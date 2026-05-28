@@ -1,0 +1,345 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// === ENUMS ===
+
+enum UserRole {
+  CUSTOMER
+  FARMER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING_CONFIRMATION // bei Vor-Ort-Zahlung: warten auf E-Mail-Bestätigung
+  PAID                 // bei Online-Zahlung: bezahlt
+  CONFIRMED            // bei Vor-Ort-Zahlung: bestätigt, wartet auf Bauer
+  IN_PREPARATION       // Bauer kommissioniert
+  READY                // bereit zur Abholung
+  PICKED_UP            // abgeholt (bei Vor-Ort-Zahlung: + bezahlt)
+  CANCELLED            // storniert
+  NOT_PICKED_UP        // nicht abgeholt nach Frist
+}
+
+enum PaymentMethod {
+  ONLINE       // Stripe
+  ONSITE_CASH  // Bar bei Abholung
+  ONSITE_CARD  // Karte bei Abholung
+}
+
+enum PaymentStatus {
+  PENDING   // noch nicht bezahlt
+  PAID      // bezahlt
+  FAILED    // fehlgeschlagen
+  REFUNDED  // zurückerstattet
+}
+
+enum SalesChannel {
+  PLATFORM  // automatisch über die Plattform
+  WHATSAPP  // manuell eingetragen
+  HOFLADEN  // manuell eingetragen
+  MARKT     // manuell eingetragen
+  BUSINESS  // Geschäftskunde
+  OTHER     // sonstiges
+}
+
+enum ProductUnit {
+  STUECK
+  KG
+  G
+  LITER
+  ML
+  M3
+  PAKET
+}
+
+// === ENTITÄTEN ===
+
+model User {
+  id            String   @id
+  email         String   @unique
+  name          String?
+  phone         String?
+  image         String?
+  role          UserRole @default(CUSTOMER)
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  farm     Farm?
+  orders   Order[]
+  sessions Session[]
+  accounts Account[]
+
+  @@index([email])
+}
+
+// === BETTER AUTH TABELLEN ===
+
+model Session {
+  id        String   @id
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+model Account {
+  id                    String    @id
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?   @db.Text
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, providerId])
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String   @db.Text
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+model Farm {
+  id          String  @id @default(cuid())
+  slug        String  @unique // für URL: /hof-mueller
+  name        String
+  ownerName   String
+  description String  @db.Text
+  address     String
+  postalCode  String
+  city        String
+  phone       String
+  email       String
+  logoUrl     String?
+  bannerUrl   String?
+
+  // Stripe Connect
+  stripeAccountId    String?  @unique
+  stripeAccountReady Boolean  @default(false)
+
+  // Zahlungsoptionen
+  acceptsOnline      Boolean  @default(true)
+  acceptsOnsite      Boolean  @default(true)
+  onsiteMaxAmount    Decimal? @db.Decimal(10, 2)
+  hasRegistrierkasse Boolean  @default(false)
+
+  // Plattform-Konfiguration
+  platformFeePercent Decimal @default(0) @db.Decimal(5, 2) // im Pilot: 0
+
+  // Status
+  isActive     Boolean @default(true)
+  isPaused     Boolean @default(false)
+  pauseMessage String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  owner       User         @relation(fields: [ownerId], references: [id])
+  ownerId     String       @unique
+  products    Product[]
+  orders      Order[]
+  pickupSlots PickupSlot[]
+  manualSales ManualSale[]
+
+  @@index([slug])
+}
+
+model Product {
+  id          String      @id @default(cuid())
+  farmId      String
+  name        String
+  description String?     @db.Text
+  imageUrl    String?
+  price       Decimal     @db.Decimal(10, 2)
+  vatRate     Decimal     @default(10) @db.Decimal(5, 2) // 10% Standard für Lebensmittel AT
+  unit        ProductUnit
+  unitSize    Decimal?    @db.Decimal(10, 3) // z.B. 0.5 für 500g
+  stock       Int         @default(0)
+  reservedStock Int       @default(0)
+  isAvailable Boolean     @default(true)
+
+  // Lebensmittel-spezifisch
+  allergens       String[] @default([])
+  isOrganic       Boolean  @default(false)
+  requiresCool    Boolean  @default(false)
+  requiresFreezer Boolean  @default(false)
+
+  // Saisonalität
+  seasonStart Int? // Monat 1-12
+  seasonEnd   Int?
+
+  // Inaktiv-Grund
+  unavailableReason String? // z.B. "Saison vorbei, wieder ab November"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  farm        Farm        @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  orderItems  OrderItem[]
+  manualSales ManualSale[]
+
+  @@index([farmId])
+  @@index([isAvailable])
+}
+
+model PickupSlot {
+  id         String  @id @default(cuid())
+  farmId     String
+  dayOfWeek  Int     // 0=Sonntag, 1=Montag, ..., 6=Samstag
+  startTime  String  // "14:00"
+  endTime    String  // "16:00"
+  maxOrders  Int?    // null = unbegrenzt
+  isActive   Boolean @default(true)
+
+  farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@index([farmId])
+}
+
+model Order {
+  id          String @id @default(cuid())
+  orderNumber String @unique // z.B. HM-2611-A4F2
+
+  farmId     String
+  customerId String? // null bei reinem Gast
+
+  // Kundendaten (auch redundant gespeichert für Gäste)
+  customerEmail String
+  customerName  String
+  customerPhone String
+  customerNote  String? @db.Text
+
+  // Bestellung
+  status      OrderStatus @default(PENDING_CONFIRMATION)
+  totalAmount Decimal     @db.Decimal(10, 2)
+
+  // Abholung
+  pickupDate      DateTime
+  pickupTimeStart String    // "14:00"
+  pickupTimeEnd   String    // "16:00"
+  pickedUpAt      DateTime?
+
+  // Zahlung
+  paymentMethod         PaymentMethod
+  paymentStatus         PaymentStatus @default(PENDING)
+  stripePaymentIntentId String?       @unique
+  paidAt                DateTime?
+
+  // Vor-Ort-Bestätigung
+  confirmationToken String?   @unique // für E-Mail-Link
+  confirmedAt       DateTime?
+
+  // Plattformgebühr (für Reporting)
+  platformFeeAmount Decimal @default(0) @db.Decimal(10, 2)
+
+  // Storno
+  cancelledAt  DateTime?
+  cancelReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  farm     Farm       @relation(fields: [farmId], references: [id])
+  customer User?      @relation(fields: [customerId], references: [id])
+  items    OrderItem[]
+
+  @@index([farmId])
+  @@index([customerEmail])
+  @@index([status])
+  @@index([pickupDate])
+}
+
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+
+  // Snapshot zum Bestellzeitpunkt
+  productId   String
+  productName String
+  unitPrice   Decimal @db.Decimal(10, 2)
+  quantity    Int
+  totalPrice  Decimal @db.Decimal(10, 2)
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+}
+
+model ManualSale {
+  id     String @id @default(cuid())
+  farmId String
+
+  // Produkt (optional aus Katalog)
+  productId   String?
+  productName String      // Pflichtfeld, da Produkt optional
+  quantity    Decimal     @db.Decimal(10, 3)
+  unit        ProductUnit?
+  totalAmount Decimal     @db.Decimal(10, 2)
+
+  // Kontext
+  channel  SalesChannel
+  saleDate DateTime     @default(now())
+  note     String?      @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  farm    Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id])
+
+  @@index([farmId])
+  @@index([saleDate])
+  @@index([channel])
+}
+
+model StockReservation {
+  id        String   @id @default(cuid())
+  productId String
+  sessionId String
+  quantity  Int
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([productId, sessionId])
+  @@index([expiresAt])
+}
+
+model WebhookEvent {
+  id             String   @id @default(cuid())
+  stripeEventId  String   @unique
+  type           String
+  createdAt      DateTime @default(now())
+
+  @@index([stripeEventId])
+}
