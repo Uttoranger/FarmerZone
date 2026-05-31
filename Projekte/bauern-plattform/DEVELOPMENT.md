@@ -28,7 +28,7 @@ Prisma 7 · PostgreSQL 16 (Supabase) · Better Auth · Stripe Connect · Resend 
 
 ## Aktueller Stand
 
-**Sprint 4 abgeschlossen** — Manuelle Verkaufserfassung (/sales) + Auswertungs-Dashboard (/analytics)
+**Sprint 5 abgeschlossen** — Öffentliche Hof-Seite mit Warenkorb und Stock-Reservierung
 
 ---
 
@@ -87,10 +87,17 @@ Prisma 7 · PostgreSQL 16 (Supabase) · Better Auth · Stripe Connect · Resend 
 - [x] Top-5-Produkte mit Fortschrittsbalken (aus Bestellungen + manuellen Verkäufen)
 - [x] Automatischer Insight-Text (z.B. Bestseller, Kanal-Tipp)
 
-### Sprint 6: Öffentliche Hof-Seite (Tag 6)
-- [ ] `/[farmSlug]` als Server Component mit ISR (revalidate: 60)
-- [ ] Produkt-Grid (2 cols mobile, 4 cols desktop)
-- [ ] Warenkorb in localStorage + Sticky Cart Button
+### Sprint 5: Öffentliche Hof-Seite + Warenkorb (Tag 6) ✅
+- [x] `/[farmSlug]` Server Component mit ISR (revalidate: 60), 404 + Pausiert-Screen
+- [x] generateMetadata mit OpenGraph + Schema.org LocalBusiness JSON-LD
+- [x] Banner, Header, Über-uns, Abholzeiten, Zahlungsarten, Kontakt
+- [x] Produkt-Grid: 2 cols mobil / 3–4 cols Desktop, Bio-Badge, Lager-Icons, Saisonalität
+- [x] "Ausverkauft"- und "Nicht verfügbar"-State mit unavailableReason
+- [x] Warenkorb in localStorage (farmId-spezifisch, Session-ID für Reservierungen)
+- [x] Pessimistisches Stock-Reservierungssystem (/api/reserve, 15 min TTL)
+- [x] Sticky Cart-Button (erscheint nach erstem Produkt), Cart-Sheet mit Mengensteuerung
+- [x] Cron-Job /api/cron/cleanup-reservations + vercel.json (alle 5 Minuten)
+- [x] Impressum + Datenschutz Platzhalter-Seiten
 
 ### Sprint 7: Checkout & Stock-Reservierung (Tag 7)
 - [ ] Checkout-Seite mit Zod-Validierung
@@ -164,4 +171,4 @@ pnpm db:generate      # Prisma Client generieren
 
 ---
 
-*Zuletzt aktualisiert: 2026-05-31 — Sprint 4 abgeschlossen*
+*Zuletzt aktualisiert: 2026-05-31 — Sprint 5 abgeschlossen*
