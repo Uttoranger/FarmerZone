@@ -28,7 +28,7 @@ Prisma 7 · PostgreSQL 16 (Supabase) · Better Auth · Stripe Connect · Resend 
 
 ## Aktueller Stand
 
-**Sprint 2 abgeschlossen** — Auth, Middleware, Farmer-Layout und Dashboard fertig
+**Sprint 4 abgeschlossen** — Manuelle Verkaufserfassung (/sales) + Auswertungs-Dashboard (/analytics)
 
 ---
 
@@ -65,20 +65,27 @@ Prisma 7 · PostgreSQL 16 (Supabase) · Better Auth · Stripe Connect · Resend 
 - [x] DB-Migration: Session/Account/Verification-Tabellen angelegt, passwordHash entfernt
 - [x] Seed: Bauer-User über Better Auth `signUpEmail()` angelegt (mit Passwort-Hash in Account)
 
-### Sprint 3: Produktverwaltung (Tag 3)
-- [ ] `/products` Liste, anlegen, bearbeiten (Modal)
-- [ ] Foto-Upload mit Vercel Blob
-- [ ] Quick-Bestandsanpassung (+5/+10/+20)
+### Sprint 3: Produktverwaltung (Tag 3) ✅
+- [x] `/products` Liste mit Status-Badge (Aktiv/Ausverkauft/Pausiert), Foto, Preis
+- [x] Produkt anlegen/bearbeiten als Dialog (react-hook-form + Zod, alle Felder)
+- [x] 14 EU-Allergene als Toggle-Buttons, Saisonalität, Eigenschaften (Bio/Kühlung/TK)
+- [x] Foto-Upload via `/api/upload` → Vercel Blob (graceful wenn Token fehlt)
+- [x] Quick-Bestand-Buttons +5/+10/+20 direkt in der Liste (optimistic update)
+- [x] StockDialog: Schnellbuttons + Direkteingabe + Setzen
+- [x] Server Actions: createProduct, updateProduct, updateStock, setStock, deleteProduct
+- [x] Löschen mit Bestätigungsdialog
+- [x] Zod-Validierung + Ownership-Check in allen Actions
 
-### Sprint 4: Manuelle Verkaufserfassung (Tag 4)
-- [ ] `/sales` mit Schnellauswahl-Buttons und Formular
-- [ ] Server Action `createManualSale` mit Zod-Validierung
-- [ ] Liste der letzten 20 Verkäufe mit Edit/Delete
-
-### Sprint 5: Auswertungs-Dashboard (Tag 5)
-- [ ] `/analytics` mit Recharts-Charts
-- [ ] Umsatz nach Kanal (Plattform/WhatsApp/Hofladen/Markt)
-- [ ] Top-5-Produkte-Liste
+### Sprint 4: Manuelle Verkaufserfassung + Analytics (Tag 4+5) ✅
+- [x] `/sales` mit Schnellwiederholung (letzte 4 Verkäufe als One-Click-Buttons)
+- [x] SaleDialog: Produkt-Dropdown + "Sonstiges", Betrag, Menge, Kanal-Buttons, Datum, Notiz
+- [x] Server Actions: createManualSale, updateManualSale, deleteManualSale (Zod + Ownership)
+- [x] Liste der letzten 20 Verkäufe mit Inline-Edit und Löschen
+- [x] `/analytics` mit Zeitraum-Wahl (Woche/Monat/Quartal/Jahr via URL-Param)
+- [x] Gesamtumsatz mit % Vergleich zur Vorperiode + Trendpfeil
+- [x] Horizontales Recharts BarChart (Umsatz nach Kanal, mobile-optimiert)
+- [x] Top-5-Produkte mit Fortschrittsbalken (aus Bestellungen + manuellen Verkäufen)
+- [x] Automatischer Insight-Text (z.B. Bestseller, Kanal-Tipp)
 
 ### Sprint 6: Öffentliche Hof-Seite (Tag 6)
 - [ ] `/[farmSlug]` als Server Component mit ISR (revalidate: 60)
@@ -157,4 +164,4 @@ pnpm db:generate      # Prisma Client generieren
 
 ---
 
-*Zuletzt aktualisiert: 2026-05-28 — Sprint 2 abgeschlossen*
+*Zuletzt aktualisiert: 2026-05-31 — Sprint 4 abgeschlossen*
