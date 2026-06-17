@@ -28,7 +28,7 @@ Prisma 7 · PostgreSQL 16 (Supabase) · Better Auth · Stripe Connect · Resend 
 
 ## Aktueller Stand
 
-**Sprint 5 abgeschlossen** — Öffentliche Hof-Seite mit Warenkorb und Stock-Reservierung
+**Sprint 6 abgeschlossen** — Stripe Connect, Checkout-Flow, Vor-Ort-Bestätigung, Webhook-Handler
 
 ---
 
@@ -99,10 +99,24 @@ Prisma 7 · PostgreSQL 16 (Supabase) · Better Auth · Stripe Connect · Resend 
 - [x] Cron-Job /api/cron/cleanup-reservations + vercel.json (alle 5 Minuten)
 - [x] Impressum + Datenschutz Platzhalter-Seiten
 
-### Sprint 7: Checkout & Stock-Reservierung (Tag 7)
-- [ ] Checkout-Seite mit Zod-Validierung
-- [ ] Slot-Auswahl, Stock-Reservierung mit Pessimistic Lock
-- [ ] Cron Job für Reservation-Cleanup
+### Sprint 6: Stripe Connect + Checkout + Vor-Ort-Zahlung (Tag 6+7) ✅
+- [x] `src/lib/stripe.ts` — Stripe-Singleton (Server), `getStripePublishableKey()`
+- [x] `src/lib/email.ts` — Resend-Wrapper mit Fallback-Logging + HTML-Templates
+- [x] Stripe Connect Express-Onboarding: `createConnectAccount`, `createOnboardingLink`, `checkConnectStatus`
+- [x] `/settings` — Übersicht mit Navigation zu Unterbereichen
+- [x] `/settings/payments` — Stripe-Status-Anzeige, Onboarding-Button, Return-Handler
+- [x] `/api/stripe/return` — Callback nach Onboarding, setzt `stripeAccountReady`
+- [x] `/[farmSlug]/checkout` — Server Component mit `CheckoutForm`-Client
+  - Warenkorb-Übersicht aus localStorage
+  - Abholtermin-Auswahl (nächste 14 Tage, basierend auf PickupSlots)
+  - Kundendaten (Name, Email, Telefon, Notiz)
+  - Zahlungsart-Auswahl (Online / Bar / Karte, nur was Farm akzeptiert)
+  - Pflicht-Checkbox bei Vor-Ort-Zahlung
+- [x] Stripe Elements — `StripePaymentStep` mit `PaymentElement` + `confirmPayment`
+- [x] `/api/checkout` — Pessimistischer Stock-Lock, Order-Erstellung, PaymentIntent (ONLINE) oder Bestätigungsmail (ONSITE)
+- [x] `/api/orders/confirm/[token]` — Vor-Ort-Bestätigung per E-Mail-Link → `CONFIRMED`
+- [x] `/api/stripe/webhook` — Signatur-Verifikation, Idempotenz via WebhookEvent, `payment_intent.succeeded` → `PAID` + Mails, `payment_intent.payment_failed` → `CANCELLED` + Stock-Restore
+- [x] `/[farmSlug]/confirm/[orderId]` — Bestätigungsseite (Online bezahlt / Vor-Ort bestätigt / pending / fehlgeschlagen)
 
 ### Sprint 8: Stripe-Integration (Tag 8)
 - [ ] Stripe Connect Onboarding für Bauer
@@ -171,4 +185,4 @@ pnpm db:generate      # Prisma Client generieren
 
 ---
 
-*Zuletzt aktualisiert: 2026-05-31 — Sprint 5 abgeschlossen*
+*Zuletzt aktualisiert: 2026-06-08 — Sprint 6 abgeschlossen*
