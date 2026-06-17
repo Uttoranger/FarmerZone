@@ -40,6 +40,7 @@ export type PublicFarm = {
   bannerUrl: string | null
   acceptsOnline: boolean
   acceptsOnsite: boolean
+  stripeAccountReady: boolean
   isPaused: boolean
   pauseMessage: string | null
   products: PublicProduct[]
@@ -64,6 +65,7 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
       bannerUrl: true,
       acceptsOnline: true,
       acceptsOnsite: true,
+      stripeAccountReady: true,
       isPaused: true,
       pauseMessage: true,
       products: {
