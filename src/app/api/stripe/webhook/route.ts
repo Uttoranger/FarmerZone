@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import type Stripe from 'stripe'
 import { stripe } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
-import { sendEmail, orderConfirmationHtml, farmerNotificationHtml } from '@/lib/email'
+import { sendOrderConfirmation, sendOrderPaidToFarmer } from '@/lib/email'
 
 // Next.js App Router does not pre-parse the body — raw text needed for Stripe sig verification
 export async function POST(request: NextRequest) {
@@ -59,8 +59,17 @@ async function handlePaymentSucceeded(pi: Stripe.PaymentIntent) {
   const order = await prisma.order.findUnique({
     where: { stripePaymentIntentId: pi.id },
     include: {
-      farm: { select: { slug: true, name: true, email: true, ownerName: true } },
-      items: { select: { productName: true, quantity: true, unitPrice: true } },
+      farm: {
+        select: {
+          name: true, slug: true, email: true, ownerName: true,
+          address: true, postalCode: true, city: true, phone: true,
+        },
+      },
+      items: {
+        select: {
+          productName: true, quantity: true, unitPrice: true, totalPrice: true,
+        },
+      },
     },
   })
 
@@ -74,47 +83,23 @@ async function handlePaymentSucceeded(pi: Stripe.PaymentIntent) {
     data: { status: 'PAID', paymentStatus: 'PAID', paidAt: new Date() },
   })
 
-  const pickupDate = order.pickupDate.toLocaleDateString('de-AT', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
-  const pickupTime = `${order.pickupTimeStart}–${order.pickupTimeEnd}`
+  const emailOrder = {
+    orderNumber: order.orderNumber,
+    customerName: order.customerName,
+    customerEmail: order.customerEmail,
+    customerPhone: order.customerPhone,
+    totalAmount: order.totalAmount,
+    pickupDate: order.pickupDate,
+    pickupTimeStart: order.pickupTimeStart,
+    pickupTimeEnd: order.pickupTimeEnd,
+    paymentMethod: order.paymentMethod,
+    stripePaymentIntentId: order.stripePaymentIntentId,
+    farm: order.farm,
+    items: order.items,
+  }
 
-  await sendEmail({
-    to: order.customerEmail,
-    subject: `Zahlung erfolgreich — Bestellung ${order.orderNumber}`,
-    html: orderConfirmationHtml({
-      customerName: order.customerName,
-      orderNumber: order.orderNumber,
-      farmName: order.farm.name,
-      pickupDate,
-      pickupTime,
-      items: order.items.map((i) => ({
-        name: i.productName,
-        quantity: i.quantity,
-        unitPrice: Number(i.unitPrice),
-      })),
-      total: Number(order.totalAmount),
-      isOnline: true,
-    }),
-  })
-
-  await sendEmail({
-    to: order.farm.email,
-    subject: `Bezahlte Bestellung ${order.orderNumber} eingegangen`,
-    html: farmerNotificationHtml({
-      farmerName: order.farm.ownerName,
-      customerName: order.customerName,
-      orderNumber: order.orderNumber,
-      pickupDate,
-      pickupTime,
-      items: order.items.map((i) => ({ name: i.productName, quantity: i.quantity })),
-      total: Number(order.totalAmount),
-      paymentLabel: 'Online (bereits bezahlt)',
-    }),
-  })
+  await sendOrderConfirmation(emailOrder)
+  await sendOrderPaidToFarmer(emailOrder)
 }
 
 async function handlePaymentFailed(pi: Stripe.PaymentIntent) {

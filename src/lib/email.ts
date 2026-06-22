@@ -1,100 +1,234 @@
+import 'server-only'
+import * as React from 'react'
+import { render } from '@react-email/render'
 import { Resend } from 'resend'
+import { OrderConfirmationEmail } from '@/emails/order-confirmation'
+import { OnsiteConfirmationEmail } from '@/emails/onsite-confirmation'
+import { NewOrderNotificationEmail } from '@/emails/new-order-notification'
+import { OrderConfirmedEmail } from '@/emails/order-confirmed'
+import { OrderReadyEmail } from '@/emails/pickup-reminder'
+import { OrderCancelledEmail } from '@/emails/order-cancelled'
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
-const FROM = 'Bauernshop <noreply@bauernshop.at>'
+const apiKey = process.env.RESEND_API_KEY
+const resend = apiKey ? new Resend(apiKey) : null
+const FROM = process.env.EMAIL_FROM ?? 'onboarding@resend.dev'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
-type SendEmailParams = {
-  to: string
-  subject: string
-  html: string
+// Einmal beim Serverstart loggen damit man im Terminal sieht ob der Key gelesen wurde
+console.log(`[E-Mail] Init — RESEND_API_KEY=${apiKey ? `gesetzt (${apiKey.slice(0, 8)}…)` : 'FEHLT → nur Log-Modus'} FROM=${FROM}`)
+
+async function toHtml(element: React.ReactElement): Promise<string> {
+  return render(element)
 }
 
-export async function sendEmail({ to, subject, html }: SendEmailParams): Promise<void> {
+export async function sendRaw(to: string, subject: string, html: string): Promise<{ id?: string; error?: string }> {
   if (!resend) {
-    console.log(`[E-Mail würde gesendet werden an ${to}] Betreff: ${subject}`)
-    return
+    console.log(`[E-Mail] KEIN API-KEY — würde senden: "${subject}" → ${to}`)
+    return { error: 'RESEND_API_KEY nicht gesetzt' }
   }
-  await resend.emails.send({ from: FROM, to, subject, html })
+  console.log(`[E-Mail] Sende: "${subject}" → ${to} (from: ${FROM})`)
+  try {
+    const result = await resend.emails.send({ from: FROM, to, subject, html })
+    if (result.error) {
+      console.error(`[E-Mail] Resend-Fehler: ${JSON.stringify(result.error)}`)
+      return { error: JSON.stringify(result.error) }
+    }
+    console.log(`[E-Mail] ✓ Gesendet, ID: ${result.data?.id}`)
+    return { id: result.data?.id }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`[E-Mail] Exception: ${msg}`)
+    return { error: msg }
+  }
 }
 
-export function orderConfirmationHtml(p: {
-  customerName: string
-  orderNumber: string
-  farmName: string
-  pickupDate: string
-  pickupTime: string
-  items: Array<{ name: string; quantity: number; unitPrice: number }>
-  total: number
-  isOnline: boolean
-}): string {
-  const rows = p.items
-    .map(
-      (i) =>
-        `<tr><td style="padding:4px 8px">${i.name}</td><td style="padding:4px 8px;text-align:center">${i.quantity}×</td><td style="padding:4px 8px;text-align:right">€ ${i.unitPrice.toFixed(2)}</td></tr>`
-    )
-    .join('')
-  return `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-  <h1 style="color:#15803d;margin-bottom:8px">Bestellbestätigung ✓</h1>
-  <p>Hallo <strong>${p.customerName}</strong>,</p>
-  <p>deine Bestellung <strong>${p.orderNumber}</strong> bei <strong>${p.farmName}</strong> wurde ${p.isOnline ? 'erfolgreich bezahlt' : 'bestätigt'}.</p>
-  <h3 style="margin-bottom:4px">📅 Abholtermin</h3>
-  <p style="margin-top:0">${p.pickupDate} &nbsp;|&nbsp; ${p.pickupTime} Uhr</p>
-  <h3 style="margin-bottom:4px">Bestellübersicht</h3>
-  <table style="width:100%;border-collapse:collapse;font-size:14px">
-    <thead><tr style="background:#f1f5f9"><th align="left" style="padding:6px 8px">Produkt</th><th style="padding:6px 8px">Menge</th><th style="padding:6px 8px;text-align:right">Preis</th></tr></thead>
-    <tbody>${rows}</tbody>
-    <tfoot><tr style="border-top:2px solid #e2e8f0"><td colspan="2" style="padding:6px 8px"><strong>Gesamt</strong></td><td style="padding:6px 8px;text-align:right"><strong>€ ${p.total.toFixed(2)}</strong></td></tr></tfoot>
-  </table>
-  <p style="margin-top:20px;color:#64748b;font-size:13px">Bei Fragen wende dich bitte direkt an den Hof.</p>
-</div>`
+async function send(to: string, subject: string, html: string): Promise<void> {
+  await sendRaw(to, subject, html)
 }
 
-export function onsiteConfirmationEmailHtml(p: {
-  customerName: string
-  orderNumber: string
-  farmName: string
-  confirmationUrl: string
-  pickupDate: string
-  pickupTime: string
-}): string {
-  return `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-  <h1 style="color:#15803d;margin-bottom:8px">Bestellung verbindlich bestätigen</h1>
-  <p>Hallo <strong>${p.customerName}</strong>,</p>
-  <p>du hast eine Bestellung (<strong>${p.orderNumber}</strong>) bei <strong>${p.farmName}</strong> aufgegeben.</p>
-  <p>Abholung: <strong>${p.pickupDate}</strong> &nbsp;|&nbsp; <strong>${p.pickupTime} Uhr</strong></p>
-  <p style="margin-top:16px">Bitte klicke auf den Button, um deine Bestellung verbindlich zu bestätigen:</p>
-  <a href="${p.confirmationUrl}"
-     style="display:inline-block;background:#15803d;color:white;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:bold;margin:8px 0">
-    Bestellung bestätigen →
-  </a>
-  <p style="margin-top:20px;color:#94a3b8;font-size:12px">
-    Wenn du diese Bestellung nicht aufgegeben hast, ignoriere diese E-Mail. Der Link läuft nach 48 Stunden ab.
-  </p>
-</div>`
+function formatPickupDate(date: Date): string {
+  return date.toLocaleDateString('de-AT', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  })
 }
 
-export function farmerNotificationHtml(p: {
-  farmerName: string
-  customerName: string
+// ─── Typen ────────────────────────────────────────────────────────────────────
+
+export type OrderForEmail = {
   orderNumber: string
-  pickupDate: string
-  pickupTime: string
-  items: Array<{ name: string; quantity: number }>
-  total: number
-  paymentLabel: string
-}): string {
-  const list = p.items.map((i) => `<li>${i.name} × ${i.quantity}</li>`).join('')
-  return `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-  <h1 style="color:#15803d;margin-bottom:8px">🛒 Neue Bestellung eingegangen!</h1>
-  <p>Hallo <strong>${p.farmerName}</strong>,</p>
-  <p>du hast eine neue Bestellung von <strong>${p.customerName}</strong> erhalten.</p>
-  <table style="width:100%;font-size:14px;border-collapse:collapse">
-    <tr><td style="padding:4px 0;color:#64748b">Bestellnummer</td><td><strong>${p.orderNumber}</strong></td></tr>
-    <tr><td style="padding:4px 0;color:#64748b">Abholung</td><td>${p.pickupDate} | ${p.pickupTime} Uhr</td></tr>
-    <tr><td style="padding:4px 0;color:#64748b">Zahlung</td><td>${p.paymentLabel}</td></tr>
-    <tr><td style="padding:4px 0;color:#64748b">Gesamt</td><td><strong>€ ${p.total.toFixed(2)}</strong></td></tr>
-  </table>
-  <h3 style="margin-top:16px;margin-bottom:4px">Bestellte Produkte:</h3>
-  <ul style="margin:0;padding-left:20px">${list}</ul>
-</div>`
+  customerName: string
+  customerEmail: string
+  customerPhone: string
+  totalAmount: { toString(): string } | number
+  pickupDate: Date
+  pickupTimeStart: string
+  pickupTimeEnd: string
+  paymentMethod: string
+  stripePaymentIntentId?: string | null
+  farm: {
+    name: string
+    email: string
+    ownerName: string
+    address: string
+    city: string
+    postalCode: string
+    phone: string
+    slug: string
+  }
+  items: Array<{
+    productName: string
+    quantity: number
+    unitPrice: { toString(): string } | number
+    totalPrice?: { toString(): string } | number
+  }>
+}
+
+function n(v: { toString(): string } | number): number {
+  return typeof v === 'number' ? v : Number(v.toString())
+}
+
+// ─── Send-Funktionen ──────────────────────────────────────────────────────────
+
+/** Online-Zahlung bestätigt → Kunde */
+export async function sendOrderConfirmation(order: OrderForEmail): Promise<void> {
+  const html = await toHtml(React.createElement(OrderConfirmationEmail, {
+    customerName: order.customerName,
+    orderNumber: order.orderNumber,
+    farmName: order.farm.name,
+    farmPhone: order.farm.phone,
+    farmAddress: order.farm.address,
+    farmCity: order.farm.city,
+    pickupDate: formatPickupDate(order.pickupDate),
+    pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
+    items: order.items.map(i => ({
+      name: i.productName,
+      quantity: i.quantity,
+      unitPrice: n(i.unitPrice),
+    })),
+    total: n(order.totalAmount),
+  }))
+
+  await send(
+    order.customerEmail,
+    `Deine Bestellung bei ${order.farm.name} – Abholung ${formatPickupDate(order.pickupDate)}`,
+    html
+  )
+}
+
+/** Vor-Ort-Zahlung: Bestätigungslink → Kunde */
+export async function sendOnsiteConfirmation(
+  order: OrderForEmail,
+  confirmationToken: string
+): Promise<void> {
+  const confirmationUrl = `${APP_URL}/api/orders/confirm/${confirmationToken}`
+
+  const html = await toHtml(React.createElement(OnsiteConfirmationEmail, {
+    customerName: order.customerName,
+    orderNumber: order.orderNumber,
+    farmName: order.farm.name,
+    farmAddress: order.farm.address,
+    farmCity: order.farm.city,
+    pickupDate: formatPickupDate(order.pickupDate),
+    pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
+    items: order.items.map(i => ({
+      name: i.productName,
+      quantity: i.quantity,
+      unitPrice: n(i.unitPrice),
+    })),
+    total: n(order.totalAmount),
+    confirmationUrl,
+  }))
+
+  await send(
+    order.customerEmail,
+    `Bitte bestätige deine Bestellung bei ${order.farm.name}`,
+    html
+  )
+}
+
+/** Online-Zahlung → Bauer */
+export async function sendOrderPaidToFarmer(order: OrderForEmail): Promise<void> {
+  const html = await toHtml(React.createElement(NewOrderNotificationEmail, {
+    farmerName: order.farm.ownerName,
+    customerName: order.customerName,
+    customerPhone: order.customerPhone,
+    orderNumber: order.orderNumber,
+    pickupDate: formatPickupDate(order.pickupDate),
+    pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
+    items: order.items.map(i => ({ name: i.productName, quantity: i.quantity })),
+    total: n(order.totalAmount),
+    paymentLabel: 'Online (bereits bezahlt)',
+    isOnline: true,
+    dashboardUrl: `${APP_URL}/orders`,
+  }))
+
+  await send(
+    order.farm.email,
+    `Neue Bestellung für ${formatPickupDate(order.pickupDate)} – ${order.orderNumber}`,
+    html
+  )
+}
+
+/** Vor-Ort bestätigt → Bauer */
+export async function sendOrderConfirmedToFarmer(order: OrderForEmail): Promise<void> {
+  const paymentLabel =
+    order.paymentMethod === 'ONSITE_CASH' ? 'Bar bei Abholung' : 'Karte bei Abholung'
+
+  const html = await toHtml(React.createElement(OrderConfirmedEmail, {
+    farmerName: order.farm.ownerName,
+    customerName: order.customerName,
+    customerPhone: order.customerPhone,
+    orderNumber: order.orderNumber,
+    pickupDate: formatPickupDate(order.pickupDate),
+    pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
+    items: order.items.map(i => ({ name: i.productName, quantity: i.quantity })),
+    total: n(order.totalAmount),
+    dashboardUrl: `${APP_URL}/orders`,
+  }))
+
+  await send(
+    order.farm.email,
+    `Neue Vor-Ort-Bestellung für ${formatPickupDate(order.pickupDate)} – ${order.orderNumber} (${paymentLabel})`,
+    html
+  )
+}
+
+/** Bauer markiert als bereit → Kunde */
+export async function sendOrderReady(order: OrderForEmail): Promise<void> {
+  const html = await toHtml(React.createElement(OrderReadyEmail, {
+    customerName: order.customerName,
+    orderNumber: order.orderNumber,
+    farmName: order.farm.name,
+    farmPhone: order.farm.phone,
+    farmAddress: order.farm.address,
+    farmCity: order.farm.city,
+    pickupDate: formatPickupDate(order.pickupDate),
+    pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
+  }))
+
+  await send(
+    order.customerEmail,
+    `${order.farm.name}: Deine Bestellung ist bereit zur Abholung`,
+    html
+  )
+}
+
+/** Storno → Kunde */
+export async function sendOrderCancelled(
+  order: OrderForEmail,
+  refundAmount: number | null
+): Promise<void> {
+  const html = await toHtml(React.createElement(OrderCancelledEmail, {
+    customerName: order.customerName,
+    orderNumber: order.orderNumber,
+    farmName: order.farm.name,
+    total: n(order.totalAmount),
+    refundAmount,
+  }))
+
+  await send(
+    order.customerEmail,
+    `Deine Bestellung ${order.orderNumber} wurde storniert`,
+    html
+  )
 }
