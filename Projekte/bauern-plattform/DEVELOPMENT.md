@@ -28,7 +28,7 @@ Prisma 7 · PostgreSQL 16 (Supabase) · Better Auth · Stripe Connect · Resend 
 
 ## Aktueller Stand
 
-**Sprint 6 abgeschlossen** — Stripe Connect, Checkout-Flow, Vor-Ort-Bestätigung, Webhook-Handler
+**Sprint 7 abgeschlossen** — Bestellverwaltung (Liste, Detail, Druck), react-email Templates, typisiertes E-Mail-System
 
 ---
 
@@ -118,22 +118,79 @@ Prisma 7 · PostgreSQL 16 (Supabase) · Better Auth · Stripe Connect · Resend 
 - [x] `/api/stripe/webhook` — Signatur-Verifikation, Idempotenz via WebhookEvent, `payment_intent.succeeded` → `PAID` + Mails, `payment_intent.payment_failed` → `CANCELLED` + Stock-Restore
 - [x] `/[farmSlug]/confirm/[orderId]` — Bestätigungsseite (Online bezahlt / Vor-Ort bestätigt / pending / fehlgeschlagen)
 
-### Sprint 8: Stripe-Integration (Tag 8)
-- [ ] Stripe Connect Onboarding für Bauer
-- [ ] Payment Intent + Webhook-Handler (Idempotenz via WebhookEvent)
+### Sprint 7: Bestellverwaltung & E-Mail-System (Tag 7+8) ✅
+- [x] `src/emails/_layout.tsx` — `EmailLayout` Wrapper + Style-Konstanten
+- [x] `src/emails/order-confirmation.tsx` — Bestellbestätigung für Kunden (Online-Zahlung)
+- [x] `src/emails/onsite-confirmation.tsx` — Vor-Ort-Bestätigungslink mit CTA-Button
+- [x] `src/emails/new-order-notification.tsx` — Bauer-Benachrichtigung (neue Bestellung)
+- [x] `src/emails/order-confirmed.tsx` — Bauer-Benachrichtigung (Vor-Ort bestätigt)
+- [x] `src/emails/pickup-reminder.tsx` — Kundenbenachrichtigung "Bereit zur Abholung"
+- [x] `src/emails/order-cancelled.tsx` — Storno-Mail mit optionaler Rückerstattungsinfo
+- [x] `src/lib/email.ts` — vollständig neu mit `OrderForEmail`-Typ und 6 typisierten Send-Funktionen; `renderToStaticMarkup` statt Resend-eigenes Rendering; Fehler werden geloggt ohne Server-Action-Crash
+- [x] `src/server/queries/orders.ts` — `getOrdersForFarm`, `getOrderDetail` mit Items
+- [x] `src/server/actions/orders.ts` — `markAsReady` (→ READY + Kundenmail), `markAsPickedUp`, `markAsPickedUpAndPaid`, `cancelOrder` (→ Stripe-Refund + Stock-Restore + Storno-Mail)
+- [x] `src/components/orders/order-status.ts` — `statusLabel`, `statusColor`, `paymentLabel`
+- [x] `src/components/orders/order-card.tsx` — OrderCard mit Quickactions + useTransition
+- [x] `src/components/orders/orders-client.tsx` — Filter-Tabs (Offen/Heute/Alle/Erledigt), Gruppierung nach Abholtag
+- [x] `src/components/orders/order-actions.tsx` — OrderActions für Detailseite
+- [x] `src/components/orders/print-button.tsx` — Client-Komponente für `window.print()`
+- [x] `/orders` — Bestellliste (Server Component → OrdersClient)
+- [x] `/orders/[orderId]` — Detailseite mit Kundeninfo, Abholung, Produkte, Zahlung, Aktionen
+- [x] `/orders/[orderId]/print` — Druckversion (print:hidden CSS, kein Nav auf Print)
+- [x] Webhook + Confirm-Route auf neue Email-Funktionen umgestellt
+- [x] `checkout/route.ts` auf `sendOnsiteConfirmation` umgestellt
 
-### Sprint 9: Vor-Ort-Zahlung & E-Mails (Tag 9)
-- [ ] Vor-Ort-Zahlung mit Bestätigungs-Token per E-Mail
-- [ ] react-email Templates (3 Stück)
-
-### Sprint 10: Bestellübersicht & Bestätigungsseite (Tag 10)
-- [ ] `/orders` für Bauer (Gruppierung, Status-Übergänge)
-- [ ] `/[farmSlug]/confirm/[orderId]` für Kunden
-
-### Sprint 11: Polish & Deployment
+### Sprint 8: Polish & Deployment
 - [ ] Impressum, Datenschutz
 - [ ] Mobile-Optimierung prüfen
 - [ ] Vercel Deployment, Domain
+
+---
+
+## Bekannte Bugs & Fixes
+
+### BUG: Status-Inkonsistenz bei Online-Zahlungen (behoben 2026-06-22)
+
+**Symptom:** Order HM-2206-E3CC zeigte `status=PENDING_CONFIRMATION` + `paymentLabel="Online bezahlt"` — optisch widersprüchlich.
+
+**Root Cause (2 Probleme):**
+
+1. **Stripe-Webhook erreicht localhost nicht** — Im lokalen Dev ohne `stripe listen` kann Stripe den `/api/stripe/webhook` Endpunkt nicht erreichen. Der `payment_intent.succeeded`-Event wird zwar von Stripe ausgelöst, landet aber nie beim Dev-Server. Die Bestellung bleibt dadurch auf `PENDING_CONFIRMATION` + `payStatus=PENDING` stecken, obwohl die Zahlung bei Stripe erfolgreich war.
+
+2. **Irreführendes Label** — `paymentLabel('ONLINE')` gab "Online bezahlt" zurück, was fälschlicherweise impliziert, die Zahlung sei bereits eingegangen. Das Label zeigt die Zahlungsmethode, nicht den Zahlungsstatus.
+
+**Fixes:**
+- `src/components/orders/order-status.ts`: `paymentLabel('ONLINE')` → "Online (Stripe)" statt "Online bezahlt"
+- `scripts/fix-pending-online-orders.ts`: Einmalige Migration — prüft alle ONLINE-Orders mit `payStatus=PENDING` gegen Stripe-API und setzt auf PAID wenn `pi.status === 'succeeded'`. **4 Bestellungen korrigiert** (HM-1506-5874, HM-1706-F081, HM-1706-1587, HM-2206-E3CC).
+- Außerdem: Prisma `Decimal`-Serialisierung in `getOrdersForFarm`/`getOrderDetail` — werden jetzt vor dem Server→Client-Transfer auf `number` konvertiert.
+
+**Lokales Webhook-Testing — Stripe CLI einrichten:**
+
+```bash
+# 1. Stripe CLI installieren (einmalig)
+# Windows: winget install Stripe.StripeCLI
+# oder: https://stripe.com/docs/stripe-cli
+
+# 2. Einloggen
+stripe login
+
+# 3. Webhooks an localhost weiterleiten (immer vor dem Testen starten!)
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+
+# 4. Den angezeigten Webhook-Signing-Secret in .env.local setzen:
+# STRIPE_WEBHOOK_SECRET=whsec_...
+
+# 5. In einem anderen Terminal: Dev-Server starten
+pnpm dev
+
+# 6. Test-Zahlung mit Testkarte 4242 4242 4242 4242 durchführen
+# → stripe listen zeigt den Event + Response
+```
+
+**Verifizierung nach einer neuen Online-Bestellung:**
+1. `/orders` öffnen → Bestellung erscheint mit Status "Bezahlt" (PAID)
+2. Oder: `stripe listen` Terminal zeigt `payment_intent.succeeded → 200 OK`
+3. Alternativ: `pnpm exec dotenv -e .env.local -- pnpm exec tsx scripts/check-orders.ts` ausführen
 
 ---
 

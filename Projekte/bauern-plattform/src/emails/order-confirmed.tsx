@@ -1,8 +1,8 @@
 import * as React from 'react'
-import { Text, Link, Button, Hr } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton } from './_layout'
+import { Text, Link } from '@react-email/components'
+import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton, amberBox } from './_layout'
 
-export interface NewOrderNotificationProps {
+export interface OrderConfirmedProps {
   farmerName: string
   customerName: string
   customerPhone: string
@@ -11,24 +11,24 @@ export interface NewOrderNotificationProps {
   pickupTime: string
   items: Array<{ name: string; quantity: number }>
   total: number
-  paymentLabel: string
-  isOnline: boolean
   dashboardUrl: string
 }
 
-export function NewOrderNotificationEmail(p: NewOrderNotificationProps) {
+export function OrderConfirmedEmail(p: OrderConfirmedProps) {
   return (
-    <EmailLayout previewText={`Neue Bestellung ${p.orderNumber} – ${p.customerName}`}>
-      <Text style={h1}>
-        {p.isOnline ? '💳 Neue bezahlte Bestellung' : '🛒 Neue Bestellung eingegangen'}
-      </Text>
+    <EmailLayout previewText={`Vor-Ort-Bestellung ${p.orderNumber} bestätigt – ${p.customerName}`}>
+      <Text style={h1}>Vor-Ort-Bestellung bestätigt ✓</Text>
       <Text style={bodyText}>
         Hallo {p.farmerName},<br />
-        <strong>{p.customerName}</strong> hat eine Bestellung aufgegeben.
-        {p.isOnline
-          ? ' Die Zahlung wurde bereits online abgewickelt.'
-          : ` Die Zahlung (${p.paymentLabel}) erfolgt bei der Abholung.`}
+        <strong>{p.customerName}</strong> hat ihre Bestellung per E-Mail bestätigt
+        und wird zum gewählten Termin abholen.
       </Text>
+
+      <div style={amberBox}>
+        <Text style={{ ...mutedText, margin: 0, fontWeight: '600', color: '#92400e' }}>
+          💵 Zahlt vor Ort: € {p.total.toFixed(2)}
+        </Text>
+      </div>
 
       <div style={highlightBox}>
         <Text style={highlightLabel}>Abholtermin</Text>
@@ -45,14 +45,7 @@ export function NewOrderNotificationEmail(p: NewOrderNotificationProps) {
         </Text>
       ))}
 
-      <Hr style={{ borderColor: '#e2e8f0', margin: '16px 0' }} />
-      <Text style={{ ...bodyText, margin: '0 0 4px' }}>
-        <strong>Gesamtbetrag:</strong> € {p.total.toFixed(2)}
-      </Text>
-      <Text style={{ ...mutedText, margin: '0 0 4px' }}>
-        <strong>Zahlung:</strong> {p.paymentLabel}
-      </Text>
-      <Text style={mutedText}>
+      <Text style={{ ...mutedText, marginTop: '12px' }}>
         <strong>Bestellnummer:</strong> {p.orderNumber}
       </Text>
       <Text style={mutedText}>

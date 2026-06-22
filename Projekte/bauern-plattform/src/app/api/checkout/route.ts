@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { nanoid } from 'nanoid'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
-import {
-  sendEmail,
-  onsiteConfirmationEmailHtml,
-} from '@/lib/email'
+import { sendOnsiteConfirmation } from '@/lib/email'
 import { checkoutRequestSchema } from '@/schemas/checkout'
 
 function generateOrderNumber(farmSlug: string): string {
@@ -25,16 +22,6 @@ function generateOrderNumber(farmSlug: string): string {
   return `${initials}-${dd}${mm}-${suffix}`
 }
 
-function formatPickupDate(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-').map(Number)
-  const date = new Date(y, m - 1, d)
-  return date.toLocaleDateString('de-AT', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
-}
 
 export async function POST(request: NextRequest) {
   let body: unknown
@@ -189,10 +176,6 @@ export async function POST(request: NextRequest) {
     where: { sessionId: data.sessionId },
   })
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-  const pickupDateLabel = formatPickupDate(data.pickupDate)
-  const pickupTimeLabel = `${data.pickupTimeStart}–${data.pickupTimeEnd}`
-
   // 11a. ONLINE — create Stripe PaymentIntent
   if (data.paymentMethod === 'ONLINE') {
     const amountCents = Math.round(totalAmount * 100)
@@ -229,20 +212,36 @@ export async function POST(request: NextRequest) {
     data: { confirmationToken },
   })
 
-  const confirmationUrl = `${appUrl}/api/orders/confirm/${confirmationToken}`
-
-  await sendEmail({
-    to: data.customerEmail,
-    subject: `Bestellung ${orderNumber} bestätigen — ${farm.name}`,
-    html: onsiteConfirmationEmailHtml({
-      customerName: data.customerName,
+  await sendOnsiteConfirmation(
+    {
       orderNumber,
-      farmName: farm.name,
-      confirmationUrl,
-      pickupDate: pickupDateLabel,
-      pickupTime: pickupTimeLabel,
-    }),
-  })
+      customerName: data.customerName,
+      customerEmail: data.customerEmail,
+      customerPhone: data.customerPhone,
+      totalAmount,
+      pickupDate,
+      pickupTimeStart: data.pickupTimeStart,
+      pickupTimeEnd: data.pickupTimeEnd,
+      paymentMethod: data.paymentMethod,
+      farm: {
+        name: farm.name,
+        slug: farm.slug,
+        email: farm.email,
+        ownerName: farm.ownerName,
+        address: farm.address,
+        postalCode: farm.postalCode,
+        city: farm.city,
+        phone: farm.phone,
+      },
+      items: data.items.map((i) => ({
+        productName: i.name,
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+        totalPrice: i.unitPrice * i.quantity,
+      })),
+    },
+    confirmationToken
+  )
 
   return NextResponse.json({ orderId: order.id, orderNumber, requiresConfirmation: true })
 }
