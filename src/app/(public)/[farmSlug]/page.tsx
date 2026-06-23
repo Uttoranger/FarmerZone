@@ -211,6 +211,9 @@ export default async function FarmPage({ params }: Props) {
           <Link href="/datenschutz" className="hover:text-foreground transition-colors">
             Datenschutz
           </Link>
+          <Link href="/account/profile" className="hover:text-foreground transition-colors">
+            Mein Konto
+          </Link>
         </div>
       </footer>
     </div>

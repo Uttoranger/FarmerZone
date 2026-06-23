@@ -10,6 +10,8 @@ export const checkoutFormSchema = z.object({
   pickupSlotKey: z.string().min(1, 'Bitte wähle einen Abholtermin'),
   paymentMethod: z.enum(['ONLINE', 'ONSITE_CASH', 'ONSITE_CARD']),
   onsiteConfirmed: z.boolean().optional(),
+  optInEmail: z.boolean().default(false),
+  optInWhatsApp: z.boolean().default(false),
 })
 
 export type CheckoutFormData = z.infer<typeof checkoutFormSchema>
@@ -27,6 +29,8 @@ export const checkoutRequestSchema = z.object({
   pickupTimeStart: z.string().min(1),  // "HH:MM"
   pickupTimeEnd: z.string().min(1),
   paymentMethod: z.enum(['ONLINE', 'ONSITE_CASH', 'ONSITE_CARD']),
+  optInEmail: z.boolean().optional().default(false),
+  optInWhatsApp: z.boolean().optional().default(false),
   items: z
     .array(
       z.object({

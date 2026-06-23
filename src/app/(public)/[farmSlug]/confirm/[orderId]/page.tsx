@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { CheckCircle, Clock, XCircle, MapPin, Calendar, Package } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
+import { ClearCartOnMount } from '@/components/checkout/clear-cart-on-mount'
 
 interface Props {
   params: Promise<{ farmSlug: string; orderId: string }>
@@ -81,6 +82,8 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Always clear the cart when reaching the confirm page — the order has been submitted */}
+      <ClearCartOnMount />
       <div className="max-w-lg mx-auto px-4 py-10">
         {isOnlinePaid && (
           <div className="flex flex-col items-center text-center mb-8">

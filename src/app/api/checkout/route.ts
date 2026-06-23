@@ -176,6 +176,34 @@ export async function POST(request: NextRequest) {
     where: { sessionId: data.sessionId },
   })
 
+  // 10b. Newsletter opt-in — only upsert if customer explicitly opted in
+  if (data.optInEmail || data.optInWhatsApp) {
+    const email = data.customerEmail.toLowerCase()
+    const existing = await prisma.customerFarmSubscription.findUnique({
+      where: { customerEmail_farmId: { customerEmail: email, farmId: farm.id } },
+      select: { optInEmail: true, optInWhatsApp: true },
+    })
+    await prisma.customerFarmSubscription.upsert({
+      where: { customerEmail_farmId: { customerEmail: email, farmId: farm.id } },
+      create: {
+        customerEmail: email,
+        farmId: farm.id,
+        optInEmail: data.optInEmail ?? false,
+        optInWhatsApp: data.optInWhatsApp ?? false,
+        customerPhone: data.customerPhone || null,
+      },
+      update: {
+        // Only set to true — never overwrite an existing true with false from this checkout
+        ...(data.optInEmail ? { optInEmail: true } : {}),
+        ...(data.optInWhatsApp ? { optInWhatsApp: true } : {}),
+        customerPhone: data.customerPhone || null,
+        // Preserve existing opts if they were already true
+        ...(existing?.optInEmail ? { optInEmail: true } : {}),
+        ...(existing?.optInWhatsApp ? { optInWhatsApp: true } : {}),
+      },
+    })
+  }
+
   // 11a. ONLINE — create Stripe PaymentIntent
   if (data.paymentMethod === 'ONLINE') {
     const amountCents = Math.round(totalAmount * 100)

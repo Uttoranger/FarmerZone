@@ -13,13 +13,14 @@ export interface OrderConfirmationProps {
   pickupTime: string
   items: Array<{ name: string; quantity: number; unitPrice: number }>
   total: number
+  manageUrl?: string
 }
 
 export function OrderConfirmationEmail(p: OrderConfirmationProps) {
   const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(`${p.farmAddress}, ${p.farmCity}`)}`
 
   return (
-    <EmailLayout previewText={`Bestellung ${p.orderNumber} bestätigt – Abholung ${p.pickupDate}`}>
+    <EmailLayout previewText={`Bestellung ${p.orderNumber} bestätigt – Abholung ${p.pickupDate}`} manageUrl={p.manageUrl}>
       <Text style={h1}>Zahlung erfolgreich ✓</Text>
       <Text style={bodyText}>
         Hallo {p.customerName},<br />

@@ -15,9 +15,15 @@ export const auth = betterAuth({
 
   plugins: [
     magicLink({
+      expiresIn: 900, // 15 Minuten
       sendMagicLink: async ({ email, url }) => {
-        // Resend-Integration kommt in Sprint 9
-        console.log(`[DEV] Magic Link für ${email}: ${url}`)
+        try {
+          const { sendMagicLinkEmail } = await import('@/lib/email')
+          await sendMagicLinkEmail(email, url)
+        } catch (err) {
+          console.error('[Magic Link] E-Mail-Fehler:', err)
+          console.log(`[DEV] Magic Link für ${email}: ${url}`)
+        }
       },
     }),
   ],
