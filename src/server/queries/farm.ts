@@ -108,3 +108,61 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
     })),
   }
 }
+
+export type FarmSettings = {
+  id: string
+  name: string
+  ownerName: string
+  description: string
+  address: string
+  postalCode: string
+  city: string
+  phone: string
+  email: string
+  logoUrl: string | null
+  bannerUrl: string | null
+  isPaused: boolean
+  pauseMessage: string | null
+  slug: string
+  pickupSlots: Array<{
+    id: string
+    dayOfWeek: number
+    startTime: string
+    endTime: string
+    maxOrders: number | null
+    isActive: boolean
+  }>
+}
+
+export async function getFarmSettings(ownerId: string): Promise<FarmSettings | null> {
+  return prisma.farm.findUnique({
+    where: { ownerId },
+    select: {
+      id: true,
+      name: true,
+      ownerName: true,
+      description: true,
+      address: true,
+      postalCode: true,
+      city: true,
+      phone: true,
+      email: true,
+      logoUrl: true,
+      bannerUrl: true,
+      isPaused: true,
+      pauseMessage: true,
+      slug: true,
+      pickupSlots: {
+        orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+        select: {
+          id: true,
+          dayOfWeek: true,
+          startTime: true,
+          endTime: true,
+          maxOrders: true,
+          isActive: true,
+        },
+      },
+    },
+  })
+}

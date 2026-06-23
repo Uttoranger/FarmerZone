@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
   const html = `
-    <h1>Bauernshop Test-E-Mail</h1>
+    <h1>FarmerZone Test-E-Mail</h1>
     <p>Diese Mail wurde um <strong>${new Date().toLocaleString('de-AT')}</strong> gesendet.</p>
     <p><strong>RESEND_API_KEY:</strong> ${apiKey ? `gesetzt (${apiKey.slice(0, 8)}…)` : '❌ FEHLT'}</p>
     <p><strong>EMAIL_FROM:</strong> ${from}</p>
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     <p>Wenn du diese Mail siehst, funktioniert der E-Mail-Versand korrekt.</p>
   `
 
-  const result = await sendRaw(to, `Bauernshop Test-E-Mail ${new Date().toISOString()}`, html)
+  const result = await sendRaw(to, `FarmerZone Test-E-Mail ${new Date().toISOString()}`, html)
 
   return NextResponse.json({
     to,

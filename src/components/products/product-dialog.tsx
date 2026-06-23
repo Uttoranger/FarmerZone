@@ -46,15 +46,23 @@ type Props = {
   onClose: () => void
 }
 
-const EMPTY_DEFAULTS: Partial<ProductFormData> = {
+const EMPTY_DEFAULTS: ProductFormData = {
+  name: '',
+  description: '',
+  imageUrl: '',
+  price: 0,
   vatRate: 10,
   unit: 'STUECK',
+  unitSize: undefined,
   stock: 0,
   isAvailable: true,
   allergens: [],
   isOrganic: false,
   requiresCool: false,
   requiresFreezer: false,
+  seasonStart: undefined,
+  seasonEnd: undefined,
+  unavailableReason: '',
 }
 
 function toFormDefaults(p: ProductData): Partial<ProductFormData> {

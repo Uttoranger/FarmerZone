@@ -18,8 +18,8 @@ export default async function OrdersPage() {
 
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto">
-      <h1 className="text-xl font-medium text-slate-800 mb-5">Bestellungen</h1>
-      <OrdersClient orders={orders} />
+      <h1 className="text-xl font-medium text-foreground mb-5">Bestellungen</h1>
+      <OrdersClient orders={orders} farmSlug={farm.slug} />
     </div>
   )
 }

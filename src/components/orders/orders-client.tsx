@@ -18,7 +18,7 @@ function formatGroupDate(date: Date): string {
   return d.toLocaleDateString('de-AT', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
-export function OrdersClient({ orders }: { orders: FarmerOrder[] }) {
+export function OrdersClient({ orders, farmSlug }: { orders: FarmerOrder[]; farmSlug: string }) {
   const [filter, setFilter] = useState<Filter>('active')
 
   const todayStr = new Date().toDateString()
@@ -38,7 +38,6 @@ export function OrdersClient({ orders }: { orders: FarmerOrder[] }) {
     }
   }, [orders, filter, todayStr, activeSet, doneSet])
 
-  // Group by pickup date string → preserve order
   const grouped = useMemo(() => {
     const map = new Map<string, FarmerOrder[]>()
     for (const order of filtered) {
@@ -63,6 +62,8 @@ export function OrdersClient({ orders }: { orders: FarmerOrder[] }) {
     { key: 'done', label: `Erledigt (${counts.done})` },
   ]
 
+  const shopUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/${farmSlug}`
+
   return (
     <div>
       <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
@@ -70,10 +71,10 @@ export function OrdersClient({ orders }: { orders: FarmerOrder[] }) {
           <button
             key={tab.key}
             onClick={() => setFilter(tab.key)}
-            className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+            className={`shrink-0 rounded-full px-4 py-2.5 text-sm font-medium transition-colors min-h-[44px] ${
               filter === tab.key
-                ? 'bg-green-700 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground'
             }`}
           >
             {tab.label}
@@ -82,13 +83,43 @@ export function OrdersClient({ orders }: { orders: FarmerOrder[] }) {
       </div>
 
       {grouped.length === 0 ? (
-        <p className="text-slate-400 text-sm text-center py-12">Keine Bestellungen</p>
+        <div className="text-center py-16">
+          <div className="text-5xl mb-4">📬</div>
+          {filter === 'active' && orders.length === 0 ? (
+            <>
+              <p className="font-medium text-foreground mb-1">Noch keine Bestellungen</p>
+              <p className="text-sm text-muted-foreground mb-6">
+                Teile deinen Shop-Link, damit Kunden bestellen können.
+              </p>
+              <div className="inline-flex flex-col sm:flex-row gap-2 items-center">
+                <button
+                  onClick={() => {
+                    navigator.clipboard
+                      .writeText(shopUrl)
+                      .then(() => alert('Shop-Link kopiert!'))
+                      .catch(() => {})
+                  }}
+                  className="h-10 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+                >
+                  Shop-Link kopieren
+                </button>
+              </div>
+            </>
+          ) : filter === 'active' ? (
+            <>
+              <p className="font-semibold text-foreground mb-1">Alle Bestellungen erledigt! 🎉</p>
+              <p className="text-sm text-muted-foreground">Super, du hast alles abgearbeitet.</p>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">Keine Bestellungen in dieser Ansicht</p>
+          )}
+        </div>
       ) : (
         grouped.map((group) => (
           <div key={group[0].pickupDate.toISOString()} className="mb-6">
-            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
               {formatGroupDate(group[0].pickupDate)}
-              <span className="ml-2 text-slate-400 normal-case font-normal tracking-normal">
+              <span className="ml-2 text-muted-foreground/60 normal-case font-normal tracking-normal">
                 {group[0].pickupTimeStart}–{group[group.length - 1].pickupTimeEnd} Uhr
               </span>
             </h2>

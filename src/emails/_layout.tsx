@@ -11,10 +11,10 @@ import {
 } from '@react-email/components'
 
 const body: React.CSSProperties = {
-  backgroundColor: '#f8fafc',
+  backgroundColor: '#FAFAF7',
   fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
   margin: 0,
-  padding: '24px 0',
+  padding: '32px 0',
 }
 
 const container: React.CSSProperties = {
@@ -23,31 +23,62 @@ const container: React.CSSProperties = {
 }
 
 const header: React.CSSProperties = {
-  backgroundColor: '#15803d',
-  borderRadius: '12px 12px 0 0',
-  padding: '20px 24px',
+  backgroundColor: '#2D5F3F',
+  borderRadius: '20px 20px 0 0',
+  padding: '24px 28px',
+}
+
+const logoMark: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '10px',
 }
 
 const logoText: React.CSSProperties = {
   color: '#ffffff',
-  fontSize: '20px',
+  fontSize: '18px',
   fontWeight: '700',
   margin: 0,
   lineHeight: '1',
+  letterSpacing: '-0.02em',
+}
+
+const logoSub: React.CSSProperties = {
+  color: 'rgba(255,255,255,0.6)',
+  fontSize: '11px',
+  fontWeight: '500',
+  margin: '3px 0 0',
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase' as const,
 }
 
 const content: React.CSSProperties = {
   backgroundColor: '#ffffff',
-  borderRadius: '0 0 12px 12px',
-  padding: '28px 24px',
+  borderRadius: '0 0 20px 20px',
+  padding: '32px 28px',
 }
 
-const footer: React.CSSProperties = {
-  color: '#94a3b8',
-  fontSize: '12px',
+const footerWrapper: React.CSSProperties = {
   textAlign: 'center' as const,
-  marginTop: '20px',
+  marginTop: '24px',
   padding: '0 24px',
+}
+
+const footerPill: React.CSSProperties = {
+  display: 'inline-block',
+  backgroundColor: '#E8F0E8',
+  borderRadius: '100px',
+  padding: '6px 16px',
+  color: '#5C6F65',
+  fontSize: '11px',
+  marginBottom: '12px',
+}
+
+const footerText: React.CSSProperties = {
+  color: '#5C6F65',
+  fontSize: '12px',
+  margin: '0',
+  lineHeight: '1.5',
 }
 
 interface EmailLayoutProps {
@@ -63,52 +94,60 @@ export function EmailLayout({ previewText, children }: EmailLayoutProps) {
       <Body style={body}>
         <Container style={container}>
           <Section style={header}>
-            <Text style={logoText}>🌱 FarmerZone</Text>
+            <div style={logoMark}>
+              <div>
+                <Text style={logoText}>🌱 FarmerZone</Text>
+                <Text style={logoSub}>Regionale Lebensmittel</Text>
+              </div>
+            </div>
           </Section>
           <Section style={content}>{children}</Section>
-          <Hr style={{ borderColor: '#e2e8f0', margin: '0 24px' }} />
-          <Text style={footer}>
-            Diese E-Mail wurde von FarmerZone im Auftrag des Hofes versendet.
-          </Text>
+          <Hr style={{ borderColor: '#E8E5DC', margin: '0 24px' }} />
+          <div style={footerWrapper}>
+            <div style={footerPill}>Versandt von FarmerZone</div>
+            <Text style={footerText}>
+              Diese E-Mail wurde im Auftrag eines Hofes versendet.
+            </Text>
+          </div>
         </Container>
       </Body>
     </Html>
   )
 }
 
-// Shared style helpers used across templates
+// Shared style helpers
 export const h1: React.CSSProperties = {
-  color: '#0f172a',
+  color: '#1A2B22',
   fontSize: '22px',
   fontWeight: '700',
-  margin: '0 0 8px',
+  margin: '0 0 10px',
   lineHeight: '1.3',
 }
 
 export const bodyText: React.CSSProperties = {
-  color: '#334155',
+  color: '#374151',
   fontSize: '15px',
-  lineHeight: '1.6',
+  lineHeight: '1.65',
   margin: '0 0 16px',
 }
 
 export const mutedText: React.CSSProperties = {
-  color: '#64748b',
+  color: '#5C6F65',
   fontSize: '13px',
   lineHeight: '1.5',
   margin: '0 0 4px',
 }
 
 export const highlightBox: React.CSSProperties = {
-  backgroundColor: '#f0fdf4',
-  border: '1px solid #bbf7d0',
-  borderRadius: '10px',
-  padding: '16px 20px',
+  backgroundColor: '#E8F0E8',
+  border: '1px solid #C4D9C8',
+  borderRadius: '12px',
+  padding: '18px 22px',
   margin: '20px 0',
 }
 
 export const highlightLabel: React.CSSProperties = {
-  color: '#15803d',
+  color: '#2D5F3F',
   fontSize: '11px',
   fontWeight: '600',
   textTransform: 'uppercase' as const,
@@ -117,27 +156,27 @@ export const highlightLabel: React.CSSProperties = {
 }
 
 export const highlightValue: React.CSSProperties = {
-  color: '#0f172a',
-  fontSize: '16px',
+  color: '#1A2B22',
+  fontSize: '17px',
   fontWeight: '600',
   margin: '0 0 4px',
   lineHeight: '1.3',
 }
 
 export const tableRow: React.CSSProperties = {
-  borderBottom: '1px solid #f1f5f9',
+  borderBottom: '1px solid #E8E5DC',
   padding: '8px 0',
 }
 
 export const totalRow: React.CSSProperties = {
-  borderTop: '2px solid #e2e8f0',
+  borderTop: '2px solid #E8E5DC',
   paddingTop: '12px',
   marginTop: '4px',
 }
 
 export const ctaButton: React.CSSProperties = {
-  backgroundColor: '#15803d',
-  borderRadius: '8px',
+  backgroundColor: '#2D5F3F',
+  borderRadius: '12px',
   color: '#ffffff',
   display: 'inline-block',
   fontSize: '15px',
@@ -149,9 +188,9 @@ export const ctaButton: React.CSSProperties = {
 }
 
 export const amberBox: React.CSSProperties = {
-  backgroundColor: '#fffbeb',
-  border: '1px solid #fde68a',
-  borderRadius: '10px',
+  backgroundColor: '#FFFBEB',
+  border: '1px solid #FDE68A',
+  borderRadius: '12px',
   padding: '16px 20px',
   margin: '20px 0',
 }

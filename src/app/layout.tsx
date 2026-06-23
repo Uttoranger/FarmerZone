@@ -1,24 +1,34 @@
 import type { Metadata } from 'next'
-import { Geist } from 'next/font/google'
+import { Geist, Fraunces } from 'next/font/google'
 import { Toaster } from '@/components/ui/sonner'
+import { CookieBanner } from '@/components/cookie-banner'
 import './globals.css'
 
 const geist = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin'],
+  display: 'swap',
+})
+
+const fraunces = Fraunces({
+  variable: '--font-fraunces',
+  subsets: ['latin'],
+  display: 'swap',
+  style: ['normal', 'italic'],
 })
 
 export const metadata: Metadata = {
-  title: 'Bauernshop',
-  description: 'Frische Produkte direkt vom Hof',
+  title: 'FarmerZone',
+  description: 'Regionale Lebensmittel direkt vom Bauern',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="de" className={`${geist.variable} h-full antialiased`}>
+    <html lang="de" className={`${geist.variable} ${fraunces.variable} h-full antialiased`}>
       <body className="min-h-full font-sans">
         {children}
         <Toaster richColors position="top-center" />
+        <CookieBanner />
       </body>
     </html>
   )
