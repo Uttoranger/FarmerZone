@@ -7,11 +7,11 @@ import { signOut } from '@/lib/auth-client'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
-  { href: '/dashboard',  label: 'Übersicht',  icon: LayoutDashboard },
+  { href: '/dashboard',  label: 'Übersicht',    icon: LayoutDashboard },
   { href: '/orders',     label: 'Bestellungen', icon: ShoppingBag },
-  { href: '/products',   label: 'Produkte',   icon: Package },
-  { href: '/sales',      label: 'Verkauf',    icon: PlusCircle },
-  { href: '/analytics',  label: 'Auswertung', icon: BarChart2 },
+  { href: '/products',   label: 'Produkte',     icon: Package },
+  { href: '/sales',      label: 'Verkauf',      icon: PlusCircle },
+  { href: '/analytics',  label: 'Auswertung',   icon: BarChart2 },
 ]
 
 interface FarmerNavProps {
@@ -32,7 +32,7 @@ export function FarmerNav({ farmName, userName }: FarmerNavProps) {
   return (
     <>
       {/* ===== MOBILE: Bottom Tab Bar ===== */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border md:hidden">
         <div className="flex items-stretch h-16">
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + '/')
@@ -41,13 +41,13 @@ export function FarmerNav({ farmName, userName }: FarmerNavProps) {
                 key={href}
                 href={href}
                 className={cn(
-                  'flex flex-1 flex-col items-center justify-center gap-0.5 min-h-[44px] text-xs transition-colors',
+                  'flex flex-1 flex-col items-center justify-center gap-0.5 min-h-[56px] text-xs transition-colors duration-[250ms]',
                   active
-                    ? 'text-green-700 font-medium'
-                    : 'text-slate-500 hover:text-slate-700',
+                    ? 'text-primary font-medium'
+                    : 'text-muted-foreground hover:text-foreground',
                 )}
               >
-                <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 1.75} />
+                <Icon className="h-5 w-5" strokeWidth={active ? 2.25 : 1.75} />
                 <span className="leading-none">{label}</span>
               </Link>
             )
@@ -56,12 +56,12 @@ export function FarmerNav({ farmName, userName }: FarmerNavProps) {
       </nav>
 
       {/* ===== DESKTOP: Sidebar ===== */}
-      <aside className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:w-56 bg-white border-r border-slate-200 z-40">
+      <aside className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:w-56 bg-secondary border-r border-border z-40">
         {/* Hof-Name */}
-        <div className="px-4 py-5 border-b border-slate-100">
-          <div className="text-xs text-slate-400 uppercase tracking-wide mb-0.5">Hof</div>
-          <div className="font-medium text-slate-800 truncate">{farmName}</div>
-          <div className="text-xs text-slate-500 truncate">{userName}</div>
+        <div className="px-4 py-5 border-b border-border">
+          <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold mb-1">Hof</div>
+          <div className="font-heading font-semibold text-foreground truncate leading-tight">{farmName}</div>
+          <div className="text-xs text-muted-foreground truncate mt-0.5">{userName}</div>
         </div>
 
         {/* Navigation */}
@@ -73,39 +73,39 @@ export function FarmerNav({ farmName, userName }: FarmerNavProps) {
                 key={href}
                 href={href}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-[44px]',
+                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-[250ms] min-h-[44px]',
                   active
-                    ? 'bg-green-50 text-green-700 font-medium'
-                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800',
+                    ? 'bg-muted text-primary font-semibold'
+                    : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
                 )}
               >
-                <Icon className="h-5 w-5 flex-shrink-0" strokeWidth={active ? 2.5 : 1.75} />
+                <Icon className="h-4.5 w-4.5 flex-shrink-0" strokeWidth={active ? 2.25 : 1.75} />
                 {label}
               </Link>
             )
           })}
         </nav>
 
-        {/* Footer: Einstellungen + Abmelden */}
-        <div className="px-2 py-3 border-t border-slate-100 space-y-0.5">
+        {/* Footer: Settings + Logout */}
+        <div className="px-2 py-3 border-t border-border space-y-0.5">
           <Link
             href="/settings"
             className={cn(
-              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-[44px]',
+              'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-[250ms] min-h-[44px]',
               pathname.startsWith('/settings')
-                ? 'bg-green-50 text-green-700 font-medium'
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800',
+                ? 'bg-muted text-primary font-semibold'
+                : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
             )}
           >
-            <Settings className="h-5 w-5 flex-shrink-0" strokeWidth={1.75} />
+            <Settings className="h-4.5 w-4.5 flex-shrink-0" strokeWidth={1.75} />
             Einstellungen
           </Link>
 
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors min-h-[44px]"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-destructive/8 hover:text-destructive transition-colors duration-[250ms] min-h-[44px]"
           >
-            <LogOut className="h-5 w-5 flex-shrink-0" strokeWidth={1.75} />
+            <LogOut className="h-4.5 w-4.5 flex-shrink-0" strokeWidth={1.75} />
             Abmelden
           </button>
         </div>

@@ -203,10 +203,12 @@ export function AnalyticsDashboard({ data, currentPeriod }: Props) {
 
       {/* Empty state */}
       {totalRevenue === 0 && (
-        <div className="text-center py-10 text-slate-400">
-          <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">
-            Im gewählten Zeitraum gibt es noch keine Verkaufsdaten.
+        <div className="text-center py-12">
+          <div className="text-4xl mb-3">📊</div>
+          <p className="font-medium text-slate-700 mb-1">Noch keine Verkaufsdaten</p>
+          <p className="text-sm text-slate-400 max-w-xs mx-auto leading-relaxed">
+            Sobald Bestellungen abgewickelt oder Direktverkäufe eingetragen werden,
+            erscheinen hier deine Auswertungen.
           </p>
         </div>
       )}

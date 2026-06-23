@@ -47,9 +47,11 @@ export function SaleList({ sales, onEdit }: Props) {
 
   if (sales.length === 0) {
     return (
-      <p className="text-center text-slate-400 text-sm py-8">
-        Noch keine Verkäufe eingetragen.
-      </p>
+      <div className="text-center py-12">
+        <div className="text-4xl mb-3">🧾</div>
+        <p className="font-medium text-slate-700 mb-1">Noch keine Verkäufe eingetragen</p>
+        <p className="text-sm text-slate-400">Trage deine ersten Direktverkäufe ein, um Statistiken zu sehen.</p>
+      </div>
     )
   }
 

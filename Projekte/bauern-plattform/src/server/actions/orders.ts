@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { revalidatePath } from 'next/cache'
 import { sendOrderReady, sendOrderCancelled, type OrderForEmail } from '@/lib/email'
+import type { OrderStatus } from '@prisma/client'
 
 export type ActionResult = { error?: string }
 
@@ -156,6 +157,29 @@ export async function markAsPickedUpAndPaid(orderId: string): Promise<ActionResu
       pickedUpAt: new Date(),
       paidAt: new Date(),
     },
+  })
+
+  revalidatePath('/orders')
+  revalidatePath(`/orders/${orderId}`)
+  return {}
+}
+
+export async function revertOrderStatus(orderId: string, previousStatus: string): Promise<ActionResult> {
+  const REVERTABLE = ['PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY']
+  if (!REVERTABLE.includes(previousStatus)) return { error: 'Status kann nicht zurückgesetzt werden' }
+
+  const farm = await getAuthFarm()
+  if (!farm) return { error: 'Nicht angemeldet' }
+
+  const exists = await prisma.order.findFirst({
+    where: { id: orderId, farmId: farm.id },
+    select: { id: true },
+  })
+  if (!exists) return { error: 'Bestellung nicht gefunden' }
+
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { status: previousStatus as OrderStatus, pickedUpAt: null, paidAt: null },
   })
 
   revalidatePath('/orders')

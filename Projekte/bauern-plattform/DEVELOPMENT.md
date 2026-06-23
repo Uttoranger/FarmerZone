@@ -1,8 +1,8 @@
-# Bauern-Plattform — Entwicklungsstand
+# FarmerZone — Entwicklungsstand
 
 ## Projektübersicht
 
-Regionaler Bauernhof-Webshop als Pilot mit einem einzelnen Betrieb.
+Regionale Lebensmittel direkt vom Bauern — FarmerZone als Pilot mit ausgewählten Höfen.
 Kunden bestellen per geteiltem Link ohne Login-Zwang, zahlen online (Stripe) oder vor Ort.
 Der Bauer verwaltet Produkte, sieht Bestellungen und trägt externe Verkäufe manuell ein.
 
@@ -28,7 +28,7 @@ Prisma 7 · PostgreSQL 16 (Supabase) · Better Auth · Stripe Connect · Resend 
 
 ## Aktueller Stand
 
-**Sprint 7 abgeschlossen** — Bestellverwaltung (Liste, Detail, Druck), react-email Templates, typisiertes E-Mail-System
+**Sprint 9a abgeschlossen** — Quick Wins fürs Bauer-Erlebnis: "Heute"-Dashboard, Shop-Link-Banner, Packlisten-Druck, Undo-Toasts, größere Touch-Targets, Sprach-Cleanup
 
 ---
 
@@ -140,10 +140,50 @@ Prisma 7 · PostgreSQL 16 (Supabase) · Better Auth · Stripe Connect · Resend 
 - [x] Webhook + Confirm-Route auf neue Email-Funktionen umgestellt
 - [x] `checkout/route.ts` auf `sendOnsiteConfirmation` umgestellt
 
-### Sprint 8: Polish & Deployment
-- [ ] Impressum, Datenschutz
-- [ ] Mobile-Optimierung prüfen
-- [ ] Vercel Deployment, Domain
+### Sprint 9a: Quick Wins fürs Bauer-Erlebnis ✅
+- [x] **"Heute"-Dashboard** — persönliche Begrüßung, Tagesaufgaben-Karte mit Kundennamen, aggregierte Packliste, Wochesumsatz mit %-Vergleich zur Vorwoche (TrendingUp/Down/Minus), Bestellungsanzahl diese Woche, 4 Aktionskarten
+- [x] **Shop-Link-Banner** — `<ShopLinkBanner farmSlug={...}>` auf jeder Farmer-Seite (im Layout), tägliches Ausblenden via localStorage, "Link kopieren" + "Per WhatsApp teilen"-Button
+- [x] **Packlisten-Druck** — `/orders/today/print` Server Component: aggregierte Mengen-Übersicht + Pro-Kunde-Blöcke, Print-CSS (`@media print`), `<PrintButton>` Client-Komponente
+- [x] **Undo-Toasts** — 6 Sek. Sonner-Toast nach "Als bereit markiert" / "Abgeholt" / "Abgeholt & bezahlt" mit "Rückgängig"-Button → `revertOrderStatus` Server Action
+- [x] **Cancel-Bestätigungsdialog** — Dialog mit Warnung vor Rückerstattung bei Online-Zahlung in `OrderCard` und `OrderActions`
+- [x] **Sprach-Cleanup** — "Stornieren" → "Zurücknehmen" in Order-Card, Order-Actions
+- [x] **Touch-Targets** — OrderCard/OrderActions Buttons `h-10`/`min-h-[52px]`, Quick-Stock-Buttons `h-10 min-w-[48px]`, Mobile-Nav-Items `min-h-[56px]`
+- [x] **OrdersClient Empty State** — "Shop-Link kopieren"-Button bei 0 Bestellungen (filter=active), spezifische Nachrichten für "alle erledigt" vs. "keine in dieser Ansicht"
+- [x] **Filter-Tabs** — Design-Update: `bg-primary` aktiv, `py-2.5` (min-h 44px)
+- [x] **`revertOrderStatus` Server Action** — whitelist-basierte Status-Rücksetzung (`PAID|CONFIRMED|IN_PREPARATION|READY`), löscht `pickedUpAt` + `paidAt`
+- [x] **Dashboard-Abfragen** — Prev-Week-Vergleich, `umsatzChangePercent`, `bestellungenWocheCount`, today-filter schließt PICKED_UP nicht mehr aus
+- [x] **Farmer-Layout** — Lädt `farm.slug` und gibt ihn an `<ShopLinkBanner>` weiter; doppelter Farm-Lookup vermieden durch direkten Query im Layout
+
+### Sprint 8: Polish, Branding & Go-Live-Vorbereitung ✅
+- [x] Branding: "Bauernshop" → "FarmerZone" (Titles, UI, E-Mails, Docs)
+- [x] Startseite `/` — FarmerZone Landing Page statt Next.js-Default
+- [x] `src/app/not-found.tsx` — hübsche 404-Seite
+- [x] `src/app/error.tsx` — hübsche Error-Seite
+- [x] `/impressum` — vollständiger Inhalt gemäß ECG (Österreich), inkl. Pilot-Hinweis
+- [x] `/datenschutz` — DSGVO-konforme Datenschutzerklärung (Stripe, Resend, Supabase, Vercel)
+- [x] Cookie-Banner — `<CookieBanner>` im Root-Layout (localStorage-gesteuert)
+- [x] Settings-Übersicht `/settings` — 5 Bereiche als Karten
+- [x] `/settings/profile` — Hof-Profil bearbeiten (Name, Beschreibung, Adresse, Kontakt, Bilder)
+- [x] `/settings/pickup-slots` — Abholzeiten verwalten (Hinzufügen, Löschen, Aktivieren/Deaktivieren)
+- [x] `/settings/pause` — Shop pausieren mit optionaler Kunden-Nachricht
+- [x] `/settings/account` — Konto-Info (E-Mail, Passwort-Hinweis, Konto-Löschung)
+- [x] Server Actions: `updateProfile`, `addPickupSlot`, `deletePickupSlot`, `togglePickupSlotActive`, `setPause`
+- [x] Empty States verbessert: Orders, Products, Sales, Analytics
+- [x] React-Warning gefixt: `EMPTY_DEFAULTS` im product-dialog.tsx mit vollständigen String-Defaults
+- [x] README.md — vollständig (Tech-Stack, Setup, Deployment, Go-Live-Checkliste)
+- [x] `.env.example` — aktualisiert mit allen Variablen
+- [x] DEVELOPMENT.md — auf Stand Sprint 8 gebracht
+
+### E-Mail-Diagnose-Infrastruktur (Sprint 7, läuft noch)
+- `/api/test-email?to=deine@email.at` — Test-E-Mail senden und Ergebnis als JSON
+- `sendRaw()` in `src/lib/email.ts` exportiert für direkte Diagnose
+- Alle Send-Funktionen loggen Init + Senden + Erfolg/Fehler
+
+### Stripe-CLI-Webhooks für lokales Testen (Sprint 7)
+```bash
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+# STRIPE_WEBHOOK_SECRET=whsec_... in .env.local eintragen
+```
 
 ---
 

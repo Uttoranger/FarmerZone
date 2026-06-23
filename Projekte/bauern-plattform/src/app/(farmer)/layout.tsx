@@ -1,7 +1,9 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
+import { getFarmForUser } from '@/server/queries/dashboard'
 import { FarmerNav } from '@/components/farmer/farmer-nav'
+import { ShopLinkBanner } from '@/components/farmer/shop-link-banner'
 
 export default async function FarmerLayout({ children }: { children: React.ReactNode }) {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -15,16 +17,16 @@ export default async function FarmerLayout({ children }: { children: React.React
     redirect('/login')
   }
 
-  const farmName = (session.user as typeof session.user & { name: string | null }).name ?? 'Mein Hof'
+  const farm = await getFarmForUser(session.user.id)
+  if (!farm) redirect('/login')
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Desktop: Sidebar + Content nebeneinander */}
+    <div className="min-h-screen bg-background">
       <div className="flex min-h-screen">
-        <FarmerNav farmName={farmName} userName={session.user.name ?? ''} />
+        <FarmerNav farmName={farm.name} userName={session.user.name ?? ''} />
 
-        {/* Hauptinhalt */}
         <main className="flex-1 pb-24 md:pb-0 md:ml-56">
+          <ShopLinkBanner farmSlug={farm.slug} />
           {children}
         </main>
       </div>

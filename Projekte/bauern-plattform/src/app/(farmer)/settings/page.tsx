@@ -1,10 +1,23 @@
 import Link from 'next/link'
-import { CreditCard, Settings } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import type { Metadata } from 'next'
+import { CreditCard, MapPin, Clock, PauseCircle, User } from 'lucide-react'
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
-export const metadata = { title: 'Einstellungen — Bauernshop' }
+export const metadata: Metadata = { title: 'Einstellungen — FarmerZone' }
 
 const SECTIONS = [
+  {
+    href: '/settings/profile',
+    icon: MapPin,
+    title: 'Hof-Profil',
+    description: 'Name, Adresse, Beschreibung, Logo und Banner',
+  },
+  {
+    href: '/settings/pickup-slots',
+    icon: Clock,
+    title: 'Abholzeiten',
+    description: 'Wochentage und Uhrzeiten für die Abholung verwalten',
+  },
   {
     href: '/settings/payments',
     icon: CreditCard,
@@ -12,11 +25,16 @@ const SECTIONS = [
     description: 'Stripe Connect einrichten, Online-Zahlung aktivieren',
   },
   {
-    href: '/settings',
-    icon: Settings,
-    title: 'Hof-Einstellungen',
-    description: 'Name, Adresse, Abholzeiten, Zahlungsarten — folgt in Sprint 11',
-    disabled: true,
+    href: '/settings/pause',
+    icon: PauseCircle,
+    title: 'Pause / Urlaub',
+    description: 'Shop pausieren und Kunden informieren',
+  },
+  {
+    href: '/settings/account',
+    icon: User,
+    title: 'Konto',
+    description: 'Passwort ändern, Konto verwalten',
   },
 ]
 
@@ -24,36 +42,22 @@ export default function SettingsPage() {
   return (
     <div className="p-4 md:p-6 max-w-2xl">
       <h1 className="text-xl font-semibold text-slate-800 mb-1">Einstellungen</h1>
-      <p className="text-sm text-slate-500 mb-6">Verwalte deinen Hof und Zahlungsoptionen.</p>
+      <p className="text-sm text-slate-500 mb-6">Verwalte deinen Hof und dein Konto.</p>
 
       <div className="grid gap-3">
-        {SECTIONS.map(({ href, icon: Icon, title, description, disabled }) =>
-          disabled ? (
-            <div key={title} className="opacity-40 cursor-not-allowed">
-              <Card size="sm">
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <Icon className="size-4 text-slate-500" />
-                    <CardTitle>{title}</CardTitle>
-                  </div>
-                  <CardDescription>{description}</CardDescription>
-                </CardHeader>
-              </Card>
-            </div>
-          ) : (
-            <Link key={title} href={href} className="group">
-              <Card size="sm" className="transition-shadow group-hover:shadow-md">
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <Icon className="size-4 text-green-700" />
-                    <CardTitle>{title}</CardTitle>
-                  </div>
-                  <CardDescription>{description}</CardDescription>
-                </CardHeader>
-              </Card>
-            </Link>
-          )
-        )}
+        {SECTIONS.map(({ href, icon: Icon, title, description }) => (
+          <Link key={href} href={href} className="group">
+            <Card size="sm" className="transition-shadow group-hover:shadow-md">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Icon className="size-4 text-green-700" />
+                  <CardTitle>{title}</CardTitle>
+                </div>
+                <CardDescription>{description}</CardDescription>
+              </CardHeader>
+            </Card>
+          </Link>
+        ))}
       </div>
     </div>
   )

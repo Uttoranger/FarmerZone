@@ -39,18 +39,22 @@ export default async function FarmPage({ params }: Props) {
   /* ── Paused state ─────────────────────────────────────────────── */
   if (farm.isPaused) {
     return (
-      <main className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
-        <div className="text-center max-w-sm">
-          <div className="text-5xl mb-4">🏡</div>
-          <h1 className="text-xl font-semibold text-slate-800 mb-2">{farm.name}</h1>
-          <p className="text-slate-600 leading-relaxed">
+      <main
+        className="min-h-screen flex items-center justify-center p-6"
+        style={{ background: 'linear-gradient(160deg, #F4EFE6 0%, #E8F0E8 100%)' }}
+      >
+        <div className="text-center max-w-sm bg-card rounded-3xl p-10 shadow-[0_8px_24px_oklch(0.18_0.03_150_/_0.08)]">
+          <div className="text-5xl mb-5">🏡</div>
+          <h1 className="font-heading text-xl font-semibold text-foreground mb-3">{farm.name}</h1>
+          <p className="text-muted-foreground leading-relaxed">
             {farm.pauseMessage ??
               'Der Hof ist gerade nicht erreichbar. Bitte versuche es etwas später noch einmal.'}
           </p>
           <a
             href={`tel:${farm.phone}`}
-            className="mt-5 inline-block text-sm text-green-700 underline underline-offset-2"
+            className="mt-6 inline-flex items-center gap-1.5 text-sm text-primary hover:underline underline-offset-2"
           >
+            <Phone className="w-3.5 h-3.5" />
             {farm.phone}
           </a>
         </div>
@@ -76,29 +80,42 @@ export default async function FarmPage({ params }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       {/* JSON-LD */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      {/* ── Banner ────────────────────────────────────────────────── */}
-      <div className="h-44 md:h-64 relative overflow-hidden">
+      {/* ── Banner ─────────────────────────────────────────────────── */}
+      <div className="h-52 md:h-72 relative overflow-hidden">
         {farm.bannerUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={farm.bannerUrl} alt="" className="w-full h-full object-cover" />
         ) : (
-          <div className="h-full bg-gradient-to-br from-green-700 via-green-800 to-green-950" />
+          <div
+            className="h-full"
+            style={{ background: 'linear-gradient(135deg, #2D5F3F 0%, #7BAE85 60%, #E8F0E8 100%)' }}
+          />
         )}
-        {/* Gradient overlay at bottom for readability */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+        {/* Soft fade at the bottom to blend into page */}
+        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-background to-transparent" />
       </div>
 
-      {/* ── Farm header ───────────────────────────────────────────── */}
-      <div className="px-4 pt-4 pb-3 max-w-4xl mx-auto">
-        <h1 className="text-2xl font-semibold text-slate-900">{farm.name}</h1>
-        <div className="flex items-center gap-1.5 text-slate-500 text-sm mt-1">
+      {/* ── Farm header ─────────────────────────────────────────────── */}
+      <div className="px-4 pt-2 pb-4 max-w-4xl mx-auto">
+        {farm.logoUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={farm.logoUrl}
+            alt={farm.name}
+            className="w-16 h-16 rounded-2xl object-cover border-2 border-card shadow-md -mt-6 mb-3"
+          />
+        )}
+        <h1 className="font-heading text-3xl font-semibold text-foreground leading-tight">
+          {farm.name}
+        </h1>
+        <div className="flex items-center gap-1.5 text-muted-foreground text-sm mt-1.5">
           <MapPin className="w-3.5 h-3.5 shrink-0" />
           <span>
             {farm.address}, {farm.postalCode} {farm.city}
@@ -106,70 +123,77 @@ export default async function FarmPage({ params }: Props) {
         </div>
       </div>
 
-      {/* ── About ─────────────────────────────────────────────────── */}
-      <section className="px-4 pb-5 max-w-4xl mx-auto">
-        <p className="text-slate-600 text-sm leading-relaxed">{farm.description}</p>
-      </section>
+      {/* ── About ───────────────────────────────────────────────────── */}
+      {farm.description && (
+        <section className="px-4 pb-6 max-w-4xl mx-auto">
+          <p className="text-muted-foreground text-sm leading-relaxed max-w-2xl">{farm.description}</p>
+        </section>
+      )}
 
-      {/* ── Info box ──────────────────────────────────────────────── */}
-      <section className="px-4 pb-6 max-w-4xl mx-auto">
-        <div className="bg-slate-50 rounded-2xl p-4 space-y-4">
-          {/* Pickup slots */}
+      {/* ── Info cards ──────────────────────────────────────────────── */}
+      <section className="px-4 pb-8 max-w-4xl mx-auto">
+        <div className={`grid gap-3 ${farm.pickupSlots.length > 0 ? 'sm:grid-cols-2' : ''}`}>
+
+          {/* Pickup slots card */}
           {farm.pickupSlots.length > 0 && (
-            <div>
-              <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-                <Clock className="w-3.5 h-3.5" />
+            <div className="bg-card rounded-2xl p-5 ring-1 ring-border/60 shadow-[0_2px_8px_oklch(0.18_0.03_150_/_0.05)]">
+              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                <div className="w-6 h-6 rounded-lg bg-muted flex items-center justify-center">
+                  <Clock className="w-3.5 h-3.5 text-primary" />
+                </div>
                 Abholzeiten
               </div>
-              <ul className="space-y-1">
+              <ul className="space-y-1.5">
                 {farm.pickupSlots.map((slot, i) => (
-                  <li key={i} className="text-sm text-slate-700">
-                    <span className="font-medium">{DAY_NAMES[slot.dayOfWeek]}</span>{' '}
-                    {slot.startTime}–{slot.endTime} Uhr
+                  <li key={i} className="text-sm text-foreground">
+                    <span className="font-medium">{DAY_NAMES[slot.dayOfWeek]}</span>
+                    <span className="text-muted-foreground ml-1.5">
+                      {slot.startTime}–{slot.endTime} Uhr
+                    </span>
                   </li>
                 ))}
               </ul>
             </div>
           )}
 
-          {/* Payment */}
-          <div>
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-              <CreditCard className="w-3.5 h-3.5" />
-              Zahlung
+          {/* Payment + contact card */}
+          <div className="bg-card rounded-2xl p-5 ring-1 ring-border/60 shadow-[0_2px_8px_oklch(0.18_0.03_150_/_0.05)]">
+            <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+              <div className="w-6 h-6 rounded-lg bg-muted flex items-center justify-center">
+                <CreditCard className="w-3.5 h-3.5 text-primary" />
+              </div>
+              Zahlung & Kontakt
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 mb-4">
               {farm.acceptsOnline && (
-                <span className="inline-flex items-center gap-1 text-xs bg-white border border-slate-200 rounded-full px-2.5 py-1">
-                  <CreditCard className="w-3 h-3 text-blue-500" />
+                <span className="inline-flex items-center gap-1.5 text-xs bg-muted rounded-full px-3 py-1 text-foreground">
+                  <CreditCard className="w-3 h-3 text-primary" />
                   Online (Karte)
                 </span>
               )}
               {farm.acceptsOnsite && (
-                <span className="inline-flex items-center gap-1 text-xs bg-white border border-slate-200 rounded-full px-2.5 py-1">
-                  <Banknote className="w-3 h-3 text-green-600" />
+                <span className="inline-flex items-center gap-1.5 text-xs bg-muted rounded-full px-3 py-1 text-foreground">
+                  <Banknote className="w-3 h-3 text-primary" />
                   Vor Ort (Bar & Karte)
                 </span>
               )}
             </div>
-          </div>
-
-          {/* Contact */}
-          <div className="flex flex-wrap gap-3 text-sm">
-            <a
-              href={`tel:${farm.phone}`}
-              className="flex items-center gap-1.5 text-green-700 hover:underline"
-            >
-              <Phone className="w-3.5 h-3.5" />
-              {farm.phone}
-            </a>
-            <a
-              href={`mailto:${farm.email}`}
-              className="flex items-center gap-1.5 text-green-700 hover:underline"
-            >
-              <Mail className="w-3.5 h-3.5" />
-              {farm.email}
-            </a>
+            <div className="flex flex-col gap-2 text-sm">
+              <a
+                href={`tel:${farm.phone}`}
+                className="flex items-center gap-2 text-primary hover:underline underline-offset-2"
+              >
+                <Phone className="w-3.5 h-3.5 shrink-0" />
+                {farm.phone}
+              </a>
+              <a
+                href={`mailto:${farm.email}`}
+                className="flex items-center gap-2 text-primary hover:underline underline-offset-2"
+              >
+                <Mail className="w-3.5 h-3.5 shrink-0" />
+                {farm.email}
+              </a>
+            </div>
           </div>
         </div>
       </section>
@@ -177,14 +201,14 @@ export default async function FarmPage({ params }: Props) {
       {/* ── Products (client component with cart) ─────────────────── */}
       <ProductGrid products={farm.products} farmId={farm.id} farmSlug={farm.slug} />
 
-      {/* ── Footer ────────────────────────────────────────────────── */}
-      <footer className="px-4 py-6 border-t border-slate-100 max-w-4xl mx-auto mt-4">
-        <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400">
+      {/* ── Footer ──────────────────────────────────────────────────── */}
+      <footer className="px-4 py-8 border-t border-border/50 max-w-4xl mx-auto mt-4">
+        <div className="flex flex-wrap items-center gap-5 text-xs text-muted-foreground">
           <span>© {new Date().getFullYear()} {farm.name}</span>
-          <Link href="/impressum" className="hover:text-slate-600 underline underline-offset-2">
+          <Link href="/impressum" className="hover:text-foreground transition-colors">
             Impressum
           </Link>
-          <Link href="/datenschutz" className="hover:text-slate-600 underline underline-offset-2">
+          <Link href="/datenschutz" className="hover:text-foreground transition-colors">
             Datenschutz
           </Link>
         </div>

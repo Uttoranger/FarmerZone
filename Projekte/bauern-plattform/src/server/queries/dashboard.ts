@@ -1,10 +1,12 @@
 import { prisma } from '@/lib/prisma'
-import { startOfWeek, endOfWeek } from 'date-fns'
+import { startOfWeek, endOfWeek, subWeeks } from 'date-fns'
 
 export async function getDashboardStats(farmId: string) {
   const heute = new Date()
   const wochenStart = startOfWeek(heute, { weekStartsOn: 1 })
   const wochenEnde = endOfWeek(heute, { weekStartsOn: 1 })
+  const prevWochenStart = startOfWeek(subWeeks(heute, 1), { weekStartsOn: 1 })
+  const prevWochenEnde = endOfWeek(subWeeks(heute, 1), { weekStartsOn: 1 })
 
   const tagStart = new Date(heute)
   tagStart.setHours(0, 0, 0, 0)
@@ -17,8 +19,10 @@ export async function getDashboardStats(farmId: string) {
     aktivProdukte,
     plattformUmsatzWoche,
     manuelleVerkaufeWoche,
+    plattformUmsatzPrevWoche,
+    manuelleVerkaufePrevWoche,
+    bestellungenWocheCount,
   ] = await Promise.all([
-    // Offene Bestellungen (noch nicht abgeholt oder storniert)
     prisma.order.count({
       where: {
         farmId,
@@ -26,12 +30,11 @@ export async function getDashboardStats(farmId: string) {
       },
     }),
 
-    // Bestellungen für heute (als Warnung)
     prisma.order.findMany({
       where: {
         farmId,
         pickupDate: { gte: tagStart, lte: tagEnde },
-        status: { notIn: ['PICKED_UP', 'CANCELLED', 'NOT_PICKED_UP'] },
+        status: { notIn: ['CANCELLED', 'NOT_PICKED_UP'] },
       },
       select: {
         id: true,
@@ -46,12 +49,10 @@ export async function getDashboardStats(farmId: string) {
       orderBy: { pickupTimeStart: 'asc' },
     }),
 
-    // Aktive Produkte
     prisma.product.count({
       where: { farmId, isAvailable: true },
     }),
 
-    // Plattform-Umsatz diese Woche (abgeholte Bestellungen)
     prisma.order.aggregate({
       where: {
         farmId,
@@ -61,7 +62,6 @@ export async function getDashboardStats(farmId: string) {
       _sum: { totalAmount: true },
     }),
 
-    // Manuelle Verkäufe diese Woche
     prisma.manualSale.aggregate({
       where: {
         farmId,
@@ -69,17 +69,53 @@ export async function getDashboardStats(farmId: string) {
       },
       _sum: { totalAmount: true },
     }),
+
+    prisma.order.aggregate({
+      where: {
+        farmId,
+        status: 'PICKED_UP',
+        pickedUpAt: { gte: prevWochenStart, lte: prevWochenEnde },
+      },
+      _sum: { totalAmount: true },
+    }),
+
+    prisma.manualSale.aggregate({
+      where: {
+        farmId,
+        saleDate: { gte: prevWochenStart, lte: prevWochenEnde },
+      },
+      _sum: { totalAmount: true },
+    }),
+
+    prisma.order.count({
+      where: {
+        farmId,
+        createdAt: { gte: wochenStart, lte: wochenEnde },
+      },
+    }),
   ])
 
   const umsatzWoche =
     Number(plattformUmsatzWoche._sum.totalAmount ?? 0) +
     Number(manuelleVerkaufeWoche._sum.totalAmount ?? 0)
 
+  const umsatzPrevWoche =
+    Number(plattformUmsatzPrevWoche._sum.totalAmount ?? 0) +
+    Number(manuelleVerkaufePrevWoche._sum.totalAmount ?? 0)
+
+  const umsatzChangePercent =
+    umsatzPrevWoche > 0
+      ? Math.round(((umsatzWoche - umsatzPrevWoche) / umsatzPrevWoche) * 100)
+      : null
+
   return {
     offeneBestellungen,
     heutigeBestellungen,
     aktivProdukte,
     umsatzWoche,
+    umsatzPrevWoche,
+    umsatzChangePercent,
+    bestellungenWocheCount,
   }
 }
 

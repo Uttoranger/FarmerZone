@@ -144,10 +144,17 @@ export function ProductList({ products: initialProducts }: Props) {
 
       {/* Empty state */}
       {products.length === 0 && (
-        <div className="text-center py-16 text-slate-400">
-          <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">Noch keine Produkte</p>
-          <p className="text-sm mt-1">Leg dein erstes Produkt an, um loszulegen.</p>
+        <div className="text-center py-16">
+          <Package className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+          <p className="font-medium text-slate-700 mb-1">Noch keine Produkte</p>
+          <p className="text-sm text-slate-400 mb-6">Leg dein erstes Produkt an, um loszulegen.</p>
+          <Button
+            onClick={() => setEditDialog({ open: true, product: null })}
+            className="bg-green-700 hover:bg-green-800 text-white"
+          >
+            <Plus className="w-4 h-4 mr-1.5" />
+            Erstes Produkt anlegen
+          </Button>
         </div>
       )}
 
@@ -217,7 +224,7 @@ export function ProductList({ products: initialProducts }: Props) {
                             key={delta}
                             onClick={() => handleQuickStock(product, delta)}
                             disabled={isPending}
-                            className="h-7 min-w-[36px] px-1.5 rounded border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-40 transition-colors"
+                            className="h-10 min-w-[48px] px-2 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted hover:border-border/80 disabled:opacity-40 transition-colors"
                           >
                             +{delta}
                           </button>
