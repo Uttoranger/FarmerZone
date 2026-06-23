@@ -84,9 +84,10 @@ const footerText: React.CSSProperties = {
 interface EmailLayoutProps {
   previewText: string
   children: React.ReactNode
+  manageUrl?: string
 }
 
-export function EmailLayout({ previewText, children }: EmailLayoutProps) {
+export function EmailLayout({ previewText, children, manageUrl }: EmailLayoutProps) {
   return (
     <Html lang="de">
       <Head />
@@ -108,6 +109,13 @@ export function EmailLayout({ previewText, children }: EmailLayoutProps) {
             <Text style={footerText}>
               Diese E-Mail wurde im Auftrag eines Hofes versendet.
             </Text>
+            {manageUrl && (
+              <Text style={{ ...footerText, marginTop: '6px' }}>
+                <a href={manageUrl} style={{ color: '#5C6F65' }}>
+                  Benachrichtigungen verwalten
+                </a>
+              </Text>
+            )}
           </div>
         </Container>
       </Body>

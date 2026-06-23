@@ -28,7 +28,7 @@ Prisma 7 · PostgreSQL 16 (Supabase) · Better Auth · Stripe Connect · Resend 
 
 ## Aktueller Stand
 
-**Sprint 9a abgeschlossen** — Quick Wins fürs Bauer-Erlebnis: "Heute"-Dashboard, Shop-Link-Banner, Packlisten-Druck, Undo-Toasts, größere Touch-Targets, Sprach-Cleanup
+**Sprint 9b abgeschlossen** — Kunden-Opt-in-System: Newsletter-Checkboxen im Checkout, Magic-Link-Login, Abo-Verwaltung unter /account/profile, HMAC-Abmelde-Links
 
 ---
 
@@ -139,6 +139,20 @@ Prisma 7 · PostgreSQL 16 (Supabase) · Better Auth · Stripe Connect · Resend 
 - [x] `/orders/[orderId]/print` — Druckversion (print:hidden CSS, kein Nav auf Print)
 - [x] Webhook + Confirm-Route auf neue Email-Funktionen umgestellt
 - [x] `checkout/route.ts` auf `sendOnsiteConfirmation` umgestellt
+
+### Sprint 9b: Kunden-Opt-in-System ✅
+- [x] **Datenmodell** — neues Prisma-Modell `CustomerFarmSubscription` mit `customerEmail`, `farmId`, `optInEmail`, `optInWhatsApp`, `customerPhone`; Unique-Index auf `(customerEmail, farmId)`; manuell migriert via `20260623_customer_subscriptions`
+- [x] **Checkout-Checkboxen** — `optInEmail` + `optInWhatsApp` in Formular (beide unchecked by default, DSGVO-konform); WhatsApp-Toggle disabled wenn keine Telefonnummer; Datenschutz-Hinweis mit Links
+- [x] **Checkout-API** — nach Bestellerstellung: `CustomerFarmSubscription.upsert()` wenn opt-in gesetzt; bestehende `true`-Werte werden nicht überschrieben
+- [x] **Magic-Link-Auth** — `auth.ts` `sendMagicLink`-Callback sendet jetzt echte E-Mails via `sendMagicLinkEmail()` aus `email.ts`; Fallback auf `console.log` bei Fehler; 15 Min. Gültigkeit
+- [x] **`/account/login`** — Kunden geben E-Mail ein, erhalten Magic-Link-E-Mail; Erfolgs-Screen mit "Erneut senden"-Option
+- [x] **`/account/profile`** — Server Component (Session-Check → redirect wenn nicht eingeloggt); zeigt alle Abos mit Inline-Toggles; Konto-Lösch-Button (DSGVO); Abmelden-Button
+- [x] **`/account/unsubscribe?token=...`** — tokenbasiertes Abmelden ohne Login (für Newsletter-Mails); HMAC-SHA256-Token via `src/lib/unsubscribe.ts`
+- [x] **E-Mail-Templates** — `customer-magic-link.tsx` (Login-Link), `newsletter.tsx` (Vorlage für Sprint 9d); `_layout.tsx` erweitert um optionales `manageUrl` im Footer; `order-confirmation.tsx` mit Link zu `/account/profile`
+- [x] **Datenschutz** — Abschnitte 9 (Newsletter-Opt-in) und 10 (Magic-Link-Login) ergänzt
+- [x] **"Mein Konto"-Link** — in Footer der Hof-Seite (`/[farmSlug]`) hinzugefügt
+- [x] **`src/server/actions/subscriptions.ts`** — `updateSubscription`, `unsubscribeWithToken`, `deleteCustomerAccount`
+- [x] **`src/lib/unsubscribe.ts`** — `generateUnsubscribeToken` / `verifyUnsubscribeToken` (HMAC-SHA256 mit BETTER_AUTH_SECRET)
 
 ### Sprint 9a: Quick Wins fürs Bauer-Erlebnis ✅
 - [x] **"Heute"-Dashboard** — persönliche Begrüßung, Tagesaufgaben-Karte mit Kundennamen, aggregierte Packliste, Wochesumsatz mit %-Vergleich zur Vorwoche (TrendingUp/Down/Minus), Bestellungsanzahl diese Woche, 4 Aktionskarten

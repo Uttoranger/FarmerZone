@@ -129,6 +129,7 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
   })
 
   const paymentMethod = form.watch('paymentMethod')
+  const customerPhone = form.watch('customerPhone')
   const isOnsite = paymentMethod === 'ONSITE_CASH' || paymentMethod === 'ONSITE_CARD'
   const total = cart.reduce((s, i) => s + i.price * i.quantity, 0)
 
@@ -162,6 +163,8 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
           pickupTimeStart,
           pickupTimeEnd,
           paymentMethod: data.paymentMethod,
+          optInEmail: data.optInEmail ?? false,
+          optInWhatsApp: data.optInWhatsApp ?? false,
           items: cart.map((i) => ({
             productId: i.productId,
             name: i.name,
@@ -371,6 +374,56 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
               rows={2}
             />
           </div>
+        </div>
+
+        {/* Newsletter opt-in */}
+        <div className="bg-white rounded-xl border border-slate-200 p-4">
+          <h2 className="font-medium text-slate-700 mb-1">Neuigkeiten vom Hof</h2>
+          <p className="text-xs text-slate-500 mb-3">
+            Standardmäßig nicht angehakt — nur wenn du möchtest.
+          </p>
+          <div className="space-y-2.5">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                {...form.register('optInEmail')}
+                className="mt-0.5 accent-green-700 w-4 h-4"
+              />
+              <span className="text-sm text-slate-700">
+                Per E-Mail über frische Produkte und Aktionen von{' '}
+                <strong>{farm.name}</strong> informiert werden
+              </span>
+            </label>
+            <label
+              className={`flex items-start gap-3 ${customerPhone?.length >= 4 ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
+            >
+              <input
+                type="checkbox"
+                {...form.register('optInWhatsApp')}
+                disabled={!customerPhone || customerPhone.length < 4}
+                className="mt-0.5 accent-green-700 w-4 h-4"
+              />
+              <span className="text-sm text-slate-700">
+                Per WhatsApp informiert werden
+                {(!customerPhone || customerPhone.length < 4) && (
+                  <span className="block text-xs text-slate-400 mt-0.5">
+                    Telefonnummer erforderlich
+                  </span>
+                )}
+              </span>
+            </label>
+          </div>
+          <p className="text-xs text-slate-400 mt-3">
+            Du kannst dich jederzeit abmelden — über den Link in jeder Nachricht oder in deinem{' '}
+            <a href="/account/profile" className="underline hover:text-slate-600">
+              Kunden-Profil
+            </a>
+            . Mehr Infos in unserer{' '}
+            <a href="/datenschutz" className="underline hover:text-slate-600">
+              Datenschutzerklärung
+            </a>
+            .
+          </p>
         </div>
 
         {/* Payment method */}

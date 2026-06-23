@@ -164,12 +164,13 @@ model Farm {
   updatedAt DateTime @updatedAt
 
   // Relations
-  owner       User         @relation(fields: [ownerId], references: [id])
-  ownerId     String       @unique
-  products    Product[]
-  orders      Order[]
-  pickupSlots PickupSlot[]
-  manualSales ManualSale[]
+  owner         User                       @relation(fields: [ownerId], references: [id])
+  ownerId       String                     @unique
+  products      Product[]
+  orders        Order[]
+  pickupSlots   PickupSlot[]
+  manualSales   ManualSale[]
+  subscriptions CustomerFarmSubscription[]
 
   @@index([slug])
 }
@@ -342,4 +343,22 @@ model WebhookEvent {
   createdAt      DateTime @default(now())
 
   @@index([stripeEventId])
+}
+
+model CustomerFarmSubscription {
+  id            String  @id @default(cuid())
+  customerEmail String
+  farmId        String
+  optInEmail    Boolean @default(false)
+  optInWhatsApp Boolean @default(false)
+  customerPhone String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@unique([customerEmail, farmId])
+  @@index([farmId, optInEmail])
+  @@index([farmId, optInWhatsApp])
 }

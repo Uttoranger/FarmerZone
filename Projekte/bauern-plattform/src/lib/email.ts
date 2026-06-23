@@ -8,6 +8,7 @@ import { NewOrderNotificationEmail } from '@/emails/new-order-notification'
 import { OrderConfirmedEmail } from '@/emails/order-confirmed'
 import { OrderReadyEmail } from '@/emails/pickup-reminder'
 import { OrderCancelledEmail } from '@/emails/order-cancelled'
+import { CustomerMagicLinkEmail } from '@/emails/customer-magic-link'
 
 const apiKey = process.env.RESEND_API_KEY
 const resend = apiKey ? new Resend(apiKey) : null
@@ -89,6 +90,12 @@ function n(v: { toString(): string } | number): number {
 
 // ─── Send-Funktionen ──────────────────────────────────────────────────────────
 
+/** Magic-Link → Kunde */
+export async function sendMagicLinkEmail(email: string, url: string, firstName?: string): Promise<void> {
+  const html = await toHtml(React.createElement(CustomerMagicLinkEmail, { firstName, magicUrl: url }))
+  await send(email, 'Dein Login-Link für FarmerZone', html)
+}
+
 /** Online-Zahlung bestätigt → Kunde */
 export async function sendOrderConfirmation(order: OrderForEmail): Promise<void> {
   const html = await toHtml(React.createElement(OrderConfirmationEmail, {
@@ -106,6 +113,7 @@ export async function sendOrderConfirmation(order: OrderForEmail): Promise<void>
       unitPrice: n(i.unitPrice),
     })),
     total: n(order.totalAmount),
+    manageUrl: `${APP_URL}/account/profile`,
   }))
 
   await send(

@@ -137,6 +137,49 @@ export default function DatenschutzPage() {
             </p>
           </Section>
 
+          <Section title="9. Newsletter und Neuigkeiten von Höfen">
+            <p>
+              Beim Abschluss einer Bestellung kannst du optional zustimmen, dass du vom jeweiligen
+              Hof über frische Produkte und Neuigkeiten informiert wirst — per E-Mail und/oder
+              WhatsApp.
+            </p>
+            <p>
+              Diese Einwilligung ist freiwillig und hat keinen Einfluss auf deine Bestellung. Du
+              kannst sie jederzeit widerrufen:
+            </p>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li>Über den Abmelde-Link in jeder Nachricht</li>
+              <li>
+                In deinem{' '}
+                <Link href="/account/profile" className="text-green-700 hover:underline">
+                  Kunden-Profil
+                </Link>{' '}
+                unter „Mein Konto"
+              </li>
+            </ul>
+            <p>
+              Rechtsgrundlage: Art. 6 Abs. 1 lit. a DSGVO (ausdrückliche Einwilligung).
+              Gespeichert werden ausschließlich deine E-Mail-Adresse, ggf. Telefonnummer und
+              die erteilten Einwilligungen.
+            </p>
+          </Section>
+
+          <Section title="10. Kunden-Konto (Magic-Link-Login)">
+            <p>
+              Du kannst dich per einmaligem Login-Link (Magic Link) in dein Kunden-Konto einloggen,
+              um deine Benachrichtigungs-Einstellungen zu verwalten. Dabei wird deine E-Mail-Adresse
+              gespeichert sowie ein temporärer Sitzungs-Cookie gesetzt (gültig 7 Tage).
+            </p>
+            <p>
+              Du kannst dein Konto und alle gespeicherten Einwilligungen jederzeit unter{' '}
+              <Link href="/account/profile" className="text-green-700 hover:underline">
+                Mein Konto → Konto löschen
+              </Link>{' '}
+              vollständig löschen. Bestelldaten werden aus steuerrechtlichen Gründen weiterhin
+              aufbewahrt (§ 132 BAO, 7 Jahre).
+            </p>
+          </Section>
+
           <p className="text-xs text-slate-400 pt-4 border-t border-slate-100">
             Stand: Juni 2026
           </p>
