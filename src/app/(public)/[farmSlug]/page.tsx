@@ -3,6 +3,7 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { MapPin, Phone, Mail, Clock, CreditCard, Banknote } from 'lucide-react'
 import { getPublicFarm } from '@/server/queries/farm'
+import { getActiveStatusPost } from '@/server/queries/status-posts'
 import { ProductGrid } from '@/components/farm/product-grid'
 
 export const revalidate = 60
@@ -35,6 +36,8 @@ export default async function FarmPage({ params }: Props) {
   const farm = await getPublicFarm(farmSlug)
 
   if (!farm) notFound()
+
+  const activeStatus = await getActiveStatusPost(farm.id)
 
   /* ── Paused state ─────────────────────────────────────────────── */
   if (farm.isPaused) {
@@ -197,6 +200,55 @@ export default async function FarmPage({ params }: Props) {
           </div>
         </div>
       </section>
+
+      {/* ── Active status post ──────────────────────────────────────── */}
+      {activeStatus && (
+        <section className="px-4 pb-6 max-w-4xl mx-auto">
+          {(() => {
+            const ANLASS_META: Record<string, { label: string; color: string }> = {
+              FRESH_PRODUCT: { label: '🥬 Frisches Produkt', color: 'bg-green-100 text-green-800' },
+              NEW_SEASON: { label: '🌱 Neue Saison', color: 'bg-emerald-100 text-emerald-800' },
+              PROMOTION: { label: '🏷️ Aktion', color: 'bg-amber-100 text-amber-800' },
+              ANNOUNCEMENT: { label: '📢 Mitteilung', color: 'bg-blue-100 text-blue-800' },
+            }
+            const meta = ANLASS_META[activeStatus.anlass] ?? ANLASS_META.ANNOUNCEMENT
+            const hoursAgo = Math.floor(
+              (Date.now() - new Date(activeStatus.publishedAt).getTime()) / (1000 * 60 * 60)
+            )
+            const timeStr =
+              hoursAgo < 1
+                ? 'gerade eben'
+                : hoursAgo < 24
+                ? `vor ${hoursAgo} Stunden`
+                : `vor ${Math.floor(hoursAgo / 24)} Tagen`
+
+            return (
+              <div className="bg-card rounded-2xl p-5 ring-1 ring-border/60 shadow-[0_2px_8px_oklch(0.18_0.03_150_/_0.05)]">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className={`text-xs font-semibold rounded-full px-2.5 py-1 ${meta.color}`}>
+                    {meta.label}
+                  </span>
+                  <span className="text-xs text-muted-foreground">Aktuell · {timeStr}</span>
+                </div>
+                <h2 className="font-heading text-lg font-semibold text-foreground mb-2">
+                  {activeStatus.title}
+                </h2>
+                <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                  {activeStatus.body}
+                </p>
+                {activeStatus.photoUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={activeStatus.photoUrl}
+                    alt={activeStatus.title}
+                    className="w-full rounded-xl mt-3 object-cover max-h-48"
+                  />
+                )}
+              </div>
+            )
+          })()}
+        </section>
+      )}
 
       {/* ── Products (client component with cart) ─────────────────── */}
       <ProductGrid products={farm.products} farmId={farm.id} farmSlug={farm.slug} />

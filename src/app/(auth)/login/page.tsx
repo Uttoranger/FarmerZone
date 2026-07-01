@@ -6,7 +6,13 @@ import { signIn } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2 } from 'lucide-react'
+import { Loader2, FlaskConical } from 'lucide-react'
+
+const IS_DEV = process.env.NODE_ENV === 'development'
+
+const DEV_ACCOUNTS = [
+  { label: 'Bauer Franz (Hof Müller)', email: 'bauer@hof-mueller.at', password: 'test1234' },
+]
 
 export default function LoginPage() {
   const router = useRouter()
@@ -14,6 +20,19 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [fehler, setFehler] = useState('')
   const [laedt, setLaedt] = useState(false)
+
+  async function quickLogin(devEmail: string, devPassword: string) {
+    setLaedt(true)
+    setFehler('')
+    const { error } = await signIn.email({ email: devEmail, password: devPassword })
+    if (error) {
+      setFehler('Dev-Login fehlgeschlagen: ' + (error.message ?? 'Unbekannter Fehler'))
+      setLaedt(false)
+      return
+    }
+    router.push('/dashboard')
+    router.refresh()
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -132,6 +151,29 @@ export default function LoginPage() {
         <p className="text-center text-xs text-muted-foreground mt-6">
           Nur für registrierte Hofbetreiber
         </p>
+
+        {IS_DEV && (
+          <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
+            <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-3">
+              <FlaskConical className="size-3.5 shrink-0" />
+              <span>Test-Konten · nur in der Entwicklungsumgebung sichtbar</span>
+            </div>
+            <div className="flex flex-col gap-2">
+              {DEV_ACCOUNTS.map((acc) => (
+                <button
+                  key={acc.email}
+                  type="button"
+                  onClick={() => quickLogin(acc.email, acc.password)}
+                  disabled={laedt}
+                  className="w-full text-left bg-white hover:bg-slate-100 border border-slate-200 rounded-xl px-3 py-2.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="text-sm font-medium text-slate-700">{acc.label}</span>
+                  <span className="block text-xs text-slate-400 mt-0.5 font-mono">{acc.email}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </main>
   )

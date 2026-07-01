@@ -2,13 +2,15 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, ShoppingBag, Package, PlusCircle, BarChart2, Settings, LogOut } from 'lucide-react'
+import { LayoutDashboard, ShoppingBag, Users, Megaphone, Package, PlusCircle, BarChart2, Settings, LogOut } from 'lucide-react'
 import { signOut } from '@/lib/auth-client'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
   { href: '/dashboard',  label: 'Übersicht',    icon: LayoutDashboard },
   { href: '/orders',     label: 'Bestellungen', icon: ShoppingBag },
+  { href: '/customers',  label: 'Kunden',       icon: Users },
+  { href: '/status',     label: 'Status',       icon: Megaphone },
   { href: '/products',   label: 'Produkte',     icon: Package },
   { href: '/sales',      label: 'Verkauf',      icon: PlusCircle },
   { href: '/analytics',  label: 'Auswertung',   icon: BarChart2 },
