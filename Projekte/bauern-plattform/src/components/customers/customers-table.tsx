@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import Link from 'next/link'
 import { Bell, Phone, ChevronUp, ChevronDown } from 'lucide-react'
 import type { CustomerSummary, CustomerStatus } from '@/server/queries/customers'
 import { cn } from '@/lib/utils'
@@ -165,11 +164,7 @@ export function CustomersTable({ customers }: { customers: CustomerSummary[] }) 
 
               {/* Last order */}
               <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap">
-                {c.daysSinceLastOrder === 0
-                  ? 'heute'
-                  : c.daysSinceLastOrder === 1
-                  ? 'gestern'
-                  : `vor ${c.daysSinceLastOrder} Tagen`}
+                {c.lastOrderShort}
               </td>
 
               {/* Top product */}
@@ -182,14 +177,14 @@ export function CustomersTable({ customers }: { customers: CustomerSummary[] }) 
               {/* Phone action */}
               <td className="px-3 py-2.5">
                 {c.customerPhone ? (
-                  <Link
+                  <a
                     href={`tel:${c.customerPhone}`}
                     onClick={(e) => e.stopPropagation()}
                     className="size-7 flex items-center justify-center rounded-lg bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
                     title={c.customerPhone}
                   >
                     <Phone className="size-3.5" />
-                  </Link>
+                  </a>
                 ) : (
                   <span className="text-muted-foreground/30 text-xs">—</span>
                 )}

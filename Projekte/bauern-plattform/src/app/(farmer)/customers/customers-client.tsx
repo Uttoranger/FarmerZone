@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Search, Bell, Phone, ChevronDown } from 'lucide-react'
 import type { CustomerSummary, CustomerStatus } from '@/server/queries/customers'
 import { CustomersTable } from '@/components/customers/customers-table'
@@ -45,6 +45,7 @@ function formatEuro(n: number): string {
 }
 
 export function CustomersClient({ customers }: { customers: CustomerSummary[] }) {
+  const router = useRouter()
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<FilterType>('all')
   const [sort, setSort] = useState<SortType>('orders')
@@ -199,10 +200,13 @@ export function CustomersClient({ customers }: { customers: CustomerSummary[] })
         ) : (
           <div className="flex flex-col gap-3">
             {sortedForCards.map((customer) => (
-              <Link
+              <div
                 key={customer.customerEmail}
-                href={`/customers/${encodeURIComponent(customer.customerEmail)}`}
-                className="block bg-card rounded-xl border border-border p-4 hover:border-primary/40 hover:shadow-sm transition-all"
+                role="link"
+                tabIndex={0}
+                onClick={() => router.push(`/customers/${encodeURIComponent(customer.customerEmail)}`)}
+                onKeyDown={(e) => e.key === 'Enter' && router.push(`/customers/${encodeURIComponent(customer.customerEmail)}`)}
+                className="block bg-card rounded-xl border border-border p-4 hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer"
               >
                 <div className="flex items-start gap-3">
                   <div
@@ -236,11 +240,7 @@ export function CustomersClient({ customers }: { customers: CustomerSummary[] })
                       {customer.orderCount}{' '}
                       {customer.orderCount === 1 ? 'Bestellung' : 'Bestellungen'}
                       {' · '}
-                      {customer.daysSinceLastOrder === 0
-                        ? 'heute bestellt'
-                        : customer.daysSinceLastOrder === 1
-                        ? 'gestern bestellt'
-                        : `zuletzt vor ${customer.daysSinceLastOrder} Tagen`}
+                      {customer.lastOrderLabel}
                     </p>
                     {customer.topProducts.length > 0 && (
                       <p className="text-xs text-muted-foreground/70 mt-1 truncate">
@@ -268,7 +268,7 @@ export function CustomersClient({ customers }: { customers: CustomerSummary[] })
                     )}
                   </div>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}

@@ -16,6 +16,8 @@ export interface CustomerSummary {
   firstOrderDate: string
   lastOrderDate: string
   daysSinceLastOrder: number
+  lastOrderLabel: string
+  lastOrderShort: string
   isSubscribed: boolean
   topProducts: { name: string; count: number }[]
   status: CustomerStatus
@@ -120,6 +122,20 @@ export async function getCustomersForFarm(farmId: string): Promise<CustomerSumma
       (now.getTime() - firstOrder.createdAt.getTime()) / (1000 * 60 * 60 * 24)
     )
 
+    const lastOrderLabel =
+      daysSinceLastOrder === 0
+        ? 'heute bestellt'
+        : daysSinceLastOrder === 1
+        ? 'gestern bestellt'
+        : `zuletzt vor ${daysSinceLastOrder} Tagen`
+
+    const lastOrderShort =
+      daysSinceLastOrder === 0
+        ? 'heute'
+        : daysSinceLastOrder === 1
+        ? 'gestern'
+        : `vor ${daysSinceLastOrder} Tagen`
+
     const sub = subscriptionMap.get(emailKey)
     const isSubscribed = !!(sub?.optInEmail || sub?.optInWhatsApp)
     const orderCount = customerOrders.length
@@ -134,6 +150,8 @@ export async function getCustomersForFarm(farmId: string): Promise<CustomerSumma
       firstOrderDate: firstOrder.createdAt.toISOString(),
       lastOrderDate: lastOrder.createdAt.toISOString(),
       daysSinceLastOrder,
+      lastOrderLabel,
+      lastOrderShort,
       isSubscribed,
       topProducts,
       status,
@@ -216,6 +234,20 @@ export async function getCustomerDetail(
     (now.getTime() - firstOrder.createdAt.getTime()) / (1000 * 60 * 60 * 24)
   )
 
+  const lastOrderLabel =
+    daysSinceLastOrder === 0
+      ? 'heute bestellt'
+      : daysSinceLastOrder === 1
+      ? 'gestern bestellt'
+      : `zuletzt vor ${daysSinceLastOrder} Tagen`
+
+  const lastOrderShort =
+    daysSinceLastOrder === 0
+      ? 'heute'
+      : daysSinceLastOrder === 1
+      ? 'gestern'
+      : `vor ${daysSinceLastOrder} Tagen`
+
   const isSubscribed = !!(subscription?.optInEmail || subscription?.optInWhatsApp)
   const orderCount = orders.length
   const status = computeStatus(orderCount, daysSinceLastOrder, firstOrderDaysAgo)
@@ -229,6 +261,8 @@ export async function getCustomerDetail(
     firstOrderDate: firstOrder.createdAt.toISOString(),
     lastOrderDate: lastOrder.createdAt.toISOString(),
     daysSinceLastOrder,
+    lastOrderLabel,
+    lastOrderShort,
     isSubscribed,
     topProducts,
     status,

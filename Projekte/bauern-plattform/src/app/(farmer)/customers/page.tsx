@@ -17,7 +17,7 @@ export default async function CustomersPage() {
   const customers = await getCustomersForFarm(farm.id)
 
   return (
-    <div className="px-4 py-6 max-w-2xl mx-auto">
+    <div className="px-4 py-6 max-w-2xl md:max-w-6xl mx-auto">
       <div className="mb-5">
         <div className="flex items-baseline gap-3">
           <h1 className="font-heading text-2xl font-semibold text-foreground">Meine Kunden</h1>
