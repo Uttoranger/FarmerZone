@@ -140,6 +140,35 @@ Prisma 7 · PostgreSQL 16 (Supabase) · Better Auth · Stripe Connect · Resend 
 - [x] Webhook + Confirm-Route auf neue Email-Funktionen umgestellt
 - [x] `checkout/route.ts` auf `sendOnsiteConfirmation` umgestellt
 
+### Kombinierter Sprint: Tabellen-Ansicht + Status-Werkstatt ✅
+
+**Teil 1 — Tabellen-Ansicht für /customers:**
+- [x] **`customers-client.tsx`** — Filter/Suche von Sortierung getrennt: `filtered` (unsortiert) → Tabelle auf Desktop; `sortedForCards` → Karten auf Mobile. Sort-Dropdown auf Mobile sichtbar (`md:hidden`), auf Desktop durch Spalten-Header ersetzt
+- [x] **`src/components/customers/customers-table.tsx`** — Eigener `sortCol/sortDir` State; sortierbare Spalten (Name/Bestellungen/Umsatz/Letzte Bestellung per Klick auf Header mit Pfeil-Indikator); Sticky Header; Hover-Highlight; Klick auf Zeile → Detailseite; Telefon-Icon in Aktionsspalte; Empty State
+
+**Teil 2 — Status-Werkstatt:**
+- [x] **`StatusPostAnlass` Enum** — FRESH_PRODUCT / NEW_SEASON / PROMOTION / ANNOUNCEMENT in `prisma/schema.prisma`
+- [x] **`StatusPost` Modell** — farmId, title, body, anlass, photoUrl, linkedProductIds[], publishedAt?, expiresAt?, showOnFarmPage, sentViaEmail, sentViaWhatsApp, emailRecipientCount, whatsappRecipientCount, whatsappSentCount; Index auf (farmId, publishedAt)
+- [x] **Migration** — `20260623_status_posts/migration.sql` manuell erstellt, via `prisma migrate deploy` angewendet (Supabase Shadow-DB Workaround)
+- [x] **`src/server/queries/status-posts.ts`** — `getStatusPostsForFarm` (alle mit isActive/isDraft Flags), `getActiveStatusPost` (für Hof-Seite, nur showOnFarmPage=true + nicht abgelaufen), `getStatusPostForWhatsApp` (inkl. Subscriber-Liste + Namensauflösung via Orders)
+- [x] **`src/server/actions/status-posts.ts`** — `publishStatusPost` (Frequenz-Schutz: max. 1 E-Mail pro 7 Tage farm-weit; `{Vorname}` Personalisierung; `revalidatePath` für /status und öffentliche Hof-Seite), `markWhatsAppSent`, `expireStatusPost`, `deleteStatusPost`
+- [x] **`src/emails/status-update.tsx`** — Anlass-Badge farbig, Titel, Body (Zeilenumbrüche erhalten), optionales Foto, Farm-CTA-Button, Abmelde-Link im Footer
+- [x] **`src/lib/email.ts`** — `sendStatusUpdateEmail()` hinzugefügt
+- [x] **`/status`** — Übersicht (Aktiv/Entwürfe/Vergangen-Sektionen), Empty State, "+ Neuer Status" Button; `status-post-card.tsx` mit Anlass-Badge, Status-Indikator, Statistiken, Deaktivieren/Löschen-Buttons, Link zu WhatsApp-Tap-Liste wenn unvollständig
+- [x] **`/status/new`** — 3-Schritt-Wizard: Schritt 1 (Anlass/Titel/Body/Produkte verlinken, Platzhalter-Buttons für Sprach&KI-Hilfe); Schritt 2 (4 Kanal-Cards mit Counts, Frequenz-Schutz-Hinweis, Info-Box); Schritt 3 (Vorschau-Card + Empfänger-Zusammenfassung + "Versand starten")
+- [x] **`/status/[id]/send-whatsapp`** — Fortschrittsbalken; pro Abonnent: Avatar+Name+Telefon, "Tippen"-Button öffnet `wa.me/…?text=…` mit vorbereiteter Nachricht; Mark-als-gesendet (clientseitig + Server via `markWhatsAppSent`); Erfolgsscreen bei 100%
+- [x] **`/api/status-image/[id]/route.tsx`** — `ImageResponse` aus `next/og` (kein Zusatzpaket nötig); 1080×1920 WhatsApp-Story-Format; Anlass-Badge, Titel, Body, Farm-Footer; downloadbar via `?download` oder direktem Link
+- [x] **Hof-Seite** — `getActiveStatusPost` parallel zu Farm-Daten; hervorgehobene Card nach Hof-Header mit Anlass-Badge + "vor X Stunden/Tagen"-Hinweis + Titel + Body + optionalem Foto
+- [x] **`farmer-nav.tsx`** — "Status" mit `Megaphone`-Icon zwischen "Kunden" und "Produkte"
+
+### Sprint 9c: Kundenliste mit Smart-Filtern und Detailansicht ✅
+- [x] **`src/server/queries/customers.ts`** — `getCustomersForFarm(farmId)`: aggregiert alle Bestellungen nach `customerEmail`, berechnet `orderCount`, `totalSpent` (ohne CANCELLED/NOT_PICKED_UP), `daysSinceLastOrder`, `topProducts` (Top 3), `isSubscribed` aus `CustomerFarmSubscription`; Status-Flags: `isStammkunde` (≥3 Bestellungen), `isDiesenMonatAktiv` (≤30 Tage), `isLangeNichtGesehen` (≥2 Bestellungen + >60 Tage), `isNeu` (1 Bestellung <14 Tage); `getCustomerDetail(farmId, email)` zusätzlich mit letzten 10 Bestellungen + Subscription-Details; alle Daten serialisiert (ISO-Strings, Numbers statt Decimal)
+- [x] **`/customers`** (Server Component) — Header mit Personen-Badge, gibt alle Kundendaten an `CustomersClient` weiter
+- [x] **`customers-client.tsx`** (Client Component) — Live-Suchleiste (Name/Telefon/Email); 5 Pill-Filter mit Counts (Alle/Stammkunden/Diesen Monat/Lange weg/Neu); Sort-Dropdown (Häufigste/Höchster Umsatz/Letzte Bestellung/Alphabetisch/Neueste Kunden); Kundenkarten mit Avatar+Initialen (grün=Stammkunde, amber=Lange weg), Glocken-Icon bei `isSubscribed`, Status-Badge, Top-2-Produkte im Footer; Tel-Icon als direkter `tel:`-Link; Insight-Box wenn ≥3 "Lange weg"-Kunden
+- [x] **`/customers/[customerEmail]`** (Server Component) — URL-Encoding für E-Mail beachtet (`encodeURIComponent` bei Links, `decodeURIComponent` + Prisma `mode: 'insensitive'` für Query); großer Avatar, Header mit Status-Badge + "Kunde seit Monat Jahr"; 3 Aktions-Buttons (Anrufen/WhatsApp/E-Mail, disabled wenn kein Telefon); Kontakt-Karte; 3 Statistik-Kacheln; Lieblingsprodukte-Karte; Abonnements-Sektion (wenn `isSubscribed`); letzte 5 Bestellungen (klickbar → `/orders/[orderId]`) mit Status-Farben aus `order-status.ts`
+- [x] **`farmer-nav.tsx`** — neuer Nav-Eintrag "Kunden" mit `Users`-Icon zwischen "Bestellungen" und "Produkte" (Desktop-Sidebar + Mobile-Tab-Bar)
+- [x] **Keine DB-Migration nötig** — `CustomerFarmSubscription` bereits in Sprint 9b angelegt
+
 ### Sprint 9b: Kunden-Opt-in-System ✅
 - [x] **Datenmodell** — neues Prisma-Modell `CustomerFarmSubscription` mit `customerEmail`, `farmId`, `optInEmail`, `optInWhatsApp`, `customerPhone`; Unique-Index auf `(customerEmail, farmId)`; manuell migriert via `20260623_customer_subscriptions`
 - [x] **Checkout-Checkboxen** — `optInEmail` + `optInWhatsApp` in Formular (beide unchecked by default, DSGVO-konform); WhatsApp-Toggle disabled wenn keine Telefonnummer; Datenschutz-Hinweis mit Links

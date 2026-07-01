@@ -38,6 +38,13 @@ enum PaymentStatus {
   REFUNDED  // zurückerstattet
 }
 
+enum StatusPostAnlass {
+  FRESH_PRODUCT
+  NEW_SEASON
+  PROMOTION
+  ANNOUNCEMENT
+}
+
 enum SalesChannel {
   PLATFORM  // automatisch über die Plattform
   WHATSAPP  // manuell eingetragen
@@ -171,6 +178,7 @@ model Farm {
   pickupSlots   PickupSlot[]
   manualSales   ManualSale[]
   subscriptions CustomerFarmSubscription[]
+  statusPosts   StatusPost[]
 
   @@index([slug])
 }
@@ -361,4 +369,28 @@ model CustomerFarmSubscription {
   @@unique([customerEmail, farmId])
   @@index([farmId, optInEmail])
   @@index([farmId, optInWhatsApp])
+}
+
+model StatusPost {
+  id                     String           @id @default(cuid())
+  farmId                 String
+  title                  String
+  body                   String           @db.Text
+  anlass                 StatusPostAnlass @default(FRESH_PRODUCT)
+  photoUrl               String?
+  linkedProductIds       String[]         @default([])
+  publishedAt            DateTime?
+  expiresAt              DateTime?
+  showOnFarmPage         Boolean          @default(true)
+  sentViaEmail           Boolean          @default(false)
+  sentViaWhatsApp        Boolean          @default(false)
+  emailRecipientCount    Int              @default(0)
+  whatsappRecipientCount Int              @default(0)
+  whatsappSentCount      Int              @default(0)
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+
+  farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@index([farmId, publishedAt])
 }

@@ -9,6 +9,7 @@ import { OrderConfirmedEmail } from '@/emails/order-confirmed'
 import { OrderReadyEmail } from '@/emails/pickup-reminder'
 import { OrderCancelledEmail } from '@/emails/order-cancelled'
 import { CustomerMagicLinkEmail } from '@/emails/customer-magic-link'
+import { StatusUpdateEmail } from '@/emails/status-update'
 
 const apiKey = process.env.RESEND_API_KEY
 const resend = apiKey ? new Resend(apiKey) : null
@@ -219,6 +220,32 @@ export async function sendOrderReady(order: OrderForEmail): Promise<void> {
     `${order.farm.name}: Deine Bestellung ist bereit zur Abholung`,
     html
   )
+}
+
+/** Status-Update → Abonnent */
+export async function sendStatusUpdateEmail(opts: {
+  to: string
+  farmName: string
+  farmSlug: string
+  title: string
+  body: string
+  anlass: string
+  photoUrl?: string
+  unsubscribeUrl: string
+}): Promise<void> {
+  const html = await toHtml(
+    React.createElement(StatusUpdateEmail, {
+      farmName: opts.farmName,
+      farmSlug: opts.farmSlug,
+      title: opts.title,
+      body: opts.body,
+      anlass: opts.anlass,
+      photoUrl: opts.photoUrl,
+      unsubscribeUrl: opts.unsubscribeUrl,
+      appUrl: APP_URL,
+    })
+  )
+  await send(opts.to, `${opts.farmName}: ${opts.title}`, html)
 }
 
 /** Storno → Kunde */
