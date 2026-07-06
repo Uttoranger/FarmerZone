@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
@@ -42,7 +42,7 @@ function getStatus(p: ProductData, stock: number) {
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   aktiv: { label: 'Aktiv', className: 'bg-green-100 text-green-800 border-green-200' },
   ausverkauft: { label: 'Ausverkauft', className: 'bg-red-100 text-red-800 border-red-200' },
-  pausiert: { label: 'Pausiert', className: 'bg-slate-100 text-slate-600 border-slate-200' },
+  pausiert: { label: 'Pausiert', className: 'bg-muted text-muted-foreground border-border' },
 }
 
 function formatPrice(price: number, unit: string, unitSize: number | null) {
@@ -126,8 +126,8 @@ export function ProductList({ products: initialProducts }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-medium text-slate-800">Produkte</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <h1 className="text-2xl font-medium text-foreground">Produkte</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             {products.length === 0
               ? 'Noch keine Produkte'
               : `${products.filter((p) => p.isAvailable).length} aktiv · ${products.length} gesamt`}
@@ -146,11 +146,11 @@ export function ProductList({ products: initialProducts }: Props) {
       {products.length === 0 && (
         <div className="text-center py-16">
           <Package className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-          <p className="font-medium text-slate-700 mb-1">Noch keine Produkte</p>
-          <p className="text-sm text-slate-400 mb-6">Leg dein erstes Produkt an, um loszulegen.</p>
+          <p className="font-medium text-foreground mb-1">Noch keine Produkte</p>
+          <p className="text-sm text-muted-foreground/60 mb-6">Leg dein erstes Produkt an, um loszulegen.</p>
           <Button
             onClick={() => setEditDialog({ open: true, product: null })}
-            className="bg-green-700 hover:bg-green-800 text-white"
+            className="bg-primary text-primary-foreground hover:opacity-90"
           >
             <Plus className="w-4 h-4 mr-1.5" />
             Erstes Produkt anlegen
@@ -170,7 +170,7 @@ export function ProductList({ products: initialProducts }: Props) {
               <CardContent className="p-0">
                 <div className="flex gap-0">
                   {/* Image */}
-                  <div className="shrink-0 w-20 h-20 md:w-24 md:h-24 bg-slate-100 flex items-center justify-center">
+                  <div className="shrink-0 w-20 h-20 md:w-24 md:h-24 bg-muted flex items-center justify-center">
                     {product.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -187,7 +187,7 @@ export function ProductList({ products: initialProducts }: Props) {
                   <div className="flex-1 px-3 py-2.5 min-w-0">
                     {/* Name + badges */}
                     <div className="flex items-start gap-1.5 flex-wrap">
-                      <span className="font-medium text-slate-800 text-sm leading-tight">
+                      <span className="font-medium text-foreground text-sm leading-tight">
                         {product.name}
                       </span>
                       <Badge className={`text-[10px] px-1.5 py-0 border ${badge.className}`}>
@@ -205,7 +205,7 @@ export function ProductList({ products: initialProducts }: Props) {
                     </div>
 
                     {/* Price */}
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       {formatPrice(product.price, product.unit, product.unitSize)}
                     </p>
 
@@ -213,7 +213,7 @@ export function ProductList({ products: initialProducts }: Props) {
                     <div className="flex items-center gap-2 mt-2">
                       <span
                         className={`text-xs font-medium min-w-[60px] ${
-                          isPending ? 'text-slate-400' : 'text-slate-700'
+                          isPending ? 'text-muted-foreground/60' : 'text-foreground'
                         }`}
                       >
                         Bestand: {product.stock}
@@ -234,23 +234,23 @@ export function ProductList({ products: initialProducts }: Props) {
                   </div>
 
                   {/* Action column */}
-                  <div className="shrink-0 flex flex-col border-l border-slate-100">
+                  <div className="shrink-0 flex flex-col border-l border-border/50">
                     <button
                       onClick={() => setEditDialog({ open: true, product })}
                       title="Bearbeiten"
-                      className="flex-1 flex items-center justify-center w-10 hover:bg-slate-50 transition-colors"
+                      className="flex-1 flex items-center justify-center w-10 hover:bg-muted/30 transition-colors"
                     >
-                      <Pencil className="w-3.5 h-3.5 text-slate-400" />
+                      <Pencil className="w-3.5 h-3.5 text-muted-foreground/60" />
                     </button>
-                    <div className="w-full h-px bg-slate-100" />
+                    <div className="w-full h-px bg-muted" />
                     <button
                       onClick={() => setStockDialogProduct(product)}
                       title="Bestand anpassen"
-                      className="flex-1 flex items-center justify-center w-10 hover:bg-slate-50 transition-colors"
+                      className="flex-1 flex items-center justify-center w-10 hover:bg-muted/30 transition-colors"
                     >
-                      <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
+                      <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground/60" />
                     </button>
-                    <div className="w-full h-px bg-slate-100" />
+                    <div className="w-full h-px bg-muted" />
                     <button
                       onClick={() => setDeleteConfirm(product)}
                       title="Löschen"
@@ -291,7 +291,7 @@ export function ProductList({ products: initialProducts }: Props) {
           <DialogHeader>
             <DialogTitle>Produkt löschen?</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted-foreground">
             <span className="font-medium">{deleteConfirm?.name}</span> wird dauerhaft gelöscht.
             Vergangene Bestellungen bleiben erhalten.
           </p>
@@ -308,3 +308,4 @@ export function ProductList({ products: initialProducts }: Props) {
     </>
   )
 }
+

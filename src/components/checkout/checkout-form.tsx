@@ -211,7 +211,7 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
   if (!isHydrated) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="size-6 animate-spin text-slate-400" />
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
       </div>
     )
   }
@@ -220,10 +220,10 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
   if (cart.length === 0) {
     return (
       <div className="max-w-lg mx-auto px-4 py-16 text-center">
-        <ShoppingCart className="size-12 text-slate-300 mx-auto mb-4" />
-        <h2 className="text-lg font-medium text-slate-700 mb-2">Dein Warenkorb ist leer</h2>
+        <ShoppingCart className="size-12 text-muted-foreground/40 mx-auto mb-4" />
+        <h2 className="text-lg font-medium text-foreground mb-2">Dein Warenkorb ist leer</h2>
         <Link href={`/${farm.slug}`}>
-          <Button className="bg-green-700 hover:bg-green-800 text-white mt-4">
+          <Button className="mt-4 bg-primary text-primary-foreground hover:opacity-90">
             Zurück zum Hof
           </Button>
         </Link>
@@ -236,17 +236,17 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
       {/* Back link */}
       <Link
         href={`/${farm.slug}`}
-        className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-6"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6"
       >
         <ArrowLeft className="size-4" />
         Zurück zu {farm.name}
       </Link>
 
-      <h1 className="text-xl font-semibold text-slate-800 mb-6">Bestellung abschließen</h1>
+      <h1 className="font-heading text-xl font-semibold text-foreground mb-6">Bestellung abschließen</h1>
 
       {/* Order summary */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 mb-6">
-        <h2 className="font-medium text-slate-700 mb-3">Bestellübersicht</h2>
+      <div className="bg-card rounded-xl border border-border p-4 mb-6">
+        <h2 className="font-medium text-foreground mb-3">Bestellübersicht</h2>
         <div className="space-y-3">
           {cart.map((item) => (
             <div key={item.productId} className="flex items-center gap-3">
@@ -260,29 +260,29 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
                 />
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-800 truncate">{item.name}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
+                <p className="text-xs text-muted-foreground">
                   {item.quantity} {UNIT_LABELS[item.unit] ?? item.unit} × {formatEuro(item.price)}
                 </p>
               </div>
-              <span className="text-sm font-medium text-slate-800 shrink-0">
+              <span className="text-sm font-medium text-foreground shrink-0">
                 {formatEuro(item.price * item.quantity)}
               </span>
             </div>
           ))}
         </div>
-        <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center">
-          <span className="font-semibold text-slate-800">Gesamt</span>
-          <span className="text-lg font-bold text-green-700">{formatEuro(total)}</span>
+        <div className="mt-4 pt-3 border-t border-border flex justify-between items-center">
+          <span className="font-semibold text-foreground">Gesamt</span>
+          <span className="text-lg font-bold text-primary">{formatEuro(total)}</span>
         </div>
       </div>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         {/* Pickup slot */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <h2 className="font-medium text-slate-700 mb-3">Abholtermin</h2>
+        <div className="bg-card rounded-xl border border-border p-4">
+          <h2 className="font-medium text-foreground mb-3">Abholtermin</h2>
           {pickupOptions.length === 0 ? (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground">
               Aktuell sind keine Abholtermine verfügbar. Bitte kontaktiere den Hof direkt.
             </p>
           ) : (
@@ -290,31 +290,31 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
               {pickupOptions.map((opt) => (
                 <label
                   key={opt.key}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer has-[:checked]:border-green-500 has-[:checked]:bg-green-50 transition-colors"
+                  className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/8 transition-colors"
                 >
                   <input
                     type="radio"
                     value={opt.key}
                     {...form.register('pickupSlotKey')}
-                    className="accent-green-700"
+                    className="accent-primary"
                   />
-                  <span className="text-sm text-slate-700">{opt.label}</span>
+                  <span className="text-sm text-foreground">{opt.label}</span>
                 </label>
               ))}
             </div>
           )}
           {form.formState.errors.pickupSlotKey && (
-            <p className="text-xs text-red-600 mt-2">
+            <p className="text-xs text-destructive mt-2">
               {form.formState.errors.pickupSlotKey.message}
             </p>
           )}
         </div>
 
         {/* Customer data */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-4">
-          <h2 className="font-medium text-slate-700">Deine Daten</h2>
+        <div className="bg-card rounded-xl border border-border p-4 space-y-4">
+          <h2 className="font-medium text-foreground">Deine Daten</h2>
           <div>
-            <Label htmlFor="customerName" className="text-sm text-slate-600 mb-1 block">
+            <Label htmlFor="customerName" className="text-sm text-muted-foreground mb-1 block">
               Name *
             </Label>
             <Input
@@ -324,13 +324,13 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
               className={form.formState.errors.customerName ? 'border-red-400' : ''}
             />
             {form.formState.errors.customerName && (
-              <p className="text-xs text-red-600 mt-1">
+              <p className="text-xs text-destructive mt-1">
                 {form.formState.errors.customerName.message}
               </p>
             )}
           </div>
           <div>
-            <Label htmlFor="customerEmail" className="text-sm text-slate-600 mb-1 block">
+            <Label htmlFor="customerEmail" className="text-sm text-muted-foreground mb-1 block">
               E-Mail *
             </Label>
             <Input
@@ -341,13 +341,13 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
               className={form.formState.errors.customerEmail ? 'border-red-400' : ''}
             />
             {form.formState.errors.customerEmail && (
-              <p className="text-xs text-red-600 mt-1">
+              <p className="text-xs text-destructive mt-1">
                 {form.formState.errors.customerEmail.message}
               </p>
             )}
           </div>
           <div>
-            <Label htmlFor="customerPhone" className="text-sm text-slate-600 mb-1 block">
+            <Label htmlFor="customerPhone" className="text-sm text-muted-foreground mb-1 block">
               Telefon *
             </Label>
             <Input
@@ -358,13 +358,13 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
               className={form.formState.errors.customerPhone ? 'border-red-400' : ''}
             />
             {form.formState.errors.customerPhone && (
-              <p className="text-xs text-red-600 mt-1">
+              <p className="text-xs text-destructive mt-1">
                 {form.formState.errors.customerPhone.message}
               </p>
             )}
           </div>
           <div>
-            <Label htmlFor="customerNote" className="text-sm text-slate-600 mb-1 block">
+            <Label htmlFor="customerNote" className="text-sm text-muted-foreground mb-1 block">
               Notiz an den Hof (optional)
             </Label>
             <Textarea
@@ -377,9 +377,9 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
         </div>
 
         {/* Newsletter opt-in */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <h2 className="font-medium text-slate-700 mb-1">Neuigkeiten vom Hof</h2>
-          <p className="text-xs text-slate-500 mb-3">
+        <div className="bg-card rounded-xl border border-border p-4">
+          <h2 className="font-medium text-foreground mb-1">Neuigkeiten vom Hof</h2>
+          <p className="text-xs text-muted-foreground mb-3">
             Standardmäßig nicht angehakt — nur wenn du möchtest.
           </p>
           <div className="space-y-2.5">
@@ -387,9 +387,9 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
               <input
                 type="checkbox"
                 {...form.register('optInEmail')}
-                className="mt-0.5 accent-green-700 w-4 h-4"
+                className="mt-0.5 accent-primary w-4 h-4"
               />
-              <span className="text-sm text-slate-700">
+              <span className="text-sm text-foreground">
                 Per E-Mail über frische Produkte und Aktionen von{' '}
                 <strong>{farm.name}</strong> informiert werden
               </span>
@@ -401,25 +401,25 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
                 type="checkbox"
                 {...form.register('optInWhatsApp')}
                 disabled={!customerPhone || customerPhone.length < 4}
-                className="mt-0.5 accent-green-700 w-4 h-4"
+                className="mt-0.5 accent-primary w-4 h-4"
               />
-              <span className="text-sm text-slate-700">
+              <span className="text-sm text-foreground">
                 Per WhatsApp informiert werden
                 {(!customerPhone || customerPhone.length < 4) && (
-                  <span className="block text-xs text-slate-400 mt-0.5">
+                  <span className="block text-xs text-muted-foreground mt-0.5">
                     Telefonnummer erforderlich
                   </span>
                 )}
               </span>
             </label>
           </div>
-          <p className="text-xs text-slate-400 mt-3">
+          <p className="text-xs text-muted-foreground mt-3">
             Du kannst dich jederzeit abmelden — über den Link in jeder Nachricht oder in deinem{' '}
-            <a href="/account/profile" className="underline hover:text-slate-600">
+            <a href="/account/profile" className="underline hover:text-foreground">
               Kunden-Profil
             </a>
             . Mehr Infos in unserer{' '}
-            <a href="/datenschutz" className="underline hover:text-slate-600">
+            <a href="/datenschutz" className="underline hover:text-foreground">
               Datenschutzerklärung
             </a>
             .
@@ -428,21 +428,21 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
 
         {/* Payment method */}
         {paymentMethods.length > 0 && (
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <h2 className="font-medium text-slate-700 mb-3">Zahlungsart</h2>
+          <div className="bg-card rounded-xl border border-border p-4">
+            <h2 className="font-medium text-foreground mb-3">Zahlungsart</h2>
             <div className="space-y-2">
               {paymentMethods.map((pm) => (
                 <label
                   key={pm.value}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer has-[:checked]:border-green-500 has-[:checked]:bg-green-50 transition-colors"
+                  className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/8 transition-colors"
                 >
                   <input
                     type="radio"
                     value={pm.value}
                     {...form.register('paymentMethod')}
-                    className="accent-green-700"
+                    className="accent-primary"
                   />
-                  <span className="text-sm text-slate-700">{pm.label}</span>
+                  <span className="text-sm text-foreground">{pm.label}</span>
                 </label>
               ))}
             </div>
@@ -453,15 +453,15 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
                   <input
                     type="checkbox"
                     {...form.register('onsiteConfirmed')}
-                    className="mt-0.5 accent-green-700"
+                    className="mt-0.5 accent-primary"
                   />
-                  <span className="text-sm text-slate-700">
+                  <span className="text-sm text-foreground">
                     Ich verpflichte mich, meine Bestellung zum gewählten Abholtermin abzuholen
                     und vor Ort zu bezahlen.
                   </span>
                 </label>
                 {form.formState.errors.onsiteConfirmed && (
-                  <p className="text-xs text-red-600 mt-1">
+                  <p className="text-xs text-destructive mt-1">
                     {form.formState.errors.onsiteConfirmed.message}
                   </p>
                 )}
@@ -469,7 +469,7 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
             )}
 
             {paymentMethod === 'ONLINE' && (
-              <p className="mt-3 text-xs text-slate-500">
+              <p className="mt-3 text-xs text-muted-foreground">
                 Du wirst nach dem Klick auf &quot;Weiter zur Zahlung&quot; zu Stripe weitergeleitet, um sicher zu bezahlen.
               </p>
             )}
@@ -479,7 +479,7 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
         <Button
           type="submit"
           disabled={isSubmitting || pickupOptions.length === 0}
-          className="w-full h-12 bg-green-700 hover:bg-green-800 text-white text-base font-semibold"
+          className="w-full h-12 bg-accent text-accent-foreground hover:bg-accent/90 text-base font-semibold"
         >
           {isSubmitting ? (
             <Loader2 className="size-5 animate-spin" />

@@ -61,7 +61,7 @@ async function handlePaymentSucceeded(pi: Stripe.PaymentIntent) {
     include: {
       farm: {
         select: {
-          name: true, slug: true, email: true, ownerName: true,
+          id: true, name: true, slug: true, email: true, ownerName: true,
           address: true, postalCode: true, city: true, phone: true,
         },
       },
@@ -84,6 +84,7 @@ async function handlePaymentSucceeded(pi: Stripe.PaymentIntent) {
   })
 
   const emailOrder = {
+    id: order.id,
     orderNumber: order.orderNumber,
     customerName: order.customerName,
     customerEmail: order.customerEmail,

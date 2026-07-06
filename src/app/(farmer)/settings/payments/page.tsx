@@ -1,4 +1,4 @@
-import Link from 'next/link'
+﻿import Link from 'next/link'
 import { headers } from 'next/headers'
 import { ChevronLeft, CheckCircle, AlertCircle, Clock } from 'lucide-react'
 import { auth } from '@/lib/auth'
@@ -36,19 +36,19 @@ export default async function PaymentsPage({
     <div className="p-4 md:p-6 max-w-2xl">
       <Link
         href="/settings"
-        className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-6"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6"
       >
         <ChevronLeft className="size-4" />
         Einstellungen
       </Link>
 
-      <h1 className="text-xl font-semibold text-slate-800 mb-1">Zahlungen</h1>
-      <p className="text-sm text-slate-500 mb-6">
+      <h1 className="text-xl font-semibold text-foreground mb-1">Zahlungen</h1>
+      <p className="text-sm text-muted-foreground mb-6">
         Verwalte, wie Kunden bezahlen können.
       </p>
 
       {stripeStatus === 'success' && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-primary/8 border border-green-200 px-4 py-3 text-sm text-green-800">
           <CheckCircle className="size-4 shrink-0" />
           Stripe-Konto erfolgreich eingerichtet! Online-Zahlung ist jetzt aktiv.
         </div>
@@ -89,7 +89,7 @@ export default async function PaymentsPage({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-2 text-sm text-green-700">
+          <div className="flex items-center gap-2 text-sm text-primary">
             <CheckCircle className="size-4" />
             Immer aktiv — keine Einrichtung nötig
           </div>
@@ -108,7 +108,7 @@ function StripeStatusBadge({
 }) {
   if (!accountId) {
     return (
-      <div className="flex items-center gap-2 text-sm text-slate-500 mb-4">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
         <AlertCircle className="size-4" />
         Noch nicht verbunden
       </div>
@@ -123,9 +123,10 @@ function StripeStatusBadge({
     )
   }
   return (
-    <div className="flex items-center gap-2 text-sm text-green-700 mb-4">
+    <div className="flex items-center gap-2 text-sm text-primary mb-4">
       <CheckCircle className="size-4" />
       Verbunden und aktiv
     </div>
   )
 }
+

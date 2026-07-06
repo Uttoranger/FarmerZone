@@ -33,7 +33,7 @@ export default async function StatusPage() {
         </div>
         <Link
           href="/status/new"
-          className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+          className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-accent text-accent-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
         >
           <Plus className="size-4" />
           Neuer Status
@@ -51,7 +51,7 @@ export default async function StatusPage() {
           </p>
           <Link
             href="/status/new"
-            className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+            className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-accent text-accent-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
           >
             <Plus className="size-4" />
             Ersten Status erstellen

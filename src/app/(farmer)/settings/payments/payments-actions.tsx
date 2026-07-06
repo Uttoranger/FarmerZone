@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -71,7 +71,7 @@ export function PaymentsActions({ hasAccount, isReady }: PaymentsActionsProps) {
 
   return (
     <div className="flex flex-wrap gap-2">
-      <Button size="sm" onClick={handleSetup} disabled={loading} className="bg-green-700 hover:bg-green-800 text-white">
+      <Button size="sm" onClick={handleSetup} disabled={loading} className="bg-primary text-primary-foreground hover:opacity-90">
         {loading ? (
           <Loader2 className="size-4 animate-spin" />
         ) : (
@@ -89,3 +89,4 @@ export function PaymentsActions({ hasAccount, isReady }: PaymentsActionsProps) {
     </div>
   )
 }
+

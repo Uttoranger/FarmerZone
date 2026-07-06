@@ -242,6 +242,7 @@ export async function POST(request: NextRequest) {
 
   await sendOnsiteConfirmation(
     {
+      id: order.id,
       orderNumber,
       customerName: data.customerName,
       customerEmail: data.customerEmail,
@@ -252,6 +253,7 @@ export async function POST(request: NextRequest) {
       pickupTimeEnd: data.pickupTimeEnd,
       paymentMethod: data.paymentMethod,
       farm: {
+        id: farm.id,
         name: farm.name,
         slug: farm.slug,
         email: farm.email,

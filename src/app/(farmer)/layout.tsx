@@ -18,7 +18,7 @@ export default async function FarmerLayout({ children }: { children: React.React
   }
 
   const farm = await getFarmForUser(session.user.id)
-  if (!farm) redirect('/login')
+  if (!farm) redirect('/onboarding')
 
   return (
     <div className="min-h-screen bg-background">

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
@@ -55,8 +55,8 @@ export function SalesClient({ recentSales, products }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-medium text-slate-800">Verkauf eintragen</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Direktverkäufe schnell erfassen</p>
+          <h1 className="text-2xl font-medium text-foreground">Verkauf eintragen</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Direktverkäufe schnell erfassen</p>
         </div>
         <Button onClick={openNewSale} className="gap-1.5">
           <Plus className="w-4 h-4" />
@@ -67,7 +67,7 @@ export function SalesClient({ recentSales, products }: Props) {
       {/* Quick-repeat buttons */}
       {quickSales.length > 0 && (
         <section className="mb-8">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
             Wiederholen
           </p>
           <div className="grid grid-cols-2 gap-2">
@@ -75,16 +75,16 @@ export function SalesClient({ recentSales, products }: Props) {
               <button
                 key={sale.id}
                 onClick={() => openFromQuick(sale)}
-                className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:border-green-300 hover:bg-green-50 active:scale-[0.98] transition-all text-left"
+                className="flex items-start gap-3 p-3 rounded-xl border border-border hover:border-green-300 hover:bg-primary/8 active:scale-[0.98] transition-all text-left"
               >
                 <span className="text-2xl shrink-0 mt-0.5">
                   {CHANNEL_ICONS[sale.channel] ?? '·'}
                 </span>
                 <div className="min-w-0">
-                  <p className="font-medium text-sm text-slate-800 truncate leading-tight">
+                  <p className="font-medium text-sm text-foreground truncate leading-tight">
                     {sale.productName}
                   </p>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-muted-foreground/60 mt-0.5">
                     {CHANNEL_LABELS[sale.channel]} · {formatEuro(sale.totalAmount)}
                   </p>
                 </div>
@@ -96,7 +96,7 @@ export function SalesClient({ recentSales, products }: Props) {
 
       {/* Recent sales list */}
       <section>
-        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
           Letzte Verkäufe
         </p>
         <SaleList sales={recentSales} onEdit={openEdit} />
@@ -113,3 +113,4 @@ export function SalesClient({ recentSales, products }: Props) {
     </>
   )
 }
+

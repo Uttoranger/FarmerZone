@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Text, Link } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue } from './_layout'
+import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton } from './_layout'
 
 export interface OrderReadyProps {
   customerName: string
@@ -11,6 +11,7 @@ export interface OrderReadyProps {
   farmCity: string
   pickupDate: string
   pickupTime: string
+  reorderUrl?: string
 }
 
 export function OrderReadyEmail(p: OrderReadyProps) {
@@ -39,6 +40,14 @@ export function OrderReadyEmail(p: OrderReadyProps) {
         Fragen?{' '}
         <Link href={`tel:${p.farmPhone}`} style={{ color: '#15803d' }}>{p.farmPhone}</Link>
       </Text>
+
+      {p.reorderUrl && (
+        <div style={{ textAlign: 'center', marginTop: '20px' }}>
+          <Link href={p.reorderUrl} style={{ ...ctaButton, backgroundColor: '#1a4f30', fontSize: '14px', padding: '12px 24px' }}>
+            🔁 Nochmal bestellen
+          </Link>
+        </div>
+      )}
     </EmailLayout>
   )
 }
