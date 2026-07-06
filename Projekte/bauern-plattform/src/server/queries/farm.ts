@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { DEFAULT_SECTIONS, type SectionConfig } from './appearance'
 
 export type PublicProduct = {
   id: string
@@ -25,6 +26,13 @@ export type PublicPickupSlot = {
   endTime: string
 }
 
+export type PublicFarmValue = {
+  id: string
+  icon: string
+  title: string
+  subtitle: string | null
+}
+
 export type PublicFarm = {
   id: string
   slug: string
@@ -38,6 +46,14 @@ export type PublicFarm = {
   email: string
   logoUrl: string | null
   bannerUrl: string | null
+  // Presentation fields
+  tagline: string | null
+  foundedYear: number | null
+  aboutText: string | null
+  bannerType: 'GRADIENT' | 'PHOTO'
+  bannerValue: string | null
+  sectionsConfig: SectionConfig[]
+  farmValues: PublicFarmValue[]
   acceptsOnline: boolean
   acceptsOnsite: boolean
   stripeAccountReady: boolean
@@ -63,11 +79,21 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
       email: true,
       logoUrl: true,
       bannerUrl: true,
+      tagline: true,
+      foundedYear: true,
+      aboutText: true,
+      bannerType: true,
+      bannerValue: true,
+      sectionsConfig: true,
       acceptsOnline: true,
       acceptsOnsite: true,
       stripeAccountReady: true,
       isPaused: true,
       pauseMessage: true,
+      farmValues: {
+        orderBy: { sortOrder: 'asc' },
+        select: { id: true, icon: true, title: true, subtitle: true },
+      },
       products: {
         orderBy: [{ isAvailable: 'desc' }, { name: 'asc' }],
         select: {
@@ -99,8 +125,16 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
 
   if (!farm) return null
 
+  const rawSections = farm.sectionsConfig
+  const sections: SectionConfig[] =
+    Array.isArray(rawSections) && rawSections.length > 0
+      ? (rawSections as SectionConfig[])
+      : DEFAULT_SECTIONS
+
   return {
     ...farm,
+    bannerType: farm.bannerType as 'GRADIENT' | 'PHOTO',
+    sectionsConfig: sections,
     products: farm.products.map((p) => ({
       ...p,
       price: Number(p.price),

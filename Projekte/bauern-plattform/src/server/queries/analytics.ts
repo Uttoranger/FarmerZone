@@ -196,6 +196,26 @@ function generateInsight(
   return null
 }
 
+export async function getYtdRevenue(farmId: string): Promise<number> {
+  const now = new Date()
+  const yearStart = new Date(now.getFullYear(), 0, 1)
+
+  const [orders, manualSales] = await Promise.all([
+    prisma.order.findMany({
+      where: { farmId, status: 'PICKED_UP', pickedUpAt: { gte: yearStart } },
+      select: { totalAmount: true },
+    }),
+    prisma.manualSale.findMany({
+      where: { farmId, saleDate: { gte: yearStart } },
+      select: { totalAmount: true },
+    }),
+  ])
+
+  const orderRevenue = orders.reduce((s, o) => s + Number(o.totalAmount), 0)
+  const manualRevenue = manualSales.reduce((s, m) => s + Number(m.totalAmount), 0)
+  return orderRevenue + manualRevenue
+}
+
 export async function getAnalyticsData(farmId: string, period: PeriodKey): Promise<AnalyticsData> {
   const { current, previous } = getDateRanges(period)
 

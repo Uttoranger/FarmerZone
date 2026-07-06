@@ -58,16 +58,16 @@ export function FarmerNav({ farmName, userName }: FarmerNavProps) {
       </nav>
 
       {/* ===== DESKTOP: Sidebar ===== */}
-      <aside className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:w-56 bg-secondary border-r border-border z-40">
+      <aside className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:w-56 bg-sidebar border-r border-border z-40">
         {/* Hof-Name */}
-        <div className="px-4 py-5 border-b border-border">
-          <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold mb-1">Hof</div>
-          <div className="font-heading font-semibold text-foreground truncate leading-tight">{farmName}</div>
-          <div className="text-xs text-muted-foreground truncate mt-0.5">{userName}</div>
+        <div className="px-4 py-5 border-b border-sidebar-border">
+          <div className="text-[10px] text-sidebar-foreground/50 uppercase tracking-widest font-semibold mb-1">Hof</div>
+          <div className="font-heading font-semibold text-sidebar-foreground truncate leading-tight">{farmName}</div>
+          <div className="text-xs text-sidebar-foreground/60 truncate mt-0.5">{userName}</div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-2 py-3 space-y-0.5">
+        <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + '/')
             return (
@@ -77,8 +77,8 @@ export function FarmerNav({ farmName, userName }: FarmerNavProps) {
                 className={cn(
                   'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-[250ms] min-h-[44px]',
                   active
-                    ? 'bg-muted text-primary font-semibold'
-                    : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+                    ? 'bg-white/20 text-sidebar-foreground font-semibold'
+                    : 'text-sidebar-foreground/60 hover:bg-white/10 hover:text-sidebar-foreground',
                 )}
               >
                 <Icon className="h-4.5 w-4.5 flex-shrink-0" strokeWidth={active ? 2.25 : 1.75} />
@@ -89,14 +89,14 @@ export function FarmerNav({ farmName, userName }: FarmerNavProps) {
         </nav>
 
         {/* Footer: Settings + Logout */}
-        <div className="px-2 py-3 border-t border-border space-y-0.5">
+        <div className="shrink-0 px-2 py-3 border-t border-sidebar-border space-y-0.5">
           <Link
             href="/settings"
             className={cn(
               'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-[250ms] min-h-[44px]',
               pathname.startsWith('/settings')
-                ? 'bg-muted text-primary font-semibold'
-                : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+                ? 'bg-white/20 text-sidebar-foreground font-semibold'
+                : 'text-sidebar-foreground/60 hover:bg-white/10 hover:text-sidebar-foreground',
             )}
           >
             <Settings className="h-4.5 w-4.5 flex-shrink-0" strokeWidth={1.75} />
@@ -105,7 +105,7 @@ export function FarmerNav({ farmName, userName }: FarmerNavProps) {
 
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-destructive/8 hover:text-destructive transition-colors duration-[250ms] min-h-[44px]"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-sidebar-foreground/60 hover:bg-red-500/15 hover:text-red-300 transition-colors duration-[250ms] min-h-[44px]"
           >
             <LogOut className="h-4.5 w-4.5 flex-shrink-0" strokeWidth={1.75} />
             Abmelden

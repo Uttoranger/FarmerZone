@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
@@ -82,22 +82,22 @@ export function StockDialog({ product, currentStock, onClose, onOptimisticUpdate
         <DialogHeader>
           <DialogTitle>Bestand anpassen</DialogTitle>
           {product && (
-            <p className="text-sm text-slate-500 mt-1">{product.name}</p>
+            <p className="text-sm text-muted-foreground mt-1">{product.name}</p>
           )}
         </DialogHeader>
 
         <div className="space-y-5 py-2">
           {/* Current stock display */}
-          <div className="text-center py-3 bg-slate-50 rounded-lg">
-            <div className="text-3xl font-semibold text-slate-800">{currentStock}</div>
-            <div className="text-sm text-slate-500 mt-0.5">
+          <div className="text-center py-3 bg-muted/30 rounded-lg">
+            <div className="text-3xl font-semibold text-foreground">{currentStock}</div>
+            <div className="text-sm text-muted-foreground mt-0.5">
               {product ? (UNIT_LABELS[product.unit] ?? product.unit) : ''}
             </div>
           </div>
 
           {/* Quick adjust buttons */}
           <div>
-            <Label className="text-xs text-slate-500 uppercase tracking-wide mb-2 block">
+            <Label className="text-xs text-muted-foreground uppercase tracking-wide mb-2 block">
               Schnell hinzufügen
             </Label>
             <div className="grid grid-cols-3 gap-2">
@@ -117,7 +117,7 @@ export function StockDialog({ product, currentStock, onClose, onOptimisticUpdate
 
           {/* Direct input */}
           <div>
-            <Label className="text-xs text-slate-500 uppercase tracking-wide mb-2 block">
+            <Label className="text-xs text-muted-foreground uppercase tracking-wide mb-2 block">
               Direkt setzen auf
             </Label>
             <div className="flex gap-2">
@@ -152,3 +152,4 @@ export function StockDialog({ product, currentStock, onClose, onOptimisticUpdate
     </Dialog>
   )
 }
+

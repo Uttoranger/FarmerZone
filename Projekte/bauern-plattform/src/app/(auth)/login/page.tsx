@@ -1,9 +1,11 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { signIn } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
+import { PasswordInput } from '@/components/ui/password-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2, FlaskConical } from 'lucide-react'
@@ -59,7 +61,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary mb-5 shadow-[0_4px_16px_oklch(0.38_0.089_150_/_0.3)]">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary mb-5 shadow-[0_4px_16px_oklch(0.30_0.082_155_/_0.30)]">
             <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <path
                 d="M16 28 C16 28 6 22 6 13 C6 8 10.5 4 16 4 C21.5 4 26 8 26 13 C26 22 16 28 16 28Z"
@@ -114,9 +116,8 @@ export default function LoginPage() {
               <Label htmlFor="password" className="text-sm font-medium text-foreground">
                 Passwort
               </Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
@@ -126,7 +127,11 @@ export default function LoginPage() {
             </div>
 
             {fehler && (
-              <p className="text-sm text-destructive bg-destructive/8 border border-destructive/20 rounded-xl px-3 py-2.5 leading-relaxed">
+              <p
+                role="alert"
+                aria-live="polite"
+                className="text-sm text-destructive bg-destructive/8 border border-destructive/20 rounded-xl px-3 py-2.5 leading-relaxed"
+              >
                 {fehler}
               </p>
             )}
@@ -134,7 +139,7 @@ export default function LoginPage() {
             <Button
               type="submit"
               disabled={laedt}
-              className="h-11 text-sm font-semibold bg-primary text-primary-foreground rounded-xl w-full mt-1"
+              className="h-11 text-sm font-semibold bg-accent text-accent-foreground hover:bg-accent/90 rounded-xl w-full mt-1"
             >
               {laedt ? (
                 <>
@@ -148,13 +153,16 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          Nur für registrierte Hofbetreiber
+        <p className="text-center text-sm text-muted-foreground mt-6">
+          Noch kein Konto?{' '}
+          <Link href="/register" className="text-primary font-medium hover:underline underline-offset-2">
+            Hof registrieren
+          </Link>
         </p>
 
         {IS_DEV && (
-          <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
-            <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-3">
+          <div className="mt-5 rounded-2xl border border-dashed border-border bg-muted/30 p-4">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60 mb-3">
               <FlaskConical className="size-3.5 shrink-0" />
               <span>Test-Konten · nur in der Entwicklungsumgebung sichtbar</span>
             </div>
@@ -165,10 +173,10 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => quickLogin(acc.email, acc.password)}
                   disabled={laedt}
-                  className="w-full text-left bg-white hover:bg-slate-100 border border-slate-200 rounded-xl px-3 py-2.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full text-left bg-white hover:bg-muted border border-border rounded-xl px-3 py-2.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <span className="text-sm font-medium text-slate-700">{acc.label}</span>
-                  <span className="block text-xs text-slate-400 mt-0.5 font-mono">{acc.email}</span>
+                  <span className="text-sm font-medium text-foreground">{acc.label}</span>
+                  <span className="block text-xs text-muted-foreground/60 mt-0.5 font-mono">{acc.email}</span>
                 </button>
               ))}
             </div>
@@ -178,3 +186,6 @@ export default function LoginPage() {
     </main>
   )
 }
+
+
+

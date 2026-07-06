@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useRef } from 'react'
 import { useForm, type Resolver } from 'react-hook-form'
@@ -199,9 +199,9 @@ export function ProductDialog({ open, product, onClose }: Props) {
 
               {/* === FOTO === */}
               <section>
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Foto</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Foto</p>
                 <div className="flex items-start gap-3">
-                  <div className="relative shrink-0 w-24 h-24 rounded-xl border-2 border-dashed border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center">
+                  <div className="relative shrink-0 w-24 h-24 rounded-xl border-2 border-dashed border-border overflow-hidden bg-muted/30 flex items-center justify-center">
                     {previewUrl ? (
                       <>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -237,7 +237,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
                     >
                       {previewUrl ? 'Foto ersetzen' : 'Foto wählen'}
                     </label>
-                    <p className="text-xs text-slate-400 mt-1.5">
+                    <p className="text-xs text-muted-foreground/60 mt-1.5">
                       JPEG, PNG oder WebP · max. 5 MB
                     </p>
                   </div>
@@ -246,7 +246,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
 
               {/* === GRUNDDATEN === */}
               <section className="space-y-3">
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Grunddaten</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Grunddaten</p>
 
                 <FormField
                   control={form.control}
@@ -284,7 +284,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
 
               {/* === PREIS & EINHEIT === */}
               <section className="space-y-3">
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Preis & Einheit</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Preis & Einheit</p>
 
                 <div className="grid grid-cols-2 gap-3">
                   <FormField
@@ -383,7 +383,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
 
               {/* === BESTAND & VERFÜGBARKEIT === */}
               <section className="space-y-3">
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Bestand & Verfügbarkeit</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Bestand & Verfügbarkeit</p>
 
                 <FormField
                   control={form.control}
@@ -410,7 +410,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
                   name="isAvailable"
                   render={({ field }) => (
                     <FormItem>
-                      <div className="flex items-center gap-3 p-3 rounded-lg border border-slate-200">
+                      <div className="flex items-center gap-3 p-3 rounded-lg border border-border">
                         <button
                           type="button"
                           role="switch"
@@ -430,7 +430,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
                           <FormLabel className="font-medium cursor-pointer" onClick={() => field.onChange(!field.value)}>
                             Im Shop verfügbar
                           </FormLabel>
-                          <p className="text-xs text-slate-400">
+                          <p className="text-xs text-muted-foreground/60">
                             {field.value ? 'Sichtbar und bestellbar' : 'Ausgeblendet im Shop'}
                           </p>
                         </div>
@@ -458,7 +458,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
 
               {/* === EIGENSCHAFTEN === */}
               <section className="space-y-2">
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Eigenschaften</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Eigenschaften</p>
                 <div className="space-y-2">
                   {(
                     [
@@ -472,7 +472,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
                       control={form.control}
                       name={name}
                       render={({ field }) => (
-                        <label className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-slate-50 cursor-pointer">
+                        <label className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted/30 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={field.value}
@@ -480,7 +480,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
                             className="w-4 h-4 rounded accent-green-600"
                           />
                           {icon}
-                          <span className="text-sm text-slate-700">{label}</span>
+                          <span className="text-sm text-foreground">{label}</span>
                         </label>
                       )}
                     />
@@ -490,7 +490,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
 
               {/* === ALLERGENE === */}
               <section className="space-y-2">
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Allergene (EU 14)</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Allergene (EU 14)</p>
                 <FormField
                   control={form.control}
                   name="allergens"
@@ -506,7 +506,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
                             className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
                               active
                                 ? 'bg-amber-100 border-amber-400 text-amber-800'
-                                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                                : 'bg-white border-border text-muted-foreground hover:border-border'
                             }`}
                           >
                             {label}
@@ -520,7 +520,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
 
               {/* === SAISONALITÄT === */}
               <section className="space-y-3">
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Saisonalität (optional)</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Saisonalität (optional)</p>
                 <div className="grid grid-cols-2 gap-3">
                   <FormField
                     control={form.control}
@@ -580,7 +580,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
                     )}
                   />
                 </div>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-muted-foreground/60">
                   Saison kann über den Jahreswechsel gehen (z. B. Okt → März)
                 </p>
               </section>
@@ -588,7 +588,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
             </div>
 
             {/* Fixed footer with action buttons */}
-            <DialogFooter className="px-6 py-4 border-t border-slate-100 shrink-0">
+            <DialogFooter className="px-6 py-4 border-t border-border/50 shrink-0">
               <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>
                 Abbrechen
               </Button>
@@ -602,3 +602,4 @@ export function ProductDialog({ open, product, onClose }: Props) {
     </Dialog>
   )
 }
+

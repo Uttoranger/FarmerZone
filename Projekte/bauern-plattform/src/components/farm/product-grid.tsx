@@ -1,17 +1,20 @@
 'use client'
 
-import { useState } from 'react'
-import { ShoppingCart, Leaf, Thermometer, Snowflake, Package } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ShoppingCart, Leaf, Thermometer, Snowflake, Package, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCart } from '@/lib/use-cart'
 import { UNIT_LABELS } from '@/schemas/product'
 import type { PublicProduct } from '@/server/queries/farm'
 import { CartSheet } from './cart-sheet'
 
+type ReorderItem = { productId: string; productName: string; quantity: number }
+
 type Props = {
   products: PublicProduct[]
   farmId: string
   farmSlug: string
+  initialReorderItems?: ReorderItem[]
 }
 
 const MONTH_SHORT = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
@@ -68,7 +71,6 @@ function ProductCard({
             <Package className="w-10 h-10 text-muted-foreground/40" />
           </div>
         )}
-        {/* Bio badge */}
         {product.isOrganic && (
           <div className="absolute top-2.5 left-2.5">
             <span className="inline-flex items-center gap-1 bg-primary text-primary-foreground text-[10px] font-semibold px-2 py-0.5 rounded-full">
@@ -77,7 +79,6 @@ function ProductCard({
             </span>
           </div>
         )}
-        {/* Storage icons */}
         <div className="absolute top-2.5 right-2.5 flex gap-1">
           {product.requiresCool && <Thermometer className="w-4 h-4 text-blue-500 drop-shadow" />}
           {product.requiresFreezer && <Snowflake className="w-4 h-4 text-sky-400 drop-shadow" />}
@@ -91,14 +92,12 @@ function ProductCard({
           {formatPrice(product.price, product.unit, product.unitSize)}
         </p>
 
-        {/* Season */}
         {product.seasonStart && product.seasonEnd && (
           <div className="mt-2">
             <SeasonBadge start={product.seasonStart} end={product.seasonEnd} />
           </div>
         )}
 
-        {/* Allergens */}
         {product.allergens.length > 0 && (
           <p className="text-[10px] text-muted-foreground mt-2 leading-tight">
             Enthält: {product.allergens.join(', ')}
@@ -107,13 +106,12 @@ function ProductCard({
 
         <div className="flex-1" />
 
-        {/* CTA */}
         <div className="mt-4">
           {canBuy ? (
             <button
               onClick={() => onAddToCart(product)}
               disabled={isAdding}
-              className="w-full h-10 bg-primary hover:opacity-90 active:scale-[0.98] disabled:opacity-60 text-primary-foreground text-sm font-semibold rounded-xl transition-all duration-[250ms] flex items-center justify-center gap-1.5"
+              className="w-full h-10 bg-accent hover:opacity-90 active:scale-[0.98] disabled:opacity-60 text-accent-foreground text-sm font-semibold rounded-xl transition-all duration-[250ms] flex items-center justify-center gap-1.5"
             >
               {isAdding ? (
                 <span className="animate-pulse">…</span>
@@ -137,11 +135,47 @@ function ProductCard({
   )
 }
 
-export function ProductGrid({ products, farmId, farmSlug }: Props) {
+export function ProductGrid({ products, farmId, farmSlug, initialReorderItems }: Props) {
   const [cartOpen, setCartOpen] = useState(false)
   const [addingId, setAddingId] = useState<string | null>(null)
+  const [showWelcomeBack, setShowWelcomeBack] = useState(false)
 
   const { items, count, total, isHydrated, addItem, updateQuantity, removeItem } = useCart(farmId)
+
+  // Prefill cart from reorder token
+  useEffect(() => {
+    if (!isHydrated || !initialReorderItems || initialReorderItems.length === 0) return
+    if (items.length > 0) return // don't overwrite existing cart
+
+    async function prefill() {
+      let prefilled = false
+      for (const ri of initialReorderItems!) {
+        const product = products.find(
+          (p) => p.id === ri.productId && p.isAvailable && p.stock > 0
+        )
+        if (!product) continue
+        const result = await addItem(
+          {
+            productId: product.id,
+            name: product.name,
+            price: product.price,
+            unit: product.unit,
+            unitSize: product.unitSize,
+            imageUrl: product.imageUrl,
+          },
+          ri.quantity
+        )
+        if (result.ok) prefilled = true
+      }
+      if (prefilled) {
+        setShowWelcomeBack(true)
+        setCartOpen(true)
+      }
+    }
+
+    prefill()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHydrated])
 
   async function handleAddToCart(product: PublicProduct) {
     setAddingId(product.id)
@@ -168,6 +202,24 @@ export function ProductGrid({ products, farmId, farmSlug }: Props) {
 
   return (
     <>
+      {/* Welcome-back banner */}
+      {showWelcomeBack && (
+        <div className="px-4 pb-4 max-w-4xl mx-auto">
+          <div className="flex items-center justify-between gap-3 bg-primary/10 border border-primary/20 rounded-2xl px-4 py-3">
+            <p className="text-sm text-foreground font-medium">
+              Willkommen zurück! Dein letzter Einkauf wurde vorgeladen.
+            </p>
+            <button
+              onClick={() => setShowWelcomeBack(false)}
+              className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Schließen"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Section heading */}
       <div className="px-4 pb-4 max-w-4xl mx-auto">
         <h2 className="font-heading text-2xl font-semibold text-foreground">Unsere Produkte</h2>
@@ -194,8 +246,8 @@ export function ProductGrid({ products, farmId, farmSlug }: Props) {
       {isHydrated && count > 0 && (
         <button
           onClick={() => setCartOpen(true)}
-          className="fixed bottom-6 inset-x-4 sm:inset-x-auto sm:right-6 sm:left-auto z-40 flex items-center justify-center gap-2.5 bg-primary hover:opacity-95 active:scale-[0.98] text-primary-foreground rounded-full px-6 py-3.5 transition-all duration-[250ms]"
-          style={{ boxShadow: '0 8px 24px oklch(0.38 0.089 150 / 0.35)' }}
+          className="fixed bottom-6 inset-x-4 sm:inset-x-auto sm:right-6 sm:left-auto z-40 flex items-center justify-center gap-2.5 bg-accent hover:opacity-95 active:scale-[0.98] text-accent-foreground rounded-full px-6 py-3.5 transition-all duration-[250ms]"
+          style={{ boxShadow: '0 8px 24px oklch(0.66 0.14 47 / 0.35)' }}
         >
           <ShoppingCart className="w-5 h-5" />
           <span className="font-semibold text-sm">

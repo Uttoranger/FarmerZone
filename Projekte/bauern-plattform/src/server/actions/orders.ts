@@ -24,6 +24,7 @@ async function getAuthFarm() {
 }
 
 type DbOrder = {
+  id: string
   orderNumber: string
   customerName: string
   customerEmail: string
@@ -43,12 +44,13 @@ type DbOrder = {
 }
 
 type FarmInfo = {
-  name: string; slug: string; email: string; ownerName: string
+  id: string; name: string; slug: string; email: string; ownerName: string
   address: string; postalCode: string; city: string; phone: string
 }
 
 function toEmailOrder(order: DbOrder, farm: FarmInfo): OrderForEmail {
   return {
+    id: order.id,
     orderNumber: order.orderNumber,
     customerName: order.customerName,
     customerEmail: order.customerEmail,
@@ -70,7 +72,7 @@ function toEmailOrder(order: DbOrder, farm: FarmInfo): OrderForEmail {
 }
 
 const ORDER_EMAIL_SELECT = {
-  id: true,
+  id: true,  // order ID (needed for reorder token)
   orderNumber: true,
   customerName: true,
   customerEmail: true,

@@ -49,63 +49,65 @@
 }
 
 :root {
-  /* ── FarmerZone Brand Palette ────────────────────────────────── */
+  /* ── Warm Harvest Brand Palette ─────────────────────────────── */
 
-  /* #FAFAF7 — Off-White, leicht warm */
-  --background: oklch(0.98 0.004 100);
-  /* #1A2B22 — Dunkelgrün-Schwarz */
-  --foreground: oklch(0.18 0.03 150);
+  /* #F7F2E7 — Warme Crème */
+  --background: oklch(0.962 0.018 87);
+  /* #1A2B22 — Tiefes Dunkelgrün */
+  --foreground: oklch(0.18 0.04 155);
 
-  /* #FFFFFF — Reine weiße Karten */
+  /* #FFFFFF — Weiße Karten auf Crème */
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.03 150);
+  --card-foreground: oklch(0.18 0.04 155);
 
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.03 150);
+  --popover-foreground: oklch(0.18 0.04 155);
 
-  /* #2D5F3F — Wiesen-Grün (Primary) */
-  --primary: oklch(0.38 0.089 150);
-  --primary-foreground: oklch(1 0 0);
+  /* #1F4732 — Dunkles Waldgrün */
+  --primary: oklch(0.30 0.082 155);
+  /* #F5EFE0 — Crème auf Dunkelgrün */
+  --primary-foreground: oklch(0.95 0.018 87);
 
-  /* #F4EFE6 — Soft Beige */
-  --secondary: oklch(0.96 0.015 80);
-  --secondary-foreground: oklch(0.18 0.03 150);
+  /* #EDE8DC — Warme Crème Panel */
+  --secondary: oklch(0.94 0.016 87);
+  --secondary-foreground: oklch(0.18 0.04 155);
 
-  /* #E8F0E8 — Sehr helles Grün für Muted-Backgrounds */
-  --muted: oklch(0.95 0.015 145);
-  /* #5C6F65 — Gedämpftes Grün-Grau */
-  --muted-foreground: oklch(0.48 0.03 155);
+  /* Gedämpfte Crème-Backgrounds */
+  --muted: oklch(0.93 0.016 86);
+  /* Gedämpftes Grün-Grau */
+  --muted-foreground: oklch(0.50 0.030 155);
 
-  /* Accent = helles Grün (für Hover-States in UI) */
-  --accent: oklch(0.95 0.015 145);
-  --accent-foreground: oklch(0.38 0.089 150);
+  /* #E8854A — Warmes Orange (CTA, max. 1× pro Seite) */
+  --accent: oklch(0.66 0.14 47);
+  /* Dunkler Text auf Orange (WCAG AA) */
+  --accent-foreground: oklch(0.18 0.04 155);
 
   --destructive: oklch(0.577 0.245 27.325);
 
-  /* #E8E5DC — Warm-Grau Border */
-  --border: oklch(0.92 0.01 85);
-  --input: oklch(0.92 0.01 85);
-  /* #7BAE85 — Frisches Grün für Focus-Ring */
+  /* Warm-Grau Border */
+  --border: oklch(0.90 0.012 85);
+  --input: oklch(0.90 0.012 85);
+  /* Frisches Grün Focus-Ring */
   --ring: oklch(0.68 0.071 148);
 
   /* Charts */
-  --chart-1: oklch(0.38 0.089 150);
-  --chart-2: oklch(0.68 0.071 148);
-  --chart-3: oklch(0.66 0.15 41);
-  --chart-4: oklch(0.96 0.015 80);
-  --chart-5: oklch(0.48 0.03 155);
+  --chart-1: oklch(0.30 0.082 155);
+  --chart-2: oklch(0.66 0.14 47);
+  --chart-3: oklch(0.55 0.10 41);
+  --chart-4: oklch(0.94 0.016 87);
+  --chart-5: oklch(0.50 0.030 155);
 
-  /* Radius — 12px Basis (weich, organisch) */
+  /* Radius — 12px Basis */
   --radius: 0.75rem;
 
-  /* Sidebar — Soft Beige */
-  --sidebar: oklch(0.96 0.015 80);
-  --sidebar-foreground: oklch(0.18 0.03 150);
-  --sidebar-primary: oklch(0.38 0.089 150);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.95 0.015 145);
-  --sidebar-accent-foreground: oklch(0.38 0.089 150);
-  --sidebar-border: oklch(0.92 0.01 85);
+  /* Sidebar — Dunkles Waldgrün #1F4732 */
+  --sidebar: oklch(0.30 0.082 155);
+  --sidebar-foreground: oklch(0.95 0.018 87);
+  --sidebar-primary: oklch(0.95 0.018 87);
+  --sidebar-primary-foreground: oklch(0.30 0.082 155);
+  --sidebar-accent: oklch(1 0 0 / 0.12);
+  --sidebar-accent-foreground: oklch(0.95 0.018 87);
+  --sidebar-border: oklch(1 0 0 / 0.10);
   --sidebar-ring: oklch(0.68 0.071 148);
 }
 

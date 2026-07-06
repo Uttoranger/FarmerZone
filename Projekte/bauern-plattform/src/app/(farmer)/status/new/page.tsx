@@ -33,7 +33,7 @@ export default async function StatusNewPage() {
   ])
 
   return (
-    <div className="px-4 py-6 max-w-xl mx-auto">
+    <div className="px-4 py-6">
       <StatusNewClient
         products={products.map((p) => ({ id: p.id, name: p.name, price: Number(p.price) }))}
         emailCount={emailCount}

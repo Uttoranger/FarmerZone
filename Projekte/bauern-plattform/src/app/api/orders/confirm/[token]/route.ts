@@ -13,7 +13,7 @@ export async function GET(
     include: {
       farm: {
         select: {
-          name: true, slug: true, email: true, ownerName: true,
+          id: true, name: true, slug: true, email: true, ownerName: true,
           address: true, postalCode: true, city: true, phone: true,
         },
       },
@@ -42,6 +42,7 @@ export async function GET(
   })
 
   const emailOrder = {
+    id: order.id,
     orderNumber: order.orderNumber,
     customerName: order.customerName,
     customerEmail: order.customerEmail,

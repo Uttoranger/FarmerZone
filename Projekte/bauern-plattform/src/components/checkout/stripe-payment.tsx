@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import {
@@ -33,18 +33,18 @@ export function StripePaymentStep({
     <div className="max-w-lg mx-auto px-4 py-6">
       <button
         onClick={onBack}
-        className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-6"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6"
       >
         <ArrowLeft className="size-4" />
         Zurück
       </button>
 
-      <h1 className="text-xl font-semibold text-slate-800 mb-2">Zahlung</h1>
-      <p className="text-sm text-slate-500 mb-6">
+      <h1 className="text-xl font-semibold text-foreground mb-2">Zahlung</h1>
+      <p className="text-sm text-muted-foreground mb-6">
         Deine Bestellung ist reserviert. Bitte gib jetzt deine Zahlungsdaten ein.
       </p>
 
-      <div className="bg-white rounded-xl border border-slate-200 p-4">
+      <div className="bg-white rounded-xl border border-border p-4">
         <Elements
           stripe={stripePromise}
           options={{
@@ -67,7 +67,7 @@ export function StripePaymentStep({
         </Elements>
       </div>
 
-      <div className="flex items-center justify-center gap-2 mt-4 text-xs text-slate-400">
+      <div className="flex items-center justify-center gap-2 mt-4 text-xs text-muted-foreground/60">
         <Lock className="size-3" />
         Sichere Zahlung über Stripe
       </div>
@@ -119,7 +119,7 @@ function PaymentForm({
         type="button"
         onClick={handlePay}
         disabled={!stripe || isProcessing}
-        className="w-full h-12 bg-green-700 hover:bg-green-800 text-white text-base font-semibold"
+        className="w-full h-12 bg-primary text-primary-foreground hover:opacity-90 text-base font-semibold"
       >
         {isProcessing ? (
           <Loader2 className="size-5 animate-spin" />
@@ -130,3 +130,4 @@ function PaymentForm({
     </div>
   )
 }
+

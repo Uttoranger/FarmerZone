@@ -10,6 +10,7 @@ import { OrderReadyEmail } from '@/emails/pickup-reminder'
 import { OrderCancelledEmail } from '@/emails/order-cancelled'
 import { CustomerMagicLinkEmail } from '@/emails/customer-magic-link'
 import { StatusUpdateEmail } from '@/emails/status-update'
+import { generateReorderToken } from '@/lib/reorder-token'
 
 const apiKey = process.env.RESEND_API_KEY
 const resend = apiKey ? new Resend(apiKey) : null
@@ -57,6 +58,7 @@ function formatPickupDate(date: Date): string {
 // ─── Typen ────────────────────────────────────────────────────────────────────
 
 export type OrderForEmail = {
+  id: string
   orderNumber: string
   customerName: string
   customerEmail: string
@@ -68,6 +70,7 @@ export type OrderForEmail = {
   paymentMethod: string
   stripePaymentIntentId?: string | null
   farm: {
+    id: string
     name: string
     email: string
     ownerName: string
@@ -99,6 +102,9 @@ export async function sendMagicLinkEmail(email: string, url: string, firstName?:
 
 /** Online-Zahlung bestätigt → Kunde */
 export async function sendOrderConfirmation(order: OrderForEmail): Promise<void> {
+  const reorderToken = generateReorderToken(order.id, order.farm.id)
+  const reorderUrl = `${APP_URL}/${order.farm.slug}?reorder=${reorderToken}`
+
   const html = await toHtml(React.createElement(OrderConfirmationEmail, {
     customerName: order.customerName,
     orderNumber: order.orderNumber,
@@ -115,6 +121,7 @@ export async function sendOrderConfirmation(order: OrderForEmail): Promise<void>
     })),
     total: n(order.totalAmount),
     manageUrl: `${APP_URL}/account/profile`,
+    reorderUrl,
   }))
 
   await send(
@@ -204,6 +211,9 @@ export async function sendOrderConfirmedToFarmer(order: OrderForEmail): Promise<
 
 /** Bauer markiert als bereit → Kunde */
 export async function sendOrderReady(order: OrderForEmail): Promise<void> {
+  const reorderToken = generateReorderToken(order.id, order.farm.id)
+  const reorderUrl = `${APP_URL}/${order.farm.slug}?reorder=${reorderToken}`
+
   const html = await toHtml(React.createElement(OrderReadyEmail, {
     customerName: order.customerName,
     orderNumber: order.orderNumber,
@@ -213,6 +223,7 @@ export async function sendOrderReady(order: OrderForEmail): Promise<void> {
     farmCity: order.farm.city,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
+    reorderUrl,
   }))
 
   await send(

@@ -20,7 +20,7 @@ export default async function CheckoutPage({ params }: Props) {
   if (!farm || farm.isPaused) notFound()
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background">
       <CheckoutForm farm={farm} />
     </div>
   )

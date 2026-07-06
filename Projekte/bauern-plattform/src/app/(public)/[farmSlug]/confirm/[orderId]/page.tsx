@@ -81,15 +81,15 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
   })
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background">
       {/* Always clear the cart when reaching the confirm page — the order has been submitted */}
       <ClearCartOnMount />
       <div className="max-w-lg mx-auto px-4 py-10">
         {isOnlinePaid && (
           <div className="flex flex-col items-center text-center mb-8">
             <CheckCircle className="size-14 text-green-600 mb-3" />
-            <h1 className="text-2xl font-bold text-slate-800">Zahlung erfolgreich!</h1>
-            <p className="text-slate-500 mt-1">
+            <h1 className="font-heading text-2xl font-semibold text-foreground">Zahlung erfolgreich!</h1>
+            <p className="text-muted-foreground mt-1">
               Deine Bestellung wurde bestätigt. Du erhältst eine E-Mail-Bestätigung.
             </p>
           </div>
@@ -98,8 +98,8 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
         {isOnsiteConfirmed && (
           <div className="flex flex-col items-center text-center mb-8">
             <CheckCircle className="size-14 text-green-600 mb-3" />
-            <h1 className="text-2xl font-bold text-slate-800">Bestellung bestätigt!</h1>
-            <p className="text-slate-500 mt-1">
+            <h1 className="font-heading text-2xl font-semibold text-foreground">Bestellung bestätigt!</h1>
+            <p className="text-muted-foreground mt-1">
               Deine Bestellung wurde verbindlich bestätigt. Bitte hole sie zum gewählten
               Termin ab und zahle vor Ort.
             </p>
@@ -109,8 +109,8 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
         {isOnsitePending && (
           <div className="flex flex-col items-center text-center mb-8">
             <Clock className="size-14 text-amber-500 mb-3" />
-            <h1 className="text-2xl font-bold text-slate-800">Fast geschafft!</h1>
-            <p className="text-slate-500 mt-1">
+            <h1 className="font-heading text-2xl font-semibold text-foreground">Fast geschafft!</h1>
+            <p className="text-muted-foreground mt-1">
               Bitte bestätige deine Bestellung über den Link in der E-Mail an{' '}
               <strong>{order.customerEmail}</strong>.
             </p>
@@ -120,40 +120,40 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
         {isOnlineFailed && (
           <div className="flex flex-col items-center text-center mb-8">
             <XCircle className="size-14 text-red-500 mb-3" />
-            <h1 className="text-2xl font-bold text-slate-800">Zahlung fehlgeschlagen</h1>
-            <p className="text-slate-500 mt-1">
+            <h1 className="font-heading text-2xl font-semibold text-foreground">Zahlung fehlgeschlagen</h1>
+            <p className="text-muted-foreground mt-1">
               Bitte versuche es erneut oder wähle eine andere Zahlungsart.
             </p>
             <Link
               href={`/${farmSlug}/checkout`}
-              className="mt-4 inline-flex items-center justify-center rounded-lg bg-green-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-green-800"
+              className="mt-4 inline-flex items-center justify-center rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accent-foreground hover:opacity-90"
             >
               Erneut versuchen
             </Link>
           </div>
         )}
 
-        <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+        <div className="bg-card rounded-xl border border-border p-4 mb-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-500 uppercase tracking-wide">Bestellnummer</span>
-            <span className="font-mono font-bold text-slate-800">{order.orderNumber}</span>
+            <span className="text-xs text-muted-foreground uppercase tracking-wide">Bestellnummer</span>
+            <span className="font-mono font-bold text-foreground">{order.orderNumber}</span>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4 space-y-3">
-          <h2 className="font-medium text-slate-700 flex items-center gap-2">
-            <Calendar className="size-4 text-green-700" />
+        <div className="bg-card rounded-xl border border-border p-4 mb-4 space-y-3">
+          <h2 className="font-medium text-foreground flex items-center gap-2">
+            <Calendar className="size-4 text-primary" />
             Abholtermin
           </h2>
-          <p className="text-sm text-slate-700">
+          <p className="text-sm text-foreground">
             {pickupDate}
             <br />
-            <span className="text-slate-500">
+            <span className="text-muted-foreground">
               {order.pickupTimeStart} – {order.pickupTimeEnd} Uhr
             </span>
           </p>
-          <div className="flex items-start gap-2 text-sm text-slate-500">
-            <MapPin className="size-4 text-slate-400 mt-0.5 shrink-0" />
+          <div className="flex items-start gap-2 text-sm text-muted-foreground">
+            <MapPin className="size-4 text-muted-foreground/60 mt-0.5 shrink-0" />
             <span>
               {order.farm.name}
               <br />
@@ -162,26 +162,26 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-4 mb-6">
-          <h2 className="font-medium text-slate-700 mb-3 flex items-center gap-2">
-            <Package className="size-4 text-green-700" />
+        <div className="bg-card rounded-xl border border-border p-4 mb-6">
+          <h2 className="font-medium text-foreground mb-3 flex items-center gap-2">
+            <Package className="size-4 text-primary" />
             Bestellübersicht
           </h2>
           <div className="space-y-2">
             {order.items.map((item, i) => (
               <div key={i} className="flex justify-between text-sm">
-                <span className="text-slate-700">
+                <span className="text-foreground">
                   {item.quantity} × {item.productName}
                 </span>
-                <span className="text-slate-700">{formatEuro(Number(item.totalPrice))}</span>
+                <span className="text-foreground">{formatEuro(Number(item.totalPrice))}</span>
               </div>
             ))}
           </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between font-semibold">
+          <div className="mt-3 pt-3 border-t border-border flex justify-between font-semibold">
             <span>Gesamt</span>
-            <span className="text-green-700">{formatEuro(Number(order.totalAmount))}</span>
+            <span className="text-primary">{formatEuro(Number(order.totalAmount))}</span>
           </div>
-          <p className="text-xs text-slate-400 mt-2">
+          <p className="text-xs text-muted-foreground mt-2">
             {order.paymentMethod === 'ONLINE'
               ? 'Online bezahlt'
               : order.paymentMethod === 'ONSITE_CASH'
@@ -192,7 +192,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
 
         <Link
           href={`/${farmSlug}`}
-          className="block text-center text-sm text-green-700 hover:underline"
+          className="block text-center text-sm text-primary hover:underline"
         >
           ← Zurück zu {order.farm.name}
         </Link>

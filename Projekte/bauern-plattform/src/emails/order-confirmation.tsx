@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Text, Link, Hr } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue } from './_layout'
+import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton } from './_layout'
 
 export interface OrderConfirmationProps {
   customerName: string
@@ -14,6 +14,7 @@ export interface OrderConfirmationProps {
   items: Array<{ name: string; quantity: number; unitPrice: number }>
   total: number
   manageUrl?: string
+  reorderUrl?: string
 }
 
 export function OrderConfirmationEmail(p: OrderConfirmationProps) {
@@ -21,6 +22,13 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps) {
 
   return (
     <EmailLayout previewText={`Bestellung ${p.orderNumber} bestätigt – Abholung ${p.pickupDate}`} manageUrl={p.manageUrl}>
+      {p.reorderUrl && (
+        <div style={{ textAlign: 'center', margin: '0 0 8px' }}>
+          <Link href={p.reorderUrl} style={{ ...ctaButton, backgroundColor: '#1a4f30', fontSize: '14px', padding: '12px 24px' }}>
+            🔁 Nochmal bestellen
+          </Link>
+        </div>
+      )}
       <Text style={h1}>Zahlung erfolgreich ✓</Text>
       <Text style={bodyText}>
         Hallo {p.customerName},<br />

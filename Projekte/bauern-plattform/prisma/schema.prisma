@@ -64,6 +64,11 @@ enum ProductUnit {
   PAKET
 }
 
+enum BannerType {
+  GRADIENT
+  PHOTO
+}
+
 // === ENTITÄTEN ===
 
 model User {
@@ -149,6 +154,14 @@ model Farm {
   logoUrl     String?
   bannerUrl   String?
 
+  // Auftritt / Präsentation
+  tagline        String?
+  foundedYear    Int?
+  aboutText      String?    @db.Text
+  bannerType     BannerType @default(GRADIENT)
+  bannerValue    String?    // gradient preset key or uploaded photo URL
+  sectionsConfig Json?      // SectionConfig[] — which sections are visible and in which order
+
   // Stripe Connect
   stripeAccountId    String?  @unique
   stripeAccountReady Boolean  @default(false)
@@ -179,6 +192,8 @@ model Farm {
   manualSales   ManualSale[]
   subscriptions CustomerFarmSubscription[]
   statusPosts   StatusPost[]
+  farmValues    FarmValue[]
+  farmPhotos    FarmPhoto[]
 
   @@index([slug])
 }
@@ -393,4 +408,29 @@ model StatusPost {
   farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
 
   @@index([farmId, publishedAt])
+}
+
+model FarmValue {
+  id        String  @id @default(cuid())
+  farmId    String
+  icon      String  // emoji, e.g. "🐄"
+  title     String
+  subtitle  String?
+  sortOrder Int
+
+  farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@index([farmId])
+}
+
+model FarmPhoto {
+  id        String  @id @default(cuid())
+  farmId    String
+  url       String
+  caption   String?
+  sortOrder Int
+
+  farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@index([farmId])
 }
