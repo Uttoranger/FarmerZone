@@ -3,7 +3,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { getOwnerFarm } from '@/server/queries/farm'
 import { getActiveStatusPost } from '@/server/queries/status-posts'
-import { FarmPageView } from '@/components/farm/farm-page-view'
+import { FarmPageClient } from '@/components/farmer/farm-page-client'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,11 +16,5 @@ export default async function FarmPageOwnerRoute() {
 
   const activeStatus = await getActiveStatusPost(farm.id)
 
-  return (
-    <FarmPageView
-      farm={farm}
-      activeStatus={activeStatus}
-      ownerMode={true}
-    />
-  )
+  return <FarmPageClient farm={farm} activeStatus={activeStatus} />
 }

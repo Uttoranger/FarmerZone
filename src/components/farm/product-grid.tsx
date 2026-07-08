@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ShoppingCart, Leaf, Thermometer, Snowflake, Package, X, Pencil, Plus } from 'lucide-react'
+import { ShoppingCart, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCart } from '@/lib/use-cart'
 import { UNIT_LABELS } from '@/schemas/product'
@@ -17,7 +17,10 @@ type Props = {
   farmSlug: string
   initialReorderItems?: ReorderItem[]
   ownerMode?: boolean
+  mode?: 'edit' | 'preview'
 }
+
+const LOW_STOCK = 5
 
 const MONTH_SHORT = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
 
@@ -42,138 +45,183 @@ function SeasonBadge({ start, end }: { start: number; end: number }) {
   )
 }
 
+type StripState =
+  | { type: 'hidden' }
+  | { type: 'soldout' }
+  | { type: 'low'; count: number }
+  | { type: 'normal'; count: number }
+
+function getStripState(product: PublicProduct): StripState {
+  if (!product.isAvailable) return { type: 'hidden' }
+  if (product.stock === 0) return { type: 'soldout' }
+  if (product.stock <= LOW_STOCK) return { type: 'low', count: product.stock }
+  return { type: 'normal', count: product.stock }
+}
+
+function StockStrip({ product }: { product: PublicProduct }) {
+  const strip = getStripState(product)
+
+  let bg: string
+  let color: string
+  let content: React.ReactNode
+
+  if (strip.type === 'hidden') {
+    bg = 'rgba(216,210,194,0.97)'
+    color = '#3F4237'
+    content = (
+      <>
+        <EyeOff className="size-3" strokeWidth={1.7} />
+        Ausgeblendet – nur du siehst es
+      </>
+    )
+  } else if (strip.type === 'soldout') {
+    bg = '#D97C46'
+    color = '#fff'
+    content = 'Ausverkauft'
+  } else if (strip.type === 'low') {
+    bg = '#D97C46'
+    color = '#fff'
+    content = `Nur noch ${strip.count} verfügbar`
+  } else {
+    bg = 'rgba(242,236,221,0.95)'
+    color = '#6E5F45'
+    content = `${strip.count} verfügbar`
+  }
+
+  return (
+    <div
+      className="absolute left-0 right-0 bottom-0 h-7 flex items-center justify-center gap-1.5 text-[11px] font-bold"
+      style={{ background: bg, color }}
+    >
+      {content}
+    </div>
+  )
+}
+
 function ProductCard({
   product,
   onAddToCart,
   isAddingId,
   ownerMode = false,
+  isEditMode = false,
 }: {
   product: PublicProduct
   onAddToCart: (product: PublicProduct) => void
   isAddingId: string | null
   ownerMode?: boolean
+  isEditMode?: boolean
 }) {
   const canBuy = product.isAvailable && product.stock > 0
   const isAdding = isAddingId === product.id
-  const isInactive = !product.isAvailable
-  // In ownerMode, inactive products get special "owner-only" treatment
-  const ownerInactive = ownerMode && isInactive
+  const dim = isEditMode && !product.isAvailable ? 0.55 : 1
 
   return (
     <div
-      className={`bg-card rounded-2xl overflow-hidden flex flex-col transition-[transform,box-shadow] duration-[250ms] ease-out ${
-        ownerInactive
-          ? 'ring-2 ring-dashed ring-border'
-          : canBuy
-            ? 'ring-1 ring-border/60 hover:-translate-y-1 hover:shadow-[0_8px_20px_oklch(0.18_0.03_150_/_0.08)]'
-            : 'ring-1 ring-border/60 opacity-60'
-      }`}
-      style={{ boxShadow: ownerInactive ? 'none' : '0 2px 8px oklch(0.18 0.03 150 / 0.05)' }}
+      className="bg-white rounded-[12px] overflow-hidden flex flex-col"
+      style={{ boxShadow: '0 2px 10px rgba(45,95,63,0.06)' }}
     >
-      {/* Image */}
-      <div className="aspect-square relative overflow-hidden flex items-center justify-center">
-        {product.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={product.imageUrl}
-            alt={product.name}
-            className={`w-full h-full object-cover${ownerInactive ? ' opacity-70' : ''}`}
-          />
-        ) : (
-          <div
-            className={`w-full h-full flex items-center justify-center${ownerInactive ? ' opacity-70' : ''}`}
-            style={{ background: 'linear-gradient(135deg, #E8F0E8 0%, #F4EFE6 100%)' }}
-          >
-            <Package className="w-10 h-10 text-muted-foreground/40" />
-          </div>
-        )}
-        {product.isOrganic && (
-          <div className="absolute top-2.5 left-2.5">
-            <span className="inline-flex items-center gap-1 bg-primary text-primary-foreground text-[10px] font-semibold px-2 py-0.5 rounded-full">
-              <Leaf className="w-2.5 h-2.5" />
-              Bio
-            </span>
-          </div>
-        )}
-        {/* Low-stock badge — ownerMode only */}
-        {ownerMode && product.isAvailable && product.stock >= 1 && product.stock <= 3 && (
-          <div className="absolute bottom-2 left-2">
-            <span className="inline-flex items-center bg-accent text-accent-foreground text-[10px] font-semibold px-2 py-0.5 rounded-full">
-              Nur noch {product.stock}!
-            </span>
-          </div>
-        )}
-        {/* "Only you see this" badge — inactive in ownerMode */}
-        {ownerInactive && (
-          <div className="absolute inset-0 flex items-end justify-start p-2">
-            <span className="inline-flex items-center bg-foreground/80 text-background text-[10px] font-semibold px-2 py-0.5 rounded-full">
-              Nur du siehst es
-            </span>
-          </div>
-        )}
-        <div className="absolute top-2.5 right-2.5 flex gap-1">
-          {product.requiresCool && <Thermometer className="w-4 h-4 text-blue-500 drop-shadow" />}
-          {product.requiresFreezer && <Snowflake className="w-4 h-4 text-sky-400 drop-shadow" />}
-          {/* Edit pencil — ownerMode only */}
-          {ownerMode && (
-            <Link
-              href="/products"
-              aria-label="Produkt bearbeiten"
-              className="w-7 h-7 rounded-full bg-card/90 shadow-sm border border-border/40 flex items-center justify-center hover:bg-card transition-colors"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Pencil className="w-3 h-3 text-foreground" />
-            </Link>
-          )}
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="p-4 flex flex-col flex-1">
-        <div className={ownerInactive ? 'opacity-70' : undefined}>
-          <p className="font-semibold text-foreground text-sm leading-snug">{product.name}</p>
-          <p className="font-heading text-base font-semibold text-primary mt-1">
-            {formatPrice(product.price, product.unit, product.unitSize)}
-          </p>
-
-          {product.seasonStart && product.seasonEnd && (
-            <div className="mt-2">
-              <SeasonBadge start={product.seasonStart} end={product.seasonEnd} />
+      {/* Image area — 170px fixed height */}
+      <div className="relative flex-shrink-0" style={{ height: 170, background: '#F4EFE3' }}>
+        {/* Dimmed image wrapper */}
+        <div className="absolute inset-0" style={{ opacity: dim }}>
+          {product.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={product.imageUrl}
+              alt={product.name}
+              className="absolute inset-0 w-full h-full object-contain"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Package className="w-10 h-10" style={{ color: '#C9C2B2' }} />
             </div>
           )}
-
-          {product.allergens.length > 0 && (
-            <p className="text-[10px] text-muted-foreground mt-2 leading-tight">
-              Enthält: {product.allergens.join(', ')}
-            </p>
+          {/* Bio badge */}
+          {product.isOrganic && (
+            <div className="absolute top-2.5 left-2.5">
+              <span className="inline-flex items-center gap-1 bg-primary text-primary-foreground text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                <Leaf className="w-2.5 h-2.5" />
+                Bio
+              </span>
+            </div>
+          )}
+          {/* Storage icons */}
+          {(product.requiresCool || product.requiresFreezer) && (
+            <div className="absolute top-2.5 right-2.5 flex gap-1">
+              {product.requiresCool && <Thermometer className="w-4 h-4 text-blue-500 drop-shadow" />}
+              {product.requiresFreezer && <Snowflake className="w-4 h-4 text-sky-400 drop-shadow" />}
+            </div>
           )}
         </div>
+
+        {/* Stock strip — always full opacity, shown in edit mode */}
+        {isEditMode && <StockStrip product={product} />}
+      </div>
+
+      {/* Body */}
+      <div
+        className="px-[15px] py-[14px] flex flex-col flex-1"
+        style={{ opacity: dim }}
+      >
+        <p className="font-semibold text-sm leading-snug" style={{ color: '#2D3027' }}>{product.name}</p>
+        <p className="text-[17px] font-bold mt-[5px]" style={{ color: '#2D3027' }}>
+          {formatPrice(product.price, product.unit, product.unitSize)}
+        </p>
+
+        {product.seasonStart && product.seasonEnd && (
+          <div className="mt-2">
+            <SeasonBadge start={product.seasonStart} end={product.seasonEnd} />
+          </div>
+        )}
+
+        {product.allergens.length > 0 && (
+          <p className="text-[10px] mt-2 leading-tight" style={{ color: '#9AA08F' }}>
+            Enthält: {product.allergens.join(', ')}
+          </p>
+        )}
 
         <div className="flex-1" />
 
-        <div className="mt-4">
-          {ownerInactive ? (
-            // Inactive in ownerMode — no cart, static chip
-            <div className="w-full h-10 bg-muted/60 border border-dashed border-border rounded-xl flex items-center justify-center text-xs text-muted-foreground">
-              Ausgeblendet
+        {/* Footer — mode-aware */}
+        <div className="mt-3 pt-2">
+          {isEditMode ? (
+            <div className="flex gap-2">
+              <Link
+                href={`/products?edit=${product.id}`}
+                className="flex-1 flex items-center justify-center gap-1.5 py-[11px] rounded-lg text-[13px] font-semibold transition-opacity hover:opacity-90"
+                style={{ background: '#2D5F3F', color: '#fff' }}
+              >
+                Bearbeiten
+              </Link>
+              <Link
+                href="/products"
+                className="flex-1 flex items-center justify-center gap-1.5 py-[11px] rounded-lg text-[13px] font-semibold border transition-colors hover:bg-gray-50"
+                style={{ borderColor: '#D6E0CE', color: '#2D5F3F', background: '#fff' }}
+              >
+                Lager
+              </Link>
             </div>
           ) : canBuy ? (
             <button
               onClick={() => onAddToCart(product)}
               disabled={isAdding}
-              className="w-full h-10 bg-accent hover:bg-accent-hover active:scale-[0.98] disabled:opacity-60 text-accent-foreground text-sm font-semibold rounded-xl transition-all duration-[250ms] flex items-center justify-center gap-1.5"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-opacity disabled:opacity-60 hover:opacity-90 active:scale-[0.98]"
+              style={{ background: '#E8854A', color: '#fff' }}
             >
               {isAdding ? (
                 <span className="animate-pulse">…</span>
               ) : (
                 <>
-                  <ShoppingCart className="w-3.5 h-3.5" />
+                  <ShoppingCart className="size-[15px]" strokeWidth={1.7} />
                   In den Warenkorb
                 </>
               )}
             </button>
           ) : (
-            <div className="w-full h-10 bg-muted rounded-xl flex items-center justify-center text-xs text-muted-foreground px-2 text-center">
+            <div
+              className="w-full h-10 flex items-center justify-center rounded-lg text-xs px-2 text-center"
+              style={{ background: 'rgba(242,236,221,0.95)', color: '#6E5F45' }}
+            >
               {!product.isAvailable
                 ? product.unavailableReason || 'Nicht verfügbar'
                 : 'Ausverkauft'}
@@ -185,23 +233,33 @@ function ProductCard({
   )
 }
 
-export function ProductGrid({ products, farmId, farmSlug, initialReorderItems, ownerMode = false }: Props) {
+export function ProductGrid({
+  products,
+  farmId,
+  farmSlug,
+  initialReorderItems,
+  ownerMode = false,
+  mode = 'preview',
+}: Props) {
+  const isEditMode = ownerMode && mode !== 'preview'
+
   const [cartOpen, setCartOpen] = useState(false)
   const [addingId, setAddingId] = useState<string | null>(null)
   const [showWelcomeBack, setShowWelcomeBack] = useState(false)
 
   const { items, count, total, isHydrated, addItem, updateQuantity, removeItem } = useCart(farmId)
 
-  // Prefill cart from reorder token
+  // Prefill cart from reorder token (not in edit mode)
   useEffect(() => {
+    if (isEditMode) return
     if (!isHydrated || !initialReorderItems || initialReorderItems.length === 0) return
-    if (items.length > 0) return // don't overwrite existing cart
+    if (items.length > 0) return
 
     async function prefill() {
       let prefilled = false
       for (const ri of initialReorderItems!) {
         const product = products.find(
-          (p) => p.id === ri.productId && p.isAvailable && p.stock > 0
+          (p) => p.id === ri.productId && p.isAvailable && p.stock > 0,
         )
         if (!product) continue
         const result = await addItem(
@@ -213,7 +271,7 @@ export function ProductGrid({ products, farmId, farmSlug, initialReorderItems, o
             unitSize: product.unitSize,
             imageUrl: product.imageUrl,
           },
-          ri.quantity
+          ri.quantity,
         )
         if (result.ok) prefilled = true
       }
@@ -238,7 +296,7 @@ export function ProductGrid({ products, farmId, farmSlug, initialReorderItems, o
         unitSize: product.unitSize,
         imageUrl: product.imageUrl,
       },
-      1
+      1,
     )
     setAddingId(null)
 
@@ -253,15 +311,19 @@ export function ProductGrid({ products, farmId, farmSlug, initialReorderItems, o
   return (
     <>
       {/* Welcome-back banner */}
-      {showWelcomeBack && (
-        <div className="px-4 pb-4 max-w-4xl mx-auto">
-          <div className="flex items-center justify-between gap-3 bg-primary/10 border border-primary/20 rounded-2xl px-4 py-3">
-            <p className="text-sm text-foreground font-medium">
+      {!isEditMode && showWelcomeBack && (
+        <div className="pb-4">
+          <div
+            className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3"
+            style={{ background: 'rgba(45,95,63,0.08)', border: '1px solid rgba(45,95,63,0.14)' }}
+          >
+            <p className="text-sm font-medium" style={{ color: '#2D3027' }}>
               Willkommen zurück! Dein letzter Einkauf wurde vorgeladen.
             </p>
             <button
               onClick={() => setShowWelcomeBack(false)}
-              className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+              className="shrink-0 transition-colors"
+              style={{ color: '#9AA08F' }}
               aria-label="Schließen"
             >
               <X className="size-4" />
@@ -270,61 +332,61 @@ export function ProductGrid({ products, farmId, farmSlug, initialReorderItems, o
         </div>
       )}
 
-      {/* Section heading */}
-      <div className="px-4 pb-4 max-w-4xl mx-auto">
-        <div className="flex items-baseline gap-3 flex-wrap">
-          <h2 className="font-heading text-2xl font-semibold text-foreground">Unsere Produkte</h2>
-          {ownerMode && products.length > 0 && (() => {
-            const visible = products.filter((p) => p.isAvailable).length
-            const hidden = products.filter((p) => !p.isAvailable).length
-            return (
-              <span className="text-xs text-muted-foreground">
-                {visible} sichtbar{hidden > 0 ? ` · ${hidden} ausgeblendet` : ''}
-              </span>
-            )
-          })()}
-        </div>
-        {!ownerMode && products.length === 0 && (
-          <p className="text-sm text-muted-foreground mt-2">Aktuell sind keine Produkte verfügbar.</p>
-        )}
-      </div>
+      {/* Empty state (public) */}
+      {!ownerMode && products.length === 0 && (
+        <p className="text-sm pb-4" style={{ color: '#9AA08F' }}>
+          Aktuell sind keine Produkte verfügbar.
+        </p>
+      )}
 
-      {/* Product grid */}
-      <div className="px-4 pb-32 max-w-4xl mx-auto">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {/* "Produkt anlegen" tile — ownerMode only, always first */}
-          {ownerMode && (
-            <Link
-              href="/products"
-              className="bg-card rounded-2xl overflow-hidden border-2 border-dashed border-border flex flex-col items-center justify-center aspect-square hover:border-primary/40 hover:bg-primary/5 transition-colors p-4 text-center"
+      {/* Grid — 3 cols, 20px gap */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+        {/* "Produkt anlegen" tile — edit mode only */}
+        {isEditMode && (
+          <Link
+            href="/products"
+            className="flex flex-col items-center justify-center rounded-[12px] transition-colors hover:bg-white/70"
+            style={{
+              border: '2px dashed #C9C2B2',
+              background: 'rgba(255,255,255,0.5)',
+              minHeight: 330,
+            }}
+          >
+            <span
+              className="flex items-center justify-center rounded-full mb-3"
+              style={{ width: 52, height: 52, background: '#E8F0E2', color: '#2D5F3F' }}
             >
-              <div className="w-10 h-10 rounded-full border-2 border-dashed border-muted-foreground/40 flex items-center justify-center mb-3">
-                <Plus className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <p className="text-sm font-medium text-foreground">Produkt anlegen</p>
-              <p className="text-xs text-muted-foreground mt-1">Foto, Preis, Menge</p>
-            </Link>
-          )}
-          {products.map((p) => (
-            <ProductCard
-              key={p.id}
-              product={p}
-              onAddToCart={handleAddToCart}
-              isAddingId={addingId}
-              ownerMode={ownerMode}
-            />
-          ))}
-        </div>
+              <Plus className="size-[22px]" strokeWidth={1.9} />
+            </span>
+            <span className="text-[15px] font-semibold" style={{ color: '#2D5F3F' }}>Produkt anlegen</span>
+            <span className="text-[13px] mt-1" style={{ color: '#9AA08F' }}>Foto, Preis, Menge</span>
+          </Link>
+        )}
+
+        {products.map((p) => (
+          <ProductCard
+            key={p.id}
+            product={p}
+            onAddToCart={handleAddToCart}
+            isAddingId={addingId}
+            ownerMode={ownerMode}
+            isEditMode={isEditMode}
+          />
+        ))}
       </div>
 
-      {/* Sticky cart button */}
-      {isHydrated && count > 0 && (
+      {/* Sticky cart button (not in edit mode) */}
+      {!isEditMode && isHydrated && count > 0 && (
         <button
           onClick={() => setCartOpen(true)}
-          className="fixed bottom-6 inset-x-4 sm:inset-x-auto sm:right-6 sm:left-auto z-40 flex items-center justify-center gap-2.5 bg-accent hover:bg-accent-hover active:scale-[0.98] text-accent-foreground rounded-full px-6 py-3.5 transition-all duration-[250ms]"
-          style={{ boxShadow: '0 8px 24px oklch(0.66 0.14 47 / 0.35)' }}
+          className="fixed bottom-6 inset-x-4 sm:inset-x-auto sm:right-6 sm:left-auto z-40 flex items-center justify-center gap-2.5 rounded-full px-6 py-3.5 transition-all duration-[250ms] active:scale-[0.98]"
+          style={{
+            background: '#E8854A',
+            color: '#fff',
+            boxShadow: '0 8px 24px rgba(232,133,74,0.35)',
+          }}
         >
-          <ShoppingCart className="w-5 h-5" />
+          <ShoppingCart className="w-5 h-5" strokeWidth={1.7} />
           <span className="font-semibold text-sm">
             {count} {count === 1 ? 'Artikel' : 'Artikel'} · {formatEuro(total)}
           </span>
@@ -332,15 +394,17 @@ export function ProductGrid({ products, farmId, farmSlug, initialReorderItems, o
       )}
 
       {/* Cart sheet */}
-      <CartSheet
-        open={cartOpen}
-        onOpenChange={setCartOpen}
-        items={items}
-        total={total}
-        farmSlug={farmSlug}
-        onUpdateQuantity={updateQuantity}
-        onRemoveItem={removeItem}
-      />
+      {!isEditMode && (
+        <CartSheet
+          open={cartOpen}
+          onOpenChange={setCartOpen}
+          items={items}
+          total={total}
+          farmSlug={farmSlug}
+          onUpdateQuantity={updateQuantity}
+          onRemoveItem={removeItem}
+        />
+      )}
     </>
   )
 }

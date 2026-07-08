@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import { Copy, X, Check } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -15,6 +16,7 @@ interface ShopLinkBannerProps {
 }
 
 export function ShopLinkBanner({ farmSlug }: ShopLinkBannerProps) {
+  const pathname = usePathname()
   const [visible, setVisible] = useState(false)
   const [copied, setCopied] = useState(false)
   const [shopUrl, setShopUrl] = useState('')
@@ -48,6 +50,7 @@ export function ShopLinkBanner({ farmSlug }: ShopLinkBannerProps) {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
   }
 
+  if (pathname === '/farm-page') return null
   if (!visible) return null
 
   return (

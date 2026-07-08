@@ -55,3 +55,11 @@ export async function getOrderDetail(farmId: string, orderId: string) {
   const row = await fetchOrder(farmId, orderId)
   return row ? serialize(row) : null
 }
+
+const OPEN_STATUSES = ['PENDING_CONFIRMATION', 'PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY'] as const
+
+export async function getOpenOrdersCount(farmId: string): Promise<number> {
+  return prisma.order.count({
+    where: { farmId, status: { in: [...OPEN_STATUSES] } },
+  })
+}

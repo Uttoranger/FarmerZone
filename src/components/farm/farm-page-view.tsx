@@ -1,12 +1,16 @@
+'use client'
+
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { MapPin, Phone, Mail, Clock, CreditCard, Banknote, Pencil, Eye, Leaf, CalendarDays, Tag, MessageCircle } from 'lucide-react'
+import {
+  MapPin, Phone, Mail, CreditCard, Banknote,
+  Pencil, Eye, Leaf, CalendarDays, Tag, MessageCircle,
+  Check, Camera, Plus,
+} from 'lucide-react'
 import type { PublicFarm } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 import { ProductGrid } from './product-grid'
-import { stripStatusVariables } from '@/lib/status-body'
-
-const DAY_NAMES = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag']
+import { stripStatusVariables, renderStatusBodyWithChip } from '@/lib/status-body'
 
 const BANNER_GRADIENTS: Record<string, string> = {
   tannengruen: 'linear-gradient(135deg, #1F4732 0%, #3D7B58 60%, #E8F0E8 100%)',
@@ -15,11 +19,52 @@ const BANNER_GRADIENTS: Record<string, string> = {
   herbst:      'linear-gradient(135deg, #7B4F00 0%, #D4900A 55%, #FFF3CC 100%)',
 }
 
-const ANLASS_META: Record<string, { label: string; icon: ReactNode; color: string }> = {
-  FRESH_PRODUCT: { label: 'Frisches Produkt', icon: <Leaf className="size-3.5" />,        color: 'bg-green-100 text-green-800' },
-  NEW_SEASON:    { label: 'Neue Saison',       icon: <CalendarDays className="size-3.5" />, color: 'bg-emerald-100 text-emerald-800' },
-  PROMOTION:     { label: 'Aktion',            icon: <Tag className="size-3.5" />,          color: 'bg-amber-100 text-amber-800' },
-  ANNOUNCEMENT:  { label: 'Mitteilung',        icon: <MessageCircle className="size-3.5" />, color: 'bg-blue-100 text-blue-800' },
+const ANLASS_META: Record<string, { label: string; icon: ReactNode }> = {
+  FRESH_PRODUCT: { label: 'Frisches Produkt', icon: <Leaf className="size-3" strokeWidth={1.7} /> },
+  NEW_SEASON:    { label: 'Neue Saison',       icon: <CalendarDays className="size-3" strokeWidth={1.7} /> },
+  PROMOTION:     { label: 'Aktion',            icon: <Tag className="size-3" strokeWidth={1.7} /> },
+  ANNOUNCEMENT:  { label: 'Mitteilung',        icon: <MessageCircle className="size-3" strokeWidth={1.7} /> },
+}
+
+function WoodCard({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return (
+    <div
+      className={`bg-white rounded-[14px] overflow-hidden ${className}`}
+      style={{ boxShadow: '0 2px 10px rgba(45,95,63,0.06)' }}
+    >
+      <div style={{ height: 7, background: 'linear-gradient(90deg,#B08054,#8B6247 35%,#A87C52 70%,#8F6A48)' }} />
+      {children}
+    </div>
+  )
+}
+
+function FarmSeal({ farmName, foundedYear }: { farmName: string; foundedYear: number }) {
+  const upper = farmName.toUpperCase()
+  if (upper.length > 18) return null
+  const fontSize = upper.length <= 10 ? 9 : upper.length <= 15 ? 7.5 : 6.5
+  return (
+    <svg width="88" height="88" viewBox="0 0 88 88">
+      <circle cx="44" cy="44" r="42" fill="#F3EBDA" />
+      <circle cx="44" cy="44" r="42" fill="none" stroke="#8B6B4F" strokeWidth="2.5" />
+      <circle cx="44" cy="44" r="34" fill="none" stroke="#8B6B4F" strokeWidth="1" strokeDasharray="3 3" />
+      <defs>
+        <path id="sealArcFpv" d="M 16 44 a 28 28 0 0 1 56 0" fill="none" />
+      </defs>
+      <text fontSize={fontSize} fill="#7A5C3E" fontFamily="Inter, sans-serif" fontWeight="700" letterSpacing="2.5">
+        <textPath href="#sealArcFpv" startOffset="50%" textAnchor="middle">{upper}</textPath>
+      </text>
+      <g fill="none" stroke="#7A5C3E" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M44 58V42" />
+        <path d="M44 50c-4-1-6.5-3.5-7-8 4.5.5 7 3 7 8z" />
+        <path d="M44 50c4-1 6.5-3.5 7-8-4.5.5-7 3-7 8z" />
+        <path d="M44 42c-3.5-1-5.5-3-6-7 4 .5 6 2.8 6 7z" />
+        <path d="M44 42c3.5-1 5.5-3 6-7-4 .5-6 2.8-6 7z" />
+      </g>
+      <text x="44" y="70" fontSize="7.5" fill="#7A5C3E" fontFamily="Inter, sans-serif" fontWeight="700" letterSpacing="1.5" textAnchor="middle">
+        SEIT {foundedYear}
+      </text>
+    </svg>
+  )
 }
 
 type ReorderItem = { productId: string; productName: string; quantity: number }
@@ -29,38 +74,11 @@ type Props = {
   activeStatus: ActiveStatusPost | null
   reorderItems?: ReorderItem[]
   ownerMode?: boolean
+  mode?: 'edit' | 'preview'
 }
 
-function EditButton({ href, label }: { href: string; label: string }) {
-  return (
-    <Link
-      href={href}
-      className="w-9 h-9 rounded-full bg-card shadow-sm border border-border/60 flex items-center justify-center hover:bg-muted transition-colors shrink-0"
-      aria-label={label}
-    >
-      <Pencil className="size-3.5 text-foreground" />
-    </Link>
-  )
-}
-
-function EditPill({ href, label }: { href: string; label: string }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full bg-card/90 shadow-sm border border-border/40 text-xs font-medium text-foreground hover:bg-card transition-colors"
-      aria-label={label}
-    >
-      <Pencil className="size-3 shrink-0" />
-      {label}
-    </Link>
-  )
-}
-
-export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = false }: Props) {
-  const bannerBg =
-    farm.bannerType === 'PHOTO' && farm.bannerUrl
-      ? null
-      : BANNER_GRADIENTS[farm.bannerValue ?? 'tannengruen'] ?? BANNER_GRADIENTS.tannengruen
+export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = false, mode = 'edit' }: Props) {
+  const isEdit = ownerMode && mode !== 'preview'
 
   const sections = farm.sectionsConfig
   function isSectionVisible(key: string) {
@@ -68,7 +86,6 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
     return s ? s.visible : true
   }
 
-  // Public-only early returns — bypassed in ownerMode
   if (!ownerMode) {
     if (farm.isPaused) {
       return (
@@ -76,14 +93,21 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           className="min-h-screen flex items-center justify-center p-6"
           style={{ background: 'linear-gradient(160deg, #F4EFE6 0%, #E8F0E8 100%)' }}
         >
-          <div className="text-center max-w-sm bg-card rounded-3xl p-10 shadow-[0_8px_24px_oklch(0.18_0.03_150_/_0.08)]">
+          <div
+            className="text-center max-w-sm bg-white rounded-3xl p-10"
+            style={{ boxShadow: '0 8px 24px rgba(45,95,63,0.08)' }}
+          >
             <div className="text-5xl mb-5">🏡</div>
-            <h1 className="font-heading text-xl font-semibold text-foreground mb-3">{farm.name}</h1>
-            <p className="text-muted-foreground leading-relaxed">
+            <h1 className="font-heading text-xl font-semibold mb-3" style={{ color: '#2D3027' }}>{farm.name}</h1>
+            <p className="leading-relaxed text-sm" style={{ color: '#5C6052' }}>
               {farm.pauseMessage ?? 'Der Hof ist gerade nicht erreichbar. Bitte versuche es etwas später noch einmal.'}
             </p>
-            <a href={`tel:${farm.phone}`} className="mt-6 inline-flex items-center gap-1.5 text-sm text-primary hover:underline underline-offset-2">
-              <Phone className="w-3.5 h-3.5" />
+            <a
+              href={`tel:${farm.phone}`}
+              className="mt-6 inline-flex items-center gap-1.5 text-sm hover:underline underline-offset-2"
+              style={{ color: '#2D5F3F' }}
+            >
+              <Phone className="w-3.5 h-3.5" strokeWidth={1.7} />
               {farm.phone}
             </a>
           </div>
@@ -96,14 +120,21 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           className="min-h-screen flex items-center justify-center p-6"
           style={{ background: 'linear-gradient(160deg, #F4EFE6 0%, #E8F0E8 100%)' }}
         >
-          <div className="text-center max-w-sm bg-card rounded-3xl p-10 shadow-[0_8px_24px_oklch(0.18_0.03_150_/_0.08)]">
+          <div
+            className="text-center max-w-sm bg-white rounded-3xl p-10"
+            style={{ boxShadow: '0 8px 24px rgba(45,95,63,0.08)' }}
+          >
             <div className="text-5xl mb-5">🌱</div>
-            <h1 className="font-heading text-xl font-semibold text-foreground mb-3">{farm.name}</h1>
-            <p className="text-muted-foreground leading-relaxed">
+            <h1 className="font-heading text-xl font-semibold mb-3" style={{ color: '#2D3027' }}>{farm.name}</h1>
+            <p className="leading-relaxed text-sm" style={{ color: '#5C6052' }}>
               Dieser Hof richtet gerade seinen Shop ein. Schau bald wieder vorbei!
             </p>
-            <a href={`tel:${farm.phone}`} className="mt-6 inline-flex items-center gap-1.5 text-sm text-primary hover:underline underline-offset-2">
-              <Phone className="w-3.5 h-3.5" />
+            <a
+              href={`tel:${farm.phone}`}
+              className="mt-6 inline-flex items-center gap-1.5 text-sm hover:underline underline-offset-2"
+              style={{ color: '#2D5F3F' }}
+            >
+              <Phone className="w-3.5 h-3.5" strokeWidth={1.7} />
               {farm.phone}
             </a>
           </div>
@@ -128,8 +159,27 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
     },
   }
 
+  const bannerBg =
+    farm.bannerType === 'PHOTO' && farm.bannerUrl
+      ? null
+      : BANNER_GRADIENTS[farm.bannerValue ?? 'tannengruen'] ?? BANNER_GRADIENTS.tannengruen
+
+  const productsForGrid = isEdit
+    ? farm.products
+    : farm.products.filter((p) => p.isAvailable)
+
+  const publicCount = farm.products.filter((p) => p.isAvailable).length
+  const hiddenCount = farm.products.filter((p) => !p.isAvailable).length
+  const productCountLabel = ownerMode
+    ? isEdit
+      ? `${publicCount} sichtbar${hiddenCount > 0 ? ` · ${hiddenCount} ausgeblendet` : ''}`
+      : `${publicCount} Produkte`
+    : publicCount > 0
+      ? `${publicCount} Produkte`
+      : ''
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen" style={{ background: '#F5F3EE' }}>
       {!ownerMode && (
         <script
           type="application/ld+json"
@@ -137,289 +187,329 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
         />
       )}
 
-      {/* ── Owner hint bar ──────────────────────────────────────────── */}
+      {/* Mode banner */}
       {ownerMode && (
-        <div className="px-4 pt-4 pb-2 max-w-4xl mx-auto">
-          <div className="flex items-center justify-between gap-4 bg-primary/10 border border-primary/20 rounded-2xl px-4 py-3">
-            <p className="text-sm text-foreground">
-              Das ist deine Hof-Seite, wie Kunden sie sehen. Jeder Stift bringt dich zum passenden Editor.
-            </p>
-            <Link
-              href={`/${farm.slug}`}
-              target="_blank"
-              className="shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-border bg-card text-xs font-medium text-foreground hover:bg-muted transition-colors"
+        <div className="max-w-[960px] mx-auto px-4 md:px-10 pt-6 pb-[22px]">
+          <div
+            className="flex items-center gap-3 rounded-xl px-4 py-[13px]"
+            style={{
+              background: isEdit ? '#fff' : '#24523A',
+              border: `1px solid ${isEdit ? '#ECE8DF' : '#24523A'}`,
+            }}
+          >
+            <span
+              className="flex items-center justify-center rounded-[10px] shrink-0"
+              style={{
+                width: 38,
+                height: 38,
+                background: isEdit ? '#F2E5D3' : 'rgba(255,255,255,0.14)',
+                color: isEdit ? '#8B6B4F' : '#fff',
+              }}
             >
-              <Eye className="size-3.5" />
-              Kundenansicht
-            </Link>
+              {isEdit
+                ? <Pencil className="size-4" strokeWidth={1.7} />
+                : <Eye className="size-[17px]" strokeWidth={1.7} />
+              }
+            </span>
+            <div>
+              <div className="text-sm font-semibold" style={{ color: isEdit ? '#2D3027' : '#fff' }}>
+                {isEdit ? 'Du bearbeitest deine Hof-Seite' : 'So sehen Kunden deine Seite'}
+              </div>
+              <div className="text-[13px] mt-px" style={{ color: isEdit ? '#9AA08F' : '#C9E3CF' }}>
+                {isEdit
+                  ? 'Alles mit Stift-Symbol kannst du ändern – Kunden sehen es sofort.'
+                  : 'Bearbeiten-Knöpfe und ausgeblendete Produkte sind unsichtbar.'
+                }
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ── Banner ─────────────────────────────────────────────────── */}
-      <div className="h-52 md:h-72 relative overflow-hidden">
+      {/* Cover 250px */}
+      <div className="relative h-[250px]">
         {bannerBg === null ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={farm.bannerUrl!} alt="" className="w-full h-full object-cover" />
+          <img src={farm.bannerUrl!} alt="" className="absolute inset-0 w-full h-full object-cover" />
         ) : (
-          <div className="h-full" style={{ background: bannerBg }} />
+          <div className="absolute inset-0" style={{ background: bannerBg }} />
         )}
-        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-background to-transparent" />
-        {ownerMode && (
-          <div className="absolute top-3 right-3">
-            <EditPill href="/settings/appearance" label="Titelbild ändern" />
+        {/* Gradient overlay */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: 'linear-gradient(180deg, rgba(24,36,27,0.10) 0%, rgba(24,36,27,0) 40%, rgba(20,30,22,0.62) 100%)',
+          }}
+        />
+        {/* Titelbild ändern (edit only) */}
+        {isEdit && (
+          <Link
+            href="/settings/appearance"
+            className="absolute top-3.5 right-[22px] flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90"
+            style={{ background: 'rgba(255,255,255,0.94)', color: '#2D5F3F', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}
+          >
+            <Camera className="size-3.5" strokeWidth={1.7} />
+            Titelbild ändern
+          </Link>
+        )}
+        {/* Hof-Siegel */}
+        {farm.foundedYear && (
+          <div
+            className="absolute top-1/2 right-16 hidden md:block pointer-events-none"
+            style={{ transform: 'translateY(-46%) rotate(-6deg)', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.25))' }}
+          >
+            <FarmSeal farmName={farm.name} foundedYear={farm.foundedYear} />
           </div>
         )}
-      </div>
-
-      {/* ── Farm header ─────────────────────────────────────────────── */}
-      <div className="px-4 pt-2 pb-4 max-w-4xl mx-auto">
-        {farm.logoUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={farm.logoUrl}
-            alt={farm.name}
-            className="w-16 h-16 rounded-2xl object-cover border-2 border-card shadow-md -mt-6 mb-3"
-          />
-        )}
-        <div className="flex items-start gap-2">
-          <div className="flex-1 min-w-0">
-            <h1 className="font-heading text-3xl font-semibold text-foreground leading-tight">
-              {farm.name}
-            </h1>
-            {farm.tagline && (
-              <p className="font-heading text-base italic text-muted-foreground mt-0.5 leading-snug">
-                {farm.tagline}
-                {farm.foundedYear && (
-                  <span className="not-italic ml-2 text-sm">· seit {farm.foundedYear}</span>
-                )}
-              </p>
-            )}
-            {!farm.tagline && farm.foundedYear && (
-              <p className="text-sm text-muted-foreground mt-0.5">seit {farm.foundedYear}</p>
-            )}
-          </div>
-          {ownerMode && (
-            <EditButton href="/settings/appearance" label="Hofname & Tagline bearbeiten" />
-          )}
-        </div>
-        <div className="flex items-center gap-1.5 text-muted-foreground text-sm mt-1.5">
-          <MapPin className="w-3.5 h-3.5 shrink-0" />
-          <span>
-            {farm.address}, {farm.postalCode} {farm.city}
-          </span>
-        </div>
-      </div>
-
-      {/* ── Über uns ─────────────────────────────────────────────────── */}
-      {isSectionVisible('about') && (farm.aboutText ?? farm.description) && (
-        <section className="px-4 pb-6 max-w-4xl mx-auto">
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <h2 className="font-heading text-lg font-semibold text-foreground">Über uns</h2>
-            {ownerMode && <EditButton href="/settings/appearance" label="Über-uns-Text bearbeiten" />}
-          </div>
-          <p className="text-muted-foreground text-sm leading-relaxed max-w-2xl">
-            {farm.aboutText ?? farm.description}
-          </p>
-        </section>
-      )}
-
-      {/* ── Werte ────────────────────────────────────────────────────── */}
-      {isSectionVisible('values') && farm.farmValues.length > 0 && (
-        <section className="px-4 pb-8 max-w-4xl mx-auto">
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <h2 className="font-heading text-lg font-semibold text-foreground">Unsere Werte</h2>
-            {ownerMode && <EditButton href="/settings/appearance" label="Werte bearbeiten" />}
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {farm.farmValues.map((v) => (
-              <div
-                key={v.id}
-                className="bg-card rounded-2xl p-4 ring-1 ring-border/60 shadow-[0_2px_8px_oklch(0.18_0.03_150_/_0.05)]"
+        {/* Name + values overlay */}
+        <div className="absolute inset-x-0 bottom-0 pointer-events-none">
+          <div className="max-w-[960px] mx-auto px-4 md:px-10 pb-5">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1
+                className="font-heading text-[34px] font-semibold text-white leading-tight"
+                style={{ textShadow: '0 2px 14px rgba(0,0,0,0.45)' }}
               >
-                <div className="text-2xl mb-2">{v.icon}</div>
-                <div className="font-semibold text-sm text-foreground">{v.title}</div>
-                {v.subtitle && (
-                  <div className="text-xs text-muted-foreground mt-0.5">{v.subtitle}</div>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ── Info cards ──────────────────────────────────────────────── */}
-      <section className="px-4 pb-8 max-w-4xl mx-auto">
-        <div className={`grid gap-3 ${farm.pickupSlots.length > 0 ? 'sm:grid-cols-2' : ''}`}>
-          {farm.pickupSlots.length > 0 && (
-            <div className="bg-card rounded-2xl p-5 ring-1 ring-border/60 shadow-[0_2px_8px_oklch(0.18_0.03_150_/_0.05)]">
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  <div className="w-6 h-6 rounded-lg bg-muted flex items-center justify-center">
-                    <Clock className="w-3.5 h-3.5 text-primary" />
-                  </div>
-                  Abholzeiten
-                </div>
-                {ownerMode && <EditButton href="/settings" label="Abholzeiten bearbeiten" />}
-              </div>
-              <ul className="space-y-1.5">
-                {farm.pickupSlots.map((slot, i) => (
-                  <li key={i} className="text-sm text-foreground">
-                    <span className="font-medium">{DAY_NAMES[slot.dayOfWeek]}</span>
-                    <span className="text-muted-foreground ml-1.5">
-                      {slot.startTime}–{slot.endTime} Uhr
-                    </span>
-                  </li>
-                ))}
-              </ul>
+                {farm.name}
+              </h1>
+              {isSectionVisible('values') && farm.farmValues.slice(0, 4).map((v) => (
+                <span
+                  key={v.id}
+                  className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full"
+                  style={{ color: '#2D5F3F', background: '#E8F0E2' }}
+                >
+                  <Check className="size-3" strokeWidth={1.7} />
+                  {v.title}
+                </span>
+              ))}
+              {isEdit && (
+                <Link
+                  href="/settings/appearance"
+                  className="pointer-events-auto flex items-center justify-center rounded-full transition-opacity hover:opacity-90"
+                  style={{
+                    width: 34, height: 34,
+                    background: 'rgba(255,255,255,0.92)',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                    color: '#5C6052',
+                  }}
+                  aria-label="Hofname & Cover bearbeiten"
+                >
+                  <Pencil className="size-3.5" strokeWidth={1.7} />
+                </Link>
+              )}
             </div>
-          )}
+            <div
+              className="flex items-center gap-1.5 mt-1.5 text-sm"
+              style={{ color: '#F1EFE8', textShadow: '0 1px 8px rgba(0,0,0,0.4)' }}
+            >
+              <MapPin className="size-3.5 shrink-0" strokeWidth={1.7} />
+              <span>{farm.address}, {farm.postalCode} {farm.city}</span>
+              {farm.tagline && <span className="ml-2 truncate">{farm.tagline}</span>}
+            </div>
+          </div>
+        </div>
+      </div>
 
-          <div className="bg-card rounded-2xl p-5 ring-1 ring-border/60 shadow-[0_2px_8px_oklch(0.18_0.03_150_/_0.05)]">
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                <div className="w-6 h-6 rounded-lg bg-muted flex items-center justify-center">
-                  <CreditCard className="w-3.5 h-3.5 text-primary" />
-                </div>
+      {/* Content column */}
+      <div className="max-w-[960px] mx-auto px-4 md:px-10 pt-[26px] pb-12">
+
+        {/* Zahlung & Kontakt */}
+        <WoodCard>
+          <div className="px-5 pt-[18px] pb-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: '#2D3027' }}>
+                <CreditCard className="size-4" strokeWidth={1.7} style={{ color: '#7A8071' }} />
                 Zahlung & Kontakt
               </div>
-              {ownerMode && <EditButton href="/settings" label="Zahlung & Kontakt bearbeiten" />}
+              {isEdit && (
+                <Link
+                  href="/settings"
+                  className="flex items-center justify-center rounded-full border transition-colors hover:bg-gray-50"
+                  style={{ width: 32, height: 32, borderColor: '#E4E0D6', color: '#5C6052' }}
+                  aria-label="Zahlung & Kontakt bearbeiten"
+                >
+                  <Pencil className="size-[13px]" strokeWidth={1.7} />
+                </Link>
+              )}
             </div>
-            <div className="flex flex-wrap gap-2 mb-4">
+            <div className="flex flex-wrap gap-2.5 mt-3.5">
               {farm.acceptsOnline && (
-                <span className="inline-flex items-center gap-1.5 text-xs bg-muted rounded-full px-3 py-1 text-foreground">
-                  <CreditCard className="w-3 h-3 text-primary" />
+                <span
+                  className="inline-flex items-center gap-1.5 text-[13px] font-semibold px-[13px] py-[7px] rounded-full"
+                  style={{ color: '#6E5F45', background: '#F2ECDC' }}
+                >
+                  <CreditCard className="size-3.5" strokeWidth={1.7} />
                   Online (Karte)
                 </span>
               )}
               {farm.acceptsOnsite && (
-                <span className="inline-flex items-center gap-1.5 text-xs bg-muted rounded-full px-3 py-1 text-foreground">
-                  <Banknote className="w-3 h-3 text-primary" />
+                <span
+                  className="inline-flex items-center gap-1.5 text-[13px] font-semibold px-[13px] py-[7px] rounded-full"
+                  style={{ color: '#6E5F45', background: '#F2ECDC' }}
+                >
+                  <Banknote className="size-3.5" strokeWidth={1.7} />
                   Vor Ort (Bar & Karte)
                 </span>
               )}
             </div>
-            <div className="flex flex-col gap-2 text-sm">
-              <a href={`tel:${farm.phone}`} className="flex items-center gap-2 text-primary hover:underline underline-offset-2">
-                <Phone className="w-3.5 h-3.5 shrink-0" />
-                {farm.phone}
-              </a>
-              <a href={`mailto:${farm.email}`} className="flex items-center gap-2 text-primary hover:underline underline-offset-2">
-                <Mail className="w-3.5 h-3.5 shrink-0" />
-                {farm.email}
-              </a>
+            <div className="flex items-center gap-2 mt-4 text-sm" style={{ color: '#2D3027' }}>
+              <Phone className="size-[15px] shrink-0" strokeWidth={1.7} style={{ color: '#7A8071' }} />
+              {farm.phone}
+            </div>
+            <div className="flex items-center gap-2 mt-2 text-sm" style={{ color: '#2D3027' }}>
+              <Mail className="size-[15px] shrink-0" strokeWidth={1.7} style={{ color: '#7A8071' }} />
+              {farm.email}
             </div>
           </div>
-        </div>
-      </section>
+        </WoodCard>
 
-      {/* ── Active status post ──────────────────────────────────────── */}
-      {/* ownerMode bypasses the section-visibility toggle so /status is always reachable */}
-      {(isSectionVisible('status') || ownerMode) && (
-        <section className="px-4 pb-6 max-w-4xl mx-auto">
-          {activeStatus ? (
-            <>
-              {(() => {
-                const meta = ANLASS_META[activeStatus.anlass] ?? ANLASS_META.ANNOUNCEMENT
-                const hoursAgo = Math.floor(
-                  (Date.now() - new Date(activeStatus.publishedAt).getTime()) / (1000 * 60 * 60),
-                )
-                const timeStr =
-                  hoursAgo < 1
-                    ? 'gerade eben'
-                    : hoursAgo < 24
-                      ? `vor ${hoursAgo} Stunden`
-                      : `vor ${Math.floor(hoursAgo / 24)} Tagen`
-                return (
-                  <div className="bg-card rounded-2xl p-5 ring-1 ring-border/60 shadow-[0_2px_8px_oklch(0.18_0.03_150_/_0.05)]">
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-2.5 py-1 ${meta.color}`}>
-                          {meta.icon}
-                          {meta.label}
-                        </span>
-                        <span className="text-xs text-muted-foreground">Aktuell · {timeStr}</span>
+        {/* Status section */}
+        {(isSectionVisible('status') || ownerMode) && (
+          <div className="mt-[18px]">
+            {activeStatus ? (
+              <>
+                {(() => {
+                  const anlassMeta = ANLASS_META[activeStatus.anlass] ?? ANLASS_META.ANNOUNCEMENT
+                  const hoursAgo = Math.floor(
+                    (Date.now() - new Date(activeStatus.publishedAt).getTime()) / (1000 * 60 * 60),
+                  )
+                  const timeStr =
+                    hoursAgo < 1
+                      ? 'heute'
+                      : hoursAgo < 24
+                        ? `vor ${hoursAgo} Stunden`
+                        : `vor ${Math.floor(hoursAgo / 24)} Tagen`
+                  return (
+                    <WoodCard>
+                      <div className="px-5 pt-4 pb-[18px]">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <span
+                            className="inline-flex items-center gap-1 text-xs font-semibold px-[11px] py-[5px] rounded-full"
+                            style={{ color: '#2D5F3F', background: '#E8F0E2' }}
+                          >
+                            {anlassMeta.icon}
+                            {anlassMeta.label}
+                          </span>
+                          {isEdit && (
+                            <span
+                              className="inline-flex items-center gap-1 text-xs font-semibold px-[11px] py-[5px] rounded-full"
+                              style={{ color: '#2D5F3F', background: '#DCEDE1' }}
+                            >
+                              <Check className="size-3" strokeWidth={1.9} />
+                              Aktiv
+                            </span>
+                          )}
+                          <span className="text-[13px]" style={{ color: '#9AA08F' }}>
+                            Aktuell · {timeStr}
+                          </span>
+                          {isEdit && (
+                            <div className="ml-auto">
+                              <Link
+                                href="/status"
+                                className="flex items-center justify-center rounded-full border transition-colors hover:bg-gray-50"
+                                style={{ width: 32, height: 32, borderColor: '#E4E0D6', color: '#5C6052' }}
+                                aria-label="Status bearbeiten"
+                              >
+                                <Pencil className="size-[13px]" strokeWidth={1.7} />
+                              </Link>
+                            </div>
+                          )}
+                        </div>
+                        <h2 className="font-heading text-xl font-semibold mt-3" style={{ color: '#2D3027' }}>
+                          {activeStatus.title}
+                        </h2>
+                        <p className="text-sm mt-1.5 leading-[1.55] whitespace-pre-wrap" style={{ color: '#5C6052' }}>
+                          {isEdit
+                            ? renderStatusBodyWithChip(activeStatus.body)
+                            : stripStatusVariables(activeStatus.body)
+                          }
+                        </p>
+                        {activeStatus.photoUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={activeStatus.photoUrl}
+                            alt={activeStatus.title}
+                            className="w-full rounded-xl mt-3 object-cover max-h-48"
+                          />
+                        )}
                       </div>
-                      {ownerMode && <EditButton href="/status" label="Status bearbeiten" />}
-                    </div>
-                    <h2 className="font-heading text-lg font-semibold text-foreground mb-2">
-                      {activeStatus.title}
-                    </h2>
-                    <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                      {stripStatusVariables(activeStatus.body)}
-                    </p>
-                    {activeStatus.photoUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={activeStatus.photoUrl}
-                        alt={activeStatus.title}
-                        className="w-full rounded-xl mt-3 object-cover max-h-48"
-                      />
-                    )}
-                  </div>
-                )
-              })()}
-              {ownerMode && (
+                    </WoodCard>
+                  )
+                })()}
+                {ownerMode && (
+                  <>
+                    <Link
+                      href="/status/new"
+                      className="w-full mt-3 flex items-center justify-center gap-2 rounded-[14px] py-3.5 text-sm font-semibold transition-colors hover:bg-white/70"
+                      style={{ border: '2px dashed #C9C2B2', background: 'rgba(255,255,255,0.5)', color: '#2D5F3F' }}
+                    >
+                      <Plus className="size-[15px]" strokeWidth={1.9} />
+                      Neuer Status
+                    </Link>
+                    <Link
+                      href="/status"
+                      className="block text-center text-xs mt-2 py-1 transition-colors hover:text-[#2D3027]"
+                      style={{ color: '#9AA08F' }}
+                    >
+                      Frühere Status ansehen →
+                    </Link>
+                  </>
+                )}
+              </>
+            ) : ownerMode ? (
+              <div className="flex flex-col gap-2">
                 <Link
                   href="/status/new"
-                  className="mt-2 flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-border hover:border-primary/40 hover:bg-primary/5 transition-colors text-xs text-muted-foreground hover:text-foreground"
+                  className="w-full flex items-center justify-center gap-2 rounded-[14px] py-4 text-sm font-semibold transition-colors hover:bg-white/70"
+                  style={{ border: '2px dashed #C9C2B2', background: 'rgba(255,255,255,0.5)', color: '#2D5F3F' }}
                 >
-                  <span className="font-semibold">+</span>
+                  <Plus className="size-[15px]" strokeWidth={1.9} />
                   Neuer Status
                 </Link>
-              )}
-            </>
-          ) : ownerMode ? (
-            <div className="flex flex-col gap-2">
-              <Link
-                href="/status/new"
-                className="flex items-center gap-3 px-4 py-4 rounded-2xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 transition-colors text-muted-foreground hover:text-foreground"
-              >
-                <div className="w-8 h-8 rounded-full border-2 border-dashed border-current flex items-center justify-center shrink-0 text-lg leading-none">
-                  +
-                </div>
-                <div>
-                  <div className="text-sm font-medium">Neuer Status</div>
-                  <div className="text-xs mt-0.5">Informiere Kunden über Neuigkeiten vom Hof</div>
-                </div>
-              </Link>
-              <Link
-                href="/status"
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors text-center py-1"
-              >
-                Frühere Status ansehen →
-              </Link>
-            </div>
-          ) : null}
-        </section>
-      )}
-
-      {/* ── Products (client component with cart) ─────────────────── */}
-      <ProductGrid
-        products={farm.products}
-        farmId={farm.id}
-        farmSlug={farm.slug}
-        initialReorderItems={reorderItems && reorderItems.length > 0 ? reorderItems : undefined}
-        ownerMode={ownerMode}
-      />
-
-      {/* ── Footer — public only ─────────────────────────────────────── */}
-      {!ownerMode && (
-        <footer className="px-4 py-8 border-t border-border/50 max-w-4xl mx-auto mt-4">
-          <div className="flex flex-wrap items-center gap-5 text-xs text-muted-foreground">
-            <span>© {new Date().getFullYear()} {farm.name}</span>
-            <Link href="/impressum" className="hover:text-foreground transition-colors">
-              Impressum
-            </Link>
-            <Link href="/datenschutz" className="hover:text-foreground transition-colors">
-              Datenschutz
-            </Link>
-            <Link href="/account/profile" className="hover:text-foreground transition-colors">
-              Mein Konto
-            </Link>
+                <Link
+                  href="/status"
+                  className="block text-center text-xs py-1 transition-colors hover:text-[#2D3027]"
+                  style={{ color: '#9AA08F' }}
+                >
+                  Frühere Status ansehen →
+                </Link>
+              </div>
+            ) : null}
           </div>
-        </footer>
-      )}
+        )}
+
+        {/* Products heading */}
+        <div className="flex items-baseline gap-3 mt-[34px] mb-[18px]">
+          <h2 className="font-heading text-[26px] font-semibold" style={{ color: '#2D3027' }}>
+            Unsere Produkte
+          </h2>
+          {productCountLabel && (
+            <span className="text-sm" style={{ color: '#9AA08F' }}>
+              {productCountLabel}
+            </span>
+          )}
+        </div>
+
+        <ProductGrid
+          products={productsForGrid}
+          farmId={farm.id}
+          farmSlug={farm.slug}
+          initialReorderItems={reorderItems && reorderItems.length > 0 ? reorderItems : undefined}
+          ownerMode={ownerMode}
+          mode={mode}
+        />
+
+        {/* Footer (public only) */}
+        {!ownerMode && (
+          <footer className="py-8 border-t mt-6" style={{ borderColor: '#ECE8DF' }}>
+            <div className="flex flex-wrap items-center gap-5 text-xs" style={{ color: '#9AA08F' }}>
+              <span>© {new Date().getFullYear()} {farm.name}</span>
+              <Link href="/impressum" className="hover:text-[#2D3027] transition-colors">Impressum</Link>
+              <Link href="/datenschutz" className="hover:text-[#2D3027] transition-colors">Datenschutz</Link>
+              <Link href="/account/profile" className="hover:text-[#2D3027] transition-colors">Mein Konto</Link>
+            </div>
+          </footer>
+        )}
+      </div>
     </div>
   )
 }

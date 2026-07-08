@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { toast } from 'sonner'
 import {
   Package,
@@ -32,6 +32,7 @@ import { PageHeader } from '@/components/farmer/page-header'
 
 type Props = {
   products: ProductData[]
+  initialEditId?: string
 }
 
 function getStatus(p: ProductData, stock: number) {
@@ -58,7 +59,7 @@ function formatPrice(price: number, unit: string, unitSize: number | null) {
   return `${formatted} / ${unitLabel}`
 }
 
-export function ProductList({ products: initialProducts }: Props) {
+export function ProductList({ products: initialProducts, initialEditId }: Props) {
   // Optimistic stock state
   const [stocks, setStocks] = useState<Record<string, number>>(
     Object.fromEntries(initialProducts.map((p) => [p.id, p.stock]))
@@ -71,6 +72,14 @@ export function ProductList({ products: initialProducts }: Props) {
     open: false,
     product: null,
   })
+
+  // Auto-open edit dialog from ?edit= URL param
+  useEffect(() => {
+    if (!initialEditId) return
+    const product = initialProducts.find((p) => p.id === initialEditId)
+    if (product) setEditDialog({ open: true, product })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [stockDialogProduct, setStockDialogProduct] = useState<ProductData | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<ProductData | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
