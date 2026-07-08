@@ -8,6 +8,7 @@ import type { ProductData } from '@/server/queries/products'
 import { CHANNEL_ICONS, CHANNEL_LABELS } from '@/schemas/manual-sale'
 import { SaleDialog } from './sale-dialog'
 import { SaleList } from './sale-list'
+import { PageHeader } from '@/components/farmer/page-header'
 
 type Props = {
   recentSales: ManualSaleData[]
@@ -53,16 +54,16 @@ export function SalesClient({ recentSales, products }: Props) {
   return (
     <>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-medium text-foreground">Verkauf eintragen</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Direktverkäufe schnell erfassen</p>
-        </div>
-        <Button onClick={openNewSale} className="gap-1.5">
-          <Plus className="w-4 h-4" />
-          Neu
-        </Button>
-      </div>
+      <PageHeader
+        title="Verkauf eintragen"
+        subtitle="Direktverkäufe schnell erfassen"
+        action={
+          <Button onClick={openNewSale} className="gap-1.5 bg-accent text-accent-foreground hover:bg-accent-hover">
+            <Plus className="w-4 h-4" />
+            Neu
+          </Button>
+        }
+      />
 
       {/* Quick-repeat buttons */}
       {quickSales.length > 0 && (

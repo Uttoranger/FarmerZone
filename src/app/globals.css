@@ -29,6 +29,7 @@
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -79,6 +80,7 @@
 
   /* #E8854A — Warmes Orange (CTA, max. 1× pro Seite) */
   --accent: oklch(0.66 0.14 47);
+  --accent-hover: oklch(0.61 0.14 47); /* #D9743B */
   /* Dunkler Text auf Orange (WCAG AA) */
   --accent-foreground: oklch(0.18 0.04 155);
 

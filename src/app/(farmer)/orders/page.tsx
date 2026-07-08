@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getOrdersForFarm } from '@/server/queries/orders'
 import { OrdersClient } from '@/components/orders/orders-client'
+import { PageHeader } from '@/components/farmer/page-header'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,7 +19,7 @@ export default async function OrdersPage() {
 
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto">
-      <h1 className="text-xl font-medium text-foreground mb-5">Bestellungen</h1>
+      <PageHeader title="Bestellungen" />
       <OrdersClient orders={orders} farmSlug={farm.slug} />
     </div>
   )

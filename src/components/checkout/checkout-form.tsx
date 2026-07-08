@@ -479,7 +479,7 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
         <Button
           type="submit"
           disabled={isSubmitting || pickupOptions.length === 0}
-          className="w-full h-12 bg-accent text-accent-foreground hover:bg-accent/90 text-base font-semibold"
+          className="w-full h-12 bg-accent text-accent-foreground hover:bg-accent-hover text-base font-semibold"
         >
           {isSubmitting ? (
             <Loader2 className="size-5 animate-spin" />

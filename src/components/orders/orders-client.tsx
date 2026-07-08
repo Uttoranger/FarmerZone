@@ -99,7 +99,7 @@ export function OrdersClient({ orders, farmSlug }: { orders: FarmerOrder[]; farm
                       .then(() => alert('Shop-Link kopiert!'))
                       .catch(() => {})
                   }}
-                  className="h-10 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+                  className="h-10 px-4 rounded-xl bg-accent text-accent-foreground text-sm font-semibold hover:bg-accent-hover transition-colors"
                 >
                   Shop-Link kopieren
                 </button>

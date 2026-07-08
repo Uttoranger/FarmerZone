@@ -126,7 +126,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
             </p>
             <Link
               href={`/${farmSlug}/checkout`}
-              className="mt-4 inline-flex items-center justify-center rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accent-foreground hover:opacity-90"
+              className="mt-4 inline-flex items-center justify-center rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accent-foreground hover:bg-accent-hover"
             >
               Erneut versuchen
             </Link>

@@ -353,6 +353,7 @@ export function AppearanceClient({ initialData }: Props) {
           {sectionsConfig
             .slice()
             .sort((a, b) => a.order - b.order)
+            .filter((section) => section.key !== 'gallery')
             .map((section) => {
               const isProducts = section.key === 'products'
               return (
@@ -412,7 +413,7 @@ export function AppearanceClient({ initialData }: Props) {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="h-12 px-8 rounded-xl bg-accent text-accent-foreground font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center gap-2"
+          className="h-12 px-8 rounded-xl bg-accent text-accent-foreground font-semibold hover:bg-accent-hover transition-colors disabled:opacity-60 flex items-center gap-2"
         >
           {saving && <Loader2 className="size-4 animate-spin" />}
           {saving ? 'Wird gespeichert…' : 'Speichern & veröffentlichen'}

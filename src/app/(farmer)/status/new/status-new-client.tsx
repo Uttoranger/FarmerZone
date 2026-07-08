@@ -303,7 +303,7 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
             {/* A2: orange CTA, A3: always clickable — validates on click */}
             <button
               onClick={handleTryNext}
-              className="w-full h-12 rounded-xl bg-accent text-accent-foreground font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+              className="w-full h-12 rounded-xl bg-accent text-accent-foreground font-semibold flex items-center justify-center gap-2 hover:bg-accent-hover transition-colors"
             >
               Weiter zu Empfängern
               <ArrowRight className="size-4" />
@@ -378,7 +378,7 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
             {/* A2: orange CTA */}
             <button
               onClick={() => setStep(3)}
-              className="w-full h-12 rounded-xl bg-accent text-accent-foreground font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+              className="w-full h-12 rounded-xl bg-accent text-accent-foreground font-semibold flex items-center justify-center gap-2 hover:bg-accent-hover transition-colors"
             >
               Vorschau ansehen
               <ArrowRight className="size-4" />
@@ -464,7 +464,7 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
             <button
               onClick={handlePublish}
               disabled={pending}
-              className="w-full h-12 rounded-xl bg-accent text-accent-foreground font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+              className="w-full h-12 rounded-xl bg-accent text-accent-foreground font-semibold hover:bg-accent-hover transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {pending ? 'Wird versendet…' : 'Versand starten'}
             </button>

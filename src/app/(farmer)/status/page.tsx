@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import Link from 'next/link'
 import { Plus, Megaphone } from 'lucide-react'
+import { PageHeader } from '@/components/farmer/page-header'
 import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getStatusPostsForFarm } from '@/server/queries/status-posts'
@@ -24,21 +25,19 @@ export default async function StatusPage() {
 
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold text-foreground">Status & Updates</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Informiere deine Kunden über Neuigkeiten vom Hof
-          </p>
-        </div>
-        <Link
-          href="/status/new"
-          className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-accent text-accent-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
-        >
-          <Plus className="size-4" />
-          Neuer Status
-        </Link>
-      </div>
+      <PageHeader
+        title="Status & Updates"
+        subtitle="Informiere deine Kunden über Neuigkeiten vom Hof"
+        action={posts.length > 0 ? (
+          <Link
+            href="/status/new"
+            className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-accent text-accent-foreground text-sm font-semibold hover:bg-accent-hover transition-colors"
+          >
+            <Plus className="size-4" />
+            Neuer Status
+          </Link>
+        ) : undefined}
+      />
 
       {posts.length === 0 ? (
         <div className="text-center py-16">
@@ -51,7 +50,7 @@ export default async function StatusPage() {
           </p>
           <Link
             href="/status/new"
-            className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-accent text-accent-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+            className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-accent text-accent-foreground text-sm font-semibold hover:bg-accent-hover transition-colors"
           >
             <Plus className="size-4" />
             Ersten Status erstellen

@@ -482,7 +482,7 @@ export function OnboardingClient({ userEmail }: { userEmail: string }) {
               </p>
             )}
 
-            <Button type="submit" disabled={laedt} className="h-11 mt-1 bg-accent text-accent-foreground hover:bg-accent/90">
+            <Button type="submit" disabled={laedt} className="h-11 mt-1 bg-accent text-accent-foreground hover:bg-accent-hover">
               {laedt ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Weiter →'}
             </Button>
           </form>
@@ -632,7 +632,7 @@ export function OnboardingClient({ userEmail }: { userEmail: string }) {
               <Button
                 onClick={() => handleStep2(false)}
                 disabled={laedt}
-                className="flex-1 h-11 bg-accent text-accent-foreground hover:bg-accent/90"
+                className="flex-1 h-11 bg-accent text-accent-foreground hover:bg-accent-hover"
               >
                 {laedt ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Weiter →'}
               </Button>
@@ -743,7 +743,7 @@ export function OnboardingClient({ userEmail }: { userEmail: string }) {
               <Button
                 onClick={() => handleStep3(false)}
                 disabled={laedt}
-                className="flex-1 h-11 bg-accent text-accent-foreground hover:bg-accent/90"
+                className="flex-1 h-11 bg-accent text-accent-foreground hover:bg-accent-hover"
               >
                 {laedt ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Weiter →'}
               </Button>
@@ -798,7 +798,7 @@ export function OnboardingClient({ userEmail }: { userEmail: string }) {
               </a>
             )}
 
-            <Button onClick={() => router.push('/dashboard')} className="h-12 bg-accent text-accent-foreground hover:bg-accent/90">
+            <Button onClick={() => router.push('/dashboard')} className="h-12 bg-accent text-accent-foreground hover:bg-accent-hover">
               Zum Dashboard →
             </Button>
 

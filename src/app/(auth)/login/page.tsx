@@ -139,7 +139,7 @@ export default function LoginPage() {
             <Button
               type="submit"
               disabled={laedt}
-              className="h-11 text-sm font-semibold bg-accent text-accent-foreground hover:bg-accent/90 rounded-xl w-full mt-1"
+              className="h-11 text-sm font-semibold bg-accent text-accent-foreground hover:bg-accent-hover rounded-xl w-full mt-1"
             >
               {laedt ? (
                 <>

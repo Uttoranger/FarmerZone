@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getAnalyticsData, getYtdRevenue, type PeriodKey } from '@/server/queries/analytics'
 import { AnalyticsDashboard } from '@/components/analytics/analytics-dashboard'
+import { PageHeader } from '@/components/farmer/page-header'
 
 const VALID_PERIODS: PeriodKey[] = ['week', 'month', 'quarter', 'year']
 const LIMIT_40K = 40_000
@@ -55,10 +56,7 @@ export default async function AnalyticsPage({
 
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-medium text-foreground">Auswertung</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Umsatz und Verkaufskanäle im Überblick</p>
-      </div>
+      <PageHeader title="Auswertung" subtitle="Umsatz und Verkaufskanäle im Überblick" />
 
       {/* 40k Direktvermarktungs-Grenze */}
       <div className={`rounded-2xl border p-5 mb-6 ${bgColor}`}>

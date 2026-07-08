@@ -2,6 +2,7 @@
 import type { Metadata } from 'next'
 import { CreditCard, MapPin, Clock, PauseCircle, User, Paintbrush } from 'lucide-react'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { PageHeader } from '@/components/farmer/page-header'
 
 export const metadata: Metadata = { title: 'Einstellungen — FarmerZone' }
 
@@ -47,8 +48,7 @@ const SECTIONS = [
 export default function SettingsPage() {
   return (
     <div className="p-4 md:p-6 max-w-2xl">
-      <h1 className="text-xl font-semibold text-foreground mb-1">Einstellungen</h1>
-      <p className="text-sm text-muted-foreground mb-6">Verwalte deinen Hof und dein Konto.</p>
+      <PageHeader title="Einstellungen" subtitle="Verwalte deinen Hof und dein Konto." />
 
       <div className="grid gap-3">
         {SECTIONS.map(({ href, icon: Icon, title, description }) => (

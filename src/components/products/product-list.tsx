@@ -28,6 +28,7 @@ import type { ProductData } from '@/server/queries/products'
 import { UNIT_LABELS } from '@/schemas/product'
 import { ProductDialog } from './product-dialog'
 import { StockDialog } from './stock-dialog'
+import { PageHeader } from '@/components/farmer/page-header'
 
 type Props = {
   products: ProductData[]
@@ -124,23 +125,21 @@ export function ProductList({ products: initialProducts }: Props) {
   return (
     <>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-medium text-foreground">Produkte</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {products.length === 0
-              ? 'Noch keine Produkte'
-              : `${products.filter((p) => p.isAvailable).length} aktiv · ${products.length} gesamt`}
-          </p>
-        </div>
-        <Button
-          onClick={() => setEditDialog({ open: true, product: null })}
-          className="gap-1.5"
-        >
-          <Plus className="w-4 h-4" />
-          Neu
-        </Button>
-      </div>
+      <PageHeader
+        title="Produkte"
+        subtitle={products.length === 0
+          ? 'Noch keine Produkte'
+          : `${products.filter((p) => p.isAvailable).length} aktiv · ${products.length} gesamt`}
+        action={
+          <Button
+            onClick={() => setEditDialog({ open: true, product: null })}
+            className="gap-1.5 bg-accent text-accent-foreground hover:bg-accent-hover"
+          >
+            <Plus className="w-4 h-4" />
+            Neu
+          </Button>
+        }
+      />
 
       {/* Empty state */}
       {products.length === 0 && (
@@ -150,7 +149,7 @@ export function ProductList({ products: initialProducts }: Props) {
           <p className="text-sm text-muted-foreground/60 mb-6">Leg dein erstes Produkt an, um loszulegen.</p>
           <Button
             onClick={() => setEditDialog({ open: true, product: null })}
-            className="bg-primary text-primary-foreground hover:opacity-90"
+            className="bg-accent text-accent-foreground hover:bg-accent-hover"
           >
             <Plus className="w-4 h-4 mr-1.5" />
             Erstes Produkt anlegen
