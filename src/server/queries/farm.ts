@@ -143,6 +143,86 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
   }
 }
 
+export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> {
+  const farm = await prisma.farm.findUnique({
+    where: { ownerId },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      ownerName: true,
+      description: true,
+      address: true,
+      postalCode: true,
+      city: true,
+      phone: true,
+      email: true,
+      logoUrl: true,
+      bannerUrl: true,
+      tagline: true,
+      foundedYear: true,
+      aboutText: true,
+      bannerType: true,
+      bannerValue: true,
+      sectionsConfig: true,
+      acceptsOnline: true,
+      acceptsOnsite: true,
+      stripeAccountReady: true,
+      isPaused: true,
+      pauseMessage: true,
+      farmValues: {
+        orderBy: { sortOrder: 'asc' },
+        select: { id: true, icon: true, title: true, subtitle: true },
+      },
+      products: {
+        orderBy: [{ isAvailable: 'desc' }, { name: 'asc' }],
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          imageUrl: true,
+          price: true,
+          unit: true,
+          unitSize: true,
+          stock: true,
+          isAvailable: true,
+          allergens: true,
+          isOrganic: true,
+          requiresCool: true,
+          requiresFreezer: true,
+          seasonStart: true,
+          seasonEnd: true,
+          unavailableReason: true,
+        },
+      },
+      pickupSlots: {
+        where: { isActive: true },
+        orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+        select: { dayOfWeek: true, startTime: true, endTime: true },
+      },
+    },
+  })
+
+  if (!farm) return null
+
+  const rawSections = farm.sectionsConfig
+  const sections: SectionConfig[] =
+    Array.isArray(rawSections) && rawSections.length > 0
+      ? (rawSections as SectionConfig[])
+      : DEFAULT_SECTIONS
+
+  return {
+    ...farm,
+    bannerType: farm.bannerType as 'GRADIENT' | 'PHOTO',
+    sectionsConfig: sections,
+    products: farm.products.map((p) => ({
+      ...p,
+      price: Number(p.price),
+      unitSize: p.unitSize ? Number(p.unitSize) : null,
+    })),
+  }
+}
+
 export type FarmSettings = {
   id: string
   name: string
