@@ -312,7 +312,8 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
       </section>
 
       {/* ── Active status post ──────────────────────────────────────── */}
-      {isSectionVisible('status') && (
+      {/* ownerMode bypasses the section-visibility toggle so /status is always reachable */}
+      {(isSectionVisible('status') || ownerMode) && (
         <section className="px-4 pb-6 max-w-4xl mx-auto">
           {activeStatus ? (
             <>
@@ -366,18 +367,26 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
               )}
             </>
           ) : ownerMode ? (
-            <Link
-              href="/status/new"
-              className="flex items-center gap-3 px-4 py-4 rounded-2xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 transition-colors text-muted-foreground hover:text-foreground"
-            >
-              <div className="w-8 h-8 rounded-full border-2 border-dashed border-current flex items-center justify-center shrink-0 text-lg leading-none">
-                +
-              </div>
-              <div>
-                <div className="text-sm font-medium">Neuer Status</div>
-                <div className="text-xs mt-0.5">Informiere Kunden über Neuigkeiten vom Hof</div>
-              </div>
-            </Link>
+            <div className="flex flex-col gap-2">
+              <Link
+                href="/status/new"
+                className="flex items-center gap-3 px-4 py-4 rounded-2xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 transition-colors text-muted-foreground hover:text-foreground"
+              >
+                <div className="w-8 h-8 rounded-full border-2 border-dashed border-current flex items-center justify-center shrink-0 text-lg leading-none">
+                  +
+                </div>
+                <div>
+                  <div className="text-sm font-medium">Neuer Status</div>
+                  <div className="text-xs mt-0.5">Informiere Kunden über Neuigkeiten vom Hof</div>
+                </div>
+              </Link>
+              <Link
+                href="/status"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors text-center py-1"
+              >
+                Frühere Status ansehen →
+              </Link>
+            </div>
           ) : null}
         </section>
       )}
