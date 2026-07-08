@@ -42,3 +42,4 @@ docs/spec_extracted.txt
 docs/*.msi
 docs/*.exe
 docs/*.dmg
+*.zip
