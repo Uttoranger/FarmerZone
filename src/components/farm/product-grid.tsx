@@ -35,8 +35,9 @@ function SeasonBadge({ start, end }: { start: number; end: number }) {
   const s = MONTH_SHORT[start - 1]
   const e = MONTH_SHORT[end - 1]
   return (
-    <span className="text-[10px] text-[#B86A2E] bg-[#FDF0E8] border border-[#F4D9BE] rounded-full px-2 py-0.5">
-      🌱 {s}–{e}
+    <span className="inline-flex items-center gap-1 text-[10px] text-[#B86A2E] bg-[#FDF0E8] border border-[#F4D9BE] rounded-full px-2 py-0.5">
+      <Leaf className="size-2.5" />
+      {s}–{e}
     </span>
   )
 }
@@ -62,7 +63,7 @@ function ProductCard({
     <div
       className={`bg-card rounded-2xl overflow-hidden flex flex-col transition-[transform,box-shadow] duration-[250ms] ease-out ${
         ownerInactive
-          ? 'ring-2 ring-dashed ring-border opacity-70'
+          ? 'ring-2 ring-dashed ring-border'
           : canBuy
             ? 'ring-1 ring-border/60 hover:-translate-y-1 hover:shadow-[0_8px_20px_oklch(0.18_0.03_150_/_0.08)]'
             : 'ring-1 ring-border/60 opacity-60'
@@ -73,10 +74,14 @@ function ProductCard({
       <div className="aspect-square relative overflow-hidden flex items-center justify-center">
         {product.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+          <img
+            src={product.imageUrl}
+            alt={product.name}
+            className={`w-full h-full object-cover${ownerInactive ? ' opacity-70' : ''}`}
+          />
         ) : (
           <div
-            className="w-full h-full flex items-center justify-center"
+            className={`w-full h-full flex items-center justify-center${ownerInactive ? ' opacity-70' : ''}`}
             style={{ background: 'linear-gradient(135deg, #E8F0E8 0%, #F4EFE6 100%)' }}
           >
             <Package className="w-10 h-10 text-muted-foreground/40" />
@@ -125,22 +130,24 @@ function ProductCard({
 
       {/* Content */}
       <div className="p-4 flex flex-col flex-1">
-        <p className="font-semibold text-foreground text-sm leading-snug">{product.name}</p>
-        <p className="font-heading text-base font-semibold text-primary mt-1">
-          {formatPrice(product.price, product.unit, product.unitSize)}
-        </p>
-
-        {product.seasonStart && product.seasonEnd && (
-          <div className="mt-2">
-            <SeasonBadge start={product.seasonStart} end={product.seasonEnd} />
-          </div>
-        )}
-
-        {product.allergens.length > 0 && (
-          <p className="text-[10px] text-muted-foreground mt-2 leading-tight">
-            Enthält: {product.allergens.join(', ')}
+        <div className={ownerInactive ? 'opacity-70' : undefined}>
+          <p className="font-semibold text-foreground text-sm leading-snug">{product.name}</p>
+          <p className="font-heading text-base font-semibold text-primary mt-1">
+            {formatPrice(product.price, product.unit, product.unitSize)}
           </p>
-        )}
+
+          {product.seasonStart && product.seasonEnd && (
+            <div className="mt-2">
+              <SeasonBadge start={product.seasonStart} end={product.seasonEnd} />
+            </div>
+          )}
+
+          {product.allergens.length > 0 && (
+            <p className="text-[10px] text-muted-foreground mt-2 leading-tight">
+              Enthält: {product.allergens.join(', ')}
+            </p>
+          )}
+        </div>
 
         <div className="flex-1" />
 

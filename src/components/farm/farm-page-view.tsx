@@ -1,8 +1,10 @@
+import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { MapPin, Phone, Mail, Clock, CreditCard, Banknote, Pencil, Eye } from 'lucide-react'
+import { MapPin, Phone, Mail, Clock, CreditCard, Banknote, Pencil, Eye, Leaf, CalendarDays, Tag, MessageCircle } from 'lucide-react'
 import type { PublicFarm } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 import { ProductGrid } from './product-grid'
+import { stripStatusVariables } from '@/lib/status-body'
 
 const DAY_NAMES = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag']
 
@@ -13,11 +15,11 @@ const BANNER_GRADIENTS: Record<string, string> = {
   herbst:      'linear-gradient(135deg, #7B4F00 0%, #D4900A 55%, #FFF3CC 100%)',
 }
 
-const ANLASS_META: Record<string, { label: string; color: string }> = {
-  FRESH_PRODUCT: { label: '🥬 Frisches Produkt', color: 'bg-green-100 text-green-800' },
-  NEW_SEASON:    { label: '🌱 Neue Saison',       color: 'bg-emerald-100 text-emerald-800' },
-  PROMOTION:     { label: '🏷️ Aktion',           color: 'bg-amber-100 text-amber-800' },
-  ANNOUNCEMENT:  { label: '📢 Mitteilung',        color: 'bg-blue-100 text-blue-800' },
+const ANLASS_META: Record<string, { label: string; icon: ReactNode; color: string }> = {
+  FRESH_PRODUCT: { label: 'Frisches Produkt', icon: <Leaf className="size-3.5" />,        color: 'bg-green-100 text-green-800' },
+  NEW_SEASON:    { label: 'Neue Saison',       icon: <CalendarDays className="size-3.5" />, color: 'bg-emerald-100 text-emerald-800' },
+  PROMOTION:     { label: 'Aktion',            icon: <Tag className="size-3.5" />,          color: 'bg-amber-100 text-amber-800' },
+  ANNOUNCEMENT:  { label: 'Mitteilung',        icon: <MessageCircle className="size-3.5" />, color: 'bg-blue-100 text-blue-800' },
 }
 
 type ReorderItem = { productId: string; productName: string; quantity: number }
@@ -332,7 +334,8 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                   <div className="bg-card rounded-2xl p-5 ring-1 ring-border/60 shadow-[0_2px_8px_oklch(0.18_0.03_150_/_0.05)]">
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-xs font-semibold rounded-full px-2.5 py-1 ${meta.color}`}>
+                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-2.5 py-1 ${meta.color}`}>
+                          {meta.icon}
                           {meta.label}
                         </span>
                         <span className="text-xs text-muted-foreground">Aktuell · {timeStr}</span>
@@ -343,7 +346,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                       {activeStatus.title}
                     </h2>
                     <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                      {activeStatus.body}
+                      {stripStatusVariables(activeStatus.body)}
                     </p>
                     {activeStatus.photoUrl && (
                       // eslint-disable-next-line @next/next/no-img-element

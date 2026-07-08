@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og'
 import { prisma } from '@/lib/prisma'
 import { NextRequest } from 'next/server'
+import { stripStatusVariables } from '@/lib/status-body'
 
 export const runtime = 'nodejs'
 
@@ -35,7 +36,8 @@ export async function GET(
 
   const emoji = ANLASS_EMOJI[post.anlass] ?? '📢'
   const anlassLabel = ANLASS_LABEL[post.anlass] ?? 'Mitteilung'
-  const displayBody = post.body.length > 180 ? post.body.slice(0, 180) + '…' : post.body
+  const cleanBody = stripStatusVariables(post.body)
+  const displayBody = cleanBody.length > 180 ? cleanBody.slice(0, 180) + '…' : cleanBody
 
   return new ImageResponse(
     (

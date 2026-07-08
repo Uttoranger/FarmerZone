@@ -7,6 +7,7 @@ import { expireStatusPost, deleteStatusPost } from '@/server/actions/status-post
 import type { StatusPostSummary } from '@/server/queries/status-posts'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { renderStatusBodyWithChip } from '@/lib/status-body'
 
 const ANLASS_META: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
   FRESH_PRODUCT: { label: 'Frisches Produkt', icon: <Leaf className="size-3.5" />, color: 'bg-green-100 text-green-800' },
@@ -92,7 +93,7 @@ export function StatusPostCard({ post }: { post: StatusPostSummary }) {
 
       {/* Content */}
       <h3 className="font-semibold text-foreground mb-1">{post.title}</h3>
-      <p className="text-sm text-muted-foreground line-clamp-2">{post.body}</p>
+      <p className="text-sm text-muted-foreground line-clamp-2">{renderStatusBodyWithChip(post.body)}</p>
 
       {/* Stats */}
       {!post.isDraft && (
