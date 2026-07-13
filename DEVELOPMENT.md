@@ -28,11 +28,26 @@ Prisma 7 · PostgreSQL 16 (Supabase) · Better Auth · Stripe Connect · Resend 
 
 ## Aktueller Stand
 
-**Sprint 9b abgeschlossen** — Kunden-Opt-in-System: Newsletter-Checkboxen im Checkout, Magic-Link-Login, Abo-Verwaltung unter /account/profile, HMAC-Abmelde-Links
+**Sprint 15 abgeschlossen** — Härtung 1: test-email dev-only, Cron fail-closed, CI-Workflow, Webhook-Retry-Fix, Build-Script mit `prisma generate`
 
 ---
 
 ## Erledigte Schritte
+
+### Sprint 15: Härtung 1 — Sicherheit + CI + Webhook + Deploy-Vorbereitung ✅
+- [x] `/api/test-email` — nur noch bei `NODE_ENV=development` aktiv, in Produktion 404; keine Konfigurationsdetails (API-Key-Präfix etc.) mehr im Response
+- [x] Cron-Route `cleanup-reservations` fail-closed: fehlendes `CRON_SECRET` oder falscher Header → 401
+- [x] `package.json`: `"typecheck": "tsc --noEmit"`; `"build": "prisma generate && next build"` (Vercel-Build-Cache kann sonst veralteten Prisma-Client verwenden); `packageManager`-Feld für CI/Vercel gepinnt
+- [x] `.github/workflows/ci.yml` — lint + typecheck + build bei push/PR auf main; Build läuft mit Dummy-ENV-Werten (im Workflow dokumentiert), keine Secrets nötig
+- [x] **Webhook-Retry-Fix**: `WebhookEvent` wird erst NACH erfolgreicher Verarbeitung persistiert; bei Verarbeitungsfehler antwortet die Route 500, sodass Stripe retried (vorher: Event galt bei Fehler dauerhaft als erledigt). Unique Constraint auf `stripeEventId` verifiziert; parallele Zustellung (P2002 beim Persistieren) wird als „skipped" behandelt. `handlePaymentFailed` läuft jetzt atomar in einer Transaktion inkl. Guard gegen doppelte Bestands-Rückbuchung bei Retries
+- [x] `scripts/README.md` — Zweck + Ausführungshinweise für alle Diagnose-/Reparaturskripte
+- [x] `vercel.json`: Cron-Schedule bereits auf `0 3 * * *` (Vercel-Hobby-Limit, war schon vor Sprint 15 umgestellt)
+
+**Webhook-Verifikation mit der Stripe CLI** (lokal, `stripe listen --forward-to localhost:3000/api/stripe/webhook`):
+1. **Erfolgsfall:** `stripe trigger payment_intent.succeeded` → zugehörige Bestellung steht auf `PAID`, `WebhookEvent`-Zeile mit der Event-ID existiert, Response 200 `{received: true}`
+2. **Idempotenz:** dasselbe Event erneut zustellen (`stripe events resend <evt_id>`) → Response 200 `{received: true, skipped: true}`, keine Doppelverarbeitung
+3. **Fehlerfall:** temporär einen `throw new Error('test')` in `handlePaymentSucceeded` einbauen → Trigger liefert Response 500, es wird KEIN `WebhookEvent` persistiert; nach Entfernen des `throw` stellt Stripe das Event automatisch erneut zu (bzw. `stripe events resend`) → Verarbeitung läuft korrekt durch
+- Hinweis: E-Mail-Fehler lösen KEIN 500 aus — `lib/email.ts` fängt Fehler intern ab (Log statt Throw). Der 500-Pfad greift bei DB-/Verarbeitungsfehlern
 
 ### Sprint 1: Setup & Datenmodell ✅
 - [x] Spezifikation (docs/spec.docx) vollständig gelesen

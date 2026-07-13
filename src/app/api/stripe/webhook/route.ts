@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type Stripe from 'stripe'
+import { Prisma } from '@prisma/client'
 import { stripe } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
 import { sendOrderConfirmation, sendOrderPaidToFarmer } from '@/lib/email'
@@ -36,11 +37,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true, skipped: true })
   }
 
-  // Record before processing so retries don't double-process
-  await prisma.webhookEvent.create({
-    data: { stripeEventId: event.id, type: event.type },
-  })
-
   try {
     if (event.type === 'payment_intent.succeeded') {
       await handlePaymentSucceeded(event.data.object as Stripe.PaymentIntent)
@@ -48,8 +44,23 @@ export async function POST(request: NextRequest) {
       await handlePaymentFailed(event.data.object as Stripe.PaymentIntent)
     }
   } catch (err) {
-    // Return 200 — event is already recorded, Stripe shouldn't retry
+    // 500 → Stripe retried das Event; es wurde noch nicht persistiert und gilt als unverarbeitet
     console.error(`[Webhook] Error handling ${event.type}:`, err)
+    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 })
+  }
+
+  // Erst nach erfolgreicher Verarbeitung als erledigt markieren
+  try {
+    await prisma.webhookEvent.create({
+      data: { stripeEventId: event.id, type: event.type },
+    })
+  } catch (err) {
+    // P2002 = paralleler Request hat dasselbe Event bereits persistiert — kein Fehler
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return NextResponse.json({ received: true, skipped: true })
+    }
+    console.error('[Webhook] Event verarbeitet, aber Persistierung fehlgeschlagen:', err)
+    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 })
   }
 
   return NextResponse.json({ received: true })
@@ -106,26 +117,32 @@ async function handlePaymentSucceeded(pi: Stripe.PaymentIntent) {
 async function handlePaymentFailed(pi: Stripe.PaymentIntent) {
   const order = await prisma.order.findUnique({
     where: { stripePaymentIntentId: pi.id },
-    select: { id: true, items: { select: { productId: true, quantity: true } } },
+    select: { id: true, status: true, items: { select: { productId: true, quantity: true } } },
   })
 
   if (!order) return
 
-  await prisma.order.update({
-    where: { id: order.id },
-    data: {
-      status: 'CANCELLED',
-      paymentStatus: 'FAILED',
-      cancelledAt: new Date(),
-      cancelReason: 'Zahlung fehlgeschlagen',
-    },
-  })
+  // Bereits storniert (z. B. früherer, vollständig gelaufener Versuch dieses Events):
+  // Bestand nicht noch einmal zurückbuchen
+  if (order.status === 'CANCELLED') return
 
-  // Restore stock so others can order
-  for (const item of order.items) {
-    await prisma.product.update({
-      where: { id: item.productId },
-      data: { stock: { increment: item.quantity } },
-    })
-  }
+  // Atomar: Storno + Bestands-Rückbuchung ganz oder gar nicht — sonst würde ein
+  // Stripe-Retry nach Teilfehler den Bestand doppelt erhöhen
+  await prisma.$transaction([
+    prisma.order.update({
+      where: { id: order.id },
+      data: {
+        status: 'CANCELLED',
+        paymentStatus: 'FAILED',
+        cancelledAt: new Date(),
+        cancelReason: 'Zahlung fehlgeschlagen',
+      },
+    }),
+    ...order.items.map((item) =>
+      prisma.product.update({
+        where: { id: item.productId },
+        data: { stock: { increment: item.quantity } },
+      })
+    ),
+  ])
 }

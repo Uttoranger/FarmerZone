@@ -6,8 +6,8 @@ export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
 
-  // Require secret in production
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  // Fail-closed: ohne konfiguriertes Secret bleibt der Endpoint gesperrt
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

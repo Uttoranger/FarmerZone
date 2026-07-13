@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    env:
+      # Dummy-Werte, keine echten Secrets: `next build` importiert Module, die
+      # Stripe/Prisma/Auth beim Laden instanziieren und dafür gesetzte
+      # ENV-Variablen erwarten. Es wird keine echte Verbindung aufgebaut —
+      # DB-Zugriffe passieren erst zur Laufzeit (alle Seiten sind dynamisch).
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci-dummy
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/ci-dummy
+      BETTER_AUTH_SECRET: ci-dummy-secret-0123456789abcdefghijklmnop
+      BETTER_AUTH_URL: http://localhost:3000
+      STRIPE_SECRET_KEY: sk_test_ci_dummy
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_ci_dummy
+      STRIPE_WEBHOOK_SECRET: whsec_ci_dummy
+      STRIPE_CONNECT_CLIENT_ID: ca_ci_dummy
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        # Version kommt aus dem "packageManager"-Feld der package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate
+
+      - name: Lint
+        # 19 vorbestehende Lint-Fehler in UI-Komponenten (Stand Sprint 15) —
+        # bewusst nicht-blockierend, das Aufräumen ist ein eigener Folge-Sprint.
+        # Sobald `pnpm lint` lokal grün ist: continue-on-error entfernen!
+        continue-on-error: true
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
