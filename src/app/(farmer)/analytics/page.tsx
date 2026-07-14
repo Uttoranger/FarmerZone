@@ -5,9 +5,9 @@ import { getFarmForUser } from '@/server/queries/dashboard'
 import { getAnalyticsData, getYtdRevenue, type PeriodKey } from '@/server/queries/analytics'
 import { AnalyticsDashboard } from '@/components/analytics/analytics-dashboard'
 import { PageHeader } from '@/components/farmer/page-header'
+import { PROCESSING_REVENUE_LIMIT, limitProgress } from '@/lib/revenue-limit'
 
 const VALID_PERIODS: PeriodKey[] = ['week', 'month', 'quarter', 'year']
-const LIMIT_40K = 40_000
 
 function formatEuro(n: number) {
   return new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
@@ -34,9 +34,10 @@ export default async function AnalyticsPage({
     getYtdRevenue(farm.id),
   ])
 
-  const pct = Math.min(100, (ytdRevenue / LIMIT_40K) * 100)
-  const remaining = Math.max(0, LIMIT_40K - ytdRevenue)
+  const { pct, remaining } = limitProgress(ytdRevenue)
   const year = new Date().getFullYear()
+  // "55.000 €" für Fließtext/Titel (Intl stellt das €-Zeichen voran, daher manuell)
+  const limitLabel = `${PROCESSING_REVENUE_LIMIT.toLocaleString('de-AT')} €`
 
   let barColor = 'bg-primary/80'
   let textColor = 'text-primary'
@@ -58,17 +59,17 @@ export default async function AnalyticsPage({
     <div className="px-4 py-6 max-w-2xl mx-auto">
       <PageHeader title="Auswertung" subtitle="Umsatz und Verkaufskanäle im Überblick" />
 
-      {/* 40k Direktvermarktungs-Grenze */}
+      {/* Grenze Be- & Verarbeitung (LK OÖ, Stand 2025) */}
       <div className={`rounded-2xl border p-5 mb-6 ${bgColor}`}>
         <div className="flex items-start justify-between gap-3 mb-3">
           <div>
             <p className={`text-xs font-semibold uppercase tracking-wide mb-0.5 ${textColor}`}>
-              40.000 € Direktvermarktungs-Grenze {year}
+              {limitLabel} Grenze Be- &amp; Verarbeitung {year}
             </p>
             <p className="text-2xl font-bold text-foreground">
               {formatEuro(ytdRevenue)}
               <span className="text-sm font-normal text-muted-foreground ml-1.5">
-                von {formatEuro(LIMIT_40K)}
+                von {formatEuro(PROCESSING_REVENUE_LIMIT)}
               </span>
             </p>
           </div>
@@ -101,10 +102,14 @@ export default async function AnalyticsPage({
         {pct >= 75 && (
           <p className="mt-3 text-xs text-muted-foreground leading-relaxed border-t border-black/10 pt-3">
             {pct >= 95
-              ? 'Du hast die Steuerfreigrenze für Direktvermarktung fast erreicht. Bitte konsultiere deinen Steuerberater.'
-              : 'Du nähert dich der 40.000 € Grenze für steuerfreie Direktvermarktung. Sprich ggf. mit deinem Steuerberater.'}
+              ? `Du hast die ${limitLabel} Grenze für Be- & Verarbeitung fast erreicht. Bitte konsultiere deinen Steuerberater.`
+              : `Du näherst dich der ${limitLabel} Grenze für Be- & Verarbeitung. Sprich ggf. mit deinem Steuerberater.`}
           </p>
         )}
+
+        <p className="mt-3 text-[11px] text-muted-foreground/70">
+          Zählweise vereinfacht — keine Steuerberatung. Details: Landwirtschaftskammer.
+        </p>
       </div>
 
       <AnalyticsDashboard data={data} currentPeriod={period} />
