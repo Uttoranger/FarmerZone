@@ -20,7 +20,7 @@ export default async function OrdersPage() {
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto">
       <PageHeader title="Bestellungen" />
-      <OrdersClient orders={orders} farmSlug={farm.slug} />
+      <OrdersClient orders={orders} farmSlug={farm.slug} farmName={farm.name} />
     </div>
   )
 }

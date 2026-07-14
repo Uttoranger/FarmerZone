@@ -18,7 +18,15 @@ function formatGroupDate(date: Date): string {
   return d.toLocaleDateString('de-AT', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
-export function OrdersClient({ orders, farmSlug }: { orders: FarmerOrder[]; farmSlug: string }) {
+export function OrdersClient({
+  orders,
+  farmSlug,
+  farmName,
+}: {
+  orders: FarmerOrder[]
+  farmSlug: string
+  farmName: string
+}) {
   const [filter, setFilter] = useState<Filter>('active')
 
   const todayStr = new Date().toDateString()
@@ -125,7 +133,7 @@ export function OrdersClient({ orders, farmSlug }: { orders: FarmerOrder[]; farm
             </h2>
             <div className="flex flex-col gap-3">
               {group.map((order) => (
-                <OrderCard key={order.id} order={order} />
+                <OrderCard key={order.id} order={order} farmName={farmName} />
               ))}
             </div>
           </div>
