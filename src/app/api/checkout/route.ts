@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { sendOnsiteConfirmation } from '@/lib/email'
 import { checkoutRequestSchema } from '@/schemas/checkout'
+import { calcTotalAmount, calcPlatformFeeAmount, eurosToCents } from '@/lib/order-totals'
 
 function generateOrderNumber(farmSlug: string): string {
   const parts = farmSlug.split('-')
@@ -121,8 +122,8 @@ export async function POST(request: NextRequest) {
   }
 
   // 5. Totals
-  const totalAmount = data.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0)
-  const platformFeeAmount = Math.round(totalAmount * Number(farm.platformFeePercent)) / 100
+  const totalAmount = calcTotalAmount(data.items)
+  const platformFeeAmount = calcPlatformFeeAmount(totalAmount, Number(farm.platformFeePercent))
 
   // 6. Order number (retry on collision — astronomically unlikely)
   let orderNumber = generateOrderNumber(data.farmSlug)
@@ -206,8 +207,8 @@ export async function POST(request: NextRequest) {
 
   // 11a. ONLINE — create Stripe PaymentIntent
   if (data.paymentMethod === 'ONLINE') {
-    const amountCents = Math.round(totalAmount * 100)
-    const feeAmountCents = Math.round(platformFeeAmount * 100)
+    const amountCents = eurosToCents(totalAmount)
+    const feeAmountCents = eurosToCents(platformFeeAmount)
 
     const intentParams: Parameters<typeof stripe.paymentIntents.create>[0] = {
       amount: amountCents,
