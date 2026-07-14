@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { Check, MessageSquare } from 'lucide-react'
 import { markWhatsAppSent } from '@/server/actions/status-posts'
+import { toWaPhone } from '@/lib/whatsapp'
 import { cn } from '@/lib/utils'
 
 interface Subscriber {
@@ -19,12 +20,6 @@ interface Props {
   farmSlug: string
   subscribers: Subscriber[]
   initialSentCount: number
-}
-
-function toWaPhone(phone: string): string {
-  const digits = phone.replace(/[\s\-().+]/g, '')
-  if (digits.startsWith('0')) return '43' + digits.slice(1)
-  return digits
 }
 
 const APP_URL = typeof window !== 'undefined' ? window.location.origin : 'https://farmerzone.at'

@@ -2,9 +2,10 @@
 
 import { useTransition, useState } from 'react'
 import Link from 'next/link'
-import { Phone } from 'lucide-react'
+import { Phone, MessageCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import type { FarmerOrder } from '@/server/queries/orders'
+import { buildOrderReminderUrl } from '@/lib/whatsapp'
 import {
   markAsReady,
   markAsPickedUp,
@@ -23,7 +24,7 @@ import {
 } from '@/components/ui/dialog'
 import { statusLabel, statusColor, paymentLabel } from './order-status'
 
-export function OrderCard({ order }: { order: FarmerOrder }) {
+export function OrderCard({ order, farmName }: { order: FarmerOrder; farmName: string }) {
   const [isPending, startTransition] = useTransition()
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
@@ -31,6 +32,7 @@ export function OrderCard({ order }: { order: FarmerOrder }) {
   const isOnline = order.paymentMethod === 'ONLINE'
   const status = order.status
 
+  const canRemind = ['PAID', 'CONFIRMED', 'READY'].includes(status) && !!order.customerPhone
   const canMarkReady = ['PAID', 'CONFIRMED', 'IN_PREPARATION'].includes(status)
   const canMarkPickedUp = status === 'READY' && isOnline
   const canMarkPickedUpAndPaid = status === 'READY' && !isOnline
@@ -85,13 +87,38 @@ export function OrderCard({ order }: { order: FarmerOrder }) {
                 {order.orderNumber}
               </Link>
               <div className="font-medium text-foreground">{order.customerName}</div>
-              <a
-                href={`tel:${order.customerPhone}`}
-                className="text-sm text-muted-foreground flex items-center gap-1 hover:text-primary w-fit"
-              >
-                <Phone className="h-3 w-3" />
-                {order.customerPhone}
-              </a>
+              <div className="flex items-center gap-2">
+                <a
+                  href={`tel:${order.customerPhone}`}
+                  className="text-sm text-muted-foreground flex items-center gap-1 hover:text-primary w-fit"
+                >
+                  <Phone className="h-3 w-3" />
+                  {order.customerPhone}
+                </a>
+                {canRemind && (
+                  <a
+                    href={buildOrderReminderUrl(order.customerPhone, {
+                      customerName: order.customerName,
+                      orderNumber: order.orderNumber,
+                      farmName,
+                      pickupDate: order.pickupDate,
+                      pickupTimeStart: order.pickupTimeStart,
+                      pickupTimeEnd: order.pickupTimeEnd,
+                    })}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-sm text-muted-foreground hover:text-primary"
+                    >
+                      <MessageCircle className="h-3 w-3" />
+                      Erinnern
+                    </Button>
+                  </a>
+                )}
+              </div>
             </div>
             <div className="text-right shrink-0">
               <span

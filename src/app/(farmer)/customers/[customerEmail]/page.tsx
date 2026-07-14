@@ -7,6 +7,7 @@ import { getFarmForUser } from '@/server/queries/dashboard'
 import { getCustomerDetail } from '@/server/queries/customers'
 import type { CustomerStatus } from '@/server/queries/customers'
 import { statusLabel, statusColor } from '@/components/orders/order-status'
+import { toWaPhone } from '@/lib/whatsapp'
 import { cn } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
@@ -35,13 +36,6 @@ function customerBadgeClass(status: CustomerStatus): string {
     case 'Neu': return 'bg-purple-100 text-purple-800'
     default: return 'bg-slate-100 text-slate-600'
   }
-}
-
-function toWaPhone(phone: string): string {
-  const digits = phone.replace(/[\s\-().]/g, '')
-  if (digits.startsWith('+')) return digits.slice(1)
-  if (digits.startsWith('0')) return '43' + digits.slice(1)
-  return digits
 }
 
 interface Props {
