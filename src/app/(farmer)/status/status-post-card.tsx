@@ -2,6 +2,7 @@
 
 import { useTransition } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Leaf, CalendarDays, Tag, MessageCircle, Mail, MessageSquare, CheckCircle, Clock, FileText, Trash2, XCircle } from 'lucide-react'
 import { expireStatusPost, deleteStatusPost } from '@/server/actions/status-posts'
 import type { StatusPostSummary } from '@/server/queries/status-posts'
@@ -94,6 +95,17 @@ export function StatusPostCard({ post }: { post: StatusPostSummary }) {
       {/* Content */}
       <h3 className="font-semibold text-foreground mb-1">{post.title}</h3>
       <p className="text-sm text-muted-foreground line-clamp-2">{renderStatusBodyWithChip(post.body)}</p>
+      {post.photoUrl && (
+        <div className="relative mt-2 h-28 w-full overflow-hidden rounded-lg">
+          <Image
+            src={post.photoUrl}
+            alt={post.title}
+            fill
+            sizes="(min-width: 768px) 640px, 100vw"
+            className="object-cover"
+          />
+        </div>
+      )}
 
       {/* Stats */}
       {!post.isDraft && (

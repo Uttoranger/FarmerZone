@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { CHANNEL_LABELS } from '@/schemas/manual-sale'
+import { sumCountedRevenue, type CountablePosition } from '@/lib/revenue-limit'
 
 export type PeriodKey = 'week' | 'month' | 'quarter' | 'year'
 
@@ -196,6 +197,9 @@ function generateInsight(
   return null
 }
 
+// Grenzwert-Summe (55k-Karte): Positionen, deren Produkt als Urproduktion
+// markiert ist (countsTowardLimit=false), zählen nicht; Positionen/Verkäufe
+// OHNE Produktbezug zählen weiter (konservativ).
 export async function getYtdRevenue(farmId: string): Promise<number> {
   const now = new Date()
   const yearStart = new Date(now.getFullYear(), 0, 1)
@@ -203,17 +207,38 @@ export async function getYtdRevenue(farmId: string): Promise<number> {
   const [orders, manualSales] = await Promise.all([
     prisma.order.findMany({
       where: { farmId, status: 'PICKED_UP', pickedUpAt: { gte: yearStart } },
-      select: { totalAmount: true },
+      select: {
+        items: {
+          select: {
+            totalPrice: true,
+            product: { select: { countsTowardLimit: true } },
+          },
+        },
+      },
     }),
     prisma.manualSale.findMany({
       where: { farmId, saleDate: { gte: yearStart } },
-      select: { totalAmount: true },
+      select: {
+        totalAmount: true,
+        product: { select: { countsTowardLimit: true } },
+      },
     }),
   ])
 
-  const orderRevenue = orders.reduce((s, o) => s + Number(o.totalAmount), 0)
-  const manualRevenue = manualSales.reduce((s, m) => s + Number(m.totalAmount), 0)
-  return orderRevenue + manualRevenue
+  const positions: CountablePosition[] = [
+    ...orders.flatMap((o) =>
+      o.items.map((i) => ({
+        amount: Number(i.totalPrice),
+        countsTowardLimit: i.product?.countsTowardLimit ?? null,
+      }))
+    ),
+    ...manualSales.map((m) => ({
+      amount: Number(m.totalAmount),
+      countsTowardLimit: m.product?.countsTowardLimit ?? null,
+    })),
+  ]
+
+  return sumCountedRevenue(positions)
 }
 
 export async function getAnalyticsData(farmId: string, period: PeriodKey): Promise<AnalyticsData> {

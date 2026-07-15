@@ -128,3 +128,25 @@ export async function updateFarmBannerAction(
 
   return {}
 }
+
+// Vertikaler Fokuspunkt des Titelbilds (0 = oben, 100 = unten).
+// Wert wird hart geclampt — der Client kann schicken, was er will.
+export async function updateBannerFocusAction(focusY: number): Promise<{ error?: string }> {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) return { error: 'Nicht angemeldet' }
+
+  const farm = await prisma.farm.findUnique({
+    where: { ownerId: session.user.id },
+    select: { id: true, slug: true },
+  })
+  if (!farm) return { error: 'Hof nicht gefunden' }
+
+  const clamped = Math.min(100, Math.max(0, Math.round(Number(focusY) || 0)))
+
+  await prisma.farm.update({ where: { id: farm.id }, data: { bannerFocusY: clamped } })
+
+  revalidatePath(`/${farm.slug}`)
+  revalidatePath('/farm-page')
+
+  return {}
+}

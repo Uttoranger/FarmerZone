@@ -11,3 +11,15 @@ export function limitProgress(ytdRevenue: number, limit: number = PROCESSING_REV
   const remaining = Math.max(0, limit - ytdRevenue)
   return { pct, remaining }
 }
+
+// Eine Umsatzposition für die Grenzwert-Summe. countsTowardLimit:
+// true = zählt, false = als Urproduktion markiert (zählt nicht),
+// null = kein Produktbezug → zählt weiter (konservativ).
+export type CountablePosition = { amount: number; countsTowardLimit: boolean | null }
+
+export function sumCountedRevenue(positions: CountablePosition[]): number {
+  return positions.reduce(
+    (sum, p) => (p.countsTowardLimit === false ? sum : sum + p.amount),
+    0
+  )
+}

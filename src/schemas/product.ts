@@ -70,10 +70,36 @@ const optionalMonth = z.preprocess(
   z.number().int().min(1).max(12).optional()
 )
 
+export const PRODUCT_CATEGORY_VALUES = [
+  'MILCH', 'EIER', 'FLEISCH', 'GEMUESE', 'OBST',
+  'BROT', 'HONIG', 'GETRAENKE', 'BRENNHOLZ', 'SONSTIGES',
+] as const
+
+export type ProductCategoryValue = (typeof PRODUCT_CATEGORY_VALUES)[number]
+
+export const CATEGORY_OPTIONS: { value: ProductCategoryValue; label: string }[] = [
+  { value: 'MILCH', label: 'Milch & Molkerei' },
+  { value: 'EIER', label: 'Eier' },
+  { value: 'FLEISCH', label: 'Fleisch & Wurst' },
+  { value: 'GEMUESE', label: 'Gemüse' },
+  { value: 'OBST', label: 'Obst' },
+  { value: 'BROT', label: 'Brot & Gebäck' },
+  { value: 'HONIG', label: 'Honig & Süßes' },
+  { value: 'GETRAENKE', label: 'Getränke' },
+  { value: 'BRENNHOLZ', label: 'Brennholz' },
+  { value: 'SONSTIGES', label: 'Sonstiges' },
+]
+
 export const productFormSchema = z.object({
   name: z.string().min(2, 'Mindestens 2 Zeichen').max(100),
   description: z.string().max(1000, 'Maximal 1000 Zeichen').optional().or(z.literal('')),
   imageUrl: z.string().optional().or(z.literal('')),
+  // null = "Keine Angabe" (heutiges Verhalten); ungültige Werte werden abgelehnt
+  category: z.preprocess(
+    (v) => (v === '' || v === undefined ? null : v),
+    z.enum(PRODUCT_CATEGORY_VALUES).nullable()
+  ).default(null),
+  countsTowardLimit: z.boolean().default(true),
   price: z.coerce.number().positive('Preis muss größer als 0 sein'),
   vatRate: z.coerce.number().min(0).max(100).default(10),
   unit: z.enum(['STUECK', 'KG', 'G', 'LITER', 'ML', 'M3', 'PAKET']),

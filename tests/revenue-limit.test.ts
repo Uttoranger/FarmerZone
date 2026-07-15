@@ -6,7 +6,7 @@
  * inklusive Deckelung bei Überschreitung und der Ampel-Schwellen 75 %/95 %.
  */
 import { describe, it, expect } from 'vitest'
-import { PROCESSING_REVENUE_LIMIT, limitProgress } from '@/lib/revenue-limit'
+import { PROCESSING_REVENUE_LIMIT, limitProgress, sumCountedRevenue } from '@/lib/revenue-limit'
 
 describe('PROCESSING_REVENUE_LIMIT', () => {
   it('beträgt 55.000 € (LK OÖ, Stand 2025)', () => {
@@ -40,5 +40,38 @@ describe('limitProgress', () => {
     const { pct, remaining } = limitProgress(PROCESSING_REVENUE_LIMIT * 0.6)
     expect(pct).toBeCloseTo(60, 10)
     expect(remaining).toBeCloseTo(PROCESSING_REVENUE_LIMIT * 0.4, 10)
+  })
+})
+
+describe('sumCountedRevenue (Sprint 17K: Urproduktion-Filter)', () => {
+  it('summiert gemischte Flags korrekt: true zählt, false nicht, ohne Produktbezug (null) zählt konservativ weiter', () => {
+    const positions = [
+      { amount: 100, countsTowardLimit: true },   // normales Produkt
+      { amount: 40, countsTowardLimit: false },   // als Urproduktion markiert
+      { amount: 25, countsTowardLimit: null },    // ManualSale ohne Produktbezug
+    ]
+    expect(sumCountedRevenue(positions)).toBe(125)
+  })
+
+  it('leere Liste ergibt 0', () => {
+    expect(sumCountedRevenue([])).toBe(0)
+  })
+
+  it('nur Urproduktion ergibt 0', () => {
+    expect(
+      sumCountedRevenue([
+        { amount: 100, countsTowardLimit: false },
+        { amount: 50, countsTowardLimit: false },
+      ])
+    ).toBe(0)
+  })
+
+  it('nur Positionen ohne Produktbezug zählen voll (konservativ)', () => {
+    expect(
+      sumCountedRevenue([
+        { amount: 10, countsTowardLimit: null },
+        { amount: 5, countsTowardLimit: null },
+      ])
+    ).toBe(15)
   })
 })

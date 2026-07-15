@@ -1,19 +1,19 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import {
   MapPin, Phone, Mail, CreditCard, Banknote,
   Pencil, Eye, Leaf, CalendarDays, Tag, MessageCircle,
-  Check, Camera, Plus, ChevronLeft, ChevronRight, X,
+  Check, Camera, Plus, ChevronLeft, ChevronRight, X, MoveVertical,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { PublicFarm } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
-import { updateFarmBannerAction } from '@/server/actions/appearance'
+import { updateFarmBannerAction, updateBannerFocusAction } from '@/server/actions/appearance'
 import { addFarmPhotoAction } from '@/server/actions/farm-photos'
 import { useImageUpload } from '@/components/shared/image-upload'
 import { ProductGrid } from './product-grid'
@@ -322,12 +322,88 @@ function CoverEditButton({ currentBannerUrl }: { currentBannerUrl: string | null
         type="button"
         onClick={openFilePicker}
         disabled={isUploading}
-        className="absolute top-3.5 right-[22px] flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-60"
+        className="flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-60"
         style={{ background: 'rgba(255,255,255,0.94)', color: '#2D5F3F', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}
       >
         <Camera className="size-3.5" strokeWidth={1.7} />
         {isUploading ? 'Lädt…' : 'Titelbild ersetzen'}
       </button>
+    </>
+  )
+}
+
+// ── Titelbild-Fokuspunkt: Anpass-Zustand (Drag mit Maus & Touch) ──────────────
+
+function CoverFocusAdjust({
+  focusY,
+  onChange,
+  onSave,
+  onCancel,
+  saving,
+}: {
+  focusY: number
+  onChange: (v: number) => void
+  onSave: () => void
+  onCancel: () => void
+  saving: boolean
+}) {
+  const drag = useRef<{ startY: number; startFocus: number; height: number } | null>(null)
+
+  return (
+    <>
+      {/* Drag-Fläche über dem ganzen Cover */}
+      <div
+        className="absolute inset-0 z-10 cursor-grab active:cursor-grabbing"
+        style={{ touchAction: 'none' }}
+        onPointerDown={(e) => {
+          drag.current = {
+            startY: e.clientY,
+            startFocus: focusY,
+            height: e.currentTarget.getBoundingClientRect().height,
+          }
+          e.currentTarget.setPointerCapture(e.pointerId)
+        }}
+        onPointerMove={(e) => {
+          const s = drag.current
+          if (!s) return
+          const dy = e.clientY - s.startY
+          onChange(Math.min(100, Math.max(0, Math.round(s.startFocus - (dy / s.height) * 100))))
+        }}
+        onPointerUp={() => { drag.current = null }}
+        onPointerCancel={() => { drag.current = null }}
+      >
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <span
+            className="flex items-center gap-1.5 rounded-full text-xs font-semibold text-white px-3.5 py-2"
+            style={{ background: 'rgba(45,48,39,0.85)' }}
+          >
+            <MoveVertical className="size-3.5" strokeWidth={1.7} />
+            Bild ziehen, um den Ausschnitt zu wählen
+          </span>
+        </div>
+      </div>
+      {/* Speichern / Abbrechen */}
+      <div className="absolute top-3.5 right-[22px] z-20 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={saving}
+          className="flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-60"
+          style={{ background: 'rgba(255,255,255,0.94)', color: '#5C6052', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}
+        >
+          Abbrechen
+        </button>
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving}
+          className="flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+          style={{ background: 'rgba(45,48,39,0.85)', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}
+        >
+          <Check className="size-3.5" strokeWidth={1.7} />
+          {saving ? 'Speichert…' : 'Speichern'}
+        </button>
+      </div>
     </>
   )
 }
@@ -347,6 +423,28 @@ type Props = {
 export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = false, mode = 'edit' }: Props) {
   const isEdit = ownerMode && mode !== 'preview'
   const [galleryKey, setGalleryKey] = useState(0)
+
+  // Titelbild-Fokuspunkt: null = kein Anpass-Zustand, sonst Live-Entwurf (0–100)
+  const [focusDraft, setFocusDraft] = useState<number | null>(null)
+  const [savingFocus, startFocusTransition] = useTransition()
+  const focusRouter = useRouter()
+  const adjustingFocus = focusDraft !== null
+  const effectiveFocusY = focusDraft ?? farm.bannerFocusY
+
+  function saveFocus() {
+    const value = focusDraft
+    if (value === null) return
+    startFocusTransition(async () => {
+      const result = await updateBannerFocusAction(value)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success('Bildausschnitt gespeichert')
+        focusRouter.refresh()
+      }
+      setFocusDraft(null)
+    })
+  }
 
   const sections = farm.sectionsConfig
   function isSectionVisible(key: string) {
@@ -508,6 +606,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
             sizes="100vw"
             priority
             className="object-cover"
+            style={{ objectPosition: `50% ${effectiveFocusY}%` }}
           />
         ) : (
           <div className="absolute inset-0" style={{ background: bannerBg }} />
@@ -519,8 +618,32 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
             background: 'linear-gradient(180deg, rgba(24,36,27,0.10) 0%, rgba(24,36,27,0) 40%, rgba(20,30,22,0.62) 100%)',
           }}
         />
-        {/* Titelbild ändern (edit only) — inline upload */}
-        {isEdit && <CoverEditButton currentBannerUrl={farm.bannerUrl} />}
+        {/* Titelbild ändern + Fokus anpassen (edit only) */}
+        {isEdit && adjustingFocus && (
+          <CoverFocusAdjust
+            focusY={effectiveFocusY}
+            onChange={setFocusDraft}
+            onSave={saveFocus}
+            onCancel={() => setFocusDraft(null)}
+            saving={savingFocus}
+          />
+        )}
+        {isEdit && !adjustingFocus && (
+          <div className="absolute top-3.5 right-[22px] flex items-center gap-2">
+            {bannerBg === null && (
+              <button
+                type="button"
+                onClick={() => setFocusDraft(farm.bannerFocusY)}
+                className="flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90"
+                style={{ background: 'rgba(255,255,255,0.94)', color: '#2D5F3F', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}
+              >
+                <MoveVertical className="size-3.5" strokeWidth={1.7} />
+                Anpassen
+              </button>
+            )}
+            <CoverEditButton currentBannerUrl={farm.bannerUrl} />
+          </div>
+        )}
         {/* Hof-Siegel */}
         {farm.foundedYear && (
           <div
@@ -550,7 +673,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                   {v.title}
                 </span>
               ))}
-              {isEdit && (
+              {isEdit && !adjustingFocus && (
                 <Link
                   href="/settings/appearance"
                   className="pointer-events-auto flex items-center justify-center rounded-full transition-opacity hover:opacity-90"
@@ -693,12 +816,15 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                           }
                         </p>
                         {activeStatus.photoUrl && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={activeStatus.photoUrl}
-                            alt={activeStatus.title}
-                            className="w-full rounded-xl mt-3 object-cover max-h-48"
-                          />
+                          <div className="relative w-full aspect-[3/2] max-h-48 mt-3 rounded-xl overflow-hidden">
+                            <Image
+                              src={activeStatus.photoUrl}
+                              alt={activeStatus.title}
+                              fill
+                              sizes="(min-width: 768px) 640px, 100vw"
+                              className="object-cover"
+                            />
+                          </div>
                         )}
                       </div>
                     </WoodCard>

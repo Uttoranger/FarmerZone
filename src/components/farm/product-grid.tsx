@@ -137,11 +137,11 @@ function ProductImageArea({
     <div className="relative flex-shrink-0 group" style={{ height: 170, background: '#F4EFE3' }}>
       {fileInput}
 
-      {/* Dimmed image wrapper */}
+      {/* Dimmed image wrapper — imageUrl ?? Kategoriebild ?? Sand-Platzhalter */}
       <div className="absolute inset-0" style={{ opacity: dim }}>
-        {product.imageUrl ? (
+        {(product.imageUrl ?? product.categoryImageUrl) ? (
           <Image
-            src={product.imageUrl}
+            src={(product.imageUrl ?? product.categoryImageUrl)!}
             alt={product.name}
             fill
             sizes="(min-width: 768px) 33vw, 50vw"
@@ -179,7 +179,7 @@ function ProductImageArea({
           type="button"
           onClick={openFilePicker}
           disabled={isUploading}
-          aria-label={product.imageUrl ? 'Bild ersetzen' : 'Bild hinzufügen'}
+          aria-label={(product.imageUrl ?? product.categoryImageUrl) ? 'Bild ersetzen' : 'Bild hinzufügen'}
           className="absolute inset-0 flex items-end justify-center pb-9 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity disabled:cursor-wait"
           style={{ background: 'rgba(20,30,22,0.35)' }}
         >
@@ -191,7 +191,7 @@ function ProductImageArea({
               ? <Loader2 className="size-3 animate-spin" />
               : <Camera className="size-3" strokeWidth={1.7} />
             }
-            {isUploading ? 'Lädt…' : product.imageUrl ? 'Ersetzen' : 'Bild hinzufügen'}
+            {isUploading ? 'Lädt…' : (product.imageUrl ?? product.categoryImageUrl) ? 'Ersetzen' : 'Bild hinzufügen'}
           </span>
         </button>
       )}
