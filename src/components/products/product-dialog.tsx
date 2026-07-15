@@ -39,6 +39,7 @@ import {
   ALLERGENS,
   UNIT_OPTIONS,
   MONTH_OPTIONS,
+  CATEGORY_OPTIONS,
 } from '@/schemas/product'
 
 type Props = {
@@ -51,6 +52,8 @@ const EMPTY_DEFAULTS: ProductFormData = {
   name: '',
   description: '',
   imageUrl: '',
+  category: null,
+  countsTowardLimit: true,
   price: 0,
   vatRate: 10,
   unit: 'STUECK',
@@ -71,6 +74,8 @@ function toFormDefaults(p: ProductData): Partial<ProductFormData> {
     name: p.name,
     description: p.description ?? '',
     imageUrl: p.imageUrl ?? '',
+    category: p.category ?? null,
+    countsTowardLimit: p.countsTowardLimit,
     price: p.price,
     vatRate: p.vatRate,
     unit: p.unit as ProductFormData['unit'],
@@ -284,6 +289,58 @@ export function ProductDialog({ open, product, onClose }: Props) {
                       </FormControl>
                       <FormMessage />
                     </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Kategorie</FormLabel>
+                      <Select
+                        onValueChange={(v) => field.onChange(v === 'NONE' ? null : v)}
+                        value={field.value ?? 'NONE'}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Keine Angabe" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="NONE">Keine Angabe</SelectItem>
+                          {CATEGORY_OPTIONS.map((c) => (
+                            <SelectItem key={c.value} value={c.value}>
+                              {c.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="countsTowardLimit"
+                  render={({ field }) => (
+                    <div>
+                      <label className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted/30 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={field.value}
+                          onChange={(e) => field.onChange(e.target.checked)}
+                          className="w-4 h-4 rounded accent-green-600"
+                        />
+                        <span className="text-sm text-foreground">
+                          Zählt zur 55.000-€-Grenze (Be- &amp; Verarbeitung)
+                        </span>
+                      </label>
+                      <p className="text-xs text-muted-foreground pl-[42px]">
+                        Reine Urproduktion zählt meist nicht — im Zweifel mit dem Steuerberater klären.
+                      </p>
+                    </div>
                   )}
                 />
               </section>

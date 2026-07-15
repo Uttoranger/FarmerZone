@@ -178,13 +178,24 @@ export function ProductList({ products: initialProducts, initialEditId }: Props)
               <CardContent className="p-0">
                 <div className="flex gap-0">
                   {/* Image */}
-                  <div className="shrink-0 w-20 h-20 md:w-24 md:h-24 bg-muted flex items-center justify-center">
+                  <div
+                    className="shrink-0 w-20 h-20 md:w-24 md:h-24 bg-muted flex items-center justify-center"
+                    style={product.categoryImageUrl && !product.imageUrl ? { background: '#F4EFE3' } : undefined}
+                  >
                     {product.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={product.imageUrl}
                         alt={product.name}
                         className="w-full h-full object-cover"
+                      />
+                    ) : product.categoryImageUrl ? (
+                      // Kategorie-Fallback: object-contain auf Sand, wie echte Bilder im Grid
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={product.categoryImageUrl}
+                        alt={product.name}
+                        className="w-full h-full object-contain"
                       />
                     ) : (
                       <Package className="w-7 h-7 text-slate-300" />

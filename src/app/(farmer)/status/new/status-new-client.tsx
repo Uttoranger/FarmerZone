@@ -2,12 +2,15 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import {
   Leaf, CalendarDays, Tag, MessageCircle,
   Home, Mail, MessageSquare, CircleDot,
   Mic, Sparkles, ArrowRight, CheckCircle, Check,
+  Camera, Loader2, X,
 } from 'lucide-react'
 import { publishStatusPost } from '@/server/actions/status-posts'
+import { useImageUpload } from '@/components/shared/image-upload'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { stripStatusVariables } from '@/lib/status-body'
@@ -88,7 +91,14 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
   const [anlass, setAnlass] = useState<Anlass>('FRESH_PRODUCT')
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const [linkedProductIds, setLinkedProductIds] = useState<string[]>([])
+
+  const photoUpload = useImageUpload({
+    variant: 'status',
+    oldUrl: photoUrl ?? undefined,
+    onUploaded: (url) => setPhotoUrl(url),
+  })
 
   // A3: field validation errors
   const [fieldErrors, setFieldErrors] = useState<{ title?: boolean; body?: boolean }>({})
@@ -128,6 +138,7 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
         title: title.trim(),
         body: body.trim(),
         anlass,
+        photoUrl: photoUrl ?? undefined,
         linkedProductIds,
         showOnFarmPage,
         sendEmail: sendEmail && !emailBlocked,
@@ -251,8 +262,42 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
               </p>
             </div>
 
-            {/* Placeholder feature buttons */}
+            {/* Optionales Foto */}
+            {photoUpload.fileInput}
+            {photoUrl && (
+              <div className="relative w-full aspect-[3/2] max-h-48 mb-3 rounded-xl overflow-hidden border border-border">
+                <Image
+                  src={photoUrl}
+                  alt="Status-Foto"
+                  fill
+                  sizes="(min-width: 768px) 640px, 100vw"
+                  className="object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => setPhotoUrl(null)}
+                  aria-label="Foto entfernen"
+                  className="absolute top-2 right-2 flex items-center justify-center size-7 rounded-full text-white transition-opacity hover:opacity-90"
+                  style={{ background: 'rgba(45,48,39,0.85)' }}
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Feature buttons */}
             <div className="flex gap-2 mb-5">
+              <button
+                type="button"
+                onClick={photoUpload.openFilePicker}
+                disabled={photoUpload.isUploading}
+                className="flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs text-foreground hover:bg-muted/40 disabled:opacity-60"
+              >
+                {photoUpload.isUploading
+                  ? <Loader2 className="size-3.5 animate-spin" />
+                  : <Camera className="size-3.5" />}
+                {photoUpload.isUploading ? 'Lädt…' : photoUrl ? 'Foto ersetzen' : 'Foto hinzufügen'}
+              </button>
               <button
                 className="flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs text-muted-foreground cursor-not-allowed opacity-50"
                 disabled

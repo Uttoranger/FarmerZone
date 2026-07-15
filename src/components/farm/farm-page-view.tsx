@@ -816,12 +816,15 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                           }
                         </p>
                         {activeStatus.photoUrl && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={activeStatus.photoUrl}
-                            alt={activeStatus.title}
-                            className="w-full rounded-xl mt-3 object-cover max-h-48"
-                          />
+                          <div className="relative w-full aspect-[3/2] max-h-48 mt-3 rounded-xl overflow-hidden">
+                            <Image
+                              src={activeStatus.photoUrl}
+                              alt={activeStatus.title}
+                              fill
+                              sizes="(min-width: 768px) 640px, 100vw"
+                              className="object-cover"
+                            />
+                          </div>
                         )}
                       </div>
                     </WoodCard>
