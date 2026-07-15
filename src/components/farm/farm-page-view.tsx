@@ -155,15 +155,7 @@ function GallerySection({
       </div>
 
       {/* Grid */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
-          gridAutoRows: 150,
-          gap: 12,
-        }}
-        className="md:[grid-template-columns:repeat(4,1fr)]"
-      >
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 [grid-auto-rows:150px]">
         {visiblePhotos.map((photo, i) => {
           const isFirst = i === 0
           const isLast = i === visiblePhotos.length - 1
