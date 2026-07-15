@@ -108,7 +108,8 @@ export default async function AnalyticsPage({
         )}
 
         <p className="mt-3 text-[11px] text-muted-foreground/70">
-          Zählweise vereinfacht — keine Steuerberatung. Details: Landwirtschaftskammer.
+          Zählweise vereinfacht, ohne als Urproduktion markierte Produkte — keine
+          Steuerberatung. Details: Landwirtschaftskammer.
         </p>
       </div>
 

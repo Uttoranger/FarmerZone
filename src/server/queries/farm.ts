@@ -1,11 +1,16 @@
 import { prisma } from '@/lib/prisma'
+import { categoryImagePath } from '@/lib/product-image'
 import { DEFAULT_SECTIONS, type SectionConfig } from './appearance'
+import { PRODUCT_ORDER_BY } from './products'
+import type { ProductCategory } from '@prisma/client'
 
 export type PublicProduct = {
   id: string
   name: string
   description: string | null
   imageUrl: string | null
+  category: ProductCategory | null
+  categoryImageUrl: string | null
   price: number
   unit: string
   unitSize: number | null
@@ -59,6 +64,7 @@ export type PublicFarm = {
   aboutText: string | null
   bannerType: 'GRADIENT' | 'PHOTO'
   bannerValue: string | null
+  bannerFocusY: number
   sectionsConfig: SectionConfig[]
   farmValues: PublicFarmValue[]
   farmPhotos: PublicFarmPhoto[]
@@ -97,6 +103,7 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
       aboutText: true,
       bannerType: true,
       bannerValue: true,
+      bannerFocusY: true,
       sectionsConfig: true,
       acceptsOnline: true,
       acceptsOnsite: true,
@@ -109,12 +116,13 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
       },
       farmPhotos: FARM_PHOTO_SELECT,
       products: {
-        orderBy: [{ isAvailable: 'desc' }, { name: 'asc' }],
+        orderBy: PRODUCT_ORDER_BY,
         select: {
           id: true,
           name: true,
           description: true,
           imageUrl: true,
+          category: true,
           price: true,
           unit: true,
           unitSize: true,
@@ -154,6 +162,7 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
       ...p,
       price: Number(p.price),
       unitSize: p.unitSize ? Number(p.unitSize) : null,
+      categoryImageUrl: categoryImagePath(p.category),
     })),
   }
 }
@@ -179,6 +188,7 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
       aboutText: true,
       bannerType: true,
       bannerValue: true,
+      bannerFocusY: true,
       sectionsConfig: true,
       acceptsOnline: true,
       acceptsOnsite: true,
@@ -191,12 +201,13 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
       },
       farmPhotos: FARM_PHOTO_SELECT,
       products: {
-        orderBy: [{ isAvailable: 'desc' }, { name: 'asc' }],
+        orderBy: PRODUCT_ORDER_BY,
         select: {
           id: true,
           name: true,
           description: true,
           imageUrl: true,
+          category: true,
           price: true,
           unit: true,
           unitSize: true,
@@ -236,6 +247,7 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
       ...p,
       price: Number(p.price),
       unitSize: p.unitSize ? Number(p.unitSize) : null,
+      categoryImageUrl: categoryImagePath(p.category),
     })),
   }
 }
