@@ -64,6 +64,19 @@ enum ProductUnit {
   PAKET
 }
 
+enum ProductCategory {
+  MILCH
+  EIER
+  FLEISCH
+  GEMUESE
+  OBST
+  BROT
+  HONIG
+  GETRAENKE
+  BRENNHOLZ
+  SONSTIGES
+}
+
 enum BannerType {
   GRADIENT
   PHOTO
@@ -160,6 +173,7 @@ model Farm {
   aboutText      String?    @db.Text
   bannerType     BannerType @default(GRADIENT)
   bannerValue    String?    // gradient preset key or uploaded photo URL
+  bannerFocusY   Int        @default(50) // vertikaler Fokuspunkt des Titelbilds: 0=oben, 100=unten
   sectionsConfig Json?      // SectionConfig[] — which sections are visible and in which order
 
   // Stripe Connect
@@ -211,6 +225,11 @@ model Product {
   stock       Int         @default(0)
   reservedStock Int       @default(0)
   isAvailable Boolean     @default(true)
+
+  // Stammdaten (Sprint 17K)
+  category          ProductCategory? // null = keine Angabe (heutiges Verhalten)
+  countsTowardLimit Boolean          @default(true) // zählt zur 55.000-€-Grenze (Be- & Verarbeitung)
+  sortOrder         Int              @default(0) // manuelle Reihenfolge; 0 überall = stabile Reihenfolge via createdAt
 
   // Lebensmittel-spezifisch
   allergens       String[] @default([])
