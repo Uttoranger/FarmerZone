@@ -1,7 +1,17 @@
-import { put } from '@vercel/blob'
+import { put, del } from '@vercel/blob'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
+import { prisma } from '@/lib/prisma'
+
+const ALLOWED_TARGETS = ['product', 'banner', 'logo', 'gallery', 'status'] as const
+type UploadTarget = typeof ALLOWED_TARGETS[number]
+
+const VERCEL_BLOB_HOST = /\.public\.blob\.vercel-storage\.com\//
+
+async function getFarmForUser(userId: string) {
+  return prisma.farm.findUnique({ where: { ownerId: userId }, select: { id: true } })
+}
 
 export async function POST(request: NextRequest) {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -12,7 +22,7 @@ export async function POST(request: NextRequest) {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     return NextResponse.json(
       { error: 'Upload nicht konfiguriert', hint: 'BLOB_READ_WRITE_TOKEN fehlt in .env.local' },
-      { status: 503 }
+      { status: 503 },
     )
   }
 
@@ -28,21 +38,68 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Keine Datei übergeben' }, { status: 400 })
   }
 
+  // Server-side content-type check
   if (!file.type.startsWith('image/')) {
     return NextResponse.json({ error: 'Nur Bilder erlaubt (JPEG, PNG, WebP)' }, { status: 400 })
   }
 
-  if (file.size > 5 * 1024 * 1024) {
-    return NextResponse.json({ error: 'Bild zu groß (max. 5 MB)' }, { status: 400 })
+  if (file.size > 4 * 1024 * 1024) {
+    return NextResponse.json({ error: 'Bild zu groß (max. 4 MB)' }, { status: 400 })
+  }
+
+  const rawTarget = formData.get('target') as string | null
+  const target: UploadTarget =
+    rawTarget && ALLOWED_TARGETS.includes(rawTarget as UploadTarget)
+      ? (rawTarget as UploadTarget)
+      : 'status'
+
+  const id = formData.get('id') as string | null
+  const oldUrl = formData.get('oldUrl') as string | null
+
+  const farm = await getFarmForUser(session.user.id)
+  if (!farm) {
+    return NextResponse.json({ error: 'Kein Hof gefunden' }, { status: 403 })
+  }
+
+  // Ownership checks per target
+  if (target === 'product' && id) {
+    const product = await prisma.product.findUnique({ where: { id }, select: { farmId: true } })
+    if (!product || product.farmId !== farm.id) {
+      return NextResponse.json({ error: 'Kein Zugriff auf dieses Produkt' }, { status: 403 })
+    }
+  }
+
+  if (target === 'gallery' && id) {
+    const photo = await prisma.farmPhoto.findUnique({ where: { id }, select: { farmId: true } })
+    if (!photo || photo.farmId !== farm.id) {
+      return NextResponse.json({ error: 'Kein Zugriff auf dieses Foto' }, { status: 403 })
+    }
+  }
+
+  if (target === 'status' && id) {
+    const post = await prisma.statusPost.findUnique({ where: { id }, select: { farmId: true } })
+    if (!post || post.farmId !== farm.id) {
+      return NextResponse.json({ error: 'Kein Zugriff auf diesen Status' }, { status: 403 })
+    }
   }
 
   const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
-  const filename = `products/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+  const filename = `farms/${farm.id}/${target}/${Date.now()}.${ext}`
 
   const blob = await put(filename, file, {
     access: 'public',
+    addRandomSuffix: true,
     token: process.env.BLOB_READ_WRITE_TOKEN,
   })
+
+  // Best-effort cleanup of old Vercel Blob URL
+  if (oldUrl && VERCEL_BLOB_HOST.test(oldUrl)) {
+    try {
+      await del(oldUrl, { token: process.env.BLOB_READ_WRITE_TOKEN })
+    } catch {
+      // ignore — best-effort only
+    }
+  }
 
   return NextResponse.json({ url: blob.url })
 }

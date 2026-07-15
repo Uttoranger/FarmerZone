@@ -1,14 +1,21 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import {
   MapPin, Phone, Mail, CreditCard, Banknote,
   Pencil, Eye, Leaf, CalendarDays, Tag, MessageCircle,
-  Check, Camera, Plus,
+  Check, Camera, Plus, ChevronLeft, ChevronRight, X,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import type { PublicFarm } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
+import { updateFarmBannerAction } from '@/server/actions/appearance'
+import { addFarmPhotoAction } from '@/server/actions/farm-photos'
+import { useImageUpload } from '@/components/shared/image-upload'
 import { ProductGrid } from './product-grid'
 import { stripStatusVariables, renderStatusBodyWithChip } from '@/lib/status-body'
 
@@ -67,6 +74,274 @@ function FarmSeal({ farmName, foundedYear }: { farmName: string; foundedYear: nu
   )
 }
 
+// ── Gallery ───────────────────────────────────────────────────────────────────
+
+const GALLERY_MAX_VISIBLE = 7
+
+function GallerySection({
+  farm,
+  isEdit,
+  onPhotoAdded,
+}: {
+  farm: PublicFarm
+  isEdit: boolean
+  onPhotoAdded: () => void
+}) {
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
+  const [, startTransition] = useTransition()
+  const router = useRouter()
+
+  const photos = farm.farmPhotos
+  const canUpload = isEdit && photos.length < 8
+
+  const { isUploading, openFilePicker, fileInput } = useImageUpload({
+    variant: 'gallery',
+    onUploaded: (url) => {
+      startTransition(async () => {
+        const result = await addFarmPhotoAction({ url })
+        if (result.error) {
+          toast.error(result.error)
+        } else {
+          toast.success('Foto hinzugefügt')
+          router.refresh()
+          onPhotoAdded()
+        }
+      })
+    },
+  })
+
+  const visiblePhotos = photos.slice(0, GALLERY_MAX_VISIBLE)
+  const hiddenCount = Math.max(0, photos.length - GALLERY_MAX_VISIBLE)
+
+  function prev() {
+    if (lightboxIdx === null || photos.length === 0) return
+    setLightboxIdx((lightboxIdx - 1 + photos.length) % photos.length)
+  }
+  function next() {
+    if (lightboxIdx === null || photos.length === 0) return
+    setLightboxIdx((lightboxIdx + 1) % photos.length)
+  }
+
+  return (
+    <>
+      {fileInput}
+
+      {/* Heading row */}
+      <div className="flex items-baseline gap-3 mb-[14px]">
+        <h2 className="font-heading font-semibold" style={{ fontFamily: 'Fraunces, serif', fontSize: 23, color: '#2D3027' }}>
+          Fotos vom Hof
+        </h2>
+        <span className="text-[13px]" style={{ color: '#9AA08F' }}>
+          {photos.length} {photos.length === 1 ? 'Foto' : 'Fotos'}
+        </span>
+        {isEdit && (
+          <button
+            type="button"
+            onClick={openFilePicker}
+            disabled={isUploading || !canUpload}
+            className="ml-auto flex items-center gap-1.5 rounded-lg text-[13px] font-semibold disabled:opacity-60 hover:bg-gray-50 transition-colors"
+            style={{
+              border: '1px solid #D6E0CE',
+              background: '#fff',
+              borderRadius: 8,
+              padding: '9px 15px',
+              color: '#2D5F3F',
+            }}
+          >
+            <Plus className="size-3.5" strokeWidth={1.9} />
+            Fotos hinzufügen
+          </button>
+        )}
+      </div>
+
+      {/* Grid */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, 1fr)',
+          gridAutoRows: 150,
+          gap: 12,
+        }}
+        className="md:[grid-template-columns:repeat(4,1fr)]"
+      >
+        {visiblePhotos.map((photo, i) => {
+          const isFirst = i === 0
+          const isLast = i === visiblePhotos.length - 1
+          const showOverlay = isLast && hiddenCount > 0
+
+          return (
+            <div
+              key={photo.id}
+              className="relative cursor-pointer rounded-[10px] overflow-hidden"
+              style={{
+                gridColumn: isFirst ? 'span 2' : undefined,
+                gridRow: isFirst ? 'span 2' : undefined,
+              }}
+              onClick={() => setLightboxIdx(i)}
+            >
+              <Image
+                src={photo.url}
+                alt={photo.caption ?? ''}
+                fill
+                sizes={isFirst ? '(min-width: 768px) 50vw, 100vw' : '(min-width: 768px) 25vw, 50vw'}
+                className="object-cover"
+              />
+              {/* Caption pill on first photo */}
+              {isFirst && photo.caption && (
+                <div
+                  className="absolute bottom-[10px] left-[10px] text-white"
+                  style={{
+                    background: 'rgba(45,48,39,0.75)',
+                    borderRadius: 14,
+                    padding: '4px 11px',
+                    fontSize: 11,
+                    fontWeight: 600,
+                  }}
+                >
+                  {photo.caption}
+                </div>
+              )}
+              {/* "+N Fotos" overlay on last visible */}
+              {showOverlay && (
+                <div
+                  className="absolute inset-0 flex items-center justify-center text-white"
+                  style={{ background: 'rgba(45,48,39,0.55)', borderRadius: 10 }}
+                >
+                  <span style={{ fontSize: 15, fontWeight: 700 }}>+{hiddenCount} Fotos</span>
+                </div>
+              )}
+            </div>
+          )
+        })}
+
+        {/* Dashed "add" tile in edit mode */}
+        {isEdit && canUpload && (
+          <button
+            type="button"
+            onClick={openFilePicker}
+            disabled={isUploading}
+            className="flex flex-col items-center justify-center rounded-[10px] gap-2 hover:bg-white/60 transition-colors disabled:opacity-60"
+            style={{
+              border: '2px dashed #C9C2B2',
+              background: 'rgba(255,255,255,0.5)',
+            }}
+          >
+            <span
+              className="flex items-center justify-center rounded-full"
+              style={{ width: 36, height: 36, background: '#E8F0E2', color: '#2D5F3F' }}
+            >
+              <Plus className="size-4" strokeWidth={1.9} />
+            </span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#2D5F3F' }}>
+              {isUploading ? 'Lädt…' : 'Foto hinzufügen'}
+            </span>
+          </button>
+        )}
+      </div>
+
+      {/* Lightbox */}
+      {lightboxIdx !== null && photos.length > 0 && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.88)' }}
+          onClick={() => setLightboxIdx(null)}
+        >
+          <button
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20"
+            onClick={() => setLightboxIdx(null)}
+            aria-label="Schließen"
+          >
+            <X className="size-5" />
+          </button>
+
+          {photos.length > 1 && (
+            <>
+              <button
+                className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20"
+                onClick={(e) => { e.stopPropagation(); prev() }}
+                aria-label="Zurück"
+              >
+                <ChevronLeft className="size-5" />
+              </button>
+              <button
+                className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20"
+                onClick={(e) => { e.stopPropagation(); next() }}
+                aria-label="Weiter"
+              >
+                <ChevronRight className="size-5" />
+              </button>
+            </>
+          )}
+
+          <div
+            className="relative max-w-3xl max-h-[80vh] w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative w-full" style={{ paddingBottom: '66%' }}>
+              <Image
+                src={photos[lightboxIdx].url}
+                alt={photos[lightboxIdx].caption ?? ''}
+                fill
+                sizes="(min-width: 768px) 768px, 100vw"
+                className="object-contain rounded-xl"
+              />
+            </div>
+            {photos[lightboxIdx].caption && (
+              <p className="text-center text-white/80 text-sm mt-3">
+                {photos[lightboxIdx].caption}
+              </p>
+            )}
+            <p className="text-center text-white/40 text-xs mt-1">
+              {lightboxIdx + 1} / {photos.length}
+            </p>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ── Cover upload hook ─────────────────────────────────────────────────────────
+
+function CoverEditButton({ currentBannerUrl }: { currentBannerUrl: string | null }) {
+  const [, startTransition] = useTransition()
+  const router = useRouter()
+
+  const { isUploading, openFilePicker, fileInput } = useImageUpload({
+    variant: 'banner',
+    oldUrl: currentBannerUrl ?? undefined,
+    onUploaded: (url) => {
+      startTransition(async () => {
+        const result = await updateFarmBannerAction('PHOTO', url)
+        if (result.error) {
+          toast.error(result.error)
+        } else {
+          toast.success('Titelbild aktualisiert')
+          router.refresh()
+        }
+      })
+    },
+  })
+
+  return (
+    <>
+      {fileInput}
+      <button
+        type="button"
+        onClick={openFilePicker}
+        disabled={isUploading}
+        className="absolute top-3.5 right-[22px] flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-60"
+        style={{ background: 'rgba(255,255,255,0.94)', color: '#2D5F3F', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}
+      >
+        <Camera className="size-3.5" strokeWidth={1.7} />
+        {isUploading ? 'Lädt…' : 'Titelbild ersetzen'}
+      </button>
+    </>
+  )
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
+
 type ReorderItem = { productId: string; productName: string; quantity: number }
 
 type Props = {
@@ -79,6 +354,7 @@ type Props = {
 
 export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = false, mode = 'edit' }: Props) {
   const isEdit = ownerMode && mode !== 'preview'
+  const [galleryKey, setGalleryKey] = useState(0)
 
   const sections = farm.sectionsConfig
   function isSectionVisible(key: string) {
@@ -178,6 +454,10 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
       ? `${publicCount} Produkte`
       : ''
 
+  const showGallery =
+    (isSectionVisible('gallery') || ownerMode) &&
+    (farm.farmPhotos.length > 0 || isEdit)
+
   return (
     <div className="min-h-screen" style={{ background: '#F5F3EE' }}>
       {!ownerMode && (
@@ -229,8 +509,14 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
       {/* Cover 250px */}
       <div className="relative h-[250px]">
         {bannerBg === null ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={farm.bannerUrl!} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          <Image
+            src={farm.bannerUrl!}
+            alt=""
+            fill
+            sizes="100vw"
+            priority
+            className="object-cover"
+          />
         ) : (
           <div className="absolute inset-0" style={{ background: bannerBg }} />
         )}
@@ -241,17 +527,8 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
             background: 'linear-gradient(180deg, rgba(24,36,27,0.10) 0%, rgba(24,36,27,0) 40%, rgba(20,30,22,0.62) 100%)',
           }}
         />
-        {/* Titelbild ändern (edit only) */}
-        {isEdit && (
-          <Link
-            href="/settings/appearance"
-            className="absolute top-3.5 right-[22px] flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90"
-            style={{ background: 'rgba(255,255,255,0.94)', color: '#2D5F3F', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}
-          >
-            <Camera className="size-3.5" strokeWidth={1.7} />
-            Titelbild ändern
-          </Link>
-        )}
+        {/* Titelbild ändern (edit only) — inline upload */}
+        {isEdit && <CoverEditButton currentBannerUrl={farm.bannerUrl} />}
         {/* Hof-Siegel */}
         {farm.foundedYear && (
           <div
@@ -474,6 +751,17 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                 </Link>
               </div>
             ) : null}
+          </div>
+        )}
+
+        {/* Gallery section */}
+        {showGallery && (
+          <div className="mt-[26px]" key={`gallery-${galleryKey}`}>
+            <GallerySection
+              farm={farm}
+              isEdit={isEdit}
+              onPhotoAdded={() => setGalleryKey((k) => k + 1)}
+            />
           </div>
         )}
 

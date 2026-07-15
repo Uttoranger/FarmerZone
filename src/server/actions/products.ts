@@ -18,6 +18,7 @@ async function getAuthenticatedFarm() {
 function revalidate(farmSlug: string) {
   revalidatePath('/products')
   revalidatePath(`/${farmSlug}`)
+  revalidatePath('/farm-page')
 }
 
 export async function createProduct(data: ProductFormData) {
@@ -81,6 +82,25 @@ export async function updateProduct(productId: string, data: ProductFormData) {
   })
 
   revalidate(farm.slug)
+}
+
+export async function updateProductImageAction(
+  productId: string,
+  imageUrl: string | null,
+): Promise<{ error?: string }> {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) return { error: 'Nicht angemeldet' }
+
+  const farm = await getFarmForUser(session.user.id)
+  if (!farm) return { error: 'Kein Hof gefunden' }
+
+  const existing = await prisma.product.findFirst({ where: { id: productId, farmId: farm.id } })
+  if (!existing) return { error: 'Produkt nicht gefunden' }
+
+  await prisma.product.update({ where: { id: productId }, data: { imageUrl } })
+
+  revalidate(farm.slug)
+  return {}
 }
 
 export async function updateStock(productId: string, delta: number): Promise<number> {

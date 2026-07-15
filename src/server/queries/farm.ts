@@ -33,6 +33,13 @@ export type PublicFarmValue = {
   subtitle: string | null
 }
 
+export type PublicFarmPhoto = {
+  id: string
+  url: string
+  caption: string | null
+  sortOrder: number
+}
+
 export type PublicFarm = {
   id: string
   slug: string
@@ -54,6 +61,7 @@ export type PublicFarm = {
   bannerValue: string | null
   sectionsConfig: SectionConfig[]
   farmValues: PublicFarmValue[]
+  farmPhotos: PublicFarmPhoto[]
   acceptsOnline: boolean
   acceptsOnsite: boolean
   stripeAccountReady: boolean
@@ -61,6 +69,11 @@ export type PublicFarm = {
   pauseMessage: string | null
   products: PublicProduct[]
   pickupSlots: PublicPickupSlot[]
+}
+
+const FARM_PHOTO_SELECT = {
+  orderBy: { sortOrder: 'asc' as const },
+  select: { id: true, url: true, caption: true, sortOrder: true },
 }
 
 export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
@@ -94,6 +107,7 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
         orderBy: { sortOrder: 'asc' },
         select: { id: true, icon: true, title: true, subtitle: true },
       },
+      farmPhotos: FARM_PHOTO_SELECT,
       products: {
         orderBy: [{ isAvailable: 'desc' }, { name: 'asc' }],
         select: {
@@ -135,6 +149,7 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
     ...farm,
     bannerType: farm.bannerType as 'GRADIENT' | 'PHOTO',
     sectionsConfig: sections,
+    farmPhotos: farm.farmPhotos,
     products: farm.products.map((p) => ({
       ...p,
       price: Number(p.price),
@@ -174,6 +189,7 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
         orderBy: { sortOrder: 'asc' },
         select: { id: true, icon: true, title: true, subtitle: true },
       },
+      farmPhotos: FARM_PHOTO_SELECT,
       products: {
         orderBy: [{ isAvailable: 'desc' }, { name: 'asc' }],
         select: {
@@ -215,6 +231,7 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
     ...farm,
     bannerType: farm.bannerType as 'GRADIENT' | 'PHOTO',
     sectionsConfig: sections,
+    farmPhotos: farm.farmPhotos,
     products: farm.products.map((p) => ({
       ...p,
       price: Number(p.price),

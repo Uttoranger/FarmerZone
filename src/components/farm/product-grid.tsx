@@ -1,12 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import Link from 'next/link'
-import { ShoppingCart, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff } from 'lucide-react'
+import Image from 'next/image'
+import { useRouter } from 'next/navigation'
+import { ShoppingCart, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff, Camera, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCart } from '@/lib/use-cart'
 import { UNIT_LABELS } from '@/schemas/product'
 import type { PublicProduct } from '@/server/queries/farm'
+import { updateProductImageAction } from '@/server/actions/products'
+import { useImageUpload } from '@/components/shared/image-upload'
 import { CartSheet } from './cart-sheet'
 
 type ReorderItem = { productId: string; productName: string; quantity: number }
@@ -98,6 +102,103 @@ function StockStrip({ product }: { product: PublicProduct }) {
   )
 }
 
+// ── Product image area with optional edit-mode upload overlay ─────────────────
+
+function ProductImageArea({
+  product,
+  dim,
+  isEditMode,
+}: {
+  product: PublicProduct
+  dim: number
+  isEditMode: boolean
+}) {
+  const [, startTransition] = useTransition()
+  const router = useRouter()
+
+  const { isUploading, openFilePicker, fileInput } = useImageUpload({
+    variant: 'product',
+    targetId: product.id,
+    oldUrl: product.imageUrl ?? undefined,
+    onUploaded: (url) => {
+      startTransition(async () => {
+        const result = await updateProductImageAction(product.id, url)
+        if (result.error) {
+          toast.error(result.error)
+        } else {
+          toast.success('Produktbild aktualisiert')
+          router.refresh()
+        }
+      })
+    },
+  })
+
+  return (
+    <div className="relative flex-shrink-0 group" style={{ height: 170, background: '#F4EFE3' }}>
+      {fileInput}
+
+      {/* Dimmed image wrapper */}
+      <div className="absolute inset-0" style={{ opacity: dim }}>
+        {product.imageUrl ? (
+          <Image
+            src={product.imageUrl}
+            alt={product.name}
+            fill
+            sizes="(min-width: 768px) 33vw, 50vw"
+            className="object-contain"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Package className="w-10 h-10" style={{ color: '#C9C2B2' }} />
+          </div>
+        )}
+        {/* Bio badge */}
+        {product.isOrganic && (
+          <div className="absolute top-2.5 left-2.5">
+            <span className="inline-flex items-center gap-1 bg-primary text-primary-foreground text-[10px] font-semibold px-2 py-0.5 rounded-full">
+              <Leaf className="w-2.5 h-2.5" />
+              Bio
+            </span>
+          </div>
+        )}
+        {/* Storage icons */}
+        {(product.requiresCool || product.requiresFreezer) && (
+          <div className="absolute top-2.5 right-2.5 flex gap-1">
+            {product.requiresCool && <Thermometer className="w-4 h-4 text-blue-500 drop-shadow" />}
+            {product.requiresFreezer && <Snowflake className="w-4 h-4 text-sky-400 drop-shadow" />}
+          </div>
+        )}
+      </div>
+
+      {/* Stock strip — always full opacity, shown in edit mode */}
+      {isEditMode && <StockStrip product={product} />}
+
+      {/* Edit-mode hover overlay */}
+      {isEditMode && (
+        <button
+          type="button"
+          onClick={openFilePicker}
+          disabled={isUploading}
+          aria-label={product.imageUrl ? 'Bild ersetzen' : 'Bild hinzufügen'}
+          className="absolute inset-0 flex items-end justify-center pb-9 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity disabled:cursor-wait"
+          style={{ background: 'rgba(20,30,22,0.35)' }}
+        >
+          <span
+            className="flex items-center gap-1.5 rounded-full text-xs font-semibold text-white px-3 py-1.5"
+            style={{ background: 'rgba(45,48,39,0.80)' }}
+          >
+            {isUploading
+              ? <Loader2 className="size-3 animate-spin" />
+              : <Camera className="size-3" strokeWidth={1.7} />
+            }
+            {isUploading ? 'Lädt…' : product.imageUrl ? 'Ersetzen' : 'Bild hinzufügen'}
+          </span>
+        </button>
+      )}
+    </div>
+  )
+}
+
 function ProductCard({
   product,
   onAddToCart,
@@ -120,43 +221,7 @@ function ProductCard({
       className="bg-white rounded-[12px] overflow-hidden flex flex-col"
       style={{ boxShadow: '0 2px 10px rgba(45,95,63,0.06)' }}
     >
-      {/* Image area — 170px fixed height */}
-      <div className="relative flex-shrink-0" style={{ height: 170, background: '#F4EFE3' }}>
-        {/* Dimmed image wrapper */}
-        <div className="absolute inset-0" style={{ opacity: dim }}>
-          {product.imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={product.imageUrl}
-              alt={product.name}
-              className="absolute inset-0 w-full h-full object-contain"
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Package className="w-10 h-10" style={{ color: '#C9C2B2' }} />
-            </div>
-          )}
-          {/* Bio badge */}
-          {product.isOrganic && (
-            <div className="absolute top-2.5 left-2.5">
-              <span className="inline-flex items-center gap-1 bg-primary text-primary-foreground text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                <Leaf className="w-2.5 h-2.5" />
-                Bio
-              </span>
-            </div>
-          )}
-          {/* Storage icons */}
-          {(product.requiresCool || product.requiresFreezer) && (
-            <div className="absolute top-2.5 right-2.5 flex gap-1">
-              {product.requiresCool && <Thermometer className="w-4 h-4 text-blue-500 drop-shadow" />}
-              {product.requiresFreezer && <Snowflake className="w-4 h-4 text-sky-400 drop-shadow" />}
-            </div>
-          )}
-        </div>
-
-        {/* Stock strip — always full opacity, shown in edit mode */}
-        {isEditMode && <StockStrip product={product} />}
-      </div>
+      <ProductImageArea product={product} dim={dim} isEditMode={isEditMode} />
 
       {/* Body */}
       <div

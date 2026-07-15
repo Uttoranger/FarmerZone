@@ -1,12 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Check, ChevronUp, ChevronDown, Trash2, Loader2, ExternalLink, Plus } from 'lucide-react'
+import Image from 'next/image'
+import {
+  Check, ChevronUp, ChevronDown, Trash2, Loader2, ExternalLink, Plus, Upload,
+  Camera, X,
+} from 'lucide-react'
 import { toast } from 'sonner'
-import { saveAppearanceAction } from '@/server/actions/appearance'
+import { saveAppearanceAction, updateFarmLogoAction, updateFarmBannerAction } from '@/server/actions/appearance'
+import {
+  addFarmPhotoAction,
+  updateFarmPhotoCaptionAction,
+  deleteFarmPhotoAction,
+  moveFarmPhotoAction,
+} from '@/server/actions/farm-photos'
+import { useImageUpload } from '@/components/shared/image-upload'
 import { cn } from '@/lib/utils'
-import type { SectionConfig } from '@/server/queries/appearance'
+import type { SectionConfig, FarmPhotoData } from '@/server/queries/appearance'
 
 // ── Design constants ──────────────────────────────────────────────────────────
 
@@ -56,19 +67,374 @@ type FarmValueInput = { icon: string; title: string; subtitle: string }
 
 interface Props {
   initialData: {
+    farmId: string
     tagline: string
     foundedYear: string
     aboutText: string
+    logoUrl: string | null
+    bannerType: 'GRADIENT' | 'PHOTO'
+    bannerUrl: string | null
     bannerValue: string
     sectionsConfig: SectionConfig[]
     farmValues: FarmValueInput[]
+    farmPhotos: FarmPhotoData[]
     farmSlug: string
   }
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Logo upload sub-component ─────────────────────────────────────────────────
+
+function LogoUpload({
+  logoUrl,
+  onUploaded,
+}: {
+  logoUrl: string | null
+  onUploaded: (url: string | null) => void
+}) {
+  const [, startTransition] = useTransition()
+
+  const { isUploading, openFilePicker, fileInput } = useImageUpload({
+    variant: 'logo',
+    oldUrl: logoUrl ?? undefined,
+    onUploaded: (url) => {
+      startTransition(async () => {
+        const result = await updateFarmLogoAction(url)
+        if (result.error) {
+          toast.error(result.error)
+        } else {
+          onUploaded(url)
+          toast.success('Logo gespeichert')
+        }
+      })
+    },
+  })
+
+  async function handleRemove() {
+    startTransition(async () => {
+      const result = await updateFarmLogoAction(null)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        onUploaded(null)
+        toast.success('Logo entfernt')
+      }
+    })
+  }
+
+  return (
+    <div className="flex items-center gap-4">
+      {fileInput}
+      {/* Round preview */}
+      <div
+        className="relative shrink-0 overflow-hidden bg-muted flex items-center justify-center"
+        style={{ width: 72, height: 72, borderRadius: '50%', border: '2px dashed #C9C2B2' }}
+      >
+        {logoUrl ? (
+          <>
+            <Image
+              src={logoUrl}
+              alt="Logo"
+              fill
+              sizes="72px"
+              className="object-cover"
+            />
+            <button
+              type="button"
+              onClick={handleRemove}
+              className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center"
+              aria-label="Logo entfernen"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </>
+        ) : (
+          <Camera className="w-6 h-6 text-muted-foreground/50" />
+        )}
+      </div>
+      <div>
+        <button
+          type="button"
+          onClick={openFilePicker}
+          disabled={isUploading}
+          className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg border border-border text-sm font-medium hover:bg-muted/40 transition-colors disabled:opacity-60"
+        >
+          {isUploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+          {logoUrl ? 'Logo ersetzen' : 'Logo hochladen'}
+        </button>
+        <p className="text-xs text-muted-foreground mt-1">Rundes Logo · max. 800 px · WebP</p>
+      </div>
+    </div>
+  )
+}
+
+// ── Banner PHOTO upload sub-component ─────────────────────────────────────────
+
+function BannerPhotoUpload({
+  bannerUrl,
+  onUploaded,
+}: {
+  bannerUrl: string | null
+  onUploaded: (url: string | null) => void
+}) {
+  const [, startTransition] = useTransition()
+
+  const { isUploading, openFilePicker, fileInput } = useImageUpload({
+    variant: 'banner',
+    oldUrl: bannerUrl ?? undefined,
+    onUploaded: (url) => {
+      startTransition(async () => {
+        const result = await updateFarmBannerAction('PHOTO', url)
+        if (result.error) {
+          toast.error(result.error)
+        } else {
+          onUploaded(url)
+          toast.success('Titelbild gespeichert')
+        }
+      })
+    },
+  })
+
+  async function handleRemove() {
+    startTransition(async () => {
+      const result = await updateFarmBannerAction('GRADIENT', null)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        onUploaded(null)
+        toast.success('Titelbild entfernt')
+      }
+    })
+  }
+
+  return (
+    <div className="mt-4">
+      {fileInput}
+      {bannerUrl ? (
+        <div className="relative h-24 rounded-xl overflow-hidden">
+          <Image src={bannerUrl} alt="Titelbild" fill sizes="600px" className="object-cover" />
+          <button
+            type="button"
+            onClick={handleRemove}
+            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
+            aria-label="Titelbild entfernen"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={openFilePicker}
+          disabled={isUploading}
+          className="w-full h-24 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 hover:bg-muted/30 transition-colors disabled:opacity-60"
+        >
+          {isUploading ? (
+            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+          ) : (
+            <>
+              <Upload className="size-5 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Foto hochladen</span>
+            </>
+          )}
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ── Gallery photo item ────────────────────────────────────────────────────────
+
+function GalleryPhotoItem({
+  photo,
+  index,
+  total,
+  onDeleted,
+  onCaptionChange,
+  onMove,
+}: {
+  photo: FarmPhotoData
+  index: number
+  total: number
+  onDeleted: (id: string) => void
+  onCaptionChange: (id: string, caption: string) => void
+  onMove: (id: string, dir: 'up' | 'down') => void
+}) {
+  const [caption, setCaption] = useState(photo.caption ?? '')
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isSavingCaption, setIsSavingCaption] = useState(false)
+
+  async function handleCaptionBlur() {
+    if (caption === (photo.caption ?? '')) return
+    setIsSavingCaption(true)
+    const result = await updateFarmPhotoCaptionAction(photo.id, caption)
+    setIsSavingCaption(false)
+    if (result.error) {
+      toast.error(result.error)
+    } else {
+      onCaptionChange(photo.id, caption)
+    }
+  }
+
+  async function handleDelete() {
+    setIsDeleting(true)
+    const result = await deleteFarmPhotoAction(photo.id)
+    if (result.error) {
+      toast.error(result.error)
+      setIsDeleting(false)
+    } else {
+      onDeleted(photo.id)
+    }
+  }
+
+  return (
+    <div className="flex items-start gap-3 bg-muted/30 rounded-xl p-3">
+      <div className="relative shrink-0 w-16 h-16 rounded-lg overflow-hidden bg-muted">
+        <Image src={photo.url} alt={caption || 'Foto'} fill sizes="64px" className="object-cover" />
+      </div>
+      <div className="flex-1 min-w-0 space-y-1.5">
+        <input
+          type="text"
+          value={caption}
+          onChange={(e) => setCaption(e.target.value.slice(0, 100))}
+          onBlur={handleCaptionBlur}
+          placeholder="Bildunterschrift (optional)"
+          className="w-full h-8 px-2 rounded-lg border border-border bg-card text-xs focus:outline-none focus:ring-1 focus:ring-primary/30"
+        />
+        {isSavingCaption && (
+          <span className="text-[10px] text-muted-foreground">Speichern…</span>
+        )}
+      </div>
+      <div className="flex flex-col gap-1 shrink-0">
+        <button
+          onClick={() => onMove(photo.id, 'up')}
+          disabled={index === 0}
+          className="w-6 h-6 rounded-md hover:bg-muted flex items-center justify-center disabled:opacity-30"
+        >
+          <ChevronUp className="size-3.5" />
+        </button>
+        <button
+          onClick={() => onMove(photo.id, 'down')}
+          disabled={index === total - 1}
+          className="w-6 h-6 rounded-md hover:bg-muted flex items-center justify-center disabled:opacity-30"
+        >
+          <ChevronDown className="size-3.5" />
+        </button>
+      </div>
+      <button
+        onClick={handleDelete}
+        disabled={isDeleting}
+        className="w-6 h-6 rounded-md hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive shrink-0 disabled:opacity-40"
+      >
+        {isDeleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+      </button>
+    </div>
+  )
+}
+
+// ── Gallery section ───────────────────────────────────────────────────────────
+
+const GALLERY_LIMIT = 8
+
+function GallerySection({ initialPhotos }: { initialPhotos: FarmPhotoData[] }) {
+  const [photos, setPhotos] = useState<FarmPhotoData[]>(initialPhotos)
+  const [, startTransition] = useTransition()
+
+  const canUpload = photos.length < GALLERY_LIMIT
+
+  const { isUploading, openFilePicker, fileInput } = useImageUpload({
+    variant: 'gallery',
+    onUploaded: (url) => {
+      startTransition(async () => {
+        const result = await addFarmPhotoAction({ url })
+        if (result.error) {
+          toast.error(result.error)
+        } else if (result.photo) {
+          setPhotos((prev) => [...prev, result.photo!])
+          toast.success('Foto hinzugefügt')
+        }
+      })
+    },
+  })
+
+  function handleDeleted(id: string) {
+    setPhotos((prev) => prev.filter((p) => p.id !== id).map((p, i) => ({ ...p, sortOrder: i })))
+  }
+
+  function handleCaptionChange(id: string, caption: string) {
+    setPhotos((prev) => prev.map((p) => (p.id === id ? { ...p, caption: caption || null } : p)))
+  }
+
+  async function handleMove(id: string, dir: 'up' | 'down') {
+    const result = await moveFarmPhotoAction(id, dir)
+    if (result.error) {
+      toast.error(result.error)
+      return
+    }
+    setPhotos((prev) => {
+      const next = [...prev]
+      const idx = next.findIndex((p) => p.id === id)
+      if (idx === -1) return next
+      const swapIdx = dir === 'up' ? idx - 1 : idx + 1
+      if (swapIdx < 0 || swapIdx >= next.length) return next
+      ;[next[idx], next[swapIdx]] = [next[swapIdx], next[idx]]
+      return next.map((p, i) => ({ ...p, sortOrder: i }))
+    })
+  }
+
+  return (
+    <section className="bg-card rounded-2xl shadow-[0_2px_8px_oklch(0.18_0.03_150_/_0.05)] p-6" id="gallery">
+      {fileInput}
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="font-semibold text-foreground">Galerie</h2>
+        <span className="text-xs text-muted-foreground">{photos.length}/{GALLERY_LIMIT}</span>
+      </div>
+      <p className="text-xs text-muted-foreground mb-4">
+        Bis zu {GALLERY_LIMIT} Fotos vom Hof — erscheinen auf deiner öffentlichen Seite
+      </p>
+
+      {photos.length > 0 && (
+        <div className="space-y-2 mb-4">
+          {photos.map((photo, i) => (
+            <GalleryPhotoItem
+              key={photo.id}
+              photo={photo}
+              index={i}
+              total={photos.length}
+              onDeleted={handleDeleted}
+              onCaptionChange={handleCaptionChange}
+              onMove={handleMove}
+            />
+          ))}
+        </div>
+      )}
+
+      {canUpload && (
+        <button
+          type="button"
+          onClick={openFilePicker}
+          disabled={isUploading}
+          className="w-full flex items-center justify-center gap-2 h-11 rounded-xl border-2 border-dashed border-border text-sm font-medium text-muted-foreground hover:bg-muted/30 hover:text-foreground transition-colors disabled:opacity-60"
+        >
+          {isUploading ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+          {isUploading ? 'Wird hochgeladen…' : 'Foto hinzufügen'}
+        </button>
+      )}
+
+      {!canUpload && (
+        <p className="text-xs text-center text-muted-foreground py-2">
+          Maximum ({GALLERY_LIMIT} Fotos) erreicht
+        </p>
+      )}
+    </section>
+  )
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
 
 export function AppearanceClient({ initialData }: Props) {
+  const [logoUrl, setLogoUrl] = useState<string | null>(initialData.logoUrl)
+  const [bannerType, setBannerType] = useState<'GRADIENT' | 'PHOTO'>(initialData.bannerType)
+  const [bannerUrl, setBannerUrl] = useState<string | null>(initialData.bannerUrl)
   const [bannerValue, setBannerValue] = useState(initialData.bannerValue || 'tannengruen')
   const [tagline, setTagline] = useState(initialData.tagline)
   const [foundedYear, setFoundedYear] = useState(initialData.foundedYear)
@@ -121,6 +487,25 @@ export function AppearanceClient({ initialData }: Props) {
     )
   }
 
+  // ── Banner type switch ──────────────────────────────────────────────────────
+
+  function switchToGradient() {
+    setBannerType('GRADIENT')
+  }
+
+  function switchToPhoto() {
+    setBannerType('PHOTO')
+  }
+
+  function handleBannerPhotoUploaded(url: string | null) {
+    setBannerUrl(url)
+    if (url === null) {
+      setBannerType('GRADIENT')
+    } else {
+      setBannerType('PHOTO')
+    }
+  }
+
   // ── Save ────────────────────────────────────────────────────────────────────
 
   async function handleSave() {
@@ -129,7 +514,10 @@ export function AppearanceClient({ initialData }: Props) {
       tagline: tagline || null,
       foundedYear: foundedYear ? parseInt(foundedYear, 10) : null,
       aboutText: aboutText || null,
+      bannerType,
       bannerValue,
+      bannerUrl: bannerType === 'PHOTO' ? bannerUrl : null,
+      logoUrl,
       sectionsConfig,
       farmValues: farmValues.map((v, i) => ({
         icon: v.icon,
@@ -168,41 +556,81 @@ export function AppearanceClient({ initialData }: Props) {
         </Link>
       </div>
 
+      {/* ── Logo section ───────────────────────────────────────────────────── */}
+      <section className="bg-card rounded-2xl shadow-[0_2px_8px_oklch(0.18_0.03_150_/_0.05)] p-6">
+        <h2 className="font-semibold text-foreground mb-1">Logo</h2>
+        <p className="text-xs text-muted-foreground mb-4">Rundes Hof-Logo — erscheint auf deiner Seite</p>
+        <LogoUpload logoUrl={logoUrl} onUploaded={setLogoUrl} />
+      </section>
+
       {/* ── Banner section ─────────────────────────────────────────────────── */}
       <section className="bg-card rounded-2xl shadow-[0_2px_8px_oklch(0.18_0.03_150_/_0.05)] p-6">
-        <h2 className="font-semibold text-foreground mb-1">Banner</h2>
-        <p className="text-xs text-muted-foreground mb-4">Wähle ein Farbthema für den Seiten-Header</p>
+        <h2 className="font-semibold text-foreground mb-1">Titelbild</h2>
+        <p className="text-xs text-muted-foreground mb-4">Header-Bereich auf deiner Hof-Seite</p>
 
-        {/* Preview */}
-        <div
-          className="h-20 rounded-xl mb-4"
-          style={{ background: currentPreset.gradient }}
-        />
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {BANNER_PRESETS.map((preset) => (
-            <button
-              key={preset.key}
-              onClick={() => setBannerValue(preset.key)}
-              className={cn(
-                'group relative h-12 rounded-xl overflow-hidden ring-2 transition-all',
-                bannerValue === preset.key ? 'ring-primary' : 'ring-transparent hover:ring-border',
-              )}
-            >
-              <div className="absolute inset-0" style={{ background: preset.gradient }} />
-              <div className="absolute inset-0 flex items-end justify-start p-1.5">
-                <span className="text-[10px] font-semibold text-white drop-shadow leading-none">
-                  {preset.label}
-                </span>
-              </div>
-              {bannerValue === preset.key && (
-                <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
-                  <Check className="w-2.5 h-2.5 text-primary-foreground" />
-                </div>
-              )}
-            </button>
-          ))}
+        {/* Type toggle */}
+        <div className="flex gap-2 mb-4">
+          <button
+            type="button"
+            onClick={switchToGradient}
+            className={cn(
+              'flex-1 h-9 rounded-lg border-2 text-sm font-medium transition-all',
+              bannerType === 'GRADIENT'
+                ? 'border-primary bg-primary/5 text-primary'
+                : 'border-border text-muted-foreground hover:border-border/80',
+            )}
+          >
+            Farbverlauf
+          </button>
+          <button
+            type="button"
+            onClick={switchToPhoto}
+            className={cn(
+              'flex-1 h-9 rounded-lg border-2 text-sm font-medium transition-all',
+              bannerType === 'PHOTO'
+                ? 'border-primary bg-primary/5 text-primary'
+                : 'border-border text-muted-foreground hover:border-border/80',
+            )}
+          >
+            Foto
+          </button>
         </div>
+
+        {bannerType === 'GRADIENT' ? (
+          <>
+            {/* Preview */}
+            <div className="h-20 rounded-xl mb-4" style={{ background: currentPreset.gradient }} />
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {BANNER_PRESETS.map((preset) => (
+                <button
+                  key={preset.key}
+                  onClick={() => setBannerValue(preset.key)}
+                  className={cn(
+                    'group relative h-12 rounded-xl overflow-hidden ring-2 transition-all',
+                    bannerValue === preset.key ? 'ring-primary' : 'ring-transparent hover:ring-border',
+                  )}
+                >
+                  <div className="absolute inset-0" style={{ background: preset.gradient }} />
+                  <div className="absolute inset-0 flex items-end justify-start p-1.5">
+                    <span className="text-[10px] font-semibold text-white drop-shadow leading-none">
+                      {preset.label}
+                    </span>
+                  </div>
+                  {bannerValue === preset.key && (
+                    <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                      <Check className="w-2.5 h-2.5 text-primary-foreground" />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <BannerPhotoUpload
+            bannerUrl={bannerUrl}
+            onUploaded={handleBannerPhotoUploaded}
+          />
+        )}
       </section>
 
       {/* ── Tagline + Founded year ─────────────────────────────────────────── */}
@@ -353,7 +781,6 @@ export function AppearanceClient({ initialData }: Props) {
           {sectionsConfig
             .slice()
             .sort((a, b) => a.order - b.order)
-            .filter((section) => section.key !== 'gallery')
             .map((section) => {
               const isProducts = section.key === 'products'
               return (
@@ -393,20 +820,8 @@ export function AppearanceClient({ initialData }: Props) {
         </div>
       </section>
 
-      {/* ── Galerie placeholder ─────────────────────────────────────────────── */}
-      <section className="bg-card rounded-2xl shadow-[0_2px_8px_oklch(0.18_0.03_150_/_0.05)] p-6">
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-            <Plus className="size-4 text-muted-foreground" />
-          </div>
-          <div>
-            <h2 className="font-semibold text-foreground">Galerie</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Foto-Upload wird nach der Vercel Blob-Einrichtung verfügbar (max. 8 Fotos, je 5 MB).
-            </p>
-          </div>
-        </div>
-      </section>
+      {/* ── Gallery ─────────────────────────────────────────────────────────── */}
+      <GallerySection initialPhotos={initialData.farmPhotos} />
 
       {/* ── Save button ─────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-4 pb-8">

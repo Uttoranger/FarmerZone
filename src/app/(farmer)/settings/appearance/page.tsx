@@ -19,9 +19,13 @@ export default async function AppearancePage() {
     <div className="px-4 py-6">
       <AppearanceClient
         initialData={{
+          farmId: data.farmId,
           tagline: data.tagline ?? '',
           foundedYear: data.foundedYear ? String(data.foundedYear) : '',
           aboutText: data.aboutText ?? '',
+          logoUrl: data.logoUrl ?? null,
+          bannerType: data.bannerType,
+          bannerUrl: data.bannerUrl ?? null,
           bannerValue: data.bannerValue ?? 'tannengruen',
           sectionsConfig: data.sectionsConfig,
           farmValues: data.farmValues.map((v) => ({
@@ -29,6 +33,7 @@ export default async function AppearancePage() {
             title: v.title,
             subtitle: v.subtitle ?? '',
           })),
+          farmPhotos: data.farmPhotos,
           farmSlug: data.slug,
         }}
       />

@@ -24,7 +24,10 @@ const appearanceSchema = z.object({
   tagline: z.string().max(60).nullable().optional(),
   foundedYear: z.number().int().min(1800).max(2050).nullable().optional(),
   aboutText: z.string().max(1000).nullable().optional(),
+  bannerType: z.enum(['GRADIENT', 'PHOTO']).optional(),
   bannerValue: z.string().nullable().optional(),
+  bannerUrl: z.string().url().nullable().optional(),
+  logoUrl: z.string().url().nullable().optional(),
   sectionsConfig: z.array(sectionConfigSchema).default([]),
   farmValues: z.array(farmValueSchema).max(4),
 })
@@ -43,7 +46,17 @@ export async function saveAppearanceAction(
   const parsed = appearanceSchema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Ungültige Daten' }
 
-  const { tagline, foundedYear, aboutText, bannerValue, sectionsConfig, farmValues } = parsed.data
+  const {
+    tagline,
+    foundedYear,
+    aboutText,
+    bannerType,
+    bannerValue,
+    bannerUrl,
+    logoUrl,
+    sectionsConfig,
+    farmValues,
+  } = parsed.data
 
   await prisma.$transaction([
     prisma.farm.update({
@@ -52,7 +65,10 @@ export async function saveAppearanceAction(
         tagline: tagline ?? null,
         foundedYear: foundedYear ?? null,
         aboutText: aboutText ?? null,
-        bannerValue: bannerValue ?? null,
+        ...(bannerType !== undefined && { bannerType }),
+        ...(bannerValue !== undefined && { bannerValue: bannerValue ?? null }),
+        ...(bannerUrl !== undefined && { bannerUrl: bannerUrl ?? null }),
+        ...(logoUrl !== undefined && { logoUrl: logoUrl ?? null }),
         sectionsConfig: sectionsConfig as unknown as SectionConfig[],
       },
     }),
@@ -74,6 +90,41 @@ export async function saveAppearanceAction(
 
   revalidatePath(`/${farm.slug}`)
   revalidatePath('/settings/appearance')
+
+  return {}
+}
+
+export async function updateFarmLogoAction(logoUrl: string | null): Promise<{ error?: string }> {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) return { error: 'Nicht angemeldet' }
+
+  const farm = await prisma.farm.findUnique({ where: { ownerId: session.user.id }, select: { id: true, slug: true } })
+  if (!farm) return { error: 'Hof nicht gefunden' }
+
+  await prisma.farm.update({ where: { id: farm.id }, data: { logoUrl } })
+
+  revalidatePath(`/${farm.slug}`)
+  revalidatePath('/settings/appearance')
+  revalidatePath('/farm-page')
+
+  return {}
+}
+
+export async function updateFarmBannerAction(
+  bannerType: 'GRADIENT' | 'PHOTO',
+  bannerUrl: string | null,
+): Promise<{ error?: string }> {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) return { error: 'Nicht angemeldet' }
+
+  const farm = await prisma.farm.findUnique({ where: { ownerId: session.user.id }, select: { id: true, slug: true } })
+  if (!farm) return { error: 'Hof nicht gefunden' }
+
+  await prisma.farm.update({ where: { id: farm.id }, data: { bannerType, bannerUrl } })
+
+  revalidatePath(`/${farm.slug}`)
+  revalidatePath('/settings/appearance')
+  revalidatePath('/farm-page')
 
   return {}
 }

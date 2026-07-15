@@ -5,6 +5,7 @@ import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { ImagePlus, X, Leaf, Thermometer, Snowflake } from 'lucide-react'
+import { resizeToWebP } from '@/components/shared/image-upload'
 import {
   Dialog,
   DialogContent,
@@ -147,8 +148,13 @@ export function ProductDialog({ open, product, onClose }: Props) {
       let imageUrl = data.imageUrl ?? ''
 
       if (selectedFile) {
+        const resized = await resizeToWebP(selectedFile, 2400).catch(() => selectedFile)
         const fd = new FormData()
-        fd.append('file', selectedFile)
+        fd.append('file', resized)
+        fd.append('target', 'product')
+        if (isEdit) fd.append('id', product.id)
+        const existingUrl = isEdit ? (product.imageUrl ?? '') : ''
+        if (existingUrl) fd.append('oldUrl', existingUrl)
         const res = await fetch('/api/upload', { method: 'POST', body: fd })
         if (res.ok) {
           const json = await res.json()
@@ -238,7 +244,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
                       {previewUrl ? 'Foto ersetzen' : 'Foto wählen'}
                     </label>
                     <p className="text-xs text-muted-foreground/60 mt-1.5">
-                      JPEG, PNG oder WebP · max. 5 MB
+                      JPEG, PNG oder WebP · max. 10 MB
                     </p>
                   </div>
                 </div>
