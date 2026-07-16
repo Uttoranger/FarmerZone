@@ -9,6 +9,7 @@ import {
   MapPin, Phone, Mail, CreditCard, Banknote,
   Pencil, Eye, Leaf, CalendarDays, Tag, MessageCircle,
   Check, Camera, Plus, ChevronLeft, ChevronRight, X, MoveVertical,
+  Share2, Navigation,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { DragEndEvent } from '@dnd-kit/core'
@@ -19,6 +20,8 @@ import type { ActiveStatusPost } from '@/server/queries/status-posts'
 import { updateFarmBannerAction, updateBannerFocusAction } from '@/server/actions/appearance'
 import { addFarmPhotoAction, reorderPhotosAction } from '@/server/actions/farm-photos'
 import { ReorderContext } from '@/components/shared/reorder-context'
+import { nextPickupDays, pickupWeekdaysLabel } from '@/lib/pickup-days'
+import { buildMapsUrl, buildShareData } from '@/lib/customer-links'
 import { useImageUpload } from '@/components/shared/image-upload'
 import { ProductGrid } from './product-grid'
 import { stripStatusVariables, renderStatusBodyWithChip } from '@/lib/status-body'
@@ -550,6 +553,57 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
     })
   }
 
+  // ── Kundenansicht (Sprint 20, Referenz 17) ──────────────────────────────
+  const pickupDays = useMemo(() => nextPickupDays(farm.pickupSlots, 3), [farm.pickupSlots])
+  const pickupDaysShort = useMemo(() => pickupWeekdaysLabel(farm.pickupSlots), [farm.pickupSlots])
+  const mapsUrl = buildMapsUrl(farm.address, farm.postalCode, farm.city)
+
+  const showFotosTab = isSectionVisible('gallery') && farm.farmPhotos.length > 0
+  const [activeTab, setActiveTab] = useState('uebersicht')
+
+  async function handleShare() {
+    const url = `${window.location.origin}/${farm.slug}`
+    const data = buildShareData(farm.name, url)
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share(data)
+        return
+      } catch {
+        // abgebrochen oder nicht erlaubt → Fallback
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success('Link kopiert')
+    } catch {
+      toast.error('Link konnte nicht kopiert werden')
+    }
+  }
+
+  function scrollToSection(id: string) {
+    setActiveTab(id)
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  // Aktiven Tab beim Scrollen nachführen
+  useEffect(() => {
+    if (isEdit) return
+    const ids = ['uebersicht', 'produkte', ...(showFotosTab ? ['fotos'] : [])]
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) setActiveTab(entry.target.id)
+        }
+      },
+      { rootMargin: '-30% 0px -60% 0px' }
+    )
+    for (const id of ids) {
+      const el = document.getElementById(id)
+      if (el) observer.observe(el)
+    }
+    return () => observer.disconnect()
+  }, [isEdit, showFotosTab])
+
   const sections = farm.sectionsConfig
   function isSectionVisible(key: string) {
     const s = sections.find((s) => s.key === key)
@@ -700,8 +754,8 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
         </div>
       )}
 
-      {/* Cover 250px */}
-      <div className="relative h-[250px]">
+      {/* Cover 260px (Referenz 17) */}
+      <div className="relative h-[260px]">
         {bannerBg === null ? (
           <Image
             src={farm.bannerUrl!}
@@ -719,7 +773,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            background: 'linear-gradient(180deg, rgba(24,36,27,0.10) 0%, rgba(24,36,27,0) 40%, rgba(20,30,22,0.62) 100%)',
+            background: 'linear-gradient(180deg, rgba(20,30,22,0) 45%, rgba(20,30,22,0.5) 100%)',
           }}
         />
         {/* Titelbild ändern + Fokus anpassen (edit only) */}
@@ -751,8 +805,8 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
         {/* Hof-Siegel */}
         {farm.foundedYear && (
           <div
-            className="absolute top-1/2 right-16 hidden md:block pointer-events-none"
-            style={{ transform: 'translateY(-46%) rotate(-6deg)', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.25))' }}
+            className="absolute hidden md:block pointer-events-none"
+            style={{ right: 70, top: 38, transform: 'rotate(-6deg)', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.25))' }}
           >
             <FarmSeal farmName={farm.name} foundedYear={farm.foundedYear} />
           </div>
@@ -762,18 +816,18 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           <div className="max-w-[960px] mx-auto px-4 md:px-10 pb-5">
             <div className="flex items-center gap-3 flex-wrap">
               <h1
-                className="font-heading text-[34px] font-semibold text-white leading-tight"
-                style={{ textShadow: '0 2px 14px rgba(0,0,0,0.45)' }}
+                className="font-heading text-[38px] font-semibold text-white leading-tight"
+                style={{ textShadow: '0 2px 14px rgba(0,0,0,0.4)' }}
               >
                 {farm.name}
               </h1>
               {isSectionVisible('values') && farm.farmValues.slice(0, 4).map((v) => (
                 <span
                   key={v.id}
-                  className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full"
-                  style={{ color: '#2D5F3F', background: '#E8F0E2' }}
+                  className="inline-flex items-center gap-[5px] text-xs font-semibold px-3 py-[5px] rounded-2xl whitespace-nowrap"
+                  style={{ color: '#2D5F3F', background: 'rgba(255,255,255,0.92)' }}
                 >
-                  <Check className="size-3" strokeWidth={1.7} />
+                  <Check className="size-3" strokeWidth={1.9} />
                   {v.title}
                 </span>
               ))}
@@ -799,14 +853,135 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
             >
               <MapPin className="size-3.5 shrink-0" strokeWidth={1.7} />
               <span>{farm.address}, {farm.postalCode} {farm.city}</span>
-              {farm.tagline && <span className="ml-2 truncate">{farm.tagline}</span>}
+              {farm.tagline && (
+                <span className="ml-2 truncate italic font-heading">{farm.tagline}</span>
+              )}
             </div>
           </div>
         </div>
       </div>
 
+      {/* Aktionsleiste unter dem Cover (Referenz 17, nur Kundenansicht) */}
+      {!isEdit && (
+        <div className="px-4 md:px-10 py-3.5" style={{ background: '#fff', borderBottom: '1px solid #ECE8DF' }}>
+          <div className="max-w-[960px] mx-auto flex items-center gap-x-[22px] gap-y-2 flex-wrap">
+            {pickupDaysShort && (
+              <span className="text-sm hidden sm:inline" style={{ color: '#5C6052' }}>
+                Abholung <b style={{ color: '#2D3027' }}>{pickupDaysShort}</b>
+              </span>
+            )}
+            {(farm.acceptsOnline || farm.acceptsOnsite) && (
+              <span className="text-sm hidden md:inline" style={{ color: '#5C6052' }}>
+                Zahlung{' '}
+                <b style={{ color: '#2D3027' }}>
+                  {farm.acceptsOnline && farm.acceptsOnsite
+                    ? 'am Hof oder online'
+                    : farm.acceptsOnline
+                      ? 'online'
+                      : 'am Hof'}
+                </b>
+              </span>
+            )}
+            <div className="ml-auto flex gap-2.5">
+              <a
+                href={`tel:${farm.phone}`}
+                className="flex items-center gap-[7px] h-10 rounded-lg px-4 text-[13px] font-semibold transition-colors hover:bg-gray-50"
+                style={{ background: '#fff', border: '1px solid #E4E0D6', color: '#5C6052' }}
+              >
+                <Phone className="size-[15px]" strokeWidth={1.7} />
+                Anrufen
+              </a>
+              <a
+                href={mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-[7px] h-10 rounded-lg px-4 text-[13px] font-semibold transition-colors hover:bg-gray-50"
+                style={{ background: '#fff', border: '1px solid #E4E0D6', color: '#5C6052' }}
+              >
+                <Navigation className="size-[15px]" strokeWidth={1.7} />
+                Anfahrt
+              </a>
+              <button
+                type="button"
+                onClick={handleShare}
+                className="flex items-center gap-[7px] h-10 rounded-lg px-5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+                style={{ background: '#2D5F3F' }}
+              >
+                <Share2 className="size-[15px]" strokeWidth={1.7} />
+                Teilen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab-Leiste (Scroll-Navigation, sticky — Referenz 17) */}
+      {!isEdit && (
+        <nav
+          className="sticky top-0 z-30 px-4 md:px-10"
+          style={{ background: '#fff', borderBottom: '1px solid #ECE8DF', boxShadow: '0 2px 10px rgba(45,95,63,0.06)' }}
+        >
+          <div className="max-w-[960px] mx-auto flex gap-[26px]">
+            {[
+              { id: 'uebersicht', label: 'Übersicht' },
+              { id: 'produkte', label: 'Produkte' },
+              ...(showFotosTab ? [{ id: 'fotos', label: 'Fotos' }] : []),
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => scrollToSection(tab.id)}
+                className="pt-[13px] pb-[11px] px-0.5 text-[13px] transition-colors"
+                style={
+                  activeTab === tab.id
+                    ? { color: '#2D5F3F', fontWeight: 700, borderBottom: '3px solid #2D5F3F' }
+                    : { color: '#9AA08F', fontWeight: 600, borderBottom: '3px solid transparent' }
+                }
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
+
       {/* Content column */}
-      <div className="max-w-[960px] mx-auto px-4 md:px-10 pt-[26px] pb-12">
+      <div id="uebersicht" className="max-w-[960px] mx-auto px-4 md:px-10 pt-[26px] pb-12 scroll-mt-14">
+
+        {/* Nächste Abholung (Referenz 17, nur Kundenansicht) */}
+        {!isEdit && pickupDays.length > 0 && (
+          <div
+            className="bg-white rounded-[14px] p-[18px] mb-[18px]"
+            style={{ boxShadow: '0 2px 10px rgba(45,95,63,0.06)' }}
+          >
+            <div className="text-[15px] font-semibold mb-3" style={{ color: '#2D3027' }}>
+              Nächste Abholung
+            </div>
+            <div className="flex gap-2">
+              {pickupDays.map((day, i) => (
+                <div
+                  key={day.date.toISOString()}
+                  className="flex-1 rounded-[10px] p-2.5 text-center"
+                  style={{
+                    background: '#fff',
+                    border: `2px solid ${i === 0 ? '#2D5F3F' : 'transparent'}`,
+                    boxShadow: i === 0 ? undefined : '0 2px 8px rgba(45,95,63,0.05)',
+                  }}
+                >
+                  <div className="text-[13px] font-bold" style={{ color: i === 0 ? '#2D5F3F' : '#5C6052' }}>
+                    {day.label}
+                  </div>
+                  <div className="text-[11px] mt-px" style={{ color: '#9AA08F' }}>
+                    {day.times}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="text-xs mt-2.5" style={{ color: '#9AA08F' }}>
+              Zeitfenster wählst du beim Bestellen.
+            </div>
+          </div>
+        )}
 
         {/* Zahlung & Kontakt */}
         <WoodCard>
@@ -978,7 +1153,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
 
         {/* Gallery section */}
         {showGallery && (
-          <div className="mt-[26px]" key={`gallery-${galleryKey}`}>
+          <div id="fotos" className="mt-[26px] scroll-mt-14" key={`gallery-${galleryKey}`}>
             <GallerySection
               farm={farm}
               isEdit={isEdit}
@@ -988,7 +1163,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
         )}
 
         {/* Products heading */}
-        <div className="flex items-baseline gap-3 mt-[34px] mb-[18px]">
+        <div id="produkte" className="flex items-baseline gap-3 mt-[34px] mb-[18px] scroll-mt-14">
           <h2 className="font-heading text-[26px] font-semibold" style={{ color: '#2D3027' }}>
             Unsere Produkte
           </h2>
