@@ -1,3 +1,6 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateEnum
 CREATE TYPE "UserRole" AS ENUM ('CUSTOMER', 'FARMER', 'ADMIN');
 
@@ -11,10 +14,19 @@ CREATE TYPE "PaymentMethod" AS ENUM ('ONLINE', 'ONSITE_CASH', 'ONSITE_CARD');
 CREATE TYPE "PaymentStatus" AS ENUM ('PENDING', 'PAID', 'FAILED', 'REFUNDED');
 
 -- CreateEnum
+CREATE TYPE "StatusPostAnlass" AS ENUM ('FRESH_PRODUCT', 'NEW_SEASON', 'PROMOTION', 'ANNOUNCEMENT');
+
+-- CreateEnum
 CREATE TYPE "SalesChannel" AS ENUM ('PLATFORM', 'WHATSAPP', 'HOFLADEN', 'MARKT', 'BUSINESS', 'OTHER');
 
 -- CreateEnum
 CREATE TYPE "ProductUnit" AS ENUM ('STUECK', 'KG', 'G', 'LITER', 'ML', 'M3', 'PAKET');
+
+-- CreateEnum
+CREATE TYPE "ProductCategory" AS ENUM ('MILCH', 'EIER', 'FLEISCH', 'GEMUESE', 'OBST', 'BROT', 'HONIG', 'GETRAENKE', 'BRENNHOLZ', 'SONSTIGES');
+
+-- CreateEnum
+CREATE TYPE "BannerType" AS ENUM ('GRADIENT', 'PHOTO');
 
 -- CreateTable
 CREATE TABLE "User" (
@@ -22,13 +34,58 @@ CREATE TABLE "User" (
     "email" TEXT NOT NULL,
     "name" TEXT,
     "phone" TEXT,
-    "passwordHash" TEXT,
+    "image" TEXT,
     "role" "UserRole" NOT NULL DEFAULT 'CUSTOMER',
     "emailVerified" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Session" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "token" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "ipAddress" TEXT,
+    "userAgent" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Session_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Account" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "accountId" TEXT NOT NULL,
+    "providerId" TEXT NOT NULL,
+    "accessToken" TEXT,
+    "refreshToken" TEXT,
+    "idToken" TEXT,
+    "accessTokenExpiresAt" TIMESTAMP(3),
+    "refreshTokenExpiresAt" TIMESTAMP(3),
+    "scope" TEXT,
+    "password" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Account_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Verification" (
+    "id" TEXT NOT NULL,
+    "identifier" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Verification_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -45,6 +102,13 @@ CREATE TABLE "Farm" (
     "email" TEXT NOT NULL,
     "logoUrl" TEXT,
     "bannerUrl" TEXT,
+    "tagline" TEXT,
+    "foundedYear" INTEGER,
+    "aboutText" TEXT,
+    "bannerType" "BannerType" NOT NULL DEFAULT 'GRADIENT',
+    "bannerValue" TEXT,
+    "bannerFocusY" INTEGER NOT NULL DEFAULT 50,
+    "sectionsConfig" JSONB,
     "stripeAccountId" TEXT,
     "stripeAccountReady" BOOLEAN NOT NULL DEFAULT false,
     "acceptsOnline" BOOLEAN NOT NULL DEFAULT true,
@@ -76,6 +140,9 @@ CREATE TABLE "Product" (
     "stock" INTEGER NOT NULL DEFAULT 0,
     "reservedStock" INTEGER NOT NULL DEFAULT 0,
     "isAvailable" BOOLEAN NOT NULL DEFAULT true,
+    "category" "ProductCategory",
+    "countsTowardLimit" BOOLEAN NOT NULL DEFAULT true,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
     "allergens" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "isOrganic" BOOLEAN NOT NULL DEFAULT false,
     "requiresCool" BOOLEAN NOT NULL DEFAULT false,
@@ -186,11 +253,89 @@ CREATE TABLE "WebhookEvent" (
     CONSTRAINT "WebhookEvent_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "CustomerFarmSubscription" (
+    "id" TEXT NOT NULL,
+    "customerEmail" TEXT NOT NULL,
+    "farmId" TEXT NOT NULL,
+    "optInEmail" BOOLEAN NOT NULL DEFAULT false,
+    "optInWhatsApp" BOOLEAN NOT NULL DEFAULT false,
+    "customerPhone" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "CustomerFarmSubscription_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "StatusPost" (
+    "id" TEXT NOT NULL,
+    "farmId" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "body" TEXT NOT NULL,
+    "anlass" "StatusPostAnlass" NOT NULL DEFAULT 'FRESH_PRODUCT',
+    "photoUrl" TEXT,
+    "linkedProductIds" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "publishedAt" TIMESTAMP(3),
+    "expiresAt" TIMESTAMP(3),
+    "showOnFarmPage" BOOLEAN NOT NULL DEFAULT true,
+    "sentViaEmail" BOOLEAN NOT NULL DEFAULT false,
+    "sentViaWhatsApp" BOOLEAN NOT NULL DEFAULT false,
+    "emailRecipientCount" INTEGER NOT NULL DEFAULT 0,
+    "whatsappRecipientCount" INTEGER NOT NULL DEFAULT 0,
+    "whatsappSentCount" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "StatusPost_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "FarmValue" (
+    "id" TEXT NOT NULL,
+    "farmId" TEXT NOT NULL,
+    "icon" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "subtitle" TEXT,
+    "sortOrder" INTEGER NOT NULL,
+
+    CONSTRAINT "FarmValue_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "FarmPhoto" (
+    "id" TEXT NOT NULL,
+    "farmId" TEXT NOT NULL,
+    "url" TEXT NOT NULL,
+    "caption" TEXT,
+    "sortOrder" INTEGER NOT NULL,
+
+    CONSTRAINT "FarmPhoto_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
 -- CreateIndex
 CREATE INDEX "User_email_idx" ON "User"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Session_token_key" ON "Session"("token");
+
+-- CreateIndex
+CREATE INDEX "Session_userId_idx" ON "Session"("userId");
+
+-- CreateIndex
+CREATE INDEX "Session_token_idx" ON "Session"("token");
+
+-- CreateIndex
+CREATE INDEX "Account_userId_idx" ON "Account"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Account_accountId_providerId_key" ON "Account"("accountId", "providerId");
+
+-- CreateIndex
+CREATE INDEX "Verification_identifier_idx" ON "Verification"("identifier");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Farm_slug_key" ON "Farm"("slug");
@@ -258,6 +403,30 @@ CREATE UNIQUE INDEX "WebhookEvent_stripeEventId_key" ON "WebhookEvent"("stripeEv
 -- CreateIndex
 CREATE INDEX "WebhookEvent_stripeEventId_idx" ON "WebhookEvent"("stripeEventId");
 
+-- CreateIndex
+CREATE INDEX "CustomerFarmSubscription_farmId_optInEmail_idx" ON "CustomerFarmSubscription"("farmId", "optInEmail");
+
+-- CreateIndex
+CREATE INDEX "CustomerFarmSubscription_farmId_optInWhatsApp_idx" ON "CustomerFarmSubscription"("farmId", "optInWhatsApp");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "CustomerFarmSubscription_customerEmail_farmId_key" ON "CustomerFarmSubscription"("customerEmail", "farmId");
+
+-- CreateIndex
+CREATE INDEX "StatusPost_farmId_publishedAt_idx" ON "StatusPost"("farmId", "publishedAt");
+
+-- CreateIndex
+CREATE INDEX "FarmValue_farmId_idx" ON "FarmValue"("farmId");
+
+-- CreateIndex
+CREATE INDEX "FarmPhoto_farmId_idx" ON "FarmPhoto"("farmId");
+
+-- AddForeignKey
+ALTER TABLE "Session" ADD CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Account" ADD CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
 -- AddForeignKey
 ALTER TABLE "Farm" ADD CONSTRAINT "Farm_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
@@ -284,3 +453,15 @@ ALTER TABLE "ManualSale" ADD CONSTRAINT "ManualSale_farmId_fkey" FOREIGN KEY ("f
 
 -- AddForeignKey
 ALTER TABLE "ManualSale" ADD CONSTRAINT "ManualSale_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CustomerFarmSubscription" ADD CONSTRAINT "CustomerFarmSubscription_farmId_fkey" FOREIGN KEY ("farmId") REFERENCES "Farm"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StatusPost" ADD CONSTRAINT "StatusPost_farmId_fkey" FOREIGN KEY ("farmId") REFERENCES "Farm"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "FarmValue" ADD CONSTRAINT "FarmValue_farmId_fkey" FOREIGN KEY ("farmId") REFERENCES "Farm"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "FarmPhoto" ADD CONSTRAINT "FarmPhoto_farmId_fkey" FOREIGN KEY ("farmId") REFERENCES "Farm"("id") ON DELETE CASCADE ON UPDATE CASCADE;

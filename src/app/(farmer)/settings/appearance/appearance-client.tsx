@@ -536,7 +536,7 @@ export function AppearanceClient({ initialData }: Props) {
       const sorted = prev.slice().sort((a, b) => a.order - b.order)
       const keys = sorted.map((sec) => sec.key)
       const next = arrayMove(sorted, keys.indexOf(String(active.id)), keys.indexOf(String(over.id)))
-      return next.map((sec, i) => ({ ...sec, order: i }))
+      return next.map((sec: SectionConfig, i: number) => ({ ...sec, order: i }))
     })
   }
 

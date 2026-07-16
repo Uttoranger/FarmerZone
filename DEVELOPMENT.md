@@ -317,12 +317,43 @@ pnpm dev
 
 ---
 
+## Schema-Änderungen ab jetzt
+
+**Regel: NIE wieder `prisma db push`. Jede Schema-Änderung erzeugt eine Migrationsdatei.**
+
+### Ablauf bei einer Schema-Änderung
+
+1. `prisma/schema.prisma` bearbeiten
+2. `pnpm db:migrate` ausführen (= `prisma migrate dev` gegen die Dev-DB in `farmerzone-dev`)
+   → Prisma erzeugt automatisch eine neue Datei unter `prisma/migrations/<timestamp>_<name>/migration.sql`
+3. Die neue Migrationsdatei committen und pushen
+4. Vercel führt beim Deploy automatisch `prisma migrate deploy` gegen Produktion aus (via `vercel-build` Script)
+
+### Warum das besser ist
+
+| Vorher (`db push`) | Jetzt (`migrate dev` + `migrate deploy`) |
+|---|---|
+| Kein SQL-Audit-Trail | Jede Änderung als SQL-Datei nachvollziehbar |
+| Reihenfolge-Fehler möglich | Konstruktionsbedingt unmöglich |
+| Deploy = manueller Schritt | Deploy = automatisch im Vercel-Build |
+| Dev = Prod-DB (Datengefahr) | Dev = eigene `farmerzone-dev`-DB |
+
+### Umgebungen
+
+| Umgebung | DB | Wer migriert |
+|---|---|---|
+| Lokal | `farmerzone-dev` (in `.env.local`) | `pnpm db:migrate` manuell |
+| Vercel Preview | `farmerzone-dev` (Vercel Env-Var: Preview scope) | automatisch im Build |
+| Vercel Production | `farmerzone` Prod-DB (Vercel Env-Var: Production scope) | automatisch im Build |
+
+---
+
 ## Nützliche Befehle
 
 ```bash
 pnpm dev              # Dev-Server starten
-pnpm db:migrate       # Datenbankmigrationen ausführen (= prisma migrate dev)
-pnpm db:seed          # Testdaten laden
+pnpm db:migrate       # Schema-Änderung: Migrationsdatei erzeugen + Dev-DB aktualisieren
+pnpm db:seed          # Testdaten laden (nur Dev-DB)
 pnpm db:studio        # Prisma Studio öffnen
 pnpm db:generate      # Prisma Client generieren
 ```
@@ -340,4 +371,4 @@ pnpm db:generate      # Prisma Client generieren
 
 ---
 
-*Zuletzt aktualisiert: 2026-06-08 — Sprint 6 abgeschlossen*
+*Zuletzt aktualisiert: 2026-07-16 — Sprint U: Umgebungs-Trennung + Migrations-Baseline*
