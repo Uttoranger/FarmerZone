@@ -1,15 +1,19 @@
 'use client'
 
-import { useState, useEffect, useTransition } from 'react'
+import { useState, useEffect, useMemo, useTransition } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { ShoppingCart, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff, Camera, Loader2 } from 'lucide-react'
+import type { DragEndEvent } from '@dnd-kit/core'
+import { arrayMove, useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { ShoppingCart, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff, Camera, Loader2, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCart } from '@/lib/use-cart'
 import { UNIT_LABELS } from '@/schemas/product'
 import type { PublicProduct } from '@/server/queries/farm'
-import { updateProductImageAction } from '@/server/actions/products'
+import { updateProductImageAction, reorderProductsAction } from '@/server/actions/products'
+import { ReorderContext } from '@/components/shared/reorder-context'
 import { useImageUpload } from '@/components/shared/image-upload'
 import { CartSheet } from './cart-sheet'
 
@@ -199,6 +203,51 @@ function ProductImageArea({
   )
 }
 
+// Sortable-Hülle (nur Edit-Modus): Grip-Handle oben links, Drag-Feedback per Schatten
+function SortableProductCard({
+  product,
+  children,
+}: {
+  product: PublicProduct
+  children: React.ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
+    useSortable({ id: product.id })
+
+  return (
+    <div
+      ref={setNodeRef}
+      className="relative"
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 30 : undefined,
+        boxShadow: isDragging ? '0 14px 32px rgba(45,95,63,0.28)' : undefined,
+        scale: isDragging ? '1.02' : undefined,
+        borderRadius: 12,
+      }}
+    >
+      <button
+        type="button"
+        ref={setActivatorNodeRef}
+        {...attributes}
+        {...listeners}
+        aria-label={`${product.name} verschieben`}
+        className="absolute top-2 left-2 z-20 flex items-center justify-center size-8 rounded-lg cursor-grab active:cursor-grabbing"
+        style={{
+          touchAction: 'none',
+          background: 'rgba(255,255,255,0.94)',
+          color: '#5C6052',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+        }}
+      >
+        <GripVertical className="size-4" strokeWidth={1.7} />
+      </button>
+      {children}
+    </div>
+  )
+}
+
 function ProductCard({
   product,
   onAddToCart,
@@ -308,6 +357,37 @@ export function ProductGrid({
 }: Props) {
   const isEditMode = ownerMode && mode !== 'preview'
 
+  // Sprint 18: optimistische Sortier-Reihenfolge (null = Server-Stand)
+  const [orderedIds, setOrderedIds] = useState<string[] | null>(null)
+  const [, startReorderTransition] = useTransition()
+
+  // Neuer Server-Stand (props) macht den optimistischen Zustand obsolet
+  useEffect(() => {
+    setOrderedIds(null)
+  }, [products])
+
+  const displayProducts = useMemo(() => {
+    if (!isEditMode || !orderedIds) return products
+    const byId = new Map(products.map((p) => [p.id, p]))
+    const ordered = orderedIds.map((id) => byId.get(id)).filter(Boolean) as PublicProduct[]
+    return ordered.length === products.length ? ordered : products
+  }, [products, orderedIds, isEditMode])
+
+  function handleReorderDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const current = displayProducts.map((p) => p.id)
+    const next = arrayMove(current, current.indexOf(String(active.id)), current.indexOf(String(over.id)))
+    setOrderedIds(next)
+    startReorderTransition(async () => {
+      const result = await reorderProductsAction(next)
+      if (result.error) {
+        toast.error(result.error)
+        setOrderedIds(null) // Revert auf Server-Stand
+      }
+    })
+  }
+
   const [cartOpen, setCartOpen] = useState(false)
   const [addingId, setAddingId] = useState<string | null>(null)
   const [showWelcomeBack, setShowWelcomeBack] = useState(false)
@@ -404,7 +484,12 @@ export function ProductGrid({
         </p>
       )}
 
-      {/* Grid — 3 cols, 20px gap */}
+      {/* Grid — 3 cols, 20px gap; im Edit-Modus sortierbar */}
+      <ReorderContext
+        enabled={isEditMode}
+        items={displayProducts.map((p) => p.id)}
+        onDragEnd={handleReorderDragEnd}
+      >
       <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
         {/* "Produkt anlegen" tile — edit mode only */}
         {isEditMode && (
@@ -428,17 +513,30 @@ export function ProductGrid({
           </Link>
         )}
 
-        {products.map((p) => (
-          <ProductCard
-            key={p.id}
-            product={p}
-            onAddToCart={handleAddToCart}
-            isAddingId={addingId}
-            ownerMode={ownerMode}
-            isEditMode={isEditMode}
-          />
-        ))}
+        {displayProducts.map((p) =>
+          isEditMode ? (
+            <SortableProductCard key={p.id} product={p}>
+              <ProductCard
+                product={p}
+                onAddToCart={handleAddToCart}
+                isAddingId={addingId}
+                ownerMode={ownerMode}
+                isEditMode={isEditMode}
+              />
+            </SortableProductCard>
+          ) : (
+            <ProductCard
+              key={p.id}
+              product={p}
+              onAddToCart={handleAddToCart}
+              isAddingId={addingId}
+              ownerMode={ownerMode}
+              isEditMode={isEditMode}
+            />
+          )
+        )}
       </div>
+      </ReorderContext>
 
       {/* Sticky cart button (not in edit mode) */}
       {!isEditMode && isHydrated && count > 0 && (

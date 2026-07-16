@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { useRef, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -11,10 +11,14 @@ import {
   Check, Camera, Plus, ChevronLeft, ChevronRight, X, MoveVertical,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import type { PublicFarm } from '@/server/queries/farm'
+import type { DragEndEvent } from '@dnd-kit/core'
+import { arrayMove, useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import type { PublicFarm, PublicFarmPhoto } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 import { updateFarmBannerAction, updateBannerFocusAction } from '@/server/actions/appearance'
-import { addFarmPhotoAction } from '@/server/actions/farm-photos'
+import { addFarmPhotoAction, reorderPhotosAction } from '@/server/actions/farm-photos'
+import { ReorderContext } from '@/components/shared/reorder-context'
 import { useImageUpload } from '@/components/shared/image-upload'
 import { ProductGrid } from './product-grid'
 import { stripStatusVariables, renderStatusBodyWithChip } from '@/lib/status-body'
@@ -78,6 +82,43 @@ function FarmSeal({ farmName, foundedYear }: { farmName: string; foundedYear: nu
 
 const GALLERY_MAX_VISIBLE = 7
 
+// Sortierbare Galerie-Kachel (nur Edit-Modus): ganze Kachel ziehbar (Airbnb-Muster)
+function SortableGalleryTile({
+  photo,
+  isFirst,
+  onClick,
+  children,
+}: {
+  photo: PublicFarmPhoto
+  isFirst: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: photo.id })
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      onClick={onClick}
+      className="relative cursor-grab active:cursor-grabbing rounded-[10px] overflow-hidden"
+      style={{
+        gridColumn: isFirst ? 'span 2' : undefined,
+        gridRow: isFirst ? 'span 2' : undefined,
+        transform: CSS.Transform.toString(transform),
+        transition,
+        touchAction: 'manipulation',
+        zIndex: isDragging ? 30 : undefined,
+        boxShadow: isDragging ? '0 14px 32px rgba(45,95,63,0.30)' : undefined,
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
 function GallerySection({
   farm,
   isEdit,
@@ -91,7 +132,34 @@ function GallerySection({
   const [, startTransition] = useTransition()
   const router = useRouter()
 
-  const photos = farm.farmPhotos
+  // Sprint 18: optimistische Foto-Reihenfolge (null = Server-Stand)
+  const [photoOrder, setPhotoOrder] = useState<string[] | null>(null)
+  useEffect(() => {
+    setPhotoOrder(null)
+  }, [farm.farmPhotos])
+
+  const photos = useMemo(() => {
+    if (!isEdit || !photoOrder) return farm.farmPhotos
+    const byId = new Map(farm.farmPhotos.map((p) => [p.id, p]))
+    const ordered = photoOrder.map((id) => byId.get(id)).filter(Boolean) as PublicFarmPhoto[]
+    return ordered.length === farm.farmPhotos.length ? ordered : farm.farmPhotos
+  }, [farm.farmPhotos, photoOrder, isEdit])
+
+  function handlePhotoDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const current = photos.map((p) => p.id)
+    const next = arrayMove(current, current.indexOf(String(active.id)), current.indexOf(String(over.id)))
+    setPhotoOrder(next)
+    startTransition(async () => {
+      const result = await reorderPhotosAction(next)
+      if (result.error) {
+        toast.error(result.error)
+        setPhotoOrder(null) // Revert auf Server-Stand
+      }
+    })
+  }
+
   const canUpload = isEdit && photos.length < 8
 
   const { isUploading, openFilePicker, fileInput } = useImageUpload({
@@ -154,23 +222,20 @@ function GallerySection({
         )}
       </div>
 
-      {/* Grid */}
+      {/* Grid — im Edit-Modus sortierbar (Airbnb-Muster) */}
+      <ReorderContext
+        enabled={isEdit}
+        items={visiblePhotos.map((p) => p.id)}
+        onDragEnd={handlePhotoDragEnd}
+      >
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 [grid-auto-rows:150px]">
         {visiblePhotos.map((photo, i) => {
           const isFirst = i === 0
           const isLast = i === visiblePhotos.length - 1
           const showOverlay = isLast && hiddenCount > 0
 
-          return (
-            <div
-              key={photo.id}
-              className="relative cursor-pointer rounded-[10px] overflow-hidden"
-              style={{
-                gridColumn: isFirst ? 'span 2' : undefined,
-                gridRow: isFirst ? 'span 2' : undefined,
-              }}
-              onClick={() => setLightboxIdx(i)}
-            >
+          const tileContent = (
+            <>
               <Image
                 src={photo.url}
                 alt={photo.caption ?? ''}
@@ -178,6 +243,21 @@ function GallerySection({
                 sizes={isFirst ? '(min-width: 768px) 50vw, 100vw' : '(min-width: 768px) 25vw, 50vw'}
                 className="object-cover"
               />
+              {/* Aufmacher-Badge auf dem ersten Foto (nur Edit-Modus) */}
+              {isFirst && isEdit && (
+                <span
+                  className="absolute top-[10px] left-[10px] text-white pointer-events-none"
+                  style={{
+                    background: 'rgba(45,48,39,0.85)',
+                    borderRadius: 14,
+                    padding: '4px 11px',
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
+                >
+                  Aufmacher
+                </span>
+              )}
               {/* Caption pill on first photo */}
               {isFirst && photo.caption && (
                 <div
@@ -202,6 +282,29 @@ function GallerySection({
                   <span style={{ fontSize: 15, fontWeight: 700 }}>+{hiddenCount} Fotos</span>
                 </div>
               )}
+            </>
+          )
+
+          return isEdit ? (
+            <SortableGalleryTile
+              key={photo.id}
+              photo={photo}
+              isFirst={isFirst}
+              onClick={() => setLightboxIdx(i)}
+            >
+              {tileContent}
+            </SortableGalleryTile>
+          ) : (
+            <div
+              key={photo.id}
+              className="relative cursor-pointer rounded-[10px] overflow-hidden"
+              style={{
+                gridColumn: isFirst ? 'span 2' : undefined,
+                gridRow: isFirst ? 'span 2' : undefined,
+              }}
+              onClick={() => setLightboxIdx(i)}
+            >
+              {tileContent}
             </div>
           )
         })}
@@ -230,6 +333,7 @@ function GallerySection({
           </button>
         )}
       </div>
+      </ReorderContext>
 
       {/* Lightbox */}
       {lightboxIdx !== null && photos.length > 0 && (

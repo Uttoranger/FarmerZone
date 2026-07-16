@@ -5,8 +5,12 @@ import Link from 'next/link'
 import Image from 'next/image'
 import {
   Check, ChevronUp, ChevronDown, Trash2, Loader2, ExternalLink, Plus, Upload,
-  Camera, X,
+  Camera, X, GripVertical,
 } from 'lucide-react'
+import type { DragEndEvent } from '@dnd-kit/core'
+import { arrayMove, useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { ReorderContext } from '@/components/shared/reorder-context'
 import { toast } from 'sonner'
 import { saveAppearanceAction, updateFarmLogoAction, updateFarmBannerAction } from '@/server/actions/appearance'
 import {
@@ -431,6 +435,40 @@ function GallerySection({ initialPhotos }: { initialPhotos: FarmPhotoData[] }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
+
+// Sprint 18: sortierbare Zeile der Bereiche-Liste (Grip + DnD; Pfeile als Fallback)
+function SortableSectionRow({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
+    useSortable({ id })
+
+  return (
+    <div
+      ref={setNodeRef}
+      className="flex items-center gap-2"
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 30 : undefined,
+        boxShadow: isDragging ? '0 10px 24px rgba(45,95,63,0.22)' : undefined,
+        borderRadius: 12,
+      }}
+    >
+      <button
+        type="button"
+        ref={setActivatorNodeRef}
+        {...attributes}
+        {...listeners}
+        aria-label="Bereich verschieben"
+        className="shrink-0 flex items-center justify-center size-8 rounded-lg text-muted-foreground hover:bg-muted cursor-grab active:cursor-grabbing"
+        style={{ touchAction: 'none' }}
+      >
+        <GripVertical className="size-4" />
+      </button>
+      <div className="flex-1 min-w-0">{children}</div>
+    </div>
+  )
+}
+
 export function AppearanceClient({ initialData }: Props) {
   const [logoUrl, setLogoUrl] = useState<string | null>(initialData.logoUrl)
   const [bannerType, setBannerType] = useState<'GRADIENT' | 'PHOTO'>(initialData.bannerType)
@@ -479,6 +517,28 @@ export function AppearanceClient({ initialData }: Props) {
   }
 
   // ── Section config helpers ──────────────────────────────────────────────────
+
+  function moveSectionByOffset(key: string, dir: -1 | 1) {
+    setSectionsConfig((prev) => {
+      const sorted = prev.slice().sort((a, b) => a.order - b.order)
+      const idx = sorted.findIndex((sec) => sec.key === key)
+      const j = idx + dir
+      if (idx < 0 || j < 0 || j >= sorted.length) return prev
+      ;[sorted[idx], sorted[j]] = [sorted[j], sorted[idx]]
+      return sorted.map((sec, i) => ({ ...sec, order: i }))
+    })
+  }
+
+  function handleSectionDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    setSectionsConfig((prev) => {
+      const sorted = prev.slice().sort((a, b) => a.order - b.order)
+      const keys = sorted.map((sec) => sec.key)
+      const next = arrayMove(sorted, keys.indexOf(String(active.id)), keys.indexOf(String(over.id)))
+      return next.map((sec, i) => ({ ...sec, order: i }))
+    })
+  }
 
   function toggleSection(key: string) {
     if (key === 'products') return
@@ -777,47 +837,77 @@ export function AppearanceClient({ initialData }: Props) {
         <p className="text-xs text-muted-foreground mb-4">
           Wähle, welche Bereiche auf deiner öffentlichen Seite sichtbar sind
         </p>
+        <ReorderContext
+          enabled
+          items={sectionsConfig.slice().sort((a, b) => a.order - b.order).map((sec) => sec.key)}
+          onDragEnd={handleSectionDragEnd}
+        >
         <div className="space-y-2">
           {sectionsConfig
             .slice()
             .sort((a, b) => a.order - b.order)
-            .map((section) => {
+            .map((section, idx, sorted) => {
               const isProducts = section.key === 'products'
               return (
-                <button
-                  key={section.key}
-                  type="button"
-                  onClick={() => toggleSection(section.key)}
-                  disabled={isProducts}
-                  className={cn(
-                    'w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all',
-                    section.visible && !isProducts
-                      ? 'border-primary bg-primary/5'
-                      : isProducts
-                        ? 'border-border bg-muted/30 cursor-not-allowed'
-                        : 'border-border hover:border-border/80',
-                  )}
-                >
-                  <div
+                <SortableSectionRow key={section.key} id={section.key}>
+                  <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(section.key)}
+                    disabled={isProducts}
                     className={cn(
-                      'size-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors',
-                      section.visible ? 'bg-primary border-primary' : 'border-border',
+                      'flex-1 flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all',
+                      section.visible && !isProducts
+                        ? 'border-primary bg-primary/5'
+                        : isProducts
+                          ? 'border-border bg-muted/30 cursor-not-allowed'
+                          : 'border-border hover:border-border/80',
                     )}
                   >
-                    {section.visible && <Check className="size-3 text-primary-foreground" />}
+                    <div
+                      className={cn(
+                        'size-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors',
+                        section.visible ? 'bg-primary border-primary' : 'border-border',
+                      )}
+                    >
+                      {section.visible && <Check className="size-3 text-primary-foreground" />}
+                    </div>
+                    <span
+                      className={cn(
+                        'text-sm font-medium',
+                        isProducts ? 'text-muted-foreground' : 'text-foreground',
+                      )}
+                    >
+                      {SECTION_LABELS[section.key] ?? section.key}
+                    </span>
+                  </button>
+                  {/* Pfeil-Fallback (Barrierefreiheit / ohne Drag) */}
+                  <div className="flex flex-col gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => moveSectionByOffset(section.key, -1)}
+                      disabled={idx === 0}
+                      aria-label="Bereich nach oben"
+                      className="w-6 h-6 rounded-md hover:bg-muted flex items-center justify-center disabled:opacity-30"
+                    >
+                      <ChevronUp className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveSectionByOffset(section.key, 1)}
+                      disabled={idx === sorted.length - 1}
+                      aria-label="Bereich nach unten"
+                      className="w-6 h-6 rounded-md hover:bg-muted flex items-center justify-center disabled:opacity-30"
+                    >
+                      <ChevronDown className="size-3.5" />
+                    </button>
                   </div>
-                  <span
-                    className={cn(
-                      'text-sm font-medium',
-                      isProducts ? 'text-muted-foreground' : 'text-foreground',
-                    )}
-                  >
-                    {SECTION_LABELS[section.key] ?? section.key}
-                  </span>
-                </button>
+                  </div>
+                </SortableSectionRow>
               )
             })}
         </div>
+        </ReorderContext>
       </section>
 
       {/* ── Gallery ─────────────────────────────────────────────────────────── */}

@@ -155,3 +155,37 @@ export async function deleteProduct(productId: string) {
 
   revalidate(farm.slug)
 }
+
+// Sprint 18: manuelle Reihenfolge per Drag & Drop.
+// ids muss GENAU die Produktmenge der eigenen Farm sein (Permutation) —
+// fremde, fehlende oder doppelte IDs → Fehler ohne Teiländerung (Transaktion).
+export async function reorderProductsAction(ids: string[]): Promise<{ error?: string }> {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) return { error: 'Nicht eingeloggt' }
+  const farm = await getFarmForUser(session.user.id)
+  if (!farm) return { error: 'Kein Hof gefunden' }
+
+  const own = await prisma.product.findMany({
+    where: { farmId: farm.id },
+    select: { id: true },
+  })
+  const ownIds = new Set(own.map((p) => p.id))
+  const uniqueIds = new Set(ids)
+
+  if (
+    ids.length !== uniqueIds.size ||
+    ids.length !== ownIds.size ||
+    ids.some((id) => !ownIds.has(id))
+  ) {
+    return { error: 'Ungültige Produktliste' }
+  }
+
+  await prisma.$transaction(
+    ids.map((id, index) =>
+      prisma.product.update({ where: { id }, data: { sortOrder: index } })
+    )
+  )
+
+  revalidate(farm.slug)
+  return {}
+}
