@@ -103,6 +103,43 @@ export async function deleteFarmPhotoAction(id: string): Promise<{ error?: strin
   return {}
 }
 
+// Sprint 18: komplette Reihenfolge setzen (Drag & Drop).
+// ids muss GENAU die Fotomenge der eigenen Farm sein (Permutation) —
+// fremde, fehlende oder doppelte IDs → Fehler ohne Teiländerung (Transaktion).
+export async function reorderPhotosAction(ids: string[]): Promise<{ error?: string }> {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) return { error: 'Nicht angemeldet' }
+
+  const farm = await getSessionFarm(session.user.id)
+  if (!farm) return { error: 'Kein Hof gefunden' }
+
+  const own = await prisma.farmPhoto.findMany({
+    where: { farmId: farm.id },
+    select: { id: true },
+  })
+  const ownIds = new Set(own.map((p) => p.id))
+  const uniqueIds = new Set(ids)
+
+  if (
+    ids.length !== uniqueIds.size ||
+    ids.length !== ownIds.size ||
+    ids.some((id) => !ownIds.has(id))
+  ) {
+    return { error: 'Ungültige Fotoliste' }
+  }
+
+  await prisma.$transaction(
+    ids.map((id, index) =>
+      prisma.farmPhoto.update({ where: { id }, data: { sortOrder: index } })
+    )
+  )
+
+  revalidate(farm.slug)
+  return {}
+}
+
+// Pfeil-Fallback (Mein Auftritt): geht in reorderPhotosAction auf —
+// berechnet die getauschte Gesamtreihenfolge und setzt sie komplett.
 export async function moveFarmPhotoAction(
   id: string,
   direction: 'up' | 'down',
@@ -116,7 +153,7 @@ export async function moveFarmPhotoAction(
   const photos = await prisma.farmPhoto.findMany({
     where: { farmId: farm.id },
     orderBy: { sortOrder: 'asc' },
-    select: { id: true, sortOrder: true },
+    select: { id: true },
   })
 
   const idx = photos.findIndex((p) => p.id === id)
@@ -125,14 +162,8 @@ export async function moveFarmPhotoAction(
   const swapIdx = direction === 'up' ? idx - 1 : idx + 1
   if (swapIdx < 0 || swapIdx >= photos.length) return {}
 
-  const a = photos[idx]
-  const b = photos[swapIdx]
+  const ids = photos.map((p) => p.id)
+  ;[ids[idx], ids[swapIdx]] = [ids[swapIdx], ids[idx]]
 
-  await prisma.$transaction([
-    prisma.farmPhoto.update({ where: { id: a.id }, data: { sortOrder: b.sortOrder } }),
-    prisma.farmPhoto.update({ where: { id: b.id }, data: { sortOrder: a.sortOrder } }),
-  ])
-
-  revalidate(farm.slug)
-  return {}
+  return reorderPhotosAction(ids)
 }
