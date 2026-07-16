@@ -294,6 +294,7 @@ pnpm dev
 
 ## Wichtige Entscheidungen & Rahmenbedingungen
 
+- **Komponentenrumpf:** Helfer-Funktionen und ihre `const`-Datengrundlagen stehen VOR ihrer ersten Verwendung — im Prod-Bundle konvertiert der SWC-Minifier `function`-Deklarationen zu `const`, die nicht gehoisted werden; TDZ crasht lautlos in Produktion (Vorfall Sprint 20: `sections`/`isSectionVisible` in `farm-page-view.tsx`).
 - **Sprache:** Gesamte App auf Deutsch, auch UI-Texte
 - **Provision:** 0% im Pilot (`platformFeePercent = 0`)
 - **Auth:** Bauer → Passwort-Login; Kunde → kein Login erforderlich

@@ -553,6 +553,12 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
     })
   }
 
+  const sections = farm.sectionsConfig
+  function isSectionVisible(key: string) {
+    const s = sections.find((s) => s.key === key)
+    return s ? s.visible : true
+  }
+
   // ── Kundenansicht (Sprint 20, Referenz 17) ──────────────────────────────
   const pickupDays = useMemo(() => nextPickupDays(farm.pickupSlots, 3), [farm.pickupSlots])
   const pickupDaysShort = useMemo(() => pickupWeekdaysLabel(farm.pickupSlots), [farm.pickupSlots])
@@ -603,12 +609,6 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
     }
     return () => observer.disconnect()
   }, [isEdit, showFotosTab])
-
-  const sections = farm.sectionsConfig
-  function isSectionVisible(key: string) {
-    const s = sections.find((s) => s.key === key)
-    return s ? s.visible : true
-  }
 
   if (!ownerMode) {
     if (farm.isPaused) {
