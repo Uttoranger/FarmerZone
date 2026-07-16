@@ -12,17 +12,19 @@ export function statusLabel(status: string): string {
   }
 }
 
+// Referenz-19-Farbwelt: Neu/wartet = Orange auf #FBEEE3 ·
+// In Arbeit/Bezahlt = Grün auf #E8F0E2 · Erledigt/neutral = #9AA08F auf #F0EDE5
 export function statusColor(status: string): string {
   switch (status) {
-    case 'PENDING_CONFIRMATION': return 'bg-amber-100 text-amber-800'
-    case 'PAID': return 'bg-blue-100 text-blue-800'
-    case 'CONFIRMED': return 'bg-blue-100 text-blue-800'
-    case 'IN_PREPARATION': return 'bg-purple-100 text-purple-800'
-    case 'READY': return 'bg-green-100 text-green-800'
-    case 'PICKED_UP': return 'bg-slate-100 text-slate-600'
+    case 'PENDING_CONFIRMATION': return 'bg-[#FBEEE3] text-[#E8854A]'
+    case 'PAID': return 'bg-[#E8F0E2] text-[#2D5F3F]'
+    case 'CONFIRMED': return 'bg-[#FBEEE3] text-[#E8854A]'
+    case 'IN_PREPARATION': return 'bg-[#E8F0E2] text-[#2D5F3F]'
+    case 'READY': return 'bg-[#F0EDE5] text-[#9AA08F]'
+    case 'PICKED_UP': return 'bg-[#F0EDE5] text-[#9AA08F]'
     case 'CANCELLED': return 'bg-red-100 text-red-700'
     case 'NOT_PICKED_UP': return 'bg-red-100 text-red-700'
-    default: return 'bg-slate-100 text-slate-600'
+    default: return 'bg-[#F0EDE5] text-[#9AA08F]'
   }
 }
 

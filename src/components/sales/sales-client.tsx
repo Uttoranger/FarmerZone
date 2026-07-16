@@ -1,7 +1,9 @@
 ﻿'use client'
 
-import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { useState, useTransition } from 'react'
+import { Plus, ExternalLink } from 'lucide-react'
+import { toast } from 'sonner'
+import { createStripeDashboardLinkAction } from '@/server/actions/stripe-connect'
 import { Button } from '@/components/ui/button'
 import type { ManualSaleData } from '@/server/queries/manual-sales'
 import type { ProductData } from '@/server/queries/products'
@@ -13,13 +15,38 @@ import { PageHeader } from '@/components/farmer/page-header'
 type Props = {
   recentSales: ManualSaleData[]
   products: ProductData[]
+  stripeReady: boolean
+}
+
+// Dezenter Link zur Auszahlungs-Übersicht im Stripe-Express-Dashboard
+function StripePayoutLink() {
+  const [isPending, startTransition] = useTransition()
+
+  return (
+    <button
+      type="button"
+      disabled={isPending}
+      onClick={() =>
+        startTransition(async () => {
+          const result = await createStripeDashboardLinkAction()
+          if (result.url) window.open(result.url, '_blank', 'noopener')
+          else toast.error(result.error ?? 'Stripe-Übersicht gerade nicht erreichbar')
+        })
+      }
+      className="inline-flex items-center gap-1.5 text-[13px] font-semibold transition-opacity hover:opacity-80 disabled:opacity-60"
+      style={{ color: '#2D5F3F' }}
+    >
+      <ExternalLink className="size-3.5" strokeWidth={1.7} />
+      {isPending ? 'Öffnet…' : 'Auszahlungen bei Stripe ansehen'}
+    </button>
+  )
 }
 
 function formatEuro(amount: number) {
   return new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(amount)
 }
 
-export function SalesClient({ recentSales, products }: Props) {
+export function SalesClient({ recentSales, products, stripeReady }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingSale, setEditingSale] = useState<ManualSaleData | null>(null)
   const [prefillSale, setPrefillSale] = useState<ManualSaleData | null>(null)
@@ -64,6 +91,12 @@ export function SalesClient({ recentSales, products }: Props) {
           </Button>
         }
       />
+
+      {stripeReady && (
+        <div className="-mt-3 mb-5">
+          <StripePayoutLink />
+        </div>
+      )}
 
       {/* Quick-repeat buttons */}
       {quickSales.length > 0 && (

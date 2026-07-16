@@ -309,3 +309,12 @@ export async function getFarmSettings(ownerId: string): Promise<FarmSettings | n
     },
   })
 }
+
+// Sprint 19: braucht die Verkauf-Seite für den Stripe-Auszahlungs-Link
+export async function getStripeReadiness(ownerId: string): Promise<boolean> {
+  const farm = await prisma.farm.findUnique({
+    where: { ownerId },
+    select: { stripeAccountReady: true },
+  })
+  return farm?.stripeAccountReady ?? false
+}

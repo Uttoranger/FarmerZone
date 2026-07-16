@@ -142,10 +142,10 @@ export function OrderCard({ order, farmName }: { order: FarmerOrder; farmName: s
               <Button
                 size="sm"
                 className="h-10 px-4"
-                onClick={() => handleWithUndo(markAsReady, 'Als bereit markiert', status)}
+                onClick={() => handleWithUndo(markAsReady, 'Fertig gemeldet — Kunde wird benachrichtigt', status)}
                 disabled={isPending}
               >
-                Bereit zur Abholung
+                Fertig melden
               </Button>
             )}
             {canMarkPickedUp && (

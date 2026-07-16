@@ -105,3 +105,23 @@ export async function checkConnectStatus(): Promise<{ ready: boolean; error?: st
   revalidatePath('/settings/payments')
   return { ready }
 }
+
+// Sprint 19 (Verkauf-Seite): Express-Dashboard-Login-Link für Auszahlungen.
+// Entscheidung gegen eine "Nächste Auszahlung"-Karte: Stripe hat keinen
+// Endpoint für KOMMENDE Auszahlungen (Payout-Objekte existieren erst nach
+// Erstellung); Betrag/Datum wären eine Schätzung aus Balance + Payout-Schedule.
+// Für Express-Konten ist der dokumentierte Weg der Login-Link ins
+// Express-Dashboard (POST /v1/accounts/{id}/login_link, nur für Express).
+export async function createStripeDashboardLinkAction(): Promise<{ url?: string; error?: string }> {
+  try {
+    const farm = await getAuthenticatedFarm()
+    if (!farm.stripeAccountId || !farm.stripeAccountReady) {
+      return { error: 'Stripe ist noch nicht eingerichtet' }
+    }
+    const link = await stripe.accounts.createLoginLink(farm.stripeAccountId)
+    return { url: link.url }
+  } catch (err) {
+    console.error('[Stripe] Login-Link fehlgeschlagen:', err)
+    return { error: 'Stripe-Übersicht gerade nicht erreichbar' }
+  }
+}

@@ -4,19 +4,10 @@ import { useState, useMemo } from 'react'
 import type { FarmerOrder } from '@/server/queries/orders'
 import { OrderCard } from './order-card'
 import { ACTIVE_STATUSES, DONE_STATUSES } from './order-status'
+import { groupOrdersByPickupDay } from '@/lib/order-groups'
+import { SegmentControl } from '@/components/farmer/segment-control'
 
 type Filter = 'active' | 'today' | 'all' | 'done'
-
-function formatGroupDate(date: Date): string {
-  const today = new Date()
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
-
-  const d = new Date(date)
-  if (d.toDateString() === today.toDateString()) return 'Heute'
-  if (d.toDateString() === tomorrow.toDateString()) return 'Morgen'
-  return d.toLocaleDateString('de-AT', { weekday: 'long', day: 'numeric', month: 'long' })
-}
 
 export function OrdersClient({
   orders,
@@ -46,15 +37,7 @@ export function OrdersClient({
     }
   }, [orders, filter, todayStr, activeSet, doneSet])
 
-  const grouped = useMemo(() => {
-    const map = new Map<string, FarmerOrder[]>()
-    for (const order of filtered) {
-      const key = new Date(order.pickupDate).toDateString()
-      if (!map.has(key)) map.set(key, [])
-      map.get(key)!.push(order)
-    }
-    return Array.from(map.values())
-  }, [filtered])
+  const grouped = useMemo(() => groupOrdersByPickupDay(filtered), [filtered])
 
   const counts = {
     active: orders.filter((o) => activeSet.includes(o.status)).length,
@@ -74,20 +57,8 @@ export function OrdersClient({
 
   return (
     <div>
-      <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setFilter(tab.key)}
-            className={`shrink-0 rounded-full px-4 py-2.5 text-sm font-medium transition-colors min-h-[44px] ${
-              filter === tab.key
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="mb-5 overflow-x-auto pb-1">
+        <SegmentControl options={tabs} value={filter} onChange={setFilter} className="w-fit" />
       </div>
 
       {grouped.length === 0 ? (
@@ -124,15 +95,18 @@ export function OrdersClient({
         </div>
       ) : (
         grouped.map((group) => (
-          <div key={group[0].pickupDate.toISOString()} className="mb-6">
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-              {formatGroupDate(group[0].pickupDate)}
-              <span className="ml-2 text-muted-foreground/60 normal-case font-normal tracking-normal">
-                {group[0].pickupTimeStart}–{group[group.length - 1].pickupTimeEnd} Uhr
+          <div key={group.key} className="mb-6">
+            <h2
+              className="text-[13px] font-bold uppercase mb-2.5"
+              style={{ color: '#8B6B4F', letterSpacing: '0.05em' }}
+            >
+              Abholung {group.label}
+              <span className="ml-2 normal-case font-normal tracking-normal" style={{ color: '#9AA08F' }}>
+                {group.orders[0].pickupTimeStart}–{group.orders[group.orders.length - 1].pickupTimeEnd} Uhr
               </span>
             </h2>
             <div className="flex flex-col gap-3">
-              {group.map((order) => (
+              {group.orders.map((order) => (
                 <OrderCard key={order.id} order={order} farmName={farmName} />
               ))}
             </div>

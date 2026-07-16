@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { SegmentControl } from '@/components/farmer/segment-control'
 import { TrendingUp, TrendingDown, Minus, Lightbulb, Package } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -54,28 +55,14 @@ export function AnalyticsDashboard({ data, currentPeriod }: Props) {
     <div className="space-y-6">
 
       {/* Period selector */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
-        {PERIODS.map((p) => (
-          <button
-            key={p.key}
-            onClick={() => setPeriod(p.key)}
-            className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              currentPeriod === p.key
-                ? 'bg-white shadow text-slate-800'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
+      <SegmentControl options={PERIODS} value={currentPeriod} onChange={setPeriod} />
 
       {/* Total revenue card */}
       <Card>
         <CardContent className="pt-5 pb-5">
-          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Gesamtumsatz</p>
+          <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Gesamtumsatz</p>
           <div className="flex items-end gap-3 flex-wrap">
-            <span className="text-4xl font-semibold text-slate-800 tabular-nums">
+            <span className="font-heading text-4xl font-bold text-foreground tabular-nums">
               {formatEuro(totalRevenue)}
             </span>
             {changePercent !== null && (
@@ -85,7 +72,7 @@ export function AnalyticsDashboard({ data, currentPeriod }: Props) {
                     ? 'text-green-600'
                     : changePercent < 0
                     ? 'text-red-500'
-                    : 'text-slate-400'
+                    : 'text-muted-foreground/70'
                 }`}
               >
                 {changePercent > 2 ? (
@@ -97,7 +84,7 @@ export function AnalyticsDashboard({ data, currentPeriod }: Props) {
                 )}
                 {changePercent > 0 ? '+' : ''}
                 {changePercent.toFixed(1)} %
-                <span className="text-slate-400 font-normal">vs. Vorperiode</span>
+                <span className="text-muted-foreground/70 font-normal">vs. Vorperiode</span>
               </div>
             )}
           </div>
@@ -108,7 +95,7 @@ export function AnalyticsDashboard({ data, currentPeriod }: Props) {
       {channelRevenue.length > 0 ? (
         <Card>
           <CardContent className="pt-5 pb-4">
-            <p className="text-xs text-slate-500 uppercase tracking-wide mb-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-4">
               Umsatz nach Kanal
             </p>
             <ResponsiveContainer width="100%" height={Math.max(160, channelRevenue.length * 44)}>
@@ -151,7 +138,7 @@ export function AnalyticsDashboard({ data, currentPeriod }: Props) {
         </Card>
       ) : (
         <Card>
-          <CardContent className="py-8 text-center text-slate-400">
+          <CardContent className="py-8 text-center text-muted-foreground/70">
             <p className="text-sm">Noch keine Verkäufe in diesem Zeitraum</p>
           </CardContent>
         </Card>
@@ -161,25 +148,25 @@ export function AnalyticsDashboard({ data, currentPeriod }: Props) {
       {topProducts.length > 0 && (
         <Card>
           <CardContent className="pt-5 pb-4">
-            <p className="text-xs text-slate-500 uppercase tracking-wide mb-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-4">
               Top-Produkte
             </p>
             <div className="space-y-3">
               {topProducts.map((p, i) => (
                 <div key={i} className="flex items-center gap-3">
-                  <span className="text-xs text-slate-400 w-4 text-right shrink-0">{i + 1}</span>
+                  <span className="text-xs text-muted-foreground/70 w-4 text-right shrink-0">{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium text-slate-700 truncate pr-2">
                         {p.productName}
                       </span>
-                      <span className="text-sm font-semibold text-slate-800 shrink-0 tabular-nums">
+                      <span className="text-sm font-semibold text-foreground shrink-0 tabular-nums">
                         {formatEuro(p.totalAmount)}
                       </span>
                     </div>
-                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-1.5 bg-[#F0EDE5] rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-green-500 rounded-full transition-all"
+                        className="h-full bg-[#7BAE85] rounded-full transition-all"
                         style={{
                           width: `${Math.round((p.totalAmount / maxProductAmount) * 100)}%`,
                         }}
@@ -195,9 +182,9 @@ export function AnalyticsDashboard({ data, currentPeriod }: Props) {
 
       {/* Insight box */}
       {insight && (
-        <div className="flex gap-3 p-4 bg-amber-50 rounded-xl border border-amber-100">
+        <div className="flex gap-3 p-4 bg-[#F2ECDC] rounded-xl border border-amber-100">
           <Lightbulb className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-          <p className="text-sm text-amber-900">{insight}</p>
+          <p className="text-sm text-[#6E5F45]">{insight}</p>
         </div>
       )}
 
@@ -206,7 +193,7 @@ export function AnalyticsDashboard({ data, currentPeriod }: Props) {
         <div className="text-center py-12">
           <div className="text-4xl mb-3">📊</div>
           <p className="font-medium text-slate-700 mb-1">Noch keine Verkaufsdaten</p>
-          <p className="text-sm text-slate-400 max-w-xs mx-auto leading-relaxed">
+          <p className="text-sm text-muted-foreground/70 max-w-xs mx-auto leading-relaxed">
             Sobald Bestellungen abgewickelt oder Direktverkäufe eingetragen werden,
             erscheinen hier deine Auswertungen.
           </p>

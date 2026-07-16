@@ -1,4 +1,10 @@
 import { prisma } from '@/lib/prisma'
+import {
+  LOW_STOCK_THRESHOLD,
+  buildLowStockHint,
+  statusReminder,
+  countUniqueCustomers,
+} from '@/lib/dashboard-hints'
 import { startOfWeek, endOfWeek, subWeeks } from 'date-fns'
 
 export async function getDashboardStats(farmId: string) {
@@ -22,6 +28,9 @@ export async function getDashboardStats(farmId: string) {
     plattformUmsatzPrevWoche,
     manuelleVerkaufePrevWoche,
     bestellungenWocheCount,
+    kundenRows,
+    lowStockProducts,
+    lastStatus,
   ] = await Promise.all([
     prisma.order.count({
       where: {
@@ -93,6 +102,24 @@ export async function getDashboardStats(farmId: string) {
         createdAt: { gte: wochenStart, lte: wochenEnde },
       },
     }),
+    // Kunden gesamt = eindeutige Kunden-E-Mails über alle Bestellungen
+    prisma.order.findMany({
+      where: { farmId },
+      distinct: ['customerEmail'],
+      select: { customerEmail: true },
+    }),
+    // Lager-Warnung: verfügbare Produkte an/unter der Low-Stock-Schwelle
+    prisma.product.findMany({
+      where: { farmId, isAvailable: true, stock: { lte: LOW_STOCK_THRESHOLD } },
+      select: { name: true, stock: true },
+      orderBy: { stock: 'asc' },
+    }),
+    // Status-Erinnerung: letzter veröffentlichter Status
+    prisma.statusPost.findFirst({
+      where: { farmId, publishedAt: { not: null } },
+      orderBy: { publishedAt: 'desc' },
+      select: { publishedAt: true },
+    }),
   ])
 
   const umsatzWoche =
@@ -116,6 +143,9 @@ export async function getDashboardStats(farmId: string) {
     umsatzPrevWoche,
     umsatzChangePercent,
     bestellungenWocheCount,
+    kundenGesamt: countUniqueCustomers(kundenRows),
+    lowStockHint: buildLowStockHint(lowStockProducts),
+    statusReminder: statusReminder(lastStatus?.publishedAt ?? null),
   }
 }
 

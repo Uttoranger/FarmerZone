@@ -12,6 +12,7 @@ import {
   PlusCircle,
   BarChart2,
   AlertTriangle,
+  Leaf,
   ExternalLink,
   Printer,
   TrendingUp,
@@ -45,7 +46,9 @@ export default async function DashboardPage() {
     aktivProdukte,
     umsatzWoche,
     umsatzChangePercent,
-    bestellungenWocheCount,
+    kundenGesamt,
+    lowStockHint,
+    statusReminder,
   } = await getDashboardStats(farm.id)
 
   const vorname = session.user.name?.split(' ')[0] ?? 'Hallo'
@@ -70,12 +73,25 @@ export default async function DashboardPage() {
 
   return (
     <div className="px-4 py-8 max-w-2xl mx-auto">
-      {/* Begrüßung + Datum */}
-      <div className="mb-8">
-        <h1 className="font-heading text-2xl font-semibold text-foreground">
-          {gruss}, {vorname}! 👋
-        </h1>
-        <p className="text-muted-foreground text-sm mt-1 capitalize">{todayLabel()}</p>
+      {/* Begrüßung + Titel + CTA (Referenz 19) */}
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm" style={{ color: '#9AA08F' }}>
+            {gruss}, {vorname}
+          </p>
+          <h1 className="font-heading text-[27px] font-semibold text-foreground mt-0.5">
+            Übersicht
+          </h1>
+          <p className="text-muted-foreground text-sm mt-0.5 capitalize">{todayLabel()}</p>
+        </div>
+        <Link
+          href="/products"
+          className="shrink-0 inline-flex items-center gap-1.5 h-11 px-5 rounded-lg bg-accent text-accent-foreground text-sm font-semibold hover:bg-accent-hover transition-colors"
+          style={{ boxShadow: '0 4px 14px rgba(232,133,74,0.3)' }}
+        >
+          <PlusCircle className="size-4" />
+          Produkt anlegen
+        </Link>
       </div>
 
       {/* ── Tages-Aufgabe ─────────────────────────────────────────── */}
@@ -140,21 +156,38 @@ export default async function DashboardPage() {
         </Alert>
       )}
 
-      {/* ── Woche-Statistik ───────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 mb-8">
+      {/* ── Kennzahlen (Referenz 19: 4 Karten, Wert Fraunces 28) ──── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <Card>
           <CardContent className="pt-5 pb-5">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-              Umsatz diese Woche
+            <p className="text-[13px] font-medium" style={{ color: '#9AA08F' }}>
+              Neue Bestellungen
             </p>
-            <div className="font-heading text-2xl font-semibold text-foreground">
+            <div className="font-heading text-[28px] font-bold text-foreground mt-1.5">
+              {offeneBestellungen}
+            </div>
+            <div
+              className="text-xs font-semibold mt-1"
+              style={{ color: offeneBestellungen > 0 ? '#E8854A' : '#9AA08F' }}
+            >
+              {offeneBestellungen > 0 ? 'warten auf dich' : 'nichts offen'}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-5 pb-5">
+            <p className="text-[13px] font-medium" style={{ color: '#9AA08F' }}>
+              Umsatz Woche
+            </p>
+            <div className="font-heading text-[28px] font-bold text-foreground mt-1.5">
               {formatEuro(umsatzWoche)}
             </div>
             {umsatzChangePercent !== null && (
               <div
-                className={`flex items-center gap-1 text-xs mt-1 font-medium ${
+                className={`flex items-center gap-1 text-xs mt-1 font-semibold ${
                   umsatzChangePercent > 0
-                    ? 'text-green-600'
+                    ? 'text-primary'
                     : umsatzChangePercent < 0
                     ? 'text-destructive'
                     : 'text-muted-foreground'
@@ -168,7 +201,7 @@ export default async function DashboardPage() {
                   <Minus className="w-3.5 h-3.5" />
                 )}
                 {umsatzChangePercent > 0 ? '+' : ''}
-                {umsatzChangePercent} % vs. Vorwoche
+                {umsatzChangePercent} % zur Vorwoche
               </div>
             )}
           </CardContent>
@@ -176,20 +209,86 @@ export default async function DashboardPage() {
 
         <Card>
           <CardContent className="pt-5 pb-5">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-              Bestellungen diese Woche
+            <p className="text-[13px] font-medium" style={{ color: '#9AA08F' }}>
+              Aktive Produkte
             </p>
-            <div className="font-heading text-2xl font-semibold text-foreground">
-              {bestellungenWocheCount}
+            <div className="font-heading text-[28px] font-bold text-foreground mt-1.5">
+              {aktivProdukte}
             </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              {offeneBestellungen > 0
-                ? `${offeneBestellungen} noch offen`
-                : 'Alle erledigt'}
+            <div
+              className="text-xs font-semibold mt-1"
+              style={{ color: lowStockHint ? '#E8854A' : '#9AA08F' }}
+            >
+              {lowStockHint ? 'Lager wird knapp' : 'im Shop sichtbar'}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-5 pb-5">
+            <p className="text-[13px] font-medium" style={{ color: '#9AA08F' }}>
+              Kunden gesamt
+            </p>
+            <div className="font-heading text-[28px] font-bold text-foreground mt-1.5">
+              {kundenGesamt}
+            </div>
+            <div className="text-xs mt-1" style={{ color: '#9AA08F' }}>
+              haben bei dir bestellt
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* ── Hinweiskarten (nur wenn zutreffend) ───────────────────── */}
+      {(lowStockHint || statusReminder !== null) && (
+        <div className="flex flex-col md:flex-row gap-3 mb-8">
+          {lowStockHint && (
+            <Card className="flex-1">
+              <CardContent className="py-4 flex items-center gap-3">
+                <span
+                  className="flex size-10 shrink-0 items-center justify-center rounded-[10px]"
+                  style={{ background: '#FBEEE3', color: '#E8854A' }}
+                >
+                  <AlertTriangle className="size-4.5" strokeWidth={1.7} />
+                </span>
+                <p className="flex-1 text-sm text-foreground">{lowStockHint}</p>
+                <Link
+                  href="/products"
+                  className="shrink-0 rounded-lg border px-3.5 py-2 text-[13px] font-semibold transition-colors hover:bg-muted/40"
+                  style={{ borderColor: '#D6E0CE', color: '#2D5F3F' }}
+                >
+                  Lager auffüllen
+                </Link>
+              </CardContent>
+            </Card>
+          )}
+          {statusReminder !== null && (
+            <Card className="flex-1">
+              <CardContent className="py-4 flex items-center gap-3">
+                <span
+                  className="flex size-10 shrink-0 items-center justify-center rounded-[10px]"
+                  style={{ background: '#E8F0E2', color: '#2D5F3F' }}
+                >
+                  <Leaf className="size-4.5" strokeWidth={1.7} />
+                </span>
+                <p className="flex-1 text-sm text-foreground">
+                  {statusReminder === 'never'
+                    ? 'Noch kein Status veröffentlicht'
+                    : `Dein letzter Status ist ${statusReminder} Tage her`}
+                  <span style={{ color: '#9AA08F' }}> — Zeit für Neuigkeiten?</span>
+                </p>
+                <Link
+                  href="/status/new"
+                  className="shrink-0 rounded-lg border px-3.5 py-2 text-[13px] font-semibold transition-colors hover:bg-muted/40"
+                  style={{ borderColor: '#D6E0CE', color: '#2D5F3F' }}
+                >
+                  Status schreiben
+                </Link>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* ── Hauptaktionen ─────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 mb-8">

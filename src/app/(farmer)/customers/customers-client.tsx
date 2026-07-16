@@ -25,17 +25,17 @@ function initials(name: string): string {
 }
 
 function avatarClass(c: CustomerSummary): string {
-  if (c.isStammkunde) return 'bg-green-100 text-green-800'
-  if (c.isLangeNichtGesehen) return 'bg-amber-100 text-amber-800'
-  return 'bg-slate-100 text-slate-600'
+  if (c.isStammkunde) return 'bg-[#E8F0E2] text-[#2D5F3F]'
+  if (c.isLangeNichtGesehen) return 'bg-[#F2ECDC] text-[#6E5F45]'
+  return 'bg-[#F0EDE5] text-[#9AA08F]'
 }
 
 function statusBadgeClass(status: CustomerStatus): string {
   switch (status) {
-    case 'Stammkunde': return 'bg-green-100 text-green-800'
-    case 'Diesen Monat aktiv': return 'bg-blue-100 text-blue-800'
-    case 'Lange nicht gesehen': return 'bg-amber-100 text-amber-800'
-    case 'Neu': return 'bg-purple-100 text-purple-800'
+    case 'Stammkunde': return 'bg-[#E8F0E2] text-[#2D5F3F]'
+    case 'Diesen Monat aktiv': return 'bg-[#E8F0E2] text-[#2D5F3F]'
+    case 'Lange nicht gesehen': return 'bg-[#F2ECDC] text-[#6E5F45]'
+    case 'Neu': return 'bg-[#FBEEE3] text-[#E8854A]'
     default: return ''
   }
 }
@@ -277,14 +277,14 @@ export function CustomersClient({ customers }: { customers: CustomerSummary[] })
       {/* Insight box */}
       {counts.lange >= 3 && (
         <div className="mt-6 rounded-xl bg-amber-50 border border-amber-200 p-4">
-          <p className="text-sm font-semibold text-amber-800 mb-1">Tipp</p>
+          <p className="text-sm font-semibold text-[#6E5F45] mb-1">Tipp</p>
           <p className="text-sm text-amber-700">
             {counts.lange} Kunden haben länger nicht bestellt. Eine kurze WhatsApp könnte
             sie zurückholen.
           </p>
           <button
             onClick={() => setFilter('lange')}
-            className="mt-3 text-xs font-semibold text-amber-800 hover:underline underline-offset-2"
+            className="mt-3 text-xs font-semibold text-[#6E5F45] hover:underline underline-offset-2"
           >
             Diese Kunden ansehen →
           </button>
