@@ -26,9 +26,11 @@ describe('categoryImagePath', () => {
     expect(categoryImagePath(undefined)).toBeNull()
   })
 
-  it('prüft gegen das echte Dateisystem: ohne public/categories/ kommt null', () => {
-    // Stand Sprint 17K existiert das Verzeichnis bewusst noch nicht
-    expect(categoryImagePath('MILCH')).toBeNull()
+  it('prüft gegen das echte Dateisystem: vorhandene Assets liefern den Pfad, fehlende null', () => {
+    // Seit dem Illustrationen-Commit existieren die 5 Kern-Assets …
+    expect(categoryImagePath('MILCH')).toBe('/categories/milch.webp')
+    // … die übrigen Kategorien (z. B. Gemüse) bewusst noch nicht
+    expect(categoryImagePath('GEMUESE')).toBeNull()
   })
 
   it('fragt die Existenz mit dem relativen public-Pfad ab', () => {

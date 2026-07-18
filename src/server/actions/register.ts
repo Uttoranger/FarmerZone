@@ -1,18 +1,9 @@
 'use server'
 
-import { z } from 'zod'
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { validatePassword, PASSWORD_SCHEMA_MESSAGE } from '@/lib/password-rules'
-
-const registrationSchema = z.object({
-  email: z.string().email('Ungültige E-Mail-Adresse.'),
-  password: z.string().refine((pw) => validatePassword(pw).valid, {
-    message: PASSWORD_SCHEMA_MESSAGE,
-  }),
-  name: z.string().min(2, 'Name muss mindestens 2 Zeichen haben.'),
-})
+import { registrationSchema } from '@/schemas/register'
 
 // Single server action for the full registration flow:
 // invite code → Zod validation → auth.api.signUpEmail (sets cookie via nextCookies()) → FARMER role

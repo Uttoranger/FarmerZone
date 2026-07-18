@@ -25,11 +25,11 @@ export default function RegisterPage() {
   const [fehler, setFehler] = useState('')
   const [laedt, setLaedt] = useState(false)
 
-  const [passwordFocused, setPasswordFocused] = useState(false)
   const [passwordTouched, setPasswordTouched] = useState(false)
 
   const { valid: pwValid, checks } = validatePassword(password)
-  const showChecklist = passwordFocused || password.length > 0
+  // Regeln von Anfang an sichtbar (nicht erst bei Fokus/Eingabe)
+  const showChecklist = true
   const pwHasError = passwordTouched && !pwValid
   const confirmHasError =
     password.length > 0 && passwordConfirm.length > 0 && password !== passwordConfirm
@@ -158,11 +158,7 @@ export default function RegisterPage() {
                 aria-invalid={pwHasError || undefined}
                 aria-describedby="password-checklist"
                 className="h-11 text-base"
-                onFocus={() => setPasswordFocused(true)}
-                onBlur={() => {
-                  setPasswordFocused(false)
-                  setPasswordTouched(true)
-                }}
+                onBlur={() => setPasswordTouched(true)}
               />
 
               {showChecklist && (
