@@ -32,7 +32,9 @@ export default async function FarmerLayout({ children }: { children: React.React
           ordersBadge={openOrdersCount > 0 ? openOrdersCount : undefined}
         />
 
-        <main className="flex-1 pb-24 md:pb-0 md:ml-56">
+        {/* min-w-0: als Flex-Item darf main nicht mit breitem Inhalt über den
+            Viewport wachsen — sonst greift kein overflow-x-auto der Kinder */}
+        <main className="flex-1 min-w-0 pb-24 md:pb-0 md:ml-56">
           <ShopLinkBanner farmSlug={farm.slug} />
           {children}
         </main>

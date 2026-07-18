@@ -57,8 +57,8 @@ export function OrdersClient({
 
   return (
     <div>
-      <div className="mb-5 overflow-x-auto pb-1">
-        <SegmentControl options={tabs} value={filter} onChange={setFilter} className="w-fit" />
+      <div className="mb-5">
+        <SegmentControl options={tabs} value={filter} onChange={setFilter} className="md:w-fit" />
       </div>
 
       {grouped.length === 0 ? (
