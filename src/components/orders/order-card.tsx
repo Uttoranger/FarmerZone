@@ -79,14 +79,14 @@ export function OrderCard({ order, farmName }: { order: FarmerOrder; farmName: s
       <Card className={isPending ? 'opacity-60 pointer-events-none' : ''}>
         <CardContent className="py-4 px-4">
           <div className="flex items-start justify-between gap-2 mb-2">
-            <div>
+            <div className="min-w-0">
               <Link
                 href={`/orders/${order.id}`}
                 className="text-xs text-muted-foreground hover:text-foreground font-mono"
               >
                 {order.orderNumber}
               </Link>
-              <div className="font-medium text-foreground">{order.customerName}</div>
+              <div className="font-medium text-foreground truncate">{order.customerName}</div>
               <div className="flex items-center gap-2">
                 <a
                   href={`tel:${order.customerPhone}`}
