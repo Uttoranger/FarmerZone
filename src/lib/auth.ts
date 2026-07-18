@@ -11,6 +11,9 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
+    // Better-Auth-Default, jetzt sichtbar konfiguriert — muss zur Zod-Regel
+    // min(8) in src/schemas/register.ts und zur Checkliste (password-rules) passen
+    minPasswordLength: 8,
   },
 
   plugins: [
