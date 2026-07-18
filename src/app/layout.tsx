@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Geist, Fraunces } from 'next/font/google'
 import { Toaster } from '@/components/ui/sonner'
 import { CookieBanner } from '@/components/cookie-banner'
@@ -21,6 +21,8 @@ export const metadata: Metadata = {
   title: 'FarmerZone',
   description: 'Regionale Lebensmittel direkt vom Bauern',
 }
+
+export const viewport: Viewport = { width: 'device-width', initialScale: 1 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
