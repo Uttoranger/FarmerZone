@@ -37,6 +37,30 @@ export default function HomePage() {
       className="min-h-screen flex flex-col"
       style={{ background: 'linear-gradient(160deg, #F4EFE6 0%, #E8F0E8 55%, #FAFAF7 100%)' }}
     >
+      {/* Schlanke Kopfzeile: Login ohne Scrollen erreichbar (einzeilig auf allen Breiten) */}
+      <header className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3">
+        <Link href="/" className="flex items-center gap-2 min-w-0">
+          <svg width="32" height="32" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle cx="40" cy="40" r="40" fill="#E8F0E8" />
+            <path
+              d="M40 64 C40 64 22 53 22 35 C22 24 30 16 40 16 C50 16 58 24 58 35 C58 53 40 64 40 64Z"
+              fill="#2D5F3F"
+            />
+            <path d="M40 64 L40 44" stroke="#7BAE85" strokeWidth="2.5" strokeLinecap="round" />
+          </svg>
+          <span className="font-heading text-lg font-bold whitespace-nowrap" style={{ color: '#2D5F3F' }}>
+            FarmerZone
+          </span>
+        </Link>
+        <Link
+          href="/login"
+          className="shrink-0 whitespace-nowrap rounded-lg border px-3.5 py-2 text-[13px] font-semibold transition-colors hover:bg-white"
+          style={{ borderColor: '#D6E0CE', color: '#2D5F3F', background: 'rgba(255,255,255,0.6)' }}
+        >
+          Hofbetreiber-Login
+        </Link>
+      </header>
+
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-16 text-center">
 
         {/* Organic leaf SVG */}
