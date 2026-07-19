@@ -38,6 +38,10 @@ interface Props {
   whatsAppCount: number
   recentEmailSentAt: string | null
   farmSlug: string
+  // Vorlage-Muster (nachlese-6): Alt-Status als Startwerte — danach verhält
+  // sich der Wizard exakt wie eine neue Erstellung (neuer Status, heutiges
+  // Datum, normale Mail-Logik, Frequenzschutz unverändert)
+  prefill?: { anlass: string; title: string; body: string; photoUrl: string | null } | null
 }
 
 // ── Visual stepper ──────────────────────────────────────────────────────────
@@ -82,16 +86,20 @@ function Stepper({ step }: { step: number }) {
   )
 }
 
-export function StatusNewClient({ products, emailCount, whatsAppCount, recentEmailSentAt }: Props) {
+export function StatusNewClient({ products, emailCount, whatsAppCount, recentEmailSentAt, prefill }: Props) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [step, setStep] = useState(1)
 
-  // Form state
-  const [anlass, setAnlass] = useState<Anlass>('FRESH_PRODUCT')
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  // Form state — Startwerte aus der Vorlage (?from=…), sonst leer
+  const [anlass, setAnlass] = useState<Anlass>(
+    prefill && ['FRESH_PRODUCT', 'NEW_SEASON', 'PROMOTION', 'ANNOUNCEMENT'].includes(prefill.anlass)
+      ? (prefill.anlass as Anlass)
+      : 'FRESH_PRODUCT'
+  )
+  const [title, setTitle] = useState(prefill?.title ?? '')
+  const [body, setBody] = useState(prefill?.body ?? '')
+  const [photoUrl, setPhotoUrl] = useState<string | null>(prefill?.photoUrl ?? null)
   const [linkedProductIds, setLinkedProductIds] = useState<string[]>([])
 
   const photoUpload = useImageUpload({
