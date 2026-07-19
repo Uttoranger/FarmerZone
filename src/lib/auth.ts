@@ -3,10 +3,23 @@ import { prismaAdapter } from 'better-auth/adapters/prisma'
 import { magicLink } from 'better-auth/plugins'
 import { prisma } from '@/lib/prisma'
 
+// Franz-tauglich: 10 Login-Versuche pro Minute pro IP sperren keinen echten
+// Nutzer aus (auch nicht bei Tippfehlern), bremsen aber Passwort-Rater.
+// Better-Auth wendet das Limit auf alle /api/auth/*-Endpunkte an.
+const AUTH_RATE_LIMIT_WINDOW_SECONDS = 60
+const AUTH_RATE_LIMIT_MAX = 10
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
   }),
+
+  rateLimit: {
+    // nur in Produktion — lokales pnpm dev bleibt ungebremst
+    enabled: process.env.NODE_ENV === 'production',
+    window: AUTH_RATE_LIMIT_WINDOW_SECONDS,
+    max: AUTH_RATE_LIMIT_MAX,
+  },
 
   emailAndPassword: {
     enabled: true,

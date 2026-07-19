@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { enforceRateLimit } from '@/lib/rate-limit'
 import { nanoid } from 'nanoid'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
@@ -25,6 +26,9 @@ function generateOrderNumber(farmSlug: string): string {
 
 
 export async function POST(request: NextRequest) {
+  const limited = enforceRateLimit('checkout', request)
+  if (limited) return limited
+
   let body: unknown
   try {
     body = await request.json()
