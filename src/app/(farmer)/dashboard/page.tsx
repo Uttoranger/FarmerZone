@@ -148,7 +148,7 @@ export default async function DashboardPage() {
       ) : (
         <Alert className="mb-6 border-border bg-muted/30">
           <AlertDescription className="text-muted-foreground">
-            Heute keine Abholungen geplant. Schöner Tag! ☀️{' '}
+            Heute keine Abholungen geplant.{' '}
             <span className="block text-xs mt-0.5">
               Teile deinen Shop-Link, um neue Kunden zu erreichen.
             </span>

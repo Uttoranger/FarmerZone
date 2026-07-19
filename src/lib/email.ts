@@ -11,6 +11,7 @@ import { OrderCancelledEmail } from '@/emails/order-cancelled'
 import { CustomerMagicLinkEmail } from '@/emails/customer-magic-link'
 import { StatusUpdateEmail } from '@/emails/status-update'
 import { generateReorderToken } from '@/lib/reorder-token'
+import { unitSuffix, type OrderLineProduct } from '@/lib/order-line'
 
 const apiKey = process.env.RESEND_API_KEY
 const resend = apiKey ? new Resend(apiKey) : null
@@ -85,7 +86,16 @@ export type OrderForEmail = {
     quantity: number
     unitPrice: { toString(): string } | number
     totalPrice?: { toString(): string } | number
+    // Einheit optional zur Anzeige gejoint (formatOrderLine-Schreibweise);
+    // fehlt sie, bleibt die Darstellung wie bisher
+    product?: OrderLineProduct
   }>
+}
+
+// "Heumilch frisch (1 l)" — dieselbe Schreibweise wie auf allen Bestellseiten
+function nameWithUnit(i: { productName: string; product?: OrderLineProduct }): string {
+  const suffix = unitSuffix(i.product)
+  return suffix ? `${i.productName} (${suffix})` : i.productName
 }
 
 function n(v: { toString(): string } | number): number {
@@ -115,7 +125,7 @@ export async function sendOrderConfirmation(order: OrderForEmail): Promise<void>
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     items: order.items.map(i => ({
-      name: i.productName,
+      name: nameWithUnit(i),
       quantity: i.quantity,
       unitPrice: n(i.unitPrice),
     })),
@@ -147,7 +157,7 @@ export async function sendOnsiteConfirmation(
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     items: order.items.map(i => ({
-      name: i.productName,
+      name: nameWithUnit(i),
       quantity: i.quantity,
       unitPrice: n(i.unitPrice),
     })),
@@ -171,7 +181,7 @@ export async function sendOrderPaidToFarmer(order: OrderForEmail): Promise<void>
     orderNumber: order.orderNumber,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
-    items: order.items.map(i => ({ name: i.productName, quantity: i.quantity })),
+    items: order.items.map(i => ({ name: nameWithUnit(i), quantity: i.quantity })),
     total: n(order.totalAmount),
     paymentLabel: 'Online (bereits bezahlt)',
     isOnline: true,
@@ -197,7 +207,7 @@ export async function sendOrderConfirmedToFarmer(order: OrderForEmail): Promise<
     orderNumber: order.orderNumber,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
-    items: order.items.map(i => ({ name: i.productName, quantity: i.quantity })),
+    items: order.items.map(i => ({ name: nameWithUnit(i), quantity: i.quantity })),
     total: n(order.totalAmount),
     dashboardUrl: `${APP_URL}/orders`,
   }))
