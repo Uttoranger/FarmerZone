@@ -6,6 +6,7 @@ import { getFarmForUser } from '@/server/queries/dashboard'
 import { getOrderDetail } from '@/server/queries/orders'
 import { OrderActions } from '@/components/orders/order-actions'
 import { statusLabel, statusColor, paymentLabel } from '@/components/orders/order-status'
+import { formatOrderLine } from '@/lib/order-line'
 import { Card, CardContent } from '@/components/ui/card'
 import { ArrowLeft, Printer } from 'lucide-react'
 
@@ -110,7 +111,7 @@ export default async function OrderDetailPage({
               {order.items.map((item) => (
                 <div key={item.id} className="flex justify-between text-sm">
                   <span className="text-slate-700">
-                    {item.quantity}× {item.productName}
+                    {formatOrderLine(item, item.product)}
                   </span>
                   <span className="text-slate-800 font-medium">
                     € {Number(item.totalPrice).toFixed(2)}

@@ -20,6 +20,8 @@ export async function GET(
       items: {
         select: {
           productName: true, quantity: true, unitPrice: true, totalPrice: true,
+          // Einheit nur für die E-Mail-Anzeige gejoint
+          product: { select: { unit: true, unitSize: true } },
         },
       },
     },

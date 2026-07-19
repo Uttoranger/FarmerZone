@@ -73,10 +73,13 @@ export async function POST(request: NextRequest) {
   // 3. Stock check — pessimistic: check stock minus other sessions' reservations
   const now = new Date()
 
+  // Einheiten fürs E-Mail-Format merken (formatOrderLine-Schreibweise)
+  const unitByProductId = new Map<string, { unit: string; unitSize: number | null }>()
+
   for (const item of data.items) {
     const product = await prisma.product.findUnique({
       where: { id: item.productId },
-      select: { id: true, stock: true, isAvailable: true, name: true },
+      select: { id: true, stock: true, isAvailable: true, name: true, unit: true, unitSize: true },
     })
     if (!product || !product.isAvailable) {
       return NextResponse.json(
@@ -84,6 +87,11 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       )
     }
+
+    unitByProductId.set(product.id, {
+      unit: product.unit,
+      unitSize: product.unitSize == null ? null : Number(product.unitSize),
+    })
 
     const otherRes = await prisma.stockReservation.aggregate({
       where: {
@@ -273,6 +281,7 @@ export async function POST(request: NextRequest) {
         quantity: i.quantity,
         unitPrice: i.unitPrice,
         totalPrice: i.unitPrice * i.quantity,
+        product: unitByProductId.get(i.productId) ?? null,
       })),
     },
     confirmationToken

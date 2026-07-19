@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { CheckCircle, Clock, XCircle, MapPin, Calendar, Package } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
+import { formatOrderLine } from '@/lib/order-line'
 import { ClearCartOnMount } from '@/components/checkout/clear-cart-on-mount'
 
 interface Props {
@@ -39,6 +40,8 @@ async function getOrder(orderId: string) {
           quantity: true,
           unitPrice: true,
           totalPrice: true,
+          // Einheit nur zur Anzeige gejoint — kein Schema-Change
+          product: { select: { unit: true, unitSize: true } },
         },
       },
     },
@@ -171,7 +174,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
             {order.items.map((item, i) => (
               <div key={i} className="flex justify-between text-sm">
                 <span className="text-foreground">
-                  {item.quantity} × {item.productName}
+                  {formatOrderLine(item, item.product)}
                 </span>
                 <span className="text-foreground">{formatEuro(Number(item.totalPrice))}</span>
               </div>

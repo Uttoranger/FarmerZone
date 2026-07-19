@@ -23,6 +23,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { statusLabel, statusColor, paymentLabel } from './order-status'
+import { formatOrderLine } from '@/lib/order-line'
 
 export function OrderCard({ order, farmName }: { order: FarmerOrder; farmName: string }) {
   const [isPending, startTransition] = useTransition()
@@ -136,7 +137,7 @@ export function OrderCard({ order, farmName }: { order: FarmerOrder; farmName: s
           </div>
 
           <div className="text-sm text-muted-foreground mb-1">
-            {order.items.map((i) => `${i.quantity}× ${i.productName}`).join(', ')}
+            {order.items.map((i) => formatOrderLine(i, i.product)).join(', ')}
           </div>
           <div className="text-sm font-semibold text-foreground mb-3">
             € {Number(order.totalAmount).toFixed(2)}

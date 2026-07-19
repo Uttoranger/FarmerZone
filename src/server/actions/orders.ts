@@ -40,6 +40,7 @@ type DbOrder = {
     quantity: number
     unitPrice: { toString(): string }
     totalPrice: { toString(): string }
+    product?: { unit: string; unitSize: { toString(): string } | null } | null
   }>
 }
 
@@ -67,6 +68,7 @@ function toEmailOrder(order: DbOrder, farm: FarmInfo): OrderForEmail {
       quantity: i.quantity,
       unitPrice: i.unitPrice,
       totalPrice: i.totalPrice,
+      product: i.product ?? null,
     })),
   }
 }
@@ -92,6 +94,8 @@ const ORDER_EMAIL_SELECT = {
       quantity: true,
       unitPrice: true,
       totalPrice: true,
+      // Einheit nur für die E-Mail-Anzeige gejoint
+      product: { select: { unit: true, unitSize: true } },
     },
   },
 } as const

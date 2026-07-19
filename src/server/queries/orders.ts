@@ -9,6 +9,8 @@ const ORDER_INCLUDE = {
       quantity: true,
       unitPrice: true,
       totalPrice: true,
+      // Einheit nur zur Anzeige gejoint (formatOrderLine) — kein Schema-Change
+      product: { select: { unit: true, unitSize: true } },
     },
   },
 } as const
@@ -24,6 +26,10 @@ function serialize(order: RawOrder) {
       ...i,
       unitPrice: Number(i.unitPrice),
       totalPrice: Number(i.totalPrice),
+      // Decimal → number, sonst nicht über die RSC-Grenze serialisierbar
+      product: i.product
+        ? { unit: i.product.unit, unitSize: i.product.unitSize == null ? null : Number(i.product.unitSize) }
+        : null,
     })),
   }
 }

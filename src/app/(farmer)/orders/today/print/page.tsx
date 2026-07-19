@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { PrintButton } from '@/components/orders/print-button'
+import { unitSuffix } from '@/lib/order-line'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,7 +29,14 @@ export default async function PrintPacklistPage() {
       status: { notIn: ['CANCELLED', 'NOT_PICKED_UP'] },
     },
     include: {
-      items: { select: { productName: true, quantity: true } },
+      items: {
+        select: {
+          productName: true,
+          quantity: true,
+          // Einheit nur zur Anzeige gejoint — kein Schema-Change
+          product: { select: { unit: true, unitSize: true } },
+        },
+      },
     },
     orderBy: { pickupTimeStart: 'asc' },
   })
@@ -40,11 +48,15 @@ export default async function PrintPacklistPage() {
     year: 'numeric',
   })
 
-  // Aggregate pack list
-  const packList = new Map<string, number>()
+  // Aggregate pack list (Schlüssel: Produktname; Einheit fürs Suffix gemerkt)
+  const packList = new Map<string, { qty: number; product: (typeof orders)[number]['items'][number]['product'] }>()
   for (const order of orders) {
     for (const item of order.items) {
-      packList.set(item.productName, (packList.get(item.productName) ?? 0) + item.quantity)
+      const entry = packList.get(item.productName)
+      packList.set(item.productName, {
+        qty: (entry?.qty ?? 0) + item.quantity,
+        product: entry?.product ?? item.product,
+      })
     }
   }
   const packListEntries = Array.from(packList.entries()).sort((a, b) => a[0].localeCompare(b[0]))
@@ -89,15 +101,20 @@ export default async function PrintPacklistPage() {
                 Gesamt vorbereiten
               </h2>
               <div className="border border-gray-200 rounded-lg overflow-hidden">
-                {packListEntries.map(([name, qty], i) => (
+                {packListEntries.map(([name, entry], i) => (
                   <div
                     key={name}
-                    className={`flex items-center justify-between px-4 py-3 ${
+                    className={`flex items-center justify-between gap-3 px-4 py-3 ${
                       i !== packListEntries.length - 1 ? 'border-b border-gray-100' : ''
                     }`}
                   >
-                    <span className="font-medium text-gray-800">{name}</span>
-                    <span className="font-bold text-gray-900 text-lg">{qty}×</span>
+                    <span className="font-medium text-gray-800 min-w-0">
+                      {name}
+                      {unitSuffix(entry.product) ? (
+                        <span className="text-gray-500 font-normal"> ({unitSuffix(entry.product)})</span>
+                      ) : null}
+                    </span>
+                    <span className="font-bold text-gray-900 text-lg shrink-0">{entry.qty}×</span>
                   </div>
                 ))}
               </div>
@@ -126,7 +143,12 @@ export default async function PrintPacklistPage() {
                       {order.items.map((item, i) => (
                         <div key={i} className="flex items-center gap-2 text-sm text-gray-700">
                           <span className="font-bold w-6 text-right shrink-0">{item.quantity}×</span>
-                          <span>{item.productName}</span>
+                          <span className="min-w-0">
+                            {item.productName}
+                            {unitSuffix(item.product) ? (
+                              <span className="text-gray-400"> ({unitSuffix(item.product)})</span>
+                            ) : null}
+                          </span>
                         </div>
                       ))}
                     </div>
