@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { isDuplicateSlot, DUPLICATE_SLOT_MESSAGE } from '@/lib/pickup-slot-rules'
+import { findSlotError } from '@/lib/pickup-slot-rules'
 
 async function getAuthFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -73,13 +73,18 @@ export async function addPickupSlot(data: SlotFormData): Promise<SlotResult> {
   const parsed = slotSchema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Ungültige Daten' }
 
-  // Duplikatsperre: exakt gleicher Wochentag + Von + Bis existiert schon
+  // Zeitlogik + Dublettensperre: Bis > Von, exakte Dubletten gesperrt,
+  // keine Überschneidung mit aktiven Fenstern desselben Wochentags
   const existing = await prisma.pickupSlot.findMany({
     where: { farmId: farm.id },
-    select: { dayOfWeek: true, startTime: true, endTime: true },
+    select: { dayOfWeek: true, startTime: true, endTime: true, isActive: true },
   })
-  if (isDuplicateSlot(existing, parsed.data)) {
-    return { error: DUPLICATE_SLOT_MESSAGE }
+  const slotError = findSlotError(parsed.data, {
+    all: existing,
+    active: existing.filter((s) => s.isActive),
+  })
+  if (slotError) {
+    return { error: slotError }
   }
 
   await prisma.pickupSlot.create({

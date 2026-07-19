@@ -7,9 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { addPickupSlot, deletePickupSlot, togglePickupSlotActive } from '@/server/actions/farm'
+import { findSlotError, DAY_NAMES } from '@/lib/pickup-slot-rules'
 import type { FarmSettings } from '@/server/queries/farm'
-
-const DAY_NAMES = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag']
 
 type Slot = FarmSettings['pickupSlots'][number]
 
@@ -52,6 +51,16 @@ export function PickupSlotsClient({ initialSlots }: { initialSlots: Slot[] }) {
   const [form, setForm] = useState({ dayOfWeek: 1, startTime: '14:00', endTime: '16:00', maxOrders: '' })
 
   function handleAdd() {
+    // Clientseitig dieselben Regeln wie der Server (Zeitlogik, Dublette,
+    // Überschneidung) — spart den Roundtrip und zeigt die Meldung sofort
+    const clientError = findSlotError(
+      { dayOfWeek: form.dayOfWeek, startTime: form.startTime, endTime: form.endTime },
+      { all: slots, active: slots.filter((s) => s.isActive) }
+    )
+    if (clientError) {
+      toast.error(clientError)
+      return
+    }
     startTransition(async () => {
       const res = await addPickupSlot({
         dayOfWeek: form.dayOfWeek,
