@@ -1,6 +1,6 @@
 export function statusLabel(status: string): string {
   switch (status) {
-    case 'PENDING_CONFIRMATION': return 'Wartet auf Bestätigung'
+    case 'PENDING_CONFIRMATION': return 'Wartet auf Kunden-Bestätigung'
     case 'PAID': return 'Bezahlt'
     case 'CONFIRMED': return 'Bestätigt'
     case 'IN_PREPARATION': return 'In Vorbereitung'

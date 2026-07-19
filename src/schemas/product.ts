@@ -37,6 +37,14 @@ export const UNIT_LABELS: Record<string, string> = {
   PAKET: 'Paket',
 }
 
+// Kurznamen für kompakte Saison-Anzeigen (Badge auf der Hof-Seite,
+// Klartext-Zeile im Produkt-Dialog) — identischer Wortlaut an beiden Stellen
+export const MONTH_SHORT = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
+
+export function seasonLabel(start: number, end: number): string {
+  return `Saisonal verfügbar: ${MONTH_SHORT[start - 1]} bis ${MONTH_SHORT[end - 1]}`
+}
+
 export const MONTH_OPTIONS = [
   { value: 1, label: 'Jänner' },
   { value: 2, label: 'Februar' },

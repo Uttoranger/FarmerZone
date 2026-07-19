@@ -40,6 +40,7 @@ import {
   UNIT_OPTIONS,
   MONTH_OPTIONS,
   CATEGORY_OPTIONS,
+  seasonLabel,
 } from '@/schemas/product'
 
 type Props = {
@@ -105,6 +106,8 @@ export function ProductDialog({ open, product, onClose }: Props) {
   })
 
   const isAvailable = form.watch('isAvailable')
+  const watchedSeasonStart = form.watch('seasonStart')
+  const watchedSeasonEnd = form.watch('seasonEnd')
 
   // Reset form when dialog opens/switches product
   useEffect(() => {
@@ -643,6 +646,11 @@ export function ProductDialog({ open, product, onClose }: Props) {
                     )}
                   />
                 </div>
+                {watchedSeasonStart && watchedSeasonEnd && (
+                  <p className="text-xs text-muted-foreground">
+                    {seasonLabel(watchedSeasonStart, watchedSeasonEnd)}
+                  </p>
+                )}
                 <p className="text-xs text-muted-foreground/60">
                   Saison kann über den Jahreswechsel gehen (z. B. Okt → März)
                 </p>
