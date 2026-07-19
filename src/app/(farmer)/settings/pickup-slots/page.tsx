@@ -29,7 +29,8 @@ export default async function PickupSlotsPage() {
       <h1 className="text-xl font-semibold text-slate-800 mb-1">Abholzeiten</h1>
       <p className="text-sm text-slate-500 mb-6">
         Lege fest, wann Kunden ihre Bestellungen abholen können.
-        Abholzeiten gelten für die nächsten 14 Tage ab heute.
+        Deine Abholzeiten gelten dauerhaft jede Woche. Kundinnen können
+        Termine bis zu 14 Tage im Voraus wählen.
       </p>
 
       <PickupSlotsClient initialSlots={farm.pickupSlots} />

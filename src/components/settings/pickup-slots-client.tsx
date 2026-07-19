@@ -1,6 +1,7 @@
 ﻿'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Plus, Trash2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -24,15 +25,18 @@ function SlotRow({ slot, onDelete, onToggle }: { slot: Slot; onDelete: () => voi
           {slot.maxOrders ? ` · max. ${slot.maxOrders} Bestellungen` : ''}
         </p>
       </div>
+      {/* min. 44px Tippfläche (Mobil-Pflicht): der Schalter ist die
+          Urlaubs-Funktion und muss mit dem Daumen sicher treffbar sein */}
       <button
         onClick={onToggle}
-        className={`text-xs px-2 py-1 rounded-full font-medium transition-colors ${
+        aria-pressed={slot.isActive}
+        className={`text-xs min-h-11 min-w-11 px-3 rounded-full font-medium transition-colors ${
           slot.isActive
             ? 'bg-green-100 text-primary hover:bg-green-200'
             : 'bg-muted text-muted-foreground hover:bg-slate-300'
         }`}
       >
-        {slot.isActive ? 'Aktiv' : 'Inaktiv'}
+        {slot.isActive ? 'Aktiv' : 'Pausiert'}
       </button>
       <button
         onClick={onDelete}
@@ -45,10 +49,27 @@ function SlotRow({ slot, onDelete, onToggle }: { slot: Slot; onDelete: () => voi
   )
 }
 
+// Anzeige-Reihenfolge wie die Server-Query (dayOfWeek, dann Beginn) — damit
+// ein optimistisch eingefügter Slot sofort an der richtigen Stelle steht
+function sortSlots(list: Slot[]): Slot[] {
+  return [...list].sort(
+    (a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime)
+  )
+}
+
 export function PickupSlotsClient({ initialSlots }: { initialSlots: Slot[] }) {
+  const router = useRouter()
   const [slots, setSlots] = useState(initialSlots)
   const [isPending, startTransition] = useTransition()
   const [form, setForm] = useState({ dayOfWeek: 1, startTime: '14:00', endTime: '16:00', maxOrders: '' })
+
+  // Haus-Muster (nachlese-4 Punkt 14): alle drei Wege optimistisch, nach
+  // Erfolg router.refresh(). Der Refresh liefert neue initialSlots — dieser
+  // Sync übernimmt sie, sonst würde der useState-Startwert ewig festhängen
+  // und Server- und Client-Stand könnten nie konvergieren.
+  useEffect(() => {
+    setSlots(initialSlots)
+  }, [initialSlots])
 
   function handleAdd() {
     // Clientseitig dieselben Regeln wie der Server (Zeitlogik, Dublette,
@@ -61,41 +82,67 @@ export function PickupSlotsClient({ initialSlots }: { initialSlots: Slot[] }) {
       toast.error(clientError)
       return
     }
+    // Optimistisch: sofort einsortiert anzeigen; die Temp-Id wird nach dem
+    // router.refresh() durch die echte Server-Id ersetzt (Prop-Sync oben)
+    const maxOrders = form.maxOrders ? parseInt(form.maxOrders) : null
+    const tempId = `temp-${form.dayOfWeek}-${form.startTime}-${form.endTime}`
+    const optimistic: Slot = {
+      id: tempId,
+      dayOfWeek: form.dayOfWeek,
+      startTime: form.startTime,
+      endTime: form.endTime,
+      maxOrders,
+      isActive: true,
+    }
+    const prevForm = form
+    setSlots((s) => sortSlots([...s, optimistic]))
+    setForm({ dayOfWeek: 1, startTime: '14:00', endTime: '16:00', maxOrders: '' })
     startTransition(async () => {
       const res = await addPickupSlot({
-        dayOfWeek: form.dayOfWeek,
-        startTime: form.startTime,
-        endTime: form.endTime,
-        maxOrders: form.maxOrders ? parseInt(form.maxOrders) : null,
+        dayOfWeek: optimistic.dayOfWeek,
+        startTime: optimistic.startTime,
+        endTime: optimistic.endTime,
+        maxOrders,
       })
       if (res.error) {
+        // Revert: Eintrag raus, Eingaben zurück, Meldung zeigen
+        setSlots((s) => s.filter((x) => x.id !== tempId))
+        setForm(prevForm)
         toast.error(res.error)
       } else {
         toast.success('Abholzeit hinzugefügt')
-        setForm({ dayOfWeek: 1, startTime: '14:00', endTime: '16:00', maxOrders: '' })
+        router.refresh()
       }
     })
   }
 
   function handleDelete(slotId: string) {
+    // Optimistisch: sofort ausblenden, bei Server-Fehler zurückrollen
+    const prev = slots
+    setSlots((s) => s.filter((x) => x.id !== slotId))
     startTransition(async () => {
       const res = await deletePickupSlot(slotId)
       if (res.error) {
+        setSlots(prev)
         toast.error(res.error)
       } else {
-        setSlots((s) => s.filter((x) => x.id !== slotId))
         toast.success('Abholzeit gelöscht')
+        router.refresh()
       }
     })
   }
 
   function handleToggle(slot: Slot) {
+    // Optimistisch: sofort umschalten, bei Server-Fehler zurückrollen
+    const next = !slot.isActive
+    setSlots((s) => s.map((x) => (x.id === slot.id ? { ...x, isActive: next } : x)))
     startTransition(async () => {
-      const res = await togglePickupSlotActive(slot.id, !slot.isActive)
+      const res = await togglePickupSlotActive(slot.id, next)
       if (res.error) {
+        setSlots((s) => s.map((x) => (x.id === slot.id ? { ...x, isActive: slot.isActive } : x)))
         toast.error(res.error)
       } else {
-        setSlots((s) => s.map((x) => x.id === slot.id ? { ...x, isActive: !x.isActive } : x))
+        router.refresh()
       }
     })
   }
@@ -119,6 +166,9 @@ export function PickupSlotsClient({ initialSlots }: { initialSlots: Slot[] }) {
             ))}
           </div>
         )}
+        <p className="text-xs text-muted-foreground mt-3">
+          Pausierte Zeiten sind für Kundinnen unsichtbar — praktisch für Urlaub.
+        </p>
       </div>
 
       {/* Add new slot */}
