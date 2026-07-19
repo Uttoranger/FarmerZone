@@ -24,15 +24,18 @@ function SlotRow({ slot, onDelete, onToggle }: { slot: Slot; onDelete: () => voi
           {slot.maxOrders ? ` · max. ${slot.maxOrders} Bestellungen` : ''}
         </p>
       </div>
+      {/* min. 44px Tippfläche (Mobil-Pflicht): der Schalter ist die
+          Urlaubs-Funktion und muss mit dem Daumen sicher treffbar sein */}
       <button
         onClick={onToggle}
-        className={`text-xs px-2 py-1 rounded-full font-medium transition-colors ${
+        aria-pressed={slot.isActive}
+        className={`text-xs min-h-11 min-w-11 px-3 rounded-full font-medium transition-colors ${
           slot.isActive
             ? 'bg-green-100 text-primary hover:bg-green-200'
             : 'bg-muted text-muted-foreground hover:bg-slate-300'
         }`}
       >
-        {slot.isActive ? 'Aktiv' : 'Inaktiv'}
+        {slot.isActive ? 'Aktiv' : 'Pausiert'}
       </button>
       <button
         onClick={onDelete}
@@ -90,12 +93,14 @@ export function PickupSlotsClient({ initialSlots }: { initialSlots: Slot[] }) {
   }
 
   function handleToggle(slot: Slot) {
+    // Optimistisch: sofort umschalten, bei Server-Fehler zurückrollen
+    const next = !slot.isActive
+    setSlots((s) => s.map((x) => (x.id === slot.id ? { ...x, isActive: next } : x)))
     startTransition(async () => {
-      const res = await togglePickupSlotActive(slot.id, !slot.isActive)
+      const res = await togglePickupSlotActive(slot.id, next)
       if (res.error) {
+        setSlots((s) => s.map((x) => (x.id === slot.id ? { ...x, isActive: slot.isActive } : x)))
         toast.error(res.error)
-      } else {
-        setSlots((s) => s.map((x) => x.id === slot.id ? { ...x, isActive: !x.isActive } : x))
       }
     })
   }
@@ -119,6 +124,9 @@ export function PickupSlotsClient({ initialSlots }: { initialSlots: Slot[] }) {
             ))}
           </div>
         )}
+        <p className="text-xs text-muted-foreground mt-3">
+          Pausierte Zeiten sind für Kundinnen unsichtbar — praktisch für Urlaub.
+        </p>
       </div>
 
       {/* Add new slot */}

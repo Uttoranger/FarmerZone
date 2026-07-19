@@ -34,8 +34,9 @@ import {
   DUPLICATE_SLOT_MESSAGE,
   INVERTED_SLOT_MESSAGE,
 } from '@/lib/pickup-slot-rules'
-import { addPickupSlot } from '@/server/actions/farm'
+import { addPickupSlot, togglePickupSlotActive } from '@/server/actions/farm'
 import { createOnboardingSlots } from '@/server/actions/onboarding'
+import { getPublicFarm, getOwnerFarm } from '@/server/queries/farm'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
@@ -44,6 +45,7 @@ const farmFindUnique = vi.mocked(prisma.farm.findUnique)
 const slotFindMany = vi.mocked(prisma.pickupSlot.findMany)
 const slotCreate = vi.mocked(prisma.pickupSlot.create)
 const slotCreateMany = vi.mocked(prisma.pickupSlot.createMany)
+const slotUpdateMany = vi.mocked(prisma.pickupSlot.updateMany)
 
 const SA_VORMITTAG = { dayOfWeek: 6, startTime: '09:00', endTime: '12:00' }
 const SA_NACHMITTAG = { dayOfWeek: 6, startTime: '15:00', endTime: '17:00' }
@@ -288,5 +290,53 @@ describe('createOnboardingSlots (Onboarding, dieselbe Prüfung)', () => {
     const result = await createOnboardingSlots('fremde_farm', [SA_NACHMITTAG])
     expect('error' in result && result.error).toBe('Hof nicht gefunden.')
     expect(slotCreateMany).not.toHaveBeenCalled()
+  })
+})
+
+describe('togglePickupSlotActive (Aktiv ⇄ Pausiert)', () => {
+  it('persistiert isActive und scoped auf die eigene Farm (Ownership)', async () => {
+    slotUpdateMany.mockResolvedValue({ count: 1 } as never)
+    const result = await togglePickupSlotActive('slot_1', false)
+    expect(result).toEqual({})
+    expect(slotUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'slot_1', farmId: 'farm_1' },
+      data: { isActive: false },
+    })
+  })
+
+  it('reaktiviert genauso (isActive: true)', async () => {
+    slotUpdateMany.mockResolvedValue({ count: 1 } as never)
+    await togglePickupSlotActive('slot_1', true)
+    expect(slotUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'slot_1', farmId: 'farm_1' },
+      data: { isActive: true },
+    })
+  })
+
+  it('ohne Session keine Änderung', async () => {
+    getSession.mockResolvedValue(null as never)
+    const result = await togglePickupSlotActive('slot_1', false)
+    expect(result.error).toBe('Nicht angemeldet')
+    expect(slotUpdateMany).not.toHaveBeenCalled()
+  })
+})
+
+describe('Kundensicht lädt nur aktive Abholzeiten (Tageskarten/Checkout-Quelle)', () => {
+  it('getPublicFarm filtert pickupSlots auf isActive: true', async () => {
+    farmFindUnique.mockResolvedValue(null)
+    await getPublicFarm('testhof')
+    const arg = farmFindUnique.mock.calls[0]?.[0] as {
+      select?: { pickupSlots?: { where?: unknown } }
+    }
+    expect(arg?.select?.pickupSlots?.where).toEqual({ isActive: true })
+  })
+
+  it('getOwnerFarm (Vorschau) filtert ebenso', async () => {
+    farmFindUnique.mockResolvedValue(null)
+    await getOwnerFarm('user_1')
+    const arg = farmFindUnique.mock.calls[0]?.[0] as {
+      select?: { pickupSlots?: { where?: unknown } }
+    }
+    expect(arg?.select?.pickupSlots?.where).toEqual({ isActive: true })
   })
 })
