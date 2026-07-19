@@ -370,7 +370,7 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
             <Textarea
               id="customerNote"
               {...form.register('customerNote')}
-              placeholder="z.B. Bitte läuten, wenn ich nicht vor Ort bin"
+              placeholder="z. B. Ich komme erst gegen 17:30"
               rows={2}
             />
           </div>

@@ -35,7 +35,6 @@ import {
   INVERTED_SLOT_MESSAGE,
 } from '@/lib/pickup-slot-rules'
 import { addPickupSlot, togglePickupSlotActive } from '@/server/actions/farm'
-import { addPickupSlot } from '@/server/actions/farm'
 import { createOnboardingSlots } from '@/server/actions/onboarding'
 import { getPublicFarm, getOwnerFarm } from '@/server/queries/farm'
 import { auth } from '@/lib/auth'

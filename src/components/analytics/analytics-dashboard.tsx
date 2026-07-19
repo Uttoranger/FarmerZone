@@ -102,7 +102,7 @@ export function AnalyticsDashboard({ data, currentPeriod }: Props) {
               <BarChart
                 data={channelRevenue}
                 layout="vertical"
-                margin={{ top: 0, right: 60, left: 0, bottom: 0 }}
+                margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
               >
                 <XAxis
                   type="number"
@@ -111,10 +111,12 @@ export function AnalyticsDashboard({ data, currentPeriod }: Props) {
                   axisLine={false}
                   tickLine={false}
                 />
+                {/* 110px: auch das längste Kanal-Label ("Geschäftskunde")
+                    passt auf 375px vollständig — Tester-Feedback Nachlese 5 */}
                 <YAxis
                   type="category"
                   dataKey="label"
-                  width={90}
+                  width={110}
                   tick={{ fontSize: 12, fill: '#475569' }}
                   axisLine={false}
                   tickLine={false}

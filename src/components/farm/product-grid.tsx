@@ -10,7 +10,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { ShoppingCart, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff, Camera, Loader2, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCart } from '@/lib/use-cart'
-import { UNIT_LABELS } from '@/schemas/product'
+import { UNIT_LABELS, MONTH_SHORT, seasonLabel } from '@/schemas/product'
 import type { PublicProduct } from '@/server/queries/farm'
 import { updateProductImageAction, reorderProductsAction } from '@/server/actions/products'
 import { ReorderContext } from '@/components/shared/reorder-context'
@@ -30,7 +30,6 @@ type Props = {
 
 const LOW_STOCK = 5
 
-const MONTH_SHORT = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
 
 function formatEuro(n: number) {
   return new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(n)
@@ -45,9 +44,16 @@ function formatPrice(price: number, unit: string, unitSize: number | null) {
 function SeasonBadge({ start, end }: { start: number; end: number }) {
   const s = MONTH_SHORT[start - 1]
   const e = MONTH_SHORT[end - 1]
+  // title (Desktop-Hover) + aria-label (Screenreader) erklären das kompakte
+  // "Okt–Mär" in Klartext — gleicher Wortlaut wie im Produkt-Dialog
+  const label = seasonLabel(start, end)
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] text-[#B86A2E] bg-[#FDF0E8] border border-[#F4D9BE] rounded-full px-2 py-0.5">
-      <Leaf className="size-2.5" />
+    <span
+      title={label}
+      aria-label={label}
+      className="inline-flex items-center gap-1 text-[10px] text-[#B86A2E] bg-[#FDF0E8] border border-[#F4D9BE] rounded-full px-2 py-0.5"
+    >
+      <Leaf className="size-2.5" aria-hidden="true" />
       {s}–{e}
     </span>
   )

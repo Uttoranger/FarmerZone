@@ -126,6 +126,11 @@ export function OrderCard({ order, farmName }: { order: FarmerOrder; farmName: s
               >
                 {statusLabel(status)}
               </span>
+              {status === 'PENDING_CONFIRMATION' && (
+                <div className="text-xs text-muted-foreground/70 mt-1">
+                  Der Kunde bestätigt per E-Mail-Link.
+                </div>
+              )}
               <div className="text-xs text-muted-foreground mt-1">{paymentLabel(order.paymentMethod)}</div>
             </div>
           </div>
