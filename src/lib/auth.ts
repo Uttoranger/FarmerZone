@@ -19,6 +19,14 @@ export const auth = betterAuth({
     enabled: process.env.NODE_ENV === 'production',
     window: AUTH_RATE_LIMIT_WINDOW_SECONDS,
     max: AUTH_RATE_LIMIT_MAX,
+    customRules: {
+      // KEIN Limit fürs Session-Lesen: die Routen-Wache (src/proxy.ts) ruft
+      // get-session bei JEDER geschützten Navigation per HTTP auf — mit dem
+      // 10/min-Limit war Franz nach wenigen Seitenwechseln ausgesperrt
+      // (im E2E-Test gegen lokale DB gefunden). Session-Lesen ist kein
+      // Brute-Force-Ziel; Login/Registrierung behalten die 10/min.
+      '/get-session': false,
+    },
   },
 
   emailAndPassword: {
