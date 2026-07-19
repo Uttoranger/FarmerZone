@@ -14,6 +14,7 @@ import {
   checkSlugAvailability,
 } from '@/server/actions/onboarding'
 import { generateSlug } from '@/lib/slug'
+import { findBatchSlotError } from '@/lib/pickup-slot-rules'
 
 type Step = 1 | 2 | 3 | 4
 type ProductRow = { name: string; price: string; unit: string; stock: string }
@@ -276,11 +277,20 @@ export function OnboardingClient({ userEmail }: { userEmail: string }) {
         setFehler('Bitte füge mindestens eine Abholzeit hinzu oder überspringe diesen Schritt.')
         return
       }
+      const candidates = valid.map((s) => ({
+        dayOfWeek: Number(s.dayOfWeek),
+        startTime: s.startTime,
+        endTime: s.endTime,
+      }))
+      // Clientseitig dieselben Regeln wie der Server: Bis > Von, keine Dublette,
+      // keine Überschneidung — auch der Zeilen untereinander
+      const clientError = findBatchSlotError(candidates, { all: [], active: [] })
+      if (clientError) {
+        setFehler(clientError)
+        return
+      }
       setLaedt(true)
-      const result = await createOnboardingSlots(
-        farmId,
-        valid.map((s) => ({ dayOfWeek: Number(s.dayOfWeek), startTime: s.startTime, endTime: s.endTime }))
-      )
+      const result = await createOnboardingSlots(farmId, candidates)
       setLaedt(false)
       if ('error' in result) {
         setFehler(result.error)
