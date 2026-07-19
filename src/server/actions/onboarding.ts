@@ -3,6 +3,7 @@
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { hasDuplicateSlots, DUPLICATE_SLOT_MESSAGE } from '@/lib/pickup-slot-rules'
 import { ProductUnit } from '@prisma/client'
 import { generateSlug, RESERVED_SLUGS } from '@/lib/slug'
 
@@ -104,6 +105,16 @@ export async function createOnboardingSlots(
     select: { id: true },
   })
   if (!farm) return { error: 'Hof nicht gefunden.' }
+
+  // Dieselbe Duplikatsperre wie in den Einstellungen: exakte Dubletten
+  // (gegen Bestand UND innerhalb des Aufrufs) ablehnen
+  const existing = await prisma.pickupSlot.findMany({
+    where: { farmId },
+    select: { dayOfWeek: true, startTime: true, endTime: true },
+  })
+  if (hasDuplicateSlots(existing, slots)) {
+    return { error: DUPLICATE_SLOT_MESSAGE }
+  }
 
   try {
     await prisma.pickupSlot.createMany({
