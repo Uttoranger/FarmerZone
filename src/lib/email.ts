@@ -18,7 +18,7 @@ const FROM = process.env.EMAIL_FROM ?? 'onboarding@resend.dev'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
 // Einmal beim Serverstart loggen damit man im Terminal sieht ob der Key gelesen wurde
-console.log(`[E-Mail] Init — RESEND_API_KEY=${apiKey ? `gesetzt (${apiKey.slice(0, 8)}…)` : 'FEHLT → nur Log-Modus'} FROM=${FROM}`)
+console.log(`[E-Mail] Init — RESEND_API_KEY=${apiKey ? 'gesetzt' : 'FEHLT → nur Log-Modus'} FROM=${FROM}`)
 
 async function toHtml(element: React.ReactElement): Promise<string> {
   return render(element)

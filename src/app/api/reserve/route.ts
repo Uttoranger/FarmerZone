@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { enforceRateLimit } from '@/lib/rate-limit'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 
@@ -11,6 +12,9 @@ const bodySchema = z.object({
 const RESERVATION_TTL_MS = 15 * 60 * 1000 // 15 minutes
 
 export async function POST(request: NextRequest) {
+  const limited = enforceRateLimit('reserve', request)
+  if (limited) return limited
+
   let body: unknown
   try {
     body = await request.json()

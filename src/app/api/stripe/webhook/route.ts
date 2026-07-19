@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import type Stripe from 'stripe'
 import { Prisma } from '@prisma/client'
 import { stripe } from '@/lib/stripe'
+import { env } from '@/lib/env'
 import { prisma } from '@/lib/prisma'
 import { sendOrderConfirmation, sendOrderPaidToFarmer } from '@/lib/email'
 
@@ -14,7 +15,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 })
   }
 
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+  const webhookSecret = env.STRIPE_WEBHOOK_SECRET
   if (!webhookSecret) {
     console.error('[Webhook] STRIPE_WEBHOOK_SECRET not set')
     return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 })
