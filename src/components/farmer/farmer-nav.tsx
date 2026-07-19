@@ -1,8 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, ReceiptText, Users, Home, Tag, BarChart3, SlidersHorizontal, LogOut } from 'lucide-react'
+import { LayoutDashboard, ReceiptText, Users, Home, Tag, BarChart3, SlidersHorizontal, LogOut, MoreHorizontal, X } from 'lucide-react'
 import { signOut } from '@/lib/auth-client'
 import { cn } from '@/lib/utils'
 
@@ -24,6 +25,8 @@ interface FarmerNavProps {
 export function FarmerNav({ farmName, userName, ordersBadge }: FarmerNavProps) {
   const pathname = usePathname()
   const router = useRouter()
+  // Mobiles "Mehr"-Sheet (Einstellungen + Abmelden)
+  const [moreOpen, setMoreOpen] = useState(false)
 
   async function handleLogout() {
     await signOut()
@@ -41,7 +44,9 @@ export function FarmerNav({ farmName, userName, ordersBadge }: FarmerNavProps) {
       {/* ===== MOBILE: Bottom Tab Bar ===== */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border md:hidden" style={{ background: '#24523A' }}>
         <div className="flex items-stretch h-16">
-          {NAV_ITEMS.map(({ href, label, icon: Icon, badgeKey }) => {
+          {/* Platz-Regel: mit 7 Tabs fielen Tap-Ziele auf 46px (<48) — Auswertung
+              wandert daher als einziger Punkt mit ins Mehr-Sheet */}
+          {NAV_ITEMS.filter((item) => item.href !== '/analytics').map(({ href, label, icon: Icon, badgeKey }) => {
             const active = pathname === href || pathname.startsWith(href + '/')
             const badgeCount = getBadgeCount(badgeKey)
             return (
@@ -66,8 +71,84 @@ export function FarmerNav({ farmName, userName, ordersBadge }: FarmerNavProps) {
               </Link>
             )
           })}
+          {/* Mehr-Tab: Einstellungen + Abmelden (fehlten mobil) */}
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            aria-label="Mehr"
+            aria-expanded={moreOpen}
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 min-h-[56px] text-xs transition-colors duration-[250ms]"
+            style={{ color: moreOpen || pathname.startsWith('/settings') || pathname.startsWith('/analytics') ? '#F5F3EE' : '#CFE4D6' }}
+          >
+            <MoreHorizontal className="h-5 w-5" strokeWidth={1.7} />
+            <span className="leading-none">Mehr</span>
+          </button>
         </div>
       </nav>
+
+      {/* ===== MOBILE: Mehr-Sheet ===== */}
+      {moreOpen && (
+        <div className="fixed inset-0 z-[60] md:hidden" onClick={() => setMoreOpen(false)}>
+          <div className="absolute inset-0" style={{ background: 'rgba(20,30,22,0.45)' }} />
+          <div
+            className="absolute bottom-16 left-0 right-0 rounded-t-2xl px-3 pt-3 pb-3"
+            style={{ background: '#24523A', borderTop: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 -8px 24px rgba(0,0,0,0.25)' }}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-label="Mehr"
+          >
+            <div className="flex items-center justify-between px-1 mb-1">
+              <span className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: 'rgba(207,228,214,0.55)' }}>
+                Mehr
+              </span>
+              <button
+                type="button"
+                onClick={() => setMoreOpen(false)}
+                aria-label="Schließen"
+                className="flex items-center justify-center size-8 rounded-full transition-colors hover:bg-white/10"
+                style={{ color: '#CFE4D6' }}
+              >
+                <X className="size-4" strokeWidth={1.7} />
+              </button>
+            </div>
+            <Link
+              href="/analytics"
+              onClick={() => setMoreOpen(false)}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm min-h-[48px]"
+              style={
+                pathname.startsWith('/analytics')
+                  ? { background: '#F5F3EE', color: '#24523A', fontWeight: 600 }
+                  : { color: '#CFE4D6' }
+              }
+            >
+              <BarChart3 className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} />
+              Auswertung
+            </Link>
+            <Link
+              href="/settings"
+              onClick={() => setMoreOpen(false)}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm min-h-[48px]"
+              style={
+                pathname.startsWith('/settings')
+                  ? { background: '#F5F3EE', color: '#24523A', fontWeight: 600 }
+                  : { color: '#CFE4D6' }
+              }
+            >
+              <SlidersHorizontal className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} />
+              Einstellungen
+            </Link>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm min-h-[48px] transition-colors hover:bg-red-500/15"
+              style={{ color: '#FCA5A5' }}
+            >
+              <LogOut className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} />
+              Abmelden
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ===== DESKTOP: Sidebar ===== */}
       <aside
