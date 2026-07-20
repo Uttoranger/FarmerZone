@@ -1097,13 +1097,14 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                           }
                         </p>
                         {activeStatus.photoUrl && (
-                          <div className="relative w-full aspect-[3/2] max-h-48 mt-3 rounded-xl overflow-hidden">
+                          /* object-contain auf Sand: volles Bild statt Zoom-Crop (nachlese-7) */
+                          <div className="relative w-full aspect-[3/2] max-h-48 mt-3 rounded-xl overflow-hidden bg-[#F4EFE3]">
                             <Image
                               src={activeStatus.photoUrl}
                               alt={activeStatus.title}
                               fill
                               sizes="(min-width: 768px) 640px, 100vw"
-                              className="object-cover"
+                              className="object-contain"
                             />
                           </div>
                         )}
