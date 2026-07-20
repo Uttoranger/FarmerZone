@@ -95,14 +95,15 @@ export function StatusPostCard({ post }: { post: StatusPostSummary }) {
       {/* Content */}
       <h3 className="font-semibold text-foreground mb-1">{post.title}</h3>
       <p className="text-sm text-muted-foreground line-clamp-2">{renderStatusBodyWithChip(post.body)}</p>
+      {/* object-contain auf Sand: volles Bild statt Zoom-Crop (nachlese-7) */}
       {post.photoUrl && (
-        <div className="relative mt-2 h-28 w-full overflow-hidden rounded-lg">
+        <div className="relative mt-2 h-28 w-full overflow-hidden rounded-lg bg-[#F4EFE3]">
           <Image
             src={post.photoUrl}
             alt={post.title}
             fill
             sizes="(min-width: 768px) 640px, 100vw"
-            className="object-cover"
+            className="object-contain"
           />
         </div>
       )}

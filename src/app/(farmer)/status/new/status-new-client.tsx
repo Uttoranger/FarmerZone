@@ -6,7 +6,7 @@ import Image from 'next/image'
 import {
   Leaf, CalendarDays, Tag, MessageCircle,
   Home, Mail, MessageSquare, CircleDot,
-  Mic, Sparkles, ArrowRight, CheckCircle, Check,
+  ArrowRight, CheckCircle, Check,
   Camera, Loader2, X,
 } from 'lucide-react'
 import { publishStatusPost } from '@/server/actions/status-posts'
@@ -272,14 +272,15 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
 
             {/* Optionales Foto */}
             {photoUpload.fileInput}
+            {/* object-contain auf Sand: volles Bild statt Zoom-Crop (nachlese-7) */}
             {photoUrl && (
-              <div className="relative w-full aspect-[3/2] max-h-48 mb-3 rounded-xl overflow-hidden border border-border">
+              <div className="relative w-full aspect-[3/2] max-h-48 mb-3 rounded-xl overflow-hidden border border-border bg-[#F4EFE3]">
                 <Image
                   src={photoUrl}
                   alt="Status-Foto"
                   fill
                   sizes="(min-width: 768px) 640px, 100vw"
-                  className="object-cover"
+                  className="object-contain"
                 />
                 <button
                   type="button"
@@ -305,22 +306,6 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
                   ? <Loader2 className="size-3.5 animate-spin" />
                   : <Camera className="size-3.5" />}
                 {photoUpload.isUploading ? 'Lädt…' : photoUrl ? 'Foto ersetzen' : 'Foto hinzufügen'}
-              </button>
-              <button
-                className="flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs text-muted-foreground cursor-not-allowed opacity-50"
-                disabled
-                title="Kommt bald"
-              >
-                <Mic className="size-3.5" />
-                Sprachnotiz
-              </button>
-              <button
-                className="flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs text-muted-foreground cursor-not-allowed opacity-50"
-                disabled
-                title="Kommt bald"
-              >
-                <Sparkles className="size-3.5" />
-                KI-Hilfe
               </button>
             </div>
 
