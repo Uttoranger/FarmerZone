@@ -13,7 +13,7 @@ import { publishStatusPost } from '@/server/actions/status-posts'
 import { useImageUpload } from '@/components/shared/image-upload'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { stripStatusVariables } from '@/lib/status-body'
+import { renderStatusBodyWithChip } from '@/lib/status-body'
 
 type Anlass = 'FRESH_PRODUCT' | 'NEW_SEASON' | 'PROMOTION' | 'ANNOUNCEMENT'
 
@@ -266,7 +266,7 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
               <p className="text-xs text-muted-foreground mt-1">
                 Tipp:{' '}
                 <code className="bg-muted px-1 rounded">{'{Vorname}'}</code> wird automatisch
-                ersetzt.
+                ersetzt. Auf der Hof-Seite steht die Anrede ohne Namen.
               </p>
             </div>
 
@@ -453,7 +453,9 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
                 {anlassMeta.label}
               </span>
               <h2 className="font-heading text-lg font-semibold text-foreground mb-2">{title}</h2>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{stripStatusVariables(body)}</p>
+              {/* Owner-Vorschau zeigt den Platzhalter als Chip (Status-Paket E) —
+                  kundenseitig wird weiterhin gestrippt */}
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{renderStatusBodyWithChip(body)}</p>
               {linkedProductIds.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-border/50">
                   {products

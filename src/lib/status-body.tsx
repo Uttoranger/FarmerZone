@@ -13,6 +13,8 @@ export function stripStatusVariables(body: string): string {
   text = text.replace(/ {2,}/g, ' ')
   // consecutive commas → single comma
   text = text.replace(/,+/g, ',')
+  // dangling comma before sentence end ("…, ." after token removal) → just the punctuation
+  text = text.replace(/,\s*([.!?])/g, '$1')
   // leading comma or space artifact
   text = text.replace(/^[, ]+/, '')
   return text.trim()
