@@ -3,7 +3,7 @@
 import { useTransition } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Leaf, CalendarDays, Tag, MessageCircle, Mail, MessageSquare, CheckCircle, Clock, FileText, Trash2, XCircle } from 'lucide-react'
+import { Leaf, CalendarDays, Tag, MessageCircle, Mail, MessageSquare, CheckCircle, Clock, FileText, Trash2, XCircle, CopyPlus } from 'lucide-react'
 import { expireStatusPost, deleteStatusPost } from '@/server/actions/status-posts'
 import type { StatusPostSummary } from '@/server/queries/status-posts'
 import { toast } from 'sonner'
@@ -134,6 +134,18 @@ export function StatusPostCard({ post }: { post: StatusPostSummary }) {
             </Link>
           )}
         </div>
+      )}
+
+      {/* Vorlage-Muster (nachlese-6): nur auf Archiv-Karten. Führt in den
+          Wizard mit Vorbefüllung — der Quell-Status bleibt unangetastet. */}
+      {!post.isActive && !post.isDraft && (
+        <Link
+          href={`/status/new?from=${post.id}`}
+          className="mt-3 flex items-center justify-center gap-2 w-full min-h-11 rounded-xl border border-border text-sm font-medium text-primary hover:bg-muted/40 transition-colors"
+        >
+          <CopyPlus className="size-4" strokeWidth={1.7} />
+          Als Vorlage verwenden
+        </Link>
       )}
     </div>
   )

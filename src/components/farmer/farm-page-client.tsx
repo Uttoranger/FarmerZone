@@ -11,9 +11,10 @@ type Mode = 'edit' | 'preview'
 interface Props {
   farm: PublicFarm
   activeStatus: ActiveStatusPost | null
+  pastStatusCount: number
 }
 
-export function FarmPageClient({ farm, activeStatus }: Props) {
+export function FarmPageClient({ farm, activeStatus, pastStatusCount }: Props) {
   const [mode, setMode] = useState<Mode>('edit')
   const [copied, setCopied] = useState(false)
 
@@ -115,6 +116,7 @@ export function FarmPageClient({ farm, activeStatus }: Props) {
         activeStatus={activeStatus}
         ownerMode={true}
         mode={mode}
+        pastStatusCount={pastStatusCount}
       />
     </>
   )

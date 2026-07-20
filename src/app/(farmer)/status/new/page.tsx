@@ -2,17 +2,27 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
+import { getStatusTemplate } from '@/server/queries/status-posts'
 import { prisma } from '@/lib/prisma'
 import { StatusNewClient } from './status-new-client'
 
 export const dynamic = 'force-dynamic'
 
-export default async function StatusNewPage() {
+export default async function StatusNewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string }>
+}) {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) redirect('/login')
 
   const farm = await getFarmForUser(session.user.id)
   if (!farm) redirect('/login')
+
+  // Vorlage-Muster: ?from={id} lädt einen Alt-Status als Vorbefüllung —
+  // serverseitig und farm-gescoped (Ownership); fremde/ungültige ID → null
+  const { from } = await searchParams
+  const template = await getStatusTemplate(farm.id, from)
 
   const [products, emailCount, whatsAppCount, recentEmail] = await Promise.all([
     prisma.product.findMany({
@@ -40,6 +50,7 @@ export default async function StatusNewPage() {
         whatsAppCount={whatsAppCount}
         recentEmailSentAt={recentEmail?.publishedAt?.toISOString() ?? null}
         farmSlug={farm.id}
+        prefill={template}
       />
     </div>
   )

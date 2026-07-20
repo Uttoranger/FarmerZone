@@ -525,9 +525,11 @@ type Props = {
   reorderItems?: ReorderItem[]
   ownerMode?: boolean
   mode?: 'edit' | 'preview'
+  // Anzahl vergangener Status für den "Frühere Status (N)"-Button (Owner)
+  pastStatusCount?: number
 }
 
-export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = false, mode = 'edit' }: Props) {
+export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = false, mode = 'edit', pastStatusCount = 0 }: Props) {
   const isEdit = ownerMode && mode !== 'preview'
   const [galleryKey, setGalleryKey] = useState(0)
 
@@ -1119,12 +1121,13 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                       <Plus className="size-[15px]" strokeWidth={1.9} />
                       Neuer Status
                     </Link>
+                    {/* Sekundär-Button statt übersehbarer Textzeile (nachlese-6) */}
                     <Link
                       href="/status"
-                      className="block text-center text-xs mt-2 py-1 transition-colors hover:text-[#2D3027]"
-                      style={{ color: '#9AA08F' }}
+                      className="w-full mt-2 flex items-center justify-center gap-2 rounded-[14px] py-3.5 text-sm font-semibold transition-colors hover:bg-white/70"
+                      style={{ border: '1.5px solid #C9C2B2', background: 'rgba(255,255,255,0.5)', color: '#4A5044' }}
                     >
-                      Frühere Status ansehen →
+                      Frühere Status ({pastStatusCount})
                     </Link>
                   </>
                 )}
@@ -1139,12 +1142,13 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                   <Plus className="size-[15px]" strokeWidth={1.9} />
                   Neuer Status
                 </Link>
+                {/* Sekundär-Button statt übersehbarer Textzeile (nachlese-6) */}
                 <Link
                   href="/status"
-                  className="block text-center text-xs py-1 transition-colors hover:text-[#2D3027]"
-                  style={{ color: '#9AA08F' }}
+                  className="w-full flex items-center justify-center gap-2 rounded-[14px] py-3.5 text-sm font-semibold transition-colors hover:bg-white/70"
+                  style={{ border: '1.5px solid #C9C2B2', background: 'rgba(255,255,255,0.5)', color: '#4A5044' }}
                 >
-                  Frühere Status ansehen →
+                  Frühere Status ({pastStatusCount})
                 </Link>
               </div>
             ) : null}
