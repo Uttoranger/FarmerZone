@@ -143,7 +143,7 @@ export function SaleDialog({ open, editingSale, prefillSale, products, onClose }
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md md:max-w-2xl max-h-[92dvh] flex flex-col p-0">
+      <DialogContent className="max-w-md md:max-w-2xl max-h-[92dvh] flex flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="px-5 pt-5 pb-0 shrink-0">
           <DialogTitle>{isEdit ? 'Verkauf bearbeiten' : 'Verkauf eintragen'}</DialogTitle>
         </DialogHeader>
@@ -151,9 +151,9 @@ export function SaleDialog({ open, editingSale, prefillSale, products, onClose }
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(onSubmit)}
-            className="flex flex-col flex-1 min-h-0"
+            className="flex flex-col flex-auto min-h-0"
           >
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+            <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4">
 
               {/* Abgrenzungs-Hinweis (verkauf-dialog): was gehört hier rein? */}
               <div className="flex items-start gap-2.5 rounded-xl border border-border bg-muted/40 px-3 py-2.5">
@@ -164,6 +164,9 @@ export function SaleDialog({ open, editingSale, prefillSale, products, onClose }
                   die Auswertung automatisch, auch die mit &bdquo;Bar bei Abholung&ldquo;.
                 </p>
               </div>
+
+              {/* Gruppe 1 */}
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Was &amp; wie viel</p>
 
               {/* Produkt */}
               <div className="space-y-2">
@@ -215,7 +218,7 @@ export function SaleDialog({ open, editingSale, prefillSale, products, onClose }
                           step="0.01"
                           min="0"
                           placeholder="0,00"
-                          className="h-11"
+                          className="h-12 text-xl md:text-2xl font-semibold tabular-nums"
                           {...field}
                           onChange={(e) => field.onChange(e.target.valueAsNumber)}
                         />
@@ -285,6 +288,11 @@ export function SaleDialog({ open, editingSale, prefillSale, products, onClose }
                 />
               )}
 
+              {/* Gruppe 2 */}
+              <div className="border-t border-border/50 pt-4">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Verkauf</p>
+              </div>
+
               {/* Kanal + Datum: mobil untereinander, ab md nebeneinander */}
               <div className="grid gap-4 md:grid-cols-2">
               <FormField
@@ -293,7 +301,12 @@ export function SaleDialog({ open, editingSale, prefillSale, products, onClose }
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Verkaufskanal *</FormLabel>
-                    <div className="grid grid-cols-5 gap-1.5">
+                    {/* Ein Pillen-Stil für die Plattform: SegmentControl-Muster
+                        (Wanne #F0EDE5, aktiv #24523A mit Weiß, Rest gedimmt) */}
+                    <div
+                      className="grid grid-cols-5 gap-1.5 rounded-[10px] p-1"
+                      style={{ background: '#F0EDE5' }}
+                    >
                       {CHANNEL_OPTIONS.map((ch) => {
                         const active = field.value === ch.value
                         return (
@@ -301,11 +314,8 @@ export function SaleDialog({ open, editingSale, prefillSale, products, onClose }
                             key={ch.value}
                             type="button"
                             onClick={() => field.onChange(ch.value)}
-                            className={`flex flex-col items-center gap-1 py-2 px-1 rounded-xl border text-center transition-colors ${
-                              active
-                                ? 'bg-green-600 border-green-600 text-white'
-                                : 'bg-white border-border text-muted-foreground hover:border-border'
-                            }`}
+                            className="flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-center transition-colors"
+                            style={active ? { background: '#24523A', color: '#fff' } : { color: '#5C6052' }}
                           >
                             <span className="text-base leading-none">{ch.icon}</span>
                             <span className="text-[10px] leading-tight font-medium">
@@ -341,13 +351,17 @@ export function SaleDialog({ open, editingSale, prefillSale, products, onClose }
               />
               </div>
 
-              {/* Notiz */}
+              {/* Gruppe 3 */}
+              <div className="border-t border-border/50 pt-4">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Notiz</p>
+              </div>
+
               <FormField
                 control={form.control}
                 name="note"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Notiz (optional)</FormLabel>
+                    <FormLabel className="sr-only">Notiz (optional)</FormLabel>
                     <FormControl>
                       <Textarea
                         placeholder="z. B. Stammkunde Maria, Rechnung folgt…"
@@ -362,7 +376,9 @@ export function SaleDialog({ open, editingSale, prefillSale, products, onClose }
               />
             </div>
 
-            <DialogFooter className="px-5 py-4 border-t border-border/50 shrink-0">
+            {/* mx-0 mb-0: neutralisiert die -mx-6/-mb-6 des Bausteins (die das
+                Standard-p-6 ausgleichen sollen — hier ist aber p-0) */}
+            <DialogFooter className="mx-0 mb-0 px-5 py-4 border-t border-border/50 shrink-0">
               <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>
                 Abbrechen
               </Button>
