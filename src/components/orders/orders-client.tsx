@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import type { FarmerOrder } from '@/server/queries/orders'
 import { OrderCard } from './order-card'
 import { ACTIVE_STATUSES, DONE_STATUSES } from './order-status'
@@ -20,6 +20,18 @@ export function OrdersClient({
 }) {
   const [filter, setFilter] = useState<Filter>('active')
 
+  // Haus-Muster (bestellungen-undo): lokale Kopie für optimistische
+  // Statuswechsel — die Karte wechselt sofort die Gruppe/Liste. Der Sync
+  // übernimmt nach revalidatePath den frischen Serverstand.
+  const [localOrders, setLocalOrders] = useState(orders)
+  useEffect(() => {
+    setLocalOrders(orders)
+  }, [orders])
+
+  function patchOrder(orderId: string, patch: Partial<FarmerOrder>) {
+    setLocalOrders((os) => os.map((o) => (o.id === orderId ? { ...o, ...patch } : o)))
+  }
+
   const todayStr = new Date().toDateString()
   const activeSet = ACTIVE_STATUSES as readonly string[]
   const doneSet = DONE_STATUSES as readonly string[]
@@ -27,23 +39,23 @@ export function OrdersClient({
   const filtered = useMemo(() => {
     switch (filter) {
       case 'today':
-        return orders.filter((o) => new Date(o.pickupDate).toDateString() === todayStr)
+        return localOrders.filter((o) => new Date(o.pickupDate).toDateString() === todayStr)
       case 'active':
-        return orders.filter((o) => activeSet.includes(o.status))
+        return localOrders.filter((o) => activeSet.includes(o.status))
       case 'done':
-        return orders.filter((o) => doneSet.includes(o.status))
+        return localOrders.filter((o) => doneSet.includes(o.status))
       default:
-        return orders
+        return localOrders
     }
-  }, [orders, filter, todayStr, activeSet, doneSet])
+  }, [localOrders, filter, todayStr, activeSet, doneSet])
 
   const grouped = useMemo(() => groupOrdersByPickupDay(filtered), [filtered])
 
   const counts = {
-    active: orders.filter((o) => activeSet.includes(o.status)).length,
-    today: orders.filter((o) => new Date(o.pickupDate).toDateString() === todayStr).length,
-    done: orders.filter((o) => doneSet.includes(o.status)).length,
-    all: orders.length,
+    active: localOrders.filter((o) => activeSet.includes(o.status)).length,
+    today: localOrders.filter((o) => new Date(o.pickupDate).toDateString() === todayStr).length,
+    done: localOrders.filter((o) => doneSet.includes(o.status)).length,
+    all: localOrders.length,
   }
 
   const tabs: { key: Filter; label: string }[] = [
@@ -107,7 +119,7 @@ export function OrdersClient({
             </h2>
             <div className="flex flex-col gap-3">
               {group.orders.map((order) => (
-                <OrderCard key={order.id} order={order} farmName={farmName} />
+                <OrderCard key={order.id} order={order} farmName={farmName} onPatch={patchOrder} />
               ))}
             </div>
           </div>

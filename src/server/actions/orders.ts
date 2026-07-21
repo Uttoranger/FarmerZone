@@ -170,6 +170,64 @@ export async function markAsPickedUpAndPaid(orderId: string): Promise<ActionResu
   return {}
 }
 
+// Ein-Schritt-Rückweg (bestellungen-undo): heilt einen Verdrücker bei
+// "Fertig melden". Nur aus READY erlaubt. Der Vorzustand wird nicht
+// gespeichert — er lässt sich eindeutig herleiten: online bereits bezahlte
+// Bestellungen (paymentStatus PAID) standen vor READY auf PAID, alle anderen
+// auf CONFIRMED. (IN_PREPARATION geht dabei bewusst auf CONFIRMED zurück —
+// ein harmloser Schritt weiter zurück statt einer gespeicherten Historie.)
+export async function revertReady(orderId: string): Promise<ActionResult> {
+  const farm = await getAuthFarm()
+  if (!farm) return { error: 'Nicht angemeldet' }
+
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, farmId: farm.id, status: 'READY' },
+    select: { id: true, paymentStatus: true },
+  })
+  if (!order) return { error: 'Bestellung nicht gefunden' }
+
+  const previous: OrderStatus = order.paymentStatus === 'PAID' ? 'PAID' : 'CONFIRMED'
+
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { status: previous },
+  })
+
+  // BEWUSST keine Mail beim Rückschritt — der Bauer sagt dem Kunden selbst
+  // Bescheid (der Dialog weist ihn darauf hin)
+
+  revalidatePath('/orders')
+  revalidatePath(`/orders/${orderId}`)
+  return {}
+}
+
+// Ein-Schritt-Rückweg: heilt einen Verdrücker bei "Abgeholt". Nur aus
+// PICKED_UP erlaubt, zurück auf READY, pickedUpAt wird geleert.
+// paymentStatus/paidAt bleiben UNANGETASTET: die Geld-Wahrheit (z. B. bar
+// kassiert bei "Abgeholt & bezahlt") wird von einem Undo nie verändert —
+// bewusste Grenze dieses Rückwegs.
+export async function revertPickedUp(orderId: string): Promise<ActionResult> {
+  const farm = await getAuthFarm()
+  if (!farm) return { error: 'Nicht angemeldet' }
+
+  const exists = await prisma.order.findFirst({
+    where: { id: orderId, farmId: farm.id, status: 'PICKED_UP' },
+    select: { id: true },
+  })
+  if (!exists) return { error: 'Bestellung nicht gefunden' }
+
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { status: 'READY', pickedUpAt: null },
+  })
+
+  // Keine Mail: der Kunde hatte die Abholbereitschafts-Mail bereits
+
+  revalidatePath('/orders')
+  revalidatePath(`/orders/${orderId}`)
+  return {}
+}
+
 export async function revertOrderStatus(orderId: string, previousStatus: string): Promise<ActionResult> {
   const REVERTABLE = ['PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY']
   if (!REVERTABLE.includes(previousStatus)) return { error: 'Status kann nicht zurückgesetzt werden' }
