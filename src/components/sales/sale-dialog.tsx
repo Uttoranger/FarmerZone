@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
+import { Info } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -142,7 +143,7 @@ export function SaleDialog({ open, editingSale, prefillSale, products, onClose }
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md max-h-[92dvh] flex flex-col p-0">
+      <DialogContent className="max-w-md md:max-w-2xl max-h-[92dvh] flex flex-col p-0">
         <DialogHeader className="px-5 pt-5 pb-0 shrink-0">
           <DialogTitle>{isEdit ? 'Verkauf bearbeiten' : 'Verkauf eintragen'}</DialogTitle>
         </DialogHeader>
@@ -153,6 +154,16 @@ export function SaleDialog({ open, editingSale, prefillSale, products, onClose }
             className="flex flex-col flex-1 min-h-0"
           >
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+
+              {/* Abgrenzungs-Hinweis (verkauf-dialog): was gehört hier rein? */}
+              <div className="flex items-start gap-2.5 rounded-xl border border-border bg-muted/40 px-3 py-2.5">
+                <Info className="size-4 shrink-0 mt-0.5 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Hier trägst du nur Verkäufe ein, die nicht über FarmerZone bestellt wurden —
+                  zum Beispiel bar im Hofladen oder am Markt. Alle Plattform-Bestellungen zählt
+                  die Auswertung automatisch, auch die mit &bdquo;Bar bei Abholung&ldquo;.
+                </p>
+              </div>
 
               {/* Produkt */}
               <div className="space-y-2">
@@ -274,7 +285,8 @@ export function SaleDialog({ open, editingSale, prefillSale, products, onClose }
                 />
               )}
 
-              {/* Kanal */}
+              {/* Kanal + Datum: mobil untereinander, ab md nebeneinander */}
+              <div className="grid gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
                 name="channel"
@@ -308,7 +320,6 @@ export function SaleDialog({ open, editingSale, prefillSale, products, onClose }
                 )}
               />
 
-              {/* Datum */}
               <FormField
                 control={form.control}
                 name="saleDate"
@@ -316,12 +327,19 @@ export function SaleDialog({ open, editingSale, prefillSale, products, onClose }
                   <FormItem>
                     <FormLabel>Datum</FormLabel>
                     <FormControl>
-                      <Input type="date" className="h-11" {...field} />
+                      {/* nativer Picker bleibt — nur die Hülle im Haus-Stil:
+                          appearance-none glättet das WebKit-Date-Rendering */}
+                      <Input
+                        type="date"
+                        className="h-11 appearance-none [&::-webkit-date-and-time-value]:text-left"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+              </div>
 
               {/* Notiz */}
               <FormField
