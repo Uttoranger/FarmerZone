@@ -5,7 +5,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { revalidatePath } from 'next/cache'
-import { sendOrderReady, sendOrderCancelled, type OrderForEmail } from '@/lib/email'
+import { sendOrderReady, sendOrderCancelled, sendOrderNotReady, type OrderForEmail } from '@/lib/email'
 import type { OrderStatus } from '@prisma/client'
 
 export type ActionResult = { error?: string }
@@ -176,13 +176,16 @@ export async function markAsPickedUpAndPaid(orderId: string): Promise<ActionResu
 // Bestellungen (paymentStatus PAID) standen vor READY auf PAID, alle anderen
 // auf CONFIRMED. (IN_PREPARATION geht dabei bewusst auf CONFIRMED zurück —
 // ein harmloser Schritt weiter zurück statt einer gespeicherten Historie.)
-export async function revertReady(orderId: string): Promise<ActionResult> {
+export async function revertReady(
+  orderId: string,
+  notifyCustomer: boolean = true
+): Promise<ActionResult> {
   const farm = await getAuthFarm()
   if (!farm) return { error: 'Nicht angemeldet' }
 
   const order = await prisma.order.findFirst({
     where: { id: orderId, farmId: farm.id, status: 'READY' },
-    select: { id: true, paymentStatus: true },
+    select: ORDER_EMAIL_SELECT,
   })
   if (!order) return { error: 'Bestellung nicht gefunden' }
 
@@ -193,8 +196,11 @@ export async function revertReady(orderId: string): Promise<ActionResult> {
     data: { status: previous },
   })
 
-  // BEWUSST keine Mail beim Rückschritt — der Bauer sagt dem Kunden selbst
-  // Bescheid (der Dialog weist ihn darauf hin)
+  // Kunden-Info nur auf Wunsch (Haken im Dialog, Standard AN): neutrales
+  // "Kurzes Update" — relativiert die bereits verschickte Abholbereit-Mail
+  if (notifyCustomer) {
+    await sendOrderNotReady(toEmailOrder(order, farm))
+  }
 
   revalidatePath('/orders')
   revalidatePath(`/orders/${orderId}`)

@@ -8,6 +8,7 @@ import { NewOrderNotificationEmail } from '@/emails/new-order-notification'
 import { OrderConfirmedEmail } from '@/emails/order-confirmed'
 import { OrderReadyEmail } from '@/emails/pickup-reminder'
 import { OrderCancelledEmail } from '@/emails/order-cancelled'
+import { OrderNotReadyEmail } from '@/emails/order-not-ready'
 import { CustomerMagicLinkEmail } from '@/emails/customer-magic-link'
 import { StatusUpdateEmail } from '@/emails/status-update'
 import { generateReorderToken } from '@/lib/reorder-token'
@@ -239,6 +240,27 @@ export async function sendOrderReady(order: OrderForEmail): Promise<void> {
   await send(
     order.customerEmail,
     `${order.farm.name}: Deine Bestellung ist bereit zur Abholung`,
+    html
+  )
+}
+
+/** Fertig-Rückschritt → Kunde (optional, Haken im Dialog): neutrales Update,
+ *  die Abholbereit-Mail war schon draußen und wird hiermit relativiert */
+export async function sendOrderNotReady(order: OrderForEmail): Promise<void> {
+  const html = await toHtml(React.createElement(OrderNotReadyEmail, {
+    customerName: order.customerName,
+    orderNumber: order.orderNumber,
+    farmName: order.farm.name,
+    farmPhone: order.farm.phone,
+    farmAddress: order.farm.address,
+    farmCity: order.farm.city,
+    pickupDate: formatPickupDate(order.pickupDate),
+    pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
+  }))
+
+  await send(
+    order.customerEmail,
+    `Kurzes Update zu deiner Bestellung ${order.orderNumber}`,
     html
   )
 }

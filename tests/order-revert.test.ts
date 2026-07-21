@@ -13,6 +13,7 @@ vi.mock('@/lib/stripe', () => ({ stripe: {} }))
 vi.mock('@/lib/email', () => ({
   sendOrderReady: vi.fn(),
   sendOrderCancelled: vi.fn(),
+  sendOrderNotReady: vi.fn(),
 }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -24,23 +25,39 @@ vi.mock('@/lib/prisma', () => ({
 import { revertReady, revertPickedUp } from '@/server/actions/orders'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { sendOrderReady, sendOrderCancelled } from '@/lib/email'
+import { sendOrderReady, sendOrderCancelled, sendOrderNotReady } from '@/lib/email'
 
 const getSession = vi.mocked(auth.api.getSession)
 const farmFindUnique = vi.mocked(prisma.farm.findUnique)
 const orderFindFirst = vi.mocked(prisma.order.findFirst)
 const orderUpdate = vi.mocked(prisma.order.update)
 
+const EMAIL_ORDER = {
+  id: 'order_1',
+  orderNumber: 'TH-1907-TEST',
+  customerName: 'Anna Testerin',
+  customerEmail: 'kundin@test.local',
+  customerPhone: '+43 660 1234567',
+  totalAmount: { toString: () => '7.00' },
+  pickupDate: new Date('2026-07-21T12:00:00Z'),
+  pickupTimeStart: '09:00',
+  pickupTimeEnd: '12:00',
+  paymentMethod: 'ONSITE_CASH',
+  paymentStatus: 'PENDING',
+  stripePaymentIntentId: null,
+  items: [],
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   getSession.mockResolvedValue({ user: { id: 'user_1' } } as never)
-  farmFindUnique.mockResolvedValue({ id: 'farm_1' } as never)
+  farmFindUnique.mockResolvedValue({ id: 'farm_1', name: 'Testhof', slug: 'testhof', email: 'hof@test.local', ownerName: 'Franz', address: 'Weg 1', postalCode: '5270', city: 'Mauerkirchen', phone: '' } as never)
   orderUpdate.mockResolvedValue({} as never)
 })
 
 describe('revertReady', () => {
   it('nur aus READY: Query ist auf Status READY + eigene Farm gescoped', async () => {
-    orderFindFirst.mockResolvedValue({ id: 'order_1', paymentStatus: 'PENDING' } as never)
+    orderFindFirst.mockResolvedValue({ ...EMAIL_ORDER, paymentStatus: 'PENDING' } as never)
     await revertReady('order_1')
     expect(orderFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -64,7 +81,7 @@ describe('revertReady', () => {
   })
 
   it('Herleitung: paymentStatus PAID → zurück auf PAID', async () => {
-    orderFindFirst.mockResolvedValue({ id: 'order_1', paymentStatus: 'PAID' } as never)
+    orderFindFirst.mockResolvedValue({ ...EMAIL_ORDER, paymentStatus: 'PAID' } as never)
     const result = await revertReady('order_1')
     expect(result).toEqual({})
     expect(orderUpdate).toHaveBeenCalledWith({
@@ -74,7 +91,7 @@ describe('revertReady', () => {
   })
 
   it('Herleitung: paymentStatus nicht PAID → zurück auf CONFIRMED', async () => {
-    orderFindFirst.mockResolvedValue({ id: 'order_1', paymentStatus: 'PENDING' } as never)
+    orderFindFirst.mockResolvedValue({ ...EMAIL_ORDER, paymentStatus: 'PENDING' } as never)
     await revertReady('order_1')
     expect(orderUpdate).toHaveBeenCalledWith({
       where: { id: 'order_1' },
@@ -82,11 +99,30 @@ describe('revertReady', () => {
     })
   })
 
-  it('verschickt KEINE Mail', async () => {
-    orderFindFirst.mockResolvedValue({ id: 'order_1', paymentStatus: 'PAID' } as never)
+  it('Haken AN (Standard) → sendOrderNotReady genau einmal, sonst keine Mail', async () => {
+    orderFindFirst.mockResolvedValue({ ...EMAIL_ORDER, paymentStatus: 'PAID' } as never)
     await revertReady('order_1')
+    expect(sendOrderNotReady).toHaveBeenCalledTimes(1)
+    expect(sendOrderNotReady).toHaveBeenCalledWith(
+      expect.objectContaining({ customerEmail: 'kundin@test.local', orderNumber: 'TH-1907-TEST' })
+    )
     expect(sendOrderReady).not.toHaveBeenCalled()
     expect(sendOrderCancelled).not.toHaveBeenCalled()
+  })
+
+  it('Haken AUS → Mail-Mock bleibt still', async () => {
+    orderFindFirst.mockResolvedValue({ ...EMAIL_ORDER, paymentStatus: 'PENDING' } as never)
+    const result = await revertReady('order_1', false)
+    expect(result).toEqual({})
+    expect(sendOrderNotReady).not.toHaveBeenCalled()
+    expect(sendOrderReady).not.toHaveBeenCalled()
+    expect(sendOrderCancelled).not.toHaveBeenCalled()
+  })
+
+  it('abgelehnter Rückschritt verschickt auch mit Haken keine Mail', async () => {
+    orderFindFirst.mockResolvedValue(null)
+    await revertReady('order_confirmed', true)
+    expect(sendOrderNotReady).not.toHaveBeenCalled()
   })
 })
 
@@ -126,10 +162,11 @@ describe('revertPickedUp', () => {
     expect(updateArg.data).not.toHaveProperty('paidAt')
   })
 
-  it('verschickt KEINE Mail', async () => {
+  it('bleibt mailfrei — auch die neue Update-Mail wird NIE verschickt', async () => {
     orderFindFirst.mockResolvedValue({ id: 'order_1' } as never)
     await revertPickedUp('order_1')
     expect(sendOrderReady).not.toHaveBeenCalled()
     expect(sendOrderCancelled).not.toHaveBeenCalled()
+    expect(sendOrderNotReady).not.toHaveBeenCalled()
   })
 })
