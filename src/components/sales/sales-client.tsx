@@ -1,19 +1,22 @@
-﻿'use client'
+'use client'
 
+// Verkauf 2 (Referenz 19, Verkauf-Sektion): Anker-Zahl der Woche,
+// Online/Bar-Summenkarten mit Definitions-Fußnoten, vereinte Verkaufsliste.
+// BEWUSST NICHT: Zeitraum-Umschalter (Parkliste), Auszahlungs-Beträge
+// (Sprint-19-Entscheidung: Link statt Zahl), Charts (→ Auswertung).
 import { useState, useTransition } from 'react'
-import { Plus, ExternalLink } from 'lucide-react'
+import { PlusCircle, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import { createStripeDashboardLinkAction } from '@/server/actions/stripe-connect'
-import { Button } from '@/components/ui/button'
-import type { ManualSaleData } from '@/server/queries/manual-sales'
+import type { ManualSaleData, SalesOverview } from '@/server/queries/manual-sales'
 import type { ProductData } from '@/server/queries/products'
 import { CHANNEL_ICONS, CHANNEL_LABELS } from '@/schemas/manual-sale'
 import { SaleDialog } from './sale-dialog'
-import { SaleList } from './sale-list'
+import { SalesFeedList } from './sales-feed-list'
 import { PageHeader } from '@/components/farmer/page-header'
 
 type Props = {
-  recentSales: ManualSaleData[]
+  overview: SalesOverview
   products: ProductData[]
   stripeReady: boolean
 }
@@ -46,7 +49,7 @@ function formatEuro(amount: number) {
   return new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(amount)
 }
 
-export function SalesClient({ recentSales, products, stripeReady }: Props) {
+export function SalesClient({ overview, products, stripeReady }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingSale, setEditingSale] = useState<ManualSaleData | null>(null)
   const [prefillSale, setPrefillSale] = useState<ManualSaleData | null>(null)
@@ -75,30 +78,76 @@ export function SalesClient({ recentSales, products, stripeReady }: Props) {
     setPrefillSale(null)
   }
 
-  // Last 4 distinct sales for quick-repeat buttons
-  const quickSales = recentSales.slice(0, 4)
+  // Schnell-Wiederholen aus den letzten Direktverkäufen der Liste
+  const quickSales = overview.feed
+    .filter((e): e is Extract<typeof e, { kind: 'manual' }> => e.kind === 'manual')
+    .map((e) => e.sale)
+    .slice(0, 4)
 
   return (
     <>
-      {/* Header */}
+      {/* Kopf wie die Nachbarseiten, rechts das "Produkt anlegen"-Muster */}
       <PageHeader
-        title="Verkauf eintragen"
-        subtitle="Direktverkäufe schnell erfassen"
+        title="Verkauf"
+        subtitle="Was du diese Woche eingenommen hast"
         action={
-          <Button onClick={openNewSale} className="gap-1.5 bg-accent text-accent-foreground hover:bg-accent-hover">
-            <Plus className="w-4 h-4" />
-            Neu
-          </Button>
+          <button
+            onClick={openNewSale}
+            className="shrink-0 inline-flex items-center gap-1.5 h-11 px-5 rounded-lg bg-accent text-accent-foreground text-sm font-semibold hover:bg-accent-hover transition-colors"
+            style={{ boxShadow: '0 4px 14px rgba(232,133,74,0.3)' }}
+          >
+            <PlusCircle className="size-4" />
+            Verkauf eintragen
+          </button>
         }
       />
 
+      {/* Anker-Karte: die eine große Zahl */}
+      <div className="bg-white rounded-[14px] border border-border p-5 mb-4">
+        <p className="text-[13px]" style={{ color: '#9AA08F' }}>
+          Diese Woche
+        </p>
+        <p className="font-heading text-4xl md:text-[40px] font-bold mt-1.5 tabular-nums" style={{ color: '#2D3027' }}>
+          {formatEuro(overview.weekTotal)}
+        </p>
+        <p className="text-xs mt-1.5" style={{ color: '#9AA08F' }}>
+          Gesamt: {formatEuro(overview.ytdTotal)}
+        </p>
+      </div>
+
+      {/* Online/Bar-Summenkarten mit Definitions-Fußnoten */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
+        <div className="bg-white rounded-[14px] border border-border p-5">
+          <p className="text-[13px]" style={{ color: '#9AA08F' }}>
+            Online bezahlt
+          </p>
+          <p className="font-heading text-[26px] font-bold mt-1 tabular-nums" style={{ color: '#2D3027' }}>
+            {formatEuro(overview.weekOnline)}
+          </p>
+          <p className="text-xs mt-1" style={{ color: '#9AA08F' }}>
+            Über FarmerZone bezahlte, abgeholte Bestellungen.
+          </p>
+        </div>
+        <div className="bg-white rounded-[14px] border border-border p-5">
+          <p className="text-[13px]" style={{ color: '#9AA08F' }}>
+            Bar kassiert
+          </p>
+          <p className="font-heading text-[26px] font-bold mt-1 tabular-nums" style={{ color: '#2D3027' }}>
+            {formatEuro(overview.weekBar)}
+          </p>
+          <p className="text-xs mt-1" style={{ color: '#9AA08F' }}>
+            Vor Ort kassierte Abholungen plus deine Direktverkäufe.
+          </p>
+        </div>
+      </div>
+
       {stripeReady && (
-        <div className="-mt-3 mb-5">
+        <div className="mb-6">
           <StripePayoutLink />
         </div>
       )}
 
-      {/* Quick-repeat buttons */}
+      {/* Schnell wiederholen */}
       {quickSales.length > 0 && (
         <section className="mb-8">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
@@ -109,7 +158,7 @@ export function SalesClient({ recentSales, products, stripeReady }: Props) {
               <button
                 key={sale.id}
                 onClick={() => openFromQuick(sale)}
-                className="flex items-start gap-3 p-3 rounded-xl border border-border hover:border-green-300 hover:bg-primary/8 active:scale-[0.98] transition-all text-left"
+                className="flex items-start gap-3 p-3 rounded-xl border border-border bg-white hover:border-green-300 hover:bg-primary/8 active:scale-[0.98] transition-all text-left"
               >
                 <span className="text-2xl shrink-0 mt-0.5">
                   {CHANNEL_ICONS[sale.channel] ?? '·'}
@@ -128,15 +177,14 @@ export function SalesClient({ recentSales, products, stripeReady }: Props) {
         </section>
       )}
 
-      {/* Recent sales list */}
+      {/* Vereinte Verkaufsliste */}
       <section>
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
           Letzte Verkäufe
         </p>
-        <SaleList sales={recentSales} onEdit={openEdit} />
+        <SalesFeedList feed={overview.feed} onEdit={openEdit} />
       </section>
 
-      {/* Dialog */}
       <SaleDialog
         open={dialogOpen}
         editingSale={editingSale}
@@ -147,4 +195,3 @@ export function SalesClient({ recentSales, products, stripeReady }: Props) {
     </>
   )
 }
-

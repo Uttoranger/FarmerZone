@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
-import { getRecentManualSales } from '@/server/queries/manual-sales'
+import { getSalesOverview } from '@/server/queries/manual-sales'
 import { getProductsForFarm } from '@/server/queries/products'
 import { getStripeReadiness } from '@/server/queries/farm'
 import { SalesClient } from '@/components/sales/sales-client'
@@ -14,12 +14,15 @@ export default async function SalesPage() {
   const farm = await getFarmForUser(session.user.id)
   if (!farm) redirect('/login')
 
-  const [recentSales, products, stripeReady] = await Promise.all([getRecentManualSales(farm.id, 20),
-    getProductsForFarm(farm.id), getStripeReadiness(session.user.id)])
+  const [overview, products, stripeReady] = await Promise.all([
+    getSalesOverview(farm.id),
+    getProductsForFarm(farm.id),
+    getStripeReadiness(session.user.id),
+  ])
 
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto">
-      <SalesClient recentSales={recentSales} products={products} stripeReady={stripeReady} />
+      <SalesClient overview={overview} products={products} stripeReady={stripeReady} />
     </div>
   )
 }
