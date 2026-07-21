@@ -12,6 +12,8 @@ import {
   markAsPickedUpAndPaid,
   cancelOrder,
   revertOrderStatus,
+  revertReady,
+  revertPickedUp,
 } from '@/server/actions/orders'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -25,10 +27,21 @@ import {
 import { statusLabel, statusColor, paymentLabel } from './order-status'
 import { formatOrderLine } from '@/lib/order-line'
 
-export function OrderCard({ order, farmName }: { order: FarmerOrder; farmName: string }) {
+export function OrderCard({
+  order,
+  farmName,
+  onPatch,
+}: {
+  order: FarmerOrder
+  farmName: string
+  // optimistischer Patch in die Liste (Haus-Muster) — optional, damit die
+  // Karte auch ohne Listen-Kontext funktioniert
+  onPatch?: (orderId: string, patch: Partial<FarmerOrder>) => void
+}) {
   const [isPending, startTransition] = useTransition()
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
+  const [revertDialog, setRevertDialog] = useState<'ready' | 'pickedUp' | null>(null)
 
   const isOnline = order.paymentMethod === 'ONLINE'
   const status = order.status
@@ -38,6 +51,8 @@ export function OrderCard({ order, farmName }: { order: FarmerOrder; farmName: s
   const canMarkPickedUp = status === 'READY' && isOnline
   const canMarkPickedUpAndPaid = status === 'READY' && !isOnline
   const canCancel = !['CANCELLED', 'PICKED_UP', 'NOT_PICKED_UP'].includes(status)
+  const canRevertReady = status === 'READY'
+  const canRevertPickedUp = status === 'PICKED_UP'
 
   function handleWithUndo(
     fn: (id: string) => Promise<{ error?: string }>,
@@ -63,6 +78,29 @@ export function OrderCard({ order, farmName }: { order: FarmerOrder; farmName: s
           },
         },
       })
+    })
+  }
+
+  // Ein-Schritt-Rückweg: optimistisch (Karte wechselt sofort die Gruppe),
+  // bei Server-Fehler Patch zurückrollen + Toast. Keine Mail in beiden Pfaden.
+  function handleRevert(kind: 'ready' | 'pickedUp') {
+    setRevertDialog(null)
+    // Spiegel der Server-Herleitung (revertReady) bzw. fester Zielstatus
+    const optimistic: Partial<FarmerOrder> =
+      kind === 'ready'
+        ? { status: order.paymentStatus === 'PAID' ? 'PAID' : 'CONFIRMED' }
+        : { status: 'READY', pickedUpAt: null }
+    const rollback: Partial<FarmerOrder> =
+      kind === 'ready' ? { status: 'READY' } : { status: 'PICKED_UP', pickedUpAt: order.pickedUpAt }
+    onPatch?.(order.id, optimistic)
+    startTransition(async () => {
+      const result = kind === 'ready' ? await revertReady(order.id) : await revertPickedUp(order.id)
+      if (result.error) {
+        onPatch?.(order.id, rollback)
+        toast.error(result.error)
+      } else {
+        toast.success(kind === 'ready' ? 'Zurück in Arbeit' : 'Zurück zu Abholbereit')
+      }
     })
   }
 
@@ -193,6 +231,20 @@ export function OrderCard({ order, farmName }: { order: FarmerOrder; farmName: s
               </Button>
             </Link>
           </div>
+
+          {/* Ein-Schritt-Rückweg: tertiär, eigene Zeile rechts — bewusst
+              räumlich getrennt vom destruktiven "Zurücknehmen" (Storno) */}
+          {(canRevertReady || canRevertPickedUp) && (
+            <div className="flex justify-end mt-1">
+              <button
+                onClick={() => setRevertDialog(canRevertReady ? 'ready' : 'pickedUp')}
+                disabled={isPending}
+                className="min-h-11 px-2 text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline transition-colors"
+              >
+                {canRevertReady ? 'Doch nicht fertig' : 'Abholung rückgängig'}
+              </button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -222,6 +274,46 @@ export function OrderCard({ order, farmName }: { order: FarmerOrder; farmName: s
             </Button>
             <Button variant="destructive" onClick={handleCancel} disabled={isCancelling}>
               {isCancelling ? 'Storniere…' : 'Zurücknehmen'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rückweg-Dialoge (bestellungen-undo) */}
+      <Dialog open={revertDialog === 'ready'} onOpenChange={(o) => !o && setRevertDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Doch nicht fertig?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Der Kunde wurde bereits per E-Mail über die Abholbereitschaft informiert — gib ihm
+            ggf. kurz Bescheid.
+          </p>
+          <DialogFooter>
+            <Button variant="ghost" className="h-11" onClick={() => setRevertDialog(null)}>
+              Abbrechen
+            </Button>
+            <Button variant="outline" className="h-11" onClick={() => handleRevert('ready')}>
+              Zurück in Arbeit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={revertDialog === 'pickedUp'} onOpenChange={(o) => !o && setRevertDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Abholung rückgängig?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Bestellung wandert zurück zu Abholbereit. Es wird keine neue E-Mail verschickt.
+          </p>
+          <DialogFooter>
+            <Button variant="ghost" className="h-11" onClick={() => setRevertDialog(null)}>
+              Abbrechen
+            </Button>
+            <Button variant="outline" className="h-11" onClick={() => handleRevert('pickedUp')}>
+              Abholung rückgängig
             </Button>
           </DialogFooter>
         </DialogContent>
