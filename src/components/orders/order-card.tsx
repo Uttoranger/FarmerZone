@@ -42,6 +42,8 @@ export function OrderCard({
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
   const [revertDialog, setRevertDialog] = useState<'ready' | 'pickedUp' | null>(null)
+  // Kunden-Info beim Fertig-Rückschritt — Standard AN, pro Öffnen frisch
+  const [notifyCustomer, setNotifyCustomer] = useState(true)
 
   const isOnline = order.paymentMethod === 'ONLINE'
   const status = order.status
@@ -94,7 +96,8 @@ export function OrderCard({
       kind === 'ready' ? { status: 'READY' } : { status: 'PICKED_UP', pickedUpAt: order.pickedUpAt }
     onPatch?.(order.id, optimistic)
     startTransition(async () => {
-      const result = kind === 'ready' ? await revertReady(order.id) : await revertPickedUp(order.id)
+      const result =
+        kind === 'ready' ? await revertReady(order.id, notifyCustomer) : await revertPickedUp(order.id)
       if (result.error) {
         onPatch?.(order.id, rollback)
         toast.error(result.error)
@@ -235,14 +238,20 @@ export function OrderCard({
           {/* Ein-Schritt-Rückweg: tertiär, eigene Zeile rechts — bewusst
               räumlich getrennt vom destruktiven "Zurücknehmen" (Storno) */}
           {(canRevertReady || canRevertPickedUp) && (
-            <div className="flex justify-end mt-1">
-              <button
-                onClick={() => setRevertDialog(canRevertReady ? 'ready' : 'pickedUp')}
+            <div className="flex justify-end mt-2">
+              {/* Stil wie der "Details"-Button: klar als Knopf erkennbar */}
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-10 px-4 text-muted-foreground cursor-pointer"
+                onClick={() => {
+                  setNotifyCustomer(true)
+                  setRevertDialog(canRevertReady ? 'ready' : 'pickedUp')
+                }}
                 disabled={isPending}
-                className="min-h-11 px-2 text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline transition-colors"
               >
                 {canRevertReady ? 'Doch nicht fertig' : 'Abholung rückgängig'}
-              </button>
+              </Button>
             </div>
           )}
         </CardContent>
@@ -289,6 +298,15 @@ export function OrderCard({
             Der Kunde wurde bereits per E-Mail über die Abholbereitschaft informiert — gib ihm
             ggf. kurz Bescheid.
           </p>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={notifyCustomer}
+              onChange={(e) => setNotifyCustomer(e.target.checked)}
+              className="mt-0.5 accent-primary w-4 h-4"
+            />
+            <span className="text-sm text-foreground">Kunden per E-Mail informieren</span>
+          </label>
           <DialogFooter>
             <Button variant="ghost" className="h-11" onClick={() => setRevertDialog(null)}>
               Abbrechen
