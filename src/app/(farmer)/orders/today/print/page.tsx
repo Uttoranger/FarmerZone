@@ -127,7 +127,7 @@ export default async function PrintPacklistPage() {
               </h2>
               <div className="space-y-4">
                 {orders.map((order) => (
-                  <div key={order.id} className="border border-gray-200 rounded-lg px-4 py-3">
+                  <div key={order.id} className="border border-gray-200 rounded-lg px-4 py-3 break-inside-avoid">
                     <div className="flex items-baseline justify-between mb-2">
                       <div>
                         <span className="font-semibold text-gray-900">{order.customerName}</span>

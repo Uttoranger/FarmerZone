@@ -34,7 +34,7 @@ export default async function FarmerLayout({ children }: { children: React.React
 
         {/* min-w-0: als Flex-Item darf main nicht mit breitem Inhalt über den
             Viewport wachsen — sonst greift kein overflow-x-auto der Kinder */}
-        <main className="flex-1 min-w-0 pb-24 md:pb-0 md:ml-56">
+        <main className="flex-1 min-w-0 pb-24 md:pb-0 md:ml-56 print:ml-0 print:pb-0">
           <ShopLinkBanner farmSlug={farm.slug} />
           {children}
         </main>

@@ -54,7 +54,7 @@ export function ShopLinkBanner({ farmSlug }: ShopLinkBannerProps) {
   if (!visible) return null
 
   return (
-    <div className="mx-4 mt-3 mb-0">
+    <div className="mx-4 mt-3 mb-0 print:hidden">
       <div className="bg-card rounded-xl ring-1 ring-border/60 shadow-[0_1px_4px_oklch(0.18_0.03_150_/_0.04)] h-14 px-3 flex items-center gap-2">
         {/* Left: label + url */}
         <div className="flex items-center gap-2 flex-1 min-w-0">
