@@ -128,6 +128,11 @@ export function ProductDialog({ open, product, onClose }: Props) {
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error('Datei zu groß (max. 25 MB)')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
     if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl)
     setSelectedFile(file)
     setPreviewUrl(URL.createObjectURL(file))
@@ -156,7 +161,14 @@ export function ProductDialog({ open, product, onClose }: Props) {
       let imageUrl = data.imageUrl ?? ''
 
       if (selectedFile) {
-        const resized = await resizeToWebP(selectedFile, 2400).catch(() => selectedFile)
+        let resized: File
+        try {
+          resized = await resizeToWebP(selectedFile, 2400)
+        } catch {
+          // Kein Roh-Upload: der Browser konnte das Format nicht dekodieren
+          toast.error('Dieses Bildformat unterstützt dein Browser nicht (z. B. HEIC) — bitte JPEG oder PNG wählen')
+          return
+        }
         const fd = new FormData()
         fd.append('file', resized)
         fd.append('target', 'product')
@@ -252,7 +264,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
                       {previewUrl ? 'Foto ersetzen' : 'Foto wählen'}
                     </label>
                     <p className="text-xs text-muted-foreground/60 mt-1.5">
-                      JPEG, PNG oder WebP · max. 10 MB
+                      JPEG, PNG oder WebP — wird automatisch verkleinert
                     </p>
                   </div>
                 </div>
