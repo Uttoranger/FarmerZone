@@ -5,6 +5,7 @@ import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 
 const ALLOWED_TARGETS = ['product', 'banner', 'logo', 'gallery', 'status'] as const
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 type UploadTarget = typeof ALLOWED_TARGETS[number]
 
 const VERCEL_BLOB_HOST = /\.public\.blob\.vercel-storage\.com\//
@@ -38,8 +39,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Keine Datei übergeben' }, { status: 400 })
   }
 
-  // Server-side content-type check
-  if (!file.type.startsWith('image/')) {
+  // Server-side content-type check — exakte Whitelist, kein startsWith:
+  // Browser können z. B. gespeicherte .heic nicht anzeigen
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
     return NextResponse.json({ error: 'Nur Bilder erlaubt (JPEG, PNG, WebP)' }, { status: 400 })
   }
 

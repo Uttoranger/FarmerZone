@@ -122,6 +122,24 @@ describe('POST /api/upload', () => {
     expect(body.error).toMatch(/Bilder/)
   })
 
+  it('400 bei HEIC — Fehlertext nennt JPEG/PNG/WebP', async () => {
+    const heicFile = makeFile('foto.heic', 'image/heic', 1024)
+    const fd = new FormData()
+    fd.append('file', heicFile)
+    const res = await POST(makeRequest(fd))
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toMatch(/JPEG.*PNG.*WebP/)
+  })
+
+  it('WebP unter 4 MB passiert Typ- und Größenprüfung', async () => {
+    const webpFile = makeFile('foto.webp', 'image/webp', 2 * 1024 * 1024)
+    const fd = makeFormData({ file: webpFile, target: 'product', id: 'prod-1' })
+    const res = await POST(makeRequest(fd))
+    expect(res.status).toBe(200)
+    expect(mockPut).toHaveBeenCalledOnce()
+  })
+
   it('400 wenn Datei > 4 MB', async () => {
     const bigFile = makeFile('big.jpg', 'image/jpeg', 4 * 1024 * 1024 + 1)
     const fd = new FormData()

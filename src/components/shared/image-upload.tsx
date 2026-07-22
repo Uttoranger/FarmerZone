@@ -27,11 +27,29 @@ export async function resizeToWebP(file: File, maxLongSide: number, quality = 0.
       const ctx = canvas.getContext('2d')
       if (!ctx) return reject(new Error('Canvas nicht verfügbar'))
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+      const finish = (blob: Blob) => {
+        // Typ und Endung ehrlich aus dem tatsächlichen Encode-Ergebnis ableiten
+        const ext = blob.type === 'image/webp' ? '.webp' : '.jpg'
+        const outName = file.name.replace(/\.[^.]+$/, '') + ext
+        resolve(new File([blob], outName, { type: blob.type }))
+      }
+
       canvas.toBlob(
         (blob) => {
-          if (!blob) return reject(new Error('Canvas toBlob fehlgeschlagen'))
-          const outName = file.name.replace(/\.[^.]+$/, '.webp')
-          resolve(new File([blob], outName, { type: 'image/webp' }))
+          if (blob && blob.type === 'image/webp') return finish(blob)
+          // Safari kann kein WebP und fällt spezifikationsgemäß still auf PNG
+          // zurück — dann denselben Canvas als JPEG kodieren
+          canvas.toBlob(
+            (jpegBlob) => {
+              if (!jpegBlob || jpegBlob.type !== 'image/jpeg') {
+                return reject(new Error('Bild konnte nicht umgewandelt werden — bitte ein JPEG- oder PNG-Foto wählen'))
+              }
+              finish(jpegBlob)
+            },
+            'image/jpeg',
+            0.85,
+          )
         },
         'image/webp',
         quality,
@@ -61,14 +79,18 @@ export function useImageUpload({ variant, targetId, oldUrl, onUploaded }: UseIma
   }
 
   async function handleFile(file: File) {
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('Datei zu groß (max. 10 MB)')
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error('Datei zu groß (max. 25 MB)')
       return
     }
 
     setIsUploading(true)
     try {
       const resized = await resizeToWebP(file, MAX_LONG_SIDE[variant])
+      if (resized.size > 3.5 * 1024 * 1024) {
+        toast.error('Bild konnte nicht ausreichend verkleinert werden — bitte kleineres Foto wählen')
+        return
+      }
       const fd = new FormData()
       fd.append('file', resized)
       fd.append('target', variant)
