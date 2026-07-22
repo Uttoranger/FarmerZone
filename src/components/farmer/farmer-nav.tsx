@@ -42,7 +42,7 @@ export function FarmerNav({ farmName, userName, ordersBadge }: FarmerNavProps) {
   return (
     <>
       {/* ===== MOBILE: Bottom Tab Bar ===== */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border md:hidden" style={{ background: '#24523A' }}>
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border md:hidden print:hidden" style={{ background: '#24523A' }}>
         <div className="flex items-stretch h-16">
           {/* Platz-Regel: mit 7 Tabs fielen Tap-Ziele auf 46px (<48) — Auswertung
               wandert daher als einziger Punkt mit ins Mehr-Sheet */}
@@ -152,7 +152,7 @@ export function FarmerNav({ farmName, userName, ordersBadge }: FarmerNavProps) {
 
       {/* ===== DESKTOP: Sidebar ===== */}
       <aside
-        className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:w-56 z-40"
+        className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:w-56 z-40 print:hidden"
         style={{ background: '#24523A', borderRight: '1px solid rgba(255,255,255,0.08)' }}
       >
         {/* Hof-Name */}
