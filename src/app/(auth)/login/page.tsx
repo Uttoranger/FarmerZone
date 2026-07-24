@@ -124,6 +124,12 @@ export default function LoginPage() {
                 required
                 className="h-11 text-base"
               />
+              <Link
+                href="/forgot-password"
+                className="self-end text-xs text-muted-foreground hover:text-foreground hover:underline underline-offset-2"
+              >
+                Passwort vergessen?
+              </Link>
             </div>
 
             {fehler && (

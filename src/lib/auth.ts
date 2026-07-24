@@ -35,6 +35,20 @@ export const auth = betterAuth({
     // Better-Auth-Default, jetzt sichtbar konfiguriert — muss zur Zod-Regel
     // min(8) in src/schemas/register.ts und zur Checkliste (password-rules) passen
     minPasswordLength: 8,
+    // Better-Auth-Default (1 Stunde), jetzt sichtbar konfiguriert — muss zum
+    // Gültigkeitshinweis in der Reset-Mail (password-reset.tsx) passen
+    resetPasswordTokenExpiresIn: 3600,
+    // Nach erfolgreichem Reset fliegen alle alten Sessions
+    revokeSessionsOnPasswordReset: true,
+    sendResetPassword: async ({ user, url }) => {
+      try {
+        const { sendPasswordResetEmail } = await import('@/lib/email')
+        await sendPasswordResetEmail(user.email, url)
+      } catch (err) {
+        console.error('[Passwort-Reset] E-Mail-Fehler:', err)
+        console.log(`[DEV] Passwort-Reset für ${user.email}: ${url}`)
+      }
+    },
   },
 
   plugins: [
