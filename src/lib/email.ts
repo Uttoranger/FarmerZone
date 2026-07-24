@@ -10,6 +10,7 @@ import { OrderReadyEmail } from '@/emails/pickup-reminder'
 import { OrderCancelledEmail } from '@/emails/order-cancelled'
 import { OrderNotReadyEmail } from '@/emails/order-not-ready'
 import { CustomerMagicLinkEmail } from '@/emails/customer-magic-link'
+import { PasswordResetEmail } from '@/emails/password-reset'
 import { StatusUpdateEmail } from '@/emails/status-update'
 import { generateReorderToken } from '@/lib/reorder-token'
 import { unitSuffix, type OrderLineProduct } from '@/lib/order-line'
@@ -109,6 +110,12 @@ function n(v: { toString(): string } | number): number {
 export async function sendMagicLinkEmail(email: string, url: string, firstName?: string): Promise<void> {
   const html = await toHtml(React.createElement(CustomerMagicLinkEmail, { firstName, magicUrl: url }))
   await send(email, 'Dein Login-Link für FarmerZone', html)
+}
+
+/** Passwort-Reset → Bauer */
+export async function sendPasswordResetEmail(email: string, url: string): Promise<void> {
+  const html = await toHtml(React.createElement(PasswordResetEmail, { resetUrl: url }))
+  await send(email, 'Passwort zurücksetzen · FarmerZone', html)
 }
 
 /** Online-Zahlung bestätigt → Kunde */
