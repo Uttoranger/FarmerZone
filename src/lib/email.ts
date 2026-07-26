@@ -23,16 +23,23 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 // Einmal beim Serverstart loggen damit man im Terminal sieht ob der Key gelesen wurde
 console.log(`[E-Mail] Init — RESEND_API_KEY=${apiKey ? 'gesetzt' : 'FEHLT → nur Log-Modus'} FROM=${FROM}`)
 
+// Empfängeradressen sind personenbezogene Daten und haben in den
+// Produktions-Logs (Vercel) nichts verloren — lokal bleiben sie sichtbar,
+// weil man dort ohne sie nicht debuggen kann.
+function logEmpfaenger(to: string): string {
+  return process.env.NODE_ENV === 'production' ? '[Empfänger verborgen]' : to
+}
+
 async function toHtml(element: React.ReactElement): Promise<string> {
   return render(element)
 }
 
 export async function sendRaw(to: string, subject: string, html: string): Promise<{ id?: string; error?: string }> {
   if (!resend) {
-    console.log(`[E-Mail] KEIN API-KEY — würde senden: "${subject}" → ${to}`)
+    console.log(`[E-Mail] KEIN API-KEY — würde senden: "${subject}" → ${logEmpfaenger(to)}`)
     return { error: 'RESEND_API_KEY nicht gesetzt' }
   }
-  console.log(`[E-Mail] Sende: "${subject}" → ${to} (from: ${FROM})`)
+  console.log(`[E-Mail] Sende: "${subject}" → ${logEmpfaenger(to)} (from: ${FROM})`)
   try {
     const result = await resend.emails.send({ from: FROM, to, subject, html })
     if (result.error) {
