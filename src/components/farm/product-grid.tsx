@@ -11,6 +11,7 @@ import { ShoppingCart, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff, C
 import { toast } from 'sonner'
 import { useCart } from '@/lib/use-cart'
 import { UNIT_LABELS, MONTH_SHORT, seasonLabel } from '@/schemas/product'
+import { SHOP_PAUSED_BUTTON_LABEL } from '@/lib/shop-pause'
 import type { PublicProduct } from '@/server/queries/farm'
 import { updateProductImageAction, reorderProductsAction } from '@/server/actions/products'
 import { ReorderContext } from '@/components/shared/reorder-context'
@@ -26,6 +27,8 @@ type Props = {
   initialReorderItems?: ReorderItem[]
   ownerMode?: boolean
   mode?: 'edit' | 'preview'
+  /** Shop pausiert: Kauf-Schaltflächen sind tot (Durchsetzung liegt am Server). */
+  isPaused?: boolean
 }
 
 const LOW_STOCK = 5
@@ -260,14 +263,16 @@ function ProductCard({
   isAddingId,
   ownerMode = false,
   isEditMode = false,
+  isPaused = false,
 }: {
   product: PublicProduct
   onAddToCart: (product: PublicProduct) => void
   isAddingId: string | null
   ownerMode?: boolean
   isEditMode?: boolean
+  isPaused?: boolean
 }) {
-  const canBuy = product.isAvailable && product.stock > 0
+  const canBuy = product.isAvailable && product.stock > 0 && !isPaused
   const isAdding = isAddingId === product.id
   const dim = isEditMode && !product.isAvailable ? 0.55 : 1
 
@@ -342,9 +347,11 @@ function ProductCard({
               className="w-full h-10 flex items-center justify-center rounded-lg text-xs px-2 text-center"
               style={{ background: 'rgba(242,236,221,0.95)', color: '#6E5F45' }}
             >
-              {!product.isAvailable
-                ? product.unavailableReason || 'Nicht verfügbar'
-                : 'Ausverkauft'}
+              {isPaused
+                ? SHOP_PAUSED_BUTTON_LABEL
+                : !product.isAvailable
+                  ? product.unavailableReason || 'Nicht verfügbar'
+                  : 'Ausverkauft'}
             </div>
           )}
         </div>
@@ -360,6 +367,7 @@ export function ProductGrid({
   initialReorderItems,
   ownerMode = false,
   mode = 'preview',
+  isPaused = false,
 }: Props) {
   const isEditMode = ownerMode && mode !== 'preview'
 
@@ -528,6 +536,7 @@ export function ProductGrid({
                 isAddingId={addingId}
                 ownerMode={ownerMode}
                 isEditMode={isEditMode}
+                isPaused={isPaused}
               />
             </SortableProductCard>
           ) : (
@@ -538,6 +547,7 @@ export function ProductGrid({
               isAddingId={addingId}
               ownerMode={ownerMode}
               isEditMode={isEditMode}
+              isPaused={isPaused}
             />
           )
         )}

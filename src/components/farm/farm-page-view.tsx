@@ -9,7 +9,7 @@ import {
   MapPin, Phone, Mail, CreditCard, Banknote,
   Pencil, Eye, Leaf, CalendarDays, Tag, MessageCircle,
   Check, Camera, Plus, ChevronLeft, ChevronRight, X, MoveVertical,
-  Share2, Navigation,
+  Share2, Navigation, PauseCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { DragEndEvent } from '@dnd-kit/core'
@@ -21,6 +21,7 @@ import { updateFarmBannerAction, updateBannerFocusAction } from '@/server/action
 import { addFarmPhotoAction, reorderPhotosAction } from '@/server/actions/farm-photos'
 import { ReorderContext } from '@/components/shared/reorder-context'
 import { nextPickupDays, pickupWeekdaysLabel } from '@/lib/pickup-days'
+import { SHOP_PAUSED_FALLBACK } from '@/lib/shop-pause'
 import { buildMapsUrl, buildShareData } from '@/lib/customer-links'
 import { useImageUpload } from '@/components/shared/image-upload'
 import { ProductGrid } from './product-grid'
@@ -613,33 +614,9 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
   }, [isEdit, showFotosTab])
 
   if (!ownerMode) {
-    if (farm.isPaused) {
-      return (
-        <main
-          className="min-h-screen flex items-center justify-center p-6"
-          style={{ background: 'linear-gradient(160deg, #F4EFE6 0%, #E8F0E8 100%)' }}
-        >
-          <div
-            className="text-center max-w-sm bg-white rounded-3xl p-10"
-            style={{ boxShadow: '0 8px 24px rgba(45,95,63,0.08)' }}
-          >
-            <div className="text-5xl mb-5">🏡</div>
-            <h1 className="font-heading text-xl font-semibold mb-3" style={{ color: '#2D3027' }}>{farm.name}</h1>
-            <p className="leading-relaxed text-sm" style={{ color: '#5C6052' }}>
-              {farm.pauseMessage ?? 'Der Hof ist gerade nicht erreichbar. Bitte versuche es etwas später noch einmal.'}
-            </p>
-            <a
-              href={`tel:${farm.phone}`}
-              className="mt-6 inline-flex items-center gap-1.5 text-sm hover:underline underline-offset-2"
-              style={{ color: '#2D5F3F' }}
-            >
-              <Phone className="w-3.5 h-3.5" strokeWidth={1.7} />
-              {farm.phone}
-            </a>
-          </div>
-        </main>
-      )
-    }
+    // Pause übernimmt die Seite NICHT mehr: der Hof bleibt mit Fotos, Kontakt
+    // und Status sichtbar, nur die Kauf-Wege sind zu (Banner + tote Buttons
+    // weiter unten). Er verschwindet nicht, er macht Pause.
     if (farm.products.length === 0 && farm.pickupSlots.length === 0) {
       return (
         <main
@@ -863,6 +840,31 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
         </div>
       </div>
 
+      {/* Pause-Banner direkt unter dem Cover.
+          Kundensicht: erklärt, warum nichts bestellt werden kann.
+          Owner-Sicht (Edit UND Vorschau): unübersehbarer Hinweis mit Weg zurück,
+          damit eine vergessene Pause nicht wochenlang Bestellungen kostet. */}
+      {farm.isPaused && (
+        <div className="px-4 md:px-10 py-3" style={{ background: '#FBEEE3', borderBottom: '1px solid #F0D9C2' }}>
+          <div className="max-w-[960px] mx-auto flex items-start gap-2.5">
+            <PauseCircle className="size-[18px] shrink-0 mt-px" strokeWidth={1.8} style={{ color: '#B86A2E' }} />
+            {ownerMode ? (
+              <p className="text-sm leading-relaxed min-w-0" style={{ color: '#8A4B18' }}>
+                <b>Dein Shop ist pausiert</b> — Kundinnen können nicht bestellen.{' '}
+                <Link href="/settings/pause" className="font-semibold underline underline-offset-2 whitespace-nowrap">
+                  Pause beenden
+                </Link>
+              </p>
+            ) : (
+              <p className="text-sm leading-relaxed min-w-0" style={{ color: '#8A4B18' }}>
+                <b>{farm.name} pausiert gerade.</b>{' '}
+                {farm.pauseMessage?.trim() || SHOP_PAUSED_FALLBACK}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Aktionsleiste unter dem Cover (Referenz 17, nur Kundenansicht) */}
       {!isEdit && (
         <div className="px-4 md:px-10 py-3.5" style={{ background: '#fff', borderBottom: '1px solid #ECE8DF' }}>
@@ -950,8 +952,10 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
       {/* Content column */}
       <div id="uebersicht" className="max-w-[960px] mx-auto px-4 md:px-10 pt-[26px] pb-12 scroll-mt-14">
 
-        {/* Nächste Abholung (Referenz 17, nur Kundenansicht) */}
-        {!isEdit && pickupDays.length > 0 && (
+        {/* Nächste Abholung (Referenz 17, nur Kundenansicht).
+            Bei Pause ausgeblendet: Termine anzukündigen, die man nicht buchen
+            kann, wäre ein leeres Versprechen. */}
+        {!isEdit && !farm.isPaused && pickupDays.length > 0 && (
           <div
             className="bg-white rounded-[14px] p-[18px] mb-[18px]"
             style={{ boxShadow: '0 2px 10px rgba(45,95,63,0.06)' }}
@@ -1186,6 +1190,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           initialReorderItems={reorderItems && reorderItems.length > 0 ? reorderItems : undefined}
           ownerMode={ownerMode}
           mode={mode}
+          isPaused={farm.isPaused}
         />
 
         {/* Footer (public only) */}

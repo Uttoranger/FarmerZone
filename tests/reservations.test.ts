@@ -38,7 +38,13 @@ const validBody = { productId: 'prod_1', quantity: 6, sessionId: 'sess_a' }
 beforeEach(() => {
   vi.clearAllMocks()
   deleteMany.mockResolvedValue({ count: 0 } as never)
-  productFindUnique.mockResolvedValue({ stock: 10, isAvailable: true } as never)
+  // farm kommt seit shop-pause über den Join mit — Shop hier aktiv,
+  // damit diese Tests weiterhin die reine Bestandslogik prüfen
+  productFindUnique.mockResolvedValue({
+    stock: 10,
+    isAvailable: true,
+    farm: { isPaused: false },
+  } as never)
   aggregate.mockResolvedValue({ _sum: { quantity: null } } as never)
   upsert.mockResolvedValue({} as never)
 })
