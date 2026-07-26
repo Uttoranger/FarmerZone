@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { enforceRateLimit } from '@/lib/rate-limit'
+import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 
@@ -38,13 +39,21 @@ export async function POST(request: NextRequest) {
     })
 
     // 2. Verify product exists and is available
+    // Der Pausen-Zustand kommt über den Hof-Join: der Request kennt nur die
+    // productId, und ein zweiter Query wäre unnötig.
     const product = await prisma.product.findUnique({
       where: { id: productId },
-      select: { stock: true, isAvailable: true },
+      select: { stock: true, isAvailable: true, farm: { select: { isPaused: true } } },
     })
 
     if (!product || !product.isAvailable) {
       return NextResponse.json({ error: 'Produkt nicht verfügbar' }, { status: 409 })
+    }
+
+    // 2b. Shop-Pause — fail-closed VOR jeder Reservierungslogik: vor der
+    // Bestandsrechnung und vor dem upsert, das die Reservierung anlegt.
+    if (product.farm.isPaused) {
+      return NextResponse.json({ error: SHOP_PAUSED_MESSAGE }, { status: 409 })
     }
 
     // 3. Count stock reserved by OTHER sessions (excluding this session)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { enforceRateLimit } from '@/lib/rate-limit'
+import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
 import { nanoid } from 'nanoid'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
@@ -53,6 +54,13 @@ export async function POST(request: NextRequest) {
   })
   if (!farm || !farm.isActive) {
     return NextResponse.json({ error: 'Hof nicht gefunden' }, { status: 404 })
+  }
+
+  // 1b. Shop-Pause — fail-closed VOR jeder Bestell- und Zahlungslogik:
+  // vor der Bestandsprüfung, vor prisma.order.create und vor jedem Stripe-Aufruf.
+  // Eine ausgeblendete Schaltfläche ist keine Durchsetzung; die Wahrheit steht hier.
+  if (farm.isPaused) {
+    return NextResponse.json({ error: SHOP_PAUSED_MESSAGE }, { status: 409 })
   }
 
   // 2. Validate payment method availability
