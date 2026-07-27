@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { KONTAKT_EMAIL } from '@/lib/support'
 
 export const metadata: Metadata = { title: 'Impressum — FarmerZone' }
 
@@ -24,7 +25,7 @@ export default function ImpressumPage() {
               <p>Johannes Briewasser</p>
               <p>Freybergstraße 15 Top 11</p>
               <p>5270 Mauerkirchen, Österreich</p>
-              <p className="mt-2">E-Mail: <a href="mailto:j.f.briewasser@gmail.com" className="text-primary hover:underline">j.f.briewasser@gmail.com</a></p>
+              <p className="mt-2">E-Mail: <a href={`mailto:${KONTAKT_EMAIL}`} className="text-primary hover:underline break-words">{KONTAKT_EMAIL}</a></p>
             </address>
           </section>
 

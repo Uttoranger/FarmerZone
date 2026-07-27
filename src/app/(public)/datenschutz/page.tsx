@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { DATENSCHUTZ_EMAIL } from '@/lib/support'
 
 export const metadata: Metadata = { title: 'Datenschutz — FarmerZone' }
 
@@ -31,8 +32,8 @@ export default function DatenschutzPage() {
             </p>
             <p>
               Kontakt für Datenschutzanfragen:{' '}
-              <a href="mailto:j.f.briewasser@gmail.com" className="text-primary hover:underline">
-                j.f.briewasser@gmail.com
+              <a href={`mailto:${DATENSCHUTZ_EMAIL}`} className="text-primary hover:underline break-words">
+                {DATENSCHUTZ_EMAIL}
               </a>
             </p>
           </Section>
@@ -109,8 +110,8 @@ export default function DatenschutzPage() {
             </ul>
             <p className="mt-3">
               Anfragen richten an:{' '}
-              <a href="mailto:j.f.briewasser@gmail.com" className="text-primary hover:underline">
-                j.f.briewasser@gmail.com
+              <a href={`mailto:${DATENSCHUTZ_EMAIL}`} className="text-primary hover:underline break-words">
+                {DATENSCHUTZ_EMAIL}
               </a>
             </p>
           </Section>
