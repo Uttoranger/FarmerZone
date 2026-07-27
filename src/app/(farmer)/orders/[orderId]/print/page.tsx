@@ -32,11 +32,11 @@ export default async function OrderPrintPage({
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   })
 
+  // Navigation und Seitenleiste blenden sich seit dem Druck-Sprint selbst aus
+  // (print:hidden in farmer-nav.tsx, print:ml-0 am <main> im Layout) — ein
+  // eigener @media-print-Block hier wäre eine zweite Wahrheit.
   return (
     <>
-      {/* Hide nav on print */}
-      <style>{`@media print { nav, aside { display: none !important; } main { margin: 0 !important; } }`}</style>
-
       <div className="p-8 max-w-md mx-auto font-sans text-slate-800">
         {/* Browser-only controls */}
         <div className="flex gap-4 mb-6 print:hidden">
