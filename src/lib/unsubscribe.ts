@@ -1,14 +1,28 @@
-import { createHmac } from 'crypto'
+import { createHmac, timingSafeEqual } from 'crypto'
 
 const SECRET = process.env.BETTER_AUTH_SECRET ?? 'dev-secret-change-in-production'
 
-export function generateUnsubscribeToken(email: string, farmId: string): string {
-  const payload = `${email.toLowerCase()}:${farmId}`
-  const hmac = createHmac('sha256', SECRET).update(payload).digest('hex')
-  const b64 = Buffer.from(payload).toString('base64url')
-  return `${b64}.${hmac}`
+function sign(payload: string): string {
+  return createHmac('sha256', SECRET).update(payload).digest('hex')
 }
 
+// Vergleich in konstanter Zeit: ein `!==` bricht beim ersten abweichenden
+// Zeichen ab und verrät über die Laufzeit, wie viele Zeichen stimmten.
+function signatureMatches(actual: string, expected: string): boolean {
+  const a = Buffer.from(actual, 'utf8')
+  const b = Buffer.from(expected, 'utf8')
+  if (a.length !== b.length) return false
+  return timingSafeEqual(a, b)
+}
+
+export function generateUnsubscribeToken(email: string, farmId: string): string {
+  const payload = `${email.toLowerCase()}:${farmId}`
+  const b64 = Buffer.from(payload).toString('base64url')
+  return `${b64}.${sign(payload)}`
+}
+
+// BEWUSST OHNE ABLAUFDATUM: ein Abmeldelink muss auch nach Jahren noch
+// funktionieren, sonst sitzt der Empfänger in einem Newsletter fest.
 export function verifyUnsubscribeToken(token: string): { email: string; farmId: string } | null {
   try {
     const dotIdx = token.lastIndexOf('.')
@@ -16,8 +30,7 @@ export function verifyUnsubscribeToken(token: string): { email: string; farmId: 
     const b64 = token.slice(0, dotIdx)
     const hmac = token.slice(dotIdx + 1)
     const payload = Buffer.from(b64, 'base64url').toString()
-    const expectedHmac = createHmac('sha256', SECRET).update(payload).digest('hex')
-    if (hmac !== expectedHmac) return null
+    if (!signatureMatches(hmac, sign(payload))) return null
     const colonIdx = payload.indexOf(':')
     if (colonIdx < 0) return null
     return {

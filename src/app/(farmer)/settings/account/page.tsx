@@ -5,6 +5,7 @@ import type { Metadata } from 'next'
 import { ChevronLeft, Mail, Shield } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { PasswordForm } from './password-form'
 
 export const metadata: Metadata = { title: 'Konto — FarmerZone' }
 
@@ -51,10 +52,11 @@ export default async function AccountPage() {
             </div>
             <CardDescription>Passwort für dein FarmerZone-Konto</CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Passwortänderung: Melde dich ab und nutze die Funktion „Passwort vergessen" auf der
-              Login-Seite, oder wende dich an den FarmerZone-Support.
+          <CardContent className="space-y-4">
+            <PasswordForm />
+            <p className="text-sm text-muted-foreground border-t border-border/50 pt-4">
+              Passwort vergessen? Melde dich ab und nutze die Funktion „Passwort vergessen" auf der
+              Login-Seite — dann bekommst du einen Link per E-Mail.
             </p>
           </CardContent>
         </Card>
@@ -63,6 +65,7 @@ export default async function AccountPage() {
           <p className="text-sm font-medium text-red-700 mb-1">Konto löschen</p>
           <p className="text-xs text-red-600">
             Wenn du dein Konto löschen möchtest, wende dich bitte an den FarmerZone-Support.
+            Die Löschung wird innerhalb weniger Werktage bearbeitet.
             Beachte: Bestelldaten müssen aus steuerrechtlichen Gründen 7 Jahre aufbewahrt werden.
           </p>
         </div>

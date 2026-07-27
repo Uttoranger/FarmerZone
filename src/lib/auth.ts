@@ -46,7 +46,11 @@ export const auth = betterAuth({
         await sendPasswordResetEmail(user.email, url)
       } catch (err) {
         console.error('[Passwort-Reset] E-Mail-Fehler:', err)
-        console.log(`[DEV] Passwort-Reset für ${user.email}: ${url}`)
+        // Der Fallback-Log enthält einen GÜLTIGEN Zugangs-Link samt Adresse —
+        // er darf niemals in die Produktions-Logs (Vercel) gelangen.
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[DEV] Passwort-Reset für ${user.email}: ${url}`)
+        }
       }
     },
   },
@@ -60,7 +64,11 @@ export const auth = betterAuth({
           await sendMagicLinkEmail(email, url)
         } catch (err) {
           console.error('[Magic Link] E-Mail-Fehler:', err)
-          console.log(`[DEV] Magic Link für ${email}: ${url}`)
+          // Der Fallback-Log enthält einen GÜLTIGEN Login-Link samt Adresse —
+          // er darf niemals in die Produktions-Logs (Vercel) gelangen.
+          if (process.env.NODE_ENV !== 'production') {
+            console.log(`[DEV] Magic Link für ${email}: ${url}`)
+          }
         }
       },
     }),
