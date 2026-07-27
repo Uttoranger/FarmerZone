@@ -22,8 +22,6 @@ const schema = z.object({
   city: z.string().min(2, 'Pflichtfeld'),
   phone: z.string().min(4, 'Pflichtfeld'),
   email: z.string().email('Ungültige E-Mail'),
-  logoUrl: z.string().optional(),
-  bannerUrl: z.string().optional(),
 })
 
 export function ProfileForm({ farm }: { farm: FarmSettings }) {
@@ -40,8 +38,6 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
       city: farm.city,
       phone: farm.phone,
       email: farm.email,
-      logoUrl: farm.logoUrl ?? '',
-      bannerUrl: farm.bannerUrl ?? '',
     },
   })
 
@@ -113,12 +109,11 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
         {field('email', 'E-Mail *', 'hof@beispiel.at')}
       </div>
 
-      <div className="bg-white rounded-xl border border-border p-4 space-y-4">
-        <h2 className="font-medium text-foreground">Bilder (optional)</h2>
-        <p className="text-xs text-muted-foreground">Füge URLs von bereits hochgeladenen Bildern ein. Direkter Upload folgt nach Domain-Einrichtung.</p>
-        {field('logoUrl', 'Logo-URL', 'https://...')}
-        {field('bannerUrl', 'Banner-URL', 'https://...')}
-      </div>
+      <p className="text-sm text-muted-foreground">
+        Logo und Titelbild verwaltest du unter{' '}
+        <span className="text-foreground">Einstellungen → Mein Auftritt</span> —
+        dort lädst du Bilder direkt vom Gerät hoch.
+      </p>
 
       <Button
         type="submit"

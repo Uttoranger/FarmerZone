@@ -160,4 +160,12 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+  /* Edge und der IE-Erbe zeigen in Passwortfeldern ein EIGENES Augen-Symbol.
+     Zusammen mit unserem Umschalter in PasswordInput ergäbe das zwei Augen
+     nebeneinander, die gegeneinander arbeiten. Wir behalten unseren — er ist
+     beschriftet (aria-label) und in beiden Zuständen sichtbar. */
+  input::-ms-reveal,
+  input::-ms-clear {
+    display: none;
+  }
 }

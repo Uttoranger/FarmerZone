@@ -24,8 +24,10 @@ const profileSchema = z.object({
   city: z.string().min(2),
   phone: z.string().min(4),
   email: z.string().email('Ungültige E-Mail-Adresse'),
-  logoUrl: z.string().url().optional().or(z.literal('')),
-  bannerUrl: z.string().url().optional().or(z.literal('')),
+  // Logo und Titelbild gehören zu „Mein Auftritt" (echter Datei-Upload) und
+  // stehen bewusst NICHT mehr im Profil-Formular. Sie fehlen hier auch im
+  // Schreibpfad: sonst würde jedes Profil-Speichern die dort hochgeladenen
+  // Bilder auf null zurücksetzen. Die DB-Felder selbst bleiben unverändert.
 })
 
 export type ProfileFormData = z.infer<typeof profileSchema>
@@ -38,15 +40,9 @@ export async function updateProfile(data: ProfileFormData): Promise<ProfileResul
   const parsed = profileSchema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Ungültige Daten' }
 
-  const { logoUrl, bannerUrl, ...rest } = parsed.data
-
   await prisma.farm.update({
     where: { id: farm.id },
-    data: {
-      ...rest,
-      logoUrl: logoUrl || null,
-      bannerUrl: bannerUrl || null,
-    },
+    data: parsed.data,
   })
 
   revalidatePath('/settings/profile')
