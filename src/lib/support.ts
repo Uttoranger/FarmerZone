@@ -4,6 +4,11 @@
 
 export const SUPPORT_EMAIL = 'support@farmerzone.at'
 
+// Öffentliche Kontaktstellen der Rechtstexte. Alle drei Postfächer werden
+// über Cloudflare-Email-Routing empfangen und an den Betreiber weitergeleitet.
+export const KONTAKT_EMAIL = 'kontakt@farmerzone.at'
+export const DATENSCHUTZ_EMAIL = 'datenschutz@farmerzone.at'
+
 type SupportMailOptions = {
   subject: string
   /** Was der Bauer möchte — erste Zeile des Textkörpers. */
