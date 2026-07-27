@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
+import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 
@@ -39,18 +40,28 @@ export async function POST(request: NextRequest) {
     })
 
     // 2. Verify product exists and is available
-    // Der Pausen-Zustand kommt über den Hof-Join: der Request kennt nur die
-    // productId, und ein zweiter Query wäre unnötig.
+    // Pausen- und Stilllegungs-Zustand kommen über den Hof-Join: der Request
+    // kennt nur die productId, und ein zweiter Query wäre unnötig.
     const product = await prisma.product.findUnique({
       where: { id: productId },
-      select: { stock: true, isAvailable: true, farm: { select: { isPaused: true } } },
+      select: {
+        stock: true,
+        isAvailable: true,
+        farm: { select: { isPaused: true, archivedAt: true } },
+      },
     })
 
     if (!product || !product.isAvailable) {
       return NextResponse.json({ error: 'Produkt nicht verfügbar' }, { status: 409 })
     }
 
-    // 2b. Shop-Pause — fail-closed VOR jeder Reservierungslogik: vor der
+    // 2b. Stilllegung — fail-closed und VOR der Pause geprüft: der dauerhafte
+    // Zustand sticht den vorübergehenden (siehe src/lib/farm-archive.ts).
+    if (product.farm.archivedAt) {
+      return NextResponse.json({ error: FARM_ARCHIVED_MESSAGE }, { status: 409 })
+    }
+
+    // 2c. Shop-Pause — fail-closed VOR jeder Reservierungslogik: vor der
     // Bestandsrechnung und vor dem upsert, das die Reservierung anlegt.
     if (product.farm.isPaused) {
       return NextResponse.json({ error: SHOP_PAUSED_MESSAGE }, { status: 409 })

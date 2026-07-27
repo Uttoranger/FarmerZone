@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
+import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { nanoid } from 'nanoid'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
@@ -56,7 +57,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Hof nicht gefunden' }, { status: 404 })
   }
 
-  // 1b. Shop-Pause — fail-closed VOR jeder Bestell- und Zahlungslogik:
+  // 1b. Stilllegung — fail-closed und VOR der Pause geprüft: der dauerhafte
+  // Zustand sticht den vorübergehenden, damit ein stillgelegter Hof nie die
+  // Pausen-Meldung ausgibt ("bald wieder da" wäre eine falsche Zusage).
+  if (farm.archivedAt) {
+    return NextResponse.json({ error: FARM_ARCHIVED_MESSAGE }, { status: 409 })
+  }
+
+  // 1c. Shop-Pause — fail-closed VOR jeder Bestell- und Zahlungslogik:
   // vor der Bestandsprüfung, vor prisma.order.create und vor jedem Stripe-Aufruf.
   // Eine ausgeblendete Schaltfläche ist keine Durchsetzung; die Wahrheit steht hier.
   if (farm.isPaused) {
