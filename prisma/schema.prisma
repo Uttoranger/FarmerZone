@@ -194,6 +194,13 @@ model Farm {
   isPaused     Boolean @default(false)
   pauseMessage String?
 
+  // Stilllegung — dauerhaft, aber umkehrbar. null = aktiver Hof.
+  // Abgrenzung zu isPaused: Pause ist vorübergehend und lässt die Hofseite
+  // mit Banner sichtbar; Stilllegung nimmt die Hofseite vom Netz (404) und
+  // sperrt Checkout und Reservierung. Es wird NICHTS gelöscht — Bestelldaten
+  // unterliegen der 7-jährigen Aufbewahrungspflicht.
+  archivedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

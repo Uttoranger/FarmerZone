@@ -83,8 +83,12 @@ const FARM_PHOTO_SELECT = {
 }
 
 export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
+  // archivedAt: null — ein stillgelegter Hof ist öffentlich nicht auffindbar.
+  // Die Filterung sitzt bewusst hier in der Query und nicht in den Seiten:
+  // jede öffentliche Unterseite, die über getPublicFarm lädt, ist damit
+  // automatisch mitgesperrt und läuft in ihren bestehenden notFound-Pfad.
   const farm = await prisma.farm.findUnique({
-    where: { slug, isActive: true },
+    where: { slug, isActive: true, archivedAt: null },
     select: {
       id: true,
       slug: true,
@@ -307,6 +311,19 @@ export async function getFarmSettings(ownerId: string): Promise<FarmSettings | n
         },
       },
     },
+  })
+}
+
+/**
+ * Stilllegungs-Zustand des eigenen Hofs — für den Kasten auf /settings/account
+ * und den Owner-Balken im Farmer-Layout.
+ */
+export async function getFarmArchiveState(
+  ownerId: string
+): Promise<{ slug: string; archivedAt: Date | null } | null> {
+  return prisma.farm.findUnique({
+    where: { ownerId },
+    select: { slug: true, archivedAt: true },
   })
 }
 

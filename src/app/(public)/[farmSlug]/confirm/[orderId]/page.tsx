@@ -32,6 +32,7 @@ async function getOrder(orderId: string) {
           address: true,
           city: true,
           postalCode: true,
+          archivedAt: true,
         },
       },
       items: {
@@ -58,7 +59,11 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
 
   const order = await getOrder(orderId)
 
-  if (!order || order.farm.slug !== farmSlug) notFound()
+  // Stillgelegter Hof: auch diese Unterseite verhält sich wie eine unbekannte
+  // Farm. Die Stilllegung setzt voraus, dass keine offene Bestellung mehr
+  // existiert (Guard in src/server/actions/farm-archive.ts), hier hängt also
+  // kein laufender Bestätigungs-Ablauf dran.
+  if (!order || order.farm.slug !== farmSlug || order.farm.archivedAt) notFound()
 
   const isOnlinePaid =
     order.paymentMethod === 'ONLINE' &&
