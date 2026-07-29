@@ -176,7 +176,16 @@ export function SaleDialog({ open, editingSale, prefillSale, products, onClose }
                   value={selectedProductId ?? SONSTIGES_ID}
                 >
                   <SelectTrigger className="h-11">
-                    <SelectValue placeholder="Produkt wählen…" />
+                    {/* Base UI zeigt ohne Formatierer den ROHWERT des Selects —
+                        also „__other__" bzw. die Produkt-ID. Die Kinder-Funktion
+                        ist der vorgesehene Weg, daraus Klartext zu machen. */}
+                    <SelectValue placeholder="Produkt wählen…">
+                      {(value: string | null) =>
+                        !value || value === SONSTIGES_ID
+                          ? 'Sonstiges / freier Text'
+                          : (products.find((p) => p.id === value)?.name ?? 'Sonstiges / freier Text')
+                      }
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {products.map((p) => (
@@ -271,7 +280,14 @@ export function SaleDialog({ open, editingSale, prefillSale, products, onClose }
                       >
                         <FormControl>
                           <SelectTrigger className="h-11">
-                            <SelectValue placeholder="—" />
+                            {/* ohne Formatierer stünde hier der Sentinel „0" */}
+                            <SelectValue placeholder="— keine —">
+                              {(value: string | null) =>
+                                !value || value === '0'
+                                  ? '— keine —'
+                                  : (UNIT_LABELS[value] ?? value)
+                              }
+                            </SelectValue>
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -314,12 +330,15 @@ export function SaleDialog({ open, editingSale, prefillSale, products, onClose }
                             key={ch.value}
                             type="button"
                             onClick={() => field.onChange(ch.value)}
-                            className="flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-center transition-colors"
+                            /* min-w-0: ohne das sprengt ein langes Wort die
+                               Fünftel-Spalte, die Chips werden ungleich breit
+                               und der aktive überlappt seine Nachbarn */
+                            className="flex min-w-0 h-full flex-col items-center justify-center gap-1 py-2 px-1 rounded-lg text-center transition-colors"
                             style={active ? { background: '#24523A', color: '#fff' } : { color: '#5C6052' }}
                           >
                             <span className="text-base leading-none">{ch.icon}</span>
-                            <span className="text-[10px] leading-tight font-medium">
-                              {ch.label.split(' ')[0]}
+                            <span className="text-[11px] leading-tight font-medium hyphens-auto break-words">
+                              {ch.label}
                             </span>
                           </button>
                         )
