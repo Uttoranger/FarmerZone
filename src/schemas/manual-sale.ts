@@ -1,10 +1,13 @@
 import { z } from 'zod'
 
+// Nur für die fünf Auswahl-Chips im Verkauf-Dialog. Die Labels müssen in eine
+// Fünftel-Spalte passen — daher „Geschäft" statt „Geschäftskunde". In Listen
+// und Auswertung steht weiterhin die Langform aus CHANNEL_LABELS.
 export const CHANNEL_OPTIONS = [
   { value: 'WHATSAPP', label: 'WhatsApp', icon: '💬' },
   { value: 'HOFLADEN', label: 'Hofladen', icon: '🏡' },
   { value: 'MARKT', label: 'Markt', icon: '🛒' },
-  { value: 'BUSINESS', label: 'Geschäftskunde', icon: '🤝' },
+  { value: 'BUSINESS', label: 'Geschäft', icon: '🤝' },
   { value: 'OTHER', label: 'Sonstiges', icon: '···' },
 ] as const
 
