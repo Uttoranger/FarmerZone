@@ -794,6 +794,21 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
         <div className="absolute inset-x-0 bottom-0 pointer-events-none">
           <div className="max-w-[960px] mx-auto px-4 md:px-10 pb-5">
             <div className="flex items-center gap-3 flex-wrap">
+              {/* Hof-Logo links vom Namen — nur wenn eines hochgeladen wurde.
+                  Ohne Logo rendert React hier nichts, der Identitätsblock bleibt
+                  damit unverändert. Der ganze Block ist pointer-events-none,
+                  das Logo kommt dem Fokus-Ziehen im Edit-Modus also nicht in die
+                  Quere. */}
+              {farm.logoUrl && (
+                <Image
+                  src={farm.logoUrl}
+                  alt={`${farm.name} – Logo`}
+                  width={72}
+                  height={72}
+                  className="size-14 md:size-[72px] shrink-0 rounded-full object-cover ring-2 ring-white/80"
+                  style={{ boxShadow: '0 2px 10px rgba(0,0,0,0.25)' }}
+                />
+              )}
               <h1
                 className="font-heading text-[38px] font-semibold text-white leading-tight"
                 style={{ textShadow: '0 2px 14px rgba(0,0,0,0.4)' }}
