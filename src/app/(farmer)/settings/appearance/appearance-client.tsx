@@ -341,22 +341,24 @@ const GALLERY_LIMIT = 8
 
 function GallerySection({ initialPhotos }: { initialPhotos: FarmPhotoData[] }) {
   const [photos, setPhotos] = useState<FarmPhotoData[]>(initialPhotos)
-  const [, startTransition] = useTransition()
 
   const canUpload = photos.length < GALLERY_LIMIT
 
-  const { isUploading, openFilePicker, fileInput } = useImageUpload({
+  // Einzige Stelle mit Mehrfachauswahl: für die Galerie ist Foto-für-Foto
+  // mühsam. Logo, Cover, Status und Produktbild bleiben Einzelauswahl.
+  const { isUploading, progress, openFilePicker, fileInput } = useImageUpload({
     variant: 'gallery',
-    onUploaded: (url) => {
-      startTransition(async () => {
-        const result = await addFarmPhotoAction({ url })
-        if (result.error) {
-          toast.error(result.error)
-        } else if (result.photo) {
-          setPhotos((prev) => [...prev, result.photo!])
-          toast.success('Foto hinzugefügt')
-        }
-      })
+    multiple: true,
+    maxFiles: GALLERY_LIMIT - photos.length,
+    onUploaded: async (url, { batch }) => {
+      const result = await addFarmPhotoAction({ url })
+      // In einer Serie zählt der Fehler ins Sammelergebnis — deshalb werfen
+      // statt einzeln melden.
+      if (result.error) throw new Error(result.error)
+      if (result.photo) {
+        setPhotos((prev) => [...prev, result.photo!])
+        if (!batch) toast.success('Foto hinzugefügt')
+      }
     },
   })
 
@@ -420,7 +422,11 @@ function GallerySection({ initialPhotos }: { initialPhotos: FarmPhotoData[] }) {
           className="w-full flex items-center justify-center gap-2 h-11 rounded-xl border-2 border-dashed border-border text-sm font-medium text-muted-foreground hover:bg-muted/30 hover:text-foreground transition-colors disabled:opacity-60"
         >
           {isUploading ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-          {isUploading ? 'Wird hochgeladen…' : 'Foto hinzufügen'}
+          {progress
+            ? `Lade ${progress.current} von ${progress.total} …`
+            : isUploading
+              ? 'Wird hochgeladen…'
+              : 'Fotos hinzufügen'}
         </button>
       )}
 

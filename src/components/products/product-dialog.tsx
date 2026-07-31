@@ -5,7 +5,7 @@ import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { ImagePlus, X, Leaf, Thermometer, Snowflake } from 'lucide-react'
-import { resizeToWebP } from '@/components/shared/image-upload'
+import { resizeToWebP, canDecodeImage, IMAGE_FORMAT_ERROR } from '@/components/shared/image-upload'
 import {
   Dialog,
   DialogContent,
@@ -125,11 +125,19 @@ export function ProductDialog({ open, product, onClose }: Props) {
     }
   }, [previewUrl])
 
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     if (file.size > 25 * 1024 * 1024) {
       toast.error('Datei zu groß (max. 25 MB)')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+    // Format-Probe VOR der Vorschau: ein nicht dekodierbares Foto (z. B. HEIC
+    // auf Android) darf keine kaputte Vorschau hinterlassen. Die vorherige
+    // Auswahl bleibt unangetastet — eine abgelehnte Datei ändert gar nichts.
+    if (!(await canDecodeImage(file))) {
+      toast.error(IMAGE_FORMAT_ERROR)
       if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
@@ -165,8 +173,9 @@ export function ProductDialog({ open, product, onClose }: Props) {
         try {
           resized = await resizeToWebP(selectedFile, 2400)
         } catch {
-          // Kein Roh-Upload: der Browser konnte das Format nicht dekodieren
-          toast.error('Dieses Bildformat unterstützt dein Browser nicht (z. B. HEIC) — bitte JPEG oder PNG wählen')
+          // Zweites Netz hinter der Auswahl-Probe, gleicher Wortlaut:
+          // kein Roh-Upload, wenn der Browser das Format nicht dekodieren kann
+          toast.error(IMAGE_FORMAT_ERROR)
           return
         }
         const fd = new FormData()
