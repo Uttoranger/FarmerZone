@@ -13,25 +13,32 @@ export const metadata: Metadata = {
 // Alle Texte als Konstanten statt als JSX-Text: so stehen die Wortlaute an
 // einer Stelle, und deutsche Anführungszeichen brauchen keine HTML-Entities.
 
-// Editorial-Zeilen „Für Höfe": Bild links / Text rechts, dann gespiegelt.
+// Editorial-Zeilen „Für Höfe": Medium links / Text rechts, dann gespiegelt.
+// Jede Zeile trägt ein typografisches Panel — bewusst KEINE Fotos, solange
+// keine in guter Qualität existieren. Das Panel-Motiv greift die Aussage der
+// Zeile auf (rund um die Uhr / einmal statt dreißigmal / Planbarkeit).
 //
-// AUSTAUSCH-KONVENTION für die beiden typografischen Panels:
-// Sie stehen stellvertretend für Fotos, die es noch nicht gibt. Sobald
-// public/landing/row-hoefe-2.jpg bzw. row-hoefe-3.jpg vorliegen, wird aus
-//     { panel: '24/7' }
+// AUSTAUSCH-KONVENTION: Sobald ein echtes Foto vorliegt, wird aus
+//     { panel: '24/7', … }
 // ein
-//     { image: '/landing/row-hoefe-2.jpg', alt: '…' }
-// — ein Einzeiler pro Zeile, sonst ändert sich nichts. <FarmRow> rendert
-// beides über dieselbe Zeilen-Geometrie.
-const FARM_BENEFITS = [
+//     { image: '/landing/row-hoefe.jpg', alt: '…', … }
+// — eine Zeile in den Daten, sonst ändert sich nichts: <FarmRow> rendert
+// Panel und Foto über dieselbe Zeilen-Geometrie, <RowImage> steht bereit.
+// Dateinamen der Reihe nach: row-hoefe.jpg, row-hoefe-2.jpg, row-hoefe-3.jpg.
+//
+// QUALITÄTSLATTE für solche Fotos: Tageslicht, ruhiger Hintergrund, EIN
+// Motiv. Ein Schnappschuss mit unruhigem Umfeld ist schlechter als das
+// Panel — im Zweifel bleibt das Panel stehen.
+type FarmRowMedia = { panel: string } | { image: string; alt: string }
+
+const FARM_BENEFITS: (FarmRowMedia & { title: string; desc: string })[] = [
   {
-    image: '/landing/row-hoefe.jpg',
-    alt: 'Geräucherte Fisch-Filets vom Hof, vakuumverpackt mit handbeschrifteten Etiketten',
+    panel: '24/7',
     title: 'Bestellungen sammeln sich von selbst',
     desc: 'Kundinnen bestellen rund um die Uhr online; du siehst alles gebündelt nach Abholtag, mit fertiger Packliste — statt Zettel, Anrufe und Chat-Verläufe zu sortieren.',
   },
   {
-    panel: '24/7',
+    panel: '1×',
     title: 'Einmal schreiben, alle erreichen',
     desc: 'Ein kurzes Update („Frische Eier ab Freitag") geht an alle deine Kundinnen auf einmal — statt dreißig Einzelnachrichten.',
   },
@@ -40,7 +47,7 @@ const FARM_BENEFITS = [
     title: 'Planbar statt Überraschung',
     desc: 'Feste Abholzeiten, Bestellungen im Voraus, online oder bar bezahlt: Du weißt vor dem Abholtag, was gebraucht wird.',
   },
-] as const
+]
 
 // Die Sätze sind unverändert; die Kicker kommen als Orientierung hinzu.
 const CUSTOMER_POINTS = [
@@ -110,28 +117,32 @@ function SectionHeading({ kicker, children }: { kicker: string; children: string
   )
 }
 
-/** Großes Editorial-Bild einer „Für Höfe"-Zeile. */
+/** Editorial-Bild einer „Für Höfe"-Zeile — bereit für den Austausch gegen ein Panel. */
 function RowImage({ src, alt }: { src: string; alt: string }) {
   return (
-    <div className="relative aspect-[3/2] overflow-hidden rounded-2xl">
+    <div className="relative h-full min-h-44 overflow-hidden rounded-2xl">
       <Image src={src} alt={alt} fill sizes="(min-width: 768px) 50vw, 100vw" className="object-cover" />
     </div>
   )
 }
 
 /**
- * Typografisches Panel — ruhige Sand-Fläche mit einem großen Fraunces-Wort.
- * Steht stellvertretend für ein späteres echtes Foto (siehe Austausch-
- * Konvention bei FARM_BENEFITS). Bewusst ohne Icons.
+ * Typografisches Panel — ruhige Sand-Fläche mit einem großen Fraunces-Motiv.
+ * Bewusst ohne Icons und Emojis.
+ *
+ * `h-full` statt fester Höhe: Die Zeile ist auf `items-stretch` gestellt, also
+ * bestimmt der Textblock die Zeilenhöhe und das Panel füllt sie genau aus. So
+ * kann es auf Desktop nie höher werden als der Text daneben; `min-h-24` ist
+ * nur die Untergrenze, damit das Motiv Luft behält.
  */
 function TypePanel({ children }: { children: string }) {
   return (
     <div
-      className="flex aspect-[3/2] items-center justify-center rounded-2xl px-8"
+      className="flex h-full min-h-24 items-center justify-center rounded-2xl px-8 py-6"
       style={{ backgroundColor: '#EFE9DC' }}
     >
       <span
-        className="font-heading text-5xl md:text-7xl font-semibold text-balance text-center leading-none"
+        className="font-heading text-5xl md:text-6xl font-semibold text-balance text-center leading-none"
         style={{ color: '#2D5F3F' }}
       >
         {children}
@@ -153,7 +164,7 @@ function FarmRow({
   flip: boolean
 }) {
   return (
-    <div className="grid items-center gap-7 md:grid-cols-2 md:gap-14">
+    <div className="grid items-stretch gap-7 md:grid-cols-2 md:gap-14">
       <div className={flip ? 'md:order-2' : undefined}>{media}</div>
       <div className={flip ? 'md:order-1' : undefined}>
         <h3 className="font-heading text-2xl md:text-3xl font-semibold text-foreground mb-3 text-balance">
