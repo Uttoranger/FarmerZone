@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import type { Metadata } from 'next'
-import { Leaf, ShoppingBasket, Users, Check, ArrowRight } from 'lucide-react'
+import { Leaf, ShoppingBasket, Users, Check, ArrowRight, ChevronDown } from 'lucide-react'
 import { KONTAKT_EMAIL } from '@/lib/support'
 
 export const metadata: Metadata = {
@@ -154,63 +154,89 @@ export default function HomePage() {
 
       <main className="flex-1">
 
-        {/* Hero — unverändert; nur die Höhenreserve wandert vom <main> hierher,
-            damit der Hero wie bisher die erste Bildschirmhöhe füllt und die
-            neuen Abschnitte darunter beginnen. */}
-        <section className="min-h-[calc(100vh-8rem)] flex flex-col items-center justify-center px-6 py-16 text-center">
+        {/* Hero — Ambient-Feld-Loop in drei Schichten:
+            (1) Standbild als Basis — immer da, damit es die Mobil- und die
+                Reduced-Motion-Darstellung ist und als LCP-Kandidat zählt;
+            (2) darüber der Loop, rein per CSS eingeblendet (kein Autoplay-JS);
+            (3) darüber der Verlauf, der die weiße Schrift lesbar hält. */}
+        <section className="relative h-[70vh] min-h-[420px] w-full overflow-hidden">
+          <Image
+            src="/landing/hero-poster.jpg"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover"
+          />
 
-          {/* Organic leaf SVG */}
-          <div className="mb-8">
-            <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <circle cx="40" cy="40" r="40" fill="#E8F0E8" />
-              <path
-                d="M40 64 C40 64 22 53 22 35 C22 24 30 16 40 16 C50 16 58 24 58 35 C58 53 40 64 40 64Z"
-                fill="#2D5F3F"
-              />
-              <path
-                d="M40 64 L40 44"
-                stroke="#7BAE85"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-              />
-              <path
-                d="M40 50 C35 47 27 46 24 39"
-                stroke="#7BAE85"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-              <path
-                d="M40 44 C45 41 53 40 56 33"
-                stroke="#7BAE85"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
+          {/* Der Loop läuft NUR ab md UND nur bei erlaubter Bewegung — die
+              Weiche ist reines Tailwind, kein JavaScript. Rein dekorativ,
+              deshalb aria-hidden und ohne Tonspur/Controls. */}
+          <video
+            className="absolute inset-0 hidden h-full w-full object-cover motion-safe:md:block"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            poster="/landing/hero-poster.jpg"
+            aria-hidden="true"
+          >
+            <source
+              media="(min-width: 768px) and (prefers-reduced-motion: no-preference)"
+              src="/landing/hero-loop.mp4"
+              type="video/mp4"
+            />
+          </video>
+
+          {/* Verlauf von unten/links über beide Schichten */}
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 bg-gradient-to-tr from-black/75 via-black/45 to-black/10"
+          />
+
+          {/* Headline und Subline im Wortlaut unverändert, nur in Weiß */}
+          <div className="relative flex h-full flex-col justify-end px-6 pb-20 sm:px-10 md:pb-24">
+            <h1 className="font-heading text-4xl sm:text-5xl font-semibold text-white mb-4 leading-tight max-w-sm">
+              Frisch vom Hof.<br />Direkt zu dir.
+            </h1>
+            <p className="text-lg text-white/90 max-w-xs leading-relaxed">
+              Regionale Lebensmittel von lokalen Bauern — bestellen, abholen, genießen.
+            </p>
           </div>
 
-          {/* Wordmark */}
-          <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase mb-3">
-            FarmerZone
-          </p>
+          {/* Scroll-Hinweis: pulsiert langsam, steht bei Reduced Motion still */}
+          <a
+            href="#weiter"
+            aria-label="Weiter zum Inhalt"
+            className="absolute bottom-5 left-1/2 flex size-11 -translate-x-1/2 items-center justify-center rounded-full text-white/85 transition-colors hover:text-white"
+          >
+            <ChevronDown
+              className="size-7 motion-safe:animate-pulse motion-safe:[animation-duration:3s]"
+              strokeWidth={1.75}
+              aria-hidden="true"
+            />
+          </a>
+        </section>
 
-          {/* Headline */}
-          <h1 className="font-heading text-4xl sm:text-5xl font-semibold text-foreground mb-4 leading-tight max-w-sm">
-            Frisch vom Hof.<br />Direkt zu dir.
-          </h1>
-
-          {/* Subline */}
-          <p className="text-lg text-muted-foreground max-w-xs mb-5 leading-relaxed">
-            Regionale Lebensmittel von lokalen Bauern — bestellen, abholen, genießen.
-          </p>
-
+        {/* Aus dem bisherigen Hero übernommen, Wortlaut und Markup unverändert:
+            Pilot-Hinweis und die drei Karten. Über dem Video wären sie weder
+            lesbar noch mit einem ~70vh hohen Hero vereinbar — gelöscht werden
+            sollten sie aber auch nicht, also stehen sie jetzt direkt darunter.
+            Blattmarke, Wortmarke und der Login-Knopf sind entfallen: Alle drei
+            stehen bereits in der Kopfzeile, und der Hero bekommt keinen Button. */}
+        <section
+          id="weiter"
+          className="flex scroll-mt-4 flex-col items-center px-6 pt-12 text-center sm:pt-16"
+        >
           {/* Pilot badge */}
-          <div className="inline-flex items-center gap-2 bg-card/80 border border-border rounded-full px-3.5 py-1.5 text-xs text-muted-foreground mb-14">
+          <div className="inline-flex items-center gap-2 bg-card/80 border border-border rounded-full px-3.5 py-1.5 text-xs text-muted-foreground mb-10">
             <span className="size-1.5 rounded-full bg-[#E8854A] animate-pulse" />
             Pilotbetrieb mit ausgewählten Höfen
           </div>
 
           {/* Feature cards */}
-          <div className="grid sm:grid-cols-3 gap-5 max-w-2xl w-full mb-14">
+          <div className="grid sm:grid-cols-3 gap-5 max-w-2xl w-full">
             {FEATURES.map(({ icon: Icon, title, desc, iconBg, iconColor }, i) => (
               <div
                 key={title}
@@ -231,18 +257,6 @@ export default function HomePage() {
               </div>
             ))}
           </div>
-
-          {/* CTA */}
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-2 rounded-full px-8 py-3.5 text-primary-foreground font-semibold text-sm transition-[transform,opacity,box-shadow] duration-[250ms] ease-out hover:opacity-90 hover:-translate-y-0.5 active:translate-y-0"
-            style={{
-              backgroundColor: '#2D5F3F',
-              boxShadow: '0 4px 16px oklch(0.38 0.089 150 / 0.3), 0 2px 4px oklch(0.38 0.089 150 / 0.15)',
-            }}
-          >
-            Hofbetreiber-Login
-          </Link>
         </section>
 
         {/* A — Für Höfe */}
