@@ -255,21 +255,28 @@ export default function HomePage() {
             className="object-cover"
           />
 
-          {/* Der Loop läuft NUR ab md UND nur bei erlaubter Bewegung — die
-              Weiche ist reines Tailwind, kein JavaScript. Rein dekorativ,
-              deshalb aria-hidden und ohne Tonspur/Controls. */}
+          {/* Der Loop läuft auf ALLEN Breiten, aber nur bei erlaubter Bewegung.
+              Die Weiche ist reines Tailwind bzw. eine media-Bedingung an der
+              <source> — kein JavaScript. Beides muss dieselbe Bedingung tragen:
+              die Klasse blendet das Element ein, die media-Bedingung entscheidet,
+              ob überhaupt eine Quelle geladen wird. Rein dekorativ, deshalb
+              aria-hidden und ohne Tonspur/Controls.
+
+              preload="none": Das Standbild darüber ist der LCP-Kandidat und soll
+              zuerst da sein; das Video holt sich der Browser erst, wenn das
+              Autoplay anläuft. */}
           <video
-            className="absolute inset-0 hidden h-full w-full object-cover motion-safe:md:block"
+            className="absolute inset-0 hidden h-full w-full object-cover motion-safe:block"
             autoPlay
             muted
             loop
             playsInline
-            preload="metadata"
+            preload="none"
             poster="/landing/hero-poster.jpg"
             aria-hidden="true"
           >
             <source
-              media="(min-width: 768px) and (prefers-reduced-motion: no-preference)"
+              media="(prefers-reduced-motion: no-preference)"
               src="/landing/hero-loop.mp4"
               type="video/mp4"
             />
