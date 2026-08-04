@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import type { Metadata } from 'next'
-import { Leaf, ShoppingBasket, Users, ArrowRight, ChevronDown } from 'lucide-react'
+import { ArrowRight, ChevronDown } from 'lucide-react'
 import { KONTAKT_EMAIL } from '@/lib/support'
 
 export const metadata: Metadata = {
@@ -176,30 +176,6 @@ function FarmRow({
   )
 }
 
-const FEATURES = [
-  {
-    icon: Leaf,
-    title: 'Frisch vom Hof',
-    desc: 'Produkte direkt von lokalen Landwirtschaftsbetrieben in deiner Region.',
-    iconBg: '#E8F0E8',
-    iconColor: '#2D5F3F',
-  },
-  {
-    icon: ShoppingBasket,
-    title: 'Einfach bestellen',
-    desc: 'Online reservieren und zur vereinbarten Zeit bequem abholen.',
-    iconBg: '#F4EFE6',
-    iconColor: '#B86A2E',
-  },
-  {
-    icon: Users,
-    title: 'Regional stärken',
-    desc: 'Unterstütze Bauern in deiner Umgebung und stärke die lokale Wirtschaft.',
-    iconBg: '#E8F0E8',
-    iconColor: '#2D5F3F',
-  },
-]
-
 export default function HomePage() {
   return (
     <div
@@ -325,49 +301,21 @@ export default function HomePage() {
           </a>
         </section>
 
-        {/* Aus dem bisherigen Hero übernommen, Wortlaut und Markup unverändert:
-            Pilot-Hinweis und die drei Karten. Über dem Video wären sie weder
-            lesbar noch mit einem ~70vh hohen Hero vereinbar — gelöscht werden
-            sollten sie aber auch nicht, also stehen sie jetzt direkt darunter.
-            Blattmarke, Wortmarke und der Login-Knopf sind entfallen: Alle drei
-            stehen bereits in der Kopfzeile, und der Hero bekommt keinen Button. */}
-        <section
-          id="weiter"
-          className="flex scroll-mt-4 flex-col items-center px-6 pt-12 text-center sm:pt-16"
-        >
-          {/* Pilot badge */}
-          <div className="inline-flex items-center gap-2 bg-card/80 border border-border rounded-full px-3.5 py-1.5 text-xs text-muted-foreground mb-10">
-            <span className="size-1.5 rounded-full bg-[#E8854A] animate-pulse" />
-            Pilotbetrieb mit ausgewählten Höfen
-          </div>
-
-          {/* Feature cards */}
-          <div className="grid sm:grid-cols-3 gap-5 max-w-2xl w-full">
-            {FEATURES.map(({ icon: Icon, title, desc, iconBg, iconColor }, i) => (
-              <div
-                key={title}
-                className="bg-card rounded-2xl p-6 text-left transition-[transform,box-shadow] duration-[250ms] ease-out hover:-translate-y-1.5"
-                style={{
-                  boxShadow: '0 4px 16px oklch(0.38 0.089 150 / 0.06), 0 1px 3px oklch(0.38 0.089 150 / 0.04)',
-                  transitionDelay: `${i * 30}ms`,
-                }}
-              >
-                <div
-                  className="w-11 h-11 rounded-xl flex items-center justify-center mb-4"
-                  style={{ backgroundColor: iconBg }}
-                >
-                  <Icon className="w-5 h-5" style={{ color: iconColor }} strokeWidth={1.75} />
-                </div>
-                <h3 className="font-heading font-semibold text-foreground mb-2 text-base">{title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* A — Für Höfe: abwechselnde Editorial-Zeilen statt Karten */}
-        <section className="px-6 py-20 md:py-28">
+        {/* A — Für Höfe: abwechselnde Editorial-Zeilen statt Karten.
+            Trägt jetzt id="weiter" — das ist das Ziel des Scroll-Pfeils im
+            Hero; es saß vorher auf dem entfernten Karten-Block. */}
+        <section id="weiter" className="scroll-mt-4 px-6 pt-14 pb-20 md:pt-20 md:pb-28">
           <div className="mx-auto max-w-5xl">
+            {/* Pilot-Hinweis, Wortlaut unverändert — steht jetzt hier oben,
+                mittig und mit Luft, damit der Übergang aus dem Hero ruhig
+                bleibt und der Abschnitt trotzdem sofort beginnt. */}
+            <div className="mb-14 flex justify-center md:mb-20">
+              <span className="inline-flex items-center gap-2 bg-card/80 border border-border rounded-full px-3.5 py-1.5 text-xs text-muted-foreground">
+                <span className="size-1.5 rounded-full bg-[#E8854A] animate-pulse" />
+                Pilotbetrieb mit ausgewählten Höfen
+              </span>
+            </div>
+
             <SectionHeading kicker={SECTION_TITLES.farms.kicker}>
               {SECTION_TITLES.farms.title}
             </SectionHeading>
