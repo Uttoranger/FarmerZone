@@ -91,6 +91,10 @@ model User {
   phone         String?
   image         String?
   role          UserRole @default(CUSTOMER)
+  // Plattformbetreiber-Recht für /admin. Bewusst SEPARAT von `role`: role
+  // steuert den Bauernbereich (src/app/(farmer)/layout.tsx prüft auf FARMER).
+  // Ein Betreiber, der selbst einen Hof führt, muss beides sein können.
+  isAdmin       Boolean  @default(false)
   emailVerified Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -200,6 +204,13 @@ model Farm {
   // sperrt Checkout und Reservierung. Es wird NICHTS gelöscht — Bestelldaten
   // unterliegen der 7-jährigen Aufbewahrungspflicht.
   archivedAt DateTime?
+
+  // Freischaltung durch den Plattformbetreiber. null = wartet auf Freigabe:
+  // Der Bauer kann seinen Hof vollständig einrichten, öffentlich sichtbar und
+  // bestellbar wird er erst nach der Freigabe im Admin-Bereich.
+  // Abgrenzung: archivedAt ist ein Zustand, den der Bauer selbst setzt;
+  // approvedAt setzt ausschließlich der Betreiber.
+  approvedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

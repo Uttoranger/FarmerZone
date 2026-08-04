@@ -6,28 +6,27 @@ import { prisma } from '@/lib/prisma'
 import { registrationSchema } from '@/schemas/register'
 
 // Single server action for the full registration flow:
-// invite code → Zod validation → auth.api.signUpEmail (sets cookie via nextCookies()) → FARMER role
+// Zod validation → auth.api.signUpEmail (sets cookie via nextCookies()) → FARMER role
+//
+// Die Registrierung ist OFFEN — kein Einladungscode mehr. Der Schutz sitzt
+// nicht mehr am Eingang, sondern an der Freigabe: Ein neu angelegter Hof
+// entsteht mit approvedAt = null und ist öffentlich unsichtbar, bis der
+// Betreiber ihn im Admin-Bereich freischaltet (src/lib/farm-approval.ts).
+// Das Rate-Limit (10/min/IP aus src/lib/auth.ts) gilt unverändert weiter.
 export async function registerFarmer(data: {
   firstName: string
   lastName: string
   email: string
   password: string
-  inviteCode: string
 }): Promise<{ ok: true } | { error: string }> {
-  // 1. Invite code check
-  const required = process.env.FARMER_SIGNUP_CODE
-  if (required && data.inviteCode.trim() !== required) {
-    return { error: 'Ungültiger Einladungscode.' }
-  }
-
-  // 2. Zod validation (defense-in-depth, same rules as client checklist)
+  // 1. Zod validation (defense-in-depth, same rules as client checklist)
   const name = `${data.firstName.trim()} ${data.lastName.trim()}`
   const validated = registrationSchema.safeParse({ email: data.email, password: data.password, name })
   if (!validated.success) {
     return { error: validated.error.issues[0].message }
   }
 
-  // 3. Create user record (no cookie set here — client calls signIn.email afterwards)
+  // 2. Create user record (no cookie set here — client calls signIn.email afterwards)
   let userId: string
   try {
     const result = await auth.api.signUpEmail({
@@ -44,7 +43,7 @@ export async function registerFarmer(data: {
     return { error: 'Registrierung fehlgeschlagen. Bitte versuche es erneut.' }
   }
 
-  // 4. Set FARMER role (role.input = false prevents setting it via Better Auth client)
+  // 3. Set FARMER role (role.input = false prevents setting it via Better Auth client)
   try {
     await prisma.user.update({ where: { id: userId }, data: { role: 'FARMER' } })
   } catch (err) {
