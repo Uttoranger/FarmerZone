@@ -339,6 +339,33 @@ pnpm dev
 | Deploy = manueller Schritt | Deploy = automatisch im Vercel-Build |
 | Dev = Prod-DB (Datengefahr) | Dev = eigene `farmerzone-dev`-DB |
 
+### Neue Tabellen: RLS nicht vergessen
+
+**Regel: Jede neu hinzugefügte Tabelle braucht in derselben Migration ihre Zeile**
+
+```sql
+ALTER TABLE "public"."NeueTabelle" ENABLE ROW LEVEL SECURITY;
+```
+
+Sonst kehrt die Supabase-Advisor-Warnung `rls_disabled_in_public` zurück (ein
+ERROR-Lint pro Tabelle ohne RLS). Vorbild ist die Migration
+`20260804091431_enable_rls`, die RLS erstmals auf allen Tabellen aktiviert hat.
+
+**Warum keine Policies nötig sind:** FarmerZone nutzt die Supabase-Daten-API
+nicht (kein `supabase-js`, kein anon-Key, keine `SUPABASE_`-Variablen). Die App
+verbindet ausschließlich über Prisma als Rolle `postgres`, die zugleich
+Eigentümerin aller Tabellen ist — und der Tabelleneigentümer umgeht RLS.
+Aktiviertes RLS ohne Policies sperrt daher genau die richtigen Rollen aus
+(`anon`, `authenticated`) und lässt die App unberührt. Policies wären toter
+Code, solange die Daten-API ungenutzt bleibt.
+
+**Kein `FORCE ROW LEVEL SECURITY`:** Das würde den Eigentümer-Bypass aufheben
+und die App selbst aussperren.
+
+Sobald die Daten-API doch genutzt werden sollte (z. B. Realtime oder ein
+Client mit anon-Key), gilt diese Begründung nicht mehr — dann braucht jede
+Tabelle echte Policies.
+
 ### Umgebungen
 
 | Umgebung | DB | Wer migriert |
