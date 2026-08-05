@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
 import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
+import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
 import { nanoid } from 'nanoid'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
@@ -64,7 +65,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: FARM_ARCHIVED_MESSAGE }, { status: 409 })
   }
 
-  // 1c. Shop-Pause — fail-closed VOR jeder Bestell- und Zahlungslogik:
+  // 1c. Freigabe — ein noch nicht freigeschalteter Hof nimmt keine Bestellungen
+  // an. Nach der Stilllegung und vor der Pause geprüft (Reihenfolge und
+  // Begründung: src/lib/farm-approval.ts).
+  if (!farm.approvedAt) {
+    return NextResponse.json({ error: FARM_NOT_APPROVED_MESSAGE }, { status: 409 })
+  }
+
+  // 1d. Shop-Pause — fail-closed VOR jeder Bestell- und Zahlungslogik:
   // vor der Bestandsprüfung, vor prisma.order.create und vor jedem Stripe-Aufruf.
   // Eine ausgeblendete Schaltfläche ist keine Durchsetzung; die Wahrheit steht hier.
   if (farm.isPaused) {

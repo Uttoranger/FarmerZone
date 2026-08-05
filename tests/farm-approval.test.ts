@@ -1,13 +1,14 @@
 /**
- * Tests für die Hof-Stilllegung (archivedAt).
+ * Tests für die Hof-Freigabe (approvedAt).
  *
  * Beweist am echten Route-Handler bzw. an der echten Server-Action:
- *  - /api/checkout und /api/reserve lehnen bei gesetztem archivedAt mit HTTP 409
- *    und eigenem Wortlaut ab — BEVOR Bestellung, Reservierung oder Stripe-Vorgang
- *    entstehen. Bei aktivem Hof läuft beides unverändert durch.
- *  - Die öffentliche Hof-Query filtert stillgelegte Höfe weg (notFound-Pfad).
- *  - Der Guard verhindert die Stilllegung bei offenen Bestellungen und erlaubt
- *    sie, sobald keine mehr offen ist.
+ *  - /api/checkout und /api/reserve lehnen einen noch nicht freigeschalteten
+ *    Hof mit HTTP 409 ab, BEVOR Bestellung, Reservierung oder Stripe-Vorgang
+ *    entstehen; ein freigeschalteter Hof läuft unverändert durch.
+ *  - Die Prüfreihenfolge stillgelegt → nicht freigeschaltet → pausiert gilt.
+ *  - Die öffentliche Hof-Query filtert wartende Höfe weg (notFound-Pfad).
+ *  - Die Freigabe-Action wirkt nur mit isAdmin — auch eine angemeldete
+ *    Bäuerin ohne Adminrecht kommt nicht durch.
  *
  * Prisma/Stripe/E-Mail/Auth sind gemockt — keine DB-, Zahlungs- oder Mailzugriffe.
  */
@@ -19,7 +20,7 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    farm: { findUnique: vi.fn(), update: vi.fn() },
+    farm: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn() },
     product: { findUnique: vi.fn(), update: vi.fn() },
     stockReservation: { aggregate: vi.fn(), deleteMany: vi.fn(), upsert: vi.fn() },
     user: { findUnique: vi.fn(), create: vi.fn() },
@@ -27,22 +28,19 @@ vi.mock('@/lib/prisma', () => ({
     customerFarmSubscription: { findUnique: vi.fn(), upsert: vi.fn() },
   },
 }))
-vi.mock('@/lib/stripe', () => ({
-  stripe: { paymentIntents: { create: vi.fn() } },
-}))
-vi.mock('@/lib/email', () => ({
-  sendOnsiteConfirmation: vi.fn(),
-}))
+vi.mock('@/lib/stripe', () => ({ stripe: { paymentIntents: { create: vi.fn() } } }))
+vi.mock('@/lib/email', () => ({ sendOnsiteConfirmation: vi.fn() }))
 
 import { POST as checkoutPOST } from '@/app/api/checkout/route'
 import { POST as reservePOST } from '@/app/api/reserve/route'
-import { archiveFarm, reactivateFarm } from '@/server/actions/farm-archive'
+import { freischaltenAction, freigabeZuruecknehmenAction } from '@/server/actions/admin'
 import { getPublicFarm } from '@/server/queries/farm'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { sendOnsiteConfirmation } from '@/lib/email'
-import { FARM_ARCHIVED_MESSAGE, farmArchiveBlockedMessage } from '@/lib/farm-archive'
+import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
+import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
 
 const getSession = vi.mocked(auth.api.getSession)
@@ -57,12 +55,12 @@ const userFindUnique = vi.mocked(prisma.user.findUnique)
 const orderFindUnique = vi.mocked(prisma.order.findUnique)
 const orderCreate = vi.mocked(prisma.order.create)
 const orderUpdate = vi.mocked(prisma.order.update)
-const orderCount = vi.mocked(prisma.order.count)
 const paymentIntentCreate = vi.mocked(stripe.paymentIntents.create)
 
-// ── Testdaten ───────────────────────────────────────────────────────────────
+const FREIGESCHALTET = new Date('2026-07-01T10:00:00.000Z')
+const STILLGELEGT = new Date('2026-07-20T10:00:00.000Z')
 
-const ACTIVE_FARM = {
+const AKTIVER_HOF = {
   id: 'farm_1',
   slug: 'testhof',
   name: 'Testhof',
@@ -75,7 +73,7 @@ const ACTIVE_FARM = {
   isActive: true,
   isPaused: false,
   archivedAt: null,
-  approvedAt: new Date('2026-01-01T00:00:00.000Z'),
+  approvedAt: FREIGESCHALTET,
   acceptsOnline: false,
   acceptsOnsite: true,
   stripeAccountReady: false,
@@ -83,8 +81,6 @@ const ACTIVE_FARM = {
   platformFeePercent: 0,
   owner: { name: 'Franz' },
 }
-
-const STILLGELEGT = new Date('2026-07-01T10:00:00.000Z')
 
 const CHECKOUT_BODY = {
   farmId: 'farm_1',
@@ -121,12 +117,11 @@ function reserveRequest(body: unknown = { productId: 'prod_1', quantity: 2, sess
 
 beforeEach(() => {
   vi.clearAllMocks()
-  // Voller Happy-Path: ein aktiver Hof läuft komplett durch.
-  farmFindUnique.mockResolvedValue(ACTIVE_FARM as never)
+  farmFindUnique.mockResolvedValue(AKTIVER_HOF as never)
   productFindUnique.mockResolvedValue({
     id: 'prod_1', stock: 10, isAvailable: true, name: 'Eier',
     unit: 'STUECK', unitSize: null,
-    farm: { isPaused: false, archivedAt: null, approvedAt: new Date('2026-01-01T00:00:00.000Z') },
+    farm: { isPaused: false, archivedAt: null, approvedAt: FREIGESCHALTET },
   } as never)
   productUpdate.mockResolvedValue({} as never)
   reservationAggregate.mockResolvedValue({ _sum: { quantity: null } } as never)
@@ -136,7 +131,6 @@ beforeEach(() => {
   orderFindUnique.mockResolvedValue(null)
   orderCreate.mockResolvedValue({ id: 'order_1' } as never)
   orderUpdate.mockResolvedValue({} as never)
-  orderCount.mockResolvedValue(0 as never)
   farmUpdate.mockResolvedValue({} as never)
   getSession.mockResolvedValue({ user: { id: 'user_1' } } as never)
   vi.mocked(sendOnsiteConfirmation).mockResolvedValue(undefined as never)
@@ -144,19 +138,19 @@ beforeEach(() => {
 
 // ── /api/checkout ───────────────────────────────────────────────────────────
 
-describe('/api/checkout bei stillgelegtem Hof', () => {
+describe('/api/checkout bei noch nicht freigeschaltetem Hof', () => {
   it('lehnt mit 409 und eigenem Wortlaut ab', async () => {
-    farmFindUnique.mockResolvedValue({ ...ACTIVE_FARM, archivedAt: STILLGELEGT } as never)
+    farmFindUnique.mockResolvedValue({ ...AKTIVER_HOF, approvedAt: null } as never)
 
     const res = await checkoutPOST(checkoutRequest())
 
     expect(res.status).toBe(409)
-    expect((await res.json()).error).toBe(FARM_ARCHIVED_MESSAGE)
-    expect(FARM_ARCHIVED_MESSAGE).toBe('Dieser Hof nimmt keine Bestellungen mehr entgegen.')
+    expect((await res.json()).error).toBe(FARM_NOT_APPROVED_MESSAGE)
+    expect(FARM_NOT_APPROVED_MESSAGE).toBe('Dieser Hof ist noch nicht freigeschaltet.')
   })
 
-  it('erzeugt dabei WEDER Bestellung NOCH Zahlungsvorgang (fail-closed vor jeder Mutation)', async () => {
-    farmFindUnique.mockResolvedValue({ ...ACTIVE_FARM, archivedAt: STILLGELEGT } as never)
+  it('erzeugt WEDER Bestellung NOCH Zahlungsvorgang', async () => {
+    farmFindUnique.mockResolvedValue({ ...AKTIVER_HOF, approvedAt: null } as never)
 
     await checkoutPOST(checkoutRequest())
 
@@ -168,7 +162,7 @@ describe('/api/checkout bei stillgelegtem Hof', () => {
 
   it('greift auch bei Online-Zahlung, bevor Stripe gefragt wird', async () => {
     farmFindUnique.mockResolvedValue({
-      ...ACTIVE_FARM, archivedAt: STILLGELEGT,
+      ...AKTIVER_HOF, approvedAt: null,
       acceptsOnline: true, stripeAccountReady: true, stripeAccountId: 'acct_1',
     } as never)
 
@@ -176,78 +170,76 @@ describe('/api/checkout bei stillgelegtem Hof', () => {
 
     expect(res.status).toBe(409)
     expect(paymentIntentCreate).not.toHaveBeenCalled()
-    expect(orderCreate).not.toHaveBeenCalled()
-  })
-
-  it('nennt die Stilllegung, nicht die Pause, wenn beides gesetzt ist', async () => {
-    farmFindUnique.mockResolvedValue({
-      ...ACTIVE_FARM, archivedAt: STILLGELEGT, isPaused: true,
-    } as never)
-
-    const res = await checkoutPOST(checkoutRequest())
-
-    // Der dauerhafte Zustand sticht den vorübergehenden: „bald wieder da"
-    // wäre bei einem stillgelegten Hof eine falsche Zusage.
-    expect((await res.json()).error).toBe(FARM_ARCHIVED_MESSAGE)
   })
 })
 
-describe('/api/checkout bei aktivem Hof', () => {
+describe('Prüfreihenfolge: stillgelegt → nicht freigeschaltet → pausiert', () => {
+  it('stillgelegt sticht die fehlende Freigabe', async () => {
+    farmFindUnique.mockResolvedValue({
+      ...AKTIVER_HOF, archivedAt: STILLGELEGT, approvedAt: null, isPaused: true,
+    } as never)
+
+    const res = await checkoutPOST(checkoutRequest())
+    expect((await res.json()).error).toBe(FARM_ARCHIVED_MESSAGE)
+  })
+
+  it('fehlende Freigabe sticht die Pause', async () => {
+    farmFindUnique.mockResolvedValue({
+      ...AKTIVER_HOF, approvedAt: null, isPaused: true,
+    } as never)
+
+    const res = await checkoutPOST(checkoutRequest())
+    expect((await res.json()).error).toBe(FARM_NOT_APPROVED_MESSAGE)
+  })
+
+  it('bei freigeschaltetem Hof bleibt die Pausen-Meldung erhalten', async () => {
+    farmFindUnique.mockResolvedValue({ ...AKTIVER_HOF, isPaused: true } as never)
+
+    const res = await checkoutPOST(checkoutRequest())
+    expect((await res.json()).error).toBe(SHOP_PAUSED_MESSAGE)
+  })
+})
+
+describe('/api/checkout bei freigeschaltetem Hof', () => {
   it('bestellt unverändert weiter', async () => {
     const res = await checkoutPOST(checkoutRequest())
 
     expect(res.status).toBe(200)
-    const json = await res.json()
-    expect(json.orderId).toBe('order_1')
-    expect(json.requiresConfirmation).toBe(true)
+    expect((await res.json()).orderId).toBe('order_1')
     expect(orderCreate).toHaveBeenCalledTimes(1)
-  })
-
-  it('lehnt einen pausierten Hof weiterhin mit der Pausen-Meldung ab', async () => {
-    farmFindUnique.mockResolvedValue({ ...ACTIVE_FARM, isPaused: true } as never)
-
-    const res = await checkoutPOST(checkoutRequest())
-
-    expect(res.status).toBe(409)
-    expect((await res.json()).error).toBe(SHOP_PAUSED_MESSAGE)
   })
 })
 
 // ── /api/reserve ────────────────────────────────────────────────────────────
 
-describe('/api/reserve bei stillgelegtem Hof', () => {
-  it('lehnt mit 409 und eigenem Wortlaut ab, ohne zu reservieren', async () => {
+describe('/api/reserve', () => {
+  it('lehnt bei fehlender Freigabe mit 409 ab, ohne zu reservieren', async () => {
     productFindUnique.mockResolvedValue({
-      stock: 10, isAvailable: true, farm: { isPaused: false, archivedAt: STILLGELEGT, approvedAt: new Date('2026-01-01T00:00:00.000Z') },
+      stock: 10, isAvailable: true,
+      farm: { isPaused: false, archivedAt: null, approvedAt: null },
     } as never)
 
     const res = await reservePOST(reserveRequest())
 
     expect(res.status).toBe(409)
-    expect((await res.json()).error).toBe(FARM_ARCHIVED_MESSAGE)
+    expect((await res.json()).error).toBe(FARM_NOT_APPROVED_MESSAGE)
     expect(reservationUpsert).not.toHaveBeenCalled()
   })
 
-  it('blockiert auch, wenn genug Bestand da wäre', async () => {
+  it('hält dieselbe Prüfreihenfolge ein wie der Checkout', async () => {
     productFindUnique.mockResolvedValue({
-      stock: 999, isAvailable: true, farm: { isPaused: false, archivedAt: STILLGELEGT, approvedAt: new Date('2026-01-01T00:00:00.000Z') },
+      stock: 10, isAvailable: true,
+      farm: { isPaused: true, archivedAt: STILLGELEGT, approvedAt: null },
     } as never)
 
-    const res = await reservePOST(
-      reserveRequest({ productId: 'prod_1', quantity: 1, sessionId: 'sess_a' })
-    )
-
-    expect(res.status).toBe(409)
-    expect(reservationUpsert).not.toHaveBeenCalled()
+    const res = await reservePOST(reserveRequest())
+    expect((await res.json()).error).toBe(FARM_ARCHIVED_MESSAGE)
   })
-})
 
-describe('/api/reserve bei aktivem Hof', () => {
-  it('reserviert unverändert weiter', async () => {
+  it('reserviert bei freigeschaltetem Hof unverändert weiter', async () => {
     const res = await reservePOST(reserveRequest())
 
     expect(res.status).toBe(200)
-    expect((await res.json()).ok).toBe(true)
     expect(reservationUpsert).toHaveBeenCalledTimes(1)
   })
 })
@@ -255,106 +247,87 @@ describe('/api/reserve bei aktivem Hof', () => {
 // ── Öffentliche Hof-Query ───────────────────────────────────────────────────
 
 describe('Öffentliche Hof-Query', () => {
-  it('filtert stillgelegte Höfe weg — die Seite läuft damit in notFound', async () => {
+  it('filtert wartende Höfe weg — die Seite läuft in notFound', async () => {
     farmFindUnique.mockResolvedValue(null)
 
     const farm = await getPublicFarm('testhof')
 
     expect(farm).toBeNull()
     const arg = farmFindUnique.mock.calls[0]?.[0] as { where: Record<string, unknown> }
-    expect(arg.where).toMatchObject({ slug: 'testhof', isActive: true, archivedAt: null })
+    expect(arg.where).toMatchObject({
+      slug: 'testhof',
+      isActive: true,
+      archivedAt: null,
+      approvedAt: { not: null },
+    })
   })
 })
 
-// ── Guard: Stilllegen nur ohne offene Bestellungen ──────────────────────────
+// ── Freigabe-Action ─────────────────────────────────────────────────────────
 
-describe('archiveFarm — Guard gegen offene Bestellungen', () => {
-  it('legt nicht still, solange offene Bestellungen existieren, und meldet die Anzahl', async () => {
-    farmFindUnique.mockResolvedValue({ id: 'farm_1', slug: 'testhof', archivedAt: null } as never)
-    orderCount.mockResolvedValue(3 as never)
+describe('freischaltenAction', () => {
+  it('schaltet mit Adminrecht frei', async () => {
+    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    farmFindUnique.mockResolvedValue({ slug: 'testhof', approvedAt: null } as never)
 
-    const res = await archiveFarm()
-
-    expect(res.openOrders).toBe(3)
-    expect(farmUpdate).not.toHaveBeenCalled()
-    expect(farmArchiveBlockedMessage(3)).toContain('3 offene Bestellungen')
-  })
-
-  it('zählt als offen genau die Status, die auch das Bestell-Badge zählt', async () => {
-    farmFindUnique.mockResolvedValue({ id: 'farm_1', slug: 'testhof', archivedAt: null } as never)
-    orderCount.mockResolvedValue(1 as never)
-
-    await archiveFarm()
-
-    expect(orderCount).toHaveBeenCalledWith({
-      where: {
-        farmId: 'farm_1',
-        status: {
-          in: ['PENDING_CONFIRMATION', 'PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY'],
-        },
-      },
-    })
-  })
-
-  it('legt still, wenn keine Bestellung mehr offen ist', async () => {
-    farmFindUnique.mockResolvedValue({ id: 'farm_1', slug: 'testhof', archivedAt: null } as never)
-    orderCount.mockResolvedValue(0 as never)
-
-    const res = await archiveFarm()
+    const res = await freischaltenAction('farm_1')
 
     expect(res.error).toBeUndefined()
-    expect(res.openOrders).toBeUndefined()
     expect(farmUpdate).toHaveBeenCalledWith({
       where: { id: 'farm_1' },
-      data: { archivedAt: expect.any(Date) },
+      data: { approvedAt: expect.any(Date) },
     })
   })
 
-  it('löscht dabei nichts — es wird ausschließlich archivedAt gesetzt', async () => {
-    farmFindUnique.mockResolvedValue({ id: 'farm_1', slug: 'testhof', archivedAt: null } as never)
+  it('lehnt eine angemeldete Nutzerin OHNE Adminrecht ab', async () => {
+    userFindUnique.mockResolvedValue({ isAdmin: false } as never)
 
-    await archiveFarm()
+    const res = await freischaltenAction('farm_1')
 
-    const arg = farmUpdate.mock.calls[0]?.[0] as { data: Record<string, unknown> }
-    expect(Object.keys(arg.data)).toEqual(['archivedAt'])
+    expect(res.error).toBe('Keine Berechtigung')
+    expect(farmUpdate).not.toHaveBeenCalled()
   })
 
-  it('verlangt eine Anmeldung', async () => {
+  it('lehnt ohne Anmeldung ab', async () => {
     getSession.mockResolvedValue(null as never)
 
-    const res = await archiveFarm()
+    const res = await freischaltenAction('farm_1')
 
     expect(res.error).toBe('Nicht angemeldet')
     expect(farmUpdate).not.toHaveBeenCalled()
   })
+
+  it('setzt ausschließlich approvedAt — keine anderen Hofdaten', async () => {
+    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    farmFindUnique.mockResolvedValue({ slug: 'testhof', approvedAt: null } as never)
+
+    await freischaltenAction('farm_1')
+
+    const arg = farmUpdate.mock.calls[0]?.[0] as { data: Record<string, unknown> }
+    expect(Object.keys(arg.data)).toEqual(['approvedAt'])
+  })
 })
 
-describe('reactivateFarm', () => {
-  it('setzt archivedAt zurück auf null und lässt isPaused unberührt', async () => {
-    farmFindUnique.mockResolvedValue({
-      id: 'farm_1', slug: 'testhof', archivedAt: STILLGELEGT,
-    } as never)
+describe('freigabeZuruecknehmenAction', () => {
+  it('setzt approvedAt mit Adminrecht auf null zurück', async () => {
+    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    farmFindUnique.mockResolvedValue({ slug: 'testhof' } as never)
 
-    const res = await reactivateFarm()
+    const res = await freigabeZuruecknehmenAction('farm_1')
 
     expect(res.error).toBeUndefined()
     expect(farmUpdate).toHaveBeenCalledWith({
       where: { id: 'farm_1' },
-      data: { archivedAt: null },
+      data: { approvedAt: null },
     })
-    const arg = farmUpdate.mock.calls[0]?.[0] as { data: Record<string, unknown> }
-    expect(Object.keys(arg.data)).toEqual(['archivedAt'])
   })
 
-  it('braucht keinen Guard — Reaktivieren ist immer erlaubt', async () => {
-    farmFindUnique.mockResolvedValue({
-      id: 'farm_1', slug: 'testhof', archivedAt: STILLGELEGT,
-    } as never)
-    orderCount.mockResolvedValue(5 as never)
+  it('lehnt ohne Adminrecht ab', async () => {
+    userFindUnique.mockResolvedValue({ isAdmin: false } as never)
 
-    const res = await reactivateFarm()
+    const res = await freigabeZuruecknehmenAction('farm_1')
 
-    expect(res.error).toBeUndefined()
-    expect(farmUpdate).toHaveBeenCalledTimes(1)
+    expect(res.error).toBe('Keine Berechtigung')
+    expect(farmUpdate).not.toHaveBeenCalled()
   })
 })

@@ -91,6 +91,13 @@ model User {
   phone         String?
   image         String?
   role          UserRole @default(CUSTOMER)
+  // Plattformbetreiber-Recht für /admin. Bewusst ORTHOGONAL zu `role`: der
+  // Betreiber führt selbst einen Hof und muss role = FARMER behalten, sonst
+  // sperrt ihn die Rollenwache in src/app/(farmer)/layout.tsx aus seinem
+  // eigenen Hofbereich aus. Der ungenutzte Enum-Wert UserRole.ADMIN bleibt
+  // deshalb absichtlich unangetastet. Kein Codepfad setzt dieses Feld —
+  // der erste Admin wird einmalig per SQL gesetzt (siehe PR-Beschreibung).
+  isAdmin       Boolean  @default(false)
   emailVerified Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -200,6 +207,12 @@ model Farm {
   // sperrt Checkout und Reservierung. Es wird NICHTS gelöscht — Bestelldaten
   // unterliegen der 7-jährigen Aufbewahrungspflicht.
   archivedAt DateTime?
+
+  // Freigabe durch den Plattformbetreiber. null = wartet auf Freigabe.
+  // Ein wartender Hof ist öffentlich unsichtbar und nimmt keine Bestellungen
+  // an, sein Bauer kann ihn aber vollständig einrichten. Der Zeitpunkt ist
+  // zugleich die Reihenfolge für die Gründungsplätze (src/lib/gruendungshof.ts).
+  approvedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

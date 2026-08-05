@@ -7,6 +7,7 @@ import { getFarmArchiveState } from '@/server/queries/farm'
 import { FarmerNav } from '@/components/farmer/farmer-nav'
 import { ShopLinkBanner } from '@/components/farmer/shop-link-banner'
 import { ArchivedFarmBanner } from '@/components/farmer/archived-farm-banner'
+import { PendingFarmBanner } from '@/components/farmer/pending-farm-banner'
 
 export default async function FarmerLayout({ children }: { children: React.ReactNode }) {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -26,6 +27,7 @@ export default async function FarmerLayout({ children }: { children: React.React
   const openOrdersCount = await getOpenOrdersCount(farm.id)
   const archiveState = await getFarmArchiveState(session.user.id)
   const isArchived = archiveState?.archivedAt != null
+  const isPending = archiveState != null && archiveState.approvedAt == null
 
   return (
     <div className="min-h-screen bg-background">
@@ -39,9 +41,17 @@ export default async function FarmerLayout({ children }: { children: React.React
         {/* min-w-0: als Flex-Item darf main nicht mit breitem Inhalt über den
             Viewport wachsen — sonst greift kein overflow-x-auto der Kinder */}
         <main className="flex-1 min-w-0 pb-24 md:pb-0 md:ml-56 print:ml-0 print:pb-0">
-          {/* Stillgelegt: der Zustands-Balken ersetzt den Shop-Link-Banner —
-              ein Shop-Link zu teilen, der ins Leere führt, wäre irreführend. */}
-          {isArchived ? <ArchivedFarmBanner /> : <ShopLinkBanner farmSlug={farm.slug} />}
+          {/* Stillgelegt oder noch nicht freigeschaltet: der Zustands-Balken
+              ersetzt den Shop-Link-Banner — einen Shop-Link zu teilen, der ins
+              Leere führt, wäre irreführend. Stilllegung sticht die offene
+              Freigabe, gleiche Reihenfolge wie serverseitig. */}
+          {isArchived ? (
+            <ArchivedFarmBanner />
+          ) : isPending ? (
+            <PendingFarmBanner farmId={archiveState.id} farmName={archiveState.name} />
+          ) : (
+            <ShopLinkBanner farmSlug={farm.slug} />
+          )}
           {children}
         </main>
       </div>

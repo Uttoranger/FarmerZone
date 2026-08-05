@@ -84,11 +84,12 @@ const FARM_PHOTO_SELECT = {
 
 export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
   // archivedAt: null — ein stillgelegter Hof ist öffentlich nicht auffindbar.
+  // approvedAt: { not: null } — ein noch nicht freigeschalteter Hof ebenso.
   // Die Filterung sitzt bewusst hier in der Query und nicht in den Seiten:
   // jede öffentliche Unterseite, die über getPublicFarm lädt, ist damit
   // automatisch mitgesperrt und läuft in ihren bestehenden notFound-Pfad.
   const farm = await prisma.farm.findUnique({
-    where: { slug, isActive: true, archivedAt: null },
+    where: { slug, isActive: true, archivedAt: null, approvedAt: { not: null } },
     select: {
       id: true,
       slug: true,
@@ -320,10 +321,10 @@ export async function getFarmSettings(ownerId: string): Promise<FarmSettings | n
  */
 export async function getFarmArchiveState(
   ownerId: string
-): Promise<{ slug: string; archivedAt: Date | null } | null> {
+): Promise<{ id: string; name: string; slug: string; archivedAt: Date | null; approvedAt: Date | null } | null> {
   return prisma.farm.findUnique({
     where: { ownerId },
-    select: { slug: true, archivedAt: true },
+    select: { id: true, name: true, slug: true, archivedAt: true, approvedAt: true },
   })
 }
 

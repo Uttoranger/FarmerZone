@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
 import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
+import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
       select: {
         stock: true,
         isAvailable: true,
-        farm: { select: { isPaused: true, archivedAt: true } },
+        farm: { select: { isPaused: true, archivedAt: true, approvedAt: true } },
       },
     })
 
@@ -61,7 +62,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: FARM_ARCHIVED_MESSAGE }, { status: 409 })
     }
 
-    // 2c. Shop-Pause — fail-closed VOR jeder Reservierungslogik: vor der
+    // 2c. Freigabe — ein noch nicht freigeschalteter Hof reserviert nichts.
+    // Nach der Stilllegung und vor der Pause (siehe src/lib/farm-approval.ts).
+    if (!product.farm.approvedAt) {
+      return NextResponse.json({ error: FARM_NOT_APPROVED_MESSAGE }, { status: 409 })
+    }
+
+    // 2d. Shop-Pause — fail-closed VOR jeder Reservierungslogik: vor der
     // Bestandsrechnung und vor dem upsert, das die Reservierung anlegt.
     if (product.farm.isPaused) {
       return NextResponse.json({ error: SHOP_PAUSED_MESSAGE }, { status: 409 })

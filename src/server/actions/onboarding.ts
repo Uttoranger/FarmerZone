@@ -55,6 +55,27 @@ export async function createFarm(data: {
         ownerId: session.user.id,
       },
     })
+    // Betreiber benachrichtigen — der Hof wartet ab jetzt auf die Freigabe.
+    // Bewusst NACH dem Anlegen und in eigenem try/catch: ein Mailproblem darf
+    // die Registrierung nicht scheitern lassen. Log-Hygiene wie in auth.ts —
+    // in Produktion keine personenbezogenen Details ins Log.
+    try {
+      const { sendNeueHofRegistrierung } = await import('@/lib/email')
+      await sendNeueHofRegistrierung({
+        farmName: farm.name,
+        farmId: farm.id,
+        farmSlug: farm.slug,
+        ownerEmail: session.user.email,
+        registriertAm: farm.createdAt,
+      })
+    } catch (err) {
+      if (process.env.NODE_ENV === 'production') {
+        console.error('[createFarm] Betreiber-Benachrichtigung fehlgeschlagen')
+      } else {
+        console.error('[createFarm] Betreiber-Benachrichtigung fehlgeschlagen:', err)
+      }
+    }
+
     return { farmId: farm.id, farmSlug: farm.slug }
   } catch (err) {
     console.error('[createFarm] error:', err)

@@ -61,6 +61,8 @@ const ACTIVE_FARM = {
   phone: '',
   isActive: true,
   isPaused: false,
+  archivedAt: null,
+  approvedAt: new Date('2026-01-01T00:00:00.000Z'),
   acceptsOnline: false,
   acceptsOnsite: true,
   stripeAccountReady: false,
@@ -110,7 +112,7 @@ beforeEach(() => {
   productFindUnique.mockResolvedValue({
     id: 'prod_1', stock: 10, isAvailable: true, name: 'Eier',
     unit: 'STUECK', unitSize: null,
-    farm: { isPaused: false },
+    farm: { isPaused: false, archivedAt: null, approvedAt: new Date('2026-01-01T00:00:00.000Z') },
   } as never)
   productUpdate.mockResolvedValue({} as never)
   reservationAggregate.mockResolvedValue({ _sum: { quantity: null } } as never)
@@ -187,7 +189,7 @@ describe('/api/checkout bei aktivem Shop', () => {
 describe('/api/reserve bei pausiertem Shop', () => {
   it('lehnt mit 409 und deutscher Meldung ab, ohne zu reservieren', async () => {
     productFindUnique.mockResolvedValue({
-      stock: 10, isAvailable: true, farm: { isPaused: true },
+      stock: 10, isAvailable: true, farm: { isPaused: true, archivedAt: null, approvedAt: new Date('2026-01-01T00:00:00.000Z') },
     } as never)
 
     const res = await reservePOST(reserveRequest())
@@ -199,7 +201,7 @@ describe('/api/reserve bei pausiertem Shop', () => {
 
   it('blockiert auch, wenn genug Bestand da wäre', async () => {
     productFindUnique.mockResolvedValue({
-      stock: 999, isAvailable: true, farm: { isPaused: true },
+      stock: 999, isAvailable: true, farm: { isPaused: true, archivedAt: null, approvedAt: new Date('2026-01-01T00:00:00.000Z') },
     } as never)
 
     const res = await reservePOST(reserveRequest({ productId: 'prod_1', quantity: 1, sessionId: 'sess_a' }))

@@ -12,6 +12,8 @@ import { OrderNotReadyEmail } from '@/emails/order-not-ready'
 import { CustomerMagicLinkEmail } from '@/emails/customer-magic-link'
 import { PasswordResetEmail } from '@/emails/password-reset'
 import { StatusUpdateEmail } from '@/emails/status-update'
+import { NeueHofRegistrierungEmail } from '@/emails/neue-hof-registrierung'
+import { SUPPORT_EMAIL } from '@/lib/support'
 import { generateReorderToken } from '@/lib/reorder-token'
 import { unitSuffix, type OrderLineProduct } from '@/lib/order-line'
 
@@ -323,4 +325,30 @@ export async function sendOrderCancelled(
     `Deine Bestellung ${order.orderNumber} wurde storniert`,
     html
   )
+}
+
+/**
+ * Betreiber-Benachrichtigung über eine neue Hof-Registrierung.
+ *
+ * Geht an SUPPORT_EMAIL, nicht an den Bauern. Der Aufrufer fängt Fehler ab —
+ * ein Mailproblem darf die Registrierung nie scheitern lassen.
+ */
+export async function sendNeueHofRegistrierung(hof: {
+  farmName: string
+  farmId: string
+  farmSlug: string
+  ownerEmail: string
+  registriertAm: Date
+}): Promise<void> {
+  const html = await toHtml(React.createElement(NeueHofRegistrierungEmail, {
+    farmName: hof.farmName,
+    farmId: hof.farmId,
+    farmSlug: hof.farmSlug,
+    ownerEmail: hof.ownerEmail,
+    registriertAm: hof.registriertAm.toLocaleString('de-AT', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    }),
+  }))
+
+  await send(SUPPORT_EMAIL, `Neuer Hof wartet auf Freischaltung: ${hof.farmName}`, html)
 }
