@@ -44,8 +44,7 @@ export async function createConnectAccount(): Promise<{ error?: string }> {
     type: 'express',
     country: 'AT',
     email: farm.email,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    business_type: 'individual' as any,
+    business_type: 'individual',
     capabilities: {
       card_payments: { requested: true },
       transfers: { requested: true },

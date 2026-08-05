@@ -1,6 +1,13 @@
 import { createHmac, timingSafeEqual } from 'crypto'
+import { env } from '@/lib/env'
 
-const SECRET = process.env.BETTER_AUTH_SECRET ?? 'dev-secret-change-in-production'
+// Das Geheimnis kommt aus dem validierten env-Modul, nicht aus process.env.
+// env.ts erzwingt BETTER_AUTH_SECRET beim Start; ein stiller Literal-Fallback
+// würde einen Konfigurationsfehler verschleiern und Links mit einem im Code
+// nachlesbaren Geheimnis signieren. Die Signatur-Logik selbst ist unverändert —
+// bereits versendete Links bleiben gültig (in Produktion war der Fallback
+// ohnehin nie aktiv, sonst hätte env.ts den Start abgebrochen).
+const SECRET = env.BETTER_AUTH_SECRET
 
 // Reorder-Links stecken in Bestellmails und liegen dort dauerhaft im Postfach.
 // 180 Tage decken jede realistische Nachbestellung ab und begrenzen trotzdem,
