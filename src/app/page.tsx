@@ -446,14 +446,16 @@ export default function HomePage() {
         </section>
 
         {/* D — Vision als vollbreites Foto-Band, Bild rein dekorativ.
-            Motiv bewusst row-2 statt hero-poster: hero-poster und row-3 sind
-            fast dasselbe Bild (Nahaufnahme Ähren im Gegenlicht), und row-3
-            steht nur zwei kurze Abschnitte darüber — das las sich als
-            Dopplung. row-2 ist die einzige Weitaufnahme mit Horizont und
-            trägt als vollbreites Band ohnehin besser als eine Makroaufnahme. */}
+            Motiv ist corn-2: die Weitaufnahme des Getreidefelds mit Horizont.
+            Ein vollbreites Band braucht Tiefe und eine ruhige Fläche; eine
+            Nahaufnahme wird auf dieser Breite zur Textur ohne Motiv.
+            NICHT row-2 — das zeigt seit dem Bildtausch einen Bauern im
+            Scheunentor und wird oben als Bildzeile verwendet; als Band hinter
+            Text würde die Person angeschnitten und vom Overlay verdeckt.
+            Auch nicht hero-poster: dasselbe Motiv wie ganz oben. */}
         <section className="relative isolate overflow-hidden py-24 md:py-32 mb-20 md:mb-28">
           <Image
-            src="/landing/row-2.jpg"
+            src="/landing/corn-2.jpg"
             alt=""
             aria-hidden="true"
             fill
