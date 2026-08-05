@@ -88,6 +88,20 @@ const CTA_HEADLINE = 'Du führst einen Hof und willst dabei sein?'
 const CTA_BUTTON = 'Hof anmelden'
 const CTA_NOTE =
   'Die Registrierung läuft mit einem persönlichen Einladungscode — schreib uns kurz, dann melden wir uns bei dir.'
+// Die Farbe, in die der Hero unten ausläuft — und zugleich die Farbe, die der
+// Seitenhintergrund an dieser Stelle bereits erreicht hat. EINE Konstante für
+// beide, sonst entsteht genau die sichtbare Kante, die es vorher gab.
+//
+// Warum nicht var(--color-background): Der Hintergrund unter dem Hero ist nicht
+// das Token, sondern der eigene Verlauf dieses Containers. Nachgemessen lag er
+// dort bei #e8f0e7 (links) bis #f3f6f1 (rechts) — das Token ist mit #F7F2E7 ein
+// warmes Creme und hätte eine andere, wärmere Kante erzeugt. Der Verlauf läuft
+// deshalb jetzt senkrecht (180deg statt 160deg, keine seitliche Wanderung mehr)
+// und hat diese Farbe schon bei 55% der ersten Bildschirmhöhe erreicht — also
+// deutlich oberhalb der Hero-Unterkante bei 70vh. Damit trifft die Ausblendung
+// auf jeder Breite exakt denselben Ton.
+const SEITEN_HINTERGRUND = '#EDF2EB'
+
 const CTA_MAILTO = `mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent('Mein Hof auf FarmerZone')}`
 
 /** Kleine Versalzeile über einer Überschrift. `tone` für das dunkle Vision-Band. */
@@ -132,7 +146,7 @@ function RowImage({ src, alt }: { src: string; alt: string }) {
         src={src}
         alt={alt}
         fill
-        sizes="(min-width: 1024px) 480px, (min-width: 768px) 50vw, 100vw"
+        sizes="(min-width: 1024px) 540px, (min-width: 768px) 50vw, 100vw"
         className="object-cover"
       />
     </div>
@@ -178,10 +192,10 @@ export default function HomePage() {
       // Element-Verlauf hätte er sich über die nun viel längere Seite gestreckt
       // und den Hero-Hintergrund verändert. Darunter läuft seine Endfarbe weiter.
       style={{
-        backgroundImage: 'linear-gradient(160deg, #F4EFE6 0%, #E8F0E8 55%, #FAFAF7 100%)',
+        backgroundImage: `linear-gradient(180deg, #F4EFE6 0%, ${SEITEN_HINTERGRUND} 55%)`,
         backgroundSize: '100% 100vh',
         backgroundRepeat: 'no-repeat',
-        backgroundColor: '#FAFAF7',
+        backgroundColor: SEITEN_HINTERGRUND,
       }}
     >
       {/* Schlanke Kopfzeile: Login ohne Scrollen erreichbar (einzeilig auf allen Breiten) */}
@@ -255,7 +269,7 @@ export default function HomePage() {
           {/* Verlauf von unten/links über beide Schichten */}
           <div
             aria-hidden="true"
-            className="absolute inset-0 bg-gradient-to-tr from-black/75 via-black/45 to-black/10"
+            className="absolute inset-0 bg-gradient-to-tr from-black/60 via-black/25 via-45% to-transparent"
           />
 
           {/* Weicher Auslauf in den Sand-Hintergrund statt harter Kante.
@@ -264,21 +278,24 @@ export default function HomePage() {
               damit der weiße Scroll-Pfeil darüber lesbar bleibt. */}
           <div
             aria-hidden="true"
-            className="absolute inset-x-0 bottom-0 h-28 md:h-36"
+            className="absolute inset-x-0 bottom-0 h-40 md:h-56"
             style={{
-              background:
-                'linear-gradient(to bottom, rgba(238,242,236,0) 0%, rgba(238,242,236,0.15) 55%, rgba(238,242,236,0.6) 82%, #EEF2EC 100%)',
+              background: `linear-gradient(to bottom, transparent 0%, color-mix(in srgb, ${SEITEN_HINTERGRUND} 15%, transparent) 55%, color-mix(in srgb, ${SEITEN_HINTERGRUND} 60%, transparent) 80%, ${SEITEN_HINTERGRUND} 94%)`,
             }}
           />
 
           {/* Headline und Subline im Wortlaut unverändert, nur in Weiß */}
-          <div className="relative flex h-full flex-col justify-end px-6 pb-20 sm:px-10 md:pb-24">
-            <h1 className="font-heading text-4xl sm:text-5xl font-semibold text-white mb-4 leading-tight max-w-sm">
-              Frisch vom Hof.<br />Direkt zu dir.
-            </h1>
-            <p className="text-lg text-white/90 max-w-xs leading-relaxed">
-              Regionale Lebensmittel von lokalen Bauern — bestellen, abholen, genießen.
-            </p>
+          <div className="relative flex h-full flex-col justify-end px-6 pb-20 md:pb-24">
+            {/* Derselbe zentrierte Container wie die Abschnitte darunter, damit
+                Headline und Inhalt auf einer gemeinsamen linken Kante stehen. */}
+            <div className="mx-auto w-full max-w-6xl">
+              <h1 className="font-heading text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-semibold text-white mb-4 leading-tight max-w-2xl text-balance">
+                Frisch vom Hof.<br />Direkt zu dir.
+              </h1>
+              <p className="text-lg text-white/90 max-w-md leading-relaxed">
+                Regionale Lebensmittel von lokalen Bauern — bestellen, abholen, genießen.
+              </p>
+            </div>
           </div>
 
           {/* Scroll-Hinweis: pulsiert langsam, steht bei Reduced Motion still */}
@@ -299,7 +316,7 @@ export default function HomePage() {
             Trägt jetzt id="weiter" — das ist das Ziel des Scroll-Pfeils im
             Hero; es saß vorher auf dem entfernten Karten-Block. */}
         <section id="weiter" className="scroll-mt-4 px-6 pt-14 pb-20 md:pt-20 md:pb-28">
-          <div className="mx-auto max-w-5xl">
+          <div className="mx-auto max-w-6xl">
             {/* Pilot-Hinweis, Wortlaut unverändert — steht jetzt hier oben,
                 mittig und mit Luft, damit der Übergang aus dem Hero ruhig
                 bleibt und der Abschnitt trotzdem sofort beginnt. */}
@@ -329,7 +346,7 @@ export default function HomePage() {
 
         {/* B — Für Kundinnen und Kunden: ruhige Typo-Reihe, keine Bilder */}
         <section className="px-6 pb-20 md:pb-28">
-          <div className="mx-auto max-w-5xl">
+          <div className="mx-auto max-w-6xl">
             <SectionHeading kicker={SECTION_TITLES.customers.kicker}>
               {SECTION_TITLES.customers.title}
             </SectionHeading>
@@ -346,7 +363,7 @@ export default function HomePage() {
 
         {/* C — So funktioniert’s: große Ziffern statt Karten */}
         <section className="px-6 pb-20 md:pb-28">
-          <div className="mx-auto max-w-5xl">
+          <div className="mx-auto max-w-6xl">
             <SectionHeading kicker={SECTION_TITLES.steps.kicker}>
               {SECTION_TITLES.steps.title}
             </SectionHeading>
