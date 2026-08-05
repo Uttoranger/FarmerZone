@@ -97,7 +97,15 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
         const data = JSON.parse(raw)
         if (data.farmId === farm.id) setCart(data.items ?? [])
       }
-    } catch {}
+    } catch (err) {
+      // Beschädigter oder nicht lesbarer Warenkorb im Browser-Speicher: ein
+      // leerer Warenkorb ist hier das korrekte Ergebnis, nicht ein Fehler.
+      // Die Kundin soll deswegen nichts sehen — sie hat nichts falsch
+      // gemacht, und ein Hinweis wäre nur Rauschen.
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[Warenkorb] Gespeicherter Warenkorb nicht lesbar:', err)
+      }
+    }
     setIsHydrated(true)
   }, [farm.id])
 
