@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { registerFarmer } from '@/server/actions/register'
+import { FARM_PENDING_AFTER_SIGNUP } from '@/lib/farm-approval'
 import { validatePassword } from '@/lib/password-rules'
 import { signIn } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
@@ -12,8 +13,6 @@ import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { Check, Loader2 } from 'lucide-react'
 
-const HAS_INVITE_CODE = process.env.NEXT_PUBLIC_HAS_FARMER_SIGNUP_CODE === 'true'
-
 export default function RegisterPage() {
   const router = useRouter()
   const [firstName, setFirstName] = useState('')
@@ -21,7 +20,6 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
-  const [inviteCode, setInviteCode] = useState('')
   const [fehler, setFehler] = useState('')
   const [laedt, setLaedt] = useState(false)
 
@@ -46,7 +44,6 @@ export default function RegisterPage() {
       lastName,
       email,
       password,
-      inviteCode,
     })
 
     if ('error' in result) {
@@ -223,22 +220,11 @@ export default function RegisterPage() {
               )}
             </div>
 
-            {HAS_INVITE_CODE && (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="inviteCode" className="text-sm font-medium text-foreground">
-                  Einladungscode
-                </Label>
-                <Input
-                  id="inviteCode"
-                  type="text"
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value)}
-                  placeholder="Code eingeben"
-                  required
-                  className="h-11 text-base"
-                />
-              </div>
-            )}
+            {/* Die Registrierung ist offen — der Schutz sitzt an der Freigabe,
+                nicht am Eingang (src/lib/farm-approval.ts). */}
+            <p className="rounded-xl border border-border bg-muted/40 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+              {FARM_PENDING_AFTER_SIGNUP}
+            </p>
 
             {fehler && (
               <p

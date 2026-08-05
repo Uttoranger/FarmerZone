@@ -43,7 +43,7 @@ beforeEach(() => {
   productFindUnique.mockResolvedValue({
     stock: 10,
     isAvailable: true,
-    farm: { isPaused: false },
+    farm: { isPaused: false, approvedAt: new Date('2026-01-01T00:00:00.000Z') },
   } as never)
   aggregate.mockResolvedValue({ _sum: { quantity: null } } as never)
   upsert.mockResolvedValue({} as never)

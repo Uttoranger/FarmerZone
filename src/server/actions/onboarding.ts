@@ -55,6 +55,28 @@ export async function createFarm(data: {
         ownerId: session.user.id,
       },
     })
+
+    // Betreiber-Benachrichtigung: der Hof wartet ab jetzt auf die Freigabe
+    // (approvedAt bleibt null). Ein Mailfehler darf die Hof-Anlage NICHT
+    // scheitern lassen — der Bauer hat seinen Hof, die Freischaltung findet
+    // der Betreiber auch über /admin.
+    try {
+      const { sendNewFarmNotification } = await import('@/lib/email')
+      await sendNewFarmNotification({
+        id: farm.id,
+        name: farm.name,
+        slug: farm.slug,
+        ownerEmail: session.user.email,
+      })
+    } catch (err) {
+      console.error('[createFarm] Benachrichtigung fehlgeschlagen:', err)
+      // Log-Hygiene wie in src/lib/auth.ts: Hofname und Adresse nur außerhalb
+      // der Produktion ins Log, damit keine Personendaten in Vercel landen.
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[DEV] Neuer Hof ohne Benachrichtigung: ${farm.name} (${farm.id}), ${session.user.email}`)
+      }
+    }
+
     return { farmId: farm.id, farmSlug: farm.slug }
   } catch (err) {
     console.error('[createFarm] error:', err)

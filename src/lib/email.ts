@@ -11,6 +11,8 @@ import { OrderCancelledEmail } from '@/emails/order-cancelled'
 import { OrderNotReadyEmail } from '@/emails/order-not-ready'
 import { CustomerMagicLinkEmail } from '@/emails/customer-magic-link'
 import { PasswordResetEmail } from '@/emails/password-reset'
+import { NewFarmNotificationEmail } from '@/emails/new-farm-notification'
+import { SUPPORT_EMAIL } from '@/lib/support'
 import { StatusUpdateEmail } from '@/emails/status-update'
 import { generateReorderToken } from '@/lib/reorder-token'
 import { unitSuffix, type OrderLineProduct } from '@/lib/order-line'
@@ -123,6 +125,28 @@ export async function sendMagicLinkEmail(email: string, url: string, firstName?:
 export async function sendPasswordResetEmail(email: string, url: string): Promise<void> {
   const html = await toHtml(React.createElement(PasswordResetEmail, { resetUrl: url }))
   await send(email, 'Passwort zurücksetzen · FarmerZone', html)
+}
+
+/** Neuer Hof registriert → Betreiber (Freischaltung nötig) */
+export async function sendNewFarmNotification(farm: {
+  id: string
+  name: string
+  slug: string
+  ownerEmail: string
+}): Promise<void> {
+  const registeredAt = new Date().toLocaleString('de-AT', {
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  })
+  const html = await toHtml(
+    React.createElement(NewFarmNotificationEmail, {
+      farmName: farm.name,
+      farmId: farm.id,
+      farmSlug: farm.slug,
+      ownerEmail: farm.ownerEmail,
+      registeredAt,
+    })
+  )
+  await send(SUPPORT_EMAIL, `Neuer Hof wartet auf Freischaltung: ${farm.name}`, html)
 }
 
 /** Online-Zahlung bestätigt → Kunde */

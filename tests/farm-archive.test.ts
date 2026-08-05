@@ -62,6 +62,9 @@ const paymentIntentCreate = vi.mocked(stripe.paymentIntents.create)
 
 // ── Testdaten ───────────────────────────────────────────────────────────────
 
+// Ein aktiver Hof ist seit dem Freischaltungs-Sprint auch freigeschaltet.
+const FREIGESCHALTET = new Date('2026-01-01T00:00:00.000Z')
+
 const ACTIVE_FARM = {
   id: 'farm_1',
   slug: 'testhof',
@@ -75,6 +78,7 @@ const ACTIVE_FARM = {
   isActive: true,
   isPaused: false,
   archivedAt: null,
+  approvedAt: FREIGESCHALTET,
   acceptsOnline: false,
   acceptsOnsite: true,
   stripeAccountReady: false,
@@ -125,7 +129,7 @@ beforeEach(() => {
   productFindUnique.mockResolvedValue({
     id: 'prod_1', stock: 10, isAvailable: true, name: 'Eier',
     unit: 'STUECK', unitSize: null,
-    farm: { isPaused: false, archivedAt: null },
+    farm: { isPaused: false, archivedAt: null, approvedAt: FREIGESCHALTET },
   } as never)
   productUpdate.mockResolvedValue({} as never)
   reservationAggregate.mockResolvedValue({ _sum: { quantity: null } } as never)

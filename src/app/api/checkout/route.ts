@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
 import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
+import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
 import { nanoid } from 'nanoid'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
@@ -62,6 +63,13 @@ export async function POST(request: NextRequest) {
   // Pausen-Meldung ausgibt ("bald wieder da" wäre eine falsche Zusage).
   if (farm.archivedAt) {
     return NextResponse.json({ error: FARM_ARCHIVED_MESSAGE }, { status: 409 })
+  }
+
+  // 1b². Freischaltung — nach der Stilllegung, aber VOR der Pause: ein noch
+  // nicht freigeschalteter Hof darf keine Pausen-Meldung ausgeben, denn er
+  // war nie offen (siehe src/lib/farm-approval.ts).
+  if (!farm.approvedAt) {
+    return NextResponse.json({ error: FARM_NOT_APPROVED_MESSAGE }, { status: 409 })
   }
 
   // 1c. Shop-Pause — fail-closed VOR jeder Bestell- und Zahlungslogik:
