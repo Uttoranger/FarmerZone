@@ -13,37 +13,34 @@ export const metadata: Metadata = {
 // Alle Texte als Konstanten statt als JSX-Text: so stehen die Wortlaute an
 // einer Stelle, und deutsche Anführungszeichen brauchen keine HTML-Entities.
 
-// Editorial-Zeilen „Für Höfe": Medium links / Text rechts, dann gespiegelt.
-// Jede Zeile trägt ein typografisches Panel — bewusst KEINE Fotos, solange
-// keine in guter Qualität existieren. Das Panel-Motiv greift die Aussage der
-// Zeile auf (rund um die Uhr / einmal statt dreißigmal / Planbarkeit).
+// Editorial-Zeilen „Für Höfe": Bild links / Text rechts, dann gespiegelt.
+// Die früheren typografischen Panels („24/7", „1×", „Planbar.") waren die
+// Übergangslösung, solange keine Fotos vorlagen — sie sind ersetzt.
 //
-// AUSTAUSCH-KONVENTION: Sobald ein echtes Foto vorliegt, wird aus
-//     { panel: '24/7', … }
-// ein
-//     { image: '/landing/row-hoefe.jpg', alt: '…', … }
-// — eine Zeile in den Daten, sonst ändert sich nichts: <FarmRow> rendert
-// Panel und Foto über dieselbe Zeilen-Geometrie, <RowImage> steht bereit.
-// Dateinamen der Reihe nach: row-hoefe.jpg, row-hoefe-2.jpg, row-hoefe-3.jpg.
+// Die Bilder sind Standbilder aus demselben Clip wie der Hero und halten
+// damit den Ton der Seite von oben bis unten. Sie illustrieren die Aussage
+// NICHT wörtlich; sie sind ruhige Flächen, die den Text atmen lassen.
 //
-// QUALITÄTSLATTE für solche Fotos: Tageslicht, ruhiger Hintergrund, EIN
-// Motiv. Ein Schnappschuss mit unruhigem Umfeld ist schlechter als das
-// Panel — im Zweifel bleibt das Panel stehen.
-type FarmRowMedia = { panel: string } | { image: string; alt: string }
-
-const FARM_BENEFITS: (FarmRowMedia & { title: string; desc: string })[] = [
+// AUSTAUSCH gegen echte Hoffotos: nur die image/alt-Zeile tauschen, sonst
+// ändert sich nichts. QUALITÄTSLATTE dafür: Tageslicht, ruhiger Hintergrund,
+// EIN Motiv, Querformat um 3:2. Ein Schnappschuss mit unruhigem Umfeld ist
+// schlechter als das Feldmotiv — im Zweifel bleibt das Feld stehen.
+const FARM_BENEFITS: { image: string; alt: string; title: string; desc: string }[] = [
   {
-    panel: '24/7',
+    image: '/landing/row-1.jpg',
+    alt: 'Reife Getreideähren im Abendlicht',
     title: 'Bestellungen sammeln sich von selbst',
     desc: 'Kundinnen bestellen rund um die Uhr online; du siehst alles gebündelt nach Abholtag, mit fertiger Packliste — statt Zettel, Anrufe und Chat-Verläufe zu sortieren.',
   },
   {
-    panel: '1×',
+    image: '/landing/row-2.jpg',
+    alt: 'Weites Getreidefeld am Waldrand',
     title: 'Einmal schreiben, alle erreichen',
     desc: 'Ein kurzes Update („Frische Eier ab Freitag") geht an alle deine Kundinnen auf einmal — statt dreißig Einzelnachrichten.',
   },
   {
-    panel: 'Planbar.',
+    image: '/landing/row-3.jpg',
+    alt: 'Getreideähren im Gegenlicht',
     title: 'Planbar statt Überraschung',
     desc: 'Feste Abholzeiten, Bestellungen im Voraus, online oder bar bezahlt: Du weißt vor dem Abholtag, was gebraucht wird.',
   },
@@ -117,41 +114,38 @@ function SectionHeading({ kicker, children }: { kicker: string; children: string
   )
 }
 
-/** Editorial-Bild einer „Für Höfe"-Zeile — bereit für den Austausch gegen ein Panel. */
+/**
+ * Editorial-Bild einer „Für Höfe"-Zeile.
+ *
+ * Festes 3:2 statt `h-full`: Die Zeile ist jetzt vertikal mittig statt
+ * gestreckt, das Bild kann seine Höhe also nicht mehr vom Textblock beziehen.
+ * 3:2 ist zugleich das Seitenverhältnis der Dateien (1080×720) — so wird nie
+ * verzerrt, und die Zeile springt beim Laden nicht.
+ *
+ * Bewusst OHNE `priority`: LCP-Kandidat bleibt der Hero ganz oben. Diese drei
+ * Bilder stehen unter dem Falz und laden verzögert (next/image-Standard).
+ */
 function RowImage({ src, alt }: { src: string; alt: string }) {
   return (
-    <div className="relative h-full min-h-44 overflow-hidden rounded-2xl">
-      <Image src={src} alt={alt} fill sizes="(min-width: 768px) 50vw, 100vw" className="object-cover" />
+    <div className="relative aspect-[3/2] w-full overflow-hidden rounded-2xl">
+      <Image
+        src={src}
+        alt={alt}
+        fill
+        sizes="(min-width: 1024px) 480px, (min-width: 768px) 50vw, 100vw"
+        className="object-cover"
+      />
     </div>
   )
 }
 
 /**
- * Typografisches Panel — ruhige Sand-Fläche mit einem großen Fraunces-Motiv.
- * Bewusst ohne Icons und Emojis.
- *
- * `h-full` statt fester Höhe: Die Zeile ist auf `items-stretch` gestellt, also
- * bestimmt der Textblock die Zeilenhöhe und das Panel füllt sie genau aus. So
- * kann es auf Desktop nie höher werden als der Text daneben; `min-h-24` ist
- * nur die Untergrenze, damit das Motiv Luft behält.
+ * Eine Editorial-Zeile: Bild und Text nebeneinander, ab md abwechselnd
+ * gespiegelt. `items-center` statt `items-stretch` — die beiden Hälften sind
+ * jetzt zwei ruhige Blöcke nebeneinander, nicht zwei gleich hohe Kacheln.
+ * `max-w-prose` hält die Zeilenlänge lesbar, statt den Text über die halbe
+ * Seitenbreite zu ziehen.
  */
-function TypePanel({ children }: { children: string }) {
-  return (
-    <div
-      className="flex h-full min-h-24 items-center justify-center rounded-2xl px-8 py-6"
-      style={{ backgroundColor: '#EFE9DC' }}
-    >
-      <span
-        className="font-heading text-5xl md:text-6xl font-semibold text-balance text-center leading-none"
-        style={{ color: '#2D5F3F' }}
-      >
-        {children}
-      </span>
-    </div>
-  )
-}
-
-/** Eine Editorial-Zeile: Medium und Text nebeneinander, ab md abwechselnd gespiegelt. */
 function FarmRow({
   media,
   title,
@@ -164,13 +158,13 @@ function FarmRow({
   flip: boolean
 }) {
   return (
-    <div className="grid items-stretch gap-7 md:grid-cols-2 md:gap-14">
+    <div className="grid items-center gap-8 md:grid-cols-2 md:gap-16 lg:gap-20">
       <div className={flip ? 'md:order-2' : undefined}>{media}</div>
       <div className={flip ? 'md:order-1' : undefined}>
-        <h3 className="font-heading text-2xl md:text-3xl font-semibold text-foreground mb-3 text-balance">
+        <h3 className="font-heading text-2xl md:text-3xl font-semibold text-foreground mb-4 text-balance">
           {title}
         </h3>
-        <p className="text-base leading-relaxed text-muted-foreground">{desc}</p>
+        <p className="max-w-prose text-base leading-relaxed text-muted-foreground">{desc}</p>
       </div>
     </div>
   )
@@ -319,18 +313,14 @@ export default function HomePage() {
             <SectionHeading kicker={SECTION_TITLES.farms.kicker}>
               {SECTION_TITLES.farms.title}
             </SectionHeading>
-            <div className="space-y-16 md:space-y-24">
+            <div className="space-y-20 md:space-y-32">
               {FARM_BENEFITS.map((row, i) => (
                 <FarmRow
                   key={row.title}
                   flip={i % 2 === 1}
                   title={row.title}
                   desc={row.desc}
-                  media={
-                    'image' in row
-                      ? <RowImage src={row.image} alt={row.alt} />
-                      : <TypePanel>{row.panel}</TypePanel>
-                  }
+                  media={<RowImage src={row.image} alt={row.alt} />}
                 />
               ))}
             </div>
@@ -384,11 +374,15 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* D — Vision als vollbreites Foto-Band: dasselbe Motiv wie der Hero,
-            das die Seite unten wieder schließt. Bild rein dekorativ. */}
+        {/* D — Vision als vollbreites Foto-Band, Bild rein dekorativ.
+            Motiv bewusst row-2 statt hero-poster: hero-poster und row-3 sind
+            fast dasselbe Bild (Nahaufnahme Ähren im Gegenlicht), und row-3
+            steht nur zwei kurze Abschnitte darüber — das las sich als
+            Dopplung. row-2 ist die einzige Weitaufnahme mit Horizont und
+            trägt als vollbreites Band ohnehin besser als eine Makroaufnahme. */}
         <section className="relative isolate overflow-hidden py-24 md:py-32 mb-20 md:mb-28">
           <Image
-            src="/landing/hero-poster.jpg"
+            src="/landing/row-2.jpg"
             alt=""
             aria-hidden="true"
             fill
