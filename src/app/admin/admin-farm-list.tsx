@@ -3,6 +3,12 @@
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { approveFarmAction, revokeFarmApprovalAction } from '@/server/actions/admin'
+import {
+  gruendungshofLabel,
+  KEIN_GRUENDUNGSPLATZ,
+  GRUENDUNGS_KONDITIONEN,
+  MAX_GRUENDUNGSHOEFE,
+} from '@/lib/gruendungshof'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -20,6 +26,8 @@ type Farm = {
   createdAt: Date
   approvedAt: Date | null
   archivedAt: Date | null
+  /** Belegter Platz (1-basiert) oder null — serverseitig berechnet. */
+  gruendungsplatz: number | null
 }
 
 function statusOf(farm: Farm): { label: string; className: string } {
@@ -32,7 +40,17 @@ function formatDate(d: Date): string {
   return new Date(d).toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-export function AdminFarmList({ farms }: { farms: Farm[] }) {
+export function AdminFarmList({
+  farms,
+  vergebenePlaetze,
+}: {
+  farms: Farm[]
+  vergebenePlaetze: number
+}) {
+  // Bekäme ein jetzt freigeschalteter Hof noch einen Platz? Die 12 sind eine
+  // Konditions-, keine Zugangsgrenze — Freischalten bleibt in jedem Fall
+  // möglich, der Dialog sagt nur, was es für die Konditionen bedeutet.
+  const plaetzeFrei = vergebenePlaetze < MAX_GRUENDUNGSHOEFE
   const [isPending, startTransition] = useTransition()
   // Der Hof, für den gerade eine Rückfrage offen ist — plus die Richtung.
   const [dialog, setDialog] = useState<{ farm: Farm; action: 'approve' | 'revoke' } | null>(null)
@@ -96,6 +114,24 @@ export function AdminFarmList({ farms }: { farms: Farm[] }) {
                     <dd>{formatDate(farm.approvedAt)}</dd>
                   </div>
                 )}
+                {/* Nur bei freigeschalteten Höfen: ein wartender Hof hat noch
+                    keinen Platz, ein stillgelegter belegt keinen mehr. */}
+                {farm.approvedAt && !farm.archivedAt && (
+                  <div className="flex gap-1.5 min-w-0">
+                    <dt className="shrink-0">Gründungsplatz:</dt>
+                    <dd
+                      className={
+                        farm.gruendungsplatz !== null && farm.gruendungsplatz <= MAX_GRUENDUNGSHOEFE
+                          ? 'font-medium text-primary'
+                          : undefined
+                      }
+                    >
+                      {farm.gruendungsplatz !== null && farm.gruendungsplatz <= MAX_GRUENDUNGSHOEFE
+                        ? gruendungshofLabel(farm.gruendungsplatz)
+                        : KEIN_GRUENDUNGSPLATZ}
+                    </dd>
+                  </div>
+                )}
               </dl>
 
               <div className="mt-3">
@@ -130,20 +166,40 @@ export function AdminFarmList({ farms }: { farms: Farm[] }) {
               {dialog?.action === 'approve' ? 'Hof freischalten?' : 'Freigabe zurücknehmen?'}
             </DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            {dialog?.action === 'approve' ? (
-              <>
-                <strong className="text-foreground">{dialog?.farm.name}</strong> wird sofort öffentlich
-                erreichbar und kann Bestellungen entgegennehmen.
-              </>
-            ) : (
-              <>
-                Die Hofseite von <strong className="text-foreground">{dialog?.farm.name}</strong> ist
-                danach nicht mehr erreichbar und Bestellungen werden abgelehnt. Es wird nichts
-                gelöscht — der Bauer behält Zugang zu allen Daten.
-              </>
-            )}
-          </p>
+          {dialog?.action === 'approve' ? (
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <p>
+                <strong className="text-foreground">{dialog.farm.name}</strong> wird sofort
+                öffentlich erreichbar und kann Bestellungen entgegennehmen.
+              </p>
+              {plaetzeFrei ? (
+                <p className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-foreground">
+                  Dieser Hof belegt {gruendungshofLabel(vergebenePlaetze + 1)}.
+                  <br />
+                  {GRUENDUNGS_KONDITIONEN}
+                </p>
+              ) : (
+                <p className="rounded-lg border border-border bg-muted p-3">
+                  Alle {MAX_GRUENDUNGSHOEFE} Gründungsplätze sind vergeben — dieser Hof bekommt
+                  keinen Gründungsplatz. Freischalten ist trotzdem möglich.
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Die Hofseite von <strong className="text-foreground">{dialog?.farm.name}</strong> ist
+              danach nicht mehr erreichbar und Bestellungen werden abgelehnt. Es wird nichts
+              gelöscht — der Bauer behält Zugang zu allen Daten.
+              {dialog !== null &&
+                dialog.farm.gruendungsplatz !== null &&
+                dialog.farm.gruendungsplatz <= MAX_GRUENDUNGSHOEFE && (
+                  <>
+                    {' '}
+                    Sein Gründungsplatz wird frei, die nachfolgenden Höfe rücken auf.
+                  </>
+                )}
+            </p>
+          )}
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDialog(null)} disabled={isPending}>
               Abbrechen
