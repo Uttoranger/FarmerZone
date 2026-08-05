@@ -14,35 +14,51 @@ export const metadata: Metadata = {
 // einer Stelle, und deutsche Anführungszeichen brauchen keine HTML-Entities.
 
 // Editorial-Zeilen „Für Höfe": Bild links / Text rechts, dann gespiegelt.
-// Die früheren typografischen Panels („24/7", „1×", „Planbar.") waren die
-// Übergangslösung, solange keine Fotos vorlagen — sie sind ersetzt.
 //
-// Die Bilder sind Standbilder aus demselben Clip wie der Hero und halten
-// damit den Ton der Seite von oben bis unten. Sie illustrieren die Aussage
-// NICHT wörtlich; sie sind ruhige Flächen, die den Text atmen lassen.
+// Jede Zeile trägt drei Ebenen: die Kurzformel als optischen Anker, die
+// Überschrift mit dem Nutzen, und darunter zwei bis drei Stichpunkte, die
+// den Satz konkret machen. Die Formeln („24/7", „1×", „Planbar.") gab es
+// früher schon als typografische Panels, als noch keine Fotos vorlagen —
+// sie kommen hier neben dem Bild zurück, weil die Textspalte sonst neben
+// der Bildfläche leer wirkt.
 //
-// AUSTAUSCH gegen echte Hoffotos: nur die image/alt-Zeile tauschen, sonst
-// ändert sich nichts. QUALITÄTSLATTE dafür: Tageslicht, ruhiger Hintergrund,
-// EIN Motiv, Querformat um 3:2. Ein Schnappschuss mit unruhigem Umfeld ist
-// schlechter als das Feldmotiv — im Zweifel bleibt das Feld stehen.
-const FARM_BENEFITS: { image: string; alt: string; title: string; desc: string }[] = [
+// Die Stichpunkte beschreiben ausschließlich Funktionen, die es gibt.
+// Nichts davon ist ein Versprechen auf die Zukunft.
+//
+// AUSTAUSCH der Bilder: nur die image/alt-Zeile tauschen, sonst ändert sich
+// nichts. Der alt-Text MUSS beschreiben, was tatsächlich zu sehen ist —
+// beim Bildtausch also immer mit anpassen.
+const FARM_BENEFITS: {
+  image: string
+  alt: string
+  formel: string
+  title: string
+  desc: string
+  details: string[]
+}[] = [
   {
     image: '/landing/row-1.jpg',
-    alt: 'Reife Getreideähren im Abendlicht',
+    alt: 'Fertig gepackte Papiertüten mit Anhängern neben einem Korb mit Gemüse und Eiern',
+    formel: '24/7',
     title: 'Bestellungen sammeln sich von selbst',
     desc: 'Kundinnen bestellen rund um die Uhr online; du siehst alles gebündelt nach Abholtag, mit fertiger Packliste — statt Zettel, Anrufe und Chat-Verläufe zu sortieren.',
+    details: ['Nach Abholtag gruppiert', 'Fertige Packliste', 'Fertig-melden mit einem Tipp'],
   },
   {
     image: '/landing/row-2.jpg',
-    alt: 'Weites Getreidefeld am Waldrand',
+    alt: 'Bauer blickt im Scheunentor auf sein Telefon',
+    formel: '1×',
     title: 'Einmal schreiben, alle erreichen',
     desc: 'Ein kurzes Update („Frische Eier ab Freitag") geht an alle deine Kundinnen auf einmal — statt dreißig Einzelnachrichten.',
+    details: ['E-Mail an alle Kundinnen', 'WhatsApp-Erinnerung', 'Foto und Text in einem Update'],
   },
   {
     image: '/landing/row-3.jpg',
-    alt: 'Getreideähren im Gegenlicht',
+    alt: 'Beschriftete Holzkisten mit Obst und Gemüse, daneben ein aufgeschlagenes Buch',
+    formel: 'Planbar.',
     title: 'Planbar statt Überraschung',
     desc: 'Feste Abholzeiten, Bestellungen im Voraus, online oder bar bezahlt: Du weißt vor dem Abholtag, was gebraucht wird.',
+    details: ['Feste Abholzeiten', 'Online oder bar bezahlt', 'Bestand wird beim Bestellen reserviert'],
   },
 ]
 
@@ -131,17 +147,22 @@ function SectionHeading({ kicker, children }: { kicker: string; children: string
 /**
  * Editorial-Bild einer „Für Höfe"-Zeile.
  *
- * Festes 3:2 statt `h-full`: Die Zeile ist jetzt vertikal mittig statt
- * gestreckt, das Bild kann seine Höhe also nicht mehr vom Textblock beziehen.
- * 3:2 ist zugleich das Seitenverhältnis der Dateien (1080×720) — so wird nie
- * verzerrt, und die Zeile springt beim Laden nicht.
+ * Festes Seitenverhältnis statt `h-full`: Die Zeile ist vertikal mittig
+ * statt gestreckt, das Bild kann seine Höhe also nicht vom Textblock
+ * beziehen. Ein fester Wert hält die Zeile beim Laden ruhig.
+ *
+ * 16:10 (1,6) statt der früheren 3:2 (1,5): Die Dateien liegen bei 1,491, es
+ * wird also rund 7% der Höhe beschnitten — bei diesen mittig aufgebauten
+ * Motiven unkritisch. Der flachere Zuschnitt bringt Bild- und Texthöhe näher
+ * zusammen; mit 3:2 stand das Bild in zwei von drei Zeilen 63px über dem
+ * Text, jetzt sind es höchstens 37px in die eine oder andere Richtung.
  *
  * Bewusst OHNE `priority`: LCP-Kandidat bleibt der Hero ganz oben. Diese drei
  * Bilder stehen unter dem Falz und laden verzögert (next/image-Standard).
  */
 function RowImage({ src, alt }: { src: string; alt: string }) {
   return (
-    <div className="relative aspect-[3/2] w-full overflow-hidden rounded-2xl">
+    <div className="relative aspect-[16/10] w-full overflow-hidden rounded-2xl">
       <Image
         src={src}
         alt={alt}
@@ -157,28 +178,59 @@ function RowImage({ src, alt }: { src: string; alt: string }) {
  * Eine Editorial-Zeile: Bild und Text nebeneinander, ab md abwechselnd
  * gespiegelt. `items-center` statt `items-stretch` — die beiden Hälften sind
  * jetzt zwei ruhige Blöcke nebeneinander, nicht zwei gleich hohe Kacheln.
- * `max-w-prose` hält die Zeilenlänge lesbar, statt den Text über die halbe
- * Seitenbreite zu ziehen.
+ *
+ * Die Textspalte trägt drei Ebenen: Kurzformel, Überschrift, Beschreibung —
+ * darunter die Stichpunkte. Zusammen füllen sie die Spalte so weit, dass sie
+ * neben dem Bild nicht mehr leer wirkt; vorher standen dort nur Überschrift
+ * und zwei Zeilen neben einer deutlich höheren Bildfläche.
+ *
+ * Der Spaltenabstand ist enger als zuvor (md:gap-12 lg:gap-16 statt
+ * md:gap-16 lg:gap-20), damit Bild und Text als Paar gelesen werden.
  */
 function FarmRow({
   media,
+  formel,
   title,
   desc,
+  details,
   flip,
 }: {
   media: ReactNode
+  formel: string
   title: string
   desc: string
+  details: string[]
   flip: boolean
 }) {
   return (
-    <div className="grid items-center gap-8 md:grid-cols-2 md:gap-16 lg:gap-20">
+    <div className="grid items-center gap-8 md:grid-cols-2 md:gap-12 lg:gap-16">
       <div className={flip ? 'md:order-2' : undefined}>{media}</div>
       <div className={flip ? 'md:order-1' : undefined}>
+        {/* Optischer Anker der Zeile: groß genug, um die Spalte zu tragen,
+            klar kleiner als die Abschnitts-Überschrift. */}
+        <p
+          className="font-heading text-3xl md:text-4xl font-semibold leading-none mb-3"
+          style={{ color: '#4F6F57' }}
+        >
+          {formel}
+        </p>
         <h3 className="font-heading text-2xl md:text-3xl font-semibold text-foreground mb-4 text-balance">
           {title}
         </h3>
         <p className="max-w-prose text-base leading-relaxed text-muted-foreground">{desc}</p>
+        {/* Bewusst ohne Icons und ohne Aufzählungszeichen — nur feine
+            Trennlinien, damit die Liste ruhig bleibt und nichts verspricht,
+            was sie nicht hält. */}
+        <ul className="mt-6 max-w-prose border-t border-border/60">
+          {details.map((d) => (
+            <li
+              key={d}
+              className="border-b border-border/60 py-2.5 text-sm text-muted-foreground"
+            >
+              {d}
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   )
@@ -330,13 +382,15 @@ export default function HomePage() {
             <SectionHeading kicker={SECTION_TITLES.farms.kicker}>
               {SECTION_TITLES.farms.title}
             </SectionHeading>
-            <div className="space-y-20 md:space-y-32">
+            <div className="space-y-16 md:space-y-24">
               {FARM_BENEFITS.map((row, i) => (
                 <FarmRow
                   key={row.title}
                   flip={i % 2 === 1}
                   title={row.title}
                   desc={row.desc}
+                  formel={row.formel}
+                  details={row.details}
                   media={<RowImage src={row.image} alt={row.alt} />}
                 />
               ))}
