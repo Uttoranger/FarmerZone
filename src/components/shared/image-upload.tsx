@@ -3,6 +3,13 @@
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { summarizeUploadBatch, type BatchSkip } from '@/lib/upload-batch'
+import {
+  BildFehler,
+  bildFehlerText,
+  bildFehlerKurz,
+  bildFehlerMeldung,
+  protokolliereBildFehler,
+} from '@/lib/upload-fehler'
 
 export type ImageUploadVariant = 'product' | 'banner' | 'logo' | 'gallery' | 'status'
 
@@ -33,16 +40,6 @@ export const MAX_LONG_SIDE: Record<ImageUploadVariant, number> = {
 }
 
 /**
- * EIN Wortlaut für „dein Browser kann dieses Format nicht" — die Auswahl-Probe,
- * der späte Resize-Fehler und der Produkt-Dialog melden dasselbe.
- */
-export const IMAGE_FORMAT_ERROR =
-  'Dieses Bildformat unterstützt dein Browser nicht (z. B. HEIC) — bitte JPEG oder PNG wählen'
-
-/** Kurzform desselben Grundes für die Sammelmeldung einer Serie. */
-const FORMAT_KURZ = 'Format nicht unterstützt'
-
-/**
  * Probiert VOR Vorschau und Upload, ob der Browser die Datei überhaupt
  * dekodieren kann. Chrome/Android scheitert hier an HEIC, Safari nicht —
  * genau das ist gewollt, denn Safari kann HEIC anschließend zu JPEG umwandeln.
@@ -51,6 +48,11 @@ const FORMAT_KURZ = 'Format nicht unterstützt'
  * Speicherbedarf klein, denn ein 48-MP-Foto würde sonst unnötig groß im
  * Speicher landen. Ältere Browser ohne createImageBitmap fallen auf das
  * bewährte <img>-Laden zurück.
+ *
+ * Was hier NICHT geprüft wird: ob der Browser das gelesene Bild anschließend
+ * wieder herausgeben darf. Dekodieren ist erlaubt, das Auslesen des Canvas
+ * kann trotzdem blockiert sein — diese zweite Hürde fällt erst in
+ * resizeToWebP und trägt dort einen eigenen Fehler.
  */
 export async function canDecodeImage(file: File): Promise<boolean> {
   if (typeof createImageBitmap === 'function') {
@@ -78,52 +80,82 @@ export async function canDecodeImage(file: File): Promise<boolean> {
   })
 }
 
+/**
+ * Verkleinert und kodiert neu. Scheitert das, gibt es genau zwei Ursachen —
+ * und die Funktion sagt jetzt, welche es war (src/lib/upload-fehler.ts):
+ *
+ *   'dekodierung'  Das <img> lädt die Datei gar nicht erst (img.onerror).
+ *   'kodierung'    Gelesen wurde sie, aber der Canvas gibt nichts zurück:
+ *                  kein 2D-Kontext, toBlob liefert null oder wirft. Braves
+ *                  Fingerprint-Schutz landet hier. Vorher lief dieser Fall in
+ *                  eine Meldung, die ein anderes Dateiformat empfahl — ein
+ *                  Rat, der bei blockiertem Canvas nie funktioniert.
+ */
 export async function resizeToWebP(file: File, maxLongSide: number, quality = 0.82): Promise<File> {
   return new Promise((resolve, reject) => {
     const img = new Image()
     const objectUrl = URL.createObjectURL(file)
     img.onload = () => {
       URL.revokeObjectURL(objectUrl)
-      const { naturalWidth: w, naturalHeight: h } = img
-      const scale = Math.min(1, maxLongSide / Math.max(w, h))
-      const canvas = document.createElement('canvas')
-      canvas.width = Math.round(w * scale)
-      canvas.height = Math.round(h * scale)
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return reject(new Error('Canvas nicht verfügbar'))
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      // Alles ab hier ist Canvas-Arbeit. Was davon schiefgeht — ein
+      // verweigerter Kontext, ein werfendes drawImage, ein leeres toBlob —
+      // ist dieselbe Ursache: der Browser gibt das Bild nicht wieder heraus.
+      try {
+        const { naturalWidth: w, naturalHeight: h } = img
+        const scale = Math.min(1, maxLongSide / Math.max(w, h))
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.round(w * scale)
+        canvas.height = Math.round(h * scale)
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return reject(new BildFehler('kodierung'))
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
 
-      const finish = (blob: Blob) => {
-        // Typ und Endung ehrlich aus dem tatsächlichen Encode-Ergebnis ableiten
-        const ext = blob.type === 'image/webp' ? '.webp' : '.jpg'
-        const outName = file.name.replace(/\.[^.]+$/, '') + ext
-        resolve(new File([blob], outName, { type: blob.type }))
+        const finish = (blob: Blob) => {
+          // Typ und Endung ehrlich aus dem tatsächlichen Encode-Ergebnis ableiten
+          const ext = blob.type === 'image/webp' ? '.webp' : '.jpg'
+          const outName = file.name.replace(/\.[^.]+$/, '') + ext
+          resolve(new File([blob], outName, { type: blob.type }))
+        }
+
+        // Safari kann kein WebP und fällt spezifikationsgemäß still auf PNG
+        // zurück — dann denselben Canvas als JPEG kodieren. Erst wenn AUCH das
+        // nichts liefert, ist die Kodierung wirklich blockiert.
+        const alsJpeg = () => {
+          try {
+            canvas.toBlob(
+              (jpegBlob) => {
+                if (!jpegBlob || jpegBlob.type !== 'image/jpeg') {
+                  return reject(new BildFehler('kodierung'))
+                }
+                finish(jpegBlob)
+              },
+              'image/jpeg',
+              0.85,
+            )
+          } catch {
+            // Der zweite toBlob-Aufruf sitzt im Callback des ersten und läuft
+            // damit außerhalb des äußeren try — er braucht sein eigenes Netz.
+            reject(new BildFehler('kodierung'))
+          }
+        }
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob && blob.type === 'image/webp') return finish(blob)
+            alsJpeg()
+          },
+          'image/webp',
+          quality,
+        )
+      } catch {
+        reject(new BildFehler('kodierung'))
       }
-
-      canvas.toBlob(
-        (blob) => {
-          if (blob && blob.type === 'image/webp') return finish(blob)
-          // Safari kann kein WebP und fällt spezifikationsgemäß still auf PNG
-          // zurück — dann denselben Canvas als JPEG kodieren
-          canvas.toBlob(
-            (jpegBlob) => {
-              if (!jpegBlob || jpegBlob.type !== 'image/jpeg') {
-                return reject(new Error('Bild konnte nicht umgewandelt werden — bitte ein JPEG- oder PNG-Foto wählen'))
-              }
-              finish(jpegBlob)
-            },
-            'image/jpeg',
-            0.85,
-          )
-        },
-        'image/webp',
-        quality,
-      )
     }
     img.onerror = () => {
       URL.revokeObjectURL(objectUrl)
-      // Zweites Netz hinter der Auswahl-Probe — gleicher Wortlaut
-      reject(new Error(IMAGE_FORMAT_ERROR))
+      // Zweites Netz hinter der Auswahl-Probe: hier ist wirklich das Format
+      // schuld, nicht die Verarbeitung.
+      reject(new BildFehler('dekodierung'))
     }
     img.src = objectUrl
   })
@@ -178,7 +210,12 @@ export function useImageUpload({
     // Format-Probe VOR allem anderen: so kommt die Absage sofort und nicht
     // erst nach Verkleinern und Hochladen
     if (!(await canDecodeImage(file))) {
-      return { ok: false, message: IMAGE_FORMAT_ERROR, short: FORMAT_KURZ }
+      protokolliereBildFehler('dekodierung', file)
+      return {
+        ok: false,
+        message: bildFehlerText('dekodierung'),
+        short: bildFehlerKurz('dekodierung'),
+      }
     }
 
     try {
@@ -208,8 +245,11 @@ export function useImageUpload({
       await onUploaded(url as string, { batch })
       return { ok: true }
     } catch (e) {
-      const text = e instanceof Error ? e.message : 'Upload fehlgeschlagen'
-      return { ok: false, message: text, short: text }
+      // Ein BildFehler bringt seine Ursache mit und bekommt den passenden
+      // Text; alles andere (Netz, Server-Antwort) behält seine eigene Meldung.
+      const { text, kurz, art } = bildFehlerMeldung(e)
+      if (art) protokolliereBildFehler(art, file)
+      return { ok: false, message: text, short: kurz }
     }
   }
 
