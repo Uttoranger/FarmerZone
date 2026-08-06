@@ -4,6 +4,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { registrationSchema } from '@/schemas/register'
+import { checkFormToken, FORM_EXPIRED_MESSAGE } from '@/lib/form-token'
 
 // Single server action for the full registration flow:
 // Zod validation → auth.api.signUpEmail (sets cookie via nextCookies()) → FARMER role
@@ -13,12 +14,51 @@ import { registrationSchema } from '@/schemas/register'
 // entsteht mit approvedAt = null und ist öffentlich unsichtbar, bis der
 // Betreiber ihn im Admin-Bereich freischaltet (src/lib/farm-approval.ts).
 // Das Rate-Limit (10/min/IP aus src/lib/auth.ts) gilt unverändert weiter.
+//
+// Davor sitzen seit dem Spam-Sprint zwei Schranken gegen naive Bots — beide
+// kosten echte Höfe nichts, weil sie an Dingen hängen, die ein Browser
+// ohnehin mitbringt:
+//   Honigtopf   ein für Menschen unsichtbares Feld, das leer bleiben muss.
+//   Zeitschranke  ein signierter Zeitstempel aus dem Seitenaufbau; unter drei
+//                 Sekunden zwischen Aufruf und Absenden füllt niemand aus.
+// Beide lehnen STILL ab: Der Aufrufer bekommt dieselbe Erfolgsmeldung wie bei
+// einer echten Registrierung, angelegt wird nichts. Ein Bot soll nicht lernen,
+// woran er gescheitert ist — sonst probiert er die nächste Variante.
 export async function registerFarmer(data: {
   firstName: string
   lastName: string
   email: string
   password: string
+  /** Honigtopf aus dem Formular — für Menschen unsichtbar, muss leer bleiben. */
+  website: string
+  /** Signierter Zeitstempel aus dem Seitenaufbau (src/lib/form-token.ts). */
+  formToken: string
 }): Promise<{ ok: true } | { error: string }> {
+  // 0. Bot-Abwehr — VOR jeder Validierung und jedem Schreibzugriff.
+  //    Beide Prüfungen sind bewusst unabhängig von den Eingabefeldern: ein Bot
+  //    mit sauberer E-Mail und starkem Passwort scheitert hier genauso.
+  const honigtopfGefuellt =
+    typeof data.website === 'string' && data.website.trim().length > 0
+  const zeitschranke = checkFormToken(typeof data.formToken === 'string' ? data.formToken : '')
+
+  if (!honigtopfGefuellt && zeitschranke === 'abgelaufen') {
+    // Der einzige sichtbare Fall: ein Mensch hat das Formular zu lange offen
+    // liegen lassen. Eine stille Erfolgsmeldung würde ihn im Glauben lassen,
+    // sein Konto sei angelegt.
+    return { error: FORM_EXPIRED_MESSAGE }
+  }
+
+  if (honigtopfGefuellt || zeitschranke !== 'ok') {
+    // Log-Hygiene wie in src/lib/auth.ts: die Adresse gehört nicht in die
+    // Produktions-Logs (Vercel), lokal hilft sie beim Nachvollziehen.
+    if (process.env.NODE_ENV !== 'production') {
+      const grund = honigtopfGefuellt ? 'Honigtopf' : `Zeitschranke/${zeitschranke}`
+      console.log(`[DEV] Registrierung still abgewiesen (${grund}): ${data.email}`)
+    }
+    // Erfolgsmeldung ohne Wirkung: kein User, kein Hof, keine Benachrichtigung.
+    return { ok: true }
+  }
+
   // 1. Zod validation (defense-in-depth, same rules as client checklist)
   const name = `${data.firstName.trim()} ${data.lastName.trim()}`
   const validated = registrationSchema.safeParse({ email: data.email, password: data.password, name })

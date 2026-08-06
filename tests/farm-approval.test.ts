@@ -15,7 +15,7 @@
  *
  * Prisma/Stripe/E-Mail/Auth sind gemockt — keine DB-, Zahlungs- oder Mailzugriffe.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
@@ -44,6 +44,7 @@ import { POST as reservePOST } from '@/app/api/reserve/route'
 import { getPublicFarm } from '@/server/queries/farm'
 import { approveFarmAction, revokeFarmApprovalAction } from '@/server/actions/admin'
 import { registerFarmer } from '@/server/actions/register'
+import { generateFormToken, MIN_FORM_AGE_MS } from '@/lib/form-token'
 import { createFarm } from '@/server/actions/onboarding'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -119,6 +120,20 @@ function checkoutRequest(body: unknown = CHECKOUT_BODY) {
   })
 }
 
+/**
+ * Ein Formular-Token, das die Zeitschranke passiert: ausgestellt, dann die
+ * Uhr um die Mindestdauer vorgestellt. Ohne Zeitreise wäre jedes frisch
+ * erzeugte Token „zu schnell" und die Registrierung würde still abgelehnt.
+ */
+function alterFormToken(): string {
+  const jetzt = Date.now()
+  vi.useFakeTimers()
+  vi.setSystemTime(jetzt)
+  const token = generateFormToken()
+  vi.setSystemTime(jetzt + MIN_FORM_AGE_MS)
+  return token
+}
+
 function reserveRequest() {
   return new NextRequest('http://localhost/api/reserve', {
     method: 'POST',
@@ -144,6 +159,11 @@ beforeEach(() => {
   farmUpdate.mockResolvedValue({} as never)
   farmCreate.mockResolvedValue({ id: 'farm_neu', slug: 'neuer-hof', name: 'Neuer Hof' } as never)
   getSession.mockResolvedValue({ user: { id: 'user_1', email: 'franz@test.local' } } as never)
+})
+
+// alterFormToken() stellt die Uhr — sie darf nicht in den nächsten Test lecken.
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 // ── Sperre bei fehlender Freigabe ───────────────────────────────────────────
@@ -350,6 +370,11 @@ describe('Registrierung ohne Einladungscode', () => {
       lastName: 'Müller',
       email: 'franz@test.local',
       password: 'Hofladen1',
+      // Leerer Honigtopf und ein Zeitstempel, der die Drei-Sekunden-Schranke
+      // passiert — die Bot-Abwehr steht der echten Anmeldung nicht im Weg.
+      // Eigene Suite dafür: tests/register-spam.test.ts
+      website: '',
+      formToken: alterFormToken(),
     })
 
     expect(result).toEqual({ ok: true })
