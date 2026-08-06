@@ -5,6 +5,7 @@ import {
   statusReminder,
   countUniqueCustomers,
 } from '@/lib/dashboard-hints'
+import { ersteSchritte } from '@/lib/erste-schritte'
 import { startOfWeek, endOfWeek, subWeeks } from 'date-fns'
 
 export async function getDashboardStats(farmId: string) {
@@ -31,6 +32,9 @@ export async function getDashboardStats(farmId: string) {
     kundenRows,
     lowStockProducts,
     lastStatus,
+    hofStammdaten,
+    produkteGesamt,
+    aktiveAbholzeiten,
   ] = await Promise.all([
     prisma.order.count({
       where: {
@@ -120,6 +124,30 @@ export async function getDashboardStats(farmId: string) {
       orderBy: { publishedAt: 'desc' },
       select: { publishedAt: true },
     }),
+
+    // ── Einstiegs-Checkliste ────────────────────────────────────────────
+    // Bewusst HIER im bestehenden Promise.all und nicht in einer eigenen
+    // Query-Kette: die drei Abfragen laufen damit neben den übrigen elf statt
+    // hinter ihnen, die Übersicht wird also nicht langsamer.
+    prisma.farm.findUnique({
+      where: { id: farmId },
+      select: {
+        description: true,
+        logoUrl: true,
+        bannerType: true,
+        bannerUrl: true,
+        stripeAccountReady: true,
+        approvedAt: true,
+      },
+    }),
+    // ALLE Produkte, nicht nur die verfügbaren: Wer ein Produkt angelegt und
+    // wieder ausgeblendet hat, hat den Schritt trotzdem hinter sich.
+    // (aktivProdukte weiter oben zählt bewusst nur isAvailable — das ist die
+    // Kennzahl, nicht die Checkliste.)
+    prisma.product.count({ where: { farmId } }),
+    // Nur AKTIVE Abholzeiten: eine abgeschaltete Zeit nützt keinem Kunden,
+    // der Schritt gilt damit zu Recht als offen.
+    prisma.pickupSlot.count({ where: { farmId, isActive: true } }),
   ])
 
   const umsatzWoche =
@@ -146,6 +174,23 @@ export async function getDashboardStats(farmId: string) {
     kundenGesamt: countUniqueCustomers(kundenRows),
     lowStockHint: buildLowStockHint(lowStockProducts),
     statusReminder: statusReminder(lastStatus?.publishedAt ?? null),
+    ersteSchritte: ersteSchritte({
+      // `description` ist eine Pflichtspalte (prisma/schema.prisma:165), im
+      // Onboarding aber ein optionales Feld — ein Hof ohne Beschreibung trägt
+      // einen leeren String, kein null. Ein `!== null` ginge hier immer durch.
+      hatBeschreibung: (hofStammdaten?.description ?? '').trim().length > 0,
+      hatLogo: (hofStammdaten?.logoUrl ?? '').trim().length > 0,
+      // Dieselbe Bedingung, mit der die Hofseite entscheidet, ob sie ein Foto
+      // oder einen Farbverlauf zeigt (farm-page-view.tsx:665–668). Ein Verlauf
+      // ist die Voreinstellung und kein hochgeladenes Titelbild — der Schritt
+      // heißt „hochladen" und wäre sonst für jeden Hof von Anfang an erledigt.
+      hatTitelbild: hofStammdaten?.bannerType === 'PHOTO' && !!hofStammdaten?.bannerUrl,
+      produkte: produkteGesamt,
+      aktiveAbholzeiten,
+      zahlungBereit: hofStammdaten?.stripeAccountReady === true,
+    }),
+    /** Für den ruhigen Zusatzsatz auf der Checklisten-Karte. */
+    wartetAufFreigabe: hofStammdaten?.approvedAt == null,
   }
 }
 
