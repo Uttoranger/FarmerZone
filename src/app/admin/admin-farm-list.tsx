@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { approveFarmAction, revokeFarmApprovalAction } from '@/server/actions/admin'
+import { approveFarmAction, revokeFarmApprovalAction, rejectFarmAction } from '@/server/actions/admin'
 import {
   gruendungshofLabel,
   KEIN_GRUENDUNGSPLATZ,
@@ -53,7 +53,10 @@ export function AdminFarmList({
   const plaetzeFrei = vergebenePlaetze < MAX_GRUENDUNGSHOEFE
   const [isPending, startTransition] = useTransition()
   // Der Hof, für den gerade eine Rückfrage offen ist — plus die Richtung.
-  const [dialog, setDialog] = useState<{ farm: Farm; action: 'approve' | 'revoke' } | null>(null)
+  const [dialog, setDialog] = useState<{
+    farm: Farm
+    action: 'approve' | 'revoke' | 'reject'
+  } | null>(null)
 
   function run() {
     if (!dialog) return
@@ -62,11 +65,22 @@ export function AdminFarmList({
       const result =
         action === 'approve'
           ? await approveFarmAction(farm.id)
-          : await revokeFarmApprovalAction(farm.id)
+          : action === 'revoke'
+            ? await revokeFarmApprovalAction(farm.id)
+            : await rejectFarmAction(farm.id)
       if (result.error) {
+        // Die Ablehnung kann an einem Guard scheitern (Bestellungen am Hof,
+        // Betreiber-Konto) — dann steht der Grund in der Meldung und der
+        // Betreiber weiß, warum nichts passiert ist.
         toast.error(result.error)
       } else {
-        toast.success(action === 'approve' ? `${farm.name} freigeschaltet` : `Freigabe für ${farm.name} zurückgenommen`)
+        toast.success(
+          action === 'approve'
+            ? `${farm.name} freigeschaltet`
+            : action === 'revoke'
+              ? `Freigabe für ${farm.name} zurückgenommen`
+              : `${farm.name} abgelehnt und gelöscht`
+        )
       }
       setDialog(null)
     })
@@ -134,15 +148,29 @@ export function AdminFarmList({
                 )}
               </dl>
 
-              <div className="mt-3">
+              {/* flex-wrap statt einer festen Zeile: bei 375px rutscht die
+                  zweite Schaltfläche unter die erste, statt schmal gequetscht
+                  danebenzustehen. */}
+              <div className="mt-3 flex flex-wrap gap-2">
                 {farm.approvedAt === null ? (
-                  <Button
-                    size="sm"
-                    disabled={isPending}
-                    onClick={() => setDialog({ farm, action: 'approve' })}
-                  >
-                    Freischalten
-                  </Button>
+                  <>
+                    <Button
+                      size="sm"
+                      disabled={isPending}
+                      onClick={() => setDialog({ farm, action: 'approve' })}
+                    >
+                      Freischalten
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isPending}
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => setDialog({ farm, action: 'reject' })}
+                    >
+                      Ablehnen &amp; löschen
+                    </Button>
+                  </>
                 ) : (
                   <Button
                     size="sm"
@@ -163,10 +191,27 @@ export function AdminFarmList({
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>
-              {dialog?.action === 'approve' ? 'Hof freischalten?' : 'Freigabe zurücknehmen?'}
+              {dialog?.action === 'approve'
+                ? 'Hof freischalten?'
+                : dialog?.action === 'revoke'
+                  ? 'Freigabe zurücknehmen?'
+                  : 'Endgültig löschen?'}
             </DialogTitle>
           </DialogHeader>
-          {dialog?.action === 'approve' ? (
+          {dialog?.action === 'reject' ? (
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <p>
+                <strong className="text-foreground">{dialog.farm.name}</strong> wird gelöscht — samt
+                dem Konto <span className="break-all">{dialog.farm.ownerEmail}</span>, den Produkten,
+                Abholzeiten und Fotos.
+              </p>
+              <p className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-foreground">
+                Endgültig, nicht umkehrbar. Für echte Höfe gibt es das Zurücknehmen der Freigabe —
+                das löscht nichts.
+              </p>
+              <p>Höfe mit Bestellungen oder Verkäufen lehnt der Server ab.</p>
+            </div>
+          ) : dialog?.action === 'approve' ? (
             <div className="space-y-3 text-sm text-muted-foreground">
               <p>
                 <strong className="text-foreground">{dialog.farm.name}</strong> wird sofort
@@ -213,7 +258,9 @@ export function AdminFarmList({
                 ? 'Moment…'
                 : dialog?.action === 'approve'
                   ? 'Freischalten'
-                  : 'Zurücknehmen'}
+                  : dialog?.action === 'revoke'
+                    ? 'Zurücknehmen'
+                    : 'Endgültig löschen'}
             </Button>
           </DialogFooter>
         </DialogContent>
