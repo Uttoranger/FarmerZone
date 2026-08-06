@@ -6,10 +6,28 @@ import { summarizeUploadBatch, type BatchSkip } from '@/lib/upload-batch'
 
 export type ImageUploadVariant = 'product' | 'banner' | 'logo' | 'gallery' | 'status'
 
-const MAX_LONG_SIDE: Record<ImageUploadVariant, number> = {
+/**
+ * Längste Kante nach dem Verkleinern, je Verwendung.
+ *
+ * `banner` liegt seit dem Cover-Sprint höher als der Rest: Das Titelbild ist
+ * das einzige Bild, das über die VOLLE Bildschirmbreite läuft (sizes="100vw").
+ * Auf einem 1920er-Monitor mit doppelter Pixeldichte fragt der Browser 3840px
+ * an — bei 2400px Quelle bekam er hochskalierte Pixel. Zusätzlich schneidet
+ * object-cover aus dem Foto einen Querstreifen heraus, sodass von der Quelle
+ * ohnehin nur ein Teil übrig bleibt; die Reserve dafür fehlte.
+ *
+ * Gemessen (Chromium, 12-MP-Vorlage, unveränderte Qualität 0.82): ein
+ * detailreiches Wiesenfoto — der ungünstigste und für ein Hof-Titelbild
+ * typischste Fall — ergibt bei 3200px rund 1,9 MB. Die Schranken liegen bei
+ * 3,5 MB (uploadOne weiter unten) und 4 MB (src/app/api/upload/route.ts:48).
+ * Die Qualität musste deshalb NICHT gesenkt werden.
+ *
+ * Exportiert, damit der Wert prüfbar ist statt nur behauptet.
+ */
+export const MAX_LONG_SIDE: Record<ImageUploadVariant, number> = {
   logo:    800,
   product: 2400,
-  banner:  2400,
+  banner:  3200,
   gallery: 2400,
   status:  2400,
 }

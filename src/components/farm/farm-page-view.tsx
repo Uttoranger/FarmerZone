@@ -733,8 +733,20 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
         </div>
       )}
 
-      {/* Cover 260px (Referenz 17) */}
-      <div className="relative h-[260px]">
+      {/* Cover: gedeckeltes Seitenverhältnis statt fester Höhe.
+          Vorher stand hier h-[260px] über die volle Bildschirmbreite — auf
+          einem 2560er-Monitor ein Band von rund 9:1. object-cover schneidet
+          aus einem 3:2-Foto dafür etwa fünf Sechstel weg und zieht den Rest
+          über die ganze Breite; genau daher der gestreckte, unscharfe Eindruck.
+
+          Bis md bleibt die feste Höhe: bei 375px sind 260px ein Verhältnis von
+          1,44:1, das war nie das Problem, und so ändert sich am Telefon nichts.
+          Ab md übernimmt das Verhältnis (768px → 256px, praktisch nahtloser
+          Übergang), ab lg wird es ruhiger. max-h deckelt das Band, damit es auf
+          sehr breiten Schirmen nicht die halbe Seite einnimmt — ab etwa 1050px
+          Breite ist die Höhe konstant 420px.
+          Wirkung bei 1440px: vorher 5,5:1, jetzt 3,4:1. */}
+      <div className="relative h-[260px] md:h-auto md:aspect-[3/1] lg:aspect-[5/2] max-h-[420px]">
         {bannerBg === null ? (
           <Image
             src={farm.bannerUrl!}
@@ -781,11 +793,15 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
             <CoverEditButton currentBannerUrl={farm.bannerUrl} />
           </div>
         )}
-        {/* Hof-Siegel */}
+        {/* Hof-Siegel — Abstand von oben jetzt anteilig statt fester 38px.
+            Bei der md-Höhe (256px) sind 15% genau die bisherigen ~38px, im
+            gedeckelten Band (420px) rutscht das Siegel auf 63px nach. Mit dem
+            festen Wert hätte es in der höheren Fläche oben geklebt, während
+            darunter eine große Leere entstanden wäre. */}
         {farm.foundedYear && (
           <div
             className="absolute hidden md:block pointer-events-none"
-            style={{ right: 70, top: 38, transform: 'rotate(-6deg)', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.25))' }}
+            style={{ right: 70, top: '15%', transform: 'rotate(-6deg)', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.25))' }}
           >
             <FarmSeal farmName={farm.name} foundedYear={farm.foundedYear} />
           </div>

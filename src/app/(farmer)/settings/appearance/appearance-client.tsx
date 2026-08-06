@@ -632,7 +632,13 @@ export function AppearanceClient({ initialData }: Props) {
       {/* ── Banner section ─────────────────────────────────────────────────── */}
       <section className="bg-card rounded-2xl shadow-[0_2px_8px_oklch(0.18_0.03_150_/_0.05)] p-6">
         <h2 className="font-semibold text-foreground mb-1">Titelbild</h2>
-        <p className="text-xs text-muted-foreground mb-4">Header-Bereich auf deiner Hof-Seite</p>
+        {/* Der Zusatz nennt bewusst Querformat UND eine Mindestbreite: Das
+            Cover läuft über die ganze Bildschirmbreite, ein Hochformat-Foto
+            verliert dabei oben und unten am meisten. */}
+        <p className="text-xs text-muted-foreground mb-4">
+          Header-Bereich auf deiner Hof-Seite — Querformat-Fotos ab etwa 2000 px Breite sehen am
+          besten aus
+        </p>
 
         {/* Type toggle */}
         <div className="flex gap-2 mb-4">
