@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import type { FarmAktivitaet } from '@/lib/farm-aktivitaet'
 
 export type AdminFarmRow = {
   id: string
@@ -8,6 +9,8 @@ export type AdminFarmRow = {
   createdAt: Date
   approvedAt: Date | null
   archivedAt: Date | null
+  /** Lebenszeichen: was der Bauer seit der Anmeldung angelegt hat. */
+  aktivitaet: FarmAktivitaet
 }
 
 /** Ist der angemeldete Nutzer Plattformbetreiber? Frisch aus der DB, nie aus der Session. */
@@ -19,7 +22,17 @@ export async function isAdminUser(userId: string): Promise<boolean> {
   return user?.isAdmin === true
 }
 
-/** Alle Höfe für den Admin-Bereich — wartende zuerst, dann die jüngsten. */
+/**
+ * Alle Höfe für den Admin-Bereich — wartende zuerst, dann die jüngsten.
+ *
+ * Die Zählwerte kommen per `_count` aus DERSELBEN Abfrage. Ein `findMany` je
+ * Hof wäre bequemer zu schreiben und bei zwölf Höfen auch nicht spürbar, würde
+ * aber mit jeder Bot-Anmeldung teurer — und genau die sollen hier ja auffallen.
+ *
+ * Gezählt wird alles Angelegte, auch Unveröffentlichtes: ein deaktiviertes
+ * Produkt und eine abgeschaltete Abholzeit sind trotzdem Lebenszeichen. Die
+ * Frage lautet „hat hier jemand gearbeitet?", nicht „ist der Hof verkaufsfertig?".
+ */
 export async function getAdminFarms(): Promise<AdminFarmRow[]> {
   const farms = await prisma.farm.findMany({
     select: {
@@ -29,7 +42,12 @@ export async function getAdminFarms(): Promise<AdminFarmRow[]> {
       createdAt: true,
       approvedAt: true,
       archivedAt: true,
+      // Beide nur, um daraus ein Ja/Nein zu machen — der Rohtext und die
+      // Bild-URL verlassen diese Funktion nicht.
+      description: true,
+      logoUrl: true,
       owner: { select: { email: true } },
+      _count: { select: { products: true, farmPhotos: true, pickupSlots: true } },
     },
     orderBy: { createdAt: 'desc' },
   })
@@ -42,6 +60,18 @@ export async function getAdminFarms(): Promise<AdminFarmRow[]> {
     createdAt: f.createdAt,
     approvedAt: f.approvedAt,
     archivedAt: f.archivedAt,
+    aktivitaet: {
+      produkte: f._count.products,
+      fotos: f._count.farmPhotos,
+      abholzeiten: f._count.pickupSlots,
+      // `description` ist eine PFLICHTSPALTE (prisma/schema.prisma:165), im
+      // Onboarding aber ein optionales Feld. Ein Hof ohne Beschreibung trägt
+      // deshalb einen leeren String, kein null — ein `!== null` ginge hier
+      // immer als „vorhanden" durch. Getrimmt, damit ein versehentliches
+      // Leerzeichen nicht als Inhalt zählt.
+      hatBeschreibung: f.description.trim().length > 0,
+      hatLogo: (f.logoUrl ?? '').trim().length > 0,
+    },
   }))
 
   // Wartende zuerst — das ist die einzige Liste, in der der Betreiber
