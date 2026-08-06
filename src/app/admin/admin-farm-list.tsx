@@ -9,6 +9,12 @@ import {
   GRUENDUNGS_KONDITIONEN,
   MAX_GRUENDUNGSHOEFE,
 } from '@/lib/gruendungshof'
+import {
+  aktivitaetsTeile,
+  istOhneInhalt,
+  AKTIVITAET_LEER,
+  type FarmAktivitaet,
+} from '@/lib/farm-aktivitaet'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -28,6 +34,39 @@ type Farm = {
   archivedAt: Date | null
   /** Belegter Platz (1-basiert) oder null — serverseitig berechnet. */
   gruendungsplatz: number | null
+  /** Lebenszeichen: was der Bauer seit der Anmeldung angelegt hat. */
+  aktivitaet: FarmAktivitaet
+}
+
+/**
+ * Die Aktivitätszeile. Als einzelne Elemente mit `flex-wrap` statt als eine
+ * lange Zeichenkette: bei 375px bricht sie so sauber zwischen den Angaben um,
+ * statt mitten in „Abholzeiten". Der Trenner hängt am vorangehenden Element
+ * und kann deshalb nie allein am Zeilenanfang landen.
+ */
+function Aktivitaet({ aktivitaet }: { aktivitaet: FarmAktivitaet }) {
+  const teile = aktivitaetsTeile(aktivitaet)
+
+  if (teile.length === 0) {
+    // Deutlich sichtbar, aber ohne Alarmfarbe: die Textfarbe des Vordergrunds
+    // reicht, um im Grau der übrigen Angaben aufzufallen.
+    return <p className="mt-3 text-xs font-medium text-foreground">{AKTIVITAET_LEER}</p>
+  }
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+      {teile.map((teil, i) => (
+        <span key={teil} className="flex items-center gap-2">
+          {teil}
+          {i < teile.length - 1 && (
+            <span aria-hidden="true" className="text-border">
+              ·
+            </span>
+          )}
+        </span>
+      ))}
+    </div>
+  )
 }
 
 function statusOf(farm: Farm): { label: string; className: string } {
@@ -147,6 +186,19 @@ export function AdminFarmList({
                   </div>
                 )}
               </dl>
+
+              <Aktivitaet aktivitaet={farm.aktivitaet} />
+
+              {/* Ein wartender Hof, an dem seit der Anmeldung nichts passiert
+                  ist. Bewusst leise: gedeckte Farben, gestrichelter Rahmen,
+                  kein Orange — der Akzent gehört der Startseite. Es steht auch
+                  bewusst nur ein Sachverhalt da und keine Empfehlung; wer
+                  abgelehnt wird, entscheidet der Betreiber. */}
+              {farm.approvedAt === null && istOhneInhalt(farm.aktivitaet) && (
+                <p className="mt-2 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                  Seit der Anmeldung am {formatDate(farm.createdAt)} wurde nichts eingerichtet.
+                </p>
+              )}
 
               {/* flex-wrap statt einer festen Zeile: bei 375px rutscht die
                   zweite Schaltfläche unter die erste, statt schmal gequetscht
