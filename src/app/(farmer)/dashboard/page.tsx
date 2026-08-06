@@ -6,6 +6,7 @@ import { getDashboardStats, getFarmForUser } from '@/server/queries/dashboard'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { ErsteSchritteKarte } from '@/components/farmer/erste-schritte-karte'
 import {
   ShoppingBag,
   Package,
@@ -49,6 +50,8 @@ export default async function DashboardPage() {
     kundenGesamt,
     lowStockHint,
     statusReminder,
+    ersteSchritte,
+    wartetAufFreigabe,
   } = await getDashboardStats(farm.id)
 
   const vorname = session.user.name?.split(' ')[0] ?? 'Hallo'
@@ -93,6 +96,12 @@ export default async function DashboardPage() {
           Produkt anlegen
         </Link>
       </div>
+
+      {/* ── Erste Schritte ────────────────────────────────────────────
+          Ganz oben, weil sie für einen frisch registrierten Hof das
+          Wichtigste auf der Seite ist. Sie rendert sich selbst weg, sobald
+          alles erledigt ist — ein eingespielter Hof sieht sie nie. */}
+      <ErsteSchritteKarte ergebnis={ersteSchritte} wartetAufFreigabe={wartetAufFreigabe} />
 
       {/* ── Tages-Aufgabe ─────────────────────────────────────────── */}
       {heutigeBestellungen.length > 0 ? (
