@@ -5,7 +5,12 @@ import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { ImagePlus, X, Leaf, Thermometer, Snowflake } from 'lucide-react'
-import { resizeToWebP, canDecodeImage, IMAGE_FORMAT_ERROR } from '@/components/shared/image-upload'
+import { resizeToWebP, canDecodeImage } from '@/components/shared/image-upload'
+import {
+  bildFehlerText,
+  bildFehlerMeldung,
+  protokolliereBildFehler,
+} from '@/lib/upload-fehler'
 import {
   Dialog,
   DialogContent,
@@ -137,7 +142,8 @@ export function ProductDialog({ open, product, onClose }: Props) {
     // auf Android) darf keine kaputte Vorschau hinterlassen. Die vorherige
     // Auswahl bleibt unangetastet — eine abgelehnte Datei ändert gar nichts.
     if (!(await canDecodeImage(file))) {
-      toast.error(IMAGE_FORMAT_ERROR)
+      protokolliereBildFehler('dekodierung', file)
+      toast.error(bildFehlerText('dekodierung'))
       if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
@@ -172,10 +178,14 @@ export function ProductDialog({ open, product, onClose }: Props) {
         let resized: File
         try {
           resized = await resizeToWebP(selectedFile, 2400)
-        } catch {
-          // Zweites Netz hinter der Auswahl-Probe, gleicher Wortlaut:
-          // kein Roh-Upload, wenn der Browser das Format nicht dekodieren kann
-          toast.error(IMAGE_FORMAT_ERROR)
+        } catch (e) {
+          // Vorher stand hier pauschal der Format-Hinweis — auch dann, wenn
+          // die Datei einwandfrei war und nur der Canvas blockiert wurde.
+          // Jetzt kommt die Ursache aus dem Fehler selbst. Weiterhin KEIN
+          // Roh-Upload als Rückfall: die ehrliche Meldung ist der Fix.
+          const { text, art } = bildFehlerMeldung(e)
+          if (art) protokolliereBildFehler(art, selectedFile)
+          toast.error(text)
           return
         }
         const fd = new FormData()
