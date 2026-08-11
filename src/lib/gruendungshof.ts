@@ -5,23 +5,95 @@
 // er nicht mit der Wirklichkeit auseinanderlaufen, und ein zurückgenommener
 // oder stillgelegter Hof gibt seinen Platz automatisch wieder frei.
 //
-// GELTUNGSBEREICH IN DIESEM SPRINT: Diese Datei speist ausschließlich den
-// Admin-Bereich. Kundenseitiges Abzeichen und Konditions-Seite folgen in einem
-// eigenen Sprint; die Gebührenberechnung bleibt unberührt (platformFeePercent
-// steht weiterhin auf 0).
+// GELTUNGSBEREICH: Diese Datei speist den Admin-Bereich und die öffentliche
+// Konditionen-Seite (src/app/(public)/konditionen/page.tsx). Ein kundenseitiges
+// Abzeichen folgt in einem eigenen Sprint; die Gebührenberechnung bleibt
+// unberührt (platformFeePercent steht weiterhin auf 0).
+//
+// REGEL FÜR ANZEIGEN: Zahlen und Datum kommen aus den Konstanten unten, nie
+// als Literal in eine Seite. Eine Zahl, die an zwei Orten steht, steht früher
+// oder später verschieden da — und bei Konditionen ist das kein Schönheitsfehler.
 
 export const MAX_GRUENDUNGSHOEFE = 12
 
 /** Ende der gebührenfreien Gründungsphase (einschließlich dieses Tages). */
 export const GRUENDUNGSPHASE_ENDE = new Date('2029-12-31T23:59:59.999Z')
 
+/**
+ * Das Ende als Datum zum Anzeigen, z. B. „31.12.2029".
+ *
+ * `timeZone: 'UTC'` ist keine Förmlichkeit: Der Zeitpunkt steht auf
+ * 23:59:59.999 UTC, und ohne feste Zone würde ein Server östlich davon den
+ * 1.1.2030 ausgeben — ein um einen Tag verschobenes Vertragsdatum.
+ */
+export const GRUENDUNGSPHASE_ENDE_TEXT = GRUENDUNGSPHASE_ENDE.toLocaleDateString('de-AT', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  timeZone: 'UTC',
+})
+
 /** Provision nach Ablauf der Gründungsphase, dauerhaft. */
 export const GRUENDUNGS_PROVISION_PROZENT = 3
 
-/** Die Konditionen in einem Satz — eine Quelle für alle Anzeigen. */
+/**
+ * Die Konditionen in einem Satz — eine Quelle für alle Anzeigen.
+ * Wortlaut unverändert, aber aus den Konstanten gebaut statt abgeschrieben.
+ */
 export const GRUENDUNGS_KONDITIONEN =
-  'Keine Plattformgebühr bis 31.12.2029, danach dauerhaft 3 %. ' +
+  `Keine Plattformgebühr bis ${GRUENDUNGSPHASE_ENDE_TEXT}, ` +
+  `danach dauerhaft ${GRUENDUNGS_PROVISION_PROZENT} %. ` +
   'Zahlungsgebühren von Stripe fallen unabhängig davon an.'
+
+// === TEXTBAUSTEINE DER KONDITIONEN-SEITE ===
+
+/** Das Angebot in einem Satz. */
+export const GRUENDUNGS_ANGEBOT =
+  `Die ersten ${MAX_GRUENDUNGSHOEFE} freigeschalteten Höfe zahlen bis ` +
+  `${GRUENDUNGSPHASE_ENDE_TEXT} keine Plattformgebühr. Danach gilt dauerhaft ein ` +
+  `Satz von ${GRUENDUNGS_PROVISION_PROZENT} % pro Online-Bestellung — dauerhaft heißt: ` +
+  'auch in zehn Jahren noch.'
+
+/**
+ * Die wichtigste Klarstellung der Seite. Die Zwölf begrenzt die KONDITIONEN,
+ * nicht den Zugang — sonst liest sich das Angebot wie eine geschlossene Tür.
+ */
+export const GRUENDUNGS_KEINE_ZUGANGSGRENZE =
+  `Die ${MAX_GRUENDUNGSHOEFE} sind eine Konditions-, keine Zugangsgrenze: ` +
+  'Mitmachen kann jeder Hof, auch nach dem zwölften Platz. Für später ' +
+  'dazukommende Höfe gilt nach dem Pilotzeitraum der reguläre Satz. Wie hoch ' +
+  'der ausfällt, geben wir rechtzeitig und vorab bekannt — niemand erfährt ' +
+  'eine Änderung erst auf der Abrechnung.'
+
+/**
+ * Zahlungsgebühren. BEWUSST OHNE Stripe-Prozentsätze: die ändern sich, und
+ * eine Zahl in einem Rechtstext, die niemand nachpflegt, ist schlimmer als
+ * keine Zahl. Die aktuellen Sätze zeigt Stripe beim Einrichten selbst an.
+ */
+export const GRUENDUNGS_ZAHLUNGSGEBUEHREN =
+  'Unabhängig davon fallen die Gebühren des Zahlungsdienstleisters (Stripe) an; ' +
+  'Barzahlung bei Abholung ist gebührenfrei. Die aktuellen Sätze siehst du beim ' +
+  'Einrichten der Online-Zahlung, bevor du sie aktivierst.'
+
+/** Der Weg auf die Plattform, in vier Schritten. */
+export const GRUENDUNGS_AUFNAHME_SCHRITTE = [
+  {
+    titel: 'Registrieren',
+    text: 'Konto anlegen — Name, E-Mail, Passwort. Mehr braucht es dafür nicht.',
+  },
+  {
+    titel: 'Hof einrichten',
+    text: 'Hofprofil, Produkte, Abholzeiten und Fotos. Das geht sofort und in Ruhe, auch vor der Freischaltung.',
+  },
+  {
+    titel: 'Wir melden uns persönlich',
+    text: 'Kein anonymes Prüfverfahren: Wir schauen uns den Hof an und sprechen mit dir.',
+  },
+  {
+    titel: 'Freischaltung',
+    text: 'Ab dann ist deine Hofseite öffentlich erreichbar und Kundinnen können bestellen.',
+  },
+] as const
 
 /** Beschriftung eines belegten Platzes, z. B. „Gründungshof Nr. 3". */
 export function gruendungshofLabel(platz: number): string {

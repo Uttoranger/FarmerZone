@@ -487,7 +487,18 @@ export default function HomePage() {
               {CTA_BUTTON}
               <ArrowRight className="size-4" aria-hidden="true" />
             </a>
-            <p className="mt-5 mx-auto max-w-md text-sm leading-relaxed text-accent-foreground/80">
+            {/* Zweitlink, bewusst als Textlink: Der Orange-Akzent gehört dem
+                mailto-Knopf darüber, ein zweiter Knopf würde ihn entwerten.
+                Wer erst nachlesen will, was es kostet, findet hier den Weg. */}
+            <p className="mt-4">
+              <Link
+                href="/konditionen"
+                className="inline-flex min-h-11 items-center text-sm font-medium text-accent-foreground/90 underline underline-offset-4 transition-opacity hover:opacity-80"
+              >
+                Konditionen ansehen
+              </Link>
+            </p>
+            <p className="mt-1 mx-auto max-w-md text-sm leading-relaxed text-accent-foreground/80">
               {CTA_NOTE}
             </p>
           </div>
