@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { LayoutDashboard, ReceiptText, Users, Home, Tag, BarChart3, SlidersHorizontal, LogOut, MoreHorizontal, X } from 'lucide-react'
 import { signOut } from '@/lib/auth-client'
+import { FarmIdentityCard } from '@/components/farmer/farm-identity-card'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
@@ -20,9 +21,19 @@ interface FarmerNavProps {
   farmName: string
   userName: string
   ordersBadge?: number
+  /** Hof-Logo für die Identitätskarte; null = Initialen. */
+  farmLogoUrl?: string | null
+  /** approvedAt === null — für den ruhigen Status-Punkt an der Karte. */
+  farmPending?: boolean
 }
 
-export function FarmerNav({ farmName, userName, ordersBadge }: FarmerNavProps) {
+export function FarmerNav({
+  farmName,
+  userName,
+  ordersBadge,
+  farmLogoUrl = null,
+  farmPending = false,
+}: FarmerNavProps) {
   const pathname = usePathname()
   const router = useRouter()
   // Mobiles "Mehr"-Sheet (Einstellungen + Abmelden)
@@ -97,15 +108,25 @@ export function FarmerNav({ farmName, userName, ordersBadge }: FarmerNavProps) {
             role="dialog"
             aria-label="Mehr"
           >
-            <div className="flex items-center justify-between px-1 mb-1">
-              <span className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: 'rgba(207,228,214,0.55)' }}>
-                Mehr
-              </span>
+            {/* Kopfzeile des Sheets: die Hof-Identitätskarte. Sie tritt an die
+                Stelle der bisherigen „Mehr"-Versalzeile — der Name des Dialogs
+                steckt weiterhin im aria-label des Containers, es geht also
+                nichts für Screenreader verloren. Die untere Leiste selbst
+                bleibt davon unberührt. */}
+            <div className="flex items-start justify-between gap-2 px-1 mb-2 pt-1">
+              <div className="min-w-0 flex-1">
+                <FarmIdentityCard
+                  farmName={farmName}
+                  logoUrl={farmLogoUrl}
+                  wartetAufFreigabe={farmPending}
+                  onNavigate={() => setMoreOpen(false)}
+                />
+              </div>
               <button
                 type="button"
                 onClick={() => setMoreOpen(false)}
                 aria-label="Schließen"
-                className="flex items-center justify-center size-8 rounded-full transition-colors hover:bg-white/10"
+                className="flex shrink-0 items-center justify-center size-8 rounded-full transition-colors hover:bg-white/10"
                 style={{ color: '#CFE4D6' }}
               >
                 <X className="size-4" strokeWidth={1.7} />
@@ -155,11 +176,18 @@ export function FarmerNav({ farmName, userName, ordersBadge }: FarmerNavProps) {
         className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:w-56 z-40 print:hidden"
         style={{ background: '#24523A', borderRight: '1px solid rgba(255,255,255,0.08)' }}
       >
-        {/* Hof-Name */}
-        <div className="px-4 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
-          <div className="text-[10px] uppercase tracking-widest font-semibold mb-1" style={{ color: 'rgba(207,228,214,0.55)' }}>Hof</div>
-          <div className="font-heading font-semibold truncate leading-tight" style={{ color: '#F5F3EE' }}>{farmName}</div>
-          <div className="text-xs truncate mt-0.5" style={{ color: '#CFE4D6', opacity: 0.7 }}>{userName}</div>
+        {/* Hof-Identitätskarte am Kopf der Seitenleiste. Sie tritt an die
+            Stelle der bisherigen Namenszeile („Hof" + Name + Nutzer): dieselbe
+            Information, dazu Logo, Vorschau-Schaltfläche und Freigabe-Zustand.
+            Der Nutzername bleibt darunter stehen — er sagt, WER angemeldet ist,
+            und das beantwortet die Karte nicht. */}
+        <div className="px-4 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
+          <FarmIdentityCard
+            farmName={farmName}
+            logoUrl={farmLogoUrl}
+            wartetAufFreigabe={farmPending}
+          />
+          <div className="text-xs truncate mt-2.5" style={{ color: '#CFE4D6', opacity: 0.7 }}>{userName}</div>
         </div>
 
         {/* Navigation */}

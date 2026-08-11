@@ -37,6 +37,10 @@ export default async function FarmerLayout({ children }: { children: React.React
           farmName={farm.name}
           userName={session.user.name ?? ''}
           ordersBadge={openOrdersCount > 0 ? openOrdersCount : undefined}
+          farmLogoUrl={farm.logoUrl}
+          // Derselbe Zustand, der den Freigabe-Balken auslöst — die Karte zeigt
+          // ihn nur zusätzlich als ruhigen Punkt an der Hof-Identität an.
+          farmPending={isPending}
         />
 
         {/* min-w-0: als Flex-Item darf main nicht mit breitem Inhalt über den
