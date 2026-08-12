@@ -9,6 +9,7 @@ import {
   bildFehlerKurz,
   bildFehlerMeldung,
   protokolliereBildFehler,
+  type BildFehlerArt,
 } from '@/lib/upload-fehler'
 
 export type ImageUploadVariant = 'product' | 'banner' | 'logo' | 'gallery' | 'status'
@@ -37,6 +38,65 @@ export const MAX_LONG_SIDE: Record<ImageUploadVariant, number> = {
   banner:  3200,
   gallery: 2400,
   status:  2400,
+}
+
+/** Wie viel vom Anfang der Datei die Lese-Probe anfordert. */
+export const LESE_PROBE_BYTES = 64 * 1024
+
+/**
+ * Wie die Lese-Probe an die Bytes kommt.
+ *
+ * `null` heißt ausdrücklich „kann nicht prüfen" und ist etwas anderes als ein
+ * leerer Puffer: Fehlt die Schnittstelle, ist das kein Beweis für eine unlesbare
+ * Datei. Ein leerer Puffer dagegen ist einer.
+ *
+ * Herausgezogen, damit `canReadFile` eine reine Funktion bleibt und ohne Browser
+ * prüfbar ist — Lesezugriffe lassen sich in jsdom nicht nachstellen, ein
+ * eingesetzter Leser dagegen schon.
+ */
+export type DateiLeser = (file: File, bytes: number) => Promise<ArrayBuffer | null>
+
+/** Der echte Weg im Browser. */
+const browserLeser: DateiLeser = async (file, bytes) => {
+  const anfang = file.slice(0, bytes)
+  // Safari vor 14 kennt Blob.arrayBuffer nicht.
+  if (typeof anfang.arrayBuffer !== 'function') return null
+  return anfang.arrayBuffer()
+}
+
+/**
+ * Kommen die Bytes überhaupt beim Browser an?
+ *
+ * Die Frage klingt trivial und war die Lücke: Bis hierher hat NIEMAND die Datei
+ * angefasst, bevor über sie geurteilt wurde. `file.size` ist Metadatum, kein
+ * Zugriff. Auf Android liefern manche Speicherdienste (SD-Backup, App- und
+ * Cloud-Alben) eine Datei-Referenz aus, hinter der beim Zugriff nichts mehr
+ * steht — das Foto ist einwandfrei, der Weg dorthin nicht. Ohne diese Probe
+ * feuerte nur img.onerror, und das sah aus wie ein unbekanntes Format.
+ *
+ * 64 kB genügen: Es geht nicht um den Inhalt, sondern darum, ob der Speicher
+ * überhaupt etwas herausgibt. Ein ganzes 12-MP-Foto dafür in den Speicher zu
+ * ziehen wäre Verschwendung.
+ *
+ * Fehlt `arrayBuffer` (Safari vor 14), wird NICHT geurteilt: Eine fehlende
+ * Schnittstelle ist kein Beweis für eine unlesbare Datei. Dann übernimmt wie
+ * bisher die Dekodier-Probe.
+ *
+ * `lies` ist einsetzbar, damit die drei Ausgänge — gelesen, geworfen, leer —
+ * ohne Browser prüfbar sind. In der Anwendung bleibt es beim Standard.
+ */
+export async function canReadFile(file: File, lies: DateiLeser = browserLeser): Promise<boolean> {
+  try {
+    const puffer = await lies(file, LESE_PROBE_BYTES)
+    // Kein Urteil möglich — die Datei gilt als lesbar, die Dekodier-Probe
+    // entscheidet weiter.
+    if (puffer === null) return true
+    // Null Bytes zurück heißt: da war nichts zu holen. Eine leere Datei ist
+    // ebenso wenig hochladbar wie eine, deren Speicherort ins Leere zeigt.
+    return puffer.byteLength > 0
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -107,6 +167,24 @@ export async function canDecodeImage(file: File): Promise<boolean> {
   }
 
   return canDecodeViaImageElement(file)
+}
+
+/**
+ * Die Vorprüfung einer ausgewählten Datei — liefert die Ursache, nicht nur ein
+ * Ja/Nein, und legt die Reihenfolge an EINEM Ort fest: lesen → dekodieren.
+ * (Die dritte Stufe, kodieren, kann erst in resizeToWebP scheitern.)
+ *
+ * Die Reihenfolge ist keine Geschmacksfrage: Jede Stufe setzt die vorige
+ * voraus. Ohne Bytes kein Dekodieren, ohne Dekodieren kein Kodieren. Stünde
+ * die Lese-Probe hinten, käme man nie an ihr an — die Dekodier-Probe hätte
+ * längst „Format" gemeldet, so wie bisher.
+ *
+ * `null` heißt: nichts gefunden, weitermachen.
+ */
+export async function pruefeDateiVorUpload(file: File): Promise<BildFehlerArt | null> {
+  if (!(await canReadFile(file))) return 'lesen'
+  if (!(await canDecodeImage(file))) return 'dekodierung'
+  return null
 }
 
 /**
@@ -236,14 +314,16 @@ export function useImageUpload({
       return { ok: false, message: 'Datei zu groß (max. 25 MB)', short: 'zu groß (max. 25 MB)' }
     }
 
-    // Format-Probe VOR allem anderen: so kommt die Absage sofort und nicht
-    // erst nach Verkleinern und Hochladen
-    if (!(await canDecodeImage(file))) {
-      protokolliereBildFehler('dekodierung', file)
+    // Lese- und Format-Probe VOR allem anderen: so kommt die Absage sofort und
+    // nicht erst nach Verkleinern und Hochladen — und sie nennt die richtige
+    // der drei Ursachen statt pauschal „Format".
+    const vorbefund = await pruefeDateiVorUpload(file)
+    if (vorbefund) {
+      protokolliereBildFehler(vorbefund, file)
       return {
         ok: false,
-        message: bildFehlerText('dekodierung'),
-        short: bildFehlerKurz('dekodierung'),
+        message: bildFehlerText(vorbefund),
+        short: bildFehlerKurz(vorbefund),
       }
     }
 
