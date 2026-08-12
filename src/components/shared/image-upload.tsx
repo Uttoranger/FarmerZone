@@ -40,31 +40,14 @@ export const MAX_LONG_SIDE: Record<ImageUploadVariant, number> = {
 }
 
 /**
- * Probiert VOR Vorschau und Upload, ob der Browser die Datei überhaupt
- * dekodieren kann. Chrome/Android scheitert hier an HEIC, Safari nicht —
- * genau das ist gewollt, denn Safari kann HEIC anschließend zu JPEG umwandeln.
+ * Die Probe über ein <img>-Element.
  *
- * createImageBitmap ist der direkte Weg; die Verkleinerung auf 16px hält den
- * Speicherbedarf klein, denn ein 48-MP-Foto würde sonst unnötig groß im
- * Speicher landen. Ältere Browser ohne createImageBitmap fallen auf das
- * bewährte <img>-Laden zurück.
- *
- * Was hier NICHT geprüft wird: ob der Browser das gelesene Bild anschließend
- * wieder herausgeben darf. Dekodieren ist erlaubt, das Auslesen des Canvas
- * kann trotzdem blockiert sein — diese zweite Hürde fällt erst in
- * resizeToWebP und trägt dort einen eigenen Fehler.
+ * Sie ist die MASSGEBLICHE Auskunft, weil resizeToWebP weiter unten die
+ * eigentliche Arbeit ebenfalls über ein <img> erledigt (siehe dort): Was hier
+ * lädt, lädt dort auch. Genau deshalb dürfen beide Zweige von canDecodeImage
+ * hier landen — sie prüfen damit das, worauf es später ankommt.
  */
-export async function canDecodeImage(file: File): Promise<boolean> {
-  if (typeof createImageBitmap === 'function') {
-    try {
-      const bitmap = await createImageBitmap(file, { resizeWidth: 16, resizeQuality: 'low' })
-      bitmap.close?.()
-      return true
-    } catch {
-      return false
-    }
-  }
-
+function canDecodeViaImageElement(file: File): Promise<boolean> {
   return new Promise((resolve) => {
     const img = new Image()
     const objectUrl = URL.createObjectURL(file)
@@ -78,6 +61,52 @@ export async function canDecodeImage(file: File): Promise<boolean> {
     }
     img.src = objectUrl
   })
+}
+
+/**
+ * Probiert VOR Vorschau und Upload, ob der Browser die Datei überhaupt
+ * dekodieren kann. Chrome/Android scheitert hier an HEIC, Safari nicht —
+ * genau das ist gewollt, denn Safari kann HEIC anschließend zu JPEG umwandeln.
+ *
+ * createImageBitmap ist der schnelle Weg; die Verkleinerung auf 16px hält den
+ * Speicherbedarf klein, denn ein 48-MP-Foto würde sonst unnötig groß im
+ * Speicher landen.
+ *
+ * ABER: Ein Fehlschlag von createImageBitmap beweist NICHT, dass die Datei
+ * unlesbar ist. Schutzmechanismen des Browsers können den Aufruf stören,
+ * während dieselbe Datei über ein <img> anstandslos dekodiert — am Gerät mit
+ * Braves strengem Fingerprint-Schutz und einem einwandfreien Baseline-JPEG
+ * (4032×3024) reproduziert. Deshalb ist der Fehlschlag hier kein Urteil,
+ * sondern nur der Anlass, die maßgebliche <img>-Probe zu befragen. Erst wenn
+ * AUCH die scheitert, ist die Datei wirklich nicht lesbar.
+ *
+ * Vorher gab der catch direkt `false` zurück. Das war doppelt falsch: Der Bauer
+ * bekam für ein tadelloses JPEG die Format-Meldung („z. B. HEIC"), und weil die
+ * Absage schon vor resizeToWebP fiel, konnte die eigens dafür gebaute
+ * Blockier-Meldung in diesem Pfad überhaupt nie erscheinen.
+ *
+ * Der Preis: Bei einer tatsächlich unlesbaren Datei (echtes HEIC auf Android)
+ * werden jetzt zwei Wege statt einem probiert. Das kostet einen Wimpernschlag
+ * auf einem Pfad, der ohnehin in einer Absage endet — gemessen am falschen
+ * Rat, den der Bauer vorher bekam, ist das nichts.
+ *
+ * Was hier NICHT geprüft wird: ob der Browser das gelesene Bild anschließend
+ * wieder herausgeben darf. Dekodieren ist erlaubt, das Auslesen des Canvas
+ * kann trotzdem blockiert sein — diese zweite Hürde fällt erst in
+ * resizeToWebP und trägt dort einen eigenen Fehler.
+ */
+export async function canDecodeImage(file: File): Promise<boolean> {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const bitmap = await createImageBitmap(file, { resizeWidth: 16, resizeQuality: 'low' })
+      bitmap.close?.()
+      return true
+    } catch {
+      // Bewusst KEIN `return false` — Rückfall auf die <img>-Probe unten.
+    }
+  }
+
+  return canDecodeViaImageElement(file)
 }
 
 /**
