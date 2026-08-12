@@ -733,20 +733,31 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
         </div>
       )}
 
-      {/* Cover: gedeckeltes Seitenverhältnis statt fester Höhe.
-          Vorher stand hier h-[260px] über die volle Bildschirmbreite — auf
-          einem 2560er-Monitor ein Band von rund 9:1. object-cover schneidet
-          aus einem 3:2-Foto dafür etwa fünf Sechstel weg und zieht den Rest
-          über die ganze Breite; genau daher der gestreckte, unscharfe Eindruck.
+      {/* Cover: Höhe aus der Fensterbreite, Breite bedingungslos voll.
+          Ursprüngliches Ziel (unverändert): am Telefon 260px, ab md rund 3:1,
+          ab lg rund 2,5:1, gedeckelt bei 420px. Ohne diese Staffelung wäre das
+          Band auf einem 2560er-Monitor rund 9:1 — object-cover schnitte aus
+          einem 3:2-Foto fünf Sechstel weg, daher der gestreckte Eindruck.
 
-          Bis md bleibt die feste Höhe: bei 375px sind 260px ein Verhältnis von
-          1,44:1, das war nie das Problem, und so ändert sich am Telefon nichts.
-          Ab md übernimmt das Verhältnis (768px → 256px, praktisch nahtloser
-          Übergang), ab lg wird es ruhiger. max-h deckelt das Band, damit es auf
-          sehr breiten Schirmen nicht die halbe Seite einnimmt — ab etwa 1050px
-          Breite ist die Höhe konstant 420px.
-          Wirkung bei 1440px: vorher 5,5:1, jetzt 3,4:1. */}
-      <div className="relative h-[260px] md:h-auto md:aspect-[3/1] lg:aspect-[5/2] max-h-[420px]">
+          WARUM KEIN aspect-* MEHR: Die vorherige Fassung kombinierte
+          md:aspect-[3/1] / lg:aspect-[5/2] mit max-h-[420px]. Sobald der Deckel
+          greift, darf der Browser die Höhenbegrenzung über das Verhältnis in
+          eine BREITEN-Begrenzung übersetzen (420 × 2,5 = 1050px). Gemessen: ab
+          1440px Fensterbreite blieb das Band bei 1050px stehen, bei 2560px
+          fehlten 1510px bis zum rechten Rand.
+
+          Höhen jetzt direkt aus der Fensterbreite, damit keine Regel existiert,
+          aus der eine Maximalbreite ableitbar wäre:
+            33vw ≈ 3:1   (768px → 253px statt 256px — drei Pixel)
+            40vw = 2,5:1 (exakt: 1024px → 410px)
+          w-full macht die Breite zusätzlich ausdrücklich, statt sie der
+          automatischen Größenfindung zu überlassen.
+
+          vw meint die Fensterbreite. Wo der Inhaltsbereich schmaler ist als das
+          Fenster — in der Eigentümer-Vorschau nimmt die Seitenleiste 224px —
+          fällt das Band zwischen md und etwa 1050px höher aus als das reine
+          Verhältnis ergäbe. Ab dem Deckel ist es wieder identisch. */}
+      <div className="relative w-full h-[260px] md:h-[33vw] lg:h-[40vw] max-h-[420px]">
         {bannerBg === null ? (
           <Image
             src={farm.bannerUrl!}
