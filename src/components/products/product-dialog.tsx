@@ -5,12 +5,9 @@ import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { ImagePlus, X, Leaf, Thermometer, Snowflake } from 'lucide-react'
-import { resizeToWebP, pruefeDateiVorUpload } from '@/components/shared/image-upload'
-import {
-  bildFehlerText,
-  bildFehlerMeldung,
-  protokolliereBildFehler,
-} from '@/lib/upload-fehler'
+import { ladeFotoHoch } from '@/components/shared/image-upload'
+import { bildFehlerMeldung } from '@/lib/upload-fehler'
+import { MAX_ORIGINAL_BYTES } from '@/lib/upload-pfade'
 import {
   Dialog,
   DialogContent,
@@ -133,22 +130,16 @@ export function ProductDialog({ open, product, onClose }: Props) {
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 25 * 1024 * 1024) {
+    if (file.size > MAX_ORIGINAL_BYTES) {
       toast.error('Datei zu groß (max. 25 MB)')
       if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
-    // Lese- und Format-Probe VOR der Vorschau: ein nicht lesbares oder nicht
-    // dekodierbares Foto darf keine kaputte Vorschau hinterlassen. Die
-    // vorherige Auswahl bleibt unangetastet — eine abgelehnte Datei ändert gar
-    // nichts. Dieselbe Prüfung und dieselbe Reihenfolge wie im Hook.
-    const vorbefund = await pruefeDateiVorUpload(file)
-    if (vorbefund) {
-      protokolliereBildFehler(vorbefund, file)
-      toast.error(bildFehlerText(vorbefund))
-      if (fileInputRef.current) fileInputRef.current.value = ''
-      return
-    }
+    // KEINE clientseitige Format-Probe mehr: Sie hing am Canvas, und genau der
+    // war das Problem. Das Urteil fällt jetzt beim Absenden auf dem Server, an
+    // den Bytes statt an einer Browser-Fähigkeit. Die Vorschau ist bis dahin
+    // nur eine Vorschau — kann der Browser sie nicht zeichnen, räumt onError
+    // sie weg, statt ein kaputtes Bildsymbol stehen zu lassen.
     if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl)
     setSelectedFile(file)
     setPreviewUrl(URL.createObjectURL(file))
@@ -177,38 +168,18 @@ export function ProductDialog({ open, product, onClose }: Props) {
       let imageUrl = data.imageUrl ?? ''
 
       if (selectedFile) {
-        let resized: File
+        // Derselbe Weg wie im Hook: Original in den Speicher, Server
+        // verkleinert, fertige Adresse zurück. Der Dialog nutzt den Hook nicht
+        // (er lädt erst beim Absenden), teilt sich mit ihm aber die Funktion —
+        // damit gibt es keinen zweiten Upload-Weg, der auseinanderlaufen kann.
         try {
-          resized = await resizeToWebP(selectedFile, 2400)
+          imageUrl = await ladeFotoHoch(selectedFile, 'product', {
+            altUrl: isEdit ? (product.imageUrl ?? undefined) : undefined,
+          })
         } catch (e) {
-          // Vorher stand hier pauschal der Format-Hinweis — auch dann, wenn
-          // die Datei einwandfrei war und nur der Canvas blockiert wurde.
-          // Jetzt kommt die Ursache aus dem Fehler selbst. Weiterhin KEIN
-          // Roh-Upload als Rückfall: die ehrliche Meldung ist der Fix.
-          const { text, art } = bildFehlerMeldung(e)
-          if (art) protokolliereBildFehler(art, selectedFile)
+          const { text } = bildFehlerMeldung(e)
           toast.error(text)
           return
-        }
-        const fd = new FormData()
-        fd.append('file', resized)
-        fd.append('target', 'product')
-        if (isEdit) fd.append('id', product.id)
-        const existingUrl = isEdit ? (product.imageUrl ?? '') : ''
-        if (existingUrl) fd.append('oldUrl', existingUrl)
-        const res = await fetch('/api/upload', { method: 'POST', body: fd })
-        if (res.ok) {
-          const json = await res.json()
-          imageUrl = json.url
-        } else {
-          const err = await res.json()
-          if (err.error === 'Upload nicht konfiguriert') {
-            toast.info('Foto-Upload noch nicht aktiviert (Vercel Blob fehlt)')
-            // proceed without image
-          } else {
-            toast.error(err.error ?? 'Foto-Upload fehlgeschlagen')
-            return
-          }
         }
       }
 
@@ -256,6 +227,12 @@ export function ProductDialog({ open, product, onClose }: Props) {
                           src={previewUrl}
                           alt="Vorschau"
                           className="w-full h-full object-cover"
+                          // Ersatz für die entfallene Format-Probe: Kann der
+                          // Browser das Foto nicht zeichnen (HEIC auf Android),
+                          // verschwindet die Vorschau still, statt ein kaputtes
+                          // Bildsymbol zu zeigen. Die Datei BLEIBT ausgewählt —
+                          // ob sie taugt, entscheidet beim Absenden der Server.
+                          onError={() => setPreviewUrl(null)}
                         />
                         <button
                           type="button"

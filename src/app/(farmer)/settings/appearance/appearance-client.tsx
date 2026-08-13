@@ -422,8 +422,11 @@ function GallerySection({ initialPhotos }: { initialPhotos: FarmPhotoData[] }) {
           className="w-full flex items-center justify-center gap-2 h-11 rounded-xl border-2 border-dashed border-border text-sm font-medium text-muted-foreground hover:bg-muted/30 hover:text-foreground transition-colors disabled:opacity-60"
         >
           {isUploading ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+          {/* Der Prozentsatz ist neu und für Mobilfunk gedacht: Seit der
+              Umstellung geht das ORIGINAL über die Leitung (6–8 MB statt
+              ~300 kB). Ohne bewegte Zahl sieht das nach Absturz aus. */}
           {progress
-            ? `Lade ${progress.current} von ${progress.total} …`
+            ? `Lade ${progress.current} von ${progress.total} … ${progress.prozent}%`
             : isUploading
               ? 'Wird hochgeladen…'
               : 'Fotos hinzufügen'}

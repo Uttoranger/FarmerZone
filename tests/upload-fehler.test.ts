@@ -1,22 +1,22 @@
 /**
  * Tests für die Zuordnung Fehlerart → Meldungstext (src/lib/upload-fehler.ts).
  *
- * Drei Ursachen, die vorher als eine erschienen:
- *  lesen        Die Bytes kommen gar nicht erst beim Browser an — ein
- *               Speicherdienst liefert eine Referenz ins Leere.
- *  dekodierung  Bytes da, Format unbekannt (echtes HEIC auf Android).
- *  kodierung    Beides ging, aber der Canvas gibt nichts heraus.
+ * Seit der Umstellung auf den serverseitigen Upload trennen sich die Ursachen
+ * danach, WER gescheitert ist:
+ *  lesen   Die Datei kommt gar nicht erst beim Server an — Speicherdienst
+ *          oder Verbindung.
+ *  format  Der Server hat die Bytes und kann sie nicht als Bild lesen. Das
+ *          ist jetzt BEWIESEN (sharp hat es versucht), nicht mehr geraten.
+ *  server  Alles Übrige auf unserer Seite — kein Rat, ein Eingeständnis.
  *
- * Jede der drei bekam über die Sprints hinweg denselben Rat „bitte JPEG oder
- * PNG wählen", der nur bei genau einer davon hilft. Diese Tests halten die
- * Trennung fest — und dass die beiden Meldungen, bei denen ein Formatwechsel
- * NICHT hilft, auch keinen empfehlen.
+ * Jede dieser Ursachen bekam über die Sprints hinweg irgendwann denselben Rat
+ * „bitte JPEG oder PNG wählen", der nur bei genau einer davon hilft. Diese
+ * Tests halten die Trennung fest — und dass die beiden Meldungen, bei denen ein
+ * Formatwechsel NICHT hilft, auch keinen empfehlen.
  *
- * Was hier bewusst NICHT geprüft wird: Canvas, createImageBitmap und der echte
- * Lesezugriff. Alle drei lassen sich in jsdom nicht sinnvoll nachstellen — ein
- * Mock, der arrayBuffer werfen lässt, würde nur die eigene Mock-Verdrahtung
- * bestätigen. Für den echten Nachweis gibt es die Prüfanleitung in der
- * PR-Beschreibung.
+ * Was hier bewusst NICHT geprüft wird: sharp selbst. Der native Pfad läuft in
+ * vitest nicht sinnvoll; ein Mock bestätigte nur die eigene Verdrahtung. Für
+ * den echten Nachweis gibt es die Prüfanleitung in der PR-Beschreibung.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
@@ -28,12 +28,12 @@ import {
   protokolliereBildFehler,
   IMAGE_READ_ERROR,
   IMAGE_FORMAT_ERROR,
-  IMAGE_ENCODE_BLOCKED_ERROR,
+  IMAGE_SERVER_ERROR,
   IMAGE_UNKNOWN_ERROR,
   UPLOAD_DIAG,
 } from '@/lib/upload-fehler'
 
-const ALLE_ARTEN = ['lesen', 'dekodierung', 'kodierung'] as const
+const ALLE_ARTEN = ['lesen', 'format', 'server'] as const
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -49,25 +49,24 @@ describe('Zuordnung Fehlerart → Text', () => {
   })
 
   it('meldet bei unbekanntem Format weiterhin das Format', () => {
-    expect(bildFehlerText('dekodierung')).toBe(IMAGE_FORMAT_ERROR)
-    expect(bildFehlerText('dekodierung')).toContain('HEIC')
-    expect(bildFehlerKurz('dekodierung')).toBe('Format nicht unterstützt')
+    expect(bildFehlerText('format')).toBe(IMAGE_FORMAT_ERROR)
+    expect(bildFehlerText('format')).toContain('HEIC')
+    expect(bildFehlerKurz('format')).toBe('Format nicht unterstützt')
   })
 
-  it('meldet bei blockierter Verarbeitung die Datenschutz-Einstellung', () => {
-    expect(bildFehlerText('kodierung')).toBe(IMAGE_ENCODE_BLOCKED_ERROR)
-    expect(bildFehlerText('kodierung')).toContain('Datenschutz-Einstellung')
-    expect(bildFehlerText('kodierung')).toContain('Fingerprint-Schutz')
-    expect(bildFehlerKurz('kodierung')).toBe('Bildverarbeitung blockiert')
+  it('meldet bei einem Serverfehler kein Nutzerproblem, sondern unseres', () => {
+    expect(bildFehlerText('server')).toBe(IMAGE_SERVER_ERROR)
+    expect(bildFehlerText('server')).toContain('nochmal versuchen')
+    expect(bildFehlerKurz('server')).toBe('Verarbeitung fehlgeschlagen')
   })
 
   it('rät nur dort zu einem anderen Dateiformat, wo das auch hilft', () => {
     // Der wiederkehrende Fehler: Der Bauer hatte bereits ein JPEG gewählt und
     // wurde aufgefordert, ein JPEG zu wählen. Das darf nur noch bei
-    // 'dekodierung' dastehen — nur dort ist das Format wirklich das Problem.
+    // 'format' dastehen — nur dort ist das Format wirklich das Problem.
     expect(bildFehlerText('lesen')).not.toMatch(/JPEG|PNG|HEIC/)
-    expect(bildFehlerText('kodierung')).not.toMatch(/JPEG|PNG|HEIC/)
-    expect(bildFehlerText('dekodierung')).toMatch(/JPEG/)
+    expect(bildFehlerText('server')).not.toMatch(/JPEG|PNG|HEIC/)
+    expect(bildFehlerText('format')).toMatch(/JPEG/)
   })
 
   it('gibt jeder der drei Ursachen einen eigenen Text und Kurzgrund', () => {
@@ -90,8 +89,8 @@ describe('Zuordnung Fehlerart → Text', () => {
   it('nennt im Standard KEINE der drei echten Ursachen', () => {
     // Eine falsche Ursache ist schlimmer als gar keine — das ist die Lehre
     // dieser Reihe. Der Rückfall darf weder aufs Format noch auf den
-    // Speicherort noch auf eine Browser-Einstellung zeigen.
-    expect(IMAGE_UNKNOWN_ERROR).not.toMatch(/JPEG|PNG|HEIC|Speicherort|Datenschutz/)
+    // Speicherort zeigen.
+    expect(IMAGE_UNKNOWN_ERROR).not.toMatch(/JPEG|PNG|HEIC|Speicherort/)
     for (const art of ALLE_ARTEN) {
       expect(IMAGE_UNKNOWN_ERROR).not.toBe(bildFehlerText(art))
     }
@@ -101,14 +100,14 @@ describe('Zuordnung Fehlerart → Text', () => {
 describe('Diagnose-Kennung', () => {
   it('hängt an jede der drei Meldungen ein eigenes Kürzel mit dem Code-Stand', () => {
     expect(bildFehlerText('lesen')).toMatch(new RegExp(`\\[L${UPLOAD_DIAG}\\]$`))
-    expect(bildFehlerText('dekodierung')).toMatch(new RegExp(`\\[F${UPLOAD_DIAG}\\]$`))
-    expect(bildFehlerText('kodierung')).toMatch(new RegExp(`\\[B${UPLOAD_DIAG}\\]$`))
+    expect(bildFehlerText('format')).toMatch(new RegExp(`\\[F${UPLOAD_DIAG}\\]$`))
+    expect(bildFehlerText('server')).toMatch(new RegExp(`\\[S${UPLOAD_DIAG}\\]$`))
   })
 
   it('unterscheidet die drei Kürzel voneinander', () => {
     const kennungen = ALLE_ARTEN.map((art) => bildFehlerText(art).match(/\[[A-Z]\d+\]$/)?.[0])
 
-    expect(kennungen).toEqual([`[L${UPLOAD_DIAG}]`, `[F${UPLOAD_DIAG}]`, `[B${UPLOAD_DIAG}]`])
+    expect(kennungen).toEqual([`[L${UPLOAD_DIAG}]`, `[F${UPLOAD_DIAG}]`, `[S${UPLOAD_DIAG}]`])
   })
 
   it('führt den Code-Stand an genau einer Stelle', () => {
@@ -131,12 +130,12 @@ describe('Diagnose-Kennung', () => {
 
 describe('BildFehler', () => {
   it('trägt seine Ursache und schon die passende Meldung', () => {
-    const fehler = new BildFehler('kodierung')
+    const fehler = new BildFehler('server')
 
     expect(fehler).toBeInstanceOf(Error)
-    expect(fehler.bildFehlerArt).toBe('kodierung')
+    expect(fehler.bildFehlerArt).toBe('server')
     // Wichtig für Aufrufer, die nur error.message kennen
-    expect(fehler.message).toBe(IMAGE_ENCODE_BLOCKED_ERROR)
+    expect(fehler.message).toBe(IMAGE_SERVER_ERROR)
   })
 
   it('wird auch ohne instanceof erkannt — für alle drei Ursachen', () => {
@@ -151,7 +150,7 @@ describe('BildFehler', () => {
     expect(bildFehlerArtVon(new Error('Netzwerk weg'))).toBeNull()
     expect(bildFehlerArtVon({ bildFehlerArt: 'irgendwas' })).toBeNull()
     expect(bildFehlerArtVon(null)).toBeNull()
-    expect(bildFehlerArtVon('kodierung')).toBeNull()
+    expect(bildFehlerArtVon('server')).toBeNull()
   })
 })
 
@@ -162,15 +161,15 @@ describe('bildFehlerMeldung — was ein gefangener Fehler zeigt', () => {
       kurz: 'Datei nicht lesbar',
       art: 'lesen',
     })
-    expect(bildFehlerMeldung(new BildFehler('kodierung'))).toEqual({
-      text: IMAGE_ENCODE_BLOCKED_ERROR,
-      kurz: 'Bildverarbeitung blockiert',
-      art: 'kodierung',
+    expect(bildFehlerMeldung(new BildFehler('server'))).toEqual({
+      text: IMAGE_SERVER_ERROR,
+      kurz: 'Verarbeitung fehlgeschlagen',
+      art: 'server',
     })
-    expect(bildFehlerMeldung(new BildFehler('dekodierung'))).toEqual({
+    expect(bildFehlerMeldung(new BildFehler('format'))).toEqual({
       text: IMAGE_FORMAT_ERROR,
       kurz: 'Format nicht unterstützt',
-      art: 'dekodierung',
+      art: 'format',
     })
   })
 
@@ -197,7 +196,7 @@ describe('Protokollierung', () => {
     vi.stubEnv('NODE_ENV', 'production')
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
 
-    protokolliereBildFehler('kodierung', { type: 'image/jpeg', size: 2_000_000 })
+    protokolliereBildFehler('server', { type: 'image/jpeg', size: 2_000_000 })
 
     expect(log).not.toHaveBeenCalled()
   })
@@ -206,11 +205,11 @@ describe('Protokollierung', () => {
     vi.stubEnv('NODE_ENV', 'development')
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
 
-    protokolliereBildFehler('kodierung', { type: 'image/jpeg', size: 2_048_000 })
+    protokolliereBildFehler('server', { type: 'image/jpeg', size: 2_048_000 })
 
     expect(log).toHaveBeenCalledTimes(1)
     const zeile = log.mock.calls[0][0] as string
-    expect(zeile).toContain('kodierung')
+    expect(zeile).toContain('server')
     expect(zeile).toContain('image/jpeg')
     expect(zeile).toContain('2000 kB')
   })
@@ -219,7 +218,7 @@ describe('Protokollierung', () => {
     vi.stubEnv('NODE_ENV', 'development')
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
 
-    protokolliereBildFehler('dekodierung', { type: '', size: 0 })
+    protokolliereBildFehler('format', { type: '', size: 0 })
 
     expect(log.mock.calls[0][0]).toContain('Typ unbekannt')
   })

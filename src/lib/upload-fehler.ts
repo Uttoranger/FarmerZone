@@ -1,82 +1,80 @@
 // Warum ein Foto-Upload gescheitert ist — und was der Bauer dagegen tun kann.
 //
-// Vorher gab es dafür praktisch eine Antwort: „falsches Format". Die stimmt
-// aber nur für eine von inzwischen DREI völlig verschiedenen Ursachen. Sie
-// werden in genau dieser Reihenfolge geprüft, weil jede die nächste erst
-// möglich macht — wer nicht lesen kann, kann auch nicht dekodieren:
+// Seit der Umstellung auf die serverseitige Verarbeitung sieht die Welt anders
+// aus als in den Sprints davor. Der Browser verkleinert nichts mehr; er sendet
+// die Datei, wie sie ist. Damit verschwinden die beiden Ursachen, die aus der
+// Canvas-Arbeit stammten ('dekodierung' und 'kodierung' im alten Sinn), und es
+// bleiben drei, die sich sauber danach trennen, WER gescheitert ist:
 //
-//   lesen        Der Browser bekommt die Bytes gar nicht erst. Auf Android
-//                liefern manche Speicherdienste (SD-Backup, App-Alben,
-//                Cloud-Alben) eine Datei-Referenz aus, hinter der beim
-//                Zugriff nichts mehr steht. Das Foto ist einwandfrei, der
-//                Weg dorthin nicht. Ein anderes Format zu wählen hilft
-//                NICHT — die Datei muss erst lokal gespeichert werden.
+//   lesen    Die Datei kommt gar nicht erst beim Server an. Der Speicherdienst
+//            gibt nichts heraus (Android-App-Alben, SD-Backup) oder die
+//            Verbindung bricht ab. Ein anderes Format hilft NICHT — die Datei
+//            muss erst lokal gespeichert werden.
 //
-//   dekodierung  Die Bytes sind da, aber der Browser versteht sie nicht.
-//                Klassiker: ein HEIC-Foto vom iPhone, auf Android geöffnet.
-//                Ein anderes Format wählen hilft — die Meldung stimmt.
+//   format   Der Server hat die Bytes, kann sie aber nicht als Bild lesen.
+//            Das ist jetzt eine BEWIESENE Aussage: sharp hat es versucht und
+//            abgelehnt — nicht mehr eine Vermutung aus einem gescheiterten
+//            Canvas. Ein echtes HEIF-Foto landet hier.
 //
-//   kodierung    Der Browser KONNTE die Datei lesen und verstehen, darf sie
-//                aber nicht über den Canvas wieder herausgeben: toBlob liefert
-//                null oder wirft, oder es gibt gar keinen 2D-Kontext. Keine
-//                Formatfrage, sondern eine Datenschutz-Einstellung — Braves
-//                Fingerprint-Schutz ist der gemeldete Fall.
+//   server   Alles Übrige auf unserer Seite. Das ist kein Rat an den Bauern,
+//            sondern ein Eingeständnis: bei uns ist etwas schiefgegangen.
 //
-// Warum „lesen" überhaupt nötig wurde: Bis dahin fasste NIEMAND die Bytes an,
-// bevor die Dekodier-Probe urteilte. Ein Speicherdienst, der nichts liefert,
-// ließ damit nur img.onerror feuern — ununterscheidbar von einem unbekannten
-// Format. Forensisch einwandfreie JPEGs bekamen so browserübergreifend die
-// Format-Meldung, und der Rat darin konnte nie helfen.
+// Was dabei gewonnen ist: Keine dieser Ursachen hängt mehr an einer Fähigkeit
+// des Browsers, die wir nicht kontrollieren. Der Fingerprint-Schutz, an dem sich
+// die Sprints #59 bis #63 abgearbeitet haben, kann hier nichts mehr blockieren —
+// es gibt keinen Canvas mehr, den er blockieren könnte.
 //
-// Reine Zuordnung ohne DOM, damit sie ohne Browser prüfbar ist — Canvas und
-// createImageBitmap selbst lassen sich in jsdom nicht sinnvoll nachstellen.
+// Reine Zuordnung ohne DOM, damit sie ohne Browser prüfbar ist.
 
-export type BildFehlerArt = 'lesen' | 'dekodierung' | 'kodierung'
+export type BildFehlerArt = 'lesen' | 'format' | 'server'
 
 /**
  * DIAGNOSE-KENNUNG DER PILOTPHASE — temporär.
  *
- * Jede Meldung endet auf ein Kürzel wie „[F62]": Buchstabe für die Ursache
- * (L = lesen, F = Format, B = blockiert), Zahl für den Code-Stand. Ohne das
- * sind die Meldungstexte über Stände hinweg identisch, und ein zugeschicktes
+ * Jede Meldung endet auf ein Kürzel wie „[F64]": Buchstabe für die Ursache
+ * (L = lesen, F = Format, S = Server), Zahl für den Code-Stand. Ohne das sind
+ * die Meldungstexte über Stände hinweg identisch, und ein zugeschicktes
  * Bildschirmfoto verrät nicht, welcher Stand es erzeugt hat — bei einem Fehler,
  * der nur auf fremden Geräten auftritt, ist das der Unterschied zwischen
  * „gefixt" und „vielleicht gefixt".
  *
- * Die Zahl wird bei künftigen Upload-Änderungen hochgezählt. Nach der
- * Stabilisierung wird das Werkzeug wieder entfernt: Kennung hier löschen, die
- * Meldungen enden dann wieder auf ihren letzten Satz.
+ * Von '62' auf '64' gezählt, weil dieser Umbau die Ursachen selbst ausgetauscht
+ * hat: Ein „[F62]" auf einem Bildschirmfoto stammt aus der Canvas-Zeit, ein
+ * „[F64]" vom Server. Die Zahl wird bei künftigen Upload-Änderungen weiter
+ * hochgezählt. Nach der Stabilisierung wird das Werkzeug wieder entfernt:
+ * Kennung hier löschen, die Meldungen enden dann wieder auf ihren letzten Satz.
  */
-export const UPLOAD_DIAG = '62'
+export const UPLOAD_DIAG = '64'
 
 /** Hängt die Kennung an eine Meldung. Ein Ort, alle Meldungen. */
-function mitKennung(text: string, buchstabe: 'L' | 'F' | 'B' | 'X'): string {
+function mitKennung(text: string, buchstabe: 'L' | 'F' | 'S' | 'X'): string {
   return `${text} [${buchstabe}${UPLOAD_DIAG}]`
 }
 
-/** Neu: die Bytes kommen nicht beim Browser an. */
+/** Die Bytes kommen nicht beim Server an — Speicherort oder Verbindung. */
 export const IMAGE_READ_ERROR = mitKennung(
   'Die Datei konnte nicht aus ihrem Speicherort gelesen werden. Bitte speichere das Foto ' +
     'zuerst über Teilen → „Eigene Dateien" und wähle es von dort aus.',
   'L'
 )
 
-/** Unverändert im Wortlaut: der Browser versteht das Format nicht. */
+/**
+ * Wortlaut unverändert seit #59 — aber die Aussage steht jetzt auf festem
+ * Grund: Der Server hat die Datei in der Hand gehabt und sie nicht als Bild
+ * lesen können. Vorher war es ein Schluss aus einem gescheiterten Canvas.
+ */
 export const IMAGE_FORMAT_ERROR = mitKennung(
   'Dieses Bildformat unterstützt dein Browser nicht (z. B. HEIC) — bitte JPEG oder PNG wählen',
   'F'
 )
 
 /**
- * Lesen und Verstehen ging, Verarbeiten nicht. Die Meldung nennt die Ursache
- * beim Namen und die zwei Wege heraus — ohne sie sucht der Bauer den Fehler bei
- * seinem Foto und findet ihn nie.
+ * Unser Fehler, nicht seiner. Deshalb kein Rat, was er anders machen soll —
+ * nur die einzige Handlung, die tatsächlich hilft: noch einmal versuchen.
  */
-export const IMAGE_ENCODE_BLOCKED_ERROR = mitKennung(
-  'Dein Browser blockiert die Bildverarbeitung — das ist meist eine Datenschutz-Einstellung ' +
-    '(z. B. Braves Fingerprint-Schutz). Bitte den Schutz für diese Seite lockern oder einen ' +
-    'anderen Browser verwenden.',
-  'B'
+export const IMAGE_SERVER_ERROR = mitKennung(
+  'Das Bild konnte gerade nicht verarbeitet werden — bitte nochmal versuchen.',
+  'S'
 )
 
 /**
@@ -99,14 +97,14 @@ export const IMAGE_UNKNOWN_ERROR = mitKennung(
 /** Kurzgründe für die Sammelmeldung einer Serie (src/lib/upload-batch.ts). */
 const KURZ: Record<BildFehlerArt, string> = {
   lesen: 'Datei nicht lesbar',
-  dekodierung: 'Format nicht unterstützt',
-  kodierung: 'Bildverarbeitung blockiert',
+  format: 'Format nicht unterstützt',
+  server: 'Verarbeitung fehlgeschlagen',
 }
 
 const TEXT: Record<BildFehlerArt, string> = {
   lesen: IMAGE_READ_ERROR,
-  dekodierung: IMAGE_FORMAT_ERROR,
-  kodierung: IMAGE_ENCODE_BLOCKED_ERROR,
+  format: IMAGE_FORMAT_ERROR,
+  server: IMAGE_SERVER_ERROR,
 }
 
 /**
@@ -148,7 +146,7 @@ export function bildFehlerArtVon(e: unknown): BildFehlerArt | null {
   if (e instanceof BildFehler) return e.bildFehlerArt
   if (typeof e === 'object' && e !== null && 'bildFehlerArt' in e) {
     const art = (e as { bildFehlerArt: unknown }).bildFehlerArt
-    if (art === 'lesen' || art === 'dekodierung' || art === 'kodierung') return art
+    if (art === 'lesen' || art === 'format' || art === 'server') return art
   }
   return null
 }
@@ -156,9 +154,8 @@ export function bildFehlerArtVon(e: unknown): BildFehlerArt | null {
 /**
  * Was einem gefangenen Fehler an Meldung zusteht.
  *
- * `art` ist null, wenn der Fehler nichts mit der Bildverarbeitung zu tun hat
- * (Netzwerk, Server-Antwort) — dann bleibt es bei seiner eigenen Meldung, und
- * es wird auch nichts protokolliert.
+ * `art` ist null, wenn der Fehler nichts mit dem Foto zu tun hat — dann bleibt
+ * es bei seiner eigenen Meldung, und es wird auch nichts protokolliert.
  */
 export function bildFehlerMeldung(e: unknown): {
   text: string
@@ -173,7 +170,7 @@ export function bildFehlerMeldung(e: unknown): {
 }
 
 /**
- * Kurze Notiz auf der Serverkonsole — ausschließlich außerhalb der Produktion,
+ * Kurze Notiz auf der Konsole — ausschließlich außerhalb der Produktion,
  * Muster wie in src/lib/auth.ts.
  *
  * Bewusst OHNE Dateinamen: „Hof_Mueller_Franz.jpg" ist ein personenbezogenes
