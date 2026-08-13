@@ -131,7 +131,6 @@ function ProductImageArea({
 
   const { isUploading, openFilePicker, fileInput } = useImageUpload({
     variant: 'product',
-    targetId: product.id,
     oldUrl: product.imageUrl ?? undefined,
     onUploaded: (url) => {
       startTransition(async () => {

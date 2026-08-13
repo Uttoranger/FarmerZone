@@ -2,270 +2,124 @@
 
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { upload } from '@vercel/blob/client'
 import { summarizeUploadBatch, type BatchSkip } from '@/lib/upload-batch'
 import {
   BildFehler,
-  bildFehlerText,
-  bildFehlerKurz,
   bildFehlerMeldung,
   protokolliereBildFehler,
   type BildFehlerArt,
 } from '@/lib/upload-fehler'
-
-export type ImageUploadVariant = 'product' | 'banner' | 'logo' | 'gallery' | 'status'
+import {
+  MAX_ORIGINAL_BYTES,
+  originalPfad,
+  type UploadZweck,
+} from '@/lib/upload-pfade'
 
 /**
- * Längste Kante nach dem Verkleinern, je Verwendung.
+ * Foto-Upload — der Browser sendet nur noch.
  *
- * `banner` liegt seit dem Cover-Sprint höher als der Rest: Das Titelbild ist
- * das einzige Bild, das über die VOLLE Bildschirmbreite läuft (sizes="100vw").
- * Auf einem 1920er-Monitor mit doppelter Pixeldichte fragt der Browser 3840px
- * an — bei 2400px Quelle bekam er hochskalierte Pixel. Zusätzlich schneidet
- * object-cover aus dem Foto einen Querstreifen heraus, sodass von der Quelle
- * ohnehin nur ein Teil übrig bleibt; die Reserve dafür fehlte.
+ * Bis zu diesem Umbau hat der Browser jedes Foto zuerst selbst verkleinert:
+ * in ein <img> laden, auf einen Canvas zeichnen, als WebP wieder auslesen. Das
+ * musste er, weil eine Vercel-Serverfunktion höchstens ~4,5 MB Anfragekörper
+ * annimmt und ein Handyfoto 6–8 MB hat. Genau diese Kette ist auf realen
+ * Geräten reihenweise gerissen — an Fingerprint-Schutz, an Speicherdiensten,
+ * an Browser-Eigenheiten. Vier Sprints lang haben wir die Fehlermeldungen
+ * darüber verbessert; behoben war es nie.
  *
- * Gemessen (Chromium, 12-MP-Vorlage, unveränderte Qualität 0.82): ein
- * detailreiches Wiesenfoto — der ungünstigste und für ein Hof-Titelbild
- * typischste Fall — ergibt bei 3200px rund 1,9 MB. Die Schranken liegen bei
- * 3,5 MB (uploadOne weiter unten) und 4 MB (src/app/api/upload/route.ts:48).
- * Die Qualität musste deshalb NICHT gesenkt werden.
+ * Jetzt geht das ORIGINAL direkt in den Blob-Speicher, am Limit der
+ * Serverfunktion vorbei, und der Server verkleinert. Der Browser kann nichts
+ * mehr falsch machen, weil er nichts mehr tut außer senden.
  *
- * Exportiert, damit der Wert prüfbar ist statt nur behauptet.
+ * Der Preis, bewusst bezahlt: Ein Upload überträgt jetzt 6–8 MB statt ~300 kB.
+ * Verlässlichkeit schlägt Datenvolumen — ein Foto hochladen muss funktionieren
+ * wie in jeder Messenger-App.
  */
-export const MAX_LONG_SIDE: Record<ImageUploadVariant, number> = {
-  logo:    800,
-  product: 2400,
-  banner:  3200,
-  gallery: 2400,
-  status:  2400,
+
+export type ImageUploadVariant = UploadZweck
+
+/**
+ * Die Hof-Kennung, einmal geholt und gemerkt.
+ *
+ * Sie steckt im Ablagepfad des Originals, und der Pfad kommt beim
+ * Client-Upload zwingend vom Client — der Server darf ihn nur annehmen oder
+ * ablehnen. Ein Abruf je Seitenaufruf genügt; das Versprechen wird gemerkt,
+ * nicht das Ergebnis, damit auch mehrere gleichzeitige Uploads nur einmal
+ * fragen.
+ */
+let hofKennung: Promise<string> | null = null
+
+function holeHofKennung(): Promise<string> {
+  hofKennung ??= fetch('/api/upload/token')
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error('Kein Zugriff'))))
+    .then((d: { farmId: string }) => d.farmId)
+    .catch((e) => {
+      // Nicht dauerhaft merken, wenn es schiefging — der nächste Versuch soll
+      // es neu probieren dürfen.
+      hofKennung = null
+      throw e
+    })
+  return hofKennung
 }
 
-/** Wie viel vom Anfang der Datei die Lese-Probe anfordert. */
-export const LESE_PROBE_BYTES = 64 * 1024
-
 /**
- * Wie die Lese-Probe an die Bytes kommt.
+ * Ein Foto hochladen und verarbeiten lassen. Liefert die fertige URL.
  *
- * `null` heißt ausdrücklich „kann nicht prüfen" und ist etwas anderes als ein
- * leerer Puffer: Fehlt die Schnittstelle, ist das kein Beweis für eine unlesbare
- * Datei. Ein leerer Puffer dagegen ist einer.
+ * Zwei Schritte, absichtlich getrennt:
+ *   1. Original in den Blob-Speicher (signierter Client-Upload).
+ *   2. Verarbeitung anstoßen — der Server dreht, verkleinert, kodiert und
+ *      löscht das Original.
  *
- * Herausgezogen, damit `canReadFile` eine reine Funktion bleibt und ohne Browser
- * prüfbar ist — Lesezugriffe lassen sich in jsdom nicht nachstellen, ein
- * eingesetzter Leser dagegen schon.
+ * Fehler aus Schritt 1 sind Lese- oder Verbindungsfehler ('lesen'): Entweder
+ * gibt der Speicherdienst des Geräts die Datei nicht heraus, oder die
+ * Verbindung bricht ab. Beides sieht für den Bauern gleich aus und hat
+ * denselben Ausweg — das Foto erst lokal speichern.
+ *
+ * Fehler aus Schritt 2 bringt der Server als Ursache mit ('format' oder
+ * 'server'), damit die Meldung nicht geraten werden muss.
  */
-export type DateiLeser = (file: File, bytes: number) => Promise<ArrayBuffer | null>
+export async function ladeFotoHoch(
+  file: File,
+  zweck: UploadZweck,
+  optionen: { altUrl?: string; onFortschritt?: (prozent: number) => void } = {}
+): Promise<string> {
+  const farmId = await holeHofKennung()
 
-/** Der echte Weg im Browser. */
-const browserLeser: DateiLeser = async (file, bytes) => {
-  const anfang = file.slice(0, bytes)
-  // Safari vor 14 kennt Blob.arrayBuffer nicht.
-  if (typeof anfang.arrayBuffer !== 'function') return null
-  return anfang.arrayBuffer()
-}
-
-/**
- * Kommen die Bytes überhaupt beim Browser an?
- *
- * Die Frage klingt trivial und war die Lücke: Bis hierher hat NIEMAND die Datei
- * angefasst, bevor über sie geurteilt wurde. `file.size` ist Metadatum, kein
- * Zugriff. Auf Android liefern manche Speicherdienste (SD-Backup, App- und
- * Cloud-Alben) eine Datei-Referenz aus, hinter der beim Zugriff nichts mehr
- * steht — das Foto ist einwandfrei, der Weg dorthin nicht. Ohne diese Probe
- * feuerte nur img.onerror, und das sah aus wie ein unbekanntes Format.
- *
- * 64 kB genügen: Es geht nicht um den Inhalt, sondern darum, ob der Speicher
- * überhaupt etwas herausgibt. Ein ganzes 12-MP-Foto dafür in den Speicher zu
- * ziehen wäre Verschwendung.
- *
- * Fehlt `arrayBuffer` (Safari vor 14), wird NICHT geurteilt: Eine fehlende
- * Schnittstelle ist kein Beweis für eine unlesbare Datei. Dann übernimmt wie
- * bisher die Dekodier-Probe.
- *
- * `lies` ist einsetzbar, damit die drei Ausgänge — gelesen, geworfen, leer —
- * ohne Browser prüfbar sind. In der Anwendung bleibt es beim Standard.
- */
-export async function canReadFile(file: File, lies: DateiLeser = browserLeser): Promise<boolean> {
+  let hochgeladen: { url: string }
   try {
-    const puffer = await lies(file, LESE_PROBE_BYTES)
-    // Kein Urteil möglich — die Datei gilt als lesbar, die Dekodier-Probe
-    // entscheidet weiter.
-    if (puffer === null) return true
-    // Null Bytes zurück heißt: da war nichts zu holen. Eine leere Datei ist
-    // ebenso wenig hochladbar wie eine, deren Speicherort ins Leere zeigt.
-    return puffer.byteLength > 0
-  } catch {
-    return false
-  }
-}
-
-/**
- * Die Probe über ein <img>-Element.
- *
- * Sie ist die MASSGEBLICHE Auskunft, weil resizeToWebP weiter unten die
- * eigentliche Arbeit ebenfalls über ein <img> erledigt (siehe dort): Was hier
- * lädt, lädt dort auch. Genau deshalb dürfen beide Zweige von canDecodeImage
- * hier landen — sie prüfen damit das, worauf es später ankommt.
- */
-function canDecodeViaImageElement(file: File): Promise<boolean> {
-  return new Promise((resolve) => {
-    const img = new Image()
-    const objectUrl = URL.createObjectURL(file)
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl)
-      resolve(true)
-    }
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl)
-      resolve(false)
-    }
-    img.src = objectUrl
-  })
-}
-
-/**
- * Probiert VOR Vorschau und Upload, ob der Browser die Datei überhaupt
- * dekodieren kann. Chrome/Android scheitert hier an HEIC, Safari nicht —
- * genau das ist gewollt, denn Safari kann HEIC anschließend zu JPEG umwandeln.
- *
- * createImageBitmap ist der schnelle Weg; die Verkleinerung auf 16px hält den
- * Speicherbedarf klein, denn ein 48-MP-Foto würde sonst unnötig groß im
- * Speicher landen.
- *
- * ABER: Ein Fehlschlag von createImageBitmap beweist NICHT, dass die Datei
- * unlesbar ist. Schutzmechanismen des Browsers können den Aufruf stören,
- * während dieselbe Datei über ein <img> anstandslos dekodiert — am Gerät mit
- * Braves strengem Fingerprint-Schutz und einem einwandfreien Baseline-JPEG
- * (4032×3024) reproduziert. Deshalb ist der Fehlschlag hier kein Urteil,
- * sondern nur der Anlass, die maßgebliche <img>-Probe zu befragen. Erst wenn
- * AUCH die scheitert, ist die Datei wirklich nicht lesbar.
- *
- * Vorher gab der catch direkt `false` zurück. Das war doppelt falsch: Der Bauer
- * bekam für ein tadelloses JPEG die Format-Meldung („z. B. HEIC"), und weil die
- * Absage schon vor resizeToWebP fiel, konnte die eigens dafür gebaute
- * Blockier-Meldung in diesem Pfad überhaupt nie erscheinen.
- *
- * Der Preis: Bei einer tatsächlich unlesbaren Datei (echtes HEIC auf Android)
- * werden jetzt zwei Wege statt einem probiert. Das kostet einen Wimpernschlag
- * auf einem Pfad, der ohnehin in einer Absage endet — gemessen am falschen
- * Rat, den der Bauer vorher bekam, ist das nichts.
- *
- * Was hier NICHT geprüft wird: ob der Browser das gelesene Bild anschließend
- * wieder herausgeben darf. Dekodieren ist erlaubt, das Auslesen des Canvas
- * kann trotzdem blockiert sein — diese zweite Hürde fällt erst in
- * resizeToWebP und trägt dort einen eigenen Fehler.
- */
-export async function canDecodeImage(file: File): Promise<boolean> {
-  if (typeof createImageBitmap === 'function') {
-    try {
-      const bitmap = await createImageBitmap(file, { resizeWidth: 16, resizeQuality: 'low' })
-      bitmap.close?.()
-      return true
-    } catch {
-      // Bewusst KEIN `return false` — Rückfall auf die <img>-Probe unten.
-    }
+    hochgeladen = await upload(originalPfad(farmId, zweck, file.name), file, {
+      access: 'public',
+      handleUploadUrl: '/api/upload/token',
+      onUploadProgress: ({ percentage }) => optionen.onFortschritt?.(percentage),
+    })
+  } catch (e) {
+    // Auch ein abgelehnter Token landet hier. Für den Bauern ist die
+    // Unterscheidung ohne Wert — er kann in beiden Fällen nur dasselbe tun.
+    protokolliereBildFehler('lesen', file)
+    throw e instanceof BildFehler ? e : new BildFehler('lesen')
   }
 
-  return canDecodeViaImageElement(file)
-}
+  const antwort = await fetch('/api/upload/verarbeiten', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ url: hochgeladen.url, zweck, altUrl: optionen.altUrl }),
+  }).catch(() => null)
 
-/**
- * Die Vorprüfung einer ausgewählten Datei — liefert die Ursache, nicht nur ein
- * Ja/Nein, und legt die Reihenfolge an EINEM Ort fest: lesen → dekodieren.
- * (Die dritte Stufe, kodieren, kann erst in resizeToWebP scheitern.)
- *
- * Die Reihenfolge ist keine Geschmacksfrage: Jede Stufe setzt die vorige
- * voraus. Ohne Bytes kein Dekodieren, ohne Dekodieren kein Kodieren. Stünde
- * die Lese-Probe hinten, käme man nie an ihr an — die Dekodier-Probe hätte
- * längst „Format" gemeldet, so wie bisher.
- *
- * `null` heißt: nichts gefunden, weitermachen.
- */
-export async function pruefeDateiVorUpload(file: File): Promise<BildFehlerArt | null> {
-  if (!(await canReadFile(file))) return 'lesen'
-  if (!(await canDecodeImage(file))) return 'dekodierung'
-  return null
-}
+  if (!antwort) {
+    // Die Verbindung ist zwischen Upload und Verarbeitung abgerissen.
+    protokolliereBildFehler('lesen', file)
+    throw new BildFehler('lesen')
+  }
 
-/**
- * Verkleinert und kodiert neu. Scheitert das, gibt es genau zwei Ursachen —
- * und die Funktion sagt jetzt, welche es war (src/lib/upload-fehler.ts):
- *
- *   'dekodierung'  Das <img> lädt die Datei gar nicht erst (img.onerror).
- *   'kodierung'    Gelesen wurde sie, aber der Canvas gibt nichts zurück:
- *                  kein 2D-Kontext, toBlob liefert null oder wirft. Braves
- *                  Fingerprint-Schutz landet hier. Vorher lief dieser Fall in
- *                  eine Meldung, die ein anderes Dateiformat empfahl — ein
- *                  Rat, der bei blockiertem Canvas nie funktioniert.
- */
-export async function resizeToWebP(file: File, maxLongSide: number, quality = 0.82): Promise<File> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    const objectUrl = URL.createObjectURL(file)
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl)
-      // Alles ab hier ist Canvas-Arbeit. Was davon schiefgeht — ein
-      // verweigerter Kontext, ein werfendes drawImage, ein leeres toBlob —
-      // ist dieselbe Ursache: der Browser gibt das Bild nicht wieder heraus.
-      try {
-        const { naturalWidth: w, naturalHeight: h } = img
-        const scale = Math.min(1, maxLongSide / Math.max(w, h))
-        const canvas = document.createElement('canvas')
-        canvas.width = Math.round(w * scale)
-        canvas.height = Math.round(h * scale)
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return reject(new BildFehler('kodierung'))
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+  const daten = (await antwort.json().catch(() => ({}))) as { url?: string; art?: unknown }
 
-        const finish = (blob: Blob) => {
-          // Typ und Endung ehrlich aus dem tatsächlichen Encode-Ergebnis ableiten
-          const ext = blob.type === 'image/webp' ? '.webp' : '.jpg'
-          const outName = file.name.replace(/\.[^.]+$/, '') + ext
-          resolve(new File([blob], outName, { type: blob.type }))
-        }
+  if (!antwort.ok || typeof daten.url !== 'string') {
+    const art: BildFehlerArt = daten.art === 'format' ? 'format' : 'server'
+    protokolliereBildFehler(art, file)
+    throw new BildFehler(art)
+  }
 
-        // Safari kann kein WebP und fällt spezifikationsgemäß still auf PNG
-        // zurück — dann denselben Canvas als JPEG kodieren. Erst wenn AUCH das
-        // nichts liefert, ist die Kodierung wirklich blockiert.
-        const alsJpeg = () => {
-          try {
-            canvas.toBlob(
-              (jpegBlob) => {
-                if (!jpegBlob || jpegBlob.type !== 'image/jpeg') {
-                  return reject(new BildFehler('kodierung'))
-                }
-                finish(jpegBlob)
-              },
-              'image/jpeg',
-              0.85,
-            )
-          } catch {
-            // Der zweite toBlob-Aufruf sitzt im Callback des ersten und läuft
-            // damit außerhalb des äußeren try — er braucht sein eigenes Netz.
-            reject(new BildFehler('kodierung'))
-          }
-        }
-
-        canvas.toBlob(
-          (blob) => {
-            if (blob && blob.type === 'image/webp') return finish(blob)
-            alsJpeg()
-          },
-          'image/webp',
-          quality,
-        )
-      } catch {
-        reject(new BildFehler('kodierung'))
-      }
-    }
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl)
-      // Zweites Netz hinter der Auswahl-Probe: hier ist wirklich das Format
-      // schuld, nicht die Verarbeitung.
-      reject(new BildFehler('dekodierung'))
-    }
-    img.src = objectUrl
-  })
+  return daten.url
 }
 
 /** Ergebnis eines einzelnen Durchlaufs: volle Meldung für Einzelauswahl,
@@ -274,7 +128,7 @@ type UploadResult = { ok: true } | { ok: false; message: string; short: string }
 
 interface UseImageUploadOptions {
   variant: ImageUploadVariant
-  targetId?: string
+  /** Bisheriges Bild — wird nach dem erfolgreichen Ersetzen aufgeräumt. */
   oldUrl?: string
   /** Mehrfachauswahl — bewusst standardmäßig AUS. Nur die Galerie schaltet sie
    *  ein; Logo, Cover, Status und Produktbild sind Einzelbild-Felder. */
@@ -291,14 +145,19 @@ interface UseImageUploadOptions {
 
 export function useImageUpload({
   variant,
-  targetId,
   oldUrl,
   multiple = false,
   maxFiles,
   onUploaded,
 }: UseImageUploadOptions) {
   const [isUploading, setIsUploading] = useState(false)
-  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null)
+  // `prozent` ist neu und für Mobilfunk gedacht: Ein 8-MB-Original braucht dort
+  // spürbar Zeit, und ein Balken ohne Bewegung sieht aus wie ein Absturz.
+  const [progress, setProgress] = useState<{
+    current: number
+    total: number
+    prozent: number
+  } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   function openFilePicker() {
@@ -310,64 +169,34 @@ export function useImageUpload({
   }
 
   async function uploadOne(file: File, batch: boolean): Promise<UploadResult> {
-    if (file.size > 25 * 1024 * 1024) {
+    if (file.size > MAX_ORIGINAL_BYTES) {
       return { ok: false, message: 'Datei zu groß (max. 25 MB)', short: 'zu groß (max. 25 MB)' }
     }
 
-    // Lese- und Format-Probe VOR allem anderen: so kommt die Absage sofort und
-    // nicht erst nach Verkleinern und Hochladen — und sie nennt die richtige
-    // der drei Ursachen statt pauschal „Format".
-    const vorbefund = await pruefeDateiVorUpload(file)
-    if (vorbefund) {
-      protokolliereBildFehler(vorbefund, file)
-      return {
-        ok: false,
-        message: bildFehlerText(vorbefund),
-        short: bildFehlerKurz(vorbefund),
-      }
-    }
-
     try {
-      const resized = await resizeToWebP(file, MAX_LONG_SIDE[variant])
-      if (resized.size > 3.5 * 1024 * 1024) {
-        return {
-          ok: false,
-          message: 'Bild konnte nicht ausreichend verkleinert werden — bitte kleineres Foto wählen',
-          short: 'zu groß nach dem Verkleinern',
-        }
-      }
-
-      const fd = new FormData()
-      fd.append('file', resized)
-      fd.append('target', variant)
-      if (targetId) fd.append('id', targetId)
-      if (oldUrl) fd.append('oldUrl', oldUrl)
-
-      const res = await fetch('/api/upload', { method: 'POST', body: fd })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Upload fehlgeschlagen' }))
-        const text = (err.error as string) ?? 'Upload fehlgeschlagen'
-        return { ok: false, message: text, short: text }
-      }
-
-      const { url } = await res.json()
-      await onUploaded(url as string, { batch })
+      const url = await ladeFotoHoch(file, variant, {
+        altUrl: oldUrl,
+        onFortschritt: (prozent) =>
+          setProgress((v) => (v ? { ...v, prozent } : { current: 1, total: 1, prozent })),
+      })
+      await onUploaded(url, { batch })
       return { ok: true }
     } catch (e) {
       // Ein BildFehler bringt seine Ursache mit und bekommt den passenden
-      // Text; alles andere (Netz, Server-Antwort) behält seine eigene Meldung.
-      const { text, kurz, art } = bildFehlerMeldung(e)
-      if (art) protokolliereBildFehler(art, file)
+      // Text; alles andere behält seine eigene Meldung.
+      const { text, kurz } = bildFehlerMeldung(e)
       return { ok: false, message: text, short: kurz }
     }
   }
 
   async function handleSingle(file: File) {
     setIsUploading(true)
+    setProgress({ current: 1, total: 1, prozent: 0 })
     try {
       const result = await uploadOne(file, false)
       if (!result.ok) toast.error(result.message)
     } finally {
+      setProgress(null)
       setIsUploading(false)
       resetInput()
     }
@@ -393,9 +222,11 @@ export function useImageUpload({
     setIsUploading(true)
     let uploaded = 0
     try {
-      // Sequenziell: schont das Rate-Limit, und ein Fehler bricht die Serie nicht ab
+      // Sequenziell: schont die Verbindung, und ein Fehler bricht die Serie
+      // nicht ab. Bei Originalen wiegt das schwerer als vorher — parallel
+      // liefen sonst mehrere 8-MB-Übertragungen gegeneinander.
       for (let i = 0; i < liste.length; i++) {
-        setProgress({ current: i + 1, total: liste.length })
+        setProgress({ current: i + 1, total: liste.length, prozent: 0 })
         const result = await uploadOne(liste[i], true)
         if (result.ok) uploaded++
         else skipped.push({ name: liste[i].name, reason: result.short })
