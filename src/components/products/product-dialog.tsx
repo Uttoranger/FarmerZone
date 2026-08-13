@@ -5,7 +5,7 @@ import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { ImagePlus, X, Leaf, Thermometer, Snowflake } from 'lucide-react'
-import { resizeToWebP, canDecodeImage } from '@/components/shared/image-upload'
+import { resizeToWebP, pruefeDateiVorUpload } from '@/components/shared/image-upload'
 import {
   bildFehlerText,
   bildFehlerMeldung,
@@ -138,12 +138,14 @@ export function ProductDialog({ open, product, onClose }: Props) {
       if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
-    // Format-Probe VOR der Vorschau: ein nicht dekodierbares Foto (z. B. HEIC
-    // auf Android) darf keine kaputte Vorschau hinterlassen. Die vorherige
-    // Auswahl bleibt unangetastet — eine abgelehnte Datei ändert gar nichts.
-    if (!(await canDecodeImage(file))) {
-      protokolliereBildFehler('dekodierung', file)
-      toast.error(bildFehlerText('dekodierung'))
+    // Lese- und Format-Probe VOR der Vorschau: ein nicht lesbares oder nicht
+    // dekodierbares Foto darf keine kaputte Vorschau hinterlassen. Die
+    // vorherige Auswahl bleibt unangetastet — eine abgelehnte Datei ändert gar
+    // nichts. Dieselbe Prüfung und dieselbe Reihenfolge wie im Hook.
+    const vorbefund = await pruefeDateiVorUpload(file)
+    if (vorbefund) {
+      protokolliereBildFehler(vorbefund, file)
+      toast.error(bildFehlerText(vorbefund))
       if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
