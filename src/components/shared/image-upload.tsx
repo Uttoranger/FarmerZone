@@ -8,6 +8,7 @@ import {
   BildFehler,
   bildFehlerMeldung,
   protokolliereBildFehler,
+  IMAGE_NETWORK_ERROR,
   type BildFehlerArt,
 } from '@/lib/upload-fehler'
 import {
@@ -63,26 +64,59 @@ function holeHofKennung(): Promise<string> {
 }
 
 /**
+ * LESE-STUFE — bewusst die erste Stufe geblieben, obwohl der Browser sonst
+ * nichts mehr selbst macht.
+ *
+ * WICHTIG: Die Fehlerklasse „Datei nicht lesbar" ([L]) liegt VOR der App und
+ * wird durch den serverseitigen Umbau nicht geheilt — wenn der Speicherdienst
+ * des Geräts (Android-App-Alben, SD-Backup) die Datei nicht herausgibt, kann
+ * auch kein Server sie bekommen. Ihre Meldung samt „Eigene Dateien"-Ausweg
+ * bleibt zentral. Diese Stufe sorgt dafür, dass der Fall auch als 'lesen'
+ * GEMELDET wird, statt später als diffuser Sendefehler zu erscheinen.
+ */
+const LESE_PROBE_BYTES = 64 * 1024
+
+async function pruefeLesbarkeit(file: File): Promise<void> {
+  try {
+    await file.slice(0, LESE_PROBE_BYTES).arrayBuffer()
+    return
+  } catch {
+    // Noch kein Urteil — erst der Zusatzversuch unten entscheidet.
+  }
+  try {
+    // Manche Speicherdienste verweigern das Teil-Lesen, geben die Datei aber
+    // am Stück heraus — EIN Zusatzversuch mit der ganzen Datei, bevor
+    // 'lesen' feststeht.
+    await file.arrayBuffer()
+  } catch {
+    protokolliereBildFehler('lesen', file)
+    throw new BildFehler('lesen')
+  }
+}
+
+/**
  * Ein Foto hochladen und verarbeiten lassen. Liefert die fertige URL.
  *
- * Zwei Schritte, absichtlich getrennt:
+ * Drei Stufen, absichtlich getrennt:
+ *   0. LESE-STUFE — gibt der Speicherdienst die Datei überhaupt heraus?
+ *      Scheitert sie: Ursache 'lesen', samt „Eigene Dateien"-Ausweg.
  *   1. Original in den Blob-Speicher (signierter Client-Upload).
  *   2. Verarbeitung anstoßen — der Server dreht, verkleinert, kodiert und
  *      löscht das Original.
  *
- * Fehler aus Schritt 1 sind Lese- oder Verbindungsfehler ('lesen'): Entweder
- * gibt der Speicherdienst des Geräts die Datei nicht heraus, oder die
- * Verbindung bricht ab. Beides sieht für den Bauern gleich aus und hat
- * denselben Ausweg — das Foto erst lokal speichern.
- *
- * Fehler aus Schritt 2 bringt der Server als Ursache mit ('format' oder
- * 'server'), damit die Meldung nicht geraten werden muss.
+ * Netz- und Sendefehler aus Stufe 1 und 2 sind BEWUSST nicht Ursache 'lesen':
+ * Die Datei war lesbar (Stufe 0), gescheitert ist die Verbindung. Sie werfen
+ * den schlichten Netzfehler-Text — ohne neue Ursachen-Kategorie. Was der
+ * Server selbst als Ursache mitbringt ('format' oder 'server'), behält seine
+ * Zuordnung.
  */
 export async function ladeFotoHoch(
   file: File,
   zweck: UploadZweck,
   optionen: { altUrl?: string; onFortschritt?: (prozent: number) => void } = {}
 ): Promise<string> {
+  await pruefeLesbarkeit(file)
+
   const farmId = await holeHofKennung()
 
   let hochgeladen: { url: string }
@@ -92,11 +126,11 @@ export async function ladeFotoHoch(
       handleUploadUrl: '/api/upload/token',
       onUploadProgress: ({ percentage }) => optionen.onFortschritt?.(percentage),
     })
-  } catch (e) {
-    // Auch ein abgelehnter Token landet hier. Für den Bauern ist die
-    // Unterscheidung ohne Wert — er kann in beiden Fällen nur dasselbe tun.
-    protokolliereBildFehler('lesen', file)
-    throw e instanceof BildFehler ? e : new BildFehler('lesen')
+  } catch {
+    // Lesbar war die Datei (Stufe 0) — hier scheitert das SENDEN: Verbindung
+    // weg, Übertragung abgerissen, oder der Server hat den Token verweigert.
+    // Für den Bauern ist das ein Fall mit einer Handlung: nochmal versuchen.
+    throw new Error(IMAGE_NETWORK_ERROR)
   }
 
   const antwort = await fetch('/api/upload/verarbeiten', {
@@ -107,8 +141,7 @@ export async function ladeFotoHoch(
 
   if (!antwort) {
     // Die Verbindung ist zwischen Upload und Verarbeitung abgerissen.
-    protokolliereBildFehler('lesen', file)
-    throw new BildFehler('lesen')
+    throw new Error(IMAGE_NETWORK_ERROR)
   }
 
   const daten = (await antwort.json().catch(() => ({}))) as { url?: string; art?: unknown }

@@ -6,10 +6,9 @@
 // Canvas-Arbeit stammten ('dekodierung' und 'kodierung' im alten Sinn), und es
 // bleiben drei, die sich sauber danach trennen, WER gescheitert ist:
 //
-//   lesen    Die Datei kommt gar nicht erst beim Server an. Der Speicherdienst
-//            gibt nichts heraus (Android-App-Alben, SD-Backup) oder die
-//            Verbindung bricht ab. Ein anderes Format hilft NICHT — die Datei
-//            muss erst lokal gespeichert werden.
+//   lesen    Der Speicherdienst des Geräts gibt die Datei nicht heraus
+//            (Android-App-Alben, SD-Backup). Ein anderes Format hilft NICHT —
+//            die Datei muss erst lokal gespeichert werden.
 //
 //   format   Der Server hat die Bytes, kann sie aber nicht als Bild lesen.
 //            Das ist jetzt eine BEWIESENE Aussage: sharp hat es versucht und
@@ -18,6 +17,12 @@
 //
 //   server   Alles Übrige auf unserer Seite. Das ist kein Rat an den Bauern,
 //            sondern ein Eingeständnis: bei uns ist etwas schiefgegangen.
+//
+// Verbindungsabbrüche beim Senden sind BEWUSST keine vierte Ursache: Ein
+// Abbruch sagt nichts über das Foto aus — nach dem Neuversuch im WLAN läuft
+// dieselbe Datei durch. Sie bekommen einen eigenen schlichten Text
+// (IMAGE_NETWORK_ERROR) und laufen als gewöhnlicher Error unverändert durch
+// bildFehlerMeldung, statt eine der Foto-Ursachen zu usurpieren.
 //
 // Was dabei gewonnen ist: Keine dieser Ursachen hängt mehr an einer Fähigkeit
 // des Browsers, die wir nicht kontrollieren. Der Fingerprint-Schutz, an dem sich
@@ -51,7 +56,12 @@ function mitKennung(text: string, buchstabe: 'L' | 'F' | 'S' | 'X'): string {
   return `${text} [${buchstabe}${UPLOAD_DIAG}]`
 }
 
-/** Die Bytes kommen nicht beim Server an — Speicherort oder Verbindung. */
+/**
+ * WICHTIG: Die Fehlerklasse „Datei nicht lesbar" ([L]) liegt VOR der App und
+ * wird durch den serverseitigen Umbau nicht geheilt — der Speicherdienst des
+ * Geräts verweigert die Herausgabe, bevor irgendetwas von uns läuft. Ihre
+ * Meldung samt „Eigene Dateien"-Ausweg bleibt deshalb zentral.
+ */
 export const IMAGE_READ_ERROR = mitKennung(
   'Die Datei konnte nicht aus ihrem Speicherort gelesen werden. Bitte speichere das Foto ' +
     'zuerst über Teilen → „Eigene Dateien" und wähle es von dort aus.',
@@ -74,6 +84,21 @@ export const IMAGE_FORMAT_ERROR = mitKennung(
  */
 export const IMAGE_SERVER_ERROR = mitKennung(
   'Das Bild konnte gerade nicht verarbeitet werden — bitte nochmal versuchen.',
+  'S'
+)
+
+/**
+ * Verbindungsabbruch beim Senden — BEWUSST keine vierte Ursache.
+ *
+ * Ein Abbruch sagt nichts über das Foto; die Ursachen oben beschreiben das
+ * Foto. Darum kein BildFehler: Dieser Text wird als gewöhnlicher `Error`
+ * geworfen und läuft durch bildFehlerMeldung unverändert durch (`art: null`).
+ * Die S-Kennung trägt er trotzdem, weil die Handlungsempfehlung dieselbe ist
+ * wie beim Serverfehler — nochmal versuchen — und ein Bildschirmfoto auch von
+ * dieser Meldung den Code-Stand verraten soll.
+ */
+export const IMAGE_NETWORK_ERROR = mitKennung(
+  'Verbindung unterbrochen — bitte nochmal versuchen.',
   'S'
 )
 

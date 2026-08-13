@@ -29,6 +29,7 @@ import {
   IMAGE_READ_ERROR,
   IMAGE_FORMAT_ERROR,
   IMAGE_SERVER_ERROR,
+  IMAGE_NETWORK_ERROR,
   IMAGE_UNKNOWN_ERROR,
   UPLOAD_DIAG,
 } from '@/lib/upload-fehler'
@@ -94,6 +95,36 @@ describe('Zuordnung Fehlerart → Text', () => {
     for (const art of ALLE_ARTEN) {
       expect(IMAGE_UNKNOWN_ERROR).not.toBe(bildFehlerText(art))
     }
+  })
+})
+
+describe('Netzfehler — bewusst keine vierte Ursache', () => {
+  it('nennt den Abbruch beim Namen und trägt die S-Kennung mit dem Code-Stand', () => {
+    expect(IMAGE_NETWORK_ERROR).toContain('Verbindung unterbrochen')
+    expect(IMAGE_NETWORK_ERROR).toMatch(new RegExp(`\\[S${UPLOAD_DIAG}\\]$`))
+  })
+
+  it('ist keiner der drei Ursachen-Texte', () => {
+    // Insbesondere nicht der Servertext, mit dem er sich die Kennung teilt —
+    // ein Bildschirmfoto muss die beiden Fälle am Wortlaut unterscheiden.
+    for (const art of ALLE_ARTEN) {
+      expect(IMAGE_NETWORK_ERROR).not.toBe(bildFehlerText(art))
+    }
+  })
+
+  it('rät weder zum Format noch zum Speicherort', () => {
+    // Ein Abbruch sagt nichts über das Foto — jeder Rat dazu wäre erfunden.
+    expect(IMAGE_NETWORK_ERROR).not.toMatch(/JPEG|PNG|HEIC|Speicherort|Eigene Dateien/)
+  })
+
+  it('läuft als gewöhnlicher Error unverändert durch die Meldungs-Zuordnung', () => {
+    // Genau so wird er geworfen: als Error, nicht als BildFehler. Er darf
+    // keiner Foto-Ursache zugeordnet werden.
+    expect(bildFehlerMeldung(new Error(IMAGE_NETWORK_ERROR))).toEqual({
+      text: IMAGE_NETWORK_ERROR,
+      kurz: IMAGE_NETWORK_ERROR,
+      art: null,
+    })
   })
 })
 
