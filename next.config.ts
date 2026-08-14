@@ -1,6 +1,26 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // sharp bleibt ein externes Server-Modul (native Binärdateien lassen sich
+  // nicht bundeln). Steht hier ausdrücklich, auch wenn es dem Next-Standard
+  // entspricht — die Absicht soll im Repo dokumentiert sein.
+  serverExternalPackages: ['sharp'],
+
+  // Produktionsfehler „ERR_DLOPEN_FAILED: libvips-cpp.so.8.18.3": Das
+  // Datei-Tracing nimmt sharps JS und sogar das .node-Addon mit, aber NICHT
+  // die libvips-Laufzeitbibliothek (.so), an der das Addon beim Laden hängt.
+  // Deshalb werden die Binärpakete hier ausdrücklich in die
+  // Verarbeitungs-Funktion gepackt. Die Muster greifen auch im pnpm-Layout
+  // (node_modules/sharp und die @img-Pakete sind dort Symlinks in den
+  // .pnpm-Store) — nachgeprüft am Tracing-Manifest der Route: Die .so-Dateien
+  // stehen erst mit diesen Einträgen darin.
+  outputFileTracingIncludes: {
+    '/api/upload/verarbeiten': [
+      './node_modules/@img/**/*',
+      './node_modules/sharp/**/*',
+    ],
+  },
+
   images: {
     remotePatterns: [
       {
