@@ -10,14 +10,30 @@ const nextConfig: NextConfig = {
   // Datei-Tracing nimmt sharps JS und sogar das .node-Addon mit, aber NICHT
   // die libvips-Laufzeitbibliothek (.so), an der das Addon beim Laden hängt.
   // Deshalb werden die Binärpakete hier ausdrücklich in die
-  // Verarbeitungs-Funktion gepackt. Die Muster greifen auch im pnpm-Layout
-  // (node_modules/sharp und die @img-Pakete sind dort Symlinks in den
-  // .pnpm-Store) — nachgeprüft am Tracing-Manifest der Route: Die .so-Dateien
-  // stehen erst mit diesen Einträgen darin.
+  // Verarbeitungs-Funktion gepackt.
+  //
+  // PNPM-SYMLINK-FALLE: Muster wie './node_modules/@img/**/*' treffen unter
+  // pnpm nur Symlinks — die echten Dateien liegen unter node_modules/.pnpm/.
+  // Vercels Paketierung lehnt das ab: „The framework produced an invalid
+  // deployment package for a Serverless Function. Typically this means that
+  // the framework produces files in symlinked directories." Das Muster zeigt
+  // deshalb BEWUSST auf die .pnpm-Realverzeichnisse und müsste bei einem
+  // Wechsel des Paketmanagers angepasst werden. Minimal gehalten: nur die
+  // Binärpakete — sharps eigenes JS kam schon immer korrekt mit.
+  //
+  // Die Realordner stehen mit NAMEN da, nicht als './node_modules/.pnpm/
+  // @img+*/node_modules/@img/**/*': pnpm legt in @img+sharp-linux-x64@*/
+  // node_modules/@img/ einen Dependency-SYMLINK auf sharp-libvips-linux-x64,
+  // und ein breites **-Muster läuft dort hinein — gemessen am Manifest: 12
+  // Datei-Einträge unter Symlink-Vorfahren, dieselbe Klasse, die das
+  // Deployment ablehnt. Zur Laufzeit findet das Addon libvips über seinen
+  // RPATH ($ORIGIN/../../sharp-libvips-linux-x64/lib) durch genau diesen
+  // Symlink — der steht als bloßer Eintrag schon im Manifest des Tracers,
+  // hier müssen nur die echten DATEIEN beider Pakete dazu.
   outputFileTracingIncludes: {
     '/api/upload/verarbeiten': [
-      './node_modules/@img/**/*',
-      './node_modules/sharp/**/*',
+      './node_modules/.pnpm/@img+sharp-libvips-linux-x64@*/node_modules/@img/sharp-libvips-linux-x64/**/*',
+      './node_modules/.pnpm/@img+sharp-linux-x64@*/node_modules/@img/sharp-linux-x64/**/*',
     ],
   },
 
