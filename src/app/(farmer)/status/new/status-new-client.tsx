@@ -10,7 +10,7 @@ import {
   Camera, Loader2, X,
 } from 'lucide-react'
 import { publishStatusPost } from '@/server/actions/status-posts'
-import { useImageUpload } from '@/components/shared/image-upload'
+import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { renderStatusBodyWithChip } from '@/lib/status-body'
@@ -305,7 +305,13 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
                 {photoUpload.isUploading
                   ? <Loader2 className="size-3.5 animate-spin" />
                   : <Camera className="size-3.5" />}
-                {photoUpload.isUploading ? 'Lädt…' : photoUrl ? 'Foto ersetzen' : 'Foto hinzufügen'}
+                {photoUpload.isUploading
+                  ? photoUpload.progress
+                    ? stufenText(photoUpload.progress)
+                    : 'Lädt…'
+                  : photoUrl
+                    ? 'Foto ersetzen'
+                    : 'Foto hinzufügen'}
               </button>
             </div>
 

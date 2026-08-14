@@ -19,7 +19,7 @@ import {
   deleteFarmPhotoAction,
   moveFarmPhotoAction,
 } from '@/server/actions/farm-photos'
-import { useImageUpload } from '@/components/shared/image-upload'
+import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { cn } from '@/lib/utils'
 import type { SectionConfig, FarmPhotoData } from '@/server/queries/appearance'
 
@@ -97,7 +97,7 @@ function LogoUpload({
 }) {
   const [, startTransition] = useTransition()
 
-  const { isUploading, openFilePicker, fileInput } = useImageUpload({
+  const { isUploading, progress, openFilePicker, fileInput } = useImageUpload({
     variant: 'logo',
     oldUrl: logoUrl ?? undefined,
     onUploaded: (url) => {
@@ -163,7 +163,13 @@ function LogoUpload({
           className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg border border-border text-sm font-medium hover:bg-muted/40 transition-colors disabled:opacity-60"
         >
           {isUploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
-          {logoUrl ? 'Logo ersetzen' : 'Logo hochladen'}
+          {/* Die Stufe statt eines stummen Spinners: Seit dem Zeitwächter-Umbau
+              nennt jeder Hänger seinen Ort. */}
+          {isUploading && progress
+            ? stufenText(progress)
+            : logoUrl
+              ? 'Logo ersetzen'
+              : 'Logo hochladen'}
         </button>
         <p className="text-xs text-muted-foreground mt-1">Rundes Logo · max. 800 px · WebP</p>
       </div>
@@ -182,7 +188,7 @@ function BannerPhotoUpload({
 }) {
   const [, startTransition] = useTransition()
 
-  const { isUploading, openFilePicker, fileInput } = useImageUpload({
+  const { isUploading, progress, openFilePicker, fileInput } = useImageUpload({
     variant: 'banner',
     oldUrl: bannerUrl ?? undefined,
     onUploaded: (url) => {
@@ -233,7 +239,12 @@ function BannerPhotoUpload({
           className="w-full h-24 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 hover:bg-muted/30 transition-colors disabled:opacity-60"
         >
           {isUploading ? (
-            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            <>
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">
+                {progress ? stufenText(progress) : 'Lädt…'}
+              </span>
+            </>
           ) : (
             <>
               <Upload className="size-5 text-muted-foreground" />
@@ -426,7 +437,9 @@ function GallerySection({ initialPhotos }: { initialPhotos: FarmPhotoData[] }) {
               Umstellung geht das ORIGINAL über die Leitung (6–8 MB statt
               ~300 kB). Ohne bewegte Zahl sieht das nach Absturz aus. */}
           {progress
-            ? `Lade ${progress.current} von ${progress.total} … ${progress.prozent}%`
+            ? progress.total > 1
+              ? `Foto ${progress.current} von ${progress.total} — ${stufenText(progress)}`
+              : stufenText(progress)
             : isUploading
               ? 'Wird hochgeladen…'
               : 'Fotos hinzufügen'}

@@ -5,7 +5,7 @@ import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { ImagePlus, X, Leaf, Thermometer, Snowflake } from 'lucide-react'
-import { ladeFotoHoch } from '@/components/shared/image-upload'
+import { ladeFotoHoch, stufenText, type UploadStufe } from '@/components/shared/image-upload'
 import { bildFehlerMeldung } from '@/lib/upload-fehler'
 import { MAX_ORIGINAL_BYTES } from '@/lib/upload-pfade'
 import {
@@ -98,6 +98,12 @@ function toFormDefaults(p: ProductData): Partial<ProductFormData> {
 export function ProductDialog({ open, product, onClose }: Props) {
   const isEdit = product !== null
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // Nur während des Foto-Uploads gesetzt — danach zeigt der Knopf wieder
+  // „Speichere…". So nennt auch hier jeder Hänger seinen Ort.
+  const [uploadFortschritt, setUploadFortschritt] = useState<{
+    stufe: UploadStufe
+    prozent: number
+  } | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -175,11 +181,17 @@ export function ProductDialog({ open, product, onClose }: Props) {
         try {
           imageUrl = await ladeFotoHoch(selectedFile, 'product', {
             altUrl: isEdit ? (product.imageUrl ?? undefined) : undefined,
+            onStufe: (stufe) =>
+              setUploadFortschritt((v) => ({ stufe, prozent: v?.prozent ?? 0 })),
+            onFortschritt: (prozent) =>
+              setUploadFortschritt((v) => ({ stufe: v?.stufe ?? 'hochladen', prozent })),
           })
         } catch (e) {
           const { text } = bildFehlerMeldung(e)
           toast.error(text)
           return
+        } finally {
+          setUploadFortschritt(null)
         }
       }
 
@@ -674,7 +686,13 @@ export function ProductDialog({ open, product, onClose }: Props) {
                 Abbrechen
               </Button>
               <Button type="submit" disabled={isSubmitting} className="min-w-[100px]">
-                {isSubmitting ? 'Speichere…' : isEdit ? 'Speichern' : 'Anlegen'}
+                {isSubmitting
+                  ? uploadFortschritt
+                    ? stufenText(uploadFortschritt)
+                    : 'Speichere…'
+                  : isEdit
+                    ? 'Speichern'
+                    : 'Anlegen'}
               </Button>
             </DialogFooter>
           </form>
