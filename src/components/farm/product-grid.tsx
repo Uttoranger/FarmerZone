@@ -15,7 +15,7 @@ import { SHOP_PAUSED_BUTTON_LABEL } from '@/lib/shop-pause'
 import type { PublicProduct } from '@/server/queries/farm'
 import { updateProductImageAction, reorderProductsAction } from '@/server/actions/products'
 import { ReorderContext } from '@/components/shared/reorder-context'
-import { useImageUpload } from '@/components/shared/image-upload'
+import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { CartSheet } from './cart-sheet'
 
 type ReorderItem = { productId: string; productName: string; quantity: number }
@@ -129,7 +129,7 @@ function ProductImageArea({
   const [, startTransition] = useTransition()
   const router = useRouter()
 
-  const { isUploading, openFilePicker, fileInput } = useImageUpload({
+  const { isUploading, progress, openFilePicker, fileInput } = useImageUpload({
     variant: 'product',
     oldUrl: product.imageUrl ?? undefined,
     onUploaded: (url) => {
@@ -203,7 +203,13 @@ function ProductImageArea({
               ? <Loader2 className="size-3 animate-spin" />
               : <Camera className="size-3" strokeWidth={1.7} />
             }
-            {isUploading ? 'Lädt…' : (product.imageUrl ?? product.categoryImageUrl) ? 'Ersetzen' : 'Bild hinzufügen'}
+            {isUploading
+              ? progress
+                ? stufenText(progress)
+                : 'Lädt…'
+              : (product.imageUrl ?? product.categoryImageUrl)
+                ? 'Ersetzen'
+                : 'Bild hinzufügen'}
           </span>
         </button>
       )}

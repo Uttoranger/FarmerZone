@@ -23,7 +23,7 @@ import { ReorderContext } from '@/components/shared/reorder-context'
 import { nextPickupDays, pickupWeekdaysLabel } from '@/lib/pickup-days'
 import { SHOP_PAUSED_FALLBACK } from '@/lib/shop-pause'
 import { buildMapsUrl, buildShareData } from '@/lib/customer-links'
-import { useImageUpload } from '@/components/shared/image-upload'
+import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { ProductGrid } from './product-grid'
 import { stripStatusVariables, renderStatusBodyWithChip } from '@/lib/status-body'
 
@@ -166,7 +166,7 @@ function GallerySection({
 
   const canUpload = isEdit && photos.length < 8
 
-  const { isUploading, openFilePicker, fileInput } = useImageUpload({
+  const { isUploading, progress, openFilePicker, fileInput } = useImageUpload({
     variant: 'gallery',
     onUploaded: (url) => {
       startTransition(async () => {
@@ -332,7 +332,7 @@ function GallerySection({
               <Plus className="size-4" strokeWidth={1.9} />
             </span>
             <span style={{ fontSize: 12, fontWeight: 600, color: '#2D5F3F' }}>
-              {isUploading ? 'Lädt…' : 'Foto hinzufügen'}
+              {isUploading ? (progress ? stufenText(progress) : 'Lädt…') : 'Foto hinzufügen'}
             </span>
           </button>
         )}
@@ -407,7 +407,7 @@ function CoverEditButton({ currentBannerUrl }: { currentBannerUrl: string | null
   const [, startTransition] = useTransition()
   const router = useRouter()
 
-  const { isUploading, openFilePicker, fileInput } = useImageUpload({
+  const { isUploading, progress, openFilePicker, fileInput } = useImageUpload({
     variant: 'banner',
     oldUrl: currentBannerUrl ?? undefined,
     onUploaded: (url) => {
@@ -434,7 +434,7 @@ function CoverEditButton({ currentBannerUrl }: { currentBannerUrl: string | null
         style={{ background: 'rgba(255,255,255,0.94)', color: '#2D5F3F', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}
       >
         <Camera className="size-3.5" strokeWidth={1.7} />
-        {isUploading ? 'Lädt…' : 'Titelbild ersetzen'}
+        {isUploading ? (progress ? stufenText(progress) : 'Lädt…') : 'Titelbild ersetzen'}
       </button>
     </>
   )
