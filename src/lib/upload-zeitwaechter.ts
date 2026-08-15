@@ -11,6 +11,8 @@
  * Reine Logik ohne DOM und ohne Netz, damit sie mit fake timers prüfbar ist.
  */
 
+import { bildFehlerArtVon } from './upload-fehler'
+
 /**
  * 64-KB-Probe der Lese-Stufe. Aus einer gesunden Quelle sind 64 KB in
  * Millisekunden da — wer nach 8 Sekunden nichts geliefert hat, ist nicht
@@ -43,11 +45,13 @@ export const UPLOAD_LIMIT_MS = 180_000
 
 /**
  * Stillstands-Erkennung („Stall"): Während eines lebendigen Transfers kommen
- * Fortschritts-Ereignisse im Sekundentakt oder schneller. 30 s völlige Stille
- * überstehen auch einen Funkzellen-Wechsel — wer länger schweigt, sendet
- * nicht mehr.
+ * Fortschritts-Ereignisse im Sekundentakt oder schneller. Völlige Stille über
+ * dieses Fenster übersteht auch ein Funkzellen-Wechsel — wer länger schweigt,
+ * sendet nicht mehr. Von 30 s auf 45 s angehoben, seit der Transfer gestückelt
+ * läuft: Der Start eines Teilstücks auf einer langsamen Leitung braucht Luft,
+ * bevor sein erstes Fortschritts-Ereignis kommt.
  */
-export const UPLOAD_STILLE_MS = 30_000
+export const UPLOAD_STILLE_MS = 45_000
 
 /**
  * Verarbeiten-Aufruf: Die Route selbst darf höchstens 60 s rechnen
@@ -56,6 +60,62 @@ export const UPLOAD_STILLE_MS = 30_000
  * geantwortet hat, antwortet nicht mehr.
  */
 export const VERARBEITEN_LIMIT_MS = 90_000
+
+/**
+ * Höchstzahl der Transfer-Anläufe: der erste plus genau EIN automatischer
+ * Zweitversuch. Kein dritter — wer zweimal hintereinander abreißt, hat gerade
+ * keine Verbindung, und weitere stumme Versuche würden nur den Netzfehler
+ * hinauszögern, den der Bauer ohnehin bekommt.
+ */
+export const TRANSFER_VERSUCHE = 2
+
+/** Atempause vor dem Zweitversuch — kurz genug, um nicht wie ein Hänger zu
+ *  wirken, lang genug, dass ein Funkloch-Moment vorbeiziehen kann. */
+export const TRANSFER_PAUSE_MS = 2_000
+
+/**
+ * Deterministisches Urteil des Blob-SDK — im Gegensatz zum Transfer-Unfall.
+ *
+ * Alle SDK-Fehler tragen das Präfix „Vercel Blob: " (BlobError setzt es im
+ * Konstruktor); echte Netzfehler kommen dagegen als TypeError. Urteile sind
+ * endgültig: abgelehnter Token (etwa nach abgelaufener Sitzung), verweigerter
+ * Zugriff, falscher Pfad — sie fielen beim Wiederholen genauso, und
+ * „Verbindung unterbrochen" wäre dafür eine falsche Auskunft. Zwei Meldungen
+ * sind KEINE Urteile und bleiben wiederholbar: der Abbruch („The request was
+ * aborted." — den lösen unsere eigenen Wächter aus) und „not available" (so
+ * meldet das SDK auch gescheiterte fetches nach seinen internen
+ * Teil-Wiederholungen).
+ *
+ * Bewusst am Meldungstext erkannt statt per instanceof: Die Klasse hielte
+ * über eine Bundle-Grenze nicht (dieselbe Lehre wie bei BildFehler), und das
+ * Präfix entsteht im BlobError-Konstruktor selbst — stabiler geht es nicht.
+ */
+function istSdkUrteil(fehler: unknown): boolean {
+  if (!(fehler instanceof Error)) return false
+  if (!fehler.message.startsWith('Vercel Blob: ')) return false
+  if (fehler.message.includes('The request was aborted')) return false
+  if (fehler.message.includes('not available')) return false
+  return true
+}
+
+/**
+ * Darf dieser Fehler einen Zweitversuch auslösen — und ist noch einer übrig?
+ *
+ * Wiederholbar sind nur TRANSFER-Unfälle: Stillstand, abgelaufener Deckel,
+ * Netzwurf aus dem Upload selbst. Sie sagen nichts über das Foto — beim
+ * nächsten Anlauf kann dieselbe Datei durchlaufen. NICHT wiederholt werden
+ * Urteile, denn ein Urteil fiele beim Wiederholen genauso: weder die eines
+ * BildFehlers ('format'/'server' aus der Verarbeitungs-Route, 'lesen' aus
+ * der Lese-Stufe) noch die des Blob-SDK (istSdkUrteil) — der Zweitversuch
+ * würde nur Zeit und Datenvolumen verbrennen und dabei fälschlich
+ * „Verbindung unterbrochen" anzeigen.
+ */
+export function darfZweitversuch(fehler: unknown, bisherigeVersuche: number): boolean {
+  if (bisherigeVersuche >= TRANSFER_VERSUCHE) return false
+  if (bildFehlerArtVon(fehler) !== null) return false
+  if (istSdkUrteil(fehler)) return false
+  return true
+}
 
 /**
  * Ein Versprechen mit Verfallszeit.
