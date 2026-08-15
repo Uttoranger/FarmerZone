@@ -10,10 +10,12 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
+  darfZweitversuch,
   mitZeitlimit,
   stillstandsWaechter,
   LESE_PROBE_LIMIT_MS,
   LESE_VOLL_LIMIT_MS,
+  TRANSFER_VERSUCHE,
 } from '@/lib/upload-zeitwaechter'
 import { pruefeLesbarkeit, stufenText } from '@/components/shared/image-upload'
 import {
@@ -119,10 +121,70 @@ describe('stillstandsWaechter (Stall-Erkennung)', () => {
   })
 })
 
+describe('darfZweitversuch — die Retry-Entscheidung', () => {
+  it('erlaubt bei einem Transferfehler den Zweitversuch, solange einer übrig ist', () => {
+    // Transfer-Unfälle sind gewöhnliche Errors ohne Bild-Ursache: der
+    // Netzwurf aus upload(), der Abbruch durch Stillstand oder Deckel.
+    expect(darfZweitversuch(new Error('Verbindung unterbrochen'), 1)).toBe(true)
+    expect(darfZweitversuch(new Error('abgebrochen'), TRANSFER_VERSUCHE - 1)).toBe(true)
+  })
+
+  it('verweigert den dritten Anlauf — der Zweitversuch ist verbraucht', () => {
+    // Mit dem LITERAL 2 festgenagelt: Formulierte der Test die Obergrenze nur
+    // über die Konstante selbst, bestünde ein stilles Hochzählen von
+    // TRANSFER_VERSUCHE jede dieser Prüfungen — und erlaubte unbemerkt einen
+    // dritten Komplett-Upload eines 8-MB-Originals.
+    expect(darfZweitversuch(new Error('Verbindung unterbrochen'), 2)).toBe(false)
+    expect(darfZweitversuch(new Error('Verbindung unterbrochen'), TRANSFER_VERSUCHE)).toBe(false)
+    expect(darfZweitversuch(new Error('Verbindung unterbrochen'), TRANSFER_VERSUCHE + 5)).toBe(false)
+  })
+
+  it('wiederholt kein Urteil des Blob-SDK — ein abgelehnter Token ist keine Verbindungsstörung', () => {
+    // Meldungstexte 1:1 aus @vercel/blob 2.4.0 (BlobError präfixiert im
+    // Konstruktor mit „Vercel Blob: "). Abgelaufene Sitzung → Token-Route
+    // verweigert → dieselbe Ablehnung fiele auch beim zweiten Anlauf.
+    expect(darfZweitversuch(new Error('Vercel Blob: Failed to retrieve the client token'), 1)).toBe(
+      false
+    )
+    expect(darfZweitversuch(new Error('Vercel Blob: Access denied, please provide a valid token for this resource.'), 1)).toBe(
+      false
+    )
+  })
+
+  it('lässt die zwei SDK-Meldungen durch, die keine Urteile sind', () => {
+    // Der Abbruch kommt von unseren eigenen Wächtern; „not available" meldet
+    // das SDK auch für gescheiterte fetches nach internen Wiederholungen —
+    // beides sind Transfer-Unfälle, genau dafür gibt es den Zweitversuch.
+    expect(darfZweitversuch(new Error('Vercel Blob: The request was aborted.'), 1)).toBe(true)
+    expect(
+      darfZweitversuch(
+        new Error('Vercel Blob: The blob service is currently not available. Please try again.'),
+        1
+      )
+    ).toBe(true)
+  })
+
+  it("wiederholt NIEMALS ein Urteil — 'format', 'server' und 'lesen' bleiben endgültig", () => {
+    // Ein BildFehler fiele beim Wiederholen genauso — der Zweitversuch würde
+    // nur Zeit und Datenvolumen verbrennen.
+    for (const art of ['format', 'server', 'lesen'] as const) {
+      expect(darfZweitversuch(new BildFehler(art), 1)).toBe(false)
+    }
+  })
+
+  it('erkennt das Urteil auch ohne instanceof — über die Modulgrenze hinweg', () => {
+    // Dasselbe Loch, das bildFehlerArtVon stopft: Klasse in zwei Bundles.
+    expect(darfZweitversuch({ bildFehlerArt: 'server' }, 1)).toBe(false)
+  })
+})
+
 describe('stufenText — die eine Quelle aller Stufen-Anzeigen', () => {
   it('benennt jede Stufe mit ihrem eigenen Text', () => {
     expect(stufenText({ stufe: 'lesen', prozent: 0 })).toBe('Lese Datei …')
     expect(stufenText({ stufe: 'hochladen', prozent: 47 })).toBe('Lade hoch … 47 %')
+    expect(stufenText({ stufe: 'wiederholen', prozent: 0 })).toBe(
+      'Verbindung unterbrochen — versuche es noch einmal …'
+    )
     expect(stufenText({ stufe: 'verarbeiten', prozent: 0 })).toBe('Verarbeite …')
   })
 
@@ -135,6 +197,7 @@ describe('stufenText — die eine Quelle aller Stufen-Anzeigen', () => {
 
   it('zeigt die Zahl nur beim Hochladen — die anderen Stufen sind nicht messbar', () => {
     expect(stufenText({ stufe: 'lesen', prozent: 99 })).not.toContain('99')
+    expect(stufenText({ stufe: 'wiederholen', prozent: 99 })).not.toContain('99')
     expect(stufenText({ stufe: 'verarbeiten', prozent: 99 })).not.toContain('99')
   })
 })

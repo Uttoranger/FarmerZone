@@ -20,9 +20,11 @@ import {
   KENNUNG_LIMIT_MS,
   LESE_PROBE_LIMIT_MS,
   LESE_VOLL_LIMIT_MS,
+  TRANSFER_PAUSE_MS,
   UPLOAD_LIMIT_MS,
   UPLOAD_STILLE_MS,
   VERARBEITEN_LIMIT_MS,
+  darfZweitversuch,
   mitZeitlimit,
   stillstandsWaechter,
 } from '@/lib/upload-zeitwaechter'
@@ -49,8 +51,9 @@ import {
 
 export type ImageUploadVariant = UploadZweck
 
-/** Die drei Stufen eines Uploads — in dieser Reihenfolge. */
-export type UploadStufe = 'lesen' | 'hochladen' | 'verarbeiten'
+/** Die Stufen eines Uploads in ihrer Reihenfolge — 'wiederholen' ist die
+ *  Ausnahme: die kurze Atempause vor dem automatischen Zweitversuch. */
+export type UploadStufe = 'lesen' | 'hochladen' | 'wiederholen' | 'verarbeiten'
 
 /**
  * Text der laufenden Stufe — EINE Quelle für alle Anzeige-Stellen.
@@ -61,6 +64,7 @@ export type UploadStufe = 'lesen' | 'hochladen' | 'verarbeiten'
  */
 export function stufenText(fortschritt: { stufe: UploadStufe; prozent: number }): string {
   if (fortschritt.stufe === 'lesen') return 'Lese Datei …'
+  if (fortschritt.stufe === 'wiederholen') return 'Verbindung unterbrochen — versuche es noch einmal …'
   if (fortschritt.stufe === 'verarbeiten') return 'Verarbeite …'
   return `Lade hoch … ${Math.round(fortschritt.prozent)} %`
 }
@@ -145,6 +149,94 @@ export async function pruefeLesbarkeit(file: File): Promise<void> {
 }
 
 /**
+ * Der Transfer des Originals — gestückelt, bewacht, mit genau EINEM
+ * automatischen Zweitversuch.
+ *
+ * `multipart: true` lässt das SDK die Datei in Teilstücke zerlegen, parallel
+ * senden und GESCHEITERTE TEILSTÜCKE selbst wiederholen — ein 6–8-MB-Original
+ * als eine einzige Übertragung war auf schwachen Uplinks der Punkt, an dem
+ * die meisten Uploads rissen. Die Fortschritts-Ereignisse kommen auch im
+ * Stückel-Modus (das SDK summiert über die Teile), die Wächter bleiben also
+ * unverändert verdrahtet.
+ *
+ * Reißt der GESAMTE Transfer (Stillstand, Deckel, Netzwurf), folgt nach einer
+ * Atempause genau ein kompletter Neustart: erneuter upload()-Aufruf, also
+ * frisches Token, Fortschritt zurück auf null, sichtbar über die Stufe
+ * 'wiederholen'. Ob ein Fehler das darf, entscheidet darfZweitversuch —
+ * Urteile der Verarbeitungs-Route ('format'/'server') fallen hier nie an,
+ * bleiben aber ausdrücklich unwiederholbar.
+ *
+ * Das Rennen ist die eigentliche Befreiung des Wartenden: @vercel/blob
+ * 2.4.0 reicht das Signal zwar an den Transfer durch, NICHT aber an seine
+ * interne Token-Beschaffung (getToken ruft retrieveClientToken ohne
+ * abortSignal auf) — ein stummer Hänger dort würde das abort() beider
+ * Wächter nie hören. Das Rennen macht den Abbruch in jeder Phase wirksam;
+ * das Signal sorgt zusätzlich dafür, dass der Transfer dort wirklich
+ * endet, wo das SDK es hört.
+ */
+async function uebertrageOriginal(
+  file: File,
+  farmId: string,
+  zweck: UploadZweck,
+  optionen: {
+    onFortschritt?: (prozent: number) => void
+    onStufe?: (stufe: UploadStufe) => void
+  }
+): Promise<{ url: string }> {
+  for (let versuch = 1; ; versuch++) {
+    // Beide Wächter je Anlauf frisch — ein Zweitversuch bekommt die volle Zeit
+    const abbruch = new AbortController()
+    const deckel = setTimeout(() => abbruch.abort(), UPLOAD_LIMIT_MS)
+    const stille = stillstandsWaechter(UPLOAD_STILLE_MS, () => abbruch.abort())
+    // Fortschritts-Ereignisse sind Makrotasks: Ein Nachzügler des gescheiterten
+    // Anlaufs könnte den auf null zurückgesetzten Fortschritt sonst wieder mit
+    // dem alten Prozentwert überschreiben.
+    let lebendig = true
+
+    try {
+      return await Promise.race([
+        upload(originalPfad(farmId, zweck, file.name), file, {
+          access: 'public',
+          handleUploadUrl: '/api/upload/token',
+          multipart: true,
+          abortSignal: abbruch.signal,
+          onUploadProgress: ({ percentage }) => {
+            if (!lebendig) return
+            stille.lebenszeichen()
+            optionen.onFortschritt?.(percentage)
+          },
+        }),
+        new Promise<never>((_, ablehnen) =>
+          abbruch.signal.addEventListener(
+            'abort',
+            () => ablehnen(new Error(IMAGE_NETWORK_ERROR)),
+            { once: true }
+          )
+        ),
+      ])
+    } catch (e) {
+      lebendig = false
+      // Haben UNSERE Wächter abgebrochen, ist es ein Transfer-Unfall — egal,
+      // in welcher Gestalt der Fehler aus dem SDK zurückkommt.
+      const massgeblich = abbruch.signal.aborted ? new Error(IMAGE_NETWORK_ERROR) : e
+      if (!darfZweitversuch(massgeblich, versuch)) {
+        // Lesbar war die Datei (Stufe 0) — gescheitert ist das SENDEN, jetzt
+        // auch im zweiten Anlauf. Für den Bauern bleibt eine Handlung:
+        // selbst nochmal versuchen.
+        throw new Error(IMAGE_NETWORK_ERROR)
+      }
+      optionen.onStufe?.('wiederholen')
+      optionen.onFortschritt?.(0)
+      await new Promise((weiter) => setTimeout(weiter, TRANSFER_PAUSE_MS))
+      optionen.onStufe?.('hochladen')
+    } finally {
+      clearTimeout(deckel)
+      stille.stopp()
+    }
+  }
+}
+
+/**
  * Ein Foto hochladen und verarbeiten lassen. Liefert die fertige URL.
  *
  * Drei Stufen, absichtlich getrennt:
@@ -181,51 +273,7 @@ export async function ladeFotoHoch(
   optionen.onStufe?.('hochladen')
   const farmId = await holeHofKennung()
 
-  // Zwei Wächter für den Transfer: Die Stillstands-Erkennung schlägt zu, wenn
-  // die Fortschritts-Ereignisse verstummen (Flugmodus, tote Funkzelle) — der
-  // harte Deckel ist nur der Rückhalt für den Fall, dass ein Transfer zwar
-  // kriecht, aber nie fertig wird.
-  const abbruch = new AbortController()
-  const deckel = setTimeout(() => abbruch.abort(), UPLOAD_LIMIT_MS)
-  const stille = stillstandsWaechter(UPLOAD_STILLE_MS, () => abbruch.abort())
-
-  let hochgeladen: { url: string }
-  try {
-    // Das Rennen ist die eigentliche Befreiung des Wartenden: @vercel/blob
-    // 2.4.0 reicht das Signal zwar an den Transfer durch, NICHT aber an seine
-    // interne Token-Beschaffung (getToken ruft retrieveClientToken ohne
-    // abortSignal auf) — ein stummer Hänger dort würde das abort() beider
-    // Wächter nie hören. Das Rennen macht den Abbruch in jeder Phase wirksam;
-    // das Signal sorgt zusätzlich dafür, dass der Transfer dort wirklich
-    // endet, wo das SDK es hört.
-    hochgeladen = await Promise.race([
-      upload(originalPfad(farmId, zweck, file.name), file, {
-        access: 'public',
-        handleUploadUrl: '/api/upload/token',
-        abortSignal: abbruch.signal,
-        onUploadProgress: ({ percentage }) => {
-          stille.lebenszeichen()
-          optionen.onFortschritt?.(percentage)
-        },
-      }),
-      new Promise<never>((_, ablehnen) =>
-        abbruch.signal.addEventListener(
-          'abort',
-          () => ablehnen(new Error(IMAGE_NETWORK_ERROR)),
-          { once: true }
-        )
-      ),
-    ])
-  } catch {
-    // Lesbar war die Datei (Stufe 0) — hier scheitert das SENDEN: Verbindung
-    // weg, Übertragung abgerissen oder abgebrochen, oder der Server hat den
-    // Token verweigert. Für den Bauern ist das ein Fall mit einer Handlung:
-    // nochmal versuchen.
-    throw new Error(IMAGE_NETWORK_ERROR)
-  } finally {
-    clearTimeout(deckel)
-    stille.stopp()
-  }
+  const hochgeladen = await uebertrageOriginal(file, farmId, zweck, optionen)
 
   optionen.onStufe?.('verarbeiten')
   const antwort = await fetch('/api/upload/verarbeiten', {
