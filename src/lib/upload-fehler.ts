@@ -58,13 +58,17 @@ function mitKennung(text: string, buchstabe: 'L' | 'F' | 'S' | 'X'): string {
 
 /**
  * WICHTIG: Die Fehlerklasse „Datei nicht lesbar" ([L]) liegt VOR der App und
- * wird durch den serverseitigen Umbau nicht geheilt — der Speicherdienst des
- * Geräts verweigert die Herausgabe, bevor irgendetwas von uns läuft. Ihre
- * Meldung samt „Eigene Dateien"-Ausweg bleibt deshalb zentral.
+ * wird durch keinen Umbau auf unserer Seite geheilt — der Speicherdienst des
+ * Geräts verweigert die Herausgabe, bevor irgendetwas von uns läuft
+ * (cloud-ausgelagerte Fotos in Samsung-/OneDrive-Alben). Die Meldung ist
+ * deshalb ein WEGWEISER auf die drei Wege, die daran vorbeiführen: die
+ * Dokument-Auswahl („Aus Dateien"), die Kamera, und das Teilen an die
+ * installierte App — beim Teilen stellt die Galerie die Bytes selbst bereit,
+ * inklusive Cloud-Abruf.
  */
 export const IMAGE_READ_ERROR = mitKennung(
-  'Die Datei konnte nicht aus ihrem Speicherort gelesen werden. Bitte speichere das Foto ' +
-    'zuerst über Teilen → „Eigene Dateien" und wähle es von dort aus.',
+  'Dieses Foto kann von hier nicht gelesen werden — das passiert bei Cloud-Alben. Wähle es ' +
+    'über ‚Aus Dateien‘, nimm es neu auf, oder teile es aus der Galerie direkt an FarmerZone.',
   'L'
 )
 

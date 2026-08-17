@@ -1,11 +1,12 @@
 ﻿'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { ImagePlus, X, Leaf, Thermometer, Snowflake } from 'lucide-react'
 import { ladeFotoHoch, stufenText, type UploadStufe } from '@/components/shared/image-upload'
+import { useFotoQuellen } from '@/components/shared/foto-quellen'
 import { bildFehlerMeldung } from '@/lib/upload-fehler'
 import { MAX_ORIGINAL_BYTES } from '@/lib/upload-pfade'
 import {
@@ -106,7 +107,11 @@ export function ProductDialog({ open, product, onClose }: Props) {
   } | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  // Drei Wege zum Produktfoto (Galerie, Dateien, Kamera) — derselbe
+  // Quellen-Hook wie im Upload-Hook, damit es nur EIN Menü gibt.
+  const fotoQuellen = useFotoQuellen({
+    onFiles: ([datei]) => uebernehmeFoto(datei),
+  })
 
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productFormSchema) as Resolver<ProductFormData>,
@@ -133,12 +138,9 @@ export function ProductDialog({ open, product, onClose }: Props) {
     }
   }, [previewUrl])
 
-  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+  function uebernehmeFoto(file: File) {
     if (file.size > MAX_ORIGINAL_BYTES) {
       toast.error('Datei zu groß (max. 25 MB)')
-      if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
     // KEINE clientseitige Format-Probe mehr: Sie hing am Canvas, und genau der
@@ -156,7 +158,6 @@ export function ProductDialog({ open, product, onClose }: Props) {
     setSelectedFile(null)
     setPreviewUrl(null)
     form.setValue('imageUrl', '')
-    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   function toggleAllergen(id: string) {
@@ -259,20 +260,14 @@ export function ProductDialog({ open, product, onClose }: Props) {
                     )}
                   </div>
                   <div className="flex-1">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      id="product-image-input"
-                      onChange={handleImageChange}
-                    />
-                    <label
-                      htmlFor="product-image-input"
-                      className={buttonVariants({ variant: 'outline', size: 'sm' }) + ' cursor-pointer'}
+                    {fotoQuellen.elemente}
+                    <button
+                      type="button"
+                      onClick={fotoQuellen.oeffnen}
+                      className={buttonVariants({ variant: 'outline', size: 'sm' })}
                     >
                       {previewUrl ? 'Foto ersetzen' : 'Foto wählen'}
-                    </label>
+                    </button>
                     <p className="text-xs text-muted-foreground/60 mt-1.5">
                       JPEG, PNG oder WebP — wird automatisch verkleinert
                     </p>

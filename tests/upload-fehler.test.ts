@@ -42,10 +42,14 @@ afterEach(() => {
 })
 
 describe('Zuordnung Fehlerart → Text', () => {
-  it('meldet bei nicht lesbarer Datei den Speicherort, nicht das Format', () => {
+  it('weist bei nicht lesbarer Datei die Wege am Cloud-Album vorbei', () => {
+    // Seit dem Quellen-Sprint ist die Meldung ein Wegweiser: Sie nennt die
+    // Ursache (Cloud-Alben) und alle drei Auswege — Dateien, Kamera, Teilen.
     expect(bildFehlerText('lesen')).toBe(IMAGE_READ_ERROR)
-    expect(bildFehlerText('lesen')).toContain('Speicherort')
-    expect(bildFehlerText('lesen')).toContain('Eigene Dateien')
+    expect(bildFehlerText('lesen')).toContain('Cloud-Alben')
+    expect(bildFehlerText('lesen')).toContain('Aus Dateien')
+    expect(bildFehlerText('lesen')).toContain('nimm es neu auf')
+    expect(bildFehlerText('lesen')).toContain('teile es')
     expect(bildFehlerKurz('lesen')).toBe('Datei nicht lesbar')
   })
 
@@ -91,7 +95,7 @@ describe('Zuordnung Fehlerart → Text', () => {
     // Eine falsche Ursache ist schlimmer als gar keine — das ist die Lehre
     // dieser Reihe. Der Rückfall darf weder aufs Format noch auf den
     // Speicherort zeigen.
-    expect(IMAGE_UNKNOWN_ERROR).not.toMatch(/JPEG|PNG|HEIC|Speicherort/)
+    expect(IMAGE_UNKNOWN_ERROR).not.toMatch(/JPEG|PNG|HEIC|Cloud-Alben|Aus Dateien/)
     for (const art of ALLE_ARTEN) {
       expect(IMAGE_UNKNOWN_ERROR).not.toBe(bildFehlerText(art))
     }
@@ -114,7 +118,7 @@ describe('Netzfehler — bewusst keine vierte Ursache', () => {
 
   it('rät weder zum Format noch zum Speicherort', () => {
     // Ein Abbruch sagt nichts über das Foto — jeder Rat dazu wäre erfunden.
-    expect(IMAGE_NETWORK_ERROR).not.toMatch(/JPEG|PNG|HEIC|Speicherort|Eigene Dateien/)
+    expect(IMAGE_NETWORK_ERROR).not.toMatch(/JPEG|PNG|HEIC|Cloud-Alben|Aus Dateien/)
   })
 
   it('läuft als gewöhnlicher Error unverändert durch die Meldungs-Zuordnung', () => {

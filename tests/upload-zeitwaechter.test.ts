@@ -227,11 +227,11 @@ describe('Lese-Stufe unter Zeitwächtern (pruefeLesbarkeit)', () => {
     const fehler = await gefangen
     expect(fehler).toBeInstanceOf(BildFehler)
     expect(bildFehlerArtVon(fehler)).toBe('lesen')
-    // Der bestehende Text samt „Eigene Dateien"-Ausweg — für die stumme Quelle
-    // genauso richtig wie für die laute.
+    // Der Wegweiser-Text — für die stumme Quelle genauso richtig wie für
+    // die laute: Beide brauchen einen Weg am Cloud-Album vorbei.
     expect((fehler as Error).message).toBe(IMAGE_READ_ERROR)
     expect((fehler as Error).message).toContain(`[L${UPLOAD_DIAG}]`)
-    expect((fehler as Error).message).toContain('Eigene Dateien')
+    expect((fehler as Error).message).toContain('Aus Dateien')
   })
 
   it('lässt eine Datei durch, deren Teil-Lesen hängt, deren Komplett-Lesen aber liefert', async () => {
