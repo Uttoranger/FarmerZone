@@ -103,7 +103,7 @@ const SECTION_TITLES = {
 const CTA_HEADLINE = 'Du führst einen Hof und willst dabei sein?'
 const CTA_BUTTON = 'Hof anmelden'
 const CTA_NOTE =
-  'Die Registrierung läuft mit einem persönlichen Einladungscode — schreib uns kurz, dann melden wir uns bei dir.'
+  'Registrieren dauert zwei Minuten — sichtbar wird dein Hof nach einer kurzen persönlichen Freischaltung.'
 // Die Farbe, in die der Hero unten ausläuft — und zugleich die Farbe, die der
 // Seitenhintergrund an dieser Stelle bereits erreicht hat. EINE Konstante für
 // beide, sonst entsteht genau die sichtbare Kante, die es vorher gab.
@@ -480,15 +480,15 @@ export default function HomePage() {
             <h2 className="font-heading text-2xl sm:text-3xl font-semibold text-accent-foreground mb-6 text-balance">
               {CTA_HEADLINE}
             </h2>
-            <a
-              href={CTA_MAILTO}
+            <Link
+              href="/register"
               className="inline-flex items-center gap-2 rounded-full bg-card px-7 py-3.5 text-sm font-semibold text-primary transition-[transform,opacity] duration-[250ms] ease-out hover:opacity-90 hover:-translate-y-0.5 active:translate-y-0"
             >
               {CTA_BUTTON}
               <ArrowRight className="size-4" aria-hidden="true" />
-            </a>
+            </Link>
             {/* Zweitlink, bewusst als Textlink: Der Orange-Akzent gehört dem
-                mailto-Knopf darüber, ein zweiter Knopf würde ihn entwerten.
+                Register-Knopf darüber, ein zweiter Knopf würde ihn entwerten.
                 Wer erst nachlesen will, was es kostet, findet hier den Weg. */}
             <p className="mt-4">
               <Link
@@ -500,6 +500,16 @@ export default function HomePage() {
             </p>
             <p className="mt-1 mx-auto max-w-md text-sm leading-relaxed text-accent-foreground/80">
               {CTA_NOTE}
+            </p>
+            {/* Wer vor der Registrierung ein persönliches Wort will, bekommt
+                den alten Weg als leise Zeile — CTA_MAILTO lebt hier weiter. */}
+            <p className="mt-1">
+              <a
+                href={CTA_MAILTO}
+                className="inline-flex min-h-11 items-center text-sm font-medium text-accent-foreground/90 underline underline-offset-4 transition-opacity hover:opacity-80"
+              >
+                Fragen vorab? Schreib uns.
+              </a>
             </p>
           </div>
         </section>
