@@ -133,6 +133,15 @@ describe('Netzfehler — bewusst keine vierte Ursache', () => {
 })
 
 describe('Diagnose-Kennung', () => {
+  it("steht auf '71' — dem letzten Sprint, der das Upload-Verhalten änderte", () => {
+    // Mit LITERAL festgenagelt (Lehre aus #69): Alle übrigen Kennungs-Tests
+    // prüfen über die Konstante selbst und blieben bei jedem Wert grün —
+    // genau so konnte '64' drei Verhaltensänderungen lang stehenbleiben.
+    // Die Zähl-Regel: bei JEDER Verhaltensänderung am Upload-Ablauf auf die
+    // Sprint-Nummer heben (upload-fehler.ts, DEVELOPMENT.md „Upload-Diagnose").
+    expect(UPLOAD_DIAG).toBe('71')
+  })
+
   it('hängt an jede der drei Meldungen ein eigenes Kürzel mit dem Code-Stand', () => {
     expect(bildFehlerText('lesen')).toMatch(new RegExp(`\\[L${UPLOAD_DIAG}\\]$`))
     expect(bildFehlerText('format')).toMatch(new RegExp(`\\[F${UPLOAD_DIAG}\\]$`))
