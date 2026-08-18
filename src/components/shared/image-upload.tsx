@@ -1,8 +1,9 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import { upload } from '@vercel/blob/client'
+import { useFotoQuellen } from '@/components/shared/foto-quellen'
 import { summarizeUploadBatch, type BatchSkip } from '@/lib/upload-batch'
 import {
   BildFehler,
@@ -111,9 +112,10 @@ function holeHofKennung(): Promise<string> {
  * WICHTIG: Die Fehlerklasse „Datei nicht lesbar" ([L]) liegt VOR der App und
  * wird durch den serverseitigen Umbau nicht geheilt — wenn der Speicherdienst
  * des Geräts (Android-App-Alben, SD-Backup) die Datei nicht herausgibt, kann
- * auch kein Server sie bekommen. Ihre Meldung samt „Eigene Dateien"-Ausweg
- * bleibt zentral. Diese Stufe sorgt dafür, dass der Fall auch als 'lesen'
- * GEMELDET wird, statt später als diffuser Sendefehler zu erscheinen.
+ * auch kein Server sie bekommen. Ihre Meldung ist deshalb der Wegweiser auf
+ * die Wege daran vorbei (Dateien, Kamera, Teilen an die App). Diese Stufe
+ * sorgt dafür, dass der Fall auch als 'lesen' GEMELDET wird, statt später
+ * als diffuser Sendefehler zu erscheinen.
  */
 const LESE_PROBE_BYTES = 64 * 1024
 
@@ -121,7 +123,7 @@ const LESE_PROBE_BYTES = 64 * 1024
  * Beide Lesewege stehen unter Zeitwächtern: Ein defekter Speicherdienst kann
  * beim arrayBuffer() auch STUMM stehenbleiben — weder Bytes noch Fehler. Für
  * den Bauern ist die stumme Quelle dasselbe wie die laute: Die Datei kommt
- * nicht heraus, der „Eigene Dateien"-Ausweg gilt genauso. Schlimmster Fall
+ * nicht heraus, die Wegweiser-Auswege gelten genauso. Schlimmster Fall
  * jetzt: 8 + 20 = 28 Sekunden bis zur klaren Meldung — statt nie.
  *
  * Exportiert für den Verhaltens-Test (tests/upload-zeitwaechter.test.ts).
@@ -241,7 +243,7 @@ async function uebertrageOriginal(
  *
  * Drei Stufen, absichtlich getrennt:
  *   0. LESE-STUFE — gibt der Speicherdienst die Datei überhaupt heraus?
- *      Scheitert sie: Ursache 'lesen', samt „Eigene Dateien"-Ausweg.
+ *      Scheitert sie: Ursache 'lesen', samt Wegweiser-Auswegen.
  *   1. Original in den Blob-Speicher (signierter Client-Upload).
  *   2. Verarbeitung anstoßen — der Server dreht, verkleinert, kodiert und
  *      löscht das Original.
@@ -348,16 +350,6 @@ export function useImageUpload({
     prozent: number
     stufe: UploadStufe
   } | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  function openFilePicker() {
-    fileInputRef.current?.click()
-  }
-
-  function resetInput() {
-    if (fileInputRef.current) fileInputRef.current.value = ''
-  }
-
   async function uploadOne(file: File, batch: boolean): Promise<UploadResult> {
     if (file.size > MAX_ORIGINAL_BYTES) {
       return { ok: false, message: 'Datei zu groß (max. 25 MB)', short: 'zu groß (max. 25 MB)' }
@@ -392,7 +384,6 @@ export function useImageUpload({
     } finally {
       setProgress(null)
       setIsUploading(false)
-      resetInput()
     }
   }
 
@@ -404,7 +395,6 @@ export function useImageUpload({
     if (typeof maxFiles === 'number' && liste.length > maxFiles) {
       if (maxFiles <= 0) {
         toast.error('Kein Platz mehr — bitte zuerst Fotos entfernen.')
-        resetInput()
         return
       }
       for (const f of liste.slice(maxFiles)) {
@@ -428,7 +418,6 @@ export function useImageUpload({
     } finally {
       setProgress(null)
       setIsUploading(false)
-      resetInput()
     }
 
     const text = summarizeUploadBatch(uploaded, skipped)
@@ -437,24 +426,22 @@ export function useImageUpload({
     else toast.success(text)
   }
 
-  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? [])
-    if (files.length === 0) return
-    // Einzelauswahl behält ihren bisherigen Weg samt Einzelmeldungen
-    if (!multiple || files.length === 1) void handleSingle(files[0])
-    else void handleSeries(files)
+  // Drei Auswahlwege (Galerie, Dateien, Kamera) hinter dem bisherigen
+  // Auslöser — die Aufrufer merken davon nichts: openFilePicker öffnet am
+  // Touch-Gerät das Quellen-Menü, fileInput trägt Inputs und Menü.
+  const quellen = useFotoQuellen({
+    multiple,
+    onFiles: (dateien) => {
+      // Einzelauswahl behält ihren bisherigen Weg samt Einzelmeldungen
+      if (!multiple || dateien.length === 1) void handleSingle(dateien[0])
+      else void handleSeries(dateien)
+    },
+  })
+
+  return {
+    isUploading,
+    progress,
+    openFilePicker: quellen.oeffnen,
+    fileInput: quellen.elemente,
   }
-
-  const fileInput = (
-    <input
-      ref={fileInputRef}
-      type="file"
-      accept="image/*"
-      multiple={multiple}
-      className="hidden"
-      onChange={handleInputChange}
-    />
-  )
-
-  return { isUploading, progress, openFilePicker, fileInput }
 }

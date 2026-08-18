@@ -23,6 +23,16 @@ const DEV_ACCOUNTS = [
  */
 export function LoginClient() {
   const router = useRouter()
+
+  // Rückkehr nach dem Login — ausschließlich zum Teilen-Ziel: /teilen schickt
+  // Ausgeloggte mit ?von=/teilen hierher, damit die geteilten Fotos nach dem
+  // Login nicht in der Ablage stranden. Streng auf exakt '/teilen' geprüft;
+  // alles andere wäre ein offener Redirect und damit ein Phishing-Helfer.
+  function zielNachLogin(): string {
+    const von = new URLSearchParams(window.location.search).get('von')
+    return von === '/teilen' ? '/teilen' : '/dashboard'
+  }
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fehler, setFehler] = useState('')
@@ -37,7 +47,7 @@ export function LoginClient() {
       setLaedt(false)
       return
     }
-    router.push('/dashboard')
+    router.push(zielNachLogin())
     router.refresh()
   }
 
@@ -54,7 +64,7 @@ export function LoginClient() {
       return
     }
 
-    router.push('/dashboard')
+    router.push(zielNachLogin())
     router.refresh()
   }
 
