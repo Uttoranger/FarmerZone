@@ -376,6 +376,12 @@ Tabelle echte Policies.
 
 ---
 
+## Upload-Diagnose
+
+Jede Upload-Fehlermeldung endet auf eine Kennung wie `[L71]` — Buchstabe für die Ursache, Zahl für den Code-Stand (`UPLOAD_DIAG` in `src/lib/upload-fehler.ts`). Bei JEDER Verhaltensänderung am Upload-Ablauf muss die Zahl auf die Nummer des Sprints gehoben werden — eine veraltete Kennung ist schlimmer als keine, weil ein zugeschicktes Bildschirmfoto dann den falschen Stand behauptet.
+
+---
+
 ## Nützliche Befehle
 
 ```bash

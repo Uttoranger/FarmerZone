@@ -43,13 +43,17 @@ export type BildFehlerArt = 'lesen' | 'format' | 'server'
  * der nur auf fremden Geräten auftritt, ist das der Unterschied zwischen
  * „gefixt" und „vielleicht gefixt".
  *
- * Von '62' auf '64' gezählt, weil dieser Umbau die Ursachen selbst ausgetauscht
- * hat: Ein „[F62]" auf einem Bildschirmfoto stammt aus der Canvas-Zeit, ein
- * „[F64]" vom Server. Die Zahl wird bei künftigen Upload-Änderungen weiter
- * hochgezählt. Nach der Stabilisierung wird das Werkzeug wieder entfernt:
- * Kennung hier löschen, die Meldungen enden dann wieder auf ihren letzten Satz.
+ * DIE ZÄHL-REGEL: Bei JEDER Verhaltensänderung am Upload-Ablauf auf die
+ * Nummer des Sprints heben — eine veraltete Kennung ist schlimmer als keine,
+ * denn sie behauptet einen Stand, der nicht mehr stimmt. Genau das war
+ * passiert: '64' blieb stehen, während #66 (Zeitwächter), #69 (Stückelung
+ * und Zweitversuch) und #71 (Quellen) das Verhalten änderten. Die Regel
+ * steht auch in DEVELOPMENT.md („Upload-Diagnose") und ist im Test mit
+ * Literal festgenagelt. Nach der Stabilisierung wird das Werkzeug wieder
+ * entfernt: Kennung hier löschen, die Meldungen enden dann wieder auf ihren
+ * letzten Satz.
  */
-export const UPLOAD_DIAG = '64'
+export const UPLOAD_DIAG = '71'
 
 /** Hängt die Kennung an eine Meldung. Ein Ort, alle Meldungen. */
 function mitKennung(text: string, buchstabe: 'L' | 'F' | 'S' | 'X'): string {

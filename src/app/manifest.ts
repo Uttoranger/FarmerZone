@@ -14,6 +14,13 @@ import type { MetadataRoute } from 'next'
  *
  * Farben aus den Haus-Tokens (globals.css), in Hex umgerechnet:
  * --primary oklch(0.30 0.082 155) → #00391A, --background → #F8F2E5.
+ *
+ * TYP-VERANKERUNG: share_target ist Teil des OFFIZIELLEN Next-Typs
+ * MetadataRoute.Manifest (next/dist/lib/metadata/types/manifest-types.d.ts,
+ * `share_target?` mit `params.files` als `{ name, accept }` — Stand Next
+ * 16.2.6) — kein Cast, keine strukturelle Lücke. Sollte ein Next-Update das
+ * Feld je entfernen, schlägt `pnpm typecheck` GENAU HIER an, statt das
+ * Teilen-Ziel lautlos wegzutypisieren.
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {

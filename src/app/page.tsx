@@ -452,7 +452,9 @@ export default function HomePage() {
             NICHT row-2 — das zeigt seit dem Bildtausch einen Bauern im
             Scheunentor und wird oben als Bildzeile verwendet; als Band hinter
             Text würde die Person angeschnitten und vom Overlay verdeckt.
-            Auch nicht hero-poster: dasselbe Motiv wie ganz oben. */}
+            Auch nicht hero-poster: dasselbe Motiv wie ganz oben.
+            corn-1/corn-3: ungenutzte Reserve-Standbilder aus dem Hero-Clip —
+            sie bleiben als dokumentierte Tausch-Kandidaten liegen. */}
         <section className="relative isolate overflow-hidden py-24 md:py-32 mb-20 md:mb-28">
           <Image
             src="/landing/corn-2.jpg"
