@@ -12,6 +12,7 @@ import { OrderNotReadyEmail } from '@/emails/order-not-ready'
 import { CustomerMagicLinkEmail } from '@/emails/customer-magic-link'
 import { PasswordResetEmail } from '@/emails/password-reset'
 import { NewFarmNotificationEmail } from '@/emails/new-farm-notification'
+import { FreischaltungEmail } from '@/emails/freischaltung'
 import { SUPPORT_EMAIL } from '@/lib/support'
 import { StatusUpdateEmail } from '@/emails/status-update'
 import { generateReorderToken } from '@/lib/reorder-token'
@@ -147,6 +148,23 @@ export async function sendNewFarmNotification(farm: {
     })
   )
   await send(SUPPORT_EMAIL, `Neuer Hof wartet auf Freischaltung: ${farm.name}`, html)
+}
+
+/**
+ * Freischalt-Zusage → Hof-Inhaber.
+ *
+ * Das Gegenstück zu sendNewFarmNotification: Dort erfährt der Betreiber vom
+ * neuen Hof, hier erfährt der Hof von seiner Freischaltung. Alle Wartetexte
+ * der App versprechen diese Mail.
+ */
+export async function sendFreischaltungEmail(farm: {
+  name: string
+  slug: string
+  ownerEmail: string
+}): Promise<void> {
+  const farmUrl = `${APP_URL}/${farm.slug}`
+  const html = await toHtml(React.createElement(FreischaltungEmail, { farmName: farm.name, farmUrl }))
+  await send(farm.ownerEmail, 'Dein Hof ist freigeschaltet', html)
 }
 
 /** Online-Zahlung bestätigt → Kunde */

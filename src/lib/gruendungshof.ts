@@ -75,23 +75,20 @@ export const GRUENDUNGS_ZAHLUNGSGEBUEHREN =
   'Barzahlung bei Abholung ist gebührenfrei. Die aktuellen Sätze siehst du beim ' +
   'Einrichten der Online-Zahlung, bevor du sie aktivierst.'
 
-/** Der Weg auf die Plattform, in vier Schritten. */
+/** Der Weg auf die Plattform, in drei Schritten — durchgängig automatisch,
+ *  nur die Freischaltung selbst ist ein bewusster Handgriff des Betreibers. */
 export const GRUENDUNGS_AUFNAHME_SCHRITTE = [
   {
     titel: 'Registrieren',
-    text: 'Konto anlegen — Name, E-Mail, Passwort. Mehr braucht es dafür nicht.',
+    text: 'Dauert zwei Minuten — Name, E-Mail, Passwort, und du kannst sofort loslegen.',
   },
   {
     titel: 'Hof einrichten',
-    text: 'Hofprofil, Produkte, Abholzeiten und Fotos. Das geht sofort und in Ruhe, auch vor der Freischaltung.',
-  },
-  {
-    titel: 'Wir melden uns persönlich',
-    text: 'Kein anonymes Prüfverfahren: Wir schauen uns den Hof an und sprechen mit dir.',
+    text: 'Produkte, Fotos, Abholzeiten. Alles geht schon vor der Freischaltung, in Ruhe.',
   },
   {
     titel: 'Freischaltung',
-    text: 'Ab dann ist deine Hofseite öffentlich erreichbar und Kundinnen können bestellen.',
+    text: 'Der Betreiber prüft kurz — du bekommst automatisch eine E-Mail, sobald dein Hof öffentlich ist.',
   },
 ] as const
 

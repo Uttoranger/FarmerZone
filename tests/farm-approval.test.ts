@@ -37,12 +37,14 @@ vi.mock('@/lib/stripe', () => ({ stripe: { paymentIntents: { create: vi.fn() } }
 vi.mock('@/lib/email', () => ({
   sendOnsiteConfirmation: vi.fn(),
   sendNewFarmNotification: vi.fn(),
+  sendFreischaltungEmail: vi.fn(),
 }))
 
 import { POST as checkoutPOST } from '@/app/api/checkout/route'
 import { POST as reservePOST } from '@/app/api/reserve/route'
 import { getPublicFarm } from '@/server/queries/farm'
 import { approveFarmAction, revokeFarmApprovalAction } from '@/server/actions/admin'
+import { sendFreischaltungEmail } from '@/lib/email'
 import { registerFarmer } from '@/server/actions/register'
 import { generateFormToken, MIN_FORM_AGE_MS } from '@/lib/form-token'
 import { createFarm } from '@/server/actions/onboarding'
@@ -64,6 +66,7 @@ const reservationAggregate = vi.mocked(prisma.stockReservation.aggregate)
 const reservationDeleteMany = vi.mocked(prisma.stockReservation.deleteMany)
 const reservationUpsert = vi.mocked(prisma.stockReservation.upsert)
 const userFindUnique = vi.mocked(prisma.user.findUnique)
+const freischaltMail = vi.mocked(sendFreischaltungEmail)
 const userUpdate = vi.mocked(prisma.user.update)
 const orderCreate = vi.mocked(prisma.order.create)
 const paymentIntentCreate = vi.mocked(stripe.paymentIntents.create)
@@ -298,7 +301,11 @@ describe('öffentliche Hof-Query', () => {
 describe('Freigabe-Actions', () => {
   it('schaltet mit isAdmin frei und setzt approvedAt auf einen Zeitstempel', async () => {
     userFindUnique.mockResolvedValue({ isAdmin: true } as never)
-    farmFindUnique.mockResolvedValue({ slug: 'testhof' } as never)
+    farmFindUnique.mockResolvedValue({
+      name: 'Testhof',
+      slug: 'testhof',
+      owner: { email: 'bauer@testhof.at' },
+    } as never)
 
     const result = await approveFarmAction('farm_1')
 
@@ -308,7 +315,44 @@ describe('Freigabe-Actions', () => {
     expect(arg.data.approvedAt).toBeInstanceOf(Date)
   })
 
-  it('nimmt mit isAdmin die Freigabe zurück (approvedAt = null)', async () => {
+  it('verschickt nach der Freischaltung die Zusage-Mail an den Inhaber', async () => {
+    // Das automatische Glied der Aufnahme: Alle Wartetexte versprechen diese
+    // Mail — hier steht fest, dass sie beim EINEN Admin-Klick wirklich fällt.
+    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    farmFindUnique.mockResolvedValue({
+      name: 'Testhof',
+      slug: 'testhof',
+      owner: { email: 'bauer@testhof.at' },
+    } as never)
+
+    await approveFarmAction('farm_1')
+
+    expect(freischaltMail).toHaveBeenCalledTimes(1)
+    expect(freischaltMail).toHaveBeenCalledWith({
+      name: 'Testhof',
+      slug: 'testhof',
+      ownerEmail: 'bauer@testhof.at',
+    })
+  })
+
+  it('lässt die Freischaltung gelingen, auch wenn die Mail scheitert', async () => {
+    // Der Hof ist ab dem Update öffentlich — eine kaputte Mail-Infrastruktur
+    // darf das nicht rückgängig erscheinen lassen.
+    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    farmFindUnique.mockResolvedValue({
+      name: 'Testhof',
+      slug: 'testhof',
+      owner: { email: 'bauer@testhof.at' },
+    } as never)
+    freischaltMail.mockRejectedValueOnce(new Error('Resend down'))
+
+    const result = await approveFarmAction('farm_1')
+
+    expect(result.error).toBeUndefined()
+    expect(farmUpdate).toHaveBeenCalledTimes(1)
+  })
+
+  it('nimmt mit isAdmin die Freigabe zurück (approvedAt = null) — und schweigt dabei', async () => {
     userFindUnique.mockResolvedValue({ isAdmin: true } as never)
     farmFindUnique.mockResolvedValue({ slug: 'testhof' } as never)
 
@@ -317,6 +361,9 @@ describe('Freigabe-Actions', () => {
     expect(result.error).toBeUndefined()
     const arg = farmUpdate.mock.calls[0][0] as { data: { approvedAt: null } }
     expect(arg.data.approvedAt).toBeNull()
+    // Bewusst KEINE Mail bei der Zurücknahme — heikle Kommunikation gehört
+    // dem Betreiber persönlich (Kommentar an revokeFarmApprovalAction).
+    expect(freischaltMail).not.toHaveBeenCalled()
   })
 
   it('lehnt ohne isAdmin ab, obwohl eine gültige Session besteht — und ändert nichts', async () => {
