@@ -56,7 +56,7 @@ export type ErsteSchritteErgebnis = {
  * lohnt, sie jetzt abzuarbeiten statt später.
  */
 export const ERSTE_SCHRITTE_WARTET =
-  'Arbeite die Liste am besten jetzt schon ab — dann steht dein Hof fertig da, sobald die Freischaltung durch ist.'
+  'Arbeite die Liste am besten jetzt schon ab — dann steht dein Hof fertig da, sobald die Freischaltungs-Mail kommt.'
 
 /**
  * Berechnet Punkte und Fortschritt.

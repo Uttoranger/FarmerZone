@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { ZurueckLink } from '@/components/shared/zurueck-link'
 import { KONTAKT_EMAIL } from '@/lib/support'
 import {
@@ -82,22 +83,23 @@ export default function KonditionenPage() {
           </section>
 
           <section>
-            <h2 className="font-semibold text-slate-800 text-base mb-3">Interesse?</h2>
-            <p className="mb-4">
-              Schreib uns kurz, worum es bei deinem Hof geht — wir melden uns persönlich.
-            </p>
+            <h2 className="font-semibold text-slate-800 text-base mb-3">Loslegen</h2>
             {/* Kein Orange: der eine Akzent der Startseite bleibt dort. Hier
-                genügt der Primärton der Rechtsseiten. */}
-            <a
-              href={CTA_MAILTO}
+                genügt der Primärton der Rechtsseiten. Die Registrierung ist
+                offen — der Weg führt direkt in die App, nicht mehr ins
+                Mail-Programm (Muster wie der Startseiten-CTA seit #70). */}
+            <Link
+              href="/register"
               className="inline-flex min-h-11 items-center rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
             >
-              Hof anmelden
-            </a>
-            <p className="mt-3 text-xs text-muted-foreground break-words">
-              oder direkt an{' '}
-              <a href={CTA_MAILTO} className="text-primary hover:underline break-all">
-                {KONTAKT_EMAIL}
+              Hof registrieren
+            </Link>
+            <p className="mt-3">
+              <a
+                href={CTA_MAILTO}
+                className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline underline-offset-4 hover:opacity-80"
+              >
+                Fragen vorab? Schreib uns.
               </a>
             </p>
           </section>

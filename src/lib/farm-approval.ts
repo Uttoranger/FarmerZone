@@ -30,11 +30,12 @@ export const FARM_PENDING_OWNER_BANNER =
 /** Erklärung unter dem Balken: was der Bauer jetzt schon tun kann. */
 export const FARM_PENDING_OWNER_HINT =
   'Du kannst schon alles einrichten: Produkte, Fotos, Abholzeiten und dein Profil. ' +
-  'Sobald wir deinen Hof freischalten, ist er sofort öffentlich erreichbar.'
+  'Sobald dein Hof freigeschaltet ist, bekommst du eine E-Mail und er ist sofort öffentlich erreichbar.'
 
 /** Hinweis nach der Registrierung, bevor der Hof eingerichtet ist. */
 export const FARM_PENDING_AFTER_SIGNUP =
-  'Wir prüfen deinen Hof und melden uns bei dir. Bis dahin kannst du alles in Ruhe einrichten.'
+  'Dein Hof wird kurz geprüft. Du bekommst eine E-Mail, sobald er freigeschaltet ist — ' +
+  'bis dahin kannst du alles in Ruhe einrichten.'
 
 // === ABLEHNEN & LÖSCHEN ===
 //

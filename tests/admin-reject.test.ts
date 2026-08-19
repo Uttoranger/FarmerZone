@@ -18,6 +18,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+// admin.ts zieht seit der Freischalt-Mail @/lib/email herein (server-only) —
+// dieselbe Mock-Grenze wie in farm-approval.test.ts
+vi.mock('@/lib/email', () => ({ sendFreischaltungEmail: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {

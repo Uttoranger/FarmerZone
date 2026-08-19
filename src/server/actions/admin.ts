@@ -4,6 +4,7 @@ import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { sendFreischaltungEmail } from '@/lib/email'
 import {
   FARM_REJECT_APPROVED_MESSAGE,
   FARM_REJECT_HAS_DATA_MESSAGE,
@@ -38,22 +39,51 @@ function revalidateAll(slug: string) {
   revalidatePath(`/${slug}`)
 }
 
-/** Hof freischalten: ab jetzt öffentlich sichtbar und bestellbar. */
+/**
+ * Hof freischalten: ab jetzt öffentlich sichtbar und bestellbar.
+ *
+ * Dieser EINE Admin-Klick bleibt Absicht — er vergibt den Gründungsplatz und
+ * ist die Schleuse gegen Bot-Anmeldungen. Alles davor (Registrierung,
+ * Einrichten) und danach (die Zusage-Mail hier) läuft automatisch.
+ */
 export async function approveFarmAction(farmId: string): Promise<{ error?: string }> {
   const guard = await requireAdmin()
   if ('error' in guard) return { error: guard.error }
 
-  const farm = await prisma.farm.findUnique({ where: { id: farmId }, select: { slug: true } })
+  const farm = await prisma.farm.findUnique({
+    where: { id: farmId },
+    select: { name: true, slug: true, owner: { select: { email: true } } },
+  })
   if (!farm) return { error: 'Hof nicht gefunden.' }
 
   await prisma.farm.update({ where: { id: farmId }, data: { approvedAt: new Date() } })
   revalidateAll(farm.slug)
+
+  // Die Zusage an den Hof — NACH dem erfolgreichen Update. Ein Mail-Fehler
+  // darf die Freischaltung nicht scheitern lassen: Der Hof ist ab hier
+  // öffentlich, die Nachricht lässt sich notfalls von Hand nachholen.
+  try {
+    await sendFreischaltungEmail({
+      name: farm.name,
+      slug: farm.slug,
+      ownerEmail: farm.owner.email,
+    })
+  } catch (e) {
+    // Log-Hygiene wie in onboarding.ts: nur außerhalb der Produktion.
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[DEV] Freischalt-Mail fehlgeschlagen: ${e instanceof Error ? e.message : e}`)
+    }
+  }
   return {}
 }
 
 /**
  * Freigabe zurücknehmen: die Hofseite verschwindet wieder, Bestellungen werden
  * abgelehnt. Es wird NICHTS gelöscht — der Bauer behält Zugang zu allen Daten.
+ *
+ * Bewusst KEINE automatische Mail: Die Zurücknahme ist heikle Kommunikation
+ * und gehört dem Betreiber persönlich — ein Automat, der „dein Hof ist wieder
+ * offline" verschickt, würde mehr beschädigen als erklären.
  */
 export async function revokeFarmApprovalAction(farmId: string): Promise<{ error?: string }> {
   const guard = await requireAdmin()
