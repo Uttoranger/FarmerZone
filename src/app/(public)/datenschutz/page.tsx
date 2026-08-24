@@ -181,8 +181,19 @@ export default function DatenschutzPage() {
             </p>
           </Section>
 
+          <Section title="Standortsuche und Kartendarstellung">
+            <p>
+              Gibt ein Hof im Hofprofil seine Adresse ein, wird diese Adresse (Straße, PLZ,
+              Ort) zur Standortsuche an den Geokodierungsdienst Photon (komoot GmbH,
+              photon.komoot.io) übermittelt — es handelt sich um die Betriebsadresse des
+              Hofes, nicht um Daten von Besucherinnen. Kartenkacheln (OpenStreetMap) werden
+              über unsere eigene Server-Infrastruktur ausgeliefert; beim Betrachten der
+              Karte findet keine Übermittlung von Besucherdaten an Kartenanbieter statt.
+            </p>
+          </Section>
+
           <p className="text-xs text-muted-foreground pt-4 border-t border-border">
-            Stand: Juni 2026
+            Stand: August 2026
           </p>
         </div>
       </div>

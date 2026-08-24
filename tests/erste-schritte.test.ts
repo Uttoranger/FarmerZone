@@ -17,6 +17,7 @@ import { ersteSchritte, type ErsteSchritteDaten } from '@/lib/erste-schritte'
 /** Ein Hof direkt nach der Registrierung: nichts eingerichtet. */
 const FRISCH: ErsteSchritteDaten = {
   hatBeschreibung: false,
+  hatKoordinaten: false,
   hatLogo: false,
   hatTitelbild: false,
   produkte: 0,
@@ -27,6 +28,7 @@ const FRISCH: ErsteSchritteDaten = {
 /** Ein eingespielter Hof: alles erledigt, auch die Online-Zahlung. */
 const FERTIG: ErsteSchritteDaten = {
   hatBeschreibung: true,
+  hatKoordinaten: true,
   hatLogo: true,
   hatTitelbild: true,
   produkte: 4,
@@ -82,9 +84,15 @@ describe('Reihenfolge', () => {
 })
 
 describe('einzelne Bedingungen', () => {
-  it('Hofprofil hängt an der Beschreibung', () => {
+  it('Hofprofil verlangt Beschreibung UND bestätigten Kartenpunkt', () => {
+    // Seit dem Standort-Sprint reicht die Beschreibung allein nicht mehr:
+    // Kundinnen sollen den Hof später auf einer Karte finden.
     expect(statusVon(FRISCH, 'profil')).toBe(false)
-    expect(statusVon({ ...FRISCH, hatBeschreibung: true }, 'profil')).toBe(true)
+    expect(statusVon({ ...FRISCH, hatBeschreibung: true }, 'profil')).toBe(false)
+    expect(statusVon({ ...FRISCH, hatKoordinaten: true }, 'profil')).toBe(false)
+    expect(statusVon({ ...FRISCH, hatBeschreibung: true, hatKoordinaten: true }, 'profil')).toBe(
+      true
+    )
   })
 
   it('Auftritt verlangt Logo UND Titelbild — eines allein genügt nicht', () => {
@@ -119,10 +127,12 @@ describe('einzelne Bedingungen', () => {
 
 describe('Zwischenstände', () => {
   it('zählt eine Kombination richtig und rechnet den Anteil aus', () => {
-    // Profil, Produkt und Abholzeiten erledigt — Auftritt und Zahlung offen
+    // Profil (Beschreibung + Kartenpunkt), Produkt und Abholzeiten erledigt —
+    // Auftritt und Zahlung offen
     const ergebnis = ersteSchritte({
       ...FRISCH,
       hatBeschreibung: true,
+      hatKoordinaten: true,
       produkte: 2,
       aktiveAbholzeiten: 1,
     })

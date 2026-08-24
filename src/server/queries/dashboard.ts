@@ -133,6 +133,8 @@ export async function getDashboardStats(farmId: string) {
       where: { id: farmId },
       select: {
         description: true,
+        latitude: true,
+        longitude: true,
         logoUrl: true,
         bannerType: true,
         bannerUrl: true,
@@ -179,6 +181,7 @@ export async function getDashboardStats(farmId: string) {
       // Onboarding aber ein optionales Feld — ein Hof ohne Beschreibung trägt
       // einen leeren String, kein null. Ein `!== null` ginge hier immer durch.
       hatBeschreibung: (hofStammdaten?.description ?? '').trim().length > 0,
+      hatKoordinaten: hofStammdaten?.latitude != null && hofStammdaten?.longitude != null,
       hatLogo: (hofStammdaten?.logoUrl ?? '').trim().length > 0,
       // Dieselbe Bedingung, mit der die Hofseite entscheidet, ob sie ein Foto
       // oder einen Farbverlauf zeigt (farm-page-view.tsx:665–668). Ein Verlauf
