@@ -37,12 +37,7 @@ const profileSchema = z.object({
 })
 
 export type ProfileFormData = z.infer<typeof profileSchema>
-export type ProfileResult = {
-  error?: string
-  /** Gesetzt, wenn nach dem Speichern der Standort bestätigt werden soll —
-   *  das Formular öffnet dann die Minikarte. */
-  standort?: GeokodierungsErgebnis
-}
+export type ProfileResult = { error?: string }
 
 export async function updateProfile(data: ProfileFormData): Promise<ProfileResult> {
   const farm = await getAuthFarm()
@@ -58,23 +53,44 @@ export async function updateProfile(data: ProfileFormData): Promise<ProfileResul
 
   revalidatePath('/settings/profile')
   revalidatePath(`/${farm.slug}`)
-
-  // Geokodiert wird NUR, wenn die Adresse sich geändert hat oder noch keine
-  // Koordinaten existieren — nicht bei jedem Speichern. Wer nur seine
-  // Beschreibung glättet, bekommt keine Karte vorgesetzt.
-  const adresseGeaendert =
-    parsed.data.address !== farm.address ||
-    parsed.data.postalCode !== farm.postalCode ||
-    parsed.data.city !== farm.city
-  if (adresseGeaendert || farm.latitude == null || farm.longitude == null) {
-    const standort = await geokodiereAdresse({
-      address: parsed.data.address,
-      postalCode: parsed.data.postalCode,
-      city: parsed.data.city,
-    })
-    return { standort }
-  }
   return {}
+}
+
+/** Was die Standort-Schaltfläche zurückbekommt. */
+export type StandortPruefung =
+  | { error: string }
+  /** Es gibt schon bestätigte Koordinaten: Karte öffnet direkt darauf —
+   *  gespeichert ist gespeichert, es wird NICHT neu geokodiert. */
+  | { art: 'vorhanden'; lat: number; lon: number }
+  /** Noch keine Koordinaten: der Kaskaden-Vorschlag. */
+  | { art: 'vorschlag'; ergebnis: GeokodierungsErgebnis }
+
+/**
+ * Auslöser ist AUSSCHLIESSLICH die Schaltfläche „Standort auf der Karte
+ * prüfen" im Hofprofil — keine Suche beim Tippen, kein Aufruf beim Speichern.
+ * Geokodiert wird nur, solange noch keine Koordinaten existieren; danach
+ * gilt der gespeicherte Punkt (Schaltfläche „Standort ändern" öffnet ihn).
+ */
+export async function pruefeHofStandort(adresse: {
+  address: string
+  postalCode: string
+  city: string
+}): Promise<StandortPruefung> {
+  const farm = await getAuthFarm()
+  if (!farm) return { error: 'Nicht angemeldet' }
+
+  if (farm.latitude != null && farm.longitude != null) {
+    return { art: 'vorhanden', lat: farm.latitude, lon: farm.longitude }
+  }
+
+  const parsed = profileSchema
+    .pick({ address: true, postalCode: true, city: true })
+    .safeParse(adresse)
+  if (!parsed.success) {
+    return { error: 'Bitte zuerst Straße, PLZ und Ort ausfüllen.' }
+  }
+
+  return { art: 'vorschlag', ergebnis: await geokodiereAdresse(parsed.data) }
 }
 
 /**

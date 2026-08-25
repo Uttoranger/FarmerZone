@@ -1,24 +1,32 @@
 /**
  * Geokodierung der Hofadresse — serverseitig, nie aus dem Browser.
  *
- * Dienst: Photon (photon.komoot.io), begründet gegen Nominatim: Photon hat
- * liberale Fair-Use-Bedingungen für gelegentliche Anfragen und keine harte
- * 1-Anfrage-pro-Sekunde-Auflage wie die Nominatim-Policy; die Antwort ist
- * GeoJSON mit sauberen Feldern, und deutschsprachige Anzeigenamen kommen per
- * lang=de. Unser Aufkommen (ein Aufruf je Profil-Speichern mit geänderter
- * Adresse) liegt weit unter jeder Grenze — trotzdem läuft jede Anfrage mit
- * aussagekräftigem User-Agent, wie es beide Dienste verlangen.
+ * Dienst: Nominatim (nominatim.openstreetmap.org) mit STRUKTURIERTER Abfrage
+ * (street, postalcode, city, country) statt Freitext: Die strukturierte
+ * Abfrage ankert österreichische Weiler-Adressen ohne Straßennamen über die
+ * Postleitzahl — vom Betreiber bereits erfolgreich gegen eine echte
+ * Weiler-Adresse geprüft.
  *
- * FEHLERTOLERANZ-REGEL (bewusst, ländliche Adressen scheitern oft): Kein
- * Treffer oder Zeitüberschreitung ist KEIN Fehlerfall für den Bauern. Statt
- * einer Meldung öffnet die Karte auf dem Zentrum der eingegebenen
- * Postleitzahl (zweiter, gröberer Versuch); ist auch das unbekannt, auf
- * einem festen Punkt in Oberösterreich. Der Bauer setzt den Punkt dann
- * selbst — das muss er für die Hofeinfahrt ohnehin.
+ * Pflichten laut Nominatim-Nutzungsbedingungen, hier eingehalten:
+ * - aussagekräftiger User-Agent mit Kontaktadresse der Plattform
+ *   (SUPPORT_EMAIL aus src/lib/support.ts — nichts neu erfunden),
+ * - HÖCHSTENS EINE ANFRAGE PRO SEKUNDE: Unser Aufkommen ist ein Klick auf
+ *   „Standort auf der Karte prüfen" je Hof, mit maximal zwei aufeinander
+ *   folgenden Anfragen (Kaskade) — weit unter der Grenze. Sollte je etwas
+ *   Automatisches auf diese Funktion aufsetzen, MUSS es diese Rate drosseln.
+ * - Timeout 5 s.
  *
- * Reine Auswertung und injizierbarer Lader, damit alles ohne Netz prüfbar
- * ist (tests/hof-standort.test.ts).
+ * DREISTUFIGE KASKADE, und in KEINEM Fall eine Fehlermeldung — es erscheint
+ * immer eine bedienbare Karte (ländliche Adressen scheitern oft, der Bauer
+ * setzt den Punkt dann selbst):
+ *   1. street+postalcode+city  → Zoom 17, „Adresse gefunden"-Hinweis
+ *   2. nur postalcode+city     → Zoom 14, „selbst schieben"-Hinweis
+ *   3. fester Punkt (48.1/13.5) → Zoom 8,  derselbe Hinweis
+ *
+ * Reine Auswertung und injizierbarer Lader, damit die Kaskade ohne Netz
+ * prüfbar ist (tests/hof-standort.test.ts).
  */
+import { SUPPORT_EMAIL } from '@/lib/support'
 
 export type StandortKandidat = {
   lat: number
@@ -27,16 +35,23 @@ export type StandortKandidat = {
 }
 
 export type GeokodierungsErgebnis = {
-  /** Bis zu drei Kandidaten der Adresssuche — leer, wenn nur der Rückfall trug. */
+  /** Bis zu drei Kandidaten aus Stufe 1 — leer ab Stufe 2. */
   kandidaten: StandortKandidat[]
   /** Wo die Karte öffnet. */
   zentrum: { lat: number; lon: number }
-  /** Woher das Zentrum stammt — steuert die Start-Zoomstufe der Karte. */
-  quelle: 'adresse' | 'plz' | 'rueckfall'
+  stufe: 'adresse' | 'ort' | 'rueckfall'
+  zoom: 17 | 14 | 8
+  /** Der Hinweistext über der Karte — je Stufe ein eigener. */
+  hinweis: string
 }
 
-/** Fester Rückfallpunkt, wenn weder Adresse noch PLZ etwas hergeben: Linz. */
-export const RUECKFALL_OBEROESTERREICH = { lat: 48.3069, lon: 14.2858 }
+export const HINWEIS_ADRESSE_GEFUNDEN =
+  'Wir haben deine Adresse gefunden — liegt der Punkt auf deiner Hofeinfahrt?'
+export const HINWEIS_SELBST_SETZEN =
+  'Wir konnten die genaue Adresse nicht finden — schieb die Karte auf deine Hofeinfahrt.'
+
+/** Fester Rückfallpunkt der Stufe 3 (Oberösterreich). */
+export const RUECKFALL_PUNKT = { lat: 48.1, lon: 13.5 }
 
 /** Grobe Österreich-Schachtel für die Plausibilisierung gespeicherter Punkte.
  *  Bewusst grob (streift Nachbarländer) — sie fängt Vertipper und
@@ -60,96 +75,106 @@ export function rundeKoordinate(wert: number): number {
 }
 
 /**
- * Wertet eine Photon-Antwort (GeoJSON FeatureCollection) aus.
- *
- * Nur Treffer in Österreich zählen — die Suche läuft zwar mit „Österreich"
- * im Text, aber Photon streut trotzdem gern über die Grenze. Höchstens drei,
- * in Antwort-Reihenfolge (Photon sortiert nach Relevanz).
+ * Wertet eine Nominatim-Antwort (format=jsonv2: Array von Treffern) aus.
+ * lat/lon kommen dort als STRINGS — wer das vergisst, rechnet mit NaN.
+ * Höchstens drei, in Antwort-Reihenfolge (Nominatim sortiert nach Güte).
  */
-export function wertePhotonAntwortAus(json: unknown): StandortKandidat[] {
-  if (typeof json !== 'object' || json === null) return []
-  const features = (json as { features?: unknown }).features
-  if (!Array.isArray(features)) return []
+export function werteNominatimAntwortAus(json: unknown): StandortKandidat[] {
+  if (!Array.isArray(json)) return []
 
   const kandidaten: StandortKandidat[] = []
-  for (const feature of features) {
+  for (const eintrag of json) {
     if (kandidaten.length >= 3) break
-    const f = feature as {
-      geometry?: { coordinates?: unknown }
-      properties?: Record<string, unknown>
-    }
-    const koordinaten = f.geometry?.coordinates
-    if (!Array.isArray(koordinaten) || koordinaten.length < 2) continue
-    const [lon, lat] = koordinaten
-    if (typeof lat !== 'number' || typeof lon !== 'number') continue
-
-    const p = f.properties ?? {}
-    if (p.countrycode !== 'AT') continue
-
-    const teile = [
-      [p.name, p.street].find((w) => typeof w === 'string' && w) as string | undefined,
-      typeof p.housenumber === 'string' ? p.housenumber : undefined,
-    ]
-      .filter(Boolean)
-      .join(' ')
-    const ort = [p.postcode, p.city].filter((w) => typeof w === 'string' && w).join(' ')
-    const anzeigeName = [teile, ort].filter(Boolean).join(', ') || 'Gefundener Ort'
-
-    kandidaten.push({ lat, lon, anzeigeName })
+    const e = eintrag as { lat?: unknown; lon?: unknown; display_name?: unknown }
+    const lat = typeof e.lat === 'string' ? Number.parseFloat(e.lat) : NaN
+    const lon = typeof e.lon === 'string' ? Number.parseFloat(e.lon) : NaN
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue
+    kandidaten.push({
+      lat,
+      lon,
+      anzeigeName: typeof e.display_name === 'string' && e.display_name ? e.display_name : 'Gefundener Ort',
+    })
   }
   return kandidaten
 }
 
-/** Lädt eine Photon-Suche als JSON — der eine unreine Baustein, injizierbar. */
-export type PhotonLader = (query: string) => Promise<unknown>
+/** Lädt eine strukturierte Nominatim-Suche — der eine unreine Baustein, injizierbar. */
+export type NominatimLader = (parameter: Record<string, string>) => Promise<unknown>
 
-const PHOTON_TIMEOUT_MS = 5_000
+const NOMINATIM_TIMEOUT_MS = 5_000
 
-async function ladePhoton(query: string): Promise<unknown> {
-  const url = `https://photon.komoot.io/api?q=${encodeURIComponent(query)}&limit=3&lang=de`
+async function ladeNominatim(parameter: Record<string, string>): Promise<unknown> {
+  const url = new URL('https://nominatim.openstreetmap.org/search')
+  url.search = new URLSearchParams({
+    ...parameter,
+    format: 'jsonv2',
+    limit: '3',
+    addressdetails: '1',
+  }).toString()
+
   const antwort = await fetch(url, {
     headers: {
-      // Fair-Use beider Geokodierer: Der Betreiber muss erkennbar sein.
-      'User-Agent': 'FarmerZone/1.0 (https://farmerzone.at; kontakt@farmerzone.at)',
+      'User-Agent': `FarmerZone/1.0 (https://farmerzone.at; ${SUPPORT_EMAIL})`,
     },
-    signal: AbortSignal.timeout(PHOTON_TIMEOUT_MS),
+    signal: AbortSignal.timeout(NOMINATIM_TIMEOUT_MS),
   })
-  if (!antwort.ok) throw new Error(`Photon antwortet ${antwort.status}`)
+  if (!antwort.ok) throw new Error(`Nominatim antwortet ${antwort.status}`)
   return antwort.json()
 }
 
 /**
- * Geokodiert eine Hofadresse mit gestuftem Rückfall (siehe Kopfkommentar):
- * volle Adresse → nur PLZ → fester Punkt. Wirft NIE — jedes Scheitern wird
- * zu einem gröberen Zentrum, nie zu einer Fehlermeldung.
+ * Die dreistufige Kaskade (siehe Kopfkommentar). Wirft NIE — jedes Scheitern
+ * (leere Antwort, Zeitüberschreitung, Dienststörung) führt zur nächsten,
+ * gröberen Stufe, nie zu einer Fehlermeldung.
  */
 export async function geokodiereAdresse(
   adresse: { address: string; postalCode: string; city: string },
-  lade: PhotonLader = ladePhoton
+  lade: NominatimLader = ladeNominatim
 ): Promise<GeokodierungsErgebnis> {
   try {
-    const kandidaten = wertePhotonAntwortAus(
-      await lade(`${adresse.address}, ${adresse.postalCode} ${adresse.city}, Österreich`)
+    const kandidaten = werteNominatimAntwortAus(
+      await lade({
+        street: adresse.address,
+        postalcode: adresse.postalCode,
+        city: adresse.city,
+        country: 'at',
+      })
     )
     if (kandidaten.length > 0) {
-      return { kandidaten, zentrum: { lat: kandidaten[0].lat, lon: kandidaten[0].lon }, quelle: 'adresse' }
+      return {
+        kandidaten,
+        zentrum: { lat: kandidaten[0].lat, lon: kandidaten[0].lon },
+        stufe: 'adresse',
+        zoom: 17,
+        hinweis: HINWEIS_ADRESSE_GEFUNDEN,
+      }
     }
   } catch {
-    // Zeitüberschreitung oder Dienststörung — weiter zum PLZ-Versuch.
+    // Zeitüberschreitung oder Dienststörung — weiter zur Orts-Stufe.
   }
 
   try {
-    const plzTreffer = wertePhotonAntwortAus(await lade(`${adresse.postalCode} Österreich`))
-    if (plzTreffer.length > 0) {
+    const ortsTreffer = werteNominatimAntwortAus(
+      await lade({ postalcode: adresse.postalCode, city: adresse.city, country: 'at' })
+    )
+    if (ortsTreffer.length > 0) {
       return {
         kandidaten: [],
-        zentrum: { lat: plzTreffer[0].lat, lon: plzTreffer[0].lon },
-        quelle: 'plz',
+        zentrum: { lat: ortsTreffer[0].lat, lon: ortsTreffer[0].lon },
+        stufe: 'ort',
+        zoom: 14,
+        hinweis: HINWEIS_SELBST_SETZEN,
       }
     }
   } catch {
     // Auch das scheiterte — der feste Punkt bleibt.
   }
 
-  return { kandidaten: [], zentrum: RUECKFALL_OBEROESTERREICH, quelle: 'rueckfall' }
+  return {
+    kandidaten: [],
+    zentrum: RUECKFALL_PUNKT,
+    stufe: 'rueckfall',
+    zoom: 8,
+    hinweis: HINWEIS_SELBST_SETZEN,
+  }
 }

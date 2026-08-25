@@ -183,12 +183,13 @@ export default function DatenschutzPage() {
 
           <Section title="Standortsuche und Kartendarstellung">
             <p>
-              Gibt ein Hof im Hofprofil seine Adresse ein, wird diese Adresse (Straße, PLZ,
-              Ort) zur Standortsuche an den Geokodierungsdienst Photon (komoot GmbH,
-              photon.komoot.io) übermittelt — es handelt sich um die Betriebsadresse des
-              Hofes, nicht um Daten von Besucherinnen. Kartenkacheln (OpenStreetMap) werden
-              über unsere eigene Server-Infrastruktur ausgeliefert; beim Betrachten der
-              Karte findet keine Übermittlung von Besucherdaten an Kartenanbieter statt.
+              Prüft ein Hof im Hofprofil seinen Standort, wird die eingegebene Hofadresse
+              (Straße, PLZ, Ort) zur Standortsuche an Nominatim (OpenStreetMap Foundation,
+              nominatim.openstreetmap.org) übermittelt — es handelt sich um die
+              Betriebsadresse des Hofes, nicht um Daten von Besucherinnen. Die
+              Kartenkacheln der Minikarte werden von OpenStreetMap geladen; dabei wird die
+              IP-Adresse des eingeloggten Betreibers an OpenStreetMap übertragen. Für
+              Besucherinnen der öffentlichen Seiten wird keine Karte geladen.
             </p>
           </Section>
 

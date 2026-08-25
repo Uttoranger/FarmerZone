@@ -266,6 +266,9 @@ export type FarmSettings = {
   address: string
   postalCode: string
   city: string
+  /** Bestätigter Kartenpunkt — steuert die Beschriftung der Standort-Schaltfläche. */
+  latitude: number | null
+  longitude: number | null
   phone: string
   email: string
   logoUrl: string | null
@@ -294,6 +297,8 @@ export async function getFarmSettings(ownerId: string): Promise<FarmSettings | n
       address: true,
       postalCode: true,
       city: true,
+      latitude: true,
+      longitude: true,
       phone: true,
       email: true,
       logoUrl: true,

@@ -14,16 +14,17 @@ import type { GeokodierungsErgebnis } from '@/lib/geokodierung'
  * treffsicherer, als einen Pin mit dem Finger zu ziehen (der Finger verdeckt
  * sonst genau das, was er treffen soll). Bestätigt wird die Kartenmitte.
  *
- * Die Kacheln kommen über /api/karte/… von der eigenen Domain — warum,
- * steht dort. Wird nur clientseitig geladen (next/dynamic in profile-form):
- * Leaflet greift beim Import auf window zu.
+ * Die Kacheln kommen DIREKT von tile.openstreetmap.org — bewusst OHNE
+ * Proxy-Route: Das Weiterverteilen von Kacheln über die eigene Domain
+ * widerspricht der OSM-Kachelrichtlinie. Diese Minikarte sehen
+ * ausschließlich eingeloggte Bauern, das Aufkommen ist minimal; die
+ * IP-Übertragung an OSM steht in der Datenschutzerklärung. Für eine spätere
+ * ÖFFENTLICHE Kundenkarte reicht das nicht — dann braucht es einen eigenen
+ * Kachel-Anbieter mit Schlüssel.
+ *
+ * Wird nur clientseitig geladen (next/dynamic in profile-form): Leaflet
+ * greift beim Import auf window zu.
  */
-
-const START_ZOOM: Record<GeokodierungsErgebnis['quelle'], number> = {
-  adresse: 16, // Vorschlag sitzt vermutlich fast — nah ran
-  plz: 12, //     nur der Ort ist bekannt — Überblick zum Suchen
-  rueckfall: 7, // gar nichts bekannt — Oberösterreich im Ganzen
-}
 
 export default function StandortKarte({
   adresse,
@@ -47,10 +48,10 @@ export default function StandortKarte({
     if (!kartenDiv.current || karte.current) return
     const map = L.map(kartenDiv.current, {
       center: [ergebnis.zentrum.lat, ergebnis.zentrum.lon],
-      zoom: START_ZOOM[ergebnis.quelle],
+      zoom: ergebnis.zoom,
       zoomControl: true,
     })
-    L.tileLayer('/api/karte/{z}/{x}/{y}', {
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution:
         '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>-Mitwirkende',
@@ -82,9 +83,7 @@ export default function StandortKarte({
       <button type="button" aria-label="Abbrechen" className="absolute inset-0 bg-black/40" onClick={onAbbrechen} />
       <div className="relative w-full max-w-md rounded-t-2xl sm:rounded-2xl bg-card p-4 shadow-lg">
         <p className="text-sm font-medium text-foreground">{adresse}</p>
-        <p className="mt-0.5 mb-3 text-xs text-muted-foreground">
-          Schieb die Karte, bis der Punkt auf deiner Hofeinfahrt liegt.
-        </p>
+        <p className="mt-0.5 mb-3 text-xs text-muted-foreground">{ergebnis.hinweis}</p>
 
         <div className="relative overflow-hidden rounded-xl" style={{ height: 240 }}>
           <div ref={kartenDiv} className="h-full w-full" />

@@ -11,9 +11,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { speichereHofStandort, updateProfile, type ProfileFormData } from '@/server/actions/farm'
+import {
+  pruefeHofStandort,
+  speichereHofStandort,
+  updateProfile,
+  type ProfileFormData,
+} from '@/server/actions/farm'
 import type { FarmSettings } from '@/server/queries/farm'
-import type { GeokodierungsErgebnis } from '@/lib/geokodierung'
+import { HINWEIS_ADRESSE_GEFUNDEN, type GeokodierungsErgebnis } from '@/lib/geokodierung'
 
 // Nur clientseitig: Leaflet greift beim Import auf window zu.
 const StandortKarte = dynamic(() => import('@/components/settings/standort-karte'), { ssr: false })
@@ -31,14 +36,18 @@ const schema = z.object({
 
 export function ProfileForm({ farm }: { farm: FarmSettings }) {
   const [isPending, startTransition] = useTransition()
-  // Nach dem Speichern mit geänderter Adresse (oder ohne Koordinaten) liefert
-  // die Action einen Standort-Vorschlag — dann öffnet die Minikarte.
+  // Die Minikarte öffnet AUSSCHLIESSLICH über die Standort-Schaltfläche —
+  // keine Suche beim Tippen, kein Aufruf beim Speichern.
   const [standort, setStandort] = useState<{
     ergebnis: GeokodierungsErgebnis
     adresse: string
   } | null>(null)
+  const [sucheLaeuft, setSucheLaeuft] = useState(false)
+  const [hatKoordinaten, setHatKoordinaten] = useState(
+    farm.latitude != null && farm.longitude != null
+  )
 
-  const { register, handleSubmit, formState: { errors } } = useForm<ProfileFormData>({
+  const { register, handleSubmit, getValues, formState: { errors } } = useForm<ProfileFormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       name: farm.name,
@@ -59,20 +68,51 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
         toast.error(res.error)
       } else {
         toast.success('Profil gespeichert')
-        if (res.standort) {
-          setStandort({
-            ergebnis: res.standort,
-            adresse: `${data.address}, ${data.postalCode} ${data.city}`,
-          })
-        }
       }
     })
+  }
+
+  async function standortPruefen() {
+    if (sucheLaeuft) return
+    setSucheLaeuft(true)
+    try {
+      const werte = getValues()
+      const res = await pruefeHofStandort({
+        address: werte.address,
+        postalCode: werte.postalCode,
+        city: werte.city,
+      })
+      if ('error' in res) {
+        toast.error(res.error)
+        return
+      }
+      const adresse = `${werte.address}, ${werte.postalCode} ${werte.city}`
+      if (res.art === 'vorhanden') {
+        // Gespeichert ist gespeichert: Karte direkt auf dem Punkt, kein
+        // erneutes Geokodieren.
+        setStandort({
+          adresse,
+          ergebnis: {
+            kandidaten: [],
+            zentrum: { lat: res.lat, lon: res.lon },
+            stufe: 'adresse',
+            zoom: 17,
+            hinweis: HINWEIS_ADRESSE_GEFUNDEN,
+          },
+        })
+      } else {
+        setStandort({ adresse, ergebnis: res.ergebnis })
+      }
+    } finally {
+      setSucheLaeuft(false)
+    }
   }
 
   async function standortBestaetigt(lat: number, lon: number) {
     const res = await speichereHofStandort(lat, lon)
     if (!res.error) {
       toast.success('Standort gespeichert')
+      setHatKoordinaten(true)
       setStandort(null)
     }
     return res
@@ -135,6 +175,17 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
             {errors.city && <p className="text-xs text-red-600 mt-1">{errors.city.message}</p>}
           </div>
         </div>
+        {/* Der EINZIGE Auslöser der Standortsuche — bewusst eine Schaltfläche,
+            nichts Automatisches beim Tippen oder Speichern. */}
+        <button
+          type="button"
+          onClick={standortPruefen}
+          disabled={sucheLaeuft}
+          className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-medium text-foreground hover:bg-muted/40 transition-colors disabled:opacity-60"
+        >
+          {sucheLaeuft && <Loader2 className="size-4 animate-spin" />}
+          {hatKoordinaten ? 'Standort ändern' : 'Standort auf der Karte prüfen'}
+        </button>
       </div>
 
       <div className="bg-white rounded-xl border border-border p-4 space-y-4">
