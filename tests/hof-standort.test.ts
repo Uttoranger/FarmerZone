@@ -1,122 +1,135 @@
 /**
  * Tests für die Standort-Datengrundlage (src/lib/geokodierung.ts):
- * die Auswertung der Photon-Antwort, den gestuften Rückfall (Adresse → PLZ →
- * fester Punkt) und die Plausibilisierung der gespeicherten Koordinaten.
+ * die Auswertung der Nominatim-Antwort, die dreistufige Kaskade (Adresse →
+ * Ort → fester Punkt, je mit eigenem Zoom und Hinweistext) und die
+ * Plausibilisierung der gespeicherten Koordinaten.
  *
- * Der Lader ist injizierbar — die Tests fahren die echte Rückfall-Logik mit
- * nachgestellten Antworten (echte GeoJSON-Gestalt) und echten Fehlwegen
- * (leere Antwort, Zeitüberschreitung als Rejection), ohne Netz.
+ * Der Lader ist injizierbar — die Tests fahren die echte Kaskaden-Logik mit
+ * nachgestellten Antworten (echte jsonv2-Gestalt: lat/lon als STRINGS) und
+ * echten Fehlwegen (leere Antwort, Zeitüberschreitung als Rejection), ohne
+ * Netz. Geprüft wird auch, WAS die Kaskade je Stufe anfragt: Stufe 2 darf
+ * die Straße nicht mehr mitschicken.
  */
 import { describe, it, expect } from 'vitest'
 import {
   geokodiereAdresse,
   istInOesterreich,
   rundeKoordinate,
-  wertePhotonAntwortAus,
-  RUECKFALL_OBEROESTERREICH,
+  werteNominatimAntwortAus,
+  HINWEIS_ADRESSE_GEFUNDEN,
+  HINWEIS_SELBST_SETZEN,
+  RUECKFALL_PUNKT,
 } from '@/lib/geokodierung'
 
 const ADRESSE = { address: 'Dorfstraße 12', postalCode: '4910', city: 'Ried im Innkreis' }
 
-/** Ein Photon-Feature in echter GeoJSON-Gestalt. */
-function feature(lat: number, lon: number, props: Record<string, unknown>) {
-  return { geometry: { coordinates: [lon, lat] }, properties: props }
+/** Ein Nominatim-jsonv2-Treffer: lat/lon kommen als Strings. */
+function treffer(lat: string, lon: string, name: string) {
+  return { lat, lon, display_name: name, address: {} }
 }
 
-const TREFFER_RIED = feature(48.21, 13.49, {
-  countrycode: 'AT',
-  name: 'Dorfstraße',
-  housenumber: '12',
-  postcode: '4910',
-  city: 'Ried im Innkreis',
-})
-
-describe('wertePhotonAntwortAus', () => {
-  it('liest Koordinaten und baut einen lesbaren Anzeigenamen', () => {
-    const [k] = wertePhotonAntwortAus({ features: [TREFFER_RIED] })
+describe('werteNominatimAntwortAus', () => {
+  it('liest die String-Koordinaten als Zahlen und übernimmt den Anzeigenamen', () => {
+    const [k] = werteNominatimAntwortAus([
+      treffer('48.21', '13.49', 'Dorfstraße 12, 4910 Ried im Innkreis, Österreich'),
+    ])
 
     expect(k.lat).toBe(48.21)
     expect(k.lon).toBe(13.49)
-    expect(k.anzeigeName).toBe('Dorfstraße 12, 4910 Ried im Innkreis')
+    expect(k.anzeigeName).toBe('Dorfstraße 12, 4910 Ried im Innkreis, Österreich')
   })
 
-  it('lässt ausländische Treffer weg und deckelt bei drei', () => {
-    // Die Suche läuft mit „Österreich" im Text — Photon streut trotzdem.
-    const antwort = {
-      features: [
-        TREFFER_RIED,
-        feature(48.2, 11.5, { countrycode: 'DE', name: 'Dorfstraße', city: 'München' }),
-        feature(47.8, 13.0, { countrycode: 'AT', name: 'Salzburg' }),
-        feature(48.3, 14.3, { countrycode: 'AT', name: 'Linz' }),
-        feature(47.1, 15.4, { countrycode: 'AT', name: 'Graz' }),
-      ],
-    }
+  it('deckelt bei drei Kandidaten und überspringt Unlesbares', () => {
+    const antwort = [
+      treffer('48.21', '13.49', 'Erster'),
+      { lat: 'kaputt', lon: '13.0', display_name: 'Unlesbar' },
+      treffer('47.8', '13.0', 'Zweiter'),
+      treffer('48.3', '14.3', 'Dritter'),
+      treffer('47.1', '15.4', 'Vierter'),
+    ]
 
-    const kandidaten = wertePhotonAntwortAus(antwort)
-    expect(kandidaten).toHaveLength(3)
-    expect(kandidaten.map((k) => k.anzeigeName)).toEqual([
-      'Dorfstraße 12, 4910 Ried im Innkreis',
-      'Salzburg',
-      'Linz',
-    ])
+    const kandidaten = werteNominatimAntwortAus(antwort)
+    expect(kandidaten.map((k) => k.anzeigeName)).toEqual(['Erster', 'Zweiter', 'Dritter'])
   })
 
   it('macht aus Müll eine leere Liste, keinen Fehler', () => {
-    expect(wertePhotonAntwortAus(null)).toEqual([])
-    expect(wertePhotonAntwortAus({})).toEqual([])
-    expect(wertePhotonAntwortAus({ features: [{}] })).toEqual([])
+    expect(werteNominatimAntwortAus(null)).toEqual([])
+    expect(werteNominatimAntwortAus({})).toEqual([])
+    expect(werteNominatimAntwortAus([{}])).toEqual([])
   })
 })
 
-describe('geokodiereAdresse — der gestufte Rückfall', () => {
-  it('liefert bei einem Adress-Treffer die Kandidaten und zentriert auf dem ersten', async () => {
-    const ergebnis = await geokodiereAdresse(ADRESSE, async () => ({ features: [TREFFER_RIED] }))
+describe('geokodiereAdresse — die dreistufige Kaskade', () => {
+  it('Stufe 1: Adress-Treffer → Zoom 17, Adress-Hinweis, Kandidaten dabei', async () => {
+    const angefragt: Record<string, string>[] = []
+    const ergebnis = await geokodiereAdresse(ADRESSE, async (parameter) => {
+      angefragt.push(parameter)
+      return [treffer('48.21', '13.49', 'Dorfstraße 12'), treffer('48.22', '13.5', 'Dorfstraße 12b')]
+    })
 
-    expect(ergebnis.quelle).toBe('adresse')
-    expect(ergebnis.kandidaten).toHaveLength(1)
+    expect(ergebnis.stufe).toBe('adresse')
+    expect(ergebnis.zoom).toBe(17)
+    expect(ergebnis.hinweis).toBe(HINWEIS_ADRESSE_GEFUNDEN)
+    expect(ergebnis.kandidaten).toHaveLength(2)
     expect(ergebnis.zentrum).toEqual({ lat: 48.21, lon: 13.49 })
+    // Die erste Anfrage ist die volle strukturierte Adresse
+    expect(angefragt[0]).toMatchObject({
+      street: ADRESSE.address,
+      postalcode: ADRESSE.postalCode,
+      city: ADRESSE.city,
+      country: 'at',
+    })
   })
 
-  it('fällt bei leerer Adress-Antwort auf das PLZ-Zentrum zurück', async () => {
-    // Der Weiler ohne Straßennamen: Adresse unbekannt, aber die PLZ trägt.
-    const ergebnis = await geokodiereAdresse(ADRESSE, async (query) =>
-      query.startsWith(ADRESSE.postalCode)
-        ? { features: [feature(48.2, 13.5, { countrycode: 'AT', name: 'Ried im Innkreis' })] }
-        : { features: [] }
-    )
+  it('Stufe 2: kein Adress-Treffer → Anfrage OHNE Straße, Zoom 14, Selbst-setzen-Hinweis', async () => {
+    // Der Weiler ohne Straßennamen: Die strukturierte Orts-Anfrage ankert
+    // über die Postleitzahl.
+    const angefragt: Record<string, string>[] = []
+    const ergebnis = await geokodiereAdresse(ADRESSE, async (parameter) => {
+      angefragt.push(parameter)
+      return 'street' in parameter ? [] : [treffer('48.2', '13.5', 'Ried im Innkreis')]
+    })
 
-    expect(ergebnis.quelle).toBe('plz')
+    expect(ergebnis.stufe).toBe('ort')
+    expect(ergebnis.zoom).toBe(14)
+    expect(ergebnis.hinweis).toBe(HINWEIS_SELBST_SETZEN)
     expect(ergebnis.kandidaten).toEqual([])
     expect(ergebnis.zentrum).toEqual({ lat: 48.2, lon: 13.5 })
+    expect(angefragt).toHaveLength(2)
+    expect(angefragt[1]).not.toHaveProperty('street')
+    expect(angefragt[1]).toMatchObject({ postalcode: ADRESSE.postalCode, city: ADRESSE.city })
   })
 
   it('behandelt eine Zeitüberschreitung wie eine leere Antwort', async () => {
-    // FEHLERTOLERANZ-REGEL: ländliche Adressen scheitern oft — nie eine
-    // Fehlermeldung, immer ein gröberes Zentrum.
-    const ergebnis = await geokodiereAdresse(ADRESSE, async (query) => {
-      if (!query.startsWith(ADRESSE.postalCode)) throw new Error('TimeoutError')
-      return { features: [feature(48.2, 13.5, { countrycode: 'AT', name: 'Ried' })] }
+    // In KEINEM Fall eine Fehlermeldung — es erscheint immer eine bedienbare
+    // Karte, nur eben eine Stufe gröber.
+    const ergebnis = await geokodiereAdresse(ADRESSE, async (parameter) => {
+      if ('street' in parameter) throw new Error('TimeoutError')
+      return [treffer('48.2', '13.5', 'Ried im Innkreis')]
     })
 
-    expect(ergebnis.quelle).toBe('plz')
-    expect(ergebnis.zentrum).toEqual({ lat: 48.2, lon: 13.5 })
+    expect(ergebnis.stufe).toBe('ort')
+    expect(ergebnis.zoom).toBe(14)
   })
 
-  it('endet auf dem festen Punkt in Oberösterreich, wenn gar nichts trägt', async () => {
+  it('Stufe 3: gar nichts trägt → fester Punkt, Zoom 8, Selbst-setzen-Hinweis', async () => {
     const ergebnis = await geokodiereAdresse(ADRESSE, async () => {
       throw new Error('TimeoutError')
     })
 
-    expect(ergebnis.quelle).toBe('rueckfall')
+    expect(ergebnis.stufe).toBe('rueckfall')
+    expect(ergebnis.zoom).toBe(8)
+    expect(ergebnis.hinweis).toBe(HINWEIS_SELBST_SETZEN)
     expect(ergebnis.kandidaten).toEqual([])
-    expect(ergebnis.zentrum).toEqual(RUECKFALL_OBEROESTERREICH)
+    expect(ergebnis.zentrum).toEqual(RUECKFALL_PUNKT)
+    expect(RUECKFALL_PUNKT).toEqual({ lat: 48.1, lon: 13.5 })
   })
 })
 
 describe('istInOesterreich — die grobe Plausibilisierung', () => {
   it('nimmt Punkte in Österreich an', () => {
     expect(istInOesterreich(48.3069, 14.2858)).toBe(true) // Linz
-    expect(istInOesterreich(48.21, 13.49)).toBe(true) //     Innviertel
+    expect(istInOesterreich(48.1, 13.5)).toBe(true) //       Rückfallpunkt selbst
   })
 
   it('lehnt Punkte außerhalb ab — Italien, Null-Insel, Unsinn', () => {
