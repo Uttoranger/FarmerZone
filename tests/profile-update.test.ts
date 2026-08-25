@@ -5,6 +5,10 @@
  * Titelbild gehören zu „Mein Auftritt" und dürfen vom Profil-Speichern nicht
  * mehr angefasst werden — früher setzte ein leeres URL-Feld sie auf null.
  *
+ * Seit der eingebetteten Profilkarte gehört der Kartenpunkt zum Profil:
+ * Gesetzte Koordinaten werden gerundet mitgespeichert (nur Österreich),
+ * null lässt einen gespeicherten Punkt unangetastet.
+ *
  * Prisma, Auth und next/* sind gemockt — keine DB-Zugriffe.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -35,6 +39,8 @@ const gueltig = {
   city: 'Klosterneuburg',
   phone: '+43 664 123 4567',
   email: 'hof@beispiel.at',
+  latitude: null,
+  longitude: null,
 }
 
 beforeEach(() => {
@@ -69,6 +75,33 @@ describe('updateProfile — Stammdaten', () => {
 
     expect(res.error).toBe('Nicht angemeldet')
     expect(farmUpdate).not.toHaveBeenCalled()
+  })
+})
+
+describe('updateProfile — der Kartenpunkt', () => {
+  it('speichert gesetzte Koordinaten gerundet mit dem Profil', async () => {
+    const res = await updateProfile({ ...gueltig, latitude: 48.123456789, longitude: 13.4 })
+
+    expect(res.error).toBeUndefined()
+    expect(farmUpdate).toHaveBeenCalledWith({
+      where: { id: 'farm_1' },
+      data: expect.objectContaining({ latitude: 48.123457, longitude: 13.4 }),
+    })
+  })
+
+  it('lehnt einen Punkt außerhalb Österreichs ab und schreibt GAR nichts', async () => {
+    const res = await updateProfile({ ...gueltig, latitude: 41.9, longitude: 12.5 }) // Rom
+
+    expect(res.error).toBe('Der Punkt liegt außerhalb Österreichs — bitte schieb die Karte auf deinen Hof.')
+    expect(farmUpdate).not.toHaveBeenCalled()
+  })
+
+  it('lässt ohne Punkt (null) gespeicherte Koordinaten unangetastet', async () => {
+    await updateProfile(gueltig)
+
+    const data = farmUpdate.mock.calls[0]![0].data as Record<string, unknown>
+    expect(Object.keys(data)).not.toContain('latitude')
+    expect(Object.keys(data)).not.toContain('longitude')
   })
 })
 

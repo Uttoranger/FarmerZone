@@ -1,6 +1,6 @@
-﻿'use client'
+'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import dynamic from 'next/dynamic'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -12,13 +12,20 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  pruefeHofStandort,
-  speichereHofStandort,
+  holeAdresseZumPunkt,
+  sucheHofStandort,
   updateProfile,
   type ProfileFormData,
 } from '@/server/actions/farm'
 import type { FarmSettings } from '@/server/queries/farm'
-import { HINWEIS_ADRESSE_GEFUNDEN, type GeokodierungsErgebnis } from '@/lib/geokodierung'
+import {
+  HINWEIS_ADRESSE_UEBERNOMMEN,
+  HINWEIS_KARTE_OHNE_PUNKT,
+  RUECKFALL_PUNKT,
+  uebernehmeAdresse,
+  type StandortKandidat,
+} from '@/lib/geokodierung'
+import type { KartenZiel } from '@/components/settings/standort-karte'
 
 // Nur clientseitig: Leaflet greift beim Import auf window zu.
 const StandortKarte = dynamic(() => import('@/components/settings/standort-karte'), { ssr: false })
@@ -32,22 +39,36 @@ const schema = z.object({
   city: z.string().min(2, 'Pflichtfeld'),
   phone: z.string().min(4, 'Pflichtfeld'),
   email: z.string().email('Ungültige E-Mail'),
+  // Der Kartenpunkt ist ein Formularwert wie jedes andere Feld: Er wird beim
+  // Schieben gesetzt und erst mit „Profil speichern" gespeichert.
+  latitude: z.number().nullable(),
+  longitude: z.number().nullable(),
 })
 
 export function ProfileForm({ farm }: { farm: FarmSettings }) {
   const [isPending, startTransition] = useTransition()
-  // Die Minikarte öffnet AUSSCHLIESSLICH über die Standort-Schaltfläche —
-  // keine Suche beim Tippen, kein Aufruf beim Speichern.
-  const [standort, setStandort] = useState<{
-    ergebnis: GeokodierungsErgebnis
-    adresse: string
-  } | null>(null)
   const [sucheLaeuft, setSucheLaeuft] = useState(false)
-  const [hatKoordinaten, setHatKoordinaten] = useState(
-    farm.latitude != null && farm.longitude != null
+  // Die ruhige Zeile über der Karte: anfangs der Start-Hinweis (solange kein
+  // Punkt gespeichert ist), danach das Vorwärts-Ergebnis oder die
+  // Übernahme-Zeile der Rückwärtssuche.
+  const [hinweis, setHinweis] = useState<string | null>(
+    farm.latitude != null && farm.longitude != null ? null : HINWEIS_KARTE_OHNE_PUNKT
   )
+  const [kandidaten, setKandidaten] = useState<StandortKandidat[]>([])
+  const [ziel, setZiel] = useState<KartenZiel | null>(null)
+  const zielFolge = useRef(0)
+  // Späte Rückwärts-Antworten dürfen frischere nicht überschreiben.
+  const anfrageFolge = useRef(0)
 
-  const { register, handleSubmit, getValues, formState: { errors } } = useForm<ProfileFormData>({
+  // Startansicht der Karte: gespeicherter Punkt bei Zoom 17, sonst der
+  // Rückfallpunkt bei Zoom 8. Die Karte liest `start` nur beim Einhängen —
+  // dass hier je Render ein frisches Objekt entsteht, ist deshalb egal.
+  const start =
+    farm.latitude != null && farm.longitude != null
+      ? { lat: farm.latitude, lon: farm.longitude, zoom: 17 }
+      : { lat: RUECKFALL_PUNKT.lat, lon: RUECKFALL_PUNKT.lon, zoom: 8 }
+
+  const { register, handleSubmit, getValues, setValue, formState: { errors } } = useForm<ProfileFormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       name: farm.name,
@@ -58,6 +79,8 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
       city: farm.city,
       phone: farm.phone,
       email: farm.email,
+      latitude: farm.latitude,
+      longitude: farm.longitude,
     },
   })
 
@@ -72,12 +95,19 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
     })
   }
 
-  async function standortPruefen() {
+  /** Jede vom Bauern gewählte Kartenmitte wird zum Formularwert — erkennbar
+   *  ungespeichert wie jedes andere geänderte Feld, bis „Profil speichern". */
+  function punktGewaehlt(lat: number, lon: number) {
+    setValue('latitude', lat, { shouldDirty: true })
+    setValue('longitude', lon, { shouldDirty: true })
+  }
+
+  async function aufKarteSuchen() {
     if (sucheLaeuft) return
     setSucheLaeuft(true)
     try {
       const werte = getValues()
-      const res = await pruefeHofStandort({
+      const res = await sucheHofStandort({
         address: werte.address,
         postalCode: werte.postalCode,
         city: werte.city,
@@ -86,39 +116,50 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
         toast.error(res.error)
         return
       }
-      const adresse = `${werte.address}, ${werte.postalCode} ${werte.city}`
-      if (res.art === 'vorhanden') {
-        // Gespeichert ist gespeichert: Karte direkt auf dem Punkt, kein
-        // erneutes Geokodieren.
-        setStandort({
-          adresse,
-          ergebnis: {
-            kandidaten: [],
-            zentrum: { lat: res.lat, lon: res.lon },
-            stufe: 'adresse',
-            zoom: 17,
-            hinweis: HINWEIS_ADRESSE_GEFUNDEN,
-          },
-        })
-      } else {
-        setStandort({ adresse, ergebnis: res.ergebnis })
+      const ergebnis = res.ergebnis
+      setHinweis(ergebnis.hinweis)
+      setKandidaten(ergebnis.kandidaten)
+      zielFolge.current += 1
+      setZiel({
+        lat: ergebnis.zentrum.lat,
+        lon: ergebnis.zentrum.lon,
+        zoom: ergebnis.zoom,
+        folge: zielFolge.current,
+      })
+      // Nur ein echter Adress-Treffer wird zum (ungespeicherten) Punkt. Die
+      // gröberen Stufen zeigen bloß die Gegend — dort setzt der Bauer den
+      // Punkt selbst, sonst würde still ein Ortszentrum als Hof gespeichert.
+      if (ergebnis.stufe === 'adresse') {
+        punktGewaehlt(ergebnis.zentrum.lat, ergebnis.zentrum.lon)
       }
     } finally {
       setSucheLaeuft(false)
     }
   }
 
-  async function standortBestaetigt(lat: number, lon: number) {
-    const res = await speichereHofStandort(lat, lon)
-    if (!res.error) {
-      toast.success('Standort gespeichert')
-      setHatKoordinaten(true)
-      setStandort(null)
+  /** Rückwärts: Die gebremste Ruheposition der Karte füllt die Adressfelder
+   *  (Übernahme-Regel in uebernehmeAdresse). Scheitern bleibt stumm. */
+  async function adresseVomPunkt(lat: number, lon: number) {
+    anfrageFolge.current += 1
+    const meineFolge = anfrageFolge.current
+    const punkt = await holeAdresseZumPunkt(lat, lon)
+    if (!punkt || anfrageFolge.current !== meineFolge) return
+
+    const bisher = {
+      address: getValues('address'),
+      postalCode: getValues('postalCode'),
+      city: getValues('city'),
     }
-    return res
+    const neu = uebernehmeAdresse(bisher, punkt)
+    for (const feld of ['address', 'postalCode', 'city'] as const) {
+      if (neu[feld] !== bisher[feld]) {
+        setValue(feld, neu[feld], { shouldDirty: true, shouldValidate: true })
+      }
+    }
+    setHinweis(HINWEIS_ADRESSE_UEBERNOMMEN)
   }
 
-  function field(id: keyof ProfileFormData, label: string, placeholder?: string) {
+  function field(id: 'name' | 'ownerName' | 'address' | 'phone' | 'email', label: string, placeholder?: string) {
     return (
       <div>
         <Label htmlFor={id} className="text-sm text-muted-foreground mb-1 block">{label}</Label>
@@ -135,14 +176,6 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      {standort && (
-        <StandortKarte
-          adresse={standort.adresse}
-          ergebnis={standort.ergebnis}
-          onBestaetigt={standortBestaetigt}
-          onAbbrechen={() => setStandort(null)}
-        />
-      )}
       <div className="bg-white rounded-xl border border-border p-4 space-y-4">
         <h2 className="font-medium text-foreground">Hof-Informationen</h2>
         {field('name', 'Hof-Name *', 'Hof Müller')}
@@ -175,17 +208,28 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
             {errors.city && <p className="text-xs text-red-600 mt-1">{errors.city.message}</p>}
           </div>
         </div>
-        {/* Der EINZIGE Auslöser der Standortsuche — bewusst eine Schaltfläche,
+        {/* Der EINZIGE Auslöser der Vorwärts-Suche — bewusst eine Schaltfläche,
             nichts Automatisches beim Tippen oder Speichern. */}
         <button
           type="button"
-          onClick={standortPruefen}
+          onClick={aufKarteSuchen}
           disabled={sucheLaeuft}
           className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-medium text-foreground hover:bg-muted/40 transition-colors disabled:opacity-60"
         >
           {sucheLaeuft && <Loader2 className="size-4 animate-spin" />}
-          {hatKoordinaten ? 'Standort ändern' : 'Standort auf der Karte prüfen'}
+          Auf der Karte suchen
         </button>
+
+        {/* Die Karte dauerhaft unter den Adressfeldern — beide Richtungen:
+            Die Suche fährt die Karte, das Schieben füllt die Adresse. */}
+        <StandortKarte
+          start={start}
+          ziel={ziel}
+          hinweis={hinweis}
+          kandidaten={kandidaten}
+          onMitteVerschoben={punktGewaehlt}
+          onAdresseAnfrage={adresseVomPunkt}
+        />
       </div>
 
       <div className="bg-white rounded-xl border border-border p-4 space-y-4">
@@ -210,4 +254,3 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
     </form>
   )
 }
-
