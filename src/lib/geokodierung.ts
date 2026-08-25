@@ -1,30 +1,35 @@
 /**
  * Geokodierung der Hofadresse — serverseitig, nie aus dem Browser.
  *
- * Dienst: Nominatim (nominatim.openstreetmap.org) mit STRUKTURIERTER Abfrage
- * (street, postalcode, city, country) statt Freitext: Die strukturierte
- * Abfrage ankert österreichische Weiler-Adressen ohne Straßennamen über die
- * Postleitzahl — vom Betreiber bereits erfolgreich gegen eine echte
- * Weiler-Adresse geprüft.
+ * Dienst: Nominatim (nominatim.openstreetmap.org) in BEIDE Richtungen:
+ * - VORWÄRTS mit STRUKTURIERTER Abfrage (street, postalcode, city, country)
+ *   statt Freitext: Die strukturierte Abfrage ankert österreichische
+ *   Weiler-Adressen ohne Straßennamen über die Postleitzahl — vom Betreiber
+ *   bereits erfolgreich gegen eine echte Weiler-Adresse geprüft.
+ * - RÜCKWÄRTS (/reverse, zoom=18): Der geschobene Kartenpunkt wird zu
+ *   Adressfeldern — die Karte im Hofprofil arbeitet in beide Richtungen.
  *
  * Pflichten laut Nominatim-Nutzungsbedingungen, hier eingehalten:
  * - aussagekräftiger User-Agent mit Kontaktadresse der Plattform
  *   (SUPPORT_EMAIL aus src/lib/support.ts — nichts neu erfunden),
- * - HÖCHSTENS EINE ANFRAGE PRO SEKUNDE: Unser Aufkommen ist ein Klick auf
- *   „Standort auf der Karte prüfen" je Hof, mit maximal zwei aufeinander
- *   folgenden Anfragen (Kaskade) — weit unter der Grenze. Sollte je etwas
- *   Automatisches auf diese Funktion aufsetzen, MUSS es diese Rate drosseln.
+ * - HÖCHSTENS EINE ANFRAGE PRO SEKUNDE: Vorwärts ist das ein Klick auf
+ *   „Auf der Karte suchen" je Hof, mit maximal zwei aufeinander folgenden
+ *   Anfragen (Kaskade) — weit unter der Grenze. Die Rückwärtssuche beim
+ *   Kartenschieben MUSS über erstelleKartenBremse laufen (Anfrage erst nach
+ *   1,2 s Ruhe und nur bei >~25 m Bewegung) — damit liegen auch dort immer
+ *   mindestens 1,2 s zwischen zwei Anfragen.
  * - Timeout 5 s.
  *
- * DREISTUFIGE KASKADE, und in KEINEM Fall eine Fehlermeldung — es erscheint
- * immer eine bedienbare Karte (ländliche Adressen scheitern oft, der Bauer
- * setzt den Punkt dann selbst):
+ * DREISTUFIGE KASKADE vorwärts, und in KEINEM Fall eine Fehlermeldung — es
+ * erscheint immer eine bedienbare Karte (ländliche Adressen scheitern oft,
+ * der Bauer setzt den Punkt dann selbst):
  *   1. street+postalcode+city  → Zoom 17, „Adresse gefunden"-Hinweis
  *   2. nur postalcode+city     → Zoom 14, „selbst schieben"-Hinweis
  *   3. fester Punkt (48.1/13.5) → Zoom 8,  derselbe Hinweis
  *
- * Reine Auswertung und injizierbarer Lader, damit die Kaskade ohne Netz
- * prüfbar ist (tests/hof-standort.test.ts).
+ * Reine Auswertung und injizierbare Lader, damit Kaskade, Rückwärts-Übernahme
+ * und Bremse ohne Netz prüfbar sind (tests/hof-standort.test.ts,
+ * tests/standort-rueckwaerts.test.ts).
  */
 import { SUPPORT_EMAIL } from '@/lib/support'
 
@@ -49,6 +54,12 @@ export const HINWEIS_ADRESSE_GEFUNDEN =
   'Wir haben deine Adresse gefunden — liegt der Punkt auf deiner Hofeinfahrt?'
 export const HINWEIS_SELBST_SETZEN =
   'Wir konnten die genaue Adresse nicht finden — schieb die Karte auf deine Hofeinfahrt.'
+/** Startansicht der eingebetteten Karte, solange kein Punkt gespeichert ist. */
+export const HINWEIS_KARTE_OHNE_PUNKT =
+  'Schreib deine Adresse oben hinein — oder schieb die Karte gleich auf deine Hofeinfahrt.'
+/** Die ruhige Zeile nach einer Rückwärts-Übernahme. */
+export const HINWEIS_ADRESSE_UEBERNOMMEN =
+  'Adresse vom Kartenpunkt übernommen — du kannst sie anpassen.'
 
 /** Fester Rückfallpunkt der Stufe 3 (Oberösterreich). */
 export const RUECKFALL_PUNKT = { lat: 48.1, lon: 13.5 }
@@ -103,14 +114,14 @@ export type NominatimLader = (parameter: Record<string, string>) => Promise<unkn
 
 const NOMINATIM_TIMEOUT_MS = 5_000
 
-async function ladeNominatim(parameter: Record<string, string>): Promise<unknown> {
-  const url = new URL('https://nominatim.openstreetmap.org/search')
-  url.search = new URLSearchParams({
-    ...parameter,
-    format: 'jsonv2',
-    limit: '3',
-    addressdetails: '1',
-  }).toString()
+/** Der gemeinsame Netz-Baustein beider Richtungen: User-Agent mit
+ *  Kontaktadresse und 5-s-Zeitlimit laut Nutzungsbedingungen. */
+async function frageNominatim(
+  pfad: '/search' | '/reverse',
+  parameter: Record<string, string>
+): Promise<unknown> {
+  const url = new URL(`https://nominatim.openstreetmap.org${pfad}`)
+  url.search = new URLSearchParams(parameter).toString()
 
   const antwort = await fetch(url, {
     headers: {
@@ -120,6 +131,15 @@ async function ladeNominatim(parameter: Record<string, string>): Promise<unknown
   })
   if (!antwort.ok) throw new Error(`Nominatim antwortet ${antwort.status}`)
   return antwort.json()
+}
+
+async function ladeNominatim(parameter: Record<string, string>): Promise<unknown> {
+  return frageNominatim('/search', {
+    ...parameter,
+    format: 'jsonv2',
+    limit: '3',
+    addressdetails: '1',
+  })
 }
 
 /**
@@ -176,5 +196,168 @@ export async function geokodiereAdresse(
     stufe: 'rueckfall',
     zoom: 8,
     hinweis: HINWEIS_SELBST_SETZEN,
+  }
+}
+
+// ─── Rückwärts: Kartenpunkt → Adressfelder ──────────────────────────────────
+
+/** Was die Rückwärtssuche liefert — ausschließlich Felder mit tatsächlichem Wert. */
+export type RueckwaertsAdresse = {
+  strasse?: string
+  hausnummer?: string
+  plz?: string
+  ort?: string
+}
+
+/**
+ * Wertet eine /reverse-Antwort (format=jsonv2: EIN Objekt mit `address`) aus.
+ * null heißt: nichts Brauchbares — auch bei Nominatims eigenem
+ * `{"error": "Unable to geocode"}` mitten im Meer.
+ */
+export function werteRueckwaertsAntwortAus(json: unknown): RueckwaertsAdresse | null {
+  if (typeof json !== 'object' || json === null) return null
+  const adresse = (json as { address?: unknown }).address
+  if (typeof adresse !== 'object' || adresse === null) return null
+  const a = adresse as Record<string, unknown>
+
+  const text = (wert: unknown): string | undefined =>
+    typeof wert === 'string' && wert.trim() ? wert.trim() : undefined
+
+  const ergebnis: RueckwaertsAdresse = {
+    strasse: text(a.road),
+    hausnummer: text(a.house_number),
+    plz: text(a.postcode),
+    // Die feinste vorhandene Orts-Stufe gewinnt — auf dem Land ist das
+    // meist `village`, notfalls die Gemeinde.
+    ort: text(a.village) ?? text(a.town) ?? text(a.city) ?? text(a.municipality),
+  }
+  return Object.values(ergebnis).some((wert) => wert !== undefined) ? ergebnis : null
+}
+
+/**
+ * ÜBERNAHME-REGEL (kritisch): Das Rückwärts-Ergebnis füllt NUR Felder, für
+ * die es einen tatsächlichen Wert hat — ein ausgefülltes Feld wird NIE mit
+ * einem leeren Wert überschrieben. Die ländliche Rückwärtssuche liefert oft
+ * keine Hausnummer; die von Hand eingetragene bleibt dann stehen, denn die
+ * Adresse steht öffentlich auf der Hofseite, und eine verschwundene
+ * Hausnummer fiele erst den Kundinnen auf.
+ */
+export function uebernehmeAdresse(
+  bisher: { address: string; postalCode: string; city: string },
+  punkt: RueckwaertsAdresse
+): { address: string; postalCode: string; city: string } {
+  let address = bisher.address
+  if (punkt.strasse) {
+    // Ohne Straße bleibt das Adressfeld ganz unangetastet — eine nackte
+    // Hausnummer wäre kein tatsächlicher Wert.
+    const hausnummer = punkt.hausnummer ?? extrahiereHausnummer(bisher.address)
+    address = hausnummer ? `${punkt.strasse} ${hausnummer}` : punkt.strasse
+  }
+  return {
+    address,
+    postalCode: punkt.plz ?? bisher.postalCode,
+    city: punkt.ort ?? bisher.city,
+  }
+}
+
+/** Die abschließende Hausnummer aus „Dorfstraße 12a" oder „Hofmark 3/1" —
+ *  das letzte Wort, sofern es mit einer Ziffer beginnt. */
+function extrahiereHausnummer(address: string): string | undefined {
+  const treffer = address.trim().match(/(\d[\w/-]*)$/)
+  return treffer ? treffer[1] : undefined
+}
+
+/** Lädt eine Rückwärtssuche zum Kartenpunkt — ebenfalls injizierbar. Bewusst
+ *  eine EIGENE Lader-Gestalt: Die Vorwärts-Signatur (NominatimLader) bleibt
+ *  unverändert, samt der Tests, die auf ihr fahren. */
+export type RueckwaertsLader = (lat: number, lon: number) => Promise<unknown>
+
+async function ladeNominatimRueckwaerts(lat: number, lon: number): Promise<unknown> {
+  return frageNominatim('/reverse', {
+    lat: String(lat),
+    lon: String(lon),
+    format: 'jsonv2',
+    addressdetails: '1',
+    // zoom=18 = Gebäudeebene: gröber fände nur den Ort, feiner gibt es nicht.
+    zoom: '18',
+  })
+}
+
+/** Wirft NIE — jedes Scheitern (Zeitüberschreitung, Dienststörung, leere
+ *  Antwort) wird zu null: Die Adressfelder bleiben dann unverändert, die
+ *  Koordinaten gelten trotzdem. */
+export async function rueckwaertsGeokodiere(
+  lat: number,
+  lon: number,
+  lade: RueckwaertsLader = ladeNominatimRueckwaerts
+): Promise<RueckwaertsAdresse | null> {
+  try {
+    return werteRueckwaertsAntwortAus(await lade(lat, lon))
+  } catch {
+    return null
+  }
+}
+
+// ─── Die Karten-Bremse ──────────────────────────────────────────────────────
+
+export type KartenBremse = {
+  /** Jede vom Nutzer herbeigeführte Ruheposition der Kartenmitte. */
+  mitteBewegt(lat: number, lon: number): void
+  /** Programmatische Sprünge (Startansicht, Vorwärts-Suche, Kandidatenwahl):
+   *  neuer Bezugspunkt OHNE Anfrage. */
+  setzeBezugspunkt(lat: number, lon: number): void
+  /** Beim Abbau der Karte: ein offener Zeitgeber wird verworfen. */
+  aufloesen(): void
+}
+
+/** Näherung in Metern (Breitengrad ≈ 111 320 m, Längengrad mit cos gestaucht)
+ *  — für die 25-m-Schwelle mehr als genau genug. */
+function meterAbstand(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
+  const dLat = (a.lat - b.lat) * 111_320
+  const dLon = (a.lon - b.lon) * 111_320 * Math.cos((a.lat * Math.PI) / 180)
+  return Math.hypot(dLat, dLon)
+}
+
+/**
+ * Bremst die Rückwärtssuche beim Kartenschieben: Eine Anfrage geht erst
+ * `ruheMs` (1,2 s) nach der letzten Bewegung raus, und nur, wenn die
+ * Kartenmitte seit der LETZTEN ANFRAGE um mehr als `minMeter` (~25 m)
+ * gewandert ist. Damit bleibt die Rate sicher unter der Nominatim-Grenze von
+ * HÖCHSTENS EINER ANFRAGE PRO SEKUNDE: Zwischen zwei Anfragen liegen immer
+ * mindestens 1,2 s Ruhe. Reine, mit unechten Zeitgebern prüfbare Logik.
+ */
+export function erstelleKartenBremse(
+  onAnfrage: (lat: number, lon: number) => void,
+  einstellungen: { ruheMs?: number; minMeter?: number } = {}
+): KartenBremse {
+  const ruheMs = einstellungen.ruheMs ?? 1_200
+  const minMeter = einstellungen.minMeter ?? 25
+  let bezugspunkt: { lat: number; lon: number } | null = null
+  let zeitgeber: ReturnType<typeof setTimeout> | null = null
+
+  const verwerfen = () => {
+    if (zeitgeber !== null) {
+      clearTimeout(zeitgeber)
+      zeitgeber = null
+    }
+  }
+
+  return {
+    mitteBewegt(lat, lon) {
+      // Jede neue Bewegung setzt die Ruhe-Uhr zurück — schnelle
+      // Folge-Bewegungen münden so in genau EINER Anfrage am Ende.
+      verwerfen()
+      if (bezugspunkt && meterAbstand({ lat, lon }, bezugspunkt) < minMeter) return
+      zeitgeber = setTimeout(() => {
+        zeitgeber = null
+        bezugspunkt = { lat, lon }
+        onAnfrage(lat, lon)
+      }, ruheMs)
+    },
+    setzeBezugspunkt(lat, lon) {
+      verwerfen()
+      bezugspunkt = { lat, lon }
+    },
+    aufloesen: verwerfen,
   }
 }

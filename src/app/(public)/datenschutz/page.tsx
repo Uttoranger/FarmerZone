@@ -183,10 +183,12 @@ export default function DatenschutzPage() {
 
           <Section title="Standortsuche und Kartendarstellung">
             <p>
-              Prüft ein Hof im Hofprofil seinen Standort, wird die eingegebene Hofadresse
+              Sucht ein Hof im Hofprofil seinen Standort, wird die eingegebene Hofadresse
               (Straße, PLZ, Ort) zur Standortsuche an Nominatim (OpenStreetMap Foundation,
-              nominatim.openstreetmap.org) übermittelt — es handelt sich um die
-              Betriebsadresse des Hofes, nicht um Daten von Besucherinnen. Die
+              nominatim.openstreetmap.org) übermittelt; schiebt er den Kartenpunkt, wird
+              umgekehrt dieser Punkt zur Ermittlung der Adresse dorthin übermittelt — es
+              handelt sich jeweils um die Betriebsadresse bzw. den Betriebsstandort des
+              Hofes, nicht um Daten von Besucherinnen. Die
               Kartenkacheln der Minikarte werden von OpenStreetMap geladen; dabei wird die
               IP-Adresse des eingeloggten Betreibers an OpenStreetMap übertragen. Für
               Besucherinnen der öffentlichen Seiten wird keine Karte geladen.

@@ -9,8 +9,10 @@ import { findSlotError } from '@/lib/pickup-slot-rules'
 import {
   geokodiereAdresse,
   istInOesterreich,
+  rueckwaertsGeokodiere,
   rundeKoordinate,
   type GeokodierungsErgebnis,
+  type RueckwaertsAdresse,
 } from '@/lib/geokodierung'
 
 async function getAuthFarm() {
@@ -30,6 +32,11 @@ const profileSchema = z.object({
   city: z.string().min(2),
   phone: z.string().min(4),
   email: z.string().email('Ungültige E-Mail-Adresse'),
+  // Der Kartenpunkt wird MIT dem Profil gespeichert — es gibt keinen eigenen
+  // Bestätigen-Schritt mehr. null heißt: (noch) kein Punkt gesetzt; ein
+  // gespeicherter Punkt wird dann NICHT angerührt (siehe updateProfile).
+  latitude: z.number().nullable(),
+  longitude: z.number().nullable(),
   // Logo und Titelbild gehören zu „Mein Auftritt" (echter Datei-Upload) und
   // stehen bewusst NICHT mehr im Profil-Formular. Sie fehlen hier auch im
   // Schreibpfad: sonst würde jedes Profil-Speichern die dort hochgeladenen
@@ -46,42 +53,50 @@ export async function updateProfile(data: ProfileFormData): Promise<ProfileResul
   const parsed = profileSchema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Ungültige Daten' }
 
+  const { latitude, longitude, ...profil } = parsed.data
+  const hatPunkt = latitude != null && longitude != null
+  // Plausibilisiert grob auf Österreich — ein Punkt in Italien oder bei 0/0
+  // ist kein Hofstandort, sondern eine verrutschte Karte. Dann wird NICHTS
+  // gespeichert, und der Bauer schiebt den Punkt zurück.
+  if (hatPunkt && !istInOesterreich(latitude, longitude)) {
+    return { error: 'Der Punkt liegt außerhalb Österreichs — bitte schieb die Karte auf deinen Hof.' }
+  }
+
   await prisma.farm.update({
     where: { id: farm.id },
-    data: parsed.data,
+    data: {
+      ...profil,
+      // Ohne Punkt bleiben gespeicherte Koordinaten unangetastet — das
+      // Profil-Speichern darf einen gesetzten Standort nie löschen.
+      ...(hatPunkt
+        ? { latitude: rundeKoordinate(latitude), longitude: rundeKoordinate(longitude) }
+        : {}),
+    },
   })
 
   revalidatePath('/settings/profile')
+  // Der Kartenpunkt zählt in die Erste-Schritte-Liste der Übersicht.
+  revalidatePath('/dashboard')
   revalidatePath(`/${farm.slug}`)
   return {}
 }
 
-/** Was die Standort-Schaltfläche zurückbekommt. */
-export type StandortPruefung =
-  | { error: string }
-  /** Es gibt schon bestätigte Koordinaten: Karte öffnet direkt darauf —
-   *  gespeichert ist gespeichert, es wird NICHT neu geokodiert. */
-  | { art: 'vorhanden'; lat: number; lon: number }
-  /** Noch keine Koordinaten: der Kaskaden-Vorschlag. */
-  | { art: 'vorschlag'; ergebnis: GeokodierungsErgebnis }
+/** Was die Schaltfläche „Auf der Karte suchen" zurückbekommt. */
+export type StandortSuche = { error: string } | { ergebnis: GeokodierungsErgebnis }
 
 /**
- * Auslöser ist AUSSCHLIESSLICH die Schaltfläche „Standort auf der Karte
- * prüfen" im Hofprofil — keine Suche beim Tippen, kein Aufruf beim Speichern.
- * Geokodiert wird nur, solange noch keine Koordinaten existieren; danach
- * gilt der gespeicherte Punkt (Schaltfläche „Standort ändern" öffnet ihn).
+ * Auslöser ist AUSSCHLIESSLICH die Schaltfläche „Auf der Karte suchen" im
+ * Hofprofil — keine Suche beim Tippen, kein Aufruf beim Speichern. Es wird
+ * IMMER geokodiert: Die Karte ist dauerhaft sichtbar, die Suche fährt sie
+ * auf den Vorschlag; gespeichert wird der Punkt erst mit dem Profil.
  */
-export async function pruefeHofStandort(adresse: {
+export async function sucheHofStandort(adresse: {
   address: string
   postalCode: string
   city: string
-}): Promise<StandortPruefung> {
+}): Promise<StandortSuche> {
   const farm = await getAuthFarm()
   if (!farm) return { error: 'Nicht angemeldet' }
-
-  if (farm.latitude != null && farm.longitude != null) {
-    return { art: 'vorhanden', lat: farm.latitude, lon: farm.longitude }
-  }
 
   const parsed = profileSchema
     .pick({ address: true, postalCode: true, city: true })
@@ -90,32 +105,25 @@ export async function pruefeHofStandort(adresse: {
     return { error: 'Bitte zuerst Straße, PLZ und Ort ausfüllen.' }
   }
 
-  return { art: 'vorschlag', ergebnis: await geokodiereAdresse(parsed.data) }
+  return { ergebnis: await geokodiereAdresse(parsed.data) }
 }
 
 /**
- * Speichert die auf der Minikarte bestätigten Koordinaten (Kartenmitte).
- *
- * Plausibilisiert grob auf Österreich — ein Punkt in Italien oder bei 0/0
- * ist kein Hofstandort, sondern eine verrutschte Karte. Dann bleibt der
- * alte Stand, und der Bauer setzt den Punkt neu.
+ * Rückwärts: Der geschobene Kartenpunkt wird zu Adressfeldern. Gebremst wird
+ * clientseitig in der Karte (erstelleKartenBremse: Anfrage erst nach 1,2 s
+ * Ruhe und nur bei >~25 m seit der letzten Anfrage). Scheitert die Suche,
+ * kommt leise null — die Felder bleiben unverändert, die Koordinaten gelten
+ * trotzdem.
  */
-export async function speichereHofStandort(lat: number, lon: number): Promise<{ error?: string }> {
+export async function holeAdresseZumPunkt(
+  lat: number,
+  lon: number
+): Promise<RueckwaertsAdresse | null> {
   const farm = await getAuthFarm()
-  if (!farm) return { error: 'Nicht angemeldet' }
+  if (!farm) return null
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null
 
-  if (!istInOesterreich(lat, lon)) {
-    return { error: 'Der Punkt liegt außerhalb Österreichs — bitte schieb die Karte auf deinen Hof.' }
-  }
-
-  await prisma.farm.update({
-    where: { id: farm.id },
-    data: { latitude: rundeKoordinate(lat), longitude: rundeKoordinate(lon) },
-  })
-
-  revalidatePath('/settings/profile')
-  revalidatePath('/dashboard')
-  return {}
+  return rueckwaertsGeokodiere(lat, lon)
 }
 
 // ─── Pickup Slots ────────────────────────────────────────────────────────────
