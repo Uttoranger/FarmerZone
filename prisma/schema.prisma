@@ -166,6 +166,11 @@ model Farm {
   address     String
   postalCode  String
   city        String
+  // Standort für die spätere Kundenkarte. Nullbar: Bestandshöfe haben noch
+  // keine Koordinaten und werden über die Einstiegs-Checkliste angeleitet,
+  // den Punkt im Hofprofil zu bestätigen (kein Backfill).
+  latitude    Float?
+  longitude   Float?
   phone       String
   email       String
   logoUrl     String?

@@ -6,6 +6,12 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { findSlotError } from '@/lib/pickup-slot-rules'
+import {
+  geokodiereAdresse,
+  istInOesterreich,
+  rundeKoordinate,
+  type GeokodierungsErgebnis,
+} from '@/lib/geokodierung'
 
 async function getAuthFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -31,7 +37,12 @@ const profileSchema = z.object({
 })
 
 export type ProfileFormData = z.infer<typeof profileSchema>
-export type ProfileResult = { error?: string }
+export type ProfileResult = {
+  error?: string
+  /** Gesetzt, wenn nach dem Speichern der Standort bestätigt werden soll —
+   *  das Formular öffnet dann die Minikarte. */
+  standort?: GeokodierungsErgebnis
+}
 
 export async function updateProfile(data: ProfileFormData): Promise<ProfileResult> {
   const farm = await getAuthFarm()
@@ -47,6 +58,47 @@ export async function updateProfile(data: ProfileFormData): Promise<ProfileResul
 
   revalidatePath('/settings/profile')
   revalidatePath(`/${farm.slug}`)
+
+  // Geokodiert wird NUR, wenn die Adresse sich geändert hat oder noch keine
+  // Koordinaten existieren — nicht bei jedem Speichern. Wer nur seine
+  // Beschreibung glättet, bekommt keine Karte vorgesetzt.
+  const adresseGeaendert =
+    parsed.data.address !== farm.address ||
+    parsed.data.postalCode !== farm.postalCode ||
+    parsed.data.city !== farm.city
+  if (adresseGeaendert || farm.latitude == null || farm.longitude == null) {
+    const standort = await geokodiereAdresse({
+      address: parsed.data.address,
+      postalCode: parsed.data.postalCode,
+      city: parsed.data.city,
+    })
+    return { standort }
+  }
+  return {}
+}
+
+/**
+ * Speichert die auf der Minikarte bestätigten Koordinaten (Kartenmitte).
+ *
+ * Plausibilisiert grob auf Österreich — ein Punkt in Italien oder bei 0/0
+ * ist kein Hofstandort, sondern eine verrutschte Karte. Dann bleibt der
+ * alte Stand, und der Bauer setzt den Punkt neu.
+ */
+export async function speichereHofStandort(lat: number, lon: number): Promise<{ error?: string }> {
+  const farm = await getAuthFarm()
+  if (!farm) return { error: 'Nicht angemeldet' }
+
+  if (!istInOesterreich(lat, lon)) {
+    return { error: 'Der Punkt liegt außerhalb Österreichs — bitte schieb die Karte auf deinen Hof.' }
+  }
+
+  await prisma.farm.update({
+    where: { id: farm.id },
+    data: { latitude: rundeKoordinate(lat), longitude: rundeKoordinate(lon) },
+  })
+
+  revalidatePath('/settings/profile')
+  revalidatePath('/dashboard')
   return {}
 }
 

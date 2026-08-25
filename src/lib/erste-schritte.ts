@@ -15,6 +15,9 @@
 /** Alles, was die Liste zum Rechnen braucht — Zählwerte und Ja/Nein, sonst nichts. */
 export type ErsteSchritteDaten = {
   hatBeschreibung: boolean
+  /** Bestätigte Koordinaten (latitude UND longitude gesetzt) — seit dem
+   *  Standort-Sprint gehört der Kartenpunkt zum fertigen Profil. */
+  hatKoordinaten: boolean
   hatLogo: boolean
   /** Ein hochgeladenes Foto, kein Farbverlauf — siehe Kommentar in der Query. */
   hatTitelbild: boolean
@@ -70,9 +73,11 @@ export function ersteSchritte(daten: ErsteSchritteDaten): ErsteSchritteErgebnis 
     {
       id: 'profil',
       titel: 'Hofprofil ausfüllen',
-      nutzen: 'Wer bei dir kauft, will wissen, wer du bist.',
+      nutzen: 'Wer bei dir kauft, will wissen, wer du bist. Standort auf der Karte bestätigen.',
       href: '/settings/profile',
-      erledigt: daten.hatBeschreibung,
+      // Beschreibung UND bestätigter Kartenpunkt — die Adresse allein reicht
+      // nicht mehr, seit Kundinnen den Hof später auf einer Karte finden sollen.
+      erledigt: daten.hatBeschreibung && daten.hatKoordinaten,
       optional: false,
     },
     {

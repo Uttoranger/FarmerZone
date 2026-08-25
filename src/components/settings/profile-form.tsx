@@ -1,6 +1,7 @@
 ﻿'use client'
 
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
+import dynamic from 'next/dynamic'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -10,8 +11,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { updateProfile, type ProfileFormData } from '@/server/actions/farm'
+import { speichereHofStandort, updateProfile, type ProfileFormData } from '@/server/actions/farm'
 import type { FarmSettings } from '@/server/queries/farm'
+import type { GeokodierungsErgebnis } from '@/lib/geokodierung'
+
+// Nur clientseitig: Leaflet greift beim Import auf window zu.
+const StandortKarte = dynamic(() => import('@/components/settings/standort-karte'), { ssr: false })
 
 const schema = z.object({
   name: z.string().min(2, 'Mindestens 2 Zeichen'),
@@ -26,6 +31,12 @@ const schema = z.object({
 
 export function ProfileForm({ farm }: { farm: FarmSettings }) {
   const [isPending, startTransition] = useTransition()
+  // Nach dem Speichern mit geänderter Adresse (oder ohne Koordinaten) liefert
+  // die Action einen Standort-Vorschlag — dann öffnet die Minikarte.
+  const [standort, setStandort] = useState<{
+    ergebnis: GeokodierungsErgebnis
+    adresse: string
+  } | null>(null)
 
   const { register, handleSubmit, formState: { errors } } = useForm<ProfileFormData>({
     resolver: zodResolver(schema),
@@ -48,8 +59,23 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
         toast.error(res.error)
       } else {
         toast.success('Profil gespeichert')
+        if (res.standort) {
+          setStandort({
+            ergebnis: res.standort,
+            adresse: `${data.address}, ${data.postalCode} ${data.city}`,
+          })
+        }
       }
     })
+  }
+
+  async function standortBestaetigt(lat: number, lon: number) {
+    const res = await speichereHofStandort(lat, lon)
+    if (!res.error) {
+      toast.success('Standort gespeichert')
+      setStandort(null)
+    }
+    return res
   }
 
   function field(id: keyof ProfileFormData, label: string, placeholder?: string) {
@@ -69,6 +95,14 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      {standort && (
+        <StandortKarte
+          adresse={standort.adresse}
+          ergebnis={standort.ergebnis}
+          onBestaetigt={standortBestaetigt}
+          onAbbrechen={() => setStandort(null)}
+        />
+      )}
       <div className="bg-white rounded-xl border border-border p-4 space-y-4">
         <h2 className="font-medium text-foreground">Hof-Informationen</h2>
         {field('name', 'Hof-Name *', 'Hof Müller')}
