@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { upload } from '@vercel/blob/client'
 import { useFotoQuellen } from '@/components/shared/foto-quellen'
 import { summarizeUploadBatch, type BatchSkip } from '@/lib/upload-batch'
+import { meldeUploadFehler, type UploadWeg } from '@/lib/upload-meldung'
 import {
   BildFehler,
   bildFehlerMeldung,
@@ -183,9 +184,13 @@ async function uebertrageOriginal(
   optionen: {
     onFortschritt?: (prozent: number) => void
     onStufe?: (stufe: UploadStufe) => void
+    /** Reine Zusatz-Meldung für die Sentry-Diagnose: welcher Anlauf gerade
+     *  läuft. Ändert am Ablauf nichts. */
+    onVersuch?: (versuch: number) => void
   }
 ): Promise<{ url: string }> {
   for (let versuch = 1; ; versuch++) {
+    optionen.onVersuch?.(versuch)
     // Beide Wächter je Anlauf frisch — ein Zweitversuch bekommt die volle Zeit
     const abbruch = new AbortController()
     const deckel = setTimeout(() => abbruch.abort(), UPLOAD_LIMIT_MS)
@@ -265,6 +270,8 @@ export async function ladeFotoHoch(
     altUrl?: string
     onFortschritt?: (prozent: number) => void
     onStufe?: (stufe: UploadStufe) => void
+    /** Reine Zusatz-Meldung (Sentry-Diagnose): welcher Transfer-Anlauf läuft. */
+    onVersuch?: (versuch: number) => void
   } = {}
 ): Promise<string> {
   optionen.onStufe?.('lesen')
@@ -350,13 +357,20 @@ export function useImageUpload({
     prozent: number
     stufe: UploadStufe
   } | null>(null)
+  // Über welchen Weg die laufende Auswahl kam — nur für die Sentry-Meldung.
+  // Am Desktop öffnet der Auslöser direkt die Galerie-Auswahl, daher der
+  // Startwert 'galerie'.
+  const weg = useRef<UploadWeg>('galerie')
   async function uploadOne(file: File, batch: boolean): Promise<UploadResult> {
     if (file.size > MAX_ORIGINAL_BYTES) {
       return { ok: false, message: 'Datei zu groß (max. 25 MB)', short: 'zu groß (max. 25 MB)' }
     }
 
+    // 0 = der Transfer hat nie begonnen (z. B. Lese-Stufe gescheitert).
+    let versuche = 0
+    let url: string
     try {
-      const url = await ladeFotoHoch(file, variant, {
+      url = await ladeFotoHoch(file, variant, {
         altUrl: oldUrl,
         onStufe: (stufe) =>
           setProgress((v) => (v ? { ...v, stufe } : { current: 1, total: 1, prozent: 0, stufe })),
@@ -364,12 +378,27 @@ export function useImageUpload({
           setProgress((v) =>
             v ? { ...v, prozent } : { current: 1, total: 1, prozent, stufe: 'hochladen' }
           ),
+        onVersuch: (versuch) => {
+          versuche = versuch
+        },
       })
+    } catch (e) {
+      // Zusätzlich zur Anzeige nach Sentry — Ursache, Kennung, Größe, Typ,
+      // Weg, Versuche; kein Dateiname (siehe upload-meldung.ts). So ist
+      // künftig ohne Bildschirmfoto nachvollziehbar, woran es scheiterte.
+      meldeUploadFehler(e, { datei: file, weg: weg.current, versuche })
+      // Ein BildFehler bringt seine Ursache mit und bekommt den passenden
+      // Text; alles andere behält seine eigene Meldung.
+      const { text, kurz } = bildFehlerMeldung(e)
+      return { ok: false, message: text, short: kurz }
+    }
+    try {
       await onUploaded(url, { batch })
       return { ok: true }
     } catch (e) {
-      // Ein BildFehler bringt seine Ursache mit und bekommt den passenden
-      // Text; alles andere behält seine eigene Meldung.
+      // KEIN Upload-Fehler: Der Transfer gelang, gescheitert ist die
+      // Weiterverarbeitung im Aufrufer — darum keine Foto-Upload-Meldung
+      // nach Sentry, die Diagnose bliebe sonst mit Fremdfällen verwässert.
       const { text, kurz } = bildFehlerMeldung(e)
       return { ok: false, message: text, short: kurz }
     }
@@ -431,7 +460,8 @@ export function useImageUpload({
   // Touch-Gerät das Quellen-Menü, fileInput trägt Inputs und Menü.
   const quellen = useFotoQuellen({
     multiple,
-    onFiles: (dateien) => {
+    onFiles: (dateien, gewaehlterWeg) => {
+      weg.current = gewaehlterWeg
       // Einzelauswahl behält ihren bisherigen Weg samt Einzelmeldungen
       if (!multiple || dateien.length === 1) void handleSingle(dateien[0])
       else void handleSeries(dateien)

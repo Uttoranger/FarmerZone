@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -8,6 +8,7 @@ import { ImagePlus, X, Leaf, Thermometer, Snowflake } from 'lucide-react'
 import { ladeFotoHoch, stufenText, type UploadStufe } from '@/components/shared/image-upload'
 import { useFotoQuellen } from '@/components/shared/foto-quellen'
 import { bildFehlerMeldung } from '@/lib/upload-fehler'
+import { meldeUploadFehler, type UploadWeg } from '@/lib/upload-meldung'
 import { MAX_ORIGINAL_BYTES } from '@/lib/upload-pfade'
 import {
   Dialog,
@@ -107,10 +108,16 @@ export function ProductDialog({ open, product, onClose }: Props) {
   } | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  // Über welchen Weg das gewählte Foto kam — nur für die Sentry-Meldung;
+  // der Upload läuft hier erst beim Absenden, also bis dahin merken.
+  const gewaehlterWeg = useRef<UploadWeg>('galerie')
   // Drei Wege zum Produktfoto (Galerie, Dateien, Kamera) — derselbe
   // Quellen-Hook wie im Upload-Hook, damit es nur EIN Menü gibt.
   const fotoQuellen = useFotoQuellen({
-    onFiles: ([datei]) => uebernehmeFoto(datei),
+    onFiles: ([datei], weg) => {
+      gewaehlterWeg.current = weg
+      uebernehmeFoto(datei)
+    },
   })
 
   const form = useForm<ProductFormData>({
@@ -179,6 +186,8 @@ export function ProductDialog({ open, product, onClose }: Props) {
         // verkleinert, fertige Adresse zurück. Der Dialog nutzt den Hook nicht
         // (er lädt erst beim Absenden), teilt sich mit ihm aber die Funktion —
         // damit gibt es keinen zweiten Upload-Weg, der auseinanderlaufen kann.
+        // 0 = der Transfer hat nie begonnen — nur für die Sentry-Meldung.
+        let versuche = 0
         try {
           imageUrl = await ladeFotoHoch(selectedFile, 'product', {
             altUrl: isEdit ? (product.imageUrl ?? undefined) : undefined,
@@ -186,8 +195,14 @@ export function ProductDialog({ open, product, onClose }: Props) {
               setUploadFortschritt((v) => ({ stufe, prozent: v?.prozent ?? 0 })),
             onFortschritt: (prozent) =>
               setUploadFortschritt((v) => ({ stufe: v?.stufe ?? 'hochladen', prozent })),
+            onVersuch: (versuch) => {
+              versuche = versuch
+            },
           })
         } catch (e) {
+          // Zusätzlich zur Anzeige nach Sentry (Ursache/Kennung/Größe/Typ/
+          // Weg/Versuche, kein Dateiname — upload-meldung.ts).
+          meldeUploadFehler(e, { datei: selectedFile, weg: gewaehlterWeg.current, versuche })
           const { text } = bildFehlerMeldung(e)
           toast.error(text)
           return

@@ -19,23 +19,27 @@ import { Camera, FolderOpen, Image as ImageIcon } from 'lucide-react'
  * der Auswahl ist der Ablauf exakt der bestehende: onFiles bekommt die
  * Dateien, sonst ändert sich nichts.
  */
+/** Welcher der drei Wege gewählt wurde — reine Zusatzinformation für die
+ *  Fehler-Meldung an Sentry (upload-meldung.ts); am Ablauf ändert sie nichts. */
+export type FotoQuellenWeg = 'galerie' | 'dateien' | 'kamera'
+
 export function useFotoQuellen({
   multiple = false,
   onFiles,
 }: {
   multiple?: boolean
-  onFiles: (dateien: File[]) => void
+  onFiles: (dateien: File[], weg: FotoQuellenWeg) => void
 }): { oeffnen: () => void; elemente: ReactNode } {
   const galerieRef = useRef<HTMLInputElement>(null)
   const dateienRef = useRef<HTMLInputElement>(null)
   const kameraRef = useRef<HTMLInputElement>(null)
   const [menueOffen, setMenueOffen] = useState(false)
 
-  function auswahl(e: React.ChangeEvent<HTMLInputElement>) {
+  function auswahl(e: React.ChangeEvent<HTMLInputElement>, weg: FotoQuellenWeg) {
     const dateien = Array.from(e.target.files ?? [])
     // Sofort zurücksetzen: dieselbe Datei darf direkt nochmal gewählt werden
     e.target.value = ''
-    if (dateien.length > 0) onFiles(dateien)
+    if (dateien.length > 0) onFiles(dateien, weg)
   }
 
   function oeffnen() {
@@ -64,20 +68,26 @@ export function useFotoQuellen({
         accept="image/*"
         multiple={multiple}
         className="hidden"
-        onChange={auswahl}
+        onChange={(e) => auswahl(e, 'galerie')}
       />
       {/* BEWUSST ohne accept: erst das öffnet die Dokument-Auswahl mit
           „Eigene Dateien" und Downloads statt des Galerie-Pickers — der Weg
           an den toten Cloud-Referenzen vorbei. Was kein Bild ist, weist der
           Server an den Bytes ab. */}
-      <input ref={dateienRef} type="file" multiple={multiple} className="hidden" onChange={auswahl} />
+      <input
+        ref={dateienRef}
+        type="file"
+        multiple={multiple}
+        className="hidden"
+        onChange={(e) => auswahl(e, 'dateien')}
+      />
       <input
         ref={kameraRef}
         type="file"
         accept="image/*"
         capture="environment"
         className="hidden"
-        onChange={auswahl}
+        onChange={(e) => auswahl(e, 'kamera')}
       />
 
       {menueOffen && (

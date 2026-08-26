@@ -9,6 +9,15 @@ const serverEnvSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(1),
   STRIPE_SECRET_KEY: z.string().min(1),
   STRIPE_WEBHOOK_SECRET: z.string().min(1),
+  // OPTIONAL, und zwar unbedingt: Ein fehlender (oder leerer) DSN darf
+  // niemals einen Deploy verhindern — dann startet die App normal und
+  // Sentry bleibt schlicht still (src/instrumentation*.ts prüfen selbst).
+  // Der leere String wird zu undefined normalisiert, damit auch eine leer
+  // angelegte Vercel-Variable nicht als „gesetzt" durchgeht.
+  NEXT_PUBLIC_SENTRY_DSN: z.preprocess(
+    (wert) => (typeof wert === 'string' && wert.trim() ? wert : undefined),
+    z.string().optional()
+  ),
 })
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>

@@ -88,6 +88,19 @@ export default function DatenschutzPage() {
                 <p className="font-medium text-slate-700">Vercel (Hosting)</p>
                 <p>Vercel Inc., USA — Hosting der Webanwendung. Angemessenes Schutzniveau durch Standardvertragsklauseln.</p>
               </div>
+              <div>
+                <p className="font-medium text-slate-700">Sentry (Fehlerdiagnose)</p>
+                <p>Functional Software, Inc. (Sentry), USA — technische Fehlerberichte der Anwendung,
+                gespeichert auf Servern in der EU. Vor dem Versand werden personenbezogene Inhalte
+                (E-Mail-Adressen, Telefonnummern, Cookies, Zugangsdaten) automatisch entfernt;
+                übermittelt wird, was technisch schiefging, nicht wer betroffen war.</p>
+              </div>
+              <div>
+                <p className="font-medium text-slate-700">Vercel Web Analytics (Reichweitenmessung)</p>
+                <p>Vercel Inc., USA — cookielose Zählung von Seitenaufrufen ohne Wiedererkennung:
+                Es werden keine Cookies gesetzt, keine Kennungen auf dem Gerät gespeichert und
+                keine Profile über den Tag hinaus gebildet.</p>
+              </div>
             </div>
           </Section>
 
