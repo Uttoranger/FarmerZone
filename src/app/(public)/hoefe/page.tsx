@@ -52,7 +52,9 @@ export default async function HoefePage() {
         </Link>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 pb-16 pt-6 sm:pt-10">
+      {/* Ab lg trägt die Seite den Splitscreen (Liste links, Karte rechts)
+          und braucht dafür die volle Breite. */}
+      <main className="mx-auto max-w-3xl px-4 pb-16 pt-6 sm:pt-10 lg:max-w-6xl">
         {/* Editorial-Kopf im Stil der Startseite: Kicker + Fraunces. */}
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: '#4F6F57' }}>
           Direkt vom Hof

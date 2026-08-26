@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { ZurueckLink } from '@/components/shared/zurueck-link'
 import { DATENSCHUTZ_EMAIL } from '@/lib/support'
 
 export const metadata: Metadata = { title: 'Datenschutz — FarmerZone' }
@@ -17,9 +18,9 @@ export default function DatenschutzPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto px-4 py-10">
-        <Link href="javascript:history.back()" className="text-sm text-primary hover:underline mb-6 inline-block">
-          ← Zurück
-        </Link>
+        {/* Kein `javascript:history.back()`-Link: React blockiert solche
+            URLs, der Link tat nichts (siehe zurueck-link.tsx). */}
+        <ZurueckLink className="text-sm text-primary hover:underline mb-6 inline-block" />
         <h1 className="text-2xl font-semibold text-slate-800 mb-2">Datenschutzerklärung</h1>
         <p className="text-sm text-slate-500 mb-8">Gemäß DSGVO / DSG Österreich</p>
 
