@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   // sharp bleibt ein externes Server-Modul (native Binärdateien lassen sich
@@ -70,4 +71,14 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// withSentryConfig verdrahtet die Build-Seite von Sentry (Quelltext-Karten,
+// Turbopack-Regeln). Es UMSCHLIESST die Konfiguration nur — serverExternal-
+// Packages, das sharp-Tracing und die Security-Header oben bleiben unberührt.
+// Der Quelltext-Karten-Upload läuft erst, wenn SENTRY_AUTH_TOKEN, SENTRY_ORG
+// und SENTRY_PROJECT in Vercel stehen; ohne sie meldet der Build eine Notiz
+// und bleibt GRÜN — fehlende Sentry-Werte dürfen niemals einen Deploy
+// verhindern (gleicher Grundsatz wie beim DSN in src/lib/env.ts).
+export default withSentryConfig(nextConfig, {
+  // Keine Nutzungsstatistik des Sentry-Build-Werkzeugs an Sentry senden.
+  telemetry: false,
+});

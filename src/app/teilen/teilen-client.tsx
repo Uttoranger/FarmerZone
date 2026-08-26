@@ -9,6 +9,7 @@ import {
   type UploadStufe,
 } from '@/components/shared/image-upload'
 import { bildFehlerMeldung } from '@/lib/upload-fehler'
+import { meldeUploadFehler } from '@/lib/upload-meldung'
 import { MAX_ORIGINAL_BYTES } from '@/lib/upload-pfade'
 import { leseGeteilteFotos, leereGeteilteFotos } from '@/lib/teilen-ablage'
 import { updateFarmBannerAction } from '@/server/actions/appearance'
@@ -79,13 +80,27 @@ export function TeilenClient({
           continue
         }
         setLaufend({ index: i, stufe: 'lesen', prozent: 0 })
+        // 0 = der Transfer hat nie begonnen — nur für die Sentry-Meldung.
+        let versuche = 0
+        let url: string
         try {
-          const url = await ladeFotoHoch(foto, wirksamesZiel, {
+          url = await ladeFotoHoch(foto, wirksamesZiel, {
             altUrl:
               wirksamesZiel === 'banner' ? (bisherigesTitelbild ?? undefined) : undefined,
             onStufe: (stufe) => setLaufend((v) => (v ? { ...v, stufe } : v)),
             onFortschritt: (prozent) => setLaufend((v) => (v ? { ...v, prozent } : v)),
+            onVersuch: (versuch) => {
+              versuche = versuch
+            },
           })
+        } catch (e) {
+          // Zusätzlich zur Anzeige nach Sentry — der Teilen-Weg ist der
+          // vierte Weg neben Galerie, Dateien und Kamera (upload-meldung.ts).
+          meldeUploadFehler(e, { datei: foto, weg: 'teilen', versuche })
+          ausgang.push({ name: foto.name, ok: false, meldung: bildFehlerMeldung(e).text })
+          continue
+        }
+        try {
           const ergebnis =
             wirksamesZiel === 'banner'
               ? await updateFarmBannerAction('PHOTO', url)
@@ -96,6 +111,8 @@ export function TeilenClient({
             ausgang.push({ name: foto.name, ok: true })
           }
         } catch (e) {
+          // KEIN Upload-Fehler mehr (der Transfer gelang) — keine
+          // Foto-Upload-Meldung, nur die bestehende Anzeige.
           ausgang.push({ name: foto.name, ok: false, meldung: bildFehlerMeldung(e).text })
         }
       }

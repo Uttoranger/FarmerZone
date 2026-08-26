@@ -6,6 +6,7 @@ import { getOpenOrdersCount } from '@/server/queries/orders'
 import { getFarmBannerState } from '@/server/queries/farm'
 import { FarmerNav } from '@/components/farmer/farmer-nav'
 import { ServiceWorkerAnmeldung } from '@/components/shared/service-worker-anmeldung'
+import { SentryNutzer } from '@/components/farmer/sentry-nutzer'
 import { ShopLinkBanner } from '@/components/farmer/shop-link-banner'
 import { ArchivedFarmBanner } from '@/components/farmer/archived-farm-banner'
 import { PendingApprovalBanner } from '@/components/farmer/pending-approval-banner'
@@ -37,6 +38,9 @@ export default async function FarmerLayout({ children }: { children: React.React
           Layout kommt — die Installation als App (und damit das Teilen-Ziel)
           setzt genau diesen Worker voraus. */}
       <ServiceWorkerAnmeldung />
+      {/* Sentry-Nutzerkennung: ausschließlich die Farm-ID (nie E-Mail, nie
+          Name) — hier gesetzt, weil jeder Bauer über dieses Layout kommt. */}
+      <SentryNutzer farmId={farm.id} />
       <div className="flex min-h-screen">
         <FarmerNav
           farmName={farm.name}

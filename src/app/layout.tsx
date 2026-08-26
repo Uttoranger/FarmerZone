@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Geist, Fraunces } from 'next/font/google'
+import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/sonner'
 import { CookieBanner } from '@/components/cookie-banner'
 import './globals.css'
@@ -31,6 +32,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         <Toaster richColors position="top-center" />
         <CookieBanner />
+        {/* Vercel Web Analytics: cookielose Reichweitenmessung ohne
+            Wiedererkennung — rendert nichts Sichtbares und setzt nichts
+            auf dem Gerät (deshalb auch nicht Teil des Cookie-Banners). */}
+        <Analytics />
       </body>
     </html>
   )
