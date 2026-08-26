@@ -3,6 +3,14 @@ import { categoryImagePath } from '@/lib/product-image'
 import { DEFAULT_SECTIONS, type SectionConfig } from './appearance'
 import { PRODUCT_ORDER_BY } from './products'
 import type { ProductCategory } from '@prisma/client'
+import { PRODUCT_CATEGORY_VALUES } from '@/schemas/product'
+import {
+  naechsteAbholung,
+  sammleKategorien,
+  wienJetzt,
+  type NaechsteAbholung,
+  type OrtsZeit,
+} from '@/lib/hofuebersicht'
 
 export type PublicProduct = {
   id: string
@@ -82,15 +90,25 @@ const FARM_PHOTO_SELECT = {
   select: { id: true, url: true, caption: true, sortOrder: true },
 }
 
+/**
+ * DIE öffentliche Sichtbarkeits-Bedingung — eine Quelle für Einzelseite UND
+ * Übersicht, damit die beiden nie auseinanderlaufen können:
+ * archivedAt: null — ein stillgelegter Hof ist öffentlich nicht auffindbar;
+ * approvedAt: { not: null } — dasselbe für einen noch nicht vom Betreiber
+ * freigeschalteten Hof (src/lib/farm-approval.ts).
+ */
+export const OEFFENTLICH_SICHTBAR = {
+  isActive: true,
+  archivedAt: null,
+  approvedAt: { not: null },
+} as const
+
 export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
-  // archivedAt: null — ein stillgelegter Hof ist öffentlich nicht auffindbar.
-  // approvedAt: { not: null } — dasselbe für einen noch nicht vom Betreiber
-  // freigeschalteten Hof (src/lib/farm-approval.ts).
   // Die Filterung sitzt bewusst hier in der Query und nicht in den Seiten:
   // jede öffentliche Unterseite, die über getPublicFarm lädt, ist damit
   // automatisch mitgesperrt und läuft in ihren bestehenden notFound-Pfad.
   const farm = await prisma.farm.findUnique({
-    where: { slug, isActive: true, archivedAt: null, approvedAt: { not: null } },
+    where: { slug, ...OEFFENTLICH_SICHTBAR },
     select: {
       id: true,
       slug: true,
@@ -355,4 +373,80 @@ export async function getStripeReadiness(ownerId: string): Promise<boolean> {
     select: { stripeAccountReady: true },
   })
   return farm?.stripeAccountReady ?? false
+}
+
+// ─── Öffentliche Hofübersicht (/hoefe) ──────────────────────────────────────
+
+export type HofUebersichtEintrag = {
+  slug: string
+  name: string
+  /** Nur PLZ und Ort — die Straße gehört nicht in die Übersicht, sie steht
+   *  auf der Hofseite. */
+  postalCode: string
+  city: string
+  logoUrl: string | null
+  latitude: number | null
+  longitude: number | null
+  isPaused: boolean
+  /** Distinct-Kategorien der VERFÜGBAREN Produkte, in Schema-Reihenfolge. */
+  kategorien: ProductCategory[]
+  /** Der nächste anstehende Abholtermin — null ohne aktive Fenster. */
+  naechsteAbholung: NaechsteAbholung | null
+}
+
+/**
+ * ALLE öffentlich sichtbaren Höfe — Filter EXAKT wie getPublicFarm oben
+ * (isActive, archivedAt: null, approvedAt not null): Was dort die Einzelseite
+ * sperrt, hält den Hof auch aus der Übersicht. EINE Query mit Einbindungen,
+ * kein N+1; die Kategorie- und Termin-Ableitung ist reine, getestete Logik
+ * (src/lib/hofuebersicht.ts).
+ */
+export async function getOeffentlicheHoefe(
+  jetzt: OrtsZeit = wienJetzt()
+): Promise<HofUebersichtEintrag[]> {
+  const hoefe = await prisma.farm.findMany({
+    where: OEFFENTLICH_SICHTBAR,
+    // Freischalt-Reihenfolge, die ältesten zuerst — stabil und fair, ohne
+    // eine Rangfrage zu eröffnen, die diese Fassung nicht beantworten will.
+    orderBy: { approvedAt: 'asc' },
+    select: {
+      // id/approvedAt/createdAt werden (noch) NICHT angezeigt: Zusammen mit
+      // archivedAt (hier durch den Filter konstant null) sind sie die
+      // Eingabe von gruendungsplaetze() (src/lib/gruendungshof.ts,
+      // HofFuerPlatz) — die spätere Gründungshof-Kennzeichnung braucht damit
+      // KEINEN Query-Umbau, nur eine Anzeige.
+      id: true,
+      approvedAt: true,
+      createdAt: true,
+      slug: true,
+      name: true,
+      postalCode: true,
+      city: true,
+      logoUrl: true,
+      latitude: true,
+      longitude: true,
+      isPaused: true,
+      products: {
+        where: { isAvailable: true, category: { not: null } },
+        select: { category: true },
+      },
+      pickupSlots: {
+        where: { isActive: true },
+        select: { dayOfWeek: true, startTime: true, endTime: true },
+      },
+    },
+  })
+
+  return hoefe.map((hof) => ({
+    slug: hof.slug,
+    name: hof.name,
+    postalCode: hof.postalCode,
+    city: hof.city,
+    logoUrl: hof.logoUrl,
+    latitude: hof.latitude,
+    longitude: hof.longitude,
+    isPaused: hof.isPaused,
+    kategorien: sammleKategorien(hof.products, PRODUCT_CATEGORY_VALUES),
+    naechsteAbholung: naechsteAbholung(hof.pickupSlots, jetzt),
+  }))
 }
