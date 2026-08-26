@@ -99,7 +99,8 @@ const SECTION_TITLES = {
 }
 
 // Der eine Orange-Einsatz der Seite (globals.css: „Warmes Orange (CTA, max. 1× pro Seite)").
-// Kein zweiter CTA für Kundinnen — die kommen über den Link ihres Hofes.
+// Kundinnen haben seit der Hofübersicht einen eigenen Weg (/hoefe) — als
+// ruhigen Textlink in Kopf, CTA-Band und Fuß, nie als zweiten Orange-Knopf.
 const CTA_HEADLINE = 'Du führst einen Hof und willst dabei sein?'
 const CTA_BUTTON = 'Hof anmelden'
 const CTA_NOTE =
@@ -265,13 +266,23 @@ export default function HomePage() {
             FarmerZone
           </span>
         </Link>
-        <Link
-          href="/login"
-          className="shrink-0 whitespace-nowrap rounded-lg border px-3.5 py-2 text-[13px] font-semibold transition-colors hover:bg-white"
-          style={{ borderColor: '#D6E0CE', color: '#2D5F3F', background: 'rgba(255,255,255,0.6)' }}
-        >
-          Hofbetreiber-Login
-        </Link>
+        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+          {/* Der Kunden-Einstieg: ruhiger Textlink, kein zweiter Knopf. */}
+          <Link
+            href="/hoefe"
+            className="whitespace-nowrap text-[13px] font-semibold transition-opacity hover:opacity-80"
+            style={{ color: '#2D5F3F' }}
+          >
+            Höfe ansehen
+          </Link>
+          <Link
+            href="/login"
+            className="whitespace-nowrap rounded-lg border px-3.5 py-2 text-[13px] font-semibold transition-colors hover:bg-white"
+            style={{ borderColor: '#D6E0CE', color: '#2D5F3F', background: 'rgba(255,255,255,0.6)' }}
+          >
+            Hofbetreiber-Login
+          </Link>
+        </div>
       </header>
 
       <main className="flex-1">
@@ -514,12 +525,27 @@ export default function HomePage() {
               </a>
             </p>
           </div>
+          {/* Der Kunden-Einstieg unter dem Band: Wer hier landet, aber
+              einkaufen will, bekommt den ruhigen Zweitweg zur Übersicht —
+              der Orange-Akzent bleibt allein beim Registrieren-Knopf. */}
+          <p className="mx-auto mt-6 max-w-4xl text-center text-sm text-muted-foreground">
+            Du willst einkaufen?{' '}
+            <Link
+              href="/hoefe"
+              className="inline-flex min-h-11 items-center font-medium text-primary underline underline-offset-4 transition-opacity hover:opacity-80"
+            >
+              Höfe ansehen
+            </Link>
+          </p>
         </section>
       </main>
 
       <footer className="py-6 px-6 border-t border-border/50">
         <div className="max-w-2xl mx-auto flex flex-wrap justify-center gap-5 text-xs text-muted-foreground">
           <span>© {new Date().getFullYear()} FarmerZone</span>
+          <Link href="/hoefe" className="hover:text-foreground transition-colors duration-[250ms]">
+            Höfe ansehen
+          </Link>
           <Link href="/impressum" className="hover:text-foreground transition-colors duration-[250ms]">
             Impressum
           </Link>

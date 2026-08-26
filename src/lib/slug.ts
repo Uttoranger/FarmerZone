@@ -2,6 +2,9 @@ export const RESERVED_SLUGS = new Set([
   'login', 'register', 'onboarding', 'account', 'api',
   'impressum', 'datenschutz', 'settings', 'orders', 'customers',
   'status', 'products', 'sales', 'analytics', 'dashboard', 'admin',
+  // Öffentliche Hofübersicht: Ein Hof namens „Höfe" bekäme sonst den Slug
+  // hoefe — und die statische Route gewänne dauerhaft gegen seine Hofseite.
+  'hoefe',
 ])
 
 export function generateSlug(name: string): string {

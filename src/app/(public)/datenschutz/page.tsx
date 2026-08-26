@@ -203,8 +203,11 @@ export default function DatenschutzPage() {
               handelt sich jeweils um die Betriebsadresse bzw. den Betriebsstandort des
               Hofes, nicht um Daten von Besucherinnen. Die
               Kartenkacheln der Minikarte werden von OpenStreetMap geladen; dabei wird die
-              IP-Adresse des eingeloggten Betreibers an OpenStreetMap übertragen. Für
-              Besucherinnen der öffentlichen Seiten wird keine Karte geladen.
+              IP-Adresse des eingeloggten Betreibers an OpenStreetMap übertragen. Auf der
+              öffentlichen Hofübersicht wird eine Karte erst geladen, wenn du dort die
+              Kartenansicht öffnest — dann wird deine IP-Adresse zum Abruf der Kacheln an
+              OpenStreetMap übertragen; darüber hinaus werden keine Daten über dich
+              weitergegeben, und dein Standort wird nicht abgefragt.
             </p>
           </Section>
 
