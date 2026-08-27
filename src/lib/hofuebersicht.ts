@@ -97,6 +97,30 @@ export function formatiereAbholung(a: NaechsteAbholung): string {
   return `${DAY_NAMES[a.dayOfWeek]} ${a.startTime}–${a.endTime}`
 }
 
+/** Höchstens so viele Fotos trägt ein Streifen — mehr wäre Ballast im
+ *  Payload und niemand blättert weiter. */
+export const FOTOSTREIFEN_DECKEL = 5
+
+/**
+ * Baut den Fotostreifen einer Hofkarte: Titelbild zuerst (NUR wenn
+ * bannerType ein echtes Bild ist — GRADIENT ist Farbe, kein Foto), dann die
+ * Galerie (bereits nach sortOrder), dann Produktfotos. Duplikate fallen weg
+ * (dasselbe Foto kann Titelbild UND Galerie-Eintrag sein), Deckel bei 5.
+ * Ein Hof ohne Fotos bekommt die leere Liste — und behält seine kompakte
+ * Karte.
+ */
+export function baueFotostreifen(eingabe: {
+  bannerUrl: string | null
+  bannerType: string
+  galerie: string[]
+  produktFotos: string[]
+}): string[] {
+  const fotos: string[] = []
+  if (eingabe.bannerType === 'PHOTO' && eingabe.bannerUrl) fotos.push(eingabe.bannerUrl)
+  fotos.push(...eingabe.galerie, ...eingabe.produktFotos)
+  return [...new Set(fotos)].slice(0, FOTOSTREIFEN_DECKEL)
+}
+
 /**
  * Kategorie-Filter der Übersicht — Mehrfachauswahl als ODER: Ein Hof bleibt,
  * wenn er MINDESTENS EINE der gewählten Kategorien führt. Leere Auswahl

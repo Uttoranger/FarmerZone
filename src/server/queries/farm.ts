@@ -5,6 +5,7 @@ import { PRODUCT_ORDER_BY } from './products'
 import type { ProductCategory } from '@prisma/client'
 import { PRODUCT_CATEGORY_VALUES } from '@/schemas/product'
 import {
+  baueFotostreifen,
   naechsteAbholung,
   sammleKategorien,
   wienJetzt,
@@ -392,6 +393,10 @@ export type HofUebersichtEintrag = {
   kategorien: ProductCategory[]
   /** Der nächste anstehende Abholtermin — null ohne aktive Fenster. */
   naechsteAbholung: NaechsteAbholung | null
+  /** Der Fotostreifen: nur URLs, Titelbild zuerst, höchstens fünf
+   *  (baueFotostreifen in src/lib/hofuebersicht.ts). Leer = keine Fotos,
+   *  die Karte bleibt kompakt. */
+  fotos: string[]
 }
 
 /**
@@ -426,9 +431,26 @@ export async function getOeffentlicheHoefe(
       latitude: true,
       longitude: true,
       isPaused: true,
+      bannerUrl: true,
+      bannerType: true,
+      // Die ersten vier Galerie-Fotos für den Fotostreifen — mehr lädt die
+      // Query nie (Deckel siehe baueFotostreifen).
+      farmPhotos: {
+        orderBy: { sortOrder: 'asc' },
+        take: 4,
+        select: { url: true },
+      },
+      // EINE products-Einbindung für ZWEI Ableitungen: Kategorien (Produkte
+      // ohne Kategorie überspringt sammleKategorien) und Produktfotos (die
+      // ersten drei mit imageUrl, geschnitten im Mapper) — Prisma erlaubt
+      // dieselbe Relation nicht zweimal im selben select.
       products: {
-        where: { isAvailable: true, category: { not: null } },
-        select: { category: true },
+        where: { isAvailable: true },
+        // Stabile Reihenfolge (Repo-Konvention der Hofseite): Ohne orderBy
+        // wären „die ersten drei" Produktfotos DB-launisch und der Streifen
+        // wechselte zwischen zwei Ladevorgängen sein Gesicht.
+        orderBy: PRODUCT_ORDER_BY,
+        select: { category: true, imageUrl: true },
       },
       pickupSlots: {
         where: { isActive: true },
@@ -448,5 +470,14 @@ export async function getOeffentlicheHoefe(
     isPaused: hof.isPaused,
     kategorien: sammleKategorien(hof.products, PRODUCT_CATEGORY_VALUES),
     naechsteAbholung: naechsteAbholung(hof.pickupSlots, jetzt),
+    fotos: baueFotostreifen({
+      bannerUrl: hof.bannerUrl,
+      bannerType: hof.bannerType,
+      galerie: hof.farmPhotos.map((f) => f.url),
+      produktFotos: hof.products
+        .map((p) => p.imageUrl)
+        .filter((url): url is string => url !== null && url !== '')
+        .slice(0, 3),
+    }),
   }))
 }

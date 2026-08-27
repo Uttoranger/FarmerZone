@@ -10,6 +10,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
+  baueFotostreifen,
   filtereHoefe,
   formatiereAbholung,
   naechsteAbholung,
@@ -48,6 +49,9 @@ function rohHof(teil: Record<string, unknown> = {}) {
     latitude: 48.21,
     longitude: 13.49,
     isPaused: false,
+    bannerUrl: null,
+    bannerType: 'GRADIENT',
+    farmPhotos: [],
     products: [],
     pickupSlots: [],
     ...teil,
@@ -219,6 +223,84 @@ describe('filtereHoefe', () => {
   })
 })
 
+describe('baueFotostreifen', () => {
+  const GALERIE = ['g1.jpg', 'g2.jpg']
+  const PRODUKTE = ['p1.jpg']
+
+  it('Titelbild zuerst, dann Galerie, dann Produktfotos', () => {
+    expect(
+      baueFotostreifen({
+        bannerUrl: 'titel.jpg',
+        bannerType: 'PHOTO',
+        galerie: GALERIE,
+        produktFotos: PRODUKTE,
+      })
+    ).toEqual(['titel.jpg', 'g1.jpg', 'g2.jpg', 'p1.jpg'])
+  })
+
+  it('ein Gradient-Titelbild ist Farbe, kein Foto — es wird übersprungen', () => {
+    expect(
+      baueFotostreifen({
+        bannerUrl: 'titel.jpg',
+        bannerType: 'GRADIENT',
+        galerie: GALERIE,
+        produktFotos: [],
+      })
+    ).toEqual(['g1.jpg', 'g2.jpg'])
+  })
+
+  it('PHOTO ohne hinterlegte URL (null oder leer) liefert kein Titelbild', () => {
+    expect(
+      baueFotostreifen({ bannerUrl: null, bannerType: 'PHOTO', galerie: GALERIE, produktFotos: [] })
+    ).toEqual(['g1.jpg', 'g2.jpg'])
+    expect(
+      baueFotostreifen({ bannerUrl: '', bannerType: 'PHOTO', galerie: GALERIE, produktFotos: [] })
+    ).toEqual(['g1.jpg', 'g2.jpg'])
+  })
+
+  it('entfernt Duplikate — dasselbe Foto als Titelbild UND in der Galerie zählt einmal', () => {
+    expect(
+      baueFotostreifen({
+        bannerUrl: 'g1.jpg',
+        bannerType: 'PHOTO',
+        galerie: GALERIE,
+        produktFotos: ['g2.jpg', 'p1.jpg'],
+      })
+    ).toEqual(['g1.jpg', 'g2.jpg', 'p1.jpg'])
+  })
+
+  it('Duplikat UND Deckel zusammen: das Duplikat frisst keinen Platz', () => {
+    // Das Titelbild steht auch in der Galerie — erst entdoppeln, DANN
+    // deckeln: p1 bekommt den fünften Platz.
+    expect(
+      baueFotostreifen({
+        bannerUrl: 'g1.jpg',
+        bannerType: 'PHOTO',
+        galerie: ['g1.jpg', 'g2.jpg', 'g3.jpg', 'g4.jpg'],
+        produktFotos: ['p1.jpg', 'p2.jpg', 'p3.jpg'],
+      })
+    ).toEqual(['g1.jpg', 'g2.jpg', 'g3.jpg', 'g4.jpg', 'p1.jpg'])
+  })
+
+  it('deckelt bei fünf Fotos', () => {
+    const streifen = baueFotostreifen({
+      bannerUrl: 'titel.jpg',
+      bannerType: 'PHOTO',
+      galerie: ['g1.jpg', 'g2.jpg', 'g3.jpg', 'g4.jpg'],
+      produktFotos: ['p1.jpg', 'p2.jpg', 'p3.jpg'],
+    })
+
+    expect(streifen).toHaveLength(5)
+    expect(streifen).toEqual(['titel.jpg', 'g1.jpg', 'g2.jpg', 'g3.jpg', 'g4.jpg'])
+  })
+
+  it('ein Hof ohne Fotos bekommt die leere Liste', () => {
+    expect(
+      baueFotostreifen({ bannerUrl: null, bannerType: 'GRADIENT', galerie: [], produktFotos: [] })
+    ).toEqual([])
+  })
+})
+
 describe('getOeffentlicheHoefe — die Query', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -235,18 +317,39 @@ describe('getOeffentlicheHoefe — die Query', () => {
     // bauen ihr where daraus — hier wird ihr Inhalt festgenagelt.
     expect(args.where).toBe(OEFFENTLICH_SICHTBAR)
     expect(OEFFENTLICH_SICHTBAR).toEqual({ isActive: true, archivedAt: null, approvedAt: { not: null } })
-    // Kategorien nur aus VERFÜGBAREN Produkten mit Kategorie …
+    // Nur VERFÜGBARE Produkte (Kategorien UND Produktfotos speisen sich
+    // daraus), Termine nur aus aktiven Fenstern, höchstens vier
+    // Galerie-Fotos in Sortierreihenfolge.
     expect(args.select).toMatchObject({
-      products: { where: { isAvailable: true, category: { not: null } } },
-      // … und Termine nur aus aktiven Fenstern.
+      products: { where: { isAvailable: true }, select: { category: true, imageUrl: true } },
       pickupSlots: { where: { isActive: true } },
+      farmPhotos: { orderBy: { sortOrder: 'asc' }, take: 4 },
+      bannerUrl: true,
+      bannerType: true,
     })
+    // EXAKT, nicht Teilmenge: Ein wieder eingeführtes category-not-null im
+    // products-where würde Produktfotos kategorieloser Produkte still
+    // verschlucken — toMatchObject sähe es nicht.
+    expect(
+      (args.select as { products: { where: unknown } }).products.where
+    ).toEqual({ isAvailable: true })
   })
 
-  it('leitet Kategorien und nächsten Termin je Hof ab; ohne Fenster bleibt der Termin leer', async () => {
+  it('leitet Kategorien, Termin und Fotostreifen je Hof ab; ohne Fenster/Fotos bleibt beides leer', async () => {
     farmFindMany.mockResolvedValue([
       rohHof({
-        products: [{ category: 'EIER' }, { category: 'EIER' }, { category: 'MILCH' }],
+        bannerUrl: 'titel.jpg',
+        bannerType: 'PHOTO',
+        farmPhotos: [{ url: 'g1.jpg' }],
+        products: [
+          { category: 'EIER', imageUrl: 'p1.jpg' },
+          { category: 'EIER', imageUrl: null },
+          { category: 'MILCH', imageUrl: 'p2.jpg' },
+          // Produkt ohne Kategorie zählt nicht zu den Kategorien,
+          // sein Foto aber sehr wohl zum Streifen.
+          { category: null, imageUrl: 'p3.jpg' },
+          { category: null, imageUrl: 'p4.jpg' },
+        ],
         pickupSlots: [{ dayOfWeek: 5, startTime: '14:00', endTime: '16:00' }],
       }),
       rohHof({ slug: 'hof-leer', latitude: null, longitude: null }),
@@ -258,12 +361,15 @@ describe('getOeffentlicheHoefe — die Query', () => {
       slug: 'hof-mueller',
       kategorien: ['MILCH', 'EIER'],
       naechsteAbholung: { dayOfWeek: 5, tageVoraus: 2 },
+      // Titelbild, Galerie, dann HÖCHSTENS DREI Produktfotos (p4 fällt).
+      fotos: ['titel.jpg', 'g1.jpg', 'p1.jpg', 'p2.jpg', 'p3.jpg'],
     })
     expect(hoefe[1]).toMatchObject({
       slug: 'hof-leer',
       latitude: null,
       kategorien: [],
       naechsteAbholung: null,
+      fotos: [],
     })
     // Die Übersicht trägt PLZ und Ort, aber KEINE Straße — die Fixtur
     // ENTHÄLT eine, der Stolperdraht kann also wirklich auslösen.

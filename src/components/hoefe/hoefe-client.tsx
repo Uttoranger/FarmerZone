@@ -4,6 +4,7 @@ import { useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ArrowRight, List, Map as MapIcon } from 'lucide-react'
 import { CATEGORY_OPTIONS } from '@/schemas/product'
 import type { ProductCategoryValue } from '@/schemas/product'
@@ -18,6 +19,7 @@ import {
 import { hofInitialen } from '@/lib/hof-initialen'
 import type { HofUebersichtEintrag } from '@/server/queries/farm'
 import HoefeKarussell from '@/components/hoefe/hoefe-karussell'
+import HoefeFotostreifen from '@/components/hoefe/hoefe-fotostreifen'
 
 // Nur clientseitig: Leaflet greift beim Import auf window zu (Muster wie die
 // Profilkarte, profile-form.tsx). Die Karte wird zudem erst EINGEHÄNGT, wenn
@@ -52,6 +54,7 @@ function useIstBreit(): boolean {
  * Karussell-Karte und „Zum Hof".
  */
 export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
+  const router = useRouter()
   const istBreit = useIstBreit()
   const [ansicht, setAnsicht] = useState<'liste' | 'karte'>('liste')
   const [gewaehlt, setGewaehlt] = useState<ProductCategoryValue[]>([])
@@ -177,7 +180,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
             // denselben Pin hervor.
             onFocus={() => setLage((l) => nachZeiger(l, hof.slug))}
             onBlur={() => setLage((l) => nachZeiger(l, null))}
-            className={`relative rounded-2xl border bg-card p-4 transition-colors ${
+            className={`relative overflow-hidden rounded-2xl border bg-card transition-colors ${
               lage.ausgewaehlt === hof.slug ? 'border-primary' : 'border-border'
             }`}
             style={lage.ausgewaehlt === hof.slug ? { background: '#F7F4EC' } : undefined}
@@ -192,7 +195,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
                 type="button"
                 onClick={() => eintragGewaehlt(hof.slug)}
                 aria-label={`${hof.name} auf der Karte zeigen`}
-                className="absolute inset-0 cursor-pointer rounded-2xl"
+                className="absolute inset-0 cursor-pointer rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
               />
             ) : (
               /* SCHMALE LISTE: Die GANZE Karte verlinkt auf die Hofseite
@@ -200,10 +203,26 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
               <Link
                 href={`/${hof.slug}`}
                 aria-label={`${hof.name} ansehen`}
-                className="absolute inset-0 rounded-2xl"
+                className="absolute inset-0 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
               />
             )}
-            <div className="flex items-start gap-3">
+            {/* Der Fotostreifen NACH der Überlagerung im Baum: So liegt er
+                über ihr, ein Tipp aufs Foto läuft über onTipp (Split: wählen,
+                schmal: navigieren) und das Wischen erreicht den Streifen.
+                Pfeile/Punkte stoppen die Weitergabe selbst. */}
+            {hof.fotos.length > 0 && (
+              <HoefeFotostreifen
+                fotos={hof.fotos}
+                hofName={hof.name}
+                sizes="(min-width: 1024px) 540px, (min-width: 640px) 704px, calc(100vw - 2rem)"
+                onTipp={
+                  istSplit
+                    ? () => eintragGewaehlt(hof.slug)
+                    : () => router.push(`/${hof.slug}`)
+                }
+              />
+            )}
+            <div className="flex items-start gap-3 p-4">
               {/* Die Nummer ist reine Ordnungszahl — im Split tut der ganze
                   Eintrag dasselbe, was früher nur sie tat. */}
               <span
