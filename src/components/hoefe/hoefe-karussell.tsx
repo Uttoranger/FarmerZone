@@ -119,7 +119,17 @@ export default function HoefeKarussell({
               className="absolute inset-0 rounded-2xl"
             />
             <div className="flex items-center gap-2.5">
-              {hof.logoUrl ? (
+              {/* NUR das erste Foto als stilles Vorschaubild — kein Karussell
+                  im Karussell; ohne Fotos wie bisher Logo bzw. Initialen. */}
+              {hof.fotos.length > 0 ? (
+                <Image
+                  src={hof.fotos[0]}
+                  alt=""
+                  width={56}
+                  height={56}
+                  className="size-14 shrink-0 rounded-lg object-cover"
+                />
+              ) : hof.logoUrl ? (
                 <Image
                   src={hof.logoUrl}
                   alt=""
