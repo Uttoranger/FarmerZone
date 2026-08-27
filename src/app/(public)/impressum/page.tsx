@@ -1,5 +1,5 @@
-import Link from 'next/link'
 import type { Metadata } from 'next'
+import { ZurueckLink } from '@/components/shared/zurueck-link'
 import { KONTAKT_EMAIL } from '@/lib/support'
 
 export const metadata: Metadata = { title: 'Impressum — FarmerZone' }
@@ -8,9 +8,9 @@ export default function ImpressumPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto px-4 py-10">
-        <Link href="javascript:history.back()" className="text-sm text-primary hover:underline mb-6 inline-block">
-          ← Zurück
-        </Link>
+        {/* Kein `javascript:history.back()`-Link: React blockiert solche
+            URLs, der Link tat nichts (siehe zurueck-link.tsx). */}
+        <ZurueckLink className="text-sm text-primary hover:underline mb-6 inline-block" />
         <h1 className="text-2xl font-semibold text-slate-800 mb-8">Impressum</h1>
 
         <div className="space-y-8 text-sm text-slate-700 leading-relaxed">
@@ -58,23 +58,12 @@ export default function ImpressumPage() {
             </p>
           </section>
 
-          <section>
-            <h2 className="font-semibold text-slate-800 text-base mb-3">Online-Streitbeilegung</h2>
-            <p>
-              Die EU-Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit:{' '}
-              <a
-                href="https://ec.europa.eu/consumers/odr"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                https://ec.europa.eu/consumers/odr
-              </a>
-            </p>
-          </section>
+          {/* Kein Abschnitt „Online-Streitbeilegung" mehr: Die EU-OS-Plattform
+              wurde zum 20.07.2025 eingestellt — ein Hinweis auf eine
+              abgeschaltete Stelle wäre irreführend. */}
 
           <p className="text-xs text-muted-foreground pt-4 border-t border-border">
-            Stand: Juni 2026
+            Stand: August 2026
           </p>
         </div>
       </div>
