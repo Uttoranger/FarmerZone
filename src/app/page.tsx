@@ -3,6 +3,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import type { Metadata } from 'next'
 import { ArrowRight, ChevronDown } from 'lucide-react'
+import { LandingNav } from '@/components/landing/landing-nav'
 import { KONTAKT_EMAIL } from '@/lib/support'
 
 export const metadata: Metadata = {
@@ -118,6 +119,8 @@ const CTA_NOTE =
 // deutlich oberhalb der Hero-Unterkante bei 70vh. Damit trifft die Ausblendung
 // auf jeder Breite exakt denselben Ton.
 const SEITEN_HINTERGRUND = '#EDF2EB'
+// Die klebende Leiste lebt in ihrer eigenen Datei (Client-Insel: sie hört auf
+// Scrollen und trägt das Menü) — die Startseite selbst bleibt eine Server-Seite.
 
 const CTA_MAILTO = `mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent('Mein Hof auf FarmerZone')}`
 
@@ -251,39 +254,9 @@ export default function HomePage() {
         backgroundColor: SEITEN_HINTERGRUND,
       }}
     >
-      {/* Schlanke Kopfzeile: Login ohne Scrollen erreichbar (einzeilig auf allen Breiten) */}
-      <header className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3">
-        <Link href="/" className="flex items-center gap-2 min-w-0">
-          <svg width="32" height="32" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <circle cx="40" cy="40" r="40" fill="#E8F0E8" />
-            <path
-              d="M40 64 C40 64 22 53 22 35 C22 24 30 16 40 16 C50 16 58 24 58 35 C58 53 40 64 40 64Z"
-              fill="#2D5F3F"
-            />
-            <path d="M40 64 L40 44" stroke="#7BAE85" strokeWidth="2.5" strokeLinecap="round" />
-          </svg>
-          <span className="font-heading text-lg font-bold whitespace-nowrap" style={{ color: '#2D5F3F' }}>
-            FarmerZone
-          </span>
-        </Link>
-        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
-          {/* Der Kunden-Einstieg: ruhiger Textlink, kein zweiter Knopf. */}
-          <Link
-            href="/hoefe"
-            className="whitespace-nowrap text-[13px] font-semibold transition-opacity hover:opacity-80"
-            style={{ color: '#2D5F3F' }}
-          >
-            Höfe ansehen
-          </Link>
-          <Link
-            href="/login"
-            className="whitespace-nowrap rounded-lg border px-3.5 py-2 text-[13px] font-semibold transition-colors hover:bg-white"
-            style={{ borderColor: '#D6E0CE', color: '#2D5F3F', background: 'rgba(255,255,255,0.6)' }}
-          >
-            Hofbetreiber-Login
-          </Link>
-        </div>
-      </header>
+      {/* Klebende Navigationsleiste: Logo, die drei Wege und der Login —
+          unter md hinter einer Menü-Schaltfläche (landing-nav.tsx). */}
+      <LandingNav />
 
       <main className="flex-1">
 
@@ -378,7 +351,9 @@ export default function HomePage() {
         {/* A — Für Höfe: abwechselnde Editorial-Zeilen statt Karten.
             Trägt jetzt id="weiter" — das ist das Ziel des Scroll-Pfeils im
             Hero; es saß vorher auf dem entfernten Karten-Block. */}
-        <section id="weiter" className="scroll-mt-4 px-6 pt-14 pb-20 md:pt-20 md:pb-28">
+        {/* scroll-mt-20: Die klebende Leiste ist 56 px hoch — ohne diesen
+            Abstand verdeckte sie beim Sprung die Überschrift. */}
+        <section id="weiter" className="scroll-mt-20 px-6 pt-14 pb-20 md:pt-20 md:pb-28">
           <div className="mx-auto max-w-6xl">
             {/* Pilot-Hinweis, Wortlaut unverändert — steht jetzt hier oben,
                 mittig und mit Luft, damit der Übergang aus dem Hero ruhig

@@ -63,8 +63,27 @@ const nextConfig: NextConfig = {
           // Stripe-Frames sind Frames IN unserer Seite und davon unberührt
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          // Wir nutzen weder Kamera noch Mikro noch Standort
+          // Überall gesperrt — auch der Standort. Nur die Hofübersicht
+          // bekommt darunter eine eigene, engere Regel.
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+        ],
+      },
+      {
+        // NUR /hoefe darf nach dem Standort FRAGEN („In meiner Nähe").
+        //
+        // Warum überhaupt: Die leere Liste `geolocation=()` sperrt auch das
+        // EIGENE Dokument aus — die Abfrage scheiterte damit immer mit
+        // PERMISSION_DENIED (in echtem Chromium nachgemessen). `self` erlaubt
+        // ausschließlich unserer eigenen Herkunft zu fragen; die Entscheidung
+        // trifft weiter die Nutzerin im Browser-Dialog, und die Position
+        // verlässt das Gerät nie (src/components/hoefe/hoefe-umkreis.tsx).
+        //
+        // Warum nur hier: Der Bauern-Bereich, /account und /admin brauchen
+        // niemals einen Standort — sie behalten die harte Sperre oben. Diese
+        // Regel steht NACH der allgemeinen, damit sie für /hoefe gewinnt.
+        source: '/hoefe',
+        headers: [
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self)' },
         ],
       },
     ]

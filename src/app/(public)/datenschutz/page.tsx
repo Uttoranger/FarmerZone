@@ -208,7 +208,25 @@ export default function DatenschutzPage() {
               öffentlichen Hofübersicht wird eine Karte erst geladen, wenn du dort die
               Kartenansicht öffnest — dann wird deine IP-Adresse zum Abruf der Kacheln an
               OpenStreetMap übertragen; darüber hinaus werden keine Daten über dich
-              weitergegeben, und dein Standort wird nicht abgefragt.
+              weitergegeben.
+            </p>
+          </Section>
+
+          <Section title="Umkreissuche auf der Hofübersicht">
+            <p>
+              Tippst du auf der Hofübersicht „In meiner Nähe“, fragt dein Browser deinen
+              Standort ab — und behält ihn: Er wird <strong className="font-medium">nicht an uns
+              und an niemanden sonst übertragen</strong>. Die Entfernungen zu den Höfen rechnet
+              dein Gerät selbst aus den Hofkoordinaten, die mit der Seite ohnehin geladen
+              wurden. Wir speichern deinen Standort nicht, weder auf dem Gerät noch bei uns;
+              schließt du die Seite, ist er fort.
+            </p>
+            <p className="mt-3">
+              Gibst du stattdessen eine Postleitzahl oder einen Ort ein, geht diese Eingabe
+              an unseren Server und von dort an Nominatim (OpenStreetMap Foundation), um
+              daraus einen Kartenpunkt zu machen — deine IP-Adresse erreicht Nominatim dabei
+              nicht, und ein gemessener Standort wird nie übermittelt. Die Suche startet
+              erst, wenn du sie absendest; die Eingabe speichern wir nicht.
             </p>
           </Section>
 

@@ -8,7 +8,14 @@ import { useRouter } from 'next/navigation'
 import { ArrowRight, List, Map as MapIcon } from 'lucide-react'
 import { CATEGORY_OPTIONS } from '@/schemas/product'
 import type { ProductCategoryValue } from '@/schemas/product'
-import { filtereHoefe, formatiereAbholung } from '@/lib/hofuebersicht'
+import {
+  filtereHoefe,
+  formatiereAbholung,
+  formatiereEntfernung,
+  ordneNachEntfernung,
+  type Bezugspunkt,
+  type UmkreisStufe,
+} from '@/lib/hofuebersicht'
 import {
   LEERE_LAGE,
   nachLeerTipp,
@@ -20,6 +27,7 @@ import { hofInitialen } from '@/lib/hof-initialen'
 import type { HofUebersichtEintrag } from '@/server/queries/farm'
 import HoefeKarussell from '@/components/hoefe/hoefe-karussell'
 import HoefeFotostreifen from '@/components/hoefe/hoefe-fotostreifen'
+import HoefeUmkreis from '@/components/hoefe/hoefe-umkreis'
 
 // Nur clientseitig: Leaflet greift beim Import auf window zu (Muster wie die
 // Profilkarte, profile-form.tsx). Die Karte wird zudem erst EINGEHÄNGT, wenn
@@ -61,6 +69,10 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
   const [lage, setLage] = useState<AuswahlLage>(LEERE_LAGE)
   // Zählt jede Pin-Anfahrt, damit dieselbe Nummer zweimal hintereinander wirkt.
   const [fokus, setFokus] = useState(0)
+  // Der Bezugspunkt der Umkreissuche lebt NUR hier: kein localStorage, kein
+  // Konto, keine URL-Parameter — „Umkreis aufheben" macht ihn spurlos fort.
+  const [bezugspunkt, setBezugspunkt] = useState<Bezugspunkt | null>(null)
+  const [umkreis, setUmkreis] = useState<UmkreisStufe>(null)
   const eintraege = useRef(new Map<string, HTMLLIElement>())
 
   // Nur Kategorien anbieten, die es hier auch gibt — in Schema-Reihenfolge.
@@ -68,7 +80,22 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
     () => CATEGORY_OPTIONS.filter((o) => hoefe.some((h) => h.kategorien.includes(o.value))),
     [hoefe]
   )
-  const gefiltert = useMemo(() => filtereHoefe(hoefe, gewaehlt), [hoefe, gewaehlt])
+  // Erst Kategorien, dann Umkreis: Mit Bezugspunkt trägt jeder Hof seine
+  // Entfernung und die Liste steht aufsteigend — Höfe ohne Kartenpunkt immer
+  // am Ende und nie von der Umkreisgrenze ausgeschlossen (ordneNachEntfernung).
+  const gefiltert = useMemo(
+    () => ordneNachEntfernung(filtereHoefe(hoefe, gewaehlt), bezugspunkt, umkreis),
+    [hoefe, gewaehlt, bezugspunkt, umkreis]
+  )
+  // Fällt der gewählte (oder überfahrene) Hof aus der Liste — durch eine
+  // Kategorie oder den Umkreis —, erlischt die Hervorhebung mit ihm. Sonst
+  // stünde sie beim Aufheben des Filters unerklärt wieder da, ohne dass
+  // jemand sie erneut gewählt hätte.
+  const sichtbareLage = useMemo<AuswahlLage>(() => {
+    const vorhanden = new Set(gefiltert.map((h) => h.slug))
+    const behalten = (slug: string | null) => (slug && vorhanden.has(slug) ? slug : null)
+    return { ausgewaehlt: behalten(lage.ausgewaehlt), hervorgehoben: behalten(lage.hervorgehoben) }
+  }, [gefiltert, lage])
   const ohneKoordinaten = gefiltert.filter((h) => h.latitude == null || h.longitude == null).length
   /** Die Pin-Menge: gefilterte Höfe MIT Koordinaten, Nummern = Listenindex. */
   const mitPunkt = useMemo(
@@ -123,6 +150,13 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
     </button>
   )
 
+  /** Die Leermeldung nennt das Mittel, das WIRKLICH hilft: Hat der Umkreis
+   *  die Liste geleert, führt „nimm einen Filter heraus" in die Irre. */
+  const leerMeldung =
+    umkreis !== null
+      ? `In ${umkreis} km ist kein Hof dabei — nimm den Umkreis weiter oder hebe ihn auf.`
+      : 'Kein Hof führt gerade etwas aus dieser Auswahl — nimm einen Filter heraus.'
+
   const filterMarken = angebotene.length > 0 && (
     <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Nach Kategorien filtern">
       {angebotene.map((option) => {
@@ -146,6 +180,23 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
     </div>
   )
 
+  /** Umkreissuche über den Kategorie-Marken — beide Ansichten teilen sie. */
+  const filterLeiste = (
+    <>
+      <HoefeUmkreis
+        bezugspunkt={bezugspunkt}
+        stufe={umkreis}
+        onBezugspunkt={setBezugspunkt}
+        onStufe={setUmkreis}
+        onAufheben={() => {
+          setBezugspunkt(null)
+          setUmkreis(null)
+        }}
+      />
+      {filterMarken}
+    </>
+  )
+
   const koordinatenHinweis = ohneKoordinaten > 0 && (
     // Höfe ohne Koordinaten erscheinen nie als Pin — nur die Liste führt
     // alle; die Karte sagt es ruhig dazu.
@@ -163,7 +214,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
   const liste = (istSplit: boolean) =>
     gefiltert.length === 0 ? (
       <p className="mt-8 text-sm leading-relaxed text-muted-foreground">
-        Kein Hof führt gerade etwas aus dieser Auswahl — nimm einen Filter heraus.
+        {leerMeldung}
       </p>
     ) : (
       <ol className="mt-4 space-y-3">
@@ -181,9 +232,9 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
             onFocus={() => setLage((l) => nachZeiger(l, hof.slug))}
             onBlur={() => setLage((l) => nachZeiger(l, null))}
             className={`relative overflow-hidden rounded-2xl border bg-card transition-colors ${
-              lage.ausgewaehlt === hof.slug ? 'border-primary' : 'border-border'
+              sichtbareLage.ausgewaehlt === hof.slug ? 'border-primary' : 'border-border'
             }`}
-            style={lage.ausgewaehlt === hof.slug ? { background: '#F7F4EC' } : undefined}
+            style={sichtbareLage.ausgewaehlt === hof.slug ? { background: '#F7F4EC' } : undefined}
           >
             {istSplit ? (
               /* SPLITSCREEN: Der Eintrag dient dem DURCHSTÖBERN — die ganze
@@ -257,8 +308,20 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
                 <h2 className="font-heading text-lg font-semibold leading-snug text-foreground">
                   {hof.name}
                 </h2>
-                <p className="text-sm text-muted-foreground">
-                  {hof.postalCode} {hof.city}
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+                  <span>
+                    {hof.postalCode} {hof.city}
+                  </span>
+                  {/* Entfernung Luftlinie zum Bezugspunkt — erscheint erst,
+                      wenn es einen gibt; bricht bei 375 px sauber um. */}
+                  {hof.entfernungKm !== null && (
+                    <span
+                      className="rounded-full px-2 py-0.5 text-xs font-medium"
+                      style={{ background: '#E8F0E2', color: '#2D5F3F' }}
+                    >
+                      {formatiereEntfernung(hof.entfernungKm)}
+                    </span>
+                  )}
                 </p>
 
                 {hof.kategorien.length > 0 && (
@@ -322,7 +385,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
     // voller Viewporthöhe läge er dauerhaft außerhalb der Sichtkante.
     return (
       <div>
-        {filterMarken}
+        {filterLeiste}
         <div className="mt-1 grid grid-cols-2 items-start gap-6">
           <div>{liste(true)}</div>
           <div className="sticky top-4 mt-4 flex h-[calc(100vh-2rem)] flex-col">
@@ -330,7 +393,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
             <div className="min-h-0 flex-1">
               <HoefeKarte
                 hoefe={kartenHoefe}
-                lage={lage}
+                lage={sichtbareLage}
                 fokus={fokus}
                 hoeheKlasse="h-full"
                 onAuswahl={pinGewaehlt}
@@ -345,7 +408,8 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
 
   const karussellHoefe = mitPunkt.map(({ hof }) => hof)
   const auswahlMitPunkt =
-    lage.ausgewaehlt !== null && karussellHoefe.some((h) => h.slug === lage.ausgewaehlt)
+    sichtbareLage.ausgewaehlt !== null &&
+    karussellHoefe.some((h) => h.slug === sichtbareLage.ausgewaehlt)
 
   return (
     <div>
@@ -357,7 +421,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
         </div>
       </div>
 
-      {filterMarken}
+      {filterLeiste}
 
       {ansicht === 'karte' ? (
         <div className="mt-4">
@@ -369,7 +433,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
           <div className="relative overflow-hidden rounded-2xl">
             <HoefeKarte
               hoefe={kartenHoefe}
-              lage={lage}
+              lage={sichtbareLage}
               fokus={fokus}
               sanft
               attributionOben
@@ -388,7 +452,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
             )}
             <HoefeKarussell
               hoefe={karussellHoefe}
-              ausgewaehlt={auswahlMitPunkt ? lage.ausgewaehlt : null}
+              ausgewaehlt={auswahlMitPunkt ? sichtbareLage.ausgewaehlt : null}
               sichtbar={auswahlMitPunkt}
               onZentriert={karussellZentriert}
             />
@@ -397,7 +461,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
             // Auch der Karten-Reiter braucht die Filter-Leermeldung — eine
             // leere Karte ohne jedes Wort wäre keine Rückmeldung (#79-Regel).
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              Kein Hof führt gerade etwas aus dieser Auswahl — nimm einen Filter heraus.
+              {leerMeldung}
             </p>
           )}
           {koordinatenHinweis}

@@ -134,3 +134,107 @@ export function filtereHoefe<H extends { kategorien: ProductCategoryValue[] }>(
   const auswahl = new Set(gewaehlt)
   return hoefe.filter((h) => h.kategorien.some((k) => auswahl.has(k)))
 }
+
+// ─── Umkreis: Entfernung, Sortierung, Stufen ────────────────────────────────
+//
+// DATENSPARSAMKEIT (nicht verhandelbar): Der Gerätestandort wird NIEMALS an
+// einen Server geschickt — weder an uns noch an Dritte. Alles hier ist reine
+// Rechnerei, die der BROWSER auf den ohnehin geladenen Hofkoordinaten
+// ausführt. Nur die Postleitzahl-Variante schickt die EINGETIPPTE Eingabe an
+// Nominatim (src/lib/geokodierung.ts, sucheOrtspunkt) — nie eine gemessene
+// Position.
+
+/** Der Bezugspunkt der Umkreissuche: eigener Standort oder aufgelöste PLZ. */
+export type Bezugspunkt = { lat: number; lon: number; name?: string }
+
+/** Die Stufen des Umkreis-Reglers. `null` = „egal" (Voreinstellung: Bei
+ *  wenigen Höfen darf nichts versteckt werden). */
+export type UmkreisStufe = 10 | 25 | 50 | null
+
+export const UMKREIS_STUFEN: UmkreisStufe[] = [10, 25, 50, null]
+
+const ERDRADIUS_KM = 6371
+
+/**
+ * Entfernung zweier Punkte auf der Kugel (Haversine) in Kilometern.
+ * Für Österreich-Distanzen mehr als genau genug — und ohne Netz prüfbar.
+ */
+export function entfernungKm(
+  a: { lat: number; lon: number },
+  b: { lat: number; lon: number }
+): number {
+  const bogen = (grad: number) => (grad * Math.PI) / 180
+  const dLat = bogen(b.lat - a.lat)
+  const dLon = bogen(b.lon - a.lon)
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(bogen(a.lat)) * Math.cos(bogen(b.lat)) * Math.sin(dLon / 2) ** 2
+  return 2 * ERDRADIUS_KM * Math.asin(Math.min(1, Math.sqrt(h)))
+}
+
+/**
+ * „unter 0,1 km" · „0,4 km" · „1,3 km" · „12 km" · „143 km": Unter zehn
+ * Kilometern zählt die erste Nachkommastelle, darüber wäre sie
+ * Scheingenauigkeit (die Luftlinie ist ohnehin nicht der Fahrweg).
+ *
+ * Gerundet wird VOR der Entscheidung über die Darstellung — sonst stünde
+ * 9,97 km als „10,0 km" da, direkt neben einem „10 km" für glatte zehn.
+ * Und unter hundert Metern ist „0,0 km" keine Aussage, sondern ein Fehler
+ * im Text.
+ */
+export function formatiereEntfernung(km: number): string {
+  if (km < 0.1) return 'unter 0,1 km'
+  const aufEineStelle = Math.round(km * 10) / 10
+  if (aufEineStelle < 10) return `${aufEineStelle.toFixed(1).replace('.', ',')} km`
+  return `${Math.round(km)} km`
+}
+
+/** Ein Hof mit berechneter Entfernung — null, wenn er (noch) keinen
+ *  Kartenpunkt hat oder es keinen Bezugspunkt gibt. */
+export type MitEntfernung<H> = H & { entfernungKm: number | null }
+
+/**
+ * Ordnet die Höfe nach Entfernung zum Bezugspunkt und wendet die
+ * Umkreisstufe an.
+ *
+ * HÖFE OHNE KOORDINATEN stehen IMMER am Ende und werden von der
+ * Umkreisgrenze NIE ausgeschlossen: Sie sind nicht weit weg, sie sind
+ * unbekannt — ein Hof, der seinen Kartenpunkt noch nicht gesetzt hat, darf
+ * dadurch nicht unsichtbar werden.
+ *
+ * Ohne Bezugspunkt bleibt die Reihenfolge unangetastet (Freischalt-
+ * Reihenfolge der Query) und jede Entfernung ist null.
+ */
+export function ordneNachEntfernung<H extends { latitude: number | null; longitude: number | null }>(
+  hoefe: H[],
+  punkt: Bezugspunkt | null,
+  stufe: UmkreisStufe = null
+): MitEntfernung<H>[] {
+  if (!punkt) return hoefe.map((hof) => ({ ...hof, entfernungKm: null }))
+
+  const mitMass = hoefe.map((hof) => {
+    // Number.isFinite statt bloßer null-Prüfung: latitude und longitude sind
+    // unabhängig nullbar, und `double precision` kennt NaN/Infinity. Ein
+    // einziger solcher Wert machte sonst die GANZE Sortierung unbrauchbar
+    // (ein NaN-Vergleich liest sich für sort wie „gleich"). Unbrauchbare
+    // Koordinaten zählen wie fehlende: ans Ende, nie ausgeschlossen.
+    const brauchbar = Number.isFinite(hof.latitude) && Number.isFinite(hof.longitude)
+    return {
+      ...hof,
+      entfernungKm: brauchbar
+        ? entfernungKm(punkt, { lat: hof.latitude as number, lon: hof.longitude as number })
+        : null,
+    }
+  })
+
+  const imUmkreis =
+    stufe === null
+      ? mitMass
+      : mitMass.filter((hof) => hof.entfernungKm === null || hof.entfernungKm <= stufe)
+
+  return [...imUmkreis].sort((a, b) => {
+    if (a.entfernungKm === null) return b.entfernungKm === null ? 0 : 1
+    if (b.entfernungKm === null) return -1
+    return a.entfernungKm - b.entfernungKm
+  })
+}
