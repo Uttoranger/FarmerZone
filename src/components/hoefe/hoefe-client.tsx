@@ -4,7 +4,7 @@ import { useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import Link from 'next/link'
-import { List, Map as MapIcon } from 'lucide-react'
+import { ArrowRight, List, Map as MapIcon } from 'lucide-react'
 import { CATEGORY_OPTIONS } from '@/schemas/product'
 import type { ProductCategoryValue } from '@/schemas/product'
 import { filtereHoefe, formatiereAbholung } from '@/lib/hofuebersicht'
@@ -154,9 +154,10 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
   )
 
   /** Die nummerierte Hofliste — Desktop-Spalte und Listen-Reiter teilen sie.
-   *  `nummernAktiv`: nur wenn die Karte sichtbar ist, steuert die Nummer den
-   *  Pin an (Desktop-Split); sonst ist sie stille Ordnungszahl. */
-  const liste = (nummernAktiv: boolean) =>
+   *  `istSplit`: Im Splitscreen WÄHLT der Eintrag aus (voller Auswahl-Button,
+   *  „Zum Hof" als einziger Absprung); in der schmalen Liste bleibt er der
+   *  vollflächige Link zur Hofseite. */
+  const liste = (istSplit: boolean) =>
     gefiltert.length === 0 ? (
       <p className="mt-8 text-sm leading-relaxed text-muted-foreground">
         Kein Hof führt gerade etwas aus dieser Auswahl — nimm einen Filter heraus.
@@ -181,33 +182,37 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
             }`}
             style={lage.ausgewaehlt === hof.slug ? { background: '#F7F4EC' } : undefined}
           >
-            {/* Die GANZE Karte verlinkt auf die Hofseite (gestreckter Link);
-                nur die Nummer liegt darüber und steuert den Pin an. */}
-            <Link
-              href={`/${hof.slug}`}
-              aria-label={`${hof.name} ansehen`}
-              className="absolute inset-0 rounded-2xl"
-            />
+            {istSplit ? (
+              /* SPLITSCREEN: Der Eintrag dient dem DURCHSTÖBERN — die ganze
+                 Fläche ist ein echter Auswahl-Button (Klick = Hervorhebung,
+                 Karte fliegt zum Pin; erneuter Klick fährt erneut an, fokus
+                 zählt weiter). Zur Hofseite führt AUSSCHLIESSLICH die
+                 „Zum Hof"-Schaltfläche unten. */
+              <button
+                type="button"
+                onClick={() => eintragGewaehlt(hof.slug)}
+                aria-label={`${hof.name} auf der Karte zeigen`}
+                className="absolute inset-0 cursor-pointer rounded-2xl"
+              />
+            ) : (
+              /* SCHMALE LISTE: Die GANZE Karte verlinkt auf die Hofseite
+                 (gestreckter Link) — unverändert wie bisher. */
+              <Link
+                href={`/${hof.slug}`}
+                aria-label={`${hof.name} ansehen`}
+                className="absolute inset-0 rounded-2xl"
+              />
+            )}
             <div className="flex items-start gap-3">
-              {nummernAktiv ? (
-                <button
-                  type="button"
-                  onClick={() => eintragGewaehlt(hof.slug)}
-                  aria-label={`${hof.name} auf der Karte zeigen`}
-                  className="relative z-10 mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
-                  style={{ background: '#E8F0E2', color: '#2D5F3F' }}
-                >
-                  {index + 1}
-                </button>
-              ) : (
-                <span
-                  aria-hidden="true"
-                  className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
-                  style={{ background: '#E8F0E2', color: '#2D5F3F' }}
-                >
-                  {index + 1}
-                </span>
-              )}
+              {/* Die Nummer ist reine Ordnungszahl — im Split tut der ganze
+                  Eintrag dasselbe, was früher nur sie tat. */}
+              <span
+                aria-hidden="true"
+                className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                style={{ background: '#E8F0E2', color: '#2D5F3F' }}
+              >
+                {index + 1}
+              </span>
 
               {hof.logoUrl ? (
                 <Image
@@ -260,6 +265,21 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
                 {hof.isPaused && (
                   <p className="mt-2 text-sm" style={{ color: '#9A6B2F' }}>
                     Macht gerade Pause — schau bald wieder vorbei.
+                  </p>
+                )}
+
+                {istSplit && (
+                  /* Der EINZIGE Navigationsweg aus der Split-Liste — Gestalt
+                     wie die Karussell-Karte, plus Pfeil. Liegt mit z-10 über
+                     dem Auswahl-Button; ein Klick hier navigiert nur. */
+                  <p className="mt-3">
+                    <Link
+                      href={`/${hof.slug}`}
+                      className="relative z-10 inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+                    >
+                      Zum Hof
+                      <ArrowRight className="size-3.5" aria-hidden="true" />
+                    </Link>
                   </p>
                 )}
               </div>
