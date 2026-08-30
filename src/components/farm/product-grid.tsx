@@ -10,7 +10,8 @@ import { CSS } from '@dnd-kit/utilities'
 import { ShoppingCart, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff, Camera, Loader2, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCart } from '@/lib/use-cart'
-import { UNIT_LABELS, MONTH_SHORT, seasonLabel } from '@/schemas/product'
+import { MONTH_SHORT, seasonLabel } from '@/schemas/product'
+import { formatEuro, formatPrice } from '@/lib/preis-format'
 import { SHOP_PAUSED_BUTTON_LABEL } from '@/lib/shop-pause'
 import type { PublicProduct } from '@/server/queries/farm'
 import { updateProductImageAction, reorderProductsAction } from '@/server/actions/products'
@@ -34,15 +35,9 @@ type Props = {
 const LOW_STOCK = 5
 
 
-function formatEuro(n: number) {
-  return new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(n)
-}
-
-function formatPrice(price: number, unit: string, unitSize: number | null) {
-  const unitLabel = UNIT_LABELS[unit] ?? unit
-  if (unitSize && unitSize !== 1) return `${formatEuro(price)} / ${unitSize} ${unitLabel}`
-  return `${formatEuro(price)} / ${unitLabel}`
-}
+// formatEuro/formatPrice liegen seit der Produktvorschau in
+// src/lib/preis-format.ts — unverändert, nur an einem Ort, damit die
+// Hofübersicht dasselbe Format zeigt wie diese Seite.
 
 function SeasonBadge({ start, end }: { start: number; end: number }) {
   const s = MONTH_SHORT[start - 1]

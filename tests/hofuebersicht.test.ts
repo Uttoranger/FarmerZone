@@ -22,14 +22,42 @@ import { PRODUCT_CATEGORY_VALUES } from '@/schemas/product'
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     farm: { findMany: vi.fn(), findUnique: vi.fn() },
+    // Kategorien UND Produktfotos kommen seit der Produktvorschau aus einer
+    // schmalen Zeilen-Abfrage — sonst verlöre ein Hof mit vielen Produkten
+    // die Kategorien und Fotos seiner hinteren Produkte (siehe
+    // Kommentar in queries/farm.ts).
+    product: { findMany: vi.fn() },
   },
 }))
 
-import { getOeffentlicheHoefe, OEFFENTLICH_SICHTBAR } from '@/server/queries/farm'
+import {
+  getOeffentlicheHoefe,
+  OEFFENTLICH_SICHTBAR,
+  VORSCHAU_LADE_DECKEL,
+} from '@/server/queries/farm'
+import { PRODUCT_ORDER_BY } from '@/server/queries/products'
 import { RESERVED_SLUGS } from '@/lib/slug'
 import { prisma } from '@/lib/prisma'
 
 const farmFindMany = vi.mocked(prisma.farm.findMany)
+const produktZeilen = vi.mocked(prisma.product.findMany)
+
+/** Eine Produktzeile, wie die Query sie bekommt (Decimal kommt als Objekt
+ *  mit toString/valueOf; für den Mapper genügt eine Zahl). */
+function produkt(teil: Record<string, unknown> = {}) {
+  return {
+    id: 'prod_1',
+    name: 'Bergkäse',
+    price: 9.9,
+    unit: 'KG',
+    unitSize: null,
+    stock: 5,
+    reservedStock: 0,
+    category: 'MILCH',
+    imageUrl: null,
+    ...teil,
+  }
+}
 
 /** Ein Roh-Hof, wie ihn die Query aus der Datenbank bekommt. */
 function rohHof(teil: Record<string, unknown> = {}) {
@@ -53,6 +81,7 @@ function rohHof(teil: Record<string, unknown> = {}) {
     bannerType: 'GRADIENT',
     farmPhotos: [],
     products: [],
+    _count: { products: 0 },
     pickupSlots: [],
     ...teil,
   }
@@ -304,6 +333,7 @@ describe('baueFotostreifen', () => {
 describe('getOeffentlicheHoefe — die Query', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    produktZeilen.mockResolvedValue([] as never)
   })
 
   it('fragt EXAKT mit dem öffentlichen Filter der Einzelseite an — wartende und stillgelegte Höfe können ihn nicht passieren', async () => {
@@ -321,18 +351,49 @@ describe('getOeffentlicheHoefe — die Query', () => {
     // daraus), Termine nur aus aktiven Fenstern, höchstens vier
     // Galerie-Fotos in Sortierreihenfolge.
     expect(args.select).toMatchObject({
-      products: { where: { isAvailable: true }, select: { category: true, imageUrl: true } },
       pickupSlots: { where: { isActive: true } },
       farmPhotos: { orderBy: { sortOrder: 'asc' }, take: 4 },
       bannerUrl: true,
       bannerType: true,
     })
-    // EXAKT, nicht Teilmenge: Ein wieder eingeführtes category-not-null im
-    // products-where würde Produktfotos kategorieloser Produkte still
-    // verschlucken — toMatchObject sähe es nicht.
-    expect(
-      (args.select as { products: { where: unknown } }).products.where
-    ).toEqual({ isAvailable: true })
+    // Die products-Einbindung EXAKT, nicht als Teilmenge — an ihr hängen drei
+    // Ableitungen auf einmal:
+    //   - ein wieder eingeführtes category-not-null im where verschlucke
+    //     Produktfotos kategorieloser Produkte still,
+    //   - ein fehlendes Feld im select nähme der Vorschau lautlos Preis,
+    //     Einheit oder die Ausverkauft-Rechnung (unit/unitSize/reservedStock).
+    const products = (args.select as { products: Record<string, unknown> }).products
+    expect(products).toEqual({
+      where: { isAvailable: true },
+      orderBy: PRODUCT_ORDER_BY,
+      take: VORSCHAU_LADE_DECKEL,
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        unit: true,
+        unitSize: true,
+        stock: true,
+        reservedStock: true,
+        category: true,
+        imageUrl: true,
+      },
+    })
+    // „+ n weitere" zählt ALLE verfügbaren Produkte — ein ungefiltertes
+    // _count zählte auch die abgeschalteten mit und verspräche zu viel.
+    expect((args.select as { _count: unknown })._count).toEqual({
+      select: { products: { where: { isAvailable: true } } },
+    })
+
+    // Die schmale Zeilen-Abfrage: dieselbe öffentliche Sichtbarkeit wie die
+    // Hof-Abfrage, dieselbe Reihenfolge wie die Hofseite — und WIRKLICH nur
+    // drei Felder (sie läuft über ALLE Produkte ALLER Höfe, ungedeckelt).
+    expect(produktZeilen).toHaveBeenCalledTimes(1)
+    expect(produktZeilen.mock.calls[0]![0]).toEqual({
+      where: { isAvailable: true, farm: OEFFENTLICH_SICHTBAR },
+      orderBy: PRODUCT_ORDER_BY,
+      select: { farmId: true, category: true, imageUrl: true },
+    })
   })
 
   it('leitet Kategorien, Termin und Fotostreifen je Hof ab; ohne Fenster/Fotos bleibt beides leer', async () => {
@@ -341,18 +402,26 @@ describe('getOeffentlicheHoefe — die Query', () => {
         bannerUrl: 'titel.jpg',
         bannerType: 'PHOTO',
         farmPhotos: [{ url: 'g1.jpg' }],
+        // Die Vorschau-Zeilen tragen hier ABSICHTLICH keine Bilder und nur
+        // eine Kategorie: So kann der Streifen seine Fotos nur aus der
+        // schmalen Abfrage haben — der Deckel-Regress wäre sichtbar.
         products: [
-          { category: 'EIER', imageUrl: 'p1.jpg' },
-          { category: 'EIER', imageUrl: null },
-          { category: 'MILCH', imageUrl: 'p2.jpg' },
-          // Produkt ohne Kategorie zählt nicht zu den Kategorien,
-          // sein Foto aber sehr wohl zum Streifen.
-          { category: null, imageUrl: 'p3.jpg' },
-          { category: null, imageUrl: 'p4.jpg' },
+          produkt({ id: 'v1', category: 'EIER', imageUrl: null }),
+          produkt({ id: 'v2', category: 'EIER', imageUrl: null }),
         ],
         pickupSlots: [{ dayOfWeek: 5, startTime: '14:00', endTime: '16:00' }],
       }),
-      rohHof({ slug: 'hof-leer', latitude: null, longitude: null }),
+      rohHof({ slug: 'hof-leer', id: 'farm_leer', latitude: null, longitude: null }),
+    ] as never)
+    // Kategorien UND Produktfotos kommen aus der schmalen Zeilen-Abfrage —
+    // NICHT aus den (gedeckelten) Vorschau-Zeilen. Deshalb steht hier auch
+    // ein Foto, das in den Vorschau-Zeilen gar nicht vorkommt: Genau so
+    // behält ein Hof mit vielen Produkten seinen Fotostreifen.
+    produktZeilen.mockResolvedValue([
+      { farmId: 'farm_1', category: 'EIER', imageUrl: 'p1.jpg' },
+      { farmId: 'farm_1', category: 'MILCH', imageUrl: 'p2.jpg' },
+      { farmId: 'farm_1', category: null, imageUrl: 'p3.jpg' },
+      { farmId: 'farm_1', category: null, imageUrl: 'p4.jpg' },
     ] as never)
 
     const hoefe = await getOeffentlicheHoefe({ wochentag: 3, uhrzeit: '12:00' })
@@ -370,10 +439,80 @@ describe('getOeffentlicheHoefe — die Query', () => {
       kategorien: [],
       naechsteAbholung: null,
       fotos: [],
+      // Ohne Produkte bleibt das Schaufenster leer — die Karte lässt den
+      // Block dann ganz weg.
+      produkte: [],
+      produkteGesamt: 0,
     })
     // Die Übersicht trägt PLZ und Ort, aber KEINE Straße — die Fixtur
     // ENTHÄLT eine, der Stolperdraht kann also wirklich auslösen.
     expect(JSON.stringify(hoefe)).not.toMatch(/address|Dorfstraße/i)
+  })
+
+  it('reicht die Produktvorschau samt Preis, Einheit und Verfügbarkeit durch — Decimal wird zur Zahl, „+ n weitere" zählt aus dem _count', async () => {
+    farmFindMany.mockResolvedValue([
+      rohHof({
+        products: [
+          // Decimal kommt als Objekt aus Prisma — die Vorschau braucht eine
+          // echte Zahl, sonst rechnete und formatierte sie auf einem Objekt.
+          produkt({
+            id: 'p_kaese',
+            name: 'Bergkäse',
+            price: { valueOf: () => '12.50' },
+            unit: 'GRAMM',
+            unitSize: { valueOf: () => '250' },
+            stock: 4,
+            reservedStock: 0,
+            category: 'MILCH',
+            imageUrl: 'kaese.jpg',
+          }),
+          // Bestand da, aber vollständig reserviert → „derzeit aus".
+          produkt({ id: 'p_eier', name: 'Eier', stock: 6, reservedStock: 6, category: 'EIER' }),
+          // Restbestand über der Reservierung → verfügbar.
+          produkt({ id: 'p_brot', name: 'Brot', stock: 6, reservedStock: 5, category: 'BROT' }),
+        ],
+        // Der Hof führt mehr, als die Query lädt (VORSCHAU_LADE_DECKEL).
+        _count: { products: 11 },
+      }),
+    ] as never)
+
+    const [hof] = await getOeffentlicheHoefe({ wochentag: 3, uhrzeit: '12:00' })
+
+    expect(hof!.produkte).toEqual([
+      {
+        id: 'p_kaese',
+        name: 'Bergkäse',
+        price: 12.5,
+        unit: 'GRAMM',
+        unitSize: 250,
+        imageUrl: 'kaese.jpg',
+        category: 'MILCH',
+        verfuegbar: true,
+      },
+      {
+        id: 'p_eier',
+        name: 'Eier',
+        price: 9.9,
+        unit: 'KG',
+        unitSize: null,
+        imageUrl: null,
+        category: 'EIER',
+        verfuegbar: false,
+      },
+      {
+        id: 'p_brot',
+        name: 'Brot',
+        price: 9.9,
+        unit: 'KG',
+        unitSize: null,
+        imageUrl: null,
+        category: 'BROT',
+        verfuegbar: true,
+      },
+    ])
+    // NICHT die Länge der geladenen Zeilen: Sonst stünde bei einem Hof mit
+    // elf Produkten „+ 0 weitere", sobald der Deckel greift.
+    expect(hof!.produkteGesamt).toBe(11)
   })
 
   it('der Routen-Slug hoefe ist für Hofnamen gesperrt — sonst beschattete ein Hof „Höfe" die Übersicht', () => {

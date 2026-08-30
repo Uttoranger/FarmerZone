@@ -135,6 +135,83 @@ export function filtereHoefe<H extends { kategorien: ProductCategoryValue[] }>(
   return hoefe.filter((h) => h.kategorien.some((k) => auswahl.has(k)))
 }
 
+// ─── Produktvorschau auf der Hofkarte ───────────────────────────────────────
+
+/** Ein Produkt, so schmal wie die Vorschau es braucht. */
+export type VorschauProdukt = {
+  id: string
+  name: string
+  price: number
+  unit: string
+  unitSize: number | null
+  imageUrl: string | null
+  category: ProductCategoryValue | null
+  /** Bestand abzüglich Reservierung — false heißt „derzeit aus". */
+  verfuegbar: boolean
+}
+
+/** Höchstens so viele Zeilen zeigt eine Hofkarte. */
+export const VORSCHAU_ZEILEN = 3
+
+/**
+ * Wählt die Produkte für das Schaufenster einer Hofkarte.
+ *
+ * REIHENFOLGE, in dieser Rangfolge:
+ *   1. Passt zum gesetzten Kategoriefilter — das Schaufenster zeigt, wonach
+ *      gesucht wurde (ohne Filter entfällt diese Stufe).
+ *   2. Verfügbar vor ausverkauft — was man kaufen kann, steht vorn.
+ *   3. Sonst die gegebene Reihenfolge (sortOrder der Hofseite).
+ * Fremde Kategorien gehen dabei NICHT verloren: Sie füllen die restlichen
+ * Plätze, sobald die passenden aufgebraucht sind.
+ *
+ * Sind ALLE Produkte ausverkauft, erscheinen ausverkaufte — gekennzeichnet.
+ * Ein leeres Schaufenster wäre die schlechtere Auskunft: Der Hof führt die
+ * Ware, sie ist nur gerade weg.
+ *
+ * `gesamt` ist die Zahl ALLER verfügbar geschalteten Produkte des Hofes (aus
+ * der Query, nicht aus dieser Liste): Die Vorschau lädt nur die ersten
+ * wenigen, „+ n weitere" muss trotzdem stimmen.
+ */
+export function waehleVorschauProdukte(
+  produkte: VorschauProdukt[],
+  gewaehlteKategorien: ProductCategoryValue[] = [],
+  gesamt: number = produkte.length,
+  zeilen: number = VORSCHAU_ZEILEN
+): { produkte: VorschauProdukt[]; weitere: number } {
+  const auswahl = new Set(gewaehlteKategorien)
+  const passt = (p: VorschauProdukt) => auswahl.size > 0 && p.category !== null && auswahl.has(p.category)
+
+  const geordnet = produkte
+    .map((produkt, index) => ({ produkt, index }))
+    .sort((a, b) => {
+      if (passt(a.produkt) !== passt(b.produkt)) return passt(a.produkt) ? -1 : 1
+      if (a.produkt.verfuegbar !== b.produkt.verfuegbar) return a.produkt.verfuegbar ? -1 : 1
+      return a.index - b.index
+    })
+    .map(({ produkt }) => produkt)
+
+  const gezeigt = geordnet.slice(0, zeilen)
+  return { produkte: gezeigt, weitere: Math.max(0, gesamt - gezeigt.length) }
+}
+
+/**
+ * Der erste SICHTBARE Buchstabe (oder die erste Ziffer) eines Produktnamens,
+ * groß — der Platzhalter für ein fehlendes Produktbild.
+ *
+ * Dasselbe Prinzip wie die Hof-Initialen (src/lib/hof-initialen.ts): ein
+ * Zeichen auf Sandfläche statt eines gebrochenen Bild-Symbols. Gesucht wird
+ * mit `\p{L}|\p{N}`, damit ein führendes Anführungszeichen oder Sternchen
+ * („*Bio-Ei") nicht als Initiale endet; bleibt gar nichts übrig, steht dort
+ * ein Mittelpunkt statt einer leeren Fläche.
+ *
+ * Hier und nicht in der Komponente, damit die Ableitung ohne Browser prüfbar
+ * ist — Repo-Konvention für reine Logik.
+ */
+export function produktInitiale(name: string): string {
+  const treffer = name.match(/\p{L}|\p{N}/u)
+  return treffer ? treffer[0].toLocaleUpperCase('de-AT').slice(0, 1) : '·'
+}
+
 // ─── Umkreis: Entfernung, Sortierung, Stufen ────────────────────────────────
 //
 // DATENSPARSAMKEIT (nicht verhandelbar): Der Gerätestandort wird NIEMALS an
