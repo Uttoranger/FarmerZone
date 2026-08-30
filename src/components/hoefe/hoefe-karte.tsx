@@ -167,6 +167,11 @@ export default function HoefeKarte({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pinSignatur, lage.ausgewaehlt, lage.hervorgehoben])
 
+  // Die Ansicht hängt NUR an der Pin-MENGE, nicht an der Nummerierung: Eine
+  // Umkreissuche sortiert die Liste um und vergibt damit alle Nummern neu,
+  // ohne dass ein Pin verschwindet — würde die Ansicht daran hängen, risse
+  // sie der Nutzerin ihren Kartenausschnitt weg.
+  const mengenSignatur = [...hoefe.map((h) => h.slug)].sort().join(',')
   useEffect(() => {
     const map = karte.current
     if (!map) return
@@ -183,7 +188,7 @@ export default function HoefeKarte({
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pinSignatur])
+  }, [mengenSignatur])
 
   // Merkt sich den beim Einhängen schon verbrauchten Stand: Nach einem
   // Reiterwechsel (Karte neu eingehängt) darf eine ALTE Anfahrt nicht erneut

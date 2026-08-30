@@ -4,7 +4,11 @@ import { useEffect, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { CATEGORY_OPTIONS } from '@/schemas/product'
-import { formatiereAbholung } from '@/lib/hofuebersicht'
+import {
+  formatiereAbholung,
+  formatiereEntfernung,
+  type MitEntfernung,
+} from '@/lib/hofuebersicht'
 import { zentrierterIndex } from '@/lib/hoefe-anzeige'
 import { hofInitialen } from '@/lib/hof-initialen'
 import type { HofUebersichtEintrag } from '@/server/queries/farm'
@@ -38,7 +42,7 @@ export default function HoefeKarussell({
   onZentriert,
 }: {
   /** Nur Höfe mit Koordinaten, in Pin-Reihenfolge. */
-  hoefe: HofUebersichtEintrag[]
+  hoefe: MitEntfernung<HofUebersichtEintrag>[]
   ausgewaehlt: string | null
   sichtbar: boolean
   /** Nach dem Snappen: dieser Hof ist jetzt zentriert. */
@@ -152,6 +156,13 @@ export default function HoefeKarussell({
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
                   {hof.postalCode} {hof.city}
+                  {/* Auch hier die Entfernung, sobald es einen Bezugspunkt
+                      gibt — wer mobil die Karte nutzt, sieht sonst nie eine. */}
+                  {hof.entfernungKm != null && (
+                    <span className="ml-1.5 font-medium" style={{ color: '#2D5F3F' }}>
+                      {formatiereEntfernung(hof.entfernungKm)}
+                    </span>
+                  )}
                 </p>
               </div>
             </div>

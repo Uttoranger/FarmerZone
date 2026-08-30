@@ -143,6 +143,39 @@ async function ladeNominatim(parameter: Record<string, string>): Promise<unknown
 }
 
 /**
+ * Löst eine EINGETIPPTE Postleitzahl oder einen Ortsnamen zum Kartenpunkt
+ * auf — der Bezugspunkt der Umkreissuche auf /hoefe.
+ *
+ * Bewusst DIESELBE strukturierte Anbindung wie die Hof-Geokodierung (kein
+ * zweiter Netzweg): country=at, und je nach Eingabe postalcode ODER city —
+ * eine vierstellige Zahl ist in Österreich eine PLZ, alles andere ein Ort.
+ * Straße wird nie mitgeschickt: Gesucht ist die Gegend, nicht die Adresse.
+ *
+ * DATENSPARSAMKEIT: Hier geht ausschließlich die getippte Eingabe hinaus —
+ * NIEMALS eine vom Gerät gemessene Position (src/lib/hofuebersicht.ts).
+ *
+ * Wirft NIE: leere Antwort, Zeitüberschreitung und Dienststörung liefern
+ * gleichermaßen null, die Liste bleibt dann unverändert.
+ */
+export async function sucheOrtspunkt(
+  eingabe: string,
+  lade: NominatimLader = ladeNominatim
+): Promise<StandortKandidat | null> {
+  const text = eingabe.trim()
+  if (text.length < 2) return null
+
+  const istPlz = /^\d{4}$/.test(text)
+  try {
+    const treffer = werteNominatimAntwortAus(
+      await lade({ [istPlz ? 'postalcode' : 'city']: text, country: 'at' })
+    )
+    return treffer[0] ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Die dreistufige Kaskade (siehe Kopfkommentar). Wirft NIE — jedes Scheitern
  * (leere Antwort, Zeitüberschreitung, Dienststörung) führt zur nächsten,
  * gröberen Stufe, nie zu einer Fehlermeldung.
