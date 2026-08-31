@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -13,6 +13,7 @@ import {
   formatiereAbholung,
   formatiereEntfernung,
   ordneNachEntfernung,
+  waehleVorschauProdukte,
   type Bezugspunkt,
   type UmkreisStufe,
 } from '@/lib/hofuebersicht'
@@ -28,6 +29,7 @@ import type { HofUebersichtEintrag } from '@/server/queries/farm'
 import HoefeKarussell from '@/components/hoefe/hoefe-karussell'
 import HoefeFotostreifen from '@/components/hoefe/hoefe-fotostreifen'
 import HoefeUmkreis from '@/components/hoefe/hoefe-umkreis'
+import { HoefeProduktzeilen } from '@/components/hoefe/hoefe-produktzeilen'
 
 // Nur clientseitig: Leaflet greift beim Import auf window zu (Muster wie die
 // Profilkarte, profile-form.tsx). Die Karte wird zudem erst EINGEHÄNGT, wenn
@@ -74,6 +76,26 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
   const [bezugspunkt, setBezugspunkt] = useState<Bezugspunkt | null>(null)
   const [umkreis, setUmkreis] = useState<UmkreisStufe>(null)
   const eintraege = useRef(new Map<string, HTMLLIElement>())
+  // Wie hoch das Karussell-Band mobil WIRKLICH ist: Die Karte hält seine
+  // Pins darüber frei (fitBounds-Polster). Seit der Produktvorschau wächst
+  // die Karte je nach Sortiment — eine feste Zahl liefe der Wirklichkeit
+  // hinterher und schöbe südliche Pins wieder hinter das Band.
+  const [bandHoehe, setBandHoehe] = useState(176)
+  const bandMessen = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return
+    const beobachter = new ResizeObserver(([eintrag]) => {
+      // Auf die HALBE Kartenhöhe gedeckelt (der Elternknoten ist die Karte —
+      // das Band liegt absolut an deren unterem Rand): Ein Polster, das mehr
+      // als die Hälfte beansprucht, ließe fitBounds ins Leere rechnen und
+      // Leaflet sinnlos weit herauszoomen. Lieber ein Pin knapp hinter dem
+      // Bandrand als eine Karte, auf der niemand mehr etwas erkennt.
+      const kartenHoehe = el.parentElement?.clientHeight ?? 0
+      const deckel = kartenHoehe > 0 ? Math.round(kartenHoehe / 2) : 260
+      setBandHoehe(Math.min(Math.round(eintrag.contentRect.height), deckel))
+    })
+    beobachter.observe(el)
+    return () => beobachter.disconnect()
+  }, [])
 
   // Nur Kategorien anbieten, die es hier auch gibt — in Schema-Reihenfolge.
   const angebotene = useMemo(
@@ -218,7 +240,11 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
       </p>
     ) : (
       <ol className="mt-4 space-y-3">
-        {gefiltert.map((hof, index) => (
+        {gefiltert.map((hof, index) => {
+          // Das Schaufenster dieser Karte — die Auswahl folgt dem gesetzten
+          // Kategoriefilter (waehleVorschauProdukte, rein und getestet).
+          const vorschau = waehleVorschauProdukte(hof.produkte, gewaehlt, hof.produkteGesamt)
+          return (
           <li
             key={hof.slug}
             ref={(el) => {
@@ -337,6 +363,11 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
                   </p>
                 )}
 
+                {/* Das Schaufenster: bis zu drei Produkte mit Preis, zwischen
+                    den Kategorie-Marken und der Abholzeile. Hof ohne Produkte:
+                    der Block entfällt ersatzlos. */}
+                <HoefeProduktzeilen produkte={vorschau.produkte} weitere={vorschau.weitere} />
+
                 {hof.naechsteAbholung && (
                   <p className="mt-2 text-sm text-foreground">
                     Nächste Abholung:{' '}
@@ -367,7 +398,8 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
               </div>
             </div>
           </li>
-        ))}
+          )
+        })}
       </ol>
     )
 
@@ -438,7 +470,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
               sanft
               attributionOben
               hoeheKlasse="h-[60vh] min-h-[320px]"
-              polsterUnten={176}
+              polsterUnten={bandHoehe}
               onAuswahl={pinGewaehlt}
               onLeerTipp={leerGetippt}
             />
@@ -454,7 +486,9 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
               hoefe={karussellHoefe}
               ausgewaehlt={auswahlMitPunkt ? sichtbareLage.ausgewaehlt : null}
               sichtbar={auswahlMitPunkt}
+              gewaehlteKategorien={gewaehlt}
               onZentriert={karussellZentriert}
+              bandRef={bandMessen}
             />
           </div>
           {gefiltert.length === 0 && (

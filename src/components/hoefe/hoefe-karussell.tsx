@@ -3,12 +3,14 @@
 import { useEffect, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { CATEGORY_OPTIONS } from '@/schemas/product'
+import { CATEGORY_OPTIONS, type ProductCategoryValue } from '@/schemas/product'
 import {
   formatiereAbholung,
   formatiereEntfernung,
+  waehleVorschauProdukte,
   type MitEntfernung,
 } from '@/lib/hofuebersicht'
+import { HoefeProduktzeilen } from '@/components/hoefe/hoefe-produktzeilen'
 import { zentrierterIndex } from '@/lib/hoefe-anzeige'
 import { hofInitialen } from '@/lib/hof-initialen'
 import type { HofUebersichtEintrag } from '@/server/queries/farm'
@@ -39,14 +41,22 @@ export default function HoefeKarussell({
   hoefe,
   ausgewaehlt,
   sichtbar,
+  gewaehlteKategorien = [],
   onZentriert,
+  bandRef,
 }: {
   /** Nur Höfe mit Koordinaten, in Pin-Reihenfolge. */
   hoefe: MitEntfernung<HofUebersichtEintrag>[]
   ausgewaehlt: string | null
   sichtbar: boolean
+  /** Der gesetzte Kategoriefilter — die Produktvorschau folgt ihm hier
+   *  genauso wie auf der Hofkarte. */
+  gewaehlteKategorien?: ProductCategoryValue[]
   /** Nach dem Snappen: dieser Hof ist jetzt zentriert. */
   onZentriert: (slug: string) => void
+  /** Lässt den Aufrufer die HÖHE des Bandes messen — die Karte hält ihre
+   *  Pins darüber frei (fitBounds-Polster in hoefe-client.tsx). */
+  bandRef?: (el: HTMLDivElement | null) => void
 }) {
   const band = useRef<HTMLDivElement>(null)
   const ruhe = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -99,6 +109,7 @@ export default function HoefeKarussell({
 
   return (
     <div
+      ref={bandRef}
       className={`absolute inset-x-0 bottom-0 z-[900] transition-transform duration-300 ${
         sichtbar ? 'translate-y-0' : 'pointer-events-none translate-y-full'
       }`}
@@ -176,6 +187,22 @@ export default function HoefeKarussell({
                 ))}
               </p>
             )}
+
+            {/* DIESELBE Komponente wie auf der Hofkarte, mit denselben 48er
+                Bildern — nur ZWEI Zeilen statt drei und OHNE die
+                „+ n weitere"-Zeile: Diese Karte liegt über der Landkarte und
+                darf um höchstens zwei Zeilen wachsen (gemessen: 110 px = 2 ×
+                (48 + 6)). Die Restzahl steht auf der Hofkarte der Liste, wo
+                Platz dafür ist; hier fräße sie eine dritte Zeile. */}
+            {(() => {
+              const vorschau = waehleVorschauProdukte(
+                hof.produkte,
+                gewaehlteKategorien,
+                hof.produkteGesamt,
+                2
+              )
+              return <HoefeProduktzeilen produkte={vorschau.produkte} weitere={0} />
+            })()}
 
             {hof.naechsteAbholung && (
               <p className="mt-1.5 truncate text-xs text-foreground">

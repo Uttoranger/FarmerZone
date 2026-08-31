@@ -11,6 +11,7 @@ import {
   wienJetzt,
   type NaechsteAbholung,
   type OrtsZeit,
+  type VorschauProdukt,
 } from '@/lib/hofuebersicht'
 
 export type PublicProduct = {
@@ -378,6 +379,40 @@ export async function getStripeReadiness(ownerId: string): Promise<boolean> {
 
 // ─── Öffentliche Hofübersicht (/hoefe) ──────────────────────────────────────
 
+/**
+ * So viele Produktzeilen lädt die Übersicht je Hof — gezeigt werden davon
+ * höchstens drei (VORSCHAU_ZEILEN). Der Vorrat darüber hinaus lässt der
+ * Kategoriefilter passende Produkte nach vorn ziehen, ohne nachzuladen.
+ *
+ * GRENZE, bewusst: Der Filter arbeitet clientseitig auf genau diesen Zeilen.
+ * Führt ein Hof seine Honig-Produkte erst ab Platz neun, erscheint er beim
+ * Filtern nach Honig weiterhin in der Liste (die Kategorien sind vollständig,
+ * siehe unten) — sein Schaufenster zeigt dann aber die vorderen Produkte
+ * statt des Honigs. Das aufzulösen hieße, den Filter serverseitig zu machen
+ * oder das ganze Sortiment zu laden; beides wäre ein eigener Sprint.
+ */
+export const VORSCHAU_LADE_DECKEL = 8
+
+/**
+ * VORSCHAU-VERFÜGBARKEIT — und eine Abweichung, die hier festgehalten gehört:
+ *
+ * Die Vorschau kennzeichnet ein Produkt als „derzeit aus", wenn
+ * `stock - reservedStock <= 0` ist. Die öffentliche Hofseite entscheidet das
+ * heute anders: Sie prüft allein den Bestand
+ * (src/components/farm/product-grid.tsx:68 `stock === 0`, :275 `stock > 0`,
+ * :421 dasselbe im Warenkorb-Abgleich).
+ *
+ * Beides führt derzeit zum SELBEN Ergebnis, weil `Product.reservedStock`
+ * (prisma/schema.prisma:249) im ganzen Repo nirgends beschrieben wird — die
+ * Spalte steht auf ihrer Vorgabe 0. Echte Reservierungen liegen in
+ * `StockReservation` (schema:392) und werden ausschließlich beim Bestellen
+ * live zusammengezählt (api/checkout/route.ts:120–131, api/reserve:78–88).
+ *
+ * Wird die Spalte je gefüllt, MÜSSEN Vorschau und Hofseite gemeinsam auf
+ * dieselbe Regel gezogen werden — sonst verspricht die eine, was die andere
+ * verweigert.
+ */
+
 export type HofUebersichtEintrag = {
   slug: string
   name: string
@@ -393,6 +428,13 @@ export type HofUebersichtEintrag = {
   kategorien: ProductCategory[]
   /** Der nächste anstehende Abholtermin — null ohne aktive Fenster. */
   naechsteAbholung: NaechsteAbholung | null
+  /** Die Produktvorschau der Karte: höchstens VORSCHAU_LADE_DECKEL Zeilen,
+   *  in der Reihenfolge der Hofseite. Die Auswahl daraus trifft
+   *  waehleVorschauProdukte (src/lib/hofuebersicht.ts). */
+  produkte: VorschauProdukt[]
+  /** ALLE verfügbar geschalteten Produkte des Hofes — Grundlage für
+   *  „+ n weitere", auch wenn oben gedeckelt wurde. */
+  produkteGesamt: number
   /** Der Fotostreifen: nur URLs, Titelbild zuerst, höchstens fünf
    *  (baueFotostreifen in src/lib/hofuebersicht.ts). Leer = keine Fotos,
    *  die Karte bleibt kompakt. */
@@ -409,6 +451,15 @@ export type HofUebersichtEintrag = {
 export async function getOeffentlicheHoefe(
   jetzt: OrtsZeit = wienJetzt()
 ): Promise<HofUebersichtEintrag[]> {
+  // Läuft PARALLEL zur Hauptabfrage — sie hängt nicht von deren Ergebnis ab,
+  // und /hoefe ist statisch mit kurzer Revalidierung: Der Aufwand fällt
+  // höchstens alle fünf Minuten an, nicht je Besuch.
+  const zeilenJeHof = prisma.product.findMany({
+    where: { isAvailable: true, farm: OEFFENTLICH_SICHTBAR },
+    orderBy: PRODUCT_ORDER_BY,
+    select: { farmId: true, category: true, imageUrl: true },
+  })
+
   const hoefe = await prisma.farm.findMany({
     where: OEFFENTLICH_SICHTBAR,
     // Freischalt-Reihenfolge, die ältesten zuerst — stabil und fair, ohne
@@ -440,24 +491,69 @@ export async function getOeffentlicheHoefe(
         take: 4,
         select: { url: true },
       },
-      // EINE products-Einbindung für ZWEI Ableitungen: Kategorien (Produkte
-      // ohne Kategorie überspringt sammleKategorien) und Produktfotos (die
-      // ersten drei mit imageUrl, geschnitten im Mapper) — Prisma erlaubt
-      // dieselbe Relation nicht zweimal im selben select.
+      // EINE products-Einbindung für DREI Ableitungen: Produktfotos des
+      // Streifens, die Produktvorschau der Karte und (bis zu ihrer Deckelung,
+      // siehe unten) die Kategorien — Prisma erlaubt dieselbe Relation nicht
+      // zweimal im selben select. Sie wurde ERWEITERT, nicht dupliziert.
       products: {
         where: { isAvailable: true },
         // Stabile Reihenfolge (Repo-Konvention der Hofseite): Ohne orderBy
         // wären „die ersten drei" Produktfotos DB-launisch und der Streifen
         // wechselte zwischen zwei Ladevorgängen sein Gesicht.
         orderBy: PRODUCT_ORDER_BY,
-        select: { category: true, imageUrl: true },
+        take: VORSCHAU_LADE_DECKEL,
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          unit: true,
+          unitSize: true,
+          stock: true,
+          reservedStock: true,
+          category: true,
+          imageUrl: true,
+        },
       },
+      // Die Gesamtzahl der verfügbar geschalteten Produkte — die Zeile
+      // „+ n weitere" muss auch dann stimmen, wenn oben gedeckelt wurde.
+      _count: { select: { products: { where: { isAvailable: true } } } },
       pickupSlots: {
         where: { isActive: true },
         select: { dayOfWeek: true, startTime: true, endTime: true },
       },
     },
   })
+
+  // Was die Deckelung oben NICHT verlieren darf: Kategorien und Produktfotos
+  // hängen an ALLEN verfügbaren Produkten, nicht an den ersten acht.
+  //   - Kategorien: Ein Hof mit mehr Produkten verlöre sonst die Kategorien
+  //     seiner hinteren Ware — und wäre beim Filtern danach unauffindbar,
+  //     obwohl er sie führt.
+  //   - Produktfotos: Der Fotostreifen (#83) nahm bisher die ersten drei
+  //     Bilder aus ALLEN Produkten; mit Deckel verlöre ein Hof, dessen
+  //     vordere Produkte kein Bild haben, seinen Streifen.
+  // Beides liefert EINE schmale Zeilen-Abfrage über alle Höfe (drei kleine
+  // Felder, kein N+1) — und keine zweite Einbindung derselben Relation, die
+  // Prisma im selben select ohnehin verbietet.
+  const schmaleZeilen = await zeilenJeHof
+  const kategorienJeHof = new Map<string, ProductCategory[]>()
+  const produktFotosJeHof = new Map<string, string[]>()
+  for (const zeile of schmaleZeilen) {
+    if (zeile.category) {
+      const bisher = kategorienJeHof.get(zeile.farmId) ?? []
+      bisher.push(zeile.category)
+      kategorienJeHof.set(zeile.farmId, bisher)
+    }
+    if (zeile.imageUrl) {
+      const bisher = produktFotosJeHof.get(zeile.farmId) ?? []
+      // Der Streifen zeigt höchstens drei Produktfotos — mehr zu sammeln
+      // wäre Ballast (baueFotostreifen deckelt ohnehin bei fünf gesamt).
+      if (bisher.length < 3) {
+        bisher.push(zeile.imageUrl)
+        produktFotosJeHof.set(zeile.farmId, bisher)
+      }
+    }
+  }
 
   return hoefe.map((hof) => ({
     slug: hof.slug,
@@ -468,16 +564,32 @@ export async function getOeffentlicheHoefe(
     latitude: hof.latitude,
     longitude: hof.longitude,
     isPaused: hof.isPaused,
-    kategorien: sammleKategorien(hof.products, PRODUCT_CATEGORY_VALUES),
+    kategorien: sammleKategorien(
+      (kategorienJeHof.get(hof.id) ?? []).map((category) => ({ category })),
+      PRODUCT_CATEGORY_VALUES
+    ),
+    produkte: hof.products.map((p) => ({
+      id: p.id,
+      name: p.name,
+      price: Number(p.price),
+      unit: p.unit,
+      unitSize: p.unitSize === null ? null : Number(p.unitSize),
+      imageUrl: p.imageUrl,
+      category: p.category,
+      // „Verfügbar" heißt: Es ist noch etwas da, das nicht schon reserviert
+      // ist. Siehe VORSCHAU-VERFÜGBARKEIT im Kopf dieser Datei.
+      verfuegbar: p.stock - p.reservedStock > 0,
+    })),
+    produkteGesamt: hof._count.products,
     naechsteAbholung: naechsteAbholung(hof.pickupSlots, jetzt),
     fotos: baueFotostreifen({
       bannerUrl: hof.bannerUrl,
       bannerType: hof.bannerType,
       galerie: hof.farmPhotos.map((f) => f.url),
-      produktFotos: hof.products
-        .map((p) => p.imageUrl)
-        .filter((url): url is string => url !== null && url !== '')
-        .slice(0, 3),
+      // Aus der schmalen Abfrage, NICHT aus den gedeckelten Vorschau-Zeilen:
+      // sonst verlöre ein Hof, dessen vordere Produkte kein Bild haben,
+      // seinen Fotostreifen (Verhalten unverändert gegenüber #83).
+      produktFotos: produktFotosJeHof.get(hof.id) ?? [],
     }),
   }))
 }
