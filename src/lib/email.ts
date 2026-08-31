@@ -16,6 +16,7 @@ import { FreischaltungEmail } from '@/emails/freischaltung'
 import { SUPPORT_EMAIL } from '@/lib/support'
 import { StatusUpdateEmail } from '@/emails/status-update'
 import { generateReorderToken } from '@/lib/reorder-token'
+import { bestellungPfad } from '@/lib/bestell-link'
 import { unitSuffix, type OrderLineProduct } from '@/lib/order-line'
 
 const apiKey = process.env.RESEND_API_KEY
@@ -171,6 +172,9 @@ export async function sendFreischaltungEmail(farm: {
 export async function sendOrderConfirmation(order: OrderForEmail): Promise<void> {
   const reorderToken = generateReorderToken(order.id, order.farm.id)
   const reorderUrl = `${APP_URL}/${order.farm.slug}?reorder=${reorderToken}`
+  // Der signierte Weg zurück zur Bestellung — der einzige, den die Kundin
+  // nach dem Schließen des Tabs noch hat (kein Konto, keine Historie).
+  const orderUrl = `${APP_URL}${bestellungPfad(order.farm.slug, order.id)}`
 
   const html = await toHtml(React.createElement(OrderConfirmationEmail, {
     customerName: order.customerName,
@@ -189,6 +193,7 @@ export async function sendOrderConfirmation(order: OrderForEmail): Promise<void>
     total: n(order.totalAmount),
     manageUrl: `${APP_URL}/account/profile`,
     reorderUrl,
+    orderUrl,
   }))
 
   await send(
@@ -280,6 +285,7 @@ export async function sendOrderConfirmedToFarmer(order: OrderForEmail): Promise<
 export async function sendOrderReady(order: OrderForEmail): Promise<void> {
   const reorderToken = generateReorderToken(order.id, order.farm.id)
   const reorderUrl = `${APP_URL}/${order.farm.slug}?reorder=${reorderToken}`
+  const orderUrl = `${APP_URL}${bestellungPfad(order.farm.slug, order.id)}`
 
   const html = await toHtml(React.createElement(OrderReadyEmail, {
     customerName: order.customerName,
@@ -291,6 +297,7 @@ export async function sendOrderReady(order: OrderForEmail): Promise<void> {
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     reorderUrl,
+    orderUrl,
   }))
 
   await send(

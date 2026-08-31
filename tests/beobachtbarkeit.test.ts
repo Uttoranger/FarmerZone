@@ -231,6 +231,24 @@ describe('bereinigeEreignis — der beforeSend-Filter', () => {
     expect(e.request?.query_string).toBe('seite=2')
   })
 
+  it('entfernt die Bestell-Link-Signatur (?s=…) und den Reorder-Token, „seite" und „sortierung" bleiben', () => {
+    const e = bereinigeEreignis(
+      ereignis({
+        request: {
+          // Beide sind Zugangsgeheimnisse: s öffnet die Bestellseite
+          // (bestell-link.ts), reorder trägt den selbsttragenden
+          // Nachbestell-Token. `^s$` darf dabei NICHT Wörter treffen, die
+          // bloß ein s enthalten (seite, sortierung).
+          url: 'https://farmerzone.at/hof/bestellung/abc?s=deadbeef&seite=2',
+          query_string: 's=deadbeef&reorder=xyz.abc&seite=2&sortierung=neu',
+        },
+      })
+    )
+
+    expect(e.request?.url).toBe('https://farmerzone.at/hof/bestellung/abc?seite=2')
+    expect(e.request?.query_string).toBe('seite=2&sortierung=neu')
+  })
+
   it('entfernt eine Objekt-Gestalt des Query-Strings ganz — die URL trägt das Unbedenkliche', () => {
     const e = bereinigeEreignis(
       ereignis({

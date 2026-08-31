@@ -25,6 +25,8 @@ import {
   type AuswahlLage,
 } from '@/lib/hoefe-anzeige'
 import { hofInitialen } from '@/lib/hof-initialen'
+import { MARKE_GRUEN } from '@/lib/bestellstatus'
+import { Marke } from '@/components/ui/marke'
 import type { HofUebersichtEintrag } from '@/server/queries/farm'
 import HoefeKarussell from '@/components/hoefe/hoefe-karussell'
 import HoefeFotostreifen from '@/components/hoefe/hoefe-fotostreifen'
@@ -368,10 +370,14 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
                     der Block entfällt ersatzlos. */}
                 <HoefeProduktzeilen produkte={vorschau.produkte} weitere={vorschau.weitere} />
 
+                {/* Als grüne Marke statt grauer Zeile — dasselbe Element wie
+                    der Status auf der Bestellseite der Kundin: Der Termin ist
+                    das Versprechen, der Status später seine Einlösung. */}
                 {hof.naechsteAbholung && (
-                  <p className="mt-2 text-sm text-foreground">
-                    Nächste Abholung:{' '}
-                    <span className="font-medium">{formatiereAbholung(hof.naechsteAbholung)}</span>
+                  <p className="mt-2">
+                    <Marke farbe={MARKE_GRUEN}>
+                      Abholung {formatiereAbholung(hof.naechsteAbholung)}
+                    </Marke>
                   </p>
                 )}
 

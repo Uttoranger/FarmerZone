@@ -58,8 +58,10 @@ const TELEFON_MUSTER = /(?:\+|\(?0)\d(?:[\s/\-.()]{0,3}\d){7,}/g
 
 /** Query-Parameter, deren NAME auf Geheimnisse oder Personenbezug deutet.
  *  `pathname` gehört dazu: Die Blob-SDK-Aufrufe tragen darin den Blob-Pfad
- *  samt Geräte-Dateinamen. */
-const HEIKLE_PARAMETER = /token|code|secret|email|pathname/i
+ *  samt Geräte-Dateinamen. `s` ist die Signatur des Bestell-Links
+ *  (src/lib/bestell-link.ts) — ein Zugangsgeheimnis; `reorder` trägt den
+ *  selbsttragenden Nachbestell-Token (reorder-token.ts), gleiche Lage. */
+const HEIKLE_PARAMETER = /token|code|secret|email|pathname|reorder|^s$/i
 
 /** Undurchsichtige Kennungen als GANZES Pfadsegment (Bestätigungs-Token der
  *  Bestellungen ist ein nanoid(32)). Trifft bewusst auch lange Hof-Slugs —
