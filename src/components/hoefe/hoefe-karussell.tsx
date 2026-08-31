@@ -13,6 +13,8 @@ import {
 import { HoefeProduktzeilen } from '@/components/hoefe/hoefe-produktzeilen'
 import { zentrierterIndex } from '@/lib/hoefe-anzeige'
 import { hofInitialen } from '@/lib/hof-initialen'
+import { MARKE_GRUEN } from '@/lib/bestellstatus'
+import { Marke } from '@/components/ui/marke'
 import type { HofUebersichtEintrag } from '@/server/queries/farm'
 
 /**
@@ -204,9 +206,13 @@ export default function HoefeKarussell({
               return <HoefeProduktzeilen produkte={vorschau.produkte} weitere={0} />
             })()}
 
+            {/* Grüne Marke statt grauer Zeile — dasselbe Element wie der
+                Status auf der Bestellseite (siehe hoefe-client.tsx). */}
             {hof.naechsteAbholung && (
-              <p className="mt-1.5 truncate text-xs text-foreground">
-                Abholung: <span className="font-medium">{formatiereAbholung(hof.naechsteAbholung)}</span>
+              <p className="mt-1.5">
+                <Marke farbe={MARKE_GRUEN}>
+                  Abholung {formatiereAbholung(hof.naechsteAbholung)}
+                </Marke>
               </p>
             )}
             {hof.isPaused && (

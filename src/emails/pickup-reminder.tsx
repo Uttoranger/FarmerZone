@@ -12,6 +12,8 @@ export interface OrderReadyProps {
   pickupDate: string
   pickupTime: string
   reorderUrl?: string
+  /** Der signierte Link zur Bestellseite — der Weg zurück zur Bestellung. */
+  orderUrl?: string
 }
 
 export function OrderReadyEmail(p: OrderReadyProps) {
@@ -34,6 +36,16 @@ export function OrderReadyEmail(p: OrderReadyProps) {
           📍 {p.farmAddress}, {p.farmCity}
         </Link>
       </div>
+
+      {/* Der Weg zurück zur Bestellung: Positionen, Status und der
+          Kalendereintrag zum Abholtermin — ohne Anmeldung. */}
+      {p.orderUrl && (
+        <div style={{ textAlign: 'center', margin: '0 0 16px' }}>
+          <Link href={p.orderUrl} style={{ ...ctaButton, margin: '0' }}>
+            Bestellung ansehen
+          </Link>
+        </div>
+      )}
 
       <Text style={mutedText}><strong>Bestellnummer:</strong> {p.orderNumber}</Text>
       <Text style={mutedText}>

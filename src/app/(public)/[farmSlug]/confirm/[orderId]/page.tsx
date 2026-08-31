@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { CheckCircle, Clock, XCircle, MapPin, Calendar, Package } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { formatOrderLine } from '@/lib/order-line'
+import { bestellungPfad } from '@/lib/bestell-link'
 import { ClearCartOnMount } from '@/components/checkout/clear-cart-on-mount'
 
 interface Props {
@@ -197,6 +198,16 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
               : 'Karte bei Abholung'}
           </p>
         </div>
+
+        {/* Der signierte Weg zurück zur Bestellung (Sprint Bestellverfolgung):
+            dieselbe Adresse steht als Knopf in der Bestätigungs-Mail — hier
+            zusätzlich, damit die Kundin sie sich gleich merken kann. */}
+        <Link
+          href={bestellungPfad(farmSlug, order.id)}
+          className="mb-4 flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+        >
+          Bestellung ansehen &amp; Link merken
+        </Link>
 
         <Link
           href={`/${farmSlug}`}

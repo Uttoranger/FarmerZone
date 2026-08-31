@@ -15,6 +15,8 @@ export interface OrderConfirmationProps {
   total: number
   manageUrl?: string
   reorderUrl?: string
+  /** Der signierte Link zur Bestellseite — der Weg zurück zur Bestellung. */
+  orderUrl?: string
 }
 
 export function OrderConfirmationEmail(p: OrderConfirmationProps) {
@@ -43,6 +45,16 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps) {
           📍 {p.farmAddress}, {p.farmCity}
         </Link>
       </div>
+
+      {/* Der Weg zurück zur Bestellung, wenn der Tab längst zu ist: Status,
+          Abholzeit, Positionen und Kalendereintrag — ohne Anmeldung. */}
+      {p.orderUrl && (
+        <div style={{ textAlign: 'center', margin: '0 0 16px' }}>
+          <Link href={p.orderUrl} style={{ ...ctaButton, margin: '0' }}>
+            Bestellung ansehen
+          </Link>
+        </div>
+      )}
 
       <Text style={{ ...mutedText, fontWeight: '600', color: '#374151', margin: '0 0 8px' }}>
         Deine Bestellung
