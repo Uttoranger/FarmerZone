@@ -5,15 +5,16 @@ import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, List, Map as MapIcon } from 'lucide-react'
+import { ArrowRight, List, Map as MapIcon, Search, X } from 'lucide-react'
 import { CATEGORY_OPTIONS } from '@/schemas/product'
 import type { ProductCategoryValue } from '@/schemas/product'
 import {
-  filtereHoefe,
+  berechneHofAuswahl,
   formatiereAbholung,
   formatiereEntfernung,
-  ordneNachEntfernung,
+  suchForm,
   waehleVorschauProdukte,
+  VORSCHAU_ZEILEN,
   type Bezugspunkt,
   type UmkreisStufe,
 } from '@/lib/hofuebersicht'
@@ -70,6 +71,11 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
   const istBreit = useIstBreit()
   const [ansicht, setAnsicht] = useState<'liste' | 'karte'>('liste')
   const [gewaehlt, setGewaehlt] = useState<ProductCategoryValue[]>([])
+  // Die Produktsuche: der getippte Text und die übernommenen Such-Marken.
+  // Rein clientseitig auf den geladenen Daten — keine URL-Parameter, kein
+  // localStorage, keine zweite Server-Runde (Sprint-Vorgabe).
+  const [suchtext, setSuchtext] = useState('')
+  const [suchMarken, setSuchMarken] = useState<string[]>([])
   const [lage, setLage] = useState<AuswahlLage>(LEERE_LAGE)
   // Zählt jede Pin-Anfahrt, damit dieselbe Nummer zweimal hintereinander wirkt.
   const [fokus, setFokus] = useState(0)
@@ -104,12 +110,20 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
     () => CATEGORY_OPTIONS.filter((o) => hoefe.some((h) => h.kategorien.includes(o.value))),
     [hoefe]
   )
-  // Erst Kategorien, dann Umkreis: Mit Bezugspunkt trägt jeder Hof seine
-  // Entfernung und die Liste steht aufsteigend — Höfe ohne Kartenpunkt immer
-  // am Ende und nie von der Umkreisgrenze ausgeschlossen (ordneNachEntfernung).
-  const gefiltert = useMemo(
-    () => ordneNachEntfernung(filtereHoefe(hoefe, gewaehlt), bezugspunkt, umkreis),
-    [hoefe, gewaehlt, bezugspunkt, umkreis]
+  // DIE Ableitung — Kategorie → Umkreis → Suche, Vorschläge aus dem
+  // sichtbaren Ausschnitt: EINE reine, getestete Funktion
+  // (berechneHofAuswahl in src/lib/hofuebersicht.ts), damit die Verdrahtung
+  // selbst unter Test steht und nicht nur ihre Einzelteile.
+  const { gefiltert, vorschlaege, suchbegriffe, sucheAktiv, sucheLeertDieListe } = useMemo(
+    () =>
+      berechneHofAuswahl(hoefe, {
+        kategorien: gewaehlt,
+        bezugspunkt,
+        umkreis,
+        suchtext,
+        suchMarken,
+      }),
+    [hoefe, gewaehlt, bezugspunkt, umkreis, suchtext, suchMarken]
   )
   // Fällt der gewählte (oder überfahrene) Hof aus der Liste — durch eine
   // Kategorie oder den Umkreis —, erlischt die Hervorhebung mit ihm. Sonst
@@ -134,6 +148,24 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
     setGewaehlt((bisher) =>
       bisher.includes(wert) ? bisher.filter((k) => k !== wert) : [...bisher, wert]
     )
+  }
+
+  /** Vorschlag angetippt → als Marke übernehmen, das Feld wird frei für den
+   *  nächsten Begriff. Doppelt übernehmen (andere Schreibweise) zählt nicht. */
+  function suchMarkeHinzufuegen(name: string) {
+    setSuchMarken((bisher) =>
+      bisher.some((m) => suchForm(m) === suchForm(name)) ? bisher : [...bisher, name]
+    )
+    setSuchtext('')
+  }
+
+  function suchMarkeEntfernen(name: string) {
+    setSuchMarken((bisher) => bisher.filter((m) => m !== name))
+  }
+
+  function sucheZuruecksetzen() {
+    setSuchtext('')
+    setSuchMarken([])
   }
 
   /** Pin angetippt → Eintrag hervorheben und (Desktop/Liste) in den Blick rollen. */
@@ -174,12 +206,29 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
     </button>
   )
 
-  /** Die Leermeldung nennt das Mittel, das WIRKLICH hilft: Hat der Umkreis
-   *  die Liste geleert, führt „nimm einen Filter heraus" in die Irre. */
-  const leerMeldung =
-    umkreis !== null
+  /** Die Leermeldung nennt das Mittel, das WIRKLICH hilft: den
+   *  Zurücksetzen-Knopf nur, wenn die SUCHE die Liste geleert hat
+   *  (sucheLeertDieListe — hat schon der Umkreis die Basis geleert, hülfe
+   *  der Knopf nicht, und die Umkreis-Meldung nennt das richtige Mittel). */
+  const leerText = sucheLeertDieListe
+    ? 'Dazu haben wir gerade nichts gefunden.'
+    : umkreis !== null
       ? `In ${umkreis} km ist kein Hof dabei — nimm den Umkreis weiter oder hebe ihn auf.`
       : 'Kein Hof führt gerade etwas aus dieser Auswahl — nimm einen Filter heraus.'
+  const leerInhalt = (
+    <>
+      <p className="text-sm leading-relaxed text-muted-foreground">{leerText}</p>
+      {sucheLeertDieListe && (
+        <button
+          type="button"
+          onClick={sucheZuruecksetzen}
+          className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/40"
+        >
+          Suche zurücksetzen
+        </button>
+      )}
+    </>
+  )
 
   const filterMarken = angebotene.length > 0 && (
     <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Nach Kategorien filtern">
@@ -204,7 +253,81 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
     </div>
   )
 
-  /** Umkreissuche über den Kategorie-Marken — beide Ansichten teilen sie. */
+  /** Die Produktsuche: aktive Marken ÜBER dem Feld (gefüllt, mit Entfernen-
+   *  Zeichen), darunter das Suchfeld, darunter die Vorschlags-Knöpfe aus dem
+   *  VERFÜGBAREN Angebot des sichtbaren Ausschnitts (umrandet). Vor dem
+   *  Tippen die häufigsten Produkte, beim Tippen verengt sich die Leiste. */
+  const produktSuche = (
+    <div className="mt-3">
+      {suchMarken.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-2" role="group" aria-label="Aktive Produktfilter">
+          {suchMarken.map((marke) => (
+            <button
+              key={marke}
+              type="button"
+              onClick={() => suchMarkeEntfernen(marke)}
+              aria-label={`Filter ${marke} entfernen`}
+              className="inline-flex min-h-9 min-w-0 max-w-full items-center gap-1.5 rounded-full border border-primary bg-primary px-3 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
+            >
+              {/* Gekürzt statt übergelaufen: Produktnamen dürfen 100 Zeichen
+                  lang sein, und ein unbrechbares Einzelwort setzte sonst die
+                  Mindestbreite des Knopfs über die Viewport-Breite. */}
+              <span className="min-w-0 truncate">{marke}</span>
+              <X className="size-3.5 shrink-0" aria-hidden="true" />
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="relative">
+        <Search
+          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+          aria-hidden="true"
+        />
+        <input
+          type="search"
+          value={suchtext}
+          onChange={(e) => setSuchtext(e.target.value)}
+          placeholder="Wonach suchst du? z. B. Eier, Brot, Wels"
+          aria-label="Nach Produkten oder Höfen suchen"
+          className="min-h-11 w-full rounded-xl border border-border bg-card pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        />
+      </div>
+      {/* Die Suchwirkung als Ansage fürs Vorlesen — Hausmuster wie die
+          Umkreis-Meldezeile (hoefe-umkreis.tsx, role="status"): dauerhaft im
+          Baum, sonst verpasst der Screenreader die erste Änderung. Sichtbar
+          ändert sich die Liste selbst, deshalb sr-only. */}
+      <p role="status" className="sr-only">
+        {sucheAktiv
+          ? gefiltert.length === 0
+            ? leerText
+            : gefiltert.length === 1
+              ? 'Ein Hof gefunden.'
+              : `${gefiltert.length} Höfe gefunden.`
+          : ''}
+      </p>
+      {vorschlaege.length > 0 && (
+        <div
+          className="mt-2 flex flex-wrap gap-2"
+          role="group"
+          aria-label="Vorschläge aus dem verfügbaren Angebot"
+        >
+          {vorschlaege.map((vorschlag) => (
+            <button
+              key={vorschlag.name}
+              type="button"
+              onClick={() => suchMarkeHinzufuegen(vorschlag.name)}
+              className="min-h-9 min-w-0 max-w-full truncate rounded-full border border-border bg-card px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-muted/40"
+            >
+              {vorschlag.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
+  /** Umkreissuche über den Kategorie-Marken — beide Ansichten teilen sie;
+   *  dazwischen die Produktsuche (über den Kategorie-Marken, Sprint B). */
   const filterLeiste = (
     <>
       <HoefeUmkreis
@@ -217,6 +340,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
           setUmkreis(null)
         }}
       />
+      {produktSuche}
       {filterMarken}
     </>
   )
@@ -237,15 +361,20 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
    *  vollflächige Link zur Hofseite. */
   const liste = (istSplit: boolean) =>
     gefiltert.length === 0 ? (
-      <p className="mt-8 text-sm leading-relaxed text-muted-foreground">
-        {leerMeldung}
-      </p>
+      <div className="mt-8">{leerInhalt}</div>
     ) : (
       <ol className="mt-4 space-y-3">
         {gefiltert.map((hof, index) => {
           // Das Schaufenster dieser Karte — die Auswahl folgt dem gesetzten
-          // Kategoriefilter (waehleVorschauProdukte, rein und getestet).
-          const vorschau = waehleVorschauProdukte(hof.produkte, gewaehlt, hof.produkteGesamt)
+          // Kategoriefilter und der Suche: Treffer zuerst
+          // (waehleVorschauProdukte, rein und getestet).
+          const vorschau = waehleVorschauProdukte(
+            hof.produkte,
+            gewaehlt,
+            hof.produkteGesamt,
+            VORSCHAU_ZEILEN,
+            suchbegriffe
+          )
           return (
           <li
             key={hof.slug}
@@ -493,6 +622,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
               ausgewaehlt={auswahlMitPunkt ? sichtbareLage.ausgewaehlt : null}
               sichtbar={auswahlMitPunkt}
               gewaehlteKategorien={gewaehlt}
+              suchbegriffe={suchbegriffe}
               onZentriert={karussellZentriert}
               bandRef={bandMessen}
             />
@@ -500,9 +630,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
           {gefiltert.length === 0 && (
             // Auch der Karten-Reiter braucht die Filter-Leermeldung — eine
             // leere Karte ohne jedes Wort wäre keine Rückmeldung (#79-Regel).
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              {leerMeldung}
-            </p>
+            <div className="mt-3">{leerInhalt}</div>
           )}
           {koordinatenHinweis}
         </div>

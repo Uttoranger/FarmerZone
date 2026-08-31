@@ -386,13 +386,21 @@ describe('getOeffentlicheHoefe — die Query', () => {
     })
 
     // Die schmale Zeilen-Abfrage: dieselbe öffentliche Sichtbarkeit wie die
-    // Hof-Abfrage, dieselbe Reihenfolge wie die Hofseite — und WIRKLICH nur
-    // drei Felder (sie läuft über ALLE Produkte ALLER Höfe, ungedeckelt).
+    // Hof-Abfrage, dieselbe Reihenfolge wie die Hofseite — ungedeckelt über
+    // ALLE Produkte ALLER Höfe. name/stock/reservedStock speisen die
+    // Produktsuche (suchNamen).
     expect(produktZeilen).toHaveBeenCalledTimes(1)
     expect(produktZeilen.mock.calls[0]![0]).toEqual({
       where: { isAvailable: true, farm: OEFFENTLICH_SICHTBAR },
       orderBy: PRODUCT_ORDER_BY,
-      select: { farmId: true, category: true, imageUrl: true },
+      select: {
+        farmId: true,
+        category: true,
+        imageUrl: true,
+        name: true,
+        stock: true,
+        reservedStock: true,
+      },
     })
   })
 
@@ -418,10 +426,11 @@ describe('getOeffentlicheHoefe — die Query', () => {
     // ein Foto, das in den Vorschau-Zeilen gar nicht vorkommt: Genau so
     // behält ein Hof mit vielen Produkten seinen Fotostreifen.
     produktZeilen.mockResolvedValue([
-      { farmId: 'farm_1', category: 'EIER', imageUrl: 'p1.jpg' },
-      { farmId: 'farm_1', category: 'MILCH', imageUrl: 'p2.jpg' },
-      { farmId: 'farm_1', category: null, imageUrl: 'p3.jpg' },
-      { farmId: 'farm_1', category: null, imageUrl: 'p4.jpg' },
+      { farmId: 'farm_1', category: 'EIER', imageUrl: 'p1.jpg', name: 'Eier', stock: 5, reservedStock: 0 },
+      { farmId: 'farm_1', category: 'MILCH', imageUrl: 'p2.jpg', name: 'Milch', stock: 3, reservedStock: 0 },
+      // Voll reserviert → für die SUCHE nicht verfügbar, Foto/Kategorie zählen.
+      { farmId: 'farm_1', category: null, imageUrl: 'p3.jpg', name: 'Speck', stock: 2, reservedStock: 2 },
+      { farmId: 'farm_1', category: null, imageUrl: 'p4.jpg', name: 'Brot', stock: 1, reservedStock: 0 },
     ] as never)
 
     const hoefe = await getOeffentlicheHoefe({ wochentag: 3, uhrzeit: '12:00' })
@@ -432,6 +441,10 @@ describe('getOeffentlicheHoefe — die Query', () => {
       naechsteAbholung: { dayOfWeek: 5, tageVoraus: 2 },
       // Titelbild, Galerie, dann HÖCHSTENS DREI Produktfotos (p4 fällt).
       fotos: ['titel.jpg', 'g1.jpg', 'p1.jpg', 'p2.jpg', 'p3.jpg'],
+      // Die Suchnamen: ALLE Zeilen mit Bestand über der Reservierung — der
+      // voll reservierte Speck fehlt, das Foto-lose „Brot" (jenseits der
+      // Streifen-Drei) ist DRIN: ungedeckelt, unabhängig vom Fotostreifen.
+      suchNamen: ['Eier', 'Milch', 'Brot'],
     })
     expect(hoefe[1]).toMatchObject({
       slug: 'hof-leer',
@@ -440,9 +453,10 @@ describe('getOeffentlicheHoefe — die Query', () => {
       naechsteAbholung: null,
       fotos: [],
       // Ohne Produkte bleibt das Schaufenster leer — die Karte lässt den
-      // Block dann ganz weg.
+      // Block dann ganz weg; auch die Suche kennt nichts.
       produkte: [],
       produkteGesamt: 0,
+      suchNamen: [],
     })
     // Die Übersicht trägt PLZ und Ort, aber KEINE Straße — die Fixtur
     // ENTHÄLT eine, der Stolperdraht kann also wirklich auslösen.

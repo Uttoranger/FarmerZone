@@ -44,6 +44,7 @@ export default function HoefeKarussell({
   ausgewaehlt,
   sichtbar,
   gewaehlteKategorien = [],
+  suchbegriffe = [],
   onZentriert,
   bandRef,
 }: {
@@ -54,6 +55,9 @@ export default function HoefeKarussell({
   /** Der gesetzte Kategoriefilter — die Produktvorschau folgt ihm hier
    *  genauso wie auf der Hofkarte. */
   gewaehlteKategorien?: ProductCategoryValue[]
+  /** Aktive Suchbegriffe — Treffer stehen im Schaufenster zuerst, wie auf
+   *  der Hofkarte. */
+  suchbegriffe?: string[]
   /** Nach dem Snappen: dieser Hof ist jetzt zentriert. */
   onZentriert: (slug: string) => void
   /** Lässt den Aufrufer die HÖHE des Bandes messen — die Karte hält ihre
@@ -201,7 +205,8 @@ export default function HoefeKarussell({
                 hof.produkte,
                 gewaehlteKategorien,
                 hof.produkteGesamt,
-                2
+                2,
+                suchbegriffe
               )
               return <HoefeProduktzeilen produkte={vorschau.produkte} weitere={0} />
             })()}

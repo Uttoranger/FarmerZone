@@ -157,10 +157,13 @@ export const VORSCHAU_ZEILEN = 3
  * Wählt die Produkte für das Schaufenster einer Hofkarte.
  *
  * REIHENFOLGE, in dieser Rangfolge:
- *   1. Passt zum gesetzten Kategoriefilter — das Schaufenster zeigt, wonach
+ *   1. SUCHTREFFER — wer nach „Eier" gesucht hat, sieht die Eier zuerst,
+ *      auch wenn sie ausverkauft sind (der Hof steht dann wegen seines
+ *      Namens in der Liste; die Kennzeichnung „derzeit aus" erklärt es).
+ *   2. Passt zum gesetzten Kategoriefilter — das Schaufenster zeigt, wonach
  *      gesucht wurde (ohne Filter entfällt diese Stufe).
- *   2. Verfügbar vor ausverkauft — was man kaufen kann, steht vorn.
- *   3. Sonst die gegebene Reihenfolge (sortOrder der Hofseite).
+ *   3. Verfügbar vor ausverkauft — was man kaufen kann, steht vorn.
+ *   4. Sonst die gegebene Reihenfolge (sortOrder der Hofseite).
  * Fremde Kategorien gehen dabei NICHT verloren: Sie füllen die restlichen
  * Plätze, sobald die passenden aufgebraucht sind.
  *
@@ -176,14 +179,19 @@ export function waehleVorschauProdukte(
   produkte: VorschauProdukt[],
   gewaehlteKategorien: ProductCategoryValue[] = [],
   gesamt: number = produkte.length,
-  zeilen: number = VORSCHAU_ZEILEN
+  zeilen: number = VORSCHAU_ZEILEN,
+  suchbegriffe: string[] = []
 ): { produkte: VorschauProdukt[]; weitere: number } {
   const auswahl = new Set(gewaehlteKategorien)
   const passt = (p: VorschauProdukt) => auswahl.size > 0 && p.category !== null && auswahl.has(p.category)
+  const begriffe = suchbegriffe.map(suchForm).filter((b) => b !== '')
+  const getroffen = (p: VorschauProdukt) =>
+    begriffe.length > 0 && begriffe.some((b) => trifft(p.name, b))
 
   const geordnet = produkte
     .map((produkt, index) => ({ produkt, index }))
     .sort((a, b) => {
+      if (getroffen(a.produkt) !== getroffen(b.produkt)) return getroffen(a.produkt) ? -1 : 1
       if (passt(a.produkt) !== passt(b.produkt)) return passt(a.produkt) ? -1 : 1
       if (a.produkt.verfuegbar !== b.produkt.verfuegbar) return a.produkt.verfuegbar ? -1 : 1
       return a.index - b.index
@@ -192,6 +200,225 @@ export function waehleVorschauProdukte(
 
   const gezeigt = geordnet.slice(0, zeilen)
   return { produkte: gezeigt, weitere: Math.max(0, gesamt - gezeigt.length) }
+}
+
+// ─── Produktsuche: Vorschläge und Filter ────────────────────────────────────
+
+/**
+ * Die Vergleichsform eines Namens für die Suche: Groß-/Kleinschreibung,
+ * Leerzeichen-Unterschiede (führend, mehrfach, anhängend) und die
+ * Unicode-Normalform zählen nicht (NFC — ein per macOS-Paste zerlegtes
+ * „Käse“ in NFD wäre sonst eine zweite, gleich aussehende Gruppe und eine
+ * Marke, die nicht filtert). EINE Normalisierung für Vorschläge, Filter,
+ * Trefferbevorzugung UND die Marken-Entdopplung in der Oberfläche (deshalb
+ * exportiert) — zwei Regeln würden auseinanderlaufen.
+ */
+export function suchForm(text: string): string {
+  return text.normalize('NFC').trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+/** Die Anzeige-Schreibweise: wie eingegeben, nur Whitespace und
+ *  Unicode-Form vereinheitlicht. */
+function schreibweiseVon(name: string): string {
+  return name.normalize('NFC').trim().replace(/\s+/g, ' ')
+}
+
+/** Teiltreffer nach Suchform: „ei“ trifft „Freilandeier“. */
+function trifft(name: string, begriff: string): boolean {
+  return suchForm(name).includes(suchForm(begriff))
+}
+
+export type ProduktVorschlag = {
+  /** Anzeigename — die häufigste Schreibweise der zusammengefassten Gruppe. */
+  name: string
+  /** Bei wie vielen Höfen es das Produkt gerade VERFÜGBAR gibt. */
+  hoefe: number
+}
+
+/** Höchstens so viele Vorschlags-Knöpfe zeigt die Leiste. */
+export const VORSCHLAGS_DECKEL = 12
+
+/**
+ * Die Vorschlags-Knöpfe unter dem Suchfeld: die VERFÜGBAREN Produkte der
+ * übergebenen (also bereits nach Kategorie/Umkreis eingegrenzten) Höfe,
+ * gleiche Namen über Schreibweisen hinweg zusammengefasst, gezählt nach
+ * Höfen und danach absteigend sortiert (Gleichstand: alphabetisch, damit
+ * die Reihenfolge nicht von der Ladereihenfolge abhängt).
+ *
+ * Gespeist aus `suchNamen` — den Namen ALLER verfügbaren Produkte je Hof
+ * (queries/farm.ts, ungedeckelt): AUSVERKAUFTES ist dort schon aussortiert
+ * (die Suche verspricht „was es gerade wirklich gibt“ — ein Vorschlag,
+ * hinter dem nur „derzeit aus“ steht, wäre ein leeres Versprechen), und
+ * anders als die acht Vorschau-Zeilen verschweigt die Liste kein Produkt
+ * ab Platz neun.
+ *
+ * `suchtext` verengt die Liste auf passende Namen (Teiltreffer), erst
+ * DANACH greift der Deckel — beim Tippen tauchen also auch Namen auf, die
+ * ohne Eingabe hinter den zwölf häufigsten lägen.
+ */
+export function verfuegbareProduktnamen(
+  hoefe: Array<{ suchNamen: string[] }>,
+  suchtext: string = '',
+  deckel: number = VORSCHLAGS_DECKEL
+): ProduktVorschlag[] {
+  type Gruppe = { schreibweisen: Map<string, number>; hoefe: number }
+  const gruppen = new Map<string, Gruppe>()
+
+  for (const hof of hoefe) {
+    // BEIDE Zählungen sind je Hof entdoppelt: „bei wie vielen Höfen gibt es
+    // das“ — und auch die Abstimmung über den Anzeigenamen. Sonst
+    // überstimmte ein Hof, der „eier“ als 6er- UND 10er-Gebinde führt, mit
+    // zwei Zeilen die Mehrheit der Höfe, die „Eier“ schreiben.
+    const gezaehlteFormen = new Set<string>()
+    const gezaehlteSchreibweisen = new Set<string>()
+    for (const name of hof.suchNamen) {
+      const form = suchForm(name)
+      if (form === '') continue
+      const gruppe = gruppen.get(form) ?? { schreibweisen: new Map(), hoefe: 0 }
+      const schreibweise = schreibweiseVon(name)
+      if (!gezaehlteFormen.has(form)) {
+        gezaehlteFormen.add(form)
+        gruppe.hoefe += 1
+      }
+      if (!gezaehlteSchreibweisen.has(schreibweise)) {
+        gezaehlteSchreibweisen.add(schreibweise)
+        gruppe.schreibweisen.set(schreibweise, (gruppe.schreibweisen.get(schreibweise) ?? 0) + 1)
+      }
+      gruppen.set(form, gruppe)
+    }
+  }
+
+  const eingabe = suchForm(suchtext)
+  return [...gruppen.entries()]
+    .filter(([form]) => eingabe === '' || form.includes(eingabe))
+    .map(([, gruppe]) => {
+      let name = ''
+      let haeufigkeit = -1
+      for (const [schreibweise, anzahl] of gruppe.schreibweisen) {
+        // Bei Gleichstand entscheidet die Sortierung mit caseFirst:'upper' —
+        // „Freilandeier“ schlägt „freilandeier“, statt dass die zufällige
+        // Ladereihenfolge der Höfe den Knopf beschriftet.
+        const gewinnt =
+          anzahl > haeufigkeit ||
+          (anzahl === haeufigkeit &&
+            schreibweise.localeCompare(name, 'de-AT', { caseFirst: 'upper' }) < 0)
+        if (gewinnt) {
+          name = schreibweise
+          haeufigkeit = anzahl
+        }
+      }
+      return { name, hoefe: gruppe.hoefe }
+    })
+    .sort((a, b) => b.hoefe - a.hoefe || a.name.localeCompare(b.name, 'de-AT'))
+    .slice(0, deckel)
+}
+
+/**
+ * Die Suchwirkung auf die Hofliste — rein, auf den geladenen Daten:
+ *
+ *   - Aktive Such-Marken sind untereinander ein ODER: Ein Hof bleibt, wenn
+ *     er zu MINDESTENS EINER ein verfügbares Produkt führt (Teiltreffer —
+ *     „Brot“ behält auch den Hof, der nur „Bauernbrot“ schreibt).
+ *   - Der getippte Suchtext durchsucht Hofnamen UND Produktnamen; gegenüber
+ *     den Marken ist er ein UND (eine weitere Einschränkung, wie Kategorie
+ *     und Umkreis — nach dem Übernehmen als Marke ist das Feld ohnehin leer).
+ *   - AUSVERKAUFTE Produkte zählen nicht als Treffer (Suche = „was es
+ *     gerade wirklich gibt“) — `suchNamen` führt sie gar nicht erst; der
+ *     HOFNAME trifft unabhängig davon.
+ *
+ * Kategorie- und Umkreisfilter laufen unverändert daneben (UND) — diese
+ * Funktion kennt sie gar nicht.
+ *
+ * Geprüft wird gegen `suchNamen` — die Namen ALLER verfügbaren Produkte je
+ * Hof (queries/farm.ts, aus der ungedeckelten Zeilen-Abfrage): Auf den acht
+ * Vorschau-Zeilen wäre ein Hof, der das Gesuchte erst ab Platz neun führt,
+ * ein falsches Negativ — dasselbe Loch, das beim Kategoriefilter bewusst
+ * gestopft wurde (farm.ts, „wäre beim Filtern danach unauffindbar“).
+ */
+export function filtereNachSuche<H extends { name: string; suchNamen: string[] }>(
+  hoefe: H[],
+  suchtext: string,
+  suchMarken: string[] = []
+): H[] {
+  const marken = suchMarken.map(suchForm).filter((m) => m !== '')
+  const eingabe = suchForm(suchtext)
+  if (marken.length === 0 && eingabe === '') return hoefe
+
+  const fuehrt = (hof: H, begriff: string) =>
+    hof.suchNamen.some((name) => trifft(name, begriff))
+
+  return hoefe.filter((hof) => {
+    if (marken.length > 0 && !marken.some((m) => fuehrt(hof, m))) return false
+    if (eingabe !== '' && !trifft(hof.name, eingabe) && !fuehrt(hof, eingabe)) return false
+    return true
+  })
+}
+
+/** Alle Filtergriffe der Übersicht in einem Wert — die Eingabe von
+ *  berechneHofAuswahl. */
+export type UebersichtsFilter = {
+  kategorien: ProductCategoryValue[]
+  bezugspunkt: Bezugspunkt | null
+  umkreis: UmkreisStufe
+  suchtext: string
+  suchMarken: string[]
+}
+
+/**
+ * DIE Ableitung der Hofübersicht — rein, damit die Verdrahtung selbst
+ * getestet ist und nicht nur ihre Einzelteile (die Komponente ruft nur noch
+ * diese eine Funktion):
+ *
+ *   - `gefiltert`: Kategorie → Umkreis/Sortierung → Suche (alles UND).
+ *   - `vorschlaege`: aus dem Kategorie/Umkreis-Ausschnitt („angeboten wird
+ *     nur, was bei den sichtbaren Höfen gerade verfügbar ist“), bewusst
+ *     OHNE die Such-Marken selbst — die sind untereinander ein ODER, und
+ *     wer „Eier“ gewählt hat, soll „Brot“ vom Nachbarhof weiter angeboten
+ *     bekommen; bereits aktive Marken erscheinen nicht noch einmal.
+ *   - `suchbegriffe`: Marken plus getippter Text — fürs Schaufenster
+ *     (Treffer zuerst, waehleVorschauProdukte).
+ *   - `sucheAktiv`: es gibt aktive Suchbegriffe.
+ *   - `sucheLeertDieListe`: die Leere geht WIRKLICH auf die Suche zurück
+ *     (ohne sie gäbe es Treffer) — nur dann hilft „Suche zurücksetzen“;
+ *     hat schon der Umkreis die Basis geleert, muss die Leermeldung IHN
+ *     nennen, sonst führt der Knopf ins Leere.
+ */
+export function berechneHofAuswahl<
+  H extends {
+    name: string
+    kategorien: ProductCategoryValue[]
+    suchNamen: string[]
+    latitude: number | null
+    longitude: number | null
+  },
+>(
+  hoefe: H[],
+  filter: UebersichtsFilter
+): {
+  gefiltert: MitEntfernung<H>[]
+  vorschlaege: ProduktVorschlag[]
+  suchbegriffe: string[]
+  sucheAktiv: boolean
+  sucheLeertDieListe: boolean
+} {
+  const suchBasis = ordneNachEntfernung(
+    filtereHoefe(hoefe, filter.kategorien),
+    filter.bezugspunkt,
+    filter.umkreis
+  )
+  const gefiltert = filtereNachSuche(suchBasis, filter.suchtext, filter.suchMarken)
+  const eingabe = filter.suchtext.trim()
+  const aktiv = new Set(filter.suchMarken.map(suchForm))
+  const sucheAktiv = filter.suchMarken.length > 0 || eingabe !== ''
+  return {
+    gefiltert,
+    vorschlaege: verfuegbareProduktnamen(suchBasis, filter.suchtext).filter(
+      (v) => !aktiv.has(suchForm(v.name))
+    ),
+    suchbegriffe: eingabe === '' ? filter.suchMarken : [...filter.suchMarken, eingabe],
+    sucheAktiv,
+    sucheLeertDieListe: sucheAktiv && gefiltert.length === 0 && suchBasis.length > 0,
+  }
 }
 
 /**
