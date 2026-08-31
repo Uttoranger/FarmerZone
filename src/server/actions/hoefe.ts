@@ -1,7 +1,7 @@
 'use server'
 
 import { headers } from 'next/headers'
-import { sucheOrtspunkt } from '@/lib/geokodierung'
+import { entdoppleTreffer, kandidatenBeschriftung, sucheOrtspunkt } from '@/lib/geokodierung'
 import { createRateLimiter, getClientIp } from '@/lib/rate-limit'
 
 /**
@@ -25,8 +25,13 @@ import { createRateLimiter, getClientIp } from '@/lib/rate-limit'
  * Schleife sofort. Zusätzlich eine Längenkappe — was länger ist als ein
  * österreichischer Ortsname, ist keine Ortssuche.
  *
- * Ohne Treffer (oder über der Drossel) kommt null zurück; die Seite lässt
- * dann alles, wie es ist — die Liste bleibt unverändert.
+ * ÜBER DIE GRENZE: Gesucht wird in Österreich UND Deutschland (Innviertel/
+ * Niederbayern). Weil derselbe Ortsname beiderseits der Grenze vorkommt,
+ * kommen bis zu DREI Kandidaten zurück statt nur des besten — welcher
+ * gemeint war, entscheidet die Kundin an der Landangabe.
+ *
+ * Ohne Treffer (oder über der Drossel) kommt eine leere Liste zurück; die
+ * Seite lässt dann alles, wie es ist — die Hofliste bleibt unverändert.
  */
 
 const ORTSSUCHE_MAX_PRO_MINUTE = 10
@@ -36,20 +41,28 @@ const ORTSSUCHE_MAX_ZEICHEN = 60
 // gilt sie damit je Instanz — bewusst, siehe Kaveat in rate-limit.ts).
 const drossel = createRateLimiter({ max: ORTSSUCHE_MAX_PRO_MINUTE })
 
-export async function loeseOrtAuf(
-  eingabe: string
-): Promise<{ lat: number; lon: number; name: string } | null> {
-  if (typeof eingabe !== 'string') return null
+/** Ein Ortstreffer, wie ihn die Auswahlliste im Umkreisfeld zeigt. */
+export type OrtsTreffer = { lat: number; lon: number; name: string }
+
+export async function loeseOrtAuf(eingabe: string): Promise<OrtsTreffer[]> {
+  if (typeof eingabe !== 'string') return []
   const text = eingabe.trim().slice(0, ORTSSUCHE_MAX_ZEICHEN)
-  if (text.length < 2) return null
+  if (text.length < 2) return []
 
   // Wie im Hausmuster nur in Produktion — lokales `pnpm dev` bleibt frei.
   if (process.env.NODE_ENV === 'production') {
     const ip = getClientIp(await headers())
-    if (!drossel.check(`ortssuche:${ip}`)) return null
+    if (!drossel.check(`ortssuche:${ip}`)) return []
   }
 
-  const treffer = await sucheOrtspunkt(text)
-  if (!treffer) return null
-  return { lat: treffer.lat, lon: treffer.lon, name: treffer.anzeigeName }
+  // Entdopplung und Beschriftung entstehen SERVERSEITIG — hier ist das Land
+  // der Treffer noch bekannt (die Seite bekommt nur noch Text). Nominatim
+  // liefert für eine österreichische Postleitzahl gern mehrere Zeilen
+  // desselben Ortes; ohne Entdopplung bekäme der häufige Weg, der vor
+  // diesem Sprint einstufig war, eine Rückfrage ohne jede Erkenntnis.
+  return entdoppleTreffer(await sucheOrtspunkt(text)).map((k) => ({
+    lat: k.lat,
+    lon: k.lon,
+    name: kandidatenBeschriftung(k),
+  }))
 }

@@ -15,6 +15,7 @@ import {
   AKTIVITAET_LEER,
   type FarmAktivitaet,
 } from '@/lib/farm-aktivitaet'
+import { DE_ADMIN_KLAERUNG, LAND_LABEL, type Land } from '@/lib/laender'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -32,6 +33,8 @@ type Farm = {
   createdAt: Date
   approvedAt: Date | null
   archivedAt: Date | null
+  /** Das Land des Hofes — DE bekommt Marke und Klär-Erinnerung. */
+  land: Land
   /** Belegter Platz (1-basiert) oder null — serverseitig berechnet. */
   gruendungsplatz: number | null
   /** Lebenszeichen: was der Bauer seit der Anmeldung angelegt hat. */
@@ -143,9 +146,25 @@ export function AdminFarmList({
                   <p className="font-medium text-foreground break-words">{farm.name}</p>
                   <p className="text-xs text-muted-foreground break-all">/{farm.slug}</p>
                 </div>
-                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${status.className}`}>
-                  {status.label}
-                </span>
+                {/* Zwei Marken nebeneinander. `shrink-0` hält die Gruppe
+                    zusammen; wird es eng, wandert sie als Ganzes unter den
+                    Hofnamen (flex-wrap am Elternteil) — die Zeile bricht
+                    also nie mitten in einer Marke. Ruhig, aber deutlich:
+                    Sandfläche mit dunkler Schrift (rund 6,4:1), keine
+                    Alarmfarbe. */}
+                <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                  {farm.land === 'DE' && (
+                    <span
+                      className="rounded-full px-2.5 py-1 text-xs font-semibold"
+                      style={{ background: '#F3EFE6', color: '#2D5F3F' }}
+                    >
+                      {LAND_LABEL.DE}
+                    </span>
+                  )}
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${status.className}`}>
+                    {status.label}
+                  </span>
+                </div>
               </div>
 
               <dl className="mt-3 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
@@ -203,6 +222,14 @@ export function AdminFarmList({
               {/* flex-wrap statt einer festen Zeile: bei 375px rutscht die
                   zweite Schaltfläche unter die erste, statt schmal gequetscht
                   danebenzustehen. */}
+              {/* Die Erinnerung vor der Freischaltung — KEINE Sperre: Die
+                  Schaltfläche darunter bleibt unverändert bedienbar. */}
+              {farm.approvedAt === null && farm.land === 'DE' && (
+                <p className="mt-2 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                  {DE_ADMIN_KLAERUNG}
+                </p>
+              )}
+
               <div className="mt-3 flex flex-wrap gap-2">
                 {farm.approvedAt === null ? (
                   <>

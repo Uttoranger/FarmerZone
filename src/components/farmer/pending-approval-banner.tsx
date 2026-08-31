@@ -6,6 +6,7 @@ import {
   farmPendingMailSubject,
   farmPendingMailBody,
 } from '@/lib/farm-approval'
+import { DE_VORBEREITUNG_HINWEIS, type Land } from '@/lib/laender'
 
 /**
  * Balken über jeder Farmer-Seite, solange der Hof auf die Freigabe wartet.
@@ -16,8 +17,23 @@ import {
  * Die Hof-ID steht im Klartext und ist der Grund für den Balken: Bei einer
  * Rückfrage soll der Bauer sie mitschicken können, ohne sie irgendwo suchen
  * zu müssen — der mailto-Link trägt sie bereits im Text.
+ *
+ * DEUTSCHE HÖFE lesen hier einen zusätzlichen Absatz. Er steht bewusst in
+ * DIESEM Balken und nicht in der Erste-Schritte-Karte: Die verschwindet,
+ * sobald alle Punkte erledigt sind (`anzeigen: erledigt < gesamt`) — also
+ * ausgerechnet dann, wenn der Hof die Einladung „richte schon alles ein"
+ * befolgt hat. Der Balken bleibt, solange der Hof wartet, und genau das
+ * verlangt D-2: der BESTEHENDE Hinweis wird ergänzt, kein zweiter Balken.
  */
-export function PendingApprovalBanner({ farmId, farmName }: { farmId: string; farmName: string }) {
+export function PendingApprovalBanner({
+  farmId,
+  farmName,
+  land = 'AT',
+}: {
+  farmId: string
+  farmName: string
+  land?: Land
+}) {
   const params = new URLSearchParams({
     subject: farmPendingMailSubject(farmName),
     body: farmPendingMailBody(farmName, farmId),
@@ -34,6 +50,9 @@ export function PendingApprovalBanner({ farmId, farmName }: { farmId: string; fa
           <div className="min-w-0">
             <p className="text-sm font-medium text-sky-900">{FARM_PENDING_OWNER_BANNER}</p>
             <p className="mt-1 text-xs leading-relaxed text-sky-800">{FARM_PENDING_OWNER_HINT}</p>
+            {land === 'DE' && (
+              <p className="mt-1 text-xs leading-relaxed text-sky-800">{DE_VORBEREITUNG_HINWEIS}</p>
+            )}
             <p className="mt-2 text-xs text-sky-800">
               Deine Hof-ID:{' '}
               <span className="font-mono font-medium break-all">{farmId}</span>

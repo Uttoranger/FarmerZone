@@ -155,40 +155,62 @@ describe('ordneNachEntfernung', () => {
   })
 })
 
-describe('sucheOrtspunkt — die PLZ-Auflösung', () => {
-  const TREFFER = [{ lat: '48.21', lon: '13.49', display_name: '4910 Ried im Innkreis' }]
+describe('sucheOrtspunkt — die Ortsauflösung über die Grenze', () => {
+  const TREFFER = [
+    { lat: '48.21', lon: '13.49', display_name: '4910 Ried im Innkreis', address: { country_code: 'at' } },
+  ]
 
-  it('eine vierstellige Zahl fragt als POSTLEITZAHL, mit Länderfilter und ohne Straße', async () => {
+  it('eine VIERstellige Zahl fragt als POSTLEITZAHL — in AT und DE, ohne Straße', async () => {
     const angefragt: Record<string, string>[] = []
-    const punkt = await sucheOrtspunkt('4910', async (parameter) => {
+    const punkte = await sucheOrtspunkt('4910', async (parameter) => {
       angefragt.push(parameter)
       return TREFFER
     })
 
-    expect(angefragt[0]).toEqual({ postalcode: '4910', country: 'at' })
-    expect(punkt).toMatchObject({ lat: 48.21, lon: 13.49 })
+    expect(angefragt[0]).toEqual({ postalcode: '4910', countrycodes: 'at,de' })
+    expect(punkte[0]).toMatchObject({ lat: 48.21, lon: 13.49, land: 'AT' })
+  })
+
+  it('auch eine FÜNFstellige Zahl ist eine Postleitzahl — deutsche PLZ haben fünf Stellen', async () => {
+    const angefragt: Record<string, string>[] = []
+    await sucheOrtspunkt('84359', async (parameter) => {
+      angefragt.push(parameter)
+      return TREFFER
+    })
+
+    expect(angefragt[0]).toEqual({ postalcode: '84359', countrycodes: 'at,de' })
   })
 
   it('alles andere fragt als ORT', async () => {
     const angefragt: Record<string, string>[] = []
-    await sucheOrtspunkt('Ried im Innkreis', async (parameter) => {
+    await sucheOrtspunkt('Simbach am Inn', async (parameter) => {
       angefragt.push(parameter)
       return TREFFER
     })
 
-    expect(angefragt[0]).toEqual({ city: 'Ried im Innkreis', country: 'at' })
+    expect(angefragt[0]).toEqual({ city: 'Simbach am Inn', countrycodes: 'at,de' })
   })
 
-  it('leeres Ergebnis liefert null — der Zustand der Seite bleibt unverändert', async () => {
-    expect(await sucheOrtspunkt('4910', async () => [])).toBeNull()
+  it('liefert MEHRERE Kandidaten samt Land — „Simbach" gibt es beiderseits der Grenze', async () => {
+    const punkte = await sucheOrtspunkt('Simbach', async () => [
+      { lat: '48.27', lon: '13.02', display_name: 'Simbach am Inn, Bayern, Deutschland', address: { country_code: 'de' } },
+      { lat: '48.25', lon: '13.03', display_name: 'Braunau am Inn, Oberösterreich, Österreich', address: { country_code: 'at' } },
+    ])
+
+    expect(punkte).toHaveLength(2)
+    expect(punkte.map((k) => k.land)).toEqual(['DE', 'AT'])
   })
 
-  it('eine Zeitüberschreitung wird zu null, nie zu einem Fehler', async () => {
+  it('leeres Ergebnis liefert eine leere Liste — der Zustand der Seite bleibt unverändert', async () => {
+    expect(await sucheOrtspunkt('4910', async () => [])).toEqual([])
+  })
+
+  it('eine Zeitüberschreitung wird zur leeren Liste, nie zu einem Fehler', async () => {
     await expect(
       sucheOrtspunkt('4910', async () => {
         throw new Error('TimeoutError')
       })
-    ).resolves.toBeNull()
+    ).resolves.toEqual([])
   })
 
   it('fragt bei zu kurzer Eingabe gar nicht erst an', async () => {
@@ -198,7 +220,7 @@ describe('sucheOrtspunkt — die PLZ-Auflösung', () => {
         angefragt++
         return TREFFER
       })
-    ).toBeNull()
+    ).toEqual([])
     expect(angefragt).toBe(0)
   })
 })

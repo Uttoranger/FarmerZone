@@ -48,7 +48,10 @@ export function ErsteSchritteKarte({
         </div>
 
         {wartetAufFreigabe && (
-          <p className="mt-3 text-xs leading-relaxed" style={{ color: '#9AA08F' }}>
+          /* `text-muted-foreground` statt #9AA08F: Letzteres erreicht auf
+             Kartenweiß nur rund 2,7:1 — unter AA. Das Token liegt bei rund
+             4,5:1 und ist dieselbe Farbfamilie. */
+          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
             {ERSTE_SCHRITTE_WARTET}
           </p>
         )}

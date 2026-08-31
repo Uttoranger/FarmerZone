@@ -25,18 +25,36 @@
  * der Bauer setzt den Punkt dann selbst):
  *   1. street+postalcode+city  → Zoom 17, „Adresse gefunden"-Hinweis
  *   2. nur postalcode+city     → Zoom 14, „selbst schieben"-Hinweis
- *   3. fester Punkt (48.1/13.5) → Zoom 8,  derselbe Hinweis
+ *   3. fester Punkt je Land    → Zoom 8,  derselbe Hinweis
+ *
+ * ZWEI LÄNDER, ZWEI WEGE (Grenzregion Innviertel/Niederbayern):
+ * - Die HOF-Geokodierung (geokodiereAdresse) folgt dem LAND DES HOFES: Sie
+ *   soll eine bekannte Adresse verankern, nicht zwischen Ländern raten.
+ * - Die UMKREISSUCHE der Kundin (sucheOrtspunkt) sucht in BEIDEN Ländern
+ *   gleichzeitig (countrycodes=at,de): Wer „Simbach" tippt, gibt kein Land
+ *   an — die Kandidatenliste nennt es dafür (kandidatenBeschriftung).
  *
  * Reine Auswertung und injizierbare Lader, damit Kaskade, Rückwärts-Übernahme
  * und Bremse ohne Netz prüfbar sind (tests/hof-standort.test.ts,
  * tests/standort-rueckwaerts.test.ts).
  */
 import { SUPPORT_EMAIL } from '@/lib/support'
+import {
+  LAND_CODE,
+  LAND_LABEL,
+  UMKREIS_LAENDER_CODES,
+  alsLand,
+  type Land,
+} from '@/lib/laender'
 
 export type StandortKandidat = {
   lat: number
   lon: number
   anzeigeName: string
+  /** Das Land des Treffers, sofern Nominatim es mitliefert („AT", „DE", …) —
+   *  die Umkreissuche zeigt es an, damit „Simbach" diesseits und jenseits der
+   *  Grenze unterscheidbar bleibt. */
+  land?: string
 }
 
 export type GeokodierungsErgebnis = {
@@ -64,20 +82,51 @@ export const HINWEIS_ADRESSE_UEBERNOMMEN =
 /** Fester Rückfallpunkt der Stufe 3 (Oberösterreich). */
 export const RUECKFALL_PUNKT = { lat: 48.1, lon: 13.5 }
 
-/** Grobe Österreich-Schachtel für die Plausibilisierung gespeicherter Punkte.
- *  Bewusst grob (streift Nachbarländer) — sie fängt Vertipper und
- *  Datenmüll, keine Grenzverläufe. */
-export const OESTERREICH_GRENZEN = {
-  latMin: 46,
-  latMax: 49.1,
-  lonMin: 9.5,
-  lonMax: 17.2,
+/**
+ * Der Rückfallpunkt je Land — die Karte soll in der richtigen Gegend
+ * öffnen, wenn beide Geokodierungs-Stufen nichts gefunden haben. Für DE ist
+ * das Südostbayern (Raum Pfarrkirchen/Eggenfelden): die Grenzregion, um die
+ * es hier geht — nicht die geografische Mitte Deutschlands, die für einen
+ * Innviertler Nachbarhof nutzlos wäre.
+ */
+export const RUECKFALL_PUNKTE: Record<Land, { lat: number; lon: number }> = {
+  AT: RUECKFALL_PUNKT,
+  DE: { lat: 48.43, lon: 12.94 },
 }
 
-export function istInOesterreich(lat: number, lon: number): boolean {
+/** Grobe Länder-Schachteln für die Plausibilisierung gespeicherter Punkte.
+ *  Bewusst grob (sie streifen Nachbarländer) — sie fangen Vertipper und
+ *  Datenmüll, keine Grenzverläufe. Genau deshalb überlappen AT und DE im
+ *  Grenzstreifen: Ein Hof in Simbach darf sowohl als DE plausibel gelten,
+ *  als auch ein Hof in Braunau als AT — die Wahrheit steht im Länderfeld. */
+export const LAENDER_GRENZEN: Record<Land, { latMin: number; latMax: number; lonMin: number; lonMax: number }> = {
+  AT: { latMin: 46, latMax: 49.1, lonMin: 9.5, lonMax: 17.2 },
+  DE: { latMin: 47.2, latMax: 55.1, lonMin: 5.8, lonMax: 15.1 },
+}
+
+/** Die Österreich-Schachtel unter ihrem bisherigen Namen — unverändert. */
+export const OESTERREICH_GRENZEN = LAENDER_GRENZEN.AT
+
+/**
+ * Liegt der Punkt grob im Gebiet des angegebenen Landes? Tritt an die Stelle
+ * von istInOesterreich: Seit deutsche Höfe sich einrichten dürfen, hängt die
+ * Plausibilisierung am Land des Hofes, nicht mehr an einer festen Schachtel.
+ * Ein unbekannter Länderwert wird wie „AT" behandelt (alsLand).
+ */
+export function istImErlaubtenGebiet(lat: number, lon: number, land: Land | string): boolean {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false
-  const g = OESTERREICH_GRENZEN
+  const g = LAENDER_GRENZEN[alsLand(land)]
   return lat >= g.latMin && lat <= g.latMax && lon >= g.lonMin && lon <= g.lonMax
+}
+
+/**
+ * Eine vier- ODER fünfstellige Zahl gilt als Postleitzahl (AT hat vier
+ * Stellen, DE fünf), alles andere als Ortsname. Bewusst eine reine Funktion:
+ * An ihr hängt, ob Nominatim `postalcode` oder `city` bekommt — eine
+ * falsche Einordnung liefert stumm den falschen Ort.
+ */
+export function istPostleitzahl(eingabe: string): boolean {
+  return /^\d{4,5}$/.test(eingabe.trim())
 }
 
 /** Sechs Nachkommastellen ≈ 11 cm — mehr Genauigkeit gäbe der Karte nur Rauschen. */
@@ -96,17 +145,84 @@ export function werteNominatimAntwortAus(json: unknown): StandortKandidat[] {
   const kandidaten: StandortKandidat[] = []
   for (const eintrag of json) {
     if (kandidaten.length >= 3) break
-    const e = eintrag as { lat?: unknown; lon?: unknown; display_name?: unknown }
+    const e = eintrag as { lat?: unknown; lon?: unknown; display_name?: unknown; address?: unknown }
     const lat = typeof e.lat === 'string' ? Number.parseFloat(e.lat) : NaN
     const lon = typeof e.lon === 'string' ? Number.parseFloat(e.lon) : NaN
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue
+    // `address.country_code` kommt mit addressdetails=1 und in
+    // Kleinschreibung („at"/„de") — hier großgeschrieben wie unser
+    // Länderfeld. Fehlt er, bleibt das Feld weg statt zu raten.
+    const adresse = typeof e.address === 'object' && e.address !== null ? (e.address as Record<string, unknown>) : null
+    const code = typeof adresse?.country_code === 'string' ? adresse.country_code.toUpperCase() : undefined
     kandidaten.push({
       lat,
       lon,
       anzeigeName: typeof e.display_name === 'string' && e.display_name ? e.display_name : 'Gefundener Ort',
+      ...(code ? { land: code } : {}),
     })
   }
   return kandidaten
+}
+
+/**
+ * Der Anzeigetext eines Kandidaten in der Auswahlliste: der Nominatim-Name,
+ * dem das Land vorangestellt wird, wenn er es nicht ohnehin schon nennt.
+ * Nominatims `display_name` endet in aller Regel auf „…, Österreich" bzw.
+ * „…, Deutschland" — dann wäre eine zweite Landangabe nur Lärm.
+ */
+/**
+ * Wirft Treffer weg, die für die Kundin NICHT unterscheidbar wären.
+ *
+ * Nominatim liefert für eine einzelne österreichische Postleitzahl gern
+ * mehrere Zeilen desselben Ortes (Gemeinde, Katastralgemeinde, Ortschaft).
+ * Ohne diese Stufe würde daraus eine Rückfrage mit zwei gleich aussehenden
+ * Zeilen — ein Zusatzklick ohne jede Erkenntnis, und zwar ausgerechnet auf
+ * dem HÄUFIGEN österreichischen Weg, der vor diesem Sprint einstufig war.
+ *
+ * Zwei Treffer gelten als derselbe Ort, wenn ihre Beschriftung gleich ist
+ * ODER sie IM SELBEN LAND weniger als `minAbstandKm` auseinanderliegen.
+ * Der erste gewinnt (Nominatim sortiert nach Güte).
+ *
+ * Das Land ist die entscheidende Bedingung, nicht bloß Beiwerk: Simbach am
+ * Inn und Braunau am Inn trennt eine Brücke — rund 1,3 km. Eine reine
+ * Abstandsregel würfe ausgerechnet das Paar zusammen, dessentwegen es diese
+ * Rückfrage überhaupt gibt.
+ */
+export function entdoppleTreffer(
+  treffer: StandortKandidat[],
+  minAbstandKm = 2
+): StandortKandidat[] {
+  const behalten: StandortKandidat[] = []
+  for (const kandidat of treffer) {
+    const schonDa = behalten.some(
+      (b) =>
+        b.anzeigeName === kandidat.anzeigeName ||
+        (b.land === kandidat.land &&
+          // Grobe Näherung genügt für „derselbe Ort" (Breitengrad ≈ 111 km,
+          // Längengrad mit cos gestaucht) — hier wird nichts vermessen.
+          Math.hypot(
+            (b.lat - kandidat.lat) * 111,
+            (b.lon - kandidat.lon) * 111 * Math.cos((b.lat * Math.PI) / 180)
+          ) < minAbstandKm)
+    )
+    if (!schonDa) behalten.push(kandidat)
+  }
+  return behalten
+}
+
+/** „Zwei Orte passen …" — die Ansage nennt die Anzahl, damit sie auch
+ *  vorgelesen etwas aussagt. */
+export function hinweisMehrere(anzahl: number): string {
+  const wort = anzahl === 2 ? 'Zwei' : anzahl === 3 ? 'Drei' : String(anzahl)
+  return `${wort} Orte passen — welchen meinst du?`
+}
+
+export function kandidatenBeschriftung(kandidat: StandortKandidat): string {
+  const land = kandidat.land === 'AT' || kandidat.land === 'DE' ? LAND_LABEL[kandidat.land] : null
+  if (!land) return kandidat.anzeigeName
+  return kandidat.anzeigeName.includes(land)
+    ? kandidat.anzeigeName
+    : `${kandidat.anzeigeName} (${land})`
 }
 
 /** Lädt eine strukturierte Nominatim-Suche — der eine unreine Baustein, injizierbar. */
@@ -147,31 +263,41 @@ async function ladeNominatim(parameter: Record<string, string>): Promise<unknown
  * auf — der Bezugspunkt der Umkreissuche auf /hoefe.
  *
  * Bewusst DIESELBE strukturierte Anbindung wie die Hof-Geokodierung (kein
- * zweiter Netzweg): country=at, und je nach Eingabe postalcode ODER city —
- * eine vierstellige Zahl ist in Österreich eine PLZ, alles andere ein Ort.
- * Straße wird nie mitgeschickt: Gesucht ist die Gegend, nicht die Adresse.
+ * zweiter Netzweg), und je nach Eingabe postalcode ODER city
+ * (istPostleitzahl). Straße wird nie mitgeschickt: Gesucht ist die Gegend,
+ * nicht die Adresse.
+ *
+ * ÜBER DIE GRENZE: `countrycodes=at,de` statt `country=at`. Im Innviertel
+ * liegt Bayern näher als halb Oberösterreich — wer „Simbach" oder „84359"
+ * eintippt, sucht denselben Umkreis wie mit „Braunau". Gesucht wird in
+ * beiden Ländern gleichzeitig; welches gemeint war, entscheidet die Kundin
+ * an der Kandidatenliste (kandidatenBeschriftung).
+ *
+ * NUR HIER beide Länder: Die Hof-Geokodierung (geokodiereAdresse) folgt dem
+ * Land des Hofes — sie soll eine Adresse verankern, nicht raten.
  *
  * DATENSPARSAMKEIT: Hier geht ausschließlich die getippte Eingabe hinaus —
  * NIEMALS eine vom Gerät gemessene Position (src/lib/hofuebersicht.ts).
  *
  * Wirft NIE: leere Antwort, Zeitüberschreitung und Dienststörung liefern
- * gleichermaßen null, die Liste bleibt dann unverändert.
+ * gleichermaßen eine leere Liste, die Hofliste bleibt dann unverändert.
  */
 export async function sucheOrtspunkt(
   eingabe: string,
   lade: NominatimLader = ladeNominatim
-): Promise<StandortKandidat | null> {
+): Promise<StandortKandidat[]> {
   const text = eingabe.trim()
-  if (text.length < 2) return null
+  if (text.length < 2) return []
 
-  const istPlz = /^\d{4}$/.test(text)
   try {
-    const treffer = werteNominatimAntwortAus(
-      await lade({ [istPlz ? 'postalcode' : 'city']: text, country: 'at' })
+    return werteNominatimAntwortAus(
+      await lade({
+        [istPostleitzahl(text) ? 'postalcode' : 'city']: text,
+        countrycodes: UMKREIS_LAENDER_CODES,
+      })
     )
-    return treffer[0] ?? null
   } catch {
-    return null
+    return []
   }
 }
 
@@ -179,18 +305,27 @@ export async function sucheOrtspunkt(
  * Die dreistufige Kaskade (siehe Kopfkommentar). Wirft NIE — jedes Scheitern
  * (leere Antwort, Zeitüberschreitung, Dienststörung) führt zur nächsten,
  * gröberen Stufe, nie zu einer Fehlermeldung.
+ *
+ * `land` steuert ALLE drei Stufen: den Länder-Anker beider Nominatim-Stufen
+ * und den Rückfallpunkt der dritten (RUECKFALL_PUNKTE) — eine deutsche
+ * Adresse, die nichts findet, öffnet in Südostbayern statt im Innviertel.
+ * Zoom-Stufen und Hinweistexte bleiben unverändert.
  */
 export async function geokodiereAdresse(
   adresse: { address: string; postalCode: string; city: string },
+  land: Land | string = 'AT',
   lade: NominatimLader = ladeNominatim
 ): Promise<GeokodierungsErgebnis> {
+  const hofLand = alsLand(land)
+  const code = LAND_CODE[hofLand]
+
   try {
     const kandidaten = werteNominatimAntwortAus(
       await lade({
         street: adresse.address,
         postalcode: adresse.postalCode,
         city: adresse.city,
-        country: 'at',
+        country: code,
       })
     )
     if (kandidaten.length > 0) {
@@ -208,7 +343,7 @@ export async function geokodiereAdresse(
 
   try {
     const ortsTreffer = werteNominatimAntwortAus(
-      await lade({ postalcode: adresse.postalCode, city: adresse.city, country: 'at' })
+      await lade({ postalcode: adresse.postalCode, city: adresse.city, country: code })
     )
     if (ortsTreffer.length > 0) {
       return {
@@ -225,7 +360,7 @@ export async function geokodiereAdresse(
 
   return {
     kandidaten: [],
-    zentrum: RUECKFALL_PUNKT,
+    zentrum: RUECKFALL_PUNKTE[hofLand],
     stufe: 'rueckfall',
     zoom: 8,
     hinweis: HINWEIS_SELBST_SETZEN,
