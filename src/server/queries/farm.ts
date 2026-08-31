@@ -435,6 +435,11 @@ export type HofUebersichtEintrag = {
   /** ALLE verfügbar geschalteten Produkte des Hofes — Grundlage für
    *  „+ n weitere", auch wenn oben gedeckelt wurde. */
   produkteGesamt: number
+  /** Die Namen ALLER verfügbaren Produkte (Bestand abzüglich Reservierung
+   *  über null), UNGEDECKELT — die Grundlage der Produktsuche: Auf den acht
+   *  Vorschau-Zeilen wäre ein Hof mit dem Gesuchten ab Platz neun ein
+   *  falsches Negativ. Aus der schmalen Zeilen-Abfrage, wie die Kategorien. */
+  suchNamen: string[]
   /** Der Fotostreifen: nur URLs, Titelbild zuerst, höchstens fünf
    *  (baueFotostreifen in src/lib/hofuebersicht.ts). Leer = keine Fotos,
    *  die Karte bleibt kompakt. */
@@ -457,7 +462,21 @@ export async function getOeffentlicheHoefe(
   const zeilenJeHof = prisma.product.findMany({
     where: { isAvailable: true, farm: OEFFENTLICH_SICHTBAR },
     orderBy: PRODUCT_ORDER_BY,
-    select: { farmId: true, category: true, imageUrl: true },
+    // name/stock/reservedStock speisen die PRODUKTSUCHE (suchNamen unten):
+    // Sie muss ALLE verfügbaren Produkte eines Hofes kennen — die auf acht
+    // gedeckelten Vorschau-Zeilen würden einen Hof, der das Gesuchte erst
+    // ab Platz neun führt, als falsches Negativ verstecken. Der
+    // Kategoriefilter hat genau dieses Loch bewusst nicht (siehe unten) —
+    // die Suche bekommt dieselbe Vollständigkeit aus DERSELBEN Abfrage,
+    // keine zweite Server-Runde.
+    select: {
+      farmId: true,
+      category: true,
+      imageUrl: true,
+      name: true,
+      stock: true,
+      reservedStock: true,
+    },
   })
 
   const hoefe = await prisma.farm.findMany({
@@ -524,20 +543,27 @@ export async function getOeffentlicheHoefe(
     },
   })
 
-  // Was die Deckelung oben NICHT verlieren darf: Kategorien und Produktfotos
-  // hängen an ALLEN verfügbaren Produkten, nicht an den ersten acht.
+  // Was die Deckelung oben NICHT verlieren darf: Kategorien, Produktfotos
+  // und Suchnamen hängen an ALLEN verfügbaren Produkten, nicht an den
+  // ersten acht.
   //   - Kategorien: Ein Hof mit mehr Produkten verlöre sonst die Kategorien
   //     seiner hinteren Ware — und wäre beim Filtern danach unauffindbar,
   //     obwohl er sie führt.
   //   - Produktfotos: Der Fotostreifen (#83) nahm bisher die ersten drei
   //     Bilder aus ALLEN Produkten; mit Deckel verlöre ein Hof, dessen
   //     vordere Produkte kein Bild haben, seinen Streifen.
-  // Beides liefert EINE schmale Zeilen-Abfrage über alle Höfe (drei kleine
-  // Felder, kein N+1) — und keine zweite Einbindung derselben Relation, die
-  // Prisma im selben select ohnehin verbietet.
+  //   - Suchnamen: Die Produktsuche verspricht „was es gerade wirklich
+  //     gibt“ — auf den gedeckelten Zeilen wäre ein Hof, der das Gesuchte
+  //     erst ab Platz neun führt, ein falsches Negativ (dasselbe Loch, das
+  //     bei den Kategorien bewusst gestopft wurde). Verfügbar heißt hier
+  //     wie überall stock - reservedStock > 0 (VORSCHAU-VERFÜGBARKEIT oben).
+  // Alles liefert EINE schmale Zeilen-Abfrage über alle Höfe (kein N+1) —
+  // und keine zweite Einbindung derselben Relation, die Prisma im selben
+  // select ohnehin verbietet.
   const schmaleZeilen = await zeilenJeHof
   const kategorienJeHof = new Map<string, ProductCategory[]>()
   const produktFotosJeHof = new Map<string, string[]>()
+  const suchNamenJeHof = new Map<string, string[]>()
   for (const zeile of schmaleZeilen) {
     if (zeile.category) {
       const bisher = kategorienJeHof.get(zeile.farmId) ?? []
@@ -552,6 +578,11 @@ export async function getOeffentlicheHoefe(
         bisher.push(zeile.imageUrl)
         produktFotosJeHof.set(zeile.farmId, bisher)
       }
+    }
+    if (zeile.stock - zeile.reservedStock > 0) {
+      const bisher = suchNamenJeHof.get(zeile.farmId) ?? []
+      bisher.push(zeile.name)
+      suchNamenJeHof.set(zeile.farmId, bisher)
     }
   }
 
@@ -581,6 +612,7 @@ export async function getOeffentlicheHoefe(
       verfuegbar: p.stock - p.reservedStock > 0,
     })),
     produkteGesamt: hof._count.products,
+    suchNamen: suchNamenJeHof.get(hof.id) ?? [],
     naechsteAbholung: naechsteAbholung(hof.pickupSlots, jetzt),
     fotos: baueFotostreifen({
       bannerUrl: hof.bannerUrl,
