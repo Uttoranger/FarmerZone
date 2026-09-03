@@ -8,12 +8,13 @@ import { prisma } from '@/lib/prisma'
 import { findSlotError } from '@/lib/pickup-slot-rules'
 import {
   geokodiereAdresse,
-  istInOesterreich,
+  istImErlaubtenGebiet,
   rueckwaertsGeokodiere,
   rundeKoordinate,
   type GeokodierungsErgebnis,
   type RueckwaertsAdresse,
 } from '@/lib/geokodierung'
+import { LAENDER, LAND_GENITIV, alsLand, type Land } from '@/lib/laender'
 
 async function getAuthFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -30,6 +31,10 @@ const profileSchema = z.object({
   address: z.string().min(3),
   postalCode: z.string().min(4),
   city: z.string().min(2),
+  // Die Spalte ist ein String mit Default (prisma/schema.prisma) — ERLAUBT
+  // sind aber nur AT und DE, und das erzwingt genau diese Zeile. Ein drittes
+  // Land kostet damit einen Eintrag in src/lib/laender.ts, keine Migration.
+  country: z.enum(LAENDER, { message: 'Bitte Österreich oder Deutschland wählen' }),
   phone: z.string().min(4),
   email: z.string().email('Ungültige E-Mail-Adresse'),
   // Der Kartenpunkt wird MIT dem Profil gespeichert — es gibt keinen eigenen
@@ -46,6 +51,12 @@ const profileSchema = z.object({
 export type ProfileFormData = z.infer<typeof profileSchema>
 export type ProfileResult = { error?: string }
 
+/** Der ruhige Hinweis bei einem Punkt außerhalb des gewählten Landes —
+ *  Wortlaut wie bisher, nur das Land wechselt mit. */
+function aussenhalbHinweis(land: Land): string {
+  return `Der Punkt liegt außerhalb ${LAND_GENITIV[land]} — bitte schieb die Karte auf deinen Hof.`
+}
+
 export async function updateProfile(data: ProfileFormData): Promise<ProfileResult> {
   const farm = await getAuthFarm()
   if (!farm) return { error: 'Nicht angemeldet' }
@@ -55,11 +66,25 @@ export async function updateProfile(data: ProfileFormData): Promise<ProfileResul
 
   const { latitude, longitude, ...profil } = parsed.data
   const hatPunkt = latitude != null && longitude != null
-  // Plausibilisiert grob auf Österreich — ein Punkt in Italien oder bei 0/0
-  // ist kein Hofstandort, sondern eine verrutschte Karte. Dann wird NICHTS
-  // gespeichert, und der Bauer schiebt den Punkt zurück.
-  if (hatPunkt && !istInOesterreich(latitude, longitude)) {
-    return { error: 'Der Punkt liegt außerhalb Österreichs — bitte schieb die Karte auf deinen Hof.' }
+  // Plausibilisiert grob auf das LAND DES HOFES — ein Punkt in Italien oder
+  // bei 0/0 ist kein Hofstandort, sondern eine verrutschte Karte. Dann wird
+  // NICHTS gespeichert, und der Bauer schiebt den Punkt zurück. Geprüft wird
+  // gegen das gerade gewählte Land, nicht gegen das gespeicherte: Wer sein
+  // Land umstellt UND den Punkt verschiebt, speichert beides in einem Zug.
+  if (hatPunkt && !istImErlaubtenGebiet(latitude, longitude, profil.country)) {
+    return { error: aussenhalbHinweis(profil.country) }
+  }
+  // UND die Gegenrichtung: Wer nur das LAND umstellt, ohne den Punkt
+  // anzufassen, ließe sonst einen gespeicherten Punkt zurück, den die
+  // Prüfung des neuen Landes nie durchgelassen hätte — Land und Punkt
+  // liefen auseinander. Der Hinweis ist derselbe; zu tun ist auch dasselbe.
+  const alterPunkt = farm.latitude != null && farm.longitude != null
+  if (
+    !hatPunkt &&
+    alterPunkt &&
+    !istImErlaubtenGebiet(farm.latitude!, farm.longitude!, profil.country)
+  ) {
+    return { error: aussenhalbHinweis(profil.country) }
   }
 
   await prisma.farm.update({
@@ -94,6 +119,7 @@ export async function sucheHofStandort(adresse: {
   address: string
   postalCode: string
   city: string
+  country?: string
 }): Promise<StandortSuche> {
   const farm = await getAuthFarm()
   if (!farm) return { error: 'Nicht angemeldet' }
@@ -105,7 +131,15 @@ export async function sucheHofStandort(adresse: {
     return { error: 'Bitte zuerst Straße, PLZ und Ort ausfüllen.' }
   }
 
-  return { ergebnis: await geokodiereAdresse(parsed.data) }
+  // Das im FORMULAR gewählte Land, nicht das gespeicherte: Wer gerade auf
+  // Deutschland umstellt, sucht seine Adresse sofort in Deutschland — sonst
+  // führe die erste Suche nach dem Wechsel noch nach Österreich. Durch
+  // DASSELBE Zod-Schema wie beim Speichern: Dieser zweite Eingang darf die
+  // Länderprüfung nicht umgehen. Fehlt die Angabe (Altaufruf), gilt das
+  // gespeicherte Land des Hofes.
+  const gewaehlt = profileSchema.shape.country.safeParse(adresse.country)
+  const land = gewaehlt.success ? gewaehlt.data : alsLand(farm.country)
+  return { ergebnis: await geokodiereAdresse(parsed.data, land) }
 }
 
 /**

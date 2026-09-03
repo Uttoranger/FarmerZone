@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import type { FarmAktivitaet } from '@/lib/farm-aktivitaet'
+import { alsLand, type Land } from '@/lib/laender'
 
 export type AdminFarmRow = {
   id: string
@@ -9,6 +10,9 @@ export type AdminFarmRow = {
   createdAt: Date
   approvedAt: Date | null
   archivedAt: Date | null
+  /** Das Land des Hofes — deutsche Höfe tragen in der Liste eine Marke und
+   *  vor der Freischaltung eine Klär-Erinnerung (src/lib/laender.ts). */
+  land: Land
   /** Lebenszeichen: was der Bauer seit der Anmeldung angelegt hat. */
   aktivitaet: FarmAktivitaet
 }
@@ -42,6 +46,9 @@ export async function getAdminFarms(): Promise<AdminFarmRow[]> {
       createdAt: true,
       approvedAt: true,
       archivedAt: true,
+      // Deutsche Höfe müssen in der Liste erkennbar sein — sie dürfen nicht
+      // beiläufig freigeschaltet werden (Stripe DE, Steuer, Kennzeichnung).
+      country: true,
       // Beide nur, um daraus ein Ja/Nein zu machen — der Rohtext und die
       // Bild-URL verlassen diese Funktion nicht.
       description: true,
@@ -60,6 +67,7 @@ export async function getAdminFarms(): Promise<AdminFarmRow[]> {
     createdAt: f.createdAt,
     approvedAt: f.approvedAt,
     archivedAt: f.archivedAt,
+    land: alsLand(f.country),
     aktivitaet: {
       produkte: f._count.products,
       fotos: f._count.farmPhotos,

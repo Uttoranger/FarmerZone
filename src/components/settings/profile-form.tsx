@@ -21,10 +21,17 @@ import type { FarmSettings } from '@/server/queries/farm'
 import {
   HINWEIS_ADRESSE_UEBERNOMMEN,
   HINWEIS_KARTE_OHNE_PUNKT,
-  RUECKFALL_PUNKT,
+  RUECKFALL_PUNKTE,
   uebernehmeAdresse,
   type StandortKandidat,
 } from '@/lib/geokodierung'
+import {
+  DE_VORBEREITUNG_HINWEIS,
+  LAENDER,
+  LAND_LABEL,
+  alsLand,
+  type Land,
+} from '@/lib/laender'
 import type { KartenZiel } from '@/components/settings/standort-karte'
 
 // Nur clientseitig: Leaflet greift beim Import auf window zu.
@@ -39,6 +46,7 @@ const schema = z.object({
   city: z.string().min(2, 'Pflichtfeld'),
   phone: z.string().min(4, 'Pflichtfeld'),
   email: z.string().email('Ungültige E-Mail'),
+  country: z.enum(LAENDER),
   // Der Kartenpunkt ist ein Formularwert wie jedes andere Feld: Er wird beim
   // Schieben gesetzt und erst mit „Profil speichern" gespeichert.
   latitude: z.number().nullable(),
@@ -63,10 +71,13 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
   // Startansicht der Karte: gespeicherter Punkt bei Zoom 17, sonst der
   // Rückfallpunkt bei Zoom 8. Die Karte liest `start` nur beim Einhängen —
   // dass hier je Render ein frisches Objekt entsteht, ist deshalb egal.
+  // Ohne Punkt öffnet die Karte im Rückfallpunkt DES LANDES — ein deutscher
+  // Hof soll nicht erst über Oberösterreich starten.
+  const startLand = alsLand(farm.country)
   const start =
     farm.latitude != null && farm.longitude != null
       ? { lat: farm.latitude, lon: farm.longitude, zoom: 17 }
-      : { lat: RUECKFALL_PUNKT.lat, lon: RUECKFALL_PUNKT.lon, zoom: 8 }
+      : { lat: RUECKFALL_PUNKTE[startLand].lat, lon: RUECKFALL_PUNKTE[startLand].lon, zoom: 8 }
 
   const { register, handleSubmit, getValues, setValue, formState: { errors } } = useForm<ProfileFormData>({
     resolver: zodResolver(schema),
@@ -79,10 +90,19 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
       city: farm.city,
       phone: farm.phone,
       email: farm.email,
+      country: startLand,
       latitude: farm.latitude,
       longitude: farm.longitude,
     },
   })
+
+  // Die Länderwahl steuert den Hinweis UND die Geokodierung — deshalb als
+  // eigener Zustand neben dem Formularwert (register allein meldet keine
+  // Änderung an die Anzeige).
+  const [land, setLand] = useState<Land>(startLand)
+  // EINMAL registrieren und den Handler festhalten — er wird unten
+  // aufgerufen, statt überschrieben zu werden (siehe Kommentar am Select).
+  const landFeld = register('country')
 
   function onSubmit(data: ProfileFormData) {
     startTransition(async () => {
@@ -111,6 +131,9 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
         address: werte.address,
         postalCode: werte.postalCode,
         city: werte.city,
+        // Das gerade GEWÄHLTE Land, nicht das gespeicherte: Wer eben auf
+        // Deutschland umgestellt hat, sucht sofort dort.
+        country: land,
       })
       if ('error' in res) {
         toast.error(res.error)
@@ -195,16 +218,74 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
 
       <div className="bg-white rounded-xl border border-border p-4 space-y-4">
         <h2 className="font-medium text-foreground">Adresse</h2>
+
+        {/* Das Land ÜBER den Adressfeldern: Es entscheidet, wie PLZ und Ort
+            gelesen werden (vier- oder fünfstellig, Nominatim-Anker) — es
+            danach zu fragen, wäre die falsche Reihenfolge. */}
+        <div>
+          <Label htmlFor="country" className="text-sm text-muted-foreground mb-1 block">Land *</Label>
+          {/* Der eigene onChange DARF den von react-hook-form nicht
+              ersetzen: `register` gibt beide Handler unter demselben Namen
+              zurück, das spätere JSX-Prop gewänne — der Formularwert käme
+              dann nur noch über onBlur nach. Wer mit den Pfeiltasten wählt
+              und sofort absendet, sähe den DE-Hinweis und speicherte AT.
+              Deshalb erst den Handler von register, dann unseren. */}
+          <select
+            id="country"
+            {...landFeld}
+            aria-describedby={land === 'DE' ? 'land-hinweis' : undefined}
+            onChange={(e) => {
+              landFeld.onChange(e)
+              setLand(alsLand(e.target.value))
+            }}
+            className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground"
+          >
+            {LAENDER.map((wert) => (
+              <option key={wert} value={wert}>
+                {LAND_LABEL[wert]}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Ruhig, kein Warnbalken, kein Orange: Der Hof hat nichts falsch
+            gemacht — wir sind noch nicht so weit. Der Wortlaut steht in
+            src/lib/laender.ts und ist derselbe wie im Warte-Hinweis der
+            Übersicht. */}
+        {land === 'DE' && (
+          <p
+            id="land-hinweis"
+            className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
+          >
+            {DE_VORBEREITUNG_HINWEIS}
+          </p>
+        )}
+
         {field('address', 'Straße und Hausnummer *', 'Dorfstraße 12')}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <Label htmlFor="postalCode" className="text-sm text-muted-foreground mb-1 block">PLZ *</Label>
-            <Input id="postalCode" {...register('postalCode')} placeholder="3400" className={errors.postalCode ? 'border-red-400' : ''} />
+            {/* Neutral beschriftet und ohne länderfestes Beispiel: „3400" wäre
+                für einen deutschen Hof eine falsche Vorgabe. */}
+            <Label htmlFor="postalCode" className="text-sm text-muted-foreground mb-1 block">Postleitzahl *</Label>
+            {/* Das Beispiel folgt dem Land — „3400" wäre für einen
+                deutschen Hof eine falsche Vorgabe, gar keines wäre für
+                beide eine verlorene Ausfüllhilfe. */}
+            <Input
+              id="postalCode"
+              {...register('postalCode')}
+              placeholder={land === 'DE' ? '84359' : '3400'}
+              className={errors.postalCode ? 'border-red-400' : ''}
+            />
             {errors.postalCode && <p className="text-xs text-red-600 mt-1">{errors.postalCode.message}</p>}
           </div>
           <div>
             <Label htmlFor="city" className="text-sm text-muted-foreground mb-1 block">Ort *</Label>
-            <Input id="city" {...register('city')} placeholder="Klosterneuburg" className={errors.city ? 'border-red-400' : ''} />
+            <Input
+              id="city"
+              {...register('city')}
+              placeholder={land === 'DE' ? 'Simbach am Inn' : 'Klosterneuburg'}
+              className={errors.city ? 'border-red-400' : ''}
+            />
             {errors.city && <p className="text-xs text-red-600 mt-1">{errors.city.message}</p>}
           </div>
         </div>

@@ -166,6 +166,12 @@ model Farm {
   address     String
   postalCode  String
   city        String
+  // Land des Hofes: "AT" oder "DE" (src/lib/laender.ts). Bewusst String mit
+  // Default statt Enum — die Migration setzt damit ALLE Bestandshöfe ohne
+  // Backfill-Skript auf AT, und ein drittes Land später kostet keine
+  // Enum-Migration. Erlaubt sind trotzdem nur AT und DE: Das erzwingt das
+  // Zod-Schema der Server-Action (src/server/actions/farm.ts).
+  country     String  @default("AT")
   // Standort für die spätere Kundenkarte. Nullbar: Bestandshöfe haben noch
   // keine Koordinaten und werden über die Einstiegs-Checkliste angeleitet,
   // den Punkt im Hofprofil zu bestätigen (kein Backfill).
@@ -343,6 +349,8 @@ model Order {
   @@index([customerEmail])
   @@index([status])
   @@index([pickupDate])
+  // Siehe ManualSale: Fremdschlüssel ohne Index (Supabase-Hinweis).
+  @@index([customerId])
 }
 
 model OrderItem {
@@ -360,6 +368,9 @@ model OrderItem {
   product Product @relation(fields: [productId], references: [id])
 
   @@index([orderId])
+  // Siehe ManualSale: Fremdschlüssel ohne Index (Supabase-Hinweis). Hier am
+  // deutlichsten — die Löschsperre auf Product prüft genau diese Spalte.
+  @@index([productId])
 }
 
 model ManualSale {
@@ -387,6 +398,10 @@ model ManualSale {
   @@index([farmId])
   @@index([saleDate])
   @@index([channel])
+  // Fremdschlüssel ohne Index — Postgres legt für FKs KEINEN an. Jede
+  // Produktlöschung prüft die Gegenseite dann per Seq Scan (offener
+  // Supabase-Leistungshinweis).
+  @@index([productId])
 }
 
 model StockReservation {

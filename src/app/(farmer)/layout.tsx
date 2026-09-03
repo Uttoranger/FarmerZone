@@ -10,6 +10,7 @@ import { SentryNutzer } from '@/components/farmer/sentry-nutzer'
 import { ShopLinkBanner } from '@/components/farmer/shop-link-banner'
 import { ArchivedFarmBanner } from '@/components/farmer/archived-farm-banner'
 import { PendingApprovalBanner } from '@/components/farmer/pending-approval-banner'
+import { alsLand } from '@/lib/laender'
 
 export default async function FarmerLayout({ children }: { children: React.ReactNode }) {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -61,7 +62,11 @@ export default async function FarmerLayout({ children }: { children: React.React
           {isArchived ? (
             <ArchivedFarmBanner />
           ) : isPending ? (
-            <PendingApprovalBanner farmId={bannerState.id} farmName={bannerState.name} />
+            <PendingApprovalBanner
+              farmId={bannerState.id}
+              farmName={bannerState.name}
+              land={alsLand(bannerState.country)}
+            />
           ) : (
             <ShopLinkBanner farmSlug={farm.slug} />
           )}

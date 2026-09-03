@@ -39,6 +39,7 @@ const gueltig = {
   city: 'Klosterneuburg',
   phone: '+43 664 123 4567',
   email: 'hof@beispiel.at',
+  country: 'AT' as const,
   latitude: null,
   longitude: null,
 }
@@ -124,5 +125,110 @@ describe('updateProfile — Bilder bleiben unberührt', () => {
     const data = farmUpdate.mock.calls[0]![0].data as Record<string, unknown>
     expect(data.logoUrl).toBeUndefined()
     expect(data.bannerUrl).toBeUndefined()
+  })
+})
+
+describe('updateProfile — das Land des Hofes', () => {
+  it('speichert das gewählte Land mit', async () => {
+    await updateProfile({ ...gueltig, country: 'DE' })
+
+    expect(farmUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ country: 'DE' }) })
+    )
+  })
+
+  it('ein anderes Land als AT oder DE wird abgewiesen — nichts wird gespeichert', async () => {
+    const res = await updateProfile({ ...gueltig, country: 'FR' } as never)
+
+    expect(res.error).toBeTruthy()
+    expect(farmUpdate).not.toHaveBeenCalled()
+  })
+
+  it('ein deutscher Punkt gilt beim deutschen Hof — und wird beim österreichischen abgelehnt', async () => {
+    // Simbach am Inn: für einen DE-Hof plausibel …
+    const de = await updateProfile({
+      ...gueltig,
+      country: 'DE',
+      latitude: 48.27,
+      longitude: 13.02,
+    })
+    expect(de.error).toBeUndefined()
+
+    // … ein Punkt in Norddeutschland dagegen NICHT für einen AT-Hof.
+    vi.clearAllMocks()
+    getSession.mockResolvedValue({ user: { id: 'user_1' } } as never)
+    farmFindUnique.mockResolvedValue({ id: 'farm_1', slug: 'testhof' } as never)
+    const at = await updateProfile({
+      ...gueltig,
+      country: 'AT',
+      latitude: 53.55,
+      longitude: 9.99,
+    })
+    expect(at.error).toContain('außerhalb Österreichs')
+    expect(farmUpdate).not.toHaveBeenCalled()
+  })
+
+  it('der Hinweis nennt das GEWÄHLTE Land — ein DE-Hof liest nicht „außerhalb Österreichs"', async () => {
+    const res = await updateProfile({
+      ...gueltig,
+      country: 'DE',
+      latitude: 41.9,
+      longitude: 12.5, // Rom
+    })
+
+    expect(res.error).toContain('außerhalb Deutschlands')
+    expect(res.error).toContain('schieb die Karte auf deinen Hof')
+  })
+})
+
+describe('updateProfile — Land und Punkt dürfen nicht auseinanderlaufen', () => {
+  it('ein Länderwechsel OHNE neuen Punkt prüft den GESPEICHERTEN Punkt mit', async () => {
+    // Der Hof steht in Hamburg (als DE gespeichert) und stellt auf AT um,
+    // ohne die Karte anzufassen. Ohne die Prüfung stünde danach ein Hof mit
+    // country='AT' und einem Punkt, den die AT-Prüfung nie durchließe.
+    farmFindUnique.mockResolvedValue({
+      id: 'farm_1',
+      slug: 'testhof',
+      latitude: 53.55,
+      longitude: 9.99,
+    } as never)
+
+    const res = await updateProfile({ ...gueltig, country: 'AT' })
+
+    expect(res.error).toContain('außerhalb Österreichs')
+    expect(farmUpdate).not.toHaveBeenCalled()
+  })
+
+  it('passt der gespeicherte Punkt zum neuen Land, wird gespeichert', async () => {
+    // Simbach am Inn, Umstellung auf DE — der Punkt passt, also ist alles gut.
+    farmFindUnique.mockResolvedValue({
+      id: 'farm_1',
+      slug: 'testhof',
+      latitude: 48.27,
+      longitude: 13.02,
+    } as never)
+
+    const res = await updateProfile({ ...gueltig, country: 'DE' })
+
+    expect(res.error).toBeUndefined()
+    expect(farmUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ country: 'DE' }) })
+    )
+  })
+
+  it('ein Hof OHNE gespeicherten Punkt kann sein Land jederzeit umstellen', async () => {
+    farmFindUnique.mockResolvedValue({
+      id: 'farm_1',
+      slug: 'testhof',
+      latitude: null,
+      longitude: null,
+    } as never)
+
+    expect((await updateProfile({ ...gueltig, country: 'DE' })).error).toBeUndefined()
+  })
+
+  it('die Fehlermeldung für ein unbekanntes Land ist deutsch', async () => {
+    const res = await updateProfile({ ...gueltig, country: 'FR' } as never)
+    expect(res.error).toBe('Bitte Österreich oder Deutschland wählen')
   })
 })

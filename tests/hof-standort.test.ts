@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   geokodiereAdresse,
-  istInOesterreich,
+  istImErlaubtenGebiet,
   rundeKoordinate,
   werteNominatimAntwortAus,
   HINWEIS_ADRESSE_GEFUNDEN,
@@ -62,7 +62,7 @@ describe('werteNominatimAntwortAus', () => {
 describe('geokodiereAdresse — die dreistufige Kaskade', () => {
   it('Stufe 1: Adress-Treffer → Zoom 17, Adress-Hinweis, Kandidaten dabei', async () => {
     const angefragt: Record<string, string>[] = []
-    const ergebnis = await geokodiereAdresse(ADRESSE, async (parameter) => {
+    const ergebnis = await geokodiereAdresse(ADRESSE, 'AT', async (parameter) => {
       angefragt.push(parameter)
       return [treffer('48.21', '13.49', 'Dorfstraße 12'), treffer('48.22', '13.5', 'Dorfstraße 12b')]
     })
@@ -85,7 +85,7 @@ describe('geokodiereAdresse — die dreistufige Kaskade', () => {
     // Der Weiler ohne Straßennamen: Die strukturierte Orts-Anfrage ankert
     // über die Postleitzahl.
     const angefragt: Record<string, string>[] = []
-    const ergebnis = await geokodiereAdresse(ADRESSE, async (parameter) => {
+    const ergebnis = await geokodiereAdresse(ADRESSE, 'AT', async (parameter) => {
       angefragt.push(parameter)
       return 'street' in parameter ? [] : [treffer('48.2', '13.5', 'Ried im Innkreis')]
     })
@@ -103,7 +103,7 @@ describe('geokodiereAdresse — die dreistufige Kaskade', () => {
   it('behandelt eine Zeitüberschreitung wie eine leere Antwort', async () => {
     // In KEINEM Fall eine Fehlermeldung — es erscheint immer eine bedienbare
     // Karte, nur eben eine Stufe gröber.
-    const ergebnis = await geokodiereAdresse(ADRESSE, async (parameter) => {
+    const ergebnis = await geokodiereAdresse(ADRESSE, 'AT', async (parameter) => {
       if ('street' in parameter) throw new Error('TimeoutError')
       return [treffer('48.2', '13.5', 'Ried im Innkreis')]
     })
@@ -113,7 +113,7 @@ describe('geokodiereAdresse — die dreistufige Kaskade', () => {
   })
 
   it('Stufe 3: gar nichts trägt → fester Punkt, Zoom 8, Selbst-setzen-Hinweis', async () => {
-    const ergebnis = await geokodiereAdresse(ADRESSE, async () => {
+    const ergebnis = await geokodiereAdresse(ADRESSE, 'AT', async () => {
       throw new Error('TimeoutError')
     })
 
@@ -126,17 +126,17 @@ describe('geokodiereAdresse — die dreistufige Kaskade', () => {
   })
 })
 
-describe('istInOesterreich — die grobe Plausibilisierung', () => {
+describe('istImErlaubtenGebiet — die grobe Plausibilisierung je Land', () => {
   it('nimmt Punkte in Österreich an', () => {
-    expect(istInOesterreich(48.3069, 14.2858)).toBe(true) // Linz
-    expect(istInOesterreich(48.1, 13.5)).toBe(true) //       Rückfallpunkt selbst
+    expect(istImErlaubtenGebiet(48.3069, 14.2858, 'AT')).toBe(true) // Linz
+    expect(istImErlaubtenGebiet(48.1, 13.5, 'AT')).toBe(true) //       Rückfallpunkt selbst
   })
 
   it('lehnt Punkte außerhalb ab — Italien, Null-Insel, Unsinn', () => {
-    expect(istInOesterreich(41.9, 12.5)).toBe(false) //  Rom
-    expect(istInOesterreich(0, 0)).toBe(false) //        Null-Insel (verrutschte Karte)
-    expect(istInOesterreich(NaN, 14)).toBe(false)
-    expect(istInOesterreich(48, Infinity)).toBe(false)
+    expect(istImErlaubtenGebiet(41.9, 12.5, 'AT')).toBe(false) //  Rom
+    expect(istImErlaubtenGebiet(0, 0, 'AT')).toBe(false) //        Null-Insel (verrutschte Karte)
+    expect(istImErlaubtenGebiet(NaN, 14, 'AT')).toBe(false)
+    expect(istImErlaubtenGebiet(48, Infinity, 'AT')).toBe(false)
   })
 })
 

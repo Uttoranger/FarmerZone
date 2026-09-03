@@ -286,6 +286,8 @@ export type FarmSettings = {
   address: string
   postalCode: string
   city: string
+  /** "AT" oder "DE" — die Länderauswahl im Hofprofil (src/lib/laender.ts). */
+  country: string
   /** Bestätigter Kartenpunkt — steuert die Beschriftung der Standort-Schaltfläche. */
   latitude: number | null
   longitude: number | null
@@ -317,6 +319,7 @@ export async function getFarmSettings(ownerId: string): Promise<FarmSettings | n
       address: true,
       postalCode: true,
       city: true,
+      country: true,
       latitude: true,
       longitude: true,
       phone: true,
@@ -361,10 +364,18 @@ export async function getFarmArchiveState(
  */
 export async function getFarmBannerState(
   ownerId: string
-): Promise<{ id: string; name: string; slug: string; archivedAt: Date | null; approvedAt: Date | null } | null> {
+): Promise<{
+  id: string
+  name: string
+  slug: string
+  archivedAt: Date | null
+  approvedAt: Date | null
+  /** Für den Zusatzsatz im Warte-Balken: Deutschland ist in Vorbereitung. */
+  country: string
+} | null> {
   return prisma.farm.findUnique({
     where: { ownerId },
-    select: { id: true, name: true, slug: true, archivedAt: true, approvedAt: true },
+    select: { id: true, name: true, slug: true, archivedAt: true, approvedAt: true, country: true },
   })
 }
 

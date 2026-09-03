@@ -39,6 +39,7 @@ function dbZeile(overrides: Record<string, unknown> = {}) {
     archivedAt: null,
     description: 'Wir sind ein kleiner Familienbetrieb.',
     logoUrl: 'https://blob.example/logo.png',
+    country: 'AT',
     owner: { email: 'franz@test.local' },
     _count: { products: 3, farmPhotos: 2, pickupSlots: 1 },
     ...overrides,
@@ -246,5 +247,32 @@ describe('Beschriftung der Aktivitätszeile', () => {
 
     expect(aktivitaetsTeile(nurLogo)).toEqual(['Logo'])
     expect(istOhneInhalt(nurLogo)).toBe(false)
+  })
+})
+
+describe('getAdminFarms — das Land des Hofes', () => {
+  it('lädt country und reicht es als Land durch — dafür muss die Query es selektieren', async () => {
+    farmFindMany.mockResolvedValue([dbZeile({ country: 'DE' })] as never)
+
+    const [hof] = await getAdminFarms()
+
+    expect(hof.land).toBe('DE')
+    // Ohne `country: true` im select käme undefined an — das nagelt die
+    // Zeile fest, an der die ganze Admin-Kennzeichnung hängt.
+    const args = farmFindMany.mock.calls[0]![0]!
+    expect((args.select as Record<string, unknown>).country).toBe(true)
+  })
+
+  it('ein Bestandshof ohne gesetztes Land gilt als Österreich, nie als undefined', async () => {
+    // Nach der Migration steht überall "AT" — die Abbildung darf trotzdem
+    // nicht an einem fehlenden Wert zerbrechen (alsLand).
+    farmFindMany.mockResolvedValue([
+      dbZeile({ country: 'AT' }),
+      dbZeile({ id: 'farm_2', slug: 'zweiter', country: undefined }),
+    ] as never)
+
+    const hoefe = await getAdminFarms()
+
+    expect(hoefe.map((h) => h.land)).toEqual(['AT', 'AT'])
   })
 })

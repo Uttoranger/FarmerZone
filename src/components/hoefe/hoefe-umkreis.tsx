@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { Loader2, LocateFixed, X } from 'lucide-react'
-import { loeseOrtAuf } from '@/server/actions/hoefe'
+import { loeseOrtAuf, type OrtsTreffer } from '@/server/actions/hoefe'
 import { UMKREIS_STUFEN, type Bezugspunkt, type UmkreisStufe } from '@/lib/hofuebersicht'
+import { hinweisMehrere } from '@/lib/geokodierung'
 
 /**
  * Die Umkreissuche der Hofübersicht: zwei gleichrangige Wege zum
@@ -19,6 +20,13 @@ import { UMKREIS_STUFEN, type Bezugspunkt, type UmkreisStufe } from '@/lib/hofue
  * Nichts wird gemerkt: kein localStorage, kein Konto, keine URL-Parameter —
  * der Bezugspunkt lebt ausschließlich im Seitenzustand und ist mit
  * „Umkreis aufheben" wieder fort.
+ *
+ * ÜBER DIE GRENZE (AT/DE): Im Innviertel liegt Bayern näher als halb
+ * Oberösterreich, deshalb sucht die Auflösung in beiden Ländern. Weil
+ * derselbe Ortsname beiderseits der Grenze vorkommt, erscheint bei mehreren
+ * Treffern eine Auswahlliste MIT Landangabe statt einer stillen Entscheidung
+ * für den ersten Treffer — bei genau einem Treffer bleibt es beim direkten
+ * Übernehmen, damit der häufige Fall keinen Zusatzklick bekommt.
  */
 
 const HINWEIS_OHNE_STANDORT = 'Kein Problem — gib einfach deine Postleitzahl ein.'
@@ -59,6 +67,8 @@ export default function HoefeUmkreis({
 }) {
   const [eingabe, setEingabe] = useState('')
   const [hinweis, setHinweis] = useState<string | null>(null)
+  /** Mehrdeutige Treffer zur Auswahl — leer, sobald einer gewählt ist. */
+  const [kandidaten, setKandidaten] = useState<OrtsTreffer[]>([])
   const [ortet, setOrtet] = useState(false)
   const [laeuft, starteAufloesung] = useTransition()
   const plzFeld = useRef<HTMLInputElement>(null)
@@ -79,11 +89,16 @@ export default function HoefeUmkreis({
 
   function standortErfragen() {
     if (ortet) return
-    setHinweis(null)
+    // Erst der Frühausstieg, DANN aufräumen: Auf einem Browser ohne
+    // Geolocation soll ein Fehlklick nicht die eben erarbeitete Ortsauswahl
+    // vernichten und dafür nur „gib deine Postleitzahl ein" hinterlassen.
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       zurPlz()
       return
     }
+    setHinweis(null)
+    // Wer den eigenen Standort wählt, hat die Ortsauswahl verworfen.
+    setKandidaten([])
     setOrtet(true)
 
     // Die Laufnummer entscheidet, WESSEN Antwort noch zählt: Wer inzwischen
@@ -132,25 +147,47 @@ export default function HoefeUmkreis({
     plzFeld.current?.focus()
   }
 
+  /** Einen Treffer übernehmen — aus der Liste oder als einziger Fund. */
+  function uebernimm(treffer: OrtsTreffer) {
+    setKandidaten([])
+    setHinweis(null)
+    // Der aufgelöste Name statt des Rohtexts: „4910 Ried im Innkreis" sagt
+    // mehr als „4910" — und zeigt, worauf sich die Entfernungen beziehen.
+    onBezugspunkt({ lat: treffer.lat, lon: treffer.lon, name: treffer.name })
+  }
+
   function ortSuchen(e: React.FormEvent) {
     e.preventDefault()
     const text = eingabe.trim()
     if (!text || laeuft) return
     // Diese Suche gilt jetzt — eine späte Standort-Antwort zählt nicht mehr.
-    laufNr.current += 1
+    // UND UMGEKEHRT: Wer zwischendurch „In meiner Nähe" drückt, erhöht die
+    // Nummer, und dann zählt DIESE Antwort nicht mehr. Ohne die Prüfung
+    // unten setzte eine längst verworfene Suche noch einen Bezugspunkt (bei
+    // genau einem Treffer) oder brächte die eben geleerte Auswahl zurück.
+    const meinSuchlauf = ++laufNr.current
+    const suchlaufVeraltet = () => laufNr.current !== meinSuchlauf
     verwerfeWaechter()
     setOrtet(false)
     setHinweis(null)
+    setKandidaten([])
     starteAufloesung(async () => {
       const treffer = await loeseOrtAuf(text)
-      if (!treffer) {
+      if (suchlaufVeraltet()) return
+      if (treffer.length === 0) {
         // Kein Treffer: ruhiger Hinweis, die Liste bleibt unverändert.
         setHinweis(HINWEIS_OHNE_TREFFER)
         return
       }
-      // Der aufgelöste Name statt des Rohtexts: „4910 Ried im Innkreis" sagt
-      // mehr als „4910" — und zeigt, worauf sich die Entfernungen beziehen.
-      onBezugspunkt({ lat: treffer.lat, lon: treffer.lon, name: treffer.name })
+      // Die Liste ist bereits serverseitig entdoppelt (loeseOrtAuf): Hier
+      // stehen nur noch WIRKLICH unterscheidbare Orte. Genau einer wird
+      // direkt übernommen — der häufige Weg bleibt damit einstufig.
+      if (treffer.length === 1) {
+        uebernimm(treffer[0])
+        return
+      }
+      setHinweis(hinweisMehrere(treffer.length))
+      setKandidaten(treffer)
     })
   }
 
@@ -178,14 +215,20 @@ export default function HoefeUmkreis({
           <input
             ref={plzFeld}
             value={eingabe}
-            onChange={(e) => setEingabe(e.target.value)}
+            onChange={(e) => {
+              setEingabe(e.target.value)
+              // Die Auswahl gehört zur GESUCHTEN Eingabe: Wer das Feld
+              // ändert, tippte sonst später einen Treffer an, der zu einem
+              // anderen Wort gehört.
+              if (kandidaten.length > 0) setKandidaten([])
+            }}
             inputMode="text"
             enterKeyHint="search"
-            aria-label="Postleitzahl oder Ort"
+            aria-label="Postleitzahl oder Ort in Österreich oder Deutschland"
             // Der Fokus springt bei abgelehntem Standort hierher — dann muss
             // die Meldezeile mitgelesen werden.
             aria-describedby="umkreis-meldung"
-            placeholder="PLZ oder Ort"
+            placeholder="PLZ oder Ort (AT/DE)"
             className="min-h-11 w-full min-w-0 flex-1 rounded-lg border border-border bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground"
           />
           <button
@@ -205,9 +248,55 @@ export default function HoefeUmkreis({
           Fälle — den ruhigen Hinweis UND den gefundenen Bezugspunkt, damit
           auch der Erfolg angesagt wird und sichtbar ist, worauf sich die
           Entfernungen beziehen. */}
-      <p className="mt-2 min-h-5 text-sm text-muted-foreground" role="status" id="umkreis-meldung">
+      {/* `break-words`: Der gewählte Name kann sehr lang sein („Simbach am
+          Inn, Landkreis Rottal-Inn, Bayern, 84359, Deutschland") — ohne
+          Umbruch liefe er bei 375 px aus der Zeile. */}
+      <p
+        className="mt-2 min-h-5 break-words text-sm text-muted-foreground"
+        role="status"
+        id="umkreis-meldung"
+      >
         {hinweis ?? (bezugspunkt ? `Entfernungen ab: ${bezugspunkt.name ?? 'deinem Punkt'}` : '')}
       </p>
+
+      {/* Die Auswahl bei mehrdeutigen Orten — untereinander statt nebeneinander:
+          Die Namen tragen Bezirk und Land („Simbach am Inn, …, Deutschland")
+          und wären in einer Zeile bei 375px unlesbar. `text-left` und
+          `break-words`, damit lange Namen umbrechen statt abzuschneiden. */}
+      {kandidaten.length > 0 && (
+        <ul className="mt-2 space-y-1.5" aria-label="Welchen Ort meinst du?">
+          {kandidaten.map((treffer, i) => (
+            /* Der Index gehört in den Schlüssel: Zwei Nominatim-Zeilen
+               können dieselben Koordinaten tragen. */
+            <li key={`${i}:${treffer.lat},${treffer.lon}`}>
+              <button
+                type="button"
+                onClick={() => uebernimm(treffer)}
+                className="min-h-11 w-full rounded-lg border border-border bg-card px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted/40"
+              >
+                <span className="break-words">{treffer.name}</span>
+              </button>
+            </li>
+          ))}
+          {/* Ein Ausstieg, der OHNE Bezugspunkt erreichbar ist: „Umkreis
+              aufheben" erscheint erst mit einem — wer die Rückfrage nicht
+              meinte, säße sonst darin fest. */}
+          <li>
+            <button
+              type="button"
+              onClick={() => {
+                setKandidaten([])
+                setHinweis(null)
+                plzFeld.current?.focus()
+              }}
+              className="inline-flex min-h-9 items-center gap-1 rounded-full px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <X className="size-3.5" aria-hidden="true" />
+              Keiner davon
+            </button>
+          </li>
+        </ul>
+      )}
 
       {bezugspunkt && (
         <div
@@ -243,6 +332,9 @@ export default function HoefeUmkreis({
               setOrtet(false)
               setEingabe('')
               setHinweis(null)
+              // Auch eine offene Ortsauswahl gehört zum Aufheben — sonst
+              // stünde sie noch da, obwohl der Bezugspunkt fort ist.
+              setKandidaten([])
               onAufheben()
             }}
             className="inline-flex min-h-9 items-center gap-1 rounded-full px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
