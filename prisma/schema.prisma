@@ -68,6 +68,7 @@ enum ProductCategory {
   MILCH
   EIER
   FLEISCH
+  FISCH
   GEMUESE
   OBST
   BROT
