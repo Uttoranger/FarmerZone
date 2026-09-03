@@ -4,11 +4,24 @@ import type { ProductCategory } from '@prisma/client'
 
 // Kategorie-Fallback-Bilder: /public/categories/{slug}.webp
 // Nur serverseitig verwenden (fs) — Client-Komponenten bekommen die fertige URL.
+//
+// Die Zuordnung ist VOLLSTÄNDIG (Record über das Prisma-Enum — TypeScript
+// erzwingt jeden Wert), die Dateien sind es noch nicht: Heute liegen in
+// public/categories/ nur brennholz, eier, fleisch, milch und sonstiges. Für
+// fisch, gemuese, obst, brot, honig und getraenke steht der Dateiname hier
+// schon fest; der Betreiber muss die Illustration nur noch unter genau diesem
+// Namen ablegen. Bis dahin greift der Rückfall unten (null → die Kachel
+// rendert ohne Bild, kein gebrochenes <img>, kein Fehler im Log).
+// ACHTUNG Existenz-Cache (unten): Eine einmal als fehlend erkannte Datei
+// bleibt für die Lebensdauer des Prozesses „fehlend". Auf Vercel ist das
+// egal (jede Ablage ist ein Deployment = neuer Prozess); ein laufender
+// `next dev` muss nach dem Ablegen neu gestartet werden.
 
 const CATEGORY_SLUGS: Record<ProductCategory, string> = {
   MILCH: 'milch',
   EIER: 'eier',
   FLEISCH: 'fleisch',
+  FISCH: 'fisch',
   GEMUESE: 'gemuese',
   OBST: 'obst',
   BROT: 'brot',

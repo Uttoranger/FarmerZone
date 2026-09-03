@@ -78,8 +78,13 @@ const optionalMonth = z.preprocess(
   z.number().int().min(1).max(12).optional()
 )
 
+// Reihenfolge = Reihenfolge des Prisma-Enums `ProductCategory` (schema.prisma)
+// und zugleich die Sortierung in Filterleiste und Produktformular. FISCH steht
+// bewusst UNMITTELBAR nach FLEISCH: Bis zu diesem Sprint kannte der Katalog
+// keinen Fisch, eine Fischzucht musste sich unter „Fleisch & Wurst" einordnen.
+// Bestehende Produkte werden dabei NICHT umsortiert (keine Datenmigration).
 export const PRODUCT_CATEGORY_VALUES = [
-  'MILCH', 'EIER', 'FLEISCH', 'GEMUESE', 'OBST',
+  'MILCH', 'EIER', 'FLEISCH', 'FISCH', 'GEMUESE', 'OBST',
   'BROT', 'HONIG', 'GETRAENKE', 'BRENNHOLZ', 'SONSTIGES',
 ] as const
 
@@ -89,6 +94,7 @@ export const CATEGORY_OPTIONS: { value: ProductCategoryValue; label: string }[] 
   { value: 'MILCH', label: 'Milch & Molkerei' },
   { value: 'EIER', label: 'Eier' },
   { value: 'FLEISCH', label: 'Fleisch & Wurst' },
+  { value: 'FISCH', label: 'Fisch' },
   { value: 'GEMUESE', label: 'Gemüse' },
   { value: 'OBST', label: 'Obst' },
   { value: 'BROT', label: 'Brot & Gebäck' },
