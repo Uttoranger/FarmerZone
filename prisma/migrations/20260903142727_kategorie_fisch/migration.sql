@@ -1,0 +1,43 @@
+-- Kategorie FISCH: neuer Wert im Enum "ProductCategory", unmittelbar NACH 'FLEISCH'.
+--
+-- WARUM: Der Kategorienkatalog kannte keinen Fisch — eine Fischzucht musste
+-- sich unter „Fleisch & Wurst" einordnen. Der Wert steht bewusst direkt hinter
+-- FLEISCH, weil die Enum-Reihenfolge (pg_enum.enumsortorder) die Reihenfolge
+-- in Prisma-Schema, Filterleiste und Produktformular spiegelt.
+--
+-- WIEDERHOLBAR GESCHRIEBEN (`IF NOT EXISTS`), Vorbild
+-- 20260831163847_grenzregion_country_und_fk_indizes: Prisma fährt eine
+-- Migration NICHT in einer Transaktion — bricht sie ab, bleibt Ausgeführtes
+-- stehen, während `_prisma_migrations.finished_at` leer bleibt; ein
+-- Wiederanlauf scheiterte sonst an „enum label already exists".
+-- Kehrseite von `IF NOT EXISTS`: Existiert FISCH bereits — etwa weil jemand
+-- vor diesem Stand `prisma migrate dev` gegen eine geteilte Dev-Datenbank
+-- laufen ließ (Prisma erzeugt dann `ADD VALUE 'FISCH'` OHNE AFTER, also am
+-- Ende) —, bleibt es dort; PostgreSQL verschiebt einen vorhandenen Wert nicht,
+-- und Prismas Drift-Erkennung ist reihenfolgeblind. Folgenlos für die
+-- Anwendung: Sortiert wird nirgends nach der Datenbank-Reihenfolge, sondern
+-- ausschließlich nach PRODUCT_CATEGORY_VALUES (src/schemas/product.ts).
+--
+-- TRANSAKTIONSFRAGE, AUSDRÜCKLICH GEPRÜFT: PostgreSQL verbietet, einen neu
+-- hinzugefügten Enum-Wert in DERSELBEN Transaktion zu verwenden (bis PG 11
+-- war ADD VALUE in Transaktionen gar nicht erlaubt). Diese Migration
+-- verwendet den Wert aber nicht — sie fügt ihn nur hinzu. Und weil Prisma
+-- ohne Transaktion fährt, ist der Wert für die nächste Anweisung bzw. die
+-- nächste Verbindung sofort nutzbar. An einer Probe-Datenbank bestätigt:
+-- eine Migration genügt, INSERT mit category = 'FISCH' direkt nach
+-- `migrate deploy` gelingt. Kein Aufteilen in zwei Migrationen nötig.
+--
+-- SPERREN: ADD VALUE nimmt nur ein kurzes Schloss auf dem Typ, kein
+-- Tabellen-Rewrite, keine Sperre auf "Product". `lock_timeout` wie im
+-- Vorbild, damit ein Warten auf ein fremdes Schloss die Migration abbricht,
+-- statt Zugriffe dahinter aufzustauen.
+--
+-- KEIN UMSCHREIBEN BESTEHENDER PRODUKTE: Produkte, die heute unter FLEISCH
+-- stehen (auch die des Betreiberhofs), bleiben FLEISCH. Die Umstellung auf
+-- FISCH nimmt der jeweilige Hof selbst im Produktformular vor — bewusst
+-- keine Datenmigration, weil kein Regelwerk trennscharf sagen kann, welches
+-- FLEISCH-Produkt eigentlich Fisch ist.
+SET lock_timeout = '5s';
+
+-- AlterEnum
+ALTER TYPE "ProductCategory" ADD VALUE IF NOT EXISTS 'FISCH' AFTER 'FLEISCH';
