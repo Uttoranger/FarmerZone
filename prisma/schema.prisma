@@ -205,6 +205,16 @@ model Farm {
   // Plattform-Konfiguration
   platformFeePercent Decimal @default(0) @db.Decimal(5, 2) // im Pilot: 0
 
+  // Servicegebühr (Sprint servicegebuehr) — die Gebühr, die die KUNDIN auf den
+  // Warenpreis zahlt; der Hof behält immer 100 % Warenpreis. Der Betreiber
+  // stellt sie PRO HOF im Admin-Bereich ein. serviceFeeActiveFrom = null heißt
+  // gebührenfrei (Voreinstellung für jeden neuen Hof); ein Datum heißt: Gebühr
+  // gilt für Bestellungen AB diesem Zeitpunkt. Prozentsatz und Mindestgebühr
+  // greifen nur, wenn ein Datum gesetzt ist. Berechnung: src/lib/servicegebuehr.ts.
+  serviceFeePercent    Decimal   @default(4.9) @db.Decimal(5, 2)
+  serviceFeeMinCents   Int       @default(50)
+  serviceFeeActiveFrom DateTime?
+
   // Status
   isActive     Boolean @default(true)
   isPaused     Boolean @default(false)
@@ -334,6 +344,22 @@ model Order {
 
   // Plattformgebühr (für Reporting)
   platformFeeAmount Decimal @default(0) @db.Decimal(10, 2)
+
+  // Servicegebühr — SNAPSHOT zur Bestellzeit (Sprint servicegebuehr).
+  // totalAmount bleibt der WARENPREIS (das ist der Umsatz des Hofes und die
+  // Basis aller Auswertungen); die Gebühr steht daneben in Cent. Was die
+  // Kundin zahlt, ist totalAmount + serviceFeeCents. Ändert der Betreiber
+  // später die Hofeinstellung (Farm.serviceFee*), bleiben bestehende
+  // Bestellungen unverändert — Prozentsatz und Betrag stehen hier fest.
+  // Bestandsbestellungen behalten 0 Cent, kein Backfill.
+  //   serviceFeeCents          Gebühr in Cent, 0 = gebührenfrei
+  //   serviceFeePercentApplied der angewendete Prozentsatz, null wenn 0 Cent
+  //   serviceFeeRefundedAt     gesetzt, wenn die Gebühr entfallen ist
+  //                            (nicht abgeholt: bar = nicht der Abrechnung
+  //                            geschuldet, online = über Stripe erstattet)
+  serviceFeeCents          Int       @default(0)
+  serviceFeePercentApplied Decimal?  @db.Decimal(5, 2)
+  serviceFeeRefundedAt     DateTime?
 
   // Storno
   cancelledAt  DateTime?

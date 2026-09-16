@@ -16,6 +16,8 @@ import {
   type FarmAktivitaet,
 } from '@/lib/farm-aktivitaet'
 import { DE_ADMIN_KLAERUNG, LAND_LABEL, type Land } from '@/lib/laender'
+import type { AdminMonatsSpalten } from '@/server/queries/admin'
+import { ServicegebuehrEinstellung } from './servicegebuehr-einstellung'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -39,6 +41,12 @@ type Farm = {
   gruendungsplatz: number | null
   /** Lebenszeichen: was der Bauer seit der Anmeldung angelegt hat. */
   aktivitaet: FarmAktivitaet
+  /** Servicegebühr-Einstellung und Monatsspalten (Sprint servicegebuehr). */
+  serviceFeePercent: number
+  serviceFeeMinCents: number
+  serviceFeeActiveFrom: Date | null
+  monat: AdminMonatsSpalten
+  monatBezeichnung: string
 }
 
 /**
@@ -207,6 +215,16 @@ export function AdminFarmList({
               </dl>
 
               <Aktivitaet aktivitaet={farm.aktivitaet} />
+
+              {/* Servicegebühr je Hof: Einstellung + Monatsspalten, aufklappbar. */}
+              <ServicegebuehrEinstellung
+                farmId={farm.id}
+                percent={farm.serviceFeePercent}
+                minCents={farm.serviceFeeMinCents}
+                activeFrom={farm.serviceFeeActiveFrom}
+                monat={farm.monat}
+                monatBezeichnung={farm.monatBezeichnung}
+              />
 
               {/* Ein wartender Hof, an dem seit der Anmeldung nichts passiert
                   ist. Bewusst leise: gedeckte Farben, gestrichelter Rahmen,

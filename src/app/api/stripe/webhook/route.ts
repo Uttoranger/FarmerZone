@@ -104,6 +104,7 @@ async function handlePaymentSucceeded(pi: Stripe.PaymentIntent) {
     customerEmail: order.customerEmail,
     customerPhone: order.customerPhone,
     totalAmount: order.totalAmount,
+    serviceFeeCents: order.serviceFeeCents,
     pickupDate: order.pickupDate,
     pickupTimeStart: order.pickupTimeStart,
     pickupTimeEnd: order.pickupTimeEnd,

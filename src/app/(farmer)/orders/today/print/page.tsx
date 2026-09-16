@@ -7,8 +7,37 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { PrintButton } from '@/components/orders/print-button'
 import { unitSuffix } from '@/lib/order-line'
+import { barZuKassierenCents, bestellSummen } from '@/lib/servicegebuehr'
 
 export const dynamic = 'force-dynamic'
+
+function PacklistenBetrag({
+  order,
+}: {
+  order: { paymentMethod: string; totalAmount: { toString(): string }; serviceFeeCents: number }
+}) {
+  const summen = bestellSummen(order)
+  const kassieren = barZuKassierenCents(order)
+  if (kassieren === null) {
+    return (
+      <span className="text-right text-sm font-semibold text-gray-800">
+        € {(summen.warenpreisCents / 100).toFixed(2)}
+      </span>
+    )
+  }
+  return (
+    <span className="text-right">
+      <span className="block text-sm font-semibold text-gray-800">
+        Bar zu kassieren: € {(kassieren / 100).toFixed(2)}
+      </span>
+      {summen.gebuehrCents > 0 && (
+        <span className="block text-xs text-gray-500">
+          inkl. € {(summen.gebuehrCents / 100).toFixed(2)} Servicegebühr
+        </span>
+      )}
+    </span>
+  )
+}
 
 export default async function PrintPacklistPage() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -152,7 +181,7 @@ export default async function PrintPacklistPage() {
                         </div>
                       ))}
                     </div>
-                    <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between">
+                    <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between gap-3">
                       <span className="text-xs text-gray-400">
                         {order.paymentMethod === 'ONLINE'
                           ? 'Online bezahlt'
@@ -160,9 +189,9 @@ export default async function PrintPacklistPage() {
                           ? 'Barzahlung vor Ort'
                           : 'Kartenzahlung vor Ort'}
                       </span>
-                      <span className="text-sm font-semibold text-gray-800">
-                        € {Number(order.totalAmount).toFixed(2)}
-                      </span>
+                      {/* Bei Vor-Ort-Zahlung der zu kassierende Betrag (Warenpreis
+                          + Servicegebühr), online der Warenpreis */}
+                      <PacklistenBetrag order={order} />
                     </div>
                   </div>
                 ))}

@@ -16,7 +16,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/lib/prisma', () => ({
-  prisma: { farm: { findMany: vi.fn() } },
+  prisma: { farm: { findMany: vi.fn() }, $queryRaw: vi.fn() },
 }))
 
 import { getAdminFarms } from '@/server/queries/admin'
@@ -24,6 +24,7 @@ import { aktivitaetsTeile, istOhneInhalt, AKTIVITAET_LEER } from '@/lib/farm-akt
 import { prisma } from '@/lib/prisma'
 
 const farmFindMany = vi.mocked(prisma.farm.findMany)
+const queryRaw = vi.mocked(prisma.$queryRaw)
 
 const ANGELEGT = new Date('2026-08-01T10:00:00.000Z')
 const FREIGESCHALTET = new Date('2026-08-02T10:00:00.000Z')
@@ -40,6 +41,10 @@ function dbZeile(overrides: Record<string, unknown> = {}) {
     description: 'Wir sind ein kleiner Familienbetrieb.',
     logoUrl: 'https://blob.example/logo.png',
     country: 'AT',
+    // Servicegebühr-Einstellung (Sprint servicegebuehr) — Decimal kommt als Objekt
+    serviceFeePercent: { toString: () => '4.90' },
+    serviceFeeMinCents: 50,
+    serviceFeeActiveFrom: null,
     owner: { email: 'franz@test.local' },
     _count: { products: 3, farmPhotos: 2, pickupSlots: 1 },
     ...overrides,
@@ -62,6 +67,9 @@ function leereZeile(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Die Monatsspalten (Sprint servicegebuehr) kommen aus EINER Aggregat-Abfrage
+  // neben dem findMany — ohne Bestellungen im Monat eine leere Liste.
+  queryRaw.mockResolvedValue([] as never)
 })
 
 describe('getAdminFarms — Zählwerte', () => {
@@ -136,6 +144,37 @@ describe('getAdminFarms — eine einzige Abfrage', () => {
     expect(arg.select._count).toEqual({
       select: { products: true, farmPhotos: true, pickupSlots: true },
     })
+    // Die Monatsspalten: EINE Aggregat-Abfrage für alle Höfe, kein N+1
+    expect(queryRaw).toHaveBeenCalledTimes(1)
+  })
+
+  it('Monatsspalten: Höfe ohne Bestellung bekommen die Nullzeile, andere ihre Werte', async () => {
+    farmFindMany.mockResolvedValue([dbZeile(), leereZeile()] as never)
+    queryRaw.mockResolvedValue([
+      { farmId: 'farm_1', bestellungen: 4, online: 196, bar: 50, entfallen: 98 },
+    ] as never)
+
+    const hoefe = await getAdminFarms(new Date('2026-09-16T10:00:00.000Z'))
+
+    const mit = hoefe.find((h) => h.id === 'farm_1')!
+    const ohne = hoefe.find((h) => h.id === 'farm_leer')!
+    expect(mit.monat).toEqual({
+      bestellungen: 4,
+      gebuehrOnlineCents: 196,
+      gebuehrBarCents: 50,
+      gebuehrEntfallenCents: 98,
+    })
+    expect(ohne.monat).toEqual({
+      bestellungen: 0,
+      gebuehrOnlineCents: 0,
+      gebuehrBarCents: 0,
+      gebuehrEntfallenCents: 0,
+    })
+    expect(mit.monatBezeichnung).toBe('September 2026')
+    // Einstellung als Zahl durchgereicht (Decimal → number)
+    expect(mit.serviceFeePercent).toBe(4.9)
+    expect(mit.serviceFeeMinCents).toBe(50)
+    expect(mit.serviceFeeActiveFrom).toBeNull()
   })
 
   it('gibt Beschreibungstext und Logo-URL nicht nach außen weiter', async () => {

@@ -10,13 +10,19 @@ export interface NewOrderNotificationProps {
   pickupDate: string
   pickupTime: string
   items: Array<{ name: string; quantity: number }>
+  /** Der WARENPREIS — das, was dem Hof überwiesen wird. */
   total: number
+  /** Servicegebühr in Euro (von der Plattform einbehalten); 0 = keine Zeile. */
+  serviceFee?: number
+  /** Was die Kundin bezahlt hat: Warenpreis + Servicegebühr. */
+  customerTotal?: number
   paymentLabel: string
   isOnline: boolean
   dashboardUrl: string
 }
 
 export function NewOrderNotificationEmail(p: NewOrderNotificationProps) {
+  const mitGebuehr = (p.serviceFee ?? 0) > 0
   return (
     <EmailLayout previewText={`Neue Bestellung ${p.orderNumber} – ${p.customerName}`}>
       <Text style={h1}>
@@ -47,8 +53,15 @@ export function NewOrderNotificationEmail(p: NewOrderNotificationProps) {
 
       <Hr style={{ borderColor: '#e2e8f0', margin: '16px 0' }} />
       <Text style={{ ...bodyText, margin: '0 0 4px' }}>
-        <strong>Gesamtbetrag:</strong> € {p.total.toFixed(2)}
+        <strong>{mitGebuehr ? 'Warenpreis (dein Anteil):' : 'Gesamtbetrag:'}</strong> € {p.total.toFixed(2)}
       </Text>
+      {mitGebuehr && (
+        <Text style={{ ...mutedText, margin: '0 0 4px' }}>
+          <strong>Servicegebühr:</strong> € {(p.serviceFee ?? 0).toFixed(2)} — von der Plattform
+          einbehalten, dir wird der Warenpreis überwiesen. Die Kundin hat €{' '}
+          {(p.customerTotal ?? p.total).toFixed(2)} bezahlt.
+        </Text>
+      )}
       <Text style={{ ...mutedText, margin: '0 0 4px' }}>
         <strong>Zahlung:</strong> {p.paymentLabel}
       </Text>

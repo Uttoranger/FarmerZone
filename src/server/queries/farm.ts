@@ -83,6 +83,13 @@ export type PublicFarm = {
   stripeAccountReady: boolean
   isPaused: boolean
   pauseMessage: string | null
+  // Servicegebühr-Einstellung des Hofes (Sprint servicegebuehr): Der Checkout
+  // zeigt die Gebühr VORAB mit derselben Rechnung wie der Server
+  // (src/lib/servicegebuehr.ts). Prozent als Zahl (Decimal ist nicht über die
+  // RSC-Grenze serialisierbar), Datum als Date oder null (= gebührenfrei).
+  serviceFeePercent: number
+  serviceFeeMinCents: number
+  serviceFeeActiveFrom: Date | null
   products: PublicProduct[]
   pickupSlots: PublicPickupSlot[]
 }
@@ -136,6 +143,9 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
       stripeAccountReady: true,
       isPaused: true,
       pauseMessage: true,
+      serviceFeePercent: true,
+      serviceFeeMinCents: true,
+      serviceFeeActiveFrom: true,
       farmValues: {
         orderBy: { sortOrder: 'asc' },
         select: { id: true, icon: true, title: true, subtitle: true },
@@ -184,6 +194,7 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
     bannerType: farm.bannerType as 'GRADIENT' | 'PHOTO',
     sectionsConfig: sections,
     farmPhotos: farm.farmPhotos,
+    serviceFeePercent: Number(farm.serviceFeePercent),
     products: farm.products.map((p) => ({
       ...p,
       price: Number(p.price),
@@ -221,6 +232,9 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
       stripeAccountReady: true,
       isPaused: true,
       pauseMessage: true,
+      serviceFeePercent: true,
+      serviceFeeMinCents: true,
+      serviceFeeActiveFrom: true,
       farmValues: {
         orderBy: { sortOrder: 'asc' },
         select: { id: true, icon: true, title: true, subtitle: true },
@@ -269,6 +283,7 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
     bannerType: farm.bannerType as 'GRADIENT' | 'PHOTO',
     sectionsConfig: sections,
     farmPhotos: farm.farmPhotos,
+    serviceFeePercent: Number(farm.serviceFeePercent),
     products: farm.products.map((p) => ({
       ...p,
       price: Number(p.price),

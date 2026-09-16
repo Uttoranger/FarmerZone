@@ -10,11 +10,18 @@ export interface OrderConfirmedProps {
   pickupDate: string
   pickupTime: string
   items: Array<{ name: string; quantity: number }>
+  /** Der WARENPREIS — der Anteil des Hofes. */
   total: number
+  /** Servicegebühr in Euro; 0 = keine Zeile. */
+  serviceFee?: number
+  /** Bar zu kassieren: Warenpreis + Servicegebühr. */
+  barZuKassieren?: number
   dashboardUrl: string
 }
 
 export function OrderConfirmedEmail(p: OrderConfirmedProps) {
+  const mitGebuehr = (p.serviceFee ?? 0) > 0
+  const kassieren = p.barZuKassieren ?? p.total
   return (
     <EmailLayout previewText={`Vor-Ort-Bestellung ${p.orderNumber} bestätigt – ${p.customerName}`}>
       <Text style={h1}>Vor-Ort-Bestellung bestätigt ✓</Text>
@@ -26,8 +33,14 @@ export function OrderConfirmedEmail(p: OrderConfirmedProps) {
 
       <div style={amberBox}>
         <Text style={{ ...mutedText, margin: 0, fontWeight: '600', color: '#92400e' }}>
-          💵 Zahlt vor Ort: € {p.total.toFixed(2)}
+          💵 Bar zu kassieren: € {kassieren.toFixed(2)}
         </Text>
+        {mitGebuehr && (
+          <Text style={{ ...mutedText, margin: '4px 0 0', color: '#92400e' }}>
+            davon Servicegebühr € {(p.serviceFee ?? 0).toFixed(2)} — die schuldest du der
+            Monatsabrechnung; Warenpreis € {p.total.toFixed(2)} bleibt dir.
+          </Text>
+        )}
       </div>
 
       <div style={highlightBox}>

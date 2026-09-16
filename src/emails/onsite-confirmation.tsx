@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Text, Link, Hr } from '@react-email/components'
 import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton, amberBox } from './_layout'
+import { SERVICEGEBUEHR_BEZEICHNUNG, SERVICEGEBUEHR_HINWEIS } from '@/lib/servicegebuehr'
 
 export interface OnsiteConfirmationProps {
   customerName: string
@@ -11,12 +12,18 @@ export interface OnsiteConfirmationProps {
   pickupDate: string
   pickupTime: string
   items: Array<{ name: string; quantity: number; unitPrice: number }>
+  /** Warenpreis (Zwischensumme) — nur nötig, wenn eine Servicegebühr anfällt. */
+  subtotal?: number
+  /** Servicegebühr in Euro; 0 oder fehlend = keine Zeile. */
+  serviceFee?: number
+  /** Was die Kundin vor Ort bezahlt: Warenpreis + Servicegebühr. */
   total: number
   confirmationUrl: string
 }
 
 export function OnsiteConfirmationEmail(p: OnsiteConfirmationProps) {
   const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(`${p.farmAddress}, ${p.farmCity}`)}`
+  const mitGebuehr = (p.serviceFee ?? 0) > 0
 
   return (
     <EmailLayout previewText={`Bestellung bei ${p.farmName} bestätigen – Abholung ${p.pickupDate}`}>
@@ -55,6 +62,26 @@ export function OnsiteConfirmationEmail(p: OnsiteConfirmationProps) {
           <span style={{ float: 'right' }}>€ {(item.unitPrice * item.quantity).toFixed(2)}</span>
         </Text>
       ))}
+      {/* Gebührenzeile identisch zum Checkout; ohne Gebühr entfällt sie. */}
+      {mitGebuehr && (
+        <div style={{ padding: '8px 0 0', borderTop: '1px solid #f1f5f9' }}>
+          <Text style={{ ...mutedText, margin: '6px 0 0' }}>
+            Zwischensumme
+            <span style={{ float: 'right' }}>€ {(p.subtotal ?? 0).toFixed(2)}</span>
+          </Text>
+          <Text style={{ ...mutedText, margin: '4px 0 0' }}>
+            {SERVICEGEBUEHR_BEZEICHNUNG}
+            <span style={{ float: 'right' }}>€ {(p.serviceFee ?? 0).toFixed(2)}</span>
+          </Text>
+          <Text style={{ ...mutedText, fontSize: '12px', color: '#94a3b8', margin: '2px 0 0' }}>
+            {SERVICEGEBUEHR_HINWEIS}
+          </Text>
+          <Text style={{ ...bodyText, fontWeight: '700', margin: '6px 0 0' }}>
+            Gesamt
+            <span style={{ float: 'right' }}>€ {p.total.toFixed(2)}</span>
+          </Text>
+        </div>
+      )}
 
       <Hr style={{ borderColor: '#e2e8f0', margin: '16px 0' }} />
       <Text style={mutedText}><strong>Bestellnummer:</strong> {p.orderNumber}</Text>

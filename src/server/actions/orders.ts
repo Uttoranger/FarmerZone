@@ -30,6 +30,8 @@ type DbOrder = {
   customerEmail: string
   customerPhone: string
   totalAmount: { toString(): string }
+  /** Servicegebühr-Snapshot in Cent (Order.serviceFeeCents). */
+  serviceFeeCents?: number
   pickupDate: Date
   pickupTimeStart: string
   pickupTimeEnd: string
@@ -57,6 +59,7 @@ function toEmailOrder(order: DbOrder, farm: FarmInfo): OrderForEmail {
     customerEmail: order.customerEmail,
     customerPhone: order.customerPhone,
     totalAmount: order.totalAmount,
+    serviceFeeCents: order.serviceFeeCents ?? 0,
     pickupDate: order.pickupDate,
     pickupTimeStart: order.pickupTimeStart,
     pickupTimeEnd: order.pickupTimeEnd,
@@ -80,6 +83,9 @@ const ORDER_EMAIL_SELECT = {
   customerEmail: true,
   customerPhone: true,
   totalAmount: true,
+  // Servicegebühr-Snapshot: für die Mails (Gesamtbetrag) und den Storno-Vermerk
+  serviceFeeCents: true,
+  serviceFeeRefundedAt: true,
   pickupDate: true,
   pickupTimeStart: true,
   pickupTimeEnd: true,
@@ -298,6 +304,13 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Act
       status: 'CANCELLED',
       cancelledAt: new Date(),
       cancelReason: reason ?? null,
+      // Servicegebühr entfällt auch bei Storno: online steckt sie in der vollen
+      // Erstattung oben (Stripe erstattet den ganzen Zahlungsbetrag), bar wurde
+      // sie nie kassiert. Der Vermerk hält den Snapshot ehrlich — Admin-Spalte
+      // „entfallen" heute, Monatsabrechnung (Sprint 3) später.
+      ...(order.serviceFeeCents > 0 && !order.serviceFeeRefundedAt
+        ? { serviceFeeRefundedAt: new Date() }
+        : {}),
     },
   })
 
@@ -306,4 +319,112 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Act
   revalidatePath('/orders')
   revalidatePath(`/orders/${orderId}`)
   return {}
+}
+
+/**
+ * „Nicht abgeholt" (Sprint servicegebuehr, Teil D). Der Status NOT_PICKED_UP
+ * existiert seit dem ersten Schema (Enum, Beschriftung, Filter), wurde aber von
+ * keinem Codepfad gesetzt (bestellstatus.ts:17–19) — dies ist der erste.
+ * Erlaubt aus jedem laufenden Status außer der offenen Kunden-Bestätigung:
+ * PAID, CONFIRMED, IN_PREPARATION, READY. Kein Rückweg: Eine Erstattung lässt
+ * sich nicht zurücknehmen, deshalb fragt die Oberfläche vorher.
+ *
+ * WARENPREIS: bleibt exakt wie bisher — und bisher gab es bei Nichtabholung
+ * keinerlei Geldbewegung: keine Erstattung (online bleibt der Warenpreis beim
+ * Hof, paymentStatus bleibt PAID), keine Bestandsrückbuchung, keine Mail.
+ * Dieser Sprint ändert NUR die Gebühr.
+ *
+ * GEBÜHR: Nicht abgeholte Bestellungen kosten keine Gebühr.
+ *   bar    → als entfallen vermerkt (serviceFeeRefundedAt), damit die spätere
+ *            Monatsabrechnung sie nicht einzieht.
+ *   online → Teilerstattung in Höhe der Gebühr über Stripe, danach der Vermerk.
+ *            Ein Fehler beim Erstatten blockiert den Statuswechsel NICHT: Der
+ *            Status ist dann gesetzt, die Erstattung steht aus — sichtbar im
+ *            Bauern-Bereich (gebuehrErstattungOffen) und im Log.
+ */
+export async function markAsNotPickedUp(
+  orderId: string
+): Promise<ActionResult & { gebuehrErstattungOffen?: boolean }> {
+  const farm = await getAuthFarm()
+  if (!farm) return { error: 'Nicht angemeldet' }
+
+  const order = await prisma.order.findFirst({
+    where: {
+      id: orderId,
+      farmId: farm.id,
+      status: { in: ['PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY'] },
+    },
+    select: {
+      id: true,
+      paymentMethod: true,
+      paymentStatus: true,
+      stripePaymentIntentId: true,
+      serviceFeeCents: true,
+      serviceFeeRefundedAt: true,
+    },
+  })
+  if (!order) return { error: 'Bestellung nicht gefunden' }
+
+  // 1. Der Statuswechsel ZUERST und für sich — er darf an nichts hängen, was
+  //    danach kommt (Stripe, Netz).
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { status: 'NOT_PICKED_UP' },
+  })
+
+  // 2. Die Gebühr entfällt.
+  const gebuehr = await lasseServicegebuehrEntfallen(order)
+
+  revalidatePath('/orders')
+  revalidatePath(`/orders/${orderId}`)
+  return gebuehr.offen ? { gebuehrErstattungOffen: true } : {}
+}
+
+async function lasseServicegebuehrEntfallen(order: {
+  id: string
+  paymentMethod: string
+  paymentStatus: string
+  stripePaymentIntentId: string | null
+  serviceFeeCents: number
+  serviceFeeRefundedAt: Date | null
+}): Promise<{ offen: boolean }> {
+  // Ohne Gebühr oder bereits entfallen: nichts zu tun (auch bei Wiederholung).
+  if (order.serviceFeeCents <= 0 || order.serviceFeeRefundedAt) return { offen: false }
+
+  // Online UND bezahlt: Teilerstattung in Höhe der Gebühr.
+  if (order.paymentMethod === 'ONLINE' && order.paymentStatus === 'PAID' && order.stripePaymentIntentId) {
+    try {
+      await stripe.refunds.create(
+        {
+          payment_intent: order.stripePaymentIntentId,
+          amount: order.serviceFeeCents,
+          // LADUNGSTYP destination charge (/api/checkout): Die Erstattung wird
+          // vom PLATTFORM-Saldo abgebucht — genau dort liegt die einbehaltene
+          // Gebühr. Deshalb bewusst OHNE reverse_transfer (würde anteilig vom
+          // Hof zurückholen, der behält 100 % Warenpreis) und OHNE
+          // refund_application_fee (das gäbe einen Anteil der Application Fee
+          // an den HOF zurück, nicht an die Kundin — der Hof bekäme mehr als
+          // den Warenpreis). Die Kundin bekommt die Gebühr, sonst bewegt sich
+          // nichts.
+          metadata: { orderId: order.id, grund: 'servicegebuehr_nicht_abgeholt' },
+        },
+        // Idempotenz: Gelingt die Erstattung, scheitert aber das Vermerken,
+        // liefert ein zweiter Anlauf DIESELBE Erstattung statt einer zweiten.
+        { idempotencyKey: `servicegebuehr-nicht-abgeholt-${order.id}` }
+      )
+    } catch (err) {
+      console.error(
+        `[markAsNotPickedUp] Servicegebühr-Erstattung fehlgeschlagen (Bestellung ${order.id}):`,
+        err instanceof Error ? err.message : err
+      )
+      return { offen: true }
+    }
+  }
+
+  // Bar (oder online nie bezahlt): nichts zu erstatten — nur als entfallen vermerken.
+  await prisma.order.update({
+    where: { id: order.id },
+    data: { serviceFeeRefundedAt: new Date() },
+  })
+  return { offen: false }
 }

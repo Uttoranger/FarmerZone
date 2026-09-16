@@ -18,6 +18,7 @@ import { StatusUpdateEmail } from '@/emails/status-update'
 import { generateReorderToken } from '@/lib/reorder-token'
 import { bestellungPfad } from '@/lib/bestell-link'
 import { unitSuffix, type OrderLineProduct } from '@/lib/order-line'
+import { bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
 
 const apiKey = process.env.RESEND_API_KEY
 const resend = apiKey ? new Resend(apiKey) : null
@@ -77,7 +78,10 @@ export type OrderForEmail = {
   customerName: string
   customerEmail: string
   customerPhone: string
+  /** Der WARENPREIS in Euro (Order.totalAmount). */
   totalAmount: { toString(): string } | number
+  /** Servicegebühr in Cent aus dem Bestell-Snapshot; fehlt sie, gilt 0. */
+  serviceFeeCents?: number
   pickupDate: Date
   pickupTimeStart: string
   pickupTimeEnd: string
@@ -113,6 +117,20 @@ function nameWithUnit(i: { productName: string; product?: OrderLineProduct }): s
 
 function n(v: { toString(): string } | number): number {
   return typeof v === 'number' ? v : Number(v.toString())
+}
+
+/**
+ * Die drei Beträge einer Bestellung in Euro — aus dem SNAPSHOT der Bestellung
+ * (src/lib/servicegebuehr.ts), damit Mail, Bestellseite und Checkout dieselbe
+ * Rechnung zeigen: Warenpreis, Servicegebühr, Gesamt (= was die Kundin zahlt).
+ */
+function betraege(order: OrderForEmail): { warenpreis: number; gebuehr: number; gesamt: number } {
+  const s = bestellSummen({ totalAmount: order.totalAmount, serviceFeeCents: order.serviceFeeCents ?? 0 })
+  return {
+    warenpreis: centsAlsEuro(s.warenpreisCents),
+    gebuehr: centsAlsEuro(s.gebuehrCents),
+    gesamt: centsAlsEuro(s.gesamtCents),
+  }
 }
 
 // ─── Send-Funktionen ──────────────────────────────────────────────────────────
@@ -190,7 +208,9 @@ export async function sendOrderConfirmation(order: OrderForEmail): Promise<void>
       quantity: i.quantity,
       unitPrice: n(i.unitPrice),
     })),
-    total: n(order.totalAmount),
+    subtotal: betraege(order).warenpreis,
+    serviceFee: betraege(order).gebuehr,
+    total: betraege(order).gesamt,
     manageUrl: `${APP_URL}/account/profile`,
     reorderUrl,
     orderUrl,
@@ -223,7 +243,9 @@ export async function sendOnsiteConfirmation(
       quantity: i.quantity,
       unitPrice: n(i.unitPrice),
     })),
-    total: n(order.totalAmount),
+    subtotal: betraege(order).warenpreis,
+    serviceFee: betraege(order).gebuehr,
+    total: betraege(order).gesamt,
     confirmationUrl,
   }))
 
@@ -244,7 +266,10 @@ export async function sendOrderPaidToFarmer(order: OrderForEmail): Promise<void>
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     items: order.items.map(i => ({ name: nameWithUnit(i), quantity: i.quantity })),
-    total: n(order.totalAmount),
+    // Für den Hof zählt der Warenpreis — das ist, was ihm überwiesen wird.
+    total: betraege(order).warenpreis,
+    serviceFee: betraege(order).gebuehr,
+    customerTotal: betraege(order).gesamt,
     paymentLabel: 'Online (bereits bezahlt)',
     isOnline: true,
     dashboardUrl: `${APP_URL}/orders`,
@@ -270,7 +295,10 @@ export async function sendOrderConfirmedToFarmer(order: OrderForEmail): Promise<
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     items: order.items.map(i => ({ name: nameWithUnit(i), quantity: i.quantity })),
-    total: n(order.totalAmount),
+    // Warenpreis für den Hof; „Bar zu kassieren" ist Warenpreis + Gebühr.
+    total: betraege(order).warenpreis,
+    serviceFee: betraege(order).gebuehr,
+    barZuKassieren: betraege(order).gesamt,
     dashboardUrl: `${APP_URL}/orders`,
   }))
 
