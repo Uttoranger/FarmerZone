@@ -13,6 +13,7 @@ import {
 } from '@/lib/farm-approval'
 import { servicegebuehrEinstellungSchema } from '@/schemas/servicegebuehr'
 import { wienerMitternacht } from '@/lib/servicegebuehr'
+import { triageEingabeSchema } from '@/schemas/meldung'
 
 /**
  * Admin-Recht IMMER frisch aus der Datenbank lesen, nie aus der Session:
@@ -225,5 +226,72 @@ export async function setServiceFeeAction(
   revalidatePath('/admin')
   revalidatePath(`/${farm.slug}`)
   revalidatePath(`/${farm.slug}/checkout`)
+  return {}
+}
+
+/**
+ * Triage einer Meldung im Fehlerbriefkasten (Sprint fehlerbriefkasten, Teil D).
+ *
+ * Der EINZIGE Schreibweg für Triage-Felder neben dem Datenbank-Connector — das
+ * Lese-CLI (scripts/briefkasten.ts) kann sie nicht setzen. Ein Duplikat-Verweis
+ * muss auf eine bestehende, andere Meldung zeigen; sonst stünde ein toter Link
+ * in der Triage. antwortAnMelder ist das einzige Triage-Feld, das der Hof sieht.
+ */
+export async function triageMeldungAction(
+  meldungId: string,
+  eingabe: {
+    status: unknown
+    clusterKey?: unknown
+    triageNotiz?: unknown
+    duplikatVonId?: unknown
+    sprintName?: unknown
+    antwortAnMelder?: unknown
+  }
+): Promise<{ error?: string }> {
+  const guard = await requireAdmin()
+  if ('error' in guard) return { error: guard.error }
+
+  const parsed = triageEingabeSchema.safeParse(eingabe)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe.' }
+  const triage = parsed.data
+
+  const meldung = await prisma.meldung.findUnique({ where: { id: meldungId }, select: { id: true } })
+  if (!meldung) return { error: 'Meldung nicht gefunden.' }
+
+  // Duplikat-Verweis: Kurznummer (Präfix) oder volle ID — gespeichert wird immer
+  // die volle ID, und nur, wenn es die Meldung wirklich gibt.
+  let duplikatVonId: string | null = null
+  if (triage.duplikatVonId !== null) {
+    const eingabe = triage.duplikatVonId
+    const original = await prisma.meldung.findFirst({
+      where: eingabe.length >= 20 ? { id: eingabe } : { id: { startsWith: eingabe } },
+      select: { id: true },
+    })
+    if (!original) return { error: 'Duplikat-Verweis: diese Meldung gibt es nicht.' }
+    if (original.id === meldungId) return { error: 'Eine Meldung kann nicht ihr eigenes Duplikat sein.' }
+    duplikatVonId = original.id
+  }
+
+  await prisma.meldung.update({
+    where: { id: meldungId },
+    data: {
+      status: triage.status,
+      clusterKey: triage.clusterKey,
+      triageNotiz: triage.triageNotiz,
+      duplikatVonId,
+      sprintName: triage.sprintName,
+      antwortAnMelder: triage.antwortAnMelder,
+      triagedAt: new Date(),
+    },
+  })
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[DEV] Meldung triagiert: ${new Date().toISOString()} admin=${guard.userId} meldung=${meldungId} status=${triage.status}`)
+  }
+
+  revalidatePath('/admin')
+  revalidatePath('/admin/meldungen')
+  revalidatePath(`/admin/meldungen/${meldungId}`)
+  revalidatePath('/meldungen')
   return {}
 }

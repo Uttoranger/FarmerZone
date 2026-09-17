@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/cleanup-reservations",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/briefkasten",
+      "schedule": "0 5 * * 1"
     }
   ]
 }

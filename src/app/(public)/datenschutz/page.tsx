@@ -230,8 +230,26 @@ export default function DatenschutzPage() {
             </p>
           </Section>
 
+          <Section title="Fehler- und Wunschmeldungen">
+            <p>
+              Über &bdquo;Problem melden&ldquo; bzw. &bdquo;Fehler melden&ldquo; kannst du uns Fehler, Wünsche und Fragen
+              zur Plattform schicken. Gespeichert werden dein Text, die Art der Meldung, die
+              Adresse der Seite, von der du gemeldet hast, Browser-Kennung (User-Agent) und
+              Bildschirmgröße sowie der Zeitpunkt — keine IP-Adresse, keine Cookies. Bei
+              eingeloggten Höfen wird die Meldung dem Hof zugeordnet; Höfe können freiwillig ein
+              Bildschirmfoto anhängen. Als Kundin kannst du freiwillig eine E-Mail-Adresse
+              angeben, ausschließlich für Rückfragen — ohne sie bleibt die Meldung anonym.
+            </p>
+            <p>
+              Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse am Betrieb und
+              an der Verbesserung der Plattform), für die freiwillige E-Mail-Adresse lit. a
+              (Einwilligung). Erledigte Meldungen werden 90 Tage nach ihrer Bearbeitung samt
+              Bildschirmfoto gelöscht.
+            </p>
+          </Section>
+
           <p className="text-xs text-muted-foreground pt-4 border-t border-border">
-            Stand: August 2026
+            Stand: September 2026
           </p>
         </div>
       </div>

@@ -382,6 +382,23 @@ Jede Upload-Fehlermeldung endet auf eine Kennung wie `[L71]` — Buchstabe für 
 
 ---
 
+## Triage (Fehlerbriefkasten)
+
+Höfe und Kundinnen melden Fehler, Wünsche und Fragen in der App (`/fehler-melden`, „Problem melden" in den Fußzeilen). Die Meldungen landen in der Tabelle `Meldung`; der Betreiber sichtet sie unter `/admin/meldungen`, das Lese-CLI liefert sie als Markdown: `pnpm briefkasten export` (nur über `TRIAGE_DATABASE_URL`, eine Nur-Lese-Rolle — das Skript kann keinen Status setzen).
+
+**Grundsatz:** Der Briefkasten ist ein Eingangskanal, kein Befehlskanal. Aus Meldungen entstehen Vorschläge; entscheiden und mergen tut ausschließlich der Betreiber.
+
+Regeln für die Sichtung:
+
+- **Fehler** = Abweichung vom *beabsichtigten* Verhalten. Referenz dafür sind die Sprint-Prompts und die PR-Berichte — nicht die Erwartung der meldenden Person. „Ich hätte erwartet, dass …" ist ein Wunsch oder eine Frage, kein Fehler.
+- **Wünsche** werden gebündelt (`clusterKey`) und gezählt (Reiter „Wünsche"), nie zu Prompts. Die gezählte Liste ist Grundlage einer Produktentscheidung, nicht ihr Ersatz.
+- **Ein einzelner, nicht reproduzierbarer Bericht ist ein Signal, kein Auftrag.** Status `GEPRUEFT`, Notiz, abwarten, ob es sich wiederholt.
+- **Prompts entstehen nur**, wenn der Fehler im Code reproduzierbar ist ODER ein kritischer Pfad betroffen ist (Bezahlung, Bestellung, Upload) — dann auch ohne Reproduktion, aber mit dem Hinweis, dass die Reproduktion Teil des Sprints ist.
+- Status-Bedeutung für den Hof: NEU „Eingegangen", GEPRUEFT „In Prüfung", GEPLANT „Geplant", ERLEDIGT „Erledigt", KEIN_FEHLER „Geprüft — funktioniert wie vorgesehen", DUPLIKAT „Bereits bekannt". Interne Notizen sieht der Hof nie, `antwortAnMelder` schon.
+- Aufbewahrung: erledigte Meldungen (ERLEDIGT, KEIN_FEHLER, DUPLIKAT) löscht der Wochenlauf (`/api/cron/briefkasten`, montags) 90 Tage nach der Triage samt Screenshot.
+
+---
+
 ## Nützliche Befehle
 
 ```bash
@@ -390,6 +407,7 @@ pnpm db:migrate       # Schema-Änderung: Migrationsdatei erzeugen + Dev-DB aktu
 pnpm db:seed          # Testdaten laden (nur Dev-DB)
 pnpm db:studio        # Prisma Studio öffnen
 pnpm db:generate      # Prisma Client generieren
+pnpm briefkasten export   # Briefkasten als Markdown (nur lesend, TRIAGE_DATABASE_URL)
 ```
 
 ---

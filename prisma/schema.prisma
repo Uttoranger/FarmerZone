@@ -83,6 +83,32 @@ enum BannerType {
   PHOTO
 }
 
+// === FEHLERBRIEFKASTEN ===
+//
+// GRUNDSATZ: Der Briefkasten ist ein EINGANGSKANAL, kein Befehlskanal. Höfe und
+// Kundinnen melden Fehler, Wünsche und Fragen; aus Meldungen entstehen
+// Vorschläge — entscheiden und mergen tut ausschließlich der Betreiber.
+// Wünsche werden gebündelt und gezählt (clusterKey), nie automatisch zu
+// Aufgaben. Kein Ticket-System, keine Threads, keine automatische
+// Klassifikation, keine automatische Sprint-Auslösung.
+
+enum MeldungArt {
+  FEHLER
+  WUNSCH
+  FRAGE
+}
+
+// Interne Triage-Status. Was der Hof davon sieht, übersetzt src/lib/meldung.ts
+// (NEU → „Eingegangen", KEIN_FEHLER → „Geprüft — funktioniert wie vorgesehen", …).
+enum MeldungStatus {
+  NEU
+  GEPRUEFT
+  GEPLANT
+  ERLEDIGT
+  KEIN_FEHLER
+  DUPLIKAT
+}
+
 // === ENTITÄTEN ===
 
 model User {
@@ -248,6 +274,7 @@ model Farm {
   statusPosts   StatusPost[]
   farmValues    FarmValue[]
   farmPhotos    FarmPhoto[]
+  meldungen     Meldung[]
 
   @@index([slug])
 }
@@ -516,5 +543,51 @@ model FarmPhoto {
 
   farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
 
+  @@index([farmId])
+}
+
+// Eine Meldung aus dem Fehlerbriefkasten (siehe GRUNDSATZ bei den Enums).
+//
+// Zwei Feldgruppen: was die MELDENDE Person liefert (art, text, Kontext), und
+// die TRIAGE-Felder, die nur der Betreiber setzt (Admin-Bereich oder
+// Datenbank-Connector — nie das Lese-CLI). Welche Felder ein Hof zu sehen
+// bekommt, entscheidet EINE reine Funktion (fuerHof in src/lib/meldung.ts):
+// text, art, createdAt, der übersetzte Status und antwortAnMelder — nie
+// triageNotiz, clusterKey, duplikatVonId, sprintName.
+//
+// Kontext: seiteUrl, userAgent und viewport kommen aus dem Browser und werden
+// im Formular sichtbar erklärt. KEINE IP, keine Cookies. farmId nur bei
+// eingeloggtem Hof (Session, nie aus dem Formular); customerEmail freiwillig,
+// „nur für Rückfragen". Aufbewahrung: erledigte Meldungen werden 90 Tage nach
+// der Triage vom Wochenlauf gelöscht (api/cron/briefkasten), samt Screenshot.
+model Meldung {
+  id           String      @id @default(cuid())
+  art          MeldungArt
+  text         String      @db.Text // max 2000 Zeichen, erzwungen im Zod-Schema
+  seiteUrl     String
+  userAgent    String
+  viewport     String
+  farmId       String?
+  customerEmail String?
+  screenshotUrl String?
+  // Freiwillige Kennung aus einer Fehlermeldung, z. B. „S71" (src/lib/upload-fehler.ts)
+  diagKennung  String?
+  createdAt    DateTime    @default(now())
+
+  // Triage (nur Betreiber)
+  status         MeldungStatus @default(NEU)
+  clusterKey     String?   // Bündel-Schlüssel, vor allem für die gezählte Wunschliste
+  triageNotiz    String?   @db.Text
+  duplikatVonId  String?   // ID der ursprünglichen Meldung; Existenz prüft die Action
+  sprintName     String?
+  triagedAt      DateTime?
+  antwortAnMelder String?  // kurzer Text, für den Hof sichtbar
+
+  // SetNull statt Restrict: Wird ein (Bot-)Hof abgelehnt und gelöscht, bleibt
+  // die Meldung als hoflose Meldung stehen, statt das Löschen zu blockieren.
+  farm Farm? @relation(fields: [farmId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([clusterKey])
   @@index([farmId])
 }

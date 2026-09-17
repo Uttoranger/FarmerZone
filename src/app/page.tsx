@@ -527,6 +527,9 @@ export default function HomePage() {
           <Link href="/datenschutz" className="hover:text-foreground transition-colors duration-[250ms]">
             Datenschutz
           </Link>
+          <Link href="/problem-melden" className="hover:text-foreground transition-colors duration-[250ms]">
+            Problem melden
+          </Link>
         </div>
       </footer>
     </div>

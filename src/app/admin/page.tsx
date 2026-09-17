@@ -2,7 +2,9 @@ import { redirect, notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import type { Metadata } from 'next'
 import { auth } from '@/lib/auth'
+import Link from 'next/link'
 import { isAdminUser, getAdminFarms } from '@/server/queries/admin'
+import { zaehleNeueMeldungen } from '@/server/queries/meldung'
 import {
   gruendungsplaetze,
   vergebeneGruendungsplaetze,
@@ -20,7 +22,7 @@ export default async function AdminPage() {
   // einmal zu erkennen geben — für sie existiert /admin schlicht nicht.
   if (!(await isAdminUser(session.user.id))) notFound()
 
-  const farms = await getAdminFarms()
+  const [farms, neueMeldungen] = await Promise.all([getAdminFarms(), zaehleNeueMeldungen()])
   const wartend = farms.filter((f) => f.approvedAt === null).length
 
   // Plätze serverseitig berechnen und als schlichte Zahlen weiterreichen: die
@@ -33,6 +35,17 @@ export default async function AdminPage() {
   return (
     <main className="min-h-screen bg-background px-4 py-8 md:px-6">
       <div className="mx-auto max-w-4xl">
+        {/* Fehlerbriefkasten: der Zähler ist bewusst ein Link, kein Alarm. */}
+        <Link
+          href="/admin/meldungen"
+          className="mb-5 flex min-h-11 items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-2.5 text-sm transition-colors hover:border-primary/40"
+        >
+          <span className="font-medium text-foreground">
+            {neueMeldungen === 1 ? '1 neue Meldung' : `${neueMeldungen} neue Meldungen`}
+          </span>
+          <span className="text-xs text-primary">Briefkasten →</span>
+        </Link>
+
         <h1 className="text-xl font-semibold text-foreground mb-1">Höfe</h1>
         <p className="text-sm text-muted-foreground mb-1">
           {wartend === 0
