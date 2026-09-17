@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { getOrderDetail } from '@/server/queries/orders'
 import { statusLabel, paymentLabel } from '@/components/orders/order-status'
 import { PrintButton } from '@/components/orders/print-button'
+import { barZuKassierenCents, bestellSummen } from '@/lib/servicegebuehr'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +32,10 @@ export default async function OrderPrintPage({
   const pickupDate = order.pickupDate.toLocaleDateString('de-AT', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   })
+  // Servicegebühr aus dem Snapshot: Zwischensumme/Gebühr/Gesamt wie im
+  // Checkout, „Bar zu kassieren" bei Vor-Ort-Zahlung
+  const summen = bestellSummen(order)
+  const kassieren = barZuKassierenCents(order)
 
   // Navigation und Seitenleiste blenden sich seit dem Druck-Sprint selbst aus
   // (print:hidden in farmer-nav.tsx, print:ml-0 am <main> im Layout) — ein
@@ -112,12 +117,24 @@ export default async function OrderPrintPage({
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t-2 border-slate-300">
+            {summen.gebuehrCents > 0 && (
+              <>
+                <tr className="border-t-2 border-slate-300">
+                  <td colSpan={2} className="py-1.5">Zwischensumme (Warenpreis)</td>
+                  <td className="text-right py-1.5">€ {(summen.warenpreisCents / 100).toFixed(2)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={2} className="py-1.5">Servicegebühr</td>
+                  <td className="text-right py-1.5">€ {(summen.gebuehrCents / 100).toFixed(2)}</td>
+                </tr>
+              </>
+            )}
+            <tr className={summen.gebuehrCents > 0 ? 'border-t border-slate-300' : 'border-t-2 border-slate-300'}>
               <td colSpan={2} className="py-2 font-bold">
                 Gesamt
               </td>
               <td className="text-right py-2 font-bold">
-                € {Number(order.totalAmount).toFixed(2)}
+                € {(summen.gesamtCents / 100).toFixed(2)}
               </td>
             </tr>
           </tfoot>
@@ -126,6 +143,16 @@ export default async function OrderPrintPage({
         <div className="text-sm text-slate-600">
           Zahlung: {paymentLabel(order.paymentMethod)}
         </div>
+        {kassieren !== null && (
+          <div className="mt-1 text-sm font-semibold text-slate-800">
+            Bar zu kassieren: € {(kassieren / 100).toFixed(2)}
+            {summen.gebuehrCents > 0 && (
+              <span className="font-normal text-slate-500">
+                {' '}(davon Servicegebühr € {(summen.gebuehrCents / 100).toFixed(2)})
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </>
   )

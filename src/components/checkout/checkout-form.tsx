@@ -6,13 +6,20 @@ import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format, addDays } from 'date-fns'
 import { de } from 'date-fns/locale'
-import { ShoppingCart, ArrowLeft, Loader2 } from 'lucide-react'
+import { ShoppingCart, ArrowLeft, Loader2, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import Image from 'next/image'
 import { checkoutFormSchema, type CheckoutFormData } from '@/schemas/checkout'
 import type { PublicFarm } from '@/server/queries/farm'
 import type { CartItem } from '@/lib/use-cart'
+import { eurosToCents } from '@/lib/order-totals'
+import {
+  SERVICEGEBUEHR_BEZEICHNUNG,
+  SERVICEGEBUEHR_HINWEIS,
+  berechneServicegebuehr,
+  centsAlsEuro,
+} from '@/lib/servicegebuehr'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -140,6 +147,11 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
   const customerPhone = form.watch('customerPhone')
   const isOnsite = paymentMethod === 'ONSITE_CASH' || paymentMethod === 'ONSITE_CARD'
   const total = cart.reduce((s, i) => s + i.price * i.quantity, 0)
+  // Servicegebühr — dieselbe Rechnung wie der Server (/api/checkout rechnet
+  // verbindlich, mit der Hofeinstellung zum Bestellzeitpunkt). Bei Online-
+  // UND Barzahlung gleich; ist sie 0, entfällt die Zeile ersatzlos.
+  const gebuehr = berechneServicegebuehr(eurosToCents(total), farm, new Date())
+  const gesamt = centsAlsEuro(eurosToCents(total) + gebuehr.gebuehrCents)
 
   async function onSubmit(data: CheckoutFormData) {
     if (cart.length === 0) {
@@ -279,9 +291,32 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
             </div>
           ))}
         </div>
-        <div className="mt-4 pt-3 border-t border-border flex justify-between items-center">
-          <span className="font-semibold text-foreground">Gesamt</span>
-          <span className="text-lg font-bold text-primary">{formatEuro(total)}</span>
+        <div className="mt-4 pt-3 border-t border-border space-y-1.5">
+          {gebuehr.gebuehrCents > 0 && (
+            <>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Zwischensumme</span>
+                <span className="text-foreground">{formatEuro(total)}</span>
+              </div>
+              <div className="flex justify-between gap-3 text-sm">
+                <span className="text-muted-foreground">{SERVICEGEBUEHR_BEZEICHNUNG}</span>
+                <span className="text-foreground">{formatEuro(centsAlsEuro(gebuehr.gebuehrCents))}</span>
+              </div>
+              {/* Der Hinweis klappt auf, statt bei 375 px als Fließtext
+                  zwischen den Zahlen umzubrechen. */}
+              <details className="text-xs text-muted-foreground">
+                <summary className="inline-flex cursor-pointer select-none items-center gap-1 min-h-6">
+                  <Info className="size-3.5" aria-hidden="true" />
+                  Was ist die Servicegebühr?
+                </summary>
+                <p className="mt-1 leading-relaxed">{SERVICEGEBUEHR_HINWEIS}</p>
+              </details>
+            </>
+          )}
+          <div className="flex justify-between items-center">
+            <span className="font-semibold text-foreground">Gesamt</span>
+            <span className="text-lg font-bold text-primary">{formatEuro(gesamt)}</span>
+          </div>
         </div>
       </div>
 
@@ -492,9 +527,9 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
           {isSubmitting ? (
             <Loader2 className="size-5 animate-spin" />
           ) : paymentMethod === 'ONLINE' ? (
-            `Weiter zur Zahlung — ${formatEuro(total)}`
+            `Weiter zur Zahlung — ${formatEuro(gesamt)}`
           ) : (
-            `Bestellung verbindlich aufgeben — ${formatEuro(total)}`
+            `Bestellung verbindlich aufgeben — ${formatEuro(gesamt)}`
           )}
         </Button>
       </form>

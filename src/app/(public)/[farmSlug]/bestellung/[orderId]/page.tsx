@@ -6,6 +6,7 @@ import { bestellStatusAnzeige, formatiereAbholtermin, zahlungsAnzeige } from '@/
 import { formatEuro } from '@/lib/preis-format'
 import { formatOrderLine } from '@/lib/order-line'
 import { Marke } from '@/components/ui/marke'
+import { BestellSummenZeilen } from '@/components/checkout/bestell-summen'
 
 /**
  * Die Bestellseite der Kundin — erreichbar NUR über den signierten Link aus
@@ -66,6 +67,8 @@ export default async function BestellungPage({ params, searchParams }: Props) {
       paymentMethod: true,
       paymentStatus: true,
       totalAmount: true,
+      serviceFeeCents: true,
+      serviceFeeRefundedAt: true,
       pickupDate: true,
       pickupTimeStart: true,
       pickupTimeEnd: true,
@@ -172,10 +175,8 @@ export default async function BestellungPage({ params, searchParams }: Props) {
               </div>
             ))}
           </div>
-          <div className="mt-3 flex justify-between border-t border-border pt-3 font-semibold">
-            <span>Gesamt</span>
-            <span className="text-primary">{formatEuro(Number(order.totalAmount))}</span>
-          </div>
+          {/* Dieselben Zeilen wie im Checkout — aus dem Snapshot der Bestellung */}
+          <BestellSummenZeilen order={order} />
           <p className="mt-2 text-xs text-muted-foreground">
             {zahlung.art} · {zahlung.zustand}
           </p>

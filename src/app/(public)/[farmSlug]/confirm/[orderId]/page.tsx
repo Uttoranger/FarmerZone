@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { formatOrderLine } from '@/lib/order-line'
 import { bestellungPfad } from '@/lib/bestell-link'
 import { ClearCartOnMount } from '@/components/checkout/clear-cart-on-mount'
+import { BestellSummenZeilen } from '@/components/checkout/bestell-summen'
 
 interface Props {
   params: Promise<{ farmSlug: string; orderId: string }>
@@ -21,6 +22,8 @@ async function getOrder(orderId: string) {
       paymentMethod: true,
       paymentStatus: true,
       totalAmount: true,
+      serviceFeeCents: true,
+      serviceFeeRefundedAt: true,
       customerName: true,
       customerEmail: true,
       pickupDate: true,
@@ -186,10 +189,8 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
               </div>
             ))}
           </div>
-          <div className="mt-3 pt-3 border-t border-border flex justify-between font-semibold">
-            <span>Gesamt</span>
-            <span className="text-primary">{formatEuro(Number(order.totalAmount))}</span>
-          </div>
+          {/* Dieselben Zeilen wie im Checkout — aus dem Snapshot der Bestellung */}
+          <BestellSummenZeilen order={order} />
           <p className="text-xs text-muted-foreground mt-2">
             {order.paymentMethod === 'ONLINE'
               ? 'Online bezahlt'

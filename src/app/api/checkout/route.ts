@@ -9,6 +9,7 @@ import { stripe } from '@/lib/stripe'
 import { sendOnsiteConfirmation } from '@/lib/email'
 import { checkoutRequestSchema } from '@/schemas/checkout'
 import { calcTotalAmount, calcPlatformFeeAmount, eurosToCents } from '@/lib/order-totals'
+import { berechneServicegebuehr } from '@/lib/servicegebuehr'
 
 function generateOrderNumber(farmSlug: string): string {
   const parts = farmSlug.split('-')
@@ -157,9 +158,15 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  // 5. Totals
+  // 5. Totals — totalAmount ist und bleibt der WARENPREIS (Umsatz des Hofes)
   const totalAmount = calcTotalAmount(data.items)
   const platformFeeAmount = calcPlatformFeeAmount(totalAmount, Number(farm.platformFeePercent))
+
+  // 5b. Servicegebühr — aus der Hofeinstellung ZUM BESTELLZEITPUNKT berechnet
+  //     und im Snapshot der Bestellung eingefroren (src/lib/servicegebuehr.ts).
+  //     Der Browser zeigt dieselbe Rechnung vorab; verbindlich ist diese hier.
+  const warenpreisCents = eurosToCents(totalAmount)
+  const servicegebuehr = berechneServicegebuehr(warenpreisCents, farm, now)
 
   // 6. Order number (retry on collision — astronomically unlikely)
   let orderNumber = generateOrderNumber(data.farmSlug)
@@ -188,6 +195,10 @@ export async function POST(request: NextRequest) {
       paymentMethod: data.paymentMethod as 'ONLINE' | 'ONSITE_CASH' | 'ONSITE_CARD',
       paymentStatus: 'PENDING',
       platformFeeAmount,
+      // Snapshot der Servicegebühr — spätere Änderungen der Hofeinstellung
+      // lassen diese Bestellung unverändert (prisma/schema.prisma, Order).
+      serviceFeeCents: servicegebuehr.gebuehrCents,
+      serviceFeePercentApplied: servicegebuehr.prozentAngewendet,
       items: {
         create: data.items.map((i) => ({
           productId: i.productId,
@@ -243,8 +254,15 @@ export async function POST(request: NextRequest) {
 
   // 11a. ONLINE — create Stripe PaymentIntent
   if (data.paymentMethod === 'ONLINE') {
-    const amountCents = eurosToCents(totalAmount)
-    const feeAmountCents = eurosToCents(platformFeeAmount)
+    // LADUNGSTYP: destination charge (transfer_data.destination) OHNE
+    // on_behalf_of — die Zahlung entsteht auf dem PLATTFORMKONTO, Stripe zieht
+    // seine Gebühren dort ab, der Hof bekommt amount − application_fee_amount
+    // überwiesen. Deshalb: amount = Warenpreis + Servicegebühr und
+    // application_fee_amount = Servicegebühr (+ Plattformgebühr, im Pilot 0)
+    // → dem Hof fließt exakt der Warenpreis zu, FarmerZone trägt die
+    // Stripe-Kosten aus der Servicegebühr.
+    const amountCents = warenpreisCents + servicegebuehr.gebuehrCents
+    const feeAmountCents = eurosToCents(platformFeeAmount) + servicegebuehr.gebuehrCents
 
     const intentParams: Parameters<typeof stripe.paymentIntents.create>[0] = {
       amount: amountCents,
@@ -285,6 +303,7 @@ export async function POST(request: NextRequest) {
       customerEmail: data.customerEmail,
       customerPhone: data.customerPhone,
       totalAmount,
+      serviceFeeCents: servicegebuehr.gebuehrCents,
       pickupDate,
       pickupTimeStart: data.pickupTimeStart,
       pickupTimeEnd: data.pickupTimeEnd,

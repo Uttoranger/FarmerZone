@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Text, Link, Hr } from '@react-email/components'
 import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton } from './_layout'
+import { SERVICEGEBUEHR_BEZEICHNUNG, SERVICEGEBUEHR_HINWEIS } from '@/lib/servicegebuehr'
 
 export interface OrderConfirmationProps {
   customerName: string
@@ -12,6 +13,11 @@ export interface OrderConfirmationProps {
   pickupDate: string
   pickupTime: string
   items: Array<{ name: string; quantity: number; unitPrice: number }>
+  /** Warenpreis (Zwischensumme) — nur nötig, wenn eine Servicegebühr anfällt. */
+  subtotal?: number
+  /** Servicegebühr in Euro; 0 oder fehlend = keine Zeile. */
+  serviceFee?: number
+  /** Was die Kundin bezahlt hat: Warenpreis + Servicegebühr. */
   total: number
   manageUrl?: string
   reorderUrl?: string
@@ -21,6 +27,7 @@ export interface OrderConfirmationProps {
 
 export function OrderConfirmationEmail(p: OrderConfirmationProps) {
   const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(`${p.farmAddress}, ${p.farmCity}`)}`
+  const mitGebuehr = (p.serviceFee ?? 0) > 0
 
   return (
     <EmailLayout previewText={`Bestellung ${p.orderNumber} bestätigt – Abholung ${p.pickupDate}`} manageUrl={p.manageUrl}>
@@ -67,6 +74,23 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps) {
           </Text>
         </div>
       ))}
+      {/* Die Gebührenzeile — identisch zum Checkout: zwischen Zwischensumme
+          und Gesamt, mit demselben Hinweis. Ohne Gebühr entfällt sie. */}
+      {mitGebuehr && (
+        <div style={{ padding: '8px 0 0' }}>
+          <Text style={{ ...mutedText, margin: 0 }}>
+            Zwischensumme
+            <span style={{ float: 'right' }}>€ {(p.subtotal ?? 0).toFixed(2)}</span>
+          </Text>
+          <Text style={{ ...mutedText, margin: '4px 0 0' }}>
+            {SERVICEGEBUEHR_BEZEICHNUNG}
+            <span style={{ float: 'right' }}>€ {(p.serviceFee ?? 0).toFixed(2)}</span>
+          </Text>
+          <Text style={{ ...mutedText, fontSize: '12px', color: '#94a3b8', margin: '2px 0 0' }}>
+            {SERVICEGEBUEHR_HINWEIS}
+          </Text>
+        </div>
+      )}
       <div style={{ padding: '10px 0 0' }}>
         <Text style={{ ...bodyText, fontWeight: '700', margin: 0 }}>
           Gesamt (bezahlt)

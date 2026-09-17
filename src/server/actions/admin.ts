@@ -11,6 +11,8 @@ import {
   FARM_REJECT_OWNER_HAS_ORDERS_MESSAGE,
   FARM_REJECT_OWNER_IS_ADMIN_MESSAGE,
 } from '@/lib/farm-approval'
+import { servicegebuehrEinstellungSchema } from '@/schemas/servicegebuehr'
+import { wienerMitternacht } from '@/lib/servicegebuehr'
 
 /**
  * Admin-Recht IMMER frisch aus der Datenbank lesen, nie aus der Session:
@@ -21,7 +23,7 @@ import {
  * Diese Prüfung sitzt in JEDER Action — nicht nur in der Seite. Eine Seite
  * schützt die Ansicht, eine Action schützt die Wirkung.
  */
-async function requireAdmin(): Promise<{ ok: true } | { error: string }> {
+async function requireAdmin(): Promise<{ ok: true; userId: string } | { error: string }> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return { error: 'Nicht angemeldet.' }
 
@@ -31,7 +33,7 @@ async function requireAdmin(): Promise<{ ok: true } | { error: string }> {
   })
   if (!user?.isAdmin) return { error: 'Kein Zugriff.' }
 
-  return { ok: true }
+  return { ok: true, userId: session.user.id }
 }
 
 function revalidateAll(slug: string) {
@@ -172,5 +174,56 @@ export async function rejectFarmAction(farmId: string): Promise<{ error?: string
   ])
 
   revalidateAll(farm.slug)
+  return {}
+}
+
+/**
+ * Servicegebühr eines Hofes einstellen (Sprint servicegebuehr, Teil E).
+ *
+ * Prozentsatz, Mindestgebühr und „gilt ab" (Kalendertag, als Wiener
+ * Mitternacht gespeichert — src/lib/servicegebuehr.ts) oder leer =
+ * gebührenfrei. Wirkt NUR auf künftige Bestellungen: jede Bestellung friert
+ * ihre Gebühr zur Bestellzeit ein (Order.serviceFee*), bestehende bleiben
+ * unverändert.
+ *
+ * Protokoll außerhalb der Produktion (Log-Hygiene wie approveFarmAction):
+ * Zeitstempel, Admin-ID, Hof und die neuen Werte — keine Personendaten.
+ */
+export async function setServiceFeeAction(
+  farmId: string,
+  eingabe: { percent: unknown; minCents: unknown; activeFrom: unknown }
+): Promise<{ error?: string }> {
+  const guard = await requireAdmin()
+  if ('error' in guard) return { error: guard.error }
+
+  const parsed = servicegebuehrEinstellungSchema.safeParse(eingabe)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe.' }
+
+  const giltAb = parsed.data.activeFrom === null ? null : wienerMitternacht(parsed.data.activeFrom)
+  if (parsed.data.activeFrom !== null && giltAb === null) return { error: 'Ungültiges Datum.' }
+
+  const farm = await prisma.farm.findUnique({ where: { id: farmId }, select: { slug: true } })
+  if (!farm) return { error: 'Hof nicht gefunden.' }
+
+  await prisma.farm.update({
+    where: { id: farmId },
+    data: {
+      serviceFeePercent: parsed.data.percent,
+      serviceFeeMinCents: parsed.data.minCents,
+      serviceFeeActiveFrom: giltAb,
+    },
+  })
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(
+      `[DEV] Servicegebühr geändert: ${new Date().toISOString()} admin=${guard.userId} farm=${farmId} ` +
+        `percent=${parsed.data.percent} minCents=${parsed.data.minCents} ` +
+        `activeFrom=${giltAb ? giltAb.toISOString() : 'gebührenfrei'}`
+    )
+  }
+
+  revalidatePath('/admin')
+  revalidatePath(`/${farm.slug}`)
+  revalidatePath(`/${farm.slug}/checkout`)
   return {}
 }

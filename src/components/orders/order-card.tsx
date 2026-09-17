@@ -10,6 +10,7 @@ import {
   markAsReady,
   markAsPickedUp,
   markAsPickedUpAndPaid,
+  markAsNotPickedUp,
   cancelOrder,
   revertOrderStatus,
   revertReady,
@@ -26,6 +27,7 @@ import {
 } from '@/components/ui/dialog'
 import { statusLabel, statusColor, paymentLabel } from './order-status'
 import { formatOrderLine } from '@/lib/order-line'
+import { BetragMitGebuehr, NichtAbgeholtDialog, NICHT_ABGEHOLT_STATUS } from './servicegebuehr-anzeige'
 
 export function OrderCard({
   order,
@@ -44,6 +46,7 @@ export function OrderCard({
   const [revertDialog, setRevertDialog] = useState<'ready' | 'pickedUp' | null>(null)
   // Kunden-Info beim Fertig-Rückschritt — Standard AN, pro Öffnen frisch
   const [notifyCustomer, setNotifyCustomer] = useState(true)
+  const [notPickedUpDialogOpen, setNotPickedUpDialogOpen] = useState(false)
 
   const isOnline = order.paymentMethod === 'ONLINE'
   const status = order.status
@@ -53,8 +56,27 @@ export function OrderCard({
   const canMarkPickedUp = status === 'READY' && isOnline
   const canMarkPickedUpAndPaid = status === 'READY' && !isOnline
   const canCancel = !['CANCELLED', 'PICKED_UP', 'NOT_PICKED_UP'].includes(status)
+  const canMarkNotPickedUp = NICHT_ABGEHOLT_STATUS.includes(status)
   const canRevertReady = status === 'READY'
   const canRevertPickedUp = status === 'PICKED_UP'
+
+  // „Nicht abgeholt": optimistisch in die Erledigt-Liste, kein Rückweg (eine
+  // Stripe-Erstattung lässt sich nicht zurücknehmen) — deshalb Dialog vorher.
+  function handleNotPickedUp() {
+    setNotPickedUpDialogOpen(false)
+    onPatch?.(order.id, { status: 'NOT_PICKED_UP' })
+    startTransition(async () => {
+      const result = await markAsNotPickedUp(order.id)
+      if (result.error) {
+        onPatch?.(order.id, { status })
+        toast.error(result.error)
+      } else if (result.gebuehrErstattungOffen) {
+        toast.warning('Als nicht abgeholt markiert — die Servicegebühr-Erstattung ist fehlgeschlagen, bitte Betreiber informieren.', { duration: 8000 })
+      } else {
+        toast.success('Als nicht abgeholt markiert')
+      }
+    })
+  }
 
   function handleWithUndo(
     fn: (id: string) => Promise<{ error?: string }>,
@@ -180,9 +202,9 @@ export function OrderCard({
           <div className="text-sm text-muted-foreground mb-1">
             {order.items.map((i) => formatOrderLine(i, i.product)).join(', ')}
           </div>
-          <div className="text-sm font-semibold text-foreground mb-3">
-            € {Number(order.totalAmount).toFixed(2)}
-          </div>
+          {/* Betrag: bei Vor-Ort-Zahlung „Bar zu kassieren" (Warenpreis +
+              Servicegebühr), online der Warenpreis mit der Gebühr als Nebenzeile */}
+          <BetragMitGebuehr order={order} className="mb-3" />
 
           <div className="flex flex-wrap gap-2">
             {canMarkReady && (
@@ -226,6 +248,17 @@ export function OrderCard({
                 disabled={isPending}
               >
                 Zurücknehmen
+              </Button>
+            )}
+            {canMarkNotPickedUp && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-10 px-4 text-destructive hover:text-destructive"
+                onClick={() => setNotPickedUpDialogOpen(true)}
+                disabled={isPending}
+              >
+                Nicht abgeholt
               </Button>
             )}
             <Link href={`/orders/${order.id}`}>
@@ -336,6 +369,15 @@ export function OrderCard({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <NichtAbgeholtDialog
+        open={notPickedUpDialogOpen}
+        onClose={() => setNotPickedUpDialogOpen(false)}
+        onConfirm={handleNotPickedUp}
+        customerName={order.customerName}
+        paymentMethod={order.paymentMethod}
+        serviceFeeCents={order.serviceFeeCents}
+      />
     </>
   )
 }

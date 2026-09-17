@@ -22,6 +22,9 @@ function serialize(order: RawOrder) {
     ...order,
     totalAmount: Number(order.totalAmount),
     platformFeeAmount: Number(order.platformFeeAmount),
+    // Servicegebühr-Snapshot: Cent bleiben Int, der Prozentsatz ist ein Decimal
+    serviceFeePercentApplied:
+      order.serviceFeePercentApplied == null ? null : Number(order.serviceFeePercentApplied),
     items: order.items.map((i) => ({
       ...i,
       unitPrice: Number(i.unitPrice),

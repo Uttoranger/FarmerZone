@@ -6,7 +6,9 @@ import { getFarmForUser } from '@/server/queries/dashboard'
 import { getOrderDetail } from '@/server/queries/orders'
 import { OrderActions } from '@/components/orders/order-actions'
 import { statusLabel, statusColor, paymentLabel } from '@/components/orders/order-status'
+import { BetragMitGebuehr } from '@/components/orders/servicegebuehr-anzeige'
 import { formatOrderLine } from '@/lib/order-line'
+import { bestellSummen } from '@/lib/servicegebuehr'
 import { Card, CardContent } from '@/components/ui/card'
 import { ArrowLeft, Printer } from 'lucide-react'
 
@@ -35,6 +37,7 @@ export default async function OrderDetailPage({
     ' um ' +
     order.createdAt.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' }) +
     ' Uhr'
+  const summen = bestellSummen(order)
 
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto">
@@ -118,10 +121,29 @@ export default async function OrderDetailPage({
                   </span>
                 </div>
               ))}
-              <div className="flex justify-between text-base font-semibold border-t border-slate-100 pt-2 mt-1">
-                <span>Gesamt</span>
-                <span>€ {Number(order.totalAmount).toFixed(2)}</span>
-              </div>
+              {/* Servicegebühr als eigene Zeile zwischen Zwischensumme und
+                  Gesamt — dieselbe Aufteilung wie im Checkout der Kundin */}
+              {summen.gebuehrCents > 0 ? (
+                <>
+                  <div className="flex justify-between text-sm border-t border-slate-100 pt-2 mt-1">
+                    <span className="text-slate-500">Zwischensumme (Warenpreis)</span>
+                    <span className="text-slate-800">€ {(summen.warenpreisCents / 100).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-500">Servicegebühr</span>
+                    <span className="text-slate-800">€ {(summen.gebuehrCents / 100).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-base font-semibold">
+                    <span>Gesamt (zahlt der Kunde)</span>
+                    <span>€ {(summen.gesamtCents / 100).toFixed(2)}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex justify-between text-base font-semibold border-t border-slate-100 pt-2 mt-1">
+                  <span>Gesamt</span>
+                  <span>€ {Number(order.totalAmount).toFixed(2)}</span>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -134,6 +156,9 @@ export default async function OrderDetailPage({
             <p className="text-sm font-medium text-slate-700">
               {paymentLabel(order.paymentMethod)}
             </p>
+            {/* „Bar zu kassieren" bzw. Warenpreis + Gebühr-Nebenzeile, samt
+                Vermerk bei ausstehender Erstattung */}
+            <BetragMitGebuehr order={order} className="mt-2" />
             {order.paidAt && (
               <p className="text-xs text-slate-400 mt-1">
                 Bezahlt am {order.paidAt.toLocaleDateString('de-AT')}
@@ -159,6 +184,7 @@ export default async function OrderDetailPage({
           orderId={order.id}
           status={order.status}
           paymentMethod={order.paymentMethod}
+          serviceFeeCents={order.serviceFeeCents}
         />
       </div>
     </div>
