@@ -1243,6 +1243,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
               <Link href="/impressum" className="hover:text-[#2D3027] transition-colors">Impressum</Link>
               <Link href="/datenschutz" className="hover:text-[#2D3027] transition-colors">Datenschutz</Link>
               <Link href="/account/profile" className="hover:text-[#2D3027] transition-colors">Mein Konto</Link>
+              <Link href="/problem-melden" className="hover:text-[#2D3027] transition-colors">Problem melden</Link>
             </div>
           </footer>
         )}

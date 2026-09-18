@@ -15,8 +15,11 @@ import { env } from '@/lib/env'
 const SECRET = env.BETTER_AUTH_SECRET
 
 // Der Zweck steckt mit im Payload: ein Reorder- oder Abmelde-Token trägt
-// dieselbe Signatur-Art und soll hier trotzdem nicht durchgehen.
-const PURPOSE = 'register'
+// dieselbe Signatur-Art und soll hier trotzdem nicht durchgehen. Seit dem
+// Fehlerbriefkasten gibt es ZWEI Formulare mit Zeitschranke — ein Token der
+// Registrierung gilt nicht für eine Meldung und umgekehrt.
+export type FormZweck = 'register' | 'meldung'
+const STANDARD_ZWECK: FormZweck = 'register'
 
 /**
  * Untergrenze. Vor- und Nachname, E-Mail und zweimal das Passwort füllt
@@ -55,8 +58,8 @@ function signatureMatches(actual: string, expected: string): boolean {
 }
 
 /** Beim Rendern des Formulars ausstellen — pro Seitenaufruf frisch. */
-export function generateFormToken(): string {
-  const payload = `${PURPOSE}:${Date.now()}`
+export function generateFormToken(zweck: FormZweck = STANDARD_ZWECK): string {
+  const payload = `${zweck}:${Date.now()}`
   const b64 = Buffer.from(payload).toString('base64url')
   return `${b64}.${sign(payload)}`
 }
@@ -69,7 +72,7 @@ export function generateFormToken(): string {
  */
 export type FormTokenVerdict = 'ok' | 'zu-schnell' | 'abgelaufen' | 'ungueltig'
 
-export function checkFormToken(token: string): FormTokenVerdict {
+export function checkFormToken(token: string, zweck: FormZweck = STANDARD_ZWECK): FormTokenVerdict {
   try {
     const dotIdx = token.lastIndexOf('.')
     if (dotIdx < 0) return 'ungueltig'
@@ -79,7 +82,7 @@ export function checkFormToken(token: string): FormTokenVerdict {
     if (!signatureMatches(hmac, sign(payload))) return 'ungueltig'
 
     const parts = payload.split(':')
-    if (parts.length !== 2 || parts[0] !== PURPOSE) return 'ungueltig'
+    if (parts.length !== 2 || parts[0] !== zweck) return 'ungueltig'
     const issuedAt = Number(parts[1])
     if (!Number.isFinite(issuedAt)) return 'ungueltig'
 

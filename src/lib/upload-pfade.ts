@@ -5,7 +5,7 @@
 // eigenmächtig anders auslegen. Ohne DOM und ohne Datenbank — damit prüfbar.
 
 /** Wofür ein Foto hochgeladen wird. Bestimmt Zielpfad und Auflösung. */
-export type UploadZweck = 'product' | 'banner' | 'logo' | 'gallery' | 'status'
+export type UploadZweck = 'product' | 'banner' | 'logo' | 'gallery' | 'status' | 'meldung'
 
 export const UPLOAD_ZWECKE: readonly UploadZweck[] = [
   'product',
@@ -13,6 +13,9 @@ export const UPLOAD_ZWECKE: readonly UploadZweck[] = [
   'logo',
   'gallery',
   'status',
+  // Screenshot zu einer Meldung im Fehlerbriefkasten (nur eingeloggte Höfe —
+  // der Upload-Weg verlangt eine Hof-Sitzung, siehe api/upload/token).
+  'meldung',
 ] as const
 
 export function istUploadZweck(wert: unknown): wert is UploadZweck {
@@ -37,6 +40,9 @@ export const MAX_LONG_SIDE: Record<UploadZweck, number> = {
   banner: 3200,
   gallery: 2400,
   status: 2400,
+  // Ein Bildschirmfoto muss lesbar sein, nicht schön — 1600 px reichen für
+  // jede Fehlermeldung und halten den Speicher klein.
+  meldung: 1600,
 }
 
 /** WebP-Qualität der Verkleinerung. Wert wie in der bisherigen Canvas-Fassung. */

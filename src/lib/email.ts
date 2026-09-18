@@ -13,6 +13,8 @@ import { CustomerMagicLinkEmail } from '@/emails/customer-magic-link'
 import { PasswordResetEmail } from '@/emails/password-reset'
 import { NewFarmNotificationEmail } from '@/emails/new-farm-notification'
 import { FreischaltungEmail } from '@/emails/freischaltung'
+import { MeldungNotificationEmail } from '@/emails/meldung-notification'
+import { BriefkastenZusammenfassungEmail } from '@/emails/briefkasten-zusammenfassung'
 import { SUPPORT_EMAIL } from '@/lib/support'
 import { StatusUpdateEmail } from '@/emails/status-update'
 import { generateReorderToken } from '@/lib/reorder-token'
@@ -184,6 +186,60 @@ export async function sendFreischaltungEmail(farm: {
   const farmUrl = `${APP_URL}/${farm.slug}`
   const html = await toHtml(React.createElement(FreischaltungEmail, { farmName: farm.name, farmUrl }))
   await send(farm.ownerEmail, 'Dein Hof ist freigeschaltet', html)
+}
+
+/**
+ * Neue FEHLER-Meldung → Betreiber (Fehlerbriefkasten). NUR bei art FEHLER —
+ * Wünsche und Fragen bleiben still (Begründung in actions/meldung.ts).
+ */
+export async function sendMeldungNotification(m: {
+  id: string
+  kurznummer: string
+  text: string
+  seiteUrl: string
+  userAgent: string
+  viewport: string
+  diagKennung: string | null
+  farmName: string | null
+  screenshotUrl: string | null
+  createdAt: Date
+}): Promise<void> {
+  const html = await toHtml(
+    React.createElement(MeldungNotificationEmail, {
+      kurznummer: m.kurznummer,
+      text: m.text,
+      seiteUrl: m.seiteUrl,
+      userAgent: m.userAgent,
+      viewport: m.viewport,
+      diagKennung: m.diagKennung,
+      farmName: m.farmName,
+      screenshotUrl: m.screenshotUrl,
+      createdAt: m.createdAt.toLocaleString('de-AT', {
+        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+        timeZone: 'Europe/Vienna',
+      }),
+      adminUrl: `${APP_URL}/admin/meldungen/${m.id}`,
+    })
+  )
+  await send(SUPPORT_EMAIL, `Fehlermeldung ${m.kurznummer}${m.farmName ? ` – ${m.farmName}` : ''}`, html)
+}
+
+/** Wochen-Zusammenfassung des Briefkastens → Betreiber (nur bei Bedarf, api/cron/briefkasten). */
+export async function sendBriefkastenZusammenfassung(z: {
+  neu: number
+  liegenGeblieben: number
+  offen: number
+  neueste: Array<{ kurznummer: string; art: string; ersteZeile: string; hofName: string | null }>
+  geloescht: number
+}): Promise<void> {
+  const html = await toHtml(
+    React.createElement(BriefkastenZusammenfassungEmail, { ...z, adminUrl: `${APP_URL}/admin/meldungen` })
+  )
+  await send(
+    SUPPORT_EMAIL,
+    `Briefkasten: ${z.neu} neu, ${z.liegenGeblieben} liegen länger als 14 Tage`,
+    html
+  )
 }
 
 /** Online-Zahlung bestätigt → Kunde */

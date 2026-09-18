@@ -146,6 +146,9 @@ describe('Zweck-Tabelle', () => {
       banner: 3200,
       gallery: 2400,
       status: 2400,
+      // Sprint fehlerbriefkasten: Screenshots zu Meldungen — 1600px reichen,
+      // um einen Bildschirm lesbar zu zeigen; die bisherigen Werte bleiben.
+      meldung: 1600,
     })
     expect(WEBP_QUALITAET).toBe(82)
   })

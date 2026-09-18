@@ -18,6 +18,21 @@ const serverEnvSchema = z.object({
     (wert) => (typeof wert === 'string' && wert.trim() ? wert : undefined),
     z.string().optional()
   ),
+  // OPTIONAL: Das Geheimnis, mit dem Vercel Cron die Routen unter /api/cron
+  // aufruft (Authorization: Bearer …). Fehlt es, bleiben die Routen
+  // fail-closed gesperrt (401) — ein Deploy scheitert daran nicht.
+  CRON_SECRET: z.preprocess(
+    (wert) => (typeof wert === 'string' && wert.trim() ? wert : undefined),
+    z.string().optional()
+  ),
+  // OPTIONAL: Die NUR-LESE-Verbindung des Triage-CLI (scripts/briefkasten.ts).
+  // Bewusst getrennt von DATABASE_URL: Das Skript verbindet sich AUSSCHLIESSLICH
+  // hierüber und fällt nie auf die Schreibverbindung zurück — ein Agent, der
+  // Tickets liest und Code schreibt, darf keine Tickets schließen.
+  TRIAGE_DATABASE_URL: z.preprocess(
+    (wert) => (typeof wert === 'string' && wert.trim() ? wert : undefined),
+    z.string().optional()
+  ),
 })
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>

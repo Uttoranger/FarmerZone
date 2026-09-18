@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, ReceiptText, Users, Home, Tag, BarChart3, SlidersHorizontal, LogOut, MoreHorizontal, X } from 'lucide-react'
+import { LayoutDashboard, ReceiptText, Users, Home, Tag, BarChart3, SlidersHorizontal, LogOut, MoreHorizontal, X, Bug, Inbox, ShieldCheck } from 'lucide-react'
 import { signOut } from '@/lib/auth-client'
 import { FarmIdentityCard } from '@/components/farmer/farm-identity-card'
 import { cn } from '@/lib/utils'
@@ -17,6 +17,19 @@ const NAV_ITEMS = [
   { href: '/analytics',  label: 'Auswertung',      icon: BarChart3 },
 ]
 
+/**
+ * Fehlerbriefkasten: „Fehler melden" und „Meine Meldungen" liegen im Mehr-Sheet
+ * (mobil) bzw. ab md in der Fußzeile der Seitenleiste — nicht in der unteren
+ * Tab-Leiste, deren Platz-Regel (max. 6 Tap-Ziele) sonst bräche.
+ */
+const BRIEFKASTEN_ITEMS = [
+  { href: '/fehler-melden', label: 'Fehler melden',   icon: Bug },
+  { href: '/meldungen',     label: 'Meine Meldungen', icon: Inbox },
+]
+
+/** Pfade, bei denen der Mehr-Tab als aktiv gilt (weil ihr Ziel im Sheet liegt). */
+const MEHR_PFADE = ['/settings', '/analytics', '/fehler-melden', '/meldungen', '/admin']
+
 interface FarmerNavProps {
   farmName: string
   userName: string
@@ -25,6 +38,8 @@ interface FarmerNavProps {
   farmLogoUrl?: string | null
   /** approvedAt === null — für den ruhigen Status-Punkt an der Karte. */
   farmPending?: boolean
+  /** Betreiber-Konto: zeigt den Menüpunkt „Admin" (frisch aus der DB, nie aus der Sitzung). */
+  isAdmin?: boolean
 }
 
 export function FarmerNav({
@@ -33,11 +48,13 @@ export function FarmerNav({
   ordersBadge,
   farmLogoUrl = null,
   farmPending = false,
+  isAdmin = false,
 }: FarmerNavProps) {
   const pathname = usePathname()
   const router = useRouter()
   // Mobiles "Mehr"-Sheet (Einstellungen + Abmelden)
   const [moreOpen, setMoreOpen] = useState(false)
+  const mehrAktiv = MEHR_PFADE.some((p) => pathname === p || pathname.startsWith(p + '/'))
 
   async function handleLogout() {
     await signOut()
@@ -89,7 +106,7 @@ export function FarmerNav({
             aria-label="Mehr"
             aria-expanded={moreOpen}
             className="flex flex-1 flex-col items-center justify-center gap-0.5 min-h-[56px] text-xs transition-colors duration-[250ms]"
-            style={{ color: moreOpen || pathname.startsWith('/settings') || pathname.startsWith('/analytics') ? '#F5F3EE' : '#CFE4D6' }}
+            style={{ color: moreOpen || mehrAktiv ? '#F5F3EE' : '#CFE4D6' }}
           >
             <MoreHorizontal className="h-5 w-5" strokeWidth={1.7} />
             <span className="leading-none">Mehr</span>
@@ -145,6 +162,22 @@ export function FarmerNav({
               <BarChart3 className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} />
               Auswertung
             </Link>
+            {BRIEFKASTEN_ITEMS.map(({ href, label, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setMoreOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm min-h-[48px]"
+                style={
+                  pathname === href || pathname.startsWith(href + '/')
+                    ? { background: '#F5F3EE', color: '#24523A', fontWeight: 600 }
+                    : { color: '#CFE4D6' }
+                }
+              >
+                <Icon className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} />
+                {label}
+              </Link>
+            ))}
             <Link
               href="/settings"
               onClick={() => setMoreOpen(false)}
@@ -158,6 +191,21 @@ export function FarmerNav({
               <SlidersHorizontal className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} />
               Einstellungen
             </Link>
+            {isAdmin && (
+              <Link
+                href="/admin"
+                onClick={() => setMoreOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm min-h-[48px]"
+                style={
+                  pathname.startsWith('/admin')
+                    ? { background: '#F5F3EE', color: '#24523A', fontWeight: 600 }
+                    : { color: '#CFE4D6' }
+                }
+              >
+                <ShieldCheck className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} />
+                Admin
+              </Link>
+            )}
             <button
               type="button"
               onClick={handleLogout}
@@ -228,8 +276,23 @@ export function FarmerNav({
           })}
         </nav>
 
-        {/* Footer: Settings + Logout */}
+        {/* Footer: Briefkasten + Settings (+ Admin) + Logout */}
         <div className="shrink-0 px-2 py-3 space-y-0.5" style={{ borderTop: '1px solid rgba(255,255,255,0.10)' }}>
+          {BRIEFKASTEN_ITEMS.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-[250ms] min-h-[44px]"
+              style={
+                pathname === href || pathname.startsWith(href + '/')
+                  ? { background: '#F5F3EE', color: '#24523A', fontWeight: 600, boxShadow: '0 1px 4px rgba(0,0,0,0.16)' }
+                  : { color: '#CFE4D6' }
+              }
+            >
+              <Icon className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} />
+              {label}
+            </Link>
+          ))}
           <Link
             href="/settings"
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-[250ms] min-h-[44px]"
@@ -242,6 +305,20 @@ export function FarmerNav({
             <SlidersHorizontal className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} />
             Einstellungen
           </Link>
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-[250ms] min-h-[44px]"
+              style={
+                pathname.startsWith('/admin')
+                  ? { background: '#F5F3EE', color: '#24523A', fontWeight: 600, boxShadow: '0 1px 4px rgba(0,0,0,0.16)' }
+                  : { color: '#CFE4D6' }
+              }
+            >
+              <ShieldCheck className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} />
+              Admin
+            </Link>
+          )}
 
           <button
             onClick={handleLogout}

@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getOpenOrdersCount } from '@/server/queries/orders'
 import { getFarmBannerState } from '@/server/queries/farm'
+import { isAdminUser } from '@/server/queries/admin'
 import { FarmerNav } from '@/components/farmer/farmer-nav'
 import { ServiceWorkerAnmeldung } from '@/components/shared/service-worker-anmeldung'
 import { SentryNutzer } from '@/components/farmer/sentry-nutzer'
@@ -32,6 +33,8 @@ export default async function FarmerLayout({ children }: { children: React.React
   const bannerState = await getFarmBannerState(session.user.id)
   const isArchived = bannerState?.archivedAt != null
   const isPending = bannerState != null && bannerState.approvedAt == null
+  // Menüpunkt „Admin" nur für den Betreiber — frisch aus der DB, nicht aus der Sitzung.
+  const isAdmin = await isAdminUser(session.user.id)
 
   return (
     <div className="min-h-screen bg-background">
@@ -51,6 +54,7 @@ export default async function FarmerLayout({ children }: { children: React.React
           // Derselbe Zustand, der den Freigabe-Balken auslöst — die Karte zeigt
           // ihn nur zusätzlich als ruhigen Punkt an der Hof-Identität an.
           farmPending={isPending}
+          isAdmin={isAdmin}
         />
 
         {/* min-w-0: als Flex-Item darf main nicht mit breitem Inhalt über den
