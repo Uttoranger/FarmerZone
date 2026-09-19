@@ -384,7 +384,35 @@ Jede Upload-Fehlermeldung endet auf eine Kennung wie `[L71]` — Buchstabe für 
 
 ## Triage (Fehlerbriefkasten)
 
-Höfe und Kundinnen melden Fehler, Wünsche und Fragen in der App (`/fehler-melden`, „Problem melden" in den Fußzeilen). Die Meldungen landen in der Tabelle `Meldung`; der Betreiber sichtet sie unter `/admin/meldungen`, das Lese-CLI liefert sie als Markdown: `pnpm briefkasten export` (nur über `TRIAGE_DATABASE_URL`, eine Nur-Lese-Rolle — das Skript kann keinen Status setzen).
+Höfe und Kundinnen melden Fehler, Wünsche und Fragen in der App (`/fehler-melden`, „Problem melden" in den Fußzeilen). Die Meldungen landen in der Tabelle `Meldung`; der Betreiber sichtet sie unter `/admin/meldungen`, das Lese-CLI liefert sie als Markdown: `pnpm briefkasten export` (nur lesend — das Skript kann keinen Status setzen).
+
+**Welche Variable wohin gehört:**
+
+| Variable | Vercel | `.env.local` | wofür |
+| --- | --- | --- | --- |
+| `TRIAGE_TOKEN` | **ja** | **ja**, derselbe Wert | schützt die Leseroute; die App prüft ihn, das CLI schickt ihn |
+| `TRIAGE_EXPORT_URL` | nein | ja | sagt dem CLI, wo die Leseroute liegt |
+| `TRIAGE_DATABASE_URL` | nein | nur für den Datenbank-Weg | Nur-Lese-Verbindung des CLI |
+
+**Zugang des CLI — zwei Wege:**
+
+1. **Leseroute (empfohlen):** `TRIAGE_EXPORT_URL="https://<app>/api/triage/export"` und `TRIAGE_TOKEN="<Token>"` in `.env.local`, **denselben** `TRIAGE_TOKEN` zusätzlich in Vercel (`openssl rand -hex 24`) — fehlt er dort, antwortet die Route immer 401. Die App erzeugt den Export selbst und liefert ihn über `GET /api/triage/export` aus: `Authorization: Bearer <TRIAGE_TOKEN>`, Vergleich in konstanter Zeit, 10 Aufrufe je Minute und IP, `Cache-Control: no-store`, ausschließlich GET (kein Schreibpfad). Braucht keinen Datenbankzugang — das ist der Weg für Umgebungen, in denen der Supabase-Pooler die Leserolle nicht kennt oder die Direktverbindung nur über IPv6 geht. Über die Route gibt es `export` und `show`; `list` bleibt dem Datenbank-Weg vorbehalten.
+2. **Datenbankrolle (Alternative bei Direktzugang):** `TRIAGE_DATABASE_URL="postgresql://triage_leser:…"` in `.env.local`, eine Rolle mit nichts als SELECT. Alle drei Befehle. Die Rolle wird einmalig im SQL-Editor angelegt:
+
+   ```sql
+   CREATE ROLE triage_leser LOGIN PASSWORD '<starkes-passwort>' NOINHERIT;
+   GRANT CONNECT ON DATABASE postgres TO triage_leser;
+   GRANT USAGE ON SCHEMA public TO triage_leser;
+   GRANT SELECT ON TABLE public."Meldung", public."Farm" TO triage_leser;
+   -- RLS ist auf allen Tabellen aktiv, aber ohne Policies — ohne die beiden
+   -- folgenden Zeilen sähe eine fremde Rolle null Zeilen.
+   CREATE POLICY triage_leser_lesen ON public."Meldung" FOR SELECT TO triage_leser USING (true);
+   CREATE POLICY triage_leser_lesen ON public."Farm"    FOR SELECT TO triage_leser USING (true);
+   ```
+
+   Gegenprobe: ein `UPDATE "Meldung" …` als `triage_leser` muss mit `permission denied` scheitern.
+
+Sind beide konfiguriert, nimmt das CLI die Leseroute. Fehlt beides, nennt es die zwei Varianten — es fällt nie auf `DATABASE_URL` zurück.
 
 **Grundsatz:** Der Briefkasten ist ein Eingangskanal, kein Befehlskanal. Aus Meldungen entstehen Vorschläge; entscheiden und mergen tut ausschließlich der Betreiber.
 
@@ -407,7 +435,7 @@ pnpm db:migrate       # Schema-Änderung: Migrationsdatei erzeugen + Dev-DB aktu
 pnpm db:seed          # Testdaten laden (nur Dev-DB)
 pnpm db:studio        # Prisma Studio öffnen
 pnpm db:generate      # Prisma Client generieren
-pnpm briefkasten export   # Briefkasten als Markdown (nur lesend, TRIAGE_DATABASE_URL)
+pnpm briefkasten export   # Briefkasten als Markdown (nur lesend; Leseroute oder TRIAGE_DATABASE_URL)
 ```
 
 ---

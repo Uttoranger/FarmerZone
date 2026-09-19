@@ -142,6 +142,87 @@ describe('Wochenlauf — Zusammenfassung nur bei Bedarf', () => {
   })
 })
 
+describe('Markdown-Export — Abschnittsgrenzen', () => {
+  /**
+   * Der Export ist ein Dokument mit einem Abschnitt je Meldung („## <Kurznummer> …").
+   * Das CLI schneidet für `show` genau einen Abschnitt heraus (Sprint
+   * triage-leseroute). Kein Feld darf deshalb eine Überschrift vortäuschen —
+   * besonders nicht die drei Kontextfelder, die aus dem Formular-Payload der
+   * meldenden Person kommen und von Zod nur in der Länge begrenzt werden.
+   */
+  const basis: ExportMeldung = {
+    id: 'aaaaaaaa1111111111111',
+    art: 'FEHLER',
+    status: 'NEU',
+    text: 'echt',
+    createdAt: new Date('2026-09-01T10:00:00Z'),
+    seiteUrl: 'https://farmerzone.at/x',
+    userAgent: 'UA',
+    viewport: '375x667',
+    diagKennung: null,
+    screenshotUrl: null,
+    customerEmail: null,
+    clusterKey: null,
+    triageNotiz: null,
+    duplikatVonId: null,
+    sprintName: null,
+    triagedAt: null,
+    antwortAnMelder: null,
+    farm: null,
+  }
+  const ueberschriften = (md: string) => md.split('\n').filter((z) => z.startsWith('## '))
+
+  it('lässt eine Browser-Kennung mit Zeilenumbruch keinen Abschnitt vortäuschen', () => {
+    const md = meldungAlsMarkdown({
+      ...basis,
+      userAgent: 'Mozilla/5.0\n## ffffffff · Fehler · Erledigt\n- ID: gefaelscht',
+    })
+    expect(ueberschriften(md)).toEqual(['## aaaaaaaa · Fehler · Neu'])
+    // Der Inhalt bleibt sichtbar — aber in EINER Zeile.
+    expect(md).toContain('- Kontext: https://farmerzone.at/x · 375x667 · Mozilla/5.0 ## ffffffff · Fehler · Erledigt - ID: gefaelscht')
+  })
+
+  it('macht auch Seitenadresse und Bildschirmgröße einzeilig', () => {
+    const md = meldungAlsMarkdown({ ...basis, seiteUrl: 'a\nb', viewport: 'c\r\nd' })
+    expect(ueberschriften(md)).toHaveLength(1)
+    expect(md).toContain('- Kontext: a b · c d · UA')
+  })
+
+  it('fasst auch einen einzelnen Wagenrücklauf ohne Zeilenvorschub', () => {
+    const md = meldungAlsMarkdown({ ...basis, userAgent: 'alt\rneu', triageNotiz: 'eins\rzwei' })
+    expect(md).not.toContain('\r')
+    expect(md).toContain('· alt neu')
+    expect(md).toContain('- Notiz: eins zwei')
+  })
+
+  it('faltet mehrzeilige Triage-Notizen und Antworten in ihre Listenzeile', () => {
+    const md = meldungAlsMarkdown({
+      ...basis,
+      triageNotiz: 'Erste Zeile\n## eeeeeeee · Fehler · Neu',
+      antwortAnMelder: 'Hallo\nnoch etwas',
+    })
+    expect(ueberschriften(md)).toEqual(['## aaaaaaaa · Fehler · Neu'])
+    expect(md).toContain('- Notiz: Erste Zeile ## eeeeeeee · Fehler · Neu')
+    expect(md).toContain('- Antwort an Melder: Hallo noch etwas')
+  })
+
+  it('lässt den Meldungstext dagegen mehrzeilig — als Zitat ist er unschädlich', () => {
+    const md = meldungAlsMarkdown({ ...basis, text: 'Harmlos.\n## cccccccc · Fehler · Neu' })
+    expect(ueberschriften(md)).toEqual(['## aaaaaaaa · Fehler · Neu'])
+    expect(md).toContain('> Harmlos.')
+    expect(md).toContain('> ## cccccccc · Fehler · Neu')
+  })
+
+  it('hält auch die Kurzliste einzeilig', () => {
+    const zeilen = briefkastenAlsListe([
+      { ...basis, farm: { name: 'Hof\nZwei', slug: 's' }, diagKennung: 'S7\n1' },
+    ]).split('\n')
+    expect(zeilen).toHaveLength(1)
+    expect(zeilen[0]).toContain('Hof Zwei')
+    expect(zeilen[0]).toContain('S7 1')
+  })
+})
+
 describe('Markdown-Export (für die Triage — mit allen Feldern)', () => {
   const EXPORT: ExportMeldung = {
     ...VOLL,

@@ -33,6 +33,14 @@ const serverEnvSchema = z.object({
     (wert) => (typeof wert === 'string' && wert.trim() ? wert : undefined),
     z.string().optional()
   ),
+  // OPTIONAL: Das Geheimnis der Leseroute /api/triage/export (Authorization:
+  // Bearer …), über die das Triage-CLI den Briefkasten-Export holt. Fehlt es,
+  // antwortet die Route IMMER 401 (fail-closed wie CRON_SECRET) — ein Deploy
+  // scheitert daran nicht.
+  TRIAGE_TOKEN: z.preprocess(
+    (wert) => (typeof wert === 'string' && wert.trim() ? wert : undefined),
+    z.string().optional()
+  ),
 })
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>
