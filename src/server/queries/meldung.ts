@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { EXPORT_AUSWAHL, type ExportMeldung } from '@/lib/briefkasten-export'
 import {
   STATUS_ABGESCHLOSSEN,
   STATUS_OFFEN,
@@ -98,6 +99,20 @@ export async function getMeldungenFuerAdmin(filter: AdminMeldungFilter): Promise
     diagKennung: z.diagKennung,
     clusterKey: z.clusterKey,
   }))
+}
+
+/**
+ * Alle Felder für den Markdown-Export (Leseroute /api/triage/export, Sprint
+ * triage-leseroute). Dieselbe Auswahl wie der Datenbank-Weg des CLI
+ * (EXPORT_AUSWAHL), derselbe Filter wie die Admin-Liste — aber ohne deren
+ * Projektion und ohne `take`: der Export ist der ganze Briefkasten. Nur lesend.
+ */
+export async function getMeldungenFuerExport(filter: AdminMeldungFilter): Promise<ExportMeldung[]> {
+  return prisma.meldung.findMany({
+    where: { status: { in: filter.status }, ...(filter.art ? { art: filter.art } : {}) },
+    orderBy: { createdAt: 'desc' },
+    select: EXPORT_AUSWAHL,
+  })
 }
 
 export type AdminMeldungDetail = {

@@ -47,4 +47,10 @@ describe('validateEnv', () => {
     expect(message).not.toContain('passwort')
     expect(message).not.toContain('sk_test')
   })
+
+  it('TRIAGE_TOKEN ist optional — leer wird zu undefined, ein Wert bleibt erhalten', () => {
+    expect(validateEnv(complete).TRIAGE_TOKEN).toBeUndefined()
+    expect(validateEnv({ ...complete, TRIAGE_TOKEN: '   ' }).TRIAGE_TOKEN).toBeUndefined()
+    expect(validateEnv({ ...complete, TRIAGE_TOKEN: 'tok-123' }).TRIAGE_TOKEN).toBe('tok-123')
+  })
 })

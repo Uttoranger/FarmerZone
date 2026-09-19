@@ -1,34 +1,86 @@
 /**
  * Briefkasten-CLI — NUR LESEND. Aufruf: `pnpm briefkasten <list|show|export> [Optionen]`.
  *
- *   list   [--status NEU,GEPRUEFT] [--art FEHLER]   eine Zeile je Meldung
+ *   list   [--status NEU,GEPRUEFT] [--art FEHLER]   eine Zeile je Meldung (nur Datenbank-Weg)
  *   show   <kurznummer|id>                         eine Meldung als Markdown
  *   export [--status …] [--art …]                  der Briefkasten als Markdown (stdout)
+ *
+ * ZWEI WEGE ZUM BRIEFKASTEN, beide nur lesend (Sprint triage-leseroute):
+ *   1. LESEROUTE (empfohlen): TRIAGE_EXPORT_URL + TRIAGE_TOKEN gesetzt → das
+ *      CLI holt den Export per HTTPS von /api/triage/export (tokengeschützt,
+ *      ausschließlich GET) und gibt ihn unverändert aus. Braucht keinen
+ *      Datenbankzugang — die App erzeugt den Export selbst.
+ *   2. DATENBANKROLLE: sonst über TRIAGE_DATABASE_URL, eine Rolle mit nichts
+ *      als SELECT. Nur für Umgebungen mit Direktzugang zur Datenbank.
+ *   Sind beide konfiguriert, gewinnt die Leseroute. Fehlt beides: Hinweis,
+ *   welche zwei Varianten es gibt — und NIE ein Fallback auf DATABASE_URL.
  *
  * WARUM NUR LESEND, UND ZWAR ERZWUNGEN: Dieses Skript ist dafür gedacht, den
  * Briefkasten in Claude Code zu sichten — also von einem Agenten gelesen zu
  * werden, der anschließend Code schreibt. Ein Agent, der Tickets liest und
- * Code schreibt, darf keine Tickets schließen. Deshalb:
- *   1. Es verbindet sich AUSSCHLIESSLICH über TRIAGE_DATABASE_URL — eine
- *      Datenbankrolle mit nichts als SELECT auf "Meldung" (Anleitung in der
- *      PR-Beschreibung des Sprints). Fehlt die Variable, bricht es mit klarer
- *      Meldung ab und fällt NICHT auf DATABASE_URL zurück.
- *   2. Es enthält keinen einzigen Schreibbefehl. Status setzen bleibt dem
- *      Admin-Bereich (Server-Action mit isAdmin-Prüfung) und dem
- *      Datenbank-Connector vorbehalten.
- * Bewusst KEIN Import aus src/lib/env.ts: Das Modul validiert beim Laden die
- * Pflichtvariablen der App (DATABASE_URL, Stripe …) — die hat dieses Skript
- * weder nötig noch soll es sie anfassen.
+ * Code schreibt, darf keine Tickets schließen. Deshalb enthält es keinen
+ * einzigen Schreibbefehl, und die Leseroute kennt nur GET. Status setzen
+ * bleibt dem Admin-Bereich (Server-Action mit isAdmin-Prüfung) vorbehalten.
+ *
+ * Bewusst KEIN Import aus src/lib/env.ts oder src/lib/prisma.ts: Die Module
+ * validieren beim Laden die Pflichtvariablen der App (DATABASE_URL, Stripe …)
+ * bzw. bauen den Schreib-Client — beides hat dieses Skript weder nötig noch
+ * soll es sie anfassen.
  */
 import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
-import { briefkastenAlsListe, briefkastenAlsMarkdown, meldungAlsMarkdown, type ExportMeldung } from '../src/lib/briefkasten-export'
-import { STATUS_OFFEN, istMeldungArt, istMeldungStatus, type MeldungArt, type MeldungStatus } from '../src/lib/meldung'
+import {
+  EXPORT_AUSWAHL,
+  briefkastenAlsListe,
+  briefkastenAlsMarkdown,
+  meldungAlsMarkdown,
+  type ExportMeldung,
+} from '../src/lib/briefkasten-export'
+import {
+  MELDUNG_STATUS,
+  STATUS_OFFEN,
+  istMeldungArt,
+  istMeldungStatus,
+  type MeldungArt,
+  type MeldungStatus,
+} from '../src/lib/meldung'
 
-export const FEHLT_TRIAGE_URL =
-  'TRIAGE_DATABASE_URL fehlt. Das Briefkasten-CLI liest ausschließlich über eine ' +
-  'Nur-Lese-Verbindung und fällt bewusst nicht auf DATABASE_URL zurück. ' +
-  'Anleitung zur Leserolle: PR „Fehlerbriefkasten", Abschnitt Teil E.'
+export const FEHLT_ZUGANG = [
+  'Kein Zugang zum Briefkasten konfiguriert. Zwei Wege (in .env.local, nur lokal):',
+  '  1. Leseroute (empfohlen):  TRIAGE_EXPORT_URL=https://<app>/api/triage/export',
+  '                             TRIAGE_TOKEN=<derselbe Wert wie in Vercel>',
+  '  2. Datenbankrolle:         TRIAGE_DATABASE_URL=postgresql://triage_leser:…',
+  '                             (nur SELECT; braucht Direktzugang zur Datenbank)',
+  'Das CLI liest in beiden Fällen nur und fällt nie auf DATABASE_URL zurück.',
+  'Anleitung: DEVELOPMENT.md, Abschnitt „Triage (Fehlerbriefkasten)".',
+].join('\n')
+
+/** Halb eingerichtete Leseroute — sagen, welche Hälfte fehlt, statt sie stillschweigend zu übergehen. */
+export function halbeRouteHinweis(env: Record<string, string | undefined>): string | null {
+  const url = env.TRIAGE_EXPORT_URL?.trim()
+  const token = env.TRIAGE_TOKEN?.trim()
+  if (url && !token) return 'Hinweis: TRIAGE_EXPORT_URL ist gesetzt, TRIAGE_TOKEN fehlt — die Leseroute bleibt ungenutzt.'
+  if (token && !url) return 'Hinweis: TRIAGE_TOKEN ist gesetzt, TRIAGE_EXPORT_URL fehlt — die Leseroute bleibt ungenutzt.'
+  return null
+}
+
+export const NUR_EXPORT_UEBER_ROUTE =
+  'Über die Leseroute gibt es `export` und `show`. `list` braucht die Datenbankrolle ' +
+  '(TRIAGE_DATABASE_URL) — oder nimm `pnpm briefkasten export`: eine Überschrift je Meldung.'
+
+/**
+ * Die Antwort der Leseroute muss ein Briefkasten-Export sein. Ohne diese Probe
+ * landete die Anmeldeseite eines Zwischenservers (Status 200, HTML) als
+ * „Briefkasten" auf stdout — und damit im Kontext eines Agenten, der daraus
+ * Vorschläge ableitet.
+ */
+export function istExport(text: string): boolean {
+  return text.trimStart().startsWith('# Briefkasten')
+}
+
+export const KEIN_EXPORT =
+  'Die Antwort der Leseroute ist kein Briefkasten-Export. Zeigt TRIAGE_EXPORT_URL wirklich ' +
+  'auf /api/triage/export — und liegt kein Zwischenserver (Anmeldeseite, Schutzwall) davor?'
 
 export type Filter = { status: MeldungStatus[]; art: MeldungArt | null }
 
@@ -44,6 +96,9 @@ export type Leser = {
   finde(idOderKurz: string): Promise<ExportMeldung | null>
   schliessen(): Promise<void>
 }
+
+/** Der Holer — die einzige Berührung mit der Leseroute: ein GET mit Bearer-Token. */
+export type Holer = (url: string, token: string) => Promise<{ status: number; text: string }>
 
 export function parseArgs(argv: readonly string[]): Befehl {
   const [befehl, ...rest] = argv
@@ -70,32 +125,64 @@ export function parseArgs(argv: readonly string[]): Befehl {
 
 export const HILFE = [
   'Briefkasten-CLI (nur lesend)',
-  '  pnpm briefkasten list   [--status NEU,GEPRUEFT] [--art FEHLER|WUNSCH|FRAGE]',
-  '  pnpm briefkasten show   <kurznummer|id>',
   '  pnpm briefkasten export [--status …] [--art …]   → Markdown auf stdout',
+  '  pnpm briefkasten show   <kurznummer|id>',
+  '  pnpm briefkasten list   [--status NEU,GEPRUEFT] [--art FEHLER|WUNSCH|FRAGE]   (nur Datenbank-Weg)',
   'Voreinstellung Status: NEU,GEPRUEFT. Alle: --status NEU,GEPRUEFT,GEPLANT,ERLEDIGT,KEIN_FEHLER,DUPLIKAT',
+  'Zugang: TRIAGE_EXPORT_URL + TRIAGE_TOKEN (Leseroute, empfohlen) oder TRIAGE_DATABASE_URL (Datenbankrolle).',
 ].join('\n')
 
-const EXPORT_SELECT = {
-  id: true,
-  art: true,
-  status: true,
-  text: true,
-  createdAt: true,
-  seiteUrl: true,
-  userAgent: true,
-  viewport: true,
-  diagKennung: true,
-  screenshotUrl: true,
-  customerEmail: true,
-  clusterKey: true,
-  triageNotiz: true,
-  duplikatVonId: true,
-  sprintName: true,
-  triagedAt: true,
-  antwortAnMelder: true,
-  farm: { select: { name: true, slug: true } },
-} as const
+// ─── Weg wählen ─────────────────────────────────────────────────────────────
+
+export type Weg =
+  | { art: 'route'; url: string; token: string }
+  | { art: 'db'; url: string }
+  | { art: 'keiner' }
+
+/** Leseroute vor Datenbankrolle; leere Werte gelten als nicht gesetzt. Rein, damit prüfbar. */
+export function waehleWeg(env: Record<string, string | undefined>): Weg {
+  const exportUrl = env.TRIAGE_EXPORT_URL?.trim()
+  const token = env.TRIAGE_TOKEN?.trim()
+  if (exportUrl && token) return { art: 'route', url: exportUrl, token }
+  const dbUrl = env.TRIAGE_DATABASE_URL?.trim()
+  if (dbUrl) return { art: 'db', url: dbUrl }
+  return { art: 'keiner' }
+}
+
+/**
+ * Die Adresse des Exports mit Filter — dieselben Parameter, die die Route liest.
+ * Wirft bei einer unbrauchbaren Basis-Adresse; der Aufrufer übersetzt das in
+ * einen Hinweis auf TRIAGE_EXPORT_URL (ein Tippfehler dort ist kein Netzfehler).
+ */
+export function exportAdresse(basis: string, filter: Filter): string {
+  const url = new URL(basis)
+  url.searchParams.set('status', filter.status.join(','))
+  if (filter.art) url.searchParams.set('art', filter.art)
+  else url.searchParams.delete('art')
+  return url.toString()
+}
+
+export const UNGUELTIGE_EXPORT_URL =
+  'TRIAGE_EXPORT_URL ist keine gültige Adresse. Erwartet wird die volle Adresse ' +
+  'der Leseroute, z. B. https://<app>/api/triage/export'
+
+/**
+ * `show` über die Leseroute: der Abschnitt EINER Meldung aus dem Export. Die
+ * Abschnitte beginnen mit `## <kurznummer> · …` (meldungAlsMarkdown) — das
+ * Ziel darf Kurznummer, Präfix davon oder die volle ID sein, wie im
+ * Datenbank-Weg (startsWith).
+ */
+export function schnittAusExport(markdown: string, ziel: string): string | null {
+  const abschnitte = markdown.split(/\n(?=## )/)
+  for (const abschnitt of abschnitte) {
+    if (!abschnitt.startsWith('## ')) continue
+    const kurz = abschnitt.slice(3).split(' · ')[0]?.trim() ?? ''
+    if (kurz && (ziel.startsWith(kurz) || kurz.startsWith(ziel))) return abschnitt.trimEnd()
+  }
+  return null
+}
+
+// ─── Datenbank-Weg ──────────────────────────────────────────────────────────
 
 /** Der echte Leser: Prisma über die Nur-Lese-Verbindung — findMany/findFirst, sonst nichts. */
 export function prismaLeser(triageUrl: string): Leser {
@@ -105,13 +192,13 @@ export function prismaLeser(triageUrl: string): Leser {
       return prisma.meldung.findMany({
         where: { status: { in: filter.status }, ...(filter.art ? { art: filter.art } : {}) },
         orderBy: { createdAt: 'desc' },
-        select: EXPORT_SELECT,
+        select: EXPORT_AUSWAHL,
       })
     },
     async finde(idOderKurz) {
       return prisma.meldung.findFirst({
         where: idOderKurz.length >= 20 ? { id: idOderKurz } : { id: { startsWith: idOderKurz } },
-        select: EXPORT_SELECT,
+        select: EXPORT_AUSWAHL,
       })
     },
     async schliessen() {
@@ -120,27 +207,59 @@ export function prismaLeser(triageUrl: string): Leser {
   }
 }
 
-/**
- * Der Lauf — getrennt von Prozess und Datenbank, damit er prüfbar ist.
- * Liefert Exit-Code und Ausgabe; `leserFabrik` wird NUR aufgerufen, wenn die
- * Nur-Lese-URL da ist.
- */
-export async function starte(
-  argv: readonly string[],
-  env: Record<string, string | undefined>,
-  leserFabrik: (triageUrl: string) => Leser = prismaLeser,
-  jetzt: Date = new Date()
-): Promise<{ code: number; ausgabe: string }> {
-  const befehl = parseArgs(argv)
-  if (befehl.art === 'hilfe') {
-    return { code: befehl.grund ? 1 : 0, ausgabe: befehl.grund ? `${befehl.grund}\n\n${HILFE}` : HILFE }
+// ─── Leseroute ──────────────────────────────────────────────────────────────
+
+/** Der echte Holer: ein GET mit Bearer-Token, sonst nichts. */
+export const fetchHoler: Holer = async (url, token) => {
+  const antwort = await fetch(url, {
+    method: 'GET',
+    headers: { authorization: `Bearer ${token}`, accept: 'text/markdown' },
+  })
+  return { status: antwort.status, text: await antwort.text() }
+}
+
+function routenFehler(status: number): string {
+  if (status === 401) return 'Die Leseroute hat den Token abgelehnt (401). TRIAGE_TOKEN in .env.local mit dem Wert in Vercel vergleichen.'
+  if (status === 429) return 'Die Leseroute bremst (429): höchstens zehn Aufrufe je Minute — kurz warten.'
+  if (status === 404) return 'Die Leseroute wurde nicht gefunden (404). TRIAGE_EXPORT_URL prüfen: https://<app>/api/triage/export'
+  return `Die Leseroute antwortet mit ${status}.`
+}
+
+async function ueberRoute(befehl: Befehl, weg: { url: string; token: string }, holer: Holer): Promise<{ code: number; ausgabe: string }> {
+  if (befehl.art === 'list') return { code: 1, ausgabe: NUR_EXPORT_UEBER_ROUTE }
+  if (befehl.art === 'hilfe') return { code: 0, ausgabe: HILFE }
+
+
+  // show: der Export über alle Status, daraus der eine Abschnitt
+  const filter: Filter = befehl.art === 'show' ? { status: [...MELDUNG_STATUS], art: null } : befehl.filter
+
+  let adresse: string
+  try {
+    adresse = exportAdresse(weg.url, filter)
+  } catch {
+    return { code: 2, ausgabe: UNGUELTIGE_EXPORT_URL }
   }
 
-  const triageUrl = env.TRIAGE_DATABASE_URL?.trim()
-  if (!triageUrl) return { code: 2, ausgabe: FEHLT_TRIAGE_URL }
-
-  const leser = leserFabrik(triageUrl)
+  let antwort: { status: number; text: string }
   try {
+    antwort = await holer(adresse, weg.token)
+  } catch (e) {
+    return { code: 3, ausgabe: `Die Leseroute ist nicht erreichbar: ${e instanceof Error ? e.message : String(e)}` }
+  }
+  if (antwort.status !== 200) return { code: 3, ausgabe: routenFehler(antwort.status) }
+  if (!istExport(antwort.text)) return { code: 3, ausgabe: KEIN_EXPORT }
+
+  if (befehl.art === 'show') {
+    const abschnitt = schnittAusExport(antwort.text, befehl.ziel)
+    return abschnitt ? { code: 0, ausgabe: abschnitt } : { code: 1, ausgabe: `Keine Meldung zu „${befehl.ziel}".` }
+  }
+  // export: unverändert weiterreichen
+  return { code: 0, ausgabe: antwort.text }
+}
+
+async function ueberDatenbank(befehl: Befehl, leser: Leser, jetzt: Date): Promise<{ code: number; ausgabe: string }> {
+  try {
+    if (befehl.art === 'hilfe') return { code: 0, ausgabe: HILFE }
     if (befehl.art === 'show') {
       const m = await leser.finde(befehl.ziel)
       return m ? { code: 0, ausgabe: meldungAlsMarkdown(m) } : { code: 1, ausgabe: `Keine Meldung zu „${befehl.ziel}".` }
@@ -153,10 +272,53 @@ export async function starte(
   }
 }
 
+/**
+ * Der Lauf — getrennt von Prozess, Netz und Datenbank, damit er prüfbar ist.
+ * Liefert Exit-Code und Ausgabe. `leserFabrik` wird NUR auf dem Datenbank-Weg
+ * gerufen, `holer` NUR auf der Leseroute.
+ */
+export async function starte(
+  argv: readonly string[],
+  env: Record<string, string | undefined>,
+  leserFabrik: (triageUrl: string) => Leser = prismaLeser,
+  jetzt: Date = new Date(),
+  holer: Holer = fetchHoler
+): Promise<{ code: number; ausgabe: string }> {
+  const befehl = parseArgs(argv)
+  if (befehl.art === 'hilfe') {
+    return { code: befehl.grund ? 1 : 0, ausgabe: befehl.grund ? `${befehl.grund}\n\n${HILFE}` : HILFE }
+  }
+
+  const weg = waehleWeg(env)
+  if (weg.art === 'keiner') {
+    const halb = halbeRouteHinweis(env)
+    return { code: 2, ausgabe: halb ? `${halb}\n\n${FEHLT_ZUGANG}` : FEHLT_ZUGANG }
+  }
+
+  // `list` braucht die Spaltenform und damit die Datenbank. Ist sie eingerichtet,
+  // wird sie für diesen einen Befehl genommen, statt ihn abzulehnen — die
+  // Leseroute bleibt für alles andere der Vorzugsweg.
+  const dbUrl = env.TRIAGE_DATABASE_URL?.trim()
+  if (weg.art === 'route' && befehl.art === 'list' && dbUrl) {
+    return ueberDatenbank(befehl, leserFabrik(dbUrl), jetzt)
+  }
+
+  if (weg.art === 'route') return ueberRoute(befehl, weg, holer)
+  return ueberDatenbank(befehl, leserFabrik(weg.url), jetzt)
+}
+
 // Nur beim direkten Aufruf (pnpm briefkasten …) laufen — nicht beim Import in Tests.
 if (/briefkasten\.(ts|js|mjs|cjs)$/.test(process.argv[1] ?? '')) {
-  void starte(process.argv.slice(2), process.env).then(({ code, ausgabe }) => {
-    ;(code === 0 ? process.stdout : process.stderr).write(`${ausgabe}\n`)
-    process.exitCode = code
-  })
+  void starte(process.argv.slice(2), process.env)
+    .then(({ code, ausgabe }) => {
+      const text = ausgabe.endsWith('\n') ? ausgabe : `${ausgabe}\n`
+      ;(code === 0 ? process.stdout : process.stderr).write(text)
+      process.exitCode = code
+    })
+    // Ein Datenbankfehler soll eine Meldung sein, kein Stapelabzug: das CLI
+    // liest, und wer liest, braucht einen verständlichen Satz.
+    .catch((e: unknown) => {
+      process.stderr.write(`Briefkasten konnte nicht gelesen werden: ${e instanceof Error ? e.message : String(e)}\n`)
+      process.exitCode = 3
+    })
 }
