@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { CheckCircle, Clock, XCircle, MapPin, Calendar, Package } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
-import { formatOrderLine } from '@/lib/order-line'
+import { formatEuro, formatPosition } from '@/lib/format'
 import { bestellungPfad } from '@/lib/bestell-link'
 import { ClearCartOnMount } from '@/components/checkout/clear-cart-on-mount'
 import { BestellSummenZeilen } from '@/components/checkout/bestell-summen'
@@ -51,10 +51,6 @@ async function getOrder(orderId: string) {
       },
     },
   })
-}
-
-function formatEuro(n: number) {
-  return `€ ${n.toFixed(2).replace('.', ',')}`
 }
 
 export default async function ConfirmPage({ params, searchParams }: Props) {
@@ -183,7 +179,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
             {order.items.map((item, i) => (
               <div key={i} className="flex justify-between text-sm">
                 <span className="text-foreground">
-                  {formatOrderLine(item, item.product)}
+                  {formatPosition({ name: item.productName, quantity: item.quantity, unit: item.product?.unit ?? null, unitSize: item.product?.unitSize ?? null })}
                 </span>
                 <span className="text-foreground">{formatEuro(Number(item.totalPrice))}</span>
               </div>

@@ -14,8 +14,8 @@ import { NextRequest } from 'next/server'
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     farm: { findUnique: vi.fn() },
-    product: { findUnique: vi.fn(), update: vi.fn() },
-    stockReservation: { aggregate: vi.fn(), deleteMany: vi.fn(), upsert: vi.fn() },
+    product: { findUnique: vi.fn(), update: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
+    stockReservation: { aggregate: vi.fn(), deleteMany: vi.fn(), upsert: vi.fn(), findMany: vi.fn() },
     user: { findUnique: vi.fn(), create: vi.fn() },
     order: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
     customerFarmSubscription: { findUnique: vi.fn(), upsert: vi.fn() },
@@ -34,6 +34,32 @@ import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { sendOnsiteConfirmation } from '@/lib/email'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
+
+/**
+ * Seit dem Checkout-Sprint prüft POST /api/checkout die Reservierungsfrist und
+ * bucht den Bestand BEDINGT (src/server/warenkorb.ts). Diese Vorbereitung
+ * stellt den Normalfall her: Produkte vorrätig, eigener Halt gültig, Buchung
+ * erfolgreich. Generisch über die angefragten IDs, damit sie unabhängig von
+ * den Produktnamen der einzelnen Suite funktioniert.
+ */
+function warenkorbBereit() {
+  const ids = (a: unknown): string[] => {
+    const w = (a as { where?: { id?: { in?: string[] }; productId?: { in?: string[] } } })?.where
+    return w?.id?.in ?? w?.productId?.in ?? []
+  }
+  vi.mocked(prisma.product.findMany).mockImplementation(((a: unknown) =>
+    Promise.resolve(ids(a).map((id) => ({ id, stock: 999, isAvailable: true })))) as never)
+  vi.mocked(prisma.stockReservation.findMany).mockImplementation(((a: unknown) => {
+    const sess = (a as { where?: { sessionId?: unknown } })?.where?.sessionId
+    // { not: ... } = fremde Sitzungen; die blockieren hier nichts.
+    if (sess && typeof sess === 'object') return Promise.resolve([])
+    return Promise.resolve(
+      ids(a).map((id) => ({ productId: id, quantity: 999, expiresAt: new Date(Date.now() + 600_000) }))
+    )
+  }) as never)
+  vi.mocked(prisma.product.updateMany).mockResolvedValue({ count: 1 } as never)
+}
+
 
 const farmFindUnique = vi.mocked(prisma.farm.findUnique)
 const productFindUnique = vi.mocked(prisma.product.findUnique)
@@ -104,6 +130,7 @@ function reserveRequest(body: unknown = { productId: 'prod_1', quantity: 2, sess
 }
 
 beforeEach(() => {
+  warenkorbBereit()
   vi.clearAllMocks()
   // Voller Happy-Path-Bestand: jeder Aufruf liefert etwas Sinnvolles,
   // damit ein NICHT pausierter Shop komplett durchläuft.

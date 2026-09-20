@@ -54,7 +54,7 @@ export function OrderConfirmedEmail(p: OrderConfirmedProps) {
       </Text>
       {p.items.map((item, i) => (
         <Text key={i} style={{ ...mutedText, margin: '2px 0' }}>
-          • {item.quantity}× {item.name}
+          • {item.name}
         </Text>
       ))}
 

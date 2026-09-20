@@ -10,7 +10,7 @@ import {
   SheetFooter,
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
-import { UNIT_LABELS } from '@/schemas/product'
+import { formatEuro, formatGrundpreis } from '@/lib/format'
 import type { CartItem } from '@/lib/use-cart'
 
 type Props = {
@@ -21,10 +21,6 @@ type Props = {
   farmSlug: string
   onUpdateQuantity: (productId: string, qty: number) => void
   onRemoveItem: (productId: string) => void
-}
-
-function formatEuro(n: number) {
-  return new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(n)
 }
 
 export function CartSheet({ open, onOpenChange, items, total, farmSlug, onUpdateQuantity, onRemoveItem }: Props) {
@@ -62,7 +58,7 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, onUpdate
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
                   <p className="text-xs text-muted-foreground/60">
-                    {formatEuro(item.price)} / {UNIT_LABELS[item.unit] ?? item.unit}
+                    {formatGrundpreis(item.price, item.unit, item.unitSize)}
                   </p>
                   {/* Quantity controls */}
                   <div className="flex items-center gap-2 mt-1.5">

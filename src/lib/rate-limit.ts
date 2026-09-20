@@ -61,7 +61,21 @@ const limiters = new Map<string, ReturnType<typeof createRateLimiter>>()
 // Für Routen-Handler: null = weiter, sonst fertige 429-Antwort.
 // Aktiv NUR bei NODE_ENV=production — lokales `pnpm dev` bleibt ungebremst,
 // damit sich Entwickler nicht selbst aussperren.
-export function enforceRateLimit(routeKey: string, request: NextRequest): NextResponse | null {
+//
+// ZWEI SCHLÜSSEL, wenn eine Sitzung bekannt ist: IP UND Sitzung. Grund: Die
+// Reservierung bindet Bestand an eine sessionId. Wer sie frei wählt, könnte
+// sonst mit einer IP beliebig viele Sitzungen eröffnen und den ganzen Bestand
+// eines Hofes blockieren; umgekehrt teilen sich hinter einem Mobilfunk-NAT
+// viele echte Kundinnen eine IP. Erst beide Grenzen zusammen sind brauchbar.
+//
+// SERVERLESS-KAVEAT wie oben: Die Zähler leben im Prozess, das Limit gilt je
+// Instanz. Für den Pilotbetrieb bewusst ausreichend; ein globaler Speicher
+// (Upstash/Redis) wäre die nächste Stufe und braucht neue Infrastruktur.
+export function enforceRateLimit(
+  routeKey: string,
+  request: NextRequest,
+  sessionId?: string | null
+): NextResponse | null {
   if (process.env.NODE_ENV !== 'production') return null
 
   let limiter = limiters.get(routeKey)
@@ -71,7 +85,13 @@ export function enforceRateLimit(routeKey: string, request: NextRequest): NextRe
   }
 
   const ip = getClientIp(request.headers)
-  if (limiter.check(`${routeKey}:${ip}`)) return null
+  const schluessel = [`${routeKey}:ip:${ip}`]
+  if (sessionId) schluessel.push(`${routeKey}:sid:${sessionId}`)
+
+  // check() zählt mit. Erst alle prüfen, dann entscheiden — sonst bliebe ein
+  // Schlüssel ungezählt, sobald ein anderer schon über dem Limit ist.
+  const ergebnisse = schluessel.map((k) => limiter.check(k))
+  if (ergebnisse.every(Boolean)) return null
 
   return NextResponse.json(
     { error: 'Zu viele Anfragen — bitte warte einen Moment und versuche es erneut.' },

@@ -10,6 +10,37 @@ import { sendOnsiteConfirmation } from '@/lib/email'
 import { checkoutRequestSchema } from '@/schemas/checkout'
 import { calcTotalAmount, calcPlatformFeeAmount, eurosToCents } from '@/lib/order-totals'
 import { berechneServicegebuehr } from '@/lib/servicegebuehr'
+import { pruefeSitzungsWarenkorb } from '@/server/warenkorb'
+import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
+import { nachDerAntwort } from '@/lib/nach-der-antwort'
+
+/**
+ * Bestellung anlegen.
+ *
+ * DREI DINGE, die dieser Weg seit dem Bug-Report anders macht:
+ *
+ * 1. IDEMPOTENZ (Befund 4). Der Browser erzeugt beim Öffnen des Checkouts
+ *    einen Schlüssel. Kommt derselbe Schlüssel zweimal — Doppelklick,
+ *    Zurück-Taste, erneut gesendetes Formular, wackeliges Netz —, gibt der
+ *    Server die BESTEHENDE Bestellung zurück. Der eindeutige Index auf
+ *    Order.idempotencyKey ist die Durchsetzung; ein deaktivierter Knopf im
+ *    Browser ist keine.
+ *
+ * 2. DIE RESERVIERUNGSFRIST WIRD GEPRÜFT (Befund 3), und zwar mit derselben
+ *    Funktion wie Warenkorb und Checkout-Einstieg (src/server/warenkorb.ts).
+ *    Eine abgelaufene Position wird NIE durchgewunken: Die Antwort nennt den
+ *    Grund und liefert den berichtigten Warenkorb mit, statt eine
+ *    Bestandsmeldung auszugeben, die die Ursache verschweigt.
+ *
+ * 3. DIE E-MAIL BLOCKIERT NICHT MEHR (Befund 4). Sie lief bisher synchron im
+ *    Request — das waren die zehn bis fünfzehn Sekunden. Jetzt geht sie über
+ *    `after()` raus, also nach der Antwort. Scheitert der Versand, steht die
+ *    Bestellung trotzdem; der Fehler wird protokolliert, nicht zurückgerollt.
+ *
+ * Dazu: Der Bestand wird BEDINGT gebucht (`updateMany` mit `stock >= Menge`)
+ * statt blind dekrementiert. Zwei gleichzeitige Bestellungen konnten vorher
+ * beide die Prüfung bestehen und den Bestand ins Minus ziehen.
+ */
 
 function generateOrderNumber(farmSlug: string): string {
   const parts = farmSlug.split('-')
@@ -28,6 +59,20 @@ function generateOrderNumber(farmSlug: string): string {
   return `${initials}-${dd}${mm}-${suffix}`
 }
 
+/** Bereits gebuchte Mengen wieder gutschreiben — Ausgleich, wenn danach etwas scheitert. */
+async function gibBestandZurueck(gebucht: Array<{ productId: string; quantity: number }>) {
+  for (const g of gebucht) {
+    try {
+      await prisma.product.update({
+        where: { id: g.productId },
+        data: { stock: { increment: g.quantity } },
+      })
+    } catch (e) {
+      // Der Ausgleich darf die Fehlerantwort nicht selbst zum Absturz bringen.
+      console.error('[/api/checkout] Bestand-Ausgleich fehlgeschlagen', g.productId, e)
+    }
+  }
+}
 
 export async function POST(request: NextRequest) {
   const limited = enforceRateLimit('checkout', request)
@@ -49,6 +94,39 @@ export async function POST(request: NextRequest) {
   }
 
   const data = parsed.data
+
+  // Zweite Bremse je SITZUNG — siehe src/lib/rate-limit.ts. Die sessionId
+  // steht erst nach dem Parsen fest, deshalb hier und nicht ganz oben.
+  const sitzungsLimit = enforceRateLimit('checkout', request, data.sessionId)
+  if (sitzungsLimit) return sitzungsLimit
+
+  // 0. IDEMPOTENZ — vor allem anderen. Kennt der Server den Schlüssel schon,
+  //    ist die Bestellung bereits angelegt; sie wird zurückgegeben, nichts
+  //    Zweites entsteht, kein Bestand wird ein zweites Mal gebucht.
+  if (data.idempotencyKey) {
+    const bestehend = await prisma.order.findUnique({
+      where: { idempotencyKey: data.idempotencyKey },
+      select: { id: true, orderNumber: true, paymentMethod: true, stripePaymentIntentId: true },
+    })
+    if (bestehend) {
+      if (bestehend.paymentMethod === 'ONLINE' && bestehend.stripePaymentIntentId) {
+        // Für die Zahlungsmaske braucht der Browser das Client-Secret erneut.
+        const intent = await stripe.paymentIntents.retrieve(bestehend.stripePaymentIntentId)
+        return NextResponse.json({
+          orderId: bestehend.id,
+          orderNumber: bestehend.orderNumber,
+          clientSecret: intent.client_secret,
+          wiederholt: true,
+        })
+      }
+      return NextResponse.json({
+        orderId: bestehend.id,
+        orderNumber: bestehend.orderNumber,
+        requiresConfirmation: true,
+        wiederholt: true,
+      })
+    }
+  }
 
   // 1. Load farm
   const farm = await prisma.farm.findUnique({
@@ -95,47 +173,29 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 3. Stock check — pessimistic: check stock minus other sessions' reservations
   const now = new Date()
 
-  // Einheiten fürs E-Mail-Format merken (formatOrderLine-Schreibweise)
-  const unitByProductId = new Map<string, { unit: string; unitSize: number | null }>()
+  // 3. RESERVIERUNGSFRIST UND BESTAND — eine Prüfung für beides, dieselbe
+  //    Funktion wie im Warenkorb (src/server/warenkorb.ts). Eine verfallene
+  //    eigene Reservierung wird hier NICHT stillschweigend hingenommen: Die
+  //    Kundin bekommt den Grund und den berichtigten Warenkorb, damit sie
+  //    sieht, was gilt, statt vor einer leeren Seite zu stehen.
+  const pruefung = await pruefeSitzungsWarenkorb(
+    data.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+    data.sessionId,
+    now
+  )
 
-  for (const item of data.items) {
-    const product = await prisma.product.findUnique({
-      where: { id: item.productId },
-      select: { id: true, stock: true, isAvailable: true, name: true, unit: true, unitSize: true },
-    })
-    if (!product || !product.isAvailable) {
-      return NextResponse.json(
-        { error: `Produkt "${item.name}" ist nicht mehr verfügbar` },
-        { status: 409 }
-      )
-    }
-
-    unitByProductId.set(product.id, {
-      unit: product.unit,
-      unitSize: product.unitSize == null ? null : Number(product.unitSize),
-    })
-
-    const otherRes = await prisma.stockReservation.aggregate({
-      where: {
-        productId: item.productId,
-        sessionId: { not: data.sessionId },
-        expiresAt: { gt: now },
+  if (pruefung.befund.etwasAbgelaufen || pruefung.befund.etwasGeaendert) {
+    return NextResponse.json(
+      {
+        error: pruefung.meldung ?? 'Dein Warenkorb hat sich geändert.',
+        code: pruefung.befund.etwasAbgelaufen ? CODE_RESERVIERUNG_ABGELAUFEN : 'WARENKORB_GEAENDERT',
+        items: pruefung.berichtigt,
+        positionen: pruefung.befund.positionen,
       },
-      _sum: { quantity: true },
-    })
-
-    const reservedByOthers = otherRes._sum.quantity ?? 0
-    const available = product.stock - reservedByOthers
-
-    if (available < item.quantity) {
-      return NextResponse.json(
-        { error: `Nicht genug Bestand für "${item.name}" (noch ${available} verfügbar)` },
-        { status: 409 }
-      )
-    }
+      { status: 409 }
+    )
   }
 
   // 4. Find or create customer account (dormant — no password)
@@ -177,46 +237,91 @@ export async function POST(request: NextRequest) {
   const [y, mo, d] = data.pickupDate.split('-').map(Number)
   const pickupDate = new Date(y, mo - 1, d, 12, 0, 0)
 
-  // 8. Create order
-  const order = await prisma.order.create({
-    data: {
-      orderNumber,
-      farmId: farm.id,
-      customerId: customer.id,
-      customerEmail: data.customerEmail,
-      customerName: data.customerName,
-      customerPhone: data.customerPhone,
-      customerNote: data.customerNote || null,
-      status: 'PENDING_CONFIRMATION',
-      totalAmount,
-      pickupDate,
-      pickupTimeStart: data.pickupTimeStart,
-      pickupTimeEnd: data.pickupTimeEnd,
-      paymentMethod: data.paymentMethod as 'ONLINE' | 'ONSITE_CASH' | 'ONSITE_CARD',
-      paymentStatus: 'PENDING',
-      platformFeeAmount,
-      // Snapshot der Servicegebühr — spätere Änderungen der Hofeinstellung
-      // lassen diese Bestellung unverändert (prisma/schema.prisma, Order).
-      serviceFeeCents: servicegebuehr.gebuehrCents,
-      serviceFeePercentApplied: servicegebuehr.prozentAngewendet,
-      items: {
-        create: data.items.map((i) => ({
-          productId: i.productId,
-          productName: i.name,
-          unitPrice: i.unitPrice,
-          quantity: i.quantity,
-          totalPrice: i.unitPrice * i.quantity,
-        })),
-      },
-    },
-  })
-
-  // 9. Decrement stock (sequential, no transaction — PgBouncer limitation)
+  // 8. BESTAND BEDINGT BUCHEN — vor der Bestellung, damit im Fehlerfall keine
+  //    halbe Bestellung übrig bleibt. `updateMany` mit `stock >= Menge` schlägt
+  //    fehl (count 0), wenn zwischen Prüfung und Buchung jemand schneller war;
+  //    ein blindes `decrement` hätte den Bestand ins Minus gezogen.
+  const gebucht: Array<{ productId: string; quantity: number }> = []
   for (const item of data.items) {
-    await prisma.product.update({
-      where: { id: item.productId },
+    const res = await prisma.product.updateMany({
+      where: { id: item.productId, stock: { gte: item.quantity } },
       data: { stock: { decrement: item.quantity } },
     })
+    if (res.count === 0) {
+      await gibBestandZurueck(gebucht)
+      return NextResponse.json(
+        {
+          error: `"${item.name}" wurde gerade von jemand anderem gekauft. Bitte prüfe deinen Warenkorb.`,
+          code: 'WARENKORB_GEAENDERT',
+        },
+        { status: 409 }
+      )
+    }
+    gebucht.push({ productId: item.productId, quantity: item.quantity })
+  }
+
+  // 9. Bestellung anlegen. Scheitert das, wird der Bestand wieder gutgeschrieben —
+  //    sonst wäre Ware verschwunden, die nie verkauft wurde.
+  let order: { id: string; createdAt: Date }
+  try {
+    order = await prisma.order.create({
+      data: {
+        orderNumber,
+        idempotencyKey: data.idempotencyKey ?? null,
+        farmId: farm.id,
+        customerId: customer.id,
+        customerEmail: data.customerEmail,
+        customerName: data.customerName,
+        customerPhone: data.customerPhone,
+        customerNote: data.customerNote || null,
+        status: 'PENDING_CONFIRMATION',
+        totalAmount,
+        pickupDate,
+        pickupTimeStart: data.pickupTimeStart,
+        pickupTimeEnd: data.pickupTimeEnd,
+        paymentMethod: data.paymentMethod as 'ONLINE' | 'ONSITE_CASH' | 'ONSITE_CARD',
+        paymentStatus: 'PENDING',
+        platformFeeAmount,
+        // Snapshot der Servicegebühr — spätere Änderungen der Hofeinstellung
+        // lassen diese Bestellung unverändert (prisma/schema.prisma, Order).
+        serviceFeeCents: servicegebuehr.gebuehrCents,
+        serviceFeePercentApplied: servicegebuehr.prozentAngewendet,
+        items: {
+          create: data.items.map((i) => ({
+            productId: i.productId,
+            productName: i.name,
+            unitPrice: i.unitPrice,
+            quantity: i.quantity,
+            totalPrice: i.unitPrice * i.quantity,
+          })),
+        },
+      },
+      select: { id: true, createdAt: true },
+    })
+  } catch (e) {
+    await gibBestandZurueck(gebucht)
+    // Zwei Requests mit demselben Schlüssel gleichzeitig: Der zweite läuft in
+    // den eindeutigen Index. Dann gewinnt der erste, und der zweite bekommt
+    // dessen Bestellung — kein Fehler für die Kundin.
+    if (data.idempotencyKey) {
+      const bestehend = await prisma.order.findUnique({
+        where: { idempotencyKey: data.idempotencyKey },
+        select: { id: true, orderNumber: true, paymentMethod: true, stripePaymentIntentId: true },
+      })
+      if (bestehend) {
+        return NextResponse.json({
+          orderId: bestehend.id,
+          orderNumber: bestehend.orderNumber,
+          requiresConfirmation: bestehend.paymentMethod !== 'ONLINE',
+          wiederholt: true,
+        })
+      }
+    }
+    console.error('[/api/checkout] Bestellung konnte nicht angelegt werden', e)
+    return NextResponse.json(
+      { error: 'Die Bestellung konnte nicht angelegt werden. Bitte versuche es erneut.' },
+      { status: 500 }
+    )
   }
 
   // 10. Release session reservations
@@ -288,47 +393,72 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  // 11b. ONSITE — confirmation token + email to customer
+  // 11b. ONSITE — Bestätigungs-Token jetzt, E-Mail NACH der Antwort.
   const confirmationToken = nanoid(32)
   await prisma.order.update({
     where: { id: order.id },
     data: { confirmationToken },
   })
 
-  await sendOnsiteConfirmation(
-    {
-      id: order.id,
-      orderNumber,
-      customerName: data.customerName,
-      customerEmail: data.customerEmail,
-      customerPhone: data.customerPhone,
-      totalAmount,
-      serviceFeeCents: servicegebuehr.gebuehrCents,
-      pickupDate,
-      pickupTimeStart: data.pickupTimeStart,
-      pickupTimeEnd: data.pickupTimeEnd,
-      paymentMethod: data.paymentMethod,
-      farm: {
-        id: farm.id,
-        name: farm.name,
-        slug: farm.slug,
-        email: farm.email,
-        ownerName: farm.ownerName,
-        address: farm.address,
-        postalCode: farm.postalCode,
-        city: farm.city,
-        phone: farm.phone,
-      },
-      items: data.items.map((i) => ({
-        productName: i.name,
-        quantity: i.quantity,
-        unitPrice: i.unitPrice,
-        totalPrice: i.unitPrice * i.quantity,
-        product: unitByProductId.get(i.productId) ?? null,
-      })),
-    },
-    confirmationToken
-  )
+  // Der Versand hängt an Resend und dauert Sekunden. Er gehört nicht in die
+  // Antwortzeit der Kundin: `after()` führt ihn aus, NACHDEM die Antwort
+  // rausgegangen ist. Die Einheiten fürs Mail-Format werden ebenfalls erst
+  // hier geladen — vorher waren es zwei zusätzliche Abfragen je Position im
+  // kritischen Pfad.
+  nachDerAntwort(async () => {
+    try {
+      const produkte = await prisma.product.findMany({
+        where: { id: { in: data.items.map((i) => i.productId) } },
+        select: { id: true, unit: true, unitSize: true },
+      })
+      const einheit = new Map(
+        produkte.map((p) => [
+          p.id,
+          { unit: p.unit, unitSize: p.unitSize == null ? null : Number(p.unitSize) },
+        ])
+      )
+
+      await sendOnsiteConfirmation(
+        {
+          id: order.id,
+          orderNumber,
+          customerName: data.customerName,
+          customerEmail: data.customerEmail,
+          customerPhone: data.customerPhone,
+          totalAmount,
+          serviceFeeCents: servicegebuehr.gebuehrCents,
+          pickupDate,
+          pickupTimeStart: data.pickupTimeStart,
+          pickupTimeEnd: data.pickupTimeEnd,
+          paymentMethod: data.paymentMethod,
+          farm: {
+            id: farm.id,
+            name: farm.name,
+            slug: farm.slug,
+            email: farm.email,
+            ownerName: farm.ownerName,
+            address: farm.address,
+            postalCode: farm.postalCode,
+            city: farm.city,
+            phone: farm.phone,
+          },
+          items: data.items.map((i) => ({
+            productName: i.name,
+            quantity: i.quantity,
+            unitPrice: i.unitPrice,
+            totalPrice: i.unitPrice * i.quantity,
+            product: einheit.get(i.productId) ?? null,
+          })),
+        },
+        confirmationToken
+      )
+    } catch (e) {
+      // Die Bestellung steht. Ein gescheiterter Versand wird protokolliert und
+      // NICHT zurückgerollt — sonst verlöre die Kundin eine gültige Bestellung,
+      // weil ein Mailserver hakte.
+      console.error('[/api/checkout] Bestätigungsmail fehlgeschlagen', orderNumber, e)
+    }
+  })
 
   return NextResponse.json({ orderId: order.id, orderNumber, requiresConfirmation: true })
 }

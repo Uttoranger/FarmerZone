@@ -9,7 +9,7 @@ import {
   type SalesFeedEntry,
 } from '@/lib/sales-summary'
 import { getYtdRevenue } from './analytics'
-import { formatOrderLine } from '@/lib/order-line'
+import { formatPosition } from '@/lib/format'
 
 export type ManualSaleData = {
   id: string
@@ -66,7 +66,7 @@ function toFeedOrder(o: PickedOrderRow): SalesFeedOrder {
     totalAmount: Number(o.totalAmount),
     stripePaymentIntentId: o.stripePaymentIntentId,
     pickedUpAt: o.pickedUpAt,
-    itemsLabel: o.items.map((i) => formatOrderLine(i, i.product)).join(', '),
+    itemsLabel: o.items.map((i) => formatPosition({ name: i.productName, quantity: i.quantity, unit: i.product?.unit ?? null, unitSize: i.product?.unitSize ?? null })).join(' · '),
   }
 }
 

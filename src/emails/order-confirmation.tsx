@@ -69,7 +69,7 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps) {
       {p.items.map((item, i) => (
         <div key={i} style={{ padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
           <Text style={{ ...mutedText, margin: 0 }}>
-            {item.quantity}× {item.name}
+            {item.name}
             <span style={{ float: 'right' }}>€ {(item.unitPrice * item.quantity).toFixed(2)}</span>
           </Text>
         </div>

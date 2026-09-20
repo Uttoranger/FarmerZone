@@ -7,7 +7,7 @@ import { getOrderDetail } from '@/server/queries/orders'
 import { OrderActions } from '@/components/orders/order-actions'
 import { statusLabel, statusColor, paymentLabel } from '@/components/orders/order-status'
 import { BetragMitGebuehr } from '@/components/orders/servicegebuehr-anzeige'
-import { formatOrderLine } from '@/lib/order-line'
+import { formatPosition } from '@/lib/format'
 import { bestellSummen } from '@/lib/servicegebuehr'
 import { Card, CardContent } from '@/components/ui/card'
 import { ArrowLeft, Printer } from 'lucide-react'
@@ -114,7 +114,7 @@ export default async function OrderDetailPage({
               {order.items.map((item) => (
                 <div key={item.id} className="flex justify-between text-sm">
                   <span className="text-slate-700">
-                    {formatOrderLine(item, item.product)}
+                    {formatPosition({ name: item.productName, quantity: item.quantity, unit: item.product?.unit ?? null, unitSize: item.product?.unitSize ?? null })}
                   </span>
                   <span className="text-slate-800 font-medium">
                     € {Number(item.totalPrice).toFixed(2)}

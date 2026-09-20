@@ -31,6 +31,12 @@ export async function POST(request: NextRequest) {
   }
 
   const { productId, quantity, sessionId } = parsed.data
+
+  // Zweite Bremse je SITZUNG (die sessionId steht erst nach dem Parsen fest).
+  // Ohne sie könnte eine IP beliebig viele Sitzungen eröffnen und über sie den
+  // Bestand eines Hofes blockieren.
+  const sitzungsLimit = enforceRateLimit('reserve', request, sessionId)
+  if (sitzungsLimit) return sitzungsLimit
   const now = new Date()
   const expiresAt = new Date(now.getTime() + RESERVATION_TTL_MS)
 

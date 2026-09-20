@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { useForm, type Resolver } from 'react-hook-form'
+import { useForm, type FieldErrors, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format, addDays } from 'date-fns'
 import { de } from 'date-fns/locale'
@@ -10,7 +10,13 @@ import { ShoppingCart, ArrowLeft, Loader2, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import Image from 'next/image'
-import { checkoutFormSchema, type CheckoutFormData } from '@/schemas/checkout'
+import {
+  checkoutFormSchema,
+  CHECKOUT_FELD_REIHENFOLGE,
+  type CheckoutFormData,
+} from '@/schemas/checkout'
+import { formatEuro, formatMenge } from '@/lib/format'
+import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import type { PublicFarm } from '@/server/queries/farm'
 import type { CartItem } from '@/lib/use-cart'
 import { eurosToCents } from '@/lib/order-totals'
@@ -29,15 +35,33 @@ import { StripePaymentStep } from './stripe-payment'
 const CART_KEY = 'bauernshop_cart'
 const SESSION_KEY = 'bauernshop_sid'
 
-const UNIT_LABELS: Record<string, string> = {
-  STUECK: 'Stk.',
-  KG: 'kg',
-  G: 'g',
-  LITER: 'l',
-  ML: 'ml',
-  M3: 'm³',
-  PAKET: 'Pak.',
+/**
+ * Den Warenkorb auf den vom Server berichtigten Stand bringen: gekürzte Mengen
+ * übernehmen, entfallene Positionen entfernen — und den Browser-Speicher
+ * mitziehen, damit der nächste Seitenaufruf denselben Stand zeigt.
+ */
+function uebernehmeBerichtigung(
+  vorher: CartItem[],
+  berichtigt: Array<{ productId: string; quantity: number }>,
+  farmId: string,
+  setCart: (items: CartItem[]) => void
+): CartItem[] {
+  const mengen = new Map(berichtigt.map((b) => [b.productId, b.quantity]))
+  const nachher = vorher
+    .filter((i) => (mengen.get(i.productId) ?? 0) > 0)
+    .map((i) => ({ ...i, quantity: mengen.get(i.productId) ?? i.quantity }))
+  setCart(nachher)
+  try {
+    localStorage.setItem(CART_KEY, JSON.stringify({ farmId, items: nachher }))
+  } catch {
+    // Kein Schreibzugriff auf den Speicher (privates Fenster): die Anzeige
+    // stimmt trotzdem, und der Checkout prüft serverseitig erneut.
+  }
+  return nachher
 }
+
+// Einheiten und Preise kommen aus src/lib/format.ts — EINE Schreibweise für
+// Warenkorb, Checkout, Bestätigung, E-Mail und Bauern-Backend (Befund 13).
 
 const PAYMENT_LABELS: Record<string, string> = {
   ONLINE: '💳 Online (Karte / Überweisung)',
@@ -79,30 +103,45 @@ function generatePickupOptions(
   return options
 }
 
-function formatEuro(n: number) {
-  return `€ ${n.toFixed(2).replace('.', ',')}`
-}
 
 export function CheckoutForm({ farm }: { farm: PublicFarm }) {
   const [cart, setCart] = useState<CartItem[]>([])
   const [sessionId, setSessionId] = useState('')
   const [isHydrated, setIsHydrated] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  // useTransition statt eigenem Flag: React setzt isPending zurück, auch wenn
+  // der Vorgang mit einem Fehler endet — ein selbst gepflegter Ladezustand
+  // blieb im Fehlerfall hängen und sperrte den Knopf für immer (Befund 4).
+  const [isPending, startTransition] = useTransition()
   const [paymentStep, setPaymentStep] = useState<{
     clientSecret: string
     orderId: string
   } | null>(null)
 
   const router = useRouter()
+  const formRef = useRef<HTMLFormElement>(null)
+
+  /**
+   * Idempotenz-Schlüssel (Befund 4): EINMAL beim Öffnen des Checkouts erzeugt
+   * und über alle Versuche hinweg mitgeschickt. Ein zweiter Request mit
+   * demselben Schlüssel liefert die bestehende Bestellung, statt eine zweite
+   * anzulegen — das gilt auch für Doppelklick, Zurück-Taste und erneut
+   * gesendetes Formular, die ein deaktivierter Knopf nicht abfängt.
+   */
+  const idempotencyKeyRef = useRef<string>('')
+  if (!idempotencyKeyRef.current && typeof crypto !== 'undefined') {
+    idempotencyKeyRef.current = crypto.randomUUID()
+  }
 
   useEffect(() => {
     const sid = localStorage.getItem(SESSION_KEY) ?? ''
     setSessionId(sid)
+
+    let geladen: CartItem[] = []
     try {
       const raw = localStorage.getItem(CART_KEY)
       if (raw) {
         const data = JSON.parse(raw)
-        if (data.farmId === farm.id) setCart(data.items ?? [])
+        if (data.farmId === farm.id) geladen = data.items ?? []
       }
     } catch (err) {
       // Beschädigter oder nicht lesbarer Warenkorb im Browser-Speicher: ein
@@ -113,7 +152,37 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
         console.warn('[Warenkorb] Gespeicherter Warenkorb nicht lesbar:', err)
       }
     }
+    setCart(geladen)
     setIsHydrated(true)
+
+    // Beim ÖFFNEN des Checkouts die Reservierungen gegen die Frist prüfen
+    // (Befund 3). Der Warenkorb bleibt sichtbar; was nicht mehr gilt, wird
+    // berichtigt, und die Kundin erfährt den Grund.
+    if (!sid || geladen.length === 0) return
+    let abgebrochen = false
+    void (async () => {
+      try {
+        const res = await fetch('/api/warenkorb/pruefen', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: sid,
+            items: geladen.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+          }),
+        })
+        if (!res.ok || abgebrochen) return
+        const befund = await res.json()
+        if (!befund.meldung) return
+        uebernehmeBerichtigung(geladen, befund.items ?? [], farm.id, setCart)
+        toast.info(befund.meldung)
+      } catch {
+        // Kein Netz oder Serverfehler: Der Warenkorb bleibt, wie er ist.
+        // Der Checkout prüft ohnehin noch einmal verbindlich.
+      }
+    })()
+    return () => {
+      abgebrochen = true
+    }
   }, [farm.id])
 
   const pickupOptions = generatePickupOptions(farm.pickupSlots)
@@ -153,20 +222,31 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
   const gebuehr = berechneServicegebuehr(eurosToCents(total), farm, new Date())
   const gesamt = centsAlsEuro(eurosToCents(total) + gebuehr.gebuehrCents)
 
+  /**
+   * Nach einer fehlgeschlagenen Prüfung zum ERSTEN Fehlerfeld springen und es
+   * fokussieren (Befund 6). Vorher sprang die Seite an den Anfang, und bei
+   * einem Fehler weiter unten war nicht zu sehen, woran es lag.
+   */
+  function onInvalid(errors: FieldErrors<CheckoutFormData>) {
+    const erstes = CHECKOUT_FELD_REIHENFOLGE.find((feld) => errors[feld])
+    if (!erstes) return
+    const el =
+      formRef.current?.querySelector<HTMLElement>(`[name="${erstes}"]`) ??
+      formRef.current?.querySelector<HTMLElement>(`#${erstes}`)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    // focus() nach dem Scrollen, sonst springt der Browser noch einmal.
+    window.setTimeout(() => el.focus({ preventScroll: true }), 120)
+  }
+
   async function onSubmit(data: CheckoutFormData) {
     if (cart.length === 0) {
       toast.error('Dein Warenkorb ist leer')
       return
     }
 
-    if (isOnsite && !data.onsiteConfirmed) {
-      form.setError('onsiteConfirmed', { message: 'Bitte bestätige die verbindliche Abholung' })
-      return
-    }
-
     const [pickupDate, pickupTimeStart, pickupTimeEnd] = data.pickupSlotKey.split('|')
 
-    setIsSubmitting(true)
     try {
       const res = await fetch('/api/checkout', {
         method: 'POST',
@@ -175,6 +255,7 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
           farmId: farm.id,
           farmSlug: farm.slug,
           sessionId,
+          idempotencyKey: idempotencyKeyRef.current || undefined,
           customerName: data.customerName,
           customerEmail: data.customerEmail,
           customerPhone: data.customerPhone,
@@ -196,6 +277,17 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
+        // Abgelaufene Reservierung oder geänderter Bestand: Der Warenkorb wird
+        // auf den geprüften Stand gebracht und bleibt SICHTBAR — die Kundin
+        // sieht, was noch gilt, statt vor einer leeren Seite zu stehen
+        // (Befund 3). Der Grund steht im Text der Antwort.
+        if (err.code === CODE_RESERVIERUNG_ABGELAUFEN || err.code === 'WARENKORB_GEAENDERT') {
+          if (Array.isArray(err.items)) {
+            uebernehmeBerichtigung(cart, err.items, farm.id, setCart)
+          }
+          toast.error(err.error ?? 'Dein Warenkorb hat sich geändert.')
+          return
+        }
         throw new Error(err.error ?? 'Fehler beim Checkout')
       }
 
@@ -209,8 +301,6 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Fehler beim Checkout')
-    } finally {
-      setIsSubmitting(false)
     }
   }
 
@@ -282,7 +372,9 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {item.quantity} {UNIT_LABELS[item.unit] ?? item.unit} × {formatEuro(item.price)}
+                  {/* Eine Schreibweise, identisch mit Warenkorb, Bestätigung
+                      und E-Mail (Befund 13) — inklusive Plural bei Paketen. */}
+                  {formatMenge(item.quantity, item.unit, item.unitSize)} × {formatEuro(item.price)}
                 </p>
               </div>
               <span className="text-sm font-medium text-foreground shrink-0">
@@ -320,7 +412,15 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
         </div>
       </div>
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form
+        ref={formRef}
+        onSubmit={form.handleSubmit(
+          (daten) => startTransition(async () => { await onSubmit(daten) }),
+          onInvalid
+        )}
+        noValidate
+        className="space-y-6"
+      >
         {/* Pickup slot */}
         <div className="bg-card rounded-xl border border-border p-4">
           <h2 className="font-medium text-foreground mb-3">Abholtermin</h2>
@@ -363,11 +463,18 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
             <Input
               id="customerName"
               {...form.register('customerName')}
+              // required/autoComplete für Browser-Ausfüllhilfen, aria-* für
+              // Screenreader (Befund 25). noValidate am Formular verhindert,
+              // dass die Browser-Blase die eigenen Meldungen verdeckt.
+              required
+              autoComplete="name"
+              aria-invalid={form.formState.errors.customerName ? true : undefined}
+              aria-describedby={form.formState.errors.customerName ? 'customerName-fehler' : undefined}
               placeholder="Maria Muster"
-              className={form.formState.errors.customerName ? 'border-red-400' : ''}
+              className={form.formState.errors.customerName ? 'border-destructive' : ''}
             />
             {form.formState.errors.customerName && (
-              <p className="text-xs text-destructive mt-1">
+              <p id="customerName-fehler" className="text-xs text-destructive mt-1">
                 {form.formState.errors.customerName.message}
               </p>
             )}
@@ -380,11 +487,16 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
               id="customerEmail"
               type="email"
               {...form.register('customerEmail')}
+              required
+              autoComplete="email"
+              inputMode="email"
+              aria-invalid={form.formState.errors.customerEmail ? true : undefined}
+              aria-describedby={form.formState.errors.customerEmail ? 'customerEmail-fehler' : undefined}
               placeholder="maria@beispiel.at"
-              className={form.formState.errors.customerEmail ? 'border-red-400' : ''}
+              className={form.formState.errors.customerEmail ? 'border-destructive' : ''}
             />
             {form.formState.errors.customerEmail && (
-              <p className="text-xs text-destructive mt-1">
+              <p id="customerEmail-fehler" className="text-xs text-destructive mt-1">
                 {form.formState.errors.customerEmail.message}
               </p>
             )}
@@ -397,11 +509,16 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
               id="customerPhone"
               type="tel"
               {...form.register('customerPhone')}
+              required
+              autoComplete="tel"
+              inputMode="tel"
+              aria-invalid={form.formState.errors.customerPhone ? true : undefined}
+              aria-describedby={form.formState.errors.customerPhone ? 'customerPhone-fehler' : undefined}
               placeholder="+43 664 123 4567"
-              className={form.formState.errors.customerPhone ? 'border-red-400' : ''}
+              className={form.formState.errors.customerPhone ? 'border-destructive' : ''}
             />
             {form.formState.errors.customerPhone && (
-              <p className="text-xs text-destructive mt-1">
+              <p id="customerPhone-fehler" className="text-xs text-destructive mt-1">
                 {form.formState.errors.customerPhone.message}
               </p>
             )}
@@ -496,7 +613,11 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
                   <input
                     type="checkbox"
                     {...form.register('onsiteConfirmed')}
-                    className="mt-0.5 accent-primary"
+                    aria-invalid={form.formState.errors.onsiteConfirmed ? true : undefined}
+                    aria-describedby={
+                      form.formState.errors.onsiteConfirmed ? 'onsiteConfirmed-fehler' : undefined
+                    }
+                    className="mt-0.5 accent-primary size-4"
                   />
                   <span className="text-sm text-foreground">
                     Ich verpflichte mich, meine Bestellung zum gewählten Abholtermin abzuholen
@@ -504,7 +625,7 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
                   </span>
                 </label>
                 {form.formState.errors.onsiteConfirmed && (
-                  <p className="text-xs text-destructive mt-1">
+                  <p id="onsiteConfirmed-fehler" className="text-xs text-destructive mt-1">
                     {form.formState.errors.onsiteConfirmed.message}
                   </p>
                 )}
@@ -521,11 +642,15 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
 
         <Button
           type="submit"
-          disabled={isSubmitting || pickupOptions.length === 0}
+          disabled={isPending || pickupOptions.length === 0}
+          aria-busy={isPending}
           className="w-full h-12 bg-accent text-accent-foreground hover:bg-accent-hover text-base font-semibold"
         >
-          {isSubmitting ? (
-            <Loader2 className="size-5 animate-spin" />
+          {isPending ? (
+            <span className="inline-flex items-center gap-2">
+              <Loader2 className="size-5 animate-spin" aria-hidden="true" />
+              Wird gesendet …
+            </span>
           ) : paymentMethod === 'ONLINE' ? (
             `Weiter zur Zahlung — ${formatEuro(gesamt)}`
           ) : (

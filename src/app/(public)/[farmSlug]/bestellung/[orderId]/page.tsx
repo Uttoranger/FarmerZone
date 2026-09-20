@@ -3,8 +3,7 @@ import { CalendarPlus, MapPin, Package } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { bestellLinkGilt, bestellSignatur } from '@/lib/bestell-link'
 import { bestellStatusAnzeige, formatiereAbholtermin, zahlungsAnzeige } from '@/lib/bestellstatus'
-import { formatEuro } from '@/lib/preis-format'
-import { formatOrderLine } from '@/lib/order-line'
+import { formatEuro, formatPosition } from '@/lib/format'
 import { Marke } from '@/components/ui/marke'
 import { BestellSummenZeilen } from '@/components/checkout/bestell-summen'
 
@@ -82,7 +81,7 @@ export default async function BestellungPage({ params, searchParams }: Props) {
           unitPrice: true,
           totalPrice: true,
           // Einheit nur zur Anzeige gejoint — dieselbe Schreibweise wie auf
-          // der Bestätigungsseite (formatOrderLine).
+          // der Bestätigungsseite (formatPosition, src/lib/format.ts).
           product: { select: { unit: true, unitSize: true } },
         },
       },
@@ -168,7 +167,7 @@ export default async function BestellungPage({ params, searchParams }: Props) {
           <div className="space-y-2">
             {order.items.map((item, i) => (
               <div key={i} className="flex justify-between gap-3 text-sm">
-                <span className="text-foreground">{formatOrderLine(item, item.product)}</span>
+                <span className="text-foreground">{formatPosition({ name: item.productName, quantity: item.quantity, unit: item.product?.unit ?? null, unitSize: item.product?.unitSize ?? null })}</span>
                 <span className="shrink-0 text-foreground">
                   {formatEuro(Number(item.totalPrice))}
                 </span>
