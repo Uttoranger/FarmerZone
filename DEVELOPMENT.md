@@ -376,6 +376,43 @@ Tabelle echte Policies.
 
 ---
 
+## Checkout und Reservierungen
+
+**Reservierungen buchen keinen Bestand ab.** `Product.stock` sinkt erst beim Kauf. Ein Eintrag in `StockReservation` ist ein weicher Halt: Er zieht die Menge nur von dem ab, was ANDERE Sitzungen sehen. Wenn ein Halt verfällt, gibt es deshalb nichts zurückzubuchen — er hört schlicht auf zu blockieren.
+
+**Die Frist wird beim Lesen durchgesetzt**, nicht vom Cron. Jede Abfrage fremder Halte filtert auf `expiresAt > jetzt`; damit gilt die 15-Minuten-Frist auf die Sekunde genau. `/api/cron/cleanup-reservations` löscht nur noch verfallene Zeilen und ist Aufräumer, nicht die Wahrheit — deshalb schadet es nicht, dass er im Hobby-Tarif einmal täglich läuft.
+
+Die Entscheidung trifft an EINER Stelle `pruefeWarenkorb` (`src/lib/reservierung.ts`, rein und getestet); angewendet wird sie über `src/server/warenkorb.ts` an drei Momenten:
+
+1. beim Laden des Warenkorbs,
+2. beim Öffnen des Checkouts (`POST /api/warenkorb/pruefen`),
+3. im `POST /api/checkout`, bevor irgendetwas geschrieben wird.
+
+Eine abgelaufene Position wird im Checkout **nie** durchgewunken: Die Antwort trägt `code: RESERVIERUNG_ABGELAUFEN`, den Grund im Klartext und den berichtigten Warenkorb, damit die Kundin sieht, was noch gilt.
+
+**Bestand wird bedingt gebucht:** `updateMany` mit `stock >= Menge` statt blindem `decrement`. Schlägt eine Position fehl, werden die bereits gebuchten wieder gutgeschrieben. Ein blindes Dekrementieren konnte den Bestand ins Minus ziehen, wenn zwei Bestellungen gleichzeitig durch die Prüfung kamen.
+
+**Idempotenz:** Der Browser erzeugt beim Öffnen des Checkouts einen Schlüssel und schickt ihn bei jedem Versuch mit. `Order.idempotencyKey` ist eindeutig; ein zweiter Request mit demselben Schlüssel liefert die bestehende Bestellung. Ein deaktivierter Knopf allein fängt Doppelklick, Zurück-Taste und erneut gesendetes Formular nicht ab.
+
+**Langsames gehört nicht in die Antwort.** Der Mailversand lief synchron im Request und kostete zehn bis fünfzehn Sekunden. Er läuft jetzt über `nachDerAntwort` (`src/lib/nach-der-antwort.ts`, Kapsel um `after()` aus `next/server`). Regel für alles Weitere: Was die Kundin nicht abwarten muss, wartet sie nicht ab — und ein gescheiterter Nachlauf darf nie eine gültige Bestellung zurückrollen.
+
+**Rate-Limit:** `/api/reserve` und `/api/checkout` bremsen je IP **und** je Sitzung (`enforceRateLimit(route, request, sessionId)`). Nur IP wäre zu grob (Mobilfunk-NAT) und zugleich zu schwach, weil eine IP beliebig viele Sitzungen eröffnen kann. Die Zähler leben im Prozess und gelten je Instanz — für den Pilotbetrieb bewusst ausreichend.
+
+---
+
+## Darstellung von Preisen, Mengen und Positionen
+
+`src/lib/format.ts` ist die EINZIGE Quelle. Produktkarte, Warenkorb, Checkout, Bestätigungsseite, Bestätigungs-E-Mail und Bauern-Backend rufen dieselben Funktionen:
+
+- `formatEuro(2.9)` → `€ 2,90` (Symbol vorn, Dezimalkomma; de-AT trennt Tausender mit schmalem Leerzeichen, nicht mit Punkt)
+- `formatMenge(6, 'PAKET')` → `6 Pakete`, `formatMenge(2, 'LITER', 0.5)` → `2 × 0,5 L`
+- `formatPosition({ name, quantity, unit, unitSize, totalPrice })` → `Tomaten · 2 kg · € 9,98`
+- `mitAnzahl(1, 'Produkt', 'Produkte')` → `1 Produkt`
+
+Gebindegrößen werden **offen** gerechnet (`2 × 0,5 L`, nicht `1 L`) — man kauft zwei Flaschen. Neue Ansichten erfinden keine eigene Schreibweise; wenn etwas fehlt, kommt es hier dazu.
+
+---
+
 ## Upload-Diagnose
 
 Jede Upload-Fehlermeldung endet auf eine Kennung wie `[L71]` — Buchstabe für die Ursache, Zahl für den Code-Stand (`UPLOAD_DIAG` in `src/lib/upload-fehler.ts`). Bei JEDER Verhaltensänderung am Upload-Ablauf muss die Zahl auf die Nummer des Sprints gehoben werden — eine veraltete Kennung ist schlimmer als keine, weil ein zugeschicktes Bildschirmfoto dann den falschen Stand behauptet.

@@ -58,7 +58,7 @@ export function OnsiteConfirmationEmail(p: OnsiteConfirmationProps) {
       </Text>
       {p.items.map((item, i) => (
         <Text key={i} style={{ ...mutedText, margin: '2px 0' }}>
-          {item.quantity}× {item.name}
+          {item.name}
           <span style={{ float: 'right' }}>€ {(item.unitPrice * item.quantity).toFixed(2)}</span>
         </Text>
       ))}

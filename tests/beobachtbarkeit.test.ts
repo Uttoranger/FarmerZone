@@ -36,7 +36,7 @@ describe('bereinigeEreignis — der beforeSend-Filter', () => {
     const e = bereinigeEreignis(
       ereignis({
         message: 'Upload für hof@beispiel.at fehlgeschlagen (Konflikt mit hof@anderes.at)',
-        exception: { values: [{ value: 'Nutzer j.f.mueller+hof@gmail.com nicht gefunden' }] },
+        exception: { values: [{ value: 'Nutzer f.mueller+hof@example.com nicht gefunden' }] },
       })
     )
 

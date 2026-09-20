@@ -26,7 +26,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { statusLabel, statusColor, paymentLabel } from './order-status'
-import { formatOrderLine } from '@/lib/order-line'
+import { formatPosition } from '@/lib/format'
 import { BetragMitGebuehr, NichtAbgeholtDialog, NICHT_ABGEHOLT_STATUS } from './servicegebuehr-anzeige'
 
 export function OrderCard({
@@ -200,7 +200,7 @@ export function OrderCard({
           </div>
 
           <div className="text-sm text-muted-foreground mb-1">
-            {order.items.map((i) => formatOrderLine(i, i.product)).join(', ')}
+            {order.items.map((i) => formatPosition({ name: i.productName, quantity: i.quantity, unit: i.product?.unit ?? null, unitSize: i.product?.unitSize ?? null })).join(' · ')}
           </div>
           {/* Betrag: bei Vor-Ort-Zahlung „Bar zu kassieren" (Warenpreis +
               Servicegebühr), online der Warenpreis mit der Gebühr als Nebenzeile */}

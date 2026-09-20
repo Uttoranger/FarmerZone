@@ -369,6 +369,16 @@ model Order {
   confirmationToken String?   @unique // für E-Mail-Link
   confirmedAt       DateTime?
 
+  // Idempotenz des Checkouts (Bug-Report Befund 4): Der Browser erzeugt beim
+  // ÖFFNEN des Checkouts einen Schlüssel und schickt ihn mit. Kommt derselbe
+  // Schlüssel ein zweites Mal — Doppelklick, Zurück-Taste, wackeliges Netz,
+  // erneut gesendetes Formular —, liefert der Server die BESTEHENDE Bestellung
+  // zurück, statt eine zweite anzulegen. Der eindeutige Index ist die
+  // Durchsetzung; ein deaktivierter Knopf allein ist keine.
+  // Nullable und ohne Backfill: Bestandsbestellungen bleiben leer, und in
+  // Postgres schließen sich mehrere NULL-Werte in einem UNIQUE nicht aus.
+  idempotencyKey String? @unique
+
   // Plattformgebühr (für Reporting)
   platformFeeAmount Decimal @default(0) @db.Decimal(10, 2)
 

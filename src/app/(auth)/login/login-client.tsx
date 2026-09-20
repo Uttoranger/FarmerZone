@@ -13,7 +13,7 @@ import { Loader2, FlaskConical } from 'lucide-react'
 const IS_DEV = process.env.NODE_ENV === 'development'
 
 const DEV_ACCOUNTS = [
-  { label: 'Bauer Franz (Hof Müller)', email: 'bauer@hof-mueller.at', password: 'test1234' },
+  { label: 'Bauer Franz (Hof Müller)', email: 'bauer@example.com', password: 'test1234' },
 ]
 
 /**
@@ -120,7 +120,7 @@ export function LoginClient() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="bauer@hof-mueller.at"
+                placeholder="bauer@example.com"
                 autoComplete="email"
                 required
                 className="h-11 text-base"

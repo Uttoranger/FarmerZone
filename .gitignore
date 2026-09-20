@@ -1,8 +1,15 @@
 # Umgebungsvariablen – NIEMALS committen!
+# .env.example ist bewusst NICHT hier: sie enthält nur Platzhalter und
+# dokumentiert, welche Variablen es gibt.
 .env
 .env.local
 .env.*.local
 .env.production
+# Auch die Varianten ohne .local-Endung — .env.*.local allein deckte
+# .env.development und .env.test nicht ab.
+.env.development
+.env.test
+.env.staging
 
 # Next.js
 .next/

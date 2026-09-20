@@ -14,7 +14,7 @@ async function main() {
   let farmerId: string
 
   const existingUser = await prisma.user.findUnique({
-    where: { email: 'bauer@hof-mueller.at' },
+    where: { email: 'bauer@example.com' },
   })
 
   if (existingUser) {
@@ -23,7 +23,7 @@ async function main() {
   } else {
     const signUpResult = await auth.api.signUpEmail({
       body: {
-        email: 'bauer@hof-mueller.at',
+        email: 'bauer@example.com',
         password: 'test1234',
         name: 'Franz Müller',
       },
@@ -62,7 +62,7 @@ async function main() {
       postalCode: '8700',
       city: 'Leoben',
       phone: '+43 664 123 4567',
-      email: 'bauer@hof-mueller.at',
+      email: 'bauer@example.com',
       acceptsOnline: true,
       acceptsOnsite: true,
       platformFeePercent: 0,
@@ -218,7 +218,7 @@ async function main() {
   console.log('✓ Abholzeiten: Mittwoch 15-18 Uhr, Samstag 9-12 Uhr')
   console.log('✓ 3 ManualSales: WhatsApp, Hofladen, Geschäftskunde')
   console.log('\nAnmeldung Bauer-Dashboard:')
-  console.log('  E-Mail:   bauer@hof-mueller.at')
+  console.log('  E-Mail:   bauer@example.com')
   console.log('  Passwort: test1234')
 }
 

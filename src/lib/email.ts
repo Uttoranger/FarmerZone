@@ -18,8 +18,9 @@ import { BriefkastenZusammenfassungEmail } from '@/emails/briefkasten-zusammenfa
 import { SUPPORT_EMAIL } from '@/lib/support'
 import { StatusUpdateEmail } from '@/emails/status-update'
 import { generateReorderToken } from '@/lib/reorder-token'
+import { formatPosition } from '@/lib/format'
 import { bestellungPfad } from '@/lib/bestell-link'
-import { unitSuffix, type OrderLineProduct } from '@/lib/order-line'
+import type { OrderLineProduct } from '@/lib/order-line'
 import { bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
 
 const apiKey = process.env.RESEND_API_KEY
@@ -111,10 +112,25 @@ export type OrderForEmail = {
   }>
 }
 
-// "Heumilch frisch (1 l)" — dieselbe Schreibweise wie auf allen Bestellseiten
-function nameWithUnit(i: { productName: string; product?: OrderLineProduct }): string {
-  const suffix = unitSuffix(i.product)
-  return suffix ? `${i.productName} (${suffix})` : i.productName
+/**
+ * „Heumilch frisch · 2 × 1 L" — die Positionszeile in DERSELBEN Schreibweise
+ * wie Warenkorb, Checkout, Bestätigungsseite und Bauern-Backend
+ * (src/lib/format.ts, Bug-Report Befund 13). Vorher stand die Menge in den
+ * Vorlagen selbst („2× Name (1 l)"), also in einer fünften Variante.
+ * Die Menge steckt jetzt IN der Zeile — die Vorlagen stellen ihr deshalb
+ * keine Anzahl mehr voran.
+ */
+function positionsZeile(i: {
+  productName: string
+  quantity: number
+  product?: OrderLineProduct
+}): string {
+  return formatPosition({
+    name: i.productName,
+    quantity: i.quantity,
+    unit: i.product?.unit ?? null,
+    unitSize: i.product?.unitSize ?? null,
+  })
 }
 
 function n(v: { toString(): string } | number): number {
@@ -260,7 +276,7 @@ export async function sendOrderConfirmation(order: OrderForEmail): Promise<void>
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     items: order.items.map(i => ({
-      name: nameWithUnit(i),
+      name: positionsZeile(i),
       quantity: i.quantity,
       unitPrice: n(i.unitPrice),
     })),
@@ -295,7 +311,7 @@ export async function sendOnsiteConfirmation(
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     items: order.items.map(i => ({
-      name: nameWithUnit(i),
+      name: positionsZeile(i),
       quantity: i.quantity,
       unitPrice: n(i.unitPrice),
     })),
@@ -321,7 +337,7 @@ export async function sendOrderPaidToFarmer(order: OrderForEmail): Promise<void>
     orderNumber: order.orderNumber,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
-    items: order.items.map(i => ({ name: nameWithUnit(i), quantity: i.quantity })),
+    items: order.items.map(i => ({ name: positionsZeile(i), quantity: i.quantity })),
     // Für den Hof zählt der Warenpreis — das ist, was ihm überwiesen wird.
     total: betraege(order).warenpreis,
     serviceFee: betraege(order).gebuehr,
@@ -350,7 +366,7 @@ export async function sendOrderConfirmedToFarmer(order: OrderForEmail): Promise<
     orderNumber: order.orderNumber,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
-    items: order.items.map(i => ({ name: nameWithUnit(i), quantity: i.quantity })),
+    items: order.items.map(i => ({ name: positionsZeile(i), quantity: i.quantity })),
     // Warenpreis für den Hof; „Bar zu kassieren" ist Warenpreis + Gebühr.
     total: betraege(order).warenpreis,
     serviceFee: betraege(order).gebuehr,

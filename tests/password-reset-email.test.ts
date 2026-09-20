@@ -36,11 +36,11 @@ describe('sendPasswordResetEmail', () => {
     const { sendPasswordResetEmail } = await importEmail()
 
     const url = 'http://localhost:3000/reset-password?token=abc123'
-    await sendPasswordResetEmail('bauer@hof-mueller.at', url)
+    await sendPasswordResetEmail('bauer@example.com', url)
 
     expect(sendMock).toHaveBeenCalledOnce()
     const call = sendMock.mock.calls[0][0]
-    expect(call.to).toBe('bauer@hof-mueller.at')
+    expect(call.to).toBe('bauer@example.com')
     expect(call.subject).toBe('Passwort zurücksetzen · FarmerZone')
     expect(call.html).toContain(url)
   })
@@ -49,7 +49,7 @@ describe('sendPasswordResetEmail', () => {
     sendMock.mockResolvedValue({ data: { id: 'email_2' }, error: null })
     const { sendPasswordResetEmail } = await importEmail()
 
-    await sendPasswordResetEmail('bauer@hof-mueller.at', 'http://localhost:3000/reset-password?token=t')
+    await sendPasswordResetEmail('bauer@example.com', 'http://localhost:3000/reset-password?token=t')
 
     const call = sendMock.mock.calls[0][0]
     expect(call.html).toContain('1 Stunde')
