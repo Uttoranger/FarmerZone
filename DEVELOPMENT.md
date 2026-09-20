@@ -247,6 +247,23 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 
 ## Bekannte Bugs & Fixes
 
+### BUG: Sprungmarken der Hofseite sprangen falsch (behoben 2026-09-20)
+
+**Symptom** (Meldung `cmua8bof` aus dem Briefkasten): „Section bzw. die Sprungmarken funktionieren auf Mobile nicht, wenn ich bilder drücke, springt der screen auf eine andere section."
+
+**Ursachen — vier, alle statisch am Code belegbar, keine davon mobil-exklusiv:**
+
+1. **Reiterfolge gegen Dokumentfolge.** Die Leiste listete Übersicht → Produkte → Fotos, im Dokument stand aber Fotos vor Produkte. Ein Tipp auf den *letzten* Reiter scrollte nach **oben**, und beim Herunterscrollen wanderte die Markierung 1 → 3 → 2, also sichtbar rückwärts.
+2. **`#uebersicht` war der Elterncontainer** von `#fotos` und `#produkte`, nicht ihr Geschwister. Der Beobachter sah eine Box, die praktisch die ganze Seite einnimmt, und zog die Markierung dauernd auf „Übersicht" zurück.
+3. **`#produkte` umfasste nur die Überschriftenzeile**, das Raster stand daneben. Nach dem Sprung lag diese flache Box oberhalb des Erkennungsstreifens und wurde nie markiert.
+4. **Keine Sperre während des programmatischen Scrollens.** `scrollToSection` setzte den Reiter und startete ein weiches Scrollen; der Beobachter überschrieb unterwegs genau den Reiter, den die Person eben gedrückt hatte. Zudem wurde nur `isIntersecting === true` behandelt, und bei mehreren Einträgen in einem Callback gewann der letzte der Schleife — die Reihenfolge des `entries`-Arrays ist nicht zugesichert.
+
+Dazu das zweite gemeldete Symptom: Die **Lightbox sperrte das Scrollen der Seite dahinter nicht** und war als einzige Overlay-Ebene des Projekts ohne Portal gebaut (Warenkorb und Dialoge sperren über Base-UI automatisch). Auf dem Telefon scrollt jede Wischgeste über dem offenen Bild die Seite mit — beim Schließen steht man in einem anderen Abschnitt. Plausibel als Ursache des gemeldeten Verhaltens, aber nicht am Gerät nachgewiesen.
+
+**Fachregel: eine Liste für beides.** Reiterleiste und Beobachter lesen die Sektionen aus `src/lib/hofseite-sektionen.ts`, nicht mehr jeder aus einer eigenen Aufzählung. `hofseiteSektionen()` liefert sie in Dokumentreihenfolge (Übersicht, Fotos, Produkte — deckungsgleich mit `DEFAULT_SECTIONS`, wo `gallery` (4) vor `products` (5) steht); `naechsterAktiverReiter()` entscheidet die Markierung: laufender Sprung gewinnt, sonst der **unterste** sichtbare Abschnitt, sonst bleibt die bisherige Markierung stehen. Wer eine Sektion hinzufügt, ändert diese eine Liste — nicht zwei Stellen, die auseinanderlaufen können.
+
+**Nicht behoben:** Die Hofseite wertet `sectionsConfig.order` weiterhin nicht aus. Der Hof kann die Sektionen unter Einstellungen → Erscheinungsbild per Drag sortieren, die öffentliche Seite rendert aber eine feste Reihenfolge. Das Bedienelement verspricht damit mehr, als es hält — eigener Sprint.
+
 ### BUG: Status-Inkonsistenz bei Online-Zahlungen (behoben 2026-06-22)
 
 **Symptom:** Order HM-2206-E3CC zeigte `status=PENDING_CONFIRMATION` + `paymentLabel="Online bezahlt"` — optisch widersprüchlich.

@@ -23,6 +23,7 @@ import { ReorderContext } from '@/components/shared/reorder-context'
 import { nextPickupDays, pickupWeekdaysLabel } from '@/lib/pickup-days'
 import { SHOP_PAUSED_FALLBACK } from '@/lib/shop-pause'
 import { buildMapsUrl, buildShareData } from '@/lib/customer-links'
+import { hofseiteSektionen, naechsterAktiverReiter } from '@/lib/hofseite-sektionen'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { ProductGrid } from './product-grid'
 import { stripStatusVariables, renderStatusBodyWithChip } from '@/lib/status-body'
@@ -86,6 +87,16 @@ function FarmSeal({ farmName, foundedYear }: { farmName: string; foundedYear: nu
 
 const GALLERY_MAX_VISIBLE = 7
 
+/**
+ * Wie lange nach einem angetippten Reiter das Sprungziel gilt. Das Ende eines
+ * weichen Scrollens lässt sich nicht überall zuverlässig abfragen (scrollend
+ * fehlt in älteren Browsern), darum eine großzügige Frist statt eines Ereignisses.
+ */
+const SPRUNG_SPERRE_MS = 1000
+
+/** Erkennungsstreifen des Beobachters: zwischen 30 % und 40 % der Fensterhöhe. */
+const SPY_STREIFEN = '-30% 0px -60% 0px'
+
 // Sortierbare Galerie-Kachel (nur Edit-Modus): ganze Kachel ziehbar (Airbnb-Muster)
 function SortableGalleryTile({
   photo,
@@ -135,6 +146,9 @@ function GallerySection({
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
   const [, startTransition] = useTransition()
   const router = useRouter()
+
+  // Die Kachel, aus der die Lightbox geöffnet wurde — dorthin kehrt der Fokus zurück.
+  const ausloeser = useRef<HTMLButtonElement | null>(null)
 
   // Sprint 18: optimistische Foto-Reihenfolge (null = Server-Stand)
   const [photoOrder, setPhotoOrder] = useState<string[] | null>(null)
@@ -193,6 +207,40 @@ function GallerySection({
     if (lightboxIdx === null || photos.length === 0) return
     setLightboxIdx((lightboxIdx + 1) % photos.length)
   }
+
+  const lightboxOffen = lightboxIdx !== null
+
+  function oeffneLightbox(i: number, kachel: HTMLButtonElement | null) {
+    ausloeser.current = kachel
+    setLightboxIdx(i)
+  }
+
+  function schliesseLightbox() {
+    setLightboxIdx(null)
+    // Ohne das landet der Fokus wieder am Seitenanfang und der Browser scrollt dorthin.
+    ausloeser.current?.focus()
+  }
+
+  // Solange das Bild offen ist, darf die Seite dahinter nicht mitscrollen. Sonst
+  // wandert die Seite unter dem Overlay weg — auf dem Telefon bei jeder Wischgeste —
+  // und nach dem Schließen steht man in einem ganz anderen Abschnitt (Meldung cmua8bof).
+  useEffect(() => {
+    if (!lightboxOffen) return
+    const vorher = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = vorher
+    }
+  }, [lightboxOffen])
+
+  useEffect(() => {
+    if (!lightboxOffen) return
+    function beiTaste(e: KeyboardEvent) {
+      if (e.key === 'Escape') schliesseLightbox()
+    }
+    window.addEventListener('keydown', beiTaste)
+    return () => window.removeEventListener('keydown', beiTaste)
+  }, [lightboxOffen])
 
   return (
     <>
@@ -299,17 +347,23 @@ function GallerySection({
               {tileContent}
             </SortableGalleryTile>
           ) : (
-            <div
+            // Echter Knopf statt div mit onClick: per Tastatur erreichbar, und
+            // touch-action: manipulation nimmt dem Browser das Warten auf einen
+            // Doppeltipp — ein Tipp auf dem Telefon löst sonst verzögert oder gar nicht aus.
+            <button
               key={photo.id}
-              className="relative cursor-pointer rounded-[10px] overflow-hidden"
+              type="button"
+              className="relative cursor-pointer rounded-[10px] overflow-hidden text-left"
               style={{
                 gridColumn: isFirst ? 'span 2' : undefined,
                 gridRow: isFirst ? 'span 2' : undefined,
+                touchAction: 'manipulation',
               }}
-              onClick={() => setLightboxIdx(i)}
+              onClick={(e) => oeffneLightbox(i, e.currentTarget)}
+              aria-label={photo.caption ?? `Foto ${i + 1} vergrößern`}
             >
               {tileContent}
-            </div>
+            </button>
           )
         })}
 
@@ -344,11 +398,11 @@ function GallerySection({
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.88)' }}
-          onClick={() => setLightboxIdx(null)}
+          onClick={schliesseLightbox}
         >
           <button
             className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20"
-            onClick={() => setLightboxIdx(null)}
+            onClick={schliesseLightbox}
             aria-label="Schließen"
           >
             <X className="size-5" />
@@ -567,8 +621,20 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
   const pickupDaysShort = useMemo(() => pickupWeekdaysLabel(farm.pickupSlots), [farm.pickupSlots])
   const mapsUrl = buildMapsUrl(farm.address, farm.postalCode, farm.city)
 
-  const showFotosTab = isSectionVisible('gallery') && farm.farmPhotos.length > 0
+  // Reiterleiste und Beobachter lesen dieselbe Liste — siehe lib/hofseite-sektionen.ts
+  const sektionen = useMemo(
+    () => hofseiteSektionen(sections, farm.farmPhotos.length > 0),
+    [sections, farm.farmPhotos.length]
+  )
   const [activeTab, setActiveTab] = useState('uebersicht')
+
+  // Ziel eines angetippten Sprungs. Solange es steht, hält der Beobachter still —
+  // sonst überschreibt er unterwegs genau den Reiter, den die Person gedrückt hat.
+  const sprungZiel = useRef<string | null>(null)
+  const sprungTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => {
+    if (sprungTimer.current) clearTimeout(sprungTimer.current)
+  }, [])
 
   async function handleShare() {
     const url = `${window.location.origin}/${farm.slug}`
@@ -591,27 +657,45 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
 
   function scrollToSection(id: string) {
     setActiveTab(id)
+    // Weiches Scrollen läuft asynchron weiter; bis es steht, gilt das Ziel.
+    sprungZiel.current = id
+    if (sprungTimer.current) clearTimeout(sprungTimer.current)
+    sprungTimer.current = setTimeout(() => {
+      sprungZiel.current = null
+    }, SPRUNG_SPERRE_MS)
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   // Aktiven Tab beim Scrollen nachführen
   useEffect(() => {
     if (isEdit) return
-    const ids = ['uebersicht', 'produkte', ...(showFotosTab ? ['fotos'] : [])]
+    const ids = sektionen.map((s) => s.id)
+    // Der Beobachter meldet nur Änderungen. Den Gesamtstand führen wir selbst,
+    // sonst entschiede jeder Aufruf allein über eine unvollständige Sicht.
+    const sichtbare = new Set<string>()
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.isIntersecting) setActiveTab(entry.target.id)
+          if (entry.isIntersecting) sichtbare.add(entry.target.id)
+          else sichtbare.delete(entry.target.id)
         }
+        setActiveTab((bisher) =>
+          naechsterAktiverReiter({
+            sichtbare: [...sichtbare],
+            reihenfolge: ids,
+            bisher,
+            gesperrtAuf: sprungZiel.current,
+          })
+        )
       },
-      { rootMargin: '-30% 0px -60% 0px' }
+      { rootMargin: SPY_STREIFEN }
     )
     for (const id of ids) {
       const el = document.getElementById(id)
       if (el) observer.observe(el)
     }
     return () => observer.disconnect()
-  }, [isEdit, showFotosTab])
+  }, [isEdit, sektionen])
 
   if (!ownerMode) {
     // Pause übernimmt die Seite NICHT mehr: der Hof bleibt mit Fotos, Kontakt
@@ -968,11 +1052,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           style={{ background: '#fff', borderBottom: '1px solid #ECE8DF', boxShadow: '0 2px 10px rgba(45,95,63,0.06)' }}
         >
           <div className="max-w-[960px] mx-auto flex gap-[26px]">
-            {[
-              { id: 'uebersicht', label: 'Übersicht' },
-              { id: 'produkte', label: 'Produkte' },
-              ...(showFotosTab ? [{ id: 'fotos', label: 'Fotos' }] : []),
-            ].map((tab) => (
+            {sektionen.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
@@ -991,8 +1071,13 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
         </nav>
       )}
 
-      {/* Content column */}
-      <div id="uebersicht" className="max-w-[960px] mx-auto px-4 md:px-10 pt-[26px] pb-12 scroll-mt-14">
+      {/* Content column.
+          Die Spalte selbst trägt KEIN Sprungziel mehr: Als #uebersicht umschloss sie
+          #fotos und #produkte, schnitt damit dauernd den Erkennungsstreifen und zog
+          die Markierung immer wieder auf „Übersicht" zurück (Meldung cmua8bof).
+          Die drei Abschnitte sind jetzt Geschwister. */}
+      <div className="max-w-[960px] mx-auto px-4 md:px-10 pt-[26px] pb-12">
+      <div id="uebersicht" className="scroll-mt-14">
 
         {/* Nächste Abholung (Referenz 17, nur Kundenansicht).
             Bei Pause ausgeblendet: Termine anzukündigen, die man nicht buchen
@@ -1202,6 +1287,8 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           </div>
         )}
 
+        </div>{/* Ende #uebersicht */}
+
         {/* Gallery section */}
         {showGallery && (
           <div id="fotos" className="mt-[26px] scroll-mt-14" key={`gallery-${galleryKey}`}>
@@ -1213,8 +1300,12 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           </div>
         )}
 
-        {/* Products heading */}
-        <div id="produkte" className="flex items-baseline gap-3 mt-[34px] mb-[18px] scroll-mt-14">
+        {/* Products section.
+            Das Sprungziel umfasst Überschrift UND Raster. Vorher hing es nur an der
+            Überschriftenzeile: eine flache Box, die nach dem Sprung oberhalb des
+            Erkennungsstreifens lag und deshalb nie markiert wurde. */}
+        <div id="produkte" className="scroll-mt-14">
+        <div className="flex items-baseline gap-3 mt-[34px] mb-[18px]">
           <h2 className="font-heading text-[26px] font-semibold" style={{ color: '#2D3027' }}>
             Unsere Produkte
           </h2>
@@ -1234,6 +1325,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           mode={mode}
           isPaused={farm.isPaused}
         />
+        </div>{/* Ende #produkte */}
 
         {/* Footer (public only) */}
         {!ownerMode && (
