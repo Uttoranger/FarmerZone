@@ -50,3 +50,6 @@ docs/*.msi
 docs/*.exe
 docs/*.dmg
 *.zip
+
+# Temporäre Arbeitsliste der KI (siehe CLAUDE.md, Abschnitt 4)
+TASK.md

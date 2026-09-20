@@ -1,0 +1,31 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/gefahr-blocken.mjs"],
+            "timeout": 10,
+            "statusMessage": "Befehl wird gegen die Projektregeln geprüft"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/abschluss-pruefen.mjs"],
+            "timeout": 300,
+            "statusMessage": "Typecheck und Tests laufen"
+          }
+        ]
+      }
+    ]
+  }
+}
