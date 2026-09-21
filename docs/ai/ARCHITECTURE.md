@@ -106,7 +106,7 @@ Client-Komponente → Server Action → Zod → Fachregel (lib) → Prisma → r
 | UI-lokal (offen/zu) | `useState` | Nicht global |
 | Warenkorb | `use-cart.ts` (localStorage) + serverseitige Reservierung | Warenkorb ist **nie** die Wahrheit über Verfügbarkeit |
 | Filter/Suche in URL | `useSearchParams` + `router.replace` | Nicht nur im State — Ergebnisse müssen teilbar sein |
-| Theme | `next-themes` | Kein eigener Provider |
+| Theme | `next-themes`, `ThemeProvider` in `src/app/layout.tsx` (`attribute="class"`, `defaultTheme="system"`) | Kein eigener Provider, keine Spalte in der Datenbank — die Wahl gehört dem Gerät |
 
 **Kein globaler Store.** Wenn etwas global wirkt, gehört es meist in die URL oder auf den Server.
 

@@ -71,7 +71,7 @@ export function LoginClient() {
   return (
     <main
       className="min-h-screen flex items-center justify-center px-4 py-12"
-      style={{ background: 'linear-gradient(160deg, #F4EFE6 0%, #E8F0E8 55%, #FAFAF7 100%)' }}
+      style={{ background: 'var(--auth-gradient)' }}
     >
       <div className="w-full max-w-sm">
         {/* Logo */}
@@ -107,7 +107,7 @@ export function LoginClient() {
 
         {/* Form card */}
         <div
-          className="bg-card rounded-3xl p-6"
+          className="bg-card rounded-3xl p-6 dark:ring-1 dark:ring-border"
           style={{ boxShadow: '0 8px 24px oklch(0.18 0.03 150 / 0.08), 0 2px 6px oklch(0.18 0.03 150 / 0.04)' }}
         >
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
@@ -194,7 +194,7 @@ export function LoginClient() {
                   type="button"
                   onClick={() => quickLogin(acc.email, acc.password)}
                   disabled={laedt}
-                  className="w-full text-left bg-white hover:bg-muted border border-border rounded-xl px-3 py-2.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full text-left bg-card hover:bg-muted border border-border rounded-xl px-3 py-2.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <span className="text-sm font-medium text-foreground">{acc.label}</span>
                   <span className="block text-xs text-muted-foreground/60 mt-0.5 font-mono">{acc.email}</span>

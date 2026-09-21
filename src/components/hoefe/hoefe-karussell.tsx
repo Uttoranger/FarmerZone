@@ -161,8 +161,7 @@ export default function HoefeKarussell({
               ) : (
                 <span
                   aria-hidden="true"
-                  className="flex size-10 shrink-0 items-center justify-center rounded-full font-heading text-xs font-semibold"
-                  style={{ background: '#F3EFE6', color: '#2D5F3F' }}
+                  className="flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary font-heading text-xs font-semibold text-brand-text"
                 >
                   {hofInitialen(hof.name)}
                 </span>
@@ -176,7 +175,7 @@ export default function HoefeKarussell({
                   {/* Auch hier die Entfernung, sobald es einen Bezugspunkt
                       gibt — wer mobil die Karte nutzt, sieht sonst nie eine. */}
                   {hof.entfernungKm != null && (
-                    <span className="ml-1.5 font-medium" style={{ color: '#2D5F3F' }}>
+                    <span className="ml-1.5 font-medium text-brand-text">
                       {formatiereEntfernung(hof.entfernungKm)}
                     </span>
                   )}
@@ -221,7 +220,7 @@ export default function HoefeKarussell({
               </p>
             )}
             {hof.isPaused && (
-              <p className="mt-1.5 text-xs" style={{ color: '#9A6B2F' }}>
+              <p className="mt-1.5 text-xs text-amber-700 dark:text-amber-300">
                 Macht gerade Pause
               </p>
             )}

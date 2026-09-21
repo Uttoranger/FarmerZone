@@ -188,7 +188,70 @@ export function istGueltig(reservierung: EigeneReservierung, jetzt: Date): boole
 
 ---
 
-## 7. Checkliste vor dem Bericht
+## 7. Farben
+
+Es gibt **zwei Modi**: hell und dunkel (`next-themes`, Klasse `dark` am `<html>`).
+Jede Farbe muss in beiden funktionieren.
+
+### Grundregel
+- **Keine Farbe hart in eine Komponente schreiben.** Kein `#2D5F3F`, kein
+  `bg-slate-700`, kein `style={{ color: '…' }}`. Farben kommen aus Tokens in
+  `src/app/globals.css` (`:root` = hell, `.dark` = dunkel).
+- Tokens werden in **oklch** geschrieben, nie in Hex. Der Hex-Wert darf als
+  Kommentar danebenstehen.
+- Beim Ersetzen einer alten Hex-Farbe: das Token nehmen, das im **hellen** Modus
+  denselben Wert hat. `bg-white` auf einer Karte wird `bg-card`, **nicht**
+  `bg-background`. Passt kein Token: **fragen**, nicht raten.
+
+### Welches Token wofür
+
+| Zweck | Token |
+|---|---|
+| Seitengrund | `background` |
+| Fläche einer Karte, eines Dialogs | `card` / `popover` |
+| Fließtext | `foreground`, leiser: `muted-foreground` |
+| Hauptknopf (Fläche) | `primary` + `primary-foreground` |
+| **Markenfarbe für Text und Symbole** | **`brand-text`** |
+| Handlungsknopf (CTA, max. 1× pro Seite) | `accent` + `accent-foreground`, Hover `accent-hover` |
+| Rahmen, Trennlinien | `border`, Eingabefelder `input` |
+| Fokusring | `ring` |
+
+**`--brand-text` ist neu und nicht dasselbe wie `--primary`.** `--primary` ist die
+*Fläche* des Hauptknopfs und wird im Dunkeln hell (heller Salbei, damit dunkle
+Schrift darauf sitzt). Markentext braucht den umgekehrten Weg: hell ist er das
+dunkle Waldgrün, dunkel ist er ein helles Salbeigrün. Im **hellen** Modus sind
+beide Werte identisch — der Unterschied entsteht erst im Dunkeln. Also:
+`text-brand-text` für Überschriften, Wortmarke, Symbole; `bg-primary` für Flächen.
+
+### Tiefe
+Im Dunkeln trägt der **Rahmen**, nicht der Schatten: Ein Schatten auf fast
+schwarzem Grund ist unsichtbar. Karten bekommen dort `dark:ring-1 dark:ring-border`.
+
+### Bedeutungsfarben (grün/bernstein/rot)
+Für „erledigt", „Achtung", „schiefgegangen" gibt es außer `destructive` **kein**
+Token. Hier bleibt der helle Wert stehen und bekommt eine `dark:`-Entsprechung:
+
+```tsx
+// ✅ GOOD — heller Wert unverändert, dunkler Wert ergänzt
+<div className="bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200">
+```
+
+Keine neuen Bedeutungs-Tokens erfinden, ohne zu fragen — das wäre ein neues
+Farbschema.
+
+### Was dem Modus NICHT folgt
+Fotos und Hof-Banner werden nicht abgedunkelt. Schleier über Fotos, weiße
+Schrift auf Fotos, Kartenkacheln samt Pins (siehe `hoefe-karte.tsx`), die
+Bildmarke und fremde Markenfarben (WhatsApp-Grün, Stripes Eingabemaske) bleiben,
+wie sie sind. Wo das so ist, gehört ein Kommentar daneben, der es begründet.
+
+### Kontrast
+Fließtext ≥ 4,5:1, große Schrift und Symbole ≥ 3:1 — **in beiden Modi** messen,
+gegen `background` **und** gegen `card`.
+
+---
+
+## 8. Checkliste vor dem Bericht
 
 - [ ] Kein `any`, kein `@ts-ignore`, keine unbegründete `!`-Assertion
 - [ ] Zod an jeder neuen Systemgrenze
@@ -199,4 +262,5 @@ export function istGueltig(reservierung: EigeneReservierung, jetzt: Date): boole
 - [ ] `revalidatePath` für jede betroffene Route
 - [ ] Nichts Langsames im Antwortpfad
 - [ ] `Decimal`/`Date` nicht roh an Client-Komponenten
+- [ ] Keine harte Farbe im Bauteil; in beiden Modi angesehen (→ Abschnitt 7)
 - [ ] `pnpm typecheck && pnpm lint && pnpm test` grün

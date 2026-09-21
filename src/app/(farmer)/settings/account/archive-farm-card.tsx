@@ -111,11 +111,11 @@ export function ArchiveFarmCard({ farmSlug, isArchived }: Props) {
           </p>
 
           {blockedBy !== null && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-              <p className="text-sm text-amber-800">{farmArchiveBlockedMessage(blockedBy)}</p>
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/60 dark:bg-amber-950/40">
+              <p className="text-sm text-amber-800 dark:text-amber-200">{farmArchiveBlockedMessage(blockedBy)}</p>
               <Link
                 href="/orders"
-                className="mt-2 inline-block text-sm font-medium text-amber-900 underline underline-offset-2"
+                className="mt-2 inline-block text-sm font-medium text-amber-900 dark:text-amber-100 underline underline-offset-2"
               >
                 Zu den Bestellungen
               </Link>

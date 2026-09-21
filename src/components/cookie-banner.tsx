@@ -22,7 +22,7 @@ export function CookieBanner() {
   return (
     <div className="fixed bottom-4 right-4 z-50 max-w-xs w-[calc(100vw-2rem)] sm:w-80">
       <div
-        className="bg-card rounded-2xl p-4 text-sm"
+        className="bg-card rounded-2xl p-4 text-sm dark:ring-1 dark:ring-border"
         style={{ boxShadow: '0 8px 24px oklch(0.18 0.03 150 / 0.12), 0 2px 6px oklch(0.18 0.03 150 / 0.06)' }}
       >
         <p className="text-muted-foreground leading-relaxed mb-3">

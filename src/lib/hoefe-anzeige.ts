@@ -55,6 +55,10 @@ export type PinDarstellung = {
  * GEFÜLLT im Hof-Grün, hervorgehoben = Zwischenstufe auf der Sandfläche,
  * normal = weiße Scheibe mit grüner Nummer. Die Nummer bleibt in jeder
  * Stufe lesbar (dunkel auf hell bzw. weiß auf Hof-Grün).
+ *
+ * Diese Werte folgen BEWUSST nicht dem Dark Mode: Die Pins sitzen auf den
+ * hellen Kartenkacheln, nicht auf der Seite (siehe hoefe-karte.tsx). Ein
+ * dunkler Pin auf heller Karte wäre schlechter lesbar, nicht besser.
  */
 export function pinDarstellung(zustand: PinZustand): PinDarstellung {
   if (zustand === 'ausgewaehlt') {

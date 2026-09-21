@@ -30,6 +30,8 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
+  --color-brand-text: var(--brand-text);
+  --color-landing-green: var(--landing-green);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -51,6 +53,11 @@
 
 :root {
   /* ── Warm Harvest Brand Palette ─────────────────────────────── */
+
+  /* Sagt dem Browser, in welcher Richtung er native Bedienteile zeichnen
+     soll: Auswahlfelder, Scrollleisten, Datumsfelder. Ohne das bleiben sie
+     im Dark Mode hell und stechen heraus. */
+  color-scheme: light;
 
   /* #F7F2E7 — Warme Crème */
   --background: oklch(0.962 0.018 87);
@@ -84,6 +91,12 @@
   /* Dunkler Text auf Orange (WCAG AA) */
   --accent-foreground: oklch(0.18 0.04 155);
 
+  /* Markenfarbe für Text und Symbole (Überschriften, Icons, Links im Hof-
+     Kontext). Nicht --primary benutzen: das ist die Fläche des Hauptknopfs
+     und muss im Dark Mode hell werden, während Text seinen eigenen Wert
+     braucht. Hell = dasselbe Waldgrün wie --primary. */
+  --brand-text: oklch(0.30 0.082 155);
+
   --destructive: oklch(0.577 0.245 27.325);
 
   /* Warm-Grau Border */
@@ -111,26 +124,70 @@
   --sidebar-accent-foreground: oklch(0.95 0.018 87);
   --sidebar-border: oklch(1 0 0 / 0.10);
   --sidebar-ring: oklch(0.68 0.071 148);
+
+  /* ── Startseite ─────────────────────────────────────────────
+     Die Startseite trägt einen eigenen Seitenverlauf statt --background;
+     warum, steht in src/app/page.tsx. Die Werte lagen dort als Hex im
+     Quelltext und wären im Dark Mode hell stehen geblieben — deshalb hier
+     als Variable. Die Tag-Werte sind unverändert. */
+  --landing-top: oklch(0.954 0.013 82.4); /* #F4EFE6 */
+  --landing-base: oklch(0.955 0.011 136.6); /* #EDF2EB */
+  /* Frisches Grün der Zierlinien und der großen Schritt-Ziffern */
+  --landing-green: oklch(0.703 0.081 150); /* #7BAE85 */
+
+  /* ── Anmeldeseiten ──────────────────────────────────────────
+     Login, Registrierung, Passwort und Onboarding stehen auf demselben
+     Verlauf. Er lag fünfmal als Hex im Quelltext; eine Variable, damit
+     er im Dark Mode mitgeht und nicht an fünf Stellen gepflegt wird.
+     Tag-Werte unverändert: #F4EFE6 → #E8F0E8 → #FAFAF7. */
+  --auth-gradient: linear-gradient(
+    160deg,
+    oklch(0.954 0.013 82.4) 0%,
+    oklch(0.947 0.014 145.5) 55%,
+    oklch(0.984 0.004 106.5) 100%
+  );
 }
 
 .dark {
+  /* ── Warm Harvest – Nacht ───────────────────────────────────────
+     Gleiche Marke, andere Tageszeit: dunkles Waldgrün als Grund, warmes
+     Crème als Schrift. Tiefe entsteht über Rahmen, nicht über Schatten —
+     ein Schatten auf fast schwarzem Grund ist unsichtbar. */
+
+  /* Native Bedienteile dunkel zeichnen (siehe :root). */
+  color-scheme: dark;
+
   --background: oklch(0.14 0.02 150);
-  --foreground: oklch(0.96 0.005 100);
+  /* #EFEBE1 — warmes Crème statt kaltem Weiß, passend zum Tag-Modus */
+  --foreground: oklch(0.94 0.014 90);
   --card: oklch(0.20 0.025 150);
-  --card-foreground: oklch(0.96 0.005 100);
+  --card-foreground: oklch(0.94 0.014 90);
   --popover: oklch(0.20 0.025 150);
-  --popover-foreground: oklch(0.96 0.005 100);
+  --popover-foreground: oklch(0.94 0.014 90);
   --primary: oklch(0.68 0.071 148);
   --primary-foreground: oklch(0.18 0.03 150);
   --secondary: oklch(0.25 0.02 150);
-  --secondary-foreground: oklch(0.96 0.005 100);
+  --secondary-foreground: oklch(0.94 0.014 90);
   --muted: oklch(0.25 0.02 150);
   --muted-foreground: oklch(0.65 0.03 155);
-  --accent: oklch(0.25 0.02 150);
-  --accent-foreground: oklch(0.96 0.005 100);
+
+  /* Der Akzent bleibt das Marken-Orange — er ist der Handlungsknopf, nicht
+     eine dezente Hover-Fläche wie sonst bei shadcn. Vorher stand hier ein
+     Graugrün: jeder CTA wäre im Dark Mode farblos gewesen und erst beim
+     Überfahren orange geworden. Der Hover wird im Dunkeln HELLER, nicht
+     dunkler — abwärts verschwindet er im Hintergrund. */
+  --accent: oklch(0.66 0.14 47);
+  --accent-hover: oklch(0.73 0.13 47); /* #EA8C5D */
+  --accent-foreground: oklch(0.18 0.04 155);
+
+  /* Helles Salbeigrün: Waldgrün wäre auf dunklem Grund unlesbar. */
+  --brand-text: oklch(0.82 0.045 148);
+
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+  /* Etwas kräftiger als im Tag-Modus, weil Karte und Grund im Dunkeln nur
+     1,1:1 auseinanderliegen — der Rahmen trägt hier die ganze Abgrenzung. */
+  --border: oklch(1 0 0 / 14%);
+  --input: oklch(1 0 0 / 20%);
   --ring: oklch(0.68 0.071 148);
   --chart-1: oklch(0.68 0.071 148);
   --chart-2: oklch(0.66 0.15 41);
@@ -145,6 +202,20 @@
   --sidebar-accent-foreground: oklch(0.96 0.005 100);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.68 0.071 148);
+
+  /* Startseite bei Nacht: oben eine Spur heller als der Grund, damit der
+     Hero nicht auf eine Kante stößt, unten exakt --background. */
+  --landing-top: oklch(0.175 0.022 150);
+  --landing-base: oklch(0.14 0.02 150);
+  --landing-green: oklch(0.82 0.045 148);
+
+  /* Anmeldeseiten bei Nacht: derselbe Verlauf, nur abwärts gedreht. */
+  --auth-gradient: linear-gradient(
+    160deg,
+    oklch(0.19 0.024 150) 0%,
+    oklch(0.165 0.022 150) 55%,
+    oklch(0.14 0.02 150) 100%
+  );
 }
 
 @layer base {

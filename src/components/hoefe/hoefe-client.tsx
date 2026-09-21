@@ -388,10 +388,11 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
             // denselben Pin hervor.
             onFocus={() => setLage((l) => nachZeiger(l, hof.slug))}
             onBlur={() => setLage((l) => nachZeiger(l, null))}
-            className={`relative overflow-hidden rounded-2xl border bg-card transition-colors ${
-              sichtbareLage.ausgewaehlt === hof.slug ? 'border-primary' : 'border-border'
+            className={`relative overflow-hidden rounded-2xl border transition-colors ${
+              sichtbareLage.ausgewaehlt === hof.slug
+                ? 'border-primary bg-secondary'
+                : 'border-border bg-card'
             }`}
-            style={sichtbareLage.ausgewaehlt === hof.slug ? { background: '#F7F4EC' } : undefined}
           >
             {istSplit ? (
               /* SPLITSCREEN: Der Eintrag dient dem DURCHSTÖBERN — die ganze
@@ -435,8 +436,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
                   Eintrag dasselbe, was früher nur sie tat. */}
               <span
                 aria-hidden="true"
-                className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
-                style={{ background: '#E8F0E2', color: '#2D5F3F' }}
+                className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-brand-text"
               >
                 {index + 1}
               </span>
@@ -454,8 +454,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
                    die Identitätskarte der Bauern-Navigation. */
                 <span
                   aria-hidden="true"
-                  className="flex size-12 shrink-0 items-center justify-center rounded-full font-heading text-sm font-semibold"
-                  style={{ background: '#F3EFE6', color: '#2D5F3F' }}
+                  className="flex size-12 shrink-0 items-center justify-center rounded-full bg-secondary font-heading text-sm font-semibold text-brand-text"
                 >
                   {hofInitialen(hof.name)}
                 </span>
@@ -473,8 +472,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
                       wenn es einen gibt; bricht bei 375 px sauber um. */}
                   {hof.entfernungKm !== null && (
                     <span
-                      className="rounded-full px-2 py-0.5 text-xs font-medium"
-                      style={{ background: '#E8F0E2', color: '#2D5F3F' }}
+                      className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-brand-text"
                     >
                       {formatiereEntfernung(hof.entfernungKm)}
                     </span>
@@ -511,7 +509,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
                 )}
 
                 {hof.isPaused && (
-                  <p className="mt-2 text-sm" style={{ color: '#9A6B2F' }}>
+                  <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
                     Macht gerade Pause — schau bald wieder vorbei.
                   </p>
                 )}

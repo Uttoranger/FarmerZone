@@ -13,6 +13,11 @@
 // #FBEEE3 = die Kundin muss etwas tun · Grün auf #E8F0E2 = alles läuft ·
 // #9AA08F auf #F0EDE5 = abgeschlossen · Rot = storniert/nicht abgeholt.
 //
+// Die Tag-Werte bleiben unverändert; für den Dark Mode hängt an jeder Marke
+// eine dark:-Entsprechung. Es sind bewusst KEINE Tokens: Diese vier Flächen
+// sind eigene Bedeutungsfarben (tun / läuft / erledigt / abgebrochen), für
+// die es im Farbsatz keine Tokens gibt.
+//
 // Nur die REAL VORHANDENEN Enum-Werte (prisma OrderStatus, schema.prisma:17)
 // — keine erfundenen Zwischenschritte. Zwei davon setzt heute kein Codepfad
 // (IN_PREPARATION, NOT_PICKED_UP; siehe order-status.ts:40), sie können aber
@@ -27,14 +32,17 @@ export type BestellStatusAnzeige = {
   satz: string
 }
 
-const ORANGE = 'bg-[#FBEEE3] text-[#E8854A]'
-const FERTIG = 'bg-[#F0EDE5] text-[#9AA08F]'
-const ROT = 'bg-red-100 text-red-700'
+// dark: Fläche bewusst nur 12 % Orange und die Schrift der hellere Hover-Ton
+// — bei 15 % blieb die Marke unter 4,5:1.
+const ORANGE = 'bg-[#FBEEE3] text-[#E8854A] dark:bg-accent/12 dark:text-accent-hover'
+const FERTIG = 'bg-[#F0EDE5] text-[#9AA08F] dark:bg-muted dark:text-muted-foreground'
+const ROT = 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300'
 
 /** Das Grün der laufenden Bestellung — exportiert, weil die Abholtermin-Marke
  *  der Hofübersicht (Teil desselben Gestaltungs-Elements) dieselbe Fläche
  *  trägt und die Farbe nicht zweimal definiert sein soll. */
-export const MARKE_GRUEN = 'bg-[#E8F0E2] text-[#2D5F3F]'
+export const MARKE_GRUEN =
+  'bg-[#E8F0E2] text-[#2D5F3F] dark:bg-primary/15 dark:text-brand-text'
 const GRUEN = MARKE_GRUEN
 
 /**

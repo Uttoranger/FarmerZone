@@ -16,7 +16,7 @@ export default async function OnboardingPage() {
   return (
     <main
       className="min-h-screen px-4 py-12"
-      style={{ background: 'linear-gradient(160deg, #F4EFE6 0%, #E8F0E8 55%, #FAFAF7 100%)' }}
+      style={{ background: 'var(--auth-gradient)' }}
     >
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-8">

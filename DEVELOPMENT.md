@@ -430,6 +430,60 @@ Gebindegrößen werden **offen** gerechnet (`2 × 0,5 L`, nicht `1 L`) — man k
 
 ---
 
+## Theme (Hell / Dunkel)
+
+Seit dem Dark-Mode-Sprint hat FarmerZone zwei Modi. Die Regeln für neuen Code
+stehen in `docs/ai/CODING_STANDARDS.md`, Abschnitt 7. Hier steht, **warum** es so
+gebaut ist.
+
+**Wo die Wahl lebt.** `next-themes` schreibt die Klasse `dark` per Inline-Skript
+ans `<html>`, bevor der erste Pixel steht — deshalb blitzt nichts hell auf. Die
+Wahl liegt im `localStorage` des Geräts, **nicht in der Datenbank**: Sie ist eine
+Eigenschaft des Bildschirms, an dem jemand gerade sitzt, nicht des Kontos. Wer am
+Traktor-Tablet dunkel will und am Bürorechner hell, bekommt genau das. Der
+Umschalter steht unter **Konto → Darstellung** (`settings/account`), bewusst nicht
+unter `settings/appearance` — das ist das öffentliche Aussehen des Hofs, eine
+ganz andere Sache. Im öffentlichen Bereich gibt es keinen Umschalter; dort
+entscheidet das Gerät der Besucherin.
+
+**Warum der Akzent im Dunkeln heller wird.** `--accent` ist bei uns nicht die
+dezente Hover-Fläche, die shadcn darunter versteht, sondern das Marken-Orange des
+Handlungsknopfs. Im `.dark`-Block stand dafür lange ein Graugrün: Jeder CTA wäre
+im Dark Mode farblos gewesen und erst beim Überfahren orange geworden. Der Akzent
+ist jetzt in beiden Modi dasselbe Orange; nur der Hover dreht die Richtung — im
+Hellen dunkler, im Dunkeln heller, weil er sonst im Hintergrund verschwindet.
+
+**Warum es `--brand-text` gibt.** `--primary` ist die Fläche des Hauptknopfs und
+muss im Dunkeln hell werden. Markentext (Wortmarke, Überschriften, Symbole) muss
+den umgekehrten Weg gehen. Im hellen Modus sind beide Werte identisch — der
+Unterschied entsteht erst nachts.
+
+**Tiefe über Rahmen.** Karte und Grund liegen im Dunkeln nur 1,1:1 auseinander,
+ein Schatten ist dort unsichtbar. Deshalb `dark:ring-1 dark:ring-border` statt
+stärkerer Schatten.
+
+**Was dem Modus nicht folgt** — und warum:
+- **Fotos und Hof-Banner** werden nicht abgedunkelt. Ein Bild vom Hof soll
+  aussehen wie der Hof.
+- **Kartenkacheln samt Pins** (`hoefe-karte.tsx`): Ein invertiertes Luftbild ist
+  keine Karte mehr, und Ortsnamen würden unlesbar. Die Pins sitzen auf diesen
+  hellen Kacheln, nicht auf der Seite — sie bleiben deshalb ebenfalls hell.
+- **Die Bildmarke**: Ein Logo, das je nach Einstellung anders aussieht, ist kein
+  Logo mehr.
+- **Die Stripe-Eingabemaske** und der weiße Kasten darum: Stripe rendert das Feld
+  in einem eigenen iframe. Die Maske umzustellen wäre eine Änderung am
+  Zahlungsweg, nicht am Anstrich.
+- **Die Browserleiste auf dem Handy** (`theme-color`) folgt der Systemeinstellung,
+  nicht der Wahl im Konto — anders geht es im `<head>` ohne JavaScript nicht.
+
+**Noch nicht umgestellt.** `src/components/farm/farm-page-view.tsx` und
+`src/components/farm/product-grid.tsx` tragen eine zweite, gewachsene Palette
+(„Referenz 19") vollständig in Inline-Styles. Sie sind in sich geschlossen hell
+und bleiben es vorerst — nichts daran ist kaputt, es ist nur noch Tag. Derselbe
+Palettensatz steckt im Bauern-Bereich und im Admin.
+
+---
+
 ## Upload-Diagnose
 
 Jede Upload-Fehlermeldung endet auf eine Kennung wie `[L71]` — Buchstabe für die Ursache, Zahl für den Code-Stand (`UPLOAD_DIAG` in `src/lib/upload-fehler.ts`). Bei JEDER Verhaltensänderung am Upload-Ablauf muss die Zahl auf die Nummer des Sprints gehoben werden — eine veraltete Kennung ist schlimmer als keine, weil ein zugeschicktes Bildschirmfoto dann den falschen Stand behauptet.

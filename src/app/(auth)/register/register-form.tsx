@@ -90,7 +90,7 @@ export function RegisterForm({ formToken }: { formToken: string }) {
   return (
     <main
       className="min-h-screen flex items-center justify-center px-4 py-12"
-      style={{ background: 'linear-gradient(160deg, #F4EFE6 0%, #E8F0E8 55%, #FAFAF7 100%)' }}
+      style={{ background: 'var(--auth-gradient)' }}
     >
       <div className="w-full max-w-sm">
         {/* Logo */}
@@ -110,7 +110,7 @@ export function RegisterForm({ formToken }: { formToken: string }) {
 
         {/* Form card */}
         <div
-          className="bg-card rounded-3xl p-6"
+          className="bg-card rounded-3xl p-6 dark:ring-1 dark:ring-border"
           style={{ boxShadow: '0 8px 24px oklch(0.18 0.03 150 / 0.08), 0 2px 6px oklch(0.18 0.03 150 / 0.04)' }}
         >
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -215,7 +215,7 @@ export function RegisterForm({ formToken }: { formToken: string }) {
                       key={check.id}
                       className={[
                         'flex items-center gap-1.5 text-xs transition-colors duration-150',
-                        check.passed ? 'text-emerald-600' : 'text-muted-foreground',
+                        check.passed ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground',
                       ].join(' ')}
                     >
                       {check.passed ? (

@@ -71,8 +71,11 @@ describe('bestellStatusAnzeige — jeder reale Status bekommt Marke, Farbe und S
     expect(bestellStatusAnzeige('READY', TERMIN).farbe).toBe(MARKE_GRUEN)
     expect(bestellStatusAnzeige('PAID', TERMIN).farbe).toBe(MARKE_GRUEN)
     expect(bestellStatusAnzeige('PENDING_CONFIRMATION', TERMIN).farbe).toContain('#FBEEE3')
-    expect(bestellStatusAnzeige('CANCELLED', TERMIN).farbe).toBe('bg-red-100 text-red-700')
-    expect(bestellStatusAnzeige('NOT_PICKED_UP', TERMIN).farbe).toBe('bg-red-100 text-red-700')
+    // toContain statt toBe: An den Klassen hängen seit dem Dark Mode noch
+    // dark:-Entsprechungen. Geprüft wird die Bedeutung (rot), nicht die
+    // vollständige Klassenliste.
+    expect(bestellStatusAnzeige('CANCELLED', TERMIN).farbe).toContain('text-red-700')
+    expect(bestellStatusAnzeige('NOT_PICKED_UP', TERMIN).farbe).toContain('text-red-700')
     expect(bestellStatusAnzeige('PICKED_UP', TERMIN).farbe).toContain('#F0EDE5')
   })
 

@@ -118,7 +118,7 @@ export function PasswordForm() {
               key={check.id}
               className={[
                 'flex items-center gap-1.5 text-xs transition-colors duration-150',
-                check.passed ? 'text-emerald-600' : 'text-muted-foreground',
+                check.passed ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground',
               ].join(' ')}
             >
               {check.passed ? (
