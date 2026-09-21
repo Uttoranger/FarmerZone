@@ -271,7 +271,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
                         </button>
                       </>
                     ) : (
-                      <ImagePlus className="w-6 h-6 text-slate-300" />
+                      <ImagePlus className="w-6 h-6 text-muted-foreground/50" />
                     )}
                   </div>
                   <div className="flex-1">
@@ -515,10 +515,12 @@ export function ProductDialog({ open, product, onClose }: Props) {
                           aria-checked={field.value}
                           onClick={() => field.onChange(!field.value)}
                           className={`relative w-10 h-6 rounded-full transition-colors ${
-                            field.value ? 'bg-green-600' : 'bg-slate-300'
+                            field.value ? 'bg-green-600' : 'bg-muted-foreground/30'
                           }`}
                         >
                           <span
+                            /* Weiß in beiden Modi: Der Schieber liegt auf heller
+                               wie auf dunkler Schiene. */
                             className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
                               field.value ? 'translate-x-4' : 'translate-x-0'
                             }`}
@@ -560,7 +562,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
                 <div className="space-y-2">
                   {(
                     [
-                      { name: 'isOrganic', label: 'Bio-zertifiziert', icon: <Leaf className="w-4 h-4 text-green-600" /> },
+                      { name: 'isOrganic', label: 'Bio-zertifiziert', icon: <Leaf className="w-4 h-4 text-green-600 dark:text-green-400" /> },
                       { name: 'requiresCool', label: 'Kühlung nötig (+2–8 °C)', icon: <Thermometer className="w-4 h-4 text-blue-500" /> },
                       { name: 'requiresFreezer', label: 'Tiefkühlung nötig (−18 °C)', icon: <Snowflake className="w-4 h-4 text-sky-500" /> },
                     ] as const
@@ -603,8 +605,8 @@ export function ProductDialog({ open, product, onClose }: Props) {
                             onClick={() => toggleAllergen(id)}
                             className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
                               active
-                                ? 'bg-amber-100 border-amber-400 text-amber-800'
-                                : 'bg-white border-border text-muted-foreground hover:border-border'
+                                ? 'bg-amber-100 dark:bg-amber-950/50 border-amber-400 text-amber-800 dark:text-amber-200'
+                                : 'bg-card border-border text-muted-foreground hover:border-border'
                             }`}
                           >
                             {label}

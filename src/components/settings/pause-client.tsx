@@ -46,16 +46,16 @@ export function PauseClient({
   return (
     <div className="space-y-4">
       {/* Status card */}
-      <div className={`rounded-xl border p-4 ${isPaused ? 'border-amber-200 bg-amber-50' : 'border-green-200 bg-primary/8'}`}>
+      <div className={`rounded-xl border p-4 ${isPaused ? 'border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40' : 'border-green-200 dark:border-green-900/60 bg-primary/8'}`}>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             {isPaused ? (
-              <PauseCircle className="size-6 text-amber-600 shrink-0" />
+              <PauseCircle className="size-6 text-amber-600 dark:text-amber-400 shrink-0" />
             ) : (
               <PlayCircle className="size-6 text-primary shrink-0" />
             )}
             <div>
-              <p className={`font-semibold ${isPaused ? 'text-amber-800' : 'text-green-800'}`}>
+              <p className={`font-semibold ${isPaused ? 'text-amber-800 dark:text-amber-200' : 'text-green-800 dark:text-green-200'}`}>
                 {isPaused ? 'Shop ist pausiert' : 'Shop ist aktiv'}
               </p>
               <p className="text-sm text-muted-foreground">
@@ -86,7 +86,7 @@ export function PauseClient({
       </div>
 
       {/* Pause message */}
-      <div className="bg-white rounded-xl border border-border p-4 space-y-3">
+      <div className="bg-card rounded-xl border border-border p-4 space-y-3">
         <Label htmlFor="pauseMessage" className="font-medium text-foreground block">
           Nachricht für Kunden (optional)
         </Label>

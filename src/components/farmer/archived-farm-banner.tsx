@@ -10,14 +10,14 @@ import { FARM_ARCHIVED_OWNER_BANNER } from '@/lib/farm-archive'
 export function ArchivedFarmBanner() {
   return (
     <div className="mx-4 mt-3 print:hidden">
-      <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="rounded-xl border border-amber-300 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/40 px-3 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-2 min-w-0">
-          <PowerOff className="size-4 shrink-0 mt-0.5 text-amber-700" aria-hidden="true" />
-          <p className="text-sm font-medium text-amber-900">{FARM_ARCHIVED_OWNER_BANNER}</p>
+          <PowerOff className="size-4 shrink-0 mt-0.5 text-amber-700 dark:text-amber-300" aria-hidden="true" />
+          <p className="text-sm font-medium text-amber-900 dark:text-amber-100">{FARM_ARCHIVED_OWNER_BANNER}</p>
         </div>
         <Link
           href="/settings/account"
-          className="shrink-0 self-start sm:self-auto rounded-lg bg-amber-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-900 transition-colors"
+          className="shrink-0 self-start sm:self-auto rounded-lg bg-amber-800 dark:bg-amber-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-900 dark:hover:bg-amber-600 transition-colors"
         >
           Hof reaktivieren
         </Link>

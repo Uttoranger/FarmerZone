@@ -25,17 +25,17 @@ function initials(name: string): string {
 }
 
 function avatarClass(c: CustomerSummary): string {
-  if (c.isStammkunde) return 'bg-[#E8F0E2] text-[#2D5F3F]'
-  if (c.isLangeNichtGesehen) return 'bg-[#F2ECDC] text-[#6E5F45]'
-  return 'bg-[#F0EDE5] text-[#9AA08F]'
+  if (c.isStammkunde) return 'bg-[#E8F0E2] text-[#2D5F3F] dark:bg-primary/15 dark:text-brand-text'
+  if (c.isLangeNichtGesehen) return 'bg-[#F2ECDC] text-app-chip-ink'
+  return 'bg-[#F0EDE5] text-[#9AA08F] dark:bg-muted dark:text-muted-foreground'
 }
 
 function statusBadgeClass(status: CustomerStatus): string {
   switch (status) {
-    case 'Stammkunde': return 'bg-[#E8F0E2] text-[#2D5F3F]'
-    case 'Diesen Monat aktiv': return 'bg-[#E8F0E2] text-[#2D5F3F]'
-    case 'Lange nicht gesehen': return 'bg-[#F2ECDC] text-[#6E5F45]'
-    case 'Neu': return 'bg-[#FBEEE3] text-[#E8854A]'
+    case 'Stammkunde': return 'bg-[#E8F0E2] text-[#2D5F3F] dark:bg-primary/15 dark:text-brand-text'
+    case 'Diesen Monat aktiv': return 'bg-[#E8F0E2] text-[#2D5F3F] dark:bg-primary/15 dark:text-brand-text'
+    case 'Lange nicht gesehen': return 'bg-[#F2ECDC] text-app-chip-ink'
+    case 'Neu': return 'bg-[#FBEEE3] text-[#E8854A] dark:bg-accent/12 dark:text-accent-hover'
     default: return ''
   }
 }
@@ -276,15 +276,15 @@ export function CustomersClient({ customers }: { customers: CustomerSummary[] })
 
       {/* Insight box */}
       {counts.lange >= 3 && (
-        <div className="mt-6 rounded-xl bg-amber-50 border border-amber-200 p-4">
-          <p className="text-sm font-semibold text-[#6E5F45] mb-1">Tipp</p>
-          <p className="text-sm text-amber-700">
+        <div className="mt-6 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 p-4">
+          <p className="text-sm font-semibold text-app-chip-ink mb-1">Tipp</p>
+          <p className="text-sm text-amber-700 dark:text-amber-300">
             {counts.lange} Kunden haben länger nicht bestellt. Eine kurze WhatsApp könnte
             sie zurückholen.
           </p>
           <button
             onClick={() => setFilter('lange')}
-            className="mt-3 text-xs font-semibold text-[#6E5F45] hover:underline underline-offset-2"
+            className="mt-3 text-xs font-semibold text-app-chip-ink hover:underline underline-offset-2"
           >
             Diese Kunden ansehen →
           </button>

@@ -32,6 +32,23 @@
   --color-accent-hover: var(--accent-hover);
   --color-brand-text: var(--brand-text);
   --color-landing-green: var(--landing-green);
+  --color-app-page: var(--app-page);
+  --color-app-ink: var(--app-ink);
+  --color-app-ink-soft: var(--app-ink-soft);
+  --color-app-ink-faint: var(--app-ink-faint);
+  --color-app-line-firm: var(--app-line-firm);
+  --color-app-chip: var(--app-chip);
+  --color-app-chip-ink: var(--app-chip-ink);
+  --color-app-chip-green: var(--app-chip-green);
+  --color-app-button: var(--app-button);
+  --color-app-bar: var(--app-bar);
+  --color-app-bar-ink: var(--app-bar-ink);
+  --color-app-bar-ink-soft: var(--app-bar-ink-soft);
+  --color-app-trough: var(--app-trough);
+  --color-notice: var(--notice);
+  --color-notice-line: var(--notice-line);
+  --color-notice-icon: var(--notice-icon);
+  --color-notice-ink: var(--notice-ink);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -146,6 +163,39 @@
     oklch(0.947 0.014 145.5) 55%,
     oklch(0.984 0.004 106.5) 100%
   );
+
+  /* ── Arbeitsflächen („Referenz 19") ─────────────────────────
+     Hofseite, Produktraster und der ganze Bauern-Bereich tragen eine
+     zweite, gewachsene Palette: weichere Kohle statt des fast schwarzen
+     --foreground, ein eigener Seitenton, Sand- und Grün-Chips. Sie lag
+     als Hex in Inline-Styles über rund vierzig Dateien verstreut.
+     Die Tag-Werte hier sind exakt die bisherigen — nichts verschiebt
+     sich; erst der .dark-Block gibt ihnen eine zweite Lesart.
+
+     Für Weiß (--card) und die feinen 1px-Rahmen (--border) gibt es
+     KEIN eigenes Token: Dort waren die Werte ohnehin deckungsgleich. */
+  --app-page: oklch(0.964 0.007 88.6); /* #F5F3EE */
+  --app-ink: oklch(0.303 0.016 122.4); /* #2D3027 — Überschriften */
+  --app-ink-soft: oklch(0.481 0.022 120.2); /* #5C6052 — Fließtext */
+  --app-ink-faint: oklch(0.696 0.025 122.9); /* #9AA08F — leise Beschriftung */
+  --app-line-firm: oklch(0.815 0.023 87.2); /* #C9C2B2 — gestrichelte Rahmen */
+  --app-chip: oklch(0.943 0.022 89.8); /* #F2ECDC — Sand-Chip */
+  --app-chip-ink: oklch(0.493 0.043 81.1); /* #6E5F45 */
+  --app-chip-green: oklch(0.945 0.02 131.5); /* #E8F0E2 — Grün-Chip */
+  --app-button: oklch(0.441 0.076 153.8); /* #2D5F3F — gefüllter Grün-Knopf */
+  --app-bar: oklch(0.399 0.066 158.6); /* #24523A — Bauern-Leiste */
+  /* Die Bauern-Leiste ist in BEIDEN Modi dunkelgrün — sie war es schon am
+     Tag. Ihre Schrift ändert sich deshalb nicht und steht nur hier, nicht
+     noch einmal in .dark. */
+  --app-bar-ink: oklch(0.964 0.007 88.6); /* #F5F3EE */
+  --app-bar-ink-soft: oklch(0.899 0.029 156.6); /* #CFE4D6 */
+  --app-trough: oklch(0.946 0.011 89.7); /* #F0EDE5 — Wanne der Segmentwahl */
+
+  /* Hinweis-Kasten (Pause, Freischaltung, „du musst etwas tun") */
+  --notice: oklch(0.956 0.02 62.9); /* #FBEEE3 */
+  --notice-line: oklch(0.898 0.04 67.3); /* #F0D9C2 */
+  --notice-icon: oklch(0.601 0.124 54.9); /* #B86A2E */
+  --notice-ink: oklch(0.48 0.105 54.9); /* #8A4B18 */
 }
 
 .dark {
@@ -195,12 +245,13 @@
   --chart-4: oklch(0.38 0.089 150);
   --chart-5: oklch(0.25 0.02 150);
   --sidebar: oklch(0.20 0.025 150);
-  --sidebar-foreground: oklch(0.96 0.005 100);
+  /* Wie --foreground warmes Crème statt kaltem Weiß. */
+  --sidebar-foreground: oklch(0.94 0.014 90);
   --sidebar-primary: oklch(0.68 0.071 148);
   --sidebar-primary-foreground: oklch(0.18 0.03 150);
   --sidebar-accent: oklch(0.25 0.02 150);
-  --sidebar-accent-foreground: oklch(0.96 0.005 100);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-accent-foreground: oklch(0.94 0.014 90);
+  --sidebar-border: oklch(1 0 0 / 14%);
   --sidebar-ring: oklch(0.68 0.071 148);
 
   /* Startseite bei Nacht: oben eine Spur heller als der Grund, damit der
@@ -216,6 +267,27 @@
     oklch(0.165 0.022 150) 55%,
     oklch(0.14 0.02 150) 100%
   );
+
+  /* Arbeitsflächen bei Nacht. Die Kohle-Töne kippen um: Was am Tag
+     dunkel auf hell stand, steht nachts hell auf dunkel. */
+  --app-page: oklch(0.14 0.02 150);
+  --app-ink: oklch(0.94 0.014 90);
+  --app-ink-soft: oklch(0.75 0.02 140);
+  --app-ink-faint: oklch(0.62 0.02 140);
+  --app-line-firm: oklch(1 0 0 / 26%);
+  --app-chip: oklch(0.27 0.022 85);
+  --app-chip-ink: oklch(0.82 0.05 85);
+  --app-chip-green: oklch(0.28 0.03 150);
+  /* Etwas heller als am Tag: Auf dunklem Grund braucht eine gefüllte
+     Fläche mehr Abstand nach unten, sonst verschwindet sie. */
+  --app-button: oklch(0.45 0.08 154);
+  --app-bar: oklch(0.22 0.03 155);
+  --app-trough: oklch(0.25 0.02 150);
+
+  --notice: oklch(0.25 0.035 60);
+  --notice-line: oklch(0.36 0.06 62);
+  --notice-icon: oklch(0.78 0.12 62);
+  --notice-ink: oklch(0.87 0.07 75);
 }
 
 @layer base {

@@ -49,31 +49,31 @@ export function SaleList({ sales, onEdit }: Props) {
     return (
       <div className="text-center py-12">
         <div className="text-4xl mb-3">🧾</div>
-        <p className="font-medium text-slate-700 mb-1">Noch keine Verkäufe eingetragen</p>
-        <p className="text-sm text-slate-400">Trage deine ersten Direktverkäufe ein, um Statistiken zu sehen.</p>
+        <p className="font-medium text-foreground mb-1">Noch keine Verkäufe eingetragen</p>
+        <p className="text-sm text-muted-foreground/70">Trage deine ersten Direktverkäufe ein, um Statistiken zu sehen.</p>
       </div>
     )
   }
 
   return (
     <>
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-border">
         {sales.map((sale) => (
           <div key={sale.id} className="flex items-center gap-3 py-2.5">
             {/* Channel icon + date */}
             <div className="shrink-0 w-10 text-center">
               <div className="text-base leading-none">{CHANNEL_ICONS[sale.channel] ?? '·'}</div>
-              <div className="text-[10px] text-slate-400 mt-0.5">{formatDate(sale.saleDate)}</div>
+              <div className="text-[10px] text-muted-foreground/70 mt-0.5">{formatDate(sale.saleDate)}</div>
             </div>
 
             {/* Product name + channel */}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-800 truncate">{sale.productName}</p>
-              <p className="text-xs text-slate-400">{CHANNEL_LABELS[sale.channel] ?? sale.channel}</p>
+              <p className="text-sm font-medium text-foreground truncate">{sale.productName}</p>
+              <p className="text-xs text-muted-foreground/70">{CHANNEL_LABELS[sale.channel] ?? sale.channel}</p>
             </div>
 
             {/* Amount */}
-            <div className="shrink-0 text-sm font-medium text-slate-700">
+            <div className="shrink-0 text-sm font-medium text-foreground">
               {formatEuro(sale.totalAmount)}
             </div>
 
@@ -81,14 +81,14 @@ export function SaleList({ sales, onEdit }: Props) {
             <div className="shrink-0 flex gap-1">
               <button
                 onClick={() => onEdit(sale)}
-                className="w-8 h-8 flex items-center justify-center rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded hover:bg-muted text-muted-foreground/70 hover:text-muted-foreground transition-colors"
                 title="Bearbeiten"
               >
                 <Pencil className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => setDeleteTarget(sale)}
-                className="w-8 h-8 flex items-center justify-center rounded hover:bg-red-50 text-slate-300 hover:text-red-400 transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded hover:bg-red-50 dark:hover:bg-red-950/40 text-muted-foreground/50 hover:text-red-400 transition-colors"
                 title="Löschen"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -103,7 +103,7 @@ export function SaleList({ sales, onEdit }: Props) {
           <DialogHeader>
             <DialogTitle>Verkauf löschen?</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted-foreground">
             <span className="font-medium">{deleteTarget?.productName}</span> vom{' '}
             {deleteTarget && formatDate(deleteTarget.saleDate)} wird dauerhaft gelöscht.
           </p>

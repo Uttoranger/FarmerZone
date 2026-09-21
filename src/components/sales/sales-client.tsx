@@ -37,7 +37,7 @@ function StripePayoutLink() {
         })
       }
       className="inline-flex items-center gap-1.5 text-[13px] font-semibold transition-opacity hover:opacity-80 disabled:opacity-60"
-      style={{ color: '#2D5F3F' }}
+      style={{ color: 'var(--brand-text)' }}
     >
       <ExternalLink className="size-3.5" strokeWidth={1.7} />
       {isPending ? 'Öffnet…' : 'Auszahlungen bei Stripe ansehen'}
@@ -103,39 +103,39 @@ export function SalesClient({ overview, products, stripeReady }: Props) {
       />
 
       {/* Anker-Karte: die eine große Zahl */}
-      <div className="bg-white rounded-[14px] border border-border p-5 mb-4">
-        <p className="text-[13px]" style={{ color: '#9AA08F' }}>
+      <div className="bg-card rounded-[14px] border border-border p-5 mb-4">
+        <p className="text-[13px]" style={{ color: 'var(--app-ink-faint)' }}>
           Diese Woche
         </p>
-        <p className="font-heading text-4xl md:text-[40px] font-bold mt-1.5 tabular-nums" style={{ color: '#2D3027' }}>
+        <p className="font-heading text-4xl md:text-[40px] font-bold mt-1.5 tabular-nums" style={{ color: 'var(--app-ink)' }}>
           {formatEuro(overview.weekTotal)}
         </p>
-        <p className="text-xs mt-1.5" style={{ color: '#9AA08F' }}>
+        <p className="text-xs mt-1.5" style={{ color: 'var(--app-ink-faint)' }}>
           Gesamt: {formatEuro(overview.ytdTotal)}
         </p>
       </div>
 
       {/* Online/Bar-Summenkarten mit Definitions-Fußnoten */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
-        <div className="bg-white rounded-[14px] border border-border p-5">
-          <p className="text-[13px]" style={{ color: '#9AA08F' }}>
+        <div className="bg-card rounded-[14px] border border-border p-5">
+          <p className="text-[13px]" style={{ color: 'var(--app-ink-faint)' }}>
             Online bezahlt
           </p>
-          <p className="font-heading text-[26px] font-bold mt-1 tabular-nums" style={{ color: '#2D3027' }}>
+          <p className="font-heading text-[26px] font-bold mt-1 tabular-nums" style={{ color: 'var(--app-ink)' }}>
             {formatEuro(overview.weekOnline)}
           </p>
-          <p className="text-xs mt-1" style={{ color: '#9AA08F' }}>
+          <p className="text-xs mt-1" style={{ color: 'var(--app-ink-faint)' }}>
             Über FarmerZone bezahlte, abgeholte Bestellungen.
           </p>
         </div>
-        <div className="bg-white rounded-[14px] border border-border p-5">
-          <p className="text-[13px]" style={{ color: '#9AA08F' }}>
+        <div className="bg-card rounded-[14px] border border-border p-5">
+          <p className="text-[13px]" style={{ color: 'var(--app-ink-faint)' }}>
             Bar kassiert
           </p>
-          <p className="font-heading text-[26px] font-bold mt-1 tabular-nums" style={{ color: '#2D3027' }}>
+          <p className="font-heading text-[26px] font-bold mt-1 tabular-nums" style={{ color: 'var(--app-ink)' }}>
             {formatEuro(overview.weekBar)}
           </p>
-          <p className="text-xs mt-1" style={{ color: '#9AA08F' }}>
+          <p className="text-xs mt-1" style={{ color: 'var(--app-ink-faint)' }}>
             Vor Ort kassierte Abholungen plus deine Direktverkäufe.
           </p>
         </div>
@@ -158,7 +158,7 @@ export function SalesClient({ overview, products, stripeReady }: Props) {
               <button
                 key={sale.id}
                 onClick={() => openFromQuick(sale)}
-                className="flex items-start gap-3 p-3 rounded-xl border border-border bg-white hover:border-green-300 hover:bg-primary/8 active:scale-[0.98] transition-all text-left"
+                className="flex items-start gap-3 p-3 rounded-xl border border-border bg-card hover:border-green-300 hover:bg-primary/8 active:scale-[0.98] transition-all text-left"
               >
                 <span className="text-2xl shrink-0 mt-0.5">
                   {CHANNEL_ICONS[sale.channel] ?? '·'}

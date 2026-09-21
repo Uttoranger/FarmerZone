@@ -41,27 +41,27 @@ export function FarmPageClient({ farm, activeStatus, pastStatusCount }: Props) {
       <div
         className="flex items-center gap-2.5 flex-wrap"
         style={{
-          background: '#fff',
-          borderBottom: '1px solid #ECE8DF',
+          background: 'var(--card)',
+          borderBottom: '1px solid var(--border)',
           padding: '13px 28px',
         }}
       >
         <span
           className="text-[11px] font-bold uppercase tracking-[0.06em]"
-          style={{ color: '#9AA08F' }}
+          style={{ color: 'var(--app-ink-faint)' }}
         >
           Shop
         </span>
-        <span className="text-sm mr-1.5" style={{ color: '#2D3027' }}>
+        <span className="text-sm mr-1.5" style={{ color: 'var(--app-ink)' }}>
           farmerzone.at/<strong>{farm.slug}</strong>
         </span>
         <button
           onClick={handleCopy}
           className="flex items-center gap-1.5 h-[38px] px-3.5 rounded-lg text-[13px] font-semibold transition-colors hover:opacity-90"
           style={{
-            border: '1px solid #E4E0D6',
-            background: '#fff',
-            color: '#5C6052',
+            border: '1px solid var(--border)',
+            background: 'var(--card)',
+            color: 'var(--app-ink-soft)',
           }}
         >
           {copied
@@ -74,9 +74,9 @@ export function FarmPageClient({ farm, activeStatus, pastStatusCount }: Props) {
           onClick={handleShare}
           className="flex items-center gap-1.5 h-[38px] px-3.5 rounded-lg text-[13px] font-semibold transition-colors hover:opacity-90"
           style={{
-            border: '1px solid #E4E0D6',
-            background: '#fff',
-            color: '#5C6052',
+            border: '1px solid var(--border)',
+            background: 'var(--card)',
+            color: 'var(--app-ink-soft)',
           }}
         >
           <Share2 className="size-[15px]" strokeWidth={1.7} />
@@ -89,8 +89,8 @@ export function FarmPageClient({ farm, activeStatus, pastStatusCount }: Props) {
             className="flex items-center gap-1.5 h-[38px] px-4 rounded-lg text-[13px] font-semibold transition-colors"
             style={
               mode === 'edit'
-                ? { background: '#24523A', color: '#fff', border: '1px solid #24523A' }
-                : { background: '#fff', color: '#5C6052', border: '1px solid #E4E0D6' }
+                ? { background: 'var(--app-bar)', color: '#fff', border: '1px solid var(--app-bar)' }
+                : { background: 'var(--card)', color: 'var(--app-ink-soft)', border: '1px solid var(--border)' }
             }
           >
             <Pencil className="size-3.5" strokeWidth={1.7} />
@@ -101,8 +101,8 @@ export function FarmPageClient({ farm, activeStatus, pastStatusCount }: Props) {
             className="flex items-center gap-1.5 h-[38px] px-4 rounded-lg text-[13px] font-semibold transition-colors"
             style={
               mode === 'preview'
-                ? { background: '#24523A', color: '#fff', border: '1px solid #24523A' }
-                : { background: '#fff', color: '#5C6052', border: '1px solid #E4E0D6' }
+                ? { background: 'var(--app-bar)', color: '#fff', border: '1px solid var(--app-bar)' }
+                : { background: 'var(--card)', color: 'var(--app-ink-soft)', border: '1px solid var(--border)' }
             }
           >
             <Eye className="size-3.5" strokeWidth={1.7} />

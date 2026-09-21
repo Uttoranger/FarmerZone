@@ -15,7 +15,7 @@ type Slot = FarmSettings['pickupSlots'][number]
 
 function SlotRow({ slot, onDelete, onToggle }: { slot: Slot; onDelete: () => void; onToggle: () => void }) {
   return (
-    <div className={`flex items-center gap-3 p-3 rounded-lg border ${slot.isActive ? 'border-border bg-white' : 'border-border/50 bg-muted/30 opacity-60'}`}>
+    <div className={`flex items-center gap-3 p-3 rounded-lg border ${slot.isActive ? 'border-border bg-card' : 'border-border/50 bg-muted/30 opacity-60'}`}>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground">
           {DAY_NAMES[slot.dayOfWeek]}
@@ -32,15 +32,15 @@ function SlotRow({ slot, onDelete, onToggle }: { slot: Slot; onDelete: () => voi
         aria-pressed={slot.isActive}
         className={`text-xs min-h-11 min-w-11 px-3 rounded-full font-medium transition-colors ${
           slot.isActive
-            ? 'bg-green-100 text-primary hover:bg-green-200'
-            : 'bg-muted text-muted-foreground hover:bg-slate-300'
+            ? 'bg-green-100 dark:bg-green-950/50 text-primary hover:bg-green-200'
+            : 'bg-muted text-muted-foreground hover:bg-muted-foreground/30'
         }`}
       >
         {slot.isActive ? 'Aktiv' : 'Pausiert'}
       </button>
       <button
         onClick={onDelete}
-        className="p-1.5 text-muted-foreground/60 hover:text-red-600 transition-colors rounded"
+        className="p-1.5 text-muted-foreground/60 hover:text-red-600 dark:hover:text-red-400 transition-colors rounded"
         title="Löschen"
       >
         <Trash2 className="size-4" />
@@ -150,7 +150,7 @@ export function PickupSlotsClient({ initialSlots }: { initialSlots: Slot[] }) {
   return (
     <div className="space-y-6">
       {/* Existing slots */}
-      <div className="bg-white rounded-xl border border-border p-4">
+      <div className="bg-card rounded-xl border border-border p-4">
         <h2 className="font-medium text-foreground mb-3">Aktuelle Abholzeiten</h2>
         {slots.length === 0 ? (
           <p className="text-sm text-muted-foreground/60 py-4 text-center">Noch keine Abholzeiten angelegt.</p>
@@ -172,7 +172,7 @@ export function PickupSlotsClient({ initialSlots }: { initialSlots: Slot[] }) {
       </div>
 
       {/* Add new slot */}
-      <div className="bg-white rounded-xl border border-border p-4 space-y-4">
+      <div className="bg-card rounded-xl border border-border p-4 space-y-4">
         <h2 className="font-medium text-foreground">Abholzeit hinzufügen</h2>
 
         <div>
@@ -180,7 +180,7 @@ export function PickupSlotsClient({ initialSlots }: { initialSlots: Slot[] }) {
           <select
             value={form.dayOfWeek}
             onChange={(e) => setForm({ ...form, dayOfWeek: parseInt(e.target.value) })}
-            className="w-full h-10 border border-border rounded-md px-3 text-sm bg-white"
+            className="w-full h-10 border border-border rounded-md px-3 text-sm bg-card"
           >
             {DAY_NAMES.map((name, i) => (
               <option key={i} value={i}>{name}</option>

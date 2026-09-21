@@ -42,8 +42,8 @@ function getStatus(p: ProductData, stock: number) {
 }
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  aktiv: { label: 'Aktiv', className: 'bg-green-100 text-green-800 border-green-200' },
-  ausverkauft: { label: 'Ausverkauft', className: 'bg-red-100 text-red-800 border-red-200' },
+  aktiv: { label: 'Aktiv', className: 'bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-200 border-green-200 dark:border-green-900/60' },
+  ausverkauft: { label: 'Ausverkauft', className: 'bg-red-100 dark:bg-red-950/50 text-red-800 dark:text-red-200 border-red-200 dark:border-red-900/60' },
   pausiert: { label: 'Pausiert', className: 'bg-muted text-muted-foreground border-border' },
 }
 
@@ -153,7 +153,7 @@ export function ProductList({ products: initialProducts, initialEditId }: Props)
       {/* Empty state */}
       {products.length === 0 && (
         <div className="text-center py-16">
-          <Package className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+          <Package className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
           <p className="font-medium text-foreground mb-1">Noch keine Produkte</p>
           <p className="text-sm text-muted-foreground/60 mb-6">Leg dein erstes Produkt an, um loszulegen.</p>
           <Button
@@ -180,7 +180,7 @@ export function ProductList({ products: initialProducts, initialEditId }: Props)
                   {/* Image */}
                   <div
                     className="shrink-0 w-20 h-20 md:w-24 md:h-24 bg-muted flex items-center justify-center"
-                    style={product.categoryImageUrl && !product.imageUrl ? { background: '#F4EFE3' } : undefined}
+                    style={product.categoryImageUrl && !product.imageUrl ? { background: 'var(--app-chip)' } : undefined}
                   >
                     {product.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -198,7 +198,7 @@ export function ProductList({ products: initialProducts, initialEditId }: Props)
                         className="w-full h-full object-contain"
                       />
                     ) : (
-                      <Package className="w-7 h-7 text-slate-300" />
+                      <Package className="w-7 h-7 text-muted-foreground/50" />
                     )}
                   </div>
 
@@ -213,7 +213,7 @@ export function ProductList({ products: initialProducts, initialEditId }: Props)
                         {badge.label}
                       </Badge>
                       {product.isOrganic && (
-                        <Leaf className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                        <Leaf className="w-3.5 h-3.5 text-green-600 dark:text-green-400 shrink-0" />
                       )}
                       {product.requiresCool && (
                         <Thermometer className="w-3.5 h-3.5 text-blue-500 shrink-0" />
@@ -273,9 +273,9 @@ export function ProductList({ products: initialProducts, initialEditId }: Props)
                     <button
                       onClick={() => setDeleteConfirm(product)}
                       title="Löschen"
-                      className="flex-1 flex items-center justify-center w-10 hover:bg-red-50 transition-colors"
+                      className="flex-1 flex items-center justify-center w-10 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                     >
-                      <Trash2 className="w-3.5 h-3.5 text-slate-300 hover:text-red-400" />
+                      <Trash2 className="w-3.5 h-3.5 text-muted-foreground/50 hover:text-red-400" />
                     </button>
                   </div>
                 </div>

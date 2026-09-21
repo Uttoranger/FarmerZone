@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { useTheme } from 'next-themes'
 import { SegmentControl } from '@/components/farmer/segment-control'
 import { TrendingUp, TrendingDown, Minus, Lightbulb, Package } from 'lucide-react'
 import {
@@ -22,6 +23,10 @@ const PERIODS: { key: PeriodKey; label: string }[] = [
   { key: 'year', label: 'Jahr' },
 ]
 
+// Recharts schreibt Farben als SVG-Attribute; dort greift keine CSS-Variable.
+// Deshalb zwei Sätze und eine Umschaltung in JavaScript. Die Tagwerte sind
+// unverändert, die Nachtwerte sind dieselben Farbtöne eine Stufe heller —
+// ein Blau 600 verschwindet auf fast schwarzem Grund.
 const CHANNEL_COLORS: Record<string, string> = {
   PLATFORM: '#2563eb',
   HOFLADEN: '#16a34a',
@@ -29,6 +34,21 @@ const CHANNEL_COLORS: Record<string, string> = {
   MARKT: '#d97706',
   BUSINESS: '#7c3aed',
   OTHER: '#64748b',
+}
+
+const CHANNEL_COLORS_DARK: Record<string, string> = {
+  PLATFORM: '#60a5fa',
+  HOFLADEN: '#4ade80',
+  WHATSAPP: '#4ade9b',
+  MARKT: '#fbbf24',
+  BUSINESS: '#c4b5fd',
+  OTHER: '#a3b0a6',
+}
+
+/** Achsen, Fadenkreuz und Rückfallfarbe des Diagramms je Modus. */
+const DIAGRAMM = {
+  hell: { achseKlein: '#94a3b8', achseGross: '#475569', fadenkreuz: '#f1f5f9', rest: '#64748b' },
+  dunkel: { achseKlein: '#8b9a90', achseGross: '#c2cfc6', fadenkreuz: '#ffffff14', rest: '#a3b0a6' },
 }
 
 function formatEuro(amount: number) {
@@ -42,6 +62,13 @@ type Props = {
 
 export function AnalyticsDashboard({ data, currentPeriod }: Props) {
   const router = useRouter()
+  // resolvedTheme ist vor der Hydration undefined — dann gilt der Tagsatz.
+  // Das Diagramm zeichnet danach einmal neu; im Bauern-Bereich ist das
+  // unkritisch und ohne Server-Kenntnis der Wahl nicht zu vermeiden.
+  const { resolvedTheme } = useTheme()
+  const dunkel = resolvedTheme === 'dark'
+  const farben = dunkel ? CHANNEL_COLORS_DARK : CHANNEL_COLORS
+  const diagramm = dunkel ? DIAGRAMM.dunkel : DIAGRAMM.hell
 
   function setPeriod(p: PeriodKey) {
     router.push(`/analytics?period=${p}`)
@@ -69,7 +96,7 @@ export function AnalyticsDashboard({ data, currentPeriod }: Props) {
               <div
                 className={`flex items-center gap-1 text-sm font-medium mb-1 ${
                   changePercent > 0
-                    ? 'text-green-600'
+                    ? 'text-green-600 dark:text-green-400'
                     : changePercent < 0
                     ? 'text-red-500'
                     : 'text-muted-foreground/70'
@@ -107,7 +134,7 @@ export function AnalyticsDashboard({ data, currentPeriod }: Props) {
                 <XAxis
                   type="number"
                   tickFormatter={(v) => `€${v}`}
-                  tick={{ fontSize: 11, fill: '#94a3b8' }}
+                  tick={{ fontSize: 11, fill: diagramm.achseKlein }}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -117,20 +144,30 @@ export function AnalyticsDashboard({ data, currentPeriod }: Props) {
                   type="category"
                   dataKey="label"
                   width={110}
-                  tick={{ fontSize: 12, fill: '#475569' }}
+                  tick={{ fontSize: 12, fill: diagramm.achseGross }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <Tooltip
                   formatter={(v) => [formatEuro(Number(v ?? 0)), 'Umsatz']}
-                  contentStyle={{ fontSize: 12, borderRadius: 8 }}
-                  cursor={{ fill: '#f1f5f9' }}
+                  // contentStyle ist ein React-Style-Objekt — hier greifen die
+                  // Tokens direkt.
+                  contentStyle={{
+                    fontSize: 12,
+                    borderRadius: 8,
+                    background: 'var(--card)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--card-foreground)',
+                  }}
+                  labelStyle={{ color: 'var(--card-foreground)' }}
+                  itemStyle={{ color: 'var(--card-foreground)' }}
+                  cursor={{ fill: diagramm.fadenkreuz }}
                 />
                 <Bar dataKey="amount" radius={[0, 4, 4, 0]} maxBarSize={32}>
                   {channelRevenue.map((entry) => (
                     <Cell
                       key={entry.channel}
-                      fill={CHANNEL_COLORS[entry.channel] ?? '#64748b'}
+                      fill={farben[entry.channel] ?? diagramm.rest}
                     />
                   ))}
                 </Bar>
@@ -159,16 +196,16 @@ export function AnalyticsDashboard({ data, currentPeriod }: Props) {
                   <span className="text-xs text-muted-foreground/70 w-4 text-right shrink-0">{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-slate-700 truncate pr-2">
+                      <span className="text-sm font-medium text-foreground truncate pr-2">
                         {p.productName}
                       </span>
                       <span className="text-sm font-semibold text-foreground shrink-0 tabular-nums">
                         {formatEuro(p.totalAmount)}
                       </span>
                     </div>
-                    <div className="h-1.5 bg-[#F0EDE5] rounded-full overflow-hidden">
+                    <div className="h-1.5 bg-app-trough rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-[#7BAE85] rounded-full transition-all"
+                        className="h-full bg-landing-green rounded-full transition-all"
                         style={{
                           width: `${Math.round((p.totalAmount / maxProductAmount) * 100)}%`,
                         }}
@@ -184,9 +221,9 @@ export function AnalyticsDashboard({ data, currentPeriod }: Props) {
 
       {/* Insight box */}
       {insight && (
-        <div className="flex gap-3 p-4 bg-[#F2ECDC] rounded-xl border border-amber-100">
+        <div className="flex gap-3 p-4 bg-app-chip rounded-xl border border-border">
           <Lightbulb className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-          <p className="text-sm text-[#6E5F45]">{insight}</p>
+          <p className="text-sm text-app-chip-ink">{insight}</p>
         </div>
       )}
 
@@ -194,7 +231,7 @@ export function AnalyticsDashboard({ data, currentPeriod }: Props) {
       {totalRevenue === 0 && (
         <div className="text-center py-12">
           <div className="text-4xl mb-3">📊</div>
-          <p className="font-medium text-slate-700 mb-1">Noch keine Verkaufsdaten</p>
+          <p className="font-medium text-foreground mb-1">Noch keine Verkaufsdaten</p>
           <p className="text-sm text-muted-foreground/70 max-w-xs mx-auto leading-relaxed">
             Sobald Bestellungen abgewickelt oder Direktverkäufe eingetragen werden,
             erscheinen hier deine Auswertungen.

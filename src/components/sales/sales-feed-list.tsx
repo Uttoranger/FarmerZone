@@ -39,8 +39,8 @@ function Pill({ text, tone }: { text: string; tone: 'online' | 'bar' }) {
       className="rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap"
       style={
         tone === 'online'
-          ? { background: '#E8F0E2', color: '#2D5F3F' }
-          : { background: '#F0EDE5', color: '#5C6052' }
+          ? { background: 'var(--app-chip-green)', color: 'var(--brand-text)' }
+          : { background: 'var(--app-trough)', color: 'var(--app-ink-soft)' }
       }
     >
       {text}
@@ -67,7 +67,7 @@ export function SalesFeedList({ feed, onEdit }: Props) {
 
   if (feed.length === 0) {
     return (
-      <div className="text-center py-12 bg-white rounded-xl border border-border">
+      <div className="text-center py-12 bg-card rounded-xl border border-border">
         <div className="text-4xl mb-3">🧾</div>
         <p className="font-medium text-foreground mb-1">Noch keine Verkäufe</p>
         <p className="text-sm text-muted-foreground">
@@ -79,7 +79,7 @@ export function SalesFeedList({ feed, onEdit }: Props) {
 
   return (
     <>
-      <div className="bg-white rounded-xl border border-border px-4 divide-y divide-border/60">
+      <div className="bg-card rounded-xl border border-border px-4 divide-y divide-border/60">
         {feed.map((entry) =>
           entry.kind === 'order' ? (
             <Link
@@ -141,7 +141,7 @@ export function SalesFeedList({ feed, onEdit }: Props) {
                 </button>
                 <button
                   onClick={() => setDeleteTarget(entry.sale)}
-                  className="w-8 h-8 flex items-center justify-center rounded hover:bg-red-50 text-muted-foreground/40 hover:text-red-400 transition-colors"
+                  className="w-8 h-8 flex items-center justify-center rounded hover:bg-red-50 dark:hover:bg-red-950/40 text-muted-foreground/40 hover:text-red-400 transition-colors"
                   title="Löschen"
                 >
                   <Trash2 className="w-3.5 h-3.5" />

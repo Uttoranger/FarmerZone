@@ -49,7 +49,7 @@ function SeasonBadge({ start, end }: { start: number; end: number }) {
     <span
       title={label}
       aria-label={label}
-      className="inline-flex items-center gap-1 text-[10px] text-[#B86A2E] bg-[#FDF0E8] border border-[#F4D9BE] rounded-full px-2 py-0.5"
+      className="inline-flex items-center gap-1 text-[10px] text-notice-icon bg-notice border border-notice-line rounded-full px-2 py-0.5"
     >
       <Leaf className="size-2.5" aria-hidden="true" />
       {s}–{e}
@@ -57,6 +57,8 @@ function SeasonBadge({ start, end }: { start: number; end: number }) {
   )
 }
 
+// Der Bestandsstreifen liegt über dem Produktfoto, nicht auf der Karte —
+// seine Farben folgen deshalb bewusst keinem Modus.
 type StripState =
   | { type: 'hidden' }
   | { type: 'soldout' }
@@ -141,7 +143,7 @@ function ProductImageArea({
   })
 
   return (
-    <div className="relative flex-shrink-0 group" style={{ height: 170, background: '#F4EFE3' }}>
+    <div className="relative flex-shrink-0 group" style={{ height: 170, background: 'var(--app-chip)' }}>
       {fileInput}
 
       {/* Dimmed image wrapper — imageUrl ?? Kategoriebild ?? Sand-Platzhalter */}
@@ -156,7 +158,7 @@ function ProductImageArea({
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
-            <Package className="w-10 h-10" style={{ color: '#C9C2B2' }} />
+            <Package className="w-10 h-10" style={{ color: 'var(--app-line-firm)' }} />
           </div>
         )}
         {/* Bio badge */}
@@ -245,6 +247,8 @@ function SortableProductCard({
         className="absolute top-2 left-2 z-20 flex items-center justify-center size-8 rounded-lg cursor-grab active:cursor-grabbing"
         style={{
           touchAction: 'none',
+          // Der Ziehgriff liegt auf dem Produktfoto, nicht auf der Karte:
+          // weiße Marke mit dunkler Schrift, in beiden Modi gleich.
           background: 'rgba(255,255,255,0.94)',
           color: '#5C6052',
           boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
@@ -278,7 +282,7 @@ function ProductCard({
 
   return (
     <div
-      className="bg-white rounded-[12px] overflow-hidden flex flex-col"
+      className="bg-card rounded-[12px] overflow-hidden flex flex-col dark:ring-1 dark:ring-border"
       style={{ boxShadow: '0 2px 10px rgba(45,95,63,0.06)' }}
     >
       <ProductImageArea product={product} dim={dim} isEditMode={isEditMode} />
@@ -288,8 +292,8 @@ function ProductCard({
         className="px-[15px] py-[14px] flex flex-col flex-1"
         style={{ opacity: dim }}
       >
-        <p className="font-semibold text-sm leading-snug" style={{ color: '#2D3027' }}>{product.name}</p>
-        <p className="text-[17px] font-bold mt-[5px]" style={{ color: '#2D3027' }}>
+        <p className="font-semibold text-sm leading-snug" style={{ color: 'var(--app-ink)' }}>{product.name}</p>
+        <p className="text-[17px] font-bold mt-[5px]" style={{ color: 'var(--app-ink)' }}>
           {formatPrice(product.price, product.unit, product.unitSize)}
         </p>
 
@@ -300,7 +304,7 @@ function ProductCard({
         )}
 
         {product.allergens.length > 0 && (
-          <p className="text-[10px] mt-2 leading-tight" style={{ color: '#9AA08F' }}>
+          <p className="text-[10px] mt-2 leading-tight" style={{ color: 'var(--app-ink-faint)' }}>
             Enthält: {product.allergens.join(', ')}
           </p>
         )}
@@ -314,14 +318,14 @@ function ProductCard({
               <Link
                 href={`/products?edit=${product.id}`}
                 className="flex-1 flex items-center justify-center gap-1.5 py-[11px] rounded-lg text-[13px] font-semibold transition-opacity hover:opacity-90"
-                style={{ background: '#2D5F3F', color: '#fff' }}
+                style={{ background: 'var(--app-button)', color: '#fff' }}
               >
                 Bearbeiten
               </Link>
               <Link
                 href="/products"
-                className="flex-1 flex items-center justify-center gap-1.5 py-[11px] rounded-lg text-[13px] font-semibold border transition-colors hover:bg-gray-50"
-                style={{ borderColor: '#D6E0CE', color: '#2D5F3F', background: '#fff' }}
+                className="flex-1 flex items-center justify-center gap-1.5 py-[11px] rounded-lg text-[13px] font-semibold border transition-colors hover:bg-muted"
+                style={{ borderColor: 'var(--border)', color: 'var(--brand-text)', background: 'var(--card)' }}
               >
                 Lager
               </Link>
@@ -331,7 +335,7 @@ function ProductCard({
               onClick={() => onAddToCart(product)}
               disabled={isAdding}
               className="w-full flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-opacity disabled:opacity-60 hover:opacity-90 active:scale-[0.98]"
-              style={{ background: '#E8854A', color: '#fff' }}
+              style={{ background: 'var(--accent)', color: '#fff' }}
             >
               {isAdding ? (
                 <span className="animate-pulse">…</span>
@@ -345,7 +349,7 @@ function ProductCard({
           ) : (
             <div
               className="w-full h-10 flex items-center justify-center rounded-lg text-xs px-2 text-center"
-              style={{ background: 'rgba(242,236,221,0.95)', color: '#6E5F45' }}
+              style={{ background: 'color-mix(in srgb, var(--app-chip) 95%, transparent)', color: 'var(--app-chip-ink)' }}
             >
               {isPaused
                 ? SHOP_PAUSED_BUTTON_LABEL
@@ -474,15 +478,15 @@ export function ProductGrid({
         <div className="pb-4">
           <div
             className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3"
-            style={{ background: 'rgba(45,95,63,0.08)', border: '1px solid rgba(45,95,63,0.14)' }}
+            style={{ background: 'color-mix(in srgb, var(--primary) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--primary) 16%, transparent)' }}
           >
-            <p className="text-sm font-medium" style={{ color: '#2D3027' }}>
+            <p className="text-sm font-medium" style={{ color: 'var(--app-ink)' }}>
               Willkommen zurück! Dein letzter Einkauf wurde vorgeladen.
             </p>
             <button
               onClick={() => setShowWelcomeBack(false)}
               className="shrink-0 transition-colors"
-              style={{ color: '#9AA08F' }}
+              style={{ color: 'var(--app-ink-faint)' }}
               aria-label="Schließen"
             >
               <X className="size-4" />
@@ -493,7 +497,7 @@ export function ProductGrid({
 
       {/* Empty state (public) */}
       {!ownerMode && products.length === 0 && (
-        <p className="text-sm pb-4" style={{ color: '#9AA08F' }}>
+        <p className="text-sm pb-4" style={{ color: 'var(--app-ink-faint)' }}>
           Aktuell sind keine Produkte verfügbar.
         </p>
       )}
@@ -509,21 +513,21 @@ export function ProductGrid({
         {isEditMode && (
           <Link
             href="/products"
-            className="flex flex-col items-center justify-center rounded-[12px] transition-colors hover:bg-white/70"
+            className="flex flex-col items-center justify-center rounded-[12px] transition-colors hover:bg-card/70"
             style={{
-              border: '2px dashed #C9C2B2',
-              background: 'rgba(255,255,255,0.5)',
+              border: '2px dashed var(--app-line-firm)',
+              background: 'color-mix(in srgb, var(--card) 50%, transparent)',
               minHeight: 330,
             }}
           >
             <span
               className="flex items-center justify-center rounded-full mb-3"
-              style={{ width: 52, height: 52, background: '#E8F0E2', color: '#2D5F3F' }}
+              style={{ width: 52, height: 52, background: 'var(--app-chip-green)', color: 'var(--brand-text)' }}
             >
               <Plus className="size-[22px]" strokeWidth={1.9} />
             </span>
-            <span className="text-[15px] font-semibold" style={{ color: '#2D5F3F' }}>Produkt anlegen</span>
-            <span className="text-[13px] mt-1" style={{ color: '#9AA08F' }}>Foto, Preis, Menge</span>
+            <span className="text-[15px] font-semibold" style={{ color: 'var(--brand-text)' }}>Produkt anlegen</span>
+            <span className="text-[13px] mt-1" style={{ color: 'var(--app-ink-faint)' }}>Foto, Preis, Menge</span>
           </Link>
         )}
 
@@ -560,7 +564,7 @@ export function ProductGrid({
           onClick={() => setCartOpen(true)}
           className="fixed bottom-6 inset-x-4 sm:inset-x-auto sm:right-6 sm:left-auto z-40 flex items-center justify-center gap-2.5 rounded-full px-6 py-3.5 transition-all duration-[250ms] active:scale-[0.98]"
           style={{
-            background: '#E8854A',
+            background: 'var(--accent)',
             color: '#fff',
             boxShadow: '0 8px 24px rgba(232,133,74,0.35)',
           }}

@@ -447,7 +447,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
                   alt=""
                   width={48}
                   height={48}
-                  className="size-12 shrink-0 rounded-full object-cover"
+                  className="size-12 shrink-0 rounded-full object-cover dark:bg-app-bar-ink"
                 />
               ) : (
                 /* Initialen statt kaputtem Bild-Symbol — dasselbe Muster wie

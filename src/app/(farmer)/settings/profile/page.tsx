@@ -20,14 +20,14 @@ export default async function ProfileSettingsPage() {
     <div className="p-4 md:p-6 max-w-2xl">
       <Link
         href="/settings"
-        className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-6"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6"
       >
         <ChevronLeft className="size-4" />
         Einstellungen
       </Link>
 
-      <h1 className="text-xl font-semibold text-slate-800 mb-1">Hof-Profil</h1>
-      <p className="text-sm text-slate-500 mb-6">
+      <h1 className="text-xl font-semibold text-foreground mb-1">Hof-Profil</h1>
+      <p className="text-sm text-muted-foreground mb-6">
         Informationen, die auf deiner öffentlichen Hof-Seite sichtbar sind.
       </p>
 

@@ -156,7 +156,7 @@ export default function HoefeKarussell({
                   alt=""
                   width={40}
                   height={40}
-                  className="size-10 shrink-0 rounded-full object-cover"
+                  className="size-10 shrink-0 rounded-full object-cover dark:bg-app-bar-ink"
                 />
               ) : (
                 <span
