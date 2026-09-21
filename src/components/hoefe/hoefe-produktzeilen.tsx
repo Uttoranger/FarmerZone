@@ -84,10 +84,9 @@ export function HoefeProduktzeilen({
           ) : (
             <span
               aria-hidden="true"
-              className={`flex size-12 shrink-0 items-center justify-center rounded-lg font-heading text-sm font-semibold ${
+              className={`flex size-12 shrink-0 items-center justify-center rounded-lg bg-secondary font-heading text-sm font-semibold text-brand-text ${
                 produkt.verfuegbar ? '' : 'grayscale opacity-70'
               }`}
-              style={{ background: '#F3EFE6', color: '#2D5F3F' }}
             >
               {produktInitiale(produkt.name)}
             </span>

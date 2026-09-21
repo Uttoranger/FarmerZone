@@ -93,20 +93,22 @@ export function LandingNav() {
   return (
     <header
       ref={leiste}
-      className="sticky top-0 z-50 transition-colors duration-200"
+      className={`sticky top-0 z-50 border-b transition-colors duration-200 ${
+        gescrollt || offen ? 'border-border backdrop-blur-[8px]' : 'border-transparent'
+      }`}
+      // Die Deckfarbe ist der obere Stopp des Seitenverlaufs (--landing-top),
+      // damit die Leiste im Dunkeln nicht als heller Balken stehen bleibt.
       style={
         gescrollt || offen
-          ? {
-              background: 'rgba(244, 239, 230, 0.85)',
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)',
-              borderBottom: '1px solid rgba(45, 95, 63, 0.12)',
-            }
-          : { borderBottom: '1px solid transparent' }
+          ? { background: 'color-mix(in srgb, var(--landing-top) 85%, transparent)' }
+          : undefined
       }
     >
       <div className="flex h-14 items-center justify-between gap-3 px-4 sm:px-6">
         <Link href="/" className="flex min-w-0 items-center gap-2">
+          {/* Die Bildmarke behält ihre Farben in beiden Modi — ein Logo, das
+              je nach Einstellung anders aussieht, ist kein Logo mehr. Der helle
+              Kreis trägt sich auf dunklem Grund wie ein Aufkleber. */}
           <svg width="32" height="32" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
             <circle cx="40" cy="40" r="40" fill="#E8F0E8" />
             <path
@@ -115,7 +117,7 @@ export function LandingNav() {
             />
             <path d="M40 64 L40 44" stroke="#7BAE85" strokeWidth="2.5" strokeLinecap="round" />
           </svg>
-          <span className="font-heading text-lg font-bold whitespace-nowrap" style={{ color: '#2D5F3F' }}>
+          <span className="font-heading text-lg font-bold whitespace-nowrap text-brand-text">
             FarmerZone
           </span>
         </Link>
@@ -126,8 +128,7 @@ export function LandingNav() {
             <Link
               key={punkt.href}
               href={punkt.href}
-              className="whitespace-nowrap text-sm font-semibold transition-opacity hover:opacity-80"
-              style={{ color: '#2D5F3F' }}
+              className="whitespace-nowrap text-sm font-semibold text-brand-text transition-opacity hover:opacity-80"
             >
               {punkt.text}
             </Link>
@@ -139,15 +140,13 @@ export function LandingNav() {
               steckt im Menü. */}
           <Link
             href="/hoefe"
-            className="whitespace-nowrap text-[13px] font-semibold transition-opacity hover:opacity-80 md:hidden"
-            style={{ color: '#2D5F3F' }}
+            className="whitespace-nowrap text-[13px] font-semibold text-brand-text transition-opacity hover:opacity-80 md:hidden"
           >
             Höfe ansehen
           </Link>
           <Link
             href="/login"
-            className="hidden whitespace-nowrap rounded-lg border px-3.5 py-2 text-[13px] font-semibold transition-colors hover:bg-white md:inline-flex"
-            style={{ borderColor: '#D6E0CE', color: '#2D5F3F', background: 'rgba(255,255,255,0.6)' }}
+            className="hidden whitespace-nowrap rounded-lg border border-border bg-card/60 px-3.5 py-2 text-[13px] font-semibold text-brand-text transition-colors hover:bg-card md:inline-flex"
           >
             Hofbetreiber-Login
           </Link>
@@ -158,8 +157,7 @@ export function LandingNav() {
             aria-expanded={offen}
             aria-controls="startseiten-menue"
             aria-label={offen ? 'Menü schließen' : 'Menü öffnen'}
-            className="inline-flex size-10 items-center justify-center rounded-lg border transition-colors hover:bg-white md:hidden"
-            style={{ borderColor: '#D6E0CE', color: '#2D5F3F', background: 'rgba(255,255,255,0.6)' }}
+            className="inline-flex size-10 items-center justify-center rounded-lg border border-border bg-card/60 text-brand-text transition-colors hover:bg-card md:hidden"
           >
             {offen ? <X className="size-5" aria-hidden="true" /> : <Menu className="size-5" aria-hidden="true" />}
           </button>
@@ -170,8 +168,7 @@ export function LandingNav() {
         <div
           id="startseiten-menue"
           ref={panel}
-          className="border-t md:hidden"
-          style={{ borderColor: 'rgba(45, 95, 63, 0.12)' }}
+          className="border-t border-border md:hidden"
         >
           <nav aria-label="Menü" className="flex flex-col px-4 py-2 sm:px-6">
             {PUNKTE.map((punkt) => (
@@ -179,8 +176,7 @@ export function LandingNav() {
                 key={punkt.href}
                 href={punkt.href}
                 onClick={() => setOffen(false)}
-                className="flex min-h-12 items-center text-sm font-semibold transition-opacity hover:opacity-80"
-                style={{ color: '#2D5F3F' }}
+                className="flex min-h-12 items-center text-sm font-semibold text-brand-text transition-opacity hover:opacity-80"
               >
                 {punkt.text}
               </Link>
@@ -188,8 +184,7 @@ export function LandingNav() {
             <Link
               href="/login"
               onClick={() => setOffen(false)}
-              className="my-2 inline-flex min-h-12 items-center justify-center rounded-lg border text-sm font-semibold transition-colors hover:bg-white"
-              style={{ borderColor: '#D6E0CE', color: '#2D5F3F', background: 'rgba(255,255,255,0.6)' }}
+              className="my-2 inline-flex min-h-12 items-center justify-center rounded-lg border border-border bg-card/60 text-sm font-semibold text-brand-text transition-colors hover:bg-card"
             >
               Hofbetreiber-Login
             </Link>

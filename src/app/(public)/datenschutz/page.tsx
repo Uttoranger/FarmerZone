@@ -8,8 +8,8 @@ export const metadata: Metadata = { title: 'Datenschutz — FarmerZone' }
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="font-semibold text-slate-800 text-base mb-3">{title}</h2>
-      <div className="space-y-2 text-slate-600">{children}</div>
+      <h2 className="font-semibold text-foreground text-base mb-3">{title}</h2>
+      <div className="space-y-2 text-muted-foreground">{children}</div>
     </section>
   )
 }
@@ -21,8 +21,8 @@ export default function DatenschutzPage() {
         {/* Kein `javascript:history.back()`-Link: React blockiert solche
             URLs, der Link tat nichts (siehe zurueck-link.tsx). */}
         <ZurueckLink className="text-sm text-primary hover:underline mb-6 inline-block" />
-        <h1 className="text-2xl font-semibold text-slate-800 mb-2">Datenschutzerklärung</h1>
-        <p className="text-sm text-slate-500 mb-8">Gemäß DSGVO / DSG Österreich</p>
+        <h1 className="text-2xl font-semibold text-foreground mb-2">Datenschutzerklärung</h1>
+        <p className="text-sm text-muted-foreground mb-8">Gemäß DSGVO / DSG Österreich</p>
 
         <div className="space-y-8 text-sm leading-relaxed">
 
@@ -40,20 +40,20 @@ export default function DatenschutzPage() {
           </Section>
 
           <Section title="2. Welche Daten wir verarbeiten">
-            <p><strong className="text-slate-700">Bei einer Bestellung:</strong></p>
+            <p><strong className="text-foreground">Bei einer Bestellung:</strong></p>
             <ul className="list-disc list-inside space-y-1 ml-2">
               <li>Name, E-Mail-Adresse, Telefonnummer</li>
               <li>Bestellte Produkte, Menge, Gesamtbetrag</li>
               <li>Gewählter Abholtermin und Zahlungsart</li>
               <li>Optionale Notiz an den Hof</li>
             </ul>
-            <p className="mt-3"><strong className="text-slate-700">Zahlungsdaten:</strong></p>
+            <p className="mt-3"><strong className="text-foreground">Zahlungsdaten:</strong></p>
             <p>
               Kreditkarten- und Bankdaten werden ausschließlich von Stripe verarbeitet und gespeichert.
               FarmerZone speichert keine vollständigen Zahlungsdaten — nur eine anonymisierte
               Bestätigungs-ID.
             </p>
-            <p className="mt-3"><strong className="text-slate-700">Technisch notwendige Daten:</strong></p>
+            <p className="mt-3"><strong className="text-foreground">Technisch notwendige Daten:</strong></p>
             <ul className="list-disc list-inside space-y-1 ml-2">
               <li>Session-Cookies (für Warenkorbfunktion, technisch notwendig)</li>
               <li>Server-Logs (IP-Adresse, Zeitstempel) für Betrieb und Sicherheit</li>
@@ -73,31 +73,31 @@ export default function DatenschutzPage() {
           <Section title="4. Externe Dienstleister">
             <div className="space-y-3">
               <div>
-                <p className="font-medium text-slate-700">Stripe (Zahlungsabwicklung)</p>
+                <p className="font-medium text-foreground">Stripe (Zahlungsabwicklung)</p>
                 <p>Stripe Payments Europe Ltd., 1 Grand Canal Street Lower, Dublin 2, Irland.<br/>
                 Stripe verarbeitet Zahlungsdaten als eigenständiger Verantwortlicher gemäß seinem Datenschutz-Rahmenwerk.</p>
               </div>
               <div>
-                <p className="font-medium text-slate-700">Resend (E-Mail-Versand)</p>
+                <p className="font-medium text-foreground">Resend (E-Mail-Versand)</p>
                 <p>Resend Inc., USA — für transaktionale E-Mails (Bestellbestätigung, Abholhinweis).</p>
               </div>
               <div>
-                <p className="font-medium text-slate-700">Supabase (Datenbank)</p>
+                <p className="font-medium text-foreground">Supabase (Datenbank)</p>
                 <p>Supabase Inc. — Bestelldaten werden in einer PostgreSQL-Datenbank auf europäischen Servern gespeichert.</p>
               </div>
               <div>
-                <p className="font-medium text-slate-700">Vercel (Hosting)</p>
+                <p className="font-medium text-foreground">Vercel (Hosting)</p>
                 <p>Vercel Inc., USA — Hosting der Webanwendung. Angemessenes Schutzniveau durch Standardvertragsklauseln.</p>
               </div>
               <div>
-                <p className="font-medium text-slate-700">Sentry (Fehlerdiagnose)</p>
+                <p className="font-medium text-foreground">Sentry (Fehlerdiagnose)</p>
                 <p>Functional Software, Inc. (Sentry), USA — technische Fehlerberichte der Anwendung,
                 gespeichert auf Servern in der EU. Vor dem Versand werden personenbezogene Inhalte
                 (E-Mail-Adressen, Telefonnummern, Cookies, Zugangsdaten) automatisch entfernt;
                 übermittelt wird, was technisch schiefging, nicht wer betroffen war.</p>
               </div>
               <div>
-                <p className="font-medium text-slate-700">Vercel Web Analytics (Reichweitenmessung)</p>
+                <p className="font-medium text-foreground">Vercel Web Analytics (Reichweitenmessung)</p>
                 <p>Vercel Inc., USA — cookielose Zählung von Seitenaufrufen ohne Wiedererkennung:
                 Es werden keine Cookies gesetzt, keine Kennungen auf dem Gerät gespeichert und
                 keine Profile über den Tag hinaus gebildet.</p>
@@ -115,12 +115,12 @@ export default function DatenschutzPage() {
 
           <Section title="6. Deine Rechte (Art. 15–22 DSGVO)">
             <ul className="list-disc list-inside space-y-1 ml-2">
-              <li><strong className="text-slate-700">Auskunft:</strong> Du kannst jederzeit Auskunft über gespeicherte Daten verlangen.</li>
-              <li><strong className="text-slate-700">Berichtigung:</strong> Unrichtige Daten werden auf Anfrage korrigiert.</li>
-              <li><strong className="text-slate-700">Löschung:</strong> Du kannst die Löschung deiner Daten verlangen, soweit keine gesetzlichen Aufbewahrungspflichten entgegenstehen.</li>
-              <li><strong className="text-slate-700">Einschränkung:</strong> Du kannst die Verarbeitung einschränken lassen.</li>
-              <li><strong className="text-slate-700">Widerspruch:</strong> Du kannst der Verarbeitung widersprechen, wenn sie auf berechtigtem Interesse beruht.</li>
-              <li><strong className="text-slate-700">Datenübertragbarkeit:</strong> Auf Anfrage erhältst du deine Daten in maschinenlesbarem Format.</li>
+              <li><strong className="text-foreground">Auskunft:</strong> Du kannst jederzeit Auskunft über gespeicherte Daten verlangen.</li>
+              <li><strong className="text-foreground">Berichtigung:</strong> Unrichtige Daten werden auf Anfrage korrigiert.</li>
+              <li><strong className="text-foreground">Löschung:</strong> Du kannst die Löschung deiner Daten verlangen, soweit keine gesetzlichen Aufbewahrungspflichten entgegenstehen.</li>
+              <li><strong className="text-foreground">Einschränkung:</strong> Du kannst die Verarbeitung einschränken lassen.</li>
+              <li><strong className="text-foreground">Widerspruch:</strong> Du kannst der Verarbeitung widersprechen, wenn sie auf berechtigtem Interesse beruht.</li>
+              <li><strong className="text-foreground">Datenübertragbarkeit:</strong> Auf Anfrage erhältst du deine Daten in maschinenlesbarem Format.</li>
             </ul>
             <p className="mt-3">
               Anfragen richten an:{' '}

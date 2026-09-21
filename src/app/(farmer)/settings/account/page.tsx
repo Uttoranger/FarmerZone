@@ -9,6 +9,7 @@ import { supportMailto } from '@/lib/support'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PasswordForm } from './password-form'
 import { ArchiveFarmCard } from './archive-farm-card'
+import { DarstellungKarte } from './darstellung-karte'
 
 export const metadata: Metadata = { title: 'Konto — FarmerZone' }
 
@@ -44,7 +45,9 @@ export default async function AccountPage() {
       </Link>
 
       <h1 className="text-xl font-semibold text-foreground mb-1">Konto</h1>
-      <p className="text-sm text-muted-foreground mb-6">Konto-Informationen und Sicherheit.</p>
+      <p className="text-sm text-muted-foreground mb-6">
+        Konto-Informationen, Sicherheit und Darstellung.
+      </p>
 
       <div className="space-y-4">
         <Card>
@@ -88,11 +91,13 @@ export default async function AccountPage() {
           </CardContent>
         </Card>
 
+        <DarstellungKarte />
+
         {farm && <ArchiveFarmCard farmSlug={farm.slug} isArchived={farm.archivedAt !== null} />}
 
-        <div className="rounded-xl border border-red-100 bg-red-50 p-4">
-          <p className="text-sm font-medium text-red-700 mb-1">Konto löschen</p>
-          <p className="text-xs text-red-600">
+        <div className="rounded-xl border border-red-100 bg-red-50 p-4 dark:border-red-900/60 dark:bg-red-950/40">
+          <p className="text-sm font-medium text-red-700 dark:text-red-200 mb-1">Konto löschen</p>
+          <p className="text-xs text-red-600 dark:text-red-300">
             Wenn du dein Konto löschen möchtest,{' '}
             <a
               href={accountDeleteMailto}
@@ -104,7 +109,7 @@ export default async function AccountPage() {
             Die Löschung wird innerhalb weniger Werktage bearbeitet.
             Beachte: Bestelldaten müssen aus steuerrechtlichen Gründen 7 Jahre aufbewahrt werden.
           </p>
-          <p className="text-xs text-red-600 mt-2">
+          <p className="text-xs text-red-600 dark:text-red-300 mt-2">
             Du willst nur deinen Hofladen schließen, dein Konto aber behalten? Dann nutze oben
             &bdquo;Hof stilllegen&ldquo; — dabei bleiben alle Daten erhalten.
           </p>

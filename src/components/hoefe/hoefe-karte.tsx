@@ -25,6 +25,12 @@ import { pinDarstellung, pinZustand, type AuswahlLage } from '@/lib/hoefe-anzeig
  * NIEMALS SELBST — er meldet nur die Auswahl nach oben; zur Hofseite führen
  * ausschließlich Listeneintrag, Karussell-Karte und „Zum Hof". Höfe ohne
  * Koordinaten kommen hier gar nicht erst an.
+ *
+ * DARK MODE: Die Kacheln bleiben hell — ein invertiertes Luftbild ist keine
+ * Karte mehr, sondern ein Negativ, und Ortsnamen würden unlesbar. Damit
+ * bleiben auch Pins und Leaflets eigene Bedienteile (Zoom, Attribution) so,
+ * wie sie sind: Sie liegen AUF den hellen Kacheln, nicht auf der Seite.
+ * Dem Modus folgt nur der Rahmen des Containers (border-border).
  */
 
 export type KartenHof = {

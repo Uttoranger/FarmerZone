@@ -44,6 +44,11 @@ export function StripePaymentStep({
         Deine Bestellung ist reserviert. Bitte gib jetzt deine Zahlungsdaten ein.
       </p>
 
+      {/* Bewusst WEISS in beiden Modi: Darin steckt Stripes eigenes
+          Eingabefeld als iframe, das mit theme: 'stripe' hell bleibt. Ein
+          dunkler Rahmen um eine helle Maske sähe aus wie ein Fehler — und
+          die Stripe-Maske umzustellen ist eine Änderung am Zahlungsweg,
+          nicht am Anstrich. */}
       <div className="bg-white rounded-xl border border-border p-4">
         <Elements
           stripe={stripePromise}

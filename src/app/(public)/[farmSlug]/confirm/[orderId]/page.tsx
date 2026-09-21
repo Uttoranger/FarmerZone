@@ -95,7 +95,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
       <div className="max-w-lg mx-auto px-4 py-10">
         {isOnlinePaid && (
           <div className="flex flex-col items-center text-center mb-8">
-            <CheckCircle className="size-14 text-green-600 mb-3" />
+            <CheckCircle className="size-14 text-green-600 dark:text-green-400 mb-3" />
             <h1 className="font-heading text-2xl font-semibold text-foreground">Zahlung erfolgreich!</h1>
             <p className="text-muted-foreground mt-1">
               Deine Bestellung wurde bestätigt. Du erhältst eine E-Mail-Bestätigung.
@@ -105,7 +105,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
 
         {isOnsiteConfirmed && (
           <div className="flex flex-col items-center text-center mb-8">
-            <CheckCircle className="size-14 text-green-600 mb-3" />
+            <CheckCircle className="size-14 text-green-600 dark:text-green-400 mb-3" />
             <h1 className="font-heading text-2xl font-semibold text-foreground">Bestellung bestätigt!</h1>
             <p className="text-muted-foreground mt-1">
               Deine Bestellung wurde verbindlich bestätigt. Bitte hole sie zum gewählten

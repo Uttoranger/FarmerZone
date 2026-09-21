@@ -118,7 +118,11 @@ const CTA_NOTE =
 // und hat diese Farbe schon bei 55% der ersten Bildschirmhöhe erreicht — also
 // deutlich oberhalb der Hero-Unterkante bei 70vh. Damit trifft die Ausblendung
 // auf jeder Breite exakt denselben Ton.
-const SEITEN_HINTERGRUND = '#EDF2EB'
+//
+// Der Wert selbst steht seit dem Dark Mode in globals.css als --landing-base
+// (Tag: unverändert #EDF2EB, Nacht: der dunkle Grund). Hier bleibt nur der
+// Verweis — so bleiben Verlauf, Auslauf und Grundfarbe eine einzige Quelle.
+const SEITEN_HINTERGRUND = 'var(--landing-base)'
 // Die klebende Leiste lebt in ihrer eigenen Datei (Client-Insel: sie hört auf
 // Scrollen und trägt das Menü) — die Startseite selbst bleibt eine Server-Seite.
 
@@ -128,8 +132,10 @@ const CTA_MAILTO = `mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent('Mein H
 function Kicker({ children, tone = 'dark' }: { children: string; tone?: 'dark' | 'light' }) {
   return (
     <p
-      className="mb-3 text-xs font-semibold uppercase tracking-[0.18em]"
-      style={{ color: tone === 'light' ? 'rgba(255,255,255,0.75)' : '#4F6F57' }}
+      className={`mb-3 text-xs font-semibold uppercase tracking-[0.18em] ${
+        // tone="light" steht auf dem Foto-Band und bleibt in beiden Modi weiß.
+        tone === 'light' ? 'text-white/75' : 'text-muted-foreground'
+      }`}
     >
       {children}
     </p>
@@ -143,7 +149,7 @@ function SectionHeading({ kicker, children }: { kicker: string; children: string
       <h2 className="font-heading text-3xl md:text-5xl font-semibold text-foreground text-balance">
         {children}
       </h2>
-      <span className="mt-6 block h-px w-12 rounded-full" style={{ backgroundColor: '#7BAE85' }} />
+      <span className="mt-6 block h-px w-12 rounded-full bg-landing-green" />
     </div>
   )
 }
@@ -212,10 +218,7 @@ function FarmRow({
       <div className={flip ? 'md:order-1' : undefined}>
         {/* Optischer Anker der Zeile: groß genug, um die Spalte zu tragen,
             klar kleiner als die Abschnitts-Überschrift. */}
-        <p
-          className="font-heading text-3xl md:text-4xl font-semibold leading-none mb-3"
-          style={{ color: '#4F6F57' }}
-        >
+        <p className="font-heading text-3xl md:text-4xl font-semibold leading-none mb-3 text-muted-foreground">
           {formel}
         </p>
         <h3 className="font-heading text-2xl md:text-3xl font-semibold text-foreground mb-4 text-balance">
@@ -248,7 +251,7 @@ export default function HomePage() {
       // Element-Verlauf hätte er sich über die nun viel längere Seite gestreckt
       // und den Hero-Hintergrund verändert. Darunter läuft seine Endfarbe weiter.
       style={{
-        backgroundImage: `linear-gradient(180deg, #F4EFE6 0%, ${SEITEN_HINTERGRUND} 55%)`,
+        backgroundImage: `linear-gradient(180deg, var(--landing-top) 0%, ${SEITEN_HINTERGRUND} 55%)`,
         backgroundSize: '100% 100vh',
         backgroundRepeat: 'no-repeat',
         backgroundColor: SEITEN_HINTERGRUND,
@@ -360,7 +363,7 @@ export default function HomePage() {
                 bleibt und der Abschnitt trotzdem sofort beginnt. */}
             <div className="mb-14 flex justify-center md:mb-20">
               <span className="inline-flex items-center gap-2 bg-card/80 border border-border rounded-full px-3.5 py-1.5 text-xs text-muted-foreground">
-                <span className="size-1.5 rounded-full bg-[#E8854A] animate-pulse" />
+                <span className="size-1.5 rounded-full bg-accent animate-pulse" />
                 Pilotbetrieb mit ausgewählten Höfen
               </span>
             </div>
@@ -414,14 +417,10 @@ export default function HomePage() {
                   {i < STEPS.length - 1 && (
                     <span
                       aria-hidden="true"
-                      className="hidden md:block absolute left-16 right-0 top-7 h-px"
-                      style={{ backgroundColor: '#D8DFD2' }}
+                      className="hidden md:block absolute left-16 right-0 top-7 h-px bg-border"
                     />
                   )}
-                  <span
-                    className="relative font-heading text-5xl md:text-6xl font-semibold leading-none"
-                    style={{ color: '#7BAE85' }}
-                  >
+                  <span className="relative font-heading text-5xl md:text-6xl font-semibold leading-none text-landing-green">
                     {i + 1}
                   </span>
                   <p className="mt-5 text-base leading-relaxed text-muted-foreground">{text}</p>
@@ -450,6 +449,8 @@ export default function HomePage() {
             sizes="100vw"
             className="-z-10 object-cover"
           />
+          {/* Schleier über dem Foto — bleibt in beiden Modi gleich dunkel:
+              das Bild wird nicht abgedunkelt, nur die Schrift lesbar gehalten. */}
           <div aria-hidden="true" className="absolute inset-0 -z-10" style={{ backgroundColor: 'rgba(20,30,22,0.66)' }} />
           <div className="mx-auto max-w-3xl px-6 text-center">
             <Kicker tone="light">{SECTION_TITLES.vision.kicker}</Kicker>

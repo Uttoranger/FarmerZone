@@ -22,7 +22,7 @@ type SlotRow = { dayOfWeek: string; startTime: string; endTime: string }
 
 // ─── Tiny label helpers ──────────────────────────────────────────────────────
 function Req() {
-  return <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
+  return <span className="text-destructive ml-0.5" aria-hidden="true">*</span>
 }
 function Opt() {
   return <span className="text-xs text-muted-foreground font-normal ml-1">(optional)</span>
@@ -324,7 +324,7 @@ export function OnboardingClient({ userEmail }: { userEmail: string }) {
       {/* ── Step 1: Farm Info ─────────────────────────────────────── */}
       {step === 1 && (
         <div
-          className="bg-card rounded-3xl p-6"
+          className="bg-card rounded-3xl p-6 dark:ring-1 dark:ring-border"
           style={{ boxShadow: '0 8px 24px oklch(0.18 0.03 150 / 0.08)' }}
         >
           <h2 className="font-heading text-xl font-semibold text-foreground mb-1">Dein Hof</h2>
@@ -332,7 +332,7 @@ export function OnboardingClient({ userEmail }: { userEmail: string }) {
             Diese Infos erscheinen auf deiner öffentlichen Shop-Seite.
           </p>
           <p className="text-xs text-muted-foreground mb-5">
-            <span className="text-red-500 mr-0.5" aria-hidden="true">*</span>Pflichtfelder
+            <span className="text-destructive mr-0.5" aria-hidden="true">*</span>Pflichtfelder
           </p>
 
           <form onSubmit={handleStep1} noValidate className="flex flex-col gap-4">
@@ -360,7 +360,7 @@ export function OnboardingClient({ userEmail }: { userEmail: string }) {
                     slugAvailable === false
                       ? 'text-destructive'
                       : slugAvailable === true
-                      ? 'text-emerald-600'
+                      ? 'text-emerald-600 dark:text-emerald-400'
                       : 'text-muted-foreground'
                   }`}
                 >
@@ -502,7 +502,7 @@ export function OnboardingClient({ userEmail }: { userEmail: string }) {
       {/* ── Step 2: Products ──────────────────────────────────────── */}
       {step === 2 && (
         <div
-          className="bg-card rounded-3xl p-6"
+          className="bg-card rounded-3xl p-6 dark:ring-1 dark:ring-border"
           style={{ boxShadow: '0 8px 24px oklch(0.18 0.03 150 / 0.08)' }}
         >
           <h2 className="font-heading text-xl font-semibold text-foreground mb-1">Deine Produkte</h2>
@@ -554,7 +554,7 @@ export function OnboardingClient({ userEmail }: { userEmail: string }) {
 
                   <div className="grid grid-cols-3 gap-2 items-start">
                     <div className="flex flex-col gap-1">
-                      <span className="text-xs text-muted-foreground">Preis (€) <span className="text-red-500" aria-hidden="true">*</span></span>
+                      <span className="text-xs text-muted-foreground">Preis (€) <span className="text-destructive" aria-hidden="true">*</span></span>
                       <Input
                         type="number"
                         step="0.01"
@@ -654,7 +654,7 @@ export function OnboardingClient({ userEmail }: { userEmail: string }) {
       {/* ── Step 3: Pickup Slots ──────────────────────────────────── */}
       {step === 3 && (
         <div
-          className="bg-card rounded-3xl p-6"
+          className="bg-card rounded-3xl p-6 dark:ring-1 dark:ring-border"
           style={{ boxShadow: '0 8px 24px oklch(0.18 0.03 150 / 0.08)' }}
         >
           <h2 className="font-heading text-xl font-semibold text-foreground mb-1">Abholzeiten</h2>
@@ -765,7 +765,7 @@ export function OnboardingClient({ userEmail }: { userEmail: string }) {
       {/* ── Step 4: Success ───────────────────────────────────────── */}
       {step === 4 && (
         <div
-          className="bg-card rounded-3xl p-8 text-center"
+          className="bg-card rounded-3xl p-8 text-center dark:ring-1 dark:ring-border"
           style={{ boxShadow: '0 8px 24px oklch(0.18 0.03 150 / 0.08)' }}
         >
           <div className="text-6xl mb-4">🎉</div>
@@ -799,6 +799,8 @@ export function OnboardingClient({ userEmail }: { userEmail: string }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 h-12 rounded-xl font-semibold text-sm transition-colors"
+                // WhatsApp-Grün ist eine fremde Markenfarbe und bleibt in
+                // beiden Modi, wie sie ist.
                 style={{ backgroundColor: '#25D366', color: '#fff' }}
               >
                 <svg viewBox="0 0 24 24" className="size-5 fill-current" aria-hidden="true">

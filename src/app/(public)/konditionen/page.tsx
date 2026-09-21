@@ -41,41 +41,40 @@ export default function KonditionenPage() {
         <ZurueckLink />
 
         {/* Kicker im Stil der Startseite */}
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: '#4F6F57' }}>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Was es kostet
         </p>
-        <h1 className="text-2xl font-semibold text-slate-800 mb-8">Konditionen für Höfe</h1>
+        <h1 className="text-2xl font-semibold text-foreground mb-8">Konditionen für Höfe</h1>
 
-        <div className="space-y-8 text-sm text-slate-700 leading-relaxed">
+        <div className="space-y-8 text-sm text-muted-foreground leading-relaxed">
 
           <section>
-            <h2 className="font-semibold text-slate-800 text-base mb-3">Das Gründungshof-Angebot</h2>
+            <h2 className="font-semibold text-foreground text-base mb-3">Das Gründungshof-Angebot</h2>
             <p>{GRUENDUNGS_ANGEBOT}</p>
             <div className="mt-4 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
-              <p className="text-slate-700">{GRUENDUNGS_KEINE_ZUGANGSGRENZE}</p>
+              <p className="text-foreground">{GRUENDUNGS_KEINE_ZUGANGSGRENZE}</p>
             </div>
           </section>
 
           <section>
-            <h2 className="font-semibold text-slate-800 text-base mb-3">Zahlungsgebühren</h2>
+            <h2 className="font-semibold text-foreground text-base mb-3">Zahlungsgebühren</h2>
             <p>{GRUENDUNGS_ZAHLUNGSGEBUEHREN}</p>
           </section>
 
           <section>
-            <h2 className="font-semibold text-slate-800 text-base mb-3">So läuft die Aufnahme</h2>
+            <h2 className="font-semibold text-foreground text-base mb-3">So läuft die Aufnahme</h2>
             <ol className="space-y-3">
               {GRUENDUNGS_AUFNAHME_SCHRITTE.map((schritt, i) => (
                 <li key={schritt.titel} className="flex gap-3">
                   <span
-                    className="flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
-                    style={{ background: '#E8F0E2', color: '#2D5F3F' }}
+                    className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-brand-text"
                     aria-hidden="true"
                   >
                     {i + 1}
                   </span>
                   <span className="min-w-0">
-                    <strong className="font-semibold text-slate-800">{schritt.titel}</strong>
-                    <span className="block text-slate-700">{schritt.text}</span>
+                    <strong className="font-semibold text-foreground">{schritt.titel}</strong>
+                    <span className="block text-muted-foreground">{schritt.text}</span>
                   </span>
                 </li>
               ))}
@@ -83,7 +82,7 @@ export default function KonditionenPage() {
           </section>
 
           <section>
-            <h2 className="font-semibold text-slate-800 text-base mb-3">Loslegen</h2>
+            <h2 className="font-semibold text-foreground text-base mb-3">Loslegen</h2>
             {/* Kein Orange: der eine Akzent der Startseite bleibt dort. Hier
                 genügt der Primärton der Rechtsseiten. Die Registrierung ist
                 offen — der Weg führt direkt in die App, nicht mehr ins

@@ -38,6 +38,7 @@ export default async function HoefePage() {
       {/* Kopfzeile wie auf der Startseite: Wortmarke zurück zum Anfang. */}
       <header className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3">
         <Link href="/" className="flex items-center gap-2 min-w-0">
+          {/* Bildmarke unverändert in beiden Modi — siehe landing-nav.tsx. */}
           <svg width="32" height="32" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
             <circle cx="40" cy="40" r="40" fill="#E8F0E8" />
             <path
@@ -46,7 +47,7 @@ export default async function HoefePage() {
             />
             <path d="M40 64 L40 44" stroke="#7BAE85" strokeWidth="2.5" strokeLinecap="round" />
           </svg>
-          <span className="font-heading text-lg font-bold whitespace-nowrap" style={{ color: '#2D5F3F' }}>
+          <span className="font-heading text-lg font-bold whitespace-nowrap text-brand-text">
             FarmerZone
           </span>
         </Link>
@@ -56,7 +57,7 @@ export default async function HoefePage() {
           und braucht dafür die volle Breite. */}
       <main className="mx-auto max-w-3xl px-4 pb-16 pt-6 sm:pt-10 lg:max-w-6xl">
         {/* Editorial-Kopf im Stil der Startseite: Kicker + Fraunces. */}
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: '#4F6F57' }}>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Direkt vom Hof
         </p>
         <h1 className="font-heading text-3xl sm:text-4xl font-semibold text-foreground text-balance">

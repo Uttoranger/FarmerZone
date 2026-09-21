@@ -50,7 +50,7 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, onUpdate
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
                   ) : (
-                    <ShoppingCart className="w-5 h-5 text-slate-300" />
+                    <ShoppingCart className="w-5 h-5 text-muted-foreground/50" />
                   )}
                 </div>
 
@@ -87,7 +87,7 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, onUpdate
                   </span>
                   <button
                     onClick={() => onRemoveItem(item.productId)}
-                    className="text-slate-300 hover:text-red-400 transition-colors"
+                    className="text-muted-foreground/60 hover:text-destructive transition-colors"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
