@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { OnboardingClient } from './onboarding-client'
+import { APP_URL } from '@/lib/umgebung-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,7 +34,9 @@ export default async function OnboardingPage() {
           </p>
         </div>
 
-        <OnboardingClient userEmail={session.user.email ?? ''} />
+        {/* Die Adresse kommt vom Server: Im Browser gäbe es NEXT_PUBLIC_APP_URL
+            nur, wenn sie zur Build-Zeit gesetzt war — in Previews ist sie es nicht. */}
+        <OnboardingClient userEmail={session.user.email ?? ''} appUrl={APP_URL} />
       </div>
     </main>
   )

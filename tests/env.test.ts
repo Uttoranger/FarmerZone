@@ -53,4 +53,27 @@ describe('validateEnv', () => {
     expect(validateEnv({ ...complete, TRIAGE_TOKEN: '   ' }).TRIAGE_TOKEN).toBeUndefined()
     expect(validateEnv({ ...complete, TRIAGE_TOKEN: 'tok-123' }).TRIAGE_TOKEN).toBe('tok-123')
   })
+
+  it('Adresse und Vercel-Systemvariablen sind optional — ein Deploy ohne sie startet', () => {
+    const env = validateEnv(complete)
+    expect(env.NEXT_PUBLIC_APP_URL).toBeUndefined()
+    expect(env.VERCEL_ENV).toBeUndefined()
+    expect(env.VERCEL_URL).toBeUndefined()
+    expect(env.VERCEL_BRANCH_URL).toBeUndefined()
+    expect(env.VERCEL_GIT_COMMIT_REF).toBeUndefined()
+  })
+
+  it('reicht gesetzte Vercel-Systemvariablen durch und normalisiert leere', () => {
+    const env = validateEnv({
+      ...complete,
+      VERCEL_ENV: 'preview',
+      VERCEL_URL: 'app-abc.vercel.app',
+      VERCEL_BRANCH_URL: '   ',
+      NEXT_PUBLIC_APP_URL: 'https://farmerzone.example',
+    })
+    expect(env.VERCEL_ENV).toBe('preview')
+    expect(env.VERCEL_URL).toBe('app-abc.vercel.app')
+    expect(env.VERCEL_BRANCH_URL).toBeUndefined()
+    expect(env.NEXT_PUBLIC_APP_URL).toBe('https://farmerzone.example')
+  })
 })

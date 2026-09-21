@@ -7,8 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { generateUnsubscribeToken } from '@/lib/unsubscribe'
 import type { StatusPostAnlass } from '@prisma/client'
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+import { APP_URL } from '@/lib/umgebung-server'
 
 async function getAuthorizedFarm() {
   const session = await auth.api.getSession({ headers: await headers() })

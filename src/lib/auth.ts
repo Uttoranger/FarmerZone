@@ -2,6 +2,7 @@ import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import { magicLink } from 'better-auth/plugins'
 import { prisma } from '@/lib/prisma'
+import { UMGEBUNG } from '@/lib/umgebung-server'
 
 // Franz-tauglich: 10 Login-Versuche pro Minute pro IP sperren keinen echten
 // Nutzer aus (auch nicht bei Tippfehlern), bremsen aber Passwort-Rater.
@@ -98,7 +99,14 @@ export const auth = betterAuth({
     },
   },
 
-  trustedOrigins: [process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'],
+  // Adresse und vertraute Herkünfte kommen aus der Umgebung (src/lib/umgebung.ts):
+  // Produktion nur NEXT_PUBLIC_APP_URL, Previews ihre Vercel-Adressen, lokal
+  // localhost. Vorher stand hier NEXT_PUBLIC_APP_URL mit localhost-Ersatz —
+  // in Previews war das die Adresse eines fremden Rechners, der Login unmöglich.
+  // Fehlt in Produktion die Adresse, bleibt baseURL leer und Better Auth
+  // greift auf BETTER_AUTH_URL zurück; eine geratene Herkunft gibt es nicht.
+  baseURL: UMGEBUNG.appUrl ?? undefined,
+  trustedOrigins: [...UMGEBUNG.trustedOrigins],
 })
 
 export type Session = typeof auth.$Infer.Session

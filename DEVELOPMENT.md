@@ -559,6 +559,59 @@ Regeln für die Sichtung:
 
 ---
 
+## Umgebungen: Produktion, Preview, lokal
+
+Seit dem Sprint `fix/testumgebung` (2026-09-21) entscheidet **eine** Stelle, wo die
+App läuft: `src/lib/umgebung.ts` (rein, getestet) und ihr Serverzweig
+`src/lib/umgebung-server.ts`.
+
+**Warum:** In Vercel-Previews waren `NEXT_PUBLIC_APP_URL` und `BETTER_AUTH_URL`
+nicht gesetzt (nur Production). Auth und Auth-Client fielen dort auf
+`http://localhost:3000` zurück — der Browser der Testerin rief einen fremden
+Rechner an, der Login war unmöglich. Und keine Preview war als Preview erkennbar.
+
+**Erkennung, fail-closed Richtung Produktion:** `preview` nur bei `VERCEL_ENV=preview`,
+`lokal` nur bei `NODE_ENV=development`, alles andere — auch Unbekanntes — ist
+`produktion`. Ein Testbanner vor Kundinnen wäre der teurere Fehler als ein fehlendes
+im Test. (`ermittleUmgebung` in `sentry-hygiene.ts` entscheidet für Sentry bewusst
+andersherum: dort ist Rauschen in der Produktions-Ansicht der teurere Fehler.)
+
+**Adresse und vertraute Herkünfte je Umgebung:**
+
+| Umgebung | `appUrl` / `trustedOrigins` |
+|---|---|
+| produktion | nur `NEXT_PUBLIC_APP_URL`; fehlt sie: **kein** Ersatz |
+| preview | `https://<VERCEL_BRANCH_URL>` (stabil je Branch, darum die Link-Adresse) und `https://<VERCEL_URL>` |
+| lokal | `http://localhost:3000` |
+
+Nie ein Platzhalter wie `*.vercel.app` — Better Auth könnte ihn, wir wollen ihn nicht.
+Der Auth-**Client** hat gar keine `baseURL` mehr: Laut Better-Auth-Doku darf sie
+entfallen, wenn Auth-Server und Seite dieselbe Domain haben — und das ist hier immer so.
+
+**Anschlüsse:** `datenbank` ist `dev` nur per Allowlist (localhost oder die Referenz der
+Dev-Datenbank — im Host **oder** im Benutzernamen, denn beim Supabase-Pooler steht sie
+nur dort); `stripe` kommt aus dem Präfix des Schlüssels (`sk_test_` / `sk_live_`).
+Widersprüche werden zu deutschen Warnsätzen: Preview mit fremder DB oder Stripe live,
+Produktion mit Dev-DB oder Stripe test, Preview ohne Vercel-Adresse.
+
+**Sichtbar machen:** In preview und lokal steht ein Balken über jeder Seite
+(`src/components/shared/umgebungs-banner.tsx`, Server-Komponente, im Fluss, nicht
+klebend, feste Farben: Bernstein, bei Warnung Rot), jeder Tab-Titel trägt `[TEST] `
+(Titel-Vorlage im Root-Layout, keine Seite einzeln angefasst) und die Browserleiste am
+Handy ist Bernstein bzw. Rot. In Produktion **nie** ein Banner — Widersprüche gehen dort
+einmal je Kaltstart als Warnung an Sentry.
+
+**Was Vercel dafür liefern muss:** `VERCEL_ENV`, `VERCEL_URL`, `VERCEL_BRANCH_URL`,
+`VERCEL_GIT_COMMIT_REF` — das sind Systemvariablen, die nur ankommen, wenn im Projekt
+„Automatically expose System Environment Variables" aktiv ist. Ohne sie zählt eine
+Preview als Produktion: kein Banner, kein Login-Fix.
+
+**Nicht mitgenommen:** Der Seed prüft noch nicht über `istDevDatenbank`, ob er gegen
+die Dev-Datenbank läuft — die Funktion ist dafür exportiert. Previews versenden weiter
+keine Mails (`RESEND_API_KEY` nur in Production), das ist gewollt.
+
+---
+
 ## Nützliche Befehle
 
 ```bash

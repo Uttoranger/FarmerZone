@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
+import { APP_URL } from '@/lib/umgebung-server'
 
 async function getAuthenticatedFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -26,8 +27,7 @@ async function getAuthenticatedFarm() {
 
 // Stripe requires a valid https:// URL; localhost is rejected even in test mode
 function getPublicUrl(): string {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
-  if (appUrl.startsWith('https://')) return appUrl
+  if (APP_URL.startsWith('https://')) return APP_URL
   return 'https://farmerzone.at'
 }
 
@@ -73,13 +73,12 @@ export async function createOnboardingLink(): Promise<{ url?: string; error?: st
   }
 
   // AccountLink return/refresh URLs are browser redirects — Stripe allows http://localhost in test mode
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
   const returnPath = `/api/stripe/return?account_id=${farm.stripeAccountId}`
 
   const link = await stripe.accountLinks.create({
     account: farm.stripeAccountId,
-    refresh_url: `${appUrl}${returnPath}`,
-    return_url: `${appUrl}${returnPath}`,
+    refresh_url: `${APP_URL}${returnPath}`,
+    return_url: `${APP_URL}${returnPath}`,
     type: 'account_onboarding',
   })
 
