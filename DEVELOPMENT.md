@@ -494,6 +494,18 @@ keine CSS-Variable. Das Auswertungs-Diagramm hält deshalb zwei Farbsätze und
 schaltet in JavaScript über `resolvedTheme` um. Nur der Tooltip kommt ohne aus:
 `contentStyle` ist ein React-Style-Objekt, da funktionieren die Tokens direkt.
 
+**Schnellumschalter (2026-09-21).** Die Karte „Darstellung" unter Konto war der einzige
+Weg — drei Klicks tief, nur eingeloggt. `src/components/shared/theme-umschalter.tsx`
+schaltet mit einem Tipp zwischen Hell und Dunkel, und zwar anhand des gerade
+*sichtbaren* Modus (`resolvedTheme`): Wer auf „System" steht und dunkel sieht, bekommt
+hell. Danach ist die Wahl fest; zurück zu „System" nur über die Karte, die deshalb
+bleibt. Zwei Gestalten, eine Logik: der Symbolknopf (Startseiten-Leiste, Mehr-Sheet)
+und die Zeile mit Wort (Seitenleiste). Vor dem Mount ein Platzhalter gleicher Größe —
+der Server kennt den Modus nicht. Mobil im Bauern-Bereich sitzt er im Kopf des
+Mehr-Sheets (zwei Tipps): Die Tab-Leiste hält ihre Platz-Regel von sechs Zielen; ein
+siebtes fiele unter 340 px unter 48 px. Öffentlich trägt ihn nur die Startseite — die
+übrigen öffentlichen Seiten haben keinen gemeinsamen Kopf oder Fuß (Header-Sprint).
+
 ---
 
 ## Upload-Diagnose

@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { LayoutDashboard, ReceiptText, Users, Home, Tag, BarChart3, SlidersHorizontal, LogOut, MoreHorizontal, X, Bug, Inbox, ShieldCheck } from 'lucide-react'
 import { signOut } from '@/lib/auth-client'
 import { FarmIdentityCard } from '@/components/farmer/farm-identity-card'
+import { ThemeUmschalter, ThemeUmschalterZeile } from '@/components/shared/theme-umschalter'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
@@ -139,15 +140,24 @@ export function FarmerNav({
                   onNavigate={() => setMoreOpen(false)}
                 />
               </div>
-              <button
-                type="button"
-                onClick={() => setMoreOpen(false)}
-                aria-label="Schließen"
-                className="flex shrink-0 items-center justify-center size-8 rounded-full transition-colors hover:bg-white/10"
-                style={{ color: 'var(--app-bar-ink-soft)' }}
-              >
-                <X className="size-4" strokeWidth={1.7} />
-              </button>
+              <div className="flex shrink-0 items-center gap-1">
+                {/* Hell/Dunkel hier statt als siebter Tab: Die Leiste hält
+                    ihre Platz-Regel (6 Ziele), der Umschalter ist trotzdem von
+                    jeder Bauern-Seite aus über „Mehr" erreichbar. */}
+                <ThemeUmschalter
+                  className="rounded-full hover:bg-white/10"
+                  style={{ color: 'var(--app-bar-ink-soft)' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setMoreOpen(false)}
+                  aria-label="Schließen"
+                  className="flex shrink-0 items-center justify-center size-8 rounded-full transition-colors hover:bg-white/10"
+                  style={{ color: 'var(--app-bar-ink-soft)' }}
+                >
+                  <X className="size-4" strokeWidth={1.7} />
+                </button>
+              </div>
             </div>
             <Link
               href="/analytics"
@@ -293,6 +303,12 @@ export function FarmerNav({
               {label}
             </Link>
           ))}
+          {/* Hell/Dunkel als Zeile wie die Nachbarn — ein Klick von jeder
+              Bauern-Seite, ohne den Weg über Einstellungen → Konto. */}
+          <ThemeUmschalterZeile
+            className="duration-[250ms] hover:bg-white/10"
+            style={{ color: 'var(--app-bar-ink-soft)' }}
+          />
           <Link
             href="/settings"
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-[250ms] min-h-[44px]"
