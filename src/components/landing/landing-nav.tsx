@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Menu, X } from 'lucide-react'
+import { ThemeUmschalter } from '@/components/shared/theme-umschalter'
 
 /**
  * Die klebende Navigationsleiste der Startseite.
@@ -150,6 +151,10 @@ export function LandingNav() {
           >
             Hofbetreiber-Login
           </Link>
+          {/* Hell/Dunkel in jeder Breite direkt in der Leiste — nicht im
+              Menü, sonst wäre er auf dem Handy zwei Tipps weit weg. Bei 375 px
+              bleibt neben Logo, „Höfe ansehen" und Menüknopf Platz dafür. */}
+          <ThemeUmschalter className="border border-border bg-card/60 text-brand-text hover:bg-card" />
           <button
             ref={schalter}
             type="button"
