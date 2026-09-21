@@ -56,6 +56,8 @@ export function FarmIdentityCard({
              eine Entscheidung, ein Platzhalter-Icon wie ein Fehler. */
           <span
             className="flex size-10 shrink-0 items-center justify-center rounded-full font-heading text-sm font-semibold"
+            /* Sand-Plakette auf der dunkelgrünen Leiste — die Leiste ist in
+               beiden Modi dunkel, die Plakette bleibt deshalb hell. */
             style={{ background: '#F2E5D3', color: '#8B6B4F' }}
             aria-hidden="true"
           >
@@ -72,7 +74,7 @@ export function FarmIdentityCard({
               er ist der Name des Betriebs, nicht eine Beschriftung. */}
           <div
             className="font-heading text-[15px] font-semibold leading-snug break-words"
-            style={{ color: '#F5F3EE' }}
+            style={{ color: 'var(--app-bar-ink)' }}
           >
             {farmName}
           </div>
@@ -100,7 +102,7 @@ export function FarmIdentityCard({
         href="/farm-page"
         onClick={onNavigate}
         className="mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border px-3 text-[13px] font-semibold transition-colors hover:bg-white/10"
-        style={{ borderColor: 'rgba(255,255,255,0.28)', color: '#F5F3EE' }}
+        style={{ borderColor: 'rgba(255,255,255,0.28)', color: 'var(--app-bar-ink)' }}
       >
         <Eye className="size-3.5 shrink-0" strokeWidth={1.8} aria-hidden="true" />
         Hofseite ansehen

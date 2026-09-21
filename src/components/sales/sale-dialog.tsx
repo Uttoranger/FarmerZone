@@ -321,7 +321,7 @@ export function SaleDialog({ open, editingSale, prefillSale, products, onClose }
                         (Wanne #F0EDE5, aktiv #24523A mit Weiß, Rest gedimmt) */}
                     <div
                       className="grid grid-cols-5 gap-1.5 rounded-[10px] p-1"
-                      style={{ background: '#F0EDE5' }}
+                      style={{ background: 'var(--app-trough)' }}
                     >
                       {CHANNEL_OPTIONS.map((ch) => {
                         const active = field.value === ch.value
@@ -334,7 +334,7 @@ export function SaleDialog({ open, editingSale, prefillSale, products, onClose }
                                Fünftel-Spalte, die Chips werden ungleich breit
                                und der aktive überlappt seine Nachbarn */
                             className="flex min-w-0 h-full flex-col items-center justify-center gap-1 py-2 px-1 rounded-lg text-center transition-colors"
-                            style={active ? { background: '#24523A', color: '#fff' } : { color: '#5C6052' }}
+                            style={active ? { background: 'var(--app-bar)', color: '#fff' } : { color: 'var(--app-ink-soft)' }}
                           >
                             <span className="text-base leading-none">{ch.icon}</span>
                             <span className="text-[11px] leading-tight font-medium hyphens-auto break-words">

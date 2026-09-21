@@ -250,6 +250,9 @@ function ToggleRow({
         }`}
         aria-label={active ? 'Deaktivieren' : 'Aktivieren'}
       >
+        {/* Der Schieber bleibt in beiden Modi weiß: Er liegt sowohl auf der
+            hellen Salbei-Schiene (aktiv) als auch auf der dunklen (inaktiv)
+            und muss auf beiden zu sehen sein. */}
         <span
           className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
             active ? 'translate-x-5' : 'translate-x-0'

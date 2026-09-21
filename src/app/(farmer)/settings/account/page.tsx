@@ -96,8 +96,8 @@ export default async function AccountPage() {
         {farm && <ArchiveFarmCard farmSlug={farm.slug} isArchived={farm.archivedAt !== null} />}
 
         <div className="rounded-xl border border-red-100 bg-red-50 p-4 dark:border-red-900/60 dark:bg-red-950/40">
-          <p className="text-sm font-medium text-red-700 dark:text-red-200 mb-1">Konto löschen</p>
-          <p className="text-xs text-red-600 dark:text-red-300">
+          <p className="text-sm font-medium text-red-700 dark:text-red-300 mb-1">Konto löschen</p>
+          <p className="text-xs text-red-600 dark:text-red-400">
             Wenn du dein Konto löschen möchtest,{' '}
             <a
               href={accountDeleteMailto}
@@ -109,7 +109,7 @@ export default async function AccountPage() {
             Die Löschung wird innerhalb weniger Werktage bearbeitet.
             Beachte: Bestelldaten müssen aus steuerrechtlichen Gründen 7 Jahre aufbewahrt werden.
           </p>
-          <p className="text-xs text-red-600 dark:text-red-300 mt-2">
+          <p className="text-xs text-red-600 dark:text-red-400 mt-2">
             Du willst nur deinen Hofladen schließen, dein Konto aber behalten? Dann nutze oben
             &bdquo;Hof stilllegen&ldquo; — dabei bleiben alle Daten erhalten.
           </p>

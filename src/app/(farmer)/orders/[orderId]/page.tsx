@@ -44,7 +44,7 @@ export default async function OrderDetailPage({
       <div className="flex items-center justify-between mb-6">
         <Link
           href="/orders"
-          className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700"
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
           Bestellungen
@@ -52,7 +52,7 @@ export default async function OrderDetailPage({
         <Link
           href={`/orders/${orderId}/print`}
           target="_blank"
-          className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700"
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <Printer className="h-4 w-4" />
           Drucken
@@ -61,8 +61,8 @@ export default async function OrderDetailPage({
 
       <div className="flex items-start justify-between gap-3 mb-5">
         <div>
-          <h1 className="text-xl font-medium text-slate-800">{order.orderNumber}</h1>
-          <p className="text-xs text-slate-400 mt-0.5">{createdAt}</p>
+          <h1 className="text-xl font-medium text-foreground">{order.orderNumber}</h1>
+          <p className="text-xs text-muted-foreground/70 mt-0.5">{createdAt}</p>
         </div>
         <span
           className={`shrink-0 inline-block rounded-full px-3 py-1 text-sm font-medium ${statusColor(order.status)}`}
@@ -74,19 +74,19 @@ export default async function OrderDetailPage({
       <div className="grid gap-4">
         <Card>
           <CardContent className="py-4 px-4">
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+            <h2 className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wide mb-3">
               Kunde
             </h2>
-            <p className="font-medium text-slate-800">{order.customerName}</p>
-            <p className="text-sm text-slate-600">{order.customerEmail}</p>
+            <p className="font-medium text-foreground">{order.customerName}</p>
+            <p className="text-sm text-muted-foreground">{order.customerEmail}</p>
             <a
               href={`tel:${order.customerPhone}`}
-              className="text-sm text-green-700 hover:underline"
+              className="text-sm text-green-700 dark:text-green-300 hover:underline"
             >
               {order.customerPhone}
             </a>
             {order.customerNote && (
-              <p className="text-sm text-slate-500 mt-2 bg-slate-50 rounded-lg p-2 italic">
+              <p className="text-sm text-muted-foreground mt-2 bg-muted rounded-lg p-2 italic">
                 {order.customerNote}
               </p>
             )}
@@ -95,11 +95,11 @@ export default async function OrderDetailPage({
 
         <Card>
           <CardContent className="py-4 px-4">
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+            <h2 className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wide mb-3">
               Abholung
             </h2>
-            <p className="font-medium text-slate-800">{pickupDate}</p>
-            <p className="text-sm text-slate-600">
+            <p className="font-medium text-foreground">{pickupDate}</p>
+            <p className="text-sm text-muted-foreground">
               {order.pickupTimeStart} – {order.pickupTimeEnd} Uhr
             </p>
           </CardContent>
@@ -107,16 +107,16 @@ export default async function OrderDetailPage({
 
         <Card>
           <CardContent className="py-4 px-4">
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+            <h2 className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wide mb-3">
               Produkte
             </h2>
             <div className="flex flex-col gap-2">
               {order.items.map((item) => (
                 <div key={item.id} className="flex justify-between text-sm">
-                  <span className="text-slate-700">
+                  <span className="text-foreground">
                     {formatPosition({ name: item.productName, quantity: item.quantity, unit: item.product?.unit ?? null, unitSize: item.product?.unitSize ?? null })}
                   </span>
-                  <span className="text-slate-800 font-medium">
+                  <span className="text-foreground font-medium">
                     € {Number(item.totalPrice).toFixed(2)}
                   </span>
                 </div>
@@ -125,13 +125,13 @@ export default async function OrderDetailPage({
                   Gesamt — dieselbe Aufteilung wie im Checkout der Kundin */}
               {summen.gebuehrCents > 0 ? (
                 <>
-                  <div className="flex justify-between text-sm border-t border-slate-100 pt-2 mt-1">
-                    <span className="text-slate-500">Zwischensumme (Warenpreis)</span>
-                    <span className="text-slate-800">€ {(summen.warenpreisCents / 100).toFixed(2)}</span>
+                  <div className="flex justify-between text-sm border-t border-border pt-2 mt-1">
+                    <span className="text-muted-foreground">Zwischensumme (Warenpreis)</span>
+                    <span className="text-foreground">€ {(summen.warenpreisCents / 100).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Servicegebühr</span>
-                    <span className="text-slate-800">€ {(summen.gebuehrCents / 100).toFixed(2)}</span>
+                    <span className="text-muted-foreground">Servicegebühr</span>
+                    <span className="text-foreground">€ {(summen.gebuehrCents / 100).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-base font-semibold">
                     <span>Gesamt (zahlt der Kunde)</span>
@@ -139,7 +139,7 @@ export default async function OrderDetailPage({
                   </div>
                 </>
               ) : (
-                <div className="flex justify-between text-base font-semibold border-t border-slate-100 pt-2 mt-1">
+                <div className="flex justify-between text-base font-semibold border-t border-border pt-2 mt-1">
                   <span>Gesamt</span>
                   <span>€ {Number(order.totalAmount).toFixed(2)}</span>
                 </div>
@@ -150,17 +150,17 @@ export default async function OrderDetailPage({
 
         <Card>
           <CardContent className="py-4 px-4">
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+            <h2 className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wide mb-3">
               Zahlung
             </h2>
-            <p className="text-sm font-medium text-slate-700">
+            <p className="text-sm font-medium text-foreground">
               {paymentLabel(order.paymentMethod)}
             </p>
             {/* „Bar zu kassieren" bzw. Warenpreis + Gebühr-Nebenzeile, samt
                 Vermerk bei ausstehender Erstattung */}
             <BetragMitGebuehr order={order} className="mt-2" />
             {order.paidAt && (
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-xs text-muted-foreground/70 mt-1">
                 Bezahlt am {order.paidAt.toLocaleDateString('de-AT')}
               </p>
             )}
@@ -168,12 +168,12 @@ export default async function OrderDetailPage({
         </Card>
 
         {order.cancelReason && (
-          <Card className="border-red-200 bg-red-50">
+          <Card className="border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/40">
             <CardContent className="py-4 px-4">
-              <h2 className="text-xs font-semibold text-red-400 uppercase tracking-wide mb-2">
+              <h2 className="text-xs font-semibold text-red-400 dark:text-red-400 uppercase tracking-wide mb-2">
                 Stornierungsgrund
               </h2>
-              <p className="text-sm text-red-700">{order.cancelReason}</p>
+              <p className="text-sm text-red-700 dark:text-red-300">{order.cancelReason}</p>
             </CardContent>
           </Card>
         )}

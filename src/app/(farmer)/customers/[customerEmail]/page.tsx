@@ -23,18 +23,18 @@ function initials(name: string): string {
 }
 
 function avatarClass(isStammkunde: boolean, isLangeNichtGesehen: boolean): string {
-  if (isStammkunde) return 'bg-green-100 text-green-800'
-  if (isLangeNichtGesehen) return 'bg-amber-100 text-amber-800'
-  return 'bg-slate-100 text-slate-600'
+  if (isStammkunde) return 'bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-200'
+  if (isLangeNichtGesehen) return 'bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-200'
+  return 'bg-muted text-muted-foreground'
 }
 
 function customerBadgeClass(status: CustomerStatus): string {
   switch (status) {
-    case 'Stammkunde': return 'bg-green-100 text-green-800'
-    case 'Diesen Monat aktiv': return 'bg-blue-100 text-blue-800'
-    case 'Lange nicht gesehen': return 'bg-amber-100 text-amber-800'
-    case 'Neu': return 'bg-purple-100 text-purple-800'
-    default: return 'bg-slate-100 text-slate-600'
+    case 'Stammkunde': return 'bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-200'
+    case 'Diesen Monat aktiv': return 'bg-blue-100 dark:bg-blue-950/50 text-blue-800 dark:text-blue-200'
+    case 'Lange nicht gesehen': return 'bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-200'
+    case 'Neu': return 'bg-purple-100 dark:bg-purple-950/50 text-purple-800 dark:text-purple-200'
+    default: return 'bg-muted text-muted-foreground'
   }
 }
 
@@ -222,7 +222,7 @@ export default async function CustomerDetailPage({ params }: Props) {
               <span
                 className={
                   customer.subscription.optInEmail
-                    ? 'text-green-700 font-medium'
+                    ? 'text-green-700 dark:text-green-300 font-medium'
                     : 'text-muted-foreground'
                 }
               >
@@ -235,7 +235,7 @@ export default async function CustomerDetailPage({ params }: Props) {
               <span
                 className={
                   customer.subscription.optInWhatsApp
-                    ? 'text-green-700 font-medium'
+                    ? 'text-green-700 dark:text-green-300 font-medium'
                     : 'text-muted-foreground'
                 }
               >

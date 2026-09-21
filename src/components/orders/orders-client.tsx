@@ -110,10 +110,10 @@ export function OrdersClient({
           <div key={group.key} className="mb-6">
             <h2
               className="text-[13px] font-bold uppercase mb-2.5"
-              style={{ color: '#8B6B4F', letterSpacing: '0.05em' }}
+              style={{ color: 'var(--app-chip-ink)', letterSpacing: '0.05em' }}
             >
               Abholung {group.label}
-              <span className="ml-2 normal-case font-normal tracking-normal" style={{ color: '#9AA08F' }}>
+              <span className="ml-2 normal-case font-normal tracking-normal" style={{ color: 'var(--app-ink-faint)' }}>
                 {group.orders[0].pickupTimeStart}–{group.orders[group.orders.length - 1].pickupTimeEnd} Uhr
               </span>
             </h2>

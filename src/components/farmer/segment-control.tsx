@@ -18,7 +18,7 @@ export function SegmentControl<K extends string>({
     // ab md verhalten sie sich wie bisher (flex-1, kein Scroll nötig)
     <div
       className={`flex gap-1.5 rounded-[10px] p-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${className}`}
-      style={{ background: '#F0EDE5' }}
+      style={{ background: 'var(--app-trough)' }}
     >
       {options.map((o) => {
         const active = o.key === value
@@ -28,7 +28,11 @@ export function SegmentControl<K extends string>({
             type="button"
             onClick={() => onChange(o.key)}
             className="flex-none md:flex-1 whitespace-nowrap rounded-lg px-4 py-2 text-[13px] font-semibold transition-colors min-h-[38px]"
-            style={active ? { background: '#24523A', color: '#fff' } : { color: '#5C6052' }}
+            style={
+              active
+                ? { background: 'var(--app-bar)', color: '#fff' }
+                : { color: 'var(--app-ink-soft)' }
+            }
           >
             {o.label}
           </button>

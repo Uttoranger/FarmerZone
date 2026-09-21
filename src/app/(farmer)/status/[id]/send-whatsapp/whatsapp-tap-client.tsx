@@ -71,8 +71,8 @@ export function WhatsAppTapClient({
   if (sentCount >= total) {
     return (
       <div className="text-center py-12">
-        <div className="size-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-          <Check className="size-8 text-green-700" />
+        <div className="size-16 rounded-full bg-green-100 dark:bg-green-950/50 flex items-center justify-center mx-auto mb-4">
+          <Check className="size-8 text-green-700 dark:text-green-300" />
         </div>
         <h2 className="font-heading text-xl font-semibold text-foreground mb-1">
           Alle {total} Nachrichten versendet!
@@ -129,7 +129,7 @@ export function WhatsAppTapClient({
               {/* Avatar */}
               <div className={cn(
                 'size-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0',
-                isSent ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'
+                isSent ? 'bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-300' : 'bg-muted text-muted-foreground'
               )}>
                 {isSent ? <Check className="size-4" /> : sub.name.charAt(0).toUpperCase()}
               </div>
@@ -144,7 +144,7 @@ export function WhatsAppTapClient({
 
               {/* Action */}
               {isSent ? (
-                <span className="text-xs text-green-700 font-medium shrink-0">Gesendet</span>
+                <span className="text-xs text-green-700 dark:text-green-300 font-medium shrink-0">Gesendet</span>
               ) : (
                 <a
                   href={buildWaUrl(sub)}

@@ -476,11 +476,23 @@ stärkerer Schatten.
 - **Die Browserleiste auf dem Handy** (`theme-color`) folgt der Systemeinstellung,
   nicht der Wahl im Konto — anders geht es im `<head>` ohne JavaScript nicht.
 
-**Noch nicht umgestellt.** `src/components/farm/farm-page-view.tsx` und
-`src/components/farm/product-grid.tsx` tragen eine zweite, gewachsene Palette
-(„Referenz 19") vollständig in Inline-Styles. Sie sind in sich geschlossen hell
-und bleiben es vorerst — nichts daran ist kaputt, es ist nur noch Tag. Derselbe
-Palettensatz steckt im Bauern-Bereich und im Admin.
+**Die zweite Palette („Referenz 19").** Hofseite, Produktraster und der ganze
+Bauern-Bereich waren nie auf den shadcn-Tokens gebaut, sondern auf einer eigenen,
+gewachsenen Palette in Inline-Styles: weichere Kohle statt des fast schwarzen
+`--foreground`, ein eigener Seitenton, Sand- und Grün-Chips. Sie steht jetzt als
+`--app-*`-Familie in `globals.css`. Die **Tag-Werte sind exakt die bisherigen
+Hex-Werte** — das war die Bedingung, unter der sich diese vierzig Dateien
+gefahrlos umstellen ließen: Im hellen Modus ändert sich nichts, erst der
+`.dark`-Block gibt ihnen eine zweite Lesart.
+
+Die Bauern-Leiste (`--app-bar`) ist in **beiden** Modi dunkelgrün — sie war es
+schon am Tag. Ihre Schrift (`--app-bar-ink`, `--app-bar-ink-soft`) steht deshalb
+nur in `:root` und wird in `.dark` nicht wiederholt.
+
+**Diagramme (Recharts).** Recharts schreibt Farben als SVG-Attribute; dort greift
+keine CSS-Variable. Das Auswertungs-Diagramm hält deshalb zwei Farbsätze und
+schaltet in JavaScript über `resolvedTheme` um. Nur der Tooltip kommt ohne aus:
+`contentStyle` ist ein React-Style-Objekt, da funktionieren die Tokens direkt.
 
 ---
 

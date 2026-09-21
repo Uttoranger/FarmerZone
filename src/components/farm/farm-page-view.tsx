@@ -28,6 +28,8 @@ import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { ProductGrid } from './product-grid'
 import { stripStatusVariables, renderStatusBodyWithChip } from '@/lib/status-body'
 
+// Ersatzbanner, wenn ein Hof noch kein Foto hochgeladen hat. Bildersatz,
+// kein Anstrich — die Verläufe folgen dem Modus bewusst nicht.
 const BANNER_GRADIENTS: Record<string, string> = {
   tannengruen: 'linear-gradient(135deg, #1F4732 0%, #3D7B58 60%, #E8F0E8 100%)',
   wiese:       'linear-gradient(135deg, #2D6A4F 0%, #52B788 50%, #D8F3DC 100%)',
@@ -45,15 +47,19 @@ const ANLASS_META: Record<string, { label: string; icon: ReactNode }> = {
 function WoodCard({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
     <div
-      className={`bg-white rounded-[14px] overflow-hidden ${className}`}
+      className={`bg-card rounded-[14px] overflow-hidden dark:ring-1 dark:ring-border ${className}`}
       style={{ boxShadow: '0 2px 10px rgba(45,95,63,0.06)' }}
     >
+      {/* Holzleiste als Zierkante — ein Materialbild, keine Fläche des
+          Farbsatzes, und deshalb in beiden Modi dieselbe. */}
       <div style={{ height: 7, background: 'linear-gradient(90deg,#B08054,#8B6247 35%,#A87C52 70%,#8F6A48)' }} />
       {children}
     </div>
   )
 }
 
+// Gezeichnetes Hofsiegel: eine Illustration in Sepia, kein Bedienteil.
+// Sie behält ihre Farben in beiden Modi — wie ein aufgeklebter Stempel.
 function FarmSeal({ farmName, foundedYear }: { farmName: string; foundedYear: number }) {
   const upper = farmName.toUpperCase()
   if (upper.length > 18) return null
@@ -248,10 +254,10 @@ function GallerySection({
 
       {/* Heading row */}
       <div className="flex items-baseline gap-3 mb-[14px]">
-        <h2 className="font-heading font-semibold" style={{ fontFamily: 'Fraunces, serif', fontSize: 23, color: '#2D3027' }}>
+        <h2 className="font-heading font-semibold" style={{ fontFamily: 'Fraunces, serif', fontSize: 23, color: 'var(--app-ink)' }}>
           Fotos vom Hof
         </h2>
-        <span className="text-[13px]" style={{ color: '#9AA08F' }}>
+        <span className="text-[13px]" style={{ color: 'var(--app-ink-faint)' }}>
           {photos.length} {photos.length === 1 ? 'Foto' : 'Fotos'}
         </span>
         {isEdit && (
@@ -259,13 +265,13 @@ function GallerySection({
             type="button"
             onClick={openFilePicker}
             disabled={isUploading || !canUpload}
-            className="ml-auto flex items-center gap-1.5 rounded-lg text-[13px] font-semibold disabled:opacity-60 hover:bg-gray-50 transition-colors"
+            className="ml-auto flex items-center gap-1.5 rounded-lg text-[13px] font-semibold disabled:opacity-60 hover:bg-muted transition-colors"
             style={{
-              border: '1px solid #D6E0CE',
-              background: '#fff',
+              border: '1px solid var(--border)',
+              background: 'var(--card)',
               borderRadius: 8,
               padding: '9px 15px',
-              color: '#2D5F3F',
+              color: 'var(--brand-text)',
             }}
           >
             <Plus className="size-3.5" strokeWidth={1.9} />
@@ -373,19 +379,19 @@ function GallerySection({
             type="button"
             onClick={openFilePicker}
             disabled={isUploading}
-            className="flex flex-col items-center justify-center rounded-[10px] gap-2 hover:bg-white/60 transition-colors disabled:opacity-60"
+            className="flex flex-col items-center justify-center rounded-[10px] gap-2 hover:bg-card/60 transition-colors disabled:opacity-60"
             style={{
-              border: '2px dashed #C9C2B2',
-              background: 'rgba(255,255,255,0.5)',
+              border: '2px dashed var(--app-line-firm)',
+              background: 'color-mix(in srgb, var(--card) 50%, transparent)',
             }}
           >
             <span
               className="flex items-center justify-center rounded-full"
-              style={{ width: 36, height: 36, background: '#E8F0E2', color: '#2D5F3F' }}
+              style={{ width: 36, height: 36, background: 'var(--app-chip-green)', color: 'var(--brand-text)' }}
             >
               <Plus className="size-4" strokeWidth={1.9} />
             </span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#2D5F3F' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--brand-text)' }}>
               {isUploading ? (progress ? stufenText(progress) : 'Lädt…') : 'Foto hinzufügen'}
             </span>
           </button>
@@ -485,6 +491,8 @@ function CoverEditButton({ currentBannerUrl }: { currentBannerUrl: string | null
         onClick={openFilePicker}
         disabled={isUploading}
         className="flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-60"
+        // Liegt auf dem Bannerfoto, nicht auf der Seite: bleibt in beiden
+        // Modi eine weiße Marke mit dunkelgrüner Schrift.
         style={{ background: 'rgba(255,255,255,0.94)', color: '#2D5F3F', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}
       >
         <Camera className="size-3.5" strokeWidth={1.7} />
@@ -705,21 +713,21 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
       return (
         <main
           className="min-h-screen flex items-center justify-center p-6"
-          style={{ background: 'linear-gradient(160deg, #F4EFE6 0%, #E8F0E8 100%)' }}
+          style={{ background: 'linear-gradient(160deg, var(--landing-top) 0%, var(--app-chip-green) 100%)' }}
         >
           <div
-            className="text-center max-w-sm bg-white rounded-3xl p-10"
+            className="text-center max-w-sm bg-card rounded-3xl p-10 dark:ring-1 dark:ring-border"
             style={{ boxShadow: '0 8px 24px rgba(45,95,63,0.08)' }}
           >
             <div className="text-5xl mb-5">🌱</div>
-            <h1 className="font-heading text-xl font-semibold mb-3" style={{ color: '#2D3027' }}>{farm.name}</h1>
-            <p className="leading-relaxed text-sm" style={{ color: '#5C6052' }}>
+            <h1 className="font-heading text-xl font-semibold mb-3" style={{ color: 'var(--app-ink)' }}>{farm.name}</h1>
+            <p className="leading-relaxed text-sm" style={{ color: 'var(--app-ink-soft)' }}>
               Dieser Hof richtet gerade seinen Shop ein. Schau bald wieder vorbei!
             </p>
             <a
               href={`tel:${farm.phone}`}
               className="mt-6 inline-flex items-center gap-1.5 text-sm hover:underline underline-offset-2"
-              style={{ color: '#2D5F3F' }}
+              style={{ color: 'var(--brand-text)' }}
             >
               <Phone className="w-3.5 h-3.5" strokeWidth={1.7} />
               {farm.phone}
@@ -770,7 +778,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
     (farm.farmPhotos.length > 0 || isEdit)
 
   return (
-    <div className="min-h-screen" style={{ background: '#F5F3EE' }}>
+    <div className="min-h-screen" style={{ background: 'var(--app-page)' }}>
       {!ownerMode && (
         <script
           type="application/ld+json"
@@ -784,8 +792,8 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           <div
             className="flex items-center gap-3 rounded-xl px-4 py-[13px]"
             style={{
-              background: isEdit ? '#fff' : '#24523A',
-              border: `1px solid ${isEdit ? '#ECE8DF' : '#24523A'}`,
+              background: isEdit ? 'var(--card)' : 'var(--app-bar)',
+              border: `1px solid ${isEdit ? 'var(--border)' : 'var(--app-bar)'}`,
             }}
           >
             <span
@@ -793,8 +801,8 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
               style={{
                 width: 38,
                 height: 38,
-                background: isEdit ? '#F2E5D3' : 'rgba(255,255,255,0.14)',
-                color: isEdit ? '#8B6B4F' : '#fff',
+                background: isEdit ? 'var(--app-chip)' : 'rgba(255,255,255,0.14)',
+                color: isEdit ? 'var(--app-chip-ink)' : '#fff',
               }}
             >
               {isEdit
@@ -803,10 +811,10 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
               }
             </span>
             <div>
-              <div className="text-sm font-semibold" style={{ color: isEdit ? '#2D3027' : '#fff' }}>
+              <div className="text-sm font-semibold" style={{ color: isEdit ? 'var(--app-ink)' : '#fff' }}>
                 {isEdit ? 'Du bearbeitest deine Hof-Seite' : 'So sehen Kunden deine Seite'}
               </div>
-              <div className="text-[13px] mt-px" style={{ color: isEdit ? '#9AA08F' : '#C9E3CF' }}>
+              <div className="text-[13px] mt-px" style={{ color: isEdit ? 'var(--app-ink-faint)' : '#C9E3CF' }}>
                 {isEdit
                   ? 'Alles mit Stift-Symbol kannst du ändern – Kunden sehen es sofort.'
                   : 'Bearbeiten-Knöpfe und ausgeblendete Produkte sind unsichtbar.'
@@ -879,7 +887,9 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                 type="button"
                 onClick={() => setFocusDraft(farm.bannerFocusY)}
                 className="flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90"
-                style={{ background: 'rgba(255,255,255,0.94)', color: '#2D5F3F', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}
+                // Liegt auf dem Bannerfoto, nicht auf der Seite: bleibt in beiden
+        // Modi eine weiße Marke mit dunkelgrüner Schrift.
+        style={{ background: 'rgba(255,255,255,0.94)', color: '#2D5F3F', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}
               >
                 <MoveVertical className="size-3.5" strokeWidth={1.7} />
                 Anpassen
@@ -944,7 +954,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                     width: 34, height: 34,
                     background: 'rgba(255,255,255,0.92)',
                     boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-                    color: '#5C6052',
+                    color: 'var(--app-ink-soft)',
                   }}
                   aria-label="Hofname & Cover bearbeiten"
                 >
@@ -971,18 +981,18 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           Owner-Sicht (Edit UND Vorschau): unübersehbarer Hinweis mit Weg zurück,
           damit eine vergessene Pause nicht wochenlang Bestellungen kostet. */}
       {farm.isPaused && (
-        <div className="px-4 md:px-10 py-3" style={{ background: '#FBEEE3', borderBottom: '1px solid #F0D9C2' }}>
+        <div className="px-4 md:px-10 py-3" style={{ background: 'var(--notice)', borderBottom: '1px solid var(--notice-line)' }}>
           <div className="max-w-[960px] mx-auto flex items-start gap-2.5">
-            <PauseCircle className="size-[18px] shrink-0 mt-px" strokeWidth={1.8} style={{ color: '#B86A2E' }} />
+            <PauseCircle className="size-[18px] shrink-0 mt-px" strokeWidth={1.8} style={{ color: 'var(--notice-icon)' }} />
             {ownerMode ? (
-              <p className="text-sm leading-relaxed min-w-0" style={{ color: '#8A4B18' }}>
+              <p className="text-sm leading-relaxed min-w-0" style={{ color: 'var(--notice-ink)' }}>
                 <b>Dein Shop ist pausiert</b> — Kundinnen können nicht bestellen.{' '}
                 <Link href="/settings/pause" className="font-semibold underline underline-offset-2 whitespace-nowrap">
                   Pause beenden
                 </Link>
               </p>
             ) : (
-              <p className="text-sm leading-relaxed min-w-0" style={{ color: '#8A4B18' }}>
+              <p className="text-sm leading-relaxed min-w-0" style={{ color: 'var(--notice-ink)' }}>
                 <b>{farm.name} pausiert gerade.</b>{' '}
                 {farm.pauseMessage?.trim() || SHOP_PAUSED_FALLBACK}
               </p>
@@ -993,17 +1003,17 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
 
       {/* Aktionsleiste unter dem Cover (Referenz 17, nur Kundenansicht) */}
       {!isEdit && (
-        <div className="px-4 md:px-10 py-3.5" style={{ background: '#fff', borderBottom: '1px solid #ECE8DF' }}>
+        <div className="px-4 md:px-10 py-3.5" style={{ background: 'var(--card)', borderBottom: '1px solid var(--border)' }}>
           <div className="max-w-[960px] mx-auto flex items-center gap-x-[22px] gap-y-2 flex-wrap">
             {pickupDaysShort && (
-              <span className="text-sm hidden sm:inline" style={{ color: '#5C6052' }}>
-                Abholung <b style={{ color: '#2D3027' }}>{pickupDaysShort}</b>
+              <span className="text-sm hidden sm:inline" style={{ color: 'var(--app-ink-soft)' }}>
+                Abholung <b style={{ color: 'var(--app-ink)' }}>{pickupDaysShort}</b>
               </span>
             )}
             {(farm.acceptsOnline || farm.acceptsOnsite) && (
-              <span className="text-sm hidden md:inline" style={{ color: '#5C6052' }}>
+              <span className="text-sm hidden md:inline" style={{ color: 'var(--app-ink-soft)' }}>
                 Zahlung{' '}
-                <b style={{ color: '#2D3027' }}>
+                <b style={{ color: 'var(--app-ink)' }}>
                   {farm.acceptsOnline && farm.acceptsOnsite
                     ? 'am Hof oder online'
                     : farm.acceptsOnline
@@ -1015,8 +1025,8 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
             <div className="ml-auto flex gap-2.5">
               <a
                 href={`tel:${farm.phone}`}
-                className="flex items-center gap-[7px] h-10 rounded-lg px-4 text-[13px] font-semibold transition-colors hover:bg-gray-50"
-                style={{ background: '#fff', border: '1px solid #E4E0D6', color: '#5C6052' }}
+                className="flex items-center gap-[7px] h-10 rounded-lg px-4 text-[13px] font-semibold transition-colors hover:bg-muted"
+                style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--app-ink-soft)' }}
               >
                 <Phone className="size-[15px]" strokeWidth={1.7} />
                 Anrufen
@@ -1025,8 +1035,8 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                 href={mapsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-[7px] h-10 rounded-lg px-4 text-[13px] font-semibold transition-colors hover:bg-gray-50"
-                style={{ background: '#fff', border: '1px solid #E4E0D6', color: '#5C6052' }}
+                className="flex items-center gap-[7px] h-10 rounded-lg px-4 text-[13px] font-semibold transition-colors hover:bg-muted"
+                style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--app-ink-soft)' }}
               >
                 <Navigation className="size-[15px]" strokeWidth={1.7} />
                 Anfahrt
@@ -1035,7 +1045,9 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                 type="button"
                 onClick={handleShare}
                 className="flex items-center gap-[7px] h-10 rounded-lg px-5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
-                style={{ background: '#2D5F3F' }}
+                // Gefüllte Fläche, nicht Text: --app-button, nicht --brand-text.
+                // Die weiße Schrift muss darauf in beiden Modi lesbar bleiben.
+                style={{ background: 'var(--app-button)' }}
               >
                 <Share2 className="size-[15px]" strokeWidth={1.7} />
                 Teilen
@@ -1049,7 +1061,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
       {!isEdit && (
         <nav
           className="sticky top-0 z-30 px-4 md:px-10"
-          style={{ background: '#fff', borderBottom: '1px solid #ECE8DF', boxShadow: '0 2px 10px rgba(45,95,63,0.06)' }}
+          style={{ background: 'var(--card)', borderBottom: '1px solid var(--border)', boxShadow: '0 2px 10px rgba(45,95,63,0.06)' }}
         >
           <div className="max-w-[960px] mx-auto flex gap-[26px]">
             {sektionen.map((tab) => (
@@ -1060,8 +1072,8 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                 className="pt-[13px] pb-[11px] px-0.5 text-[13px] transition-colors"
                 style={
                   activeTab === tab.id
-                    ? { color: '#2D5F3F', fontWeight: 700, borderBottom: '3px solid #2D5F3F' }
-                    : { color: '#9AA08F', fontWeight: 600, borderBottom: '3px solid transparent' }
+                    ? { color: 'var(--brand-text)', fontWeight: 700, borderBottom: '3px solid var(--brand-text)' }
+                    : { color: 'var(--app-ink-faint)', fontWeight: 600, borderBottom: '3px solid transparent' }
                 }
               >
                 {tab.label}
@@ -1084,10 +1096,10 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
             kann, wäre ein leeres Versprechen. */}
         {!isEdit && !farm.isPaused && pickupDays.length > 0 && (
           <div
-            className="bg-white rounded-[14px] p-[18px] mb-[18px]"
+            className="bg-card rounded-[14px] p-[18px] mb-[18px] dark:ring-1 dark:ring-border"
             style={{ boxShadow: '0 2px 10px rgba(45,95,63,0.06)' }}
           >
-            <div className="text-[15px] font-semibold mb-3" style={{ color: '#2D3027' }}>
+            <div className="text-[15px] font-semibold mb-3" style={{ color: 'var(--app-ink)' }}>
               Nächste Abholung
             </div>
             <div className="flex gap-2">
@@ -1096,21 +1108,21 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                   key={day.date.toISOString()}
                   className="flex-1 rounded-[10px] p-2.5 text-center"
                   style={{
-                    background: '#fff',
-                    border: `2px solid ${i === 0 ? '#2D5F3F' : 'transparent'}`,
+                    background: 'var(--card)',
+                    border: `2px solid ${i === 0 ? 'var(--brand-text)' : 'transparent'}`,
                     boxShadow: i === 0 ? undefined : '0 2px 8px rgba(45,95,63,0.05)',
                   }}
                 >
-                  <div className="text-[13px] font-bold" style={{ color: i === 0 ? '#2D5F3F' : '#5C6052' }}>
+                  <div className="text-[13px] font-bold" style={{ color: i === 0 ? 'var(--brand-text)' : 'var(--app-ink-soft)' }}>
                     {day.label}
                   </div>
-                  <div className="text-[11px] mt-px" style={{ color: '#9AA08F' }}>
+                  <div className="text-[11px] mt-px" style={{ color: 'var(--app-ink-faint)' }}>
                     {day.times}
                   </div>
                 </div>
               ))}
             </div>
-            <div className="text-xs mt-2.5" style={{ color: '#9AA08F' }}>
+            <div className="text-xs mt-2.5" style={{ color: 'var(--app-ink-faint)' }}>
               Zeitfenster wählst du beim Bestellen.
             </div>
           </div>
@@ -1120,15 +1132,15 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
         <WoodCard>
           <div className="px-5 pt-[18px] pb-5">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: '#2D3027' }}>
-                <CreditCard className="size-4" strokeWidth={1.7} style={{ color: '#7A8071' }} />
+              <div className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: 'var(--app-ink)' }}>
+                <CreditCard className="size-4" strokeWidth={1.7} style={{ color: 'var(--app-ink-faint)' }} />
                 Zahlung & Kontakt
               </div>
               {isEdit && (
                 <Link
                   href="/settings"
-                  className="flex items-center justify-center rounded-full border transition-colors hover:bg-gray-50"
-                  style={{ width: 32, height: 32, borderColor: '#E4E0D6', color: '#5C6052' }}
+                  className="flex items-center justify-center rounded-full border transition-colors hover:bg-muted"
+                  style={{ width: 32, height: 32, borderColor: 'var(--border)', color: 'var(--app-ink-soft)' }}
                   aria-label="Zahlung & Kontakt bearbeiten"
                 >
                   <Pencil className="size-[13px]" strokeWidth={1.7} />
@@ -1139,7 +1151,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
               {farm.acceptsOnline && (
                 <span
                   className="inline-flex items-center gap-1.5 text-[13px] font-semibold px-[13px] py-[7px] rounded-full"
-                  style={{ color: '#6E5F45', background: '#F2ECDC' }}
+                  style={{ color: 'var(--app-chip-ink)', background: 'var(--app-chip)' }}
                 >
                   <CreditCard className="size-3.5" strokeWidth={1.7} />
                   Online (Karte)
@@ -1148,19 +1160,19 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
               {farm.acceptsOnsite && (
                 <span
                   className="inline-flex items-center gap-1.5 text-[13px] font-semibold px-[13px] py-[7px] rounded-full"
-                  style={{ color: '#6E5F45', background: '#F2ECDC' }}
+                  style={{ color: 'var(--app-chip-ink)', background: 'var(--app-chip)' }}
                 >
                   <Banknote className="size-3.5" strokeWidth={1.7} />
                   Vor Ort (Bar & Karte)
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2 mt-4 text-sm" style={{ color: '#2D3027' }}>
-              <Phone className="size-[15px] shrink-0" strokeWidth={1.7} style={{ color: '#7A8071' }} />
+            <div className="flex items-center gap-2 mt-4 text-sm" style={{ color: 'var(--app-ink)' }}>
+              <Phone className="size-[15px] shrink-0" strokeWidth={1.7} style={{ color: 'var(--app-ink-faint)' }} />
               {farm.phone}
             </div>
-            <div className="flex items-center gap-2 mt-2 text-sm" style={{ color: '#2D3027' }}>
-              <Mail className="size-[15px] shrink-0" strokeWidth={1.7} style={{ color: '#7A8071' }} />
+            <div className="flex items-center gap-2 mt-2 text-sm" style={{ color: 'var(--app-ink)' }}>
+              <Mail className="size-[15px] shrink-0" strokeWidth={1.7} style={{ color: 'var(--app-ink-faint)' }} />
               {farm.email}
             </div>
           </div>
@@ -1188,7 +1200,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                         <div className="flex items-center gap-2.5 flex-wrap">
                           <span
                             className="inline-flex items-center gap-1 text-xs font-semibold px-[11px] py-[5px] rounded-full"
-                            style={{ color: '#2D5F3F', background: '#E8F0E2' }}
+                            style={{ color: 'var(--brand-text)', background: 'var(--app-chip-green)' }}
                           >
                             {anlassMeta.icon}
                             {anlassMeta.label}
@@ -1196,21 +1208,21 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                           {isEdit && (
                             <span
                               className="inline-flex items-center gap-1 text-xs font-semibold px-[11px] py-[5px] rounded-full"
-                              style={{ color: '#2D5F3F', background: '#DCEDE1' }}
+                              style={{ color: 'var(--brand-text)', background: 'var(--app-chip-green)' }}
                             >
                               <Check className="size-3" strokeWidth={1.9} />
                               Aktiv
                             </span>
                           )}
-                          <span className="text-[13px]" style={{ color: '#9AA08F' }}>
+                          <span className="text-[13px]" style={{ color: 'var(--app-ink-faint)' }}>
                             Aktuell · {timeStr}
                           </span>
                           {isEdit && (
                             <div className="ml-auto">
                               <Link
                                 href="/status"
-                                className="flex items-center justify-center rounded-full border transition-colors hover:bg-gray-50"
-                                style={{ width: 32, height: 32, borderColor: '#E4E0D6', color: '#5C6052' }}
+                                className="flex items-center justify-center rounded-full border transition-colors hover:bg-muted"
+                                style={{ width: 32, height: 32, borderColor: 'var(--border)', color: 'var(--app-ink-soft)' }}
                                 aria-label="Status bearbeiten"
                               >
                                 <Pencil className="size-[13px]" strokeWidth={1.7} />
@@ -1218,10 +1230,10 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                             </div>
                           )}
                         </div>
-                        <h2 className="font-heading text-xl font-semibold mt-3" style={{ color: '#2D3027' }}>
+                        <h2 className="font-heading text-xl font-semibold mt-3" style={{ color: 'var(--app-ink)' }}>
                           {activeStatus.title}
                         </h2>
-                        <p className="text-sm mt-1.5 leading-[1.55] whitespace-pre-wrap" style={{ color: '#5C6052' }}>
+                        <p className="text-sm mt-1.5 leading-[1.55] whitespace-pre-wrap" style={{ color: 'var(--app-ink-soft)' }}>
                           {isEdit
                             ? renderStatusBodyWithChip(activeStatus.body)
                             : stripStatusVariables(activeStatus.body)
@@ -1229,7 +1241,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                         </p>
                         {activeStatus.photoUrl && (
                           /* object-contain auf Sand: volles Bild statt Zoom-Crop (nachlese-7) */
-                          <div className="relative w-full aspect-[3/2] max-h-48 mt-3 rounded-xl overflow-hidden bg-[#F4EFE3]">
+                          <div className="relative w-full aspect-[3/2] max-h-48 mt-3 rounded-xl overflow-hidden bg-app-chip">
                             <Image
                               src={activeStatus.photoUrl}
                               alt={activeStatus.title}
@@ -1247,8 +1259,8 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                   <>
                     <Link
                       href="/status/new"
-                      className="w-full mt-3 flex items-center justify-center gap-2 rounded-[14px] py-3.5 text-sm font-semibold transition-colors hover:bg-white/70"
-                      style={{ border: '2px dashed #C9C2B2', background: 'rgba(255,255,255,0.5)', color: '#2D5F3F' }}
+                      className="w-full mt-3 flex items-center justify-center gap-2 rounded-[14px] py-3.5 text-sm font-semibold transition-colors hover:bg-card/70"
+                      style={{ border: '2px dashed var(--app-line-firm)', background: 'color-mix(in srgb, var(--card) 50%, transparent)', color: 'var(--brand-text)' }}
                     >
                       <Plus className="size-[15px]" strokeWidth={1.9} />
                       Neuer Status
@@ -1256,8 +1268,8 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                     {/* Sekundär-Button statt übersehbarer Textzeile (nachlese-6) */}
                     <Link
                       href="/status"
-                      className="w-full mt-2 flex items-center justify-center gap-2 rounded-[14px] py-3.5 text-sm font-semibold transition-colors hover:bg-white/70"
-                      style={{ border: '1.5px solid #C9C2B2', background: 'rgba(255,255,255,0.5)', color: '#4A5044' }}
+                      className="w-full mt-2 flex items-center justify-center gap-2 rounded-[14px] py-3.5 text-sm font-semibold transition-colors hover:bg-card/70"
+                      style={{ border: '1.5px solid var(--app-line-firm)', background: 'color-mix(in srgb, var(--card) 50%, transparent)', color: 'var(--app-ink-soft)' }}
                     >
                       Frühere Status ({pastStatusCount})
                     </Link>
@@ -1268,8 +1280,8 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
               <div className="flex flex-col gap-2">
                 <Link
                   href="/status/new"
-                  className="w-full flex items-center justify-center gap-2 rounded-[14px] py-4 text-sm font-semibold transition-colors hover:bg-white/70"
-                  style={{ border: '2px dashed #C9C2B2', background: 'rgba(255,255,255,0.5)', color: '#2D5F3F' }}
+                  className="w-full flex items-center justify-center gap-2 rounded-[14px] py-4 text-sm font-semibold transition-colors hover:bg-card/70"
+                  style={{ border: '2px dashed var(--app-line-firm)', background: 'color-mix(in srgb, var(--card) 50%, transparent)', color: 'var(--brand-text)' }}
                 >
                   <Plus className="size-[15px]" strokeWidth={1.9} />
                   Neuer Status
@@ -1277,8 +1289,8 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                 {/* Sekundär-Button statt übersehbarer Textzeile (nachlese-6) */}
                 <Link
                   href="/status"
-                  className="w-full flex items-center justify-center gap-2 rounded-[14px] py-3.5 text-sm font-semibold transition-colors hover:bg-white/70"
-                  style={{ border: '1.5px solid #C9C2B2', background: 'rgba(255,255,255,0.5)', color: '#4A5044' }}
+                  className="w-full flex items-center justify-center gap-2 rounded-[14px] py-3.5 text-sm font-semibold transition-colors hover:bg-card/70"
+                  style={{ border: '1.5px solid var(--app-line-firm)', background: 'color-mix(in srgb, var(--card) 50%, transparent)', color: 'var(--app-ink-soft)' }}
                 >
                   Frühere Status ({pastStatusCount})
                 </Link>
@@ -1306,11 +1318,11 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
             Erkennungsstreifens lag und deshalb nie markiert wurde. */}
         <div id="produkte" className="scroll-mt-14">
         <div className="flex items-baseline gap-3 mt-[34px] mb-[18px]">
-          <h2 className="font-heading text-[26px] font-semibold" style={{ color: '#2D3027' }}>
+          <h2 className="font-heading text-[26px] font-semibold" style={{ color: 'var(--app-ink)' }}>
             Unsere Produkte
           </h2>
           {productCountLabel && (
-            <span className="text-sm" style={{ color: '#9AA08F' }}>
+            <span className="text-sm" style={{ color: 'var(--app-ink-faint)' }}>
               {productCountLabel}
             </span>
           )}
@@ -1329,13 +1341,13 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
 
         {/* Footer (public only) */}
         {!ownerMode && (
-          <footer className="py-8 border-t mt-6" style={{ borderColor: '#ECE8DF' }}>
-            <div className="flex flex-wrap items-center gap-5 text-xs" style={{ color: '#9AA08F' }}>
+          <footer className="py-8 border-t mt-6" style={{ borderColor: 'var(--border)' }}>
+            <div className="flex flex-wrap items-center gap-5 text-xs" style={{ color: 'var(--app-ink-faint)' }}>
               <span>© {new Date().getFullYear()} {farm.name}</span>
-              <Link href="/impressum" className="hover:text-[#2D3027] transition-colors">Impressum</Link>
-              <Link href="/datenschutz" className="hover:text-[#2D3027] transition-colors">Datenschutz</Link>
-              <Link href="/account/profile" className="hover:text-[#2D3027] transition-colors">Mein Konto</Link>
-              <Link href="/problem-melden" className="hover:text-[#2D3027] transition-colors">Problem melden</Link>
+              <Link href="/impressum" className="hover:text-app-ink transition-colors">Impressum</Link>
+              <Link href="/datenschutz" className="hover:text-app-ink transition-colors">Datenschutz</Link>
+              <Link href="/account/profile" className="hover:text-app-ink transition-colors">Mein Konto</Link>
+              <Link href="/problem-melden" className="hover:text-app-ink transition-colors">Problem melden</Link>
             </div>
           </footer>
         )}

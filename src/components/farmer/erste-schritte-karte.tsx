@@ -32,7 +32,7 @@ export function ErsteSchritteKarte({
       <CardContent className="pt-5 pb-4">
         <div className="flex items-baseline justify-between gap-3">
           <p className="font-semibold text-foreground">Erste Schritte</p>
-          <p className="shrink-0 text-[13px] font-medium" style={{ color: '#9AA08F' }}>
+          <p className="shrink-0 text-[13px] font-medium" style={{ color: 'var(--app-ink-faint)' }}>
             {erledigt} von {gesamt} erledigt
           </p>
         </div>
@@ -43,7 +43,7 @@ export function ErsteSchritteKarte({
         <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
           <div
             className="h-full rounded-full transition-[width] duration-500"
-            style={{ width: `${prozent}%`, background: '#2D5F3F' }}
+            style={{ width: `${prozent}%`, background: 'var(--app-button)' }}
           />
         </div>
 
@@ -64,8 +64,8 @@ export function ErsteSchritteKarte({
                   className="mt-px flex size-5 shrink-0 items-center justify-center rounded-full"
                   style={
                     schritt.erledigt
-                      ? { background: '#E8F0E2', color: '#2D5F3F' }
-                      : { border: '1.5px solid #D6E0CE' }
+                      ? { background: 'var(--app-chip-green)', color: 'var(--brand-text)' }
+                      : { border: '1.5px solid var(--border)' }
                   }
                   aria-hidden="true"
                 >
@@ -80,14 +80,14 @@ export function ErsteSchritteKarte({
                   >
                     {schritt.titel}
                     {schritt.optional && (
-                      <span className="font-normal" style={{ color: '#9AA08F' }}>
+                      <span className="font-normal" style={{ color: 'var(--app-ink-faint)' }}>
                         {' '}
                         (optional)
                       </span>
                     )}
                   </span>
                   {!schritt.erledigt && (
-                    <span className="mt-0.5 block text-xs" style={{ color: '#9AA08F' }}>
+                    <span className="mt-0.5 block text-xs" style={{ color: 'var(--app-ink-faint)' }}>
                       {schritt.nutzen}
                     </span>
                   )}
@@ -96,7 +96,7 @@ export function ErsteSchritteKarte({
                 {!schritt.erledigt && (
                   <ChevronRight
                     className="mt-0.5 size-4 shrink-0"
-                    style={{ color: '#9AA08F' }}
+                    style={{ color: 'var(--app-ink-faint)' }}
                     aria-hidden="true"
                   />
                 )}

@@ -41,17 +41,17 @@ export default async function AnalyticsPage({
 
   let barColor = 'bg-primary/80'
   let textColor = 'text-primary'
-  let bgColor = 'bg-primary/8 border-green-200'
+  let bgColor = 'bg-primary/8 border-green-200 dark:border-green-900/60'
   let statusLabel = 'Im grünen Bereich'
   if (pct >= 95) {
     barColor = 'bg-red-500'
-    textColor = 'text-red-700'
-    bgColor = 'bg-red-50 border-red-200'
+    textColor = 'text-red-700 dark:text-red-300'
+    bgColor = 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900/60'
     statusLabel = 'Grenze fast erreicht!'
   } else if (pct >= 75) {
     barColor = 'bg-amber-500'
-    textColor = 'text-amber-700'
-    bgColor = 'bg-amber-50 border-amber-200'
+    textColor = 'text-amber-700 dark:text-amber-300'
+    bgColor = 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900/60'
     statusLabel = 'Achtung: Grenze nähert sich'
   }
 
@@ -74,16 +74,16 @@ export default async function AnalyticsPage({
             </p>
           </div>
           <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${
-            pct >= 95 ? 'bg-red-100 text-red-800'
-            : pct >= 75 ? 'bg-amber-100 text-amber-800'
-            : 'bg-green-100 text-green-800'
+            pct >= 95 ? 'bg-red-100 dark:bg-red-950/50 text-red-800 dark:text-red-200'
+            : pct >= 75 ? 'bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-200'
+            : 'bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-200'
           }`}>
             {pct.toFixed(0)} %
           </span>
         </div>
 
         {/* Progress bar */}
-        <div className="h-2.5 rounded-full bg-black/10 overflow-hidden mb-3">
+        <div className="h-2.5 rounded-full bg-black/10 dark:bg-white/15 overflow-hidden mb-3">
           <div
             className={`h-full rounded-full transition-all duration-500 ${barColor}`}
             style={{ width: `${pct}%` }}
@@ -100,7 +100,7 @@ export default async function AnalyticsPage({
         </div>
 
         {pct >= 75 && (
-          <p className="mt-3 text-xs text-muted-foreground leading-relaxed border-t border-black/10 pt-3">
+          <p className="mt-3 text-xs text-muted-foreground leading-relaxed border-t border-black/10 dark:border-white/15 pt-3">
             {pct >= 95
               ? `Du hast die ${limitLabel} Grenze für Be- & Verarbeitung fast erreicht. Bitte konsultiere deinen Steuerberater.`
               : `Du näherst dich der ${limitLabel} Grenze für Be- & Verarbeitung. Sprich ggf. mit deinem Steuerberater.`}

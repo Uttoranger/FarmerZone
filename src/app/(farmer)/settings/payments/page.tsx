@@ -48,13 +48,13 @@ export default async function PaymentsPage({
       </p>
 
       {stripeStatus === 'success' && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg bg-primary/8 border border-green-200 px-4 py-3 text-sm text-green-800">
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-primary/8 border border-green-200 dark:border-green-900/60 px-4 py-3 text-sm text-green-800 dark:text-green-200">
           <CheckCircle className="size-4 shrink-0" />
           Stripe-Konto erfolgreich eingerichtet! Online-Zahlung ist jetzt aktiv.
         </div>
       )}
       {stripeStatus === 'pending' && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
           <Clock className="size-4 shrink-0" />
           Das Onboarding ist noch nicht vollständig abgeschlossen. Bitte setze es fort.
         </div>
@@ -116,7 +116,7 @@ function StripeStatusBadge({
   }
   if (!ready) {
     return (
-      <div className="flex items-center gap-2 text-sm text-amber-700 mb-4">
+      <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300 mb-4">
         <Clock className="size-4" />
         Onboarding unvollständig — bitte fortsetzen
       </div>

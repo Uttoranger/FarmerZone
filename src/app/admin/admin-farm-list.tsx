@@ -82,7 +82,7 @@ function Aktivitaet({ aktivitaet }: { aktivitaet: FarmAktivitaet }) {
 
 function statusOf(farm: Farm): { label: string; className: string } {
   if (farm.archivedAt) return { label: 'stillgelegt', className: 'bg-muted text-muted-foreground' }
-  if (farm.approvedAt === null) return { label: 'wartet', className: 'bg-sky-100 text-sky-900' }
+  if (farm.approvedAt === null) return { label: 'wartet', className: 'bg-sky-100 dark:bg-sky-950/50 text-sky-900 dark:text-sky-100' }
   return { label: 'freigeschaltet', className: 'bg-primary/10 text-primary' }
 }
 
@@ -164,7 +164,7 @@ export function AdminFarmList({
                   {farm.land === 'DE' && (
                     <span
                       className="rounded-full px-2.5 py-1 text-xs font-semibold"
-                      style={{ background: '#F3EFE6', color: '#2D5F3F' }}
+                      style={{ background: 'var(--secondary)', color: 'var(--brand-text)' }}
                     >
                       {LAND_LABEL.DE}
                     </span>

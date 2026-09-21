@@ -14,17 +14,20 @@ export function statusLabel(status: string): string {
 
 // Referenz-19-Farbwelt: Neu/wartet = Orange auf #FBEEE3 ·
 // In Arbeit/Bezahlt = Grün auf #E8F0E2 · Erledigt/neutral = #9AA08F auf #F0EDE5
+//
+// Die Tag-Werte bleiben unverändert; jede Marke trägt zusätzlich eine
+// dark:-Entsprechung — gleiche Konvention wie src/lib/bestellstatus.ts.
 export function statusColor(status: string): string {
   switch (status) {
-    case 'PENDING_CONFIRMATION': return 'bg-[#FBEEE3] text-[#E8854A]'
-    case 'PAID': return 'bg-[#E8F0E2] text-[#2D5F3F]'
-    case 'CONFIRMED': return 'bg-[#FBEEE3] text-[#E8854A]'
-    case 'IN_PREPARATION': return 'bg-[#E8F0E2] text-[#2D5F3F]'
-    case 'READY': return 'bg-[#F0EDE5] text-[#9AA08F]'
-    case 'PICKED_UP': return 'bg-[#F0EDE5] text-[#9AA08F]'
-    case 'CANCELLED': return 'bg-red-100 text-red-700'
-    case 'NOT_PICKED_UP': return 'bg-red-100 text-red-700'
-    default: return 'bg-[#F0EDE5] text-[#9AA08F]'
+    case 'PENDING_CONFIRMATION': return 'bg-[#FBEEE3] text-[#E8854A] dark:bg-accent/12 dark:text-accent-hover'
+    case 'PAID': return 'bg-[#E8F0E2] text-[#2D5F3F] dark:bg-primary/15 dark:text-brand-text'
+    case 'CONFIRMED': return 'bg-[#FBEEE3] text-[#E8854A] dark:bg-accent/12 dark:text-accent-hover'
+    case 'IN_PREPARATION': return 'bg-[#E8F0E2] text-[#2D5F3F] dark:bg-primary/15 dark:text-brand-text'
+    case 'READY': return 'bg-[#F0EDE5] text-[#9AA08F] dark:bg-muted dark:text-muted-foreground'
+    case 'PICKED_UP': return 'bg-[#F0EDE5] text-[#9AA08F] dark:bg-muted dark:text-muted-foreground'
+    case 'CANCELLED': return 'bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-300'
+    case 'NOT_PICKED_UP': return 'bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-300'
+    default: return 'bg-[#F0EDE5] text-[#9AA08F] dark:bg-muted dark:text-muted-foreground'
   }
 }
 

@@ -11,10 +11,10 @@ import { cn } from '@/lib/utils'
 import { renderStatusBodyWithChip } from '@/lib/status-body'
 
 const ANLASS_META: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-  FRESH_PRODUCT: { label: 'Frisches Produkt', icon: <Leaf className="size-3.5" />, color: 'bg-green-100 text-green-800' },
-  NEW_SEASON: { label: 'Neue Saison', icon: <CalendarDays className="size-3.5" />, color: 'bg-emerald-100 text-emerald-800' },
-  PROMOTION: { label: 'Aktion', icon: <Tag className="size-3.5" />, color: 'bg-amber-100 text-amber-800' },
-  ANNOUNCEMENT: { label: 'Mitteilung', icon: <MessageCircle className="size-3.5" />, color: 'bg-blue-100 text-blue-800' },
+  FRESH_PRODUCT: { label: 'Frisches Produkt', icon: <Leaf className="size-3.5" />, color: 'bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-200' },
+  NEW_SEASON: { label: 'Neue Saison', icon: <CalendarDays className="size-3.5" />, color: 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-200' },
+  PROMOTION: { label: 'Aktion', icon: <Tag className="size-3.5" />, color: 'bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-200' },
+  ANNOUNCEMENT: { label: 'Mitteilung', icon: <MessageCircle className="size-3.5" />, color: 'bg-blue-100 dark:bg-blue-950/50 text-blue-800 dark:text-blue-200' },
 }
 
 export function StatusPostCard({ post }: { post: StatusPostSummary }) {
@@ -39,10 +39,10 @@ export function StatusPostCard({ post }: { post: StatusPostSummary }) {
   }
 
   const statusBadge = post.isActive
-    ? { label: 'Aktiv', icon: <CheckCircle className="size-3" />, cls: 'bg-green-100 text-green-800' }
+    ? { label: 'Aktiv', icon: <CheckCircle className="size-3" />, cls: 'bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-200' }
     : post.isDraft
-    ? { label: 'Entwurf', icon: <FileText className="size-3" />, cls: 'bg-slate-100 text-slate-600' }
-    : { label: 'Abgelaufen', icon: <Clock className="size-3" />, cls: 'bg-slate-100 text-slate-500' }
+    ? { label: 'Entwurf', icon: <FileText className="size-3" />, cls: 'bg-muted text-muted-foreground' }
+    : { label: 'Abgelaufen', icon: <Clock className="size-3" />, cls: 'bg-muted text-muted-foreground' }
 
   const timeAgo = post.publishedAt
     ? (() => {
@@ -97,7 +97,7 @@ export function StatusPostCard({ post }: { post: StatusPostSummary }) {
       <p className="text-sm text-muted-foreground line-clamp-2">{renderStatusBodyWithChip(post.body)}</p>
       {/* object-contain auf Sand: volles Bild statt Zoom-Crop (nachlese-7) */}
       {post.photoUrl && (
-        <div className="relative mt-2 h-28 w-full overflow-hidden rounded-lg bg-[#F4EFE3]">
+        <div className="relative mt-2 h-28 w-full overflow-hidden rounded-lg bg-app-chip">
           <Image
             src={post.photoUrl}
             alt={post.title}

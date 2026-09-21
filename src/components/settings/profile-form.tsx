@@ -190,16 +190,16 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
           id={id}
           {...register(id)}
           placeholder={placeholder}
-          className={errors[id] ? 'border-red-400' : ''}
+          className={errors[id] ? 'border-destructive' : ''}
         />
-        {errors[id] && <p className="text-xs text-red-600 mt-1">{errors[id]?.message}</p>}
+        {errors[id] && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{errors[id]?.message}</p>}
       </div>
     )
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div className="bg-white rounded-xl border border-border p-4 space-y-4">
+      <div className="bg-card rounded-xl border border-border p-4 space-y-4">
         <h2 className="font-medium text-foreground">Hof-Informationen</h2>
         {field('name', 'Hof-Name *', 'Hof Müller')}
         {field('ownerName', 'Name des Inhabers *', 'Klaus Müller')}
@@ -210,13 +210,13 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
             {...register('description')}
             rows={4}
             placeholder="Beschreibe deinen Hof für Kunden..."
-            className={errors.description ? 'border-red-400' : ''}
+            className={errors.description ? 'border-destructive' : ''}
           />
-          {errors.description && <p className="text-xs text-red-600 mt-1">{errors.description.message}</p>}
+          {errors.description && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{errors.description.message}</p>}
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-border p-4 space-y-4">
+      <div className="bg-card rounded-xl border border-border p-4 space-y-4">
         <h2 className="font-medium text-foreground">Adresse</h2>
 
         {/* Das Land ÜBER den Adressfeldern: Es entscheidet, wie PLZ und Ort
@@ -274,9 +274,9 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
               id="postalCode"
               {...register('postalCode')}
               placeholder={land === 'DE' ? '84359' : '3400'}
-              className={errors.postalCode ? 'border-red-400' : ''}
+              className={errors.postalCode ? 'border-destructive' : ''}
             />
-            {errors.postalCode && <p className="text-xs text-red-600 mt-1">{errors.postalCode.message}</p>}
+            {errors.postalCode && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{errors.postalCode.message}</p>}
           </div>
           <div>
             <Label htmlFor="city" className="text-sm text-muted-foreground mb-1 block">Ort *</Label>
@@ -284,9 +284,9 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
               id="city"
               {...register('city')}
               placeholder={land === 'DE' ? 'Simbach am Inn' : 'Klosterneuburg'}
-              className={errors.city ? 'border-red-400' : ''}
+              className={errors.city ? 'border-destructive' : ''}
             />
-            {errors.city && <p className="text-xs text-red-600 mt-1">{errors.city.message}</p>}
+            {errors.city && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{errors.city.message}</p>}
           </div>
         </div>
         {/* Der EINZIGE Auslöser der Vorwärts-Suche — bewusst eine Schaltfläche,
@@ -313,7 +313,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
         />
       </div>
 
-      <div className="bg-white rounded-xl border border-border p-4 space-y-4">
+      <div className="bg-card rounded-xl border border-border p-4 space-y-4">
         <h2 className="font-medium text-foreground">Kontakt</h2>
         {field('phone', 'Telefon *', '+43 664 123 4567')}
         {field('email', 'E-Mail *', 'hof@beispiel.at')}

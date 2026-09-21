@@ -78,7 +78,7 @@ export function ShopLinkBanner({ farmSlug }: ShopLinkBannerProps) {
             className="h-8 px-2.5 rounded-lg border border-border text-xs font-medium text-foreground hover:bg-muted transition-colors flex items-center gap-1.5"
           >
             {copied ? (
-              <Check className="w-3.5 h-3.5 text-green-600" />
+              <Check className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
             ) : (
               <Copy className="w-3.5 h-3.5" />
             )}

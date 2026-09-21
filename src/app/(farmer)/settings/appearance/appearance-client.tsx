@@ -131,7 +131,7 @@ function LogoUpload({
       {/* Round preview */}
       <div
         className="relative shrink-0 overflow-hidden bg-muted flex items-center justify-center"
-        style={{ width: 72, height: 72, borderRadius: '50%', border: '2px dashed #C9C2B2' }}
+        style={{ width: 72, height: 72, borderRadius: '50%', border: '2px dashed var(--app-line-firm)' }}
       >
         {logoUrl ? (
           <>
@@ -797,7 +797,7 @@ export function AppearanceClient({ initialData }: Props) {
                 className={cn(
                   'flex items-center gap-2 p-2.5 rounded-xl border-2 text-sm transition-all text-left',
                   selected
-                    ? 'bg-[#E8F0E8] border-primary text-primary'
+                    ? 'bg-app-chip-green border-primary text-primary'
                     : 'border-border text-muted-foreground hover:border-border/80 hover:bg-muted/40',
                 )}
               >

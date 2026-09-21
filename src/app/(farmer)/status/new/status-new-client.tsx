@@ -27,9 +27,9 @@ const ANLASS_OPTIONS: { value: Anlass; label: string; icon: React.ReactNode }[] 
 // Badge colors for preview (read-only, not used for active state)
 const ANLASS_COLOR: Record<Anlass, string> = {
   FRESH_PRODUCT: 'text-primary bg-primary/10',
-  NEW_SEASON:    'text-emerald-700 bg-emerald-50',
-  PROMOTION:     'text-amber-700 bg-amber-50',
-  ANNOUNCEMENT:  'text-blue-700 bg-blue-50',
+  NEW_SEASON:    'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40',
+  PROMOTION:     'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40',
+  ANNOUNCEMENT:  'text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40',
 }
 
 interface Props {
@@ -195,7 +195,7 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
                     className={cn(
                       'relative flex items-center gap-2.5 p-3 rounded-xl border-2 text-sm font-medium transition-all text-left',
                       anlass === opt.value
-                        ? 'bg-[#E8F0E8] border-primary text-primary'
+                        ? 'bg-app-chip-green border-primary text-primary'
                         : 'border-border text-muted-foreground hover:border-border/80 hover:bg-muted/40',
                     )}
                   >
@@ -274,7 +274,7 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
             {photoUpload.fileInput}
             {/* object-contain auf Sand: volles Bild statt Zoom-Crop (nachlese-7) */}
             {photoUrl && (
-              <div className="relative w-full aspect-[3/2] max-h-48 mb-3 rounded-xl overflow-hidden border border-border bg-[#F4EFE3]">
+              <div className="relative w-full aspect-[3/2] max-h-48 mb-3 rounded-xl overflow-hidden border border-border bg-app-chip">
                 <Image
                   src={photoUrl}
                   alt="Status-Foto"
@@ -483,25 +483,25 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
               <h3 className="text-sm font-semibold text-foreground mb-2">Empfänger</h3>
               {showOnFarmPage && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="size-4 text-green-600 shrink-0" />
+                  <CheckCircle className="size-4 text-green-600 dark:text-green-400 shrink-0" />
                   Auf Hof-Seite für 7 Tage anzeigen
                 </div>
               )}
               {sendEmail && !emailBlocked && emailCount > 0 && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="size-4 text-green-600 shrink-0" />
+                  <CheckCircle className="size-4 text-green-600 dark:text-green-400 shrink-0" />
                   {emailCount} E-Mails werden automatisch versendet
                 </div>
               )}
               {sendWhatsApp && whatsAppCount > 0 && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="size-4 text-green-600 shrink-0" />
+                  <CheckCircle className="size-4 text-green-600 dark:text-green-400 shrink-0" />
                   {whatsAppCount} WhatsApp-Nachrichten (je 1 Tap)
                 </div>
               )}
               {sendWhatsAppStatus && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="size-4 text-green-600 shrink-0" />
+                  <CheckCircle className="size-4 text-green-600 dark:text-green-400 shrink-0" />
                   WhatsApp-Status-Bild zum Download
                 </div>
               )}

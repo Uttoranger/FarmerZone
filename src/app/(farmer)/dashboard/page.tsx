@@ -79,7 +79,7 @@ export default async function DashboardPage() {
       {/* Begrüßung + Titel + CTA (Referenz 19) */}
       <div className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm" style={{ color: '#9AA08F' }}>
+          <p className="text-sm" style={{ color: 'var(--app-ink-faint)' }}>
             {gruss}, {vorname}
           </p>
           <h1 className="font-heading text-[27px] font-semibold text-foreground mt-0.5">
@@ -169,7 +169,7 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <Card>
           <CardContent className="pt-5 pb-5">
-            <p className="text-[13px] font-medium" style={{ color: '#9AA08F' }}>
+            <p className="text-[13px] font-medium" style={{ color: 'var(--app-ink-faint)' }}>
               Neue Bestellungen
             </p>
             <div className="font-heading text-[28px] font-bold text-foreground mt-1.5">
@@ -177,7 +177,7 @@ export default async function DashboardPage() {
             </div>
             <div
               className="text-xs font-semibold mt-1"
-              style={{ color: offeneBestellungen > 0 ? '#E8854A' : '#9AA08F' }}
+              style={{ color: offeneBestellungen > 0 ? 'var(--accent)' : 'var(--app-ink-faint)' }}
             >
               {offeneBestellungen > 0 ? 'warten auf dich' : 'nichts offen'}
             </div>
@@ -186,7 +186,7 @@ export default async function DashboardPage() {
 
         <Card>
           <CardContent className="pt-5 pb-5">
-            <p className="text-[13px] font-medium" style={{ color: '#9AA08F' }}>
+            <p className="text-[13px] font-medium" style={{ color: 'var(--app-ink-faint)' }}>
               Umsatz Woche
             </p>
             <div className="font-heading text-[28px] font-bold text-foreground mt-1.5">
@@ -218,7 +218,7 @@ export default async function DashboardPage() {
 
         <Card>
           <CardContent className="pt-5 pb-5">
-            <p className="text-[13px] font-medium" style={{ color: '#9AA08F' }}>
+            <p className="text-[13px] font-medium" style={{ color: 'var(--app-ink-faint)' }}>
               Aktive Produkte
             </p>
             <div className="font-heading text-[28px] font-bold text-foreground mt-1.5">
@@ -226,7 +226,7 @@ export default async function DashboardPage() {
             </div>
             <div
               className="text-xs font-semibold mt-1"
-              style={{ color: lowStockHint ? '#E8854A' : '#9AA08F' }}
+              style={{ color: lowStockHint ? 'var(--accent)' : 'var(--app-ink-faint)' }}
             >
               {lowStockHint ? 'Lager wird knapp' : 'im Shop sichtbar'}
             </div>
@@ -235,13 +235,13 @@ export default async function DashboardPage() {
 
         <Card>
           <CardContent className="pt-5 pb-5">
-            <p className="text-[13px] font-medium" style={{ color: '#9AA08F' }}>
+            <p className="text-[13px] font-medium" style={{ color: 'var(--app-ink-faint)' }}>
               Kunden gesamt
             </p>
             <div className="font-heading text-[28px] font-bold text-foreground mt-1.5">
               {kundenGesamt}
             </div>
-            <div className="text-xs mt-1" style={{ color: '#9AA08F' }}>
+            <div className="text-xs mt-1" style={{ color: 'var(--app-ink-faint)' }}>
               haben bei dir bestellt
             </div>
           </CardContent>
@@ -256,7 +256,7 @@ export default async function DashboardPage() {
               <CardContent className="py-4 flex items-center gap-3">
                 <span
                   className="flex size-10 shrink-0 items-center justify-center rounded-[10px]"
-                  style={{ background: '#FBEEE3', color: '#E8854A' }}
+                  style={{ background: 'var(--notice)', color: 'var(--notice-ink)' }}
                 >
                   <AlertTriangle className="size-4.5" strokeWidth={1.7} />
                 </span>
@@ -264,7 +264,7 @@ export default async function DashboardPage() {
                 <Link
                   href="/products"
                   className="shrink-0 rounded-lg border px-3.5 py-2 text-[13px] font-semibold transition-colors hover:bg-muted/40"
-                  style={{ borderColor: '#D6E0CE', color: '#2D5F3F' }}
+                  style={{ borderColor: 'var(--border)', color: 'var(--brand-text)' }}
                 >
                   Lager auffüllen
                 </Link>
@@ -276,7 +276,7 @@ export default async function DashboardPage() {
               <CardContent className="py-4 flex items-center gap-3">
                 <span
                   className="flex size-10 shrink-0 items-center justify-center rounded-[10px]"
-                  style={{ background: '#E8F0E2', color: '#2D5F3F' }}
+                  style={{ background: 'var(--app-chip-green)', color: 'var(--brand-text)' }}
                 >
                   <Leaf className="size-4.5" strokeWidth={1.7} />
                 </span>
@@ -284,12 +284,12 @@ export default async function DashboardPage() {
                   {statusReminder === 'never'
                     ? 'Noch kein Status veröffentlicht'
                     : `Dein letzter Status ist ${statusReminder} Tage her`}
-                  <span style={{ color: '#9AA08F' }}> — Zeit für Neuigkeiten?</span>
+                  <span style={{ color: 'var(--app-ink-faint)' }}> — Zeit für Neuigkeiten?</span>
                 </p>
                 <Link
                   href="/status/new"
                   className="shrink-0 rounded-lg border px-3.5 py-2 text-[13px] font-semibold transition-colors hover:bg-muted/40"
-                  style={{ borderColor: '#D6E0CE', color: '#2D5F3F' }}
+                  style={{ borderColor: 'var(--border)', color: 'var(--brand-text)' }}
                 >
                   Status schreiben
                 </Link>
@@ -310,7 +310,7 @@ export default async function DashboardPage() {
               <div>
                 <div className="font-medium text-foreground text-sm">Bestellungen</div>
                 {offeneBestellungen > 0 && (
-                  <Badge className="mt-1.5 bg-amber-100 text-amber-800 text-xs border-0">
+                  <Badge className="mt-1.5 bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-200 text-xs border-0">
                     {offeneBestellungen} offen
                   </Badge>
                 )}

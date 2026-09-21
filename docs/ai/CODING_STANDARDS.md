@@ -216,6 +216,13 @@ Jede Farbe muss in beiden funktionieren.
 | Rahmen, Trennlinien | `border`, Eingabefelder `input` |
 | Fokusring | `ring` |
 
+Hofseite, Produktraster und Bauern-Bereich tragen zusätzlich die gewachsene
+Palette `--app-*` (`app-page`, `app-ink`, `app-ink-soft`, `app-ink-faint`,
+`app-chip`, `app-chip-ink`, `app-chip-green`, `app-line-firm`, `app-button`,
+`app-bar`, `app-trough`) und den Hinweis-Kasten `--notice*`. Wer dort etwas neu
+baut, nimmt diese Tokens — nicht `foreground`/`card`, sonst stehen zwei
+Grautöne nebeneinander. Begründung in `DEVELOPMENT.md`.
+
 **`--brand-text` ist neu und nicht dasselbe wie `--primary`.** `--primary` ist die
 *Fläche* des Hauptknopfs und wird im Dunkeln hell (heller Salbei, damit dunkle
 Schrift darauf sitzt). Markentext braucht den umgekehrten Weg: hell ist er das
@@ -244,6 +251,12 @@ Fotos und Hof-Banner werden nicht abgedunkelt. Schleier über Fotos, weiße
 Schrift auf Fotos, Kartenkacheln samt Pins (siehe `hoefe-karte.tsx`), die
 Bildmarke und fremde Markenfarben (WhatsApp-Grün, Stripes Eingabemaske) bleiben,
 wie sie sind. Wo das so ist, gehört ein Kommentar daneben, der es begründet.
+
+### Diagramme
+Recharts schreibt Farben als SVG-Attribute — `var(--token)` greift dort **nicht**.
+Farbsätze je Modus in JavaScript halten und über `resolvedTheme` (next-themes)
+umschalten. Nur `contentStyle`/`labelStyle`/`itemStyle` des Tooltips sind
+React-Style-Objekte; dort gehören die Tokens hin.
 
 ### Kontrast
 Fließtext ≥ 4,5:1, große Schrift und Symbole ≥ 3:1 — **in beiden Modi** messen,
