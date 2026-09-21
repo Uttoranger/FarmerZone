@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import Link from 'next/link'
+import { APP_URL } from '@/lib/umgebung-server'
 import { auth } from '@/lib/auth'
 import { getDashboardStats, getFarmForUser } from '@/server/queries/dashboard'
 import { Card, CardContent } from '@/components/ui/card'
@@ -360,8 +361,7 @@ export default async function DashboardPage() {
 
       {/* WhatsApp Einladungskarte */}
       {(() => {
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-        const shopUrl = `${appUrl}/${farm.slug}`
+        const shopUrl = `${APP_URL}/${farm.slug}`
         const text = encodeURIComponent(
           `Hey! Ich biete frische Produkte direkt vom Hof an. Hier kannst du einfach online bestellen: ${shopUrl}`
         )

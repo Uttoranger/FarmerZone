@@ -93,3 +93,4 @@ Nach der Freigabe: hier in die Tabelle eintragen.
 - **Kein Dateisystem-Schreibzugriff.** Uploads gehen an Vercel Blob.
 - **Kalte Starts.** Nichts Teures auf Modulebene ausführen.
 - **Env-Variablen** ausschließlich über `@/lib/env` (Zod-validiert). Nie `process.env.X` direkt lesen — Ausnahme: `NODE_ENV`.
+- **Die Adresse der App** (`APP_URL`) und die Umgebung (`UMGEBUNG`: produktion / preview / lokal) ausschließlich über `@/lib/umgebung-server`. Nie `NEXT_PUBLIC_APP_URL` selbst lesen, nie `?? 'http://localhost:3000'` in einer Datei — in Previews ist die Variable nicht gesetzt, und genau dieser Ersatz hat dort den Login zerstört. Die Entscheidung selbst ist rein und getestet: `@/lib/umgebung`. Im Browser gibt es die Adresse nur als Prop vom Server (Vorbild: `onboarding/page.tsx`), nie über `process.env`.
