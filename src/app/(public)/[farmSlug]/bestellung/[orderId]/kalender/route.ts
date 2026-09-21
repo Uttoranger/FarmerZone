@@ -2,14 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { bestellLinkGilt, bestellungPfad } from '@/lib/bestell-link'
 import { erzeugeIcs, wienKalendertag } from '@/lib/kalender'
+import { APP_URL } from '@/lib/umgebung-server'
 
 // Die ICS-Datei zum Abholtermin — derselbe signierte Zugang wie die
 // Bestellseite darüber. Jede Ablehnung antwortet IDENTISCH (Text + 404),
 // egal ob die Signatur falsch ist, die Bestellung fehlt, der Hof-Slug nicht
 // stimmt oder der Hof stillgelegt wurde: kein Unterschied, aus dem sich die
 // Existenz einer Bestellung ablesen ließe.
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
 function abgelehnt(): NextResponse {
   return new NextResponse('Dieser Link ist nicht gültig', {

@@ -22,11 +22,11 @@ import { formatPosition } from '@/lib/format'
 import { bestellungPfad } from '@/lib/bestell-link'
 import type { OrderLineProduct } from '@/lib/order-line'
 import { bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
+import { APP_URL } from '@/lib/umgebung-server'
 
 const apiKey = process.env.RESEND_API_KEY
 const resend = apiKey ? new Resend(apiKey) : null
 const FROM = process.env.EMAIL_FROM ?? 'onboarding@resend.dev'
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
 // Einmal beim Serverstart loggen damit man im Terminal sieht ob der Key gelesen wurde
 console.log(`[E-Mail] Init — RESEND_API_KEY=${apiKey ? 'gesetzt' : 'FEHLT → nur Log-Modus'} FROM=${FROM}`)

@@ -4,6 +4,8 @@ import { ThemeProvider } from 'next-themes'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/sonner'
 import { CookieBanner } from '@/components/cookie-banner'
+import { UmgebungsBanner } from '@/components/shared/umgebungs-banner'
+import { UMGEBUNG, ZEIGE_UMGEBUNGSBANNER } from '@/lib/umgebung-server'
 import './globals.css'
 
 const geist = Geist({
@@ -19,23 +21,44 @@ const fraunces = Fraunces({
   style: ['normal', 'italic'],
 })
 
-export const metadata: Metadata = {
-  title: 'FarmerZone',
-  description: 'Regionale Lebensmittel direkt vom Bauern',
+// In der Testumgebung trägt JEDER Browser-Tab das Präfix „[TEST] " — auch
+// Seiten mit festem Titel, weil das Präfix hier als Vorlage wirkt und nicht in
+// jeder Seite einzeln stehen muss. Das Banner scrollt weg, der Tab bleibt.
+const TITEL_PRAEFIX = ZEIGE_UMGEBUNGSBANNER ? '[TEST] ' : ''
+
+export function generateMetadata(): Metadata {
+  return {
+    title: {
+      default: `${TITEL_PRAEFIX}FarmerZone`,
+      template: `${TITEL_PRAEFIX}%s`,
+    },
+    description: 'Regionale Lebensmittel direkt vom Bauern',
+  }
 }
 
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  // Färbt die Browserleiste auf dem Handy wie den Seitenhintergrund. Die Werte
-  // sind die sRGB-Entsprechungen von --background aus globals.css (:root und
-  // .dark). Die Media-Query folgt der Systemeinstellung — wer im Konto von Hand
-  // auf Hell oder Dunkel stellt, behält die Leiste des Systems. Das lässt sich
-  // ohne JavaScript im <head> nicht anders lösen und ist bewusst so.
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#F8F2E5' },
-    { media: '(prefers-color-scheme: dark)', color: '#040B05' },
-  ],
+// Färbt die Browserleiste auf dem Handy wie den Seitenhintergrund. Die Werte
+// sind die sRGB-Entsprechungen von --background aus globals.css (:root und
+// .dark). Die Media-Query folgt der Systemeinstellung — wer im Konto von Hand
+// auf Hell oder Dunkel stellt, behält die Leiste des Systems. Das lässt sich
+// ohne JavaScript im <head> nicht anders lösen und ist bewusst so.
+const THEME_COLOR_PRODUKTION: Viewport['themeColor'] = [
+  { media: '(prefers-color-scheme: light)', color: '#F8F2E5' },
+  { media: '(prefers-color-scheme: dark)', color: '#040B05' },
+]
+
+export function generateViewport(): Viewport {
+  return {
+    width: 'device-width',
+    initialScale: 1,
+    // In der Testumgebung ist die Browserleiste die Warnfarbe des Banners —
+    // Bernstein, bei Widersprüchen Rot —, damit das Handy es auch dann zeigt,
+    // wenn das Banner längst weggescrollt ist. Feste Werte, unabhängig vom Modus.
+    themeColor: ZEIGE_UMGEBUNGSBANNER
+      ? UMGEBUNG.warnungen.length > 0
+        ? '#B91C1C'
+        : '#FBBF24'
+      : THEME_COLOR_PRODUKTION,
+  }
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -49,6 +72,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${geist.variable} ${fraunces.variable} h-full antialiased`}
     >
       <body className="min-h-full font-sans">
+        {/* Vor dem ThemeProvider: Der Balken folgt keinem Modus. */}
+        <UmgebungsBanner />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

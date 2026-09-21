@@ -104,7 +104,7 @@ function StepIndicator({ current }: { current: Step }) {
 }
 
 // ─── Main component ──────────────────────────────────────────────────────────
-export function OnboardingClient({ userEmail }: { userEmail: string }) {
+export function OnboardingClient({ userEmail, appUrl }: { userEmail: string; appUrl: string }) {
   const router = useRouter()
   const [step, setStep] = useState<Step>(1)
   const [farmId, setFarmId] = useState<string | null>(null)
@@ -134,8 +134,6 @@ export function OnboardingClient({ userEmail }: { userEmail: string }) {
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [showAllErrors, setShowAllErrors] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
   // Slug preview: client-side, immediate on every keystroke
   const slugPreview = farmName.trim() ? generateSlug(farmName) : ''
