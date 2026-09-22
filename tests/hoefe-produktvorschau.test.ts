@@ -1,8 +1,8 @@
 /**
  * Tests für die Produktvorschau der Hofkarten: die reine Auswahl
  * (waehleVorschauProdukte in src/lib/hofuebersicht.ts) und das geteilte
- * Preisformat (src/lib/preis-format.ts), das die Vorschau mit der
- * öffentlichen Hofseite gemeinsam hat.
+ * Preisformat (src/lib/format.ts), das die Vorschau mit der öffentlichen
+ * Hofseite gemeinsam hat.
  */
 import { describe, it, expect } from 'vitest'
 import {
@@ -10,7 +10,7 @@ import {
   waehleVorschauProdukte,
   type VorschauProdukt,
 } from '@/lib/hofuebersicht'
-import { formatEuro, formatPrice } from '@/lib/preis-format'
+import { formatEuro, formatGrundpreis } from '@/lib/format'
 
 function p(teil: Partial<VorschauProdukt> & { id: string }): VorschauProdukt {
   return {
@@ -127,19 +127,18 @@ describe('waehleVorschauProdukte — der Kategoriefilter zieht Passendes nach vo
 })
 
 describe('Preisformat — dasselbe wie auf der öffentlichen Hofseite', () => {
-  it('Euro-Betrag in österreichischer Schreibweise', () => {
-    expect(formatEuro(3.5)).toMatch(/3,50/)
-    expect(formatEuro(3.5)).toMatch(/€/)
+  it('Euro-Betrag in österreichischer Schreibweise, Symbol vorn', () => {
+    expect(formatEuro(3.5)).toBe('€ 3,50')
   })
 
-  it('Preis je Einheit, mit Gebindegröße nur wenn sie nicht eins ist', () => {
-    expect(formatPrice(3.5, 'KG', null)).toBe(`${formatEuro(3.5)} / kg`)
-    expect(formatPrice(3.5, 'KG', 1)).toBe(`${formatEuro(3.5)} / kg`)
-    expect(formatPrice(4.2, 'KG', 0.5)).toBe(`${formatEuro(4.2)} / 0.5 kg`)
+  it('Preis je Einheit; mit Gebindegröße ungleich eins „für" statt „/"', () => {
+    expect(formatGrundpreis(3.5, 'KG', null)).toBe('€ 3,50 / kg')
+    expect(formatGrundpreis(3.5, 'KG', 1)).toBe('€ 3,50 / kg')
+    expect(formatGrundpreis(4.2, 'KG', 0.5)).toBe('€ 4,20 für 0,5 kg')
   })
 
   it('unbekannte Einheit erscheint als sie selbst, statt zu verschwinden', () => {
-    expect(formatPrice(1, 'BUENDEL', null)).toBe(`${formatEuro(1)} / BUENDEL`)
+    expect(formatGrundpreis(1, 'BUENDEL', null)).toBe('€ 1,00 / BUENDEL')
   })
 })
 

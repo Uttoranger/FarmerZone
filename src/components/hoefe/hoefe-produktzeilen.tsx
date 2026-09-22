@@ -1,6 +1,13 @@
 import Image from 'next/image'
-import { formatPrice } from '@/lib/preis-format'
+import { formatGrundpreis, formatGrundpreisZeile } from '@/lib/format'
 import { produktInitiale, type VorschauProdukt } from '@/lib/hofuebersicht'
+
+/** „€ 50,00 für 2 kg · € 25,00 / kg" — in EINER Zeile, die Hofkarte hat keinen Platz für zwei. */
+function preisZeile(p: VorschauProdukt): string {
+  const gebinde = formatGrundpreis(p.price, p.unit, p.unitSize)
+  const grundpreis = formatGrundpreisZeile(p.price, p.unit, p.unitSize)
+  return grundpreis ? `${gebinde} · ${grundpreis}` : gebinde
+}
 
 /**
  * Die Produktvorschau einer Hofkarte: je Produkt eine kompakte Zeile mit
@@ -66,7 +73,7 @@ export function HoefeProduktzeilen({
             {/* Der Preis bleibt IMMER sichtbar — er darf nie der Kürzung
                 des Namens zum Opfer fallen, deshalb eine eigene Zeile. */}
             <p className="text-xs text-muted-foreground">
-              {formatPrice(produkt.price, produkt.unit, produkt.unitSize)}
+              {preisZeile(produkt)}
             </p>
           </div>
 

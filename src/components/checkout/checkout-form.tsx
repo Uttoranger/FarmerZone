@@ -16,6 +16,7 @@ import {
   type CheckoutFormData,
 } from '@/schemas/checkout'
 import { formatEuro, formatMenge } from '@/lib/format'
+import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import type { PublicFarm } from '@/server/queries/farm'
 import type { CartItem } from '@/lib/use-cart'
@@ -376,6 +377,12 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
                       und E-Mail (Befund 13) — inklusive Plural bei Paketen. */}
                   {formatMenge(item.quantity, item.unit, item.unitSize)} × {formatEuro(item.price)}
                 </p>
+                <GrundpreisZeile
+                  price={item.price}
+                  unit={item.unit}
+                  unitSize={item.unitSize}
+                  className="text-[11px]"
+                />
               </div>
               <span className="text-sm font-medium text-foreground shrink-0">
                 {formatEuro(item.price * item.quantity)}

@@ -141,7 +141,7 @@ Nicht nachahmen. Beim Anfassen der Datei mit aufräumen, nicht als eigener Sprin
 
 | Altlast | Regel für neuen Code |
 |---|---|
-| `src/lib/format.ts` **und** `src/lib/preis-format.ts` existieren parallel | `format.ts` ist kanonisch. Neue Formatierung nur dort. Wer `preis-format.ts` anfasst, migriert den Aufrufer. |
+| `src/lib/preis-format.ts` hält noch ein zweites `formatEuro` (Symbol hinten) für Warenkorb-Summe, Bestellsummen und Servicegebühr-Einstellung | `format.ts` ist kanonisch. Neue Formatierung nur dort. Wer eine dieser drei Stellen anfasst, stellt sie um; danach fällt die Datei. |
 | Server Actions mischen `throw new Error()` und `return { error }` | Neuer Code: `return { error }` (→ `CODING_STANDARDS.md`) |
 | Keine Header-Komponente; Unterseiten ohne Rückweg | Neue öffentliche Seite bekommt Header und Footer |
 | Geld teils `Decimal`, teils `Int` in Cent | Neue Geldfelder: `Decimal(10,2)`. Bestehende `*Cents` nicht umbauen. |
