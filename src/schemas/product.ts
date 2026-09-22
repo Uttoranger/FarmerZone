@@ -98,14 +98,17 @@ const dezimal = (v: unknown): unknown => {
   return v
 }
 
-/** Gebindegröße: optional, größer 0, höchstens drei Nachkommastellen (125 g). */
+/** Gebindegröße: leer = null, sonst größer 0, höchstens drei Nachkommastellen (125 g). */
 const optionalPositiveNumber = z.preprocess(
-  dezimal,
+  (v) => {
+    const d = dezimal(v)
+    return d === undefined ? null : d
+  },
   z
     .number({ error: 'Bitte nur Zahlen, z. B. 2 oder 0,5.' })
     .positive('Muss größer als 0 sein')
     .refine((n) => nachkommastellen(n) <= 3, 'Höchstens drei Nachkommastellen, z. B. 0,125.')
-    .optional()
+    .nullable()
 )
 
 /** Preis je Gebinde: Pflicht, größer 0, auf den Cent (zwei Nachkommastellen). */
@@ -123,13 +126,17 @@ const mwstZahl = z.preprocess(
   z.number({ error: 'Bitte nur Zahlen, z. B. 10.' }).min(0).max(100)
 )
 
+// LEER IST NULL, NIE UNDEFINED — für alle optionalen Zahlenfelder des
+// Formulars. react-hook-form liest `undefined` als „Ausgangswert
+// wiederherstellen": Beim Tippen von „0," war die Gebindegröße kurz leer, das
+// Formular holte die gespeicherte 1 zurück, und aus „0,5" wurde „15".
 const optionalMonth = z.preprocess(
   (v) => {
-    if (v === '' || v === null || v === undefined || v === '0') return undefined
+    if (v === '' || v === null || v === undefined || v === '0') return null
     const n = Number(v)
-    return isNaN(n) ? undefined : n
+    return isNaN(n) ? null : n
   },
-  z.number().int().min(1).max(12).optional()
+  z.number().int().min(1).max(12).nullable()
 )
 
 /** Leerer String und undefined werden zu null — „Keine Angabe". */
@@ -191,7 +198,8 @@ export const productFormSchema = z
       .default([])
       .refine((l) => new Set(l).size === l.length, 'Ein Siegel kann nur einmal gewählt werden.'),
     // Nur bei Kategorie Futtermittel — Pflicht dort, verboten sonst (superRefine).
-    futter: futterKennzeichnungSchema.optional(),
+    // null = keine Kennzeichnung (das Formular schreibt null, nie undefined).
+    futter: futterKennzeichnungSchema.nullable().optional(),
     countsTowardLimit: z.boolean().default(true),
     price: preisZahl,
     vatRate: mwstZahl,
@@ -226,10 +234,10 @@ export const productFormSchema = z
       if (data.subcategory === null) {
         ctx.addIssue({ code: 'custom', path: ['subcategory'], message: FUTTER_FEHLER.unterkategorie })
       }
-      if (data.futter === undefined) {
+      if (data.futter == null) {
         ctx.addIssue({ code: 'custom', path: ['futter'], message: FUTTER_FEHLER.fehlt })
       }
-    } else if (data.futter !== undefined) {
+    } else if (data.futter != null) {
       ctx.addIssue({ code: 'custom', path: ['futter'], message: FUTTER_FEHLER.verboten })
     }
   })

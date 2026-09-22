@@ -148,21 +148,23 @@ const EMPTY_DEFAULTS: ProductFormData = {
   category: null,
   subcategory: null,
   labels: [],
-  futter: undefined,
+  // Leer ist null, nie undefined: react-hook-form liest undefined als
+  // „Ausgangswert wiederherstellen" (docs/ai/CODING_STANDARDS.md, Formulare).
+  futter: null,
   countsTowardLimit: true,
   // NaN statt 0: Das Preisfeld startet leer, und die Prüfung meldet „Bitte gib
   // einen Preis ein" statt „größer als 0" für eine Null, die niemand getippt hat.
   price: Number.NaN,
   vatRate: MWST_STANDARD,
   unit: 'STUECK',
-  unitSize: undefined,
+  unitSize: null,
   stock: 0,
   isAvailable: true,
   allergens: [],
   requiresCool: false,
   requiresFreezer: false,
-  seasonStart: undefined,
-  seasonEnd: undefined,
+  seasonStart: null,
+  seasonEnd: null,
   unavailableReason: '',
 }
 
@@ -186,19 +188,19 @@ function toFormDefaults(p: ProductData): Partial<ProductFormData> {
           gebrauchshinweis: p.futter.gebrauchshinweis ?? '',
           bestaetigt: true,
         }
-      : undefined,
+      : null,
     countsTowardLimit: p.countsTowardLimit,
     price: p.price,
     vatRate: p.vatRate,
     unit: p.unit as ProductFormData['unit'],
-    unitSize: p.unitSize ?? undefined,
+    unitSize: p.unitSize ?? null,
     stock: p.stock,
     isAvailable: p.isAvailable,
     allergens: p.allergens,
     requiresCool: p.requiresCool,
     requiresFreezer: p.requiresFreezer,
-    seasonStart: p.seasonStart ?? undefined,
-    seasonEnd: p.seasonEnd ?? undefined,
+    seasonStart: p.seasonStart ?? null,
+    seasonEnd: p.seasonEnd ?? null,
     unavailableReason: p.unavailableReason ?? '',
   }
 }
@@ -330,7 +332,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
   function festePaketeUmschalten(an: boolean) {
     setFestePakete(an)
     if (!an) {
-      form.setValue('unitSize', undefined, { shouldDirty: true })
+      form.setValue('unitSize', null, { shouldDirty: true })
       form.clearErrors('unitSize')
       setReferenzPreis(null)
     }
@@ -344,8 +346,8 @@ export function ProductDialog({ open, product, onClose }: Props) {
       form.setValue('seasonStart', start, { shouldDirty: true })
       form.setValue('seasonEnd', end, { shouldDirty: true })
     } else {
-      form.setValue('seasonStart', undefined, { shouldDirty: true })
-      form.setValue('seasonEnd', undefined, { shouldDirty: true })
+      form.setValue('seasonStart', null, { shouldDirty: true })
+      form.setValue('seasonEnd', null, { shouldDirty: true })
     }
   }
 
@@ -388,7 +390,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
   function kategorieWaehlen(neu: ProductCategoryValue | null) {
     const alt = form.getValues('category')
     if (neu === alt) return
-    if (alt === 'FUTTERMITTEL' && form.getValues('futter') !== undefined) {
+    if (alt === 'FUTTERMITTEL' && form.getValues('futter') != null) {
       setKategorieWechsel({ neu })
       return
     }
@@ -400,11 +402,11 @@ export function ProductDialog({ open, product, onClose }: Props) {
     form.setValue('subcategory', null, { shouldDirty: true })
     form.clearErrors('subcategory')
     if (neu === 'FUTTERMITTEL') {
-      if (form.getValues('futter') === undefined) form.setValue('futter', { ...FUTTER_LEER })
+      if (form.getValues('futter') == null) form.setValue('futter', { ...FUTTER_LEER })
       // Beim Anlegen eines Futtermittels ist die Kennzeichnung Pflicht — gleich zeigen.
       abschnittOeffnen('kennzeichnung')
     } else {
-      form.setValue('futter', undefined, { shouldDirty: true })
+      form.setValue('futter', null, { shouldDirty: true })
       form.clearErrors('futter')
     }
   }
@@ -750,7 +752,9 @@ export function ProductDialog({ open, product, onClose }: Props) {
                                     } else if (neu == null || neu <= 1) {
                                       setReferenzPreis(null)
                                     }
-                                    field.onChange(neu ?? undefined)
+                                    // null durchreichen, nie undefined — sonst holt
+                                    // react-hook-form den Ausgangswert zurück.
+                                    field.onChange(neu)
                                   }}
                                 />
                               </FormControl>

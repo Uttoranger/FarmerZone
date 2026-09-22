@@ -672,6 +672,16 @@ am Dialog. Merksatz für neue Dialoge mit Scrollinhalt: **`min-h-0` auf den
 scrollenden Flex-Kindern, kein `DialogFooter` bei `p-0`.** Der Preis zeigt beim
 Verlassen immer zwei Stellen („1,00", `formatDezimal`).
 
+**Gebindegröße sprang beim Bearbeiten zurück (reproduziert).** Das Feld gab bei
+leerem Zwischenstand `undefined` weiter, und react-hook-form liest `undefined`
+als „Ausgangswert wiederherstellen": Bei einem Bestandsprodukt mit Gebinde 1
+wurde aus dem Tippen von „0,5" die Folge „1" → „15". Neue Produkte (Ausgangswert
+leer) zeigten es nicht, der Preis auch nicht, weil er leer als `NaN` übergibt.
+Seitdem gilt im Formular: **Leer ist `null`, nie `undefined`** — für
+Gebindegröße, Saison-Monate und die Kennzeichnung gleichermaßen, im Schema
+(`.nullable()`), in den Defaults und beim Umschalten. Die Regel steht in
+`docs/ai/CODING_STANDARDS.md`, Abschnitt 8.
+
 ---
 
 ## Upload-Diagnose

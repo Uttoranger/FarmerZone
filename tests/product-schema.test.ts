@@ -146,9 +146,21 @@ describe('Futtermittel', () => {
     expect(fehler['subcategory']).toBe(FUTTER_FEHLER.unterkategorie)
   })
 
-  it('ohne Kennzeichnung: Fehler am Feld futter', () => {
-    const fehler = fehlerNachPfad({ ...heu, futter: undefined })
-    expect(fehler['futter']).toBe(FUTTER_FEHLER.fehlt)
+  it('ohne Kennzeichnung: Fehler am Feld futter — bei undefined wie bei null', () => {
+    expect(fehlerNachPfad({ ...heu, futter: undefined })['futter']).toBe(FUTTER_FEHLER.fehlt)
+    expect(fehlerNachPfad({ ...heu, futter: null })['futter']).toBe(FUTTER_FEHLER.fehlt)
+  })
+
+  it('bei anderen Kategorien ist futter = null erlaubt (das Formular schreibt null)', () => {
+    const parsed = productFormSchema.parse({ ...minimalValid, category: 'OBST', futter: null })
+    expect(parsed.futter).toBeNull()
+  })
+
+  it('Saison: leer und 0 werden null, nie undefined', () => {
+    const parsed = productFormSchema.parse({ ...minimalValid, seasonStart: '', seasonEnd: '0' })
+    expect(parsed.seasonStart).toBeNull()
+    expect(parsed.seasonEnd).toBeNull()
+    expect(productFormSchema.parse(minimalValid).seasonStart).toBeNull()
   })
 
   it('ohne Tierart: Fehler in Du-Form', () => {
@@ -210,8 +222,10 @@ describe('Dezimaleingabe — Preis, Gebindegröße, MwSt', () => {
 
   it('Gebindegröße: Komma erlaubt, drei Nachkommastellen erlaubt, vier nicht', () => {
     expect(productFormSchema.parse({ ...minimalValid, unitSize: '0,125' }).unitSize).toBe(0.125)
-    expect(productFormSchema.parse({ ...minimalValid, unitSize: '' }).unitSize).toBeUndefined()
-    expect(productFormSchema.parse({ ...minimalValid, unitSize: null }).unitSize).toBeUndefined()
+    // Leer ist null, nie undefined — react-hook-form läse undefined als „Ausgangswert zurück".
+    expect(productFormSchema.parse({ ...minimalValid, unitSize: '' }).unitSize).toBeNull()
+    expect(productFormSchema.parse({ ...minimalValid, unitSize: null }).unitSize).toBeNull()
+    expect(productFormSchema.parse({ ...minimalValid, unitSize: undefined }).unitSize).toBeNull()
     expect(fehlerNachPfad({ ...minimalValid, unitSize: 0.0625 })['unitSize']).toBe('Höchstens drei Nachkommastellen, z. B. 0,125.')
     expect(fehlerNachPfad({ ...minimalValid, unitSize: 'zwei' })['unitSize']).toBe('Bitte nur Zahlen, z. B. 2 oder 0,5.')
   })
