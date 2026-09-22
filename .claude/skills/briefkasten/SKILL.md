@@ -1,3 +1,7 @@
+---
+description: Wöchentliche Triage des Fehlerbriefkastens — Meldungen laden, nach den Regeln in DEVELOPMENT.md einstufen, nur lesend, Bericht im Terminal. Nutzen bei „Briefkasten", „Meldungen" oder „Triage".
+---
+
 Du führst die wöchentliche Triage des Fehlerbriefkastens durch. Du arbeitest NUR LESEND: keine Datenbank-Schreibzugriffe, keine Commits, keine Dateien im Repository anlegen — Meldungen enthalten personenbezogene Daten und dürfen nie ins öffentliche Repo gelangen. Deine Ausgabe ist ausschließlich ein Bericht im Terminal.
 
 SCHRITT 1 — LADEN

@@ -58,14 +58,14 @@ Bei offenen Fragen, die den Bau blockieren: **erst fragen, dann bauen.**
 
 ### 4. Umsetzen
 
-Ein Schritt nach dem anderen. Nach jedem Schritt die betroffenen Tests laufen lassen
-(`pnpm vitest run tests/<datei>.test.ts`), nicht erst am Ende alles.
+Ein Schritt nach dem anderen. Nach jedem Schritt den Subagenten `tester` mit den
+betroffenen Testdateien aufrufen, nicht erst am Ende alles.
 
 Neue Fachregel → Test im selben Schritt, nicht später.
 
 ### 5. Selbst prüfen
 
-Rufe `/pruefen` auf. Behebe, was dort auffällt, bevor du weitermachst.
+Rufe den Subagenten `pruefer` auf. Behebe, was dort auffällt, bevor du weitermachst.
 
 ### 6. Abschließen
 

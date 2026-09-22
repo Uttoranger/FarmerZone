@@ -87,6 +87,9 @@ Diese Abläufe stehen als Befehle bereit. Lies sie nicht aus dem Gedächtnis —
 | Beauftragte Änderung, Sprint, neues Feature | `/sprint <auftrag>` |
 | Fehler beheben, Bugreport, Sentry-Issue | `/fix <beschreibung>` |
 | Vor jedem Commit und vor jedem PR | `/pruefen` |
+| Nach jedem Umsetzungsblock | Subagent `tester` |
+| Vor Commit und PR | Subagent `pruefer` (führt `/pruefen` mit frischen Augen aus) |
+| Produktionsfehler, Sentry, Briefkasten | Subagenten `waechter` und `kurator` |
 
 Sie liegen unter `.claude/skills/` und enthalten die verbindliche Reihenfolge:
 Kontext aus `docs/ai/` laden → Branch → `TASK.md` bei mehr als zwei Dateien →

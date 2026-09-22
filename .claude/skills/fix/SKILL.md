@@ -46,7 +46,8 @@ und mach weiter.
 ### 4. Beweisen
 
 - Der neue Test ist grün.
-- `pnpm test` ist komplett grün — der Fix hat nichts anderes zerbrochen.
+- Ruf den Subagenten `tester` auf: Typecheck, Lint und die Suite müssen komplett
+  grün sein — der Fix hat nichts anderes zerbrochen.
 
 ### 5. Berichten
 
