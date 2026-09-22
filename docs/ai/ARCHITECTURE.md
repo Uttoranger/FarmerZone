@@ -45,7 +45,7 @@ Vorbild: `src/lib/reservierung.ts` entscheidet (rein, 174 Tests ohne DB), `src/s
 | `tests/` | Alle Tests, flach | — |
 
 ### `src/lib/` ist voll — Regel beim Hinzufügen
-57 Dateien, gemischter Zweck. Bevor eine neue entsteht:
+61 Dateien (Stand 2026-09), gemischter Zweck. Bevor eine neue entsteht:
 1. Passt es in eine bestehende Datei? Dann dorthin.
 2. Ist es eine **Fachregel**? → eigene Datei, rein, ohne Import von `prisma`/`auth`/`stripe`.
 3. Ist es eine **Infrastrukturkapsel** (externer Dienst)? → `server-only` importieren.

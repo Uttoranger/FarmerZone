@@ -1,6 +1,6 @@
 # TESTING_GUIDELINES
 
-Stand: 71 Testdateien, ~870 Tests, alle in `tests/`.
+Stand 2026-09-22: 77 Testdateien, ~1.100 Tests, alle in `tests/`.
 
 ---
 
@@ -50,12 +50,12 @@ pnpm test:watch                           # Entwicklung
 
 ### Gemockt werden darf — Infrastruktur
 ```ts
-vi.mock('@/lib/prisma')      // 26 Dateien
-vi.mock('@/lib/auth')        // 14
+vi.mock('@/lib/prisma')      // 27 Dateien
+vi.mock('@/lib/auth')        // 15
 vi.mock('@/lib/email')       // 14
 vi.mock('@/lib/stripe')      // 8
-vi.mock('next/headers')      // 14
-vi.mock('next/cache')        // 12
+vi.mock('next/headers')      // 15
+vi.mock('next/cache')        // 13
 vi.mock('@vercel/blob')      // 3
 ```
 Alles, was Netz, DB oder Request-Kontext braucht.
@@ -109,5 +109,6 @@ Reine Funktionen (`src/lib/<fachregel>.ts`) werden **ohne jeden Mock** getestet.
 - Roter Test wird **nie** mit `.skip` stillgelegt. Entweder reparieren oder melden.
 - `pnpm test` muss vor jedem Commit grün sein.
 
-### Bekannte Umgebungsfalle
-`prisma generate` braucht Netzzugriff auf `binaries.prisma.sh`. Ist er blockiert, scheitern vier Testdateien mit `Cannot find module '.prisma/client/default'`. Das ist **kein** Codefehler — vor der Fehlersuche `pnpm db:generate` prüfen.
+### Bekannte Umgebungsfallen
+- `prisma generate` braucht Netzzugriff auf `binaries.prisma.sh`. Ist er blockiert, scheitern vier Testdateien mit `Cannot find module '.prisma/client/default'`. Das ist **kein** Codefehler — vor der Fehlersuche `pnpm db:generate` prüfen.
+- `tests/email-sendraw.test.ts` und `tests/password-reset-email.test.ts` flackern gelegentlich im Gesamtlauf: Ihr erster Fall importiert `@/lib/email` kalt (`vi.resetModules()`), und unter Parallellast läuft das ins 5-Sekunden-Limit. Allein laufen sie grün. Vor einem Fix des eigenen Codes die beiden Dateien einzeln starten.

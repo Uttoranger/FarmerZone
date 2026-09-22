@@ -28,7 +28,14 @@ Prisma 7 · PostgreSQL 16 (Supabase) · Better Auth · Stripe Connect · Resend 
 
 ## Aktueller Stand
 
-**Sprint 15 abgeschlossen** — Härtung 1: test-email dev-only, Cron fail-closed, CI-Workflow, Webhook-Retry-Fix, Build-Script mit `prisma generate`
+**Stand 2026-09-22.** Produktivbetrieb mit einem Pilothof. Zuletzt gemerged:
+Dark Mode (#96–#99), Testumgebung erkennbar (#98), Taxonomie 1 mit Unterkategorien,
+Siegeln und Futter-Kennzeichnung (#100), Preis-Semantik „€ 50,00 für 2 kg" mit
+Grundpreis-Zeile (#101). Offen: Produktformular Feinschliff (#102).
+
+Die Sprintliste darunter ist chronologisch von neu nach alt und endet bei Sprint 1;
+die Fachabschnitte weiter unten (Reservierungen, Preise, Theme, Taxonomie,
+Umgebungen, Triage) beschreiben, wie die Regeln heute funktionieren.
 
 ---
 
@@ -328,10 +335,11 @@ pnpm dev
 
 | Service | Zweck | Status |
 |---------|-------|--------|
-| Supabase | PostgreSQL-Datenbank | ✅ aktiv, Region Frankfurt |
-| Stripe | Zahlungen + Connect | ⏳ noch nicht angelegt |
-| Resend | E-Mail-Versand | ⏳ noch nicht angelegt |
-| Vercel | Hosting + Blob-Storage | ⏳ noch nicht angelegt |
+| Supabase | PostgreSQL — zwei Projekte: `Farmerzone` (Produktion) und `farmerzone-dev` (lokal + Previews) | ✅ aktiv, Region Frankfurt |
+| Stripe | Zahlungen + Connect (Test-Keys in Dev/Preview, Live in Produktion) | ✅ aktiv |
+| Resend | E-Mail-Versand (nur Produktion; Previews senden nicht) | ✅ aktiv |
+| Vercel | Hosting, Blob-Storage, Cron (Hobby-Tarif) | ✅ aktiv |
+| Sentry | Fehlerberichte (ohne personenbezogene Daten, `sentry-hygiene.ts`) | ✅ aktiv |
 
 ---
 
@@ -752,4 +760,4 @@ pnpm briefkasten export   # Briefkasten als Markdown (nur lesend; Leseroute oder
 
 ---
 
-*Zuletzt aktualisiert: 2026-07-16 — Sprint U: Umgebungs-Trennung + Migrations-Baseline*
+*Zuletzt aktualisiert: 2026-09-22 — Stand nach Taxonomie 1 (#100) und Preis-Semantik (#101)*
