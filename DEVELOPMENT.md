@@ -630,6 +630,66 @@ Einheit"; ein Hof trug den Kilopreis ein, meinte 50 €/kg und speicherte 50 €
 Betreiber fragt die Höfe, was gemeint war): Dev-Datenbank 3 Produkte, Produktion 2
 Produkte; die Namen stehen im PR.
 
+### Produktformular Feinschliff (2026-09-22)
+
+**Dezimaleingabe.** `type="number"` verwarf das Komma je nach Browser still —
+„5,99" wurde zu 599 oder zu nichts. Preis, Gebindegröße und MwSt sind jetzt
+Textfelder mit `inputMode="decimal"` (`src/components/shared/dezimal-feld.tsx`):
+Komma UND Punkt gelten als Dezimaltrenner (`parseDezimal` in `format.ts`),
+Leerzeichen werden entfernt, beim Verlassen wird deutsch formatiert. Ein
+Tausenderpunkt wird abgelehnt, weil „1.500" zweideutig ist — mit einer Ausnahme:
+„0,125" hat auch drei Stellen, ist aber kein Tausender, und 125 g Gebinde müssen
+möglich bleiben. Das Zod-Schema parst denselben Weg (`z.preprocess`), Preis auf
+zwei, Gebindegröße auf drei Nachkommastellen begrenzt. Das Feld hält den
+Rohtext im State, ohne Effekt: Der Entwurf gilt nur, solange er zum Wert des
+Formulars passt; setzt jemand den Wert von außen („Nein, das ist der Preis je
+kg"), zeigt das Feld ihn formatiert. „Rohwerte der Kennzeichnung" gibt es nicht
+als Zahlfelder — die analytischen Bestandteile sind Freitext, dort bleibt es.
+
+**Gebinde und Saison hinter Schaltern.** Beide Felder sind Sonderfälle; ein
+Schalter („Ich verkaufe in festen Paketen", „Nur saisonal verfügbar") sagt es
+und blendet die Felder erst dann ein. Aus heißt leer (`unitSize`, `seasonStart`,
+`seasonEnd` = null). Beim Einschalten der Saison ist Von/Bis mit aktuellem Monat
+bis Monat + 2 vorbelegt (`saisonVorbelegung`, über den Jahreswechsel) — es gibt
+keinen leeren Zustand und keinen Wert 0 mehr. Beim Bearbeiten steht der
+Schalter auf An, wenn der Wert gesetzt ist. Der Schalter selbst ist Base UI
+(`src/components/ui/switch.tsx`), auch für „Im Shop verfügbar".
+
+**Bestand mit Einheit.** „Bestand (kg)" bzw. „Bestand (Pakete) = 20 kg"
+(`bestandLabel`, `formatBestand`) — bei Stück und Paket ohne Umrechnung, weil
+„6er-Pack × 30 = 180 Pakete" nichts sagt.
+
+**MwSt nach Details.** Der Satz gehört nicht zum täglichen Preis-Handgriff.
+Unter dem Feld steht „Standard: 10 %" — es gibt keinen Satz je Kategorie, der
+Standard ist der Schema-Default `MWST_STANDARD`. Die Zusammenfassung von
+„Details" nennt den Satz nur, wenn er davon abweicht.
+
+**Rückfrage mit Antworten.** Statt eines Textes zwei Knöpfe: „Ja, das Paket
+kostet € 50,00" lässt alles stehen; „Nein, € 50,00 ist der Preis je kg" trägt
+Einheitspreis × Gebinde ein (`paketpreisAntworten`). Beides beendet die
+Rückfrage für diese Eingabe; die Rechnung steht ohnehin in „Kunden sehen".
+
+**Knöpfe unten fest**, Hintergrund `card`, feine Linie oben, Abstand für die
+Safe-Area am Handy. Der erste Wurf klebte mitten im Dialog und ragte über die
+Kante: `DialogFooter` bringt negative Ränder (`-mx-6 -mb-6`) mit, die bei `p-0`
+über den Rand laufen, und dem Scrollbereich fehlte `min-h-0` — ohne das wächst
+ein Flex-Kind auf Inhaltshöhe, der ganze Dialog scrollt, und ein `sticky`-Fuß
+hängt irgendwo dazwischen. Jetzt: drei Flex-Zonen (Kopf, Inhalt mit `min-h-0`
+und `overflow-y-auto`, Fuß als eigenes Div ohne Rand-Tricks), `overflow-hidden`
+am Dialog. Merksatz für neue Dialoge mit Scrollinhalt: **`min-h-0` auf den
+scrollenden Flex-Kindern, kein `DialogFooter` bei `p-0`.** Der Preis zeigt beim
+Verlassen immer zwei Stellen („1,00", `formatDezimal`).
+
+**Gebindegröße sprang beim Bearbeiten zurück (reproduziert).** Das Feld gab bei
+leerem Zwischenstand `undefined` weiter, und react-hook-form liest `undefined`
+als „Ausgangswert wiederherstellen": Bei einem Bestandsprodukt mit Gebinde 1
+wurde aus dem Tippen von „0,5" die Folge „1" → „15". Neue Produkte (Ausgangswert
+leer) zeigten es nicht, der Preis auch nicht, weil er leer als `NaN` übergibt.
+Seitdem gilt im Formular: **Leer ist `null`, nie `undefined`** — für
+Gebindegröße, Saison-Monate und die Kennzeichnung gleichermaßen, im Schema
+(`.nullable()`), in den Defaults und beim Umschalten. Die Regel steht in
+`docs/ai/CODING_STANDARDS.md`, Abschnitt 8.
+
 ---
 
 ## Upload-Diagnose

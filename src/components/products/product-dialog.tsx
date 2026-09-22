@@ -34,7 +34,9 @@ import {
 } from '@/components/ui/accordion'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import { DezimalFeld } from '@/components/shared/dezimal-feld'
 import {
   Select,
   SelectContent,
@@ -52,6 +54,7 @@ import {
   UNIT_OPTIONS,
   MONTH_OPTIONS,
   CATEGORY_OPTIONS,
+  MWST_STANDARD,
   seasonLabel,
 } from '@/schemas/product'
 import {
@@ -64,20 +67,62 @@ import {
   TIERART_LABEL,
   type ProductCategoryValue,
 } from '@/lib/taxonomie'
-import { formatKategorie, formatGrundpreis, mitAnzahl } from '@/lib/format'
+import {
+  formatKategorie,
+  formatGrundpreis,
+  formatZahl,
+  mitAnzahl,
+  einheitLabel,
+  bestandLabel,
+  formatBestand,
+} from '@/lib/format'
 import { cn } from '@/lib/utils'
 import {
   kundenVorschau,
   paketpreisFraglich,
-  paketpreisHinweis,
+  paketpreisAntworten,
+  PAKETPREIS_FRAGE,
   preisFeldLabel,
 } from './produkt-preis'
 import {
   ABSCHNITT_TITEL,
   abschnitteMitFehlern,
   erstesFehlerfeld,
+  saisonVorbelegung,
   type Abschnitt,
 } from './produkt-abschnitte'
+
+/**
+ * Eine Zeile mit Schalter, Titel und Untertitel — drei davon im Formular
+ * (feste Pakete, im Shop verfügbar, saisonal). Der ganze Kasten ist klickbar,
+ * das Touch-Ziel damit deutlich über 44 px.
+ */
+function SchalterZeile({
+  id,
+  titel,
+  untertitel,
+  checked,
+  onCheckedChange,
+}: {
+  id: string
+  titel: string
+  untertitel: string
+  checked: boolean
+  onCheckedChange: (an: boolean) => void
+}) {
+  return (
+    <label
+      htmlFor={id}
+      className="flex min-h-14 cursor-pointer items-center gap-3 rounded-lg border border-border p-3"
+    >
+      <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} />
+      <span className="flex flex-col gap-0.5">
+        <span className="text-sm font-medium text-foreground">{titel}</span>
+        <span className="text-xs text-muted-foreground">{untertitel}</span>
+      </span>
+    </label>
+  )
+}
 
 type Props = {
   open: boolean
@@ -103,19 +148,23 @@ const EMPTY_DEFAULTS: ProductFormData = {
   category: null,
   subcategory: null,
   labels: [],
-  futter: undefined,
+  // Leer ist null, nie undefined: react-hook-form liest undefined als
+  // „Ausgangswert wiederherstellen" (docs/ai/CODING_STANDARDS.md, Formulare).
+  futter: null,
   countsTowardLimit: true,
-  price: 0,
-  vatRate: 10,
+  // NaN statt 0: Das Preisfeld startet leer, und die Prüfung meldet „Bitte gib
+  // einen Preis ein" statt „größer als 0" für eine Null, die niemand getippt hat.
+  price: Number.NaN,
+  vatRate: MWST_STANDARD,
   unit: 'STUECK',
-  unitSize: undefined,
+  unitSize: null,
   stock: 0,
   isAvailable: true,
   allergens: [],
   requiresCool: false,
   requiresFreezer: false,
-  seasonStart: undefined,
-  seasonEnd: undefined,
+  seasonStart: null,
+  seasonEnd: null,
   unavailableReason: '',
 }
 
@@ -139,19 +188,19 @@ function toFormDefaults(p: ProductData): Partial<ProductFormData> {
           gebrauchshinweis: p.futter.gebrauchshinweis ?? '',
           bestaetigt: true,
         }
-      : undefined,
+      : null,
     countsTowardLimit: p.countsTowardLimit,
     price: p.price,
     vatRate: p.vatRate,
     unit: p.unit as ProductFormData['unit'],
-    unitSize: p.unitSize ?? undefined,
+    unitSize: p.unitSize ?? null,
     stock: p.stock,
     isAvailable: p.isAvailable,
     allergens: p.allergens,
     requiresCool: p.requiresCool,
     requiresFreezer: p.requiresFreezer,
-    seasonStart: p.seasonStart ?? undefined,
-    seasonEnd: p.seasonEnd ?? undefined,
+    seasonStart: p.seasonStart ?? null,
+    seasonEnd: p.seasonEnd ?? null,
     unavailableReason: p.unavailableReason ?? '',
   }
 }
@@ -171,6 +220,10 @@ function zusammenfassung(abschnitt: Abschnitt, w: ProductFormData): string {
       const teile: string[] = []
       teile.push(w.labels.length > 0 ? w.labels.map((l) => SIEGEL[l].name).join(', ') : 'Keine Siegel')
       if (w.allergens.length > 0) teile.push(mitAnzahl(w.allergens.length, 'Allergen', 'Allergene'))
+      // Der MwSt-Satz steht nur da, wenn er vom Standard abweicht.
+      if (Number.isFinite(w.vatRate) && w.vatRate !== MWST_STANDARD) {
+        teile.push(`MwSt ${formatZahl(w.vatRate)} %`)
+      }
       return teile.join(' · ')
     }
     case 'kennzeichnung': {
@@ -210,6 +263,10 @@ export function ProductDialog({ open, product, onClose }: Props) {
   // Der Preis, der im Feld stand, bevor eine Gebindegröße über 1 gesetzt wurde —
   // mutmaßlich ein Preis je Einheit. Grundlage der Rückfrage „ganzes Paket?".
   const [referenzPreis, setReferenzPreis] = useState<number | null>(null)
+  // Die beiden Schalter. Sie sind KEIN Formularwert: Aus bedeutet „Feld leer",
+  // An zeigt das Feld — auch wenn noch nichts drinsteht.
+  const [festePakete, setFestePakete] = useState(false)
+  const [saisonal, setSaisonal] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   // Über welchen Weg das gewählte Foto kam — nur für die Sentry-Meldung;
   // der Upload läuft hier erst beim Absenden, also bis dahin merken.
@@ -241,6 +298,9 @@ export function ProductDialog({ open, product, onClose }: Props) {
     unitSize: werte.unitSize,
     referenzPreis,
   })
+  const preisAntworten = paketpreisAntworten(werte.price, werte.unit, werte.unitSize)
+  const bestandGesamt = formatBestand(werte.stock, werte.unit, werte.unitSize)
+  const mwstStandard = MWST_STANDARD
 
   // Reset form when dialog opens/switches product
   useEffect(() => {
@@ -251,6 +311,9 @@ export function ProductDialog({ open, product, onClose }: Props) {
       setOffen(isEdit ? [] : ['grunddaten'])
       setKategorieWechsel(null)
       setReferenzPreis(null)
+      // Beim Bearbeiten stehen die Schalter so, wie das Produkt gespeichert ist.
+      setFestePakete(isEdit && product.unitSize != null)
+      setSaisonal(isEdit && product.seasonStart != null && product.seasonEnd != null)
     }
   }, [open, product?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -263,6 +326,29 @@ export function ProductDialog({ open, product, onClose }: Props) {
 
   function abschnittOeffnen(abschnitt: Abschnitt) {
     setOffen((o) => (o.includes(abschnitt) ? o : [...o, abschnitt]))
+  }
+
+  /** Schalter „feste Pakete": Aus leert die Gebindegröße und die Rückfrage-Referenz. */
+  function festePaketeUmschalten(an: boolean) {
+    setFestePakete(an)
+    if (!an) {
+      form.setValue('unitSize', null, { shouldDirty: true })
+      form.clearErrors('unitSize')
+      setReferenzPreis(null)
+    }
+  }
+
+  /** Schalter „saisonal": An belegt Von/Bis vor, Aus leert beide. */
+  function saisonalUmschalten(an: boolean) {
+    setSaisonal(an)
+    if (an) {
+      const { start, end } = saisonVorbelegung(new Date())
+      form.setValue('seasonStart', start, { shouldDirty: true })
+      form.setValue('seasonEnd', end, { shouldDirty: true })
+    } else {
+      form.setValue('seasonStart', null, { shouldDirty: true })
+      form.setValue('seasonEnd', null, { shouldDirty: true })
+    }
   }
 
   function uebernehmeFoto(file: File) {
@@ -304,7 +390,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
   function kategorieWaehlen(neu: ProductCategoryValue | null) {
     const alt = form.getValues('category')
     if (neu === alt) return
-    if (alt === 'FUTTERMITTEL' && form.getValues('futter') !== undefined) {
+    if (alt === 'FUTTERMITTEL' && form.getValues('futter') != null) {
       setKategorieWechsel({ neu })
       return
     }
@@ -316,11 +402,11 @@ export function ProductDialog({ open, product, onClose }: Props) {
     form.setValue('subcategory', null, { shouldDirty: true })
     form.clearErrors('subcategory')
     if (neu === 'FUTTERMITTEL') {
-      if (form.getValues('futter') === undefined) form.setValue('futter', { ...FUTTER_LEER })
+      if (form.getValues('futter') == null) form.setValue('futter', { ...FUTTER_LEER })
       // Beim Anlegen eines Futtermittels ist die Kennzeichnung Pflicht — gleich zeigen.
       abschnittOeffnen('kennzeichnung')
     } else {
-      form.setValue('futter', undefined, { shouldDirty: true })
+      form.setValue('futter', null, { shouldDirty: true })
       form.clearErrors('futter')
     }
   }
@@ -422,8 +508,12 @@ export function ProductDialog({ open, product, onClose }: Props) {
   return (
     <>
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg max-h-[92dvh] flex flex-col p-0">
-        <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
+      {/* Drei Zonen innerhalb der Dialogkante: Kopf fest, EIN scrollbarer
+          Inhalt mit allen Abschnitten, Fuß fest. overflow-hidden hält alles im
+          Radius; min-h-0 auf dem Inhalt ist die Bedingung dafür, dass er selbst
+          scrollt statt den ganzen Dialog aufzublähen. */}
+      <DialogContent className="max-w-lg max-h-[92dvh] flex flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
           <DialogTitle>{isEdit ? 'Produkt bearbeiten' : 'Neues Produkt'}</DialogTitle>
         </DialogHeader>
 
@@ -433,8 +523,8 @@ export function ProductDialog({ open, product, onClose }: Props) {
             onSubmit={form.handleSubmit(onSubmit, onInvalid)}
             className="flex flex-col flex-1 min-h-0"
           >
-            {/* Scrollable form body */}
-            <div className="flex-1 overflow-y-auto px-6 py-2">
+            {/* Scrollbarer Inhalt — pb-8, damit die letzte Karte nie unter dem Fuß liegt */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-6 pt-1 pb-8">
               <Accordion
                 multiple
                 value={offen}
@@ -601,52 +691,60 @@ export function ProductDialog({ open, product, onClose }: Props) {
                   <AccordionTrigger>{abschnittTitel('preis')}</AccordionTrigger>
                   <AccordionPanel>
                     <div className="space-y-3">
-                      {/* Reihenfolge Einheit → Gebindegröße → Preis: Das Preisfeld heißt
-                          je nach Gebinde anders („Preis je kg" / „Preis für das
-                          2-kg-Paket"), also stehen die beiden zuerst. */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <FormField
-                          control={form.control}
-                          name="unit"
-                          render={({ field }) => (
-                            <FormItem data-feld="unit">
-                              <FormLabel>Einheit *</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Wählen…" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  {UNIT_OPTIONS.map((u) => (
-                                    <SelectItem key={u.value} value={u.value}>
-                                      {u.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                      {/* Reihenfolge Einheit → Gebinde → Preis: Das Preisfeld heißt je
+                          nach Gebinde anders („Preis je kg" / „Preis für das 2-kg-Paket"),
+                          also stehen die beiden zuerst. */}
+                      <FormField
+                        control={form.control}
+                        name="unit"
+                        render={({ field }) => (
+                          <FormItem data-feld="unit">
+                            <FormLabel>Einheit *</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Wählen…" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {UNIT_OPTIONS.map((u) => (
+                                  <SelectItem key={u.value} value={u.value}>
+                                    {u.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
+                      {/* Gebinde hinter einem Schalter: Aus = Kunden bestellen einzeln
+                          (unitSize leer), An = feste Pakete mit Größe. */}
+                      <SchalterZeile
+                        id="feste-pakete"
+                        titel="Ich verkaufe in festen Paketen"
+                        untertitel="z. B. ein 2-kg-Paket oder eine 0,5-L-Flasche"
+                        checked={festePakete}
+                        onCheckedChange={festePaketeUmschalten}
+                      />
+
+                      {festePakete && (
                         <FormField
                           control={form.control}
                           name="unitSize"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Gebindegröße</FormLabel>
+                              <FormLabel>Gebindegröße *</FormLabel>
                               <FormControl>
-                                <Input
-                                  type="number"
-                                  step="0.001"
-                                  min="0"
-                                  placeholder="leer = einzeln"
+                                <DezimalFeld
                                   name={field.name}
-                                  value={field.value ?? ''}
-                                  onChange={(e) => {
+                                  value={field.value}
+                                  placeholder="z. B. 2"
+                                  suffix={einheitLabel(werte.unit)}
+                                  onBlur={field.onBlur}
+                                  onChange={(neu) => {
                                     const alt = field.value
-                                    const neu = e.target.value === '' ? undefined : e.target.valueAsNumber
                                     // Wird das Gebinde gerade größer als 1, merken wir uns den
                                     // Preis, der bis eben galt — er war mutmaßlich je Einheit.
                                     if ((alt == null || alt <= 1) && neu != null && neu > 1) {
@@ -654,6 +752,8 @@ export function ProductDialog({ open, product, onClose }: Props) {
                                     } else if (neu == null || neu <= 1) {
                                       setReferenzPreis(null)
                                     }
+                                    // null durchreichen, nie undefined — sonst holt
+                                    // react-hook-form den Ausgangswert zurück.
                                     field.onChange(neu)
                                   }}
                                 />
@@ -662,55 +762,29 @@ export function ProductDialog({ open, product, onClose }: Props) {
                             </FormItem>
                           )}
                         />
-                      </div>
-                      <p className="text-xs text-muted-foreground -mt-1">
-                        Gebindegröße leer lassen, wenn der Kunde in kg/L/Stück bestellt. Ausfüllen, wenn
-                        du feste Pakete verkaufst, z. B. 2 für ein 2-kg-Paket.
-                      </p>
+                      )}
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <FormField
-                          control={form.control}
-                          name="price"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>{preisFeldLabel(werte.unit, werte.unitSize)} (€) *</FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  placeholder="0,00"
-                                  {...field}
-                                  onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name="vatRate"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>MwSt. (%)</FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  step="1"
-                                  min="0"
-                                  max="100"
-                                  {...field}
-                                  onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
+                      <FormField
+                        control={form.control}
+                        name="price"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{preisFeldLabel(werte.unit, werte.unitSize)} *</FormLabel>
+                            <FormControl>
+                              <DezimalFeld
+                                name={field.name}
+                                value={field.value}
+                                placeholder="0,00"
+                                praefix="€"
+                                stellen={2}
+                                onBlur={field.onBlur}
+                                onChange={(neu) => field.onChange(neu ?? Number.NaN)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
                       {/* Live-Vorschau: was Kundinnen aus Preis und Gebinde lesen werden */}
                       {preisVorschau && (
@@ -719,19 +793,48 @@ export function ProductDialog({ open, product, onClose }: Props) {
                         </p>
                       )}
                       {preisFraglich && (
-                        <p className="text-xs text-amber-800 dark:text-amber-200 -mt-1" aria-live="polite">
-                          {paketpreisHinweis(werte.price, werte.unit, werte.unitSize)}
-                        </p>
+                        <div
+                          className="rounded-lg bg-amber-50 dark:bg-amber-950/40 p-3 text-xs text-amber-800 dark:text-amber-200"
+                          aria-live="polite"
+                        >
+                          <p className="font-medium">{PAKETPREIS_FRAGE}</p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setReferenzPreis(null)}
+                              className="min-h-9 rounded-full border border-current px-3 text-xs font-medium hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                            >
+                              {preisAntworten.ja}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                form.setValue('price', preisAntworten.paketpreis, { shouldDirty: true })
+                                setReferenzPreis(null)
+                              }}
+                              className="min-h-9 rounded-full border border-current px-3 text-xs font-medium hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                            >
+                              {preisAntworten.nein}
+                            </button>
+                          </div>
+                        </div>
                       )}
+
                       <FormField
                         control={form.control}
                         name="stock"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Aktueller Bestand</FormLabel>
+                            <div className="flex items-baseline justify-between gap-2">
+                              <FormLabel>{bestandLabel(werte.unit, werte.unitSize)}</FormLabel>
+                              {bestandGesamt && (
+                                <span className="text-xs text-muted-foreground">= {bestandGesamt}</span>
+                              )}
+                            </div>
                             <FormControl>
                               <Input
                                 type="number"
+                                inputMode="numeric"
                                 step="1"
                                 min="0"
                                 {...field}
@@ -748,33 +851,13 @@ export function ProductDialog({ open, product, onClose }: Props) {
                         name="isAvailable"
                         render={({ field }) => (
                           <FormItem data-feld="isAvailable">
-                            <div className="flex items-center gap-3 p-3 rounded-lg border border-border">
-                              <button
-                                type="button"
-                                role="switch"
-                                aria-checked={field.value}
-                                onClick={() => field.onChange(!field.value)}
-                                className={`relative w-10 h-6 rounded-full transition-colors ${
-                                  field.value ? 'bg-green-600' : 'bg-muted-foreground/30'
-                                }`}
-                              >
-                                <span
-                                  /* Weiß in beiden Modi: Der Schieber liegt auf heller
-                                     wie auf dunkler Schiene. */
-                                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                                    field.value ? 'translate-x-4' : 'translate-x-0'
-                                  }`}
-                                />
-                              </button>
-                              <div>
-                                <FormLabel className="font-medium cursor-pointer" onClick={() => field.onChange(!field.value)}>
-                                  Im Shop verfügbar
-                                </FormLabel>
-                                <p className="text-xs text-muted-foreground/60">
-                                  {field.value ? 'Sichtbar und bestellbar' : 'Ausgeblendet im Shop'}
-                                </p>
-                              </div>
-                            </div>
+                            <SchalterZeile
+                              id="im-shop-verfuegbar"
+                              titel="Im Shop verfügbar"
+                              untertitel={field.value ? 'Sichtbar und bestellbar' : 'Ausgeblendet im Shop'}
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
                           </FormItem>
                         )}
                       />
@@ -795,77 +878,84 @@ export function ProductDialog({ open, product, onClose }: Props) {
                         />
                       )}
 
-                      {/* Saisonalität */}
-                      <div className="space-y-2 pt-1">
-                        <p className="text-sm font-medium text-foreground">Saison (optional)</p>
-                        <div className="grid grid-cols-2 gap-3">
-                          <FormField
-                            control={form.control}
-                            name="seasonStart"
-                            render={({ field }) => (
-                              <FormItem data-feld="seasonStart">
-                                <FormLabel>Saison von</FormLabel>
-                                <Select
-                                  onValueChange={(v) => field.onChange(v === '0' ? undefined : Number(v))}
-                                  value={field.value?.toString() ?? '0'}
-                                >
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Monat…" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="0">— keiner —</SelectItem>
-                                    {MONTH_OPTIONS.map((m) => (
-                                      <SelectItem key={m.value} value={m.value.toString()}>
-                                        {m.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+                      {/* Saison hinter einem Schalter: An = Von/Bis immer gesetzt, Aus = leer. */}
+                      <SchalterZeile
+                        id="nur-saisonal"
+                        titel="Nur saisonal verfügbar"
+                        untertitel="Kundinnen sehen, von wann bis wann es das Produkt gibt"
+                        checked={saisonal}
+                        onCheckedChange={saisonalUmschalten}
+                      />
 
-                          <FormField
-                            control={form.control}
-                            name="seasonEnd"
-                            render={({ field }) => (
-                              <FormItem data-feld="seasonEnd">
-                                <FormLabel>Saison bis</FormLabel>
-                                <Select
-                                  onValueChange={(v) => field.onChange(v === '0' ? undefined : Number(v))}
-                                  value={field.value?.toString() ?? '0'}
-                                >
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Monat…" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="0">— keiner —</SelectItem>
-                                    {MONTH_OPTIONS.map((m) => (
-                                      <SelectItem key={m.value} value={m.value.toString()}>
-                                        {m.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        {watchedSeasonStart && watchedSeasonEnd && (
-                          <p className="text-xs text-muted-foreground">
-                            {seasonLabel(watchedSeasonStart, watchedSeasonEnd)}
+                      {saisonal && (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 gap-3">
+                            <FormField
+                              control={form.control}
+                              name="seasonStart"
+                              render={({ field }) => (
+                                <FormItem data-feld="seasonStart">
+                                  <FormLabel>Von</FormLabel>
+                                  <Select
+                                    onValueChange={(v) => field.onChange(Number(v))}
+                                    value={String(field.value ?? '')}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Monat…" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {MONTH_OPTIONS.map((m) => (
+                                        <SelectItem key={m.value} value={m.value.toString()}>
+                                          {m.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="seasonEnd"
+                              render={({ field }) => (
+                                <FormItem data-feld="seasonEnd">
+                                  <FormLabel>Bis</FormLabel>
+                                  <Select
+                                    onValueChange={(v) => field.onChange(Number(v))}
+                                    value={String(field.value ?? '')}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Monat…" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {MONTH_OPTIONS.map((m) => (
+                                        <SelectItem key={m.value} value={m.value.toString()}>
+                                          {m.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          {watchedSeasonStart && watchedSeasonEnd && (
+                            <p className="text-xs text-muted-foreground">
+                              {seasonLabel(watchedSeasonStart, watchedSeasonEnd)}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground/60">
+                            Saison kann über den Jahreswechsel gehen (z. B. Okt → März)
                           </p>
-                        )}
-                        <p className="text-xs text-muted-foreground/60">
-                          Saison kann über den Jahreswechsel gehen (z. B. Okt → März)
-                        </p>
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </AccordionPanel>
                 </AccordionItem>
@@ -1003,6 +1093,31 @@ export function ProductDialog({ open, product, onClose }: Props) {
                               Reine Urproduktion zählt meist nicht — im Zweifel mit dem Steuerberater klären.
                             </p>
                           </div>
+                        )}
+                      />
+
+                      {/* MwSt: kein täglicher Handgriff, deshalb hier statt beim Preis */}
+                      <FormField
+                        control={form.control}
+                        name="vatRate"
+                        render={({ field }) => (
+                          <FormItem className="max-w-[12rem]">
+                            <FormLabel>MwSt.</FormLabel>
+                            <FormControl>
+                              <DezimalFeld
+                                name={field.name}
+                                value={field.value}
+                                placeholder={String(mwstStandard)}
+                                suffix="%"
+                                onBlur={field.onBlur}
+                                onChange={(neu) => field.onChange(neu ?? mwstStandard)}
+                              />
+                            </FormControl>
+                            <FormDescription className="text-xs">
+                              Standard für diese Kategorie: {formatZahl(mwstStandard)} %
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
                         )}
                       />
                     </div>
@@ -1188,8 +1303,10 @@ export function ProductDialog({ open, product, onClose }: Props) {
               </Accordion>
             </div>
 
-            {/* Fixed footer with action buttons */}
-            <DialogFooter className="px-6 py-4 border-t border-border/50 shrink-0">
+            {/* Fuß: fest am unteren Rand als eigene Flex-Zone — kein sticky, keine
+                negativen Ränder (die von DialogFooter ragten bei p-0 über die
+                Kante). Hintergrund card, feine Linie oben, Safe-Area-Abstand. */}
+            <div className="flex shrink-0 flex-row justify-end gap-2 border-t border-border bg-card px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
               <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>
                 Abbrechen
               </Button>
@@ -1202,7 +1319,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
                     ? 'Speichern'
                     : 'Anlegen'}
               </Button>
-            </DialogFooter>
+            </div>
           </form>
         </Form>
       </DialogContent>

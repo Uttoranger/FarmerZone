@@ -7,6 +7,14 @@ import {
   KATEGORIE_LABEL,
   gehoertZu,
 } from '@/lib/taxonomie'
+import { nachkommastellen, parseDezimal } from '@/lib/format'
+
+/**
+ * Der MwSt-Satz, mit dem ein neues Produkt startet — 10 % (Lebensmittel, AT).
+ * Es gibt (noch) keinen Satz je Kategorie; das Formular nennt diesen Wert als
+ * Standard und zeigt eine Abweichung in der Zusammenfassung.
+ */
+export const MWST_STANDARD = 10
 
 // Kategorien, Unterkategorien und Siegel leben seit Sprint Taxonomie 1 in
 // src/lib/taxonomie.ts — der EINEN Quelle. Die drei Namen bleiben hier
@@ -78,22 +86,57 @@ export const MONTH_OPTIONS = [
   { value: 12, label: 'Dezember' },
 ]
 
+/**
+ * Getippter Text („5,99") wird zur Zahl, Zahlen bleiben Zahlen. Leer ist
+ * undefined. Unlesbares wird zu NaN, damit z.number() den Fehler meldet —
+ * ein stilles undefined ließe „abc" als „kein Wert" durchgehen.
+ */
+const dezimal = (v: unknown): unknown => {
+  if (v === '' || v === null || v === undefined) return undefined
+  if (typeof v === 'number') return v
+  if (typeof v === 'string') return parseDezimal(v) ?? Number.NaN
+  return v
+}
+
+/** Gebindegröße: leer = null, sonst größer 0, höchstens drei Nachkommastellen (125 g). */
 const optionalPositiveNumber = z.preprocess(
   (v) => {
-    if (v === '' || v === null || v === undefined) return undefined
-    const n = Number(v)
-    return isNaN(n) ? undefined : n
+    const d = dezimal(v)
+    return d === undefined ? null : d
   },
-  z.number().positive('Muss größer als 0 sein').optional()
+  z
+    .number({ error: 'Bitte nur Zahlen, z. B. 2 oder 0,5.' })
+    .positive('Muss größer als 0 sein')
+    .refine((n) => nachkommastellen(n) <= 3, 'Höchstens drei Nachkommastellen, z. B. 0,125.')
+    .nullable()
 )
 
+/** Preis je Gebinde: Pflicht, größer 0, auf den Cent (zwei Nachkommastellen). */
+const preisZahl = z.preprocess(
+  dezimal,
+  z
+    .number({ error: 'Bitte gib einen Preis ein, z. B. 5,99.' })
+    .positive('Preis muss größer als 0 sein')
+    .refine((n) => nachkommastellen(n) <= 2, 'Höchstens zwei Nachkommastellen, z. B. 5,99.')
+)
+
+/** MwSt-Satz in Prozent: 0 bis 100, leer = Standard. */
+const mwstZahl = z.preprocess(
+  (v) => (dezimal(v) === undefined ? MWST_STANDARD : dezimal(v)),
+  z.number({ error: 'Bitte nur Zahlen, z. B. 10.' }).min(0).max(100)
+)
+
+// LEER IST NULL, NIE UNDEFINED — für alle optionalen Zahlenfelder des
+// Formulars. react-hook-form liest `undefined` als „Ausgangswert
+// wiederherstellen": Beim Tippen von „0," war die Gebindegröße kurz leer, das
+// Formular holte die gespeicherte 1 zurück, und aus „0,5" wurde „15".
 const optionalMonth = z.preprocess(
   (v) => {
-    if (v === '' || v === null || v === undefined || v === '0') return undefined
+    if (v === '' || v === null || v === undefined || v === '0') return null
     const n = Number(v)
-    return isNaN(n) ? undefined : n
+    return isNaN(n) ? null : n
   },
-  z.number().int().min(1).max(12).optional()
+  z.number().int().min(1).max(12).nullable()
 )
 
 /** Leerer String und undefined werden zu null — „Keine Angabe". */
@@ -155,10 +198,11 @@ export const productFormSchema = z
       .default([])
       .refine((l) => new Set(l).size === l.length, 'Ein Siegel kann nur einmal gewählt werden.'),
     // Nur bei Kategorie Futtermittel — Pflicht dort, verboten sonst (superRefine).
-    futter: futterKennzeichnungSchema.optional(),
+    // null = keine Kennzeichnung (das Formular schreibt null, nie undefined).
+    futter: futterKennzeichnungSchema.nullable().optional(),
     countsTowardLimit: z.boolean().default(true),
-    price: z.coerce.number().positive('Preis muss größer als 0 sein'),
-    vatRate: z.coerce.number().min(0).max(100).default(10),
+    price: preisZahl,
+    vatRate: mwstZahl,
     unit: z.enum(['STUECK', 'KG', 'G', 'LITER', 'ML', 'M3', 'PAKET']),
     unitSize: optionalPositiveNumber,
     stock: z.coerce.number().int().min(0, 'Bestand kann nicht negativ sein').default(0),
@@ -190,10 +234,10 @@ export const productFormSchema = z
       if (data.subcategory === null) {
         ctx.addIssue({ code: 'custom', path: ['subcategory'], message: FUTTER_FEHLER.unterkategorie })
       }
-      if (data.futter === undefined) {
+      if (data.futter == null) {
         ctx.addIssue({ code: 'custom', path: ['futter'], message: FUTTER_FEHLER.fehlt })
       }
-    } else if (data.futter !== undefined) {
+    } else if (data.futter != null) {
       ctx.addIssue({ code: 'custom', path: ['futter'], message: FUTTER_FEHLER.verboten })
     }
   })
@@ -213,7 +257,6 @@ export const PRODUKT_FELD_REIHENFOLGE = [
   'unit',
   'unitSize',
   'price',
-  'vatRate',
   'stock',
   'isAvailable',
   'seasonStart',
@@ -224,5 +267,6 @@ export const PRODUKT_FELD_REIHENFOLGE = [
   'requiresCool',
   'requiresFreezer',
   'countsTowardLimit',
+  'vatRate',
   'futter',
 ] as const satisfies readonly (keyof ProductFormData)[]
