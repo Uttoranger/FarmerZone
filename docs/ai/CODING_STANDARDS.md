@@ -265,7 +265,25 @@ gegen `background` **und** gegen `card`.
 
 ---
 
-## 8. Checkliste vor dem Bericht
+## 8. Formulare
+
+- **Optionale Zahlenfelder in react-hook-form: Leer ist `null`, nie `undefined`.**
+  `undefined` heißt für RHF „Ausgangswert wiederherstellen". Beim Tippen von
+  „0," ist ein Feld kurz leer; wer dann `undefined` übergibt, bekommt bei einem
+  Bestandsprodukt den gespeicherten Wert zurück, und aus „0,5" wird „15".
+  Gilt für `field.onChange`, `setValue`, `defaultValues` und die
+  Bearbeiten-Vorbelegung. Das Zod-Schema gibt `null` weiter (`.nullable()`),
+  die Server Action macht daraus die Datenbank-`null`.
+- Dasselbe für optionale Objekte (z. B. die Futter-Kennzeichnung): leeren mit
+  `null`, prüfen mit `== null`.
+- Zahlen tippt der Mensch mit Komma oder Punkt: `DezimalFeld` aus
+  `src/components/shared/`, nie `type="number"` für Dezimalwerte.
+
+---
+
+## 9. Checkliste vor dem Bericht
+
+- [ ] Optionale Formularwerte leer = `null`, nie `undefined` (→ Abschnitt 8)
 
 - [ ] Kein `any`, kein `@ts-ignore`, keine unbegründete `!`-Assertion
 - [ ] Zod an jeder neuen Systemgrenze
