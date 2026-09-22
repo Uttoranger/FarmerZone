@@ -79,6 +79,14 @@ export function parseDezimal(text: string): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+/** „1,00" · „5,99" · „0,125" — eine Zahl mit FESTER Stellenzahl, deutsch, ohne Einheit. */
+export function formatDezimal(n: number, stellen: number): string {
+  return new Intl.NumberFormat('de-AT', {
+    minimumFractionDigits: stellen,
+    maximumFractionDigits: stellen,
+  }).format(Number.isFinite(n) ? n : 0)
+}
+
 /** Wie viele Nachkommastellen eine Zahl hat — „5.99" → 2, „2" → 0. */
 export function nachkommastellen(n: number): number {
   if (!Number.isFinite(n)) return 0

@@ -2,7 +2,7 @@
 
 import { useState, type ComponentProps } from 'react'
 import { Input } from '@/components/ui/input'
-import { formatZahl, parseDezimal } from '@/lib/format'
+import { formatDezimal, formatZahl, parseDezimal } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 /**
@@ -18,22 +18,25 @@ import { cn } from '@/lib/utils'
  * ihn formatiert — ohne Effekt: Der Entwurf gilt nur, solange er zum Wert des
  * Formulars passt.
  *
- * Optionales Präfix („€") und Suffix („kg", „%") liegen IM Feld.
+ * Optionales Präfix („€") und Suffix („kg", „%") liegen IM Feld. `stellen`
+ * erzwingt beim Verlassen eine feste Stellenzahl — der Preis zeigt „1,00".
  */
 type Props = Omit<ComponentProps<'input'>, 'value' | 'onChange' | 'type' | 'prefix'> & {
   value: number | null | undefined
   onChange: (wert: number | null) => void
   praefix?: string
   suffix?: string
+  stellen?: number
 }
 
-export function DezimalFeld({ value, onChange, praefix, suffix, className, onBlur, ...rest }: Props) {
+export function DezimalFeld({ value, onChange, praefix, suffix, stellen, className, onBlur, ...rest }: Props) {
   const [entwurf, setEntwurf] = useState<{ text: string; wert: number | null } | null>(null)
   // NaN (leeres Pflichtfeld im Formular) zählt wie null — sonst passte der
   // Entwurf „5," (Wert null) nie zum Formularwert, und der Text verschwände.
   const wert = value == null || !Number.isFinite(value) ? null : value
+  const formatiert = (n: number) => (stellen === undefined ? formatZahl(n) : formatDezimal(n, stellen))
   const angezeigt =
-    entwurf !== null && Object.is(entwurf.wert, wert) ? entwurf.text : wert === null ? '' : formatZahl(wert)
+    entwurf !== null && Object.is(entwurf.wert, wert) ? entwurf.text : wert === null ? '' : formatiert(wert)
 
   return (
     <div className="relative">

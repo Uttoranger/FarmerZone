@@ -14,6 +14,7 @@ import {
   formatGrundpreisZeile,
   grundpreisJeEinheit,
   parseDezimal,
+  formatDezimal,
   nachkommastellen,
   bestandLabel,
   formatBestand,
@@ -186,6 +187,24 @@ describe('parseDezimal — Komma und Punkt, kein Tausender', () => {
     expect(parseDezimal('1.234,56')).toBeNull()
     expect(parseDezimal('-5')).toBeNull()
     expect(parseDezimal('5,')).toBeNull()
+  })
+})
+
+describe('formatDezimal — feste Stellenzahl', () => {
+  it('füllt auf und rundet auf die gewünschten Stellen', () => {
+    expect(formatDezimal(1, 2)).toBe('1,00')
+    expect(formatDezimal(5.99, 2)).toBe('5,99')
+    expect(formatDezimal(5.999, 2)).toBe('6,00')
+    expect(formatDezimal(0.125, 3)).toBe('0,125')
+    expect(formatDezimal(2, 0)).toBe('2')
+  })
+
+  it('unbrauchbare Zahlen werden zu 0', () => {
+    expect(formatDezimal(Number.NaN, 2)).toBe('0,00')
+  })
+
+  it('lässt sich wieder einlesen — auch mit Tausender-Leerzeichen', () => {
+    expect(parseDezimal(formatDezimal(1234.5, 2))).toBe(1234.5)
   })
 })
 
