@@ -133,6 +133,8 @@ Diese Regeln sind fachlich, nicht technisch. Verletzung kostet Geld oder Vertrau
 - **Siegel sind orthogonal zur Kategorie.** `labels` ist eine Menge (BIO, GENTECHNIKFREI, AMA_GUETESIEGEL), mehrere je Produkt, keines Pflicht, keines doppelt. `isOrganic` ist Altlast: wird nur noch gelesen, nie mehr geschrieben; Bio ist `labels` enthält BIO.
 - **Futter-Kennzeichnung nur bei FUTTERMITTEL.** Dort Pflicht (Unterkategorie, Tierarten, Zusammensetzung, analytische Bestandteile, Bestätigung), bei jeder anderen Kategorie verboten. Ein Kategoriewechsel weg von Futtermittel löscht sie in derselben Transaktion wie das Produkt-Update.
 
+Fachkonzepte liegen unter docs/konzepte/. Ein Sprint verweist auf sein Konzept, statt es zu wiederholen.
+
 ---
 
 ## 6. Bekannte Altlasten
