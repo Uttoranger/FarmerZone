@@ -74,8 +74,77 @@ enum ProductCategory {
   BROT
   HONIG
   GETRAENKE
+  FUTTERMITTEL
   BRENNHOLZ
   SONSTIGES
+}
+
+// === TAXONOMIE (Sprint Taxonomie 1) ===
+//
+// Zweite Kategorieebene. Welche L2 zu welcher L1 gehört, entscheidet
+// ausschließlich src/lib/taxonomie.ts (TAXONOMIE) — die Datenbank kennt nur
+// die Werte, nicht die Zuordnung. Fisch, Brot, Getränke, Brennholz und
+// Sonstiges haben bewusst keine Unterkategorien.
+enum ProductSubcategory {
+  // Fleisch
+  RIND
+  SCHWEIN
+  HAEHNCHEN
+  PUTE
+  LAMM
+  WILD
+  WURST
+  // Eier
+  EIER_BIO
+  EIER_FREILAND
+  EIER_BODENHALTUNG
+  // Milch
+  TRINKMILCH
+  KAESE
+  JOGHURT_TOPFEN
+  BUTTER
+  // Gemüse
+  ERDAEPFEL
+  WURZELGEMUESE
+  BLATT_SALAT
+  KOHL
+  FRUCHTGEMUESE
+  KUERBIS
+  ZWIEBEL_LAUCH
+  KRAEUTER
+  EINGELEGT
+  // Obst
+  KERNOBST
+  STEINOBST
+  BEEREN
+  NUESSE
+  EINGEKOCHT_GETROCKNET
+  // Honig
+  BLUETENHONIG
+  WALDHONIG
+  SORTENHONIG
+  BIENENPRODUKTE
+  // Futtermittel
+  EINZELFUTTERMITTEL
+  MISCHFUTTERMITTEL
+  ERGAENZUNGSFUTTERMITTEL
+}
+
+// Benannte Siegel — orthogonal zur Kategorie, mehrere je Produkt möglich.
+enum ProductLabel {
+  BIO
+  GENTECHNIKFREI
+  AMA_GUETESIEGEL
+}
+
+// Zieltierarten der Futtermittel-Kennzeichnung.
+enum Tierart {
+  PFERD
+  RIND
+  GEFLUEGEL
+  SCHWEIN
+  SCHAF_ZIEGE
+  HEIMTIER
 }
 
 enum BannerType {
@@ -298,8 +367,16 @@ model Product {
   countsTowardLimit Boolean          @default(true) // zählt zur 55.000-€-Grenze (Be- & Verarbeitung)
   sortOrder         Int              @default(0) // manuelle Reihenfolge; 0 überall = stabile Reihenfolge via createdAt
 
+  // Taxonomie (Sprint Taxonomie 1)
+  subcategory ProductSubcategory?  // null erlaubt — Bestandsprodukte ohne Unterkategorie
+  labels      ProductLabel[]       @default([])
+  futter      FutterKennzeichnung? // nur bei category = FUTTERMITTEL
+
   // Lebensmittel-spezifisch
   allergens       String[] @default([])
+  // isOrganic: Altlast, wird in einem späteren Sprint entfernt. Seit Sprint
+  // Taxonomie 1 ist labels (BIO) die Wahrheit; diese Spalte wird nur noch
+  // gelesen, nie mehr geschrieben.
   isOrganic       Boolean  @default(false)
   requiresCool    Boolean  @default(false)
   requiresFreezer Boolean  @default(false)
@@ -320,6 +397,27 @@ model Product {
 
   @@index([farmId])
   @@index([isAvailable])
+}
+
+// Futtermittel-Kennzeichnung (Sprint Taxonomie 1). Pflicht bei
+// category = FUTTERMITTEL, sonst verboten — die Regel sitzt im Zod-Schema
+// (src/schemas/product.ts), die Datenbank hält nur die Daten. 1:1 zum Produkt,
+// stirbt mit ihm. Die Angaben stammen vom Sackanhänger bzw. Lieferschein; der
+// Hof bestätigt das ausdrücklich (bestaetigtAm).
+model FutterKennzeichnung {
+  id                      String    @id @default(cuid())
+  productId               String    @unique
+  zielTierarten           Tierart[]
+  zusammensetzung         String    @db.Text // Mischfutter: Einzelfuttermittel absteigend
+  analytischeBestandteile String    @db.Text // Rohprotein, Rohfaser … Freitext
+  zusatzstoffe            String?   @db.Text
+  registrierungsnummer    String?   // BAES, LFBIS oder BVL — EIN Feld
+  gebrauchshinweis        String?   @db.Text
+  bestaetigtAm            DateTime  // Hof bestätigt Übereinstimmung mit Sackanhänger
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
 model PickupSlot {

@@ -1,12 +1,20 @@
 /**
- * Tests für das Produkt-Zod-Schema (Kategorie + Grenzwert-Flag, Sprint 17K).
+ * Tests für das Produkt-Zod-Schema (Kategorie + Grenzwert-Flag, Sprint 17K;
+ * Unterkategorie, Siegel und Futter-Kennzeichnung, Sprint Taxonomie 1).
  *
  * Beweist: Gültige Kategorie-Werte werden akzeptiert, leer/fehlend wird zu
- * null ("Keine Angabe"), ungültige Werte werden verweigert, und
- * countsTowardLimit defaultet auf true.
+ * null ("Keine Angabe"), ungültige Werte werden verweigert, countsTowardLimit
+ * defaultet auf true. Eine Unterkategorie muss zur Kategorie passen, darf aber
+ * fehlen (Bestandsprodukte). Siegel ohne Doppelte. Futtermittel verlangen
+ * Unterkategorie und Kennzeichnung; alle anderen Kategorien verbieten sie.
  */
 import { describe, it, expect } from 'vitest'
-import { productFormSchema, PRODUCT_CATEGORY_VALUES, CATEGORY_OPTIONS } from '@/schemas/product'
+import {
+  productFormSchema,
+  PRODUCT_CATEGORY_VALUES,
+  CATEGORY_OPTIONS,
+  FUTTER_FEHLER,
+} from '@/schemas/product'
 
 const minimalValid = {
   name: 'Heumilch',
@@ -14,10 +22,38 @@ const minimalValid = {
   unit: 'STUECK' as const,
 }
 
+/** Eine vollständige, gültige Kennzeichnung — so, wie das Formular sie liefert. */
+const futterGueltig = {
+  zielTierarten: ['PFERD', 'RIND'],
+  zusammensetzung: 'Heu vom ersten Schnitt, Wiesenmischung',
+  analytischeBestandteile: 'Rohprotein 9 %, Rohfaser 28 %',
+  zusatzstoffe: '',
+  registrierungsnummer: '',
+  gebrauchshinweis: '',
+  bestaetigt: true,
+}
+
+const heu = {
+  ...minimalValid,
+  name: 'Heu',
+  category: 'FUTTERMITTEL',
+  subcategory: 'EINZELFUTTERMITTEL',
+  futter: futterGueltig,
+}
+
+/** Die Fehlermeldungen eines fehlgeschlagenen Parse, nach Pfad. */
+function fehlerNachPfad(input: unknown): Record<string, string> {
+  const ergebnis = productFormSchema.safeParse(input)
+  if (ergebnis.success) return {}
+  return Object.fromEntries(ergebnis.error.issues.map((i) => [i.path.join('.'), i.message]))
+}
+
 describe('category', () => {
   it('akzeptiert jeden gültigen Kategorie-Wert', () => {
     for (const value of PRODUCT_CATEGORY_VALUES) {
-      const parsed = productFormSchema.parse({ ...minimalValid, category: value })
+      // Futtermittel verlangen mehr — dafür gibt es unten eigene Tests.
+      const eingabe = value === 'FUTTERMITTEL' ? heu : { ...minimalValid, category: value }
+      const parsed = productFormSchema.parse(eingabe)
       expect(parsed.category).toBe(value)
     }
   })
@@ -38,6 +74,117 @@ describe('category', () => {
       [...PRODUCT_CATEGORY_VALUES].sort()
     )
     for (const o of CATEGORY_OPTIONS) expect(o.label.length).toBeGreaterThan(1)
+  })
+})
+
+describe('subcategory', () => {
+  it('fehlt sie, ist das kein Fehler — auch bei einer Kategorie mit Unterkategorien', () => {
+    const parsed = productFormSchema.parse({ ...minimalValid, category: 'FLEISCH' })
+    expect(parsed.subcategory).toBeNull()
+    expect(productFormSchema.parse({ ...minimalValid, category: 'FLEISCH', subcategory: '' }).subcategory).toBeNull()
+  })
+
+  it('passt sie zur Kategorie, wird sie übernommen', () => {
+    const parsed = productFormSchema.parse({ ...minimalValid, category: 'FLEISCH', subcategory: 'RIND' })
+    expect(parsed.subcategory).toBe('RIND')
+  })
+
+  it('passt sie nicht zur Kategorie, nennt der Fehler die Kategorie', () => {
+    const fehler = fehlerNachPfad({ ...minimalValid, category: 'EIER', subcategory: 'RIND' })
+    expect(fehler['subcategory']).toBe('Diese Unterkategorie passt nicht zu Eier.')
+  })
+
+  it('ohne Kategorie ist eine Unterkategorie ein Fehler', () => {
+    const fehler = fehlerNachPfad({ ...minimalValid, subcategory: 'RIND' })
+    expect(fehler['subcategory']).toBe('Wähle zuerst eine Kategorie.')
+  })
+
+  it('verweigert erfundene Unterkategorien', () => {
+    expect(() =>
+      productFormSchema.parse({ ...minimalValid, category: 'FLEISCH', subcategory: 'DRACHE' })
+    ).toThrow()
+  })
+})
+
+describe('labels (Siegel)', () => {
+  it('defaultet auf leer', () => {
+    expect(productFormSchema.parse(minimalValid).labels).toEqual([])
+  })
+
+  it('nimmt mehrere Siegel an', () => {
+    const parsed = productFormSchema.parse({ ...minimalValid, labels: ['BIO', 'GENTECHNIKFREI'] })
+    expect(parsed.labels).toEqual(['BIO', 'GENTECHNIKFREI'])
+  })
+
+  it('verweigert Doppelte', () => {
+    const fehler = fehlerNachPfad({ ...minimalValid, labels: ['BIO', 'BIO'] })
+    expect(fehler['labels']).toBe('Ein Siegel kann nur einmal gewählt werden.')
+  })
+
+  it('verweigert unbekannte Siegel', () => {
+    expect(() => productFormSchema.parse({ ...minimalValid, labels: ['FAIRTRADE'] })).toThrow()
+  })
+
+  it('isOrganic ist kein Formularfeld mehr — es wird still ignoriert', () => {
+    const parsed = productFormSchema.parse({ ...minimalValid, isOrganic: true })
+    expect('isOrganic' in parsed).toBe(false)
+    expect(parsed.labels).toEqual([])
+  })
+})
+
+describe('Futtermittel', () => {
+  it('vollständig: Unterkategorie und Kennzeichnung werden übernommen', () => {
+    const parsed = productFormSchema.parse(heu)
+    expect(parsed.subcategory).toBe('EINZELFUTTERMITTEL')
+    expect(parsed.futter?.zielTierarten).toEqual(['PFERD', 'RIND'])
+    expect(parsed.futter?.bestaetigt).toBe(true)
+  })
+
+  it('ohne Unterkategorie: Fehler am Feld subcategory', () => {
+    const fehler = fehlerNachPfad({ ...heu, subcategory: null })
+    expect(fehler['subcategory']).toBe(FUTTER_FEHLER.unterkategorie)
+  })
+
+  it('ohne Kennzeichnung: Fehler am Feld futter', () => {
+    const fehler = fehlerNachPfad({ ...heu, futter: undefined })
+    expect(fehler['futter']).toBe(FUTTER_FEHLER.fehlt)
+  })
+
+  it('ohne Tierart: Fehler in Du-Form', () => {
+    const fehler = fehlerNachPfad({ ...heu, futter: { ...futterGueltig, zielTierarten: [] } })
+    expect(fehler['futter.zielTierarten']).toBe(FUTTER_FEHLER.tierarten)
+  })
+
+  it('Zusammensetzung und analytische Bestandteile brauchen mindestens 3 Zeichen — der Fehler sagt, wo der Wert steht', () => {
+    const fehler = fehlerNachPfad({
+      ...heu,
+      futter: { ...futterGueltig, zusammensetzung: 'ab', analytischeBestandteile: '  ' },
+    })
+    expect(fehler['futter.zusammensetzung']).toBe(FUTTER_FEHLER.zusammensetzung)
+    expect(fehler['futter.analytischeBestandteile']).toBe(FUTTER_FEHLER.analytischeBestandteile)
+  })
+
+  it('ohne Bestätigung: Fehler am Haken', () => {
+    const fehler = fehlerNachPfad({ ...heu, futter: { ...futterGueltig, bestaetigt: false } })
+    expect(fehler['futter.bestaetigt']).toBe(FUTTER_FEHLER.bestaetigt)
+  })
+
+  it('eine Futter-Unterkategorie an einer anderen Kategorie passt nicht', () => {
+    const fehler = fehlerNachPfad({ ...minimalValid, category: 'OBST', subcategory: 'MISCHFUTTERMITTEL' })
+    expect(fehler['subcategory']).toBe('Diese Unterkategorie passt nicht zu Obst.')
+  })
+
+  it('bei jeder anderen Kategorie ist eine Kennzeichnung verboten', () => {
+    for (const value of PRODUCT_CATEGORY_VALUES) {
+      if (value === 'FUTTERMITTEL') continue
+      const fehler = fehlerNachPfad({ ...minimalValid, category: value, futter: futterGueltig })
+      expect(fehler['futter'], value).toBe(FUTTER_FEHLER.verboten)
+    }
+  })
+
+  it('ohne Kategorie ist eine Kennzeichnung ebenfalls verboten', () => {
+    const fehler = fehlerNachPfad({ ...minimalValid, futter: futterGueltig })
+    expect(fehler['futter']).toBe(FUTTER_FEHLER.verboten)
   })
 })
 

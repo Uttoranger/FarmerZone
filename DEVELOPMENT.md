@@ -508,6 +508,77 @@ siebtes fiele unter 340 px unter 48 px. Öffentlich trägt ihn nur die Startseit
 
 ---
 
+## Produkt-Taxonomie (Sprint Taxonomie 1, 2026-09-22)
+
+Zwei Kategorieebenen, benannte Siegel und die Futtermittel-Kennzeichnung — im
+Datenmodell und im Produktformular des Bauern-Bereichs. Die Regeln für neuen Code
+stehen in `docs/ai/ARCHITECTURE.md`, Abschnitt 5 („Taxonomie"). Hier steht, warum es
+so gebaut ist und was bewusst NICHT passiert ist.
+
+**Öffentliche Seiten sind unverändert.** Kundinnen sehen in diesem Sprint nichts
+Neues: keine Unterkategorie auf der Hofseite, keine Siegel-Chips, kein Filter. Die
+eine sichtbare Ausnahme ist ein Wort: Die Kategorie HONIG heißt jetzt „Honig &
+Bienenprodukte" statt „Honig & Süßes" — weil `src/lib/taxonomie.ts` die einzige
+Quelle für Labels ist und die Filterchips auf /hoefe daraus lesen.
+
+**Warum eine Datei für alles.** Vor dem Sprint gab es zwei Zuordnungen je Kategorie
+(Labels in `schemas/product.ts`, Illustrations-Dateinamen in `product-image.ts`).
+Mit Unterkategorien, Siegeln und Tierarten wären es sechs geworden, die
+auseinanderlaufen können. Jetzt ist `taxonomie.ts` die eine Quelle; ein Test hält
+ihre Wertlisten deckungsgleich mit den Prisma-Enums. `schemas/product.ts` reicht
+`CATEGORY_OPTIONS` nur noch durch, damit /hoefe und die Hofkarte unangetastet
+bleiben konnten.
+
+**Warum `isOrganic` bleibt — und trotzdem tot ist.** Die Spalte wird nicht
+gelöscht (keine destruktive Migration ohne eigenen Sprint), aber seit der
+Migration `20260921100000_taxonomie_1` ist `labels` die Wahrheit: Die Migration
+hat jedes `isOrganic = true` nach `labels ∋ BIO` gespiegelt (Dev-DB: 3 von 4
+Produkten, alle getroffen). Formular und Server Action schreiben nur noch
+`labels`. Die beiden Queries leiten das Boolean `isOrganic`, das die Hofseite und
+die Produktliste kennen, aus `labels` ab — sonst hätte das öffentliche Bio-Badge
+nach dem ersten Bearbeiten gelogen: neues Bio-Produkt ohne Badge, entferntes Bio
+mit Badge. Die Spalte selbst liest damit niemand mehr; ein späterer Sprint
+entfernt sie.
+
+**Warum die Unterkategorie fehlen darf.** Alle Bestandsprodukte haben keine. Ein
+Pflichtfeld hätte jedes Bearbeiten — auch eine Bestandsänderung — blockiert, bis
+der Hof die Taxonomie nachpflegt. Deshalb: kein Fehler, nur ein gestrichelter
+Chip „Unterkategorie ergänzen" in der Produktliste und ein Hinweis im Formular.
+Einzige Ausnahme sind Futtermittel, weil dort die Art (Einzel-, Misch-,
+Ergänzungsfuttermittel) Teil der gesetzlichen Kennzeichnung ist.
+
+**Warum die Futter-Kennzeichnung ein eigenes Modell ist.** Sieben Felder, die nur
+eine von zwölf Kategorien braucht, gehören nicht als Nullspalten an jedes Produkt.
+`FutterKennzeichnung` ist 1:1, stirbt mit dem Produkt (Cascade), und die
+Server Action hält sie in EINER Transaktion mit dem Produkt-Update konsistent:
+bei FUTTERMITTEL upsert, sonst deleteMany. Ein Kategoriewechsel weg von
+Futtermittel fragt im Formular nach, bevor die Angaben verloren gehen.
+`bestaetigtAm` wird bei jedem Speichern neu gestempelt — der Haken ist Pflicht,
+also bestätigt der Hof jedes Mal neu.
+
+**Warum ein Accordion, kein Wizard.** Das Formular hatte 17 Felder in einer
+Bildschirmhöhe von drei Seiten. Vier Abschnitte (Grunddaten, Preis &
+Verfügbarkeit, Details, Kennzeichnung) — beim Anlegen nur der erste offen, beim
+Bearbeiten alle zu mit einer Zusammenfassungszeile im Titel („€ 4,90 / kg · 12
+auf Lager"). Ein Wizard hätte für eine Preisänderung drei Schritte gekostet.
+Validierungsfehler öffnen ihren Abschnitt, markieren den Titel und springen zum
+ersten Feld (Muster aus dem Checkout-Fix; Entscheidung in
+`produkt-abschnitte.ts`, getestet). Das Accordion selbst ist Base UI
+(`src/components/ui/accordion.tsx`), kein neues Paket.
+
+**Bewusst nicht in diesem Sprint:** kein Feld „Reihenfolge" im Formular (die
+Reihenfolge wird per Drag & Drop gesetzt, ein Zahlenfeld würde damit
+konkurrieren), keine eigene Illustration für Futtermittel (nutzt die Kachel von
+Sonstiges), keine dritte Ebene, keine Freitext-Kategorien, keine Änderung an
+Hofseite, Produktraster, Chips oder Filtern.
+
+**Migration:** von Hand geschrieben und wiederholbar wie die übrigen; ausgeführt
+über `prisma migrate deploy`, weil `migrate dev` an der Supabase-Shadow-Datenbank
+scheitert (P3006 bei `enable_rls`) — dasselbe Hindernis wie bei früheren
+handgeschriebenen Migrationen.
+
+---
+
 ## Upload-Diagnose
 
 Jede Upload-Fehlermeldung endet auf eine Kennung wie `[L71]` — Buchstabe für die Ursache, Zahl für den Code-Stand (`UPLOAD_DIAG` in `src/lib/upload-fehler.ts`). Bei JEDER Verhaltensänderung am Upload-Ablauf muss die Zahl auf die Nummer des Sprints gehoben werden — eine veraltete Kennung ist schlimmer als keine, weil ein zugeschicktes Bildschirmfoto dann den falschen Stand behauptet.

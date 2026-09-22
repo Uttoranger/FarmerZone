@@ -1,4 +1,22 @@
 import { z } from 'zod'
+import {
+  PRODUCT_CATEGORY_VALUES,
+  PRODUCT_SUBCATEGORY_VALUES,
+  PRODUCT_LABEL_VALUES,
+  TIERART_VALUES,
+  KATEGORIE_LABEL,
+  gehoertZu,
+} from '@/lib/taxonomie'
+
+// Kategorien, Unterkategorien und Siegel leben seit Sprint Taxonomie 1 in
+// src/lib/taxonomie.ts — der EINEN Quelle. Die drei Namen bleiben hier
+// erreichbar, damit Filterleiste (/hoefe), Hofkarte und Hofübersicht
+// unverändert weiterlaufen; neuer Code importiert direkt aus der Taxonomie.
+export {
+  PRODUCT_CATEGORY_VALUES,
+  CATEGORY_OPTIONS,
+  type ProductCategoryValue,
+} from '@/lib/taxonomie'
 
 export const ALLERGENS = [
   { id: 'gluten', label: 'Gluten' },
@@ -78,55 +96,133 @@ const optionalMonth = z.preprocess(
   z.number().int().min(1).max(12).optional()
 )
 
-// Reihenfolge = Reihenfolge des Prisma-Enums `ProductCategory` (schema.prisma)
-// und zugleich die Sortierung in Filterleiste und Produktformular. FISCH steht
-// bewusst UNMITTELBAR nach FLEISCH: Bis zu diesem Sprint kannte der Katalog
-// keinen Fisch, eine Fischzucht musste sich unter „Fleisch & Wurst" einordnen.
-// Bestehende Produkte werden dabei NICHT umsortiert (keine Datenmigration).
-export const PRODUCT_CATEGORY_VALUES = [
-  'MILCH', 'EIER', 'FLEISCH', 'FISCH', 'GEMUESE', 'OBST',
-  'BROT', 'HONIG', 'GETRAENKE', 'BRENNHOLZ', 'SONSTIGES',
-] as const
+/** Leerer String und undefined werden zu null — „Keine Angabe". */
+const leerZuNull = (v: unknown) => (v === '' || v === undefined ? null : v)
 
-export type ProductCategoryValue = (typeof PRODUCT_CATEGORY_VALUES)[number]
+/** Optionaler Freitext: leer erlaubt, Länge begrenzt, Ränder abgeschnitten. */
+const optionalerText = (max: number) => z.string().trim().max(max).optional().or(z.literal(''))
 
-export const CATEGORY_OPTIONS: { value: ProductCategoryValue; label: string }[] = [
-  { value: 'MILCH', label: 'Milch & Molkerei' },
-  { value: 'EIER', label: 'Eier' },
-  { value: 'FLEISCH', label: 'Fleisch & Wurst' },
-  { value: 'FISCH', label: 'Fisch' },
-  { value: 'GEMUESE', label: 'Gemüse' },
-  { value: 'OBST', label: 'Obst' },
-  { value: 'BROT', label: 'Brot & Gebäck' },
-  { value: 'HONIG', label: 'Honig & Süßes' },
-  { value: 'GETRAENKE', label: 'Getränke' },
-  { value: 'BRENNHOLZ', label: 'Brennholz' },
-  { value: 'SONSTIGES', label: 'Sonstiges' },
-]
+// Fehlertexte der Futter-Kennzeichnung — in Du-Form, mit dem Hinweis, WO der
+// Wert steht. Der Hof tippt vom Sackanhänger ab; die Meldung sagt ihm das.
+export const FUTTER_FEHLER = {
+  tierarten: 'Bitte wähle mindestens eine Tierart, für die das Futter gedacht ist.',
+  zusammensetzung: 'Bitte trag die Zusammensetzung ein — sie steht auf dem Sackanhänger oder Lieferschein.',
+  analytischeBestandteile:
+    'Bitte trag die analytischen Bestandteile ein — sie stehen auf dem Sackanhänger oder Lieferschein.',
+  bestaetigt: 'Bitte bestätige, dass die Angaben dem Sackanhänger bzw. Lieferschein entsprechen.',
+  unterkategorie: 'Bitte wähle, welche Art Futtermittel es ist.',
+  fehlt: 'Bei Futtermitteln brauchen wir die Kennzeichnung vom Sackanhänger.',
+  verboten: 'Eine Futter-Kennzeichnung gibt es nur bei der Kategorie Futtermittel.',
+} as const
 
-export const productFormSchema = z.object({
-  name: z.string().min(2, 'Mindestens 2 Zeichen').max(100),
-  description: z.string().max(1000, 'Maximal 1000 Zeichen').optional().or(z.literal('')),
-  imageUrl: z.string().optional().or(z.literal('')),
-  // null = "Keine Angabe" (heutiges Verhalten); ungültige Werte werden abgelehnt
-  category: z.preprocess(
-    (v) => (v === '' || v === undefined ? null : v),
-    z.enum(PRODUCT_CATEGORY_VALUES).nullable()
-  ).default(null),
-  countsTowardLimit: z.boolean().default(true),
-  price: z.coerce.number().positive('Preis muss größer als 0 sein'),
-  vatRate: z.coerce.number().min(0).max(100).default(10),
-  unit: z.enum(['STUECK', 'KG', 'G', 'LITER', 'ML', 'M3', 'PAKET']),
-  unitSize: optionalPositiveNumber,
-  stock: z.coerce.number().int().min(0, 'Bestand kann nicht negativ sein').default(0),
-  isAvailable: z.boolean().default(true),
-  allergens: z.array(z.string()).default([]),
-  isOrganic: z.boolean().default(false),
-  requiresCool: z.boolean().default(false),
-  requiresFreezer: z.boolean().default(false),
-  seasonStart: optionalMonth,
-  seasonEnd: optionalMonth,
-  unavailableReason: z.string().max(200).optional().or(z.literal('')),
+/**
+ * Die Futter-Kennzeichnung, wie der Hof sie eingibt. `bestaetigt` ist der
+ * Haken „Die Angaben entsprechen dem Sackanhänger" — die Server Action macht
+ * daraus `bestaetigtAm = jetzt`. Ein Boolean statt `z.literal(true)`, damit das
+ * Formular mit `false` starten kann; die Prüfung verlangt trotzdem true.
+ */
+export const futterKennzeichnungSchema = z.object({
+  zielTierarten: z.array(z.enum(TIERART_VALUES)).min(1, FUTTER_FEHLER.tierarten),
+  zusammensetzung: z.string().trim().min(3, FUTTER_FEHLER.zusammensetzung).max(2000),
+  analytischeBestandteile: z
+    .string()
+    .trim()
+    .min(3, FUTTER_FEHLER.analytischeBestandteile)
+    .max(2000),
+  zusatzstoffe: optionalerText(2000),
+  registrierungsnummer: optionalerText(100),
+  gebrauchshinweis: optionalerText(2000),
+  bestaetigt: z.boolean().refine((v) => v === true, FUTTER_FEHLER.bestaetigt),
 })
 
+export type FutterKennzeichnungFormData = z.infer<typeof futterKennzeichnungSchema>
+
+export const productFormSchema = z
+  .object({
+    name: z.string().min(2, 'Mindestens 2 Zeichen').max(100),
+    description: z.string().max(1000, 'Maximal 1000 Zeichen').optional().or(z.literal('')),
+    imageUrl: z.string().optional().or(z.literal('')),
+    // null = "Keine Angabe" (heutiges Verhalten); ungültige Werte werden abgelehnt
+    category: z.preprocess(leerZuNull, z.enum(PRODUCT_CATEGORY_VALUES).nullable()).default(null),
+    // null erlaubt — Bestandsprodukte haben keine Unterkategorie. Ob sie zur
+    // Kategorie passt, prüft superRefine unten.
+    subcategory: z
+      .preprocess(leerZuNull, z.enum(PRODUCT_SUBCATEGORY_VALUES).nullable())
+      .default(null),
+    // Siegel: mehrere möglich, jedes höchstens einmal.
+    labels: z
+      .array(z.enum(PRODUCT_LABEL_VALUES))
+      .default([])
+      .refine((l) => new Set(l).size === l.length, 'Ein Siegel kann nur einmal gewählt werden.'),
+    // Nur bei Kategorie Futtermittel — Pflicht dort, verboten sonst (superRefine).
+    futter: futterKennzeichnungSchema.optional(),
+    countsTowardLimit: z.boolean().default(true),
+    price: z.coerce.number().positive('Preis muss größer als 0 sein'),
+    vatRate: z.coerce.number().min(0).max(100).default(10),
+    unit: z.enum(['STUECK', 'KG', 'G', 'LITER', 'ML', 'M3', 'PAKET']),
+    unitSize: optionalPositiveNumber,
+    stock: z.coerce.number().int().min(0, 'Bestand kann nicht negativ sein').default(0),
+    isAvailable: z.boolean().default(true),
+    allergens: z.array(z.string()).default([]),
+    requiresCool: z.boolean().default(false),
+    requiresFreezer: z.boolean().default(false),
+    seasonStart: optionalMonth,
+    seasonEnd: optionalMonth,
+    unavailableReason: z.string().max(200).optional().or(z.literal('')),
+  })
+  .superRefine((data, ctx) => {
+    // L2 muss zur L1 gehören. Fehlt die L2, ist das KEIN Fehler — auch nicht,
+    // wenn die L1 welche hätte (Bestandsprodukte); das Formular zeigt dann
+    // nur einen Hinweis. Ausnahme Futtermittel, siehe unten.
+    if (data.subcategory !== null) {
+      if (data.category === null) {
+        ctx.addIssue({ code: 'custom', path: ['subcategory'], message: 'Wähle zuerst eine Kategorie.' })
+      } else if (!gehoertZu(data.category, data.subcategory)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['subcategory'],
+          message: `Diese Unterkategorie passt nicht zu ${KATEGORIE_LABEL[data.category]}.`,
+        })
+      }
+    }
+
+    if (data.category === 'FUTTERMITTEL') {
+      if (data.subcategory === null) {
+        ctx.addIssue({ code: 'custom', path: ['subcategory'], message: FUTTER_FEHLER.unterkategorie })
+      }
+      if (data.futter === undefined) {
+        ctx.addIssue({ code: 'custom', path: ['futter'], message: FUTTER_FEHLER.fehlt })
+      }
+    } else if (data.futter !== undefined) {
+      ctx.addIssue({ code: 'custom', path: ['futter'], message: FUTTER_FEHLER.verboten })
+    }
+  })
+
 export type ProductFormData = z.infer<typeof productFormSchema>
+
+/**
+ * Feldreihenfolge des Produktformulars — für „zum ersten Fehler springen"
+ * (Muster aus dem Checkout). Gleiche Reihenfolge wie die Abschnitte im Dialog.
+ */
+export const PRODUKT_FELD_REIHENFOLGE = [
+  'name',
+  'category',
+  'subcategory',
+  'imageUrl',
+  'description',
+  'price',
+  'unit',
+  'unitSize',
+  'vatRate',
+  'stock',
+  'isAvailable',
+  'seasonStart',
+  'seasonEnd',
+  'unavailableReason',
+  'labels',
+  'allergens',
+  'requiresCool',
+  'requiresFreezer',
+  'countsTowardLimit',
+  'futter',
+] as const satisfies readonly (keyof ProductFormData)[]
