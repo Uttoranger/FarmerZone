@@ -112,16 +112,71 @@ export function plural(n: number, singular: string, mehrzahl: string): string {
   return n === 1 ? singular : mehrzahl
 }
 
-/** „€ 3,50 / kg" bzw. „€ 4,20 / 0,5 kg" — der Grundpreis auf der Produktkarte. */
+/**
+ * PREIS-SEMANTIK, an einer Stelle festgehalten: `price` ist der Preis je
+ * Gebinde, `unitSize` die Gebindegröße, der Warenkorb rechnet price × Anzahl.
+ * Ein Preis von 50 mit Gebindegröße 2 kg kostet also 50 Euro für das ganze
+ * 2-kg-Paket — nicht 50 Euro je Kilo. Der Schrägstrich „€ 50,00 / 2 kg" las
+ * sich als „pro" und hat genau dieses Missverständnis erzeugt. Deshalb schreibt
+ * die Anzeige bei einer Gebindegröße jetzt „für": „€ 50,00 für 2 kg".
+ */
+
+/** Maßeinheiten, bei denen ein Grundpreis je Einheit etwas sagt — bei Stück und Paket nicht. */
+const MASS_EINHEITEN = new Set(['KG', 'G', 'LITER', 'ML', 'M3'])
+
+export function istMassEinheit(unit: string): boolean {
+  return MASS_EINHEITEN.has(unit)
+}
+
+/** Die Gebindegröße als brauchbare Zahl — sonst null (leer, 0, negativ, NaN). */
+export function gebindeGroesse(unitSize?: number | { toString(): string } | null): number | null {
+  if (unitSize == null) return null
+  const size = Number(unitSize.toString())
+  return Number.isFinite(size) && size > 0 ? size : null
+}
+
+/** „€ 3,50 / kg" ohne Gebinde, „€ 50,00 für 2 kg" bzw. „€ 3,60 für 6 Pakete" mit Gebinde. */
 export function formatGrundpreis(
   price: number,
   unit: string,
   unitSize?: number | { toString(): string } | null
 ): string {
-  const size = unitSize == null ? null : Number(unitSize.toString())
-  const label = einheitLabel(unit)
-  if (size && size !== 1) return `${formatEuro(price)} / ${formatZahl(size)} ${label}`
-  return `${formatEuro(price)} / ${label}`
+  const size = gebindeGroesse(unitSize)
+  if (size && size !== 1) return `${formatEuro(price)} für ${formatZahl(size)} ${einheitLabel(unit, size)}`
+  return `${formatEuro(price)} / ${einheitLabel(unit)}`
+}
+
+/**
+ * Preis je EINZELNER Einheit (Kilo, Liter, Stück): Gebindepreis geteilt durch
+ * Gebindegröße; ohne Gebinde der Preis selbst. null bei unbrauchbaren Zahlen.
+ * NUR zur Anzeige, auf Cent gerundet — abgerechnet wird nie damit.
+ */
+export function grundpreisJeEinheit(
+  price: number,
+  unitSize?: number | { toString(): string } | null
+): number | null {
+  if (!Number.isFinite(price)) return null
+  if (unitSize == null) return price
+  const size = gebindeGroesse(unitSize)
+  if (size == null) return null
+  return Math.round((price / size) * 100) / 100
+}
+
+/**
+ * Die zweite Zeile unter dem Preis: „€ 25,00 / kg". Nur bei einer Maßeinheit
+ * UND einer Gebindegröße ungleich 1 — sonst null, dann steht dort nichts.
+ */
+export function formatGrundpreisZeile(
+  price: number,
+  unit: string,
+  unitSize?: number | { toString(): string } | null
+): string | null {
+  const size = gebindeGroesse(unitSize)
+  if (!size || size === 1) return null
+  if (!istMassEinheit(unit)) return null
+  const je = grundpreisJeEinheit(price, size)
+  if (je == null) return null
+  return `${formatEuro(je)} / ${einheitLabel(unit)}`
 }
 
 /**

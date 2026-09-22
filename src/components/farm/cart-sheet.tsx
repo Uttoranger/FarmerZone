@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { formatEuro, formatGrundpreis } from '@/lib/format'
+import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 import type { CartItem } from '@/lib/use-cart'
 
 type Props = {
@@ -60,6 +61,12 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, onUpdate
                   <p className="text-xs text-muted-foreground/60">
                     {formatGrundpreis(item.price, item.unit, item.unitSize)}
                   </p>
+                  <GrundpreisZeile
+                    price={item.price}
+                    unit={item.unit}
+                    unitSize={item.unitSize}
+                    className="text-[11px] text-muted-foreground/60"
+                  />
                   {/* Quantity controls */}
                   <div className="flex items-center gap-2 mt-1.5">
                     <button
