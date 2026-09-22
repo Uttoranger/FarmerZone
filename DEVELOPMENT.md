@@ -622,6 +622,48 @@ Einheit"; ein Hof trug den Kilopreis ein, meinte 50 €/kg und speicherte 50 €
 Betreiber fragt die Höfe, was gemeint war): Dev-Datenbank 3 Produkte, Produktion 2
 Produkte; die Namen stehen im PR.
 
+### Produktformular Feinschliff (2026-09-22)
+
+**Dezimaleingabe.** `type="number"` verwarf das Komma je nach Browser still —
+„5,99" wurde zu 599 oder zu nichts. Preis, Gebindegröße und MwSt sind jetzt
+Textfelder mit `inputMode="decimal"` (`src/components/shared/dezimal-feld.tsx`):
+Komma UND Punkt gelten als Dezimaltrenner (`parseDezimal` in `format.ts`),
+Leerzeichen werden entfernt, beim Verlassen wird deutsch formatiert. Ein
+Tausenderpunkt wird abgelehnt, weil „1.500" zweideutig ist — mit einer Ausnahme:
+„0,125" hat auch drei Stellen, ist aber kein Tausender, und 125 g Gebinde müssen
+möglich bleiben. Das Zod-Schema parst denselben Weg (`z.preprocess`), Preis auf
+zwei, Gebindegröße auf drei Nachkommastellen begrenzt. Das Feld hält den
+Rohtext im State, ohne Effekt: Der Entwurf gilt nur, solange er zum Wert des
+Formulars passt; setzt jemand den Wert von außen („Nein, das ist der Preis je
+kg"), zeigt das Feld ihn formatiert. „Rohwerte der Kennzeichnung" gibt es nicht
+als Zahlfelder — die analytischen Bestandteile sind Freitext, dort bleibt es.
+
+**Gebinde und Saison hinter Schaltern.** Beide Felder sind Sonderfälle; ein
+Schalter („Ich verkaufe in festen Paketen", „Nur saisonal verfügbar") sagt es
+und blendet die Felder erst dann ein. Aus heißt leer (`unitSize`, `seasonStart`,
+`seasonEnd` = null). Beim Einschalten der Saison ist Von/Bis mit aktuellem Monat
+bis Monat + 2 vorbelegt (`saisonVorbelegung`, über den Jahreswechsel) — es gibt
+keinen leeren Zustand und keinen Wert 0 mehr. Beim Bearbeiten steht der
+Schalter auf An, wenn der Wert gesetzt ist. Der Schalter selbst ist Base UI
+(`src/components/ui/switch.tsx`), auch für „Im Shop verfügbar".
+
+**Bestand mit Einheit.** „Bestand (kg)" bzw. „Bestand (Pakete) = 20 kg"
+(`bestandLabel`, `formatBestand`) — bei Stück und Paket ohne Umrechnung, weil
+„6er-Pack × 30 = 180 Pakete" nichts sagt.
+
+**MwSt nach Details.** Der Satz gehört nicht zum täglichen Preis-Handgriff.
+Unter dem Feld steht „Standard: 10 %" — es gibt keinen Satz je Kategorie, der
+Standard ist der Schema-Default `MWST_STANDARD`. Die Zusammenfassung von
+„Details" nennt den Satz nur, wenn er davon abweicht.
+
+**Rückfrage mit Antworten.** Statt eines Textes zwei Knöpfe: „Ja, das Paket
+kostet € 50,00" lässt alles stehen; „Nein, € 50,00 ist der Preis je kg" trägt
+Einheitspreis × Gebinde ein (`paketpreisAntworten`). Beides beendet die
+Rückfrage für diese Eingabe; die Rechnung steht ohnehin in „Kunden sehen".
+
+**Knöpfe unten fest**, Hintergrund `card`, feine Linie oben, Abstand für die
+Safe-Area am Handy.
+
 ---
 
 ## Upload-Diagnose

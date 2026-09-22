@@ -13,6 +13,10 @@ import {
   formatGrundpreis,
   formatGrundpreisZeile,
   grundpreisJeEinheit,
+  parseDezimal,
+  nachkommastellen,
+  bestandLabel,
+  formatBestand,
   einheitLabel,
   mitAnzahl,
   plural,
@@ -145,6 +149,78 @@ describe('grundpreisJeEinheit — nur zur Anzeige', () => {
 
   it('nimmt Prisma-Decimal-artige Werte an', () => {
     expect(grundpreisJeEinheit(89, { toString: () => '5.000' })).toBe(17.8)
+  })
+})
+
+describe('parseDezimal — Komma und Punkt, kein Tausender', () => {
+  it('nimmt Komma und Punkt als Dezimaltrenner', () => {
+    expect(parseDezimal('5,99')).toBe(5.99)
+    expect(parseDezimal('5.99')).toBe(5.99)
+    expect(parseDezimal('0,5')).toBe(0.5)
+    expect(parseDezimal('2')).toBe(2)
+    expect(parseDezimal(',5')).toBe(0.5)
+  })
+
+  it('entfernt Leerzeichen — auch das schmale aus formatZahl', () => {
+    expect(parseDezimal(' 5,99 ')).toBe(5.99)
+    expect(parseDezimal('1 234')).toBe(1234)
+    expect(parseDezimal('1 234,5')).toBe(1234.5)
+  })
+
+  it('lehnt einen Tausenderpunkt ab — „1.500" ist zweideutig', () => {
+    expect(parseDezimal('1.500')).toBeNull()
+    expect(parseDezimal('1,500')).toBeNull()
+    expect(parseDezimal('12.500')).toBeNull()
+  })
+
+  it('erlaubt drei Nachkommastellen hinter einer 0 — 125 g bleiben möglich', () => {
+    expect(parseDezimal('0,125')).toBe(0.125)
+    expect(parseDezimal('0.125')).toBe(0.125)
+  })
+
+  it('null bei leer, Buchstaben, mehreren Trennern oder Vorzeichen', () => {
+    expect(parseDezimal('')).toBeNull()
+    expect(parseDezimal('   ')).toBeNull()
+    expect(parseDezimal('abc')).toBeNull()
+    expect(parseDezimal('5,9,9')).toBeNull()
+    expect(parseDezimal('1.234,56')).toBeNull()
+    expect(parseDezimal('-5')).toBeNull()
+    expect(parseDezimal('5,')).toBeNull()
+  })
+})
+
+describe('nachkommastellen', () => {
+  it('zählt die Stellen hinter dem Komma', () => {
+    expect(nachkommastellen(5.99)).toBe(2)
+    expect(nachkommastellen(0.125)).toBe(3)
+    expect(nachkommastellen(2)).toBe(0)
+    expect(nachkommastellen(1e-7)).toBe(7)
+    expect(nachkommastellen(Number.NaN)).toBe(0)
+  })
+})
+
+describe('Bestand mit Einheit', () => {
+  it('Label ohne Gebinde nennt die Einheit, mit Gebinde zählt es Pakete', () => {
+    expect(bestandLabel('KG')).toBe('Bestand (kg)')
+    expect(bestandLabel('KG', 1)).toBe('Bestand (kg)')
+    expect(bestandLabel('STUECK', null)).toBe('Bestand (Stück)')
+    expect(bestandLabel('KG', 2)).toBe('Bestand (Pakete)')
+    expect(bestandLabel('PAKET', 6)).toBe('Bestand (Pakete)')
+  })
+
+  it('formatBestand rechnet Pakete in die Einheit um', () => {
+    expect(formatBestand(10, 'KG', 2)).toBe('20 kg')
+    expect(formatBestand(8, 'LITER', 0.5)).toBe('4 L')
+    expect(formatBestand(3, 'KG', 0.125)).toBe('0,375 kg')
+  })
+
+  it('formatBestand: nichts ohne Gebinde, bei Stück und Paket, oder bei unbrauchbarem Bestand', () => {
+    expect(formatBestand(10, 'KG')).toBeNull()
+    expect(formatBestand(10, 'KG', 1)).toBeNull()
+    expect(formatBestand(30, 'PAKET', 6)).toBeNull()
+    expect(formatBestand(10, 'STUECK', 10)).toBeNull()
+    expect(formatBestand(Number.NaN, 'KG', 2)).toBeNull()
+    expect(formatBestand(-1, 'KG', 2)).toBeNull()
   })
 })
 
