@@ -11,7 +11,9 @@ import { ShoppingCart, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff, C
 import { toast } from 'sonner'
 import { useCart } from '@/lib/use-cart'
 import { MONTH_SHORT, seasonLabel } from '@/schemas/product'
-import { formatEuro, formatPrice } from '@/lib/preis-format'
+import { formatEuro } from '@/lib/preis-format'
+import { formatGrundpreis } from '@/lib/format'
+import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 import { SHOP_PAUSED_BUTTON_LABEL } from '@/lib/shop-pause'
 import type { PublicProduct } from '@/server/queries/farm'
 import { updateProductImageAction, reorderProductsAction } from '@/server/actions/products'
@@ -35,9 +37,10 @@ type Props = {
 const LOW_STOCK = 5
 
 
-// formatEuro/formatPrice liegen seit der Produktvorschau in
-// src/lib/preis-format.ts — unverändert, nur an einem Ort, damit die
-// Hofübersicht dasselbe Format zeigt wie diese Seite.
+// Produktpreise kommen aus src/lib/format.ts (formatGrundpreis + Grundpreis-
+// Zeile), damit Hofübersicht, Warenkorb und Bauern-Bereich dieselbe Schreib-
+// weise zeigen. Nur die Warenkorb-Summe nutzt noch formatEuro aus
+// preis-format.ts (Altlast, Symbol hinten).
 
 function SeasonBadge({ start, end }: { start: number; end: number }) {
   const s = MONTH_SHORT[start - 1]
@@ -294,8 +297,15 @@ function ProductCard({
       >
         <p className="font-semibold text-sm leading-snug" style={{ color: 'var(--app-ink)' }}>{product.name}</p>
         <p className="text-[17px] font-bold mt-[5px]" style={{ color: 'var(--app-ink)' }}>
-          {formatPrice(product.price, product.unit, product.unitSize)}
+          {formatGrundpreis(product.price, product.unit, product.unitSize)}
         </p>
+        <GrundpreisZeile
+          price={product.price}
+          unit={product.unit}
+          unitSize={product.unitSize}
+          className="mt-0.5 text-[12px]"
+          style={{ color: 'var(--app-ink-soft)' }}
+        />
 
         {product.seasonStart && product.seasonEnd && (
           <div className="mt-2">

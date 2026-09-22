@@ -11,6 +11,8 @@ import {
   formatMenge,
   formatPosition,
   formatGrundpreis,
+  formatGrundpreisZeile,
+  grundpreisJeEinheit,
   einheitLabel,
   mitAnzahl,
   plural,
@@ -103,10 +105,70 @@ describe('Position', () => {
 })
 
 describe('Grundpreis', () => {
-  it('nennt Preis je Einheit, Gebindegröße nur wenn sie etwas sagt', () => {
+  it('ohne Gebinde: Preis je Einheit mit Schrägstrich', () => {
     expect(formatGrundpreis(3.5, 'KG')).toBe('€ 3,50 / kg')
-    expect(formatGrundpreis(4.2, 'KG', 0.5)).toBe('€ 4,20 / 0,5 kg')
     expect(formatGrundpreis(4.2, 'KG', 1)).toBe('€ 4,20 / kg')
+    expect(formatGrundpreis(4.2, 'KG', null)).toBe('€ 4,20 / kg')
+  })
+
+  it('mit Gebinde: „für", nicht „/" — der Schrägstrich las sich als „pro"', () => {
+    expect(formatGrundpreis(50, 'KG', 2)).toBe('€ 50,00 für 2 kg')
+    expect(formatGrundpreis(4.2, 'KG', 0.5)).toBe('€ 4,20 für 0,5 kg')
+    expect(formatGrundpreis(3.6, 'PAKET', 6)).toBe('€ 3,60 für 6 Pakete')
+    expect(formatGrundpreis(2, 'STUECK', 10)).toBe('€ 2,00 für 10 Stück')
+  })
+
+  it('unbrauchbare Gebindegrößen zählen als kein Gebinde', () => {
+    expect(formatGrundpreis(3.5, 'KG', 0)).toBe('€ 3,50 / kg')
+    expect(formatGrundpreis(3.5, 'KG', Number.NaN)).toBe('€ 3,50 / kg')
+  })
+})
+
+describe('grundpreisJeEinheit — nur zur Anzeige', () => {
+  it('ohne Gebinde ist es der Preis selbst', () => {
+    expect(grundpreisJeEinheit(3.5)).toBe(3.5)
+    expect(grundpreisJeEinheit(3.5, null)).toBe(3.5)
+  })
+
+  it('teilt durch die Gebindegröße und rundet auf Cent', () => {
+    expect(grundpreisJeEinheit(50, 2)).toBe(25)
+    expect(grundpreisJeEinheit(4.2, 0.5)).toBe(8.4)
+    expect(grundpreisJeEinheit(10, 3)).toBe(3.33)
+  })
+
+  it('null bei Null, negativ, NaN oder unbrauchbarem Preis', () => {
+    expect(grundpreisJeEinheit(50, 0)).toBeNull()
+    expect(grundpreisJeEinheit(50, -2)).toBeNull()
+    expect(grundpreisJeEinheit(50, Number.NaN)).toBeNull()
+    expect(grundpreisJeEinheit(Number.NaN, 2)).toBeNull()
+  })
+
+  it('nimmt Prisma-Decimal-artige Werte an', () => {
+    expect(grundpreisJeEinheit(89, { toString: () => '5.000' })).toBe(17.8)
+  })
+})
+
+describe('formatGrundpreisZeile — die zweite Zeile unter dem Preis', () => {
+  it('bei Maßeinheit mit Gebinde: Preis je Einheit', () => {
+    expect(formatGrundpreisZeile(50, 'KG', 2)).toBe('€ 25,00 / kg')
+    expect(formatGrundpreisZeile(4.2, 'LITER', 0.5)).toBe('€ 8,40 / L')
+    expect(formatGrundpreisZeile(89, 'KG', 5)).toBe('€ 17,80 / kg')
+  })
+
+  it('ohne Gebinde oder bei Gebinde 1 nichts — der Preis sagt es schon', () => {
+    expect(formatGrundpreisZeile(3.5, 'KG')).toBeNull()
+    expect(formatGrundpreisZeile(3.5, 'KG', 1)).toBeNull()
+    expect(formatGrundpreisZeile(3.5, 'KG', null)).toBeNull()
+  })
+
+  it('bei Stück und Paket nichts, auch mit Gebinde', () => {
+    expect(formatGrundpreisZeile(3.6, 'PAKET', 6)).toBeNull()
+    expect(formatGrundpreisZeile(2, 'STUECK', 10)).toBeNull()
+  })
+
+  it('unbrauchbare Zahlen: nichts statt „€ NaN"', () => {
+    expect(formatGrundpreisZeile(Number.NaN, 'KG', 2)).toBeNull()
+    expect(formatGrundpreisZeile(50, 'KG', 0)).toBeNull()
   })
 })
 

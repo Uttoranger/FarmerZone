@@ -25,8 +25,9 @@ import {
 import { updateStock } from '@/server/actions/products'
 import { deleteProduct } from '@/server/actions/products'
 import type { ProductData } from '@/server/queries/products'
-import { UNIT_LABELS } from '@/schemas/product'
 import { hatUnterkategorien } from '@/lib/taxonomie'
+import { formatGrundpreis } from '@/lib/format'
+import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 import { ProductDialog } from './product-dialog'
 import { StockDialog } from './stock-dialog'
 import { PageHeader } from '@/components/farmer/page-header'
@@ -46,18 +47,6 @@ const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   aktiv: { label: 'Aktiv', className: 'bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-200 border-green-200 dark:border-green-900/60' },
   ausverkauft: { label: 'Ausverkauft', className: 'bg-red-100 dark:bg-red-950/50 text-red-800 dark:text-red-200 border-red-200 dark:border-red-900/60' },
   pausiert: { label: 'Pausiert', className: 'bg-muted text-muted-foreground border-border' },
-}
-
-function formatPrice(price: number, unit: string, unitSize: number | null) {
-  const formatted = new Intl.NumberFormat('de-AT', {
-    style: 'currency',
-    currency: 'EUR',
-  }).format(price)
-  const unitLabel = UNIT_LABELS[unit] ?? unit
-  if (unitSize && unitSize !== 1) {
-    return `${formatted} / ${unitSize} ${unitLabel}`
-  }
-  return `${formatted} / ${unitLabel}`
 }
 
 export function ProductList({ products: initialProducts, initialEditId }: Props) {
@@ -238,8 +227,14 @@ export function ProductList({ products: initialProducts, initialEditId }: Props)
 
                     {/* Price */}
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {formatPrice(product.price, product.unit, product.unitSize)}
+                      {formatGrundpreis(product.price, product.unit, product.unitSize)}
                     </p>
+                    <GrundpreisZeile
+                      price={product.price}
+                      unit={product.unit}
+                      unitSize={product.unitSize}
+                      className="text-[11px]"
+                    />
 
                     {/* Stock + quick buttons */}
                     <div className="flex items-center gap-2 mt-2">

@@ -579,6 +579,51 @@ handgeschriebenen Migrationen.
 
 ---
 
+## Preis-Semantik: Preis je Gebinde (Sprint Preis-Semantik, 2026-09-22)
+
+**Die Fachregel:** `price` ist der Preis je Gebinde, `unitSize` die Gebindegröße,
+der Warenkorb rechnet `price × Anzahl`. Ein Produkt mit Preis 50 und Gebindegröße
+2 kg kostet 50 Euro für das ganze Paket, nicht 50 Euro je Kilo. Daran ändert
+dieser Sprint nichts — weder am Schema noch an der Rechnung.
+
+**Der Befund:** Das Formular sagte das nirgends. „Preis (€)" stand über „Menge je
+Einheit"; ein Hof trug den Kilopreis ein, meinte 50 €/kg und speicherte 50 € je
+2-kg-Gebinde. Die Karte zeigte „€ 50,00 / 2 kg", und der Schrägstrich las sich als
+„pro". In der Dev-Datenbank steht genau so ein Produkt.
+
+**Was sich geändert hat, und warum so:**
+- Die Anzeige schreibt mit Gebinde jetzt „€ 50,00 für 2 kg"; ohne Gebinde bleibt
+  „€ 3,50 / kg". Darunter steht überall, wo Kundinnen oder der Hof Preise sehen
+  (Produktkarte, Hofübersicht, Warenkorb, Checkout, Bauern-Produktliste), die
+  Grundpreis-Zeile „€ 25,00 / kg" — kleiner, Sekundärfarbe. Bei Stück und Paket
+  entfällt sie, weil „€ 0,60 / Stück" für ein 6er-Pack Eier mehr verwirrt als
+  hilft. Die Rechnung dafür ist `grundpreisJeEinheit` in `format.ts`: reine
+  Anzeige, auf Cent gerundet, nie Grundlage einer Abrechnung.
+- Das Formular fragt in der Reihenfolge Einheit → Gebindegröße → Preis, weil das
+  Preisfeld je nach Gebinde anders heißt: „Preis je kg" oder „Preis für das
+  2-kg-Paket". Darunter eine Live-Vorschau: „Kunden sehen: € 50,00 für 2 kg ·
+  € 25,00 / kg". Die Entscheidungen liegen in
+  `src/components/products/produkt-preis.ts`, rein und getestet.
+- **Die Rückfrage „Ist das der Preis für das ganze Paket?"** ist ein Hinweis,
+  kein Fehler. Die beauftragte Regel „Gebindegröße > 1 und Preis ≤ Vorschau-
+  Kilopreis × 1,2" kann nie wahr werden, weil der Vorschau-Kilopreis der Preis
+  geteilt durch die Gebindegröße ist. Umgesetzt ist deshalb die Absicht dahinter:
+  Referenz ist der Preis, der im Feld stand, BEVOR die Gebindegröße über 1
+  gesetzt wurde — mutmaßlich ein Preis je Einheit. Bleibt der Preis danach in
+  dessen Nähe (bis 20 % darüber), kommt die Rückfrage samt Rechnung. Ohne
+  Referenz (Bestandsprodukt, das schon mit Gebinde gespeichert war) gibt es
+  keine Rückfrage — was der Hof damals meinte, wissen wir nicht.
+- `formatPrice` aus `preis-format.ts` ist nach `format.ts` gewandert; die
+  Bauern-Produktliste hatte noch ein drittes, eigenes Preisformat — weg. Übrig in
+  `preis-format.ts` ist nur `formatEuro` mit dem Symbol hinten (Altlast, siehe
+  `docs/ai/ARCHITECTURE.md`).
+
+**Bestandsdaten mit Gebindegröße > 1** (nur gelesen, nicht geändert — der
+Betreiber fragt die Höfe, was gemeint war): Dev-Datenbank 3 Produkte, Produktion 2
+Produkte; die Namen stehen im PR.
+
+---
+
 ## Upload-Diagnose
 
 Jede Upload-Fehlermeldung endet auf eine Kennung wie `[L71]` — Buchstabe für die Ursache, Zahl für den Code-Stand (`UPLOAD_DIAG` in `src/lib/upload-fehler.ts`). Bei JEDER Verhaltensänderung am Upload-Ablauf muss die Zahl auf die Nummer des Sprints gehoben werden — eine veraltete Kennung ist schlimmer als keine, weil ein zugeschicktes Bildschirmfoto dann den falschen Stand behauptet.

@@ -67,6 +67,12 @@ import {
 import { formatKategorie, formatGrundpreis, mitAnzahl } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import {
+  kundenVorschau,
+  paketpreisFraglich,
+  paketpreisHinweis,
+  preisFeldLabel,
+} from './produkt-preis'
+import {
   ABSCHNITT_TITEL,
   abschnitteMitFehlern,
   erstesFehlerfeld,
@@ -201,6 +207,9 @@ export function ProductDialog({ open, product, onClose }: Props) {
   // Kategoriewechsel weg von Futtermittel wartet auf Bestätigung — die
   // Kennzeichnung würde beim Speichern gelöscht.
   const [kategorieWechsel, setKategorieWechsel] = useState<{ neu: ProductCategoryValue | null } | null>(null)
+  // Der Preis, der im Feld stand, bevor eine Gebindegröße über 1 gesetzt wurde —
+  // mutmaßlich ein Preis je Einheit. Grundlage der Rückfrage „ganzes Paket?".
+  const [referenzPreis, setReferenzPreis] = useState<number | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
   // Über welchen Weg das gewählte Foto kam — nur für die Sentry-Meldung;
   // der Upload läuft hier erst beim Absenden, also bis dahin merken.
@@ -226,6 +235,12 @@ export function ProductDialog({ open, product, onClose }: Props) {
   const watchedSeasonEnd = werte.seasonEnd
   const istFuttermittel = category === 'FUTTERMITTEL'
   const fehlerhafteAbschnitte = abschnitteMitFehlern(form.formState.errors)
+  const preisVorschau = kundenVorschau(werte.price, werte.unit, werte.unitSize)
+  const preisFraglich = paketpreisFraglich({
+    price: werte.price,
+    unitSize: werte.unitSize,
+    referenzPreis,
+  })
 
   // Reset form when dialog opens/switches product
   useEffect(() => {
@@ -235,6 +250,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
       setPreviewUrl(isEdit ? (product.imageUrl ?? null) : null)
       setOffen(isEdit ? [] : ['grunddaten'])
       setKategorieWechsel(null)
+      setReferenzPreis(null)
     }
   }, [open, product?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -585,28 +601,10 @@ export function ProductDialog({ open, product, onClose }: Props) {
                   <AccordionTrigger>{abschnittTitel('preis')}</AccordionTrigger>
                   <AccordionPanel>
                     <div className="space-y-3">
+                      {/* Reihenfolge Einheit → Gebindegröße → Preis: Das Preisfeld heißt
+                          je nach Gebinde anders („Preis je kg" / „Preis für das
+                          2-kg-Paket"), also stehen die beiden zuerst. */}
                       <div className="grid grid-cols-2 gap-3">
-                        <FormField
-                          control={form.control}
-                          name="price"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Preis (€) *</FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  placeholder="0,00"
-                                  {...field}
-                                  onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
                         <FormField
                           control={form.control}
                           name="unit"
@@ -631,26 +629,60 @@ export function ProductDialog({ open, product, onClose }: Props) {
                             </FormItem>
                           )}
                         />
-                      </div>
 
-                      <div className="grid grid-cols-2 gap-3">
                         <FormField
                           control={form.control}
                           name="unitSize"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Menge je Einheit</FormLabel>
+                              <FormLabel>Gebindegröße</FormLabel>
                               <FormControl>
                                 <Input
                                   type="number"
                                   step="0.001"
                                   min="0"
-                                  placeholder="z. B. 0.5"
+                                  placeholder="leer = einzeln"
                                   name={field.name}
                                   value={field.value ?? ''}
-                                  onChange={(e) =>
-                                    field.onChange(e.target.value === '' ? undefined : e.target.valueAsNumber)
-                                  }
+                                  onChange={(e) => {
+                                    const alt = field.value
+                                    const neu = e.target.value === '' ? undefined : e.target.valueAsNumber
+                                    // Wird das Gebinde gerade größer als 1, merken wir uns den
+                                    // Preis, der bis eben galt — er war mutmaßlich je Einheit.
+                                    if ((alt == null || alt <= 1) && neu != null && neu > 1) {
+                                      setReferenzPreis(form.getValues('price'))
+                                    } else if (neu == null || neu <= 1) {
+                                      setReferenzPreis(null)
+                                    }
+                                    field.onChange(neu)
+                                  }}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground -mt-1">
+                        Gebindegröße leer lassen, wenn der Kunde in kg/L/Stück bestellt. Ausfüllen, wenn
+                        du feste Pakete verkaufst, z. B. 2 für ein 2-kg-Paket.
+                      </p>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <FormField
+                          control={form.control}
+                          name="price"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>{preisFeldLabel(werte.unit, werte.unitSize)} (€) *</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  placeholder="0,00"
+                                  {...field}
+                                  onChange={(e) => field.onChange(e.target.valueAsNumber)}
                                 />
                               </FormControl>
                               <FormMessage />
@@ -680,6 +712,17 @@ export function ProductDialog({ open, product, onClose }: Props) {
                         />
                       </div>
 
+                      {/* Live-Vorschau: was Kundinnen aus Preis und Gebinde lesen werden */}
+                      {preisVorschau && (
+                        <p className="text-xs text-muted-foreground -mt-1" aria-live="polite">
+                          {preisVorschau}
+                        </p>
+                      )}
+                      {preisFraglich && (
+                        <p className="text-xs text-amber-800 dark:text-amber-200 -mt-1" aria-live="polite">
+                          {paketpreisHinweis(werte.price, werte.unit, werte.unitSize)}
+                        </p>
+                      )}
                       <FormField
                         control={form.control}
                         name="stock"
