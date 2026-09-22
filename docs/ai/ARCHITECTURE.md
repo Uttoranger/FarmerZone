@@ -124,6 +124,15 @@ Diese Regeln sind fachlich, nicht technisch. Verletzung kostet Geld oder Vertrau
 - **Jede Abfrage im Bauern-Bereich ist auf den eigenen Hof begrenzt.** Es gibt keine hofübergreifende Sicht außer im Admin.
 - **Archivierte, pausierte und nicht freigegebene Höfe** sind öffentlich unsichtbar. Bei jeder neuen öffentlichen Abfrage mitprüfen.
 
+### Taxonomie (Kategorien, Unterkategorien, Siegel)
+
+`src/lib/taxonomie.ts` ist die **einzige** Quelle für Werte und Labels. Kein zweites Label-Verzeichnis, kein Hof-Sonderfall anderswo. Anzeige nur über `formatKategorie` in `format.ts`.
+
+- **Jede Unterkategorie (L2) gehört zu genau einer Kategorie (L1).** `gehoertZu(l1, l2)` entscheidet; das Zod-Schema lehnt jede andere Kombination ab. Fisch, Brot, Getränke, Brennholz, Sonstiges haben keine L2. Keine dritte Ebene, keine Freitext-Kategorien.
+- **Eine fehlende L2 ist kein Fehler.** Bestandsprodukte dürfen ohne bleiben; das Formular zeigt nur einen Hinweis. Einzige Ausnahme: Futtermittel.
+- **Siegel sind orthogonal zur Kategorie.** `labels` ist eine Menge (BIO, GENTECHNIKFREI, AMA_GUETESIEGEL), mehrere je Produkt, keines Pflicht, keines doppelt. `isOrganic` ist Altlast: wird nur noch gelesen, nie mehr geschrieben; Bio ist `labels` enthält BIO.
+- **Futter-Kennzeichnung nur bei FUTTERMITTEL.** Dort Pflicht (Unterkategorie, Tierarten, Zusammensetzung, analytische Bestandteile, Bestätigung), bei jeder anderen Kategorie verboten. Ein Kategoriewechsel weg von Futtermittel löscht sie in derselben Transaktion wie das Produkt-Update.
+
 ---
 
 ## 6. Bekannte Altlasten

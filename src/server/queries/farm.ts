@@ -165,7 +165,10 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
           stock: true,
           isAvailable: true,
           allergens: true,
-          isOrganic: true,
+          // Bio kommt seit Sprint Taxonomie 1 aus labels, nicht aus der
+          // Altlast-Spalte isOrganic — die Abbildung unten macht daraus das
+          // Boolean, das die Hofseite kennt.
+          labels: true,
           requiresCool: true,
           requiresFreezer: true,
           seasonStart: true,
@@ -195,11 +198,12 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
     sectionsConfig: sections,
     farmPhotos: farm.farmPhotos,
     serviceFeePercent: Number(farm.serviceFeePercent),
-    products: farm.products.map((p) => ({
+    products: farm.products.map(({ labels, ...p }) => ({
       ...p,
       price: Number(p.price),
       unitSize: p.unitSize ? Number(p.unitSize) : null,
       categoryImageUrl: categoryImagePath(p.category),
+      isOrganic: labels.includes('BIO'),
     })),
   }
 }
@@ -254,7 +258,10 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
           stock: true,
           isAvailable: true,
           allergens: true,
-          isOrganic: true,
+          // Bio kommt seit Sprint Taxonomie 1 aus labels, nicht aus der
+          // Altlast-Spalte isOrganic — die Abbildung unten macht daraus das
+          // Boolean, das die Hofseite kennt.
+          labels: true,
           requiresCool: true,
           requiresFreezer: true,
           seasonStart: true,
@@ -284,11 +291,12 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
     sectionsConfig: sections,
     farmPhotos: farm.farmPhotos,
     serviceFeePercent: Number(farm.serviceFeePercent),
-    products: farm.products.map((p) => ({
+    products: farm.products.map(({ labels, ...p }) => ({
       ...p,
       price: Number(p.price),
       unitSize: p.unitSize ? Number(p.unitSize) : null,
       categoryImageUrl: categoryImagePath(p.category),
+      isOrganic: labels.includes('BIO'),
     })),
   }
 }

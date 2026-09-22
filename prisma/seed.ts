@@ -1,4 +1,10 @@
-import { PrismaClient } from '@prisma/client'
+import {
+  PrismaClient,
+  type Prisma,
+  type ProductCategory,
+  type ProductLabel,
+  type ProductSubcategory,
+} from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { auth } from '../src/lib/auth'
 
@@ -72,11 +78,40 @@ async function main() {
     },
   })
 
-  // Produkte
+  // Produkte. Kategorie, Unterkategorie und Siegel stehen auch im `update`,
+  // damit ein erneuter Seed-Lauf Bestandsprodukte aus der Zeit vor Sprint
+  // Taxonomie 1 nachrüstet. isOrganic wird nicht mehr geschrieben — Bio ist
+  // das Siegel BIO in labels.
+  type Taxonomie = {
+    category: ProductCategory
+    subcategory: ProductSubcategory | null
+    labels: ProductLabel[]
+  }
+  const milchTaxonomie: Taxonomie = {
+    category: 'MILCH',
+    subcategory: 'TRINKMILCH',
+    labels: ['BIO', 'GENTECHNIKFREI'],
+  }
+  const eierTaxonomie: Taxonomie = { category: 'EIER', subcategory: 'EIER_FREILAND', labels: ['BIO'] }
+  const holzTaxonomie: Taxonomie = { category: 'BRENNHOLZ', subcategory: null, labels: [] }
+  const fleischTaxonomie: Taxonomie = { category: 'FLEISCH', subcategory: 'RIND', labels: ['BIO'] }
+
+  // Vollständige Futter-Kennzeichnung, wie sie auf einem Sackanhänger steht.
+  // Die Registrierungsnummer ist erfunden (öffentliches Repo).
+  const heuKennzeichnung: Prisma.FutterKennzeichnungCreateWithoutProductInput = {
+    zielTierarten: ['PFERD', 'RIND'],
+    zusammensetzung: 'Wiesenheu vom ersten Schnitt, Dauergrünland, ohne Zusatz',
+    analytischeBestandteile: 'Rohprotein 9,5 %, Rohfaser 28 %, Rohfett 2 %, Rohasche 7 %',
+    zusatzstoffe: null,
+    registrierungsnummer: 'LFBIS 1234567',
+    gebrauchshinweis: 'Trocken und luftig lagern. Als Raufutter zur freien Aufnahme.',
+    bestaetigtAm: new Date(),
+  }
+
   const [milch, eier, , fleisch] = await Promise.all([
     prisma.product.upsert({
       where: { id: 'prod-milch' },
-      update: {},
+      update: { ...milchTaxonomie },
       create: {
         id: 'prod-milch',
         farmId: farm.id,
@@ -89,7 +124,7 @@ async function main() {
         unitSize: 1,
         stock: 50,
         isAvailable: true,
-        isOrganic: true,
+        ...milchTaxonomie,
         requiresCool: true,
         allergens: ['milch'],
       },
@@ -97,7 +132,7 @@ async function main() {
 
     prisma.product.upsert({
       where: { id: 'prod-eier' },
-      update: {},
+      update: { ...eierTaxonomie },
       create: {
         id: 'prod-eier',
         farmId: farm.id,
@@ -109,7 +144,7 @@ async function main() {
         unitSize: 6,
         stock: 30,
         isAvailable: true,
-        isOrganic: true,
+        ...eierTaxonomie,
         requiresCool: false,
         allergens: ['eier'],
       },
@@ -117,7 +152,7 @@ async function main() {
 
     prisma.product.upsert({
       where: { id: 'prod-holz' },
-      update: {},
+      update: { ...holzTaxonomie },
       create: {
         id: 'prod-holz',
         farmId: farm.id,
@@ -130,13 +165,13 @@ async function main() {
         unitSize: 1,
         stock: 10,
         isAvailable: true,
-        isOrganic: false,
+        ...holzTaxonomie,
       },
     }),
 
     prisma.product.upsert({
       where: { id: 'prod-fleisch' },
-      update: {},
+      update: { ...fleischTaxonomie },
       create: {
         id: 'prod-fleisch',
         farmId: farm.id,
@@ -149,11 +184,40 @@ async function main() {
         unitSize: 5,
         stock: 8,
         isAvailable: true,
-        isOrganic: true,
+        ...fleischTaxonomie,
         requiresFreezer: true,
         allergens: [],
         seasonStart: 10,
         seasonEnd: 3,
+      },
+    }),
+
+    // Ein Futtermittel mit vollständiger Kennzeichnung (Sprint Taxonomie 1)
+    prisma.product.upsert({
+      where: { id: 'prod-heu' },
+      update: {
+        category: 'FUTTERMITTEL',
+        subcategory: 'EINZELFUTTERMITTEL',
+        labels: [],
+        futter: { upsert: { create: heuKennzeichnung, update: heuKennzeichnung } },
+      },
+      create: {
+        id: 'prod-heu',
+        farmId: farm.id,
+        name: 'Heu Kleinballen',
+        description:
+          'Wiesenheu vom ersten Schnitt, kleine Ballen mit rund 15 kg. Für Pferde und Rinder. Bitte beim Abholen Anhänger oder Kombi mitbringen.',
+        price: 6.50,
+        vatRate: 10,
+        unit: 'STUECK',
+        unitSize: 1,
+        stock: 40,
+        isAvailable: true,
+        category: 'FUTTERMITTEL',
+        subcategory: 'EINZELFUTTERMITTEL',
+        labels: [],
+        countsTowardLimit: false,
+        futter: { create: heuKennzeichnung },
       },
     }),
   ])
@@ -214,7 +278,7 @@ async function main() {
   })
 
   console.log('✓ Farm angelegt:', farm.name, '→ /hof-mueller')
-  console.log('✓ Produkte: Heumilch, Bio-Eier, Brennholz, Rindfleisch-Paket')
+  console.log('✓ Produkte: Heumilch, Bio-Eier, Brennholz, Rindfleisch-Paket, Heu (Futtermittel mit Kennzeichnung)')
   console.log('✓ Abholzeiten: Mittwoch 15-18 Uhr, Samstag 9-12 Uhr')
   console.log('✓ 3 ManualSales: WhatsApp, Hofladen, Geschäftskunde')
   console.log('\nAnmeldung Bauer-Dashboard:')

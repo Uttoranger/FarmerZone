@@ -27,6 +27,10 @@ const CATEGORY_SLUGS: Record<ProductCategory, string> = {
   BROT: 'brot',
   HONIG: 'honig',
   GETRAENKE: 'getraenke',
+  // Bewusst KEINE eigene Illustration (Sprint Taxonomie 1): Futtermittel
+  // teilt sich die neutrale Kachel mit Sonstiges, damit die Karte nicht leer
+  // bleibt. Eine eigene Datei wäre ein neuer Illustrationsauftrag.
+  FUTTERMITTEL: 'sonstiges',
   BRENNHOLZ: 'brennholz',
   SONSTIGES: 'sonstiges',
 }

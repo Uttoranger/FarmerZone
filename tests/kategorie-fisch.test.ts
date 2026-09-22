@@ -54,8 +54,8 @@ describe('Kategorie FISCH — Reihenfolge', () => {
     expect(CATEGORY_OPTIONS.map((o) => o.value)).toEqual([...PRODUCT_CATEGORY_VALUES])
   })
 
-  it('elf Werte, FISCH an vierter Stelle — direkt nach FLEISCH', () => {
-    expect(PRODUCT_CATEGORY_VALUES).toHaveLength(11)
+  it('zwölf Werte (seit Taxonomie 1 mit FUTTERMITTEL), FISCH an vierter Stelle — direkt nach FLEISCH', () => {
+    expect(PRODUCT_CATEGORY_VALUES).toHaveLength(12)
     expect(PRODUCT_CATEGORY_VALUES[2]).toBe('FLEISCH')
     expect(PRODUCT_CATEGORY_VALUES[3]).toBe('FISCH')
     expect(PRODUCT_CATEGORY_VALUES[4]).toBe('GEMUESE')
@@ -128,7 +128,7 @@ describe('Kategorie FISCH — Illustration', () => {
     }
   })
 
-  it('alle elf Kategorien haben eine Zuordnung — keine läuft ins Leere', () => {
+  it('alle Kategorien haben eine Zuordnung — keine läuft ins Leere', () => {
     for (const kategorie of PRODUCT_CATEGORY_VALUES) {
       expect(categoryImagePath(kategorie as ProductCategoryValue, () => true)).toMatch(
         /^\/categories\/[a-z]+\.webp$/
@@ -141,8 +141,11 @@ describe('Kategorie FISCH — Illustration', () => {
     const warnung = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
     for (const kategorie of PRODUCT_CATEGORY_VALUES) {
-      const datei = path.join(process.cwd(), 'public', 'categories', `${kategorie.toLowerCase()}.webp`)
-      const erwartet = fs.existsSync(datei) ? `/categories/${kategorie.toLowerCase()}.webp` : null
+      // FUTTERMITTEL hat bewusst keine eigene Datei und nutzt die Kachel von
+      // Sonstiges (Sprint Taxonomie 1) — die Abbildung steht in product-image.ts.
+      const slug = kategorie === 'FUTTERMITTEL' ? 'sonstiges' : kategorie.toLowerCase()
+      const datei = path.join(process.cwd(), 'public', 'categories', `${slug}.webp`)
+      const erwartet = fs.existsSync(datei) ? `/categories/${slug}.webp` : null
       expect(categoryImagePath(kategorie)).toBe(erwartet)
     }
     // Heute (Stand dieses Sprints) liegt fisch.webp noch nicht vor — die

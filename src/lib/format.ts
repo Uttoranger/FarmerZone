@@ -1,4 +1,10 @@
 import { UNIT_LABELS } from '@/schemas/product'
+import {
+  KATEGORIE_LABEL,
+  UNTERKATEGORIE_LABEL,
+  type ProductCategoryValue,
+  type ProductSubcategoryValue,
+} from '@/lib/taxonomie'
 
 /**
  * EINE Darstellung für Geld, Mengen und Positionen — überall.
@@ -116,4 +122,19 @@ export function formatGrundpreis(
   const label = einheitLabel(unit)
   if (size && size !== 1) return `${formatEuro(price)} / ${formatZahl(size)} ${label}`
   return `${formatEuro(price)} / ${label}`
+}
+
+/**
+ * Kategorie und Unterkategorie in EINER Schreibweise: „Fleisch & Wurst · Rind",
+ * ohne Unterkategorie nur „Fleisch & Wurst". Die Wörter kommen aus
+ * src/lib/taxonomie.ts — hier wird nur zusammengesetzt, nirgends ein Hofname
+ * oder Sonderfall hart verdrahtet.
+ */
+export function formatKategorie(
+  l1: ProductCategoryValue,
+  l2?: ProductSubcategoryValue | null
+): string {
+  const kategorie = KATEGORIE_LABEL[l1]
+  if (!l2) return kategorie
+  return `${kategorie} · ${UNTERKATEGORIE_LABEL[l2]}`
 }

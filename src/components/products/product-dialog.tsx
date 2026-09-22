@@ -1,7 +1,7 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useForm, type Resolver } from 'react-hook-form'
+import { useForm, type FieldErrors, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { ImagePlus, X, Leaf, Thermometer, Snowflake } from 'lucide-react'
@@ -20,11 +20,18 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionPanel,
+} from '@/components/ui/accordion'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -40,12 +47,31 @@ import type { ProductData } from '@/server/queries/products'
 import {
   productFormSchema,
   type ProductFormData,
+  type FutterKennzeichnungFormData,
   ALLERGENS,
   UNIT_OPTIONS,
   MONTH_OPTIONS,
   CATEGORY_OPTIONS,
   seasonLabel,
 } from '@/schemas/product'
+import {
+  hatUnterkategorien,
+  unterkategorienVon,
+  UNTERKATEGORIE_LABEL,
+  PRODUCT_LABEL_VALUES,
+  SIEGEL,
+  TIERART_VALUES,
+  TIERART_LABEL,
+  type ProductCategoryValue,
+} from '@/lib/taxonomie'
+import { formatKategorie, formatGrundpreis, mitAnzahl } from '@/lib/format'
+import { cn } from '@/lib/utils'
+import {
+  ABSCHNITT_TITEL,
+  abschnitteMitFehlern,
+  erstesFehlerfeld,
+  type Abschnitt,
+} from './produkt-abschnitte'
 
 type Props = {
   open: boolean
@@ -53,11 +79,25 @@ type Props = {
   onClose: () => void
 }
 
+/** Eine leere Kennzeichnung — sobald die Kategorie Futtermittel gewählt ist. */
+const FUTTER_LEER: FutterKennzeichnungFormData = {
+  zielTierarten: [],
+  zusammensetzung: '',
+  analytischeBestandteile: '',
+  zusatzstoffe: '',
+  registrierungsnummer: '',
+  gebrauchshinweis: '',
+  bestaetigt: false,
+}
+
 const EMPTY_DEFAULTS: ProductFormData = {
   name: '',
   description: '',
   imageUrl: '',
   category: null,
+  subcategory: null,
+  labels: [],
+  futter: undefined,
   countsTowardLimit: true,
   price: 0,
   vatRate: 10,
@@ -66,7 +106,6 @@ const EMPTY_DEFAULTS: ProductFormData = {
   stock: 0,
   isAvailable: true,
   allergens: [],
-  isOrganic: false,
   requiresCool: false,
   requiresFreezer: false,
   seasonStart: undefined,
@@ -80,6 +119,21 @@ function toFormDefaults(p: ProductData): Partial<ProductFormData> {
     description: p.description ?? '',
     imageUrl: p.imageUrl ?? '',
     category: p.category ?? null,
+    subcategory: p.subcategory ?? null,
+    labels: p.labels,
+    // Eine gespeicherte Kennzeichnung wurde schon einmal bestätigt — der Haken
+    // ist deshalb gesetzt. Beim Speichern wird das Datum ohnehin neu gestempelt.
+    futter: p.futter
+      ? {
+          zielTierarten: p.futter.zielTierarten,
+          zusammensetzung: p.futter.zusammensetzung,
+          analytischeBestandteile: p.futter.analytischeBestandteile,
+          zusatzstoffe: p.futter.zusatzstoffe ?? '',
+          registrierungsnummer: p.futter.registrierungsnummer ?? '',
+          gebrauchshinweis: p.futter.gebrauchshinweis ?? '',
+          bestaetigt: true,
+        }
+      : undefined,
     countsTowardLimit: p.countsTowardLimit,
     price: p.price,
     vatRate: p.vatRate,
@@ -88,13 +142,46 @@ function toFormDefaults(p: ProductData): Partial<ProductFormData> {
     stock: p.stock,
     isAvailable: p.isAvailable,
     allergens: p.allergens,
-    isOrganic: p.isOrganic,
     requiresCool: p.requiresCool,
     requiresFreezer: p.requiresFreezer,
     seasonStart: p.seasonStart ?? undefined,
     seasonEnd: p.seasonEnd ?? undefined,
     unavailableReason: p.unavailableReason ?? '',
   }
+}
+
+/** Die Zeile unter dem Abschnittstitel, wenn er zugeklappt ist. */
+function zusammenfassung(abschnitt: Abschnitt, w: ProductFormData): string {
+  switch (abschnitt) {
+    case 'grunddaten':
+      return w.category ? formatKategorie(w.category, w.subcategory) : 'Noch keine Kategorie'
+    case 'preis': {
+      const preis = Number.isFinite(w.price) ? w.price : 0
+      const teile = [formatGrundpreis(preis, w.unit, w.unitSize), `${Number.isFinite(w.stock) ? w.stock : 0} auf Lager`]
+      if (!w.isAvailable) teile.push('ausgeblendet')
+      return teile.join(' · ')
+    }
+    case 'details': {
+      const teile: string[] = []
+      teile.push(w.labels.length > 0 ? w.labels.map((l) => SIEGEL[l].name).join(', ') : 'Keine Siegel')
+      if (w.allergens.length > 0) teile.push(mitAnzahl(w.allergens.length, 'Allergen', 'Allergene'))
+      return teile.join(' · ')
+    }
+    case 'kennzeichnung': {
+      const tiere = w.futter?.zielTierarten ?? []
+      return tiere.length > 0 ? `Für ${tiere.map((t) => TIERART_LABEL[t]).join(', ')}` : 'Noch nicht ausgefüllt'
+    }
+  }
+}
+
+/** Auswahl-Chip, Touch-Ziel 44 px — dieselbe Gestalt wie die Filterchips auf /hoefe. */
+function chipKlasse(aktiv: boolean): string {
+  return cn(
+    'min-h-11 rounded-full border px-4 text-sm font-medium transition-colors',
+    aktiv
+      ? 'border-primary bg-primary text-primary-foreground'
+      : 'border-border bg-card text-foreground hover:bg-muted/40'
+  )
 }
 
 export function ProductDialog({ open, product, onClose }: Props) {
@@ -108,6 +195,13 @@ export function ProductDialog({ open, product, onClose }: Props) {
   } | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  // Welche Abschnitte aufgeklappt sind. Anlegen: nur Grunddaten; Bearbeiten:
+  // alle zu, die Titel tragen dann eine Zusammenfassung.
+  const [offen, setOffen] = useState<Abschnitt[]>([])
+  // Kategoriewechsel weg von Futtermittel wartet auf Bestätigung — die
+  // Kennzeichnung würde beim Speichern gelöscht.
+  const [kategorieWechsel, setKategorieWechsel] = useState<{ neu: ProductCategoryValue | null } | null>(null)
+  const formRef = useRef<HTMLFormElement>(null)
   // Über welchen Weg das gewählte Foto kam — nur für die Sentry-Meldung;
   // der Upload läuft hier erst beim Absenden, also bis dahin merken.
   const gewaehlterWeg = useRef<UploadWeg>('galerie')
@@ -125,9 +219,13 @@ export function ProductDialog({ open, product, onClose }: Props) {
     defaultValues: isEdit ? toFormDefaults(product) : EMPTY_DEFAULTS,
   })
 
-  const isAvailable = form.watch('isAvailable')
-  const watchedSeasonStart = form.watch('seasonStart')
-  const watchedSeasonEnd = form.watch('seasonEnd')
+  const werte = form.watch()
+  const category = werte.category
+  const isAvailable = werte.isAvailable
+  const watchedSeasonStart = werte.seasonStart
+  const watchedSeasonEnd = werte.seasonEnd
+  const istFuttermittel = category === 'FUTTERMITTEL'
+  const fehlerhafteAbschnitte = abschnitteMitFehlern(form.formState.errors)
 
   // Reset form when dialog opens/switches product
   useEffect(() => {
@@ -135,6 +233,8 @@ export function ProductDialog({ open, product, onClose }: Props) {
       form.reset(isEdit ? toFormDefaults(product) : EMPTY_DEFAULTS)
       setSelectedFile(null)
       setPreviewUrl(isEdit ? (product.imageUrl ?? null) : null)
+      setOffen(isEdit ? [] : ['grunddaten'])
+      setKategorieWechsel(null)
     }
   }, [open, product?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -144,6 +244,10 @@ export function ProductDialog({ open, product, onClose }: Props) {
       if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl)
     }
   }, [previewUrl])
+
+  function abschnittOeffnen(abschnitt: Abschnitt) {
+    setOffen((o) => (o.includes(abschnitt) ? o : [...o, abschnitt]))
+  }
 
   function uebernehmeFoto(file: File) {
     if (file.size > MAX_ORIGINAL_BYTES) {
@@ -174,6 +278,58 @@ export function ProductDialog({ open, product, onClose }: Props) {
       current.includes(id) ? current.filter((a) => a !== id) : [...current, id],
       { shouldDirty: true }
     )
+  }
+
+  /**
+   * Kategorie wählen. Ein Wechsel setzt die Unterkategorie zurück (sie gehört
+   * zur alten L1). Weg von Futtermittel mit vorhandener Kennzeichnung: erst
+   * fragen — sie würde beim Speichern gelöscht.
+   */
+  function kategorieWaehlen(neu: ProductCategoryValue | null) {
+    const alt = form.getValues('category')
+    if (neu === alt) return
+    if (alt === 'FUTTERMITTEL' && form.getValues('futter') !== undefined) {
+      setKategorieWechsel({ neu })
+      return
+    }
+    kategorieSetzen(neu)
+  }
+
+  function kategorieSetzen(neu: ProductCategoryValue | null) {
+    form.setValue('category', neu, { shouldDirty: true })
+    form.setValue('subcategory', null, { shouldDirty: true })
+    form.clearErrors('subcategory')
+    if (neu === 'FUTTERMITTEL') {
+      if (form.getValues('futter') === undefined) form.setValue('futter', { ...FUTTER_LEER })
+      // Beim Anlegen eines Futtermittels ist die Kennzeichnung Pflicht — gleich zeigen.
+      abschnittOeffnen('kennzeichnung')
+    } else {
+      form.setValue('futter', undefined, { shouldDirty: true })
+      form.clearErrors('futter')
+    }
+  }
+
+  /**
+   * Nach einer fehlgeschlagenen Prüfung den betroffenen Abschnitt öffnen und
+   * zum ERSTEN Fehlerfeld springen (Muster aus dem Checkout). Vorher blieb der
+   * Fehler in einem zugeklappten Abschnitt unsichtbar.
+   */
+  function onInvalid(errors: FieldErrors<ProductFormData>) {
+    const treffer = erstesFehlerfeld(errors)
+    if (!treffer) return
+    abschnittOeffnen(treffer.abschnitt)
+    toast.error('Bitte prüfe die markierten Felder.')
+    // Erst nach dem Aufklappen scrollen — ein zugeklappter Abschnitt hat keine
+    // Höhe, und die Öffnung braucht eine Animation lang.
+    window.setTimeout(() => {
+      const el =
+        formRef.current?.querySelector<HTMLElement>(`[name="${treffer.feld}"]`) ??
+        formRef.current?.querySelector<HTMLElement>(`[data-feld="${treffer.feld}"]`)
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      // focus() nach dem Scrollen, sonst springt der Browser noch einmal.
+      window.setTimeout(() => el.focus({ preventScroll: true }), 120)
+    }, 250)
   }
 
   async function onSubmit(data: ProductFormData) {
@@ -213,22 +369,42 @@ export function ProductDialog({ open, product, onClose }: Props) {
 
       const payload: ProductFormData = { ...data, imageUrl }
 
-      if (isEdit) {
-        await updateProduct(product.id, payload)
-        toast.success('Produkt gespeichert')
-      } else {
-        await createProduct(payload)
-        toast.success('Produkt angelegt')
+      const ergebnis = isEdit
+        ? await updateProduct(product.id, payload)
+        : await createProduct(payload)
+      if ('error' in ergebnis) {
+        toast.error(ergebnis.error)
+        return
       }
+      toast.success(isEdit ? 'Produkt gespeichert' : 'Produkt angelegt')
       onClose()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Fehler beim Speichern')
+      toast.error(e instanceof Error ? e.message : 'Wir konnten das Produkt nicht speichern. Bitte versuch es noch einmal.')
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  function abschnittTitel(abschnitt: Abschnitt, pflicht = false) {
+    const zu = !offen.includes(abschnitt)
+    const fehler = fehlerhafteAbschnitte.has(abschnitt)
+    return (
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className={cn(fehler && 'text-destructive')}>
+          {ABSCHNITT_TITEL[abschnitt]}
+          {pflicht && ' *'}
+        </span>
+        {zu && (
+          <span className={cn('truncate text-xs font-normal', fehler ? 'text-destructive' : 'text-muted-foreground')}>
+            {fehler ? 'Bitte prüfen' : zusammenfassung(abschnitt, werte)}
+          </span>
+        )}
+      </span>
+    )
+  }
+
   return (
+    <>
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg max-h-[92dvh] flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
@@ -237,459 +413,736 @@ export function ProductDialog({ open, product, onClose }: Props) {
 
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit(onSubmit)}
+            ref={formRef}
+            onSubmit={form.handleSubmit(onSubmit, onInvalid)}
             className="flex flex-col flex-1 min-h-0"
           >
             {/* Scrollable form body */}
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+            <div className="flex-1 overflow-y-auto px-6 py-2">
+              <Accordion
+                multiple
+                value={offen}
+                onValueChange={(v) => setOffen(v as Abschnitt[])}
+              >
+                {/* === 1. GRUNDDATEN === */}
+                <AccordionItem value="grunddaten">
+                  <AccordionTrigger>{abschnittTitel('grunddaten')}</AccordionTrigger>
+                  <AccordionPanel>
+                    <div className="space-y-3">
+                      <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Name *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="z. B. Heumilch frisch" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-              {/* === FOTO === */}
-              <section>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Foto</p>
-                <div className="flex items-start gap-3">
-                  <div className="relative shrink-0 w-24 h-24 rounded-xl border-2 border-dashed border-border overflow-hidden bg-muted/30 flex items-center justify-center">
-                    {previewUrl ? (
-                      <>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={previewUrl}
-                          alt="Vorschau"
-                          className="w-full h-full object-cover"
-                          // Ersatz für die entfallene Format-Probe: Kann der
-                          // Browser das Foto nicht zeichnen (HEIC auf Android),
-                          // verschwindet die Vorschau still, statt ein kaputtes
-                          // Bildsymbol zu zeigen. Die Datei BLEIBT ausgewählt —
-                          // ob sie taugt, entscheidet beim Absenden der Server.
-                          onError={() => setPreviewUrl(null)}
+                      <FormField
+                        control={form.control}
+                        name="category"
+                        render={({ field }) => (
+                          <FormItem data-feld="category">
+                            <FormLabel>Kategorie</FormLabel>
+                            <Select
+                              onValueChange={(v) =>
+                                kategorieWaehlen(v === 'NONE' ? null : (v as ProductCategoryValue))
+                              }
+                              value={field.value ?? 'NONE'}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Keine Angabe" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="NONE">Keine Angabe</SelectItem>
+                                {CATEGORY_OPTIONS.map((c) => (
+                                  <SelectItem key={c.value} value={c.value}>
+                                    {c.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Unterkategorie: erst nach der Kategorie, nur wo es welche gibt.
+                          Chips statt Select — es sind höchstens neun. */}
+                      {category && hatUnterkategorien(category) && (
+                        <FormField
+                          control={form.control}
+                          name="subcategory"
+                          render={({ field }) => (
+                            <FormItem data-feld="subcategory" tabIndex={-1} className="outline-none">
+                              <FormLabel>Unterkategorie{istFuttermittel && ' *'}</FormLabel>
+                              <div className="flex flex-wrap gap-2" role="group" aria-label="Unterkategorie">
+                                {unterkategorienVon(category).map((l2) => {
+                                  const aktiv = field.value === l2
+                                  return (
+                                    <button
+                                      key={l2}
+                                      type="button"
+                                      aria-pressed={aktiv}
+                                      onClick={() => field.onChange(aktiv ? null : l2)}
+                                      className={chipKlasse(aktiv)}
+                                    >
+                                      {UNTERKATEGORIE_LABEL[l2]}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                              {!field.value && !istFuttermittel && (
+                                <FormDescription className="text-xs">
+                                  Hilft Kundinnen beim Finden — du kannst sie auch später ergänzen.
+                                </FormDescription>
+                              )}
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
-                        <button
-                          type="button"
-                          onClick={handleRemoveImage}
-                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </>
-                    ) : (
-                      <ImagePlus className="w-6 h-6 text-muted-foreground/50" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    {fotoQuellen.elemente}
-                    <button
-                      type="button"
-                      onClick={fotoQuellen.oeffnen}
-                      className={buttonVariants({ variant: 'outline', size: 'sm' })}
-                    >
-                      {previewUrl ? 'Foto ersetzen' : 'Foto wählen'}
-                    </button>
-                    <p className="text-xs text-muted-foreground/60 mt-1.5">
-                      JPEG, PNG oder WebP — wird automatisch verkleinert
-                    </p>
-                  </div>
-                </div>
-              </section>
+                      )}
 
-              {/* === GRUNDDATEN === */}
-              <section className="space-y-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Grunddaten</p>
-
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Name *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="z. B. Heumilch frisch" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Beschreibung</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Kurze Produktbeschreibung für den Shop…"
-                          rows={3}
-                          className="resize-none"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Kategorie</FormLabel>
-                      <Select
-                        onValueChange={(v) => field.onChange(v === 'NONE' ? null : v)}
-                        value={field.value ?? 'NONE'}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Keine Angabe" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="NONE">Keine Angabe</SelectItem>
-                          {CATEGORY_OPTIONS.map((c) => (
-                            <SelectItem key={c.value} value={c.value}>
-                              {c.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="countsTowardLimit"
-                  render={({ field }) => (
-                    <div>
-                      <label className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted/30 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={field.value}
-                          onChange={(e) => field.onChange(e.target.checked)}
-                          className="w-4 h-4 rounded accent-green-600"
-                        />
-                        <span className="text-sm text-foreground">
-                          Zählt zur 55.000-€-Grenze (Be- &amp; Verarbeitung)
-                        </span>
-                      </label>
-                      <p className="text-xs text-muted-foreground pl-[42px]">
-                        Reine Urproduktion zählt meist nicht — im Zweifel mit dem Steuerberater klären.
-                      </p>
-                    </div>
-                  )}
-                />
-              </section>
-
-              {/* === PREIS & EINHEIT === */}
-              <section className="space-y-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Preis & Einheit</p>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField
-                    control={form.control}
-                    name="price"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Preis (€) *</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="0,00"
-                            {...field}
-                            onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="vatRate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>MwSt. (%)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="1"
-                            min="0"
-                            max="100"
-                            {...field}
-                            onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField
-                    control={form.control}
-                    name="unit"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Einheit *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Wählen…" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {UNIT_OPTIONS.map((u) => (
-                              <SelectItem key={u.value} value={u.value}>
-                                {u.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="unitSize"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Menge / Größe</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.001"
-                            min="0"
-                            placeholder="z. B. 0.5"
-                            value={field.value ?? ''}
-                            onChange={(e) =>
-                              field.onChange(e.target.value === '' ? undefined : e.target.valueAsNumber)
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </section>
-
-              {/* === BESTAND & VERFÜGBARKEIT === */}
-              <section className="space-y-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Bestand & Verfügbarkeit</p>
-
-                <FormField
-                  control={form.control}
-                  name="stock"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Aktueller Bestand</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="1"
-                          min="0"
-                          {...field}
-                          onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="isAvailable"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="flex items-center gap-3 p-3 rounded-lg border border-border">
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={field.value}
-                          onClick={() => field.onChange(!field.value)}
-                          className={`relative w-10 h-6 rounded-full transition-colors ${
-                            field.value ? 'bg-green-600' : 'bg-muted-foreground/30'
-                          }`}
-                        >
-                          <span
-                            /* Weiß in beiden Modi: Der Schieber liegt auf heller
-                               wie auf dunkler Schiene. */
-                            className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                              field.value ? 'translate-x-4' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
-                        <div>
-                          <FormLabel className="font-medium cursor-pointer" onClick={() => field.onChange(!field.value)}>
-                            Im Shop verfügbar
-                          </FormLabel>
-                          <p className="text-xs text-muted-foreground/60">
-                            {field.value ? 'Sichtbar und bestellbar' : 'Ausgeblendet im Shop'}
-                          </p>
+                      {/* Foto */}
+                      <div data-feld="imageUrl">
+                        <p className="text-sm font-medium text-foreground mb-2">Foto</p>
+                        <div className="flex items-start gap-3">
+                          <div className="relative shrink-0 w-24 h-24 rounded-xl border-2 border-dashed border-border overflow-hidden bg-muted/30 flex items-center justify-center">
+                            {previewUrl ? (
+                              <>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={previewUrl}
+                                  alt="Vorschau"
+                                  className="w-full h-full object-cover"
+                                  // Ersatz für die entfallene Format-Probe: Kann der
+                                  // Browser das Foto nicht zeichnen (HEIC auf Android),
+                                  // verschwindet die Vorschau still, statt ein kaputtes
+                                  // Bildsymbol zu zeigen. Die Datei BLEIBT ausgewählt —
+                                  // ob sie taugt, entscheidet beim Absenden der Server.
+                                  onError={() => setPreviewUrl(null)}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={handleRemoveImage}
+                                  aria-label="Foto entfernen"
+                                  className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </>
+                            ) : (
+                              <ImagePlus className="w-6 h-6 text-muted-foreground/50" />
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            {fotoQuellen.elemente}
+                            <button
+                              type="button"
+                              onClick={fotoQuellen.oeffnen}
+                              className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                            >
+                              {previewUrl ? 'Foto ersetzen' : 'Foto wählen'}
+                            </button>
+                            <p className="text-xs text-muted-foreground/60 mt-1.5">
+                              JPEG, PNG oder WebP — wird automatisch verkleinert
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </FormItem>
-                  )}
-                />
 
-                {!isAvailable && (
-                  <FormField
-                    control={form.control}
-                    name="unavailableReason"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Grund (optional, für dich)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="z. B. Saison vorbei, wieder ab November" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-              </section>
-
-              {/* === EIGENSCHAFTEN === */}
-              <section className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Eigenschaften</p>
-                <div className="space-y-2">
-                  {(
-                    [
-                      { name: 'isOrganic', label: 'Bio-zertifiziert', icon: <Leaf className="w-4 h-4 text-green-600 dark:text-green-400" /> },
-                      { name: 'requiresCool', label: 'Kühlung nötig (+2–8 °C)', icon: <Thermometer className="w-4 h-4 text-blue-500" /> },
-                      { name: 'requiresFreezer', label: 'Tiefkühlung nötig (−18 °C)', icon: <Snowflake className="w-4 h-4 text-sky-500" /> },
-                    ] as const
-                  ).map(({ name, label, icon }) => (
-                    <FormField
-                      key={name}
-                      control={form.control}
-                      name={name}
-                      render={({ field }) => (
-                        <label className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted/30 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={field.value}
-                            onChange={(e) => field.onChange(e.target.checked)}
-                            className="w-4 h-4 rounded accent-green-600"
-                          />
-                          {icon}
-                          <span className="text-sm text-foreground">{label}</span>
-                        </label>
-                      )}
-                    />
-                  ))}
-                </div>
-              </section>
-
-              {/* === ALLERGENE === */}
-              <section className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Allergene (EU 14)</p>
-                <FormField
-                  control={form.control}
-                  name="allergens"
-                  render={({ field }) => (
-                    <div className="flex flex-wrap gap-1.5">
-                      {ALLERGENS.map(({ id, label }) => {
-                        const active = field.value.includes(id)
-                        return (
-                          <button
-                            key={id}
-                            type="button"
-                            onClick={() => toggleAllergen(id)}
-                            className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-                              active
-                                ? 'bg-amber-100 dark:bg-amber-950/50 border-amber-400 text-amber-800 dark:text-amber-200'
-                                : 'bg-card border-border text-muted-foreground hover:border-border'
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        )
-                      })}
+                      <FormField
+                        control={form.control}
+                        name="description"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Kurzbeschreibung</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                placeholder="Kurze Produktbeschreibung für den Shop…"
+                                rows={3}
+                                className="resize-none"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
-                  )}
-                />
-              </section>
+                  </AccordionPanel>
+                </AccordionItem>
 
-              {/* === SAISONALITÄT === */}
-              <section className="space-y-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Saisonalität (optional)</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField
-                    control={form.control}
-                    name="seasonStart"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Saison von</FormLabel>
-                        <Select
-                          onValueChange={(v) => field.onChange(v === '0' ? undefined : Number(v))}
-                          value={field.value?.toString() ?? '0'}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Monat…" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="0">— keiner —</SelectItem>
-                            {MONTH_OPTIONS.map((m) => (
-                              <SelectItem key={m.value} value={m.value.toString()}>
-                                {m.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                {/* === 2. PREIS & VERFÜGBARKEIT === */}
+                <AccordionItem value="preis">
+                  <AccordionTrigger>{abschnittTitel('preis')}</AccordionTrigger>
+                  <AccordionPanel>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <FormField
+                          control={form.control}
+                          name="price"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Preis (€) *</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  placeholder="0,00"
+                                  {...field}
+                                  onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-                  <FormField
-                    control={form.control}
-                    name="seasonEnd"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Saison bis</FormLabel>
-                        <Select
-                          onValueChange={(v) => field.onChange(v === '0' ? undefined : Number(v))}
-                          value={field.value?.toString() ?? '0'}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Monat…" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="0">— keiner —</SelectItem>
-                            {MONTH_OPTIONS.map((m) => (
-                              <SelectItem key={m.value} value={m.value.toString()}>
-                                {m.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                {watchedSeasonStart && watchedSeasonEnd && (
-                  <p className="text-xs text-muted-foreground">
-                    {seasonLabel(watchedSeasonStart, watchedSeasonEnd)}
-                  </p>
+                        <FormField
+                          control={form.control}
+                          name="unit"
+                          render={({ field }) => (
+                            <FormItem data-feld="unit">
+                              <FormLabel>Einheit *</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Wählen…" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {UNIT_OPTIONS.map((u) => (
+                                    <SelectItem key={u.value} value={u.value}>
+                                      {u.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <FormField
+                          control={form.control}
+                          name="unitSize"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Menge je Einheit</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.001"
+                                  min="0"
+                                  placeholder="z. B. 0.5"
+                                  name={field.name}
+                                  value={field.value ?? ''}
+                                  onChange={(e) =>
+                                    field.onChange(e.target.value === '' ? undefined : e.target.valueAsNumber)
+                                  }
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="vatRate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>MwSt. (%)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="1"
+                                  min="0"
+                                  max="100"
+                                  {...field}
+                                  onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <FormField
+                        control={form.control}
+                        name="stock"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Aktueller Bestand</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="1"
+                                min="0"
+                                {...field}
+                                onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="isAvailable"
+                        render={({ field }) => (
+                          <FormItem data-feld="isAvailable">
+                            <div className="flex items-center gap-3 p-3 rounded-lg border border-border">
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={field.value}
+                                onClick={() => field.onChange(!field.value)}
+                                className={`relative w-10 h-6 rounded-full transition-colors ${
+                                  field.value ? 'bg-green-600' : 'bg-muted-foreground/30'
+                                }`}
+                              >
+                                <span
+                                  /* Weiß in beiden Modi: Der Schieber liegt auf heller
+                                     wie auf dunkler Schiene. */
+                                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                                    field.value ? 'translate-x-4' : 'translate-x-0'
+                                  }`}
+                                />
+                              </button>
+                              <div>
+                                <FormLabel className="font-medium cursor-pointer" onClick={() => field.onChange(!field.value)}>
+                                  Im Shop verfügbar
+                                </FormLabel>
+                                <p className="text-xs text-muted-foreground/60">
+                                  {field.value ? 'Sichtbar und bestellbar' : 'Ausgeblendet im Shop'}
+                                </p>
+                              </div>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+
+                      {!isAvailable && (
+                        <FormField
+                          control={form.control}
+                          name="unavailableReason"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Grund (optional, für dich)</FormLabel>
+                              <FormControl>
+                                <Input placeholder="z. B. Saison vorbei, wieder ab November" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+
+                      {/* Saisonalität */}
+                      <div className="space-y-2 pt-1">
+                        <p className="text-sm font-medium text-foreground">Saison (optional)</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <FormField
+                            control={form.control}
+                            name="seasonStart"
+                            render={({ field }) => (
+                              <FormItem data-feld="seasonStart">
+                                <FormLabel>Saison von</FormLabel>
+                                <Select
+                                  onValueChange={(v) => field.onChange(v === '0' ? undefined : Number(v))}
+                                  value={field.value?.toString() ?? '0'}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Monat…" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="0">— keiner —</SelectItem>
+                                    {MONTH_OPTIONS.map((m) => (
+                                      <SelectItem key={m.value} value={m.value.toString()}>
+                                        {m.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="seasonEnd"
+                            render={({ field }) => (
+                              <FormItem data-feld="seasonEnd">
+                                <FormLabel>Saison bis</FormLabel>
+                                <Select
+                                  onValueChange={(v) => field.onChange(v === '0' ? undefined : Number(v))}
+                                  value={field.value?.toString() ?? '0'}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Monat…" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="0">— keiner —</SelectItem>
+                                    {MONTH_OPTIONS.map((m) => (
+                                      <SelectItem key={m.value} value={m.value.toString()}>
+                                        {m.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        {watchedSeasonStart && watchedSeasonEnd && (
+                          <p className="text-xs text-muted-foreground">
+                            {seasonLabel(watchedSeasonStart, watchedSeasonEnd)}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground/60">
+                          Saison kann über den Jahreswechsel gehen (z. B. Okt → März)
+                        </p>
+                      </div>
+                    </div>
+                  </AccordionPanel>
+                </AccordionItem>
+
+                {/* === 3. DETAILS === */}
+                <AccordionItem value="details">
+                  <AccordionTrigger>{abschnittTitel('details')}</AccordionTrigger>
+                  <AccordionPanel>
+                    <div className="space-y-4">
+                      {/* Siegel — drei Zeilen mit Erklärsatz */}
+                      <FormField
+                        control={form.control}
+                        name="labels"
+                        render={({ field }) => (
+                          <FormItem data-feld="labels" tabIndex={-1} className="outline-none">
+                            <FormLabel>Siegel</FormLabel>
+                            <div className="space-y-1">
+                              {PRODUCT_LABEL_VALUES.map((l) => {
+                                const siegel = SIEGEL[l]
+                                const aktiv = field.value.includes(l)
+                                return (
+                                  <label
+                                    key={l}
+                                    className="flex min-h-11 items-start gap-3 p-2.5 rounded-lg hover:bg-muted/30 cursor-pointer"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={aktiv}
+                                      onChange={(e) =>
+                                        field.onChange(
+                                          e.target.checked
+                                            ? [...field.value, l]
+                                            : field.value.filter((x) => x !== l)
+                                        )
+                                      }
+                                      className="mt-0.5 w-4 h-4 rounded accent-primary"
+                                    />
+                                    <span className="flex flex-col gap-0.5">
+                                      <span className="flex items-center gap-1.5 text-sm text-foreground">
+                                        {siegel.hatIcon && (
+                                          <Leaf className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                        )}
+                                        {siegel.name}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground">{siegel.erklaerung}</span>
+                                    </span>
+                                  </label>
+                                )
+                              })}
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Allergene */}
+                      <FormField
+                        control={form.control}
+                        name="allergens"
+                        render={({ field }) => (
+                          <FormItem data-feld="allergens">
+                            <FormLabel>Allergene (EU 14)</FormLabel>
+                            <div className="flex flex-wrap gap-1.5">
+                              {ALLERGENS.map(({ id, label }) => {
+                                const active = field.value.includes(id)
+                                return (
+                                  <button
+                                    key={id}
+                                    type="button"
+                                    aria-pressed={active}
+                                    onClick={() => toggleAllergen(id)}
+                                    className={`min-h-9 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                                      active
+                                        ? 'bg-amber-100 dark:bg-amber-950/50 border-amber-400 text-amber-800 dark:text-amber-200'
+                                        : 'bg-card border-border text-muted-foreground hover:border-border'
+                                    }`}
+                                  >
+                                    {label}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Lagerung */}
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-foreground">Lagerung</p>
+                        {(
+                          [
+                            { name: 'requiresCool', label: 'Kühlung nötig (+2–8 °C)', icon: <Thermometer className="w-4 h-4 text-blue-500" /> },
+                            { name: 'requiresFreezer', label: 'Tiefkühlung nötig (−18 °C)', icon: <Snowflake className="w-4 h-4 text-sky-500" /> },
+                          ] as const
+                        ).map(({ name, label, icon }) => (
+                          <FormField
+                            key={name}
+                            control={form.control}
+                            name={name}
+                            render={({ field }) => (
+                              <label className="flex min-h-11 items-center gap-3 p-2.5 rounded-lg hover:bg-muted/30 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  name={field.name}
+                                  checked={field.value}
+                                  onChange={(e) => field.onChange(e.target.checked)}
+                                  className="w-4 h-4 rounded accent-primary"
+                                />
+                                {icon}
+                                <span className="text-sm text-foreground">{label}</span>
+                              </label>
+                            )}
+                          />
+                        ))}
+                      </div>
+
+                      <FormField
+                        control={form.control}
+                        name="countsTowardLimit"
+                        render={({ field }) => (
+                          <div>
+                            <label className="flex min-h-11 items-center gap-3 p-2.5 rounded-lg hover:bg-muted/30 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                name={field.name}
+                                checked={field.value}
+                                onChange={(e) => field.onChange(e.target.checked)}
+                                className="w-4 h-4 rounded accent-primary"
+                              />
+                              <span className="text-sm text-foreground">
+                                Zählt zur 55.000-€-Grenze (Be- &amp; Verarbeitung)
+                              </span>
+                            </label>
+                            <p className="text-xs text-muted-foreground pl-[42px]">
+                              Reine Urproduktion zählt meist nicht — im Zweifel mit dem Steuerberater klären.
+                            </p>
+                          </div>
+                        )}
+                      />
+                    </div>
+                  </AccordionPanel>
+                </AccordionItem>
+
+                {/* === 4. KENNZEICHNUNG — nur bei Futtermitteln === */}
+                {istFuttermittel && (
+                  <AccordionItem value="kennzeichnung">
+                    <AccordionTrigger>{abschnittTitel('kennzeichnung', true)}</AccordionTrigger>
+                    <AccordionPanel>
+                      <div className="space-y-4">
+                        <p className="text-xs text-muted-foreground">
+                          Alle Angaben findest du auf dem Sackanhänger oder Lieferschein deines Futters.
+                        </p>
+
+                        <FormField
+                          control={form.control}
+                          name="futter.zielTierarten"
+                          render={({ field }) => (
+                            <FormItem data-feld="futter.zielTierarten" tabIndex={-1} className="outline-none">
+                              <FormLabel>Für welche Tiere? *</FormLabel>
+                              <div className="flex flex-wrap gap-2" role="group" aria-label="Tierarten">
+                                {TIERART_VALUES.map((t) => {
+                                  const aktiv = (field.value ?? []).includes(t)
+                                  return (
+                                    <button
+                                      key={t}
+                                      type="button"
+                                      aria-pressed={aktiv}
+                                      onClick={() =>
+                                        field.onChange(
+                                          aktiv
+                                            ? (field.value ?? []).filter((x) => x !== t)
+                                            : [...(field.value ?? []), t]
+                                        )
+                                      }
+                                      className={chipKlasse(aktiv)}
+                                    >
+                                      {TIERART_LABEL[t]}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                              <FormDescription className="text-xs">
+                                Steht als „Alleinfuttermittel für …" oder „Ergänzungsfuttermittel für …" auf dem Anhänger.
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="futter.zusammensetzung"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Zusammensetzung *</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  rows={3}
+                                  placeholder="z. B. Heu vom ersten Schnitt, Wiesenmischung"
+                                  {...field}
+                                  value={field.value ?? ''}
+                                />
+                              </FormControl>
+                              <FormDescription className="text-xs">
+                                Steht auf dem Sackanhänger. Bei Mischfutter die Einzelfuttermittel in absteigender Reihenfolge.
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="futter.analytischeBestandteile"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Analytische Bestandteile *</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  rows={3}
+                                  placeholder="z. B. Rohprotein 9 %, Rohfaser 28 %, Rohasche 7 %"
+                                  {...field}
+                                  value={field.value ?? ''}
+                                />
+                              </FormControl>
+                              <FormDescription className="text-xs">
+                                Steht auf dem Sackanhänger unter „Analytische Bestandteile" (Rohprotein, Rohfaser, Rohfett, Rohasche …).
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="futter.zusatzstoffe"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Zusatzstoffe</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  rows={2}
+                                  placeholder="z. B. Vitamin A 8.000 IE/kg, Selen 0,3 mg/kg"
+                                  {...field}
+                                  value={field.value ?? ''}
+                                />
+                              </FormControl>
+                              <FormDescription className="text-xs">
+                                Nur wenn auf dem Anhänger welche stehen — bei reinem Heu bleibt das leer.
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="futter.registrierungsnummer"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Registrierungsnummer</FormLabel>
+                              <FormControl>
+                                <Input placeholder="z. B. AT 1234567" {...field} value={field.value ?? ''} />
+                              </FormControl>
+                              <FormDescription className="text-xs">
+                                BAES-Registrierung, oder deine LFBIS-Nummer, wenn du nur selbst erzeugtes Futter verkaufst.
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="futter.gebrauchshinweis"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Gebrauchshinweis</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  rows={2}
+                                  placeholder="z. B. Trocken lagern, täglich 1–2 kg je Tier"
+                                  {...field}
+                                  value={field.value ?? ''}
+                                />
+                              </FormControl>
+                              <FormDescription className="text-xs">
+                                Fütterungsempfehlung oder Lagerhinweis vom Anhänger, falls vorhanden.
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="futter.bestaetigt"
+                          render={({ field }) => (
+                            <FormItem data-feld="futter.bestaetigt">
+                              <label className="flex min-h-11 items-start gap-3 rounded-lg border border-border p-3 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  name={field.name}
+                                  checked={field.value ?? false}
+                                  onChange={(e) => field.onChange(e.target.checked)}
+                                  className="mt-0.5 w-4 h-4 rounded accent-primary"
+                                />
+                                <span className="text-sm text-foreground">
+                                  Die Angaben entsprechen dem Sackanhänger bzw. Lieferschein. Ich bin für die Richtigkeit verantwortlich.
+                                </span>
+                              </label>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </AccordionPanel>
+                  </AccordionItem>
                 )}
-                <p className="text-xs text-muted-foreground/60">
-                  Saison kann über den Jahreswechsel gehen (z. B. Okt → März)
-                </p>
-              </section>
-
+              </Accordion>
             </div>
 
             {/* Fixed footer with action buttons */}
@@ -711,6 +1164,33 @@ export function ProductDialog({ open, product, onClose }: Props) {
         </Form>
       </DialogContent>
     </Dialog>
+
+    {/* Rückfrage: Kategoriewechsel weg von Futtermittel löscht die Kennzeichnung */}
+    <Dialog open={kategorieWechsel !== null} onOpenChange={(o) => !o && setKategorieWechsel(null)}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Kennzeichnung löschen?</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Wenn das Produkt kein Futtermittel mehr ist, wird die Kennzeichnung beim Speichern
+          gelöscht. Die Angaben musst du dann neu eintippen, falls du sie wieder brauchst.
+        </p>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setKategorieWechsel(null)}>
+            Abbrechen
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              if (kategorieWechsel) kategorieSetzen(kategorieWechsel.neu)
+              setKategorieWechsel(null)
+            }}
+          >
+            Kategorie wechseln
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }
-

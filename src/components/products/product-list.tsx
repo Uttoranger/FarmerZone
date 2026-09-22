@@ -26,6 +26,7 @@ import { updateStock } from '@/server/actions/products'
 import { deleteProduct } from '@/server/actions/products'
 import type { ProductData } from '@/server/queries/products'
 import { UNIT_LABELS } from '@/schemas/product'
+import { hatUnterkategorien } from '@/lib/taxonomie'
 import { ProductDialog } from './product-dialog'
 import { StockDialog } from './stock-dialog'
 import { PageHeader } from '@/components/farmer/page-header'
@@ -221,6 +222,18 @@ export function ProductList({ products: initialProducts, initialEditId }: Props)
                       {product.requiresFreezer && (
                         <Snowflake className="w-3.5 h-3.5 text-sky-500 shrink-0" />
                       )}
+                      {/* Dezenter Hinweis, kein Fehler: Bestandsprodukte haben
+                          noch keine Unterkategorie (Sprint Taxonomie 1). */}
+                      {product.category &&
+                        hatUnterkategorien(product.category) &&
+                        !product.subcategory && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0 border-dashed text-muted-foreground"
+                          >
+                            Unterkategorie ergänzen
+                          </Badge>
+                        )}
                     </div>
 
                     {/* Price */}
