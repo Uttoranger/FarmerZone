@@ -26,8 +26,8 @@ Regionale Lebensmittel direkt vom Bauern — eine digitale Vermittlungsplattform
 ## Lokales Setup (Schritt für Schritt)
 
 ### Voraussetzungen
-- Node.js 20+
-- pnpm (`npm install -g pnpm`)
+- Node.js 22 (wie in der CI)
+- pnpm 10 (`corepack enable` oder `npm install -g pnpm`) — nie `npm` oder `yarn` im Projekt
 - Stripe CLI (für lokales Webhook-Testing)
 - Supabase-Konto mit PostgreSQL-Datenbank
 
@@ -50,12 +50,14 @@ Fülle alle Felder in `.env.local` aus (Supabase, Stripe, Resend, etc.).
 ### 3. Datenbank einrichten
 
 ```bash
-# Schema auf die DB pushen
-pnpm exec dotenv -e .env.local -- pnpm exec prisma db push
+# Alle Migrationen einspielen (nie `prisma db push` — siehe DEVELOPMENT.md, „Schema-Änderungen")
+pnpm exec dotenv -e .env.local -- prisma migrate deploy
 
-# Ersten Bauer-User anlegen (interaktives Skript)
-pnpm exec dotenv -e .env.local -- pnpm exec tsx scripts/seed.ts
+# Testdaten laden: Hof, Produkte, Abholzeiten, Bauer-Zugang bauer@example.com / test1234
+pnpm db:seed
 ```
+
+Der Seed läuft nur gegen die Dev-Datenbank (`farmerzone-dev`), nie gegen Produktion.
 
 ### 4. Dev-Server starten
 
@@ -117,7 +119,7 @@ Im [Stripe Dashboard](https://dashboard.stripe.com/webhooks) einen neuen Webhook
 - [ ] Domain registrieren und in Vercel einrichten
 - [ ] SSL-Zertifikat (automatisch über Vercel)
 - [ ] Alle Umgebungsvariablen in Vercel gesetzt
-- [ ] Datenbank-Migration auf Prod ausgeführt (`prisma db push`)
+- [ ] Migrationen auf Prod eingespielt (läuft automatisch im Vercel-Build über `prisma migrate deploy`)
 
 ### Stripe
 - [ ] Stripe-Konto vollständig eingerichtet (Bankverbindung hinterlegt)
@@ -161,9 +163,9 @@ Im [Stripe Dashboard](https://dashboard.stripe.com/webhooks) einen neuen Webhook
 
 ## Bekannte Einschränkungen (Pilotbetrieb)
 
-- Kein Kunden-Account — Bestellungen sind anonym (nur E-Mail)
-- Kein Admin-Panel — Bauer-Accounts werden direkt in DB angelegt
-- Resend Free-Tier: E-Mails nur an verifizierte Domains möglich
+- Kundinnen bestellen ohne Konto; ein Konto per Magic-Link (`/account`) dient nur der Verwaltung von Benachrichtigungen
+- Höfe registrieren sich selbst und werden vom Betreiber unter `/admin` freigeschaltet
+- Vercel Hobby: der Cron läuft einmal täglich — Fristen gelten deshalb beim Lesen, nie durch den Cron
 - Foto-Upload erfordert Vercel Blob Token
 
 ## Lizenz
