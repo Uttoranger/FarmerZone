@@ -53,6 +53,42 @@ export function formatZahl(n: number): string {
   return mengenFormat.format(Number.isFinite(n) ? n : 0)
 }
 
+/**
+ * Dezimalzahl aus getipptem Text — für Preis, Gebindegröße und MwSt im
+ * Produktformular. Komma UND Punkt gelten als Dezimaltrenner (die Tastatur
+ * am Handy bietet je nach Sprache nur eines von beiden), Leerzeichen werden
+ * entfernt. KEIN Tausendertrenner: „1.500" ist zweideutig (1,5 oder 1500)
+ * und wird abgelehnt — ebenso mehr als ein Trenner oder Buchstaben.
+ *
+ * Die eine Ausnahme: „0,125" hat auch drei Nachkommastellen, ist aber kein
+ * Tausender — bei einer führenden 0 gibt es nichts zu tausendern. So bleibt
+ * eine Gebindegröße von 125 g möglich.
+ */
+export function parseDezimal(text: string): number | null {
+  // Auch das schmale geschützte Leerzeichen, das formatZahl als Tausender setzt.
+  const bereinigt = text.replace(/[\s  ]/g, '')
+  if (bereinigt === '') return null
+  const trenner = bereinigt.match(/[.,]/g)?.length ?? 0
+  if (trenner > 1) return null
+  const normiert = bereinigt.replace(',', '.')
+  if (!/^\d+(\.\d+)?$|^\.\d+$/.test(normiert)) return null
+  // Zweideutiger Tausender: 1–3 Ziffern, Trenner, genau 3 Ziffern („1.500").
+  const tausender = normiert.match(/^(\d{1,3})\.\d{3}$/)
+  if (tausender && tausender[1] !== '0') return null
+  const n = Number(normiert)
+  return Number.isFinite(n) ? n : null
+}
+
+/** Wie viele Nachkommastellen eine Zahl hat — „5.99" → 2, „2" → 0. */
+export function nachkommastellen(n: number): number {
+  if (!Number.isFinite(n)) return 0
+  const text = n.toString()
+  const exp = text.match(/e-(\d+)$/)
+  if (exp) return Number(exp[1])
+  const komma = text.indexOf('.')
+  return komma === -1 ? 0 : text.length - komma - 1
+}
+
 /** Das Einheitenkürzel, bei Bedarf im Plural: „kg" · „Stück" · „Pakete". */
 export function einheitLabel(unit: string, anzahl = 1): string {
   const basis = UNIT_LABELS[unit] ?? unit
@@ -160,6 +196,33 @@ export function grundpreisJeEinheit(
   const size = gebindeGroesse(unitSize)
   if (size == null) return null
   return Math.round((price / size) * 100) / 100
+}
+
+/**
+ * Das Label des Bestandsfelds: ohne Gebinde die Einheit („Bestand (kg)",
+ * „Bestand (Stück)"), mit Gebinde zählt der Bestand Pakete („Bestand (Pakete)").
+ */
+export function bestandLabel(unit: string, unitSize?: number | { toString(): string } | null): string {
+  const size = gebindeGroesse(unitSize)
+  if (size && size !== 1) return 'Bestand (Pakete)'
+  return `Bestand (${einheitLabel(unit)})`
+}
+
+/**
+ * Was der Paketbestand in der Einheit bedeutet: 10 Pakete à 2 kg → „20 kg".
+ * Nur bei Maßeinheit und Gebinde ungleich 1 — bei Stück und Paket sagt die
+ * Rechnung nichts (6er-Pack Eier × 30 sind keine „180 Pakete"). Sonst null.
+ */
+export function formatBestand(
+  stock: number,
+  unit: string,
+  unitSize?: number | { toString(): string } | null
+): string | null {
+  const size = gebindeGroesse(unitSize)
+  if (!size || size === 1) return null
+  if (!istMassEinheit(unit)) return null
+  if (!Number.isFinite(stock) || stock < 0) return null
+  return `${formatZahl(Math.round(stock * size * 1000) / 1000)} ${einheitLabel(unit)}`
 }
 
 /**

@@ -9,9 +9,33 @@
 import { describe, it, expect } from 'vitest'
 import type { FieldErrors } from 'react-hook-form'
 import type { ProductFormData } from '@/schemas/product'
-import { abschnitteMitFehlern, erstesFehlerfeld } from '@/components/products/produkt-abschnitte'
+import {
+  abschnitteMitFehlern,
+  erstesFehlerfeld,
+  saisonVorbelegung,
+} from '@/components/products/produkt-abschnitte'
 
 const fehler = (message = 'x') => ({ type: 'custom', message })
+
+describe('saisonVorbelegung', () => {
+  it('aktueller Monat bis aktueller Monat + 2', () => {
+    expect(saisonVorbelegung(new Date(2026, 2, 15))).toEqual({ start: 3, end: 5 })
+    expect(saisonVorbelegung(new Date(2026, 0, 1))).toEqual({ start: 1, end: 3 })
+  })
+
+  it('läuft über den Jahreswechsel, nie auf 0', () => {
+    expect(saisonVorbelegung(new Date(2026, 10, 30))).toEqual({ start: 11, end: 1 })
+    expect(saisonVorbelegung(new Date(2026, 11, 31))).toEqual({ start: 12, end: 2 })
+    expect(saisonVorbelegung(new Date(2026, 9, 1))).toEqual({ start: 10, end: 12 })
+  })
+})
+
+describe('Abschnitt der MwSt', () => {
+  it('ein MwSt-Fehler liegt im Abschnitt Details, nicht mehr bei Preis', () => {
+    const errors = { vatRate: fehler() } as unknown as FieldErrors<ProductFormData>
+    expect(erstesFehlerfeld(errors)).toEqual({ feld: 'vatRate', abschnitt: 'details' })
+  })
+})
 
 describe('abschnitteMitFehlern', () => {
   it('ohne Fehler: leer', () => {

@@ -27,7 +27,6 @@ const ABSCHNITT_VON_FELD: Record<Feld, Abschnitt> = {
   price: 'preis',
   unit: 'preis',
   unitSize: 'preis',
-  vatRate: 'preis',
   stock: 'preis',
   isAvailable: 'preis',
   seasonStart: 'preis',
@@ -38,7 +37,19 @@ const ABSCHNITT_VON_FELD: Record<Feld, Abschnitt> = {
   requiresCool: 'details',
   requiresFreezer: 'details',
   countsTowardLimit: 'details',
+  vatRate: 'details',
   futter: 'kennzeichnung',
+}
+
+/**
+ * Vorbelegung beim Einschalten von „Nur saisonal verfügbar": aktueller Monat
+ * bis aktueller Monat + 2, über den Jahreswechsel hinweg (Nov → Jän). Monate
+ * 1–12, nie 0 — der Schalter kennt keinen leeren Zustand.
+ */
+export function saisonVorbelegung(jetzt: Date): { start: number; end: number } {
+  const start = jetzt.getMonth() + 1
+  const end = ((start - 1 + 2) % 12) + 1
+  return { start, end }
 }
 
 /** Reihenfolge der Kennzeichnungsfelder = Reihenfolge im Formular. */

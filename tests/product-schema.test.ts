@@ -14,6 +14,7 @@ import {
   PRODUCT_CATEGORY_VALUES,
   CATEGORY_OPTIONS,
   FUTTER_FEHLER,
+  MWST_STANDARD,
 } from '@/schemas/product'
 
 const minimalValid = {
@@ -185,6 +186,42 @@ describe('Futtermittel', () => {
   it('ohne Kategorie ist eine Kennzeichnung ebenfalls verboten', () => {
     const fehler = fehlerNachPfad({ ...minimalValid, futter: futterGueltig })
     expect(fehler['futter']).toBe(FUTTER_FEHLER.verboten)
+  })
+})
+
+describe('Dezimaleingabe — Preis, Gebindegröße, MwSt', () => {
+  it('nimmt Preis mit Komma und Punkt an', () => {
+    expect(productFormSchema.parse({ ...minimalValid, price: '5,99' }).price).toBe(5.99)
+    expect(productFormSchema.parse({ ...minimalValid, price: '5.99' }).price).toBe(5.99)
+    expect(productFormSchema.parse({ ...minimalValid, price: 5.99 }).price).toBe(5.99)
+  })
+
+  it('Preis: leer, Buchstaben, Tausenderpunkt und drei Nachkommastellen sind Fehler', () => {
+    expect(fehlerNachPfad({ ...minimalValid, price: '' })['price']).toBe('Bitte gib einen Preis ein, z. B. 5,99.')
+    expect(fehlerNachPfad({ ...minimalValid, price: 'abc' })['price']).toBe('Bitte gib einen Preis ein, z. B. 5,99.')
+    expect(fehlerNachPfad({ ...minimalValid, price: '1.500' })['price']).toBe('Bitte gib einen Preis ein, z. B. 5,99.')
+    // „5,999" ist als Tausender zweideutig und fällt schon beim Lesen durch;
+    // erst eine eindeutige Zahl mit zu vielen Stellen trifft die Stellenregel.
+    expect(fehlerNachPfad({ ...minimalValid, price: '5,999' })['price']).toBe('Bitte gib einen Preis ein, z. B. 5,99.')
+    expect(fehlerNachPfad({ ...minimalValid, price: '5,9999' })['price']).toBe('Höchstens zwei Nachkommastellen, z. B. 5,99.')
+    expect(fehlerNachPfad({ ...minimalValid, price: 5.999 })['price']).toBe('Höchstens zwei Nachkommastellen, z. B. 5,99.')
+    expect(fehlerNachPfad({ ...minimalValid, price: 0 })['price']).toBe('Preis muss größer als 0 sein')
+  })
+
+  it('Gebindegröße: Komma erlaubt, drei Nachkommastellen erlaubt, vier nicht', () => {
+    expect(productFormSchema.parse({ ...minimalValid, unitSize: '0,125' }).unitSize).toBe(0.125)
+    expect(productFormSchema.parse({ ...minimalValid, unitSize: '' }).unitSize).toBeUndefined()
+    expect(productFormSchema.parse({ ...minimalValid, unitSize: null }).unitSize).toBeUndefined()
+    expect(fehlerNachPfad({ ...minimalValid, unitSize: 0.0625 })['unitSize']).toBe('Höchstens drei Nachkommastellen, z. B. 0,125.')
+    expect(fehlerNachPfad({ ...minimalValid, unitSize: 'zwei' })['unitSize']).toBe('Bitte nur Zahlen, z. B. 2 oder 0,5.')
+  })
+
+  it('MwSt: leer wird zum Standard, Komma erlaubt, außerhalb 0–100 Fehler', () => {
+    expect(productFormSchema.parse(minimalValid).vatRate).toBe(MWST_STANDARD)
+    expect(productFormSchema.parse({ ...minimalValid, vatRate: '' }).vatRate).toBe(MWST_STANDARD)
+    expect(productFormSchema.parse({ ...minimalValid, vatRate: '13' }).vatRate).toBe(13)
+    expect(productFormSchema.parse({ ...minimalValid, vatRate: '7,5' }).vatRate).toBe(7.5)
+    expect(fehlerNachPfad({ ...minimalValid, vatRate: 120 })['vatRate']).toBeDefined()
   })
 })
 

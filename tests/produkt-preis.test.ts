@@ -11,7 +11,8 @@ import {
   preisFeldLabel,
   kundenVorschau,
   paketpreisFraglich,
-  paketpreisHinweis,
+  paketpreisAntworten,
+  PAKETPREIS_FRAGE,
 } from '@/components/products/produkt-preis'
 
 describe('preisFeldLabel', () => {
@@ -80,14 +81,24 @@ describe('paketpreisFraglich', () => {
   })
 })
 
-describe('paketpreisHinweis', () => {
-  it('nennt die Rechnung bei Maßeinheiten', () => {
-    expect(paketpreisHinweis(50, 'KG', 2)).toBe(
-      'Ist das der Preis für das ganze Paket? € 50,00 für 2 kg heißt € 25,00 / kg.'
-    )
+describe('paketpreisAntworten', () => {
+  it('die Frage ist nur die Frage — die Rechnung steht in der Vorschau', () => {
+    expect(PAKETPREIS_FRAGE).toBe('Ist das der Preis für das ganze Paket?')
   })
 
-  it('bei Paketen nur die Frage', () => {
-    expect(paketpreisHinweis(3.6, 'PAKET', 6)).toBe('Ist das der Preis für das ganze Paket?')
+  it('nennt beide Antworten mit Betrag und Einheit', () => {
+    const a = paketpreisAntworten(50, 'KG', 2)
+    expect(a.ja).toBe('Ja, das Paket kostet € 50,00')
+    expect(a.nein).toBe('Nein, € 50,00 ist der Preis je kg')
+  })
+
+  it('„Nein" trägt Einheitspreis × Gebinde ein, auf Cent gerundet', () => {
+    expect(paketpreisAntworten(50, 'KG', 2).paketpreis).toBe(100)
+    expect(paketpreisAntworten(4.99, 'KG', 3).paketpreis).toBe(14.97)
+    expect(paketpreisAntworten(3.333, 'LITER', 3).paketpreis).toBe(10)
+  })
+
+  it('ohne Gebinde bleibt der Preis, wie er ist', () => {
+    expect(paketpreisAntworten(50, 'KG', null).paketpreis).toBe(50)
   })
 })

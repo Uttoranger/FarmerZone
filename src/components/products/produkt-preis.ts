@@ -9,6 +9,7 @@
  */
 import {
   einheitLabel,
+  formatEuro,
   formatGrundpreis,
   formatGrundpreisZeile,
   formatZahl,
@@ -59,10 +60,25 @@ export function paketpreisFraglich(input: {
   return input.price <= referenz * 1.2
 }
 
-/** Der Text der Rückfrage — mit der Rechnung, damit der Hof sieht, was gespeichert würde. */
-export function paketpreisHinweis(price: number, unit: string, unitSize?: number | null): string {
-  const frage = 'Ist das der Preis für das ganze Paket?'
-  const zeile = formatGrundpreisZeile(price, unit, unitSize)
-  if (!zeile) return frage
-  return `${frage} ${formatGrundpreis(price, unit, unitSize)} heißt ${zeile}.`
+/** Die Rückfrage — nur die Frage; die Rechnung steht schon in „Kunden sehen". */
+export const PAKETPREIS_FRAGE = 'Ist das der Preis für das ganze Paket?'
+
+/**
+ * Die zwei Antworten auf die Rückfrage, mit Beträgen im Wortlaut:
+ *   ja:   „Ja, das Paket kostet € 50,00"        → Preis bleibt
+ *   nein: „Nein, € 50,00 ist der Preis je kg"   → Preis wird Gebindepreis
+ * `paketpreis` ist der Betrag, den „Nein" einträgt: Einheitspreis × Gebinde,
+ * auf Cent gerundet.
+ */
+export function paketpreisAntworten(
+  price: number,
+  unit: string,
+  unitSize?: number | null
+): { ja: string; nein: string; paketpreis: number } {
+  const size = gebindeGroesse(unitSize) ?? 1
+  return {
+    ja: `Ja, das Paket kostet ${formatEuro(price)}`,
+    nein: `Nein, ${formatEuro(price)} ist der Preis je ${einheitLabel(unit)}`,
+    paketpreis: Math.round(price * size * 100) / 100,
+  }
 }
