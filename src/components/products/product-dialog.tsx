@@ -506,8 +506,12 @@ export function ProductDialog({ open, product, onClose }: Props) {
   return (
     <>
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg max-h-[92dvh] flex flex-col p-0">
-        <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
+      {/* Drei Zonen innerhalb der Dialogkante: Kopf fest, EIN scrollbarer
+          Inhalt mit allen Abschnitten, Fuß fest. overflow-hidden hält alles im
+          Radius; min-h-0 auf dem Inhalt ist die Bedingung dafür, dass er selbst
+          scrollt statt den ganzen Dialog aufzublähen. */}
+      <DialogContent className="max-w-lg max-h-[92dvh] flex flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
           <DialogTitle>{isEdit ? 'Produkt bearbeiten' : 'Neues Produkt'}</DialogTitle>
         </DialogHeader>
 
@@ -517,8 +521,8 @@ export function ProductDialog({ open, product, onClose }: Props) {
             onSubmit={form.handleSubmit(onSubmit, onInvalid)}
             className="flex flex-col flex-1 min-h-0"
           >
-            {/* Scrollable form body */}
-            <div className="flex-1 overflow-y-auto px-6 py-2">
+            {/* Scrollbarer Inhalt — pb-8, damit die letzte Karte nie unter dem Fuß liegt */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-6 pt-1 pb-8">
               <Accordion
                 multiple
                 value={offen}
@@ -768,6 +772,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
                                 value={field.value}
                                 placeholder="0,00"
                                 praefix="€"
+                                stellen={2}
                                 onBlur={field.onBlur}
                                 onChange={(neu) => field.onChange(neu ?? Number.NaN)}
                               />
@@ -1294,9 +1299,10 @@ export function ProductDialog({ open, product, onClose }: Props) {
               </Accordion>
             </div>
 
-            {/* Knöpfe fest am unteren Rand: Hintergrund card, feine Linie oben,
-                Abstand für die Safe-Area am Handy (Home-Balken). */}
-            <DialogFooter className="sticky bottom-0 shrink-0 border-t border-border bg-card px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            {/* Fuß: fest am unteren Rand als eigene Flex-Zone — kein sticky, keine
+                negativen Ränder (die von DialogFooter ragten bei p-0 über die
+                Kante). Hintergrund card, feine Linie oben, Safe-Area-Abstand. */}
+            <div className="flex shrink-0 flex-row justify-end gap-2 border-t border-border bg-card px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
               <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>
                 Abbrechen
               </Button>
@@ -1309,7 +1315,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
                     ? 'Speichern'
                     : 'Anlegen'}
               </Button>
-            </DialogFooter>
+            </div>
           </form>
         </Form>
       </DialogContent>

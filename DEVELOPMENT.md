@@ -662,7 +662,15 @@ Einheitspreis × Gebinde ein (`paketpreisAntworten`). Beides beendet die
 Rückfrage für diese Eingabe; die Rechnung steht ohnehin in „Kunden sehen".
 
 **Knöpfe unten fest**, Hintergrund `card`, feine Linie oben, Abstand für die
-Safe-Area am Handy.
+Safe-Area am Handy. Der erste Wurf klebte mitten im Dialog und ragte über die
+Kante: `DialogFooter` bringt negative Ränder (`-mx-6 -mb-6`) mit, die bei `p-0`
+über den Rand laufen, und dem Scrollbereich fehlte `min-h-0` — ohne das wächst
+ein Flex-Kind auf Inhaltshöhe, der ganze Dialog scrollt, und ein `sticky`-Fuß
+hängt irgendwo dazwischen. Jetzt: drei Flex-Zonen (Kopf, Inhalt mit `min-h-0`
+und `overflow-y-auto`, Fuß als eigenes Div ohne Rand-Tricks), `overflow-hidden`
+am Dialog. Merksatz für neue Dialoge mit Scrollinhalt: **`min-h-0` auf den
+scrollenden Flex-Kindern, kein `DialogFooter` bei `p-0`.** Der Preis zeigt beim
+Verlassen immer zwei Stellen („1,00", `formatDezimal`).
 
 ---
 
