@@ -7,6 +7,9 @@
  * defaultet auf true. Eine Unterkategorie muss zur Kategorie passen, darf aber
  * fehlen (Bestandsprodukte). Siegel ohne Doppelte. Futtermittel verlangen
  * Unterkategorie und Kennzeichnung; alle anderen Kategorien verbieten sie.
+ * Seit Sprint Bereiche 1: Die Altlast-Werte werden abgelehnt, der Bereich
+ * entscheidet (bereichVon), Futtermittelart und Nettomenge sind Pflicht, die
+ * MwSt startet mit dem Vorschlag der Kategorie (mwstStandard).
  */
 import { describe, it, expect } from 'vitest'
 import {
@@ -14,8 +17,9 @@ import {
   PRODUCT_CATEGORY_VALUES,
   CATEGORY_OPTIONS,
   FUTTER_FEHLER,
-  MWST_STANDARD,
 } from '@/schemas/product'
+import { mwstStandard } from '@/lib/mwst'
+import { istFuttermittel } from '@/lib/taxonomie'
 
 const minimalValid = {
   name: 'Heumilch',
@@ -25,11 +29,17 @@ const minimalValid = {
 
 /** Eine vollständige, gültige Kennzeichnung — so, wie das Formular sie liefert. */
 const futterGueltig = {
+  futtermittelart: 'EINZELFUTTERMITTEL',
   zielTierarten: ['PFERD', 'RIND'],
   zusammensetzung: 'Heu vom ersten Schnitt, Wiesenmischung',
   analytischeBestandteile: 'Rohprotein 9 %, Rohfaser 28 %',
+  nettoMenge: '300',
+  nettoEinheit: 'KG',
+  rohprotein: '',
+  rohfaser: '',
+  rohfett: '',
+  rohasche: '',
   zusatzstoffe: '',
-  registrierungsnummer: '',
   gebrauchshinweis: '',
   bestaetigt: true,
 }
@@ -37,9 +47,23 @@ const futterGueltig = {
 const heu = {
   ...minimalValid,
   name: 'Heu',
-  category: 'FUTTERMITTEL',
-  subcategory: 'EINZELFUTTERMITTEL',
+  unit: 'BALLEN' as const,
+  category: 'HEU_STROH',
+  subcategory: 'WIESENHEU',
   futter: futterGueltig,
+}
+
+/** Ein gültiges Futtermittel je Futter-Kategorie — für Schleifen über alle Kategorien. */
+function gueltigFuer(category: string) {
+  if (category === 'HEU_STROH') return heu
+  if (category === 'GETREIDE_KOERNER') return { ...heu, category, subcategory: 'HAFER' }
+  if (category === 'MISCHFUTTER') {
+    return { ...heu, category, subcategory: null, futter: { ...futterGueltig, futtermittelart: 'ALLEINFUTTERMITTEL' } }
+  }
+  if (category === 'ERGAENZUNGSFUTTER') {
+    return { ...heu, category, subcategory: null, futter: { ...futterGueltig, futtermittelart: 'MINERALFUTTERMITTEL' } }
+  }
+  return { ...minimalValid, category }
 }
 
 /** Die Fehlermeldungen eines fehlgeschlagenen Parse, nach Pfad. */
@@ -50,11 +74,10 @@ function fehlerNachPfad(input: unknown): Record<string, string> {
 }
 
 describe('category', () => {
-  it('akzeptiert jeden gültigen Kategorie-Wert', () => {
-    for (const value of PRODUCT_CATEGORY_VALUES) {
+  it('akzeptiert jeden wählbaren Kategorie-Wert', () => {
+    for (const { value } of CATEGORY_OPTIONS) {
       // Futtermittel verlangen mehr — dafür gibt es unten eigene Tests.
-      const eingabe = value === 'FUTTERMITTEL' ? heu : { ...minimalValid, category: value }
-      const parsed = productFormSchema.parse(eingabe)
+      const parsed = productFormSchema.parse(gueltigFuer(value))
       expect(parsed.category).toBe(value)
     }
   })
@@ -70,9 +93,9 @@ describe('category', () => {
     expect(() => productFormSchema.parse({ ...minimalValid, category: 'milch' })).toThrow()
   })
 
-  it('jede Kategorie hat ein deutsches Label', () => {
+  it('jede wählbare Kategorie hat ein deutsches Label — die Altlast ist nicht wählbar', () => {
     expect(CATEGORY_OPTIONS.map((o) => o.value).sort()).toEqual(
-      [...PRODUCT_CATEGORY_VALUES].sort()
+      PRODUCT_CATEGORY_VALUES.filter((v) => v !== 'FUTTERMITTEL').sort()
     )
     for (const o of CATEGORY_OPTIONS) expect(o.label.length).toBeGreaterThan(1)
   })
@@ -136,7 +159,7 @@ describe('labels (Siegel)', () => {
 describe('Futtermittel', () => {
   it('vollständig: Unterkategorie und Kennzeichnung werden übernommen', () => {
     const parsed = productFormSchema.parse(heu)
-    expect(parsed.subcategory).toBe('EINZELFUTTERMITTEL')
+    expect(parsed.subcategory).toBe('WIESENHEU')
     expect(parsed.futter?.zielTierarten).toEqual(['PFERD', 'RIND'])
     expect(parsed.futter?.bestaetigt).toBe(true)
   })
@@ -183,13 +206,13 @@ describe('Futtermittel', () => {
   })
 
   it('eine Futter-Unterkategorie an einer anderen Kategorie passt nicht', () => {
-    const fehler = fehlerNachPfad({ ...minimalValid, category: 'OBST', subcategory: 'MISCHFUTTERMITTEL' })
+    const fehler = fehlerNachPfad({ ...minimalValid, category: 'OBST', subcategory: 'HAFER' })
     expect(fehler['subcategory']).toBe('Diese Unterkategorie passt nicht zu Obst.')
   })
 
-  it('bei jeder anderen Kategorie ist eine Kennzeichnung verboten', () => {
+  it('bei jeder Kategorie außerhalb der Futtermittel ist eine Kennzeichnung verboten', () => {
     for (const value of PRODUCT_CATEGORY_VALUES) {
-      if (value === 'FUTTERMITTEL') continue
+      if (istFuttermittel(value)) continue
       const fehler = fehlerNachPfad({ ...minimalValid, category: value, futter: futterGueltig })
       expect(fehler['futter'], value).toBe(FUTTER_FEHLER.verboten)
     }
@@ -231,8 +254,8 @@ describe('Dezimaleingabe — Preis, Gebindegröße, MwSt', () => {
   })
 
   it('MwSt: leer wird zum Standard, Komma erlaubt, außerhalb 0–100 Fehler', () => {
-    expect(productFormSchema.parse(minimalValid).vatRate).toBe(MWST_STANDARD)
-    expect(productFormSchema.parse({ ...minimalValid, vatRate: '' }).vatRate).toBe(MWST_STANDARD)
+    expect(productFormSchema.parse(minimalValid).vatRate).toBe(mwstStandard(null))
+    expect(productFormSchema.parse({ ...minimalValid, vatRate: '' }).vatRate).toBe(mwstStandard(null))
     expect(productFormSchema.parse({ ...minimalValid, vatRate: '13' }).vatRate).toBe(13)
     expect(productFormSchema.parse({ ...minimalValid, vatRate: '7,5' }).vatRate).toBe(7.5)
     expect(fehlerNachPfad({ ...minimalValid, vatRate: 120 })['vatRate']).toBeDefined()

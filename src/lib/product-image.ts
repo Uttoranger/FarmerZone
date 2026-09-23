@@ -31,6 +31,11 @@ const CATEGORY_SLUGS: Record<ProductCategory, string> = {
   // teilt sich die neutrale Kachel mit Sonstiges, damit die Karte nicht leer
   // bleibt. Eine eigene Datei wäre ein neuer Illustrationsauftrag.
   FUTTERMITTEL: 'sonstiges',
+  // Dasselbe für die vier Futter-Kategorien aus Sprint Bereiche 1.
+  HEU_STROH: 'sonstiges',
+  GETREIDE_KOERNER: 'sonstiges',
+  MISCHFUTTER: 'sonstiges',
+  ERGAENZUNGSFUTTER: 'sonstiges',
   BRENNHOLZ: 'brennholz',
   SONSTIGES: 'sonstiges',
 }

@@ -62,8 +62,17 @@ enum ProductUnit {
   ML
   M3
   PAKET
+  // Sprint Bereiche 1 — Gewicht steht in FutterKennzeichnung.nettoMenge,
+  // unitSize bleibt leer (Zod). Im Formular nur in den Bereichen Futtermittel
+  // und Sonstiges angeboten (Brennholz im Big Bag).
+  BALLEN
+  BIGBAG
 }
 
+// Reihenfolge = Reihenfolge in PostgreSQL. Die vier Futter-Kategorien kamen per
+// ADD VALUE … BEFORE 'BRENNHOLZ' hinzu, die Altlast FUTTERMITTEL bleibt davor
+// stehen (Postgres sortiert nicht um). Die Auswahl-Reihenfolge entscheidet
+// src/lib/taxonomie.ts (CATEGORY_OPTIONS), nicht dieses Enum.
 enum ProductCategory {
   MILCH
   EIER
@@ -74,7 +83,11 @@ enum ProductCategory {
   BROT
   HONIG
   GETRAENKE
-  FUTTERMITTEL
+  FUTTERMITTEL // ALTLAST seit Bereiche 1 — Zod lehnt ab, Cleanup-Sprint entfernt
+  HEU_STROH
+  GETREIDE_KOERNER
+  MISCHFUTTER
+  ERGAENZUNGSFUTTER
   BRENNHOLZ
   SONSTIGES
 }
@@ -124,10 +137,57 @@ enum ProductSubcategory {
   WALDHONIG
   SORTENHONIG
   BIENENPRODUKTE
-  // Futtermittel
+  // ALTLAST seit Bereiche 1 — der Rechtsbegriff steht jetzt in
+  // FutterKennzeichnung.futtermittelart. Zod lehnt ab, Cleanup-Sprint entfernt.
   EINZELFUTTERMITTEL
   MISCHFUTTERMITTEL
   ERGAENZUNGSFUTTERMITTEL
+  // Heu & Stroh
+  WIESENHEU
+  LUZERNE
+  STROH
+  SILAGE
+  // Getreide & Körner
+  MAIS
+  HAFER
+  GERSTE
+  WEIZEN
+  ROGGEN
+  TRITICALE
+}
+
+// === BEREICHE (Sprint Bereiche 1, docs/konzepte/bereiche.md) ===
+
+// Wer ein Produkt kaufen darf. ≠ ALLE nur im Bereich Futtermittel (Zod).
+enum Abgabe {
+  ALLE
+  NUR_BETRIEBE
+}
+
+// Futtermittelart nach VO (EG) 767/2009 — Pflichtangabe, an die Kategorie
+// gebunden (futtermittelartenFuer in src/lib/taxonomie.ts).
+enum Futtermittelart {
+  EINZELFUTTERMITTEL
+  ALLEINFUTTERMITTEL
+  ERGAENZUNGSFUTTERMITTEL
+  MINERALFUTTERMITTEL
+}
+
+enum NettoEinheit {
+  KG
+  LITER
+}
+
+// Erklärt, welche Nummer in Farm.betriebsnummer steht (LFBIS, BAES/BVL, α-Nummer).
+enum Betriebsstatus {
+  PRIMAERPRODUKTION
+  REGISTRIERT
+  ZUGELASSEN
+}
+
+enum KaeuferArt {
+  PRIVAT
+  BETRIEB
 }
 
 // Benannte Siegel — orthogonal zur Kategorie, mehrere je Produkt möglich.
@@ -329,6 +389,13 @@ model Farm {
   // approvedAt setzt ausschließlich der Betreiber.
   approvedAt DateTime?
 
+  // Betriebsnummer des Hofs (Sprint Bereiche 1, Rückfrage F6). Eine Eigenschaft
+  // des HOFS, nicht des Produkts: Wer Futter nur kauft, hat keine
+  // Kennzeichnung, braucht die Nummer aber im Checkout (NUR_BETRIEBE).
+  // betriebsstatus erklärt, welche Nummer es ist. Die Plattform prüft sie nicht.
+  betriebsnummer String?
+  betriebsstatus Betriebsstatus?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -370,7 +437,8 @@ model Product {
   // Taxonomie (Sprint Taxonomie 1)
   subcategory ProductSubcategory?  // null erlaubt — Bestandsprodukte ohne Unterkategorie
   labels      ProductLabel[]       @default([])
-  futter      FutterKennzeichnung? // nur bei category = FUTTERMITTEL
+  futter      FutterKennzeichnung? // nur im Bereich Futtermittel (bereichVon)
+  abgabe      Abgabe               @default(ALLE) // ≠ ALLE nur im Bereich Futtermittel
 
   // Lebensmittel-spezifisch
   allergens       String[] @default([])
@@ -397,10 +465,11 @@ model Product {
 
   @@index([farmId])
   @@index([isAvailable])
+  @@index([category])
 }
 
-// Futtermittel-Kennzeichnung (Sprint Taxonomie 1). Pflicht bei
-// category = FUTTERMITTEL, sonst verboten — die Regel sitzt im Zod-Schema
+// Futtermittel-Kennzeichnung (Sprint Taxonomie 1, erweitert in Bereiche 1).
+// Pflicht im Bereich Futtermittel, sonst verboten — die Regel sitzt im Zod-Schema
 // (src/schemas/product.ts), die Datenbank hält nur die Daten. 1:1 zum Produkt,
 // stirbt mit ihm. Die Angaben stammen vom Sackanhänger bzw. Lieferschein; der
 // Hof bestätigt das ausdrücklich (bestaetigtAm).
@@ -411,9 +480,21 @@ model FutterKennzeichnung {
   zusammensetzung         String    @db.Text // Mischfutter: Einzelfuttermittel absteigend
   analytischeBestandteile String    @db.Text // Rohprotein, Rohfaser … Freitext
   zusatzstoffe            String?   @db.Text
-  registrierungsnummer    String?   // BAES, LFBIS oder BVL — EIN Feld
+  // ALTLAST seit Bereiche 1 (Rückfrage F6): Die Nummer gehört dem Hof
+  // (Farm.betriebsnummer). Wird nicht mehr geschrieben, nur noch als Rückfall
+  // gelesen, wenn Farm.betriebsnummer leer ist. Cleanup-Sprint entfernt sie.
+  registrierungsnummer    String?
   gebrauchshinweis        String?   @db.Text
   bestaetigtAm            DateTime  // Hof bestätigt Übereinstimmung mit Sackanhänger
+  futtermittelart         Futtermittelart // Pflicht, erlaubte Werte je Kategorie
+  nettoMenge              Decimal   @db.Decimal(10, 3) // Inhalt EINES Gebindes, nicht Bestand
+  nettoEinheit            NettoEinheit
+  // Prozentwerte für Filter und Vergleich. Die Pflichtangabe bleibt der
+  // Freitext analytischeBestandteile.
+  rohprotein              Decimal?  @db.Decimal(5, 2)
+  rohfaser                Decimal?  @db.Decimal(5, 2)
+  rohfett                 Decimal?  @db.Decimal(5, 2)
+  rohasche                Decimal?  @db.Decimal(5, 2)
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
 
@@ -496,6 +577,12 @@ model Order {
   serviceFeePercentApplied Decimal?  @db.Decimal(5, 2)
   serviceFeeRefundedAt     DateTime?
 
+  // Käuferart (Sprint Bereiche 1). BETRIEB ist Pflicht, sobald eine Position
+  // mit abgabe = NUR_BETRIEBE im Korb liegt — geprüft im Checkout-Handler.
+  // betriebsnummer ist ein Snapshot der Eingabe, nur bei BETRIEB gesetzt.
+  kaeuferArt     KaeuferArt @default(PRIVAT)
+  betriebsnummer String?
+
   // Storno
   cancelledAt  DateTime?
   cancelReason String?
@@ -525,6 +612,10 @@ model OrderItem {
   unitPrice   Decimal @db.Decimal(10, 2)
   quantity    Int
   totalPrice  Decimal @db.Decimal(10, 2)
+  // MwSt-Satz zum Kaufzeitpunkt (Sprint Bereiche 1). Wird im Checkout aus
+  // Product.vatRate geschrieben, nie nachgelesen, nie rückwirkend geändert.
+  // Bewusst ohne @default: Jede neue Position muss den Satz mitbringen.
+  vatRate     Decimal @db.Decimal(5, 2)
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])

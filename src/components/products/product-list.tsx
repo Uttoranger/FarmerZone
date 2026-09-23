@@ -35,6 +35,8 @@ import { PageHeader } from '@/components/farmer/page-header'
 type Props = {
   products: ProductData[]
   initialEditId?: string
+  /** Betriebsnummer aus den Hof-Einstellungen — Anzeige in der Futter-Kennzeichnung. */
+  hofBetriebsnummer: string | null
 }
 
 function getStatus(p: ProductData, stock: number) {
@@ -49,7 +51,7 @@ const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   pausiert: { label: 'Pausiert', className: 'bg-muted text-muted-foreground border-border' },
 }
 
-export function ProductList({ products: initialProducts, initialEditId }: Props) {
+export function ProductList({ products: initialProducts, initialEditId, hofBetriebsnummer }: Props) {
   // Optimistic stock state
   const [stocks, setStocks] = useState<Record<string, number>>(
     Object.fromEntries(initialProducts.map((p) => [p.id, p.stock]))
@@ -298,6 +300,7 @@ export function ProductList({ products: initialProducts, initialEditId }: Props)
         open={editDialog.open}
         product={editDialog.product}
         onClose={() => setEditDialog({ open: false, product: null })}
+        hofBetriebsnummer={hofBetriebsnummer}
       />
 
       {/* Stock adjustment dialog */}

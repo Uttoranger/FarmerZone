@@ -1,6 +1,7 @@
 # Konzept: Bereiche — Lebensmittel und Futtermittel
 
-Stand: 2026-09-22 · Status: **freigegeben** · Basis: Taxonomie 1 (#100)
+Stand: 2026-09-22 · Status: **Bereiche 1 umgesetzt am 2026-09-23** · Basis: Taxonomie 1 (#100)
+Geändert nach Rückfrage F6 im Sprint Bereiche 1: Betriebsnummer und Betriebsstatus gehören dem Hof (§3, §6.4, §8).
 Verbindliche Quelle für die Sprints „Bereiche 1–3". Abweichungen nur nach Änderung dieser Datei.
 
 ---
@@ -98,13 +99,20 @@ model Product {
   @@index([category])
 }
 
+model Farm {
+  // … unverändert …
+  betriebsnummer String?                          // LFBIS, BAES/BVL oder α-Nummer — Eigenschaft des Hofs
+  betriebsstatus Betriebsstatus?                  // erklärt betriebsnummer
+}
+
 model FutterKennzeichnung {
   // … bestehende Felder: zusammensetzung, analytischeBestandteile, zusatzstoffe,
-  //     registrierungsnummer, gebrauchshinweis, bestaetigtAm, zielTierarten …
+  //     gebrauchshinweis, bestaetigtAm, zielTierarten …
+  // registrierungsnummer: ALTLAST — nicht mehr geschrieben, nur Rückfall beim
+  //     Lesen, wenn Farm.betriebsnummer leer ist; Entfernung im Cleanup-Sprint
   futtermittelart Futtermittelart                 // Pflicht
   nettoMenge      Decimal  @db.Decimal(10, 3)     // Pflicht — Inhalt EINES Gebindes
   nettoEinheit    NettoEinheit                    // Pflicht
-  betriebsstatus  Betriebsstatus?                 // erklärt registrierungsnummer
   rohprotein      Decimal? @db.Decimal(5, 2)      // % — Filter/Vergleich; Freitext bleibt Pflichtangabe
   rohfaser        Decimal? @db.Decimal(5, 2)
   rohfett         Decimal? @db.Decimal(5, 2)
@@ -126,7 +134,9 @@ model OrderItem {
 **Bewusst nicht:** `Farm.besteuerung` (pauschaliert / regelbesteuert / Kleinunternehmer). Gehört in einen eigenen Steuer-Sprint mit Steuerberater.
 
 ### Betriebsstatus und Nummern — was wo steht
-| Status | Nummer in `registrierungsnummer` | Wer |
+Die Nummer ist eine Eigenschaft des Hofs, nicht des Produkts: Wer Futter kauft, verkauft meist keines und hat gar keine Kennzeichnung. Sie steht in den Hof-Einstellungen.
+
+| Status | Nummer in `Farm.betriebsnummer` | Wer |
 |---|---|---|
 | PRIMAERPRODUKTION | LFBIS-Nummer | Hof verkauft nur selbst erzeugtes Futter |
 | REGISTRIERT | BAES- bzw. BVL-Registrierungsnummer | Hof handelt oder lagert Futter |
@@ -198,7 +208,7 @@ Die Plattform prüft die Nummer nicht. Der Hof bestätigt die Richtigkeit (`best
 
 ### 6.4 Checkout (Bereiche 1)
 - Abschnitt „Betrieb" erscheint nur, wenn eine NUR_BETRIEBE-Position im Korb liegt: Auswahl „Ich bestelle als landwirtschaftlicher Betrieb" + Betriebsnummer.
-- Ist die Session ein eingeloggter Bauer: Käuferart „Betrieb" vorbelegt, Betriebsnummer aus seinen Hof-Einstellungen (Registrierungsnummer der Kennzeichnung, sonst leer). Der Bauer kann beides ändern — Vorbelegung, kein Zwang.
+- Ist die Session ein eingeloggter Bauer: Käuferart „Betrieb" vorbelegt, Betriebsnummer aus seinen Hof-Einstellungen (`Farm.betriebsnummer`, sonst leer). Der Bauer kann beides ändern — Vorbelegung, kein Zwang.
 
 ---
 
@@ -229,7 +239,7 @@ Migration immer zeigen, Freigabe abwarten, dann ausführen (`CLAUDE.md`, Hard Co
 | **Bereiche 2** | `/hoefe` Bereichs-Umschalter + Facetten, Hofseite sektioniert, Produktdetail Futter | Kunden |
 | **Umfeld** | siehe `docs/konzepte/umfeld.md` — setzt Bereiche 1 voraus | Bauern |
 | **Steuer** | `Farm.besteuerung`, echte Sätze, Käufertyp-abhängige Logik — nach Steuerberater | — |
-| **Cleanup** | Altlast-Enum-Werte, `isOrganic` entfernen — frühestens 4 Wochen nach Bereiche 1 | — |
+| **Cleanup** | Altlast-Enum-Werte, `isOrganic`, `FutterKennzeichnung.registrierungsnummer` entfernen — frühestens 4 Wochen nach Bereiche 1 | — |
 
 ---
 

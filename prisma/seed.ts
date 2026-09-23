@@ -57,7 +57,9 @@ async function main() {
   // Farm
   const farm = await prisma.farm.upsert({
     where: { slug: 'hof-mueller' },
-    update: {},
+    // Betriebsnummer auch im update — ein erneuter Seed-Lauf rüstet Höfe aus
+    // der Zeit vor Sprint Bereiche 1 nach. Die Nummer ist erfunden.
+    update: { betriebsnummer: 'LFBIS 1234567', betriebsstatus: 'PRIMAERPRODUKTION' },
     create: {
       slug: 'hof-mueller',
       name: 'Hof Müller',
@@ -74,6 +76,9 @@ async function main() {
       platformFeePercent: 0,
       isActive: true,
       isPaused: false,
+      // Betriebsnummer gehört dem Hof (Sprint Bereiche 1, Rückfrage F6). Erfunden.
+      betriebsnummer: 'LFBIS 1234567',
+      betriebsstatus: 'PRIMAERPRODUKTION',
       ownerId: farmerId,
     },
   })
@@ -97,16 +102,45 @@ async function main() {
   const fleischTaxonomie: Taxonomie = { category: 'FLEISCH', subcategory: 'RIND', labels: ['BIO'] }
 
   // Vollständige Futter-Kennzeichnung, wie sie auf einem Sackanhänger steht.
-  // Die Registrierungsnummer ist erfunden (öffentliches Repo).
-  const heuKennzeichnung: Prisma.FutterKennzeichnungCreateWithoutProductInput = {
+  // Seit Sprint Bereiche 1 mit Futtermittelart und Nettomenge (Inhalt EINES
+  // Gebindes). registrierungsnummer ist Altlast: nicht mehr gesetzt, die
+  // Nummer steht am Hof. null auch im update-Zweig, damit ein Seed-Lauf auf
+  // einer alten Dev-DB keinen Altbestand stehen lässt.
+  const heuKennzeichnung = {
+    futtermittelart: 'EINZELFUTTERMITTEL',
     zielTierarten: ['PFERD', 'RIND'],
     zusammensetzung: 'Wiesenheu vom ersten Schnitt, Dauergrünland, ohne Zusatz',
     analytischeBestandteile: 'Rohprotein 9,5 %, Rohfaser 28 %, Rohfett 2 %, Rohasche 7 %',
+    nettoMenge: 15,
+    nettoEinheit: 'KG',
+    rohprotein: 9.5,
+    rohfaser: 28,
+    rohfett: 2,
+    rohasche: 7,
     zusatzstoffe: null,
-    registrierungsnummer: 'LFBIS 1234567',
+    registrierungsnummer: null,
     gebrauchshinweis: 'Trocken und luftig lagern. Als Raufutter zur freien Aufnahme.',
     bestaetigtAm: new Date(),
-  }
+  } satisfies Prisma.FutterKennzeichnungCreateWithoutProductInput
+
+  // Big-Bag-Hafer, den der Hof nur an landwirtschaftliche Betriebe abgibt
+  // (Konzept §7) — zeigt im Checkout den Abschnitt „Betrieb“.
+  const haferKennzeichnung = {
+    futtermittelart: 'EINZELFUTTERMITTEL',
+    zielTierarten: ['PFERD', 'RIND', 'GEFLUEGEL'],
+    zusammensetzung: 'Hafer, gereinigt, aus eigenem Anbau',
+    analytischeBestandteile: 'Rohprotein 11 %, Rohfaser 10 %, Rohfett 5 %, Rohasche 3 %',
+    nettoMenge: 500,
+    nettoEinheit: 'KG',
+    rohprotein: 11,
+    rohfaser: 10,
+    rohfett: 5,
+    rohasche: 3,
+    zusatzstoffe: null,
+    registrierungsnummer: null,
+    gebrauchshinweis: 'Trocken lagern. Big Bag nur mit Stapler oder Frontlader verladbar.',
+    bestaetigtAm: new Date(),
+  } satisfies Prisma.FutterKennzeichnungCreateWithoutProductInput
 
   const [milch, eier, , fleisch] = await Promise.all([
     prisma.product.upsert({
@@ -192,13 +226,17 @@ async function main() {
       },
     }),
 
-    // Ein Futtermittel mit vollständiger Kennzeichnung (Sprint Taxonomie 1)
+    // Ein Futtermittel mit vollständiger Kennzeichnung (Sprint Taxonomie 1,
+    // umgestellt in Sprint Bereiche 1: HEU_STROH/WIESENHEU, Ballen à 15 kg).
     prisma.product.upsert({
       where: { id: 'prod-heu' },
       update: {
-        category: 'FUTTERMITTEL',
-        subcategory: 'EINZELFUTTERMITTEL',
+        category: 'HEU_STROH',
+        subcategory: 'WIESENHEU',
         labels: [],
+        unit: 'BALLEN',
+        unitSize: null,
+        abgabe: 'ALLE',
         futter: { upsert: { create: heuKennzeichnung, update: heuKennzeichnung } },
       },
       create: {
@@ -209,15 +247,44 @@ async function main() {
           'Wiesenheu vom ersten Schnitt, kleine Ballen mit rund 15 kg. Für Pferde und Rinder. Bitte beim Abholen Anhänger oder Kombi mitbringen.',
         price: 6.50,
         vatRate: 10,
-        unit: 'STUECK',
-        unitSize: 1,
+        unit: 'BALLEN',
+        unitSize: null,
         stock: 40,
         isAvailable: true,
-        category: 'FUTTERMITTEL',
-        subcategory: 'EINZELFUTTERMITTEL',
+        category: 'HEU_STROH',
+        subcategory: 'WIESENHEU',
         labels: [],
         countsTowardLimit: false,
         futter: { create: heuKennzeichnung },
+      },
+    }),
+
+    prisma.product.upsert({
+      where: { id: 'prod-hafer' },
+      update: {
+        category: 'GETREIDE_KOERNER',
+        subcategory: 'HAFER',
+        abgabe: 'NUR_BETRIEBE',
+        futter: { upsert: { create: haferKennzeichnung, update: haferKennzeichnung } },
+      },
+      create: {
+        id: 'prod-hafer',
+        farmId: farm.id,
+        name: 'Hafer im Big Bag',
+        description:
+          'Futterhafer aus eigenem Anbau, gereinigt, im Big Bag mit rund 500 kg. Verladung mit Frontlader am Hof.',
+        price: 180.0,
+        vatRate: 10,
+        unit: 'BIGBAG',
+        unitSize: null,
+        stock: 6,
+        isAvailable: true,
+        category: 'GETREIDE_KOERNER',
+        subcategory: 'HAFER',
+        labels: [],
+        abgabe: 'NUR_BETRIEBE',
+        countsTowardLimit: false,
+        futter: { create: haferKennzeichnung },
       },
     }),
   ])
@@ -278,7 +345,7 @@ async function main() {
   })
 
   console.log('✓ Farm angelegt:', farm.name, '→ /hof-mueller')
-  console.log('✓ Produkte: Heumilch, Bio-Eier, Brennholz, Rindfleisch-Paket, Heu (Futtermittel mit Kennzeichnung)')
+  console.log('✓ Produkte: Heumilch, Bio-Eier, Brennholz, Rindfleisch-Paket, Heu und Big-Bag-Hafer (Futtermittel mit Kennzeichnung, Hafer nur an Betriebe)')
   console.log('✓ Abholzeiten: Mittwoch 15-18 Uhr, Samstag 9-12 Uhr')
   console.log('✓ 3 ManualSales: WhatsApp, Hofladen, Geschäftskunde')
   console.log('\nAnmeldung Bauer-Dashboard:')

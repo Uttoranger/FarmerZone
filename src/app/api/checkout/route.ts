@@ -13,6 +13,11 @@ import { berechneServicegebuehr } from '@/lib/servicegebuehr'
 import { pruefeSitzungsWarenkorb } from '@/server/warenkorb'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
+import {
+  pruefeBetriebsnachweis,
+  betriebsnummerFuerBestellung,
+  CODE_BETRIEBSNACHWEIS_FEHLT,
+} from '@/lib/betriebsnachweis'
 
 /**
  * Bestellung anlegen.
@@ -198,6 +203,37 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // 3b. ABGABE UND MWST AUS DER DATENBANK (Sprint Bereiche 1). Der Warenkorb
+  //     ist nie die Wahrheit: Ob ein Futtermittel nur an Betriebe geht und
+  //     welcher MwSt-Satz gilt, steht am Produkt — nicht in dem, was der
+  //     Browser schickt. Nur Produkte DIESES Hofs zählen.
+  const produkte = await prisma.product.findMany({
+    where: { id: { in: data.items.map((i) => i.productId) }, farmId: farm.id },
+    select: { id: true, vatRate: true, abgabe: true },
+  })
+  const produktJeId = new Map(produkte.map((p) => [p.id, p]))
+  if (data.items.some((i) => !produktJeId.has(i.productId))) {
+    return NextResponse.json(
+      { error: 'Dein Warenkorb hat sich geändert. Bitte prüfe ihn noch einmal.', code: 'WARENKORB_GEAENDERT' },
+      { status: 409 }
+    )
+  }
+
+  // 3c. BETRIEBSNACHWEIS — serverseitig erneut, auch wenn das Formular schon
+  //     geprüft hat. Vor jeder Buchung: Ein Verstoß bucht keinen Bestand und
+  //     legt keine Bestellung an.
+  const nachweis = pruefeBetriebsnachweis({
+    nurBetriebeImKorb: produkte.some((p) => p.abgabe === 'NUR_BETRIEBE'),
+    kaeuferArt: data.kaeuferArt,
+    betriebsnummer: data.betriebsnummer,
+  })
+  if (!nachweis.ok) {
+    return NextResponse.json(
+      { error: nachweis.meldung, code: CODE_BETRIEBSNACHWEIS_FEHLT, feld: nachweis.feld },
+      { status: 400 }
+    )
+  }
+
   // 4. Find or create customer account (dormant — no password)
   let customer = await prisma.user.findUnique({
     where: { email: data.customerEmail },
@@ -286,6 +322,8 @@ export async function POST(request: NextRequest) {
         // lassen diese Bestellung unverändert (prisma/schema.prisma, Order).
         serviceFeeCents: servicegebuehr.gebuehrCents,
         serviceFeePercentApplied: servicegebuehr.prozentAngewendet,
+        kaeuferArt: data.kaeuferArt,
+        betriebsnummer: betriebsnummerFuerBestellung(data.kaeuferArt, data.betriebsnummer),
         items: {
           create: data.items.map((i) => ({
             productId: i.productId,
@@ -293,6 +331,11 @@ export async function POST(request: NextRequest) {
             unitPrice: i.unitPrice,
             quantity: i.quantity,
             totalPrice: i.unitPrice * i.quantity,
+            // SNAPSHOT des MwSt-Satzes — im selben create wie die Bestellung,
+            // also atomar mit ihr. Später nie aus Product nachlesen, nie
+            // rückwirkend ändern (Invariante ARCHITECTURE.md §5). Die Map ist
+            // oben vollständig geprüft (3b).
+            vatRate: produktJeId.get(i.productId)!.vatRate,
           })),
         },
       },

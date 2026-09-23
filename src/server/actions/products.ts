@@ -9,7 +9,9 @@ import {
   type FutterKennzeichnungFormData,
   type ProductFormData,
 } from '@/schemas/product'
-import { bereinigeSiegel } from '@/lib/taxonomie'
+import { bereinigeSiegel, istFuttermittel } from '@/lib/taxonomie'
+import { dualUseHinweis, normiereProduktname, DUAL_USE_MIN_ZEICHEN } from '@/lib/dual-use'
+import { dualUseAnfrageSchema } from '@/schemas/product'
 import { getFarmForUser } from '@/server/queries/dashboard'
 
 async function getAuthenticatedFarm() {
@@ -37,6 +39,7 @@ function produktDaten(v: ProductFormData) {
     category: v.category ?? null,
     subcategory: v.subcategory ?? null,
     labels: bereinigeSiegel(v.labels),
+    abgabe: v.abgabe,
     countsTowardLimit: v.countsTowardLimit,
     price: v.price,
     vatRate: v.vatRate,
@@ -54,26 +57,47 @@ function produktDaten(v: ProductFormData) {
   }
 }
 
+/** Eine Kennzeichnung, die das Schema durchgelassen hat — dort ist die Futtermittelart gesetzt. */
+type GepruefteKennzeichnung = FutterKennzeichnungFormData & {
+  futtermittelart: NonNullable<FutterKennzeichnungFormData['futtermittelart']>
+}
+
 /**
  * Die Kennzeichnungsspalten. Der Haken „entspricht dem Sackanhänger" wird
  * bei JEDEM Speichern neu gesetzt (bestaetigtAm = jetzt): Wer die Kennzeichnung
  * ändert, bestätigt sie neu — das Formular verlangt den Haken ohnehin.
+ *
+ * registrierungsnummer wird bewusst NICHT geschrieben (Rückfrage F6): Die
+ * Nummer gehört dem Hof. Beim Update bleibt ein Altbestand so unangetastet —
+ * er dient nur noch als Rückfall zum Lesen.
  */
-function futterDaten(f: FutterKennzeichnungFormData, jetzt: Date) {
+function futterDaten(f: GepruefteKennzeichnung, jetzt: Date) {
   return {
+    futtermittelart: f.futtermittelart,
     zielTierarten: f.zielTierarten,
     zusammensetzung: f.zusammensetzung,
     analytischeBestandteile: f.analytischeBestandteile,
+    nettoMenge: f.nettoMenge,
+    nettoEinheit: f.nettoEinheit,
+    rohprotein: f.rohprotein,
+    rohfaser: f.rohfaser,
+    rohfett: f.rohfett,
+    rohasche: f.rohasche,
     zusatzstoffe: f.zusatzstoffe || null,
-    registrierungsnummer: f.registrierungsnummer || null,
     gebrauchshinweis: f.gebrauchshinweis || null,
     bestaetigtAm: jetzt,
   }
 }
 
-/** Das Schema hat schon entschieden: futter gibt es genau dann, wenn FUTTERMITTEL. */
-function futterAus(v: ProductFormData): FutterKennzeichnungFormData | null {
-  return v.category === 'FUTTERMITTEL' && v.futter ? v.futter : null
+/**
+ * Das Schema hat schon entschieden: futter gibt es genau dann, wenn der
+ * Bereich Futtermittel ist, und dann mit einer passenden Futtermittelart.
+ */
+function futterAus(v: ProductFormData): GepruefteKennzeichnung | null {
+  if (!istFuttermittel(v.category) || !v.futter) return null
+  const { futtermittelart } = v.futter
+  if (futtermittelart === null) return null
+  return { ...v.futter, futtermittelart }
 }
 
 export async function createProduct(data: ProductFormData): Promise<ProduktErgebnis> {
@@ -96,8 +120,8 @@ export async function createProduct(data: ProductFormData): Promise<ProduktErgeb
 }
 
 /**
- * Speichert das Produkt und hält die Futter-Kennzeichnung konsistent: bei
- * FUTTERMITTEL wird sie angelegt oder aktualisiert, bei jeder anderen
+ * Speichert das Produkt und hält die Futter-Kennzeichnung konsistent: im
+ * Bereich Futtermittel wird sie angelegt oder aktualisiert, bei jeder anderen
  * Kategorie GELÖSCHT — auch dann, wenn das Produkt vorher ein Futtermittel
  * war (Kategoriewechsel; das Formular fragt vorher nach). Beides in EINER
  * Transaktion, damit nie ein Produkt ohne Kategorie Futtermittel eine
@@ -135,6 +159,40 @@ export async function updateProduct(productId: string, data: ProductFormData): P
 
   revalidate(farm.slug)
   return { ok: true }
+}
+
+export type DualUseErgebnis = { hinweis: string | null } | { error: string }
+
+/**
+ * Dual-Use-Hinweis beim Tippen des Namens (Konzept 6.1): Gibt es im EIGENEN
+ * Hof schon ein Produkt gleichen Namens in einem anderen Bereich? Nur lesend.
+ * Das Formular ruft das verzögert auf, nicht je Tastendruck. Der Hof steht in
+ * der WHERE-Klausel — fremde Höfe sieht diese Abfrage nie.
+ */
+export async function pruefeDualUse(eingabe: unknown): Promise<DualUseErgebnis> {
+  const geprueft = dualUseAnfrageSchema.safeParse(eingabe)
+  if (!geprueft.success) return { error: 'Ungültige Eingabe.' }
+  const { name, category, productId } = geprueft.data
+
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) return { error: 'Bitte melde dich neu an.' }
+  const farm = await getFarmForUser(session.user.id)
+  if (!farm) return { error: 'Kein Hof gefunden.' }
+
+  if (category == null || normiereProduktname(name).length < DUAL_USE_MIN_ZEICHEN) return { hinweis: null }
+
+  const vorhandene = await prisma.product.findMany({
+    where: {
+      farmId: farm.id,
+      name: { equals: name.trim(), mode: 'insensitive' },
+      // Beim Bearbeiten ist das Produkt selbst kein Zwilling.
+      ...(productId ? { id: { not: productId } } : {}),
+    },
+    select: { name: true, category: true },
+    take: 5,
+  })
+
+  return { hinweis: dualUseHinweis({ name, category }, vorhandene) }
 }
 
 export async function updateProductImageAction(

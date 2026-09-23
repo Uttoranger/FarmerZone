@@ -13,6 +13,7 @@
  * aufgelösten Wochentag + Uhrzeit — die Auflösung macht wienJetzt().
  */
 import type { ProductCategoryValue } from '@/schemas/product'
+import { PRODUCT_CATEGORY_VALUES, istFuttermittel } from '@/lib/taxonomie'
 import { DAY_NAMES } from '@/lib/pickup-slot-rules'
 
 export type AbholFenster = {
@@ -55,6 +56,17 @@ export function sammleKategorien(
   }
   return reihenfolge.filter((k) => vorhanden.has(k))
 }
+
+/**
+ * Die Kategorien, die /hoefe als Chips und Badges zeigt — in Schema-Reihenfolge,
+ * OHNE den Bereich Futtermittel (Konzept 6.2): Bis der Bereichs-Umschalter
+ * aus Sprint Bereiche 2 da ist, bleibt Futter aus den Chips heraus. Die
+ * Produkte selbst bleiben über die Hofseite erreichbar. Der Bereich wird hier
+ * auf dem Server entschieden, nie im Browser.
+ */
+export const HOEFE_KATEGORIEN: readonly ProductCategoryValue[] = PRODUCT_CATEGORY_VALUES.filter(
+  (k) => !istFuttermittel(k)
+)
 
 export type NaechsteAbholung = AbholFenster & {
   /** 0 = heute, 1 = morgen, … 6; 7 = das heutige Fenster ist schon vorbei

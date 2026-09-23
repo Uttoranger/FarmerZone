@@ -83,10 +83,10 @@ describe('erstesFehlerfeld', () => {
     })
   })
 
-  it('Kennzeichnung fehlt ganz: Abschnitt Kennzeichnung, erstes Unterfeld', () => {
+  it('Kennzeichnung fehlt ganz: Abschnitt Kennzeichnung, erstes Unterfeld (seit Bereiche 1 die Futtermittelart)', () => {
     const errors = { futter: fehler('fehlt') } as unknown as FieldErrors<ProductFormData>
     expect(erstesFehlerfeld(errors)).toEqual({
-      feld: 'futter.zielTierarten',
+      feld: 'futter.futtermittelart',
       abschnitt: 'kennzeichnung',
     })
   })
