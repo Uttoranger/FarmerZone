@@ -129,9 +129,17 @@ Diese Regeln sind fachlich, nicht technisch. Verletzung kostet Geld oder Vertrau
 `src/lib/taxonomie.ts` ist die **einzige** Quelle für Werte und Labels. Kein zweites Label-Verzeichnis, kein Hof-Sonderfall anderswo. Anzeige nur über `formatKategorie` in `format.ts`.
 
 - **Jede Unterkategorie (L2) gehört zu genau einer Kategorie (L1).** `gehoertZu(l1, l2)` entscheidet; das Zod-Schema lehnt jede andere Kombination ab. Fisch, Brot, Getränke, Brennholz, Sonstiges haben keine L2. Keine dritte Ebene, keine Freitext-Kategorien.
-- **Eine fehlende L2 ist kein Fehler.** Bestandsprodukte dürfen ohne bleiben; das Formular zeigt nur einen Hinweis. Einzige Ausnahme: Futtermittel.
+- **Eine fehlende L2 ist kein Fehler.** Bestandsprodukte dürfen ohne bleiben; das Formular zeigt nur einen Hinweis. Einzige Ausnahme: Futter-Kategorien mit Sorten (Heu & Stroh, Getreide & Körner).
 - **Siegel sind orthogonal zur Kategorie.** `labels` ist eine Menge (BIO, GENTECHNIKFREI, AMA_GUETESIEGEL), mehrere je Produkt, keines Pflicht, keines doppelt. `isOrganic` ist Altlast: wird nur noch gelesen, nie mehr geschrieben; Bio ist `labels` enthält BIO.
-- **Futter-Kennzeichnung nur bei FUTTERMITTEL.** Dort Pflicht (Unterkategorie, Tierarten, Zusammensetzung, analytische Bestandteile, Bestätigung), bei jeder anderen Kategorie verboten. Ein Kategoriewechsel weg von Futtermittel löscht sie in derselben Transaktion wie das Produkt-Update.
+- **Futter-Kennzeichnung nur im Bereich Futtermittel.** Dort Pflicht (Futtermittelart passend zur Kategorie, Nettomenge, Tierarten, Zusammensetzung, analytische Bestandteile, Bestätigung), sonst verboten. Ein Kategoriewechsel aus dem Bereich heraus löscht sie in derselben Transaktion wie das Produkt-Update.
+
+### Bereiche (Lebensmittel, Futtermittel, Sonstiges)
+
+Konzept: `docs/konzepte/bereiche.md`.
+
+- **Bereich ist abgeleitet.** `bereichVon(category)` in `taxonomie.ts` entscheidet. Nie als Spalte, nie in `localStorage`, nie `category === '…'` vergleichen, wo der Bereich gemeint ist. Im Browser nur zur Anzeige und Formularführung (dieselbe Funktion) — verbindlich prüfen Zod und die Servergrenze.
+- **Ein Produkt gehört zu genau einem Bereich.** Dual-Use (Mais als Lebensmittel und als Futter) = zwei Produkte mit zwei Beständen, ohne Verknüpfung im Schema.
+- **`OrderItem.vatRate` ist ein Snapshot.** Der Checkout-Handler schreibt ihn aus `Product.vatRate` im selben `create` wie die Bestellung. Nie nachlesen, nie rückwirkend ändern. `mwstStandard` ist nur die Vorbelegung im Formular.
 
 Fachkonzepte liegen unter docs/konzepte/. Ein Sprint verweist auf sein Konzept, statt es zu wiederholen.
 
@@ -147,3 +155,5 @@ Nicht nachahmen. Beim Anfassen der Datei mit aufräumen, nicht als eigener Sprin
 | Server Actions mischen `throw new Error()` und `return { error }` | Neuer Code: `return { error }` (→ `CODING_STANDARDS.md`) |
 | Keine Header-Komponente; Unterseiten ohne Rückweg | Neue öffentliche Seite bekommt Header und Footer |
 | Geld teils `Decimal`, teils `Int` in Cent | Neue Geldfelder: `Decimal(10,2)`. Bestehende `*Cents` nicht umbauen. |
+| Enum-Werte `FUTTERMITTEL` (Kategorie) und `EINZELFUTTERMITTEL`, `MISCHFUTTERMITTEL`, `ERGAENZUNGSFUTTERMITTEL` (Unterkategorie) aus Taxonomie 1 | Nie wählbar anbieten, nie schreiben; Zod lehnt sie ab. Lesen nur über `istAltlastKategorie` / `istAltlastUnterkategorie`. Entfernen im Cleanup-Sprint. |
+| `FutterKennzeichnung.registrierungsnummer` — die Nummer gehört dem Hof (`Farm.betriebsnummer`) | Nie schreiben. Lesen nur als Rückfall über `betriebsnummerFuerAnzeige`. Entfernen im Cleanup-Sprint. |

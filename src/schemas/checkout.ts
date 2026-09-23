@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { KAEUFER_ART_VALUES, pruefeBetriebsnachweis } from '@/lib/betriebsnachweis'
 
 /**
  * Die Reihenfolge der Felder auf der Seite — maßgeblich dafür, zu welchem
@@ -11,6 +12,8 @@ export const CHECKOUT_FELD_REIHENFOLGE = [
   'customerEmail',
   'customerPhone',
   'customerNote',
+  'kaeuferArt',
+  'betriebsnummer',
   'paymentMethod',
   'onsiteConfirmed',
 ] as const
@@ -28,6 +31,14 @@ export const checkoutFormSchema = z
     onsiteConfirmed: z.boolean().optional(),
     optInEmail: z.boolean().default(false),
     optInWhatsApp: z.boolean().default(false),
+    // Abschnitt „Betrieb" (Sprint Bereiche 1). Nur sichtbar, wenn eine
+    // Position mit abgabe = NUR_BETRIEBE im Korb liegt.
+    kaeuferArt: z.enum(KAEUFER_ART_VALUES).default('PRIVAT'),
+    betriebsnummer: z.string().trim().max(100).optional(),
+    // Kein Eingabefeld: Die Checkout-Seite setzt es aus der Abgabe der
+    // Produkte in der DB. Nur für die Komfortprüfung im Browser — der Handler
+    // prüft mit seinen eigenen Daten erneut und liest diesen Wert NIE.
+    nurBetriebeImKorb: z.boolean().default(false),
   })
   // Die Abhol-Verpflichtung gehört in die Prüfung, nicht in die Absende-Funktion
   // (Bug-Report Befund 5). Nur so erzeugt sie denselben sichtbaren Fehler wie
@@ -40,6 +51,11 @@ export const checkoutFormSchema = z
         path: ['onsiteConfirmed'],
         message: 'Bitte bestätige die verbindliche Abholung',
       })
+    }
+    // Dieselbe Regel wie im Handler (src/lib/betriebsnachweis.ts).
+    const nachweis = pruefeBetriebsnachweis(daten)
+    if (!nachweis.ok) {
+      ctx.addIssue({ code: 'custom', path: [nachweis.feld], message: nachweis.meldung })
     }
   })
 
@@ -65,6 +81,10 @@ export const checkoutRequestSchema = z.object({
   paymentMethod: z.enum(['ONLINE', 'ONSITE_CASH', 'ONSITE_CARD']),
   optInEmail: z.boolean().optional().default(false),
   optInWhatsApp: z.boolean().optional().default(false),
+  // Ob die Käuferart reicht, prüft der Handler gegen Product.abgabe aus der
+  // DB (pruefeBetriebsnachweis) — hier nur die Form der Eingabe.
+  kaeuferArt: z.enum(KAEUFER_ART_VALUES).optional().default('PRIVAT'),
+  betriebsnummer: z.string().trim().max(100).optional(),
   items: z
     .array(
       z.object({

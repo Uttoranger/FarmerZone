@@ -4,17 +4,23 @@ import {
   PRODUCT_SUBCATEGORY_VALUES,
   PRODUCT_LABEL_VALUES,
   TIERART_VALUES,
+  FUTTERMITTELART_VALUES,
+  NETTO_EINHEIT_VALUES,
+  ABGABE_VALUES,
   KATEGORIE_LABEL,
   gehoertZu,
+  hatUnterkategorien,
+  istFuttermittel,
+  istAltlastKategorie,
+  istAltlastUnterkategorie,
+  istGrossgebindeEinheit,
+  futtermittelartenFuer,
+  futtermittelartSatz,
+  grossgebindeEinheitenAngeboten,
+  type ProductCategoryValue,
 } from '@/lib/taxonomie'
+import { mwstStandard } from '@/lib/mwst'
 import { nachkommastellen, parseDezimal } from '@/lib/format'
-
-/**
- * Der MwSt-Satz, mit dem ein neues Produkt startet — 10 % (Lebensmittel, AT).
- * Es gibt (noch) keinen Satz je Kategorie; das Formular nennt diesen Wert als
- * Standard und zeigt eine Abweichung in der Zusammenfassung.
- */
-export const MWST_STANDARD = 10
 
 // Kategorien, Unterkategorien und Siegel leben seit Sprint Taxonomie 1 in
 // src/lib/taxonomie.ts — der EINEN Quelle. Die drei Namen bleiben hier
@@ -51,7 +57,24 @@ export const UNIT_OPTIONS = [
   { value: 'ML', label: 'ml' },
   { value: 'M3', label: 'm³' },
   { value: 'PAKET', label: 'Paket' },
+  { value: 'BALLEN', label: 'Ballen' },
+  { value: 'BIGBAG', label: 'Big Bag' },
 ] as const
+
+export const PRODUCT_UNIT_VALUES = ['STUECK', 'KG', 'G', 'LITER', 'ML', 'M3', 'PAKET', 'BALLEN', 'BIGBAG'] as const
+
+/**
+ * Die Einheiten, die das Formular für eine Kategorie anbietet: Ballen und Big
+ * Bags nur bei Futtermitteln und Sonstiges (Rückfrage F7). Reine Anzeige — das
+ * Schema nimmt jede Einheit an.
+ */
+export function unitOptionsFuer(
+  category: ProductCategoryValue | null | undefined
+): readonly (typeof UNIT_OPTIONS)[number][] {
+  return grossgebindeEinheitenAngeboten(category)
+    ? UNIT_OPTIONS
+    : UNIT_OPTIONS.filter((u) => !istGrossgebindeEinheit(u.value))
+}
 
 export const UNIT_LABELS: Record<string, string> = {
   STUECK: 'Stück',
@@ -61,6 +84,8 @@ export const UNIT_LABELS: Record<string, string> = {
   ML: 'ml',
   M3: 'm³',
   PAKET: 'Paket',
+  BALLEN: 'Ballen',
+  BIGBAG: 'Big Bag',
 }
 
 // Kurznamen für kompakte Saison-Anzeigen (Badge auf der Hof-Seite,
@@ -120,10 +145,13 @@ const preisZahl = z.preprocess(
     .refine((n) => nachkommastellen(n) <= 2, 'Höchstens zwei Nachkommastellen, z. B. 5,99.')
 )
 
-/** MwSt-Satz in Prozent: 0 bis 100, leer = Standard. */
+/**
+ * MwSt-Satz in Prozent: 0 bis 100. Leer bleibt hier null — den Standard setzt
+ * das Schema erst am Ende, weil er von der Kategorie abhängt (mwstStandard).
+ */
 const mwstZahl = z.preprocess(
-  (v) => (dezimal(v) === undefined ? MWST_STANDARD : dezimal(v)),
-  z.number({ error: 'Bitte nur Zahlen, z. B. 10.' }).min(0).max(100)
+  (v) => dezimal(v) ?? null,
+  z.number({ error: 'Bitte nur Zahlen, z. B. 10.' }).min(0).max(100).nullable()
 )
 
 // LEER IST NULL, NIE UNDEFINED — für alle optionalen Zahlenfelder des
@@ -147,24 +175,58 @@ const optionalerText = (max: number) => z.string().trim().max(max).optional().or
 
 // Fehlertexte der Futter-Kennzeichnung — in Du-Form, mit dem Hinweis, WO der
 // Wert steht. Der Hof tippt vom Sackanhänger ab; die Meldung sagt ihm das.
+// Wortlaute aus docs/konzepte/bereiche.md §4 und den Rückfragen F2–F4.
 export const FUTTER_FEHLER = {
   tierarten: 'Bitte wähle mindestens eine Tierart, für die das Futter gedacht ist.',
   zusammensetzung: 'Bitte trag die Zusammensetzung ein — sie steht auf dem Sackanhänger oder Lieferschein.',
   analytischeBestandteile:
     'Bitte trag die analytischen Bestandteile ein — sie stehen auf dem Sackanhänger oder Lieferschein.',
   bestaetigt: 'Bitte bestätige, dass die Angaben dem Sackanhänger bzw. Lieferschein entsprechen.',
-  unterkategorie: 'Bitte wähle, welche Art Futtermittel es ist.',
+  unterkategorie: 'Bitte wähle die Sorte — zum Beispiel Wiesenheu oder Stroh.',
   fehlt: 'Bei Futtermitteln brauchen wir die Kennzeichnung vom Sackanhänger.',
-  verboten: 'Eine Futter-Kennzeichnung gibt es nur bei der Kategorie Futtermittel.',
+  verboten: 'Eine Futter-Kennzeichnung gibt es nur bei Futtermitteln.',
+  altlast:
+    'Diese Kategorie gibt es nicht mehr — bitte Heu & Stroh, Getreide & Körner, Mischfutter oder Ergänzungsfutter wählen.',
+  nettoMenge: 'Bitte trag ein, wie viel ein Gebinde enthält — steht auf dem Sackanhänger.',
+  rohwerte: 'Rohprotein, Rohfaser, Rohfett und Rohasche sind Prozentwerte — bitte eine Zahl zwischen 0 und 100.',
+  abgabe: 'Die Abgabebeschränkung gibt es nur für Futtermittel.',
+  grossgebinde: 'Bei Ballen und Big Bags steht das Gewicht in der Kennzeichnung.',
 } as const
+
+/** Nettomenge eines Gebindes: Pflicht, größer 0, höchstens drei Nachkommastellen (Decimal(10,3)). */
+const nettoMengeZahl = z.preprocess(
+  dezimal,
+  z
+    .number({ error: FUTTER_FEHLER.nettoMenge })
+    .positive(FUTTER_FEHLER.nettoMenge)
+    .refine((n) => nachkommastellen(n) <= 3, 'Höchstens drei Nachkommastellen, z. B. 0,125.')
+)
+
+/**
+ * Rohwert in Prozent: leer = null, sonst 0 bis 100. Mehr als zwei
+ * Nachkommastellen rundet die Spalte (Decimal(5,2)) — auf dem Sackanhänger
+ * steht ohnehin höchstens eine.
+ */
+const rohwertZahl = z.preprocess(
+  (v) => dezimal(v) ?? null,
+  z.number({ error: FUTTER_FEHLER.rohwerte }).min(0, FUTTER_FEHLER.rohwerte).max(100, FUTTER_FEHLER.rohwerte).nullable()
+)
 
 /**
  * Die Futter-Kennzeichnung, wie der Hof sie eingibt. `bestaetigt` ist der
  * Haken „Die Angaben entsprechen dem Sackanhänger" — die Server Action macht
  * daraus `bestaetigtAm = jetzt`. Ein Boolean statt `z.literal(true)`, damit das
  * Formular mit `false` starten kann; die Prüfung verlangt trotzdem true.
+ *
+ * futtermittelart ist hier nullable: Ob sie fehlt oder nicht zur Kategorie
+ * passt, entscheidet productFormSchema — erst dort ist die Kategorie bekannt,
+ * und beide Fälle bekommen denselben Satz (futtermittelartSatz).
+ *
+ * KEINE registrierungsnummer mehr (Rückfrage F6): Die Nummer gehört dem Hof
+ * (Farm.betriebsnummer). Ein mitgeschicktes Feld verwirft Zod stillschweigend.
  */
 export const futterKennzeichnungSchema = z.object({
+  futtermittelart: z.preprocess(leerZuNull, z.enum(FUTTERMITTELART_VALUES).nullable()),
   zielTierarten: z.array(z.enum(TIERART_VALUES)).min(1, FUTTER_FEHLER.tierarten),
   zusammensetzung: z.string().trim().min(3, FUTTER_FEHLER.zusammensetzung).max(2000),
   analytischeBestandteile: z
@@ -172,8 +234,13 @@ export const futterKennzeichnungSchema = z.object({
     .trim()
     .min(3, FUTTER_FEHLER.analytischeBestandteile)
     .max(2000),
+  nettoMenge: nettoMengeZahl,
+  nettoEinheit: z.enum(NETTO_EINHEIT_VALUES),
+  rohprotein: rohwertZahl,
+  rohfaser: rohwertZahl,
+  rohfett: rohwertZahl,
+  rohasche: rohwertZahl,
   zusatzstoffe: optionalerText(2000),
-  registrierungsnummer: optionalerText(100),
   gebrauchshinweis: optionalerText(2000),
   bestaetigt: z.boolean().refine((v) => v === true, FUTTER_FEHLER.bestaetigt),
 })
@@ -197,13 +264,15 @@ export const productFormSchema = z
       .array(z.enum(PRODUCT_LABEL_VALUES))
       .default([])
       .refine((l) => new Set(l).size === l.length, 'Ein Siegel kann nur einmal gewählt werden.'),
-    // Nur bei Kategorie Futtermittel — Pflicht dort, verboten sonst (superRefine).
+    // Nur im Bereich Futtermittel — Pflicht dort, verboten sonst (superRefine).
     // null = keine Kennzeichnung (das Formular schreibt null, nie undefined).
     futter: futterKennzeichnungSchema.nullable().optional(),
+    // ≠ ALLE nur im Bereich Futtermittel (superRefine).
+    abgabe: z.enum(ABGABE_VALUES).default('ALLE'),
     countsTowardLimit: z.boolean().default(true),
     price: preisZahl,
     vatRate: mwstZahl,
-    unit: z.enum(['STUECK', 'KG', 'G', 'LITER', 'ML', 'M3', 'PAKET']),
+    unit: z.enum(PRODUCT_UNIT_VALUES),
     unitSize: optionalPositiveNumber,
     stock: z.coerce.number().int().min(0, 'Bestand kann nicht negativ sein').default(0),
     isAvailable: z.boolean().default(true),
@@ -215,11 +284,19 @@ export const productFormSchema = z
     unavailableReason: z.string().max(200).optional().or(z.literal('')),
   })
   .superRefine((data, ctx) => {
+    // Altlast aus Taxonomie 1: bleibt im Enum, wird aber nicht mehr angenommen
+    // (Konzept 2.3). Ein Bestandsprodukt muss beim nächsten Speichern umziehen.
+    if (istAltlastKategorie(data.category)) {
+      ctx.addIssue({ code: 'custom', path: ['category'], message: FUTTER_FEHLER.altlast })
+    }
+
     // L2 muss zur L1 gehören. Fehlt die L2, ist das KEIN Fehler — auch nicht,
     // wenn die L1 welche hätte (Bestandsprodukte); das Formular zeigt dann
     // nur einen Hinweis. Ausnahme Futtermittel, siehe unten.
     if (data.subcategory !== null) {
-      if (data.category === null) {
+      if (istAltlastUnterkategorie(data.subcategory)) {
+        ctx.addIssue({ code: 'custom', path: ['subcategory'], message: FUTTER_FEHLER.altlast })
+      } else if (data.category === null) {
         ctx.addIssue({ code: 'custom', path: ['subcategory'], message: 'Wähle zuerst eine Kategorie.' })
       } else if (!gehoertZu(data.category, data.subcategory)) {
         ctx.addIssue({
@@ -230,19 +307,50 @@ export const productFormSchema = z
       }
     }
 
-    if (data.category === 'FUTTERMITTEL') {
-      if (data.subcategory === null) {
+    // Der Bereich entscheidet, nicht der Vergleich mit einer einzelnen
+    // Kategorie (Invariante „Bereich ist abgeleitet", ARCHITECTURE.md §5).
+    if (istFuttermittel(data.category)) {
+      // Heu vs. Stroh ist fachlich kein Detail, und ohne L2 gruppiert das
+      // Umfeld später nicht (Rückfrage F2). Nur wo die Kategorie L2 hat.
+      if (data.subcategory === null && hatUnterkategorien(data.category)) {
         ctx.addIssue({ code: 'custom', path: ['subcategory'], message: FUTTER_FEHLER.unterkategorie })
       }
       if (data.futter == null) {
         ctx.addIssue({ code: 'custom', path: ['futter'], message: FUTTER_FEHLER.fehlt })
+      } else {
+        const satz = futtermittelartSatz(data.category)
+        const art = data.futter.futtermittelart
+        // Ohne Satz (Altlast-Kategorie) gibt es keine Tabelle — der
+        // Altlast-Fehler oben sagt dann schon, was zu tun ist.
+        if (satz && (art === null || !futtermittelartenFuer(data.category).includes(art))) {
+          ctx.addIssue({ code: 'custom', path: ['futter', 'futtermittelart'], message: satz })
+        }
       }
-    } else if (data.futter != null) {
-      ctx.addIssue({ code: 'custom', path: ['futter'], message: FUTTER_FEHLER.verboten })
+    } else {
+      if (data.futter != null) {
+        ctx.addIssue({ code: 'custom', path: ['futter'], message: FUTTER_FEHLER.verboten })
+      }
+      if (data.abgabe !== 'ALLE') {
+        ctx.addIssue({ code: 'custom', path: ['abgabe'], message: FUTTER_FEHLER.abgabe })
+      }
+    }
+
+    if (istGrossgebindeEinheit(data.unit) && data.unitSize != null) {
+      ctx.addIssue({ code: 'custom', path: ['unitSize'], message: FUTTER_FEHLER.grossgebinde })
     }
   })
+  // Leerer MwSt-Satz → Vorschlag für die Kategorie. Erst hier, weil der
+  // Vorschlag von der Kategorie abhängt; mwstStandard ist nur Vorbelegung.
+  .transform((data) => ({ ...data, vatRate: data.vatRate ?? mwstStandard(data.category) }))
 
 export type ProductFormData = z.infer<typeof productFormSchema>
+
+/** Anfrage des Dual-Use-Hinweises (pruefeDualUse) — Name, Kategorie und beim Bearbeiten die eigene ID. */
+export const dualUseAnfrageSchema = z.object({
+  name: z.string().max(100),
+  category: z.enum(PRODUCT_CATEGORY_VALUES).nullable(),
+  productId: z.string().min(1).max(100).optional(),
+})
 
 /**
  * Feldreihenfolge des Produktformulars — für „zum ersten Fehler springen"
@@ -269,4 +377,5 @@ export const PRODUKT_FELD_REIHENFOLGE = [
   'countsTowardLimit',
   'vatRate',
   'futter',
+  'abgabe',
 ] as const satisfies readonly (keyof ProductFormData)[]

@@ -587,6 +587,82 @@ handgeschriebenen Migrationen.
 
 ---
 
+## Bereiche (Sprint Bereiche 1, 2026-09-23)
+
+**Konzept:** `docs/konzepte/bereiche.md` — dort steht das Fachliche vollständig.
+Hier steht nur, was umgesetzt ist, was nach Rückfrage anders kam und was offen
+bleibt. Die Regeln für neuen Code stehen in `docs/ai/ARCHITECTURE.md` §5.
+
+**Umgesetzt:**
+- Futtermittel sind ein eigener Bereich mit vier Kategorien (Heu & Stroh,
+  Getreide & Körner, Mischfutter, Ergänzungsfutter) und zehn Sorten. Der
+  Bereich ist eine Funktion der Kategorie (`bereichVon` in `taxonomie.ts`),
+  keine Spalte.
+- Die Futtermittelart nach VO (EG) 767/2009 steht jetzt in der Kennzeichnung
+  und ist an die Kategorie gebunden. Dazu Nettomenge je Gebinde und optionale
+  Rohwerte. Neue Einheiten Ballen und Big Bag.
+- `Product.abgabe` (ALLE / NUR_BETRIEBE); der Checkout zeigt dann den Abschnitt
+  „Betrieb" und der Handler verlangt serverseitig Käuferart BETRIEB plus
+  Betriebsnummer (400 `BETRIEBSNACHWEIS_FEHLT`).
+- `OrderItem.vatRate` als Snapshot, `Order.kaeuferArt` und `Order.betriebsnummer`.
+- `mwst.ts` (Vorschlag je Bereich, überall 10 %) und `summenJeSatz` in
+  `order-totals.ts` — Letzteres ruft noch niemand auf, es ist Vorbereitung für
+  den Steuer-Sprint.
+- Produktformular: Kategorie-Sheet (Bereich → Kategorie → Sorte), Kennzeichnung
+  mit Futtermittelart, Nettomenge samt vorgerechnetem Kilopreis, Rohwerten und
+  Abgabe-Schalter; Dual-Use-Hinweis unter dem Namen (verzögert abgefragt).
+- /hoefe zeigt die Futter-Kategorien bis Bereiche 2 nicht in den Chips
+  (`HOEFE_KATEGORIEN`, serverseitig). Futterprodukte bleiben über die Hofseite
+  erreichbar.
+
+**Nach Rückfrage anders als im ersten Konzeptstand:**
+- *F6 — Betriebsnummer gehört dem Hof.* Wer Futter kauft, verkauft meist keines
+  und hat gar keine Kennzeichnung. Deshalb `Farm.betriebsnummer` und
+  `Farm.betriebsstatus` (Hof-Einstellungen → Profil); `betriebsstatus` ist aus
+  der Kennzeichnung gestrichen; `FutterKennzeichnung.registrierungsnummer` ist
+  Altlast wie `isOrganic` — nicht mehr geschrieben, nur noch Rückfall beim
+  Lesen (`betriebsnummerFuerAnzeige`). Das Konzept ist entsprechend geändert.
+- *F2 — Sorte ist Pflicht bei Heu & Stroh und Getreide & Körner.* Ohne Sorte
+  gruppiert das Umfeld später nicht, und Heu vs. Stroh ist fachlich kein Detail.
+  Misch- und Ergänzungsfutter haben keine Sorten.
+- *F7 — Ballen und Big Bags* bietet das Formular bei Futtermitteln UND bei
+  Sonstiges an (Brennholz im Big Bag), nicht bei Lebensmitteln. Keine Zod-Regel
+  dazu. Ein Big Bag Brennholz hat keine Kennzeichnung, also keinen Grundpreis —
+  gewollt.
+- *Mindestlänge Betriebsnummer:* 5 Zeichen auch in den Hof-Einstellungen, sonst
+  belegte der Checkout eine Nummer vor, die er im nächsten Schritt ablehnt.
+
+**Migration `20260922215748_bereiche_1`.** Futtermittelart und Nettomenge sind
+Pflichtangaben vom Sackanhänger; die Migration erfindet sie nicht, sondern bricht
+laut ab, wenn beim ersten Lauf Kennzeichnungen existieren. Produktion hatte null
+Kennzeichnungen. In Dev wurde vorher die eine Seed-Kennzeichnung (`prod-heu`)
+gelöscht, danach Migration und Seed — in dieser Reihenfolge, weil Preview-Builds
+`migrate deploy` gegen dieselbe Dev-DB fahren. Backfill `OrderItem.vatRate`: in
+Dev 0 Zeilen (keine Bestellungen), in Produktion alle Positionen aus
+`Product.vatRate`. Der Rückfall „10 % für Positionen ohne Produkt" aus Konzept §7
+steht in der Migration, kann aber nicht greifen: Der Fremdschlüssel
+OrderItem→Product ist `ON DELETE RESTRICT`. `prisma migrate diff` meldete danach
+„No difference detected" (in Prisma 7 mit `--from-config-datasource --to-schema`;
+`--from-url` gibt es nicht mehr).
+
+**Nebenwirkung im Checkout:** Der Handler lädt jetzt die Produkte des Hofs, um
+Abgabe und MwSt zu lesen. Eine Position, die nicht zu diesem Hof gehört, geht
+deshalb mit 409 `WARENKORB_GEAENDERT` zurück, statt still mitbestellt zu werden.
+
+**Offen:**
+- Steuersätze: überall 10 % als Vorschlag. Echte Sätze, `Farm.besteuerung` und
+  die käuferabhängige Rechnung kommen im Steuer-Sprint mit Steuerberater.
+- Cleanup frühestens vier Wochen nach dem Merge: Enum-Werte `FUTTERMITTEL`,
+  `EINZELFUTTERMITTEL`, `MISCHFUTTERMITTEL`, `ERGAENZUNGSFUTTERMITTEL`, Spalten
+  `FutterKennzeichnung.registrierungsnummer` und `Product.isOrganic`.
+- Bereiche 2: Umschalter und Facetten auf /hoefe, Hofseite nach Bereich
+  sektioniert, Produktdetail mit Akkordeon „Kennzeichnung" (dort liest
+  `betriebsnummerFuerAnzeige` die Nummer).
+- Befund außerhalb dieses Sprints: `/api/checkout` übernimmt `unitPrice` aus dem
+  Request, ohne ihn mit `Product.price` abzugleichen. Eigene Aufgabe (`/fix`).
+
+---
+
 ## Preis-Semantik: Preis je Gebinde (Sprint Preis-Semantik, 2026-09-22)
 
 **Die Fachregel:** `price` ist der Preis je Gebinde, `unitSize` die Gebindegröße,

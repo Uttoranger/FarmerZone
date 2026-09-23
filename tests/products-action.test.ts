@@ -6,6 +6,8 @@
  * ein Kategoriewechsel weg von Futtermittel LÖSCHT die Kennzeichnung in
  * derselben Transaktion; ein fremdes Produkt wird nicht angefasst (Besitz in
  * der WHERE-Klausel); ungültige Eingaben kommen als { error } zurück.
+ * Seit Sprint Bereiche 1: Futtermittelart, Nettomenge, Rohwerte und Abgabe
+ * werden geschrieben, die Registrierungsnummer NICHT mehr (Rückfrage F6).
  *
  * Prisma, Auth und Next sind gemockt — kein Datenbankzugriff.
  */
@@ -58,16 +60,25 @@ const basis = {
 
 const heu = {
   name: 'Heu',
-  price: 6.5,
-  unit: 'PAKET' as const,
-  category: 'FUTTERMITTEL',
-  subcategory: 'EINZELFUTTERMITTEL',
+  price: 45,
+  unit: 'BALLEN' as const,
+  category: 'HEU_STROH',
+  subcategory: 'WIESENHEU',
   labels: [],
+  abgabe: 'NUR_BETRIEBE',
   futter: {
+    futtermittelart: 'EINZELFUTTERMITTEL',
     zielTierarten: ['PFERD', 'RIND'],
     zusammensetzung: 'Heu vom ersten Schnitt',
     analytischeBestandteile: 'Rohprotein 9 %, Rohfaser 28 %',
+    nettoMenge: '300',
+    nettoEinheit: 'KG',
+    rohprotein: '9,5',
+    rohfaser: '',
+    rohfett: '',
+    rohasche: '',
     zusatzstoffe: '',
+    // Altlast: schickt ein alter Tab die Nummer noch mit, wird sie verworfen.
     registrierungsnummer: 'AT 1234567',
     gebrauchshinweis: '',
     bestaetigt: true,
@@ -110,14 +121,32 @@ describe('createProduct', () => {
 
     const data = productCreate.mock.calls[0][0].data as { futter?: { create: Record<string, unknown> } }
     expect(data.futter?.create).toMatchObject({
+      futtermittelart: 'EINZELFUTTERMITTEL',
       zielTierarten: ['PFERD', 'RIND'],
       zusammensetzung: 'Heu vom ersten Schnitt',
-      registrierungsnummer: 'AT 1234567',
+      nettoMenge: 300,
+      nettoEinheit: 'KG',
+      rohprotein: 9.5,
+      rohfaser: null,
       zusatzstoffe: null,
       gebrauchshinweis: null,
       bestaetigtAm: JETZT,
     })
     expect('bestaetigt' in (data.futter?.create ?? {})).toBe(false)
+  })
+
+  it('schreibt die Registrierungsnummer nicht mehr — sie gehört dem Hof (F6)', async () => {
+    await createProduct(heu as never)
+
+    const data = productCreate.mock.calls[0][0].data as { futter?: { create: Record<string, unknown> } }
+    expect('registrierungsnummer' in (data.futter?.create ?? {})).toBe(false)
+  })
+
+  it('schreibt die Abgabe', async () => {
+    await createProduct(heu as never)
+
+    const data = productCreate.mock.calls[0][0].data as Record<string, unknown>
+    expect(data.abgabe).toBe('NUR_BETRIEBE')
   })
 
   it('gibt bei ungültiger Eingabe { error } zurück und schreibt nichts', async () => {
@@ -178,6 +207,8 @@ describe('updateProduct', () => {
       category: 'SONSTIGES',
       subcategory: null,
       futter: undefined,
+      // Das Formular setzt die Abgabe beim Wechsel weg von Futter zurück (P11).
+      abgabe: 'ALLE',
     } as never)
 
     expect(ergebnis).toEqual({ ok: true })

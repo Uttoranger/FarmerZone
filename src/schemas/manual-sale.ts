@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { PRODUCT_UNIT_VALUES } from '@/schemas/product'
 
 // Nur für die fünf Auswahl-Chips im Verkauf-Dialog. Die Labels müssen in eine
 // Fünftel-Spalte passen — daher „Geschäft" statt „Geschäftskunde". In Listen
@@ -33,7 +34,8 @@ export const manualSaleFormSchema = z.object({
   productId: z.string().nullable().optional(),
   productName: z.string().min(1, 'Produktname erforderlich').max(100),
   quantity: z.coerce.number().positive('Menge muss größer als 0 sein'),
-  unit: z.enum(['STUECK', 'KG', 'G', 'LITER', 'ML', 'M3', 'PAKET']).nullable().optional(),
+  // Dieselbe Liste wie am Produkt — sonst scheitert ein Verkauf von Ballen/Big Bags (Bereiche 1).
+  unit: z.enum(PRODUCT_UNIT_VALUES).nullable().optional(),
   totalAmount: z.coerce.number().positive('Betrag muss größer als 0 sein'),
   channel: z.enum(['WHATSAPP', 'HOFLADEN', 'MARKT', 'BUSINESS', 'OTHER']),
   saleDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ungültiges Datum'),

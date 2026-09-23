@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react'
 import dynamic from 'next/dynamic'
-import { useForm } from 'react-hook-form'
+import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
@@ -33,6 +33,8 @@ import {
   type Land,
 } from '@/lib/laender'
 import type { KartenZiel } from '@/components/settings/standort-karte'
+import { hofBetriebsnummerSchema, betriebsstatusSchema } from '@/schemas/betrieb'
+import { BETRIEBSSTATUS, BETRIEBSSTATUS_VALUES, type BetriebsstatusValue } from '@/lib/taxonomie'
 
 // Nur clientseitig: Leaflet greift beim Import auf window zu.
 const StandortKarte = dynamic(() => import('@/components/settings/standort-karte'), { ssr: false })
@@ -51,6 +53,9 @@ const schema = z.object({
   // Schieben gesetzt und erst mit „Profil speichern" gespeichert.
   latitude: z.number().nullable(),
   longitude: z.number().nullable(),
+  // Dieselben Regeln wie auf dem Server (src/schemas/betrieb.ts).
+  betriebsnummer: hofBetriebsnummerSchema,
+  betriebsstatus: betriebsstatusSchema,
 })
 
 export function ProfileForm({ farm }: { farm: FarmSettings }) {
@@ -80,7 +85,9 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
       : { lat: RUECKFALL_PUNKTE[startLand].lat, lon: RUECKFALL_PUNKTE[startLand].lon, zoom: 8 }
 
   const { register, handleSubmit, getValues, setValue, formState: { errors } } = useForm<ProfileFormData>({
-    resolver: zodResolver(schema),
+    // Cast wie im Produktformular: Die Vorverarbeitung (leer → null) macht den
+    // Eingabetyp des Schemas zu unknown; der Ausgabetyp ist ProfileFormData.
+    resolver: zodResolver(schema) as Resolver<ProfileFormData>,
     defaultValues: {
       name: farm.name,
       ownerName: farm.ownerName,
@@ -93,8 +100,13 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
       country: startLand,
       latitude: farm.latitude,
       longitude: farm.longitude,
+      betriebsnummer: farm.betriebsnummer,
+      betriebsstatus: farm.betriebsstatus,
     },
   })
+  // Der Hilfesatz folgt dem gewählten Status — welche Nummer gehört hierher?
+  const [status, setStatus] = useState<BetriebsstatusValue | null>(farm.betriebsstatus)
+  const statusFeld = register('betriebsstatus')
 
   // Die Länderwahl steuert den Hinweis UND die Geokodierung — deshalb als
   // eigener Zustand neben dem Formularwert (register allein meldet keine
@@ -182,7 +194,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
     setHinweis(HINWEIS_ADRESSE_UEBERNOMMEN)
   }
 
-  function field(id: 'name' | 'ownerName' | 'address' | 'phone' | 'email', label: string, placeholder?: string) {
+  function field(id: 'name' | 'ownerName' | 'address' | 'phone' | 'email' | 'betriebsnummer', label: string, placeholder?: string) {
     return (
       <div>
         <Label htmlFor={id} className="text-sm text-muted-foreground mb-1 block">{label}</Label>
@@ -317,6 +329,44 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
         <h2 className="font-medium text-foreground">Kontakt</h2>
         {field('phone', 'Telefon *', '+43 664 123 4567')}
         {field('email', 'E-Mail *', 'hof@beispiel.at')}
+      </div>
+
+      {/* Betriebsnummer (Sprint Bereiche 1): gehört dem Hof, nicht einem
+          Produkt. Die Futter-Kennzeichnung zeigt sie an, der Checkout belegt
+          sie vor, wenn du selbst Futter „nur an Betriebe" kaufst. */}
+      <div className="bg-card rounded-xl border border-border p-4 space-y-4">
+        <div>
+          <h2 className="font-medium text-foreground">Betriebsnummer</h2>
+          <p className="text-xs text-muted-foreground">
+            Freiwillig. Brauchst du, wenn du Futter verkaufst oder bei einem anderen Hof als Betrieb einkaufst.
+          </p>
+        </div>
+        <div>
+          <Label htmlFor="betriebsstatus" className="text-sm text-muted-foreground mb-1 block">Was für ein Betrieb bist du?</Label>
+          {/* Wie beim Land: erst der Handler von register, dann unserer. */}
+          <select
+            id="betriebsstatus"
+            {...statusFeld}
+            onChange={(e) => {
+              statusFeld.onChange(e)
+              setStatus(e.target.value === '' ? null : (e.target.value as BetriebsstatusValue))
+            }}
+            className="min-h-11 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground"
+          >
+            <option value="">Keine Angabe</option>
+            {BETRIEBSSTATUS_VALUES.map((s) => (
+              <option key={s} value={s}>
+                {BETRIEBSSTATUS[s].name}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-muted-foreground mt-1">
+            {status
+              ? BETRIEBSSTATUS[status].hilfe
+              : 'LFBIS-Nummer, BAES- bzw. BVL-Registrierung oder α-Nummer — je nachdem, was du mit Futter machst.'}
+          </p>
+        </div>
+        {field('betriebsnummer', 'Betriebsnummer', 'z. B. AT 1234567')}
       </div>
 
       <p className="text-sm text-muted-foreground">

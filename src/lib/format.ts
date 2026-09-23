@@ -2,6 +2,9 @@ import { UNIT_LABELS } from '@/schemas/product'
 import {
   KATEGORIE_LABEL,
   UNTERKATEGORIE_LABEL,
+  NETTO_EINHEIT_LABEL,
+  istGrossgebindeEinheit,
+  type NettoEinheitValue,
   type ProductCategoryValue,
   type ProductSubcategoryValue,
 } from '@/lib/taxonomie'
@@ -30,6 +33,7 @@ import {
 /** Einheiten, deren Plural sich im Deutschen unterscheidet. Maßeinheiten bleiben gleich. */
 const EINHEIT_PLURAL: Record<string, string> = {
   PAKET: 'Pakete',
+  BIGBAG: 'Big Bags',
 }
 
 const mengenFormat = new Intl.NumberFormat('de-AT', {
@@ -211,6 +215,8 @@ export function grundpreisJeEinheit(
  * „Bestand (Stück)"), mit Gebinde zählt der Bestand Pakete („Bestand (Pakete)").
  */
 export function bestandLabel(unit: string, unitSize?: number | { toString(): string } | null): string {
+  // Ballen und Big Bags zählen Gebinde; ihr Gewicht steht in der Kennzeichnung.
+  if (istGrossgebindeEinheit(unit)) return `Bestand (${einheitLabel(unit, 2)})`
   const size = gebindeGroesse(unitSize)
   if (size && size !== 1) return 'Bestand (Pakete)'
   return `Bestand (${einheitLabel(unit)})`
@@ -263,4 +269,34 @@ export function formatKategorie(
   const kategorie = KATEGORIE_LABEL[l1]
   if (!l2) return kategorie
   return `${kategorie} · ${UNTERKATEGORIE_LABEL[l2]}`
+}
+
+/**
+ * Was ein Bestand in Ballen oder Big Bags wiegt: 10 Ballen à 300 kg → „3.000 kg".
+ * Gerechnet aus stock × nettoMenge der Kennzeichnung (Sprint Bereiche 1) —
+ * nie fest hinterlegt. null bei unbrauchbaren Zahlen. Nur Anzeige.
+ */
+export function formatNettoBestand(
+  stock: number,
+  nettoMenge: number | { toString(): string } | null | undefined,
+  nettoEinheit: NettoEinheitValue
+): string | null {
+  const menge = gebindeGroesse(nettoMenge)
+  if (menge == null || !Number.isFinite(stock) || stock < 0) return null
+  return `${formatZahl(Math.round(stock * menge * 1000) / 1000)} ${NETTO_EINHEIT_LABEL[nettoEinheit]}`
+}
+
+/**
+ * Kilo- bzw. Literpreis eines Futtermittels aus Gebindepreis und Nettomenge:
+ * € 45,00 für 300 kg → „€ 0,15 / kg". NUR Anzeige (Konzept-Glossar
+ * „Grundpreis"), auf Cent gerundet; null ohne brauchbaren Preis oder Menge.
+ */
+export function formatGrundpreisNetto(
+  price: number,
+  nettoMenge: number | { toString(): string } | null | undefined,
+  nettoEinheit: NettoEinheitValue
+): string | null {
+  const menge = gebindeGroesse(nettoMenge)
+  if (menge == null || !Number.isFinite(price) || price <= 0) return null
+  return `${formatEuro(Math.round((price / menge) * 100) / 100)} / ${NETTO_EINHEIT_LABEL[nettoEinheit]}`
 }

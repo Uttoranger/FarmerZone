@@ -42,6 +42,9 @@ const gueltig = {
   country: 'AT' as const,
   latitude: null,
   longitude: null,
+  // Seit Sprint Bereiche 1 (Rückfrage F6) Teil des Profils; leer ist erlaubt.
+  betriebsnummer: null,
+  betriebsstatus: null,
 }
 
 beforeEach(() => {
@@ -230,5 +233,32 @@ describe('updateProfile — Land und Punkt dürfen nicht auseinanderlaufen', () 
   it('die Fehlermeldung für ein unbekanntes Land ist deutsch', async () => {
     const res = await updateProfile({ ...gueltig, country: 'FR' } as never)
     expect(res.error).toBe('Bitte Österreich oder Deutschland wählen')
+  })
+})
+
+describe('updateProfile — Betriebsnummer (Sprint Bereiche 1)', () => {
+  it('speichert Betriebsnummer und Betriebsstatus getrimmt am eigenen Hof', async () => {
+    const res = await updateProfile({ ...gueltig, betriebsnummer: '  AT 1234567 ', betriebsstatus: 'PRIMAERPRODUKTION' })
+
+    expect(res.error).toBeUndefined()
+    expect(farmUpdate).toHaveBeenCalledWith({
+      where: { id: 'farm_1' },
+      data: expect.objectContaining({ betriebsnummer: 'AT 1234567', betriebsstatus: 'PRIMAERPRODUKTION' }),
+    })
+  })
+
+  it('eine leere Nummer löscht die gespeicherte (null)', async () => {
+    await updateProfile({ ...gueltig, betriebsnummer: '' as never })
+
+    expect(farmUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ betriebsnummer: null }) })
+    )
+  })
+
+  it('eine zu kurze Nummer wird mit dem vereinbarten Satz abgelehnt, nichts wird geschrieben', async () => {
+    const res = await updateProfile({ ...gueltig, betriebsnummer: '1234' })
+
+    expect(res.error).toBe('Eine Betriebsnummer hat mindestens 5 Zeichen.')
+    expect(farmUpdate).not.toHaveBeenCalled()
   })
 })

@@ -2,12 +2,12 @@ import { prisma } from '@/lib/prisma'
 import { categoryImagePath } from '@/lib/product-image'
 import { DEFAULT_SECTIONS, type SectionConfig } from './appearance'
 import { PRODUCT_ORDER_BY } from './products'
-import type { ProductCategory } from '@prisma/client'
-import { PRODUCT_CATEGORY_VALUES } from '@/schemas/product'
+import type { Betriebsstatus, ProductCategory } from '@prisma/client'
 import {
   baueFotostreifen,
   naechsteAbholung,
   sammleKategorien,
+  HOEFE_KATEGORIEN,
   wienJetzt,
   type NaechsteAbholung,
   type OrtsZeit,
@@ -321,6 +321,9 @@ export type FarmSettings = {
   isPaused: boolean
   pauseMessage: string | null
   slug: string
+  /** Betriebsnummer und -status (Sprint Bereiche 1, Rückfrage F6). */
+  betriebsnummer: string | null
+  betriebsstatus: Betriebsstatus | null
   pickupSlots: Array<{
     id: string
     dayOfWeek: number
@@ -352,6 +355,8 @@ export async function getFarmSettings(ownerId: string): Promise<FarmSettings | n
       isPaused: true,
       pauseMessage: true,
       slug: true,
+      betriebsnummer: true,
+      betriebsstatus: true,
       pickupSlots: {
         orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
         select: {
@@ -631,7 +636,8 @@ export async function getOeffentlicheHoefe(
     isPaused: hof.isPaused,
     kategorien: sammleKategorien(
       (kategorienJeHof.get(hof.id) ?? []).map((category) => ({ category })),
-      PRODUCT_CATEGORY_VALUES
+      // Ohne Futter-Kategorien, bis Bereiche 2 den Umschalter bringt (Konzept 6.2).
+      HOEFE_KATEGORIEN
     ),
     produkte: hof.products.map((p) => ({
       id: p.id,

@@ -15,6 +15,7 @@ import {
   type RueckwaertsAdresse,
 } from '@/lib/geokodierung'
 import { LAENDER, LAND_GENITIV, alsLand, type Land } from '@/lib/laender'
+import { hofBetriebsnummerSchema, betriebsstatusSchema } from '@/schemas/betrieb'
 
 async function getAuthFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -42,6 +43,10 @@ const profileSchema = z.object({
   // gespeicherter Punkt wird dann NICHT angerührt (siehe updateProfile).
   latitude: z.number().nullable(),
   longitude: z.number().nullable(),
+  // Betriebsnummer des Hofs (Sprint Bereiche 1, Rückfrage F6) — Vorbelegung
+  // im Checkout, Anzeige in der Futter-Kennzeichnung. Leer ist erlaubt.
+  betriebsnummer: hofBetriebsnummerSchema,
+  betriebsstatus: betriebsstatusSchema,
   // Logo und Titelbild gehören zu „Mein Auftritt" (echter Datei-Upload) und
   // stehen bewusst NICHT mehr im Profil-Formular. Sie fehlen hier auch im
   // Schreibpfad: sonst würde jedes Profil-Speichern die dort hochgeladenen

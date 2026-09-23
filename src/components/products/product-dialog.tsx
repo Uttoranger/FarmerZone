@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { useForm, type FieldErrors, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { ImagePlus, X, Leaf, Thermometer, Snowflake } from 'lucide-react'
+import { ImagePlus, X, Leaf, Thermometer, Snowflake, ChevronRight, Info } from 'lucide-react'
 import { ladeFotoHoch, stufenText, type UploadStufe } from '@/components/shared/image-upload'
 import { useFotoQuellen } from '@/components/shared/foto-quellen'
 import { bildFehlerMeldung } from '@/lib/upload-fehler'
@@ -44,38 +45,51 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { createProduct, updateProduct } from '@/server/actions/products'
+import { createProduct, updateProduct, pruefeDualUse } from '@/server/actions/products'
 import type { ProductData } from '@/server/queries/products'
 import {
   productFormSchema,
   type ProductFormData,
   type FutterKennzeichnungFormData,
   ALLERGENS,
-  UNIT_OPTIONS,
   MONTH_OPTIONS,
-  CATEGORY_OPTIONS,
-  MWST_STANDARD,
+  unitOptionsFuer,
   seasonLabel,
 } from '@/schemas/product'
 import {
   hatUnterkategorien,
-  unterkategorienVon,
-  UNTERKATEGORIE_LABEL,
   PRODUCT_LABEL_VALUES,
   SIEGEL,
   TIERART_VALUES,
   TIERART_LABEL,
+  FUTTERMITTELART_LABEL,
+  FUTTERMITTELART_ERKLAERUNG,
+  NETTO_EINHEIT_VALUES,
+  NETTO_EINHEIT_LABEL,
+  betriebsnummerFuerAnzeige,
+  futtermittelartenFuer,
+  futtermittelartSatz,
+  grossgebindeEinheitenAngeboten,
+  istFuttermittel,
+  istGrossgebindeEinheit,
+  type FuttermittelartValue,
   type ProductCategoryValue,
+  type ProductSubcategoryValue,
 } from '@/lib/taxonomie'
+import { mwstStandard } from '@/lib/mwst'
+import { DUAL_USE_MIN_ZEICHEN, DUAL_USE_VERZOEGERUNG_MS } from '@/lib/dual-use'
 import {
   formatKategorie,
   formatGrundpreis,
+  formatGrundpreisNetto,
+  formatNettoBestand,
   formatZahl,
   mitAnzahl,
   einheitLabel,
   bestandLabel,
   formatBestand,
 } from '@/lib/format'
+import { KategorieSheet } from './kategorie-sheet'
 import { cn } from '@/lib/utils'
 import {
   kundenVorschau,
@@ -128,17 +142,41 @@ type Props = {
   open: boolean
   product: ProductData | null
   onClose: () => void
+  /** Betriebsnummer aus den Hof-Einstellungen — nur Anzeige in der Kennzeichnung (F6). */
+  hofBetriebsnummer: string | null
 }
 
-/** Eine leere Kennzeichnung — sobald die Kategorie Futtermittel gewählt ist. */
+/** Eine leere Kennzeichnung — sobald eine Futter-Kategorie gewählt ist. */
 const FUTTER_LEER: FutterKennzeichnungFormData = {
+  futtermittelart: null,
   zielTierarten: [],
   zusammensetzung: '',
   analytischeBestandteile: '',
+  // NaN statt 0, wie beim Preis: Das Feld startet leer, und die Prüfung meldet
+  // den Sackanhänger-Satz statt „größer als 0" für eine Null, die niemand tippte.
+  nettoMenge: Number.NaN,
+  nettoEinheit: 'KG',
+  rohprotein: null,
+  rohfaser: null,
+  rohfett: null,
+  rohasche: null,
   zusatzstoffe: '',
-  registrierungsnummer: '',
   gebrauchshinweis: '',
   bestaetigt: false,
+}
+
+/**
+ * Die Futtermittelart, die zu einer Kategorie passt: bleibt, wenn sie erlaubt
+ * ist; bei genau einem erlaubten Wert ist er gesetzt; sonst leer — dann wählt
+ * der Hof (Ergänzungsfutter).
+ */
+function passendeFuttermittelart(
+  category: ProductCategoryValue | null,
+  bisher: FuttermittelartValue | null
+): FuttermittelartValue | null {
+  const erlaubt = futtermittelartenFuer(category)
+  if (bisher && erlaubt.includes(bisher)) return bisher
+  return erlaubt.length === 1 ? erlaubt[0] : null
 }
 
 const EMPTY_DEFAULTS: ProductFormData = {
@@ -151,11 +189,12 @@ const EMPTY_DEFAULTS: ProductFormData = {
   // Leer ist null, nie undefined: react-hook-form liest undefined als
   // „Ausgangswert wiederherstellen" (docs/ai/CODING_STANDARDS.md, Formulare).
   futter: null,
+  abgabe: 'ALLE',
   countsTowardLimit: true,
   // NaN statt 0: Das Preisfeld startet leer, und die Prüfung meldet „Bitte gib
   // einen Preis ein" statt „größer als 0" für eine Null, die niemand getippt hat.
   price: Number.NaN,
-  vatRate: MWST_STANDARD,
+  vatRate: mwstStandard(null),
   unit: 'STUECK',
   unitSize: null,
   stock: 0,
@@ -180,15 +219,22 @@ function toFormDefaults(p: ProductData): Partial<ProductFormData> {
     // ist deshalb gesetzt. Beim Speichern wird das Datum ohnehin neu gestempelt.
     futter: p.futter
       ? {
+          futtermittelart: p.futter.futtermittelart,
           zielTierarten: p.futter.zielTierarten,
           zusammensetzung: p.futter.zusammensetzung,
           analytischeBestandteile: p.futter.analytischeBestandteile,
+          nettoMenge: p.futter.nettoMenge,
+          nettoEinheit: p.futter.nettoEinheit,
+          rohprotein: p.futter.rohprotein,
+          rohfaser: p.futter.rohfaser,
+          rohfett: p.futter.rohfett,
+          rohasche: p.futter.rohasche,
           zusatzstoffe: p.futter.zusatzstoffe ?? '',
-          registrierungsnummer: p.futter.registrierungsnummer ?? '',
           gebrauchshinweis: p.futter.gebrauchshinweis ?? '',
           bestaetigt: true,
         }
       : null,
+    abgabe: p.abgabe,
     countsTowardLimit: p.countsTowardLimit,
     price: p.price,
     vatRate: p.vatRate,
@@ -220,15 +266,18 @@ function zusammenfassung(abschnitt: Abschnitt, w: ProductFormData): string {
       const teile: string[] = []
       teile.push(w.labels.length > 0 ? w.labels.map((l) => SIEGEL[l].name).join(', ') : 'Keine Siegel')
       if (w.allergens.length > 0) teile.push(mitAnzahl(w.allergens.length, 'Allergen', 'Allergene'))
-      // Der MwSt-Satz steht nur da, wenn er vom Standard abweicht.
-      if (Number.isFinite(w.vatRate) && w.vatRate !== MWST_STANDARD) {
+      // Der MwSt-Satz steht nur da, wenn er vom Standard der Kategorie abweicht.
+      if (Number.isFinite(w.vatRate) && w.vatRate !== mwstStandard(w.category)) {
         teile.push(`MwSt ${formatZahl(w.vatRate)} %`)
       }
       return teile.join(' · ')
     }
     case 'kennzeichnung': {
       const tiere = w.futter?.zielTierarten ?? []
-      return tiere.length > 0 ? `Für ${tiere.map((t) => TIERART_LABEL[t]).join(', ')}` : 'Noch nicht ausgefüllt'
+      if (tiere.length === 0) return 'Noch nicht ausgefüllt'
+      const teile = [`Für ${tiere.map((t) => TIERART_LABEL[t]).join(', ')}`]
+      if (w.abgabe === 'NUR_BETRIEBE') teile.push('nur an Betriebe')
+      return teile.join(' · ')
     }
   }
 }
@@ -243,7 +292,7 @@ function chipKlasse(aktiv: boolean): string {
   )
 }
 
-export function ProductDialog({ open, product, onClose }: Props) {
+export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Props) {
   const isEdit = product !== null
   const [isSubmitting, setIsSubmitting] = useState(false)
   // Nur während des Foto-Uploads gesetzt — danach zeigt der Knopf wieder
@@ -257,9 +306,15 @@ export function ProductDialog({ open, product, onClose }: Props) {
   // Welche Abschnitte aufgeklappt sind. Anlegen: nur Grunddaten; Bearbeiten:
   // alle zu, die Titel tragen dann eine Zusammenfassung.
   const [offen, setOffen] = useState<Abschnitt[]>([])
-  // Kategoriewechsel weg von Futtermittel wartet auf Bestätigung — die
+  // Kategoriewechsel weg von den Futtermitteln wartet auf Bestätigung — die
   // Kennzeichnung würde beim Speichern gelöscht.
-  const [kategorieWechsel, setKategorieWechsel] = useState<{ neu: ProductCategoryValue | null } | null>(null)
+  const [kategorieWechsel, setKategorieWechsel] = useState<{
+    neu: ProductCategoryValue | null
+    sorte: ProductSubcategoryValue | null
+  } | null>(null)
+  const [kategorieSheetOffen, setKategorieSheetOffen] = useState(false)
+  // Dual-Use-Hinweis unter dem Namen (Konzept 6.1) — ein Hinweis, kein Fehler.
+  const [dualUseHinweis, setDualUseHinweis] = useState<string | null>(null)
   // Der Preis, der im Feld stand, bevor eine Gebindegröße über 1 gesetzt wurde —
   // mutmaßlich ein Preis je Einheit. Grundlage der Rückfrage „ganzes Paket?".
   const [referenzPreis, setReferenzPreis] = useState<number | null>(null)
@@ -290,7 +345,9 @@ export function ProductDialog({ open, product, onClose }: Props) {
   const isAvailable = werte.isAvailable
   const watchedSeasonStart = werte.seasonStart
   const watchedSeasonEnd = werte.seasonEnd
-  const istFuttermittel = category === 'FUTTERMITTEL'
+  // Der Bereich entscheidet, nicht der Vergleich mit einer Kategorie (ARCHITECTURE.md §5).
+  const futterBereich = istFuttermittel(category)
+  const grossgebinde = istGrossgebindeEinheit(werte.unit)
   const fehlerhafteAbschnitte = abschnitteMitFehlern(form.formState.errors)
   const preisVorschau = kundenVorschau(werte.price, werte.unit, werte.unitSize)
   const preisFraglich = paketpreisFraglich({
@@ -299,8 +356,20 @@ export function ProductDialog({ open, product, onClose }: Props) {
     referenzPreis,
   })
   const preisAntworten = paketpreisAntworten(werte.price, werte.unit, werte.unitSize)
-  const bestandGesamt = formatBestand(werte.stock, werte.unit, werte.unitSize)
-  const mwstStandard = MWST_STANDARD
+  // Bei Ballen und Big Bags steht das Gewicht in der Kennzeichnung: Bestand ×
+  // Nettomenge, nie fest hinterlegt. Sonst wie bisher aus der Gebindegröße.
+  const bestandGesamt = grossgebinde
+    ? formatNettoBestand(werte.stock, werte.futter?.nettoMenge, werte.futter?.nettoEinheit ?? 'KG')
+    : formatBestand(werte.stock, werte.unit, werte.unitSize)
+  const mwstVorschlag = mwstStandard(category)
+  const kilopreis = werte.futter
+    ? formatGrundpreisNetto(werte.price, werte.futter.nettoMenge, werte.futter.nettoEinheit)
+    : null
+  const erlaubteArten = futtermittelartenFuer(category)
+  const betriebsnummer = betriebsnummerFuerAnzeige(
+    { betriebsnummer: hofBetriebsnummer },
+    isEdit ? product.futter : null
+  )
 
   // Reset form when dialog opens/switches product
   useEffect(() => {
@@ -310,12 +379,40 @@ export function ProductDialog({ open, product, onClose }: Props) {
       setPreviewUrl(isEdit ? (product.imageUrl ?? null) : null)
       setOffen(isEdit ? [] : ['grunddaten'])
       setKategorieWechsel(null)
+      setKategorieSheetOffen(false)
+      setDualUseHinweis(null)
       setReferenzPreis(null)
       // Beim Bearbeiten stehen die Schalter so, wie das Produkt gespeichert ist.
       setFestePakete(isEdit && product.unitSize != null)
       setSaisonal(isEdit && product.seasonStart != null && product.seasonEnd != null)
     }
   }, [open, product?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Dual-Use-Hinweis: erst fragen, wenn der Hof kurz aufgehört hat zu tippen —
+  // keine Abfrage je Tastendruck. Eine überholte Antwort wird verworfen.
+  const dualUseAnfrage = useRef(0)
+  const produktId = isEdit ? product.id : undefined
+  useEffect(() => {
+    if (!open) return
+    const nummer = ++dualUseAnfrage.current
+    // Ohne Kategorie oder mit zu kurzem Namen kann es keinen Hinweis geben —
+    // dann gar nicht erst fragen.
+    if (category == null || werte.name.trim().length < DUAL_USE_MIN_ZEICHEN) {
+      setDualUseHinweis(null)
+      return
+    }
+    const zeitgeber = window.setTimeout(async () => {
+      try {
+        const ergebnis = await pruefeDualUse({ name: werte.name, category, productId: produktId })
+        if (nummer !== dualUseAnfrage.current) return
+        setDualUseHinweis('hinweis' in ergebnis ? ergebnis.hinweis : null)
+      } catch {
+        // Nur ein Hinweis: Scheitert die Abfrage, fehlt er eben — kein Fehler für den Hof.
+        if (nummer === dualUseAnfrage.current) setDualUseHinweis(null)
+      }
+    }, DUAL_USE_VERZOEGERUNG_MS)
+    return () => window.clearTimeout(zeitgeber)
+  }, [open, werte.name, category, produktId])
 
   // Revoke object URLs on cleanup
   useEffect(() => {
@@ -382,32 +479,57 @@ export function ProductDialog({ open, product, onClose }: Props) {
     )
   }
 
-  /**
-   * Kategorie wählen. Ein Wechsel setzt die Unterkategorie zurück (sie gehört
-   * zur alten L1). Weg von Futtermittel mit vorhandener Kennzeichnung: erst
-   * fragen — sie würde beim Speichern gelöscht.
-   */
-  function kategorieWaehlen(neu: ProductCategoryValue | null) {
-    const alt = form.getValues('category')
-    if (neu === alt) return
-    if (alt === 'FUTTERMITTEL' && form.getValues('futter') != null) {
-      setKategorieWechsel({ neu })
-      return
-    }
-    kategorieSetzen(neu)
+  /** Einheit wechseln: Ballen und Big Bags haben keine Gebindegröße (P12). */
+  function einheitSetzen(unit: ProductFormData['unit']) {
+    form.setValue('unit', unit, { shouldDirty: true })
+    if (istGrossgebindeEinheit(unit)) festePaketeUmschalten(false)
   }
 
-  function kategorieSetzen(neu: ProductCategoryValue | null) {
+  /**
+   * Die Wahl aus dem Kategorie-Sheet übernehmen. Weg aus den Futtermitteln mit
+   * vorhandener Kennzeichnung: erst fragen — sie würde beim Speichern gelöscht.
+   */
+  function kategorieUebernehmen(neu: ProductCategoryValue | null, sorte: ProductSubcategoryValue | null) {
+    setKategorieSheetOffen(false)
+    const alt = form.getValues('category')
+    if (neu === alt && sorte === form.getValues('subcategory')) return
+    if (istFuttermittel(alt) && !istFuttermittel(neu) && form.getValues('futter') != null) {
+      setKategorieWechsel({ neu, sorte })
+      return
+    }
+    kategorieSetzen(neu, sorte)
+  }
+
+  function kategorieSetzen(neu: ProductCategoryValue | null, sorte: ProductSubcategoryValue | null) {
+    const alt = form.getValues('category')
     form.setValue('category', neu, { shouldDirty: true })
-    form.setValue('subcategory', null, { shouldDirty: true })
-    form.clearErrors('subcategory')
-    if (neu === 'FUTTERMITTEL') {
-      if (form.getValues('futter') == null) form.setValue('futter', { ...FUTTER_LEER })
+    form.setValue('subcategory', sorte, { shouldDirty: true })
+    form.clearErrors(['category', 'subcategory'])
+
+    // MwSt: Stand noch der Vorschlag der alten Kategorie da, gilt jetzt der
+    // der neuen. Einen selbst getippten Satz fasst der Wechsel nicht an.
+    if (form.getValues('vatRate') === mwstStandard(alt)) {
+      form.setValue('vatRate', mwstStandard(neu), { shouldDirty: true })
+    }
+    // Ballen und Big Bags gibt es bei Lebensmitteln nicht (F7).
+    if (!grossgebindeEinheitenAngeboten(neu) && istGrossgebindeEinheit(form.getValues('unit'))) {
+      einheitSetzen('STUECK')
+    }
+
+    if (istFuttermittel(neu)) {
+      const bisher = form.getValues('futter')
+      const futter = bisher ?? { ...FUTTER_LEER }
+      form.setValue(
+        'futter',
+        { ...futter, futtermittelart: passendeFuttermittelart(neu, futter.futtermittelart) },
+        { shouldDirty: true }
+      )
       // Beim Anlegen eines Futtermittels ist die Kennzeichnung Pflicht — gleich zeigen.
       abschnittOeffnen('kennzeichnung')
     } else {
       form.setValue('futter', null, { shouldDirty: true })
-      form.clearErrors('futter')
+      form.setValue('abgabe', 'ALLE', { shouldDirty: true })
+      form.clearErrors(['futter', 'abgabe'])
     }
   }
 
@@ -545,76 +667,51 @@ export function ProductDialog({ open, product, onClose }: Props) {
                               <Input placeholder="z. B. Heumilch frisch" {...field} />
                             </FormControl>
                             <FormMessage />
+                            {/* Hinweis, kein Fehler, keine Sperre (Konzept 6.1). */}
+                            {dualUseHinweis && (
+                              <p
+                                className="flex items-start gap-2 rounded-lg border border-notice-line bg-notice p-2.5 text-xs text-notice-ink"
+                                aria-live="polite"
+                              >
+                                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-notice-icon" aria-hidden />
+                                {dualUseHinweis}
+                              </p>
+                            )}
                           </FormItem>
                         )}
                       />
 
+                      {/* Kategorie und Sorte in EINEM Sheet: Bereich → Kategorie → Sorte.
+                          Hier steht nur die Wahl und ihre Fehlermeldungen. */}
                       <FormField
                         control={form.control}
                         name="category"
-                        render={({ field }) => (
+                        render={() => (
                           <FormItem data-feld="category">
-                            <FormLabel>Kategorie</FormLabel>
-                            <Select
-                              onValueChange={(v) =>
-                                kategorieWaehlen(v === 'NONE' ? null : (v as ProductCategoryValue))
-                              }
-                              value={field.value ?? 'NONE'}
+                            <FormLabel>Kategorie{futterBereich && ' *'}</FormLabel>
+                            <button
+                              type="button"
+                              data-feld="subcategory"
+                              onClick={() => setKategorieSheetOffen(true)}
+                              className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-input bg-card px-3 text-left text-sm"
                             >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Keine Angabe" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="NONE">Keine Angabe</SelectItem>
-                                {CATEGORY_OPTIONS.map((c) => (
-                                  <SelectItem key={c.value} value={c.value}>
-                                    {c.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              <span className={cn(!category && 'text-muted-foreground')}>
+                                {category ? formatKategorie(category, werte.subcategory) : 'Keine Angabe'}
+                              </span>
+                              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                            </button>
                             <FormMessage />
+                            {form.formState.errors.subcategory?.message && (
+                              <p className="text-sm text-destructive">{form.formState.errors.subcategory.message}</p>
+                            )}
+                            {category && hatUnterkategorien(category) && !werte.subcategory && !futterBereich && (
+                              <FormDescription className="text-xs">
+                                Eine Unterkategorie hilft Kundinnen beim Finden — du kannst sie auch später ergänzen.
+                              </FormDescription>
+                            )}
                           </FormItem>
                         )}
                       />
-
-                      {/* Unterkategorie: erst nach der Kategorie, nur wo es welche gibt.
-                          Chips statt Select — es sind höchstens neun. */}
-                      {category && hatUnterkategorien(category) && (
-                        <FormField
-                          control={form.control}
-                          name="subcategory"
-                          render={({ field }) => (
-                            <FormItem data-feld="subcategory" tabIndex={-1} className="outline-none">
-                              <FormLabel>Unterkategorie{istFuttermittel && ' *'}</FormLabel>
-                              <div className="flex flex-wrap gap-2" role="group" aria-label="Unterkategorie">
-                                {unterkategorienVon(category).map((l2) => {
-                                  const aktiv = field.value === l2
-                                  return (
-                                    <button
-                                      key={l2}
-                                      type="button"
-                                      aria-pressed={aktiv}
-                                      onClick={() => field.onChange(aktiv ? null : l2)}
-                                      className={chipKlasse(aktiv)}
-                                    >
-                                      {UNTERKATEGORIE_LABEL[l2]}
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                              {!field.value && !istFuttermittel && (
-                                <FormDescription className="text-xs">
-                                  Hilft Kundinnen beim Finden — du kannst sie auch später ergänzen.
-                                </FormDescription>
-                              )}
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      )}
 
                       {/* Foto */}
                       <div data-feld="imageUrl">
@@ -700,14 +797,17 @@ export function ProductDialog({ open, product, onClose }: Props) {
                         render={({ field }) => (
                           <FormItem data-feld="unit">
                             <FormLabel>Einheit *</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
+                            <Select
+                              onValueChange={(v) => einheitSetzen(v as ProductFormData['unit'])}
+                              value={field.value}
+                            >
                               <FormControl>
                                 <SelectTrigger>
                                   <SelectValue placeholder="Wählen…" />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                {UNIT_OPTIONS.map((u) => (
+                                {unitOptionsFuer(category).map((u) => (
                                   <SelectItem key={u.value} value={u.value}>
                                     {u.label}
                                   </SelectItem>
@@ -720,16 +820,23 @@ export function ProductDialog({ open, product, onClose }: Props) {
                       />
 
                       {/* Gebinde hinter einem Schalter: Aus = Kunden bestellen einzeln
-                          (unitSize leer), An = feste Pakete mit Größe. */}
-                      <SchalterZeile
-                        id="feste-pakete"
-                        titel="Ich verkaufe in festen Paketen"
-                        untertitel="z. B. ein 2-kg-Paket oder eine 0,5-L-Flasche"
-                        checked={festePakete}
-                        onCheckedChange={festePaketeUmschalten}
-                      />
+                          (unitSize leer), An = feste Pakete mit Größe. Bei Ballen und
+                          Big Bags gibt es ihn nicht — das Gewicht steht in der Kennzeichnung. */}
+                      {grossgebinde ? (
+                        <p className="text-xs text-muted-foreground">
+                          Bei Ballen und Big Bags steht das Gewicht in der Kennzeichnung.
+                        </p>
+                      ) : (
+                        <SchalterZeile
+                          id="feste-pakete"
+                          titel="Ich verkaufe in festen Paketen"
+                          untertitel="z. B. ein 2-kg-Paket oder eine 0,5-L-Flasche"
+                          checked={festePakete}
+                          onCheckedChange={festePaketeUmschalten}
+                        />
+                      )}
 
-                      {festePakete && (
+                      {festePakete && !grossgebinde && (
                         <FormField
                           control={form.control}
                           name="unitSize"
@@ -1107,14 +1214,14 @@ export function ProductDialog({ open, product, onClose }: Props) {
                               <DezimalFeld
                                 name={field.name}
                                 value={field.value}
-                                placeholder={String(mwstStandard)}
+                                placeholder={String(mwstVorschlag)}
                                 suffix="%"
                                 onBlur={field.onBlur}
-                                onChange={(neu) => field.onChange(neu ?? mwstStandard)}
+                                onChange={(neu) => field.onChange(neu ?? mwstVorschlag)}
                               />
                             </FormControl>
                             <FormDescription className="text-xs">
-                              Standard für diese Kategorie: {formatZahl(mwstStandard)} %
+                              Standard für diese Kategorie: {formatZahl(mwstVorschlag)} %
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
@@ -1125,7 +1232,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
                 </AccordionItem>
 
                 {/* === 4. KENNZEICHNUNG — nur bei Futtermitteln === */}
-                {istFuttermittel && (
+                {futterBereich && (
                   <AccordionItem value="kennzeichnung">
                     <AccordionTrigger>{abschnittTitel('kennzeichnung', true)}</AccordionTrigger>
                     <AccordionPanel>
@@ -1133,6 +1240,108 @@ export function ProductDialog({ open, product, onClose }: Props) {
                         <p className="text-xs text-muted-foreground">
                           Alle Angaben findest du auf dem Sackanhänger oder Lieferschein deines Futters.
                         </p>
+
+                        {/* Futtermittelart: nur die nach Tabelle 2.4 erlaubten Werte. Bei
+                            genau einem steht er schon fest — und das Feld sagt, warum. */}
+                        <FormField
+                          control={form.control}
+                          name="futter.futtermittelart"
+                          render={({ field }) => (
+                            <FormItem data-feld="futter.futtermittelart" tabIndex={-1} className="outline-none">
+                              <FormLabel>Futtermittelart *</FormLabel>
+                              {erlaubteArten.length === 1 ? (
+                                <div className="rounded-lg border border-border bg-muted/30 p-3">
+                                  <p className="text-sm font-medium text-foreground">
+                                    {FUTTERMITTELART_LABEL[erlaubteArten[0]]}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">{futtermittelartSatz(category)}</p>
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Futtermittelart">
+                                    {erlaubteArten.map((art) => {
+                                      const aktiv = field.value === art
+                                      return (
+                                        <button
+                                          key={art}
+                                          type="button"
+                                          role="radio"
+                                          aria-checked={aktiv}
+                                          onClick={() => field.onChange(art)}
+                                          className={chipKlasse(aktiv)}
+                                        >
+                                          {FUTTERMITTELART_LABEL[art]}
+                                        </button>
+                                      )
+                                    })}
+                                  </div>
+                                  <FormDescription className="text-xs">
+                                    {field.value
+                                      ? FUTTERMITTELART_ERKLAERUNG[field.value]
+                                      : 'Steht auf dem Sackanhänger, meist direkt über der Zusammensetzung.'}
+                                  </FormDescription>
+                                </>
+                              )}
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* Nettomenge: Inhalt EINES Gebindes, nicht Bestand. */}
+                        <div className="space-y-1.5">
+                          <div className="grid grid-cols-[1fr_6.5rem] gap-3">
+                            <FormField
+                              control={form.control}
+                              name="futter.nettoMenge"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Nettomenge *</FormLabel>
+                                  <FormControl>
+                                    <DezimalFeld
+                                      name={field.name}
+                                      value={field.value}
+                                      placeholder="z. B. 300"
+                                      onBlur={field.onBlur}
+                                      onChange={(neu) => field.onChange(neu ?? Number.NaN)}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="futter.nettoEinheit"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Einheit</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {NETTO_EINHEIT_VALUES.map((e) => (
+                                        <SelectItem key={e} value={e}>
+                                          {NETTO_EINHEIT_LABEL[e]}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Durchschnittsgewicht eines Gebindes, wie auf dem Sackanhänger.
+                          </p>
+                          {kilopreis && (
+                            <p className="text-xs text-foreground" aria-live="polite">
+                              {formatGrundpreis(werte.price, werte.unit, werte.unitSize)} → {kilopreis}
+                            </p>
+                          )}
+                        </div>
 
                         <FormField
                           control={form.control}
@@ -1214,6 +1423,46 @@ export function ProductDialog({ open, product, onClose }: Props) {
                           )}
                         />
 
+                        {/* Rohwerte optional, als Zahl — für späteren Vergleich. Die
+                            Pflichtangabe bleibt der Freitext darüber. */}
+                        <div className="space-y-1.5">
+                          <p className="text-sm font-medium text-foreground">Rohwerte in % (freiwillig)</p>
+                          <div className="grid grid-cols-2 gap-3">
+                            {(
+                              [
+                                ['futter.rohprotein', 'Rohprotein'],
+                                ['futter.rohfaser', 'Rohfaser'],
+                                ['futter.rohfett', 'Rohfett'],
+                                ['futter.rohasche', 'Rohasche'],
+                              ] as const
+                            ).map(([name, label]) => (
+                              <FormField
+                                key={name}
+                                control={form.control}
+                                name={name}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-xs font-normal">{label}</FormLabel>
+                                    <FormControl>
+                                      <DezimalFeld
+                                        name={field.name}
+                                        value={field.value}
+                                        suffix="%"
+                                        onBlur={field.onBlur}
+                                        onChange={(neu) => field.onChange(neu)}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            ))}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Dieselben Zahlen wie oben, nur einzeln. Die Pflichtangabe bleibt der Text darüber.
+                          </p>
+                        </div>
+
                         <FormField
                           control={form.control}
                           name="futter.zusatzstoffe"
@@ -1236,22 +1485,22 @@ export function ProductDialog({ open, product, onClose }: Props) {
                           )}
                         />
 
-                        <FormField
-                          control={form.control}
-                          name="futter.registrierungsnummer"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Registrierungsnummer</FormLabel>
-                              <FormControl>
-                                <Input placeholder="z. B. AT 1234567" {...field} value={field.value ?? ''} />
-                              </FormControl>
-                              <FormDescription className="text-xs">
-                                BAES-Registrierung, oder deine LFBIS-Nummer, wenn du nur selbst erzeugtes Futter verkaufst.
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                        {/* Die Nummer gehört dem Hof, nicht dem Produkt (Rückfrage F6):
+                            hier nur Anzeige, geändert wird sie in den Hof-Einstellungen. */}
+                        <div className="rounded-lg border border-border p-3">
+                          <p className="text-sm font-medium text-foreground">Betriebsnummer</p>
+                          <p className="text-sm text-foreground">
+                            {betriebsnummer ?? (
+                              <span className="text-muted-foreground">Noch keine hinterlegt.</span>
+                            )}
+                          </p>
+                          <Link
+                            href="/settings/profile"
+                            className="mt-1 inline-flex min-h-9 items-center text-xs font-medium text-brand-text underline underline-offset-2"
+                          >
+                            In den Hof-Einstellungen ändern
+                          </Link>
+                        </div>
 
                         <FormField
                           control={form.control}
@@ -1270,6 +1519,23 @@ export function ProductDialog({ open, product, onClose }: Props) {
                               <FormDescription className="text-xs">
                                 Fütterungsempfehlung oder Lagerhinweis vom Anhänger, falls vorhanden.
                               </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="abgabe"
+                          render={({ field }) => (
+                            <FormItem data-feld="abgabe">
+                              <SchalterZeile
+                                id="nur-betriebe"
+                                titel="Nur an landwirtschaftliche Betriebe"
+                                untertitel="Wer bestellt, muss im Checkout eine Betriebsnummer angeben."
+                                checked={field.value === 'NUR_BETRIEBE'}
+                                onCheckedChange={(an) => field.onChange(an ? 'NUR_BETRIEBE' : 'ALLE')}
+                              />
                               <FormMessage />
                             </FormItem>
                           )}
@@ -1325,6 +1591,13 @@ export function ProductDialog({ open, product, onClose }: Props) {
       </DialogContent>
     </Dialog>
 
+    <KategorieSheet
+      open={kategorieSheetOffen}
+      onOpenChange={setKategorieSheetOffen}
+      wert={{ category, subcategory: werte.subcategory }}
+      onUebernehmen={({ category: neu, subcategory: sorte }) => kategorieUebernehmen(neu, sorte)}
+    />
+
     {/* Rückfrage: Kategoriewechsel weg von Futtermittel löscht die Kennzeichnung */}
     <Dialog open={kategorieWechsel !== null} onOpenChange={(o) => !o && setKategorieWechsel(null)}>
       <DialogContent className="max-w-sm">
@@ -1342,7 +1615,7 @@ export function ProductDialog({ open, product, onClose }: Props) {
           <Button
             variant="destructive"
             onClick={() => {
-              if (kategorieWechsel) kategorieSetzen(kategorieWechsel.neu)
+              if (kategorieWechsel) kategorieSetzen(kategorieWechsel.neu, kategorieWechsel.sorte)
               setKategorieWechsel(null)
             }}
           >

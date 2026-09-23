@@ -18,6 +18,7 @@ import {
 import { formatEuro, formatMenge } from '@/lib/format'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
+import { BETRIEBSNACHWEIS_FEHLER, CODE_BETRIEBSNACHWEIS_FEHLT } from '@/lib/betriebsnachweis'
 import type { PublicFarm } from '@/server/queries/farm'
 import type { CartItem } from '@/lib/use-cart'
 import { eurosToCents } from '@/lib/order-totals'
@@ -105,8 +106,21 @@ function generatePickupOptions(
 }
 
 
-export function CheckoutForm({ farm }: { farm: PublicFarm }) {
+export function CheckoutForm({
+  farm,
+  nurBetriebeIds,
+  vorbelegung,
+}: {
+  farm: PublicFarm
+  /** Produkte dieses Hofs mit abgabe = NUR_BETRIEBE — aus der DB, nicht aus dem Korb. */
+  nurBetriebeIds: string[]
+  /** Ist der Besteller selbst ein Hof: Käuferart Betrieb und seine Nummer (Konzept 6.4). */
+  vorbelegung: { kaeuferArt: 'BETRIEB'; betriebsnummer: string } | null
+}) {
   const [cart, setCart] = useState<CartItem[]>([])
+  // Verlangt der Server den Nachweis, obwohl der Browser nichts davon wusste
+  // (veraltete Seite), erscheint der Abschnitt trotzdem.
+  const [nachweisVomServer, setNachweisVomServer] = useState(false)
   const [sessionId, setSessionId] = useState('')
   const [isHydrated, setIsHydrated] = useState(false)
   // useTransition statt eigenem Flag: React setzt isPending zurück, auch wenn
@@ -210,8 +224,20 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
       pickupSlotKey: '',
       paymentMethod: defaultPayment as CheckoutFormData['paymentMethod'],
       onsiteConfirmed: false,
+      kaeuferArt: vorbelegung?.kaeuferArt ?? 'PRIVAT',
+      betriebsnummer: vorbelegung?.betriebsnummer ?? '',
+      nurBetriebeImKorb: false,
     },
   })
+
+  // Abschnitt „Betrieb" nur, wenn eine NUR_BETRIEBE-Position im Korb liegt.
+  const betriebAbschnitt = nachweisVomServer || cart.some((i) => nurBetriebeIds.includes(i.productId))
+  // Der Wert fließt in die Komfortprüfung des Formulars (checkoutFormSchema);
+  // verbindlich prüft der Checkout-Handler mit seinen eigenen Daten.
+  useEffect(() => {
+    form.setValue('nurBetriebeImKorb', betriebAbschnitt)
+  }, [betriebAbschnitt, form])
+  const kaeuferArt = form.watch('kaeuferArt')
 
   const paymentMethod = form.watch('paymentMethod')
   const customerPhone = form.watch('customerPhone')
@@ -267,6 +293,10 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
           paymentMethod: data.paymentMethod,
           optInEmail: data.optInEmail ?? false,
           optInWhatsApp: data.optInWhatsApp ?? false,
+          // Ohne sichtbaren Abschnitt ist jede Bestellung privat — eine
+          // Vorbelegung als Betrieb darf nicht unbemerkt mitlaufen.
+          kaeuferArt: betriebAbschnitt ? data.kaeuferArt : 'PRIVAT',
+          betriebsnummer: betriebAbschnitt && data.kaeuferArt === 'BETRIEB' ? data.betriebsnummer : undefined,
           items: cart.map((i) => ({
             productId: i.productId,
             name: i.name,
@@ -287,6 +317,15 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
             uebernehmeBerichtigung(cart, err.items, farm.id, setCart)
           }
           toast.error(err.error ?? 'Dein Warenkorb hat sich geändert.')
+          return
+        }
+        // Betriebsnachweis fehlt (Sprint Bereiche 1): Fehler am Feld zeigen
+        // und dorthin springen, wie bei jedem anderen Pflichtfeld.
+        if (err.code === CODE_BETRIEBSNACHWEIS_FEHLT) {
+          setNachweisVomServer(true)
+          const feld = err.feld === 'betriebsnummer' ? 'betriebsnummer' : 'kaeuferArt'
+          form.setError(feld, { type: 'server', message: err.error ?? BETRIEBSNACHWEIS_FEHLER })
+          window.setTimeout(() => onInvalid(form.formState.errors), 50)
           return
         }
         throw new Error(err.error ?? 'Fehler beim Checkout')
@@ -542,6 +581,66 @@ export function CheckoutForm({ farm }: { farm: PublicFarm }) {
             />
           </div>
         </div>
+
+        {/* Betrieb (Sprint Bereiche 1, Konzept 6.4) — nur, wenn ein Futtermittel
+            im Korb liegt, das der Hof nur an landwirtschaftliche Betriebe abgibt. */}
+        {betriebAbschnitt && (
+          <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+            <div>
+              <h2 className="font-medium text-foreground">Betrieb</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Ein Futtermittel in deinem Korb gibt der Hof nur an landwirtschaftliche Betriebe ab.
+              </p>
+            </div>
+            <label className="flex min-h-11 items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                name="kaeuferArt"
+                checked={kaeuferArt === 'BETRIEB'}
+                onChange={(e) => {
+                  form.setValue('kaeuferArt', e.target.checked ? 'BETRIEB' : 'PRIVAT', { shouldDirty: true })
+                  form.clearErrors('kaeuferArt')
+                }}
+                aria-invalid={form.formState.errors.kaeuferArt ? true : undefined}
+                aria-describedby={form.formState.errors.kaeuferArt ? 'kaeuferArt-fehler' : undefined}
+                className="mt-0.5 accent-primary w-4 h-4"
+              />
+              <span className="text-sm text-foreground">Ich bestelle als landwirtschaftlicher Betrieb</span>
+            </label>
+            {form.formState.errors.kaeuferArt && (
+              <p id="kaeuferArt-fehler" className="text-xs text-destructive">
+                {form.formState.errors.kaeuferArt.message}
+              </p>
+            )}
+            <div>
+              <Label htmlFor="betriebsnummer" className="text-sm text-muted-foreground mb-1 block">
+                Betriebsnummer *
+              </Label>
+              <Input
+                id="betriebsnummer"
+                {...form.register('betriebsnummer')}
+                autoComplete="off"
+                aria-invalid={form.formState.errors.betriebsnummer ? true : undefined}
+                aria-describedby={
+                  form.formState.errors.betriebsnummer ? 'betriebsnummer-fehler' : 'betriebsnummer-hilfe'
+                }
+                placeholder="z. B. LFBIS-Nummer"
+                className={form.formState.errors.betriebsnummer ? 'border-destructive' : ''}
+              />
+              {form.formState.errors.betriebsnummer ? (
+                <p id="betriebsnummer-fehler" className="text-xs text-destructive mt-1">
+                  {form.formState.errors.betriebsnummer.message}
+                </p>
+              ) : (
+                <p id="betriebsnummer-hilfe" className="text-xs text-muted-foreground mt-1">
+                  {vorbelegung?.betriebsnummer
+                    ? 'Aus deinen Hof-Einstellungen übernommen — du kannst sie hier ändern.'
+                    : 'Deine LFBIS-, BAES- bzw. BVL-Nummer.'}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Newsletter opt-in */}
         <div className="bg-card rounded-xl border border-border p-4">

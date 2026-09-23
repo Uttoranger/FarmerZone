@@ -28,6 +28,10 @@ import {
   unterkategorienVon,
   zeigeUnterkategorien,
   bereinigeSiegel,
+  FUTTERMITTELART_VALUES,
+  NETTO_EINHEIT_VALUES,
+  ABGABE_VALUES,
+  BETRIEBSSTATUS_VALUES,
   type ProductCategoryValue,
   type ProductSubcategoryValue,
 } from '@/lib/taxonomie'
@@ -50,9 +54,21 @@ describe('Abgleich mit dem Prisma-Schema', () => {
     expect([...PRODUCT_CATEGORY_VALUES]).toEqual(schemaEnumWerte('ProductCategory'))
   })
 
-  it('FUTTERMITTEL steht unmittelbar vor BRENNHOLZ', () => {
+  it('Altlast FUTTERMITTEL steht vor den vier Futter-Kategorien, diese direkt vor BRENNHOLZ', () => {
+    // Postgres hängt neue Werte per ADD VALUE ... BEFORE BRENNHOLZ ein — das
+    // Schema muss dieselbe Reihenfolge tragen wie die Datenbank.
     const werte = [...PRODUCT_CATEGORY_VALUES]
-    expect(werte.indexOf('FUTTERMITTEL')).toBe(werte.indexOf('BRENNHOLZ') - 1)
+    const b = werte.indexOf('BRENNHOLZ')
+    expect(werte.slice(b - 5, b)).toEqual([
+      'FUTTERMITTEL', 'HEU_STROH', 'GETREIDE_KOERNER', 'MISCHFUTTER', 'ERGAENZUNGSFUTTER',
+    ])
+  })
+
+  it('Futtermittelart, Nettoeinheit, Abgabe und Betriebsstatus: dieselben Werte in derselben Reihenfolge', () => {
+    expect([...FUTTERMITTELART_VALUES]).toEqual(schemaEnumWerte('Futtermittelart'))
+    expect([...NETTO_EINHEIT_VALUES]).toEqual(schemaEnumWerte('NettoEinheit'))
+    expect([...ABGABE_VALUES]).toEqual(schemaEnumWerte('Abgabe'))
+    expect([...BETRIEBSSTATUS_VALUES]).toEqual(schemaEnumWerte('Betriebsstatus'))
   })
 
   it('Unterkategorien: dieselben Werte in derselben Reihenfolge', () => {
@@ -87,15 +103,15 @@ describe('TAXONOMIE — jede L2 gehört zu genau einer L1', () => {
     }
   })
 
-  it('Fisch, Brot, Getränke, Brennholz und Sonstiges haben keine Unterkategorien', () => {
-    for (const l1 of ['FISCH', 'BROT', 'GETRAENKE', 'BRENNHOLZ', 'SONSTIGES'] as const) {
+  it('Fisch, Brot, Getränke, Brennholz, Sonstiges, Mischfutter und Ergänzungsfutter haben keine Unterkategorien', () => {
+    for (const l1 of ['FISCH', 'BROT', 'GETRAENKE', 'BRENNHOLZ', 'SONSTIGES', 'MISCHFUTTER', 'ERGAENZUNGSFUTTER'] as const) {
       expect(hatUnterkategorien(l1)).toBe(false)
       expect(unterkategorienVon(l1)).toEqual([])
     }
   })
 
-  it('die übrigen sieben Kategorien haben Unterkategorien', () => {
-    for (const l1 of ['MILCH', 'EIER', 'FLEISCH', 'GEMUESE', 'OBST', 'HONIG', 'FUTTERMITTEL'] as const) {
+  it('die übrigen neun Kategorien haben Unterkategorien (inklusive Altlast FUTTERMITTEL)', () => {
+    for (const l1 of ['MILCH', 'EIER', 'FLEISCH', 'GEMUESE', 'OBST', 'HONIG', 'FUTTERMITTEL', 'HEU_STROH', 'GETREIDE_KOERNER'] as const) {
       expect(hatUnterkategorien(l1)).toBe(true)
       expect(unterkategorienVon(l1).length).toBeGreaterThan(0)
     }
@@ -120,10 +136,16 @@ describe('Labels', () => {
     for (const l1 of PRODUCT_CATEGORY_VALUES) expect(KATEGORIE_LABEL[l1].length).toBeGreaterThan(1)
     expect(KATEGORIE_LABEL.HONIG).toBe('Honig & Bienenprodukte')
     expect(KATEGORIE_LABEL.FUTTERMITTEL).toBe('Futtermittel')
+    expect(KATEGORIE_LABEL.HEU_STROH).toBe('Heu & Stroh')
+    expect(KATEGORIE_LABEL.GETREIDE_KOERNER).toBe('Getreide & Körner')
+    expect(KATEGORIE_LABEL.MISCHFUTTER).toBe('Mischfutter')
+    expect(KATEGORIE_LABEL.ERGAENZUNGSFUTTER).toBe('Ergänzungsfutter')
   })
 
-  it('CATEGORY_OPTIONS folgt der Enum-Reihenfolge mit denselben Labels', () => {
-    expect(CATEGORY_OPTIONS.map((o) => o.value)).toEqual([...PRODUCT_CATEGORY_VALUES])
+  it('CATEGORY_OPTIONS folgt der Enum-Reihenfolge mit denselben Labels, ohne Altlast', () => {
+    expect(CATEGORY_OPTIONS.map((o) => o.value)).toEqual(
+      PRODUCT_CATEGORY_VALUES.filter((v) => v !== 'FUTTERMITTEL')
+    )
     for (const o of CATEGORY_OPTIONS) expect(o.label).toBe(KATEGORIE_LABEL[o.value])
   })
 

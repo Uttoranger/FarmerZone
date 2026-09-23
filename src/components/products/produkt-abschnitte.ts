@@ -39,6 +39,8 @@ const ABSCHNITT_VON_FELD: Record<Feld, Abschnitt> = {
   countsTowardLimit: 'details',
   vatRate: 'details',
   futter: 'kennzeichnung',
+  // Der Schalter „Nur an landwirtschaftliche Betriebe" steht in der Futter-Sektion (Konzept 6.1).
+  abgabe: 'kennzeichnung',
 }
 
 /**
@@ -54,11 +56,17 @@ export function saisonVorbelegung(jetzt: Date): { start: number; end: number } {
 
 /** Reihenfolge der Kennzeichnungsfelder = Reihenfolge im Formular. */
 export const FUTTER_FELD_REIHENFOLGE = [
+  'futtermittelart',
+  'nettoMenge',
+  'nettoEinheit',
   'zielTierarten',
   'zusammensetzung',
   'analytischeBestandteile',
+  'rohprotein',
+  'rohfaser',
+  'rohfett',
+  'rohasche',
   'zusatzstoffe',
-  'registrierungsnummer',
   'gebrauchshinweis',
   'bestaetigt',
 ] as const

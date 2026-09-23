@@ -16,6 +16,7 @@ import { CATEGORY_OPTIONS, PRODUCT_CATEGORY_VALUES, productFormSchema } from '@/
 import type { ProductCategoryValue } from '@/schemas/product'
 import { categoryImagePath } from '@/lib/product-image'
 import { sammleKategorien } from '@/lib/hofuebersicht'
+import { istFuttermittel } from '@/lib/taxonomie'
 
 /** Die Enum-Werte aus prisma/schema.prisma in Dateireihenfolge — die Quelle,
  *  an der sich pg_enum.enumsortorder und damit die Migration orientieren. */
@@ -24,7 +25,9 @@ function schemaEnumWerte(): string[] {
   const block = schema.match(/enum ProductCategory \{([^}]*)\}/)
   if (!block) throw new Error('enum ProductCategory nicht in prisma/schema.prisma gefunden')
   return block[1]
-    .split('\n')
+    // \r?\n: Die Datei liegt unter Windows mit CRLF vor; `.` frisst kein \r,
+    // sonst bleibt ein nachgestellter Kommentar am Wert hängen.
+    .split(/\r?\n/)
     // Nachgestellte Kommentare wie bei OrderStatus (`PAID // bezahlt`) abstreifen
     .map((zeile) => zeile.replace(/\/\/.*$/, '').trim())
     .filter((zeile) => zeile !== '')
@@ -51,11 +54,14 @@ describe('Kategorie FISCH — Reihenfolge', () => {
 
   it('Schema, Wertliste und Anzeigeliste haben DIESELBE Reihenfolge', () => {
     expect([...PRODUCT_CATEGORY_VALUES]).toEqual(schemaEnumWerte())
-    expect(CATEGORY_OPTIONS.map((o) => o.value)).toEqual([...PRODUCT_CATEGORY_VALUES])
+    // Die Anzeigeliste lässt seit Bereiche 1 nur die Altlast FUTTERMITTEL aus.
+    expect(CATEGORY_OPTIONS.map((o) => o.value)).toEqual(
+      PRODUCT_CATEGORY_VALUES.filter((v) => v !== 'FUTTERMITTEL')
+    )
   })
 
-  it('zwölf Werte (seit Taxonomie 1 mit FUTTERMITTEL), FISCH an vierter Stelle — direkt nach FLEISCH', () => {
-    expect(PRODUCT_CATEGORY_VALUES).toHaveLength(12)
+  it('sechzehn Werte (seit Bereiche 1 mit vier Futter-Kategorien), FISCH an vierter Stelle — direkt nach FLEISCH', () => {
+    expect(PRODUCT_CATEGORY_VALUES).toHaveLength(16)
     expect(PRODUCT_CATEGORY_VALUES[2]).toBe('FLEISCH')
     expect(PRODUCT_CATEGORY_VALUES[3]).toBe('FISCH')
     expect(PRODUCT_CATEGORY_VALUES[4]).toBe('GEMUESE')
@@ -141,9 +147,9 @@ describe('Kategorie FISCH — Illustration', () => {
     const warnung = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
     for (const kategorie of PRODUCT_CATEGORY_VALUES) {
-      // FUTTERMITTEL hat bewusst keine eigene Datei und nutzt die Kachel von
-      // Sonstiges (Sprint Taxonomie 1) — die Abbildung steht in product-image.ts.
-      const slug = kategorie === 'FUTTERMITTEL' ? 'sonstiges' : kategorie.toLowerCase()
+      // Die Futter-Kategorien haben bewusst keine eigene Datei und nutzen die
+      // Kachel von Sonstiges (Taxonomie 1, Bereiche 1) — siehe product-image.ts.
+      const slug = istFuttermittel(kategorie) ? 'sonstiges' : kategorie.toLowerCase()
       const datei = path.join(process.cwd(), 'public', 'categories', `${slug}.webp`)
       const erwartet = fs.existsSync(datei) ? `/categories/${slug}.webp` : null
       expect(categoryImagePath(kategorie)).toBe(erwartet)
