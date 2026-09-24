@@ -259,24 +259,54 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 **Symptom (statisch belegt, kein Kundenfall):** `cancelOrder` prüfte den Status nur
 lesend, buchte dann je Position außerhalb jeder Transaktion zurück und setzte
 CANCELLED erst am Ende. Zwei gleichzeitige Aufrufe (Doppeltipp) passierten beide
-die Leseprüfung → Bestand doppelt zurückgebucht; die Stripe-Erstattung lief sogar
-VOR dem Statuswechsel, ihr Scheitern verhinderte den ganzen Storno.
+die Leseprüfung → Bestand doppelt zurückgebucht. Die Stripe-Erstattung lief VOR
+dem Statuswechsel; ihr Scheitern verhinderte den ganzen Storno.
 
-**Fix (fix/storno-atomar):** Muster des Stripe-Webhooks übernommen — der bedingte
-Statuswechsel (`updateMany` mit `status notIn [CANCELLED, PICKED_UP]`) ist die
-Sperre und läuft mit der Rückbuchung in EINER Transaktion; Stripe erst danach
-(scheitert die Erstattung, bleibt storniert + zurückgebucht, Meldung „manuell
-erstatten"); Mail über `nachDerAntwort()`. Wache: `tests/storno-atomar.test.ts`
-(deterministischer Wettlauf: beide lesen, bevor einer schreibt).
+**Zweiter Weg zum selben Schaden — sequentiell, kein Wettlauf nötig:**
+`revertOrderStatus` (das Undo im Toast nach „Bereit"/„Abgeholt") hatte **keinen**
+Statusfilter. „Bereit" → Storno → „Rückgängig" im noch sichtbaren Toast holte
+die stornierte Bestellung zurück; ein zweiter Storno buchte den Bestand erneut
+zurück. `revertReady`/`revertPickedUp` prüften lesend und schrieben blind —
+derselbe Schaden, aber nur in einem echten Gleichzeitig-Wettlauf.
+
+**Fix (fix/storno-atomar):**
+- Storno: Der bedingte Statuswechsel (`updateMany`, `status notIn [CANCELLED,
+  PICKED_UP, NOT_PICKED_UP]`) ist die Sperre und läuft mit der Rückbuchung in
+  EINER Transaktion. Die Transaktion ist dem Stripe-Webhook entlehnt — die Sperre
+  nicht: Der Webhook prüft nur lesend (siehe Altlast unten).
+- `NOT_PICKED_UP` mitgesperrt: Bei „nicht abgeholt" bleibt der Warenpreis beim
+  Hof; ein Storno danach erstattete ihn voll und buchte Ware zurück, die nie
+  zurückkam. Die Oberfläche bot es dort nie an, der Server jetzt auch nicht.
+- Stripe erst nach der Transaktion. Scheitert die Erstattung: Storno und
+  Rückbuchung bleiben (richtig so), Meldung an den Hof, **Sentry-Eintrag** mit der
+  Bestell-ID — vorher stand es nur im Log. **Keine Storno-Mail** in diesem Fall:
+  `order-cancelled.tsx` liest „keine Erstattung" als Vor-Ort-Zahlung und schriebe
+  „Da du vor Ort bezahlst, entstehen dir keine Kosten".
+- Mail sonst über `nachDerAntwort()`.
+- Alle drei Rückwege schreiben bedingt (`updateMany` mit Statusfilter);
+  `revertOrderStatus` nur noch aus READY oder PICKED_UP.
+
+Wache: `tests/storno-atomar.test.ts` — deterministischer Wettlauf (beide lesen,
+bevor einer schreibt), Storno → Undo → Storno, Rückweg-Wettlauf, eigene tx-Fakes
+als Beweis, dass die Rückbuchung IN der Transaktion läuft.
 
 **Kandidat fürs Testfundament (Integrationstests, sobald es sie gibt):** zwei
 GLEICHZEITIGE `cancelOrder` gegen echtes Postgres → Bestand exakt einmal zurück.
 
-**Notiert, nicht angefasst:** `markAsNotPickedUp` und die Undo-Actions bewegen
-keinen Bestand (Schwäche gilt dort nicht), ihre Statuswechsel sind aber weiter
-unbedingte `update` nach Leseprüfung — ein Wettlauf kann dort nur ein falsches
-Status-Etikett erzeugen, kein Geld- oder Bestandsproblem. `PaymentStatus` kennt
-kein „Erstattung ausstehend"; Vorschlag `REFUND_PENDING`, nur mit Freigabe.
+**Offen, mit Absicht nicht angefasst:**
+- `PaymentStatus` kennt kein „Erstattung ausstehend" — nach gescheiterter
+  Erstattung steht die stornierte Bestellung auf PAID. Vorschlag `REFUND_PENDING`,
+  nur mit Freigabe (Schema).
+- Die Meldung „Bitte manuell über das Stripe Dashboard erstatten" ist für den Hof
+  nicht umsetzbar: Bei der Destination Charge kann nur das Plattformkonto
+  erstatten. Wortlaut blieb auf ausdrücklichen Wunsch.
+- `markAsNotPickedUp` schreibt nach Leseprüfung blind. Kein Bestand, die
+  Gebühren-Erstattung ist per Stripe-Schlüssel idempotent — ein Wettlauf mit einem
+  Storno kann dort nur das Status-Etikett (NOT_PICKED_UP statt CANCELLED) falsch
+  setzen, und NOT_PICKED_UP ist jetzt gegen einen zweiten Storno gesperrt.
+- Altlast Webhook: `handlePaymentFailed`/`handlePaymentSucceeded` prüfen lesend
+  und schreiben unbedingt — `handlePaymentSucceeded` kann eine stornierte
+  Bestellung wieder auf PAID setzen. Eigener Fix.
 
 ### BUG: Sprungmarken der Hofseite sprangen falsch (behoben 2026-09-20)
 

@@ -7,6 +7,7 @@ import { stripe } from '@/lib/stripe'
 import { revalidatePath } from 'next/cache'
 import { sendOrderReady, sendOrderCancelled, sendOrderNotReady, type OrderForEmail } from '@/lib/email'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
+import * as Sentry from '@sentry/nextjs'
 import type { OrderStatus } from '@prisma/client'
 
 export type ActionResult = { error?: string }
@@ -198,10 +199,14 @@ export async function revertReady(
 
   const previous: OrderStatus = order.paymentStatus === 'PAID' ? 'PAID' : 'CONFIRMED'
 
-  await prisma.order.update({
-    where: { id: orderId },
+  // Bedingt geschrieben, nicht nach der Leseprüfung blind: Wird die Bestellung
+  // zwischen Lesen und Schreiben storniert, holte ein unbedingtes update sie
+  // zurück ins Leben — und ein zweiter Storno buchte den Bestand erneut zurück.
+  const { count } = await prisma.order.updateMany({
+    where: { id: orderId, farmId: farm.id, status: 'READY' },
     data: { status: previous },
   })
+  if (count === 0) return { error: 'Bestellung nicht gefunden' }
 
   // Kunden-Info nur auf Wunsch (Haken im Dialog, Standard AN): neutrales
   // "Kurzes Update" — relativiert die bereits verschickte Abholbereit-Mail
@@ -229,10 +234,12 @@ export async function revertPickedUp(orderId: string): Promise<ActionResult> {
   })
   if (!exists) return { error: 'Bestellung nicht gefunden' }
 
-  await prisma.order.update({
-    where: { id: orderId },
+  // Bedingt geschrieben — Begründung wie bei revertReady.
+  const { count } = await prisma.order.updateMany({
+    where: { id: orderId, farmId: farm.id, status: 'PICKED_UP' },
     data: { status: 'READY', pickedUpAt: null },
   })
+  if (count === 0) return { error: 'Bestellung nicht gefunden' }
 
   // Keine Mail: der Kunde hatte die Abholbereitschafts-Mail bereits
 
@@ -248,16 +255,16 @@ export async function revertOrderStatus(orderId: string, previousStatus: string)
   const farm = await getAuthFarm()
   if (!farm) return { error: 'Nicht angemeldet' }
 
-  const exists = await prisma.order.findFirst({
-    where: { id: orderId, farmId: farm.id },
-    select: { id: true },
-  })
-  if (!exists) return { error: 'Bestellung nicht gefunden' }
-
-  await prisma.order.update({
-    where: { id: orderId },
+  // Das Undo im Toast folgt nur auf „Bereit" (→ READY) und „Abgeholt"
+  // (→ PICKED_UP). Nur aus diesen beiden Status darf es zurück. Vorher gab es
+  // hier KEINEN Statusfilter: „Bereit" → Storno → „Rückgängig" im noch
+  // sichtbaren Toast holte eine stornierte Bestellung zurück, und ein zweiter
+  // Storno buchte den Bestand ein zweites Mal zurück.
+  const { count } = await prisma.order.updateMany({
+    where: { id: orderId, farmId: farm.id, status: { in: ['READY', 'PICKED_UP'] } },
     data: { status: previousStatus as OrderStatus, pickedUpAt: null, paidAt: null },
   })
+  if (count === 0) return { error: 'Status kann nicht zurückgesetzt werden' }
 
   revalidatePath('/orders')
   revalidatePath(`/orders/${orderId}`)
@@ -280,10 +287,20 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Act
   // Der bedingte Statuswechsel IST die Sperre: updateMany mit Statusbedingung
   // gewinnt genau einmal, der zweite Aufruf trifft count 0 und bucht nichts
   // zurück. Rückbuchung in DERSELBEN Transaktion wie der Statuswechsel —
-  // ganz oder gar nicht (Muster wie der Stripe-Webhook bei Zahlungsabbruch).
+  // ganz oder gar nicht. (Die Transaktion ist dem Stripe-Webhook entlehnt;
+  // die Sperre geht darüber hinaus — der Webhook prüft nur lesend.)
+  //
+  // NOT_PICKED_UP ist ebenfalls gesperrt: Bei „nicht abgeholt" bleibt der
+  // Warenpreis beim Hof (markAsNotPickedUp); ein Storno danach erstattete ihn
+  // voll und buchte Ware zurück, die nie zurückkam. Die Oberfläche bietet es
+  // dort schon nicht an — der Server muss es genauso sehen.
   const storniert = await prisma.$transaction(async (tx) => {
     const { count } = await tx.order.updateMany({
-      where: { id: orderId, farmId: farm.id, status: { notIn: ['CANCELLED', 'PICKED_UP'] } },
+      where: {
+        id: orderId,
+        farmId: farm.id,
+        status: { notIn: ['CANCELLED', 'PICKED_UP', 'NOT_PICKED_UP'] },
+      },
       data: {
         status: 'CANCELLED',
         cancelledAt: new Date(),
@@ -320,12 +337,9 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Act
 
   if (order.stripePaymentIntentId && order.paymentStatus === 'PAID') {
     try {
-      const refund = await stripe.refunds.create(
-        { payment_intent: order.stripePaymentIntentId },
-        // Idempotenz: Gelingt die Erstattung, stirbt aber der Prozess vor dem
-        // Vermerk, liefert ein manueller zweiter Anlauf DIESELBE Erstattung.
-        { idempotencyKey: `storno-${orderId}` }
-      )
+      const refund = await stripe.refunds.create({
+        payment_intent: order.stripePaymentIntentId,
+      })
       refundAmount = refund.amount / 100
       await prisma.order.update({
         where: { id: orderId },
@@ -333,17 +347,30 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Act
       })
     } catch (err) {
       console.error('[cancelOrder] Stripe refund failed:', err)
+      // Offenes Geld darf nicht nur im Log stehen: Die Bestellung ist
+      // storniert, ein zweiter Anlauf in der App ist durch die Sperre
+      // ausgeschlossen — erstatten kann nur der Betreiber über das
+      // Plattformkonto (Destination Charge). Nur die Bestell-ID, keine
+      // Kundendaten (sentry-hygiene.ts filtert zusätzlich).
+      Sentry.captureException(err, {
+        tags: { aktion: 'cancelOrder', grund: 'erstattung_offen' },
+        extra: { orderId },
+      })
       erstattungOffen = true
     }
   }
 
-  // Die Kundin erfährt vom Storno auch dann, wenn die Erstattung noch aussteht
-  // (refundAmount bleibt dann null, die Mail verspricht kein Geld). Nichts
-  // Langsames im Antwortpfad — und ein Mailfehler kippt keine gültige
-  // Stornierung.
-  nachDerAntwort(async () => {
-    await sendOrderCancelled(toEmailOrder(order, farm), refundAmount)
-  })
+  // Nichts Langsames im Antwortpfad, und ein Mailfehler kippt keine gültige
+  // Stornierung. Bei OFFENER Erstattung keine Mail: Die Vorlage liest „keine
+  // Erstattung" als Vor-Ort-Zahlung und schriebe „Da du vor Ort bezahlst,
+  // entstehen dir keine Kosten" — an eine Kundin, die online bezahlt hat und
+  // noch nichts zurückbekam. Wie vor diesem Fix: gescheiterte Erstattung →
+  // keine Storno-Mail; der Betreiber meldet sich mit der Erstattung.
+  if (!erstattungOffen) {
+    nachDerAntwort(async () => {
+      await sendOrderCancelled(toEmailOrder(order, farm), refundAmount)
+    })
+  }
 
   revalidatePath('/orders')
   revalidatePath(`/orders/${orderId}`)

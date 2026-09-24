@@ -18,7 +18,7 @@ vi.mock('@/lib/email', () => ({
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     farm: { findUnique: vi.fn() },
-    order: { findFirst: vi.fn(), update: vi.fn() },
+    order: { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   },
 }))
 
@@ -31,6 +31,10 @@ const getSession = vi.mocked(auth.api.getSession)
 const farmFindUnique = vi.mocked(prisma.farm.findUnique)
 const orderFindFirst = vi.mocked(prisma.order.findFirst)
 const orderUpdate = vi.mocked(prisma.order.update)
+// Seit fix/storno-atomar schreiben die Rückwege BEDINGT (updateMany mit
+// Statusfilter), damit sie eine inzwischen stornierte Bestellung nie
+// zurückholen. Das unbedingte update bleibt ungenutzt.
+const orderUpdateMany = vi.mocked(prisma.order.updateMany)
 
 const EMAIL_ORDER = {
   id: 'order_1',
@@ -53,6 +57,7 @@ beforeEach(() => {
   getSession.mockResolvedValue({ user: { id: 'user_1' } } as never)
   farmFindUnique.mockResolvedValue({ id: 'farm_1', name: 'Testhof', slug: 'testhof', email: 'hof@test.local', ownerName: 'Franz', address: 'Weg 1', postalCode: '5270', city: 'Mauerkirchen', phone: '' } as never)
   orderUpdate.mockResolvedValue({} as never)
+  orderUpdateMany.mockResolvedValue({ count: 1 } as never)
 })
 
 describe('revertReady', () => {
@@ -84,8 +89,8 @@ describe('revertReady', () => {
     orderFindFirst.mockResolvedValue({ ...EMAIL_ORDER, paymentStatus: 'PAID' } as never)
     const result = await revertReady('order_1')
     expect(result).toEqual({})
-    expect(orderUpdate).toHaveBeenCalledWith({
-      where: { id: 'order_1' },
+    expect(orderUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'order_1', farmId: 'farm_1', status: 'READY' },
       data: { status: 'PAID' },
     })
   })
@@ -93,8 +98,8 @@ describe('revertReady', () => {
   it('Herleitung: paymentStatus nicht PAID → zurück auf CONFIRMED', async () => {
     orderFindFirst.mockResolvedValue({ ...EMAIL_ORDER, paymentStatus: 'PENDING' } as never)
     await revertReady('order_1')
-    expect(orderUpdate).toHaveBeenCalledWith({
-      where: { id: 'order_1' },
+    expect(orderUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'order_1', farmId: 'farm_1', status: 'READY' },
       data: { status: 'CONFIRMED' },
     })
   })
@@ -155,7 +160,11 @@ describe('revertPickedUp', () => {
     orderFindFirst.mockResolvedValue({ id: 'order_1' } as never)
     const result = await revertPickedUp('order_1')
     expect(result).toEqual({})
-    const updateArg = orderUpdate.mock.calls[0]?.[0] as { data: Record<string, unknown> }
+    const updateArg = orderUpdateMany.mock.calls[0]?.[0] as {
+      where: Record<string, unknown>
+      data: Record<string, unknown>
+    }
+    expect(updateArg.where).toEqual({ id: 'order_1', farmId: 'farm_1', status: 'PICKED_UP' })
     expect(updateArg.data).toEqual({ status: 'READY', pickedUpAt: null })
     // Geld-Wahrheit: kein paymentStatus, kein paidAt im Update
     expect(updateArg.data).not.toHaveProperty('paymentStatus')

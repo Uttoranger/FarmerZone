@@ -271,11 +271,8 @@ describe('cancelOrder — Gebühren-Vermerk bei Storno', () => {
 
     await cancelOrder('order_online')
 
-    // Unverändert voll: Erstattung nur über den Intent, OHNE amount (der ganze
-    // Zahlungsbetrag). Neu ist nur der Idempotenz-Schlüssel.
-    const [params, options] = refundCreate.mock.calls[0] as [Record<string, unknown>, Record<string, unknown>]
-    expect(params).toEqual({ payment_intent: 'pi_1' })
-    expect(options).toEqual(expect.objectContaining({ idempotencyKey: expect.stringContaining('order_online') }))
+    // Unverändert: volle Erstattung nur über den Intent (Warenpreis-Umgang bleibt)
+    expect(refundCreate).toHaveBeenCalledWith({ payment_intent: 'pi_1' })
     expect(stornoDaten().at(-1)).toEqual(
       expect.objectContaining({ status: 'CANCELLED', serviceFeeRefundedAt: expect.any(Date) })
     )
