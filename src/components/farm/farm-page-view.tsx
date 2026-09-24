@@ -21,7 +21,7 @@ import { updateFarmBannerAction, updateBannerFocusAction } from '@/server/action
 import { addFarmPhotoAction, reorderPhotosAction } from '@/server/actions/farm-photos'
 import { ReorderContext } from '@/components/shared/reorder-context'
 import { nextPickupDays, pickupWeekdaysLabel } from '@/lib/pickup-days'
-import { SHOP_PAUSED_FALLBACK } from '@/lib/shop-pause'
+import { pausenBanner } from '@/lib/shop-pause'
 import { buildMapsUrl, buildShareData } from '@/lib/customer-links'
 import { hofseiteSektionen, naechsterAktiverReiter } from '@/lib/hofseite-sektionen'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
@@ -594,6 +594,8 @@ type Props = {
 
 export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = false, mode = 'edit', pastStatusCount = 0 }: Props) {
   const isEdit = ownerMode && mode !== 'preview'
+  // Pausen-Banner: was Kundinnen und was der Hof sieht, entschieden in lib/shop-pause.ts.
+  const pausen = pausenBanner({ ownerMode, vorschau: mode === 'preview', pauseMessage: farm.pauseMessage })
   const [galleryKey, setGalleryKey] = useState(0)
 
   // Titelbild-Fokuspunkt: null = kein Anpass-Zustand, sonst Live-Entwurf (0–100)
@@ -984,17 +986,24 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
         <div className="px-4 md:px-10 py-3" style={{ background: 'var(--notice)', borderBottom: '1px solid var(--notice-line)' }}>
           <div className="max-w-[960px] mx-auto flex items-start gap-2.5">
             <PauseCircle className="size-[18px] shrink-0 mt-px" strokeWidth={1.8} style={{ color: 'var(--notice-icon)' }} />
-            {ownerMode ? (
-              <p className="text-sm leading-relaxed min-w-0" style={{ color: 'var(--notice-ink)' }}>
-                <b>Dein Shop ist pausiert</b> — Kundinnen können nicht bestellen.{' '}
-                <Link href="/settings/pause" className="font-semibold underline underline-offset-2 whitespace-nowrap">
-                  Pause beenden
-                </Link>
-              </p>
+            {pausen.hofHinweis ? (
+              <div className="min-w-0 space-y-1.5">
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--notice-ink)' }}>
+                  <b>Dein Shop ist pausiert</b> — Kundinnen können nicht bestellen.{' '}
+                  <Link href="/settings/pause" className="font-semibold underline underline-offset-2 whitespace-nowrap">
+                    Pause beenden
+                  </Link>
+                </p>
+                {/* Kundenansicht: derselbe Satz, den die öffentliche Seite zeigt. */}
+                {pausen.kundenText && (
+                  <p className="text-sm leading-relaxed break-words" style={{ color: 'var(--notice-ink)' }}>
+                    Kundinnen sehen: <b>{farm.name} pausiert gerade.</b> {pausen.kundenText}
+                  </p>
+                )}
+              </div>
             ) : (
-              <p className="text-sm leading-relaxed min-w-0" style={{ color: 'var(--notice-ink)' }}>
-                <b>{farm.name} pausiert gerade.</b>{' '}
-                {farm.pauseMessage?.trim() || SHOP_PAUSED_FALLBACK}
+              <p className="text-sm leading-relaxed min-w-0 break-words" style={{ color: 'var(--notice-ink)' }}>
+                <b>{farm.name} pausiert gerade.</b> {pausen.kundenText}
               </p>
             )}
           </div>

@@ -246,7 +246,10 @@ export async function setPause(isPaused: boolean, pauseMessage: string): Promise
     where: { id: farm.id },
     data: {
       isPaused,
-      pauseMessage: isPaused ? (pauseMessage.trim() || null) : null,
+      // Die Nachricht gilt unabhängig vom Status: Der Hof schreibt sie oft vor,
+      // solange der Shop noch läuft, und will sie nach dem Urlaub wiederverwenden.
+      // Früher wurde sie ohne Pause verworfen — trotz „Nachricht gespeichert".
+      pauseMessage: pauseMessage.trim() || null,
     },
   })
 
