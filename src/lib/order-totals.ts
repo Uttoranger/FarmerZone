@@ -1,24 +1,46 @@
 // Betragsberechnung des Checkouts — extrahiert aus /api/checkout, damit die
-// Rundungslogik unit-testbar ist. Die Formeln sind 1:1 identisch zum
-// bisherigen Inline-Code; Beträge sind Euro-Werte, Stripe bekommt Cents.
+// Rundungslogik unit-testbar ist. Beträge sind Euro als Decimal, Stripe
+// bekommt ganze Cent (decimalZuCents).
 //
 // Decimal aus dem Browser-Einstieg der Prisma-Runtime: Diese Datei läuft auch
 // im Checkout-Formular, und dort darf kein Datenbank-Client mitgeladen werden.
 import { Decimal } from '@prisma/client/runtime/index-browser'
 
-export type LineItem = { unitPrice: number; quantity: number }
+/** Ein Geldbetrag, wie er ankommt: Prisma-Decimal, Text oder Zahl aus JSON. */
+export type DecimalEingabe = Decimal | string | number | { toString(): string }
 
-export function calcTotalAmount(items: LineItem[]): number {
-  return items.reduce((s, i) => s + i.unitPrice * i.quantity, 0)
+// Geld wird hier mit Decimal gerechnet, nie mit number (CODING_STANDARDS §2):
+// Die Beträge landen in der Bestellung und bei Stripe, und 3 × 1,10 muss
+// 3,30 ergeben, nicht 3,3000000000000003.
+
+export type LineItem = { unitPrice: DecimalEingabe; quantity: number }
+
+/** Zeilensumme einer Position: Einzelpreis × Menge, exakt. */
+export function calcLineTotal(unitPrice: DecimalEingabe, quantity: number): Decimal {
+  return new Decimal(unitPrice.toString()).times(quantity)
 }
 
-// Plattformgebühr in Euro, auf ganze Cents gerundet
-// (totalAmount × Prozent ergibt direkt Cents, daher / 100 am Ende)
-export function calcPlatformFeeAmount(totalAmount: number, feePercent: number): number {
-  return Math.round(totalAmount * feePercent) / 100
+/** Warenpreis der Bestellung: Summe aller Zeilensummen, exakt. */
+export function calcTotalAmount(items: readonly LineItem[]): Decimal {
+  return items.reduce((s, i) => s.plus(calcLineTotal(i.unitPrice, i.quantity)), new Decimal(0))
 }
 
-// Euro → Cents für Stripe (rundet Float-Artefakte wie 3.3000000000000003 weg)
+/** Plattformgebühr in Euro, kaufmännisch auf ganze Cent gerundet (0,165 → 0,17). */
+export function calcPlatformFeeAmount(totalAmount: Decimal, feePercent: DecimalEingabe): Decimal {
+  return totalAmount
+    .times(new Decimal(feePercent.toString()))
+    .div(100)
+    .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+}
+
+/** Euro als Decimal → ganze Cent für Stripe und die Servicegebühr. */
+export function decimalZuCents(betrag: Decimal): number {
+  return betrag.times(100).toDecimalPlaces(0, Decimal.ROUND_HALF_UP).toNumber()
+}
+
+// Euro → Cents für die ANZEIGE im Browser (Warenkorb-Summe, Gebühren-Vorschau).
+// Rundet Float-Artefakte weg; abgerechnet wird damit nicht — das tut der Server
+// mit decimalZuCents.
 export function eurosToCents(amount: number): number {
   return Math.round(amount * 100)
 }
@@ -35,17 +57,23 @@ export type PreisAbweichung = { productId: string; name: string; price: number }
  */
 export function preisAbweichungen(
   positionen: ReadonlyArray<{ productId: string; name: string; unitPrice: number }>,
-  dbPreise: ReadonlyMap<string, number>
+  dbPreise: ReadonlyMap<string, DecimalEingabe>
 ): PreisAbweichung[] {
   const abweichend: PreisAbweichung[] = []
   for (const p of positionen) {
-    const gueltig = dbPreise.get(p.productId)
-    if (gueltig === undefined) continue
-    if (eurosToCents(p.unitPrice) !== eurosToCents(gueltig)) {
-      abweichend.push({ productId: p.productId, name: p.name, price: gueltig })
+    const eintrag = dbPreise.get(p.productId)
+    if (eintrag === undefined) continue
+    const gueltig = aufCent(eintrag)
+    if (!aufCent(p.unitPrice).equals(gueltig)) {
+      // number nur für die JSON-Antwort an den Browser, nicht zum Rechnen.
+      abweichend.push({ productId: p.productId, name: p.name, price: gueltig.toNumber() })
     }
   }
   return abweichend
+}
+
+function aufCent(betrag: DecimalEingabe): Decimal {
+  return new Decimal(betrag.toString()).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
 }
 
 /** Eine Bestellposition für die Summe je Steuersatz — Werte wie aus Prisma (Decimal) oder als Text. */
@@ -56,7 +84,6 @@ export type PositionMitSatz = {
 
 export type SummeJeSatz = { vatRate: Decimal; summe: Decimal }
 
-type DecimalEingabe = Decimal | string | number | { toString(): string }
 
 /**
  * Bruttosumme je MwSt-Satz, aufsteigend nach Satz (Sprint Bereiche 1).

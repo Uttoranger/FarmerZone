@@ -121,8 +121,14 @@ function anfrage(overrides: Record<string, unknown> = {}) {
   })
 }
 
+/** Decimal-Beträge als Zahl — nur für den Vergleich im Test; gerechnet wird im Handler mit Decimal. */
+function alsZahl(v: unknown): unknown {
+  return v !== null && typeof v === 'object' && 'toFixed' in v ? Number(String(v)) : v
+}
+
 function createData(): Record<string, unknown> {
-  return (orderCreate.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data
+  const data = (orderCreate.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data
+  return { ...data, totalAmount: alsZahl(data.totalAmount), platformFeeAmount: alsZahl(data.platformFeeAmount) }
 }
 
 function intentParams(): Record<string, unknown> {
@@ -222,9 +228,11 @@ describe('Checkout BAR mit Servicegebühr', () => {
     )
     expect(paymentIntentCreate).not.toHaveBeenCalled()
     expect(sendOnsiteConfirmation).toHaveBeenCalledWith(
-      expect.objectContaining({ totalAmount: 6, serviceFeeCents: 50 }),
+      expect.objectContaining({ serviceFeeCents: 50 }),
       expect.any(String)
     )
+    const mailBestellung = vi.mocked(sendOnsiteConfirmation).mock.calls[0][0] as { totalAmount: unknown }
+    expect(alsZahl(mailBestellung.totalAmount)).toBe(6)
   })
 
   it('Karte beim Hof zählt wie bar: derselbe Snapshot, kein Stripe', async () => {

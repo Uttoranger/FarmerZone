@@ -8,7 +8,13 @@ import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { sendOnsiteConfirmation } from '@/lib/email'
 import { checkoutRequestSchema } from '@/schemas/checkout'
-import { calcTotalAmount, calcPlatformFeeAmount, eurosToCents, preisAbweichungen } from '@/lib/order-totals'
+import {
+  calcLineTotal,
+  calcTotalAmount,
+  calcPlatformFeeAmount,
+  decimalZuCents,
+  preisAbweichungen,
+} from '@/lib/order-totals'
 import { berechneServicegebuehr } from '@/lib/servicegebuehr'
 import { pruefeSitzungsWarenkorb } from '@/server/warenkorb'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
@@ -223,7 +229,8 @@ export async function POST(request: NextRequest) {
   // Betrag zahlen, den sie nicht gesehen hat. Die Antwort liefert die gültigen
   // Preise mit; der Checkout übernimmt sie in den Warenkorb und zeigt die neue
   // Summe (dasselbe Muster wie bei gekürzten Mengen).
-  const dbPreise = new Map(produkte.map((p) => [p.id, Number(p.price)]))
+  // Decimal bleibt Decimal — gerechnet wird damit, nicht mit number.
+  const dbPreise = new Map(produkte.map((p) => [p.id, p.price]))
   const abweichend = preisAbweichungen(data.items, dbPreise)
   if (abweichend.length > 0) {
     const namen = abweichend.map((a) => `„${a.name}“`).join(', ')
@@ -240,6 +247,7 @@ export async function POST(request: NextRequest) {
     )
   }
   // Ab hier rechnet alles mit dem Preis aus der DB — auch wenn er gleich war.
+  // Das ! ist sicher: 3b hat oben jedes Produkt der Anfrage in produktJeId gefunden.
   const positionen = data.items.map((i) => ({ ...i, unitPrice: dbPreise.get(i.productId)! }))
 
   // 3c. BETRIEBSNACHWEIS — serverseitig erneut, auch wenn das Formular schon
@@ -279,12 +287,12 @@ export async function POST(request: NextRequest) {
 
   // 5. Totals — totalAmount ist und bleibt der WARENPREIS (Umsatz des Hofes)
   const totalAmount = calcTotalAmount(positionen)
-  const platformFeeAmount = calcPlatformFeeAmount(totalAmount, Number(farm.platformFeePercent))
+  const platformFeeAmount = calcPlatformFeeAmount(totalAmount, farm.platformFeePercent)
 
   // 5b. Servicegebühr — aus der Hofeinstellung ZUM BESTELLZEITPUNKT berechnet
   //     und im Snapshot der Bestellung eingefroren (src/lib/servicegebuehr.ts).
   //     Der Browser zeigt dieselbe Rechnung vorab; verbindlich ist diese hier.
-  const warenpreisCents = eurosToCents(totalAmount)
+  const warenpreisCents = decimalZuCents(totalAmount)
   const servicegebuehr = berechneServicegebuehr(warenpreisCents, farm, now)
 
   // 6. Order number (retry on collision — astronomically unlikely)
@@ -353,7 +361,7 @@ export async function POST(request: NextRequest) {
             productName: i.name,
             unitPrice: i.unitPrice,
             quantity: i.quantity,
-            totalPrice: i.unitPrice * i.quantity,
+            totalPrice: calcLineTotal(i.unitPrice, i.quantity),
             // SNAPSHOT des MwSt-Satzes — im selben create wie die Bestellung,
             // also atomar mit ihr. Später nie aus Product nachlesen, nie
             // rückwirkend ändern (Invariante ARCHITECTURE.md §5). Die Map ist
@@ -433,7 +441,7 @@ export async function POST(request: NextRequest) {
     // → dem Hof fließt exakt der Warenpreis zu, FarmerZone trägt die
     // Stripe-Kosten aus der Servicegebühr.
     const amountCents = warenpreisCents + servicegebuehr.gebuehrCents
-    const feeAmountCents = eurosToCents(platformFeeAmount) + servicegebuehr.gebuehrCents
+    const feeAmountCents = decimalZuCents(platformFeeAmount) + servicegebuehr.gebuehrCents
 
     const intentParams: Parameters<typeof stripe.paymentIntents.create>[0] = {
       amount: amountCents,
@@ -512,7 +520,7 @@ export async function POST(request: NextRequest) {
             productName: i.name,
             quantity: i.quantity,
             unitPrice: i.unitPrice,
-            totalPrice: i.unitPrice * i.quantity,
+            totalPrice: calcLineTotal(i.unitPrice, i.quantity),
             product: einheit.get(i.productId) ?? null,
           })),
         },
