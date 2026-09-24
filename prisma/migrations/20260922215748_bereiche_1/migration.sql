@@ -89,6 +89,9 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+-- EXPAND-CONTRACT: Tabelle leer — belegt durch die Schutzabfrage direkt darüber:
+-- Sie bricht LAUT ab, wenn die Tabelle beim ersten Lauf schon Zeilen hat.
+-- (Marker nachträglich, Vorfall 2026-09-23: siehe DEVELOPMENT.md → Vorfälle.)
 ALTER TABLE "FutterKennzeichnung"
   ADD COLUMN IF NOT EXISTS "futtermittelart" "Futtermittelart" NOT NULL,
   ADD COLUMN IF NOT EXISTS "nettoMenge"      DECIMAL(10,3)     NOT NULL,

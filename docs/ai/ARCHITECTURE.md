@@ -123,6 +123,7 @@ Diese Regeln sind fachlich, nicht technisch. Verletzung kostet Geld oder Vertrau
 - **Eine Bestellung überlebt einen gescheiterten Mailversand.** Immer.
 - **Jede Abfrage im Bauern-Bereich ist auf den eigenen Hof begrenzt.** Es gibt keine hofübergreifende Sicht außer im Admin.
 - **Archivierte, pausierte und nicht freigegebene Höfe** sind öffentlich unsichtbar. Bei jeder neuen öffentlichen Abfrage mitprüfen.
+- **Migrationen laufen vor dem Code.** Eine NOT-NULL-Spalte ohne Default darf auf eine bestehende Tabelle nur, wenn die Tabelle nachweislich leer ist oder die Spalte in zwei Schritten kommt: erst nullable plus Code, der sie schreibt; im nächsten Sprint NOT NULL. Dasselbe gilt für das Entfernen von Spalten, die alter Code noch liest. — Grund: `vercel-build` schaltet die Migration Minuten vor dem Code live; in diesem Deploy-Fenster schreibt der alte Code ins neue Schema (Vorfall 2026-09-23, `DEVELOPMENT.md` → Vorfälle). Durchgesetzt von `tests/migrationen-wache.test.ts`; begründete Ausnahmen tragen einen `-- EXPAND-CONTRACT:`-Marker in den fünf Zeilen vor dem `ALTER TABLE`.
 
 ### Taxonomie (Kategorien, Unterkategorien, Siegel)
 

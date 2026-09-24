@@ -32,6 +32,9 @@ den tatsächlichen Diff, nicht die Absicht dahinter.
      einem dieser Werte, gefolgt von Addition oder Multiplikation, ist
      ein Verstoß — auch in Tests, wenn dort Beträge geprüft werden.
 4. Liegt eine Datei unter prisma/migrations/ im Diff, zusätzlich:
+   - NOT-NULL-Spalte ohne Default auf bestehender Tabelle ohne
+     EXPAND-CONTRACT-Marker → Verstoß, Sicherheit und Geld.
+   - Spalte entfernt, die der Code auf main noch liest → Verstoß.
    - destruktive Operationen (DROP, ALTER TYPE, NOT NULL ohne Backfill)?
    - neue Tabellen ohne RLS-Policy, obwohl RLS im Projekt aktiv ist?
    - neue Fremdschlüssel ohne Index?

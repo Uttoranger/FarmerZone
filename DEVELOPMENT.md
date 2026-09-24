@@ -316,6 +316,47 @@ pnpm dev
 
 ---
 
+## Vorfälle
+
+Produktionsvorfälle, chronologisch. Jeder Eintrag: was passiert ist, Ursache,
+Folge, Maßnahme — damit die Regel, die daraus wurde, ihre Begründung behält.
+
+### 2026-09-23 · Deploy-Fenster: P2011 auf FutterKennzeichnung (eine Anfrage, kein Schaden)
+
+**Was passiert ist.** Um 16:13 UTC, während des Deploys von Bereiche 1 (#107),
+scheiterte genau eine Anfrage: `POST /products` mit Prisma-Fehler P2011. Der
+noch laufende alte Code (Stand #106) legte eine Futter-Kennzeichnung an und
+konnte die neuen NOT-NULL-Spalten `futtermittelart`, `nettoMenge`,
+`nettoEinheit` nicht liefern.
+
+**Ursache.** `vercel-build` führt `prisma migrate deploy` VOR `next build` aus.
+Zwischen Migration und Live-Schaltung läuft der alte Code auf dem neuen Schema
+— das Deploy-Fenster, wenige Minuten. Die Schutzabfrage der Migration belegt
+zwar, dass die Tabelle beim Migrieren LEER war; „leer" schützt aber nicht vor
+Einfügungen des alten Codes in diesem Fenster.
+
+**Folge.** Eine Anfrage mit Fehlermeldung. Kein Datenschaden, kein Checkout
+betroffen, die Migration lief vollständig durch; der nächste Versuch nach dem
+Deploy ging durch.
+
+**Maßnahme.** Expand/Contract-Regel als Invariante in `docs/ai/ARCHITECTURE.md`
+§5, durchgesetzt von `tests/migrationen-wache.test.ts` (Teil der Unit-Suite und
+damit des Stop-Hooks). Begründete Ausnahmen tragen
+`-- EXPAND-CONTRACT: Tabelle leer` oder `-- EXPAND-CONTRACT: Schritt 2 von 2`
+in den fünf Zeilen vor dem `ALTER TABLE`; die Migration von Bereiche 1 trägt
+den Marker „Tabelle leer" rückwirkend (die Schutzabfrage belegt ihn). Der
+Prüfer-Agent prüft dieselbe Regel im Diff.
+
+**Beobachtungen am Rand, nichts unternommen:**
+- `pg` meldet eine Deprecation-Warnung für `client.query()` bei paralleler
+  Nutzung desselben Clients — mit pg@8 harmlos; vor einem Update auf pg@9
+  prüfen.
+- Nach einem Merge mit Migration nicht auf farmerzone.at testen, bis das
+  Deployment in Vercel READY ist — sonst testet man genau in das
+  Deploy-Fenster hinein.
+
+---
+
 ## Wichtige Entscheidungen & Rahmenbedingungen
 
 - **Komponentenrumpf:** Helfer-Funktionen und ihre `const`-Datengrundlagen stehen VOR ihrer ersten Verwendung — im Prod-Bundle konvertiert der SWC-Minifier `function`-Deklarationen zu `const`, die nicht gehoisted werden; TDZ crasht lautlos in Produktion (Vorfall Sprint 20: `sections`/`isSectionVisible` in `farm-page-view.tsx`).
