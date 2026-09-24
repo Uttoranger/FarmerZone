@@ -29,7 +29,10 @@ const PROJEKT = (() => {
   writeFileSync(path.join(dir, '.env.example'), '')
   writeFileSync(path.join(dir, '.env.local'), 'NICHT_ECHT=1')
   writeFileSync(path.join(dir, '.vercel/project.json'), '{}')
-  symlinkSync(tmpdir(), path.join(dir, 'raus'))
+  // 'junction': Unter Windows braucht ein normaler Symlink Sonderrechte (EPERM
+  // ohne Entwicklermodus) — eine Verzeichnis-Junction nicht. Linux und macOS
+  // ignorieren das dritte Argument. Der Hook löst beides mit realpath auf.
+  symlinkSync(tmpdir(), path.join(dir, 'raus'), 'junction')
   return dir
 })()
 
