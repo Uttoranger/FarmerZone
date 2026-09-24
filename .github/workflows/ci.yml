@@ -56,3 +56,60 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  # Zweite Testschicht: Server-Handler gegen ein echtes Postgres
+  # (docs/ai/TESTING_GUIDELINES.md, Abschnitt 1). Eigener Job, damit ein
+  # fehlender Datenbankdienst nie die schnelle Suite mit umbringt und beide
+  # parallel laufen.
+  #
+  # KEINE SECRETS. Die Datenbank entsteht leer im Container dieses Laufs und
+  # verschwindet mit ihm; Passwort und Name stehen offen da, weil sie nichts
+  # schützen. Die Sicherheitssperre
+  # (tests/integration/setup/sicherheitssperre.ts) lässt ohnehin nur lokale
+  # Hosts durch.
+  integration:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: farmerzone_test
+        ports:
+          - 5432:5432
+        # Ohne Health-Check startet der erste Migrationslauf, bevor Postgres
+        # Verbindungen annimmt.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Der Dienst ist auf den Runner gemappt, deshalb localhost und nicht der
+      # Dienstname postgres.
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/farmerzone_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate
+
+      # Vitest direkt statt `pnpm test:integration`: Das Script lädt .env.test
+      # über dotenv-cli, und die Datei gibt es hier bewusst nicht — die Adresse
+      # steht oben im Job. Alles Übrige (Stripe- und Resend-Platzhalter) setzt
+      # vitest.integration.config.ts selbst.
+      - name: Integrationstests
+        run: pnpm exec vitest run --config vitest.integration.config.ts

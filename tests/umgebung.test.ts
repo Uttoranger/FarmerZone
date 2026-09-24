@@ -1,9 +1,21 @@
 import { describe, it, expect } from 'vitest'
-import { bannerZeilen, bestimmeUmgebung, istDevDatenbank, type UmgebungsWerte } from '@/lib/umgebung'
+import {
+  bannerZeilen,
+  bestimmeUmgebung,
+  datenbankHost,
+  erkannteFernDatenbank,
+  istDevDatenbank,
+  istTestDatenbank,
+  zeigtAufGehostetesProjekt,
+  type UmgebungsWerte,
+} from '@/lib/umgebung'
 
 // Frei erfundene Werte — das Repo ist öffentlich. Die Projektreferenz ist die
 // echte Dev-Referenz, weil genau sie die Allowlist bildet; sie ist kein Geheimnis.
 const DEV_REF = 'pmshaubwpxzdupwhyvjj'
+const PROD_REF = 'zxwkhizjvpyporjteylr'
+const PROD_DB_POOLER = `postgresql://postgres.${PROD_REF}:geheimes-passwort@aws-0-eu-central-1.pooler.supabase.com:6543/postgres`
+const LOKALE_DB = 'postgresql://postgres:postgres@localhost:5432/farmerzone_test'
 const DEV_DB_DIREKT = `postgresql://postgres:geheimes-passwort@db.${DEV_REF}.supabase.co:5432/postgres`
 const DEV_DB_POOLER = `postgresql://postgres.${DEV_REF}:geheimes-passwort@aws-0-eu-central-1.pooler.supabase.com:6543/postgres?pgbouncer=true`
 const FREMDE_DB = 'postgresql://postgres.zzzzfremdeprojektzzzz:anderes-passwort@aws-0-eu-central-1.pooler.supabase.com:6543/postgres'
@@ -131,6 +143,14 @@ describe('istDevDatenbank', () => {
     expect(istDevDatenbank('postgresql://postgres:postgres@127.0.0.1:5432/db')).toBe(true)
   })
 
+  it('kennt den Docker-Dienstnamen postgres NICHT — deshalb prüft der Seed beide Allowlists', () => {
+    // Festgehalten, weil die Asymmetrie der Grund ist, warum prisma/seed.ts
+    // `istDevDatenbank || istTestDatenbank` prüft: Nur die erste Prüfung ließe
+    // einen docker-compose-Lauf mitten im globalSetup sterben.
+    expect(istDevDatenbank('postgresql://postgres:postgres@postgres:5432/db')).toBe(false)
+    expect(istTestDatenbank('postgresql://postgres:postgres@postgres:5432/db')).toBe(true)
+  })
+
   it('stuft jede andere Datenbank als fremd ein — Allowlist, keine Blocklist', () => {
     expect(istDevDatenbank(FREMDE_DB)).toBe(false)
     expect(istDevDatenbank('postgresql://u:p@db.anderesprojekt.supabase.co:5432/postgres')).toBe(false)
@@ -145,6 +165,102 @@ describe('istDevDatenbank', () => {
   it('lässt sich nicht durch die Referenz im Passwort oder Pfad täuschen', () => {
     expect(istDevDatenbank(`postgresql://u:${DEV_REF}@db.fremd.supabase.co:5432/postgres`)).toBe(false)
     expect(istDevDatenbank(`postgresql://u:p@db.fremd.supabase.co:5432/${DEV_REF}`)).toBe(false)
+  })
+})
+
+// Die zweite Allowlist. Sie entscheidet, wohin die Integrationstests schreiben
+// DÜRFEN — dort wird angelegt, geändert und gelöscht. Sie ist deshalb strenger
+// als istDevDatenbank und lehnt die Dev-Datenbank mit ab.
+describe('istTestDatenbank', () => {
+  it('erlaubt die lokalen Hosts', () => {
+    expect(istTestDatenbank(LOKALE_DB)).toBe(true)
+    expect(istTestDatenbank('postgresql://postgres:postgres@127.0.0.1:5432/fz_test')).toBe(true)
+    expect(istTestDatenbank('postgresql://postgres:postgres@postgres:5432/fz_test')).toBe(true)
+  })
+
+  it('lehnt die Produktions-Datenbank ab', () => {
+    expect(istTestDatenbank(PROD_DB_POOLER)).toBe(false)
+    expect(
+      istTestDatenbank(`postgresql://postgres:p@db.${PROD_REF}.supabase.co:5432/postgres`)
+    ).toBe(false)
+  })
+
+  it('lehnt auch die Dev-Datenbank ab — Tests löschen, das darf nur die Testdatenbank treffen', () => {
+    expect(istTestDatenbank(DEV_DB_DIREKT)).toBe(false)
+    expect(istTestDatenbank(DEV_DB_POOLER)).toBe(false)
+  })
+
+  it('lehnt einen Tunnel auf localhost ab, dessen Benutzername auf ein echtes Projekt zeigt', () => {
+    expect(istTestDatenbank(`postgresql://postgres.${PROD_REF}:p@localhost:5432/postgres`)).toBe(false)
+    expect(istTestDatenbank(`postgresql://postgres.${DEV_REF}:p@127.0.0.1:6543/postgres`)).toBe(false)
+  })
+
+  it('lehnt einen Tunnel auch bei einem unbekannten Projekt ab — die Pooler-Regel ist generisch', () => {
+    // Genau der Fall, für den die namentliche Prüfung nicht reicht: eine
+    // Projektreferenz, die in umgebung.ts nirgends steht.
+    expect(istTestDatenbank('postgresql://postgres.nieheirgendwonotiert:p@localhost:5432/postgres')).toBe(
+      false
+    )
+  })
+
+  it('erlaubt die gewöhnliche lokale Rolle ohne Punkt im Namen', () => {
+    expect(istTestDatenbank('postgresql://postgres:postgres@localhost:5432/fz_test')).toBe(true)
+    expect(istTestDatenbank('postgresql://franz:geheim@127.0.0.1:5432/fz_test')).toBe(true)
+  })
+
+  it('vergleicht den Host exakt — ein fremder Rechner mit localhost im Namen zählt nicht', () => {
+    expect(istTestDatenbank('postgresql://u:p@db.localhost.example.com:5432/postgres')).toBe(false)
+    expect(istTestDatenbank('postgresql://u:p@localhost.fremd.at:5432/postgres')).toBe(false)
+  })
+
+  it('lehnt Fehlendes und Unlesbares ab, statt es durchzuwinken', () => {
+    expect(istTestDatenbank(undefined)).toBe(false)
+    expect(istTestDatenbank('')).toBe(false)
+    expect(istTestDatenbank('   ')).toBe(false)
+    expect(istTestDatenbank('das ist keine adresse')).toBe(false)
+  })
+})
+
+describe('zeigtAufGehostetesProjekt', () => {
+  it('erkennt den Pooler-Benutzernamen am Punkt, unabhängig vom Projekt', () => {
+    expect(zeigtAufGehostetesProjekt(DEV_DB_POOLER)).toBe(true)
+    expect(zeigtAufGehostetesProjekt(PROD_DB_POOLER)).toBe(true)
+    expect(zeigtAufGehostetesProjekt('postgresql://postgres.irgendwas:p@localhost:5432/db')).toBe(true)
+  })
+
+  it('lässt lokale Rollen und die Direktverbindung in Ruhe', () => {
+    expect(zeigtAufGehostetesProjekt(LOKALE_DB)).toBe(false)
+    // Direktverbindung: Referenz im Host, Benutzername schlicht „postgres".
+    expect(zeigtAufGehostetesProjekt(DEV_DB_DIREKT)).toBe(false)
+    expect(zeigtAufGehostetesProjekt(undefined)).toBe(false)
+  })
+})
+
+describe('erkannteFernDatenbank', () => {
+  it('benennt Produktion und Dev, damit eine Abbruchmeldung sie nennen kann', () => {
+    expect(erkannteFernDatenbank(PROD_DB_POOLER)).toBe('produktion')
+    expect(erkannteFernDatenbank(DEV_DB_POOLER)).toBe('dev')
+  })
+
+  it('meldet null für lokale und unbekannte Adressen', () => {
+    expect(erkannteFernDatenbank(LOKALE_DB)).toBeNull()
+    expect(erkannteFernDatenbank(FREMDE_DB)).toBeNull()
+    expect(erkannteFernDatenbank(undefined)).toBeNull()
+  })
+})
+
+describe('datenbankHost', () => {
+  it('gibt den Host heraus — und sonst nichts aus der Adresse', () => {
+    const host = datenbankHost(DEV_DB_POOLER)
+    expect(host).toBe('aws-0-eu-central-1.pooler.supabase.com')
+    expect(host).not.toContain('geheimes-passwort')
+    expect(host).not.toContain(DEV_REF)
+    expect(datenbankHost(LOKALE_DB)).toBe('localhost')
+  })
+
+  it('nennt unlesbare Adressen beim Namen, statt zu werfen', () => {
+    expect(datenbankHost(undefined)).toBe('(keine lesbare Adresse)')
+    expect(datenbankHost('das ist keine adresse')).toBe('(keine lesbare Adresse)')
   })
 })
 

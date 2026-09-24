@@ -13,6 +13,7 @@ Solo-Entwickler, ein Pilothof. **Produktivsystem mit echten Bestellungen und ech
 | Alle Tests | `pnpm test` |
 | **Ein Test** | `pnpm vitest run tests/<name>.test.ts` |
 | Test-Watch | `pnpm test:watch` |
+| Integrationstests (echtes Postgres) | `pnpm test:integration` |
 | Typecheck | `pnpm typecheck` |
 | Lint | `pnpm lint` |
 | Build (lokal) | `pnpm build` |
@@ -22,6 +23,10 @@ Solo-Entwickler, ein Pilothof. **Produktivsystem mit echten Bestellungen und ech
 
 - Paketmanager ist **pnpm 10.33.0**. Nie `npm` oder `yarn` benutzen.
 - `db:*`-Skripte laden `.env.local` über `dotenv-cli`. Ohne diesen Vorsatz läuft Prisma gegen die falsche DB.
+- `test:integration` läuft **nur mit `TEST_DATABASE_URL`** aus `.env.test`
+  (Vorlage `.env.test.example`) und **niemals gegen Dev oder Produktion** — die
+  Sperre lässt nur localhost, 127.0.0.1 und postgres durch und bricht sonst ab.
+  Nicht Teil von `pnpm test`, nicht Teil des Stop-Hooks; in der CI ein eigener Job.
 
 **Vor jedem Commit verpflichtend:** `pnpm typecheck && pnpm lint && pnpm test`.
 Kein Commit mit rotem Typecheck oder roten Tests. Keine Ausnahme, auch nicht "nur ein Formatfehler".
