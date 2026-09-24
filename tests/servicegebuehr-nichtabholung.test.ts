@@ -21,13 +21,24 @@ vi.mock('@/lib/email', () => ({
   sendOrderCancelled: vi.fn(),
   sendOrderNotReady: vi.fn(),
 }))
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
-    farm: { findUnique: vi.fn() },
-    order: { findFirst: vi.fn(), update: vi.fn() },
-    product: { update: vi.fn() },
-  },
-}))
+vi.mock('@/lib/prisma', () => {
+  const order = { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() }
+  const product = { update: vi.fn() }
+  return {
+    prisma: {
+      farm: { findUnique: vi.fn() },
+      order,
+      product,
+      // Storno läuft seit fix/storno-atomar durch eine interaktive
+      // Transaktion — der Rückruf bekommt dieselben Fakes.
+      $transaction: vi.fn(async (arg: unknown) =>
+        typeof arg === 'function'
+          ? (arg as (tx: unknown) => Promise<unknown>)({ order, product })
+          : Promise.all(arg as Array<Promise<unknown>>)
+      ),
+    },
+  }
+})
 
 import { markAsNotPickedUp, cancelOrder } from '@/server/actions/orders'
 import { auth } from '@/lib/auth'
@@ -39,6 +50,7 @@ const getSession = vi.mocked(auth.api.getSession)
 const farmFindUnique = vi.mocked(prisma.farm.findUnique)
 const orderFindFirst = vi.mocked(prisma.order.findFirst)
 const orderUpdate = vi.mocked(prisma.order.update)
+const orderUpdateMany = vi.mocked(prisma.order.updateMany)
 const productUpdate = vi.mocked(prisma.product.update)
 const refundCreate = vi.mocked(stripe.refunds.create)
 
@@ -63,6 +75,11 @@ function updateDaten(): Array<Record<string, unknown>> {
   return orderUpdate.mock.calls.map((c) => (c[0] as { data: Record<string, unknown> }).data)
 }
 
+/** Der Storno-Schreiber ist seit fix/storno-atomar das gesperrte updateMany. */
+function stornoDaten(): Array<Record<string, unknown>> {
+  return orderUpdateMany.mock.calls.map((c) => (c[0] as { data: Record<string, unknown> }).data)
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   getSession.mockResolvedValue({ user: { id: 'user_1' } } as never)
@@ -71,6 +88,7 @@ beforeEach(() => {
     address: 'Weg 1', postalCode: '5270', city: 'Mauerkirchen', phone: '',
   } as never)
   orderUpdate.mockResolvedValue({} as never)
+  orderUpdateMany.mockResolvedValue({ count: 1 } as never)
   productUpdate.mockResolvedValue({} as never)
   refundCreate.mockResolvedValue({ id: 're_1', amount: 98 } as never)
 })
@@ -230,8 +248,7 @@ describe('cancelOrder — Gebühren-Vermerk bei Storno', () => {
     const result = await cancelOrder('order_bar')
     expect(result).toEqual({})
     expect(refundCreate).not.toHaveBeenCalled()
-    const letzte = updateDaten().at(-1)
-    expect(letzte).toEqual(
+    expect(stornoDaten().at(-1)).toEqual(
       expect.objectContaining({ status: 'CANCELLED', serviceFeeRefundedAt: expect.any(Date) })
     )
   })
@@ -239,7 +256,7 @@ describe('cancelOrder — Gebühren-Vermerk bei Storno', () => {
   it('ohne Gebühr bleibt der Vermerk weg', async () => {
     orderFindFirst.mockResolvedValue({ ...STORNO_BAR, serviceFeeCents: 0 } as never)
     await cancelOrder('order_bar')
-    expect(updateDaten().at(-1)).not.toHaveProperty('serviceFeeRefundedAt')
+    expect(stornoDaten().at(-1)).not.toHaveProperty('serviceFeeRefundedAt')
   })
 
   it('online bezahlt: volle Erstattung wie bisher (unverändert), dazu der Vermerk', async () => {
@@ -256,7 +273,7 @@ describe('cancelOrder — Gebühren-Vermerk bei Storno', () => {
 
     // Unverändert: volle Erstattung nur über den Intent (Warenpreis-Umgang bleibt)
     expect(refundCreate).toHaveBeenCalledWith({ payment_intent: 'pi_1' })
-    expect(updateDaten().at(-1)).toEqual(
+    expect(stornoDaten().at(-1)).toEqual(
       expect.objectContaining({ status: 'CANCELLED', serviceFeeRefundedAt: expect.any(Date) })
     )
     expect(sendOrderCancelled).toHaveBeenCalledWith(expect.objectContaining({ serviceFeeCents: 98 }), 20.98)

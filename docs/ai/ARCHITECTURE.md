@@ -119,6 +119,7 @@ Diese Regeln sind fachlich, nicht technisch. Verletzung kostet Geld oder Vertrau
 - **Reservierung bucht keinen Bestand ab.** `Product.stock` sinkt erst beim Kauf. `StockReservation` ist ein weicher Halt, der die Menge nur vor **anderen** Sitzungen verbirgt. Verfällt er, gibt es nichts zurückzubuchen.
 - **Die 15-Minuten-Frist gilt beim Lesen.** Jede Abfrage fremder Halte filtert auf `expiresAt > jetzt`. Nie einem Cron vertrauen.
 - **Bestandsabzug ist bedingt.** `updateMany` mit `stock >= Menge`; bei Teilfehlschlag die bereits gebuchten Positionen gutschreiben.
+- **Ein Statuswechsel mit Wirkung auf Bestand oder Geld ist die Sperre.** Er läuft als `updateMany` mit Statusbedingung (Vorlage: `cancelOrder`), `count === 0` heißt „schon erledigt" — nie eine Leseprüfung mit anschließendem blindem `update`. Bestandsbuchungen gehören in DIESELBE Transaktion; Stripe und Mail kommen danach. Auch ein Rückweg (Undo) schreibt bedingt: Er darf eine stornierte Bestellung nie zurückholen.
 - **Checkout ist idempotent.** `Order.idempotencyKey` ist unique. Zweiter Request mit gleichem Schlüssel gibt die bestehende Bestellung zurück.
 - **Eine Bestellung überlebt einen gescheiterten Mailversand.** Immer.
 - **Jede Abfrage im Bauern-Bereich ist auf den eigenen Hof begrenzt.** Es gibt keine hofübergreifende Sicht außer im Admin.
@@ -158,3 +159,4 @@ Nicht nachahmen. Beim Anfassen der Datei mit aufräumen, nicht als eigener Sprin
 | Geld teils `Decimal`, teils `Int` in Cent | Neue Geldfelder: `Decimal(10,2)`. Bestehende `*Cents` nicht umbauen. |
 | Enum-Werte `FUTTERMITTEL` (Kategorie) und `EINZELFUTTERMITTEL`, `MISCHFUTTERMITTEL`, `ERGAENZUNGSFUTTERMITTEL` (Unterkategorie) aus Taxonomie 1 | Nie wählbar anbieten, nie schreiben; Zod lehnt sie ab. Lesen nur über `istAltlastKategorie` / `istAltlastUnterkategorie`. Entfernen im Cleanup-Sprint. |
 | `FutterKennzeichnung.registrierungsnummer` — die Nummer gehört dem Hof (`Farm.betriebsnummer`) | Nie schreiben. Lesen nur als Rückfall über `betriebsnummerFuerAnzeige`. Entfernen im Cleanup-Sprint. |
+| `markAsReady`, `markAsPickedUp`, `markAsPickedUpAndPaid`, `markAsNotPickedUp` prüfen lesend und schreiben blind — ein Storno im Fenster dazwischen wird überschrieben | Neuer Statuswechsel: bedingtes `updateMany` (§5). Wer eine dieser vier anfasst, stellt sie um. |

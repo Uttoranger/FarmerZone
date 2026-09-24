@@ -6,9 +6,17 @@ import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { revalidatePath } from 'next/cache'
 import { sendOrderReady, sendOrderCancelled, sendOrderNotReady, type OrderForEmail } from '@/lib/email'
+import { nachDerAntwort } from '@/lib/nach-der-antwort'
+import * as Sentry from '@sentry/nextjs'
 import type { OrderStatus } from '@prisma/client'
 
 export type ActionResult = { error?: string }
+
+// Für den Fall, dass ein bedingter Statuswechsel nichts mehr trifft: Die
+// Bestellung gibt es, sie hat sich nur seit dem Laden der Seite geändert
+// (typisch: in einem anderen Tab storniert). „Nicht gefunden" wäre falsch.
+const BESTELLUNG_INZWISCHEN_GEAENDERT =
+  'Die Bestellung wurde inzwischen geändert, zum Beispiel storniert. Lade die Seite neu.'
 
 async function getAuthFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -193,14 +201,18 @@ export async function revertReady(
     where: { id: orderId, farmId: farm.id, status: 'READY' },
     select: ORDER_EMAIL_SELECT,
   })
-  if (!order) return { error: 'Bestellung nicht gefunden' }
+  if (!order) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
 
   const previous: OrderStatus = order.paymentStatus === 'PAID' ? 'PAID' : 'CONFIRMED'
 
-  await prisma.order.update({
-    where: { id: orderId },
+  // Bedingt geschrieben, nicht nach der Leseprüfung blind: Wird die Bestellung
+  // zwischen Lesen und Schreiben storniert, holte ein unbedingtes update sie
+  // zurück ins Leben — und ein zweiter Storno buchte den Bestand erneut zurück.
+  const { count } = await prisma.order.updateMany({
+    where: { id: orderId, farmId: farm.id, status: 'READY' },
     data: { status: previous },
   })
+  if (count === 0) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
 
   // Kunden-Info nur auf Wunsch (Haken im Dialog, Standard AN): neutrales
   // "Kurzes Update" — relativiert die bereits verschickte Abholbereit-Mail
@@ -226,12 +238,14 @@ export async function revertPickedUp(orderId: string): Promise<ActionResult> {
     where: { id: orderId, farmId: farm.id, status: 'PICKED_UP' },
     select: { id: true },
   })
-  if (!exists) return { error: 'Bestellung nicht gefunden' }
+  if (!exists) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
 
-  await prisma.order.update({
-    where: { id: orderId },
+  // Bedingt geschrieben — Begründung wie bei revertReady.
+  const { count } = await prisma.order.updateMany({
+    where: { id: orderId, farmId: farm.id, status: 'PICKED_UP' },
     data: { status: 'READY', pickedUpAt: null },
   })
+  if (count === 0) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
 
   // Keine Mail: der Kunde hatte die Abholbereitschafts-Mail bereits
 
@@ -247,16 +261,19 @@ export async function revertOrderStatus(orderId: string, previousStatus: string)
   const farm = await getAuthFarm()
   if (!farm) return { error: 'Nicht angemeldet' }
 
-  const exists = await prisma.order.findFirst({
-    where: { id: orderId, farmId: farm.id },
-    select: { id: true },
-  })
-  if (!exists) return { error: 'Bestellung nicht gefunden' }
-
-  await prisma.order.update({
-    where: { id: orderId },
+  // Das Undo im Toast folgt nur auf „Bereit" (→ READY) und „Abgeholt"
+  // (→ PICKED_UP) — und darf NUR den Schritt zurück, den der Toast meint:
+  // zurück auf READY nur aus PICKED_UP, zurück auf PAID/CONFIRMED/
+  // IN_PREPARATION nur aus READY. Vorher gab es hier KEINEN Statusfilter:
+  // „Bereit" → Storno → „Rückgängig" holte eine stornierte Bestellung zurück
+  // (zweite Rückbuchung beim zweiten Storno), und „Bereit" → „Abgeholt" →
+  // „Rückgängig" im ersten Toast machte abgeholte Ware wieder stornierbar.
+  const ausStatus: OrderStatus = previousStatus === 'READY' ? 'PICKED_UP' : 'READY'
+  const { count } = await prisma.order.updateMany({
+    where: { id: orderId, farmId: farm.id, status: ausStatus },
     data: { status: previousStatus as OrderStatus, pickedUpAt: null, paidAt: null },
   })
+  if (count === 0) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
 
   revalidatePath('/orders')
   revalidatePath(`/orders/${orderId}`)
@@ -267,13 +284,65 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Act
   const farm = await getAuthFarm()
   if (!farm) return { error: 'Nicht angemeldet' }
 
+  // Nur LESEN — die Daten für Rückbuchung und Mail. Die Entscheidung, ob
+  // storniert werden darf, fällt NICHT hier: eine Leseprüfung lassen zwei
+  // gleichzeitige Aufrufe (Doppeltipp) beide passieren.
   const order = await prisma.order.findFirst({
-    where: { id: orderId, farmId: farm.id, status: { notIn: ['CANCELLED', 'PICKED_UP'] } },
+    where: { id: orderId, farmId: farm.id },
     select: ORDER_EMAIL_SELECT,
   })
   if (!order) return { error: 'Bestellung nicht gefunden' }
 
+  // Der bedingte Statuswechsel IST die Sperre: updateMany mit Statusbedingung
+  // gewinnt genau einmal, der zweite Aufruf trifft count 0 und bucht nichts
+  // zurück. Rückbuchung in DERSELBEN Transaktion wie der Statuswechsel —
+  // ganz oder gar nicht. (Die Transaktion ist dem Stripe-Webhook entlehnt;
+  // die Sperre geht darüber hinaus — der Webhook prüft nur lesend.)
+  //
+  // NOT_PICKED_UP ist ebenfalls gesperrt: Bei „nicht abgeholt" bleibt der
+  // Warenpreis beim Hof (markAsNotPickedUp); ein Storno danach erstattete ihn
+  // voll und buchte Ware zurück, die nie zurückkam. Die Oberfläche bietet es
+  // dort schon nicht an — der Server muss es genauso sehen.
+  const storniert = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.order.updateMany({
+      where: {
+        id: orderId,
+        farmId: farm.id,
+        status: { notIn: ['CANCELLED', 'PICKED_UP', 'NOT_PICKED_UP'] },
+      },
+      data: {
+        status: 'CANCELLED',
+        cancelledAt: new Date(),
+        cancelReason: reason ?? null,
+        // Servicegebühr entfällt auch bei Storno: online steckt sie in der vollen
+        // Erstattung unten (Stripe erstattet den ganzen Zahlungsbetrag), bar wurde
+        // sie nie kassiert. Der Vermerk hält den Snapshot ehrlich — Admin-Spalte
+        // „entfallen" heute, Monatsabrechnung (Sprint 3) später.
+        ...(order.serviceFeeCents > 0 && !order.serviceFeeRefundedAt
+          ? { serviceFeeRefundedAt: new Date() }
+          : {}),
+      },
+    })
+    if (count === 0) return false
+
+    for (const item of order.items) {
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { stock: { increment: item.quantity } },
+      })
+    }
+    return true
+  })
+
+  if (!storniert) return { error: 'Diese Bestellung ist schon storniert oder abgeholt.' }
+
+  // Erstattung erst NACH der Transaktion. Scheitert Stripe, bleibt die
+  // Bestellung storniert und die Ware zurückgebucht — das ist der richtige
+  // Zustand, nur das Geld steht noch aus. paymentStatus bleibt dann PAID:
+  // das Enum kennt kein „Erstattung ausstehend" (Vorschlag: REFUND_PENDING,
+  // nicht eigenmächtig angelegt — Schema-Änderung nur mit Freigabe).
   let refundAmount: number | null = null
+  let erstattungOffen = false
 
   if (order.stripePaymentIntentId && order.paymentStatus === 'PAID') {
     try {
@@ -281,44 +350,56 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Act
         payment_intent: order.stripePaymentIntentId,
       })
       refundAmount = refund.amount / 100
-      await prisma.order.update({
-        where: { id: orderId },
-        data: { paymentStatus: 'REFUNDED' },
-      })
     } catch (err) {
       console.error('[cancelOrder] Stripe refund failed:', err)
-      return { error: 'Rückerstattung fehlgeschlagen. Bitte manuell über das Stripe Dashboard erstatten.' }
+      // Offenes Geld darf nicht nur im Log stehen: Die Bestellung ist
+      // storniert, ein zweiter Anlauf in der App ist durch die Sperre
+      // ausgeschlossen — erstatten kann nur der Betreiber über das
+      // Plattformkonto (Destination Charge). Nur die Bestell-ID, keine
+      // Kundendaten (sentry-hygiene.ts filtert zusätzlich).
+      Sentry.captureException(err, {
+        tags: { aktion: 'cancelOrder', grund: 'erstattung_offen' },
+        extra: { orderId },
+      })
+      erstattungOffen = true
+    }
+
+    // Der Vermerk getrennt von der Erstattung: Scheitert NUR er, ist das
+    // Geld trotzdem zurück — dann Erfolg an den Hof und Mail mit Betrag,
+    // nur paymentStatus steht falsch auf PAID. Das bekommt der Betreiber
+    // über Sentry zu sehen, nicht der Hof als „Erstattung fehlgeschlagen".
+    if (refundAmount !== null) {
+      try {
+        await prisma.order.update({
+          where: { id: orderId },
+          data: { paymentStatus: 'REFUNDED' },
+        })
+      } catch (err) {
+        Sentry.captureException(err, {
+          tags: { aktion: 'cancelOrder', grund: 'vermerk_fehlgeschlagen' },
+          extra: { orderId },
+        })
+      }
     }
   }
 
-  for (const item of order.items) {
-    await prisma.product.update({
-      where: { id: item.productId },
-      data: { stock: { increment: item.quantity } },
+  // Nichts Langsames im Antwortpfad, und ein Mailfehler kippt keine gültige
+  // Stornierung. Bei OFFENER Erstattung keine Mail: Die Vorlage liest „keine
+  // Erstattung" als Vor-Ort-Zahlung und schriebe „Da du vor Ort bezahlst,
+  // entstehen dir keine Kosten" — an eine Kundin, die online bezahlt hat und
+  // noch nichts zurückbekam. Wie vor diesem Fix: gescheiterte Erstattung →
+  // keine Storno-Mail; der Betreiber meldet sich mit der Erstattung.
+  if (!erstattungOffen) {
+    nachDerAntwort(async () => {
+      await sendOrderCancelled(toEmailOrder(order, farm), refundAmount)
     })
   }
 
-  await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      status: 'CANCELLED',
-      cancelledAt: new Date(),
-      cancelReason: reason ?? null,
-      // Servicegebühr entfällt auch bei Storno: online steckt sie in der vollen
-      // Erstattung oben (Stripe erstattet den ganzen Zahlungsbetrag), bar wurde
-      // sie nie kassiert. Der Vermerk hält den Snapshot ehrlich — Admin-Spalte
-      // „entfallen" heute, Monatsabrechnung (Sprint 3) später.
-      ...(order.serviceFeeCents > 0 && !order.serviceFeeRefundedAt
-        ? { serviceFeeRefundedAt: new Date() }
-        : {}),
-    },
-  })
-
-  await sendOrderCancelled(toEmailOrder(order, farm), refundAmount)
-
   revalidatePath('/orders')
   revalidatePath(`/orders/${orderId}`)
-  return {}
+  return erstattungOffen
+    ? { error: 'Rückerstattung fehlgeschlagen. Bitte manuell über das Stripe Dashboard erstatten.' }
+    : {}
 }
 
 /**

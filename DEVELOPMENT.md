@@ -254,6 +254,69 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 
 ## Bekannte Bugs & Fixes
 
+### BUG: Storno-Rückbuchung nicht atomar, Doppeltipp buchte doppelt (behoben 2026-09-24)
+
+**Symptom (statisch belegt, kein Kundenfall):** `cancelOrder` prüfte den Status nur
+lesend, buchte dann je Position außerhalb jeder Transaktion zurück und setzte
+CANCELLED erst am Ende. Zwei gleichzeitige Aufrufe (Doppeltipp) passierten beide
+die Leseprüfung → Bestand doppelt zurückgebucht. Die Stripe-Erstattung lief VOR
+dem Statuswechsel; ihr Scheitern verhinderte den ganzen Storno.
+
+**Zweiter Weg zum selben Schaden — sequentiell, kein Wettlauf nötig:**
+`revertOrderStatus` (das Undo im Toast nach „Bereit"/„Abgeholt") hatte **keinen**
+Statusfilter. „Bereit" → Storno → „Rückgängig" im noch sichtbaren Toast holte
+die stornierte Bestellung zurück; ein zweiter Storno buchte den Bestand erneut
+zurück. `revertReady`/`revertPickedUp` prüften lesend und schrieben blind —
+derselbe Schaden, aber nur in einem echten Gleichzeitig-Wettlauf.
+
+**Fix (fix/storno-atomar):**
+- Storno: Der bedingte Statuswechsel (`updateMany`, `status notIn [CANCELLED,
+  PICKED_UP, NOT_PICKED_UP]`) ist die Sperre und läuft mit der Rückbuchung in
+  EINER Transaktion. Die Transaktion ist dem Stripe-Webhook entlehnt — die Sperre
+  nicht: Der Webhook prüft nur lesend (siehe Altlast unten).
+- `NOT_PICKED_UP` mitgesperrt: Bei „nicht abgeholt" bleibt der Warenpreis beim
+  Hof; ein Storno danach erstattete ihn voll und buchte Ware zurück, die nie
+  zurückkam. Die Oberfläche bot es dort nie an, der Server jetzt auch nicht.
+- Stripe erst nach der Transaktion. Scheitert die Erstattung: Storno und
+  Rückbuchung bleiben (richtig so), Meldung an den Hof, **Sentry-Eintrag** mit der
+  Bestell-ID — vorher stand es nur im Log. **Keine Storno-Mail** in diesem Fall:
+  `order-cancelled.tsx` liest „keine Erstattung" als Vor-Ort-Zahlung und schriebe
+  „Da du vor Ort bezahlst, entstehen dir keine Kosten".
+- Mail sonst über `nachDerAntwort()`.
+- Alle drei Rückwege schreiben bedingt (`updateMany` mit Statusfilter).
+  `revertOrderStatus` darf nur den Schritt zurück, den sein Toast meint:
+  zurück auf READY nur aus PICKED_UP, sonst nur aus READY. (Ein loser Filter
+  „READY oder PICKED_UP" hätte „Bereit" → „Abgeholt" → „Rückgängig" im ersten
+  Toast erlaubt — abgeholte Ware wäre wieder stornierbar gewesen.)
+- Erstattung und REFUNDED-Vermerk getrennt: Scheitert nur der Vermerk, ist das
+  Geld zurück → Erfolg an den Hof, Mail mit Betrag, Sentry meldet den Vermerk.
+
+Wache: `tests/storno-atomar.test.ts` — deterministischer Wettlauf (beide lesen,
+bevor einer schreibt), Storno → Undo → Storno, Rückweg-Wettlauf, eigene tx-Fakes
+als Beweis, dass die Rückbuchung IN der Transaktion läuft.
+
+**Kandidat fürs Testfundament (Integrationstests, sobald es sie gibt):** zwei
+GLEICHZEITIGE `cancelOrder` gegen echtes Postgres → Bestand exakt einmal zurück.
+
+**Offen, mit Absicht nicht angefasst:**
+- `PaymentStatus` kennt kein „Erstattung ausstehend" — nach gescheiterter
+  Erstattung steht die stornierte Bestellung auf PAID. Vorschlag `REFUND_PENDING`,
+  nur mit Freigabe (Schema).
+- Die Meldung „Bitte manuell über das Stripe Dashboard erstatten" ist für den Hof
+  nicht umsetzbar: Bei der Destination Charge kann nur das Plattformkonto
+  erstatten. Wortlaut blieb auf ausdrücklichen Wunsch.
+- `markAsReady`, `markAsPickedUp`, `markAsPickedUpAndPaid` prüfen lesend und
+  schreiben blind — außerhalb dieses Auftrags, als Altlast in ARCHITECTURE §6.
+  Ein Storno genau zwischen ihrem Lesen und Schreiben wird überschrieben; aus
+  READY bucht ein zweiter Storno dann erneut zurück. Nur bei echter
+  Gleichzeitigkeit erreichbar (zwei Geräte, zwei Knöpfe im selben Moment).
+- `markAsNotPickedUp` ebenso. Dort kein Bestand, die Gebühren-Erstattung ist per
+  Stripe-Schlüssel idempotent — ein Wettlauf kann nur das Status-Etikett falsch
+  setzen, und NOT_PICKED_UP ist jetzt gegen einen zweiten Storno gesperrt.
+- Altlast Webhook: `handlePaymentFailed`/`handlePaymentSucceeded` prüfen lesend
+  und schreiben unbedingt — `handlePaymentSucceeded` kann eine stornierte
+  Bestellung wieder auf PAID setzen. Eigener Fix.
+
 ### BUG: Sprungmarken der Hofseite sprangen falsch (behoben 2026-09-20)
 
 **Symptom** (Meldung `cmua8bof` aus dem Briefkasten): „Section bzw. die Sprungmarken funktionieren auf Mobile nicht, wenn ich bilder drücke, springt der screen auf eine andere section."
