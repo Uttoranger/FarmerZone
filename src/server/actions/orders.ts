@@ -201,7 +201,7 @@ export async function revertReady(
     where: { id: orderId, farmId: farm.id, status: 'READY' },
     select: ORDER_EMAIL_SELECT,
   })
-  if (!order) return { error: 'Bestellung nicht gefunden' }
+  if (!order) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
 
   const previous: OrderStatus = order.paymentStatus === 'PAID' ? 'PAID' : 'CONFIRMED'
 
@@ -238,7 +238,7 @@ export async function revertPickedUp(orderId: string): Promise<ActionResult> {
     where: { id: orderId, farmId: farm.id, status: 'PICKED_UP' },
     select: { id: true },
   })
-  if (!exists) return { error: 'Bestellung nicht gefunden' }
+  if (!exists) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
 
   // Bedingt geschrieben — Begründung wie bei revertReady.
   const { count } = await prisma.order.updateMany({

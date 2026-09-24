@@ -74,7 +74,7 @@ describe('revertReady', () => {
   it('falscher Ausgangsstatus → abgelehnt, kein Update', async () => {
     orderFindFirst.mockResolvedValue(null)
     const result = await revertReady('order_confirmed')
-    expect(result.error).toBe('Bestellung nicht gefunden')
+    expect(result.error).toBe('Die Bestellung wurde inzwischen geändert, zum Beispiel storniert. Lade die Seite neu.')
     expect(orderUpdateMany).not.toHaveBeenCalled()
     expect(orderUpdate).not.toHaveBeenCalled()
   })
@@ -147,7 +147,7 @@ describe('revertPickedUp', () => {
   it('falscher Ausgangsstatus → abgelehnt, kein Update', async () => {
     orderFindFirst.mockResolvedValue(null)
     const result = await revertPickedUp('order_ready')
-    expect(result.error).toBe('Bestellung nicht gefunden')
+    expect(result.error).toBe('Die Bestellung wurde inzwischen geändert, zum Beispiel storniert. Lade die Seite neu.')
     expect(orderUpdateMany).not.toHaveBeenCalled()
     expect(orderUpdate).not.toHaveBeenCalled()
   })
