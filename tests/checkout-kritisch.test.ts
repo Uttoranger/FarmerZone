@@ -74,6 +74,10 @@ const HOF = {
   owner: { name: 'Inhaberin' },
 }
 
+// Preis in der „Datenbank" — passend zu dem, was die Anfragen schicken; der
+// Handler nimmt seit dem Preis-Fix den DB-Preis (tests/checkout-preis.test.ts).
+const PREIS: Record<string, number> = { prod_1: 5, prod_2: 2 }
+
 const ids = (a: unknown): string[] => {
   const w = (a as { where?: { id?: { in?: string[] }; productId?: { in?: string[] } } })?.where
   return w?.id?.in ?? w?.productId?.in ?? []
@@ -82,7 +86,7 @@ const ids = (a: unknown): string[] => {
 /** Normalfall: Ware da, eigener Halt gültig, Buchung geht durch. */
 function warenkorbBereit(haltMs = 600_000, bestand = 999) {
   productFindMany.mockImplementation(((a: unknown) =>
-    Promise.resolve(ids(a).map((id) => ({ id, stock: bestand, isAvailable: true })))) as never)
+    Promise.resolve(ids(a).map((id) => ({ id, stock: bestand, isAvailable: true, price: PREIS[id] ?? 5 })))) as never)
   reservationFindMany.mockImplementation(((a: unknown) => {
     const sess = (a as { where?: { sessionId?: unknown } })?.where?.sessionId
     if (sess && typeof sess === 'object') return Promise.resolve([]) // fremde Sitzungen

@@ -135,6 +135,7 @@ Diese Regeln sind fachlich, nicht technisch. Verletzung kostet Geld oder Vertrau
 - **Bestandsabzug ist bedingt.** `updateMany` mit `stock >= Menge`; bei Teilfehlschlag die bereits gebuchten Positionen gutschreiben.
 - **Ein Statuswechsel mit Wirkung auf Bestand oder Geld ist die Sperre.** Er läuft als `updateMany` mit Statusbedingung (Vorlage: `cancelOrder`), `count === 0` heißt „schon erledigt" — nie eine Leseprüfung mit anschließendem blindem `update`. Bestandsbuchungen gehören in DIESELBE Transaktion; Stripe und Mail kommen danach. Auch ein Rückweg (Undo) schreibt bedingt: Er darf eine stornierte Bestellung nie zurückholen.
 - **Checkout ist idempotent.** `Order.idempotencyKey` ist unique. Zweiter Request mit gleichem Schlüssel gibt die bestehende Bestellung zurück.
+- **Der Preis kommt aus der Datenbank.** Der Checkout rechnet Positionen, Summe und Stripe-Betrag mit `Product.price`, nie mit dem Preis aus dem Request. Weicht der Request ab, 409 `WARENKORB_GEAENDERT` mit den gültigen Preisen (`preise`) — nie eine Bestellung zu einem Preis, den die Kundin nicht gesehen hat.
 - **Eine Bestellung überlebt einen gescheiterten Mailversand.** Immer.
 - **Jede Abfrage im Bauern-Bereich ist auf den eigenen Hof begrenzt.** Es gibt keine hofübergreifende Sicht außer im Admin.
 - **Archivierte, pausierte und nicht freigegebene Höfe** sind öffentlich unsichtbar. Bei jeder neuen öffentlichen Abfrage mitprüfen.

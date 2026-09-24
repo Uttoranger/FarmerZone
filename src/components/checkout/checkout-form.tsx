@@ -62,6 +62,29 @@ function uebernehmeBerichtigung(
   return nachher
 }
 
+/**
+ * Die gültigen Preise, die der Server bei einer Abweichung mitschickt, in den
+ * Warenkorb übernehmen — dann zeigt der Checkout die neue Summe, und die
+ * Kundin schickt bewusst noch einmal ab. Ohne das bliebe der alte Preis im
+ * Speicher, und jeder weitere Versuch liefe wieder in dieselbe Ablehnung.
+ */
+function uebernehmePreise(
+  vorher: CartItem[],
+  preise: Array<{ productId: string; price: number }>,
+  farmId: string,
+  setCart: (items: CartItem[]) => void
+): CartItem[] {
+  const neu = new Map(preise.map((p) => [p.productId, p.price]))
+  const nachher = vorher.map((i) => (neu.has(i.productId) ? { ...i, price: neu.get(i.productId) ?? i.price } : i))
+  setCart(nachher)
+  try {
+    localStorage.setItem(CART_KEY, JSON.stringify({ farmId, items: nachher }))
+  } catch {
+    // Kein Schreibzugriff (privates Fenster): die Anzeige stimmt trotzdem.
+  }
+  return nachher
+}
+
 // Einheiten und Preise kommen aus src/lib/format.ts — EINE Schreibweise für
 // Warenkorb, Checkout, Bestätigung, E-Mail und Bauern-Backend (Befund 13).
 
@@ -315,6 +338,11 @@ export function CheckoutForm({
         if (err.code === CODE_RESERVIERUNG_ABGELAUFEN || err.code === 'WARENKORB_GEAENDERT') {
           if (Array.isArray(err.items)) {
             uebernehmeBerichtigung(cart, err.items, farm.id, setCart)
+          }
+          // Preis geändert: den gültigen Preis übernehmen, damit die neue
+          // Summe sichtbar ist, bevor erneut abgeschickt wird.
+          if (Array.isArray(err.preise)) {
+            uebernehmePreise(cart, err.preise, farm.id, setCart)
           }
           toast.error(err.error ?? 'Dein Warenkorb hat sich geändert.')
           return

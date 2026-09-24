@@ -39,13 +39,17 @@ import { sendOnsiteConfirmation } from '@/lib/email'
  * erfolgreich. Generisch über die angefragten IDs, damit sie unabhängig von
  * den Produktnamen der einzelnen Suite funktioniert.
  */
+// Der Preis in der „Datenbank" — der Handler rechnet seit dem Preis-Fix mit
+// ihm, nicht mit dem Preis aus der Anfrage. Tests mit anderem Preis setzen ihn.
+let einzelpreis = 10
+
 function warenkorbBereit() {
   const ids = (a: unknown): string[] => {
     const w = (a as { where?: { id?: { in?: string[] }; productId?: { in?: string[] } } })?.where
     return w?.id?.in ?? w?.productId?.in ?? []
   }
   vi.mocked(prisma.product.findMany).mockImplementation(((a: unknown) =>
-    Promise.resolve(ids(a).map((id) => ({ id, stock: 999, isAvailable: true })))) as never)
+    Promise.resolve(ids(a).map((id) => ({ id, stock: 999, isAvailable: true, price: einzelpreis })))) as never)
   vi.mocked(prisma.stockReservation.findMany).mockImplementation(((a: unknown) => {
     const sess = (a as { where?: { sessionId?: unknown } })?.where?.sessionId
     // { not: ... } = fremde Sitzungen; die blockieren hier nichts.
@@ -126,6 +130,7 @@ function intentParams(): Record<string, unknown> {
 }
 
 beforeEach(() => {
+  einzelpreis = 10
   warenkorbBereit()
   vi.clearAllMocks()
   farmFindUnique.mockResolvedValue(HOF as never)
@@ -202,6 +207,7 @@ describe('Checkout ONLINE mit Servicegebühr', () => {
 
 describe('Checkout BAR mit Servicegebühr', () => {
   it('6 €: Mindestgebühr 50 Cent im Snapshot, kein Stripe, Bestätigungs-Mail kennt die Gebühr', async () => {
+    einzelpreis = 6
     const res = await POST(
       anfrage({
         paymentMethod: 'ONSITE_CASH',
