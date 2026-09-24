@@ -100,7 +100,11 @@ describe('POST /api/checkout — Betriebsnachweis in der echten Datenbank', () =
       })
     )
 
+    // Auf den Code prüfen, nicht nur auf 400: Ein Zod-Fehler antwortet ebenfalls
+    // mit 400, der Test bliebe also grün, wenn der Betriebsnachweis gar nicht
+    // mehr greift.
     expect(antwort.status).toBe(400)
+    expect(await antwort.json()).toMatchObject({ code: CODE_BETRIEBSNACHWEIS_FEHLT })
     expect(await prisma.product.findUniqueOrThrow({ where: { id: harmlos.id } })).toMatchObject({
       stock: 5,
     })

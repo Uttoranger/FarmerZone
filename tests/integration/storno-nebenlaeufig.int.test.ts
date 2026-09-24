@@ -44,6 +44,8 @@ afterEach(async () => {
   await raeumeAuf()
 })
 
+const EINZELPREIS = 10
+
 /** Ein Hof mit Anmeldung, ein Produkt und eine bestätigte Bestellung darauf. */
 async function bestellungZumStornieren(menge = 2) {
   const { farm, cookie } = await erstelleHofMitAnmeldung()
@@ -61,7 +63,10 @@ async function bestellungZumStornieren(menge = 2) {
       customerName: 'Erika Mustermann',
       customerPhone: '+43 660 0000000',
       status: 'CONFIRMED',
-      totalAmount: 20,
+      // Aus der Menge abgeleitet, nicht verdrahtet: Ein Fixture mit einem
+      // Gesamtbetrag, der seinen Positionen widerspricht, wäre ein unmöglicher
+      // Geldzustand in der Datenbank.
+      totalAmount: EINZELPREIS * menge,
       pickupDate: new Date(Date.now() + 24 * 60 * 60 * 1000),
       pickupTimeStart: '15:00',
       pickupTimeEnd: '18:00',
@@ -74,9 +79,9 @@ async function bestellungZumStornieren(menge = 2) {
           {
             productId: produkt.id,
             productName: 'Testprodukt',
-            unitPrice: 10,
+            unitPrice: EINZELPREIS,
             quantity: menge,
-            totalPrice: 10 * menge,
+            totalPrice: EINZELPREIS * menge,
             vatRate: 10,
           },
         ],

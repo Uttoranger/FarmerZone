@@ -49,6 +49,12 @@ describe('pruefeTestDatenbank', () => {
     expect(pruefeTestDatenbank(tunnel)).toContain('PRODUKTIONS-Datenbank')
   })
 
+  it('bricht bei einem Tunnel auch dann ab, wenn das Projekt hier nicht notiert ist', () => {
+    // Die generische Pooler-Regel: Punkt im Benutzernamen, Host lokal.
+    const fehler = pruefeTestDatenbank('postgresql://postgres.fremdesprojekt:geheim@localhost:6543/postgres')
+    expect(fehler).toContain('postgres.<projekt>')
+  })
+
   it('bricht bei jedem fremden Host ab und nennt ihn', () => {
     const fehler = pruefeTestDatenbank('postgresql://u:geheim@db.fremd.example.com:5432/postgres')
     expect(fehler).toContain('db.fremd.example.com')

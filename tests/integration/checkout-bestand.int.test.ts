@@ -75,7 +75,18 @@ describe('POST /api/checkout — Bestandsabzug in der echten Datenbank', () => {
     const abgelehnt = antworten.filter((r) => r.status === 409)
     expect(erfolge).toHaveLength(1)
     expect(abgelehnt).toHaveLength(1)
-    expect(await abgelehnt[0]!.json()).toMatchObject({ code: 'WARENKORB_GEAENDERT' })
+
+    // DEN PFAD FESTNAGELN. `WARENKORB_GEAENDERT` entsteht an zwei Stellen: in der
+    // Vorprüfung (Schritt 3) und in der bedingten Buchung (Schritt 8). Nur der
+    // Code zu prüfen ließe den Test auch grün, wenn Schritt 8 nie erreicht wurde
+    // — dann bewiese er nicht, was er behauptet. Schritt 8 antwortet mit dem
+    // Produktnamen und OHNE berichtigten Warenkorb; Schritt 3 schickt `items`
+    // und `positionen` mit.
+    const koerper = await abgelehnt[0]!.json()
+    expect(koerper.code).toBe('WARENKORB_GEAENDERT')
+    expect(koerper.error).toContain('wurde gerade von jemand anderem gekauft')
+    expect(koerper.items).toBeUndefined()
+    expect(koerper.positionen).toBeUndefined()
 
     // Nie ins Minus: genau eine Buchung, nicht zwei.
     const danach = await prisma.product.findUniqueOrThrow({ where: { id: produkt.id } })
@@ -167,7 +178,16 @@ describe('POST /api/checkout — Bestandsabzug in der echten Datenbank', () => {
 
     const antworten = await Promise.all([anfrage(), anfrage()])
     expect(antworten.filter((r) => r.status === 200)).toHaveLength(1)
-    expect(antworten.filter((r) => r.status === 409)).toHaveLength(1)
+    const abgelehnt = antworten.filter((r) => r.status === 409)
+    expect(abgelehnt).toHaveLength(1)
+
+    // Auch hier den Pfad festnageln: Die Verliererin muss an der BEDINGTEN
+    // BUCHUNG der zweiten Position gescheitert sein — nur dann hat sie die erste
+    // überhaupt gebucht und der Ausgleich ist das, was `stock: 9` erklärt.
+    // Scheiterte sie schon in der Vorprüfung, stünde 9 auch ohne Ausgleich da.
+    const koerper = await abgelehnt[0]!.json()
+    expect(koerper.error).toContain('"Knapp" wurde gerade von jemand anderem gekauft')
+    expect(koerper.positionen).toBeUndefined()
 
     // 10 − 1 verkauft = 9. Ohne Ausgleich stünde hier 8.
     expect(await prisma.product.findUniqueOrThrow({ where: { id: reichlich.id } })).toMatchObject({

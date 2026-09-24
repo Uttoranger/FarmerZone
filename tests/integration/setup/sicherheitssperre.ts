@@ -25,7 +25,12 @@
  * `vitest.integration.config.ts` geladen, und beim Laden einer Vite-Konfiguration
  * gilt deren eigener Alias noch nicht.
  */
-import { datenbankHost, erkannteFernDatenbank, istTestDatenbank } from '../../../src/lib/umgebung'
+import {
+  datenbankHost,
+  erkannteFernDatenbank,
+  istTestDatenbank,
+  zeigtAufGehostetesProjekt,
+} from '../../../src/lib/umgebung'
 
 const HINWEIS =
   'Lege .env.test an (Vorlage: .env.test.example) und setze TEST_DATABASE_URL auf eine eigene lokale Postgres-Datenbank.'
@@ -52,6 +57,17 @@ export function pruefeTestDatenbank(url: string | undefined): string | null {
     )
   }
 
+  // Vor der Hostprüfung, sonst käme bei einem Tunnel auf localhost die
+  // irreführende Meldung „Host nicht erlaubt" für einen erlaubten Host.
+  if (zeigtAufGehostetesProjekt(url)) {
+    return (
+      'TEST_DATABASE_URL benutzt einen Benutzernamen der Form postgres.<projekt>. ' +
+      'Das ist eine gehostete Datenbank hinter einem Pooler, auch wenn der Host lokal ' +
+      'aussieht (Tunnel). ' +
+      HINWEIS
+    )
+  }
+
   if (!istTestDatenbank(url)) {
     return (
       `TEST_DATABASE_URL zeigt auf den Host ${datenbankHost(url)}. ` +
@@ -73,5 +89,7 @@ export function verlangeTestDatenbank(url: string | undefined): string {
   if (fehler) {
     throw new Error(`Integrationstests abgebrochen — ${fehler}`)
   }
+  // `!` ist hier sicher: `pruefeTestDatenbank` liefert für undefined, leer und
+  // nur-Leerzeichen eine Meldung, und die hat oben geworfen.
   return url!.trim()
 }

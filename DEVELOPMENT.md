@@ -970,12 +970,16 @@ einmal je Kaltstart als Warnung an Sentry.
 „Automatically expose System Environment Variables" aktiv ist. Ohne sie zählt eine
 Preview als Produktion: kein Banner, kein Login-Fix.
 
-**Seit Testfundament 1 (2026-09-24) angeschlossen:** `prisma/seed.ts` ruft
-`istDevDatenbank` vor dem ersten Schreibzugriff und bricht sonst ab — in der Meldung
-steht nur der **Host**, nie die Adresse (sie enthält das Passwort). Daneben liegt eine
-zweite, strengere Allowlist `istTestDatenbank` für die Integrationstests; beide teilen
-sich eine Host-Extraktion. Previews versenden weiter keine Mails
-(`RESEND_API_KEY` nur in Production), das ist gewollt.
+**Seit Testfundament 1 (2026-09-24) angeschlossen:** `prisma/seed.ts` prüft vor dem
+ersten Schreibzugriff und bricht sonst ab — in der Meldung steht nur der **Host**, nie
+die Adresse (sie enthält das Passwort). Geprüft wird gegen **beide** Allowlists:
+`istDevDatenbank` für `pnpm db:seed`, `istTestDatenbank` für den Seed-Aufruf aus dem
+globalSetup der Integrationstests. Beide zusammen zu prüfen ist nötig, nicht bequem:
+`istTestDatenbank` erlaubt den Docker-Dienstnamen `postgres`, den die Dev-Allowlist
+nicht kennt — mit nur `istDevDatenbank` stürbe ein docker-compose-Lauf mitten im Setup.
+Produktion kommt durch keine von beiden. Beide teilen sich eine Host-Extraktion.
+Previews versenden weiter keine Mails (`RESEND_API_KEY` nur in Production), das ist
+gewollt.
 
 ---
 
@@ -1001,14 +1005,20 @@ Stripe, Nominatim und Vercel Blob bleiben gemockt — „echte Datenbank" heißt
 Mail auslösen, ein abgelehnter Checkout keine und keinen Stripe-Aufruf. Regeln dazu in
 `docs/ai/TESTING_GUIDELINES.md`, Abschnitte 1 und 3.
 
-**Die Sicherheitssperre.** Die Tests legen an, ändern und löschen. `TEST_DATABASE_URL`
-muss gesetzt sein und auf `localhost`, `127.0.0.1` oder `postgres` zeigen; Dev- und
-Produktionsdatenbank werden namentlich abgelehnt — auch ein Tunnel auf localhost, dessen
-Benutzername auf ein echtes Supabase-Projekt zeigt (beim Pooler steht die Projektreferenz
-nur dort). Fehlt die Variable, wird **abgebrochen**, nicht übersprungen: Eine grüne
-Suite, die nichts getan hat, ist schlimmer als eine rote. Die Sperre ist eine reine
-Funktion mit eigenem Unit-Test in der schnellen Suite
-(`tests/sicherheitssperre.test.ts`), damit sie beweisbar ist, bevor jemand sie benutzt.
+**Warum es eine Sicherheitssperre braucht** (die Regel selbst steht in
+`docs/ai/TESTING_GUIDELINES.md`, Abschnitt 1): Die Tests legen an, ändern und löschen.
+Ein Lauf gegen die falsche Adresse hätte echte Bestellungen getroffen, und eine
+Umgebungsvariable, die man vergisst umzustellen, reicht dafür. Fehlt die Variable, wird
+**abgebrochen** statt übersprungen — eine grüne Suite, die nichts getan hat, ist
+schlimmer als eine rote. Die Sperre ist eine reine Funktion mit eigenem Unit-Test in der
+schnellen Suite (`tests/sicherheitssperre.test.ts`), damit sie beweisbar ist, bevor
+jemand sie benutzt.
+
+Zwei Prüfungen, weil eine nicht reicht: Die **namentliche** (bekannte Projektreferenzen)
+erlaubt eine klare Meldung, welche Datenbank gemeint war. Die **generische** (Punkt im
+Benutzernamen, also `postgres.<projekt>` beim Supabase-Pooler) hält auch bei einem
+Projekt, dessen Referenz nirgends notiert ist — ein Tunnel auf localhost sieht sonst
+lokal aus, obwohl er auf eine gehostete Datenbank zeigt.
 
 **Datentrennung ohne Rollback-Trick.** Kein „alles in eine Transaktion und
 zurückrollen": Die Transaktionsgrenzen sind selbst Prüfgegenstand, und was in einer
@@ -1040,10 +1050,13 @@ in diesem Teil.
    Hof. Ob der Seed nachgezogen wird, ist eine Entscheidung über Demodaten, keine
    Testfrage — hier nur notiert.
 2. **Der Rückfall in `nachDerAntwort` läuft unbeaufsichtigt.** Außerhalb eines Requests
-   startet er die Aufgabe ohne Warten (`src/lib/nach-der-antwort.ts`). In der
-   Integrationsschicht kann sie dadurch noch schreiben, während `afterEach` aufräumt.
-   Gelöst ohne Codeänderung: Die Tests warten mit `vi.waitFor` auf die Mail-Prüfstelle,
-   bevor sie fertig sind.
+   startet er die Aufgabe ohne Warten (`src/lib/nach-der-antwort.ts`). Der Nachlauf im
+   Checkout **liest** nur (`product.findMany`) und ruft den gemockten Versand — er
+   schreibt nichts, es geht also kein Datenverlust davon aus. Er kann aber noch laufen,
+   während `afterEach` die Produkte schon löscht, und dann eine Fehlermeldung ins
+   Protokoll schreiben, die nach einem echten Fehler aussieht. Gelöst ohne
+   Codeänderung: Die Tests warten mit `vi.waitFor` auf die Mail-Prüfstelle, bevor sie
+   fertig sind.
 
 ---
 

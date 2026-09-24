@@ -7,7 +7,7 @@ import {
 } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { auth } from '../src/lib/auth'
-import { datenbankHost, istDevDatenbank } from '../src/lib/umgebung'
+import { datenbankHost, istDevDatenbank, istTestDatenbank } from '../src/lib/umgebung'
 
 /**
  * Sperre VOR dem ersten Schreibzugriff.
@@ -18,22 +18,30 @@ import { datenbankHost, istDevDatenbank } from '../src/lib/umgebung'
  * längst (src/lib/umgebung.ts, `istDevDatenbank`) — sie war hier nur nie
  * angeschlossen.
  *
+ * ZWEI ALLOWLISTS, beide erlaubt. `istDevDatenbank` deckt `pnpm db:seed` ab.
+ * `istTestDatenbank` muss dazu, weil das globalSetup der Integrationstests
+ * diesen Seed gegen die TESTdatenbank ruft — und die darf auf dem
+ * Docker-Dienstnamen `postgres` liegen, den die Dev-Allowlist nicht kennt.
+ * Nur `istDevDatenbank` zu prüfen ließe einen solchen Lauf mitten im Setup
+ * sterben. Beide zusammen bleiben eng: Produktion kommt durch keine von beiden.
+ *
  * In der Meldung steht NUR der Host: Die Verbindungsadresse enthält das
  * Passwort und hat weder im Terminal noch in einem CI-Protokoll etwas verloren.
  */
-function verlangeDevDatenbank(): void {
+function verlangeEigeneDatenbank(): void {
   const url = process.env['DATABASE_URL']
-  if (istDevDatenbank(url)) return
+  if (istDevDatenbank(url) || istTestDatenbank(url)) return
   console.error(
     `\nSeed abgebrochen: DATABASE_URL zeigt auf ${datenbankHost(url)}.\n` +
-      'Das ist nicht die Dev-Datenbank. Der Seed legt Daten an und überschreibt\n' +
-      'bestehende — erlaubt sind nur localhost und die Dev-Datenbank.\n' +
+      'Das ist weder die Dev- noch eine lokale Testdatenbank. Der Seed legt Daten\n' +
+      'an und überschreibt bestehende — erlaubt sind localhost, 127.0.0.1, der\n' +
+      'Docker-Dienstname postgres und die Dev-Datenbank.\n' +
       'Prüfe DATABASE_URL in .env.local.\n'
   )
   process.exit(1)
 }
 
-verlangeDevDatenbank()
+verlangeEigeneDatenbank()
 
 const adapter = new PrismaPg({
   connectionString: process.env['DATABASE_URL']!,

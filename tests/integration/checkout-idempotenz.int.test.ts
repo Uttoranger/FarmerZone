@@ -92,6 +92,13 @@ describe('POST /api/checkout — Idempotenz in der echten Datenbank', () => {
   })
 
   it('bucht auch bei zwei gleichzeitigen Anfragen mit demselben Schlüssel nur einmal ab', async () => {
+    // EHRLICHE ABGRENZUNG zum Test darüber: Von außen ist nicht feststellbar,
+    // ob die zweite Anfrage in Schritt 0 fündig wurde oder in Schritt 9 in den
+    // eindeutigen Index gelaufen ist — beide Wege antworten gleich. Die Aussage
+    // ist deshalb nicht „Weg X wurde genommen", sondern: WELCHEN der beiden Wege
+    // sie auch nimmt, das Ergebnis muss dasselbe sein. Genau das deckt der
+    // sequenzielle Test nicht ab, weil dort die erste Bestellung fertig ist,
+    // bevor die zweite beginnt.
     const { farm, produkt, anfrage } = await vorbereiten()
 
     const [erste, zweite] = await Promise.all([anfrage(), anfrage()])
@@ -103,6 +110,10 @@ describe('POST /api/checkout — Idempotenz in der echten Datenbank', () => {
     const b = await zweite.json()
     expect(a.orderId).toBe(b.orderId)
 
+    // Genau eine der beiden Antworten ist die Wiederholung — die Gewinnerin
+    // kennt das Feld nicht.
+    expect([a.wiederholt, b.wiederholt].filter(Boolean)).toHaveLength(1)
+
     const bestellungen = await prisma.order.findMany({
       where: { farmId: farm.id },
       include: { items: true },
@@ -110,8 +121,9 @@ describe('POST /api/checkout — Idempotenz in der echten Datenbank', () => {
     expect(bestellungen).toHaveLength(1)
     expect(bestellungen[0]!.items).toHaveLength(1)
 
-    // Die Verliererin hat gebucht, ist in den Index gelaufen und hat
-    // zurückgegeben. Ohne diesen Ausgleich stünde hier 3.
+    // Einmal abgebucht, nicht zweimal. Lief die Verliererin über den Index,
+    // hatte sie vorher gebucht und hat wieder gutgeschrieben — ohne diesen
+    // Ausgleich stünde hier 3.
     expect(await prisma.product.findUniqueOrThrow({ where: { id: produkt.id } })).toMatchObject({
       stock: 4,
     })

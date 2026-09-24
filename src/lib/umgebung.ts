@@ -110,6 +110,22 @@ export function datenbankHost(databaseUrl: string | undefined): string {
   return zerlegeDatenbankUrl(databaseUrl)?.host ?? '(keine lesbare Adresse)'
 }
 
+/**
+ * Sieht der Benutzername wie der eines GEHOSTETEN Supabase-Projekts aus?
+ *
+ * Beim Pooler lautet er `postgres.<projektreferenz>` — ein Punkt im
+ * Benutzernamen ist das verlässliche Merkmal, unabhängig davon, welches Projekt
+ * dahintersteht. Lokale Rollen heißen `postgres` oder `<name>`, ohne Punkt.
+ *
+ * Dadurch greift die Testsperre auch bei einem Projekt, dessen Referenz hier
+ * nicht notiert ist — die namentliche Prüfung darunter ist nur die Zugabe, die
+ * eine klare Meldung erlaubt.
+ */
+export function zeigtAufGehostetesProjekt(databaseUrl: string | undefined): boolean {
+  const ziel = zerlegeDatenbankUrl(databaseUrl)
+  return ziel ? ziel.benutzer.includes('.') : false
+}
+
 /** Welche bekannte Fern-Datenbank eine Adresse anspricht — null, wenn keine. */
 export function erkannteFernDatenbank(
   databaseUrl: string | undefined
@@ -145,17 +161,20 @@ export function istDevDatenbank(databaseUrl: string | undefined): boolean {
  * Die zweite Allowlist, strenger als die erste: Die Integrationstests legen an,
  * ändern und löschen. Sie dürfen deshalb nicht einmal die Dev-Datenbank treffen.
  *
- * Zwei Bedingungen, beide nötig:
+ * Drei Bedingungen, alle nötig:
  *  1. Der Host ist EXAKT einer der lokalen Hosts. Exakt, nicht `includes` —
  *     „db.localhost.example.com" ist ein fremder Rechner.
- *  2. Keine bekannte Projektreferenz in Host oder Benutzernamen. Ein Tunnel auf
- *     localhost mit `postgres.<ref>` als Benutzer zeigt auf eine echte
- *     Datenbank; Bedingung 1 allein ließe ihn durch.
+ *  2. Der Benutzername sieht nicht nach einem gehosteten Projekt aus. Ein Tunnel
+ *     auf localhost mit `postgres.<ref>` als Benutzer zeigt auf eine echte
+ *     Datenbank; Bedingung 1 allein ließe ihn durch. Diese Regel ist generisch
+ *     und hält auch bei einem Projekt, dessen Referenz hier nicht steht.
+ *  3. Keine bekannte Projektreferenz in Host oder Benutzernamen.
  */
 export function istTestDatenbank(databaseUrl: string | undefined): boolean {
   const ziel = zerlegeDatenbankUrl(databaseUrl)
   if (!ziel) return false
   if (!TEST_DATENBANK_HOSTS.some((h) => h === ziel.host)) return false
+  if (zeigtAufGehostetesProjekt(databaseUrl)) return false
   return erkannteFernDatenbank(databaseUrl) === null
 }
 

@@ -6,6 +6,7 @@ import {
   erkannteFernDatenbank,
   istDevDatenbank,
   istTestDatenbank,
+  zeigtAufGehostetesProjekt,
   type UmgebungsWerte,
 } from '@/lib/umgebung'
 
@@ -142,6 +143,14 @@ describe('istDevDatenbank', () => {
     expect(istDevDatenbank('postgresql://postgres:postgres@127.0.0.1:5432/db')).toBe(true)
   })
 
+  it('kennt den Docker-Dienstnamen postgres NICHT — deshalb prüft der Seed beide Allowlists', () => {
+    // Festgehalten, weil die Asymmetrie der Grund ist, warum prisma/seed.ts
+    // `istDevDatenbank || istTestDatenbank` prüft: Nur die erste Prüfung ließe
+    // einen docker-compose-Lauf mitten im globalSetup sterben.
+    expect(istDevDatenbank('postgresql://postgres:postgres@postgres:5432/db')).toBe(false)
+    expect(istTestDatenbank('postgresql://postgres:postgres@postgres:5432/db')).toBe(true)
+  })
+
   it('stuft jede andere Datenbank als fremd ein — Allowlist, keine Blocklist', () => {
     expect(istDevDatenbank(FREMDE_DB)).toBe(false)
     expect(istDevDatenbank('postgresql://u:p@db.anderesprojekt.supabase.co:5432/postgres')).toBe(false)
@@ -186,6 +195,19 @@ describe('istTestDatenbank', () => {
     expect(istTestDatenbank(`postgresql://postgres.${DEV_REF}:p@127.0.0.1:6543/postgres`)).toBe(false)
   })
 
+  it('lehnt einen Tunnel auch bei einem unbekannten Projekt ab — die Pooler-Regel ist generisch', () => {
+    // Genau der Fall, für den die namentliche Prüfung nicht reicht: eine
+    // Projektreferenz, die in umgebung.ts nirgends steht.
+    expect(istTestDatenbank('postgresql://postgres.nieheirgendwonotiert:p@localhost:5432/postgres')).toBe(
+      false
+    )
+  })
+
+  it('erlaubt die gewöhnliche lokale Rolle ohne Punkt im Namen', () => {
+    expect(istTestDatenbank('postgresql://postgres:postgres@localhost:5432/fz_test')).toBe(true)
+    expect(istTestDatenbank('postgresql://franz:geheim@127.0.0.1:5432/fz_test')).toBe(true)
+  })
+
   it('vergleicht den Host exakt — ein fremder Rechner mit localhost im Namen zählt nicht', () => {
     expect(istTestDatenbank('postgresql://u:p@db.localhost.example.com:5432/postgres')).toBe(false)
     expect(istTestDatenbank('postgresql://u:p@localhost.fremd.at:5432/postgres')).toBe(false)
@@ -196,6 +218,21 @@ describe('istTestDatenbank', () => {
     expect(istTestDatenbank('')).toBe(false)
     expect(istTestDatenbank('   ')).toBe(false)
     expect(istTestDatenbank('das ist keine adresse')).toBe(false)
+  })
+})
+
+describe('zeigtAufGehostetesProjekt', () => {
+  it('erkennt den Pooler-Benutzernamen am Punkt, unabhängig vom Projekt', () => {
+    expect(zeigtAufGehostetesProjekt(DEV_DB_POOLER)).toBe(true)
+    expect(zeigtAufGehostetesProjekt(PROD_DB_POOLER)).toBe(true)
+    expect(zeigtAufGehostetesProjekt('postgresql://postgres.irgendwas:p@localhost:5432/db')).toBe(true)
+  })
+
+  it('lässt lokale Rollen und die Direktverbindung in Ruhe', () => {
+    expect(zeigtAufGehostetesProjekt(LOKALE_DB)).toBe(false)
+    // Direktverbindung: Referenz im Host, Benutzername schlicht „postgres".
+    expect(zeigtAufGehostetesProjekt(DEV_DB_DIREKT)).toBe(false)
+    expect(zeigtAufGehostetesProjekt(undefined)).toBe(false)
   })
 })
 

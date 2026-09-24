@@ -39,8 +39,17 @@ laufendes Postgres. `exclude` **ersetzt** die Vorgabe von Vitest, deshalb muss
 | Better Auth | gemockt | **echt** — Anmeldung mit Passwort, Sitzung aus der Datenbank |
 | Rate-Limit | aus | aus (siehe unten) |
 | Resend, Stripe, Nominatim, Vercel Blob | gemockt | gemockt |
-| Zeit | Parameter oder `vi.useFakeTimers()` | Parameter oder `vi.useFakeTimers()` |
+| Zeit | Parameter oder `vi.useFakeTimers()` | **Systemuhr** — siehe unten |
 | Laufzeit | Millisekunden | Sekunden |
+
+**Zeit in der Integrationsschicht: die einzige Ausnahme von Abschnitt 4.** Über die
+Handler-Grenze ist `jetzt` nicht injizierbar — der Handler setzt seinen Zeitpunkt
+selbst (`const now = new Date()`), und ein Request trägt keinen Parameter dafür.
+Die Integrationstests hängen deshalb an der Systemuhr. Damit das nie zu Flackern
+führt, gilt dort: **Fristen großzügig setzen, nie auf die Millisekunde prüfen.**
+Wer eine Frist auf die Sekunde prüfen will, tut das an der reinen Funktion in
+`src/lib/reservierung.ts` — dort ist `jetzt` ein Parameter. Für die Unit-Schicht
+bleibt Abschnitt 4 unverändert in Kraft.
 
 **Rate-Limit in beiden Schichten aus, und zwar nicht aus Bequemlichkeit:**
 `enforceRateLimit` kehrt bei `NODE_ENV !== 'production'` sofort zurück, bevor ein
@@ -130,7 +139,7 @@ Alles, was Netz, DB oder Request-Kontext braucht.
 - **Nie** eine Fachregel aus `src/lib/` mocken, wenn ihr Ergebnis die Aussage des Tests ist.
 - **Nie** Zod-Validierung mocken oder umgehen. Ungültige Eingabe muss echt durchs Schema.
 - **Nie** Geldrechnung mocken. Beträge echt durchrechnen lassen.
-- **Nie** die Zeit implizit lassen: `jetzt` als Parameter übergeben oder `vi.useFakeTimers()`. Kein Test darf von der Systemuhr abhängen.
+- **Nie** die Zeit implizit lassen: `jetzt` als Parameter übergeben oder `vi.useFakeTimers()`. Kein Test darf von der Systemuhr abhängen. (Einzige Ausnahme: die Integrationsschicht, wo `jetzt` über die Handler-Grenze nicht injizierbar ist — Abschnitt 1 nennt die Bedingung dafür.)
 - **Nie** eine Berechtigungsprüfung wegmocken, um "an die eigentliche Logik zu kommen". Genau die Prüfung ist die Logik.
 
 ### Regel
