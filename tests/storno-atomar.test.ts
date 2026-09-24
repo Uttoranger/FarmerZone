@@ -315,6 +315,21 @@ describe('cancelOrder — Erstattung erst nach der Sperre', () => {
     expect(JSON.stringify(kontext)).not.toContain('anna@example.com')
   })
 
+  it('Geld erstattet, nur der REFUNDED-Vermerk scheitert: Erfolg an den Hof, Mail MIT Betrag, Sentry meldet den Vermerk', async () => {
+    onlineBezahlt()
+    orderUpdate.mockRejectedValueOnce(new Error('connection reset'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const result = await cancelOrder('order_1')
+
+    // Das Geld IST zurück — „Rückerstattung fehlgeschlagen" wäre gelogen.
+    expect(result).toEqual({})
+    expect(mailStorno).toHaveBeenCalledWith(expect.objectContaining({ orderNumber: 'TH-1' }), 20)
+    expect(sentryMeldung).toHaveBeenCalledTimes(1)
+    const [, kontext] = sentryMeldung.mock.calls[0] as [unknown, { tags?: Record<string, unknown> }]
+    expect(kontext.tags).toEqual(expect.objectContaining({ grund: 'vermerk_fehlgeschlagen' }))
+  })
+
   it('der Mailversand hängt nicht im Antwortpfad — eine nie endende Mail blockiert die Stornierung nicht', async () => {
     datenbankMit({ ...barBestellung(), status: 'READY' })
     mailStorno.mockImplementation((() => new Promise<void>(() => {})) as never)
@@ -351,6 +366,22 @@ describe('Undo-Aktionen — eine stornierte Bestellung bleibt storniert', () => 
 
     expect(satz.status).toBe('CANCELLED')
     expect(rueckbuchungen()).toBe(2)
+  })
+
+  it.each([
+    // „Bereit" → „Abgeholt" → „Rückgängig" im ERSTEN, noch sichtbaren Toast:
+    // Abgeholte Ware spränge auf CONFIRMED und wäre wieder stornierbar.
+    ['PICKED_UP', 'CONFIRMED'],
+    ['PICKED_UP', 'PAID'],
+    // READY → READY: nach „Abholung rückgängig" löschte ein Toast-Undo paidAt.
+    ['READY', 'READY'],
+  ] as const)('revertOrderStatus lehnt das falsche Paar %s → %s ab', async (ist, zurueckAuf) => {
+    const satz = datenbankMit({ ...barBestellung(), status: ist })
+
+    const result = await revertOrderStatus('order_1', zurueckAuf)
+
+    expect(result.error).toBeTruthy()
+    expect(satz.status).toBe(ist)
   })
 
   it('revertOrderStatus aus READY bzw. PICKED_UP funktioniert weiter', async () => {

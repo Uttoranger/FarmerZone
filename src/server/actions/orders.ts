@@ -12,6 +12,12 @@ import type { OrderStatus } from '@prisma/client'
 
 export type ActionResult = { error?: string }
 
+// Für den Fall, dass ein bedingter Statuswechsel nichts mehr trifft: Die
+// Bestellung gibt es, sie hat sich nur seit dem Laden der Seite geändert
+// (typisch: in einem anderen Tab storniert). „Nicht gefunden" wäre falsch.
+const BESTELLUNG_INZWISCHEN_GEAENDERT =
+  'Die Bestellung wurde inzwischen geändert, zum Beispiel storniert. Lade die Seite neu.'
+
 async function getAuthFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return null
@@ -206,7 +212,7 @@ export async function revertReady(
     where: { id: orderId, farmId: farm.id, status: 'READY' },
     data: { status: previous },
   })
-  if (count === 0) return { error: 'Bestellung nicht gefunden' }
+  if (count === 0) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
 
   // Kunden-Info nur auf Wunsch (Haken im Dialog, Standard AN): neutrales
   // "Kurzes Update" — relativiert die bereits verschickte Abholbereit-Mail
@@ -239,7 +245,7 @@ export async function revertPickedUp(orderId: string): Promise<ActionResult> {
     where: { id: orderId, farmId: farm.id, status: 'PICKED_UP' },
     data: { status: 'READY', pickedUpAt: null },
   })
-  if (count === 0) return { error: 'Bestellung nicht gefunden' }
+  if (count === 0) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
 
   // Keine Mail: der Kunde hatte die Abholbereitschafts-Mail bereits
 
@@ -256,15 +262,18 @@ export async function revertOrderStatus(orderId: string, previousStatus: string)
   if (!farm) return { error: 'Nicht angemeldet' }
 
   // Das Undo im Toast folgt nur auf „Bereit" (→ READY) und „Abgeholt"
-  // (→ PICKED_UP). Nur aus diesen beiden Status darf es zurück. Vorher gab es
-  // hier KEINEN Statusfilter: „Bereit" → Storno → „Rückgängig" im noch
-  // sichtbaren Toast holte eine stornierte Bestellung zurück, und ein zweiter
-  // Storno buchte den Bestand ein zweites Mal zurück.
+  // (→ PICKED_UP) — und darf NUR den Schritt zurück, den der Toast meint:
+  // zurück auf READY nur aus PICKED_UP, zurück auf PAID/CONFIRMED/
+  // IN_PREPARATION nur aus READY. Vorher gab es hier KEINEN Statusfilter:
+  // „Bereit" → Storno → „Rückgängig" holte eine stornierte Bestellung zurück
+  // (zweite Rückbuchung beim zweiten Storno), und „Bereit" → „Abgeholt" →
+  // „Rückgängig" im ersten Toast machte abgeholte Ware wieder stornierbar.
+  const ausStatus: OrderStatus = previousStatus === 'READY' ? 'PICKED_UP' : 'READY'
   const { count } = await prisma.order.updateMany({
-    where: { id: orderId, farmId: farm.id, status: { in: ['READY', 'PICKED_UP'] } },
+    where: { id: orderId, farmId: farm.id, status: ausStatus },
     data: { status: previousStatus as OrderStatus, pickedUpAt: null, paidAt: null },
   })
-  if (count === 0) return { error: 'Status kann nicht zurückgesetzt werden' }
+  if (count === 0) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
 
   revalidatePath('/orders')
   revalidatePath(`/orders/${orderId}`)
@@ -341,10 +350,6 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Act
         payment_intent: order.stripePaymentIntentId,
       })
       refundAmount = refund.amount / 100
-      await prisma.order.update({
-        where: { id: orderId },
-        data: { paymentStatus: 'REFUNDED' },
-      })
     } catch (err) {
       console.error('[cancelOrder] Stripe refund failed:', err)
       // Offenes Geld darf nicht nur im Log stehen: Die Bestellung ist
@@ -357,6 +362,24 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Act
         extra: { orderId },
       })
       erstattungOffen = true
+    }
+
+    // Der Vermerk getrennt von der Erstattung: Scheitert NUR er, ist das
+    // Geld trotzdem zurück — dann Erfolg an den Hof und Mail mit Betrag,
+    // nur paymentStatus steht falsch auf PAID. Das bekommt der Betreiber
+    // über Sentry zu sehen, nicht der Hof als „Erstattung fehlgeschlagen".
+    if (refundAmount !== null) {
+      try {
+        await prisma.order.update({
+          where: { id: orderId },
+          data: { paymentStatus: 'REFUNDED' },
+        })
+      } catch (err) {
+        Sentry.captureException(err, {
+          tags: { aktion: 'cancelOrder', grund: 'vermerk_fehlgeschlagen' },
+          extra: { orderId },
+        })
+      }
     }
   }
 

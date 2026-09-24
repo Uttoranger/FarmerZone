@@ -283,8 +283,13 @@ derselbe Schaden, aber nur in einem echten Gleichzeitig-Wettlauf.
   `order-cancelled.tsx` liest „keine Erstattung" als Vor-Ort-Zahlung und schriebe
   „Da du vor Ort bezahlst, entstehen dir keine Kosten".
 - Mail sonst über `nachDerAntwort()`.
-- Alle drei Rückwege schreiben bedingt (`updateMany` mit Statusfilter);
-  `revertOrderStatus` nur noch aus READY oder PICKED_UP.
+- Alle drei Rückwege schreiben bedingt (`updateMany` mit Statusfilter).
+  `revertOrderStatus` darf nur den Schritt zurück, den sein Toast meint:
+  zurück auf READY nur aus PICKED_UP, sonst nur aus READY. (Ein loser Filter
+  „READY oder PICKED_UP" hätte „Bereit" → „Abgeholt" → „Rückgängig" im ersten
+  Toast erlaubt — abgeholte Ware wäre wieder stornierbar gewesen.)
+- Erstattung und REFUNDED-Vermerk getrennt: Scheitert nur der Vermerk, ist das
+  Geld zurück → Erfolg an den Hof, Mail mit Betrag, Sentry meldet den Vermerk.
 
 Wache: `tests/storno-atomar.test.ts` — deterministischer Wettlauf (beide lesen,
 bevor einer schreibt), Storno → Undo → Storno, Rückweg-Wettlauf, eigene tx-Fakes
@@ -300,9 +305,13 @@ GLEICHZEITIGE `cancelOrder` gegen echtes Postgres → Bestand exakt einmal zurü
 - Die Meldung „Bitte manuell über das Stripe Dashboard erstatten" ist für den Hof
   nicht umsetzbar: Bei der Destination Charge kann nur das Plattformkonto
   erstatten. Wortlaut blieb auf ausdrücklichen Wunsch.
-- `markAsNotPickedUp` schreibt nach Leseprüfung blind. Kein Bestand, die
-  Gebühren-Erstattung ist per Stripe-Schlüssel idempotent — ein Wettlauf mit einem
-  Storno kann dort nur das Status-Etikett (NOT_PICKED_UP statt CANCELLED) falsch
+- `markAsReady`, `markAsPickedUp`, `markAsPickedUpAndPaid` prüfen lesend und
+  schreiben blind — außerhalb dieses Auftrags, als Altlast in ARCHITECTURE §6.
+  Ein Storno genau zwischen ihrem Lesen und Schreiben wird überschrieben; aus
+  READY bucht ein zweiter Storno dann erneut zurück. Nur bei echter
+  Gleichzeitigkeit erreichbar (zwei Geräte, zwei Knöpfe im selben Moment).
+- `markAsNotPickedUp` ebenso. Dort kein Bestand, die Gebühren-Erstattung ist per
+  Stripe-Schlüssel idempotent — ein Wettlauf kann nur das Status-Etikett falsch
   setzen, und NOT_PICKED_UP ist jetzt gegen einen zweiten Storno gesperrt.
 - Altlast Webhook: `handlePaymentFailed`/`handlePaymentSucceeded` prüfen lesend
   und schreiben unbedingt — `handlePaymentSucceeded` kann eine stornierte

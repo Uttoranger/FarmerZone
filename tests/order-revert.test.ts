@@ -75,6 +75,7 @@ describe('revertReady', () => {
     orderFindFirst.mockResolvedValue(null)
     const result = await revertReady('order_confirmed')
     expect(result.error).toBe('Bestellung nicht gefunden')
+    expect(orderUpdateMany).not.toHaveBeenCalled()
     expect(orderUpdate).not.toHaveBeenCalled()
   })
 
@@ -82,6 +83,7 @@ describe('revertReady', () => {
     getSession.mockResolvedValue(null as never)
     const result = await revertReady('order_1')
     expect(result.error).toBe('Nicht angemeldet')
+    expect(orderUpdateMany).not.toHaveBeenCalled()
     expect(orderUpdate).not.toHaveBeenCalled()
   })
 
@@ -146,6 +148,7 @@ describe('revertPickedUp', () => {
     orderFindFirst.mockResolvedValue(null)
     const result = await revertPickedUp('order_ready')
     expect(result.error).toBe('Bestellung nicht gefunden')
+    expect(orderUpdateMany).not.toHaveBeenCalled()
     expect(orderUpdate).not.toHaveBeenCalled()
   })
 
@@ -153,6 +156,7 @@ describe('revertPickedUp', () => {
     getSession.mockResolvedValue(null as never)
     const result = await revertPickedUp('order_1')
     expect(result.error).toBe('Nicht angemeldet')
+    expect(orderUpdateMany).not.toHaveBeenCalled()
     expect(orderUpdate).not.toHaveBeenCalled()
   })
 
