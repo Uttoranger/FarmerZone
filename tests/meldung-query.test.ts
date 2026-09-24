@@ -21,8 +21,10 @@ import {
   getMeldungDetail,
   gruppiereWuensche,
   getWunschCluster,
+  zaehleZuEntscheiden,
 } from '@/server/queries/meldung'
 import { prisma } from '@/lib/prisma'
+import { STATUS_ZU_ENTSCHEIDEN } from '@/lib/meldung'
 
 const findMany = vi.mocked(prisma.meldung.findMany)
 const findFirst = vi.mocked(prisma.meldung.findFirst)
@@ -64,7 +66,7 @@ describe('Hof-Sicht', () => {
     expect(Object.keys(m).sort()).toEqual(
       ['antwortAnMelder', 'art', 'createdAt', 'id', 'kurznummer', 'status', 'statusFarbe', 'text'].sort()
     )
-    expect(m.status).toBe('Geprüft — funktioniert wie vorgesehen')
+    expect(m.status).toBe('Kein Fehler — Antwort lesen')
     expect(m.kurznummer).toBe('cmfmeldu')
     expect(m.antwortAnMelder).toBe(ZEILE.antwortAnMelder)
     expect(m).not.toHaveProperty('triageNotiz')
@@ -82,14 +84,19 @@ describe('Hof-Sicht', () => {
   it('liefert die eigene Meldung in der Hof-Sicht', async () => {
     findFirst.mockResolvedValue(ZEILE as never)
     const m = await getMeldungFuerHof('farm_1', ZEILE.id)
-    expect(m?.status).toBe('Geprüft — funktioniert wie vorgesehen')
+    expect(m?.status).toBe('Kein Fehler — Antwort lesen')
     expect(m).not.toHaveProperty('triageNotiz')
   })
 })
 
 describe('Admin-Filter', () => {
-  it('fällt ohne Parameter auf NEU + GEPRUEFT und alle Arten zurück', () => {
-    expect(filterAusParametern({})).toEqual({ status: ['NEU', 'GEPRUEFT'], art: null })
+  it('fällt ohne Parameter auf die offene Arbeit (NEU, GEPRUEFT, Vermutlich Wunsch) und alle Arten zurück', () => {
+    expect(filterAusParametern({})).toEqual({ status: ['NEU', 'GEPRUEFT', 'VERMUTLICH_WUNSCH'], art: null })
+  })
+
+  it('die Admin-Liste startet bei „Zu entscheiden" (NEU + Vermutlich Wunsch)', () => {
+    expect(filterAusParametern({}, STATUS_ZU_ENTSCHEIDEN)).toEqual({ status: ['NEU', 'VERMUTLICH_WUNSCH'], art: null })
+    expect(filterAusParametern({ status: 'GEPLANT' }, STATUS_ZU_ENTSCHEIDEN).status).toEqual(['GEPLANT'])
   })
 
   it('nimmt gültige Werte, ignoriert unbekannte', () => {
@@ -97,7 +104,7 @@ describe('Admin-Filter', () => {
       status: ['ERLEDIGT', 'DUPLIKAT'],
       art: 'WUNSCH',
     })
-    expect(filterAusParametern({ status: 'quatsch', art: 'X' })).toEqual({ status: ['NEU', 'GEPRUEFT'], art: null })
+    expect(filterAusParametern({ status: 'quatsch', art: 'X' })).toEqual({ status: ['NEU', 'GEPRUEFT', 'VERMUTLICH_WUNSCH'], art: null })
   })
 
   it('gibt den Filter an Prisma weiter und bildet die Zeile mit Kurznummer und erster Zeile', async () => {
@@ -171,5 +178,14 @@ describe('gruppiereWuensche', () => {
     findMany.mockResolvedValue([] as never)
     await getWunschCluster()
     expect(findMany.mock.calls[0][0]?.where).toEqual({ art: 'WUNSCH', status: { not: 'DUPLIKAT' } })
+  })
+})
+
+describe('Zähler „zu entscheiden"', () => {
+  it('zählt Neues und die Wunsch-Vorschläge der KI — sonst nichts', async () => {
+    const count = vi.mocked(prisma.meldung.count)
+    count.mockResolvedValue(3)
+    expect(await zaehleZuEntscheiden()).toBe(3)
+    expect(count.mock.calls[0][0]).toEqual({ where: { status: { in: ['NEU', 'VERMUTLICH_WUNSCH'] } } })
   })
 })

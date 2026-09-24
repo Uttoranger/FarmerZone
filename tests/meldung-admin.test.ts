@@ -146,7 +146,7 @@ describe('triageMeldungAction — Schreiben', () => {
     expect((data.triagedAt as Date).getTime()).toBeGreaterThanOrEqual(vorher)
   })
 
-  it('rührt Text, Art und Kontext der Meldung nicht an', async () => {
+  it('rührt Text, Art und Kontext der Meldung nicht an, solange keine Art geschickt wird', async () => {
     await triageMeldungAction(ID, GUELTIG)
     const data = meldungUpdate.mock.calls[0][0].data
     for (const feld of ['text', 'art', 'seiteUrl', 'userAgent', 'viewport', 'farmId', 'customerEmail', 'screenshotUrl']) {
@@ -161,5 +161,34 @@ describe('triageMeldungAction — Schreiben', () => {
       clusterKey: 'abholzeiten',
       sprintName: 'abholzeiten-v2',
     })
+  })
+})
+
+describe('triageMeldungAction — Knöpfe zum KI-Vorschlag (Sprint Briefkasten-Rückkopplung)', () => {
+  const VORSCHLAG = {
+    status: 'VERMUTLICH_WUNSCH',
+    clusterKey: '',
+    triageNotiz: 'Telefonat: nur am Handy.\n[KI] Wünscht Sortierung nach Preis.\n[Auto · KI · 24.09.2026 · Vermutlich Wunsch]',
+    duplikatVonId: '',
+    sprintName: '',
+    antwortAnMelder: '',
+  }
+
+  it('„Ja, ein Wunsch": setzt Art WUNSCH und Status GEPRUEFT', async () => {
+    expect(await triageMeldungAction(ID, { ...VORSCHLAG, status: 'GEPRUEFT', art: 'WUNSCH' })).toEqual({})
+    expect(meldungUpdate.mock.calls[0][0].data).toMatchObject({ status: 'GEPRUEFT', art: 'WUNSCH' })
+  })
+
+  it('„Nein, ein Fehler": Status GEPRUEFT, die Zeile der KI ist weg, die übrige Notiz bleibt', async () => {
+    const { ohneKiNotiz } = await import('@/lib/meldung')
+    await triageMeldungAction(ID, { ...VORSCHLAG, status: 'GEPRUEFT', triageNotiz: ohneKiNotiz(VORSCHLAG.triageNotiz) ?? '' })
+    const data = meldungUpdate.mock.calls[0][0].data
+    expect(data).toMatchObject({ status: 'GEPRUEFT', triageNotiz: 'Telefonat: nur am Handy.\n[Auto · KI · 24.09.2026 · Vermutlich Wunsch]' })
+    expect(data).not.toHaveProperty('art')
+  })
+
+  it('eine unbekannte Art wird abgelehnt', async () => {
+    expect(await triageMeldungAction(ID, { ...VORSCHLAG, status: 'GEPRUEFT', art: 'BEFEHL' })).toEqual({ error: 'Unbekannte Art.' })
+    expect(meldungUpdate).not.toHaveBeenCalled()
   })
 })

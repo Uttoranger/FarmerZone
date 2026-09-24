@@ -1,0 +1,56 @@
+name: Briefkasten (Ersatzweg)
+
+# ERSATZWEG — STANDARDMÄSSIG AUS (`if: false && …` unten).
+# Nur einschalten, wenn Vercel keine deployment_status-Events mehr liefert
+# (Sprint Briefkasten-Rückkopplung, Phase 0 f: am 2026-09-24 lieferte Vercel
+# sie). Dann hier `false && ` entfernen UND in briefkasten.yml das `if:` des
+# Jobs auf `false` setzen — sonst schließen beide.
+#
+# Schließt beim Merge statt beim Deployment. Der Satz an den Melder lautet
+# deshalb „… kommt mit dem nächsten Update online." (quelle: merge).
+#
+# Nur `pull_request`, nie die _target-Variante: Ein PR aus einem Fork bekommt so
+# keine Secrets. Der PR-Text steht nie in einer run:-Zeile.
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: briefkasten
+  cancel-in-progress: false
+
+jobs:
+  erledigt:
+    if: false && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Das Skript von main, nicht vom Zweig des PR.
+          ref: main
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Meldungen schließen
+        run: pnpm exec tsx scripts/briefkasten-deploy.ts
+        env:
+          MODUS: merge
+          PR_NUMMER: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ github.token }}
+          TRIAGE_EXPORT_URL: ${{ secrets.TRIAGE_EXPORT_URL }}
+          TRIAGE_MERGE_TOKEN: ${{ secrets.TRIAGE_MERGE_TOKEN }}

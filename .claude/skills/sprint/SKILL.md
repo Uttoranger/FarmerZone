@@ -74,6 +74,10 @@ Rufe den Subagenten `pruefer` auf. Behebe, was dort auffällt, bevor du weiterma
 
 Dann committen, pushen, PR öffnen. Commit-Message deutsch mit Präfix.
 
+Behebt die Änderung eine Meldung aus dem Briefkasten: direkt nach dem Öffnen des PR
+`pnpm briefkasten geplant <id> --pr <nr>` (die Nummer gibt es erst mit dem PR), im PR-Body je
+Meldung die Zeile `Behebt Meldung: <id>`. Nur Art FEHLER. ERLEDIGT setzt das Deployment, nie ein Agent.
+
 ### 7. Dokumentation nachziehen — im selben Arbeitsgang
 
 - neues Muster oder geänderte Konvention → passende Datei in `docs/ai/`

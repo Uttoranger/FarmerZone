@@ -6,7 +6,7 @@ import { Bug, Lightbulb, HelpCircle, ImagePlus, X, Loader2 } from 'lucide-react'
 import { meldungAbsenden } from '@/server/actions/meldung'
 import {
   MELDUNG_ARTEN,
-  MELDUNG_ART_LABEL,
+  MELDUNG_ART_SATZ,
   MELDUNG_KENNUNG_MAX,
   MELDUNG_TEXT_MAX,
   MELDUNG_TEXT_MIN,
@@ -25,12 +25,6 @@ import { Button } from '@/components/ui/button'
  */
 
 const ART_ICON: Record<MeldungArt, typeof Bug> = { FEHLER: Bug, WUNSCH: Lightbulb, FRAGE: HelpCircle }
-
-const ART_HILFE: Record<MeldungArt, string> = {
-  FEHLER: 'Etwas funktioniert nicht so, wie es soll.',
-  WUNSCH: 'Etwas fehlt oder könnte besser sein.',
-  FRAGE: 'Du bist dir nicht sicher, wie etwas gemeint ist.',
-}
 
 // Honigtopf: aus dem Blickfeld, aus der Tab-Reihenfolge, aus dem Screenreader —
 // dasselbe Muster wie die Registrierung (register-form.tsx).
@@ -191,7 +185,9 @@ export function MeldungForm({
       {/* Art: drei Knöpfe */}
       <fieldset>
         <legend className="mb-2 text-sm font-medium text-foreground">Worum geht es?</legend>
-        <div className="grid grid-cols-3 gap-2">
+        {/* Drei Sätze statt „Fehler / Wunsch / Frage" — untereinander, weil ein
+            Satz bei 375 px nicht in ein Drittel passt. Die Werte bleiben dieselben. */}
+        <div className="grid gap-2 sm:grid-cols-3">
           {MELDUNG_ARTEN.map((wert) => {
             const Icon = ART_ICON[wert]
             const aktiv = art === wert
@@ -201,17 +197,16 @@ export function MeldungForm({
                 type="button"
                 onClick={() => setArt(wert)}
                 aria-pressed={aktiv}
-                className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl border px-2 py-2 text-sm font-medium transition-colors ${
+                className={`flex min-h-12 items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm font-medium transition-colors sm:flex-col sm:justify-center sm:gap-1 sm:text-center ${
                   aktiv ? 'border-primary bg-primary/8 text-primary' : 'border-border bg-card text-foreground hover:bg-muted/40'
                 }`}
               >
-                <Icon className="size-4" aria-hidden="true" />
-                {MELDUNG_ART_LABEL[wert]}
+                <Icon className="size-4 shrink-0" aria-hidden="true" />
+                {MELDUNG_ART_SATZ[wert]}
               </button>
             )
           })}
         </div>
-        <p className="mt-1.5 text-xs text-muted-foreground">{ART_HILFE[art]}</p>
       </fieldset>
 
       {/* Text */}

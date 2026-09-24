@@ -5,6 +5,7 @@ import { getFarmForUser } from '@/server/queries/dashboard'
 import { getOpenOrdersCount } from '@/server/queries/orders'
 import { getFarmBannerState } from '@/server/queries/farm'
 import { isAdminUser } from '@/server/queries/admin'
+import { zaehleZuEntscheiden } from '@/server/queries/meldung'
 import { FarmerNav } from '@/components/farmer/farmer-nav'
 import { ServiceWorkerAnmeldung } from '@/components/shared/service-worker-anmeldung'
 import { SentryNutzer } from '@/components/farmer/sentry-nutzer'
@@ -35,6 +36,8 @@ export default async function FarmerLayout({ children }: { children: React.React
   const isPending = bannerState != null && bannerState.approvedAt == null
   // Menüpunkt „Admin" nur für den Betreiber — frisch aus der DB, nicht aus der Sitzung.
   const isAdmin = await isAdminUser(session.user.id)
+  // Die Zählabfrage nur für den Betreiber — kein Hof bezahlt dafür.
+  const zuEntscheiden = isAdmin ? await zaehleZuEntscheiden() : 0
 
   return (
     <div className="min-h-screen bg-background">
@@ -55,6 +58,7 @@ export default async function FarmerLayout({ children }: { children: React.React
           // ihn nur zusätzlich als ruhigen Punkt an der Hof-Identität an.
           farmPending={isPending}
           isAdmin={isAdmin}
+          adminBadge={zuEntscheiden > 0 ? zuEntscheiden : undefined}
         />
 
         {/* min-w-0: als Flex-Item darf main nicht mit breitem Inhalt über den

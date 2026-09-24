@@ -5,9 +5,10 @@ import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { isAdminUser } from '@/server/queries/admin'
 import { getMeldungDetail } from '@/server/queries/meldung'
-import { MELDUNG_ART_LABEL, STATUS_INTERN, STATUS_MARKE_FARBE, kurznummer } from '@/lib/meldung'
+import { MELDUNG_ART_LABEL, STATUS_INTERN, STATUS_MARKE_FARBE, kiBegruendung, kurznummer, prLink } from '@/lib/meldung'
 import { Marke } from '@/components/ui/marke'
-import { TriageForm } from './triage-form'
+import { TriageForm, type TriageWerte } from './triage-form'
+import { KiVorschlag } from './ki-vorschlag'
 
 export const metadata: Metadata = { title: 'Meldung — Admin — FarmerZone' }
 export const dynamic = 'force-dynamic'
@@ -37,6 +38,16 @@ export default async function AdminMeldungDetailPage({ params }: { params: Promi
   const m = await getMeldungDetail(id)
   if (!m) notFound()
 
+  const gespeichert: TriageWerte = {
+    status: m.status,
+    clusterKey: m.clusterKey ?? '',
+    triageNotiz: m.triageNotiz ?? '',
+    duplikatVonId: m.duplikatVonId ? kurznummer(m.duplikatVonId) : '',
+    sprintName: m.sprintName ?? '',
+    antwortAnMelder: m.antwortAnMelder ?? '',
+  }
+  const pr = prLink(m.sprintName)
+
   return (
     <main className="min-h-screen bg-background px-4 py-8 md:px-6">
       <div className="mx-auto max-w-3xl">
@@ -65,6 +76,10 @@ export default async function AdminMeldungDetailPage({ params }: { params: Promi
             'Anonym'
           )}
         </p>
+
+        {m.status === 'VERMUTLICH_WUNSCH' && (
+          <KiVorschlag meldungId={m.id} gespeichert={gespeichert} begruendung={kiBegruendung(m.triageNotiz)} />
+        )}
 
         {/* Text */}
         <section className="mt-5 rounded-xl border border-border bg-card p-4">
@@ -100,6 +115,20 @@ export default async function AdminMeldungDetailPage({ params }: { params: Promi
             <dd className="break-all text-foreground">{m.userAgent || '—'}</dd>
             <dt className="text-muted-foreground">ID</dt>
             <dd className="break-all font-mono text-foreground">{m.id}</dd>
+            {m.sprintName && (
+              <>
+                <dt className="text-muted-foreground">Sprint</dt>
+                <dd className="text-foreground">
+                  {pr ? (
+                    <a href={pr} target="_blank" rel="noopener noreferrer" className="font-medium text-brand-text underline-offset-2 hover:underline">
+                      {m.sprintName}
+                    </a>
+                  ) : (
+                    m.sprintName
+                  )}
+                </dd>
+              </>
+            )}
             {m.triagedAt && (
               <>
                 <dt className="text-muted-foreground">Triage</dt>
@@ -112,18 +141,7 @@ export default async function AdminMeldungDetailPage({ params }: { params: Promi
         {/* Triage */}
         <section className="mt-4 rounded-xl border border-border bg-card p-4">
           <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Triage</h2>
-          <TriageForm
-            meldungId={m.id}
-            werte={{
-              status: m.status,
-              clusterKey: m.clusterKey ?? '',
-              triageNotiz: m.triageNotiz ?? '',
-              duplikatVonId: m.duplikatVonId ? kurznummer(m.duplikatVonId) : '',
-              sprintName: m.sprintName ?? '',
-              antwortAnMelder: m.antwortAnMelder ?? '',
-            }}
-            hatHof={m.farm !== null}
-          />
+          <TriageForm meldungId={m.id} art={m.art} werte={gespeichert} hatHof={m.farm !== null} />
         </section>
       </div>
     </main>

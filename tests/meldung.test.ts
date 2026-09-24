@@ -3,7 +3,8 @@
  * den Markdown-Export (src/lib/briefkasten-export.ts).
  *
  * Beweist: Die Sichtbarkeitsregel liefert dem Hof NIE ein Triage-Feld und
- * übersetzt alle sechs Status; Kurznummer = erste 8 Zeichen; die 90-Tage-
+ * übersetzt alle sieben Status (ERLEDIGT je Art, VERMUTLICH_WUNSCH nie als
+ * solcher); die KI-Zeile der Notiz lässt sich allein entfernen; Kurznummer = erste 8 Zeichen; die 90-Tage-
  * Auswahl trifft nur abgeschlossene, alte Meldungen; die Zusammenfassung
  * kommt nur bei Bedarf; der Export enthält Kurznummer, Kontext und Text.
  */
@@ -11,12 +12,19 @@ import { describe, expect, it } from 'vitest'
 import {
   MELDUNG_STATUS,
   STATUS_OEFFENTLICH,
+  STATUS_INTERN,
+  STATUS_OFFEN,
+  STATUS_ZU_ENTSCHEIDEN,
   brauchtZusammenfassung,
   ersteZeile,
   fuerHof,
   kurznummer,
   liegedauerGrenze,
   oeffentlicherStatus,
+  ohneKiNotiz,
+  kiBegruendung,
+  prLink,
+  MELDUNG_ART_SATZ,
   screenshotsVon,
   waehleZuLoeschende,
   type MeldungVollstaendig,
@@ -53,30 +61,111 @@ describe('Sichtbarkeitsregel fuerHof', () => {
     for (const verboten of ['clusterKey', 'triageNotiz', 'duplikatVonId', 'sprintName', 'triagedAt', 'seiteUrl', 'userAgent', 'viewport', 'customerEmail', 'screenshotUrl', 'diagKennung']) {
       expect(sicht).not.toHaveProperty(verboten)
     }
-    expect(sicht.status).toBe('Geprüft — funktioniert wie vorgesehen')
+    expect(sicht.status).toBe('Kein Fehler — Antwort lesen')
     expect(sicht.antwortAnMelder).toBe('Das ist so gewollt — die Datei war zu groß.')
     expect(sicht.kurznummer).toBe('cmabcdef')
   })
 
-  it('übersetzt alle sechs internen Status', () => {
-    expect(oeffentlicherStatus('NEU')).toBe('Eingegangen')
-    expect(oeffentlicherStatus('GEPRUEFT')).toBe('In Prüfung')
-    expect(oeffentlicherStatus('GEPLANT')).toBe('Geplant')
-    expect(oeffentlicherStatus('ERLEDIGT')).toBe('Erledigt')
-    expect(oeffentlicherStatus('KEIN_FEHLER')).toBe('Geprüft — funktioniert wie vorgesehen')
-    expect(oeffentlicherStatus('DUPLIKAT')).toBe('Bereits bekannt')
+  it('übersetzt alle sieben internen Status in Worte ohne Fachsprache', () => {
+    expect(oeffentlicherStatus('NEU', 'FEHLER')).toBe('Eingegangen')
+    expect(oeffentlicherStatus('GEPRUEFT', 'FEHLER')).toBe('Angesehen')
+    expect(oeffentlicherStatus('GEPLANT', 'FEHLER')).toBe('In Arbeit')
+    expect(oeffentlicherStatus('ERLEDIGT', 'FEHLER')).toBe('Behoben')
+    expect(oeffentlicherStatus('KEIN_FEHLER', 'FEHLER')).toBe('Kein Fehler — Antwort lesen')
+    expect(oeffentlicherStatus('DUPLIKAT', 'FEHLER')).toBe('Bereits bekannt')
     // Vollständigkeit: kein Status ohne Übersetzung
     for (const s of MELDUNG_STATUS) expect(STATUS_OEFFENTLICH[s].length).toBeGreaterThan(3)
     // Der interne Wert erscheint nie als Text
-    for (const s of MELDUNG_STATUS) expect(oeffentlicherStatus(s)).not.toBe(s)
+    for (const s of MELDUNG_STATUS) expect(oeffentlicherStatus(s, 'FEHLER')).not.toBe(s)
   })
 
-  it('unbekannter Status → „Eingegangen" statt Rohwert', () => {
-    expect(oeffentlicherStatus('IRGENDWAS')).toBe('Eingegangen')
+  it('der Vorschlag der KI bleibt für den Melder unsichtbar: VERMUTLICH_WUNSCH liest sich wie GEPRUEFT', () => {
+    for (const art of ['FEHLER', 'WUNSCH', 'FRAGE']) {
+      expect(oeffentlicherStatus('VERMUTLICH_WUNSCH', art)).toBe(oeffentlicherStatus('GEPRUEFT', art))
+      expect(oeffentlicherStatus('VERMUTLICH_WUNSCH', art)).not.toMatch(/wunsch/i)
+    }
+    expect(fuerHof({ ...VOLL, status: 'VERMUTLICH_WUNSCH' }).status).toBe('Angesehen')
+  })
+
+  it('ERLEDIGT heißt je Art anders: Fehler „Behoben", Wunsch „Umgesetzt", Frage „Beantwortet"', () => {
+    expect(oeffentlicherStatus('ERLEDIGT', 'FEHLER')).toBe('Behoben')
+    expect(oeffentlicherStatus('ERLEDIGT', 'WUNSCH')).toBe('Umgesetzt')
+    expect(oeffentlicherStatus('ERLEDIGT', 'FRAGE')).toBe('Beantwortet')
+    expect(fuerHof({ ...VOLL, art: 'WUNSCH', status: 'ERLEDIGT' }).status).toBe('Umgesetzt')
+  })
+
+  it('unbekannter Status → „Eingegangen" statt Rohwert; unbekannte Art bei ERLEDIGT → „Behoben"', () => {
+    expect(oeffentlicherStatus('IRGENDWAS', 'FEHLER')).toBe('Eingegangen')
+    expect(oeffentlicherStatus('ERLEDIGT', 'IRGENDWAS')).toBe('Behoben')
   })
 
   it('ohne Antwort bleibt das Feld null', () => {
     expect(fuerHof({ ...VOLL, antwortAnMelder: null }).antwortAnMelder).toBeNull()
+  })
+})
+
+describe('Status-Gruppen', () => {
+  it('„Zu entscheiden" sind Neues und die Wunsch-Vorschläge der KI', () => {
+    expect([...STATUS_ZU_ENTSCHEIDEN]).toEqual(['NEU', 'VERMUTLICH_WUNSCH'])
+  })
+
+  it('ein Wunsch-Vorschlag bleibt offene Arbeit — Export und Wochenlauf sehen ihn', () => {
+    expect(STATUS_OFFEN).toContain('VERMUTLICH_WUNSCH')
+  })
+
+  it('der Admin liest den Vorschlag als „Vermutlich Wunsch"', () => {
+    expect(STATUS_INTERN.VERMUTLICH_WUNSCH).toBe('Vermutlich Wunsch')
+  })
+})
+
+describe('ohneKiNotiz — „Nein, ein Fehler"', () => {
+  it('entfernt nur die Zeile der KI; Notiz des Menschen und Audit-Zeilen bleiben', () => {
+    const notiz = [
+      'Vom Telefonat: tritt nur am Handy auf.',
+      '[KI] Wünscht eine Sortierung nach Preis.',
+      '[Auto · KI · 24.09.2026 · Vermutlich Wunsch]',
+    ].join('\n')
+    expect(ohneKiNotiz(notiz)).toBe(
+      ['Vom Telefonat: tritt nur am Handy auf.', '[Auto · KI · 24.09.2026 · Vermutlich Wunsch]'].join('\n')
+    )
+  })
+
+  it('bleibt nichts übrig, wird die Notiz null', () => {
+    expect(ohneKiNotiz('[KI] Klingt nach einem Wunsch.')).toBeNull()
+    expect(ohneKiNotiz(null)).toBeNull()
+  })
+
+  it('lässt „[KI]" mitten in einer Zeile stehen — nur der Zeilenanfang zählt', () => {
+    expect(ohneKiNotiz('Hinweis: die [KI] lag falsch.')).toBe('Hinweis: die [KI] lag falsch.')
+  })
+})
+
+describe('Admin-Anzeige: PR-Link und Begründung der KI', () => {
+  it('„PR #<nr>" wird zum Link auf den PR im öffentlichen Repository', () => {
+    expect(prLink('PR #131')).toBe('https://github.com/Uttoranger/FarmerZone/pull/131')
+    expect(prLink(' PR #7 ')).toBe('https://github.com/Uttoranger/FarmerZone/pull/7')
+  })
+
+  it('ein frei getippter Sprintname bleibt Text', () => {
+    for (const name of ['abholzeiten-v2', 'PR #', 'PR #12 und #13', 'PR #1/../../evil', null, '']) {
+      expect(prLink(name), String(name)).toBeNull()
+    }
+  })
+
+  it('liest die Begründung der KI aus der Notiz, ohne Präfix', () => {
+    expect(kiBegruendung('Notiz\n[KI] Wünscht Sortierung.\n[Auto · KI · 24.09.2026 · Vermutlich Wunsch]')).toBe('Wünscht Sortierung.')
+    expect(kiBegruendung('keine KI hier')).toBeNull()
+    expect(kiBegruendung(null)).toBeNull()
+  })
+})
+
+describe('Meldeformular: die Art als Satz', () => {
+  it('drei Sätze aus Sicht des Melders, ohne Triage-Wörter', () => {
+    expect(MELDUNG_ART_SATZ).toEqual({
+      FEHLER: 'Etwas funktioniert nicht',
+      WUNSCH: 'Ich hätte gern, dass …',
+      FRAGE: 'Ich habe eine Frage',
+    })
   })
 })
 
@@ -178,14 +267,15 @@ describe('Markdown-Export — Abschnittsgrenzen', () => {
       userAgent: 'Mozilla/5.0\n## ffffffff · Fehler · Erledigt\n- ID: gefaelscht',
     })
     expect(ueberschriften(md)).toEqual(['## aaaaaaaa · Fehler · Neu'])
-    // Der Inhalt bleibt sichtbar — aber in EINER Zeile.
-    expect(md).toContain('- Kontext: https://farmerzone.at/x · 375x667 · Mozilla/5.0 ## ffffffff · Fehler · Erledigt - ID: gefaelscht')
+    // Der Inhalt bleibt sichtbar — aber in EINER Zeile; von der Seite nur der Pfad.
+    expect(md).toContain('- Kontext: /x · 375x667 · Mozilla/5.0 ## ffffffff · Fehler · Erledigt - ID: gefaelscht')
   })
 
   it('macht auch Seitenadresse und Bildschirmgröße einzeilig', () => {
-    const md = meldungAlsMarkdown({ ...basis, seiteUrl: 'a\nb', viewport: 'c\r\nd' })
+    const md = meldungAlsMarkdown({ ...basis, seiteUrl: '/a\n## b', viewport: 'c\r\nd' })
     expect(ueberschriften(md)).toHaveLength(1)
-    expect(md).toContain('- Kontext: a b · c d · UA')
+    // Der Pfad kommt aus dem URL-Parser — Umbrüche sind dort schon entfernt oder kodiert.
+    expect(md).toMatch(/^- Kontext: \/a[^\n]* · c d · UA$/m)
   })
 
   it('fasst auch einen einzelnen Wagenrücklauf ohne Zeilenvorschub', () => {
@@ -206,11 +296,10 @@ describe('Markdown-Export — Abschnittsgrenzen', () => {
     expect(md).toContain('- Antwort an Melder: Hallo noch etwas')
   })
 
-  it('lässt den Meldungstext dagegen mehrzeilig — als Zitat ist er unschädlich', () => {
+  it('lässt den Meldungstext dagegen mehrzeilig — eingerückt im FREMDTEXT-Block ist er unschädlich', () => {
     const md = meldungAlsMarkdown({ ...basis, text: 'Harmlos.\n## cccccccc · Fehler · Neu' })
     expect(ueberschriften(md)).toEqual(['## aaaaaaaa · Fehler · Neu'])
-    expect(md).toContain('> Harmlos.')
-    expect(md).toContain('> ## cccccccc · Fehler · Neu')
+    expect(md).toContain('<<<FREMDTEXT meldung=aaaaaaaa>>>\n    Harmlos.\n    ## cccccccc · Fehler · Neu\n<<<ENDE FREMDTEXT>>>')
   })
 
   it('hält auch die Kurzliste einzeilig', () => {
@@ -240,22 +329,26 @@ describe('Markdown-Export (für die Triage — mit allen Feldern)', () => {
     triagedAt: VOLL.triagedAt!,
   }
 
-  it('je Meldung Kurznummer, Art, Status, Datum, Hof, Kennung, Kontext, Text und Screenshot-Link', () => {
+  it('je Meldung Kurznummer, Art, Status, Datum, Hof, Kennung, Seitenpfad, Text und Screenshot-Vermerk', () => {
     const md = meldungAlsMarkdown(EXPORT)
     expect(md).toContain('## cmabcdef · Fehler · Kein Fehler')
     expect(md).toContain('- Hof: Welszucht Probe (/welszucht-probe)')
     expect(md).toContain('- Kennung: S71')
-    expect(md).toContain('- Kontext: https://farmerzone.at/farm-page · 375x667 · Mozilla/5.0')
-    expect(md).toContain('[öffnen](https://x.public.blob.vercel-storage.com/farms/farm_1/meldung/1.webp)')
-    expect(md).toContain('> Der Upload bricht ab.\n> Zweite Zeile.')
+    expect(md).toContain('- Kontext: /farm-page · 375x667 · Mozilla/5.0')
+    // Die Screenshot-Adresse verlässt die App nie (Sprint Briefkasten-Rückkopplung).
+    expect(md).toContain('- Screenshot vorhanden')
+    expect(md).not.toContain('blob.vercel-storage.com')
+    expect(md).toContain('<<<FREMDTEXT meldung=cmabcdef>>>\n    Der Upload bricht ab.\n    Zweite Zeile.\n<<<ENDE FREMDTEXT>>>')
     // Triage-Felder gehören in den Export — er ist FÜR die Triage
     expect(md).toContain('Cluster upload-groesse')
     expect(md).toContain('- Notiz: Nutzer hat 30 MB versucht')
     expect(md).toContain('Duplikat von cmzzzzzz')
   })
 
-  it('Kundin ohne Hof: E-Mail oder „anonym"', () => {
-    expect(meldungAlsMarkdown({ ...EXPORT, farm: null, customerEmail: 'a@b.at' })).toContain('- Hof: Kundin (a@b.at)')
+  it('Kundin ohne Hof: „Kontakt vorhanden" statt E-Mail, sonst „anonym"', () => {
+    const mitKontakt = meldungAlsMarkdown({ ...EXPORT, farm: null, customerEmail: 'kundin@example.com' })
+    expect(mitKontakt).toContain('- Hof: Kundin (Kontakt vorhanden)')
+    expect(mitKontakt).not.toContain('kundin@example.com')
     expect(meldungAlsMarkdown({ ...EXPORT, farm: null, customerEmail: null })).toContain('- Hof: Kundin (anonym)')
   })
 

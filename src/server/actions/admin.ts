@@ -232,8 +232,9 @@ export async function setServiceFeeAction(
 /**
  * Triage einer Meldung im Fehlerbriefkasten (Sprint fehlerbriefkasten, Teil D).
  *
- * Der EINZIGE Schreibweg für Triage-Felder neben dem Datenbank-Connector — das
- * Lese-CLI (scripts/briefkasten.ts) kann sie nicht setzen. Ein Duplikat-Verweis
+ * Der Schreibweg des Menschen für ALLE Triage-Felder, auch die Art. Daneben
+ * gibt es nur die Schreibroute /api/triage/status, die genau vier Status
+ * setzen kann und nie die Art (Sprint Briefkasten-Rückkopplung). Ein Duplikat-Verweis
  * muss auf eine bestehende, andere Meldung zeigen; sonst stünde ein toter Link
  * in der Triage. antwortAnMelder ist das einzige Triage-Feld, das der Hof sieht.
  */
@@ -241,6 +242,7 @@ export async function triageMeldungAction(
   meldungId: string,
   eingabe: {
     status: unknown
+    art?: unknown
     clusterKey?: unknown
     triageNotiz?: unknown
     duplikatVonId?: unknown
@@ -276,6 +278,8 @@ export async function triageMeldungAction(
     where: { id: meldungId },
     data: {
       status: triage.status,
+      // Nur der Knopf „Ja, ein Wunsch" schickt eine Art (Sprint Briefkasten-Rückkopplung).
+      ...(triage.art ? { art: triage.art } : {}),
       clusterKey: triage.clusterKey,
       triageNotiz: triage.triageNotiz,
       duplikatVonId,
