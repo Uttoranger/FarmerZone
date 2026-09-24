@@ -83,6 +83,14 @@ pnpm test:integration                        # Integration (braucht .env.test)
   Prüfgegenstand. Seed-Daten werden nur **gelesen**.
 - **Eine Datei zur Zeit** (`fileParallelism: false`). Nebenläufigkeit wird
   innerhalb eines Tests hergestellt, nicht zwischen Dateien.
+- **Nebenläufigkeitstests sichern den ZUSTAND zu, nicht den WEG.** Welchen
+  Zweig zwei gleichzeitige Anfragen nehmen, entscheidet die Maschine. Eine
+  Zusicherung auf „genau dieser Fehlercode aus genau diesem Schritt" ist
+  zeitabhängig und flackert irgendwann — erst in der CI, auf fremder Hardware.
+  Richtig ist: Die Antwort muss EINER der gültigen Ausgänge sein, und darunter
+  steht der Zustand, der in **allen** Verschränkungen gelten muss (Bestand,
+  Anzahl Bestellungen, Anzahl Mails). Das ist auch die Zusicherung, die das Geld
+  schützt.
 - **Nicht in `pnpm test`, nicht im Stop-Hook.** Eigener CI-Job `integration` mit
   einem `postgres:17`-Dienst.
 
@@ -180,6 +188,8 @@ in einen ungültigen Schlüssel statt in echtes Geld.
 - Grenzfälle: 0, leer, `null`, exakt an der Frist, ein Millisekunde davor und danach.
 - Der Fehlerweg, nicht nur der Erfolgsweg.
 - Nebenläufigkeit, wo Bestand oder Geld betroffen ist: zwei gleichzeitige Zugriffe.
+  In der Integrationsschicht dabei den Zustand zusichern, nicht den Zweig
+  (Abschnitt 1).
 
 ---
 
