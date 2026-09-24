@@ -271,6 +271,13 @@ schickt bewusst neu ab. Entschieden gegen „still den DB-Preis nehmen": Die Kun
 soll nie einen Betrag zahlen, den sie nicht gesehen hat. Tests:
 `tests/checkout-preis.test.ts`, `tests/integration/checkout-preis.int.test.ts`.
 
+**Nachtrag (Folge-PR zu #114):** Der erste Fix wandelte `Product.price` mit
+`Number()` um und rechnete Summe und Positionen weiter in `number` — gegen
+CODING_STANDARDS §2. Jetzt rechnen `calcLineTotal`, `calcTotalAmount` und
+`calcPlatformFeeAmount` in `order-totals.ts` mit Decimal; Stripe und die
+Servicegebühr bekommen ganze Cent über `decimalZuCents`. `eurosToCents` bleibt
+nur für die Anzeige im Browser.
+
 ### BUG: Storno-Rückbuchung nicht atomar, Doppeltipp buchte doppelt (behoben 2026-09-24)
 
 **Symptom (statisch belegt, kein Kundenfall):** `cancelOrder` prüfte den Status nur

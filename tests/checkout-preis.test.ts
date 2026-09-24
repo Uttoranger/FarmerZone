@@ -136,8 +136,8 @@ function anfrage(
 }
 
 type OrderData = {
-  totalAmount: number
-  items: { create: Array<{ productId: string; unitPrice: number; totalPrice: number }> }
+  totalAmount: unknown
+  items: { create: Array<{ productId: string; unitPrice: unknown; totalPrice: unknown }> }
 }
 const bestellung = () => orderCreate.mock.calls[0][0].data as unknown as OrderData
 
@@ -179,11 +179,14 @@ describe('Preis stimmt', () => {
     )
 
     expect(res.status).toBe(200)
-    expect(bestellung().items.create.map((p) => [p.productId, p.unitPrice, p.totalPrice])).toEqual([
-      ['tomaten', 4.99, 9.98],
-      ['eier', 3.6, 10.8],
+    // Exakt, als Text verglichen: Decimal kennt keinen Float-Rest.
+    expect(
+      bestellung().items.create.map((p) => [p.productId, String(p.unitPrice), String(p.totalPrice)])
+    ).toEqual([
+      ['tomaten', '4.99', '9.98'],
+      ['eier', '3.60', '10.8'],
     ])
-    expect(bestellung().totalAmount).toBeCloseTo(20.78, 10)
+    expect(String(bestellung().totalAmount)).toBe('20.78')
   })
 
   it('Online: Stripe bekommt den Betrag aus dem DB-Preis', async () => {
