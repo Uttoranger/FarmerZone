@@ -254,6 +254,26 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 
 ## Bekannte Bugs & Fixes
 
+### BUG: Pausen-Nachricht ging verloren und fehlte in der Kundenansicht (behoben 2026-09-24)
+
+**Meldung:** Briefkasten, Hof meldet, die Abwesenheitsnachricht erscheine in
+der Kundenansicht nicht.
+
+**Ursache, zweifach:** `setPause` schrieb `null`, sobald der Shop nicht
+pausiert war — die Nachricht ließ sich nicht vorschreiben (trotz „Nachricht
+gespeichert") und ging beim Beenden der Pause verloren. Und der Knopf
+„Kundenansicht" rendert die Hofseite im Owner-Modus; dessen Pausen-Banner zeigte
+nur „Dein Shop ist pausiert — Pause beenden", nie die Nachricht. Die öffentliche
+Hofseite war die ganze Zeit korrekt.
+
+**Fachregel Pausen-Nachricht:** Die Nachricht gehört dem Hof unabhängig vom
+Pausenstatus — speichern jederzeit, beim Entpausieren behalten, leer = null.
+Kundinnen sehen „<Hof> pausiert gerade." plus Nachricht oder Rückfall
+(`SHOP_PAUSED_FALLBACK`). Der Hof sieht im Bearbeiten-Modus nur den Hinweis mit
+Weg zurück, in der Kundenansicht zusätzlich genau den Satz der Kundinnen.
+Entschieden in `pausenBanner` (`src/lib/shop-pause.ts`), getestet in
+`tests/pause-nachricht.test.ts`.
+
 ### BUG: Checkout übernahm den Preis aus dem Browser (behoben 2026-09-24)
 
 **Symptom (statisch belegt, kein Kundenfall bekannt):** `/api/checkout` rechnete
