@@ -222,4 +222,5 @@ in einen ungültigen Schlüssel statt in echtes Geld.
   (Vorlage: `.env.test.example`). Fehlt die Datei, meldet dotenv-cli sie; fehlt
   `TEST_DATABASE_URL`, bricht die Sicherheitssperre mit Hinweis ab. Beides ist
   kein Codefehler.
+- **Links auf Ordner in Tests** als `symlinkSync(ziel, pfad, 'junction')` mit absolutem Ordnerziel anlegen. Ein normaler Symlink braucht unter Windows Sonderrechte (`EPERM` ohne Entwicklermodus), eine Junction nicht; Linux und macOS ignorieren das dritte Argument. `realpath` löst beides auf (Vorbild: `tests/fremdtext-hooks.test.ts`). Junctions gehen nur auf Ordner — für einen Link auf eine **Datei** gibt es unter Windows keinen Weg ohne Sonderrechte; solche Tests brauchen den Entwicklermodus oder laufen nur in der CI.
 - `tests/email-sendraw.test.ts` und `tests/password-reset-email.test.ts` flackern gelegentlich im Gesamtlauf: Ihr erster Fall importiert `@/lib/email` kalt (`vi.resetModules()`), und unter Parallellast läuft das ins 5-Sekunden-Limit. Allein laufen sie grün. Vor einem Fix des eigenen Codes die beiden Dateien einzeln starten.
