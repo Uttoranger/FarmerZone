@@ -5,7 +5,10 @@ import {
   MELDUNG_TEXT_MAX,
   MELDUNG_TEXT_MIN,
   MELDUNG_STATUS,
+  TRIAGE_NOTIZ_MAX,
+  ZIEL_STATUS,
 } from '@/lib/meldung'
+import { bereinige } from '@/lib/fremdtext'
 
 /**
  * Was das Meldeformular an den Server schickt (Sprint fehlerbriefkasten).
@@ -13,7 +16,7 @@ import {
  * soll keine Validierungsmeldung bekommen, an der er lernen könnte.
  */
 export const meldungEingabeSchema = z.object({
-  art: z.enum(MELDUNG_ARTEN, { message: 'Bitte wähle Fehler, Wunsch oder Frage.' }),
+  art: z.enum(MELDUNG_ARTEN, { message: 'Bitte wähle oben aus, worum es geht.' }),
   text: z
     .string()
     .trim()
@@ -47,11 +50,61 @@ const leerZuNull = (max: number, feld: string) =>
 
 export const triageEingabeSchema = z.object({
   status: z.enum(MELDUNG_STATUS, { message: 'Unbekannter Status.' }),
+  // Nur der Knopf „Ja, ein Wunsch" schickt eine Art; das Formular lässt sie weg.
+  art: z.enum(MELDUNG_ARTEN, { message: 'Unbekannte Art.' }).optional(),
   clusterKey: leerZuNull(60, 'Cluster'),
-  triageNotiz: leerZuNull(2000, 'Notiz'),
+  triageNotiz: leerZuNull(TRIAGE_NOTIZ_MAX, 'Notiz'),
   duplikatVonId: leerZuNull(40, 'Duplikat von'),
   sprintName: leerZuNull(60, 'Sprint'),
   antwortAnMelder: leerZuNull(500, 'Antwort'),
+  // Der Stand, auf dem das Formular aufbaut. Seit die Schreibroute (CLI,
+  // Deployment) ebenfalls schreibt, speichert die Action nur, wenn Status und
+  // Notiz noch so sind — jede Änderung der Route hängt eine Zeile an die Notiz.
+  vorherStatus: z.enum(MELDUNG_STATUS).optional(),
+  vorherNotiz: z.string().max(TRIAGE_NOTIZ_MAX).nullable().optional(),
 })
 
 export type TriageEingabe = z.infer<typeof triageEingabeSchema>
+
+/** Ziele, die eine PR-Nummer brauchen — sie steht in sprintName und im Audit. */
+const MIT_PR: readonly string[] = ['GEPLANT', 'ERLEDIGT', 'GEPRUEFT']
+
+/**
+ * Der Body der Schreibroute POST /api/triage/status (Sprint
+ * Briefkasten-Rückkopplung). STRIKT: ein unbekanntes Feld ist ein Fehler —
+ * insbesondere antwortAnMelder. Die Route schreibt nie Text, den ein Melder
+ * sieht, außer ihren festen Sätzen.
+ */
+export const triageStatusSchema = z
+  .strictObject(
+    {
+    // Kurznummer oder volle ID — beides nur Kleinbuchstaben und Ziffern (cuid).
+    meldungId: z.string().trim().regex(/^[a-z0-9]{8,30}$/, 'meldungId: Kurznummer (8 Zeichen) oder volle ID.'),
+    status: z.enum(ZIEL_STATUS, { message: 'status: erlaubt sind VERMUTLICH_WUNSCH, GEPLANT, ERLEDIGT, GEPRUEFT.' }),
+    prNummer: z.number().int().positive().max(1_000_000).optional(),
+    // Steuer- und Richtungszeichen fallen VOR der Längenprüfung weg — der Grund
+    // landet in der Triage-Notiz und damit wieder im Export.
+    grund: z
+      .string()
+      .transform((g) => bereinige(g).replace(/\s+/g, ' ').trim())
+      .pipe(z.string().min(1, 'grund ist leer.').max(300, 'grund: höchstens 300 Zeichen.'))
+      .optional(),
+    quelle: z.enum(['deployment', 'merge']).default('deployment'),
+    },
+    {
+      error: (iss) =>
+        iss.code === 'unrecognized_keys'
+          ? `Unbekanntes Feld: ${iss.keys.join(', ')} — die Schreibroute nimmt nur meldungId, status, prNummer, grund, quelle.`
+          : undefined,
+    }
+  )
+  .superRefine((d, ctx) => {
+    if (MIT_PR.includes(d.status) && d.prNummer === undefined) {
+      ctx.addIssue({ code: 'custom', path: ['prNummer'], message: `prNummer fehlt — ${d.status} braucht die Nummer des PR.` })
+    }
+    if (d.status === 'VERMUTLICH_WUNSCH' && d.grund === undefined) {
+      ctx.addIssue({ code: 'custom', path: ['grund'], message: 'grund fehlt — sag in eigenen Worten, warum es ein Wunsch ist.' })
+    }
+  })
+
+export type TriageStatusEingabe = z.infer<typeof triageStatusSchema>

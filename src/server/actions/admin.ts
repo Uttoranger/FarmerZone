@@ -232,8 +232,9 @@ export async function setServiceFeeAction(
 /**
  * Triage einer Meldung im Fehlerbriefkasten (Sprint fehlerbriefkasten, Teil D).
  *
- * Der EINZIGE Schreibweg für Triage-Felder neben dem Datenbank-Connector — das
- * Lese-CLI (scripts/briefkasten.ts) kann sie nicht setzen. Ein Duplikat-Verweis
+ * Der Schreibweg des Menschen für ALLE Triage-Felder, auch die Art. Daneben
+ * gibt es nur die Schreibroute /api/triage/status, die genau vier Status
+ * setzen kann und nie die Art (Sprint Briefkasten-Rückkopplung). Ein Duplikat-Verweis
  * muss auf eine bestehende, andere Meldung zeigen; sonst stünde ein toter Link
  * in der Triage. antwortAnMelder ist das einzige Triage-Feld, das der Hof sieht.
  */
@@ -241,11 +242,14 @@ export async function triageMeldungAction(
   meldungId: string,
   eingabe: {
     status: unknown
+    art?: unknown
     clusterKey?: unknown
     triageNotiz?: unknown
     duplikatVonId?: unknown
     sprintName?: unknown
     antwortAnMelder?: unknown
+    vorherStatus?: unknown
+    vorherNotiz?: unknown
   }
 ): Promise<{ error?: string }> {
   const guard = await requireAdmin()
@@ -272,10 +276,19 @@ export async function triageMeldungAction(
     duplikatVonId = original.id
   }
 
-  await prisma.meldung.update({
-    where: { id: meldungId },
+  // Bedingt schreiben, wenn das Formular seinen Ausgangsstand mitschickt: Hat
+  // die Schreibroute (CLI, Deployment) inzwischen etwas gesetzt, würde ein
+  // altes Formular sonst Status, PR-Nummer und festen Satz zurückdrehen.
+  const { count } = await prisma.meldung.updateMany({
+    where: {
+      id: meldungId,
+      ...(triage.vorherStatus !== undefined ? { status: triage.vorherStatus } : {}),
+      ...(triage.vorherNotiz !== undefined ? { triageNotiz: triage.vorherNotiz } : {}),
+    },
     data: {
       status: triage.status,
+      // Nur der Knopf „Ja, ein Wunsch" schickt eine Art (Sprint Briefkasten-Rückkopplung).
+      ...(triage.art ? { art: triage.art } : {}),
       clusterKey: triage.clusterKey,
       triageNotiz: triage.triageNotiz,
       duplikatVonId,
@@ -284,6 +297,7 @@ export async function triageMeldungAction(
       triagedAt: new Date(),
     },
   })
+  if (count === 0) return { error: 'Die Meldung hat sich inzwischen geändert — lade die Seite neu und entscheide noch einmal.' }
 
   if (process.env.NODE_ENV !== 'production') {
     console.log(`[DEV] Meldung triagiert: ${new Date().toISOString()} admin=${guard.userId} meldung=${meldungId} status=${triage.status}`)

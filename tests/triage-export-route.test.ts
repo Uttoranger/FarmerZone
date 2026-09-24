@@ -16,7 +16,7 @@ vi.mock('@/lib/prisma', () => ({ prisma: { meldung: { findMany: vi.fn() } } }))
 
 import * as route from '@/app/api/triage/export/route'
 import { prisma } from '@/lib/prisma'
-import { EXPORT_AUSWAHL } from '@/lib/briefkasten-export'
+import { EXPORT_AUSWAHL, EXPORT_MAX } from '@/lib/briefkasten-export'
 
 const findMany = vi.mocked(prisma.meldung.findMany)
 const TOKEN = 'triage-token-geheim-42'
@@ -124,9 +124,9 @@ describe('Leseroute — Zugriff', () => {
     expect(text).toContain('# Briefkasten — 1 Meldung')
     expect(text).toContain('## cmfmeldu · Fehler · Neu')
     expect(text).toContain('- Hof: Biohof Sonnleitner (/sonnleitner)')
-    expect(text).toContain('- Kontext: https://farmerzone.at/settings · 375x667 · Mozilla/5.0 (iPhone)')
+    expect(text).toContain('- Kontext: /settings · 375x667 · Mozilla/5.0 (iPhone)')
     expect(text).toContain('- Notiz: intern')
-    expect(text).toContain('> Abholzeiten speichern geht nicht.')
+    expect(text).toContain('<<<FREMDTEXT meldung=cmfmeldu>>>\n    Abholzeiten speichern geht nicht.\n<<<ENDE FREMDTEXT>>>')
   })
 
   it('kennt nur GET — kein POST, kein Schreibpfad', () => {
@@ -139,16 +139,16 @@ describe('Leseroute — Zugriff', () => {
 })
 
 describe('Leseroute — Filter', () => {
-  it('liest alle Export-Felder, Voreinstellung NEU + GEPRUEFT, jüngste zuerst, ohne Grenze', async () => {
+  it('liest alle Export-Felder, Voreinstellung offene Arbeit, jüngste zuerst, höchstens 51', async () => {
     await route.GET(anfrage({ auth: `Bearer ${TOKEN}` }))
     expect(findMany).toHaveBeenCalledTimes(1)
     const args = findMany.mock.calls[0][0]
-    expect(args?.where).toEqual({ status: { in: ['NEU', 'GEPRUEFT'] } })
+    expect(args?.where).toEqual({ status: { in: ['NEU', 'GEPRUEFT', 'VERMUTLICH_WUNSCH'] } })
     expect(args?.select).toEqual(EXPORT_AUSWAHL)
     // Die jüngste Meldung zuerst — beim Sichten ist das Neue das Wichtige.
     expect(args?.orderBy).toEqual({ createdAt: 'desc' })
-    // Kein take: der Export ist der ganze Briefkasten, nicht die ersten 200.
-    expect(args).not.toHaveProperty('take')
+    // 50 zeigt der Export, die eine mehr sagt ihm, dass er kappen muss.
+    expect(args?.take).toBe(EXPORT_MAX + 1)
   })
 
   it('nimmt status (Liste, auch klein geschrieben) und art aus der Adresse', async () => {
@@ -160,7 +160,7 @@ describe('Leseroute — Filter', () => {
 
   it('unbekannte Werte fallen still weg — zurück auf die Voreinstellung', async () => {
     await route.GET(anfrage({ auth: `Bearer ${TOKEN}`, query: '?status=quatsch&art=x' }))
-    expect(findMany.mock.calls[0][0]?.where).toEqual({ status: { in: ['NEU', 'GEPRUEFT'] } })
+    expect(findMany.mock.calls[0][0]?.where).toEqual({ status: { in: ['NEU', 'GEPRUEFT', 'VERMUTLICH_WUNSCH'] } })
   })
 
   it('leerer Briefkasten: 200 mit Hinweis statt Fehler', async () => {

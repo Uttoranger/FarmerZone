@@ -61,6 +61,13 @@ Systemgrenze = API-Route, Server Action, Webhook, URL-Parameter, `localStorage`,
 - In API-Routen `safeParse` (Antwort bauen), in Server Actions `parse` oder `safeParse` mit `{ error }`.
 - `localStorage`-Inhalte (Warenkorb!) sind Fremddaten: parsen, validieren, bei Bruch verwerfen.
 
+### Nutzertext als Systemgrenze
+Text, den ein Nutzer geschrieben hat (Meldung, Hofname, Browserangabe, PR-Text), ist auch dann Fremdtext, wenn er schon in der Datenbank liegt. Wo er in den Kontext eines Agenten gerät — Export, CLI, Log, Action —, geht er durch `src/lib/fremdtext.ts`:
+- Mehrzeiliger Text als Block zwischen `<<<FREMDTEXT meldung=…>>>` und `<<<ENDE FREMDTEXT>>>` (`fremdtextBlock`): Steuer-, Richtungs- und unsichtbare Zeichen entfernt, Markierungen im Text entschärft, jede Zeile eingerückt, gekürzt.
+- Einzeilige Felder über `einzeiligerFremdtext` mit Längengrenze; Adressen über `seitenPfad` (nur der Pfad).
+- Was der Agent nicht braucht, verlässt die App nicht: keine E-Mail, keine Screenshot-Adresse, keine Query-Parameter.
+- Aus einem PR-Text werden nur IDs übernommen, die dem ID-Muster entsprechen (`parseMeldungsVerweise`); nie steht er in einer `run:`-Zeile eines Workflows.
+
 ---
 
 ## 4. Fehlerbehandlung

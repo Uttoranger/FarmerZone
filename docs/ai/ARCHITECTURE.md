@@ -45,7 +45,7 @@ Vorbild: `src/lib/reservierung.ts` entscheidet (rein, 174 Tests ohne DB), `src/s
 | `tests/` | Alle Tests, flach | — |
 
 ### `src/lib/` ist voll — Regel beim Hinzufügen
-61 Dateien (Stand 2026-09), gemischter Zweck. Bevor eine neue entsteht:
+67 Dateien (Stand 2026-09-24), gemischter Zweck. Bevor eine neue entsteht:
 1. Passt es in eine bestehende Datei? Dann dorthin.
 2. Ist es eine **Fachregel**? → eigene Datei, rein, ohne Import von `prisma`/`auth`/`stripe`.
 3. Ist es eine **Infrastrukturkapsel** (externer Dienst)? → `server-only` importieren.
@@ -72,6 +72,20 @@ Sonst: Server Action. **Keine** API-Route bauen, nur weil das Muster vertraut is
 3. Auth- bzw. Token-Prüfung, **fail-closed**: fehlt das Geheimnis, wird gesperrt, nicht geöffnet.
 4. Antwortform nach `CODING_STANDARDS.md`.
 5. Langsames über `nachDerAntwort()`.
+
+### Triage-Routen: ein Token je Recht
+Der Briefkasten hat zwei API-Routen, weil ihre Aufrufer extern sind (CLI, GitHub Action):
+
+| Route | Token | Darf |
+|---|---|---|
+| `GET /api/triage/export` | `TRIAGE_TOKEN` | nur lesen |
+| `POST /api/triage/status` | `TRIAGE_WRITE_TOKEN` (Rechner des Entwicklers) | `VERMUTLICH_WUNSCH`, `GEPLANT` — nur Art FEHLER |
+| `POST /api/triage/status` | `TRIAGE_MERGE_TOKEN` (nur GitHub Actions) | `ERLEDIGT`, Wiederöffnen (`ERLEDIGT → GEPRUEFT`) |
+
+- Ein Token je Recht, alle drei verschieden — sind zwei gleich, lehnt die Route alles ab. Ein Token, der für den Status nicht gilt → 403.
+- Welcher Übergang erlaubt ist und was er schreibt, entscheidet `src/lib/triage-status.ts`; die Route liest, fragt dort und schreibt per `updateMany` auf genau den gelesenen Stand (sonst 409).
+- Die Schreibroute schreibt nie Text, den ein Melder sieht, außer ihren festen Sätzen, und nie die Art. Body strikt: ein unbekanntes Feld ist 400.
+- Den Merge-Token gibt es nie auf einem Rechner mit Agenten — abschließen kann nur das Deployment.
 
 ### Pflichten jeder Server Action
 1. `'use server'` als erste Zeile.

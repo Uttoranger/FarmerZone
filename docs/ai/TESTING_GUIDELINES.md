@@ -1,6 +1,6 @@
 # TESTING_GUIDELINES
 
-Stand 2026-09-24: 86 Testdateien, ~1.260 Tests, alle in `tests/`.
+Stand 2026-09-24: 92 Testdateien, ~1.470 Tests, alle in `tests/`.
 
 ---
 
