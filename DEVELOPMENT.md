@@ -1090,7 +1090,32 @@ in diesem Teil.
    antwortet 409. Deshalb baut jeder Integrationstest seinen eigenen freigeschalteten
    Hof. Ob der Seed nachgezogen wird, ist eine Entscheidung über Demodaten, keine
    Testfrage — hier nur notiert.
-2. **Der Rückfall in `nachDerAntwort` läuft unbeaufsichtigt.** Außerhalb eines Requests
+2. **Die weiche Reservierung schützt mehr, als man denkt — und macht den harten
+   Wettlauf nur innerhalb EINER Sitzung erreichbar.** Rechnung: Zwei Sitzungen mit
+   je einem Halt über `q` sehen beide `Bestand − q`. Damit beide die Vorprüfung
+   passieren, braucht es `Bestand ≥ 2q`; damit die bedingte Buchung überhaupt
+   kollidiert, `Bestand < 2q`. Beides zugleich geht nicht. Der Doppelverkauf
+   zweier Kundinnen ist durch die weiche Schicht also ausgeschlossen; erreichbar
+   bleibt der Fall, den der Kommentar im Handler nennt — zwei gleichzeitige
+   Anfragen DERSELBEN Sitzung, also Doppelklick, erneut gesendetes Formular,
+   Wiederholung auf wackeligem Netz.
+
+   Folge für die Tests: Dieser Fall rennt zwangsläufig gegen Schritt 10, der die
+   Halte der Sitzung löscht. Je nach Verschränkung wird die Verliererin in der
+   Vorprüfung, in der bedingten Buchung oder mit „Reservierung abgelaufen"
+   abgewiesen — drei gültige Ausgänge. Zusicherungen auf genau einen davon
+   flackern; die Regel steht jetzt in `docs/ai/TESTING_GUIDELINES.md`,
+   Abschnitt 1. Gefunden hat das die CI: lokal fünf Läufe grün, auf dem Runner
+   rot.
+
+   **Nebenbefund, nicht behoben:** In genau diesem Fenster — zweite Anfrage nach
+   Schritt 10, aber bevor sie die Bestellung in Schritt 0 findet — antwortet der
+   Checkout „Deine Reservierung ist abgelaufen" statt die bestehende Bestellung
+   zu liefern. Kein Geldschaden (keine zweite Bestellung, keine zweite Buchung),
+   aber eine irreführende Meldung. Kandidat für einen eigenen Fix, nicht
+   eigenmächtig gebaut.
+
+3. **Der Rückfall in `nachDerAntwort` läuft unbeaufsichtigt.** Außerhalb eines Requests
    startet er die Aufgabe ohne Warten (`src/lib/nach-der-antwort.ts`). Der Nachlauf im
    Checkout **liest** nur (`product.findMany`) und ruft den gemockten Versand — er
    schreibt nichts, es geht also kein Datenverlust davon aus. Er kann aber noch laufen,
