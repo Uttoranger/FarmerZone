@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { revalidatePath } from 'next/cache'
 import { sendOrderReady, sendOrderCancelled, sendOrderNotReady, type OrderForEmail } from '@/lib/email'
+import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import type { OrderStatus } from '@prisma/client'
 
 export type ActionResult = { error?: string }
@@ -267,19 +268,64 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Act
   const farm = await getAuthFarm()
   if (!farm) return { error: 'Nicht angemeldet' }
 
+  // Nur LESEN — die Daten für Rückbuchung und Mail. Die Entscheidung, ob
+  // storniert werden darf, fällt NICHT hier: eine Leseprüfung lassen zwei
+  // gleichzeitige Aufrufe (Doppeltipp) beide passieren.
   const order = await prisma.order.findFirst({
-    where: { id: orderId, farmId: farm.id, status: { notIn: ['CANCELLED', 'PICKED_UP'] } },
+    where: { id: orderId, farmId: farm.id },
     select: ORDER_EMAIL_SELECT,
   })
   if (!order) return { error: 'Bestellung nicht gefunden' }
 
+  // Der bedingte Statuswechsel IST die Sperre: updateMany mit Statusbedingung
+  // gewinnt genau einmal, der zweite Aufruf trifft count 0 und bucht nichts
+  // zurück. Rückbuchung in DERSELBEN Transaktion wie der Statuswechsel —
+  // ganz oder gar nicht (Muster wie der Stripe-Webhook bei Zahlungsabbruch).
+  const storniert = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.order.updateMany({
+      where: { id: orderId, farmId: farm.id, status: { notIn: ['CANCELLED', 'PICKED_UP'] } },
+      data: {
+        status: 'CANCELLED',
+        cancelledAt: new Date(),
+        cancelReason: reason ?? null,
+        // Servicegebühr entfällt auch bei Storno: online steckt sie in der vollen
+        // Erstattung unten (Stripe erstattet den ganzen Zahlungsbetrag), bar wurde
+        // sie nie kassiert. Der Vermerk hält den Snapshot ehrlich — Admin-Spalte
+        // „entfallen" heute, Monatsabrechnung (Sprint 3) später.
+        ...(order.serviceFeeCents > 0 && !order.serviceFeeRefundedAt
+          ? { serviceFeeRefundedAt: new Date() }
+          : {}),
+      },
+    })
+    if (count === 0) return false
+
+    for (const item of order.items) {
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { stock: { increment: item.quantity } },
+      })
+    }
+    return true
+  })
+
+  if (!storniert) return { error: 'Diese Bestellung ist schon storniert oder abgeholt.' }
+
+  // Erstattung erst NACH der Transaktion. Scheitert Stripe, bleibt die
+  // Bestellung storniert und die Ware zurückgebucht — das ist der richtige
+  // Zustand, nur das Geld steht noch aus. paymentStatus bleibt dann PAID:
+  // das Enum kennt kein „Erstattung ausstehend" (Vorschlag: REFUND_PENDING,
+  // nicht eigenmächtig angelegt — Schema-Änderung nur mit Freigabe).
   let refundAmount: number | null = null
+  let erstattungOffen = false
 
   if (order.stripePaymentIntentId && order.paymentStatus === 'PAID') {
     try {
-      const refund = await stripe.refunds.create({
-        payment_intent: order.stripePaymentIntentId,
-      })
+      const refund = await stripe.refunds.create(
+        { payment_intent: order.stripePaymentIntentId },
+        // Idempotenz: Gelingt die Erstattung, stirbt aber der Prozess vor dem
+        // Vermerk, liefert ein manueller zweiter Anlauf DIESELBE Erstattung.
+        { idempotencyKey: `storno-${orderId}` }
+      )
       refundAmount = refund.amount / 100
       await prisma.order.update({
         where: { id: orderId },
@@ -287,38 +333,23 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Act
       })
     } catch (err) {
       console.error('[cancelOrder] Stripe refund failed:', err)
-      return { error: 'Rückerstattung fehlgeschlagen. Bitte manuell über das Stripe Dashboard erstatten.' }
+      erstattungOffen = true
     }
   }
 
-  for (const item of order.items) {
-    await prisma.product.update({
-      where: { id: item.productId },
-      data: { stock: { increment: item.quantity } },
-    })
-  }
-
-  await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      status: 'CANCELLED',
-      cancelledAt: new Date(),
-      cancelReason: reason ?? null,
-      // Servicegebühr entfällt auch bei Storno: online steckt sie in der vollen
-      // Erstattung oben (Stripe erstattet den ganzen Zahlungsbetrag), bar wurde
-      // sie nie kassiert. Der Vermerk hält den Snapshot ehrlich — Admin-Spalte
-      // „entfallen" heute, Monatsabrechnung (Sprint 3) später.
-      ...(order.serviceFeeCents > 0 && !order.serviceFeeRefundedAt
-        ? { serviceFeeRefundedAt: new Date() }
-        : {}),
-    },
+  // Die Kundin erfährt vom Storno auch dann, wenn die Erstattung noch aussteht
+  // (refundAmount bleibt dann null, die Mail verspricht kein Geld). Nichts
+  // Langsames im Antwortpfad — und ein Mailfehler kippt keine gültige
+  // Stornierung.
+  nachDerAntwort(async () => {
+    await sendOrderCancelled(toEmailOrder(order, farm), refundAmount)
   })
-
-  await sendOrderCancelled(toEmailOrder(order, farm), refundAmount)
 
   revalidatePath('/orders')
   revalidatePath(`/orders/${orderId}`)
-  return {}
+  return erstattungOffen
+    ? { error: 'Rückerstattung fehlgeschlagen. Bitte manuell über das Stripe Dashboard erstatten.' }
+    : {}
 }
 
 /**

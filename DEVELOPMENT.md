@@ -254,6 +254,30 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 
 ## Bekannte Bugs & Fixes
 
+### BUG: Storno-Rückbuchung nicht atomar, Doppeltipp buchte doppelt (behoben 2026-09-24)
+
+**Symptom (statisch belegt, kein Kundenfall):** `cancelOrder` prüfte den Status nur
+lesend, buchte dann je Position außerhalb jeder Transaktion zurück und setzte
+CANCELLED erst am Ende. Zwei gleichzeitige Aufrufe (Doppeltipp) passierten beide
+die Leseprüfung → Bestand doppelt zurückgebucht; die Stripe-Erstattung lief sogar
+VOR dem Statuswechsel, ihr Scheitern verhinderte den ganzen Storno.
+
+**Fix (fix/storno-atomar):** Muster des Stripe-Webhooks übernommen — der bedingte
+Statuswechsel (`updateMany` mit `status notIn [CANCELLED, PICKED_UP]`) ist die
+Sperre und läuft mit der Rückbuchung in EINER Transaktion; Stripe erst danach
+(scheitert die Erstattung, bleibt storniert + zurückgebucht, Meldung „manuell
+erstatten"); Mail über `nachDerAntwort()`. Wache: `tests/storno-atomar.test.ts`
+(deterministischer Wettlauf: beide lesen, bevor einer schreibt).
+
+**Kandidat fürs Testfundament (Integrationstests, sobald es sie gibt):** zwei
+GLEICHZEITIGE `cancelOrder` gegen echtes Postgres → Bestand exakt einmal zurück.
+
+**Notiert, nicht angefasst:** `markAsNotPickedUp` und die Undo-Actions bewegen
+keinen Bestand (Schwäche gilt dort nicht), ihre Statuswechsel sind aber weiter
+unbedingte `update` nach Leseprüfung — ein Wettlauf kann dort nur ein falsches
+Status-Etikett erzeugen, kein Geld- oder Bestandsproblem. `PaymentStatus` kennt
+kein „Erstattung ausstehend"; Vorschlag `REFUND_PENDING`, nur mit Freigabe.
+
 ### BUG: Sprungmarken der Hofseite sprangen falsch (behoben 2026-09-20)
 
 **Symptom** (Meldung `cmua8bof` aus dem Briefkasten): „Section bzw. die Sprungmarken funktionieren auf Mobile nicht, wenn ich bilder drücke, springt der screen auf eine andere section."
