@@ -1,6 +1,6 @@
 # TESTING_GUIDELINES
 
-Stand 2026-09-23: 85 Testdateien, ~1.250 Tests, alle in `tests/`.
+Stand 2026-09-24: 86 Testdateien, ~1.260 Tests, alle in `tests/`.
 
 ---
 
@@ -37,6 +37,12 @@ pnpm test:watch                           # Entwicklung
 | Jede Berechtigungsentscheidung | `farm-approval.test.ts`, `bestellverfolgung-zugang.test.ts` |
 | Jeder Token-/Signaturweg | `geheimnis.test.ts` |
 | Jeder behobene Bug | ein Test, der ihn vorher gefangen hätte |
+| Jede Migration gegen das Deploy-Fenster | `migrationen-wache.test.ts` |
+
+Die **Migrationswache** ist ein normaler Unit-Test der Suite (reine Dateiarbeit,
+ohne Datenbank) — sie läuft bei `pnpm test` und damit im Stop-Hook. Sie schlägt
+bei `ADD COLUMN … NOT NULL` ohne `DEFAULT` an; begründete Ausnahmen tragen einen
+`-- EXPAND-CONTRACT:`-Marker (Regel: `ARCHITECTURE.md` §5).
 
 ### Nicht testen
 - Prisma selbst, Next.js selbst, Stripe selbst.

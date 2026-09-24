@@ -47,6 +47,7 @@ Kein Commit mit rotem Typecheck oder roten Tests. Keine Ausnahme, auch nicht "nu
 - **Niemals** `prisma db push` gegen Produktion. Nur Migrationen (`pnpm db:migrate`).
 - **Niemals** eine Schema-Änderung ohne Rückfrage ausführen. Migration zeigen, auf Freigabe warten.
 - **Niemals** destruktive Migrationen (Spalte löschen, Typ ändern) ohne ausdrückliche Zustimmung.
+- **Niemals** eine NOT-NULL-Spalte ohne Default auf eine bestehende Tabelle und keine Spalte entfernen, die alter Code noch liest — im Deploy-Fenster läuft alter Code auf neuem Schema; Expand/Contract nach `docs/ai/ARCHITECTURE.md`, Abschnitt 5.
 
 ### Prozess
 - **Niemals** direkt auf `main` committen. Immer Feature-Branch + PR.
