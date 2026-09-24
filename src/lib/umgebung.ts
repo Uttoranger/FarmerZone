@@ -56,6 +56,17 @@ export type Umgebung = {
  *  jedem Hostnamen des Projekts. Alles andere gilt als fremd — auch Produktion. */
 const DEV_DATENBANK_REFERENZ = 'pmshaubwpxzdupwhyvjj'
 
+/** Die Supabase-Projektreferenz der PRODUKTIONS-Datenbank. Ebenso kein Geheimnis
+ *  — nur hier notiert, damit die Testsperre sie NAMENTLICH ablehnen kann und die
+ *  Fehlermeldung sagen darf, wohin gezeigt wurde. */
+const PRODUKTION_DATENBANK_REFERENZ = 'zxwkhizjvpyporjteylr'
+
+/** Hosts, die nur auf dem eigenen Rechner oder im CI-Container erreichbar sind.
+ *  `postgres` ist der Dienstname einer Datenbank im selben Container-Netz
+ *  (docker compose); die CI nutzt localhost, weil der Dienst dort auf den
+ *  Runner gemappt ist. */
+const TEST_DATENBANK_HOSTS = ['localhost', '127.0.0.1', 'postgres'] as const
+
 const LOKALE_ADRESSE = 'http://localhost:3000'
 
 function bereinigt(wert: string | undefined): string | undefined {
@@ -63,33 +74,89 @@ function bereinigt(wert: string | undefined): string | undefined {
   return t ? t : undefined
 }
 
+type DatenbankZiel = { host: string; benutzer: string }
+
+/**
+ * Host und Benutzername einer Datenbankadresse — die EINE Stelle, die eine
+ * Verbindungsadresse zerlegt. Beide Allowlists darunter bauen darauf auf, damit
+ * sie nicht getrennt voneinander driften.
+ *
+ * Der Benutzername zählt mit, weil beim Supabase-Pooler die Projektreferenz
+ * NUR dort steht (postgres.<ref>@aws-…) und der Host sie nicht trägt.
+ */
+function zerlegeDatenbankUrl(databaseUrl: string | undefined): DatenbankZiel | null {
+  const url = bereinigt(databaseUrl)
+  if (!url) return null
+  try {
+    const geparst = new URL(url)
+    return {
+      host: geparst.hostname.toLowerCase(),
+      benutzer: decodeURIComponent(geparst.username).toLowerCase(),
+    }
+  } catch {
+    // Unlesbare Adresse: im Zweifel fremd.
+    return null
+  }
+}
+
+/**
+ * Nur der Host einer Datenbankadresse, für Fehlermeldungen.
+ *
+ * SICHERHEIT: gibt NIEMALS Benutzer, Passwort, Port oder Datenbanknamen heraus.
+ * Eine Abbruchmeldung soll sagen, WOHIN gezeigt wurde, ohne die Zugangsdaten in
+ * ein Terminal oder ein CI-Protokoll zu schreiben.
+ */
+export function datenbankHost(databaseUrl: string | undefined): string {
+  return zerlegeDatenbankUrl(databaseUrl)?.host ?? '(keine lesbare Adresse)'
+}
+
+/** Welche bekannte Fern-Datenbank eine Adresse anspricht — null, wenn keine. */
+export function erkannteFernDatenbank(
+  databaseUrl: string | undefined
+): 'produktion' | 'dev' | null {
+  const ziel = zerlegeDatenbankUrl(databaseUrl)
+  if (!ziel) return null
+  const zeigtAuf = (referenz: string) =>
+    ziel.host.includes(referenz) || ziel.benutzer.includes(referenz)
+  if (zeigtAuf(PRODUKTION_DATENBANK_REFERENZ)) return 'produktion'
+  if (zeigtAuf(DEV_DATENBANK_REFERENZ)) return 'dev'
+  return null
+}
+
 /**
  * Zeigt DATABASE_URL auf die Dev-Datenbank?
  *
  * Allowlist, keine Blocklist: „dev" nur bei localhost oder der bekannten
- * Projektreferenz. Die Referenz wird im Host UND im Benutzernamen gesucht —
- * beim Supabase-Pooler steht sie nur im Benutzernamen (postgres.<ref>@aws-…),
- * der Host trägt sie dort nicht. Ohne diese zweite Prüfung zählte die Dev-DB
- * über den Pooler als fremd.
+ * Projektreferenz. Alles andere gilt als fremd — auch Produktion.
  *
  * Eigener Export, damit der Seed sich damit sperren kann: Er darf nie gegen
- * eine fremde Datenbank laufen.
+ * eine fremde Datenbank laufen (prisma/seed.ts).
  */
 export function istDevDatenbank(databaseUrl: string | undefined): boolean {
-  const url = bereinigt(databaseUrl)
-  if (!url) return false
-  let host: string
-  let benutzer: string
-  try {
-    const geparst = new URL(url)
-    host = geparst.hostname.toLowerCase()
-    benutzer = decodeURIComponent(geparst.username).toLowerCase()
-  } catch {
-    // Unlesbare Adresse: im Zweifel fremd.
-    return false
-  }
-  if (host.includes('localhost') || host === '127.0.0.1') return true
-  return host.includes(DEV_DATENBANK_REFERENZ) || benutzer.includes(DEV_DATENBANK_REFERENZ)
+  const ziel = zerlegeDatenbankUrl(databaseUrl)
+  if (!ziel) return false
+  if (ziel.host.includes('localhost') || ziel.host === '127.0.0.1') return true
+  return erkannteFernDatenbank(databaseUrl) === 'dev'
+}
+
+/**
+ * Zeigt eine Adresse auf eine Datenbank, die ein Test LEEREN und BESCHREIBEN darf?
+ *
+ * Die zweite Allowlist, strenger als die erste: Die Integrationstests legen an,
+ * ändern und löschen. Sie dürfen deshalb nicht einmal die Dev-Datenbank treffen.
+ *
+ * Zwei Bedingungen, beide nötig:
+ *  1. Der Host ist EXAKT einer der lokalen Hosts. Exakt, nicht `includes` —
+ *     „db.localhost.example.com" ist ein fremder Rechner.
+ *  2. Keine bekannte Projektreferenz in Host oder Benutzernamen. Ein Tunnel auf
+ *     localhost mit `postgres.<ref>` als Benutzer zeigt auf eine echte
+ *     Datenbank; Bedingung 1 allein ließe ihn durch.
+ */
+export function istTestDatenbank(databaseUrl: string | undefined): boolean {
+  const ziel = zerlegeDatenbankUrl(databaseUrl)
+  if (!ziel) return false
+  if (!TEST_DATENBANK_HOSTS.some((h) => h === ziel.host)) return false
+  return erkannteFernDatenbank(databaseUrl) === null
 }
 
 /** Nur das Präfix zählt — der Schlüssel selbst verlässt diese Funktion nicht. */

@@ -970,9 +970,80 @@ einmal je Kaltstart als Warnung an Sentry.
 „Automatically expose System Environment Variables" aktiv ist. Ohne sie zählt eine
 Preview als Produktion: kein Banner, kein Login-Fix.
 
-**Nicht mitgenommen:** Der Seed prüft noch nicht über `istDevDatenbank`, ob er gegen
-die Dev-Datenbank läuft — die Funktion ist dafür exportiert. Previews versenden weiter
-keine Mails (`RESEND_API_KEY` nur in Production), das ist gewollt.
+**Seit Testfundament 1 (2026-09-24) angeschlossen:** `prisma/seed.ts` ruft
+`istDevDatenbank` vor dem ersten Schreibzugriff und bricht sonst ab — in der Meldung
+steht nur der **Host**, nie die Adresse (sie enthält das Passwort). Daneben liegt eine
+zweite, strengere Allowlist `istTestDatenbank` für die Integrationstests; beide teilen
+sich eine Host-Extraktion. Previews versenden weiter keine Mails
+(`RESEND_API_KEY` nur in Production), das ist gewollt.
+
+---
+
+## Testfundament, Teil 1: Integrationstests gegen echtes Postgres (2026-09-24)
+
+**Warum es die Schicht braucht.** Die schnelle Suite mockt `@/lib/prisma`. Sie kann
+damit beweisen, *mit welchen Argumenten* der Code die Datenbank ruft — aber nicht,
+*was die Datenbank daraus macht*. Genau dort sitzen die Zusagen, um die es beim Geld
+geht: Zieht `updateMany` mit `stock >= Menge` den Bestand wirklich nie ins Minus, wenn
+zwei Anfragen gleichzeitig auf dieselbe Zeile greifen? Hält der eindeutige Index auf
+`Order.idempotencyKey`, wenn beide Anfragen im selben Moment einfügen? Bleibt
+`OrderItem.vatRate` stehen, wenn der Hof den Satz danach ändert?
+
+`tests/storno-atomar.test.ts` sagt seine Annahme selbst: der Fake sei „in JS unteilbar
+— wie ein einzelnes `UPDATE … WHERE` in PostgreSQL". Die Annahme ist richtig. Bewiesen
+war sie nicht. Seit diesem Sprint prüft sie `tests/integration/storno-nebenlaeufig.int.test.ts`
+an der echten Datenbank, mit echter Zeilensperre und echter Transaktion.
+
+**Was echt ist und was nicht.** Postgres echt, Better Auth echt (der Hof meldet sich
+mit Passwort an, die Server-Action liest die Sitzung aus der Datenbank). Resend,
+Stripe, Nominatim und Vercel Blob bleiben gemockt — „echte Datenbank" heißt nicht
+„echter Mailversand". Die Mocks sind dabei **Prüfstellen**: Ein Storno muss genau eine
+Mail auslösen, ein abgelehnter Checkout keine und keinen Stripe-Aufruf. Regeln dazu in
+`docs/ai/TESTING_GUIDELINES.md`, Abschnitte 1 und 3.
+
+**Die Sicherheitssperre.** Die Tests legen an, ändern und löschen. `TEST_DATABASE_URL`
+muss gesetzt sein und auf `localhost`, `127.0.0.1` oder `postgres` zeigen; Dev- und
+Produktionsdatenbank werden namentlich abgelehnt — auch ein Tunnel auf localhost, dessen
+Benutzername auf ein echtes Supabase-Projekt zeigt (beim Pooler steht die Projektreferenz
+nur dort). Fehlt die Variable, wird **abgebrochen**, nicht übersprungen: Eine grüne
+Suite, die nichts getan hat, ist schlimmer als eine rote. Die Sperre ist eine reine
+Funktion mit eigenem Unit-Test in der schnellen Suite
+(`tests/sicherheitssperre.test.ts`), damit sie beweisbar ist, bevor jemand sie benutzt.
+
+**Datentrennung ohne Rollback-Trick.** Kein „alles in eine Transaktion und
+zurückrollen": Die Transaktionsgrenzen sind selbst Prüfgegenstand, und was in einer
+fremden Transaktion läuft, verhält sich anders als im Ernstfall. Stattdessen trägt
+alles Angelegte das Präfix `int-`, und `raeumeAuf()` löscht in `afterEach` genau danach
+— in Fremdschlüssel-Reihenfolge, weil `Order → Farm` und `OrderItem → Product` nicht
+kaskadieren. Seed-Daten werden nur gelesen.
+
+**Was die fünf Dateien prüfen.**
+
+| Datei | Zustand danach |
+|---|---|
+| `checkout-bestand.int.test.ts` | zwei gleichzeitige Bestellungen auf `stock: 1` → genau eine 200, eine 409; Bestand 0, nie negativ. Fünf auf `stock: 2` → genau zwei Bestellungen. Verliert eine Anfrage die zweite Position, wird die erste zurückgegeben (Ausgleich) |
+| `checkout-idempotenz.int.test.ts` | derselbe Schlüssel zweimal → dieselbe `orderId`, eine Bestellung, eine Position, Bestand einmal abgebucht — auch bei gleichzeitigem Eingang über den eindeutigen Index |
+| `checkout-betriebsnachweis.int.test.ts` | PRIVAT mit Betriebsware → 400, keine Bestellung, Bestand unverändert, keine Mail, kein Stripe. BETRIEB mit Nummer → Nummer im Snapshot. PRIVAT ohne Betriebsware → Nummer `null` |
+| `checkout-mwst-snapshot.int.test.ts` | Satz kommt aus der DB (13 %, nirgends in der Anfrage). Änderung am Produkt auf 20 % lässt die Position bei 10 % — mit Gegenprobe am Produkt |
+| `storno-nebenlaeufig.int.test.ts` | zwei gleichzeitige `cancelOrder` → einmal storniert, Bestand einmal zurück (5 → 7, nicht 9), Servicegebühr-Vermerk einmal, genau eine Storno-Mail; abgeholte Bestellung wird nicht storniert |
+
+**Bewusst offen geblieben** (Kandidaten für Teil 2): Reservierungsfrist am Handler,
+Sichtbarkeit eines nicht freigeschalteten Hofes, Bestätigungs-Token. Und: **kein E2E**
+in diesem Teil.
+
+**Zwei Befunde am Rand, die beim Bauen sichtbar wurden.**
+
+1. **Der Seed-Hof ist nicht freigeschaltet.** `prisma/seed.ts` setzt `isActive` und
+   `isPaused`, aber kein `approvedAt` — seit dem Sprint `hof-freischaltung` heißt das:
+   Die Demo-Hofseite ist öffentlich 404 und jeder Checkout gegen `hof-mueller`
+   antwortet 409. Deshalb baut jeder Integrationstest seinen eigenen freigeschalteten
+   Hof. Ob der Seed nachgezogen wird, ist eine Entscheidung über Demodaten, keine
+   Testfrage — hier nur notiert.
+2. **Der Rückfall in `nachDerAntwort` läuft unbeaufsichtigt.** Außerhalb eines Requests
+   startet er die Aufgabe ohne Warten (`src/lib/nach-der-antwort.ts`). In der
+   Integrationsschicht kann sie dadurch noch schreiben, während `afterEach` aufräumt.
+   Gelöst ohne Codeänderung: Die Tests warten mit `vi.waitFor` auf die Mail-Prüfstelle,
+   bevor sie fertig sind.
 
 ---
 
@@ -984,6 +1055,7 @@ pnpm db:migrate       # Schema-Änderung: Migrationsdatei erzeugen + Dev-DB aktu
 pnpm db:seed          # Testdaten laden (nur Dev-DB)
 pnpm db:studio        # Prisma Studio öffnen
 pnpm db:generate      # Prisma Client generieren
+pnpm test:integration # Integrationstests gegen echtes Postgres (braucht .env.test)
 pnpm briefkasten export   # Briefkasten als Markdown (nur lesend; Leseroute oder TRIAGE_DATABASE_URL)
 ```
 
@@ -1000,4 +1072,4 @@ pnpm briefkasten export   # Briefkasten als Markdown (nur lesend; Leseroute oder
 
 ---
 
-*Zuletzt aktualisiert: 2026-09-22 — Stand nach Taxonomie 1 (#100) und Preis-Semantik (#101)*
+*Zuletzt aktualisiert: 2026-09-24 — Stand nach Testfundament 1 (Integrationstests gegen echtes Postgres)*

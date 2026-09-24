@@ -7,6 +7,33 @@ import {
 } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { auth } from '../src/lib/auth'
+import { datenbankHost, istDevDatenbank } from '../src/lib/umgebung'
+
+/**
+ * Sperre VOR dem ersten Schreibzugriff.
+ *
+ * Der Seed legt Daten an und überschreibt bestehende (`upsert`). Ein
+ * versehentliches `pnpm db:seed` mit der falschen Adresse in der Umgebung
+ * schriebe damit in die Produktionsdatenbank. Die Allowlist dafür gibt es
+ * längst (src/lib/umgebung.ts, `istDevDatenbank`) — sie war hier nur nie
+ * angeschlossen.
+ *
+ * In der Meldung steht NUR der Host: Die Verbindungsadresse enthält das
+ * Passwort und hat weder im Terminal noch in einem CI-Protokoll etwas verloren.
+ */
+function verlangeDevDatenbank(): void {
+  const url = process.env['DATABASE_URL']
+  if (istDevDatenbank(url)) return
+  console.error(
+    `\nSeed abgebrochen: DATABASE_URL zeigt auf ${datenbankHost(url)}.\n` +
+      'Das ist nicht die Dev-Datenbank. Der Seed legt Daten an und überschreibt\n' +
+      'bestehende — erlaubt sind nur localhost und die Dev-Datenbank.\n' +
+      'Prüfe DATABASE_URL in .env.local.\n'
+  )
+  process.exit(1)
+}
+
+verlangeDevDatenbank()
 
 const adapter = new PrismaPg({
   connectionString: process.env['DATABASE_URL']!,

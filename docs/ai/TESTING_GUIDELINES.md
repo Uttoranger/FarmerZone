@@ -1,23 +1,81 @@
 # TESTING_GUIDELINES
 
-Stand 2026-09-24: 86 Testdateien, ~1.260 Tests, alle in `tests/`.
+Stand 2026-09-24: 88 Testdateien / ~1.300 Tests in `tests/` (Unit),
+5 Dateien / 15 Tests in `tests/integration/` (Integration).
 
 ---
 
 ## 1. Setup
 
-- Runner: **Vitest 4**, Konfiguration in `vitest.config.ts`.
+- Runner: **Vitest 4**. Zwei Konfigurationen: `vitest.config.ts` (Unit),
+  `vitest.integration.config.ts` (Integration).
 - Umgebung: **`node`** — kein jsdom, kein happy-dom.
-- Muster: `tests/**/*.test.ts` — flach, keine Unterordner, `.test.ts` (nicht `.spec.ts`).
 - Alias `@/` → `src/`.
 - `BETTER_AUTH_SECRET` wird von der Config gesetzt; Token-Tests brauchen nichts weiter.
 
+### Ordner: einer je Schicht, innerhalb flach
+
+| Ordner | Schicht | Suffix |
+|---|---|---|
+| `tests/` | Unit | `.test.ts` |
+| `tests/integration/` | Integration | `.int.test.ts` |
+| `e2e/` | E2E (noch nicht vorhanden) | außerhalb von `tests/` |
+
+Keine weiteren Unterordner, kein `.spec.ts`. Innerhalb eines Ordners bleibt es
+flach; `tests/integration/setup/` enthält nur Hilfsmittel, keine Tests.
+
+**Der `exclude` in `vitest.config.ts` ist Pflicht, keine Geschmacksfrage:**
+`tests/**/*.test.ts` passt auch auf `tests/integration/*.int.test.ts`. Ohne
+`exclude: ['**/node_modules/**', 'tests/integration/**']` zöge `pnpm test` — und
+damit der Stop-Hook — die Integrationstests mit hinein und scheiterte ohne
+laufendes Postgres. `exclude` **ersetzt** die Vorgabe von Vitest, deshalb muss
+`**/node_modules/**` mit drin stehen bleiben.
+
+### Was in welcher Schicht echt ist
+
+| | Unit (`tests/`) | Integration (`tests/integration/`) |
+|---|---|---|
+| Postgres | gemockt (`vi.mock('@/lib/prisma')`) | **echt** — lokale Datenbank, Zustand nach dem Aufruf ist die Aussage |
+| Better Auth | gemockt | **echt** — Anmeldung mit Passwort, Sitzung aus der Datenbank |
+| Rate-Limit | aus | aus (siehe unten) |
+| Resend, Stripe, Nominatim, Vercel Blob | gemockt | gemockt |
+| Zeit | Parameter oder `vi.useFakeTimers()` | Parameter oder `vi.useFakeTimers()` |
+| Laufzeit | Millisekunden | Sekunden |
+
+**Rate-Limit in beiden Schichten aus, und zwar nicht aus Bequemlichkeit:**
+`enforceRateLimit` kehrt bei `NODE_ENV !== 'production'` sofort zurück, bevor ein
+Zähler angefasst wird (`src/lib/rate-limit.ts`). In Tests ist der Limiter damit
+untätig — es gibt nichts zurückzusetzen. Wer die Grenze selbst prüfen will,
+nimmt `createRateLimiter()` und bekommt eine frische Instanz; das ist ein
+Unit-Test der reinen Funktion, kein Integrationstest.
+
 ```bash
-pnpm test                                 # alles
+pnpm test                                    # Unit, alles
 pnpm vitest run tests/reservierung.test.ts   # eine Datei
 pnpm vitest run -t "verfallene Position"     # ein Testname
-pnpm test:watch                           # Entwicklung
+pnpm test:watch                              # Entwicklung
+pnpm test:integration                        # Integration (braucht .env.test)
 ```
+
+### Die Integrationsschicht
+
+- **Wofür:** Aussagen, die nur die Datenbank beantworten kann — bedingte
+  Bestandsbuchung unter Nebenläufigkeit, eindeutige Indizes, Transaktionsgrenzen,
+  Snapshot-Spalten. Geprüft wird der **Zustand danach**, nicht der Aufruf.
+- **Nicht dafür:** Fachregeln. Die gehören in `src/lib/` und in die schnelle Suite.
+- **Sicherheitssperre:** `TEST_DATABASE_URL` muss gesetzt sein und auf
+  `localhost`, `127.0.0.1` oder `postgres` zeigen. Dev- und Produktionsdatenbank
+  werden namentlich abgelehnt. Fehlt die Variable, wird **abgebrochen**, nicht
+  übersprungen (`tests/integration/setup/sicherheitssperre.ts`, Allowlists in
+  `src/lib/umgebung.ts`).
+- **Datentrennung ohne Rollback-Trick:** Jeder Test legt eigene Objekte mit
+  `int-`-Präfix an und räumt sie in `afterEach` weg (`raeumeAuf()`). Kein „alles
+  in eine Transaktion und zurückrollen" — die Transaktionsgrenzen sind selbst
+  Prüfgegenstand. Seed-Daten werden nur **gelesen**.
+- **Eine Datei zur Zeit** (`fileParallelism: false`). Nebenläufigkeit wird
+  innerhalb eines Tests hergestellt, nicht zwischen Dateien.
+- **Nicht in `pnpm test`, nicht im Stop-Hook.** Eigener CI-Job `integration` mit
+  einem `postgres:17`-Dienst.
 
 ### Folge der Node-Umgebung
 - **Kein Rendering-Test möglich.** Keine Testing-Library, kein `render()`, kein Snapshot von JSX.
@@ -38,6 +96,7 @@ pnpm test:watch                           # Entwicklung
 | Jeder Token-/Signaturweg | `geheimnis.test.ts` |
 | Jeder behobene Bug | ein Test, der ihn vorher gefangen hätte |
 | Jede Migration gegen das Deploy-Fenster | `migrationen-wache.test.ts` |
+| Jeder Geldweg, bei dem die Datenbank die Antwort gibt, **zusätzlich** in der Integrationsschicht | `checkout-bestand.int.test.ts`, `storno-nebenlaeufig.int.test.ts` |
 
 Die **Migrationswache** ist ein normaler Unit-Test der Suite (reine Dateiarbeit,
 ohne Datenbank) — sie läuft bei `pnpm test` und damit im Stop-Hook. Sie schlägt
@@ -77,6 +136,24 @@ Alles, was Netz, DB oder Request-Kontext braucht.
 ### Regel
 Reine Funktionen (`src/lib/<fachregel>.ts`) werden **ohne jeden Mock** getestet. Braucht ein Test Mocks, um eine Fachregel zu prüfen, sitzt die Regel an der falschen Stelle → in `src/lib/` ziehen.
 
+### In der Integrationsschicht sind Mocks Prüfstellen
+Postgres ist dort echt, Resend und Stripe nicht. Was gemockt ist, wird deshalb
+**mitgeprüft** statt nur stillgelegt — das ist kein Widerspruch zu „keine Tests,
+die nur Mocks prüfen" (Abschnitt 2), weil die Aussage über das Verhalten daneben
+steht:
+
+- Storno → `sendOrderCancelled` **genau einmal**, dazu Status und Bestand in der DB.
+- Abgelehnter Checkout (Betriebsnachweis fehlt) → **keine** Mail, **kein**
+  Stripe-Aufruf, dazu: keine Bestellung und unveränderter Bestand.
+
+Der Nachlauf läuft außerhalb des Requests (`src/lib/nach-der-antwort.ts`), also
+`await vi.waitFor(...)` statt sofort behaupten.
+
+Zweite Sicherung neben den Mocks: `vitest.integration.config.ts` setzt
+`STRIPE_SECRET_KEY` und `RESEND_API_KEY` **unbedingt** auf Platzhalter — auch
+gegen `.env.test`. Vergisst ein künftiger Test sein `vi.mock`, läuft der Aufruf
+in einen ungültigen Schlüssel statt in echtes Geld.
+
 ---
 
 ## 4. Aufbau
@@ -104,6 +181,11 @@ Reine Funktionen (`src/lib/<fachregel>.ts`) werden **ohne jeden Mock** getestet.
 - Telefon: `+43 660 0000000`.
 - Keine echten Stripe-IDs, keine echten Tokens — auch keine abgelaufenen.
 - Faktoren für Testobjekte lokal in der Testdatei halten, keine geteilte Fixture-Datei ohne Not.
+- **Integrationsschicht: alles trägt das Präfix `int-`** — Hof-Slug, Produkt-ID,
+  Sitzungs-ID, E-Mail-Adresse. Das Präfix ist die Sicherung, an der `raeumeAuf()`
+  hängt; wer daran vorbei anlegt, lässt Daten stehen. Faktoren dafür in
+  `tests/integration/setup/basis.ts`, weil sie über Dateien hinweg gleich sein
+  müssen.
 
 ---
 
@@ -117,4 +199,8 @@ Reine Funktionen (`src/lib/<fachregel>.ts`) werden **ohne jeden Mock** getestet.
 
 ### Bekannte Umgebungsfallen
 - `prisma generate` braucht Netzzugriff auf `binaries.prisma.sh`. Ist er blockiert, scheitern vier Testdateien mit `Cannot find module '.prisma/client/default'`. Das ist **kein** Codefehler — vor der Fehlersuche `pnpm db:generate` prüfen.
+- `pnpm test:integration` braucht ein laufendes Postgres **und** `.env.test`
+  (Vorlage: `.env.test.example`). Fehlt die Datei, meldet dotenv-cli sie; fehlt
+  `TEST_DATABASE_URL`, bricht die Sicherheitssperre mit Hinweis ab. Beides ist
+  kein Codefehler.
 - `tests/email-sendraw.test.ts` und `tests/password-reset-email.test.ts` flackern gelegentlich im Gesamtlauf: Ihr erster Fall importiert `@/lib/email` kalt (`vi.resetModules()`), und unter Parallellast läuft das ins 5-Sekunden-Limit. Allein laufen sie grün. Vor einem Fix des eigenen Codes die beiden Dateien einzeln starten.
