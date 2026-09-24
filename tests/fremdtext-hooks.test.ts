@@ -180,6 +180,16 @@ describe('Eintrag im Frontmatter', () => {
     expect(frontmatter('waechter.md')).toMatch(/matcher: ["']?Read\|Grep\|Glob/)
   })
 
+  it('der Briefkasten-Skill läuft nie im Hauptagenten: er zweigt in den Kurator ab und trägt beide Hooks selbst', () => {
+    const skill = frontmatter('../skills/briefkasten/SKILL.md')
+    expect(skill).toMatch(/^context: fork$/m)
+    expect(skill).toMatch(/^agent: kurator$/m)
+    expect(skill).toContain('kurator-bash.mjs')
+    expect(skill).toContain('fremdtext-lesen.mjs')
+    // Vorgeladen UND abzweigend liefe er doppelt.
+    expect(frontmatter('kurator.md')).not.toMatch(/^skills:/m)
+  })
+
   it('NICHT global — der Hauptagent muss .env.local lesen können', () => {
     expect(readFileSync(path.join(WURZEL, '.claude/settings.json'), 'utf8')).not.toContain('fremdtext-lesen')
   })

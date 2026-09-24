@@ -29,13 +29,21 @@ const MERGE = 'merge-token-test-3'
 
 const ID = 'cmmeldung00000000001abcd'
 
-type Zeile = { id: string; status: string; art: string; triageNotiz: string | null; antwortAnMelder: string | null }
+type Zeile = {
+  id: string
+  status: string
+  art: string
+  triageNotiz: string | null
+  antwortAnMelder: string | null
+  sprintName: string | null
+}
 const zeile = (extra: Partial<Zeile> = {}): Zeile => ({
   id: ID,
   status: 'NEU',
   art: 'FEHLER',
   triageNotiz: null,
   antwortAnMelder: null,
+  sprintName: null,
   ...extra,
 })
 
@@ -177,7 +185,8 @@ describe('Schreibroute — Übergänge und Wirkung', () => {
     expect(res.status).toBe(200)
     expect(await json(res)).toEqual({ status: 'GEPLANT' })
     const args = updateMany.mock.calls[0][0]
-    expect(args?.where).toEqual({ id: ID, status: 'NEU', triageNotiz: null })
+    // Jedes Feld, von dem die Entscheidung abhängt, steht in der Bedingung.
+    expect(args?.where).toEqual({ id: ID, status: 'NEU', art: 'FEHLER', triageNotiz: null, antwortAnMelder: null, sprintName: null })
     expect(args?.data).toMatchObject({ status: 'GEPLANT', sprintName: 'PR #131', triageNotiz: '[Auto · PR #131 · 24.09.2026 · Geplant]' })
     expect(args?.data).not.toHaveProperty('art')
   })
@@ -220,6 +229,14 @@ describe('Schreibroute — Übergänge und Wirkung', () => {
     findMany.mockResolvedValueOnce([zeile({ status: 'ERLEDIGT', antwortAnMelder: 'Das war ein Tippfehler, jetzt passt es.' })] as never)
     await route.POST(anfrage({ meldungId: ID, status: 'GEPRUEFT', prNummer: 150 }, { token: MERGE }))
     expect(updateMany.mock.calls[1][0]?.data).not.toHaveProperty('antwortAnMelder')
+  })
+
+  it('ERLEDIGT durch einen anderen PR als den eingeplanten → 409 ANDERER_PR, nichts geschrieben', async () => {
+    findMany.mockResolvedValue([zeile({ status: 'GEPLANT', sprintName: 'PR #131' })] as never)
+    const res = await route.POST(anfrage({ meldungId: ID, status: 'ERLEDIGT', prNummer: 140 }, { token: MERGE }))
+    expect(res.status).toBe(409)
+    expect(await json(res)).toMatchObject({ code: 'ANDERER_PR' })
+    expect(updateMany).not.toHaveBeenCalled()
   })
 
   it('ERLEDIGT → ERLEDIGT: 200, nichts geschrieben', async () => {

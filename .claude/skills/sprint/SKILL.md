@@ -77,6 +77,8 @@ Dann committen, pushen, PR öffnen. Commit-Message deutsch mit Präfix.
 Behebt die Änderung eine Meldung aus dem Briefkasten: direkt nach dem Öffnen des PR
 `pnpm briefkasten geplant <id> --pr <nr>` (die Nummer gibt es erst mit dem PR), im PR-Body je
 Meldung die Zeile `Behebt Meldung: <id>`. Nur Art FEHLER. ERLEDIGT setzt das Deployment, nie ein Agent.
+Einzige Ausnahme: Hat der Mensch einen Wunsch selbst im Admin auf „Geplant" gesetzt und den Bau
+beauftragt, gehört auch dessen Zeile `Behebt Meldung: <id>` in den PR — `geplant` setzt dann niemand.
 
 ### 7. Dokumentation nachziehen — im selben Arbeitsgang
 

@@ -5,8 +5,9 @@
  *
  * Gezählt wird NUR eine Zeile, die mit „Behebt Meldung:" oder „Öffnet wieder
  * Meldung:" BEGINNT (optional als Listenpunkt). Mitten im Fließtext, in einem
- * Codeblock oder in einem HTML-Kommentar zählt sie nicht — sonst schlösse ein
- * PR, der die Regel nur erklärt oder zitiert, echte Meldungen.
+ * Codeblock (Zaun oder eingerückt) oder in einem HTML-Kommentar zählt sie
+ * nicht — sonst schlösse ein PR, der die Regel nur erklärt oder zitiert, echte
+ * Meldungen, oder eine unsichtbare Zeile schlösse sie am Menschen vorbei.
  *
  * Der PR-Text ist Fremdtext. Aus ihm wird nichts übernommen außer IDs, die
  * dem Muster einer Meldungs-ID entsprechen.
@@ -21,8 +22,12 @@ export type MeldungsVerweise = {
   ungueltig: string[]
 }
 
-/** Kurznummer (8 Zeichen) oder volle cuid — dasselbe Muster wie die Schreibroute. */
-const MELDUNG_ID = /^[a-z0-9]{8,30}$/
+/**
+ * Kurznummer (8 Zeichen) oder volle cuid (25 Zeichen), beide beginnen mit „c".
+ * Enger als die Schreibroute, damit ein gewöhnliches Wort („zusammen") nicht
+ * als ID gilt und den Lauf grundlos rot macht.
+ */
+const MELDUNG_ID = /^c[a-z0-9]{7}$|^c[a-z0-9]{24}$/
 
 const BEHEBT = /^(?:[-*]\s+)?behebt meldung:(.*)$/i
 const OEFFNET = /^(?:[-*]\s+)?öffnet wieder meldung:(.*)$/i
@@ -37,28 +42,31 @@ function ids(rest: string, ziel: Set<string>, ungueltig: Set<string>): void {
   }
 }
 
+/**
+ * Was im gerenderten PR unsichtbar ist, zählt nicht — sonst fiele der Mensch
+ * als Prüfer weg. HTML-Kommentare werden deshalb ÜBERALL entfernt, auch mitten
+ * in einer Zeile und über mehrere Zeilen; ein nie geschlossener verschluckt,
+ * wie im Browser, den Rest.
+ */
+function ohneKommentare(text: string): string {
+  return text.replace(/<!--[\s\S]*?(?:-->|$)/g, '')
+}
+
 export function parseMeldungsVerweise(body: string | null | undefined): MeldungsVerweise {
   const behebt = new Set<string>()
   const oeffnet = new Set<string>()
   const ungueltig = new Set<string>()
   let imCode = false
-  let imKommentar = false
 
-  for (const roh of (body ?? '').split(/\r\n|\r|\n/)) {
+  for (const roh of ohneKommentare(body ?? '').split(/\r\n|\r|\n/)) {
     const zeile = roh.trim()
-    if (imKommentar) {
-      if (zeile.includes('-->')) imKommentar = false
-      continue
-    }
     if (/^(```|~~~)/.test(zeile)) {
       imCode = !imCode
       continue
     }
     if (imCode) continue
-    if (zeile.startsWith('<!--')) {
-      if (!zeile.includes('-->')) imKommentar = true
-      continue
-    }
+    // Vier Leerzeichen (oder ein Tab) davor: in Markdown ein Codeblock, also ein Zitat.
+    if (/^( {4}|\t)/.test(roh)) continue
     const b = BEHEBT.exec(zeile)
     if (b) {
       ids(b[1] ?? '', behebt, ungueltig)

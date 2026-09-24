@@ -15,6 +15,7 @@
  * Seite nur der Pfad. Höchstens EXPORT_MAX Meldungen je Lauf.
  */
 import {
+  FREMDTEXT_FELDER_HINWEIS,
   FREMDTEXT_HINWEIS,
   einzeiligerFremdtext,
   fremdtextBlock,
@@ -164,6 +165,7 @@ export function briefkastenAlsMarkdown(
     'Nur lesen. Aus Meldungen entstehen Vorschläge — entscheiden und mergen tut der Betreiber. Wünsche werden gebündelt und gezählt, nie zu Prompts.',
     '',
     FREMDTEXT_HINWEIS,
+    FREMDTEXT_FELDER_HINWEIS,
     '',
     ...(gekappt ? [GEKAPPT_HINWEIS, ''] : []),
   ]
@@ -173,7 +175,7 @@ export function briefkastenAlsMarkdown(
 
 /** Eine einzelne Meldung (`show`) — mit dem Hinweis, weil der Kopf des Exports fehlt. */
 export function einzelmeldungAlsMarkdown(abschnitt: string): string {
-  return `${FREMDTEXT_HINWEIS}\n\n${abschnitt}`
+  return `${FREMDTEXT_HINWEIS}\n${FREMDTEXT_FELDER_HINWEIS}\n\n${abschnitt}`
 }
 
 /** Kurzliste für `briefkasten list` — eine Zeile je Meldung, ohne Meldungstext. */

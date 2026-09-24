@@ -24,7 +24,7 @@ import { triageStatusSchema } from '@/schemas/meldung'
 
 const JETZT = new Date('2026-09-24T10:00:00Z')
 
-const FEHLER: GeleseneMeldung = { status: 'NEU', art: 'FEHLER', triageNotiz: null, antwortAnMelder: null }
+const FEHLER: GeleseneMeldung = { status: 'NEU', art: 'FEHLER', triageNotiz: null, antwortAnMelder: null, sprintName: null }
 
 function aenderung(ziel: ZielStatus, extra: Partial<{ prNummer: number | null; grund: string | null; quelle: 'deployment' | 'merge' }> = {}) {
   return { ziel, prNummer: 7, grund: 'Wünscht eine Sortierung nach Preis.', quelle: 'deployment' as const, ...extra }
@@ -145,6 +145,7 @@ describe('entscheideUebergang — Wirkung', () => {
     const leer = entscheideUebergang({ ...FEHLER, status: 'GEPLANT' }, aenderung('ERLEDIGT'), JETZT)
     expect(leer).toMatchObject({ daten: { status: 'ERLEDIGT', triagedAt: JETZT, antwortAnMelder: 'Behoben — seit 24.09.2026 online.' } })
     const mitAntwort = entscheideUebergang({ ...FEHLER, status: 'GEPLANT', antwortAnMelder: 'Danke, war ein Tippfehler.' }, aenderung('ERLEDIGT'), JETZT)
+    expect(mitAntwort.art).toBe('schreiben')
     expect(mitAntwort.art === 'schreiben' && mitAntwort.daten).not.toHaveProperty('antwortAnMelder')
   })
 
@@ -155,6 +156,7 @@ describe('entscheideUebergang — Wirkung', () => {
 
   it('ERLEDIGT bei einer Frage: kein fester Satz — die Antwort schreibt der Mensch', () => {
     const e = entscheideUebergang({ ...FEHLER, art: 'FRAGE', status: 'GEPLANT' }, aenderung('ERLEDIGT'), JETZT)
+    expect(e.art).toBe('schreiben')
     expect(e.art === 'schreiben' && e.daten).not.toHaveProperty('antwortAnMelder')
   })
 
@@ -175,6 +177,7 @@ describe('entscheideUebergang — Wirkung', () => {
       aenderung('GEPRUEFT'),
       JETZT
     )
+    expect(e.art).toBe('schreiben')
     expect(e.art === 'schreiben' && e.daten).not.toHaveProperty('antwortAnMelder')
     expect(e).toMatchObject({ daten: { triageNotiz: '[Auto · PR #7 · 24.09.2026 · Wieder geöffnet]' } })
   })
@@ -183,7 +186,34 @@ describe('entscheideUebergang — Wirkung', () => {
     for (const ziel of ZIEL_STATUS) {
       const von = ERLAUBT_AUS[ziel][0]
       const e = entscheideUebergang({ ...FEHLER, status: von }, aenderung(ziel), JETZT)
-      if (e.art === 'schreiben') expect(e.daten, ziel).not.toHaveProperty('art')
+      expect(e.art, ziel).toBe('schreiben')
+      expect(e.art === 'schreiben' && e.daten, ziel).not.toHaveProperty('art')
+    }
+  })
+
+  it('ERLEDIGT nur durch den PR, für den die Meldung eingeplant ist — sonst 409 ANDERER_PR', () => {
+    const geplant = { ...FEHLER, status: 'GEPLANT' as const, sprintName: 'PR #131' }
+    expect(entscheideUebergang(geplant, aenderung('ERLEDIGT', { prNummer: 131 }), JETZT).art).toBe('schreiben')
+    expect(entscheideUebergang(geplant, aenderung('ERLEDIGT', { prNummer: 140 }), JETZT)).toMatchObject({
+      art: 'abgelehnt',
+      code: 'ANDERER_PR',
+      grund: 'Die Meldung ist für PR #131 eingeplant, nicht für PR #140.',
+    })
+  })
+
+  it('hat der Mensch ohne PR-Nummer geplant (etwa einen Wunsch), schließt jeder PR, der sie nennt', () => {
+    const imAdminGeplant = { ...FEHLER, art: 'WUNSCH' as const, status: 'GEPLANT' as const, sprintName: 'sortierung-v1' }
+    expect(entscheideUebergang(imAdminGeplant, aenderung('ERLEDIGT', { prNummer: 140 }), JETZT).art).toBe('schreiben')
+    expect(entscheideUebergang({ ...imAdminGeplant, sprintName: null }, aenderung('ERLEDIGT'), JETZT).art).toBe('schreiben')
+  })
+
+  it('ohne PR-Nummer lehnt schon die Regel ab — nicht erst das Schema', () => {
+    for (const ziel of ['GEPLANT', 'ERLEDIGT', 'GEPRUEFT'] as const) {
+      const von = ERLAUBT_AUS[ziel][0]
+      expect(entscheideUebergang({ ...FEHLER, status: von }, aenderung(ziel, { prNummer: null }), JETZT), ziel).toMatchObject({
+        art: 'abgelehnt',
+        code: 'PR_FEHLT',
+      })
     }
   })
 })
@@ -250,6 +280,13 @@ describe('triageStatusSchema', () => {
       const r = triageStatusSchema.safeParse({ meldungId: 'cmabcdef', status })
       expect(r.error?.issues[0]?.message, status).toMatch(/^prNummer fehlt/)
     }
+  })
+
+  it('ein unbekanntes Feld bekommt einen deutschen Satz, der die erlaubten Felder nennt', () => {
+    const r = triageStatusSchema.safeParse({ meldungId: 'cmabcdef', status: 'GEPLANT', prNummer: 1, antwortAnMelder: 'x' })
+    expect(r.error?.issues[0]?.message).toBe(
+      'Unbekanntes Feld: antwortAnMelder — die Schreibroute nimmt nur meldungId, status, prNummer, grund, quelle.'
+    )
   })
 
   it('lehnt antwortAnMelder und jedes andere unbekannte Feld ab', () => {

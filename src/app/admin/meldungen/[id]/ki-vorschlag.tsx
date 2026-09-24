@@ -30,12 +30,18 @@ export function KiVorschlag({
   const [pending, startTransition] = useTransition()
 
   function entscheide(wunsch: boolean) {
+    // Der Ausgangsstand geht mit: hat das CLI die Meldung inzwischen geplant,
+    // dreht der Knopf das nicht zurück, sondern bittet um Neuladen.
+    const vorher = {
+      vorherStatus: gespeichert.status,
+      vorherNotiz: gespeichert.triageNotiz === '' ? null : gespeichert.triageNotiz,
+    }
     startTransition(async () => {
       const result = await triageMeldungAction(
         meldungId,
         wunsch
-          ? { ...gespeichert, status: 'GEPRUEFT', art: 'WUNSCH' }
-          : { ...gespeichert, status: 'GEPRUEFT', triageNotiz: ohneKiNotiz(gespeichert.triageNotiz) ?? '' }
+          ? { ...gespeichert, ...vorher, status: 'GEPRUEFT', art: 'WUNSCH' }
+          : { ...gespeichert, ...vorher, status: 'GEPRUEFT', triageNotiz: ohneKiNotiz(gespeichert.triageNotiz) ?? '' }
       )
       if (result.error) {
         toast.error(result.error)

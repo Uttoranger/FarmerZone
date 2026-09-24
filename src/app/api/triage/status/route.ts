@@ -34,7 +34,7 @@ function fehler(status: number, code: string, error: string, extra: Record<strin
   return NextResponse.json({ error, code }, { status, headers: { ...KEIN_CACHE, ...extra } })
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   // 1. Rate-Limit je IP
   if (!drossel.check(`triage-status:${getClientIp(request.headers)}`)) {
     return fehler(429, 'ZU_VIELE', 'Zu viele Anfragen — bitte warte einen Moment und versuche es erneut.', {
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
   const treffer = await prisma.meldung.findMany({
     where: meldungId.length >= 20 ? { id: meldungId } : { id: { startsWith: meldungId } },
     take: 2,
-    select: { id: true, status: true, art: true, triageNotiz: true, antwortAnMelder: true },
+    select: { id: true, status: true, art: true, triageNotiz: true, antwortAnMelder: true, sprintName: true },
   })
   if (treffer.length === 0) return fehler(404, 'NICHT_GEFUNDEN', `Keine Meldung zu „${meldungId}".`)
   if (treffer.length > 1) {
@@ -91,9 +91,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: meldung.status }, { headers: KEIN_CACHE })
   }
 
-  // 5. Bedingt schreiben: nur auf genau den Stand, den die Entscheidung gesehen hat.
+  // 5. Bedingt schreiben: nur auf genau den Stand, den die Entscheidung gesehen
+  //    hat — jedes Feld, von dem sie abhängt. Schreibt der Mensch dazwischen
+  //    eine Antwort, darf der feste Satz sie nicht überschreiben.
   const { count } = await prisma.meldung.updateMany({
-    where: { id: meldung.id, status: meldung.status, triageNotiz: meldung.triageNotiz },
+    where: {
+      id: meldung.id,
+      status: meldung.status,
+      art: meldung.art,
+      triageNotiz: meldung.triageNotiz,
+      antwortAnMelder: meldung.antwortAnMelder,
+      sprintName: meldung.sprintName,
+    },
     data: entscheidung.daten,
   })
   if (count === 0) {

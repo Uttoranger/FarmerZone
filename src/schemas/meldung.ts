@@ -57,6 +57,11 @@ export const triageEingabeSchema = z.object({
   duplikatVonId: leerZuNull(40, 'Duplikat von'),
   sprintName: leerZuNull(60, 'Sprint'),
   antwortAnMelder: leerZuNull(500, 'Antwort'),
+  // Der Stand, auf dem das Formular aufbaut. Seit die Schreibroute (CLI,
+  // Deployment) ebenfalls schreibt, speichert die Action nur, wenn Status und
+  // Notiz noch so sind — jede Änderung der Route hängt eine Zeile an die Notiz.
+  vorherStatus: z.enum(MELDUNG_STATUS).optional(),
+  vorherNotiz: z.string().max(TRIAGE_NOTIZ_MAX).nullable().optional(),
 })
 
 export type TriageEingabe = z.infer<typeof triageEingabeSchema>
@@ -71,7 +76,8 @@ const MIT_PR: readonly string[] = ['GEPLANT', 'ERLEDIGT', 'GEPRUEFT']
  * sieht, außer ihren festen Sätzen.
  */
 export const triageStatusSchema = z
-  .object({
+  .strictObject(
+    {
     // Kurznummer oder volle ID — beides nur Kleinbuchstaben und Ziffern (cuid).
     meldungId: z.string().trim().regex(/^[a-z0-9]{8,30}$/, 'meldungId: Kurznummer (8 Zeichen) oder volle ID.'),
     status: z.enum(ZIEL_STATUS, { message: 'status: erlaubt sind VERMUTLICH_WUNSCH, GEPLANT, ERLEDIGT, GEPRUEFT.' }),
@@ -84,8 +90,14 @@ export const triageStatusSchema = z
       .pipe(z.string().min(1, 'grund ist leer.').max(300, 'grund: höchstens 300 Zeichen.'))
       .optional(),
     quelle: z.enum(['deployment', 'merge']).default('deployment'),
-  })
-  .strict()
+    },
+    {
+      error: (iss) =>
+        iss.code === 'unrecognized_keys'
+          ? `Unbekanntes Feld: ${iss.keys.join(', ')} — die Schreibroute nimmt nur meldungId, status, prNummer, grund, quelle.`
+          : undefined,
+    }
+  )
   .superRefine((d, ctx) => {
     if (MIT_PR.includes(d.status) && d.prNummer === undefined) {
       ctx.addIssue({ code: 'custom', path: ['prNummer'], message: `prNummer fehlt — ${d.status} braucht die Nummer des PR.` })

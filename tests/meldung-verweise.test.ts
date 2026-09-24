@@ -15,8 +15,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { parseMeldungsVerweise } from '@/lib/meldung-verweise'
 import { fuehreAus, zaehlendePrs, type Abhaengigkeiten, type Pr } from '../scripts/briefkasten-deploy'
 
-const A = 'cmaaaaaa11111111111aaaaa'
-const B = 'cmbbbbbb22222222222bbbbb'
+const A = 'cmaaaaaa11111111111aaaaaa'
+const B = 'cmbbbbbb22222222222bbbbbb'
 
 describe('parseMeldungsVerweise', () => {
   it('eine ID', () => {
@@ -48,6 +48,25 @@ describe('parseMeldungsVerweise', () => {
   it('in einem Codeblock oder HTML-Kommentar zählt sie nicht — sonst schlösse eine Erklärung echte Meldungen', () => {
     const text = ['```', `Behebt Meldung: ${A}`, '```', '<!--', `Behebt Meldung: ${B}`, '-->', `<!-- Behebt Meldung: ${B} -->`].join('\n')
     expect(parseMeldungsVerweise(text).behebt).toEqual([])
+  })
+
+  it('ein Kommentar, der mitten in der Zeile beginnt, versteckt nichts — im PR unsichtbar heißt: zählt nicht', () => {
+    expect(parseMeldungsVerweise(`Siehe Notiz <!--\nBehebt Meldung: ${A}\n-->`).behebt).toEqual([])
+    expect(parseMeldungsVerweise(`Text <!-- Behebt Meldung: ${A} --> weiter`).behebt).toEqual([])
+    expect(parseMeldungsVerweise(`Offen <!--\nBehebt Meldung: ${A}`).behebt).toEqual([])
+    // Nach einem geschlossenen Kommentar zählt die sichtbare Zeile wieder.
+    expect(parseMeldungsVerweise(`<!-- Vorlage -->\nBehebt Meldung: ${A}`).behebt).toEqual([A])
+  })
+
+  it('ein eingerückter Codeblock (vier Leerzeichen) zählt nicht', () => {
+    expect(parseMeldungsVerweise(`Beispiel:\n\n    Behebt Meldung: ${A}`).behebt).toEqual([])
+    expect(parseMeldungsVerweise(`  - Behebt Meldung: ${A}`).behebt).toEqual([A])
+  })
+
+  it('gewöhnliche Wörter aus acht Buchstaben sind keine IDs', () => {
+    const v = parseMeldungsVerweise('Behebt Meldung: zusammen, cmabcdef')
+    expect(v.behebt).toEqual(['cmabcdef'])
+    expect(v.ungueltig).toEqual(['zusammen'])
   })
 
   it('„Öffnet wieder Meldung:" öffnet', () => {

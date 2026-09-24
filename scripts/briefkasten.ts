@@ -225,6 +225,15 @@ export function schnittAusExport(markdown: string, ziel: string): string | null 
 
 export const STATUS_IM_ADMIN = 'Status bitte im Admin setzen.'
 
+export const NUR_HTTPS =
+  'Der Schreib-Token geht nur über https:// — TRIAGE_EXPORT_URL zeigt auf eine unverschlüsselte Adresse.'
+
+/** Den Schreib-Token nie im Klartext übers Netz; nur lokal (Entwicklung) ist http erlaubt. */
+export function sichereAdresse(adresse: string): boolean {
+  const url = new URL(adresse)
+  return url.protocol === 'https:' || ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
+}
+
 /** Die Schreibroute liegt neben der Leseroute — derselbe Host, anderer Pfad. */
 export function statusAdresse(exportUrl: string): string {
   return new URL('/api/triage/status', exportUrl).toString()
@@ -273,6 +282,7 @@ async function schreibe(
   } catch {
     return { code: 2, ausgabe: UNGUELTIGE_EXPORT_URL }
   }
+  if (!sichereAdresse(adresse)) return { code: 2, ausgabe: NUR_HTTPS }
 
   const body =
     befehl.art === 'geplant'
@@ -355,7 +365,6 @@ type LeseBefehl = Exclude<Befehl, { art: 'geplant' | 'vermutlich-wunsch' }>
 async function ueberRoute(befehl: LeseBefehl, weg: { url: string; token: string }, holer: Holer): Promise<{ code: number; ausgabe: string }> {
   if (befehl.art === 'list') return { code: 1, ausgabe: NUR_EXPORT_UEBER_ROUTE }
   if (befehl.art === 'hilfe') return { code: 0, ausgabe: HILFE }
-
 
   // show: der Export über alle Status, daraus der eine Abschnitt
   const filter: Filter = befehl.art === 'show' ? { status: [...MELDUNG_STATUS], art: null } : befehl.filter

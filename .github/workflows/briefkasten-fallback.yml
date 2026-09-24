@@ -22,7 +22,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: briefkasten
+  group: briefkasten-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:

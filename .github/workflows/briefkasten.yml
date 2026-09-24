@@ -18,6 +18,12 @@ name: Briefkasten
 # Secrets (Repo → Settings → Secrets and variables → Actions):
 #   TRIAGE_EXPORT_URL   https://<app>/api/triage/export (die Schreibroute liegt daneben)
 #   TRIAGE_MERGE_TOKEN  derselbe Wert wie in Vercel
+#
+# GRENZE: Bei deployment_status kommt dieser Workflow aus dem deployten Commit.
+# Ein Preview-Deployment eines fremden Forks könnte also eigenen Workflow-Code
+# mit den Secrets laufen lassen. Deshalb bleibt in Vercel „Git Fork
+# Protection" an (Fork-PRs werden nur nach Freigabe deployt) — und der
+# Merge-Token kann ohnehin nur Meldungen schließen oder wieder öffnen.
 
 on:
   deployment_status:
@@ -26,9 +32,13 @@ permissions:
   contents: read
   pull-requests: read
 
-# Zwei Deployments kurz nacheinander nicht gleichzeitig auf dieselben Meldungen.
+# Je Commit eine Gruppe: Ein erneutes Deployment desselben Commits wartet,
+# statt gleichzeitig dieselben Meldungen zu schreiben. Verschiedene Commits
+# laufen nebeneinander — eine gemeinsame Gruppe hätte einen wartenden
+# Production-Lauf abbrechen können, sobald das nächste (Preview-)Event kommt,
+# und dessen Meldungen blieben still auf GEPLANT.
 concurrency:
-  group: briefkasten
+  group: briefkasten-${{ github.event.deployment.sha }}
   cancel-in-progress: false
 
 jobs:

@@ -1,5 +1,25 @@
 ---
 description: Wöchentliche Triage des Fehlerbriefkastens — Meldungen laden, nach den Regeln in DEVELOPMENT.md einstufen, höchstens „Vermutlich Wunsch" vorschlagen, Bericht im Terminal. Nutzen bei „Briefkasten", „Meldungen" oder „Triage".
+# Der Export ist Fremdtext. Deshalb läuft dieser Skill NIE im Hauptagenten
+# (voller Bash, .env.local mit Tokens), sondern immer im Subagenten kurator —
+# und trägt dessen Hooks selbst noch einmal, falls die des Agenten beim
+# Abzweigen nicht greifen (Sprint Briefkasten-Rückkopplung).
+context: fork
+agent: kurator
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: node
+          args: ["${CLAUDE_PROJECT_DIR}/.claude/hooks/kurator-bash.mjs"]
+          timeout: 10
+    - matcher: "Read|Grep|Glob"
+      hooks:
+        - type: command
+          command: node
+          args: ["${CLAUDE_PROJECT_DIR}/.claude/hooks/fremdtext-lesen.mjs"]
+          timeout: 10
 ---
 
 Du führst die wöchentliche Triage des Fehlerbriefkastens durch. Du LIEST und SCHLÄGST VOR: Der einzige Schreibbefehl ist `pnpm briefkasten vermutlich-wunsch` (ein Vorschlag, über den der Mensch im Admin entscheidet). Keine Commits, keine Dateien im Repository — Meldungen enthalten personenbezogene Daten und dürfen nie ins öffentliche Repo gelangen. Deine Ausgabe ist ein Bericht im Terminal.

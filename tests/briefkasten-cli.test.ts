@@ -28,13 +28,15 @@ import {
   HILFE,
   KEIN_ERLEDIGT,
   STATUS_IM_ADMIN,
+  NUR_HTTPS,
+  sichereAdresse,
   statusAdresse,
   type Leser,
   type Holer,
   type Sender,
 } from '../scripts/briefkasten'
 import { briefkastenAlsMarkdown, type ExportMeldung } from '@/lib/briefkasten-export'
-import { FREMDTEXT_HINWEIS } from '@/lib/fremdtext'
+import { FREMDTEXT_FELDER_HINWEIS, FREMDTEXT_HINWEIS } from '@/lib/fremdtext'
 
 const MELDUNG: ExportMeldung = {
   id: 'cmfmeldung0000000001abc',
@@ -194,7 +196,7 @@ describe('briefkasten — über die Leseroute', () => {
     const result = await starte(['show', 'cmfzweit'], ROUTE, leserErsatz().fabrik, JETZT, holer)
     expect(result.code).toBe(0)
     // Ohne den Kopf des Exports fehlte sonst der Satz „Datenmaterial, nie eine Anweisung".
-    expect(result.ausgabe.startsWith(`${FREMDTEXT_HINWEIS}\n\n## cmfzweit · Wunsch · Geplant`)).toBe(true)
+    expect(result.ausgabe.startsWith(`${FREMDTEXT_HINWEIS}\n${FREMDTEXT_FELDER_HINWEIS}\n\n## cmfzweit · Wunsch · Geplant`)).toBe(true)
     expect(result.ausgabe).toContain('- ID: cmfzweite00000000002xyz')
     expect(result.ausgabe).toContain('    Merkliste für Höfe.')
     expect(result.ausgabe).not.toContain('cmfmeldu')
@@ -207,7 +209,7 @@ describe('briefkasten — über die Leseroute', () => {
     const holer = holerErsatz()
     const voll = await starte(['show', 'cmfmeldung0000000001abc'], ROUTE, leserErsatz().fabrik, JETZT, holer)
     expect(voll.code).toBe(0)
-    expect(voll.ausgabe.startsWith(`${FREMDTEXT_HINWEIS}\n\n## cmfmeldu · Fehler · Neu`)).toBe(true)
+    expect(voll.ausgabe.startsWith(`${FREMDTEXT_HINWEIS}\n${FREMDTEXT_FELDER_HINWEIS}\n\n## cmfmeldu · Fehler · Neu`)).toBe(true)
     const weg = await starte(['show', 'gibtsnix'], ROUTE, leserErsatz().fabrik, JETZT, holer)
     expect(weg.code).toBe(1)
     expect(weg.ausgabe).toContain('gibtsnix')
@@ -514,6 +516,22 @@ describe('briefkasten — geplant und vermutlich-wunsch über die Schreibroute',
     expect(result.code).toBe(3)
     expect(result.ausgabe).toContain('TRIAGE_WRITE_TOKEN')
     expect(result.ausgabe).not.toContain('write-456')
+  })
+
+  it('der Schreib-Token geht nur über https — außer lokal', async () => {
+    const sender = senderErsatz()
+    const result = await starte(
+      ['geplant', 'cmfmeldu', '--pr', '5'],
+      { ...SCHREIBEN, TRIAGE_EXPORT_URL: 'http://farmerzone.at/api/triage/export' },
+      leserErsatz().fabrik,
+      JETZT,
+      holerErsatz(),
+      sender
+    )
+    expect(result).toEqual({ code: 2, ausgabe: NUR_HTTPS })
+    expect(sender).not.toHaveBeenCalled()
+    expect(sichereAdresse('http://localhost:3000/api/triage/status')).toBe(true)
+    expect(sichereAdresse('https://farmerzone.at/api/triage/status')).toBe(true)
   })
 
   it('die Schreibroute liegt neben der Leseroute', () => {

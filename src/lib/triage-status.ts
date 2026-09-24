@@ -149,7 +149,17 @@ export type GeleseneMeldung = {
   art: MeldungArt
   triageNotiz: string | null
   antwortAnMelder: string | null
+  sprintName: string | null
 }
+
+/** Die PR-Nummer aus „PR #<nr>" — so schreibt GEPLANT sie; sonst null. */
+function geplanterPr(sprintName: string | null): number | null {
+  const treffer = sprintName ? /^PR #(\d+)$/.exec(sprintName.trim()) : null
+  return treffer ? Number(treffer[1]) : null
+}
+
+/** Ziele, die eine PR-Nummer brauchen — sie steht in sprintName und im Audit. */
+const BRAUCHT_PR: readonly ZielStatus[] = ['GEPLANT', 'ERLEDIGT', 'GEPRUEFT']
 
 export type Aenderung = {
   ziel: ZielStatus
@@ -170,7 +180,7 @@ export type Entscheidung =
       }
     }
   | { art: 'unveraendert' }
-  | { art: 'abgelehnt'; code: 'UEBERGANG' | 'FALSCHE_ART'; grund: string }
+  | { art: 'abgelehnt'; code: 'UEBERGANG' | 'FALSCHE_ART' | 'ANDERER_PR' | 'PR_FEHLT'; grund: string }
 
 /**
  * DIE Entscheidung der Route: darf die Meldung vom gelesenen Status zum Ziel,
@@ -193,7 +203,23 @@ export function entscheideUebergang(m: GeleseneMeldung, a: Aenderung, jetzt: Dat
       grund: `Die Meldung steht auf „${STATUS_WORT[m.status]}". „${ZIEL_WORT[a.ziel]}" geht nur aus: ${von}.`,
     }
   }
+  // Das Schema verlangt die Nummer schon — die Regel verlässt sich nicht darauf.
+  if (BRAUCHT_PR.includes(a.ziel) && a.prNummer === null) {
+    return { art: 'abgelehnt', code: 'PR_FEHLT', grund: `„${ZIEL_WORT[a.ziel]}" braucht die Nummer des PR.` }
+  }
   if (a.ziel === 'ERLEDIGT' && m.status === 'ERLEDIGT') return { art: 'unveraendert' }
+  // Nur der PR, für den die Meldung eingeplant ist, schließt sie. Nennt ein
+  // anderer PR die ID (Tippfehler, Zitat), läse der Melder sonst „Behoben",
+  // obwohl der Fix noch gar nicht gemergt ist. Hat der Mensch im Admin ohne
+  // PR-Nummer geplant (etwa einen Wunsch), gilt seine Freigabe für jeden PR.
+  const eingeplant = geplanterPr(m.sprintName)
+  if (a.ziel === 'ERLEDIGT' && eingeplant !== null && eingeplant !== a.prNummer) {
+    return {
+      art: 'abgelehnt',
+      code: 'ANDERER_PR',
+      grund: `Die Meldung ist für PR #${eingeplant} eingeplant, nicht für PR #${a.prNummer}.`,
+    }
+  }
 
   const audit = auditZeile(a.ziel, a.prNummer, jetzt)
   const notiz = (zeilen: readonly (string | null)[]) =>

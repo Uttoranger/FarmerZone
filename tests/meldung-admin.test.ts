@@ -18,7 +18,7 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     user: { findUnique: vi.fn() },
     farm: { findUnique: vi.fn(), update: vi.fn() },
-    meldung: { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
+    meldung: { findUnique: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn() },
   },
 }))
 
@@ -30,7 +30,8 @@ const getSession = vi.mocked(auth.api.getSession)
 const userFindUnique = vi.mocked(prisma.user.findUnique)
 const meldungFindUnique = vi.mocked(prisma.meldung.findUnique)
 const meldungFindFirst = vi.mocked(prisma.meldung.findFirst)
-const meldungUpdate = vi.mocked(prisma.meldung.update)
+// Bedingtes Schreiben (Sprint Briefkasten-Rückkopplung): die Action nimmt updateMany.
+const meldungUpdate = vi.mocked(prisma.meldung.updateMany)
 
 const ID = 'cmfmeldung0000000001abc'
 const ORIGINAL = 'cmforiginal000000002xyz'
@@ -50,7 +51,7 @@ beforeEach(() => {
   userFindUnique.mockResolvedValue({ isAdmin: true } as never)
   meldungFindUnique.mockResolvedValue({ id: ID } as never)
   meldungFindFirst.mockResolvedValue(null)
-  meldungUpdate.mockResolvedValue({} as never)
+  meldungUpdate.mockResolvedValue({ count: 1 })
 })
 
 afterEach(() => {
@@ -189,6 +190,24 @@ describe('triageMeldungAction — Knöpfe zum KI-Vorschlag (Sprint Briefkasten-R
 
   it('eine unbekannte Art wird abgelehnt', async () => {
     expect(await triageMeldungAction(ID, { ...VORSCHLAG, status: 'GEPRUEFT', art: 'BEFEHL' })).toEqual({ error: 'Unbekannte Art.' })
+    expect(meldungUpdate).not.toHaveBeenCalled()
+  })
+})
+
+describe('triageMeldungAction — zweiter Schreiber (Schreibroute)', () => {
+  it('schreibt nur auf den Stand, den das Formular kannte', async () => {
+    await triageMeldungAction(ID, { ...GUELTIG, vorherStatus: 'NEU', vorherNotiz: null })
+    expect(meldungUpdate.mock.calls[0][0].where).toEqual({ id: ID, status: 'NEU', triageNotiz: null })
+  })
+
+  it('hat die Schreibroute inzwischen geschrieben: Fehler mit Ausweg, nichts zurückgedreht', async () => {
+    meldungUpdate.mockResolvedValue({ count: 0 })
+    const result = await triageMeldungAction(ID, { ...GUELTIG, vorherStatus: 'NEU', vorherNotiz: null })
+    expect(result).toEqual({ error: 'Die Meldung hat sich inzwischen geändert — lade die Seite neu und entscheide noch einmal.' })
+  })
+
+  it('ein unbekannter Ausgangsstatus wird abgelehnt', async () => {
+    expect((await triageMeldungAction(ID, { ...GUELTIG, vorherStatus: 'IRGENDWAS' })).error).toBeDefined()
     expect(meldungUpdate).not.toHaveBeenCalled()
   })
 })

@@ -248,6 +248,8 @@ export async function triageMeldungAction(
     duplikatVonId?: unknown
     sprintName?: unknown
     antwortAnMelder?: unknown
+    vorherStatus?: unknown
+    vorherNotiz?: unknown
   }
 ): Promise<{ error?: string }> {
   const guard = await requireAdmin()
@@ -274,8 +276,15 @@ export async function triageMeldungAction(
     duplikatVonId = original.id
   }
 
-  await prisma.meldung.update({
-    where: { id: meldungId },
+  // Bedingt schreiben, wenn das Formular seinen Ausgangsstand mitschickt: Hat
+  // die Schreibroute (CLI, Deployment) inzwischen etwas gesetzt, würde ein
+  // altes Formular sonst Status, PR-Nummer und festen Satz zurückdrehen.
+  const { count } = await prisma.meldung.updateMany({
+    where: {
+      id: meldungId,
+      ...(triage.vorherStatus !== undefined ? { status: triage.vorherStatus } : {}),
+      ...(triage.vorherNotiz !== undefined ? { triageNotiz: triage.vorherNotiz } : {}),
+    },
     data: {
       status: triage.status,
       // Nur der Knopf „Ja, ein Wunsch" schickt eine Art (Sprint Briefkasten-Rückkopplung).
@@ -288,6 +297,7 @@ export async function triageMeldungAction(
       triagedAt: new Date(),
     },
   })
+  if (count === 0) return { error: 'Die Meldung hat sich inzwischen geändert — lade die Seite neu und entscheide noch einmal.' }
 
   if (process.env.NODE_ENV !== 'production') {
     console.log(`[DEV] Meldung triagiert: ${new Date().toISOString()} admin=${guard.userId} meldung=${meldungId} status=${triage.status}`)

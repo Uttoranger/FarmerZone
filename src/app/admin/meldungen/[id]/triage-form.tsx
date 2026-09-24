@@ -48,7 +48,13 @@ export function TriageForm({
   function speichern(e: React.FormEvent) {
     e.preventDefault()
     startTransition(async () => {
-      const result = await triageMeldungAction(meldungId, form)
+      // Ausgangsstand mitschicken: hat inzwischen das CLI oder das Deployment
+      // geschrieben, lehnt die Action ab, statt es zurückzudrehen.
+      const result = await triageMeldungAction(meldungId, {
+        ...form,
+        vorherStatus: werte.status,
+        vorherNotiz: werte.triageNotiz === '' ? null : werte.triageNotiz,
+      })
       if (result.error) {
         toast.error(result.error)
         return

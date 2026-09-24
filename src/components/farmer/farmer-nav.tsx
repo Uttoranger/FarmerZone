@@ -45,14 +45,15 @@ interface FarmerNavProps {
   adminBadge?: number
 }
 
-/** Die Zahl am Menüpunkt „Admin" — dieselbe Marke wie an „Bestellungen". */
+/**
+ * Die Zahl am Menüpunkt „Admin" — dieselbe Form wie an „Bestellungen", aber
+ * mit dunkler Schrift (accent-foreground): Weiß auf dem Orange erreicht bei
+ * 11 px nur etwa 3:1, verlangt sind 4,5:1 (CODING_STANDARDS §7).
+ */
 function AdminZahl({ anzahl }: { anzahl?: number }) {
   if (!anzahl) return null
   return (
-    <span
-      className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold leading-none text-white"
-      style={{ background: 'var(--accent)' }}
-    >
+    <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-bold leading-none text-accent-foreground">
       {anzahl > 99 ? '99+' : anzahl}
       <span className="sr-only"> Meldungen zu entscheiden</span>
     </span>
