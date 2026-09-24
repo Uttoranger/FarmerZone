@@ -17,6 +17,8 @@ import {
   STATUS_INTERN,
   STATUS_MARKE_FARBE,
   STATUS_OFFEN,
+  STATUS_ZU_ENTSCHEIDEN,
+  prLink,
 } from '@/lib/meldung'
 import { Marke } from '@/components/ui/marke'
 import { cn } from '@/lib/utils'
@@ -57,7 +59,8 @@ function Chip({ href, aktiv, children }: { href: string; aktiv: boolean; childre
 
 /**
  * /admin/meldungen — die Triage-Liste des Betreibers (Sprint fehlerbriefkasten,
- * Teil D). Voreinstellung: NEU + GEPRUEFT. Der Reiter „Wünsche" zeigt die
+ * Teil D). Startansicht „Zu entscheiden": NEU + VERMUTLICH_WUNSCH — was auf
+ * den Menschen wartet (Sprint Briefkasten-Rückkopplung). Der Reiter „Wünsche" zeigt die
  * gezählte Wunschliste nach clusterKey — Grundlage einer Entscheidung, nie ihr
  * Ersatz. Bei 375px sind die Zeilen Karten, keine Tabelle: nichts scrollt quer.
  */
@@ -68,7 +71,7 @@ export default async function AdminMeldungenPage({ searchParams }: { searchParam
 
   const suche = await searchParams
   const reiter = suche.reiter === 'wuensche' ? 'wuensche' : 'meldungen'
-  const filter = filterAusParametern(suche)
+  const filter = filterAusParametern(suche, STATUS_ZU_ENTSCHEIDEN)
 
   return (
     <main className="min-h-screen bg-background px-4 py-8 md:px-6">
@@ -114,8 +117,10 @@ export default async function AdminMeldungenPage({ searchParams }: { searchParam
 async function MeldungReiter({ suche, filter }: { suche: Suche; filter: AdminMeldungFilter }) {
   const meldungen = await getMeldungenFuerAdmin(filter)
   const istVoreinstellung = !suche.status
+  const gleicheMenge = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((s) => b.includes(s))
   const statusChips: Array<{ wert: string | undefined; label: string; aktiv: boolean }> = [
-    { wert: undefined, label: 'Offen', aktiv: istVoreinstellung },
+    { wert: undefined, label: 'Zu entscheiden', aktiv: istVoreinstellung },
+    { wert: STATUS_OFFEN.join(','), label: 'Offen', aktiv: !istVoreinstellung && gleicheMenge(filter.status, STATUS_OFFEN) },
     ...MELDUNG_STATUS.map((s) => ({
       wert: s,
       label: STATUS_INTERN[s],
@@ -155,18 +160,26 @@ async function MeldungReiter({ suche, filter }: { suche: Suche; filter: AdminMel
             ? '1 Meldung'
             : `${meldungen.length} Meldungen${meldungen.length === 200 ? ' (die jüngsten 200)' : ''}`}
         {' · Voreinstellung: '}
-        {STATUS_OFFEN.map((s) => STATUS_INTERN[s]).join(' + ')}
+        {STATUS_ZU_ENTSCHEIDEN.map((s) => STATUS_INTERN[s]).join(' + ')}
       </p>
 
       <ul className="space-y-2">
-        {meldungen.map((m) => (
-          <li key={m.id}>
-            <Link
-              href={`/admin/meldungen/${m.id}`}
-              className="block rounded-xl border border-border bg-card p-3 transition-colors hover:border-primary/40"
+        {meldungen.map((m) => {
+          const pr = prLink(m.sprintName)
+          return (
+            // Die ganze Karte ist klickbar (after:-Fläche des Links), der PR-Link liegt
+            // darüber — ein Link im Link wäre ungültiges HTML.
+            <li
+              key={m.id}
+              className="relative rounded-xl border border-border bg-card p-3 transition-colors hover:border-primary/40"
             >
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                <span className="font-mono font-semibold text-foreground">{m.kurznummer}</span>
+                <Link
+                  href={`/admin/meldungen/${m.id}`}
+                  className="font-mono font-semibold text-foreground after:absolute after:inset-0 after:rounded-xl focus-visible:underline focus-visible:outline-none"
+                >
+                  {m.kurznummer}
+                </Link>
                 <span className="font-medium text-foreground">{MELDUNG_ART_LABEL[m.art]}</span>
                 <span>{datum(m.createdAt)}</span>
                 <span className="truncate">{m.hofName ?? (m.customerEmail ? 'Kundin' : 'Anonym')}</span>
@@ -175,15 +188,27 @@ async function MeldungReiter({ suche, filter }: { suche: Suche; filter: AdminMel
                 </Marke>
               </div>
               <p className="mt-1.5 truncate text-sm text-foreground">{m.ersteZeile || '—'}</p>
-              {(m.diagKennung || m.clusterKey) && (
+              {(m.diagKennung || m.clusterKey || m.sprintName) && (
                 <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
                   {m.diagKennung && <span>Kennung {m.diagKennung}</span>}
                   {m.clusterKey && <span>Cluster {m.clusterKey}</span>}
+                  {pr ? (
+                    <a
+                      href={pr}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="relative z-10 font-medium text-brand-text underline-offset-2 hover:underline"
+                    >
+                      {m.sprintName}
+                    </a>
+                  ) : (
+                    m.sprintName && <span>Sprint {m.sprintName}</span>
+                  )}
                 </div>
               )}
-            </Link>
-          </li>
-        ))}
+            </li>
+          )
+        })}
       </ul>
     </>
   )

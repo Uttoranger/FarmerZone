@@ -35,6 +35,13 @@ const serverEnvSchema = z.object({
   // antwortet die Route IMMER 401 (fail-closed wie CRON_SECRET) — ein Deploy
   // scheitert daran nicht.
   TRIAGE_TOKEN: optional(),
+  // OPTIONAL: Die zwei Tokens der Schreibroute /api/triage/status (Sprint
+  // Briefkasten-Rückkopplung). WRITE liegt auf dem Rechner des Entwicklers
+  // (CLI: geplant, vermutlich-wunsch), MERGE nur in GitHub Actions (ERLEDIGT,
+  // Wiederöffnen). Fehlt einer, gilt er nie (fail-closed); sind zwei der drei
+  // Triage-Tokens gleich, lehnt die Route alles ab.
+  TRIAGE_WRITE_TOKEN: optional(),
+  TRIAGE_MERGE_TOKEN: optional(),
   // OPTIONAL: Die öffentliche Adresse der App — nur in Produktion gesetzt.
   // Previews und lokal leiten ihre Adresse aus den Vercel-Systemvariablen
   // darunter bzw. aus localhost ab (src/lib/umgebung.ts). Fehlt sie in

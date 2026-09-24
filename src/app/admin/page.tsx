@@ -4,7 +4,7 @@ import type { Metadata } from 'next'
 import { auth } from '@/lib/auth'
 import Link from 'next/link'
 import { isAdminUser, getAdminFarms } from '@/server/queries/admin'
-import { zaehleNeueMeldungen } from '@/server/queries/meldung'
+import { zaehleZuEntscheiden } from '@/server/queries/meldung'
 import {
   gruendungsplaetze,
   vergebeneGruendungsplaetze,
@@ -22,7 +22,7 @@ export default async function AdminPage() {
   // einmal zu erkennen geben — für sie existiert /admin schlicht nicht.
   if (!(await isAdminUser(session.user.id))) notFound()
 
-  const [farms, neueMeldungen] = await Promise.all([getAdminFarms(), zaehleNeueMeldungen()])
+  const [farms, zuEntscheiden] = await Promise.all([getAdminFarms(), zaehleZuEntscheiden()])
   const wartend = farms.filter((f) => f.approvedAt === null).length
 
   // Plätze serverseitig berechnen und als schlichte Zahlen weiterreichen: die
@@ -35,13 +35,18 @@ export default async function AdminPage() {
   return (
     <main className="min-h-screen bg-background px-4 py-8 md:px-6">
       <div className="mx-auto max-w-4xl">
-        {/* Fehlerbriefkasten: der Zähler ist bewusst ein Link, kein Alarm. */}
+        {/* Fehlerbriefkasten: der Zähler ist bewusst ein Link, kein Alarm. Er zählt,
+            was auf dich wartet — Neues und die Wunsch-Vorschläge der KI. */}
         <Link
           href="/admin/meldungen"
           className="mb-5 flex min-h-11 items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-2.5 text-sm transition-colors hover:border-primary/40"
         >
           <span className="font-medium text-foreground">
-            {neueMeldungen === 1 ? '1 neue Meldung' : `${neueMeldungen} neue Meldungen`}
+            {zuEntscheiden === 0
+              ? 'Keine Meldung wartet auf dich'
+              : zuEntscheiden === 1
+                ? '1 Meldung zu entscheiden'
+                : `${zuEntscheiden} Meldungen zu entscheiden`}
           </span>
           <span className="text-xs text-primary">Briefkasten →</span>
         </Link>

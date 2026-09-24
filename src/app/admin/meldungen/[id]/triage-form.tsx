@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { triageMeldungAction } from '@/server/actions/admin'
-import { MELDUNG_STATUS, STATUS_INTERN, STATUS_OEFFENTLICH, type MeldungStatus } from '@/lib/meldung'
+import { MELDUNG_STATUS, STATUS_INTERN, oeffentlicherStatus, type MeldungArt, type MeldungStatus } from '@/lib/meldung'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
@@ -22,15 +22,18 @@ export type TriageWerte = {
  * Die Triage-Felder des Betreibers. Alles außer der Antwort bleibt intern —
  * die Antwort ist das EINZIGE Feld, das der Hof unter „Meine Meldungen" liest,
  * und steht deshalb sichtbar so beschriftet. Native Elemente statt Select-
- * Komponente: sechs Status passen in ein <select>, und das tippt sich bei
+ * Komponente: sieben Status passen in ein <select>, und das tippt sich bei
  * 375px zuverlässig.
  */
 export function TriageForm({
   meldungId,
+  art,
   werte,
   hatHof,
 }: {
   meldungId: string
+  /** Für „Der Hof liest": ERLEDIGT heißt je Art Behoben, Umgesetzt oder Beantwortet. */
+  art: MeldungArt
   werte: TriageWerte
   hatHof: boolean
 }) {
@@ -45,7 +48,13 @@ export function TriageForm({
   function speichern(e: React.FormEvent) {
     e.preventDefault()
     startTransition(async () => {
-      const result = await triageMeldungAction(meldungId, form)
+      // Ausgangsstand mitschicken: hat inzwischen das CLI oder das Deployment
+      // geschrieben, lehnt die Action ab, statt es zurückzudrehen.
+      const result = await triageMeldungAction(meldungId, {
+        ...form,
+        vorherStatus: werte.status,
+        vorherNotiz: werte.triageNotiz === '' ? null : werte.triageNotiz,
+      })
       if (result.error) {
         toast.error(result.error)
         return
@@ -77,7 +86,7 @@ export function TriageForm({
             ))}
           </select>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            Der Hof liest: &bdquo;{STATUS_OEFFENTLICH[form.status]}&ldquo;
+            Der Hof liest: &bdquo;{oeffentlicherStatus(form.status, art)}&ldquo;
           </p>
         </div>
         <div>

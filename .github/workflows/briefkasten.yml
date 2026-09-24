@@ -1,0 +1,70 @@
+name: Briefkasten
+
+# Schließt Meldungen, sobald ihr Fix in Produktion ist (Sprint
+# Briefkasten-Rückkopplung, Teil E). Vercel meldet jedes Deployment als
+# deployment_status an GitHub (geprüft in Phase 0 f, 2026-09-24). Bei
+# „success" in „Production" holt scripts/briefkasten-deploy.ts die PRs zum
+# Commit und ruft je Zeile „Behebt Meldung: <id>" die Schreibroute mit
+# TRIAGE_MERGE_TOKEN auf („Öffnet wieder Meldung: <id>" öffnet wieder).
+#
+# SICHERHEIT
+# - Kein PR-Auslöser mit Base-Rechten (die _target-Variante). Dieser Lauf
+#   startet nur durch ein Deployment.
+# - Der PR-Text ist Fremdtext: Er steht nie in einer run:-Zeile (${{ }} setzte
+#   ihn in die Shell ein). Das Skript holt ihn selbst und liest nur IDs.
+# - Nur Leserechte für den GITHUB_TOKEN; geschrieben wird allein über die
+#   Schreibroute, und die kann mit diesem Token nur ERLEDIGT und Wiederöffnen.
+#
+# Secrets (Repo → Settings → Secrets and variables → Actions):
+#   TRIAGE_EXPORT_URL   https://<app>/api/triage/export (die Schreibroute liegt daneben)
+#   TRIAGE_MERGE_TOKEN  derselbe Wert wie in Vercel
+#
+# GRENZE: Bei deployment_status kommt dieser Workflow aus dem deployten Commit.
+# Ein Preview-Deployment eines fremden Forks könnte also eigenen Workflow-Code
+# mit den Secrets laufen lassen. Deshalb bleibt in Vercel „Git Fork
+# Protection" an (Fork-PRs werden nur nach Freigabe deployt) — und der
+# Merge-Token kann ohnehin nur Meldungen schließen oder wieder öffnen.
+
+on:
+  deployment_status:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+# Je Commit eine Gruppe: Ein erneutes Deployment desselben Commits wartet,
+# statt gleichzeitig dieselben Meldungen zu schreiben. Verschiedene Commits
+# laufen nebeneinander — eine gemeinsame Gruppe hätte einen wartenden
+# Production-Lauf abbrechen können, sobald das nächste (Preview-)Event kommt,
+# und dessen Meldungen blieben still auf GEPLANT.
+concurrency:
+  group: briefkasten-${{ github.event.deployment.sha }}
+  cancel-in-progress: false
+
+jobs:
+  erledigt:
+    if: github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        # Version kommt aus dem "packageManager"-Feld der package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Meldungen schließen
+        run: pnpm exec tsx scripts/briefkasten-deploy.ts
+        env:
+          MODUS: deployment
+          DEPLOY_SHA: ${{ github.event.deployment.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+          TRIAGE_EXPORT_URL: ${{ secrets.TRIAGE_EXPORT_URL }}
+          TRIAGE_MERGE_TOKEN: ${{ secrets.TRIAGE_MERGE_TOKEN }}

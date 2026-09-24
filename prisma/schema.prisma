@@ -228,10 +228,13 @@ enum MeldungArt {
 }
 
 // Interne Triage-Status. Was der Hof davon sieht, übersetzt src/lib/meldung.ts
-// (NEU → „Eingegangen", KEIN_FEHLER → „Geprüft — funktioniert wie vorgesehen", …).
+// (NEU → „Eingegangen", KEIN_FEHLER → „Kein Fehler — Antwort lesen", …).
+// VERMUTLICH_WUNSCH: Vorschlag der KI, dass eine Fehler-Meldung ein Wunsch ist
+// — der Mensch entscheidet im Admin; der Melder sieht „Angesehen".
 enum MeldungStatus {
   NEU
   GEPRUEFT
+  VERMUTLICH_WUNSCH
   GEPLANT
   ERLEDIGT
   KEIN_FEHLER

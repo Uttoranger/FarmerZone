@@ -1,8 +1,9 @@
 import { prisma } from '@/lib/prisma'
-import { EXPORT_AUSWAHL, type ExportMeldung } from '@/lib/briefkasten-export'
+import { EXPORT_AUSWAHL, EXPORT_MAX, type ExportMeldung } from '@/lib/briefkasten-export'
 import {
   STATUS_ABGESCHLOSSEN,
   STATUS_OFFEN,
+  STATUS_ZU_ENTSCHEIDEN,
   ersteZeile,
   fuerHof,
   istMeldungArt,
@@ -54,18 +55,26 @@ export type AdminMeldungZeile = {
   ersteZeile: string
   diagKennung: string | null
   clusterKey: string | null
+  sprintName: string | null
 }
 
 export type AdminMeldungFilter = { status: MeldungStatus[]; art: MeldungArt | null }
 
-/** Filter aus Suchparametern — unbekannte Werte fallen still weg, leer = Voreinstellung. */
-export function filterAusParametern(params: { status?: string; art?: string }): AdminMeldungFilter {
+/**
+ * Filter aus Suchparametern — unbekannte Werte fallen still weg, leer =
+ * Voreinstellung. Export und CLI nehmen die offene Arbeit, die Admin-Liste
+ * startet bei „Zu entscheiden".
+ */
+export function filterAusParametern(
+  params: { status?: string; art?: string },
+  voreinstellung: readonly MeldungStatus[] = STATUS_OFFEN
+): AdminMeldungFilter {
   const status = (params.status ?? '')
     .split(',')
     .map((s) => s.trim())
     .filter(istMeldungStatus)
   return {
-    status: status.length > 0 ? status : [...STATUS_OFFEN],
+    status: status.length > 0 ? status : [...voreinstellung],
     art: istMeldungArt(params.art) ? params.art : null,
   }
 }
@@ -84,6 +93,7 @@ export async function getMeldungenFuerAdmin(filter: AdminMeldungFilter): Promise
       text: true,
       diagKennung: true,
       clusterKey: true,
+      sprintName: true,
       farm: { select: { name: true } },
     },
   })
@@ -98,19 +108,22 @@ export async function getMeldungenFuerAdmin(filter: AdminMeldungFilter): Promise
     ersteZeile: ersteZeile(z.text),
     diagKennung: z.diagKennung,
     clusterKey: z.clusterKey,
+    sprintName: z.sprintName,
   }))
 }
 
 /**
  * Alle Felder für den Markdown-Export (Leseroute /api/triage/export, Sprint
  * triage-leseroute). Dieselbe Auswahl wie der Datenbank-Weg des CLI
- * (EXPORT_AUSWAHL), derselbe Filter wie die Admin-Liste — aber ohne deren
- * Projektion und ohne `take`: der Export ist der ganze Briefkasten. Nur lesend.
+ * (EXPORT_AUSWAHL), derselbe Filter wie die Admin-Liste. Höchstens
+ * EXPORT_MAX + 1 Zeilen: die eine mehr sagt dem Export, dass er kappen und
+ * es dazuschreiben muss (Sprint Briefkasten-Rückkopplung). Nur lesend.
  */
 export async function getMeldungenFuerExport(filter: AdminMeldungFilter): Promise<ExportMeldung[]> {
   return prisma.meldung.findMany({
     where: { status: { in: filter.status }, ...(filter.art ? { art: filter.art } : {}) },
     orderBy: { createdAt: 'desc' },
+    take: EXPORT_MAX + 1,
     select: EXPORT_AUSWAHL,
   })
 }
@@ -147,8 +160,12 @@ export async function getMeldungDetail(idOderKurz: string): Promise<AdminMeldung
   return { ...zeile, kurznummer: kurznummer(zeile.id) }
 }
 
-export async function zaehleNeueMeldungen(): Promise<number> {
-  return prisma.meldung.count({ where: { status: 'NEU' } })
+/**
+ * Was auf eine Entscheidung wartet: Neues und die Wunsch-Vorschläge der KI —
+ * der Zähler auf /admin und am Menüpunkt „Admin". Nutzt den Index auf status.
+ */
+export async function zaehleZuEntscheiden(): Promise<number> {
+  return prisma.meldung.count({ where: { status: { in: [...STATUS_ZU_ENTSCHEIDEN] } } })
 }
 
 // ─── Wünsche, gebündelt ─────────────────────────────────────────────────────

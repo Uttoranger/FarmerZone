@@ -13,10 +13,10 @@ import { filterAusParametern, getMeldungenFuerExport } from '@/server/queries/me
  * Umgebungen ohne Direktzugang zur Datenbank (Pooler kennt die Leserolle
  * nicht, Direktverbindung nur über IPv6).
  *
- * NUR LESEND: Es gibt ausschließlich GET. Kein POST, kein Schreibpfad, keine
- * Statusänderung über HTTP — Triage bleibt der Server-Action im Admin
- * (isAdmin) vorbehalten. Wer hier etwas anderes als GET ergänzt, bricht den
- * Grundsatz „Eingangskanal, kein Befehlskanal".
+ * NUR LESEND: Es gibt ausschließlich GET, und der Lese-Token (TRIAGE_TOKEN)
+ * schreibt nirgends. Status setzt die eigene Schreibroute /api/triage/status
+ * mit zwei eigenen Tokens (Sprint Briefkasten-Rückkopplung) — getrennt, damit
+ * wer lesen darf, nicht still auch schreiben darf. Hier kommt kein POST dazu.
  *
  * Schutz, in dieser Reihenfolge:
  *   1. Rate-Limit 10 Aufrufe je Minute je IP — VOR der Token-Prüfung, damit
@@ -29,10 +29,12 @@ import { filterAusParametern, getMeldungenFuerExport } from '@/server/queries/me
  *      Vergleich in konstanter Zeit (geheimnisGleich), anders als das `!==`
  *      des Cron.
  *   3. Cache-Control: no-store — der Export enthält Triage-Notizen und
- *      Kundinnen-E-Mails, nichts davon darf in einem Zwischenspeicher liegen.
+ *      Meldungstexte, nichts davon darf in einem Zwischenspeicher liegen.
+ *      E-Mails und Screenshot-Adressen enthält er nicht (lib/fremdtext.ts).
  *
- * Query-Parameter wie im CLI: status (Liste, Voreinstellung NEU,GEPRUEFT) und
+ * Query-Parameter wie im CLI: status (Liste, Voreinstellung STATUS_OFFEN) und
  * art (optional). Unbekannte Werte fallen still weg (filterAusParametern).
+ * Höchstens EXPORT_MAX Meldungen, die neuesten.
  */
 
 const MAX_AUFRUFE_PRO_MINUTE = 10
