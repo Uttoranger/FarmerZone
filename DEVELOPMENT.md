@@ -254,6 +254,23 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 
 ## Bekannte Bugs & Fixes
 
+### BUG: Checkout übernahm den Preis aus dem Browser (behoben 2026-09-24)
+
+**Symptom (statisch belegt, kein Kundenfall bekannt):** `/api/checkout` rechnete
+Positionen, Bestellsumme und Stripe-Betrag mit dem `unitPrice` aus dem Request.
+Wer den Request selbst baute, bestellte zu einem Preis seiner Wahl, auch zu 1 Cent.
+
+**Ursache:** Der Handler las seit Bereiche 1 zwar Abgabe und MwSt aus der
+Datenbank, den Preis aber nicht — der Warenkorb galt beim Preis als Wahrheit.
+
+**Fix:** Schritt 3b liest `Product.price` mit. Weicht der Preis der Anfrage auf
+den Cent ab (`preisAbweichungen` in `order-totals.ts`), antwortet der Handler mit
+409 `WARENKORB_GEAENDERT` und den gültigen Preisen, bevor Bestand gebucht wird. Der
+Checkout übernimmt sie in den Warenkorb; die Kundin sieht die neue Summe und
+schickt bewusst neu ab. Entschieden gegen „still den DB-Preis nehmen": Die Kundin
+soll nie einen Betrag zahlen, den sie nicht gesehen hat. Tests:
+`tests/checkout-preis.test.ts`, `tests/integration/checkout-preis.int.test.ts`.
+
 ### BUG: Storno-Rückbuchung nicht atomar, Doppeltipp buchte doppelt (behoben 2026-09-24)
 
 **Symptom (statisch belegt, kein Kundenfall):** `cancelOrder` prüfte den Status nur
@@ -762,8 +779,9 @@ deshalb mit 409 `WARENKORB_GEAENDERT` zurück, statt still mitbestellt zu werden
 - Bereiche 2: Umschalter und Facetten auf /hoefe, Hofseite nach Bereich
   sektioniert, Produktdetail mit Akkordeon „Kennzeichnung" (dort liest
   `betriebsnummerFuerAnzeige` die Nummer).
-- Befund außerhalb dieses Sprints: `/api/checkout` übernimmt `unitPrice` aus dem
-  Request, ohne ihn mit `Product.price` abzugleichen. Eigene Aufgabe (`/fix`).
+- ~~Befund außerhalb dieses Sprints: `/api/checkout` übernimmt `unitPrice` aus dem
+  Request, ohne ihn mit `Product.price` abzugleichen.~~ Behoben 2026-09-24, siehe
+  „Bekannte Bugs & Fixes".
 
 ---
 

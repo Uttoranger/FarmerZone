@@ -49,6 +49,7 @@ describe('POST /api/checkout — Betriebsnachweis in der echten Datenbank', () =
       stock: 6,
       abgabe: 'NUR_BETRIEBE',
       name: 'Hafer im Big Bag',
+      price: 180,
     })
     const sitzung = intKennung('sitzung')
     await setzeHalt(hafer.id, sitzung, 1)
@@ -78,11 +79,12 @@ describe('POST /api/checkout — Betriebsnachweis in der echten Datenbank', () =
     // Die Anfrage behauptet nichts über die Abgabe — der Handler liest sie aus
     // der Datenbank. Ein manipulierter Warenkorb hilft deshalb nicht.
     const { farm } = await erstelleHof()
-    const harmlos = await erstelleProdukt(farm.id, { stock: 5, name: 'Eier' })
+    const harmlos = await erstelleProdukt(farm.id, { stock: 5, name: 'Eier', price: 3.6 })
     const hafer = await erstelleProdukt(farm.id, {
       stock: 6,
       abgabe: 'NUR_BETRIEBE',
       name: 'Hafer im Big Bag',
+      price: 180,
     })
     const sitzung = intKennung('sitzung')
     await setzeHalt(harmlos.id, sitzung, 1)
@@ -119,6 +121,7 @@ describe('POST /api/checkout — Betriebsnachweis in der echten Datenbank', () =
       stock: 6,
       abgabe: 'NUR_BETRIEBE',
       name: 'Hafer im Big Bag',
+      price: 180,
     })
     const sitzung = intKennung('sitzung')
     await setzeHalt(hafer.id, sitzung, 1)
@@ -144,7 +147,7 @@ describe('POST /api/checkout — Betriebsnachweis in der echten Datenbank', () =
 
   it('lässt die Betriebsnummer leer, wenn keine Betriebsware im Korb liegt', async () => {
     const { farm } = await erstelleHof()
-    const eier = await erstelleProdukt(farm.id, { stock: 5, name: 'Eier' })
+    const eier = await erstelleProdukt(farm.id, { stock: 5, name: 'Eier', price: 3.6 })
     const sitzung = intKennung('sitzung')
     await setzeHalt(eier.id, sitzung, 1)
 

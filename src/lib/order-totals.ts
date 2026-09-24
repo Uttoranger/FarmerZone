@@ -23,6 +23,31 @@ export function eurosToCents(amount: number): number {
   return Math.round(amount * 100)
 }
 
+/** Eine Position, deren Preis nicht mehr zur Datenbank passt — mit dem gültigen Preis. */
+export type PreisAbweichung = { productId: string; name: string; price: number }
+
+/**
+ * Welche Positionen einen anderen Preis tragen als die Datenbank? Verglichen
+ * wird auf den Cent, damit ein Float-Rest (4.99 vs. 4.990000001) nicht als
+ * Änderung zählt. Der Warenkorb ist nie die Wahrheit über den Preis — weicht
+ * er ab, hat der Hof ihn geändert oder jemand hat den Request gebaut. Beides
+ * darf nie zu einer Bestellung zu einem Preis führen, den die DB nicht kennt.
+ */
+export function preisAbweichungen(
+  positionen: ReadonlyArray<{ productId: string; name: string; unitPrice: number }>,
+  dbPreise: ReadonlyMap<string, number>
+): PreisAbweichung[] {
+  const abweichend: PreisAbweichung[] = []
+  for (const p of positionen) {
+    const gueltig = dbPreise.get(p.productId)
+    if (gueltig === undefined) continue
+    if (eurosToCents(p.unitPrice) !== eurosToCents(gueltig)) {
+      abweichend.push({ productId: p.productId, name: p.name, price: gueltig })
+    }
+  }
+  return abweichend
+}
+
 /** Eine Bestellposition für die Summe je Steuersatz — Werte wie aus Prisma (Decimal) oder als Text. */
 export type PositionMitSatz = {
   vatRate: DecimalEingabe

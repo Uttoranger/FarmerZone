@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { sendOnsiteConfirmation } from '@/lib/email'
 import { checkoutRequestSchema } from '@/schemas/checkout'
-import { calcTotalAmount, calcPlatformFeeAmount, eurosToCents } from '@/lib/order-totals'
+import { calcTotalAmount, calcPlatformFeeAmount, eurosToCents, preisAbweichungen } from '@/lib/order-totals'
 import { berechneServicegebuehr } from '@/lib/servicegebuehr'
 import { pruefeSitzungsWarenkorb } from '@/server/warenkorb'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
@@ -203,13 +203,13 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 3b. ABGABE UND MWST AUS DER DATENBANK (Sprint Bereiche 1). Der Warenkorb
-  //     ist nie die Wahrheit: Ob ein Futtermittel nur an Betriebe geht und
+  // 3b. PREIS, ABGABE UND MWST AUS DER DATENBANK. Der Warenkorb ist nie die
+  //     Wahrheit: Was ein Produkt kostet, ob es nur an Betriebe geht und
   //     welcher MwSt-Satz gilt, steht am Produkt — nicht in dem, was der
   //     Browser schickt. Nur Produkte DIESES Hofs zählen.
   const produkte = await prisma.product.findMany({
     where: { id: { in: data.items.map((i) => i.productId) }, farmId: farm.id },
-    select: { id: true, vatRate: true, abgabe: true },
+    select: { id: true, price: true, vatRate: true, abgabe: true },
   })
   const produktJeId = new Map(produkte.map((p) => [p.id, p]))
   if (data.items.some((i) => !produktJeId.has(i.productId))) {
@@ -218,6 +218,29 @@ export async function POST(request: NextRequest) {
       { status: 409 }
     )
   }
+
+  // Weicht ein Preis ab, entsteht KEINE Bestellung: Die Kundin soll nie einen
+  // Betrag zahlen, den sie nicht gesehen hat. Die Antwort liefert die gültigen
+  // Preise mit; der Checkout übernimmt sie in den Warenkorb und zeigt die neue
+  // Summe (dasselbe Muster wie bei gekürzten Mengen).
+  const dbPreise = new Map(produkte.map((p) => [p.id, Number(p.price)]))
+  const abweichend = preisAbweichungen(data.items, dbPreise)
+  if (abweichend.length > 0) {
+    const namen = abweichend.map((a) => `„${a.name}“`).join(', ')
+    return NextResponse.json(
+      {
+        error:
+          abweichend.length === 1
+            ? `Der Preis von ${namen} hat sich geändert. Bitte prüfe deinen Warenkorb.`
+            : `Die Preise von ${namen} haben sich geändert. Bitte prüfe deinen Warenkorb.`,
+        code: 'WARENKORB_GEAENDERT',
+        preise: abweichend.map(({ productId, price }) => ({ productId, price })),
+      },
+      { status: 409 }
+    )
+  }
+  // Ab hier rechnet alles mit dem Preis aus der DB — auch wenn er gleich war.
+  const positionen = data.items.map((i) => ({ ...i, unitPrice: dbPreise.get(i.productId)! }))
 
   // 3c. BETRIEBSNACHWEIS — serverseitig erneut, auch wenn das Formular schon
   //     geprüft hat. Vor jeder Buchung: Ein Verstoß bucht keinen Bestand und
@@ -255,7 +278,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 5. Totals — totalAmount ist und bleibt der WARENPREIS (Umsatz des Hofes)
-  const totalAmount = calcTotalAmount(data.items)
+  const totalAmount = calcTotalAmount(positionen)
   const platformFeeAmount = calcPlatformFeeAmount(totalAmount, Number(farm.platformFeePercent))
 
   // 5b. Servicegebühr — aus der Hofeinstellung ZUM BESTELLZEITPUNKT berechnet
@@ -325,7 +348,7 @@ export async function POST(request: NextRequest) {
         kaeuferArt: data.kaeuferArt,
         betriebsnummer: betriebsnummerFuerBestellung(data.kaeuferArt, data.betriebsnummer),
         items: {
-          create: data.items.map((i) => ({
+          create: positionen.map((i) => ({
             productId: i.productId,
             productName: i.name,
             unitPrice: i.unitPrice,
@@ -485,7 +508,7 @@ export async function POST(request: NextRequest) {
             city: farm.city,
             phone: farm.phone,
           },
-          items: data.items.map((i) => ({
+          items: positionen.map((i) => ({
             productName: i.name,
             quantity: i.quantity,
             unitPrice: i.unitPrice,

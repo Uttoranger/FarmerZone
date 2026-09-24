@@ -91,7 +91,8 @@ beforeEach(() => {
     return Promise.resolve(
       gesucht
         .filter((id) => PRODUKTE[id] && (w.farmId === undefined || PRODUKTE[id].farmId === w.farmId))
-        .map((id) => ({ id, stock: 999, isAvailable: true, ...PRODUKTE[id] }))
+        // price passt zur Anfrage (unitPrice 5) — sonst greift die Preisprüfung.
+        .map((id) => ({ id, stock: 999, isAvailable: true, price: 5, ...PRODUKTE[id] }))
     )
   }) as never)
   reservationFindMany.mockImplementation(((a: { where?: Where }) => {
