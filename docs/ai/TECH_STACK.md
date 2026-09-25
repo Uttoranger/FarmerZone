@@ -9,7 +9,7 @@ Stand: 2026-09. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 | Paket | Version | Kritisch für KI |
 |---|---|---|
 | `next` | **16.2.6** | App Router. `after()` verfügbar. Keine Pages-Router-Muster. |
-| `react` / `react-dom` | **19.2.4** | Server Components Standard. `useActionState`, kein `useFormState`. |
+| `react` / `react-dom` | **19.2.4** | Server Components Standard. `useActionState`, kein `useFormState`. `useOptimistic` für vorgezogene Zustände (Vorbild: `src/components/products/im-shop-schalter.tsx`). |
 | `typescript` | ^5 | `strict: true` |
 | `prisma` / `@prisma/client` | **^7.8.0** | Treiber-Adapter Pflicht (s. u.) |
 | `@prisma/adapter-pg` + `pg` | ^7.8.0 / ^8.21.0 | Verbindung läuft über den Adapter |
@@ -37,6 +37,18 @@ Stand: 2026-09. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 **Next 16:**
 - `params` und `searchParams` sind **Promises** → `const { farmSlug } = await params`.
 - Langsame Arbeit nach der Antwort: `after()` aus `next/server`, gekapselt in `nachDerAntwort()` (`src/lib/nach-der-antwort.ts`). Nie `after()` direkt aufrufen.
+- **Cache-Entwertung hat sich geändert, und zwar still.** `revalidateTag(tag)` mit
+  einem Argument warnt zur Laufzeit und ist typseitig unvollständig — die Signatur
+  ist jetzt `revalidateTag(tag, profile)`. Aus einer **Server Action** gehört
+  stattdessen `updateTag(tag)`: ein Argument, sofortige Entwertung, „lies deine
+  eigene Schreibung". Es **wirft** außerhalb einer Server Action, also auch in
+  Route-Handlern — dort bleibt `revalidateTag` mit zweitem Argument. Dazu neu:
+  `refresh()` aktualisiert nur den Client-Cache, keine Daten.
+- **`revalidatePath` erreicht keinen `unstable_cache`-Eintrag.** Wer einen solchen
+  Cache anlegt, gibt ihm ein `tags` — ohne Etikett gibt es keinen Weg, ihn vor
+  Ablauf zu leeren. Vorbild: `src/app/(public)/hoefe/page.tsx` mit
+  `HOEFE_CACHE_TAG` aus `src/lib/hofuebersicht.ts`, entwertet in
+  `src/server/actions/products.ts`.
 
 ---
 

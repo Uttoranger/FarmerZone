@@ -117,6 +117,7 @@ export function FarmPageClient({ farm, activeStatus, pastStatusCount }: Props) {
         ownerMode={true}
         mode={mode}
         pastStatusCount={pastStatusCount}
+        onVorschau={() => setMode('preview')}
       />
     </>
   )

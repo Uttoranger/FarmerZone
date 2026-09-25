@@ -1356,6 +1356,96 @@ installieren.
 
 ---
 
+## Sichtbarkeits-Schalter: „Im Shop" mit einem Tipp (2026-09-25)
+
+Auf jeder Produktkarte im Bearbeitungsmodus von „Meine Hof-Seite" und in jeder
+Zeile der Produktliste sitzt ein Schalter „Im Shop". Ein Tipp blendet das Produkt
+aus oder ein, ohne Rückfrage — dafür hält der Toast sechs Sekunden „Rückgängig"
+bereit, wie die Bestell-Aktionen. Geschrieben wird `Product.isAvailable`; es gab
+keine Schemaänderung.
+
+### Zwei Zustände, die man nicht verwechseln darf
+
+| | „Nicht im Shop" | „Ausverkauft" |
+|---|---|---|
+| Woher | der Hof hat den Schalter ausgeschaltet | `stock` ist 0, Schalter bleibt AN |
+| Was die Kundin sieht | **nichts** — das Produkt ist nicht da | das Produkt mit dem Hinweis „Ausverkauft" |
+| Was der Hof sieht | blasse Karte, Streifen „Nicht im Shop" | Streifen „Ausverkauft", darunter „Bestand 0 — Kunden sehen ‚Ausverkauft'" |
+
+Die **Reihenfolge zwischen beiden ist entschieden**: Trifft beides zu
+(abgeschaltet UND Bestand 0), heißt es „Nicht im Shop". „Ausverkauft" wäre ein
+Versprechen, dass es wiederkommt, sobald der Hof nachlegt — und das gilt nur,
+solange der Schalter an ist.
+
+**Das Wort „Ausgeblendet" gibt es in der Oberfläche nicht mehr**, und „Pausiert"
+auch nicht: Pause heißt bei uns der ganze Hof (Hof-Pause). Ein Wort für zwei
+Dinge ließ den Hof rätseln, was er gerade abgeschaltet hatte. Der Aus-Zustand
+heißt überall gleich „Nicht im Shop" — auf dem Streifen, als Marke in der Liste
+und im Toast. Die Beschriftung des Schalters selbst wechselt **nicht**: Sie
+lautet immer „Im Shop", der Zustand steckt in der Schalterstellung.
+
+Wo diese Entscheidung lebt: `src/lib/produkt-sichtbarkeit.ts`, rein und
+getestet. Vorher lag dieselbe Ableitung zweimal im Code — `getStripState` im
+Produktraster und `getStatus` in der Produktliste, mit verschiedenen Wörtern.
+Mit dem Schalter wäre ein dritter Ort dazugekommen.
+
+### Warum der Schalter den Cache der Hofübersicht entwerten muss
+
+`/hoefe` hält seine Hofdaten in einem `unstable_cache` mit fünf Minuten Laufzeit.
+Dieser Eintrag hatte **kein Etikett**, und ohne Etikett gibt es keinen Weg, ihn
+vor Ablauf zu leeren: `revalidatePath` erreicht einen Dateneintrag nicht. Alle
+acht Produktaktionen revalidierten also `/products`, `/<slug>` und `/farm-page`
+— und die Hofübersicht zeigte bis zu fünf Minuten weiter den alten Stand. Das
+betraf nicht nur die Sichtbarkeit, sondern auch Preis, Name und Bestand.
+
+Behoben für alle acht Aktionen: Der Cache trägt jetzt `HOEFE_CACHE_TAG`
+(`src/lib/hofuebersicht.ts` — ein reines Modul, damit weder die Seite die Query
+noch die Action die Seite importieren muss), und der Helfer `revalidate()` in
+`src/server/actions/products.ts` entwertet es.
+
+**Versionsfalle, die dabei auffiel** (Regel jetzt in `docs/ai/TECH_STACK.md`): In
+Next 16 verlangt `revalidateTag` ein zweites Argument und warnt ohne es. Aus
+einer Server Action heißt die Funktion `updateTag(tag)` — sie nimmt nur das
+Etikett, entwertet sofort und wirft außerhalb einer Server Action.
+
+### Was NICHT geändert wurde, obwohl der Auftrag es vorsah
+
+Der Auftrag nannte eine Lücke im Checkout: Die Produktabfrage in Schritt 3b
+(`src/app/api/checkout/route.ts`) filtert nur auf `id` und `farmId`, ein
+ausgeblendetes Produkt aus einem alten Warenkorb sei damit noch bestellbar.
+**Die Lücke existiert nicht.** Schritt 3 davor ruft `pruefeSitzungsWarenkorb`,
+das `isAvailable` mitliest (`src/server/warenkorb.ts`); `pruefeWarenkorb` macht
+daraus `zustand: 'weg'` (`src/lib/reservierung.ts`), und der Handler antwortet
+409 — vor Schritt 3b und lange vor jeder Bestandsbuchung. Ein Test dafür wäre
+schon vor der Änderung grün gewesen und hätte nichts bewiesen.
+
+Statt eines Fixes gibt es **Regressionsschutz** an der Stelle, die es wirklich
+entscheidet: `tests/warenkorb-sichtbarkeit.test.ts`. `src/server/warenkorb.ts`
+hatte bis dahin keinen einzigen Test — fiele `isAvailable` eines Tages aus der
+`select`-Liste, wäre nichts rot. Der Test prüft beides: das Ergebnis und dass
+die Spalte überhaupt abgefragt wird.
+
+### Kleinigkeiten am Rand
+
+- Die Farben des Bestandsstreifens sind von vier harten Hex-Werten auf Tokens
+  umgestellt (`CODING_STANDARDS.md` §7). Vorher saß im dunklen Modus dunkelgraue
+  Schrift auf beigem Grund.
+- Die Blässe der ausgeblendeten Karte (`opacity: 0.55`) sitzt nicht mehr an der
+  Hülle, sondern an den Teilen, die blass werden sollen. Deckkraft wirkt auf den
+  ganzen Teilbaum, und der Schalter muss voll deckend bleiben: Er ist das
+  Bedienelement, das die Blässe erklärt, und seine Schiene fiele bei 55 % unter
+  den Mindestkontrast.
+- Der Hinweissatz über der Produktliste ist ein Knopf geworden („Kunden sehen
+  deine Produkte getrennt nach Hofladen und Futter. Ansehen →") und wechselt in
+  die Kundenansicht. Dafür brauchte es einen Rückweg für `setMode`: Der Zustand
+  floss bisher nur nach unten, jetzt geht ein Callback von
+  `farm-page-client.tsx` über `FarmPageView` bis ins `ProductGrid`.
+- `unavailableReason` wird beim Umschalten **nicht** angefasst. Wer ein Produkt
+  kurz abschaltet und wieder einschaltet, behält seine Notiz („Saison vorbei,
+  wieder ab November"), statt sie neu zu tippen.
+
+---
+
 ## Nützliche Befehle
 
 ```bash

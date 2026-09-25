@@ -403,6 +403,24 @@ export const kategorieSetzenSchema = z
     message: 'Diese Unterkategorie passt nicht zur Kategorie.',
   })
 
+/**
+ * Der Schalter „Im Shop" (produktSichtbarkeitSetzen).
+ *
+ * `strict()`, weil hier nur zwei Dinge hineingehören: welches Produkt und ob es
+ * im Shop steht. Ein Schalter, der versehentlich mehr Felder durchließe, wäre
+ * ein zweiter Weg, ein Produkt zu ändern — und einer, den niemand als solchen
+ * liest. `imShop` ist bewusst ein Boolean und kein „toggle": Der Browser sagt
+ * den gewünschten Zustand, nicht „das Gegenteil von was auch immer jetzt gilt".
+ * Zwei schnelle Tipps hintereinander landen so verlässlich, statt sich zu
+ * überkreuzen.
+ */
+export const sichtbarkeitSchema = z
+  .object({
+    productId: z.string().min(1).max(100),
+    imShop: z.boolean(),
+  })
+  .strict()
+
 /** Anfrage des Dual-Use-Hinweises (pruefeDualUse) — Name, Kategorie und beim Bearbeiten die eigene ID. */
 export const dualUseAnfrageSchema = z.object({
   name: z.string().max(100),

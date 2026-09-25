@@ -1,13 +1,14 @@
 'use server'
 
 import { headers } from 'next/headers'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
   productAnlegenSchema,
   productFormSchema,
   kategorieSetzenSchema,
+  sichtbarkeitSchema,
   type FutterKennzeichnungFormData,
   type ProductFormData,
 } from '@/schemas/product'
@@ -16,6 +17,7 @@ import { mwstStandard } from '@/lib/mwst'
 import { dualUseHinweis, normiereProduktname, DUAL_USE_MIN_ZEICHEN } from '@/lib/dual-use'
 import { dualUseAnfrageSchema } from '@/schemas/product'
 import { getFarmForUser } from '@/server/queries/dashboard'
+import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 
 async function getAuthenticatedFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -29,6 +31,18 @@ function revalidate(farmSlug: string) {
   revalidatePath('/products')
   revalidatePath(`/${farmSlug}`)
   revalidatePath('/farm-page')
+  // Die Hofübersicht hängt an einem eigenen Fünf-Minuten-Cache, den kein
+  // revalidatePath erreicht (src/app/(public)/hoefe/page.tsx). Ohne diese Zeile
+  // stand ein ausgeblendetes, umbenanntes oder ausverkauftes Produkt dort bis
+  // zu fünf Minuten weiter — bei einem Schalter, der sofort wirken soll, ist
+  // das keine Verzögerung, sondern ein falsches Versprechen.
+  //
+  // updateTag, NICHT revalidateTag: In Next 16 verlangt revalidateTag ein
+  // zweites Argument und warnt ohne es; updateTag gilt für Server Actions, gibt
+  // „lies deine eigene Schreibung" und braucht kein Profil. Es WIRFT außerhalb
+  // einer Server Action — dieser Helfer wird ausschließlich von den Aktionen
+  // dieser Datei gerufen, nie aus einer Route.
+  updateTag(HOEFE_CACHE_TAG)
 }
 
 export type ProduktErgebnis = { ok: true } | { error: string }
@@ -198,6 +212,43 @@ export async function setzeKategorie(input: unknown): Promise<ProduktErgebnis> {
     const ohneMwst = await prisma.product.updateMany({ where: basis, data: { category, subcategory } })
     if (ohneMwst.count === 0) return { error: 'Das Produkt hat schon eine Kategorie. Lade die Seite neu.' }
   }
+
+  revalidate(farm.slug)
+  return { ok: true }
+}
+
+/**
+ * Der Schalter „Im Shop" — ein Tipp blendet ein Produkt aus oder ein.
+ *
+ * Gebaut nach setzeKategorie oben, nicht nach togglePickupSlotActive in
+ * farm.ts: Die dortige Vorlage prüft weder mit Zod noch den Treffer und meldet
+ * einem fremden Produkt stillschweigend Erfolg. Hier gilt die Hausregel
+ * (CODING_STANDARDS, Beispiel 2): Besitz steht in der WHERE-Klausel, nicht in
+ * einem vorgelagerten `if` — sonst liegt zwischen Prüfung und Schreiben eine
+ * Lücke —, und `count === 0` ist die Antwort auf „gibt es nicht oder gehört
+ * nicht dir". Welcher der beiden Fälle es war, erfährt der Browser nicht; das
+ * wäre eine Auskunft über fremde Daten.
+ *
+ * `unavailableReason` wird NICHT angefasst. Der Grund ist die Notiz des Hofes,
+ * warum etwas gerade nicht da ist („Saison vorbei, wieder ab November"). Wer
+ * ein Produkt kurz abschaltet und wieder einschaltet, soll seine Notiz
+ * behalten, statt sie neu tippen zu müssen.
+ */
+export async function produktSichtbarkeitSetzen(input: unknown): Promise<ProduktErgebnis> {
+  const geprueft = sichtbarkeitSchema.safeParse(input)
+  if (!geprueft.success) return { error: 'Das hat nicht geklappt. Bitte nochmal.' }
+  const { productId, imShop } = geprueft.data
+
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) return { error: 'Bitte melde dich neu an.' }
+  const farm = await getFarmForUser(session.user.id)
+  if (!farm) return { error: 'Kein Hof gefunden.' }
+
+  const { count } = await prisma.product.updateMany({
+    where: { id: productId, farmId: farm.id },
+    data: { isAvailable: imShop },
+  })
+  if (count === 0) return { error: 'Produkt nicht gefunden.' }
 
   revalidate(farm.slug)
   return { ok: true }

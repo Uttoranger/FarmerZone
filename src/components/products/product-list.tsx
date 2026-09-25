@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition, useEffect, useOptimistic } from 'react'
 import { toast } from 'sonner'
 import {
   Package,
@@ -33,6 +33,8 @@ import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 import { ProductDialog } from './product-dialog'
 import { StockDialog } from './stock-dialog'
 import { PageHeader } from '@/components/farmer/page-header'
+import { ImShopSchalter } from '@/components/products/im-shop-schalter'
+import { kopfzeileProdukte, markeText, produktZustand } from '@/lib/produkt-sichtbarkeit'
 
 type Props = {
   products: ProductData[]
@@ -41,16 +43,18 @@ type Props = {
   hofBetriebsnummer: string | null
 }
 
-function getStatus(p: ProductData, stock: number) {
-  if (!p.isAvailable) return 'pausiert'
-  if (stock <= 0) return 'ausverkauft'
-  return 'aktiv'
-}
-
-const STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  aktiv: { label: 'Aktiv', className: 'bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-200 border-green-200 dark:border-green-900/60' },
-  ausverkauft: { label: 'Ausverkauft', className: 'bg-red-100 dark:bg-red-950/50 text-red-800 dark:text-red-200 border-red-200 dark:border-red-900/60' },
-  pausiert: { label: 'Pausiert', className: 'bg-muted text-muted-foreground border-border' },
+/**
+ * Nur noch die Farben. WAS die Marke sagt, entscheidet
+ * src/lib/produkt-sichtbarkeit.ts — vorher stand dieselbe Ableitung auch im
+ * Produktraster der Hofseite, mit anderen Wörtern.
+ *
+ * „Pausiert" ist verschwunden: Das heißt bei uns der ganze Hof (Hof-Pause).
+ * Ein einzelnes Produkt ist „Nicht im Shop".
+ */
+const MARKE_FARBE: Record<string, string> = {
+  Aktiv: 'bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-200 border-green-200 dark:border-green-900/60',
+  Ausverkauft: 'bg-red-100 dark:bg-red-950/50 text-red-800 dark:text-red-200 border-red-200 dark:border-red-900/60',
+  'Nicht im Shop': 'bg-muted text-muted-foreground border-border',
 }
 
 export function ProductList({ products: initialProducts, initialEditId, hofBetriebsnummer }: Props) {
@@ -78,11 +82,24 @@ export function ProductList({ products: initialProducts, initialEditId, hofBetri
   const [deleteConfirm, setDeleteConfirm] = useState<ProductData | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  // Use latest product data but keep optimistic stock
-  const products = initialProducts.map((p) => ({
-    ...p,
-    stock: stocks[p.id] ?? p.stock,
-  }))
+  // Sprint Sichtbarkeits-Schalter: der vorgezogene Sichtbarkeitsstand. Leerer
+  // Grundzustand — nach der Transition sind die Props die Wahrheit, und
+  // scheitert die Aktion, fällt React von selbst dorthin zurück.
+  const [vorgezogen, setzeVorgezogen] = useOptimistic<
+    Record<string, boolean>,
+    { id: string; imShop: boolean }
+  >({}, (stand, aenderung) => ({ ...stand, [aenderung.id]: aenderung.imShop }))
+
+  // Neuester Server-Stand, aber mit optimistischem Bestand UND optimistischer
+  // Sichtbarkeit — beides muss die Kopfzeile sofort mitzählen.
+  const products = initialProducts.map((p) => {
+    const sichtbar = vorgezogen[p.id]
+    return {
+      ...p,
+      stock: stocks[p.id] ?? p.stock,
+      isAvailable: sichtbar === undefined ? p.isAvailable : sichtbar,
+    }
+  })
 
   function handleOptimisticUpdate(productId: string, newStock: number) {
     setStocks((prev) => ({ ...prev, [productId]: newStock }))
@@ -145,9 +162,7 @@ export function ProductList({ products: initialProducts, initialEditId, hofBetri
       {/* Header */}
       <PageHeader
         title="Produkte"
-        subtitle={products.length === 0
-          ? 'Noch keine Produkte'
-          : `${products.filter((p) => p.isAvailable).length} aktiv · ${products.length} gesamt`}
+        subtitle={kopfzeileProdukte(products)}
         action={
           <Button
             onClick={() => setEditDialog({ open: true, product: null })}
@@ -178,8 +193,8 @@ export function ProductList({ products: initialProducts, initialEditId, hofBetri
       {/* Product cards */}
       <div className="space-y-3">
         {products.map((product) => {
-          const status = getStatus(product, product.stock)
-          const badge = STATUS_BADGE[status]
+          const zustand = produktZustand(product)
+          const marke = markeText(zustand)
           const isPending = pendingIds.has(product.id)
           const hinweise = produktHinweise(product)
 
@@ -219,8 +234,8 @@ export function ProductList({ products: initialProducts, initialEditId, hofBetri
                       <span className="font-medium text-foreground text-sm leading-tight">
                         {product.name}
                       </span>
-                      <Badge className={`text-[10px] px-1.5 py-0 border ${badge.className}`}>
-                        {badge.label}
+                      <Badge className={`text-[10px] px-1.5 py-0 border ${MARKE_FARBE[marke]}`}>
+                        {marke}
                       </Badge>
                       {product.isOrganic && (
                         <Leaf className="w-3.5 h-3.5 text-green-600 dark:text-green-400 shrink-0" />
@@ -313,6 +328,20 @@ export function ProductList({ products: initialProducts, initialEditId, hofBetri
                         ))}
                       </div>
                     </div>
+                  </div>
+
+                  {/* Der Schalter „Im Shop" — eigene Spalte VOR den
+                      Symbolknöpfen, nicht in ihnen: Die Aktionsspalte ist 40 px
+                      schmal, die Tippfläche hier soll 56 × 56 sein. Er steht
+                      rechts, wo in jeder Zeile dasselbe zu erwarten ist. */}
+                  <div className="shrink-0 flex items-center justify-center border-l border-border/50 px-0.5">
+                    <ImShopSchalter
+                      productId={product.id}
+                      name={product.name}
+                      imShop={product.isAvailable}
+                      setzeOptimistisch={(imShop) => setzeVorgezogen({ id: product.id, imShop })}
+                      variante="kompakt"
+                    />
                   </div>
 
                   {/* Action column */}

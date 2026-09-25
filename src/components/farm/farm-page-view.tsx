@@ -590,9 +590,11 @@ type Props = {
   mode?: 'edit' | 'preview'
   // Anzahl vergangener Status für den "Frühere Status (N)"-Button (Owner)
   pastStatusCount?: number
+  /** Wechselt in die Kundenansicht — nur im Bauern-Bereich gesetzt, wo `mode` lebt. */
+  onVorschau?: () => void
 }
 
-export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = false, mode = 'edit', pastStatusCount = 0 }: Props) {
+export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = false, mode = 'edit', pastStatusCount = 0, onVorschau }: Props) {
   const isEdit = ownerMode && mode !== 'preview'
   // Pausen-Banner: was Kundinnen und was der Hof sieht, entschieden in lib/shop-pause.ts.
   const pausen = pausenBanner({ ownerMode, vorschau: mode === 'preview', pauseMessage: farm.pauseMessage })
@@ -1346,6 +1348,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           ownerMode={ownerMode}
           mode={mode}
           isPaused={farm.isPaused}
+          onVorschau={onVorschau}
         />
         </div>{/* Ende #produkte */}
 
