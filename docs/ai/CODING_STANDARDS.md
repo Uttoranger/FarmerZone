@@ -39,7 +39,17 @@ Bei **jeder** Codeänderung lesen.
 ### Geld
 - Prisma speichert Preise als `Decimal(10,2)`.
 - **Nie** `Number(decimal)` für Rechnungen, die addiert oder multipliziert werden. Rundungsfehler landen auf der Rechnung des Hofs.
-- Rechnen in den vorhandenen Helfern: `src/lib/order-totals.ts`, `src/lib/servicegebuehr.ts`.
+- **In reinen Funktionen wird Geld in ganzen Cent (Int) gerechnet; `Decimal` ↔ Cent nur an der Servergrenze, über Decimal-Methoden.**
+  Ein Modul in `src/lib/` darf `prisma` nicht importieren (→ `ARCHITECTURE.md` §1),
+  und `Prisma.Decimal` käme genau von dort. Also: die Servergrenze wandelt einmal
+  (`betrag.mul(100).toNumber()` — **nie** `Number(betrag) * 100`, aus 19,99 €
+  würde sonst 1998,9999999999998), die Fachregel rechnet in Cent, die Anzeige
+  geht über `centsAlsEuro` + `formatEuro`. Vorbild: `src/lib/finanzen.ts`.
+- **Einen Betrag auf Teile verteilen heißt exakt verteilen, nicht n-mal runden.**
+  Rest = Betrag mod Anzahl; die ersten `Rest` Teile bekommen einen Cent mehr.
+  Zwölfmal kaufmännisch gerundet ergäbe aus 100 € im Jahr 99,96 € — und die vier
+  Cent stünden in keinem Monat (`kostenImMonat`).
+- Rechnen in den vorhandenen Helfern: `src/lib/order-totals.ts`, `src/lib/servicegebuehr.ts`, `src/lib/finanzen.ts`.
 - Anzeigen ausschließlich über `src/lib/format.ts` (`formatEuro`, `formatMenge`, `formatPosition`, `formatGrundpreis`).
 - **Preis-Semantik:** `price` ist der Preis je Gebinde, `unitSize` die Gebindegröße. Mit Gebinde schreibt die Anzeige „€ 50,00 für 2 kg" (nie „/ 2 kg"), darunter die Grundpreis-Zeile „€ 25,00 / kg" über `<GrundpreisZeile>` aus `src/components/shared/`. Bei Stück und Paket gibt es keine Grundpreis-Zeile. `grundpreisJeEinheit` ist nur Anzeige, nie Abrechnung.
 - Nie ein eigenes Preisformat erfinden. Nie `toFixed(2) + ' €'`.

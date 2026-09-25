@@ -1446,6 +1446,133 @@ die Spalte überhaupt abgefragt wird.
 
 ---
 
+## Admin-Finanzen: was die Plattform einnimmt und was sie kostet (2026-09-25)
+
+`/admin/finanzen` beantwortet EINE Frage: Ab wann trägt sich die Plattform? Die
+Einnahmen kommen automatisch aus den Bestellungen, die Kosten trägt der
+Betreiber einmal ein. Ein Überblick, keine Buchhaltung.
+
+### Die Einnahmen-Regel: vier Töpfe, die sich gegenseitig ausschließen
+
+Gerechnet wird ausschließlich die **Servicegebühr aus dem Snapshot**
+(`Order.serviceFeeCents`). Stichtag ist der **Bestelleingang** (`createdAt`) in
+Wiener Zeit — nicht der Abholtag und nicht der Zahltag: Nur so bleibt eine
+Bestellung für immer in demselben Monat, egal was später mit ihr passiert.
+
+**Die Tabelle wird von oben nach unten gelesen; die erste zutreffende Zeile
+gewinnt.** Sonst passte eine stornierte, bezahlte Bestellung in zwei Zeilen.
+
+| # | Topf | Bedingung | Bedeutung |
+|---|---|---|---|
+| 1 | **zählt nirgends** | `status = CANCELLED` **oder** `serviceFeeRefundedAt IS NOT NULL` | Storniert oder Gebühr entfallen — das sticht alles Weitere |
+| 2 | **eingezogen** | `paymentMethod = ONLINE` **und** `paymentStatus = PAID` | Liegt auf dem Plattformkonto |
+| 3 | **geschuldet** | `paymentMethod ∈ {ONSITE_CASH, ONSITE_CARD}` **und** `status = PICKED_UP` | Der Hof hat sie mitkassiert und schuldet sie der Abrechnung |
+| 4 | **zählt nirgends** | `status = NOT_PICKED_UP` | Da kommt nichts mehr |
+| 5 | **erwartet** | alles Übrige | Kann noch in Topf 2 oder 3 wandern |
+
+**Warum sie sich ausschließen müssen:** Eine bezahlte Online-Bestellung im
+Status `READY` steckt in Topf 1. Zählte sie zusätzlich als „erwartet", stünde
+dasselbe Geld zweimal auf der Seite — und die Kostendeckung wäre um genau diesen
+Betrag zu optimistisch.
+
+**`paymentStatus`, nicht `status`, entscheidet über „bezahlt".** Der
+Bestellstatus wandert weiter (`CONFIRMED` → `READY` → `PICKED_UP`), der
+Zahlungsstatus bleibt `PAID`. Wer auf `status = 'PAID'` prüft, verliert jede
+Bestellung, die schon einen Schritt weiter ist.
+
+Zwei Grenzfälle, absichtlich so:
+
+1. **Nicht abgeholt, Stripe-Erstattung gescheitert.** `serviceFeeRefundedAt`
+   bleibt null, der Status ist `NOT_PICKED_UP`. Die Bestellung zählt weiter als
+   **eingezogen** — sachlich richtig, das Geld liegt bis zur geglückten
+   Erstattung bei der Plattform (`gebuehrErstattungOffen` nennt genau diesen
+   Zustand).
+2. **`NOT_PICKED_UP` ist aus „erwartet" ausgeschlossen.** Da kommt nichts mehr,
+   auch wenn die Gebühr noch nicht als entfallen vermerkt ist.
+
+**Gezählte Bestellungen** (für den Durchschnitt und „Im September waren es M")
+sind die aus Topf 1 und 2 — die, die tatsächlich etwas eingebracht haben.
+Bewusst **nicht** `status <> CANCELLED` wie in der Admin-Hofliste: Diese Zahl hat
+dort einen anderen Zweck und darf hier nicht dieselbe sein.
+
+### Dieselbe Regel steht zweimal — und das ist bekannt
+
+`src/server/queries/admin.ts` (`monatsSpaltenJeHof`) rechnet für die
+Admin-Hofliste dieselben Töpfe in **rohem SQL**, als `FILTER`-Klauseln. Rohes SQL
+kann keine TypeScript-Funktion rufen, also bleiben es zwei Fassungen. Wer eine
+ändert, ändert die andere mit — sonst zeigen `/admin` und `/admin/finanzen` für
+denselben Monat verschiedene Zahlen. Die reine Funktion
+(`topfVonBestellung` in `src/lib/finanzen.ts`) benutzt dafür wenigstens dieselben
+Prädikate wie der Rest der Gebührenrechnung (`gebuehrEntfallen`,
+`istVorOrtZahlung`).
+
+Eine Abweichung ist bekannt und heute ohne Folgen: Die SQL-Fassung prüft im
+`online`-Bucket **nicht** auf `status <> CANCELLED`, die reine Funktion schon.
+Beide kommen trotzdem auf dieselbe Zahl, weil `cancelOrder` in derselben
+Transaktion `serviceFeeRefundedAt` setzt, sobald die Gebühr über 0 liegt
+(`src/server/actions/orders.ts:321`) — und bei 0 Cent gibt es nichts zu
+summieren. Wer an der Storno-Logik etwas ändert, muss diese Annahme mitprüfen.
+
+### „Eingezogen" ist ein Brutto — die Stripe-Gebühren fehlen darin
+
+Die Zahlung entsteht als **Destination Charge ohne `on_behalf_of`** auf dem
+**Plattformkonto** (`src/app/api/checkout/route.ts`). Stripe zieht seine Gebühren
+dort ab, der Hof bekommt `amount − application_fee_amount`. Also: **Die Plattform
+trägt die Stripe-Kosten, und zwar aus der Servicegebühr.** Gespeichert wird
+davon **nichts** — kein Gebührenbetrag, keine `balance_transaction`. Auf einer
+Seite, die „ab wann trägt sich die Plattform?" beantwortet, ist das eine Lücke
+von einigen Prozent, deshalb steht der Satz „Stripe-Gebühren sind hier noch
+nicht abgezogen" direkt unter der Zeile „Servicegebühr, online". Der Abruf über
+`balance_transaction.fee` ist ein eigener Sprint.
+
+### Kosten: Monate sind Kalenderdaten, keine Zeitpunkte
+
+`Kostenposten.ab` und `.bis` sind **`DATE`**, nicht `TIMESTAMP`, und immer der
+Erste eines Monats. Als Zeitstempel könnte die Umrechnung zwischen Wiener Zeit
+und UTC einen Posten in den Vormonat schieben: Wiener Mitternacht des 1.
+September ist `2026-08-31T22:00Z`. Geschrieben und gelesen wird darum mit
+UTC-Gettern (`monatAlsUtcDatum` / `utcDatumAlsMonat`), nicht mit
+`wienerMitternacht`. `bis` ist der **letzte** Monat, in dem der Posten zählt
+(einschließlich), nicht der erste danach.
+
+**Der Jahresbetrag wird exakt verteilt, nicht zwölfmal gerundet.** Rest =
+Jahresbetrag in Cent mod 12; die ersten `Rest` Monate **jedes Abo-Jahres**,
+gezählt ab `ab`, bekommen einen Cent mehr. 100 € ergeben vier Monate mit 8,34 €
+und acht mit 8,33 € — zusammen genau 100 €. Zwölfmal kaufmännisch gerundet wären
+es 99,96 €, und die vier Cent stünden in keinem Monat. Gezählt wird ab `ab`, nicht
+ab Jänner: Ein Abo, das im September beginnt, hat kein Kalenderjahr.
+
+**Beenden ist der Normalfall, Löschen die Ausnahme.** Löschen entfernt den Posten
+aus allen Monaten, auch aus denen, in denen er Geld gekostet hat — vergangene
+Monate sehen danach besser aus, als sie waren. Das Sheet sagt das hin, bevor es
+löscht.
+
+### Geld in ganzen Cent, Decimal nur an der Grenze
+
+`src/lib/finanzen.ts` rechnet durchgehend in **ganzen Cent**. Der Grund ist eine
+Regel, keine Bequemlichkeit: Ein Modul in `src/lib/` darf `prisma` nicht
+importieren (ARCHITECTURE §1), und `Prisma.Decimal` käme genau von dort;
+`decimal.js` direkt wäre eine neue Abhängigkeit. Die Einnahmen liegen ohnehin als
+Int-Cent in der Datenbank. Die `Decimal`-Spalte `Kostenposten.betrag` wird an der
+Servergrenze **über die Decimal-Methode** gewandelt: `betrag.mul(100).toNumber()`.
+`Number(betrag) * 100` ergibt bei 19,99 € nachweislich 1998,9999999999998 —
+gegen echtes Postgres geprüft.
+
+### Was die Seite bewusst NICHT tut
+
+- **Keine Abrechnung mit den Höfen.** Die vor Ort kassierte Gebühr steht als
+  „noch offen" da; sie einzuziehen ist ein eigener Sprint.
+- **Kein automatischer Abruf von Kosten** (Vercel-API, Stripe-Gebühren).
+- **Keine Fremdwährung.** Beträge in Euro, so wie abgebucht.
+- **Die Zeile „Provision" erscheint nur, wenn sie im Monat nicht 0 ist.**
+  `Farm.platformFeePercent` steht im Pilot auf 0; eine Nullzeile auf jeder Seite
+  ist Rauschen.
+- **Im Seed nur erkennbar erfundene Beispielposten** („Beispiel-Hosting", runde
+  Beträge). Das Repository ist öffentlich; die echten Kosten der Plattform
+  gehören nicht hinein.
+
+---
+
 ## Nützliche Befehle
 
 ```bash

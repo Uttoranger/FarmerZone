@@ -94,6 +94,26 @@ Der Briefkasten hat zwei API-Routen, weil ihre Aufrufer extern sind (CLI, GitHub
 4. Zod-Validierung des Arguments.
 5. `revalidatePath()` für jede betroffene Route.
 
+### Die Admin-Prüfung: `src/server/admin-wache.ts`
+
+Für den Betreiber-Bereich gibt es **eine** Antwort auf „darf dieser Mensch die
+Plattform verwalten?", mit zwei Ausgängen:
+
+| Wo | Aufruf | Verhalten |
+|---|---|---|
+| Admin-**Seite** (`src/app/admin/**/page.tsx`) | `await verlangeAdminSeite()` | nicht angemeldet → `redirect('/login')`, angemeldet ohne Recht → `notFound()` |
+| Admin-**Aktion** (`'use server'`) | `await verlangeAdminAktion()` | `{ ok: true, userId } \| { error }` — die Antwortform der Actions |
+
+- Beide lesen das Recht über `isAdminUser` **frisch aus der Datenbank**, nie aus
+  der Session: `isAdmin` steckt bewusst nicht in den
+  Better-Auth-additionalFields, damit ein zurückgenommenes Recht sofort greift.
+- `notFound()` statt 403: Der Bereich gibt sich Unbefugten nicht zu erkennen.
+- Die Prüfung steht in **jeder** Aktion, nicht nur in der Seite. Eine Seite
+  schützt die Ansicht, eine Aktion schützt die Wirkung.
+- Im Admin gibt es keine Hofzugehörigkeit — das Admin-Recht **ist** die
+  Besitzprüfung. Keine eigene Fassung daneben bauen: Vorher lag die Frage an
+  vier Stellen und in zwei Implementierungen.
+
 ---
 
 ## 4. Datenfluss

@@ -213,15 +213,70 @@ export function kalendertagInWien(zeitpunkt: Date): string {
 }
 
 /**
- * Die Grenzen des laufenden Kalendermonats in Wiener Zeit — [von, bis) als
- * UTC-Zeitpunkte für die Datenbank, dazu die Bezeichnung („September 2026").
- * Grundlage der Admin-Monatsspalten und später der Monatsabrechnung.
+ * Ein Kalendermonat als `JJJJ-MM` — die Form, in der die Adresse den Monat
+ * trägt (`/admin/finanzen?monat=2026-09`) und in der ein Kostenposten sein
+ * `ab` und `bis` nennt.
+ *
+ * Ein MONAT, kein Zeitpunkt: Erst `monatsgrenzenWienFuer` macht daraus die
+ * beiden UTC-Zeitpunkte für die Datenbank. Wer mit einem Date rechnet, wo ein
+ * Monat gemeint ist, verschiebt ihn irgendwann über die Zeitzonengrenze.
  */
-export function monatsgrenzenWien(jetzt: Date): { von: Date; bis: Date; bezeichnung: string } {
-  const [jahr, monat] = kalendertagInWien(jetzt).split('-').map(Number)
-  const tag = (j: number, m: number) => `${j}-${String(m).padStart(2, '0')}-01`
-  const von = wienerMitternacht(tag(jahr, monat))
-  const bis = wienerMitternacht(monat === 12 ? tag(jahr + 1, 1) : tag(jahr, monat + 1))
+export type Monatsschluessel = string
+
+const MONATSMUSTER = /^(\d{4})-(0[1-9]|1[0-2])$/
+
+/** Ist das ein gültiger Monatsschlüssel? (Zod und die Adressleiste fragen hier.) */
+export function istMonatsschluessel(wert: string): boolean {
+  return MONATSMUSTER.test(wert)
+}
+
+/** Jahr und Monat (1–12) → `2026-09`. */
+export function monatsschluessel(jahr: number, monat: number): Monatsschluessel {
+  return `${String(jahr).padStart(4, '0')}-${String(monat).padStart(2, '0')}`
+}
+
+/** `2026-09` → `{ jahr: 2026, monat: 9 }`, bei Unsinn null. */
+export function zerlegeMonat(monat: Monatsschluessel): { jahr: number; monat: number } | null {
+  const treffer = MONATSMUSTER.exec(monat)
+  if (!treffer) return null
+  return { jahr: Number(treffer[1]), monat: Number(treffer[2]) }
+}
+
+/**
+ * Einen Monat um `schritte` Monate verschieben (negativ = zurück).
+ * Gerechnet wird in Monaten seit Jahr 0, nicht mit einem Date — ein Date würde
+ * beim 31. in einem 30-tägigen Monat überlaufen.
+ */
+export function monatVerschoben(monat: Monatsschluessel, schritte: number): Monatsschluessel {
+  const teile = zerlegeMonat(monat)
+  if (!teile) throw new Error('Kein Monatsschlüssel')
+  const gesamt = teile.jahr * 12 + (teile.monat - 1) + schritte
+  return monatsschluessel(Math.floor(gesamt / 12), (gesamt % 12) + 1)
+}
+
+/** Wie viele Monate liegen zwischen `von` und `bis`? (bis vor von = negativ.) */
+export function monatsAbstand(von: Monatsschluessel, bis: Monatsschluessel): number {
+  const a = zerlegeMonat(von)
+  const b = zerlegeMonat(bis)
+  if (!a || !b) throw new Error('Kein Monatsschlüssel')
+  return (b.jahr - a.jahr) * 12 + (b.monat - a.monat)
+}
+
+/**
+ * Die Grenzen EINES Kalendermonats in Wiener Zeit — [von, bis) als
+ * UTC-Zeitpunkte für die Datenbank, dazu die Bezeichnung („September 2026").
+ * Grundlage der Admin-Monatsspalten, der Finanzseite und der Monatsabrechnung.
+ */
+export function monatsgrenzenWienFuer(monat: Monatsschluessel): {
+  von: Date
+  bis: Date
+  bezeichnung: string
+} {
+  const teile = zerlegeMonat(monat)
+  if (!teile) throw new Error('Monatsgrenzen nicht bestimmbar')
+  const tag = (m: Monatsschluessel) => `${m}-01`
+  const von = wienerMitternacht(tag(monat))
+  const bis = wienerMitternacht(tag(monatVerschoben(monat, 1)))
   if (!von || !bis) throw new Error('Monatsgrenzen nicht bestimmbar')
   const bezeichnung = von.toLocaleDateString('de-AT', {
     month: 'long',
@@ -229,6 +284,24 @@ export function monatsgrenzenWien(jetzt: Date): { von: Date; bis: Date; bezeichn
     timeZone: 'Europe/Vienna',
   })
   return { von, bis, bezeichnung }
+}
+
+/**
+ * In welchem Kalendermonat liegt dieser Zeitpunkt — in WIENER Zeit?
+ * Eine Bestellung am 30. September um 23:30 Uhr Wien ist 21:30 UTC und gehört
+ * in den September; eine am 1. Oktober um 00:30 Wien ist 22:30 UTC am 30.
+ * September und gehört trotzdem in den Oktober.
+ */
+export function monatsschluesselInWien(zeitpunkt: Date): Monatsschluessel {
+  return kalendertagInWien(zeitpunkt).slice(0, 7)
+}
+
+/**
+ * Die Grenzen des LAUFENDEN Kalendermonats in Wiener Zeit.
+ * Dünne Hülle über `monatsgrenzenWienFuer`, damit es eine Rechnung bleibt.
+ */
+export function monatsgrenzenWien(jetzt: Date): { von: Date; bis: Date; bezeichnung: string } {
+  return monatsgrenzenWienFuer(monatsschluesselInWien(jetzt))
 }
 
 /**

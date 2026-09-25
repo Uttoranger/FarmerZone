@@ -241,6 +241,26 @@ enum MeldungStatus {
   DUPLIKAT
 }
 
+// Wofür die Plattform Geld ausgibt — die Kategorie gruppiert nur die Liste,
+// sie rechnet nichts.
+enum KostenKategorie {
+  HOSTING
+  DATENBANK
+  KI
+  WERKZEUGE
+  DOMAIN
+  EMAIL
+  SONSTIGES
+}
+
+// Wie oft der Betrag anfällt. JAEHRLICH wird auf die zwölf Monate des
+// Abo-Jahres verteilt (src/lib/finanzen.ts), EINMALIG zählt nur im Monat von ab.
+enum KostenRhythmus {
+  MONATLICH
+  JAEHRLICH
+  EINMALIG
+}
+
 // === ENTITÄTEN ===
 
 model User {
@@ -792,4 +812,29 @@ model Meldung {
   @@index([status])
   @@index([clusterKey])
   @@index([farmId])
+}
+
+// Ein laufender Kostenposten der PLATTFORM — nicht eines Hofes. Der Betreiber
+// trägt ihn einmal ein („Hosting, 20 €, monatlich, ab September 2026"), die
+// Finanzseite legt ihn gegen die Servicegebühren des Monats.
+//
+// ab und bis sind DATE, nicht DateTime: Ein Monat ist ein Kalenderdatum, kein
+// Zeitpunkt. Als Zeitstempel könnte die Umrechnung zwischen Wiener Zeit und UTC
+// einen Posten in den Vormonat schieben. Gespeichert wird immer der ERSTE eines
+// Monats; bis ist der LETZTE Monat, in dem der Posten zählt (einschließlich),
+// null heißt „läuft weiter".
+//
+// Kein Fremdschlüssel, kein Hofbezug, keine Fremdwährung: Beträge in Euro, so
+// wie sie abgebucht werden. Ein Überblick, keine Buchhaltung.
+model Kostenposten {
+  id        String          @id @default(cuid())
+  name      String
+  kategorie KostenKategorie
+  betrag    Decimal         @db.Decimal(10, 2)
+  rhythmus  KostenRhythmus
+  ab        DateTime        @db.Date
+  bis       DateTime?       @db.Date
+  notiz     String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
 }
