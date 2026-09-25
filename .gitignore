@@ -53,3 +53,10 @@ docs/*.dmg
 
 # Temporäre Arbeitsliste der KI (siehe CLAUDE.md, Abschnitt 4)
 TASK.md
+
+# Skill-Ordner anderer KI-Werkzeuge - dieses Projekt nutzt nur .claude/skills/
+.agents/
+
+# Worktrees paralleler Sitzungen — ein `git add .` nähme sie sonst als
+# eingebettetes Repo auf, samt ihrer lokalen Umgebungsdateien mit Geheimnissen
+.claude/worktrees/

@@ -1312,6 +1312,50 @@ pro Fall neu, aber mit gemocktem Sentry — leicht, nicht umgebaut.
 
 ---
 
+## Agenten-Umgebung: parallele Sitzungen und Browser (2026-09-25)
+
+Anlass: Im Sprint Bereiche 2 arbeiteten zwei Agenten-Sitzungen parallel in zwei
+Worktrees. Drei Dinge waren dafür nicht gebaut:
+
+- **`git stash`** — der Stash-Stapel gilt für alle Worktrees. Zwei zeitgleiche
+  stash/pop haben die Stände vertauscht (beide gesichert und zurückgetauscht).
+  Seitdem Hard Constraint in `CLAUDE.md`: kein Stash, Zwischenstände als
+  WIP-Commit.
+- **Stop-Hook-Zähler** — er lag global im Temp-Ordner. Parallele Sitzungen
+  zählten die Fehlversuche der anderen mit (und ließen sich dadurch vorzeitig
+  durch) oder löschten den Zähler der anderen. Jetzt je `session_id`
+  (`.claude/hooks/stop-zaehler.mjs`, ohne ID ein Hash des Arbeitsordners),
+  Dateien älter als 24 h räumt der Hook beim Start weg.
+- **Worktrees unter `.claude/worktrees/`** stehen in `.gitignore` — ein
+  `git add .` nähme sie sonst als eingebettetes Repo samt ihrer lokalen
+  Umgebungsdatei auf.
+
+Browser: Claude in Chrome arbeitet im echten Browser des Entwicklers — mit
+seinen Anmeldungen (Stripe, Vercel, Supabase, Mail). Das ist für einen Agenten
+zu viel Reichweite. Deshalb ist es in `.claude/settings.json` gesperrt
+(`permissions.deny`), und Browser-Prüfungen laufen nur über agent-browser, eine
+eigene Chromium-Instanz ohne Anmeldungen. Der Skill `web-design-guidelines`
+ist dazugekommen (Barrierefreiheit, Bedienbarkeit); bei Widerspruch gilt
+`docs/ai/` (Liste in `TECH_STACK.md` §6). Im Original lädt er vor jeder
+Prüfung seine Regeln vom beweglichen `main` eines fremden Repos und befolgt
+sie — damit bestimmte Fremdtext aus dem Netz, was der Agent tut. Die Regeln
+sind deshalb eingefroren (`guidelines.md`, Commit und Hash in `SKILL.md`).
+Aus `skills-lock.json` flogen zwei Einträge ohne installierten Skill
+(`vercel-composition-patterns`, `vercel-react-native-skills`).
+
+**Sicherheits-Overrides umgezogen.** pnpm 10.33 warnt bei jedem Aufruf, das
+Feld `"pnpm"` in `package.json` werde nicht mehr gelesen — darin standen die
+drei Overrides für undici, hono und ws. Eine Gegenprobe zeigte: 10.33 liest
+es trotz der Warnung noch (Lockfile blieb gleich), ohne Overrides fliegt der
+Abschnitt aus dem Lockfile und die Auflösung ändert sich. Neuere
+pnpm-Versionen lesen das Feld nicht mehr und ließen sie stillschweigend
+fallen. Sie stehen jetzt in
+`pnpm-workspace.yaml`; der Lockfile ist damit byte-gleich, die Warnung weg.
+Deshalb auch die Regel in `CLAUDE.md`: nur mit der festgelegten pnpm-Version
+installieren.
+
+---
+
 ## Nützliche Befehle
 
 ```bash

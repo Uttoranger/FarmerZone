@@ -30,6 +30,8 @@ Stand: 2026-09. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 - `z.string().email()` ist deprecated → `z.email()`.
 - Fehlerliste heißt `error.issues`, nicht `error.errors`.
 
+**pnpm-Einstellungen:** `overrides`, `allowBuilds` und `onlyBuiltDependencies` stehen in `pnpm-workspace.yaml`, **nicht** im Feld `"pnpm"` der `package.json` — das Feld ist abgekündigt. Ein neuer Sicherheits-Override kommt dorthin; danach muss er im Kopf von `pnpm-lock.yaml` unter `overrides:` stehen.
+
 **Tailwind 4:** Konfiguration lebt in `src/app/globals.css` per `@theme` / `@import "tailwindcss"`. **Keine** `tailwind.config.js` anlegen. Keine `content`-Pfade pflegen.
 
 **Next 16:**
@@ -94,3 +96,21 @@ Nach der Freigabe: hier in die Tabelle eintragen.
 - **Kalte Starts.** Nichts Teures auf Modulebene ausführen.
 - **Env-Variablen** ausschließlich über `@/lib/env` (Zod-validiert). Nie `process.env.X` direkt lesen — Ausnahme: `NODE_ENV`.
 - **Die Adresse der App** (`APP_URL`) und die Umgebung (`UMGEBUNG`: produktion / preview / lokal) ausschließlich über `@/lib/umgebung-server`. Nie `NEXT_PUBLIC_APP_URL` selbst lesen, nie `?? 'http://localhost:3000'` in einer Datei — in Previews ist die Variable nicht gesetzt, und genau dieser Ersatz hat dort den Login zerstört. Die Entscheidung selbst ist rein und getestet: `@/lib/umgebung`. Im Browser gibt es die Adresse nur als Prop vom Server (Vorbild: `onboarding/page.tsx`), nie über `process.env`.
+
+---
+
+## 6. Hersteller-Skills für Agenten
+
+Unter `.claude/skills/` liegen Skills von Herstellern, festgehalten in `skills-lock.json`. Sie liefern Fachwissen, keine Projektregeln. **Bei Widerspruch gilt `docs/ai/`.**
+
+| Skill | Quelle | Wofür |
+|---|---|---|
+| `agent-browser` | vercel-labs/agent-browser | Browser-Prüfungen in eigener Chromium-Instanz ohne Anmeldungen — der einzige erlaubte Weg (`CLAUDE.md`) |
+| `frontend-design` | anthropics/skills | Gestaltung neuer Oberflächen |
+| `prisma-client-api` | prisma/skills | Prisma-Client-Abfragen |
+| `shadcn` | shadcn/ui | Bausteine in `src/components/ui/` |
+| `supabase-postgres-best-practices` | supabase/agent-skills | Schema, Migrationen, Abfragen |
+| `vercel-react-best-practices` | vercel-labs/agent-skills | React-/Next-Muster und Performance |
+| `web-design-guidelines` | vercel-labs/agent-skills | Prüft UI-Code auf Barrierefreiheit und Bedienbarkeit. Regeln **eingefroren** in `guidelines.md` (Stand und Hash in `SKILL.md`) — nie aus dem Netz nachladen. |
+
+Hersteller-Skills, die Anweisungen zur Laufzeit aus dem Netz holen, werden vor dem Commit eingefroren: Inhalt als Datei in den Skill-Ordner, Abruf-Anweisung gestrichen, Quelle, Commit und Hash vermerkt. Ein automatisches Skill-Update überschreibt diese Anpassung — danach erneut einfrieren.
