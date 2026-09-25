@@ -285,6 +285,21 @@ gegen `background` **und** gegen `card`.
   `null`, prüfen mit `== null`.
 - Zahlen tippt der Mensch mit Komma oder Punkt: `DezimalFeld` aus
   `src/components/shared/`, nie `type="number"` für Dezimalwerte.
+- **Select (Base UI) braucht einen Formatierer.** `<SelectValue>` zeigt im
+  geschlossenen Zustand sonst den Rohwert („KG", „3"). Immer die
+  Kinder-Funktion mitgeben: `{(v) => auswahlLabel(OPTIONEN, v) ?? 'Platzhalter'}`
+  (`auswahlLabel` in `src/components/products/produkt-abschnitte.ts`).
+- **Anlegen strenger als Bearbeiten → zwei Schemas.** Ein eigenes
+  `*AnlegenSchema` für die neue Pflicht; `create*` prüft damit, `update*` mit
+  dem alten. Bestandsdaten müssen speicherbar bleiben, ohne sie erst umzubauen.
+  Vorbild: `productAnlegenSchema`.
+- **Pflichtfelder am Feld, nicht in `superRefine`.** Zod 4 überspringt
+  Querprüfungen, solange ein anderes Feld ungültig ist. Was sofort zählen soll
+  (Fehlerzähler im Button, Markierung beim ersten Absenden), gehört als
+  `.refine` an das Feld selbst (`.extend({ feld: … .refine(…) })`).
+- **Zähler „Noch n Angaben fehlen"** rechnet mit demselben Schema wie das
+  Absenden (`fehlendeAngaben`), je Feld gezählt — nie eine zweite Liste von
+  Pflichtfeldern pflegen.
 
 ---
 

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useForm, type FieldErrors, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { ImagePlus, X, Leaf, Thermometer, Snowflake, ChevronRight, Info } from 'lucide-react'
+import { Camera, X, Leaf, Thermometer, Snowflake, ChevronRight, Info, Sparkles } from 'lucide-react'
 import { ladeFotoHoch, stufenText, type UploadStufe } from '@/components/shared/image-upload'
 import { useFotoQuellen } from '@/components/shared/foto-quellen'
 import { bildFehlerMeldung } from '@/lib/upload-fehler'
@@ -49,10 +49,12 @@ import { createProduct, updateProduct, pruefeDualUse } from '@/server/actions/pr
 import type { ProductData } from '@/server/queries/products'
 import {
   productFormSchema,
+  productAnlegenSchema,
   type ProductFormData,
   type FutterKennzeichnungFormData,
   ALLERGENS,
   MONTH_OPTIONS,
+  UNIT_OPTIONS,
   unitOptionsFuer,
   seasonLabel,
 } from '@/schemas/product'
@@ -67,6 +69,7 @@ import {
   NETTO_EINHEIT_VALUES,
   NETTO_EINHEIT_LABEL,
   betriebsnummerFuerAnzeige,
+  kategorieVorschlag,
   futtermittelartenFuer,
   futtermittelartSatz,
   grossgebindeEinheitenAngeboten,
@@ -81,7 +84,6 @@ import { DUAL_USE_MIN_ZEICHEN, DUAL_USE_VERZOEGERUNG_MS } from '@/lib/dual-use'
 import {
   formatKategorie,
   formatGrundpreis,
-  formatGrundpreisNetto,
   formatNettoBestand,
   formatZahl,
   mitAnzahl,
@@ -92,17 +94,26 @@ import {
 import { KategorieSheet } from './kategorie-sheet'
 import { cn } from '@/lib/utils'
 import {
+  gewichtFrage,
+  inhaltZeile,
   kundenVorschau,
+  nettoAutomatisch,
+  nettoNachEinheitswechsel,
   paketpreisFraglich,
   paketpreisAntworten,
   PAKETPREIS_FRAGE,
   preisFeldLabel,
+  vergleichsKilopreis,
 } from './produkt-preis'
 import {
   ABSCHNITT_TITEL,
   abschnitteMitFehlern,
+  auswahlLabel,
   erstesFehlerfeld,
+  fehlendeAngaben,
   saisonVorbelegung,
+  speichernText,
+  zusammensetzungVorbelegung,
   type Abschnitt,
 } from './produkt-abschnitte'
 
@@ -335,8 +346,23 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
     },
   })
 
+  // Anlegen ist strenger als Bearbeiten (Kategorie Pflicht, Futter ohne
+  // Gebindegröße). Der Dialog bleibt zwischen Anlegen und Bearbeiten
+  // derselbe — der Resolver liest das passende Schema deshalb erst beim Prüfen.
+  const schema = isEdit ? productFormSchema : productAnlegenSchema
+  const schemaRef = useRef(schema)
+  useEffect(() => {
+    schemaRef.current = schema
+  }, [schema])
   const form = useForm<ProductFormData>({
-    resolver: zodResolver(productFormSchema) as Resolver<ProductFormData>,
+    // Beide Schemas liefern denselben Datentyp (ProductFormData) — der Cast
+    // gleicht nur ab, dass TypeScript die Eingabetypen der Pipes nicht vereint.
+    resolver: ((werte, kontext, optionen) =>
+      (zodResolver(schemaRef.current as typeof productFormSchema) as Resolver<ProductFormData>)(
+        werte,
+        kontext,
+        optionen
+      )) as Resolver<ProductFormData>,
     defaultValues: isEdit ? toFormDefaults(product) : EMPTY_DEFAULTS,
   })
 
@@ -356,15 +382,27 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
     referenzPreis,
   })
   const preisAntworten = paketpreisAntworten(werte.price, werte.unit, werte.unitSize)
-  // Bei Ballen und Big Bags steht das Gewicht in der Kennzeichnung: Bestand ×
-  // Nettomenge, nie fest hinterlegt. Sonst wie bisher aus der Gebindegröße.
-  const bestandGesamt = grossgebinde
-    ? formatNettoBestand(werte.stock, werte.futter?.nettoMenge, werte.futter?.nettoEinheit ?? 'KG')
-    : formatBestand(werte.stock, werte.unit, werte.unitSize)
+  // Futtermittel: Das Gewicht je Gebinde wird direkt unter der Einheit
+  // gefragt (Ballen, Big Bag, Paket, Stück); bei kg und Liter steht es fest.
+  const gewichtGefragt = futterBereich ? gewichtFrage(werte.unit) : null
+  // Altfall (Rückfrage F1): ein Futtermittel, das noch eine Gebindegröße trägt.
+  // Es bleibt speicherbar; das Formular zeigt das Feld mit einem Hinweis.
+  const altesGebinde = futterBereich && werte.unitSize != null
+  // Bestand × Gewicht je Gebinde, wo gefragt; sonst wie bisher aus der Gebindegröße.
+  const bestandGesamt =
+    gewichtGefragt && !altesGebinde
+      ? formatNettoBestand(werte.stock, werte.futter?.nettoMenge, werte.futter?.nettoEinheit ?? 'KG')
+      : grossgebinde
+        ? null
+        : formatBestand(werte.stock, werte.unit, werte.unitSize)
   const mwstVorschlag = mwstStandard(category)
-  const kilopreis = werte.futter
-    ? formatGrundpreisNetto(werte.price, werte.futter.nettoMenge, werte.futter.nettoEinheit)
-    : null
+  const kilopreisVergleich =
+    werte.futter && !altesGebinde
+      ? vergleichsKilopreis(werte.price, werte.unit, werte.futter.nettoMenge, werte.futter.nettoEinheit)
+      : null
+  // Nur ein Vorschlag, nie eine Wahl — und nur, solange keine Kategorie gewählt ist.
+  const vorschlag = category == null ? kategorieVorschlag(werte.name) : null
+  const fehlend = fehlendeAngaben(werte, schema)
   const erlaubteArten = futtermittelartenFuer(category)
   const betriebsnummer = betriebsnummerFuerAnzeige(
     { betriebsnummer: hofBetriebsnummer },
@@ -479,10 +517,21 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
     )
   }
 
-  /** Einheit wechseln: Ballen und Big Bags haben keine Gebindegröße (P12). */
+  /**
+   * Einheit wechseln: Ballen und Big Bags haben keine Gebindegröße (P12). Bei
+   * Futtermitteln folgt das Gewicht je Gebinde der Einheit (kg → 1 kg).
+   */
   function einheitSetzen(unit: ProductFormData['unit']) {
+    const alt = form.getValues('unit')
     form.setValue('unit', unit, { shouldDirty: true })
     if (istGrossgebindeEinheit(unit)) festePaketeUmschalten(false)
+    const futter = form.getValues('futter')
+    if (futter != null) {
+      const netto = nettoNachEinheitswechsel(futter, alt, unit)
+      form.setValue('futter.nettoMenge', netto.nettoMenge, { shouldDirty: true })
+      form.setValue('futter.nettoEinheit', netto.nettoEinheit, { shouldDirty: true })
+      if (nettoAutomatisch(unit)) form.clearErrors('futter.nettoMenge')
+    }
   }
 
   /**
@@ -502,6 +551,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
 
   function kategorieSetzen(neu: ProductCategoryValue | null, sorte: ProductSubcategoryValue | null) {
     const alt = form.getValues('category')
+    const alteSorte = form.getValues('subcategory')
     form.setValue('category', neu, { shouldDirty: true })
     form.setValue('subcategory', sorte, { shouldDirty: true })
     form.clearErrors(['category', 'subcategory'])
@@ -517,11 +567,24 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
     }
 
     if (istFuttermittel(neu)) {
+      // Futtermittel gibt es nicht in g, ml oder m³ (Rückfrage F2).
+      if (!unitOptionsFuer(neu).some((u) => u.value === form.getValues('unit'))) {
+        form.setValue('unit', 'KG', { shouldDirty: true })
+      }
       const bisher = form.getValues('futter')
-      const futter = bisher ?? { ...FUTTER_LEER }
+      if (bisher == null) {
+        // Neu im Bereich Futtermittel: Das Gewicht übernimmt die Rolle der
+        // Gebindegröße — die festen Pakete entfallen.
+        festePaketeUmschalten(false)
+      }
+      const futter = bisher ?? { ...FUTTER_LEER, ...nettoAutomatisch(form.getValues('unit')) }
       form.setValue(
         'futter',
-        { ...futter, futtermittelart: passendeFuttermittelart(neu, futter.futtermittelart) },
+        {
+          ...futter,
+          futtermittelart: passendeFuttermittelart(neu, futter.futtermittelart),
+          zusammensetzung: zusammensetzungVorbelegung(futter.zusammensetzung, alteSorte, sorte),
+        },
         { shouldDirty: true }
       )
       // Beim Anlegen eines Futtermittels ist die Kennzeichnung Pflicht — gleich zeigen.
@@ -657,16 +720,89 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                   <AccordionTrigger>{abschnittTitel('grunddaten')}</AccordionTrigger>
                   <AccordionPanel>
                     <div className="space-y-3">
+                      {/* Foto zuerst (Vorbild Depop, Shopify, Nextdoor): der schnellste
+                          Einstieg, aber freiwillig — ohne Foto zeigt die Hofseite die
+                          Illustration der Kategorie. Hochgeladen wird unverändert erst
+                          beim Absenden. */}
+                      <div data-feld="imageUrl">
+                        {fotoQuellen.elemente}
+                        {previewUrl ? (
+                          <div className="relative overflow-hidden rounded-xl border border-border bg-muted/30">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={previewUrl}
+                              alt="Vorschau"
+                              className="h-44 w-full object-cover"
+                              // Ersatz für die entfallene Format-Probe: Kann der
+                              // Browser das Foto nicht zeichnen (HEIC auf Android),
+                              // verschwindet die Vorschau still, statt ein kaputtes
+                              // Bildsymbol zu zeigen. Die Datei BLEIBT ausgewählt —
+                              // ob sie taugt, entscheidet beim Absenden der Server.
+                              onError={() => setPreviewUrl(null)}
+                            />
+                            {/* Weiß auf dunklem Schleier über dem Foto — folgt dem Modus
+                                bewusst nicht (CODING_STANDARDS §7). */}
+                            <button
+                              type="button"
+                              onClick={handleRemoveImage}
+                              aria-label="Foto entfernen"
+                              className="absolute top-2 right-2 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={fotoQuellen.oeffnen}
+                              className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'absolute right-2 bottom-2 bg-card')}
+                            >
+                              Foto ersetzen
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={fotoQuellen.oeffnen}
+                            className="flex min-h-[120px] w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border bg-muted/30 px-4 py-5 text-center transition-colors hover:bg-muted/50"
+                          >
+                            <Camera className="h-7 w-7 text-brand-text" aria-hidden />
+                            <span className="text-sm font-medium text-foreground">
+                              {selectedFile ? 'Foto ausgewählt — tippen zum Ersetzen' : 'Foto hinzufügen'}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              Freiwillig — ohne Foto zeigen wir ein Bild zur Kategorie.
+                            </span>
+                          </button>
+                        )}
+                      </div>
+
                       <FormField
                         control={form.control}
                         name="name"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Name *</FormLabel>
+                            <FormLabel>Was verkaufst du? *</FormLabel>
                             <FormControl>
-                              <Input placeholder="z. B. Heumilch frisch" {...field} />
+                              <Input placeholder="z. B. Lammfleisch oder Wiesenheu" {...field} />
                             </FormControl>
                             <FormMessage />
+                            {/* Vorschlag aus dem Namen (Vorbild Shopee „Recommend
+                                Category"): nur ein Angebot — übernommen wird erst mit
+                                einem Tipp, ohne Tipp passiert nichts. */}
+                            {vorschlag && (
+                              <button
+                                type="button"
+                                onClick={() => kategorieUebernehmen(vorschlag.category, vorschlag.subcategory)}
+                                className="flex min-h-11 w-full items-center gap-2 rounded-full border border-dashed border-primary/60 bg-primary/5 px-3 text-left text-sm text-foreground transition-colors hover:bg-primary/10"
+                              >
+                                <Sparkles className="h-4 w-4 shrink-0 text-brand-text" aria-hidden />
+                                <span className="min-w-0">
+                                  Passt das?{' '}
+                                  <span className="font-medium">
+                                    {formatKategorie(vorschlag.category, vorschlag.subcategory)}
+                                  </span>
+                                </span>
+                              </button>
+                            )}
                             {/* Hinweis, kein Fehler, keine Sperre (Konzept 6.1). */}
                             {dualUseHinweis && (
                               <p
@@ -682,13 +818,15 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                       />
 
                       {/* Kategorie und Sorte in EINEM Sheet: Bereich → Kategorie → Sorte.
-                          Hier steht nur die Wahl und ihre Fehlermeldungen. */}
+                          Hier steht nur die Wahl und ihre Fehlermeldungen. Beim Anlegen
+                          Pflicht — ohne Kategorie landet das Produkt im Bereich Sonstiges,
+                          zwischen den Lebensmitteln. */}
                       <FormField
                         control={form.control}
                         name="category"
                         render={() => (
                           <FormItem data-feld="category">
-                            <FormLabel>Kategorie{futterBereich && ' *'}</FormLabel>
+                            <FormLabel>Kategorie{(!isEdit || futterBereich) && ' *'}</FormLabel>
                             <button
                               type="button"
                               data-feld="subcategory"
@@ -712,54 +850,6 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                           </FormItem>
                         )}
                       />
-
-                      {/* Foto */}
-                      <div data-feld="imageUrl">
-                        <p className="text-sm font-medium text-foreground mb-2">Foto</p>
-                        <div className="flex items-start gap-3">
-                          <div className="relative shrink-0 w-24 h-24 rounded-xl border-2 border-dashed border-border overflow-hidden bg-muted/30 flex items-center justify-center">
-                            {previewUrl ? (
-                              <>
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={previewUrl}
-                                  alt="Vorschau"
-                                  className="w-full h-full object-cover"
-                                  // Ersatz für die entfallene Format-Probe: Kann der
-                                  // Browser das Foto nicht zeichnen (HEIC auf Android),
-                                  // verschwindet die Vorschau still, statt ein kaputtes
-                                  // Bildsymbol zu zeigen. Die Datei BLEIBT ausgewählt —
-                                  // ob sie taugt, entscheidet beim Absenden der Server.
-                                  onError={() => setPreviewUrl(null)}
-                                />
-                                <button
-                                  type="button"
-                                  onClick={handleRemoveImage}
-                                  aria-label="Foto entfernen"
-                                  className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </>
-                            ) : (
-                              <ImagePlus className="w-6 h-6 text-muted-foreground/50" />
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            {fotoQuellen.elemente}
-                            <button
-                              type="button"
-                              onClick={fotoQuellen.oeffnen}
-                              className={buttonVariants({ variant: 'outline', size: 'sm' })}
-                            >
-                              {previewUrl ? 'Foto ersetzen' : 'Foto wählen'}
-                            </button>
-                            <p className="text-xs text-muted-foreground/60 mt-1.5">
-                              JPEG, PNG oder WebP — wird automatisch verkleinert
-                            </p>
-                          </div>
-                        </div>
-                      </div>
 
                       <FormField
                         control={form.control}
@@ -803,7 +893,11 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                             >
                               <FormControl>
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Wählen…" />
+                                  {/* Base UI zeigt ohne Formatierer den ROHWERT („KG") —
+                                      die Kinder-Funktion macht daraus das Label. */}
+                                  <SelectValue placeholder="Wählen…">
+                                    {(v: string | null) => auswahlLabel(UNIT_OPTIONS, v) ?? 'Wählen…'}
+                                  </SelectValue>
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
@@ -819,14 +913,64 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                         )}
                       />
 
-                      {/* Gebinde hinter einem Schalter: Aus = Kunden bestellen einzeln
-                          (unitSize leer), An = feste Pakete mit Größe. Bei Ballen und
-                          Big Bags gibt es ihn nicht — das Gewicht steht in der Kennzeichnung. */}
-                      {grossgebinde ? (
+                      {/* Futtermittel: Das Gewicht je Gebinde steht direkt unter der Einheit
+                          und übernimmt die Rolle der festen Pakete — es sind dieselben
+                          Felder wie in der Kennzeichnung (futter.nettoMenge/-Einheit).
+                          Bei kg und Liter steht es fest (1 kg / 1 L), die Frage entfällt. */}
+                      {futterBereich ? (
+                        gewichtGefragt && (
+                          <FormField
+                            control={form.control}
+                            name="futter.nettoMenge"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>{gewichtGefragt} *</FormLabel>
+                                <div className="flex gap-2">
+                                  <FormControl>
+                                    <DezimalFeld
+                                      name={field.name}
+                                      value={field.value}
+                                      placeholder="z. B. 300"
+                                      onBlur={field.onBlur}
+                                      onChange={(neu) => field.onChange(neu ?? Number.NaN)}
+                                    />
+                                  </FormControl>
+                                  <FormField
+                                    control={form.control}
+                                    name="futter.nettoEinheit"
+                                    render={({ field: einheit }) => (
+                                      <div className="flex shrink-0 gap-1" role="radiogroup" aria-label="Gewicht in">
+                                        {NETTO_EINHEIT_VALUES.map((e) => (
+                                          <button
+                                            key={e}
+                                            type="button"
+                                            role="radio"
+                                            aria-checked={einheit.value === e}
+                                            onClick={() => einheit.onChange(e)}
+                                            className={cn(chipKlasse(einheit.value === e), 'px-3')}
+                                          >
+                                            {NETTO_EINHEIT_LABEL[e]}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+                                  />
+                                </div>
+                                <FormDescription className="text-xs">
+                                  Durchschnittsgewicht, wie auf dem Sackanhänger oder Lieferschein.
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )
+                      ) : grossgebinde ? (
                         <p className="text-xs text-muted-foreground">
-                          Bei Ballen und Big Bags steht das Gewicht in der Kennzeichnung.
+                          Ballen und Big Bags verkaufst du einzeln — ohne feste Pakete.
                         </p>
                       ) : (
+                        /* Gebinde hinter einem Schalter: Aus = Kunden bestellen einzeln
+                           (unitSize leer), An = feste Pakete mit Größe. */
                         <SchalterZeile
                           id="feste-pakete"
                           titel="Ich verkaufe in festen Paketen"
@@ -836,13 +980,21 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                         />
                       )}
 
-                      {festePakete && !grossgebinde && (
+                      {/* Bei Futtermitteln nur noch der Altfall (Rückfrage F1): Das Feld
+                          bleibt, damit das Produkt ohne Umbau speicherbar ist. */}
+                      {((festePakete && !futterBereich) || altesGebinde) && !grossgebinde && (
                         <FormField
                           control={form.control}
                           name="unitSize"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Gebindegröße *</FormLabel>
+                              {altesGebinde && (
+                                <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                                  Dieses Produkt nutzt noch die alte Gebindegröße. Verkaufst du einzelne Ballen
+                                  oder Pakete aus mehreren? Stell bitte die Einheit um — dann stimmt der Kilopreis.
+                                </p>
+                              )}
+                              <FormLabel>Gebindegröße{!altesGebinde && ' *'}</FormLabel>
                               <FormControl>
                                 <DezimalFeld
                                   name={field.name}
@@ -897,6 +1049,13 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                       {preisVorschau && (
                         <p className="text-xs text-muted-foreground -mt-1" aria-live="polite">
                           {preisVorschau}
+                        </p>
+                      )}
+                      {/* Nur für den Hof: Kunden sehen den Kilopreis eines
+                          Futtermittels erst mit Bereiche 2 — deshalb nicht „Kunden sehen". */}
+                      {kilopreisVergleich && (
+                        <p className="text-xs text-foreground" aria-live="polite">
+                          {kilopreisVergleich}
                         </p>
                       )}
                       {preisFraglich && (
@@ -1009,7 +1168,9 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                                   >
                                     <FormControl>
                                       <SelectTrigger>
-                                        <SelectValue placeholder="Monat…" />
+                                        <SelectValue placeholder="Monat…">
+                                          {(v: string | null) => auswahlLabel(MONTH_OPTIONS, v) ?? 'Monat…'}
+                                        </SelectValue>
                                       </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
@@ -1037,7 +1198,9 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                                   >
                                     <FormControl>
                                       <SelectTrigger>
-                                        <SelectValue placeholder="Monat…" />
+                                        <SelectValue placeholder="Monat…">
+                                          {(v: string | null) => auswahlLabel(MONTH_OPTIONS, v) ?? 'Monat…'}
+                                        </SelectValue>
                                       </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
@@ -1287,61 +1450,11 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                           )}
                         />
 
-                        {/* Nettomenge: Inhalt EINES Gebindes, nicht Bestand. */}
-                        <div className="space-y-1.5">
-                          <div className="grid grid-cols-[1fr_6.5rem] gap-3">
-                            <FormField
-                              control={form.control}
-                              name="futter.nettoMenge"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Nettomenge *</FormLabel>
-                                  <FormControl>
-                                    <DezimalFeld
-                                      name={field.name}
-                                      value={field.value}
-                                      placeholder="z. B. 300"
-                                      onBlur={field.onBlur}
-                                      onChange={(neu) => field.onChange(neu ?? Number.NaN)}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="futter.nettoEinheit"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Einheit</FormLabel>
-                                  <Select onValueChange={field.onChange} value={field.value}>
-                                    <FormControl>
-                                      <SelectTrigger>
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {NETTO_EINHEIT_VALUES.map((e) => (
-                                        <SelectItem key={e} value={e}>
-                                          {NETTO_EINHEIT_LABEL[e]}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Durchschnittsgewicht eines Gebindes, wie auf dem Sackanhänger.
-                          </p>
-                          {kilopreis && (
-                            <p className="text-xs text-foreground" aria-live="polite">
-                              {formatGrundpreis(werte.price, werte.unit, werte.unitSize)} → {kilopreis}
-                            </p>
-                          )}
-                        </div>
+                        {/* Die Nettomenge gehört zur Kennzeichnung, wird aber beim Preis
+                            eingegeben — dort denkt der Hof über das Gebinde nach. */}
+                        <p className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-foreground">
+                          {inhaltZeile(werte.futter?.nettoMenge, werte.futter?.nettoEinheit ?? 'KG')}
+                        </p>
 
                         <FormField
                           control={form.control}
@@ -1576,14 +1689,14 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
               <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>
                 Abbrechen
               </Button>
+              {/* Fehlt noch etwas, sagt der Knopf wie viel; ein Tipp prüft trotzdem
+                  und springt zum ersten fehlenden Feld (onInvalid). */}
               <Button type="submit" disabled={isSubmitting} className="min-w-[100px]">
                 {isSubmitting
                   ? uploadFortschritt
                     ? stufenText(uploadFortschritt)
                     : 'Speichere…'
-                  : isEdit
-                    ? 'Speichern'
-                    : 'Anlegen'}
+                  : speichernText(fehlend, isEdit)}
               </Button>
             </div>
           </form>
@@ -1595,6 +1708,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
       open={kategorieSheetOffen}
       onOpenChange={setKategorieSheetOffen}
       wert={{ category, subcategory: werte.subcategory }}
+      keineAngabeErlaubt={isEdit}
       onUebernehmen={({ category: neu, subcategory: sorte }) => kategorieUebernehmen(neu, sorte)}
     />
 

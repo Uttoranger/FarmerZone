@@ -5,11 +5,14 @@ import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
+  productAnlegenSchema,
   productFormSchema,
+  kategorieSetzenSchema,
   type FutterKennzeichnungFormData,
   type ProductFormData,
 } from '@/schemas/product'
 import { bereinigeSiegel, istFuttermittel } from '@/lib/taxonomie'
+import { mwstStandard } from '@/lib/mwst'
 import { dualUseHinweis, normiereProduktname, DUAL_USE_MIN_ZEICHEN } from '@/lib/dual-use'
 import { dualUseAnfrageSchema } from '@/schemas/product'
 import { getFarmForUser } from '@/server/queries/dashboard'
@@ -102,7 +105,8 @@ function futterAus(v: ProductFormData): GepruefteKennzeichnung | null {
 
 export async function createProduct(data: ProductFormData): Promise<ProduktErgebnis> {
   const farm = await getAuthenticatedFarm()
-  const geprueft = productFormSchema.safeParse(data)
+  // Anlegen ist strenger als Bearbeiten: Kategorie Pflicht, Futter ohne Gebindegröße.
+  const geprueft = productAnlegenSchema.safeParse(data)
   if (!geprueft.success) return { error: 'Bitte prüfe deine Eingaben.' }
   const v = geprueft.data
   const futter = futterAus(v)
@@ -156,6 +160,44 @@ export async function updateProduct(productId: string, data: ProductFormData): P
   })
 
   if (ergebnis === 'nicht-gefunden') return { error: 'Produkt nicht gefunden.' }
+
+  revalidate(farm.slug)
+  return { ok: true }
+}
+
+/**
+ * Kategorie eines Bestandsprodukts ohne Kategorie setzen — der Chip
+ * „… übernehmen" in der Produktliste. Bewusst NICHT über updateProduct: Das
+ * schriebe das ganze Produkt aus den Listendaten zurück, samt einem Bestand,
+ * den eine Bestellung inzwischen gesenkt haben kann.
+ *
+ * Schreibt nur, solange die Kategorie noch leer ist (Bedingung in der
+ * WHERE-Klausel, zusammen mit dem Besitz) — ein zweiter Tipp oder eine
+ * inzwischen gewählte Kategorie wird nie überschrieben. Futtermittel sind
+ * ausgeschlossen (Schema): Sie brauchen eine Kennzeichnung, die nur der
+ * Dialog erfasst.
+ */
+export async function setzeKategorie(input: unknown): Promise<ProduktErgebnis> {
+  const geprueft = kategorieSetzenSchema.safeParse(input)
+  if (!geprueft.success) return { error: 'Diese Kategorie passt nicht. Bitte wähle sie im Produkt selbst.' }
+  const { productId, category, subcategory } = geprueft.data
+
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) return { error: 'Bitte melde dich neu an.' }
+  const farm = await getFarmForUser(session.user.id)
+  if (!farm) return { error: 'Kein Hof gefunden.' }
+
+  // MwSt wie im Formular: Stand noch der Vorschlag für „ohne Kategorie", gilt
+  // jetzt der der neuen Kategorie. Einen selbst gesetzten Satz fasst das nicht an.
+  const basis = { id: productId, farmId: farm.id, category: null }
+  const mitMwst = await prisma.product.updateMany({
+    where: { ...basis, vatRate: mwstStandard(null) },
+    data: { category, subcategory, vatRate: mwstStandard(category) },
+  })
+  if (mitMwst.count === 0) {
+    const ohneMwst = await prisma.product.updateMany({ where: basis, data: { category, subcategory } })
+    if (ohneMwst.count === 0) return { error: 'Das Produkt hat schon eine Kategorie. Lade die Seite neu.' }
+  }
 
   revalidate(farm.slug)
   return { ok: true }

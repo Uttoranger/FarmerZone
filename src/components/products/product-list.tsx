@@ -11,6 +11,7 @@ import {
   Thermometer,
   Snowflake,
   SlidersHorizontal,
+  Sparkles,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -22,11 +23,12 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { updateStock } from '@/server/actions/products'
+import { updateStock, setzeKategorie } from '@/server/actions/products'
 import { deleteProduct } from '@/server/actions/products'
 import type { ProductData } from '@/server/queries/products'
-import { hatUnterkategorien } from '@/lib/taxonomie'
-import { formatGrundpreis } from '@/lib/format'
+import type { KategorieVorschlag } from '@/lib/taxonomie'
+import { formatGrundpreis, formatKategorie } from '@/lib/format'
+import { produktHinweise } from './produkt-hinweise'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 import { ProductDialog } from './product-dialog'
 import { StockDialog } from './stock-dialog'
@@ -109,6 +111,21 @@ export function ProductList({ products: initialProducts, initialEditId, hofBetri
     })
   }
 
+  /** Chip „… übernehmen": setzt nur die Kategorie, nie das ganze Produkt (setzeKategorie). */
+  const [uebernimmt, setUebernimmt] = useState<string | null>(null)
+  async function kategorieUebernehmen(product: ProductData, vorschlag: KategorieVorschlag) {
+    setUebernimmt(product.id)
+    try {
+      const ergebnis = await setzeKategorie({ productId: product.id, ...vorschlag })
+      if ('error' in ergebnis) toast.error(ergebnis.error)
+      else toast.success(`${product.name}: ${formatKategorie(vorschlag.category, vorschlag.subcategory)}`)
+    } catch {
+      toast.error('Wir konnten die Kategorie nicht speichern. Bitte versuch es noch einmal.')
+    } finally {
+      setUebernimmt(null)
+    }
+  }
+
   async function handleDelete() {
     if (!deleteConfirm) return
     setIsDeleting(true)
@@ -164,6 +181,7 @@ export function ProductList({ products: initialProducts, initialEditId, hofBetri
           const status = getStatus(product, product.stock)
           const badge = STATUS_BADGE[status]
           const isPending = pendingIds.has(product.id)
+          const hinweise = produktHinweise(product)
 
           return (
             <Card key={product.id} className="overflow-hidden">
@@ -215,17 +233,52 @@ export function ProductList({ products: initialProducts, initialEditId, hofBetri
                       )}
                       {/* Dezenter Hinweis, kein Fehler: Bestandsprodukte haben
                           noch keine Unterkategorie (Sprint Taxonomie 1). */}
-                      {product.category &&
-                        hatUnterkategorien(product.category) &&
-                        !product.subcategory && (
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] px-1.5 py-0 border-dashed text-muted-foreground"
-                          >
-                            Unterkategorie ergänzen
-                          </Badge>
-                        )}
+                      {hinweise.some((h) => h.art === 'unterkategorie-ergaenzen') && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] px-1.5 py-0 border-dashed text-muted-foreground"
+                        >
+                          Unterkategorie ergänzen
+                        </Badge>
+                      )}
                     </div>
+
+                    {/* Hinweise mit Handlung, keine Fehler: Produkte ohne Kategorie
+                        stehen öffentlich unter Sonstiges; Futtermittel mit alter
+                        Gebindegröße rechnen den Kilopreis falsch (Rückfrage F1). */}
+                    {hinweise.some((h) => h.art !== 'unterkategorie-ergaenzen') && (
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {hinweise.map((h) => {
+                          const klasse =
+                            'inline-flex min-h-9 items-center gap-1 rounded-full border border-dashed px-2.5 text-xs font-medium transition-colors disabled:opacity-50'
+                          if (h.art === 'kategorie-uebernehmen') {
+                            return (
+                              <button
+                                key={h.art}
+                                type="button"
+                                disabled={uebernimmt === product.id}
+                                onClick={() => kategorieUebernehmen(product, h.vorschlag)}
+                                className={`${klasse} border-primary/60 bg-primary/5 text-foreground hover:bg-primary/10`}
+                              >
+                                <Sparkles className="h-3.5 w-3.5 shrink-0 text-brand-text" aria-hidden />
+                                {formatKategorie(h.vorschlag.category, h.vorschlag.subcategory)} übernehmen
+                              </button>
+                            )
+                          }
+                          if (h.art === 'unterkategorie-ergaenzen') return null
+                          return (
+                            <button
+                              key={h.art}
+                              type="button"
+                              onClick={() => setEditDialog({ open: true, product })}
+                              className={`${klasse} border-amber-400 bg-amber-50 text-amber-800 dark:border-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/40`}
+                            >
+                              {h.art === 'kategorie-ergaenzen' ? 'Kategorie ergänzen' : 'Einheit prüfen'}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
 
                     {/* Price */}
                     <p className="text-xs text-muted-foreground mt-0.5">
