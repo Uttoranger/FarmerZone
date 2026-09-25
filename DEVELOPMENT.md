@@ -803,14 +803,82 @@ deshalb mit 409 `WARENKORB_GEAENDERT` zurück, statt still mitbestellt zu werden
 - Cleanup frühestens vier Wochen nach dem Merge: Enum-Werte `FUTTERMITTEL`,
   `EINZELFUTTERMITTEL`, `MISCHFUTTERMITTEL`, `ERGAENZUNGSFUTTERMITTEL`, Spalten
   `FutterKennzeichnung.registrierungsnummer` und `Product.isOrganic`.
-- Bereiche 2: Umschalter und Facetten auf /hoefe, Hofseite nach Bereich
-  sektioniert, Produktdetail mit Akkordeon „Kennzeichnung" (dort liest
-  `betriebsnummerFuerAnzeige` die Nummer).
+- ~~Bereiche 2: Umschalter und Facetten auf /hoefe, Hofseite nach Bereich
+  sektioniert, Produktdetail mit Akkordeon „Kennzeichnung".~~ Umgesetzt
+  2026-09-25, siehe nächster Abschnitt.
 - ~~Befund außerhalb dieses Sprints: `/api/checkout` übernimmt `unitPrice` aus dem
   Request, ohne ihn mit `Product.price` abzugleichen.~~ Behoben 2026-09-24, siehe
   „Bekannte Bugs & Fixes".
 
 ---
+
+## Bereiche 2 — Hofladen und Futtermittel getrennt (2026-09-25)
+
+**Konzept:** `docs/konzepte/bereiche.md` §6.0–6.3, vor dem Sprint geändert
+(Vermerk „geändert vor Bereiche 2"). Regeln: `docs/ai/ARCHITECTURE.md` §4
+(URL-Zustand) und §5 (Bereiche). Vorbild für den Umschalter: ein Laden, zwei
+Welten (Crate & Barrel | Crate & Kids, Best Buy Products | Services).
+
+**„Hofladen" statt „Lebensmittel".** Brennholz und Sonstiges gehören in den
+ersten Bereich und stünden unter „Lebensmittel" falsch. Intern bleibt
+`LEBENSMITTEL`; die Oberfläche hat genau ein Label (`ANZEIGE_BEREICHE` in
+`taxonomie.ts`, vorher `FORMULAR_KACHELN`). Es gilt auch für die Kachel im
+Kategorie-Sheet („Hofladen — Lebensmittel und mehr") und den Dual-Use-Hinweis.
+Der Dual-Use-Hinweis vergleicht seitdem Anzeige-Bereiche: Brennholz neben Eiern
+ist kein Zwilling mehr; seine eigene Label-Tabelle ist weg.
+
+**Kaufbar ist eine Regel.** Vorher zählten die Kategorie-Chips jedes sichtbare
+Produkt (auch ausverkauft), die Suche nur Produkte mit freiem Bestand. Ein Hof
+mit ausverkauftem Heu stand unter „Heu & Stroh", war aber nicht auffindbar.
+Jetzt entsteht beides aus demselben Angebot (`istKaufbar`, `baueAngebotsZeile`,
+`fasseAngebotZusammen`); ein Test in `hofuebersicht.test.ts` sichert zu, dass
+Chip- und Suchzählung übereinstimmen. Folge: Ein Hof mit ausverkauftem Heu fällt
+von der Futterkarte — gewollt.
+
+**/hoefe:** Umschalter über allen Filtern, Futter-Kategorien sichtbar (die
+Ausblendung `HOEFE_KATEGORIEN` und ihr Test sind entfallen). Karte und Liste
+lesen dieselbe Menge (`berechneHofAuswahl`). Facetten gelten je Produkt — „Bio"
+und „Heu" treffen nur einen Hof mit Bio-Heu. Die Sorten-Reihe erscheint erst,
+wenn eine Kategorie gewählt ist und die Ergebnismenge mindestens zwei Sorten hat
+(Annahme: ohne gewählte Kategorie wäre sie im Hofladen eine Wand aus 30 Chips).
+Kilopreis-Sortierung nur im Futter; die Karte zeigt dann „ab € 0,12 / kg".
+Im Hofladen ohne Filter bleiben Höfe sichtbar, die gerade gar nichts kaufbar
+haben (wie vorher); ein reiner Futterhof steht nie im Hofladen.
+
+**URL-Zustand.** Alles außer Bezugspunkt und Umkreis steht in der URL
+(`src/schemas/hoefe-filter.ts`, Zod je Wert, Ungültiges wird still verworfen).
+Der Standort bleibt draußen, weil er sonst in Server-Logs und geteilten Links
+landete. Die Seite ist deshalb dynamisch, die Hofdaten bleiben per
+`unstable_cache` fünf Minuten gecacht. Geschrieben wird mit
+`history.replaceState` statt `router.replace`: Das hält `useSearchParams` aktuell,
+ohne die dynamische Seite je Chip-Tipp neu vom Server zu holen.
+
+**Hofseite:** Umschalter nur bei Produkten in beiden Bereichen, Standard
+Hofladen, `?bereich=futter` aus der URL (auch vom Link auf /hoefe). Der andere
+Bereich wird nicht gerendert. Sektionen je Kategorie in der Reihenfolge des
+jeweils ersten Produkts der Hof-Sortierung (wer das Lamm nach oben zieht, bekommt
+Fleisch zuerst) — `teileHofseite`. Sprungmarken ab 12 Produkten im Bereich. Ein
+Warenkorb für beide Bereiche. Die Bearbeitungsansicht bleibt flach mit Drag und
+sagt, wie Kunden gruppiert sehen.
+
+**Produktdetail (neu, für alle Produkte).** Behobener Befund: Die
+Kurzbeschreibung wurde geladen, aber nirgends angezeigt — die Höfe pflegten sie
+umsonst. Das Sheet zeigt sie jetzt, dazu Kategorie-Pills, Siegel, Saison,
+Lagerung, Allergene. Futter zusätzlich: Kilopreis aus der Nettomenge (auch auf
+der Karte, sonst hätten Ballen und Big Bags keinen), Chip „Nur an Betriebe",
+Akkordeon „Kennzeichnung" (zugeklappt) mit allen Pflichtangaben des Modells und
+dem Hof als Verantwortlichem (`kennzeichnungsZeilen`). Die Betriebsnummer kommt
+aufgelöst vom Server; die Altlast-Spalte verlässt ihn nicht.
+
+**Nicht gebaut:** Chargennummer und Mindesthaltbarkeit — sie wechseln je
+Lieferung und stehen auf dem Sackanhänger bei der Abholung. Ob der Fernabsatz
+sie vorab verlangt, klärt der Betreiber mit der Landwirtschaftskammer.
+
+**Vorfall im Sprint (Arbeitsumgebung, kein Produktionsschaden):** Zwei
+Agenten-Sitzungen arbeiteten parallel in zwei Worktrees und benutzten zeitgleich
+`git stash`. Der Stash-Stapel ist für alle Worktrees gemeinsam — jede holte den
+Stand der anderen zurück. Beide Stände waren als Branch und Patch gesichert und
+wurden zurückgetauscht. Seitdem kein `git stash` in Agenten-Sitzungen.
 
 ## Preis-Semantik: Preis je Gebinde (Sprint Preis-Semantik, 2026-09-22)
 

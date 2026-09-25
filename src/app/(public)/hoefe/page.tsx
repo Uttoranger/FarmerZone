@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { unstable_cache } from 'next/cache'
 import { getOeffentlicheHoefe } from '@/server/queries/farm'
 import { HoefeClient } from '@/components/hoefe/hoefe-client'
 
@@ -9,29 +10,20 @@ export const metadata: Metadata = {
     'Alle Höfe auf FarmerZone: was sie verkaufen, wo sie sind und wann du abholen kannst — direkt vom Hof, ohne Umwege.',
 }
 
-// Statisch mit kurzer Revalidierung: Die Übersicht ändert sich, wenn ein Hof
-// freigeschaltet wird oder Produkte/Abholzeiten pflegt — fünf Minuten Verzug
-// sind dafür unerheblich, jeder Aufruf bleibt eine fertige Seite.
+// Dynamisch seit Bereiche 2: Die Filter stehen in der URL
+// (src/schemas/hoefe-filter.ts), und ein geteilter Link soll schon im
+// Server-HTML so aussehen, wie er gemeint ist — nicht erst nach der
+// Hydration. Die HOFDATEN bleiben trotzdem fünf Minuten gecacht (wie vorher
+// mit revalidate = 300): Gefiltert wird im Browser auf demselben Datensatz,
+// jeder Aufruf kostet also keine Datenbankabfrage.
 // BEWUSST IN KAUF GENOMMEN: Auch die „Heute/Morgen"-Angabe der nächsten
-// Abholung wird beim Rendern gebacken und altert mit der Seite — auf einer
-// ruhigen Seite kann der erste Besuch nach einer Pause noch den Stand von
-// davor sehen (stale-while-revalidate), der nächste Aufruf stimmt wieder.
-// Wochentags-Angaben bleiben dabei immer korrekt.
-export const revalidate = 300
+// Abholung wird mit den Daten gecacht und altert höchstens fünf Minuten.
+export const dynamic = 'force-dynamic'
+
+const ladeHoefe = unstable_cache(() => getOeffentlicheHoefe(), ['oeffentliche-hoefe'], { revalidate: 300 })
 
 export default async function HoefePage() {
-  let hoefe: Awaited<ReturnType<typeof getOeffentlicheHoefe>>
-  try {
-    hoefe = await getOeffentlicheHoefe()
-  } catch (fehler) {
-    // NUR während `next build` ohne erreichbare Datenbank (der Prüf-Build
-    // läuft mit Attrappen-Env): Dann wird der Leerzustand vorgerendert; auf
-    // Vercel hat der Build die echte Datenbank und rendert echte Höfe. Zur
-    // LAUFZEIT fliegt der Fehler weiter — eine scheiternde Revalidierung
-    // behält so die letzte gute Seite, statt still eine leere auszuliefern.
-    if (process.env.NEXT_PHASE !== 'phase-production-build') throw fehler
-    hoefe = []
-  }
+  const hoefe = await ladeHoefe()
 
   return (
     <div className="min-h-screen bg-background">

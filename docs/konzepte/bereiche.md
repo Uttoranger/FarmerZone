@@ -2,6 +2,7 @@
 
 Stand: 2026-09-22 · Status: **Bereiche 1 umgesetzt am 2026-09-23** · Basis: Taxonomie 1 (#100)
 Geändert nach Rückfrage F6 im Sprint Bereiche 1: Betriebsnummer und Betriebsstatus gehören dem Hof (§3, §6.4, §8).
+Geändert vor Bereiche 2 (2026-09-25): Der erste Bereich heißt in der Oberfläche „Hofladen"; die Hofseite trennt die Bereiche mit einem Umschalter (§6.1–6.3).
 Verbindliche Quelle für die Sprints „Bereiche 1–3". Abweichungen nur nach Änderung dieser Datei.
 
 ---
@@ -189,22 +190,36 @@ Die Plattform prüft die Nummer nicht. Der Hof bestätigt die Richtigkeit (`best
 
 ## 6. UI
 
+### 6.0 Anzeige-Bereiche *(geändert vor Bereiche 2)*
+Die Oberfläche kennt zwei Bereiche: **„Hofladen"** und **„Futtermittel"**. Intern bleibt es bei `LEBENSMITTEL`, `FUTTERMITTEL`, `SONSTIGES` (§2.1); Hofladen = Lebensmittel + Sonstiges. Grund: Brennholz und Sonstiges gehören in den Hofladen und stünden unter „Lebensmittel" falsch. Das Label steht einmal in `taxonomie.ts` und gilt überall, wo ein Bereich angezeigt wird — Produktformular, /hoefe, Hofseite.
+
+Beide Orte (/hoefe und Hofseite) teilen **einen** Umschalter „Hofladen | Futtermittel": volle Breite, zwei gleich breite Hälften, mindestens 44 px hoch, direkt über dem Inhalt, nicht klebend, aktive Hälfte gefüllt.
+
+**Kaufbar** heißt überall: im Shop sichtbar UND freier Bestand (`stock − reservedStock`) über 0 — eine Funktion für Chips, Suche, Facetten, Karte und Grundpreis-Sortierung.
+
 ### 6.1 Produktformular (Bereiche 1)
-- Kategorie-Sheet: zuerst **zwei Kacheln** „Lebensmittel" / „Futtermittel" (Sonstiges liegt unter Lebensmittel), dann die Kategorien des Bereichs, dann L2 als Chips.
+- Kategorie-Sheet: zuerst **zwei Kacheln** „Hofladen — Lebensmittel und mehr" / „Futtermittel — Für Tiere" (Sonstiges liegt unter Hofladen), dann die Kategorien des Bereichs, dann L2 als Chips. *(Geändert vor Bereiche 2: „Hofladen" statt „Lebensmittel".)*
 - Futter-Sektion: Futtermittelart (Auswahl, nur erlaubte), Nettomenge + Einheit mit Hilfetext „Durchschnittsgewicht eines Gebindes, wie auf dem Sackanhänger", Betriebsstatus mit Hilfetext, Rohwerte optional, Abgabe als Schalter „Nur an landwirtschaftliche Betriebe".
-- Dual-Use-Hinweis: Existiert im selben Hof bereits ein Produkt gleichen Namens in einem anderen Bereich, zeigt das Formular unter dem Namen: „Du hast schon ein Produkt namens Mais im Bereich Lebensmittel. Das hier wird ein zweites, eigenes Produkt mit eigenem Bestand." Hinweis, kein Fehler, keine Sperre.
+- Dual-Use-Hinweis: Existiert im selben Hof bereits ein Produkt gleichen Namens in einem anderen Bereich, zeigt das Formular unter dem Namen: „Du hast schon ein Produkt namens Mais im Bereich Hofladen. Das hier wird ein zweites, eigenes Produkt mit eigenem Bestand." Hinweis, kein Fehler, keine Sperre.
 - Bestand-Label bei BALLEN/BIGBAG: „Bestand (Ballen)" mit „= 3.000 kg" aus `nettoMenge`.
 - MwSt in „Details", vorbelegt aus `mwstStandard`, Hinweis „Standard für diese Kategorie".
 
 ### 6.2 Hofübersicht `/hoefe` (Bereiche 2)
-- Oberste Weiche: Umschalter **„Lebensmittel | Futtermittel"** über den Kategorie-Chips. Sonstiges (Brennholz) erscheint unter Lebensmittel als letzter Chip.
-- Bis Bereiche 2 gemerged ist: Futter-Kategorien **nicht** in den Chips zeigen. Produkte bleiben über die Hofseite erreichbar.
-- Facette „Gebinde: Klein (bis 25 kg) | Groß" nur im Bereich Futtermittel. Facette „Für Tiere" ebenso.
-- Sortierung nach Grundpreis möglich, weil Nettomenge bekannt.
+- Oberste Weiche: Umschalter **„Hofladen | Futtermittel"** über den Kategorie-Chips. Sonstiges (Brennholz) erscheint unter Hofladen als letzter Chip. *(Geändert vor Bereiche 2.)*
+- Die Ausblendung der Futter-Kategorien aus Bereiche 1 entfällt.
+- Karte und Liste zeigen dieselbe Menge. Im Bereich Futtermittel nur Höfe mit mindestens einem kaufbaren Futtermittel.
+- L2-Reihe nur, wenn die Ergebnismenge mindestens zwei Unterkategorien hat, mit Zählern (Höfe); Chips ohne Treffer fehlen.
+- Facetten als eckige Chips: Bio, Gentechnikfrei, AMA; im Bereich Futtermittel zusätzlich „Für Tiere" (Sheet, Mehrfachwahl, Trefferzahl im Knopf) und „Gebinde: Klein (unter 25 kg) | Groß". Facetten gelten je Produkt: Ein Hof bleibt, wenn EIN kaufbares Produkt alle gewählten Bedingungen zugleich erfüllt.
+- Sortierung nach Grundpreis im Bereich Futtermittel: Höfe nach dem günstigsten Kilopreis (Preis ÷ Nettomenge) ihrer passenden Futterprodukte; die Hofkarte zeigt den Wert („ab € 0,12 / kg").
+- Alle Filter in der URL, teilbar und reload-fest — außer Bezugspunkt und Umkreis (der Standort verlässt den Browser nie). Ungültige Parameter werden verworfen, nie ein Fehler.
+- Der Link auf die Hofseite trägt den Bereich mit (`?bereich=futter`).
 
 ### 6.3 Hofseite und Produktdetail (Bereiche 2)
-- Sektionierung nach Bereich, dann L1. Ein Hof mit Eiern und Heu zeigt zwei Blöcke.
-- Produktdetail Futter: Badges, Akkordeon „Kennzeichnung" (zugeklappt, Pflichtangaben vollständig — Fernabsatz verlangt Einsehbarkeit vor dem Kauf), Chip „Nur an Betriebe" wenn gesetzt.
+- ~~Sektionierung nach Bereich, dann L1. Ein Hof mit Eiern und Heu zeigt zwei Blöcke.~~ *Geändert vor Bereiche 2:* Bietet der Hof Produkte in beiden Bereichen an, trennt der Umschalter sie (Standard Hofladen, `?bereich=futter` in der URL). Produkte des anderen Bereichs werden nicht gerendert. Bei nur einem Bereich kein Umschalter.
+- Innerhalb eines Bereichs Sektionen nach Kategorie mit Überschrift. Reihenfolge der Sektionen: nach dem jeweils ersten Produkt der Kategorie in der Sortierung des Hofs (wer sein Lamm nach oben zieht, bekommt Fleisch zuerst); innerhalb nach sortOrder. Sprungmarken ab 12 Produkten im Bereich.
+- Der Warenkorb bleibt gemeinsam — Eier und Heu vom selben Hof in einer Bestellung sind erlaubt.
+- Die Bearbeitungsansicht des Hofs bleibt eine flache, ziehbare Liste.
+- Produktdetail (für alle Produkte, zeigt auch die Kurzbeschreibung). Futter zusätzlich: Kategorie-Pills, Siegel-Badges, Akkordeon „Kennzeichnung" (zugeklappt, Pflichtangaben vollständig — Fernabsatz verlangt Einsehbarkeit vor dem Kauf), Chip „Nur an Betriebe" wenn gesetzt.
 
 ### 6.4 Checkout (Bereiche 1)
 - Abschnitt „Betrieb" erscheint nur, wenn eine NUR_BETRIEBE-Position im Korb liegt: Auswahl „Ich bestelle als landwirtschaftlicher Betrieb" + Betriebsnummer.

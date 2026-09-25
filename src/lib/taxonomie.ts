@@ -269,14 +269,17 @@ export function istFuttermittel(l1: ProductCategoryValue | null | undefined): bo
 }
 
 /**
- * Die zwei Kacheln im Kategorie-Sheet des Produktformulars. Sonstiges liegt
- * unter Lebensmittel (Konzept 6.1) — für den Hof gibt es nur „für Menschen"
- * und „für Tiere".
+ * Die zwei Bereiche, die Kundinnen und Höfe SEHEN — Kacheln im Kategorie-Sheet
+ * des Produktformulars, Umschalter auf /hoefe und auf der Hofseite. Der erste
+ * heißt „Hofladen", nicht „Lebensmittel": Brennholz und Sonstiges gehören dazu
+ * und stünden unter „Lebensmittel" falsch (Konzept 6.0, geändert vor
+ * Bereiche 2). Intern bleibt es bei LEBENSMITTEL — dieses Label ist das
+ * einzige, das die Oberfläche dafür benutzt.
  */
-export const FORMULAR_KACHELN = {
+export const ANZEIGE_BEREICHE = {
   LEBENSMITTEL: {
-    titel: 'Lebensmittel',
-    untertitel: 'Für Menschen',
+    titel: 'Hofladen',
+    untertitel: 'Lebensmittel und mehr',
     kategorien: [...BEREICH_KATEGORIEN.LEBENSMITTEL, ...BEREICH_KATEGORIEN.SONSTIGES],
   },
   FUTTERMITTEL: {
@@ -286,9 +289,13 @@ export const FORMULAR_KACHELN = {
   },
 } as const
 
-export type FormularKachel = keyof typeof FORMULAR_KACHELN
+export type AnzeigeBereich = keyof typeof ANZEIGE_BEREICHE
 
-export function kachelVon(l1: ProductCategoryValue | null | undefined): FormularKachel {
+/** Reihenfolge der Hälften im Umschalter: Hofladen links. */
+export const ANZEIGE_BEREICH_VALUES = ['LEBENSMITTEL', 'FUTTERMITTEL'] as const satisfies readonly AnzeigeBereich[]
+
+/** Hofladen oder Futtermittel — ohne Kategorie Hofladen (wie bereichVon: Sonstiges). */
+export function anzeigeBereichVon(l1: ProductCategoryValue | null | undefined): AnzeigeBereich {
   return istFuttermittel(l1) ? 'FUTTERMITTEL' : 'LEBENSMITTEL'
 }
 

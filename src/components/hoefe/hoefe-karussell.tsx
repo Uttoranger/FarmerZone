@@ -3,13 +3,17 @@
 import { useEffect, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { CATEGORY_OPTIONS, type ProductCategoryValue } from '@/schemas/product'
+import type { ProductCategoryValue } from '@/schemas/product'
 import {
   formatiereAbholung,
   formatiereEntfernung,
-  waehleVorschauProdukte,
+  waehleVorschauImBereich,
+  type ImBereich,
   type MitEntfernung,
 } from '@/lib/hofuebersicht'
+import { hofseitenLink } from '@/lib/bereiche-anzeige'
+import { KATEGORIE_LABEL, type AnzeigeBereich } from '@/lib/taxonomie'
+import { formatAbGrundpreis } from '@/lib/format'
 import { HoefeProduktzeilen } from '@/components/hoefe/hoefe-produktzeilen'
 import { zentrierterIndex } from '@/lib/hoefe-anzeige'
 import { hofInitialen } from '@/lib/hof-initialen'
@@ -43,15 +47,18 @@ export default function HoefeKarussell({
   hoefe,
   ausgewaehlt,
   sichtbar,
+  bereich,
   gewaehlteKategorien = [],
   suchbegriffe = [],
   onZentriert,
   bandRef,
 }: {
   /** Nur Höfe mit Koordinaten, in Pin-Reihenfolge. */
-  hoefe: MitEntfernung<HofUebersichtEintrag>[]
+  hoefe: MitEntfernung<ImBereich<HofUebersichtEintrag>>[]
   ausgewaehlt: string | null
   sichtbar: boolean
+  /** Der gewählte Bereich — Vorschau und Hof-Link folgen ihm wie auf der Hofkarte. */
+  bereich: AnzeigeBereich
   /** Der gesetzte Kategoriefilter — die Produktvorschau folgt ihm hier
    *  genauso wie auf der Hofkarte. */
   gewaehlteKategorien?: ProductCategoryValue[]
@@ -134,7 +141,7 @@ export default function HoefeKarussell({
             {/* Tipp auf die Karte selbst → Hofseite (gestreckter Link);
                 „Zum Hof" darunter ist derselbe Weg, nur ausgeschrieben. */}
             <Link
-              href={`/${hof.slug}`}
+              href={hofseitenLink(hof.slug, bereich)}
               aria-label={`${hof.name} ansehen`}
               tabIndex={sichtbar ? 0 : -1}
               className="absolute inset-0 rounded-2xl"
@@ -187,9 +194,14 @@ export default function HoefeKarussell({
               <p className="mt-2 flex flex-wrap gap-1">
                 {hof.kategorien.slice(0, 3).map((k) => (
                   <span key={k} className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-foreground">
-                    {CATEGORY_OPTIONS.find((o) => o.value === k)?.label ?? k}
+                    {KATEGORIE_LABEL[k]}
                   </span>
                 ))}
+              </p>
+            )}
+            {hof.abGrundpreis && (
+              <p className="mt-1.5 text-xs font-semibold text-brand-text">
+                {formatAbGrundpreis(hof.abGrundpreis)}
               </p>
             )}
 
@@ -200,13 +212,7 @@ export default function HoefeKarussell({
                 (48 + 6)). Die Restzahl steht auf der Hofkarte der Liste, wo
                 Platz dafür ist; hier fräße sie eine dritte Zeile. */}
             {(() => {
-              const vorschau = waehleVorschauProdukte(
-                hof.produkte,
-                gewaehlteKategorien,
-                hof.produkteGesamt,
-                2,
-                suchbegriffe
-              )
+              const vorschau = waehleVorschauImBereich(hof, bereich, gewaehlteKategorien, 2, suchbegriffe)
               return <HoefeProduktzeilen produkte={vorschau.produkte} weitere={0} />
             })()}
 

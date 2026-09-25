@@ -11,15 +11,15 @@ import {
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import {
-  FORMULAR_KACHELN,
+  ANZEIGE_BEREICHE,
   KATEGORIE_LABEL,
   UNTERKATEGORIE_LABEL,
-  kachelVon,
+  anzeigeBereichVon,
   unterkategorienVon,
   gehoertZu,
   istAltlastKategorie,
   istAltlastUnterkategorie,
-  type FormularKachel,
+  type AnzeigeBereich,
   type ProductCategoryValue,
   type ProductSubcategoryValue,
 } from '@/lib/taxonomie'
@@ -31,13 +31,13 @@ import { cn } from '@/lib/utils'
  * Die Wahl wird erst mit „Übernehmen" ins Formular geschrieben — bis dahin
  * ist sie ein Entwurf, den „Schließen" verwirft.
  *
- * Der Bereich wird hier NICHT entschieden, nur angezeigt: kachelVon leitet
+ * Der Bereich wird hier NICHT entschieden, nur angezeigt: anzeigeBereichVon leitet
  * ihn aus der Kategorie ab (taxonomie.ts). Die Kachel ist eine Navigation.
  */
 
 type Wahl = { category: ProductCategoryValue | null; subcategory: ProductSubcategoryValue | null }
 
-const KACHEL_ICON: Record<FormularKachel, typeof Carrot> = {
+const KACHEL_ICON: Record<AnzeigeBereich, typeof Carrot> = {
   LEBENSMITTEL: Carrot,
   FUTTERMITTEL: Wheat,
 }
@@ -104,14 +104,14 @@ function SheetInhalt({
 }) {
   const start = bereinigt(wert)
   // Die Altlast FUTTERMITTEL öffnet die Futter-Kachel, auch wenn sie leer startet.
-  const [kachel, setKachel] = useState<FormularKachel>(kachelVon(wert.category))
+  const [kachel, setKachel] = useState<AnzeigeBereich>(anzeigeBereichVon(wert.category))
   const [entwurf, setEntwurf] = useState<Wahl>(start)
 
-  const kategorien = FORMULAR_KACHELN[kachel].kategorien as readonly ProductCategoryValue[]
+  const kategorien = ANZEIGE_BEREICHE[kachel].kategorien as readonly ProductCategoryValue[]
   const sorten = entwurf.category ? unterkategorienVon(entwurf.category) : []
   const istFutterKachel = kachel === 'FUTTERMITTEL'
 
-  function kachelWaehlen(neu: FormularKachel) {
+  function kachelWaehlen(neu: AnzeigeBereich) {
     if (neu === kachel) return
     setKachel(neu)
     // Eine Kategorie aus dem anderen Bereich passt nicht mehr — neu wählen.
@@ -142,7 +142,7 @@ function SheetInhalt({
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 pb-4">
         <Abschnitt titel="Bereich">
           <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Bereich">
-            {(Object.keys(FORMULAR_KACHELN) as FormularKachel[]).map((k) => {
+            {(Object.keys(ANZEIGE_BEREICHE) as AnzeigeBereich[]).map((k) => {
               const aktiv = kachel === k
               const Icon = KACHEL_ICON[k]
               return (
@@ -158,8 +158,8 @@ function SheetInhalt({
                   )}
                 >
                   <Icon className="h-6 w-6 text-brand-text" aria-hidden />
-                  <span className="text-sm font-semibold text-foreground">{FORMULAR_KACHELN[k].titel}</span>
-                  <span className="text-xs text-muted-foreground">{FORMULAR_KACHELN[k].untertitel}</span>
+                  <span className="text-sm font-semibold text-foreground">{ANZEIGE_BEREICHE[k].titel}</span>
+                  <span className="text-xs text-muted-foreground">{ANZEIGE_BEREICHE[k].untertitel}</span>
                   {aktiv && (
                     <span className="absolute top-2 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
                       <Check className="h-3.5 w-3.5" aria-hidden />

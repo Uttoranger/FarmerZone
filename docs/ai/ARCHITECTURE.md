@@ -119,7 +119,7 @@ Client-Komponente → Server Action → Zod → Fachregel (lib) → Prisma → r
 | Formular | `react-hook-form` | Kein `useState` je Feld |
 | UI-lokal (offen/zu) | `useState` | Nicht global |
 | Warenkorb | `use-cart.ts` (localStorage) + serverseitige Reservierung | Warenkorb ist **nie** die Wahrheit über Verfügbarkeit |
-| Filter/Suche in URL | `useSearchParams` + `router.replace` | Nicht nur im State — Ergebnisse müssen teilbar sein |
+| Filter/Suche in URL | `useSearchParams` lesen, Zod-Schema in `src/schemas/` parst und verwirft Ungültiges still; schreiben mit `window.history.replaceState` (Next gleicht `useSearchParams` ab, kein Server-Roundtrip je Tipp) oder `router.replace`, wenn der Server neu rendern soll | Nicht nur im State — Ergebnisse müssen teilbar sein. **Nie** Standort/Koordinaten in die URL |
 | Theme | `next-themes`, `ThemeProvider` in `src/app/layout.tsx` (`attribute="class"`, `defaultTheme="system"`) | Kein eigener Provider, keine Spalte in der Datenbank — die Wahl gehört dem Gerät |
 
 **Kein globaler Store.** Wenn etwas global wirkt, gehört es meist in die URL oder auf den Server.
@@ -157,6 +157,8 @@ Diese Regeln sind fachlich, nicht technisch. Verletzung kostet Geld oder Vertrau
 Konzept: `docs/konzepte/bereiche.md`.
 
 - **Bereich ist abgeleitet.** `bereichVon(category)` in `taxonomie.ts` entscheidet. Nie als Spalte, nie in `localStorage`, nie `category === '…'` vergleichen, wo der Bereich gemeint ist. Im Browser nur zur Anzeige und Formularführung (dieselbe Funktion) — verbindlich prüfen Zod und die Servergrenze.
+- **Angezeigt werden zwei Bereiche: „Hofladen" und „Futtermittel".** `anzeigeBereichVon` und `ANZEIGE_BEREICHE` in `taxonomie.ts` (Hofladen = Lebensmittel + Sonstiges). Das Label steht nur dort — nie „Lebensmittel" als Bereichsname in der Oberfläche, keine zweite Label-Tabelle.
+- **Kaufbar heißt: sichtbar UND freier Bestand > 0** — `istKaufbar` in `src/lib/bereiche-anzeige.ts`. Chips, Suche, Facetten, Karte und Kilopreis-Sortierung fragen nur dort.
 - **Ein Produkt gehört zu genau einem Bereich.** Dual-Use (Mais als Lebensmittel und als Futter) = zwei Produkte mit zwei Beständen, ohne Verknüpfung im Schema.
 - **`OrderItem.vatRate` ist ein Snapshot.** Der Checkout-Handler schreibt ihn aus `Product.vatRate` im selben `create` wie die Bestellung. Nie nachlesen, nie rückwirkend ändern. `mwstStandard` ist nur die Vorbelegung im Formular.
 

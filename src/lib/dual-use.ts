@@ -9,14 +9,12 @@
  * Rein: Die Server Action liefert die namensgleichen Produkte des EIGENEN
  * Hofs, diese Funktion entscheidet. Gleicher Bereich → kein Hinweis (das ist
  * ein Doppel, kein Dual-Use, und dafür gibt es keine Regel).
+ *
+ * Verglichen wird der ANZEIGE-Bereich (Hofladen | Futtermittel), denn Dual-Use
+ * heißt „für Menschen und für Tiere"; Brennholz neben Eiern ist kein Zwilling.
+ * Den Namen liefert taxonomie.ts — keine eigene Label-Tabelle (Bereiche 2).
  */
-import { bereichVon, type Bereich, type ProductCategoryValue } from '@/lib/taxonomie'
-
-const BEREICH_NAME: Record<Bereich, string> = {
-  LEBENSMITTEL: 'Lebensmittel',
-  FUTTERMITTEL: 'Futtermittel',
-  SONSTIGES: 'Sonstiges',
-}
+import { ANZEIGE_BEREICHE, anzeigeBereichVon, type ProductCategoryValue } from '@/lib/taxonomie'
 
 /** Ab so vielen Zeichen lohnt die Abfrage — wie die Mindestlänge des Namens im Schema. */
 export const DUAL_USE_MIN_ZEICHEN = 2
@@ -37,13 +35,13 @@ export function dualUseHinweis(
   if (eingabe.category == null) return null
   const gesucht = normiereProduktname(eingabe.name)
   if (gesucht.length < DUAL_USE_MIN_ZEICHEN) return null
-  const bereich = bereichVon(eingabe.category)
+  const bereich = anzeigeBereichVon(eingabe.category)
 
   const treffer = vorhandene.find(
-    (p) => normiereProduktname(p.name) === gesucht && bereichVon(p.category) !== bereich
+    (p) => normiereProduktname(p.name) === gesucht && anzeigeBereichVon(p.category) !== bereich
   )
   if (!treffer) return null
   return `Du hast schon ein Produkt namens ${treffer.name.trim()} im Bereich ${
-    BEREICH_NAME[bereichVon(treffer.category)]
+    ANZEIGE_BEREICHE[anzeigeBereichVon(treffer.category)].titel
   }. Das hier wird ein zweites, eigenes Produkt mit eigenem Bestand.`
 }
