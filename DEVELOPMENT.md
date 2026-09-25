@@ -1294,6 +1294,22 @@ in diesem Teil.
    Codeänderung: Die Tests warten mit `vi.waitFor` auf die Mail-Prüfstelle, bevor sie
    fertig sind.
 
+### Nachtrag: E-Mail-Tests unter Last (2026-09-25)
+
+`tests/email-sendraw.test.ts` und `tests/password-reset-email.test.ts` riefen in
+jedem Fall `vi.resetModules()` und importierten `@/lib/email` neu — jedes Mal der
+ganze Baum aus React, `@react-email/render` und allen Vorlagen. Allein blieb das
+unter dem Limit, mit zwei parallelen Suiten lag es über 5 s und damit über dem
+Testlimit. Da der Stop-Hook `pnpm test` fährt, blockierte das jeden Commit,
+sobald eine zweite Sitzung arbeitete.
+
+Jetzt importieren beide Dateien einmal in `beforeAll` mit 30 s Timeout.
+`email.ts` liest `RESEND_API_KEY` auf Modulebene; der Log-Modus-Fall braucht
+deshalb eine zweite Instanz ohne Key — `vi.resetModules()` läuft dafür genau
+einmal, ebenfalls in `beforeAll`. Kein anderer Unit-Test importiert `@/lib/email`
+echt, alle mocken es. `tests/beobachtbarkeit.test.ts` lädt `@/instrumentation`
+pro Fall neu, aber mit gemocktem Sentry — leicht, nicht umgebaut.
+
 ---
 
 ## Nützliche Befehle
