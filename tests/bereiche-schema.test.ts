@@ -234,7 +234,7 @@ describe('P11 — Abgabe nur an Betriebe nur bei Futtermitteln', () => {
 describe('P12 — Ballen und Big Bags ohne Gebindegröße', () => {
   it('Ballen mit unitSize 300: Fehler', () => {
     expect(fehler({ ...heu, unitSize: 300 })['unitSize']).toBe(
-      'Bei Ballen und Big Bags steht das Gewicht in der Kennzeichnung.'
+      'Bei Ballen und Big Bags gibt es keine Gebindegröße — das Gewicht steht direkt unter der Einheit.'
     )
   })
 

@@ -915,6 +915,63 @@ Gebindegröße, Saison-Monate und die Kennzeichnung gleichermaßen, im Schema
 (`.nullable()`), in den Defaults und beim Umschalten. Die Regel steht in
 `docs/ai/CODING_STANDARDS.md`, Abschnitt 8.
 
+### Produktformular Nachschliff (2026-09-25)
+
+Sieben Stellen, an denen das Formular hakte. Vorbilder aus Mobbin: Foto zuerst
+(Depop, Whatnot, Shopify), Kategorie-Vorschlag aus dem Namen (Shopee
+„Recommend Category"), Namensfeld als Frage (Nextdoor „What are you selling?").
+
+**Anlass aus Produktion.** 6 von 12 Produkten hatten keine Kategorie, alle
+sichtbar — sie standen im Bereich Sonstiges zwischen den Lebensmitteln. Von den
+zwei Futtermitteln war eines sauber (Ballen, 150 kg), das andere trug Einheit
+Stück, Gebindegröße 50 und Nettomenge 20 kg zu € 200: Aus den Zahlen lässt sich
+nicht sagen, was gemeint ist. Der Mensch klärt das mit dem Hof; der Code deutet
+nichts um.
+
+**Kategorie beim Anlegen Pflicht.** `productAnlegenSchema` (Kategorie Pflicht,
+Futtermittel ohne Gebindegröße), `createProduct` prüft damit; `updateProduct`
+bleibt bei `productFormSchema`, damit Bestandsprodukte speicherbar bleiben.
+„Keine Angabe" gibt es im Kategorie-Sheet nur noch beim Bearbeiten. Die
+Produktliste zeigt „Kategorie ergänzen" (öffnet das Produkt) oder bei einem
+eindeutigen Vorschlag „Fleisch & Wurst · Lamm übernehmen". Der Chip schreibt
+über die schmale Action `setzeKategorie`, nicht über `updateProduct`: Diese
+schriebe das ganze Produkt aus den Listendaten zurück, samt einem Bestand, den
+eine Bestellung inzwischen gesenkt haben kann (Rückfrage während des Sprints).
+
+**Gewicht je Gebinde beim Preis.** Bei Futtermitteln fragt das Formular direkt
+unter der Einheit „Wie viel wiegt ein Ballen?" (Big Bag, Paket, Stück) — es
+sind die Felder `futter.nettoMenge`/`nettoEinheit` der Kennzeichnung, nur an
+der Stelle, an der der Hof über das Gebinde nachdenkt. Bei kg und Liter ist ein
+Gebinde 1 kg bzw. 1 L, die Frage entfällt. Der Schalter „feste Pakete" entfällt
+bei Futtermitteln; Futter-Einheiten sind nur noch kg, Liter, Stück, Paket,
+Ballen, Big Bag. Ein Futtermittel mit alter Gebindegröße bleibt speicherbar,
+zeigt das Feld mit Hinweis und trägt in der Liste „Einheit prüfen".
+
+**Zwei Zeilen statt „Kunden sehen … / kg".** Die Hofseite zeigt den Kilopreis
+eines Futtermittels noch nicht — `futter.nettoMenge` liest außerhalb des
+Formulars niemand. Deshalb: „Kunden sehen: € 45,00 / Ballen" und darunter, nur
+für den Hof, „Das sind € 0,15 / kg — zum Vergleichen." **Mit Bereiche 2
+bekommen Kunden den Kilopreis; dann werden die beiden Zeilen wieder eine**
+(`vergleichsKilopreis` in `produkt-preis.ts` entfällt).
+
+**Kategorie-Vorschlag.** `kategorieVorschlag(name)` vergleicht klein, mit
+ausgeschriebenen Umlauten: Labels der Unter- und Kategorien am Wortanfang
+(„Lammfleisch" → Lamm), eine kurze Synonymliste nur als ganzes Wort („Heu",
+„Heuballen", „Heumilch" → Milch · Trinkmilch). Label-Teile bis drei Buchstaben
+(Heu, Bio) zählen ebenfalls nur als ganzes Wort — sonst wäre „Heurigenbrot"
+Heu. Unterkategorie-Treffer vor Kategorie-Treffern; mehrere Unterkategorien
+derselben Kategorie ergeben nur die Kategorie. „Bio", „Freiland",
+„Bodenhaltung" zählen nur mit „Ei"/„Eier" im Namen. Wörter aus `DUAL_USE`
+(Mais, Hafer, Gerste, Weizen, Roggen, Triticale, Erdäpfel, Kartoffel) lösen nie
+einen Vorschlag aus — ob für Menschen oder Tiere, entscheidet der Hof.
+
+**Kleinere Stellen.** Die Selects zeigen im geschlossenen Zustand das Label
+statt des Rohwerts (Einheit, Saison Von/Bis). Die Zusammensetzung eines
+Futtermittels wird mit der Sorte vorbelegt („Wiesenheu"), solange sie leer ist
+oder noch die Vorbelegung trägt. Der Button zählt fehlende Angaben („Noch 2
+Angaben fehlen") und springt beim Tipp zum ersten. Das Foto steht als große
+Kachel am Anfang von Grunddaten, der Name heißt „Was verkaufst du?".
+
 ---
 
 ## Upload-Diagnose

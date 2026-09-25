@@ -66,11 +66,17 @@ export function KategorieSheet({
   open,
   onOpenChange,
   wert,
+  keineAngabeErlaubt,
   onUebernehmen,
 }: {
   open: boolean
   onOpenChange: (offen: boolean) => void
   wert: Wahl
+  /**
+   * Darf „Keine Angabe" gewählt werden? Nur beim Bearbeiten — Bestandsprodukte
+   * ohne Kategorie bleiben speicherbar. Beim Anlegen ist die Kategorie Pflicht.
+   */
+  keineAngabeErlaubt: boolean
   onUebernehmen: (wahl: Wahl) => void
 }) {
   return (
@@ -81,13 +87,21 @@ export function KategorieSheet({
       >
         {/* Der Inhalt wird bei jedem Öffnen neu aufgebaut — so startet der
             Entwurf immer beim gespeicherten Wert, ohne Effekt zum Zurücksetzen. */}
-        {open && <SheetInhalt wert={wert} onUebernehmen={onUebernehmen} />}
+        {open && <SheetInhalt wert={wert} keineAngabeErlaubt={keineAngabeErlaubt} onUebernehmen={onUebernehmen} />}
       </SheetContent>
     </Sheet>
   )
 }
 
-function SheetInhalt({ wert, onUebernehmen }: { wert: Wahl; onUebernehmen: (wahl: Wahl) => void }) {
+function SheetInhalt({
+  wert,
+  keineAngabeErlaubt,
+  onUebernehmen,
+}: {
+  wert: Wahl
+  keineAngabeErlaubt: boolean
+  onUebernehmen: (wahl: Wahl) => void
+}) {
   const start = bereinigt(wert)
   // Die Altlast FUTTERMITTEL öffnet die Futter-Kachel, auch wenn sie leer startet.
   const [kachel, setKachel] = useState<FormularKachel>(kachelVon(wert.category))
@@ -108,8 +122,10 @@ function SheetInhalt({ wert, onUebernehmen }: { wert: Wahl; onUebernehmen: (wahl
     setEntwurf((w) => (w.category === neu ? w : { category: neu, subcategory: null }))
   }
 
-  // Futtermittel brauchen eine Kategorie; bei Lebensmitteln ist „Keine Angabe" erlaubt.
-  const kannUebernehmen = !istFutterKachel || entwurf.category !== null
+  // Futtermittel brauchen immer eine Kategorie; bei Lebensmitteln ist „Keine
+  // Angabe" nur beim Bearbeiten erlaubt (Bestandsprodukte).
+  const keineAngabeWaehlbar = keineAngabeErlaubt && !istFutterKachel
+  const kannUebernehmen = keineAngabeWaehlbar || entwurf.category !== null
   const zusammenfassung = [
     entwurf.category ? KATEGORIE_LABEL[entwurf.category] : 'Keine Angabe',
     entwurf.subcategory ? UNTERKATEGORIE_LABEL[entwurf.subcategory] : null,
@@ -165,7 +181,7 @@ function SheetInhalt({ wert, onUebernehmen }: { wert: Wahl; onUebernehmen: (wahl
                 onClick={() => kategorieWaehlen(l1)}
               />
             ))}
-            {!istFutterKachel && (
+            {keineAngabeWaehlbar && (
               <KategorieZeile
                 label="Keine Angabe"
                 aktiv={entwurf.category === null}

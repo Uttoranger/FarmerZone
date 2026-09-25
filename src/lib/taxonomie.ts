@@ -500,3 +500,145 @@ export const TIERART_LABEL: Record<TierartValue, string> = {
   SCHAF_ZIEGE: 'Schafe & Ziegen',
   HEIMTIER: 'Heimtiere',
 }
+
+// ---------------------------------------------------------------------------
+// Kategorie-Vorschlag aus dem Produktnamen (Sprint Produktformular Nachschliff)
+// ---------------------------------------------------------------------------
+
+/**
+ * Wörter, bei denen nur der Hof weiß, ob es für Menschen oder Tiere ist. Sie
+ * lösen NIE einen Vorschlag aus — auch nicht als Wortanfang („Haferflocken").
+ * Ein falscher Vorschlag würde das Produkt in den falschen Bereich legen.
+ */
+export const DUAL_USE = [
+  'Mais', 'Hafer', 'Gerste', 'Weizen', 'Roggen', 'Triticale', 'Erdäpfel', 'Kartoffel',
+] as const
+
+/**
+ * Kurze Synonymliste: Wörter, die kein Label sind, aber eindeutig eine
+ * Unterkategorie meinen. Zählen nur als GANZES Wort — „Heu" darf nicht
+ * „Heumilch" treffen; Heumilch ist in Österreich ein eigener Begriff.
+ */
+const SYNONYME: Readonly<Record<string, ProductSubcategoryValue>> = {
+  Heu: 'WIESENHEU',
+  Heuballen: 'WIESENHEU',
+  Heumilch: 'TRINKMILCH',
+  Milch: 'TRINKMILCH',
+  Speck: 'WURST',
+  Salami: 'WURST',
+  Schinken: 'WURST',
+  Hendl: 'HAEHNCHEN',
+  Huhn: 'HAEHNCHEN',
+  Apfel: 'KERNOBST',
+  Äpfel: 'KERNOBST',
+  Birnen: 'KERNOBST',
+  Kirschen: 'STEINOBST',
+  Zwetschken: 'STEINOBST',
+  Marillen: 'STEINOBST',
+  Erdbeeren: 'BEEREN',
+  Himbeeren: 'BEEREN',
+  Heidelbeeren: 'BEEREN',
+  Karotten: 'WURZELGEMUESE',
+  Tomaten: 'FRUCHTGEMUESE',
+}
+
+/**
+ * Unterkategorien, deren Label allein nichts sagt („Bio", „Freiland"). Sie
+ * zählen nur, wenn im Namen auch ihre Kategorie steht — sonst würde
+ * „Bio-Lammfleisch" zu Eier › Bio.
+ */
+const ALLGEMEINE_L2: readonly ProductSubcategoryValue[] = ['EIER_BIO', 'EIER_FREILAND', 'EIER_BODENHALTUNG']
+
+/** Kategorien, die nie vorgeschlagen werden: Altlast und „Sonstiges" (sagt nichts). */
+const OHNE_VORSCHLAG: readonly ProductCategoryValue[] = ['FUTTERMITTEL', 'SONSTIGES']
+
+/** Klein, Umlaute ausgeschrieben, ß → ss — „Erdäpfel" und „Erdaepfel" sind dasselbe Wort. */
+function normiere(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+}
+
+function woerter(text: string): string[] {
+  return normiere(text).split(/[^a-z0-9]+/).filter(Boolean)
+}
+
+/** „Joghurt & Topfen" → [joghurt, topfen]: jeder Teil eines Labels ist ein Schlüssel. */
+function labelSchluessel(label: string): string[] {
+  return woerter(label).filter((w) => w.length >= 3)
+}
+
+// Kurze Schlüssel (Heu, Bio) nur als ganzes Wort: Am Wortanfang träfe „Heu"
+// auch „Heurigenbrot" und „Heute".
+const KURZ_BIS = 3
+
+const trifftWortanfang = (namensWoerter: string[], schluessel: string[]) =>
+  schluessel.some((s) =>
+    namensWoerter.some((w) => (s.length <= KURZ_BIS ? w === s : w.startsWith(s)))
+  )
+
+export type KategorieVorschlag = {
+  category: ProductCategoryValue
+  subcategory: ProductSubcategoryValue | null
+}
+
+/**
+ * Schlägt aus dem Produktnamen eine Kategorie vor — nur, wenn es EINEN
+ * eindeutigen Treffer gibt; sonst null. Ein Vorschlag ist nie eine Wahl: Das
+ * Formular zeigt ihn als Chip, übernommen wird er erst mit einem Tipp.
+ *
+ * Regeln: Labels der Unterkategorien und Kategorien zählen am Wortanfang
+ * („Lammfleisch" → Lamm), Synonyme und Label-Teile bis drei Buchstaben (Heu,
+ * Bio) nur als ganzes Wort. Unterkategorie-Treffer
+ * gehen vor Kategorie-Treffern. Mehrere Unterkategorien derselben Kategorie
+ * („Lammwurst") ergeben nur die Kategorie. Ein Wort aus DUAL_USE verhindert
+ * jeden Vorschlag.
+ */
+export function kategorieVorschlag(name: string): KategorieVorschlag | null {
+  const namensWoerter = woerter(name)
+  if (namensWoerter.length === 0) return null
+
+  const dualUse = DUAL_USE.map(normiere)
+  if (namensWoerter.some((w) => dualUse.some((d) => w.startsWith(d)))) return null
+
+  const l1Treffer = new Set<ProductCategoryValue>()
+  for (const l1 of CATEGORY_OPTIONS.map((o) => o.value)) {
+    if (OHNE_VORSCHLAG.includes(l1)) continue
+    if (trifftWortanfang(namensWoerter, labelSchluessel(KATEGORIE_LABEL[l1]))) l1Treffer.add(l1)
+  }
+  // „Ei" ist zu kurz für einen Wortanfang („Eis", „Eintopf") — nur als ganzes Wort.
+  if (namensWoerter.includes('ei')) l1Treffer.add('EIER')
+
+  const l2Treffer = new Set<ProductSubcategoryValue>()
+  for (const l2 of PRODUCT_SUBCATEGORY_VALUES) {
+    if (istAltlastUnterkategorie(l2)) continue
+    if (!trifftWortanfang(namensWoerter, labelSchluessel(UNTERKATEGORIE_LABEL[l2]))) continue
+    if (ALLGEMEINE_L2.includes(l2) && !l1Treffer.has(kategorieVon(l2))) continue
+    l2Treffer.add(l2)
+  }
+  for (const [wort, l2] of Object.entries(SYNONYME)) {
+    if (namensWoerter.includes(normiere(wort))) l2Treffer.add(l2)
+  }
+
+  if (l2Treffer.size > 0) {
+    if (l2Treffer.size === 1) {
+      const [l2] = l2Treffer
+      return { category: kategorieVon(l2), subcategory: l2 }
+    }
+    const kategorien = new Set([...l2Treffer].map(kategorieVon))
+    if (kategorien.size === 1) {
+      const [l1] = kategorien
+      return { category: l1, subcategory: null }
+    }
+    return null
+  }
+
+  if (l1Treffer.size === 1) {
+    const [l1] = l1Treffer
+    return { category: l1, subcategory: null }
+  }
+  return null
+}

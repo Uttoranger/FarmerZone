@@ -1,6 +1,6 @@
 # TESTING_GUIDELINES
 
-Stand 2026-09-24: 93 Testdateien / ~1.515 Tests in `tests/` (Unit),
+Stand 2026-09-25: 100 Testdateien / ~1.600 Tests in `tests/` (Unit),
 5 Dateien / 15 Tests in `tests/integration/` (Integration).
 
 ---
