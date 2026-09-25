@@ -19,7 +19,9 @@ function Switch({ className, ...props }: SwitchPrimitive.Root.Props) {
         data-slot="switch-thumb"
         // Weiß in beiden Modi: Der Schieber liegt auf heller wie auf dunkler
         // Schiene; ein Token, das dem Modus folgt, verschwände auf einer davon.
-        className="block size-5 rounded-full bg-white shadow transition-transform data-unchecked:translate-x-0.5 data-checked:translate-x-[18px]"
+        // Haarlinie, weil Weiß auf der grauen Aus-Schiene nur 1,5:1 erreicht und
+        // der Schieber die Zustandsanzeige ist (CODING_STANDARDS §7: 3:1).
+        className="block size-5 rounded-full bg-white shadow ring-1 ring-black/15 transition-transform data-unchecked:translate-x-0.5 data-checked:translate-x-[18px]"
       />
     </SwitchPrimitive.Root>
   )

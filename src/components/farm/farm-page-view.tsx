@@ -21,6 +21,7 @@ import { updateFarmBannerAction, updateBannerFocusAction } from '@/server/action
 import { addFarmPhotoAction, reorderPhotosAction } from '@/server/actions/farm-photos'
 import { ReorderContext } from '@/components/shared/reorder-context'
 import { nextPickupDays, pickupWeekdaysLabel } from '@/lib/pickup-days'
+import { kopfzeileProdukte } from '@/lib/produkt-sichtbarkeit'
 import { pausenBanner } from '@/lib/shop-pause'
 import { buildMapsUrl, buildShareData } from '@/lib/customer-links'
 import { hofseiteSektionen, naechsterAktiverReiter } from '@/lib/hofseite-sektionen'
@@ -768,10 +769,12 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
     : farm.products.filter((p) => p.isAvailable)
 
   const publicCount = farm.products.filter((p) => p.isAvailable).length
-  const hiddenCount = farm.products.filter((p) => !p.isAvailable).length
   const productCountLabel = ownerMode
     ? isEdit
-      ? `${publicCount} sichtbar${hiddenCount > 0 ? ` · ${hiddenCount} ausgeblendet` : ''}`
+      ? // Dieselbe Zählzeile wie in der Produktliste: „n im Shop · m gesamt".
+        // Vorher stand hier eine dritte Fassung („n sichtbar · m ausgeblendet")
+        // direkt über dem Raster, das jetzt „Nicht im Shop" sagt.
+        kopfzeileProdukte(farm.products)
       : `${publicCount} Produkte`
     : publicCount > 0
       ? `${publicCount} Produkte`

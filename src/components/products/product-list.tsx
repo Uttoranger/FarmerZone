@@ -34,7 +34,7 @@ import { ProductDialog } from './product-dialog'
 import { StockDialog } from './stock-dialog'
 import { PageHeader } from '@/components/farmer/page-header'
 import { ImShopSchalter } from '@/components/products/im-shop-schalter'
-import { kopfzeileProdukte, markeText, produktZustand } from '@/lib/produkt-sichtbarkeit'
+import { kopfzeileProdukte, markeText, NICHT_IM_SHOP, produktZustand } from '@/lib/produkt-sichtbarkeit'
 
 type Props = {
   products: ProductData[]
@@ -51,10 +51,16 @@ type Props = {
  * „Pausiert" ist verschwunden: Das heißt bei uns der ganze Hof (Hof-Pause).
  * Ein einzelnes Produkt ist „Nicht im Shop".
  */
-const MARKE_FARBE: Record<string, string> = {
+// Der Typ ist ABSICHTLICH an markeText gebunden und nicht Record<string, string>:
+// Käme dort ein Wort hinzu oder änderte sich eines, lieferte ein loser Record
+// still `undefined` in das className — die Marke wäre unsichtbar, und niemand
+// bekäme es zu sehen. So ist es ein Typfehler. Der Aus-Zustand kommt als
+// berechneter Schlüssel aus der Konstante, damit das Wort nur EINMAL geschrieben
+// steht.
+const MARKE_FARBE: Record<ReturnType<typeof markeText>, string> = {
   Aktiv: 'bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-200 border-green-200 dark:border-green-900/60',
   Ausverkauft: 'bg-red-100 dark:bg-red-950/50 text-red-800 dark:text-red-200 border-red-200 dark:border-red-900/60',
-  'Nicht im Shop': 'bg-muted text-muted-foreground border-border',
+  [NICHT_IM_SHOP]: 'bg-muted text-muted-foreground border-border',
 }
 
 export function ProductList({ products: initialProducts, initialEditId, hofBetriebsnummer }: Props) {

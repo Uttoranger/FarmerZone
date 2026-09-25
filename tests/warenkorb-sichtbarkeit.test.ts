@@ -97,7 +97,7 @@ describe('pruefeSitzungsWarenkorb — ausgeblendete Produkte', () => {
 
     const pruefung = await pruefeSitzungsWarenkorb([{ productId: 'p1', quantity: 1 }], SITZUNG, JETZT)
 
-    expect(pruefung.befund.positionen[0]!.zustand).toBe('weg')
+    expect(pruefung.befund.positionen[0]).toMatchObject({ zustand: 'weg' })
   })
 
   it('ein Produkt, das es gar nicht mehr gibt, fällt genauso', async () => {
@@ -107,7 +107,7 @@ describe('pruefeSitzungsWarenkorb — ausgeblendete Produkte', () => {
     const pruefung = await pruefeSitzungsWarenkorb([{ productId: 'weg', quantity: 1 }], SITZUNG, JETZT)
 
     expect(pruefung.befund.etwasGeaendert).toBe(true)
-    expect(pruefung.befund.positionen[0]!.zustand).toBe('weg')
+    expect(pruefung.befund.positionen[0]).toMatchObject({ zustand: 'weg' })
     // Ohne eigenen Halt gilt die Position zusätzlich als abgelaufen — der
     // Checkout nennt dann diesen Grund zuerst.
     expect(pruefung.befund.etwasAbgelaufen).toBe(true)

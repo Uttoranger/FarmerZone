@@ -271,7 +271,8 @@ function zusammenfassung(abschnitt: Abschnitt, w: ProductFormData): string {
     case 'preis': {
       const preis = Number.isFinite(w.price) ? w.price : 0
       const teile = [formatGrundpreis(preis, w.unit, w.unitSize), `${Number.isFinite(w.stock) ? w.stock : 0} auf Lager`]
-      if (!w.isAvailable) teile.push('ausgeblendet')
+      // Dasselbe Wort wie auf dem Streifen, in der Liste und im Toast.
+      if (!w.isAvailable) teile.push(NICHT_IM_SHOP.toLowerCase())
       return teile.join(' · ')
     }
     case 'details': {

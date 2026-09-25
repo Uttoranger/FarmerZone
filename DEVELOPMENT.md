@@ -1403,10 +1403,14 @@ Behoben für alle acht Aktionen: Der Cache trägt jetzt `HOEFE_CACHE_TAG`
 noch die Action die Seite importieren muss), und der Helfer `revalidate()` in
 `src/server/actions/products.ts` entwertet es.
 
-**Versionsfalle, die dabei auffiel** (Regel jetzt in `docs/ai/TECH_STACK.md`): In
-Next 16 verlangt `revalidateTag` ein zweites Argument und warnt ohne es. Aus
-einer Server Action heißt die Funktion `updateTag(tag)` — sie nimmt nur das
-Etikett, entwertet sofort und wirft außerhalb einer Server Action.
+**Wie die Versionsfalle dabei auffiel:** Die naheliegende Zeile wäre
+`revalidateTag('oeffentliche-hoefe')` gewesen — so stand es in jedem Beispiel,
+das man aus dem Gedächtnis zitiert. In Next 16 ist die Signatur eine andere.
+Herausgefunden nicht durch Suchen, sondern durch Nachsehen in den Typen der
+installierten Version (`node_modules/next/dist/server/web/spec-extension/`).
+Die Regel, die daraus folgt, steht in `docs/ai/TECH_STACK.md` — hier nur der
+Hinweis, wie man an so etwas kommt: bei einer Cache- oder API-Frage die
+installierte Version lesen, nicht die Erinnerung.
 
 ### Was NICHT geändert wurde, obwohl der Auftrag es vorsah
 

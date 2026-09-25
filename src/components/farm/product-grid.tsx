@@ -80,21 +80,28 @@ function SeasonBadge({ start, end }: { start: number; end: number }) {
  * src/lib/produkt-sichtbarkeit.ts; hier wird nur gezeichnet. Vorher lag dieselbe
  * Ableitung auch in der Produktliste, mit anderen Wörtern.
  *
- * FARBEN AUS TOKENS (CODING_STANDARDS §7). Vorher standen hier vier harte
- * Hex-Werte ohne dunkle Entsprechung — im dunklen Modus saß dunkelgraue Schrift
- * auf beigem Grund. „Nicht im Shop" nimmt den ruhigen Chip-Ton, „Ausverkauft"
- * und „knapp" die Handlungsfarbe, weil sie den Hof etwas tun lassen wollen.
+ * FARBEN (CODING_STANDARDS §7). Vorher standen hier vier harte Hex-Werte ohne
+ * dunkle Entsprechung — im dunklen Modus saß dunkelgraue Schrift auf beigem
+ * Grund, und weiß auf #D97C46 kam bei 11 px auf 3,3:1.
+ *
+ * „Ausverkauft" und „knapp" sind BEDEUTUNGSFARBEN, nicht die Handlungsfarbe:
+ * `accent` gehört dem Kaufknopf (§7: höchstens einmal je Seite), und der sitzt
+ * auf derselben Karte — auf einem Raster stünde die CTA-Farbe sonst zwanzigmal.
+ * Rot und Bernstein nach dem Beispiel aus §7, heller Wert plus `dark:`, und
+ * dieselbe Familie wie die Marken in der Produktliste. Neutral bleibt der
+ * Chip-Ton aus der Palette der Hofseite.
  */
+const STREIFEN_FARBE: Record<ProduktZustand['art'], string> = {
+  'nicht-im-shop': 'bg-[var(--app-chip)] text-[var(--app-chip-ink)]',
+  ausverkauft: 'bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-100',
+  knapp: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-100',
+  'im-shop': 'bg-[var(--app-chip)] text-[var(--app-chip-ink)]',
+}
+
 function StockStrip({ zustand }: { zustand: ProduktZustand }) {
-  const warnung = zustand.art === 'ausverkauft' || zustand.art === 'knapp'
   return (
     <div
-      className="absolute left-0 right-0 bottom-0 h-7 flex items-center justify-center gap-1.5 text-[11px] font-bold"
-      style={
-        warnung
-          ? { background: 'var(--accent)', color: 'var(--accent-foreground)' }
-          : { background: 'var(--app-chip)', color: 'var(--app-chip-ink)' }
-      }
+      className={`absolute left-0 right-0 bottom-0 h-7 flex items-center justify-center gap-1.5 text-[11px] font-bold ${STREIFEN_FARBE[zustand.art]}`}
     >
       {zustand.art === 'nicht-im-shop' && <EyeOff className="size-3" strokeWidth={1.7} />}
       {streifenText(zustand)}
@@ -364,7 +371,10 @@ function ProductCard({
             {/* Im Shop, aber nichts da: Der Schalter bleibt AN, und der Hof
                 erfährt, was die Kundin stattdessen liest. */}
             {zustand.art === 'ausverkauft' && (
-              <p className="px-1 pb-1.5 text-[11px] leading-snug" style={{ color: 'var(--app-ink-faint)' }}>
+              // app-ink-soft, NICHT app-ink-faint: Letzteres kommt im hellen Modus
+              // auf 2,7:1 gegen die Karte und reißt die 4,5:1 aus §7 — bei 11 px
+              // erst recht.
+              <p className="px-1 pb-1.5 text-[11px] leading-snug" style={{ color: 'var(--app-ink-soft)' }}>
                 {'Bestand 0 — Kunden sehen \u201eAusverkauft\u201c'}
               </p>
             )}

@@ -118,10 +118,13 @@ export function ImShopSchalter({
         )}
       >
         {/* Weiß in beiden Modi — wie in ui/switch.tsx: Der Schieber liegt auf
-            heller wie auf dunkler Schiene, ein Token verschwände auf einer. */}
+            heller wie auf dunkler Schiene, ein Token verschwände auf einer.
+            Die Haarlinie ist nicht Zierde: Weiß auf der grauen Aus-Schiene
+            kommt auf 1,5:1, und der Schieber IST die Zustandsanzeige (§7
+            verlangt 3:1 für Symbole). Mit Rand ist die Kante sichtbar. */}
         <span
           className={cn(
-            'absolute top-1/2 block size-[22px] -translate-y-1/2 rounded-full bg-white shadow transition-transform',
+            'absolute top-1/2 block size-[22px] -translate-y-1/2 rounded-full bg-white shadow ring-1 ring-black/15 transition-transform',
             imShop ? 'translate-x-[20px]' : 'translate-x-0.5'
           )}
         />
