@@ -1343,6 +1343,19 @@ sind deshalb eingefroren (`guidelines.md`, Commit und Hash in `SKILL.md`).
 Aus `skills-lock.json` flogen zwei Einträge ohne installierten Skill
 (`vercel-composition-patterns`, `vercel-react-native-skills`).
 
+**Sicherheits-Overrides umgezogen.** pnpm 10.33 warnt bei jedem Aufruf, das
+Feld `"pnpm"` in `package.json` werde nicht mehr gelesen — darin standen die
+drei Overrides für undici, hono und ws. Eine Gegenprobe zeigte: 10.33 liest
+es trotz der Warnung noch (Lockfile blieb gleich), ohne Overrides fliegt der
+Abschnitt aus dem Lockfile und die Auflösung ändert sich. Neuere
+pnpm-Versionen lesen das Feld nicht mehr und ließen sie stillschweigend
+fallen. Sie stehen jetzt in
+`pnpm-workspace.yaml`; der Lockfile ist damit byte-gleich, die Warnung weg.
+Deshalb auch die Regel in `CLAUDE.md`: nur mit der festgelegten pnpm-Version
+installieren.
+
+---
+
 ## Nützliche Befehle
 
 ```bash

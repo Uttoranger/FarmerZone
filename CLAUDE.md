@@ -64,6 +64,7 @@ Kein Commit mit rotem Typecheck oder roten Tests. Keine Ausnahme, auch nicht "nu
 - **Niemals** mehr als eine Aufgabe in einen Branch mischen.
 - **Niemals** `git stash`. Der Stash-Stapel ist für alle Worktrees gemeinsam; parallele Sitzungen holen sich sonst gegenseitig ihre Stände zurück (Vorfall in Bereiche 2). Zwischenstände als WIP-Commit auf dem eigenen Branch sichern.
 - **Niemals** unaufgefordert Pakete installieren. Vorschlagen und fragen.
+- Pakete nur mit der in package.json festgelegten pnpm-Version installieren (corepack). Eine andere Version kann den Lockfile ohne die Sicherheits-Overrides neu schreiben.
 - **Niemals** Features bauen, die nicht beauftragt sind. Im Zweifel fragen.
 
 ---

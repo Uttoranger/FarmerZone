@@ -11,3 +11,11 @@ onlyBuiltDependencies:
   - unrs-resolver
   - '@prisma/client'
   - prisma
+
+# Sicherheits-Overrides. Stehen hier, weil das Feld "pnpm" in package.json
+# abgekündigt ist — neuere pnpm-Versionen lesen es nicht mehr und ließen die
+# Overrides dort stillschweigend fallen.
+overrides:
+  undici@<6.27.0: '>=6.27.0'
+  hono@<4.12.25: '>=4.12.25'
+  ws@>=8.0.0 <8.21.0: '>=8.21.0'

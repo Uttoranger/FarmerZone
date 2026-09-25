@@ -30,6 +30,8 @@ Stand: 2026-09. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 - `z.string().email()` ist deprecated → `z.email()`.
 - Fehlerliste heißt `error.issues`, nicht `error.errors`.
 
+**pnpm-Einstellungen:** `overrides`, `allowBuilds` und `onlyBuiltDependencies` stehen in `pnpm-workspace.yaml`, **nicht** im Feld `"pnpm"` der `package.json` — das Feld ist abgekündigt. Ein neuer Sicherheits-Override kommt dorthin; danach muss er im Kopf von `pnpm-lock.yaml` unter `overrides:` stehen.
+
 **Tailwind 4:** Konfiguration lebt in `src/app/globals.css` per `@theme` / `@import "tailwindcss"`. **Keine** `tailwind.config.js` anlegen. Keine `content`-Pfade pflegen.
 
 **Next 16:**
