@@ -14,7 +14,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
-vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/server/queries/dashboard', () => ({ getFarmForUser: vi.fn() }))
 vi.mock('@/lib/prisma', () => {
@@ -33,10 +33,11 @@ vi.mock('@/lib/prisma', () => {
 })
 
 import { createProduct, updateProduct } from '@/server/actions/products'
+import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getFarmForUser } from '@/server/queries/dashboard'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 
 type Tx = {
   product: { updateMany: ReturnType<typeof vi.fn> }
@@ -160,6 +161,37 @@ describe('createProduct', () => {
     getSession.mockResolvedValue(null as never)
     await expect(createProduct(basis as never)).rejects.toThrow()
     expect(productCreate).not.toHaveBeenCalled()
+  })
+})
+
+describe('Cache-Entwertung', () => {
+  it('entwertet mit jeder erfolgreichen Änderung auch den Cache der Hofübersicht', async () => {
+    // Die Hofübersicht hängt an einem eigenen Fünf-Minuten-Cache, den kein
+    // revalidatePath erreicht. Ohne diese Entwertung stand ein ausgeblendetes
+    // oder ausverkauftes Produkt dort bis zu fünf Minuten weiter.
+    await updateProduct('p_1', basis as never)
+
+    expect(revalidatePath).toHaveBeenCalledWith('/products')
+    expect(revalidatePath).toHaveBeenCalledWith('/testhof')
+    expect(revalidatePath).toHaveBeenCalledWith('/farm-page')
+    expect(updateTag).toHaveBeenCalledWith(HOEFE_CACHE_TAG)
+  })
+
+  it('entwertet nichts, wenn nichts geschrieben wurde', async () => {
+    tx.product.updateMany.mockResolvedValue({ count: 0 })
+
+    await updateProduct('p_fremd', basis as never)
+
+    expect(updateTag).not.toHaveBeenCalled()
+  })
+
+  it('ruft updateTag mit genau einem Argument — revalidateTag bräuchte in Next 16 ein zweites', async () => {
+    // Festgehalten, weil es eine Versionsfalle ist: revalidateTag(tag) allein
+    // warnt in Next 16 zur Laufzeit und ist typseitig unvollständig. updateTag
+    // nimmt nur das Etikett, gilt aber ausschließlich in Server Actions.
+    await updateProduct('p_1', basis as never)
+
+    expect(vi.mocked(updateTag).mock.calls[0]).toHaveLength(1)
   })
 })
 

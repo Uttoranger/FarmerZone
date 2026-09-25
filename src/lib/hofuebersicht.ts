@@ -25,6 +25,18 @@ import {
   type Grundpreis,
 } from '@/lib/bereiche-anzeige'
 
+/**
+ * Das Etikett des Fünf-Minuten-Caches der Hofübersicht.
+ *
+ * Es steht in diesem reinen Modul, weil zwei Schichten es brauchen und keine
+ * von ihnen die andere importieren soll: Die Seite hängt es an ihren
+ * `unstable_cache` (`src/app/(public)/hoefe/page.tsx`), die Produktaktionen
+ * entwerten es (`src/server/actions/products.ts`). Zwei gleichlautende
+ * Zeichenketten an zwei Orten wären genau die Art Fehler, die niemand bemerkt —
+ * der Cache bliebe dann einfach stehen.
+ */
+export const HOEFE_CACHE_TAG = 'oeffentliche-hoefe'
+
 export type AbholFenster = {
   /** 0=Sonntag … 6=Samstag — wie PickupSlot.dayOfWeek und JS getDay(). */
   dayOfWeek: number

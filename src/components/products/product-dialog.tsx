@@ -9,6 +9,7 @@ import { Camera, X, Leaf, Thermometer, Snowflake, ChevronRight, Info, Sparkles }
 import { ladeFotoHoch, stufenText, type UploadStufe } from '@/components/shared/image-upload'
 import { useFotoQuellen } from '@/components/shared/foto-quellen'
 import { bildFehlerMeldung } from '@/lib/upload-fehler'
+import { IM_SHOP, NICHT_IM_SHOP } from '@/lib/produkt-sichtbarkeit'
 import { meldeUploadFehler, type UploadWeg } from '@/lib/upload-meldung'
 import { MAX_ORIGINAL_BYTES } from '@/lib/upload-pfade'
 import {
@@ -1119,8 +1120,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                           <FormItem data-feld="isAvailable">
                             <SchalterZeile
                               id="im-shop-verfuegbar"
-                              titel="Im Shop verfügbar"
-                              untertitel={field.value ? 'Sichtbar und bestellbar' : 'Ausgeblendet im Shop'}
+                              titel={IM_SHOP}
+                              untertitel={field.value ? 'Sichtbar und bestellbar' : NICHT_IM_SHOP}
                               checked={field.value}
                               onCheckedChange={field.onChange}
                             />

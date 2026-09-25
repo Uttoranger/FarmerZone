@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useTransition } from 'react'
+import { useState, useEffect, useMemo, useOptimistic, useTransition } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -16,6 +16,8 @@ import { formatGrundpreis, formatGrundpreisNetto } from '@/lib/format'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 import { BereichUmschalter } from '@/components/shared/bereich-umschalter'
 import { SHOP_PAUSED_BUTTON_LABEL } from '@/lib/shop-pause'
+import { produktZustand, streifenText, type ProduktZustand } from '@/lib/produkt-sichtbarkeit'
+import { ImShopSchalter } from '@/components/products/im-shop-schalter'
 import { teileHofseite, zeigeKaufknopf } from '@/lib/bereiche-anzeige'
 import { bereichAusParameter, bereichParameter } from '@/schemas/hoefe-filter'
 import type { AnzeigeBereich } from '@/lib/taxonomie'
@@ -39,9 +41,13 @@ type Props = {
   mode?: 'edit' | 'preview'
   /** Shop pausiert: Kauf-Schaltflächen sind tot (Durchsetzung liegt am Server). */
   isPaused?: boolean
+  /**
+   * Wechselt in die Kundenansicht. Kommt von farm-page-client.tsx, wo `mode`
+   * lebt — der Zustand floss bisher nur nach unten, für diesen Knopf braucht es
+   * den Rückweg.
+   */
+  onVorschau?: () => void
 }
-
-const LOW_STOCK = 5
 
 
 // Produktpreise kommen aus src/lib/format.ts (formatGrundpreis + Grundpreis-
@@ -67,57 +73,31 @@ function SeasonBadge({ start, end }: { start: number; end: number }) {
   )
 }
 
-// Der Bestandsstreifen liegt über dem Produktfoto, nicht auf der Karte —
-// seine Farben folgen deshalb bewusst keinem Modus.
-type StripState =
-  | { type: 'hidden' }
-  | { type: 'soldout' }
-  | { type: 'low'; count: number }
-  | { type: 'normal'; count: number }
-
-function getStripState(product: PublicProduct): StripState {
-  if (!product.isAvailable) return { type: 'hidden' }
-  if (product.stock === 0) return { type: 'soldout' }
-  if (product.stock <= LOW_STOCK) return { type: 'low', count: product.stock }
-  return { type: 'normal', count: product.stock }
-}
-
-function StockStrip({ product }: { product: PublicProduct }) {
-  const strip = getStripState(product)
-
-  let bg: string
-  let color: string
-  let content: React.ReactNode
-
-  if (strip.type === 'hidden') {
-    bg = 'rgba(216,210,194,0.97)'
-    color = '#3F4237'
-    content = (
-      <>
-        <EyeOff className="size-3" strokeWidth={1.7} />
-        Ausgeblendet – nur du siehst es
-      </>
-    )
-  } else if (strip.type === 'soldout') {
-    bg = '#D97C46'
-    color = '#fff'
-    content = 'Ausverkauft'
-  } else if (strip.type === 'low') {
-    bg = '#D97C46'
-    color = '#fff'
-    content = `Nur noch ${strip.count} verfügbar`
-  } else {
-    bg = 'rgba(242,236,221,0.95)'
-    color = '#6E5F45'
-    content = `${strip.count} verfügbar`
-  }
-
+/**
+ * Der Streifen über dem Produktbild — nur im Bearbeitungsmodus.
+ *
+ * WAS ER SAGT, entscheidet die reine Funktion in
+ * src/lib/produkt-sichtbarkeit.ts; hier wird nur gezeichnet. Vorher lag dieselbe
+ * Ableitung auch in der Produktliste, mit anderen Wörtern.
+ *
+ * FARBEN AUS TOKENS (CODING_STANDARDS §7). Vorher standen hier vier harte
+ * Hex-Werte ohne dunkle Entsprechung — im dunklen Modus saß dunkelgraue Schrift
+ * auf beigem Grund. „Nicht im Shop" nimmt den ruhigen Chip-Ton, „Ausverkauft"
+ * und „knapp" die Handlungsfarbe, weil sie den Hof etwas tun lassen wollen.
+ */
+function StockStrip({ zustand }: { zustand: ProduktZustand }) {
+  const warnung = zustand.art === 'ausverkauft' || zustand.art === 'knapp'
   return (
     <div
       className="absolute left-0 right-0 bottom-0 h-7 flex items-center justify-center gap-1.5 text-[11px] font-bold"
-      style={{ background: bg, color }}
+      style={
+        warnung
+          ? { background: 'var(--accent)', color: 'var(--accent-foreground)' }
+          : { background: 'var(--app-chip)', color: 'var(--app-chip-ink)' }
+      }
     >
-      {content}
+      {zustand.art === 'nicht-im-shop' && <EyeOff className="size-3" strokeWidth={1.7} />}
+      {streifenText(zustand)}
     </div>
   )
 }
@@ -189,8 +169,8 @@ function ProductImageArea({
         )}
       </div>
 
-      {/* Stock strip — always full opacity, shown in edit mode */}
-      {isEditMode && <StockStrip product={product} />}
+      {/* Streifen — immer volle Deckkraft, nur im Bearbeitungsmodus */}
+      {isEditMode && <StockStrip zustand={produktZustand(product)} />}
 
       {/* Edit-mode hover overlay */}
       {isEditMode && (
@@ -279,6 +259,7 @@ function ProductCard({
   ownerMode = false,
   isEditMode = false,
   isPaused = false,
+  setzeSichtbarkeit,
 }: {
   product: PublicProduct
   onAddToCart: (product: PublicProduct) => void
@@ -288,9 +269,12 @@ function ProductCard({
   ownerMode?: boolean
   isEditMode?: boolean
   isPaused?: boolean
+  /** Vorgezogener Sichtbarkeitsstand im Eltern-Bauteil — nur im Bearbeitungsmodus. */
+  setzeSichtbarkeit?: (imShop: boolean) => void
 }) {
   const canBuy = zeigeKaufknopf(product, isPaused)
   const isAdding = isAddingId === product.id
+  const zustand = produktZustand(product)
   const dim = isEditMode && !product.isAvailable ? 0.55 : 1
   // Futter: Kilopreis aus der Nettomenge (Bereiche 2) — Ballen und Big Bags
   // haben keine Gebindegröße und bekämen sonst gar keinen Grundpreis.
@@ -343,10 +327,15 @@ function ProductCard({
       )}
 
       {/* Body */}
-      <div
-        className="px-[15px] pb-[14px] flex flex-col flex-1"
-        style={{ opacity: dim }}
-      >
+      <div className="px-[15px] pb-[14px] flex flex-col flex-1">
+
+        {/* Die Blässe sitzt NICHT mehr an der Hülle, sondern an den Teilen, die
+            blass werden sollen: Deckkraft wirkt auf den ganzen Teilbaum, und der
+            Schalter darunter muss voll deckend bleiben. Er ist das
+            Bedienelement, das die Blässe erklärt — halb durchsichtig sähe er
+            selbst abgeschaltet aus, und seine Schiene fiele unter den
+            Mindestkontrast. */}
+        <div className="flex flex-col flex-1" style={{ opacity: dim }}>
 
         {product.seasonStart && product.seasonEnd && (
           <div className="mt-2">
@@ -361,9 +350,29 @@ function ProductCard({
         )}
 
         <div className="flex-1" />
+        </div>
+
+        {/* Zwischen Preis und den Knöpfen — die ganze Zeile ist der Schalter. */}
+        {isEditMode && setzeSichtbarkeit && (
+          <div className="mt-3 border-t pt-1" style={{ borderColor: 'var(--border)' }}>
+            <ImShopSchalter
+              productId={product.id}
+              name={product.name}
+              imShop={product.isAvailable}
+              setzeOptimistisch={setzeSichtbarkeit}
+            />
+            {/* Im Shop, aber nichts da: Der Schalter bleibt AN, und der Hof
+                erfährt, was die Kundin stattdessen liest. */}
+            {zustand.art === 'ausverkauft' && (
+              <p className="px-1 pb-1.5 text-[11px] leading-snug" style={{ color: 'var(--app-ink-faint)' }}>
+                {'Bestand 0 — Kunden sehen \u201eAusverkauft\u201c'}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Footer — mode-aware */}
-        <div className="mt-3 pt-2">
+        <div className="mt-3 pt-2" style={{ opacity: dim }}>
           {isEditMode ? (
             <div className="flex gap-2">
               <Link
@@ -481,6 +490,7 @@ export function ProductGrid({
   ownerMode = false,
   mode = 'preview',
   isPaused = false,
+  onVorschau,
 }: Props) {
   const isEditMode = ownerMode && mode !== 'preview'
 
@@ -516,12 +526,32 @@ export function ProductGrid({
     setOrderedIds(null)
   }, [products])
 
+  // Sprint Sichtbarkeits-Schalter: der vorgezogene Sichtbarkeitsstand.
+  //
+  // Grundzustand ist ABSICHTLICH leer: Sobald die Transition durch ist, hat
+  // revalidatePath neue Props geliefert, und die sind die Wahrheit. Der Eintrag
+  // gilt nur solange die Aktion läuft — scheitert sie, fällt React von selbst
+  // auf die Props zurück, ohne dass irgendwo ein Zurückschalten steht.
+  const [vorgezogen, setzeVorgezogen] = useOptimistic<
+    Record<string, boolean>,
+    { id: string; imShop: boolean }
+  >({}, (stand, aenderung) => ({ ...stand, [aenderung.id]: aenderung.imShop }))
+
+  const sichtbareProdukte = useMemo(
+    () =>
+      products.map((p) => {
+        const neu = vorgezogen[p.id]
+        return neu === undefined ? p : { ...p, isAvailable: neu }
+      }),
+    [products, vorgezogen]
+  )
+
   const displayProducts = useMemo(() => {
-    if (!isEditMode || !orderedIds) return products
-    const byId = new Map(products.map((p) => [p.id, p]))
+    if (!isEditMode || !orderedIds) return sichtbareProdukte
+    const byId = new Map(sichtbareProdukte.map((p) => [p.id, p]))
     const ordered = orderedIds.map((id) => byId.get(id)).filter(Boolean) as PublicProduct[]
-    return ordered.length === products.length ? ordered : products
-  }, [products, orderedIds, isEditMode])
+    return ordered.length === sichtbareProdukte.length ? ordered : sichtbareProdukte
+  }, [sichtbareProdukte, orderedIds, isEditMode])
 
   function handleReorderDragEnd(event: DragEndEvent) {
     const { active, over } = event
@@ -660,9 +690,29 @@ export function ProductGrid({
         />
       ) : (
       <>
-      <p className="mb-4 text-sm" style={{ color: 'var(--app-ink-soft)' }}>
-        Kunden sehen deine Produkte nach Kategorie gruppiert, Hofladen und Futtermittel getrennt.
-      </p>
+      {/* Aus dem Hinweissatz ist ein Knopf geworden: Er beschreibt die
+          Kundenansicht — dann soll er sie auch zeigen können, statt den Hof
+          oben im Umschalter danach suchen zu lassen. Ohne Rückweg (öffentliche
+          Hofseite) bleibt es ein Satz. */}
+      {onVorschau ? (
+        <button
+          type="button"
+          onClick={onVorschau}
+          className="mb-4 flex min-h-11 w-full items-center gap-1.5 rounded-lg px-1 text-left text-sm transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          style={{ color: 'var(--app-ink-soft)' }}
+        >
+          <span>
+            Kunden sehen deine Produkte getrennt nach Hofladen und Futter.{' '}
+            <span className="font-semibold whitespace-nowrap" style={{ color: 'var(--brand-text)' }}>
+              Ansehen →
+            </span>
+          </span>
+        </button>
+      ) : (
+        <p className="mb-4 text-sm" style={{ color: 'var(--app-ink-soft)' }}>
+          Kunden sehen deine Produkte getrennt nach Hofladen und Futter.
+        </p>
+      )}
       {/* Grid — 3 cols, 20px gap; im Edit-Modus sortierbar */}
       <ReorderContext
         enabled={isEditMode}
@@ -702,6 +752,7 @@ export function ProductGrid({
                 ownerMode={ownerMode}
                 isEditMode={isEditMode}
                 isPaused={isPaused}
+                setzeSichtbarkeit={(imShop) => setzeVorgezogen({ id: p.id, imShop })}
               />
             </SortableProductCard>
           ) : (
@@ -713,6 +764,7 @@ export function ProductGrid({
               ownerMode={ownerMode}
               isEditMode={isEditMode}
               isPaused={isPaused}
+              setzeSichtbarkeit={(imShop) => setzeVorgezogen({ id: p.id, imShop })}
             />
           )
         )}

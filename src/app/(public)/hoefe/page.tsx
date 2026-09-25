@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { unstable_cache } from 'next/cache'
 import { getOeffentlicheHoefe } from '@/server/queries/farm'
+import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 import { HoefeClient } from '@/components/hoefe/hoefe-client'
 
 export const metadata: Metadata = {
@@ -20,7 +21,15 @@ export const metadata: Metadata = {
 // Abholung wird mit den Daten gecacht und altert höchstens fünf Minuten.
 export const dynamic = 'force-dynamic'
 
-const ladeHoefe = unstable_cache(() => getOeffentlicheHoefe(), ['oeffentliche-hoefe'], { revalidate: 300 })
+// `tags` ist nicht Zierde: OHNE Etikett gibt es keinen Weg, diesen Eintrag
+// vorzeitig zu leeren — `revalidatePath` erreicht einen Dateneintrag nicht, und
+// `updateTag`/`revalidateTag` brauchen ein Etikett. Genau deshalb blieb ein
+// ausgeblendetes Produkt hier bis zu fünf Minuten stehen, obwohl die
+// Produktaktionen längst revalidierten (Sprint Sichtbarkeits-Schalter).
+const ladeHoefe = unstable_cache(() => getOeffentlicheHoefe(), [HOEFE_CACHE_TAG], {
+  revalidate: 300,
+  tags: [HOEFE_CACHE_TAG],
+})
 
 export default async function HoefePage() {
   const hoefe = await ladeHoefe()
