@@ -1,9 +1,7 @@
-import { redirect, notFound } from 'next/navigation'
-import { headers } from 'next/headers'
 import type { Metadata } from 'next'
-import { auth } from '@/lib/auth'
 import Link from 'next/link'
-import { isAdminUser, getAdminFarms } from '@/server/queries/admin'
+import { verlangeAdminSeite } from '@/server/admin-wache'
+import { getAdminFarms } from '@/server/queries/admin'
 import { zaehleZuEntscheiden } from '@/server/queries/meldung'
 import {
   gruendungsplaetze,
@@ -15,12 +13,7 @@ import { AdminFarmList } from './admin-farm-list'
 export const metadata: Metadata = { title: 'Admin — FarmerZone' }
 
 export default async function AdminPage() {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
-
-  // notFound statt redirect oder 403: Der Bereich soll sich Unbefugten nicht
-  // einmal zu erkennen geben — für sie existiert /admin schlicht nicht.
-  if (!(await isAdminUser(session.user.id))) notFound()
+  await verlangeAdminSeite()
 
   const [farms, zuEntscheiden] = await Promise.all([getAdminFarms(), zaehleZuEntscheiden()])
   const wartend = farms.filter((f) => f.approvedAt === null).length
@@ -49,6 +42,17 @@ export default async function AdminPage() {
                 : `${zuEntscheiden} Meldungen zu entscheiden`}
           </span>
           <span className="text-xs text-primary">Briefkasten →</span>
+        </Link>
+
+        {/* Finanzen: kein Zähler davor. „Ab wann trägt sich die Plattform?"
+            ist eine Frage, die man stellt, wenn man sie stellen will — kein
+            Posten, der auf Erledigung wartet. */}
+        <Link
+          href="/admin/finanzen"
+          className="mb-5 flex min-h-11 items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-2.5 text-sm transition-colors hover:border-primary/40"
+        >
+          <span className="font-medium text-foreground">Einnahmen und Kosten der Plattform</span>
+          <span className="text-xs text-primary">Finanzen →</span>
         </Link>
 
         <h1 className="text-xl font-semibold text-foreground mb-1">Höfe</h1>

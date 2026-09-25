@@ -1,9 +1,8 @@
 'use server'
 
-import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
-import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { verlangeAdminAktion } from '@/server/admin-wache'
 import { sendFreischaltungEmail } from '@/lib/email'
 import {
   FARM_REJECT_APPROVED_MESSAGE,
@@ -14,28 +13,6 @@ import {
 import { servicegebuehrEinstellungSchema } from '@/schemas/servicegebuehr'
 import { wienerMitternacht } from '@/lib/servicegebuehr'
 import { triageEingabeSchema } from '@/schemas/meldung'
-
-/**
- * Admin-Recht IMMER frisch aus der Datenbank lesen, nie aus der Session:
- * `isAdmin` steckt bewusst nicht in den Better-Auth-additionalFields, damit
- * ein zurückgenommenes Recht sofort greift und nicht bis zum Ablauf des
- * Session-Cookies weiterwirkt.
- *
- * Diese Prüfung sitzt in JEDER Action — nicht nur in der Seite. Eine Seite
- * schützt die Ansicht, eine Action schützt die Wirkung.
- */
-async function requireAdmin(): Promise<{ ok: true; userId: string } | { error: string }> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) return { error: 'Nicht angemeldet.' }
-
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { isAdmin: true },
-  })
-  if (!user?.isAdmin) return { error: 'Kein Zugriff.' }
-
-  return { ok: true, userId: session.user.id }
-}
 
 function revalidateAll(slug: string) {
   revalidatePath('/admin')
@@ -50,7 +27,7 @@ function revalidateAll(slug: string) {
  * Einrichten) und danach (die Zusage-Mail hier) läuft automatisch.
  */
 export async function approveFarmAction(farmId: string): Promise<{ error?: string }> {
-  const guard = await requireAdmin()
+  const guard = await verlangeAdminAktion()
   if ('error' in guard) return { error: guard.error }
 
   const farm = await prisma.farm.findUnique({
@@ -89,7 +66,7 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
  * offline" verschickt, würde mehr beschädigen als erklären.
  */
 export async function revokeFarmApprovalAction(farmId: string): Promise<{ error?: string }> {
-  const guard = await requireAdmin()
+  const guard = await verlangeAdminAktion()
   if ('error' in guard) return { error: guard.error }
 
   const farm = await prisma.farm.findUnique({ where: { id: farmId }, select: { slug: true } })
@@ -124,7 +101,7 @@ export async function revokeFarmApprovalAction(farmId: string): Promise<{ error?
  * Status-Beiträge, Abos (am Hof) sowie Sessions und Accounts (am User).
  */
 export async function rejectFarmAction(farmId: string): Promise<{ error?: string }> {
-  const guard = await requireAdmin()
+  const guard = await verlangeAdminAktion()
   if ('error' in guard) return { error: guard.error }
 
   const farm = await prisma.farm.findUnique({
@@ -194,7 +171,7 @@ export async function setServiceFeeAction(
   farmId: string,
   eingabe: { percent: unknown; minCents: unknown; activeFrom: unknown }
 ): Promise<{ error?: string }> {
-  const guard = await requireAdmin()
+  const guard = await verlangeAdminAktion()
   if ('error' in guard) return { error: guard.error }
 
   const parsed = servicegebuehrEinstellungSchema.safeParse(eingabe)
@@ -252,7 +229,7 @@ export async function triageMeldungAction(
     vorherNotiz?: unknown
   }
 ): Promise<{ error?: string }> {
-  const guard = await requireAdmin()
+  const guard = await verlangeAdminAktion()
   if ('error' in guard) return { error: guard.error }
 
   const parsed = triageEingabeSchema.safeParse(eingabe)

@@ -1,9 +1,7 @@
-import { redirect, notFound } from 'next/navigation'
-import { headers } from 'next/headers'
+import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { auth } from '@/lib/auth'
-import { isAdminUser } from '@/server/queries/admin'
+import { verlangeAdminSeite } from '@/server/admin-wache'
 import { getMeldungDetail } from '@/server/queries/meldung'
 import { MELDUNG_ART_LABEL, STATUS_INTERN, STATUS_MARKE_FARBE, kiBegruendung, kurznummer, prLink } from '@/lib/meldung'
 import { Marke } from '@/components/ui/marke'
@@ -30,9 +28,7 @@ function zeitpunkt(d: Date): string {
  * getMeldungDetail löst ein Präfix auf.
  */
 export default async function AdminMeldungDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
-  if (!(await isAdminUser(session.user.id))) notFound()
+  await verlangeAdminSeite()
 
   const { id } = await params
   const m = await getMeldungDetail(id)

@@ -17,8 +17,16 @@ import {
   einstellungKurz,
   gebuehrEntfallen,
   gebuehrErstattungOffen,
+  istMonatsschluessel,
   kalendertagInWien,
+  monatsAbstand,
+  monatVerschoben,
+  monatsgrenzenWien,
+  monatsgrenzenWienFuer,
+  monatsschluessel,
+  monatsschluesselInWien,
   wienerMitternacht,
+  zerlegeMonat,
   type ServicegebuehrEinstellung,
 } from '@/lib/servicegebuehr'
 
@@ -179,5 +187,81 @@ describe('einstellungKurz', () => {
     const kurz = (e: ServicegebuehrEinstellung) => einstellungKurz(e).replace(/ /g, ' ')
     expect(kurz(AKTIV)).toBe('4,9 % · mind. € 0,50 · gilt ab 01.09.2026')
     expect(kurz({ ...AKTIV, serviceFeeActiveFrom: null })).toBe('gebührenfrei')
+  })
+})
+
+describe('Kalendermonate als Schlüssel (JJJJ-MM)', () => {
+  it('nimmt nur echte Monate an', () => {
+    expect(istMonatsschluessel('2026-09')).toBe(true)
+    expect(istMonatsschluessel('2026-12')).toBe(true)
+    expect(istMonatsschluessel('2026-00')).toBe(false)
+    expect(istMonatsschluessel('2026-13')).toBe(false)
+    expect(istMonatsschluessel('2026-9')).toBe(false)
+    expect(istMonatsschluessel('09-2026')).toBe(false)
+    expect(istMonatsschluessel('')).toBe(false)
+  })
+
+  it('setzt zusammen und zerlegt wieder', () => {
+    expect(monatsschluessel(2026, 9)).toBe('2026-09')
+    expect(monatsschluessel(2026, 12)).toBe('2026-12')
+    expect(zerlegeMonat('2026-09')).toEqual({ jahr: 2026, monat: 9 })
+    expect(zerlegeMonat('Unsinn')).toBeNull()
+  })
+
+  it('verschiebt über den Jahreswechsel, in beide Richtungen', () => {
+    expect(monatVerschoben('2026-09', 1)).toBe('2026-10')
+    expect(monatVerschoben('2026-12', 1)).toBe('2027-01')
+    expect(monatVerschoben('2026-01', -1)).toBe('2025-12')
+    expect(monatVerschoben('2026-09', 0)).toBe('2026-09')
+    expect(monatVerschoben('2026-09', -12)).toBe('2025-09')
+    expect(monatVerschoben('2026-09', 16)).toBe('2028-01')
+  })
+
+  it('zählt den Abstand in Monaten, negativ wenn es rückwärts geht', () => {
+    expect(monatsAbstand('2026-09', '2026-09')).toBe(0)
+    expect(monatsAbstand('2026-09', '2026-11')).toBe(2)
+    expect(monatsAbstand('2026-11', '2027-02')).toBe(3)
+    expect(monatsAbstand('2026-11', '2026-09')).toBe(-2)
+  })
+})
+
+describe('monatsschluesselInWien', () => {
+  it('nimmt WIENER Zeit, nicht UTC — 30.09. 23:30 UTC ist schon Oktober', () => {
+    expect(monatsschluesselInWien(new Date('2026-09-30T23:30:00.000Z'))).toBe('2026-10')
+    expect(monatsschluesselInWien(new Date('2026-09-30T21:30:00.000Z'))).toBe('2026-09')
+  })
+
+  it('gilt auch in der Winterzeit, wo Wien nur eine Stunde vor UTC liegt', () => {
+    expect(monatsschluesselInWien(new Date('2026-12-31T23:30:00.000Z'))).toBe('2027-01')
+    expect(monatsschluesselInWien(new Date('2026-12-31T22:30:00.000Z'))).toBe('2026-12')
+  })
+})
+
+describe('monatsgrenzenWienFuer', () => {
+  it('spannt [von, bis) über den Wiener Monat', () => {
+    const g = monatsgrenzenWienFuer('2026-10')
+    expect(g.von.toISOString()).toBe('2026-09-30T22:00:00.000Z')
+    expect(g.bis.toISOString()).toBe('2026-10-31T23:00:00.000Z')
+  })
+
+  it('kommt über den Jahreswechsel', () => {
+    const g = monatsgrenzenWienFuer('2026-12')
+    expect(g.von.toISOString()).toBe('2026-11-30T23:00:00.000Z')
+    expect(g.bis.toISOString()).toBe('2026-12-31T23:00:00.000Z')
+  })
+
+  it('benennt den Monat deutsch', () => {
+    expect(monatsgrenzenWienFuer('2026-09').bezeichnung).toBe('September 2026')
+  })
+
+  it('wirft bei Unsinn statt still einen falschen Monat zu liefern', () => {
+    expect(() => monatsgrenzenWienFuer('2026-13')).toThrow()
+  })
+})
+
+describe('monatsgrenzenWien (laufender Monat)', () => {
+  it('ist dieselbe Rechnung wie monatsgrenzenWienFuer für den Wiener Monat', () => {
+    const jetzt = new Date('2026-09-30T23:30:00.000Z') // in Wien schon Oktober
+    expect(monatsgrenzenWien(jetzt)).toEqual(monatsgrenzenWienFuer('2026-10'))
   })
 })

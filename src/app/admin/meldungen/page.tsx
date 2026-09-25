@@ -1,9 +1,6 @@
-import { redirect, notFound } from 'next/navigation'
-import { headers } from 'next/headers'
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { auth } from '@/lib/auth'
-import { isAdminUser } from '@/server/queries/admin'
+import { verlangeAdminSeite } from '@/server/admin-wache'
 import {
   filterAusParametern,
   getMeldungenFuerAdmin,
@@ -65,9 +62,7 @@ function Chip({ href, aktiv, children }: { href: string; aktiv: boolean; childre
  * Ersatz. Bei 375px sind die Zeilen Karten, keine Tabelle: nichts scrollt quer.
  */
 export default async function AdminMeldungenPage({ searchParams }: { searchParams: Promise<Suche> }) {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
-  if (!(await isAdminUser(session.user.id))) notFound()
+  await verlangeAdminSeite()
 
   const suche = await searchParams
   const reiter = suche.reiter === 'wuensche' ? 'wuensche' : 'meldungen'

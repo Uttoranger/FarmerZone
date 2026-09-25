@@ -379,10 +379,51 @@ async function main() {
     skipDuplicates: true,
   })
 
+  // Beispiel-Kostenposten für /admin/finanzen. ERFUNDENE Beträge, erkennbar
+  // runde Zahlen: Das Repository ist öffentlich, die echten Kosten der
+  // Plattform gehören nicht hinein. Nur für Dev, damit die Seite nicht leer
+  // aussieht — nur anlegen, wenn die Tabelle leer ist, sonst verdoppelt jeder
+  // Seed-Lauf die Posten (kein unique-Feld, an dem skipDuplicates greifen
+  // könnte).
+  if ((await prisma.kostenposten.count()) === 0) {
+    const ersterDesMonats = new Date(
+      Date.UTC(heute.getUTCFullYear(), heute.getUTCMonth(), 1)
+    )
+    await prisma.kostenposten.createMany({
+      data: [
+        {
+          name: 'Beispiel-Hosting',
+          kategorie: 'HOSTING',
+          betrag: '20.00',
+          rhythmus: 'MONATLICH',
+          ab: ersterDesMonats,
+          notiz: 'Erfundener Beispielposten für die Entwicklung',
+        },
+        {
+          name: 'Beispiel-Domain',
+          kategorie: 'DOMAIN',
+          betrag: '60.00',
+          rhythmus: 'JAEHRLICH',
+          ab: ersterDesMonats,
+          notiz: 'Erfundener Beispielposten für die Entwicklung',
+        },
+        {
+          name: 'Beispiel-Einrichtung',
+          kategorie: 'SONSTIGES',
+          betrag: '100.00',
+          rhythmus: 'EINMALIG',
+          ab: ersterDesMonats,
+          notiz: 'Erfundener Beispielposten für die Entwicklung',
+        },
+      ],
+    })
+  }
+
   console.log('✓ Farm angelegt:', farm.name, '→ /hof-mueller')
   console.log('✓ Produkte: Heumilch, Bio-Eier, Brennholz, Rindfleisch-Paket, Heu und Big-Bag-Hafer (Futtermittel mit Kennzeichnung, Hafer nur an Betriebe)')
   console.log('✓ Abholzeiten: Mittwoch 15-18 Uhr, Samstag 9-12 Uhr')
   console.log('✓ 3 ManualSales: WhatsApp, Hofladen, Geschäftskunde')
+  console.log('✓ 3 erfundene Kostenposten (monatlich, jährlich, einmalig) für /admin/finanzen')
   console.log('\nAnmeldung Bauer-Dashboard:')
   console.log('  E-Mail:   bauer@example.com')
   console.log('  Passwort: test1234')
