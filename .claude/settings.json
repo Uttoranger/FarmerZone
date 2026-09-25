@@ -1,4 +1,7 @@
 {
+  "permissions": {
+    "deny": ["mcp__claude-in-chrome__*"]
+  },
   "hooks": {
     "PreToolUse": [
       {

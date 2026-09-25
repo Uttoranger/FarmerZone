@@ -10,12 +10,18 @@
  * Node statt Bash: läuft auf Windows und macOS gleich, braucht kein jq.
  */
 import { execSync } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
+import {
+  raeumeAlteAuf,
+  sitzungAusStdin,
+  zaehlerDatei as dateiFuer,
+  zaehlerLesen as lesen,
+  zaehlerSchreiben as schreiben,
+  zaehlerLoeschen as loeschen,
+} from './stop-zaehler.mjs'
 
 const MAX_VERSUCHE = 3          // danach durchlassen, sonst Endlosschleife
-const zaehlerDatei = join(tmpdir(), 'farmerzone-stop-hook.count')
 
 function lauf(befehl) {
   try {
@@ -27,18 +33,17 @@ function lauf(befehl) {
   }
 }
 
-function zaehlerLesen() {
-  try { return Number(readFileSync(zaehlerDatei, 'utf8')) || 0 } catch { return 0 }
-}
-function zaehlerSchreiben(n) {
-  try { mkdirSync(tmpdir(), { recursive: true }); writeFileSync(zaehlerDatei, String(n)) } catch {}
-}
-function zaehlerLoeschen() {
-  try { unlinkSync(zaehlerDatei) } catch {}
-}
-
-// stdin leeren, sonst blockiert der Prozess auf manchen Plattformen
-try { readFileSync(0, 'utf8') } catch {}
+// stdin lesen (sonst blockiert der Prozess auf manchen Plattformen) — es
+// trägt die session_id: Der Zähler gilt je Sitzung, nicht für alle parallel
+// laufenden (stop-zaehler.mjs).
+let stdin = ''
+try { stdin = readFileSync(0, 'utf8') } catch {}
+const verzeichnis = tmpdir()
+raeumeAlteAuf(verzeichnis, Date.now())
+const zaehlerDatei = dateiFuer(verzeichnis, sitzungAusStdin(stdin), process.cwd())
+const zaehlerLesen = () => lesen(zaehlerDatei)
+const zaehlerSchreiben = (n) => schreiben(zaehlerDatei, verzeichnis, n)
+const zaehlerLoeschen = () => loeschen(zaehlerDatei)
 
 if (!existsSync('package.json')) process.exit(0)
 
