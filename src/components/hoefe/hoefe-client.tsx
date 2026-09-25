@@ -4,20 +4,44 @@ import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 're
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ArrowRight, List, Map as MapIcon, Search, X } from 'lucide-react'
-import { CATEGORY_OPTIONS } from '@/schemas/product'
 import type { ProductCategoryValue } from '@/schemas/product'
+import {
+  leseHoefeFilter,
+  schreibeHoefeFilter,
+  wechsleBereich,
+  type HoefeFilter,
+} from '@/schemas/hoefe-filter'
 import {
   berechneHofAuswahl,
   formatiereAbholung,
   formatiereEntfernung,
   suchForm,
-  waehleVorschauProdukte,
+  waehleVorschauImBereich,
   VORSCHAU_ZEILEN,
   type Bezugspunkt,
   type UmkreisStufe,
 } from '@/lib/hofuebersicht'
+import {
+  gebindeChips,
+  hatProduktfilter,
+  hofseitenLink,
+  kategorieChips,
+  siegelChips,
+  sortenChips,
+  tierChips,
+} from '@/lib/bereiche-anzeige'
+import {
+  KATEGORIE_LABEL,
+  SIEGEL,
+  TIERART_LABEL,
+  type AnzeigeBereich,
+  type ProductSubcategoryValue,
+} from '@/lib/taxonomie'
+import { formatAbGrundpreis } from '@/lib/format'
+import { BereichUmschalter } from '@/components/shared/bereich-umschalter'
+import { HoefeFacetten } from '@/components/hoefe/hoefe-facetten'
 import {
   LEERE_LAGE,
   nachLeerTipp,
@@ -68,14 +92,28 @@ function useIstBreit(): boolean {
  */
 export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
   const router = useRouter()
+  const pfad = usePathname()
   const istBreit = useIstBreit()
-  const [ansicht, setAnsicht] = useState<'liste' | 'karte'>('liste')
-  const [gewaehlt, setGewaehlt] = useState<ProductCategoryValue[]>([])
-  // Die Produktsuche: der getippte Text und die übernommenen Such-Marken.
-  // Rein clientseitig auf den geladenen Daten — keine URL-Parameter, kein
-  // localStorage, keine zweite Server-Runde (Sprint-Vorgabe).
-  const [suchtext, setSuchtext] = useState('')
-  const [suchMarken, setSuchMarken] = useState<string[]>([])
+  // DIE URL IST DER ZUSTAND (Bereiche 2): Bereich, Kategorien, Sorten,
+  // Facetten, Sortierung, Suche und Ansicht stehen in der Adresse — teilbar
+  // und reload-fest. Gelesen und geprüft über src/schemas/hoefe-filter.ts,
+  // Unsinn wird dort verworfen. Geschrieben wird mit history.replaceState,
+  // nicht mit router.replace: Next gleicht useSearchParams damit ab, ohne
+  // die (dynamische) Seite für jeden Chip-Tipp neu vom Server zu holen —
+  // gefiltert wird ohnehin im Browser. Ersetzen statt anhängen: Ein
+  // Filtertipp ist kein Schritt, zu dem „Zurück" führen soll.
+  const suchParameter = useSearchParams()
+  const filter = useMemo(() => leseHoefeFilter(suchParameter), [suchParameter])
+  const { ansicht, suchtext, suchMarken } = filter
+  const gewaehlt = filter.kategorien
+  const bereich: AnzeigeBereich = filter.bereich
+  function schreibeUrl(neu: HoefeFilter) {
+    const query = schreibeHoefeFilter(neu)
+    window.history.replaceState(null, '', query ? `${pfad}?${query}` : pfad)
+  }
+  const setzeFilter = (aenderung: Partial<HoefeFilter>) => schreibeUrl({ ...filter, ...aenderung })
+  const setAnsicht = (wert: 'liste' | 'karte') => setzeFilter({ ansicht: wert })
+  const setSuchtext = (wert: string) => setzeFilter({ suchtext: wert })
   const [lage, setLage] = useState<AuswahlLage>(LEERE_LAGE)
   // Zählt jede Pin-Anfahrt, damit dieselbe Nummer zweimal hintereinander wirkt.
   const [fokus, setFokus] = useState(0)
@@ -105,26 +143,28 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
     return () => beobachter.disconnect()
   }, [])
 
-  // Nur Kategorien anbieten, die es hier auch gibt — in Schema-Reihenfolge.
-  const angebotene = useMemo(
-    () => CATEGORY_OPTIONS.filter((o) => hoefe.some((h) => h.kategorien.includes(o.value))),
-    [hoefe]
+  // Chips nur für das, was es im Bereich gibt — Zählung und Reihenfolge
+  // entscheidet src/lib/bereiche-anzeige.ts.
+  const angebotene = useMemo(() => kategorieChips(hoefe, filter), [hoefe, filter])
+  const sorten = useMemo(() => sortenChips(hoefe, filter), [hoefe, filter])
+  const facetten = useMemo(
+    () => ({
+      siegel: siegelChips(hoefe, filter, (s) => SIEGEL[s].name),
+      tiere: tierChips(hoefe, filter, (t) => TIERART_LABEL[t]),
+      gebinde: gebindeChips(hoefe, filter),
+    }),
+    [hoefe, filter]
   )
-  // DIE Ableitung — Kategorie → Umkreis → Suche, Vorschläge aus dem
-  // sichtbaren Ausschnitt: EINE reine, getestete Funktion
+  // DIE Ableitung — Bereich/Facetten → Umkreis → Sortierung → Suche,
+  // Vorschläge aus dem sichtbaren Ausschnitt: EINE reine, getestete Funktion
   // (berechneHofAuswahl in src/lib/hofuebersicht.ts), damit die Verdrahtung
-  // selbst unter Test steht und nicht nur ihre Einzelteile.
-  const { gefiltert, vorschlaege, suchbegriffe, sucheAktiv, sucheLeertDieListe } = useMemo(
-    () =>
-      berechneHofAuswahl(hoefe, {
-        kategorien: gewaehlt,
-        bezugspunkt,
-        umkreis,
-        suchtext,
-        suchMarken,
-      }),
-    [hoefe, gewaehlt, bezugspunkt, umkreis, suchtext, suchMarken]
-  )
+  // selbst unter Test steht und nicht nur ihre Einzelteile. Liste UND Karte
+  // lesen `gefiltert` — im Futter zeigt die Karte also nur Futterhöfe.
+  const { gefiltert, vorschlaege, suchbegriffe, sucheAktiv, sucheLeertDieListe, vorschauKategorien } =
+    useMemo(
+      () => berechneHofAuswahl(hoefe, { ...filter, bezugspunkt, umkreis }),
+      [hoefe, filter, bezugspunkt, umkreis]
+    )
   // Fällt der gewählte (oder überfahrene) Hof aus der Liste — durch eine
   // Kategorie oder den Umkreis —, erlischt die Hervorhebung mit ihm. Sonst
   // stünde sie beim Aufheben des Filters unerklärt wieder da, ohne dass
@@ -145,27 +185,41 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
   )
 
   function kategorieUmschalten(wert: ProductCategoryValue) {
-    setGewaehlt((bisher) =>
-      bisher.includes(wert) ? bisher.filter((k) => k !== wert) : [...bisher, wert]
-    )
+    setzeFilter({
+      kategorien: gewaehlt.includes(wert) ? gewaehlt.filter((k) => k !== wert) : [...gewaehlt, wert],
+    })
+  }
+
+  function sorteUmschalten(wert: ProductSubcategoryValue) {
+    setzeFilter({
+      sorten: filter.sorten.includes(wert)
+        ? filter.sorten.filter((s) => s !== wert)
+        : [...filter.sorten, wert],
+    })
+  }
+
+  /** Bereichswechsel: bereichsgebundene Filter fallen weg (wechsleBereich). */
+  function bereichWechseln(neu: AnzeigeBereich) {
+    schreibeUrl(wechsleBereich(filter, neu))
   }
 
   /** Vorschlag angetippt → als Marke übernehmen, das Feld wird frei für den
    *  nächsten Begriff. Doppelt übernehmen (andere Schreibweise) zählt nicht. */
   function suchMarkeHinzufuegen(name: string) {
-    setSuchMarken((bisher) =>
-      bisher.some((m) => suchForm(m) === suchForm(name)) ? bisher : [...bisher, name]
-    )
-    setSuchtext('')
+    setzeFilter({
+      suchMarken: suchMarken.some((m) => suchForm(m) === suchForm(name))
+        ? suchMarken
+        : [...suchMarken, name],
+      suchtext: '',
+    })
   }
 
   function suchMarkeEntfernen(name: string) {
-    setSuchMarken((bisher) => bisher.filter((m) => m !== name))
+    setzeFilter({ suchMarken: suchMarken.filter((m) => m !== name) })
   }
 
   function sucheZuruecksetzen() {
-    setSuchtext('')
-    setSuchMarken([])
+    setzeFilter({ suchtext: '', suchMarken: [] })
   }
 
   /** Pin angetippt → Eintrag hervorheben und (Desktop/Liste) in den Blick rollen. */
@@ -214,7 +268,9 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
     ? 'Dazu haben wir gerade nichts gefunden.'
     : umkreis !== null
       ? `In ${umkreis} km ist kein Hof dabei — nimm den Umkreis weiter oder hebe ihn auf.`
-      : 'Kein Hof führt gerade etwas aus dieser Auswahl — nimm einen Filter heraus.'
+      : bereich === 'FUTTERMITTEL' && !hatProduktfilter(filter)
+        ? 'Gerade verkauft hier kein Hof Futter — schau bald wieder vorbei.'
+        : 'Kein Hof führt gerade etwas aus dieser Auswahl — nimm einen Filter heraus.'
   const leerInhalt = (
     <>
       <p className="text-sm leading-relaxed text-muted-foreground">{leerText}</p>
@@ -233,12 +289,12 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
   const filterMarken = angebotene.length > 0 && (
     <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Nach Kategorien filtern">
       {angebotene.map((option) => {
-        const aktiv = gewaehlt.includes(option.value)
+        const aktiv = gewaehlt.includes(option.wert)
         return (
           <button
-            key={option.value}
+            key={option.wert}
             type="button"
-            onClick={() => kategorieUmschalten(option.value)}
+            onClick={() => kategorieUmschalten(option.wert)}
             aria-pressed={aktiv}
             className={`min-h-9 rounded-full border px-3 text-[13px] font-medium transition-colors ${
               aktiv
@@ -247,6 +303,33 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
             }`}
           >
             {option.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+
+  /** Die Sorten (L2) der gewählten Kategorien mit der Zahl der Höfe — nur ab
+   *  zwei Sorten in der Ergebnismenge (sortenChips). Gestrichelt, damit sie
+   *  als zweite Ebene unter den Kategorien lesbar bleiben. */
+  const sortenReihe = sorten.length > 0 && (
+    <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Nach Sorten filtern">
+      {sorten.map((chip) => {
+        const aktiv = filter.sorten.includes(chip.wert)
+        return (
+          <button
+            key={chip.wert}
+            type="button"
+            onClick={() => sorteUmschalten(chip.wert)}
+            aria-pressed={aktiv}
+            className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition-colors ${
+              aktiv
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-dashed border-border bg-card text-foreground hover:bg-muted/40'
+            }`}
+          >
+            {chip.label}
+            <span className={`tabular-nums ${aktiv ? '' : 'text-muted-foreground'}`}>{chip.anzahl}</span>
           </button>
         )
       })}
@@ -342,8 +425,25 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
       />
       {produktSuche}
       {filterMarken}
+      {sortenReihe}
+      <HoefeFacetten
+        // Beim Bereichswechsel neu eingehängt — kein Sheet-Entwurf wandert mit.
+        key={bereich}
+        filter={filter}
+        siegel={facetten.siegel}
+        tiere={facetten.tiere}
+        gebinde={facetten.gebinde}
+        onFilter={setzeFilter}
+        trefferMitTieren={(tiere) =>
+          berechneHofAuswahl(hoefe, { ...filter, tiere, bezugspunkt, umkreis }).gefiltert.length
+        }
+      />
     </>
   )
+
+  /** Die oberste Weiche (Konzept 6.2): direkt unter der Überschrift, über
+   *  allen Filtern — nicht in der Kopfzeile, nicht klebend. */
+  const umschalter = <BereichUmschalter aktiv={bereich} onWechsel={bereichWechseln} className="mt-5" />
 
   const koordinatenHinweis = ohneKoordinaten > 0 && (
     // Höfe ohne Koordinaten erscheinen nie als Pin — nur die Liste führt
@@ -368,10 +468,10 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
           // Das Schaufenster dieser Karte — die Auswahl folgt dem gesetzten
           // Kategoriefilter und der Suche: Treffer zuerst
           // (waehleVorschauProdukte, rein und getestet).
-          const vorschau = waehleVorschauProdukte(
-            hof.produkte,
-            gewaehlt,
-            hof.produkteGesamt,
+          const vorschau = waehleVorschauImBereich(
+            hof,
+            bereich,
+            vorschauKategorien,
             VORSCHAU_ZEILEN,
             suchbegriffe
           )
@@ -410,7 +510,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
               /* SCHMALE LISTE: Die GANZE Karte verlinkt auf die Hofseite
                  (gestreckter Link) — unverändert wie bisher. */
               <Link
-                href={`/${hof.slug}`}
+                href={hofseitenLink(hof.slug, bereich)}
                 aria-label={`${hof.name} ansehen`}
                 className="absolute inset-0 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
               />
@@ -427,7 +527,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
                 onTipp={
                   istSplit
                     ? () => eintragGewaehlt(hof.slug)
-                    : () => router.push(`/${hof.slug}`)
+                    : () => router.push(hofseitenLink(hof.slug, bereich))
                 }
               />
             )}
@@ -486,9 +586,18 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
                         key={k}
                         className="rounded-full bg-muted px-2 py-0.5 text-xs text-foreground"
                       >
-                        {CATEGORY_OPTIONS.find((o) => o.value === k)?.label ?? k}
+                        {KATEGORIE_LABEL[k]}
                       </span>
                     ))}
+                  </p>
+                )}
+
+                {/* Bei Sortierung nach Kilopreis steht der Wert, nach dem
+                    sortiert wurde, auf der Karte — sonst wirkte die
+                    Reihenfolge zufällig. */}
+                {hof.abGrundpreis && (
+                  <p className="mt-2 text-sm font-semibold text-brand-text">
+                    {formatAbGrundpreis(hof.abGrundpreis)}
                   </p>
                 )}
 
@@ -520,7 +629,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
                      dem Auswahl-Button; ein Klick hier navigiert nur. */
                   <p className="mt-3">
                     <Link
-                      href={`/${hof.slug}`}
+                      href={hofseitenLink(hof.slug, bereich)}
                       className="relative z-10 inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90"
                     >
                       Zum Hof
@@ -550,6 +659,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
     // voller Viewporthöhe läge er dauerhaft außerhalb der Sichtkante.
     return (
       <div>
+        {umschalter}
         {filterLeiste}
         <div className="mt-1 grid grid-cols-2 items-start gap-6">
           <div>{liste(true)}</div>
@@ -578,8 +688,9 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
 
   return (
     <div>
+      {umschalter}
       {/* Umschalter oben rechts; die Liste ist die Voreinstellung. */}
-      <div className="mt-5 flex justify-end">
+      <div className="mt-3 flex justify-end">
         <div className="inline-flex rounded-xl bg-muted p-1" role="group" aria-label="Ansicht wählen">
           {umschalterKnopf('liste', 'Liste', List)}
           {umschalterKnopf('karte', 'Karte', MapIcon)}
@@ -619,7 +730,8 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
               hoefe={karussellHoefe}
               ausgewaehlt={auswahlMitPunkt ? sichtbareLage.ausgewaehlt : null}
               sichtbar={auswahlMitPunkt}
-              gewaehlteKategorien={gewaehlt}
+              bereich={bereich}
+              gewaehlteKategorien={vorschauKategorien}
               suchbegriffe={suchbegriffe}
               onZentriert={karussellZentriert}
               bandRef={bandMessen}

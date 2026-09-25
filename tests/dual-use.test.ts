@@ -21,7 +21,7 @@ import { prisma } from '@/lib/prisma'
 import { getFarmForUser } from '@/server/queries/dashboard'
 
 const HINWEIS_MAIS =
-  'Du hast schon ein Produkt namens Mais im Bereich Lebensmittel. Das hier wird ein zweites, eigenes Produkt mit eigenem Bestand.'
+  'Du hast schon ein Produkt namens Mais im Bereich Hofladen. Das hier wird ein zweites, eigenes Produkt mit eigenem Bestand.'
 
 describe('dualUseHinweis (rein)', () => {
   it('gleicher Name im selben Bereich: kein Hinweis', () => {
@@ -46,6 +46,10 @@ describe('dualUseHinweis (rein)', () => {
 
   it('ohne Kategorie noch kein Hinweis — es gibt keinen Bereich zum Vergleichen', () => {
     expect(dualUseHinweis({ name: 'Mais', category: null }, [{ name: 'Mais', category: 'GEMUESE' }])).toBeNull()
+  })
+
+  it('Brennholz neben Eiern ist kein Zwilling — beides Hofladen', () => {
+    expect(dualUseHinweis({ name: 'Holz', category: 'BRENNHOLZ' }, [{ name: 'Holz', category: 'EIER' }])).toBeNull()
   })
 
   it('nennt den Bereich des VORHANDENEN Produkts', () => {

@@ -2,12 +2,22 @@ import { prisma } from '@/lib/prisma'
 import { categoryImagePath } from '@/lib/product-image'
 import { DEFAULT_SECTIONS, type SectionConfig } from './appearance'
 import { PRODUCT_ORDER_BY } from './products'
-import type { Betriebsstatus, ProductCategory } from '@prisma/client'
+import type {
+  Abgabe,
+  Betriebsstatus,
+  Futtermittelart,
+  NettoEinheit,
+  Prisma,
+  ProductCategory,
+  ProductLabel,
+  ProductSubcategory,
+  Tierart,
+} from '@prisma/client'
+import { baueAngebotsZeile, fasseAngebotZusammen, type AngebotsZeile } from '@/lib/bereiche-anzeige'
+import { anzeigeBereichVon, betriebsnummerFuerAnzeige, type AnzeigeBereich } from '@/lib/taxonomie'
 import {
   baueFotostreifen,
   naechsteAbholung,
-  sammleKategorien,
-  HOEFE_KATEGORIEN,
   wienJetzt,
   type NaechsteAbholung,
   type OrtsZeit,
@@ -33,6 +43,35 @@ export type PublicProduct = {
   seasonStart: number | null
   seasonEnd: number | null
   unavailableReason: string | null
+  // Seit Bereiche 2: für Sektionen, Siegel-Badges und das Produktdetail.
+  subcategory: ProductSubcategory | null
+  labels: ProductLabel[]
+  abgabe: Abgabe
+  futter: PublicFutter | null
+}
+
+/**
+ * Die Futter-Kennzeichnung, wie Kundinnen sie vor dem Kauf sehen (Fernabsatz,
+ * Konzept 6.3). Decimal und Date sind schon gewandelt — dieser Typ geht an
+ * Client-Komponenten. Die Betriebsnummer ist bereits aufgelöst (Hof, sonst
+ * Altlast der Kennzeichnung); die Altlast-Spalte selbst verlässt den Server nie.
+ */
+export type PublicFutter = {
+  futtermittelart: Futtermittelart
+  zielTierarten: Tierart[]
+  zusammensetzung: string
+  analytischeBestandteile: string
+  zusatzstoffe: string | null
+  gebrauchshinweis: string | null
+  nettoMenge: number
+  nettoEinheit: NettoEinheit
+  rohprotein: number | null
+  rohfaser: number | null
+  rohfett: number | null
+  rohasche: number | null
+  betriebsnummer: string | null
+  /** ISO-Zeitpunkt der letzten Bestätigung durch den Hof. */
+  bestaetigtAm: string
 }
 
 export type PublicPickupSlot = {
@@ -112,6 +151,86 @@ export const OEFFENTLICH_SICHTBAR = {
   approvedAt: { not: null },
 } as const
 
+/** Die Produktfelder der Hofseite — EINE Liste für Kundenansicht und Hof-Vorschau. */
+const OEFFENTLICHES_PRODUKT_SELECT = {
+  id: true,
+  name: true,
+  description: true,
+  imageUrl: true,
+  category: true,
+  subcategory: true,
+  price: true,
+  unit: true,
+  unitSize: true,
+  stock: true,
+  isAvailable: true,
+  allergens: true,
+  // Bio kommt seit Sprint Taxonomie 1 aus labels, nicht aus der
+  // Altlast-Spalte isOrganic — die Abbildung unten macht daraus das
+  // Boolean, das die Hofseite kennt.
+  labels: true,
+  abgabe: true,
+  requiresCool: true,
+  requiresFreezer: true,
+  seasonStart: true,
+  seasonEnd: true,
+  unavailableReason: true,
+  futter: {
+    select: {
+      futtermittelart: true,
+      zielTierarten: true,
+      zusammensetzung: true,
+      analytischeBestandteile: true,
+      zusatzstoffe: true,
+      gebrauchshinweis: true,
+      nettoMenge: true,
+      nettoEinheit: true,
+      rohprotein: true,
+      rohfaser: true,
+      rohfett: true,
+      rohasche: true,
+      registrierungsnummer: true,
+      bestaetigtAm: true,
+    },
+  },
+} satisfies Prisma.ProductSelect
+
+type RohesOeffentlichesProdukt = Prisma.ProductGetPayload<{ select: typeof OEFFENTLICHES_PRODUKT_SELECT }>
+
+const zahlOderNull = (d: { toString(): string } | null): number | null => (d === null ? null : Number(d))
+
+function alsOeffentlichesProdukt(
+  { futter, ...p }: RohesOeffentlichesProdukt,
+  hof: { betriebsnummer: string | null }
+): PublicProduct {
+  return {
+    ...p,
+    price: Number(p.price),
+    unitSize: p.unitSize ? Number(p.unitSize) : null,
+    categoryImageUrl: categoryImagePath(p.category),
+    isOrganic: p.labels.includes('BIO'),
+    futter: futter
+      ? {
+          futtermittelart: futter.futtermittelart,
+          zielTierarten: futter.zielTierarten,
+          zusammensetzung: futter.zusammensetzung,
+          analytischeBestandteile: futter.analytischeBestandteile,
+          zusatzstoffe: futter.zusatzstoffe,
+          gebrauchshinweis: futter.gebrauchshinweis,
+          // Nur Anzeige (Nettomenge, Kilopreis) — abgerechnet wird je Gebinde.
+          nettoMenge: Number(futter.nettoMenge),
+          nettoEinheit: futter.nettoEinheit,
+          rohprotein: zahlOderNull(futter.rohprotein),
+          rohfaser: zahlOderNull(futter.rohfaser),
+          rohfett: zahlOderNull(futter.rohfett),
+          rohasche: zahlOderNull(futter.rohasche),
+          betriebsnummer: betriebsnummerFuerAnzeige(hof, futter),
+          bestaetigtAm: futter.bestaetigtAm.toISOString(),
+        }
+      : null,
+  }
+}
+
 export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
   // Die Filterung sitzt bewusst hier in der Query und nicht in den Seiten:
   // jede öffentliche Unterseite, die über getPublicFarm lädt, ist damit
@@ -151,30 +270,12 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
         select: { id: true, icon: true, title: true, subtitle: true },
       },
       farmPhotos: FARM_PHOTO_SELECT,
+      // Die Betriebsnummer des Hofs zeigt das Produktdetail in der
+      // Futter-Kennzeichnung (Rückfrage F6); sie geht nur aufgelöst weiter.
+      betriebsnummer: true,
       products: {
         orderBy: PRODUCT_ORDER_BY,
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          imageUrl: true,
-          category: true,
-          price: true,
-          unit: true,
-          unitSize: true,
-          stock: true,
-          isAvailable: true,
-          allergens: true,
-          // Bio kommt seit Sprint Taxonomie 1 aus labels, nicht aus der
-          // Altlast-Spalte isOrganic — die Abbildung unten macht daraus das
-          // Boolean, das die Hofseite kennt.
-          labels: true,
-          requiresCool: true,
-          requiresFreezer: true,
-          seasonStart: true,
-          seasonEnd: true,
-          unavailableReason: true,
-        },
+        select: OEFFENTLICHES_PRODUKT_SELECT,
       },
       pickupSlots: {
         where: { isActive: true },
@@ -192,19 +293,14 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
       ? (rawSections as SectionConfig[])
       : DEFAULT_SECTIONS
 
+  const { betriebsnummer, ...rest } = farm
   return {
-    ...farm,
+    ...rest,
     bannerType: farm.bannerType as 'GRADIENT' | 'PHOTO',
     sectionsConfig: sections,
     farmPhotos: farm.farmPhotos,
     serviceFeePercent: Number(farm.serviceFeePercent),
-    products: farm.products.map(({ labels, ...p }) => ({
-      ...p,
-      price: Number(p.price),
-      unitSize: p.unitSize ? Number(p.unitSize) : null,
-      categoryImageUrl: categoryImagePath(p.category),
-      isOrganic: labels.includes('BIO'),
-    })),
+    products: farm.products.map((p) => alsOeffentlichesProdukt(p, { betriebsnummer })),
   }
 }
 
@@ -244,30 +340,12 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
         select: { id: true, icon: true, title: true, subtitle: true },
       },
       farmPhotos: FARM_PHOTO_SELECT,
+      // Die Betriebsnummer des Hofs zeigt das Produktdetail in der
+      // Futter-Kennzeichnung (Rückfrage F6); sie geht nur aufgelöst weiter.
+      betriebsnummer: true,
       products: {
         orderBy: PRODUCT_ORDER_BY,
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          imageUrl: true,
-          category: true,
-          price: true,
-          unit: true,
-          unitSize: true,
-          stock: true,
-          isAvailable: true,
-          allergens: true,
-          // Bio kommt seit Sprint Taxonomie 1 aus labels, nicht aus der
-          // Altlast-Spalte isOrganic — die Abbildung unten macht daraus das
-          // Boolean, das die Hofseite kennt.
-          labels: true,
-          requiresCool: true,
-          requiresFreezer: true,
-          seasonStart: true,
-          seasonEnd: true,
-          unavailableReason: true,
-        },
+        select: OEFFENTLICHES_PRODUKT_SELECT,
       },
       pickupSlots: {
         where: { isActive: true },
@@ -285,19 +363,14 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
       ? (rawSections as SectionConfig[])
       : DEFAULT_SECTIONS
 
+  const { betriebsnummer, ...rest } = farm
   return {
-    ...farm,
+    ...rest,
     bannerType: farm.bannerType as 'GRADIENT' | 'PHOTO',
     sectionsConfig: sections,
     farmPhotos: farm.farmPhotos,
     serviceFeePercent: Number(farm.serviceFeePercent),
-    products: farm.products.map(({ labels, ...p }) => ({
-      ...p,
-      price: Number(p.price),
-      unitSize: p.unitSize ? Number(p.unitSize) : null,
-      categoryImageUrl: categoryImagePath(p.category),
-      isOrganic: labels.includes('BIO'),
-    })),
+    products: farm.products.map((p) => alsOeffentlichesProdukt(p, { betriebsnummer })),
   }
 }
 
@@ -463,8 +536,13 @@ export type HofUebersichtEintrag = {
   latitude: number | null
   longitude: number | null
   isPaused: boolean
-  /** Distinct-Kategorien der VERFÜGBAREN Produkte, in Schema-Reihenfolge. */
+  /** Distinct-Kategorien der KAUFBAREN Produkte (istKaufbar), in
+   *  Schema-Reihenfolge, über beide Bereiche — aus demselben Angebot wie
+   *  suchNamen, deshalb zählen Chips und Suche dasselbe. */
   kategorien: ProductCategory[]
+  /** Jedes KAUFBARE Produkt als schmale Zeile — Grundlage für Bereich,
+   *  Facetten, Karte und Kilopreis-Sortierung (src/lib/bereiche-anzeige.ts). */
+  angebot: AngebotsZeile[]
   /** Der nächste anstehende Abholtermin — null ohne aktive Fenster. */
   naechsteAbholung: NaechsteAbholung | null
   /** Die Produktvorschau der Karte: höchstens VORSCHAU_LADE_DECKEL Zeilen,
@@ -474,6 +552,9 @@ export type HofUebersichtEintrag = {
   /** ALLE verfügbar geschalteten Produkte des Hofes — Grundlage für
    *  „+ n weitere", auch wenn oben gedeckelt wurde. */
   produkteGesamt: number
+  /** Dieselbe Zahl je Bereich — „+ n weitere" zählt auf der Karte nur den
+   *  gezeigten Bereich, sonst verspräche der Hofladen Heu. */
+  produkteJeBereich: Record<AnzeigeBereich, number>
   /** Die Namen ALLER verfügbaren Produkte (Bestand abzüglich Reservierung
    *  über null), UNGEDECKELT — die Grundlage der Produktsuche: Auf den acht
    *  Vorschau-Zeilen wäre ein Hof mit dem Gesuchten ab Platz neun ein
@@ -496,8 +577,8 @@ export async function getOeffentlicheHoefe(
   jetzt: OrtsZeit = wienJetzt()
 ): Promise<HofUebersichtEintrag[]> {
   // Läuft PARALLEL zur Hauptabfrage — sie hängt nicht von deren Ergebnis ab,
-  // und /hoefe ist statisch mit kurzer Revalidierung: Der Aufwand fällt
-  // höchstens alle fünf Minuten an, nicht je Besuch.
+  // und /hoefe cacht das Ergebnis fünf Minuten (unstable_cache in der Seite):
+  // Der Aufwand fällt höchstens alle fünf Minuten an, nicht je Besuch.
   const zeilenJeHof = prisma.product.findMany({
     where: { isAvailable: true, farm: OEFFENTLICH_SICHTBAR },
     orderBy: PRODUCT_ORDER_BY,
@@ -508,13 +589,19 @@ export async function getOeffentlicheHoefe(
     // Kategoriefilter hat genau dieses Loch bewusst nicht (siehe unten) —
     // die Suche bekommt dieselbe Vollständigkeit aus DERSELBEN Abfrage,
     // keine zweite Server-Runde.
+    // Seit Bereiche 2 zusätzlich alles, was Facetten und Kilopreis brauchen:
+    // Sorte, Siegel, Preis und aus der Kennzeichnung Tiere und Nettomenge.
     select: {
       farmId: true,
       category: true,
+      subcategory: true,
+      labels: true,
       imageUrl: true,
       name: true,
+      price: true,
       stock: true,
       reservedStock: true,
+      futter: { select: { zielTierarten: true, nettoMenge: true, nettoEinheit: true } },
     },
   })
 
@@ -600,14 +687,26 @@ export async function getOeffentlicheHoefe(
   // und keine zweite Einbindung derselben Relation, die Prisma im selben
   // select ohnehin verbietet.
   const schmaleZeilen = await zeilenJeHof
-  const kategorienJeHof = new Map<string, ProductCategory[]>()
+  const angebotJeHof = new Map<string, AngebotsZeile[]>()
   const produktFotosJeHof = new Map<string, string[]>()
-  const suchNamenJeHof = new Map<string, string[]>()
+  const jeBereich = new Map<string, Record<AnzeigeBereich, number>>()
   for (const zeile of schmaleZeilen) {
-    if (zeile.category) {
-      const bisher = kategorienJeHof.get(zeile.farmId) ?? []
-      bisher.push(zeile.category)
-      kategorienJeHof.set(zeile.farmId, bisher)
+    const zaehler = jeBereich.get(zeile.farmId) ?? { LEBENSMITTEL: 0, FUTTERMITTEL: 0 }
+    zaehler[anzeigeBereichVon(zeile.category)] += 1
+    jeBereich.set(zeile.farmId, zaehler)
+    // Kategorien, Suche, Facetten und Karte hängen an EINER Regel
+    // (istKaufbar in baueAngebotsZeile). Vorher zählten die Chips jedes
+    // sichtbare Produkt, die Suche nur solche mit freiem Bestand.
+    const angebot = baueAngebotsZeile({
+      ...zeile,
+      isAvailable: true, // die Abfrage liest nur sichtbare Produkte
+      price: Number(zeile.price),
+      futter: zeile.futter ? { ...zeile.futter, nettoMenge: Number(zeile.futter.nettoMenge) } : null,
+    })
+    if (angebot) {
+      const bisher = angebotJeHof.get(zeile.farmId) ?? []
+      bisher.push(angebot)
+      angebotJeHof.set(zeile.farmId, bisher)
     }
     if (zeile.imageUrl) {
       const bisher = produktFotosJeHof.get(zeile.farmId) ?? []
@@ -618,50 +717,47 @@ export async function getOeffentlicheHoefe(
         produktFotosJeHof.set(zeile.farmId, bisher)
       }
     }
-    if (zeile.stock - zeile.reservedStock > 0) {
-      const bisher = suchNamenJeHof.get(zeile.farmId) ?? []
-      bisher.push(zeile.name)
-      suchNamenJeHof.set(zeile.farmId, bisher)
-    }
   }
 
-  return hoefe.map((hof) => ({
-    slug: hof.slug,
-    name: hof.name,
-    postalCode: hof.postalCode,
-    city: hof.city,
-    logoUrl: hof.logoUrl,
-    latitude: hof.latitude,
-    longitude: hof.longitude,
-    isPaused: hof.isPaused,
-    kategorien: sammleKategorien(
-      (kategorienJeHof.get(hof.id) ?? []).map((category) => ({ category })),
-      // Ohne Futter-Kategorien, bis Bereiche 2 den Umschalter bringt (Konzept 6.2).
-      HOEFE_KATEGORIEN
-    ),
-    produkte: hof.products.map((p) => ({
-      id: p.id,
-      name: p.name,
-      price: Number(p.price),
-      unit: p.unit,
-      unitSize: p.unitSize === null ? null : Number(p.unitSize),
-      imageUrl: p.imageUrl,
-      category: p.category,
-      // „Verfügbar" heißt: Es ist noch etwas da, das nicht schon reserviert
-      // ist. Siehe VORSCHAU-VERFÜGBARKEIT im Kopf dieser Datei.
-      verfuegbar: p.stock - p.reservedStock > 0,
-    })),
-    produkteGesamt: hof._count.products,
-    suchNamen: suchNamenJeHof.get(hof.id) ?? [],
-    naechsteAbholung: naechsteAbholung(hof.pickupSlots, jetzt),
-    fotos: baueFotostreifen({
-      bannerUrl: hof.bannerUrl,
-      bannerType: hof.bannerType,
-      galerie: hof.farmPhotos.map((f) => f.url),
-      // Aus der schmalen Abfrage, NICHT aus den gedeckelten Vorschau-Zeilen:
-      // sonst verlöre ein Hof, dessen vordere Produkte kein Bild haben,
-      // seinen Fotostreifen (Verhalten unverändert gegenüber #83).
-      produktFotos: produktFotosJeHof.get(hof.id) ?? [],
-    }),
-  }))
+  return hoefe.map((hof) => {
+    const angebot = angebotJeHof.get(hof.id) ?? []
+    const { kategorien, suchNamen } = fasseAngebotZusammen(angebot)
+    return {
+      slug: hof.slug,
+      name: hof.name,
+      postalCode: hof.postalCode,
+      city: hof.city,
+      logoUrl: hof.logoUrl,
+      latitude: hof.latitude,
+      longitude: hof.longitude,
+      isPaused: hof.isPaused,
+      kategorien,
+      angebot,
+      produkte: hof.products.map((p) => ({
+        id: p.id,
+        name: p.name,
+        price: Number(p.price),
+        unit: p.unit,
+        unitSize: p.unitSize === null ? null : Number(p.unitSize),
+        imageUrl: p.imageUrl,
+        category: p.category,
+        // „Verfügbar" heißt: Es ist noch etwas da, das nicht schon reserviert
+        // ist. Siehe VORSCHAU-VERFÜGBARKEIT im Kopf dieser Datei.
+        verfuegbar: p.stock - p.reservedStock > 0,
+      })),
+      produkteGesamt: hof._count.products,
+      produkteJeBereich: jeBereich.get(hof.id) ?? { LEBENSMITTEL: 0, FUTTERMITTEL: 0 },
+      suchNamen,
+      naechsteAbholung: naechsteAbholung(hof.pickupSlots, jetzt),
+      fotos: baueFotostreifen({
+        bannerUrl: hof.bannerUrl,
+        bannerType: hof.bannerType,
+        galerie: hof.farmPhotos.map((f) => f.url),
+        // Aus der schmalen Abfrage, NICHT aus den gedeckelten Vorschau-Zeilen:
+        // sonst verlöre ein Hof, dessen vordere Produkte kein Bild haben,
+        // seinen Fotostreifen (Verhalten unverändert gegenüber #83).
+        produktFotos: produktFotosJeHof.get(hof.id) ?? [],
+      }),
+    }
+  })
 }

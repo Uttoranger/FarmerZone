@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useTransition } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -12,14 +12,19 @@ import { toast } from 'sonner'
 import { useCart } from '@/lib/use-cart'
 import { MONTH_SHORT, seasonLabel } from '@/schemas/product'
 import { formatEuro } from '@/lib/preis-format'
-import { formatGrundpreis } from '@/lib/format'
+import { formatGrundpreis, formatGrundpreisNetto } from '@/lib/format'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
+import { BereichUmschalter } from '@/components/shared/bereich-umschalter'
 import { SHOP_PAUSED_BUTTON_LABEL } from '@/lib/shop-pause'
+import { teileHofseite, zeigeKaufknopf } from '@/lib/bereiche-anzeige'
+import { bereichAusParameter, bereichParameter } from '@/schemas/hoefe-filter'
+import type { AnzeigeBereich } from '@/lib/taxonomie'
 import type { PublicProduct } from '@/server/queries/farm'
 import { updateProductImageAction, reorderProductsAction } from '@/server/actions/products'
 import { ReorderContext } from '@/components/shared/reorder-context'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { CartSheet } from './cart-sheet'
+import { ProduktDetail, type HofFuerDetail } from './produkt-detail'
 
 type ReorderItem = { productId: string; productName: string; quantity: number }
 
@@ -27,6 +32,8 @@ type Props = {
   products: PublicProduct[]
   farmId: string
   farmSlug: string
+  /** Für das Produktdetail: der Hof als Verantwortlicher der Futter-Kennzeichnung. */
+  hof: HofFuerDetail
   initialReorderItems?: ReorderItem[]
   ownerMode?: boolean
   mode?: 'edit' | 'preview'
@@ -267,6 +274,7 @@ function SortableProductCard({
 function ProductCard({
   product,
   onAddToCart,
+  onDetails,
   isAddingId,
   ownerMode = false,
   isEditMode = false,
@@ -274,38 +282,71 @@ function ProductCard({
 }: {
   product: PublicProduct
   onAddToCart: (product: PublicProduct) => void
+  /** Öffnet das Produktdetail — nicht im Bearbeitungsmodus. */
+  onDetails?: (product: PublicProduct) => void
   isAddingId: string | null
   ownerMode?: boolean
   isEditMode?: boolean
   isPaused?: boolean
 }) {
-  const canBuy = product.isAvailable && product.stock > 0 && !isPaused
+  const canBuy = zeigeKaufknopf(product, isPaused)
   const isAdding = isAddingId === product.id
   const dim = isEditMode && !product.isAvailable ? 0.55 : 1
+  // Futter: Kilopreis aus der Nettomenge (Bereiche 2) — Ballen und Big Bags
+  // haben keine Gebindegröße und bekämen sonst gar keinen Grundpreis.
+  const kilopreis = product.futter
+    ? formatGrundpreisNetto(product.price, product.futter.nettoMenge, product.futter.nettoEinheit)
+    : null
+
+  const kopf = (
+    <>
+      <ProductImageArea product={product} dim={dim} isEditMode={isEditMode} />
+      <div className="px-[15px] pt-[14px]" style={{ opacity: dim }}>
+        <p className="font-semibold text-sm leading-snug" style={{ color: 'var(--app-ink)' }}>{product.name}</p>
+        <p className="text-[17px] font-bold mt-[5px]" style={{ color: 'var(--app-ink)' }}>
+          {formatGrundpreis(product.price, product.unit, product.unitSize)}
+        </p>
+        {kilopreis ? (
+          <p className="mt-0.5 text-[12px]" style={{ color: 'var(--app-ink-soft)' }}>{kilopreis}</p>
+        ) : (
+          <GrundpreisZeile
+            price={product.price}
+            unit={product.unit}
+            unitSize={product.unitSize}
+            className="mt-0.5 text-[12px]"
+            style={{ color: 'var(--app-ink-soft)' }}
+          />
+        )}
+      </div>
+    </>
+  )
 
   return (
     <div
       className="bg-card rounded-[12px] overflow-hidden flex flex-col dark:ring-1 dark:ring-border"
       style={{ boxShadow: '0 2px 10px rgba(45,95,63,0.06)' }}
     >
-      <ProductImageArea product={product} dim={dim} isEditMode={isEditMode} />
+      {/* Bild, Name und Preis öffnen das Produktdetail; der Kaufknopf
+          darunter bleibt ein eigener Knopf. Im Bearbeitungsmodus liegt auf
+          dem Bild der Foto-Knopf — dort gibt es kein Detail. */}
+      {onDetails && !isEditMode ? (
+        <button
+          type="button"
+          onClick={() => onDetails(product)}
+          aria-label={`${product.name} — Details ansehen`}
+          className="block w-full text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        >
+          {kopf}
+        </button>
+      ) : (
+        kopf
+      )}
 
       {/* Body */}
       <div
-        className="px-[15px] py-[14px] flex flex-col flex-1"
+        className="px-[15px] pb-[14px] flex flex-col flex-1"
         style={{ opacity: dim }}
       >
-        <p className="font-semibold text-sm leading-snug" style={{ color: 'var(--app-ink)' }}>{product.name}</p>
-        <p className="text-[17px] font-bold mt-[5px]" style={{ color: 'var(--app-ink)' }}>
-          {formatGrundpreis(product.price, product.unit, product.unitSize)}
-        </p>
-        <GrundpreisZeile
-          price={product.price}
-          unit={product.unit}
-          unitSize={product.unitSize}
-          className="mt-0.5 text-[12px]"
-          style={{ color: 'var(--app-ink-soft)' }}
-        />
 
         {product.seasonStart && product.seasonEnd && (
           <div className="mt-2">
@@ -374,16 +415,97 @@ function ProductCard({
   )
 }
 
+/**
+ * Die Produkte der Kundenansicht: Umschalter „Hofladen | Futtermittel" (nur,
+ * wenn der Hof in BEIDEN Bereichen anbietet), darunter Sektionen je Kategorie,
+ * ab SPRUNGMARKEN_AB Produkten mit Sprungmarken. Was wohin gehört und in
+ * welcher Reihenfolge, entscheidet teileHofseite (src/lib/bereiche-anzeige.ts);
+ * Produkte des anderen Bereichs werden gar nicht erst gerendert.
+ */
+function HofseitenSektionen({
+  products,
+  bereichWunsch,
+  onBereichWechsel,
+  renderKarte,
+}: {
+  products: PublicProduct[]
+  bereichWunsch: AnzeigeBereich | null
+  onBereichWechsel: (bereich: AnzeigeBereich) => void
+  renderKarte: (p: PublicProduct) => React.ReactNode
+}) {
+  const aufteilung = useMemo(() => teileHofseite(products, bereichWunsch), [products, bereichWunsch])
+  if (aufteilung.aktiv === null) return null
+
+  return (
+    <>
+      {aufteilung.umschalter && (
+        <BereichUmschalter aktiv={aufteilung.aktiv} onWechsel={onBereichWechsel} className="mb-5" />
+      )}
+
+      {aufteilung.sprungmarken && (
+        <nav aria-label="Zu einer Kategorie springen" className="-mx-1 mb-5 flex flex-wrap gap-2 px-1">
+          {aufteilung.sektionen.map((s) => (
+            <button
+              key={s.anker}
+              type="button"
+              onClick={() => document.getElementById(s.anker)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              className="min-h-9 rounded-full border border-border bg-card px-3 text-[13px] font-medium text-app-ink transition-colors hover:bg-app-chip"
+            >
+              {s.titel}
+              <span className="ml-1.5 tabular-nums text-app-ink-faint">{s.produkte.length}</span>
+            </button>
+          ))}
+        </nav>
+      )}
+
+      <div className="space-y-8">
+        {aufteilung.sektionen.map((s) => (
+          <section key={s.anker} id={s.anker} aria-labelledby={`${s.anker}-titel`} className="scroll-mt-14">
+            <h3 id={`${s.anker}-titel`} className="mb-3 font-heading text-lg font-semibold text-app-ink">
+              {s.titel}
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-5">{s.produkte.map((p) => renderKarte(p))}</div>
+          </section>
+        ))}
+      </div>
+    </>
+  )
+}
+
 export function ProductGrid({
   products,
   farmId,
   farmSlug,
+  hof,
   initialReorderItems,
   ownerMode = false,
   mode = 'preview',
   isPaused = false,
 }: Props) {
   const isEditMode = ownerMode && mode !== 'preview'
+
+  // Hofladen | Futtermittel (Bereiche 2): Die Wahl steht in der URL
+  // (?bereich=futter), damit /hoefe direkt beim Futter landen kann und ein
+  // Reload sie behält. Gewechselt wird per replaceState — die Seite wird
+  // nicht neu geladen, andere Parameter (reorder-Token) bleiben stehen.
+  const suchParameter = useSearchParams()
+  const pfad = usePathname()
+  const bereichWunsch: AnzeigeBereich | null =
+    suchParameter.get('bereich') === null ? null : bereichAusParameter(suchParameter.get('bereich'))
+  function bereichWechseln(neu: AnzeigeBereich) {
+    const params = new URLSearchParams(suchParameter.toString())
+    const wert = bereichParameter(neu)
+    if (wert) params.set('bereich', wert)
+    else params.delete('bereich')
+    const query = params.toString()
+    window.history.replaceState(null, '', query ? `${pfad}?${query}` : pfad)
+  }
+  const [detail, setDetail] = useState<PublicProduct | null>(null)
+  const [detailOffen, setDetailOffen] = useState(false)
+  function detailOeffnen(produkt: PublicProduct) {
+    setDetail(produkt)
+    setDetailOffen(true)
+  }
 
   // Sprint 18: optimistische Sortier-Reihenfolge (null = Server-Stand)
   const [orderedIds, setOrderedIds] = useState<string[] | null>(null)
@@ -475,6 +597,9 @@ export function ProductGrid({
 
     if (result.ok) {
       toast.success(`${product.name} hinzugefügt`, { duration: 2000 })
+      // Aus dem Detail heraus: erst das Detail schließen, dann der Warenkorb —
+      // zwei Sheets übereinander wären eines zu viel.
+      setDetailOffen(false)
       setCartOpen(true)
     } else {
       toast.error(result.error ?? 'Produkt nicht verfügbar')
@@ -512,6 +637,32 @@ export function ProductGrid({
         </p>
       )}
 
+      {/* Kundenansicht (und Vorschau des Hofs): nach Bereich getrennt, darin
+          nach Kategorie. Der Bearbeitungsmodus bleibt EINE flache, ziehbare
+          Liste — die Reihenfolge dort bestimmt auch die der Sektionen. */}
+      {!isEditMode ? (
+        <HofseitenSektionen
+          products={displayProducts}
+          bereichWunsch={bereichWunsch}
+          onBereichWechsel={bereichWechseln}
+          renderKarte={(p) => (
+            <ProductCard
+              key={p.id}
+              product={p}
+              onAddToCart={handleAddToCart}
+              onDetails={detailOeffnen}
+              isAddingId={addingId}
+              ownerMode={ownerMode}
+              isEditMode={false}
+              isPaused={isPaused}
+            />
+          )}
+        />
+      ) : (
+      <>
+      <p className="mb-4 text-sm" style={{ color: 'var(--app-ink-soft)' }}>
+        Kunden sehen deine Produkte nach Kategorie gruppiert, Hofladen und Futtermittel getrennt.
+      </p>
       {/* Grid — 3 cols, 20px gap; im Edit-Modus sortierbar */}
       <ReorderContext
         enabled={isEditMode}
@@ -567,6 +718,21 @@ export function ProductGrid({
         )}
       </div>
       </ReorderContext>
+      </>
+      )}
+
+      {/* EIN Produktdetail und EIN Warenkorb für beide Bereiche. */}
+      {!isEditMode && (
+        <ProduktDetail
+          produkt={detail}
+          hof={hof}
+          offen={detailOffen}
+          onOpenChange={setDetailOffen}
+          onAddToCart={handleAddToCart}
+          wirdHinzugefuegt={detail !== null && addingId === detail.id}
+          isPaused={isPaused}
+        />
+      )}
 
       {/* Sticky cart button (not in edit mode) */}
       {!isEditMode && isHydrated && count > 0 && (

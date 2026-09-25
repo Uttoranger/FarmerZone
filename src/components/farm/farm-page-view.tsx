@@ -1341,6 +1341,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           products={productsForGrid}
           farmId={farm.id}
           farmSlug={farm.slug}
+          hof={{ name: farm.name, address: farm.address, postalCode: farm.postalCode, city: farm.city }}
           initialReorderItems={reorderItems && reorderItems.length > 0 ? reorderItems : undefined}
           ownerMode={ownerMode}
           mode={mode}

@@ -287,16 +287,42 @@ export function formatNettoBestand(
 }
 
 /**
- * Kilo- bzw. Literpreis eines Futtermittels aus Gebindepreis und Nettomenge:
- * € 45,00 für 300 kg → „€ 0,15 / kg". NUR Anzeige (Konzept-Glossar
- * „Grundpreis"), auf Cent gerundet; null ohne brauchbaren Preis oder Menge.
+ * DIE Rechenstelle für den Kilo- bzw. Literpreis eines Futtermittels:
+ * Gebindepreis ÷ Nettomenge, ungerundet (die Sortierung auf /hoefe braucht
+ * die volle Zahl). NUR Anzeige und Sortierung, nie Abrechnung. null ohne
+ * brauchbaren Preis oder Menge. Hofkarte, Produktkarte und Detail rechnen
+ * alle hierüber, damit sie nicht auseinanderlaufen.
+ */
+export function kilopreisNetto(
+  price: number,
+  nettoMenge: number | { toString(): string } | null | undefined
+): number | null {
+  const menge = gebindeGroesse(nettoMenge)
+  if (menge == null || !Number.isFinite(price) || price <= 0) return null
+  return price / menge
+}
+
+/**
+ * Kilo- bzw. Literpreis aus Gebindepreis und Nettomenge:
+ * € 45,00 für 300 kg → „€ 0,15 / kg". Auf Cent gerundet (Konzept-Glossar
+ * „Grundpreis"); null ohne brauchbaren Preis oder Menge.
  */
 export function formatGrundpreisNetto(
   price: number,
   nettoMenge: number | { toString(): string } | null | undefined,
   nettoEinheit: NettoEinheitValue
 ): string | null {
-  const menge = gebindeGroesse(nettoMenge)
-  if (menge == null || !Number.isFinite(price) || price <= 0) return null
-  return `${formatEuro(Math.round((price / menge) * 100) / 100)} / ${NETTO_EINHEIT_LABEL[nettoEinheit]}`
+  const wert = kilopreisNetto(price, nettoMenge)
+  if (wert == null) return null
+  return `${formatEuro(Math.round(wert * 100) / 100)} / ${NETTO_EINHEIT_LABEL[nettoEinheit]}`
+}
+
+/**
+ * „ab € 0,12 / kg" — der günstigste Kilopreis eines Hofs auf /hoefe, wenn
+ * nach Kilopreis sortiert wird (Bereiche 2). Ohne ihn wirkte die Reihenfolge
+ * zufällig. Nur Anzeige, auf Cent gerundet.
+ */
+export function formatAbGrundpreis(grundpreis: { wert: number; einheit: NettoEinheitValue }): string {
+  // wert kommt aus kilopreisNetto — dieselbe Rundung wie formatGrundpreisNetto.
+  return `ab ${formatEuro(Math.round(grundpreis.wert * 100) / 100)} / ${NETTO_EINHEIT_LABEL[grundpreis.einheit]}`
 }

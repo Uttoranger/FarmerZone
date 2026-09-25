@@ -396,12 +396,56 @@ describe('getOeffentlicheHoefe — die Query', () => {
       select: {
         farmId: true,
         category: true,
+        // Seit Bereiche 2: Sorte, Siegel, Preis und Kennzeichnung für
+        // Facetten und Kilopreis-Sortierung.
+        subcategory: true,
+        labels: true,
         imageUrl: true,
         name: true,
+        price: true,
         stock: true,
         reservedStock: true,
+        futter: { select: { zielTierarten: true, nettoMenge: true, nettoEinheit: true } },
       },
     })
+  })
+
+  it('Chips und Suche zählen dasselbe: ausverkauftes Heu steht weder unter „Heu & Stroh" noch in der Suche', async () => {
+    farmFindMany.mockResolvedValue([rohHof({})] as never)
+    produktZeilen.mockResolvedValue([
+      { farmId: 'farm_1', category: 'EIER', subcategory: null, labels: [], imageUrl: null, name: 'Eier', price: 3, stock: 5, reservedStock: 0, futter: null },
+      // Im Shop sichtbar, aber ausverkauft — vor Bereiche 2 zählte der Chip es mit, die Suche nicht.
+      { farmId: 'farm_1', category: 'HEU_STROH', subcategory: 'WIESENHEU', labels: [], imageUrl: null, name: 'Heu', price: 45, stock: 0, reservedStock: 0, futter: { zielTierarten: ['PFERD'], nettoMenge: 300, nettoEinheit: 'KG' } },
+      // Voll reserviert zählt genauso wenig.
+      { farmId: 'farm_1', category: 'GETREIDE_KOERNER', subcategory: 'HAFER', labels: [], imageUrl: null, name: 'Hafer', price: 20, stock: 2, reservedStock: 2, futter: { zielTierarten: ['PFERD'], nettoMenge: 25, nettoEinheit: 'KG' } },
+    ] as never)
+
+    const [hof] = await getOeffentlicheHoefe({ wochentag: 3, uhrzeit: '12:00' })
+
+    expect(hof!.kategorien).toEqual(['EIER'])
+    expect(hof!.suchNamen).toEqual(['Eier'])
+    expect(hof!.angebot.map((z) => z.name)).toEqual(['Eier'])
+  })
+
+  it('das Angebot trägt Kilopreis, Tiere und Gebinde aus der Kennzeichnung', async () => {
+    farmFindMany.mockResolvedValue([rohHof({})] as never)
+    produktZeilen.mockResolvedValue([
+      { farmId: 'farm_1', category: 'HEU_STROH', subcategory: 'WIESENHEU', labels: ['BIO'], imageUrl: null, name: 'Heu', price: 45, stock: 3, reservedStock: 0, futter: { zielTierarten: ['PFERD', 'RIND'], nettoMenge: 300, nettoEinheit: 'KG' } },
+    ] as never)
+
+    const [hof] = await getOeffentlicheHoefe({ wochentag: 3, uhrzeit: '12:00' })
+
+    expect(hof!.angebot).toEqual([
+      {
+        name: 'Heu',
+        category: 'HEU_STROH',
+        subcategory: 'WIESENHEU',
+        labels: ['BIO'],
+        tiere: ['PFERD', 'RIND'],
+        grundpreis: { wert: 0.15, einheit: 'KG' },
+        grossgebinde: true,
+      },
+    ])
   })
 
   it('leitet Kategorien, Termin und Fotostreifen je Hof ab; ohne Fenster/Fotos bleibt beides leer', async () => {

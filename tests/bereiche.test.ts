@@ -13,7 +13,7 @@ import {
   BEREICH_KATEGORIEN,
   BEREICH_VALUES,
   CATEGORY_OPTIONS,
-  FORMULAR_KACHELN,
+  ANZEIGE_BEREICHE,
   FUTTERMITTELART_VALUES,
   FUTTERMITTELART_LABEL,
   FUTTERMITTELART_ERKLAERUNG,
@@ -32,7 +32,7 @@ import {
   istFuttermittel,
   istGrossgebinde,
   istGrossgebindeEinheit,
-  kachelVon,
+  anzeigeBereichVon,
   type ProductCategoryValue,
 } from '@/lib/taxonomie'
 
@@ -115,17 +115,17 @@ describe('Altlast', () => {
 
 describe('Formular-Kacheln', () => {
   it('Lebensmittel trägt Lebensmittel UND Sonstiges, Futtermittel nur die vier Futter-Kategorien', () => {
-    expect(FORMULAR_KACHELN.LEBENSMITTEL.kategorien).toEqual([
+    expect(ANZEIGE_BEREICHE.LEBENSMITTEL.kategorien).toEqual([
       ...BEREICH_KATEGORIEN.LEBENSMITTEL,
       ...BEREICH_KATEGORIEN.SONSTIGES,
     ])
-    expect(FORMULAR_KACHELN.FUTTERMITTEL.kategorien).toEqual([...BEREICH_KATEGORIEN.FUTTERMITTEL])
+    expect(ANZEIGE_BEREICHE.FUTTERMITTEL.kategorien).toEqual([...BEREICH_KATEGORIEN.FUTTERMITTEL])
   })
 
-  it('kachelVon: Futter → Futtermittel, alles andere und leer → Lebensmittel', () => {
-    expect(kachelVon('MISCHFUTTER')).toBe('FUTTERMITTEL')
-    expect(kachelVon('BRENNHOLZ')).toBe('LEBENSMITTEL')
-    expect(kachelVon(null)).toBe('LEBENSMITTEL')
+  it('anzeigeBereichVon: Futter → Futtermittel, alles andere und leer → Lebensmittel', () => {
+    expect(anzeigeBereichVon('MISCHFUTTER')).toBe('FUTTERMITTEL')
+    expect(anzeigeBereichVon('BRENNHOLZ')).toBe('LEBENSMITTEL')
+    expect(anzeigeBereichVon(null)).toBe('LEBENSMITTEL')
   })
 })
 

@@ -22,6 +22,8 @@ import {
   type VorschauProdukt,
 } from '@/lib/hofuebersicht'
 import type { ProductCategoryValue } from '@/schemas/product'
+import { LEERER_HOEFE_FILTER } from '@/schemas/hoefe-filter'
+import type { AngebotsZeile } from '@/lib/bereiche-anzeige'
 
 let laufnummer = 0
 function produkt(teil: Partial<VorschauProdukt> & { name: string }): VorschauProdukt {
@@ -44,10 +46,23 @@ function hof(
   kategorien: ProductCategoryValue[] = [],
   teil: Record<string, unknown> = {}
 ) {
+  // Seit Bereiche 2 filtert die Übersicht auf dem ANGEBOT (kaufbare
+  // Produkte): Jeder Suchname wird eine Angebotszeile mit der Kategorie an
+  // derselben Stelle (sonst der ersten).
+  const angebot: AngebotsZeile[] = suchNamen.map((n, i) => ({
+    name: n,
+    category: kategorien[i] ?? kategorien[0] ?? null,
+    subcategory: null,
+    labels: [],
+    tiere: [],
+    grundpreis: null,
+    grossgebinde: null,
+  }))
   return {
     name,
     suchNamen,
     kategorien,
+    angebot,
     produkte: [] as VorschauProdukt[],
     latitude: 48.2,
     longitude: 13.5,
@@ -216,11 +231,10 @@ describe('filtereNachSuche — die Wirkung auf die Hofliste', () => {
 
 describe('berechneHofAuswahl — die Verdrahtung der Übersicht als Ganzes', () => {
   const FILTER = {
+    ...LEERER_HOEFE_FILTER,
     kategorien: [] as ProductCategoryValue[],
     bezugspunkt: null,
     umkreis: null,
-    suchtext: '',
-    suchMarken: [] as string[],
   }
   const HOEFE = [
     hof('Biohof Huber', ['Freilandeier', 'Brot'], ['EIER', 'BROT']),

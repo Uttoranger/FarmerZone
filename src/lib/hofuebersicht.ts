@@ -13,8 +13,17 @@
  * aufgelösten Wochentag + Uhrzeit — die Auflösung macht wienJetzt().
  */
 import type { ProductCategoryValue } from '@/schemas/product'
-import { PRODUCT_CATEGORY_VALUES, istFuttermittel } from '@/lib/taxonomie'
+import type { HoefeFilter } from '@/schemas/hoefe-filter'
+import { ANZEIGE_BEREICHE, anzeigeBereichVon, type AnzeigeBereich } from '@/lib/taxonomie'
 import { DAY_NAMES } from '@/lib/pickup-slot-rules'
+import {
+  abGrundpreis,
+  fasseAngebotZusammen,
+  filtereNachAngebot,
+  sortiereNachGrundpreis,
+  type AngebotsZeile,
+  type Grundpreis,
+} from '@/lib/bereiche-anzeige'
 
 export type AbholFenster = {
   /** 0=Sonntag … 6=Samstag — wie PickupSlot.dayOfWeek und JS getDay(). */
@@ -56,17 +65,6 @@ export function sammleKategorien(
   }
   return reihenfolge.filter((k) => vorhanden.has(k))
 }
-
-/**
- * Die Kategorien, die /hoefe als Chips und Badges zeigt — in Schema-Reihenfolge,
- * OHNE den Bereich Futtermittel (Konzept 6.2): Bis der Bereichs-Umschalter
- * aus Sprint Bereiche 2 da ist, bleibt Futter aus den Chips heraus. Die
- * Produkte selbst bleiben über die Hofseite erreichbar. Der Bereich wird hier
- * auf dem Server entschieden, nie im Browser.
- */
-export const HOEFE_KATEGORIEN: readonly ProductCategoryValue[] = PRODUCT_CATEGORY_VALUES.filter(
-  (k) => !istFuttermittel(k)
-)
 
 export type NaechsteAbholung = AbholFenster & {
   /** 0 = heute, 1 = morgen, … 6; 7 = das heutige Fenster ist schon vorbei
@@ -212,6 +210,27 @@ export function waehleVorschauProdukte(
 
   const gezeigt = geordnet.slice(0, zeilen)
   return { produkte: gezeigt, weitere: Math.max(0, gesamt - gezeigt.length) }
+}
+
+/**
+ * Das Schaufenster einer Hofkarte im gewählten Bereich (Bereiche 2): nur
+ * Produkte dieses Bereichs — wer Eier sucht, sieht auf der Karte eines
+ * gemischten Hofs kein Heu —, und „+ n weitere" zählt ebenfalls nur ihn.
+ */
+export function waehleVorschauImBereich(
+  hof: { produkte: VorschauProdukt[]; produkteJeBereich: Record<AnzeigeBereich, number> },
+  bereich: AnzeigeBereich,
+  gewaehlteKategorien: ProductCategoryValue[],
+  zeilen: number,
+  suchbegriffe: string[]
+): { produkte: VorschauProdukt[]; weitere: number } {
+  return waehleVorschauProdukte(
+    hof.produkte.filter((p) => anzeigeBereichVon(p.category) === bereich),
+    gewaehlteKategorien,
+    hof.produkteJeBereich[bereich],
+    zeilen,
+    suchbegriffe
+  )
 }
 
 // ─── Produktsuche: Vorschläge und Filter ────────────────────────────────────
@@ -367,13 +386,12 @@ export function filtereNachSuche<H extends { name: string; suchNamen: string[] }
 }
 
 /** Alle Filtergriffe der Übersicht in einem Wert — die Eingabe von
- *  berechneHofAuswahl. */
-export type UebersichtsFilter = {
-  kategorien: ProductCategoryValue[]
+ *  berechneHofAuswahl. Bereich, Facetten und Suche kommen aus der URL
+ *  (src/schemas/hoefe-filter.ts), Bezugspunkt und Umkreis bleiben im
+ *  Browser. */
+export type UebersichtsFilter = Omit<HoefeFilter, 'ansicht'> & {
   bezugspunkt: Bezugspunkt | null
   umkreis: UmkreisStufe
-  suchtext: string
-  suchMarken: string[]
 }
 
 /**
@@ -400,6 +418,7 @@ export function berechneHofAuswahl<
     name: string
     kategorien: ProductCategoryValue[]
     suchNamen: string[]
+    angebot: readonly AngebotsZeile[]
     latitude: number | null
     longitude: number | null
   },
@@ -407,17 +426,36 @@ export function berechneHofAuswahl<
   hoefe: H[],
   filter: UebersichtsFilter
 ): {
-  gefiltert: MitEntfernung<H>[]
+  gefiltert: MitEntfernung<ImBereich<H>>[]
   vorschlaege: ProduktVorschlag[]
   suchbegriffe: string[]
   sucheAktiv: boolean
   sucheLeertDieListe: boolean
+  /** Die Kategorien, nach denen das Schaufenster jeder Karte zuerst greift:
+   *  die gewählten, sonst die des Bereichs — im Futter-Bereich zeigt die
+   *  Karte also das Futter zuerst. */
+  vorschauKategorien: ProductCategoryValue[]
 } {
-  const suchBasis = ordneNachEntfernung(
-    filtereHoefe(hoefe, filter.kategorien),
-    filter.bezugspunkt,
-    filter.umkreis
-  )
+  // Bereich und Facetten zuerst (Sprint Bereiche 2): Kategorien und
+  // Suchnamen jedes Hofs gelten danach nur noch im gewählten Bereich — ein
+  // Hofladen-Hof taucht nicht bei der Suche nach „Heu" auf, und seine Karte
+  // trägt keine Futter-Marken.
+  const imBereich = filtereNachAngebot(hoefe, filter).map((hof) => {
+    const { kategorien, suchNamen } = fasseAngebotZusammen(hof.angebot, filter.bereich)
+    return {
+      ...hof,
+      kategorien,
+      suchNamen,
+      abGrundpreis: filter.sortierung === 'GRUNDPREIS' ? abGrundpreis(hof, filter) : null,
+    }
+  })
+  const nachEntfernung = ordneNachEntfernung(imBereich, filter.bezugspunkt, filter.umkreis)
+  // Die ausdrückliche Wahl „nach Kilopreis" schlägt die Entfernung; der
+  // Umkreis grenzt trotzdem weiter ein.
+  const suchBasis =
+    filter.bereich === 'FUTTERMITTEL' && filter.sortierung === 'GRUNDPREIS'
+      ? sortiereNachGrundpreis(nachEntfernung, filter)
+      : nachEntfernung
   const gefiltert = filtereNachSuche(suchBasis, filter.suchtext, filter.suchMarken)
   const eingabe = filter.suchtext.trim()
   const aktiv = new Set(filter.suchMarken.map(suchForm))
@@ -430,8 +468,17 @@ export function berechneHofAuswahl<
     suchbegriffe: eingabe === '' ? filter.suchMarken : [...filter.suchMarken, eingabe],
     sucheAktiv,
     sucheLeertDieListe: sucheAktiv && gefiltert.length === 0 && suchBasis.length > 0,
+    vorschauKategorien:
+      filter.kategorien.length > 0
+        ? filter.kategorien
+        : [...(ANZEIGE_BEREICHE[filter.bereich].kategorien as readonly ProductCategoryValue[])],
   }
 }
+
+/** Ein Hof, wie ihn der gewählte Bereich sieht: Kategorien und Suchnamen nur
+ *  aus diesem Bereich, dazu der Kilopreis, nach dem sortiert wurde (nur bei
+ *  sort=grundpreis, sonst null). */
+export type ImBereich<H> = H & { abGrundpreis: Grundpreis | null }
 
 /**
  * Der erste SICHTBARE Buchstabe (oder die erste Ziffer) eines Produktnamens,
