@@ -7,7 +7,7 @@
  *
  * Nur das Resend-SDK ist gemockt — kein Netzwerk.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest'
 
 const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
 
@@ -18,25 +18,36 @@ vi.mock('resend', () => ({
   },
 }))
 
-async function importEmail() {
-  // email.ts liest RESEND_API_KEY auf Modulebene → pro Test frisch importieren
+// Der kalte Import von email.ts zieht React, @react-email/render und alle
+// Vorlagen nach. Unter Last (parallele Suiten) dauert das länger als das
+// 5-s-Testlimit — deshalb einmal pro Datei mit eigenem Timeout statt in jedem Test.
+const IMPORT_TIMEOUT = 30_000
+
+// email.ts liest RESEND_API_KEY auf Modulebene. Der Log-Modus braucht deshalb
+// eine zweite Instanz ohne Key — vi.resetModules genau einmal, nicht pro Test.
+let mitKey: typeof import('@/lib/email')
+let ohneKey: typeof import('@/lib/email')
+
+beforeAll(async () => {
+  vi.stubEnv('RESEND_API_KEY', 're_test_dummy')
+  mitKey = await import('@/lib/email')
   vi.resetModules()
-  return import('@/lib/email')
-}
+  vi.stubEnv('RESEND_API_KEY', '')
+  ohneKey = await import('@/lib/email')
+}, IMPORT_TIMEOUT)
+
+afterAll(() => {
+  vi.unstubAllEnvs()
+})
 
 beforeEach(() => {
   sendMock.mockReset()
-  vi.stubEnv('RESEND_API_KEY', 're_test_dummy')
-})
-
-afterEach(() => {
-  vi.unstubAllEnvs()
 })
 
 describe('sendRaw wirft nie', () => {
   it('gibt { id } zurück, wenn Resend erfolgreich sendet', async () => {
     sendMock.mockResolvedValue({ data: { id: 'email_1' }, error: null })
-    const { sendRaw } = await importEmail()
+    const { sendRaw } = mitKey
 
     const result = await sendRaw('kunde@example.com', 'Test', '<p>Hallo</p>')
 
@@ -45,7 +56,7 @@ describe('sendRaw wirft nie', () => {
 
   it('fängt eine Exception des Resend-SDK und gibt { error } zurück statt zu werfen', async () => {
     sendMock.mockRejectedValue(new Error('ECONNRESET'))
-    const { sendRaw } = await importEmail()
+    const { sendRaw } = mitKey
 
     await expect(sendRaw('kunde@example.com', 'Test', '<p>Hallo</p>')).resolves.toEqual({
       error: 'ECONNRESET',
@@ -54,7 +65,7 @@ describe('sendRaw wirft nie', () => {
 
   it('gibt { error } zurück, wenn Resend einen API-Fehler liefert', async () => {
     sendMock.mockResolvedValue({ data: null, error: { message: 'domain not verified' } })
-    const { sendRaw } = await importEmail()
+    const { sendRaw } = mitKey
 
     const result = await sendRaw('kunde@example.com', 'Test', '<p>Hallo</p>')
 
@@ -63,8 +74,7 @@ describe('sendRaw wirft nie', () => {
   })
 
   it('läuft ohne RESEND_API_KEY im Log-Modus (kein Throw, kein Versand)', async () => {
-    vi.stubEnv('RESEND_API_KEY', '')
-    const { sendRaw } = await importEmail()
+    const { sendRaw } = ohneKey
 
     const result = await sendRaw('kunde@example.com', 'Test', '<p>Hallo</p>')
 

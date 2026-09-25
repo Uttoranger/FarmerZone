@@ -4,7 +4,7 @@
  * Beweist: sendPasswordResetEmail übergibt Empfänger, deutschen Betreff und
  * die Reset-URL an den Versand. Nur das Resend-SDK ist gemockt — kein Netzwerk.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest'
 
 const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
 
@@ -15,25 +15,31 @@ vi.mock('resend', () => ({
   },
 }))
 
-async function importEmail() {
-  // email.ts liest RESEND_API_KEY auf Modulebene → pro Test frisch importieren
-  vi.resetModules()
-  return import('@/lib/email')
-}
+// Der kalte Import von email.ts zieht React, @react-email/render und alle
+// Vorlagen nach. Unter Last (parallele Suiten) dauert das länger als das
+// 5-s-Testlimit — deshalb einmal pro Datei mit eigenem Timeout statt in jedem Test.
+const IMPORT_TIMEOUT = 30_000
+
+let email: typeof import('@/lib/email')
+
+beforeAll(async () => {
+  // email.ts liest RESEND_API_KEY auf Modulebene → vor dem Import setzen
+  vi.stubEnv('RESEND_API_KEY', 're_test_dummy')
+  email = await import('@/lib/email')
+}, IMPORT_TIMEOUT)
+
+afterAll(() => {
+  vi.unstubAllEnvs()
+})
 
 beforeEach(() => {
   sendMock.mockReset()
-  vi.stubEnv('RESEND_API_KEY', 're_test_dummy')
-})
-
-afterEach(() => {
-  vi.unstubAllEnvs()
 })
 
 describe('sendPasswordResetEmail', () => {
   it('übergibt Empfänger, deutschen Betreff und die Reset-URL an den Versand', async () => {
     sendMock.mockResolvedValue({ data: { id: 'email_1' }, error: null })
-    const { sendPasswordResetEmail } = await importEmail()
+    const { sendPasswordResetEmail } = email
 
     const url = 'http://localhost:3000/reset-password?token=abc123'
     await sendPasswordResetEmail('bauer@example.com', url)
@@ -47,7 +53,7 @@ describe('sendPasswordResetEmail', () => {
 
   it('nennt die Gültigkeit (1 Stunde) und den Ignorieren-Hinweis im Body', async () => {
     sendMock.mockResolvedValue({ data: { id: 'email_2' }, error: null })
-    const { sendPasswordResetEmail } = await importEmail()
+    const { sendPasswordResetEmail } = email
 
     await sendPasswordResetEmail('bauer@example.com', 'http://localhost:3000/reset-password?token=t')
 

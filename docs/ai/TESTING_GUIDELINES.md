@@ -183,6 +183,7 @@ in einen ungültigen Schlüssel statt in echtes Geld.
 - Ein Verhalten je Test. Keine Testdatei, die einen Ablauf über zehn `it` hinweg aufbaut.
 - Keine gemeinsame veränderliche Variable zwischen Tests. `beforeEach` zum Zurücksetzen (`vi.clearAllMocks()`).
 - Reihenfolge-Unabhängigkeit: Jeder Test muss allein laufen.
+- **Schwere Module echt importieren** (z. B. `@/lib/email` mit React und allen Vorlagen): einmal je Datei in `beforeAll` mit eigenem Timeout (`30_000`), nie in jedem Test. Ein kalter Import im Test zählt gegen das 5-s-Limit und reißt es, sobald parallel gearbeitet wird. `vi.resetModules()` nur, wo ein Modul Umgebungswerte auf Modulebene liest — dann ebenfalls in `beforeAll`, eine Instanz je Variante (Vorbild: `tests/email-sendraw.test.ts`). Das Testlimit nie global anheben.
 
 ### Immer mitprüfen
 - Grenzfälle: 0, leer, `null`, exakt an der Frist, ein Millisekunde davor und danach.
@@ -223,4 +224,3 @@ in einen ungültigen Schlüssel statt in echtes Geld.
   `TEST_DATABASE_URL`, bricht die Sicherheitssperre mit Hinweis ab. Beides ist
   kein Codefehler.
 - **Links auf Ordner in Tests** als `symlinkSync(ziel, pfad, 'junction')` mit absolutem Ordnerziel anlegen. Ein normaler Symlink braucht unter Windows Sonderrechte (`EPERM` ohne Entwicklermodus), eine Junction nicht; Linux und macOS ignorieren das dritte Argument. `realpath` löst beides auf (Vorbild: `tests/fremdtext-hooks.test.ts`). Junctions gehen nur auf Ordner — für einen Link auf eine **Datei** gibt es unter Windows keinen Weg ohne Sonderrechte; solche Tests brauchen den Entwicklermodus oder laufen nur in der CI.
-- `tests/email-sendraw.test.ts` und `tests/password-reset-email.test.ts` flackern gelegentlich im Gesamtlauf: Ihr erster Fall importiert `@/lib/email` kalt (`vi.resetModules()`), und unter Parallellast läuft das ins 5-Sekunden-Limit. Allein laufen sie grün. Vor einem Fix des eigenen Codes die beiden Dateien einzeln starten.
