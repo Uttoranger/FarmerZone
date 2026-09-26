@@ -153,7 +153,7 @@ Die Plattform prüft die Nummer nicht. Der Hof bestätigt die Richtigkeit (`best
 - `bereichVon(category | null)`
 - `BEREICH_KATEGORIEN: Record<Bereich, ProductCategory[]>`
 - `futtermittelartenFuer(category)` nach Tabelle 2.4
-- `GROSSGEBINDE_AB_KG = 25`, `istGrossgebinde(nettoMenge, nettoEinheit)` — Liter zählen 1:1 als kg
+- `GROSSGEBINDE_AB_KG = 25`, `istGrossgebinde(nettoMenge, nettoEinheit)` — Liter zählen 1:1 als kg *(geändert vor dem Umfeld-Sprint: `KLEINGEBINDE_BIS_KG = 25`, Großgebinde erst über 25 kg; der Filter bleibt bei Liter = kg, Preisvergleiche im Umfeld nicht)*
 - Labels: „Heu & Stroh", „Getreide & Körner", „Mischfutter", „Ergänzungsfutter"; L2 deutsch
 
 ### `src/lib/mwst.ts` — neu
@@ -209,9 +209,10 @@ Beide Orte (/hoefe und Hofseite) teilen **einen** Umschalter „Hofladen | Futte
 - Die Ausblendung der Futter-Kategorien aus Bereiche 1 entfällt.
 - Karte und Liste zeigen dieselbe Menge. Im Bereich Futtermittel nur Höfe mit mindestens einem kaufbaren Futtermittel.
 - L2-Reihe nur, wenn die Ergebnismenge mindestens zwei Unterkategorien hat, mit Zählern (Höfe); Chips ohne Treffer fehlen.
-- Facetten als eckige Chips: Bio, Gentechnikfrei, AMA; im Bereich Futtermittel zusätzlich „Für Tiere" (Sheet, Mehrfachwahl, Trefferzahl im Knopf) und „Gebinde: Klein (unter 25 kg) | Groß". Facetten gelten je Produkt: Ein Hof bleibt, wenn EIN kaufbares Produkt alle gewählten Bedingungen zugleich erfüllt.
+- Facetten als eckige Chips: Bio, Gentechnikfrei, AMA; im Bereich Futtermittel zusätzlich „Für Tiere" (Sheet, Mehrfachwahl, Trefferzahl im Knopf) und „Gebinde: Klein (unter 25 kg) | Groß". *(Geändert vor dem Umfeld-Sprint: Klein bis einschließlich 25 kg, Groß erst darüber — der 25-kg-Sack ist Kleingebinde.)* Facetten gelten je Produkt: Ein Hof bleibt, wenn EIN kaufbares Produkt alle gewählten Bedingungen zugleich erfüllt.
 - Sortierung nach Grundpreis im Bereich Futtermittel: Höfe nach dem günstigsten Kilopreis (Preis ÷ Nettomenge) ihrer passenden Futterprodukte; die Hofkarte zeigt den Wert („ab € 0,12 / kg").
 - Alle Filter in der URL, teilbar und reload-fest — außer Bezugspunkt und Umkreis (der Standort verlässt den Browser nie). Ungültige Parameter werden verworfen, nie ein Fehler.
+  *(Geändert vor dem Umfeld-Sprint:)* Ausnahme: `um=<hof-slug>&km=` — Bezugspunkt ist der öffentliche Standort eines freigegebenen Hofs. Der Standort des Besuchers kommt nie in die URL. Unbekannter Slug oder Hof ohne Standort: still verworfen.
 - Der Link auf die Hofseite trägt den Bereich mit (`?bereich=futter`).
 
 ### 6.3 Hofseite und Produktdetail (Bereiche 2)
@@ -260,7 +261,7 @@ Migration immer zeigen, Freigabe abwarten, dann ausführen (`CLAUDE.md`, Hard Co
 
 ## 9. Entscheidungen, die gefallen sind
 - Bereich statt Kategorie — ja, jetzt, solange es nichts kostet.
-- Großgebinde ab 25 kg.
+- Großgebinde ab 25 kg. *(Geändert vor dem Umfeld-Sprint: über 25 kg — der 25-kg-Sack ist Kleingebinde.)*
 - NUR_BETRIEBE mit Betriebsnummer-Pflicht im Checkout — ja.
 - `Farm.besteuerung` — verschoben.
 - Silage und Triticale sind drin; Soja nicht, bis ein Hof es anbietet.

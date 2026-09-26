@@ -67,7 +67,7 @@ export type AngebotsZeile = {
   tiere: TierartValue[]
   /** null ohne Kennzeichnung oder ohne brauchbare Nettomenge. */
   grundpreis: Grundpreis | null
-  /** Ab GROSSGEBINDE_AB_KG; null ohne Kennzeichnung (dann weder klein noch groß). */
+  /** Über KLEINGEBINDE_BIS_KG; null ohne Kennzeichnung (dann weder klein noch groß). */
   grossgebinde: boolean | null
 }
 

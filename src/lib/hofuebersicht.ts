@@ -522,13 +522,31 @@ export function produktInitiale(name: string): string {
 /** Der Bezugspunkt der Umkreissuche: eigener Standort oder aufgelöste PLZ. */
 export type Bezugspunkt = { lat: number; lon: number; name?: string }
 
+/**
+ * Der Bezugspunkt aus `um=<hof-slug>` (Link „Auf der Karte zeigen" im Umfeld):
+ * der ÖFFENTLICHE Standort dieses Hofs, gesucht in der Liste, die /hoefe
+ * ohnehin geladen hat — also nur Höfe, die dort sichtbar sind. Unbekannter
+ * Slug oder Hof ohne brauchbare Koordinaten: null, und der Parameter ist still
+ * verworfen. Der Standort des Besuchers kommt so nie in die URL.
+ */
+export function bezugspunktVonHof(
+  hoefe: readonly { slug: string; name: string; latitude: number | null; longitude: number | null }[],
+  slug: string | null
+): Bezugspunkt | null {
+  if (!slug) return null
+  const hof = hoefe.find((h) => h.slug === slug)
+  if (!hof || !Number.isFinite(hof.latitude) || !Number.isFinite(hof.longitude)) return null
+  return { lat: hof.latitude as number, lon: hof.longitude as number, name: hof.name }
+}
+
 /** Die Stufen des Umkreis-Reglers. `null` = „egal" (Voreinstellung: Bei
  *  wenigen Höfen darf nichts versteckt werden). */
 export type UmkreisStufe = 10 | 25 | 50 | null
 
 export const UMKREIS_STUFEN: UmkreisStufe[] = [10, 25, 50, null]
 
-const ERDRADIUS_KM = 6371
+/** Mittlerer Erdradius — auch die Grundlage der Umkreis-Box im Umfeld (src/lib/umfeld.ts). */
+export const ERDRADIUS_KM = 6371
 
 /**
  * Entfernung zweier Punkte auf der Kugel (Haversine) in Kilometern.

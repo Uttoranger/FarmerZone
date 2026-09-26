@@ -4,8 +4,8 @@
  *
  * Beweist: Jede wählbare Kategorie gehört zu genau einem Bereich; die Altlast
  * zählt als Futter; die Futtermittelart ist an die Kategorie gebunden
- * (Tabelle 2.4) und trägt den Satz aus Rückfrage F4; Großgebinde beginnt bei
- * genau 25 kg; Ballen und Big Bags gibt es nicht bei Lebensmitteln (F7); die
+ * (Tabelle 2.4) und trägt den Satz aus Rückfrage F4; Großgebinde beginnt erst
+ * über 25 kg (Korrektur im Umfeld-Sprint); Ballen und Big Bags gibt es nicht bei Lebensmitteln (F7); die
  * Betriebsnummer kommt vom Hof, die Kennzeichnung ist nur Rückfall (F6).
  */
 import { describe, it, expect } from 'vitest'
@@ -17,7 +17,7 @@ import {
   FUTTERMITTELART_VALUES,
   FUTTERMITTELART_LABEL,
   FUTTERMITTELART_ERKLAERUNG,
-  GROSSGEBINDE_AB_KG,
+  KLEINGEBINDE_BIS_KG,
   PRODUCT_CATEGORY_VALUES,
   PRODUCT_SUBCATEGORY_VALUES,
   BETRIEBSSTATUS,
@@ -179,12 +179,14 @@ describe('futtermittelartSatz — Fehlertext und Begründung (F4)', () => {
 
 describe('istGrossgebinde', () => {
   it('die Schwelle liegt bei 25 kg', () => {
-    expect(GROSSGEBINDE_AB_KG).toBe(25)
+    expect(KLEINGEBINDE_BIS_KG).toBe(25)
   })
 
-  it('knapp darunter klein, genau 25 und darüber groß', () => {
+  it('der 25-kg-Sack ist Kleingebinde — groß erst darüber', () => {
+    // Geändert im Umfeld-Sprint: Bis dahin zählte genau 25 kg schon als groß
+    // („Klein" hieß „unter 25 kg"). Der 25-kg-Sack ist im Handel Kleingebinde.
     expect(istGrossgebinde(24.999, 'KG')).toBe(false)
-    expect(istGrossgebinde(25, 'KG')).toBe(true)
+    expect(istGrossgebinde(25, 'KG')).toBe(false)
     expect(istGrossgebinde(25.001, 'KG')).toBe(true)
     expect(istGrossgebinde(300, 'KG')).toBe(true)
   })
@@ -195,7 +197,8 @@ describe('istGrossgebinde', () => {
   })
 
   it('nimmt Prisma-Decimal-artige Werte an', () => {
-    expect(istGrossgebinde({ toString: () => '25.000' }, 'KG')).toBe(true)
+    expect(istGrossgebinde({ toString: () => '25.000' }, 'KG')).toBe(false)
+    expect(istGrossgebinde({ toString: () => '25.500' }, 'KG')).toBe(true)
     expect(istGrossgebinde({ toString: () => '5.5' }, 'KG')).toBe(false)
   })
 

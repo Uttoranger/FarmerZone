@@ -5,6 +5,7 @@ import { getFarmForUser } from '@/server/queries/dashboard'
 import { getAnalyticsData, getYtdRevenue, type PeriodKey } from '@/server/queries/analytics'
 import { AnalyticsDashboard } from '@/components/analytics/analytics-dashboard'
 import { PageHeader } from '@/components/farmer/page-header'
+import { AuswertungReiter } from '@/components/analytics/auswertung-reiter'
 import { PROCESSING_REVENUE_LIMIT, limitProgress } from '@/lib/revenue-limit'
 
 const VALID_PERIODS: PeriodKey[] = ['week', 'month', 'quarter', 'year']
@@ -58,6 +59,7 @@ export default async function AnalyticsPage({
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto">
       <PageHeader title="Auswertung" subtitle="Umsatz und Verkaufskanäle im Überblick" />
+      <AuswertungReiter aktiv="umsatz" />
 
       {/* Grenze Be- & Verarbeitung (LK OÖ, Stand 2025) */}
       <div className={`rounded-2xl border p-5 mb-6 ${bgColor}`}>

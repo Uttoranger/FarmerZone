@@ -32,11 +32,12 @@ import {
   type AngebotsZeile,
   type ProduktFilter,
 } from '@/lib/bereiche-anzeige'
-import { berechneHofAuswahl } from '@/lib/hofuebersicht'
+import { UMKREIS_STUFEN, berechneHofAuswahl } from '@/lib/hofuebersicht'
 import { formatAbGrundpreis, formatGrundpreisNetto, kilopreisNetto } from '@/lib/format'
 import {
   LEERER_HOEFE_FILTER,
   SUCHTEXT_MAX,
+  UM_KM_VALUES,
   leseHoefeFilter,
   schreibeHoefeFilter,
   wechsleBereich,
@@ -158,7 +159,26 @@ describe('hofPasst — Bereich und Facetten', () => {
     expect(hofPasst(hof, { ...FUTTER, siegel: ['BIO', 'AMA_GUETESIEGEL'] })).toBe(false)
   })
 
-  it('Gebinde: Groß ab 25 kg, Klein darunter, ohne Kennzeichnung weder noch', () => {
+  it('Gebinde: der 25-kg-Sack steht unter Klein, nicht unter Groß', () => {
+    // Geänderte Schwelle im Umfeld-Sprint: Genau 25 kg zählte bis dahin als
+    // groß („Klein" hieß „unter 25 kg"). Der 25-kg-Sack ist Kleingebinde.
+    const sack = baueAngebotsZeile({
+      name: 'Hafer',
+      isAvailable: true,
+      stock: 4,
+      reservedStock: 0,
+      price: 12,
+      category: 'GETREIDE_KOERNER',
+      subcategory: 'HAFER',
+      labels: [],
+      futter: { zielTierarten: ['PFERD'], nettoMenge: 25, nettoEinheit: 'KG' },
+    })
+    const hof = { angebot: sack ? [sack] : [] }
+    expect(hofPasst(hof, { ...FUTTER, gebinde: 'KLEIN' })).toBe(true)
+    expect(hofPasst(hof, { ...FUTTER, gebinde: 'GROSS' })).toBe(false)
+  })
+
+  it('Gebinde: Groß über 25 kg, Klein bis 25 kg, ohne Kennzeichnung weder noch', () => {
     const gross = { angebot: [heu({ grossgebinde: true })] }
     const klein = { angebot: [heu({ grossgebinde: false })] }
     const ohne = { angebot: [heu({ grossgebinde: null })] }
@@ -301,6 +321,8 @@ describe('URL-Zustand von /hoefe', () => {
       suchtext: 'heu',
       suchMarken: ['Heu, gepresst', 'Stroh'],
       ansicht: 'karte',
+      um: 'hof-test',
+      km: 25,
     }
     expect(lies(schreibeHoefeFilter(filter))).toEqual(filter)
   })
@@ -332,6 +354,35 @@ describe('URL-Zustand von /hoefe', () => {
   it('Bezugspunkt und Umkreis stehen nie in der URL', () => {
     const query = schreibeHoefeFilter({ ...LEERER_HOEFE_FILTER, suchtext: 'Eier' })
     expect(query).not.toMatch(/lat|lon|umkreis|plz/)
+  })
+
+  it('um= trägt nur den Slug eines Hofs, nie Koordinaten — samt Umkreis', () => {
+    // Ausnahme aus dem Umfeld-Sprint: Bezugspunkt ist der öffentliche
+    // Standort eines Hofs, nicht der des Besuchers.
+    const query = schreibeHoefeFilter({ ...LEERER_HOEFE_FILTER, um: 'hof-test', km: 10, ansicht: 'karte' })
+    expect(query).toBe('ansicht=karte&um=hof-test&km=10')
+    expect(query).not.toMatch(/lat|lon|\d+\.\d+/)
+  })
+
+  it('verwirft einen kaputten Slug, einen fremden Umkreis und einen Umkreis ohne um', () => {
+    expect(lies('um=Hof Test&km=25')).toMatchObject({ um: null, km: null })
+    expect(lies('um=hof--test')).toMatchObject({ um: null })
+    expect(lies('um=../admin')).toMatchObject({ um: null })
+    expect(lies('um=hof-test&km=30')).toMatchObject({ um: 'hof-test', km: null })
+    expect(lies('um=hof-test&km=abc')).toMatchObject({ um: 'hof-test', km: null })
+    expect(lies('km=25')).toMatchObject({ um: null, km: null })
+    expect(lies('um=hof-test')).toMatchObject({ um: 'hof-test', km: null })
+    // Ohne um schreibt sich auch ein km nicht in die URL.
+    expect(schreibeHoefeFilter({ ...LEERER_HOEFE_FILTER, km: 25 })).toBe('')
+  })
+
+  it('die um-Stufen sind die des Umkreis-Reglers ohne „egal"', () => {
+    expect([...UM_KM_VALUES, null]).toEqual(UMKREIS_STUFEN)
+  })
+
+  it('beim Bereichswechsel bleibt der Bezugspunkt aus um=', () => {
+    const vorher: HoefeFilter = { ...LEERER_HOEFE_FILTER, bereich: 'FUTTERMITTEL', um: 'hof-test', km: 25 }
+    expect(wechsleBereich(vorher, 'LEBENSMITTEL')).toMatchObject({ um: 'hof-test', km: 25 })
   })
 
   it('beim Bereichswechsel fallen die bereichsgebundenen Filter, Siegel und Suche bleiben', () => {

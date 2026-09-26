@@ -47,9 +47,20 @@ const geldFormat = new Intl.NumberFormat('de-AT', {
   maximumFractionDigits: 2,
 })
 
-/** „€ 2,90" · „€ 1.234,50" · „€ 0,00" */
-export function formatEuro(n: number): string {
-  return `€ ${geldFormat.format(Number.isFinite(n) ? n : 0)}`
+const ganzeEuroFormat = new Intl.NumberFormat('de-AT', { maximumFractionDigits: 0 })
+
+/** Der Betrag ohne Symbol — mit zwei Nachkommastellen oder in ganzen Euro. */
+function betrag(n: number, stellen: 0 | 2): string {
+  return (stellen === 0 ? ganzeEuroFormat : geldFormat).format(Number.isFinite(n) ? n : 0)
+}
+
+/**
+ * „€ 2,90" · „€ 1.234,50" · „€ 0,00". Mit `stellen = 0` in ganzen Euro:
+ * „€ 150" — nur für Grundpreise je Tonne oder Doppelzentner (Umfeld), wo ein
+ * Cent bedeutungslos ist. Abgerechnet wird nie in ganzen Euro.
+ */
+export function formatEuro(n: number, stellen: 0 | 2 = 2): string {
+  return `€ ${betrag(n, stellen)}`
 }
 
 /** „0,5" · „2" · „1.234" — eine Zahl ohne Einheit, deutsch geschrieben. */
@@ -300,6 +311,55 @@ export function kilopreisNetto(
   const menge = gebindeGroesse(nettoMenge)
   if (menge == null || !Number.isFinite(price) || price <= 0) return null
   return price / menge
+}
+
+/** Maßeinheiten des Produkts → Grundpreis-Basis und Umrechnung auf kg bzw. L. */
+const GRUNDPREIS_BASIS: Record<string, { einheit: NettoEinheitValue; jeBasis: number }> = {
+  KG: { einheit: 'KG', jeBasis: 1 },
+  G: { einheit: 'KG', jeBasis: 1000 },
+  LITER: { einheit: 'LITER', jeBasis: 1 },
+  ML: { einheit: 'LITER', jeBasis: 1000 },
+}
+
+/**
+ * Der vergleichbare Grundpreis eines Produkts: Euro je Kilo bzw. je Liter,
+ * ungerundet. NUR Anzeige und Vergleich (Umfeld), nie Abrechnung.
+ *
+ *   - Mit Futter-Kennzeichnung: Gebindepreis ÷ Nettomenge über kilopreisNetto
+ *     — dieselbe Zahl wie der Kilopreis auf /hoefe. Eine unbrauchbare
+ *     Nettomenge ergibt null, kein Rückfall auf die Einheit.
+ *   - Sonst aus Einheit und Gebindegröße: € 3,00 für 500 g → € 6,00 / kg,
+ *     € 4,50 für 5 L → € 0,90 / L. Ohne Gebindegröße gilt der Preis je Einheit.
+ *   - Stück, Paket, Raummeter, Ballen und Big Bag ohne Kennzeichnung: null —
+ *     „nicht vergleichbar". Ein Stückpreis sagt über den Kilopreis nichts.
+ */
+export function grundpreisJeKg(
+  price: number,
+  unit: string,
+  unitSize: number | { toString(): string } | null | undefined,
+  nettoMenge: number | { toString(): string } | null | undefined,
+  nettoEinheit: NettoEinheitValue | null | undefined
+): { wert: number; einheit: NettoEinheitValue } | null {
+  if (nettoMenge != null && nettoEinheit != null) {
+    const wert = kilopreisNetto(price, nettoMenge)
+    return wert === null ? null : { wert, einheit: nettoEinheit }
+  }
+  const basis = GRUNDPREIS_BASIS[unit]
+  if (!basis || !Number.isFinite(price) || price <= 0) return null
+  const groesse = unitSize == null ? 1 : gebindeGroesse(unitSize)
+  if (groesse == null) return null
+  return { wert: (price * basis.jeBasis) / groesse, einheit: basis.einheit }
+}
+
+/**
+ * Eine Preisspanne je Einheit: „€ 120 – 180 / t" (ganze Euro) bzw.
+ * „€ 0,12 – 0,18 / kg". Liegen beide Enden auf derselben gezeigten Zahl, steht
+ * nur eine da — „€ 150 – 150" wäre keine Spanne.
+ */
+export function formatPreisSpanne(von: number, bis: number, einheit: string, stellen: 0 | 2): string {
+  const links = betrag(von, stellen)
+  const rechts = betrag(bis, stellen)
+  return links === rechts ? `€ ${links} / ${einheit}` : `€ ${links} – ${rechts} / ${einheit}`
 }
 
 /**

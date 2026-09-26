@@ -1749,6 +1749,115 @@ Sperre. Der Kommentar oben in der Datei sagt das.
 
 ---
 
+## Umfeld: was andere Höfe in der Nähe anbieten (2026-09-26)
+
+Auswertung → Reiter „Umfeld" (`/analytics/umfeld?km=25&bereich=futter`). Ein
+Hof sieht je Unterkategorie, wie viele Höfe im Umkreis sie gerade kaufbar
+anbieten, zu welcher Grundpreis-Spanne und Mitte — und seinen eigenen Preis
+daneben. Konzept: `docs/konzepte/umfeld.md` (mit den Entscheidungen „geändert
+vor dem Umfeld-Sprint"). Die Auswertung hat seitdem zwei Reiter, „Umsatz" ist
+das Bisherige.
+
+### Die erste hofübergreifende Sicht im Bauern-Bereich
+
+Bis hierher galt ausnahmslos: Jede Abfrage im Bauern-Bereich ist auf den
+eigenen Hof begrenzt. Das Umfeld liest fremde Höfe. Die Regel in
+`ARCHITECTURE.md` §5 hat deshalb eine Ausnahme bekommen, und die ist eng: nur
+Daten, die auch auf /hoefe oder der Hofseite stehen, und dieselbe oder eine
+strengere Sichtbarkeitsregel. Das Umfeld nimmt `OEFFENTLICH_SICHTBAR`
+unverändert und schließt zusätzlich pausierte Höfe aus — ein pausierter Hof
+verkauft gerade nicht. Aus der Query kommen nur Slug, Name, Ort, Entfernung
+und die Produktzeilen; Bestand und Reservierung werden nur für `istKaufbar`
+gelesen und verlassen sie nicht. Die farmId kommt aus der Sitzung, nie aus dem
+Client.
+
+### Die Rechenregeln
+
+- **Umkreis in zwei Schritten.** Eine Bounding-Box (`umkreisBox`) als
+  Vorfilter in der WHERE-Klausel, das Urteil fällt über die exakte Entfernung
+  (`entfernungKm`, dieselbe wie /hoefe, Grenze einschließlich). Die Länge der
+  Box kommt aus `asin(sin r / cos φ)` plus 1 % Polster — das einfache
+  `r / cos φ` wäre knapp zu schmal und schnitte Höfe am Rand still ab. Über
+  200 Höfe bleiben die nächsten 200, mit Hinweis — gezählt über alle
+  sichtbaren Höfe im Umkreis, bevor feststeht, wer gerade etwas Kaufbares hat
+  („berücksichtigt sind die 200 nächsten"). Einen Index auf
+  `latitude`/`longitude` gibt es noch nicht; bei 40 Höfen braucht es ihn nicht,
+  er wäre eine Schema-Änderung mit eigener Freigabe.
+- **Ein Wert je Hof und Gebindeklasse**, sein günstigster. Spanne und Median
+  laufen über diese Werte — „wo liegt das günstigste Angebot jedes Nachbarn".
+  Ein Hof mit drei Heusorten zählt nicht dreifach.
+- **Grundpreis** über `grundpreisJeKg` (`format.ts`, neben `kilopreisNetto`):
+  im Futter aus der Nettomenge der Kennzeichnung (dieselbe Zahl wie der
+  Kilopreis auf /hoefe), sonst aus Einheit und Gebindegröße, Gramm und
+  Milliliter auf kg bzw. L umgerechnet. Stück, Paket, Raummeter und Ballen ohne
+  Kennzeichnung sind „nicht vergleichbar" — gezählt, nicht bepreist. Passt die
+  Einheit nicht zur Zeile (Liter in einer €/dt-Zeile), ebenfalls: kein
+  Liter-gleich-Kilo in Preisvergleichen. Gerechnet wird wie auf /hoefe mit dem
+  Preis als Zahl — der Grundpreis ist Anzeige, nie Abrechnung.
+- **Anzeigeeinheit** aus `preisAnzeigeVon` (`taxonomie.ts`): Heu & Stroh €/t,
+  Getreide, Misch- und Ergänzungsfutter €/dt — dort in ganzen Euro
+  („€ 120 – 180 / t · Mitte € 150", ein Cent je Tonne ist bedeutungslos und die
+  Zeile passt so bei 375 px) —, Hofladen €/kg, Trinkmilch und Getränke €/L mit
+  Cent. Das Euro-Zeichen steht vorn wie überall.
+- **Gebindeklassen nur im Futter** — nur dort gibt es die Nettomenge. Beide
+  Klassen in einer Zeile: zwei Spannen untereinander, sonst eine ohne Label.
+- **„Deins"** aus allen eigenen Produkten mit „Im Shop", auch bei Bestand 0;
+  mehrere in einer Klasse ergeben eine Spanne. Dieselbe Menge bestimmt den
+  Standard-Bereich (mehr eigene Futterprodukte → Futter, sonst Hofladen).
+- **Zeilen** gibt es nur, wo ein fremder Hof anbietet. Eigene Zeilen zuerst,
+  dann nach Anzahl Höfe, dann Taxonomie.
+
+### „Auf der Karte zeigen" und der Parameter `um`
+
+Der Link öffnet /hoefe in der Kartenansicht, vorbelegt mit Bereich, Kategorie,
+Sorte und `um=<eigener-slug>&km=…`. `kat=` steht immer mit drin, sonst
+verwirft /hoefe die Sorte. `um` setzt den Bezugspunkt auf den öffentlichen
+Standort dieses Hofs — gesucht in der Liste, die /hoefe ohnehin lädt, also nur
+unter öffentlich sichtbaren Höfen; unbekannt oder ohne Standort: still
+verworfen (`bezugspunktVonHof`). Das ist die einzige Ausnahme von „nie ein
+Standort in der URL" (`ARCHITECTURE.md` §4, `bereiche.md` 6.2): Es ist der
+Standort eines Hofs, nie der des Besuchers. Wählt der Besucher selbst einen
+Punkt oder hebt den Umkreis auf, fallen `um` und `km` aus der URL. Steht der
+eigene Hof noch nicht auf /hoefe (nicht freigegeben), fehlt der Link, statt auf
+eine Karte ohne Bezugspunkt zu führen.
+
+### Geänderte Schwelle aus Bereiche 2: der 25-kg-Sack ist Kleingebinde
+
+Bis hierher zählte `istGrossgebinde` genau 25 kg schon als groß, und der
+Gebinde-Filter auf /hoefe nannte „Klein" folgerichtig „unter 25 kg". Auf
+Anweisung im Umfeld-Sprint gilt jetzt: Großgebinde erst über 25 kg
+(`KLEINGEBINDE_BIS_KG`, vorher `GROSSGEBINDE_AB_KG`) — der 25-kg-Sack ist im
+Handel ein Kleingebinde. Das verschiebt den
+25-kg-Hafer- und Futtersack von „Groß" nach „Klein" — im Umfeld und im Filter
+auf /hoefe. Die Titel der Filter-Chips sagen jetzt „Bis 25 kg" / „Über 25 kg".
+
+### Pausierte Höfe
+
+`ARCHITECTURE.md` §5 nannte pausierte Höfe „öffentlich unsichtbar"; der Code
+sah das nie so. Richtig ist und steht jetzt dort: Sie bleiben sichtbar, mit
+Hinweis, und nehmen keine Bestellungen an — `/api/reserve` und `/api/checkout`
+lehnen sie mit 409 ab (`SHOP_PAUSED_MESSAGE`, `src/app/api/reserve/route.ts`
+Schritt 2c, `src/app/api/checkout/route.ts` Schritt 1c). Nur das Umfeld blendet
+sie aus.
+
+### Die Zahlen im Testdatensatz
+
+Pilothof in 5280 Braunau am Inn; `tests/umfeld-seed.test.ts` rechnet sie mit
+einer Prisma-Attrappe, die die WHERE-Klausel der Query auf `SEED_HOEFE`
+auswertet:
+
+| Umkreis | Höfe | Hofladen | Futtermittel |
+|---|---|---|---|
+| 10 km | 5 | 4 | 4 |
+| 25 km | 19 | 11 | 13 |
+| 50 km | 34 | 20 | 23 |
+
+Dazu im Hofladen „1 Hof ohne Standort nicht berücksichtigt". Knapp an den
+Grenzen: Kirchbauernhof 9,80 km (drin bei 10), Wengerhof 10,24 km (draußen),
+Weilbachhof 24,41 km (drin bei 25), Höhenbauernhof 25,15 km (draußen).
+
+---
+
 ## Nützliche Befehle
 
 ```bash
