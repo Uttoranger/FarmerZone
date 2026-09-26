@@ -1778,7 +1778,9 @@ Client.
   (`entfernungKm`, dieselbe wie /hoefe, Grenze einschließlich). Die Länge der
   Box kommt aus `asin(sin r / cos φ)` plus 1 % Polster — das einfache
   `r / cos φ` wäre knapp zu schmal und schnitte Höfe am Rand still ab. Über
-  200 Höfe bleiben die nächsten 200, mit Hinweis. Einen Index auf
+  200 Höfe bleiben die nächsten 200, mit Hinweis — gezählt über alle
+  sichtbaren Höfe im Umkreis, bevor feststeht, wer gerade etwas Kaufbares hat
+  („berücksichtigt sind die 200 nächsten"). Einen Index auf
   `latitude`/`longitude` gibt es noch nicht; bei 40 Höfen braucht es ihn nicht,
   er wäre eine Schema-Änderung mit eigener Freigabe.
 - **Ein Wert je Hof und Gebindeklasse**, sein günstigster. Spanne und Median
@@ -1819,11 +1821,13 @@ Punkt oder hebt den Umkreis auf, fallen `um` und `km` aus der URL. Steht der
 eigene Hof noch nicht auf /hoefe (nicht freigegeben), fehlt der Link, statt auf
 eine Karte ohne Bezugspunkt zu führen.
 
-### Korrektur an Bereiche 2: der 25-kg-Sack ist Kleingebinde
+### Geänderte Schwelle aus Bereiche 2: der 25-kg-Sack ist Kleingebinde
 
-`istGrossgebinde` zählte genau 25 kg schon als groß, der Gebinde-Filter auf
-/hoefe versprach aber „Klein (bis 25 kg)". Jetzt: Großgebinde erst über 25 kg
-(`KLEINGEBINDE_BIS_KG`, vorher `GROSSGEBINDE_AB_KG`). Das verschiebt den
+Bis hierher zählte `istGrossgebinde` genau 25 kg schon als groß, und der
+Gebinde-Filter auf /hoefe nannte „Klein" folgerichtig „unter 25 kg". Auf
+Anweisung im Umfeld-Sprint gilt jetzt: Großgebinde erst über 25 kg
+(`KLEINGEBINDE_BIS_KG`, vorher `GROSSGEBINDE_AB_KG`) — der 25-kg-Sack ist im
+Handel ein Kleingebinde. Das verschiebt den
 25-kg-Hafer- und Futtersack von „Groß" nach „Klein" — im Umfeld und im Filter
 auf /hoefe. Die Titel der Filter-Chips sagen jetzt „Bis 25 kg" / „Über 25 kg".
 

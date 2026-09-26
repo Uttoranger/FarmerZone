@@ -183,8 +183,8 @@ describe('istGrossgebinde', () => {
   })
 
   it('der 25-kg-Sack ist Kleingebinde — groß erst darüber', () => {
-    // Korrektur im Umfeld-Sprint: Bis dahin zählte genau 25 kg schon als
-    // groß, obwohl der Filter „Klein (bis 25 kg)" beschriftet war.
+    // Geändert im Umfeld-Sprint: Bis dahin zählte genau 25 kg schon als groß
+    // („Klein" hieß „unter 25 kg"). Der 25-kg-Sack ist im Handel Kleingebinde.
     expect(istGrossgebinde(24.999, 'KG')).toBe(false)
     expect(istGrossgebinde(25, 'KG')).toBe(false)
     expect(istGrossgebinde(25.001, 'KG')).toBe(true)

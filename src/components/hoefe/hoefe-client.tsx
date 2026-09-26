@@ -124,8 +124,9 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
   const [lage, setLage] = useState<AuswahlLage>(LEERE_LAGE)
   // Zählt jede Pin-Anfahrt, damit dieselbe Nummer zweimal hintereinander wirkt.
   const [fokus, setFokus] = useState(0)
-  // Der Bezugspunkt der Umkreissuche lebt NUR hier: kein localStorage, kein
-  // Konto, keine URL-Parameter — „Umkreis aufheben" macht ihn spurlos fort.
+  // Der EIGENE Bezugspunkt des Besuchers lebt NUR hier: kein localStorage,
+  // kein Konto, keine URL-Parameter — „Umkreis aufheben" macht ihn spurlos
+  // fort. In der URL steht höchstens um= (der Standort eines Hofs, s. o.).
   const [eigenerPunkt, setEigenerPunkt] = useState<Bezugspunkt | null>(null)
   const [eigeneStufe, setEigeneStufe] = useState<UmkreisStufe>(null)
   // Wählt der Besucher selbst einen Punkt, gilt seiner; sonst der aus um=.
@@ -212,7 +213,8 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
 
   /** Bereichswechsel: bereichsgebundene Filter fallen weg (wechsleBereich). */
   function bereichWechseln(neu: AnzeigeBereich) {
-    schreibeUrl(wechsleBereich(filter, neu))
+    // Wie setzeFilter: ein um=, das sich nicht auflösen ließ, fällt dabei weg.
+    schreibeUrl(wechsleBereich(umPunkt ? filter : { ...filter, um: null, km: null }, neu))
   }
 
   /** Vorschlag angetippt → als Marke übernehmen, das Feld wird frei für den

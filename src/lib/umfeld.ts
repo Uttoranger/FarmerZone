@@ -48,7 +48,9 @@ export const UMFELD_HOEFE_DECKEL = 200
 export const UMFELD_HOEFE_SICHTBAR = 3
 
 /**
- * Ein Prozent Polster: Die Box ist nur der Vorfilter, der den Index nutzt.
+ * Ein Prozent Polster: Die Box ist nur der Vorfilter in der WHERE-Klausel
+ * (einen Index auf latitude/longitude gibt es noch nicht — bei ein paar Dutzend
+ * Höfen braucht es ihn nicht).
  * Schneidet sie wegen einer Rundung einen Hof am Rand ab, fehlt er still —
  * zu groß kostet nichts, die exakte Entfernung sortiert ihn danach aus.
  */
@@ -440,7 +442,9 @@ export function baueUmfeld(
   const ohneStandort = hoefeMitAngebotIm(eingabe.ohneStandort, eingabe.bereich)
   if (ohneStandort > 0) hinweise.push(`${mitAnzahl(ohneStandort, 'Hof', 'Höfe')} ohne Standort nicht berücksichtigt.`)
   if (eingabe.abgeschnitten) {
-    hinweise.push(`Mehr als ${UMFELD_HOEFE_DECKEL} Höfe im Umkreis — gezeigt werden die ${UMFELD_HOEFE_DECKEL} nächsten.`)
+    // Gedeckelt wird über alle sichtbaren Höfe im Umkreis, bevor feststeht, wer
+    // gerade etwas Kaufbares hat — der Satz sagt deshalb „berücksichtigt".
+    hinweise.push(`Mehr als ${UMFELD_HOEFE_DECKEL} Höfe im Umkreis — berücksichtigt sind die ${UMFELD_HOEFE_DECKEL} nächsten.`)
   }
   const was = eingabe.bereich === 'FUTTERMITTEL' ? 'Futtermittel' : 'etwas aus dem Hofladen'
   const groesster = UMFELD_KM[UMFELD_KM.length - 1]

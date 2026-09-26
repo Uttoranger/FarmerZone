@@ -32,7 +32,7 @@ export function UmfeldListe({ zeilen }: { zeilen: UmfeldZeile[] }) {
             <button
               type="button"
               aria-expanded={istOffen}
-              aria-controls={panelId}
+              aria-controls={istOffen ? panelId : undefined}
               onClick={() => setOffen(istOffen ? null : zeile.schluessel)}
               className="flex w-full items-start gap-3 rounded-xl px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
@@ -51,7 +51,7 @@ export function UmfeldListe({ zeilen }: { zeilen: UmfeldZeile[] }) {
                       </span>
                     )}
                     {preis.deins && (
-                      <span className="rounded-full bg-app-chip-green px-2 py-0.5 text-xs font-semibold text-app-ink tabular-nums">
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-brand-text tabular-nums">
                         Deins: {preis.deins}
                       </span>
                     )}
@@ -59,7 +59,7 @@ export function UmfeldListe({ zeilen }: { zeilen: UmfeldZeile[] }) {
                 ))}
                 {zeile.hinweis && <span className="mt-1 block text-sm text-muted-foreground">{zeile.hinweis}</span>}
                 {deinsOhnePreis && (
-                  <span className="mt-1 inline-block rounded-full bg-app-chip-green px-2 py-0.5 text-xs font-semibold text-app-ink">
+                  <span className="mt-1 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-brand-text">
                     Deins
                   </span>
                 )}
@@ -75,9 +75,13 @@ export function UmfeldListe({ zeilen }: { zeilen: UmfeldZeile[] }) {
                 <ul className="space-y-3">
                   {sichtbar.map((hof) => (
                     <li key={hof.slug}>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <Link href={hof.link} className="min-w-0 truncate font-semibold text-brand-text underline-offset-4 hover:underline">
-                          {hof.name}
+                      <div className="flex items-center justify-between gap-3">
+                        {/* 44 px hoch — ein Tap-Ziel, keine bloße Textzeile. */}
+                        <Link
+                          href={hof.link}
+                          className="flex min-h-11 min-w-0 items-center font-semibold text-brand-text underline-offset-4 hover:underline"
+                        >
+                          <span className="truncate">{hof.name}</span>
                         </Link>
                         <span className="shrink-0 text-sm text-muted-foreground tabular-nums">{hof.entfernung}</span>
                       </div>

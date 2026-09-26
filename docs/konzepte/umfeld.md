@@ -88,6 +88,6 @@ Verbindliche Quelle für den Sprint „Umfeld". Die Stellen mit *(geändert vor 
 
 ## 6. Bewusst offen, mit Standard
 - Median vs. Mittelwert → **Median** (robust gegen einen Ausreißer bei drei Höfen). Über einen Wert je Hof und Klasse (§4).
-- Mehr als 200 Höfe im Umkreis → die nächsten 200, mit Hinweis. Der Deckel greift nach der exakten Entfernung, nicht in der Box.
+- Mehr als 200 Höfe im Umkreis → die nächsten 200, mit Hinweis. Der Deckel greift nach der exakten Entfernung, nicht in der Box, und über alle sichtbaren Höfe — auch solche, die gerade nichts Kaufbares haben.
 - Ab wie vielen Höfen eine Spanne gezeigt wird → **ab 1**, aber bei 1 Hof steht „1 Hof · 0,15 €/kg" statt einer Spanne.
 - Regionalgrenze → nur Umkreis, keine Ländergrenze; Grenzhöfe sind Absicht der Plattform.

@@ -375,8 +375,8 @@ export const NETTO_EINHEIT_LABEL: Record<NettoEinheitValue, string> = { KG: 'kg'
 /**
  * Bis zu diesem Gebinde-Inhalt EINSCHLIESSLICH ist ein Futtermittel ein
  * Kleingebinde. Bis zum Umfeld-Sprint hieß die Konstante GROSSGEBINDE_AB_KG und
- * zählte genau 25 kg schon als groß — der Filter auf /hoefe beschriftet aber
- * „Klein (bis 25 kg)", und der 25-kg-Sack ist im Handel ein Kleingebinde.
+ * zählte genau 25 kg schon als groß („Klein" hieß „unter 25 kg"). Geändert auf
+ * Anweisung im Umfeld-Sprint: Der 25-kg-Sack ist im Handel ein Kleingebinde.
  */
 export const KLEINGEBINDE_BIS_KG = 25
 

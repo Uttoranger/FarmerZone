@@ -160,8 +160,8 @@ describe('hofPasst — Bereich und Facetten', () => {
   })
 
   it('Gebinde: der 25-kg-Sack steht unter Klein, nicht unter Groß', () => {
-    // Korrektur an Bereiche 2 im Umfeld-Sprint: Genau 25 kg zählte schon als
-    // groß, obwohl der Chip „Klein (bis 25 kg)" versprach.
+    // Geänderte Schwelle im Umfeld-Sprint: Genau 25 kg zählte bis dahin als
+    // groß („Klein" hieß „unter 25 kg"). Der 25-kg-Sack ist Kleingebinde.
     const sack = baueAngebotsZeile({
       name: 'Hafer',
       isAvailable: true,

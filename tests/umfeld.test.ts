@@ -7,7 +7,7 @@
  * welcher Einheit ihr Grundpreis steht, und dass Spanne, Mitte und „Deins" aus
  * EINEM Wert je Hof und Gebindeklasse kommen.
  */
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import {
   UMFELD_HOEFE_DECKEL,
   baueUmfeld,
@@ -62,7 +62,11 @@ function produkt(teil: Partial<UmfeldProdukt>): UmfeldProdukt {
 const heu = (preis: number, kg: number, name = 'Heu') =>
   produkt({ name, category: 'HEU_STROH', subcategory: 'WIESENHEU', price: preis, unit: 'BALLEN', nettoMenge: kg, nettoEinheit: 'KG' })
 
+// Nur für eindeutige Slugs innerhalb eines Tests — vor jedem Test auf null.
 let hofNummer = 0
+beforeEach(() => {
+  hofNummer = 0
+})
 function hof(entfernungKm: number, produkte: UmfeldProdukt[], teil: Partial<UmfeldHof> = {}): UmfeldHof {
   hofNummer += 1
   return { slug: `hof-${hofNummer}`, name: `Hof ${hofNummer}`, ort: 'Testort', entfernungKm, produkte, ...teil }
@@ -481,7 +485,7 @@ describe('baueUmfeld — Hinweise und Leere', () => {
 
   it('meldet den Deckel', () => {
     const ansicht = baueUmfeld({ ...FUTTER, hoefe: [hof(1, [heu(8, 20)])], ohneStandort: [], abgeschnitten: true })
-    expect(ansicht.hinweise).toEqual(['Mehr als 200 Höfe im Umkreis — gezeigt werden die 200 nächsten.'])
+    expect(ansicht.hinweise).toEqual(['Mehr als 200 Höfe im Umkreis — berücksichtigt sind die 200 nächsten.'])
   })
 
   it('sagt bei leerem Umkreis, was fehlt, und schlägt 50 km vor', () => {

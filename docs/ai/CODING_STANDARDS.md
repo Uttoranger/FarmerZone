@@ -49,6 +49,7 @@ Bei **jeder** Codeänderung lesen.
   Rest = Betrag mod Anzahl; die ersten `Rest` Teile bekommen einen Cent mehr.
   Zwölfmal kaufmännisch gerundet ergäbe aus 100 € im Jahr 99,96 € — und die vier
   Cent stünden in keinem Monat (`kostenImMonat`).
+- **Ausnahme Grundpreis-Vergleich:** Kilo-, Liter-, Tonnen- und Doppelzentnerpreise zum Vergleichen (Kilopreis-Sortierung auf /hoefe, Umfeld) rechnen als Zahl — `Decimal` → Zahl an der Servergrenze, dann `kilopreisNetto` bzw. `grundpreisJeKg`, Spanne und Median. Sie sind nur Anzeige, werden gerundet gezeigt und fließen **nie** in eine Abrechnung, einen Warenkorb oder einen Stripe-Betrag.
 - Rechnen in den vorhandenen Helfern: `src/lib/order-totals.ts`, `src/lib/servicegebuehr.ts`, `src/lib/finanzen.ts`.
 - Anzeigen ausschließlich über `src/lib/format.ts` (`formatEuro`, `formatMenge`, `formatPosition`, `formatGrundpreis`).
 - **Preis-Semantik:** `price` ist der Preis je Gebinde, `unitSize` die Gebindegröße. Mit Gebinde schreibt die Anzeige „€ 50,00 für 2 kg" (nie „/ 2 kg"), darunter die Grundpreis-Zeile „€ 25,00 / kg" über `<GrundpreisZeile>` aus `src/components/shared/`. Bei Stück und Paket gibt es keine Grundpreis-Zeile. `grundpreisJeEinheit` ist nur Anzeige, nie Abrechnung.
