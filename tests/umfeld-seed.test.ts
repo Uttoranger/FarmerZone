@@ -116,7 +116,6 @@ vi.mock('@/lib/prisma', () => ({
           longitude,
         }))
       ),
-      count: vi.fn(async ({ where }: { where: Record<string, unknown> }) => HOEFE.filter((h) => passt(h, where)).length),
     },
     product: {
       findMany: vi.fn(async ({ where }: { where: { farmId: { in: string[] }; isAvailable: boolean } }) => {
@@ -128,7 +127,7 @@ vi.mock('@/lib/prisma', () => ({
 }))
 
 import { getUmfeld } from '@/server/queries/umfeld'
-import { baueUmfeld, hoefeMitAngebotIm } from '@/lib/umfeld'
+import { baueUmfeld, baueUmfeldKarte, hoefeMitAngebotIm } from '@/lib/umfeld'
 
 const PILOTHOF = 'hof-mueller'
 
@@ -169,10 +168,6 @@ describe('Umfeld des Pilothofs im Testdatensatz', () => {
     expect(fuenfundzwanzig).not.toContain('hoehenbauernhof') // 25,15 km
   })
 
-  it('steht auf /hoefe und bekommt deshalb einen Kartenlink', async () => {
-    expect((await umfeld(25)).eigenerSlug).toBe(PILOTHOF)
-  })
-
   it('nennt den Hof ohne Standort nur im Bereich, in dem er etwas anbietet', async () => {
     // Er führt Käse und Fisch — also Hofladen, kein Futter.
     const daten = await umfeld(25)
@@ -193,5 +188,25 @@ describe('Umfeld des Pilothofs im Testdatensatz', () => {
     expect(heu?.preise[1].deins).toBeNull()
     // Zeilen mit eigenem Produkt stehen oben.
     expect(zeilen[0].eigenesProdukt).toBe(true)
+  })
+
+  it.each([
+    [10, 4, 4],
+    [25, 11, 13],
+    [50, 20, 23],
+  ] as const)('die Karte bei %i km: %i Pins im Hofladen, %i im Futter — genau die Höfe der Liste, nie der Pilothof', async (km, hofladen, futter) => {
+    const daten = await umfeld(km)
+    for (const [bereich, anzahl] of [
+      ['LEBENSMITTEL', hofladen],
+      ['FUTTERMITTEL', futter],
+    ] as const) {
+      const eingabe = { ...daten, bereich, km }
+      const { pins, zentrum } = baueUmfeldKarte({ ...eingabe, eigenerStandort: daten.standort })
+      const inZeilen = new Set(baueUmfeld(eingabe).zeilen.flatMap((z) => z.hoefe.map((h) => h.slug)))
+      expect(pins, `${bereich} ${km} km`).toHaveLength(anzahl)
+      expect(new Set(pins.map((p) => p.slug))).toEqual(inZeilen)
+      expect(pins.map((p) => p.slug)).not.toContain(PILOTHOF)
+      expect(zentrum).toEqual({ lat: 48.2563, lon: 13.0434, radiusKm: km })
+    }
   })
 })

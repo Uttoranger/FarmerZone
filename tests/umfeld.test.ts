@@ -10,6 +10,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   UMFELD_HOEFE_DECKEL,
+  UMFELD_KM,
+  baueUmfeldKarte,
+  gezaehlteHoefe,
+  guenstigsterGrundpreis,
   baueUmfeld,
   baueUmfeldZeilen,
   bewerteProdukt,
@@ -21,10 +25,10 @@ import {
   type UmfeldHof,
   type UmfeldProdukt,
 } from '@/lib/umfeld'
-import { ERDRADIUS_KM, bezugspunktVonHof, entfernungKm } from '@/lib/hofuebersicht'
+import { ERDRADIUS_KM, UMKREIS_STUFEN, entfernungKm } from '@/lib/hofuebersicht'
+import { EIGENER_PIN, pinDarstellung } from '@/lib/hoefe-anzeige'
 import { preisAnzeigeVon } from '@/lib/taxonomie'
-import { leseHoefeFilter } from '@/schemas/hoefe-filter'
-import { leseUmfeldFilter, umfeldLink } from '@/schemas/umfeld-filter'
+import { leseUmfeldAnsicht, leseUmfeldFilter, umfeldLink } from '@/schemas/umfeld-filter'
 
 // ─── Hilfen ─────────────────────────────────────────────────────────────────
 
@@ -69,7 +73,7 @@ beforeEach(() => {
 })
 function hof(entfernungKm: number, produkte: UmfeldProdukt[], teil: Partial<UmfeldHof> = {}): UmfeldHof {
   hofNummer += 1
-  return { slug: `hof-${hofNummer}`, name: `Hof ${hofNummer}`, ort: 'Testort', entfernungKm, produkte, ...teil }
+  return { slug: `hof-${hofNummer}`, name: `Hof ${hofNummer}`, ort: 'Testort', lat: 48.25, lon: 13.05, entfernungKm, produkte, ...teil }
 }
 
 const FUTTER: UmfeldEingabe = { bereich: 'FUTTERMITTEL', km: 25, eigeneProdukte: [], hoefe: [], eigenerSlug: 'hof-mueller' }
@@ -440,25 +444,6 @@ describe('baueUmfeldZeilen — aufgeklappte Zeile', () => {
   })
 })
 
-describe('Kartenlink — „Auf der Karte zeigen"', () => {
-  it('gibt Bereich, Kategorie, Sorte, eigenen Hof und Umkreis mit — und /hoefe liest die Sorte', () => {
-    const [zeile] = baueUmfeldZeilen({ ...FUTTER, km: 10, hoefe: [hof(1, [heu(8, 20)])] })
-    expect(zeile.kartenLink).toBe('/hoefe?bereich=futter&kat=HEU_STROH&sorte=WIESENHEU&ansicht=karte&um=hof-mueller&km=10')
-    const filter = leseHoefeFilter(new URLSearchParams(zeile.kartenLink?.split('?')[1]))
-    expect(filter).toMatchObject({ bereich: 'FUTTERMITTEL', kategorien: ['HEU_STROH'], sorten: ['WIESENHEU'], um: 'hof-mueller', km: 10 })
-  })
-
-  it('im Hofladen ohne bereich=, ohne L2 ohne sorte=', () => {
-    const [zeile] = baueUmfeldZeilen({ ...HOFLADEN, hoefe: [hof(1, [produkt({ category: 'BROT', unit: 'STUECK' })])] })
-    expect(zeile.kartenLink).toBe('/hoefe?kat=BROT&ansicht=karte&um=hof-mueller&km=25')
-  })
-
-  it('fehlt, wenn der eigene Hof nicht auf /hoefe steht', () => {
-    const [zeile] = baueUmfeldZeilen({ ...FUTTER, eigenerSlug: null, hoefe: [hof(1, [heu(8, 20)])] })
-    expect(zeile.kartenLink).toBeNull()
-  })
-})
-
 describe('standardBereich', () => {
   const futter = produkt({ category: 'HEU_STROH' })
   const eier = produkt({ category: 'EIER' })
@@ -505,58 +490,134 @@ describe('baueUmfeld — Hinweise und Leere', () => {
   })
 })
 
-describe('leseUmfeldFilter — Umkreis und Bereich aus der URL', () => {
+describe('leseUmfeldFilter — Umkreis, Bereich und Ansicht aus der URL', () => {
   it('liest gültige Werte', () => {
-    expect(leseUmfeldFilter({ km: '10', bereich: 'futter' })).toEqual({ km: 10, bereich: 'FUTTERMITTEL' })
-    expect(leseUmfeldFilter({ km: '50', bereich: 'hofladen' })).toEqual({ km: 50, bereich: 'LEBENSMITTEL' })
+    expect(leseUmfeldFilter({ km: '10', bereich: 'futter', ansicht: 'karte' })).toEqual({
+      km: 10,
+      bereich: 'FUTTERMITTEL',
+      ansicht: 'karte',
+    })
+    expect(leseUmfeldFilter({ km: '50', bereich: 'hofladen' })).toEqual({ km: 50, bereich: 'LEBENSMITTEL', ansicht: 'liste' })
   })
 
-  it('fällt bei Fehlendem und Unsinn still auf 25 km und „kein Bereich gewählt" zurück', () => {
-    expect(leseUmfeldFilter({})).toEqual({ km: 25, bereich: null })
-    expect(leseUmfeldFilter({ km: '30', bereich: 'lebensmittel' })).toEqual({ km: 25, bereich: null })
-    expect(leseUmfeldFilter({ km: 'abc', bereich: 'FUTTER' })).toEqual({ km: 25, bereich: null })
-    expect(leseUmfeldFilter({ km: '-25' })).toEqual({ km: 25, bereich: null })
+  it('fällt bei Fehlendem und Unsinn still auf 25 km, „kein Bereich gewählt" und die Liste zurück', () => {
+    expect(leseUmfeldFilter({})).toEqual({ km: 25, bereich: null, ansicht: 'liste' })
+    expect(leseUmfeldFilter({ km: '30', bereich: 'lebensmittel', ansicht: 'globus' })).toEqual({
+      km: 25,
+      bereich: null,
+      ansicht: 'liste',
+    })
+    expect(leseUmfeldFilter({ km: 'abc', bereich: 'FUTTER' })).toMatchObject({ km: 25, bereich: null })
+    expect(leseUmfeldFilter({ km: '-25' })).toMatchObject({ km: 25 })
+    expect(leseUmfeldAnsicht(null)).toBe('liste')
+    expect(leseUmfeldAnsicht('KARTE')).toBe('liste')
   })
 
   it('nimmt bei doppelten Parametern den ersten', () => {
-    expect(leseUmfeldFilter({ km: ['10', '50'], bereich: ['futter', 'hofladen'] })).toEqual({ km: 10, bereich: 'FUTTERMITTEL' })
+    expect(leseUmfeldFilter({ km: ['10', '50'], bereich: ['futter', 'hofladen'], ansicht: ['karte', 'liste'] })).toEqual({
+      km: 10,
+      bereich: 'FUTTERMITTEL',
+      ansicht: 'karte',
+    })
   })
 
-  it('der Link schreibt beide Werte aus, und das Lesen ergibt sie zurück', () => {
-    const link = umfeldLink({ km: 50, bereich: 'FUTTERMITTEL' })
-    expect(link).toBe('/analytics/umfeld?km=50&bereich=futter')
+  it('der Link trägt Umkreis und Bereich immer, die Ansicht nur als Karte — und das Lesen ergibt sie zurück', () => {
+    const link = umfeldLink({ km: 50, bereich: 'FUTTERMITTEL', ansicht: 'karte' })
+    expect(link).toBe('/analytics/umfeld?km=50&bereich=futter&ansicht=karte')
     const params = new URLSearchParams(link.split('?')[1])
-    expect(leseUmfeldFilter({ km: params.get('km') ?? undefined, bereich: params.get('bereich') ?? undefined })).toEqual({
-      km: 50,
-      bereich: 'FUTTERMITTEL',
-    })
+    expect(
+      leseUmfeldFilter({ km: params.get('km'), bereich: params.get('bereich'), ansicht: params.get('ansicht') })
+    ).toEqual({ km: 50, bereich: 'FUTTERMITTEL', ansicht: 'karte' })
     expect(umfeldLink({ km: 25, bereich: 'LEBENSMITTEL' })).toBe('/analytics/umfeld?km=25&bereich=hofladen')
+    expect(umfeldLink({ km: 25, bereich: 'LEBENSMITTEL', ansicht: 'liste' })).toBe('/analytics/umfeld?km=25&bereich=hofladen')
+  })
+
+  it('die Umkreis-Stufen sind die des Reglers auf /hoefe ohne „egal"', () => {
+    expect([...UMFELD_KM, null]).toEqual(UMKREIS_STUFEN)
   })
 })
 
-describe('Der Parameter um — Bezugspunkt auf /hoefe', () => {
-  const hoefe = [
-    { slug: 'hof-mueller', name: 'Hof Müller', latitude: 48.2563, longitude: 13.0434 },
-    { slug: 'ohne-standort', name: 'Ohne', latitude: null, longitude: null },
-    { slug: 'kaputt', name: 'Kaputt', latitude: Number.NaN, longitude: 13 },
-  ]
+// ─── Karte ──────────────────────────────────────────────────────────────────
 
-  it('nimmt den öffentlichen Standort des Hofs, mit seinem Namen für „Entfernungen ab"', () => {
-    expect(bezugspunktVonHof(hoefe, 'hof-mueller')).toEqual({ lat: 48.2563, lon: 13.0434, name: 'Hof Müller' })
+describe('baueUmfeldKarte — Pins genau für die Höfe, die die Liste zählt', () => {
+  const eier = (preis = 3.6) => produkt({ category: 'EIER', subcategory: 'EIER_FREILAND', price: preis, unit: 'PAKET', unitSize: 10 })
+
+  it('zeigt im Futter nur Höfe mit Futter, im Hofladen nur Höfe mit Hofladen — wie die Zeilen', () => {
+    const hoefe = [hof(1, [heu(8, 20)]), hof(2, [eier()]), hof(3, [heu(45, 300), eier()])]
+    for (const bereich of ['FUTTERMITTEL', 'LEBENSMITTEL'] as const) {
+      const eingabe = { ...FUTTER, bereich, hoefe }
+      const inZeilen = new Set(baueUmfeldZeilen(eingabe).flatMap((z) => z.hoefe.map((h) => h.slug)))
+      const pins = baueUmfeldKarte({ ...eingabe, eigenerStandort: BRAUNAU }).pins
+      expect(new Set(pins.map((p) => p.slug)), bereich).toEqual(inZeilen)
+      expect(pins.map((p) => p.slug)).toEqual(gezaehlteHoefe(eingabe).map((h) => h.slug))
+    }
   })
 
-  it('verwirft still: unbekannter Slug, Hof ohne Standort, kaputte Koordinaten, kein um', () => {
-    expect(bezugspunktVonHof(hoefe, 'gibt-es-nicht')).toBeNull()
-    expect(bezugspunktVonHof(hoefe, 'ohne-standort')).toBeNull()
-    expect(bezugspunktVonHof(hoefe, 'kaputt')).toBeNull()
-    expect(bezugspunktVonHof(hoefe, null)).toBeNull()
+  it('der eigene Hof ist nie ein fremder Pin — auch wenn er in den Daten steht', () => {
+    const eingabe = {
+      ...FUTTER,
+      hoefe: [hof(0, [heu(7, 20)], { slug: 'hof-mueller', name: 'Hof Müller' }), hof(2, [heu(8, 20)])],
+    }
+    const karte = baueUmfeldKarte({ ...eingabe, eigenerStandort: BRAUNAU })
+    expect(karte.pins.map((p) => p.slug)).not.toContain('hof-mueller')
+    // … und in der Liste auch nicht.
+    expect(baueUmfeldZeilen(eingabe)[0].hoefe.map((h) => h.slug)).not.toContain('hof-mueller')
   })
 
-  it('der Kartenlink aus dem Umfeld ergibt auf /hoefe genau diesen Bezugspunkt und Umkreis', () => {
-    const [zeile] = baueUmfeldZeilen({ ...FUTTER, km: 25, hoefe: [hof(1, [heu(8, 20)])] })
-    const filter = leseHoefeFilter(new URLSearchParams(zeile.kartenLink?.split('?')[1]))
-    expect(bezugspunktVonHof(hoefe, filter.um)).toMatchObject({ lat: 48.2563, lon: 13.0434 })
-    expect(filter.km).toBe(25)
-    expect(filter.ansicht).toBe('karte')
+  it('der eigene Hof ist das Zentrum, der gewählte Umkreis sein Radius', () => {
+    const karte = baueUmfeldKarte({ ...FUTTER, km: 10, hoefe: [hof(2, [heu(8, 20)])], eigenerStandort: BRAUNAU })
+    expect(karte.zentrum).toEqual({ ...BRAUNAU, radiusKm: 10 })
+  })
+
+  it('Pins nach Entfernung nummeriert, mit Hofseiten-Link im Bereich', () => {
+    const karte = baueUmfeldKarte({
+      ...FUTTER,
+      hoefe: [hof(14.1, [heu(8, 20)], { slug: 'weit' }), hof(2.34, [heu(9, 20)], { slug: 'nah' })],
+      eigenerStandort: BRAUNAU,
+    })
+    expect(karte.pins.map((p) => [p.slug, p.nummer, p.entfernung, p.link])).toEqual([
+      ['nah', 1, '2,3 km', '/nah?bereich=futter'],
+      ['weit', 2, '14 km', '/weit?bereich=futter'],
+    ])
+  })
+
+  it('ohne Höfe keine Pins — das Zentrum bleibt', () => {
+    const karte = baueUmfeldKarte({ ...FUTTER, eigenerStandort: { lat: 48, lon: 13 } })
+    expect(karte.pins).toEqual([])
+    expect(karte.zentrum.radiusKm).toBe(25)
+  })
+})
+
+describe('guenstigsterGrundpreis — die Zeile unter dem Pin', () => {
+  it('der günstigste Kilopreis im Bereich, in der Einheit seiner Zeile und mit der Sorte', () => {
+    const stroh = produkt({ category: 'HEU_STROH', subcategory: 'STROH', price: 28, unit: 'BALLEN', nettoMenge: 250, nettoEinheit: 'KG' })
+    // Heu: 8 € / 20 kg = 0,40 €/kg · Stroh: 28 € / 250 kg = 0,112 €/kg
+    expect(guenstigsterGrundpreis([heu(8, 20), stroh], 'FUTTERMITTEL')).toBe('Stroh · € 112 / t')
+  })
+
+  it('vergleicht nie Liter gegen Kilo — Kilopreise gehen vor', () => {
+    const milch = produkt({ category: 'MILCH', subcategory: 'TRINKMILCH', price: 1.4, unit: 'LITER', unitSize: 1 })
+    const erdaepfel = produkt({ category: 'GEMUESE', subcategory: 'ERDAEPFEL', price: 20, unit: 'KG', unitSize: 10 })
+    // In beiden Reihenfolgen — der Kilopreis gewinnt, egal was zuerst kommt.
+    expect(guenstigsterGrundpreis([milch, erdaepfel], 'LEBENSMITTEL')).toBe('Erdäpfel · € 2,00 / kg')
+    expect(guenstigsterGrundpreis([erdaepfel, milch], 'LEBENSMITTEL')).toBe('Erdäpfel · € 2,00 / kg')
+    expect(guenstigsterGrundpreis([milch], 'LEBENSMITTEL')).toBe('Trinkmilch · € 1,40 / L')
+  })
+
+  it('nur im gewählten Bereich, und null ohne vergleichbares Produkt', () => {
+    const brot = produkt({ category: 'BROT', unit: 'STUECK' })
+    expect(guenstigsterGrundpreis([heu(8, 20)], 'LEBENSMITTEL')).toBeNull()
+    expect(guenstigsterGrundpreis([brot], 'LEBENSMITTEL')).toBeNull()
+  })
+})
+
+describe('Der eigene Pin — deutlich anders als jeder fremde', () => {
+  it('andere Farbe, andere Form, „Du" statt einer Nummer', () => {
+    for (const zustand of ['normal', 'hervorgehoben', 'ausgewaehlt'] as const) {
+      expect(EIGENER_PIN.hintergrund).not.toBe(pinDarstellung(zustand).hintergrund)
+    }
+    // Fremde Pins sind Scheiben (border-radius 9999px), der eigene ein Quadrat.
+    expect(EIGENER_PIN.eckenRadius).toBeLessThan(EIGENER_PIN.groesse / 2)
+    expect(EIGENER_PIN.beschriftung).toBe('Du')
   })
 })

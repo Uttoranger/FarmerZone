@@ -70,6 +70,24 @@ export function pinDarstellung(zustand: PinZustand): PinDarstellung {
   return { groesse: 28, hintergrund: '#FFFFFF', schrift: '#2D5F3F', rand: '#2D5F3F' }
 }
 
+/**
+ * Der EIGENE Hof auf der Umfeld-Karte — deutlich anders als jeder fremde Pin:
+ * ein Quadrat statt einer Scheibe, Erdbraun statt Hof-Grün, „Du" statt einer
+ * Nummer. Wer ihn sieht, verwechselt ihn nicht mit einem Nachbarn. Wie die
+ * übrigen Pins bewusst ohne Dark Mode (er sitzt auf den hellen Kacheln).
+ */
+export const EIGENER_PIN = {
+  groesse: 34,
+  eckenRadius: 8,
+  hintergrund: '#7A4A1E',
+  schrift: '#FFFFFF',
+  rand: '#FFFFFF',
+  beschriftung: 'Du',
+} as const
+
+/** Der Umkreis um den eigenen Hof: gestrichelt im Hof-Grün, kaum Fläche. */
+export const UMKREIS_KREIS = { rand: '#2D5F3F', flaeche: '#2D5F3F', flaechenDeckung: 0.06 } as const
+
 // ─── Karussell-Snap ─────────────────────────────────────────────────────────
 
 /**

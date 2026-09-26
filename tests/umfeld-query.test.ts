@@ -13,7 +13,7 @@ import { Decimal } from '@prisma/client/runtime/index-browser'
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    farm: { findUnique: vi.fn(), findMany: vi.fn(), count: vi.fn() },
+    farm: { findUnique: vi.fn(), findMany: vi.fn() },
     product: { findMany: vi.fn() },
   },
 }))
@@ -57,7 +57,6 @@ beforeEach(() => {
     products: [produktZeile({ name: 'Mein Heu', price: new Decimal('7.50') })],
   } as never)
   farm.findMany.mockResolvedValue([] as never)
-  farm.count.mockResolvedValue(1 as never)
   product.findMany.mockResolvedValue([] as never)
 })
 
@@ -91,11 +90,6 @@ describe('getUmfeld — was die Query die Datenbank fragt', () => {
       { latitude: null },
       { longitude: null },
     ])
-  })
-
-  it('prüft, ob der eigene Hof auf /hoefe steht, mit derselben Bedingung', async () => {
-    await getUmfeld('hof-1', 25)
-    expect(farm.count).toHaveBeenCalledWith({ where: { id: 'hof-1', ...OEFFENTLICH_SICHTBAR } })
   })
 
   it('liest keine Kontaktdaten — weder beim Hof noch beim Produkt', async () => {
@@ -160,17 +154,30 @@ describe('getUmfeld — was zurückkommt', () => {
     expect(daten.hoefe.map((h) => [h.slug, h.produkte.map((p) => p.name)])).toEqual([['a', ['Da']]])
   })
 
-  it('trägt keine IDs, Koordinaten oder Bestände nach außen', async () => {
-    farm.findMany.mockResolvedValue([{ id: 'h1', slug: 'nachbar', name: 'Nachbarhof', city: 'Dorf', ...oestlich(3) }] as never)
+  it('trägt keine IDs und keine Bestände nach außen — Koordinaten nur für die Pins im Umkreis', async () => {
+    const punkt = oestlich(3)
+    farm.findMany.mockResolvedValue([{ id: 'h1', slug: 'nachbar', name: 'Nachbarhof', city: 'Dorf', ...punkt }] as never)
     product.findMany.mockResolvedValue([{ farmId: 'h1', stock: 7, reservedStock: 1, ...produktZeile() }] as never)
     const daten = await getUmfeld('hof-1', 25)
     const text = JSON.stringify(daten)
     for (const verboten of ['"id"', 'farmId', 'latitude', 'longitude', 'stock', 'reservedStock', 'h1']) {
       expect(text).not.toContain(verboten)
     }
+    // Dieselben Punkte, die /hoefe als Pin zeigt — die Umfeld-Karte braucht sie.
     expect(daten).toMatchObject({
       eigenerStandort: true,
-      hoefe: [{ slug: 'nachbar', name: 'Nachbarhof', ort: 'Dorf', produkte: [{ name: 'Heu Kleinballen', price: 8, nettoMenge: 20 }] }],
+      standort: EIGEN,
+      eigenerSlug: 'hof-eigen',
+      hoefe: [
+        {
+          slug: 'nachbar',
+          name: 'Nachbarhof',
+          ort: 'Dorf',
+          lat: punkt.latitude,
+          lon: punkt.longitude,
+          produkte: [{ name: 'Heu Kleinballen', price: 8, nettoMenge: 20 }],
+        },
+      ],
     })
   })
 
@@ -187,13 +194,6 @@ describe('getUmfeld — was zurückkommt', () => {
     if (!daten?.eigenerStandort) throw new Error('Standort erwartet')
     expect(daten.ohneStandort).toHaveLength(1)
     expect(daten.hoefe).toEqual([])
-  })
-
-  it('gibt den eigenen Slug nur, wenn der Hof auf /hoefe steht', async () => {
-    farm.count.mockResolvedValue(0 as never)
-    expect(await getUmfeld('hof-1', 25)).toMatchObject({ eigenerSlug: null })
-    farm.count.mockResolvedValue(1 as never)
-    expect(await getUmfeld('hof-1', 25)).toMatchObject({ eigenerSlug: 'hof-eigen' })
   })
 
   it('wandelt die eigenen Produkte wie die fremden', async () => {

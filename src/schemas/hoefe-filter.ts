@@ -25,11 +25,6 @@ import {
  * NICHT in der URL: Bezugspunkt und Umkreis. Der Standort verlässt den Browser
  * nie (src/lib/hofuebersicht.ts, Abschnitt Umkreis) — ein geteilter Link oder
  * ein Server-Log trüge ihn sonst weiter.
- * Ausnahme: um=<hof-slug>&km= — Bezugspunkt ist der öffentliche Standort eines
- * freigegebenen Hofs (Link „Auf der Karte zeigen" aus dem Umfeld). Der
- * Standort des Besuchers kommt nie in die URL. Aufgelöst wird der Slug im
- * Browser gegen die ohnehin geladene Hofliste; unbekannt oder ohne Standort
- * wird er dort still verworfen.
  *
  * Voreinstellungen stehen nicht in der URL: Die nackte /hoefe ist Hofladen,
  * Liste, ohne Filter.
@@ -37,11 +32,6 @@ import {
 
 export const GEBINDE_VALUES = ['KLEIN', 'GROSS'] as const
 export type GebindeWahl = (typeof GEBINDE_VALUES)[number]
-
-/** Die Umkreis-Stufen, die zu um= passen — dieselben wie UMKREIS_STUFEN in
- *  src/lib/hofuebersicht.ts ohne „egal" (ein Test hält beide zusammen). */
-export const UM_KM_VALUES = [10, 25, 50] as const
-export type UmKm = (typeof UM_KM_VALUES)[number]
 
 export type HoefeFilter = {
   bereich: AnzeigeBereich
@@ -57,10 +47,6 @@ export type HoefeFilter = {
   suchtext: string
   suchMarken: string[]
   ansicht: 'liste' | 'karte'
-  /** Slug des Hofs, dessen öffentlicher Standort der Bezugspunkt ist; null = keiner. */
-  um: string | null
-  /** Umkreis um diesen Hof; nur zusammen mit um, null = egal. */
-  km: UmKm | null
 }
 
 export const LEERER_HOEFE_FILTER: HoefeFilter = {
@@ -74,8 +60,6 @@ export const LEERER_HOEFE_FILTER: HoefeFilter = {
   suchtext: '',
   suchMarken: [],
   ansicht: 'liste',
-  um: null,
-  km: null,
 }
 
 /** Obergrenzen gegen aufgeblähte Links — die Oberfläche erreicht sie nie. */
@@ -92,10 +76,6 @@ const bereichSchema = z.enum(['futter']).nullable().catch(null)
 const gebindeSchema = z.enum(['klein', 'gross']).nullable().catch(null)
 const sortSchema = z.enum(['grundpreis']).nullable().catch(null)
 const ansichtSchema = z.enum(['liste', 'karte']).catch('liste')
-// Wie generateSlug (src/lib/slug.ts) Slugs baut: Kleinbuchstaben, Ziffern,
-// einzelne Bindestriche. Alles andere kann kein Hof sein.
-const slugSchema = z.string().max(100).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
-const kmSchema = z.coerce.number().pipe(z.literal([...UM_KM_VALUES]))
 
 /** Die Namen der Parameter — eine Stelle, damit Lesen und Schreiben nicht auseinanderlaufen. */
 const P = {
@@ -109,8 +89,6 @@ const P = {
   suchtext: 'q',
   suchMarken: 'such',
   ansicht: 'ansicht',
-  um: 'um',
-  km: 'km',
 } as const
 
 /** Was URLSearchParams und Nexts ReadonlyURLSearchParams beide können. */
@@ -154,8 +132,6 @@ export function leseHoefeFilter(params: SuchParameter): HoefeFilter {
   const futter = bereich === 'FUTTERMITTEL'
   const gebinde = gebindeSchema.parse(params.get(P.gebinde))
   const suchtext = suchSchema.safeParse(params.get(P.suchtext) ?? '')
-  const um = slugSchema.safeParse(params.get(P.um))
-  const km = kmSchema.safeParse(params.get(P.km))
   const suchMarken: string[] = []
   for (const roh of params.getAll(P.suchMarken)) {
     const marke = suchSchema.safeParse(roh)
@@ -177,9 +153,6 @@ export function leseHoefeFilter(params: SuchParameter): HoefeFilter {
     suchtext: suchtext.success ? (params.get(P.suchtext) ?? '') : '',
     suchMarken,
     ansicht: ansichtSchema.parse(params.get(P.ansicht)),
-    um: um.success ? um.data : null,
-    // Ein Umkreis ohne Bezugspunkt hätte keinen Mittelpunkt — verworfen.
-    km: um.success && km.success ? km.data : null,
   }
 }
 
@@ -197,18 +170,13 @@ export function schreibeHoefeFilter(filter: HoefeFilter): string {
   if (filter.suchtext.trim() !== '') params.set(P.suchtext, filter.suchtext)
   for (const marke of filter.suchMarken) params.append(P.suchMarken, marke)
   if (filter.ansicht === 'karte') params.set(P.ansicht, 'karte')
-  if (filter.um) {
-    params.set(P.um, filter.um)
-    if (filter.km) params.set(P.km, String(filter.km))
-  }
   return params.toString()
 }
 
 /**
  * Bereichswechsel: Was nur im alten Bereich Sinn hatte (Kategorien, Sorten,
- * Tiere, Gebinde, Sortierung), fällt weg. Siegel, Suche, Ansicht und der
- * Bezugspunkt aus um= bleiben — „Bio" gilt in beiden Bereichen, der Hof steht
- * in beiden am selben Ort.
+ * Tiere, Gebinde, Sortierung), fällt weg. Siegel, Suche und Ansicht bleiben —
+ * „Bio" gilt in beiden Bereichen.
  */
 export function wechsleBereich(filter: HoefeFilter, bereich: AnzeigeBereich): HoefeFilter {
   if (filter.bereich === bereich) return filter

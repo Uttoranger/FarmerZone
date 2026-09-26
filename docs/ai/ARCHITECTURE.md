@@ -139,7 +139,7 @@ Client-Komponente → Server Action → Zod → Fachregel (lib) → Prisma → r
 | Formular | `react-hook-form` | Kein `useState` je Feld |
 | UI-lokal (offen/zu) | `useState` | Nicht global |
 | Warenkorb | `use-cart.ts` (localStorage) + serverseitige Reservierung | Warenkorb ist **nie** die Wahrheit über Verfügbarkeit |
-| Filter/Suche in URL | `useSearchParams` lesen, Zod-Schema in `src/schemas/` parst und verwirft Ungültiges still; schreiben mit `window.history.replaceState` (Next gleicht `useSearchParams` ab, kein Server-Roundtrip je Tipp) oder `router.replace`, wenn der Server neu rendern soll | Nicht nur im State — Ergebnisse müssen teilbar sein. **Nie** Standort/Koordinaten in die URL. Ausnahme: `um=<hof-slug>&km=` — Bezugspunkt ist der öffentliche Standort eines freigegebenen Hofs. Der Standort des Besuchers kommt nie in die URL. |
+| Filter/Suche in URL | `useSearchParams` lesen, Zod-Schema in `src/schemas/` parst und verwirft Ungültiges still; schreiben mit `window.history.replaceState` (Next gleicht `useSearchParams` ab, kein Server-Roundtrip je Tipp) oder `router.replace`, wenn der Server neu rendern soll | Nicht nur im State — Ergebnisse müssen teilbar sein. **Nie** Standort/Koordinaten in die URL |
 | Theme | `next-themes`, `ThemeProvider` in `src/app/layout.tsx` (`attribute="class"`, `defaultTheme="system"`) | Kein eigener Provider, keine Spalte in der Datenbank — die Wahl gehört dem Gerät |
 
 **Kein globaler Store.** Wenn etwas global wirkt, gehört es meist in die URL oder auf den Server.

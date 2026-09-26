@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ChevronDown, MapPin } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { mitAnzahl } from '@/lib/format'
 import { UMFELD_HOEFE_SICHTBAR, type UmfeldZeile } from '@/lib/umfeld'
 import { cn } from '@/lib/utils'
@@ -108,18 +108,7 @@ export function UmfeldListe({ zeilen }: { zeilen: UmfeldZeile[] }) {
                   </button>
                 )}
 
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                  {zeile.kartenLink && (
-                    <Link
-                      href={zeile.kartenLink}
-                      className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-brand-text underline-offset-4 hover:underline"
-                    >
-                      <MapPin className="size-4" aria-hidden="true" />
-                      Auf der Karte zeigen
-                    </Link>
-                  )}
-                  <p className="text-xs text-muted-foreground">Kaufen geht über die Hofseite.</p>
-                </div>
+                <p className="mt-3 text-xs text-muted-foreground">Kaufen geht über die Hofseite.</p>
               </div>
             )}
           </li>
