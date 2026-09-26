@@ -320,7 +320,12 @@ function baueZeile(
   const preise: UmfeldPreis[] = klassen.map((klasse) => {
     const werte = werteJeKlasse.get(klasse) ?? []
     const deine = deineJeKlasse.get(klasse) ?? []
-    const mitte = werte.length >= 2 ? median(werte) : null
+    // Die Mitte nur, wenn es eine Spanne gibt: Zeigen alle Höfe denselben
+    // Betrag, wiederholte „Mitte € 1,20" nur die Zahl davor.
+    const echteSpanne =
+      werte.length >= 2 &&
+      formatEuro(Math.min(...werte), anzeige.stellen) !== formatEuro(Math.max(...werte), anzeige.stellen)
+    const mitte = echteSpanne ? median(werte) : null
     return {
       klasse: klassen.length >= 2 && klasse !== null ? KLASSEN_LABEL[klasse] : null,
       spanne:

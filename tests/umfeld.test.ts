@@ -278,6 +278,11 @@ describe('baueUmfeldZeilen — Spanne, Mitte, ein Wert je Hof', () => {
     expect(zeile.anzahlText).toBe('1 Hof')
   })
 
+  it('ohne echte Spanne keine Mitte — gleiche Beträge stünden sonst doppelt da', () => {
+    const [zeile] = baueUmfeldZeilen({ ...FUTTER, hoefe: [hof(1, [heu(8, 20)]), hof(2, [heu(8.001, 20)])] })
+    expect(zeile.preise[0]).toMatchObject({ spanne: '€ 400 / t', mitte: null, anzahlHoefe: 2 })
+  })
+
   it('im Hofladen mit Cent: € je Kilo', () => {
     const erdaepfel = (preis: number) => produkt({ category: 'GEMUESE', subcategory: 'ERDAEPFEL', price: preis, unit: 'KG', unitSize: 10 })
     const [zeile] = baueUmfeldZeilen({ ...HOFLADEN, hoefe: [hof(1, [erdaepfel(12)]), hof(2, [erdaepfel(15)])] })
