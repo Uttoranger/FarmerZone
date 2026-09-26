@@ -53,7 +53,9 @@ Fülle alle Felder in `.env.local` aus (Supabase, Stripe, Resend, etc.).
 # Alle Migrationen einspielen (nie `prisma db push` — siehe DEVELOPMENT.md, „Schema-Änderungen")
 pnpm exec dotenv -e .env.local -- prisma migrate deploy
 
-# Testdaten laden: Hof, Produkte, Abholzeiten, Bauer-Zugang bauer@example.com / test1234
+# Testdaten laden: sechs erfundene Höfe, Produkte in allen Kategorien,
+# Bestellungen, Kostenposten, Meldungen. Der Seed nennt am Ende alle Zugänge
+# (Passwort überall test1234) und je Hof einen Satz, was dort zu testen ist.
 pnpm db:seed
 ```
 
