@@ -1573,6 +1573,129 @@ gegen echtes Postgres geprüft.
 
 ---
 
+## Testdaten: der erfundene Datensatz (2026-09-26)
+
+`pnpm db:seed` legt seit diesem Sprint einen Datensatz an, der die Fälle zeigt,
+für die es Code gibt — nicht nur den Glücksfall. **Alles ist erfunden.** Keine
+Zeile stammt aus der Produktion: E-Mails enden auf `@example.com`,
+Telefonnummern lauten `+43 660 000xxxx`, Betriebsnummern beginnen mit `TEST-`.
+Die **Orte** sind echte steirische Gemeinden — sie müssen es sein, sonst stimmen
+die Entfernungen nicht; Straßen und Hausnummern sind erfunden.
+
+### Sechs Höfe, und warum jeder einzelne da ist
+
+Bezugspunkt ist der Pilothof in 8700 Leoben. Die Entfernungen rechnet
+`entfernungKm` (`src/lib/hofuebersicht.ts`), nicht ein Kommentar:
+
+| Hof | Ort | Entfernung | Wofür er da ist |
+|---|---|---|---|
+| Hof Müller | 8700 Leoben | — | der Bezugspunkt |
+| Hof Sonnleiten | 8792 Sankt Peter-Freienstein | 5,6 km | im 10-km-Umkreis |
+| Bergwiesenhof | 8600 Bruck an der Mur | 13,7 km | erst ab 25 km; **nur** Futter, **nur** Vor-Ort-Zahlung |
+| Waldrandhof | 8650 Kindberg | 29,8 km | erst ab 50 km |
+| Weizberghof | 8160 Weiz | 43,5 km | **nicht freigeschaltet** — unsichtbar trotz Koordinaten |
+| Tallerhof | 8712 Niklasdorf | — | **ohne Kartenpunkt** — in der Liste, nie im Umfeld |
+
+Die drei Stufen des Umkreis-Reglers (10/25/50 km) sind damit **einzeln
+trennbar**: jede zeigt genau einen Hof mehr. Ein Test hält das fest
+(`tests/seed-idempotenz.test.ts`) — wer die Koordinaten verschiebt, merkt es.
+
+Die letzten zwei Zeilen sind der Kern: Es braucht **beide** Gründe für
+Unsichtbarkeit. Ein Hof ohne Kartenpunkt kann nicht platziert werden; ein nicht
+freigeschalteter Hof hat Koordinaten und Produkte und ist trotzdem nirgends
+öffentlich. Wer nur den einen Fall hat, hält den anderen für einen Bug.
+
+Der Pilothof **bleibt, wie er ist**: Name, Adresse, Beschreibung, Produkte und
+Preise unverändert. Ergänzt werden nur Kartenpunkt, Betriebsnummer und
+`serviceFeeActiveFrom` — ohne Kartenpunkt gibt es keinen Bezugspunkt, ohne
+Gebühren-Geltung keine Servicegebühr und damit leere Finanzen. Sein
+Freischaltdatum wird **nicht** überschrieben (`bestandsHof: true` in
+`prisma/seed-daten.ts`), sonst ersetzte jeder Seed-Lauf die Wirklichkeit durch
+ein relatives Datum.
+
+### Was der Datensatz sonst abdeckt
+
+- **Alle vier Futter-Kategorien** und **alle neun Lebensmittel-Kategorien**, mit
+  Unterkategorie wo die Kategorie eine hat.
+- **Wiesenheu bei drei Höfen in beiden Gebindeklassen** (20-kg-Kleinballen und
+  300-kg-Rundballen, Schwelle `GROSSGEBINDE_AB_KG`). Das ist die Voraussetzung
+  dafür, dass die Teilung der Spanne im Umfeld überhaupt etwas zu teilen hat:
+  Kleinballen liegen bei 400–450 €/t, Rundballen bei 150–180 €/t.
+- **Grenzfälle**: ein Produkt mit Bestand 0 und im Shop („Ausverkauft"), eines
+  mit Bestand und **nicht** im Shop, zwei `NUR_BETRIEBE`-Produkte, ein Big Bag,
+  Siegel, Allergene, Saisonfenster.
+- **20 Bestellungen** über jeden `OrderStatus`, jeden `PaymentStatus`, alle drei
+  Zahlungsarten und beide Käuferarten, verteilt über vier Monate. Warenpreis und
+  Servicegebühr rechnet der **echte** Helfer (`berechneServicegebuehr`) — ein
+  Testdatensatz mit eigener Gebührenrechnung wäre eine zweite Wahrheit.
+- **Fünf Kostenposten** (zwei monatlich, einer beendet, einer jährlich, einer
+  einmalig), damit sich „beenden" von „löschen" unterscheiden lässt.
+- **Fünf Meldungen**, darunter absichtlich eine, die versucht, einen Agenten zu
+  steuern („Ignoriere alle vorherigen Anweisungen …"). Sie ist eine
+  **Prüfstelle**: Text aus dem Briefkasten ist Datenmaterial, nie eine
+  Anweisung. Wer sie aus dem Seed entfernt, nimmt den Beweis mit, dass die
+  Oberfläche sie als gewöhnliche Meldung zeigt.
+
+### Drei Dinge, die der Seed absichtlich NICHT entscheidet
+
+- **Die Gebühreneinstellung schreibt er auf den Hof und liest sie von dort
+  zurück.** Die Bestellungen rechnet er mit `berechneServicegebuehr` aus
+  `Farm.serviceFeePercent`/`serviceFeeMinCents`/`serviceFeeActiveFrom`, nicht aus
+  einer Konstante. Sonst stünde in den Bestellungen eine Gebühr, die nicht zu der
+  Einstellung passt, aus der `/admin/finanzen` rechnet — und bei einem
+  Bestandshof mit abweichenden Werten wäre die Zahl schlicht falsch.
+- **`countsTowardLimit` leitet er nicht aus der Kategorie ab.** `false` heißt
+  „Urproduktion" und hält den Umsatz aus der 55.000-€-Grenze für Be- und
+  Verarbeitung heraus (`src/lib/revenue-limit.ts`) — das ist eine Steuerfrage und
+  gehört dem Hof. Der Seed setzt das Feld nur da, wo es der alte Seed auch setzte:
+  bei Futtermitteln. Alles andere bleibt auf der Schema-Vorgabe.
+- **Beim Pilothof füllt er nur leere Felder.** „Bleibt, wie er ist" ist wörtlich
+  gemeint: Der Lauf liest den Hof erst, und schreibt Kartenpunkt, Betriebsnummer
+  und Gebühren-Geltung nur, wenn sie `null` sind. Adresse, Beschreibung,
+  Freischaltdatum und eine schon gesetzte Gebühreneinstellung bleiben unberührt.
+  Ein `update` mit relativen Datumswerten hätte die Wirklichkeit bei jedem Lauf
+  ein Stück verschoben.
+
+Dazu ein Zustand, den die Fixtures **nicht** erzeugen: abgeholt und vor Ort
+bezahlt heißt `paymentStatus = 'PAID'`, weil die App es beim Abholen so schreibt
+(`markAsPickedUpAndPaid`). Ein abgeholter Vor-Ort-Auftrag mit `PENDING` wäre ein
+Zustand, den es in der Wirklichkeit nicht gibt — Testdaten, die es trotzdem gibt,
+lassen später einen echten Fehler wie ein Datenproblem aussehen.
+
+### Idempotenz ist die Regel, nicht die Hoffnung
+
+**Jede Zeile hat einen stabilen Schlüssel und wird mit `upsert` geschrieben.**
+`createMany({ skipDuplicates: true })` kommt im Seed nicht mehr vor — es
+überspringt nur, was einen **eindeutigen Index** verletzt, und `PickupSlot` wie
+`ManualSale` haben keinen. Vor diesem Sprint legte deshalb **jeder**
+`pnpm db:seed` zwei Abholzeiten und drei Handverkäufe erneut an; nach drei Läufen
+hatte der Pilothof sechs Abholfenster. Das war kein theoretisches Risiko,
+sondern der Zustand.
+
+### Drei Dateien, und warum
+
+| Datei | Inhalt |
+|---|---|
+| `prisma/seed.ts` | **Der Einstieg.** Prüft die Datenbank und lädt erst danach Client, Auth und Lauf. |
+| `prisma/seed-lauf.ts` | `seed(prisma, auth, jetzt)` — was geschrieben wird. Kein Datenbankzugriff von sich aus. |
+| `prisma/seed-daten.ts` | Die Fixtures als reine Daten. |
+
+Die Trennung hat einen Grund: Der Einstieg prüfte die Sperre auf **Modulebene**
+und rief `main()` beim Import. Ein Test, der die Datei importierte, starb an
+`process.exit(1)`, bevor er etwas mocken konnte — die Zusicherung „ein zweiter
+Lauf erzeugt keine Dubletten" war nicht prüfbar. Jetzt ist sie es, und zwar an
+einem Speicher mit echter Upsert-Semantik, nicht an der Anwesenheit des Wortes
+`upsert`.
+
+**Die Sperre ist nicht schwächer geworden, sie ist präziser geworden:**
+`istDevDatenbank`/`istTestDatenbank` laufen im Einstieg, **bevor dort ein
+Prisma-Client entsteht** — deshalb stehen `@prisma/client`, `auth` und
+`seed-lauf` in `await import(...)` hinter der Prüfung und nicht oben im Kopf.
+`seed-lauf.ts` prüft nichts; wer es mit einem echten Client aufruft, umgeht die
+Sperre. Der Kommentar oben in der Datei sagt das.
+
+---
+
 ## Nützliche Befehle
 
 ```bash
