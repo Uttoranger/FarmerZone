@@ -207,56 +207,54 @@ describe('seed — zweiter Lauf', () => {
     for (const u of bestellUpdates) expect(u.daten['items']).toBeUndefined()
   })
 
-  it('ergänzt beim Pilothof, was fehlt — und nur das', async () => {
-    // „Der Pilothof bleibt, wie er ist": Der Hof liegt schon da, ohne
-    // Kartenpunkt und ohne Gebühren-Geltung. Beides wird ergänzt, alles andere
-    // bleibt unberührt.
+  it('schreibt beim Pilothof Ort und Kartenpunkt, lässt aber das Freischaltdatum stehen', async () => {
+    // Der Pilothof zieht mit dem Datensatz ins Innviertel — Ort, Adresse und
+    // Kartenpunkt kommen also aus den Fixtures. Was NICHT wandert: das echte
+    // Freischaltdatum und eine schon gesetzte Gebühren-Geltung. An diesen zwei
+    // Daten hängt Geld.
     const s = macheSpeicher()
+    const echteFreigabe = new Date('2026-01-01T00:00:00.000Z')
+    const echteGebuehr = new Date('2026-02-01T00:00:00.000Z')
     s.stelleHofHin('hof-mueller', {
       name: 'Hof Müller',
-      address: 'Echte Adresse aus Dev',
-      description: 'Echter Text aus Dev',
-      approvedAt: new Date('2026-01-01T00:00:00.000Z'),
+      address: 'Alte Adresse aus Dev',
+      approvedAt: echteFreigabe,
+      serviceFeeActiveFrom: echteGebuehr,
       latitude: null,
       longitude: null,
       betriebsnummer: null,
-      serviceFeeActiveFrom: null,
     })
 
     await seed(s.prisma, s.auth, JETZT)
 
     const pilot = s.updates.find((u) => u.tabelle === 'farm' && 'latitude' in u.daten)
     expect(pilot).toBeDefined()
-    expect(pilot!.daten['latitude']).toBe(47.3765)
-    expect(pilot!.daten['longitude']).toBe(15.0972)
-    expect(pilot!.daten['serviceFeeActiveFrom']).toBeInstanceOf(Date)
-    // Nicht angefasst:
+    // Ort und Kartenpunkt kommen aus den Fixtures:
+    expect(pilot!.daten['latitude']).toBe(48.2563)
+    expect(pilot!.daten['longitude']).toBe(13.0434)
+    expect(pilot!.daten['city']).toBe('Braunau am Inn')
+    expect(pilot!.daten['postalCode']).toBe('5280')
+    // Die zwei Geschäftsdaten bleiben unberührt:
     expect(pilot!.daten['approvedAt']).toBeUndefined()
-    expect(pilot!.daten['address']).toBeUndefined()
-    expect(pilot!.daten['description']).toBeUndefined()
-    expect(pilot!.daten['name']).toBeUndefined()
+    expect(pilot!.daten['serviceFeeActiveFrom']).toBeUndefined()
   })
 
-  it('schreibt beim Pilothof nichts mehr, wenn nichts fehlt', async () => {
+  it('setzt die beiden Geschäftsdaten beim Pilothof, wenn sie noch fehlen', async () => {
     const s = macheSpeicher()
     s.stelleHofHin('hof-mueller', {
       name: 'Hof Müller',
-      address: 'Echte Adresse aus Dev',
-      approvedAt: new Date('2026-01-01T00:00:00.000Z'),
-      latitude: 47.0,
-      longitude: 15.0,
-      betriebsnummer: 'LFBIS 9999999',
-      serviceFeeActiveFrom: new Date('2026-02-01T00:00:00.000Z'),
-      serviceFeePercent: '3.00',
-      serviceFeeMinCents: 30,
+      approvedAt: null,
+      serviceFeeActiveFrom: null,
+      latitude: null,
+      longitude: null,
+      betriebsnummer: null,
     })
 
     await seed(s.prisma, s.auth, JETZT)
 
-    const pilot = s.updates.filter((u) => u.tabelle === 'farm')[0]
-    expect(pilot).toBeDefined()
-    // Leeres Update: Es fehlte nichts. Der eigene Kartenpunkt bleibt stehen.
-    expect(Object.keys(pilot!.daten)).toHaveLength(0)
+    const pilot = s.updates.find((u) => u.tabelle === 'farm' && 'latitude' in u.daten)
+    expect(pilot!.daten['approvedAt']).toBeInstanceOf(Date)
+    expect(pilot!.daten['serviceFeeActiveFrom']).toBeInstanceOf(Date)
   })
 
   it('rechnet die Gebühr aus der Einstellung DES HOFES, nicht aus einer Konstante', async () => {
@@ -267,8 +265,9 @@ describe('seed — zweiter Lauf', () => {
     const s = macheSpeicher()
     s.stelleHofHin('hof-mueller', {
       name: 'Hof Müller',
-      latitude: 47.0,
-      longitude: 15.0,
+      approvedAt: new Date('2026-01-01T00:00:00.000Z'),
+      latitude: 48.0,
+      longitude: 13.0,
       betriebsnummer: 'LFBIS 9999999',
       serviceFeeActiveFrom: new Date('2020-01-01T00:00:00.000Z'),
       serviceFeePercent: '3.00',
@@ -284,6 +283,15 @@ describe('seed — zweiter Lauf', () => {
     expect(erste!.daten['totalAmount']).toBe('8.40')
     expect(erste!.daten['serviceFeeCents']).toBe(30)
     expect(erste!.daten['serviceFeePercentApplied']).toBe('3.00')
+  })
+
+  it('schreibt das Land des Hofes — sonst landen die bayerischen Höfe in Österreich', async () => {
+    const s = macheSpeicher()
+    await seed(s.prisma, s.auth, JETZT)
+    const hoefe = s.creates.filter((c) => c.tabelle === 'farm')
+    const laender = hoefe.map((c) => c.daten['country'])
+    expect(laender.filter((l) => l === 'DE')).toHaveLength(2)
+    expect(laender.filter((l) => l === 'AT').length).toBeGreaterThanOrEqual(35)
   })
 
   it('nimmt bei einem neuen Hof die Vorgabe 4,9 % / mind. 50 Cent', async () => {
@@ -341,10 +349,11 @@ describe('Testdaten — nichts Echtes', () => {
     for (const mail of mails) expect(mail).toMatch(/@example\.com$/)
   })
 
-  it('benutzt für alle NEUEN Höfe das Nummernschema +43 660 000xxxx', () => {
+  it('benutzt für alle NEUEN Höfe ein erfundenes Nummernschema, je Land eines', () => {
     for (const h of SEED_HOEFE) {
       if (h.bestandsHof === true) continue
-      expect(h.inhaber.telefon, h.slug).toMatch(/^\+43 660 000\d{4}$/)
+      const muster = h.land === 'DE' ? /^\+49 8571 0000\d{2}$/ : /^\+43 660 000\d{4}$/
+      expect(h.inhaber.telefon, h.slug).toMatch(muster)
     }
     for (const k of SEED_KONTEN) expect(k.telefon).toMatch(/^\+43 660 000\d{4}$/)
   })
@@ -418,6 +427,112 @@ describe('Testdaten — Umkreis', () => {
     const wartend = SEED_HOEFE.find((h) => !h.freigegeben)!
     expect(wartend.breite).not.toBeNull()
     expect(wartend.produkte.length).toBeGreaterThan(0)
+  })
+})
+
+describe('Testdaten — das Gebiet', () => {
+  const pilot = SEED_HOEFE.find((h) => h.slug === 'hof-mueller')!
+  const punkt = { lat: pilot.breite!, lon: pilot.laenge! }
+
+  it('hat mindestens 35 Höfe — sonst sieht die Karte nicht aus wie im Betrieb', () => {
+    expect(SEED_HOEFE.length).toBeGreaterThanOrEqual(35)
+  })
+
+  it('liegt geschlossen im Innviertel: jeder Hof mit Kartenpunkt unter 50 km', () => {
+    for (const h of SEED_HOEFE) {
+      if (h.breite === null || h.laenge === null) continue
+      const km = entfernungKm(punkt, { lat: h.breite, lon: h.laenge })
+      expect(km, h.slug).toBeLessThan(50)
+    }
+  })
+
+  it('füllt alle drei Umkreisstufen mit mehreren Höfen', () => {
+    const km = (h: (typeof SEED_HOEFE)[number]) =>
+      h.breite === null || h.laenge === null
+        ? null
+        : entfernungKm(punkt, { lat: h.breite, lon: h.laenge })
+    const inStufe = (grenze: number) =>
+      SEED_HOEFE.filter((h) => {
+        const d = km(h)
+        return d !== null && d > 0 && d <= grenze && h.freigegeben
+      }).length
+
+    // Jede Stufe zeigt deutlich mehr als die vorige — daran lässt sich der
+    // Regler überhaupt erst ablesen.
+    expect(inStufe(10)).toBeGreaterThanOrEqual(4)
+    expect(inStufe(25)).toBeGreaterThan(inStufe(10))
+    expect(inStufe(50)).toBeGreaterThan(inStufe(25))
+  })
+
+  it('deckt beide österreichischen Bezirke mit jeweils über zehn Höfen ab', () => {
+    // Der Bezirk steht als Feld in den Fixtures, abgeleitet aus der
+    // Gemeindekennzahl — deshalb prüft das hier den Datensatz und nicht nur,
+    // ob zwei Ortsnamen vorkommen.
+    const jeBezirk = new Map<string, number>()
+    for (const h of SEED_HOEFE) jeBezirk.set(h.bezirk, (jeBezirk.get(h.bezirk) ?? 0) + 1)
+
+    expect(jeBezirk.get('Braunau am Inn') ?? 0).toBeGreaterThanOrEqual(10)
+    expect(jeBezirk.get('Ried im Innkreis') ?? 0).toBeGreaterThanOrEqual(10)
+    expect(jeBezirk.get('Rottal-Inn') ?? 0).toBe(2)
+    // Und die Orte wiederholen sich kaum — sonst stünden alle Höfe im Dorf.
+    expect(new Set(SEED_HOEFE.map((h) => h.ort)).size).toBeGreaterThanOrEqual(30)
+  })
+
+  it('setzt für jeden bayerischen Hof den Landkreis Rottal-Inn — und nur dort', () => {
+    for (const h of SEED_HOEFE) {
+      if (h.land === 'DE') expect(h.bezirk, h.slug).toBe('Rottal-Inn')
+      else expect(h.bezirk, h.slug).not.toBe('Rottal-Inn')
+    }
+  })
+
+  it('hat genau zwei Höfe in Bayern — der Grenzfall, für den es bisher keine Daten gab', () => {
+    const de = SEED_HOEFE.filter((h) => h.land === 'DE')
+    expect(de).toHaveLength(2)
+    for (const h of de) {
+      // Fünfstellige deutsche PLZ, und nah genug, um im Umkreis aufzutauchen.
+      expect(h.plz, h.slug).toMatch(/^\d{5}$/)
+      expect(entfernungKm(punkt, { lat: h.breite!, lon: h.laenge! }), h.slug).toBeLessThan(25)
+    }
+  })
+
+  it('schreibt jeder österreichischen Adresse eine vierstellige PLZ', () => {
+    for (const h of SEED_HOEFE) {
+      if (h.land !== 'AT') continue
+      expect(h.plz, h.slug).toMatch(/^\d{4}$/)
+    }
+  })
+
+  it('gibt jedem Hof zwischen einem und neun Produkten', () => {
+    for (const h of SEED_HOEFE) {
+      expect(h.produkte.length, h.slug).toBeGreaterThanOrEqual(1)
+      expect(h.produkte.length, h.slug).toBeLessThanOrEqual(9)
+    }
+  })
+
+  it('erzeugt echte Preisspannen beim Wiesenheu, in beiden Gebindeklassen', () => {
+    const heu = SEED_HOEFE.flatMap((h) => h.produkte).filter((p) => p.subcategory === 'WIESENHEU')
+    const klein = heu.filter((p) => !istGrossgebinde(p.futter!.nettoMenge, p.futter!.nettoEinheit))
+    const gross = heu.filter((p) => istGrossgebinde(p.futter!.nettoMenge, p.futter!.nettoEinheit))
+
+    // Eine Spanne braucht verschiedene Werte — sonst zeigt das Umfeld einen
+    // Strich statt einer Spanne.
+    expect(new Set(klein.map((p) => p.preis)).size).toBeGreaterThanOrEqual(4)
+    expect(new Set(gross.map((p) => p.preis)).size).toBeGreaterThanOrEqual(4)
+    expect(klein.length).toBeGreaterThanOrEqual(10)
+    expect(gross.length).toBeGreaterThanOrEqual(8)
+  })
+
+  it('streut Bestand 0 und „nicht im Shop", ohne sie zur Regel zu machen', () => {
+    const alle = SEED_HOEFE.flatMap((h) => h.produkte)
+    const ausverkauft = alle.filter((p) => p.bestand === 0 && p.imShop)
+    const abgeschaltet = alle.filter((p) => !p.imShop)
+    expect(ausverkauft.length).toBeGreaterThanOrEqual(2)
+    expect(abgeschaltet.length).toBeGreaterThanOrEqual(2)
+    // Kein Produkt ist BEIDES: Ein abgeschaltetes Produkt mit Bestand 0 zeigt
+    // nur „Nicht im Shop" — der Ausverkauft-Fall wäre daran verschenkt.
+    expect(alle.filter((p) => p.bestand === 0 && !p.imShop)).toHaveLength(0)
+    // Aber der Regelfall bleibt „im Shop und vorrätig".
+    expect(abgeschaltet.length / alle.length).toBeLessThan(0.2)
   })
 })
 
@@ -501,9 +616,18 @@ describe('Testdaten — Bereiche und Kategorien', () => {
     expect(ALLE_PRODUKTE.some(({ p }) => (p.allergene ?? []).length > 0)).toBe(true)
   })
 
-  it('lässt unitSize bei Ballen und Big Bags leer — das Gewicht steht in der Kennzeichnung', () => {
+  it('lässt unitSize bei JEDEM Futtermittel leer — das Gewicht steht in der Kennzeichnung', () => {
+    // productAnlegenSchema lehnt eine Gebindegröße bei Futtermitteln ab
+    // (FUTTER_OHNE_GEBINDEGROESSE). Ein Seed, der sie setzt, erzeugt Produkte,
+    // die über das Formular nie entstehen könnten — und lässt später einen
+    // echten Fehler wie ein Datenproblem aussehen.
     for (const { p } of ALLE_PRODUKTE) {
-      if (p.einheit === 'BALLEN' || p.einheit === 'BIGBAG') expect(p.gebindeGroesse).toBeNull()
+      if (bereichVon(p.category) === 'FUTTERMITTEL') {
+        expect(p.gebindeGroesse, p.id).toBeNull()
+      }
+      if (p.einheit === 'BALLEN' || p.einheit === 'BIGBAG') {
+        expect(p.gebindeGroesse, p.id).toBeNull()
+      }
     }
   })
 })
