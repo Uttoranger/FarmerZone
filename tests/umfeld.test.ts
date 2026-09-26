@@ -29,6 +29,7 @@ import { ERDRADIUS_KM, UMKREIS_STUFEN, entfernungKm } from '@/lib/hofuebersicht'
 import { EIGENER_PIN, pinDarstellung } from '@/lib/hoefe-anzeige'
 import { preisAnzeigeVon } from '@/lib/taxonomie'
 import { leseUmfeldAnsicht, leseUmfeldFilter, umfeldLink } from '@/schemas/umfeld-filter'
+import { bereichAusParameter } from '@/schemas/hoefe-filter'
 
 // ─── Hilfen ─────────────────────────────────────────────────────────────────
 
@@ -623,13 +624,19 @@ describe('Links auf fremde Hofseiten — im Futter direkt beim Futter', () => {
     }
   }
 
+  // Was die Hofseite aus dem Link liest (product-grid.tsx) — so hängt der Test
+  // an der Wirkung „öffnet beim Futter", nicht nur an der Zeichenkette.
+  const hofseiteOeffnet = (link: string) =>
+    bereichAusParameter(new URLSearchParams(link.split('?')[1] ?? '').get('bereich'))
+
   it('aus einer Futter-Zeile und vom Pin trägt der Link bereich=futter', () => {
     const { liste, pins } = links('FUTTERMITTEL')
     expect(liste.length).toBeGreaterThan(0)
     expect(pins.length).toBeGreaterThan(0)
     for (const link of [...liste, ...pins]) {
-      expect(new URLSearchParams(link.split('?')[1] ?? '').get('bereich'), link).toBe('futter')
+      expect(link, link).toContain('bereich=futter')
       expect(link.startsWith('/gemischt?'), link).toBe(true)
+      expect(hofseiteOeffnet(link), link).toBe('FUTTERMITTEL')
     }
   })
 
@@ -638,8 +645,9 @@ describe('Links auf fremde Hofseiten — im Futter direkt beim Futter', () => {
     expect(liste.length).toBeGreaterThan(0)
     expect(pins.length).toBeGreaterThan(0)
     for (const link of [...liste, ...pins]) {
+      expect(link).not.toContain('bereich=futter')
       expect(link).toBe('/gemischt')
-      expect(link).not.toContain('bereich=')
+      expect(hofseiteOeffnet(link), link).toBe('LEBENSMITTEL')
     }
   })
 })

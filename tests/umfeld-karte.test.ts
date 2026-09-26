@@ -8,6 +8,9 @@
  * (`import(...)` in next/dynamic). Der Test läuft den statischen Import-Graph
  * der Projektdateien ab; Pakete sind Blätter. Dass er Leaflet überhaupt
  * erkennt, prüft er an der Karte selbst.
+ *
+ * Dazu, ebenfalls am Quelltext: Liste und Pin-Karte verlinken fremde Höfe nur
+ * über den fertigen Link aus src/lib/umfeld.ts.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -85,13 +88,19 @@ describe('Umfeld-Karte — erst beim Umschalten geladen', () => {
 })
 
 describe('Links auf fremde Hofseiten — Liste und Pin-Karte', () => {
-  it('nehmen nur den fertigen Link aus src/lib/umfeld.ts, bauen keinen eigenen', () => {
+  it('nehmen den fertigen Link aus src/lib/umfeld.ts und bauen keinen eigenen', () => {
     // Den Bereich-Parameter (bereich=futter) setzt hofseitenLink; welche Links
-    // entstehen, prüft tests/umfeld.test.ts. Baute eine Komponente den Link
-    // selbst, fiele der Parameter dort still weg.
-    const hrefs = (datei: string) =>
-      [...fs.readFileSync(path.join(WURZEL, datei), 'utf8').matchAll(/href=(\{[^}]*\}|"[^"]*")/g)].map((m) => m[1])
-    expect(hrefs('src/components/analytics/umfeld-liste.tsx')).toEqual(['{hof.link}'])
-    expect(hrefs('src/components/analytics/umfeld-karte.tsx')).toEqual(['{gewaehlt.link}'])
+    // entstehen, prüft tests/umfeld.test.ts. Baute eine Komponente einen
+    // Hof-Link selbst — als href oder für router.push —, fiele der Parameter
+    // dort still weg.
+    const lies = (datei: string) => fs.readFileSync(path.join(WURZEL, 'src/components/analytics', datei), 'utf8')
+    const liste = lies('umfeld-liste.tsx')
+    const karte = lies('umfeld-karte.tsx')
+    expect(liste).toMatch(/href=\{hof\.link\}/)
+    expect(karte).toMatch(/href=\{gewaehlt\.link\}/)
+    for (const text of [liste, karte]) {
+      expect(text).not.toMatch(/\$\{[^}]*slug[^}]*\}/)
+      expect(text).not.toMatch(/hofseitenLink/)
+    }
   })
 })

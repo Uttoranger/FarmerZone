@@ -1847,10 +1847,16 @@ Menüpunkt bleibt „Auswertung“, der erste Reiter „Umsatz“.
 
 Die Links auf fremde Hofseiten — in der Liste und unter dem Pin — tragen im
 Bereich Futtermittel `?bereich=futter`, damit die Hofseite beim Futter öffnet,
-im Hofladen keinen Parameter. So war es schon seit #130 (`hofseitenLink`, wie auf
-/hoefe); jetzt sichert es ein eigener Test in beide Richtungen, und
-`tests/umfeld-karte.test.ts` prüft, dass Liste und Pin-Karte keinen eigenen
-Link bauen.
+im Hofladen keinen Parameter. Gebaut war das schon — in der Liste seit #130, unter
+dem Pin seit #131, beide über `hofseitenLink` wie auf /hoefe. Jetzt sichert es ein
+eigener Test in beide Richtungen, geprüft an dem, was die Hofseite daraus liest
+(`bereichAusParameter`), und `tests/umfeld-karte.test.ts` prüft, dass Liste und
+Pin-Karte keinen Hof-Link selbst bauen.
+
+Die Überschrift der Unterseite hieß vorher „Auswertung“, einen eigenen
+Seitentitel hatte sie nicht. Umgesetzt ist der Auftrag wörtlich: h1 und Tab-Titel
+„In der Nähe“. Damit steht auf dem Reiter „Umsatz“ weiter „Auswertung“ als
+Überschrift, auf „In der Nähe“ nicht mehr.
 
 ### Geänderte Schwelle aus Bereiche 2: der 25-kg-Sack ist Kleingebinde
 
