@@ -1578,27 +1578,41 @@ gegen echtes Postgres geprüft.
 `pnpm db:seed` legt seit diesem Sprint einen Datensatz an, der die Fälle zeigt,
 für die es Code gibt — nicht nur den Glücksfall. **Alles ist erfunden.** Keine
 Zeile stammt aus der Produktion: E-Mails enden auf `@example.com`,
-Telefonnummern lauten `+43 660 000xxxx`, Betriebsnummern beginnen mit `TEST-`.
-Die **Orte** sind echte steirische Gemeinden — sie müssen es sein, sonst stimmen
-die Entfernungen nicht; Straßen und Hausnummern sind erfunden.
+Telefonnummern lauten `+43 660 000xxxx`, Betriebsnummern beginnen mit `TEST-`
+(der bayerische Hof: `09 000 000 …`, deutsche Form mit Nullen).
+Die **Orte** sind echte Gemeinden im Bezirk Braunau am Inn und eine in Bayern —
+dort liegt der Pilot, dort sollen die Entfernungen stimmen; Straßen und
+Hausnummern sind erfunden. In Uttendorf liegt bewusst kein Testhof: Dort gibt es
+einen echten Hof der Plattform.
 
 ### Sechs Höfe, und warum jeder einzelne da ist
 
-Bezugspunkt ist der Pilothof in 8700 Leoben. Die Entfernungen rechnet
-`entfernungKm` (`src/lib/hofuebersicht.ts`), nicht ein Kommentar:
+Bezugspunkt ist der Pilothof, gesetzt auf die **Ortsmitte** von 5270
+Mauerkirchen — keine Hofadresse. Die Entfernungen rechnet `entfernungKm`
+(`src/lib/hofuebersicht.ts`), nicht ein Kommentar:
 
 | Hof | Ort | Entfernung | Wofür er da ist |
 |---|---|---|---|
-| Hof Müller | 8700 Leoben | — | der Bezugspunkt |
-| Hof Sonnleiten | 8792 Sankt Peter-Freienstein | 5,6 km | im 10-km-Umkreis |
-| Bergwiesenhof | 8600 Bruck an der Mur | 13,7 km | erst ab 25 km; **nur** Futter, **nur** Vor-Ort-Zahlung |
-| Waldrandhof | 8650 Kindberg | 29,8 km | erst ab 50 km |
-| Weizberghof | 8160 Weiz | 43,5 km | **nicht freigeschaltet** — unsichtbar trotz Koordinaten |
-| Tallerhof | 8712 Niklasdorf | — | **ohne Kartenpunkt** — in der Liste, nie im Umfeld |
+| Hof Müller | 5270 Mauerkirchen (Ortsmitte) | — | der Bezugspunkt |
+| Hof Sonnleiten | 5274 Burgkirchen | 2,9 km | im 10-km-Umkreis |
+| Bergwiesenhof | 84489 Burghausen (**Bayern**, `country: DE`) | 22,5 km | erst ab 25 km; **nur** Futter, **nur** Vor-Ort-Zahlung; die Grenzregion läuft mit |
+| Waldrandhof | 5121 Ostermiething | 27,7 km | erst ab 50 km |
+| Weizberghof | 5222 Munderfing | 14,3 km | **nicht freigeschaltet** — unsichtbar trotz Koordinaten |
+| Tallerhof | 4962 Mining | — | **ohne Kartenpunkt** — in der Liste, nie im Umfeld |
 
 Die drei Stufen des Umkreis-Reglers (10/25/50 km) sind damit **einzeln
 trennbar**: jede zeigt genau einen Hof mehr. Ein Test hält das fest
-(`tests/seed-idempotenz.test.ts`) — wer die Koordinaten verschiebt, merkt es.
+(`tests/seed-idempotenz.test.ts`) — und zusätzlich, dass jede Entfernung
+mindestens 2 km von jeder Stufengrenze liegt. Die Koordinaten sind Ortsmitten
+aus den Gemeinde-Infoboxen der Wikipedia (bestimmt 2026-09-26, Burghausen nur
+auf die Bogenminute genau); eine genauere Mitte schiebt so keinen Hof in eine
+andere Stufe.
+
+**Warum Mauerkirchen und nicht mehr Leoben (2026-09-26):** Der Pilothof hatte
+in Dev keine Koordinaten, also wählte der erste Datensatz (#126) einen eigenen
+Mittelpunkt in der Steiermark. Der echte Pilot liegt im Bezirk Braunau am Inn —
+das Umfeld, die Grenzregion zu Bayern und die Karte sollen in Dev so aussehen
+wie dort. Dev hatte die Leoben-Daten nie bekommen, es gab nichts aufzuräumen.
 
 Die letzten zwei Zeilen sind der Kern: Es braucht **beide** Gründe für
 Unsichtbarkeit. Ein Hof ohne Kartenpunkt kann nicht platziert werden; ein nicht
@@ -1608,8 +1622,10 @@ freigeschalteter Hof hat Koordinaten und Produkte und ist trotzdem nirgends
 Der Pilothof **bleibt, wie er ist**: Name, Adresse, Beschreibung, Produkte und
 Preise unverändert. Ergänzt werden nur Kartenpunkt, Betriebsnummer und
 `serviceFeeActiveFrom` — ohne Kartenpunkt gibt es keinen Bezugspunkt, ohne
-Gebühren-Geltung keine Servicegebühr und damit leere Finanzen. Sein
-Freischaltdatum wird **nicht** überschrieben (`bestandsHof: true` in
+Gebühren-Geltung keine Servicegebühr und damit leere Finanzen. In einem Dev, in
+dem er schon steht, bekommt er also die Koordinaten der Ortsmitte Mauerkirchen,
+behält aber seine eingetragene Adresse; erst eine frische Datenbank bekommt auch
+5270 Mauerkirchen als Ort. Sein Freischaltdatum wird **nicht** überschrieben (`bestandsHof: true` in
 `prisma/seed-daten.ts`), sonst ersetzte jeder Seed-Lauf die Wirklichkeit durch
 ein relatives Datum.
 

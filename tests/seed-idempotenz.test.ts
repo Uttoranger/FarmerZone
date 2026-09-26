@@ -32,7 +32,10 @@ import {
   SEED_KOSTENPOSTEN,
   SEED_MELDUNGEN,
 } from '../prisma/seed-daten'
-import { entfernungKm } from '@/lib/hofuebersicht'
+import { UMKREIS_STUFEN, entfernungKm } from '@/lib/hofuebersicht'
+
+/** Die Grenzen des Umkreis-Reglers (10, 25, 50 km) — aus derselben Quelle wie /hoefe. */
+const UMKREIS_GRENZEN_KM = UMKREIS_STUFEN.filter((s): s is 10 | 25 | 50 => s !== null)
 import { bereichVon, istGrossgebinde, unterkategorienVon } from '@/lib/taxonomie'
 
 const JETZT = new Date('2026-09-26T10:00:00.000Z')
@@ -227,14 +230,28 @@ describe('seed — zweiter Lauf', () => {
 
     const pilot = s.updates.find((u) => u.tabelle === 'farm' && 'latitude' in u.daten)
     expect(pilot).toBeDefined()
-    expect(pilot!.daten['latitude']).toBe(47.3765)
-    expect(pilot!.daten['longitude']).toBe(15.0972)
+    // Die Ortsmitte von Mauerkirchen — die eingetragene Adresse bleibt (siehe unten).
+    expect(pilot!.daten['latitude']).toBe(48.1908)
+    expect(pilot!.daten['longitude']).toBe(13.1353)
     expect(pilot!.daten['serviceFeeActiveFrom']).toBeInstanceOf(Date)
     // Nicht angefasst:
     expect(pilot!.daten['approvedAt']).toBeUndefined()
     expect(pilot!.daten['address']).toBeUndefined()
     expect(pilot!.daten['description']).toBeUndefined()
     expect(pilot!.daten['name']).toBeUndefined()
+    expect(pilot!.daten['postalCode']).toBeUndefined()
+    expect(pilot!.daten['city']).toBeUndefined()
+    expect(pilot!.daten['country']).toBeUndefined()
+  })
+
+  it('legt Hof B in Deutschland an, alle anderen neuen Höfe in Österreich', async () => {
+    const s = macheSpeicher()
+    await seed(s.prisma, s.auth, JETZT)
+    const hoefe = s.creates.filter((c) => c.tabelle === 'farm')
+    expect(hoefe.find((c) => c.daten['slug'] === 'hof-bergwiese')?.daten['country']).toBe('DE')
+    for (const c of hoefe.filter((c) => c.daten['slug'] !== 'hof-bergwiese')) {
+      expect(c.daten['country'], String(c.daten['slug'])).toBe('AT')
+    }
   })
 
   it('schreibt beim Pilothof nichts mehr, wenn nichts fehlt', async () => {
@@ -363,8 +380,9 @@ describe('Testdaten — nichts Echtes', () => {
   it('macht Betriebsnummern als Testwerte erkennbar', () => {
     const nummern = SEED_HOEFE.map((h) => h.betriebsnummer).filter((n): n is string => n !== null)
     expect(nummern.length).toBeGreaterThanOrEqual(2)
-    // Neue Höfe: TEST-…; der Pilothof behält seine alte Nummer (eigener Test).
-    for (const n of nummern) expect(n).toMatch(/^(TEST-|LFBIS )/)
+    // Neue Höfe: TEST-… bzw. die deutsche Form mit Nullen (Hof B); der
+    // Pilothof behält seine alte Nummer (eigener Test).
+    for (const n of nummern) expect(n).toMatch(/^(TEST-|LFBIS |09 000 000 )/)
   })
 
   it('vergibt jeden Schlüssel nur einmal', () => {
@@ -401,6 +419,23 @@ describe('Testdaten — Umkreis', () => {
     expect(km('hof-waldrand')).toBeLessThan(50)
   })
 
+  it('hält jede Entfernung mindestens 2 km von jeder Umkreisgrenze fern — eine ungenaue Ortsmitte rutscht nie in die falsche Stufe', () => {
+    // Die Koordinaten sind Ortsmitten (manche nur auf die Bogenminute genau,
+    // also bis rund 1 km daneben). Mit 2 km Abstand zu 10, 25 und 50 km
+    // wechselt kein Hof die Stufe, wenn jemand die Mitte genauer bestimmt.
+    for (const h of SEED_HOEFE) {
+      if (h.slug === 'hof-mueller' || h.breite === null || h.laenge === null) continue
+      const entfernung = entfernungKm(punkt, { lat: h.breite, lon: h.laenge })
+      for (const grenze of UMKREIS_GRENZEN_KM) {
+        expect(Math.abs(entfernung - grenze), `${h.slug}: ${entfernung.toFixed(1)} km gegen ${grenze} km`).toBeGreaterThanOrEqual(2)
+      }
+    }
+  })
+
+  it('der nicht freigeschaltete Hof läge im 50-km-Umkreis — er fehlt nur wegen der Freischaltung', () => {
+    expect(km('hof-wartend')).toBeLessThan(50)
+  })
+
   it('hält jeden Hof innerhalb von 50 km', () => {
     for (const h of SEED_HOEFE) {
       if (h.breite === null || h.laenge === null) continue
@@ -418,6 +453,41 @@ describe('Testdaten — Umkreis', () => {
     const wartend = SEED_HOEFE.find((h) => !h.freigegeben)!
     expect(wartend.breite).not.toBeNull()
     expect(wartend.produkte.length).toBeGreaterThan(0)
+  })
+})
+
+describe('Testdaten — Bezirk Braunau am Inn, wo der Pilot liegt', () => {
+  const hof = (slug: string) => SEED_HOEFE.find((h) => h.slug === slug)!
+
+  it('der Bezugspunkt ist die Ortsmitte von 5270 Mauerkirchen', () => {
+    const pilot = hof('hof-mueller')
+    expect(pilot.plz).toBe('5270')
+    expect(pilot.ort).toBe('Mauerkirchen')
+    // Ortsmitte laut Gemeinde-Infobox: 48°11′27″ N, 13°08′07″ E — auf gut 100 m.
+    expect(pilot.breite).toBeCloseTo(48.1908, 3)
+    expect(pilot.laenge).toBeCloseTo(13.1353, 3)
+  })
+
+  it('Hof B liegt in Bayern — die Grenzregion läuft mit', () => {
+    const b = hof('hof-bergwiese')
+    expect(b.land).toBe('DE')
+    expect(b.plz).toMatch(/^\d{5}$/)
+    // Aufbau einer deutschen Betriebsnummer (12 Ziffern, 09 = Bayern), mit
+    // Nullen im Kreis- und Gemeindeteil erkennbar erfunden.
+    expect(b.betriebsnummer).toMatch(/^09 000 000 \d{4}$/)
+  })
+
+  it('alle übrigen Höfe liegen in Österreich, im Innviertel — keine steirische Postleitzahl mehr', () => {
+    for (const h of SEED_HOEFE) {
+      if (h.slug === 'hof-bergwiese') continue
+      expect(h.land ?? 'AT', h.slug).toBe('AT')
+      // Oberösterreich hat Postleitzahlen ab 4 und 5, die Steiermark ab 8.
+      expect(h.plz, h.slug).toMatch(/^[45]\d{3}$/)
+    }
+  })
+
+  it('kein Testhof in Uttendorf — dort liegt ein echter Hof der Plattform', () => {
+    for (const h of SEED_HOEFE) expect(h.ort, h.slug).not.toMatch(/uttendorf/i)
   })
 })
 

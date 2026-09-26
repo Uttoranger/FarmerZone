@@ -228,6 +228,8 @@ async function hof(
     address: h.adresse,
     postalCode: h.plz,
     city: h.ort,
+    // Ohne Angabe Österreich — wie die Schema-Vorgabe; Hof B liegt in Bayern.
+    country: h.land ?? 'AT',
     phone: h.inhaber.telefon,
     email: h.inhaber.email,
     acceptsOnline: h.nimmtOnline,

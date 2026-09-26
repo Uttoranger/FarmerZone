@@ -25,9 +25,10 @@ import type {
  * ALLES ERFUNDEN. Keine Zeile stammt aus der Produktion: Namen, Höfe,
  * Betriebsnummern, Preise und Bestände sind ausgedacht, E-Mails enden auf
  * @example.com, Telefonnummern lauten +43 660 000xxxx. Die ORTE sind echte
- * steirische Gemeinden — sie müssen es sein, sonst stimmen die Entfernungen
- * nicht, und ein Ortsname ist kein personenbezogenes Datum. Die Straßen und
- * Hausnummern sind erfunden.
+ * Gemeinden im Bezirk Braunau am Inn und eine in Bayern — dort liegt der Pilot,
+ * dort sollen die Entfernungen stimmen, und ein Ortsname ist kein
+ * personenbezogenes Datum. Die Straßen und Hausnummern sind erfunden. In
+ * Uttendorf liegt KEIN Testhof: Dort gibt es einen echten Hof der Plattform.
  *
  * WOFÜR: Dev und jede Preview sollen alle Fälle zeigen, die die Bereiche, der
  * Sichtbarkeits-Schalter, die Finanzen und das Umfeld brauchen — nicht den
@@ -35,18 +36,24 @@ import type {
  * Koordinaten, einen nicht freigeschalteten Hof und eine Meldung, die einen
  * Agenten zu steuern versucht.
  *
- * ENTFERNUNGEN zum Pilothof (8700 Leoben, 47.3765/15.0972), gerechnet mit
- * `entfernungKm` aus src/lib/hofuebersicht.ts — die Stufen des Umkreis-Reglers
- * (10/25/50 km) sind damit einzeln prüfbar:
- *   Hof A  Sankt Peter-Freienstein   5,6 km   → im 10-km-Umkreis
- *   Hof B  Bruck an der Mur         13,7 km   → erst ab 25 km
- *   Hof E  Kindberg                 29,8 km   → erst ab 50 km
- *   Hof D  Weiz                     43,5 km   → nie, weil nicht freigeschaltet
- *   Hof C  Niklasdorf               keine Koordinaten → nie platzierbar
+ * ENTFERNUNGEN zum Pilothof (Ortsmitte 5270 Mauerkirchen, 48.1908/13.1353),
+ * gerechnet mit `entfernungKm` aus src/lib/hofuebersicht.ts — die Stufen des
+ * Umkreis-Reglers (10/25/50 km) sind damit einzeln prüfbar:
+ *   Hof A  5274 Burgkirchen           2,9 km  → im 10-km-Umkreis
+ *   Hof B  84489 Burghausen (DE)     22,5 km  → erst ab 25 km, über der Salzach
+ *   Hof E  5121 Ostermiething        27,7 km  → erst ab 50 km
+ *   Hof D  5222 Munderfing           14,3 km  → nie, weil nicht freigeschaltet
+ *   Hof C  4962 Mining               keine Koordinaten → nie platzierbar
+ * Jede Entfernung liegt mindestens 2 km von 10, 25 und 50 km entfernt
+ * (tests/seed-idempotenz.test.ts) — eine ungenaue Ortsmitte verschiebt so
+ * keinen Hof in eine andere Stufe.
  *
- * Die Koordinaten sind Ortsmitten aus Ortskenntnis, nicht geokodiert
- * (Nominatim ist aus der Agentenumgebung nicht erreichbar). Wer sie
- * korrigiert, ändert nur diese Datei — die Entfernungen rechnet der Code.
+ * KOORDINATEN: Ortsmitten aus den Gemeinde-Infoboxen der Wikipedia, einmalig
+ * bestimmt am 2026-09-26 (über eine Websuche — Nominatim und Wikipedia selbst
+ * sind aus der Agentenumgebung nicht erreichbar). Burghausen steht dort nur
+ * auf die Bogenminute (48°10′ N, 12°50′ E), also bis rund 1 km genau; die
+ * übrigen auf die Bogensekunde. Zur Laufzeit wird nichts geokodiert. Wer eine
+ * Mitte korrigiert, ändert nur diese Datei — die Entfernungen rechnet der Code.
  *
  * IDEMPOTENZ: Jede Zeile trägt einen STABILEN Schlüssel (`id`, `slug`,
  * `nummer`). Der Lauf schreibt ausschließlich mit `upsert` darauf. Ohne das
@@ -184,6 +191,8 @@ export type SeedHof = {
   adresse: string
   plz: string
   ort: string
+  /** `Farm.country`; ohne Angabe Österreich (Schema-Vorgabe „AT"). */
+  land?: 'AT' | 'DE'
   /** null = kein Kartenpunkt; der Hof kann im Umfeld nicht platziert werden. */
   breite: number | null
   laenge: number | null
@@ -212,10 +221,11 @@ const HOF_A: SeedHof = {
   name: 'Hof Sonnleiten',
   inhaber: { email: 'bauer-a@example.com', name: 'Maria Sonnleitner', telefon: '+43 660 0000011' },
   adresse: 'Sonnleitenweg 4',
-  plz: '8792',
-  ort: 'Sankt Peter-Freienstein',
-  breite: 47.4083,
-  laenge: 15.0403,
+  plz: '5274',
+  ort: 'Burgkirchen',
+  // Ortsmitte 48°12′16″ N, 13°06′05″ E (Wikipedia, 2026-09-26)
+  breite: 48.2044,
+  laenge: 13.1014,
   beschreibung:
     'Gemischter Betrieb mit Ackerbau, Obstgarten und einer kleinen Heuwirtschaft. Wir verkaufen ab Hof und liefern auf Bestellung.',
   freigegeben: true,
@@ -228,7 +238,7 @@ const HOF_A: SeedHof = {
     { tag: 5, von: '14:00', bis: '18:00' },
   ],
   testhinweis:
-    'Nächster Hof (5,6 km) — im 10-km-Umkreis der einzige neben dem Pilothof. Beide Wiesenheu-Gebinde, ein Brot mit Bestand 0.',
+    'Nächster Hof (2,9 km) — im 10-km-Umkreis der einzige neben dem Pilothof. Beide Wiesenheu-Gebinde, ein Brot mit Bestand 0.',
   produkte: [
     {
       id: 'prod-a-heu-klein',
@@ -405,20 +415,26 @@ const HOF_B: SeedHof = {
   name: 'Bergwiesenhof',
   inhaber: { email: 'bauer-b@example.com', name: 'Johann Bergmann', telefon: '+43 660 0000012' },
   adresse: 'Bergwiesenstraße 18',
-  plz: '8600',
-  ort: 'Bruck an der Mur',
-  breite: 47.4103,
-  laenge: 15.2717,
+  plz: '84489',
+  ort: 'Burghausen',
+  // In Bayern, über der Salzach: Die Grenzregion läuft mit (src/lib/laender.ts).
+  land: 'DE',
+  // Ortsmitte 48°10′ N, 12°50′ E (Wikipedia, 2026-09-26) — nur auf die
+  // Bogenminute genau, deshalb der Abstand zur 25-km-Grenze im Test.
+  breite: 48.1667,
+  laenge: 12.8333,
   beschreibung:
     'Reiner Futterbaubetrieb. Heu, Stroh, Silage und Getreide in großen Gebinden — Abholung nur am Hof, Bezahlung vor Ort.',
   freigegeben: true,
   nimmtOnline: false,
   nimmtVorOrt: true,
-  betriebsnummer: 'TEST-23456',
+  // Aufbau einer deutschen Betriebsnummer (12 Ziffern, 09 = Bayern), mit Nullen
+  // im Kreis- und Gemeindeteil erkennbar erfunden.
+  betriebsnummer: '09 000 000 0002',
   betriebsstatus: 'PRIMAERPRODUKTION',
   abholzeiten: [{ tag: 6, von: '08:00', bis: '12:00' }],
   testhinweis:
-    'Nur Futtermittel, nur Vor-Ort-Zahlung (kein Stripe im Checkout). Bei 13,7 km erst ab Umkreis 25 km sichtbar; eine Luzerne mit Bestand 0 und eine Gerste nur für Betriebe.',
+    'Nur Futtermittel, nur Vor-Ort-Zahlung (kein Stripe im Checkout). In Bayern (Burghausen), bei 22,5 km erst ab Umkreis 25 km sichtbar; eine Luzerne mit Bestand 0 und eine Gerste nur für Betriebe.',
   produkte: [
     {
       id: 'prod-b-heu-klein',
@@ -609,8 +625,8 @@ const HOF_C: SeedHof = {
   name: 'Tallerhof',
   inhaber: { email: 'bauer-c@example.com', name: 'Elisabeth Taller', telefon: '+43 660 0000013' },
   adresse: 'Talstraße 7',
-  plz: '8712',
-  ort: 'Niklasdorf',
+  plz: '4962',
+  ort: 'Mining',
   // KEINE Koordinaten, mit Absicht: Der Hof steht auf /hoefe (die Umkreisgrenze
   // schließt Höfe ohne Kartenpunkt nie aus), kann im Umfeld aber nicht
   // platziert werden und erscheint dort nur in der Zeile „n Höfe ohne Standort
@@ -685,10 +701,11 @@ const HOF_D: SeedHof = {
   name: 'Weizberghof',
   inhaber: { email: 'bauer-d@example.com', name: 'Thomas Weiz', telefon: '+43 660 0000014' },
   adresse: 'Weizbergweg 22',
-  plz: '8160',
-  ort: 'Weiz',
-  breite: 47.2186,
-  laenge: 15.6253,
+  plz: '5222',
+  ort: 'Munderfing',
+  // Ortsmitte 48°04′00″ N, 13°11′00″ E (Wikipedia, 2026-09-26)
+  breite: 48.0667,
+  laenge: 13.1833,
   beschreibung:
     'Neu angemeldeter Betrieb mit Ackerbau und Beerenobst. Wartet auf die Freischaltung durch den Betreiber.',
   // NICHT freigegeben: Der Hof hat Koordinaten und Produkte und ist trotzdem
@@ -758,10 +775,11 @@ const HOF_E: SeedHof = {
   name: 'Waldrandhof',
   inhaber: { email: 'bauer-e@example.com', name: 'Katharina Walder', telefon: '+43 660 0000015' },
   adresse: 'Waldrandgasse 9',
-  plz: '8650',
-  ort: 'Kindberg',
-  breite: 47.4986,
-  laenge: 15.4506,
+  plz: '5121',
+  ort: 'Ostermiething',
+  // Ortsmitte 48°02′50″ N, 12°49′50″ E (Wikipedia, 2026-09-26)
+  breite: 48.0472,
+  laenge: 12.8306,
   beschreibung:
     'Milchviehbetrieb mit Heuwirtschaft und Hofladen. Heumilch, Eier und Futter aus eigener Erzeugung.',
   freigegeben: true,
@@ -775,7 +793,7 @@ const HOF_E: SeedHof = {
     { tag: 5, von: '15:00', bis: '19:00' },
   ],
   testhinweis:
-    'Weitester sichtbarer Hof (29,8 km) — erscheint erst im Umkreis 50 km. Dritter Wiesenheu-Preis, damit die Spanne im Umfeld eine Mitte hat.',
+    'Weitester sichtbarer Hof (27,7 km) — erscheint erst im Umkreis 50 km. Dritter Wiesenheu-Preis, damit die Spanne im Umfeld eine Mitte hat.',
   produkte: [
     {
       id: 'prod-e-heu-klein',
@@ -875,22 +893,30 @@ const HOF_E: SeedHof = {
 // ─── Der Pilothof ────────────────────────────────────────────────────────────
 
 /**
- * Der Pilothof — unverändert bis auf zwei Ergänzungen: Ohne Kartenpunkt gibt es
- * keinen Bezugspunkt für das Umfeld, ohne `serviceFeeActiveFrom` keine
- * Servicegebühr und damit leere Finanzen. Name, Adresse, Beschreibung, Produkte
- * und Preise sind dieselben wie vor diesem Sprint.
+ * Der Pilothof — zwei Ergänzungen gegenüber dem alten Seed: Ohne Kartenpunkt
+ * gibt es keinen Bezugspunkt für das Umfeld, ohne `serviceFeeActiveFrom` keine
+ * Servicegebühr und damit leere Finanzen. Name, Produkte und Preise sind
+ * dieselben wie vor dem Testdaten-Sprint; der Ort ist seit dem Umzug der
+ * Testdaten ins Innviertel die Ortsmitte von Mauerkirchen.
+ *
+ * ACHTUNG, Bestandshof: Steht der Pilothof schon in der Datenbank, ergänzt der
+ * Lauf nur LEERE Felder (seed-lauf.ts). Dort kommen also nur die Koordinaten
+ * an — Postleitzahl, Ort und Beschreibung bleiben, was eingetragen ist. Erst
+ * eine frische Datenbank bekommt alles aus dieser Datei.
  */
 const PILOTHOF: SeedHof = {
   slug: 'hof-mueller',
   name: 'Hof Müller',
   inhaber: { email: 'bauer@example.com', name: 'Franz Müller', telefon: '+43 664 123 4567' },
   adresse: 'Hofgasse 12',
-  plz: '8700',
-  ort: 'Leoben',
-  breite: 47.3765,
-  laenge: 15.0972,
+  plz: '5270',
+  ort: 'Mauerkirchen',
+  // Die ORTSMITTE von Mauerkirchen, keine Hofadresse: 48°11′27″ N, 13°08′07″ E
+  // (Wikipedia, 2026-09-26). Der Bezugspunkt aller Entfernungen oben.
+  breite: 48.1908,
+  laenge: 13.1353,
   beschreibung:
-    'Wir sind ein kleiner Familienbetrieb in der Steiermark. Unsere Tiere leben auf saftigen Wiesen und werden artgerecht gehalten. Alle Produkte kommen direkt vom Hof – ohne Zwischenhändler.',
+    'Wir sind ein kleiner Familienbetrieb im Innviertel. Unsere Tiere leben auf saftigen Wiesen und werden artgerecht gehalten. Alle Produkte kommen direkt vom Hof – ohne Zwischenhändler.',
   freigegeben: true,
   nimmtOnline: true,
   nimmtVorOrt: true,
@@ -902,7 +928,7 @@ const PILOTHOF: SeedHof = {
     { tag: 6, von: '09:00', bis: '12:00' },
   ],
   testhinweis:
-    'Der Bezugspunkt (8700 Leoben). Kleinballen-Heu à 15 kg und Big-Bag-Hafer nur für Betriebe; drei Handverkäufe für die Auswertung.',
+    'Der Bezugspunkt (Ortsmitte 5270 Mauerkirchen). Kleinballen-Heu à 15 kg und Big-Bag-Hafer nur für Betriebe; drei Handverkäufe für die Auswertung.',
   produkte: [
     {
       id: 'prod-milch',
