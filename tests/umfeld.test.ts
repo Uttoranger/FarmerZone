@@ -547,7 +547,7 @@ describe('baueUmfeldKarte — Pins genau für die Höfe, die die Liste zählt', 
     for (const bereich of ['FUTTERMITTEL', 'LEBENSMITTEL'] as const) {
       const eingabe = { ...FUTTER, bereich, hoefe }
       const inZeilen = new Set(baueUmfeldZeilen(eingabe).flatMap((z) => z.hoefe.map((h) => h.slug)))
-      const pins = baueUmfeldKarte({ ...eingabe, eigenerStandort: { lat: 48.2563, lon: 13.0434 } }).pins
+      const pins = baueUmfeldKarte({ ...eingabe, eigenerStandort: BRAUNAU }).pins
       expect(new Set(pins.map((p) => p.slug)), bereich).toEqual(inZeilen)
       expect(pins.map((p) => p.slug)).toEqual(gezaehlteHoefe(eingabe).map((h) => h.slug))
     }
@@ -558,22 +558,22 @@ describe('baueUmfeldKarte — Pins genau für die Höfe, die die Liste zählt', 
       ...FUTTER,
       hoefe: [hof(0, [heu(7, 20)], { slug: 'hof-mueller', name: 'Hof Müller' }), hof(2, [heu(8, 20)])],
     }
-    const karte = baueUmfeldKarte({ ...eingabe, eigenerStandort: { lat: 48.2563, lon: 13.0434 } })
+    const karte = baueUmfeldKarte({ ...eingabe, eigenerStandort: BRAUNAU })
     expect(karte.pins.map((p) => p.slug)).not.toContain('hof-mueller')
     // … und in der Liste auch nicht.
     expect(baueUmfeldZeilen(eingabe)[0].hoefe.map((h) => h.slug)).not.toContain('hof-mueller')
   })
 
   it('der eigene Hof ist das Zentrum, der gewählte Umkreis sein Radius', () => {
-    const karte = baueUmfeldKarte({ ...FUTTER, km: 10, hoefe: [hof(2, [heu(8, 20)])], eigenerStandort: { lat: 48.2563, lon: 13.0434 } })
-    expect(karte.zentrum).toEqual({ lat: 48.2563, lon: 13.0434, radiusKm: 10 })
+    const karte = baueUmfeldKarte({ ...FUTTER, km: 10, hoefe: [hof(2, [heu(8, 20)])], eigenerStandort: BRAUNAU })
+    expect(karte.zentrum).toEqual({ ...BRAUNAU, radiusKm: 10 })
   })
 
   it('Pins nach Entfernung nummeriert, mit Hofseiten-Link im Bereich', () => {
     const karte = baueUmfeldKarte({
       ...FUTTER,
       hoefe: [hof(14.1, [heu(8, 20)], { slug: 'weit' }), hof(2.34, [heu(9, 20)], { slug: 'nah' })],
-      eigenerStandort: { lat: 48.2563, lon: 13.0434 },
+      eigenerStandort: BRAUNAU,
     })
     expect(karte.pins.map((p) => [p.slug, p.nummer, p.entfernung, p.link])).toEqual([
       ['nah', 1, '2,3 km', '/nah?bereich=futter'],
@@ -598,7 +598,9 @@ describe('guenstigsterGrundpreis — die Zeile unter dem Pin', () => {
   it('vergleicht nie Liter gegen Kilo — Kilopreise gehen vor', () => {
     const milch = produkt({ category: 'MILCH', subcategory: 'TRINKMILCH', price: 1.4, unit: 'LITER', unitSize: 1 })
     const erdaepfel = produkt({ category: 'GEMUESE', subcategory: 'ERDAEPFEL', price: 20, unit: 'KG', unitSize: 10 })
+    // In beiden Reihenfolgen — der Kilopreis gewinnt, egal was zuerst kommt.
     expect(guenstigsterGrundpreis([milch, erdaepfel], 'LEBENSMITTEL')).toBe('Erdäpfel · € 2,00 / kg')
+    expect(guenstigsterGrundpreis([erdaepfel, milch], 'LEBENSMITTEL')).toBe('Erdäpfel · € 2,00 / kg')
     expect(guenstigsterGrundpreis([milch], 'LEBENSMITTEL')).toBe('Trinkmilch · € 1,40 / L')
   })
 

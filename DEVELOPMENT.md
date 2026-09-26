@@ -1768,8 +1768,8 @@ strengere Sichtbarkeitsregel. Das Umfeld nimmt `OEFFENTLICH_SICHTBAR`
 unverändert und schließt zusätzlich pausierte Höfe aus — ein pausierter Hof
 verkauft gerade nicht. Aus der Query kommen nur Slug, Name, Ort, Entfernung,
 Koordinaten (für die Karte, wie auf /hoefe) und die Produktzeilen; Bestand und
-Reservierung werden nur für `istKaufbar` gelesen und verlassen sie nicht. Die farmId kommt aus der Sitzung, nie aus dem
-Client.
+Reservierung werden nur für `istKaufbar` gelesen und verlassen sie nicht. Die
+farmId kommt aus der Sitzung, nie aus dem Client.
 
 ### Die Rechenregeln
 

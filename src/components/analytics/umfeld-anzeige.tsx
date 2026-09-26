@@ -66,15 +66,17 @@ export function UmfeldAnzeige({
   return (
     <>
       <UmfeldKopf bereich={bereich} km={km} ansicht={wahl} />
-      <div className="mb-3 flex items-end justify-between gap-3">
-        <p className="text-xs text-muted-foreground">
-          Luftlinie ab deinem Hof. Nur Höfe, die gerade verkaufen — je Hof zählt sein günstigstes Angebot.
-        </p>
-        <div className="inline-flex shrink-0 rounded-xl bg-muted p-1" role="group" aria-label="Ansicht wählen">
+      {/* Eigene Zeile wie auf /hoefe — neben dem Umschalter bliebe dem Satz
+          darunter bei 375 px kaum Platz. */}
+      <div className="mb-3 flex justify-end">
+        <div className="inline-flex rounded-xl bg-muted p-1" role="group" aria-label="Ansicht wählen">
           {knopf('liste', 'Liste', List)}
           {knopf('karte', 'Karte', MapIcon)}
         </div>
       </div>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Luftlinie ab deinem Hof. Nur Höfe, die gerade verkaufen — je Hof zählt sein günstigstes Angebot.
+      </p>
       {ansicht.hinweise.map((hinweis) => (
         <p key={hinweis} className="mb-3 text-xs text-muted-foreground">
           {hinweis}

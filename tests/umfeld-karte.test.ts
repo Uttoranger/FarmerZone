@@ -52,7 +52,9 @@ function statischErreichbar(einstiege: string[]): Set<string> {
 const relativ = (menge: Set<string>) => [...menge].map((d) => (d.startsWith('paket:') ? d : path.relative(WURZEL, d)))
 
 const AUSWERTUNG = [
+  'src/app/layout.tsx',
   'src/app/(farmer)/layout.tsx',
+  'src/app/(farmer)/loading.tsx',
   'src/app/(farmer)/analytics/page.tsx',
   'src/app/(farmer)/analytics/umfeld/page.tsx',
 ]
@@ -70,6 +72,9 @@ describe('Umfeld-Karte — erst beim Umschalten geladen', () => {
     const text = fs.readFileSync(path.join(WURZEL, 'src/components/analytics/umfeld-anzeige.tsx'), 'utf8')
     expect(text).toMatch(/dynamic\(\s*\(\)\s*=>\s*import\('@\/components\/analytics\/umfeld-karte'\)/)
     expect(text).toMatch(/ssr:\s*false/)
+    // Gerendert — und damit geladen — nur in der Ansicht „Karte".
+    expect(text).toMatch(/wahl === 'karte' \? \(\s*<UmfeldKarteAnsicht/)
+    expect(text.match(/<UmfeldKarteAnsicht/g)).toHaveLength(1)
   })
 
   it('die Umfeld-Karte ist die Karte von /hoefe — und der Test erkennt Leaflet dahinter', () => {

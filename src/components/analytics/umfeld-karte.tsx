@@ -7,6 +7,9 @@ import HoefeKarte, { type KartenHof } from '@/components/hoefe/hoefe-karte'
 import { LEERE_LAGE, nachLeerTipp, nachPinTipp, type AuswahlLage } from '@/lib/hoefe-anzeige'
 import type { UmfeldKarte } from '@/lib/umfeld'
 
+/** Ungefähre Höhe der Karte unter dem Pin (Name, Entfernung, Preis, Link). */
+const PIN_KARTE_HOEHE = 160
+
 /**
  * Die Karte des Umfelds — die Kartenkomponente von /hoefe, nicht eine zweite.
  * Diese Datei ist nur der schmale Adapter: Umfeld-Pins → KartenHof, dazu der
@@ -25,13 +28,19 @@ export default function UmfeldKarteAnsicht({ karte, eigenerName }: { karte: Umfe
   const gewaehlt = karte.pins.find((p) => p.slug === lage.ausgewaehlt) ?? null
 
   return (
-    <div className="relative overflow-hidden rounded-2xl">
+    // `isolate`: eine eigene Stapelebene. Sonst stünden Leaflets Ebenen (400)
+    // und Bedienteile (1000) im selben Stapel wie die feste Bauern-Leiste
+    // (z-50) und lägen beim Scrollen über ihr.
+    <div className="relative isolate overflow-hidden rounded-2xl">
       <HoefeKarte
         hoefe={hoefe}
         lage={lage}
         fokus={0}
         attributionOben
         hoeheKlasse="h-[60vh] min-h-[320px]"
+        // So viel hält der Ausschnitt unten frei, wie die Karte unter dem
+        // Pin hoch ist — sonst lägen die südlichsten Höfe dahinter.
+        polsterUnten={PIN_KARTE_HOEHE}
         zentrum={{ ...karte.zentrum, titel: `${eigenerName} (dein Hof)` }}
         onAuswahl={(slug) => setLage((l) => nachPinTipp(l, slug))}
         onLeerTipp={() => setLage((l) => nachLeerTipp(l))}
@@ -39,7 +48,7 @@ export default function UmfeldKarteAnsicht({ karte, eigenerName }: { karte: Umfe
       {gewaehlt && (
         // Über den Leaflet-Ebenen (400) und unter den Bedienteilen (1000).
         <div
-          role="dialog"
+          role="region"
           aria-label={gewaehlt.name}
           className="absolute inset-x-3 bottom-3 z-[500] rounded-xl border border-border bg-card p-4 shadow-lg dark:ring-1 dark:ring-border"
         >

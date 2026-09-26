@@ -65,12 +65,15 @@ function pinIcon(nummer: number, zustand: ReturnType<typeof pinZustand>): L.DivI
   })
 }
 
-function eigenerPinIcon(): L.DivIcon {
+function eigenerPinIcon(titel: string): L.DivIcon {
   const p = EIGENER_PIN
+  // Der Pin ist nicht antippbar (interactive: false) — ein title zeigte sich
+  // nie. Die Beschriftung trägt er deshalb selbst, für Screenreader.
+  const beschriftung = titel.replace(/[<>&"]/g, '')
   return L.divIcon({
     className: '',
     html:
-      `<div style="width:${p.groesse}px;height:${p.groesse}px;border-radius:${p.eckenRadius}px;` +
+      `<div role="img" aria-label="${beschriftung}" style="width:${p.groesse}px;height:${p.groesse}px;border-radius:${p.eckenRadius}px;` +
       `background:${p.hintergrund};color:${p.schrift};` +
       `display:flex;align-items:center;justify-content:center;` +
       `font-size:12px;font-weight:700;border:2px solid ${p.rand};` +
@@ -245,10 +248,9 @@ export default function HoefeKarte({
       interactive: false,
     }).addTo(ebene)
     L.marker(mitte, {
-      icon: eigenerPinIcon(),
+      icon: eigenerPinIcon(zentrum.titel),
       keyboard: false,
       interactive: false,
-      title: zentrum.titel,
       zIndexOffset: 1000,
     }).addTo(ebene)
     map.fitBounds(mitte.toBounds(zentrum.radiusKm * 2000), {
@@ -257,7 +259,7 @@ export default function HoefeKarte({
       animate: false,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zentrum?.lat, zentrum?.lon, zentrum?.radiusKm])
+  }, [zentrum?.lat, zentrum?.lon, zentrum?.radiusKm, zentrum?.titel])
 
   // Merkt sich den beim Einhängen schon verbrauchten Stand: Nach einem
   // Reiterwechsel (Karte neu eingehängt) darf eine ALTE Anfahrt nicht erneut
