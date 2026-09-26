@@ -611,6 +611,39 @@ describe('guenstigsterGrundpreis — die Zeile unter dem Pin', () => {
   })
 })
 
+describe('Links auf fremde Hofseiten — im Futter direkt beim Futter', () => {
+  const eier = produkt({ category: 'EIER', subcategory: 'EIER_FREILAND', price: 3.6, unit: 'PAKET', unitSize: 10 })
+  // Ein Hof mit beidem — derselbe Hof, nur der gewählte Bereich entscheidet.
+  const hoefe = [hof(3, [heu(8, 20), eier], { slug: 'gemischt' })]
+  const links = (bereich: UmfeldEingabe['bereich']) => {
+    const eingabe = { ...FUTTER, bereich, hoefe }
+    return {
+      liste: baueUmfeldZeilen(eingabe).flatMap((z) => z.hoefe.map((h) => h.link)),
+      pins: baueUmfeldKarte({ ...eingabe, eigenerStandort: BRAUNAU }).pins.map((p) => p.link),
+    }
+  }
+
+  it('aus einer Futter-Zeile und vom Pin trägt der Link bereich=futter', () => {
+    const { liste, pins } = links('FUTTERMITTEL')
+    expect(liste.length).toBeGreaterThan(0)
+    expect(pins.length).toBeGreaterThan(0)
+    for (const link of [...liste, ...pins]) {
+      expect(new URLSearchParams(link.split('?')[1] ?? '').get('bereich'), link).toBe('futter')
+      expect(link.startsWith('/gemischt?'), link).toBe(true)
+    }
+  })
+
+  it('aus einer Hofladen-Zeile und vom Pin ohne Parameter', () => {
+    const { liste, pins } = links('LEBENSMITTEL')
+    expect(liste.length).toBeGreaterThan(0)
+    expect(pins.length).toBeGreaterThan(0)
+    for (const link of [...liste, ...pins]) {
+      expect(link).toBe('/gemischt')
+      expect(link).not.toContain('bereich=')
+    }
+  })
+})
+
 describe('Der eigene Pin — deutlich anders als jeder fremde', () => {
   it('andere Farbe, andere Form, „Du" statt einer Nummer', () => {
     for (const zustand of ['normal', 'hervorgehoben', 'ausgewaehlt'] as const) {

@@ -83,3 +83,15 @@ describe('Umfeld-Karte — erst beim Umschalten geladen', () => {
     expect(erreicht).toContain('paket:leaflet')
   })
 })
+
+describe('Links auf fremde Hofseiten — Liste und Pin-Karte', () => {
+  it('nehmen nur den fertigen Link aus src/lib/umfeld.ts, bauen keinen eigenen', () => {
+    // Den Bereich-Parameter (bereich=futter) setzt hofseitenLink; welche Links
+    // entstehen, prüft tests/umfeld.test.ts. Baute eine Komponente den Link
+    // selbst, fiele der Parameter dort still weg.
+    const hrefs = (datei: string) =>
+      [...fs.readFileSync(path.join(WURZEL, datei), 'utf8').matchAll(/href=(\{[^}]*\}|"[^"]*")/g)].map((m) => m[1])
+    expect(hrefs('src/components/analytics/umfeld-liste.tsx')).toEqual(['{hof.link}'])
+    expect(hrefs('src/components/analytics/umfeld-karte.tsx')).toEqual(['{gewaehlt.link}'])
+  })
+})

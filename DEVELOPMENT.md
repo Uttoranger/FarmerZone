@@ -1837,6 +1837,21 @@ Kilopreise, gewinnt der günstigste davon — gezeigt in der Einheit seiner Zeil
 mit der Sorte („Stroh · € 112 / t“), damit ein Strohpreis nicht wie ein
 Heupreis aussieht.
 
+### Beschriftung „In der Nähe“
+
+Auf Anweisung nach #131: In der Oberfläche heißt der Reiter „In der Nähe“,
+ebenso Seitentitel und Überschrift der Unterseite. „Umfeld“ ist ein Wort aus
+dem Konzept, kein Wort eines Landwirts. Code, Dateinamen, die Route
+`/analytics/umfeld` und das Konzept behalten „umfeld“ als internen Namen. Der
+Menüpunkt bleibt „Auswertung“, der erste Reiter „Umsatz“.
+
+Die Links auf fremde Hofseiten — in der Liste und unter dem Pin — tragen im
+Bereich Futtermittel `?bereich=futter`, damit die Hofseite beim Futter öffnet,
+im Hofladen keinen Parameter. So war es schon seit #130 (`hofseitenLink`, wie auf
+/hoefe); jetzt sichert es ein eigener Test in beide Richtungen, und
+`tests/umfeld-karte.test.ts` prüft, dass Liste und Pin-Karte keinen eigenen
+Link bauen.
+
 ### Geänderte Schwelle aus Bereiche 2: der 25-kg-Sack ist Kleingebinde
 
 Bis hierher zählte `istGrossgebinde` genau 25 kg schon als groß, und der

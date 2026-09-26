@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
@@ -11,9 +12,13 @@ import { PageHeader } from '@/components/farmer/page-header'
 import { AuswertungReiter } from '@/components/analytics/auswertung-reiter'
 import { UmfeldAnzeige } from '@/components/analytics/umfeld-anzeige'
 
+// Sichtbar heißt die Ansicht „In der Nähe"; „umfeld" ist nur der interne Name
+// (Route, Dateien, Konzept).
+export const metadata: Metadata = { title: 'In der Nähe — FarmerZone' }
+
 /**
- * Auswertung → Umfeld: was andere Höfe in der Nähe anbieten
- * (docs/konzepte/umfeld.md). Die Query bekommt nur die farmId aus der
+ * Auswertung → In der Nähe (intern: Umfeld): was andere Höfe in der Nähe
+ * anbieten (docs/konzepte/umfeld.md). Die Query bekommt nur die farmId aus der
  * Sitzung; Umkreis, Bereich und Ansicht (Liste | Karte) kommen aus der URL
  * und laufen durch Zod. Ohne eigenen Standort gibt es nur den Hinweis — auch
  * keinen Umschalter, eine Karte ohne Mittelpunkt sagte nichts.
@@ -37,7 +42,7 @@ export default async function UmfeldPage({
 
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto">
-      <PageHeader title="Auswertung" subtitle="Was andere Höfe in der Nähe anbieten" />
+      <PageHeader title="In der Nähe" subtitle="Was andere Höfe in der Nähe anbieten" />
       <AuswertungReiter aktiv="umfeld" />
 
       {!daten.eigenerStandort ? (
