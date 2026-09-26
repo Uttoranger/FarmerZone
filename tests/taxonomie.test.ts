@@ -32,6 +32,7 @@ import {
   NETTO_EINHEIT_VALUES,
   ABGABE_VALUES,
   BETRIEBSSTATUS_VALUES,
+  preisAnzeigeVon,
   type ProductCategoryValue,
   type ProductSubcategoryValue,
 } from '@/lib/taxonomie'
@@ -237,6 +238,30 @@ describe('formatKategorie', () => {
   it('kennt jede Kategorie', () => {
     for (const l1 of PRODUCT_CATEGORY_VALUES as readonly ProductCategoryValue[]) {
       expect(formatKategorie(l1)).toBe(KATEGORIE_LABEL[l1])
+    }
+  })
+})
+
+describe('preisAnzeigeVon — die Einheit einer Umfeld-Zeile', () => {
+  it('zeigt Heu & Stroh je Tonne und die übrigen Futtermittel je Doppelzentner, in ganzen Euro', () => {
+    expect(preisAnzeigeVon('HEU_STROH', 'WIESENHEU')).toEqual({ basis: 'KG', faktor: 1000, label: 't', stellen: 0 })
+    for (const l1 of ['GETREIDE_KOERNER', 'MISCHFUTTER', 'ERGAENZUNGSFUTTER'] as const) {
+      expect(preisAnzeigeVon(l1, null)).toEqual({ basis: 'KG', faktor: 100, label: 'dt', stellen: 0 })
+    }
+  })
+
+  it('zeigt den Hofladen je Kilo, Getränke und Trinkmilch je Liter, mit Cent', () => {
+    expect(preisAnzeigeVon('GEMUESE', 'ERDAEPFEL')).toEqual({ basis: 'KG', faktor: 1, label: 'kg', stellen: 2 })
+    expect(preisAnzeigeVon('MILCH', 'KAESE').label).toBe('kg')
+    expect(preisAnzeigeVon('MILCH', 'TRINKMILCH')).toEqual({ basis: 'LITER', faktor: 1, label: 'L', stellen: 2 })
+    expect(preisAnzeigeVon('GETRAENKE', null).label).toBe('L')
+    expect(preisAnzeigeVon(null, null).label).toBe('kg')
+  })
+
+  it('kennt für jede Futter-Kategorie eine Futter-Einheit — keine landet versehentlich bei €/kg', () => {
+    for (const l1 of PRODUCT_CATEGORY_VALUES) {
+      const futter = ['HEU_STROH', 'GETREIDE_KOERNER', 'MISCHFUTTER', 'ERGAENZUNGSFUTTER', 'FUTTERMITTEL'].includes(l1)
+      expect(['t', 'dt'].includes(preisAnzeigeVon(l1, null).label), l1).toBe(futter)
     }
   })
 })

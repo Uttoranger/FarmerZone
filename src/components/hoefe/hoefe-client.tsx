@@ -15,6 +15,7 @@ import {
 } from '@/schemas/hoefe-filter'
 import {
   berechneHofAuswahl,
+  bezugspunktVonHof,
   formatiereAbholung,
   formatiereEntfernung,
   suchForm,
@@ -111,7 +112,13 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
     const query = schreibeHoefeFilter(neu)
     window.history.replaceState(null, '', query ? `${pfad}?${query}` : pfad)
   }
-  const setzeFilter = (aenderung: Partial<HoefeFilter>) => schreibeUrl({ ...filter, ...aenderung })
+  // um=<hof-slug> (Link aus dem Umfeld): Bezugspunkt ist der öffentliche
+  // Standort dieses Hofs, aufgelöst gegen die ohnehin geladene Liste.
+  // Unbekannt oder ohne Standort: still verworfen — auch beim nächsten
+  // Schreiben der URL.
+  const umPunkt = useMemo(() => bezugspunktVonHof(hoefe, filter.um), [hoefe, filter.um])
+  const setzeFilter = (aenderung: Partial<HoefeFilter>) =>
+    schreibeUrl({ ...filter, ...(umPunkt ? {} : { um: null, km: null }), ...aenderung })
   const setAnsicht = (wert: 'liste' | 'karte') => setzeFilter({ ansicht: wert })
   const setSuchtext = (wert: string) => setzeFilter({ suchtext: wert })
   const [lage, setLage] = useState<AuswahlLage>(LEERE_LAGE)
@@ -119,8 +126,13 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
   const [fokus, setFokus] = useState(0)
   // Der Bezugspunkt der Umkreissuche lebt NUR hier: kein localStorage, kein
   // Konto, keine URL-Parameter — „Umkreis aufheben" macht ihn spurlos fort.
-  const [bezugspunkt, setBezugspunkt] = useState<Bezugspunkt | null>(null)
-  const [umkreis, setUmkreis] = useState<UmkreisStufe>(null)
+  const [eigenerPunkt, setEigenerPunkt] = useState<Bezugspunkt | null>(null)
+  const [eigeneStufe, setEigeneStufe] = useState<UmkreisStufe>(null)
+  // Wählt der Besucher selbst einen Punkt, gilt seiner; sonst der aus um=.
+  // Solange um= gilt, steht auch seine Stufe in der URL (km=).
+  const umAktiv = eigenerPunkt === null && umPunkt !== null
+  const bezugspunkt = eigenerPunkt ?? umPunkt
+  const umkreis: UmkreisStufe = umAktiv ? filter.km : eigeneStufe
   const eintraege = useRef(new Map<string, HTMLLIElement>())
   // Wie hoch das Karussell-Band mobil WIRKLICH ist: Die Karte hält seine
   // Pins darüber frei (fitBounds-Polster). Seit der Produktvorschau wächst
@@ -416,11 +428,20 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
       <HoefeUmkreis
         bezugspunkt={bezugspunkt}
         stufe={umkreis}
-        onBezugspunkt={setBezugspunkt}
-        onStufe={setUmkreis}
+        onBezugspunkt={(punkt) => {
+          setEigenerPunkt(punkt)
+          // Der eigene Punkt löst den Hof aus um= ab — die Stufe bleibt, die
+          // URL verliert um und km (der Besucherstandort kommt nie hinein).
+          if (filter.um) {
+            setEigeneStufe(umkreis)
+            setzeFilter({ um: null, km: null })
+          }
+        }}
+        onStufe={(stufe) => (umAktiv ? setzeFilter({ km: stufe }) : setEigeneStufe(stufe))}
         onAufheben={() => {
-          setBezugspunkt(null)
-          setUmkreis(null)
+          setEigenerPunkt(null)
+          setEigeneStufe(null)
+          if (filter.um) setzeFilter({ um: null, km: null })
         }}
       />
       {produktSuche}

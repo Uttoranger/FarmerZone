@@ -139,7 +139,7 @@ Client-Komponente → Server Action → Zod → Fachregel (lib) → Prisma → r
 | Formular | `react-hook-form` | Kein `useState` je Feld |
 | UI-lokal (offen/zu) | `useState` | Nicht global |
 | Warenkorb | `use-cart.ts` (localStorage) + serverseitige Reservierung | Warenkorb ist **nie** die Wahrheit über Verfügbarkeit |
-| Filter/Suche in URL | `useSearchParams` lesen, Zod-Schema in `src/schemas/` parst und verwirft Ungültiges still; schreiben mit `window.history.replaceState` (Next gleicht `useSearchParams` ab, kein Server-Roundtrip je Tipp) oder `router.replace`, wenn der Server neu rendern soll | Nicht nur im State — Ergebnisse müssen teilbar sein. **Nie** Standort/Koordinaten in die URL |
+| Filter/Suche in URL | `useSearchParams` lesen, Zod-Schema in `src/schemas/` parst und verwirft Ungültiges still; schreiben mit `window.history.replaceState` (Next gleicht `useSearchParams` ab, kein Server-Roundtrip je Tipp) oder `router.replace`, wenn der Server neu rendern soll | Nicht nur im State — Ergebnisse müssen teilbar sein. **Nie** Standort/Koordinaten in die URL. Ausnahme: `um=<hof-slug>&km=` — Bezugspunkt ist der öffentliche Standort eines freigegebenen Hofs. Der Standort des Besuchers kommt nie in die URL. |
 | Theme | `next-themes`, `ThemeProvider` in `src/app/layout.tsx` (`attribute="class"`, `defaultTheme="system"`) | Kein eigener Provider, keine Spalte in der Datenbank — die Wahl gehört dem Gerät |
 
 **Kein globaler Store.** Wenn etwas global wirkt, gehört es meist in die URL oder auf den Server.
@@ -157,8 +157,9 @@ Diese Regeln sind fachlich, nicht technisch. Verletzung kostet Geld oder Vertrau
 - **Checkout ist idempotent.** `Order.idempotencyKey` ist unique. Zweiter Request mit gleichem Schlüssel gibt die bestehende Bestellung zurück.
 - **Der Preis kommt aus der Datenbank.** Der Checkout rechnet Positionen, Summe und Stripe-Betrag mit `Product.price`, nie mit dem Preis aus dem Request. Weicht der Request ab, 409 `WARENKORB_GEAENDERT` mit den gültigen Preisen (`preise`) — nie eine Bestellung zu einem Preis, den die Kundin nicht gesehen hat.
 - **Eine Bestellung überlebt einen gescheiterten Mailversand.** Immer.
-- **Jede Abfrage im Bauern-Bereich ist auf den eigenen Hof begrenzt.** Es gibt keine hofübergreifende Sicht außer im Admin.
-- **Archivierte, pausierte und nicht freigegebene Höfe** sind öffentlich unsichtbar. Bei jeder neuen öffentlichen Abfrage mitprüfen.
+- **Jede Abfrage im Bauern-Bereich ist auf den eigenen Hof begrenzt.** Ausnahme: aggregierte Sichten über fremde Höfe, die nur Daten lesen, die auch auf /hoefe oder der Hofseite stehen, und dieselbe oder eine strengere Sichtbarkeitsregel wie /hoefe nutzen.
+- **Aggregierte Sichten über fremde Höfe nutzen dieselbe Sichtbarkeitsregel wie /hoefe** — `OEFFENTLICH_SICHTBAR` aus `src/server/queries/farm.ts`, unverändert, höchstens um Bedingungen ergänzt (das Umfeld schließt zusätzlich pausierte Höfe aus, `src/server/queries/umfeld.ts`). Verfügbar heißt dort `istKaufbar`. Keine zweite Sichtbarkeitslogik.
+- **Archivierte und nicht freigegebene Höfe** sind öffentlich unsichtbar. Bei jeder neuen öffentlichen Abfrage mitprüfen. **Pausierte Höfe** bleiben öffentlich sichtbar, mit Hinweis, und nehmen keine Bestellungen an: `/api/reserve` und `/api/checkout` lehnen sie mit 409 ab (`SHOP_PAUSED_MESSAGE`).
 - **Migrationen laufen vor dem Code.** Eine NOT-NULL-Spalte ohne Default darf auf eine bestehende Tabelle nur, wenn die Tabelle nachweislich leer ist oder die Spalte in zwei Schritten kommt: erst nullable plus Code, der sie schreibt; im nächsten Sprint NOT NULL. Dasselbe gilt für das Entfernen von Spalten, die alter Code noch liest. — Grund: `vercel-build` schaltet die Migration Minuten vor dem Code live; in diesem Deploy-Fenster schreibt der alte Code ins neue Schema (Vorfall 2026-09-23, `DEVELOPMENT.md` → Vorfälle). Durchgesetzt von `tests/migrationen-wache.test.ts`; begründete Ausnahmen tragen einen `-- EXPAND-CONTRACT:`-Marker in den fünf Zeilen vor dem `ALTER TABLE`.
 
 ### Taxonomie (Kategorien, Unterkategorien, Siegel)

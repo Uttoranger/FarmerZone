@@ -372,12 +372,18 @@ export type NettoEinheitValue = (typeof NETTO_EINHEIT_VALUES)[number]
 
 export const NETTO_EINHEIT_LABEL: Record<NettoEinheitValue, string> = { KG: 'kg', LITER: 'L' }
 
-/** Ab diesem Gebinde-Inhalt gilt ein Futtermittel als Großgebinde (Konzept §9). */
-export const GROSSGEBINDE_AB_KG = 25
+/**
+ * Bis zu diesem Gebinde-Inhalt EINSCHLIESSLICH ist ein Futtermittel ein
+ * Kleingebinde. Bis zum Umfeld-Sprint hieß die Konstante GROSSGEBINDE_AB_KG und
+ * zählte genau 25 kg schon als groß — der Filter auf /hoefe beschriftet aber
+ * „Klein (bis 25 kg)", und der 25-kg-Sack ist im Handel ein Kleingebinde.
+ */
+export const KLEINGEBINDE_BIS_KG = 25
 
 /**
- * Großgebinde ab 25 kg Inhalt — genau 25 kg zählt schon als groß. Liter zählen
- * 1:1 als kg: Für die Einordnung reicht das; eine Dichte kennt die Plattform nicht.
+ * Großgebinde erst ÜBER 25 kg Inhalt — der 25-kg-Sack ist Kleingebinde. Liter
+ * zählen 1:1 als kg: Für die Einordnung reicht das; eine Dichte kennt die
+ * Plattform nicht. (Preisvergleiche rechnen Liter NIE als Kilo, src/lib/umfeld.ts.)
  */
 export function istGrossgebinde(
   nettoMenge: number | { toString(): string },
@@ -388,7 +394,48 @@ export function istGrossgebinde(
   _nettoEinheit: NettoEinheitValue
 ): boolean {
   const menge = typeof nettoMenge === 'number' ? nettoMenge : Number(nettoMenge.toString())
-  return Number.isFinite(menge) && menge >= GROSSGEBINDE_AB_KG
+  return Number.isFinite(menge) && menge > KLEINGEBINDE_BIS_KG
+}
+
+/**
+ * In welcher Einheit das Umfeld Grundpreise einer Zeile zeigt (Konzept Umfeld
+ * §4). Intern rechnet alles in €/kg bzw. €/L (`basis`); `faktor` skaliert auf
+ * die Anzeige, `stellen` sagt, ob Cent noch etwas bedeuten — bei einer Tonne
+ * nicht.
+ */
+export type PreisAnzeige = {
+  basis: NettoEinheitValue
+  faktor: number
+  label: string
+  stellen: 0 | 2
+}
+
+const JE_KG: PreisAnzeige = { basis: 'KG', faktor: 1, label: 'kg', stellen: 2 }
+const JE_LITER: PreisAnzeige = { basis: 'LITER', faktor: 1, label: 'L', stellen: 2 }
+const JE_TONNE: PreisAnzeige = { basis: 'KG', faktor: 1000, label: 't', stellen: 0 }
+const JE_DOPPELZENTNER: PreisAnzeige = { basis: 'KG', faktor: 100, label: 'dt', stellen: 0 }
+
+const PREIS_ANZEIGE_JE_KATEGORIE: Partial<Record<ProductCategoryValue, PreisAnzeige>> = {
+  HEU_STROH: JE_TONNE,
+  GETREIDE_KOERNER: JE_DOPPELZENTNER,
+  MISCHFUTTER: JE_DOPPELZENTNER,
+  ERGAENZUNGSFUTTER: JE_DOPPELZENTNER,
+  // Altlast aus Taxonomie 1 — fachlich Futter, also wie die Futter-Kategorien.
+  FUTTERMITTEL: JE_DOPPELZENTNER,
+  GETRAENKE: JE_LITER,
+}
+
+/**
+ * Die Anzeigeeinheit einer Umfeld-Zeile. Im Hofladen €/kg, außer Getränke und
+ * Trinkmilch in €/L — Milch ist die eine Kategorie, deren Sorten beides
+ * kennen (Käse je kg, Trinkmilch je Liter), deshalb entscheidet dort die L2.
+ */
+export function preisAnzeigeVon(
+  l1: ProductCategoryValue | null | undefined,
+  l2: ProductSubcategoryValue | null | undefined
+): PreisAnzeige {
+  if (l2 === 'TRINKMILCH') return JE_LITER
+  return (l1 && PREIS_ANZEIGE_JE_KATEGORIE[l1]) || JE_KG
 }
 
 /** Einheiten, deren Gewicht in der Kennzeichnung steht statt in unitSize. */

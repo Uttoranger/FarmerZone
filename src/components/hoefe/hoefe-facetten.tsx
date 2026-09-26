@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { ArrowUpDown, ChevronDown } from 'lucide-react'
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
-import { GROSSGEBINDE_AB_KG, type ProductLabelValue, type TierartValue } from '@/lib/taxonomie'
+import { KLEINGEBINDE_BIS_KG, type ProductLabelValue, type TierartValue } from '@/lib/taxonomie'
 import type { Chip } from '@/lib/bereiche-anzeige'
 import type { GebindeWahl, HoefeFilter } from '@/schemas/hoefe-filter'
 import { cn } from '@/lib/utils'
@@ -109,8 +109,8 @@ export function HoefeFacetten({
               aktiv={filter.gebinde === chip.wert}
               title={
                 chip.wert === 'KLEIN'
-                  ? `Unter ${GROSSGEBINDE_AB_KG} kg je Gebinde`
-                  : `Ab ${GROSSGEBINDE_AB_KG} kg je Gebinde`
+                  ? `Bis ${KLEINGEBINDE_BIS_KG} kg je Gebinde`
+                  : `Über ${KLEINGEBINDE_BIS_KG} kg je Gebinde`
               }
               onClick={() => onFilter({ gebinde: filter.gebinde === chip.wert ? null : chip.wert })}
             >

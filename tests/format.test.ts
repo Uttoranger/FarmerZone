@@ -13,6 +13,8 @@ import {
   formatGrundpreis,
   formatGrundpreisZeile,
   grundpreisJeEinheit,
+  grundpreisJeKg,
+  formatPreisSpanne,
   parseDezimal,
   formatDezimal,
   nachkommastellen,
@@ -43,6 +45,66 @@ describe('Geld', () => {
   it('fällt bei unbrauchbaren Zahlen auf null zurück statt „€ NaN" zu zeigen', () => {
     expect(formatEuro(Number.NaN)).toBe('€ 0,00')
     expect(formatEuro(Number.POSITIVE_INFINITY)).toBe('€ 0,00')
+  })
+
+  it('schreibt auf Wunsch ganze Euro — für Preise je Tonne und Doppelzentner', () => {
+    expect(formatEuro(150, 0)).toBe('€ 150')
+    expect(formatEuro(149.6, 0)).toBe('€ 150')
+    expect(norm(formatEuro(1234.4, 0))).toBe('€ 1 234')
+    expect(formatEuro(Number.NaN, 0)).toBe('€ 0')
+    // Ohne Angabe bleibt alles bei zwei Stellen.
+    expect(formatEuro(150)).toBe('€ 150,00')
+  })
+})
+
+describe('grundpreisJeKg — der vergleichbare Grundpreis (Umfeld)', () => {
+  it('rechnet Kilo und Liter aus Einheit und Gebindegröße', () => {
+    expect(grundpreisJeKg(3.5, 'KG', null, null, null)).toEqual({ wert: 3.5, einheit: 'KG' })
+    expect(grundpreisJeKg(20, 'KG', 5, null, null)).toEqual({ wert: 4, einheit: 'KG' })
+    expect(grundpreisJeKg(4.5, 'LITER', 5, null, null)).toEqual({ wert: 0.9, einheit: 'LITER' })
+  })
+
+  it('rechnet Gramm und Milliliter auf Kilo und Liter um', () => {
+    expect(grundpreisJeKg(3, 'G', 500, null, null)).toEqual({ wert: 6, einheit: 'KG' })
+    expect(grundpreisJeKg(7.5, 'G', 250, null, null)?.wert).toBeCloseTo(30)
+    expect(grundpreisJeKg(2, 'ML', 500, null, null)).toEqual({ wert: 4, einheit: 'LITER' })
+  })
+
+  it('nimmt mit Futter-Kennzeichnung die Nettomenge — wie der Kilopreis auf /hoefe', () => {
+    expect(grundpreisJeKg(45, 'BALLEN', null, 300, 'KG')).toEqual({ wert: 0.15, einheit: 'KG' })
+    // Die Nettomenge gewinnt auch gegen eine Maßeinheit am Produkt.
+    expect(grundpreisJeKg(12, 'KG', null, 25, 'KG')).toEqual({ wert: 0.48, einheit: 'KG' })
+    expect(grundpreisJeKg(12, 'KG', null, { toString: () => '25.000' }, 'KG')?.wert).toBeCloseTo(0.48)
+    expect(grundpreisJeKg(30, 'KG', null, 20, 'LITER')).toEqual({ wert: 1.5, einheit: 'LITER' })
+  })
+
+  it('ist für Stück, Paket, Raummeter und Ballen ohne Kennzeichnung nicht vergleichbar', () => {
+    expect(grundpreisJeKg(3.8, 'STUECK', null, null, null)).toBeNull()
+    expect(grundpreisJeKg(3.6, 'PAKET', 10, null, null)).toBeNull()
+    expect(grundpreisJeKg(95, 'M3', 1, null, null)).toBeNull()
+    expect(grundpreisJeKg(45, 'BALLEN', null, null, null)).toBeNull()
+  })
+
+  it('gibt bei unbrauchbaren Zahlen null statt eines falschen Preises', () => {
+    expect(grundpreisJeKg(0, 'KG', null, null, null)).toBeNull()
+    expect(grundpreisJeKg(Number.NaN, 'KG', null, null, null)).toBeNull()
+    expect(grundpreisJeKg(10, 'KG', 0, null, null)).toBeNull()
+    expect(grundpreisJeKg(10, 'KG', -2, null, null)).toBeNull()
+    // Kennzeichnung mit Nettomenge 0: kein Rückfall auf die Einheit.
+    expect(grundpreisJeKg(10, 'KG', null, 0, 'KG')).toBeNull()
+  })
+})
+
+describe('formatPreisSpanne', () => {
+  it('schreibt die Spanne mit dem Euro-Zeichen vorn und der Einheit hinten', () => {
+    expect(formatPreisSpanne(120, 180, 't', 0)).toBe('€ 120 – 180 / t')
+    expect(formatPreisSpanne(0.12, 0.18, 'kg', 2)).toBe('€ 0,12 – 0,18 / kg')
+  })
+
+  it('zeigt nur einen Wert, wenn beide Enden gleich aussehen', () => {
+    expect(formatPreisSpanne(150, 150, 't', 0)).toBe('€ 150 / t')
+    expect(formatPreisSpanne(150.2, 149.9, 't', 0)).toBe('€ 150 / t')
+    expect(formatPreisSpanne(0.9, 0.9, 'L', 2)).toBe('€ 0,90 / L')
   })
 })
 
