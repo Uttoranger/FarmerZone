@@ -36,6 +36,13 @@ const regeln = [
       'Nur .env.example mit Platzhaltern gehört in den Commit.',
   },
   {
+    // Auch mit globalen Optionen davor (git -C <ordner> push --all). Die
+    // lokalen Branches enthalten längst gemergte Stände und Versuche — auf dem
+    // öffentlichen Repo tauchten sie alle wieder auf.
+    muster: /\bgit(\s+(-C|-c)\s+\S+|\s+--[\w-]+(=\S+)?)*\s+push\b[^|;&]*\s--(all|mirror)\b/,
+    grund: 'Schiebt alle lokalen Branches auf das öffentliche Repo. Nur den eigenen Branch pushen.',
+  },
+  {
     muster: /git\s+push\b[^|;&]*\s(origin\s+)?main\b/,
     grund:
       'Direktes Pushen auf main ist nicht vorgesehen. Feature-Branch anlegen, ' +

@@ -134,7 +134,8 @@ Eine Regel hier widerlegt? **Nicht heimlich abweichen** — melden.
 ### Zwei Hooks setzen durch, was nicht verhandelbar ist
 
 - **Gefährliche Befehle werden blockiert** (`prisma db push`, Force-Push,
-  `.env` committen, Push auf `main`, `npm install`).
+  `.env` committen, Push auf `main`, Push aller Branches mit `--all`/`--mirror`,
+  `npm install`).
 - **Ein Zug endet nicht bei rotem Typecheck oder roten Tests.**
 
 Das ist Absicht. Nicht umgehen, sondern beheben. Konfiguration: `.claude/settings.json`.
