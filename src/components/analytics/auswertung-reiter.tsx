@@ -3,12 +3,14 @@ import { cn } from '@/lib/utils'
 
 const REITER = [
   { key: 'umsatz', label: 'Umsatz', href: '/analytics' },
-  { key: 'umfeld', label: 'Umfeld', href: '/analytics/umfeld' },
+  { key: 'umfeld', label: 'In der Nähe', href: '/analytics/umfeld' },
 ] as const
 
 /**
- * Die Reiter der Auswertung: „Umsatz" (das Bisherige) und „Umfeld" (Konzept
- * Umfeld §4). Als Links, nicht als Tabs-Komponente: Jeder Reiter hat seine
+ * Die Reiter der Auswertung: „Umsatz" (das Bisherige) und „In der Nähe" (Konzept
+ * Umfeld §4). „umfeld" bleibt der interne Name in Code und Route — sichtbar
+ * ist er nie, ein Landwirt sagt „in der Nähe", nicht „Umfeld".
+ * Als Links, nicht als Tabs-Komponente: Jeder Reiter hat seine
  * eigene Adresse, Zurück und Neuladen landen im richtigen. Bewusst als
  * Unterstrich-Reiter gestaltet — die Zeitraum-Wahl darunter ist eine
  * Segment-Wanne, zwei gleiche Wannen übereinander läsen sich wie eine Wahl.

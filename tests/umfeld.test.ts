@@ -29,6 +29,7 @@ import { ERDRADIUS_KM, UMKREIS_STUFEN, entfernungKm } from '@/lib/hofuebersicht'
 import { EIGENER_PIN, pinDarstellung } from '@/lib/hoefe-anzeige'
 import { preisAnzeigeVon } from '@/lib/taxonomie'
 import { leseUmfeldAnsicht, leseUmfeldFilter, umfeldLink } from '@/schemas/umfeld-filter'
+import { bereichAusParameter } from '@/schemas/hoefe-filter'
 
 // ─── Hilfen ─────────────────────────────────────────────────────────────────
 
@@ -608,6 +609,46 @@ describe('guenstigsterGrundpreis — die Zeile unter dem Pin', () => {
     const brot = produkt({ category: 'BROT', unit: 'STUECK' })
     expect(guenstigsterGrundpreis([heu(8, 20)], 'LEBENSMITTEL')).toBeNull()
     expect(guenstigsterGrundpreis([brot], 'LEBENSMITTEL')).toBeNull()
+  })
+})
+
+describe('Links auf fremde Hofseiten — im Futter direkt beim Futter', () => {
+  const eier = produkt({ category: 'EIER', subcategory: 'EIER_FREILAND', price: 3.6, unit: 'PAKET', unitSize: 10 })
+  // Ein Hof mit beidem — derselbe Hof, nur der gewählte Bereich entscheidet.
+  const hoefe = [hof(3, [heu(8, 20), eier], { slug: 'gemischt' })]
+  const links = (bereich: UmfeldEingabe['bereich']) => {
+    const eingabe = { ...FUTTER, bereich, hoefe }
+    return {
+      liste: baueUmfeldZeilen(eingabe).flatMap((z) => z.hoefe.map((h) => h.link)),
+      pins: baueUmfeldKarte({ ...eingabe, eigenerStandort: BRAUNAU }).pins.map((p) => p.link),
+    }
+  }
+
+  // Was die Hofseite aus dem Link liest (product-grid.tsx) — so hängt der Test
+  // an der Wirkung „öffnet beim Futter", nicht nur an der Zeichenkette.
+  const hofseiteOeffnet = (link: string) =>
+    bereichAusParameter(new URLSearchParams(link.split('?')[1] ?? '').get('bereich'))
+
+  it('aus einer Futter-Zeile und vom Pin trägt der Link bereich=futter', () => {
+    const { liste, pins } = links('FUTTERMITTEL')
+    expect(liste.length).toBeGreaterThan(0)
+    expect(pins.length).toBeGreaterThan(0)
+    for (const link of [...liste, ...pins]) {
+      expect(link, link).toContain('bereich=futter')
+      expect(link.startsWith('/gemischt?'), link).toBe(true)
+      expect(hofseiteOeffnet(link), link).toBe('FUTTERMITTEL')
+    }
+  })
+
+  it('aus einer Hofladen-Zeile und vom Pin ohne Parameter', () => {
+    const { liste, pins } = links('LEBENSMITTEL')
+    expect(liste.length).toBeGreaterThan(0)
+    expect(pins.length).toBeGreaterThan(0)
+    for (const link of [...liste, ...pins]) {
+      expect(link).not.toContain('bereich=futter')
+      expect(link).toBe('/gemischt')
+      expect(hofseiteOeffnet(link), link).toBe('LEBENSMITTEL')
+    }
   })
 })
 

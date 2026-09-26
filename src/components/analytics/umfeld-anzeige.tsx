@@ -19,7 +19,7 @@ const UmfeldKarteAnsicht = dynamic(() => import('@/components/analytics/umfeld-k
 })
 
 /**
- * Der Inhalt des Reiters „Umfeld": Kopf (Bereich, Umkreis), Umschalter
+ * Der Inhalt des Reiters „In der Nähe" (intern: Umfeld): Kopf (Bereich, Umkreis), Umschalter
  * „Liste | Karte" wie auf /hoefe, Hinweise und die gewählte Ansicht.
  *
  * Die Ansicht steht als ?ansicht= in der URL der Umfeld-Seite. Gewechselt wird

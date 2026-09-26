@@ -3,6 +3,8 @@
 Stand: 2026-09-26 · Status: **umgesetzt im Sprint Umfeld** (Branch `feature/hoefe-in-der-naehe`) · Voraussetzung: Bereiche 1 und 2 gemerged
 Verbindliche Quelle für den Sprint „Umfeld". Die Stellen mit *(geändert vor dem Umfeld-Sprint)* gelten vor dem ursprünglichen Wortlaut.
 
+In der Oberfläche heißt die Ansicht ‚In der Nähe‘.
+
 ---
 
 ## 1. Ziel und Nicht-Ziele

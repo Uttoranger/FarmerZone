@@ -3,7 +3,7 @@ import type { AnzeigeBereich } from '@/lib/taxonomie'
 import { UMFELD_KM, type UmfeldKm } from '@/lib/umfeld'
 
 /**
- * Umkreis, Bereich und Ansicht des Reiters „Umfeld" in der URL
+ * Umkreis, Bereich und Ansicht des Reiters „In der Nähe" (intern: Umfeld) in der URL
  * (`/analytics/umfeld?km=25&bereich=futter&ansicht=karte`), damit Reload und
  * Zurück funktionieren — auch von der Hofseite zurück in die Karte (Konzept
  * Umfeld §4).
