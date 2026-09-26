@@ -10,7 +10,8 @@
  *     Kategorie), was ihr vergleichbarer Grundpreis ist und in welcher
  *     Einheit er gezeigt wird,
  *   - Spanne, Mitte und „Deins" — über EINEN Wert je Hof und Gebindeklasse,
- *     seinen günstigsten: „wo liegt das günstigste Angebot jedes Nachbarn".
+ *     seinen günstigsten: „wo liegt das günstigste Angebot jedes Nachbarn",
+ *   - welche Pins die Karte zeigt: genau die Höfe, die die Liste zählt.
  *
  * Was hier bewusst NICHT entschieden wird: die Sichtbarkeit fremder Höfe. Die
  * steht in der WHERE-Klausel der Query (OEFFENTLICH_SICHTBAR plus nicht
@@ -33,13 +34,12 @@ import {
   type ProductCategoryValue,
   type ProductSubcategoryValue,
 } from '@/lib/taxonomie'
-import { LEERER_HOEFE_FILTER, UM_KM_VALUES, schreibeHoefeFilter, type UmKm } from '@/schemas/hoefe-filter'
 
 // ─── Umkreis ────────────────────────────────────────────────────────────────
 
-/** Die Stufen des Umfelds — dieselben wie der Umkreis-Regler auf /hoefe. */
-export const UMFELD_KM = UM_KM_VALUES
-export type UmfeldKm = UmKm
+/** Die Stufen des Umfelds — dieselben wie der Umkreis-Regler auf /hoefe ohne „egal" (Test). */
+export const UMFELD_KM = [10, 25, 50] as const
+export type UmfeldKm = (typeof UMFELD_KM)[number]
 
 /** Mehr Höfe zeigt das Umfeld nicht — die nächsten gewinnen, mit Hinweis. */
 export const UMFELD_HOEFE_DECKEL = 200
@@ -131,11 +131,17 @@ export type UmfeldProdukt = {
   nettoEinheit: NettoEinheitValue | null
 }
 
-/** Ein fremder Hof im Umkreis. Keine Kontaktdaten — nur, was die Hofübersicht auch zeigt. */
+/**
+ * Ein fremder Hof im Umkreis. Keine Kontaktdaten — nur, was die Hofübersicht
+ * auch zeigt. Die Koordinaten stehen dort ebenfalls (als Pin); hier braucht
+ * sie die Karte des Umfelds.
+ */
 export type UmfeldHof = {
   slug: string
   name: string
   ort: string
+  lat: number
+  lon: number
   entfernungKm: number
   produkte: UmfeldProdukt[]
 }
@@ -223,8 +229,6 @@ export type UmfeldZeile = {
   hinweis: string | null
   /** Nach Entfernung; die ersten UMFELD_HOEFE_SICHTBAR stehen gleich da. */
   hoefe: UmfeldHofEintrag[]
-  /** null, wenn dein Hof nicht auf /hoefe steht — ein Link, der nichts bewirkt, fehlt lieber. */
-  kartenLink: string | null
 }
 
 type ZeilenSchluessel = { l1: ProductCategoryValue; l2: ProductSubcategoryValue | null }
@@ -339,20 +343,6 @@ function baueZeile(
     }
   })
 
-  const kartenLink =
-    eingabe.eigenerSlug === null
-      ? null
-      : `/hoefe?${schreibeHoefeFilter({
-          ...LEERER_HOEFE_FILTER,
-          bereich,
-          // kat= immer mit: Ohne gewählte Kategorie verwirft /hoefe die Sorte.
-          kategorien: [schluessel.l1],
-          sorten: schluessel.l2 ? [schluessel.l2] : [],
-          ansicht: 'karte',
-          um: eingabe.eigenerSlug,
-          km: eingabe.km,
-        })}`
-
   return {
     schluessel: schluesselText(schluessel),
     titel: schluessel.l2 ? UNTERKATEGORIE_LABEL[schluessel.l2] : KATEGORIE_LABEL[schluessel.l1],
@@ -362,7 +352,6 @@ function baueZeile(
     preise,
     hinweis: werteJeKlasse.size === 0 ? nichtVergleichbarText(fremdeProdukte) : null,
     hoefe,
-    kartenLink,
   }
 }
 
@@ -373,8 +362,8 @@ export type UmfeldEingabe = {
   eigeneProdukte: readonly UmfeldProdukt[]
   /** Fremde Höfe im Umkreis, nach Entfernung, nur kaufbare Produkte. */
   hoefe: readonly UmfeldHof[]
-  /** Dein Slug, wenn dein Hof auf /hoefe steht — sonst null (kein Kartenlink). */
-  eigenerSlug: string | null
+  /** Dein Slug — dein Hof ist nie ein fremder Hof, auch nicht auf der Karte. */
+  eigenerSlug: string
 }
 
 /**
@@ -384,8 +373,10 @@ export type UmfeldEingabe = {
  * Taxonomie-Reihenfolge.
  */
 export function baueUmfeldZeilen(eingabe: UmfeldEingabe): UmfeldZeile[] {
+  // Dieselbe Menge wie die Pins der Karte — eine Regel, zwei Ansichten.
+  const fremde = { ...eingabe, hoefe: gezaehlteHoefe(eingabe) }
   const schluessel = new Map<string, ZeilenSchluessel>()
-  for (const hof of eingabe.hoefe) {
+  for (const hof of fremde.hoefe) {
     for (const p of hof.produkte) {
       if (anzeigeBereichVon(p.category) !== eingabe.bereich) continue
       const z = zeileVon(p)
@@ -393,7 +384,7 @@ export function baueUmfeldZeilen(eingabe: UmfeldEingabe): UmfeldZeile[] {
     }
   }
   return [...schluessel.values()]
-    .map((z) => ({ zeile: baueZeile(z, eingabe), rang: taxonomieRang(z, eingabe.bereich) }))
+    .map((z) => ({ zeile: baueZeile(z, fremde), rang: taxonomieRang(z, eingabe.bereich) }))
     .sort(
       (a, b) =>
         Number(b.zeile.eigenesProdukt) - Number(a.zeile.eigenesProdukt) ||
@@ -401,6 +392,87 @@ export function baueUmfeldZeilen(eingabe: UmfeldEingabe): UmfeldZeile[] {
         a.rang - b.rang
     )
     .map(({ zeile }) => zeile)
+}
+
+/**
+ * Die Höfe, die das Umfeld zählt: fremd (nie der eigene, auch wenn er
+ * übergeben wird) und mit mindestens einem Produkt im gewählten Bereich. Die
+ * Query liefert ohnehin nur sichtbare, nicht pausierte Höfe im Umkreis mit
+ * kaufbarem Angebot. Liste und Karte fragen beide hier — sonst zählte die
+ * Karte andere Höfe als die Zeilen.
+ */
+export function gezaehlteHoefe(eingabe: Pick<UmfeldEingabe, 'bereich' | 'hoefe' | 'eigenerSlug'>): UmfeldHof[] {
+  return eingabe.hoefe.filter(
+    (h) => h.slug !== eingabe.eigenerSlug && h.produkte.some((p) => anzeigeBereichVon(p.category) === eingabe.bereich)
+  )
+}
+
+// ─── Karte ──────────────────────────────────────────────────────────────────
+
+/** Ein Pin der Umfeld-Karte — ein Hof, den die Liste gerade zählt. */
+export type UmfeldPin = {
+  slug: string
+  name: string
+  /** 1 = der nächste; nach Entfernung wie die Höfe in den Zeilen. */
+  nummer: number
+  lat: number
+  lon: number
+  entfernung: string
+  /** „Wiesenheu · € 350 / t"; null ohne vergleichbares Produkt im Bereich. */
+  guenstigster: string | null
+  link: string
+}
+
+export type UmfeldKarte = {
+  /** Dein Hof: Mittelpunkt, eigener Pin, der Umkreis als Kreis. */
+  zentrum: { lat: number; lon: number; radiusKm: UmfeldKm }
+  pins: UmfeldPin[]
+}
+
+/**
+ * Der günstigste Grundpreis eines Hofs im gewählten Bereich — für die Karte
+ * unter dem Pin. Verglichen wird je Kilo bzw. je Liter, nie beides gegen-
+ * einander (kein Liter-gleich-Kilo); hat der Hof Kilopreise, gewinnt der
+ * günstigste davon, sonst der günstigste Literpreis. Gezeigt wird er in der
+ * Einheit seiner Zeile, mit der Sorte — ein Strohpreis je Tonne ist kein
+ * Heupreis, das soll man lesen können.
+ */
+export function guenstigsterGrundpreis(produkte: readonly UmfeldProdukt[], bereich: AnzeigeBereich): string | null {
+  let bester: { basis: NettoEinheitValue; jeBasis: number; text: string } | null = null
+  for (const p of produkte) {
+    if (anzeigeBereichVon(p.category) !== bereich) continue
+    const zeile = zeileVon(p)
+    const anzeige = preisAnzeigeVon(zeile.l1, zeile.l2)
+    const { wert } = bewerteProdukt(p, bereich, anzeige)
+    if (wert === null) continue
+    const titel = zeile.l2 ? UNTERKATEGORIE_LABEL[zeile.l2] : KATEGORIE_LABEL[zeile.l1]
+    const kandidat = { basis: anzeige.basis, jeBasis: wert / anzeige.faktor, text: `${titel} · ${preisText(wert, anzeige)}` }
+    const besser =
+      bester === null ||
+      (kandidat.basis === bester.basis ? kandidat.jeBasis < bester.jeBasis : kandidat.basis === 'KG')
+    if (besser) bester = kandidat
+  }
+  return bester?.text ?? null
+}
+
+/** Pins und Mittelpunkt der Karte — die Pins sind genau die gezählten Höfe. */
+export function baueUmfeldKarte(eingabe: UmfeldEingabe & { eigenerStandort: { lat: number; lon: number } }): UmfeldKarte {
+  return {
+    zentrum: { ...eingabe.eigenerStandort, radiusKm: eingabe.km },
+    pins: gezaehlteHoefe(eingabe)
+      .slice()
+      .sort((a, b) => a.entfernungKm - b.entfernungKm)
+      .map((hof, i) => ({
+        slug: hof.slug,
+        name: hof.name,
+        nummer: i + 1,
+        lat: hof.lat,
+        lon: hof.lon,
+        entfernung: formatiereEntfernung(hof.entfernungKm),
+        guenstigster: guenstigsterGrundpreis(hof.produkte, eingabe.bereich),
+        link: hofseitenLink(hof.slug, eingabe.bereich),
+      })),
+  }
 }
 
 // ─── Kopf, Hinweise, Leere ──────────────────────────────────────────────────

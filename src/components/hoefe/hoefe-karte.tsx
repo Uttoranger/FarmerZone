@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { pinDarstellung, pinZustand, type AuswahlLage } from '@/lib/hoefe-anzeige'
+import { EIGENER_PIN, UMKREIS_KREIS, pinDarstellung, pinZustand, type AuswahlLage } from '@/lib/hoefe-anzeige'
 
 /**
  * Die Kundenkarte der Hofübersicht — Leaflet nach dem Muster der Profilkarte
@@ -25,6 +25,11 @@ import { pinDarstellung, pinZustand, type AuswahlLage } from '@/lib/hoefe-anzeig
  * NIEMALS SELBST — er meldet nur die Auswahl nach oben; zur Hofseite führen
  * ausschließlich Listeneintrag, Karussell-Karte und „Zum Hof". Höfe ohne
  * Koordinaten kommen hier gar nicht erst an.
+ *
+ * ZENTRUM (Umfeld, Auswertung): Optional ein Mittelpunkt — der eigene Hof als
+ * eigener, deutlich anderer Pin (EIGENER_PIN) und der Umkreis als Kreis. Die
+ * Ansicht folgt dann dem Kreis, nicht der Pin-Menge. Die fremden Pins bleiben
+ * dieselben wie auf /hoefe; der eigene ist nie einer davon.
  *
  * DARK MODE: Die Kacheln bleiben hell — ein invertiertes Luftbild ist keine
  * Karte mehr, sondern ein Negativ, und Ortsnamen würden unlesbar. Damit
@@ -60,6 +65,24 @@ function pinIcon(nummer: number, zustand: ReturnType<typeof pinZustand>): L.DivI
   })
 }
 
+function eigenerPinIcon(): L.DivIcon {
+  const p = EIGENER_PIN
+  return L.divIcon({
+    className: '',
+    html:
+      `<div style="width:${p.groesse}px;height:${p.groesse}px;border-radius:${p.eckenRadius}px;` +
+      `background:${p.hintergrund};color:${p.schrift};` +
+      `display:flex;align-items:center;justify-content:center;` +
+      `font-size:12px;font-weight:700;border:2px solid ${p.rand};` +
+      `box-shadow:0 1px 5px rgba(0,0,0,0.45);">${p.beschriftung}</div>`,
+    iconSize: [p.groesse, p.groesse],
+    iconAnchor: [p.groesse / 2, p.groesse / 2],
+  })
+}
+
+/** Mittelpunkt und Umkreis — nur in der Auswertung (Umfeld). */
+export type KartenZentrum = { lat: number; lon: number; radiusKm: number; titel: string }
+
 /** Sanft nur, wenn das System nichts anderes wünscht. */
 function wuenschtRuhe(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -73,6 +96,7 @@ export default function HoefeKarte({
   attributionOben = false,
   hoeheKlasse = 'h-[340px]',
   polsterUnten = 0,
+  zentrum,
   onAuswahl,
   onLeerTipp,
 }: {
@@ -92,6 +116,8 @@ export default function HoefeKarte({
    *  Karussell überlagert — südliche Pins müssen DARÜBER landen, sonst
    *  liegen sie hinter dem Band und sind nicht antippbar. */
   polsterUnten?: number
+  /** Der eigene Hof als Mittelpunkt, samt Umkreis als Kreis (Umfeld). */
+  zentrum?: KartenZentrum
   onAuswahl: (slug: string) => void
   /** Tipp ins Kartenleere (nicht auf einen Pin). */
   onLeerTipp?: () => void
@@ -99,6 +125,7 @@ export default function HoefeKarte({
   const kartenDiv = useRef<HTMLDivElement>(null)
   const karte = useRef<L.Map | null>(null)
   const pinEbene = useRef<L.LayerGroup | null>(null)
+  const zentrumEbene = useRef<L.LayerGroup | null>(null)
   // Rückrufe wechseln mit jedem Render, die Handler hängen aber an Karte und
   // Ebene — Refs (im Effekt nachgeführt), damit nichts Altes gefangen bleibt.
   const auswahlRef = useRef(onAuswahl)
@@ -140,6 +167,7 @@ export default function HoefeKarte({
     map.on('dblclick', verwerfeLeerTipp)
     map.on('zoomstart', verwerfeLeerTipp)
     map.on('movestart', verwerfeLeerTipp)
+    zentrumEbene.current = L.layerGroup().addTo(map)
     pinEbene.current = L.layerGroup().addTo(map)
     karte.current = map
     return () => {
@@ -147,6 +175,7 @@ export default function HoefeKarte({
       map.remove()
       karte.current = null
       pinEbene.current = null
+      zentrumEbene.current = null
     }
     // Bewusst nur beim Einhängen; attributionOben wechselt nie zur Laufzeit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -180,7 +209,9 @@ export default function HoefeKarte({
   const mengenSignatur = [...hoefe.map((h) => h.slug)].sort().join(',')
   useEffect(() => {
     const map = karte.current
-    if (!map) return
+    // Mit Zentrum bestimmt der Kreis den Ausschnitt (Effekt unten) — ein
+    // Bereichswechsel soll ihn nicht wegreißen.
+    if (!map || zentrum) return
     if (hoefe.length === 0) {
       map.setView(OESTERREICH_MITTE, OESTERREICH_ZOOM, { animate: false })
     } else if (hoefe.length === 1) {
@@ -195,6 +226,38 @@ export default function HoefeKarte({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mengenSignatur])
+
+  // Zentrum: eigener Pin und Kreis, der Ausschnitt ist der ganze Umkreis.
+  useEffect(() => {
+    const map = karte.current
+    const ebene = zentrumEbene.current
+    if (!map || !ebene) return
+    ebene.clearLayers()
+    if (!zentrum) return
+    const mitte = L.latLng(zentrum.lat, zentrum.lon)
+    L.circle(mitte, {
+      radius: zentrum.radiusKm * 1000,
+      color: UMKREIS_KREIS.rand,
+      weight: 2,
+      dashArray: '6 6',
+      fillColor: UMKREIS_KREIS.flaeche,
+      fillOpacity: UMKREIS_KREIS.flaechenDeckung,
+      interactive: false,
+    }).addTo(ebene)
+    L.marker(mitte, {
+      icon: eigenerPinIcon(),
+      keyboard: false,
+      interactive: false,
+      title: zentrum.titel,
+      zIndexOffset: 1000,
+    }).addTo(ebene)
+    map.fitBounds(mitte.toBounds(zentrum.radiusKm * 2000), {
+      paddingTopLeft: [16, 16],
+      paddingBottomRight: [16, 16 + polsterUnten],
+      animate: false,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zentrum?.lat, zentrum?.lon, zentrum?.radiusKm])
 
   // Merkt sich den beim Einhängen schon verbrauchten Stand: Nach einem
   // Reiterwechsel (Karte neu eingehängt) darf eine ALTE Anfahrt nicht erneut

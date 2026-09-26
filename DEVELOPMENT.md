@@ -1766,9 +1766,9 @@ eigenen Hof begrenzt. Das Umfeld liest fremde Höfe. Die Regel in
 Daten, die auch auf /hoefe oder der Hofseite stehen, und dieselbe oder eine
 strengere Sichtbarkeitsregel. Das Umfeld nimmt `OEFFENTLICH_SICHTBAR`
 unverändert und schließt zusätzlich pausierte Höfe aus — ein pausierter Hof
-verkauft gerade nicht. Aus der Query kommen nur Slug, Name, Ort, Entfernung
-und die Produktzeilen; Bestand und Reservierung werden nur für `istKaufbar`
-gelesen und verlassen sie nicht. Die farmId kommt aus der Sitzung, nie aus dem
+verkauft gerade nicht. Aus der Query kommen nur Slug, Name, Ort, Entfernung,
+Koordinaten (für die Karte, wie auf /hoefe) und die Produktzeilen; Bestand und
+Reservierung werden nur für `istKaufbar` gelesen und verlassen sie nicht. Die farmId kommt aus der Sitzung, nie aus dem
 Client.
 
 ### Die Rechenregeln
@@ -1807,19 +1807,35 @@ Client.
 - **Zeilen** gibt es nur, wo ein fremder Hof anbietet. Eigene Zeilen zuerst,
   dann nach Anzahl Höfe, dann Taxonomie.
 
-### „Auf der Karte zeigen" und der Parameter `um`
+### Liste | Karte (statt „Auf der Karte zeigen“)
 
-Der Link öffnet /hoefe in der Kartenansicht, vorbelegt mit Bereich, Kategorie,
-Sorte und `um=<eigener-slug>&km=…`. `kat=` steht immer mit drin, sonst
-verwirft /hoefe die Sorte. `um` setzt den Bezugspunkt auf den öffentlichen
-Standort dieses Hofs — gesucht in der Liste, die /hoefe ohnehin lädt, also nur
-unter öffentlich sichtbaren Höfen; unbekannt oder ohne Standort: still
-verworfen (`bezugspunktVonHof`). Das ist die einzige Ausnahme von „nie ein
-Standort in der URL" (`ARCHITECTURE.md` §4, `bereiche.md` 6.2): Es ist der
-Standort eines Hofs, nie der des Besuchers. Wählt der Besucher selbst einen
-Punkt oder hebt den Umkreis auf, fallen `um` und `km` aus der URL. Steht der
-eigene Hof noch nicht auf /hoefe (nicht freigegeben), fehlt der Link, statt auf
-eine Karte ohne Bezugspunkt zu führen.
+Zuerst gebaut (#130) und dann auf Anweisung zurückgenommen: ein Link „Auf der
+Karte zeigen“ nach /hoefe mit einem neuen Parameter `um=<hof-slug>&km=`, der den
+Bezugspunkt auf den öffentlichen Standort des eigenen Hofs setzte. Er brauchte
+eine Ausnahme von „nie ein Standort in der URL“ an drei Stellen
+(`ARCHITECTURE.md` §4, `bereiche.md` 6.2, `hoefe-filter.ts`). Parameter,
+Auflösung in `hoefe-client.tsx` und die drei Ausnahmen sind wieder heraus; die
+Regel gilt wieder ohne Ausnahme.
+
+Stattdessen hat das Umfeld einen Umschalter „Liste | Karte“ wie /hoefe, die
+Wahl steht als `?ansicht=karte` in der URL der Umfeld-Seite (gewechselt per
+`history.replaceState` — „Zurück“ von der Hofseite landet in derselben
+Ansicht). Die Karte ist `hoefe-karte.tsx`, nicht eine zweite: Sie hat ein
+optionales `zentrum` bekommen — eigener Pin (`EIGENER_PIN`: Quadrat, Erdbraun,
+„Du“ statt Nummer) und der Umkreis als gestrichelter Kreis, der Ausschnitt folgt
+dem Kreis. `umfeld-karte.tsx` ist nur der Adapter (Pins → `KartenHof`, die
+Karte unter dem Pin) und wird per dynamic import erst beim Umschalten geladen;
+`tests/umfeld-karte.test.ts` prüft am statischen Import-Graph, dass von den
+Seiten der Auswertung kein Weg zu Leaflet führt.
+
+Pins sind genau die Höfe, die die Liste zählt: Zeilen und Karte fragen beide
+`gezaehlteHoefe` (fremd, mit Angebot im Bereich). Dafür verlassen jetzt die
+Koordinaten der Höfe im Umkreis die Query — dieselben Punkte, die /hoefe
+ohnehin als Pin zeigt. Unter dem Pin steht der günstigste Grundpreis im
+Bereich: je Kilo bzw. je Liter verglichen, nie gegeneinander; hat der Hof
+Kilopreise, gewinnt der günstigste davon — gezeigt in der Einheit seiner Zeile,
+mit der Sorte („Stroh · € 112 / t“), damit ein Strohpreis nicht wie ein
+Heupreis aussieht.
 
 ### Geänderte Schwelle aus Bereiche 2: der 25-kg-Sack ist Kleingebinde
 

@@ -13,9 +13,11 @@ import { OEFFENTLICH_SICHTBAR } from './farm'
  * OEFFENTLICH_SICHTBAR unverändert, dazu strenger `isPaused: false` (ein
  * pausierter Hof verkauft gerade nicht). Keine zweite Sichtbarkeitslogik.
  *
- * Was den Server NICHT verlässt: IDs, Koordinaten fremder Höfe, Adresse,
- * Telefon, E-Mail, Bestand. Bestand und Reservierung werden hier nur gelesen,
- * um `istKaufbar` zu fragen — das Ergebnis trägt sie nicht mehr.
+ * Was den Server NICHT verlässt: IDs, Adresse, Telefon, E-Mail, Bestand.
+ * Bestand und Reservierung werden hier nur gelesen, um `istKaufbar` zu fragen
+ * — das Ergebnis trägt sie nicht mehr. Die Koordinaten der Höfe im Umkreis
+ * gehen mit: Die Karte des Umfelds setzt ihre Pins, und auf /hoefe stehen
+ * dieselben Punkte ohnehin öffentlich.
  *
  * Drei Abfragen, kein N+1:
  *   1. der eigene Hof (Standort, eigene Produkte) — die farmId kommt aus der
@@ -66,8 +68,10 @@ export type UmfeldDaten =
   | { eigenerStandort: false }
   | {
       eigenerStandort: true
-      /** Dein Slug, wenn dein Hof auf /hoefe steht — sonst null (kein Kartenlink). */
-      eigenerSlug: string | null
+      /** Dein Standort — Mittelpunkt des Umkreises und der Karte. */
+      standort: { lat: number; lon: number }
+      /** Dein Slug — damit dein Hof nie als fremder Pin erscheint. */
+      eigenerSlug: string
       /** Deine Produkte mit „Im Shop", auch bei Bestand 0. */
       eigeneProdukte: UmfeldProdukt[]
       /** Fremde Höfe im Umkreis mit mindestens einem kaufbaren Produkt, nach Entfernung. */
@@ -93,31 +97,26 @@ export async function getUmfeld(farmId: string, km: UmfeldKm): Promise<UmfeldDat
 
   const punkt = { lat: eigen.latitude as number, lon: eigen.longitude as number }
   const box = umkreisBox(punkt, km)
-  const [kandidaten, eigenOeffentlich] = await Promise.all([
-    prisma.farm.findMany({
-      where: {
-        ...OEFFENTLICH_SICHTBAR,
-        // Strenger als /hoefe: Ein pausierter Hof verkauft gerade nicht.
-        isPaused: false,
-        id: { not: farmId },
-        OR: [
-          // Die Box ist der Vorfilter — das Urteil fällt über die exakte
-          // Entfernung in waehleHoefeImUmkreis.
-          {
-            latitude: { gte: box.breiteVon, lte: box.breiteBis },
-            longitude: { gte: box.laengeVon, lte: box.laengeBis },
-          },
-          // Ohne Standort: nur, um sie zu zählen.
-          { latitude: null },
-          { longitude: null },
-        ],
-      },
-      select: { id: true, slug: true, name: true, city: true, latitude: true, longitude: true },
-    }),
-    // Steht dein Hof auf /hoefe? Dieselbe Bedingung wie dort, keine eigene Fassung
-    // — sonst führte „Auf der Karte zeigen" zu einer Karte ohne Bezugspunkt.
-    prisma.farm.count({ where: { id: farmId, ...OEFFENTLICH_SICHTBAR } }),
-  ])
+  const kandidaten = await prisma.farm.findMany({
+    where: {
+      ...OEFFENTLICH_SICHTBAR,
+      // Strenger als /hoefe: Ein pausierter Hof verkauft gerade nicht.
+      isPaused: false,
+      id: { not: farmId },
+      OR: [
+        // Die Box ist der Vorfilter — das Urteil fällt über die exakte
+        // Entfernung in waehleHoefeImUmkreis.
+        {
+          latitude: { gte: box.breiteVon, lte: box.breiteBis },
+          longitude: { gte: box.laengeVon, lte: box.laengeBis },
+        },
+        // Ohne Standort: nur, um sie zu zählen.
+        { latitude: null },
+        { longitude: null },
+      ],
+    },
+    select: { id: true, slug: true, name: true, city: true, latitude: true, longitude: true },
+  })
 
   const { nah, ohneStandort, abgeschnitten } = waehleHoefeImUmkreis(punkt, kandidaten, km, farmId)
   const ids = [...nah, ...ohneStandort].map((h) => h.id)
@@ -138,10 +137,20 @@ export async function getUmfeld(farmId: string, km: UmfeldKm): Promise<UmfeldDat
 
   return {
     eigenerStandort: true,
-    eigenerSlug: eigenOeffentlich > 0 ? eigen.slug : null,
+    standort: punkt,
+    eigenerSlug: eigen.slug,
     eigeneProdukte: eigen.products.map(zuUmfeldProdukt),
     hoefe: nah
-      .map((h) => ({ slug: h.slug, name: h.name, ort: h.city, entfernungKm: h.entfernungKm, produkte: jeHof.get(h.id) ?? [] }))
+      .map((h) => ({
+        slug: h.slug,
+        name: h.name,
+        ort: h.city,
+        // Im Umkreis heißt: brauchbare Koordinaten (waehleHoefeImUmkreis).
+        lat: h.latitude as number,
+        lon: h.longitude as number,
+        entfernungKm: h.entfernungKm,
+        produkte: jeHof.get(h.id) ?? [],
+      }))
       .filter((h) => h.produkte.length > 0),
     ohneStandort: ohneStandort
       .map((h) => ({ produkte: jeHof.get(h.id) ?? [] }))
