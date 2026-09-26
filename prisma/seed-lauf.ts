@@ -78,6 +78,7 @@ type HofStand = {
   id: string
   slug: string
   name: string
+  approvedAt: Date | null
   serviceFeePercent: number | string | { toString(): string }
   serviceFeeMinCents: number
   serviceFeeActiveFrom: Date | null
@@ -228,6 +229,7 @@ async function hof(
     address: h.adresse,
     postalCode: h.plz,
     city: h.ort,
+    country: h.land,
     phone: h.inhaber.telefon,
     email: h.inhaber.email,
     acceptsOnline: h.nimmtOnline,
@@ -238,36 +240,54 @@ async function hof(
     betriebsstatus: h.betriebsstatus,
     latitude: h.breite,
     longitude: h.laenge,
-    serviceFeePercent: GEBUEHR_PROZENT.toFixed(2),
-    serviceFeeMinCents: GEBUEHR_MIND_CENTS,
-    serviceFeeActiveFrom: vorTagen(jetzt, GEBUEHR_AKTIV_VOR_TAGEN),
-    approvedAt: h.freigegeben ? vorTagen(jetzt, 120) : null,
   }
 
+  /** Was Geld betrifft — beim Bestandshof anders behandelt, siehe unten. */
+  const gebuehr = {
+    serviceFeePercent: GEBUEHR_PROZENT.toFixed(2),
+    serviceFeeMinCents: GEBUEHR_MIND_CENTS,
+  }
+  const gebuehrAb = vorTagen(jetzt, GEBUEHR_AKTIV_VOR_TAGEN)
+  const freigabe = h.freigegeben ? vorTagen(jetzt, h.freigabeVorTagen ?? 120) : null
+
   /**
-   * Ein BESTANDSHOF (der Pilothof) wird nur ERGÄNZT, und zwar wörtlich: Jedes
-   * Feld nur dann, wenn es leer ist. Alles andere — Adresse, Beschreibung,
-   * Freischaltdatum, Gebühreneinstellung — bleibt, wie es ist. Ein `update` mit
-   * relativen Datumswerten hätte die Wirklichkeit bei jedem Lauf verschoben.
+   * Ein BESTANDSHOF (der Pilothof) ist der einzige, der in Dev schon liegt.
+   * Sein Ort, sein Kartenpunkt und seine Produkte kommen aus dem Datensatz wie
+   * bei jedem anderen Hof — aber was GELD betrifft, fasst der Seed nicht an:
+   *   `serviceFeePercent`, `serviceFeeMinCents`  nie überschrieben,
+   *   `serviceFeeActiveFrom`, `approvedAt`       nur, wenn sie noch leer sind.
+   * Hat der Betreiber für diesen Hof 3 % eingestellt, bleiben es 3 % — und die
+   * Bestellungen des Seeds rechnen damit, nicht mit der Vorgabe. Ein `update`
+   * mit relativen Datumswerten hätte die zwei Daten bei jedem Lauf verschoben.
    */
-  const ergaenzung: Prisma.FarmUpdateInput = {}
+  let felder: Prisma.FarmUpdateInput = {
+    ...stamm,
+    ...gebuehr,
+    serviceFeeActiveFrom: gebuehrAb,
+    approvedAt: freigabe,
+  }
   if (h.bestandsHof === true) {
     const stand = await prisma.farm.findUnique({ where: { slug: h.slug } })
-    if (stand === null || stand.latitude === null) ergaenzung.latitude = h.breite
-    if (stand === null || stand.longitude === null) ergaenzung.longitude = h.laenge
-    if (stand === null || stand.betriebsnummer === null) {
-      ergaenzung.betriebsnummer = h.betriebsnummer
-      ergaenzung.betriebsstatus = h.betriebsstatus
-    }
-    if (stand === null || stand.serviceFeeActiveFrom === null) {
-      ergaenzung.serviceFeeActiveFrom = vorTagen(jetzt, GEBUEHR_AKTIV_VOR_TAGEN)
+    felder = {
+      ...stamm,
+      ...(stand === null || stand.approvedAt === null ? { approvedAt: freigabe } : {}),
+      ...(stand === null || stand.serviceFeeActiveFrom === null
+        ? { serviceFeeActiveFrom: gebuehrAb }
+        : {}),
     }
   }
 
   const angelegt = await prisma.farm.upsert({
     where: { slug: h.slug },
-    update: h.bestandsHof === true ? ergaenzung : stamm,
-    create: { slug: h.slug, ownerId, ...stamm },
+    update: felder,
+    create: {
+      slug: h.slug,
+      ownerId,
+      ...stamm,
+      ...gebuehr,
+      serviceFeeActiveFrom: gebuehrAb,
+      approvedAt: freigabe,
+    },
   })
 
   for (const [nummer, zeit] of h.abholzeiten.entries()) {
