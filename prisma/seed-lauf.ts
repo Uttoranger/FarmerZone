@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { berechneServicegebuehr } from '../src/lib/servicegebuehr'
+import { LAND_VORGABE } from '../src/lib/laender'
 import {
   SEED_BESTELLUNGEN,
   SEED_HANDVERKAEUFE,
@@ -229,7 +230,7 @@ async function hof(
     postalCode: h.plz,
     city: h.ort,
     // Ohne Angabe Österreich — wie die Schema-Vorgabe; Hof B liegt in Bayern.
-    country: h.land ?? 'AT',
+    country: h.land ?? LAND_VORGABE,
     phone: h.inhaber.telefon,
     email: h.inhaber.email,
     acceptsOnline: h.nimmtOnline,

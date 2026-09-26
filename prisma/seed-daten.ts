@@ -18,6 +18,7 @@ import type {
   SalesChannel,
   Tierart,
 } from '@prisma/client'
+import type { Land } from '../src/lib/laender'
 
 /**
  * Der Testdatensatz — REINE DATEN, kein Datenbankzugriff.
@@ -27,8 +28,9 @@ import type {
  * @example.com, Telefonnummern lauten +43 660 000xxxx. Die ORTE sind echte
  * Gemeinden im Bezirk Braunau am Inn und eine in Bayern — dort liegt der Pilot,
  * dort sollen die Entfernungen stimmen, und ein Ortsname ist kein
- * personenbezogenes Datum. Die Straßen und Hausnummern sind erfunden. In
- * Uttendorf liegt KEIN Testhof: Dort gibt es einen echten Hof der Plattform.
+ * personenbezogenes Datum. Die Straßen und Hausnummern sind erfunden. Kein
+ * Testhof liegt in einer Gemeinde, in der ein echter Hof der Plattform steht
+ * (der Test hält die Orte per Positivliste fest).
  *
  * WOFÜR: Dev und jede Preview sollen alle Fälle zeigen, die die Bereiche, der
  * Sichtbarkeits-Schalter, die Finanzen und das Umfeld brauchen — nicht den
@@ -40,7 +42,7 @@ import type {
  * gerechnet mit `entfernungKm` aus src/lib/hofuebersicht.ts — die Stufen des
  * Umkreis-Reglers (10/25/50 km) sind damit einzeln prüfbar:
  *   Hof A  5274 Burgkirchen           2,9 km  → im 10-km-Umkreis
- *   Hof B  84489 Burghausen (DE)     22,5 km  → erst ab 25 km, über der Salzach
+ *   Hof B  84489 Burghausen (DE)     22,6 km  → erst ab 25 km, über der Salzach
  *   Hof E  5121 Ostermiething        27,7 km  → erst ab 50 km
  *   Hof D  5222 Munderfing           14,3 km  → nie, weil nicht freigeschaltet
  *   Hof C  4962 Mining               keine Koordinaten → nie platzierbar
@@ -50,9 +52,9 @@ import type {
  *
  * KOORDINATEN: Ortsmitten aus den Gemeinde-Infoboxen der Wikipedia, einmalig
  * bestimmt am 2026-09-26 (über eine Websuche — Nominatim und Wikipedia selbst
- * sind aus der Agentenumgebung nicht erreichbar). Burghausen steht dort nur
- * auf die Bogenminute (48°10′ N, 12°50′ E), also bis rund 1 km genau; die
- * übrigen auf die Bogensekunde. Zur Laufzeit wird nichts geokodiert. Wer eine
+ * sind aus der Agentenumgebung nicht erreichbar). Burghausen (48°10′ N,
+ * 12°50′ E) und Munderfing (48°04′ N, 13°11′ E) stehen dort nur auf die
+ * Bogenminute, also bis rund 1 km genau; die übrigen auf die Bogensekunde. Zur Laufzeit wird nichts geokodiert. Wer eine
  * Mitte korrigiert, ändert nur diese Datei — die Entfernungen rechnet der Code.
  *
  * IDEMPOTENZ: Jede Zeile trägt einen STABILEN Schlüssel (`id`, `slug`,
@@ -191,8 +193,8 @@ export type SeedHof = {
   adresse: string
   plz: string
   ort: string
-  /** `Farm.country`; ohne Angabe Österreich (Schema-Vorgabe „AT"). */
-  land?: 'AT' | 'DE'
+  /** `Farm.country`; ohne Angabe Österreich (LAND_VORGABE). */
+  land?: Land
   /** null = kein Kartenpunkt; der Hof kann im Umfeld nicht platziert werden. */
   breite: number | null
   laenge: number | null
@@ -434,7 +436,7 @@ const HOF_B: SeedHof = {
   betriebsstatus: 'PRIMAERPRODUKTION',
   abholzeiten: [{ tag: 6, von: '08:00', bis: '12:00' }],
   testhinweis:
-    'Nur Futtermittel, nur Vor-Ort-Zahlung (kein Stripe im Checkout). In Bayern (Burghausen), bei 22,5 km erst ab Umkreis 25 km sichtbar; eine Luzerne mit Bestand 0 und eine Gerste nur für Betriebe.',
+    'Nur Futtermittel, nur Vor-Ort-Zahlung (kein Stripe im Checkout). In Bayern (Burghausen), bei 22,6 km erst ab Umkreis 25 km sichtbar; eine Luzerne mit Bestand 0 und eine Gerste nur für Betriebe.',
   produkte: [
     {
       id: 'prod-b-heu-klein',
@@ -703,7 +705,7 @@ const HOF_D: SeedHof = {
   adresse: 'Weizbergweg 22',
   plz: '5222',
   ort: 'Munderfing',
-  // Ortsmitte 48°04′00″ N, 13°11′00″ E (Wikipedia, 2026-09-26)
+  // Ortsmitte 48°04′ N, 13°11′ E (Wikipedia, 2026-09-26) — nur auf die Bogenminute
   breite: 48.0667,
   laenge: 13.1833,
   beschreibung:
@@ -900,9 +902,11 @@ const HOF_E: SeedHof = {
  * Testdaten ins Innviertel die Ortsmitte von Mauerkirchen.
  *
  * ACHTUNG, Bestandshof: Steht der Pilothof schon in der Datenbank, ergänzt der
- * Lauf nur LEERE Felder (seed-lauf.ts). Dort kommen also nur die Koordinaten
- * an — Postleitzahl, Ort und Beschreibung bleiben, was eingetragen ist. Erst
- * eine frische Datenbank bekommt alles aus dieser Datei.
+ * Lauf nur LEERE Felder (seed-lauf.ts). Postleitzahl, Ort und Beschreibung
+ * bleiben, was eingetragen ist; die Koordinaten kommen nur an, wenn dort noch
+ * keine stehen. Eine Datenbank, die schon Koordinaten hat (etwa die
+ * Leoben-Mitte aus #126), behält sie — dann lägen alle Testhöfe rund 250 km
+ * entfernt. Erst eine frische Datenbank bekommt alles aus dieser Datei.
  */
 const PILOTHOF: SeedHof = {
   slug: 'hof-mueller',

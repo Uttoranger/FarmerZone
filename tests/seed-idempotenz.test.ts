@@ -32,10 +32,7 @@ import {
   SEED_KOSTENPOSTEN,
   SEED_MELDUNGEN,
 } from '../prisma/seed-daten'
-import { UMKREIS_STUFEN, entfernungKm } from '@/lib/hofuebersicht'
-
-/** Die Grenzen des Umkreis-Reglers (10, 25, 50 km) — aus derselben Quelle wie /hoefe. */
-const UMKREIS_GRENZEN_KM = UMKREIS_STUFEN.filter((s): s is 10 | 25 | 50 => s !== null)
+import { UMKREIS_STUFEN, entfernungKm, type UmkreisStufe } from '@/lib/hofuebersicht'
 import { bereichVon, istGrossgebinde, unterkategorienVon } from '@/lib/taxonomie'
 
 const JETZT = new Date('2026-09-26T10:00:00.000Z')
@@ -397,6 +394,9 @@ describe('Testdaten — nichts Echtes', () => {
   })
 })
 
+/** Die Grenzen des Umkreis-Reglers (10, 25, 50 km) — aus derselben Quelle wie /hoefe. */
+const UMKREIS_GRENZEN_KM = UMKREIS_STUFEN.filter((s): s is NonNullable<UmkreisStufe> => s !== null)
+
 describe('Testdaten — Umkreis', () => {
   const pilot = SEED_HOEFE.find((h) => h.slug === 'hof-mueller')!
   const punkt = { lat: pilot.breite!, lon: pilot.laenge! }
@@ -477,17 +477,22 @@ describe('Testdaten — Bezirk Braunau am Inn, wo der Pilot liegt', () => {
     expect(b.betriebsnummer).toMatch(/^09 000 000 \d{4}$/)
   })
 
-  it('alle übrigen Höfe liegen in Österreich, im Innviertel — keine steirische Postleitzahl mehr', () => {
-    for (const h of SEED_HOEFE) {
-      if (h.slug === 'hof-bergwiese') continue
-      expect(h.land ?? 'AT', h.slug).toBe('AT')
-      // Oberösterreich hat Postleitzahlen ab 4 und 5, die Steiermark ab 8.
-      expect(h.plz, h.slug).toMatch(/^[45]\d{3}$/)
+  it('jeder Hof liegt genau an seinem vereinbarten Ort — und nirgends sonst', () => {
+    // Eine Positivliste statt einer Sperrliste: Sie schließt jede andere
+    // Gemeinde aus, auch die eines echten Hofs der Plattform, ohne sie im
+    // öffentlichen Repo zu nennen.
+    const vereinbart: Record<string, { plz: string; ort: string; land: 'AT' | 'DE' }> = {
+      'hof-mueller': { plz: '5270', ort: 'Mauerkirchen', land: 'AT' },
+      'hof-sonnleiten': { plz: '5274', ort: 'Burgkirchen', land: 'AT' },
+      'hof-bergwiese': { plz: '84489', ort: 'Burghausen', land: 'DE' },
+      'hof-ohne-standort': { plz: '4962', ort: 'Mining', land: 'AT' },
+      'hof-wartend': { plz: '5222', ort: 'Munderfing', land: 'AT' },
+      'hof-waldrand': { plz: '5121', ort: 'Ostermiething', land: 'AT' },
     }
-  })
-
-  it('kein Testhof in Uttendorf — dort liegt ein echter Hof der Plattform', () => {
-    for (const h of SEED_HOEFE) expect(h.ort, h.slug).not.toMatch(/uttendorf/i)
+    expect(SEED_HOEFE.map((h) => h.slug).sort()).toEqual(Object.keys(vereinbart).sort())
+    for (const h of SEED_HOEFE) {
+      expect({ plz: h.plz, ort: h.ort, land: h.land ?? 'AT' }, h.slug).toEqual(vereinbart[h.slug])
+    }
   })
 })
 
