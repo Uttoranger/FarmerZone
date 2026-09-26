@@ -30,6 +30,26 @@ export type UploadAnlauf = AnlaufBefund & { dauerMs: number }
 
 export type UploadDiagnose = { schritt: UploadSchritt; anlaeufe: UploadAnlauf[] }
 
+/**
+ * Ein Leseversuch der Lese-Stufe (JAVASCRIPT-NEXTJS-3).
+ * 'zeitlimit': Die Datei blieb stumm, bis unser Wächter aufgab — typisch für
+ * ein hängendes Cloud-Album. 'fehler': Der Browser hat abgelehnt, meist sofort
+ * (NotReadableError, NotFoundError) — typisch für eine entzogene Berechtigung.
+ * Klasse und Meldung gibt es nur bei 'fehler', schon bereinigt.
+ */
+export type LeseVersuch =
+  | { ergebnis: 'ok' | 'zeitlimit'; dauerMs: number }
+  | { ergebnis: 'fehler'; klasse: string; meldung: string; dauerMs: number }
+
+export type LeseErgebnis = LeseVersuch['ergebnis']
+
+/**
+ * Was die Lese-Stufe über die Datei herausfand: die 64-KB-Probe und, nur wenn
+ * sie scheiterte, das Volllesen. Dazu das Alter der Datei in ganzen Tagen —
+ * ein sehr altes Foto aus der Galerie spricht für ein Cloud-Album.
+ */
+export type LeseDiagnose = { probe: LeseVersuch; voll?: LeseVersuch; dateiAlterTage: number | null }
+
 const BLOB_PRAEFIX = 'Vercel Blob: '
 
 /**
@@ -185,4 +205,53 @@ export function befundVon(fehler: unknown, verborgen: readonly string[] = []): A
   if (fehler instanceof UploadSchrittFehler) return fehler.befund
   const text = fehler instanceof Error ? fehler.message : typeof fehler === 'string' ? fehler : ''
   return { klasse: fehlerKlasse(fehler), meldung: bereinigeFehlerText(text, verborgen) }
+}
+
+/** Ein Fehlername, wie Browser ihn setzen — alles andere könnte etwas tragen. */
+const BEZEICHNER = /^[A-Za-z][A-Za-z0-9_]{0,59}$/
+
+/**
+ * Klasse und bereinigte Nachricht eines Lesefehlers. Anders als befundVon
+ * nimmt es Name und Nachricht auch von einer DOMException, die kein Error ist
+ * — in älteren Safari-Ständen erbt sie nicht von Error, und gerade ihr Name
+ * (NotReadableError, NotFoundError) ist hier die Auskunft.
+ *
+ * Wirft nie: Es läuft im catch der Lese-Stufe, und ein Fehler hier ersetzte
+ * dem Bauern den Wegweiser. Die Klasse geht nur durch, wenn sie wie ein Name
+ * aussieht — sie wird sonst nicht bereinigt.
+ */
+export function leseFehlerBefund(fehler: unknown, verborgen: readonly string[] = []): AnlaufBefund {
+  try {
+    let befund: AnlaufBefund
+    if (fehler instanceof Error || typeof fehler !== 'object' || fehler === null) {
+      befund = befundVon(fehler, verborgen)
+    } else {
+      const { name, message } = fehler as { name?: unknown; message?: unknown }
+      befund = {
+        klasse: typeof name === 'string' && name ? name : fehlerKlasse(fehler),
+        meldung: bereinigeFehlerText(typeof message === 'string' ? message : '', verborgen),
+      }
+    }
+    return { ...befund, klasse: BEZEICHNER.test(befund.klasse) ? befund.klasse : 'unbekannt' }
+  } catch {
+    // Absichtlich leer im Ergebnis: Ein Fehler, der sich nicht einmal lesen
+    // lässt, hat keine Auskunft — aber die Lese-Stufe muss weiterlaufen.
+    return { klasse: 'unbekannt', meldung: '' }
+  }
+}
+
+const TAG_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Alter einer Datei in ganzen Tagen aus `file.lastModified` — kein Datumsfeld.
+ * Zusammen mit dem Zeitpunkt der Meldung grenzt es den Tag der Datei auf ein
+ * 24-Stunden-Fenster ein; genauer nicht, und so ist es beauftragt.
+ * null, wo die Zahl nichts sagt: fehlend, 0 (manche Speicherdienste liefern
+ * 1970 statt nichts) oder in der Zukunft (falsche Uhr). Kennt der Browser das
+ * Datum nicht, setzt er laut File API die aktuelle Zeit — dann steht hier 0.
+ */
+export function dateiAlterTage(lastModified: number | undefined, jetzt: number): number | null {
+  if (typeof lastModified !== 'number' || !Number.isFinite(lastModified) || lastModified <= 0) return null
+  const alter = jetzt - lastModified
+  return alter < 0 ? null : Math.floor(alter / TAG_MS)
 }

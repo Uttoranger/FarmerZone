@@ -104,6 +104,7 @@ NextResponse.json({ ok: true, …daten })
 
 ### Fremde Fehler nach Sentry
 - Den Originalfehler nicht durch einen Nutzertext ersetzen und damit verlieren: Klasse, Nachricht und, wo vorhanden, HTTP-Status gehen als Kontext mit (Vorbild: `src/lib/upload-diagnose.ts`, `onDiagnose` in `ladeFotoHoch`).
+- Kein leeres `catch` auf einem Weg, der am Ende nach Sentry meldet: Ausgang, Klasse, Nachricht und Dauer festhalten, den Ablauf eines Zeitwächters getrennt vom Fehler (Vorbild: `leseVersuch` und `onLesen` in `image-upload.tsx`).
 - Fehlertexte aus SDKs und `fetch` gehen nur bereinigt nach Sentry (`bereinigeFehlerText`): Sie können Pfade, Dateinamen und Adressen tragen.
 - **Nie** `cause` mit dem Rohfehler setzen. Sentry schickt verkettete Fehler mit, am Kontext vorbei.
 - Kontexte flach halten (ein Kontext je Anlauf statt einer Liste) — Sentry kürzt ab der dritten Ebene.
