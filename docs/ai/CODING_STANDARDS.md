@@ -101,6 +101,12 @@ NextResponse.json({ ok: true, …daten })
 - Statuscodes: 400 Validierung, 401 nicht angemeldet, 403 kein Zugriff, 404 nicht gefunden, 409 Konflikt, 429 Rate-Limit, 500 unerwartet.
 - **Nie** interne Details nach außen geben: kein Stacktrace, kein SQL, kein Prisma-Fehlertext, keine ID fremder Datensätze.
 
+### Fremde Fehler nach Sentry
+- Den Originalfehler nicht durch einen Nutzertext ersetzen und damit verlieren: Klasse, Nachricht und, wo vorhanden, HTTP-Status gehen als Kontext mit (Vorbild: `src/lib/upload-diagnose.ts`, `onDiagnose` in `ladeFotoHoch`).
+- Fehlertexte aus SDKs und `fetch` gehen nur bereinigt nach Sentry (`bereinigeFehlerText`): Sie können Pfade, Dateinamen und Adressen tragen.
+- **Nie** `cause` mit dem Rohfehler setzen. Sentry schickt verkettete Fehler mit, am Kontext vorbei.
+- Kontexte flach halten (ein Kontext je Anlauf statt einer Liste) — Sentry kürzt ab der dritten Ebene.
+
 ### Nutzertexte
 - Deutsch, geduzt, ohne Fachjargon, mit Ausweg.
 - ✅ "Deine Reservierung ist abgelaufen. Wir haben die Verfügbarkeit neu geprüft."

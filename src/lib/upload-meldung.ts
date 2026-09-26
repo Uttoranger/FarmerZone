@@ -7,15 +7,18 @@
  * DATENSPARSAMKEIT: KEIN Dateiname (— „Hof_Mueller_Franz.jpg" ist ein
  * personenbezogenes Datum, gleiche Regel wie protokolliereBildFehler in
  * upload-fehler.ts) und selbstverständlich KEIN Dateiinhalt. MIME-Typ,
- * Größe, Weg, Ursache und Versuchszahl sagen über niemanden etwas aus.
+ * Größe, Weg, Ursache und Versuchszahl sagen über niemanden etwas aus. Die
+ * Diagnose je Anlauf kommt schon bereinigt an (upload-diagnose.ts).
  *
  * Der Bau der Meldung ist rein und getestet; nur meldeUploadFehler berührt
  * Sentry — und wirft nie: Telemetrie darf den Upload-Ablauf nicht verändern.
  */
 import * as Sentry from '@sentry/nextjs'
+import type { UploadAnlauf, UploadDiagnose, UploadSchritt } from '@/lib/upload-diagnose'
 import {
   bildFehlerArtVon,
   IMAGE_NETWORK_ERROR,
+  IMAGE_STORAGE_ERROR,
   UPLOAD_DIAG,
   type BildFehlerArt,
 } from '@/lib/upload-fehler'
@@ -23,21 +26,23 @@ import {
 /** Über welchen Weg die Datei kam (#71: drei Quellen plus Teilen-Ziel). */
 export type UploadWeg = 'galerie' | 'dateien' | 'kamera' | 'teilen'
 
-/** Die drei Foto-Ursachen, plus Netz (kein Foto-Urteil) und Unbekannt. */
-export type UploadUrsache = BildFehlerArt | 'netz' | 'unbekannt'
+/** Die drei Foto-Ursachen, plus Netz und Bildspeicher (keine Foto-Urteile)
+ *  und Unbekannt. */
+export type UploadUrsache = BildFehlerArt | 'netz' | 'bildspeicher' | 'unbekannt'
 
 /** Ordnet einem gefangenen Fehler die Melde-Ursache zu — dieselbe Trennung
- *  wie in upload-fehler.ts: Foto-Urteile tragen ihre Art, der Netzfehler-Text
- *  ist 'netz', alles Übrige ehrlich 'unbekannt'. */
+ *  wie in upload-fehler.ts: Foto-Urteile tragen ihre Art, Netzfehler- und
+ *  Bildspeicher-Text ihre eigene, alles Übrige ehrlich 'unbekannt'. */
 export function uploadUrsacheVon(e: unknown): UploadUrsache {
   const art = bildFehlerArtVon(e)
   if (art) return art
   if (e instanceof Error && e.message === IMAGE_NETWORK_ERROR) return 'netz'
+  if (e instanceof Error && e.message === IMAGE_STORAGE_ERROR) return 'bildspeicher'
   return 'unbekannt'
 }
 
 export type UploadMeldung = {
-  tags: { bereich: 'foto-upload'; ursache: UploadUrsache; kennung: string }
+  tags: { bereich: 'foto-upload'; ursache: UploadUrsache; kennung: string; schritt?: UploadSchritt }
   contexts: {
     upload: {
       dateiGroesseBytes: number
@@ -45,17 +50,25 @@ export type UploadMeldung = {
       weg: UploadWeg
       versuche: number
     }
-  }
+  } & { [anlauf: `uploadAnlauf${number}`]: UploadAnlauf }
 }
 
-/** Baut die Zusatzfelder des Sentry-Ereignisses — rein, ohne Dateinamen. */
+/**
+ * Baut die Zusatzfelder des Sentry-Ereignisses — rein, ohne Dateinamen.
+ *
+ * Jeder Anlauf bekommt einen eigenen Kontext (uploadAnlauf1, uploadAnlauf2)
+ * statt einer Liste unter `upload`: Sentry kürzt verschachtelte Werte ab der
+ * dritten Ebene (normalizeDepth), eine Liste von Objekten käme als
+ * „[Object]" an.
+ */
 export function baueUploadMeldung(eingabe: {
   ursache: UploadUrsache
   datei: { size: number; type: string }
   weg: UploadWeg
   versuche: number
+  diagnose?: UploadDiagnose
 }): UploadMeldung {
-  return {
+  const meldung: UploadMeldung = {
     tags: { bereich: 'foto-upload', ursache: eingabe.ursache, kennung: UPLOAD_DIAG },
     contexts: {
       upload: {
@@ -66,6 +79,13 @@ export function baueUploadMeldung(eingabe: {
       },
     },
   }
+  if (eingabe.diagnose) {
+    meldung.tags.schritt = eingabe.diagnose.schritt
+    eingabe.diagnose.anlaeufe.forEach((anlauf, i) => {
+      meldung.contexts[`uploadAnlauf${i + 1}` as const] = anlauf
+    })
+  }
+  return meldung
 }
 
 /**
@@ -75,7 +95,13 @@ export function baueUploadMeldung(eingabe: {
  */
 export function meldeUploadFehler(
   fehler: unknown,
-  eingabe: { datei: { size: number; type: string }; weg: UploadWeg; versuche: number }
+  eingabe: {
+    datei: { size: number; type: string }
+    weg: UploadWeg
+    versuche: number
+    /** Der Originalfehler je Anlauf, bereinigt — aus ladeFotoHoch (onDiagnose). */
+    diagnose?: UploadDiagnose
+  }
 ): void {
   try {
     Sentry.captureException(fehler, baueUploadMeldung({ ursache: uploadUrsacheVon(fehler), ...eingabe }))

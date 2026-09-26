@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { Camera, X, Leaf, Thermometer, Snowflake, ChevronRight, Info, Sparkles } from 'lucide-react'
 import { ladeFotoHoch, stufenText, type UploadStufe } from '@/components/shared/image-upload'
 import { useFotoQuellen } from '@/components/shared/foto-quellen'
+import type { UploadDiagnose } from '@/lib/upload-diagnose'
 import { bildFehlerMeldung } from '@/lib/upload-fehler'
 import { IM_SHOP, NICHT_IM_SHOP } from '@/lib/produkt-sichtbarkeit'
 import { meldeUploadFehler, type UploadWeg } from '@/lib/upload-meldung'
@@ -632,6 +633,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
         // damit gibt es keinen zweiten Upload-Weg, der auseinanderlaufen kann.
         // 0 = der Transfer hat nie begonnen — nur für die Sentry-Meldung.
         let versuche = 0
+        let diagnose: UploadDiagnose | undefined
         try {
           imageUrl = await ladeFotoHoch(selectedFile, 'product', {
             altUrl: isEdit ? (product.imageUrl ?? undefined) : undefined,
@@ -642,11 +644,19 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
             onVersuch: (versuch) => {
               versuche = versuch
             },
+            onDiagnose: (d) => {
+              diagnose = d
+            },
           })
         } catch (e) {
           // Zusätzlich zur Anzeige nach Sentry (Ursache/Kennung/Größe/Typ/
-          // Weg/Versuche, kein Dateiname — upload-meldung.ts).
-          meldeUploadFehler(e, { datei: selectedFile, weg: gewaehlterWeg.current, versuche })
+          // Weg/Versuche/Originalfehler, kein Dateiname — upload-meldung.ts).
+          meldeUploadFehler(e, {
+            datei: selectedFile,
+            weg: gewaehlterWeg.current,
+            versuche,
+            diagnose,
+          })
           const { text } = bildFehlerMeldung(e)
           toast.error(text)
           return

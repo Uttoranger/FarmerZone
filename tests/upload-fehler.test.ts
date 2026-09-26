@@ -30,6 +30,7 @@ import {
   IMAGE_FORMAT_ERROR,
   IMAGE_SERVER_ERROR,
   IMAGE_NETWORK_ERROR,
+  IMAGE_STORAGE_ERROR,
   IMAGE_UNKNOWN_ERROR,
   UPLOAD_DIAG,
 } from '@/lib/upload-fehler'
@@ -132,14 +133,41 @@ describe('Netzfehler — bewusst keine vierte Ursache', () => {
   })
 })
 
+describe('Ablehnung durch den Bildspeicher — eigener Text, keine Foto-Ursache', () => {
+  it('sagt, wer abgelehnt hat, und trägt die eigene B-Kennung', () => {
+    expect(IMAGE_STORAGE_ERROR).toBe(
+      `Der Bildspeicher hat das Foto gerade nicht angenommen — bitte später nochmal. [B${UPLOAD_DIAG}]`
+    )
+  })
+
+  it('ist weder Netzfehler noch eine der drei Foto-Ursachen', () => {
+    // Bis #129 stand hier „Verbindung unterbrochen" — der Bauer suchte
+    // besseren Empfang, obwohl sein Netz funktioniert hatte.
+    expect(IMAGE_STORAGE_ERROR).not.toContain('Verbindung')
+    expect(IMAGE_STORAGE_ERROR).not.toBe(IMAGE_NETWORK_ERROR)
+    for (const art of ALLE_ARTEN) {
+      expect(IMAGE_STORAGE_ERROR).not.toBe(bildFehlerText(art))
+    }
+    expect(IMAGE_STORAGE_ERROR).not.toMatch(/JPEG|PNG|HEIC|Cloud-Alben|Aus Dateien/)
+  })
+
+  it('läuft als gewöhnlicher Error unverändert durch die Meldungs-Zuordnung', () => {
+    expect(bildFehlerMeldung(new Error(IMAGE_STORAGE_ERROR))).toEqual({
+      text: IMAGE_STORAGE_ERROR,
+      kurz: IMAGE_STORAGE_ERROR,
+      art: null,
+    })
+  })
+})
+
 describe('Diagnose-Kennung', () => {
-  it("steht auf '71' — dem letzten Sprint, der das Upload-Verhalten änderte", () => {
+  it("steht auf '129' — dem letzten Sprint, der das Upload-Verhalten änderte", () => {
     // Mit LITERAL festgenagelt (Lehre aus #69): Alle übrigen Kennungs-Tests
     // prüfen über die Konstante selbst und blieben bei jedem Wert grün —
     // genau so konnte '64' drei Verhaltensänderungen lang stehenbleiben.
     // Die Zähl-Regel: bei JEDER Verhaltensänderung am Upload-Ablauf auf die
     // Sprint-Nummer heben (upload-fehler.ts, DEVELOPMENT.md „Upload-Diagnose").
-    expect(UPLOAD_DIAG).toBe('71')
+    expect(UPLOAD_DIAG).toBe('129')
   })
 
   it('hängt an jede der drei Meldungen ein eigenes Kürzel mit dem Code-Stand', () => {
