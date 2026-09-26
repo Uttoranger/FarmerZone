@@ -7,9 +7,18 @@ import { useFotoQuellen } from '@/components/shared/foto-quellen'
 import { summarizeUploadBatch, type BatchSkip } from '@/lib/upload-batch'
 import { meldeUploadFehler, type UploadWeg } from '@/lib/upload-meldung'
 import {
+  befundVon,
+  ordneTransferFehler,
+  UploadSchrittFehler,
+  type AnlaufBefund,
+  type UploadAnlauf,
+  type UploadDiagnose,
+} from '@/lib/upload-diagnose'
+import {
   BildFehler,
   bildFehlerMeldung,
   protokolliereBildFehler,
+  transferFehlerText,
   IMAGE_NETWORK_ERROR,
   type BildFehlerArt,
 } from '@/lib/upload-fehler'
@@ -84,17 +93,27 @@ let hofKennung: Promise<string> | null = null
 
 function holeHofKennung(): Promise<string> {
   hofKennung ??= fetch('/api/upload/token', { signal: AbortSignal.timeout(KENNUNG_LIMIT_MS) })
-    .catch(() => {
+    .catch((e: unknown) => {
       // Netz weg oder Zeit abgelaufen — es kam gar keine Antwort. Das ist der
-      // Netzfehler, nicht „kein Zugriff".
-      throw new Error(IMAGE_NETWORK_ERROR)
+      // Netzfehler, nicht „kein Zugriff". Der Befund behält, was fetch sagte.
+      throw new UploadSchrittFehler(IMAGE_NETWORK_ERROR, befundVon(e))
     })
     .then((r) =>
       r.ok
         ? // Auch das Körper-Lesen kann noch abreißen (das Zeitlimit gilt bis
           // zum letzten Byte) — dann darf keine rohe DOMException durchsickern.
-          r.json().catch(() => Promise.reject(new Error(IMAGE_NETWORK_ERROR)))
-        : Promise.reject(new Error('Kein Zugriff'))
+          r.json().catch((e: unknown) =>
+            Promise.reject(
+              new UploadSchrittFehler(IMAGE_NETWORK_ERROR, { ...befundVon(e), status: r.status })
+            )
+          )
+        : Promise.reject(
+            new UploadSchrittFehler('Kein Zugriff', {
+              klasse: 'HttpAntwort',
+              meldung: 'Kennung abgelehnt',
+              status: r.status,
+            })
+          )
     )
     .then((d: { farmId: string }) => d.farmId)
     .catch((e) => {
@@ -187,14 +206,29 @@ async function uebertrageOriginal(
     /** Reine Zusatz-Meldung für die Sentry-Diagnose: welcher Anlauf gerade
      *  läuft. Ändert am Ablauf nichts. */
     onVersuch?: (versuch: number) => void
+    /** Reine Zusatz-Meldung für die Sentry-Diagnose: der Befund je Anlauf,
+     *  sobald der Transfer endgültig gescheitert ist. */
+    onDiagnose?: (diagnose: UploadDiagnose) => void
   }
 ): Promise<{ url: string }> {
+  const anlaeufe: UploadAnlauf[] = []
   for (let versuch = 1; ; versuch++) {
     optionen.onVersuch?.(versuch)
-    // Beide Wächter je Anlauf frisch — ein Zweitversuch bekommt die volle Zeit
+    const beginn = Date.now()
+    // Beide Wächter je Anlauf frisch — ein Zweitversuch bekommt die volle Zeit.
+    // Welcher Wächter abbrach, merken wir uns hier und geben es bewusst NICHT
+    // als Grund an abort(): fetch lehnte dann mit diesem Wert statt mit einem
+    // AbortError ab, und das SDK wiederholte den Request im Hintergrund.
     const abbruch = new AbortController()
-    const deckel = setTimeout(() => abbruch.abort(), UPLOAD_LIMIT_MS)
-    const stille = stillstandsWaechter(UPLOAD_STILLE_MS, () => abbruch.abort())
+    const waechter: { grund?: 'stillstand' | 'deckel' } = {}
+    const deckel = setTimeout(() => {
+      waechter.grund = 'deckel'
+      abbruch.abort()
+    }, UPLOAD_LIMIT_MS)
+    const stille = stillstandsWaechter(UPLOAD_STILLE_MS, () => {
+      waechter.grund = 'stillstand'
+      abbruch.abort()
+    })
     // Fortschritts-Ereignisse sind Makrotasks: Ein Nachzügler des gescheiterten
     // Anlaufs könnte den auf null zurückgesetzten Fortschritt sonst wieder mit
     // dem alten Prozentwert überschreiben.
@@ -223,14 +257,21 @@ async function uebertrageOriginal(
       ])
     } catch (e) {
       lebendig = false
+      const abgebrochen = abbruch.signal.aborted
+      anlaeufe.push({
+        ...(waechter.grund ? waechterBefund(waechter.grund) : befundVon(e, [file.name, farmId])),
+        dauerMs: Date.now() - beginn,
+      })
       // Haben UNSERE Wächter abgebrochen, ist es ein Transfer-Unfall — egal,
       // in welcher Gestalt der Fehler aus dem SDK zurückkommt.
-      const massgeblich = abbruch.signal.aborted ? new Error(IMAGE_NETWORK_ERROR) : e
+      const massgeblich = abgebrochen ? new Error(IMAGE_NETWORK_ERROR) : e
       if (!darfZweitversuch(massgeblich, versuch)) {
-        // Lesbar war die Datei (Stufe 0) — gescheitert ist das SENDEN, jetzt
-        // auch im zweiten Anlauf. Für den Bauern bleibt eine Handlung:
-        // selbst nochmal versuchen.
-        throw new Error(IMAGE_NETWORK_ERROR)
+        optionen.onDiagnose?.({ schritt: 'uebertragung', anlaeufe })
+        // Lesbar war die Datei (Stufe 0) — gescheitert ist das SENDEN. Der
+        // Text folgt der Ursache des letzten Anlaufs: „Verbindung
+        // unterbrochen" nur, wenn sie es wirklich war (#129). Vorher stand
+        // hier für jeden Fehler der Netzfehler-Text.
+        throw new Error(transferFehlerText(ordneTransferFehler(e, abgebrochen)))
       }
       optionen.onStufe?.('wiederholen')
       optionen.onFortschritt?.(0)
@@ -241,6 +282,13 @@ async function uebertrageOriginal(
       stille.stopp()
     }
   }
+}
+
+/** Befund für einen Abbruch durch unsere Wächter — es gibt keinen Originalfehler. */
+function waechterBefund(grund: 'stillstand' | 'deckel'): AnlaufBefund {
+  return grund === 'stillstand'
+    ? { klasse: 'WaechterAbbruch', meldung: `Stillstand: ${UPLOAD_STILLE_MS / 1000} s ohne Fortschritt` }
+    : { klasse: 'WaechterAbbruch', meldung: `Zeitdeckel: ${UPLOAD_LIMIT_MS / 1000} s überschritten` }
 }
 
 /**
@@ -254,14 +302,16 @@ async function uebertrageOriginal(
  *      löscht das Original.
  *
  * Netz- und Sendefehler aus Stufe 1 und 2 sind BEWUSST nicht Ursache 'lesen':
- * Die Datei war lesbar (Stufe 0), gescheitert ist die Verbindung. Sie werfen
- * den schlichten Netzfehler-Text — ohne neue Ursachen-Kategorie. Was der
- * Server selbst als Ursache mitbringt ('format' oder 'server'), behält seine
- * Zuordnung.
+ * Die Datei war lesbar (Stufe 0), gescheitert ist das Senden. Sie werfen einen
+ * Text nach dem, was wirklich war — Verbindung, Ablehnung des Bildspeichers
+ * oder ehrlich unbestimmt —, ohne neue Foto-Ursache. Was der Server selbst
+ * als Ursache mitbringt ('format' oder 'server'), behält seine Zuordnung.
  *
  * Seit dem Zeitwächter-Umbau steht jede Stufe unter einem Zeitlimit und
  * meldet sich über `onStufe` — kein Hänger bleibt mehr stumm, und die Anzeige
- * kann sagen, WO es gerade steht.
+ * kann sagen, WO es gerade steht. Scheitert Kennung, Übertragung oder
+ * Abschluss, bekommt `onDiagnose` den Originalfehler bereinigt mit — für
+ * Sentry, denn der Text für den Bauern verrät ihn nicht (#129).
  */
 export async function ladeFotoHoch(
   file: File,
@@ -272,6 +322,8 @@ export async function ladeFotoHoch(
     onStufe?: (stufe: UploadStufe) => void
     /** Reine Zusatz-Meldung (Sentry-Diagnose): welcher Transfer-Anlauf läuft. */
     onVersuch?: (versuch: number) => void
+    /** Reine Zusatz-Meldung (Sentry-Diagnose): woran der Upload scheiterte. */
+    onDiagnose?: (diagnose: UploadDiagnose) => void
   } = {}
 ): Promise<string> {
   optionen.onStufe?.('lesen')
@@ -280,24 +332,44 @@ export async function ladeFotoHoch(
   // Die Kennung gehört schon zum Hochladen: Hängt ihr Abruf, zeigt die
   // Anzeige den richtigen Ort, und ihr Zeitwächter meldet den Netzfehler.
   optionen.onStufe?.('hochladen')
-  const farmId = await holeHofKennung()
+  const kennungBeginn = Date.now()
+  const farmId = await holeHofKennung().catch((e: unknown) => {
+    optionen.onDiagnose?.({
+      schritt: 'kennung',
+      anlaeufe: [{ ...befundVon(e), dauerMs: Date.now() - kennungBeginn }],
+    })
+    throw e
+  })
 
   const hochgeladen = await uebertrageOriginal(file, farmId, zweck, optionen)
 
   optionen.onStufe?.('verarbeiten')
-  const antwort = await fetch('/api/upload/verarbeiten', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ url: hochgeladen.url, zweck, altUrl: optionen.altUrl }),
-    signal: AbortSignal.timeout(VERARBEITEN_LIMIT_MS),
-  }).catch(() => null)
+  const abschlussBeginn = Date.now()
+  const meldeAbschluss = (befund: AnlaufBefund): void =>
+    optionen.onDiagnose?.({
+      schritt: 'abschluss',
+      anlaeufe: [{ ...befund, dauerMs: Date.now() - abschlussBeginn }],
+    })
 
-  if (!antwort) {
+  let antwort: Response
+  try {
+    antwort = await fetch('/api/upload/verarbeiten', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ url: hochgeladen.url, zweck, altUrl: optionen.altUrl }),
+      signal: AbortSignal.timeout(VERARBEITEN_LIMIT_MS),
+    })
+  } catch (e) {
     // Die Verbindung ist zwischen Upload und Verarbeitung abgerissen.
+    meldeAbschluss(befundVon(e))
     throw new Error(IMAGE_NETWORK_ERROR)
   }
 
-  const daten = (await antwort.json().catch(() => null)) as {
+  let leseFehler: unknown = null
+  const daten = (await antwort.json().catch((e: unknown) => {
+    leseFehler = e
+    return null
+  })) as {
     url?: string
     art?: unknown
   } | null
@@ -306,11 +378,17 @@ export async function ladeFotoHoch(
     // Die Antwort kam an, aber ihr Körper riss beim Lesen ab — das Zeitlimit
     // gilt bis zum letzten Byte. Das ist die Verbindung, nicht der Server;
     // eine falsche Ursache wäre schlimmer als gar keine.
+    meldeAbschluss({ ...befundVon(leseFehler), status: antwort.status })
     throw new Error(IMAGE_NETWORK_ERROR)
   }
 
   if (!antwort.ok || !daten || typeof daten.url !== 'string') {
     const art: BildFehlerArt = daten?.art === 'format' ? 'format' : 'server'
+    meldeAbschluss({
+      klasse: 'HttpAntwort',
+      meldung: `Verarbeitung abgelehnt (${art})`,
+      status: antwort.status,
+    })
     protokolliereBildFehler(art, file)
     throw new BildFehler(art)
   }
@@ -368,6 +446,7 @@ export function useImageUpload({
 
     // 0 = der Transfer hat nie begonnen (z. B. Lese-Stufe gescheitert).
     let versuche = 0
+    let diagnose: UploadDiagnose | undefined
     let url: string
     try {
       url = await ladeFotoHoch(file, variant, {
@@ -381,12 +460,16 @@ export function useImageUpload({
         onVersuch: (versuch) => {
           versuche = versuch
         },
+        onDiagnose: (d) => {
+          diagnose = d
+        },
       })
     } catch (e) {
       // Zusätzlich zur Anzeige nach Sentry — Ursache, Kennung, Größe, Typ,
-      // Weg, Versuche; kein Dateiname (siehe upload-meldung.ts). So ist
-      // künftig ohne Bildschirmfoto nachvollziehbar, woran es scheiterte.
-      meldeUploadFehler(e, { datei: file, weg: weg.current, versuche })
+      // Weg, Versuche, Originalfehler je Anlauf; kein Dateiname (siehe
+      // upload-meldung.ts). So ist ohne Bildschirmfoto nachvollziehbar,
+      // woran es scheiterte.
+      meldeUploadFehler(e, { datei: file, weg: weg.current, versuche, diagnose })
       // Ein BildFehler bringt seine Ursache mit und bekommt den passenden
       // Text; alles andere behält seine eigene Meldung.
       const { text, kurz } = bildFehlerMeldung(e)

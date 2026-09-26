@@ -37,7 +37,8 @@ export type BildFehlerArt = 'lesen' | 'format' | 'server'
  * DIAGNOSE-KENNUNG DER PILOTPHASE — temporär.
  *
  * Jede Meldung endet auf ein Kürzel wie „[F64]": Buchstabe für die Ursache
- * (L = lesen, F = Format, S = Server), Zahl für den Code-Stand. Ohne das sind
+ * (L = lesen, F = Format, S = Server, B = Bildspeicher, X = unbestimmt), Zahl
+ * für den Code-Stand. Ohne das sind
  * die Meldungstexte über Stände hinweg identisch, und ein zugeschicktes
  * Bildschirmfoto verrät nicht, welcher Stand es erzeugt hat — bei einem Fehler,
  * der nur auf fremden Geräten auftritt, ist das der Unterschied zwischen
@@ -53,10 +54,10 @@ export type BildFehlerArt = 'lesen' | 'format' | 'server'
  * entfernt: Kennung hier löschen, die Meldungen enden dann wieder auf ihren
  * letzten Satz.
  */
-export const UPLOAD_DIAG = '71'
+export const UPLOAD_DIAG = '129'
 
 /** Hängt die Kennung an eine Meldung. Ein Ort, alle Meldungen. */
-function mitKennung(text: string, buchstabe: 'L' | 'F' | 'S' | 'X'): string {
+function mitKennung(text: string, buchstabe: 'L' | 'F' | 'S' | 'B' | 'X'): string {
   return `${text} [${buchstabe}${UPLOAD_DIAG}]`
 }
 
@@ -111,6 +112,20 @@ export const IMAGE_NETWORK_ERROR = mitKennung(
 )
 
 /**
+ * Der Bildspeicher hat abgelehnt — die Verbindung stand, die Antwort war Nein.
+ *
+ * Bis #129 bekam auch dieser Fall „Verbindung unterbrochen". Das schickte den
+ * Bauern auf die Suche nach besserem Empfang, obwohl sein Netz funktioniert
+ * hatte. Eigene Kennung B, damit ein Bildschirmfoto diesen Fall vom
+ * Netzfehler unterscheidet. Wie der Netzfehler kein BildFehler: Die
+ * Ablehnung sagt nichts über das Foto.
+ */
+export const IMAGE_STORAGE_ERROR = mitKennung(
+  'Der Bildspeicher hat das Foto gerade nicht angenommen — bitte später nochmal.',
+  'B'
+)
+
+/**
  * Rückfall für eine Ursache, die es hier nicht gibt.
  *
  * Der Typ verspricht drei Arten, zur Laufzeit kann trotzdem etwas anderes
@@ -120,12 +135,37 @@ export const IMAGE_NETWORK_ERROR = mitKennung(
  * Reihe. Also eine ehrlich unbestimmte Meldung — mit eigener Kennung, damit ein
  * Bildschirmfoto diesen Fall sofort als das ausweist, was er ist: ein Fehler
  * in unserem Code, nicht am Foto.
+ *
+ * Seit #129 auch der Text nach einem Transferfehler, der weder Netzfehler
+ * noch Antwort des Bildspeichers war — dort stand vorher „Verbindung
+ * unterbrochen", also genau so eine falsche Ursache.
  */
 export const IMAGE_UNKNOWN_ERROR = mitKennung(
   'Das Foto konnte nicht hochgeladen werden. Bitte versuche es noch einmal oder wähle ein ' +
     'anderes Foto.',
   'X'
 )
+
+/**
+ * Woran der Transfer des Originals gescheitert ist — aus Sicht des Bauern.
+ *
+ *   netz          Die Verbindung ist abgerissen (fetch-Netzfehler) oder
+ *                 unsere Wächter haben abgebrochen.
+ *   bildspeicher  Der Bildspeicher hat geantwortet — mit einer Ablehnung.
+ *   unbekannt     Weder noch. Ehrlich unbestimmt statt geraten.
+ */
+export type TransferUrteil = 'netz' | 'bildspeicher' | 'unbekannt'
+
+const TRANSFER_TEXT: Record<TransferUrteil, string> = {
+  netz: IMAGE_NETWORK_ERROR,
+  bildspeicher: IMAGE_STORAGE_ERROR,
+  unbekannt: IMAGE_UNKNOWN_ERROR,
+}
+
+/** Meldung an den Bauern nach einem gescheiterten Transfer. */
+export function transferFehlerText(urteil: TransferUrteil): string {
+  return TRANSFER_TEXT[urteil] ?? IMAGE_UNKNOWN_ERROR
+}
 
 /** Kurzgründe für die Sammelmeldung einer Serie (src/lib/upload-batch.ts). */
 const KURZ: Record<BildFehlerArt, string> = {

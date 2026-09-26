@@ -16,7 +16,13 @@ import type { ErrorEvent } from '@sentry/nextjs'
 import { bereinigeEreignis, ermittleUmgebung } from '@/lib/sentry-hygiene'
 import { validateEnv } from '@/lib/env'
 import { baueUploadMeldung, meldeUploadFehler, uploadUrsacheVon } from '@/lib/upload-meldung'
-import { BildFehler, IMAGE_NETWORK_ERROR, UPLOAD_DIAG } from '@/lib/upload-fehler'
+import {
+  BildFehler,
+  IMAGE_NETWORK_ERROR,
+  IMAGE_STORAGE_ERROR,
+  IMAGE_UNKNOWN_ERROR,
+  UPLOAD_DIAG,
+} from '@/lib/upload-fehler'
 
 vi.mock('@sentry/nextjs', () => ({
   init: vi.fn(),
@@ -332,12 +338,82 @@ describe('env-Validierung — der DSN ist optional', () => {
 })
 
 describe('Upload-Meldung', () => {
-  it('ordnet die Ursache zu: Foto-Urteil, Netzfehler, Unbekanntes', () => {
+  it('ordnet die Ursache zu: Foto-Urteil, Netzfehler, Bildspeicher, Unbekanntes', () => {
     expect(uploadUrsacheVon(new BildFehler('format'))).toBe('format')
     expect(uploadUrsacheVon(new BildFehler('lesen'))).toBe('lesen')
     expect(uploadUrsacheVon(new Error(IMAGE_NETWORK_ERROR))).toBe('netz')
+    expect(uploadUrsacheVon(new Error(IMAGE_STORAGE_ERROR))).toBe('bildspeicher')
+    expect(uploadUrsacheVon(new Error(IMAGE_UNKNOWN_ERROR))).toBe('unbekannt')
     expect(uploadUrsacheVon(new Error('irgendwas anderes'))).toBe('unbekannt')
     expect(uploadUrsacheVon('kein Error')).toBe('unbekannt')
+  })
+
+  it('legt je Anlauf einen eigenen Kontext an und den Schritt als Tag', () => {
+    // Eigene Kontexte statt einer Liste: Sentry kürzt ab der dritten Ebene.
+    const meldung = baueUploadMeldung({
+      ursache: 'netz',
+      datei: { size: 1_000, type: 'image/jpeg' },
+      weg: 'galerie',
+      versuche: 2,
+      diagnose: {
+        schritt: 'uebertragung',
+        anlaeufe: [
+          { klasse: 'TypeError', meldung: 'Failed to fetch', dauerMs: 1_900 },
+          { klasse: 'BlobServiceNotAvailable', meldung: 'Vercel Blob: The blob service …', dauerMs: 2_100 },
+        ],
+      },
+    })
+
+    expect(meldung.tags.schritt).toBe('uebertragung')
+    expect(meldung.contexts.uploadAnlauf1).toEqual({
+      klasse: 'TypeError',
+      meldung: 'Failed to fetch',
+      dauerMs: 1_900,
+    })
+    expect(meldung.contexts.uploadAnlauf2?.klasse).toBe('BlobServiceNotAvailable')
+    expect(meldung.contexts.uploadAnlauf3).toBeUndefined()
+  })
+
+  it('trägt einen HTTP-Status mit, wo es einen gab', () => {
+    const meldung = baueUploadMeldung({
+      ursache: 'server',
+      datei: { size: 1_000, type: 'image/jpeg' },
+      weg: 'kamera',
+      versuche: 1,
+      diagnose: {
+        schritt: 'abschluss',
+        anlaeufe: [{ klasse: 'HttpAntwort', meldung: 'Verarbeitung abgelehnt (server)', status: 500, dauerMs: 400 }],
+      },
+    })
+
+    expect(meldung.tags.schritt).toBe('abschluss')
+    expect(meldung.contexts.uploadAnlauf1?.status).toBe(500)
+  })
+
+  it('reicht die Diagnose an Sentry weiter', async () => {
+    const Sentry = await import('@sentry/nextjs')
+    vi.mocked(Sentry.captureException).mockClear()
+    const fehler = new Error(IMAGE_STORAGE_ERROR)
+
+    meldeUploadFehler(fehler, {
+      datei: { size: 1, type: 'image/png' },
+      weg: 'dateien',
+      versuche: 1,
+      diagnose: {
+        schritt: 'uebertragung',
+        anlaeufe: [{ klasse: 'BlobAccessError', meldung: 'Vercel Blob: Access denied …', dauerMs: 300 }],
+      },
+    })
+
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      fehler,
+      expect.objectContaining({
+        tags: expect.objectContaining({ ursache: 'bildspeicher', schritt: 'uebertragung' }),
+        contexts: expect.objectContaining({
+          uploadAnlauf1: { klasse: 'BlobAccessError', meldung: 'Vercel Blob: Access denied …', dauerMs: 300 },
+        }),
+      })
+    )
   })
 
   it('trägt Ursache, Kennung, Größe, Typ, Weg und Versuche — und KEINEN Dateinamen', () => {

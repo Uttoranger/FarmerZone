@@ -151,10 +151,25 @@ describe('darfZweitversuch — die Retry-Entscheidung', () => {
     )
   })
 
+  it('wiederholt keine 4xx-Ablehnung, auch wenn „not available" in ihrem Text steht', () => {
+    // client_token_not_allowed kommt mit 4xx vom Bildspeicher und fiele beim
+    // zweiten Anlauf genauso. Das alte Merkmal „enthält not available" hielt
+    // sie für den gerade nicht erreichbaren Dienst.
+    expect(
+      darfZweitversuch(
+        new Error(
+          'Vercel Blob: This operation is not available when using a client token. Use a read–write or OIDC token on the server.'
+        ),
+        1
+      )
+    ).toBe(false)
+  })
+
   it('lässt die zwei SDK-Meldungen durch, die keine Urteile sind', () => {
-    // Der Abbruch kommt von unseren eigenen Wächtern; „not available" meldet
-    // das SDK auch für gescheiterte fetches nach internen Wiederholungen —
-    // beides sind Transfer-Unfälle, genau dafür gibt es den Zweitversuch.
+    // Der Abbruch kommt von unseren eigenen Wächtern; „The blob service is
+    // currently not available" meldet das SDK für 5xx und im gestückelten
+    // Weg auch für gescheiterte fetches — beides kann ein zweiter Anlauf
+    // beheben, genau dafür gibt es ihn.
     expect(darfZweitversuch(new Error('Vercel Blob: The request was aborted.'), 1)).toBe(true)
     expect(
       darfZweitversuch(

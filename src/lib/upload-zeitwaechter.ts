@@ -11,6 +11,7 @@
  * Reine Logik ohne DOM und ohne Netz, damit sie mit fake timers prüfbar ist.
  */
 
+import { blobFehlerKlasse } from './upload-diagnose'
 import { bildFehlerArtVon } from './upload-fehler'
 
 /**
@@ -74,28 +75,32 @@ export const TRANSFER_VERSUCHE = 2
 export const TRANSFER_PAUSE_MS = 2_000
 
 /**
+ * Die zwei SDK-Fehler, die KEINE Urteile sind: der Abbruch (den lösen unsere
+ * eigenen Wächter aus) und der gerade nicht erreichbare Dienst (5xx; im
+ * gestückelten Weg meldet das SDK so auch gescheiterte fetches). Beide kann
+ * ein zweiter Anlauf beheben.
+ *
+ * Bis #129 stand hier „Text enthält not available". Das traf auch
+ * client_token_not_allowed („This operation is not available when using a
+ * client token") — eine 4xx-Ablehnung, die beim zweiten Anlauf genauso fällt.
+ */
+const WIEDERHOLBARE_BLOB_KLASSEN = new Set(['BlobRequestAbortedError', 'BlobServiceNotAvailable'])
+
+/**
  * Deterministisches Urteil des Blob-SDK — im Gegensatz zum Transfer-Unfall.
  *
  * Alle SDK-Fehler tragen das Präfix „Vercel Blob: " (BlobError setzt es im
  * Konstruktor); echte Netzfehler kommen dagegen als TypeError. Urteile sind
  * endgültig: abgelehnter Token (etwa nach abgelaufener Sitzung), verweigerter
- * Zugriff, falscher Pfad — sie fielen beim Wiederholen genauso, und
- * „Verbindung unterbrochen" wäre dafür eine falsche Auskunft. Zwei Meldungen
- * sind KEINE Urteile und bleiben wiederholbar: der Abbruch („The request was
- * aborted." — den lösen unsere eigenen Wächter aus) und „not available" (so
- * meldet das SDK auch gescheiterte fetches nach seinen internen
- * Teil-Wiederholungen).
+ * Zugriff, falscher Pfad — sie fielen beim Wiederholen genauso.
  *
- * Bewusst am Meldungstext erkannt statt per instanceof: Die Klasse hielte
- * über eine Bundle-Grenze nicht (dieselbe Lehre wie bei BildFehler), und das
- * Präfix entsteht im BlobError-Konstruktor selbst — stabiler geht es nicht.
+ * Bewusst am Meldungstext erkannt statt per instanceof (blobFehlerKlasse):
+ * Die Klasse hielte über eine Bundle-Grenze nicht (dieselbe Lehre wie bei
+ * BildFehler), und der Text entsteht im Konstruktor selbst.
  */
 function istSdkUrteil(fehler: unknown): boolean {
-  if (!(fehler instanceof Error)) return false
-  if (!fehler.message.startsWith('Vercel Blob: ')) return false
-  if (fehler.message.includes('The request was aborted')) return false
-  if (fehler.message.includes('not available')) return false
-  return true
+  const klasse = blobFehlerKlasse(fehler)
+  return klasse !== null && !WIEDERHOLBARE_BLOB_KLASSEN.has(klasse)
 }
 
 /**
@@ -107,8 +112,7 @@ function istSdkUrteil(fehler: unknown): boolean {
  * Urteile, denn ein Urteil fiele beim Wiederholen genauso: weder die eines
  * BildFehlers ('format'/'server' aus der Verarbeitungs-Route, 'lesen' aus
  * der Lese-Stufe) noch die des Blob-SDK (istSdkUrteil) — der Zweitversuch
- * würde nur Zeit und Datenvolumen verbrennen und dabei fälschlich
- * „Verbindung unterbrochen" anzeigen.
+ * würde nur Zeit und Datenvolumen verbrennen.
  */
 export function darfZweitversuch(fehler: unknown, bisherigeVersuche: number): boolean {
   if (bisherigeVersuche >= TRANSFER_VERSUCHE) return false
