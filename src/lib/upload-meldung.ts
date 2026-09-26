@@ -14,7 +14,7 @@
  * Sentry — und wirft nie: Telemetrie darf den Upload-Ablauf nicht verändern.
  */
 import * as Sentry from '@sentry/nextjs'
-import type { UploadAnlauf, UploadDiagnose, UploadSchritt } from '@/lib/upload-diagnose'
+import type { LeseDiagnose, LeseErgebnis, UploadAnlauf, UploadDiagnose, UploadSchritt } from '@/lib/upload-diagnose'
 import {
   bildFehlerArtVon,
   IMAGE_NETWORK_ERROR,
@@ -50,7 +50,42 @@ export type UploadMeldung = {
       weg: UploadWeg
       versuche: number
     }
+    uploadLesen?: UploadLesenKontext
   } & { [anlauf: `uploadAnlauf${number}`]: UploadAnlauf }
+}
+
+/**
+ * Die Lese-Stufe als EIN flacher Kontext — aus demselben Grund wie die
+ * Anläufe: Sentry kürzt verschachtelte Werte ab der dritten Ebene. Die
+ * voll…-Felder fehlen, wenn die Probe gelang (dann gab es kein Volllesen).
+ */
+export type UploadLesenKontext = {
+  probeErgebnis: LeseErgebnis
+  probeKlasse?: string
+  probeMeldung?: string
+  probeDauerMs: number
+  vollErgebnis?: LeseErgebnis
+  vollKlasse?: string
+  vollMeldung?: string
+  vollDauerMs?: number
+  dateiAlterTage: number | null
+}
+
+function lesenKontext({ probe, voll, dateiAlterTage }: LeseDiagnose): UploadLesenKontext {
+  const kontext: UploadLesenKontext = { probeErgebnis: probe.ergebnis, probeDauerMs: probe.dauerMs, dateiAlterTage }
+  if (probe.ergebnis === 'fehler') {
+    kontext.probeKlasse = probe.klasse
+    kontext.probeMeldung = probe.meldung
+  }
+  if (voll) {
+    kontext.vollErgebnis = voll.ergebnis
+    kontext.vollDauerMs = voll.dauerMs
+    if (voll.ergebnis === 'fehler') {
+      kontext.vollKlasse = voll.klasse
+      kontext.vollMeldung = voll.meldung
+    }
+  }
+  return kontext
 }
 
 /**
@@ -67,6 +102,7 @@ export function baueUploadMeldung(eingabe: {
   weg: UploadWeg
   versuche: number
   diagnose?: UploadDiagnose
+  lesen?: LeseDiagnose
 }): UploadMeldung {
   const meldung: UploadMeldung = {
     tags: { bereich: 'foto-upload', ursache: eingabe.ursache, kennung: UPLOAD_DIAG },
@@ -85,6 +121,7 @@ export function baueUploadMeldung(eingabe: {
       meldung.contexts[`uploadAnlauf${i + 1}` as const] = anlauf
     })
   }
+  if (eingabe.lesen) meldung.contexts.uploadLesen = lesenKontext(eingabe.lesen)
   return meldung
 }
 
@@ -101,6 +138,8 @@ export function meldeUploadFehler(
     versuche: number
     /** Der Originalfehler je Anlauf, bereinigt — aus ladeFotoHoch (onDiagnose). */
     diagnose?: UploadDiagnose
+    /** Wie die Lese-Stufe ausging, bereinigt — aus ladeFotoHoch (onLesen). */
+    lesen?: LeseDiagnose
   }
 ): void {
   try {

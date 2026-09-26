@@ -22,7 +22,7 @@ import {
   IMAGE_STORAGE_ERROR,
   IMAGE_UNKNOWN_ERROR,
 } from '@/lib/upload-fehler'
-import type { UploadDiagnose } from '@/lib/upload-diagnose'
+import type { LeseDiagnose, UploadDiagnose } from '@/lib/upload-diagnose'
 
 /** Erfundene Hof-Kennung im cuid-Format — sie darf in keiner Diagnose landen. */
 const HOF = 'cltesthofkennung000000001'
@@ -208,6 +208,24 @@ describe('Übertragung — was der Bauer liest', () => {
 })
 
 describe('Übertragung — was Sentry erfährt', () => {
+  it('gibt den Ausgang der Lese-Stufe über onLesen heraus, auch wenn erst das Senden scheitert (JAVASCRIPT-NEXTJS-3)', async () => {
+    upload.mockImplementation(scheitertNach(1_900, new TypeError('Load failed')))
+    let lesen: LeseDiagnose | undefined
+    const ausgang = ladeFotoHoch(foto(), 'product', {
+      onLesen: (l) => {
+        lesen = l
+      },
+    }).then(
+      () => undefined,
+      (e: unknown) => e as Error
+    )
+    await vi.advanceTimersByTimeAsync(10_000)
+
+    expect((await ausgang)?.message).toBe(IMAGE_NETWORK_ERROR)
+    // Die Attrappe hat kein lastModified — kein Alter statt eines erfundenen.
+    expect(lesen).toEqual({ probe: { ergebnis: 'ok', dauerMs: 0 }, dateiAlterTage: null })
+  })
+
   it('hält je Anlauf Klasse, Nachricht und Dauer fest', async () => {
     upload.mockImplementation(scheitertNach(1_900, new TypeError('Load failed')))
 

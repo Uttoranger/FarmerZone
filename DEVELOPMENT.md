@@ -1057,6 +1057,21 @@ Jede Upload-Fehlermeldung endet auf eine Kennung wie `[L129]` — Buchstabe für
 
 Beim Lesen der Daten beachten (Stand `@vercel/blob` 2.4.0): Das SDK wiederholt Netzfehler und 5xx seiner Requests an den Bildspeicher selbst, bis zu zehnmal mit wachsender Pause — bevor so ein Fehler bei uns ankommt, greift meist schon der Stillstands-Wächter (45 s). Im gestückelten Weg macht es aus einem Chrome-„Failed to fetch" nach diesen Wiederholungen `BlobServiceNotAvailable`; beides wird hier wiederholt, der Text ist dann der des Bildspeichers — eine bekannte Unschärfe, die erst die Dauer des Anlaufs in Sentry auflöst. Die Abholung des Upload-Tokens über unsere Route wiederholt das SDK dagegen nicht: Ein Netzfehler dort kommt sofort als TypeError, eine Ablehnung als `BlobError` „Failed to  retrieve the client token" (mit doppeltem Leerzeichen; mit einfachem, wenn die Antwort kein JSON war).
 
+**Die Lese-Stufe behält ihre Ursache (JAVASCRIPT-NEXTJS-3).** `pruefeLesbarkeit` fing die 64-KB-Probe und das Volllesen mit leerem `catch` ab — Sentry sah nur „lesen", nicht ob die Datei stumm blieb oder sofort abgelehnt wurde. Seitdem hält die Stufe je Versuch fest:
+
+- `ergebnis`: `ok`, `zeitlimit` (keine Antwort bis zum Wächter, 8 s bzw. 20 s) oder `fehler` (der Browser hat abgelehnt).
+- Bei `fehler` die `klasse` und die bereinigte `meldung`. `klasse` ist der Name des Fehlers, etwa `NotReadableError` oder `NotFoundError` — auch aus einer DOMException, die in älteren Safari-Ständen kein Error ist. Sieht der Name nicht wie ein Bezeichner aus, steht dort `unbekannt`.
+- `dauerMs`.
+- Dazu `dateiAlterTage` aus `lastModified`: ganze Tage, kein Datumsfeld. Zusammen mit dem Zeitpunkt der Meldung grenzt es den Tag der Datei auf 24 Stunden ein, genauer nicht. `null` bei 0, fehlendem Wert oder einem Zeitpunkt in der Zukunft. Kennt der Browser das Datum nicht, setzt er laut File API die aktuelle Zeit — `0` heißt deshalb „heute oder unbekannt“.
+
+Das alles steht in einem flachen Kontext `uploadLesen` (`probeErgebnis`, `probeKlasse`, `probeMeldung`, `probeDauerMs`, `voll…`, `dateiAlterTage`). Die `voll…`-Felder fehlen, wenn die Probe gelang. Der Kontext geht bei jedem Upload-Fehler mit, auch wenn erst das Senden scheitert: Eine gescheiterte Probe vor einem Sendefehler ist dieselbe Spur.
+
+Die Meldung an den Bauern und der Ablauf sind unverändert. Die Wegweiser stimmen für die stumme wie für die ablehnende Quelle, deshalb bleibt die Kennung `129`.
+
+So liest man es:
+- `zeitlimit` in beiden Versuchen spricht für eine Quelle, die die Datei erst holen müsste (Cloud-Album); ein hohes `dateiAlterTage` stützt das.
+- `fehler` nach wenigen Millisekunden spricht für eine verweigerte oder verschwundene Datei.
+
 ---
 
 ## Triage (Fehlerbriefkasten)

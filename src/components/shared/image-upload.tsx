@@ -8,9 +8,13 @@ import { summarizeUploadBatch, type BatchSkip } from '@/lib/upload-batch'
 import { meldeUploadFehler, type UploadWeg } from '@/lib/upload-meldung'
 import {
   befundVon,
+  dateiAlterTage,
+  leseFehlerBefund,
   ordneTransferFehler,
   UploadSchrittFehler,
   type AnlaufBefund,
+  type LeseDiagnose,
+  type LeseVersuch,
   type UploadAnlauf,
   type UploadDiagnose,
 } from '@/lib/upload-diagnose'
@@ -146,27 +150,54 @@ const LESE_PROBE_BYTES = 64 * 1024
  * nicht heraus, die Wegweiser-Auswege gelten genauso. Schlimmster Fall
  * jetzt: 8 + 20 = 28 Sekunden bis zur klaren Meldung — statt nie.
  *
- * Exportiert für den Verhaltens-Test (tests/upload-zeitwaechter.test.ts).
+ * Wie jeder Versuch ausging, bekommt `onLesen` — für Sentry, nie für den
+ * Bauern (JAVASCRIPT-NEXTJS-3): Bis dahin fingen zwei leere catch den Fehler
+ * ab, und die Meldung sagte nur „lesen", nicht ob die Datei stumm blieb oder
+ * sofort abgelehnt wurde. Auch bei Erfolg, denn ein späterer Sendefehler nach
+ * einer gescheiterten Probe ist dieselbe Spur.
+ *
+ * Exportiert für die Verhaltens-Tests (tests/upload-zeitwaechter.test.ts,
+ * tests/upload-lesen.test.ts).
  */
-export async function pruefeLesbarkeit(file: File): Promise<void> {
-  try {
-    await mitZeitlimit(
-      file.slice(0, LESE_PROBE_BYTES).arrayBuffer(),
-      LESE_PROBE_LIMIT_MS,
-      () => new BildFehler('lesen')
-    )
+export async function pruefeLesbarkeit(file: File, onLesen?: (lesen: LeseDiagnose) => void): Promise<void> {
+  // Was eine Browser-Meldung über die Datei verraten könnte — der Name vom Gerät.
+  const verborgen = file.name ? [file.name] : []
+  const alter = dateiAlterTage(file.lastModified, Date.now())
+
+  const probe = await leseVersuch(() => file.slice(0, LESE_PROBE_BYTES).arrayBuffer(), LESE_PROBE_LIMIT_MS, verborgen)
+  if (probe.ergebnis === 'ok') {
+    onLesen?.({ probe, dateiAlterTage: alter })
     return
-  } catch {
-    // Noch kein Urteil — erst der Zusatzversuch unten entscheidet.
   }
+
+  // Noch kein Urteil: Manche Speicherdienste verweigern das Teil-Lesen, geben
+  // die Datei aber am Stück heraus — EIN Zusatzversuch mit der ganzen Datei,
+  // bevor 'lesen' feststeht.
+  const voll = await leseVersuch(() => file.arrayBuffer(), LESE_VOLL_LIMIT_MS, verborgen)
+  onLesen?.({ probe, voll, dateiAlterTage: alter })
+  if (voll.ergebnis === 'ok') return
+
+  protokolliereBildFehler('lesen', file)
+  throw new BildFehler('lesen')
+}
+
+/** Ein Leseversuch unter Zeitwächter — wirft nie, sondern sagt, wie er ausging. */
+async function leseVersuch(
+  lesen: () => Promise<ArrayBuffer>,
+  limitMs: number,
+  verborgen: readonly string[]
+): Promise<LeseVersuch> {
+  const beginn = Date.now()
+  // Nur unser Wächter wirft genau dieses Objekt — so ist der Ablauf vom
+  // Fehler des Browsers unterscheidbar, auch wenn der ebenfalls ein Error ist.
+  const ablauf = new Error('Zeitlimit')
   try {
-    // Manche Speicherdienste verweigern das Teil-Lesen, geben die Datei aber
-    // am Stück heraus — EIN Zusatzversuch mit der ganzen Datei, bevor
-    // 'lesen' feststeht.
-    await mitZeitlimit(file.arrayBuffer(), LESE_VOLL_LIMIT_MS, () => new BildFehler('lesen'))
-  } catch {
-    protokolliereBildFehler('lesen', file)
-    throw new BildFehler('lesen')
+    await mitZeitlimit(lesen(), limitMs, () => ablauf)
+    return { ergebnis: 'ok', dauerMs: Date.now() - beginn }
+  } catch (e) {
+    const dauerMs = Date.now() - beginn
+    if (e === ablauf) return { ergebnis: 'zeitlimit', dauerMs }
+    return { ergebnis: 'fehler', ...leseFehlerBefund(e, verborgen), dauerMs }
   }
 }
 
@@ -328,10 +359,12 @@ export async function ladeFotoHoch(
     onVersuch?: (versuch: number) => void
     /** Reine Zusatz-Meldung (Sentry-Diagnose): woran der Upload scheiterte. */
     onDiagnose?: (diagnose: UploadDiagnose) => void
+    /** Reine Zusatz-Meldung (Sentry-Diagnose): wie die Lese-Stufe ausging. */
+    onLesen?: (lesen: LeseDiagnose) => void
   } = {}
 ): Promise<string> {
   optionen.onStufe?.('lesen')
-  await pruefeLesbarkeit(file)
+  await pruefeLesbarkeit(file, optionen.onLesen)
 
   // Die Kennung gehört schon zum Hochladen: Hängt ihr Abruf, zeigt die
   // Anzeige den richtigen Ort, und ihr Zeitwächter meldet den Netzfehler.
@@ -451,6 +484,7 @@ export function useImageUpload({
     // 0 = der Transfer hat nie begonnen (z. B. Lese-Stufe gescheitert).
     let versuche = 0
     let diagnose: UploadDiagnose | undefined
+    let lesen: LeseDiagnose | undefined
     let url: string
     try {
       url = await ladeFotoHoch(file, variant, {
@@ -467,13 +501,16 @@ export function useImageUpload({
         onDiagnose: (d) => {
           diagnose = d
         },
+        onLesen: (l) => {
+          lesen = l
+        },
       })
     } catch (e) {
       // Zusätzlich zur Anzeige nach Sentry — Ursache, Kennung, Größe, Typ,
-      // Weg, Versuche, Originalfehler je Anlauf; kein Dateiname (siehe
-      // upload-meldung.ts). So ist ohne Bildschirmfoto nachvollziehbar,
-      // woran es scheiterte.
-      meldeUploadFehler(e, { datei: file, weg: weg.current, versuche, diagnose })
+      // Weg, Versuche, Originalfehler je Anlauf, Ausgang der Lese-Stufe; kein
+      // Dateiname (siehe upload-meldung.ts). So ist ohne Bildschirmfoto
+      // nachvollziehbar, woran es scheiterte.
+      meldeUploadFehler(e, { datei: file, weg: weg.current, versuche, diagnose, lesen })
       // Ein BildFehler bringt seine Ursache mit und bekommt den passenden
       // Text; alles andere behält seine eigene Meldung.
       const { text, kurz } = bildFehlerMeldung(e)

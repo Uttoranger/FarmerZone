@@ -8,7 +8,7 @@ import {
   stufenText,
   type UploadStufe,
 } from '@/components/shared/image-upload'
-import type { UploadDiagnose } from '@/lib/upload-diagnose'
+import type { LeseDiagnose, UploadDiagnose } from '@/lib/upload-diagnose'
 import { bildFehlerMeldung } from '@/lib/upload-fehler'
 import { meldeUploadFehler } from '@/lib/upload-meldung'
 import { MAX_ORIGINAL_BYTES } from '@/lib/upload-pfade'
@@ -84,6 +84,7 @@ export function TeilenClient({
         // 0 = der Transfer hat nie begonnen — nur für die Sentry-Meldung.
         let versuche = 0
         let diagnose: UploadDiagnose | undefined
+        let lesen: LeseDiagnose | undefined
         let url: string
         try {
           url = await ladeFotoHoch(foto, wirksamesZiel, {
@@ -97,11 +98,14 @@ export function TeilenClient({
             onDiagnose: (d) => {
               diagnose = d
             },
+            onLesen: (l) => {
+              lesen = l
+            },
           })
         } catch (e) {
           // Zusätzlich zur Anzeige nach Sentry — der Teilen-Weg ist der
           // vierte Weg neben Galerie, Dateien und Kamera (upload-meldung.ts).
-          meldeUploadFehler(e, { datei: foto, weg: 'teilen', versuche, diagnose })
+          meldeUploadFehler(e, { datei: foto, weg: 'teilen', versuche, diagnose, lesen })
           ausgang.push({ name: foto.name, ok: false, meldung: bildFehlerMeldung(e).text })
           continue
         }
