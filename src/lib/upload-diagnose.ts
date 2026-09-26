@@ -108,8 +108,21 @@ export function ordneTransferFehler(fehler: unknown, abgebrochen: boolean): Tran
   // Den Abbruch meldet das SDK nur, wenn das Signal am Request feuert — und
   // das einzige Signal dort ist das unserer Wächter.
   if (klasse === 'BlobRequestAbortedError') return 'netz'
+  // Die Upload-Erlaubnis verweigert hat UNSERE Token-Route (abgelaufene
+  // Sitzung, Pfad nicht erlaubt, Serverfehler), nicht der Bildspeicher —
+  // „bitte später nochmal" wäre dafür eine falsche Auskunft.
+  if (istTokenAbruf(fehler)) return 'unbekannt'
   if (klasse !== null) return 'bildspeicher'
   return 'unbekannt'
+}
+
+/**
+ * Das SDK hat den Upload-Token bei unserer Route nicht bekommen. Wortlaut aus
+ * @vercel/blob 2.4.0 (retrieveClientToken): mit doppeltem Leerzeichen bei
+ * einer Ablehnung, mit einfachem, wenn die Antwort kein JSON war.
+ */
+function istTokenAbruf(fehler: unknown): boolean {
+  return fehler instanceof Error && /^Vercel Blob: Failed to {1,2}retrieve the client token/.test(fehler.message)
 }
 
 /** Die Klasse eines Fehlers, bei @vercel/blob die Unterklasse. */
@@ -122,6 +135,9 @@ export function fehlerKlasse(fehler: unknown): string {
 
 const MELDUNG_MAX = 200
 
+/** Ein MIME-Typ wie „image/jpeg" — hat einen Schrägstrich, ist aber kein Pfad. */
+const MIME_TYP = /^["'(]?(?:image|application|text|video|audio)\/[a-z0-9.+-]+["')]?[.,;:]?$/i
+
 /**
  * Nimmt aus einem Fehlertext alles heraus, was über den Hof oder die Datei
  * etwas verrät: die übergebenen Werte wörtlich (Dateiname, Hof-Kennung),
@@ -129,7 +145,9 @@ const MELDUNG_MAX = 200
  * cuid-Format. Danach gekürzt.
  *
  * Die bekannten Werte kommen zuerst: Ein Dateiname mit Leerzeichen entginge
- * den Mustern darunter zur Hälfte.
+ * den Mustern darunter zur Hälfte. MIME-Typen bleiben stehen — sie sagen
+ * über niemanden etwas und sind bei BlobContentTypeNotAllowedError genau die
+ * Auskunft, die gebraucht wird.
  */
 export function bereinigeFehlerText(text: string, verborgen: readonly string[] = []): string {
   let sauber = text
@@ -138,7 +156,7 @@ export function bereinigeFehlerText(text: string, verborgen: readonly string[] =
   }
   sauber = sauber
     .replace(/[a-z][a-z0-9+.-]*:\/\/\S*/gi, '[adresse]')
-    .replace(/\S*\/\S*/g, '[pfad]')
+    .replace(/\S*\/\S*/g, (treffer) => (MIME_TYP.test(treffer) ? treffer : '[pfad]'))
     .replace(/[^\s@]+@[^\s@]+/g, '[e-mail]')
     .replace(/\S+\.(?:jpe?g|png|gif|webp|heic|heif|avif|bmp|tiff?|dng)\b/gi, '[datei]')
     .replace(/[a-z0-9]{20,}/gi, '[kennung]')

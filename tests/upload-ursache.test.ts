@@ -111,7 +111,9 @@ afterEach(() => {
 
 describe('Übertragung — was der Bauer liest', () => {
   it('sagt „Verbindung unterbrochen" bei einem echten Netzfehler — nach genau einem Zweitversuch', async () => {
-    upload.mockImplementation(scheitertNach(1_900, new TypeError('Failed to fetch')))
+    // Safaris Wortlaut: Den reicht das SDK im gestückelten Weg unverändert
+    // durch; Chromes „Failed to fetch" macht es dort zu BlobServiceNotAvailable.
+    upload.mockImplementation(scheitertNach(1_900, new TypeError('Load failed')))
 
     const { fehler } = await lauf()
 
@@ -190,19 +192,32 @@ describe('Übertragung — was der Bauer liest', () => {
     expect(fehler?.message).toBe(IMAGE_UNKNOWN_ERROR)
     expect(fehler?.message).not.toContain('Verbindung')
   })
+
+  it('schiebt die Ablehnung durch unsere Token-Route nicht dem Bildspeicher zu — und wiederholt sie nicht', async () => {
+    // Die Kennung ist gemerkt, die Sitzung inzwischen abgelaufen: Unsere
+    // Route verweigert den Upload-Token, das SDK meldet es so.
+    upload.mockImplementation(
+      scheitertNach(300, new Error('Vercel Blob: Failed to  retrieve the client token'))
+    )
+
+    const { fehler } = await lauf()
+
+    expect(upload).toHaveBeenCalledTimes(1)
+    expect(fehler?.message).toBe(IMAGE_UNKNOWN_ERROR)
+  })
 })
 
 describe('Übertragung — was Sentry erfährt', () => {
   it('hält je Anlauf Klasse, Nachricht und Dauer fest', async () => {
-    upload.mockImplementation(scheitertNach(1_900, new TypeError('Failed to fetch')))
+    upload.mockImplementation(scheitertNach(1_900, new TypeError('Load failed')))
 
     const { diagnose } = await lauf()
 
     expect(diagnose).toEqual({
       schritt: 'uebertragung',
       anlaeufe: [
-        { klasse: 'TypeError', meldung: 'Failed to fetch', dauerMs: 1_900 },
-        { klasse: 'TypeError', meldung: 'Failed to fetch', dauerMs: 1_900 },
+        { klasse: 'TypeError', meldung: 'Load failed', dauerMs: 1_900 },
+        { klasse: 'TypeError', meldung: 'Load failed', dauerMs: 1_900 },
       ],
     })
   })
@@ -269,7 +284,7 @@ describe('Übertragung — was Sentry erfährt', () => {
 
   it('meldet bei Erfolg keine Diagnose — auch nicht nach einem gescheiterten ersten Anlauf', async () => {
     upload
-      .mockImplementationOnce(scheitertNach(300, new TypeError('Failed to fetch')))
+      .mockImplementationOnce(scheitertNach(300, new TypeError('Load failed')))
       .mockImplementationOnce(() => nach(300, () => ({ url: ORIGINAL })))
 
     const { url, diagnose } = await lauf()

@@ -85,7 +85,16 @@ describe('ordneTransferFehler — was der Bauer liest', () => {
   it('ordnet jede Antwort des Bildspeichers ihm zu — Ablehnung wie Ausfall', () => {
     expect(ordneTransferFehler(blob('Access denied, please provide a valid token for this resource.'), false)).toBe('bildspeicher')
     expect(ordneTransferFehler(blob('The blob service is currently not available. Please try again.'), false)).toBe('bildspeicher')
-    expect(ordneTransferFehler(blob('Failed to  retrieve the client token'), false)).toBe('bildspeicher')
+    expect(
+      ordneTransferFehler(blob('This operation is not available when using a client token.'), false)
+    ).toBe('bildspeicher')
+  })
+
+  it('schiebt die Ablehnung durch unsere eigene Token-Route nicht dem Bildspeicher zu', () => {
+    // Abgelaufene Sitzung, Pfad nicht erlaubt, Serverfehler: „bitte später
+    // nochmal" hülfe dort nicht. Beide Wortlaute des SDK.
+    expect(ordneTransferFehler(blob('Failed to  retrieve the client token'), false)).toBe('unbekannt')
+    expect(ordneTransferFehler(blob('Failed to retrieve the client token'), false)).toBe('unbekannt')
   })
 
   it('bleibt bei allem anderen ehrlich unbestimmt', () => {
@@ -142,6 +151,15 @@ describe('bereinigeFehlerText — nichts über Hof oder Datei', () => {
     expect(text).not.toContain('originals')
     expect(text).not.toContain('Stall')
     expect(text).not.toContain('example.com')
+  })
+
+  it('lässt MIME-Typen stehen — sie haben einen Schrägstrich, sind aber kein Pfad', () => {
+    expect(
+      bereinigeFehlerText('Vercel Blob: Content type mismatch, contentType image/heic is not allowed.')
+    ).toBe('Vercel Blob: Content type mismatch, contentType image/heic is not allowed.')
+    expect(bereinigeFehlerText('Typ "application/octet-stream".')).toBe('Typ "application/octet-stream".')
+    // Ein Pfad, der nur so anfängt, bleibt ein Pfad.
+    expect(bereinigeFehlerText(`image/${HOF}/stall.jpg`)).toBe('[pfad]')
   })
 
   it('kürzt auf 200 Zeichen', () => {

@@ -212,6 +212,10 @@ async function uebertrageOriginal(
   }
 ): Promise<{ url: string }> {
   const anlaeufe: UploadAnlauf[] = []
+  // Was ein SDK-Fehlertext über Hof und Datei verraten kann: der Pfad, der
+  // Name vom Gerät, der daraus bereinigte Name im Pfad, die Kennung.
+  const pfad = originalPfad(farmId, zweck, file.name)
+  const verborgen = [pfad, file.name, pfad.slice(pfad.lastIndexOf('/') + 1), farmId]
   for (let versuch = 1; ; versuch++) {
     optionen.onVersuch?.(versuch)
     const beginn = Date.now()
@@ -259,7 +263,7 @@ async function uebertrageOriginal(
       lebendig = false
       const abgebrochen = abbruch.signal.aborted
       anlaeufe.push({
-        ...(waechter.grund ? waechterBefund(waechter.grund) : befundVon(e, [file.name, farmId])),
+        ...(waechter.grund ? waechterBefund(waechter.grund) : befundVon(e, verborgen)),
         dauerMs: Date.now() - beginn,
       })
       // Haben UNSERE Wächter abgebrochen, ist es ein Transfer-Unfall — egal,
