@@ -1578,49 +1578,91 @@ gegen echtes Postgres geprüft.
 `pnpm db:seed` legt seit diesem Sprint einen Datensatz an, der die Fälle zeigt,
 für die es Code gibt — nicht nur den Glücksfall. **Alles ist erfunden.** Keine
 Zeile stammt aus der Produktion: E-Mails enden auf `@example.com`,
-Telefonnummern lauten `+43 660 000xxxx`, Betriebsnummern beginnen mit `TEST-`.
-Die **Orte** sind echte steirische Gemeinden — sie müssen es sein, sonst stimmen
-die Entfernungen nicht; Straßen und Hausnummern sind erfunden.
+Telefonnummern lauten `+43 660 000xxxx` (bayerische Höfe `+49 8571 0000xx`),
+Betriebsnummern der neuen Höfe beginnen mit `TEST-` (der Pilothof trägt seit dem
+ersten Seed `LFBIS 1234567`). Die **Orte** sind echte Gemeinden im
+Innviertel — sie müssen es sein, sonst stimmen die Entfernungen nicht; Straßen
+und Hausnummern sind erfunden.
 
-### Sechs Höfe, und warum jeder einzelne da ist
+**Praktischer Hinweis nach einem erneuten Seed-Lauf:** `/hoefe` cacht die
+Hofliste fünf Minuten (`unstable_cache` in der Seite). Direkt nach einem
+`pnpm db:seed` steht dort also noch die alte Liste. Das ist kein Fehler im Seed —
+einmal warten oder den Dev-Server neu starten.
 
-Bezugspunkt ist der Pilothof in 8700 Leoben. Die Entfernungen rechnet
-`entfernungKm` (`src/lib/hofuebersicht.ts`), nicht ein Kommentar:
+### 37 Höfe im Innviertel, und warum jeder einzelne da ist
+
+Das Gebiet sind die Bezirke **Braunau am Inn** und **Ried im Innkreis**, dazu
+zwei Höfe jenseits der Grenze in Niederbayern. Bezugspunkt ist der Pilothof in
+5280 Braunau am Inn. Die Entfernungen rechnet `entfernungKm`
+(`src/lib/hofuebersicht.ts`), nicht ein Kommentar.
+
+**Sechs Rollen-Höfe** tragen die Sonderfälle:
 
 | Hof | Ort | Entfernung | Wofür er da ist |
 |---|---|---|---|
-| Hof Müller | 8700 Leoben | — | der Bezugspunkt |
-| Hof Sonnleiten | 8792 Sankt Peter-Freienstein | 5,6 km | im 10-km-Umkreis |
-| Bergwiesenhof | 8600 Bruck an der Mur | 13,7 km | erst ab 25 km; **nur** Futter, **nur** Vor-Ort-Zahlung |
-| Waldrandhof | 8650 Kindberg | 29,8 km | erst ab 50 km |
-| Weizberghof | 8160 Weiz | 43,5 km | **nicht freigeschaltet** — unsichtbar trotz Koordinaten |
-| Tallerhof | 8712 Niklasdorf | — | **ohne Kartenpunkt** — in der Liste, nie im Umfeld |
-
-Die drei Stufen des Umkreis-Reglers (10/25/50 km) sind damit **einzeln
-trennbar**: jede zeigt genau einen Hof mehr. Ein Test hält das fest
-(`tests/seed-idempotenz.test.ts`) — wer die Koordinaten verschiebt, merkt es.
+| Hof Müller | 5280 Braunau am Inn | — | der Bezugspunkt |
+| Hof Sonnleiten | 4963 Sankt Peter am Hart | 3,9 km | im 10-km-Umkreis |
+| Bergwiesenhof | 4950 Altheim | 14,1 km | erst ab 25 km; **nur** Futter, **nur** Vor-Ort-Zahlung |
+| Waldrandhof | 4971 Aurolzmünster | 30,5 km | erst ab 50 km |
+| Weizberghof | 4906 Eberschwang | 40,0 km | **nicht freigeschaltet** — unsichtbar trotz Koordinaten |
+| Tallerhof | 5230 Mattighofen | — | **ohne Kartenpunkt** — in der Liste, nie im Umfeld |
 
 Die letzten zwei Zeilen sind der Kern: Es braucht **beide** Gründe für
 Unsichtbarkeit. Ein Hof ohne Kartenpunkt kann nicht platziert werden; ein nicht
 freigeschalteter Hof hat Koordinaten und Produkte und ist trotzdem nirgends
 öffentlich. Wer nur den einen Fall hat, hält den anderen für einen Bug.
 
-Der Pilothof **bleibt, wie er ist**: Name, Adresse, Beschreibung, Produkte und
-Preise unverändert. Ergänzt werden nur Kartenpunkt, Betriebsnummer und
-`serviceFeeActiveFrom` — ohne Kartenpunkt gibt es keinen Bezugspunkt, ohne
-Gebühren-Geltung keine Servicegebühr und damit leere Finanzen. Sein
-Freischaltdatum wird **nicht** überschrieben (`bestandsHof: true` in
-`prisma/seed-daten.ts`), sonst ersetzte jeder Seed-Lauf die Wirklichkeit durch
-ein relatives Datum.
+**31 Nachbarhöfe** zwischen 1,0 und 39,2 km füllen das Gebiet. Sie sind der
+Unterschied zwischen „die Karte funktioniert" und „die Karte sieht aus wie im
+Betrieb": Um den Pilothof herum liegen **fünf** Höfe im 10-km-Umkreis, **neunzehn** im
+25-km-Umkreis und **vierunddreißig** im 50-km-Umkreis (freigeschaltet und mit
+Kartenpunkt, den Pilothof selbst nicht gezählt). Erst mit dieser Dichte sagt der
+Umkreis-Regler etwas, und erst damit hat eine Preisspanne im Umfeld mehr als zwei
+Werte.
+
+**Zwei Länder.** Braunau liegt am Inn, gegenüber liegt Simbach in Bayern. Der
+Inntalhof (1,8 km) und der Rottalhof (16,3 km) tragen `country = 'DE'` — der
+Fall, den Schema und Geokodierung (`countrycodes=at,de`) vorsehen und für den es
+bisher keine Testdaten gab.
+
+**Woher die Koordinaten kommen.** Aus dem GeoNames-Datensatz, gelesen über das
+MIT-lizenzierte npm-Paket `all-the-cities` — **nur als Datenquelle beim Bauen des
+Fixtures, keine Abhängigkeit im Projekt**. Die Bezirkszuordnung ist über die
+Gemeindekennzahl gesichert (Präfix 404 = Braunau am Inn, 412 = Ried im
+Innkreis), nicht über Ortskenntnis. Nachgeprüft ist damit alles außer den
+**Postleitzahlen**: GeoNames `cities1000` führt keine, sie stammen aus
+Ortskenntnis und sind der einzige unbelegte Wert in der Datei.
+
+**Der Pilothof zieht mit.** Er ist der einzige Hof, den es in Dev schon gibt
+(`bestandsHof: true`). Ort, Adresse und Kartenpunkt kommen deshalb wie bei jedem
+anderen Hof aus den Fixtures — aber was Geld betrifft, fasst der Seed nicht an:
+`serviceFeePercent` und `serviceFeeMinCents` werden **nie** überschrieben,
+`serviceFeeActiveFrom` und `approvedAt` nur, wenn sie noch leer sind. Hat der
+Betreiber für diesen Hof 3 % eingestellt, bleiben es 3 % — und die Bestellungen
+des Seeds rechnen damit, nicht mit der Vorgabe.
+
+### Der Baukasten: 82 Produkte ohne 82 Objekte
+
+31 Nachbarhöfe mit je zwei bis vier Produkten von Hand zu schreiben wären achtzig
+fast gleiche Objekte. Stattdessen hält `BAUPLAENE` jede Sorte **einmal**
+(22 Bauplänen von Wiesenheu bis Apfelsaft) und `baueProdukt` setzt sie je Hof
+ein. Preis und Bestand verschieben sich um ± 12 % in sieben Stufen — **aus der
+Hofnummer abgeleitet, nicht zufällig**. Ein Seed mit `Math.random` wäre bei jedem
+Lauf ein anderer Datensatz, und ein Fehler, der nur bei einem bestimmten Preis
+auftritt, ließe sich nicht wiederfinden.
+
+Das Ergebnis sind echte Spannen: **16 Kleinballen-Angebote zwischen 7,39 € und
+9,41 €** (370–470 €/t), **13 Rundballen zwischen 44,16 € und 54,00 €**
+(147–180 €/t). Genau daran lässt sich die Teilung nach Gebindeklasse im Umfeld
+ablesen — die beiden Klassen liegen im Kilopreis um den Faktor zweieinhalb
+auseinander, ein gemeinsamer Median wäre sinnlos.
 
 ### Was der Datensatz sonst abdeckt
 
 - **Alle vier Futter-Kategorien** und **alle neun Lebensmittel-Kategorien**, mit
   Unterkategorie wo die Kategorie eine hat.
-- **Wiesenheu bei drei Höfen in beiden Gebindeklassen** (20-kg-Kleinballen und
-  300-kg-Rundballen, Schwelle `GROSSGEBINDE_AB_KG`). Das ist die Voraussetzung
-  dafür, dass die Teilung der Spanne im Umfeld überhaupt etwas zu teilen hat:
-  Kleinballen liegen bei 400–450 €/t, Rundballen bei 150–180 €/t.
+- **Wiesenheu in beiden Gebindeklassen** (20-kg-Kleinballen und 300-kg-Rundballen,
+  Schwelle `GROSSGEBINDE_AB_KG`) bei über zwanzig Höfen.
 - **Grenzfälle**: ein Produkt mit Bestand 0 und im Shop („Ausverkauft"), eines
   mit Bestand und **nicht** im Shop, zwei `NUR_BETRIEBE`-Produkte, ein Big Bag,
   Siegel, Allergene, Saisonfenster.

@@ -22,31 +22,47 @@ import type {
 /**
  * Der Testdatensatz — REINE DATEN, kein Datenbankzugriff.
  *
- * ALLES ERFUNDEN. Keine Zeile stammt aus der Produktion: Namen, Höfe,
- * Betriebsnummern, Preise und Bestände sind ausgedacht, E-Mails enden auf
- * @example.com, Telefonnummern lauten +43 660 000xxxx. Die ORTE sind echte
- * steirische Gemeinden — sie müssen es sein, sonst stimmen die Entfernungen
- * nicht, und ein Ortsname ist kein personenbezogenes Datum. Die Straßen und
- * Hausnummern sind erfunden.
+ * ALLES ERFUNDEN. Höfe, Inhaber, Betriebsnummern, Preise und Bestände sind
+ * ausgedacht, E-Mails enden auf @example.com, Telefonnummern lauten
+ * +43 660 000xxxx (österreichische Höfe) bzw. +49 8571 0000xx (bayerische).
+ * Straßen und Hausnummern sind erfunden.
+ *
+ * DAS GEBIET: die Bezirke **Braunau am Inn** und **Ried im Innkreis** im
+ * Innviertel, dazu zwei Höfe jenseits der Grenze in Niederbayern. 37 Höfe in
+ * einem zusammenhängenden Gebiet — damit sehen Umkreis, Karte und Umfeld so aus
+ * wie im Betrieb und nicht wie eine Handvoll Streupunkte.
+ *
+ * DIE ORTE SIND ECHT, und ihre KOORDINATEN kommen aus dem GeoNames-Datensatz
+ * (via dem MIT-lizenzierten npm-Paket `all-the-cities`, nur als Datenquelle
+ * gelesen — keine Abhängigkeit im Projekt). Die Bezirke sind über die
+ * Gemeindekennzahl gesichert: Präfix 404 = Braunau am Inn, 412 = Ried im
+ * Innkreis. Ein Ortsname ist kein personenbezogenes Datum.
+ *
+ * AUSNAHME, die man wissen muss: Die POSTLEITZAHLEN stammen aus Ortskenntnis,
+ * nicht aus dem Datensatz — GeoNames `cities1000` führt keine. Sie sind der
+ * einzige Wert hier, der nicht nachgeprüft ist. Wer sie korrigiert, ändert nur
+ * diese Datei.
  *
  * WOFÜR: Dev und jede Preview sollen alle Fälle zeigen, die die Bereiche, der
  * Sichtbarkeits-Schalter, die Finanzen und das Umfeld brauchen — nicht den
  * Glücksfall, sondern auch Bestand 0, „nicht im Shop", einen Hof ohne
- * Koordinaten, einen nicht freigeschalteten Hof und eine Meldung, die einen
- * Agenten zu steuern versucht.
+ * Koordinaten, einen nicht freigeschalteten Hof, Höfe in zwei Ländern und eine
+ * Meldung, die einen Agenten zu steuern versucht.
  *
- * ENTFERNUNGEN zum Pilothof (8700 Leoben, 47.3765/15.0972), gerechnet mit
- * `entfernungKm` aus src/lib/hofuebersicht.ts — die Stufen des Umkreis-Reglers
- * (10/25/50 km) sind damit einzeln prüfbar:
- *   Hof A  Sankt Peter-Freienstein   5,6 km   → im 10-km-Umkreis
- *   Hof B  Bruck an der Mur         13,7 km   → erst ab 25 km
- *   Hof E  Kindberg                 29,8 km   → erst ab 50 km
- *   Hof D  Weiz                     43,5 km   → nie, weil nicht freigeschaltet
- *   Hof C  Niklasdorf               keine Koordinaten → nie platzierbar
+ * ENTFERNUNGEN zum Pilothof (5280 Braunau am Inn, 48.2563/13.0434), gerechnet
+ * mit `entfernungKm` aus src/lib/hofuebersicht.ts — die Stufen des
+ * Umkreis-Reglers (10/25/50 km) sind damit einzeln prüfbar:
+ *   Hof A  Sankt Peter am Hart   3,9 km   → im 10-km-Umkreis
+ *   Hof B  Altheim              14,1 km   → erst ab 25 km
+ *   Hof E  Aurolzmünster        30,5 km   → erst ab 50 km
+ *   Hof D  Eberschwang          40,0 km   → nie, weil nicht freigeschaltet
+ *   Hof C  Mattighofen          keine Koordinaten → nie platzierbar
+ * Dazu 31 Nachbarhöfe zwischen 1,0 und 39,2 km, gestreut über beide Bezirke.
  *
- * Die Koordinaten sind Ortsmitten aus Ortskenntnis, nicht geokodiert
- * (Nominatim ist aus der Agentenumgebung nicht erreichbar). Wer sie
- * korrigiert, ändert nur diese Datei — die Entfernungen rechnet der Code.
+ * ZWEI LÄNDER: Braunau liegt am Inn, gegenüber liegt Simbach in Bayern. Der
+ * Inntalhof (1,8 km) und der Rottalhof (16,3 km) tragen `land: 'DE'` — der Fall,
+ * den Schema (`Farm.country`) und Geokodierung (`countrycodes=at,de`) vorsehen
+ * und für den es bisher keine Testdaten gab.
  *
  * IDEMPOTENZ: Jede Zeile trägt einen STABILEN Schlüssel (`id`, `slug`,
  * `nummer`). Der Lauf schreibt ausschließlich mit `upsert` darauf. Ohne das
@@ -119,6 +135,34 @@ export type SeedKennzeichnung = {
   gebrauchshinweis: string
 }
 
+/**
+ * Ein Einzelfuttermittel ohne Zusatzstoffe — der Regelfall bei Heu, Stroh,
+ * Silage und Getreide. Die vier Rohwerte stehen in derselben Reihenfolge wie auf
+ * einem Sackanhänger: Rohprotein, Rohfaser, Rohfett, Rohasche.
+ */
+function einfachesFutter(
+  zusammensetzung: string,
+  nettoMenge: number,
+  zielTierarten: Tierart[],
+  // Benannt statt vier Zahlen hintereinander: Ein Vertippen zwischen Rohfaser
+  // und Rohfett fiele in einer positionalen Liste niemandem auf.
+  werte: { rohprotein: number; rohfaser: number; rohfett: number; rohasche: number }
+): SeedKennzeichnung {
+  return {
+    futtermittelart: 'EINZELFUTTERMITTEL',
+    zielTierarten,
+    zusammensetzung,
+    analytischeBestandteile:
+      `Rohprotein ${werte.rohprotein} %, Rohfaser ${werte.rohfaser} %, ` +
+      `Rohfett ${werte.rohfett} %, Rohasche ${werte.rohasche} %`,
+    nettoMenge,
+    nettoEinheit: 'KG',
+    ...werte,
+    zusatzstoffe: null,
+    gebrauchshinweis: 'Trocken lagern.',
+  }
+}
+
 /** Wiesenheu — zwei Gebindegrößen, sonst identisch. */
 function wiesenheu(nettoMenge: number): SeedKennzeichnung {
   return {
@@ -184,6 +228,15 @@ export type SeedHof = {
   adresse: string
   plz: string
   ort: string
+  /** Land des Hofes — `Farm.country`. Zwei Höfe liegen in Bayern. */
+  land: 'AT' | 'DE'
+  /**
+   * Der politische Bezirk, aus der Gemeindekennzahl des GeoNames-Datensatzes
+   * abgeleitet (Präfix 404 bzw. 412), nicht aus Ortskenntnis. Steht hier, damit
+   * die Zusicherung „der Datensatz deckt beide Bezirke ab" prüfbar ist und nicht
+   * nur eine Behauptung über zwei Ortsnamen.
+   */
+  bezirk: 'Braunau am Inn' | 'Ried im Innkreis' | 'Rottal-Inn'
   /** null = kein Kartenpunkt; der Hof kann im Umfeld nicht platziert werden. */
   breite: number | null
   laenge: number | null
@@ -199,6 +252,16 @@ export type SeedHof = {
   /** Ein Satz für die Abschlussausgabe: was hier zu testen ist. */
   testhinweis: string
   /**
+   * Wie viele Tage vor dem Lauf der Hof freigeschaltet wurde. Ohne Angabe 120.
+   *
+   * Warum das überhaupt einstellbar ist: Die zwölf Gründungsplätze gehen an die
+   * ZUERST freigeschalteten Höfe (src/lib/gruendungshof.ts). Hätten alle
+   * denselben Zeitpunkt, entschiede die Datenbankreihenfolge, wer einen bekommt —
+   * und /admin zeigte bei jedem Seed eine andere Verteilung. Die Rollen-Höfe
+   * sind deshalb die ältesten.
+   */
+  freigabeVorTagen?: number
+  /**
    * Der Hof existiert in Dev schon (der Pilothof). Dann ERGÄNZT der Lauf nur,
    * was fehlt — Adresse, Beschreibung und das Freischaltdatum bleiben, wie sie
    * sind. Ohne diese Ausnahme überschriebe jeder Seed-Lauf die echte
@@ -212,10 +275,12 @@ const HOF_A: SeedHof = {
   name: 'Hof Sonnleiten',
   inhaber: { email: 'bauer-a@example.com', name: 'Maria Sonnleitner', telefon: '+43 660 0000011' },
   adresse: 'Sonnleitenweg 4',
-  plz: '8792',
-  ort: 'Sankt Peter-Freienstein',
-  breite: 47.4083,
-  laenge: 15.0403,
+  plz: '4963',
+  ort: 'Sankt Peter am Hart',
+  land: 'AT',
+  bezirk: 'Braunau am Inn',
+  breite: 48.2527,
+  laenge: 13.0961,
   beschreibung:
     'Gemischter Betrieb mit Ackerbau, Obstgarten und einer kleinen Heuwirtschaft. Wir verkaufen ab Hof und liefern auf Bestellung.',
   freigegeben: true,
@@ -228,7 +293,7 @@ const HOF_A: SeedHof = {
     { tag: 5, von: '14:00', bis: '18:00' },
   ],
   testhinweis:
-    'Nächster Hof (5,6 km) — im 10-km-Umkreis der einzige neben dem Pilothof. Beide Wiesenheu-Gebinde, ein Brot mit Bestand 0.',
+    'Nachbarhof in 3,9 km, beide Bereiche, online und vor Ort. Beide Wiesenheu-Gebinde, ein Brot mit Bestand 0.',
   produkte: [
     {
       id: 'prod-a-heu-klein',
@@ -300,7 +365,9 @@ const HOF_A: SeedHof = {
       preis: 32.0,
       mwst: 20,
       einheit: 'KG',
-      gebindeGroesse: 25,
+      // Bei Futtermitteln bleibt unitSize leer — das Gewicht steht in der
+      // Kennzeichnung (productAnlegenSchema, FUTTER_OHNE_GEBINDEGROESSE).
+      gebindeGroesse: null,
       bestand: 20,
       imShop: true,
       category: 'ERGAENZUNGSFUTTER',
@@ -405,10 +472,12 @@ const HOF_B: SeedHof = {
   name: 'Bergwiesenhof',
   inhaber: { email: 'bauer-b@example.com', name: 'Johann Bergmann', telefon: '+43 660 0000012' },
   adresse: 'Bergwiesenstraße 18',
-  plz: '8600',
-  ort: 'Bruck an der Mur',
-  breite: 47.4103,
-  laenge: 15.2717,
+  plz: '4950',
+  ort: 'Altheim',
+  land: 'AT',
+  bezirk: 'Braunau am Inn',
+  breite: 48.2515,
+  laenge: 13.2341,
   beschreibung:
     'Reiner Futterbaubetrieb. Heu, Stroh, Silage und Getreide in großen Gebinden — Abholung nur am Hof, Bezahlung vor Ort.',
   freigegeben: true,
@@ -418,12 +487,12 @@ const HOF_B: SeedHof = {
   betriebsstatus: 'PRIMAERPRODUKTION',
   abholzeiten: [{ tag: 6, von: '08:00', bis: '12:00' }],
   testhinweis:
-    'Nur Futtermittel, nur Vor-Ort-Zahlung (kein Stripe im Checkout). Bei 13,7 km erst ab Umkreis 25 km sichtbar; eine Luzerne mit Bestand 0 und eine Gerste nur für Betriebe.',
+    'Nur Futtermittel, nur Vor-Ort-Zahlung (kein Stripe im Checkout). Bei 14,1 km erst ab Umkreis 25 km sichtbar; eine Luzerne mit Bestand 0 und eine Gerste nur für Betriebe.',
   produkte: [
     {
       id: 'prod-b-heu-klein',
       name: 'Wiesenheu Kleinballen',
-      beschreibung: 'Bergwiesenheu in Kleinballen mit rund 20 kg, später Schnitt, kräuterreich.',
+      beschreibung: 'Wiesenheu in Kleinballen mit rund 20 kg, später Schnitt, kräuterreich.',
       preis: 9.0,
       mwst: 10,
       einheit: 'BALLEN',
@@ -439,7 +508,7 @@ const HOF_B: SeedHof = {
     {
       id: 'prod-b-heu-rund',
       name: 'Wiesenheu Rundballen',
-      beschreibung: 'Bergwiesenheu als Rundballen mit rund 300 kg.',
+      beschreibung: 'Wiesenheu als Rundballen mit rund 300 kg.',
       preis: 54.0,
       mwst: 10,
       einheit: 'BALLEN',
@@ -550,7 +619,9 @@ const HOF_B: SeedHof = {
       preis: 16.0,
       mwst: 10,
       einheit: 'KG',
-      gebindeGroesse: 40,
+      // Bei Futtermitteln bleibt unitSize leer — das Gewicht steht in der
+      // Kennzeichnung (productAnlegenSchema, FUTTER_OHNE_GEBINDEGROESSE).
+      gebindeGroesse: null,
       bestand: 25,
       imShop: true,
       category: 'GETREIDE_KOERNER',
@@ -579,7 +650,9 @@ const HOF_B: SeedHof = {
       preis: 21.0,
       mwst: 20,
       einheit: 'KG',
-      gebindeGroesse: 25,
+      // Bei Futtermitteln bleibt unitSize leer — das Gewicht steht in der
+      // Kennzeichnung (productAnlegenSchema, FUTTER_OHNE_GEBINDEGROESSE).
+      gebindeGroesse: null,
       bestand: 30,
       imShop: true,
       category: 'MISCHFUTTER',
@@ -609,8 +682,10 @@ const HOF_C: SeedHof = {
   name: 'Tallerhof',
   inhaber: { email: 'bauer-c@example.com', name: 'Elisabeth Taller', telefon: '+43 660 0000013' },
   adresse: 'Talstraße 7',
-  plz: '8712',
-  ort: 'Niklasdorf',
+  plz: '5230',
+  ort: 'Mattighofen',
+  land: 'AT',
+  bezirk: 'Braunau am Inn',
   // KEINE Koordinaten, mit Absicht: Der Hof steht auf /hoefe (die Umkreisgrenze
   // schließt Höfe ohne Kartenpunkt nie aus), kann im Umfeld aber nicht
   // platziert werden und erscheint dort nur in der Zeile „n Höfe ohne Standort
@@ -685,10 +760,12 @@ const HOF_D: SeedHof = {
   name: 'Weizberghof',
   inhaber: { email: 'bauer-d@example.com', name: 'Thomas Weiz', telefon: '+43 660 0000014' },
   adresse: 'Weizbergweg 22',
-  plz: '8160',
-  ort: 'Weiz',
-  breite: 47.2186,
-  laenge: 15.6253,
+  plz: '4906',
+  ort: 'Eberschwang',
+  land: 'AT',
+  bezirk: 'Ried im Innkreis',
+  breite: 48.1550,
+  laenge: 13.5619,
   beschreibung:
     'Neu angemeldeter Betrieb mit Ackerbau und Beerenobst. Wartet auf die Freischaltung durch den Betreiber.',
   // NICHT freigegeben: Der Hof hat Koordinaten und Produkte und ist trotzdem
@@ -712,7 +789,9 @@ const HOF_D: SeedHof = {
       preis: 13.0,
       mwst: 10,
       einheit: 'KG',
-      gebindeGroesse: 25,
+      // Bei Futtermitteln bleibt unitSize leer — das Gewicht steht in der
+      // Kennzeichnung (productAnlegenSchema, FUTTER_OHNE_GEBINDEGROESSE).
+      gebindeGroesse: null,
       bestand: 20,
       imShop: true,
       category: 'GETREIDE_KOERNER',
@@ -758,10 +837,12 @@ const HOF_E: SeedHof = {
   name: 'Waldrandhof',
   inhaber: { email: 'bauer-e@example.com', name: 'Katharina Walder', telefon: '+43 660 0000015' },
   adresse: 'Waldrandgasse 9',
-  plz: '8650',
-  ort: 'Kindberg',
-  breite: 47.4986,
-  laenge: 15.4506,
+  plz: '4971',
+  ort: 'Aurolzmünster',
+  land: 'AT',
+  bezirk: 'Ried im Innkreis',
+  breite: 48.2483,
+  laenge: 13.4553,
   beschreibung:
     'Milchviehbetrieb mit Heuwirtschaft und Hofladen. Heumilch, Eier und Futter aus eigener Erzeugung.',
   freigegeben: true,
@@ -775,12 +856,12 @@ const HOF_E: SeedHof = {
     { tag: 5, von: '15:00', bis: '19:00' },
   ],
   testhinweis:
-    'Weitester sichtbarer Hof (29,8 km) — erscheint erst im Umkreis 50 km. Dritter Wiesenheu-Preis, damit die Spanne im Umfeld eine Mitte hat.',
+    'Rollen-Hof in 30,5 km — erscheint erst im Umkreis 50 km. Dritter Wiesenheu-Preis der Rollen-Höfe.',
   produkte: [
     {
       id: 'prod-e-heu-klein',
       name: 'Wiesenheu Kleinballen',
-      beschreibung: 'Wiesenheu in Kleinballen mit rund 20 kg aus der Bergmahd.',
+      beschreibung: 'Wiesenheu in Kleinballen mit rund 20 kg vom eigenen Grünland.',
       preis: 8.6,
       mwst: 10,
       einheit: 'BALLEN',
@@ -796,7 +877,7 @@ const HOF_E: SeedHof = {
     {
       id: 'prod-e-heu-rund',
       name: 'Wiesenheu Rundballen',
-      beschreibung: 'Wiesenheu als Rundballen mit rund 300 kg aus der Bergmahd.',
+      beschreibung: 'Wiesenheu als Rundballen mit rund 300 kg vom eigenen Grünland.',
       preis: 48.0,
       mwst: 10,
       einheit: 'BALLEN',
@@ -816,7 +897,9 @@ const HOF_E: SeedHof = {
       preis: 14.5,
       mwst: 10,
       einheit: 'KG',
-      gebindeGroesse: 25,
+      // Bei Futtermitteln bleibt unitSize leer — das Gewicht steht in der
+      // Kennzeichnung (productAnlegenSchema, FUTTER_OHNE_GEBINDEGROESSE).
+      gebindeGroesse: null,
       bestand: 40,
       imShop: true,
       category: 'GETREIDE_KOERNER',
@@ -875,22 +958,24 @@ const HOF_E: SeedHof = {
 // ─── Der Pilothof ────────────────────────────────────────────────────────────
 
 /**
- * Der Pilothof — unverändert bis auf zwei Ergänzungen: Ohne Kartenpunkt gibt es
- * keinen Bezugspunkt für das Umfeld, ohne `serviceFeeActiveFrom` keine
- * Servicegebühr und damit leere Finanzen. Name, Adresse, Beschreibung, Produkte
- * und Preise sind dieselben wie vor diesem Sprint.
+ * Der Pilothof und Bezugspunkt, jetzt in Braunau am Inn. Er ist der einzige Hof,
+ * den es in Dev schon gibt (`bestandsHof`) — deshalb bleibt sein
+ * FREISCHALTDATUM unberührt, während Ort, Kartenpunkt und Gebühren-Geltung
+ * geschrieben werden. Produkte und Preise sind dieselben wie vorher.
  */
 const PILOTHOF: SeedHof = {
   slug: 'hof-mueller',
   name: 'Hof Müller',
   inhaber: { email: 'bauer@example.com', name: 'Franz Müller', telefon: '+43 664 123 4567' },
   adresse: 'Hofgasse 12',
-  plz: '8700',
-  ort: 'Leoben',
-  breite: 47.3765,
-  laenge: 15.0972,
+  plz: '5280',
+  ort: 'Braunau am Inn',
+  land: 'AT',
+  bezirk: 'Braunau am Inn',
+  breite: 48.2563,
+  laenge: 13.0434,
   beschreibung:
-    'Wir sind ein kleiner Familienbetrieb in der Steiermark. Unsere Tiere leben auf saftigen Wiesen und werden artgerecht gehalten. Alle Produkte kommen direkt vom Hof – ohne Zwischenhändler.',
+    'Wir sind ein kleiner Familienbetrieb im Innviertel. Unsere Tiere leben auf saftigen Wiesen und werden artgerecht gehalten. Alle Produkte kommen direkt vom Hof – ohne Zwischenhändler.',
   freigegeben: true,
   nimmtOnline: true,
   nimmtVorOrt: true,
@@ -902,7 +987,7 @@ const PILOTHOF: SeedHof = {
     { tag: 6, von: '09:00', bis: '12:00' },
   ],
   testhinweis:
-    'Der Bezugspunkt (8700 Leoben). Kleinballen-Heu à 15 kg und Big-Bag-Hafer nur für Betriebe; drei Handverkäufe für die Auswertung.',
+    'Der Bezugspunkt (5280 Braunau am Inn). Kleinballen-Heu à 15 kg und Big-Bag-Hafer nur für Betriebe; drei Handverkäufe für die Auswertung.',
   produkte: [
     {
       id: 'prod-milch',
@@ -1020,8 +1105,904 @@ const PILOTHOF: SeedHof = {
   ],
 }
 
-/** Alle Höfe des Datensatzes — der Pilothof zuerst, er ist der Bezugspunkt. */
-export const SEED_HOEFE: SeedHof[] = [PILOTHOF, HOF_A, HOF_B, HOF_C, HOF_D, HOF_E]
+// ─── Nachbarhöfe: Baukasten und Tabelle ──────────────────────────────────────
+
+/**
+ * Ein Produktbauplan. 31 Nachbarhöfe × zwei bis vier Produkte von Hand zu
+ * schreiben wären achtzig fast gleiche Objekte — dieser Baukasten hält jede
+ * Sorte EINMAL und setzt sie je Hof ein.
+ *
+ * Was er NICHT tut: zufällig streuen. Jeder Wert ist aus der Hofnummer
+ * abgeleitet, damit zwei Seed-Läufe dieselben Daten ergeben. Ein Seed mit
+ * Math.random wäre bei jedem Lauf ein anderer Datensatz, und ein Fehler, der
+ * nur bei einem bestimmten Preis auftritt, ließe sich nicht wiederfinden.
+ */
+type Bauplan = Omit<SeedProdukt, 'id' | 'preis' | 'bestand' | 'imShop'> & {
+  /** Grundpreis in Euro; je Hof leicht verschoben (siehe baueProdukt). */
+  grundpreis: number
+  /** Typischer Bestand; je Hof leicht verschoben. */
+  grundbestand: number
+}
+
+const BAUPLAENE = {
+  HEU_KLEIN: {
+    name: 'Wiesenheu Kleinballen',
+    beschreibung: 'Wiesenheu vom ersten Schnitt in Kleinballen mit rund 20 kg.',
+    grundpreis: 8.4,
+    grundbestand: 50,
+    mwst: 10,
+    einheit: 'BALLEN',
+    gebindeGroesse: null,
+    category: 'HEU_STROH',
+    subcategory: 'WIESENHEU',
+    labels: [],
+    zaehltZurGrenze: false,
+    futter: wiesenheu(20),
+  },
+  HEU_RUND: {
+    name: 'Wiesenheu Rundballen',
+    beschreibung: 'Wiesenheu als Rundballen mit rund 300 kg. Verladung am Hof.',
+    grundpreis: 48,
+    grundbestand: 14,
+    mwst: 10,
+    einheit: 'BALLEN',
+    gebindeGroesse: null,
+    category: 'HEU_STROH',
+    subcategory: 'WIESENHEU',
+    labels: [],
+    zaehltZurGrenze: false,
+    futter: wiesenheu(300),
+  },
+  STROH_RUND: {
+    name: 'Weizenstroh Rundballen',
+    beschreibung: 'Trockenes Weizenstroh als Einstreu, Rundballen mit rund 250 kg.',
+    grundpreis: 29,
+    grundbestand: 10,
+    mwst: 10,
+    einheit: 'BALLEN',
+    gebindeGroesse: null,
+    category: 'HEU_STROH',
+    subcategory: 'STROH',
+    labels: [],
+    zaehltZurGrenze: false,
+    futter: einfachesFutter('Weizenstroh, gepresst, ohne Zusatz', 250, ['RIND', 'PFERD'], { rohprotein: 3, rohfaser: 42, rohfett: 1, rohasche: 6 }),
+  },
+  SILAGE: {
+    name: 'Grassilage Rundballen',
+    beschreibung: 'Grassilage in gewickelten Rundballen mit rund 600 kg.',
+    grundpreis: 39,
+    grundbestand: 12,
+    mwst: 10,
+    einheit: 'BALLEN',
+    gebindeGroesse: null,
+    category: 'HEU_STROH',
+    subcategory: 'SILAGE',
+    labels: [],
+    zaehltZurGrenze: false,
+    futter: einfachesFutter('Grassilage, angewelkt, ohne Zusatz', 600, ['RIND'], { rohprotein: 14, rohfaser: 24, rohfett: 3, rohasche: 9 }),
+  },
+  LUZERNE: {
+    name: 'Luzerneheu Kleinballen',
+    beschreibung: 'Luzerneheu in Kleinballen mit rund 20 kg, eiweißreich.',
+    grundpreis: 11.2,
+    grundbestand: 30,
+    mwst: 10,
+    einheit: 'BALLEN',
+    gebindeGroesse: null,
+    category: 'HEU_STROH',
+    subcategory: 'LUZERNE',
+    labels: [],
+    zaehltZurGrenze: false,
+    futter: einfachesFutter('Luzerne, getrocknet, ohne Zusatz', 20, ['PFERD', 'RIND'], { rohprotein: 17, rohfaser: 25, rohfett: 2, rohasche: 10 }),
+  },
+  HAFER_SACK: {
+    name: 'Futterhafer',
+    beschreibung: 'Hafer aus eigenem Anbau, Sack mit 25 kg.',
+    grundpreis: 14.5,
+    grundbestand: 40,
+    mwst: 10,
+    einheit: 'KG',
+    // Bei Futtermitteln bleibt unitSize leer — das Gewicht steht in der
+    // Kennzeichnung (productAnlegenSchema, FUTTER_OHNE_GEBINDEGROESSE).
+    gebindeGroesse: null,
+    category: 'GETREIDE_KOERNER',
+    subcategory: 'HAFER',
+    labels: [],
+    zaehltZurGrenze: false,
+    futter: einfachesFutter('Hafer, gereinigt, aus eigenem Anbau', 25, ['PFERD', 'RIND'], { rohprotein: 11, rohfaser: 10, rohfett: 5, rohasche: 3 }),
+  },
+  GERSTE_SACK: {
+    name: 'Futtergerste',
+    beschreibung: 'Futtergerste, gereinigt, Sack mit 25 kg.',
+    grundpreis: 13,
+    grundbestand: 35,
+    mwst: 10,
+    einheit: 'KG',
+    // Bei Futtermitteln bleibt unitSize leer — das Gewicht steht in der
+    // Kennzeichnung (productAnlegenSchema, FUTTER_OHNE_GEBINDEGROESSE).
+    gebindeGroesse: null,
+    category: 'GETREIDE_KOERNER',
+    subcategory: 'GERSTE',
+    labels: [],
+    zaehltZurGrenze: false,
+    futter: einfachesFutter('Gerste, gereinigt, aus eigenem Anbau', 25, ['RIND', 'SCHWEIN'], { rohprotein: 10, rohfaser: 5, rohfett: 2, rohasche: 3 }),
+  },
+  MAIS_SACK: {
+    name: 'Futtermais',
+    beschreibung: 'Körnermais aus eigenem Anbau, Sack mit 40 kg.',
+    grundpreis: 16,
+    grundbestand: 28,
+    mwst: 10,
+    einheit: 'KG',
+    // Bei Futtermitteln bleibt unitSize leer — das Gewicht steht in der
+    // Kennzeichnung (productAnlegenSchema, FUTTER_OHNE_GEBINDEGROESSE).
+    gebindeGroesse: null,
+    category: 'GETREIDE_KOERNER',
+    subcategory: 'MAIS',
+    labels: [],
+    zaehltZurGrenze: false,
+    futter: einfachesFutter('Mais, gereinigt, aus eigenem Anbau', 40, ['GEFLUEGEL', 'SCHWEIN'], { rohprotein: 9, rohfaser: 3, rohfett: 4, rohasche: 2 }),
+  },
+  WEIZEN_SACK: {
+    name: 'Futterweizen',
+    beschreibung: 'Futterweizen aus eigenem Anbau, Sack mit 25 kg.',
+    grundpreis: 13.4,
+    grundbestand: 30,
+    mwst: 10,
+    einheit: 'KG',
+    // Bei Futtermitteln bleibt unitSize leer — das Gewicht steht in der
+    // Kennzeichnung (productAnlegenSchema, FUTTER_OHNE_GEBINDEGROESSE).
+    gebindeGroesse: null,
+    category: 'GETREIDE_KOERNER',
+    subcategory: 'WEIZEN',
+    labels: [],
+    zaehltZurGrenze: false,
+    futter: einfachesFutter('Weizen, gereinigt, aus eigenem Anbau', 25, ['SCHWEIN', 'GEFLUEGEL'], { rohprotein: 12, rohfaser: 3, rohfett: 2, rohasche: 2 }),
+  },
+  MISCHFUTTER: {
+    name: 'Legehennenfutter',
+    beschreibung: 'Alleinfutter für Legehennen, Sack mit 25 kg.',
+    grundpreis: 21,
+    grundbestand: 26,
+    mwst: 20,
+    einheit: 'KG',
+    // Bei Futtermitteln bleibt unitSize leer — das Gewicht steht in der
+    // Kennzeichnung (productAnlegenSchema, FUTTER_OHNE_GEBINDEGROESSE).
+    gebindeGroesse: null,
+    category: 'MISCHFUTTER',
+    subcategory: null,
+    labels: ['GENTECHNIKFREI'],
+    zaehltZurGrenze: false,
+    futter: {
+      futtermittelart: 'ALLEINFUTTERMITTEL',
+      zielTierarten: ['GEFLUEGEL'],
+      zusammensetzung: 'Mais, Weizen, Sojaextraktionsschrot, Calciumcarbonat',
+      analytischeBestandteile: 'Rohprotein 17 %, Rohfaser 4 %, Rohfett 5 %, Rohasche 13 %',
+      nettoMenge: 25,
+      nettoEinheit: 'KG',
+      rohprotein: 17,
+      rohfaser: 4,
+      rohfett: 5,
+      rohasche: 13,
+      zusatzstoffe: 'Vitamin A, Vitamin D3, Methionin',
+      gebrauchshinweis: 'Zur ausschließlichen Fütterung. Wasser zur freien Aufnahme.',
+    },
+  },
+  MINERAL: {
+    name: 'Mineralfutter Rind',
+    beschreibung: 'Mineralfutter für Milchkühe und Mastrinder, Sack mit 25 kg.',
+    grundpreis: 32,
+    grundbestand: 18,
+    mwst: 20,
+    einheit: 'KG',
+    // Bei Futtermitteln bleibt unitSize leer — das Gewicht steht in der
+    // Kennzeichnung (productAnlegenSchema, FUTTER_OHNE_GEBINDEGROESSE).
+    gebindeGroesse: null,
+    category: 'ERGAENZUNGSFUTTER',
+    subcategory: null,
+    labels: [],
+    zaehltZurGrenze: false,
+    futter: {
+      futtermittelart: 'MINERALFUTTERMITTEL',
+      zielTierarten: ['RIND'],
+      zusammensetzung: 'Calciumcarbonat, Natriumchlorid, Magnesiumoxid',
+      analytischeBestandteile: 'Calcium 18 %, Phosphor 6 %, Natrium 7 %, Magnesium 5 %',
+      nettoMenge: 25,
+      nettoEinheit: 'KG',
+      rohprotein: 0,
+      rohfaser: 0,
+      rohfett: 0,
+      rohasche: 92,
+      zusatzstoffe: 'Vitamin A, Vitamin D3, Zink, Selen',
+      gebrauchshinweis: 'Täglich 100–150 g je Tier über das Grundfutter.',
+    },
+  },
+  MILCH: {
+    name: 'Heumilch frisch',
+    beschreibung: 'Frische Heumilch, nicht homogenisiert, Flasche mit 1 Liter.',
+    grundpreis: 1.6,
+    grundbestand: 44,
+    mwst: 10,
+    einheit: 'LITER',
+    gebindeGroesse: 1,
+    category: 'MILCH',
+    subcategory: 'TRINKMILCH',
+    labels: ['GENTECHNIKFREI'],
+    allergene: ['milch'],
+    kuehlpflichtig: true,
+  },
+  KAESE: {
+    name: 'Bergkäse 12 Monate',
+    beschreibung: 'Rohmilchkäse aus eigener Käserei, 12 Monate gereift. Preis je Kilo.',
+    grundpreis: 24,
+    grundbestand: 14,
+    mwst: 10,
+    einheit: 'KG',
+    gebindeGroesse: 1,
+    category: 'MILCH',
+    subcategory: 'KAESE',
+    labels: ['BIO'],
+    allergene: ['milch'],
+    kuehlpflichtig: true,
+  },
+  EIER: {
+    name: 'Freilandeier 10er',
+    beschreibung: 'Eier aus Freilandhaltung, Karton mit 10 Stück, Größe L.',
+    grundpreis: 4.2,
+    grundbestand: 24,
+    mwst: 10,
+    einheit: 'PAKET',
+    gebindeGroesse: 10,
+    category: 'EIER',
+    subcategory: 'EIER_FREILAND',
+    labels: [],
+    allergene: ['eier'],
+  },
+  RIND: {
+    name: 'Rindfleisch-Paket',
+    beschreibung: 'Gemischtes Rindfleisch aus eigener Schlachtung, ca. 5 kg, vakuumverpackt.',
+    grundpreis: 89,
+    grundbestand: 6,
+    mwst: 10,
+    einheit: 'KG',
+    gebindeGroesse: 5,
+    category: 'FLEISCH',
+    subcategory: 'RIND',
+    labels: [],
+    gefrierpflichtig: true,
+  },
+  FISCH: {
+    name: 'Forellenfilet',
+    beschreibung: 'Filet von der Bachforelle aus eigenem Teich, vakuumverpackt, 250 g.',
+    grundpreis: 7.5,
+    grundbestand: 18,
+    mwst: 10,
+    einheit: 'G',
+    gebindeGroesse: 250,
+    category: 'FISCH',
+    subcategory: null,
+    labels: [],
+    allergene: ['fisch'],
+    gefrierpflichtig: true,
+  },
+  ERDAEPFEL: {
+    name: 'Erdäpfel festkochend',
+    beschreibung: 'Festkochende Erdäpfel aus eigenem Anbau, Sack mit 10 kg.',
+    grundpreis: 12,
+    grundbestand: 32,
+    mwst: 10,
+    einheit: 'KG',
+    gebindeGroesse: 10,
+    category: 'GEMUESE',
+    subcategory: 'ERDAEPFEL',
+    labels: ['AMA_GUETESIEGEL'],
+  },
+  KUERBIS: {
+    name: 'Hokkaido-Kürbis',
+    beschreibung: 'Hokkaido aus dem Feld, rund 1,5 kg je Stück.',
+    grundpreis: 3.5,
+    grundbestand: 20,
+    mwst: 10,
+    einheit: 'STUECK',
+    gebindeGroesse: null,
+    category: 'GEMUESE',
+    subcategory: 'KUERBIS',
+    labels: [],
+  },
+  AEPFEL: {
+    name: 'Äpfel Elstar',
+    beschreibung: 'Knackige Elstar-Äpfel aus dem Hofgarten, Steige mit 5 kg.',
+    grundpreis: 11,
+    grundbestand: 22,
+    mwst: 10,
+    einheit: 'KG',
+    gebindeGroesse: 5,
+    category: 'OBST',
+    subcategory: 'KERNOBST',
+    labels: ['BIO'],
+    saisonVon: 9,
+    saisonBis: 2,
+  },
+  BROT: {
+    name: 'Bauernbrot',
+    beschreibung: 'Im Holzofen gebackenes Mischbrot, 1,5 kg Laib.',
+    grundpreis: 6.5,
+    grundbestand: 12,
+    mwst: 10,
+    einheit: 'STUECK',
+    gebindeGroesse: null,
+    category: 'BROT',
+    subcategory: null,
+    labels: [],
+    allergene: ['gluten'],
+  },
+  HONIG: {
+    name: 'Blütenhonig',
+    beschreibung: 'Blütenhonig aus eigener Imkerei, Glas mit 500 g.',
+    grundpreis: 9,
+    grundbestand: 16,
+    mwst: 10,
+    einheit: 'G',
+    gebindeGroesse: 500,
+    category: 'HONIG',
+    subcategory: 'BLUETENHONIG',
+    labels: [],
+  },
+  SAFT: {
+    name: 'Apfelsaft naturtrüb',
+    beschreibung: 'Naturtrüber Apfelsaft aus eigener Presse, Bag-in-Box mit 5 Litern.',
+    grundpreis: 14,
+    grundbestand: 26,
+    mwst: 20,
+    einheit: 'LITER',
+    gebindeGroesse: 5,
+    category: 'GETRAENKE',
+    subcategory: null,
+    labels: ['BIO'],
+  },
+} satisfies Record<string, Bauplan>
+
+export type SortenCode = keyof typeof BAUPLAENE
+
+/**
+ * Ein Produkt für Hof Nummer `hofNr` nach Bauplan.
+ *
+ * PREIS: Grundpreis ± 12 %, in sieben Stufen aus der Hofnummer. Damit ergeben
+ * sich echte Spannen — Wiesenheu-Kleinballen liegen so zwischen 7,39 € und
+ * 9,41 €, Rundballen zwischen 42,24 € und 53,76 €. Eine Spanne braucht
+ * verschiedene Werte, sonst zeigt das Umfeld einen Strich statt einer Spanne.
+ *
+ * BESTAND und SICHTBARKEIT: Drei Höfe haben bei ihrem ersten Produkt Bestand 0
+ * („Ausverkauft"), drei andere haben es abgeschaltet („Nicht im Shop"). Beides
+ * deterministisch und ohne Überschneidung — es soll in der Liste vorkommen, aber
+ * nicht überall, und kein Produkt soll beides sein.
+ */
+/** Der Bauplan ohne seine zwei Vorgabewerte — der Rest ist schon ein Produkt. */
+function ohneVorgaben(plan: Bauplan): Omit<Bauplan, 'grundpreis' | 'grundbestand'> {
+  const kopie: Record<string, unknown> = { ...plan }
+  delete kopie['grundpreis']
+  delete kopie['grundbestand']
+  return kopie as Omit<Bauplan, 'grundpreis' | 'grundbestand'>
+}
+
+function baueProdukt(code: SortenCode, hofSlug: string, hofNr: number, stelle: number): SeedProdukt {
+  const plan = BAUPLAENE[code]
+  const stufe = ((hofNr + stelle) % 7) - 3
+  const preis = Math.round(plan.grundpreis * (1 + stufe * 0.04) * 100) / 100
+  const bestandVersatz = ((hofNr * 3 + stelle) % 9) - 4
+  // Die Reste 4 und 7 statt 0: Bei 0 träfe BEIDES den ersten Hof, und ein
+  // Produkt, das gleichzeitig ausverkauft und abgeschaltet ist, zeigt nur den
+  // zweiten Zustand — der erste Fall wäre verschenkt. 9 und 11 sind teilerfremd,
+  // die beiden Reihen treffen sich bei 31 Höfen nirgends.
+  const ausverkauft = stelle === 0 && hofNr % 9 === 4
+  const abgeschaltet = stelle === 0 && hofNr % 11 === 7
+
+  return {
+    ...ohneVorgaben(plan),
+    id: `prod-${hofSlug}-${code.toLowerCase()}`,
+    preis,
+    bestand: ausverkauft ? 0 : Math.max(1, plan.grundbestand + bestandVersatz),
+    imShop: !abgeschaltet,
+  }
+}
+
+/** Ein Nachbarhof, knapp: Ort, Kartenpunkt, zwei bis vier Sorten. */
+type Nachbar = {
+  slug: string
+  name: string
+  inhaber: { email: string; name: string; telefon: string }
+  adresse: string
+  plz: string
+  ort: string
+  land: 'AT' | 'DE'
+  bezirk: 'Braunau am Inn' | 'Ried im Innkreis' | 'Rottal-Inn'
+  breite: number
+  laenge: number
+  sorten: SortenCode[]
+}
+
+/**
+ * Die 31 Nachbarhöfe. Orte und Koordinaten aus GeoNames (siehe Kopf), Namen und
+ * Inhaber erfunden. Entfernungen zum Pilothof in Braunau am Inn:
+ *     1.0 km  Innbogenhof  (Haselbach, AT)
+ *     3.3 km  Auhof  (Ranshofen, AT)
+ *     9.8 km  Kirchbauernhof  (Mauerkirchen, AT)
+ *    10.2 km  Wengerhof  (Weng im Innkreis, AT)
+ *    12.3 km  Moosbauernhof  (Uttendorf, AT)
+ *    13.9 km  Waldbauernhof  (Handenberg, AT)
+ *    14.8 km  Bachgutshof  (Sankt Georgen am Fillmannsbach, AT)
+ *    17.4 km  Schalchnerhof  (Schalchen, AT)
+ *    18.5 km  Kapellenhof  (Maria Schmolln, AT)
+ *    18.7 km  Achleitenhof  (Hochburg-Ach, AT)
+ *    21.8 km  Innleitenhof  (Sankt Georgen bei Obernberg am Inn, AT)
+ *    22.7 km  Marktbauernhof  (Obernberg am Inn, AT)
+ *    23.1 km  Kobernaußerhof  (Munderfing, AT)
+ *    23.9 km  Seebauernhof  (Moosdorf, AT)
+ *    24.4 km  Weilbachhof  (Weilbach, AT)
+ *    25.2 km  Höhenbauernhof  (Wippenham, AT)
+ *    27.5 km  Grabenseehof  (Palting, AT)
+ *    27.9 km  Schilfhof  (Perwang am Grabensee, AT)
+ *    28.2 km  Salzachhof  (Ostermiething, AT)
+ *    29.5 km  Antiesenhof  (Mehrnbach, AT)
+ *    29.6 km  Martinihof  (Sankt Martin im Innkreis, AT)
+ *    29.6 km  Ortnerhof  (Ort im Innkreis, AT)
+ *    31.0 km  Pramtalhof  (Utzenaich, AT)
+ *    31.4 km  Zellerhof  (Waldzell, AT)
+ *    33.4 km  Riedhof  (Ried im Innkreis, AT)
+ *    33.5 km  Schilderhof  (Schildorn, AT)
+ *    34.6 km  Hügelbauernhof  (Pattigham, AT)
+ *    35.2 km  Prambachhof  (Pramet, AT)
+ *    39.2 km  Taiskirchenhof  (Taiskirchen im Innkreis, AT)
+ *     1.8 km  Inntalhof  (Simbach am Inn, DE)
+ *    16.3 km  Rottalhof  (Rotthalmünster, DE)
+ */
+const NACHBARN: Nachbar[] = [
+  {
+    slug: 'innbogenhof',
+    name: 'Innbogenhof',
+    inhaber: { email: 'bauer-01@example.com', name: 'Anna Kreuzer', telefon: '+43 660 0000101' },
+    adresse: 'Innbogenweg 1',
+    plz: '5280',
+    ort: 'Haselbach',
+    land: 'AT',
+    bezirk: 'Braunau am Inn',
+    breite: 48.2531,
+    laenge: 13.0561,
+    sorten: ['HEU_KLEIN', 'MILCH', 'EIER'],
+  },
+  {
+    slug: 'auhof',
+    name: 'Auhof',
+    inhaber: { email: 'bauer-02@example.com', name: 'Michael Steinbichler', telefon: '+43 660 0000102' },
+    adresse: 'Auweg 2',
+    plz: '5282',
+    ort: 'Ranshofen',
+    land: 'AT',
+    bezirk: 'Braunau am Inn',
+    breite: 48.2331,
+    laenge: 13.0157,
+    sorten: ['HEU_RUND', 'STROH_RUND'],
+  },
+  {
+    slug: 'kirchbauernhof',
+    name: 'Kirchbauernhof',
+    inhaber: { email: 'bauer-03@example.com', name: 'Sabine Hofstätter', telefon: '+43 660 0000103' },
+    adresse: 'Kirchbauernweg 3',
+    plz: '5270',
+    ort: 'Mauerkirchen',
+    land: 'AT',
+    bezirk: 'Braunau am Inn',
+    breite: 48.1917,
+    laenge: 13.1334,
+    sorten: ['HEU_KLEIN', 'ERDAEPFEL', 'BROT'],
+  },
+  {
+    slug: 'wengerhof',
+    name: 'Wengerhof',
+    inhaber: { email: 'bauer-04@example.com', name: 'Peter Brandstätter', telefon: '+43 660 0000104' },
+    adresse: 'Wengerweg 4',
+    plz: '4952',
+    ort: 'Weng im Innkreis',
+    land: 'AT',
+    bezirk: 'Braunau am Inn',
+    breite: 48.2351,
+    laenge: 13.1780,
+    sorten: ['HEU_KLEIN', 'HEU_RUND', 'HAFER_SACK'],
+  },
+  {
+    slug: 'moosbauernhof',
+    name: 'Moosbauernhof',
+    inhaber: { email: 'bauer-05@example.com', name: 'Claudia Ebner', telefon: '+43 660 0000105' },
+    adresse: 'Moosbauernweg 5',
+    plz: '5261',
+    ort: 'Uttendorf',
+    land: 'AT',
+    bezirk: 'Braunau am Inn',
+    breite: 48.1589,
+    laenge: 13.1218,
+    sorten: ['MILCH', 'KAESE', 'EIER'],
+  },
+  {
+    slug: 'waldbauernhof',
+    name: 'Waldbauernhof',
+    inhaber: { email: 'bauer-06@example.com', name: 'Stefan Aigner', telefon: '+43 660 0000106' },
+    adresse: 'Waldbauernweg 6',
+    plz: '5144',
+    ort: 'Handenberg',
+    land: 'AT',
+    bezirk: 'Braunau am Inn',
+    breite: 48.1336,
+    laenge: 13.0075,
+    sorten: ['HEU_RUND', 'SILAGE'],
+  },
+  {
+    slug: 'bachgutshof',
+    name: 'Bachgutshof',
+    inhaber: { email: 'bauer-07@example.com', name: 'Irene Lindner', telefon: '+43 660 0000107' },
+    adresse: 'Bachgutsweg 7',
+    plz: '5144',
+    ort: 'Sankt Georgen am Fillmannsbach',
+    land: 'AT',
+    bezirk: 'Braunau am Inn',
+    breite: 48.1256,
+    laenge: 13.0081,
+    sorten: ['HEU_KLEIN', 'MAIS_SACK'],
+  },
+  {
+    slug: 'schalchnerhof',
+    name: 'Schalchnerhof',
+    inhaber: { email: 'bauer-08@example.com', name: 'Gerald Moser', telefon: '+43 660 0000108' },
+    adresse: 'Schalchnerweg 8',
+    plz: '5231',
+    ort: 'Schalchen',
+    land: 'AT',
+    bezirk: 'Braunau am Inn',
+    breite: 48.1192,
+    laenge: 13.1572,
+    sorten: ['ERDAEPFEL', 'AEPFEL', 'SAFT'],
+  },
+  {
+    slug: 'kapellenhof',
+    name: 'Kapellenhof',
+    inhaber: { email: 'bauer-09@example.com', name: 'Birgit Reiter', telefon: '+43 660 0000109' },
+    adresse: 'Kapellenweg 9',
+    plz: '5241',
+    ort: 'Maria Schmolln',
+    land: 'AT',
+    bezirk: 'Braunau am Inn',
+    breite: 48.1382,
+    laenge: 13.2198,
+    sorten: ['HEU_KLEIN', 'HEU_RUND', 'MISCHFUTTER', 'EIER'],
+  },
+  {
+    slug: 'achleitenhof',
+    name: 'Achleitenhof',
+    inhaber: { email: 'bauer-10@example.com', name: 'Rudolf Hochreiter', telefon: '+43 660 0000110' },
+    adresse: 'Achleitenweg 10',
+    plz: '5122',
+    ort: 'Hochburg-Ach',
+    land: 'AT',
+    bezirk: 'Braunau am Inn',
+    breite: 48.1300,
+    laenge: 12.8773,
+    sorten: ['LUZERNE', 'HAFER_SACK'],
+  },
+  {
+    slug: 'innleitenhof',
+    name: 'Innleitenhof',
+    inhaber: { email: 'bauer-11@example.com', name: 'Monika Fuchs', telefon: '+43 660 0000111' },
+    adresse: 'Innleitenweg 11',
+    plz: '4983',
+    ort: 'Sankt Georgen bei Obernberg am Inn',
+    land: 'AT',
+    bezirk: 'Ried im Innkreis',
+    breite: 48.2919,
+    laenge: 13.3332,
+    sorten: ['HEU_KLEIN', 'HONIG'],
+  },
+  {
+    slug: 'marktbauernhof',
+    name: 'Marktbauernhof',
+    inhaber: { email: 'bauer-12@example.com', name: 'Andreas Gruber', telefon: '+43 660 0000112' },
+    adresse: 'Marktbauernweg 12',
+    plz: '4982',
+    ort: 'Obernberg am Inn',
+    land: 'AT',
+    bezirk: 'Ried im Innkreis',
+    breite: 48.3213,
+    laenge: 13.3343,
+    sorten: ['MILCH', 'BROT', 'KAESE'],
+  },
+  {
+    slug: 'kobernausserhof',
+    name: 'Kobernaußerhof',
+    inhaber: { email: 'bauer-13@example.com', name: 'Elisabeth Wimmer', telefon: '+43 660 0000113' },
+    adresse: 'Kobernaußerweg 13',
+    plz: '5222',
+    ort: 'Munderfing',
+    land: 'AT',
+    bezirk: 'Braunau am Inn',
+    breite: 48.0704,
+    laenge: 13.1816,
+    sorten: ['HEU_RUND', 'GERSTE_SACK', 'MINERAL'],
+  },
+  {
+    slug: 'seebauernhof',
+    name: 'Seebauernhof',
+    inhaber: { email: 'bauer-14@example.com', name: 'Hannes Pichler', telefon: '+43 660 0000114' },
+    adresse: 'Seebauernweg 14',
+    plz: '5141',
+    ort: 'Moosdorf',
+    land: 'AT',
+    bezirk: 'Braunau am Inn',
+    breite: 48.0449,
+    laenge: 12.9890,
+    sorten: ['HEU_KLEIN', 'FISCH'],
+  },
+  {
+    slug: 'weilbachhof',
+    name: 'Weilbachhof',
+    inhaber: { email: 'bauer-15@example.com', name: 'Katrin Schuster', telefon: '+43 660 0000115' },
+    adresse: 'Weilbachweg 15',
+    plz: '4984',
+    ort: 'Weilbach',
+    land: 'AT',
+    bezirk: 'Ried im Innkreis',
+    breite: 48.2773,
+    laenge: 13.3717,
+    sorten: ['AEPFEL', 'SAFT', 'HONIG'],
+  },
+  {
+    slug: 'hoehenbauernhof',
+    name: 'Höhenbauernhof',
+    inhaber: { email: 'bauer-16@example.com', name: 'Josef Stadler', telefon: '+43 660 0000116' },
+    adresse: 'Höhenbauernweg 16',
+    plz: '4942',
+    ort: 'Wippenham',
+    land: 'AT',
+    bezirk: 'Ried im Innkreis',
+    breite: 48.2225,
+    laenge: 13.3792,
+    sorten: ['HEU_KLEIN', 'HEU_RUND', 'WEIZEN_SACK'],
+  },
+  {
+    slug: 'grabenseehof',
+    name: 'Grabenseehof',
+    inhaber: { email: 'bauer-17@example.com', name: 'Martina Holzer', telefon: '+43 660 0000117' },
+    adresse: 'Grabenseeweg 17',
+    plz: '5163',
+    ort: 'Palting',
+    land: 'AT',
+    bezirk: 'Braunau am Inn',
+    breite: 48.0154,
+    laenge: 13.1271,
+    sorten: ['MILCH', 'EIER', 'KUERBIS'],
+  },
+  {
+    slug: 'schilfhof',
+    name: 'Schilfhof',
+    inhaber: { email: 'bauer-18@example.com', name: 'Franz Gschwandtner', telefon: '+43 660 0000118' },
+    adresse: 'Schilfweg 18',
+    plz: '5163',
+    ort: 'Perwang am Grabensee',
+    land: 'AT',
+    bezirk: 'Braunau am Inn',
+    breite: 48.0069,
+    laenge: 13.0830,
+    sorten: ['STROH_RUND', 'MAIS_SACK'],
+  },
+  {
+    slug: 'salzachhof',
+    name: 'Salzachhof',
+    inhaber: { email: 'bauer-19@example.com', name: 'Ulrike Mayrhofer', telefon: '+43 660 0000119' },
+    adresse: 'Salzachweg 19',
+    plz: '5121',
+    ort: 'Ostermiething',
+    land: 'AT',
+    bezirk: 'Braunau am Inn',
+    breite: 48.0464,
+    laenge: 12.8294,
+    sorten: ['HEU_KLEIN', 'RIND'],
+  },
+  {
+    slug: 'antiesenhof',
+    name: 'Antiesenhof',
+    inhaber: { email: 'bauer-20@example.com', name: 'Thomas Reisinger', telefon: '+43 660 0000120' },
+    adresse: 'Antiesenweg 20',
+    plz: '4941',
+    ort: 'Mehrnbach',
+    land: 'AT',
+    bezirk: 'Ried im Innkreis',
+    breite: 48.2081,
+    laenge: 13.4352,
+    sorten: ['HEU_RUND', 'SILAGE', 'MINERAL'],
+  },
+  {
+    slug: 'martinihof',
+    name: 'Martinihof',
+    inhaber: { email: 'bauer-21@example.com', name: 'Daniela Kern', telefon: '+43 660 0000121' },
+    adresse: 'Martiniweg 1',
+    plz: '4973',
+    ort: 'Sankt Martin im Innkreis',
+    land: 'AT',
+    bezirk: 'Ried im Innkreis',
+    breite: 48.2939,
+    laenge: 13.4387,
+    sorten: ['ERDAEPFEL', 'KUERBIS', 'BROT'],
+  },
+  {
+    slug: 'ortnerhof',
+    name: 'Ortnerhof',
+    inhaber: { email: 'bauer-22@example.com', name: 'Christoph Baumgartner', telefon: '+43 660 0000122' },
+    adresse: 'Ortnerweg 2',
+    plz: '4974',
+    ort: 'Ort im Innkreis',
+    land: 'AT',
+    bezirk: 'Ried im Innkreis',
+    breite: 48.3165,
+    laenge: 13.4336,
+    sorten: ['HEU_KLEIN', 'MILCH'],
+  },
+  {
+    slug: 'pramtalhof',
+    name: 'Pramtalhof',
+    inhaber: { email: 'bauer-23@example.com', name: 'Verena Leitner', telefon: '+43 660 0000123' },
+    adresse: 'Pramtalweg 3',
+    plz: '4972',
+    ort: 'Utzenaich',
+    land: 'AT',
+    bezirk: 'Ried im Innkreis',
+    breite: 48.2762,
+    laenge: 13.4609,
+    sorten: ['GERSTE_SACK', 'MISCHFUTTER'],
+  },
+  {
+    slug: 'zellerhof',
+    name: 'Zellerhof',
+    inhaber: { email: 'bauer-24@example.com', name: 'Markus Hinterberger', telefon: '+43 660 0000124' },
+    adresse: 'Zellerweg 4',
+    plz: '4924',
+    ort: 'Waldzell',
+    land: 'AT',
+    bezirk: 'Ried im Innkreis',
+    breite: 48.1356,
+    laenge: 13.4270,
+    sorten: ['HEU_KLEIN', 'HEU_RUND', 'LUZERNE'],
+  },
+  {
+    slug: 'riedhof',
+    name: 'Riedhof',
+    inhaber: { email: 'bauer-25@example.com', name: 'Petra Schwaiger', telefon: '+43 660 0000125' },
+    adresse: 'Riedweg 5',
+    plz: '4910',
+    ort: 'Ried im Innkreis',
+    land: 'AT',
+    bezirk: 'Ried im Innkreis',
+    breite: 48.2112,
+    laenge: 13.4886,
+    sorten: ['MILCH', 'KAESE', 'SAFT', 'EIER'],
+  },
+  {
+    slug: 'schilderhof',
+    name: 'Schilderhof',
+    inhaber: { email: 'bauer-26@example.com', name: 'Alois Nussbaumer', telefon: '+43 660 0000126' },
+    adresse: 'Schilderweg 6',
+    plz: '4920',
+    ort: 'Schildorn',
+    land: 'AT',
+    bezirk: 'Ried im Innkreis',
+    breite: 48.1456,
+    laenge: 13.4631,
+    sorten: ['HAFER_SACK', 'WEIZEN_SACK'],
+  },
+  {
+    slug: 'huegelbauernhof',
+    name: 'Hügelbauernhof',
+    inhaber: { email: 'bauer-27@example.com', name: 'Sonja Haas', telefon: '+43 660 0000127' },
+    adresse: 'Hügelbauernweg 7',
+    plz: '4910',
+    ort: 'Pattigham',
+    land: 'AT',
+    bezirk: 'Ried im Innkreis',
+    breite: 48.1552,
+    laenge: 13.4844,
+    sorten: ['HEU_KLEIN', 'AEPFEL'],
+  },
+  {
+    slug: 'prambachhof',
+    name: 'Prambachhof',
+    inhaber: { email: 'bauer-28@example.com', name: 'Bernhard Eder', telefon: '+43 660 0000128' },
+    adresse: 'Prambachweg 8',
+    plz: '4925',
+    ort: 'Pramet',
+    land: 'AT',
+    bezirk: 'Ried im Innkreis',
+    breite: 48.1429,
+    laenge: 13.4875,
+    sorten: ['HEU_RUND', 'STROH_RUND', 'HONIG'],
+  },
+  {
+    slug: 'taiskirchenhof',
+    name: 'Taiskirchenhof',
+    inhaber: { email: 'bauer-29@example.com', name: 'Gudrun Wallner', telefon: '+43 660 0000129' },
+    adresse: 'Taiskirchenweg 9',
+    plz: '4753',
+    ort: 'Taiskirchen im Innkreis',
+    land: 'AT',
+    bezirk: 'Ried im Innkreis',
+    breite: 48.2647,
+    laenge: 13.5732,
+    sorten: ['MILCH', 'RIND', 'FISCH'],
+  },
+  {
+    slug: 'inntalhof',
+    name: 'Inntalhof',
+    inhaber: { email: 'bauer-30@example.com', name: 'Andrea Brunner', telefon: '+49 8571 000030' },
+    adresse: 'Inntalweg 10',
+    plz: '84359',
+    ort: 'Simbach am Inn',
+    land: 'DE',
+    bezirk: 'Rottal-Inn',
+    breite: 48.2655,
+    laenge: 13.0231,
+    sorten: ['HEU_KLEIN', 'MILCH', 'BROT'],
+  },
+  {
+    slug: 'rottalhof',
+    name: 'Rottalhof',
+    inhaber: { email: 'bauer-31@example.com', name: 'Georg Kellermann', telefon: '+49 8571 000031' },
+    adresse: 'Rottalweg 11',
+    plz: '94094',
+    ort: 'Rotthalmünster',
+    land: 'DE',
+    bezirk: 'Rottal-Inn',
+    breite: 48.3582,
+    laenge: 13.2016,
+    sorten: ['HEU_RUND', 'GERSTE_SACK'],
+  },
+]
+
+/** Aus jedem Nachbarn wird ein vollständiger Hof — eine Abholzeit, zwei bis
+ *  vier Produkte, freigeschaltet, beide Zahlungswege. */
+const NACHBAR_HOEFE: SeedHof[] = NACHBARN.map((n, i) => ({
+  slug: n.slug,
+  name: n.name,
+  inhaber: n.inhaber,
+  adresse: n.adresse,
+  plz: n.plz,
+  ort: n.ort,
+  land: n.land,
+  bezirk: n.bezirk,
+  breite: n.breite,
+  laenge: n.laenge,
+  beschreibung: `Erfundener Testhof in ${n.ort}. Verkauf ab Hof nach Vereinbarung.`,
+  freigegeben: true,
+  nimmtOnline: true,
+  nimmtVorOrt: true,
+  betriebsnummer: null,
+  betriebsstatus: null,
+  // Eine Abholzeit je Hof, über die Woche gestreut (Montag bis Samstag).
+  abholzeiten: [{ tag: (i % 6) + 1, von: '15:00', bis: '18:00' }],
+  // Jünger als die Rollen-Höfe (120 Tage) — so liegen die Gründungsplätze
+  // vorhersagbar bei den Höfen, an denen etwas zu sehen ist.
+  freigabeVorTagen: 110 - i,
+  produkte: n.sorten.map((code, stelle) => baueProdukt(code, n.slug, i, stelle)),
+  testhinweis: `${n.ort} — Nachbarhof mit ${n.sorten.length} Produkten.`,
+}))
+
+/**
+ * Alle Höfe des Datensatzes — der Pilothof zuerst, er ist der Bezugspunkt, dann
+ * die fünf Rollen-Höfe mit ihren Sonderfällen, dann die 31 Nachbarn.
+ */
+export const SEED_HOEFE: SeedHof[] = [
+  PILOTHOF,
+  HOF_A,
+  HOF_B,
+  HOF_C,
+  HOF_D,
+  HOF_E,
+  ...NACHBAR_HOEFE,
+]
 
 // ─── Bestellungen ────────────────────────────────────────────────────────────
 
