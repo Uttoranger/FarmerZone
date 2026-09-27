@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { ZurueckLink } from '@/components/shared/zurueck-link'
+import { KundenKopf } from '@/components/shared/kunden-kopf'
 import { KONTAKT_EMAIL } from '@/lib/support'
 
 export const metadata: Metadata = { title: 'Impressum — FarmerZone' }
@@ -7,10 +7,8 @@ export const metadata: Metadata = { title: 'Impressum — FarmerZone' }
 export default function ImpressumPage() {
   return (
     <div className="min-h-screen bg-background">
+      <KundenKopf seite={{ art: 'info' }} titel="Impressum" />
       <div className="max-w-2xl mx-auto px-4 py-10">
-        {/* Kein `javascript:history.back()`-Link: React blockiert solche
-            URLs, der Link tat nichts (siehe zurueck-link.tsx). */}
-        <ZurueckLink className="text-sm text-primary hover:underline mb-6 inline-block" />
         <h1 className="text-2xl font-semibold text-foreground mb-8">Impressum</h1>
 
         <div className="space-y-8 text-sm text-muted-foreground leading-relaxed">

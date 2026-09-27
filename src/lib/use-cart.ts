@@ -2,57 +2,66 @@
 
 import { useState, useEffect } from 'react'
 import { nanoid } from 'nanoid'
+import type { WarenkorbPosition } from '@/schemas/warenkorb-speicher'
+import {
+  SITZUNG_SCHLUESSEL,
+  WARENKORB_SCHLUESSEL,
+  leereWarenkorb,
+  leseWarenkorb,
+  positionenFuer,
+  schreibeWarenkorb,
+  warenkorbAnzahl,
+} from '@/lib/warenkorb-speicher'
 
-export type CartItem = {
-  productId: string
-  name: string
-  price: number
-  unit: string
-  unitSize: number | null
-  quantity: number
-  imageUrl: string | null
+export type CartItem = WarenkorbPosition
+
+export type Warenkorb = {
+  items: CartItem[]
+  count: number
+  total: number
+  sessionId: string
+  isHydrated: boolean
+  addItem: (product: Omit<CartItem, 'quantity'>, qty?: number) => Promise<{ ok: boolean; error?: string }>
+  updateQuantity: (productId: string, qty: number) => Promise<void>
+  removeItem: (productId: string) => void
+  clearCart: () => void
 }
 
-const CART_KEY = 'bauernshop_cart'
-const SESSION_KEY = 'bauernshop_sid'
-
-export function useCart(farmId: string) {
+/**
+ * Der Warenkorb eines Hofs. `farmSlug` wird mitgespeichert, damit das
+ * Warenkorb-Symbol der Kopfzeile auf anderen Seiten zu diesem Hof führt.
+ */
+export function useCart(farmId: string, farmSlug: string): Warenkorb {
   const [items, setItems] = useState<CartItem[]>([])
   const [sessionId, setSessionId] = useState('')
   const [isHydrated, setIsHydrated] = useState(false)
 
   useEffect(() => {
     // Session ID (persists across page loads for reservation tracking)
-    let sid = localStorage.getItem(SESSION_KEY)
+    let sid = localStorage.getItem(SITZUNG_SCHLUESSEL)
     if (!sid) {
       sid = nanoid()
-      localStorage.setItem(SESSION_KEY, sid)
+      localStorage.setItem(SITZUNG_SCHLUESSEL, sid)
     }
     setSessionId(sid)
 
-    // Cart (farm-specific)
-    try {
-      const raw = localStorage.getItem(CART_KEY)
-      if (raw) {
-        const data = JSON.parse(raw)
-        if (data.farmId === farmId) setItems(data.items ?? [])
-      }
-    } catch (err) {
-      // Beschädigter oder nicht lesbarer Warenkorb im Browser-Speicher: ein
-      // leerer Warenkorb ist hier das korrekte Ergebnis, nicht ein Fehler.
-      // Die Kundin soll deswegen nichts sehen — sie hat nichts falsch
-      // gemacht, und ein Hinweis wäre nur Rauschen.
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('[Warenkorb] Gespeicherter Warenkorb nicht lesbar:', err)
-      }
+    // Beschädigter oder fremder Korb ergibt einen leeren — kein Fehler, den
+    // die Kundin sehen müsste (leseWarenkorb prüft mit Zod).
+    const gespeichert = leseWarenkorb(localStorage.getItem(WARENKORB_SCHLUESSEL))
+    const geladen = positionenFuer(gespeichert, farmId)
+    setItems(geladen)
+    // Ein Korb von vor der Kopfzeile kennt den Slug nicht — nachtragen, damit
+    // das Warenkorb-Symbol auf anderen Seiten zu diesem Hof führt.
+    if (gespeichert && !gespeichert.farmSlug && geladen.length > 0) {
+      schreibeWarenkorb({ farmId, farmSlug, items: geladen })
     }
 
     setIsHydrated(true)
-  }, [farmId])
+  }, [farmId, farmSlug])
 
   function persist(next: CartItem[]) {
     setItems(next)
-    localStorage.setItem(CART_KEY, JSON.stringify({ farmId, items: next }))
+    schreibeWarenkorb({ farmId, farmSlug, items: next })
   }
 
   async function addItem(
@@ -107,10 +116,10 @@ export function useCart(farmId: string) {
 
   function clearCart() {
     setItems([])
-    localStorage.removeItem(CART_KEY)
+    leereWarenkorb()
   }
 
-  const count = items.reduce((s, i) => s + i.quantity, 0)
+  const count = warenkorbAnzahl(items)
   const total = items.reduce((s, i) => s + i.price * i.quantity, 0)
 
   return { items, count, total, sessionId, isHydrated, addItem, updateQuantity, removeItem, clearCart }

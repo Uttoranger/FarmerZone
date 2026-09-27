@@ -6,7 +6,7 @@ import { useForm, type FieldErrors, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format, addDays } from 'date-fns'
 import { de } from 'date-fns/locale'
-import { ShoppingCart, ArrowLeft, Loader2, Info } from 'lucide-react'
+import { ShoppingCart, Loader2, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -21,6 +21,14 @@ import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import { BETRIEBSNACHWEIS_FEHLER, CODE_BETRIEBSNACHWEIS_FEHLT } from '@/lib/betriebsnachweis'
 import type { PublicFarm } from '@/server/queries/farm'
 import type { CartItem } from '@/lib/use-cart'
+import {
+  SITZUNG_SCHLUESSEL,
+  WARENKORB_SCHLUESSEL,
+  leereWarenkorb,
+  leseWarenkorb,
+  positionenFuer,
+  schreibeWarenkorb,
+} from '@/lib/warenkorb-speicher'
 import { eurosToCents } from '@/lib/order-totals'
 import {
   SERVICEGEBUEHR_BEZEICHNUNG,
@@ -33,9 +41,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { StripePaymentStep } from './stripe-payment'
-
-const CART_KEY = 'bauernshop_cart'
-const SESSION_KEY = 'bauernshop_sid'
+import { KundenKopf } from '@/components/shared/kunden-kopf'
 
 /**
  * Den Warenkorb auf den vom Server berichtigten Stand bringen: gekürzte Mengen
@@ -45,7 +51,7 @@ const SESSION_KEY = 'bauernshop_sid'
 function uebernehmeBerichtigung(
   vorher: CartItem[],
   berichtigt: Array<{ productId: string; quantity: number }>,
-  farmId: string,
+  hof: { farmId: string; farmSlug: string },
   setCart: (items: CartItem[]) => void
 ): CartItem[] {
   const mengen = new Map(berichtigt.map((b) => [b.productId, b.quantity]))
@@ -53,12 +59,9 @@ function uebernehmeBerichtigung(
     .filter((i) => (mengen.get(i.productId) ?? 0) > 0)
     .map((i) => ({ ...i, quantity: mengen.get(i.productId) ?? i.quantity }))
   setCart(nachher)
-  try {
-    localStorage.setItem(CART_KEY, JSON.stringify({ farmId, items: nachher }))
-  } catch {
-    // Kein Schreibzugriff auf den Speicher (privates Fenster): die Anzeige
-    // stimmt trotzdem, und der Checkout prüft serverseitig erneut.
-  }
+  // Ohne Schreibzugriff (privates Fenster) stimmt die Anzeige trotzdem, und
+  // der Checkout prüft serverseitig erneut — schreibeWarenkorb wirft nie.
+  schreibeWarenkorb({ ...hof, items: nachher })
   return nachher
 }
 
@@ -71,17 +74,13 @@ function uebernehmeBerichtigung(
 function uebernehmePreise(
   vorher: CartItem[],
   preise: Array<{ productId: string; price: number }>,
-  farmId: string,
+  hof: { farmId: string; farmSlug: string },
   setCart: (items: CartItem[]) => void
 ): CartItem[] {
   const neu = new Map(preise.map((p) => [p.productId, p.price]))
   const nachher = vorher.map((i) => (neu.has(i.productId) ? { ...i, price: neu.get(i.productId) ?? i.price } : i))
   setCart(nachher)
-  try {
-    localStorage.setItem(CART_KEY, JSON.stringify({ farmId, items: nachher }))
-  } catch {
-    // Kein Schreibzugriff (privates Fenster): die Anzeige stimmt trotzdem.
-  }
+  schreibeWarenkorb({ ...hof, items: nachher })
   return nachher
 }
 
@@ -150,6 +149,9 @@ export function CheckoutForm({
   // der Vorgang mit einem Fehler endet — ein selbst gepflegter Ladezustand
   // blieb im Fehlerfall hängen und sperrte den Knopf für immer (Befund 4).
   const [isPending, startTransition] = useTransition()
+  // Ab hier gibt es eine Bestellung — auch wenn „Zurück" im Zahlungsschritt
+  // wieder das Formular zeigt. Siehe `kopf` unten.
+  const [bestellungAngelegt, setBestellungAngelegt] = useState(false)
   const [paymentStep, setPaymentStep] = useState<{
     clientSecret: string
     orderId: string
@@ -171,25 +173,12 @@ export function CheckoutForm({
   }
 
   useEffect(() => {
-    const sid = localStorage.getItem(SESSION_KEY) ?? ''
+    const sid = localStorage.getItem(SITZUNG_SCHLUESSEL) ?? ''
     setSessionId(sid)
 
-    let geladen: CartItem[] = []
-    try {
-      const raw = localStorage.getItem(CART_KEY)
-      if (raw) {
-        const data = JSON.parse(raw)
-        if (data.farmId === farm.id) geladen = data.items ?? []
-      }
-    } catch (err) {
-      // Beschädigter oder nicht lesbarer Warenkorb im Browser-Speicher: ein
-      // leerer Warenkorb ist hier das korrekte Ergebnis, nicht ein Fehler.
-      // Die Kundin soll deswegen nichts sehen — sie hat nichts falsch
-      // gemacht, und ein Hinweis wäre nur Rauschen.
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('[Warenkorb] Gespeicherter Warenkorb nicht lesbar:', err)
-      }
-    }
+    // Beschädigter oder fremder Korb ergibt einen leeren — kein Fehler, den
+    // die Kundin sehen müsste (leseWarenkorb prüft mit Zod).
+    const geladen: CartItem[] = positionenFuer(leseWarenkorb(localStorage.getItem(WARENKORB_SCHLUESSEL)), farm.id)
     setCart(geladen)
     setIsHydrated(true)
 
@@ -211,7 +200,7 @@ export function CheckoutForm({
         if (!res.ok || abgebrochen) return
         const befund = await res.json()
         if (!befund.meldung) return
-        uebernehmeBerichtigung(geladen, befund.items ?? [], farm.id, setCart)
+        uebernehmeBerichtigung(geladen, befund.items ?? [], { farmId: farm.id, farmSlug: farm.slug }, setCart)
         toast.info(befund.meldung)
       } catch {
         // Kein Netz oder Serverfehler: Der Warenkorb bleibt, wie er ist.
@@ -221,7 +210,7 @@ export function CheckoutForm({
     return () => {
       abgebrochen = true
     }
-  }, [farm.id])
+  }, [farm.id, farm.slug])
 
   const pickupOptions = generatePickupOptions(farm.pickupSlots)
 
@@ -337,12 +326,12 @@ export function CheckoutForm({
         // (Befund 3). Der Grund steht im Text der Antwort.
         if (err.code === CODE_RESERVIERUNG_ABGELAUFEN || err.code === 'WARENKORB_GEAENDERT') {
           if (Array.isArray(err.items)) {
-            uebernehmeBerichtigung(cart, err.items, farm.id, setCart)
+            uebernehmeBerichtigung(cart, err.items, { farmId: farm.id, farmSlug: farm.slug }, setCart)
           }
           // Preis geändert: den gültigen Preis übernehmen, damit die neue
           // Summe sichtbar ist, bevor erneut abgeschickt wird.
           if (Array.isArray(err.preise)) {
-            uebernehmePreise(cart, err.preise, farm.id, setCart)
+            uebernehmePreise(cart, err.preise, { farmId: farm.id, farmSlug: farm.slug }, setCart)
           }
           toast.error(err.error ?? 'Dein Warenkorb hat sich geändert.')
           return
@@ -362,15 +351,26 @@ export function CheckoutForm({
       const result = await res.json()
 
       if (data.paymentMethod === 'ONLINE') {
+        setBestellungAngelegt(true)
         setPaymentStep({ clientSecret: result.clientSecret, orderId: result.orderId })
       } else {
-        localStorage.removeItem(CART_KEY)
+        leereWarenkorb()
         router.push(`/${farm.slug}/confirm/${result.orderId}`)
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Fehler beim Checkout')
     }
   }
+
+  // Kopfzeile des Checkouts (kunden-kopf.tsx) — nicht mehr, sobald eine
+  // Bestellung angelegt ist (Zahlungsschritt, und auch nach „Zurück" von dort
+  // ins Formular): Die Bestellung hält dann Bestand. Wer über die Kopfzeile
+  // hinausginge und wiederkäme, bekäme einen neuen Idempotenz-Schlüssel und
+  // legte eine zweite an. Der Zahlungsschritt hat sein eigenes „Zurück" zum
+  // Formular (StripePaymentStep, onBack).
+  const kopf = bestellungAngelegt ? null : (
+    <KundenKopf seite={{ art: 'checkout', hofSlug: farm.slug }} titel="Bestellung" hofName={farm.name} />
+  )
 
   // Stripe payment step
   if (paymentStep) {
@@ -379,7 +379,7 @@ export function CheckoutForm({
         clientSecret={paymentStep.clientSecret}
         orderId={paymentStep.orderId}
         farmSlug={farm.slug}
-        onClearCart={() => localStorage.removeItem(CART_KEY)}
+        onClearCart={leereWarenkorb}
         onBack={() => setPaymentStep(null)}
       />
     )
@@ -388,15 +388,20 @@ export function CheckoutForm({
   // Loading state
   if (!isHydrated) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
+      <>
+        {kopf}
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      </>
     )
   }
 
   // Empty cart
   if (cart.length === 0) {
     return (
+      <>
+      {kopf}
       <div className="max-w-lg mx-auto px-4 py-16 text-center">
         <ShoppingCart className="size-12 text-muted-foreground/40 mx-auto mb-4" />
         <h2 className="text-lg font-medium text-foreground mb-2">Dein Warenkorb ist leer</h2>
@@ -406,20 +411,15 @@ export function CheckoutForm({
           </Button>
         </Link>
       </div>
+      </>
     )
   }
 
   return (
+    <>
+    {kopf}
     <div className="max-w-2xl mx-auto px-4 py-6">
-      {/* Back link */}
-      <Link
-        href={`/${farm.slug}`}
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6"
-      >
-        <ArrowLeft className="size-4" />
-        Zurück zu {farm.name}
-      </Link>
-
+      {/* Der Rückweg zum Hof steht in der Kopfzeile (kunden-kopf.tsx). */}
       <h1 className="font-heading text-xl font-semibold text-foreground mb-6">Bestellung abschließen</h1>
 
       {/* Order summary */}
@@ -793,5 +793,6 @@ export function CheckoutForm({
         </Button>
       </form>
     </div>
+    </>
   )
 }

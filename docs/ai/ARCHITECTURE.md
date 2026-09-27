@@ -138,13 +138,22 @@ Client-Komponente → Server Action → Zod → Fachregel (lib) → Prisma → r
 | Server-Daten | Server Component, per Props | Nicht in Client-State spiegeln |
 | Formular | `react-hook-form` | Kein `useState` je Feld |
 | UI-lokal (offen/zu) | `useState` | Nicht global |
-| Warenkorb | `use-cart.ts` (localStorage) + serverseitige Reservierung | Warenkorb ist **nie** die Wahrheit über Verfügbarkeit |
+| Warenkorb | `use-cart.ts` (localStorage) + serverseitige Reservierung; der Speicher nur über `src/lib/warenkorb-speicher.ts` (ein Schlüssel, Zod, Ereignis `WARENKORB_EREIGNIS` nach jedem Schreiben) | Warenkorb ist **nie** die Wahrheit über Verfügbarkeit. Kein zweiter Zugriff auf den Schlüssel (`tests/warenkorb-speicher.test.ts`) |
 | Filter/Suche in URL | `useSearchParams` lesen, Zod-Schema in `src/schemas/` parst und verwirft Ungültiges still; schreiben mit `window.history.replaceState` (Next gleicht `useSearchParams` ab, kein Server-Roundtrip je Tipp) oder `router.replace`, wenn der Server neu rendern soll | Nicht nur im State — Ergebnisse müssen teilbar sein. **Nie** Standort/Koordinaten in die URL |
 | Theme | `next-themes`, `ThemeProvider` in `src/app/layout.tsx` (`attribute="class"`, `defaultTheme="system"`) | Kein eigener Provider, keine Spalte in der Datenbank — die Wahl gehört dem Gerät |
 
 **Kein globaler Store.** Wenn etwas global wirkt, gehört es meist in die URL oder auf den Server.
 
 ---
+
+### Kundenseiten: Kopfzeile und Rückweg
+- Jede Seite unter `src/app/(public)/` rendert `KundenKopf` (`src/components/shared/kunden-kopf.tsx`) mit ihrer `KundenSeite`; die Startseite behält `LandingNav`. `tests/kunden-kopf.test.ts` kennt jede Seite — eine neue fällt dort auf.
+- Form (Knöpfe über dem Titelbild oder Leiste, Warenkorb-Symbol, Rückweg-Zeile) und Rückweg entscheidet `src/lib/kunden-kopf.ts`, nicht die Komponente.
+- „Zurück" ist immer ein echter Link auf das übergeordnete Ziel; nur bei eigenem Vorgänger (`eigenerVorgaengerJetzt`: Navigation API, sonst `RueckwegMerker` im Root-Layout) geht es per `router.back()`. **Nie** `history.length` oder `document.referrer` für einen Rückweg. Bestätigung und Bestellverfolgung nie über den Verlauf.
+- Wer über den Ersatz-Link hinaufsteigt, hat dort keinen eigenen Vorgänger (`merkeHinauf`) — sonst pendelt „Zurück" zwischen zwei Seiten. Die Browser-Zeile („‹ Alle Höfe") nimmt den Verlauf nur, wenn er genau zu ihrem Ziel führt (`zeileNimmtVerlauf`).
+- Im Checkout keine Kopfzeile, sobald eine Bestellung angelegt ist (Zahlungsschritt, auch nach dessen „Zurück"): Ein Weg hinaus und zurück ergäbe eine zweite. Bekannte Grenze: Solange die Anfrage an `/api/checkout` läuft, steht die Kopfzeile noch.
+- Der Rückweg der Hofseite nimmt den **angezeigten** Bereich (`angezeigterBereich` in `src/lib/bereiche-anzeige.ts`), nicht den URL-Parameter.
+- Die Kopfzeile klebt (`sticky`, Ebene 40): Umgebungsbanner (60) darüber, Sheets/Dialoge (50) davor, Sektionsleiste (30) darunter. Ausnahme Hofseite am Handy: Die Leiste ist `fixed` und wird erst eingehängt, wenn das Titelbild verschwindet — `sticky` verschöbe beim Einhängen den Inhalt. Eigene Stapelebenen (`isolate`) um alles mit hohen z-Werten (Leaflet), sonst liegt es über der Kopfzeile.
 
 ## 5. Domänen-Invarianten
 
@@ -195,7 +204,7 @@ Nicht nachahmen. Beim Anfassen der Datei mit aufräumen, nicht als eigener Sprin
 |---|---|
 | `src/lib/preis-format.ts` hält noch ein zweites `formatEuro` (Symbol hinten) für Warenkorb-Summe, Bestellsummen und Servicegebühr-Einstellung | `format.ts` ist kanonisch. Neue Formatierung nur dort. Wer eine dieser drei Stellen anfasst, stellt sie um; danach fällt die Datei. |
 | Server Actions mischen `throw new Error()` und `return { error }` | Neuer Code: `return { error }` (→ `CODING_STANDARDS.md`) |
-| Keine Header-Komponente; Unterseiten ohne Rückweg | Neue öffentliche Seite bekommt Header und Footer |
+| Einen gemeinsamen Footer haben nur Startseite und Hofseite | Neue öffentliche Seite bekommt `KundenKopf` (§4, Pflicht); den Footer, sobald es eine gemeinsame Komponente gibt |
 | Geld teils `Decimal`, teils `Int` in Cent | Neue Geldfelder: `Decimal(10,2)`. Bestehende `*Cents` nicht umbauen. |
 | Enum-Werte `FUTTERMITTEL` (Kategorie) und `EINZELFUTTERMITTEL`, `MISCHFUTTERMITTEL`, `ERGAENZUNGSFUTTERMITTEL` (Unterkategorie) aus Taxonomie 1 | Nie wählbar anbieten, nie schreiben; Zod lehnt sie ab. Lesen nur über `istAltlastKategorie` / `istAltlastUnterkategorie`. Entfernen im Cleanup-Sprint. |
 | `FutterKennzeichnung.registrierungsnummer` — die Nummer gehört dem Hof (`Farm.betriebsnummer`) | Nie schreiben. Lesen nur als Rückfall über `betriebsnummerFuerAnzeige`. Entfernen im Cleanup-Sprint. |

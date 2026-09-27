@@ -660,7 +660,8 @@ und die Zeile mit Wort (Seitenleiste). Vor dem Mount ein Platzhalter gleicher Gr
 der Server kennt den Modus nicht. Mobil im Bauern-Bereich sitzt er im Kopf des
 Mehr-Sheets (zwei Tipps): Die Tab-Leiste hält ihre Platz-Regel von sechs Zielen; ein
 siebtes fiele unter 340 px unter 48 px. Öffentlich trägt ihn nur die Startseite — die
-übrigen öffentlichen Seiten haben keinen gemeinsamen Kopf oder Fuß (Header-Sprint).
+Kopfzeile der übrigen Kundenseiten (`KundenKopf`, 2026-09-27) hat keinen, er war dort
+nicht beauftragt.
 
 ---
 
@@ -1907,6 +1908,103 @@ auswertet:
 Dazu im Hofladen „1 Hof ohne Standort nicht berücksichtigt". Knapp an den
 Grenzen: Kirchbauernhof 9,80 km (drin bei 10), Wengerhof 10,24 km (draußen),
 Weilbachhof 24,41 km (drin bei 25), Höhenbauernhof 25,15 km (draußen).
+
+---
+
+## Kopfzeile der Kundenseiten: jeder Kunde findet zurück (2026-09-27)
+
+Behebt Befund 18 aus dem Bug-Report vom 18.09. (liegt nicht im Repo) und die
+Briefkasten-Meldung cmue2rrcc000004l293sa8nn2. Vorher hatte nur die Startseite eine
+Navigation (LandingNav). Wer über einen geteilten Link auf einer Hofseite landete, kam
+nur über den Zurück-Knopf des Browsers weiter — und der führte zurück zu WhatsApp.
+
+**Formen.** `KundenKopf` (`src/components/shared/kunden-kopf.tsx`):
+- Am Handy auf der Hofseite zwei runde Knöpfe über dem Titelbild, 44 px: Zurück und
+  Teilen. Sobald das Bild aus dem Blick ist (IntersectionObserver, oberer Rand um die
+  56 px der Leiste verkürzt), erscheint eine Leiste mit Zurück und Hofname (rechts
+  bleibt Platz frei — dort kein Warenkorb, der sitzt unten); die Sektionsleiste klebt
+  darunter (`top-14`). Die Leiste ist dort `fixed` und wird erst eingehängt; `sticky`
+  verschöbe beim Einhängen den Inhalt. Bei reduzierter Bewegung ohne Einblenden. Der
+  Hofname im Titelbild ist am Handy 32 statt 38 px, damit er mit Logo und Werten nicht
+  bis unter die Knöpfe wächst.
+- Auf allen anderen Kundenseiten steht die Leiste von Anfang an, mit Seitentitel.
+- Im Browser (ab md) eine Kopfzeile, 64 px: FarmerZone, „Höfe entdecken", „Für Höfe"
+  (`/#weiter`) und „Hofbetreiber-Login" (`/login`), Warenkorb. Wie auf der Startseite:
+  ein Wort, ein Ziel. Wo sie selbst nicht zurückführt, steht darunter ein Rückweg-Link:
+  „‹ Alle Höfe" auf der Hofseite, „‹ {Hofname}" im Bestellweg.
+- Die Vorbilder (foodpanda, Deliveroo, Careem) zeigen oben links Zurück, rechts Teilen.
+  Den Warenkorb hat keines von ihnen in der oberen Leiste der Restaurantseite — deshalb
+  auf der Hofseite nur der Knopf unten.
+
+**Rückweg** (`src/lib/kunden-kopf.ts`, rein):
+- Kam der Kunde von einer eigenen Seite, geht Zurück einen Schritt im Verlauf, mit
+  Scrollposition und Filtern.
+- Sonst führt ein echter Link zum übergeordneten Ort: Hofseite → Hofübersicht, im
+  **angezeigten** Bereich. Ein reiner Futterhof zeigt Futter auch ohne `?bereich`, und
+  geteilte Links tragen keinen. Checkout, Bestätigung, Bestellverfolgung → Hofseite;
+  Hofübersicht → Startseite; Rechtsseiten → Hofübersicht.
+- Bestätigung und Bestellverfolgung gehen nie über den Verlauf: Davor stehen Stripe und
+  die Bank, und die Bestellverfolgung kommt aus einer Mail. Mit ungültigem Link ist
+  nicht einmal der Hof bestätigt — dort führt Zurück zur Hofübersicht
+  (`bestellung-ungueltig`).
+- Kein Hin und Her: Der Ersatz-Link legt einen neuen Verlaufseintrag an. Ohne weitere
+  Regel hielte die Zielseite die Ausgangsseite für ihren Vorgänger, und das nächste
+  „Zurück" führte wieder hinunter — ein Kunde aus einem geteilten Link pendelte zwischen
+  Hofseite und Hofübersicht und erreichte die Startseite nie, und von der Hofseite ging
+  es zurück in die Bestätigung (deren ClearCartOnMount einen neuen Korb geleert hätte).
+  Deshalb zählt Hinaufsteigen nicht als Vorgänger (`merkeHinauf`; mit Navigation API
+  per Eintragsschlüssel im sessionStorage, übersteht Neuladen).
+- Im Browser nimmt „‹ Alle Höfe" (bzw. „‹ {Hofname}" im Bestellweg) den Verlauf nur,
+  wenn er genau dorthin führt — von der gefilterten Hofübersicht kommend mit Filtern
+  und Scrollposition, von der Startseite kommend als Link zur Übersicht.
+
+„Eigene Seite davor" weiß nur das Dokument selbst:
+- `document.referrer` bleibt nach Seitenwechseln in der App auf dem ersten Laden stehen.
+- `history.length` zählt fremde Seiten mit. Darüber führte der alte `ZurueckLink` auf
+  Impressum und Co. zu Google zurück; er ist gelöscht.
+- Eigene Werte in `history.state` überschreibt Next.
+
+Deshalb:
+- Wo der Browser die Navigation API hat, entscheidet `navigation.canGoBack`.
+- Sonst zählt der `RueckwegMerker` im Root-Layout mit: Ein Seitenwechsel in der App
+  beweist einen Vorgänger, Zurück/Vorwärts oder Neuladen nicht. Im Zweifel führt der
+  Link zum Ziel statt ein Schritt ins Ungewisse.
+
+**Warenkorb.** Der Speicher läuft nur noch über `src/lib/warenkorb-speicher.ts`.
+- Ein Schlüssel statt drei hart kodierter.
+- Zod statt nacktem `JSON.parse`; kaputte Positionen fallen einzeln heraus.
+- Der Slug des Hofs wird mitgespeichert. Alte Einträge ohne Slug bleiben lesbar; die
+  Hofseite trägt den Slug beim nächsten Besuch nach, erst dann zeigt das Symbol.
+- Nach jedem Schreiben geht ein Ereignis an alle Mitzähler im Tab; andere Tabs hören
+  `storage`.
+- Das Symbol mit Anzahl (Stück) steht, sobald ein Korb liegt, auf Hofübersicht und
+  Rechtsseiten, nicht auf Hofseite und Bestellweg. Ein Tipp führt zu
+  `/<hof>#warenkorb`: Die Hofseite öffnet den Korb und nimmt den Anker wieder weg.
+
+**Checkout:** Die Kopfzeile rendert `CheckoutForm` selbst — nicht mehr, sobald eine
+Bestellung angelegt ist: im Stripe-Zahlungsschritt und auch nach dessen „Zurück" ins
+Formular. Die Bestellung hält dann Bestand; wer über die Kopfzeile ginge und
+wiederkäme, bekäme einen neuen Idempotenz-Schlüssel und legte eine zweite an. Bekannte
+Grenze: Solange die Anfrage an `/api/checkout` läuft, steht die Kopfzeile noch.
+
+**Teilen** ist aus der Hofseite herausgezogen (`src/lib/teilen.ts`). Schließt der Kunde
+das Teilen-Menü, wird nichts mehr kopiert — vorher kam trotzdem „Link kopiert".
+
+**Befund 6 (Audit):** Der klebende Warenkorb-Knopf sitzt über
+`env(safe-area-inset-bottom)`. Ohne `viewport-fit=cover` liefert iOS dafür 0; die
+Änderung wirkt erst mit dem offenen Punkt unten.
+
+**Offen:**
+- viewport-fit=cover plus Safe-Area auf allen Seiten — eigener Sprint. Die App ist als
+  PWA `standalone`; `cover` schöbe jede Seite unter die Statusleiste.
+- Ein Korb, ein Hof: Wer bei einem zweiten Hof etwas hinzufügt, überschreibt den ersten
+  ohne Rückfrage.
+- Ein Korb eines Hofs, der nicht mehr öffentlich ist, bleibt liegen; das Symbol führt
+  dann auf „Hof nicht gefunden".
+- Zurück-Taste des Browsers auf die Bestätigung: ClearCartOnMount leert einen
+  inzwischen neu gefüllten Korb (war schon vorher so).
+- Kein `scroll-padding-top`: Beim Rückwärts-Tabben kann ein fokussiertes Element unter
+  der klebenden Kopfzeile liegen (WCAG 2.4.11).
 
 ---
 

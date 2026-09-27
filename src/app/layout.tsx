@@ -5,6 +5,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/sonner'
 import { CookieBanner } from '@/components/cookie-banner'
 import { UmgebungsBanner } from '@/components/shared/umgebungs-banner'
+import { RueckwegMerker } from '@/components/shared/rueckweg-merker'
 import { UMGEBUNG, ZEIGE_UMGEBUNGSBANNER } from '@/lib/umgebung-server'
 import './globals.css'
 
@@ -81,6 +82,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           disableTransitionOnChange
         >
           {children}
+          {/* Merkt, ob vor der Seite eine eigene steht — für „Zurück" der
+              Kundenseiten. Hier im Root-Layout, damit auch der Weg von der
+              Startseite zählt. Rendert nichts. */}
+          <RueckwegMerker />
           <Toaster richColors position="top-center" />
           <CookieBanner />
         </ThemeProvider>

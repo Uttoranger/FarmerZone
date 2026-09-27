@@ -290,7 +290,9 @@ export default function HoefeKarte({
   }, [fokus])
 
   return (
-    <div className={`relative overflow-hidden rounded-2xl border border-border ${hoeheKlasse}`}>
+    // `isolate`: Leaflets Ebenen (400) und Bedienteile (1000) bleiben in der
+    // Karte — sonst lägen sie beim Scrollen über der klebenden Kopfzeile (40).
+    <div className={`relative isolate overflow-hidden rounded-2xl border border-border ${hoeheKlasse}`}>
       <div ref={kartenDiv} className="h-full w-full" />
     </div>
   )
