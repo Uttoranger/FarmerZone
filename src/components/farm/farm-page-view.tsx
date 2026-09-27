@@ -140,15 +140,7 @@ function SortableGalleryTile({
   )
 }
 
-function GallerySection({
-  farm,
-  isEdit,
-  onPhotoAdded,
-}: {
-  farm: PublicFarm
-  isEdit: boolean
-  onPhotoAdded: () => void
-}) {
+function GallerySection({ farm, isEdit }: { farm: PublicFarm; isEdit: boolean }) {
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
   const [, startTransition] = useTransition()
   const router = useRouter()
@@ -156,7 +148,12 @@ function GallerySection({
   // Die Kachel, aus der die Lightbox geöffnet wurde — dorthin kehrt der Fokus zurück.
   const ausloeser = useRef<HTMLButtonElement | null>(null)
 
-  // Sprint 18: optimistische Foto-Reihenfolge (null = Server-Stand)
+  // Sprint 18: optimistische Foto-Reihenfolge (null = Server-Stand).
+  // Dieser Effekt ist auch der Grund, aus dem die Galerie nach einem neuen Foto
+  // NICHT mehr neu aufgebaut wird (#134): Der frische Server-Stand setzt die
+  // Reihenfolge hier zurück. Der alte Neuaufbau über einen key-Wechsel hätte
+  // mitten in einer Serie die Datei-Felder ausgehängt — und damit auf Android
+  // die Leseerlaubnis für die noch nicht übertragenen Fotos.
   const [photoOrder, setPhotoOrder] = useState<string[] | null>(null)
   useEffect(() => {
     setPhotoOrder(null)
@@ -196,7 +193,6 @@ function GallerySection({
         } else {
           toast.success('Foto hinzugefügt')
           router.refresh()
-          onPhotoAdded()
         }
       })
     },
@@ -598,7 +594,6 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
   const isEdit = ownerMode && mode !== 'preview'
   // Pausen-Banner: was Kundinnen und was der Hof sieht, entschieden in lib/shop-pause.ts.
   const pausen = pausenBanner({ ownerMode, vorschau: mode === 'preview', pauseMessage: farm.pauseMessage })
-  const [galleryKey, setGalleryKey] = useState(0)
 
   // Titelbild-Fokuspunkt: null = kein Anpass-Zustand, sonst Live-Entwurf (0–100)
   const [focusDraft, setFocusDraft] = useState<number | null>(null)
@@ -1312,14 +1307,13 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
 
         </div>{/* Ende #uebersicht */}
 
-        {/* Gallery section */}
+        {/* Gallery section — BEWUSST ohne wechselnden key (#134): Der Neuaufbau
+            nach jedem hinzugefügten Foto hängte die Datei-Felder der Galerie
+            aus, während eine Serie noch lief. Die Reihenfolge stellt der
+            Effekt in GallerySection richtig, nicht ein Neuaufbau. */}
         {showGallery && (
-          <div id="fotos" className="mt-[26px] scroll-mt-14" key={`gallery-${galleryKey}`}>
-            <GallerySection
-              farm={farm}
-              isEdit={isEdit}
-              onPhotoAdded={() => setGalleryKey((k) => k + 1)}
-            />
+          <div id="fotos" className="mt-[26px] scroll-mt-14">
+            <GallerySection farm={farm} isEdit={isEdit} />
           </div>
         )}
 

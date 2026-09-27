@@ -18,7 +18,7 @@
  *
  * Rein, ohne DOM und ohne Netz.
  */
-import type { TransferUrteil } from './upload-fehler'
+import type { LeseUrteil, TransferUrteil } from './upload-fehler'
 
 /** Der Schritt, an dem ein Upload endgültig scheiterte. */
 export type UploadSchritt = 'kennung' | 'uebertragung' | 'abschluss'
@@ -116,6 +116,88 @@ function istNetzfehler(fehler: unknown): boolean {
 }
 
 /**
+ * Der Name, den ein Fehler trägt — auch von einer DOMException, die kein Error
+ * ist (ältere Safari-Stände). Wirft nie; ein Getter, der selbst scheitert, ist
+ * dasselbe wie kein Name.
+ */
+function fehlerName(fehler: unknown): string | null {
+  try {
+    if (typeof fehler !== 'object' || fehler === null) return null
+    const name = (fehler as { name?: unknown }).name
+    return typeof name === 'string' && name ? name : null
+  } catch {
+    // Absichtlich leer: Ein Fehler, der sich nicht lesen lässt, hat keinen Namen.
+    return null
+  }
+}
+
+/**
+ * Die Datei gibt ihre Bytes nicht mehr her, weil die FREIGABE weg ist — nicht,
+ * weil eine Leitung abriss.
+ *
+ * So meldet es der Browser: `NotReadableError` mit dem Satz „The requested file
+ * could not be read, typically due to permission problems that have occurred
+ * after a reference to a file was acquired." (JAVASCRIPT-NEXTJS-4). Der
+ * Textvergleich steht daneben für den Fall, dass der Fehler durch eine fremde
+ * Schicht gereist ist und nur seine Nachricht behalten hat — etwa aus dem
+ * Blob-SDK, das die Datei in Teilstücken selbst liest.
+ *
+ * BEKANNTE UNSCHÄRFE: Chrome meldet einen Leseverlust während eines `fetch`
+ * auch als „Failed to fetch". Dieser Fall bleibt ein Netzfehler; ihn zusätzlich
+ * zu beanspruchen hieße, jeden echten Abbruch zur entzogenen Freigabe zu
+ * erklären — genau die falsche Auskunft, die #129 und #134 beseitigen.
+ */
+export function istLeseVerlust(fehler: unknown): boolean {
+  if (fehlerName(fehler) === 'NotReadableError') return true
+  const text = fehler instanceof Error ? fehler.message : ''
+  return /NotReadableError|file could not be read/i.test(text)
+}
+
+/**
+ * Wie lange eine Ablehnung höchstens gebraucht haben darf, um noch als
+ * „sofort" zu gelten.
+ *
+ * Eine verweigerte Freigabe fällt beim ersten Zugriff auf die Referenz — in
+ * Millisekunden (belegt: 84 und 14 ms). Wer dagegen erst nach Sekunden
+ * ablehnt, hat unterwegs etwas versucht, und dann ist die Freigabe nicht die
+ * nächstliegende Erklärung.
+ *
+ * Steht hier und nicht bei den übrigen Zeitwerten in upload-zeitwaechter.ts:
+ * Die Datei importiert diese hier (`blobFehlerKlasse`), der umgekehrte Weg wäre
+ * ein Ringschluss.
+ */
+export const LESE_SOFORT_MS = 1_000
+
+/**
+ * Woran die Lese-Stufe gescheitert ist — Grundlage der Meldung an den Bauern.
+ *
+ * Bis #133 bekam jeder Lesefehler den Cloud-Album-Text. JAVASCRIPT-NEXTJS-4
+ * zeigte, dass das falsch sein kann: Probe und Volllesen scheiterten nach 84
+ * und 14 ms mit NotReadableError, an einem Foto, das 0 Tage alt war. Kein
+ * Cloud-Abruf wartet 84 ms — dort war die FREIGABE weg, nicht die Datei
+ * ausgelagert.
+ *
+ * Die Reihenfolge ist die Beweiskraft: Ein Ablauf am Zeitwächter ist die
+ * eindeutigste Aussage (etwas hat gewartet), deshalb steht er vorn — auch wenn
+ * der andere Versuch daneben sofort abgelehnt hat.
+ *
+ * Das ALTER der Datei geht bewusst NICHT ein, obwohl es im Issue der
+ * auffälligste Wert war: Manche Speicherdienste liefern kein `lastModified`
+ * (dann ist es null), und auch ein altes Foto kann sofort abgelehnt werden. Es
+ * bleibt Diagnose für Sentry, keine Bedingung für den Text.
+ */
+export function ordneLeseFehler(lesen: LeseDiagnose): LeseUrteil {
+  const versuche: LeseVersuch[] = lesen.voll ? [lesen.probe, lesen.voll] : [lesen.probe]
+  if (versuche.some((v) => v.ergebnis === 'zeitlimit')) return 'cloud'
+
+  const gescheitert = versuche.filter((v) => v.ergebnis === 'fehler')
+  if (gescheitert.length === 0) return 'unbestimmt'
+  const sofort = gescheitert.every((v) => v.dauerMs < LESE_SOFORT_MS)
+  const freigabe = gescheitert.some((v) => v.ergebnis === 'fehler' && v.klasse === 'NotReadableError')
+  return sofort && freigabe ? 'erlaubnis' : 'unbestimmt'
+}
+
+/**
  * Woran der Transfer gescheitert ist — Grundlage der Meldung an den Bauern.
  *
  * `abgebrochen`: Unsere Wächter (Stillstand, Zeitdeckel) haben abgebrochen.
@@ -123,7 +205,12 @@ function istNetzfehler(fehler: unknown): boolean {
  * aus dem SDK kommt.
  */
 export function ordneTransferFehler(fehler: unknown, abgebrochen: boolean): TransferUrteil {
-  if (abgebrochen || istNetzfehler(fehler)) return 'netz'
+  if (abgebrochen) return 'netz'
+  // Die Datei war in Stufe 0 lesbar und ist es jetzt nicht mehr: Dazwischen hat
+  // das Gerät die Freigabe zurückgezogen (#134). Vor der Netzfehler-Prüfung,
+  // weil das SDK dieselbe Ablehnung auch beim Lesen eines Teilstücks bekommt.
+  if (istLeseVerlust(fehler)) return 'lesen'
+  if (istNetzfehler(fehler)) return 'netz'
   const klasse = blobFehlerKlasse(fehler)
   // Den Abbruch meldet das SDK nur, wenn das Signal am Request feuert — und
   // das einzige Signal dort ist das unserer Wächter.

@@ -718,6 +718,14 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
           <DialogTitle>{isEdit ? 'Produkt bearbeiten' : 'Neues Produkt'}</DialogTitle>
         </DialogHeader>
 
+        {/* Die drei Datei-Felder bewusst HIER, außerhalb des Akkordeons (#134):
+            Base UI hängt einen zugeklappten Abschnitt aus dem DOM aus
+            (keepMounted ist standardmäßig false). Gelesen wird die Datei aber
+            erst beim Absenden — wer „Grunddaten" nach der Auswahl zuklappt,
+            hätte das Feld bis dahin ausgehängt, und das entwertet die Auswahl
+            genauso wie ein Schreibzugriff auf value. */}
+        {fotoQuellen.elemente}
+
         <Form {...form}>
           <form
             ref={formRef}
@@ -741,7 +749,6 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                           Illustration der Kategorie. Hochgeladen wird unverändert erst
                           beim Absenden. */}
                       <div data-feld="imageUrl">
-                        {fotoQuellen.elemente}
                         {previewUrl ? (
                           <div className="relative overflow-hidden rounded-xl border border-border bg-muted/30">
                             {/* eslint-disable-next-line @next/next/no-img-element */}

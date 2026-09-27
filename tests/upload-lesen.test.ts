@@ -19,8 +19,22 @@ vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
 
 import * as Sentry from '@sentry/nextjs'
 import { ladeFotoHoch, pruefeLesbarkeit } from '@/components/shared/image-upload'
-import { dateiAlterTage, type LeseDiagnose } from '@/lib/upload-diagnose'
-import { BildFehler, bildFehlerArtVon, IMAGE_READ_ERROR } from '@/lib/upload-fehler'
+import {
+  dateiAlterTage,
+  LESE_SOFORT_MS,
+  ordneLeseFehler,
+  type LeseDiagnose,
+  type LeseVersuch,
+} from '@/lib/upload-diagnose'
+import {
+  BildFehler,
+  bildFehlerArtVon,
+  bildFehlerMeldung,
+  IMAGE_READ_ERROR,
+  IMAGE_READ_PERMISSION_ERROR,
+  IMAGE_READ_UNCLEAR_ERROR,
+  leseFehlerText,
+} from '@/lib/upload-fehler'
 import { baueUploadMeldung, meldeUploadFehler } from '@/lib/upload-meldung'
 import { LESE_PROBE_LIMIT_MS, LESE_VOLL_LIMIT_MS } from '@/lib/upload-zeitwaechter'
 
@@ -85,6 +99,8 @@ describe('Lese-Stufe — was Sentry erfährt (pruefeLesbarkeit)', () => {
     const { fehler, lesen } = await lies(datei(nie, nie))
 
     expect(bildFehlerArtVon(fehler)).toBe('lesen')
+    // Nur hier darf der Cloud-Text stehen: Etwas hat gewartet (#134).
+    expect((fehler as Error).message).toBe(IMAGE_READ_ERROR)
     expect(lesen).toEqual({
       probe: { ergebnis: 'zeitlimit', dauerMs: LESE_PROBE_LIMIT_MS },
       voll: { ergebnis: 'zeitlimit', dauerMs: LESE_VOLL_LIMIT_MS },
@@ -119,11 +135,35 @@ describe('Lese-Stufe — was Sentry erfährt (pruefeLesbarkeit)', () => {
     })
   })
 
-  it('beides scheitert sofort: je Versuch sein eigener Fehler — und der Bauer liest den Wegweiser wie bisher', async () => {
+  it('beides scheitert sofort mit NotReadableError: das Handy hat die Datei nicht freigegeben', async () => {
+    // Der Fall aus JAVASCRIPT-NEXTJS-4 — 84 und 14 ms, Foto 0 Tage alt. Bis
+    // #133 stand hier der Cloud-Album-Text; der Bauer suchte einen Fehler in
+    // seinen Album-Einstellungen, den es nicht gab.
+    const { fehler, lesen } = await lies(datei(scheitertNach(84, nichtLesbar()), scheitertNach(14, nichtLesbar()), 0))
+
+    expect(fehler).toBeInstanceOf(BildFehler)
+    expect((fehler as Error).message).toBe(IMAGE_READ_PERMISSION_ERROR)
+    // Die URSACHE bleibt 'lesen' — für Sentry und für den Kurzgrund einer Serie.
+    expect(bildFehlerMeldung(fehler)).toEqual({
+      text: IMAGE_READ_PERMISSION_ERROR,
+      kurz: 'Datei nicht lesbar',
+      art: 'lesen',
+    })
+    expect(lesen?.dateiAlterTage).toBe(0)
+  })
+
+  it('scheitert die Probe sofort und das Volllesen mit einem anderen Fehler: keine Ursache behauptet', async () => {
+    const { fehler, lesen } = await lies(datei(scheitertNach(5, nichtGefunden()), scheitertNach(3, nichtGefunden())))
+
+    expect(fehler).toBeInstanceOf(BildFehler)
+    expect((fehler as Error).message).toBe(IMAGE_READ_UNCLEAR_ERROR)
+    expect(lesen?.voll).toMatchObject({ klasse: 'NotFoundError' })
+  })
+
+  it('beides scheitert sofort: je Versuch sein eigener Fehler in der Diagnose', async () => {
     const { fehler, lesen } = await lies(datei(scheitertNach(5, nichtLesbar()), scheitertNach(3, nichtGefunden())))
 
     expect(fehler).toBeInstanceOf(BildFehler)
-    expect((fehler as Error).message).toBe(IMAGE_READ_ERROR)
     expect(lesen).toEqual({
       probe: { ergebnis: 'fehler', klasse: 'NotReadableError', meldung: nichtLesbar().message, dauerMs: 5 },
       voll: { ergebnis: 'fehler', klasse: 'NotFoundError', meldung: nichtGefunden().message, dauerMs: 3 },
@@ -165,7 +205,9 @@ describe('Lese-Stufe — was Sentry erfährt (pruefeLesbarkeit)', () => {
     const { fehler, lesen } = await lies(datei(scheitertNach(5, unlesbar), scheitertNach(5, unlesbar)))
 
     expect(bildFehlerArtVon(fehler)).toBe('lesen')
-    expect((fehler as Error).message).toBe(IMAGE_READ_ERROR)
+    // Ohne erkennbaren Grund der unbestimmte Text — er nennt die Auswege, aber
+    // keine Ursache.
+    expect((fehler as Error).message).toBe(IMAGE_READ_UNCLEAR_ERROR)
     expect(lesen?.voll).toEqual({ ergebnis: 'fehler', klasse: 'unbekannt', meldung: '', dauerMs: 5 })
   })
 
@@ -181,6 +223,58 @@ describe('Lese-Stufe — was Sentry erfährt (pruefeLesbarkeit)', () => {
     expect(text).not.toContain('content://')
     expect(text).not.toContain('4711')
     expect(lesen?.probe).toMatchObject({ meldung: expect.stringContaining('[entfernt]') })
+  })
+})
+
+describe('ordneLeseFehler — welcher Lesefehler welche Meldung verdient', () => {
+  const fehlgeschlagen = (klasse: string, dauerMs: number): LeseVersuch => ({
+    ergebnis: 'fehler',
+    klasse,
+    meldung: 'x',
+    dauerMs,
+  })
+  const abgelaufen = (dauerMs: number): LeseVersuch => ({ ergebnis: 'zeitlimit', dauerMs })
+  const urteil = (probe: LeseVersuch, voll?: LeseVersuch) =>
+    ordneLeseFehler({ probe, voll, dateiAlterTage: 0 })
+
+  it("nennt den sofortigen NotReadableError 'erlaubnis' — der Fall aus dem Issue", () => {
+    expect(urteil(fehlgeschlagen('NotReadableError', 84), fehlgeschlagen('NotReadableError', 14))).toBe('erlaubnis')
+  })
+
+  it("nennt jeden Ablauf am Zeitwächter 'cloud' — auch neben einer sofortigen Ablehnung", () => {
+    // Ein Ablauf ist die eindeutigste Aussage: Irgendetwas hat gewartet.
+    expect(urteil(abgelaufen(LESE_PROBE_LIMIT_MS), abgelaufen(LESE_VOLL_LIMIT_MS))).toBe('cloud')
+    expect(urteil(fehlgeschlagen('NotReadableError', 12), abgelaufen(LESE_VOLL_LIMIT_MS))).toBe('cloud')
+    expect(urteil(abgelaufen(LESE_PROBE_LIMIT_MS), fehlgeschlagen('NotReadableError', 12))).toBe('cloud')
+  })
+
+  it("nennt alles andere 'unbestimmt' statt eine Ursache zu erfinden", () => {
+    expect(urteil(fehlgeschlagen('NotFoundError', 5), fehlgeschlagen('NotFoundError', 5))).toBe('unbestimmt')
+    expect(urteil(fehlgeschlagen('unbekannt', 5), fehlgeschlagen('unbekannt', 5))).toBe('unbestimmt')
+    // Kein gescheiterter Versuch = nichts zu beurteilen (kommt auf dem
+    // werfenden Weg nicht vor, der Typ lässt es aber zu).
+    expect(urteil({ ergebnis: 'ok', dauerMs: 4 })).toBe('unbestimmt')
+  })
+
+  it('zählt eine Ablehnung nach Sekunden nicht mehr als sofort', () => {
+    // An der Grenze: knapp darunter noch die Freigabe, ab der Grenze nicht mehr.
+    expect(urteil(fehlgeschlagen('NotReadableError', LESE_SOFORT_MS - 1))).toBe('erlaubnis')
+    expect(urteil(fehlgeschlagen('NotReadableError', LESE_SOFORT_MS))).toBe('unbestimmt')
+  })
+
+  it('verlangt, dass JEDER gescheiterte Versuch sofort abgelehnt hat', () => {
+    // Hat einer der beiden es sekundenlang versucht, ist die entzogene
+    // Freigabe nicht mehr die nächstliegende Erklärung.
+    expect(urteil(fehlgeschlagen('NotReadableError', 5), fehlgeschlagen('NotReadableError', 9_000))).toBe('unbestimmt')
+  })
+
+  it('führt zu genau drei Texten, und der Cloud-Text steht nur beim Zeitlimit', () => {
+    expect(leseFehlerText('erlaubnis')).toBe(IMAGE_READ_PERMISSION_ERROR)
+    expect(leseFehlerText('cloud')).toBe(IMAGE_READ_ERROR)
+    expect(leseFehlerText('unbestimmt')).toBe(IMAGE_READ_UNCLEAR_ERROR)
+    expect(new Set([IMAGE_READ_PERMISSION_ERROR, IMAGE_READ_ERROR, IMAGE_READ_UNCLEAR_ERROR]).size).toBe(3)
+    expect(IMAGE_READ_PERMISSION_ERROR).not.toContain('Cloud')
+    expect(IMAGE_READ_UNCLEAR_ERROR).not.toContain('Cloud')
   })
 })
 

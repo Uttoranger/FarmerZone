@@ -13,11 +13,13 @@ import {
   bereinigeFehlerText,
   blobFehlerKlasse,
   fehlerKlasse,
+  istLeseVerlust,
   ordneTransferFehler,
   UploadSchrittFehler,
 } from '@/lib/upload-diagnose'
 import {
   IMAGE_NETWORK_ERROR,
+  IMAGE_READ_PERMISSION_ERROR,
   IMAGE_STORAGE_ERROR,
   IMAGE_UNKNOWN_ERROR,
   transferFehlerText,
@@ -25,6 +27,15 @@ import {
 } from '@/lib/upload-fehler'
 
 const blob = (text: string): Error => new Error(`Vercel Blob: ${text}`)
+
+/** Wortlaut des Browsers, wenn die Freigabe für die Datei-Referenz weg ist. */
+const nichtLesbar = (): Error =>
+  new DOMException(
+    'The requested file could not be read, typically due to permission problems that have occurred after a reference to a file was acquired.',
+    'NotReadableError'
+  ) as unknown as Error
+const nichtGefunden = (): Error =>
+  new DOMException('A requested file or directory could not be found.', 'NotFoundError') as unknown as Error
 
 describe('blobFehlerKlasse — die Unterklasse, obwohl das SDK keinen Namen setzt', () => {
   it('erkennt jede Unterklasse am Anfang ihrer Meldung', () => {
@@ -102,18 +113,61 @@ describe('ordneTransferFehler — was der Bauer liest', () => {
     expect(ordneTransferFehler(new Error('irgendwas'), false)).toBe('unbekannt')
     expect(ordneTransferFehler('kein Error', false)).toBe('unbekannt')
   })
+
+  it("nennt eine Datei, die beim Senden unlesbar wird, 'lesen' — nicht 'netz'", () => {
+    // Lesbar war sie in Stufe 0; im gestückelten Weg liest das SDK sie selbst
+    // weiter (#134). Auch wenn nur die Nachricht durch eine fremde Schicht kam.
+    expect(ordneTransferFehler(nichtLesbar(), false)).toBe('lesen')
+    expect(ordneTransferFehler(new Error(`Vercel Blob: ${nichtLesbar().message}`), false)).toBe('lesen')
+  })
+
+  it('bleibt beim Abbruch unserer Wächter bei „netz", auch wenn ein Lesefehler zurückkommt', () => {
+    // Unser abort() kann dem SDK jeden Fehler entlocken; abgebrochen haben WIR.
+    expect(ordneTransferFehler(nichtLesbar(), true)).toBe('netz')
+  })
+})
+
+describe('istLeseVerlust — die entzogene Freigabe, nicht der Abbruch', () => {
+  it('erkennt den NotReadableError am Namen und an der Nachricht', () => {
+    expect(istLeseVerlust(nichtLesbar())).toBe(true)
+    // Ältere Safari-Stände: DOMException erbt dort nicht von Error.
+    expect(istLeseVerlust({ name: 'NotReadableError', message: '' })).toBe(true)
+  })
+
+  it('beansprucht den Verbindungsabbruch NICHT für sich', () => {
+    // Chrome meldet einen Leseverlust im fetch auch als „Failed to fetch".
+    // Diesen Fall dem Lesen zuzuschlagen, hieße jeden echten Abbruch zur
+    // entzogenen Freigabe zu erklären.
+    expect(istLeseVerlust(new TypeError('Failed to fetch'))).toBe(false)
+    expect(istLeseVerlust(new DOMException('abgebrochen', 'AbortError'))).toBe(false)
+    expect(istLeseVerlust(nichtGefunden())).toBe(false)
+    expect(istLeseVerlust(null)).toBe(false)
+    expect(istLeseVerlust('NotReadableError')).toBe(false)
+  })
+
+  it('bleibt ruhig, wenn sich der Fehler nicht einmal lesen lässt', () => {
+    const kaputt = {
+      get name(): string {
+        throw new Error('Getter kaputt')
+      },
+    }
+
+    expect(istLeseVerlust(kaputt)).toBe(false)
+  })
 })
 
 describe('transferFehlerText — die Meldung zum Urteil', () => {
   it('gibt jedem Urteil seinen eigenen Text', () => {
     expect(transferFehlerText('netz')).toBe(IMAGE_NETWORK_ERROR)
     expect(transferFehlerText('bildspeicher')).toBe(IMAGE_STORAGE_ERROR)
+    expect(transferFehlerText('lesen')).toBe(IMAGE_READ_PERMISSION_ERROR)
     expect(transferFehlerText('unbekannt')).toBe(IMAGE_UNKNOWN_ERROR)
   })
 
   it('sagt „Verbindung unterbrochen" ausschließlich beim Netzfehler', () => {
     expect(transferFehlerText('netz')).toContain('Verbindung unterbrochen')
     expect(transferFehlerText('bildspeicher')).not.toContain('Verbindung')
+    expect(transferFehlerText('lesen')).not.toContain('Verbindung')
     expect(transferFehlerText('unbekannt')).not.toContain('Verbindung')
   })
 

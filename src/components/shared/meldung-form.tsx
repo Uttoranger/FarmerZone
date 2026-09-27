@@ -234,6 +234,10 @@ export function MeldungForm({
       {alsHof && (
         <div>
           <span className="mb-1 block text-sm font-medium text-foreground">Bildschirmfoto (optional)</span>
+          {/* Die Datei-Felder außerhalb der Fallunterscheidung (#134): Standen
+              sie im Zweig ohne Bildschirmfoto, hängte der Erfolg sie mitten im
+              laufenden Upload aus — dasselbe Muster wie das Leeren des Feldes. */}
+          {upload.fileInput}
           {screenshotUrl ? (
             <div className="flex items-center gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -247,18 +251,15 @@ export function MeldungForm({
               </button>
             </div>
           ) : (
-            <>
-              <button
-                type="button"
-                onClick={upload.openFilePicker}
-                disabled={upload.isUploading}
-                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-dashed border-border px-4 text-sm text-foreground hover:bg-muted/40 disabled:opacity-60"
-              >
-                {upload.isUploading ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <ImagePlus className="size-4" aria-hidden="true" />}
-                {upload.isUploading && upload.progress ? stufenText(upload.progress) : 'Bildschirmfoto anhängen'}
-              </button>
-              {upload.fileInput}
-            </>
+            <button
+              type="button"
+              onClick={upload.openFilePicker}
+              disabled={upload.isUploading}
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-dashed border-border px-4 text-sm text-foreground hover:bg-muted/40 disabled:opacity-60"
+            >
+              {upload.isUploading ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <ImagePlus className="size-4" aria-hidden="true" />}
+              {upload.isUploading && upload.progress ? stufenText(upload.progress) : 'Bildschirmfoto anhängen'}
+            </button>
           )}
         </div>
       )}

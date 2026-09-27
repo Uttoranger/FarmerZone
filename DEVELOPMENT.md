@@ -1044,9 +1044,9 @@ Kachel am Anfang von Grunddaten, der Name heißt „Was verkaufst du?".
 
 ## Upload-Diagnose
 
-Jede Upload-Fehlermeldung endet auf eine Kennung wie `[L129]` — Buchstabe für die Ursache, Zahl für den Code-Stand (`UPLOAD_DIAG` in `src/lib/upload-fehler.ts`). Bei JEDER Verhaltensänderung am Upload-Ablauf muss die Zahl auf die Nummer des Sprints gehoben werden — eine veraltete Kennung ist schlimmer als keine, weil ein zugeschicktes Bildschirmfoto dann den falschen Stand behauptet.
+Jede Upload-Fehlermeldung endet auf eine Kennung wie `[L134]` — Buchstabe für die Ursache, Zahl für den Code-Stand (`UPLOAD_DIAG` in `src/lib/upload-fehler.ts`). Bei JEDER Verhaltensänderung am Upload-Ablauf muss die Zahl auf die Nummer des Sprints gehoben werden — eine veraltete Kennung ist schlimmer als keine, weil ein zugeschicktes Bildschirmfoto dann den falschen Stand behauptet.
 
-**Die Buchstaben:** L = Datei nicht lesbar, F = Format, S = Server und Verbindung unterbrochen (beide „nochmal versuchen"), B = der Bildspeicher hat das Foto nicht genommen, X = ehrlich unbestimmt.
+**Die Buchstaben:** E = das Gerät hat die Leseerlaubnis entzogen, L = die Quelle blieb stumm (Cloud-Album), D = Lesen gescheitert, Ursache unbestimmt, F = Format, S = Server und Verbindung unterbrochen (beide „nochmal versuchen"), B = der Bildspeicher hat das Foto nicht genommen, X = ehrlich unbestimmt. E, L und D sind alle drei die **Ursache `lesen`** — sie unterscheiden nur, was der Bauer liest.
 
 **Originalfehler statt Sammeltext (#129, JAVASCRIPT-NEXTJS-2).** Bis #129 ersetzte `uebertrageOriginal` jeden Fehler des letzten Transfer-Anlaufs durch „Verbindung unterbrochen". Das Issue zeigte zwei Anläufe, die je rund zwei Sekunden nach gültiger Kennung scheiterten — woran, verriet es nicht. Seitdem gilt:
 
@@ -1066,11 +1066,19 @@ Beim Lesen der Daten beachten (Stand `@vercel/blob` 2.4.0): Das SDK wiederholt N
 
 Das alles steht in einem flachen Kontext `uploadLesen` (`probeErgebnis`, `probeKlasse`, `probeMeldung`, `probeDauerMs`, `voll…`, `dateiAlterTage`). Die `voll…`-Felder fehlen, wenn die Probe gelang. Der Kontext geht bei jedem Upload-Fehler mit, auch wenn erst das Senden scheitert: Eine gescheiterte Probe vor einem Sendefehler ist dieselbe Spur.
 
-Die Meldung an den Bauern und der Ablauf sind unverändert. Die Wegweiser stimmen für die stumme wie für die ablehnende Quelle, deshalb bleibt die Kennung `129`.
+Die Meldung an den Bauern war in #133 noch für alle Fälle dieselbe; seit #134 folgt sie dem Befund (siehe unten).
 
 So liest man es:
 - `zeitlimit` in beiden Versuchen spricht für eine Quelle, die die Datei erst holen müsste (Cloud-Album); ein hohes `dateiAlterTage` stützt das.
 - `fehler` nach wenigen Millisekunden spricht für eine verweigerte oder verschwundene Datei.
+
+**Die Leseerlaubnis überlebt die Auswahl (#134, JAVASCRIPT-NEXTJS-4).** Das Issue zeigte einen Fall, den die Meldung falsch erklärte: Probe und Volllesen scheiterten nach 84 und 14 ms mit `NotReadableError` („permission problems … after a reference to a file was acquired"), an einem Foto, das **0 Tage alt** war, gewählt über „Galerie". Kein Cloud-Abruf antwortet in 84 ms — die Ursache lag bei uns.
+
+- **Ursache:** `foto-quellen.tsx` leerte das Datei-Feld im `onChange`, unmittelbar nach der Auswahl (`e.target.value = ''`, gedacht dafür, dass dieselbe Datei erneut gewählt werden kann). Auf Android-Chrome gibt genau dieser Schreibzugriff die Datei-Referenz frei: Das `File`-Objekt lebt weiter, seine Bytes kommen nicht mehr heraus.
+- **Die Regel jetzt** (`src/lib/foto-feld.ts`, zwei reine Funktionen): Geleert wird im **`onClick`** der drei Eingaben, unmittelbar bevor der Auswahldialog aufgeht; nach der Auswahl wird nur **gelesen**. Dieselbe Datei bleibt zweimal hintereinander wählbar — das Feld ist beim Öffnen leer, also feuert `change` auch bei gleichem Namen.
+- **Dasselbe Muster galt an zwei weiteren Stellen**, beide mitbehoben: Die Galerie der Hofseite wurde nach jedem hinzugefügten Foto über einen wechselnden `key` **neu aufgebaut** — mitten in einer Serie, deren restliche Fotos noch am ausgehängten Feld hingen (die Reihenfolge stellt seit Sprint 18 ein Effekt auf `farm.farmPhotos` richtig, ein Neuaufbau ist dafür nicht nötig). Im **Produktdialog** lagen die Felder in einem Akkordeon-Abschnitt; Base UI hängt einen zugeklappten Abschnitt aus dem DOM aus (`keepMounted` ist standardmäßig `false`), und gelesen wird dort erst beim Absenden — Minuten später. Im Meldungsformular standen sie im Zweig „noch kein Bildschirmfoto" und verschwanden mit dem Erfolg.
+- **Die Meldung folgt dem Befund** (`ordneLeseFehler`, `leseFehlerText`): sofortige Ablehnung mit `NotReadableError` in **jedem** gescheiterten Versuch (< 1 s) → „Das Handy hat das Foto nicht freigegeben — bitte wähle es nochmal aus." `[E…]`; ein Ablauf am Zeitwächter in **einem** der Versuche → der Cloud-Wegweiser `[L…]`; alles andere → derselbe Wegweiser ohne Ursachenbehauptung `[D…]`. Das **Alter** der Datei geht bewusst NICHT ein, obwohl es im Issue der auffälligste Wert war: Manche Speicherdienste liefern kein `lastModified`, und auch ein altes Foto kann sofort abgelehnt werden. Es bleibt Diagnose.
+- **Auch beim Senden zählt ein Leseverlust als Lesefehler** (`ordneTransferFehler` → `lesen`): Lesbar war die Datei in Stufe 0, also hat das Gerät die Freigabe dazwischen entzogen. Der gestückelte Transferweg liest die Datei selbst weiter, Teilstück für Teilstück, und bekommt dieselbe Ablehnung. Sie wird als `BildFehler('lesen')` geworfen — Sentry zählt sie unter `lesen`, eine Serie listet sie als „Datei nicht lesbar" — und **nicht wiederholt**: Eine entzogene Freigabe kommt nicht von selbst zurück. Bekannte Unschärfe: Chrome meldet einen Leseverlust im `fetch` auch als „Failed to fetch"; dieser Fall bleibt ein Netzfehler, weil ihn zu beanspruchen jeden echten Abbruch zur entzogenen Freigabe erklärte.
 
 ---
 

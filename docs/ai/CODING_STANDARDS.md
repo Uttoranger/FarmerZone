@@ -318,6 +318,15 @@ gegen `background` **und** gegen `card`.
 - **Zähler „Noch n Angaben fehlen"** rechnet mit demselben Schema wie das
   Absenden (`fehlendeAngaben`), je Feld gezählt — nie eine zweite Liste von
   Pflichtfeldern pflegen.
+- **Ein Datei-Feld wird nie angefasst, solange seine Datei noch gebraucht wird.**
+  Kein `value = ''`, kein wechselnder `key` darüber, kein Aushängen (bedingtes
+  Rendern, zugeklapptes Akkordeon — Base UI hängt einen geschlossenen Abschnitt
+  standardmäßig aus) zwischen Auswahl und fertigem Upload. Android-Chrome
+  entzieht der Datei-Referenz dabei die Leseerlaubnis; die Datei ist danach
+  stumm (`NotReadableError`), obwohl das `File`-Objekt weiterlebt. Geleert wird
+  im `onClick` der Eingabe, bevor der Auswahldialog aufgeht — beide Griffe
+  stehen als reine Funktionen in `src/lib/foto-feld.ts`. Gilt auch, wo erst
+  später hochgeladen wird (Produktdialog: beim Absenden).
 
 ---
 

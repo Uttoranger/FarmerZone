@@ -191,6 +191,17 @@ describe('darfZweitversuch — die Retry-Entscheidung', () => {
     // Dasselbe Loch, das bildFehlerArtVon stopft: Klasse in zwei Bundles.
     expect(darfZweitversuch({ bildFehlerArt: 'server' }, 1)).toBe(false)
   })
+
+  it('wiederholt keine entzogene Leseerlaubnis — die kommt nicht von selbst zurück', () => {
+    // Wird die Datei während des Sendens unlesbar (#134), hilft nur eine neue
+    // Auswahl. Ein zweiter Anlauf schickte dieselbe tote Referenz los.
+    const nichtLesbar = new DOMException(
+      'The requested file could not be read, typically due to permission problems that have occurred after a reference to a file was acquired.',
+      'NotReadableError'
+    )
+
+    expect(darfZweitversuch(nichtLesbar, 1)).toBe(false)
+  })
 })
 
 describe('stufenText — die eine Quelle aller Stufen-Anzeigen', () => {
