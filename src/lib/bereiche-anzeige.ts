@@ -399,6 +399,20 @@ export function teileHofseite<P extends { category: ProductCategoryValue | null 
   }
 }
 
+/**
+ * Der Bereich, den die Hofseite gerade ZEIGT — dieselbe Regel wie
+ * teileHofseite: der gewünschte, wenn der Hof ihn anbietet, sonst der erste
+ * vorhandene. Ein reiner Futterhof zeigt also Futter auch ohne ?bereich (und
+ * geteilte Links tragen keinen). Ohne Produkte der Hofladen. Der Rückweg der
+ * Kopfzeile fragt hier, nicht den URL-Parameter (src/lib/kunden-kopf.ts).
+ */
+export function angezeigterBereich(
+  produkte: readonly { category: ProductCategoryValue | null }[],
+  wunsch: AnzeigeBereich | null
+): AnzeigeBereich {
+  return teileHofseite(produkte, wunsch).aktiv ?? 'LEBENSMITTEL'
+}
+
 // ─── Produktdetail: Futter-Kennzeichnung ────────────────────────────────────
 
 export type KennzeichnungsEingabe = {

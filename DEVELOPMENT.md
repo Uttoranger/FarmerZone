@@ -1921,8 +1921,12 @@ nur über den Zurück-Knopf des Browsers weiter — und der führte zurück zu W
 **Formen.** `KundenKopf` (`src/components/shared/kunden-kopf.tsx`):
 - Am Handy auf der Hofseite zwei runde Knöpfe über dem Titelbild, 44 px: Zurück und
   Teilen. Sobald das Bild aus dem Blick ist (IntersectionObserver, oberer Rand um die
-  56 px der Leiste verkürzt), erscheint eine Leiste mit Zurück, Hofname und Teilen; die
-  Sektionsleiste klebt darunter (`top-14`). Bei reduzierter Bewegung ohne Einblenden.
+  56 px der Leiste verkürzt), erscheint eine Leiste mit Zurück und Hofname (rechts
+  bleibt Platz frei — dort kein Warenkorb, der sitzt unten); die Sektionsleiste klebt
+  darunter (`top-14`). Die Leiste ist dort `fixed` und wird erst eingehängt; `sticky`
+  verschöbe beim Einhängen den Inhalt. Bei reduzierter Bewegung ohne Einblenden. Der
+  Hofname im Titelbild ist am Handy 32 statt 38 px, damit er mit Logo und Werten nicht
+  bis unter die Knöpfe wächst.
 - Auf allen anderen Kundenseiten steht die Leiste von Anfang an, mit Seitentitel.
 - Im Browser (ab md) eine Kopfzeile, 64 px: FarmerZone, „Höfe entdecken", „Für Höfe"
   (`/#weiter`) und „Hofbetreiber-Login" (`/login`), Warenkorb. Wie auf der Startseite:
@@ -1940,7 +1944,19 @@ nur über den Zurück-Knopf des Browsers weiter — und der führte zurück zu W
   geteilte Links tragen keinen. Checkout, Bestätigung, Bestellverfolgung → Hofseite;
   Hofübersicht → Startseite; Rechtsseiten → Hofübersicht.
 - Bestätigung und Bestellverfolgung gehen nie über den Verlauf: Davor stehen Stripe und
-  die Bank, und die Bestellverfolgung kommt aus einer Mail.
+  die Bank, und die Bestellverfolgung kommt aus einer Mail. Mit ungültigem Link ist
+  nicht einmal der Hof bestätigt — dort führt Zurück zur Hofübersicht
+  (`bestellung-ungueltig`).
+- Kein Hin und Her: Der Ersatz-Link legt einen neuen Verlaufseintrag an. Ohne weitere
+  Regel hielte die Zielseite die Ausgangsseite für ihren Vorgänger, und das nächste
+  „Zurück" führte wieder hinunter — ein Kunde aus einem geteilten Link pendelte zwischen
+  Hofseite und Hofübersicht und erreichte die Startseite nie, und von der Hofseite ging
+  es zurück in die Bestätigung (deren ClearCartOnMount einen neuen Korb geleert hätte).
+  Deshalb zählt Hinaufsteigen nicht als Vorgänger (`merkeHinauf`; mit Navigation API
+  per Eintragsschlüssel im sessionStorage, übersteht Neuladen).
+- Im Browser nimmt „‹ Alle Höfe" (bzw. „‹ {Hofname}" im Bestellweg) den Verlauf nur,
+  wenn er genau dorthin führt — von der gefilterten Hofübersicht kommend mit Filtern
+  und Scrollposition, von der Startseite kommend als Link zur Übersicht.
 
 „Eigene Seite davor" weiß nur das Dokument selbst:
 - `document.referrer` bleibt nach Seitenwechseln in der App auf dem ersten Laden stehen.
@@ -1957,13 +1973,18 @@ Deshalb:
 **Warenkorb.** Der Speicher läuft nur noch über `src/lib/warenkorb-speicher.ts`.
 - Ein Schlüssel statt drei hart kodierter.
 - Zod statt nacktem `JSON.parse`; kaputte Positionen fallen einzeln heraus.
-- Der Slug des Hofs wird mitgespeichert. Alte Einträge ohne Slug bleiben lesbar und
-  zeigen erst ein Symbol, wenn der Korb wieder geschrieben wird.
+- Der Slug des Hofs wird mitgespeichert. Alte Einträge ohne Slug bleiben lesbar; die
+  Hofseite trägt den Slug beim nächsten Besuch nach, erst dann zeigt das Symbol.
 - Nach jedem Schreiben geht ein Ereignis an alle Mitzähler im Tab; andere Tabs hören
   `storage`.
 - Das Symbol mit Anzahl (Stück) steht, sobald ein Korb liegt, auf Hofübersicht und
   Rechtsseiten, nicht auf Hofseite und Bestellweg. Ein Tipp führt zu
   `/<hof>#warenkorb`: Die Hofseite öffnet den Korb und nimmt den Anker wieder weg.
+
+**Checkout:** Die Kopfzeile rendert `CheckoutForm` selbst, im Stripe-Zahlungsschritt
+nicht. Dort ist die Bestellung angelegt und der Bestand gehalten; wer über die
+Kopfzeile ginge und wiederkäme, bekäme einen neuen Idempotenz-Schlüssel und legte eine
+zweite Bestellung an. Der Schritt hat sein eigenes „Zurück" zum Formular.
 
 **Teilen** ist aus der Hofseite herausgezogen (`src/lib/teilen.ts`). Schließt der Kunde
 das Teilen-Menü, wird nichts mehr kopiert — vorher kam trotzdem „Link kopiert".
@@ -1977,6 +1998,12 @@ das Teilen-Menü, wird nichts mehr kopiert — vorher kam trotzdem „Link kopie
   PWA `standalone`; `cover` schöbe jede Seite unter die Statusleiste.
 - Ein Korb, ein Hof: Wer bei einem zweiten Hof etwas hinzufügt, überschreibt den ersten
   ohne Rückfrage.
+- Ein Korb eines Hofs, der nicht mehr öffentlich ist, bleibt liegen; das Symbol führt
+  dann auf „Hof nicht gefunden".
+- Zurück-Taste des Browsers auf die Bestätigung: ClearCartOnMount leert einen
+  inzwischen neu gefüllten Korb (war schon vorher so).
+- Kein `scroll-padding-top`: Beim Rückwärts-Tabben kann ein fokussiertes Element unter
+  der klebenden Kopfzeile liegen (WCAG 2.4.11).
 
 ---
 

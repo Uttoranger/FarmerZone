@@ -39,3 +39,8 @@ export const warenkorbSpeicherSchema = z.object({
     .catch(undefined),
   items: z.array(z.unknown()),
 })
+
+/** Ein gelesener Korb: die Hülle aus dem Schema, die Positionen geprüft (leseWarenkorb). */
+export type WarenkorbSpeicher = Omit<z.infer<typeof warenkorbSpeicherSchema>, 'items'> & {
+  items: WarenkorbPosition[]
+}

@@ -2,28 +2,92 @@
 
 import { useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
-import { merkeVorgaenger, vorgaengerEigen, type SeitenWechsel } from '@/lib/kunden-kopf'
+import { eigenerVorgaenger, merkeVorgaenger, type SeitenWechsel } from '@/lib/kunden-kopf'
+import { hinaufEintraegeSchema } from '@/schemas/rueckweg'
 
 /**
- * Merkt sich je Dokument, ob vor der aktuellen Seite eine eigene steht — für
- * den Zurück-Knopf der Kundenseiten (kunden-kopf.tsx).
+ * Merkt sich je Dokument, welche eigene Seite vor der aktuellen steht — für
+ * den Zurück-Knopf der Kundenseiten (kunden-kopf.tsx). Die Regeln stehen rein
+ * in src/lib/kunden-kopf.ts; hier wird nur beobachtet.
  *
  * Warum nicht einfacher: `document.referrer` bleibt nach Seitenwechseln in
  * der App auf dem Stand des ersten Ladens stehen, `history.length` zählt auch
  * fremde Seiten (so führte der alte ZurueckLink zurück zu Google), und eigene
- * Werte in `history.state` überschreibt Next. Bleibt: selbst mitzählen. Der
- * Stand lebt im Modul, also genau so lange wie das Dokument — ein geteilter
- * Link, ein neuer Tab und Neuladen fangen bei „kein eigener Vorgänger" an.
+ * Werte in `history.state` überschreibt Next. Bleibt: die Navigation API, wo
+ * es sie gibt, und sonst selbst mitzählen. Der Merker lebt im Modul, also
+ * genau so lange wie das Dokument — ein geteilter Link, ein neuer Tab und
+ * Neuladen fangen bei „keine eigene Seite davor" an.
  *
  * Sitzt im Root-Layout, damit auch der Weg von der Startseite zählt.
  */
-let eigenerVorgaenger = false
+let vorgaengerMerker: string | null = null
+let hinaufAusstehend = false
 
-/** Zum Zeitpunkt des Tipps gelesen — die Navigation API, wo es sie gibt, sonst der Merker. */
-export function hatEigenenVorgaenger(): boolean {
-  const navigation = (window as Window & { navigation?: { canGoBack?: unknown } }).navigation
-  const canGoBack = typeof navigation?.canGoBack === 'boolean' ? navigation.canGoBack : undefined
-  return vorgaengerEigen(canGoBack, eigenerVorgaenger)
+type NavigationStand = { schluessel: string | null; vorherigerPfad: string | null }
+
+/** Die Navigation API, soweit wir sie brauchen — oder undefined, wo der Browser sie nicht hat. */
+function navigationStand(): NavigationStand | undefined {
+  const navigation = (
+    window as Window & {
+      navigation?: {
+        currentEntry?: { key?: unknown; index?: unknown } | null
+        entries?: () => Array<{ url?: unknown }>
+      }
+    }
+  ).navigation
+  if (!navigation?.currentEntry || typeof navigation.entries !== 'function') return undefined
+  const { key, index } = navigation.currentEntry
+  const vorher = typeof index === 'number' && index > 0 ? navigation.entries()[index - 1]?.url : null
+  let vorherigerPfad: string | null = null
+  if (typeof vorher === 'string') {
+    try {
+      vorherigerPfad = new URL(vorher).pathname
+    } catch {
+      // Keine lesbare Adresse — dann eben kein bekannter Vorgänger.
+      vorherigerPfad = null
+    }
+  }
+  return { schluessel: typeof key === 'string' ? key : null, vorherigerPfad }
+}
+
+// Hinauf erreichte Einträge (Navigation API) — im sessionStorage, damit das
+// Hinaufsteigen auch nach Neuladen nicht als „zurück" gilt.
+const HINAUF_SPEICHER = 'farmerzone:hinauf'
+
+function hinaufEintraege(): string[] {
+  try {
+    const roh = sessionStorage.getItem(HINAUF_SPEICHER)
+    return roh ? hinaufEintraegeSchema.parse(JSON.parse(roh)) : []
+  } catch {
+    // Kein Zugriff oder kein JSON: keine bekannten Einträge — dann gilt die
+    // Navigation API allein, im schlimmsten Fall ein Schritt zurück hinunter.
+    return []
+  }
+}
+
+function merkeHinaufEintrag(schluessel: string): void {
+  try {
+    const neu = [...hinaufEintraege().filter((s) => s !== schluessel), schluessel].slice(-50)
+    sessionStorage.setItem(HINAUF_SPEICHER, JSON.stringify(neu))
+  } catch {
+    // Kein Speicher (privates Fenster): gilt dann nur, solange das Dokument lebt.
+    return
+  }
+}
+
+/** Der Pfad der eigenen Seite davor, zum Zeitpunkt des Tipps gelesen — oder null. */
+export function eigenerVorgaengerJetzt(): string | null {
+  const stand = navigationStand()
+  const hinauf = stand?.schluessel ? hinaufEintraege().includes(stand.schluessel) : false
+  return eigenerVorgaenger(stand, vorgaengerMerker, hinauf)
+}
+
+/**
+ * Der nächste Seitenwechsel ist ein Hinaufsteigen über den Ersatz-Link des
+ * Rückwegs — dort soll „Zurück" weiter hinauf führen, nicht wieder hinunter.
+ */
+export function merkeHinauf(): void {
+  hinaufAusstehend = true
 }
 
 export function RueckwegMerker() {
@@ -33,26 +97,37 @@ export function RueckwegMerker() {
 
   useEffect(() => {
     // Zurück oder Vorwärts im Browser — auch der Zurück-Knopf der Kopfzeile
-    // selbst (router.back). Der Seitenwechsel danach zählt dann nicht als Link.
+    // selbst (router.back). Nur wenn sich dabei die Seite ändert: Ein Schritt
+    // innerhalb derselben Seite (Anker) bliebe sonst als Marke stehen.
     const beiVerlauf = () => {
-      durchVerlauf.current = true
+      if (window.location.pathname !== letzterPfad.current) durchVerlauf.current = true
     }
     window.addEventListener('popstate', beiVerlauf)
     return () => window.removeEventListener('popstate', beiVerlauf)
   }, [])
 
   useEffect(() => {
+    const von = letzterPfad.current
     const wechsel: SeitenWechsel =
-      letzterPfad.current === null
-        ? 'start'
-        : letzterPfad.current === pfad
-          ? 'nurQuery'
+      von === null
+        ? { art: 'start' }
+        : von === pfad
+          ? { art: 'nurQuery' }
           : durchVerlauf.current
-            ? 'verlauf'
-            : 'link'
+            ? { art: 'verlauf' }
+            : hinaufAusstehend
+              ? { art: 'hinauf' }
+              : { art: 'link', von }
+    if (wechsel.art === 'hinauf') {
+      const schluessel = navigationStand()?.schluessel
+      if (schluessel) merkeHinaufEintrag(schluessel)
+    }
+    if (wechsel.art !== 'nurQuery') {
+      durchVerlauf.current = false
+      hinaufAusstehend = false
+    }
     letzterPfad.current = pfad
-    durchVerlauf.current = false
-    eigenerVorgaenger = merkeVorgaenger(eigenerVorgaenger, wechsel)
+    vorgaengerMerker = merkeVorgaenger(vorgaengerMerker, wechsel)
   }, [pfad])
 
   return null

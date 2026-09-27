@@ -488,7 +488,9 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
             // denselben Pin hervor.
             onFocus={() => setLage((l) => nachZeiger(l, hof.slug))}
             onBlur={() => setLage((l) => nachZeiger(l, null))}
-            className={`relative overflow-hidden rounded-2xl border transition-colors ${
+            // scroll-mt-20: Ein Pin-Tipp rollt den Eintrag in den Blick —
+            // unter die klebende Kopfzeile (kunden-kopf.tsx), nicht dahinter.
+            className={`relative scroll-mt-20 overflow-hidden rounded-2xl border transition-colors ${
               sichtbareLage.ausgewaehlt === hof.slug
                 ? 'border-primary bg-secondary'
                 : 'border-border bg-card'

@@ -149,9 +149,11 @@ Client-Komponente → Server Action → Zod → Fachregel (lib) → Prisma → r
 ### Kundenseiten: Kopfzeile und Rückweg
 - Jede Seite unter `src/app/(public)/` rendert `KundenKopf` (`src/components/shared/kunden-kopf.tsx`) mit ihrer `KundenSeite`; die Startseite behält `LandingNav`. `tests/kunden-kopf.test.ts` kennt jede Seite — eine neue fällt dort auf.
 - Form (Knöpfe über dem Titelbild oder Leiste, Warenkorb-Symbol, Rückweg-Zeile) und Rückweg entscheidet `src/lib/kunden-kopf.ts`, nicht die Komponente.
-- „Zurück" ist immer ein echter Link auf das übergeordnete Ziel; nur bei eigenem Vorgänger (`hatEigenenVorgaenger`: Navigation API, sonst `RueckwegMerker` im Root-Layout) geht es per `router.back()`. **Nie** `history.length` oder `document.referrer` für einen Rückweg. Bestätigung und Bestellverfolgung nie über den Verlauf.
+- „Zurück" ist immer ein echter Link auf das übergeordnete Ziel; nur bei eigenem Vorgänger (`eigenerVorgaengerJetzt`: Navigation API, sonst `RueckwegMerker` im Root-Layout) geht es per `router.back()`. **Nie** `history.length` oder `document.referrer` für einen Rückweg. Bestätigung und Bestellverfolgung nie über den Verlauf.
+- Wer über den Ersatz-Link hinaufsteigt, hat dort keinen eigenen Vorgänger (`merkeHinauf`) — sonst pendelt „Zurück" zwischen zwei Seiten. Die Browser-Zeile („‹ Alle Höfe") nimmt den Verlauf nur, wenn er genau zu ihrem Ziel führt (`zeileNimmtVerlauf`).
+- Im Stripe-Zahlungsschritt keine Kopfzeile: Die Bestellung ist dort schon angelegt, ein Weg hinaus und zurück ergäbe eine zweite.
 - Der Rückweg der Hofseite nimmt den **angezeigten** Bereich (`teileHofseite(...).aktiv`), nicht den URL-Parameter.
-- Die Kopfzeile klebt (`sticky`, Ebene 40): Umgebungsbanner (60) darüber, Sheets/Dialoge (50) davor, Sektionsleiste (30) darunter. Eigene Stapelebenen (`isolate`) um alles mit hohen z-Werten (Leaflet), sonst liegt es über der Kopfzeile.
+- Die Kopfzeile klebt (`sticky`, Ebene 40): Umgebungsbanner (60) darüber, Sheets/Dialoge (50) davor, Sektionsleiste (30) darunter. Ausnahme Hofseite am Handy: Die Leiste ist `fixed` und wird erst eingehängt, wenn das Titelbild verschwindet — `sticky` verschöbe beim Einhängen den Inhalt. Eigene Stapelebenen (`isolate`) um alles mit hohen z-Werten (Leaflet), sonst liegt es über der Kopfzeile.
 
 ## 5. Domänen-Invarianten
 

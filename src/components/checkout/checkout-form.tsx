@@ -41,6 +41,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { StripePaymentStep } from './stripe-payment'
+import { KundenKopf } from '@/components/shared/kunden-kopf'
 
 /**
  * Den Warenkorb auf den vom Server berichtigten Stand bringen: gekürzte Mengen
@@ -357,6 +358,13 @@ export function CheckoutForm({
     }
   }
 
+  // Kopfzeile des Checkouts (kunden-kopf.tsx) — NICHT im Zahlungsschritt:
+  // Dort ist die Bestellung schon angelegt und der Bestand gehalten. Wer von
+  // dort über die Kopfzeile ginge und wiederkäme, bekäme einen neuen
+  // Idempotenz-Schlüssel und legte eine zweite Bestellung an. Der Schritt hat
+  // sein eigenes „Zurück" zum Formular (StripePaymentStep, onBack).
+  const kopf = <KundenKopf seite={{ art: 'checkout', hofSlug: farm.slug }} titel="Bestellung" hofName={farm.name} />
+
   // Stripe payment step
   if (paymentStep) {
     return (
@@ -373,15 +381,20 @@ export function CheckoutForm({
   // Loading state
   if (!isHydrated) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
+      <>
+        {kopf}
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      </>
     )
   }
 
   // Empty cart
   if (cart.length === 0) {
     return (
+      <>
+      {kopf}
       <div className="max-w-lg mx-auto px-4 py-16 text-center">
         <ShoppingCart className="size-12 text-muted-foreground/40 mx-auto mb-4" />
         <h2 className="text-lg font-medium text-foreground mb-2">Dein Warenkorb ist leer</h2>
@@ -391,10 +404,13 @@ export function CheckoutForm({
           </Button>
         </Link>
       </div>
+      </>
     )
   }
 
   return (
+    <>
+    {kopf}
     <div className="max-w-2xl mx-auto px-4 py-6">
       {/* Der Rückweg zum Hof steht in der Kopfzeile (kunden-kopf.tsx). */}
       <h1 className="font-heading text-xl font-semibold text-foreground mb-6">Bestellung abschließen</h1>
@@ -770,5 +786,6 @@ export function CheckoutForm({
         </Button>
       </form>
     </div>
+    </>
   )
 }

@@ -19,7 +19,19 @@ export type CartItem = WarenkorbPosition
  * Der Warenkorb eines Hofs. `farmSlug` wird mitgespeichert, damit das
  * Warenkorb-Symbol der Kopfzeile auf anderen Seiten zu diesem Hof führt.
  */
-export function useCart(farmId: string, farmSlug: string) {
+export type Warenkorb = {
+  items: CartItem[]
+  count: number
+  total: number
+  sessionId: string
+  isHydrated: boolean
+  addItem: (product: Omit<CartItem, 'quantity'>, qty?: number) => Promise<{ ok: boolean; error?: string }>
+  updateQuantity: (productId: string, qty: number) => Promise<void>
+  removeItem: (productId: string) => void
+  clearCart: () => void
+}
+
+export function useCart(farmId: string, farmSlug: string): Warenkorb {
   const [items, setItems] = useState<CartItem[]>([])
   const [sessionId, setSessionId] = useState('')
   const [isHydrated, setIsHydrated] = useState(false)
@@ -35,10 +47,17 @@ export function useCart(farmId: string, farmSlug: string) {
 
     // Beschädigter oder fremder Korb ergibt einen leeren — kein Fehler, den
     // die Kundin sehen müsste (leseWarenkorb prüft mit Zod).
-    setItems(positionenFuer(leseWarenkorb(localStorage.getItem(WARENKORB_SCHLUESSEL)), farmId))
+    const gespeichert = leseWarenkorb(localStorage.getItem(WARENKORB_SCHLUESSEL))
+    const geladen = positionenFuer(gespeichert, farmId)
+    setItems(geladen)
+    // Ein Korb von vor der Kopfzeile kennt den Slug nicht — nachtragen, damit
+    // das Warenkorb-Symbol auf anderen Seiten zu diesem Hof führt.
+    if (gespeichert && !gespeichert.farmSlug && geladen.length > 0) {
+      schreibeWarenkorb({ farmId, farmSlug, items: geladen })
+    }
 
     setIsHydrated(true)
-  }, [farmId])
+  }, [farmId, farmSlug])
 
   function persist(next: CartItem[]) {
     setItems(next)

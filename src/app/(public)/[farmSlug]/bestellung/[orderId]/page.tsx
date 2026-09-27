@@ -36,7 +36,7 @@ function LinkUngueltig() {
     <div className="min-h-screen bg-background">
       {/* Ohne gültige Signatur ist nicht einmal der Hof bestätigt — der
           Rückweg führt deshalb zur Hofübersicht, nicht zu /{farmSlug}. */}
-      <KundenKopf seite={{ art: 'info' }} titel="Bestellung" />
+      <KundenKopf seite={{ art: 'bestellung-ungueltig' }} titel="Bestellung" />
       <div className="mx-auto max-w-lg px-4 py-16 text-center">
         <h1 className="font-heading text-2xl font-semibold text-foreground">
           Dieser Link ist nicht gültig

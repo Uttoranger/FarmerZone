@@ -23,7 +23,7 @@ import { ReorderContext } from '@/components/shared/reorder-context'
 import { nextPickupDays, pickupWeekdaysLabel } from '@/lib/pickup-days'
 import { pausenBanner } from '@/lib/shop-pause'
 import { buildMapsUrl } from '@/lib/customer-links'
-import { teileHofseite } from '@/lib/bereiche-anzeige'
+import { angezeigterBereich } from '@/lib/bereiche-anzeige'
 import type { KundenSeite } from '@/lib/kunden-kopf'
 import { teileHof } from '@/components/shared/hof-teilen'
 import {
@@ -651,14 +651,14 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
   // Kopfzeile der Kundenansicht (kunden-kopf.tsx). Ihr Rückweg führt in den
   // Bereich, den das Produktraster gerade ZEIGT — nicht in den der URL: Ein
   // reiner Futterhof zeigt Futter auch ohne ?bereich, und geteilte Links
-  // tragen keinen. Dieselbe Frage wie im Raster: teileHofseite.
+  // tragen keinen. Dieselbe Produktmenge wie das Raster der Kundenansicht.
   const titelbild = useRef<HTMLDivElement>(null)
   const bereichWunsch = useBereichWunsch()
-  const angezeigterBereich = useMemo(
-    () => teileHofseite(farm.products.filter((p) => p.isAvailable), bereichWunsch).aktiv ?? 'LEBENSMITTEL',
+  const bereich = useMemo(
+    () => angezeigterBereich(farm.products.filter((p) => p.isAvailable), bereichWunsch),
     [farm.products, bereichWunsch]
   )
-  const kundenSeite: KundenSeite = { art: 'hofseite', hofSlug: farm.slug, bereich: angezeigterBereich }
+  const kundenSeite: KundenSeite = { art: 'hofseite', hofSlug: farm.slug, bereich }
   const [activeTab, setActiveTab] = useState('uebersicht')
 
   // Ziel eines angetippten Sprungs. Solange es steht, hält der Beobachter still —
@@ -725,9 +725,10 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
       return (
         <>
         {/* Ohne Titelbild: die Leiste steht von Anfang an. */}
-        <KundenKopf seite={kundenSeite} titel={farm.name} onTeilen={handleShare} />
+        <KundenKopf seite={kundenSeite} titel={farm.name} />
         <main
-          className="min-h-screen flex items-center justify-center p-6"
+          // Die Kopfleiste steht darüber: zusammen genau ein Bildschirm.
+          className="min-h-[calc(100dvh-3.5rem)] md:min-h-[calc(100dvh-4rem)] flex items-center justify-center p-6"
           style={{ background: 'linear-gradient(160deg, var(--landing-top) 0%, var(--app-chip-green) 100%)' }}
         >
           <div
@@ -804,7 +805,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
 
       {/* Nur für Kundinnen — die Vorschau im Bauern-Bereich hat dessen Navigation. */}
       {!ownerMode && (
-        <KundenKopf seite={kundenSeite} titel={farm.name} titelbild={titelbild} onTeilen={handleShare} />
+        <KundenKopf seite={kundenSeite} titel={farm.name} titelbild={titelbild} />
       )}
 
       {/* Mode banner */}
@@ -953,8 +954,10 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                   style={{ boxShadow: '0 2px 10px rgba(0,0,0,0.25)' }}
                 />
               )}
+              {/* Am Handy etwas kleiner: Der Block wächst nach oben, und oben
+                  stehen die runden Knöpfe (TitelbildKnoepfe). */}
               <h1
-                className="font-heading text-[38px] font-semibold text-white leading-tight"
+                className="font-heading text-[32px] md:text-[38px] font-semibold text-white leading-tight"
                 style={{ textShadow: '0 2px 14px rgba(0,0,0,0.4)' }}
               >
                 {farm.name}

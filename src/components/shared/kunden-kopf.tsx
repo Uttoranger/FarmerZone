@@ -4,10 +4,9 @@ import { useEffect, useState, type MouseEvent, type RefObject } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Share2, ShoppingCart } from 'lucide-react'
-import { hoefeLink } from '@/lib/bereiche-anzeige'
-import { kopfForm, rueckweg, type KundenSeite } from '@/lib/kunden-kopf'
+import { kopfForm, rueckweg, zeileNimmtVerlauf, type KundenSeite } from '@/lib/kunden-kopf'
 import { useWarenkorbKopf } from '@/lib/use-warenkorb-kopf'
-import { hatEigenenVorgaenger } from '@/components/shared/rueckweg-merker'
+import { eigenerVorgaengerJetzt, merkeHinauf } from '@/components/shared/rueckweg-merker'
 import { Wortmarke } from '@/components/shared/wortmarke'
 
 /**
@@ -26,13 +25,15 @@ export const SPRUNGZIEL_OHNE_KOPF = 'scroll-mt-14'
  * HANDY (unter md): eine schmale Leiste, 56 px — Zurück, Seitentitel, rechts
  * der Warenkorb. Auf der Hofseite steht sie erst, wenn das Titelbild aus dem
  * Blick ist; bis dahin tragen zwei runde Knöpfe über dem Bild (TitelbildKnoepfe)
- * Zurück und Teilen. Vorbild: foodpanda, Deliveroo, Careem.
+ * Zurück und Teilen. Vorbild: foodpanda, Deliveroo, Careem. Dort ist die
+ * Leiste `fixed` und wird erst eingehängt, wenn das Bild verschwindet — als
+ * `sticky` nähme sie beim Erscheinen 56 px im Fluss ein, und der Inhalt spränge.
  *
  * BROWSER (ab md): eine Kopfzeile, 64 px — FarmerZone, Höfe entdecken, Für
  * Höfe, Hofbetreiber-Login, Warenkorb. Wo sie selbst nicht zurückführt
  * (Hofseite, Bestellweg), steht darunter ein Rückweg-Link.
  *
- * Beide kleben (`sticky`) statt fest zu stehen: Das Umgebungsbanner der
+ * Sonst kleben beide (`sticky`) statt fest zu stehen: Das Umgebungsbanner der
  * Testumgebung liegt im Fluss darüber und läge sonst beim Laden über ihr.
  * Ebene 40: über der Sektionsleiste der Hofseite (30), unter Sheets,
  * Dialogen und der Lightbox (50).
@@ -42,7 +43,6 @@ export function KundenKopf({
   titel,
   hofName,
   titelbild,
-  onTeilen,
 }: {
   seite: KundenSeite
   /** Handy: der Titel in der Mitte der Leiste — Hofname oder Seitentitel. */
@@ -51,25 +51,17 @@ export function KundenKopf({
   hofName?: string
   /** Hofseite mit Titelbild: solange es im Blick ist, steht am Handy keine Leiste. */
   titelbild?: RefObject<HTMLElement | null>
-  /** Hofseite: rechts in der Leiste teilen statt Warenkorb (der sitzt dort unten). */
-  onTeilen?: () => void
 }) {
   const form = kopfForm(seite)
   const korb = useWarenkorbKopf()
   const titelbildImBlick = useTitelbildImBlick(titelbild)
 
-  const rechts =
+  // Ein fester Platz für das Symbol, auch solange noch keins da ist (beim
+  // Server-Rendern gibt es keinen Korb) — sonst sprängen Titel und Links,
+  // sobald es erscheint.
+  const warenkorbPlatz =
     form.warenkorb && korb ? (
       <WarenkorbSymbol anzahl={korb.anzahl} href={korb.href} />
-    ) : onTeilen ? (
-      <button
-        type="button"
-        onClick={onTeilen}
-        aria-label="Hof teilen"
-        className="inline-flex size-11 items-center justify-center rounded-full text-brand-text transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <Share2 className="size-5" strokeWidth={1.7} aria-hidden="true" />
-      </button>
     ) : (
       <span className="size-11" aria-hidden="true" />
     )
@@ -77,8 +69,13 @@ export function KundenKopf({
   const leiste = (
     <div className="grid h-14 grid-cols-[2.75rem_1fr_2.75rem] items-center gap-2 border-b border-border bg-card px-2">
       <ZurueckKnopf seite={seite} />
-      <p className="truncate text-center text-[15px] font-semibold text-foreground">{titel}</p>
-      {rechts}
+      {/* Auf der Hofseite die Schrift der Hofseite (app-*), sonst zwei Dunkeltöne übereinander. */}
+      <p
+        className={`truncate text-center text-[15px] font-semibold ${seite.art === 'hofseite' ? 'text-app-ink' : 'text-foreground'}`}
+      >
+        {titel}
+      </p>
+      {warenkorbPlatz}
     </div>
   )
 
@@ -89,37 +86,37 @@ export function KundenKopf({
         // Hofseite mit Titelbild: die Leiste erscheint, sobald das Bild aus
         // dem Blick ist. Kein Einblenden bei reduzierter Bewegung.
         !titelbildImBlick && (
-          <div className="fixed inset-x-0 top-0 z-40 md:hidden motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+          <div className="fixed inset-x-0 top-0 z-40 print:hidden md:hidden motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
             {leiste}
           </div>
         )
       ) : (
-        <div className="sticky top-0 z-40 md:hidden">{leiste}</div>
+        <div className="sticky top-0 z-40 print:hidden md:hidden">{leiste}</div>
       )}
 
       {/* ── Browser ── */}
-      <header className="sticky top-0 z-40 hidden h-16 border-b border-border bg-card md:block">
+      <header className="sticky top-0 z-40 hidden h-16 border-b border-border bg-card print:hidden md:block">
         <div className="mx-auto flex h-full max-w-6xl items-center gap-8 px-6">
-          <Link href="/" aria-label="FarmerZone — zur Startseite" className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Link href="/" aria-label="FarmerZone — zur Startseite" className={`rounded-md ${FOKUS}`}>
             <Wortmarke />
           </Link>
           <nav aria-label="Hauptnavigation" className="flex flex-1 items-center gap-6">
-            <Link href="/hoefe" className="text-sm font-medium text-foreground/80 transition-colors hover:text-foreground">
+            <Link href="/hoefe" className={`${TEXTLINK} ${FOKUS}`}>
               Höfe entdecken
             </Link>
           </nav>
           <div className="flex items-center gap-5">
             {/* Wie auf der Startseite: ein Wort, ein Ziel (landing-nav.tsx). */}
-            <Link href="/#weiter" className="text-sm font-medium text-foreground/80 transition-colors hover:text-foreground">
+            <Link href="/#weiter" className={`${TEXTLINK} ${FOKUS}`}>
               Für Höfe
             </Link>
             <Link
               href="/login"
-              className="inline-flex h-9 items-center rounded-lg border border-border px-3.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+              className={`inline-flex h-9 items-center rounded-lg border border-border px-3.5 text-sm font-medium text-foreground transition-colors hover:bg-muted ${FOKUS}`}
             >
               Hofbetreiber-Login
             </Link>
-            {form.warenkorb && korb && <WarenkorbSymbol anzahl={korb.anzahl} href={korb.href} />}
+            {form.warenkorb && warenkorbPlatz}
           </div>
         </div>
       </header>
@@ -143,34 +140,49 @@ export function TitelbildKnoepfe({ seite, onTeilen }: { seite: KundenSeite; onTe
   )
 }
 
+const FOKUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+const TEXTLINK = 'rounded-md text-sm font-medium text-foreground/80 transition-colors hover:text-foreground'
+
 /**
  * Liegt auf dem Foto, nicht auf der Seite: bleibt in beiden Modi eine weiße
  * Marke mit dunkelgrünem Symbol — wie die Knöpfe „Anpassen" im Titelbild
  * (farm-page-view.tsx), CODING_STANDARDS §7 „Was dem Modus NICHT folgt".
  * Der Schatten trägt ihn auch auf hellen Fotos, deren oberer Rand keinen
- * Schleier hat.
+ * Schleier hat; der Fokusring ist dunkel mit weißem Abstand, damit er auf
+ * dem weißen Knopf und auf hellem Himmel sichtbar bleibt.
  */
 const RUND =
-  'inline-flex size-11 items-center justify-center rounded-full bg-white/90 text-[#2D5F3F] shadow-[0_2px_8px_rgba(0,0,0,0.18)] transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white'
+  'inline-flex size-11 items-center justify-center rounded-full bg-white/90 text-[#2D5F3F] shadow-[0_2px_8px_rgba(0,0,0,0.18)] transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2D5F3F] focus-visible:ring-offset-2 focus-visible:ring-offset-white'
+
+/**
+ * Der Klick eines Rückwegs: Führt der Verlauf dorthin (`nimmtVerlauf`), ein
+ * Schritt zurück — mit Scrollposition und Filtern. Sonst folgt der Link und
+ * steigt damit hinauf; das merkt sich der RueckwegMerker, damit „Zurück" dort
+ * nicht wieder hinunterführt. Neuer Tab und neues Fenster tut der Link selbst.
+ */
+function useRueckwegKlick(nimmtVerlauf: (vorgaengerPfad: string | null) => boolean) {
+  const router = useRouter()
+  return function beimTipp(e: MouseEvent<HTMLAnchorElement>) {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+    if (nimmtVerlauf(eigenerVorgaengerJetzt())) {
+      e.preventDefault()
+      router.back()
+      return
+    }
+    merkeHinauf()
+  }
+}
 
 /**
  * Zurück: immer ein echter Link (funktioniert ohne JavaScript und im neuen
  * Tab). Steht vor dieser Seite eine eigene, führt ein Tipp stattdessen einen
- * Schritt im Verlauf zurück — mit Scrollposition und Filtern.
+ * Schritt im Verlauf zurück.
  */
 function ZurueckKnopf({ seite, rund = false }: { seite: KundenSeite; rund?: boolean }) {
-  const router = useRouter()
   // Beim Server-Rendern und ersten Anzeigen gilt der Link; ob der Verlauf
   // zählt, entscheidet erst der Tipp — sonst wiche das HTML vom Server ab.
   const ersatz = rueckweg(seite, false)
-
-  function beimTipp(e: MouseEvent<HTMLAnchorElement>) {
-    // Neuer Tab, neues Fenster: das tut der Link selbst.
-    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
-    if (!rueckweg(seite, hatEigenenVorgaenger()).verlauf) return
-    e.preventDefault()
-    router.back()
-  }
+  const beimTipp = useRueckwegKlick((vorgaenger) => rueckweg(seite, vorgaenger !== null).verlauf)
 
   return (
     <Link
@@ -180,7 +192,7 @@ function ZurueckKnopf({ seite, rund = false }: { seite: KundenSeite; rund?: bool
       className={
         rund
           ? RUND
-          : 'inline-flex size-11 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+          : `inline-flex size-11 items-center justify-center rounded-full ${seite.art === 'hofseite' ? 'text-app-ink' : 'text-foreground'} transition-colors hover:bg-muted ${FOKUS}`
       }
     >
       <ArrowLeft className="size-5" strokeWidth={1.7} aria-hidden="true" />
@@ -188,17 +200,25 @@ function ZurueckKnopf({ seite, rund = false }: { seite: KundenSeite; rund?: bool
   )
 }
 
-/** Browser: der Rückweg unter der Kopfzeile, wo sie selbst nicht zurückführt. */
+/**
+ * Browser: der Rückweg unter der Kopfzeile, wo sie selbst nicht zurückführt —
+ * nach seinem Ziel benannt. Den Verlauf nimmt er nur, wenn der genau dorthin
+ * führt (zeileNimmtVerlauf): Von der gefilterten Hofübersicht kommend geht
+ * „‹ Alle Höfe" mit Filtern zurück, von der Startseite kommend zur Übersicht.
+ */
 function RueckwegZeile({ seite, hofName }: { seite: KundenSeite; hofName?: string }) {
-  const ziel =
-    seite.art === 'hofseite'
-      ? { href: hoefeLink(seite.bereich), text: 'Alle Höfe' }
-      : { href: rueckweg(seite, false).href, text: hofName ?? 'Zum Hof' }
+  const href = rueckweg(seite, false).href
+  const text = seite.art === 'hofseite' ? 'Alle Höfe' : (hofName ?? 'Zum Hof')
+  const beimTipp = useRueckwegKlick((vorgaenger) => zeileNimmtVerlauf(seite, vorgaenger))
   return (
-    <div className="hidden md:block">
+    <div className="hidden print:hidden md:block">
       <div className="mx-auto max-w-6xl px-6 pt-4">
-        <Link href={ziel.href} className="text-sm font-medium text-brand-text underline-offset-4 hover:underline">
-          ‹ {ziel.text}
+        <Link
+          href={href}
+          onClick={beimTipp}
+          className={`rounded-md text-sm font-medium text-brand-text underline-offset-4 hover:underline ${FOKUS}`}
+        >
+          ‹ {text}
         </Link>
       </div>
     </div>

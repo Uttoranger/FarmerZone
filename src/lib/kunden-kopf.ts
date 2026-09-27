@@ -19,6 +19,8 @@ export type KundenSeite =
   | { art: 'checkout'; hofSlug: string }
   | { art: 'bestaetigung'; hofSlug: string }
   | { art: 'bestellung'; hofSlug: string }
+  /** Bestellverfolgung mit ungültigem Link: nicht einmal der Hof ist bestätigt. */
+  | { art: 'bestellung-ungueltig' }
   | { art: 'hofuebersicht' }
   /** Impressum, Datenschutz, Konditionen, Problem melden. */
   | { art: 'info' }
@@ -45,6 +47,10 @@ export function kopfForm(seite: KundenSeite): KopfForm {
     case 'bestaetigung':
     case 'bestellung':
       return { handy: 'leiste', warenkorb: false, rueckwegZeile: true }
+    case 'bestellung-ungueltig':
+      // Kein Hof, zu dem eine Rückweg-Zeile führen könnte — die Kopfzeile
+      // führt zur Hofübersicht.
+      return { handy: 'leiste', warenkorb: false, rueckwegZeile: false }
     case 'hofuebersicht':
     case 'info':
       // Im Browser führen „FarmerZone" und „Höfe entdecken" schon zurück.
@@ -81,6 +87,8 @@ export function rueckweg(seite: KundenSeite, vorgaengerEigen: boolean): Rueckweg
     case 'bestaetigung':
     case 'bestellung':
       return { href: `/${seite.hofSlug}`, verlauf: false }
+    case 'bestellung-ungueltig':
+      return { href: '/hoefe', verlauf: false }
     case 'hofuebersicht':
       return { href: '/', verlauf: vorgaengerEigen }
     case 'info':
@@ -88,38 +96,76 @@ export function rueckweg(seite: KundenSeite, vorgaengerEigen: boolean): Rueckweg
   }
 }
 
+/** Der Pfad eines Links ohne Suchparameter und Anker. */
+function pfadVon(href: string): string {
+  return href.split(/[?#]/)[0]
+}
+
+/**
+ * Die Browser-Zeile unter der Kopfzeile ist nach ihrem Ziel benannt („‹ Alle
+ * Höfe", „‹ {Hof}"). Den Verlauf nimmt sie nur, wenn er genau dorthin führt —
+ * dann mit Filtern und Scrollposition. Sonst ist sie ein Link: Stand davor die
+ * Startseite, führte ein Schritt zurück nicht zu „Alle Höfe".
+ */
+export function zeileNimmtVerlauf(seite: KundenSeite, vorgaengerPfad: string | null): boolean {
+  const weg = rueckweg(seite, vorgaengerPfad !== null)
+  return weg.verlauf && vorgaengerPfad === pfadVon(weg.href)
+}
+
 /**
  * Wie das Dokument zur aktuellen Seite kam:
  * - 'start': erste Seite dieses Dokuments (geteilter Link, neuer Tab, Neuladen),
- * - 'link': ein Seitenwechsel in der App (Link, router.push),
+ * - 'link': ein Seitenwechsel in der App (Link, router.push), von `von`,
+ * - 'hinauf': über den Ersatz-Link eines Rückwegs hinauf (Hofseite → Hofübersicht),
  * - 'verlauf': Zurück oder Vorwärts im Browser,
  * - 'nurQuery': nur die Suchparameter haben sich geändert (Filter, Bereich).
  */
-export type SeitenWechsel = 'start' | 'link' | 'verlauf' | 'nurQuery'
+export type SeitenWechsel =
+  | { art: 'start' }
+  | { art: 'link'; von: string }
+  | { art: 'hinauf' }
+  | { art: 'verlauf' }
+  | { art: 'nurQuery' }
 
 /**
- * Ob vor der aktuellen Seite eine eigene steht — nachgeführt bei jedem
- * Wechsel. Bewusst vorsichtig: Nur ein Seitenwechsel in der App beweist
- * einen eigenen Vorgänger. Nach Zurück oder Vorwärts ist unbekannt, was davor
- * steht; dann lieber der Link als ein Schritt zu einer fremden Seite.
+ * Der Pfad der eigenen Seite vor der aktuellen — oder null. Nachgeführt bei
+ * jedem Wechsel und bewusst vorsichtig: Nur ein Seitenwechsel in der App
+ * beweist einen eigenen Vorgänger. Nach Zurück oder Vorwärts ist unbekannt,
+ * was davor steht; dann lieber der Link als ein Schritt zu einer fremden Seite.
+ *
+ * 'hinauf' zählt NICHT als Vorgänger: Wer von der Hofseite über den
+ * Ersatz-Link zur Hofübersicht hinaufgestiegen ist, will mit dem nächsten
+ * „Zurück" weiter hinauf (zur Startseite), nicht wieder hinunter auf die
+ * Hofseite — sonst pendelte ein Kunde aus einem geteilten Link zwischen beiden
+ * und erreichte die Startseite nie.
  */
-export function merkeVorgaenger(vorher: boolean, wechsel: SeitenWechsel): boolean {
-  switch (wechsel) {
+export function merkeVorgaenger(vorher: string | null, wechsel: SeitenWechsel): string | null {
+  switch (wechsel.art) {
     case 'start':
+    case 'hinauf':
     case 'verlauf':
-      return false
+      return null
     case 'link':
-      return true
+      return wechsel.von
     case 'nurQuery':
       return vorher
   }
 }
 
 /**
- * Das Urteil „eigener Vorgänger": Kennt der Browser die Navigation API, sagt
- * `navigation.canGoBack` es genau (nur zusammenhängende Einträge desselben
- * Ursprungs, auch nach Neuladen). Sonst gilt der Merker.
+ * Das Urteil „eigene Seite davor" — ihr Pfad oder null.
+ * - Kennt der Browser die Navigation API, sagt sie es genau: der vorige
+ *   Eintrag, nur zusammenhängend und desselben Ursprungs, auch nach Neuladen
+ *   (`navigation.vorherigerPfad`, null wenn keiner). Wurde der aktuelle
+ *   Eintrag durch Hinaufsteigen erreicht (`hinaufErreicht`), gilt die Seite
+ *   darunter nicht als „zurück".
+ * - Sonst gilt der Merker (merkeVorgaenger), der 'hinauf' schon kennt.
  */
-export function vorgaengerEigen(canGoBack: boolean | undefined, merker: boolean): boolean {
-  return canGoBack ?? merker
+export function eigenerVorgaenger(
+  navigation: { vorherigerPfad: string | null } | undefined,
+  merker: string | null,
+  hinaufErreicht: boolean
+): string | null {
+  if (!navigation) return merker
+  return hinaufErreicht ? null : navigation.vorherigerPfad
 }

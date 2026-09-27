@@ -5,13 +5,14 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { hoefeLink } from '@/lib/bereiche-anzeige'
+import { angezeigterBereich, hoefeLink } from '@/lib/bereiche-anzeige'
 import { bereichAusParameter } from '@/schemas/hoefe-filter'
 import {
+  eigenerVorgaenger,
   kopfForm,
   merkeVorgaenger,
   rueckweg,
-  vorgaengerEigen,
+  zeileNimmtVerlauf,
   type KundenSeite,
   type SeitenWechsel,
 } from '@/lib/kunden-kopf'
@@ -23,7 +24,8 @@ const BESTAETIGUNG: KundenSeite = { art: 'bestaetigung', hofSlug: 'testhof' }
 const BESTELLUNG: KundenSeite = { art: 'bestellung', hofSlug: 'testhof' }
 const HOFUEBERSICHT: KundenSeite = { art: 'hofuebersicht' }
 const INFO: KundenSeite = { art: 'info' }
-const ALLE = [HOFSEITE, FUTTER_HOFSEITE, CHECKOUT, BESTAETIGUNG, BESTELLUNG, HOFUEBERSICHT, INFO]
+const BESTELLUNG_UNGUELTIG: KundenSeite = { art: 'bestellung-ungueltig' }
+const ALLE = [HOFSEITE, FUTTER_HOFSEITE, CHECKOUT, BESTAETIGUNG, BESTELLUNG, BESTELLUNG_UNGUELTIG, HOFUEBERSICHT, INFO]
 
 describe('rueckweg — Hofseite', () => {
   it('vom eigenen Verlauf: einen Schritt zurück, dorthin, wo der Kunde herkam', () => {
@@ -58,6 +60,11 @@ describe('rueckweg — Bestellweg', () => {
       expect(rueckweg(seite, false), seite.art).toEqual({ href: '/testhof', verlauf: false })
     }
   })
+
+  it('Bestellverfolgung mit ungültigem Link: nie über den Verlauf, zur Hofübersicht — der Hof ist nicht bestätigt', () => {
+    expect(rueckweg(BESTELLUNG_UNGUELTIG, true)).toEqual({ href: '/hoefe', verlauf: false })
+    expect(rueckweg(BESTELLUNG_UNGUELTIG, false)).toEqual({ href: '/hoefe', verlauf: false })
+  })
 })
 
 describe('rueckweg — übrige Seiten', () => {
@@ -83,14 +90,16 @@ describe('rueckweg — übrige Seiten', () => {
 describe('kopfForm — welche Seite welche Form bekommt', () => {
   it('nur die Hofseite hat am Handy die Knöpfe über dem Titelbild', () => {
     expect(kopfForm(HOFSEITE).handy).toBe('titelbild-knoepfe')
-    for (const seite of [CHECKOUT, BESTAETIGUNG, BESTELLUNG, HOFUEBERSICHT, INFO]) {
+    for (const seite of [CHECKOUT, BESTAETIGUNG, BESTELLUNG, BESTELLUNG_UNGUELTIG, HOFUEBERSICHT, INFO]) {
       expect(kopfForm(seite).handy, seite.art).toBe('leiste')
     }
   })
 
   it('Warenkorb-Symbol weder auf der Hofseite noch im Bestellweg — sonst ja', () => {
     expect(kopfForm(HOFSEITE).warenkorb).toBe(false)
-    for (const seite of [CHECKOUT, BESTAETIGUNG, BESTELLUNG]) expect(kopfForm(seite).warenkorb, seite.art).toBe(false)
+    for (const seite of [CHECKOUT, BESTAETIGUNG, BESTELLUNG, BESTELLUNG_UNGUELTIG]) {
+      expect(kopfForm(seite).warenkorb, seite.art).toBe(false)
+    }
     for (const seite of [HOFUEBERSICHT, INFO]) expect(kopfForm(seite).warenkorb, seite.art).toBe(true)
   })
 
@@ -98,41 +107,124 @@ describe('kopfForm — welche Seite welche Form bekommt', () => {
     for (const seite of [HOFSEITE, CHECKOUT, BESTAETIGUNG, BESTELLUNG]) {
       expect(kopfForm(seite).rueckwegZeile, seite.art).toBe(true)
     }
-    for (const seite of [HOFUEBERSICHT, INFO]) expect(kopfForm(seite).rueckwegZeile, seite.art).toBe(false)
+    for (const seite of [HOFUEBERSICHT, INFO, BESTELLUNG_UNGUELTIG]) expect(kopfForm(seite).rueckwegZeile, seite.art).toBe(false)
   })
 })
 
-describe('merkeVorgaenger — eigener Vorgänger je Dokument', () => {
-  const folge = (wechsel: SeitenWechsel[]) => wechsel.reduce(merkeVorgaenger, false)
+describe('merkeVorgaenger — die eigene Seite davor, je Dokument', () => {
+  const folge = (wechsel: SeitenWechsel[]) => wechsel.reduce<string | null>(merkeVorgaenger, null)
+  const link = (von: string): SeitenWechsel => ({ art: 'link', von })
 
-  it('die erste Seite eines Dokuments hat keinen eigenen Vorgänger — geteilter Link, neuer Tab, Neuladen', () => {
-    expect(folge(['start'])).toBe(false)
+  it('die erste Seite eines Dokuments hat keine — geteilter Link, neuer Tab, Neuladen', () => {
+    expect(folge([{ art: 'start' }])).toBeNull()
   })
 
-  it('nach einem Seitenwechsel in der App gibt es einen', () => {
-    expect(folge(['start', 'link'])).toBe(true)
+  it('nach einem Seitenwechsel in der App ist es die Seite, von der er kam', () => {
+    expect(folge([{ art: 'start' }, link('/hoefe')])).toBe('/hoefe')
   })
 
-  it('nach Zurück oder Vorwärts im Browser ist er unbekannt — lieber der Link', () => {
-    expect(folge(['start', 'link', 'verlauf'])).toBe(false)
-    expect(folge(['start', 'link', 'verlauf', 'link'])).toBe(true)
+  it('nach Zurück oder Vorwärts im Browser ist sie unbekannt — lieber der Link', () => {
+    expect(folge([{ art: 'start' }, link('/hoefe'), { art: 'verlauf' }])).toBeNull()
+    expect(folge([{ art: 'start' }, link('/hoefe'), { art: 'verlauf' }, link('/testhof')])).toBe('/testhof')
+  })
+
+  it('wer über den Ersatz-Link hinaufgestiegen ist, hat keine — sonst führte Zurück wieder hinunter', () => {
+    expect(folge([{ art: 'start' }, { art: 'hinauf' }])).toBeNull()
   })
 
   it('ein Filterwechsel ändert nichts', () => {
-    expect(folge(['start', 'nurQuery'])).toBe(false)
-    expect(folge(['start', 'link', 'nurQuery'])).toBe(true)
+    expect(folge([{ art: 'start' }, { art: 'nurQuery' }])).toBeNull()
+    expect(folge([{ art: 'start' }, link('/hoefe'), { art: 'nurQuery' }])).toBe('/hoefe')
   })
 })
 
-describe('vorgaengerEigen — Navigation API vor dem Merker', () => {
-  it('kennt der Browser navigation.canGoBack, entscheidet es', () => {
-    expect(vorgaengerEigen(true, false)).toBe(true)
-    expect(vorgaengerEigen(false, true)).toBe(false)
+describe('eigenerVorgaenger — Navigation API vor dem Merker', () => {
+  it('kennt der Browser die Navigation API, entscheidet sie', () => {
+    expect(eigenerVorgaenger({ vorherigerPfad: '/hoefe' }, null, false)).toBe('/hoefe')
+    expect(eigenerVorgaenger({ vorherigerPfad: null }, '/hoefe', false)).toBeNull()
+  })
+
+  it('ein hinauf erreichter Eintrag hat keine eigene Seite davor — auch nach Neuladen', () => {
+    expect(eigenerVorgaenger({ vorherigerPfad: '/testhof' }, null, true)).toBeNull()
   })
 
   it('sonst entscheidet der Merker', () => {
-    expect(vorgaengerEigen(undefined, true)).toBe(true)
-    expect(vorgaengerEigen(undefined, false)).toBe(false)
+    expect(eigenerVorgaenger(undefined, '/hoefe', false)).toBe('/hoefe')
+    expect(eigenerVorgaenger(undefined, null, false)).toBeNull()
+  })
+})
+
+describe('Kein Hin und Her — die Folge von Tipps auf „Zurück"', () => {
+  /** Ein Tipp auf „Zurück": Verlauf, wenn eine eigene Seite davor steht, sonst hinauf über den Link. */
+  function tippe(seite: KundenSeite, vorgaenger: string | null) {
+    const weg = rueckweg(seite, vorgaenger !== null)
+    return weg.verlauf ? { ziel: vorgaenger, wechsel: { art: 'verlauf' } as const } : { ziel: weg.href, wechsel: { art: 'hinauf' } as const }
+  }
+
+  it('geteilter Link auf die Hofseite → Zurück → Hofübersicht → Zurück → Startseite', () => {
+    let vorgaenger = merkeVorgaenger(null, { art: 'start' })
+    const erster = tippe(HOFSEITE, vorgaenger)
+    expect(erster.ziel).toBe('/hoefe')
+    vorgaenger = merkeVorgaenger(vorgaenger, erster.wechsel)
+    const zweiter = tippe(HOFUEBERSICHT, vorgaenger)
+    expect(zweiter.ziel).toBe('/')
+  })
+
+  it('Bestätigung → Zurück → Hofseite → Zurück führt zur Hofübersicht, nicht zurück in die Bestätigung', () => {
+    let vorgaenger = merkeVorgaenger(null, { art: 'link', von: '/testhof/checkout' })
+    const erster = tippe(BESTAETIGUNG, vorgaenger)
+    expect(erster.ziel).toBe('/testhof')
+    vorgaenger = merkeVorgaenger(vorgaenger, erster.wechsel)
+    expect(tippe(HOFSEITE, vorgaenger).ziel).toBe('/hoefe')
+  })
+
+  it('von der Hofübersicht auf die Hofseite und Zurück: ein Schritt im Verlauf, dorthin zurück', () => {
+    const vorgaenger = merkeVorgaenger(null, { art: 'link', von: '/hoefe' })
+    expect(tippe(HOFSEITE, vorgaenger)).toEqual({ ziel: '/hoefe', wechsel: { art: 'verlauf' } })
+  })
+})
+
+describe('zeileNimmtVerlauf — die Browser-Zeile unter der Kopfzeile', () => {
+  it('„‹ Alle Höfe" geht im Verlauf zurück, wenn davor die Hofübersicht stand — mit Filtern', () => {
+    expect(zeileNimmtVerlauf(HOFSEITE, '/hoefe')).toBe(true)
+    expect(zeileNimmtVerlauf(FUTTER_HOFSEITE, '/hoefe')).toBe(true)
+  })
+
+  it('stand davor eine andere Seite, ist sie ein Link — ein Schritt zurück führte nicht zu „Alle Höfe"', () => {
+    expect(zeileNimmtVerlauf(HOFSEITE, '/')).toBe(false)
+    expect(zeileNimmtVerlauf(HOFSEITE, '/impressum')).toBe(false)
+    expect(zeileNimmtVerlauf(HOFSEITE, null)).toBe(false)
+  })
+
+  it('im Checkout zurück zur Hofseite, wenn sie davor stand; Bestätigung und Bestellung nie', () => {
+    expect(zeileNimmtVerlauf(CHECKOUT, '/testhof')).toBe(true)
+    expect(zeileNimmtVerlauf(CHECKOUT, '/hoefe')).toBe(false)
+    expect(zeileNimmtVerlauf(BESTAETIGUNG, '/testhof')).toBe(false)
+    expect(zeileNimmtVerlauf(BESTELLUNG, '/testhof')).toBe(false)
+  })
+})
+
+describe('Der Rückweg nimmt den ANGEZEIGTEN Bereich, nicht den URL-Parameter', () => {
+  const heu = { category: 'HEU_STROH' as const }
+  const eier = { category: 'EIER' as const }
+  const weg = (produkte: { category: 'HEU_STROH' | 'EIER' }[], wunsch: 'FUTTERMITTEL' | 'LEBENSMITTEL' | null) =>
+    rueckweg({ art: 'hofseite', hofSlug: 'testhof', bereich: angezeigterBereich(produkte, wunsch) }, false).href
+
+  it('ein reiner Futterhof ohne ?bereich — geteilte Links tragen keinen — führt in die Futter-Übersicht', () => {
+    expect(weg([heu], null)).toBe('/hoefe?bereich=futter')
+  })
+
+  it('ein Hof mit beidem ohne Parameter zeigt den Hofladen', () => {
+    expect(weg([heu, eier], null)).toBe('/hoefe')
+    expect(weg([heu, eier], 'FUTTERMITTEL')).toBe('/hoefe?bereich=futter')
+  })
+
+  it('ein reiner Hofladen mit ?bereich=futter zeigt trotzdem den Hofladen', () => {
+    expect(weg([eier], 'FUTTERMITTEL')).toBe('/hoefe')
+  })
+
+  it('ohne Produkte der Hofladen', () => {
+    expect(weg([], null)).toBe('/hoefe')
   })
 })
 
@@ -147,10 +239,11 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
   const lies = (datei: string) => fs.readFileSync(path.resolve(__dirname, '..', datei), 'utf8')
   const ARTEN: Record<string, KundenSeite['art'][]> = {
     'src/app/(public)/hoefe/page.tsx': ['hofuebersicht'],
-    'src/app/(public)/[farmSlug]/checkout/page.tsx': ['checkout'],
+    // Der Checkout rendert den Kopf in CheckoutForm (siehe unten).
+    'src/app/(public)/[farmSlug]/checkout/page.tsx': [],
     'src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx': ['bestaetigung'],
     // Ungültiger Link: nicht einmal der Hof ist bestätigt → zur Hofübersicht.
-    'src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx': ['info', 'bestellung'],
+    'src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx': ['bestellung-ungueltig', 'bestellung'],
     'src/app/(public)/impressum/page.tsx': ['info'],
     'src/app/(public)/datenschutz/page.tsx': ['info'],
     'src/app/(public)/konditionen/page.tsx': ['info'],
@@ -176,7 +269,7 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
   it('jede Seite rendert KundenKopf mit ihrer Art', () => {
     for (const [datei, arten] of Object.entries(ARTEN)) {
       const text = lies(datei)
-      const gefunden = [...text.matchAll(/<KundenKopf\s+seite=\{\{\s*art:\s*'([a-z]+)'/g)].map((m) => m[1])
+      const gefunden = [...text.matchAll(/<KundenKopf\s+seite=\{\{\s*art:\s*'([a-z-]+)'/g)].map((m) => m[1])
       expect(gefunden, datei).toEqual(arten)
     }
   })
@@ -188,6 +281,16 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     expect(text).toMatch(/\{!ownerMode && <TitelbildKnoepfe/)
     // Der Leer-Zustand (ohne Titelbild) liegt schon hinter `if (!ownerMode)`.
     expect(text.match(/<KundenKopf /g)).toHaveLength(2)
+  })
+
+  it('der Checkout: Kopf in jeder Ansicht außer dem Zahlungsschritt — dort ist die Bestellung schon angelegt', () => {
+    const text = lies('src/components/checkout/checkout-form.tsx')
+    expect(text).toMatch(/const kopf = <KundenKopf seite=\{\{ art: 'checkout'/)
+    const zahlungsschritt = text.slice(text.indexOf('if (paymentStep) {'), text.indexOf('if (!isHydrated) {'))
+    expect(zahlungsschritt).toMatch(/<StripePaymentStep/)
+    expect(zahlungsschritt).not.toMatch(/\{kopf\}/)
+    // Laden, leerer Korb, Formular
+    expect(text.match(/\{kopf\}/g)).toHaveLength(3)
   })
 
   it('die Startseite behält ihre LandingNav und bekommt keine zweite Kopfzeile', () => {

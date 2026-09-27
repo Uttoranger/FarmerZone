@@ -18,7 +18,10 @@ import {
   warenkorbPositionSchema,
   warenkorbSpeicherSchema,
   type WarenkorbPosition,
+  type WarenkorbSpeicher,
 } from '@/schemas/warenkorb-speicher'
+
+export type { WarenkorbSpeicher }
 
 export const WARENKORB_SCHLUESSEL = 'bauernshop_cart'
 export const SITZUNG_SCHLUESSEL = 'bauernshop_sid'
@@ -28,12 +31,6 @@ export const WARENKORB_EREIGNIS = 'farmerzone:warenkorb'
 
 /** Mit diesem Anker öffnet die Hofseite beim Ankommen den Warenkorb. */
 export const WARENKORB_ANKER = 'warenkorb'
-
-export type WarenkorbSpeicher = {
-  farmId: string
-  farmSlug?: string
-  items: WarenkorbPosition[]
-}
 
 /**
  * Liest den gespeicherten Korb. Kaputtes JSON oder eine kaputte Hülle ergibt
