@@ -19,6 +19,7 @@ import { ladeFotoHoch } from '@/components/shared/image-upload'
 import {
   bildFehlerArtVon,
   IMAGE_NETWORK_ERROR,
+  IMAGE_READ_PERMISSION_ERROR,
   IMAGE_STORAGE_ERROR,
   IMAGE_UNKNOWN_ERROR,
 } from '@/lib/upload-fehler'
@@ -130,6 +131,30 @@ describe('Übertragung — was der Bauer liest', () => {
 
     expect(fehler?.message).toBe(IMAGE_NETWORK_ERROR)
     expect(upload).toHaveBeenCalledTimes(2)
+  })
+
+  it('zählt eine Datei, die beim Senden unlesbar wird, als Lesefehler — nicht als Verbindungsabbruch', async () => {
+    // Im gestückelten Weg liest das SDK die Datei selbst, Teilstück für
+    // Teilstück. Ist die Freigabe dazwischen weg, lehnt der Browser genauso ab
+    // wie in der Lese-Stufe (#135). Lesbar war die Datei dort noch — hier ist
+    // also die Freigabe entzogen worden, und „Verbindung unterbrochen" hätte
+    // den Bauern nach besserem Empfang suchen lassen.
+    upload.mockImplementation(
+      scheitertNach(
+        800,
+        new DOMException(
+          'The requested file could not be read, typically due to permission problems that have occurred after a reference to a file was acquired.',
+          'NotReadableError'
+        ) as unknown as Error
+      )
+    )
+
+    const { fehler } = await lauf()
+
+    expect(fehler?.message).toBe(IMAGE_READ_PERMISSION_ERROR)
+    expect(bildFehlerArtVon(fehler)).toBe('lesen')
+    // Kein Zweitversuch: Eine entzogene Freigabe kommt nicht von selbst zurück.
+    expect(upload).toHaveBeenCalledTimes(1)
   })
 
   it('meldet eine Ablehnung des Bildspeichers als solche — nicht als Verbindungsabbruch', async () => {

@@ -718,6 +718,14 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
           <DialogTitle>{isEdit ? 'Produkt bearbeiten' : 'Neues Produkt'}</DialogTitle>
         </DialogHeader>
 
+        {/* Die drei Datei-Felder bewusst HIER, außerhalb des Akkordeons (#135):
+            Base UI hängt einen zugeklappten Abschnitt aus dem DOM aus
+            (keepMounted ist standardmäßig false). Gelesen wird die Datei aber
+            erst beim Absenden — wer „Grunddaten" nach der Auswahl zuklappt,
+            hätte das Feld bis dahin ausgehängt, und das entwertet die Auswahl
+            genauso wie ein Schreibzugriff auf value. */}
+        {fotoQuellen.elemente}
+
         <Form {...form}>
           <form
             ref={formRef}
@@ -741,7 +749,6 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                           Illustration der Kategorie. Hochgeladen wird unverändert erst
                           beim Absenden. */}
                       <div data-feld="imageUrl">
-                        {fotoQuellen.elemente}
                         {previewUrl ? (
                           <div className="relative overflow-hidden rounded-xl border border-border bg-muted/30">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -766,10 +773,13 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                             >
                               <X className="h-4 w-4" />
                             </button>
+                            {/* Während des Absendens gesperrt (#135): Der Klick leert das
+                                Datei-Feld, dessen Datei gerade übertragen wird. */}
                             <button
                               type="button"
                               onClick={fotoQuellen.oeffnen}
-                              className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'absolute right-2 bottom-2 bg-card')}
+                              disabled={isSubmitting}
+                              className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'absolute right-2 bottom-2 bg-card disabled:opacity-60')}
                             >
                               Foto ersetzen
                             </button>
@@ -778,7 +788,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                           <button
                             type="button"
                             onClick={fotoQuellen.oeffnen}
-                            className="flex min-h-[120px] w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border bg-muted/30 px-4 py-5 text-center transition-colors hover:bg-muted/50"
+                            disabled={isSubmitting}
+                            className="flex min-h-[120px] w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border bg-muted/30 px-4 py-5 text-center transition-colors hover:bg-muted/50 disabled:opacity-60"
                           >
                             <Camera className="h-7 w-7 text-brand-text" aria-hidden />
                             <span className="text-sm font-medium text-foreground">

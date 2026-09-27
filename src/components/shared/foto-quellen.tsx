@@ -2,6 +2,7 @@
 
 import { useRef, useState, type ReactNode } from 'react'
 import { Camera, FolderOpen, Image as ImageIcon } from 'lucide-react'
+import { dateienAusFeld, leereDateiFeld } from '@/lib/foto-feld'
 
 /**
  * Drei Wege zum Foto: Galerie, Dateien, Kamera.
@@ -18,6 +19,11 @@ import { Camera, FolderOpen, Image as ImageIcon } from 'lucide-react'
  * nicht — dort öffnet der Klick wie bisher direkt die Dateiauswahl. Nach
  * der Auswahl ist der Ablauf exakt der bestehende: onFiles bekommt die
  * Dateien, sonst ändert sich nichts.
+ *
+ * Seit #135 wird das Datei-Feld beim KLICK geleert, nicht nach der Auswahl:
+ * Ein Schreibzugriff auf `value` entzieht auf Android-Chrome die Leseerlaubnis
+ * für ein Foto aus der Galerie (JAVASCRIPT-NEXTJS-4). Die Reihenfolge und ihre
+ * Begründung stehen in src/lib/foto-feld.ts.
  */
 /** Welcher der drei Wege gewählt wurde — reine Zusatzinformation für die
  *  Fehler-Meldung an Sentry (upload-meldung.ts); am Ablauf ändert sie nichts. */
@@ -35,10 +41,22 @@ export function useFotoQuellen({
   const kameraRef = useRef<HTMLInputElement>(null)
   const [menueOffen, setMenueOffen] = useState(false)
 
+  /**
+   * Geleert wird VOR dem Auswahldialog, nicht nach der Auswahl (#135).
+   *
+   * `e.currentTarget` ist das angeklickte Feld — derselbe Handler taugt für
+   * alle drei. `.click()` aus `oeffnen`/`waehle` löst ihn genauso aus wie ein
+   * echter Fingertipp, und zwar synchron, bevor der Dialog aufgeht.
+   * Begründung der Reihenfolge: src/lib/foto-feld.ts.
+   */
+  function vorAuswahl(e: React.MouseEvent<HTMLInputElement>) {
+    leereDateiFeld(e.currentTarget)
+  }
+
   function auswahl(e: React.ChangeEvent<HTMLInputElement>, weg: FotoQuellenWeg) {
-    const dateien = Array.from(e.target.files ?? [])
-    // Sofort zurücksetzen: dieselbe Datei darf direkt nochmal gewählt werden
-    e.target.value = ''
+    // BEWUSST ohne Zurücksetzen: Das würde die gerade gewählte Datei auf
+    // Android entwerten, bevor sie gelesen ist.
+    const dateien = dateienAusFeld(e.target)
     if (dateien.length > 0) onFiles(dateien, weg)
   }
 
@@ -68,6 +86,7 @@ export function useFotoQuellen({
         accept="image/*"
         multiple={multiple}
         className="hidden"
+        onClick={vorAuswahl}
         onChange={(e) => auswahl(e, 'galerie')}
       />
       {/* BEWUSST ohne accept: erst das öffnet die Dokument-Auswahl mit
@@ -79,6 +98,7 @@ export function useFotoQuellen({
         type="file"
         multiple={multiple}
         className="hidden"
+        onClick={vorAuswahl}
         onChange={(e) => auswahl(e, 'dateien')}
       />
       <input
@@ -87,6 +107,7 @@ export function useFotoQuellen({
         accept="image/*"
         capture="environment"
         className="hidden"
+        onClick={vorAuswahl}
         onChange={(e) => auswahl(e, 'kamera')}
       />
 

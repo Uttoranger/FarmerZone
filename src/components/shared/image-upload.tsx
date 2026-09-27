@@ -10,6 +10,7 @@ import {
   befundVon,
   dateiAlterTage,
   leseFehlerBefund,
+  ordneLeseFehler,
   ordneTransferFehler,
   UploadSchrittFehler,
   type AnlaufBefund,
@@ -21,6 +22,7 @@ import {
 import {
   BildFehler,
   bildFehlerMeldung,
+  leseFehlerText,
   protokolliereBildFehler,
   transferFehlerText,
   IMAGE_NETWORK_ERROR,
@@ -174,11 +176,14 @@ export async function pruefeLesbarkeit(file: File, onLesen?: (lesen: LeseDiagnos
   // die Datei aber am Stück heraus — EIN Zusatzversuch mit der ganzen Datei,
   // bevor 'lesen' feststeht.
   const voll = await leseVersuch(() => file.arrayBuffer(), LESE_VOLL_LIMIT_MS, verborgen)
-  onLesen?.({ probe, voll, dateiAlterTage: alter })
+  const lesen: LeseDiagnose = { probe, voll, dateiAlterTage: alter }
+  onLesen?.(lesen)
   if (voll.ergebnis === 'ok') return
 
   protokolliereBildFehler('lesen', file)
-  throw new BildFehler('lesen')
+  // Die Ursache bleibt 'lesen'; der TEXT folgt seit #135 dem, was wirklich war
+  // — entzogene Freigabe, stumme Quelle oder ehrlich unbestimmt.
+  throw new BildFehler('lesen', leseFehlerText(ordneLeseFehler(lesen)))
 }
 
 /** Ein Leseversuch unter Zeitwächter — wirft nie, sondern sagt, wie er ausging. */
@@ -302,11 +307,17 @@ async function uebertrageOriginal(
       const massgeblich = abgebrochen ? new Error(IMAGE_NETWORK_ERROR) : e
       if (!darfZweitversuch(massgeblich, versuch)) {
         optionen.onDiagnose?.({ schritt: 'uebertragung', anlaeufe })
-        // Lesbar war die Datei (Stufe 0) — gescheitert ist das SENDEN. Der
-        // Text folgt der Ursache des letzten Anlaufs: „Verbindung
+        // Der Text folgt der Ursache des letzten Anlaufs: „Verbindung
         // unterbrochen" nur, wenn sie es wirklich war (#129). Vorher stand
         // hier für jeden Fehler der Netzfehler-Text.
-        throw new Error(transferFehlerText(ordneTransferFehler(e, abgebrochen)))
+        const urteil = ordneTransferFehler(e, abgebrochen)
+        // Lesbar war die Datei in Stufe 0 — ist sie es beim Senden nicht mehr,
+        // ist das ein LESEFEHLER und kein Sendefehler (#135). Als BildFehler,
+        // damit Sentry ihn unter 'lesen' zählt und eine Serie ihn unter dem
+        // Kurzgrund „Datei nicht lesbar" listet.
+        throw urteil === 'lesen'
+          ? new BildFehler('lesen', transferFehlerText(urteil))
+          : new Error(transferFehlerText(urteil))
       }
       optionen.onStufe?.('wiederholen')
       optionen.onFortschritt?.(0)

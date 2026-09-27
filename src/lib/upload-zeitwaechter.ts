@@ -11,7 +11,7 @@
  * Reine Logik ohne DOM und ohne Netz, damit sie mit fake timers prüfbar ist.
  */
 
-import { blobFehlerKlasse } from './upload-diagnose'
+import { blobFehlerKlasse, istLeseVerlust } from './upload-diagnose'
 import { bildFehlerArtVon } from './upload-fehler'
 
 /**
@@ -113,10 +113,15 @@ function istSdkUrteil(fehler: unknown): boolean {
  * BildFehlers ('format'/'server' aus der Verarbeitungs-Route, 'lesen' aus
  * der Lese-Stufe) noch die des Blob-SDK (istSdkUrteil) — der Zweitversuch
  * würde nur Zeit und Datenvolumen verbrennen.
+ *
+ * Seit #135 gilt das auch für den entzogenen Leseverlust: Eine Datei, deren
+ * Freigabe weg ist, bekommt sie nicht dadurch zurück, dass wir es noch einmal
+ * versuchen — sie muss neu ausgewählt werden.
  */
 export function darfZweitversuch(fehler: unknown, bisherigeVersuche: number): boolean {
   if (bisherigeVersuche >= TRANSFER_VERSUCHE) return false
   if (bildFehlerArtVon(fehler) !== null) return false
+  if (istLeseVerlust(fehler)) return false
   if (istSdkUrteil(fehler)) return false
   return true
 }

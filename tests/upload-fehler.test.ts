@@ -27,6 +27,9 @@ import {
   bildFehlerMeldung,
   protokolliereBildFehler,
   IMAGE_READ_ERROR,
+  IMAGE_READ_PERMISSION_ERROR,
+  IMAGE_READ_UNCLEAR_ERROR,
+  leseFehlerText,
   IMAGE_FORMAT_ERROR,
   IMAGE_SERVER_ERROR,
   IMAGE_NETWORK_ERROR,
@@ -43,11 +46,12 @@ afterEach(() => {
 })
 
 describe('Zuordnung Fehlerart → Text', () => {
-  it('weist bei nicht lesbarer Datei die Wege am Cloud-Album vorbei', () => {
-    // Seit dem Quellen-Sprint ist die Meldung ein Wegweiser: Sie nennt die
-    // Ursache (Cloud-Alben) und alle drei Auswege — Dateien, Kamera, Teilen.
-    expect(bildFehlerText('lesen')).toBe(IMAGE_READ_ERROR)
-    expect(bildFehlerText('lesen')).toContain('Cloud-Alben')
+  it('behauptet bei nicht lesbarer Datei keine Ursache, solange keine bekannt ist', () => {
+    // Seit #135 hat 'lesen' DREI Texte (leseFehlerText), und die Ursache allein
+    // sagt nicht, welcher gilt. Der Standard nennt deshalb die Auswege, aber
+    // keinen Grund — eine falsche Ursache ist schlimmer als gar keine.
+    expect(bildFehlerText('lesen')).toBe(IMAGE_READ_UNCLEAR_ERROR)
+    expect(bildFehlerText('lesen')).not.toContain('Cloud')
     expect(bildFehlerText('lesen')).toContain('Aus Dateien')
     expect(bildFehlerText('lesen')).toContain('nimm es neu auf')
     expect(bildFehlerText('lesen')).toContain('teile es')
@@ -100,6 +104,56 @@ describe('Zuordnung Fehlerart → Text', () => {
     for (const art of ALLE_ARTEN) {
       expect(IMAGE_UNKNOWN_ERROR).not.toBe(bildFehlerText(art))
     }
+  })
+})
+
+describe('Lesefehler — drei Fälle, drei Texte, eine Ursache', () => {
+  it('nennt beim sofortigen NotReadableError das Handy und den einen Ausweg', () => {
+    expect(leseFehlerText('erlaubnis')).toBe(IMAGE_READ_PERMISSION_ERROR)
+    expect(IMAGE_READ_PERMISSION_ERROR).toContain('Das Handy hat das Foto nicht freigegeben')
+    expect(IMAGE_READ_PERMISSION_ERROR).toContain('nochmal aus')
+    // Bewusst OHNE die drei Wegweiser-Auswege: Sie kosten drei Versuche für
+    // ein Problem, das der nächste Griff löst.
+    expect(IMAGE_READ_PERMISSION_ERROR).not.toContain('Aus Dateien')
+  })
+
+  it('behält den Cloud-Text ausschließlich für die stumme Quelle', () => {
+    expect(leseFehlerText('cloud')).toBe(IMAGE_READ_ERROR)
+    expect(IMAGE_READ_ERROR).toContain('Cloud-Alben')
+    // Und nur dort: Kein anderer Lesetext nennt das Cloud-Album.
+    expect(IMAGE_READ_PERMISSION_ERROR).not.toContain('Cloud')
+    expect(IMAGE_READ_UNCLEAR_ERROR).not.toContain('Cloud')
+  })
+
+  it('gibt jedem Fall eine eigene Kennung — ein Bildschirmfoto unterscheidet sie', () => {
+    expect(IMAGE_READ_PERMISSION_ERROR).toMatch(new RegExp(`\\[E${UPLOAD_DIAG}\\]$`))
+    expect(IMAGE_READ_ERROR).toMatch(new RegExp(`\\[L${UPLOAD_DIAG}\\]$`))
+    expect(IMAGE_READ_UNCLEAR_ERROR).toMatch(new RegExp(`\\[D${UPLOAD_DIAG}\\]$`))
+  })
+
+  it('rät in keinem der drei Fälle zu einem anderen Dateiformat', () => {
+    for (const urteil of ['erlaubnis', 'cloud', 'unbestimmt'] as const) {
+      expect(leseFehlerText(urteil)).not.toMatch(/JPEG|PNG|HEIC/)
+    }
+  })
+
+  it('fällt bei einem unbekannten Urteil auf den unbestimmten Text zurück', () => {
+    const unbekannt = 'gibt-es-nicht' as unknown as Parameters<typeof leseFehlerText>[0]
+
+    expect(leseFehlerText(unbekannt)).toBe(IMAGE_READ_UNCLEAR_ERROR)
+  })
+
+  it('trägt den genauen Text, behält aber die Ursache lesen', () => {
+    // So wirft die Lese-Stufe: Ursache für Sentry und Kurzgrund, Text für den
+    // Bauern.
+    const fehler = new BildFehler('lesen', IMAGE_READ_PERMISSION_ERROR)
+
+    expect(fehler.bildFehlerArt).toBe('lesen')
+    expect(bildFehlerMeldung(fehler)).toEqual({
+      text: IMAGE_READ_PERMISSION_ERROR,
+      kurz: 'Datei nicht lesbar',
+      art: 'lesen',
+    })
   })
 })
 
@@ -161,17 +215,17 @@ describe('Ablehnung durch den Bildspeicher — eigener Text, keine Foto-Ursache'
 })
 
 describe('Diagnose-Kennung', () => {
-  it("steht auf '129' — dem letzten Sprint, der das Upload-Verhalten änderte", () => {
+  it("steht auf '135' — dem letzten Sprint, der das Upload-Verhalten änderte", () => {
     // Mit LITERAL festgenagelt (Lehre aus #69): Alle übrigen Kennungs-Tests
     // prüfen über die Konstante selbst und blieben bei jedem Wert grün —
     // genau so konnte '64' drei Verhaltensänderungen lang stehenbleiben.
     // Die Zähl-Regel: bei JEDER Verhaltensänderung am Upload-Ablauf auf die
     // Sprint-Nummer heben (upload-fehler.ts, DEVELOPMENT.md „Upload-Diagnose").
-    expect(UPLOAD_DIAG).toBe('129')
+    expect(UPLOAD_DIAG).toBe('135')
   })
 
   it('hängt an jede der drei Meldungen ein eigenes Kürzel mit dem Code-Stand', () => {
-    expect(bildFehlerText('lesen')).toMatch(new RegExp(`\\[L${UPLOAD_DIAG}\\]$`))
+    expect(bildFehlerText('lesen')).toMatch(new RegExp(`\\[D${UPLOAD_DIAG}\\]$`))
     expect(bildFehlerText('format')).toMatch(new RegExp(`\\[F${UPLOAD_DIAG}\\]$`))
     expect(bildFehlerText('server')).toMatch(new RegExp(`\\[S${UPLOAD_DIAG}\\]$`))
   })
@@ -179,7 +233,7 @@ describe('Diagnose-Kennung', () => {
   it('unterscheidet die drei Kürzel voneinander', () => {
     const kennungen = ALLE_ARTEN.map((art) => bildFehlerText(art).match(/\[[A-Z]\d+\]$/)?.[0])
 
-    expect(kennungen).toEqual([`[L${UPLOAD_DIAG}]`, `[F${UPLOAD_DIAG}]`, `[S${UPLOAD_DIAG}]`])
+    expect(kennungen).toEqual([`[D${UPLOAD_DIAG}]`, `[F${UPLOAD_DIAG}]`, `[S${UPLOAD_DIAG}]`])
   })
 
   it('führt den Code-Stand an genau einer Stelle', () => {
@@ -229,7 +283,7 @@ describe('BildFehler', () => {
 describe('bildFehlerMeldung — was ein gefangener Fehler zeigt', () => {
   it('nimmt bei einem BildFehler die Ursache und beide Textformen', () => {
     expect(bildFehlerMeldung(new BildFehler('lesen'))).toEqual({
-      text: IMAGE_READ_ERROR,
+      text: IMAGE_READ_UNCLEAR_ERROR,
       kurz: 'Datei nicht lesbar',
       art: 'lesen',
     })
