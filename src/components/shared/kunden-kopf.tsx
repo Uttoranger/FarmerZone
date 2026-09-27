@@ -4,7 +4,7 @@ import { useEffect, useState, type MouseEvent, type RefObject } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Share2, ShoppingCart } from 'lucide-react'
-import { kopfForm, rueckweg, zeileNimmtVerlauf, type KundenSeite } from '@/lib/kunden-kopf'
+import { kopfForm, rueckweg, tippAufRueckweg, type KundenSeite } from '@/lib/kunden-kopf'
 import { useWarenkorbKopf } from '@/lib/use-warenkorb-kopf'
 import { eigenerVorgaengerJetzt, merkeHinauf } from '@/components/shared/rueckweg-merker'
 import { Wortmarke } from '@/components/shared/wortmarke'
@@ -155,21 +155,22 @@ const RUND =
   'inline-flex size-11 items-center justify-center rounded-full bg-white/90 text-[#2D5F3F] shadow-[0_2px_8px_rgba(0,0,0,0.18)] transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2D5F3F] focus-visible:ring-offset-2 focus-visible:ring-offset-white'
 
 /**
- * Der Klick eines Rückwegs: Führt der Verlauf dorthin (`nimmtVerlauf`), ein
- * Schritt zurück — mit Scrollposition und Filtern. Sonst folgt der Link und
+ * Der Klick eines Rückwegs (Entscheidung: tippAufRueckweg): ein Schritt im
+ * Verlauf zurück — mit Scrollposition und Filtern —, oder der Link folgt und
  * steigt damit hinauf; das merkt sich der RueckwegMerker, damit „Zurück" dort
  * nicht wieder hinunterführt. Neuer Tab und neues Fenster tut der Link selbst.
  */
-function useRueckwegKlick(nimmtVerlauf: (vorgaengerPfad: string | null) => boolean) {
+function useRueckwegKlick(seite: KundenSeite, form: 'knopf' | 'zeile') {
   const router = useRouter()
   return function beimTipp(e: MouseEvent<HTMLAnchorElement>) {
     if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
-    if (nimmtVerlauf(eigenerVorgaengerJetzt())) {
+    const tipp = tippAufRueckweg(seite, eigenerVorgaengerJetzt(), form)
+    if (tipp.aktion === 'verlauf') {
       e.preventDefault()
       router.back()
       return
     }
-    merkeHinauf()
+    merkeHinauf(tipp.ziel)
   }
 }
 
@@ -182,7 +183,7 @@ function ZurueckKnopf({ seite, rund = false }: { seite: KundenSeite; rund?: bool
   // Beim Server-Rendern und ersten Anzeigen gilt der Link; ob der Verlauf
   // zählt, entscheidet erst der Tipp — sonst wiche das HTML vom Server ab.
   const ersatz = rueckweg(seite, false)
-  const beimTipp = useRueckwegKlick((vorgaenger) => rueckweg(seite, vorgaenger !== null).verlauf)
+  const beimTipp = useRueckwegKlick(seite, 'knopf')
 
   return (
     <Link
@@ -209,7 +210,7 @@ function ZurueckKnopf({ seite, rund = false }: { seite: KundenSeite; rund?: bool
 function RueckwegZeile({ seite, hofName }: { seite: KundenSeite; hofName?: string }) {
   const href = rueckweg(seite, false).href
   const text = seite.art === 'hofseite' ? 'Alle Höfe' : (hofName ?? 'Zum Hof')
-  const beimTipp = useRueckwegKlick((vorgaenger) => zeileNimmtVerlauf(seite, vorgaenger))
+  const beimTipp = useRueckwegKlick(seite, 'zeile')
   return (
     <div className="hidden print:hidden md:block">
       <div className="mx-auto max-w-6xl px-6 pt-4">

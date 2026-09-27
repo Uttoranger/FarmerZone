@@ -151,8 +151,8 @@ Client-Komponente → Server Action → Zod → Fachregel (lib) → Prisma → r
 - Form (Knöpfe über dem Titelbild oder Leiste, Warenkorb-Symbol, Rückweg-Zeile) und Rückweg entscheidet `src/lib/kunden-kopf.ts`, nicht die Komponente.
 - „Zurück" ist immer ein echter Link auf das übergeordnete Ziel; nur bei eigenem Vorgänger (`eigenerVorgaengerJetzt`: Navigation API, sonst `RueckwegMerker` im Root-Layout) geht es per `router.back()`. **Nie** `history.length` oder `document.referrer` für einen Rückweg. Bestätigung und Bestellverfolgung nie über den Verlauf.
 - Wer über den Ersatz-Link hinaufsteigt, hat dort keinen eigenen Vorgänger (`merkeHinauf`) — sonst pendelt „Zurück" zwischen zwei Seiten. Die Browser-Zeile („‹ Alle Höfe") nimmt den Verlauf nur, wenn er genau zu ihrem Ziel führt (`zeileNimmtVerlauf`).
-- Im Stripe-Zahlungsschritt keine Kopfzeile: Die Bestellung ist dort schon angelegt, ein Weg hinaus und zurück ergäbe eine zweite.
-- Der Rückweg der Hofseite nimmt den **angezeigten** Bereich (`teileHofseite(...).aktiv`), nicht den URL-Parameter.
+- Im Checkout keine Kopfzeile, sobald eine Bestellung angelegt ist (Zahlungsschritt, auch nach dessen „Zurück"): Ein Weg hinaus und zurück ergäbe eine zweite. Bekannte Grenze: Solange die Anfrage an `/api/checkout` läuft, steht die Kopfzeile noch.
+- Der Rückweg der Hofseite nimmt den **angezeigten** Bereich (`angezeigterBereich` in `src/lib/bereiche-anzeige.ts`), nicht den URL-Parameter.
 - Die Kopfzeile klebt (`sticky`, Ebene 40): Umgebungsbanner (60) darüber, Sheets/Dialoge (50) davor, Sektionsleiste (30) darunter. Ausnahme Hofseite am Handy: Die Leiste ist `fixed` und wird erst eingehängt, wenn das Titelbild verschwindet — `sticky` verschöbe beim Einhängen den Inhalt. Eigene Stapelebenen (`isolate`) um alles mit hohen z-Werten (Leaflet), sonst liegt es über der Kopfzeile.
 
 ## 5. Domänen-Invarianten

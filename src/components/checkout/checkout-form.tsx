@@ -149,6 +149,9 @@ export function CheckoutForm({
   // der Vorgang mit einem Fehler endet — ein selbst gepflegter Ladezustand
   // blieb im Fehlerfall hängen und sperrte den Knopf für immer (Befund 4).
   const [isPending, startTransition] = useTransition()
+  // Ab hier gibt es eine Bestellung — auch wenn „Zurück" im Zahlungsschritt
+  // wieder das Formular zeigt. Siehe `kopf` unten.
+  const [bestellungAngelegt, setBestellungAngelegt] = useState(false)
   const [paymentStep, setPaymentStep] = useState<{
     clientSecret: string
     orderId: string
@@ -348,6 +351,7 @@ export function CheckoutForm({
       const result = await res.json()
 
       if (data.paymentMethod === 'ONLINE') {
+        setBestellungAngelegt(true)
         setPaymentStep({ clientSecret: result.clientSecret, orderId: result.orderId })
       } else {
         leereWarenkorb()
@@ -358,12 +362,15 @@ export function CheckoutForm({
     }
   }
 
-  // Kopfzeile des Checkouts (kunden-kopf.tsx) — NICHT im Zahlungsschritt:
-  // Dort ist die Bestellung schon angelegt und der Bestand gehalten. Wer von
-  // dort über die Kopfzeile ginge und wiederkäme, bekäme einen neuen
-  // Idempotenz-Schlüssel und legte eine zweite Bestellung an. Der Schritt hat
-  // sein eigenes „Zurück" zum Formular (StripePaymentStep, onBack).
-  const kopf = <KundenKopf seite={{ art: 'checkout', hofSlug: farm.slug }} titel="Bestellung" hofName={farm.name} />
+  // Kopfzeile des Checkouts (kunden-kopf.tsx) — nicht mehr, sobald eine
+  // Bestellung angelegt ist (Zahlungsschritt, und auch nach „Zurück" von dort
+  // ins Formular): Die Bestellung hält dann Bestand. Wer über die Kopfzeile
+  // hinausginge und wiederkäme, bekäme einen neuen Idempotenz-Schlüssel und
+  // legte eine zweite an. Der Zahlungsschritt hat sein eigenes „Zurück" zum
+  // Formular (StripePaymentStep, onBack).
+  const kopf = bestellungAngelegt ? null : (
+    <KundenKopf seite={{ art: 'checkout', hofSlug: farm.slug }} titel="Bestellung" hofName={farm.name} />
+  )
 
   // Stripe payment step
   if (paymentStep) {

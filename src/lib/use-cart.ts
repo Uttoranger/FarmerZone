@@ -15,10 +15,6 @@ import {
 
 export type CartItem = WarenkorbPosition
 
-/**
- * Der Warenkorb eines Hofs. `farmSlug` wird mitgespeichert, damit das
- * Warenkorb-Symbol der Kopfzeile auf anderen Seiten zu diesem Hof führt.
- */
 export type Warenkorb = {
   items: CartItem[]
   count: number
@@ -31,6 +27,10 @@ export type Warenkorb = {
   clearCart: () => void
 }
 
+/**
+ * Der Warenkorb eines Hofs. `farmSlug` wird mitgespeichert, damit das
+ * Warenkorb-Symbol der Kopfzeile auf anderen Seiten zu diesem Hof führt.
+ */
 export function useCart(farmId: string, farmSlug: string): Warenkorb {
   const [items, setItems] = useState<CartItem[]>([])
   const [sessionId, setSessionId] = useState('')

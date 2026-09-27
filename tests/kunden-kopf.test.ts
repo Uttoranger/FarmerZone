@@ -11,7 +11,9 @@ import {
   eigenerVorgaenger,
   kopfForm,
   merkeVorgaenger,
+  ordneWechsel,
   rueckweg,
+  tippAufRueckweg,
   zeileNimmtVerlauf,
   type KundenSeite,
   type SeitenWechsel,
@@ -154,33 +156,78 @@ describe('eigenerVorgaenger — Navigation API vor dem Merker', () => {
   })
 })
 
+describe('ordneWechsel — was der Merker beobachtet hat', () => {
+  const basis = { von: '/hoefe', pfad: '/testhof', durchVerlauf: false, hinaufZiel: null }
+
+  it('erstes Mal, Filterwechsel, Link', () => {
+    expect(ordneWechsel({ ...basis, von: null })).toEqual({ art: 'start' })
+    expect(ordneWechsel({ ...basis, pfad: '/hoefe' })).toEqual({ art: 'nurQuery' })
+    expect(ordneWechsel(basis)).toEqual({ art: 'link', von: '/hoefe' })
+  })
+
+  it('Zurück oder Vorwärts geht vor — auch vor einem gemerkten Hinaufsteigen', () => {
+    expect(ordneWechsel({ ...basis, durchVerlauf: true, hinaufZiel: '/testhof' })).toEqual({ art: 'verlauf' })
+  })
+
+  it('Hinaufsteigen nur zu genau seinem Ziel — ein anderer Link dazwischen ist ein gewöhnlicher Wechsel', () => {
+    expect(ordneWechsel({ ...basis, hinaufZiel: '/testhof' })).toEqual({ art: 'hinauf' })
+    expect(ordneWechsel({ ...basis, hinaufZiel: '/impressum' })).toEqual({ art: 'link', von: '/hoefe' })
+  })
+})
+
+describe('tippAufRueckweg — was ein Tipp tut', () => {
+  it('Knopf: mit eigener Seite davor ein Schritt zurück, sonst hinauf zum Ziel', () => {
+    expect(tippAufRueckweg(HOFSEITE, '/impressum', 'knopf')).toEqual({ aktion: 'verlauf' })
+    expect(tippAufRueckweg(FUTTER_HOFSEITE, null, 'knopf')).toEqual({ aktion: 'hinauf', ziel: '/hoefe' })
+  })
+
+  it('Zeile: der Verlauf nur, wenn er genau zum Ziel führt', () => {
+    expect(tippAufRueckweg(HOFSEITE, '/hoefe', 'zeile')).toEqual({ aktion: 'verlauf' })
+    expect(tippAufRueckweg(HOFSEITE, '/impressum', 'zeile')).toEqual({ aktion: 'hinauf', ziel: '/hoefe' })
+  })
+
+  it('Bestätigung: immer hinauf zur Hofseite', () => {
+    expect(tippAufRueckweg(BESTAETIGUNG, '/testhof/checkout', 'knopf')).toEqual({ aktion: 'hinauf', ziel: '/testhof' })
+  })
+})
+
 describe('Kein Hin und Her — die Folge von Tipps auf „Zurück"', () => {
-  /** Ein Tipp auf „Zurück": Verlauf, wenn eine eigene Seite davor steht, sonst hinauf über den Link. */
-  function tippe(seite: KundenSeite, vorgaenger: string | null) {
-    const weg = rueckweg(seite, vorgaenger !== null)
-    return weg.verlauf ? { ziel: vorgaenger, wechsel: { art: 'verlauf' } as const } : { ziel: weg.href, wechsel: { art: 'hinauf' } as const }
+  /**
+   * Ein Tipp samt dem Seitenwechsel, den er auslöst — mit denselben
+   * Funktionen wie Kopfzeile (tippAufRueckweg) und Merker (ordneWechsel,
+   * merkeVorgaenger).
+   */
+  type Stand = { pfad: string; vorgaenger: string | null }
+  function tippe(seite: KundenSeite, stand: Stand): Stand {
+    const tipp = tippAufRueckweg(seite, stand.vorgaenger, 'knopf')
+    const pfad = tipp.aktion === 'verlauf' ? (stand.vorgaenger ?? stand.pfad) : tipp.ziel
+    const wechsel = ordneWechsel({
+      von: stand.pfad,
+      pfad,
+      durchVerlauf: tipp.aktion === 'verlauf',
+      hinaufZiel: tipp.aktion === 'hinauf' ? tipp.ziel : null,
+    })
+    return { pfad, vorgaenger: merkeVorgaenger(stand.vorgaenger, wechsel) }
   }
+  const erstAufruf = (pfad: string): Stand => ({ pfad, vorgaenger: merkeVorgaenger(null, { art: 'start' }) })
 
   it('geteilter Link auf die Hofseite → Zurück → Hofübersicht → Zurück → Startseite', () => {
-    let vorgaenger = merkeVorgaenger(null, { art: 'start' })
-    const erster = tippe(HOFSEITE, vorgaenger)
-    expect(erster.ziel).toBe('/hoefe')
-    vorgaenger = merkeVorgaenger(vorgaenger, erster.wechsel)
-    const zweiter = tippe(HOFUEBERSICHT, vorgaenger)
-    expect(zweiter.ziel).toBe('/')
+    const aufHoefe = tippe(HOFSEITE, erstAufruf('/testhof'))
+    expect(aufHoefe.pfad).toBe('/hoefe')
+    expect(tippe(HOFUEBERSICHT, aufHoefe).pfad).toBe('/')
   })
 
   it('Bestätigung → Zurück → Hofseite → Zurück führt zur Hofübersicht, nicht zurück in die Bestätigung', () => {
-    let vorgaenger = merkeVorgaenger(null, { art: 'link', von: '/testhof/checkout' })
-    const erster = tippe(BESTAETIGUNG, vorgaenger)
-    expect(erster.ziel).toBe('/testhof')
-    vorgaenger = merkeVorgaenger(vorgaenger, erster.wechsel)
-    expect(tippe(HOFSEITE, vorgaenger).ziel).toBe('/hoefe')
+    const bestaetigung: Stand = { pfad: '/testhof/confirm/b1', vorgaenger: '/testhof/checkout' }
+    const aufHof = tippe(BESTAETIGUNG, bestaetigung)
+    expect(aufHof.pfad).toBe('/testhof')
+    expect(tippe(HOFSEITE, aufHof).pfad).toBe('/hoefe')
   })
 
   it('von der Hofübersicht auf die Hofseite und Zurück: ein Schritt im Verlauf, dorthin zurück', () => {
-    const vorgaenger = merkeVorgaenger(null, { art: 'link', von: '/hoefe' })
-    expect(tippe(HOFSEITE, vorgaenger)).toEqual({ ziel: '/hoefe', wechsel: { art: 'verlauf' } })
+    const vonHoefe: Stand = { pfad: '/testhof', vorgaenger: merkeVorgaenger(null, { art: 'link', von: '/hoefe' }) }
+    expect(tippAufRueckweg(HOFSEITE, vonHoefe.vorgaenger, 'knopf')).toEqual({ aktion: 'verlauf' })
+    expect(tippe(HOFSEITE, vonHoefe).pfad).toBe('/hoefe')
   })
 })
 
@@ -283,9 +330,11 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     expect(text.match(/<KundenKopf /g)).toHaveLength(2)
   })
 
-  it('der Checkout: Kopf in jeder Ansicht außer dem Zahlungsschritt — dort ist die Bestellung schon angelegt', () => {
+  it('der Checkout: kein Kopf, sobald eine Bestellung angelegt ist — und nie im Zahlungsschritt', () => {
     const text = lies('src/components/checkout/checkout-form.tsx')
-    expect(text).toMatch(/const kopf = <KundenKopf seite=\{\{ art: 'checkout'/)
+    // Ab angelegter Bestellung keine Kopfzeile — auch nach „Zurück" aus dem Zahlungsschritt.
+    expect(text).toMatch(/const kopf = bestellungAngelegt \? null : \(\s*<KundenKopf seite=\{\{ art: 'checkout'/)
+    expect(text).toMatch(/setBestellungAngelegt\(true\)\s*setPaymentStep\(/)
     const zahlungsschritt = text.slice(text.indexOf('if (paymentStep) {'), text.indexOf('if (!isHydrated) {'))
     expect(zahlungsschritt).toMatch(/<StripePaymentStep/)
     expect(zahlungsschritt).not.toMatch(/\{kopf\}/)

@@ -1981,10 +1981,11 @@ Deshalb:
   Rechtsseiten, nicht auf Hofseite und Bestellweg. Ein Tipp führt zu
   `/<hof>#warenkorb`: Die Hofseite öffnet den Korb und nimmt den Anker wieder weg.
 
-**Checkout:** Die Kopfzeile rendert `CheckoutForm` selbst, im Stripe-Zahlungsschritt
-nicht. Dort ist die Bestellung angelegt und der Bestand gehalten; wer über die
-Kopfzeile ginge und wiederkäme, bekäme einen neuen Idempotenz-Schlüssel und legte eine
-zweite Bestellung an. Der Schritt hat sein eigenes „Zurück" zum Formular.
+**Checkout:** Die Kopfzeile rendert `CheckoutForm` selbst — nicht mehr, sobald eine
+Bestellung angelegt ist: im Stripe-Zahlungsschritt und auch nach dessen „Zurück" ins
+Formular. Die Bestellung hält dann Bestand; wer über die Kopfzeile ginge und
+wiederkäme, bekäme einen neuen Idempotenz-Schlüssel und legte eine zweite an. Bekannte
+Grenze: Solange die Anfrage an `/api/checkout` läuft, steht die Kopfzeile noch.
 
 **Teilen** ist aus der Hofseite herausgezogen (`src/lib/teilen.ts`). Schließt der Kunde
 das Teilen-Menü, wird nichts mehr kopiert — vorher kam trotzdem „Link kopiert".

@@ -2,13 +2,14 @@
 
 import { useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
-import { eigenerVorgaenger, merkeVorgaenger, type SeitenWechsel } from '@/lib/kunden-kopf'
+import { eigenerVorgaenger, merkeVorgaenger, ordneWechsel } from '@/lib/kunden-kopf'
 import { hinaufEintraegeSchema } from '@/schemas/rueckweg'
 
 /**
  * Merkt sich je Dokument, welche eigene Seite vor der aktuellen steht — für
  * den Zurück-Knopf der Kundenseiten (kunden-kopf.tsx). Die Regeln stehen rein
- * in src/lib/kunden-kopf.ts; hier wird nur beobachtet.
+ * in src/lib/kunden-kopf.ts (ordneWechsel, merkeVorgaenger, eigenerVorgaenger);
+ * hier wird nur beobachtet.
  *
  * Warum nicht einfacher: `document.referrer` bleibt nach Seitenwechseln in
  * der App auf dem Stand des ersten Ladens stehen, `history.length` zählt auch
@@ -21,7 +22,8 @@ import { hinaufEintraegeSchema } from '@/schemas/rueckweg'
  * Sitzt im Root-Layout, damit auch der Weg von der Startseite zählt.
  */
 let vorgaengerMerker: string | null = null
-let hinaufAusstehend = false
+/** Wohin ein Tipp gerade über den Ersatz-Link hinaufsteigt — bis der Wechsel da ist. */
+let hinaufZiel: string | null = null
 
 type NavigationStand = { schluessel: string | null; vorherigerPfad: string | null }
 
@@ -83,11 +85,11 @@ export function eigenerVorgaengerJetzt(): string | null {
 }
 
 /**
- * Der nächste Seitenwechsel ist ein Hinaufsteigen über den Ersatz-Link des
- * Rückwegs — dort soll „Zurück" weiter hinauf führen, nicht wieder hinunter.
+ * Der Tipp steigt über den Ersatz-Link des Rückwegs zu `ziel` hinauf — dort
+ * soll „Zurück" weiter hinauf führen, nicht wieder hinunter.
  */
-export function merkeHinauf(): void {
-  hinaufAusstehend = true
+export function merkeHinauf(ziel: string): void {
+  hinaufZiel = ziel
 }
 
 export function RueckwegMerker() {
@@ -107,24 +109,19 @@ export function RueckwegMerker() {
   }, [])
 
   useEffect(() => {
-    const von = letzterPfad.current
-    const wechsel: SeitenWechsel =
-      von === null
-        ? { art: 'start' }
-        : von === pfad
-          ? { art: 'nurQuery' }
-          : durchVerlauf.current
-            ? { art: 'verlauf' }
-            : hinaufAusstehend
-              ? { art: 'hinauf' }
-              : { art: 'link', von }
+    const wechsel = ordneWechsel({
+      von: letzterPfad.current,
+      pfad,
+      durchVerlauf: durchVerlauf.current,
+      hinaufZiel,
+    })
     if (wechsel.art === 'hinauf') {
       const schluessel = navigationStand()?.schluessel
       if (schluessel) merkeHinaufEintrag(schluessel)
     }
     if (wechsel.art !== 'nurQuery') {
       durchVerlauf.current = false
-      hinaufAusstehend = false
+      hinaufZiel = null
     }
     letzterPfad.current = pfad
     vorgaengerMerker = merkeVorgaenger(vorgaengerMerker, wechsel)

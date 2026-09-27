@@ -112,6 +112,21 @@ export function zeileNimmtVerlauf(seite: KundenSeite, vorgaengerPfad: string | n
   return weg.verlauf && vorgaengerPfad === pfadVon(weg.href)
 }
 
+/** Was ein Tipp auf einen Rückweg tut: ein Schritt im Verlauf — oder dem Link folgen und damit hinaufsteigen. */
+export type RueckwegTipp = { aktion: 'verlauf' } | { aktion: 'hinauf'; ziel: string }
+
+/**
+ * Die Entscheidung beim Tipp — für den Zurück-Knopf (`knopf`) und die
+ * Browser-Zeile (`zeile`). Folgt der Tipp dem Link, steigt er zum Ziel hinauf;
+ * das merkt sich der RueckwegMerker (für GENAU diesen Pfad), damit „Zurück"
+ * dort nicht wieder hinunterführt.
+ */
+export function tippAufRueckweg(seite: KundenSeite, vorgaengerPfad: string | null, form: 'knopf' | 'zeile'): RueckwegTipp {
+  const weg = rueckweg(seite, vorgaengerPfad !== null)
+  const verlauf = form === 'zeile' ? zeileNimmtVerlauf(seite, vorgaengerPfad) : weg.verlauf
+  return verlauf ? { aktion: 'verlauf' } : { aktion: 'hinauf', ziel: pfadVon(weg.href) }
+}
+
 /**
  * Wie das Dokument zur aktuellen Seite kam:
  * - 'start': erste Seite dieses Dokuments (geteilter Link, neuer Tab, Neuladen),
@@ -126,6 +141,28 @@ export type SeitenWechsel =
   | { art: 'hinauf' }
   | { art: 'verlauf' }
   | { art: 'nurQuery' }
+
+/**
+ * Ordnet einen Pfadwechsel ein — was der RueckwegMerker beobachtet hat:
+ * `von` (null beim ersten Mal), der neue `pfad`, ob ein popstate mit
+ * Seitenwechsel vorausging (`durchVerlauf`) und wohin ein Tipp gerade
+ * hinaufsteigt (`hinaufZiel`). Zurück/Vorwärts geht vor, dann das
+ * Hinaufsteigen — aber nur zu genau seinem Ziel: Ein anderer Link, der noch
+ * dazwischenkam, ist ein gewöhnlicher Seitenwechsel.
+ */
+export function ordneWechsel(beobachtet: {
+  von: string | null
+  pfad: string
+  durchVerlauf: boolean
+  hinaufZiel: string | null
+}): SeitenWechsel {
+  const { von, pfad, durchVerlauf, hinaufZiel } = beobachtet
+  if (von === null) return { art: 'start' }
+  if (von === pfad) return { art: 'nurQuery' }
+  if (durchVerlauf) return { art: 'verlauf' }
+  if (hinaufZiel === pfad) return { art: 'hinauf' }
+  return { art: 'link', von }
+}
 
 /**
  * Der Pfad der eigenen Seite vor der aktuellen — oder null. Nachgeführt bei
