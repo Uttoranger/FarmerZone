@@ -773,10 +773,13 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                             >
                               <X className="h-4 w-4" />
                             </button>
+                            {/* Während des Absendens gesperrt (#134): Der Klick leert das
+                                Datei-Feld, dessen Datei gerade übertragen wird. */}
                             <button
                               type="button"
                               onClick={fotoQuellen.oeffnen}
-                              className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'absolute right-2 bottom-2 bg-card')}
+                              disabled={isSubmitting}
+                              className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'absolute right-2 bottom-2 bg-card disabled:opacity-60')}
                             >
                               Foto ersetzen
                             </button>
@@ -785,7 +788,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                           <button
                             type="button"
                             onClick={fotoQuellen.oeffnen}
-                            className="flex min-h-[120px] w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border bg-muted/30 px-4 py-5 text-center transition-colors hover:bg-muted/50"
+                            disabled={isSubmitting}
+                            className="flex min-h-[120px] w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border bg-muted/30 px-4 py-5 text-center transition-colors hover:bg-muted/50 disabled:opacity-60"
                           >
                             <Camera className="h-7 w-7 text-brand-text" aria-hidden />
                             <span className="text-sm font-medium text-foreground">

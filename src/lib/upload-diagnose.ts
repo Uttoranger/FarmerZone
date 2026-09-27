@@ -181,6 +181,11 @@ export const LESE_SOFORT_MS = 1_000
  * eindeutigste Aussage (etwas hat gewartet), deshalb steht er vorn — auch wenn
  * der andere Versuch daneben sofort abgelehnt hat.
  *
+ * Für die Dauer gilt „alle", für die Klasse „mindestens einer": Ein entzogener
+ * Zugriff sieht auf den zwei Lesewegen verschieden aus (NotReadableError hier,
+ * NotFoundError dort), aber wer sekundenlang gewartet hat, hat unterwegs etwas
+ * versucht — und dann ist die Freigabe nicht die nächstliegende Erklärung.
+ *
  * Das ALTER der Datei geht bewusst NICHT ein, obwohl es im Issue der
  * auffälligste Wert war: Manche Speicherdienste liefern kein `lastModified`
  * (dann ist es null), und auch ein altes Foto kann sofort abgelehnt werden. Es

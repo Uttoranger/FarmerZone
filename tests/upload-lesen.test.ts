@@ -164,6 +164,9 @@ describe('Lese-Stufe — was Sentry erfährt (pruefeLesbarkeit)', () => {
     const { fehler, lesen } = await lies(datei(scheitertNach(5, nichtLesbar()), scheitertNach(3, nichtGefunden())))
 
     expect(fehler).toBeInstanceOf(BildFehler)
+    // Gemischtes Paar: Ein entzogener Zugriff sieht auf den zwei Lesewegen
+    // verschieden aus, und „nochmal auswählen" stimmt in beiden Fällen.
+    expect((fehler as Error).message).toBe(IMAGE_READ_PERMISSION_ERROR)
     expect(lesen).toEqual({
       probe: { ergebnis: 'fehler', klasse: 'NotReadableError', meldung: nichtLesbar().message, dauerMs: 5 },
       voll: { ergebnis: 'fehler', klasse: 'NotFoundError', meldung: nichtGefunden().message, dauerMs: 3 },
@@ -260,6 +263,12 @@ describe('ordneLeseFehler — welcher Lesefehler welche Meldung verdient', () =>
     // An der Grenze: knapp darunter noch die Freigabe, ab der Grenze nicht mehr.
     expect(urteil(fehlgeschlagen('NotReadableError', LESE_SOFORT_MS - 1))).toBe('erlaubnis')
     expect(urteil(fehlgeschlagen('NotReadableError', LESE_SOFORT_MS))).toBe('unbestimmt')
+  })
+
+  it('genügt EIN NotReadableError, solange beide Versuche sofort abgelehnt haben', () => {
+    // Der entzogene Zugriff sieht auf den zwei Lesewegen verschieden aus.
+    expect(urteil(fehlgeschlagen('NotReadableError', 5), fehlgeschlagen('NotFoundError', 3))).toBe('erlaubnis')
+    expect(urteil(fehlgeschlagen('NotFoundError', 5), fehlgeschlagen('NotReadableError', 3))).toBe('erlaubnis')
   })
 
   it('verlangt, dass JEDER gescheiterte Versuch sofort abgelehnt hat', () => {
