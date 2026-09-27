@@ -34,6 +34,7 @@ export default async function CheckoutPage({ params }: Props) {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Die Kopfzeile rendert CheckoutForm selbst — im Zahlungsschritt nicht. */}
       <CheckoutForm farm={farm} nurBetriebeIds={nurBetriebeIds} vorbelegung={vorbelegung} />
     </div>
   )

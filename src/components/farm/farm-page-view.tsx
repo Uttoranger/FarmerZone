@@ -22,10 +22,19 @@ import { addFarmPhotoAction, reorderPhotosAction } from '@/server/actions/farm-p
 import { ReorderContext } from '@/components/shared/reorder-context'
 import { nextPickupDays, pickupWeekdaysLabel } from '@/lib/pickup-days'
 import { pausenBanner } from '@/lib/shop-pause'
-import { buildMapsUrl, buildShareData } from '@/lib/customer-links'
+import { buildMapsUrl } from '@/lib/customer-links'
+import { angezeigterBereich } from '@/lib/bereiche-anzeige'
+import type { KundenSeite } from '@/lib/kunden-kopf'
+import { teileHof } from '@/components/shared/hof-teilen'
+import {
+  KundenKopf,
+  SPRUNGZIEL_OHNE_KOPF,
+  SPRUNGZIEL_UNTER_KOPF,
+  TitelbildKnoepfe,
+} from '@/components/shared/kunden-kopf'
 import { hofseiteSektionen, naechsterAktiverReiter } from '@/lib/hofseite-sektionen'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
-import { ProductGrid } from './product-grid'
+import { ProductGrid, useBereichWunsch } from './product-grid'
 import { stripStatusVariables, renderStatusBodyWithChip } from '@/lib/status-body'
 
 // Ersatzbanner, wenn ein Hof noch kein Foto hochgeladen hat. Bildersatz,
@@ -633,6 +642,18 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
     () => hofseiteSektionen(sections, farm.farmPhotos.length > 0),
     [sections, farm.farmPhotos.length]
   )
+
+  // Kopfzeile der Kundenansicht (kunden-kopf.tsx). Ihr Rückweg führt in den
+  // Bereich, den das Produktraster gerade ZEIGT — nicht in den der URL: Ein
+  // reiner Futterhof zeigt Futter auch ohne ?bereich, und geteilte Links
+  // tragen keinen. Dieselbe Produktmenge wie das Raster der Kundenansicht.
+  const titelbild = useRef<HTMLDivElement>(null)
+  const bereichWunsch = useBereichWunsch()
+  const bereich = useMemo(
+    () => angezeigterBereich(farm.products.filter((p) => p.isAvailable), bereichWunsch),
+    [farm.products, bereichWunsch]
+  )
+  const kundenSeite: KundenSeite = { art: 'hofseite', hofSlug: farm.slug, bereich }
   const [activeTab, setActiveTab] = useState('uebersicht')
 
   // Ziel eines angetippten Sprungs. Solange es steht, hält der Beobachter still —
@@ -643,23 +664,10 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
     if (sprungTimer.current) clearTimeout(sprungTimer.current)
   }, [])
 
-  async function handleShare() {
-    const url = `${window.location.origin}/${farm.slug}`
-    const data = buildShareData(farm.name, url)
-    if (typeof navigator.share === 'function') {
-      try {
-        await navigator.share(data)
-        return
-      } catch {
-        // abgebrochen oder nicht erlaubt → Fallback
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(url)
-      toast.success('Link kopiert')
-    } catch {
-      toast.error('Link konnte nicht kopiert werden')
-    }
+  // Ein Weg für alle Teilen-Knöpfe der Hofseite; schließt der Kunde das
+  // Teilen-Menü, wird nichts kopiert (src/lib/teilen.ts).
+  function handleShare() {
+    void teileHof(farm)
   }
 
   function scrollToSection(id: string) {
@@ -710,8 +718,12 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
     // weiter unten). Er verschwindet nicht, er macht Pause.
     if (farm.products.length === 0 && farm.pickupSlots.length === 0) {
       return (
+        <>
+        {/* Ohne Titelbild: die Leiste steht von Anfang an. */}
+        <KundenKopf seite={kundenSeite} titel={farm.name} />
         <main
-          className="min-h-screen flex items-center justify-center p-6"
+          // Die Kopfleiste steht darüber: zusammen genau ein Bildschirm.
+          className="min-h-[calc(100dvh-3.5rem)] md:min-h-[calc(100dvh-4rem)] flex items-center justify-center p-6"
           style={{ background: 'linear-gradient(160deg, var(--landing-top) 0%, var(--app-chip-green) 100%)' }}
         >
           <div
@@ -733,6 +745,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
             </a>
           </div>
         </main>
+        </>
       )
     }
   }
@@ -783,6 +796,11 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
+      )}
+
+      {/* Nur für Kundinnen — die Vorschau im Bauern-Bereich hat dessen Navigation. */}
+      {!ownerMode && (
+        <KundenKopf seite={kundenSeite} titel={farm.name} titelbild={titelbild} />
       )}
 
       {/* Mode banner */}
@@ -848,7 +866,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           Fenster — in der Eigentümer-Vorschau nimmt die Seitenleiste 224px —
           fällt das Band zwischen md und etwa 1050px höher aus als das reine
           Verhältnis ergäbe. Ab dem Deckel ist es wieder identisch. */}
-      <div className="relative w-full h-[260px] md:h-[33vw] lg:h-[40vw] max-h-[420px]">
+      <div ref={titelbild} className="relative w-full h-[260px] md:h-[33vw] lg:h-[40vw] max-h-[420px]">
         {bannerBg === null ? (
           <Image
             src={farm.bannerUrl!}
@@ -869,6 +887,8 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
             background: 'linear-gradient(180deg, rgba(20,30,22,0) 45%, rgba(20,30,22,0.5) 100%)',
           }}
         />
+        {/* Handy: Zurück und Teilen über dem Bild, solange es im Blick ist. */}
+        {!ownerMode && <TitelbildKnoepfe seite={kundenSeite} onTeilen={handleShare} />}
         {/* Titelbild ändern + Fokus anpassen (edit only) */}
         {isEdit && adjustingFocus && (
           <CoverFocusAdjust
@@ -929,8 +949,10 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                   style={{ boxShadow: '0 2px 10px rgba(0,0,0,0.25)' }}
                 />
               )}
+              {/* Am Handy etwas kleiner: Der Block wächst nach oben, und oben
+                  stehen die runden Knöpfe (TitelbildKnoepfe). */}
               <h1
-                className="font-heading text-[38px] font-semibold text-white leading-tight"
+                className="font-heading text-[32px] md:text-[38px] font-semibold text-white leading-tight"
                 style={{ textShadow: '0 2px 14px rgba(0,0,0,0.4)' }}
               >
                 {farm.name}
@@ -1066,7 +1088,9 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
       {/* Tab-Leiste (Scroll-Navigation, sticky — Referenz 17) */}
       {!isEdit && (
         <nav
-          className="sticky top-0 z-30 px-4 md:px-10"
+          // Unter der Kopfleiste (56 px, ab md 64 px); in der Vorschau des
+          // Bauern-Bereichs gibt es keine, dort bleibt sie oben.
+          className={`sticky z-30 px-4 md:px-10 ${ownerMode ? 'top-0' : 'top-14 md:top-16'}`}
           style={{ background: 'var(--card)', borderBottom: '1px solid var(--border)', boxShadow: '0 2px 10px rgba(45,95,63,0.06)' }}
         >
           <div className="max-w-[960px] mx-auto flex gap-[26px]">
@@ -1095,7 +1119,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           die Markierung immer wieder auf „Übersicht" zurück (Meldung cmua8bof).
           Die drei Abschnitte sind jetzt Geschwister. */}
       <div className="max-w-[960px] mx-auto px-4 md:px-10 pt-[26px] pb-12">
-      <div id="uebersicht" className="scroll-mt-14">
+      <div id="uebersicht" className={ownerMode ? SPRUNGZIEL_OHNE_KOPF : SPRUNGZIEL_UNTER_KOPF}>
 
         {/* Nächste Abholung (Referenz 17, nur Kundenansicht).
             Bei Pause ausgeblendet: Termine anzukündigen, die man nicht buchen
@@ -1312,7 +1336,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
             aus, während eine Serie noch lief. Die Reihenfolge stellt der
             Effekt in GallerySection richtig, nicht ein Neuaufbau. */}
         {showGallery && (
-          <div id="fotos" className="mt-[26px] scroll-mt-14">
+          <div id="fotos" className={`mt-[26px] ${ownerMode ? SPRUNGZIEL_OHNE_KOPF : SPRUNGZIEL_UNTER_KOPF}`}>
             <GallerySection farm={farm} isEdit={isEdit} />
           </div>
         )}
@@ -1321,7 +1345,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
             Das Sprungziel umfasst Überschrift UND Raster. Vorher hing es nur an der
             Überschriftenzeile: eine flache Box, die nach dem Sprung oberhalb des
             Erkennungsstreifens lag und deshalb nie markiert wurde. */}
-        <div id="produkte" className="scroll-mt-14">
+        <div id="produkte" className={ownerMode ? SPRUNGZIEL_OHNE_KOPF : SPRUNGZIEL_UNTER_KOPF}>
         <div className="flex items-baseline gap-3 mt-[34px] mb-[18px]">
           <h2 className="font-heading text-[26px] font-semibold" style={{ color: 'var(--app-ink)' }}>
             Unsere Produkte

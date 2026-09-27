@@ -1,12 +1,11 @@
 'use client'
 
 import { useEffect } from 'react'
-
-const CART_KEY = 'bauernshop_cart'
+import { leereWarenkorb } from '@/lib/warenkorb-speicher'
 
 export function ClearCartOnMount() {
   useEffect(() => {
-    localStorage.removeItem(CART_KEY)
+    leereWarenkorb()
   }, [])
   return null
 }

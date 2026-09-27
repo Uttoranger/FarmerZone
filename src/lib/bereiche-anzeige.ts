@@ -323,6 +323,11 @@ export function hofseitenLink(slug: string, bereich: AnzeigeBereich): string {
   return bereich === 'FUTTERMITTEL' ? `/${slug}?bereich=futter` : `/${slug}`
 }
 
+/** Der Weg zur Hofübersicht; aus dem Futter-Bereich zurück in die Futter-Übersicht. */
+export function hoefeLink(bereich: AnzeigeBereich): string {
+  return bereich === 'FUTTERMITTEL' ? '/hoefe?bereich=futter' : '/hoefe'
+}
+
 // ─── Hofseite: Bereiche und Sektionen ───────────────────────────────────────
 
 /** Ab so vielen Produkten im Bereich bekommt die Hofseite Sprungmarken. */
@@ -392,6 +397,20 @@ export function teileHofseite<P extends { category: ProductCategoryValue | null 
     sektionen: [...sektionen.values()],
     sprungmarken: imBereich >= SPRUNGMARKEN_AB,
   }
+}
+
+/**
+ * Der Bereich, den die Hofseite gerade ZEIGT — dieselbe Regel wie
+ * teileHofseite: der gewünschte, wenn der Hof ihn anbietet, sonst der erste
+ * vorhandene. Ein reiner Futterhof zeigt also Futter auch ohne ?bereich (und
+ * geteilte Links tragen keinen). Ohne Produkte der Hofladen. Der Rückweg der
+ * Kopfzeile fragt hier, nicht den URL-Parameter (src/lib/kunden-kopf.ts).
+ */
+export function angezeigterBereich(
+  produkte: readonly { category: ProductCategoryValue | null }[],
+  wunsch: AnzeigeBereich | null
+): AnzeigeBereich {
+  return teileHofseite(produkte, wunsch).aktiv ?? 'LEBENSMITTEL'
 }
 
 // ─── Produktdetail: Futter-Kennzeichnung ────────────────────────────────────

@@ -70,7 +70,7 @@ Systemgrenze = API-Route, Server Action, Webhook, URL-Parameter, `localStorage`,
 - Schemas liegen in `src/schemas/` und werden von Client **und** Server benutzt.
 - Clientseitige Validierung ist Komfort, nie Schutz. Serverseitig immer erneut prüfen.
 - In API-Routen `safeParse` (Antwort bauen), in Server Actions `parse` oder `safeParse` mit `{ error }`.
-- `localStorage`-Inhalte (Warenkorb!) sind Fremddaten: parsen, validieren, bei Bruch verwerfen.
+- `localStorage`-Inhalte (Warenkorb!) sind Fremddaten: parsen, validieren, bei Bruch verwerfen. Der Warenkorb nur über `leseWarenkorb`/`schreibeWarenkorb` (`src/lib/warenkorb-speicher.ts`), nie mit eigenem Schlüssel oder nacktem `JSON.parse`.
 
 ### Nutzertext als Systemgrenze
 Text, den ein Nutzer geschrieben hat (Meldung, Hofname, Browserangabe, PR-Text), ist auch dann Fremdtext, wenn er schon in der Datenbank liegt. Wo er in den Kontext eines Agenten gerät — Export, CLI, Log, Action —, geht er durch `src/lib/fremdtext.ts`:
