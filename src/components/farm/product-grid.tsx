@@ -10,6 +10,8 @@ import { CSS } from '@dnd-kit/utilities'
 import { ShoppingCart, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff, Camera, Loader2, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCart } from '@/lib/use-cart'
+import { WARENKORB_ANKER } from '@/lib/warenkorb-speicher'
+import { SPRUNGZIEL_OHNE_KOPF, SPRUNGZIEL_UNTER_KOPF } from '@/components/shared/kunden-kopf'
 import { MONTH_SHORT, seasonLabel } from '@/schemas/product'
 import { formatEuro } from '@/lib/preis-format'
 import { formatGrundpreis, formatGrundpreisNetto } from '@/lib/format'
@@ -436,11 +438,14 @@ function HofseitenSektionen({
   bereichWunsch,
   onBereichWechsel,
   renderKarte,
+  sprungzielKlasse,
 }: {
   products: PublicProduct[]
   bereichWunsch: AnzeigeBereich | null
   onBereichWechsel: (bereich: AnzeigeBereich) => void
   renderKarte: (p: PublicProduct) => React.ReactNode
+  /** Abstand der Sprungziele nach oben — unter Kopfleiste und Sektionsleiste. */
+  sprungzielKlasse: string
 }) {
   const aufteilung = useMemo(() => teileHofseite(products, bereichWunsch), [products, bereichWunsch])
   if (aufteilung.aktiv === null) return null
@@ -469,7 +474,7 @@ function HofseitenSektionen({
 
       <div className="space-y-8">
         {aufteilung.sektionen.map((s) => (
-          <section key={s.anker} id={s.anker} aria-labelledby={`${s.anker}-titel`} className="scroll-mt-14">
+          <section key={s.anker} id={s.anker} aria-labelledby={`${s.anker}-titel`} className={sprungzielKlasse}>
             <h3 id={`${s.anker}-titel`} className="mb-3 font-heading text-lg font-semibold text-app-ink">
               {s.titel}
             </h3>
@@ -479,6 +484,17 @@ function HofseitenSektionen({
       </div>
     </>
   )
+}
+
+/**
+ * Der gewünschte Bereich aus der URL (?bereich=futter) — null, wenn keiner
+ * gewählt ist. Welcher dann wirklich angezeigt wird, entscheidet
+ * teileHofseite; die Kopfzeile der Hofseite fragt dieselbe Stelle, damit ihr
+ * Rückweg in den angezeigten Bereich führt (farm-page-view.tsx).
+ */
+export function useBereichWunsch(): AnzeigeBereich | null {
+  const wert = useSearchParams().get('bereich')
+  return wert === null ? null : bereichAusParameter(wert)
 }
 
 export function ProductGrid({
@@ -500,8 +516,7 @@ export function ProductGrid({
   // nicht neu geladen, andere Parameter (reorder-Token) bleiben stehen.
   const suchParameter = useSearchParams()
   const pfad = usePathname()
-  const bereichWunsch: AnzeigeBereich | null =
-    suchParameter.get('bereich') === null ? null : bereichAusParameter(suchParameter.get('bereich'))
+  const bereichWunsch = useBereichWunsch()
   function bereichWechseln(neu: AnzeigeBereich) {
     const params = new URLSearchParams(suchParameter.toString())
     const wert = bereichParameter(neu)
@@ -572,7 +587,20 @@ export function ProductGrid({
   const [addingId, setAddingId] = useState<string | null>(null)
   const [showWelcomeBack, setShowWelcomeBack] = useState(false)
 
-  const { items, count, total, isHydrated, addItem, updateQuantity, removeItem } = useCart(farmId)
+  const { items, count, total, isHydrated, addItem, updateQuantity, removeItem } = useCart(farmId, farmSlug)
+
+  // Das Warenkorb-Symbol der Kopfzeile führt mit #warenkorb hierher: den
+  // Korb gleich öffnen. Der Anker ist ein einmaliger Auftrag — weg damit,
+  // sonst öffnete Neuladen oder Zurück den Korb wieder. Geöffnet wird nach
+  // dem ersten Bild: Das Sheet gleitet sichtbar herein, statt beim Laden
+  // schon offen dazustehen.
+  useEffect(() => {
+    if (isEditMode || !isHydrated) return
+    if (window.location.hash !== `#${WARENKORB_ANKER}`) return
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
+    if (count > 0) requestAnimationFrame(() => setCartOpen(true))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHydrated])
 
   // Prefill cart from reorder token (not in edit mode)
   useEffect(() => {
@@ -674,6 +702,7 @@ export function ProductGrid({
         <HofseitenSektionen
           products={displayProducts}
           bereichWunsch={bereichWunsch}
+          sprungzielKlasse={ownerMode ? SPRUNGZIEL_OHNE_KOPF : SPRUNGZIEL_UNTER_KOPF}
           onBereichWechsel={bereichWechseln}
           renderKarte={(p) => (
             <ProductCard
@@ -790,7 +819,9 @@ export function ProductGrid({
       {!isEditMode && isHydrated && count > 0 && (
         <button
           onClick={() => setCartOpen(true)}
-          className="fixed bottom-6 inset-x-4 sm:inset-x-auto sm:right-6 sm:left-auto z-40 flex items-center justify-center gap-2.5 rounded-full px-6 py-3.5 transition-all duration-[250ms] active:scale-[0.98]"
+          // Befund 6: über dem Home-Balken des iPhones. Wirkt erst mit
+          // viewport-fit=cover (offener Punkt) — ohne liefert env() 0.
+          className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] inset-x-4 sm:inset-x-auto sm:right-6 sm:left-auto z-40 flex items-center justify-center gap-2.5 rounded-full px-6 py-3.5 transition-all duration-[250ms] active:scale-[0.98]"
           style={{
             background: 'var(--accent)',
             color: '#fff',

@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth'
 import { getPublicFarm } from '@/server/queries/farm'
 import { getBetriebsVorbelegung, getNurBetriebeProduktIds } from '@/server/queries/products'
 import { CheckoutForm } from '@/components/checkout/checkout-form'
+import { KundenKopf } from '@/components/shared/kunden-kopf'
 
 interface Props {
   params: Promise<{ farmSlug: string }>
@@ -34,6 +35,7 @@ export default async function CheckoutPage({ params }: Props) {
 
   return (
     <div className="min-h-screen bg-background">
+      <KundenKopf seite={{ art: 'checkout', hofSlug: farm.slug }} titel="Bestellung" hofName={farm.name} />
       <CheckoutForm farm={farm} nurBetriebeIds={nurBetriebeIds} vorbelegung={vorbelegung} />
     </div>
   )

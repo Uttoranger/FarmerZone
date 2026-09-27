@@ -6,6 +6,7 @@ import { bestellStatusAnzeige, formatiereAbholtermin, zahlungsAnzeige } from '@/
 import { formatEuro, formatPosition } from '@/lib/format'
 import { Marke } from '@/components/ui/marke'
 import { BestellSummenZeilen } from '@/components/checkout/bestell-summen'
+import { KundenKopf } from '@/components/shared/kunden-kopf'
 
 /**
  * Die Bestellseite der Kundin — erreichbar NUR über den signierten Link aus
@@ -33,6 +34,9 @@ export const metadata = {
 function LinkUngueltig() {
   return (
     <div className="min-h-screen bg-background">
+      {/* Ohne gültige Signatur ist nicht einmal der Hof bestätigt — der
+          Rückweg führt deshalb zur Hofübersicht, nicht zu /{farmSlug}. */}
+      <KundenKopf seite={{ art: 'info' }} titel="Bestellung" />
       <div className="mx-auto max-w-lg px-4 py-16 text-center">
         <h1 className="font-heading text-2xl font-semibold text-foreground">
           Dieser Link ist nicht gültig
@@ -112,6 +116,8 @@ export default async function BestellungPage({ params, searchParams }: Props) {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Zurück führt hier NIE durch den Verlauf — die Seite kommt aus einer Mail (kunden-kopf.ts). */}
+      <KundenKopf seite={{ art: 'bestellung', hofSlug: order.farm.slug }} titel="Deine Bestellung" hofName={order.farm.name} />
       <div className="mx-auto max-w-lg px-4 py-10">
         <p className="text-sm text-muted-foreground">
           Deine Bestellung bei{' '}

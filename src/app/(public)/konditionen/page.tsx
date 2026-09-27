@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ZurueckLink } from '@/components/shared/zurueck-link'
+import { KundenKopf } from '@/components/shared/kunden-kopf'
 import { KONTAKT_EMAIL } from '@/lib/support'
 import {
   MAX_GRUENDUNGSHOEFE,
@@ -34,12 +34,8 @@ const CTA_MAILTO = `mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent('Mein H
 export default function KonditionenPage() {
   return (
     <div className="min-h-screen bg-background">
+      <KundenKopf seite={{ art: 'info' }} titel="Konditionen" />
       <div className="max-w-2xl mx-auto px-4 py-10">
-        {/* Bewusst NICHT der `javascript:history.back()`-Link der Rechtsseiten:
-            React blockiert solche URLs, der Link dort tut nichts. Gleiche
-            Optik, funktionierendes Verhalten (siehe zurueck-link.tsx). */}
-        <ZurueckLink />
-
         {/* Kicker im Stil der Startseite */}
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Was es kostet

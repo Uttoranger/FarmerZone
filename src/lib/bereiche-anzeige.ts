@@ -323,6 +323,11 @@ export function hofseitenLink(slug: string, bereich: AnzeigeBereich): string {
   return bereich === 'FUTTERMITTEL' ? `/${slug}?bereich=futter` : `/${slug}`
 }
 
+/** Der Weg zur Hofübersicht; aus dem Futter-Bereich zurück in die Futter-Übersicht. */
+export function hoefeLink(bereich: AnzeigeBereich): string {
+  return bereich === 'FUTTERMITTEL' ? '/hoefe?bereich=futter' : '/hoefe'
+}
+
 // ─── Hofseite: Bereiche und Sektionen ───────────────────────────────────────
 
 /** Ab so vielen Produkten im Bereich bekommt die Hofseite Sprungmarken. */

@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
-import { ZurueckLink } from '@/components/shared/zurueck-link'
+import { KundenKopf } from '@/components/shared/kunden-kopf'
 import { MeldungForm } from '@/components/shared/meldung-form'
 import { generateFormToken } from '@/lib/form-token'
 
@@ -28,8 +28,8 @@ export default async function ProblemMeldenPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <KundenKopf seite={{ art: 'info' }} titel="Problem melden" />
       <div className="mx-auto max-w-2xl px-4 py-10">
-        <ZurueckLink className="mb-6 inline-block text-sm text-primary hover:underline" />
         <h1 className="font-heading text-2xl font-semibold text-foreground">Problem melden</h1>
         <p className="mb-6 mt-1 text-sm text-muted-foreground">
           Etwas funktioniert nicht, fehlt dir oder ist unklar? Schreib es uns — kurz und in deinen

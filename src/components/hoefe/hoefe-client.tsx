@@ -663,7 +663,8 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
         {filterLeiste}
         <div className="mt-1 grid grid-cols-2 items-start gap-6">
           <div>{liste(true)}</div>
-          <div className="sticky top-4 mt-4 flex h-[calc(100vh-2rem)] flex-col">
+          {/* Unter der Kopfzeile (64 px, kunden-kopf.tsx) plus Luft. */}
+          <div className="sticky top-20 mt-4 flex h-[calc(100vh-6rem)] flex-col">
             {koordinatenHinweis && <div className="mb-2">{koordinatenHinweis}</div>}
             <div className="min-h-0 flex-1">
               <HoefeKarte
@@ -706,7 +707,9 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
               scrollt ausschließlich horizontal. `overflow-hidden` clippt das
               hinausgeglittene Karussell — sonst stünde es sichtbar UNTER der
               Karte und finge dort Tipps. */}
-          <div className="relative overflow-hidden rounded-2xl">
+          {/* `isolate`: Karussell und Hinweis (z-[900]) bleiben in dieser
+              Stapelebene — sonst lägen sie beim Scrollen über der Kopfzeile. */}
+          <div className="relative isolate overflow-hidden rounded-2xl">
             <HoefeKarte
               hoefe={kartenHoefe}
               lage={sichtbareLage}
