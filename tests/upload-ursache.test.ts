@@ -136,7 +136,7 @@ describe('Übertragung — was der Bauer liest', () => {
   it('zählt eine Datei, die beim Senden unlesbar wird, als Lesefehler — nicht als Verbindungsabbruch', async () => {
     // Im gestückelten Weg liest das SDK die Datei selbst, Teilstück für
     // Teilstück. Ist die Freigabe dazwischen weg, lehnt der Browser genauso ab
-    // wie in der Lese-Stufe (#134). Lesbar war die Datei dort noch — hier ist
+    // wie in der Lese-Stufe (#135). Lesbar war die Datei dort noch — hier ist
     // also die Freigabe entzogen worden, und „Verbindung unterbrochen" hätte
     // den Bauern nach besserem Empfang suchen lassen.
     upload.mockImplementation(

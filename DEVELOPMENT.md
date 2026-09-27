@@ -1044,7 +1044,7 @@ Kachel am Anfang von Grunddaten, der Name heißt „Was verkaufst du?".
 
 ## Upload-Diagnose
 
-Jede Upload-Fehlermeldung endet auf eine Kennung wie `[L134]` — Buchstabe für die Ursache, Zahl für den Code-Stand (`UPLOAD_DIAG` in `src/lib/upload-fehler.ts`). Bei JEDER Verhaltensänderung am Upload-Ablauf muss die Zahl auf die Nummer des Sprints gehoben werden — eine veraltete Kennung ist schlimmer als keine, weil ein zugeschicktes Bildschirmfoto dann den falschen Stand behauptet.
+Jede Upload-Fehlermeldung endet auf eine Kennung wie `[L135]` — Buchstabe für die Ursache, Zahl für den Code-Stand (`UPLOAD_DIAG` in `src/lib/upload-fehler.ts`). Bei JEDER Verhaltensänderung am Upload-Ablauf muss die Zahl auf die Nummer des Sprints gehoben werden — eine veraltete Kennung ist schlimmer als keine, weil ein zugeschicktes Bildschirmfoto dann den falschen Stand behauptet.
 
 **Die Buchstaben:** E = das Gerät hat die Leseerlaubnis entzogen, L = die Quelle blieb stumm (Cloud-Album), D = Lesen gescheitert, Ursache unbestimmt, F = Format, S = Server und Verbindung unterbrochen (beide „nochmal versuchen"), B = der Bildspeicher hat das Foto nicht genommen, X = ehrlich unbestimmt. E, L und D sind alle drei die **Ursache `lesen`** — sie unterscheiden nur, was der Bauer liest.
 
@@ -1066,13 +1066,13 @@ Beim Lesen der Daten beachten (Stand `@vercel/blob` 2.4.0): Das SDK wiederholt N
 
 Das alles steht in einem flachen Kontext `uploadLesen` (`probeErgebnis`, `probeKlasse`, `probeMeldung`, `probeDauerMs`, `voll…`, `dateiAlterTage`). Die `voll…`-Felder fehlen, wenn die Probe gelang. Der Kontext geht bei jedem Upload-Fehler mit, auch wenn erst das Senden scheitert: Eine gescheiterte Probe vor einem Sendefehler ist dieselbe Spur.
 
-Die Meldung an den Bauern war in #133 noch für alle Fälle dieselbe; seit #134 folgt sie dem Befund (siehe unten).
+Die Meldung an den Bauern war in #133 noch für alle Fälle dieselbe; seit #135 folgt sie dem Befund (siehe unten).
 
 So liest man es:
 - `zeitlimit` in beiden Versuchen spricht für eine Quelle, die die Datei erst holen müsste (Cloud-Album); ein hohes `dateiAlterTage` stützt das.
 - `fehler` nach wenigen Millisekunden spricht für eine verweigerte oder verschwundene Datei.
 
-**Die Leseerlaubnis überlebt die Auswahl (#134, JAVASCRIPT-NEXTJS-4).** Das Issue zeigte einen Fall, den die Meldung falsch erklärte: Probe und Volllesen scheiterten nach 84 und 14 ms mit `NotReadableError` („permission problems … after a reference to a file was acquired"), an einem Foto, das **0 Tage alt** war, gewählt über „Galerie". Kein Cloud-Abruf antwortet in 84 ms — die Ursache lag bei uns.
+**Die Leseerlaubnis überlebt die Auswahl (#135, JAVASCRIPT-NEXTJS-4).** Das Issue zeigte einen Fall, den die Meldung falsch erklärte: Probe und Volllesen scheiterten nach 84 und 14 ms mit `NotReadableError` („permission problems … after a reference to a file was acquired"), an einem Foto, das **0 Tage alt** war, gewählt über „Galerie". Kein Cloud-Abruf antwortet in 84 ms — die Ursache lag bei uns.
 
 - **Ursache:** `foto-quellen.tsx` leerte das Datei-Feld im `onChange`, unmittelbar nach der Auswahl (`e.target.value = ''`, gedacht dafür, dass dieselbe Datei erneut gewählt werden kann). Auf Android-Chrome gibt genau dieser Schreibzugriff die Datei-Referenz frei: Das `File`-Objekt lebt weiter, seine Bytes kommen nicht mehr heraus.
 - **Die Regel jetzt** (`src/lib/foto-feld.ts`, zwei reine Funktionen): Geleert wird im **`onClick`** der drei Eingaben, unmittelbar bevor der Auswahldialog aufgeht; nach der Auswahl wird nur **gelesen**. Dieselbe Datei bleibt zweimal hintereinander wählbar — das Feld ist beim Öffnen leer, also feuert `change` auch bei gleichem Namen.

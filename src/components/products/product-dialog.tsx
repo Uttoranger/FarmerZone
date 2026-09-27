@@ -718,7 +718,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
           <DialogTitle>{isEdit ? 'Produkt bearbeiten' : 'Neues Produkt'}</DialogTitle>
         </DialogHeader>
 
-        {/* Die drei Datei-Felder bewusst HIER, außerhalb des Akkordeons (#134):
+        {/* Die drei Datei-Felder bewusst HIER, außerhalb des Akkordeons (#135):
             Base UI hängt einen zugeklappten Abschnitt aus dem DOM aus
             (keepMounted ist standardmäßig false). Gelesen wird die Datei aber
             erst beim Absenden — wer „Grunddaten" nach der Auswahl zuklappt,
@@ -773,7 +773,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                             >
                               <X className="h-4 w-4" />
                             </button>
-                            {/* Während des Absendens gesperrt (#134): Der Klick leert das
+                            {/* Während des Absendens gesperrt (#135): Der Klick leert das
                                 Datei-Feld, dessen Datei gerade übertragen wird. */}
                             <button
                               type="button"

@@ -181,7 +181,7 @@ export async function pruefeLesbarkeit(file: File, onLesen?: (lesen: LeseDiagnos
   if (voll.ergebnis === 'ok') return
 
   protokolliereBildFehler('lesen', file)
-  // Die Ursache bleibt 'lesen'; der TEXT folgt seit #134 dem, was wirklich war
+  // Die Ursache bleibt 'lesen'; der TEXT folgt seit #135 dem, was wirklich war
   // — entzogene Freigabe, stumme Quelle oder ehrlich unbestimmt.
   throw new BildFehler('lesen', leseFehlerText(ordneLeseFehler(lesen)))
 }
@@ -312,7 +312,7 @@ async function uebertrageOriginal(
         // hier für jeden Fehler der Netzfehler-Text.
         const urteil = ordneTransferFehler(e, abgebrochen)
         // Lesbar war die Datei in Stufe 0 — ist sie es beim Senden nicht mehr,
-        // ist das ein LESEFEHLER und kein Sendefehler (#134). Als BildFehler,
+        // ist das ein LESEFEHLER und kein Sendefehler (#135). Als BildFehler,
         // damit Sentry ihn unter 'lesen' zählt und eine Serie ihn unter dem
         // Kurzgrund „Datei nicht lesbar" listet.
         throw urteil === 'lesen'

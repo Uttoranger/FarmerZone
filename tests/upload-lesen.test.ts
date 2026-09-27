@@ -99,7 +99,7 @@ describe('Lese-Stufe — was Sentry erfährt (pruefeLesbarkeit)', () => {
     const { fehler, lesen } = await lies(datei(nie, nie))
 
     expect(bildFehlerArtVon(fehler)).toBe('lesen')
-    // Nur hier darf der Cloud-Text stehen: Etwas hat gewartet (#134).
+    // Nur hier darf der Cloud-Text stehen: Etwas hat gewartet (#135).
     expect((fehler as Error).message).toBe(IMAGE_READ_ERROR)
     expect(lesen).toEqual({
       probe: { ergebnis: 'zeitlimit', dauerMs: LESE_PROBE_LIMIT_MS },

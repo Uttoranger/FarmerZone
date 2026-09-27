@@ -114,7 +114,7 @@ function istSdkUrteil(fehler: unknown): boolean {
  * der Lese-Stufe) noch die des Blob-SDK (istSdkUrteil) — der Zweitversuch
  * würde nur Zeit und Datenvolumen verbrennen.
  *
- * Seit #134 gilt das auch für den entzogenen Leseverlust: Eine Datei, deren
+ * Seit #135 gilt das auch für den entzogenen Leseverlust: Eine Datei, deren
  * Freigabe weg ist, bekommt sie nicht dadurch zurück, dass wir es noch einmal
  * versuchen — sie muss neu ausgewählt werden.
  */

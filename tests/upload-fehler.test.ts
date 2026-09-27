@@ -47,7 +47,7 @@ afterEach(() => {
 
 describe('Zuordnung Fehlerart → Text', () => {
   it('behauptet bei nicht lesbarer Datei keine Ursache, solange keine bekannt ist', () => {
-    // Seit #134 hat 'lesen' DREI Texte (leseFehlerText), und die Ursache allein
+    // Seit #135 hat 'lesen' DREI Texte (leseFehlerText), und die Ursache allein
     // sagt nicht, welcher gilt. Der Standard nennt deshalb die Auswege, aber
     // keinen Grund — eine falsche Ursache ist schlimmer als gar keine.
     expect(bildFehlerText('lesen')).toBe(IMAGE_READ_UNCLEAR_ERROR)
@@ -215,13 +215,13 @@ describe('Ablehnung durch den Bildspeicher — eigener Text, keine Foto-Ursache'
 })
 
 describe('Diagnose-Kennung', () => {
-  it("steht auf '134' — dem letzten Sprint, der das Upload-Verhalten änderte", () => {
+  it("steht auf '135' — dem letzten Sprint, der das Upload-Verhalten änderte", () => {
     // Mit LITERAL festgenagelt (Lehre aus #69): Alle übrigen Kennungs-Tests
     // prüfen über die Konstante selbst und blieben bei jedem Wert grün —
     // genau so konnte '64' drei Verhaltensänderungen lang stehenbleiben.
     // Die Zähl-Regel: bei JEDER Verhaltensänderung am Upload-Ablauf auf die
     // Sprint-Nummer heben (upload-fehler.ts, DEVELOPMENT.md „Upload-Diagnose").
-    expect(UPLOAD_DIAG).toBe('134')
+    expect(UPLOAD_DIAG).toBe('135')
   })
 
   it('hängt an jede der drei Meldungen ein eigenes Kürzel mit dem Code-Stand', () => {

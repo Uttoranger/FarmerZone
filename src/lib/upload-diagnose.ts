@@ -145,7 +145,7 @@ function fehlerName(fehler: unknown): string | null {
  * BEKANNTE UNSCHÄRFE: Chrome meldet einen Leseverlust während eines `fetch`
  * auch als „Failed to fetch". Dieser Fall bleibt ein Netzfehler; ihn zusätzlich
  * zu beanspruchen hieße, jeden echten Abbruch zur entzogenen Freigabe zu
- * erklären — genau die falsche Auskunft, die #129 und #134 beseitigen.
+ * erklären — genau die falsche Auskunft, die #129 und #135 beseitigen.
  */
 export function istLeseVerlust(fehler: unknown): boolean {
   if (fehlerName(fehler) === 'NotReadableError') return true
@@ -212,7 +212,7 @@ export function ordneLeseFehler(lesen: LeseDiagnose): LeseUrteil {
 export function ordneTransferFehler(fehler: unknown, abgebrochen: boolean): TransferUrteil {
   if (abgebrochen) return 'netz'
   // Die Datei war in Stufe 0 lesbar und ist es jetzt nicht mehr: Dazwischen hat
-  // das Gerät die Freigabe zurückgezogen (#134). Vor der Netzfehler-Prüfung,
+  // das Gerät die Freigabe zurückgezogen (#135). Vor der Netzfehler-Prüfung,
   // weil das SDK dieselbe Ablehnung auch beim Lesen eines Teilstücks bekommt.
   if (istLeseVerlust(fehler)) return 'lesen'
   if (istNetzfehler(fehler)) return 'netz'

@@ -150,7 +150,7 @@ function GallerySection({ farm, isEdit }: { farm: PublicFarm; isEdit: boolean })
 
   // Sprint 18: optimistische Foto-Reihenfolge (null = Server-Stand).
   // Dieser Effekt ist auch der Grund, aus dem die Galerie nach einem neuen Foto
-  // NICHT mehr neu aufgebaut wird (#134): Der frische Server-Stand setzt die
+  // NICHT mehr neu aufgebaut wird (#135): Der frische Server-Stand setzt die
   // Reihenfolge hier zurück. Der alte Neuaufbau über einen key-Wechsel hätte
   // mitten in einer Serie die Datei-Felder ausgehängt — und damit auf Android
   // die Leseerlaubnis für die noch nicht übertragenen Fotos.
@@ -1307,7 +1307,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
 
         </div>{/* Ende #uebersicht */}
 
-        {/* Gallery section — BEWUSST ohne wechselnden key (#134): Der Neuaufbau
+        {/* Gallery section — BEWUSST ohne wechselnden key (#135): Der Neuaufbau
             nach jedem hinzugefügten Foto hängte die Datei-Felder der Galerie
             aus, während eine Serie noch lief. Die Reihenfolge stellt der
             Effekt in GallerySection richtig, nicht ein Neuaufbau. */}

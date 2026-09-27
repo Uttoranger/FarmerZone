@@ -55,7 +55,7 @@ export type BildFehlerArt = 'lesen' | 'format' | 'server'
  * entfernt: Kennung hier löschen, die Meldungen enden dann wieder auf ihren
  * letzten Satz.
  */
-export const UPLOAD_DIAG = '134'
+export const UPLOAD_DIAG = '135'
 
 /** Hängt die Kennung an eine Meldung. Ein Ort, alle Meldungen. */
 function mitKennung(text: string, buchstabe: 'E' | 'L' | 'D' | 'F' | 'S' | 'B' | 'X'): string {
@@ -72,7 +72,7 @@ function mitKennung(text: string, buchstabe: 'E' | 'L' | 'D' | 'F' | 'S' | 'B' |
  * Teilen an die installierte App — beim Teilen stellt die Galerie die Bytes
  * selbst bereit, inklusive Cloud-Abruf.
  *
- * Seit #134 NUR noch für den Ablauf am Zeitlimit. Vorher stand dieser Text
+ * Seit #135 NUR noch für den Ablauf am Zeitlimit. Vorher stand dieser Text
  * hinter jedem Lesefehler, auch hinter dem sofortigen NotReadableError bei
  * einem Foto, das 0 Tage alt war (JAVASCRIPT-NEXTJS-4) — dort war das
  * Cloud-Album eine Erfindung, und der Bauer suchte in seinen Album-
@@ -219,7 +219,7 @@ export const IMAGE_UNKNOWN_ERROR = mitKennung(
  *   bildspeicher  Das SDK meldet, dass der Bildspeicher das Foto nicht
  *                 genommen hat (Ablehnung oder nicht verfügbar).
  *   lesen         Die Datei ist während des Sendens unlesbar geworden. Seit
- *                 #134 ein eigenes Urteil: Gelesen wurde sie in Stufe 0
+ *                 #135 ein eigenes Urteil: Gelesen wurde sie in Stufe 0
  *                 noch, also hat das Gerät die Freigabe dazwischen
  *                 zurückgezogen — „Verbindung unterbrochen" schickte den
  *                 Bauern auf die Suche nach besserem Empfang.
@@ -252,7 +252,7 @@ const KURZ: Record<BildFehlerArt, string> = {
 /**
  * Der Text zur Ursache, wenn nichts Genaueres bekannt ist.
  *
- * Für 'lesen' ist das seit #134 der unbestimmte Text, nicht mehr der
+ * Für 'lesen' ist das seit #135 der unbestimmte Text, nicht mehr der
  * Cloud-Text: Wer nur die Ursache kennt, weiß nicht, ob die Quelle stumm blieb
  * oder die Freigabe entzogen wurde — und darf dann keine von beiden behaupten.
  * Den genauen Text setzt die Lese-Stufe über `leseFehlerText` selbst
@@ -320,7 +320,7 @@ export function bildFehlerArtVon(e: unknown): BildFehlerArt | null {
  * es bei seiner eigenen Meldung, und es wird auch nichts protokolliert.
  *
  * Trägt ein Foto-Fehler einen eigenen Text, gilt der: Die Lese-Stufe
- * unterscheidet drei Fälle, die alle die Ursache 'lesen' haben (#134). Der
+ * unterscheidet drei Fälle, die alle die Ursache 'lesen' haben (#135). Der
  * Kurzgrund bleibt der der Ursache — eine Serie listet Gründe, keine Fälle.
  */
 export function bildFehlerMeldung(e: unknown): {

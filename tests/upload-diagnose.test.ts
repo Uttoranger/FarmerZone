@@ -116,7 +116,7 @@ describe('ordneTransferFehler — was der Bauer liest', () => {
 
   it("nennt eine Datei, die beim Senden unlesbar wird, 'lesen' — nicht 'netz'", () => {
     // Lesbar war sie in Stufe 0; im gestückelten Weg liest das SDK sie selbst
-    // weiter (#134). Auch wenn nur die Nachricht durch eine fremde Schicht kam.
+    // weiter (#135). Auch wenn nur die Nachricht durch eine fremde Schicht kam.
     expect(ordneTransferFehler(nichtLesbar(), false)).toBe('lesen')
     expect(ordneTransferFehler(new Error(`Vercel Blob: ${nichtLesbar().message}`), false)).toBe('lesen')
   })

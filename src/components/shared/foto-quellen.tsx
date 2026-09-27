@@ -20,7 +20,7 @@ import { dateienAusFeld, leereDateiFeld } from '@/lib/foto-feld'
  * der Auswahl ist der Ablauf exakt der bestehende: onFiles bekommt die
  * Dateien, sonst ändert sich nichts.
  *
- * Seit #134 wird das Datei-Feld beim KLICK geleert, nicht nach der Auswahl:
+ * Seit #135 wird das Datei-Feld beim KLICK geleert, nicht nach der Auswahl:
  * Ein Schreibzugriff auf `value` entzieht auf Android-Chrome die Leseerlaubnis
  * für ein Foto aus der Galerie (JAVASCRIPT-NEXTJS-4). Die Reihenfolge und ihre
  * Begründung stehen in src/lib/foto-feld.ts.
@@ -42,7 +42,7 @@ export function useFotoQuellen({
   const [menueOffen, setMenueOffen] = useState(false)
 
   /**
-   * Geleert wird VOR dem Auswahldialog, nicht nach der Auswahl (#134).
+   * Geleert wird VOR dem Auswahldialog, nicht nach der Auswahl (#135).
    *
    * `e.currentTarget` ist das angeklickte Feld — derselbe Handler taugt für
    * alle drei. `.click()` aus `oeffnen`/`waehle` löst ihn genauso aus wie ein
