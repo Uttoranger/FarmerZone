@@ -8,8 +8,12 @@
  *
  * Seit JAVASCRIPT-NEXTJS-5 dazu: der zweite Leseversuch nach einer Pause
  * (nur nach sofortiger Ablehnung), das Format an den ersten Bytes (HEIC nie
- * hochladen, auf dem Rettungsweg muss es ein Bild sein) und die Meldung
+ * hochladen, über die Dateien-App muss es ein Bild sein) und die Meldung
  * ohne Dateialter.
+ *
+ * Seit JAVASCRIPT-NEXTJS-6: Nach der Probe wird die ganze Datei einmal als
+ * Kopie gelesen; das Format entscheidet sich an der Kopie. Brachte schon das
+ * Volllesen die Datei, ist das die Kopie.
  *
  * Geprüft wird der echte Ablauf in pruefeLesbarkeit. Die Datei ist eine
  * Attrappe, deren zwei Lesewege nach einer festen Zeit liefern, scheitern
@@ -82,7 +86,7 @@ function datei(probe: () => Promise<ArrayBuffer>, voll: () => Promise<ArrayBuffe
 }
 
 /** Lässt die Lese-Stufe laufen und sammelt Ausgang und Diagnose. */
-async function lies(f: File, weg: FotoWeg = 'standard', zeitMs = LESE_PROBE_LIMIT_MS + LESE_VOLL_LIMIT_MS) {
+async function lies(f: File, weg: FotoWeg = 'galerie', zeitMs = LESE_PROBE_LIMIT_MS + LESE_VOLL_LIMIT_MS) {
   let lesen: LeseDiagnose | undefined
   const ausgang = pruefeLesbarkeit(f, {
     weg,
@@ -185,14 +189,42 @@ describe('Lese-Stufe — was Sentry erfährt (pruefeLesbarkeit)', () => {
     })
   })
 
-  it('gelingt die Probe, gibt es kein Volllesen — und keinen Eintrag dafür', async () => {
+  it('gelingt die Probe, wird die Datei einmal ganz gelesen — als Kopie, nicht als Volllesen', async () => {
     const volllesen = vi.fn(liefertNach(1))
     const { fehler, lesen } = await lies(datei(liefertNach(4), volllesen))
 
     expect(fehler).toBeUndefined()
-    expect(volllesen).not.toHaveBeenCalled()
-    expect(lesen).toEqual({ probe: { ergebnis: 'ok', dauerMs: 4 } })
+    expect(volllesen).toHaveBeenCalledTimes(1)
+    expect(lesen).toEqual({ probe: { ergebnis: 'ok', dauerMs: 4 }, kopie: { ergebnis: 'ok', dauerMs: 1 } })
     expect(lesen && 'voll' in lesen).toBe(false)
+  })
+
+  it('brachte schon das Volllesen die Datei, ist das die Kopie — kein zweites Lesen', async () => {
+    const volllesen = vi.fn(liefertNach(900))
+    const { fehler, lesen } = await lies(datei(scheitertNach(12, nichtLesbar()), volllesen))
+
+    expect(fehler).toBeUndefined()
+    expect(volllesen).toHaveBeenCalledTimes(1)
+    expect(lesen && 'kopie' in lesen).toBe(false)
+  })
+
+  it('scheitert die Kopie nach gelungener Probe, ist es ein Lesefehler — mit ihrem Befund und Urteil', async () => {
+    // JAVASCRIPT-NEXTJS-6: Die Probe gelang, das Ganze kam nicht heraus.
+    const { fehler, lesen } = await lies(datei(liefertNach(4), scheitertNach(30, nichtLesbar())))
+
+    expect(bildFehlerArtVon(fehler)).toBe('lesen')
+    expect((fehler as Error).message).toBe(IMAGE_READ_PERMISSION_ERROR)
+    expect(lesen).toEqual({
+      probe: { ergebnis: 'ok', dauerMs: 4 },
+      kopie: { ergebnis: 'fehler', klasse: 'NotReadableError', meldung: nichtLesbar().message, dauerMs: 30 },
+    })
+  })
+
+  it('bleibt die Kopie stumm, greift der Zeitwächter des Volllesens — die stumme Quelle', async () => {
+    const { fehler, lesen } = await lies(datei(liefertNach(4), nie))
+
+    expect((fehler as Error).message).toBe(IMAGE_READ_ERROR)
+    expect(lesen?.kopie).toEqual({ ergebnis: 'zeitlimit', dauerMs: LESE_VOLL_LIMIT_MS })
   })
 
   it('nennt den Namen auch, wenn der Browser eine DOMException liefert, die kein Error ist', async () => {
@@ -243,19 +275,22 @@ describe('Lese-Stufe — was Sentry erfährt (pruefeLesbarkeit)', () => {
 describe('Netz 1 — der zweite Leseversuch (JAVASCRIPT-NEXTJS-5)', () => {
   it('nach sofortiger Ablehnung EIN weiterer Versuch nach der Pause — gelingt er, geht es weiter', async () => {
     let aufrufe = 0
-    // Die Probe scheitert beim ersten Mal sofort, beim zweiten liefert sie.
+    // Die Probe scheitert beim ersten Mal sofort, beim zweiten liefert sie —
+    // und mit der Freigabe kommt auch das Ganze für die Kopie heraus.
     const probe = () => (aufrufe++ === 0 ? scheitertNach(84, nichtLesbar())() : liefertNach(3)())
-    const volllesen = vi.fn(scheitertNach(14, nichtLesbar()))
+    let ganz = 0
+    const volllesen = vi.fn(() => (ganz++ === 0 ? scheitertNach(14, nichtLesbar())() : liefertNach(2)()))
 
     const { fehler, lesen } = await lies(datei(probe, volllesen))
 
     expect(fehler).toBeUndefined()
     expect(aufrufe).toBe(2)
-    expect(volllesen).toHaveBeenCalledTimes(1)
+    expect(volllesen).toHaveBeenCalledTimes(2)
     expect(lesen).toEqual({
       probe: { ergebnis: 'fehler', klasse: 'NotReadableError', meldung: nichtLesbar().message, dauerMs: 84 },
       voll: { ergebnis: 'fehler', klasse: 'NotReadableError', meldung: nichtLesbar().message, dauerMs: 14 },
       zweiterVersuch: { ergebnis: 'ok', dauerMs: 3 },
+      kopie: { ergebnis: 'ok', dauerMs: 2 },
     })
   })
 
@@ -316,10 +351,10 @@ describe('Netz 1 — der zweite Leseversuch (JAVASCRIPT-NEXTJS-5)', () => {
   })
 })
 
-describe('Das Format an den ersten Bytes — vor jedem Transfer', () => {
+describe('Das Format an den ersten Bytes der Kopie — vor jedem Transfer', () => {
   it('HEIC wird auf keinem Weg hochgeladen: eigener Fehler, ohne Fachwort', async () => {
-    for (const weg of ['standard', 'kamera', 'rettung'] as const) {
-      const { fehler } = await lies(datei(liefertNach(2, heicBytes), liefertNach(1)), weg)
+    for (const weg of ['galerie', 'kamera', 'dateien'] as const) {
+      const { fehler } = await lies(datei(liefertNach(2, heicBytes), liefertNach(1, heicBytes)), weg)
 
       expect(bildFehlerArtVon(fehler), weg).toBe('heic')
       expect((fehler as Error).message).toBe(IMAGE_HEIC_ERROR)
@@ -335,20 +370,28 @@ describe('Das Format an den ersten Bytes — vor jedem Transfer', () => {
   it('erkennt HEIC auch nach dem zweiten Leseversuch', async () => {
     let aufrufe = 0
     const probe = () => (aufrufe++ === 0 ? scheitertNach(5, nichtLesbar())() : liefertNach(3, heicBytes)())
-    const { fehler } = await lies(datei(probe, scheitertNach(5, nichtLesbar())))
+    let ganz = 0
+    const volllesen = () => (ganz++ === 0 ? scheitertNach(5, nichtLesbar())() : liefertNach(3, heicBytes)())
+    const { fehler } = await lies(datei(probe, volllesen))
 
     expect(bildFehlerArtVon(fehler)).toBe('heic')
   })
 
-  it('auf dem Rettungsweg muss es ein Bild sein — sonst „kein Foto"', async () => {
-    const { fehler } = await lies(datei(liefertNach(2, textBytes), liefertNach(1)), 'rettung')
+  it('entscheidet an der Kopie, nicht an der Probe — geprüft wird, was übertragen wird', async () => {
+    const { fehler } = await lies(datei(liefertNach(2, jpegBytes), liefertNach(1, heicBytes)))
+
+    expect(bildFehlerArtVon(fehler)).toBe('heic')
+  })
+
+  it('über die Dateien-App muss es ein Bild sein — sonst „kein Foto"', async () => {
+    const { fehler } = await lies(datei(liefertNach(2, textBytes), liefertNach(1, textBytes)), 'dateien')
 
     expect(bildFehlerArtVon(fehler)).toBe('kein-foto')
     expect((fehler as Error).message).toBe(IMAGE_NOT_PHOTO_ERROR)
   })
 
   it('auf den anderen Wegen bleibt Unbekanntes dem Server überlassen — wie bisher', async () => {
-    const { fehler } = await lies(datei(liefertNach(2, textBytes), liefertNach(1)), 'standard')
+    const { fehler } = await lies(datei(liefertNach(2, textBytes), liefertNach(1, textBytes)), 'galerie')
     expect(fehler).toBeUndefined()
 
     const leer = await lies(datei(liefertNach(2, () => new ArrayBuffer(0)), liefertNach(1)), 'kamera')
@@ -418,7 +461,7 @@ describe('Meldung an Sentry — Kontext uploadLesen', () => {
     probe: { ergebnis: 'fehler', klasse: 'NotReadableError', meldung: 'nicht lesbar', dauerMs: 12 },
     voll: { ergebnis: 'zeitlimit', dauerMs: LESE_VOLL_LIMIT_MS },
   }
-  const eingabe = { ursache: 'lesen' as const, datei: { size: 6_000_000, type: 'image/jpeg' }, weg: 'standard' as const, versuche: 0 }
+  const eingabe = { ursache: 'lesen' as const, datei: { size: 6_000_000, type: 'image/jpeg' }, weg: 'galerie' as const, versuche: 0 }
 
   it('legt Probe und Volllesen flach in einen Kontext — Sentry kürzt ab der dritten Ebene', () => {
     const meldung = baueUploadMeldung({ ...eingabe, lesen })
@@ -463,6 +506,25 @@ describe('Meldung an Sentry — Kontext uploadLesen', () => {
     })
   })
 
+  it('legt auch die Kopie flach in den Kontext — mit ihrem Fehler, wenn sie scheiterte', () => {
+    const meldung = baueUploadMeldung({
+      ...eingabe,
+      lesen: {
+        probe: { ergebnis: 'ok', dauerMs: 88 },
+        kopie: { ergebnis: 'fehler', klasse: 'NotReadableError', meldung: 'x', dauerMs: 1_219 },
+      },
+    })
+    expect(meldung.contexts.uploadLesen).toEqual({
+      probeErgebnis: 'ok',
+      probeDauerMs: 88,
+      kopieErgebnis: 'fehler',
+      kopieKlasse: 'NotReadableError',
+      kopieMeldung: 'x',
+      kopieDauerMs: 1_219,
+      zweiterVersuchGeholfen: null,
+    })
+  })
+
   it('ohne Volllesen nur die Probe — und ohne Lese-Diagnose kein Kontext; kein Dateialter mehr', () => {
     const nurProbe = baueUploadMeldung({ ...eingabe, lesen: { probe: { ergebnis: 'ok', dauerMs: 4 } } })
     expect(nurProbe.contexts.uploadLesen).toEqual({ probeErgebnis: 'ok', probeDauerMs: 4, zweiterVersuchGeholfen: null })
@@ -471,8 +533,8 @@ describe('Meldung an Sentry — Kontext uploadLesen', () => {
   })
 
   it('trägt den Weg und die Android-Version — null, wo keine bekannt ist', () => {
-    const meldung = baueUploadMeldung({ ...eingabe, weg: 'rettung', androidVersion: 13 })
-    expect(meldung.contexts.upload).toMatchObject({ weg: 'rettung', androidVersion: 13 })
+    const meldung = baueUploadMeldung({ ...eingabe, weg: 'dateien', androidVersion: 13 })
+    expect(meldung.contexts.upload).toMatchObject({ weg: 'dateien', androidVersion: 13 })
     expect(baueUploadMeldung(eingabe).contexts.upload.androidVersion).toBeNull()
   })
 
@@ -480,7 +542,7 @@ describe('Meldung an Sentry — Kontext uploadLesen', () => {
     vi.mocked(Sentry.captureException).mockClear()
     const fehler = new BildFehler('lesen')
 
-    meldeUploadFehler(fehler, { datei: eingabe.datei, weg: 'standard', versuche: 0, lesen })
+    meldeUploadFehler(fehler, { datei: eingabe.datei, weg: 'galerie', versuche: 0, lesen })
 
     expect(Sentry.captureException).toHaveBeenCalledWith(
       fehler,
@@ -497,14 +559,14 @@ describe('Meldung an Sentry — Kontext uploadLesen', () => {
     vi.mocked(Sentry.captureException).mockClear()
     const fehler = new BildFehler('heic')
 
-    meldeUploadFehler(fehler, { datei: { size: 3_400_000, type: 'image/heic' }, weg: 'standard', versuche: 0 })
+    meldeUploadFehler(fehler, { datei: { size: 3_400_000, type: 'image/heic' }, weg: 'dateien', versuche: 0 })
 
     expect(Sentry.captureException).toHaveBeenCalledWith(
       fehler,
       expect.objectContaining({
         tags: expect.objectContaining({ ursache: 'heic' }),
         contexts: expect.objectContaining({
-          upload: expect.objectContaining({ weg: 'standard', dateiGroesseBytes: 3_400_000, dateiTyp: 'image/heic' }),
+          upload: expect.objectContaining({ weg: 'dateien', dateiGroesseBytes: 3_400_000, dateiTyp: 'image/heic' }),
         }),
       })
     )

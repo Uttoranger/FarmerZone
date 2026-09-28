@@ -7,11 +7,11 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { Camera, X, Leaf, Thermometer, Snowflake, ChevronRight, Info, Sparkles } from 'lucide-react'
 import { ladeFotoHoch, pruefeLesbarkeit, stufenText, type UploadStufe } from '@/components/shared/image-upload'
-import { useFotoQuellen, type FotoQuellenWeg } from '@/components/shared/foto-quellen'
+import { useFotoQuellen, type FotoAuswahl } from '@/components/shared/foto-quellen'
 import { ordneLeseFehler, type LeseDiagnose, type UploadDiagnose } from '@/lib/upload-diagnose'
-import { bildFehlerMeldung, karteText } from '@/lib/upload-fehler'
+import { bildFehlerArtVon, bildFehlerMeldung, karteText } from '@/lib/upload-fehler'
 import { IM_SHOP, NICHT_IM_SHOP } from '@/lib/produkt-sichtbarkeit'
-import { meldeUploadFehler, type UploadWeg } from '@/lib/upload-meldung'
+import { meldeUploadFehler } from '@/lib/upload-meldung'
 import { naechsterSchritt } from '@/lib/foto-wege'
 import { MAX_ORIGINAL_BYTES } from '@/lib/upload-pfade'
 import {
@@ -315,6 +315,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
     stufe: UploadStufe
     prozent: number
   } | null>(null)
+  // Seit JAVASCRIPT-NEXTJS-6 die KOPIE im Speicher aus pruefeLesbarkeit, nie
+  // die Datei vom Gerät: Bis zum Absenden können Minuten vergehen.
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   // Solange die Lese-Stufe bei der Auswahl läuft (höchstens 28 s + Pause).
@@ -342,16 +344,16 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
   const [festePakete, setFestePakete] = useState(false)
   const [saisonal, setSaisonal] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
-  // Über welchen Weg das gewählte Foto kam — nur für die Sentry-Meldung;
-  // der Upload läuft hier erst beim Absenden, also bis dahin merken.
-  const gewaehlterWeg = useRef<UploadWeg>('standard')
+  // Über welchen Weg und warum das gewählte Foto kam — nur für die
+  // Sentry-Meldung; der Upload läuft hier erst beim Absenden, also bis dahin merken.
+  const gewaehlteAuswahl = useRef<FotoAuswahl>({ weg: 'galerie', wahl: 'standard' })
   // Dieselben zwei Knöpfe und dieselbe Karte wie im Upload-Hook, damit es nur
   // EIN Menü gibt. Zweck 'product': Die Karte bietet hier kein Teilen an,
   // /teilen kann nur Titelbild und Hofgalerie.
   const fotoQuellen = useFotoQuellen({
     zweck: 'product',
-    onFiles: ([datei], weg) => {
-      void pruefeUndUebernehme(datei, weg)
+    onFiles: ([datei], auswahl) => {
+      void pruefeUndUebernehme(datei, auswahl)
     },
   })
 
@@ -501,10 +503,11 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
   /**
    * Die Lese-Stufe samt zweitem Versuch schon bei der Auswahl: Der Dialog
    * lädt erst beim Absenden, Minuten später — die Karte gehört hierher, nicht
-   * mitten ins Speichern. Beim Absenden liest ladeFotoHoch noch einmal (die
-   * 64-KB-Probe kostet nichts); scheitert es erst dort, bleibt die Meldung.
+   * mitten ins Speichern. Übernommen wird die KOPIE aus der Lese-Stufe
+   * (JAVASCRIPT-NEXTJS-6): Beim Absenden wird nichts mehr vom Gerät gelesen,
+   * die Übertragung nimmt genau diese Kopie.
    */
-  async function pruefeUndUebernehme(file: File, weg: FotoQuellenWeg) {
+  async function pruefeUndUebernehme(file: File, auswahl: FotoAuswahl) {
     if (file.size > MAX_ORIGINAL_BYTES) {
       toast.error('Datei zu groß (max. 25 MB)')
       return
@@ -512,24 +515,27 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
     const nr = ++pruefungNr.current
     setPruefeFoto(true)
     let lesen: LeseDiagnose | undefined
+    let kopie: File
     try {
-      await pruefeLesbarkeit(file, {
-        weg,
+      kopie = await pruefeLesbarkeit(file, {
+        weg: auswahl.weg,
         onLesen: (l) => {
           lesen = l
         },
       })
     } catch (e) {
       // Nach Sentry wie im Upload-Hook (kein Dateiname — upload-meldung.ts) —
-      // auch veraltet, denn der Fehler war echt.
-      meldeUploadFehler(e, { datei: file, weg, versuche: 0, lesen })
+      // auch veraltet, denn der Fehler war echt. Aus demselben Grund zählt er
+      // für den gemerkten Weg: Nur ein Lesefehler sagt etwas über den Weg.
+      meldeUploadFehler(e, { datei: file, weg: auswahl.weg, wahl: auswahl.wahl, versuche: 0, lesen })
+      fotoQuellen.meldeErgebnis(auswahl, bildFehlerArtVon(e) !== 'lesen')
       if (nr !== pruefungNr.current) return
       // Die Karte, wo das Foto oder der Weg das Problem war; sonst die Meldung.
       const { text, art } = bildFehlerMeldung(e)
       const schritt = naechsterSchritt(art)
       if (schritt.art === 'karte') {
         const urteil = lesen ? ordneLeseFehler(lesen) : 'unbestimmt'
-        fotoQuellen.zeigeKarte({ grund: schritt.grund, text: karteText(schritt.grund, urteil) }, [file])
+        fotoQuellen.zeigeKarte({ grund: schritt.grund, text: karteText(schritt.grund, urteil) }, auswahl, [file])
       } else {
         toast.error(text)
       }
@@ -537,12 +543,13 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
     } finally {
       if (nr === pruefungNr.current) setPruefeFoto(false)
     }
+    fotoQuellen.meldeErgebnis(auswahl, true)
     // Veraltet: Inzwischen wurde ein anderes Foto gewählt oder der Dialog gewechselt.
     if (nr !== pruefungNr.current) return
-    // Der Weg gehört zur ANGENOMMENEN Datei — eine gescheiterte Rettung
+    // Die Auswahl gehört zur ANGENOMMENEN Datei — ein gescheiterter Ausweg
     // darf der zuvor angenommenen keinen falschen Weg anhängen.
-    gewaehlterWeg.current = weg
-    uebernehmeFoto(file)
+    gewaehlteAuswahl.current = auswahl
+    uebernehmeFoto(kopie)
   }
 
   function uebernehmeFoto(file: File) {
@@ -561,6 +568,16 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
     setSelectedFile(null)
     setPreviewUrl(null)
     form.setValue('imageUrl', '')
+  }
+
+  /**
+   * Nach dem Speichern: Die Kopie (bis 25 MB im Speicher) wird nicht mehr
+   * gebraucht. Die Vorschau-Adresse hält sie sonst fest, bis der Dialog das
+   * nächste Mal aufgeht; das Bild selbst ist schon gezeichnet und bleibt stehen.
+   */
+  function gibKopieFrei() {
+    if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl)
+    setSelectedFile(null)
   }
 
   function toggleAllergen(id: string) {
@@ -691,7 +708,9 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
         try {
           imageUrl = await ladeFotoHoch(selectedFile, 'product', {
             altUrl: isEdit ? (product.imageUrl ?? undefined) : undefined,
-            weg: gewaehlterWeg.current,
+            weg: gewaehlteAuswahl.current.weg,
+            // Geprüft und kopiert bei der Auswahl (pruefeUndUebernehme).
+            bereitsKopiert: true,
             onStufe: (stufe) =>
               setUploadFortschritt((v) => ({ stufe, prozent: v?.prozent ?? 0 })),
             onFortschritt: (prozent) =>
@@ -711,7 +730,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
           // Weg/Versuche/Originalfehler, kein Dateiname — upload-meldung.ts).
           meldeUploadFehler(e, {
             datei: selectedFile,
-            weg: gewaehlterWeg.current,
+            weg: gewaehlteAuswahl.current.weg,
+            wahl: gewaehlteAuswahl.current.wahl,
             versuche,
             diagnose,
             lesen,
@@ -734,6 +754,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
         return
       }
       toast.success(isEdit ? 'Produkt gespeichert' : 'Produkt angelegt')
+      gibKopieFrei()
       onClose()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Wir konnten das Produkt nicht speichern. Bitte versuch es noch einmal.')

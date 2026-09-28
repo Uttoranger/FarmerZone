@@ -334,18 +334,27 @@ gegen `background` **und** gegen `card`.
   stehen als reine Funktionen in `src/lib/foto-feld.ts`. Gilt auch, wo erst
   später hochgeladen wird (Produktdialog: beim Absenden).
 - **Fotos kommen über `useFotoQuellen`** (`src/components/shared/foto-quellen.tsx`):
-  zwei Knöpfe („Foto wählen" mit `accept="image/*"` ohne `capture`, „Foto
-  aufnehmen"), die Rettungs-Eingabe nur über die Karte. Nie eine dritte
-  Eingabe daneben, nie ein eigenes `accept` — das breite `accept` ist der Grund,
-  warum Android die Dateien-App statt der Fotoauswahl zeigt, und gehört nur zur
-  Rettung. Was nach einem Fehler kommt, entscheidet `src/lib/foto-wege.ts`
-  (Karte oder Meldung, zweiter Leseversuch); die Komponente führt nur aus.
+  zwei Knöpfe („Foto wählen", „Foto aufnehmen") über drei verborgenen Eingaben —
+  Galerie (`accept="image/*"` ohne `capture`), Dateien-App (breites `accept`),
+  Kamera. Nie eine vierte Eingabe daneben, nie ein eigenes `accept`. Welchen Weg
+  „Foto wählen" öffnet (`ersterWeg`: Android die Dateien-App, sonst die Galerie,
+  ein gemerkter Weg sticht), was der Ausweg der Karte ist (`auswegFuer`) und wann
+  der Weg gemerkt oder vergessen wird (`merkerNachErgebnis`), entscheidet
+  `src/lib/foto-wege.ts`; die Komponente führt nur aus. Wer `onFiles` bekommt,
+  meldet das Ergebnis jeder Auswahl über `meldeErgebnis` zurück.
 - **Das Bildformat wird an den ersten Bytes entschieden** (`bildFormat`), nie am
   MIME-Typ oder Dateinamen. HEIC wird nie hochgeladen (`BildFehler('heic')`, ohne
-  Fachwort für den Bauern); auf dem Rettungsweg muss es ein Bild sein. Beides in
+  Fachwort für den Bauern); über die Dateien-App muss es ein Bild sein. Beides in
   der Lese-Stufe (`pruefeLesbarkeit`), bevor der Transfer beginnt.
+- **Übertragen wird nur die Kopie, nie die Datei vom Gerät.** `pruefeLesbarkeit`
+  liest das Foto nach der Probe einmal ganz und gibt es als `File` im Speicher
+  zurück; Formatprüfung und Upload nehmen nur diese Kopie. Ein Aufrufer, der die
+  Kopie schon hat, übergibt sie mit `bereitsKopiert: true` an `ladeFotoHoch` —
+  nie eine Datei direkt aus der Eingabe. Mehrere Fotos nacheinander, nie alle
+  Kopien auf einmal im Speicher.
 - **Wer erst später hochlädt, prüft die Datei bei der Auswahl** (`pruefeLesbarkeit`
-  mit `weg`), damit die Karte dort erscheint und nicht mitten im Speichern.
+  mit `weg`), behält die Kopie statt der Datei und gibt sie nach dem Speichern
+  frei — damit die Karte bei der Auswahl erscheint und nicht mitten im Speichern.
 
 ---
 

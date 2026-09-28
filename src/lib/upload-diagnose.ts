@@ -48,10 +48,19 @@ export type LeseErgebnis = LeseVersuch['ergebnis']
  * scheiterte das Volllesen, und nur nach einer sofortigen Ablehnung der
  * zweite Versuch nach der Pause (Netz 1, foto-wege.ts).
  *
+ * `kopie` ist das ganze Lesen für die Kopie im Speicher (JAVASCRIPT-NEXTJS-6)
+ * — nur, wenn es ein eigener Versuch war: Brachte schon das Volllesen die
+ * Datei, ist das die Kopie.
+ *
  * Kein Dateialter mehr: Android setzt lastModified bei Galerie-Fotos auf den
  * Auswahlzeitpunkt — die Zahl sagte nichts.
  */
-export type LeseDiagnose = { probe: LeseVersuch; voll?: LeseVersuch; zweiterVersuch?: LeseVersuch }
+export type LeseDiagnose = {
+  probe: LeseVersuch
+  voll?: LeseVersuch
+  zweiterVersuch?: LeseVersuch
+  kopie?: LeseVersuch
+}
 
 const BLOB_PRAEFIX = 'Vercel Blob: '
 
@@ -193,9 +202,12 @@ export const LESE_SOFORT_MS = 1_000
  * auffälligste Wert war: Manche Speicherdienste liefern kein `lastModified`
  * (dann ist es null), und auch ein altes Foto kann sofort abgelehnt werden. Es
  * bleibt Diagnose für Sentry, keine Bedingung für den Text.
+ *
+ * Die Kopie zählt wie das Volllesen: Scheitert sie, nachdem die Probe
+ * gelang, ist die Datei genauso wenig herausgekommen.
  */
 export function ordneLeseFehler(lesen: LeseDiagnose): LeseUrteil {
-  const versuche: LeseVersuch[] = lesen.voll ? [lesen.probe, lesen.voll] : [lesen.probe]
+  const versuche = [lesen.probe, lesen.voll, lesen.kopie].filter((v): v is LeseVersuch => v !== undefined)
   if (versuche.some((v) => v.ergebnis === 'zeitlimit')) return 'cloud'
 
   const gescheitert = versuche.filter((v) => v.ergebnis === 'fehler')

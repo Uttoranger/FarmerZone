@@ -7,7 +7,7 @@
  * DATENSPARSAMKEIT: KEIN Dateiname (— „Hof_Mueller_Franz.jpg" ist ein
  * personenbezogenes Datum, gleiche Regel wie protokolliereBildFehler in
  * upload-fehler.ts) und selbstverständlich KEIN Dateiinhalt. MIME-Typ,
- * Größe, Weg, Ursache, Versuchszahl und Android-Hauptversion sagen über
+ * Größe, Weg, Wahl, Ursache, Versuchszahl und Android-Hauptversion sagen über
  * niemanden etwas aus. Die Diagnose je Anlauf kommt schon bereinigt an
  * (upload-diagnose.ts).
  *
@@ -17,7 +17,7 @@
  */
 import * as Sentry from '@sentry/nextjs'
 import type { LeseDiagnose, LeseErgebnis, LeseVersuch, UploadAnlauf, UploadDiagnose, UploadSchritt } from '@/lib/upload-diagnose'
-import { androidAuskunft, type AndroidAuskunft, type FotoWeg } from '@/lib/foto-wege'
+import { androidAuskunft, type AndroidAuskunft, type FotoWeg, type WegWahl } from '@/lib/foto-wege'
 import {
   bildFehlerArtVon,
   IMAGE_NETWORK_ERROR,
@@ -51,6 +51,8 @@ export type UploadMeldung = {
       dateiGroesseBytes: number
       dateiTyp: string
       weg: UploadWeg
+      /** Warum dieser Weg: Standard des Geräts, Ausweg der Karte oder gemerkt (foto-wege.ts). Fehlt bei /teilen. */
+      wahl?: WegWahl
       versuche: number
       /** Android-Hauptversion aus den Client Hints; null = kein Android oder unbekannt (foto-wege.ts). */
       androidVersion: number | null
@@ -80,13 +82,18 @@ export type UploadLesenKontext = {
   zweiterVersuchDauerMs?: number
   /** Hat der zweite Leseversuch die Datei gebracht? null = es gab keinen. */
   zweiterVersuchGeholfen: boolean | null
+  /** Das ganze Lesen für die Kopie — fehlt, wenn schon das Volllesen die Kopie war. */
+  kopieErgebnis?: LeseErgebnis
+  kopieKlasse?: string
+  kopieMeldung?: string
+  kopieDauerMs?: number
 }
 
 function fehlerFelder(versuch: LeseVersuch): { klasse?: string; meldung?: string } {
   return versuch.ergebnis === 'fehler' ? { klasse: versuch.klasse, meldung: versuch.meldung } : {}
 }
 
-function lesenKontext({ probe, voll, zweiterVersuch }: LeseDiagnose): UploadLesenKontext {
+function lesenKontext({ probe, voll, zweiterVersuch, kopie }: LeseDiagnose): UploadLesenKontext {
   const kontext: UploadLesenKontext = {
     probeErgebnis: probe.ergebnis,
     probeDauerMs: probe.dauerMs,
@@ -115,6 +122,15 @@ function lesenKontext({ probe, voll, zweiterVersuch }: LeseDiagnose): UploadLese
       kontext.zweiterVersuchMeldung = zweiterFehler.meldung
     }
   }
+  if (kopie) {
+    kontext.kopieErgebnis = kopie.ergebnis
+    kontext.kopieDauerMs = kopie.dauerMs
+    const kopieFehler = fehlerFelder(kopie)
+    if (kopieFehler.klasse !== undefined) {
+      kontext.kopieKlasse = kopieFehler.klasse
+      kontext.kopieMeldung = kopieFehler.meldung
+    }
+  }
   return kontext
 }
 
@@ -130,6 +146,7 @@ export function baueUploadMeldung(eingabe: {
   ursache: UploadUrsache
   datei: { size: number; type: string }
   weg: UploadWeg
+  wahl?: WegWahl
   versuche: number
   diagnose?: UploadDiagnose
   lesen?: LeseDiagnose
@@ -147,6 +164,7 @@ export function baueUploadMeldung(eingabe: {
       },
     },
   }
+  if (eingabe.wahl) meldung.contexts.upload.wahl = eingabe.wahl
   if (eingabe.diagnose) {
     meldung.tags.schritt = eingabe.diagnose.schritt
     eingabe.diagnose.anlaeufe.forEach((anlauf, i) => {
@@ -171,14 +189,32 @@ let hintsAngefragt = false
 
 /**
  * Die Android-Auskunft, wie sie gerade vorliegt: aus den Client Hints, wenn
- * sie schon geantwortet haben, sonst aus dem User-Agent — der nennt seit
- * Chrome 110 für jedes Android „10", das gilt dann als unbekannt. Außerhalb
- * des Browsers null.
+ * sie schon geantwortet haben, sonst aus der Plattform (userAgentData.platform
+ * liegt sofort vor) und dem User-Agent — der nennt seit Chrome 110 für jedes
+ * Android „10", das gilt dann als unbekannt. Außerhalb des Browsers null.
+ *
+ * Seit JAVASCRIPT-NEXTJS-6 entscheidet `android` auch, welchen Weg „Foto
+ * wählen" zuerst öffnet (foto-wege.ts, ersterWeg). Wirft nie.
  */
 export function geraeteAuskunft(): AndroidAuskunft | null {
-  if (typeof navigator === 'undefined') return null
-  if (!auskunft) auskunft = androidAuskunft({ userAgent: navigator.userAgent })
-  return auskunft
+  try {
+    if (typeof navigator === 'undefined') return null
+    if (!auskunft) auskunft = androidAuskunft({ userAgent: navigator.userAgent, platform: plattform() })
+    return auskunft
+  } catch {
+    // Ein Browser, der schon beim User-Agent wirft: ohne Auskunft, also wie ein iPhone oder Desktop.
+    return null
+  }
+}
+
+/** userAgentData.platform, sofern es sie gibt — ein werfender Getter kostet nur sie, nicht den User-Agent. */
+function plattform(): string | undefined {
+  try {
+    return (navigator as NavigatorMitHints).userAgentData?.platform
+  } catch {
+    // Absichtlich leer im Ergebnis: Dann entscheidet der User-Agent allein.
+    return undefined
+  }
 }
 
 /**
@@ -217,6 +253,8 @@ export function meldeUploadFehler(
   eingabe: {
     datei: { size: number; type: string }
     weg: UploadWeg
+    /** Standard, Ausweg oder gemerkt — fehlt bei /teilen, dort gibt es keine Wahl. */
+    wahl?: WegWahl
     versuche: number
     /** Der Originalfehler je Anlauf, bereinigt — aus ladeFotoHoch (onDiagnose). */
     diagnose?: UploadDiagnose

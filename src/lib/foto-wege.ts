@@ -12,28 +12,105 @@
  *           bei der sofortigen Ablehnung (Urteil 'erlaubnis'), denn nur dort
  *           kann eine Freigabe zurückkommen. Wer 8 Sekunden stumm blieb,
  *           bleibt es auch nach 1,5 weiteren.
- *   Netz 2  Eine Karte statt einer Meldung: „Anders auswählen" öffnet eine
- *           Eingabe mit breitem accept, damit Android die Dateien-App zeigt
- *           (dort holt Google Fotos ein Cloud-Bild beim Öffnen herunter).
+ *   Netz 2  Eine Karte statt einer Meldung, mit dem Ausweg: dem jeweils
+ *           anderen Auswahlweg (Galerie ↔ Dateien-App).
  *   Netz 3  Teilen aus der Galerie an die installierte App.
  *
+ * Seit JAVASCRIPT-NEXTJS-6 ist die Reihenfolge auf Android umgedreht: Auf dem
+ * Handy des Pilotbauern gibt der Galerie-Weg dasselbe Foto nicht verlässlich
+ * heraus — mal scheitert schon das Lesen, mal erst das stückweise Lesen
+ * während der Übertragung („network error"). Über die Dateien-App lädt es im
+ * selben Chrome ohne Fehler. Android öffnet deshalb zuerst die Dateien-App,
+ * die Galerie ist dort der Ausweg; iPhone und Desktop bleiben bei der Galerie.
+ * Braucht ein Gerät den Ausweg und klappt er, merkt es sich den Weg.
+ *
  * Alles, was hier entscheidet, bekommt seine Eingaben hereingereicht — der
- * User-Agent, die Bytes, das Urteil der Lese-Stufe. Die Komponenten
- * (foto-quellen.tsx, image-upload.tsx) führen nur aus.
+ * User-Agent, die Bytes, das Urteil der Lese-Stufe, der gemerkte Weg. Die
+ * Komponenten (foto-quellen.tsx, image-upload.tsx) führen nur aus.
  */
 import type { UploadZweck } from '@/lib/upload-pfade'
 import type { BildFehlerArt, LeseUrteil } from '@/lib/upload-fehler'
 
 /**
  * Über welchen Weg eine Datei kam.
- *   standard  „Foto wählen": accept="image/*", ohne capture — Android zeigt
- *             die Systemfotoauswahl, ab Android 12 mit Cloud-Fotos, die sie
- *             selbst lädt.
- *   kamera    „Foto aufnehmen": capture="environment".
- *   rettung   „Anders auswählen" auf der Karte: breites accept, Dateien-App.
- *   teilen    Teilen aus der Galerie an die installierte App (/teilen).
+ *   galerie  accept="image/*", ohne capture — Android zeigt die
+ *            Systemfotoauswahl, das iPhone die Mediathek (samt iCloud-Abruf).
+ *   dateien  breites accept — Android zeigt die Dateien-App, in der Google
+ *            Fotos ein Cloud-Bild beim Öffnen herunterlädt.
+ *   kamera   „Foto aufnehmen": capture="environment".
+ *   teilen   Teilen aus der Galerie an die installierte App (/teilen).
+ *
+ * Bis #138 hießen galerie und dateien in Sentry 'standard' und 'rettung'.
  */
-export type FotoWeg = 'standard' | 'kamera' | 'rettung' | 'teilen'
+export type FotoWeg = 'galerie' | 'dateien' | 'kamera' | 'teilen'
+
+/** Die zwei Wege hinter „Foto wählen" — nur zwischen ihnen wird gewählt und gemerkt. */
+export type AuswahlWeg = 'galerie' | 'dateien'
+
+/**
+ * Warum dieser Weg genommen wurde — für Sentry und für den Merker.
+ *   standard  der erste Weg des Geräts (ersterWeg ohne Merker)
+ *   ausweg    der Knopf auf der Karte nach einem gescheiterten Foto
+ *   gemerkt   der Weg, den sich das Gerät nach einem geglückten Ausweg gemerkt hat
+ */
+export type WegWahl = 'standard' | 'ausweg' | 'gemerkt'
+
+// ─── Welcher Weg zuerst ─────────────────────────────────────────────────────
+
+/** Der erste Weg eines Geräts ohne Merker: Android die Dateien-App, alle anderen die Galerie. */
+export function standardWeg(android: boolean): AuswahlWeg {
+  return android ? 'dateien' : 'galerie'
+}
+
+/**
+ * Was „Foto wählen" öffnet. Ein gemerkter Weg sticht den Standard — er ist
+ * auf genau diesem Gerät schon einmal gelungen, wo der Standard scheiterte.
+ */
+export function ersterWeg(eingabe: { android: boolean; gemerkt: AuswahlWeg | null }): {
+  weg: AuswahlWeg
+  wahl: WegWahl
+} {
+  if (eingabe.gemerkt) return { weg: eingabe.gemerkt, wahl: 'gemerkt' }
+  return { weg: standardWeg(eingabe.android), wahl: 'standard' }
+}
+
+/**
+ * Der Ausweg auf der Karte: der jeweils andere Auswahlweg. Scheiterte die
+ * Kamera oder das Teilen, gibt es keinen „anderen" — dann der Weg, den
+ * „Foto wählen" auf diesem Gerät gerade öffnet (`gewohnt`).
+ */
+export function auswegFuer(weg: FotoWeg, gewohnt: AuswahlWeg): AuswahlWeg {
+  if (weg === 'dateien') return 'galerie'
+  if (weg === 'galerie') return 'dateien'
+  return gewohnt
+}
+
+export type MerkerAenderung = { art: 'setzen'; weg: AuswahlWeg } | { art: 'loeschen' }
+
+/**
+ * Was nach einem Foto mit dem gemerkten Weg geschieht. `lesbar` heißt: Die
+ * Lese-Stufe hat die Datei samt Kopie bekommen — nur das sagt etwas über den
+ * Weg; ein Formatfehler oder ein Netzabbruch sagt nichts über ihn.
+ *
+ *   Ausweg geglückt, anderer Weg als der Standard → merken.
+ *   Ausweg geglückt, aber das IST der Standard   → Merker weg, er wäre überflüssig.
+ *   Gemerkter Weg gescheitert                     → Merker weg, der Standard ist wieder dran.
+ *   Alles andere                                  → nichts ändern.
+ *
+ * Die Kamera ist kein Auswahlweg und wird nie gemerkt.
+ */
+export function merkerNachErgebnis(eingabe: {
+  weg: FotoWeg
+  wahl: WegWahl
+  lesbar: boolean
+  standard: AuswahlWeg
+}): MerkerAenderung | null {
+  const { weg, wahl, lesbar, standard } = eingabe
+  if (weg !== 'galerie' && weg !== 'dateien') return null
+  if (wahl === 'ausweg' && lesbar) return weg === standard ? { art: 'loeschen' } : { art: 'setzen', weg }
+  if (wahl === 'gemerkt' && !lesbar) return { art: 'loeschen' }
+  return null
+}
 
 // ─── Netz 1: der zweite Leseversuch ─────────────────────────────────────────
 
@@ -111,14 +188,14 @@ export function bildFormat(bytes: ArrayLike<number>): BildFormat | null {
  * Was das erkannte Format bedeutet, je nach Weg.
  *   heic       Nie hochladen — der Server kann es nicht (sharp ohne HEIF), und
  *              8 MB für eine sichere Ablehnung wären Verschwendung.
- *   kein-foto  Nur auf dem Rettungsweg: Dort sind auch Nicht-Bilder wählbar.
+ *   kein-foto  Nur über die Dateien-App: Dort sind auch Nicht-Bilder wählbar.
  *              Auf den anderen Wegen bleibt Unbekanntes wie bisher dem Server
  *              überlassen — er kennt mehr Formate als diese vier.
  *   ok         Weiter zum Upload.
  */
 export function formatUrteil(format: BildFormat | null, weg: FotoWeg): 'ok' | 'heic' | 'kein-foto' {
   if (format === 'heic') return 'heic'
-  if (format === null && weg === 'rettung') return 'kein-foto'
+  if (format === null && weg === 'dateien') return 'kein-foto'
   return 'ok'
 }
 
@@ -152,11 +229,24 @@ export type Fehlschlag = { size: number; type: string }
 
 /**
  * Nach einer Auswahl: sofort die Karte, ohne Versuch — wenn genau eine
- * Datei über „Foto wählen" kam und einem gemerkten Fehlschlag gleicht. Über
- * die Rettung oder die Kamera wird immer versucht: Das ist ja der Ausweg.
+ * Datei über „Foto wählen" kam und einem Fehlschlag gleicht, der auf
+ * DEMSELBEN Weg gemerkt wurde. Über den Ausweg oder die Kamera wird immer
+ * versucht: Das ist ja der Ausweg. Und öffnet „Foto wählen" inzwischen einen
+ * anderen Weg (der gemerkte ist gescheitert und gelöscht), verdient dieser
+ * seinen eigenen Versuch.
  */
-export function sofortKarte(weg: FotoWeg, dateien: readonly Fehlschlag[], gemerkt: readonly Fehlschlag[]): boolean {
-  return weg === 'standard' && dateien.length === 1 && gemerkt.some((g) => gleicheDatei(dateien[0], g))
+export function sofortKarte(
+  auswahl: { weg: FotoWeg; wahl: WegWahl },
+  dateien: readonly Fehlschlag[],
+  gemerkt: { weg: FotoWeg; dateien: readonly Fehlschlag[] }
+): boolean {
+  const ueberFotoWaehlen = (auswahl.weg === 'galerie' || auswahl.weg === 'dateien') && auswahl.wahl !== 'ausweg'
+  return (
+    ueberFotoWaehlen &&
+    auswahl.weg === gemerkt.weg &&
+    dateien.length === 1 &&
+    gemerkt.dateien.some((g) => gleicheDatei(dateien[0], g))
+  )
 }
 
 /**
@@ -172,8 +262,8 @@ export type SerienFall = { grund: KartenGrund; urteil: LeseUrteil }
 
 /**
  * Das Ende einer Serie (mehrere Fotos): Die lesbaren sind durch, für die
- * anderen kommt die Karte — unlesbare zuerst, weil dort „Anders auswählen"
- * hilft; sonst der erste Grund. Die Sammelmeldung entfällt nur, wenn die
+ * anderen kommt die Karte — unlesbare zuerst, weil dort der Ausweg hilft;
+ * sonst der erste Grund. Die Sammelmeldung entfällt nur, wenn die
  * Karte wirklich alles sagt: nichts hochgeladen, nichts aus anderem Grund
  * übersprungen, alle Fälle mit demselben Grund.
  */
