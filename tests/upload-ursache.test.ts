@@ -247,8 +247,7 @@ describe('Übertragung — was Sentry erfährt', () => {
     await vi.advanceTimersByTimeAsync(10_000)
 
     expect((await ausgang)?.message).toBe(IMAGE_NETWORK_ERROR)
-    // Die Attrappe hat kein lastModified — kein Alter statt eines erfundenen.
-    expect(lesen).toEqual({ probe: { ergebnis: 'ok', dauerMs: 0 }, dateiAlterTage: null })
+    expect(lesen).toEqual({ probe: { ergebnis: 'ok', dauerMs: 0 } })
   })
 
   it('hält je Anlauf Klasse, Nachricht und Dauer fest', async () => {

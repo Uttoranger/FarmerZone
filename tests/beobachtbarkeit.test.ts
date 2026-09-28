@@ -353,7 +353,7 @@ describe('Upload-Meldung', () => {
     const meldung = baueUploadMeldung({
       ursache: 'netz',
       datei: { size: 1_000, type: 'image/jpeg' },
-      weg: 'galerie',
+      weg: 'standard',
       versuche: 2,
       diagnose: {
         schritt: 'uebertragung',
@@ -397,7 +397,7 @@ describe('Upload-Meldung', () => {
 
     meldeUploadFehler(fehler, {
       datei: { size: 1, type: 'image/png' },
-      weg: 'dateien',
+      weg: 'rettung',
       versuche: 1,
       diagnose: {
         schritt: 'uebertragung',
@@ -430,6 +430,8 @@ describe('Upload-Meldung', () => {
       dateiTyp: 'image/jpeg',
       weg: 'kamera',
       versuche: 2,
+      // Ohne Auskunft (kein Browser, keine Client Hints) ehrlich null.
+      androidVersion: null,
     })
     // Kein Feld der Meldung darf je einen Dateinamen tragen.
     expect(JSON.stringify(meldung)).not.toMatch(/name/i)
@@ -439,7 +441,7 @@ describe('Upload-Meldung', () => {
     const meldung = baueUploadMeldung({
       ursache: 'lesen',
       datei: { size: 10, type: '' },
-      weg: 'galerie',
+      weg: 'standard',
       versuche: 0,
     })
     expect(meldung.contexts.upload.dateiTyp).toBe('unbekannt')
@@ -452,7 +454,7 @@ describe('Upload-Meldung', () => {
     })
 
     expect(() =>
-      meldeUploadFehler(new Error('x'), { datei: { size: 1, type: '' }, weg: 'galerie', versuche: 1 })
+      meldeUploadFehler(new Error('x'), { datei: { size: 1, type: '' }, weg: 'standard', versuche: 1 })
     ).not.toThrow()
   })
 })

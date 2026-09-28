@@ -10,7 +10,7 @@ import {
 } from '@/components/shared/image-upload'
 import type { LeseDiagnose, UploadDiagnose } from '@/lib/upload-diagnose'
 import { bildFehlerMeldung } from '@/lib/upload-fehler'
-import { meldeUploadFehler } from '@/lib/upload-meldung'
+import { bereiteGeraeteAuskunftVor, meldeUploadFehler } from '@/lib/upload-meldung'
 import { MAX_ORIGINAL_BYTES } from '@/lib/upload-pfade'
 import { leseGeteilteFotos, leereGeteilteFotos } from '@/lib/teilen-ablage'
 import { updateFarmBannerAction } from '@/server/actions/appearance'
@@ -48,6 +48,8 @@ export function TeilenClient({
   const [ergebnisse, setErgebnisse] = useState<Ergebnis[] | null>(null)
 
   useEffect(() => {
+    // Die Android-Version für die Diagnose — asynchron, vor dem ersten Upload.
+    bereiteGeraeteAuskunftVor()
     let vorschauUrls: string[] = []
     ;(async () => {
       // Ohne Cache-API (sehr alte Browser) gibt es schlicht keine Ablage
@@ -88,6 +90,7 @@ export function TeilenClient({
         let url: string
         try {
           url = await ladeFotoHoch(foto, wirksamesZiel, {
+            weg: 'teilen',
             altUrl:
               wirksamesZiel === 'banner' ? (bisherigesTitelbild ?? undefined) : undefined,
             onStufe: (stufe) => setLaufend((v) => (v ? { ...v, stufe } : v)),

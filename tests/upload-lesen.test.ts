@@ -6,47 +6,57 @@
  * dauerte. Genau das unterscheidet ein hängendes Cloud-Album von einer
  * entzogenen Berechtigung.
  *
- * Geprüft wird der echte Ablauf in pruefeLesbarkeit und ladeFotoHoch. Die
- * Datei ist eine Attrappe, deren zwei Lesewege nach einer festen Zeit liefern,
- * scheitern oder nie antworten. Die Zeit läuft über fake timers — Zeitlimits
- * und Dauer sind damit exakt.
+ * Seit JAVASCRIPT-NEXTJS-5 dazu: der zweite Leseversuch nach einer Pause
+ * (nur nach sofortiger Ablehnung), das Format an den ersten Bytes (HEIC nie
+ * hochladen, auf dem Rettungsweg muss es ein Bild sein) und die Meldung
+ * ohne Dateialter.
+ *
+ * Geprüft wird der echte Ablauf in pruefeLesbarkeit. Die Datei ist eine
+ * Attrappe, deren zwei Lesewege nach einer festen Zeit liefern, scheitern
+ * oder nie antworten. Die Zeit läuft über fake timers — Zeitlimits und Dauer
+ * sind damit exakt.
  */
-import fs from 'node:fs'
-import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
 
 import * as Sentry from '@sentry/nextjs'
-import { ladeFotoHoch, pruefeLesbarkeit } from '@/components/shared/image-upload'
-import {
-  dateiAlterTage,
-  LESE_SOFORT_MS,
-  ordneLeseFehler,
-  type LeseDiagnose,
-  type LeseVersuch,
-} from '@/lib/upload-diagnose'
+import { pruefeLesbarkeit } from '@/components/shared/image-upload'
+import type { FotoWeg } from '@/lib/foto-wege'
+import { LESE_SOFORT_MS, ordneLeseFehler, type LeseDiagnose, type LeseVersuch } from '@/lib/upload-diagnose'
 import {
   BildFehler,
   bildFehlerArtVon,
   bildFehlerMeldung,
+  IMAGE_HEIC_ERROR,
+  IMAGE_NOT_PHOTO_ERROR,
   IMAGE_READ_ERROR,
   IMAGE_READ_PERMISSION_ERROR,
   IMAGE_READ_UNCLEAR_ERROR,
   leseFehlerText,
 } from '@/lib/upload-fehler'
 import { baueUploadMeldung, meldeUploadFehler } from '@/lib/upload-meldung'
-import { LESE_PROBE_LIMIT_MS, LESE_VOLL_LIMIT_MS } from '@/lib/upload-zeitwaechter'
+import { LESE_PROBE_LIMIT_MS, LESE_VOLL_LIMIT_MS, LESE_ZWEITVERSUCH_PAUSE_MS } from '@/lib/upload-zeitwaechter'
 
-const TAG_MS = 24 * 60 * 60 * 1000
 const JETZT = Date.UTC(2026, 8, 26, 12, 0, 0)
 const DATEINAME = 'Hof Test Stall.jpg'
 
+/** Die ersten Bytes eines JPEG — genug für die Format-Probe. */
+function jpegBytes(): ArrayBuffer {
+  return Uint8Array.from([0xff, 0xd8, 0xff, 0xe1, 0, 0, 0, 0, 0, 0, 0, 0]).buffer
+}
+function heicBytes(): ArrayBuffer {
+  return Uint8Array.from([0, 0, 0, 0x18, ...'ftypheic'.split('').map((z) => z.charCodeAt(0))]).buffer
+}
+function textBytes(): ArrayBuffer {
+  return Uint8Array.from('hello world!'.split('').map((z) => z.charCodeAt(0))).buffer
+}
+
 /** Ein Versprechen, das nie fertig wird — die stumme Quelle. */
 const nie = () => new Promise<ArrayBuffer>(() => {})
-/** Liefert nach `ms` Bytes. */
-const liefertNach = (ms: number) => () =>
-  new Promise<ArrayBuffer>((erfuellen) => setTimeout(() => erfuellen(new ArrayBuffer(8)), ms))
+/** Liefert nach `ms` Bytes (ein JPEG-Kopf, damit das Format durchgeht). */
+const liefertNach = (ms: number, bytes: () => ArrayBuffer = jpegBytes) => () =>
+  new Promise<ArrayBuffer>((erfuellen) => setTimeout(() => erfuellen(bytes()), ms))
 /** Scheitert nach `ms` mit `fehler`. */
 const scheitertNach = (ms: number, fehler: unknown) => () =>
   new Promise<ArrayBuffer>((_, ablehnen) => setTimeout(() => ablehnen(fehler), ms))
@@ -56,25 +66,29 @@ const nichtLesbar = () =>
     'The requested file could not be read, typically due to permission problems that have occurred after a reference to a file was acquired.',
     'NotReadableError'
   )
-const nichtGefunden = () => new DOMException('A requested file or directory could not be found at the time an operation was processed.', 'NotFoundError')
+const nichtGefunden = () =>
+  new DOMException('A requested file or directory could not be found at the time an operation was processed.', 'NotFoundError')
 
 /** Datei-Attrappe: `probe` ist das Teil-Lesen (64 KB), `voll` das Lesen am Stück. */
-function datei(probe: () => Promise<ArrayBuffer>, voll: () => Promise<ArrayBuffer>, alterMs = 400.5 * TAG_MS): File {
+function datei(probe: () => Promise<ArrayBuffer>, voll: () => Promise<ArrayBuffer>): File {
   return {
     name: DATEINAME,
     type: 'image/jpeg',
     size: 6_000_000,
-    lastModified: JETZT - alterMs,
+    lastModified: JETZT,
     slice: () => ({ arrayBuffer: probe }),
     arrayBuffer: voll,
   } as unknown as File
 }
 
 /** Lässt die Lese-Stufe laufen und sammelt Ausgang und Diagnose. */
-async function lies(f: File, zeitMs = LESE_PROBE_LIMIT_MS + LESE_VOLL_LIMIT_MS) {
+async function lies(f: File, weg: FotoWeg = 'standard', zeitMs = LESE_PROBE_LIMIT_MS + LESE_VOLL_LIMIT_MS) {
   let lesen: LeseDiagnose | undefined
-  const ausgang = pruefeLesbarkeit(f, (d) => {
-    lesen = d
+  const ausgang = pruefeLesbarkeit(f, {
+    weg,
+    onLesen: (d) => {
+      lesen = d
+    },
   }).then(
     () => ({ fehler: undefined }),
     (fehler: unknown) => ({ fehler })
@@ -104,7 +118,6 @@ describe('Lese-Stufe — was Sentry erfährt (pruefeLesbarkeit)', () => {
     expect(lesen).toEqual({
       probe: { ergebnis: 'zeitlimit', dauerMs: LESE_PROBE_LIMIT_MS },
       voll: { ergebnis: 'zeitlimit', dauerMs: LESE_VOLL_LIMIT_MS },
-      dateiAlterTage: 400,
     })
   })
 
@@ -115,7 +128,6 @@ describe('Lese-Stufe — was Sentry erfährt (pruefeLesbarkeit)', () => {
     expect(lesen).toEqual({
       probe: { ergebnis: 'zeitlimit', dauerMs: LESE_PROBE_LIMIT_MS },
       voll: { ergebnis: 'ok', dauerMs: 1_200 },
-      dateiAlterTage: 400,
     })
   })
 
@@ -131,15 +143,14 @@ describe('Lese-Stufe — was Sentry erfährt (pruefeLesbarkeit)', () => {
         dauerMs: 12,
       },
       voll: { ergebnis: 'ok', dauerMs: 900 },
-      dateiAlterTage: 400,
     })
   })
 
   it('beides scheitert sofort mit NotReadableError: das Handy hat die Datei nicht freigegeben', async () => {
-    // Der Fall aus JAVASCRIPT-NEXTJS-4 — 84 und 14 ms, Foto 0 Tage alt. Bis
-    // #133 stand hier der Cloud-Album-Text; der Bauer suchte einen Fehler in
-    // seinen Album-Einstellungen, den es nicht gab.
-    const { fehler, lesen } = await lies(datei(scheitertNach(84, nichtLesbar()), scheitertNach(14, nichtLesbar()), 0))
+    // Der Fall aus JAVASCRIPT-NEXTJS-4 und -5 — 80 und 25 ms. Bis #133 stand
+    // hier der Cloud-Album-Text; der Bauer suchte einen Fehler in seinen
+    // Album-Einstellungen, den es nicht gab.
+    const { fehler, lesen } = await lies(datei(scheitertNach(84, nichtLesbar()), scheitertNach(14, nichtLesbar())))
 
     expect(fehler).toBeInstanceOf(BildFehler)
     expect((fehler as Error).message).toBe(IMAGE_READ_PERMISSION_ERROR)
@@ -149,7 +160,8 @@ describe('Lese-Stufe — was Sentry erfährt (pruefeLesbarkeit)', () => {
       kurz: 'Datei nicht lesbar',
       art: 'lesen',
     })
-    expect(lesen?.dateiAlterTage).toBe(0)
+    // Kein Dateialter mehr — Android setzt lastModified auf den Auswahlzeitpunkt.
+    expect(lesen && 'dateiAlterTage' in lesen).toBe(false)
   })
 
   it('scheitert die Probe sofort und das Volllesen mit einem anderen Fehler: keine Ursache behauptet', async () => {
@@ -167,10 +179,9 @@ describe('Lese-Stufe — was Sentry erfährt (pruefeLesbarkeit)', () => {
     // Gemischtes Paar: Ein entzogener Zugriff sieht auf den zwei Lesewegen
     // verschieden aus, und „nochmal auswählen" stimmt in beiden Fällen.
     expect((fehler as Error).message).toBe(IMAGE_READ_PERMISSION_ERROR)
-    expect(lesen).toEqual({
+    expect(lesen).toMatchObject({
       probe: { ergebnis: 'fehler', klasse: 'NotReadableError', meldung: nichtLesbar().message, dauerMs: 5 },
       voll: { ergebnis: 'fehler', klasse: 'NotFoundError', meldung: nichtGefunden().message, dauerMs: 3 },
-      dateiAlterTage: 400,
     })
   })
 
@@ -180,7 +191,7 @@ describe('Lese-Stufe — was Sentry erfährt (pruefeLesbarkeit)', () => {
 
     expect(fehler).toBeUndefined()
     expect(volllesen).not.toHaveBeenCalled()
-    expect(lesen).toEqual({ probe: { ergebnis: 'ok', dauerMs: 4 }, dateiAlterTage: 400 })
+    expect(lesen).toEqual({ probe: { ergebnis: 'ok', dauerMs: 4 } })
     expect(lesen && 'voll' in lesen).toBe(false)
   })
 
@@ -229,6 +240,122 @@ describe('Lese-Stufe — was Sentry erfährt (pruefeLesbarkeit)', () => {
   })
 })
 
+describe('Netz 1 — der zweite Leseversuch (JAVASCRIPT-NEXTJS-5)', () => {
+  it('nach sofortiger Ablehnung EIN weiterer Versuch nach der Pause — gelingt er, geht es weiter', async () => {
+    let aufrufe = 0
+    // Die Probe scheitert beim ersten Mal sofort, beim zweiten liefert sie.
+    const probe = () => (aufrufe++ === 0 ? scheitertNach(84, nichtLesbar())() : liefertNach(3)())
+    const volllesen = vi.fn(scheitertNach(14, nichtLesbar()))
+
+    const { fehler, lesen } = await lies(datei(probe, volllesen))
+
+    expect(fehler).toBeUndefined()
+    expect(aufrufe).toBe(2)
+    expect(volllesen).toHaveBeenCalledTimes(1)
+    expect(lesen).toEqual({
+      probe: { ergebnis: 'fehler', klasse: 'NotReadableError', meldung: nichtLesbar().message, dauerMs: 84 },
+      voll: { ergebnis: 'fehler', klasse: 'NotReadableError', meldung: nichtLesbar().message, dauerMs: 14 },
+      zweiterVersuch: { ergebnis: 'ok', dauerMs: 3 },
+    })
+  })
+
+  it('wartet die Pause wirklich ab, bevor er es noch einmal versucht', async () => {
+    let aufrufe = 0
+    const probe = () => {
+      aufrufe++
+      return scheitertNach(10, nichtLesbar())()
+    }
+    const ausgang = pruefeLesbarkeit(datei(probe, scheitertNach(10, nichtLesbar()))).catch(() => undefined)
+
+    // Probe (10 ms) und Volllesen (10 ms) sind durch, die Pause läuft.
+    await vi.advanceTimersByTimeAsync(20 + LESE_ZWEITVERSUCH_PAUSE_MS - 1)
+    expect(aufrufe).toBe(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(aufrufe).toBe(2)
+    await vi.advanceTimersByTimeAsync(100)
+    await ausgang
+  })
+
+  it('scheitert auch der zweite Versuch, bleibt es der Freigabe-Fall — mit dem zweiten Versuch in der Diagnose', async () => {
+    const { fehler, lesen } = await lies(datei(scheitertNach(80, nichtLesbar()), scheitertNach(25, nichtLesbar())))
+
+    expect((fehler as Error).message).toBe(IMAGE_READ_PERMISSION_ERROR)
+    expect(lesen?.zweiterVersuch).toEqual({
+      ergebnis: 'fehler',
+      klasse: 'NotReadableError',
+      meldung: nichtLesbar().message,
+      dauerMs: 80,
+    })
+    expect(ordneLeseFehler(lesen!)).toBe('erlaubnis')
+  })
+
+  it('keinen zweiten Versuch für die stumme Quelle — sie hat schon 28 Sekunden gewartet', async () => {
+    const probe = vi.fn(nie)
+    const { fehler, lesen } = await lies(datei(probe, nie))
+
+    expect(bildFehlerArtVon(fehler)).toBe('lesen')
+    expect(probe).toHaveBeenCalledTimes(1)
+    expect(lesen && 'zweiterVersuch' in lesen).toBe(false)
+  })
+
+  it('keinen zweiten Versuch für Unbestimmtes — dort ist nichts, was zurückkommen könnte', async () => {
+    const probe = vi.fn(scheitertNach(5, nichtGefunden()))
+    const { fehler, lesen } = await lies(datei(probe, scheitertNach(3, nichtGefunden())))
+
+    expect((fehler as Error).message).toBe(IMAGE_READ_UNCLEAR_ERROR)
+    expect(probe).toHaveBeenCalledTimes(1)
+    expect(lesen && 'zweiterVersuch' in lesen).toBe(false)
+  })
+
+  it('zählt eine Ablehnung nach Sekunden nicht als sofort — also auch kein zweiter Versuch', async () => {
+    const probe = vi.fn(scheitertNach(LESE_SOFORT_MS, nichtLesbar()))
+    const { lesen } = await lies(datei(probe, scheitertNach(5, nichtLesbar())))
+
+    expect(probe).toHaveBeenCalledTimes(1)
+    expect(lesen && 'zweiterVersuch' in lesen).toBe(false)
+  })
+})
+
+describe('Das Format an den ersten Bytes — vor jedem Transfer', () => {
+  it('HEIC wird auf keinem Weg hochgeladen: eigener Fehler, ohne Fachwort', async () => {
+    for (const weg of ['standard', 'kamera', 'rettung'] as const) {
+      const { fehler } = await lies(datei(liefertNach(2, heicBytes), liefertNach(1)), weg)
+
+      expect(bildFehlerArtVon(fehler), weg).toBe('heic')
+      expect((fehler as Error).message).toBe(IMAGE_HEIC_ERROR)
+    }
+  })
+
+  it('erkennt HEIC auch, wenn erst das Volllesen die Bytes bringt', async () => {
+    const { fehler } = await lies(datei(scheitertNach(5, nichtGefunden()), liefertNach(900, heicBytes)))
+
+    expect(bildFehlerArtVon(fehler)).toBe('heic')
+  })
+
+  it('erkennt HEIC auch nach dem zweiten Leseversuch', async () => {
+    let aufrufe = 0
+    const probe = () => (aufrufe++ === 0 ? scheitertNach(5, nichtLesbar())() : liefertNach(3, heicBytes)())
+    const { fehler } = await lies(datei(probe, scheitertNach(5, nichtLesbar())))
+
+    expect(bildFehlerArtVon(fehler)).toBe('heic')
+  })
+
+  it('auf dem Rettungsweg muss es ein Bild sein — sonst „kein Foto"', async () => {
+    const { fehler } = await lies(datei(liefertNach(2, textBytes), liefertNach(1)), 'rettung')
+
+    expect(bildFehlerArtVon(fehler)).toBe('kein-foto')
+    expect((fehler as Error).message).toBe(IMAGE_NOT_PHOTO_ERROR)
+  })
+
+  it('auf den anderen Wegen bleibt Unbekanntes dem Server überlassen — wie bisher', async () => {
+    const { fehler } = await lies(datei(liefertNach(2, textBytes), liefertNach(1)), 'standard')
+    expect(fehler).toBeUndefined()
+
+    const leer = await lies(datei(liefertNach(2, () => new ArrayBuffer(0)), liefertNach(1)), 'kamera')
+    expect(leer.fehler).toBeUndefined()
+  })
+})
+
 describe('ordneLeseFehler — welcher Lesefehler welche Meldung verdient', () => {
   const fehlgeschlagen = (klasse: string, dauerMs: number): LeseVersuch => ({
     ergebnis: 'fehler',
@@ -237,8 +364,7 @@ describe('ordneLeseFehler — welcher Lesefehler welche Meldung verdient', () =>
     dauerMs,
   })
   const abgelaufen = (dauerMs: number): LeseVersuch => ({ ergebnis: 'zeitlimit', dauerMs })
-  const urteil = (probe: LeseVersuch, voll?: LeseVersuch) =>
-    ordneLeseFehler({ probe, voll, dateiAlterTage: 0 })
+  const urteil = (probe: LeseVersuch, voll?: LeseVersuch) => ordneLeseFehler({ probe, voll })
 
   it("nennt den sofortigen NotReadableError 'erlaubnis' — der Fall aus dem Issue", () => {
     expect(urteil(fehlgeschlagen('NotReadableError', 84), fehlgeschlagen('NotReadableError', 14))).toBe('erlaubnis')
@@ -287,27 +413,12 @@ describe('ordneLeseFehler — welcher Lesefehler welche Meldung verdient', () =>
   })
 })
 
-describe('dateiAlterTage — ganze Tage, nie ein Datum', () => {
-  it('rundet auf ganze Tage ab', () => {
-    expect(dateiAlterTage(JETZT - 400.9 * TAG_MS, JETZT)).toBe(400)
-    expect(dateiAlterTage(JETZT - 60 * 60 * 1000, JETZT)).toBe(0)
-  })
-
-  it('sagt nichts, wo es nichts zu sagen gibt: fehlend, 0 (1970) oder in der Zukunft', () => {
-    expect(dateiAlterTage(undefined, JETZT)).toBeNull()
-    expect(dateiAlterTage(Number.NaN, JETZT)).toBeNull()
-    expect(dateiAlterTage(0, JETZT)).toBeNull()
-    expect(dateiAlterTage(JETZT + TAG_MS, JETZT)).toBeNull()
-  })
-})
-
 describe('Meldung an Sentry — Kontext uploadLesen', () => {
   const lesen: LeseDiagnose = {
     probe: { ergebnis: 'fehler', klasse: 'NotReadableError', meldung: 'nicht lesbar', dauerMs: 12 },
     voll: { ergebnis: 'zeitlimit', dauerMs: LESE_VOLL_LIMIT_MS },
-    dateiAlterTage: 400,
   }
-  const eingabe = { ursache: 'lesen' as const, datei: { size: 6_000_000, type: 'image/jpeg' }, weg: 'galerie' as const, versuche: 0 }
+  const eingabe = { ursache: 'lesen' as const, datei: { size: 6_000_000, type: 'image/jpeg' }, weg: 'standard' as const, versuche: 0 }
 
   it('legt Probe und Volllesen flach in einen Kontext — Sentry kürzt ab der dritten Ebene', () => {
     const meldung = baueUploadMeldung({ ...eingabe, lesen })
@@ -319,7 +430,7 @@ describe('Meldung an Sentry — Kontext uploadLesen', () => {
       probeDauerMs: 12,
       vollErgebnis: 'zeitlimit',
       vollDauerMs: LESE_VOLL_LIMIT_MS,
-      dateiAlterTage: 400,
+      zweiterVersuchGeholfen: null,
     })
     for (const wert of Object.values(meldung.contexts.uploadLesen ?? {})) {
       expect(wert === null || typeof wert !== 'object').toBe(true)
@@ -328,17 +439,48 @@ describe('Meldung an Sentry — Kontext uploadLesen', () => {
     expect(JSON.stringify(meldung)).not.toMatch(/name/i)
   })
 
-  it('ohne Volllesen nur die Probe — und ohne Lese-Diagnose kein Kontext', () => {
-    const nurProbe = baueUploadMeldung({ ...eingabe, lesen: { probe: { ergebnis: 'ok', dauerMs: 4 }, dateiAlterTage: null } })
-    expect(nurProbe.contexts.uploadLesen).toEqual({ probeErgebnis: 'ok', probeDauerMs: 4, dateiAlterTage: null })
+  it('sagt, ob der zweite Leseversuch geholfen hat — mit seinen Feldern', () => {
+    const geholfen = baueUploadMeldung({
+      ...eingabe,
+      lesen: { ...lesen, zweiterVersuch: { ergebnis: 'ok', dauerMs: 3 } },
+    })
+    expect(geholfen.contexts.uploadLesen).toMatchObject({
+      zweiterVersuchErgebnis: 'ok',
+      zweiterVersuchDauerMs: 3,
+      zweiterVersuchGeholfen: true,
+    })
+
+    const vergeblich = baueUploadMeldung({
+      ...eingabe,
+      lesen: { ...lesen, zweiterVersuch: { ergebnis: 'fehler', klasse: 'NotReadableError', meldung: 'x', dauerMs: 80 } },
+    })
+    expect(vergeblich.contexts.uploadLesen).toMatchObject({
+      zweiterVersuchErgebnis: 'fehler',
+      zweiterVersuchKlasse: 'NotReadableError',
+      zweiterVersuchMeldung: 'x',
+      zweiterVersuchDauerMs: 80,
+      zweiterVersuchGeholfen: false,
+    })
+  })
+
+  it('ohne Volllesen nur die Probe — und ohne Lese-Diagnose kein Kontext; kein Dateialter mehr', () => {
+    const nurProbe = baueUploadMeldung({ ...eingabe, lesen: { probe: { ergebnis: 'ok', dauerMs: 4 } } })
+    expect(nurProbe.contexts.uploadLesen).toEqual({ probeErgebnis: 'ok', probeDauerMs: 4, zweiterVersuchGeholfen: null })
+    expect(JSON.stringify(nurProbe)).not.toContain('dateiAlter')
     expect(baueUploadMeldung(eingabe).contexts.uploadLesen).toBeUndefined()
+  })
+
+  it('trägt den Weg und die Android-Version — null, wo keine bekannt ist', () => {
+    const meldung = baueUploadMeldung({ ...eingabe, weg: 'rettung', androidVersion: 13 })
+    expect(meldung.contexts.upload).toMatchObject({ weg: 'rettung', androidVersion: 13 })
+    expect(baueUploadMeldung(eingabe).contexts.upload.androidVersion).toBeNull()
   })
 
   it('reicht die Lese-Diagnose an Sentry weiter', () => {
     vi.mocked(Sentry.captureException).mockClear()
     const fehler = new BildFehler('lesen')
 
-    meldeUploadFehler(fehler, { datei: eingabe.datei, weg: 'galerie', versuche: 0, lesen })
+    meldeUploadFehler(fehler, { datei: eingabe.datei, weg: 'standard', versuche: 0, lesen })
 
     expect(Sentry.captureException).toHaveBeenCalledWith(
       fehler,
@@ -350,34 +492,21 @@ describe('Meldung an Sentry — Kontext uploadLesen', () => {
       })
     )
   })
-})
 
-describe('ladeFotoHoch — gibt die Lese-Diagnose heraus', () => {
-  it('meldet sie über onLesen, bevor der Lesefehler geworfen wird', async () => {
-    let lesen: LeseDiagnose | undefined
-    const ausgang = ladeFotoHoch(datei(scheitertNach(5, nichtLesbar()), nie), 'product', {
-      onLesen: (d) => {
-        lesen = d
-      },
-    }).catch((e: unknown) => e)
-    await vi.advanceTimersByTimeAsync(LESE_PROBE_LIMIT_MS + LESE_VOLL_LIMIT_MS)
+  it('meldet ein HEIC-Foto mit Weg und Größe — damit wir zählen können, wie oft es vorkommt', () => {
+    vi.mocked(Sentry.captureException).mockClear()
+    const fehler = new BildFehler('heic')
 
-    expect(bildFehlerArtVon(await ausgang)).toBe('lesen')
-    expect(lesen?.probe).toMatchObject({ ergebnis: 'fehler', klasse: 'NotReadableError' })
-    expect(lesen?.voll).toEqual({ ergebnis: 'zeitlimit', dauerMs: LESE_VOLL_LIMIT_MS })
-  })
+    meldeUploadFehler(fehler, { datei: { size: 3_400_000, type: 'image/heic' }, weg: 'standard', versuche: 0 })
 
-  it('jede Stelle, die einen Upload-Fehler meldet, reicht die Lese-Diagnose mit', () => {
-    // Die drei Aufrufer von ladeFotoHoch — ohne onLesen und `lesen` bei
-    // meldeUploadFehler bliebe Sentry dort so blind wie vorher.
-    for (const datei of [
-      'src/components/shared/image-upload.tsx',
-      'src/app/teilen/teilen-client.tsx',
-      'src/components/products/product-dialog.tsx',
-    ]) {
-      const text = fs.readFileSync(path.resolve(__dirname, '..', datei), 'utf8')
-      expect(text, datei).toMatch(/onLesen: \(/)
-      expect(text, datei).toMatch(/meldeUploadFehler\(e, \{[^}]*\blesen\b[^}]*\}\)/)
-    }
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      fehler,
+      expect.objectContaining({
+        tags: expect.objectContaining({ ursache: 'heic' }),
+        contexts: expect.objectContaining({
+          upload: expect.objectContaining({ weg: 'standard', dateiGroesseBytes: 3_400_000, dateiTyp: 'image/heic' }),
+        }),
+      })
+    )
   })
 })

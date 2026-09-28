@@ -31,6 +31,14 @@ export const LESE_PROBE_LIMIT_MS = 8_000
 export const LESE_VOLL_LIMIT_MS = 20_000
 
 /**
+ * Pause vor dem zweiten Leseversuch derselben Datei (Netz 1, foto-wege.ts):
+ * Eine entzogene Freigabe (sofortiger NotReadableError) kann nach einem
+ * Augenblick wieder da sein — 1,5 s sind für den Bauern noch „gleich", für
+ * das Gerät lange genug.
+ */
+export const LESE_ZWEITVERSUCH_PAUSE_MS = 1_500
+
+/**
  * Abruf der Hof-Kennung: ein winziges JSON. 15 s reichen auch dem zähesten
  * Mobilfunk-Handschlag; danach ist es ein Verbindungsproblem.
  */

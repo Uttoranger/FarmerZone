@@ -88,7 +88,7 @@ describe('Verdrahtung in den Bauteilen', () => {
   it('leert in foto-quellen.tsx beim Klick und fasst die Auswahl nicht an', () => {
     const text = quelltext('src/components/shared/foto-quellen.tsx')
 
-    // Das Leeren hängt am Klick — dreimal, für Galerie, Dateien und Kamera.
+    // Das Leeren hängt am Klick — dreimal: Foto wählen, Foto aufnehmen, Rettung.
     expect(text.match(/onClick=\{vorAuswahl\}/g)).toHaveLength(3)
     expect(text).toContain('leereDateiFeld(e.currentTarget)')
     // Und nirgends mehr am Ereignis der Auswahl.

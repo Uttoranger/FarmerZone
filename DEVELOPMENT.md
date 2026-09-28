@@ -1047,7 +1047,7 @@ Kachel am Anfang von Grunddaten, der Name heißt „Was verkaufst du?".
 
 Jede Upload-Fehlermeldung endet auf eine Kennung wie `[L135]` — Buchstabe für die Ursache, Zahl für den Code-Stand (`UPLOAD_DIAG` in `src/lib/upload-fehler.ts`). Bei JEDER Verhaltensänderung am Upload-Ablauf muss die Zahl auf die Nummer des Sprints gehoben werden — eine veraltete Kennung ist schlimmer als keine, weil ein zugeschicktes Bildschirmfoto dann den falschen Stand behauptet.
 
-**Die Buchstaben:** E = das Gerät hat die Leseerlaubnis entzogen, L = die Quelle blieb stumm (Cloud-Album), D = Lesen gescheitert, Ursache unbestimmt, F = Format, S = Server und Verbindung unterbrochen (beide „nochmal versuchen"), B = der Bildspeicher hat das Foto nicht genommen, X = ehrlich unbestimmt. E, L und D sind alle drei die **Ursache `lesen`** — sie unterscheiden nur, was der Bauer liest.
+**Die Buchstaben:** E = das Gerät hat die Leseerlaubnis entzogen, L = die Quelle blieb stumm (Cloud-Album), D = Lesen gescheitert, Ursache unbestimmt, F = Format (der Server hat es abgelehnt), H = HEIC an den ersten Bytes erkannt und nie hochgeladen, K = kein Foto (über die Dateien-App), S = Server und Verbindung unterbrochen (beide „nochmal versuchen"), B = der Bildspeicher hat das Foto nicht genommen, X = ehrlich unbestimmt. E, L und D sind alle drei die **Ursache `lesen`** — sie unterscheiden nur, was der Bauer liest; seit #138 stehen sie auf der Karte statt in einer Meldung.
 
 **Originalfehler statt Sammeltext (#129, JAVASCRIPT-NEXTJS-2).** Bis #129 ersetzte `uebertrageOriginal` jeden Fehler des letzten Transfer-Anlaufs durch „Verbindung unterbrochen". Das Issue zeigte zwei Anläufe, die je rund zwei Sekunden nach gültiger Kennung scheiterten — woran, verriet es nicht. Seitdem gilt:
 
@@ -1063,15 +1063,15 @@ Beim Lesen der Daten beachten (Stand `@vercel/blob` 2.4.0): Das SDK wiederholt N
 - `ergebnis`: `ok`, `zeitlimit` (keine Antwort bis zum Wächter, 8 s bzw. 20 s) oder `fehler` (der Browser hat abgelehnt).
 - Bei `fehler` die `klasse` und die bereinigte `meldung`. `klasse` ist der Name des Fehlers, etwa `NotReadableError` oder `NotFoundError` — auch aus einer DOMException, die in älteren Safari-Ständen kein Error ist. Sieht der Name nicht wie ein Bezeichner aus, steht dort `unbekannt`.
 - `dauerMs`.
-- Dazu `dateiAlterTage` aus `lastModified`: ganze Tage, kein Datumsfeld. Zusammen mit dem Zeitpunkt der Meldung grenzt es den Tag der Datei auf 24 Stunden ein, genauer nicht. `null` bei 0, fehlendem Wert oder einem Zeitpunkt in der Zukunft. Kennt der Browser das Datum nicht, setzt er laut File API die aktuelle Zeit — `0` heißt deshalb „heute oder unbekannt“.
+- Seit #138 der zweite Leseversuch (`zweiterVersuch…`, dazu `zweiterVersuchGeholfen`), wenn es einen gab. Das Dateialter (`dateiAlterTage`, #133) ist wieder weg: Android setzt `lastModified` bei Galerie-Fotos auf den Auswahlzeitpunkt, die Zahl sagte nichts.
 
-Das alles steht in einem flachen Kontext `uploadLesen` (`probeErgebnis`, `probeKlasse`, `probeMeldung`, `probeDauerMs`, `voll…`, `dateiAlterTage`). Die `voll…`-Felder fehlen, wenn die Probe gelang. Der Kontext geht bei jedem Upload-Fehler mit, auch wenn erst das Senden scheitert: Eine gescheiterte Probe vor einem Sendefehler ist dieselbe Spur.
+Das alles steht in einem flachen Kontext `uploadLesen` (`probeErgebnis`, `probeKlasse`, `probeMeldung`, `probeDauerMs`, `voll…`, `zweiterVersuch…`). Die `voll…`-Felder fehlen, wenn die Probe gelang. Der Kontext geht bei jedem Upload-Fehler mit, auch wenn erst das Senden scheitert: Eine gescheiterte Probe vor einem Sendefehler ist dieselbe Spur. Im Kontext `upload` stehen dazu `weg` (`standard`, `kamera`, `rettung`, `teilen`) und `androidVersion` aus den Client Hints (`null` = kein Android oder unbekannt — der User-Agent nennt seit Chrome 110 für jedes Android „10").
 
 Die Meldung an den Bauern war in #133 noch für alle Fälle dieselbe; seit #135 folgt sie dem Befund (siehe unten).
 
 So liest man es:
-- `zeitlimit` in beiden Versuchen spricht für eine Quelle, die die Datei erst holen müsste (Cloud-Album); ein hohes `dateiAlterTage` stützt das.
-- `fehler` nach wenigen Millisekunden spricht für eine verweigerte oder verschwundene Datei.
+- `zeitlimit` in beiden Versuchen spricht für eine Quelle, die die Datei erst holen müsste (Cloud-Album).
+- `fehler` nach wenigen Millisekunden spricht für eine verweigerte oder verschwundene Datei; `zweiterVersuchGeholfen: true` heißt, die Freigabe kam nach der Pause zurück.
 
 **Die Leseerlaubnis überlebt die Auswahl (#135, JAVASCRIPT-NEXTJS-4).** Das Issue zeigte einen Fall, den die Meldung falsch erklärte: Probe und Volllesen scheiterten nach 84 und 14 ms mit `NotReadableError` („permission problems … after a reference to a file was acquired"), an einem Foto, das **0 Tage alt** war, gewählt über „Galerie". Kein Cloud-Abruf antwortet in 84 ms — die Ursache lag bei uns.
 
@@ -2098,6 +2098,78 @@ Ordner unter `(farmer)` (neu: `/customers`, `/farm-page`, `/status`, `/fehler-me
   öffnet bis dahin den vorhandenen Dialog.
 - „Hof teilen" als schmale Zeile auf Heute gibt es nicht, weil der Balken oben teilt.
   Ist er für heute weggeklickt, fehlt das Teilen dort bis morgen.
+
+---
+
+## Ein Knopf für alle Fotos — lokal oder Cloud, jede Android-Version (2026-09-28)
+
+Fixes JAVASCRIPT-NEXTJS-5: dasselbe Foto 16-mal nicht lesbar, sofort mit
+NotReadableError (80 bzw. 25 ms), Weg „Galerie", auf `/farm-page`. Die Meldung „bitte
+wähle es nochmal aus" (#135) schickte den Bauern in eine Schleife, und vorher musste er
+zwischen Galerie, Dateien und Kamera wählen, ohne zu wissen, was der Unterschied ist.
+
+**Was Sentry über das Gerät wirklich wusste: nichts.** „Android 10" auf Gerät „K" ist die
+Einheitsangabe, die Chrome seit Version 110 für JEDES Android in den User-Agent schreibt.
+Die echte Version liefern nur die Client Hints (`navigator.userAgentData
+.getHighEntropyValues(['platformVersion'])`); sie werden beim Öffnen der Auswahl und auf
+`/teilen` einmal je Seitenlast angestoßen (`bereiteGeraeteAuskunftVor`) und stehen seither
+als `androidVersion` in der Meldung. Ohne Client Hints (Safari, Firefox, alte Chromes)
+bleibt der User-Agent — und „Android 10; K" gilt dort als unbekannt, nicht als 10.
+Nicht erkennbar am `File`-Objekt: ob die Systemfotoauswahl oder ein anderer Auswähler die
+Datei lieferte — Name, Typ, Größe und `lastModified` unterscheiden das nicht; deshalb
+weggelassen.
+
+**Zwei Knöpfe statt drei Wege** (`foto-quellen.tsx`): „Foto wählen" (`accept="image/*"`,
+ohne `capture`, Mehrfachauswahl wie bisher) und „Foto aufnehmen" (`capture="environment"`).
+Mit `image/*` allein zeigt Android die Systemfotoauswahl, die ab Android 12 auch
+Cloud-Fotos (Google Fotos) anbietet und selbst lädt. Der Weg „Dateien" ist aus der
+Oberfläche verschwunden und zur Rettung geworden.
+
+**Drei Netze** (`src/lib/foto-wege.ts`, rein):
+1. Nach der sofortigen Ablehnung (Urteil `erlaubnis`) EIN zweiter Leseversuch derselben
+   Datei nach 1,5 s (`LESE_ZWEITVERSUCH_PAUSE_MS`) — nur dort, denn nur eine entzogene
+   Freigabe kann zurückkommen; die stumme Quelle hat schon 28 s gewartet. Gelingt er, läuft
+   der Upload, als wäre nichts gewesen.
+2. Statt der Meldung eine Karte: „Dein Handy gibt dieses Foto auf diesem Weg nicht
+   heraus." mit „Anders auswählen" und „Foto aufnehmen". „Anders auswählen" öffnet die
+   verborgene Rettungs-Eingabe mit `accept="image/*,application/octet-stream"` — das breite
+   `accept` führt Android in die Dateien-App, in der Google Fotos ein Cloud-Bild beim Öffnen
+   herunterlädt. Weil dort auch Nicht-Bilder wählbar sind, entscheiden die ersten Bytes
+   (`bildFormat`: JPEG, PNG, WebP, HEIC), sonst „Das ist kein Foto." Die Karte kommt für
+   alle drei Lesefehler-Arten; Übertragungs- und Serverfehler bleiben Meldungen, denn sie
+   sagen nichts über das Foto.
+3. Auf der Karte der Satz „Oder in der Galerie: Teilen → FarmerZone" — nur wo `/teilen`
+   das Foto hinbringen kann (Titelbild, Hofgalerie), nur auf Android (das iPhone kennt kein
+   Teilen-Ziel), in der installierten App (`display-mode: standalone`); sonst der Hinweis,
+   wie man sie installiert. Nicht auf `/problem-melden`.
+
+Dieselbe Datei nach einem Fehler noch einmal über „Foto wählen" (Größe und Typ gleich):
+sofort die Karte, kein neuer Versuch. Bei mehreren Fotos laufen die lesbaren durch, für die
+anderen kommt am Ende die Karte, „Anders auswählen" dort mit Mehrfachauswahl.
+
+**HEIC wird nie hochgeladen.** Bisher gingen 8 MB in den Bildspeicher, bevor sharp auf
+Vercel das Format ablehnte (`[F]`). Jetzt erkennt die Lese-Stufe HEIC/HEIF an der
+`ftyp`-Marke, auf allen Wegen, und sagt es ohne Fachwort: „Dieses Foto ist in einem Format
+gespeichert, das wir noch nicht öffnen können. Mach es am besten neu — oder stell in der
+Kamera-App ‚Hohe Kompatibilität‘ bzw. JPEG ein." (`[H]`), mit „Foto aufnehmen" daneben.
+Jedes Vorkommen geht mit Weg und Größe nach Sentry (Ursache `heic`) — über echte
+HEIC-Unterstützung wird danach entschieden, mit Zahlen. AVIF ist derselbe Behälter, aber ein
+Bild, das der Server kann, und bleibt deshalb Unbekanntes.
+
+**Produktdialog:** Er lädt erst beim Absenden, Minuten nach der Auswahl. Die Lese-Stufe
+samt zweitem Versuch läuft deshalb schon bei der Auswahl (`pruefeLesbarkeit` mit `weg`), und
+die Karte erscheint dort — nicht mitten im Speichern. Beim Absenden liest `ladeFotoHoch`
+die 64-KB-Probe noch einmal; scheitert es erst dort, bleibt die Meldung.
+
+**Unverändert:** der gestückelte Transfer (`multipart: true`, `handleUpload`) — das Problem
+liegt vor der Übertragung. Die Meldungstexte E/L/D bleiben als Rückfall, wo keine Karte
+gezeigt wird (Serie-Kurzgrund, `/teilen`).
+
+**Offen:**
+- Ob die Systemfotoauswahl das Foto lieferte, weiß Sentry nicht (siehe oben).
+- Der Test am Gerät steht aus (Checkliste im PR): Android 10 mit dem 16-mal gescheiterten
+  Foto, Android 12+ mit einem reinen Google-Fotos-Bild, iPhone mit iCloud, Teilen aus der
+  installierten App.
 
 ---
 

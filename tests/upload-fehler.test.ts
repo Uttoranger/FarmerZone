@@ -32,13 +32,16 @@ import {
   leseFehlerText,
   IMAGE_FORMAT_ERROR,
   IMAGE_SERVER_ERROR,
+  IMAGE_HEIC_ERROR,
   IMAGE_NETWORK_ERROR,
+  IMAGE_NOT_PHOTO_ERROR,
   IMAGE_STORAGE_ERROR,
   IMAGE_UNKNOWN_ERROR,
   UPLOAD_DIAG,
+  karteText,
 } from '@/lib/upload-fehler'
 
-const ALLE_ARTEN = ['lesen', 'format', 'server'] as const
+const ALLE_ARTEN = ['lesen', 'format', 'server', 'heic', 'kein-foto'] as const
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -79,12 +82,35 @@ describe('Zuordnung Fehlerart → Text', () => {
     expect(bildFehlerText('format')).toMatch(/JPEG/)
   })
 
-  it('gibt jeder der drei Ursachen einen eigenen Text und Kurzgrund', () => {
+  it('gibt jeder Ursache einen eigenen Text und Kurzgrund', () => {
     const texte = ALLE_ARTEN.map(bildFehlerText)
     const kurz = ALLE_ARTEN.map(bildFehlerKurz)
 
-    expect(new Set(texte).size).toBe(3)
-    expect(new Set(kurz).size).toBe(3)
+    expect(new Set(texte).size).toBe(ALLE_ARTEN.length)
+    expect(new Set(kurz).size).toBe(ALLE_ARTEN.length)
+  })
+
+  it('HEIC an den Bytes: ohne Fachwort, mit dem Weg heraus — und nie hochgeladen', () => {
+    expect(bildFehlerText('heic')).toBe(IMAGE_HEIC_ERROR)
+    expect(IMAGE_HEIC_ERROR).not.toMatch(/HEIC|HEIF/)
+    expect(IMAGE_HEIC_ERROR).toContain('noch nicht öffnen')
+    expect(IMAGE_HEIC_ERROR).toContain('Hohe Kompatibilität')
+    expect(IMAGE_HEIC_ERROR).toMatch(/\[H\d+\]$/)
+    expect(bildFehlerKurz('heic')).toBe('Format noch nicht möglich')
+  })
+
+  it('kein Foto über die Dateien-App: kurz und mit eigener Kennung', () => {
+    expect(bildFehlerText('kein-foto')).toBe(IMAGE_NOT_PHOTO_ERROR)
+    expect(IMAGE_NOT_PHOTO_ERROR).toMatch(/^Das ist kein Foto\. \[K\d+\]$/)
+  })
+
+  it('die Karte nach einem Lesefehler: ein Satz, der Buchstabe des Urteils, Mehrzahl bei mehreren', () => {
+    expect(karteText('lesen', 'erlaubnis')).toBe(`Dein Handy gibt dieses Foto auf diesem Weg nicht heraus. [E${UPLOAD_DIAG}]`)
+    expect(karteText('lesen', 'cloud')).toMatch(/\[L\d+\]$/)
+    expect(karteText('lesen', 'unbestimmt')).toMatch(/\[D\d+\]$/)
+    expect(karteText('lesen', 'erlaubnis', 3)).toContain('diese 3 Fotos')
+    expect(karteText('heic')).toBe(IMAGE_HEIC_ERROR)
+    expect(karteText('kein-foto')).toBe(IMAGE_NOT_PHOTO_ERROR)
   })
 
   it('fällt bei einer unbekannten Ursache auf einen definierten Standard zurück', () => {
@@ -215,25 +241,33 @@ describe('Ablehnung durch den Bildspeicher — eigener Text, keine Foto-Ursache'
 })
 
 describe('Diagnose-Kennung', () => {
-  it("steht auf '135' — dem letzten Sprint, der das Upload-Verhalten änderte", () => {
+  it("steht auf '138' — dem letzten Sprint, der das Upload-Verhalten änderte", () => {
     // Mit LITERAL festgenagelt (Lehre aus #69): Alle übrigen Kennungs-Tests
     // prüfen über die Konstante selbst und blieben bei jedem Wert grün —
     // genau so konnte '64' drei Verhaltensänderungen lang stehenbleiben.
     // Die Zähl-Regel: bei JEDER Verhaltensänderung am Upload-Ablauf auf die
     // Sprint-Nummer heben (upload-fehler.ts, DEVELOPMENT.md „Upload-Diagnose").
-    expect(UPLOAD_DIAG).toBe('135')
+    expect(UPLOAD_DIAG).toBe('138')
   })
 
-  it('hängt an jede der drei Meldungen ein eigenes Kürzel mit dem Code-Stand', () => {
+  it('hängt an jede Meldung ein eigenes Kürzel mit dem Code-Stand', () => {
     expect(bildFehlerText('lesen')).toMatch(new RegExp(`\\[D${UPLOAD_DIAG}\\]$`))
     expect(bildFehlerText('format')).toMatch(new RegExp(`\\[F${UPLOAD_DIAG}\\]$`))
     expect(bildFehlerText('server')).toMatch(new RegExp(`\\[S${UPLOAD_DIAG}\\]$`))
+    expect(bildFehlerText('heic')).toMatch(new RegExp(`\\[H${UPLOAD_DIAG}\\]$`))
+    expect(bildFehlerText('kein-foto')).toMatch(new RegExp(`\\[K${UPLOAD_DIAG}\\]$`))
   })
 
-  it('unterscheidet die drei Kürzel voneinander', () => {
+  it('unterscheidet die Kürzel voneinander', () => {
     const kennungen = ALLE_ARTEN.map((art) => bildFehlerText(art).match(/\[[A-Z]\d+\]$/)?.[0])
 
-    expect(kennungen).toEqual([`[D${UPLOAD_DIAG}]`, `[F${UPLOAD_DIAG}]`, `[S${UPLOAD_DIAG}]`])
+    expect(kennungen).toEqual([
+      `[D${UPLOAD_DIAG}]`,
+      `[F${UPLOAD_DIAG}]`,
+      `[S${UPLOAD_DIAG}]`,
+      `[H${UPLOAD_DIAG}]`,
+      `[K${UPLOAD_DIAG}]`,
+    ])
   })
 
   it('führt den Code-Stand an genau einer Stelle', () => {
@@ -264,7 +298,7 @@ describe('BildFehler', () => {
     expect(fehler.message).toBe(IMAGE_SERVER_ERROR)
   })
 
-  it('wird auch ohne instanceof erkannt — für alle drei Ursachen', () => {
+  it('wird auch ohne instanceof erkannt — für alle Ursachen', () => {
     // Falls die Klasse je in zwei Bundles landet, greift instanceof nicht mehr
     for (const art of ALLE_ARTEN) {
       expect(bildFehlerArtVon({ bildFehlerArt: art })).toBe(art)

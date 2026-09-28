@@ -333,6 +333,19 @@ gegen `background` **und** gegen `card`.
   im `onClick` der Eingabe, bevor der Auswahldialog aufgeht — beide Griffe
   stehen als reine Funktionen in `src/lib/foto-feld.ts`. Gilt auch, wo erst
   später hochgeladen wird (Produktdialog: beim Absenden).
+- **Fotos kommen über `useFotoQuellen`** (`src/components/shared/foto-quellen.tsx`):
+  zwei Knöpfe („Foto wählen" mit `accept="image/*"` ohne `capture`, „Foto
+  aufnehmen"), die Rettungs-Eingabe nur über die Karte. Nie eine dritte
+  Eingabe daneben, nie ein eigenes `accept` — das breite `accept` ist der Grund,
+  warum Android die Dateien-App statt der Fotoauswahl zeigt, und gehört nur zur
+  Rettung. Was nach einem Fehler kommt, entscheidet `src/lib/foto-wege.ts`
+  (Karte oder Meldung, zweiter Leseversuch); die Komponente führt nur aus.
+- **Das Bildformat wird an den ersten Bytes entschieden** (`bildFormat`), nie am
+  MIME-Typ oder Dateinamen. HEIC wird nie hochgeladen (`BildFehler('heic')`, ohne
+  Fachwort für den Bauern); auf dem Rettungsweg muss es ein Bild sein. Beides in
+  der Lese-Stufe (`pruefeLesbarkeit`), bevor der Transfer beginnt.
+- **Wer erst später hochlädt, prüft die Datei bei der Auswahl** (`pruefeLesbarkeit`
+  mit `weg`), damit die Karte dort erscheint und nicht mitten im Speichern.
 
 ---
 

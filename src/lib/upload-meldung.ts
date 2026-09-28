@@ -7,14 +7,17 @@
  * DATENSPARSAMKEIT: KEIN Dateiname (— „Hof_Mueller_Franz.jpg" ist ein
  * personenbezogenes Datum, gleiche Regel wie protokolliereBildFehler in
  * upload-fehler.ts) und selbstverständlich KEIN Dateiinhalt. MIME-Typ,
- * Größe, Weg, Ursache und Versuchszahl sagen über niemanden etwas aus. Die
- * Diagnose je Anlauf kommt schon bereinigt an (upload-diagnose.ts).
+ * Größe, Weg, Ursache, Versuchszahl und Android-Hauptversion sagen über
+ * niemanden etwas aus. Die Diagnose je Anlauf kommt schon bereinigt an
+ * (upload-diagnose.ts).
  *
- * Der Bau der Meldung ist rein und getestet; nur meldeUploadFehler berührt
- * Sentry — und wirft nie: Telemetrie darf den Upload-Ablauf nicht verändern.
+ * Der Bau der Meldung ist rein und getestet; nur meldeUploadFehler und die
+ * Geräteauskunft berühren Sentry bzw. den Browser — und werfen nie:
+ * Telemetrie darf den Upload-Ablauf nicht verändern.
  */
 import * as Sentry from '@sentry/nextjs'
-import type { LeseDiagnose, LeseErgebnis, UploadAnlauf, UploadDiagnose, UploadSchritt } from '@/lib/upload-diagnose'
+import type { LeseDiagnose, LeseErgebnis, LeseVersuch, UploadAnlauf, UploadDiagnose, UploadSchritt } from '@/lib/upload-diagnose'
+import { androidAuskunft, type AndroidAuskunft, type FotoWeg } from '@/lib/foto-wege'
 import {
   bildFehlerArtVon,
   IMAGE_NETWORK_ERROR,
@@ -23,10 +26,10 @@ import {
   type BildFehlerArt,
 } from '@/lib/upload-fehler'
 
-/** Über welchen Weg die Datei kam (#71: drei Quellen plus Teilen-Ziel). */
-export type UploadWeg = 'galerie' | 'dateien' | 'kamera' | 'teilen'
+/** Über welchen Weg die Datei kam — die vier Wege aus foto-wege.ts. */
+export type UploadWeg = FotoWeg
 
-/** Die drei Foto-Ursachen, plus Netz und Bildspeicher (keine Foto-Urteile)
+/** Die Foto-Ursachen, plus Netz und Bildspeicher (keine Foto-Urteile)
  *  und Unbekannt. */
 export type UploadUrsache = BildFehlerArt | 'netz' | 'bildspeicher' | 'unbekannt'
 
@@ -49,6 +52,8 @@ export type UploadMeldung = {
       dateiTyp: string
       weg: UploadWeg
       versuche: number
+      /** Android-Hauptversion aus den Client Hints; null = kein Android oder unbekannt (foto-wege.ts). */
+      androidVersion: number | null
     }
     uploadLesen?: UploadLesenKontext
   } & { [anlauf: `uploadAnlauf${number}`]: UploadAnlauf }
@@ -57,7 +62,8 @@ export type UploadMeldung = {
 /**
  * Die Lese-Stufe als EIN flacher Kontext — aus demselben Grund wie die
  * Anläufe: Sentry kürzt verschachtelte Werte ab der dritten Ebene. Die
- * voll…-Felder fehlen, wenn die Probe gelang (dann gab es kein Volllesen).
+ * voll…-Felder fehlen, wenn die Probe gelang; die zweiterVersuch…-Felder,
+ * wenn es keinen zweiten Versuch gab (Netz 1 nur nach sofortiger Ablehnung).
  */
 export type UploadLesenKontext = {
   probeErgebnis: LeseErgebnis
@@ -68,21 +74,45 @@ export type UploadLesenKontext = {
   vollKlasse?: string
   vollMeldung?: string
   vollDauerMs?: number
-  dateiAlterTage: number | null
+  zweiterVersuchErgebnis?: LeseErgebnis
+  zweiterVersuchKlasse?: string
+  zweiterVersuchMeldung?: string
+  zweiterVersuchDauerMs?: number
+  /** Hat der zweite Leseversuch die Datei gebracht? null = es gab keinen. */
+  zweiterVersuchGeholfen: boolean | null
 }
 
-function lesenKontext({ probe, voll, dateiAlterTage }: LeseDiagnose): UploadLesenKontext {
-  const kontext: UploadLesenKontext = { probeErgebnis: probe.ergebnis, probeDauerMs: probe.dauerMs, dateiAlterTage }
-  if (probe.ergebnis === 'fehler') {
-    kontext.probeKlasse = probe.klasse
-    kontext.probeMeldung = probe.meldung
+function fehlerFelder(versuch: LeseVersuch): { klasse?: string; meldung?: string } {
+  return versuch.ergebnis === 'fehler' ? { klasse: versuch.klasse, meldung: versuch.meldung } : {}
+}
+
+function lesenKontext({ probe, voll, zweiterVersuch }: LeseDiagnose): UploadLesenKontext {
+  const kontext: UploadLesenKontext = {
+    probeErgebnis: probe.ergebnis,
+    probeDauerMs: probe.dauerMs,
+    zweiterVersuchGeholfen: zweiterVersuch ? zweiterVersuch.ergebnis === 'ok' : null,
+  }
+  const probeFehler = fehlerFelder(probe)
+  if (probeFehler.klasse !== undefined) {
+    kontext.probeKlasse = probeFehler.klasse
+    kontext.probeMeldung = probeFehler.meldung
   }
   if (voll) {
     kontext.vollErgebnis = voll.ergebnis
     kontext.vollDauerMs = voll.dauerMs
-    if (voll.ergebnis === 'fehler') {
-      kontext.vollKlasse = voll.klasse
-      kontext.vollMeldung = voll.meldung
+    const vollFehler = fehlerFelder(voll)
+    if (vollFehler.klasse !== undefined) {
+      kontext.vollKlasse = vollFehler.klasse
+      kontext.vollMeldung = vollFehler.meldung
+    }
+  }
+  if (zweiterVersuch) {
+    kontext.zweiterVersuchErgebnis = zweiterVersuch.ergebnis
+    kontext.zweiterVersuchDauerMs = zweiterVersuch.dauerMs
+    const zweiterFehler = fehlerFelder(zweiterVersuch)
+    if (zweiterFehler.klasse !== undefined) {
+      kontext.zweiterVersuchKlasse = zweiterFehler.klasse
+      kontext.zweiterVersuchMeldung = zweiterFehler.meldung
     }
   }
   return kontext
@@ -103,6 +133,7 @@ export function baueUploadMeldung(eingabe: {
   versuche: number
   diagnose?: UploadDiagnose
   lesen?: LeseDiagnose
+  androidVersion?: number | null
 }): UploadMeldung {
   const meldung: UploadMeldung = {
     tags: { bereich: 'foto-upload', ursache: eingabe.ursache, kennung: UPLOAD_DIAG },
@@ -112,6 +143,7 @@ export function baueUploadMeldung(eingabe: {
         dateiTyp: eingabe.datei.type || 'unbekannt',
         weg: eingabe.weg,
         versuche: eingabe.versuche,
+        androidVersion: eingabe.androidVersion ?? null,
       },
     },
   }
@@ -123,6 +155,52 @@ export function baueUploadMeldung(eingabe: {
   }
   if (eingabe.lesen) meldung.contexts.uploadLesen = lesenKontext(eingabe.lesen)
   return meldung
+}
+
+// ─── Geräteauskunft ─────────────────────────────────────────────────────────
+
+type NavigatorMitHints = Navigator & {
+  userAgentData?: {
+    platform: string
+    getHighEntropyValues?: (hints: string[]) => Promise<{ platformVersion?: string }>
+  }
+}
+
+let auskunft: AndroidAuskunft | null = null
+let hintsAngefragt = false
+
+/**
+ * Die Android-Auskunft, wie sie gerade vorliegt: aus den Client Hints, wenn
+ * sie schon geantwortet haben, sonst aus dem User-Agent — der nennt seit
+ * Chrome 110 für jedes Android „10", das gilt dann als unbekannt. Außerhalb
+ * des Browsers null.
+ */
+export function geraeteAuskunft(): AndroidAuskunft | null {
+  if (typeof navigator === 'undefined') return null
+  if (!auskunft) auskunft = androidAuskunft({ userAgent: navigator.userAgent })
+  return auskunft
+}
+
+/**
+ * Holt die echte Android-Version einmal je Seitenlast über die Client Hints —
+ * asynchron, deshalb VOR dem ersten Foto anstoßen (beim Öffnen der Auswahl,
+ * beim Laden von /teilen). Bis die Antwort da ist, gilt der User-Agent;
+ * ohne Client Hints (Safari, Firefox) bleibt er es. Wirft nie.
+ */
+export function bereiteGeraeteAuskunftVor(): void {
+  if (hintsAngefragt || typeof navigator === 'undefined') return
+  hintsAngefragt = true
+  const daten = (navigator as NavigatorMitHints).userAgentData
+  if (!daten || typeof daten.getHighEntropyValues !== 'function') return
+  const userAgent = navigator.userAgent
+  daten
+    .getHighEntropyValues(['platformVersion'])
+    .then((werte) => {
+      auskunft = androidAuskunft({ userAgent, platform: daten.platform, platformVersion: werte.platformVersion })
+    })
+    .catch(() => {
+      // Verweigert oder nicht unterstützt — der User-Agent bleibt die Auskunft.
+    })
 }
 
 /**
@@ -143,7 +221,14 @@ export function meldeUploadFehler(
   }
 ): void {
   try {
-    Sentry.captureException(fehler, baueUploadMeldung({ ursache: uploadUrsacheVon(fehler), ...eingabe }))
+    Sentry.captureException(
+      fehler,
+      baueUploadMeldung({
+        ursache: uploadUrsacheVon(fehler),
+        androidVersion: geraeteAuskunft()?.version ?? null,
+        ...eingabe,
+      })
+    )
   } catch {
     // Telemetrie scheitert leise.
   }

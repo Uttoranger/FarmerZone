@@ -6,12 +6,15 @@ import { useForm, type FieldErrors, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { Camera, X, Leaf, Thermometer, Snowflake, ChevronRight, Info, Sparkles } from 'lucide-react'
-import { ladeFotoHoch, stufenText, type UploadStufe } from '@/components/shared/image-upload'
-import { useFotoQuellen } from '@/components/shared/foto-quellen'
+import { ladeFotoHoch, pruefeLesbarkeit, stufenText, type UploadStufe } from '@/components/shared/image-upload'
+import { useFotoQuellen, type FotoQuellenWeg } from '@/components/shared/foto-quellen'
 import type { LeseDiagnose, UploadDiagnose } from '@/lib/upload-diagnose'
 import { bildFehlerMeldung } from '@/lib/upload-fehler'
 import { IM_SHOP, NICHT_IM_SHOP } from '@/lib/produkt-sichtbarkeit'
 import { meldeUploadFehler, type UploadWeg } from '@/lib/upload-meldung'
+import { naechsterSchritt } from '@/lib/foto-wege'
+import { ordneLeseFehler } from '@/lib/upload-diagnose'
+import { karteText } from '@/lib/upload-fehler'
 import { MAX_ORIGINAL_BYTES } from '@/lib/upload-pfade'
 import {
   Dialog,
@@ -316,6 +319,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
   } | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  // Solange die Lese-Stufe bei der Auswahl läuft (höchstens 28 s + Pause).
+  const [pruefeFoto, setPruefeFoto] = useState(false)
   // Welche Abschnitte aufgeklappt sind. Anlegen: nur Grunddaten; Bearbeiten:
   // alle zu, die Titel tragen dann eine Zusammenfassung.
   const [offen, setOffen] = useState<Abschnitt[]>([])
@@ -338,13 +343,15 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
   const formRef = useRef<HTMLFormElement>(null)
   // Über welchen Weg das gewählte Foto kam — nur für die Sentry-Meldung;
   // der Upload läuft hier erst beim Absenden, also bis dahin merken.
-  const gewaehlterWeg = useRef<UploadWeg>('galerie')
-  // Drei Wege zum Produktfoto (Galerie, Dateien, Kamera) — derselbe
-  // Quellen-Hook wie im Upload-Hook, damit es nur EIN Menü gibt.
+  const gewaehlterWeg = useRef<UploadWeg>('standard')
+  // Dieselben zwei Knöpfe und dieselbe Karte wie im Upload-Hook, damit es nur
+  // EIN Menü gibt. Zweck 'product': Die Karte bietet hier kein Teilen an,
+  // /teilen kann nur Titelbild und Hofgalerie.
   const fotoQuellen = useFotoQuellen({
+    zweck: 'product',
     onFiles: ([datei], weg) => {
       gewaehlterWeg.current = weg
-      uebernehmeFoto(datei)
+      void pruefeUndUebernehme(datei, weg)
     },
   })
 
@@ -488,16 +495,51 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
     }
   }
 
-  function uebernehmeFoto(file: File) {
+  /**
+   * Die Lese-Stufe samt zweitem Versuch schon bei der Auswahl: Der Dialog
+   * lädt erst beim Absenden, Minuten später — die Karte gehört hierher, nicht
+   * mitten ins Speichern. Beim Absenden liest ladeFotoHoch noch einmal (die
+   * 64-KB-Probe kostet nichts); scheitert es erst dort, bleibt die Meldung.
+   */
+  async function pruefeUndUebernehme(file: File, weg: FotoQuellenWeg) {
     if (file.size > MAX_ORIGINAL_BYTES) {
       toast.error('Datei zu groß (max. 25 MB)')
       return
     }
-    // KEINE clientseitige Format-Probe mehr: Sie hing am Canvas, und genau der
-    // war das Problem. Das Urteil fällt jetzt beim Absenden auf dem Server, an
-    // den Bytes statt an einer Browser-Fähigkeit. Die Vorschau ist bis dahin
-    // nur eine Vorschau — kann der Browser sie nicht zeichnen, räumt onError
-    // sie weg, statt ein kaputtes Bildsymbol stehen zu lassen.
+    setPruefeFoto(true)
+    let lesen: LeseDiagnose | undefined
+    try {
+      await pruefeLesbarkeit(file, {
+        weg,
+        onLesen: (l) => {
+          lesen = l
+        },
+      })
+    } catch (e) {
+      // Nach Sentry wie im Upload-Hook (kein Dateiname — upload-meldung.ts),
+      // dann die Karte, wo das Foto oder der Weg das Problem war.
+      meldeUploadFehler(e, { datei: file, weg, versuche: 0, lesen })
+      const { text, art } = bildFehlerMeldung(e)
+      const schritt = naechsterSchritt(art)
+      if (schritt.art === 'karte') {
+        const urteil = lesen ? ordneLeseFehler(lesen) : 'unbestimmt'
+        fotoQuellen.zeigeKarte({ grund: schritt.grund, text: karteText(schritt.grund, urteil) }, file)
+      } else {
+        toast.error(text)
+      }
+      return
+    } finally {
+      setPruefeFoto(false)
+    }
+    uebernehmeFoto(file)
+  }
+
+  function uebernehmeFoto(file: File) {
+    // KEINE clientseitige Format-Probe über den Canvas mehr: Genau der war
+    // das Problem. Das Urteil fällt an den ersten Bytes (Lese-Stufe) und
+    // beim Absenden auf dem Server. Die Vorschau ist bis dahin nur eine
+    // Vorschau — kann der Browser sie nicht zeichnen, räumt onError sie weg,
+    // statt ein kaputtes Bildsymbol stehen zu lassen.
     if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl)
     setSelectedFile(file)
     setPreviewUrl(URL.createObjectURL(file))
@@ -638,6 +680,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
         try {
           imageUrl = await ladeFotoHoch(selectedFile, 'product', {
             altUrl: isEdit ? (product.imageUrl ?? undefined) : undefined,
+            weg: gewaehlterWeg.current,
             onStufe: (stufe) =>
               setUploadFortschritt((v) => ({ stufe, prozent: v?.prozent ?? 0 })),
             onFortschritt: (prozent) =>
@@ -778,22 +821,26 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                             <button
                               type="button"
                               onClick={fotoQuellen.oeffnen}
-                              disabled={isSubmitting}
+                              disabled={isSubmitting || pruefeFoto}
                               className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'absolute right-2 bottom-2 bg-card disabled:opacity-60')}
                             >
-                              Foto ersetzen
+                              {pruefeFoto ? 'Foto wird geprüft …' : 'Foto ersetzen'}
                             </button>
                           </div>
                         ) : (
                           <button
                             type="button"
                             onClick={fotoQuellen.oeffnen}
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || pruefeFoto}
                             className="flex min-h-[120px] w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border bg-muted/30 px-4 py-5 text-center transition-colors hover:bg-muted/50 disabled:opacity-60"
                           >
                             <Camera className="h-7 w-7 text-brand-text" aria-hidden />
                             <span className="text-sm font-medium text-foreground">
-                              {selectedFile ? 'Foto ausgewählt — tippen zum Ersetzen' : 'Foto hinzufügen'}
+                              {pruefeFoto
+                                ? 'Foto wird geprüft …'
+                                : selectedFile
+                                  ? 'Foto ausgewählt — tippen zum Ersetzen'
+                                  : 'Foto hinzufügen'}
                             </span>
                             <span className="text-xs text-muted-foreground">
                               Freiwillig — ohne Foto zeigen wir ein Bild zur Kategorie.
