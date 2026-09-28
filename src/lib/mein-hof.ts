@@ -20,6 +20,15 @@ export function titelbildVerlauf(bannerValue: string | null | undefined): string
   return TITELBILD_VERLAEUFE[bannerValue ?? 'tannengruen'] ?? TITELBILD_VERLAEUFE.tannengruen
 }
 
+/**
+ * Das hochgeladene Titelbild, sonst null (dann gilt der Verlauf). Eine Stelle
+ * für Hofseite und Streifen — `bannerValue` kann laut Schema auch eine
+ * Foto-URL tragen, maßgeblich ist aber nur PHOTO mit `bannerUrl`.
+ */
+export function titelbildFoto(hof: { bannerType: string; bannerUrl: string | null }): string | null {
+  return hof.bannerType === 'PHOTO' && hof.bannerUrl ? hof.bannerUrl : null
+}
+
 export type HofZustandArt = 'sichtbar' | 'pausiert' | 'wartet' | 'aus'
 
 export type HofZustand = {
@@ -30,9 +39,10 @@ export type HofZustand = {
 }
 
 /**
- * Der Zustand des Hofs in einem Wort. Reihenfolge wie in /api/checkout
- * (farm-approval.ts): stillgelegt → nicht freigeschaltet → pausiert. Ein
- * pausierter Hof bleibt öffentlich (mit Hinweis), die beiden anderen nicht —
+ * Der Zustand des Hofs in einem Wort. Reihenfolge nach farm-approval.ts:
+ * stillgelegt → nicht freigeschaltet → pausiert; „Nicht öffentlich"
+ * (isActive false) steht nach „Stillgelegt", weil das dem Hof mehr sagt.
+ * Ein pausierter Hof bleibt öffentlich (mit Hinweis), die anderen nicht —
  * einen Link zu teilen, der ins Leere führt, wäre irreführend.
  */
 export function hofZustand(hof: {

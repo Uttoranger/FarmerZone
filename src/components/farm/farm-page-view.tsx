@@ -37,8 +37,7 @@ import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { ProductGrid, useBereichWunsch } from './product-grid'
 import { stripStatusVariables, renderStatusBodyWithChip } from '@/lib/status-body'
 // Ersatz-Titelbild ohne Foto — gemeinsam mit dem Kopf von „Mein Hof".
-import { titelbildVerlauf } from '@/lib/mein-hof'
-
+import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
 
 const ANLASS_META: Record<string, { label: string; icon: ReactNode }> = {
   FRESH_PRODUCT: { label: 'Frisches Produkt', icon: <Leaf className="size-3" strokeWidth={1.7} /> },
@@ -760,10 +759,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
     },
   }
 
-  const bannerBg =
-    farm.bannerType === 'PHOTO' && farm.bannerUrl
-      ? null
-      : titelbildVerlauf(farm.bannerValue)
+  const bannerBg = titelbildFoto(farm) ? null : titelbildVerlauf(farm.bannerValue)
 
   const productsForGrid = isEdit
     ? farm.products

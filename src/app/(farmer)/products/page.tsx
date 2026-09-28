@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getProductsForFarm, getHofBetriebsnummer } from '@/server/queries/products'
+import { getMeinHofKopf } from '@/server/queries/farm'
 import { ProductList } from '@/components/products/product-list'
 import { MeinHofKopf } from '@/components/farmer/mein-hof-kopf'
 
@@ -14,14 +15,15 @@ export default async function ProductsPage() {
   const farm = await getFarmForUser(session.user.id)
   if (!farm) redirect('/login')
 
-  const [products, hofBetriebsnummer] = await Promise.all([
+  const [products, hofBetriebsnummer, kopf] = await Promise.all([
     getProductsForFarm(farm.id),
     getHofBetriebsnummer(farm.id),
+    getMeinHofKopf(session.user.id),
   ])
 
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto">
-      <MeinHofKopf ownerId={session.user.id} aktiv="produkte" />
+      <MeinHofKopf hof={kopf} aktiv="produkte" />
       <ProductList products={products} hofBetriebsnummer={hofBetriebsnummer} />
     </div>
   )

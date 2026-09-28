@@ -33,6 +33,7 @@ import {
   HANDY_LEISTE,
   VERKAUF_UND_KUNDEN_TITEL,
   aktiverPunkt,
+  ariaAktuell,
   fuerNutzer,
   mehrAktiv,
   type NavPunkt,
@@ -121,12 +122,14 @@ function NavZeile({
   punkt,
   handy,
   istAktiv,
+  ariaCurrent,
   anzahl,
   onNavigate,
 }: {
   punkt: NavPunkt
   handy: boolean
   istAktiv: boolean
+  ariaCurrent: 'page' | 'true' | undefined
   anzahl?: number
   onNavigate?: () => void
 }) {
@@ -135,7 +138,7 @@ function NavZeile({
     <Link
       href={punkt.href}
       onClick={onNavigate}
-      aria-current={istAktiv ? 'page' : undefined}
+      aria-current={ariaCurrent}
       className={cn(
         'flex items-center gap-3 rounded-xl px-3 text-sm transition-colors duration-[250ms]',
         handy ? 'min-h-[48px] py-2.5' : 'min-h-10 py-2',
@@ -279,7 +282,7 @@ export function FarmerNav({
                   key={punkt.id}
                   href={punkt.href}
                   onClick={schliessen}
-                  aria-current={aktiv === punkt.id ? 'page' : undefined}
+                  aria-current={ariaAktuell(pathname, punkt)}
                   className={cn(
                     'relative flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 text-xs transition-colors duration-[250ms]',
                     FOKUS
@@ -400,11 +403,11 @@ export function FarmerNav({
                   </div>
                   <Gruppe>{VERKAUF_UND_KUNDEN_TITEL}</Gruppe>
                   {nav.verkaufUndKunden.map((punkt) => (
-                    <NavZeile key={punkt.id} punkt={punkt} handy istAktiv={aktiv === punkt.id} anzahl={zahlVon(punkt)} onNavigate={schliessen} />
+                    <NavZeile key={punkt.id} punkt={punkt} handy istAktiv={aktiv === punkt.id} ariaCurrent={ariaAktuell(pathname, punkt)} anzahl={zahlVon(punkt)} onNavigate={schliessen} />
                   ))}
                   <div className="my-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.10)' }} />
                   {nav.unten.map((punkt) => (
-                    <NavZeile key={punkt.id} punkt={punkt} handy istAktiv={aktiv === punkt.id} anzahl={zahlVon(punkt)} onNavigate={schliessen} />
+                    <NavZeile key={punkt.id} punkt={punkt} handy istAktiv={aktiv === punkt.id} ariaCurrent={ariaAktuell(pathname, punkt)} anzahl={zahlVon(punkt)} onNavigate={schliessen} />
                   ))}
                   <Abmelden handy onClick={handleLogout} />
                 </SheetContent>
@@ -463,17 +466,17 @@ export function FarmerNav({
 
           <nav aria-label="Hauptnavigation" className="space-y-0.5 px-2 py-3">
             {nav.haupt.map((punkt) => (
-              <NavZeile key={punkt.id} punkt={punkt} handy={false} istAktiv={aktiv === punkt.id} anzahl={zahlVon(punkt)} />
+              <NavZeile key={punkt.id} punkt={punkt} handy={false} istAktiv={aktiv === punkt.id} ariaCurrent={ariaAktuell(pathname, punkt)} anzahl={zahlVon(punkt)} />
             ))}
             <Gruppe>{VERKAUF_UND_KUNDEN_TITEL}</Gruppe>
             {nav.verkaufUndKunden.map((punkt) => (
-              <NavZeile key={punkt.id} punkt={punkt} handy={false} istAktiv={aktiv === punkt.id} anzahl={zahlVon(punkt)} />
+              <NavZeile key={punkt.id} punkt={punkt} handy={false} istAktiv={aktiv === punkt.id} ariaCurrent={ariaAktuell(pathname, punkt)} anzahl={zahlVon(punkt)} />
             ))}
           </nav>
 
           <div className="mt-auto space-y-0.5 px-2 py-3" style={{ borderTop: '1px solid rgba(255,255,255,0.10)' }}>
             {nav.unten.map((punkt) => (
-              <NavZeile key={punkt.id} punkt={punkt} handy={false} istAktiv={aktiv === punkt.id} anzahl={zahlVon(punkt)} />
+              <NavZeile key={punkt.id} punkt={punkt} handy={false} istAktiv={aktiv === punkt.id} ariaCurrent={ariaAktuell(pathname, punkt)} anzahl={zahlVon(punkt)} />
             ))}
             {/* Hell/Dunkel als Zeile wie die Nachbarn — ein Klick von jeder
                 Bauern-Seite, ohne den Weg über Einstellungen → Konto. */}

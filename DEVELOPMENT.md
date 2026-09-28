@@ -2123,7 +2123,8 @@ gerendert statt über ein gemeinsames Layout — so bleibt er auf Unterseiten wi
 `/status/new` weg, und keine Seite musste verschoben werden.
 
 **Zustand** (`hofZustand` in `src/lib/mein-hof.ts`), in der Reihenfolge von
-`/api/checkout`: stillgelegt → wartet auf Freischaltung → pausiert → „Im Shop sichtbar".
+`farm-approval.ts`: „Stillgelegt" → „Nicht öffentlich" (isActive false, wird heute
+nirgends gesetzt) → „Wartet auf Freischaltung" → „Pausiert" → „Im Shop sichtbar".
 Kundenansicht und Teilen erscheinen nur, wenn die Hofseite öffentlich ist (sichtbar oder
 pausiert) — ein geteilter Link, der auf „nicht gefunden" führt, wäre irreführend.
 
@@ -2134,8 +2135,10 @@ erledigt: Auf Heute gibt es kein eigenes Teilen, es sitzt im Kopf von Mein Hof.
 **Browser:** Hauptpunkte Heute, Bestellungen, Mein Hof; die Gruppe darunter heißt
 „Verkauf und Kunden" (Kunden, Verkäufe, Auswertung).
 
-Die Titelbild-Verläufe standen in `farm-page-view.tsx`; sie liegen jetzt in
-`src/lib/mein-hof.ts`, damit Hofseite und Streifen dieselben Farben zeigen.
+Die Titelbild-Verläufe und die Bedingung „Foto oder Verlauf" standen in
+`farm-page-view.tsx`; sie liegen jetzt in `src/lib/mein-hof.ts`, damit Hofseite und
+Streifen dasselbe Titelbild zeigen. Die Daten des Kopfs lädt jede Seite parallel zu
+ihren eigenen.
 
 **Offen:**
 - Doppeltes Teilen: Der Shop-Link-Balken oben (im Layout) und die Leiste der Hofseite

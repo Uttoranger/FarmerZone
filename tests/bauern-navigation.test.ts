@@ -25,7 +25,7 @@ import {
   VERKAUF_UND_KUNDEN,
   VERKAUF_UND_KUNDEN_TITEL,
   aktiverPunkt,
-  aktiverReiter,
+  ariaAktuell,
   fuerNutzer,
   mehrAktiv,
 } from '@/lib/bauern-navigation'
@@ -92,25 +92,49 @@ describe('Mein Hof', () => {
     expect(HAUPT.find((p) => p.id === 'mein-hof')?.href).toBe(MEIN_HOF_REITER[0].href)
   })
 
-  it.each([
-    ['/products', 'produkte'],
-    ['/farm-page', 'hofseite'],
-    ['/status', 'beitraege'],
-    ['/status/new', 'beitraege'],
-    ['/dashboard', null],
-    ['/productsxyz', null],
-  ])('aktiverReiter(%s) → %s', (pfad, id) => {
-    expect(aktiverReiter(pfad)).toBe(id)
+  it('der Kopf sitzt über jeder Reiter-Seite, mit genau ihrem Reiter und parallel geladenen Daten', () => {
+    for (const reiter of MEIN_HOF_REITER) {
+      const seite = quelle(`src/app/(farmer)${reiter.href}/page.tsx`)
+      expect(seite, reiter.href).toMatch(new RegExp(`<MeinHofKopf[^>]*aktiv="${reiter.id}"`))
+      expect(seite, reiter.href).toContain('getMeinHofKopf(session.user.id)')
+    }
   })
 
-  it('der Kopf sitzt über den drei Seiten, jeweils mit ihrem Reiter', () => {
-    expect(quelle('src/app/(farmer)/products/page.tsx')).toContain('<MeinHofKopf ownerId={session.user.id} aktiv="produkte" />')
-    expect(quelle('src/app/(farmer)/farm-page/page.tsx')).toContain('<MeinHofKopf ownerId={session.user.id} aktiv="hofseite" />')
-    expect(quelle('src/app/(farmer)/status/page.tsx')).toContain('<MeinHofKopf ownerId={session.user.id} aktiv="beitraege" />')
+  it('Unterseiten der Reiter (z. B. „Neuer Status") bekommen ihn nicht', () => {
+    const unterseiten: string[] = []
+    const suche = (ordner: string) => {
+      for (const name of readdirSync(ordner)) {
+        const pfad = join(ordner, name)
+        if (statSync(pfad).isDirectory()) suche(pfad)
+        else if (name === 'page.tsx') unterseiten.push(pfad)
+      }
+    }
+    for (const reiter of MEIN_HOF_REITER) {
+      const wurzel = join(process.cwd(), `src/app/(farmer)${reiter.href}`)
+      for (const name of readdirSync(wurzel)) {
+        if (statSync(join(wurzel, name)).isDirectory()) suche(join(wurzel, name))
+      }
+    }
+    expect(unterseiten.length).toBeGreaterThan(0)
+    for (const pfad of unterseiten) expect(readFileSync(pfad, 'utf8'), pfad).not.toContain('MeinHofKopf')
+  })
+})
+
+describe('aria-current', () => {
+  const meinHof = HAUPT.find((p) => p.id === 'mein-hof')!
+  const bestellungen = HAUPT.find((p) => p.id === 'bestellungen')!
+
+  it("'page' nur auf genau der Zielseite, sonst 'true' — nie zwei Links als dieselbe Seite", () => {
+    expect(ariaAktuell('/products', meinHof)).toBe('page')
+    expect(ariaAktuell('/farm-page', meinHof)).toBe('true')
+    expect(ariaAktuell('/status/new', meinHof)).toBe('true')
+    expect(ariaAktuell('/orders', bestellungen)).toBe('page')
+    expect(ariaAktuell('/orders/abc', bestellungen)).toBe('true')
   })
 
-  it('Unterseiten wie „Neuer Status" bekommen ihn nicht', () => {
-    expect(quelle('src/app/(farmer)/status/new/page.tsx')).not.toContain('MeinHofKopf')
+  it('kein aria-current für andere Punkte', () => {
+    expect(ariaAktuell('/orders', meinHof)).toBeUndefined()
+    expect(ariaAktuell('/dashboard', bestellungen)).toBeUndefined()
   })
 })
 

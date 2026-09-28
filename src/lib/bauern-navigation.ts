@@ -177,7 +177,13 @@ export function mehrAktiv(pfad: string): boolean {
   return id !== null && [...VERKAUF_UND_KUNDEN, ...UNTEN].some((p) => p.id === id)
 }
 
-/** Der aktive Reiter von „Mein Hof" — null außerhalb der drei Seiten. */
-export function aktiverReiter(pfad: string): MeinHofReiterId | null {
-  return MEIN_HOF_REITER.find((r) => treffer(pfad, r.href) >= 0)?.id ?? null
+/**
+ * aria-current für einen Punkt: 'page' nur, wenn der Link genau auf diese
+ * Seite führt; 'true', wenn er nur für sie steht (Unterseite, oder „Mein Hof"
+ * auf /farm-page) — sonst hörte der Screenreader zwei Links mit
+ * verschiedenen Zielen als „aktuelle Seite".
+ */
+export function ariaAktuell(pfad: string, punkt: NavPunkt): 'page' | 'true' | undefined {
+  if (aktiverPunkt(pfad) !== punkt.id) return undefined
+  return pfad === punkt.href.split('?')[0] ? 'page' : 'true'
 }

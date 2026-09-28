@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { hofZustand, type HofZustand } from '@/lib/mein-hof'
+import { hofZustand, titelbildFoto, type HofZustand } from '@/lib/mein-hof'
 import { categoryImagePath } from '@/lib/product-image'
 import { DEFAULT_SECTIONS, type SectionConfig } from './appearance'
 import { PRODUCT_ORDER_BY } from './products'
@@ -798,8 +798,7 @@ export async function getMeinHofKopf(ownerId: string): Promise<MeinHofKopfDaten 
     name: hof.name,
     slug: hof.slug,
     logoUrl: hof.logoUrl,
-    // Dieselbe Bedingung wie die Hofseite: Foto nur bei PHOTO mit URL.
-    titelbildUrl: hof.bannerType === 'PHOTO' && hof.bannerUrl ? hof.bannerUrl : null,
+    titelbildUrl: titelbildFoto(hof),
     bannerValue: hof.bannerValue,
     bannerFocusY: hof.bannerFocusY,
     zustand: hofZustand(hof),

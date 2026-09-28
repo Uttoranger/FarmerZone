@@ -4,7 +4,7 @@ import { Eye } from 'lucide-react'
 import { MEIN_HOF_REITER, type MeinHofReiterId } from '@/lib/bauern-navigation'
 import { hofInitialen } from '@/lib/hof-initialen'
 import { titelbildVerlauf, type HofZustandArt } from '@/lib/mein-hof'
-import { getMeinHofKopf } from '@/server/queries/farm'
+import type { MeinHofKopfDaten } from '@/server/queries/farm'
 import { HofTeilenKnopf } from '@/components/farmer/hof-teilen-knopf'
 import { cn } from '@/lib/utils'
 
@@ -14,6 +14,9 @@ import { cn } from '@/lib/utils'
  * bleiben, wie sie sind; jede rendert diesen Kopf mit ihrem Reiter. Die
  * Unterseiten (/status/new usw.) bekommen ihn bewusst nicht — dort wird
  * etwas getan, nicht gewechselt.
+ *
+ * Die Daten (getMeinHofKopf) lädt die Seite parallel zu ihren eigenen — der
+ * Kopf fragt nicht selbst, sonst käme eine Datenbankrunde hinterher.
  */
 
 /** Bedeutungsfarben des Zustandspunkts, in beiden Modi sichtbar. */
@@ -27,8 +30,13 @@ const PUNKT_FARBE: Record<HofZustandArt, string> = {
 const KNOPF =
   'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-app-ink transition-colors hover:bg-muted/50 outline-none focus-visible:ring-3 focus-visible:ring-ring/50'
 
-export async function MeinHofKopf({ ownerId, aktiv }: { ownerId: string; aktiv: MeinHofReiterId }) {
-  const hof = await getMeinHofKopf(ownerId)
+export function MeinHofKopf({
+  hof,
+  aktiv,
+}: {
+  hof: MeinHofKopfDaten | null
+  aktiv: MeinHofReiterId
+}): React.JSX.Element | null {
   if (!hof) return null
 
   return (
@@ -87,6 +95,7 @@ export async function MeinHofKopf({ ownerId, aktiv }: { ownerId: string; aktiv: 
               <Link href={`/${hof.slug}`} target="_blank" rel="noopener noreferrer" className={KNOPF}>
                 <Eye className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
                 Kundenansicht
+                <span className="sr-only"> (öffnet in neuem Tab)</span>
               </Link>
               <HofTeilenKnopf name={hof.name} slug={hof.slug} className={KNOPF} />
             </div>
@@ -103,7 +112,9 @@ export async function MeinHofKopf({ ownerId, aktiv }: { ownerId: string; aktiv: 
               href={reiter.href}
               aria-current={istAktiv ? 'page' : undefined}
               className={cn(
-                '-mb-px flex min-h-11 flex-1 items-center justify-center border-b-2 px-2 text-sm transition-colors outline-none focus-visible:bg-muted/50',
+                // Fokus als Rahmen, nicht als Fläche: Die Reiter stehen auf dem
+                // Seitengrund, eine halbdurchsichtige Fläche sähe man dort kaum.
+                '-mb-px flex min-h-11 flex-1 items-center justify-center rounded-t-md border-b-2 px-2 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
                 istAktiv
                   ? 'border-brand-text font-semibold text-app-ink'
                   : 'border-transparent text-app-ink-soft hover:text-app-ink'
