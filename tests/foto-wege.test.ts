@@ -26,6 +26,7 @@ import {
   bildFormat,
   formatUrteil,
   gleicheDatei,
+  merkeFehlschlag,
   naechsterSchritt,
   serienAbschluss,
   sofortKarte,
@@ -147,25 +148,39 @@ describe('sofortKarte und zuMerken — dieselbe Datei nach einem Fehler', () => 
   })
 
   const dateienStandard = { weg: 'dateien' as const, wahl: 'standard' as const }
-  const aufDateien = (...dateien: { size: number; type: string }[]) => ({ weg: 'dateien' as const, dateien })
+  const aufDateien = (...dateien: { size: number; type: string }[]) => ({ wege: ['dateien' as const], dateien })
 
   it('sofort die Karte nur über „Foto wählen", genau eine Datei, und nur eine gemerkte', () => {
     expect(sofortKarte(dateienStandard, [A], aufDateien(A))).toBe(true)
     expect(sofortKarte(dateienStandard, [A], aufDateien(B, A))).toBe(true)
-    expect(sofortKarte({ weg: 'galerie', wahl: 'gemerkt' }, [A], { weg: 'galerie', dateien: [A] })).toBe(true)
+    expect(sofortKarte({ weg: 'galerie', wahl: 'gemerkt' }, [A], { wege: ['galerie'], dateien: [A] })).toBe(true)
     expect(sofortKarte(dateienStandard, [B], aufDateien(A))).toBe(false)
     expect(sofortKarte(dateienStandard, [A, B], aufDateien(A))).toBe(false)
     expect(sofortKarte(dateienStandard, [A], aufDateien())).toBe(false)
   })
 
-  it('nur auf demselben Weg — öffnet „Foto wählen" inzwischen einen anderen, bekommt er seinen Versuch', () => {
+  it('nur auf einem Weg, auf dem die Datei schon scheiterte — ein neuer Weg bekommt seinen Versuch', () => {
     // Der gemerkte Weg (Galerie) scheiterte und ist vergessen; jetzt öffnet der Standard.
-    expect(sofortKarte(dateienStandard, [A], { weg: 'galerie', dateien: [A] })).toBe(false)
+    expect(sofortKarte(dateienStandard, [A], { wege: ['galerie'], dateien: [A] })).toBe(false)
   })
 
   it('Ausweg und Kamera versuchen es immer — das ist der Ausweg', () => {
     expect(sofortKarte({ weg: 'dateien', wahl: 'ausweg' }, [A], aufDateien(A))).toBe(false)
-    expect(sofortKarte({ weg: 'kamera', wahl: 'standard' }, [A], { weg: 'kamera', dateien: [A] })).toBe(false)
+    expect(sofortKarte({ weg: 'kamera', wahl: 'standard' }, [A], { wege: ['kamera'], dateien: [A] })).toBe(false)
+  })
+
+  it('merkeFehlschlag sammelt die Wege derselben Datei — scheitert auch der Ausweg, bleibt der Standard gesperrt', () => {
+    const nachStandard = merkeFehlschlag(null, 'dateien', [A])
+    expect(nachStandard).toEqual({ wege: ['dateien'], dateien: [A] })
+
+    const nachAusweg = merkeFehlschlag(nachStandard, 'galerie', [A])
+    expect(nachAusweg).toEqual({ wege: ['dateien', 'galerie'], dateien: [A] })
+    // Dieselbe Datei wieder über „Foto wählen" (Standard): sofort die Karte, nicht 30 s warten.
+    expect(sofortKarte(dateienStandard, [A], nachAusweg)).toBe(true)
+
+    // Derselbe Weg kommt nicht doppelt hinein; eine andere Datei beginnt neu.
+    expect(merkeFehlschlag(nachAusweg, 'galerie', [A]).wege).toEqual(['dateien', 'galerie'])
+    expect(merkeFehlschlag(nachAusweg, 'galerie', [B])).toEqual({ wege: ['galerie'], dateien: [B] })
   })
 })
 
@@ -300,7 +315,7 @@ describe('am Quelltext: zwei Knöpfe, drei verborgene Eingaben', () => {
     expect(dialog).toContain('uebernehmeFoto(kopie)')
     expect(dialog).not.toContain('uebernehmeFoto(file)')
     expect(dialog).toContain('bereitsKopiert: true')
-    // Nach dem Speichern wird die Kopie freigegeben.
-    expect(dialog.indexOf('gibKopieFrei()', dialog.indexOf('async function onSubmit'))).toBeGreaterThan(0)
+    // Beim Schließen — mit oder ohne Speichern — wird die Kopie freigegeben.
+    expect(dialog).toMatch(/\} else \{[^}]*pruefungNr\.current\+\+\s+gibKopieFrei\(\)\s+\}\s+\}, \[open, product\?\.id\]\)/)
   })
 })

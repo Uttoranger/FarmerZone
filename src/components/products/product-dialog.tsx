@@ -12,7 +12,7 @@ import { ordneLeseFehler, type LeseDiagnose, type UploadDiagnose } from '@/lib/u
 import { bildFehlerArtVon, bildFehlerMeldung, karteText } from '@/lib/upload-fehler'
 import { IM_SHOP, NICHT_IM_SHOP } from '@/lib/produkt-sichtbarkeit'
 import { meldeUploadFehler } from '@/lib/upload-meldung'
-import { naechsterSchritt } from '@/lib/foto-wege'
+import { leseAusgangVon, naechsterSchritt } from '@/lib/foto-wege'
 import { MAX_ORIGINAL_BYTES } from '@/lib/upload-pfade'
 import {
   Dialog,
@@ -319,7 +319,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
   // die Datei vom Gerät: Bis zum Absenden können Minuten vergehen.
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  // Solange die Lese-Stufe bei der Auswahl läuft (höchstens 28 s + Pause).
+  // Solange die Lese-Stufe bei der Auswahl läuft (höchstens knapp 32 s, image-upload.tsx).
   const [pruefeFoto, setPruefeFoto] = useState(false)
   // Jede neue Auswahl und jedes Öffnen zählt hoch — ein Prüfergebnis, das
   // erst danach kommt, ist veraltet und wird verworfen.
@@ -347,6 +347,9 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
   // Über welchen Weg und warum das gewählte Foto kam — nur für die
   // Sentry-Meldung; der Upload läuft hier erst beim Absenden, also bis dahin merken.
   const gewaehlteAuswahl = useRef<FotoAuswahl>({ weg: 'galerie', wahl: 'standard' })
+  // Wie die Lese-Stufe bei der Auswahl ausging — beim Absenden wird nicht
+  // mehr gelesen, die Sentry-Meldung bekommt dann diese Diagnose.
+  const gewaehlteLesung = useRef<LeseDiagnose | undefined>(undefined)
   // Dieselben zwei Knöpfe und dieselbe Karte wie im Upload-Hook, damit es nur
   // EIN Menü gibt. Zweck 'product': Die Karte bietet hier kein Teilen an,
   // /teilen kann nur Titelbild und Hofgalerie.
@@ -437,6 +440,12 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
       // Beim Bearbeiten stehen die Schalter so, wie das Produkt gespeichert ist.
       setFestePakete(isEdit && product.unitSize != null)
       setSaisonal(isEdit && product.seasonStart != null && product.seasonEnd != null)
+    } else {
+      // Zu, mit oder ohne Speichern: Der Dialog bleibt eingehängt, die Kopie
+      // (bis 25 MB) würde sonst bis zum nächsten Öffnen im Speicher liegen.
+      // Eine noch laufende Prüfung darf danach nichts mehr übernehmen.
+      pruefungNr.current++
+      gibKopieFrei()
     }
   }, [open, product?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -528,7 +537,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
       // auch veraltet, denn der Fehler war echt. Aus demselben Grund zählt er
       // für den gemerkten Weg: Nur ein Lesefehler sagt etwas über den Weg.
       meldeUploadFehler(e, { datei: file, weg: auswahl.weg, wahl: auswahl.wahl, versuche: 0, lesen })
-      fotoQuellen.meldeErgebnis(auswahl, bildFehlerArtVon(e) !== 'lesen')
+      fotoQuellen.meldeErgebnis(auswahl, leseAusgangVon(bildFehlerArtVon(e)))
       if (nr !== pruefungNr.current) return
       // Die Karte, wo das Foto oder der Weg das Problem war; sonst die Meldung.
       const { text, art } = bildFehlerMeldung(e)
@@ -543,12 +552,13 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
     } finally {
       if (nr === pruefungNr.current) setPruefeFoto(false)
     }
-    fotoQuellen.meldeErgebnis(auswahl, true)
+    fotoQuellen.meldeErgebnis(auswahl, 'gelesen')
     // Veraltet: Inzwischen wurde ein anderes Foto gewählt oder der Dialog gewechselt.
     if (nr !== pruefungNr.current) return
     // Die Auswahl gehört zur ANGENOMMENEN Datei — ein gescheiterter Ausweg
     // darf der zuvor angenommenen keinen falschen Weg anhängen.
     gewaehlteAuswahl.current = auswahl
+    gewaehlteLesung.current = lesen
     uebernehmeFoto(kopie)
   }
 
@@ -571,7 +581,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
   }
 
   /**
-   * Nach dem Speichern: Die Kopie (bis 25 MB im Speicher) wird nicht mehr
+   * Beim Schließen: Die Kopie (bis 25 MB im Speicher) wird nicht mehr
    * gebraucht. Die Vorschau-Adresse hält sie sonst fest, bis der Dialog das
    * nächste Mal aufgeht; das Bild selbst ist schon gezeichnet und bleibt stehen.
    */
@@ -704,7 +714,6 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
         // 0 = der Transfer hat nie begonnen — nur für die Sentry-Meldung.
         let versuche = 0
         let diagnose: UploadDiagnose | undefined
-        let lesen: LeseDiagnose | undefined
         try {
           imageUrl = await ladeFotoHoch(selectedFile, 'product', {
             altUrl: isEdit ? (product.imageUrl ?? undefined) : undefined,
@@ -721,9 +730,6 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
             onDiagnose: (d) => {
               diagnose = d
             },
-            onLesen: (l) => {
-              lesen = l
-            },
           })
         } catch (e) {
           // Zusätzlich zur Anzeige nach Sentry (Ursache/Kennung/Größe/Typ/
@@ -734,7 +740,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
             wahl: gewaehlteAuswahl.current.wahl,
             versuche,
             diagnose,
-            lesen,
+            lesen: gewaehlteLesung.current,
           })
           const { text } = bildFehlerMeldung(e)
           toast.error(text)
@@ -754,7 +760,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
         return
       }
       toast.success(isEdit ? 'Produkt gespeichert' : 'Produkt angelegt')
-      gibKopieFrei()
+      // Schließen gibt auch die Kopie frei (Effekt auf `open`).
       onClose()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Wir konnten das Produkt nicht speichern. Bitte versuch es noch einmal.')

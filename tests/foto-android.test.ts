@@ -11,7 +11,8 @@
  *    gemerkter Weg sticht beide.
  *  - Der Ausweg der Karte ist jeweils der andere Weg.
  *  - Der Merker wird nur gesetzt, wenn ein Ausweg klappte, der nicht ohnehin
- *    der Standard ist — und gelöscht, wenn der gemerkte Weg scheitert.
+ *    der Standard ist — und gelöscht, wenn der gemerkte Weg scheitert (auch
+ *    mit HEIC, das das iPhone nur über die Galerie wandelt).
  *  - Der Speicher liest mit Zod und übersteht einen Browser, der wirft.
  *  - Die Übertragung bekommt eine Kopie im Speicher, nie die Datei vom Gerät.
  *  - Hook und Produktdialog pflegen den Merker und melden Weg und Wahl.
@@ -25,9 +26,10 @@ vi.mock('@vercel/blob/client', () => ({ upload }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
 
 import { ladeFotoHoch, pruefeLesbarkeit } from '@/components/shared/image-upload'
-import { auswegFuer, ersterWeg, merkerNachErgebnis } from '@/lib/foto-wege'
+import { auswegFuer, ersterWeg, leseAusgangVon, merkerNachErgebnis, serienAusgang } from '@/lib/foto-wege'
 import { FOTO_WEG_SCHLUESSEL, leseFotoWeg, loescheFotoWeg, schreibeFotoWeg } from '@/lib/foto-weg-speicher'
 import { bildFehlerArtVon } from '@/lib/upload-fehler'
+import { LESE_ZWEITVERSUCH_PAUSE_MS } from '@/lib/upload-zeitwaechter'
 import { baueUploadMeldung } from '@/lib/upload-meldung'
 
 describe('ersterWeg — welcher Weg zuerst, auf welchem Gerät', () => {
@@ -59,34 +61,61 @@ describe('auswegFuer — der Ausweg der Karte', () => {
 
 describe('merkerNachErgebnis — merken, benutzen, löschen', () => {
   it('ein Ausweg, der klappte und nicht der Standard ist, wird gemerkt', () => {
-    expect(merkerNachErgebnis({ weg: 'galerie', wahl: 'ausweg', lesbar: true, standard: 'dateien' })).toEqual({
+    expect(merkerNachErgebnis({ weg: 'galerie', wahl: 'ausweg', ausgang: 'gelesen', standard: 'dateien' })).toEqual({
       art: 'setzen',
       weg: 'galerie',
     })
-    expect(merkerNachErgebnis({ weg: 'dateien', wahl: 'ausweg', lesbar: true, standard: 'galerie' })).toEqual({
+    expect(merkerNachErgebnis({ weg: 'dateien', wahl: 'ausweg', ausgang: 'gelesen', standard: 'galerie' })).toEqual({
       art: 'setzen',
       weg: 'dateien',
     })
   })
 
   it('führt der Ausweg zurück zum Standard, braucht es keinen Merker', () => {
-    expect(merkerNachErgebnis({ weg: 'dateien', wahl: 'ausweg', lesbar: true, standard: 'dateien' })).toEqual({
+    expect(merkerNachErgebnis({ weg: 'dateien', wahl: 'ausweg', ausgang: 'gelesen', standard: 'dateien' })).toEqual({
       art: 'loeschen',
     })
   })
 
   it('scheitert der gemerkte Weg, wird der Merker gelöscht', () => {
-    expect(merkerNachErgebnis({ weg: 'galerie', wahl: 'gemerkt', lesbar: false, standard: 'dateien' })).toEqual({
+    expect(merkerNachErgebnis({ weg: 'galerie', wahl: 'gemerkt', ausgang: 'unlesbar', standard: 'dateien' })).toEqual({
       art: 'loeschen',
     })
   })
 
+  it('HEIC über den gemerkten Weg löscht ihn auch — sonst hinge ein iPhone an der Dateien-App', () => {
+    expect(merkerNachErgebnis({ weg: 'dateien', wahl: 'gemerkt', ausgang: 'heic', standard: 'galerie' })).toEqual({
+      art: 'loeschen',
+    })
+  })
+
+  it('ein Ausweg, der HEIC oder „kein Foto" brachte, hat nicht geklappt — kein Merker', () => {
+    expect(merkerNachErgebnis({ weg: 'galerie', wahl: 'ausweg', ausgang: 'heic', standard: 'dateien' })).toBeNull()
+    expect(merkerNachErgebnis({ weg: 'dateien', wahl: 'ausweg', ausgang: 'kein-foto', standard: 'galerie' })).toBeNull()
+  })
+
   it('sonst bleibt alles, wie es ist', () => {
-    expect(merkerNachErgebnis({ weg: 'galerie', wahl: 'gemerkt', lesbar: true, standard: 'dateien' })).toBeNull()
-    expect(merkerNachErgebnis({ weg: 'dateien', wahl: 'standard', lesbar: false, standard: 'dateien' })).toBeNull()
-    expect(merkerNachErgebnis({ weg: 'galerie', wahl: 'ausweg', lesbar: false, standard: 'dateien' })).toBeNull()
+    expect(merkerNachErgebnis({ weg: 'galerie', wahl: 'gemerkt', ausgang: 'gelesen', standard: 'dateien' })).toBeNull()
+    expect(merkerNachErgebnis({ weg: 'dateien', wahl: 'gemerkt', ausgang: 'kein-foto', standard: 'galerie' })).toBeNull()
+    expect(merkerNachErgebnis({ weg: 'dateien', wahl: 'standard', ausgang: 'unlesbar', standard: 'dateien' })).toBeNull()
+    expect(merkerNachErgebnis({ weg: 'galerie', wahl: 'ausweg', ausgang: 'unlesbar', standard: 'dateien' })).toBeNull()
     // Die Kamera ist kein Auswahlweg — sie wird nie gemerkt.
-    expect(merkerNachErgebnis({ weg: 'kamera', wahl: 'ausweg', lesbar: true, standard: 'dateien' })).toBeNull()
+    expect(merkerNachErgebnis({ weg: 'kamera', wahl: 'ausweg', ausgang: 'gelesen', standard: 'dateien' })).toBeNull()
+  })
+
+  it('der Ausgang kommt aus der Fehlerart — Netz und Server sagen nichts gegen den Weg', () => {
+    expect(leseAusgangVon('lesen')).toBe('unlesbar')
+    expect(leseAusgangVon('heic')).toBe('heic')
+    expect(leseAusgangVon('kein-foto')).toBe('kein-foto')
+    expect(leseAusgangVon('server')).toBe('gelesen')
+    expect(leseAusgangVon(null)).toBe('gelesen')
+  })
+
+  it('eine Serie gilt als geglückt, sobald ein Foto gelesen wurde', () => {
+    expect(serienAusgang(['unlesbar', 'gelesen', 'heic'])).toBe('gelesen')
+    expect(serienAusgang(['heic', 'unlesbar'])).toBe('unlesbar')
+    expect(serienAusgang(['kein-foto', 'heic'])).toBe('heic')
+    expect(serienAusgang([])).toBeNull()
   })
 })
 
@@ -168,7 +197,12 @@ describe('die Kopie bei der Auswahl', () => {
 
   beforeEach(() => {
     upload.mockReset()
-    upload.mockResolvedValue({ url: `https://beispiel.public.blob.vercel-storage.com/originals/${HOF}/x.jpg` })
+    // Wie das Blob-SDK: Es liest den Inhalt während der Übertragung über
+    // stream(). Bekäme es die Datei vom Gerät, risse genau hier der Upload.
+    upload.mockImplementation(async (_pfad: string, inhalt: Blob) => {
+      await new Response(inhalt.stream()).arrayBuffer()
+      return { url: `https://beispiel.public.blob.vercel-storage.com/originals/${HOF}/x.jpg` }
+    })
     vi.stubGlobal(
       'fetch',
       vi.fn(async (adresse: string) =>
@@ -181,6 +215,7 @@ describe('die Kopie bei der Auswahl', () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
   })
@@ -201,7 +236,9 @@ describe('die Kopie bei der Auswahl', () => {
   it('die Übertragung bekommt die Kopie; die Datei vom Gerät wird dabei nie gestreamt', async () => {
     const { datei, lesen } = geraetedatei()
 
-    await ladeFotoHoch(datei, 'gallery')
+    // Gelingt nur, weil die Attrappe des SDK die Kopie streamt — die Datei
+    // vom Gerät wirft beim stream() „network error" wie in JAVASCRIPT-NEXTJS-6.
+    await expect(ladeFotoHoch(datei, 'gallery')).resolves.toBe(ZIEL)
 
     expect(upload).toHaveBeenCalledTimes(1)
     const uebertragen = upload.mock.calls[0][1] as File
@@ -219,10 +256,37 @@ describe('die Kopie bei der Auswahl', () => {
     expect(upload.mock.calls[0][1]).toBe(kopie)
   })
 
-  it('scheitert das Kopieren, ist es ein Lesefehler', async () => {
+  it('scheitert das Kopieren, ist es ein Lesefehler — auch nach dem zweiten Versuch', async () => {
+    vi.useFakeTimers()
     const { datei } = geraetedatei()
-    ;(datei as unknown as { arrayBuffer: () => Promise<ArrayBuffer> }).arrayBuffer = () =>
-      Promise.reject(new DOMException('weg', 'NotReadableError'))
+    let ganz = 0
+    ;(datei as unknown as { arrayBuffer: () => Promise<ArrayBuffer> }).arrayBuffer = () => {
+      ganz++
+      return Promise.reject(new DOMException('weg', 'NotReadableError'))
+    }
+
+    const ausgang = ladeFotoHoch(datei, 'gallery').then(
+      () => null,
+      (e: unknown) => e
+    )
+    await vi.advanceTimersByTimeAsync(LESE_ZWEITVERSUCH_PAUSE_MS + 100)
+
+    expect(bildFehlerArtVon(await ausgang)).toBe('lesen')
+    // Sofort abgelehnt → Netz 1: nach der Pause noch einmal das Ganze.
+    expect(ganz).toBe(2)
+    expect(upload).not.toHaveBeenCalled()
+  })
+
+  it('entsteht die Kopie trotz gelesener Bytes nicht, ist auch das ein Lesefehler', async () => {
+    const { datei } = geraetedatei()
+    vi.stubGlobal(
+      'File',
+      class {
+        constructor() {
+          throw new RangeError('Array buffer allocation failed')
+        }
+      }
+    )
 
     const fehler = await pruefeLesbarkeit(datei).then(
       () => null,
@@ -230,7 +294,6 @@ describe('die Kopie bei der Auswahl', () => {
     )
 
     expect(bildFehlerArtVon(fehler)).toBe('lesen')
-    expect(upload).not.toHaveBeenCalled()
   })
 })
 
@@ -240,7 +303,9 @@ describe('Verdrahtung am Quelltext', () => {
   it('„Foto wählen" liest den Merker und das Gerät; das Ergebnis pflegt den Merker', () => {
     const quellen = quelle('src/components/shared/foto-quellen.tsx')
     expect(quellen).toContain('ersterWeg({ android: istAndroid(), gemerkt: leseFotoWeg(browserSpeicher()) })')
-    expect(quellen).toContain('merkerNachErgebnis({ ...gewaehlt, lesbar, standard: standardWeg(istAndroid()) })')
+    expect(quellen).toContain('merkerNachErgebnis({ ...gewaehlt, ausgang, standard: standardWeg(istAndroid()) })')
+    // Ein durchgekommenes Foto beendet auch den Fehlschlag-Merker für „dieselbe Datei".
+    expect(quellen).toContain("if (ausgang === 'gelesen') merker.current = null")
     expect(quellen).toContain('schreibeFotoWeg(browserSpeicher(), aenderung.weg)')
     expect(quellen).toContain('loescheFotoWeg(browserSpeicher())')
   })
@@ -254,6 +319,9 @@ describe('Verdrahtung am Quelltext', () => {
     expect(dialog.match(/fotoQuellen\.meldeErgebnis\(auswahl,/g)).toHaveLength(2)
     expect(dialog).toContain('weg: auswahl.weg, wahl: auswahl.wahl')
     expect(dialog).toContain('wahl: gewaehlteAuswahl.current.wahl')
+    // Beim Absenden wird nicht mehr gelesen — Sentry bekommt die Lese-Diagnose der Auswahl.
+    expect(dialog).toContain('lesen: gewaehlteLesung.current')
+    expect(dialog).not.toContain('onLesen: (l) => {\n              lesen = l')
   })
 })
 

@@ -2255,21 +2255,36 @@ Sentry.
 `src/lib/foto-weg-speicher.ts`): Braucht ein Gerät den Ausweg und klappt er, merkt es sich
 diesen Weg im localStorage (Schlüssel `farmerzone_foto_weg`, gelesen mit Zod, nichts wirft)
 und „Foto wählen" öffnet künftig direkt ihn. Scheitert der gemerkte Weg, wird er gelöscht.
-„Klappt" heißt: Die Lese-Stufe hat die Datei samt Kopie bekommen — ein HEIC, ein Netzabbruch
-oder ein Serverfehler sagen nichts über den Weg. In einer Serie genügt ein lesbares Foto.
-Führt der Ausweg zum Standard zurück, gibt es keinen Merker. Die Kamera wird nie gemerkt.
-Die sofortige Karte für dieselbe Datei (#138) gilt nur noch auf dem Weg, auf dem sie
-scheiterte: Öffnet „Foto wählen" inzwischen einen anderen, bekommt der seinen Versuch.
+„Klappt" heißt: Die Lese-Stufe hat die Datei samt Kopie bekommen, und sie taugt als Foto
+(`LeseAusgang` `gelesen`) — ein Netzabbruch oder ein Serverfehler danach sagt nichts gegen
+den Weg; ein Ausweg, der HEIC oder „kein Foto" brachte, hat nicht geklappt. „Scheitert" heißt
+unlesbar **oder HEIC**: Hat sich ein iPhone die Dateien-App gemerkt, kommt HEIC dort roh an
+(über die Galerie wandelt iOS es in der Regel in JPEG), und die HEIC-Karte bietet keinen
+anderen Weg an — ohne Löschen bliebe das Gerät dort hängen. In einer Serie genügt ein
+gelesenes Foto (`serienAusgang`). Führt der Ausweg zum Standard zurück, gibt es keinen
+Merker. Die Kamera wird nie gemerkt.
+
+Die sofortige Karte für dieselbe Datei (#138) gilt auf jedem Weg, auf dem diese Datei schon
+scheiterte (`merkeFehlschlag` sammelt die Wege): Scheitern Standard und Ausweg, gibt es über
+„Foto wählen" sofort die Karte statt eines neuen Versuchs von bis zu 30 Sekunden. Öffnet
+„Foto wählen" einen Weg, auf dem sie noch nicht scheiterte (der gemerkte ist gelöscht),
+bekommt der seinen Versuch. Kommt ein Foto durch, ist der Fehlschlag vergessen.
 
 **Die Kopie bei der Auswahl** (`pruefeLesbarkeit`): Nach bestandener Probe wird das ganze Foto
 einmal gelesen (Zeitwächter des Volllesens, 20 s) und als `File` im Speicher zurückgegeben;
 Formatprüfung und Übertragung nehmen nur noch die Kopie. Brachte schon das Volllesen die
 Datei, ist das die Kopie. Scheitert das Kopieren, ist es ein Lesefehler mit eigenem Befund
-(`kopie…` in Sentry) — ohne zweiten Versuch. Mehrere Fotos laufen nacheinander, es liegt
-immer nur eine Kopie im Speicher; sie lebt nur in `ladeFotoHoch`. Der Produktdialog behält die
-Kopie von der Auswahl bis zum Absenden, lädt sie mit `bereitsKopiert` ohne neues Lesen hoch
-und gibt sie nach dem Speichern frei. Der Preis: bis zu 25 MB Arbeitsspeicher je Foto, für
-die Dauer eines Uploads.
+(`kopie…` in Sentry), und Netz 1 gilt auch hier: Wurde die Kopie sofort abgelehnt (Urteil
+`erlaubnis` — genau das Muster von -6), wird nach der Pause noch einmal das Ganze gelesen; die
+Probe war ja schon durch. Auch eine Kopie, die trotz gelesener Bytes nicht entsteht (zu wenig
+Speicher), ist ein Lesefehler. Schlimmster Fall der Lese-Stufe damit knapp 32 statt 28
+Sekunden (sofortige Ablehnungen, Pause, Probe, Kopie). Mehrere Fotos laufen nacheinander, es
+liegt immer nur eine Kopie im Speicher; im Upload-Hook lebt sie nur in `ladeFotoHoch`. Der
+Produktdialog behält die Kopie von der Auswahl bis zum Absenden, lädt sie mit
+`bereitsKopiert` ohne neues Lesen hoch (Sentry bekommt dann die Lese-Diagnose der Auswahl)
+und gibt sie beim Schließen frei, mit oder ohne Speichern. Der Preis: bis zu 25 MB
+Arbeitsspeicher je Foto — im Hook für die Dauer eines Uploads, im Produktdialog von der
+Auswahl bis zum Schließen.
 
 **Sentry:** `weg` und `wahl` (`standard`, `ausweg`, `gemerkt`) im Kontext `upload`.
 Kennung `139`.
@@ -2277,9 +2292,12 @@ Kennung `139`.
 **Offen:**
 - Der Test am Gerät steht aus (Checkliste im PR): das Problemfoto auf dem Pilot-Handy über
   „Foto wählen" muss ohne Karte hochladen; ein iPhone-Foto aus iCloud.
-- Hat sich ein iPhone die Dateien-App gemerkt, kommen HEIC-Fotos dort womöglich unverwandelt
-  an (bei `image/*` wandelt iOS sie in der Regel in JPEG); die HEIC-Karte bietet keinen
-  Ausweg an. Am Gerät nicht geprüft.
+- Dass iOS HEIC über die Dateien-App roh und über die Galerie als JPEG liefert, ist am
+  Gerät nicht geprüft; der Merker wird nach HEIC über den gemerkten Weg deshalb vorsorglich
+  gelöscht.
+- Die Kopie wird nicht gegen `file.size` geprüft. Ein echter Browser liefert bei
+  `arrayBuffer()` die ganze Datei oder wirft (Chrome prüft den Datei-Schnappschuss); nur
+  Test-Attrappen ohne echte Bytes ergeben eine leere Kopie.
 
 ---
 

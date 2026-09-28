@@ -50,7 +50,9 @@ export type LeseErgebnis = LeseVersuch['ergebnis']
  *
  * `kopie` ist das ganze Lesen für die Kopie im Speicher (JAVASCRIPT-NEXTJS-6)
  * — nur, wenn es ein eigener Versuch war: Brachte schon das Volllesen die
- * Datei, ist das die Kopie.
+ * Datei, ist das die Kopie. Gelang die Probe und wurde nur die Kopie sofort
+ * abgelehnt, ist der zweite Versuch nach der Pause wieder das Ganze statt
+ * der Probe; seine Bytes sind dann die Kopie.
  *
  * Kein Dateialter mehr: Android setzt lastModified bei Galerie-Fotos auf den
  * Auswahlzeitpunkt — die Zahl sagte nichts.

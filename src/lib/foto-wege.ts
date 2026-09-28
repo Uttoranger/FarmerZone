@@ -28,8 +28,10 @@
  * User-Agent, die Bytes, das Urteil der Lese-Stufe, der gemerkte Weg. Die
  * Komponenten (foto-quellen.tsx, image-upload.tsx) führen nur aus.
  */
+import type { z } from 'zod'
 import type { UploadZweck } from '@/lib/upload-pfade'
 import type { BildFehlerArt, LeseUrteil } from '@/lib/upload-fehler'
+import type { fotoWegSchema } from '@/schemas/foto-weg'
 
 /**
  * Über welchen Weg eine Datei kam.
@@ -44,8 +46,8 @@ import type { BildFehlerArt, LeseUrteil } from '@/lib/upload-fehler'
  */
 export type FotoWeg = 'galerie' | 'dateien' | 'kamera' | 'teilen'
 
-/** Die zwei Wege hinter „Foto wählen" — nur zwischen ihnen wird gewählt und gemerkt. */
-export type AuswahlWeg = 'galerie' | 'dateien'
+/** Die zwei Wege hinter „Foto wählen" — nur zwischen ihnen wird gewählt und gemerkt. Aus dem Schema des Speichers. */
+export type AuswahlWeg = z.infer<typeof fotoWegSchema>
 
 /**
  * Warum dieser Weg genommen wurde — für Sentry und für den Merker.
@@ -88,27 +90,63 @@ export function auswegFuer(weg: FotoWeg, gewohnt: AuswahlWeg): AuswahlWeg {
 export type MerkerAenderung = { art: 'setzen'; weg: AuswahlWeg } | { art: 'loeschen' }
 
 /**
- * Was nach einem Foto mit dem gemerkten Weg geschieht. `lesbar` heißt: Die
- * Lese-Stufe hat die Datei samt Kopie bekommen — nur das sagt etwas über den
- * Weg; ein Formatfehler oder ein Netzabbruch sagt nichts über ihn.
+ * Was ein Foto über seinen Weg sagt.
+ *   gelesen    Die Lese-Stufe bekam die Datei samt Kopie, und sie taugt als
+ *              Foto. Ein späterer Netz- oder Serverfehler ändert daran nichts.
+ *   unlesbar   Die Datei kam nicht heraus — der Weg hat versagt.
+ *   heic       Die Datei kam heraus, aber als HEIC. Das iPhone wandelt HEIC
+ *              nur über die Galerie in JPEG; über die Dateien-App kommt es roh.
+ *   kein-foto  Über die Dateien-App wurde etwas gewählt, das kein Foto ist —
+ *              das sagt nichts über den Weg.
+ */
+export type LeseAusgang = 'gelesen' | 'unlesbar' | 'heic' | 'kein-foto'
+
+/**
+ * Der Ausgang eines Fotos aus der Fehlerart seines Uploads — null (kein
+ * BildFehler, etwa ein Netzabbruch) heißt: gelesen. Eine Datei, die nie
+ * gelesen wurde (zu groß), gehört nicht hierher.
+ */
+export function leseAusgangVon(art: BildFehlerArt | null): LeseAusgang {
+  if (art === 'lesen') return 'unlesbar'
+  if (art === 'heic' || art === 'kein-foto') return art
+  return 'gelesen'
+}
+
+/**
+ * Der Ausgang einer Serie für den Merker: Ein einziges gelesenes Foto
+ * genügt, damit der Weg als geglückt gilt; sonst zählt das Scheitern.
+ */
+export function serienAusgang(ausgaenge: readonly LeseAusgang[]): LeseAusgang | null {
+  for (const ausgang of ['gelesen', 'unlesbar', 'heic', 'kein-foto'] as const) {
+    if (ausgaenge.includes(ausgang)) return ausgang
+  }
+  return null
+}
+
+/**
+ * Was nach einem Foto mit dem gemerkten Weg geschieht.
  *
- *   Ausweg geglückt, anderer Weg als der Standard → merken.
- *   Ausweg geglückt, aber das IST der Standard   → Merker weg, er wäre überflüssig.
- *   Gemerkter Weg gescheitert                     → Merker weg, der Standard ist wieder dran.
- *   Alles andere                                  → nichts ändern.
+ *   Ausweg gelesen, anderer Weg als der Standard → merken.
+ *   Ausweg gelesen, aber das IST der Standard   → Merker weg, er wäre überflüssig.
+ *   Gemerkter Weg unlesbar oder HEIC            → Merker weg, der Standard ist wieder dran.
+ *   Alles andere                                 → nichts ändern.
  *
- * Die Kamera ist kein Auswahlweg und wird nie gemerkt.
+ * HEIC über den gemerkten Weg zählt als Scheitern: Hat sich ein iPhone die
+ * Dateien-App gemerkt, kommt jedes HEIC-Foto dort roh an, und die HEIC-Karte
+ * bietet keinen anderen Weg an — ohne Löschen bliebe das Gerät dort hängen.
+ * Ein Ausweg, der HEIC oder „kein Foto" brachte, hat dagegen nicht geklappt
+ * und wird nicht gemerkt. Die Kamera ist kein Auswahlweg und wird nie gemerkt.
  */
 export function merkerNachErgebnis(eingabe: {
   weg: FotoWeg
   wahl: WegWahl
-  lesbar: boolean
+  ausgang: LeseAusgang
   standard: AuswahlWeg
 }): MerkerAenderung | null {
-  const { weg, wahl, lesbar, standard } = eingabe
+  const { weg, wahl, ausgang, standard } = eingabe
   if (weg !== 'galerie' && weg !== 'dateien') return null
-  if (wahl === 'ausweg' && lesbar) return weg === standard ? { art: 'loeschen' } : { art: 'setzen', weg }
-  if (wahl === 'gemerkt' && !lesbar) return { art: 'loeschen' }
+  if (wahl === 'ausweg' && ausgang === 'gelesen') return weg === standard ? { art: 'loeschen' } : { art: 'setzen', weg }
+  if (wahl === 'gemerkt' && (ausgang === 'unlesbar' || ausgang === 'heic')) return { art: 'loeschen' }
   return null
 }
 
@@ -118,7 +156,7 @@ export function merkerNachErgebnis(eingabe: {
  * Lohnt nach diesem Urteil ein zweiter Leseversuch derselben Datei? Nur bei
  * der sofortigen Ablehnung: Dort war die Datei da, nur die Freigabe fehlte —
  * und die kann nach einer Pause wieder da sein. Die stumme Quelle ('cloud')
- * hat schon 28 Sekunden gewartet; Unbestimmtes verdient kein Raten.
+ * hat schon bis zu 28 Sekunden gewartet; Unbestimmtes verdient kein Raten.
  */
 export function zweiterLeseversuch(urteil: LeseUrteil): boolean {
   return urteil === 'erlaubnis'
@@ -227,23 +265,42 @@ export function gleicheDatei(a: { size: number; type: string }, b: { size: numbe
 
 export type Fehlschlag = { size: number; type: string }
 
+/** Die unlesbaren Dateien und die Wege, auf denen sie schon scheiterten. */
+export type FehlschlagMerker = { wege: FotoWeg[]; dateien: Fehlschlag[] }
+
+/**
+ * Einen Fehlschlag merken. Scheitern dieselben Dateien auf einem weiteren
+ * Weg (erst der Standard, dann der Ausweg), kommt der Weg dazu — sonst
+ * beginnt der Merker neu. So bekommt dieselbe Datei auf KEINEM der schon
+ * gescheiterten Wege einen neuen vollen Versuch.
+ */
+export function merkeFehlschlag(
+  alt: FehlschlagMerker | null,
+  weg: FotoWeg,
+  dateien: readonly Fehlschlag[]
+): FehlschlagMerker {
+  const dieselben = alt !== null && dateien.every((d) => alt.dateien.some((a) => gleicheDatei(a, d)))
+  if (!dieselben) return { wege: [weg], dateien: dateien.map(({ size, type }) => ({ size, type })) }
+  return { wege: alt.wege.includes(weg) ? alt.wege : [...alt.wege, weg], dateien: alt.dateien }
+}
+
 /**
  * Nach einer Auswahl: sofort die Karte, ohne Versuch — wenn genau eine
  * Datei über „Foto wählen" kam und einem Fehlschlag gleicht, der auf
- * DEMSELBEN Weg gemerkt wurde. Über den Ausweg oder die Kamera wird immer
+ * DEMSELBEN Weg schon scheiterte. Über den Ausweg oder die Kamera wird immer
  * versucht: Das ist ja der Ausweg. Und öffnet „Foto wählen" inzwischen einen
- * anderen Weg (der gemerkte ist gescheitert und gelöscht), verdient dieser
- * seinen eigenen Versuch.
+ * Weg, auf dem die Datei noch nicht scheiterte (der gemerkte ist gelöscht),
+ * verdient dieser seinen eigenen Versuch.
  */
 export function sofortKarte(
   auswahl: { weg: FotoWeg; wahl: WegWahl },
   dateien: readonly Fehlschlag[],
-  gemerkt: { weg: FotoWeg; dateien: readonly Fehlschlag[] }
+  gemerkt: FehlschlagMerker
 ): boolean {
   const ueberFotoWaehlen = (auswahl.weg === 'galerie' || auswahl.weg === 'dateien') && auswahl.wahl !== 'ausweg'
   return (
     ueberFotoWaehlen &&
-    auswahl.weg === gemerkt.weg &&
+    gemerkt.wege.includes(auswahl.weg) &&
     dateien.length === 1 &&
     gemerkt.dateien.some((g) => gleicheDatei(dateien[0], g))
   )

@@ -8,11 +8,14 @@ import {
   FORMAT_PROBE_BYTES,
   bildFormat,
   formatUrteil,
+  leseAusgangVon,
   naechsterSchritt,
   serienAbschluss,
+  serienAusgang,
   zweiterLeseversuch,
   type FotoWeg,
   type KartenGrund,
+  type LeseAusgang,
 } from '@/lib/foto-wege'
 import { summarizeUploadBatch, type BatchSkip } from '@/lib/upload-batch'
 import { meldeUploadFehler } from '@/lib/upload-meldung'
@@ -161,8 +164,9 @@ const LESE_PROBE_BYTES = 64 * 1024
  * Beide Lesewege stehen unter Zeitwächtern: Ein defekter Speicherdienst kann
  * beim arrayBuffer() auch STUMM stehenbleiben — weder Bytes noch Fehler. Für
  * den Bauern ist die stumme Quelle dasselbe wie die laute: Die Datei kommt
- * nicht heraus. Schlimmster Fall jetzt: 8 + 20 = 28 Sekunden bis zur klaren
- * Meldung — statt nie.
+ * nicht heraus. Schlimmster Fall ohne zweiten Versuch: 8 + 20 = 28 Sekunden
+ * bis zur klaren Meldung — statt nie. Mit ihm (nur nach sofortiger Ablehnung,
+ * also je unter 1 s): 1 + 1 + 1,5 Pause + 8 + 20, knapp 32 Sekunden.
  *
  * Wie jeder Versuch ausging, bekommt `onLesen` — für Sentry, nie für den
  * Bauern (JAVASCRIPT-NEXTJS-3): Bis dahin fingen zwei leere catch den Fehler
@@ -184,7 +188,9 @@ const LESE_PROBE_BYTES = 64 * 1024
  * — und genau dort riss sie auf dem Pilot-Handy mit „network error", obwohl
  * die Probe gelungen war. Die Kopie hängt an keiner Freigabe des Geräts mehr;
  * Formatprüfung und Übertragung nehmen nur noch sie. Scheitert das Kopieren,
- * ist das ein Lesefehler wie jeder andere. Brachte schon das Volllesen die
+ * ist das ein Lesefehler wie jeder andere — auch Netz 1 gilt für ihn: Wurde
+ * die Kopie sofort abgelehnt, wird nach der Pause noch einmal das Ganze
+ * gelesen (die Probe war ja schon durch). Brachte schon das Volllesen die
  * Datei, ist das die Kopie — sie wird nicht zweimal gelesen.
  *
  * Exportiert für die Verhaltens-Tests (tests/upload-zeitwaechter.test.ts,
@@ -200,7 +206,7 @@ export async function pruefeLesbarkeit(
   const verborgen = file.name ? [file.name] : []
   const probeLesen = () => file.slice(0, LESE_PROBE_BYTES).arrayBuffer()
   // Die Kopie steht unter demselben Zeitwächter wie das Volllesen: Es ist
-  // dasselbe Lesen am Stück. Schlimmster Fall bleibt 8 + 20 = 28 Sekunden.
+  // dasselbe Lesen am Stück.
   const kopieLesen = () => leseVersuch(() => file.arrayBuffer(), LESE_VOLL_LIMIT_MS, verborgen)
 
   let lesen: LeseDiagnose
@@ -218,9 +224,17 @@ export async function pruefeLesbarkeit(
     const voll = await kopieLesen()
     lesen = { probe: probe.versuch, voll: voll.versuch }
     bytes = voll.bytes
+  }
 
-    if (!bytes && zweiterLeseversuch(ordneLeseFehler(lesen))) {
-      await new Promise<void>((weiter) => setTimeout(weiter, LESE_ZWEITVERSUCH_PAUSE_MS))
+  if (!bytes && zweiterLeseversuch(ordneLeseFehler(lesen))) {
+    await new Promise<void>((weiter) => setTimeout(weiter, LESE_ZWEITVERSUCH_PAUSE_MS))
+    if (probe.bytes) {
+      // Die Probe kam heraus, nur das Ganze nicht — das Muster von
+      // JAVASCRIPT-NEXTJS-6. Noch einmal das Ganze; gelingt es, ist es die Kopie.
+      const zweiter = await kopieLesen()
+      lesen = { ...lesen, zweiterVersuch: zweiter.versuch }
+      bytes = zweiter.bytes
+    } else {
       const zweiter = await leseVersuch(probeLesen, LESE_PROBE_LIMIT_MS, verborgen)
       lesen = { ...lesen, zweiterVersuch: zweiter.versuch }
       if (zweiter.bytes) {
@@ -230,18 +244,28 @@ export async function pruefeLesbarkeit(
       }
     }
   }
+
+  // Ein File statt eines nackten Blob: Name und Typ bleiben für den Ablagepfad
+  // und die Übertragung erhalten; die Bytes liegen im Speicher, nicht am Gerät.
+  let kopie: File | null = null
+  if (bytes) {
+    try {
+      kopie = new File([bytes], file.name, { type: file.type, lastModified: file.lastModified })
+    } catch (e) {
+      // Die Bytes sind da, die Kopie entsteht trotzdem nicht (etwa zu wenig
+      // Speicher): Auch das ist ein Lesefehler, mit eigenem Befund.
+      lesen = { ...lesen, kopie: { ergebnis: 'fehler', ...leseFehlerBefund(e, verborgen), dauerMs: 0 } }
+    }
+  }
   optionen.onLesen?.(lesen)
 
-  if (!bytes) {
+  if (!kopie || !bytes) {
     protokolliereBildFehler('lesen', file)
     // Die Ursache bleibt 'lesen'; der TEXT folgt seit #135 dem, was wirklich war
     // — entzogene Freigabe, stumme Quelle oder ehrlich unbestimmt.
     throw new BildFehler('lesen', leseFehlerText(ordneLeseFehler(lesen)))
   }
 
-  // Ein File statt eines nackten Blob: Name und Typ bleiben für den Ablagepfad
-  // und die Übertragung erhalten; die Bytes liegen im Speicher, nicht am Gerät.
-  const kopie = new File([bytes], file.name, { type: file.type, lastModified: file.lastModified })
   pruefeFormat(bytes, kopie, weg)
   return kopie
 }
@@ -540,8 +564,8 @@ type UploadResult =
       message: string
       short: string
       karte?: { grund: KartenGrund; urteil: LeseUrteil }
-      /** Hat die Lese-Stufe die Datei bekommen? null = nie versucht (zu groß). Für den gemerkten Weg. */
-      lesbar: boolean | null
+      /** Was die Lese-Stufe erlebte — für den gemerkten Weg. null = nie versucht (zu groß). */
+      ausgang: LeseAusgang | null
     }
 
 interface UseImageUploadOptions {
@@ -583,7 +607,7 @@ export function useImageUpload({
   // für das Format-Urteil bei der Dateien-App und für den gemerkten Weg.
   async function uploadOne(file: File, batch: boolean, auswahl: FotoAuswahl): Promise<UploadResult> {
     if (file.size > MAX_ORIGINAL_BYTES) {
-      return { ok: false, message: 'Datei zu groß (max. 25 MB)', short: 'zu groß (max. 25 MB)', lesbar: null }
+      return { ok: false, message: 'Datei zu groß (max. 25 MB)', short: 'zu groß (max. 25 MB)', ausgang: null }
     }
 
     // 0 = der Transfer hat nie begonnen (z. B. Lese-Stufe gescheitert).
@@ -623,8 +647,8 @@ export function useImageUpload({
       // Text; alles andere behält seine eigene Meldung. Liegt es am Foto
       // oder am Weg, kommt statt der Meldung die Karte.
       const { text, kurz, art } = bildFehlerMeldung(e)
-      // Nur ein Lesefehler sagt etwas über den Weg; Format, Netz und Server nicht.
-      const lesbar = art !== 'lesen'
+      // Lesefehler und HEIC sagen etwas über den Weg; Netz und Server nicht.
+      const ausgang = leseAusgangVon(art)
       const schritt = naechsterSchritt(art)
       if (schritt.art === 'karte') {
         return {
@@ -632,10 +656,10 @@ export function useImageUpload({
           message: text,
           short: kurz,
           karte: { grund: schritt.grund, urteil: lesen ? ordneLeseFehler(lesen) : 'unbestimmt' },
-          lesbar,
+          ausgang,
         }
       }
-      return { ok: false, message: text, short: kurz, lesbar }
+      return { ok: false, message: text, short: kurz, ausgang }
     }
     try {
       await onUploaded(url, { batch })
@@ -645,7 +669,7 @@ export function useImageUpload({
       // Weiterverarbeitung im Aufrufer — darum keine Foto-Upload-Meldung
       // nach Sentry, die Diagnose bliebe sonst mit Fremdfällen verwässert.
       const { text, kurz } = bildFehlerMeldung(e)
-      return { ok: false, message: text, short: kurz, lesbar: true }
+      return { ok: false, message: text, short: kurz, ausgang: 'gelesen' }
     }
   }
 
@@ -654,8 +678,8 @@ export function useImageUpload({
     setProgress({ current: 1, total: 1, prozent: 0, stufe: 'lesen' })
     try {
       const result = await uploadOne(file, false, auswahl)
-      const lesbar = result.ok ? true : result.lesbar
-      if (lesbar !== null) quellen.meldeErgebnis(auswahl, lesbar)
+      const ausgang = result.ok ? 'gelesen' : result.ausgang
+      if (ausgang !== null) quellen.meldeErgebnis(auswahl, ausgang)
       if (result.ok) return
       if (result.karte) {
         quellen.zeigeKarte(
@@ -692,8 +716,8 @@ export function useImageUpload({
     let uploaded = 0
     // Die lesbaren laufen durch; für die anderen kommt am Ende die Karte.
     const fuerKarte: { grund: KartenGrund; urteil: LeseUrteil; datei: File }[] = []
-    // Je Foto: kam es heraus? Ein einziges lesbares genügt, damit der Weg als geglückt gilt.
-    const gelesen: boolean[] = []
+    // Je Foto: was die Lese-Stufe erlebte — für den gemerkten Weg (serienAusgang).
+    const ausgaenge: LeseAusgang[] = []
     try {
       // Sequenziell: schont die Verbindung, und ein Fehler bricht die Serie
       // nicht ab. Bei Originalen wiegt das schwerer als vorher — parallel
@@ -704,18 +728,19 @@ export function useImageUpload({
         const result = await uploadOne(liste[i], true, auswahl)
         if (result.ok) {
           uploaded++
-          gelesen.push(true)
+          ausgaenge.push('gelesen')
         } else {
           skipped.push({ name: liste[i].name, reason: result.short })
           if (result.karte) fuerKarte.push({ ...result.karte, datei: liste[i] })
-          if (result.lesbar !== null) gelesen.push(result.lesbar)
+          if (result.ausgang !== null) ausgaenge.push(result.ausgang)
         }
       }
     } finally {
       setProgress(null)
       setIsUploading(false)
     }
-    if (gelesen.length > 0) quellen.meldeErgebnis(auswahl, gelesen.some(Boolean))
+    const ausgang = serienAusgang(ausgaenge)
+    if (ausgang !== null) quellen.meldeErgebnis(auswahl, ausgang)
 
     // Sammelmeldung und Karte entscheidet serienAbschluss (foto-wege.ts).
     const abschluss = serienAbschluss({ hochgeladen: uploaded, uebersprungen: skipped.length, faelle: fuerKarte })

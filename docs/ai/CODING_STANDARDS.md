@@ -353,8 +353,9 @@ gegen `background` **und** gegen `card`.
   nie eine Datei direkt aus der Eingabe. Mehrere Fotos nacheinander, nie alle
   Kopien auf einmal im Speicher.
 - **Wer erst später hochlädt, prüft die Datei bei der Auswahl** (`pruefeLesbarkeit`
-  mit `weg`), behält die Kopie statt der Datei und gibt sie nach dem Speichern
-  frei — damit die Karte bei der Auswahl erscheint und nicht mitten im Speichern.
+  mit `weg`), behält die Kopie statt der Datei samt der Lese-Diagnose für Sentry
+  und gibt sie beim Schließen frei — damit die Karte bei der Auswahl erscheint
+  und nicht mitten im Speichern.
 
 ---
 

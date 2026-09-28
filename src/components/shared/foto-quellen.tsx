@@ -7,6 +7,7 @@ import { browserSpeicher, leseFotoWeg, loescheFotoWeg, schreibeFotoWeg } from '@
 import {
   auswegFuer,
   ersterWeg,
+  merkeFehlschlag,
   merkerNachErgebnis,
   sofortKarte,
   standardWeg,
@@ -14,8 +15,10 @@ import {
   zuMerken,
   type AuswahlWeg,
   type Fehlschlag,
+  type FehlschlagMerker,
   type FotoWeg,
   type KartenGrund,
+  type LeseAusgang,
   type WegWahl,
 } from '@/lib/foto-wege'
 import { bereiteGeraeteAuskunftVor, geraeteAuskunft } from '@/lib/upload-meldung'
@@ -117,17 +120,19 @@ export function useFotoQuellen({
   elemente: ReactNode
   /** Die Karte nach einem Fehlschlag dieser Auswahl; `dateien` merkt die unlesbaren für sofortKarte. */
   zeigeKarte: (karte: FotoKarte, auswahl: FotoAuswahl, dateien?: readonly Fehlschlag[]) => void
-  /** Ob die Lese-Stufe die Datei dieser Auswahl bekam — pflegt den gemerkten Weg (merkerNachErgebnis). */
-  meldeErgebnis: (auswahl: FotoAuswahl, lesbar: boolean) => void
+  /** Was die Lese-Stufe mit dieser Auswahl erlebte — pflegt den gemerkten Weg (merkerNachErgebnis). */
+  meldeErgebnis: (auswahl: FotoAuswahl, ausgang: LeseAusgang) => void
 } {
   const galerieRef = useRef<HTMLInputElement>(null)
   const dateienRef = useRef<HTMLInputElement>(null)
   const kameraRef = useRef<HTMLInputElement>(null)
   const [menueOffen, setMenueOffen] = useState(false)
   const [karte, setKarte] = useState<OffeneKarte | null>(null)
-  // Die Dateien, an denen es zuletzt scheiterte, und ihr Weg — kommt eine
-  // über denselben Weg noch einmal (Größe und Typ gleich), gibt es sofort die Karte.
-  const merker = useRef<{ weg: FotoQuellenWeg; dateien: Fehlschlag[]; karte: FotoKarte } | null>(null)
+  // Die Dateien, an denen es zuletzt scheiterte, und die Wege, auf denen sie
+  // scheiterten — kommt eine über einen dieser Wege noch einmal (Größe und
+  // Typ gleich), gibt es sofort die Karte. Vergessen wird er, sobald ein
+  // Foto durchkommt (meldeErgebnis).
+  const merker = useRef<(FehlschlagMerker & { karte: FotoKarte }) | null>(null)
   // Warum die gerade geöffnete Eingabe geöffnet wurde. Gesetzt unmittelbar
   // vor dem click(); die Auswahl kommt erst, wenn der Dialog zu ist.
   const offeneWahl = useRef<WegWahl>('standard')
@@ -168,8 +173,8 @@ export function useFotoQuellen({
       zeigeKarte(gemerkt.karte, gewaehlt)
       return
     }
-    // Eine andere Datei oder ein anderer Weg: Der alte Fehlschlag ist vorbei.
-    merker.current = null
+    // Der Merker bleibt stehen: Scheitert dieselbe Datei auch hier, kommt
+    // dieser Weg dazu (merkeFehlschlag); kommt ein Foto durch, ist er weg.
     onFiles(dateien, gewaehlt)
   }
 
@@ -205,7 +210,7 @@ export function useFotoQuellen({
 
   function zeigeKarte(neue: FotoKarte, gescheitert: FotoAuswahl, dateien?: readonly Fehlschlag[]) {
     const merke = dateien ? zuMerken(neue.grund, dateien) : []
-    if (merke.length > 0) merker.current = { weg: gescheitert.weg, dateien: merke, karte: neue }
+    if (merke.length > 0) merker.current = { ...merkeFehlschlag(merker.current, gescheitert.weg, merke), karte: neue }
     setMenueOffen(false)
     setKarte({
       ...neue,
@@ -214,8 +219,10 @@ export function useFotoQuellen({
     })
   }
 
-  function meldeErgebnis(gewaehlt: FotoAuswahl, lesbar: boolean) {
-    const aenderung = merkerNachErgebnis({ ...gewaehlt, lesbar, standard: standardWeg(istAndroid()) })
+  function meldeErgebnis(gewaehlt: FotoAuswahl, ausgang: LeseAusgang) {
+    // Ein Foto kam durch: Der alte Fehlschlag ist vorbei.
+    if (ausgang === 'gelesen') merker.current = null
+    const aenderung = merkerNachErgebnis({ ...gewaehlt, ausgang, standard: standardWeg(istAndroid()) })
     if (aenderung?.art === 'setzen') schreibeFotoWeg(browserSpeicher(), aenderung.weg)
     else if (aenderung?.art === 'loeschen') loescheFotoWeg(browserSpeicher())
   }
@@ -290,8 +297,10 @@ export function useFotoQuellen({
           <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-card p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-4px_24px_rgba(0,0,0,0.15)]">
             <p className="px-4 pt-2 pb-3 text-sm leading-relaxed text-foreground">{karte.text}</p>
             {/* Der Ausweg: der jeweils andere Auswahlweg (foto-wege.ts,
-                auswegFuer). Bei HEIC hilft kein anderer Weg — das Foto
-                bleibt in seinem Format. */}
+                auswegFuer). Nicht bei HEIC: Auf Android bleibt das Foto auf
+                jedem Weg HEIC. Kam es über einen gemerkten Weg, ist der
+                vergessen (merkerNachErgebnis) — „Foto wählen" öffnet wieder
+                den Standard, auf dem iPhone die Galerie, die HEIC wandelt. */}
             {karte.grund !== 'heic' && (
               <button
                 type="button"

@@ -217,7 +217,23 @@ describe('Lese-Stufe — was Sentry erfährt (pruefeLesbarkeit)', () => {
     expect(lesen).toEqual({
       probe: { ergebnis: 'ok', dauerMs: 4 },
       kopie: { ergebnis: 'fehler', klasse: 'NotReadableError', meldung: nichtLesbar().message, dauerMs: 30 },
+      // Sofort abgelehnt → Netz 1: nach der Pause noch einmal das Ganze (die Probe war ja durch).
+      zweiterVersuch: { ergebnis: 'fehler', klasse: 'NotReadableError', meldung: nichtLesbar().message, dauerMs: 30 },
     })
+  })
+
+  it('kommt nach der gescheiterten Kopie die Freigabe zurück, bringt der zweite Versuch die Kopie', async () => {
+    const probe = vi.fn(liefertNach(4))
+    let ganz = 0
+    const volllesen = vi.fn(() => (ganz++ === 0 ? scheitertNach(30, nichtLesbar())() : liefertNach(5)()))
+
+    const { fehler, lesen } = await lies(datei(probe, volllesen))
+
+    expect(fehler).toBeUndefined()
+    // Die Probe war schon durch — sie wird nicht wiederholt.
+    expect(probe).toHaveBeenCalledTimes(1)
+    expect(volllesen).toHaveBeenCalledTimes(2)
+    expect(lesen?.zweiterVersuch).toEqual({ ergebnis: 'ok', dauerMs: 5 })
   })
 
   it('bleibt die Kopie stumm, greift der Zeitwächter des Volllesens — die stumme Quelle', async () => {
