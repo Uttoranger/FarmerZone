@@ -8,13 +8,11 @@ import { toast } from 'sonner'
 import { Camera, X, Leaf, Thermometer, Snowflake, ChevronRight, Info, Sparkles } from 'lucide-react'
 import { ladeFotoHoch, pruefeLesbarkeit, stufenText, type UploadStufe } from '@/components/shared/image-upload'
 import { useFotoQuellen, type FotoQuellenWeg } from '@/components/shared/foto-quellen'
-import type { LeseDiagnose, UploadDiagnose } from '@/lib/upload-diagnose'
-import { bildFehlerMeldung } from '@/lib/upload-fehler'
+import { ordneLeseFehler, type LeseDiagnose, type UploadDiagnose } from '@/lib/upload-diagnose'
+import { bildFehlerMeldung, karteText } from '@/lib/upload-fehler'
 import { IM_SHOP, NICHT_IM_SHOP } from '@/lib/produkt-sichtbarkeit'
 import { meldeUploadFehler, type UploadWeg } from '@/lib/upload-meldung'
 import { naechsterSchritt } from '@/lib/foto-wege'
-import { ordneLeseFehler } from '@/lib/upload-diagnose'
-import { karteText } from '@/lib/upload-fehler'
 import { MAX_ORIGINAL_BYTES } from '@/lib/upload-pfade'
 import {
   Dialog,
@@ -321,6 +319,9 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   // Solange die Lese-Stufe bei der Auswahl läuft (höchstens 28 s + Pause).
   const [pruefeFoto, setPruefeFoto] = useState(false)
+  // Jede neue Auswahl und jedes Öffnen zählt hoch — ein Prüfergebnis, das
+  // erst danach kommt, ist veraltet und wird verworfen.
+  const pruefungNr = useRef(0)
   // Welche Abschnitte aufgeklappt sind. Anlegen: nur Grunddaten; Bearbeiten:
   // alle zu, die Titel tragen dann eine Zusammenfassung.
   const [offen, setOffen] = useState<Abschnitt[]>([])
@@ -350,7 +351,6 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
   const fotoQuellen = useFotoQuellen({
     zweck: 'product',
     onFiles: ([datei], weg) => {
-      gewaehlterWeg.current = weg
       void pruefeUndUebernehme(datei, weg)
     },
   })
@@ -422,6 +422,9 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
   useEffect(() => {
     if (open) {
       form.reset(isEdit ? toFormDefaults(product) : EMPTY_DEFAULTS)
+      // Eine Prüfung aus dem vorigen Produkt darf hier nichts mehr setzen.
+      pruefungNr.current++
+      setPruefeFoto(false)
       setSelectedFile(null)
       setPreviewUrl(isEdit ? (product.imageUrl ?? null) : null)
       setOffen(isEdit ? [] : ['grunddaten'])
@@ -506,6 +509,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
       toast.error('Datei zu groß (max. 25 MB)')
       return
     }
+    const nr = ++pruefungNr.current
     setPruefeFoto(true)
     let lesen: LeseDiagnose | undefined
     try {
@@ -516,21 +520,28 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
         },
       })
     } catch (e) {
-      // Nach Sentry wie im Upload-Hook (kein Dateiname — upload-meldung.ts),
-      // dann die Karte, wo das Foto oder der Weg das Problem war.
+      // Nach Sentry wie im Upload-Hook (kein Dateiname — upload-meldung.ts) —
+      // auch veraltet, denn der Fehler war echt.
       meldeUploadFehler(e, { datei: file, weg, versuche: 0, lesen })
+      if (nr !== pruefungNr.current) return
+      // Die Karte, wo das Foto oder der Weg das Problem war; sonst die Meldung.
       const { text, art } = bildFehlerMeldung(e)
       const schritt = naechsterSchritt(art)
       if (schritt.art === 'karte') {
         const urteil = lesen ? ordneLeseFehler(lesen) : 'unbestimmt'
-        fotoQuellen.zeigeKarte({ grund: schritt.grund, text: karteText(schritt.grund, urteil) }, file)
+        fotoQuellen.zeigeKarte({ grund: schritt.grund, text: karteText(schritt.grund, urteil) }, [file])
       } else {
         toast.error(text)
       }
       return
     } finally {
-      setPruefeFoto(false)
+      if (nr === pruefungNr.current) setPruefeFoto(false)
     }
+    // Veraltet: Inzwischen wurde ein anderes Foto gewählt oder der Dialog gewechselt.
+    if (nr !== pruefungNr.current) return
+    // Der Weg gehört zur ANGENOMMENEN Datei — eine gescheiterte Rettung
+    // darf der zuvor angenommenen keinen falschen Weg anhängen.
+    gewaehlterWeg.current = weg
     uebernehmeFoto(file)
   }
 
@@ -1765,7 +1776,9 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
               </Button>
               {/* Fehlt noch etwas, sagt der Knopf wie viel; ein Tipp prüft trotzdem
                   und springt zum ersten fehlenden Feld (onInvalid). */}
-              <Button type="submit" disabled={isSubmitting} className="min-w-[100px]">
+              {/* Solange das Foto geprüft wird, gibt es noch nichts zu speichern —
+                  sonst ginge das Produkt ohne (oder mit dem vorigen) Foto hinaus. */}
+              <Button type="submit" disabled={isSubmitting || pruefeFoto} className="min-w-[100px]">
                 {isSubmitting
                   ? uploadFortschritt
                     ? stufenText(uploadFortschritt)

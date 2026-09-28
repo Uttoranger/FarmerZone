@@ -2144,8 +2144,11 @@ Oberfläche verschwunden und zur Rettung geworden.
    wie man sie installiert. Nicht auf `/problem-melden`.
 
 Dieselbe Datei nach einem Fehler noch einmal über „Foto wählen" (Größe und Typ gleich):
-sofort die Karte, kein neuer Versuch. Bei mehreren Fotos laufen die lesbaren durch, für die
-anderen kommt am Ende die Karte, „Anders auswählen" dort mit Mehrfachauswahl.
+sofort die Karte, kein neuer Versuch — gemerkt werden nur unlesbare Dateien, auch aus einer
+Serie. Bei mehreren Fotos laufen die lesbaren durch, für die anderen kommt am Ende die Karte,
+„Anders auswählen" dort mit Mehrfachauswahl (`serienAbschluss`): unlesbare zuerst, die
+Sammelmeldung entfällt nur, wenn die Karte wirklich alles sagt (nichts hochgeladen, alle
+Fälle mit demselben Grund).
 
 **HEIC wird nie hochgeladen.** Bisher gingen 8 MB in den Bildspeicher, bevor sharp auf
 Vercel das Format ablehnte (`[F]`). Jetzt erkennt die Lese-Stufe HEIC/HEIF an der
@@ -2154,12 +2157,17 @@ gespeichert, das wir noch nicht öffnen können. Mach es am besten neu — oder 
 Kamera-App ‚Hohe Kompatibilität‘ bzw. JPEG ein." (`[H]`), mit „Foto aufnehmen" daneben.
 Jedes Vorkommen geht mit Weg und Größe nach Sentry (Ursache `heic`) — über echte
 HEIC-Unterstützung wird danach entschieden, mit Zahlen. AVIF ist derselbe Behälter, aber ein
-Bild, das der Server kann, und bleibt deshalb Unbekanntes.
+Bild, das der Server kann, und bleibt deshalb Unbekanntes — auch wenn es die allgemeine
+HEIF-Hauptmarke `mif1` trägt und „avif" erst in den Zusatzmarken nennt; deshalb zählen alle
+Marken des ftyp-Kastens.
 
 **Produktdialog:** Er lädt erst beim Absenden, Minuten nach der Auswahl. Die Lese-Stufe
 samt zweitem Versuch läuft deshalb schon bei der Auswahl (`pruefeLesbarkeit` mit `weg`), und
-die Karte erscheint dort — nicht mitten im Speichern. Beim Absenden liest `ladeFotoHoch`
-die 64-KB-Probe noch einmal; scheitert es erst dort, bleibt die Meldung.
+die Karte erscheint dort — nicht mitten im Speichern. Solange sie läuft, ist „Speichern"
+gesperrt (sonst ginge das Produkt ohne Foto hinaus), und ein Ergebnis, das erst nach einer
+neuen Auswahl oder einem Produktwechsel kommt, wird verworfen (Zähler `pruefungNr`). Der Weg
+für Sentry gehört zur angenommenen Datei, nicht zum letzten Versuch. Beim Absenden liest
+`ladeFotoHoch` die 64-KB-Probe noch einmal; scheitert es erst dort, bleibt die Meldung.
 
 **Unverändert:** der gestückelte Transfer (`multipart: true`, `handleUpload`) — das Problem
 liegt vor der Übertragung. Die Meldungstexte E/L/D bleiben als Rückfall, wo keine Karte

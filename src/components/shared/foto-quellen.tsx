@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Camera, FolderOpen, Image as ImageIcon, Share2 } from 'lucide-react'
 import { dateienAusFeld, leereDateiFeld } from '@/lib/foto-feld'
-import { gleicheDatei, teilenHinweis, type FotoWeg, type KartenGrund } from '@/lib/foto-wege'
+import { sofortKarte, teilenHinweis, zuMerken, type Fehlschlag, type FotoWeg, type KartenGrund } from '@/lib/foto-wege'
 import { bereiteGeraeteAuskunftVor, geraeteAuskunft } from '@/lib/upload-meldung'
 import type { UploadZweck } from '@/lib/upload-pfade'
 
@@ -57,6 +57,13 @@ function istInstalliert(): boolean {
   )
 }
 
+/** Was der Screenreader zur Karte ansagt — je Grund. */
+const KARTEN_LABEL: Record<KartenGrund, string> = {
+  lesen: 'Foto nicht lesbar',
+  heic: 'Format noch nicht möglich',
+  'kein-foto': 'Kein Foto',
+}
+
 const EINTRAG =
   'flex w-full min-h-12 items-center gap-3 rounded-xl px-4 text-left text-sm font-medium text-foreground hover:bg-muted/40 transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50'
 const ABBRECHEN =
@@ -71,15 +78,15 @@ export function useFotoQuellen({
   /** Wohin das Foto soll — entscheidet, ob die Karte das Teilen anbietet. */
   zweck: UploadZweck
   onFiles: (dateien: File[], weg: FotoQuellenWeg) => void
-}): { oeffnen: () => void; elemente: ReactNode; zeigeKarte: (karte: FotoKarte, datei?: { size: number; type: string }) => void } {
+}): { oeffnen: () => void; elemente: ReactNode; zeigeKarte: (karte: FotoKarte, dateien?: readonly Fehlschlag[]) => void } {
   const standardRef = useRef<HTMLInputElement>(null)
   const kameraRef = useRef<HTMLInputElement>(null)
   const rettungRef = useRef<HTMLInputElement>(null)
   const [menueOffen, setMenueOffen] = useState(false)
   const [karte, setKarte] = useState<OffeneKarte | null>(null)
-  // Die Datei, an der es zuletzt scheiterte — kommt sie über „Foto wählen"
-  // noch einmal (Größe und Typ gleich), gibt es sofort die Karte.
-  const merker = useRef<{ size: number; type: string; karte: FotoKarte } | null>(null)
+  // Die Dateien, an denen es zuletzt scheiterte — kommt eine über „Foto
+  // wählen" noch einmal (Größe und Typ gleich), gibt es sofort die Karte.
+  const merker = useRef<{ dateien: Fehlschlag[]; karte: FotoKarte } | null>(null)
 
   // Escape schließt Menü und Karte — wie jedes Blatt.
   useEffect(() => {
@@ -112,7 +119,7 @@ export function useFotoQuellen({
     const dateien = dateienAusFeld(e.target)
     if (dateien.length === 0) return
     const gemerkt = merker.current
-    if (weg === 'standard' && dateien.length === 1 && gemerkt && gleicheDatei(dateien[0], gemerkt)) {
+    if (gemerkt && sofortKarte(weg, dateien, gemerkt.dateien)) {
       zeigeKarte(gemerkt.karte)
       return
     }
@@ -139,8 +146,9 @@ export function useFotoQuellen({
     ref.current?.click()
   }
 
-  function zeigeKarte(neue: FotoKarte, datei?: { size: number; type: string }) {
-    if (datei && neue.grund === 'lesen') merker.current = { size: datei.size, type: datei.type, karte: neue }
+  function zeigeKarte(neue: FotoKarte, dateien?: readonly Fehlschlag[]) {
+    const merke = dateien ? zuMerken(neue.grund, dateien) : []
+    if (merke.length > 0) merker.current = { dateien: merke, karte: neue }
     setMenueOffen(false)
     setKarte({
       ...neue,
@@ -209,7 +217,7 @@ export function useFotoQuellen({
       )}
 
       {karte && (
-        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Foto nicht lesbar">
+        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={KARTEN_LABEL[karte.grund]}>
           <button type="button" aria-label="Schließen" className="absolute inset-0 bg-black/40" onClick={() => setKarte(null)} />
           <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-card p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-4px_24px_rgba(0,0,0,0.15)]">
             <p className="px-4 pt-2 pb-3 text-sm leading-relaxed text-foreground">{karte.text}</p>

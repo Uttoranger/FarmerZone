@@ -188,19 +188,23 @@ export function geraeteAuskunft(): AndroidAuskunft | null {
  * ohne Client Hints (Safari, Firefox) bleibt er es. Wirft nie.
  */
 export function bereiteGeraeteAuskunftVor(): void {
-  if (hintsAngefragt || typeof navigator === 'undefined') return
-  hintsAngefragt = true
-  const daten = (navigator as NavigatorMitHints).userAgentData
-  if (!daten || typeof daten.getHighEntropyValues !== 'function') return
-  const userAgent = navigator.userAgent
-  daten
-    .getHighEntropyValues(['platformVersion'])
-    .then((werte) => {
-      auskunft = androidAuskunft({ userAgent, platform: daten.platform, platformVersion: werte.platformVersion })
-    })
-    .catch(() => {
-      // Verweigert oder nicht unterstützt — der User-Agent bleibt die Auskunft.
-    })
+  try {
+    if (hintsAngefragt || typeof navigator === 'undefined') return
+    hintsAngefragt = true
+    const daten = (navigator as NavigatorMitHints).userAgentData
+    if (!daten || typeof daten.getHighEntropyValues !== 'function') return
+    const userAgent = navigator.userAgent
+    daten
+      .getHighEntropyValues(['platformVersion'])
+      .then((werte) => {
+        auskunft = androidAuskunft({ userAgent, platform: daten.platform, platformVersion: werte.platformVersion })
+      })
+      .catch(() => {
+        // Verweigert oder nicht unterstützt — der User-Agent bleibt die Auskunft.
+      })
+  } catch {
+    // Ein Browser, der schon beim Zugriff wirft: Die Fotoauswahl muss trotzdem aufgehen.
+  }
 }
 
 /**

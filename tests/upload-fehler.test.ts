@@ -111,6 +111,11 @@ describe('Zuordnung Fehlerart → Text', () => {
     expect(karteText('lesen', 'erlaubnis', 3)).toContain('diese 3 Fotos')
     expect(karteText('heic')).toBe(IMAGE_HEIC_ERROR)
     expect(karteText('kein-foto')).toBe(IMAGE_NOT_PHOTO_ERROR)
+    // Mehrzahl, wenn eine Serie mehrere trifft — ohne Fachwort, gleiche Kennung.
+    expect(karteText('heic', 'unbestimmt', 3)).toContain('3 Fotos sind in einem Format')
+    expect(karteText('heic', 'unbestimmt', 3)).toMatch(/\[H\d+\]$/)
+    expect(karteText('heic', 'unbestimmt', 3)).not.toMatch(/HEIC/)
+    expect(karteText('kein-foto', 'unbestimmt', 2)).toBe(`2 Dateien sind keine Fotos. [K${UPLOAD_DIAG}]`)
   })
 
   it('fällt bei einer unbekannten Ursache auf einen definierten Standard zurück', () => {

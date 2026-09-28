@@ -51,15 +51,22 @@ export function zweiterLeseversuch(urteil: LeseUrteil): boolean {
 
 export type BildFormat = 'jpeg' | 'png' | 'webp' | 'heic'
 
-/** So viele Bytes vom Anfang genügen für jedes der vier Formate. */
-export const FORMAT_PROBE_BYTES = 12
+/**
+ * So viele Bytes vom Anfang genügen: JPEG, PNG und WebP entscheiden sich in
+ * den ersten zwölf, der ftyp-Kasten von HEIC und AVIF trägt seine Marken
+ * dahinter — 64 decken jeden üblichen Kasten.
+ */
+export const FORMAT_PROBE_BYTES = 64
 
 /**
- * ISO-BMFF-Marken der HEIC/HEIF-Familie (die Bytes 8–11 hinter „ftyp"). AVIF
- * steht bewusst nicht dabei: Das ist derselbe Behälter, aber ein anderes
- * Bild, das der Server verarbeiten kann.
+ * ISO-BMFF-Marken der HEIC/HEIF-Familie (hinter „ftyp"). mif1 und msf1 sind
+ * die allgemeinen HEIF-Marken — auch ein AVIF darf sie als Hauptmarke tragen
+ * und nennt „avif" dann erst in den Zusatzmarken. Deshalb zählen alle Marken
+ * des Kastens, und AVIF sticht: derselbe Behälter, aber ein Bild, das der
+ * Server verarbeiten kann.
  */
 const HEIC_MARKEN = new Set(['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'mif1', 'msf1', 'heif'])
+const AVIF_MARKEN = new Set(['avif', 'avis'])
 
 function ascii(bytes: ArrayLike<number>, von: number, bis: number): string {
   let text = ''
@@ -87,7 +94,16 @@ export function bildFormat(bytes: ArrayLike<number>): BildFormat | null {
     return 'png'
   }
   if (bytes.length >= 12 && ascii(bytes, 0, 4) === 'RIFF' && ascii(bytes, 8, 12) === 'WEBP') return 'webp'
-  if (bytes.length >= 12 && ascii(bytes, 4, 8) === 'ftyp' && HEIC_MARKEN.has(ascii(bytes, 8, 12))) return 'heic'
+  if (bytes.length >= 12 && ascii(bytes, 4, 8) === 'ftyp') {
+    // Hauptmarke, dann die Zusatzmarken ab Byte 16 bis zum Ende des Kastens
+    // (seine Länge steht in den ersten vier Bytes; 0 = bis zum Dateiende).
+    const laenge = ((bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3]) >>> 0
+    const ende = Math.min(bytes.length, laenge > 0 ? laenge : bytes.length)
+    const marken = [ascii(bytes, 8, 12)]
+    for (let i = 16; i + 4 <= ende; i += 4) marken.push(ascii(bytes, i, i + 4))
+    if (marken.some((m) => AVIF_MARKEN.has(m))) return null
+    if (marken.some((m) => HEIC_MARKEN.has(m))) return 'heic'
+  }
   return null
 }
 
@@ -130,6 +146,52 @@ export function naechsterSchritt(art: BildFehlerArt | null): { art: 'karte'; gru
  */
 export function gleicheDatei(a: { size: number; type: string }, b: { size: number; type: string }): boolean {
   return a.size === b.size && a.type === b.type
+}
+
+export type Fehlschlag = { size: number; type: string }
+
+/**
+ * Nach einer Auswahl: sofort die Karte, ohne Versuch — wenn genau eine
+ * Datei über „Foto wählen" kam und einem gemerkten Fehlschlag gleicht. Über
+ * die Rettung oder die Kamera wird immer versucht: Das ist ja der Ausweg.
+ */
+export function sofortKarte(weg: FotoWeg, dateien: readonly Fehlschlag[], gemerkt: readonly Fehlschlag[]): boolean {
+  return weg === 'standard' && dateien.length === 1 && gemerkt.some((g) => gleicheDatei(dateien[0], g))
+}
+
+/**
+ * Was nach einer Karte gemerkt wird: nur die unlesbaren Dateien. HEIC und
+ * „kein Foto" brauchen keinen Merker — ihre Karte kommt ohnehin sofort, an
+ * den ersten Bytes, ohne Pause.
+ */
+export function zuMerken(grund: KartenGrund, dateien: readonly Fehlschlag[]): Fehlschlag[] {
+  return grund === 'lesen' ? dateien.map(({ size, type }) => ({ size, type })) : []
+}
+
+export type SerienFall = { grund: KartenGrund; urteil: LeseUrteil }
+
+/**
+ * Das Ende einer Serie (mehrere Fotos): Die lesbaren sind durch, für die
+ * anderen kommt die Karte — unlesbare zuerst, weil dort „Anders auswählen"
+ * hilft; sonst der erste Grund. Die Sammelmeldung entfällt nur, wenn die
+ * Karte wirklich alles sagt: nichts hochgeladen, nichts aus anderem Grund
+ * übersprungen, alle Fälle mit demselben Grund.
+ */
+export function serienAbschluss(eingabe: {
+  hochgeladen: number
+  uebersprungen: number
+  faelle: readonly SerienFall[]
+}): { sammelmeldung: boolean; karte: { grund: KartenGrund; urteil: LeseUrteil; anzahl: number } | null } {
+  const { hochgeladen, uebersprungen, faelle } = eingabe
+  if (faelle.length === 0) return { sammelmeldung: true, karte: null }
+  const lesen = faelle.filter((f) => f.grund === 'lesen')
+  const erster = lesen[0] ?? faelle[0]
+  const gleiche = faelle.filter((f) => f.grund === erster.grund)
+  const karteSagtAlles = hochgeladen === 0 && uebersprungen === faelle.length && gleiche.length === faelle.length
+  return {
+    sammelmeldung: !karteSagtAlles,
+    karte: { grund: erster.grund, urteil: erster.urteil, anzahl: gleiche.length },
+  }
 }
 
 // ─── Netz 3: Teilen an die App ──────────────────────────────────────────────

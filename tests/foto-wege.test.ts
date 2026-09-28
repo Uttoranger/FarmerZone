@@ -27,7 +27,10 @@ import {
   formatUrteil,
   gleicheDatei,
   naechsterSchritt,
+  serienAbschluss,
+  sofortKarte,
   teilenHinweis,
+  zuMerken,
   zweiterLeseversuch,
 } from '@/lib/foto-wege'
 
@@ -64,6 +67,16 @@ describe('bildFormat — an den ersten Bytes', () => {
     expect(bildFormat(bytes(0, 0, 0, 0x18, 'ftyp', 'isom'))).toBeNull()
   })
 
+  it('liest die Zusatzmarken: ein AVIF mit allgemeiner HEIF-Hauptmarke ist kein HEIC', () => {
+    // Kasten 24 Bytes: Länge, ftyp, Hauptmarke mif1, Version, Zusatzmarken mif1 + avif.
+    expect(bildFormat(bytes(0, 0, 0, 0x18, 'ftyp', 'mif1', 0, 0, 0, 0, 'mif1', 'avif'))).toBeNull()
+    expect(bildFormat(bytes(0, 0, 0, 0x18, 'ftyp', 'msf1', 0, 0, 0, 0, 'msf1', 'avis'))).toBeNull()
+    // Umgekehrt: mif1 mit heic als Zusatzmarke bleibt HEIC.
+    expect(bildFormat(bytes(0, 0, 0, 0x18, 'ftyp', 'mif1', 0, 0, 0, 0, 'mif1', 'heic'))).toBe('heic')
+    // Zusatzmarken hinter dem Kastenende zählen nicht.
+    expect(bildFormat(bytes(0, 0, 0, 0x14, 'ftyp', 'mif1', 0, 0, 0, 0, 'mif1', 'avif'))).toBe('heic')
+  })
+
   it('kennt Text, Leeres und Kurzes nicht', () => {
     expect(bildFormat(bytes('hello world!'))).toBeNull()
     expect(bildFormat(bytes())).toBeNull()
@@ -71,8 +84,8 @@ describe('bildFormat — an den ersten Bytes', () => {
     expect(bildFormat(bytes('RIFF', 0, 0, 0, 0, 'WAVE'))).toBeNull()
   })
 
-  it('braucht dafür nie mehr als die Probe', () => {
-    expect(FORMAT_PROBE_BYTES).toBe(12)
+  it('braucht dafür nie mehr als 64 Bytes — weit unter der Probe', () => {
+    expect(FORMAT_PROBE_BYTES).toBe(64)
     expect(bildFormat(bytes('RIFF', 0, 0, 0, 0, 'WEBP').slice(0, FORMAT_PROBE_BYTES))).toBe('webp')
   })
 })
@@ -120,6 +133,65 @@ describe('gleicheDatei — Größe und Typ', () => {
   it('unterscheidet Größe und Typ', () => {
     expect(gleicheDatei({ size: 8_247_048, type: 'image/jpeg' }, { size: 8_247_049, type: 'image/jpeg' })).toBe(false)
     expect(gleicheDatei({ size: 8_247_048, type: 'image/jpeg' }, { size: 8_247_048, type: 'image/png' })).toBe(false)
+  })
+})
+
+describe('sofortKarte und zuMerken — dieselbe Datei nach einem Fehler', () => {
+  const A = { size: 8_247_048, type: 'image/jpeg' }
+  const B = { size: 1_000, type: 'image/png' }
+
+  it('gemerkt werden nur unlesbare Dateien', () => {
+    expect(zuMerken('lesen', [A, B])).toEqual([A, B])
+    expect(zuMerken('heic', [A])).toEqual([])
+    expect(zuMerken('kein-foto', [A])).toEqual([])
+  })
+
+  it('sofort die Karte nur über „Foto wählen", genau eine Datei, und nur eine gemerkte', () => {
+    expect(sofortKarte('standard', [A], [A])).toBe(true)
+    expect(sofortKarte('standard', [A], [B, A])).toBe(true)
+    expect(sofortKarte('standard', [B], [A])).toBe(false)
+    expect(sofortKarte('standard', [A, B], [A])).toBe(false)
+    expect(sofortKarte('standard', [A], [])).toBe(false)
+  })
+
+  it('Rettung und Kamera versuchen es immer — das ist der Ausweg', () => {
+    expect(sofortKarte('rettung', [A], [A])).toBe(false)
+    expect(sofortKarte('kamera', [A], [A])).toBe(false)
+  })
+})
+
+describe('serienAbschluss — mehrere Fotos', () => {
+  const lesen = { grund: 'lesen' as const, urteil: 'erlaubnis' as const }
+  const heic = { grund: 'heic' as const, urteil: 'unbestimmt' as const }
+
+  it('ohne Karten-Fälle nur die Sammelmeldung', () => {
+    expect(serienAbschluss({ hochgeladen: 2, uebersprungen: 0, faelle: [] })).toEqual({ sammelmeldung: true, karte: null })
+  })
+
+  it('alle gescheitert, alle unlesbar: nur die Karte, mit Anzahl', () => {
+    expect(serienAbschluss({ hochgeladen: 0, uebersprungen: 2, faelle: [lesen, lesen] })).toEqual({
+      sammelmeldung: false,
+      karte: { grund: 'lesen', urteil: 'erlaubnis', anzahl: 2 },
+    })
+  })
+
+  it('gemischte Gründe: die Karte für die unlesbaren, die Sammelmeldung für den Rest', () => {
+    expect(serienAbschluss({ hochgeladen: 0, uebersprungen: 3, faelle: [heic, lesen, lesen] })).toEqual({
+      sammelmeldung: true,
+      karte: { grund: 'lesen', urteil: 'erlaubnis', anzahl: 2 },
+    })
+  })
+
+  it('etwas hochgeladen oder aus anderem Grund übersprungen: Sammelmeldung bleibt', () => {
+    expect(serienAbschluss({ hochgeladen: 1, uebersprungen: 1, faelle: [lesen] }).sammelmeldung).toBe(true)
+    expect(serienAbschluss({ hochgeladen: 0, uebersprungen: 2, faelle: [lesen] }).sammelmeldung).toBe(true)
+  })
+
+  it('nur HEIC: die HEIC-Karte mit Anzahl', () => {
+    expect(serienAbschluss({ hochgeladen: 0, uebersprungen: 3, faelle: [heic, heic, heic] })).toEqual({
+      sammelmeldung: false,
+      karte: { grund: 'heic', urteil: 'unbestimmt', anzahl: 3 },
+    })
   })
 })
 
@@ -198,5 +270,14 @@ describe('am Quelltext: zwei Knöpfe, die Rettung verborgen', () => {
     expect(quelle).toContain('Oder in der Galerie: Teilen → FarmerZone')
     expect(quelle).toContain('display-mode: standalone')
     expect(quelle).toContain('Zum Startbildschirm hinzufügen')
+  })
+
+  it('der Produktdialog prüft bei der Auswahl, sperrt das Speichern derweil und setzt den Weg erst danach', () => {
+    const dialog = readFileSync(join(process.cwd(), 'src/components/products/product-dialog.tsx'), 'utf8')
+    expect(dialog).toContain('await pruefeLesbarkeit(file, {')
+    expect(dialog).toMatch(/type="submit" disabled=\{isSubmitting \|\| pruefeFoto\}/)
+    // Der Weg wird der angenommenen Datei zugeordnet — nach der Prüfung, nicht in onFiles.
+    expect(dialog.indexOf('gewaehlterWeg.current = weg')).toBeGreaterThan(dialog.indexOf('await pruefeLesbarkeit(file, {'))
+    expect(dialog.match(/gewaehlterWeg\.current = weg/g)).toHaveLength(1)
   })
 })

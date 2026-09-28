@@ -185,11 +185,18 @@ export function karteLesenText(urteil: LeseUrteil, anzahl = 1): string {
   return mitKennung(`Dein Handy gibt ${was} auf diesem Weg nicht heraus.`, buchstabe)
 }
 
-/** Der Satz der Karte je Grund — Lesefehler nach Urteil, die beiden anderen fest. */
+/** Der Satz der Karte je Grund — Lesefehler nach Urteil; bei mehreren Fotos in der Mehrzahl. */
 export function karteText(grund: KartenGrund, urteil: LeseUrteil = 'unbestimmt', anzahl = 1): string {
   if (grund === 'lesen') return karteLesenText(urteil, anzahl)
-  if (grund === 'heic') return IMAGE_HEIC_ERROR
-  return IMAGE_NOT_PHOTO_ERROR
+  if (grund === 'heic') {
+    if (anzahl <= 1) return IMAGE_HEIC_ERROR
+    return mitKennung(
+      `${anzahl} Fotos sind in einem Format gespeichert, das wir noch nicht öffnen können. Mach sie am ` +
+        'besten neu — oder stell in der Kamera-App ‚Hohe Kompatibilität‘ bzw. JPEG ein.',
+      'H'
+    )
+  }
+  return anzahl <= 1 ? IMAGE_NOT_PHOTO_ERROR : mitKennung(`${anzahl} Dateien sind keine Fotos.`, 'K')
 }
 
 /**

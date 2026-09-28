@@ -9,6 +9,7 @@ import {
   bildFormat,
   formatUrteil,
   naechsterSchritt,
+  serienAbschluss,
   zweiterLeseversuch,
   type FotoWeg,
   type KartenGrund,
@@ -613,7 +614,7 @@ export function useImageUpload({
       const result = await uploadOne(file, false)
       if (result.ok) return
       if (result.karte) {
-        quellen.zeigeKarte({ grund: result.karte.grund, text: karteText(result.karte.grund, result.karte.urteil) }, file)
+        quellen.zeigeKarte({ grund: result.karte.grund, text: karteText(result.karte.grund, result.karte.urteil) }, [file])
       } else {
         toast.error(result.message)
       }
@@ -642,7 +643,7 @@ export function useImageUpload({
     setIsUploading(true)
     let uploaded = 0
     // Die lesbaren laufen durch; für die anderen kommt am Ende die Karte.
-    const fuerKarte: { grund: KartenGrund; urteil: LeseUrteil }[] = []
+    const fuerKarte: { grund: KartenGrund; urteil: LeseUrteil; datei: File }[] = []
     try {
       // Sequenziell: schont die Verbindung, und ein Fehler bricht die Serie
       // nicht ab. Bei Originalen wiegt das schwerer als vorher — parallel
@@ -653,7 +654,7 @@ export function useImageUpload({
         if (result.ok) uploaded++
         else {
           skipped.push({ name: liste[i].name, reason: result.short })
-          if (result.karte) fuerKarte.push(result.karte)
+          if (result.karte) fuerKarte.push({ ...result.karte, datei: liste[i] })
         }
       }
     } finally {
@@ -661,22 +662,20 @@ export function useImageUpload({
       setIsUploading(false)
     }
 
-    // Die Sammelmeldung bleibt, wo sie etwas sagt (Hochgeladenes, andere
-    // Gründe); sind ALLE gescheitert und alle ein Fall für die Karte, sagt
-    // die Karte alles.
-    const nurKarte = uploaded === 0 && fuerKarte.length === skipped.length
-    if (!nurKarte) {
+    // Sammelmeldung und Karte entscheidet serienAbschluss (foto-wege.ts).
+    const abschluss = serienAbschluss({ hochgeladen: uploaded, uebersprungen: skipped.length, faelle: fuerKarte })
+    if (abschluss.sammelmeldung) {
       const text = summarizeUploadBatch(uploaded, skipped)
       if (uploaded === 0) toast.error(text)
       else if (skipped.length > 0) toast.warning(text)
       else toast.success(text)
     }
-    if (fuerKarte.length > 0) {
-      // Unlesbare zuerst — dort hilft „Anders auswählen"; sonst der erste Grund.
-      const lesen = fuerKarte.filter((k) => k.grund === 'lesen')
-      const erster = lesen[0] ?? fuerKarte[0]
-      const anzahl = erster.grund === 'lesen' ? lesen.length : fuerKarte.filter((k) => k.grund === erster.grund).length
-      quellen.zeigeKarte({ grund: erster.grund, text: karteText(erster.grund, erster.urteil, anzahl) })
+    if (abschluss.karte) {
+      const { grund, urteil, anzahl } = abschluss.karte
+      quellen.zeigeKarte(
+        { grund, text: karteText(grund, urteil, anzahl) },
+        fuerKarte.filter((k) => k.grund === grund).map((k) => k.datei)
+      )
     }
   }
 
