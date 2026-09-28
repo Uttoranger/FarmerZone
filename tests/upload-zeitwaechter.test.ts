@@ -273,7 +273,10 @@ describe('Lese-Stufe unter Zeitwächtern (pruefeLesbarkeit)', () => {
 
     const lauf = pruefeLesbarkeit(zaehe)
     await vi.advanceTimersByTimeAsync(LESE_PROBE_LIMIT_MS)
-    await expect(lauf).resolves.toBeUndefined()
+    // Das Komplett-Lesen ist zugleich die Kopie, die weitergeht.
+    const kopie = await lauf
+    expect(kopie).toBeInstanceOf(File)
+    expect(kopie.size).toBe(8)
     expect(vi.getTimerCount()).toBe(0)
   })
 })

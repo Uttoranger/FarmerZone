@@ -3,7 +3,24 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Camera, FolderOpen, Image as ImageIcon, Share2 } from 'lucide-react'
 import { dateienAusFeld, leereDateiFeld } from '@/lib/foto-feld'
-import { sofortKarte, teilenHinweis, zuMerken, type Fehlschlag, type FotoWeg, type KartenGrund } from '@/lib/foto-wege'
+import { browserSpeicher, leseFotoWeg, loescheFotoWeg, schreibeFotoWeg } from '@/lib/foto-weg-speicher'
+import {
+  auswegFuer,
+  ersterWeg,
+  merkeFehlschlag,
+  merkerNachErgebnis,
+  sofortKarte,
+  standardWeg,
+  teilenHinweis,
+  zuMerken,
+  type AuswahlWeg,
+  type Fehlschlag,
+  type FehlschlagMerker,
+  type FotoWeg,
+  type KartenGrund,
+  type LeseAusgang,
+  type WegWahl,
+} from '@/lib/foto-wege'
 import { bereiteGeraeteAuskunftVor, geraeteAuskunft } from '@/lib/upload-meldung'
 import type { UploadZweck } from '@/lib/upload-pfade'
 
@@ -15,24 +32,26 @@ import type { UploadZweck } from '@/lib/upload-pfade'
  * wählen, ohne den Unterschied zu kennen (JAVASCRIPT-NEXTJS-5: dasselbe Foto
  * 16-mal nicht lesbar, die Meldung schickte ihn in eine Schleife). Jetzt:
  *
- *  - „Foto wählen": accept="image/*", ohne capture. Android zeigt damit die
- *    Systemfotoauswahl, die ab Android 12 auch Cloud-Fotos (Google Fotos)
- *    selbst lädt.
+ *  - „Foto wählen" öffnet den ersten Weg des Geräts (foto-wege.ts,
+ *    ersterWeg): auf Android die Dateien-App (breites accept), sonst die
+ *    Galerie (accept="image/*", ohne capture). Seit JAVASCRIPT-NEXTJS-6 ist
+ *    das auf Android umgedreht — der Galerie-Weg gab dort dasselbe Foto nicht
+ *    verlässlich heraus, die Dateien-App schon.
  *  - „Foto aufnehmen": capture="environment".
- *  - Die frühere Dokument-Auswahl ist zur RETTUNG geworden: eine verborgene
- *    Eingabe mit breitem accept, damit Android die Dateien-App zeigt, in der
- *    Google Fotos ein Bild beim Öffnen herunterlädt. Sie öffnet nur über die
- *    Karte („Anders auswählen").
  *  - Die Karte ersetzt die Fehlermeldung, wo das Foto oder der Weg das
- *    Problem war: mit „Anders auswählen", „Foto aufnehmen" und, wo es geht,
- *    dem Teilen aus der Galerie an die installierte App.
- *  - Dieselbe Datei nach einem Fehler noch einmal über „Foto wählen": sofort
+ *    Problem war: mit dem Ausweg (dem jeweils anderen Weg — „Aus der Galerie"
+ *    oder „Anders auswählen"), „Foto aufnehmen" und, wo es geht, dem Teilen
+ *    aus der Galerie an die installierte App.
+ *  - Klappt der Ausweg, merkt sich das Gerät ihn (foto-weg-speicher.ts) und
+ *    „Foto wählen" öffnet künftig direkt ihn; scheitert der gemerkte Weg,
+ *    wird er vergessen. Das meldet der Aufrufer über meldeErgebnis.
+ *  - Dieselbe Datei nach einem Fehler noch einmal über denselben Weg: sofort
  *    die Karte, kein neuer Versuch.
  *
  * Auf Touch-Geräten (grober Zeiger) öffnet der bestehende Auslöser das Menü
  * mit den zwei Knöpfen; am Desktop öffnet der Klick wie bisher direkt die
  * Dateiauswahl. Nach der Auswahl ist der Ablauf der bestehende: onFiles
- * bekommt die Dateien und den Weg.
+ * bekommt die Dateien und die Auswahl (Weg und Wahl).
  *
  * Seit #135 wird das Datei-Feld beim KLICK geleert, nicht nach der Auswahl:
  * Ein Schreibzugriff auf `value` entzieht auf Android-Chrome die Leseerlaubnis
@@ -40,13 +59,31 @@ import type { UploadZweck } from '@/lib/upload-pfade'
  * Begründung stehen in src/lib/foto-feld.ts.
  */
 
-/** Über welchen der drei Knöpfe die Auswahl kam — Teilen läuft über /teilen. */
+/** Über welche der drei Eingaben die Auswahl kam — Teilen läuft über /teilen. */
 export type FotoQuellenWeg = Exclude<FotoWeg, 'teilen'>
+
+/** Eine Auswahl: über welchen Weg, und warum dieser Weg (Standard, Ausweg, gemerkt). */
+export type FotoAuswahl = { weg: FotoQuellenWeg; wahl: WegWahl }
 
 /** Was die Karte zeigt: der Grund und der fertige Satz (karteText in upload-fehler.ts). */
 export type FotoKarte = { grund: KartenGrund; text: string }
 
-type OffeneKarte = FotoKarte & { hinweis: 'teilen' | 'installieren' | null }
+type OffeneKarte = FotoKarte & { hinweis: 'teilen' | 'installieren' | null; ausweg: AuswahlWeg }
+
+/** Der Knopf für den Ausweg — je nachdem, welcher Weg der andere ist. */
+const AUSWEG_KNOPF: Record<AuswahlWeg, string> = {
+  galerie: 'Aus der Galerie',
+  dateien: 'Anders auswählen',
+}
+
+function istAndroid(): boolean {
+  return geraeteAuskunft()?.android ?? false
+}
+
+/** Was „Foto wählen" gerade öffnet — der gemerkte Weg, sonst der Standard des Geräts. */
+function ersteAuswahl(): { weg: AuswahlWeg; wahl: WegWahl } {
+  return ersterWeg({ android: istAndroid(), gemerkt: leseFotoWeg(browserSpeicher()) })
+}
 
 /** Läuft die Seite als installierte App? Nur dort ist Teilen an FarmerZone möglich. */
 function istInstalliert(): boolean {
@@ -77,16 +114,28 @@ export function useFotoQuellen({
   multiple?: boolean
   /** Wohin das Foto soll — entscheidet, ob die Karte das Teilen anbietet. */
   zweck: UploadZweck
-  onFiles: (dateien: File[], weg: FotoQuellenWeg) => void
-}): { oeffnen: () => void; elemente: ReactNode; zeigeKarte: (karte: FotoKarte, dateien?: readonly Fehlschlag[]) => void } {
-  const standardRef = useRef<HTMLInputElement>(null)
+  onFiles: (dateien: File[], auswahl: FotoAuswahl) => void
+}): {
+  oeffnen: () => void
+  elemente: ReactNode
+  /** Die Karte nach einem Fehlschlag dieser Auswahl; `dateien` merkt die unlesbaren für sofortKarte. */
+  zeigeKarte: (karte: FotoKarte, auswahl: FotoAuswahl, dateien?: readonly Fehlschlag[]) => void
+  /** Was die Lese-Stufe mit dieser Auswahl erlebte — pflegt den gemerkten Weg (merkerNachErgebnis). */
+  meldeErgebnis: (auswahl: FotoAuswahl, ausgang: LeseAusgang) => void
+} {
+  const galerieRef = useRef<HTMLInputElement>(null)
+  const dateienRef = useRef<HTMLInputElement>(null)
   const kameraRef = useRef<HTMLInputElement>(null)
-  const rettungRef = useRef<HTMLInputElement>(null)
   const [menueOffen, setMenueOffen] = useState(false)
   const [karte, setKarte] = useState<OffeneKarte | null>(null)
-  // Die Dateien, an denen es zuletzt scheiterte — kommt eine über „Foto
-  // wählen" noch einmal (Größe und Typ gleich), gibt es sofort die Karte.
-  const merker = useRef<{ dateien: Fehlschlag[]; karte: FotoKarte } | null>(null)
+  // Die Dateien, an denen es zuletzt scheiterte, und die Wege, auf denen sie
+  // scheiterten — kommt eine über einen dieser Wege noch einmal (Größe und
+  // Typ gleich), gibt es sofort die Karte. Vergessen wird er, sobald ein
+  // Foto durchkommt (meldeErgebnis).
+  const merker = useRef<(FehlschlagMerker & { karte: FotoKarte }) | null>(null)
+  // Warum die gerade geöffnete Eingabe geöffnet wurde. Gesetzt unmittelbar
+  // vor dem click(); die Auswahl kommt erst, wenn der Dialog zu ist.
+  const offeneWahl = useRef<WegWahl>('standard')
 
   // Escape schließt Menü und Karte — wie jedes Blatt.
   useEffect(() => {
@@ -118,14 +167,21 @@ export function useFotoQuellen({
     // Android entwerten, bevor sie gelesen ist.
     const dateien = dateienAusFeld(e.target)
     if (dateien.length === 0) return
+    const gewaehlt: FotoAuswahl = { weg, wahl: offeneWahl.current }
     const gemerkt = merker.current
-    if (gemerkt && sofortKarte(weg, dateien, gemerkt.dateien)) {
-      zeigeKarte(gemerkt.karte)
+    if (gemerkt && sofortKarte(gewaehlt, dateien, gemerkt)) {
+      zeigeKarte(gemerkt.karte, gewaehlt)
       return
     }
-    // Eine andere Datei oder ein anderer Weg: Der alte Fehlschlag ist vorbei.
-    merker.current = null
-    onFiles(dateien, weg)
+    // Der Merker bleibt stehen: Scheitert dieselbe Datei auch hier, kommt
+    // dieser Weg dazu (merkeFehlschlag); kommt ein Foto durch, ist er weg.
+    onFiles(dateien, gewaehlt)
+  }
+
+  const eingabe: Record<FotoQuellenWeg, React.RefObject<HTMLInputElement | null>> = {
+    galerie: galerieRef,
+    dateien: dateienRef,
+    kamera: kameraRef,
   }
 
   function oeffnen() {
@@ -136,36 +192,67 @@ export function useFotoQuellen({
     if (typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches) {
       setMenueOffen(true)
     } else {
-      standardRef.current?.click()
+      fotoWaehlen()
     }
   }
 
-  function waehle(ref: React.RefObject<HTMLInputElement | null>) {
+  function waehle({ weg, wahl }: FotoAuswahl) {
     setMenueOffen(false)
     setKarte(null)
-    ref.current?.click()
+    offeneWahl.current = wahl
+    eingabe[weg].current?.click()
   }
 
-  function zeigeKarte(neue: FotoKarte, dateien?: readonly Fehlschlag[]) {
+  /** „Foto wählen": der Weg wird erst beim Tippen bestimmt — der Merker kann sich seit dem Laden geändert haben. */
+  function fotoWaehlen() {
+    waehle(ersteAuswahl())
+  }
+
+  function zeigeKarte(neue: FotoKarte, gescheitert: FotoAuswahl, dateien?: readonly Fehlschlag[]) {
     const merke = dateien ? zuMerken(neue.grund, dateien) : []
-    if (merke.length > 0) merker.current = { dateien: merke, karte: neue }
+    if (merke.length > 0) merker.current = { ...merkeFehlschlag(merker.current, gescheitert.weg, merke), karte: neue }
     setMenueOffen(false)
     setKarte({
       ...neue,
-      hinweis: teilenHinweis({ zweck, android: geraeteAuskunft()?.android ?? false, installiert: istInstalliert() }),
+      hinweis: teilenHinweis({ zweck, android: istAndroid(), installiert: istInstalliert() }),
+      ausweg: auswegFuer(gescheitert.weg, ersteAuswahl().weg),
     })
+  }
+
+  function meldeErgebnis(gewaehlt: FotoAuswahl, ausgang: LeseAusgang) {
+    // Ein Foto kam durch: Der alte Fehlschlag ist vorbei.
+    if (ausgang === 'gelesen') merker.current = null
+    const aenderung = merkerNachErgebnis({ ...gewaehlt, ausgang, standard: standardWeg(istAndroid()) })
+    if (aenderung?.art === 'setzen') schreibeFotoWeg(browserSpeicher(), aenderung.weg)
+    else if (aenderung?.art === 'loeschen') loescheFotoWeg(browserSpeicher())
   }
 
   const elemente = (
     <>
+      {/* Die Galerie: accept="image/*" ohne capture — Android zeigt die
+          Systemfotoauswahl, das iPhone die Mediathek samt iCloud-Abruf.
+          Erster Weg auf iPhone und Desktop, Ausweg auf Android. */}
       <input
-        ref={standardRef}
+        ref={galerieRef}
         type="file"
         accept="image/*"
         multiple={multiple}
         className="hidden"
         onClick={vorAuswahl}
-        onChange={(e) => auswahl(e, 'standard')}
+        onChange={(e) => auswahl(e, 'galerie')}
+      />
+      {/* Die Dateien-App: Das breite accept führt Android in die Dateien-App
+          statt in die Fotoauswahl. Erster Weg auf Android, Ausweg sonst.
+          Weil dort auch Nicht-Bilder wählbar sind, prüft die Lese-Stufe die
+          ersten Bytes (foto-wege.ts). */}
+      <input
+        ref={dateienRef}
+        type="file"
+        accept="image/*,application/octet-stream"
+        multiple={multiple}
+        className="hidden"
+        onClick={vorAuswahl}
+        onChange={(e) => auswahl(e, 'dateien')}
       />
       <input
         ref={kameraRef}
@@ -175,18 +262,6 @@ export function useFotoQuellen({
         className="hidden"
         onClick={vorAuswahl}
         onChange={(e) => auswahl(e, 'kamera')}
-      />
-      {/* Die Rettung: Das breite accept führt Android in die Dateien-App
-          statt in die Fotoauswahl. Weil dort auch Nicht-Bilder wählbar sind,
-          prüft die Lese-Stufe die ersten Bytes (foto-wege.ts). */}
-      <input
-        ref={rettungRef}
-        type="file"
-        accept="image/*,application/octet-stream"
-        multiple={multiple}
-        className="hidden"
-        onClick={vorAuswahl}
-        onChange={(e) => auswahl(e, 'rettung')}
       />
 
       {menueOffen && (
@@ -201,11 +276,11 @@ export function useFotoQuellen({
             <p className="px-4 pt-1 pb-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               Foto auswählen
             </p>
-            <button type="button" autoFocus className={EINTRAG} onClick={() => waehle(standardRef)}>
+            <button type="button" autoFocus className={EINTRAG} onClick={fotoWaehlen}>
               <ImageIcon className="size-4 text-muted-foreground" aria-hidden="true" />
               Foto wählen
             </button>
-            <button type="button" className={EINTRAG} onClick={() => waehle(kameraRef)}>
+            <button type="button" className={EINTRAG} onClick={() => waehle({ weg: 'kamera', wahl: 'standard' })}>
               <Camera className="size-4 text-muted-foreground" aria-hidden="true" />
               Foto aufnehmen
             </button>
@@ -221,13 +296,32 @@ export function useFotoQuellen({
           <button type="button" aria-label="Schließen" className="absolute inset-0 bg-black/40" onClick={() => setKarte(null)} />
           <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-card p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-4px_24px_rgba(0,0,0,0.15)]">
             <p className="px-4 pt-2 pb-3 text-sm leading-relaxed text-foreground">{karte.text}</p>
+            {/* Der Ausweg: der jeweils andere Auswahlweg (foto-wege.ts,
+                auswegFuer). Nicht bei HEIC: Auf Android bleibt das Foto auf
+                jedem Weg HEIC. Kam es über einen gemerkten Weg, ist der
+                vergessen (merkerNachErgebnis) — „Foto wählen" öffnet wieder
+                den Standard, auf dem iPhone die Galerie, die HEIC wandelt. */}
             {karte.grund !== 'heic' && (
-              <button type="button" autoFocus className={EINTRAG} onClick={() => waehle(rettungRef)}>
-                <FolderOpen className="size-4 text-muted-foreground" aria-hidden="true" />
-                Anders auswählen
+              <button
+                type="button"
+                autoFocus
+                className={EINTRAG}
+                onClick={() => waehle({ weg: karte.ausweg, wahl: 'ausweg' })}
+              >
+                {karte.ausweg === 'galerie' ? (
+                  <ImageIcon className="size-4 text-muted-foreground" aria-hidden="true" />
+                ) : (
+                  <FolderOpen className="size-4 text-muted-foreground" aria-hidden="true" />
+                )}
+                {AUSWEG_KNOPF[karte.ausweg]}
               </button>
             )}
-            <button type="button" autoFocus={karte.grund === 'heic'} className={EINTRAG} onClick={() => waehle(kameraRef)}>
+            <button
+              type="button"
+              autoFocus={karte.grund === 'heic'}
+              className={EINTRAG}
+              onClick={() => waehle({ weg: 'kamera', wahl: 'ausweg' })}
+            >
               <Camera className="size-4 text-muted-foreground" aria-hidden="true" />
               Foto aufnehmen
             </button>
@@ -257,5 +351,5 @@ export function useFotoQuellen({
     </>
   )
 
-  return { oeffnen, elemente, zeigeKarte }
+  return { oeffnen, elemente, zeigeKarte, meldeErgebnis }
 }

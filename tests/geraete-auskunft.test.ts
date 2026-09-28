@@ -50,6 +50,18 @@ describe('geraeteAuskunft', () => {
     expect(geraeteAuskunft()).toEqual({ android: true, version: null })
   })
 
+  it('userAgentData.platform zählt sofort, ohne auf die Hints zu warten — sie entscheidet den ersten Foto-Weg', async () => {
+    // Ein User-Agent ohne „Android" (etwa „Desktop-Ansicht"), aber die Plattform sagt es.
+    const getHighEntropyValues = vi.fn(() => new Promise<{ platformVersion?: string }>(() => {}))
+    vi.stubGlobal('navigator', {
+      userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/153.0.0.0 Safari/537.36',
+      userAgentData: { platform: 'Android', getHighEntropyValues },
+    })
+    const { geraeteAuskunft } = await frisch()
+
+    expect(geraeteAuskunft()).toEqual({ android: true, version: null })
+  })
+
   it('die Client Hints bringen die echte Version — und die Meldung trägt sie', async () => {
     const getHighEntropyValues = vi.fn(async () => ({ platformVersion: '14.0.0' }))
     vi.stubGlobal('navigator', { userAgent: EINHEITS_UA, userAgentData: { platform: 'Android', getHighEntropyValues } })
@@ -61,7 +73,7 @@ describe('geraeteAuskunft', () => {
     await abwarten()
     expect(geraeteAuskunft()).toEqual({ android: true, version: 14 })
 
-    meldeUploadFehler(new Error('x'), { datei: { size: 1, type: 'image/jpeg' }, weg: 'standard', versuche: 0 })
+    meldeUploadFehler(new Error('x'), { datei: { size: 1, type: 'image/jpeg' }, weg: 'dateien', versuche: 0 })
     expect(Sentry.captureException).toHaveBeenLastCalledWith(
       expect.any(Error),
       expect.objectContaining({ contexts: expect.objectContaining({ upload: expect.objectContaining({ androidVersion: 14 }) }) })

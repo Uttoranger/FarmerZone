@@ -353,7 +353,7 @@ describe('Upload-Meldung', () => {
     const meldung = baueUploadMeldung({
       ursache: 'netz',
       datei: { size: 1_000, type: 'image/jpeg' },
-      weg: 'standard',
+      weg: 'galerie',
       versuche: 2,
       diagnose: {
         schritt: 'uebertragung',
@@ -397,7 +397,7 @@ describe('Upload-Meldung', () => {
 
     meldeUploadFehler(fehler, {
       datei: { size: 1, type: 'image/png' },
-      weg: 'rettung',
+      weg: 'dateien',
       versuche: 1,
       diagnose: {
         schritt: 'uebertragung',
@@ -441,7 +441,7 @@ describe('Upload-Meldung', () => {
     const meldung = baueUploadMeldung({
       ursache: 'lesen',
       datei: { size: 10, type: '' },
-      weg: 'standard',
+      weg: 'galerie',
       versuche: 0,
     })
     expect(meldung.contexts.upload.dateiTyp).toBe('unbekannt')
@@ -454,7 +454,7 @@ describe('Upload-Meldung', () => {
     })
 
     expect(() =>
-      meldeUploadFehler(new Error('x'), { datei: { size: 1, type: '' }, weg: 'standard', versuche: 1 })
+      meldeUploadFehler(new Error('x'), { datei: { size: 1, type: '' }, weg: 'galerie', versuche: 1 })
     ).not.toThrow()
   })
 })

@@ -6,8 +6,8 @@
  * Beweist:
  *  - Netz 1: Ein zweiter Leseversuch nur nach der sofortigen Ablehnung.
  *  - Ein Bild wird an den ersten Bytes erkannt (JPEG, PNG, WebP, HEIC), nie am
- *    MIME-Typ; HEIC führt nie zum Upload, Unbekanntes ist nur auf dem
- *    Rettungsweg „kein Foto".
+ *    MIME-Typ; HEIC führt nie zum Upload, Unbekanntes ist nur über die
+ *    Dateien-App „kein Foto".
  *  - Karte oder Meldung: Foto und Weg bekommen die Karte, Übertragung und
  *    Server die Meldung.
  *  - Dieselbe Datei (Größe und Typ) wird erkannt.
@@ -15,7 +15,7 @@
  *    als Anleitung, sonst als Installationshinweis.
  *  - Die Android-Version kommt aus den Client Hints; „Android 10; K" im
  *    User-Agent gilt als unbekannt.
- *  - Am Quelltext: zwei Knöpfe, die Rettung verborgen, keine dritte Wahl.
+ *  - Am Quelltext: zwei Knöpfe, drei verborgene Eingaben, der Ausweg auf der Karte.
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -26,6 +26,7 @@ import {
   bildFormat,
   formatUrteil,
   gleicheDatei,
+  merkeFehlschlag,
   naechsterSchritt,
   serienAbschluss,
   sofortKarte,
@@ -92,21 +93,21 @@ describe('bildFormat — an den ersten Bytes', () => {
 
 describe('formatUrteil — was das Format je Weg bedeutet', () => {
   it('HEIC wird auf keinem Weg hochgeladen', () => {
-    for (const weg of ['standard', 'kamera', 'rettung', 'teilen'] as const) {
+    for (const weg of ['galerie', 'kamera', 'dateien', 'teilen'] as const) {
       expect(formatUrteil('heic', weg), weg).toBe('heic')
     }
   })
 
-  it('Unbekanntes ist nur auf dem Rettungsweg „kein Foto" — sonst entscheidet der Server', () => {
-    expect(formatUrteil(null, 'rettung')).toBe('kein-foto')
-    expect(formatUrteil(null, 'standard')).toBe('ok')
+  it('Unbekanntes ist nur über die Dateien-App „kein Foto" — sonst entscheidet der Server', () => {
+    expect(formatUrteil(null, 'dateien')).toBe('kein-foto')
+    expect(formatUrteil(null, 'galerie')).toBe('ok')
     expect(formatUrteil(null, 'kamera')).toBe('ok')
     expect(formatUrteil(null, 'teilen')).toBe('ok')
   })
 
   it('die drei Bildformate gehen überall durch', () => {
-    expect(formatUrteil('jpeg', 'rettung')).toBe('ok')
-    expect(formatUrteil('png', 'standard')).toBe('ok')
+    expect(formatUrteil('jpeg', 'dateien')).toBe('ok')
+    expect(formatUrteil('png', 'galerie')).toBe('ok')
     expect(formatUrteil('webp', 'kamera')).toBe('ok')
   })
 })
@@ -146,17 +147,40 @@ describe('sofortKarte und zuMerken — dieselbe Datei nach einem Fehler', () => 
     expect(zuMerken('kein-foto', [A])).toEqual([])
   })
 
+  const dateienStandard = { weg: 'dateien' as const, wahl: 'standard' as const }
+  const aufDateien = (...dateien: { size: number; type: string }[]) => ({ wege: ['dateien' as const], dateien })
+
   it('sofort die Karte nur über „Foto wählen", genau eine Datei, und nur eine gemerkte', () => {
-    expect(sofortKarte('standard', [A], [A])).toBe(true)
-    expect(sofortKarte('standard', [A], [B, A])).toBe(true)
-    expect(sofortKarte('standard', [B], [A])).toBe(false)
-    expect(sofortKarte('standard', [A, B], [A])).toBe(false)
-    expect(sofortKarte('standard', [A], [])).toBe(false)
+    expect(sofortKarte(dateienStandard, [A], aufDateien(A))).toBe(true)
+    expect(sofortKarte(dateienStandard, [A], aufDateien(B, A))).toBe(true)
+    expect(sofortKarte({ weg: 'galerie', wahl: 'gemerkt' }, [A], { wege: ['galerie'], dateien: [A] })).toBe(true)
+    expect(sofortKarte(dateienStandard, [B], aufDateien(A))).toBe(false)
+    expect(sofortKarte(dateienStandard, [A, B], aufDateien(A))).toBe(false)
+    expect(sofortKarte(dateienStandard, [A], aufDateien())).toBe(false)
   })
 
-  it('Rettung und Kamera versuchen es immer — das ist der Ausweg', () => {
-    expect(sofortKarte('rettung', [A], [A])).toBe(false)
-    expect(sofortKarte('kamera', [A], [A])).toBe(false)
+  it('nur auf einem Weg, auf dem die Datei schon scheiterte — ein neuer Weg bekommt seinen Versuch', () => {
+    // Der gemerkte Weg (Galerie) scheiterte und ist vergessen; jetzt öffnet der Standard.
+    expect(sofortKarte(dateienStandard, [A], { wege: ['galerie'], dateien: [A] })).toBe(false)
+  })
+
+  it('Ausweg und Kamera versuchen es immer — das ist der Ausweg', () => {
+    expect(sofortKarte({ weg: 'dateien', wahl: 'ausweg' }, [A], aufDateien(A))).toBe(false)
+    expect(sofortKarte({ weg: 'kamera', wahl: 'standard' }, [A], { wege: ['kamera'], dateien: [A] })).toBe(false)
+  })
+
+  it('merkeFehlschlag sammelt die Wege derselben Datei — scheitert auch der Ausweg, bleibt der Standard gesperrt', () => {
+    const nachStandard = merkeFehlschlag(null, 'dateien', [A])
+    expect(nachStandard).toEqual({ wege: ['dateien'], dateien: [A] })
+
+    const nachAusweg = merkeFehlschlag(nachStandard, 'galerie', [A])
+    expect(nachAusweg).toEqual({ wege: ['dateien', 'galerie'], dateien: [A] })
+    // Dieselbe Datei wieder über „Foto wählen" (Standard): sofort die Karte, nicht 30 s warten.
+    expect(sofortKarte(dateienStandard, [A], nachAusweg)).toBe(true)
+
+    // Derselbe Weg kommt nicht doppelt hinein; eine andere Datei beginnt neu.
+    expect(merkeFehlschlag(nachAusweg, 'galerie', [A]).wege).toEqual(['dateien', 'galerie'])
+    expect(merkeFehlschlag(nachAusweg, 'galerie', [B])).toEqual({ wege: ['galerie'], dateien: [B] })
   })
 })
 
@@ -249,21 +273,24 @@ describe('androidAuskunft — welches Android wirklich', () => {
   })
 })
 
-describe('am Quelltext: zwei Knöpfe, die Rettung verborgen', () => {
+describe('am Quelltext: zwei Knöpfe, drei verborgene Eingaben', () => {
   const quelle = readFileSync(join(process.cwd(), 'src/components/shared/foto-quellen.tsx'), 'utf8')
 
-  it('„Foto wählen" nimmt image/* ohne capture, „Foto aufnehmen" die Kamera', () => {
+  it('Galerie mit image/* ohne capture, Dateien-App mit breitem accept, Kamera mit capture', () => {
     expect(quelle).toContain('Foto wählen')
     expect(quelle).toContain('Foto aufnehmen')
-    expect(quelle).toMatch(/accept="image\/\*"\s+multiple=\{multiple\}/)
+    expect(quelle).toMatch(/ref=\{galerieRef\}\s+type="file"\s+accept="image\/\*"\s+multiple=\{multiple\}/)
+    expect(quelle).toMatch(/ref=\{dateienRef\}\s+type="file"\s+accept="image\/\*,application\/octet-stream"/)
     expect(quelle).toMatch(/accept="image\/\*"\s+capture="environment"/)
   })
 
-  it('die Rettung hat das breite accept und kein sichtbares Menü mehr', () => {
-    expect(quelle).toContain('accept="image/*,application/octet-stream"')
+  it('„Foto wählen" fragt ersterWeg, der Ausweg der Karte auswegFuer — kein eigenes Menü je Weg', () => {
+    expect(quelle).toContain('ersterWeg({')
+    expect(quelle).toContain('auswegFuer(')
     expect(quelle).not.toContain('Aus Dateien')
-    expect(quelle).not.toContain('Aus der Galerie')
-    expect(quelle).toContain('Anders auswählen')
+    // Der Knopf heißt nach dem Weg, den er öffnet.
+    expect(quelle).toContain("galerie: 'Aus der Galerie'")
+    expect(quelle).toContain("dateien: 'Anders auswählen'")
   })
 
   it('die Karte kennt das Teilen und den Installationshinweis', () => {
@@ -274,10 +301,21 @@ describe('am Quelltext: zwei Knöpfe, die Rettung verborgen', () => {
 
   it('der Produktdialog prüft bei der Auswahl, sperrt das Speichern derweil und setzt den Weg erst danach', () => {
     const dialog = readFileSync(join(process.cwd(), 'src/components/products/product-dialog.tsx'), 'utf8')
-    expect(dialog).toContain('await pruefeLesbarkeit(file, {')
+    expect(dialog).toContain('kopie = await pruefeLesbarkeit(file, {')
     expect(dialog).toMatch(/type="submit" disabled=\{isSubmitting \|\| pruefeFoto\}/)
-    // Der Weg wird der angenommenen Datei zugeordnet — nach der Prüfung, nicht in onFiles.
-    expect(dialog.indexOf('gewaehlterWeg.current = weg')).toBeGreaterThan(dialog.indexOf('await pruefeLesbarkeit(file, {'))
-    expect(dialog.match(/gewaehlterWeg\.current = weg/g)).toHaveLength(1)
+    // Die Auswahl wird der angenommenen Datei zugeordnet — nach der Prüfung, nicht in onFiles.
+    expect(dialog.indexOf('gewaehlteAuswahl.current = auswahl')).toBeGreaterThan(
+      dialog.indexOf('kopie = await pruefeLesbarkeit(file, {')
+    )
+    expect(dialog.match(/gewaehlteAuswahl\.current = auswahl/g)).toHaveLength(1)
+  })
+
+  it('der Produktdialog übernimmt die Kopie und lädt beim Absenden genau sie hoch', () => {
+    const dialog = readFileSync(join(process.cwd(), 'src/components/products/product-dialog.tsx'), 'utf8')
+    expect(dialog).toContain('uebernehmeFoto(kopie)')
+    expect(dialog).not.toContain('uebernehmeFoto(file)')
+    expect(dialog).toContain('bereitsKopiert: true')
+    // Beim Schließen — mit oder ohne Speichern — wird die Kopie freigegeben.
+    expect(dialog).toMatch(/\} else \{[^}]*pruefungNr\.current\+\+\s+gibKopieFrei\(\)\s+\}\s+\}, \[open, product\?\.id\]\)/)
   })
 })

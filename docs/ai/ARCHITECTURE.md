@@ -142,6 +142,7 @@ Client-Komponente → Server Action → Zod → Fachregel (lib) → Prisma → r
 | Filter/Suche in URL | `useSearchParams` lesen, Zod-Schema in `src/schemas/` parst und verwirft Ungültiges still; schreiben mit `window.history.replaceState` (Next gleicht `useSearchParams` ab, kein Server-Roundtrip je Tipp) oder `router.replace`, wenn der Server neu rendern soll | Nicht nur im State — Ergebnisse müssen teilbar sein. **Nie** Standort/Koordinaten in die URL |
 | Auftrag in der URL (Dialog öffnen) | `?neu=1` / `?edit=<id>` über `useUrlAuftrag` (`src/lib/use-url-auftrag.ts`): liest `useSearchParams` (Zod: `src/schemas/url-auftrag.ts`), führt den Auftrag einmal aus und nimmt ihn per `replaceState` aus der Adresse | Nicht die `searchParams` der Seite als Startwert — ein zweiter Auftrag auf derselben Seite (Plus bei offenem `/products`) käme nie an. Nie einen Dialog nur für die URL bauen: der vorhandene öffnet |
 | Theme | `next-themes`, `ThemeProvider` in `src/app/layout.tsx` (`attribute="class"`, `defaultTheme="system"`) | Kein eigener Provider, keine Spalte in der Datenbank — die Wahl gehört dem Gerät |
+| Gemerkter Foto-Weg | localStorage, nur über `src/lib/foto-weg-speicher.ts` (ein Schlüssel, Zod: `src/schemas/foto-weg.ts`, nichts wirft); ob gesetzt oder gelöscht wird, entscheidet `merkerNachErgebnis` in `src/lib/foto-wege.ts` | Kein zweiter Zugriff auf den Schlüssel, keine Spalte in der Datenbank — der Weg gehört dem Gerät |
 
 **Kein globaler Store.** Wenn etwas global wirkt, gehört es meist in die URL oder auf den Server.
 

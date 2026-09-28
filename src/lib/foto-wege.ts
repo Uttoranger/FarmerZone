@@ -12,28 +12,143 @@
  *           bei der sofortigen Ablehnung (Urteil 'erlaubnis'), denn nur dort
  *           kann eine Freigabe zurückkommen. Wer 8 Sekunden stumm blieb,
  *           bleibt es auch nach 1,5 weiteren.
- *   Netz 2  Eine Karte statt einer Meldung: „Anders auswählen" öffnet eine
- *           Eingabe mit breitem accept, damit Android die Dateien-App zeigt
- *           (dort holt Google Fotos ein Cloud-Bild beim Öffnen herunter).
+ *   Netz 2  Eine Karte statt einer Meldung, mit dem Ausweg: dem jeweils
+ *           anderen Auswahlweg (Galerie ↔ Dateien-App).
  *   Netz 3  Teilen aus der Galerie an die installierte App.
  *
+ * Seit JAVASCRIPT-NEXTJS-6 ist die Reihenfolge auf Android umgedreht: Auf dem
+ * Handy des Pilotbauern gibt der Galerie-Weg dasselbe Foto nicht verlässlich
+ * heraus — mal scheitert schon das Lesen, mal erst das stückweise Lesen
+ * während der Übertragung („network error"). Über die Dateien-App lädt es im
+ * selben Chrome ohne Fehler. Android öffnet deshalb zuerst die Dateien-App,
+ * die Galerie ist dort der Ausweg; iPhone und Desktop bleiben bei der Galerie.
+ * Braucht ein Gerät den Ausweg und klappt er, merkt es sich den Weg.
+ *
  * Alles, was hier entscheidet, bekommt seine Eingaben hereingereicht — der
- * User-Agent, die Bytes, das Urteil der Lese-Stufe. Die Komponenten
- * (foto-quellen.tsx, image-upload.tsx) führen nur aus.
+ * User-Agent, die Bytes, das Urteil der Lese-Stufe, der gemerkte Weg. Die
+ * Komponenten (foto-quellen.tsx, image-upload.tsx) führen nur aus.
  */
+import type { z } from 'zod'
 import type { UploadZweck } from '@/lib/upload-pfade'
 import type { BildFehlerArt, LeseUrteil } from '@/lib/upload-fehler'
+import type { fotoWegSchema } from '@/schemas/foto-weg'
 
 /**
  * Über welchen Weg eine Datei kam.
- *   standard  „Foto wählen": accept="image/*", ohne capture — Android zeigt
- *             die Systemfotoauswahl, ab Android 12 mit Cloud-Fotos, die sie
- *             selbst lädt.
- *   kamera    „Foto aufnehmen": capture="environment".
- *   rettung   „Anders auswählen" auf der Karte: breites accept, Dateien-App.
- *   teilen    Teilen aus der Galerie an die installierte App (/teilen).
+ *   galerie  accept="image/*", ohne capture — Android zeigt die
+ *            Systemfotoauswahl, das iPhone die Mediathek (samt iCloud-Abruf).
+ *   dateien  breites accept — Android zeigt die Dateien-App, in der Google
+ *            Fotos ein Cloud-Bild beim Öffnen herunterlädt.
+ *   kamera   „Foto aufnehmen": capture="environment".
+ *   teilen   Teilen aus der Galerie an die installierte App (/teilen).
+ *
+ * Bis #138 hießen galerie und dateien in Sentry 'standard' und 'rettung'.
  */
-export type FotoWeg = 'standard' | 'kamera' | 'rettung' | 'teilen'
+export type FotoWeg = 'galerie' | 'dateien' | 'kamera' | 'teilen'
+
+/** Die zwei Wege hinter „Foto wählen" — nur zwischen ihnen wird gewählt und gemerkt. Aus dem Schema des Speichers. */
+export type AuswahlWeg = z.infer<typeof fotoWegSchema>
+
+/**
+ * Warum dieser Weg genommen wurde — für Sentry und für den Merker.
+ *   standard  der erste Weg des Geräts (ersterWeg ohne Merker)
+ *   ausweg    der Knopf auf der Karte nach einem gescheiterten Foto
+ *   gemerkt   der Weg, den sich das Gerät nach einem geglückten Ausweg gemerkt hat
+ */
+export type WegWahl = 'standard' | 'ausweg' | 'gemerkt'
+
+// ─── Welcher Weg zuerst ─────────────────────────────────────────────────────
+
+/** Der erste Weg eines Geräts ohne Merker: Android die Dateien-App, alle anderen die Galerie. */
+export function standardWeg(android: boolean): AuswahlWeg {
+  return android ? 'dateien' : 'galerie'
+}
+
+/**
+ * Was „Foto wählen" öffnet. Ein gemerkter Weg sticht den Standard — er ist
+ * auf genau diesem Gerät schon einmal gelungen, wo der Standard scheiterte.
+ */
+export function ersterWeg(eingabe: { android: boolean; gemerkt: AuswahlWeg | null }): {
+  weg: AuswahlWeg
+  wahl: WegWahl
+} {
+  if (eingabe.gemerkt) return { weg: eingabe.gemerkt, wahl: 'gemerkt' }
+  return { weg: standardWeg(eingabe.android), wahl: 'standard' }
+}
+
+/**
+ * Der Ausweg auf der Karte: der jeweils andere Auswahlweg. Scheiterte die
+ * Kamera oder das Teilen, gibt es keinen „anderen" — dann der Weg, den
+ * „Foto wählen" auf diesem Gerät gerade öffnet (`gewohnt`).
+ */
+export function auswegFuer(weg: FotoWeg, gewohnt: AuswahlWeg): AuswahlWeg {
+  if (weg === 'dateien') return 'galerie'
+  if (weg === 'galerie') return 'dateien'
+  return gewohnt
+}
+
+export type MerkerAenderung = { art: 'setzen'; weg: AuswahlWeg } | { art: 'loeschen' }
+
+/**
+ * Was ein Foto über seinen Weg sagt.
+ *   gelesen    Die Lese-Stufe bekam die Datei samt Kopie, und sie taugt als
+ *              Foto. Ein späterer Netz- oder Serverfehler ändert daran nichts.
+ *   unlesbar   Die Datei kam nicht heraus — der Weg hat versagt.
+ *   heic       Die Datei kam heraus, aber als HEIC. Das iPhone wandelt HEIC
+ *              nur über die Galerie in JPEG; über die Dateien-App kommt es roh.
+ *   kein-foto  Über die Dateien-App wurde etwas gewählt, das kein Foto ist —
+ *              das sagt nichts über den Weg.
+ */
+export type LeseAusgang = 'gelesen' | 'unlesbar' | 'heic' | 'kein-foto'
+
+/**
+ * Der Ausgang eines Fotos aus der Fehlerart seines Uploads — null (kein
+ * BildFehler, etwa ein Netzabbruch) heißt: gelesen. Eine Datei, die nie
+ * gelesen wurde (zu groß), gehört nicht hierher.
+ */
+export function leseAusgangVon(art: BildFehlerArt | null): LeseAusgang {
+  if (art === 'lesen') return 'unlesbar'
+  if (art === 'heic' || art === 'kein-foto') return art
+  return 'gelesen'
+}
+
+/**
+ * Der Ausgang einer Serie für den Merker: Ein einziges gelesenes Foto
+ * genügt, damit der Weg als geglückt gilt; sonst zählt das Scheitern.
+ */
+export function serienAusgang(ausgaenge: readonly LeseAusgang[]): LeseAusgang | null {
+  for (const ausgang of ['gelesen', 'unlesbar', 'heic', 'kein-foto'] as const) {
+    if (ausgaenge.includes(ausgang)) return ausgang
+  }
+  return null
+}
+
+/**
+ * Was nach einem Foto mit dem gemerkten Weg geschieht.
+ *
+ *   Ausweg gelesen, anderer Weg als der Standard → merken.
+ *   Ausweg gelesen, aber das IST der Standard   → Merker weg, er wäre überflüssig.
+ *   Gemerkter Weg unlesbar oder HEIC            → Merker weg, der Standard ist wieder dran.
+ *   Alles andere                                 → nichts ändern.
+ *
+ * HEIC über den gemerkten Weg zählt als Scheitern: Hat sich ein iPhone die
+ * Dateien-App gemerkt, kommt jedes HEIC-Foto dort roh an, und die HEIC-Karte
+ * bietet keinen anderen Weg an — ohne Löschen bliebe das Gerät dort hängen.
+ * Ein Ausweg, der HEIC oder „kein Foto" brachte, hat dagegen nicht geklappt
+ * und wird nicht gemerkt. Die Kamera ist kein Auswahlweg und wird nie gemerkt.
+ */
+export function merkerNachErgebnis(eingabe: {
+  weg: FotoWeg
+  wahl: WegWahl
+  ausgang: LeseAusgang
+  standard: AuswahlWeg
+}): MerkerAenderung | null {
+  const { weg, wahl, ausgang, standard } = eingabe
+  if (weg !== 'galerie' && weg !== 'dateien') return null
+  if (wahl === 'ausweg' && ausgang === 'gelesen') return weg === standard ? { art: 'loeschen' } : { art: 'setzen', weg }
+  if (wahl === 'gemerkt' && (ausgang === 'unlesbar' || ausgang === 'heic')) return { art: 'loeschen' }
+  return null
+}
 
 // ─── Netz 1: der zweite Leseversuch ─────────────────────────────────────────
 
@@ -41,7 +156,7 @@ export type FotoWeg = 'standard' | 'kamera' | 'rettung' | 'teilen'
  * Lohnt nach diesem Urteil ein zweiter Leseversuch derselben Datei? Nur bei
  * der sofortigen Ablehnung: Dort war die Datei da, nur die Freigabe fehlte —
  * und die kann nach einer Pause wieder da sein. Die stumme Quelle ('cloud')
- * hat schon 28 Sekunden gewartet; Unbestimmtes verdient kein Raten.
+ * hat schon bis zu 28 Sekunden gewartet; Unbestimmtes verdient kein Raten.
  */
 export function zweiterLeseversuch(urteil: LeseUrteil): boolean {
   return urteil === 'erlaubnis'
@@ -111,14 +226,14 @@ export function bildFormat(bytes: ArrayLike<number>): BildFormat | null {
  * Was das erkannte Format bedeutet, je nach Weg.
  *   heic       Nie hochladen — der Server kann es nicht (sharp ohne HEIF), und
  *              8 MB für eine sichere Ablehnung wären Verschwendung.
- *   kein-foto  Nur auf dem Rettungsweg: Dort sind auch Nicht-Bilder wählbar.
+ *   kein-foto  Nur über die Dateien-App: Dort sind auch Nicht-Bilder wählbar.
  *              Auf den anderen Wegen bleibt Unbekanntes wie bisher dem Server
  *              überlassen — er kennt mehr Formate als diese vier.
  *   ok         Weiter zum Upload.
  */
 export function formatUrteil(format: BildFormat | null, weg: FotoWeg): 'ok' | 'heic' | 'kein-foto' {
   if (format === 'heic') return 'heic'
-  if (format === null && weg === 'rettung') return 'kein-foto'
+  if (format === null && weg === 'dateien') return 'kein-foto'
   return 'ok'
 }
 
@@ -150,13 +265,45 @@ export function gleicheDatei(a: { size: number; type: string }, b: { size: numbe
 
 export type Fehlschlag = { size: number; type: string }
 
+/** Die unlesbaren Dateien und die Wege, auf denen sie schon scheiterten. */
+export type FehlschlagMerker = { wege: FotoWeg[]; dateien: Fehlschlag[] }
+
+/**
+ * Einen Fehlschlag merken. Scheitern dieselben Dateien auf einem weiteren
+ * Weg (erst der Standard, dann der Ausweg), kommt der Weg dazu — sonst
+ * beginnt der Merker neu. So bekommt dieselbe Datei auf KEINEM der schon
+ * gescheiterten Wege einen neuen vollen Versuch.
+ */
+export function merkeFehlschlag(
+  alt: FehlschlagMerker | null,
+  weg: FotoWeg,
+  dateien: readonly Fehlschlag[]
+): FehlschlagMerker {
+  const dieselben = alt !== null && dateien.every((d) => alt.dateien.some((a) => gleicheDatei(a, d)))
+  if (!dieselben) return { wege: [weg], dateien: dateien.map(({ size, type }) => ({ size, type })) }
+  return { wege: alt.wege.includes(weg) ? alt.wege : [...alt.wege, weg], dateien: alt.dateien }
+}
+
 /**
  * Nach einer Auswahl: sofort die Karte, ohne Versuch — wenn genau eine
- * Datei über „Foto wählen" kam und einem gemerkten Fehlschlag gleicht. Über
- * die Rettung oder die Kamera wird immer versucht: Das ist ja der Ausweg.
+ * Datei über „Foto wählen" kam und einem Fehlschlag gleicht, der auf
+ * DEMSELBEN Weg schon scheiterte. Über den Ausweg oder die Kamera wird immer
+ * versucht: Das ist ja der Ausweg. Und öffnet „Foto wählen" inzwischen einen
+ * Weg, auf dem die Datei noch nicht scheiterte (der gemerkte ist gelöscht),
+ * verdient dieser seinen eigenen Versuch.
  */
-export function sofortKarte(weg: FotoWeg, dateien: readonly Fehlschlag[], gemerkt: readonly Fehlschlag[]): boolean {
-  return weg === 'standard' && dateien.length === 1 && gemerkt.some((g) => gleicheDatei(dateien[0], g))
+export function sofortKarte(
+  auswahl: { weg: FotoWeg; wahl: WegWahl },
+  dateien: readonly Fehlschlag[],
+  gemerkt: FehlschlagMerker
+): boolean {
+  const ueberFotoWaehlen = (auswahl.weg === 'galerie' || auswahl.weg === 'dateien') && auswahl.wahl !== 'ausweg'
+  return (
+    ueberFotoWaehlen &&
+    gemerkt.wege.includes(auswahl.weg) &&
+    dateien.length === 1 &&
+    gemerkt.dateien.some((g) => gleicheDatei(dateien[0], g))
+  )
 }
 
 /**
@@ -172,8 +319,8 @@ export type SerienFall = { grund: KartenGrund; urteil: LeseUrteil }
 
 /**
  * Das Ende einer Serie (mehrere Fotos): Die lesbaren sind durch, für die
- * anderen kommt die Karte — unlesbare zuerst, weil dort „Anders auswählen"
- * hilft; sonst der erste Grund. Die Sammelmeldung entfällt nur, wenn die
+ * anderen kommt die Karte — unlesbare zuerst, weil dort der Ausweg hilft;
+ * sonst der erste Grund. Die Sammelmeldung entfällt nur, wenn die
  * Karte wirklich alles sagt: nichts hochgeladen, nichts aus anderem Grund
  * übersprungen, alle Fälle mit demselben Grund.
  */

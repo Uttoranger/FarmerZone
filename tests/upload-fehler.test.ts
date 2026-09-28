@@ -246,13 +246,13 @@ describe('Ablehnung durch den Bildspeicher — eigener Text, keine Foto-Ursache'
 })
 
 describe('Diagnose-Kennung', () => {
-  it("steht auf '138' — dem letzten Sprint, der das Upload-Verhalten änderte", () => {
+  it("steht auf '139' — dem letzten Sprint, der das Upload-Verhalten änderte", () => {
     // Mit LITERAL festgenagelt (Lehre aus #69): Alle übrigen Kennungs-Tests
     // prüfen über die Konstante selbst und blieben bei jedem Wert grün —
     // genau so konnte '64' drei Verhaltensänderungen lang stehenbleiben.
     // Die Zähl-Regel: bei JEDER Verhaltensänderung am Upload-Ablauf auf die
     // Sprint-Nummer heben (upload-fehler.ts, DEVELOPMENT.md „Upload-Diagnose").
-    expect(UPLOAD_DIAG).toBe('138')
+    expect(UPLOAD_DIAG).toBe('139')
   })
 
   it('hängt an jede Meldung ein eigenes Kürzel mit dem Code-Stand', () => {

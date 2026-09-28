@@ -24,7 +24,7 @@
 //            Ohne Fachwort für den Bauern — er soll die Kamera umstellen oder
 //            neu fotografieren.
 //
-//   kein-foto  Über „Anders auswählen" (Dateien-App) kam etwas, das an den
+//   kein-foto  Über die Dateien-App (breites accept) kam etwas, das an den
 //            ersten Bytes kein Bild ist. Nur auf diesem Weg möglich.
 //
 // Verbindungsabbrüche beim Senden sind BEWUSST keine vierte Ursache: Ein
@@ -67,7 +67,7 @@ export type BildFehlerArt = 'lesen' | 'format' | 'server' | 'heic' | 'kein-foto'
  * entfernt: Kennung hier löschen, die Meldungen enden dann wieder auf ihren
  * letzten Satz.
  */
-export const UPLOAD_DIAG = '138'
+export const UPLOAD_DIAG = '139'
 
 /** Hängt die Kennung an eine Meldung. Ein Ort, alle Meldungen. */
 function mitKennung(text: string, buchstabe: 'E' | 'L' | 'D' | 'F' | 'H' | 'K' | 'S' | 'B' | 'X'): string {
@@ -176,7 +176,8 @@ export const IMAGE_NOT_PHOTO_ERROR = mitKennung('Das ist kein Foto.', 'K')
 /**
  * Die Karte nach einem Lesefehler (Netz 2, foto-wege.ts) — EIN Satz für alle
  * drei Urteile, denn die Karte erklärt keine Ursache, sie zeigt die Wege:
- * „Anders auswählen", „Foto aufnehmen", Teilen. Der Buchstabe bleibt der des
+ * den Ausweg („Aus der Galerie" oder „Anders auswählen"), „Foto aufnehmen",
+ * Teilen. Der Buchstabe bleibt der des
  * Urteils, damit ein Bildschirmfoto der Karte weiter sagt, was war.
  */
 export function karteLesenText(urteil: LeseUrteil, anzahl = 1): string {

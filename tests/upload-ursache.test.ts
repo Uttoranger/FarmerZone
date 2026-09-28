@@ -247,7 +247,8 @@ describe('Übertragung — was Sentry erfährt', () => {
     await vi.advanceTimersByTimeAsync(10_000)
 
     expect((await ausgang)?.message).toBe(IMAGE_NETWORK_ERROR)
-    expect(lesen).toEqual({ probe: { ergebnis: 'ok', dauerMs: 0 } })
+    // Probe und Kopie gelangen — gescheitert ist erst das Senden der Kopie.
+    expect(lesen).toEqual({ probe: { ergebnis: 'ok', dauerMs: 0 }, kopie: { ergebnis: 'ok', dauerMs: 0 } })
   })
 
   it('hält je Anlauf Klasse, Nachricht und Dauer fest', async () => {

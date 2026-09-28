@@ -1064,8 +1064,9 @@ Beim Lesen der Daten beachten (Stand `@vercel/blob` 2.4.0): Das SDK wiederholt N
 - Bei `fehler` die `klasse` und die bereinigte `meldung`. `klasse` ist der Name des Fehlers, etwa `NotReadableError` oder `NotFoundError` — auch aus einer DOMException, die in älteren Safari-Ständen kein Error ist. Sieht der Name nicht wie ein Bezeichner aus, steht dort `unbekannt`.
 - `dauerMs`.
 - Seit #138 der zweite Leseversuch (`zweiterVersuch…`, dazu `zweiterVersuchGeholfen`), wenn es einen gab. Das Dateialter (`dateiAlterTage`, #133) ist wieder weg: Android setzt `lastModified` bei Galerie-Fotos auf den Auswahlzeitpunkt, die Zahl sagte nichts.
+- Seit #139 die Kopie (`kopie…`): das ganze Lesen nach gelungener Probe, dessen Bytes übertragen werden. Sie fehlt, wenn schon das Volllesen die Datei brachte — das ist dann die Kopie.
 
-Das alles steht in einem flachen Kontext `uploadLesen` (`probeErgebnis`, `probeKlasse`, `probeMeldung`, `probeDauerMs`, `voll…`, `zweiterVersuch…`). Die `voll…`-Felder fehlen, wenn die Probe gelang. Der Kontext geht bei jedem Upload-Fehler mit, auch wenn erst das Senden scheitert: Eine gescheiterte Probe vor einem Sendefehler ist dieselbe Spur. Im Kontext `upload` stehen dazu `weg` (`standard`, `kamera`, `rettung`, `teilen`) und `androidVersion` aus den Client Hints (`null` = kein Android oder unbekannt — der User-Agent nennt seit Chrome 110 für jedes Android „10").
+Das alles steht in einem flachen Kontext `uploadLesen` (`probeErgebnis`, `probeKlasse`, `probeMeldung`, `probeDauerMs`, `voll…`, `zweiterVersuch…`, `kopie…`). Die `voll…`-Felder fehlen, wenn die Probe gelang. Der Kontext geht bei jedem Upload-Fehler mit, auch wenn erst das Senden scheitert: Eine gescheiterte Probe vor einem Sendefehler ist dieselbe Spur. Im Kontext `upload` stehen dazu `weg` (`galerie`, `dateien`, `kamera`, `teilen` — bis #138 hießen die ersten beiden `standard` und `rettung`), seit #139 `wahl` (`standard`, `ausweg`, `gemerkt`; fehlt bei `/teilen`) und `androidVersion` aus den Client Hints (`null` = kein Android oder unbekannt — der User-Agent nennt seit Chrome 110 für jedes Android „10").
 
 Die Meldung an den Bauern war in #133 noch für alle Fälle dieselbe; seit #135 folgt sie dem Befund (siehe unten).
 
@@ -2226,6 +2227,77 @@ gezeigt wird (Serie-Kurzgrund, `/teilen`).
 - Der Test am Gerät steht aus (Checkliste im PR): Android 10 mit dem 16-mal gescheiterten
   Foto, Android 12+ mit einem reinen Google-Fotos-Bild, iPhone mit iCloud, Teilen aus der
   installierten App.
+
+---
+
+## Foto-Upload auf Android: Dateien-App zuerst, Kopie bei der Auswahl (2026-09-28)
+
+Fixes JAVASCRIPT-NEXTJS-6: dasselbe JPEG (rund 8 MB) über den Weg „Galerie", die 64-KB-Probe
+gelang nach 88 ms — und beide Übertragungs-Anläufe scheiterten nach 1,2 bzw. 0,5 s mit
+`TypeError: network error`. Am Handy des Pilotbauern scheitert dasselbe Foto über
+`accept="image/*"` jedes Mal (NotReadableError, auch -5), über die Dateien-App im selben
+Chrome nie.
+
+**Ursache:** Über den Galerie-Weg gibt Android auf diesem Gerät die Datei nicht verlässlich
+heraus. Das Blob-SDK liest das `File` erst während der Übertragung, Stück für Stück über
+`file.stream()` — reißt das Lesen dort ab, meldet der Browser es als „network error". Die
+Probe beweist nur, dass die ersten 64 KB herauskamen.
+
+**Android öffnet zuerst die Dateien-App** (`ersterWeg` in `src/lib/foto-wege.ts`, rein): Auf
+Android (`userAgentData.platform` — liegt sofort vor — oder „Android" im User-Agent) nutzt
+„Foto wählen" die Eingabe mit breitem `accept` aus #138, samt Byte-Prüfung und HEIC-Karte.
+Der Ausweg auf der Karte ist der jeweils andere Weg (`auswegFuer`): auf Android „Aus der
+Galerie" (`accept="image/*"`), auf iPhone und Desktop wie bisher „Anders auswählen" (Dateien).
+Die Wege heißen seither `galerie` und `dateien` statt `standard` und `rettung` — auch in
+Sentry.
+
+**Den Weg merken, nur für den umgekehrten Fall** (`merkerNachErgebnis`,
+`src/lib/foto-weg-speicher.ts`): Braucht ein Gerät den Ausweg und klappt er, merkt es sich
+diesen Weg im localStorage (Schlüssel `farmerzone_foto_weg`, gelesen mit Zod, nichts wirft)
+und „Foto wählen" öffnet künftig direkt ihn. Scheitert der gemerkte Weg, wird er gelöscht.
+„Klappt" heißt: Die Lese-Stufe hat die Datei samt Kopie bekommen, und sie taugt als Foto
+(`LeseAusgang` `gelesen`) — ein Netzabbruch oder ein Serverfehler danach sagt nichts gegen
+den Weg; ein Ausweg, der HEIC oder „kein Foto" brachte, hat nicht geklappt. „Scheitert" heißt
+unlesbar **oder HEIC**: Hat sich ein iPhone die Dateien-App gemerkt, kommt HEIC dort roh an
+(über die Galerie wandelt iOS es in der Regel in JPEG), und die HEIC-Karte bietet keinen
+anderen Weg an — ohne Löschen bliebe das Gerät dort hängen. In einer Serie genügt ein
+gelesenes Foto (`serienAusgang`). Führt der Ausweg zum Standard zurück, gibt es keinen
+Merker. Die Kamera wird nie gemerkt.
+
+Die sofortige Karte für dieselbe Datei (#138) gilt auf jedem Weg, auf dem diese Datei schon
+scheiterte (`merkeFehlschlag` sammelt die Wege): Scheitern Standard und Ausweg, gibt es über
+„Foto wählen" sofort die Karte statt eines neuen Versuchs von bis zu 30 Sekunden. Öffnet
+„Foto wählen" einen Weg, auf dem sie noch nicht scheiterte (der gemerkte ist gelöscht),
+bekommt der seinen Versuch. Kommt ein Foto durch, ist der Fehlschlag vergessen.
+
+**Die Kopie bei der Auswahl** (`pruefeLesbarkeit`): Nach bestandener Probe wird das ganze Foto
+einmal gelesen (Zeitwächter des Volllesens, 20 s) und als `File` im Speicher zurückgegeben;
+Formatprüfung und Übertragung nehmen nur noch die Kopie. Brachte schon das Volllesen die
+Datei, ist das die Kopie. Scheitert das Kopieren, ist es ein Lesefehler mit eigenem Befund
+(`kopie…` in Sentry), und Netz 1 gilt auch hier: Wurde die Kopie sofort abgelehnt (Urteil
+`erlaubnis` — genau das Muster von -6), wird nach der Pause noch einmal das Ganze gelesen; die
+Probe war ja schon durch. Auch eine Kopie, die trotz gelesener Bytes nicht entsteht (zu wenig
+Speicher), ist ein Lesefehler. Schlimmster Fall der Lese-Stufe damit knapp 32 statt 28
+Sekunden (sofortige Ablehnungen, Pause, Probe, Kopie). Mehrere Fotos laufen nacheinander, es
+liegt immer nur eine Kopie im Speicher; im Upload-Hook lebt sie nur in `ladeFotoHoch`. Der
+Produktdialog behält die Kopie von der Auswahl bis zum Absenden, lädt sie mit
+`bereitsKopiert` ohne neues Lesen hoch (Sentry bekommt dann die Lese-Diagnose der Auswahl)
+und gibt sie beim Schließen frei, mit oder ohne Speichern. Der Preis: bis zu 25 MB
+Arbeitsspeicher je Foto — im Hook für die Dauer eines Uploads, im Produktdialog von der
+Auswahl bis zum Schließen.
+
+**Sentry:** `weg` und `wahl` (`standard`, `ausweg`, `gemerkt`) im Kontext `upload`.
+Kennung `139`.
+
+**Offen:**
+- Der Test am Gerät steht aus (Checkliste im PR): das Problemfoto auf dem Pilot-Handy über
+  „Foto wählen" muss ohne Karte hochladen; ein iPhone-Foto aus iCloud.
+- Dass iOS HEIC über die Dateien-App roh und über die Galerie als JPEG liefert, ist am
+  Gerät nicht geprüft; der Merker wird nach HEIC über den gemerkten Weg deshalb vorsorglich
+  gelöscht.
+- Die Kopie wird nicht gegen `file.size` geprüft. Ein echter Browser liefert bei
+  `arrayBuffer()` die ganze Datei oder wirft (Chrome prüft den Datei-Schnappschuss); nur
+  Test-Attrappen ohne echte Bytes ergeben eine leere Kopie.
 
 ---
 
