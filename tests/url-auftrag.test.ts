@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { auftragsSchluessel, leseAuftrag, ohneAuftrag } from '@/lib/url-auftrag'
+import { auftragsSchluessel, auftragsSchritt, leseAuftrag, ohneAuftrag } from '@/lib/url-auftrag'
 
 const q = (suche: string) => new URLSearchParams(suche)
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
@@ -45,6 +45,34 @@ describe('leseAuftrag', () => {
   })
 })
 
+describe('auftragsSchritt — genau einmal, und wieder, wenn er neu kommt', () => {
+  /** Spielt eine Folge von Adressen durch, wie der Hook sie beim Rendern sieht. */
+  function folge(schluessel: (string | null)[]): boolean[] {
+    let erledigt: string | null = null
+    return schluessel.map((s) => {
+      const schritt = auftragsSchritt(s, erledigt)
+      erledigt = schritt.erledigt
+      return schritt.ausfuehren
+    })
+  }
+
+  it('Aufruf mit ?neu=1, erneutes Rendern, Parameter entfernt: einmal geöffnet', () => {
+    expect(folge(['neu', 'neu', null, null])).toEqual([true, false, false, false])
+  })
+
+  it('Plus bei schon offener Seite: der zweite Auftrag kommt an', () => {
+    expect(folge([null, 'neu', null, 'neu', null])).toEqual([false, true, false, true, false])
+  })
+
+  it('ein anderer Auftrag direkt danach wird ebenfalls ausgeführt', () => {
+    expect(folge(['neu', 'bearbeiten:a', 'bearbeiten:b'])).toEqual([true, true, true])
+  })
+
+  it('ohne Auftrag passiert nichts', () => {
+    expect(folge([null, null])).toEqual([false, false])
+  })
+})
+
 describe('ohneAuftrag — die Adresse nach dem Öffnen', () => {
   it('nimmt neu und edit heraus', () => {
     expect(ohneAuftrag('/sales', '?neu=1')).toBe('/sales')
@@ -73,6 +101,7 @@ describe('an den Seiten', () => {
   it('der Hook nimmt den Auftrag per replaceState aus der Adresse', () => {
     const hook = quelle('src/lib/use-url-auftrag.ts')
     expect(hook).toContain('useSearchParams()')
+    expect(hook).toContain('auftragsSchritt(schluessel, erledigt)')
     expect(hook).toMatch(/window\.history\.replaceState\(null, '', ohneAuftrag\(/)
   })
 })

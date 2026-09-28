@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Menu } from '@base-ui/react/menu'
@@ -177,12 +177,14 @@ function Abmelden({ handy, onClick }: { handy: boolean; onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
+      // Rot als Bedeutungsfarbe, ohne dark:-Gegenstück: Die Leiste ist in beiden
+      // Modi dunkelgrün, das helle Rot trägt auf ihr in beiden (CODING_STANDARDS §7).
       className={cn(
         'flex w-full items-center gap-3 rounded-xl px-3 text-sm transition-colors duration-[250ms] hover:bg-red-500/15',
-        handy ? 'min-h-[48px] py-2.5' : 'min-h-10 py-2 hover:text-red-300',
+        handy ? 'min-h-[48px] py-2.5 text-red-300' : 'min-h-10 py-2 hover:text-red-300',
         FOKUS
       )}
-      style={handy ? { color: '#FCA5A5' } : RUHIG}
+      style={handy ? undefined : RUHIG}
     >
       <LogOut className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} aria-hidden="true" />
       {ABMELDEN_LABEL}
@@ -220,6 +222,17 @@ export function FarmerNav({
     setLetzterPfad(pathname)
     setOffen(null)
   }
+
+  // Wird das Tablet bei offenem Blatt ins Querformat gedreht (ab md), gibt
+  // es Blatt und Leiste nicht mehr — der Schleier bliebe allein stehen.
+  useEffect(() => {
+    const breit = window.matchMedia('(min-width: 768px)')
+    const beiWechsel = () => {
+      if (breit.matches) setOffen(null)
+    }
+    breit.addEventListener('change', beiWechsel)
+    return () => breit.removeEventListener('change', beiWechsel)
+  }, [])
 
   async function handleLogout() {
     await signOut()
@@ -341,6 +354,8 @@ export function FarmerNav({
             return (
               <Sheet key="mehr" open={offen === 'mehr'} onOpenChange={wechsle('mehr')}>
                 <SheetTrigger
+                  // Die Seite liegt im Mehr-Blatt — dasselbe wie aria-current an den Leistenpunkten.
+                  aria-current={mehrAktiv(pathname) ? 'true' : undefined}
                   className={cn(
                     'flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 text-xs transition-colors duration-[250ms]',
                     FOKUS

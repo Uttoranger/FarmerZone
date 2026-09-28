@@ -141,9 +141,9 @@ export type HofFuerErsteSchritte = {
 }
 
 /**
- * Stammdaten und Zählwerte → Checklisten-Daten. Eine Stelle für Heute
- * (queries/heute.ts) und die alte Übersicht (queries/dashboard.ts), damit die
- * Bedingungen nicht auseinanderlaufen.
+ * Stammdaten und Zählwerte → Checklisten-Daten, für Heute (queries/heute.ts).
+ * getDashboardStats in queries/dashboard.ts hält noch eine eigene Kopie; sie
+ * ist seit Heute ungenutzt und fällt mit ihr.
  */
 export function ersteSchritteDaten(
   hof: HofFuerErsteSchritte | null,

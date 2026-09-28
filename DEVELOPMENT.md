@@ -2064,7 +2064,9 @@ anlegen", bleibt die Liste stehen — ein Startwert sähe diesen zweiten Auftrag
 
 Weggefallen: die vier Kennzahlen, die Aktionskacheln (macht jetzt das Plus), die
 WhatsApp-Karte und der Shop-Link (beides bietet der Balken oben mit Kopieren und Teilen),
-der Knopf „Produkt anlegen". Geblieben: „Erste Schritte" für neue Höfe.
+der Knopf „Produkt anlegen". Geblieben: „Erste Schritte" für neue Höfe. Grenze: Wer den
+Balken wegklickt, hat ihn bis zum nächsten Tag nicht — dann bietet Heute das Teilen
+nicht an.
 
 **Wiener Zeit.** Gruß, Datum, Tag und Woche rechnen in Wien, nicht in Serverzeit. Auf
 Vercel (UTC) stand der Hof zwischen Mitternacht und 2 Uhr früher noch im Gestern: Die
@@ -2086,6 +2088,8 @@ Ordner unter `(farmer)` (neu: `/customers`, `/farm-page`, `/status`, `/fehler-me
   `analytics.ts`. Die Zahl auf `/sales` kann deshalb nachts von der auf Heute abweichen.
 - Neues Formular „Verkauf eintragen" mit dem Betrag zuerst — eigener Sprint; das Plus
   öffnet bis dahin den vorhandenen Dialog.
+- „Hof teilen" als schmale Zeile auf Heute gibt es nicht, weil der Balken oben teilt.
+  Ist er für heute weggeklickt, fehlt das Teilen dort bis morgen.
 
 ---
 

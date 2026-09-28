@@ -134,6 +134,15 @@ describe('wochenfenster — Vorwoche bis zum selben Wochentag und zur selben Uhr
     expect(iso(vorwoche.bis)).toBe('2026-10-21T12:30:00.000Z')
   })
 
+  it('am 25-Stunden-Sonntag reicht die Vorwoche nicht in diese Woche hinein', () => {
+    // Sonntag 25.10.2026, 23:30 Winterzeit — der Tag hat 25 Stunden.
+    const { dieseWoche, vorwoche } = wochenfenster(new Date('2026-10-25T22:30:00Z'))
+    expect(iso(dieseWoche.von)).toBe('2026-10-18T22:00:00.000Z')
+    expect(iso(vorwoche.von)).toBe('2026-10-11T22:00:00.000Z')
+    expect(vorwoche.bis < dieseWoche.von).toBe(true)
+    expect(iso(vorwoche.bis)).toBe('2026-10-18T21:59:59.999Z')
+  })
+
   it('Montag 0:30 Wien: die Woche hat eben erst begonnen', () => {
     const { dieseWoche, vorwoche } = wochenfenster(new Date('2026-10-04T22:30:00Z'))
     expect(iso(dieseWoche.von)).toBe('2026-10-04T22:00:00.000Z')

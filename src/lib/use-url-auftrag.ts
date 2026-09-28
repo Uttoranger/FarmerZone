@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { auftragsSchluessel, leseAuftrag, ohneAuftrag, type UrlAuftrag } from '@/lib/url-auftrag'
+import { auftragsSchluessel, auftragsSchritt, leseAuftrag, ohneAuftrag, type UrlAuftrag } from '@/lib/url-auftrag'
 
 /**
  * Führt einen Auftrag aus der Adresse genau einmal aus (src/lib/url-auftrag.ts)
@@ -20,8 +20,9 @@ export function useUrlAuftrag(ausfuehren: (auftrag: UrlAuftrag) => void): void {
   const [erledigt, setErledigt] = useState<string | null>(null)
 
   if (schluessel !== erledigt) {
-    setErledigt(schluessel)
-    if (auftrag) ausfuehren(auftrag)
+    const schritt = auftragsSchritt(schluessel, erledigt)
+    setErledigt(schritt.erledigt)
+    if (schritt.ausfuehren && auftrag) ausfuehren(auftrag)
   }
 
   useEffect(() => {

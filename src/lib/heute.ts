@@ -71,7 +71,7 @@ export function ueberfaelligWhere(farmId: string, jetzt: Date): Prisma.OrderWher
 
 // ─── Heute abholen ──────────────────────────────────────────────────────────
 
-/** „Maria Huber" → „Maria H." — genug zum Erkennen, mehr steht auf dem Handy nicht offen herum. */
+/** „Anna Beispiel" → „Anna B." — genug zum Erkennen, mehr steht auf dem Handy nicht offen herum. */
 export function kurzname(name: string): string {
   const teile = name.trim().split(/\s+/).filter(Boolean)
   if (teile.length === 0) return 'Kunde'
@@ -258,15 +258,20 @@ export function brauchtDich(daten: BrauchtDichDaten): BrauchtDichEintrag[] {
  *
  * „Selbe Uhrzeit" ist die Zeit seit Wiener Mitternacht des Tages; nur an den
  * zwei Tagen der Zeitumstellung weicht das um eine Stunde von der Wanduhr ab.
+ * Am 25-Stunden-Sonntag (Umstellung auf Winterzeit) reichte die Vorwoche nach
+ * 23 Uhr sonst in die laufende hinein — deshalb endet sie spätestens dort,
+ * wo diese Woche beginnt.
  */
 export function wochenfenster(jetzt: Date): { dieseWoche: Zeitraum; vorwoche: Zeitraum } {
   const heute = wienKalendertag(jetzt)
   const seitMitternacht = jetzt.getTime() - mitternacht(heute).getTime()
+  const wochenbeginn = wienWochenbeginn(jetzt)
+  const vorwocheBisZeit = mitternacht(tagVersetzt(heute, -7)).getTime() + seitMitternacht
   return {
-    dieseWoche: { von: wienWochenbeginn(jetzt), bis: jetzt },
+    dieseWoche: { von: wochenbeginn, bis: jetzt },
     vorwoche: {
       von: mitternacht(tagVersetzt(wienWochenMontag(jetzt), -7)),
-      bis: new Date(mitternacht(tagVersetzt(heute, -7)).getTime() + seitMitternacht),
+      bis: new Date(Math.min(vorwocheBisZeit, wochenbeginn.getTime() - 1)),
     },
   }
 }

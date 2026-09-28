@@ -28,6 +28,18 @@ export function auftragsSchluessel(auftrag: UrlAuftrag | null): string | null {
   return auftrag.art === 'neu' ? 'neu' : `bearbeiten:${auftrag.id}`
 }
 
+/**
+ * Ein Schritt des Hooks: Ist `schluessel` ein Auftrag, der noch nicht
+ * ausgeführt wurde? Danach gilt `schluessel` als erledigt — auch null, damit
+ * derselbe Auftrag später (Plus bei schon offener Seite) wieder ankommt.
+ */
+export function auftragsSchritt(
+  schluessel: string | null,
+  erledigt: string | null
+): { ausfuehren: boolean; erledigt: string | null } {
+  return { ausfuehren: schluessel !== null && schluessel !== erledigt, erledigt: schluessel }
+}
+
 /** Die Adresse ohne Auftrag; andere Parameter und der Anker bleiben stehen. */
 export function ohneAuftrag(pfad: string, suche: string, anker = ''): string {
   const parameter = new URLSearchParams(suche)

@@ -41,7 +41,7 @@ import { cn } from '@/lib/utils'
 const CHIP_FARBE: Record<AbholChip, string> = {
   bereit: 'bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-200',
   vorbereiten: 'bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200',
-  wartet: 'bg-muted text-muted-foreground',
+  wartet: 'bg-app-chip text-app-chip-ink',
 }
 
 const BRAUCHT_DICH_SYMBOL: Record<BrauchtDichEintrag['art'], LucideIcon> = {
@@ -63,7 +63,7 @@ function Abschnitt({
   return (
     <section className="mb-6" aria-label={titel}>
       <div className="mb-2 flex items-baseline justify-between gap-3">
-        <h2 className="font-heading text-lg font-semibold text-foreground">{titel}</h2>
+        <h2 className="font-heading text-lg font-semibold text-app-ink">{titel}</h2>
         {aktion}
       </div>
       {children}
@@ -94,11 +94,11 @@ export default async function HeutePage() {
     <div className="px-4 py-8 max-w-2xl mx-auto">
       {/* Kopf: Gruß und Datum in Wiener Zeit */}
       <div className="mb-6">
-        <p className="text-sm" style={{ color: 'var(--app-ink-faint)' }}>
+        <p className="text-sm text-app-ink-faint">
           {vorname ? `${begruessung(jetzt)}, ${vorname}` : begruessung(jetzt)}
         </p>
-        <h1 className="font-heading text-[27px] font-semibold text-foreground mt-0.5">Heute</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">{datumLang(jetzt)}</p>
+        <h1 className="font-heading text-[27px] font-semibold text-app-ink mt-0.5">Heute</h1>
+        <p className="text-app-ink-soft text-sm mt-0.5">{datumLang(jetzt)}</p>
       </div>
 
       {/* Für einen frisch registrierten Hof das Wichtigste — sie rendert sich
@@ -116,19 +116,19 @@ export default async function HeutePage() {
       >
         <Card className="py-0 gap-0 overflow-hidden">
           {abholungen.length === 0 ? (
-            <p className="px-4 py-4 text-sm text-muted-foreground">Heute holt niemand etwas ab.</p>
+            <p className="px-4 py-4 text-sm text-app-ink-soft">Heute holt niemand etwas ab.</p>
           ) : (
             <ul className="divide-y divide-border">
               {abholungen.map((a) => (
                 <li key={a.id}>
                   <Link href={`/orders/${a.id}`} className={ZEILE}>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm text-foreground">
+                      <p className="text-sm text-app-ink">
                         <span className="font-semibold tabular-nums">{a.uhrzeit}</span>
-                        <span className="text-muted-foreground"> · </span>
+                        <span className="text-app-ink-soft"> · </span>
                         <span className="font-medium">{a.kunde}</span>
                       </p>
-                      <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
+                      <p className="mt-0.5 truncate text-[13px] text-app-ink-soft">
                         {a.positionen} · {a.zahlart}
                       </p>
                     </div>
@@ -148,17 +148,17 @@ export default async function HeutePage() {
           {abholungen.length > 0 && (
             <Link
               href="/orders/today/print"
-              className={cn(ZEILE, 'border-t border-border text-sm font-medium text-foreground print:hidden')}
+              className={cn(ZEILE, 'border-t border-border text-sm font-medium text-app-ink print:hidden')}
             >
-              <Printer className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
+              <Printer className="size-4 shrink-0 text-app-ink-soft" strokeWidth={1.7} aria-hidden="true" />
               <span className="flex-1">Packliste drucken</span>
-              <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <ChevronRight className="size-4 shrink-0 text-app-ink-soft" aria-hidden="true" />
             </Link>
           )}
           {morgenAnzahl > 0 && (
             <Link
               href="/orders"
-              className="flex items-center gap-3 border-t border-border bg-muted/30 px-4 py-2.5 text-[13px] text-muted-foreground transition-colors hover:bg-muted/60 outline-none focus-visible:bg-muted/60"
+              className="flex items-center gap-3 border-t border-border bg-muted/30 px-4 py-2.5 text-[13px] text-app-ink-soft transition-colors hover:bg-muted/60 outline-none focus-visible:bg-muted/60"
             >
               <span className="flex-1">
                 Morgen: {morgenAnzahl} {morgenAnzahl === 1 ? 'Bestellung' : 'Bestellungen'} →
@@ -172,7 +172,7 @@ export default async function HeutePage() {
       <Abschnitt titel="Braucht dich">
         <Card className="py-0 gap-0 overflow-hidden">
           {brauchtDich.length === 0 ? (
-            <p className="px-4 py-4 text-sm text-muted-foreground">Alles erledigt.</p>
+            <p className="px-4 py-4 text-sm text-app-ink-soft">Alles erledigt.</p>
           ) : (
             <ul className="divide-y divide-border">
               {brauchtDich.map((eintrag) => {
@@ -186,8 +186,8 @@ export default async function HeutePage() {
                       >
                         <Symbol className="size-4" strokeWidth={1.7} aria-hidden="true" />
                       </span>
-                      <span className="min-w-0 flex-1 text-sm text-foreground">{eintrag.text}</span>
-                      <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 text-sm text-app-ink">{eintrag.text}</span>
+                      <ChevronRight className="size-4 shrink-0 text-app-ink-soft" aria-hidden="true" />
                     </Link>
                     {eintrag.unterpunkte && eintrag.unterpunkte.length > 0 && (
                       <ul className="pb-2 pl-16 pr-4">
@@ -195,7 +195,7 @@ export default async function HeutePage() {
                           <li key={`${u.href}-${u.text}`}>
                             <Link
                               href={u.href}
-                              className="flex min-h-[40px] items-center gap-2 rounded-lg px-2 text-[13px] text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground outline-none focus-visible:bg-muted/50"
+                              className="flex min-h-[40px] items-center gap-2 rounded-lg px-2 text-[13px] text-app-ink-soft transition-colors hover:bg-muted/50 hover:text-app-ink outline-none focus-visible:bg-muted/50"
                             >
                               <span className="flex-1">{u.text}</span>
                               <ChevronRight className="size-3.5 shrink-0" aria-hidden="true" />
@@ -223,19 +223,17 @@ export default async function HeutePage() {
       >
         <Card>
           <CardContent className="py-1">
-            <p className="text-[13px]" style={{ color: 'var(--app-ink-faint)' }}>
-              Umsatz seit Montag
-            </p>
-            <p className="font-heading text-[32px] font-bold tabular-nums text-foreground mt-1 leading-tight">
+            <p className="text-[13px] text-app-ink-soft">Umsatz seit Montag</p>
+            <p className="font-heading text-[32px] font-bold tabular-nums text-app-ink mt-1 leading-tight">
               {formatEuro(centsAlsEuro(woche.dieseWocheCent))}
             </p>
             <p
               className={cn(
                 'mt-1 flex items-center gap-1.5 text-[13px] font-medium',
                 woche.prozent === null || woche.prozent === 0
-                  ? 'text-muted-foreground'
+                  ? 'text-app-ink-soft'
                   : woche.prozent > 0
-                    ? 'text-primary'
+                    ? 'text-green-700 dark:text-green-300'
                     : 'text-destructive'
               )}
             >
