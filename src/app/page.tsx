@@ -102,9 +102,10 @@ const HERO_HOFLADEN = 'Hofladen entdecken'
 const HERO_FUTTER = 'Heu & Futter finden'
 
 // Der zweite Einstieg: Heu, Stroh und Futter. Jeder Punkt beschreibt, was es
-// heute schon gibt — Kilopreis bei Ballen und Big Bag (vergleichsKilopreis),
+// heute schon gibt — der Kilopreis jedes Futtermittels auf der Hofseite
+// (formatGrundpreisNetto aus der Nettomenge, auch bei Ballen und Big Bag),
 // die Großgebinde BALLEN und BIGBAG, die Kennzeichnung mit Zusammensetzung,
-// Inhaltsstoffen und Betriebsnummer im Produktblatt der Hofseite.
+// analytischen Bestandteilen und Betriebsnummer im Produktblatt.
 // Bewusst ohne Bild: Es gibt kein eigenes Heu- oder Futterfoto, und fremde
 // oder Stockbilder kommen nicht auf die Seite.
 const FUTTER = {
@@ -373,9 +374,10 @@ export default function HomePage() {
           />
 
           {/* Weicher Auslauf in den Sand-Hintergrund statt harter Kante.
-              Der Farbwert entspricht dem Seitenverlauf auf Höhe des unteren
-              Hero-Rands (70vh); die Deckkraft steigt erst ganz unten spürbar,
-              damit der weiße Scroll-Pfeil darüber lesbar bleibt. */}
+              Der Farbwert entspricht dem Seitenverlauf am unteren Hero-Rand
+              (der Verlauf hat seine Endfarbe schon bei 55vh erreicht, der
+              Hero endet frühestens bei 70vh); die Deckkraft steigt erst ganz
+              unten spürbar, damit der weiße Scroll-Pfeil darüber lesbar bleibt. */}
           <div
             aria-hidden="true"
             className="absolute inset-x-0 bottom-0 h-40 md:h-56"
@@ -520,7 +522,8 @@ export default function HomePage() {
             Der Knopf ist Crème auf Waldgrün, kein Orange — das gehört dem
             Band „Hof anmelden". */}
         <section className="px-6 pb-20 md:pb-28">
-          <div className="mx-auto max-w-6xl rounded-3xl bg-landing-wald px-6 py-12 sm:px-10 md:px-14 md:py-16">
+          {/* Nachts trägt der Rahmen die Abgrenzung (CODING_STANDARDS §7, Tiefe). */}
+          <div className="mx-auto max-w-6xl rounded-3xl bg-landing-wald px-6 py-12 sm:px-10 md:px-14 md:py-16 dark:ring-1 dark:ring-border">
             <Kicker tone="wald">{FUTTER.kicker}</Kicker>
             <h2 className="font-heading text-3xl md:text-5xl font-semibold text-landing-wald-ink text-balance">
               {FUTTER.title}

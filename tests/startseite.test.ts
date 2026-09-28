@@ -97,20 +97,31 @@ describe('Farben', () => {
   })
 
   it('der Futter-Abschnitt hat kein Bild und keine harte Farbe', () => {
+    expect(seite.indexOf('C2 — Heu und Futter')).toBeGreaterThan(-1)
+    expect(seite.indexOf('D — Vision')).toBeGreaterThan(seite.indexOf('C2 — Heu und Futter'))
     const abschnitt = seite.slice(seite.indexOf('C2 — Heu und Futter'), seite.indexOf('D — Vision'))
-    expect(abschnitt.length).toBeGreaterThan(0)
     expect(abschnitt).not.toContain('<Image')
     expect(abschnitt).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
     expect(abschnitt).toContain('bg-landing-wald')
   })
 
-  it('das Waldgrün ist ein Token — für Tailwind freigegeben, in beiden Modi derselbe Wert', () => {
+  it('das Waldgrün ist ein Token — für Tailwind freigegeben, mit eigenem Nachtwert', () => {
     const css = quelle('src/app/globals.css')
     expect(css).toContain('--color-landing-wald: var(--landing-wald);')
     expect(css).toContain('--color-landing-wald-ink: var(--landing-wald-ink);')
-    expect(css).toMatch(/--landing-wald: oklch\(/)
-    // Bewusst nur in :root — nachts bleibt das Band dunkelgrün.
-    const nacht = css.slice(css.indexOf('.dark {'))
-    expect(nacht).not.toContain('--landing-wald')
+    const nachtBeginn = css.indexOf('.dark {')
+    expect(nachtBeginn).toBeGreaterThan(-1)
+    const tag = css.slice(0, nachtBeginn)
+    const nacht = css.slice(nachtBeginn)
+    expect(tag).toMatch(/--landing-wald: oklch\(/)
+    expect(tag).toMatch(/--landing-wald-ink: oklch\(/)
+    // Das Band wird nachts dunkler, die Crème-Schrift bleibt dieselbe.
+    expect(nacht).toMatch(/--landing-wald: oklch\(/)
+    expect(nacht).not.toContain('--landing-wald-ink')
+  })
+
+  it('nachts trägt der Rahmen das Band', () => {
+    const abschnitt = seite.slice(seite.indexOf('C2 — Heu und Futter'), seite.indexOf('D — Vision'))
+    expect(abschnitt).toContain('dark:ring-1 dark:ring-border')
   })
 })

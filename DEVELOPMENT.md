@@ -2325,8 +2325,9 @@ dem Band „Hof anmelden". Entschieden: Der Hofladen-Knopf ist Crème mit Waldgr
 kleine pulsierende Punkt am Pilot-Hinweis bleibt, er ist ein Statuspunkt, kein Knopf.
 
 **Waldgrün als Token.** `--landing-wald` (#1F4732, der Tag-Wert von `--primary`) und
-`--landing-wald-ink` (Crème) stehen nur in `:root`: Das Band ist in beiden Modi dunkelgrün,
-wie die Bauern-Leiste. `--primary` hätte nicht gepasst — es wird nachts ein helles Salbeigrün.
+`--landing-wald-ink` (Crème). Das Band ist in beiden Modi dunkelgrün; nachts wird es dunkler
+(eigener `.dark`-Wert) und bekommt einen Rahmen, wie die Bauern-Leiste. Die Crème-Schrift ist
+in beiden Modi gleich. `--primary` hätte nicht gepasst — es wird nachts ein helles Salbeigrün.
 
 **Kein Bild im Futter-Abschnitt (Rückfrage).** Es gibt kein eigenes Heu- oder Futterfoto.
 `corn-1`/`corn-3` (Weizenähren aus dem Hero-Clip) wären denkbar, ihre Herkunft ist aber
