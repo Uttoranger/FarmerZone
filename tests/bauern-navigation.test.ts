@@ -3,34 +3,42 @@
  *
  * Beweist:
  *  - Handy: fünf Plätze in fester Reihenfolge — Heute · Bestellungen · ➕ ·
- *    Produkte · Mehr.
- *  - Browser und Handy lesen dieselbe Ordnung: Hauptpunkte, „Neu", „Dein Hof",
- *    unten der Rest.
+ *    Mein Hof · Mehr.
+ *  - Browser und Handy lesen dieselbe Ordnung: Hauptpunkte, „Neu",
+ *    „Verkauf und Kunden", unten der Rest.
+ *  - „Mein Hof" ist auf Produkte, Hofseite und Beiträge aktiv; die Reiter
+ *    darunter kennen ihre Seite.
  *  - Aktiv ist der längste passende Punkt; „Mehr" für alles, was im Blatt liegt.
  *  - „Admin" nur für den Betreiber.
  *  - Jede Seite unter src/app/(farmer) ist über die Navigation erreichbar.
+ *  - Der Kopf von Mein Hof sitzt über genau den drei Seiten, mit ihrem Reiter.
  */
 import { describe, it, expect } from 'vitest'
-import { readdirSync, statSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  DEIN_HOF,
   HANDY_LEISTE,
   HAUPT,
+  MEIN_HOF_REITER,
   NEU,
   UNTEN,
+  VERKAUF_UND_KUNDEN,
+  VERKAUF_UND_KUNDEN_TITEL,
   aktiverPunkt,
+  ariaAktuell,
   fuerNutzer,
   mehrAktiv,
 } from '@/lib/bauern-navigation'
 
+const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
+
 describe('Reihenfolge', () => {
-  it('Handy: Heute · Bestellungen · Plus · Produkte · Mehr', () => {
+  it('Handy: Heute · Bestellungen · Plus · Mein Hof · Mehr', () => {
     expect(HANDY_LEISTE.map((p) => (p.art === 'punkt' ? p.punkt.label : p.art))).toEqual([
       'Heute',
       'Bestellungen',
       'neu',
-      'Produkte',
+      'Mein Hof',
       'mehr',
     ])
   })
@@ -39,7 +47,7 @@ describe('Reihenfolge', () => {
     expect(HAUPT.map((p) => [p.label, p.href, p.zahl])).toEqual([
       ['Heute', '/dashboard', undefined],
       ['Bestellungen', '/orders', 'bestellungen'],
-      ['Produkte', '/products', undefined],
+      ['Mein Hof', '/products', undefined],
     ])
   })
 
@@ -52,18 +60,81 @@ describe('Reihenfolge', () => {
     for (const p of NEU) expect(p.satz).toMatch(/^\S.*\.$/)
   })
 
-  it('Dein Hof: Hof-Seite, Kunden, Verkäufe, Auswertung, Status-Beiträge', () => {
-    expect(DEIN_HOF.map((p) => [p.label, p.href])).toEqual([
-      ['Meine Hof-Seite', '/farm-page'],
+  it('Verkauf und Kunden: Kunden, Verkäufe, Auswertung — ohne Hofseite und Beiträge', () => {
+    expect(VERKAUF_UND_KUNDEN_TITEL).toBe('Verkauf und Kunden')
+    expect(VERKAUF_UND_KUNDEN.map((p) => [p.label, p.href])).toEqual([
       ['Kunden', '/customers'],
       ['Verkäufe', '/sales'],
       ['Auswertung', '/analytics'],
-      ['Status-Beiträge', '/status'],
     ])
   })
 
   it('Unten: Einstellungen, Fehler melden, Meine Meldungen, Admin', () => {
     expect(UNTEN.map((p) => p.label)).toEqual(['Einstellungen', 'Fehler melden', 'Meine Meldungen', 'Admin'])
+  })
+
+  it('das Mehr-Blatt kennt weder Hofseite noch Beiträge', () => {
+    const imBlatt = [...VERKAUF_UND_KUNDEN, ...UNTEN].map((p) => p.href)
+    expect(imBlatt).not.toContain('/farm-page')
+    expect(imBlatt).not.toContain('/status')
+    expect(imBlatt).not.toContain('/products')
+  })
+})
+
+describe('Mein Hof', () => {
+  it('Reiter: Produkte (Standard) · Hofseite · Beiträge', () => {
+    expect(MEIN_HOF_REITER.map((r) => [r.label, r.href])).toEqual([
+      ['Produkte', '/products'],
+      ['Hofseite', '/farm-page'],
+      ['Beiträge', '/status'],
+    ])
+    // Der Punkt „Mein Hof" führt zum ersten Reiter.
+    expect(HAUPT.find((p) => p.id === 'mein-hof')?.href).toBe(MEIN_HOF_REITER[0].href)
+  })
+
+  it('der Kopf sitzt über jeder Reiter-Seite, mit genau ihrem Reiter und parallel geladenen Daten', () => {
+    for (const reiter of MEIN_HOF_REITER) {
+      const seite = quelle(`src/app/(farmer)${reiter.href}/page.tsx`)
+      expect(seite, reiter.href).toMatch(new RegExp(`<MeinHofKopf[^>]*aktiv="${reiter.id}"`))
+      expect(seite, reiter.href).toContain('getMeinHofKopf(session.user.id)')
+    }
+  })
+
+  it('Unterseiten der Reiter (z. B. „Neuer Status") bekommen ihn nicht', () => {
+    const unterseiten: string[] = []
+    const suche = (ordner: string) => {
+      for (const name of readdirSync(ordner)) {
+        const pfad = join(ordner, name)
+        if (statSync(pfad).isDirectory()) suche(pfad)
+        else if (name === 'page.tsx') unterseiten.push(pfad)
+      }
+    }
+    for (const reiter of MEIN_HOF_REITER) {
+      const wurzel = join(process.cwd(), `src/app/(farmer)${reiter.href}`)
+      for (const name of readdirSync(wurzel)) {
+        if (statSync(join(wurzel, name)).isDirectory()) suche(join(wurzel, name))
+      }
+    }
+    expect(unterseiten.length).toBeGreaterThan(0)
+    for (const pfad of unterseiten) expect(readFileSync(pfad, 'utf8'), pfad).not.toContain('MeinHofKopf')
+  })
+})
+
+describe('aria-current', () => {
+  const meinHof = HAUPT.find((p) => p.id === 'mein-hof')!
+  const bestellungen = HAUPT.find((p) => p.id === 'bestellungen')!
+
+  it("'page' nur auf genau der Zielseite, sonst 'true' — nie zwei Links als dieselbe Seite", () => {
+    expect(ariaAktuell('/products', meinHof)).toBe('page')
+    expect(ariaAktuell('/farm-page', meinHof)).toBe('true')
+    expect(ariaAktuell('/status/new', meinHof)).toBe('true')
+    expect(ariaAktuell('/orders', bestellungen)).toBe('page')
+    expect(ariaAktuell('/orders/abc', bestellungen)).toBe('true')
+  })
+
+  it('kein aria-current für andere Punkte', () => {
+    expect(ariaAktuell('/orders', meinHof)).toBeUndefined()
+    expect(ariaAktuell('/dashboard', bestellungen)).toBeUndefined()
   })
 })
 
@@ -74,7 +145,7 @@ describe('Admin nur für Admins', () => {
     expect(bauer.unten.map((p) => p.id)).toEqual(['einstellungen', 'fehler-melden', 'meldungen'])
     expect(betreiber.unten.map((p) => p.id)).toEqual(['einstellungen', 'fehler-melden', 'meldungen', 'admin'])
     expect(bauer.haupt).toEqual(betreiber.haupt)
-    expect(bauer.deinHof).toEqual(betreiber.deinHof)
+    expect(bauer.verkaufUndKunden).toEqual(betreiber.verkaufUndKunden)
     expect(bauer.neu).toEqual(betreiber.neu)
   })
 
@@ -89,14 +160,14 @@ describe('aktive Pfade', () => {
     ['/orders', 'bestellungen'],
     ['/orders/abc123', 'bestellungen'],
     ['/orders/today/print', 'bestellungen'],
-    ['/products', 'produkte'],
-    ['/farm-page', 'hofseite'],
+    ['/products', 'mein-hof'],
+    ['/farm-page', 'mein-hof'],
+    ['/status', 'mein-hof'],
+    ['/status/new', 'mein-hof'],
+    ['/status/xyz/send-whatsapp', 'mein-hof'],
     ['/customers/abc', 'kunden'],
     ['/sales', 'verkaeufe'],
     ['/analytics/umfeld', 'auswertung'],
-    ['/status', 'status'],
-    ['/status/new', 'status'],
-    ['/status/xyz/send-whatsapp', 'status'],
     ['/settings/pickup-slots', 'einstellungen'],
     ['/fehler-melden', 'fehler-melden'],
     ['/meldungen', 'meldungen'],
@@ -107,15 +178,16 @@ describe('aktive Pfade', () => {
 
   it('kein Treffer über ein Namenspräfix hinweg', () => {
     expect(aktiverPunkt('/ordersxyz')).toBeNull()
+    expect(aktiverPunkt('/statusmeldung')).toBeNull()
     expect(aktiverPunkt('/onboarding')).toBeNull()
     expect(aktiverPunkt('/')).toBeNull()
   })
 
   it('Mehr ist aktiv für alles, was im Mehr-Blatt liegt — nicht für die Leiste', () => {
-    for (const pfad of ['/farm-page', '/customers', '/sales', '/analytics/umfeld', '/status/new', '/settings', '/fehler-melden', '/meldungen', '/admin']) {
+    for (const pfad of ['/customers', '/sales', '/analytics/umfeld', '/settings', '/fehler-melden', '/meldungen', '/admin']) {
       expect(mehrAktiv(pfad), pfad).toBe(true)
     }
-    for (const pfad of ['/dashboard', '/orders', '/orders/today/print', '/products', '/onboarding']) {
+    for (const pfad of ['/dashboard', '/orders', '/orders/today/print', '/products', '/farm-page', '/status', '/status/new', '/onboarding']) {
       expect(mehrAktiv(pfad), pfad).toBe(false)
     }
   })

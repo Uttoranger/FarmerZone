@@ -6,7 +6,9 @@ import { PageHeader } from '@/components/farmer/page-header'
 import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getStatusPostsForFarm } from '@/server/queries/status-posts'
+import { getMeinHofKopf } from '@/server/queries/farm'
 import { StatusPostCard } from './status-post-card'
+import { MeinHofKopf } from '@/components/farmer/mein-hof-kopf'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +19,7 @@ export default async function StatusPage() {
   const farm = await getFarmForUser(session.user.id)
   if (!farm) redirect('/login')
 
-  const posts = await getStatusPostsForFarm(farm.id)
+  const [posts, kopf] = await Promise.all([getStatusPostsForFarm(farm.id), getMeinHofKopf(session.user.id)])
 
   const active = posts.filter((p) => p.isActive)
   const past = posts.filter((p) => !p.isActive && !p.isDraft)
@@ -25,6 +27,7 @@ export default async function StatusPage() {
 
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto">
+      <MeinHofKopf hof={kopf} aktiv="beitraege" />
       <PageHeader
         title="Status & Updates"
         subtitle="Informiere deine Kunden über Neuigkeiten vom Hof"
