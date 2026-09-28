@@ -36,15 +36,8 @@ import { hofseiteSektionen, naechsterAktiverReiter } from '@/lib/hofseite-sektio
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { ProductGrid, useBereichWunsch } from './product-grid'
 import { stripStatusVariables, renderStatusBodyWithChip } from '@/lib/status-body'
-
-// Ersatzbanner, wenn ein Hof noch kein Foto hochgeladen hat. Bildersatz,
-// kein Anstrich — die Verläufe folgen dem Modus bewusst nicht.
-const BANNER_GRADIENTS: Record<string, string> = {
-  tannengruen: 'linear-gradient(135deg, #1F4732 0%, #3D7B58 60%, #E8F0E8 100%)',
-  wiese:       'linear-gradient(135deg, #2D6A4F 0%, #52B788 50%, #D8F3DC 100%)',
-  erde:        'linear-gradient(135deg, #6B4226 0%, #A0663E 55%, #F5E6D8 100%)',
-  herbst:      'linear-gradient(135deg, #7B4F00 0%, #D4900A 55%, #FFF3CC 100%)',
-}
+// Ersatz-Titelbild ohne Foto — gemeinsam mit dem Kopf von „Mein Hof".
+import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
 
 const ANLASS_META: Record<string, { label: string; icon: ReactNode }> = {
   FRESH_PRODUCT: { label: 'Frisches Produkt', icon: <Leaf className="size-3" strokeWidth={1.7} /> },
@@ -766,10 +759,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
     },
   }
 
-  const bannerBg =
-    farm.bannerType === 'PHOTO' && farm.bannerUrl
-      ? null
-      : BANNER_GRADIENTS[farm.bannerValue ?? 'tannengruen'] ?? BANNER_GRADIENTS.tannengruen
+  const bannerBg = titelbildFoto(farm) ? null : titelbildVerlauf(farm.bannerValue)
 
   const productsForGrid = isEdit
     ? farm.products
