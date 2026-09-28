@@ -1,414 +1,250 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import Link from 'next/link'
-import { APP_URL } from '@/lib/umgebung-server'
+import {
+  ChevronRight,
+  Clock,
+  Megaphone,
+  PackageX,
+  Printer,
+  Tags,
+  TrendingDown,
+  TrendingUp,
+  type LucideIcon,
+} from 'lucide-react'
 import { auth } from '@/lib/auth'
-import { getDashboardStats, getFarmForUser } from '@/server/queries/dashboard'
+import { getFarmForUser } from '@/server/queries/dashboard'
+import { getHeute } from '@/server/queries/heute'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ErsteSchritteKarte } from '@/components/farmer/erste-schritte-karte'
 import {
-  ShoppingBag,
-  Package,
-  PlusCircle,
-  BarChart2,
-  AlertTriangle,
-  Leaf,
-  ExternalLink,
-  Printer,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-} from 'lucide-react'
+  ABHOL_CHIP_TEXT,
+  begruessung,
+  datumLang,
+  vergleichText,
+  type AbholChip,
+  type BrauchtDichEintrag,
+} from '@/lib/heute'
+import { formatEuro } from '@/lib/format'
+import { centsAlsEuro } from '@/lib/servicegebuehr'
+import { cn } from '@/lib/utils'
 
-function formatEuro(amount: number) {
-  return new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(amount)
+/*
+ * Heute — der Startbildschirm des Hofs. Drei Fragen, in dieser Reihenfolge:
+ * Wer kommt heute? Was braucht mich? Wie läuft die Woche?
+ * Die Regeln stehen rein in src/lib/heute.ts, die Abfragen in
+ * src/server/queries/heute.ts; hier wird nur angezeigt. Anlegen läuft über
+ * das Plus der Navigation, deshalb gibt es keinen eigenen Knopf mehr.
+ */
+
+/** Bedeutungsfarben, in beiden Modi lesbar. */
+const CHIP_FARBE: Record<AbholChip, string> = {
+  bereit: 'bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-200',
+  vorbereiten: 'bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200',
+  wartet: 'bg-app-chip text-app-chip-ink',
 }
 
-function todayLabel(): string {
-  return new Date().toLocaleDateString('de-AT', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
+const BRAUCHT_DICH_SYMBOL: Record<BrauchtDichEintrag['art'], LucideIcon> = {
+  ueberfaellig: Clock,
+  ausverkauft: PackageX,
+  'ohne-kategorie': Tags,
+  status: Megaphone,
 }
 
-export default async function DashboardPage() {
+function Abschnitt({
+  titel,
+  aktion,
+  children,
+}: {
+  titel: string
+  aktion?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <section className="mb-6" aria-label={titel}>
+      <div className="mb-2 flex items-baseline justify-between gap-3">
+        <h2 className="font-heading text-lg font-semibold text-app-ink">{titel}</h2>
+        {aktion}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+const ZEILE = 'flex items-center gap-3 px-4 py-3 min-h-[56px] transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 outline-none'
+
+export default async function HeutePage() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) redirect('/login')
 
   const farm = await getFarmForUser(session.user.id)
   if (!farm) redirect('/login')
 
-  const {
-    offeneBestellungen,
-    heutigeBestellungen,
-    aktivProdukte,
-    umsatzWoche,
-    umsatzChangePercent,
-    kundenGesamt,
-    lowStockHint,
-    statusReminder,
-    ersteSchritte,
-    wartetAufFreigabe,
-  } = await getDashboardStats(farm.id)
+  // Ein Zeitpunkt für die ganze Seite: Gruß, Datum, Tag und Woche passen zusammen.
+  const jetzt = new Date()
+  const { abholungen, morgenAnzahl, brauchtDich, woche, ersteSchritte, wartetAufFreigabe } = await getHeute(
+    farm.id,
+    jetzt
+  )
 
-  const vorname = session.user.name?.split(' ')[0] ?? 'Hallo'
-  const uhrzeit = new Date().getHours()
-  const gruss = uhrzeit < 12 ? 'Guten Morgen' : uhrzeit < 18 ? 'Guten Tag' : 'Guten Abend'
-
-  // Aggregate pack list from today's orders
-  const packList = new Map<string, number>()
-  for (const order of heutigeBestellungen) {
-    for (const item of order.items) {
-      packList.set(item.productName, (packList.get(item.productName) ?? 0) + item.quantity)
-    }
-  }
-  const packListEntries = Array.from(packList.entries()).sort((a, b) => a[0].localeCompare(b[0]))
-
-  // Customer names for today
-  const todayCustomers = heutigeBestellungen.map((o) => o.customerName)
-
-  // Pick up time window
-  const firstTime = heutigeBestellungen[0]?.pickupTimeStart
-  const lastTime = heutigeBestellungen[heutigeBestellungen.length - 1]?.pickupTimeEnd
+  const vorname = session.user.name?.trim().split(/\s+/)[0] ?? ''
+  const Trend = woche.prozent !== null && woche.prozent < 0 ? TrendingDown : TrendingUp
 
   return (
     <div className="px-4 py-8 max-w-2xl mx-auto">
-      {/* Begrüßung + Titel + CTA (Referenz 19) */}
-      <div className="mb-8 flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm" style={{ color: 'var(--app-ink-faint)' }}>
-            {gruss}, {vorname}
-          </p>
-          <h1 className="font-heading text-[27px] font-semibold text-foreground mt-0.5">
-            Übersicht
-          </h1>
-          <p className="text-muted-foreground text-sm mt-0.5 capitalize">{todayLabel()}</p>
-        </div>
-        <Link
-          href="/products"
-          className="shrink-0 inline-flex items-center gap-1.5 h-11 px-5 rounded-lg bg-accent text-accent-foreground text-sm font-semibold hover:bg-accent-hover transition-colors"
-          style={{ boxShadow: '0 4px 14px rgba(232,133,74,0.3)' }}
-        >
-          <PlusCircle className="size-4" />
-          Produkt anlegen
-        </Link>
+      {/* Kopf: Gruß und Datum in Wiener Zeit */}
+      <div className="mb-6">
+        <p className="text-sm text-app-ink-faint">
+          {vorname ? `${begruessung(jetzt)}, ${vorname}` : begruessung(jetzt)}
+        </p>
+        <h1 className="font-heading text-[27px] font-semibold text-app-ink mt-0.5">Heute</h1>
+        <p className="text-app-ink-soft text-sm mt-0.5">{datumLang(jetzt)}</p>
       </div>
 
-      {/* ── Erste Schritte ────────────────────────────────────────────
-          Ganz oben, weil sie für einen frisch registrierten Hof das
-          Wichtigste auf der Seite ist. Sie rendert sich selbst weg, sobald
-          alles erledigt ist — ein eingespielter Hof sieht sie nie. */}
+      {/* Für einen frisch registrierten Hof das Wichtigste — sie rendert sich
+          selbst weg, sobald alles erledigt ist. */}
       <ErsteSchritteKarte ergebnis={ersteSchritte} wartetAufFreigabe={wartetAufFreigabe} />
 
-      {/* ── Tages-Aufgabe ─────────────────────────────────────────── */}
-      {heutigeBestellungen.length > 0 ? (
-        <Card className="mb-6 border-l-4 border-l-primary">
-          <CardContent className="pt-5 pb-5">
-            <div className="flex items-start gap-3 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center shrink-0">
-                <AlertTriangle className="h-4.5 w-4.5 text-primary" />
-              </div>
-              <div>
-                <p className="font-semibold text-foreground">
-                  Heute: {heutigeBestellungen.length}{' '}
-                  {heutigeBestellungen.length === 1 ? 'Bestellung' : 'Bestellungen'} zur Abholung
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {firstTime}–{lastTime} Uhr ·{' '}
-                  {todayCustomers.slice(0, 3).join(' · ')}
-                  {todayCustomers.length > 3 && ` · +${todayCustomers.length - 3} weitere`}
-                </p>
-              </div>
-            </div>
-
-            {/* Packliste */}
-            {packListEntries.length > 0 && (
-              <div className="bg-muted rounded-xl p-3 mb-4">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                  Heute vorbereiten
-                </p>
-                <p className="text-sm text-foreground leading-relaxed">
-                  {packListEntries.map(([name, qty]) => `${qty}× ${name}`).join(', ')}
-                </p>
-              </div>
-            )}
-
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href="/orders"
-                className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold transition-opacity hover:opacity-90"
-              >
-                <ShoppingBag className="h-4 w-4" />
-                Zu den Bestellungen
-              </Link>
-              <Link
-                href="/orders/today/print"
-                className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-muted text-foreground text-sm font-medium transition-colors hover:bg-muted/70 print:hidden"
-              >
-                <Printer className="h-4 w-4" />
-                Packliste drucken
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Alert className="mb-6 border-border bg-muted/30">
-          <AlertDescription className="text-muted-foreground">
-            Heute keine Abholungen geplant.{' '}
-            <span className="block text-xs mt-0.5">
-              Teile deinen Shop-Link, um neue Kunden zu erreichen.
-            </span>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* ── Kennzahlen (Referenz 19: 4 Karten, Wert Fraunces 28) ──── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <Card>
-          <CardContent className="pt-5 pb-5">
-            <p className="text-[13px] font-medium" style={{ color: 'var(--app-ink-faint)' }}>
-              Neue Bestellungen
-            </p>
-            <div className="font-heading text-[28px] font-bold text-foreground mt-1.5">
-              {offeneBestellungen}
-            </div>
-            <div
-              className="text-xs font-semibold mt-1"
-              style={{ color: offeneBestellungen > 0 ? 'var(--accent)' : 'var(--app-ink-faint)' }}
-            >
-              {offeneBestellungen > 0 ? 'warten auf dich' : 'nichts offen'}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-5 pb-5">
-            <p className="text-[13px] font-medium" style={{ color: 'var(--app-ink-faint)' }}>
-              Umsatz Woche
-            </p>
-            <div className="font-heading text-[28px] font-bold text-foreground mt-1.5">
-              {formatEuro(umsatzWoche)}
-            </div>
-            {umsatzChangePercent !== null && (
-              <div
-                className={`flex items-center gap-1 text-xs mt-1 font-semibold ${
-                  umsatzChangePercent > 0
-                    ? 'text-primary'
-                    : umsatzChangePercent < 0
-                    ? 'text-destructive'
-                    : 'text-muted-foreground'
-                }`}
-              >
-                {umsatzChangePercent > 2 ? (
-                  <TrendingUp className="w-3.5 h-3.5" />
-                ) : umsatzChangePercent < -2 ? (
-                  <TrendingDown className="w-3.5 h-3.5" />
-                ) : (
-                  <Minus className="w-3.5 h-3.5" />
-                )}
-                {umsatzChangePercent > 0 ? '+' : ''}
-                {umsatzChangePercent} % zur Vorwoche
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-5 pb-5">
-            <p className="text-[13px] font-medium" style={{ color: 'var(--app-ink-faint)' }}>
-              Aktive Produkte
-            </p>
-            <div className="font-heading text-[28px] font-bold text-foreground mt-1.5">
-              {aktivProdukte}
-            </div>
-            <div
-              className="text-xs font-semibold mt-1"
-              style={{ color: lowStockHint ? 'var(--accent)' : 'var(--app-ink-faint)' }}
-            >
-              {lowStockHint ? 'Lager wird knapp' : 'im Shop sichtbar'}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-5 pb-5">
-            <p className="text-[13px] font-medium" style={{ color: 'var(--app-ink-faint)' }}>
-              Kunden gesamt
-            </p>
-            <div className="font-heading text-[28px] font-bold text-foreground mt-1.5">
-              {kundenGesamt}
-            </div>
-            <div className="text-xs mt-1" style={{ color: 'var(--app-ink-faint)' }}>
-              haben bei dir bestellt
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ── Hinweiskarten (nur wenn zutreffend) ───────────────────── */}
-      {(lowStockHint || statusReminder !== null) && (
-        <div className="flex flex-col md:flex-row gap-3 mb-8">
-          {lowStockHint && (
-            <Card className="flex-1">
-              <CardContent className="py-4 flex items-center gap-3">
-                <span
-                  className="flex size-10 shrink-0 items-center justify-center rounded-[10px]"
-                  style={{ background: 'var(--notice)', color: 'var(--notice-ink)' }}
-                >
-                  <AlertTriangle className="size-4.5" strokeWidth={1.7} />
-                </span>
-                <p className="flex-1 text-sm text-foreground">{lowStockHint}</p>
-                <Link
-                  href="/products"
-                  className="shrink-0 rounded-lg border px-3.5 py-2 text-[13px] font-semibold transition-colors hover:bg-muted/40"
-                  style={{ borderColor: 'var(--border)', color: 'var(--brand-text)' }}
-                >
-                  Lager auffüllen
-                </Link>
-              </CardContent>
-            </Card>
+      {/* ── Heute abholen ─────────────────────────────────────────────── */}
+      <Abschnitt
+        titel="Heute abholen"
+        aktion={
+          <Link href="/orders" className="shrink-0 text-sm font-semibold hover:underline underline-offset-2" style={{ color: 'var(--brand-text)' }}>
+            Alle →
+          </Link>
+        }
+      >
+        <Card className="py-0 gap-0 overflow-hidden">
+          {abholungen.length === 0 ? (
+            <p className="px-4 py-4 text-sm text-app-ink-soft">Heute holt niemand etwas ab.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {abholungen.map((a) => (
+                <li key={a.id}>
+                  <Link href={`/orders/${a.id}`} className={ZEILE}>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-app-ink">
+                        <span className="font-semibold tabular-nums">{a.uhrzeit}</span>
+                        <span className="text-app-ink-soft"> · </span>
+                        <span className="font-medium">{a.kunde}</span>
+                      </p>
+                      <p className="mt-0.5 truncate text-[13px] text-app-ink-soft">
+                        {a.positionen} · {a.zahlart}
+                      </p>
+                    </div>
+                    <span
+                      className={cn(
+                        'shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold leading-none',
+                        CHIP_FARBE[a.chip]
+                      )}
+                    >
+                      {ABHOL_CHIP_TEXT[a.chip]}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           )}
-          {statusReminder !== null && (
-            <Card className="flex-1">
-              <CardContent className="py-4 flex items-center gap-3">
-                <span
-                  className="flex size-10 shrink-0 items-center justify-center rounded-[10px]"
-                  style={{ background: 'var(--app-chip-green)', color: 'var(--brand-text)' }}
-                >
-                  <Leaf className="size-4.5" strokeWidth={1.7} />
-                </span>
-                <p className="flex-1 text-sm text-foreground">
-                  {statusReminder === 'never'
-                    ? 'Noch kein Status veröffentlicht'
-                    : `Dein letzter Status ist ${statusReminder} Tage her`}
-                  <span style={{ color: 'var(--app-ink-faint)' }}> — Zeit für Neuigkeiten?</span>
-                </p>
-                <Link
-                  href="/status/new"
-                  className="shrink-0 rounded-lg border px-3.5 py-2 text-[13px] font-semibold transition-colors hover:bg-muted/40"
-                  style={{ borderColor: 'var(--border)', color: 'var(--brand-text)' }}
-                >
-                  Status schreiben
-                </Link>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
-
-      {/* ── Hauptaktionen ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 mb-8">
-        <Link href="/orders">
-          <Card className="hover:shadow-[0_8px_20px_oklch(0.18_0.03_150_/_0.1)] transition-shadow duration-[250ms] cursor-pointer h-full">
-            <CardContent className="flex flex-col items-center justify-center gap-3 py-7 px-4 text-center min-h-[110px]">
-              <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center">
-                <ShoppingBag className="h-6 w-6 text-primary" strokeWidth={1.75} />
-              </div>
-              <div>
-                <div className="font-medium text-foreground text-sm">Bestellungen</div>
-                {offeneBestellungen > 0 && (
-                  <Badge className="mt-1.5 bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-200 text-xs border-0">
-                    {offeneBestellungen} offen
-                  </Badge>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href="/products">
-          <Card className="hover:shadow-[0_8px_20px_oklch(0.18_0.03_150_/_0.1)] transition-shadow duration-[250ms] cursor-pointer h-full">
-            <CardContent className="flex flex-col items-center justify-center gap-3 py-7 px-4 text-center min-h-[110px]">
-              <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center">
-                <Package className="h-6 w-6 text-primary" strokeWidth={1.75} />
-              </div>
-              <div>
-                <div className="font-medium text-foreground text-sm">Produkte</div>
-                <div className="text-xs text-muted-foreground mt-0.5">
-                  {aktivProdukte} aktiv
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href="/sales">
-          <Card className="hover:shadow-[0_8px_20px_oklch(0.18_0.03_150_/_0.1)] transition-shadow duration-[250ms] cursor-pointer h-full">
-            <CardContent className="flex flex-col items-center justify-center gap-3 py-7 px-4 text-center min-h-[110px]">
-              <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center">
-                <PlusCircle className="h-6 w-6 text-primary" strokeWidth={1.75} />
-              </div>
-              <div className="font-medium text-foreground text-sm">Verkauf eintragen</div>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href="/analytics">
-          <Card className="hover:shadow-[0_8px_20px_oklch(0.18_0.03_150_/_0.1)] transition-shadow duration-[250ms] cursor-pointer h-full">
-            <CardContent className="flex flex-col items-center justify-center gap-3 py-7 px-4 text-center min-h-[110px]">
-              <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center">
-                <BarChart2 className="h-6 w-6 text-primary" strokeWidth={1.75} />
-              </div>
-              <div className="font-medium text-foreground text-sm">Auswertung</div>
-            </CardContent>
-          </Card>
-        </Link>
-      </div>
-
-      {/* WhatsApp Einladungskarte */}
-      {(() => {
-        const shopUrl = `${APP_URL}/${farm.slug}`
-        const text = encodeURIComponent(
-          `Hey! Ich biete frische Produkte direkt vom Hof an. Hier kannst du einfach online bestellen: ${shopUrl}`
-        )
-        return (
-          <div className="rounded-2xl border border-border bg-card p-5 mb-6">
-            <div className="flex items-center gap-3 mb-3">
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                style={{ backgroundColor: '#25D366' }}
-              >
-                <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white" aria-hidden="true">
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-                </svg>
-              </div>
-              <div>
-                <p className="font-semibold text-foreground text-sm">Kunden einladen</p>
-                <p className="text-xs text-muted-foreground">Teile deinen Shop direkt per WhatsApp</p>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mb-3 font-mono truncate">{shopUrl}</p>
-            <a
-              href={`https://wa.me/?text=${text}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 h-10 px-4 rounded-xl text-white text-sm font-semibold transition-opacity hover:opacity-90"
-              style={{ backgroundColor: '#25D366' }}
+          {abholungen.length > 0 && (
+            <Link
+              href="/orders/today/print"
+              className={cn(ZEILE, 'border-t border-border text-sm font-medium text-app-ink print:hidden')}
             >
-              <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" aria-hidden="true">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-              </svg>
-              Per WhatsApp teilen
-            </a>
-          </div>
-        )
-      })()}
+              <Printer className="size-4 shrink-0 text-app-ink-soft" strokeWidth={1.7} aria-hidden="true" />
+              <span className="flex-1">Packliste drucken</span>
+              <ChevronRight className="size-4 shrink-0 text-app-ink-soft" aria-hidden="true" />
+            </Link>
+          )}
+          {morgenAnzahl > 0 && (
+            <Link
+              href="/orders"
+              className="flex items-center gap-3 border-t border-border bg-muted/30 px-4 py-2.5 text-[13px] text-app-ink-soft transition-colors hover:bg-muted/60 outline-none focus-visible:bg-muted/60"
+            >
+              <span className="flex-1">
+                Morgen: {morgenAnzahl} {morgenAnzahl === 1 ? 'Bestellung' : 'Bestellungen'} →
+              </span>
+            </Link>
+          )}
+        </Card>
+      </Abschnitt>
 
-      {/* Shop-Link */}
-      <div className="text-center">
-        <Link
-          href={`/${farm.slug}`}
-          target="_blank"
-          className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline underline-offset-2 transition-colors"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-          Meinen Shop ansehen
-        </Link>
-      </div>
+      {/* ── Braucht dich ──────────────────────────────────────────────── */}
+      <Abschnitt titel="Braucht dich">
+        <Card className="py-0 gap-0 overflow-hidden">
+          {brauchtDich.length === 0 ? (
+            <p className="px-4 py-4 text-sm text-app-ink-soft">Alles erledigt.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {brauchtDich.map((eintrag) => {
+                const Symbol = BRAUCHT_DICH_SYMBOL[eintrag.art]
+                return (
+                  <li key={`${eintrag.art}-${eintrag.href}-${eintrag.text}`}>
+                    <Link href={eintrag.href} className={ZEILE}>
+                      <span
+                        className="flex size-9 shrink-0 items-center justify-center rounded-[10px]"
+                        style={{ background: 'var(--notice)', color: 'var(--notice-ink)' }}
+                      >
+                        <Symbol className="size-4" strokeWidth={1.7} aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0 flex-1 text-sm text-app-ink">{eintrag.text}</span>
+                      <ChevronRight className="size-4 shrink-0 text-app-ink-soft" aria-hidden="true" />
+                    </Link>
+                    {eintrag.unterpunkte && eintrag.unterpunkte.length > 0 && (
+                      <ul className="pb-2 pl-16 pr-4">
+                        {eintrag.unterpunkte.map((u) => (
+                          <li key={`${u.href}-${u.text}`}>
+                            <Link
+                              href={u.href}
+                              className="flex min-h-[40px] items-center gap-2 rounded-lg px-2 text-[13px] text-app-ink-soft transition-colors hover:bg-muted/50 hover:text-app-ink outline-none focus-visible:bg-muted/50"
+                            >
+                              <span className="flex-1">{u.text}</span>
+                              <ChevronRight className="size-3.5 shrink-0" aria-hidden="true" />
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </Card>
+      </Abschnitt>
+
+      {/* ── Diese Woche ───────────────────────────────────────────────── */}
+      <Abschnitt
+        titel="Diese Woche"
+        aktion={
+          <Link href="/analytics" className="shrink-0 text-sm font-semibold hover:underline underline-offset-2" style={{ color: 'var(--brand-text)' }}>
+            Auswertung →
+          </Link>
+        }
+      >
+        <Card>
+          <CardContent className="py-1">
+            <p className="text-[13px] text-app-ink-soft">Umsatz seit Montag</p>
+            <p className="font-heading text-[32px] font-bold tabular-nums text-app-ink mt-1 leading-tight">
+              {formatEuro(centsAlsEuro(woche.dieseWocheCent))}
+            </p>
+            <p
+              className={cn(
+                'mt-1 flex items-center gap-1.5 text-[13px] font-medium',
+                woche.prozent === null || woche.prozent === 0
+                  ? 'text-app-ink-soft'
+                  : woche.prozent > 0
+                    ? 'text-green-700 dark:text-green-300'
+                    : 'text-destructive'
+              )}
+            >
+              {woche.prozent !== null && woche.prozent !== 0 && (
+                <Trend className="size-3.5 shrink-0" strokeWidth={1.9} aria-hidden="true" />
+              )}
+              {vergleichText(woche.prozent, jetzt)}
+            </p>
+          </CardContent>
+        </Card>
+      </Abschnitt>
     </div>
   )
 }

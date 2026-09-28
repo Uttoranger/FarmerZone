@@ -12,7 +12,7 @@
  * Ohne Datenbank: die Funktion bekommt nur Zählwerte und Ja/Nein.
  */
 import { describe, it, expect } from 'vitest'
-import { ersteSchritte, type ErsteSchritteDaten } from '@/lib/erste-schritte'
+import { ersteSchritte, ersteSchritteDaten, type ErsteSchritteDaten } from '@/lib/erste-schritte'
 
 /** Ein Hof direkt nach der Registrierung: nichts eingerichtet. */
 const FRISCH: ErsteSchritteDaten = {
@@ -170,5 +170,34 @@ describe('vollständig eingerichteter Hof', () => {
     expect(ersteSchritte({ ...FERTIG, produkte: 0 }).anzeigen).toBe(true)
     expect(ersteSchritte({ ...FERTIG, aktiveAbholzeiten: 0 }).anzeigen).toBe(true)
     expect(ersteSchritte({ ...FERTIG, hatLogo: false }).anzeigen).toBe(true)
+  })
+})
+
+describe('ersteSchritteDaten — Stammdaten des Hofs → Checkliste', () => {
+  const HOF = {
+    description: 'Wir halten Hühner.',
+    latitude: 48.2,
+    longitude: 13.0,
+    logoUrl: 'https://bilder.example/logo.png',
+    bannerType: 'PHOTO',
+    bannerUrl: 'https://bilder.example/titel.jpg',
+    stripeAccountReady: true,
+  }
+
+  it('ein fertiger Hof ergibt eine fertige Liste', () => {
+    expect(ersteSchritteDaten(HOF, { produkte: 4, aktiveAbholzeiten: 2 })).toEqual(FERTIG)
+  })
+
+  it('leere Beschreibung zählt nicht — die Spalte trägt dann einen leeren String', () => {
+    expect(ersteSchritteDaten({ ...HOF, description: '   ' }, { produkte: 0, aktiveAbholzeiten: 0 }).hatBeschreibung).toBe(false)
+  })
+
+  it('ein Farbverlauf ist kein Titelbild, auch wenn noch eine alte URL daneben steht', () => {
+    expect(ersteSchritteDaten({ ...HOF, bannerType: 'GRADIENT' }, { produkte: 0, aktiveAbholzeiten: 0 }).hatTitelbild).toBe(false)
+    expect(ersteSchritteDaten({ ...HOF, bannerUrl: null }, { produkte: 0, aktiveAbholzeiten: 0 }).hatTitelbild).toBe(false)
+  })
+
+  it('ohne Hof ist alles offen', () => {
+    expect(ersteSchritteDaten(null, { produkte: 0, aktiveAbholzeiten: 0 })).toEqual(FRISCH)
   })
 })

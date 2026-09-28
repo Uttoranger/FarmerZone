@@ -14,6 +14,7 @@ import { CHANNEL_ICONS, CHANNEL_LABELS } from '@/schemas/manual-sale'
 import { SaleDialog } from './sale-dialog'
 import { SalesFeedList } from './sales-feed-list'
 import { PageHeader } from '@/components/farmer/page-header'
+import { useUrlAuftrag } from '@/lib/use-url-auftrag'
 
 type Props = {
   overview: SalesOverview
@@ -59,6 +60,12 @@ export function SalesClient({ overview, products, stripeReady }: Props) {
     setPrefillSale(null)
     setDialogOpen(true)
   }
+
+  // „Verkauf eintragen" aus dem Plus der Navigation (/sales?neu=1): der
+  // vorhandene Dialog, einmal — danach ist der Parameter aus der Adresse.
+  useUrlAuftrag((auftrag) => {
+    if (auftrag.art === 'neu') openNewSale()
+  })
 
   function openFromQuick(sale: ManualSaleData) {
     setEditingSale(null)
