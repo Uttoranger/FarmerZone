@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { hofZustand, type HofZustand } from '@/lib/mein-hof'
 import { categoryImagePath } from '@/lib/product-image'
 import { DEFAULT_SECTIONS, type SectionConfig } from './appearance'
 import { PRODUCT_ORDER_BY } from './products'
@@ -760,4 +761,47 @@ export async function getOeffentlicheHoefe(
       }),
     }
   })
+}
+
+/** Was der Kopf von „Mein Hof" zeigt (components/farmer/mein-hof-kopf.tsx). */
+export type MeinHofKopfDaten = {
+  name: string
+  slug: string
+  logoUrl: string | null
+  /** Ein hochgeladenes Titelbild; null = Verlauf (bannerValue). */
+  titelbildUrl: string | null
+  bannerValue: string | null
+  bannerFocusY: number
+  zustand: HofZustand
+}
+
+/** Der Hof des angemeldeten Bauern für den Kopf — über ownerId, nie über eine ID aus der Anfrage. */
+export async function getMeinHofKopf(ownerId: string): Promise<MeinHofKopfDaten | null> {
+  const hof = await prisma.farm.findUnique({
+    where: { ownerId },
+    select: {
+      name: true,
+      slug: true,
+      logoUrl: true,
+      bannerType: true,
+      bannerUrl: true,
+      bannerValue: true,
+      bannerFocusY: true,
+      isActive: true,
+      isPaused: true,
+      approvedAt: true,
+      archivedAt: true,
+    },
+  })
+  if (!hof) return null
+  return {
+    name: hof.name,
+    slug: hof.slug,
+    logoUrl: hof.logoUrl,
+    // Dieselbe Bedingung wie die Hofseite: Foto nur bei PHOTO mit URL.
+    titelbildUrl: hof.bannerType === 'PHOTO' && hof.bannerUrl ? hof.bannerUrl : null,
+    bannerValue: hof.bannerValue,
+    bannerFocusY: hof.bannerFocusY,
+    zustand: hofZustand(hof),
+  }
 }

@@ -157,7 +157,9 @@ Client-Komponente → Server Action → Zod → Fachregel (lib) → Prisma → r
 - Die Kopfzeile klebt (`sticky`, Ebene 40): Umgebungsbanner (60) darüber, Sheets/Dialoge (50) davor, Sektionsleiste (30) darunter. Ausnahme Hofseite am Handy: Die Leiste ist `fixed` und wird erst eingehängt, wenn das Titelbild verschwindet — `sticky` verschöbe beim Einhängen den Inhalt. Eigene Stapelebenen (`isolate`) um alles mit hohen z-Werten (Leaflet), sonst liegt es über der Kopfzeile.
 
 ### Bauern-Bereich: Navigation
-- Eine Ordnung für Handy und Browser: `src/lib/bauern-navigation.ts` (Hauptpunkte, „Neu", „Dein Hof", unten). Die Komponente `farmer-nav.tsx` ordnet nur Symbole zu und zeichnet.
+- Eine Ordnung für Handy und Browser: `src/lib/bauern-navigation.ts` (Hauptpunkte, „Neu", „Verkauf und Kunden", unten; dazu die Reiter von „Mein Hof"). Die Komponente `farmer-nav.tsx` ordnet nur Symbole zu und zeichnet.
+- „Mein Hof" ist ein Punkt über mehreren Seiten (`auchAktivAuf`). Jede dieser Seiten rendert oben `MeinHofKopf` mit ihrem Reiter (`MEIN_HOF_REITER`); Unterseiten, auf denen etwas getan wird (`/status/new`), nicht. Eine neue Seite unter Mein Hof: Reiter in der Konfiguration **und** der Kopf in der Seite.
+- Teilen des Hof-Links läuft überall über `teileHof` (`src/components/shared/hof-teilen.ts`), angeboten nur, wenn `hofZustand(...).oeffentlich` — nie ein Link ins Leere.
 - Neue Seite unter `src/app/(farmer)/`: Punkt in der Konfiguration **und** Eintrag in `FARMER_PATHS` samt `matcher` von `src/proxy.ts`. `tests/bauern-navigation.test.ts` und `tests/proxy-pfade.test.ts` fallen sonst rot.
 - Handlungen („Verkauf eintragen", „Produkt anlegen") sind Einträge in `NEU` und öffnen den vorhandenen Dialog über den URL-Auftrag (§4 State-Regeln), keinen eigenen.
 - Die Blätter „Neu" und „Mehr" sind `ui/sheet` (Base UI Dialog): Escape, Tipp daneben, Fokus im Blatt. Die Leiste hebt sich nur, solange eines offen ist, auf Ebene 60 — sonst bleibt sie auf 50, damit andere Dialoge sie verdecken.

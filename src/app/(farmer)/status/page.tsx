@@ -7,6 +7,7 @@ import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getStatusPostsForFarm } from '@/server/queries/status-posts'
 import { StatusPostCard } from './status-post-card'
+import { MeinHofKopf } from '@/components/farmer/mein-hof-kopf'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +26,7 @@ export default async function StatusPage() {
 
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto">
+      <MeinHofKopf ownerId={session.user.id} aktiv="beitraege" />
       <PageHeader
         title="Status & Updates"
         subtitle="Informiere deine Kunden über Neuigkeiten vom Hof"

@@ -14,7 +14,6 @@ import {
   LogOut,
   Megaphone,
   MoreHorizontal,
-  Package,
   PackagePlus,
   Plus,
   ReceiptText,
@@ -32,6 +31,7 @@ import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from '@/com
 import {
   ABMELDEN_LABEL,
   HANDY_LEISTE,
+  VERKAUF_UND_KUNDEN_TITEL,
   aktiverPunkt,
   fuerNutzer,
   mehrAktiv,
@@ -51,12 +51,11 @@ import { cn } from '@/lib/utils'
 const SYMBOL: Record<NavPunktId, LucideIcon> = {
   heute: CalendarCheck,
   bestellungen: ReceiptText,
-  produkte: Package,
-  hofseite: Home,
+  // Ein Haus: „Mein Hof" bündelt Produkte, Hofseite und Beiträge.
+  'mein-hof': Home,
   kunden: Users,
   verkaeufe: Tag,
   auswertung: BarChart3,
-  status: Megaphone,
   einstellungen: SlidersHorizontal,
   'fehler-melden': Bug,
   meldungen: Inbox,
@@ -399,8 +398,8 @@ export function FarmerNav({
                       </SheetClose>
                     </div>
                   </div>
-                  <Gruppe>Dein Hof</Gruppe>
-                  {nav.deinHof.map((punkt) => (
+                  <Gruppe>{VERKAUF_UND_KUNDEN_TITEL}</Gruppe>
+                  {nav.verkaufUndKunden.map((punkt) => (
                     <NavZeile key={punkt.id} punkt={punkt} handy istAktiv={aktiv === punkt.id} anzahl={zahlVon(punkt)} onNavigate={schliessen} />
                   ))}
                   <div className="my-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.10)' }} />
@@ -466,8 +465,8 @@ export function FarmerNav({
             {nav.haupt.map((punkt) => (
               <NavZeile key={punkt.id} punkt={punkt} handy={false} istAktiv={aktiv === punkt.id} anzahl={zahlVon(punkt)} />
             ))}
-            <Gruppe>Dein Hof</Gruppe>
-            {nav.deinHof.map((punkt) => (
+            <Gruppe>{VERKAUF_UND_KUNDEN_TITEL}</Gruppe>
+            {nav.verkaufUndKunden.map((punkt) => (
               <NavZeile key={punkt.id} punkt={punkt} handy={false} istAktiv={aktiv === punkt.id} anzahl={zahlVon(punkt)} />
             ))}
           </nav>

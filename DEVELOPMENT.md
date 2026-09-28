@@ -2101,6 +2101,51 @@ Ordner unter `(farmer)` (neu: `/customers`, `/farm-page`, `/status`, `/fehler-me
 
 ---
 
+## Mein Hof statt Produkte (2026-09-28)
+
+Nachtrag zur Bauern-Navigation (#136), auf Wunsch des Menschen: Der vierte Platz der
+Leiste heißt nicht mehr „Produkte", sondern **„Mein Hof"** (Symbol: ein Haus). Leiste:
+Heute · Bestellungen · ➕ · Mein Hof · Mehr.
+
+**Warum.** Produkte, Hofseite und Status-Beiträge sind alle „mein Auftritt": was ich
+anbiete, wie mein Hof aussieht, was ich erzähle. Vorher lagen Hofseite und Beiträge im
+Mehr-Blatt, Produkte in der Leiste — drei Teile desselben Themas an zwei Orten. Jetzt
+liegen sie unter einem Punkt, und das Mehr-Blatt ist reiner Betrieb (Verkauf und Kunden,
+Einstellungen, Briefkasten).
+
+**Der Kopf** (`components/farmer/mein-hof-kopf.tsx`) steht über drei vorhandenen Seiten:
+schmaler Titelbild-Streifen (Foto oder der gewählte Verlauf), Hofbild, Hofname, Zustand,
+darunter die Knöpfe „Kundenansicht" (öffentliche Hofseite, neuer Tab) und „Hof teilen",
+dann die Reiter Produkte (`/products`, Standard) · Hofseite (`/farm-page`) · Beiträge
+(`/status`). Der Punkt „Mein Hof" ist auf allen drei Pfaden aktiv, auch auf
+`/status/new`. Die Seiten selbst sind unverändert; der Kopf wird in jeder Seite
+gerendert statt über ein gemeinsames Layout — so bleibt er auf Unterseiten wie
+`/status/new` weg, und keine Seite musste verschoben werden.
+
+**Zustand** (`hofZustand` in `src/lib/mein-hof.ts`), in der Reihenfolge von
+`/api/checkout`: stillgelegt → wartet auf Freischaltung → pausiert → „Im Shop sichtbar".
+Kundenansicht und Teilen erscheinen nur, wenn die Hofseite öffentlich ist (sichtbar oder
+pausiert) — ein geteilter Link, der auf „nicht gefunden" führt, wäre irreführend.
+
+**Teilen** nimmt `teileHof` aus dem Kopfzeilen-Sprint: Teilen-Menü des Geräts, sonst
+kopieren; Schließen des Menüs kopiert nichts. Damit ist die offene Frage aus #136
+erledigt: Auf Heute gibt es kein eigenes Teilen, es sitzt im Kopf von Mein Hof.
+
+**Browser:** Hauptpunkte Heute, Bestellungen, Mein Hof; die Gruppe darunter heißt
+„Verkauf und Kunden" (Kunden, Verkäufe, Auswertung).
+
+Die Titelbild-Verläufe standen in `farm-page-view.tsx`; sie liegen jetzt in
+`src/lib/mein-hof.ts`, damit Hofseite und Streifen dieselben Farben zeigen.
+
+**Offen:**
+- Doppeltes Teilen: Der Shop-Link-Balken oben (im Layout) und die Leiste der Hofseite
+  (`farm-page-client.tsx`) bieten weiter Kopieren und Teilen an — auf `/products` und
+  `/status` steht der Balken jetzt über einem Kopf, der dasselbe kann.
+- Die Seitenüberschriften bleiben, wie sie waren („Produkte", „Status & Updates"); der
+  Reiter heißt „Beiträge".
+
+---
+
 ## Nützliche Befehle
 
 ```bash

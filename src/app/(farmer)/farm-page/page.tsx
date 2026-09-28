@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth'
 import { getOwnerFarm } from '@/server/queries/farm'
 import { getActiveStatusPost, getPastStatusCount } from '@/server/queries/status-posts'
 import { FarmPageClient } from '@/components/farmer/farm-page-client'
+import { MeinHofKopf } from '@/components/farmer/mein-hof-kopf'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,5 +20,13 @@ export default async function FarmPageOwnerRoute() {
     getPastStatusCount(farm.id),
   ])
 
-  return <FarmPageClient farm={farm} activeStatus={activeStatus} pastStatusCount={pastStatusCount} />
+  return (
+    <>
+      {/* Der Kopf von „Mein Hof" über der unveränderten Hofseiten-Bearbeitung. */}
+      <div className="px-4 pt-6 max-w-2xl mx-auto">
+        <MeinHofKopf ownerId={session.user.id} aktiv="hofseite" />
+      </div>
+      <FarmPageClient farm={farm} activeStatus={activeStatus} pastStatusCount={pastStatusCount} />
+    </>
+  )
 }
