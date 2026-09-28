@@ -18,6 +18,15 @@
 //   server   Alles Übrige auf unserer Seite. Das ist kein Rat an den Bauern,
 //            sondern ein Eingeständnis: bei uns ist etwas schiefgegangen.
 //
+//   heic     An den ersten Bytes als HEIC/HEIF erkannt (foto-wege.ts), BEVOR
+//            etwas hochgeladen wird: Der Server könnte es ohnehin nur
+//            ablehnen, und 8 MB für eine sichere Ablehnung wären Verschwendung.
+//            Ohne Fachwort für den Bauern — er soll die Kamera umstellen oder
+//            neu fotografieren.
+//
+//   kein-foto  Über „Anders auswählen" (Dateien-App) kam etwas, das an den
+//            ersten Bytes kein Bild ist. Nur auf diesem Weg möglich.
+//
 // Verbindungsabbrüche beim Senden sind BEWUSST keine vierte Ursache: Ein
 // Abbruch sagt nichts über das Foto aus — nach dem Neuversuch im WLAN läuft
 // dieselbe Datei durch. Sie bekommen einen eigenen schlichten Text
@@ -31,15 +40,18 @@
 //
 // Reine Zuordnung ohne DOM, damit sie ohne Browser prüfbar ist.
 
-export type BildFehlerArt = 'lesen' | 'format' | 'server'
+import type { KartenGrund } from '@/lib/foto-wege'
+
+export type BildFehlerArt = 'lesen' | 'format' | 'server' | 'heic' | 'kein-foto'
 
 /**
  * DIAGNOSE-KENNUNG DER PILOTPHASE — temporär.
  *
  * Jede Meldung endet auf ein Kürzel wie „[F64]": Buchstabe für die Ursache
  * (E = Leseerlaubnis entzogen, L = Lesen blieb stumm, D = Lesen gescheitert
- * ohne erkennbaren Grund, F = Format, S = Server, B = Bildspeicher,
- * X = unbestimmt), Zahl für den Code-Stand. Ohne das sind die Meldungstexte
+ * ohne erkennbaren Grund, F = Format, H = HEIC an den Bytes erkannt,
+ * K = kein Foto, S = Server, B = Bildspeicher, X = unbestimmt), Zahl für den
+ * Code-Stand. Ohne das sind die Meldungstexte
  * über Stände hinweg
  * identisch, und ein zugeschicktes Bildschirmfoto verrät nicht, welcher Stand
  * es erzeugt hat — bei einem Fehler, der nur auf fremden Geräten auftritt, ist
@@ -55,10 +67,10 @@ export type BildFehlerArt = 'lesen' | 'format' | 'server'
  * entfernt: Kennung hier löschen, die Meldungen enden dann wieder auf ihren
  * letzten Satz.
  */
-export const UPLOAD_DIAG = '135'
+export const UPLOAD_DIAG = '138'
 
 /** Hängt die Kennung an eine Meldung. Ein Ort, alle Meldungen. */
-function mitKennung(text: string, buchstabe: 'E' | 'L' | 'D' | 'F' | 'S' | 'B' | 'X'): string {
+function mitKennung(text: string, buchstabe: 'E' | 'L' | 'D' | 'F' | 'H' | 'K' | 'S' | 'B' | 'X'): string {
   return `${text} [${buchstabe}${UPLOAD_DIAG}]`
 }
 
@@ -146,6 +158,46 @@ export const IMAGE_FORMAT_ERROR = mitKennung(
   'Dieses Bildformat unterstützt dein Browser nicht (z. B. HEIC) — bitte JPEG oder PNG wählen',
   'F'
 )
+
+/**
+ * HEIC an den ersten Bytes erkannt, nichts hochgeladen ([H]). Der Wortlaut ist
+ * beauftragt: kein Fachwort, dafür der Weg heraus — neu fotografieren oder die
+ * Kamera-App auf „Hohe Kompatibilität" bzw. JPEG stellen.
+ */
+export const IMAGE_HEIC_ERROR = mitKennung(
+  'Dieses Foto ist in einem Format gespeichert, das wir noch nicht öffnen können. Mach es am ' +
+    'besten neu — oder stell in der Kamera-App ‚Hohe Kompatibilität‘ bzw. JPEG ein.',
+  'H'
+)
+
+/** Über die Dateien-App kam etwas, das kein Bild ist ([K]). */
+export const IMAGE_NOT_PHOTO_ERROR = mitKennung('Das ist kein Foto.', 'K')
+
+/**
+ * Die Karte nach einem Lesefehler (Netz 2, foto-wege.ts) — EIN Satz für alle
+ * drei Urteile, denn die Karte erklärt keine Ursache, sie zeigt die Wege:
+ * „Anders auswählen", „Foto aufnehmen", Teilen. Der Buchstabe bleibt der des
+ * Urteils, damit ein Bildschirmfoto der Karte weiter sagt, was war.
+ */
+export function karteLesenText(urteil: LeseUrteil, anzahl = 1): string {
+  const buchstabe = urteil === 'erlaubnis' ? 'E' : urteil === 'cloud' ? 'L' : 'D'
+  const was = anzahl > 1 ? `diese ${anzahl} Fotos` : 'dieses Foto'
+  return mitKennung(`Dein Handy gibt ${was} auf diesem Weg nicht heraus.`, buchstabe)
+}
+
+/** Der Satz der Karte je Grund — Lesefehler nach Urteil; bei mehreren Fotos in der Mehrzahl. */
+export function karteText(grund: KartenGrund, urteil: LeseUrteil = 'unbestimmt', anzahl = 1): string {
+  if (grund === 'lesen') return karteLesenText(urteil, anzahl)
+  if (grund === 'heic') {
+    if (anzahl <= 1) return IMAGE_HEIC_ERROR
+    return mitKennung(
+      `${anzahl} Fotos sind in einem Format gespeichert, das wir noch nicht öffnen können. Mach sie am ` +
+        'besten neu — oder stell in der Kamera-App ‚Hohe Kompatibilität‘ bzw. JPEG ein.',
+      'H'
+    )
+  }
+  return anzahl <= 1 ? IMAGE_NOT_PHOTO_ERROR : mitKennung(`${anzahl} Dateien sind keine Fotos.`, 'K')
+}
 
 /**
  * Unser Fehler, nicht seiner. Deshalb kein Rat, was er anders machen soll —
@@ -247,6 +299,8 @@ const KURZ: Record<BildFehlerArt, string> = {
   lesen: 'Datei nicht lesbar',
   format: 'Format nicht unterstützt',
   server: 'Verarbeitung fehlgeschlagen',
+  heic: 'Format noch nicht möglich',
+  'kein-foto': 'kein Foto',
 }
 
 /**
@@ -262,6 +316,8 @@ const TEXT: Record<BildFehlerArt, string> = {
   lesen: IMAGE_READ_UNCLEAR_ERROR,
   format: IMAGE_FORMAT_ERROR,
   server: IMAGE_SERVER_ERROR,
+  heic: IMAGE_HEIC_ERROR,
+  'kein-foto': IMAGE_NOT_PHOTO_ERROR,
 }
 
 /**
@@ -308,7 +364,7 @@ export function bildFehlerArtVon(e: unknown): BildFehlerArt | null {
   if (e instanceof BildFehler) return e.bildFehlerArt
   if (typeof e === 'object' && e !== null && 'bildFehlerArt' in e) {
     const art = (e as { bildFehlerArt: unknown }).bildFehlerArt
-    if (art === 'lesen' || art === 'format' || art === 'server') return art
+    if (art === 'lesen' || art === 'format' || art === 'server' || art === 'heic' || art === 'kein-foto') return art
   }
   return null
 }

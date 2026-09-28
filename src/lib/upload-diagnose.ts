@@ -44,11 +44,14 @@ export type LeseVersuch =
 export type LeseErgebnis = LeseVersuch['ergebnis']
 
 /**
- * Was die Lese-Stufe über die Datei herausfand: die 64-KB-Probe und, nur wenn
- * sie scheiterte, das Volllesen. Dazu das Alter der Datei in ganzen Tagen —
- * ein sehr altes Foto aus der Galerie spricht für ein Cloud-Album.
+ * Was die Lese-Stufe über die Datei herausfand: die 64-KB-Probe, nur wenn sie
+ * scheiterte das Volllesen, und nur nach einer sofortigen Ablehnung der
+ * zweite Versuch nach der Pause (Netz 1, foto-wege.ts).
+ *
+ * Kein Dateialter mehr: Android setzt lastModified bei Galerie-Fotos auf den
+ * Auswahlzeitpunkt — die Zahl sagte nichts.
  */
-export type LeseDiagnose = { probe: LeseVersuch; voll?: LeseVersuch; dateiAlterTage: number | null }
+export type LeseDiagnose = { probe: LeseVersuch; voll?: LeseVersuch; zweiterVersuch?: LeseVersuch }
 
 const BLOB_PRAEFIX = 'Vercel Blob: '
 
@@ -330,20 +333,4 @@ export function leseFehlerBefund(fehler: unknown, verborgen: readonly string[] =
     // lässt, hat keine Auskunft — aber die Lese-Stufe muss weiterlaufen.
     return { klasse: 'unbekannt', meldung: '' }
   }
-}
-
-const TAG_MS = 24 * 60 * 60 * 1000
-
-/**
- * Alter einer Datei in ganzen Tagen aus `file.lastModified` — kein Datumsfeld.
- * Zusammen mit dem Zeitpunkt der Meldung grenzt es den Tag der Datei auf ein
- * 24-Stunden-Fenster ein; genauer nicht, und so ist es beauftragt.
- * null, wo die Zahl nichts sagt: fehlend, 0 (manche Speicherdienste liefern
- * 1970 statt nichts) oder in der Zukunft (falsche Uhr). Kennt der Browser das
- * Datum nicht, setzt er laut File API die aktuelle Zeit — dann steht hier 0.
- */
-export function dateiAlterTage(lastModified: number | undefined, jetzt: number): number | null {
-  if (typeof lastModified !== 'number' || !Number.isFinite(lastModified) || lastModified <= 0) return null
-  const alter = jetzt - lastModified
-  return alter < 0 ? null : Math.floor(alter / TAG_MS)
 }
