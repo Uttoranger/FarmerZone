@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -18,10 +18,12 @@ import {
   formatiereAbholung,
   formatiereEntfernung,
   suchForm,
+  tasteInVorschlaegen,
   waehleVorschauImBereich,
   VORSCHAU_ZEILEN,
   type Bezugspunkt,
   type UmkreisStufe,
+  type VorschlagsLage,
 } from '@/lib/hofuebersicht'
 import {
   gebindeChips,
@@ -114,6 +116,11 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
   const setzeFilter = (aenderung: Partial<HoefeFilter>) => schreibeUrl({ ...filter, ...aenderung })
   const setAnsicht = (wert: 'liste' | 'karte') => setzeFilter({ ansicht: wert })
   const setSuchtext = (wert: string) => setzeFilter({ suchtext: wert })
+  // Die Vorschlagsliste unter dem Suchfeld: offen nur beim Tippen bzw. solange
+  // das Feld den Fokus hat — beim Laden mit ?q=… bleibt sie zu, bis jemand ins
+  // Feld geht. Markiert wird über den Namen (tasteInVorschlaegen).
+  const [vorschlagsLage, setVorschlagsLage] = useState<VorschlagsLage>({ offen: false, markiert: null })
+  const listeId = useId()
   const [lage, setLage] = useState<AuswahlLage>(LEERE_LAGE)
   // Zählt jede Pin-Anfahrt, damit dieselbe Nummer zweimal hintereinander wirkt.
   const [fokus, setFokus] = useState(0)
@@ -165,6 +172,11 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
       () => berechneHofAuswahl(hoefe, { ...filter, bezugspunkt, umkreis }),
       [hoefe, filter, bezugspunkt, umkreis]
     )
+  // Vorschläge gibt es nur beim Tippen (berechneHofAuswahl). Ein markierter
+  // Name, den ein Filterwechsel aus der Liste genommen hat, gilt als keiner.
+  const vorschlagsNamen = vorschlaege.map((v) => v.name)
+  const listeOffen = vorschlaege.length > 0 && vorschlagsLage.offen
+  const markiertGueltig = vorschlagsLage.markiert === null ? -1 : vorschlagsNamen.indexOf(vorschlagsLage.markiert)
   // Fällt der gewählte (oder überfahrene) Hof aus der Liste — durch eine
   // Kategorie oder den Umkreis —, erlischt die Hervorhebung mit ihm. Sonst
   // stünde sie beim Aufheben des Filters unerklärt wieder da, ohne dass
@@ -212,6 +224,20 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
         : [...suchMarken, name],
       suchtext: '',
     })
+  }
+
+  function suchtextGetippt(wert: string) {
+    setVorschlagsLage({ offen: true, markiert: null })
+    setSuchtext(wert)
+  }
+
+  /** Pfeiltasten, Enter und Escape entscheidet tasteInVorschlaegen (rein,
+   *  getestet); hier wird nur ausgeführt. */
+  function tasteImSuchfeld(e: React.KeyboardEvent<HTMLInputElement>) {
+    const ergebnis = tasteInVorschlaegen(e.key, vorschlagsLage, vorschlagsNamen)
+    if (ergebnis.verbrauchen) e.preventDefault()
+    setVorschlagsLage(ergebnis.lage)
+    if (ergebnis.uebernehmen) suchMarkeHinzufuegen(ergebnis.uebernehmen)
   }
 
   function suchMarkeEntfernen(name: string) {
@@ -296,13 +322,17 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
             type="button"
             onClick={() => kategorieUmschalten(option.wert)}
             aria-pressed={aktiv}
-            className={`min-h-9 rounded-full border px-3 text-[13px] font-medium transition-colors ${
+            // „Eier · 3": die Zahl der Höfe mit kaufbarem Angebot in dieser
+            // Kategorie (kategorieChips, istKaufbar). Vorgelesen als Satz.
+            aria-label={`${option.label}, ${option.anzahl} ${option.anzahl === 1 ? 'Hof' : 'Höfe'}`}
+            className={`inline-flex min-h-9 items-center gap-1 rounded-full border px-3 text-[13px] font-medium transition-colors ${
               aktiv
                 ? 'border-primary bg-primary text-primary-foreground'
                 : 'border-border bg-card text-foreground hover:bg-muted/40'
             }`}
           >
             {option.label}
+            <span className={`tabular-nums ${aktiv ? '' : 'text-muted-foreground'}`}>· {option.anzahl}</span>
           </button>
         )
       })}
@@ -337,9 +367,12 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
   )
 
   /** Die Produktsuche: aktive Marken ÜBER dem Feld (gefüllt, mit Entfernen-
-   *  Zeichen), darunter das Suchfeld, darunter die Vorschlags-Knöpfe aus dem
-   *  VERFÜGBAREN Angebot des sichtbaren Ausschnitts (umrandet). Vor dem
-   *  Tippen die häufigsten Produkte, beim Tippen verengt sich die Leiste. */
+   *  Zeichen), darunter das Suchfeld, direkt darunter — erst ab dem ersten
+   *  Zeichen — die Vorschlagsliste aus dem VERFÜGBAREN Angebot des Bereichs
+   *  (höchstens sechs). Ohne Eingabe keine Vorschläge: Sie sahen als Knöpfe
+   *  aus wie Filter und schoben die Kategorien nach unten. Die Liste ist ein
+   *  Combobox-Muster (Pfeiltasten, Enter, Escape) und steht im Fluss statt
+   *  darüber, damit sie nie unter der Karte (Leaflet) verschwindet. */
   const produktSuche = (
     <div className="mt-3">
       {suchMarken.length > 0 && (
@@ -368,13 +401,59 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
         />
         <input
           type="search"
+          role="combobox"
           value={suchtext}
-          onChange={(e) => setSuchtext(e.target.value)}
+          onChange={(e) => suchtextGetippt(e.target.value)}
+          onKeyDown={tasteImSuchfeld}
+          // Wer das Feld verlässt (Tab, Antippen eines Chips), schließt die
+          // Liste — sonst schöbe sie die Chips weiter nach unten. Das
+          // Antippen eines Vorschlags nimmt dem Feld den Fokus nicht
+          // (onMouseDown unten), schließt also nicht vorzeitig.
+          onFocus={() => setVorschlagsLage((l) => ({ ...l, offen: true }))}
+          onBlur={() => setVorschlagsLage({ offen: false, markiert: null })}
           placeholder="Wonach suchst du? z. B. Eier, Brot, Wels"
           aria-label="Nach Produkten oder Höfen suchen"
+          aria-autocomplete="list"
+          aria-expanded={listeOffen}
+          aria-controls={listeId}
+          aria-activedescendant={listeOffen && markiertGueltig >= 0 ? `${listeId}-${markiertGueltig}` : undefined}
           className="min-h-11 w-full rounded-xl border border-border bg-card pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         />
       </div>
+      {listeOffen && (
+        <ul
+          id={listeId}
+          role="listbox"
+          aria-label="Vorschläge"
+          className="mt-1 overflow-hidden rounded-xl border border-border bg-popover py-1 shadow-sm dark:shadow-none"
+        >
+          {vorschlaege.map((vorschlag, i) => (
+            <li
+              key={vorschlag.name}
+              id={`${listeId}-${i}`}
+              role="option"
+              aria-selected={i === markiertGueltig}
+              // Der Fokus bleibt im Suchfeld — sonst schlösse das Antippen die
+              // Tastatur, bevor der Vorschlag übernommen ist.
+              onMouseDown={(e) => e.preventDefault()}
+              onMouseEnter={() => setVorschlagsLage((l) => ({ ...l, markiert: vorschlag.name }))}
+              onMouseLeave={() => setVorschlagsLage((l) => ({ ...l, markiert: null }))}
+              onClick={() => {
+                suchMarkeHinzufuegen(vorschlag.name)
+                setVorschlagsLage({ offen: false, markiert: null })
+              }}
+              className={`flex min-h-11 cursor-pointer items-center justify-between gap-3 px-3 text-sm ${
+                i === markiertGueltig ? 'bg-muted' : ''
+              }`}
+            >
+              <span className="min-w-0 truncate text-popover-foreground">{vorschlag.name}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {vorschlag.hoefe === 1 ? '1 Hof' : `${vorschlag.hoefe} Höfe`}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
       {/* Die Suchwirkung als Ansage fürs Vorlesen — Hausmuster wie die
           Umkreis-Meldezeile (hoefe-umkreis.tsx, role="status"): dauerhaft im
           Baum, sonst verpasst der Screenreader die erste Änderung. Sichtbar
@@ -388,24 +467,6 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
               : `${gefiltert.length} Höfe gefunden.`
           : ''}
       </p>
-      {vorschlaege.length > 0 && (
-        <div
-          className="mt-2 flex flex-wrap gap-2"
-          role="group"
-          aria-label="Vorschläge aus dem verfügbaren Angebot"
-        >
-          {vorschlaege.map((vorschlag) => (
-            <button
-              key={vorschlag.name}
-              type="button"
-              onClick={() => suchMarkeHinzufuegen(vorschlag.name)}
-              className="min-h-9 min-w-0 max-w-full truncate rounded-full border border-border bg-card px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-muted/40"
-            >
-              {vorschlag.name}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   )
 

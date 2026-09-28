@@ -2301,6 +2301,47 @@ Kennung `139`.
 
 ---
 
+## Hofübersicht: Kategorien zuerst, Vorschläge nur beim Tippen (2026-09-28)
+
+Unter dem Suchfeld auf `/hoefe` standen immer bis zu zwölf Produktnamen als Knöpfe
+(„Vorschläge aus dem verfügbaren Angebot"), auch ohne Eingabe. Sie sahen aus wie Filter und
+schoben die Kategorie-Chips nach unten.
+
+**Ursache:** `berechneHofAuswahl` (`src/lib/hofuebersicht.ts`) lieferte die Vorschläge auch bei
+leerem Suchtext — gedacht als „die häufigsten Produkte vor dem Tippen" —, und die Komponente
+zeichnete sie als Knopfreihe.
+
+**Jetzt:**
+- Vorschläge gibt es NUR, wenn nach der Suchform (`suchForm`) etwas getippt ist — reine
+  Leerzeichen zählen nicht. Höchstens sechs (`VORSCHLAGS_DECKEL`, vorher zwölf), nur aus dem
+  gewählten Bereich (wie bisher über `fasseAngebotZusammen`). Aktive Such-Marken fallen vor dem
+  Deckel heraus und kosten keinen Platz.
+- Die Vorschläge sind eine Liste direkt unter dem Suchfeld im Combobox-Muster: Suchfeld mit
+  `role="combobox"`, Liste mit `role="listbox"`. Die Tasten entscheidet `tasteInVorschlaegen`
+  (rein): Pfeile wandern ringsum und öffnen eine geschlossene Liste wieder, Enter übernimmt
+  den markierten Vorschlag als Such-Marke, Escape schließt — und wird dabei verbraucht, sonst
+  leert ein `type="search"`-Feld samt Suchfilter. Markiert wird über den Namen, nicht die
+  Stelle: Nach einem Filterwechsel zeigte eine Stelle auf einen anderen Vorschlag. Antippen
+  übernimmt ebenfalls, der Fokus bleibt im Feld; verlässt der Fokus das Feld, schließt die
+  Liste (sonst schöbe sie die Chips weiter nach unten). Beim Laden mit `?q=…` bleibt sie zu,
+  bis jemand ins Feld geht. Die Liste steht im Fluss statt darüber — so gerät sie nie unter
+  die Leaflet-Karte.
+- Die Kategorie-Chips zeigen die Zahl der Höfe mit kaufbarem Angebot („Eier · 3", aus
+  `kategorieChips`, die schon nach `istKaufbar` zählte). Vorgelesen als „Eier, 3 Höfe".
+- Such-Marken aus einem gewählten Vorschlag funktionieren wie bisher; die Sorten-Reihe
+  erscheint weiter erst nach Wahl einer Kategorie.
+
+**Offen:**
+- Die Ansicht bei 375 px in beiden Modi ist nicht maschinell geprüft (`agent-browser` ist in
+  der Sitzung nicht installiert) — Checkliste im PR.
+- Die Chip-Zahl zählt alle Höfe des Bereichs, auch außerhalb eines gesetzten Umkreises
+  (`kategorieChips` bekommt die ungefilterte Liste). Mit Umkreis kann „Eier · 3" neben einer
+  Liste mit einem Hof stehen.
+- Kategorie- und Sorten-Chips sind 36 px hoch (`min-h-9`), unter dem 44-px-Tap-Ziel; so war
+  es schon vorher.
+
+---
+
 ## Nützliche Befehle
 
 ```bash
