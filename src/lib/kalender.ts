@@ -7,6 +7,8 @@
 // als 14:00 — ohne dass dieser Code je einen Sommerzeit-Versatz rechnen
 // muss, das übernimmt der Kalender des Telefons.
 
+import { wienerMitternacht } from '@/lib/servicegebuehr'
+
 /** RFC-5545-TEXT: Rückstrich, Strichpunkt, Beistrich und Zeilenumbruch
  *  werden maskiert — sonst zerfiele z. B. „Ried, Hauptplatz 1" in Felder.
  *  Auch ein NACKTES \r (per API-Import denkbar) wird zu \n: roh wäre es in
@@ -64,6 +66,34 @@ export function wienKalendertag(moment: Date): string {
     month: '2-digit',
     day: '2-digit',
   }).format(moment)
+}
+
+/** Ein Kalendertag JJJJ-MM-TT, um `tage` verschoben (auch rückwärts) — reine Datumsrechnung, ohne Uhrzeit und Zeitzone. */
+export function tagVersetzt(kalendertag: string, tage: number): string {
+  const [j, m, t] = kalendertag.split('-').map(Number)
+  return new Date(Date.UTC(j, m - 1, t + tage)).toISOString().slice(0, 10)
+}
+
+/** Der Montag der Woche, in der `moment` in Wien liegt, als JJJJ-MM-TT. */
+export function wienWochenMontag(moment: Date): string {
+  const tag = wienKalendertag(moment)
+  const [j, m, t] = tag.split('-').map(Number)
+  const wochentag = new Date(Date.UTC(j, m - 1, t)).getUTCDay() // 0 = Sonntag
+  return tagVersetzt(tag, -((wochentag + 6) % 7))
+}
+
+/**
+ * Der Wochenbeginn in Wien: Montag 0 Uhr Wiener Zeit, als UTC-Zeitpunkt für
+ * die Datenbank. Eine Woche, die um Mitternacht UTC beginnt, begänne in Wien
+ * um 1 bzw. 2 Uhr — ein Verkauf am Montag um 0:30 fiele in die Vorwoche.
+ * Hier neben wienKalendertag, damit Heute und später die Auswertung dieselbe
+ * Grenze nehmen.
+ */
+export function wienWochenbeginn(moment: Date): Date {
+  const beginn = wienerMitternacht(wienWochenMontag(moment))
+  // Kann nicht fehlschlagen: Der Montag ist ein gültiger Kalendertag.
+  if (!beginn) throw new Error('Wochenbeginn in Wien nicht bestimmbar')
+  return beginn
 }
 
 // Die übliche statische Definition für Europe/Vienna (CET/CEST, letzter

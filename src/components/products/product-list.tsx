@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useState, useTransition, useEffect, useOptimistic } from 'react'
+import { useState, useTransition, useOptimistic } from 'react'
 import { toast } from 'sonner'
 import {
   Package,
@@ -35,10 +35,10 @@ import { StockDialog } from './stock-dialog'
 import { PageHeader } from '@/components/farmer/page-header'
 import { ImShopSchalter } from '@/components/products/im-shop-schalter'
 import { kopfzeileProdukte, markeText, produktZustand } from '@/lib/produkt-sichtbarkeit'
+import { useUrlAuftrag } from '@/lib/use-url-auftrag'
 
 type Props = {
   products: ProductData[]
-  initialEditId?: string
   /** Betriebsnummer aus den Hof-Einstellungen — Anzeige in der Futter-Kennzeichnung. */
   hofBetriebsnummer: string | null
 }
@@ -57,7 +57,7 @@ const MARKE_FARBE: Record<string, string> = {
   'Nicht im Shop': 'bg-muted text-muted-foreground border-border',
 }
 
-export function ProductList({ products: initialProducts, initialEditId, hofBetriebsnummer }: Props) {
+export function ProductList({ products: initialProducts, hofBetriebsnummer }: Props) {
   // Optimistic stock state
   const [stocks, setStocks] = useState<Record<string, number>>(
     Object.fromEntries(initialProducts.map((p) => [p.id, p.stock]))
@@ -71,13 +71,17 @@ export function ProductList({ products: initialProducts, initialEditId, hofBetri
     product: null,
   })
 
-  // Auto-open edit dialog from ?edit= URL param
-  useEffect(() => {
-    if (!initialEditId) return
-    const product = initialProducts.find((p) => p.id === initialEditId)
+  // ?neu=1 (Plus der Navigation) und ?edit=<id> (Hofseite, „Braucht dich")
+  // öffnen den vorhandenen Dialog einmal; danach verschwindet der Parameter
+  // aus der Adresse, Neuladen öffnet ihn nicht wieder.
+  useUrlAuftrag((auftrag) => {
+    if (auftrag.art === 'neu') {
+      setEditDialog({ open: true, product: null })
+      return
+    }
+    const product = initialProducts.find((p) => p.id === auftrag.id)
     if (product) setEditDialog({ open: true, product })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  })
   const [stockDialogProduct, setStockDialogProduct] = useState<ProductData | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<ProductData | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)

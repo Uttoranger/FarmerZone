@@ -5,11 +5,8 @@ import { getFarmForUser } from '@/server/queries/dashboard'
 import { getProductsForFarm, getHofBetriebsnummer } from '@/server/queries/products'
 import { ProductList } from '@/components/products/product-list'
 
-export default async function ProductsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ edit?: string }>
-}) {
+// ?neu=1 und ?edit=<id> liest die Liste selbst (src/lib/use-url-auftrag.ts).
+export default async function ProductsPage() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) redirect('/login')
 
@@ -20,11 +17,10 @@ export default async function ProductsPage({
     getProductsForFarm(farm.id),
     getHofBetriebsnummer(farm.id),
   ])
-  const { edit } = await searchParams
 
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto">
-      <ProductList products={products} initialEditId={edit} hofBetriebsnummer={hofBetriebsnummer} />
+      <ProductList products={products} hofBetriebsnummer={hofBetriebsnummer} />
     </div>
   )
 }

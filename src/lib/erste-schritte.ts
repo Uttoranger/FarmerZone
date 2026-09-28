@@ -128,3 +128,43 @@ export function ersteSchritte(daten: ErsteSchritteDaten): ErsteSchritteErgebnis 
     anzeigen: erledigt < gesamt,
   }
 }
+
+/** Die Hof-Stammdaten, aus denen die Checkliste liest — so, wie die Abfrage sie liefert. */
+export type HofFuerErsteSchritte = {
+  description: string | null
+  latitude: number | null
+  longitude: number | null
+  logoUrl: string | null
+  bannerType: string
+  bannerUrl: string | null
+  stripeAccountReady: boolean
+}
+
+/**
+ * Stammdaten und Zählwerte → Checklisten-Daten. Eine Stelle für Heute
+ * (queries/heute.ts) und die alte Übersicht (queries/dashboard.ts), damit die
+ * Bedingungen nicht auseinanderlaufen.
+ */
+export function ersteSchritteDaten(
+  hof: HofFuerErsteSchritte | null,
+  zaehler: { produkte: number; aktiveAbholzeiten: number }
+): ErsteSchritteDaten {
+  return {
+    // `description` ist eine Pflichtspalte (prisma/schema.prisma), im
+    // Onboarding aber ein optionales Feld — ein Hof ohne Beschreibung trägt
+    // einen leeren String, kein null. Ein `!== null` ginge hier immer durch.
+    hatBeschreibung: (hof?.description ?? '').trim().length > 0,
+    hatKoordinaten: hof?.latitude != null && hof?.longitude != null,
+    hatLogo: (hof?.logoUrl ?? '').trim().length > 0,
+    // Dieselbe Bedingung, mit der die Hofseite entscheidet, ob sie ein Foto
+    // oder einen Farbverlauf zeigt (farm-page-view.tsx). Ein Verlauf ist die
+    // Voreinstellung und kein hochgeladenes Titelbild — der Schritt heißt
+    // „hochladen" und wäre sonst für jeden Hof von Anfang an erledigt.
+    hatTitelbild: hof?.bannerType === 'PHOTO' && !!hof?.bannerUrl,
+    // ALLE Produkte, auch ausgeblendete: angelegt ist angelegt.
+    produkte: zaehler.produkte,
+    // Nur AKTIVE Abholzeiten: eine abgeschaltete nützt keinem Kunden.
+    aktiveAbholzeiten: zaehler.aktiveAbholzeiten,
+    zahlungBereit: hof?.stripeAccountReady === true,
+  }
+}

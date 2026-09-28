@@ -2008,6 +2008,87 @@ das Teilen-Menü, wird nichts mehr kopiert — vorher kam trotzdem „Link kopie
 
 ---
 
+## Bauern-Navigation mit fünf Plätzen und der Heute-Bildschirm (2026-09-28)
+
+**Vorher:** Die untere Leiste hatte sechs Einträge (Übersicht, Bestellungen, Kunden,
+Meine Hof-Seite, Verkauf, Mehr). „Produkte" fehlte ganz, obwohl der Hof dort am
+häufigsten nachbessert, und „Verkauf" mischte Eintragen und Liste. `/status` war nur
+über die Übersicht und die Hof-Seite zu erreichen.
+
+**Die neue Ordnung** steht in EINER Konfiguration (`src/lib/bauern-navigation.ts`), aus
+der Handy und Browser lesen:
+- Am Handy fünf Plätze: Heute · Bestellungen · ➕ · Produkte · Mehr. Heute, Bestellungen
+  und Produkte sind das Tagesgeschäft; alles andere ist seltener und liegt im Mehr-Blatt.
+- Das Plus in der Mitte (rund, 56 px, Akzentfarbe, leicht gehoben; offen dreht es sich
+  zum Kreuz) ist eine bewusste Entscheidung für die drei häufigsten Handlungen:
+  Verkauf eintragen, Status posten, Produkt anlegen. Die drei Vorbilder (eBay, alias,
+  Whatnot) haben es so nicht; das Blatt folgt dem Whatnot-Muster „Create": Symbol,
+  Titel, ein Satz.
+- „Dein Hof": Meine Hof-Seite, Kunden, Verkäufe (bisher „Verkauf" — jetzt die Liste,
+  Eintragen macht das Plus), Auswertung, Status-Beiträge. Unten: Einstellungen, Fehler
+  melden, Meine Meldungen, Admin (nur Betreiber), Abmelden.
+- Im Browser dieselbe Reihenfolge als Seitenleiste: Hof-Visitenkarte, Knopf „Neu" mit
+  Menü (Base UI Menu), Hauptpunkte, Gruppe „Dein Hof", unten der Rest. Alles unter der
+  Karte scrollt als eine Spalte, damit auf niedrigen Bildschirmen nichts abgeschnitten
+  wird.
+- Aktiv ist der längste passende Punkt; „Mehr" leuchtet für jeden Pfad, dessen Ziel im
+  Blatt liegt (z. B. `/status/new`, `/analytics/umfeld`, `/admin/meldungen`).
+
+**Das Plus öffnet vorhandene Dialoge, keine neuen.** `/sales?neu=1` und
+`/products?neu=1` öffnen den bestehenden Dialog einmal; danach nimmt die Seite den
+Parameter per `replaceState` wieder aus der Adresse, Neuladen öffnet nichts erneut.
+Dasselbe gilt jetzt für `?edit=<id>` auf `/products` (vorher blieb er stehen und öffnete
+den Dialog bei jedem Neuladen). Gelesen wird im Client über `useSearchParams` statt über
+die `searchParams` der Seite: Steht der Bauer schon auf `/products` und tippt „Produkt
+anlegen", bleibt die Liste stehen — ein Startwert sähe diesen zweiten Auftrag nie.
+
+**Heute (`/dashboard`)** beantwortet drei Fragen, in dieser Reihenfolge:
+- *Wer kommt heute?* „Heute abholen": Uhrzeit, Vorname und Initial, kurze Positionen,
+  Zahlart und ein Chip — „bereit" (READY), „vorbereiten" (bezahlt, bestätigt, in
+  Vorbereitung), „wartet auf Kunde" (PENDING_CONFIRMATION: Die Kundin hat per Mail noch
+  nicht bestätigt; „vorbereiten" wäre dort eine falsche Aufforderung). Abgeholte,
+  stornierte und nicht abgeholte fallen weg. Darunter die Packliste und, nur wenn es
+  welche gibt, „Morgen: n Bestellungen →".
+- *Was braucht mich?* „Braucht dich" zeigt nur, was eine Handlung verlangt, jede Zeile
+  mit Ziel: Abholungen, deren Tag vorbei ist und die weder als abgeholt noch als nicht
+  abgeholt markiert sind (die jüngsten fünf einzeln verlinkt), ausverkaufte Produkte im
+  Shop (bis drei einzeln, direkt in den Bearbeiten-Dialog), Produkte ohne Kategorie, die
+  Status-Erinnerung (nur fällig). Leer: „Alles erledigt."
+  „Neue Bestellungen zum Bestätigen" gibt es bewusst nicht: Der Hof bestätigt nie
+  selbst, das tut die Kundin per Mail-Link. Er markiert nur bereit, abgeholt oder nicht
+  abgeholt.
+- *Wie läuft die Woche?* Umsatz seit Montag gegen die Vorwoche bis zum selben Wochentag
+  und zur selben Uhrzeit — vorher stand am Dienstag eine halbe Woche gegen eine ganze.
+  Umsatzregel wie in der Auswertung (abgeholte Bestellungen nach Abholzeitpunkt plus
+  manuelle Verkäufe nach Verkaufsdatum), in Cent.
+
+Weggefallen: die vier Kennzahlen, die Aktionskacheln (macht jetzt das Plus), die
+WhatsApp-Karte und der Shop-Link (beides bietet der Balken oben mit Kopieren und Teilen),
+der Knopf „Produkt anlegen". Geblieben: „Erste Schritte" für neue Höfe.
+
+**Wiener Zeit.** Gruß, Datum, Tag und Woche rechnen in Wien, nicht in Serverzeit. Auf
+Vercel (UTC) stand der Hof zwischen Mitternacht und 2 Uhr früher noch im Gestern: Die
+Übersicht zeigte die Abholungen von gestern, die Packliste auch. Dafür neu in
+`kalender.ts`: `tagVersetzt`, `wienWochenMontag`, `wienWochenbeginn` — neben
+`wienKalendertag`, damit die Auswertung später dieselbe Grenze nimmt.
+
+**Packliste = Bildschirm.** `/orders/today/print` fragt über dieselbe Bedingung
+(`abholWhere`) wie „Heute abholen", mit Wiener Tagesgrenze. Abgeholte stehen jetzt auch
+auf dem Papier nicht mehr.
+
+**Proxy vollständig.** `FARMER_PATHS` und `matcher` in `src/proxy.ts` kennen jetzt jeden
+Ordner unter `(farmer)` (neu: `/customers`, `/farm-page`, `/status`, `/fehler-melden`,
+`/meldungen`). Die Seiten prüfen die Anmeldung weiterhin selbst; eine Lücke war das nicht.
+
+**Offen:**
+- Drei alte Wochenrechnungen in Serverzeit bleiben unverändert: `getDashboardStats`
+  (jetzt ungenutzt, kann weg), `getSalesOverview` („Diese Woche" auf `/sales`) und
+  `analytics.ts`. Die Zahl auf `/sales` kann deshalb nachts von der auf Heute abweichen.
+- Neues Formular „Verkauf eintragen" mit dem Betrag zuerst — eigener Sprint; das Plus
+  öffnet bis dahin den vorhandenen Dialog.
+
+---
+
 ## Nützliche Befehle
 
 ```bash

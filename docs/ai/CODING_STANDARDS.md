@@ -55,6 +55,12 @@ Bei **jeder** Codeänderung lesen.
 - **Preis-Semantik:** `price` ist der Preis je Gebinde, `unitSize` die Gebindegröße. Mit Gebinde schreibt die Anzeige „€ 50,00 für 2 kg" (nie „/ 2 kg"), darunter die Grundpreis-Zeile „€ 25,00 / kg" über `<GrundpreisZeile>` aus `src/components/shared/`. Bei Stück und Paket gibt es keine Grundpreis-Zeile. `grundpreisJeEinheit` ist nur Anzeige, nie Abrechnung.
 - Nie ein eigenes Preisformat erfinden. Nie `toFixed(2) + ' €'`.
 
+### Tage und Wochen
+- Der Tag und die Woche eines Hofs sind **Wiener** Tag und Woche, nie Serverzeit (Vercel rechnet in UTC — um 0:30 Uhr stünde der Hof sonst im Gestern).
+- Werkzeuge: `wienKalendertag`, `tagVersetzt`, `wienWochenMontag`, `wienWochenbeginn` (`src/lib/kalender.ts`), `wienerMitternacht` (`src/lib/servicegebuehr.ts`), `abholtage` und `wochenfenster` (`src/lib/heute.ts`).
+- Verboten für neue Abfragen: `setHours(0, 0, 0, 0)`, `getHours()`, `startOfWeek` aus `date-fns` auf einem Serverzeitpunkt, `toLocaleDateString` ohne `timeZone: 'Europe/Vienna'`.
+- Bestellungen eines Abholtags: `abholWhere(farmId, tag)` — dieselbe Bedingung für „Heute abholen" und die Packliste.
+
 ### Serialisierung an Client-Komponenten
 - `Decimal` und `Date` nicht roh übergeben.
 - `Decimal` → in der Query in `string` oder bereits formatiert wandeln.

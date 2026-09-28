@@ -140,6 +140,7 @@ Client-Komponente → Server Action → Zod → Fachregel (lib) → Prisma → r
 | UI-lokal (offen/zu) | `useState` | Nicht global |
 | Warenkorb | `use-cart.ts` (localStorage) + serverseitige Reservierung; der Speicher nur über `src/lib/warenkorb-speicher.ts` (ein Schlüssel, Zod, Ereignis `WARENKORB_EREIGNIS` nach jedem Schreiben) | Warenkorb ist **nie** die Wahrheit über Verfügbarkeit. Kein zweiter Zugriff auf den Schlüssel (`tests/warenkorb-speicher.test.ts`) |
 | Filter/Suche in URL | `useSearchParams` lesen, Zod-Schema in `src/schemas/` parst und verwirft Ungültiges still; schreiben mit `window.history.replaceState` (Next gleicht `useSearchParams` ab, kein Server-Roundtrip je Tipp) oder `router.replace`, wenn der Server neu rendern soll | Nicht nur im State — Ergebnisse müssen teilbar sein. **Nie** Standort/Koordinaten in die URL |
+| Auftrag in der URL (Dialog öffnen) | `?neu=1` / `?edit=<id>` über `useUrlAuftrag` (`src/lib/use-url-auftrag.ts`): liest `useSearchParams` (Zod: `src/schemas/url-auftrag.ts`), führt den Auftrag einmal aus und nimmt ihn per `replaceState` aus der Adresse | Nicht die `searchParams` der Seite als Startwert — ein zweiter Auftrag auf derselben Seite (Plus bei offenem `/products`) käme nie an. Nie einen Dialog nur für die URL bauen: der vorhandene öffnet |
 | Theme | `next-themes`, `ThemeProvider` in `src/app/layout.tsx` (`attribute="class"`, `defaultTheme="system"`) | Kein eigener Provider, keine Spalte in der Datenbank — die Wahl gehört dem Gerät |
 
 **Kein globaler Store.** Wenn etwas global wirkt, gehört es meist in die URL oder auf den Server.
@@ -154,6 +155,12 @@ Client-Komponente → Server Action → Zod → Fachregel (lib) → Prisma → r
 - Im Checkout keine Kopfzeile, sobald eine Bestellung angelegt ist (Zahlungsschritt, auch nach dessen „Zurück"): Ein Weg hinaus und zurück ergäbe eine zweite. Bekannte Grenze: Solange die Anfrage an `/api/checkout` läuft, steht die Kopfzeile noch.
 - Der Rückweg der Hofseite nimmt den **angezeigten** Bereich (`angezeigterBereich` in `src/lib/bereiche-anzeige.ts`), nicht den URL-Parameter.
 - Die Kopfzeile klebt (`sticky`, Ebene 40): Umgebungsbanner (60) darüber, Sheets/Dialoge (50) davor, Sektionsleiste (30) darunter. Ausnahme Hofseite am Handy: Die Leiste ist `fixed` und wird erst eingehängt, wenn das Titelbild verschwindet — `sticky` verschöbe beim Einhängen den Inhalt. Eigene Stapelebenen (`isolate`) um alles mit hohen z-Werten (Leaflet), sonst liegt es über der Kopfzeile.
+
+### Bauern-Bereich: Navigation
+- Eine Ordnung für Handy und Browser: `src/lib/bauern-navigation.ts` (Hauptpunkte, „Neu", „Dein Hof", unten). Die Komponente `farmer-nav.tsx` ordnet nur Symbole zu und zeichnet.
+- Neue Seite unter `src/app/(farmer)/`: Punkt in der Konfiguration **und** Eintrag in `FARMER_PATHS` samt `matcher` von `src/proxy.ts`. `tests/bauern-navigation.test.ts` und `tests/proxy-pfade.test.ts` fallen sonst rot.
+- Handlungen („Verkauf eintragen", „Produkt anlegen") sind Einträge in `NEU` und öffnen den vorhandenen Dialog über den URL-Auftrag (§4 State-Regeln), keinen eigenen.
+- Die Blätter „Neu" und „Mehr" sind `ui/sheet` (Base UI Dialog): Escape, Tipp daneben, Fokus im Blatt. Die Leiste hebt sich nur, solange eines offen ist, auf Ebene 60 — sonst bleibt sie auf 50, damit andere Dialoge sie verdecken.
 
 ## 5. Domänen-Invarianten
 
@@ -208,4 +215,5 @@ Nicht nachahmen. Beim Anfassen der Datei mit aufräumen, nicht als eigener Sprin
 | Geld teils `Decimal`, teils `Int` in Cent | Neue Geldfelder: `Decimal(10,2)`. Bestehende `*Cents` nicht umbauen. |
 | Enum-Werte `FUTTERMITTEL` (Kategorie) und `EINZELFUTTERMITTEL`, `MISCHFUTTERMITTEL`, `ERGAENZUNGSFUTTERMITTEL` (Unterkategorie) aus Taxonomie 1 | Nie wählbar anbieten, nie schreiben; Zod lehnt sie ab. Lesen nur über `istAltlastKategorie` / `istAltlastUnterkategorie`. Entfernen im Cleanup-Sprint. |
 | `FutterKennzeichnung.registrierungsnummer` — die Nummer gehört dem Hof (`Farm.betriebsnummer`) | Nie schreiben. Lesen nur als Rückfall über `betriebsnummerFuerAnzeige`. Entfernen im Cleanup-Sprint. |
+| Wochengrenzen in Serverzeit (`date-fns` `startOfWeek`, `setHours`) in `getDashboardStats` (seit Heute ungenutzt), `getSalesOverview` und `analytics.ts` | Tage und Wochen des Hofs in Wiener Zeit (`CODING_STANDARDS.md` §2). Wer eine der drei anfasst, stellt sie auf `wienWochenbeginn` um. |
 | `markAsReady`, `markAsPickedUp`, `markAsPickedUpAndPaid`, `markAsNotPickedUp` prüfen lesend und schreiben blind — ein Storno im Fenster dazwischen wird überschrieben | Neuer Statuswechsel: bedingtes `updateMany` (§5). Wer eine dieser vier anfasst, stellt sie um. |

@@ -1,35 +1,78 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, ReceiptText, Users, Home, Tag, BarChart3, SlidersHorizontal, LogOut, MoreHorizontal, X, Bug, Inbox, ShieldCheck } from 'lucide-react'
+import { Menu } from '@base-ui/react/menu'
+import {
+  Banknote,
+  BarChart3,
+  Bug,
+  CalendarCheck,
+  Home,
+  Inbox,
+  LogOut,
+  Megaphone,
+  MoreHorizontal,
+  Package,
+  PackagePlus,
+  Plus,
+  ReceiptText,
+  ShieldCheck,
+  SlidersHorizontal,
+  Tag,
+  Users,
+  X,
+  type LucideIcon,
+} from 'lucide-react'
 import { signOut } from '@/lib/auth-client'
 import { FarmIdentityCard } from '@/components/farmer/farm-identity-card'
 import { ThemeUmschalter, ThemeUmschalterZeile } from '@/components/shared/theme-umschalter'
+import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import {
+  ABMELDEN_LABEL,
+  HANDY_LEISTE,
+  aktiverPunkt,
+  fuerNutzer,
+  mehrAktiv,
+  type NavPunkt,
+  type NavPunktId,
+  type NeuId,
+  type NeuPunkt,
+} from '@/lib/bauern-navigation'
 import { cn } from '@/lib/utils'
 
-const NAV_ITEMS = [
-  { href: '/dashboard',  label: 'Übersicht',       icon: LayoutDashboard },
-  { href: '/orders',     label: 'Bestellungen',    icon: ReceiptText, badgeKey: 'orders' as const },
-  { href: '/customers',  label: 'Kunden',          icon: Users },
-  { href: '/farm-page',  label: 'Meine Hof-Seite', icon: Home },
-  { href: '/sales',      label: 'Verkauf',         icon: Tag },
-  { href: '/analytics',  label: 'Auswertung',      icon: BarChart3 },
-]
-
-/**
- * Fehlerbriefkasten: „Fehler melden" und „Meine Meldungen" liegen im Mehr-Sheet
- * (mobil) bzw. ab md in der Fußzeile der Seitenleiste — nicht in der unteren
- * Tab-Leiste, deren Platz-Regel (max. 6 Tap-Ziele) sonst bräche.
+/*
+ * Die Ordnung (welcher Punkt wohin, wann aktiv, Admin nur für den Betreiber)
+ * steht in src/lib/bauern-navigation.ts und ist dort getestet. Hier nur
+ * Symbole und Zeichnung — Handy und Browser lesen dieselbe Konfiguration.
  */
-const BRIEFKASTEN_ITEMS = [
-  { href: '/fehler-melden', label: 'Fehler melden',   icon: Bug },
-  { href: '/meldungen',     label: 'Meine Meldungen', icon: Inbox },
-]
 
-/** Pfade, bei denen der Mehr-Tab als aktiv gilt (weil ihr Ziel im Sheet liegt). */
-const MEHR_PFADE = ['/settings', '/analytics', '/fehler-melden', '/meldungen', '/admin']
+const SYMBOL: Record<NavPunktId, LucideIcon> = {
+  heute: CalendarCheck,
+  bestellungen: ReceiptText,
+  produkte: Package,
+  hofseite: Home,
+  kunden: Users,
+  verkaeufe: Tag,
+  auswertung: BarChart3,
+  status: Megaphone,
+  einstellungen: SlidersHorizontal,
+  'fehler-melden': Bug,
+  meldungen: Inbox,
+  admin: ShieldCheck,
+}
+
+const NEU_SYMBOL: Record<NeuId, LucideIcon> = {
+  'verkauf-eintragen': Banknote,
+  'status-posten': Megaphone,
+  'produkt-anlegen': PackagePlus,
+}
+
+const AKTIV: CSSProperties = { background: 'var(--app-bar-ink)', color: 'var(--app-bar)', fontWeight: 600 }
+const RUHIG: CSSProperties = { color: 'var(--app-bar-ink-soft)' }
+/** Fokusrahmen auf der dunklen Leiste — Outline statt Ring, weil einige Knöpfe ihren Schatten inline tragen. */
+const FOKUS = 'outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-bar-ink'
 
 interface FarmerNavProps {
   farmName: string
@@ -46,17 +89,104 @@ interface FarmerNavProps {
 }
 
 /**
- * Die Zahl am Menüpunkt „Admin" — dieselbe Form wie an „Bestellungen", aber
- * mit dunkler Schrift (accent-foreground): Weiß auf dem Orange erreicht bei
- * 11 px nur etwa 3:1, verlangt sind 4,5:1 (CODING_STANDARDS §7).
+ * Die Zahl an einem Punkt — offene Bestellungen oder Meldungen für den
+ * Betreiber. Dunkle Schrift (accent-foreground): Weiß auf dem Orange erreicht
+ * bei 11 px nur etwa 3:1, verlangt sind 4,5:1 (CODING_STANDARDS §7).
  */
-function AdminZahl({ anzahl }: { anzahl?: number }) {
+function Zahl({ anzahl, wofuer, klein = false }: { anzahl?: number; wofuer: string; klein?: boolean }) {
   if (!anzahl) return null
   return (
-    <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-bold leading-none text-accent-foreground">
+    <span
+      className={cn(
+        'flex items-center justify-center rounded-full bg-accent font-bold leading-none text-accent-foreground',
+        klein ? 'absolute -top-1.5 -right-2 h-4 min-w-[16px] px-1 text-[9px]' : 'ml-auto h-5 min-w-[20px] px-1.5 text-[11px]'
+      )}
+    >
       {anzahl > 99 ? '99+' : anzahl}
-      <span className="sr-only"> Meldungen zu entscheiden</span>
+      <span className="sr-only"> {wofuer}</span>
     </span>
+  )
+}
+
+/** Überschrift einer Gruppe in Blatt und Seitenleiste. */
+function Gruppe({ children }: { children: string }) {
+  return (
+    <div className="px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wider" style={RUHIG}>
+      {children}
+    </div>
+  )
+}
+
+/** Eine Zeile im Mehr-Blatt (Handy) oder in der Seitenleiste (Browser). */
+function NavZeile({
+  punkt,
+  handy,
+  istAktiv,
+  anzahl,
+  onNavigate,
+}: {
+  punkt: NavPunkt
+  handy: boolean
+  istAktiv: boolean
+  anzahl?: number
+  onNavigate?: () => void
+}) {
+  const Symbol = SYMBOL[punkt.id]
+  return (
+    <Link
+      href={punkt.href}
+      onClick={onNavigate}
+      aria-current={istAktiv ? 'page' : undefined}
+      className={cn(
+        'flex items-center gap-3 rounded-xl px-3 text-sm transition-colors duration-[250ms]',
+        handy ? 'min-h-[48px] py-2.5' : 'min-h-10 py-2',
+        !istAktiv && 'hover:bg-white/10',
+        FOKUS
+      )}
+      style={istAktiv ? { ...AKTIV, ...(handy ? {} : { boxShadow: '0 1px 4px rgba(0,0,0,0.16)' }) } : RUHIG}
+    >
+      <Symbol className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} aria-hidden="true" />
+      <span className="flex-1">{punkt.label}</span>
+      <Zahl anzahl={anzahl} wofuer={zahlWofuer(punkt)} />
+    </Link>
+  )
+}
+
+function zahlWofuer(punkt: NavPunkt): string {
+  return punkt.zahl === 'admin' ? 'Meldungen zu entscheiden' : 'offene Bestellungen'
+}
+
+/** Ein Eintrag von „Neu": Symbol, Titel, ein Satz (Muster wie bei Whatnot). */
+function NeuInhalt({ punkt }: { punkt: NeuPunkt }) {
+  const Symbol = NEU_SYMBOL[punkt.id]
+  return (
+    <>
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
+        <Symbol className="size-5" strokeWidth={1.7} aria-hidden="true" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[15px] font-semibold leading-snug">{punkt.label}</span>
+        <span className="block text-[13px] leading-snug opacity-80">{punkt.satz}</span>
+      </span>
+    </>
+  )
+}
+
+function Abmelden({ handy, onClick }: { handy: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'flex w-full items-center gap-3 rounded-xl px-3 text-sm transition-colors duration-[250ms] hover:bg-red-500/15',
+        handy ? 'min-h-[48px] py-2.5' : 'min-h-10 py-2 hover:text-red-300',
+        FOKUS
+      )}
+      style={handy ? { color: '#FCA5A5' } : RUHIG}
+    >
+      <LogOut className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} aria-hidden="true" />
+      {ABMELDEN_LABEL}
+    </button>
   )
 }
 
@@ -71,9 +201,25 @@ export function FarmerNav({
 }: FarmerNavProps) {
   const pathname = usePathname()
   const router = useRouter()
-  // Mobiles "Mehr"-Sheet (Einstellungen + Abmelden)
-  const [moreOpen, setMoreOpen] = useState(false)
-  const mehrAktiv = MEHR_PFADE.some((p) => pathname === p || pathname.startsWith(p + '/'))
+  const nav = fuerNutzer({ isAdmin })
+  const aktiv = aktiverPunkt(pathname)
+
+  // Höchstens ein Blatt offen: „Neu" oder „Mehr".
+  const [offen, setOffen] = useState<'neu' | 'mehr' | null>(null)
+  const schliessen = () => setOffen(null)
+  // Beide Blätter melden Öffnen und Schließen selbst (Escape, Tipp daneben,
+  // ihr Knopf). Ein Schließen zählt nur für das eigene Blatt — tippt der Bauer
+  // bei offenem „Neu" auf „Mehr", darf das späte Schließen von „Neu" das
+  // frisch geöffnete „Mehr" nicht wieder zumachen.
+  const wechsle = (welches: 'neu' | 'mehr') => (auf: boolean) =>
+    setOffen((jetzt) => (auf ? welches : jetzt === welches ? null : jetzt))
+
+  // Seitenwechsel (auch Zurück im Browser) schließt jedes Blatt.
+  const [letzterPfad, setLetzterPfad] = useState(pathname)
+  if (pathname !== letzterPfad) {
+    setLetzterPfad(pathname)
+    setOffen(null)
+  }
 
   async function handleLogout() {
     await signOut()
@@ -81,289 +227,245 @@ export function FarmerNav({
     router.refresh()
   }
 
-  function getBadgeCount(badgeKey?: 'orders') {
-    if (badgeKey === 'orders' && ordersBadge) return ordersBadge
+  function zahlVon(punkt: NavPunkt): number | undefined {
+    if (punkt.zahl === 'bestellungen') return ordersBadge
+    if (punkt.zahl === 'admin') return adminBadge
     return undefined
   }
 
+  // Blätter über der Leiste: Die Leiste hebt sich über den Schleier, solange
+  // eines offen ist — so bleibt das Plus als Kreuz zu sehen und zu tippen.
+  // Sonst bleibt sie auf z-50, damit andere Dialoge sie verdecken.
+  const blattStil: CSSProperties = {
+    bottom: '4rem',
+    background: 'var(--app-bar)',
+    color: 'var(--app-bar-ink)',
+    borderTop: '1px solid rgba(255,255,255,0.10)',
+    boxShadow: '0 -8px 24px rgba(0,0,0,0.25)',
+  }
+  const blattKlasse = 'gap-0 rounded-t-2xl border-t-0 px-3 pt-3 pb-3 max-h-[calc(100dvh-5rem)] overflow-y-auto md:hidden'
+
   return (
     <>
-      {/* ===== MOBILE: Bottom Tab Bar ===== */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border md:hidden print:hidden" style={{ background: 'var(--app-bar)' }}>
-        <div className="flex items-stretch h-16">
-          {/* Platz-Regel: mit 7 Tabs fielen Tap-Ziele auf 46px (<48) — Auswertung
-              wandert daher als einziger Punkt mit ins Mehr-Sheet */}
-          {NAV_ITEMS.filter((item) => item.href !== '/analytics').map(({ href, label, icon: Icon, badgeKey }) => {
-            const active = pathname === href || pathname.startsWith(href + '/')
-            const badgeCount = getBadgeCount(badgeKey)
-            return (
-              <Link
-                key={href}
-                href={href}
-                className="flex flex-1 flex-col items-center justify-center gap-0.5 min-h-[56px] text-xs transition-colors duration-[250ms] relative"
-                style={{ color: active ? 'var(--app-bar-ink)' : 'var(--app-bar-ink-soft)' }}
-              >
-                <div className="relative">
-                  <Icon className="h-5 w-5" strokeWidth={1.7} />
-                  {badgeCount && (
-                    <span
-                      className="absolute -top-1.5 -right-2 min-w-[16px] h-4 flex items-center justify-center rounded-full px-1 text-[9px] font-bold text-white leading-none"
-                      style={{ background: 'var(--accent)' }}
-                    >
-                      {badgeCount > 99 ? '99+' : badgeCount}
-                    </span>
+      {/* ===== HANDY: Leiste mit fünf Plätzen ===== */}
+      <nav
+        aria-label="Hauptnavigation"
+        className={cn(
+          'fixed bottom-0 left-0 right-0 border-t border-border md:hidden print:hidden',
+          offen ? 'z-[60]' : 'z-50'
+        )}
+        style={{ background: 'var(--app-bar)' }}
+      >
+        <div className="flex h-16 items-stretch">
+          {HANDY_LEISTE.map((platz) => {
+            if (platz.art === 'punkt') {
+              const { punkt } = platz
+              const Symbol = SYMBOL[punkt.id]
+              const istAktiv = aktiv === punkt.id && !offen
+              return (
+                <Link
+                  key={punkt.id}
+                  href={punkt.href}
+                  onClick={schliessen}
+                  aria-current={aktiv === punkt.id ? 'page' : undefined}
+                  className={cn(
+                    'relative flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 text-xs transition-colors duration-[250ms]',
+                    FOKUS
                   )}
-                </div>
-                <span className="leading-none">{label}</span>
-              </Link>
+                  style={{ color: istAktiv ? 'var(--app-bar-ink)' : 'var(--app-bar-ink-soft)' }}
+                >
+                  <span className="relative">
+                    <Symbol className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" />
+                    <Zahl anzahl={zahlVon(punkt)} wofuer={zahlWofuer(punkt)} klein />
+                  </span>
+                  <span className="leading-none">{punkt.label}</span>
+                </Link>
+              )
+            }
+
+            if (platz.art === 'neu') {
+              return (
+                <Sheet key="neu" open={offen === 'neu'} onOpenChange={wechsle('neu')}>
+                  <div className="flex flex-1 items-start justify-center">
+                    {/* Rund, 56 px, in der Akzentfarbe, leicht über die Leiste
+                        gehoben. Offen dreht sich das Plus zum Kreuz — bei
+                        reduzierter Bewegung ohne Drehbewegung, nur der Wechsel. */}
+                    <SheetTrigger
+                      aria-label="Neu anlegen"
+                      className={cn(
+                        '-mt-4 flex size-14 items-center justify-center rounded-full bg-accent text-accent-foreground',
+                        FOKUS
+                      )}
+                      style={{ boxShadow: '0 0 0 4px var(--app-bar), 0 6px 16px rgba(0,0,0,0.28)' }}
+                    >
+                      <Plus
+                        className={cn(
+                          'size-7 motion-safe:transition-transform motion-safe:duration-200',
+                          offen === 'neu' && 'rotate-45'
+                        )}
+                        strokeWidth={2}
+                        aria-hidden="true"
+                      />
+                    </SheetTrigger>
+                  </div>
+                  <SheetContent side="bottom" showCloseButton={false} className={blattKlasse} style={blattStil}>
+                    <div className="flex items-center justify-between px-3 pb-1">
+                      <SheetTitle className="font-heading text-base font-semibold" style={{ color: 'var(--app-bar-ink)' }}>
+                        Neu
+                      </SheetTitle>
+                      {/* Das Kreuz in der Leiste schließt für alle, die sehen;
+                          dieser Knopf ist für Tastatur und Screenreader da. */}
+                      <SheetClose className={cn('sr-only focus-visible:not-sr-only rounded-lg px-2 py-1 text-sm', FOKUS)}>
+                        Schließen
+                      </SheetClose>
+                    </div>
+                    {nav.neu.map((punkt) => (
+                      <Link
+                        key={punkt.id}
+                        href={punkt.href}
+                        onClick={schliessen}
+                        className={cn(
+                          'flex min-h-[56px] items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-white/10',
+                          FOKUS
+                        )}
+                        style={{ color: 'var(--app-bar-ink)' }}
+                      >
+                        <NeuInhalt punkt={punkt} />
+                      </Link>
+                    ))}
+                  </SheetContent>
+                </Sheet>
+              )
+            }
+
+            return (
+              <Sheet key="mehr" open={offen === 'mehr'} onOpenChange={wechsle('mehr')}>
+                <SheetTrigger
+                  className={cn(
+                    'flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 text-xs transition-colors duration-[250ms]',
+                    FOKUS
+                  )}
+                  style={{
+                    color: offen === 'mehr' || (!offen && mehrAktiv(pathname)) ? 'var(--app-bar-ink)' : 'var(--app-bar-ink-soft)',
+                  }}
+                >
+                  <MoreHorizontal className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" />
+                  <span className="leading-none">Mehr</span>
+                </SheetTrigger>
+                <SheetContent
+                  side="bottom"
+                  showCloseButton={false}
+                  aria-label="Mehr"
+                  className={blattKlasse}
+                  style={blattStil}
+                >
+                  {/* Kopf des Blatts: die Hof-Visitenkarte, daneben Hell/Dunkel
+                      und Schließen — wie bisher. */}
+                  <div className="mb-1 flex items-start justify-between gap-2 px-1 pt-1">
+                    <div className="min-w-0 flex-1">
+                      <FarmIdentityCard
+                        farmName={farmName}
+                        logoUrl={farmLogoUrl}
+                        wartetAufFreigabe={farmPending}
+                        onNavigate={schliessen}
+                      />
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <ThemeUmschalter className="rounded-full hover:bg-white/10" style={RUHIG} />
+                      <SheetClose
+                        aria-label="Schließen"
+                        className={cn(
+                          'flex size-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-white/10',
+                          FOKUS
+                        )}
+                        style={RUHIG}
+                      >
+                        <X className="size-5" strokeWidth={1.7} aria-hidden="true" />
+                      </SheetClose>
+                    </div>
+                  </div>
+                  <Gruppe>Dein Hof</Gruppe>
+                  {nav.deinHof.map((punkt) => (
+                    <NavZeile key={punkt.id} punkt={punkt} handy istAktiv={aktiv === punkt.id} anzahl={zahlVon(punkt)} onNavigate={schliessen} />
+                  ))}
+                  <div className="my-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.10)' }} />
+                  {nav.unten.map((punkt) => (
+                    <NavZeile key={punkt.id} punkt={punkt} handy istAktiv={aktiv === punkt.id} anzahl={zahlVon(punkt)} onNavigate={schliessen} />
+                  ))}
+                  <Abmelden handy onClick={handleLogout} />
+                </SheetContent>
+              </Sheet>
             )
           })}
-          {/* Mehr-Tab: Einstellungen + Abmelden (fehlten mobil) */}
-          <button
-            type="button"
-            onClick={() => setMoreOpen(true)}
-            aria-label="Mehr"
-            aria-expanded={moreOpen}
-            className="flex flex-1 flex-col items-center justify-center gap-0.5 min-h-[56px] text-xs transition-colors duration-[250ms]"
-            style={{ color: moreOpen || mehrAktiv ? 'var(--app-bar-ink)' : 'var(--app-bar-ink-soft)' }}
-          >
-            <MoreHorizontal className="h-5 w-5" strokeWidth={1.7} />
-            <span className="leading-none">Mehr</span>
-          </button>
         </div>
       </nav>
 
-      {/* ===== MOBILE: Mehr-Sheet ===== */}
-      {moreOpen && (
-        <div className="fixed inset-0 z-[60] md:hidden" onClick={() => setMoreOpen(false)}>
-          <div className="absolute inset-0" style={{ background: 'rgba(20,30,22,0.45)' }} />
-          <div
-            className="absolute bottom-16 left-0 right-0 rounded-t-2xl px-3 pt-3 pb-3"
-            style={{ background: 'var(--app-bar)', borderTop: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 -8px 24px rgba(0,0,0,0.25)' }}
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-label="Mehr"
-          >
-            {/* Kopfzeile des Sheets: die Hof-Identitätskarte. Sie tritt an die
-                Stelle der bisherigen „Mehr"-Versalzeile — der Name des Dialogs
-                steckt weiterhin im aria-label des Containers, es geht also
-                nichts für Screenreader verloren. Die untere Leiste selbst
-                bleibt davon unberührt. */}
-            <div className="flex items-start justify-between gap-2 px-1 mb-2 pt-1">
-              <div className="min-w-0 flex-1">
-                <FarmIdentityCard
-                  farmName={farmName}
-                  logoUrl={farmLogoUrl}
-                  wartetAufFreigabe={farmPending}
-                  onNavigate={() => setMoreOpen(false)}
-                />
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                {/* Hell/Dunkel hier statt als siebter Tab: Die Leiste hält
-                    ihre Platz-Regel (6 Ziele), der Umschalter ist trotzdem von
-                    jeder Bauern-Seite aus über „Mehr" erreichbar. */}
-                <ThemeUmschalter
-                  className="rounded-full hover:bg-white/10"
-                  style={{ color: 'var(--app-bar-ink-soft)' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setMoreOpen(false)}
-                  aria-label="Schließen"
-                  className="flex shrink-0 items-center justify-center size-8 rounded-full transition-colors hover:bg-white/10"
-                  style={{ color: 'var(--app-bar-ink-soft)' }}
-                >
-                  <X className="size-4" strokeWidth={1.7} />
-                </button>
-              </div>
-            </div>
-            <Link
-              href="/analytics"
-              onClick={() => setMoreOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm min-h-[48px]"
-              style={
-                pathname.startsWith('/analytics')
-                  ? { background: 'var(--app-bar-ink)', color: 'var(--app-bar)', fontWeight: 600 }
-                  : { color: 'var(--app-bar-ink-soft)' }
-              }
-            >
-              <BarChart3 className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} />
-              Auswertung
-            </Link>
-            {BRIEFKASTEN_ITEMS.map(({ href, label, icon: Icon }) => (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setMoreOpen(false)}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm min-h-[48px]"
-                style={
-                  pathname === href || pathname.startsWith(href + '/')
-                    ? { background: 'var(--app-bar-ink)', color: 'var(--app-bar)', fontWeight: 600 }
-                    : { color: 'var(--app-bar-ink-soft)' }
-                }
-              >
-                <Icon className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} />
-                {label}
-              </Link>
-            ))}
-            <Link
-              href="/settings"
-              onClick={() => setMoreOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm min-h-[48px]"
-              style={
-                pathname.startsWith('/settings')
-                  ? { background: 'var(--app-bar-ink)', color: 'var(--app-bar)', fontWeight: 600 }
-                  : { color: 'var(--app-bar-ink-soft)' }
-              }
-            >
-              <SlidersHorizontal className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} />
-              Einstellungen
-            </Link>
-            {isAdmin && (
-              <Link
-                href="/admin"
-                onClick={() => setMoreOpen(false)}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm min-h-[48px]"
-                style={
-                  pathname.startsWith('/admin')
-                    ? { background: 'var(--app-bar-ink)', color: 'var(--app-bar)', fontWeight: 600 }
-                    : { color: 'var(--app-bar-ink-soft)' }
-                }
-              >
-                <ShieldCheck className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} />
-                Admin
-                <AdminZahl anzahl={adminBadge} />
-              </Link>
-            )}
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm min-h-[48px] transition-colors hover:bg-red-500/15"
-              style={{ color: '#FCA5A5' }}
-            >
-              <LogOut className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} />
-              Abmelden
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ===== DESKTOP: Sidebar ===== */}
+      {/* ===== BROWSER: Seitenleiste ===== */}
       <aside
-        className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:w-56 z-40 print:hidden"
+        className="hidden md:fixed md:inset-y-0 md:left-0 md:z-40 md:flex md:w-56 md:flex-col print:hidden"
         style={{ background: 'var(--app-bar)', borderRight: '1px solid rgba(255,255,255,0.08)' }}
       >
-        {/* Hof-Identitätskarte am Kopf der Seitenleiste. Sie tritt an die
-            Stelle der bisherigen Namenszeile („Hof" + Name + Nutzer): dieselbe
-            Information, dazu Logo, Vorschau-Schaltfläche und Freigabe-Zustand.
-            Der Nutzername bleibt darunter stehen — er sagt, WER angemeldet ist,
-            und das beantwortet die Karte nicht. */}
-        <div className="px-4 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
-          <FarmIdentityCard
-            farmName={farmName}
-            logoUrl={farmLogoUrl}
-            wartetAufFreigabe={farmPending}
-          />
-          <div className="text-xs truncate mt-2.5" style={{ color: 'var(--app-bar-ink-soft)', opacity: 0.7 }}>{userName}</div>
+        {/* Hof-Visitenkarte am Kopf. Der Nutzername darunter sagt, WER
+            angemeldet ist — das beantwortet die Karte nicht. */}
+        <div className="shrink-0 px-4 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
+          <FarmIdentityCard farmName={farmName} logoUrl={farmLogoUrl} wartetAufFreigabe={farmPending} />
+          <div className="mt-2.5 truncate text-xs" style={{ color: 'var(--app-bar-ink-soft)', opacity: 0.7 }}>
+            {userName}
+          </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 min-h-0 px-2 py-3 space-y-0.5 overflow-y-auto">
-          {NAV_ITEMS.map(({ href, label, icon: Icon, badgeKey }) => {
-            const active = pathname === href || pathname.startsWith(href + '/')
-            const badgeCount = getBadgeCount(badgeKey)
-            return (
-              <Link
-                key={href}
-                href={href}
+        {/* Alles darunter scrollt als eine Spalte: Auf niedrigen Bildschirmen
+            bleibt so jeder Punkt erreichbar, auf hohen sitzt der Rest unten. */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <div className="px-2 pt-3">
+            <Menu.Root>
+              <Menu.Trigger
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-[250ms] min-h-[44px]',
+                  'flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent px-3 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover',
+                  FOKUS
                 )}
-                style={
-                  active
-                    ? {
-                        background: 'var(--app-bar-ink)',
-                        color: 'var(--app-bar)',
-                        fontWeight: 600,
-                        boxShadow: '0 1px 4px rgba(0,0,0,0.16)',
-                      }
-                    : { color: 'var(--app-bar-ink-soft)' }
-                }
               >
-                <Icon className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} />
-                <span className="flex-1">{label}</span>
-                {badgeCount && (
-                  <span
-                    className="min-w-[20px] h-5 flex items-center justify-center rounded-full px-1.5 text-[11px] font-bold text-white leading-none"
-                    style={{ background: 'var(--accent)' }}
-                  >
-                    {badgeCount > 99 ? '99+' : badgeCount}
-                  </span>
-                )}
-              </Link>
-            )
-          })}
-        </nav>
+                <Plus className="size-4" strokeWidth={2} aria-hidden="true" />
+                Neu
+              </Menu.Trigger>
+              <Menu.Portal>
+                <Menu.Positioner side="bottom" align="start" sideOffset={6} className="z-50 outline-none">
+                  <Menu.Popup className="w-72 origin-[var(--transform-origin)] rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-lg outline-none transition-[opacity,transform] duration-150 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+                    {nav.neu.map((punkt) => (
+                      <Menu.LinkItem
+                        key={punkt.id}
+                        closeOnClick
+                        render={<Link href={punkt.href} />}
+                        className="flex items-center gap-3 rounded-lg px-2.5 py-2 outline-none data-[highlighted]:bg-muted"
+                      >
+                        <NeuInhalt punkt={punkt} />
+                      </Menu.LinkItem>
+                    ))}
+                  </Menu.Popup>
+                </Menu.Positioner>
+              </Menu.Portal>
+            </Menu.Root>
+          </div>
 
-        {/* Footer: Briefkasten + Settings (+ Admin) + Logout */}
-        <div className="shrink-0 px-2 py-3 space-y-0.5" style={{ borderTop: '1px solid rgba(255,255,255,0.10)' }}>
-          {BRIEFKASTEN_ITEMS.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-[250ms] min-h-[44px]"
-              style={
-                pathname === href || pathname.startsWith(href + '/')
-                  ? { background: 'var(--app-bar-ink)', color: 'var(--app-bar)', fontWeight: 600, boxShadow: '0 1px 4px rgba(0,0,0,0.16)' }
-                  : { color: 'var(--app-bar-ink-soft)' }
-              }
-            >
-              <Icon className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} />
-              {label}
-            </Link>
-          ))}
-          {/* Hell/Dunkel als Zeile wie die Nachbarn — ein Klick von jeder
-              Bauern-Seite, ohne den Weg über Einstellungen → Konto. */}
-          <ThemeUmschalterZeile
-            className="duration-[250ms] hover:bg-white/10"
-            style={{ color: 'var(--app-bar-ink-soft)' }}
-          />
-          <Link
-            href="/settings"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-[250ms] min-h-[44px]"
-            style={
-              pathname.startsWith('/settings')
-                ? { background: 'var(--app-bar-ink)', color: 'var(--app-bar)', fontWeight: 600, boxShadow: '0 1px 4px rgba(0,0,0,0.16)' }
-                : { color: 'var(--app-bar-ink-soft)' }
-            }
-          >
-            <SlidersHorizontal className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} />
-            Einstellungen
-          </Link>
-          {isAdmin && (
-            <Link
-              href="/admin"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-[250ms] min-h-[44px]"
-              style={
-                pathname.startsWith('/admin')
-                  ? { background: 'var(--app-bar-ink)', color: 'var(--app-bar)', fontWeight: 600, boxShadow: '0 1px 4px rgba(0,0,0,0.16)' }
-                  : { color: 'var(--app-bar-ink-soft)' }
-              }
-            >
-              <ShieldCheck className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} />
-              Admin
-              <AdminZahl anzahl={adminBadge} />
-            </Link>
-          )}
+          <nav aria-label="Hauptnavigation" className="space-y-0.5 px-2 py-3">
+            {nav.haupt.map((punkt) => (
+              <NavZeile key={punkt.id} punkt={punkt} handy={false} istAktiv={aktiv === punkt.id} anzahl={zahlVon(punkt)} />
+            ))}
+            <Gruppe>Dein Hof</Gruppe>
+            {nav.deinHof.map((punkt) => (
+              <NavZeile key={punkt.id} punkt={punkt} handy={false} istAktiv={aktiv === punkt.id} anzahl={zahlVon(punkt)} />
+            ))}
+          </nav>
 
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-[250ms] min-h-[44px] hover:bg-red-500/15 hover:text-red-300"
-            style={{ color: 'var(--app-bar-ink-soft)' }}
-          >
-            <LogOut className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} />
-            Abmelden
-          </button>
+          <div className="mt-auto space-y-0.5 px-2 py-3" style={{ borderTop: '1px solid rgba(255,255,255,0.10)' }}>
+            {nav.unten.map((punkt) => (
+              <NavZeile key={punkt.id} punkt={punkt} handy={false} istAktiv={aktiv === punkt.id} anzahl={zahlVon(punkt)} />
+            ))}
+            {/* Hell/Dunkel als Zeile wie die Nachbarn — ein Klick von jeder
+                Bauern-Seite, ohne den Weg über Einstellungen → Konto. */}
+            <ThemeUmschalterZeile className={cn('min-h-10 py-2 duration-[250ms] hover:bg-white/10', FOKUS)} style={RUHIG} />
+            <Abmelden handy={false} onClick={handleLogout} />
+          </div>
         </div>
       </aside>
     </>

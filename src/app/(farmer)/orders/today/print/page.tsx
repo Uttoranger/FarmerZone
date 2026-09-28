@@ -8,6 +8,7 @@ import { ArrowLeft } from 'lucide-react'
 import { PrintButton } from '@/components/orders/print-button'
 import { unitSuffix } from '@/lib/order-line'
 import { barZuKassierenCents, bestellSummen } from '@/lib/servicegebuehr'
+import { abholtage, abholWhere, datumLang } from '@/lib/heute'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,17 +47,11 @@ export default async function PrintPacklistPage() {
   const farm = await getFarmForUser(session.user.id)
   if (!farm) redirect('/login')
 
-  const tagStart = new Date()
-  tagStart.setHours(0, 0, 0, 0)
-  const tagEnde = new Date()
-  tagEnde.setHours(23, 59, 59, 999)
-
+  // Dieselbe Bedingung wie „Heute abholen" auf /dashboard, mit Wiener
+  // Tagesgrenze: Bildschirm und Papier zeigen dieselben Bestellungen.
+  const jetzt = new Date()
   const orders = await prisma.order.findMany({
-    where: {
-      farmId: farm.id,
-      pickupDate: { gte: tagStart, lte: tagEnde },
-      status: { notIn: ['CANCELLED', 'NOT_PICKED_UP'] },
-    },
+    where: abholWhere(farm.id, abholtage(jetzt).heute),
     include: {
       items: {
         select: {
@@ -70,12 +65,7 @@ export default async function PrintPacklistPage() {
     orderBy: { pickupTimeStart: 'asc' },
   })
 
-  const today = new Date().toLocaleDateString('de-AT', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
+  const today = datumLang(jetzt)
 
   // Aggregate pack list (Schlüssel: Produktname; Einheit fürs Suffix gemerkt)
   const packList = new Map<string, { qty: number; product: (typeof orders)[number]['items'][number]['product'] }>()
