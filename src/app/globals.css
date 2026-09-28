@@ -32,6 +32,8 @@
   --color-accent-hover: var(--accent-hover);
   --color-brand-text: var(--brand-text);
   --color-landing-green: var(--landing-green);
+  --color-landing-wald: var(--landing-wald);
+  --color-landing-wald-ink: var(--landing-wald-ink);
   --color-app-page: var(--app-page);
   --color-app-ink: var(--app-ink);
   --color-app-ink-soft: var(--app-ink-soft);
@@ -151,6 +153,14 @@
   --landing-base: oklch(0.955 0.011 136.6); /* #EDF2EB */
   /* Frisches Grün der Zierlinien und der großen Schritt-Ziffern */
   --landing-green: oklch(0.703 0.081 150); /* #7BAE85 */
+  /* Das Waldgrün-Band der Startseite (Abschnitt Heu und Futter) und der
+     gefüllte Knopf im Kopf, der dort Crème ist und Waldgrün schreibt. In
+     BEIDEN Modi dunkelgrün mit Crème — wie die Bauern-Leiste: Das Band hebt
+     sich am Tag vom hellen, nachts vom fast schwarzen Grund ab, und der Knopf
+     steht auf dem Foto, das dem Modus ohnehin nicht folgt. Deshalb nur hier,
+     nicht noch einmal in .dark. Werte = --primary / --primary-foreground am Tag. */
+  --landing-wald: oklch(0.30 0.082 155); /* #1F4732 */
+  --landing-wald-ink: oklch(0.95 0.018 87); /* #F5EFE0 */
 
   /* ── Anmeldeseiten ──────────────────────────────────────────
      Login, Registrierung, Passwort und Onboarding stehen auf demselben

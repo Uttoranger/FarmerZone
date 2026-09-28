@@ -283,6 +283,9 @@ Fotos und Hof-Banner werden nicht abgedunkelt. Schleier über Fotos, weiße
 Schrift auf Fotos, Kartenkacheln samt Pins (siehe `hoefe-karte.tsx`), die
 Bildmarke und fremde Markenfarben (WhatsApp-Grün, Stripes Eingabemaske) bleiben,
 wie sie sind. Wo das so ist, gehört ein Kommentar daneben, der es begründet.
+Bewusst in beiden Modi gleich sind außerdem die Bauern-Leiste (`app-bar`) und
+das Waldgrün der Startseite (`landing-wald` mit `landing-wald-ink`) — beide
+stehen nur in `:root`, nicht noch einmal in `.dark`.
 
 ### Diagramme
 Recharts schreibt Farben als SVG-Attribute — `var(--token)` greift dort **nicht**.
