@@ -91,16 +91,26 @@ export function naechsterAktiverReiter(input: {
 }
 
 /**
- * Wohin die Seite nach dem Schließen der Bildansicht gehört — null, wenn sie
- * sich nicht bewegt hat.
+ * Wohin die Seite nach der Bildansicht gehört — null, wenn nichts zu tun ist.
  *
  * Die Sperre über body.style.overflow hält nicht überall: Auf iOS greift sie
  * bei eingeklappter Safari-Leiste nicht (so auch der Kommentar in Base UIs
  * useScrollLock), und eine Wischgeste über dem Bild schiebt die Seite darunter
  * weiter. Ohne Rückweg stünde man nach dem Schließen in einem anderen
- * Abschnitt (Meldung cmua8bof). Unter einem Pixel ist kein Weg: Hochauflösende
- * Bildschirme melden krumme Werte, ein Rücksprung darum wäre selbst ein Ruckeln.
+ * Abschnitt (Meldung cmua8bof).
+ *
+ * Nur beim echten Schließen: Wird die Hofseite bei offenem Bild verlassen
+ * (Zurück-Geste, Link aus dem Overlay), hebt React die Sperre erst auf, wenn
+ * die neue Seite schon steht — ein Rücksprung schöbe dann die falsche Seite.
+ * Unter einem Pixel ist kein Weg: Hochauflösende Bildschirme melden krumme
+ * Werte, ein Rücksprung darum wäre selbst ein Ruckeln.
  */
-export function scrollNachBildansicht(stand: { beimOeffnen: number; jetzt: number }): number | null {
+export function stelleNachBildansicht(stand: {
+  beimOeffnen: number
+  jetzt: number
+  /** true nur, wenn die Bildansicht selbst geschlossen wurde — nicht die Seite darunter. */
+  geschlossen: boolean
+}): number | null {
+  if (!stand.geschlossen) return null
   return Math.abs(stand.jetzt - stand.beimOeffnen) < 1 ? null : stand.beimOeffnen
 }
