@@ -7,6 +7,7 @@ import { Loader2, Plus, Trash2, Check, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DezimalFeld } from '@/components/shared/dezimal-feld'
 import {
   createFarm,
   createOnboardingProducts,
@@ -17,7 +18,9 @@ import { generateSlug } from '@/lib/slug'
 import { findBatchSlotError } from '@/lib/pickup-slot-rules'
 
 type Step = 1 | 2 | 3 | 4
-type ProductRow = { name: string; price: string; unit: string; stock: string }
+// Preis und Bestand als Zahl (DezimalFeld liest Komma wie Punkt); leer ist null.
+type ProductRow = { name: string; price: number | null; unit: string; stock: number | null }
+type ProductError = { name?: string; price?: string; stock?: string }
 type SlotRow = { dayOfWeek: string; startTime: string; endTime: string }
 
 // ─── Tiny label helpers ──────────────────────────────────────────────────────
@@ -58,7 +61,7 @@ const DAY_OPTIONS = [
 const STEP_LABELS = ['Hof-Daten', 'Produkte', 'Abholzeiten', 'Fertig!']
 
 function emptyProduct(): ProductRow {
-  return { name: '', price: '', unit: 'KG', stock: '50' }
+  return { name: '', price: null, unit: 'KG', stock: 50 }
 }
 
 function emptySlot(): SlotRow {
@@ -125,7 +128,7 @@ export function OnboardingClient({ userEmail, appUrl }: { userEmail: string; app
 
   // ── Step 2 fields ──────────────────────────────────────────────
   const [products, setProducts] = useState<ProductRow[]>([emptyProduct()])
-  const [productErrors, setProductErrors] = useState<Array<{ name?: string; price?: string }>>([])
+  const [productErrors, setProductErrors] = useState<ProductError[]>([])
 
   // ── Step 3 fields ──────────────────────────────────────────────
   const [slots, setSlots] = useState<SlotRow[]>([emptySlot()])
@@ -227,15 +230,19 @@ export function OnboardingClient({ userEmail, appUrl }: { userEmail: string; app
     if (!skip) {
       // Validate started product rows (any field has content = started)
       const errors = products.map((p) => {
-        const isStarted = p.name.trim() || p.price
-        const err: { name?: string; price?: string } = {}
+        const isStarted = p.name.trim() || p.price !== null
+        const err: ProductError = {}
         if (isStarted) {
           if (!p.name.trim()) err.name = 'Bitte gib den Produktnamen an.'
-          if (!p.price || Number(p.price) <= 0) err.price = 'Bitte gib einen gültigen Preis an (z.B. 3.50).'
+          if (p.price === null || p.price <= 0) err.price = 'Bitte gib einen gültigen Preis an (z. B. 3,50).'
+          // Der Bestand ist in der Datenbank eine ganze Zahl — „2,5" käme dort
+          // nicht an, also hier abfangen statt mit einem Speicherfehler.
+          if (p.stock !== null && (!Number.isInteger(p.stock) || p.stock < 0))
+            err.stock = 'Bitte gib den Bestand als ganze Zahl an (z. B. 50).'
         }
         return err
       })
-      const hasProductErrors = errors.some((e) => e.name || e.price)
+      const hasProductErrors = errors.some((e) => e.name || e.price || e.stock)
       if (hasProductErrors) {
         setProductErrors(errors)
         fireToast('Bitte fülle die markierten Felder aus.')
@@ -243,7 +250,9 @@ export function OnboardingClient({ userEmail, appUrl }: { userEmail: string; app
       }
       setProductErrors([])
 
-      const valid = products.filter((p) => p.name.trim() && p.price && Number(p.price) > 0)
+      const valid = products.filter(
+        (p): p is ProductRow & { price: number } => Boolean(p.name.trim()) && p.price !== null && p.price > 0
+      )
       if (valid.length === 0) {
         setFehler('Bitte füge mindestens ein Produkt hinzu oder überspringe diesen Schritt.')
         return
@@ -252,7 +261,7 @@ export function OnboardingClient({ userEmail, appUrl }: { userEmail: string; app
       setLaedt(true)
       const result = await createOnboardingProducts(
         farmId,
-        valid.map((p) => ({ name: p.name, price: Number(p.price), unit: p.unit, stock: Number(p.stock) || 50 }))
+        valid.map((p) => ({ name: p.name, price: p.price, unit: p.unit, stock: p.stock ?? 50 }))
       )
       setLaedt(false)
       if ('error' in result) {
@@ -553,15 +562,13 @@ export function OnboardingClient({ userEmail, appUrl }: { userEmail: string; app
                   <div className="grid grid-cols-3 gap-2 items-start">
                     <div className="flex flex-col gap-1">
                       <span className="text-xs text-muted-foreground">Preis (€) <span className="text-destructive" aria-hidden="true">*</span></span>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0.01"
-                        placeholder="3.50"
+                      <DezimalFeld
+                        stellen={2}
+                        placeholder="3,50"
                         value={p.price}
-                        onChange={(e) => {
+                        onChange={(wert) => {
                           const next = [...products]
-                          next[i] = { ...next[i], price: e.target.value }
+                          next[i] = { ...next[i], price: wert }
                           setProducts(next)
                           if (pe.price) {
                             const errs = [...productErrors]
@@ -593,18 +600,24 @@ export function OnboardingClient({ userEmail, appUrl }: { userEmail: string; app
                     </div>
                     <div className="flex flex-col gap-1">
                       <span className="text-xs text-muted-foreground">Lagerbestand</span>
-                      <Input
-                        type="number"
-                        min="0"
+                      <DezimalFeld
                         placeholder="50"
                         value={p.stock}
-                        onChange={(e) => {
+                        onChange={(wert) => {
                           const next = [...products]
-                          next[i] = { ...next[i], stock: e.target.value }
+                          next[i] = { ...next[i], stock: wert }
                           setProducts(next)
+                          if (pe.stock) {
+                            const errs = [...productErrors]
+                            errs[i] = { ...errs[i], stock: undefined }
+                            setProductErrors(errs)
+                          }
                         }}
+                        aria-invalid={pe.stock ? true : undefined}
+                        aria-describedby={pe.stock ? `p${i}-stock-error` : undefined}
                         className="h-10"
                       />
+                      {pe.stock && <FieldErr id={`p${i}-stock-error`} msg={pe.stock} />}
                     </div>
                   </div>
                 </div>

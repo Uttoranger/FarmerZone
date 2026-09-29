@@ -93,11 +93,27 @@ const nextConfig: NextConfig = {
 // withSentryConfig verdrahtet die Build-Seite von Sentry (Quelltext-Karten,
 // Turbopack-Regeln). Es UMSCHLIESST die Konfiguration nur — serverExternal-
 // Packages, das sharp-Tracing und die Security-Header oben bleiben unberührt.
-// Der Quelltext-Karten-Upload läuft erst, wenn SENTRY_AUTH_TOKEN, SENTRY_ORG
-// und SENTRY_PROJECT in Vercel stehen; ohne sie meldet der Build eine Notiz
-// und bleibt GRÜN — fehlende Sentry-Werte dürfen niemals einen Deploy
-// verhindern (gleicher Grundsatz wie beim DSN in src/lib/env.ts).
+// Organisation und Projekt stehen fest hier — sie sind kein Geheimnis, und als
+// Umgebungsvariable gab es sie nie. Geheim ist nur SENTRY_AUTH_TOKEN (in Vercel
+// für Production und Preview). Ohne Token (lokal, CI) überspringt der Build
+// den Upload mit einer Notiz und bleibt GRÜN — fehlende Sentry-Werte dürfen
+// niemals einen Deploy verhindern (gleicher Grundsatz wie beim DSN in
+// src/lib/env.ts).
+//
+// Keine SENTRY_URL für die EU-Region: Der Organisations-Token (sntrys_…)
+// trägt die Adresse seiner Region in sich, und sentry-cli zieht sie der
+// voreingestellten sentry.io vor.
 export default withSentryConfig(nextConfig, {
+  org: 'farmerzone',
+  project: 'javascript-nextjs',
+  // Build-Werkzeug, keine App-Laufzeit: @/lib/env gilt hier nicht.
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  sourcemaps: {
+    // Nach dem Upload löschen — sonst lägen die Karten unter /_next/static
+    // öffentlich, und jeder könnte den ungepressten Quelltext lesen. Steht
+    // ausdrücklich da, auch wenn es heute der Standard ist.
+    deleteSourcemapsAfterUpload: true,
+  },
   // Keine Nutzungsstatistik des Sentry-Build-Werkzeugs an Sentry senden.
   telemetry: false,
 });

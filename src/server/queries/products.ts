@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { categoryImagePath } from '@/lib/product-image'
+import { zuProduktDto } from '@/lib/produkt-dto'
 import type {
   Abgabe,
   Futtermittelart,
@@ -113,10 +114,9 @@ export async function getProductsForFarm(farmId: string): Promise<ProductData[]>
     abgabe: p.abgabe,
     categoryImageUrl: categoryImagePath(p.category),
     countsTowardLimit: p.countsTowardLimit,
-    price: Number(p.price),
+    ...zuProduktDto({ price: p.price, unitSize: p.unitSize }),
     vatRate: Number(p.vatRate),
     unit: p.unit,
-    unitSize: p.unitSize ? Number(p.unitSize) : null,
     stock: p.stock,
     reservedStock: p.reservedStock,
     isAvailable: p.isAvailable,

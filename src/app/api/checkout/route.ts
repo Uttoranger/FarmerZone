@@ -85,6 +85,69 @@ async function gibBestandZurueck(gebucht: Array<{ productId: string; quantity: n
   }
 }
 
+const CODE_BESTELLUNG_IN_ARBEIT = 'BESTELLUNG_IN_ARBEIT'
+
+/**
+ * Gibt es zu diesem Schlüssel schon eine Bestellung, die Antwort mit ihr —
+ * sonst null. EINE Stelle für Schritt 0, den Index-Konflikt in Schritt 9 und
+ * den letzten Blick vor jedem 409.
+ */
+async function antwortFuerBestehendeBestellung(
+  idempotencyKey: string | undefined
+): Promise<NextResponse | null> {
+  if (!idempotencyKey) return null
+  const bestehend = await prisma.order.findUnique({
+    where: { idempotencyKey },
+    select: { id: true, orderNumber: true, paymentMethod: true, stripePaymentIntentId: true },
+  })
+  if (!bestehend) return null
+  if (bestehend.paymentMethod === 'ONLINE') {
+    // Die Gewinnerin legt den PaymentIntent erst NACH der Bestellung an. In
+    // diesem Fenster gibt es noch kein Client-Secret — eine 200 ohne ließe die
+    // Zahlungsmaske abstürzen. Also bitten wir um einen zweiten Versuch; dann
+    // steht der Intent, und die Antwort unten trägt ihn.
+    if (!bestehend.stripePaymentIntentId) {
+      return NextResponse.json(
+        {
+          error: 'Deine Bestellung wird gerade angelegt. Bitte versuch es in ein paar Sekunden noch einmal.',
+          code: CODE_BESTELLUNG_IN_ARBEIT,
+        },
+        { status: 409 }
+      )
+    }
+    // Für die Zahlungsmaske braucht der Browser das Client-Secret erneut.
+    const intent = await stripe.paymentIntents.retrieve(bestehend.stripePaymentIntentId)
+    return NextResponse.json({
+      orderId: bestehend.id,
+      orderNumber: bestehend.orderNumber,
+      clientSecret: intent.client_secret,
+      wiederholt: true,
+    })
+  }
+  return NextResponse.json({
+    orderId: bestehend.id,
+    orderNumber: bestehend.orderNumber,
+    requiresConfirmation: true,
+    wiederholt: true,
+  })
+}
+
+/**
+ * 409 — außer, zu diesem Schlüssel steht inzwischen eine Bestellung.
+ *
+ * Zwei gleichzeitige Anfragen mit demselben Schlüssel: Die Gewinnerin legt die
+ * Bestellung an und löscht danach die Halte der Sitzung. Die Verliererin sieht
+ * dann „Reservierung abgelaufen" oder einen verbrauchten Bestand — beides
+ * stimmt für sie nicht, denn ihre Bestellung gibt es ja. Der letzte Blick
+ * macht daraus die 200 mit genau dieser Bestellung.
+ */
+async function konflikt(idempotencyKey: string | undefined, inhalt: object): Promise<NextResponse> {
+  return (
+    (await antwortFuerBestehendeBestellung(idempotencyKey)) ??
+    NextResponse.json(inhalt, { status: 409 })
+  )
+}
+
 export async function POST(request: NextRequest) {
   const limited = enforceRateLimit('checkout', request)
   if (limited) return limited
@@ -114,30 +177,8 @@ export async function POST(request: NextRequest) {
   // 0. IDEMPOTENZ — vor allem anderen. Kennt der Server den Schlüssel schon,
   //    ist die Bestellung bereits angelegt; sie wird zurückgegeben, nichts
   //    Zweites entsteht, kein Bestand wird ein zweites Mal gebucht.
-  if (data.idempotencyKey) {
-    const bestehend = await prisma.order.findUnique({
-      where: { idempotencyKey: data.idempotencyKey },
-      select: { id: true, orderNumber: true, paymentMethod: true, stripePaymentIntentId: true },
-    })
-    if (bestehend) {
-      if (bestehend.paymentMethod === 'ONLINE' && bestehend.stripePaymentIntentId) {
-        // Für die Zahlungsmaske braucht der Browser das Client-Secret erneut.
-        const intent = await stripe.paymentIntents.retrieve(bestehend.stripePaymentIntentId)
-        return NextResponse.json({
-          orderId: bestehend.id,
-          orderNumber: bestehend.orderNumber,
-          clientSecret: intent.client_secret,
-          wiederholt: true,
-        })
-      }
-      return NextResponse.json({
-        orderId: bestehend.id,
-        orderNumber: bestehend.orderNumber,
-        requiresConfirmation: true,
-        wiederholt: true,
-      })
-    }
-  }
+  const wiederholung = await antwortFuerBestehendeBestellung(data.idempotencyKey)
+  if (wiederholung) return wiederholung
 
   // 1. Load farm
   const farm = await prisma.farm.findUnique({
@@ -152,21 +193,21 @@ export async function POST(request: NextRequest) {
   // Zustand sticht den vorübergehenden, damit ein stillgelegter Hof nie die
   // Pausen-Meldung ausgibt ("bald wieder da" wäre eine falsche Zusage).
   if (farm.archivedAt) {
-    return NextResponse.json({ error: FARM_ARCHIVED_MESSAGE }, { status: 409 })
+    return konflikt(data.idempotencyKey, { error: FARM_ARCHIVED_MESSAGE })
   }
 
   // 1b². Freischaltung — nach der Stilllegung, aber VOR der Pause: ein noch
   // nicht freigeschalteter Hof darf keine Pausen-Meldung ausgeben, denn er
   // war nie offen (siehe src/lib/farm-approval.ts).
   if (!farm.approvedAt) {
-    return NextResponse.json({ error: FARM_NOT_APPROVED_MESSAGE }, { status: 409 })
+    return konflikt(data.idempotencyKey, { error: FARM_NOT_APPROVED_MESSAGE })
   }
 
   // 1c. Shop-Pause — fail-closed VOR jeder Bestell- und Zahlungslogik:
   // vor der Bestandsprüfung, vor prisma.order.create und vor jedem Stripe-Aufruf.
   // Eine ausgeblendete Schaltfläche ist keine Durchsetzung; die Wahrheit steht hier.
   if (farm.isPaused) {
-    return NextResponse.json({ error: SHOP_PAUSED_MESSAGE }, { status: 409 })
+    return konflikt(data.idempotencyKey, { error: SHOP_PAUSED_MESSAGE })
   }
 
   // 2. Validate payment method availability
@@ -198,14 +239,14 @@ export async function POST(request: NextRequest) {
   )
 
   if (pruefung.befund.etwasAbgelaufen || pruefung.befund.etwasGeaendert) {
-    return NextResponse.json(
+    return konflikt(
+      data.idempotencyKey,
       {
         error: pruefung.meldung ?? 'Dein Warenkorb hat sich geändert.',
         code: pruefung.befund.etwasAbgelaufen ? CODE_RESERVIERUNG_ABGELAUFEN : 'WARENKORB_GEAENDERT',
         items: pruefung.berichtigt,
         positionen: pruefung.befund.positionen,
       },
-      { status: 409 }
     )
   }
 
@@ -219,9 +260,9 @@ export async function POST(request: NextRequest) {
   })
   const produktJeId = new Map(produkte.map((p) => [p.id, p]))
   if (data.items.some((i) => !produktJeId.has(i.productId))) {
-    return NextResponse.json(
+    return konflikt(
+      data.idempotencyKey,
       { error: 'Dein Warenkorb hat sich geändert. Bitte prüfe ihn noch einmal.', code: 'WARENKORB_GEAENDERT' },
-      { status: 409 }
     )
   }
 
@@ -234,7 +275,8 @@ export async function POST(request: NextRequest) {
   const abweichend = preisAbweichungen(data.items, dbPreise)
   if (abweichend.length > 0) {
     const namen = abweichend.map((a) => `„${a.name}“`).join(', ')
-    return NextResponse.json(
+    return konflikt(
+      data.idempotencyKey,
       {
         error:
           abweichend.length === 1
@@ -243,7 +285,6 @@ export async function POST(request: NextRequest) {
         code: 'WARENKORB_GEAENDERT',
         preise: abweichend.map(({ productId, price }) => ({ productId, price })),
       },
-      { status: 409 }
     )
   }
   // Ab hier rechnet alles mit dem Preis aus der DB — auch wenn er gleich war.
@@ -316,12 +357,12 @@ export async function POST(request: NextRequest) {
     })
     if (res.count === 0) {
       await gibBestandZurueck(gebucht)
-      return NextResponse.json(
+      return konflikt(
+        data.idempotencyKey,
         {
           error: `"${item.name}" wurde gerade von jemand anderem gekauft. Bitte prüfe deinen Warenkorb.`,
           code: 'WARENKORB_GEAENDERT',
         },
-        { status: 409 }
       )
     }
     gebucht.push({ productId: item.productId, quantity: item.quantity })
@@ -377,20 +418,8 @@ export async function POST(request: NextRequest) {
     // Zwei Requests mit demselben Schlüssel gleichzeitig: Der zweite läuft in
     // den eindeutigen Index. Dann gewinnt der erste, und der zweite bekommt
     // dessen Bestellung — kein Fehler für die Kundin.
-    if (data.idempotencyKey) {
-      const bestehend = await prisma.order.findUnique({
-        where: { idempotencyKey: data.idempotencyKey },
-        select: { id: true, orderNumber: true, paymentMethod: true, stripePaymentIntentId: true },
-      })
-      if (bestehend) {
-        return NextResponse.json({
-          orderId: bestehend.id,
-          orderNumber: bestehend.orderNumber,
-          requiresConfirmation: bestehend.paymentMethod !== 'ONLINE',
-          wiederholt: true,
-        })
-      }
-    }
+    const wiederholung = await antwortFuerBestehendeBestellung(data.idempotencyKey)
+    if (wiederholung) return wiederholung
     console.error('[/api/checkout] Bestellung konnte nicht angelegt werden', e)
     return NextResponse.json(
       { error: 'Die Bestellung konnte nicht angelegt werden. Bitte versuche es erneut.' },
