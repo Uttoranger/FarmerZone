@@ -1,5 +1,4 @@
 import { prisma } from '@/lib/prisma'
-import { startOfWeek, endOfWeek } from 'date-fns'
 import {
   sumOnlinePaid,
   sumBarKassiert,
@@ -10,6 +9,10 @@ import {
 } from '@/lib/sales-summary'
 import { getYtdRevenue } from './analytics'
 import { formatPosition } from '@/lib/format'
+import { centsAlsEuro } from '@/lib/servicegebuehr'
+import { umsatzBestellungWhere, umsatzfenster, umsatzVerkaufWhere } from '@/lib/umsatz'
+import { meistverkaufteProdukte } from '@/lib/verkauf-eintragen'
+import { centAusDecimal } from './umsatz'
 
 export type ManualSaleData = {
   id: string
@@ -25,8 +28,8 @@ export type ManualSaleData = {
 
 // Verkauf 2: Wochen-Summen (Online/Bar), Gesamt (YTD) und die vereinte
 // "Letzte Verkäufe"-Liste — Unterscheidung rein über stripePaymentIntentId,
-// KEIN Schema-Change. Zeitraum der Karten: laufende Woche (Mo–So), dieselbe
-// Wochen-Definition wie das Dashboard.
+// KEIN Schema-Change. Zeitraum der Karten: laufende Woche nach der EINEN
+// Umsatzregel (src/lib/umsatz.ts) — dieselbe Zahl wie auf Heute.
 export type SalesOverview = {
   weekTotal: number
   weekOnline: number
@@ -70,18 +73,16 @@ function toFeedOrder(o: PickedOrderRow): SalesFeedOrder {
   }
 }
 
-export async function getSalesOverview(farmId: string): Promise<SalesOverview> {
-  const now = new Date()
-  const wochenStart = startOfWeek(now, { weekStartsOn: 1 })
-  const wochenEnde = endOfWeek(now, { weekStartsOn: 1 })
+export async function getSalesOverview(farmId: string, jetzt: Date = new Date()): Promise<SalesOverview> {
+  const woche = umsatzfenster('woche', jetzt).aktuell
 
   const [weekOrders, weekSales, recentOrders, recentSales, ytdTotal] = await Promise.all([
     prisma.order.findMany({
-      where: { farmId, status: 'PICKED_UP', pickedUpAt: { gte: wochenStart, lte: wochenEnde } },
+      where: umsatzBestellungWhere(farmId, woche),
       select: PICKED_ORDER_SELECT,
     }),
     prisma.manualSale.findMany({
-      where: { farmId, saleDate: { gte: wochenStart, lte: wochenEnde } },
+      where: umsatzVerkaufWhere(farmId, woche),
       select: { id: true, totalAmount: true, saleDate: true },
     }),
     prisma.order.findMany({
@@ -91,16 +92,19 @@ export async function getSalesOverview(farmId: string): Promise<SalesOverview> {
       select: PICKED_ORDER_SELECT,
     }),
     getRecentManualSales(farmId, 10),
-    getYtdRevenue(farmId),
+    getYtdRevenue(farmId, jetzt),
   ])
 
-  const weekFeedOrders = weekOrders.map(toFeedOrder)
-  const weekFeedSales = weekSales.map((s) => ({ id: s.id, totalAmount: Number(s.totalAmount), saleDate: s.saleDate }))
+  // Summen in Cent (CODING_STANDARDS §2 Geld), erst zur Anzeige in Euro. Achtung:
+  // totalAmount trägt hier Cent, im Feed (toFeedOrder) Euro — die Summen-
+  // Funktionen rechnen einheitenlos, die Umrechnung steht nur hier.
+  const weekFeedOrders = weekOrders.map((o) => ({ ...toFeedOrder(o), totalAmount: centAusDecimal(o.totalAmount) }))
+  const weekFeedSales = weekSales.map((s) => ({ id: s.id, totalAmount: centAusDecimal(s.totalAmount), saleDate: s.saleDate }))
 
   return {
-    weekTotal: sumWeekTotal(weekFeedOrders, weekFeedSales),
-    weekOnline: sumOnlinePaid(weekFeedOrders),
-    weekBar: sumBarKassiert(weekFeedOrders, weekFeedSales),
+    weekTotal: centsAlsEuro(sumWeekTotal(weekFeedOrders, weekFeedSales)),
+    weekOnline: centsAlsEuro(sumOnlinePaid(weekFeedOrders)),
+    weekBar: centsAlsEuro(sumBarKassiert(weekFeedOrders, weekFeedSales)),
     ytdTotal,
     feed: mergeSalesFeed(recentOrders.map(toFeedOrder), recentSales, 10),
   }
@@ -124,4 +128,28 @@ export async function getRecentManualSales(farmId: string, limit = 20): Promise<
     saleDate: s.saleDate,
     note: s.note,
   }))
+}
+
+/**
+ * Die Produkte, die der Hof in den letzten 90 Tagen am häufigsten verkauft
+ * hat — für die Schnellwahl „Was?" im Verkauf-Dialog. Gezählt werden
+ * abgeholte Bestellpositionen und manuelle Verkäufe mit Produkt, nach
+ * derselben Umsatzregel wie überall.
+ */
+export async function getMeistverkaufteProduktIds(farmId: string, jetzt: Date = new Date()): Promise<string[]> {
+  const fenster = { von: new Date(jetzt.getTime() - 90 * 24 * 60 * 60 * 1000), bis: jetzt }
+  const [positionen, verkaeufe] = await Promise.all([
+    prisma.orderItem.findMany({
+      where: { order: umsatzBestellungWhere(farmId, fenster) },
+      select: { productId: true, totalPrice: true },
+    }),
+    prisma.manualSale.findMany({
+      where: { ...umsatzVerkaufWhere(farmId, fenster), productId: { not: null } },
+      select: { productId: true, totalAmount: true },
+    }),
+  ])
+  return meistverkaufteProdukte([
+    ...positionen.map((p) => ({ productId: p.productId, cent: centAusDecimal(p.totalPrice) })),
+    ...verkaeufe.flatMap((s) => (s.productId ? [{ productId: s.productId, cent: centAusDecimal(s.totalAmount) }] : [])),
+  ])
 }

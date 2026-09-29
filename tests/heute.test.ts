@@ -7,8 +7,8 @@
  *    schon der neue Tag, obwohl UTC noch im alten steht.
  *  - Packliste und „Heute abholen" teilen EINE Bedingung — ohne abgeholte,
  *    stornierte und nicht abgeholte Bestellungen.
- *  - Woche ab Montag 0 Uhr Wien, auch über die Zeitumstellung; die Vorwoche
- *    zählt bis zum selben Wochentag und zur selben Uhrzeit.
+ *  - Woche ab Montag 0 Uhr Wien, auch über die Zeitumstellung (die Fenster
+ *    samt Vorwoche prüft tests/umsatz.test.ts).
  *  - Die nächste Abholung heißt „Morgen", bis fünf Tage voraus nach dem
  *    Wochentag, weiter weg mit Datum — an leeren Tagen gibt es keine Zeile.
  *  - Braucht dich: jede Art mit ihrem Ziel, leer bleibt leer.
@@ -34,7 +34,6 @@ import {
   ueberfaelligWhere,
   vergleichText,
   vorwocheBis,
-  wochenfenster,
   wochenvergleich,
   type BrauchtDichDaten,
   type HeutigeAbholung,
@@ -153,41 +152,6 @@ describe('Wiener Woche (kalender.ts)', () => {
     // Umstellungssonntag auf Sommerzeit (29.3.2026) gehört zur Woche davor
     expect(iso(wienWochenbeginn(new Date('2026-03-29T12:00:00Z')))).toBe('2026-03-22T23:00:00.000Z')
     expect(iso(wienWochenbeginn(new Date('2026-03-30T12:00:00Z')))).toBe('2026-03-29T22:00:00.000Z')
-  })
-})
-
-describe('wochenfenster — Vorwoche bis zum selben Wochentag und zur selben Uhrzeit', () => {
-  it('Mittwoch 14:30 gegen den Mittwoch davor, 14:30', () => {
-    const jetzt = new Date('2026-09-30T12:30:00Z')
-    const { dieseWoche, vorwoche } = wochenfenster(jetzt)
-    expect(iso(dieseWoche.von)).toBe('2026-09-27T22:00:00.000Z')
-    expect(dieseWoche.bis).toBe(jetzt)
-    expect(iso(vorwoche.von)).toBe('2026-09-20T22:00:00.000Z')
-    expect(iso(vorwoche.bis)).toBe('2026-09-23T12:30:00.000Z')
-  })
-
-  it('über die Zeitumstellung bleibt es 14:30 Wiener Zeit', () => {
-    // Mittwoch 28.10. 14:30 Winterzeit gegen Mittwoch 21.10. 14:30 Sommerzeit
-    const { dieseWoche, vorwoche } = wochenfenster(new Date('2026-10-28T13:30:00Z'))
-    expect(iso(dieseWoche.von)).toBe('2026-10-25T23:00:00.000Z')
-    expect(iso(vorwoche.von)).toBe('2026-10-18T22:00:00.000Z')
-    expect(iso(vorwoche.bis)).toBe('2026-10-21T12:30:00.000Z')
-  })
-
-  it('am 25-Stunden-Sonntag reicht die Vorwoche nicht in diese Woche hinein', () => {
-    // Sonntag 25.10.2026, 23:30 Winterzeit — der Tag hat 25 Stunden.
-    const { dieseWoche, vorwoche } = wochenfenster(new Date('2026-10-25T22:30:00Z'))
-    expect(iso(dieseWoche.von)).toBe('2026-10-18T22:00:00.000Z')
-    expect(iso(vorwoche.von)).toBe('2026-10-11T22:00:00.000Z')
-    expect(vorwoche.bis < dieseWoche.von).toBe(true)
-    expect(iso(vorwoche.bis)).toBe('2026-10-18T21:59:59.999Z')
-  })
-
-  it('Montag 0:30 Wien: die Woche hat eben erst begonnen', () => {
-    const { dieseWoche, vorwoche } = wochenfenster(new Date('2026-10-04T22:30:00Z'))
-    expect(iso(dieseWoche.von)).toBe('2026-10-04T22:00:00.000Z')
-    expect(iso(vorwoche.von)).toBe('2026-09-27T22:00:00.000Z')
-    expect(iso(vorwoche.bis)).toBe('2026-09-27T22:30:00.000Z')
   })
 })
 

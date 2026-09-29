@@ -1,23 +1,19 @@
-﻿import { redirect } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
-import { getAnalyticsData, getYtdRevenue, type PeriodKey } from '@/server/queries/analytics'
-import { AnalyticsDashboard } from '@/components/analytics/analytics-dashboard'
+import { getUmsatzAuswertung, getYtdRevenue } from '@/server/queries/analytics'
+import { UmsatzAuswertungAnzeige } from '@/components/analytics/umsatz-auswertung'
 import { PageHeader } from '@/components/farmer/page-header'
 import { AuswertungReiter } from '@/components/analytics/auswertung-reiter'
 import { PROCESSING_REVENUE_LIMIT, limitProgress } from '@/lib/revenue-limit'
-
-const VALID_PERIODS: PeriodKey[] = ['week', 'month', 'quarter', 'year']
-
-function formatEuro(n: number) {
-  return new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
-}
+import { formatEuro } from '@/lib/format'
+import { leseAuswertungZeitraum } from '@/schemas/auswertung'
 
 export default async function AnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string }>
+  searchParams: Promise<{ periode?: string | string[]; zurueck?: string | string[] }>
 }) {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) redirect('/login')
@@ -25,20 +21,17 @@ export default async function AnalyticsPage({
   const farm = await getFarmForUser(session.user.id)
   if (!farm) redirect('/login')
 
-  const params = await searchParams
-  const period: PeriodKey = VALID_PERIODS.includes(params.period as PeriodKey)
-    ? (params.period as PeriodKey)
-    : 'week'
+  const { periode, zurueck } = leseAuswertungZeitraum(await searchParams)
 
-  const [data, ytdRevenue] = await Promise.all([
-    getAnalyticsData(farm.id, period),
+  const [daten, ytdRevenue] = await Promise.all([
+    getUmsatzAuswertung(farm.id, periode, zurueck),
     getYtdRevenue(farm.id),
   ])
 
   const { pct, remaining } = limitProgress(ytdRevenue)
-  const year = new Date().getFullYear()
-  // "55.000 €" für Fließtext/Titel (Intl stellt das €-Zeichen voran, daher manuell)
-  const limitLabel = `${PROCESSING_REVENUE_LIMIT.toLocaleString('de-AT')} €`
+  // Das Wiener Kalenderjahr, wie die Grenzwert-Summe (getYtdRevenue).
+  const year = new Intl.DateTimeFormat('de-AT', { timeZone: 'Europe/Vienna', year: 'numeric' }).format(new Date())
+  const limitLabel = formatEuro(PROCESSING_REVENUE_LIMIT, 0)
 
   let barColor = 'bg-primary/80'
   let textColor = 'text-primary'
@@ -61,17 +54,21 @@ export default async function AnalyticsPage({
       <PageHeader title="Auswertung" subtitle="Umsatz und Verkaufskanäle im Überblick" />
       <AuswertungReiter aktiv="umsatz" />
 
+      <UmsatzAuswertungAnzeige daten={daten} />
+
+      {/* Die Jahresgrenze gilt unabhängig vom gewählten Zeitraum — daher unter
+          dem Zeitraum statt darüber. */}
       {/* Grenze Be- & Verarbeitung (LK OÖ, Stand 2025) */}
-      <div className={`rounded-2xl border p-5 mb-6 ${bgColor}`}>
+      <div className={`rounded-2xl border p-5 mt-6 ${bgColor}`}>
         <div className="flex items-start justify-between gap-3 mb-3">
           <div>
             <p className={`text-xs font-semibold uppercase tracking-wide mb-0.5 ${textColor}`}>
               {limitLabel} Grenze Be- &amp; Verarbeitung {year}
             </p>
             <p className="text-2xl font-bold text-foreground">
-              {formatEuro(ytdRevenue)}
+              {formatEuro(ytdRevenue, 0)}
               <span className="text-sm font-normal text-muted-foreground ml-1.5">
-                von {formatEuro(PROCESSING_REVENUE_LIMIT)}
+                von {formatEuro(PROCESSING_REVENUE_LIMIT, 0)}
               </span>
             </p>
           </div>
@@ -96,7 +93,7 @@ export default async function AnalyticsPage({
           <span className={`font-medium ${textColor}`}>{statusLabel}</span>
           {remaining > 0 && (
             <span className="text-muted-foreground">
-              Noch {formatEuro(remaining)} Spielraum
+              Noch {formatEuro(remaining, 0)} Spielraum
             </span>
           )}
         </div>
@@ -114,8 +111,6 @@ export default async function AnalyticsPage({
           Steuerberatung. Details: Landwirtschaftskammer.
         </p>
       </div>
-
-      <AnalyticsDashboard data={data} currentPeriod={period} />
     </div>
   )
 }
