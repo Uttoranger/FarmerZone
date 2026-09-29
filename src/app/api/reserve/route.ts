@@ -6,9 +6,13 @@ import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 
+const MAX_MENGE = 10_000
+
 const bodySchema = z.object({
   productId: z.string().min(1),
-  quantity: z.number().int().positive(),
+  // Obergrenze gegen Bestand blockieren mit einer Riesenmenge — so viel führt
+  // kein Hof, und der Bestand ist ein Int.
+  quantity: z.number().int().positive().max(MAX_MENGE),
   sessionId: z.string().min(1),
 })
 
@@ -27,7 +31,13 @@ export async function POST(request: NextRequest) {
 
   const parsed = bodySchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Ungültige Parameter' }, { status: 400 })
+    const mengeZuGross = parsed.error.issues.some(
+      (issue) => issue.path[0] === 'quantity' && issue.code === 'too_big'
+    )
+    return NextResponse.json(
+      { error: mengeZuGross ? 'Bitte eine Menge bis 10.000.' : 'Ungültige Parameter' },
+      { status: 400 }
+    )
   }
 
   const { productId, quantity, sessionId } = parsed.data

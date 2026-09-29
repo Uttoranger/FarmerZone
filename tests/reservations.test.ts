@@ -149,6 +149,26 @@ describe('Randfälle', () => {
     expect(productFindUnique).not.toHaveBeenCalled()
   })
 
+  it('lehnt mehr als 10.000 Stück mit 400 und verständlichem Text ab', async () => {
+    const res = await POST(makeRequest({ ...validBody, quantity: 10_001 }))
+
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ error: 'Bitte eine Menge bis 10.000.' })
+    expect(productFindUnique).not.toHaveBeenCalled()
+  })
+
+  it('nimmt genau 10.000 Stück noch an', async () => {
+    productFindUnique.mockResolvedValue({
+      stock: 20_000,
+      isAvailable: true,
+      farm: { isPaused: false, approvedAt: new Date('2026-01-01T00:00:00.000Z') },
+    } as never)
+
+    const res = await POST(makeRequest({ ...validBody, quantity: 10_000 }))
+
+    expect(res.status).toBe(200)
+  })
+
   it('lehnt ungültiges JSON mit 400 ab', async () => {
     const req = new NextRequest('http://localhost/api/reserve', {
       method: 'POST',

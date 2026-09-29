@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { hofAdresse, hofZustand, titelbildFoto, type HofZustand } from '@/lib/mein-hof'
 import { APP_URL } from '@/lib/umgebung-server'
 import { categoryImagePath } from '@/lib/product-image'
+import { zuProduktDto } from '@/lib/produkt-dto'
 import { DEFAULT_SECTIONS, type SectionConfig } from './appearance'
 import { PRODUCT_ORDER_BY } from './products'
 import type {
@@ -206,9 +207,7 @@ function alsOeffentlichesProdukt(
   hof: { betriebsnummer: string | null }
 ): PublicProduct {
   return {
-    ...p,
-    price: Number(p.price),
-    unitSize: p.unitSize ? Number(p.unitSize) : null,
+    ...zuProduktDto(p),
     categoryImageUrl: categoryImagePath(p.category),
     isOrganic: p.labels.includes('BIO'),
     futter: futter
@@ -700,9 +699,8 @@ export async function getOeffentlicheHoefe(
     // (istKaufbar in baueAngebotsZeile). Vorher zählten die Chips jedes
     // sichtbare Produkt, die Suche nur solche mit freiem Bestand.
     const angebot = baueAngebotsZeile({
-      ...zeile,
+      ...zuProduktDto(zeile),
       isAvailable: true, // die Abfrage liest nur sichtbare Produkte
-      price: Number(zeile.price),
       futter: zeile.futter ? { ...zeile.futter, nettoMenge: Number(zeile.futter.nettoMenge) } : null,
     })
     if (angebot) {
@@ -738,9 +736,8 @@ export async function getOeffentlicheHoefe(
       produkte: hof.products.map((p) => ({
         id: p.id,
         name: p.name,
-        price: Number(p.price),
+        ...zuProduktDto({ price: p.price, unitSize: p.unitSize }),
         unit: p.unit,
-        unitSize: p.unitSize === null ? null : Number(p.unitSize),
         imageUrl: p.imageUrl,
         category: p.category,
         // „Verfügbar" heißt: Es ist noch etwas da, das nicht schon reserviert
