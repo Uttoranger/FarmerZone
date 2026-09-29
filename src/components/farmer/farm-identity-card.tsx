@@ -20,8 +20,8 @@ import { hofInitialen } from '@/lib/hof-initialen'
  *  - Sie zeigt nicht die öffentliche Hof-URL. Die trägt der Shop-Link-Balken
  *    (shop-link-banner.tsx) mit Kopieren und Teilen; hier führt die
  *    Schaltfläche in die Eigentümer-Vorschau /farm-page.
- *  - Sie ersetzt den Freigabe-Balken nicht. Der Punkt „Wartet auf
- *    Freischaltung" ist eine Zustandsanzeige an der Identität, die Erklärung
+ *  - Sie ersetzt den Freigabe-Balken nicht. Der Punkt „Noch nicht
+ *    freigegeben" ist eine Zustandsanzeige an der Identität, die Erklärung
  *    samt Hof-ID und Rückfrage-Link bleibt beim Balken
  *    (pending-approval-banner.tsx).
  */
@@ -85,8 +85,10 @@ export function FarmIdentityCard({
             style={{ background: '#A9CFE3' }}
             aria-hidden="true"
           />
+          {/* Derselbe Wortlaut wie das Schild im Kopf von Mein Hof — am
+              Desktop stehen beide zugleich auf dem Bildschirm. */}
           <span className="text-[11px] leading-tight" style={{ color: 'rgba(207,228,214,0.75)' }}>
-            Wartet auf Freischaltung
+            Noch nicht freigegeben
           </span>
         </div>
       )}

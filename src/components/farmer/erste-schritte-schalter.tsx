@@ -38,11 +38,13 @@ export function ErsteSchritteSchalter({
       type="button"
       onClick={klick}
       disabled={laeuft}
+      // Im Kopf der Karte heißt er nur „Ausblenden" — der Screenreader braucht den Bezug.
+      aria-label={richtung === 'aus' ? 'Erste Schritte ausblenden' : undefined}
       className={cn(
-        'rounded-md text-[13px] font-medium underline-offset-2 transition-colors hover:underline disabled:opacity-60 outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+        // min-h-11 = 44 px Tippfläche; -my-2 hält die Zeile trotzdem schlank.
+        'inline-flex min-h-11 items-center rounded-md text-[13px] font-medium text-app-ink-soft underline-offset-2 transition-colors hover:text-app-ink hover:underline disabled:opacity-60 outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
         className
       )}
-      style={{ color: 'var(--app-ink-faint)' }}
     >
       {richtung === 'aus' ? 'Ausblenden' : 'Erste Schritte einblenden'}
     </button>

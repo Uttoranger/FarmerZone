@@ -128,6 +128,7 @@ describe('Mein Hof', () => {
 })
 
 describe('Hilfe und Rückmeldung', () => {
+  // Sicher: Der Test „Unten: …" oben beweist, dass der Punkt existiert.
   const hilfe = UNTEN.find((p) => p.id === 'hilfe')!
 
   it('leuchtet auf /meldungen und auf /fehler-melden', () => {

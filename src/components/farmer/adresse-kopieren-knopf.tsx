@@ -21,7 +21,7 @@ export function AdresseKopierenKnopf({ url, className }: { url: string; classNam
       toast.success('Adresse kopiert')
       setTimeout(() => setKopiert(false), 2000)
     } catch {
-      toast.error('Die Adresse konnte nicht kopiert werden.')
+      toast.error('Die Adresse ließ sich nicht kopieren — markier sie und kopier sie selbst.')
     }
   }
 
@@ -31,7 +31,8 @@ export function AdresseKopierenKnopf({ url, className }: { url: string; classNam
       onClick={() => void kopiere()}
       aria-label={kopiert ? 'Adresse kopiert' : 'Adresse kopieren'}
       className={cn(
-        'inline-flex size-8 shrink-0 items-center justify-center rounded-md text-app-ink-soft transition-colors hover:bg-muted/60 hover:text-app-ink outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+        // size-11 = 44 px Tippfläche; -my-2 hält die Adresszeile trotzdem schlank.
+        'inline-flex size-11 -my-2 shrink-0 items-center justify-center rounded-md text-app-ink-soft transition-colors hover:bg-muted/60 hover:text-app-ink outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
         className
       )}
     >

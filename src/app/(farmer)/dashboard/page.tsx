@@ -262,7 +262,7 @@ export default async function HeutePage() {
 
       {ersteSchritteZeigen === 'zeile' && (
         <p className="mt-2 text-center">
-          <ErsteSchritteSchalter richtung="ein" className="inline-flex min-h-11 items-center px-3" />
+          <ErsteSchritteSchalter richtung="ein" className="px-3" />
         </p>
       )}
     </div>

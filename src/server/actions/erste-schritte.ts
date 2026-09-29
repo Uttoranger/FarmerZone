@@ -15,16 +15,20 @@ import { ERSTE_SCHRITTE_AUS_COOKIE, ERSTE_SCHRITTE_AUS_DAUER_S } from '@/lib/ers
 
 type Ergebnis = { ok: true } | { error: string }
 
-async function hofDerSitzung(): Promise<{ id: string } | null> {
+/** Der Hof der Sitzung — oder der Grund, warum es keinen gibt. */
+async function hofDerSitzung(): Promise<{ farm: { id: string } } | { error: string }> {
   const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) return null
-  return getFarmForUser(session.user.id)
+  if (!session?.user) return { error: 'Bitte melde dich neu an.' }
+  const farm = await getFarmForUser(session.user.id)
+  if (!farm) return { error: 'Kein Hof gefunden.' }
+  return { farm }
 }
 
 /** Blendet die Karte für diesen Hof auf diesem Gerät aus — ein Jahr lang. */
 export async function blendeErsteSchritteAus(): Promise<Ergebnis> {
-  const farm = await hofDerSitzung()
-  if (!farm) return { error: 'Bitte melde dich neu an.' }
+  const hof = await hofDerSitzung()
+  if ('error' in hof) return hof
+  const { farm } = hof
 
   const jar = await cookies()
   jar.set({
@@ -45,8 +49,8 @@ export async function blendeErsteSchritteAus(): Promise<Ergebnis> {
 
 /** Holt die Karte zurück: Der Cookie fällt weg. */
 export async function blendeErsteSchritteEin(): Promise<Ergebnis> {
-  const farm = await hofDerSitzung()
-  if (!farm) return { error: 'Bitte melde dich neu an.' }
+  const hof = await hofDerSitzung()
+  if ('error' in hof) return hof
 
   const jar = await cookies()
   jar.delete(ERSTE_SCHRITTE_AUS_COOKIE)

@@ -35,11 +35,11 @@ export function ErsteSchritteKarte({
       <CardContent className="pt-5 pb-4">
         <div className="flex items-baseline justify-between gap-3">
           <p className="font-semibold text-foreground">Erste Schritte</p>
-          <p className="flex shrink-0 items-baseline gap-3 text-[13px] font-medium" style={{ color: 'var(--app-ink-faint)' }}>
+          <p className="flex shrink-0 items-center gap-3 text-[13px] font-medium" style={{ color: 'var(--app-ink-faint)' }}>
             <span>
               {erledigt} von {gesamt} erledigt
             </span>
-            <ErsteSchritteSchalter richtung="aus" />
+            <ErsteSchritteSchalter richtung="aus" className="-my-2 px-1" />
           </p>
         </div>
 
