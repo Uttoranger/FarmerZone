@@ -18,6 +18,8 @@ import { getHeute } from '@/server/queries/heute'
 import { Card, CardContent } from '@/components/ui/card'
 import { ErsteSchritteKarte } from '@/components/farmer/erste-schritte-karte'
 import { ErsteSchritteSchalter } from '@/components/farmer/erste-schritte-schalter'
+import { Schild } from '@/components/farmer/schild'
+import type { SchildFarbe } from '@/lib/mein-hof'
 import { ERSTE_SCHRITTE_AUS_COOKIE, ersteSchritteAnzeige, ersteSchritteAusgeblendet } from '@/lib/erste-schritte'
 import {
   ABHOL_CHIP_TEXT,
@@ -40,11 +42,11 @@ import { cn } from '@/lib/utils'
  * das Plus der Navigation, deshalb gibt es keinen eigenen Knopf mehr.
  */
 
-/** Bedeutungsfarben, in beiden Modi lesbar. */
-const CHIP_FARBE: Record<AbholChip, string> = {
-  bereit: 'bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-200',
-  vorbereiten: 'bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200',
-  wartet: 'bg-app-chip text-app-chip-ink',
+/** Welche Schildfarbe ein Abholchip trägt — die Klassen hält components/farmer/schild.tsx. */
+const CHIP_FARBE: Record<AbholChip, SchildFarbe> = {
+  bereit: 'gruen',
+  vorbereiten: 'bernstein',
+  wartet: 'grau',
 }
 
 const BRAUCHT_DICH_SYMBOL: Record<BrauchtDichEintrag['art'], LucideIcon> = {
@@ -146,14 +148,9 @@ export default async function HeutePage() {
                         {a.positionen} · {a.zahlart}
                       </p>
                     </div>
-                    <span
-                      className={cn(
-                        'shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold leading-none',
-                        CHIP_FARBE[a.chip]
-                      )}
-                    >
+                    <Schild farbe={CHIP_FARBE[a.chip]} className="shrink-0">
                       {ABHOL_CHIP_TEXT[a.chip]}
-                    </span>
+                    </Schild>
                   </Link>
                 </li>
               ))}

@@ -13,7 +13,6 @@ import {
   IM_SHOP,
   NICHT_IM_SHOP,
   kopfzeileProdukte,
-  markeText,
   produktZustand,
   streifenText,
   umschaltMeldung,
@@ -62,14 +61,13 @@ describe('Beschriftungen', () => {
   it('sagt im Aus-Zustand überall genau dasselbe Wort', () => {
     const aus = produktZustand(p(false, 4))
     expect(streifenText(aus)).toBe(NICHT_IM_SHOP)
-    expect(markeText(aus)).toBe(NICHT_IM_SHOP)
     expect(umschaltMeldung('Heumilch', false)).toContain('nicht mehr im Shop')
   })
 
   it('benutzt das Wort „Ausgeblendet" nirgends mehr', () => {
     const alle = [p(false, 0), p(false, 3), p(true, 0), p(true, 2), p(true, 9)]
       .map((x) => produktZustand(x))
-      .flatMap((z) => [streifenText(z), markeText(z)])
+      .map((z) => streifenText(z))
     for (const text of alle) {
       expect(text.toLowerCase()).not.toContain('ausgeblendet')
       expect(text.toLowerCase()).not.toContain('pausiert')
@@ -89,11 +87,9 @@ describe('Beschriftungen', () => {
     expect(IM_SHOP).not.toBe(NICHT_IM_SHOP)
   })
 
-  it('nennt den Bestand auf dem Streifen, in der Marke nicht', () => {
+  it('nennt den Bestand auf dem Streifen', () => {
     expect(streifenText(produktZustand(p(true, 3)))).toBe('Nur noch 3 verfügbar')
     expect(streifenText(produktZustand(p(true, 40)))).toBe('40 verfügbar')
-    expect(markeText(produktZustand(p(true, 3)))).toBe('Aktiv')
-    expect(markeText(produktZustand(p(true, 40)))).toBe('Aktiv')
   })
 
   it('nennt im Toast das Produkt, in beide Richtungen', () => {

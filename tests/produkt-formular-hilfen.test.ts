@@ -29,7 +29,6 @@ import {
   inhaltZeile,
   nettoAutomatisch,
   nettoNachEinheitswechsel,
-  vergleichsKilopreis,
   kundenVorschau,
 } from '@/components/products/produkt-preis'
 
@@ -173,15 +172,21 @@ describe('Gewichtsfrage und Vergleichspreis', () => {
     expect(nettoAutomatisch('BALLEN')).toBeNull()
   })
 
-  it('Rundballen 300 kg zu € 45: Kunden sehen den Ballenpreis, der Hof den Kilopreis zum Vergleich', () => {
-    expect(kundenVorschau(45, 'BALLEN', null)).toBe('Kunden sehen: € 45,00 / Ballen')
-    expect(vergleichsKilopreis(45, 'BALLEN', 300, 'KG')).toBe('Das sind € 0,15 / kg — zum Vergleichen.')
+  it('Rundballen 300 kg zu € 45: eine Zeile mit Ballen- und Kilopreis', () => {
+    expect(kundenVorschau(45, 'BALLEN', null, { nettoMenge: 300, nettoEinheit: 'KG' })).toBe(
+      'Kunden sehen: € 45,00 / Ballen · € 0,15 / kg'
+    )
+    // Ballen zu 120 kg: 0,375 → auf Cent gerundet wie überall (formatGrundpreisNetto)
+    expect(kundenVorschau(45, 'BALLEN', null, { nettoMenge: 120, nettoEinheit: 'KG' })).toBe(
+      'Kunden sehen: € 45,00 / Ballen · € 0,38 / kg'
+    )
   })
 
-  it('keine Vergleichszeile ohne Gewicht, ohne Preis oder bei kg', () => {
-    expect(vergleichsKilopreis(45, 'BALLEN', null, 'KG')).toBeNull()
-    expect(vergleichsKilopreis(Number.NaN, 'BALLEN', 300, 'KG')).toBeNull()
-    expect(vergleichsKilopreis(2, 'KG', 1, 'KG')).toBeNull()
+  it('ohne Gewicht, ohne Preis oder bei kg kein Kilopreis-Anhang', () => {
+    expect(kundenVorschau(45, 'BALLEN', null, { nettoMenge: null, nettoEinheit: 'KG' })).toBe('Kunden sehen: € 45,00 / Ballen')
+    expect(kundenVorschau(45, 'BALLEN', null, null)).toBe('Kunden sehen: € 45,00 / Ballen')
+    expect(kundenVorschau(Number.NaN, 'BALLEN', null, { nettoMenge: 300, nettoEinheit: 'KG' })).toBeNull()
+    expect(kundenVorschau(2, 'KG', null, { nettoMenge: 1, nettoEinheit: 'KG' })).toBe('Kunden sehen: € 2,00 / kg')
   })
 
   it('Inhaltszeile in der Kennzeichnung', () => {

@@ -3,10 +3,11 @@ import Link from 'next/link'
 import { Eye } from 'lucide-react'
 import { MEIN_HOF_REITER, type MeinHofReiterId } from '@/lib/bauern-navigation'
 import { hofInitialen } from '@/lib/hof-initialen'
-import { titelbildVerlauf, type SchildFarbe } from '@/lib/mein-hof'
+import { titelbildVerlauf } from '@/lib/mein-hof'
 import type { MeinHofKopfDaten } from '@/server/queries/farm'
 import { AdresseKopierenKnopf } from '@/components/farmer/adresse-kopieren-knopf'
 import { HofTeilenKnopf } from '@/components/farmer/hof-teilen-knopf'
+import { Schild } from '@/components/farmer/schild'
 import { cn } from '@/lib/utils'
 
 /*
@@ -20,39 +21,37 @@ import { cn } from '@/lib/utils'
  * Kopf fragt nicht selbst, sonst käme eine Datenbankrunde hinterher.
  */
 
-/** Bedeutungsfarben des Schilds, in beiden Modi lesbar (CODING_STANDARDS §7). */
-const SCHILD_FARBE: Record<SchildFarbe, string> = {
-  gruen: 'bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-200',
-  bernstein: 'bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200',
-  grau: 'bg-app-chip text-app-chip-ink',
-}
-
 const KNOPF =
   'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-app-ink transition-colors hover:bg-muted/50 outline-none focus-visible:ring-3 focus-visible:ring-ring/50'
 
 export function MeinHofKopf({
   hof,
   aktiv,
+  produktZahl,
 }: {
   hof: MeinHofKopfDaten | null
   aktiv: MeinHofReiterId
+  /** Steht hinter dem Reiter „Produkte" („Produkte · 2"). */
+  produktZahl?: number
 }): React.JSX.Element | null {
   if (!hof) return null
 
   return (
     <header className="mb-6 print:hidden">
       <div className="overflow-hidden rounded-2xl bg-card ring-1 ring-border/60 shadow-[0_2px_8px_oklch(0.18_0.03_150_/_0.06)] dark:ring-border">
-        {/* Schmaler Streifen des Titelbilds — Foto oder der gewählte Verlauf.
-            Bildersatz, folgt dem Modus bewusst nicht. */}
-        <div className="relative h-16 md:h-20">
+        {/* Streifen des Titelbilds — Foto oder der gewählte Verlauf.
+            Bildersatz, folgt dem Modus bewusst nicht. Mittig ausgeschnitten,
+            nicht nach dem Fokus der Hofseite: Der Fokus ist für das hohe
+            Titelbild dort gewählt; im flachen Streifen hier zeigte er oft nur
+            Himmel oder Boden. */}
+        <div className="relative h-24 md:h-28">
           {hof.titelbildUrl ? (
             <Image
               src={hof.titelbildUrl}
               alt=""
               fill
-              sizes="(min-width: 768px) 672px, 100vw"
-              className="object-cover"
-              style={{ objectPosition: `50% ${hof.bannerFocusY}%` }}
+              sizes="(min-width: 1024px) 100vw, (min-width: 768px) 672px, 100vw"
+              className="object-cover object-center"
             />
           ) : (
             <div className="absolute inset-0" style={{ background: titelbildVerlauf(hof.bannerValue) }} />
@@ -61,7 +60,11 @@ export function MeinHofKopf({
 
         <div className="px-4 pb-4">
           <div className="flex gap-3">
-            <div className="-mt-7 shrink-0">
+            {/* relative z-10: Der Streifen darüber ist positioniert (das Bild
+                füllt ihn absolut) und malte sich sonst über das Hofbild — es
+                lag halb verdeckt HINTER dem Titelbild. Der Rand in der
+                Kartenfarbe trennt es von Foto und Verlauf. */}
+            <div className="relative z-10 -mt-7 shrink-0">
               {hof.logoUrl ? (
                 <Image
                   src={hof.logoUrl}
@@ -108,14 +111,9 @@ export function MeinHofKopf({
                   „Noch nicht freigegeben". Stillgelegt trägt keins — das
                   sagt der Balken über der Seite. */}
               {hof.zustand.schild && (
-                <span
-                  className={cn(
-                    'mt-1.5 inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-                    SCHILD_FARBE[hof.zustand.schild.farbe]
-                  )}
-                >
+                <Schild farbe={hof.zustand.schild.farbe} className="mt-1.5">
                   {hof.zustand.schild.text}
-                </span>
+                </Schild>
               )}
             </div>
           </div>
@@ -153,7 +151,7 @@ export function MeinHofKopf({
                   : 'border-transparent text-app-ink-soft hover:text-app-ink'
               )}
             >
-              {reiter.label}
+              {reiter.id === 'produkte' && produktZahl != null ? `${reiter.label} · ${produktZahl}` : reiter.label}
             </Link>
           )
         })}

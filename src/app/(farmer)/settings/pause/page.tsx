@@ -28,7 +28,7 @@ export default async function PausePage() {
 
       <h1 className="text-xl font-semibold text-foreground mb-1">Pause / Urlaub</h1>
       <p className="text-sm text-muted-foreground mb-6">
-        Pausiere deinen Shop während Urlaub oder Betriebsferien.
+        Pausiere Bestellungen während Urlaub oder Betriebsferien.
         Bestehende Bestellungen bleiben erhalten.
       </p>
 

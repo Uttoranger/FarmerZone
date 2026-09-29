@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Search, Bell, Phone, ChevronDown } from 'lucide-react'
 import type { CustomerSummary, CustomerStatus } from '@/server/queries/customers'
 import { CustomersTable } from '@/components/customers/customers-table'
+import { formatEuro } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 type FilterType = 'all' | 'stammkunde' | 'aktiv' | 'lange' | 'neu'
@@ -40,9 +41,6 @@ function statusBadgeClass(status: CustomerStatus): string {
   }
 }
 
-function formatEuro(n: number): string {
-  return `€ ${n.toFixed(2).replace('.', ',')}`
-}
 
 export function CustomersClient({ customers }: { customers: CustomerSummary[] }) {
   const router = useRouter()
@@ -204,8 +202,8 @@ export function CustomersClient({ customers }: { customers: CustomerSummary[] })
                 key={customer.customerEmail}
                 role="link"
                 tabIndex={0}
-                onClick={() => router.push(`/customers/${encodeURIComponent(customer.customerEmail)}`)}
-                onKeyDown={(e) => e.key === 'Enter' && router.push(`/customers/${encodeURIComponent(customer.customerEmail)}`)}
+                onClick={() => router.push(`/customers/${customer.kundeId}`)}
+                onKeyDown={(e) => e.key === 'Enter' && router.push(`/customers/${customer.kundeId}`)}
                 className="block bg-card rounded-xl border border-border p-4 hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer"
               >
                 <div className="flex items-start gap-3">

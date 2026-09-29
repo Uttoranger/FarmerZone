@@ -28,14 +28,30 @@ export function preisFeldLabel(unit: string, unitSize?: number | null): string {
 }
 
 /**
- * Die Vorschau unter dem Preisfeld: „Kunden sehen: € 50,00 für 2 kg · € 25,00 / kg".
+ * Die Vorschau unter dem Preisfeld, EINE Zeile:
+ * „Kunden sehen: € 50,00 für 2 kg · € 25,00 / kg" oder bei einem Futtermittel
+ * mit Gewicht je Gebinde „Kunden sehen: € 45,00 / Ballen · € 0,15 / kg".
+ * Früher stand der Kilopreis eines Ballens als zweite Zeile „zum Vergleichen"
+ * darunter, weil Kundinnen ihn nicht sahen — inzwischen sehen sie ihn
+ * (Bereiche 2), also gehört er in dieselbe Zeile.
  * null, solange kein brauchbarer Preis eingetragen ist.
  */
-export function kundenVorschau(price: number, unit: string, unitSize?: number | null): string | null {
+export function kundenVorschau(
+  price: number,
+  unit: string,
+  unitSize?: number | null,
+  netto?: { nettoMenge: number | null | undefined; nettoEinheit: NettoEinheitValue } | null
+): string | null {
   if (!Number.isFinite(price) || price <= 0) return null
   const teile = [formatGrundpreis(price, unit, unitSize)]
   const zeile = formatGrundpreisZeile(price, unit, unitSize)
   if (zeile) teile.push(zeile)
+  // Nur bei Einheiten mit Gewichtsfrage (Ballen, Big Bag …) — bei kg und
+  // Liter wäre es der Preis selbst, bei Gebinden steht die Grundpreis-Zeile schon da.
+  else if (netto && gewichtFrage(unit) != null) {
+    const je = formatGrundpreisNetto(price, netto.nettoMenge, netto.nettoEinheit)
+    if (je) teile.push(je)
+  }
   return `Kunden sehen: ${teile.join(' · ')}`
 }
 
@@ -114,24 +130,6 @@ export function nettoAutomatisch(unit: string): { nettoMenge: number; nettoEinhe
   if (unit === 'KG') return { nettoMenge: 1, nettoEinheit: 'KG' }
   if (unit === 'LITER') return { nettoMenge: 1, nettoEinheit: 'LITER' }
   return null
-}
-
-/**
- * Die Vergleichszeile für den Hof: „Das sind € 0,15 / kg — zum Vergleichen."
- * Bewusst NICHT „Kunden sehen": Die Hofseite zeigt den Kilopreis eines
- * Futtermittels noch nicht (kommt mit Bereiche 2). Nur bei Einheiten mit
- * Gewichtsfrage — bei kg und Liter wäre es der Preis selbst.
- */
-export function vergleichsKilopreis(
-  price: number,
-  unit: string,
-  nettoMenge: number | null | undefined,
-  nettoEinheit: NettoEinheitValue
-): string | null {
-  if (gewichtFrage(unit) == null) return null
-  if (!Number.isFinite(price) || price <= 0) return null
-  const je = formatGrundpreisNetto(price, nettoMenge, nettoEinheit)
-  return je ? `Das sind ${je} — zum Vergleichen.` : null
 }
 
 /** Die Anzeigezeile in der Kennzeichnung — dort wird die Menge nicht mehr eingegeben. */

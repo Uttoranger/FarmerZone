@@ -1,21 +1,9 @@
-﻿'use client'
+'use client'
 
 import { useState, useTransition, useOptimistic } from 'react'
 import { toast } from 'sonner'
-import {
-  Package,
-  Plus,
-  Pencil,
-  Trash2,
-  Leaf,
-  Thermometer,
-  Snowflake,
-  SlidersHorizontal,
-  Sparkles,
-} from 'lucide-react'
+import { Package, Plus, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -34,8 +22,18 @@ import { ProductDialog } from './product-dialog'
 import { StockDialog } from './stock-dialog'
 import { PageHeader } from '@/components/farmer/page-header'
 import { ImShopSchalter } from '@/components/products/im-shop-schalter'
-import { kopfzeileProdukte, markeText, produktZustand } from '@/lib/produkt-sichtbarkeit'
+import {
+  BestandStepper,
+  ProduktBild,
+  UEBER_ZEILE,
+  ZeilenChips,
+  ZeilenMenue,
+  ZeilenName,
+} from '@/components/products/produkt-zeile-teile'
+import { kopfzeileProdukte } from '@/lib/produkt-sichtbarkeit'
+import { PRODUKT_FILTER, bestandNach, passtZuFilter, zaehleFilter, type ProduktFilter } from '@/lib/produkt-zeile'
 import { useUrlAuftrag } from '@/lib/use-url-auftrag'
+import { cn } from '@/lib/utils'
 
 type Props = {
   products: ProductData[]
@@ -43,27 +41,16 @@ type Props = {
   hofBetriebsnummer: string | null
 }
 
-/**
- * Nur noch die Farben. WAS die Marke sagt, entscheidet
- * src/lib/produkt-sichtbarkeit.ts — vorher stand dieselbe Ableitung auch im
- * Produktraster der Hofseite, mit anderen Wörtern.
- *
- * „Pausiert" ist verschwunden: Das heißt bei uns der ganze Hof (Hof-Pause).
- * Ein einzelnes Produkt ist „Nicht im Shop".
+/*
+ * Die Produktliste unter „Mein Hof". Am Handy Karten, ab lg eine Tabelle über
+ * die volle Inhaltsbreite mit Filter-Chips darüber. Beide zeigen dieselben
+ * Teile (produkt-zeile-teile.tsx); was eine Zeile sagt, entscheidet
+ * src/lib/produkt-zeile.ts.
  */
-const MARKE_FARBE: Record<string, string> = {
-  Aktiv: 'bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-200 border-green-200 dark:border-green-900/60',
-  Ausverkauft: 'bg-red-100 dark:bg-red-950/50 text-red-800 dark:text-red-200 border-red-200 dark:border-red-900/60',
-  'Nicht im Shop': 'bg-muted text-muted-foreground border-border',
-}
-
 export function ProductList({ products: initialProducts, hofBetriebsnummer }: Props) {
-  // Optimistic stock state
-  const [stocks, setStocks] = useState<Record<string, number>>(
-    Object.fromEntries(initialProducts.map((p) => [p.id, p.stock]))
-  )
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())
   const [, startTransition] = useTransition()
+  const [filter, setFilter] = useState<ProduktFilter>('alle')
 
   // Dialog state
   const [editDialog, setEditDialog] = useState<{ open: boolean; product: ProductData | null }>({
@@ -94,40 +81,52 @@ export function ProductList({ products: initialProducts, hofBetriebsnummer }: Pr
     { id: string; imShop: boolean }
   >({}, (stand, aenderung) => ({ ...stand, [aenderung.id]: aenderung.imShop }))
 
+  // Derselbe Weg für den Bestand. Vorher hielt ein useState den Bestand ALLER
+  // Produkte ab dem ersten Laden fest — eine Änderung im Bearbeiten-Dialog
+  // erschien in der Liste erst nach Neuladen.
+  const [bestandVorgezogen, setzeBestandVorgezogen] = useOptimistic<
+    Record<string, number>,
+    { id: string; bestand: number }
+  >({}, (stand, aenderung) => ({ ...stand, [aenderung.id]: aenderung.bestand }))
+
   // Neuester Server-Stand, aber mit optimistischem Bestand UND optimistischer
   // Sichtbarkeit — beides muss die Kopfzeile sofort mitzählen.
   const products = initialProducts.map((p) => {
     const sichtbar = vorgezogen[p.id]
     return {
       ...p,
-      stock: stocks[p.id] ?? p.stock,
+      stock: bestandVorgezogen[p.id] ?? p.stock,
       isAvailable: sichtbar === undefined ? p.isAvailable : sichtbar,
     }
   })
+  const zahlen = zaehleFilter(products)
+  const gefiltert = products.filter((p) => passtZuFilter(p, filter))
 
-  function handleOptimisticUpdate(productId: string, newStock: number) {
-    setStocks((prev) => ({ ...prev, [productId]: newStock }))
+  function setzeLaeuft(id: string, laeuft: boolean) {
+    setPendingIds((prev) => {
+      const s = new Set(prev)
+      if (laeuft) s.add(id)
+      else s.delete(id)
+      return s
+    })
   }
 
-  function handleQuickStock(product: ProductData, delta: number) {
-    const current = stocks[product.id] ?? product.stock
-    const newStock = Math.max(0, current + delta)
-    setStocks((prev) => ({ ...prev, [product.id]: newStock }))
-    setPendingIds((prev) => new Set(prev).add(product.id))
+  /** ±1 über die bestehende Aktion; der Server klemmt ebenso auf 0. */
+  function bestandSchritt(product: ProductData, delta: 1 | -1) {
+    const neu = bestandNach(product.stock, delta)
+    if (neu === product.stock) return
+    setzeLaeuft(product.id, true)
 
     startTransition(async () => {
+      setzeBestandVorgezogen({ id: product.id, bestand: neu })
       try {
         await updateStock(product.id, delta)
-        toast.success(`+${delta} — Bestand: ${newStock}`)
       } catch {
-        setStocks((prev) => ({ ...prev, [product.id]: current }))
-        toast.error('Fehler beim Speichern')
+        // Kein Zurücksetzen von Hand: useOptimistic fällt mit dem Ende der
+        // Transition auf den Serverstand zurück.
+        toast.error('Wir konnten den Bestand nicht speichern. Bitte versuch es noch einmal.')
       } finally {
-        setPendingIds((prev) => {
-          const s = new Set(prev)
-          s.delete(product.id)
-          return s
-        })
+        setzeLaeuft(product.id, false)
       }
     })
   }
@@ -155,35 +154,138 @@ export function ProductList({ products: initialProducts, hofBetriebsnummer }: Pr
       toast.success('Produkt gelöscht')
       setDeleteConfirm(null)
     } catch {
-      toast.error('Fehler beim Löschen')
+      toast.error('Wir konnten das Produkt nicht löschen. Bitte versuch es noch einmal.')
     } finally {
       setIsDeleting(false)
     }
   }
 
+  const oeffnen = (product: ProductData) => () => setEditDialog({ open: true, product })
+
+  /**
+   * Hinweise mit Handlung, keine Fehler: Produkte ohne Kategorie stehen
+   * öffentlich unter Sonstiges; Futtermittel mit alter Gebindegröße rechnen
+   * den Kilopreis falsch (Rückfrage F1).
+   */
+  function hinweiseFuer(product: ProductData) {
+    const hinweise = produktHinweise(product)
+    if (hinweise.length === 0) return null
+    const klasse =
+      'inline-flex min-h-9 items-center gap-1 rounded-full border border-dashed px-2.5 text-xs font-medium transition-colors disabled:opacity-50'
+    return (
+      <div className={cn(UEBER_ZEILE, 'pointer-events-none mt-1.5 flex flex-wrap gap-1.5 [&>button]:pointer-events-auto')}>
+        {hinweise.map((h) => {
+          if (h.art === 'kategorie-uebernehmen') {
+            return (
+              <button
+                key={h.art}
+                type="button"
+                disabled={uebernimmt === product.id}
+                onClick={() => kategorieUebernehmen(product, h.vorschlag)}
+                className={`${klasse} border-primary/60 bg-primary/5 text-foreground hover:bg-primary/10`}
+              >
+                <Sparkles className="h-3.5 w-3.5 shrink-0 text-brand-text" aria-hidden />
+                {formatKategorie(h.vorschlag.category, h.vorschlag.subcategory)} übernehmen
+              </button>
+            )
+          }
+          // Dezenter Hinweis, kein Fehler: Bestandsprodukte haben noch keine
+          // Unterkategorie (Sprint Taxonomie 1).
+          if (h.art === 'unterkategorie-ergaenzen') {
+            return (
+              <span key={h.art} className={`${klasse} min-h-0 py-0.5 border-border text-app-ink-soft`}>
+                Unterkategorie ergänzen
+              </span>
+            )
+          }
+          return (
+            <button
+              key={h.art}
+              type="button"
+              onClick={oeffnen(product)}
+              className={`${klasse} border-amber-400 bg-amber-50 text-amber-800 dark:border-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/40`}
+            >
+              {h.art === 'kategorie-ergaenzen' ? 'Kategorie ergänzen' : 'Einheit prüfen'}
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
+
+  function preisFuer(product: ProductData, className?: string) {
+    return (
+      <div className={className}>
+        <p className="text-[13px] text-app-ink-soft">
+          {formatGrundpreis(product.price, product.unit, product.unitSize)}
+        </p>
+        <GrundpreisZeile
+          price={product.price}
+          unit={product.unit}
+          unitSize={product.unitSize}
+          className="text-[11px] text-app-ink-soft"
+        />
+      </div>
+    )
+  }
+
+  function schalterFuer(product: ProductData, variante: 'zeile' | 'kompakt') {
+    return (
+      <ImShopSchalter
+        productId={product.id}
+        name={product.name}
+        imShop={product.isAvailable}
+        setzeOptimistisch={(imShop) => setzeVorgezogen({ id: product.id, imShop })}
+        variante={variante}
+        // Die Zeilen-Variante ist sonst so breit wie ihr Platz; hier steht sie
+        // rechts neben dem Bestand und nimmt nur, was „Im Shop" und die Schiene brauchen.
+        className={cn(UEBER_ZEILE, variante === 'zeile' && 'w-auto')}
+      />
+    )
+  }
+
+  function stepperFuer(product: ProductData) {
+    return (
+      <BestandStepper
+        name={product.name}
+        bestand={product.stock}
+        laeuft={pendingIds.has(product.id)}
+        onSchritt={(delta) => bestandSchritt(product, delta)}
+        onEintippen={() => setStockDialogProduct(product)}
+      />
+    )
+  }
+
+  function menueFuer(product: ProductData) {
+    return (
+      <ZeilenMenue
+        name={product.name}
+        onBestand={() => setStockDialogProduct(product)}
+        onLoeschen={() => setDeleteConfirm(product)}
+      />
+    )
+  }
+
+  const neuKnopf = (
+    <Button
+      onClick={() => setEditDialog({ open: true, product: null })}
+      className="gap-1.5 bg-accent text-accent-foreground hover:bg-accent-hover"
+    >
+      <Plus className="w-4 h-4" />
+      Produkt
+    </Button>
+  )
+
   return (
     <>
-      {/* Header */}
-      <PageHeader
-        title="Produkte"
-        subtitle={kopfzeileProdukte(products)}
-        action={
-          <Button
-            onClick={() => setEditDialog({ open: true, product: null })}
-            className="gap-1.5 bg-accent text-accent-foreground hover:bg-accent-hover"
-          >
-            <Plus className="w-4 h-4" />
-            Neu
-          </Button>
-        }
-      />
+      <PageHeader title="Produkte" subtitle={kopfzeileProdukte(products)} action={neuKnopf} />
 
       {/* Empty state */}
       {products.length === 0 && (
         <div className="text-center py-16">
           <Package className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
           <p className="font-medium text-foreground mb-1">Noch keine Produkte</p>
-          <p className="text-sm text-muted-foreground/60 mb-6">Leg dein erstes Produkt an, um loszulegen.</p>
+          <p className="text-sm text-app-ink-soft mb-6">Leg dein erstes Produkt an, um loszulegen.</p>
           <Button
             onClick={() => setEditDialog({ open: true, product: null })}
             className="bg-accent text-accent-foreground hover:bg-accent-hover"
@@ -194,192 +296,131 @@ export function ProductList({ products: initialProducts, hofBetriebsnummer }: Pr
         </div>
       )}
 
-      {/* Product cards */}
-      <div className="space-y-3">
-        {products.map((product) => {
-          const zustand = produktZustand(product)
-          const marke = markeText(zustand)
-          const isPending = pendingIds.has(product.id)
-          const hinweise = produktHinweise(product)
-
-          return (
-            <Card key={product.id} className="overflow-hidden">
-              <CardContent className="p-0">
-                <div className="flex gap-0">
-                  {/* Image */}
-                  <div
-                    className="shrink-0 w-20 h-20 md:w-24 md:h-24 bg-muted flex items-center justify-center"
-                    style={product.categoryImageUrl && !product.imageUrl ? { background: 'var(--app-chip)' } : undefined}
-                  >
-                    {product.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={product.imageUrl}
-                        alt={product.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : product.categoryImageUrl ? (
-                      // Kategorie-Fallback: object-contain auf Sand, wie echte Bilder im Grid
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={product.categoryImageUrl}
-                        alt={product.name}
-                        className="w-full h-full object-contain"
-                      />
-                    ) : (
-                      <Package className="w-7 h-7 text-muted-foreground/50" />
-                    )}
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 px-3 py-2.5 min-w-0">
-                    {/* Name + badges */}
-                    <div className="flex items-start gap-1.5 flex-wrap">
-                      <span className="font-medium text-foreground text-sm leading-tight">
-                        {product.name}
-                      </span>
-                      <Badge className={`text-[10px] px-1.5 py-0 border ${MARKE_FARBE[marke]}`}>
-                        {marke}
-                      </Badge>
-                      {product.isOrganic && (
-                        <Leaf className="w-3.5 h-3.5 text-green-600 dark:text-green-400 shrink-0" />
-                      )}
-                      {product.requiresCool && (
-                        <Thermometer className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                      )}
-                      {product.requiresFreezer && (
-                        <Snowflake className="w-3.5 h-3.5 text-sky-500 shrink-0" />
-                      )}
-                      {/* Dezenter Hinweis, kein Fehler: Bestandsprodukte haben
-                          noch keine Unterkategorie (Sprint Taxonomie 1). */}
-                      {hinweise.some((h) => h.art === 'unterkategorie-ergaenzen') && (
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] px-1.5 py-0 border-dashed text-muted-foreground"
-                        >
-                          Unterkategorie ergänzen
-                        </Badge>
-                      )}
-                    </div>
-
-                    {/* Hinweise mit Handlung, keine Fehler: Produkte ohne Kategorie
-                        stehen öffentlich unter Sonstiges; Futtermittel mit alter
-                        Gebindegröße rechnen den Kilopreis falsch (Rückfrage F1). */}
-                    {hinweise.some((h) => h.art !== 'unterkategorie-ergaenzen') && (
-                      <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {hinweise.map((h) => {
-                          const klasse =
-                            'inline-flex min-h-9 items-center gap-1 rounded-full border border-dashed px-2.5 text-xs font-medium transition-colors disabled:opacity-50'
-                          if (h.art === 'kategorie-uebernehmen') {
-                            return (
-                              <button
-                                key={h.art}
-                                type="button"
-                                disabled={uebernimmt === product.id}
-                                onClick={() => kategorieUebernehmen(product, h.vorschlag)}
-                                className={`${klasse} border-primary/60 bg-primary/5 text-foreground hover:bg-primary/10`}
-                              >
-                                <Sparkles className="h-3.5 w-3.5 shrink-0 text-brand-text" aria-hidden />
-                                {formatKategorie(h.vorschlag.category, h.vorschlag.subcategory)} übernehmen
-                              </button>
-                            )
-                          }
-                          if (h.art === 'unterkategorie-ergaenzen') return null
-                          return (
-                            <button
-                              key={h.art}
-                              type="button"
-                              onClick={() => setEditDialog({ open: true, product })}
-                              className={`${klasse} border-amber-400 bg-amber-50 text-amber-800 dark:border-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/40`}
-                            >
-                              {h.art === 'kategorie-ergaenzen' ? 'Kategorie ergänzen' : 'Einheit prüfen'}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    )}
-
-                    {/* Price */}
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {formatGrundpreis(product.price, product.unit, product.unitSize)}
-                    </p>
-                    <GrundpreisZeile
-                      price={product.price}
-                      unit={product.unit}
-                      unitSize={product.unitSize}
-                      className="text-[11px]"
-                    />
-
-                    {/* Stock + quick buttons */}
-                    <div className="flex items-center gap-2 mt-2">
-                      <span
-                        className={`text-xs font-medium min-w-[60px] ${
-                          isPending ? 'text-muted-foreground/60' : 'text-foreground'
-                        }`}
-                      >
-                        Bestand: {product.stock}
-                      </span>
-                      <div className="flex gap-1">
-                        {[5, 10, 20].map((delta) => (
-                          <button
-                            key={delta}
-                            onClick={() => handleQuickStock(product, delta)}
-                            disabled={isPending}
-                            className="h-10 min-w-[48px] px-2 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted hover:border-border/80 disabled:opacity-40 transition-colors"
-                          >
-                            +{delta}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Der Schalter „Im Shop" — eigene Spalte VOR den
-                      Symbolknöpfen, nicht in ihnen: Die Aktionsspalte ist 40 px
-                      schmal, die Tippfläche hier soll 56 × 56 sein. Er steht
-                      rechts, wo in jeder Zeile dasselbe zu erwarten ist. */}
-                  <div className="shrink-0 flex items-center justify-center border-l border-border/50 px-0.5">
-                    <ImShopSchalter
-                      productId={product.id}
-                      name={product.name}
-                      imShop={product.isAvailable}
-                      setzeOptimistisch={(imShop) => setzeVorgezogen({ id: product.id, imShop })}
-                      variante="kompakt"
-                    />
-                  </div>
-
-                  {/* Action column */}
-                  <div className="shrink-0 flex flex-col border-l border-border/50">
-                    <button
-                      onClick={() => setEditDialog({ open: true, product })}
-                      title="Bearbeiten"
-                      className="flex-1 flex items-center justify-center w-10 hover:bg-muted/30 transition-colors"
-                    >
-                      <Pencil className="w-3.5 h-3.5 text-muted-foreground/60" />
-                    </button>
-                    <div className="w-full h-px bg-muted" />
-                    <button
-                      onClick={() => setStockDialogProduct(product)}
-                      title="Bestand anpassen"
-                      className="flex-1 flex items-center justify-center w-10 hover:bg-muted/30 transition-colors"
-                    >
-                      <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground/60" />
-                    </button>
-                    <div className="w-full h-px bg-muted" />
-                    <button
-                      onClick={() => setDeleteConfirm(product)}
-                      title="Löschen"
-                      className="flex-1 flex items-center justify-center w-10 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5 text-muted-foreground/50 hover:text-red-400" />
-                    </button>
-                  </div>
+      {/* ── Handy und Tablet: Karten ───────────────────────────────────── */}
+      {products.length > 0 && (
+        <ul className="space-y-3 lg:hidden">
+          {products.map((product) => (
+            <li
+              key={product.id}
+              className="relative rounded-xl bg-card ring-1 ring-border/60 shadow-[0_1px_4px_oklch(0.18_0.03_150_/_0.04)] transition-colors hover:bg-muted/20 dark:ring-border"
+            >
+              <div className="flex gap-3 p-3 pb-2">
+                <ProduktBild product={product} className="size-16 rounded-lg" />
+                <div className="min-w-0 flex-1">
+                  <ZeilenName name={product.name} onOeffnen={oeffnen(product)} className="text-sm" />
+                  {preisFuer(product, 'mt-0.5')}
+                  <ZeilenChips product={product} className="mt-1.5" />
+                  {hinweiseFuer(product)}
                 </div>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
+                <div className="-mr-1 -mt-1 self-start">
+                  {menueFuer(product)}
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-2 border-t border-border/60 px-3 py-1.5">
+                {stepperFuer(product)}
+                {schalterFuer(product, 'zeile')}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* ── Browser ab lg: Tabelle mit Filtern ─────────────────────────── */}
+      {products.length > 0 && (
+        <div className="hidden lg:block">
+          <div role="group" aria-label="Produkte filtern" className="mb-3 flex flex-wrap gap-2">
+            {PRODUKT_FILTER.map((f) => {
+              const aktiv = filter === f.id
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  aria-pressed={aktiv}
+                  onClick={() => setFilter(f.id)}
+                  className={cn(
+                    'inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3.5 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+                    aktiv
+                      ? 'border-transparent bg-primary font-semibold text-primary-foreground'
+                      : 'border-border bg-card text-app-ink hover:bg-muted/60'
+                  )}
+                >
+                  {f.label}
+                  <span className={cn('tabular-nums', aktiv ? 'opacity-80' : 'text-app-ink-soft')}>
+                    · {zahlen[f.id]}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="overflow-hidden rounded-xl bg-card ring-1 ring-border/60 shadow-[0_1px_4px_oklch(0.18_0.03_150_/_0.04)] dark:ring-border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs font-semibold text-app-ink-soft">
+                  <th scope="col" className="px-4 py-2.5 font-semibold">Produkt</th>
+                  <th scope="col" className="px-4 py-2.5 font-semibold">Preis</th>
+                  <th scope="col" className="px-4 py-2.5 font-semibold">Bestand</th>
+                  <th scope="col" className="px-4 py-2.5 text-center font-semibold">Im Shop</th>
+                  <th scope="col" className="w-14 px-2 py-2.5">
+                    <span className="sr-only">Aktionen</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {gefiltert.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-app-ink-soft">
+                      In diesem Filter ist gerade kein Produkt.
+                    </td>
+                  </tr>
+                )}
+                {gefiltert.map((product) => (
+                  // Kein ::after-Trick wie bei den Karten: Ob ein <tr> als
+                  // Bezugsrahmen für position:absolute taugt, ist in WebKit
+                  // nicht verlässlich. Der Klick an der Zeile übergeht deshalb
+                  // alles Bedienbare und alles aus dem Menü-Portal (React reicht
+                  // Portal-Klicks durch, das DOM enthält sie aber nicht). Die
+                  // Tastatur nimmt den Namensknopf.
+                  <tr
+                    key={product.id}
+                    onClick={(e) => {
+                      if (!(e.target instanceof Element) || !e.currentTarget.contains(e.target)) return
+                      if (e.target.closest('button, a, input')) return
+                      setEditDialog({ open: true, product })
+                    }}
+                    className="cursor-pointer align-middle transition-colors hover:bg-muted/30"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <ProduktBild product={product} className="size-12 rounded-lg" />
+                        <div className="min-w-0">
+                          <ZeilenName name={product.name} onOeffnen={oeffnen(product)} ueberdeckt={false} />
+                          <ZeilenChips product={product} className="mt-1" />
+                          {hinweiseFuer(product)}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      {preisFuer(product)}
+                    </td>
+                    <td className="px-4 py-3">
+                      {stepperFuer(product)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-center">
+                        {schalterFuer(product, 'kompakt')}
+                      </div>
+                    </td>
+                    <td className="px-2 py-3">
+                      {menueFuer(product)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Product create/edit dialog */}
       <ProductDialog
@@ -389,16 +430,16 @@ export function ProductList({ products: initialProducts, hofBetriebsnummer }: Pr
         hofBetriebsnummer={hofBetriebsnummer}
       />
 
-      {/* Stock adjustment dialog */}
+      {/* Bestand eintippen, mit +5/+10/+20 — Tipp auf die Zahl oder „⋯" */}
       <StockDialog
         product={stockDialogProduct}
         currentStock={
           stockDialogProduct
-            ? (stocks[stockDialogProduct.id] ?? stockDialogProduct.stock)
+            ? (products.find((p) => p.id === stockDialogProduct.id)?.stock ?? stockDialogProduct.stock)
             : 0
         }
         onClose={() => setStockDialogProduct(null)}
-        onOptimisticUpdate={handleOptimisticUpdate}
+        onOptimisticUpdate={(id, bestand) => setzeBestandVorgezogen({ id, bestand })}
       />
 
       {/* Delete confirmation dialog */}
@@ -424,4 +465,3 @@ export function ProductList({ products: initialProducts, hofBetriebsnummer }: Pr
     </>
   )
 }
-

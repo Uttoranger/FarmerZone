@@ -22,8 +22,10 @@ export default async function ProductsPage() {
   ])
 
   return (
-    <div className="px-4 py-6 max-w-2xl mx-auto">
-      <MeinHofKopf hof={kopf} aktiv="produkte" />
+    // Ab lg über die volle Inhaltsbreite: Dort steht die Liste als Tabelle mit
+    // fünf Spalten, die in 672 px nicht Platz hätte. Am Handy bleiben Karten.
+    <div className="px-4 py-6 max-w-2xl mx-auto lg:max-w-none lg:px-8">
+      <MeinHofKopf hof={kopf} aktiv="produkte" produktZahl={products.length} />
       <ProductList products={products} hofBetriebsnummer={hofBetriebsnummer} />
     </div>
   )
