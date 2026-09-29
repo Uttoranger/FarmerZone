@@ -278,11 +278,60 @@ export type ProduktVorschlag = {
   hoefe: number
 }
 
-/** Höchstens so viele Vorschlags-Knöpfe zeigt die Leiste. */
-export const VORSCHLAGS_DECKEL = 12
+/**
+ * Höchstens so viele Vorschläge zeigt die Liste unter dem Suchfeld — eine
+ * kurze Liste zum Weitertippen, keine Auslage, die die Kategorien verdrängt.
+ */
+export const VORSCHLAGS_DECKEL = 6
 
 /**
- * Die Vorschlags-Knöpfe unter dem Suchfeld: die VERFÜGBAREN Produkte der
+ * Pfeiltasten in der Vorschlagsliste: ringsum, -1 heißt „nichts markiert".
+ * Ohne Markierung führt ↓ zum ersten, ↑ zum letzten Vorschlag.
+ */
+export function bewegeMarkierung(markiert: number, anzahl: number, richtung: 1 | -1): number {
+  if (anzahl === 0) return -1
+  if (markiert < 0 || markiert >= anzahl) return richtung === 1 ? 0 : anzahl - 1
+  return (markiert + richtung + anzahl) % anzahl
+}
+
+/**
+ * Zustand der Vorschlagsliste: offen oder zu, und welcher Vorschlag markiert
+ * ist — über den NAMEN, nicht die Stelle: Ändert ein Filter die Liste,
+ * bliebe eine Stelle stehen und zeigte auf einen anderen Vorschlag, den
+ * Enter dann übernähme.
+ */
+export type VorschlagsLage = { offen: boolean; markiert: string | null }
+
+/**
+ * Eine Taste im Suchfeld, nach dem Combobox-Muster:
+ *   ↓ / ↑   wandern ringsum; bei geschlossener Liste öffnen sie sie wieder.
+ *   Enter   übernimmt den markierten Vorschlag (ohne Markierung: nichts).
+ *   Escape  schließt die offene Liste.
+ * `verbrauchen` heißt: Der Browser soll mit der Taste nichts tun — Escape
+ * leert ein type="search"-Feld sonst samt Suchfilter.
+ */
+export function tasteInVorschlaegen(
+  taste: string,
+  lage: VorschlagsLage,
+  namen: readonly string[]
+): { lage: VorschlagsLage; uebernehmen: string | null; verbrauchen: boolean } {
+  const unveraendert = { lage, uebernehmen: null, verbrauchen: false }
+  if (namen.length === 0) return unveraendert
+  const stelle = lage.markiert === null ? -1 : namen.indexOf(lage.markiert)
+  if (taste === 'ArrowDown' || taste === 'ArrowUp') {
+    const neu = bewegeMarkierung(lage.offen ? stelle : -1, namen.length, taste === 'ArrowDown' ? 1 : -1)
+    return { lage: { offen: true, markiert: namen[neu] ?? null }, uebernehmen: null, verbrauchen: true }
+  }
+  if (!lage.offen) return unveraendert
+  if (taste === 'Enter' && stelle >= 0) {
+    return { lage: { offen: false, markiert: null }, uebernehmen: namen[stelle] ?? null, verbrauchen: true }
+  }
+  if (taste === 'Escape') return { lage: { offen: false, markiert: null }, uebernehmen: null, verbrauchen: true }
+  return unveraendert
+}
+
+/**
+ * Die Vorschlagsliste unter dem Suchfeld: die VERFÜGBAREN Produkte der
  * übergebenen (also bereits nach Kategorie/Umkreis eingegrenzten) Höfe,
  * gleiche Namen über Schreibweisen hinweg zusammengefasst, gezählt nach
  * Höfen und danach absteigend sortiert (Gleichstand: alphabetisch, damit
@@ -296,8 +345,9 @@ export const VORSCHLAGS_DECKEL = 12
  * ab Platz neun.
  *
  * `suchtext` verengt die Liste auf passende Namen (Teiltreffer), erst
- * DANACH greift der Deckel — beim Tippen tauchen also auch Namen auf, die
- * ohne Eingabe hinter den zwölf häufigsten lägen.
+ * DANACH greift der Deckel — es erscheinen die häufigsten TREFFER, nicht die
+ * häufigsten Produkte. Dass es ohne Eingabe gar keine Liste gibt, entscheidet
+ * berechneHofAuswahl; diese Funktion zählt nur.
  */
 export function verfuegbareProduktnamen(
   hoefe: Array<{ suchNamen: string[] }>,
@@ -412,11 +462,14 @@ export type UebersichtsFilter = Omit<HoefeFilter, 'ansicht'> & {
  * diese eine Funktion):
  *
  *   - `gefiltert`: Kategorie → Umkreis/Sortierung → Suche (alles UND).
- *   - `vorschlaege`: aus dem Kategorie/Umkreis-Ausschnitt („angeboten wird
- *     nur, was bei den sichtbaren Höfen gerade verfügbar ist“), bewusst
- *     OHNE die Such-Marken selbst — die sind untereinander ein ODER, und
- *     wer „Eier“ gewählt hat, soll „Brot“ vom Nachbarhof weiter angeboten
- *     bekommen; bereits aktive Marken erscheinen nicht noch einmal.
+ *   - `vorschlaege`: NUR bei getipptem Text (ohne Eingabe keine — sonst
+ *     stehen Produktnamen wie Filter über den Kategorien), höchstens
+ *     VORSCHLAGS_DECKEL, aus dem Bereich/Kategorie/Umkreis-Ausschnitt
+ *     („angeboten wird nur, was bei den sichtbaren Höfen gerade verfügbar
+ *     ist“), bewusst OHNE die Such-Marken selbst — die sind untereinander
+ *     ein ODER, und wer „Eier“ gewählt hat, soll „Brot“ vom Nachbarhof weiter
+ *     angeboten bekommen; bereits aktive Marken erscheinen nicht noch einmal
+ *     und kosten keinen Platz.
  *   - `suchbegriffe`: Marken plus getippter Text — fürs Schaufenster
  *     (Treffer zuerst, waehleVorschauProdukte).
  *   - `sucheAktiv`: es gibt aktive Suchbegriffe.
@@ -474,9 +527,15 @@ export function berechneHofAuswahl<
   const sucheAktiv = filter.suchMarken.length > 0 || eingabe !== ''
   return {
     gefiltert,
-    vorschlaege: verfuegbareProduktnamen(suchBasis, filter.suchtext).filter(
-      (v) => !aktiv.has(suchForm(v.name))
-    ),
+    // Erst ab einem Zeichen, das nach der Suchform übrig bleibt — reine
+    // Leerzeichen sind keine Eingabe. Aktive Marken fallen VOR dem Deckel
+    // heraus, sonst blieben weniger als sechs übrig, obwohl es mehr gibt.
+    vorschlaege:
+      suchForm(filter.suchtext) === ''
+        ? []
+        : verfuegbareProduktnamen(suchBasis, filter.suchtext, Infinity)
+            .filter((v) => !aktiv.has(suchForm(v.name)))
+            .slice(0, VORSCHLAGS_DECKEL),
     suchbegriffe: eingabe === '' ? filter.suchMarken : [...filter.suchMarken, eingabe],
     sucheAktiv,
     sucheLeertDieListe: sucheAktiv && gefiltert.length === 0 && suchBasis.length > 0,

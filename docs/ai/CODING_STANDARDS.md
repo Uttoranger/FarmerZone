@@ -356,6 +356,12 @@ gegen `background` **und** gegen `card`.
   mit `weg`), behält die Kopie statt der Datei samt der Lese-Diagnose für Sentry
   und gibt sie beim Schließen frei — damit die Karte bei der Auswahl erscheint
   und nicht mitten im Speichern.
+- **Suchvorschläge erst beim Tippen, als Liste unter dem Feld** — nie als
+  Knopfreihe ohne Eingabe, die wie ein Filter aussieht und die Filter
+  verdrängt. Muster: Combobox (`role="combobox"` am Feld, `role="listbox"`,
+  Pfeiltasten, Enter, Escape, schließt beim Verlassen des Felds), Liste im
+  Fluss statt als Overlay, Markierung über den Namen. Die Tastenlogik rein in
+  `src/lib/` (Vorbild: `tasteInVorschlaegen` für die Produktsuche auf `/hoefe`).
 
 ---
 

@@ -130,19 +130,19 @@ describe('verfuegbareProduktnamen — die Vorschlags-Knöpfe', () => {
     ])
   })
 
-  it('der Deckel greift bei zwölf', () => {
+  it('der Deckel greift bei sechs (fix/hoefe-kategorien-zuerst, vorher zwölf)', () => {
     const viele = hof(
       'A',
       Array.from({ length: 20 }, (_, i) => `Produkt ${String(i).padStart(2, '0')}`)
     )
 
-    expect(VORSCHLAGS_DECKEL).toBe(12)
-    expect(verfuegbareProduktnamen([viele])).toHaveLength(12)
+    expect(VORSCHLAGS_DECKEL).toBe(6)
+    expect(verfuegbareProduktnamen([viele])).toHaveLength(6)
   })
 
-  it('der Suchtext verengt die Liste VOR dem Deckel — auch Namen hinter den Zwölf tauchen auf', () => {
+  it('der Suchtext verengt die Liste VOR dem Deckel — auch seltene Namen tauchen auf', () => {
     // 13 Höfe führen je ein Massenprodukt, EIN Hof zusätzlich den „Wels" —
-    // ohne Eingabe fällt er hinter den Deckel, mit „wel" erscheint er.
+    // ungefiltert fällt er hinter den Deckel, mit „wel" erscheint er.
     const hoefe = Array.from({ length: 13 }, (_, i) =>
       hof(`Hof ${i}`, [`Massenware ${String(i).padStart(2, '0')}`])
     )
@@ -243,32 +243,42 @@ describe('berechneHofAuswahl — die Verdrahtung der Übersicht als Ganzes', () 
     hof('Ferner Hof', ['Wels'], ['SONSTIGES'], { latitude: 50.5, longitude: 14.5 }),
   ]
 
+  // Vorschläge gibt es nur beim Tippen (fix/hoefe-kategorien-zuerst) —
+  // deshalb tippen diese Fälle einen Buchstaben, den mehrere Namen tragen.
   it('die Vorschläge speisen sich aus dem KATEGORIE-Ausschnitt, nicht aus allen Höfen', () => {
-    const { vorschlaege } = berechneHofAuswahl(HOEFE, { ...FILTER, kategorien: ['EIER'] })
+    // „r" steckt in Freilandeier, Brot UND Karotten — die Karotten gehören
+    // aber zu einem Hof außerhalb der gewählten Kategorie.
+    const { vorschlaege } = berechneHofAuswahl(HOEFE, { ...FILTER, kategorien: ['EIER'], suchtext: 'r' })
 
     expect(vorschlaege.map((v) => v.name)).toEqual(['Brot', 'Freilandeier'])
   })
 
   it('auch der Umkreis begrenzt das Angebot der Vorschläge', () => {
+    expect(berechneHofAuswahl(HOEFE, { ...FILTER, suchtext: 'wel' }).vorschlaege.map((v) => v.name)).toEqual([
+      'Wels',
+    ])
     const { vorschlaege } = berechneHofAuswahl(HOEFE, {
       ...FILTER,
+      suchtext: 'wel',
       bezugspunkt: { lat: 48.2, lon: 13.5 },
       umkreis: 10,
     })
 
-    expect(vorschlaege.map((v) => v.name)).not.toContain('Wels')
+    expect(vorschlaege).toEqual([])
   })
 
   it('aktive Marken verschwinden aus den Vorschlägen, begrenzen sie aber NICHT (ODER bleibt erweiterbar)', () => {
     const { vorschlaege, gefiltert } = berechneHofAuswahl(HOEFE, {
       ...FILTER,
       suchMarken: ['Freilandeier'],
+      suchtext: 'r',
     })
 
     // Gefiltert ist nur der Eier-Hof — angeboten werden trotzdem die
     // Produkte der Nachbarhöfe, denn eine zweite Marke ERWEITERT die Liste.
+    // (Die Liste selbst verengt der getippte Buchstabe.)
     expect(gefiltert.map((h) => h.name)).toEqual(['Biohof Huber'])
-    expect(vorschlaege.map((v) => v.name)).toEqual(['Brot', 'Karotten', 'Wels'])
+    expect(vorschlaege.map((v) => v.name)).toEqual(['Brot', 'Karotten'])
   })
 
   it('suchbegriffe = Marken plus getippter Text; sucheAktiv folgt beidem', () => {
