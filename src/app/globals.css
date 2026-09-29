@@ -153,11 +153,10 @@
   --landing-base: oklch(0.955 0.011 136.6); /* #EDF2EB */
   /* Frisches Grün der Zierlinien und der großen Schritt-Ziffern */
   --landing-green: oklch(0.703 0.081 150); /* #7BAE85 */
-  /* Das Waldgrün-Band der Startseite (Abschnitt Heu und Futter) und der
-     gefüllte Knopf im Kopf, der dort Crème ist und Waldgrün schreibt. Das
-     Band bleibt in beiden Modi dunkelgrün; nachts wird es dunkler (.dark),
-     wie die Bauern-Leiste. Die Crème-Schrift bleibt gleich und steht deshalb
-     nur hier. Tag-Werte = --primary / --primary-foreground. */
+  /* Der gefüllte Knopf im Kopf der Startseite: Crème mit Waldgrün-Schrift.
+     Er steht auf dem Foto, das dem Modus nicht folgt — deshalb in beiden
+     Modi gleich und nur hier, nicht noch einmal in .dark.
+     Werte = --primary / --primary-foreground am Tag. */
   --landing-wald: oklch(0.30 0.082 155); /* #1F4732 */
   --landing-wald-ink: oklch(0.95 0.018 87); /* #F5EFE0 */
 
@@ -268,9 +267,6 @@
   --landing-top: oklch(0.175 0.022 150);
   --landing-base: oklch(0.14 0.02 150);
   --landing-green: oklch(0.82 0.045 148);
-  /* Waldgrün bei Nacht: dunkel genug, dass das Band nicht leuchtet, hell
-     genug, dass es sich vom Grund abhebt — den Rest trägt der Rahmen. */
-  --landing-wald: oklch(0.25 0.05 153);
 
   /* Anmeldeseiten bei Nacht: derselbe Verlauf, nur abwärts gedreht. */
   --auth-gradient: linear-gradient(

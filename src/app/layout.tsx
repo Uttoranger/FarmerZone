@@ -6,7 +6,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { CookieBanner } from '@/components/cookie-banner'
 import { UmgebungsBanner } from '@/components/shared/umgebungs-banner'
 import { RueckwegMerker } from '@/components/shared/rueckweg-merker'
-import { UMGEBUNG, ZEIGE_UMGEBUNGSBANNER } from '@/lib/umgebung-server'
+import { APP_URL, UMGEBUNG, ZEIGE_UMGEBUNGSBANNER } from '@/lib/umgebung-server'
 import './globals.css'
 
 const geist = Geist({
@@ -29,6 +29,11 @@ const TITEL_PRAEFIX = ZEIGE_UMGEBUNGSBANNER ? '[TEST] ' : ''
 
 export function generateMetadata(): Metadata {
   return {
+    // Löst relative Bildpfade der Vorschau (openGraph.images, src/lib/vorschaubild.ts)
+    // zu vollen Adressen auf — Messenger laden nur absolute URLs. APP_URL ist
+    // je Umgebung richtig (Produktion, Preview, lokal); ohne diese Zeile riete
+    // Next die Adresse selbst und warnt beim Bauen.
+    metadataBase: new URL(APP_URL),
     title: {
       default: `${TITEL_PRAEFIX}FarmerZone`,
       template: `${TITEL_PRAEFIX}%s`,

@@ -2384,6 +2384,52 @@ zeichnete sie als Knopfreihe.
 
 ---
 
+## Marke und Startseite aus einem Guss (2026-09-29)
+
+Die Bilder (Kategorie-Illustrationen, Favicon, Apple-Icon, App-Icons, Vorschaubild) hat der
+Betreiber direkt in `main` hochgeladen (7946f87, d4a2ac2, 3c67cf4, 30ff8e4); dieser Sprint
+verdrahtet sie.
+
+**Kategoriebilder.** `public/categories/` hat jetzt 15 Illustrationen. Die vier
+Futter-Kategorien zeigen ihr eigenes Bild (`heu-stroh`, `getreide-koerner`, `mischfutter`,
+`ergaenzungsfutter`); nur die Altlast `FUTTERMITTEL` bleibt bei `sonstiges`. `CATEGORY_SLUGS`
+ist exportiert, ein Test prüft zu jeder Kategorie die Datei.
+
+**Icons.** Favicon und Apple-Icon (180 × 180) liegen in `src/app/` und wirken über Nexts
+Dateikonvention. Das Manifest führt `icons/icon-192.png` und `icons/icon-512.png` (any) und
+`icons/icon-maskable-512.png` (maskable) — Favicon und das alte `app-icon-256.png` sind
+raus, die Datei ist gelöscht (sie stand nirgends sonst). Der Test liest die Größe aus dem
+PNG-Kopf, statt der Angabe im Manifest zu glauben.
+
+**Vorschaubild.** Die Startseite zeigt beim Teilen `og/startseite.jpg` (1200 × 630) und
+trägt eine große X-/Twitter-Karte. Hofseiten zeigen ihr Titelbild, ohne Titelbild dasselbe
+Bild wie die Startseite. „Mit Titelbild" heißt jetzt `titelbildFoto` — vorher nahm die
+Hofseite `bannerUrl` auch bei gewähltem Verlauf, also ein nicht mehr gezeigtes altes Foto.
+`metadataBase` fehlte ganz; es kommt jetzt aus `APP_URL`, sonst hätte Next die Adresse der
+relativen Bildpfade geraten. Eine Datei `opengraph-image` im app-Ordner gibt es bewusst nicht
+— sie überschriebe die Titelbilder der Hofseiten.
+
+**Startseite aus einem Guss.** Der dunkelgrüne Futter-Block aus #140 ist ersetzt durch das
+Kachelraster „Was suchst du?" direkt nach dem Kopf: „Für die Küche" (Eier, Fleisch & Wurst,
+Milch & Molkerei, Gemüse, Brot & Gebäck, Honig & Bienenprodukte) und „Für Stall und Tiere"
+(Heu & Stroh, Getreide & Körner, Mischfutter, Ergänzungsfutter) mit der Zeile zu Kilopreis
+und Pflichtangaben. Beide Gruppen sind gleich gebaut, kein farbiger Sonderblock; am Handy drei
+Kacheln je Reihe, ab md sechs. Eine Konfiguration (`src/lib/startseite-kacheln.ts`), Namen
+aus `KATEGORIE_LABEL`, Links über `schreibeHoefeFilter` (`/hoefe?kat=EIER`,
+`/hoefe?bereich=futter&kat=HEU_STROH`), Bilder über `product-image.ts`. Die Illustrationen
+werden nachts gedämpft und gerahmt (CODING_STANDARDS §7). Im Kopf steht nur noch ein Knopf,
+„Höfe in deiner Nähe". Titel, Beschreibung, Satz im Kopf, Schritt 1 und der Punkt bei „Für
+Höfe" aus #140 bleiben. `--landing-wald` trägt nur noch diesen Knopf auf dem Foto und ist
+deshalb in beiden Modi gleich.
+
+**Offen:**
+- Die Ansicht bei 375 px und 1280 px in beiden Modi ist nicht maschinell geprüft
+  (`agent-browser` ist in der Sitzung nicht installiert) — Checkliste im PR.
+- Honig heißt auf der Kachel „Honig & Bienenprodukte" (der Name aus `KATEGORIE_LABEL`).
+- Im Produktraster und in der Produktliste stehen die Illustrationen nachts ungedämpft.
+
+---
+
 ## Nützliche Befehle
 
 ```bash

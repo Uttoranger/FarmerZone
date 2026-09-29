@@ -14,9 +14,8 @@ import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CATEGORY_OPTIONS, PRODUCT_CATEGORY_VALUES, productFormSchema } from '@/schemas/product'
 import type { ProductCategoryValue } from '@/schemas/product'
-import { categoryImagePath } from '@/lib/product-image'
+import { CATEGORY_SLUGS, categoryImagePath } from '@/lib/product-image'
 import { sammleKategorien } from '@/lib/hofuebersicht'
-import { istFuttermittel } from '@/lib/taxonomie'
 
 /** Die Enum-Werte aus prisma/schema.prisma in Dateireihenfolge — die Quelle,
  *  an der sich pg_enum.enumsortorder und damit die Migration orientieren. */
@@ -137,7 +136,7 @@ describe('Kategorie FISCH — Illustration', () => {
   it('alle Kategorien haben eine Zuordnung — keine läuft ins Leere', () => {
     for (const kategorie of PRODUCT_CATEGORY_VALUES) {
       expect(categoryImagePath(kategorie as ProductCategoryValue, () => true)).toMatch(
-        /^\/categories\/[a-z]+\.webp$/
+        /^\/categories\/[a-z]+(?:-[a-z]+)*\.webp$/
       )
     }
   })
@@ -147,9 +146,9 @@ describe('Kategorie FISCH — Illustration', () => {
     const warnung = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
     for (const kategorie of PRODUCT_CATEGORY_VALUES) {
-      // Die Futter-Kategorien haben bewusst keine eigene Datei und nutzen die
-      // Kachel von Sonstiges (Taxonomie 1, Bereiche 1) — siehe product-image.ts.
-      const slug = istFuttermittel(kategorie) ? 'sonstiges' : kategorie.toLowerCase()
+      // Die Zuordnung selbst steht in product-image.ts (CATEGORY_SLUGS) — seit
+      // „Marke und Startseite" mit eigenen Futter-Bildern (heu-stroh, …).
+      const slug = CATEGORY_SLUGS[kategorie]
       const datei = path.join(process.cwd(), 'public', 'categories', `${slug}.webp`)
       const erwartet = fs.existsSync(datei) ? `/categories/${slug}.webp` : null
       expect(categoryImagePath(kategorie)).toBe(erwartet)

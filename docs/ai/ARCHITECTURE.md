@@ -157,6 +157,11 @@ Client-Komponente → Server Action → Zod → Fachregel (lib) → Prisma → r
 - Der Rückweg der Hofseite nimmt den **angezeigten** Bereich (`angezeigterBereich` in `src/lib/bereiche-anzeige.ts`), nicht den URL-Parameter.
 - Die Kopfzeile klebt (`sticky`, Ebene 40): Umgebungsbanner (60) darüber, Sheets/Dialoge (50) davor, Sektionsleiste (30) darunter. Ausnahme Hofseite am Handy: Die Leiste ist `fixed` und wird erst eingehängt, wenn das Titelbild verschwindet — `sticky` verschöbe beim Einhängen den Inhalt. Eigene Stapelebenen (`isolate`) um alles mit hohen z-Werten (Leaflet), sonst liegt es über der Kopfzeile.
 
+### Vorschaubild und Icons
+- Das Vorschaubild beim Teilen kommt aus `src/lib/vorschaubild.ts`: Startseite `STARTSEITE_VORSCHAUBILD` (`public/og/startseite.jpg`), Hofseite `hofVorschaubild` — ihr Titelbild (`titelbildFoto`), sonst das der Startseite. **Nie** eine Datei `opengraph-image.*` oder `twitter-image.*` unter `src/app/`: Nach Nexts Dateikonvention gälte sie für alle Seiten darunter und überschriebe die Titelbilder der Hofseiten (`tests/vorschaubild.test.ts`).
+- Relative Bildpfade in den Metadaten löst `metadataBase` im Root-Layout auf (`APP_URL`).
+- Favicon (`src/app/favicon.ico`) und Apple-Icon (`src/app/apple-icon.png`) wirken über die Dateikonvention; das Manifest (`src/app/manifest.ts`) führt nur `public/icons/` — `tests/manifest.test.ts` prüft Datei und Größe jedes Eintrags.
+
 ### Bauern-Bereich: Navigation
 - Eine Ordnung für Handy und Browser: `src/lib/bauern-navigation.ts` (Hauptpunkte, „Neu", „Verkauf und Kunden", unten; dazu die Reiter von „Mein Hof"). Die Komponente `farmer-nav.tsx` ordnet nur Symbole zu und zeichnet.
 - „Mein Hof" ist ein Punkt über mehreren Seiten (`auchAktivAuf`). Jede dieser Seiten rendert oben `MeinHofKopf` mit ihrem Reiter (`MEIN_HOF_REITER`); Unterseiten, auf denen etwas getan wird (`/status/new`), nicht. Eine neue Seite unter Mein Hof: Reiter in der Konfiguration **und** der Kopf in der Seite.
