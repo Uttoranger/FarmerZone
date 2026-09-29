@@ -231,6 +231,86 @@ describe('Idempotenz', () => {
       expect.objectContaining({ data: { stock: { increment: 2 } } })
     )
   })
+
+  /** Am Eingang unbekannt, beim letzten Blick vor der Absage schon da. */
+  function bestellungErscheintNachDemEingang() {
+    let vorbeiAmEingang = false
+    orderFindUnique.mockImplementation((({ where }: { where: Record<string, unknown> }) => {
+      if (!where.idempotencyKey) return Promise.resolve(null)
+      if (!vorbeiAmEingang) {
+        vorbeiAmEingang = true
+        return Promise.resolve(null)
+      }
+      return Promise.resolve({
+        id: 'order_erst',
+        orderNumber: 'BH-2009-CCCC',
+        paymentMethod: 'ONSITE_CASH',
+        stripePaymentIntentId: null,
+      })
+    }) as never)
+  }
+
+  it('Halt schon gelöscht, weil die Gewinnerin fertig ist: 200 mit ihrer Bestellung statt 409', async () => {
+    bestellungErscheintNachDemEingang()
+    reservationFindMany.mockResolvedValue([] as never)
+
+    const res = await POST(anfrage({ idempotencyKey: 'gleichzeitig' }))
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ orderId: 'order_erst', wiederholt: true })
+    expect(orderCreate).not.toHaveBeenCalled()
+  })
+
+  it('Bestand schon verbraucht, weil die Gewinnerin gebucht hat: 200 statt 409', async () => {
+    bestellungErscheintNachDemEingang()
+    productUpdateMany.mockResolvedValue({ count: 0 } as never)
+
+    const res = await POST(anfrage({ idempotencyKey: 'gleichzeitig' }))
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ orderId: 'order_erst', wiederholt: true })
+    expect(orderCreate).not.toHaveBeenCalled()
+  })
+
+  it('Online-Bestellung ohne Zahlungsvorgang: kein 200 ohne Client-Secret, sondern 409 mit Bitte um erneuten Versuch', async () => {
+    orderFindUnique.mockImplementation((({ where }: { where: Record<string, unknown> }) =>
+      Promise.resolve(
+        where.idempotencyKey
+          ? { id: 'order_online', orderNumber: 'BH-2009-DDDD', paymentMethod: 'ONLINE', stripePaymentIntentId: null }
+          : null
+      )) as never)
+
+    const res = await POST(anfrage({ idempotencyKey: 'online-im-fenster', paymentMethod: 'ONLINE' }))
+
+    expect(res.status).toBe(409)
+    expect((await res.json()).code).toBe('BESTELLUNG_IN_ARBEIT')
+    expect(orderCreate).not.toHaveBeenCalled()
+    expect(productUpdateMany).not.toHaveBeenCalled()
+  })
+
+  it('Online-Bestellung mit Zahlungsvorgang: 200 mit Client-Secret', async () => {
+    orderFindUnique.mockImplementation((({ where }: { where: Record<string, unknown> }) =>
+      Promise.resolve(
+        where.idempotencyKey
+          ? { id: 'order_online', orderNumber: 'BH-2009-EEEE', paymentMethod: 'ONLINE', stripePaymentIntentId: 'pi_1' }
+          : null
+      )) as never)
+    vi.mocked(stripe.paymentIntents.retrieve).mockResolvedValue({ client_secret: 'geheim_1' } as never)
+
+    const res = await POST(anfrage({ idempotencyKey: 'online-fertig', paymentMethod: 'ONLINE' }))
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ orderId: 'order_online', clientSecret: 'geheim_1', wiederholt: true })
+  })
+
+  it('ohne Bestellung zum Schlüssel bleibt es beim 409', async () => {
+    reservationFindMany.mockResolvedValue([] as never)
+
+    const res = await POST(anfrage({ idempotencyKey: 'ohne-vorgaengerin' }))
+
+    expect(res.status).toBe(409)
+    expect((await res.json()).code).toBe(CODE_RESERVIERUNG_ABGELAUFEN)
+  })
 })
 
 // ── Befund 4: Mailversand blockiert nicht ───────────────────────────────────
