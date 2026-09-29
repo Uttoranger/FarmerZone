@@ -2301,6 +2301,48 @@ Kennung `139`.
 
 ---
 
+## Startseite: Futter als zweiter Einstieg (2026-09-28)
+
+Die Startseite erwähnte Futter nirgends, auch nicht im Titel für Suchmaschinen. Jetzt ist
+Futter der zweite Einstieg, ohne den Hofladen zu verdrängen (`src/app/page.tsx`):
+
+- **Kopf:** Der Satz unter der Überschrift nennt beide Wege, darunter zwei Knöpfe —
+  „Hofladen entdecken" (`/hoefe`, gefüllt) vor „Heu & Futter finden"
+  (`/hoefe?bereich=futter`, weißer Umriss). Beide Ziele kommen aus `hoefeLink`.
+- **So funktioniert's**, Schritt 1: „Hof in der Nähe finden — für den Hofladen oder für Heu
+  und Futter." Der alte Schritt 1 (der Hof teilt seinen Link) ist damit ersetzt.
+- **Neuer Abschnitt** nach den Schritten: das Waldgrün-Band „Heu, Stroh und Futter vom
+  Nachbarhof" mit drei Punkten und dem Knopf „Futter in der Nähe finden". Ein gerundeter
+  Block, kein vollbreites Band — direkt darunter steht die Vision als dunkles Foto-Band.
+- **Für Höfe:** ein vierter Punkt ohne Bild unter den drei Bildzeilen, „Auch Heu und Futter
+  verkaufen …".
+- **Metadaten:** Titel „FarmerZone — Lebensmittel und Futter direkt vom Hof", die
+  Beschreibung nennt Heu, Stroh und Futter; Open Graph trägt dasselbe.
+
+**Kein zweites Orange (Rückfrage).** Der Auftrag sah „Hofladen entdecken" als Akzent vor.
+Orange ist aber der Handlungsknopf, höchstens einmal je Seite, und gehört auf der Startseite
+dem Band „Hof anmelden". Entschieden: Der Hofladen-Knopf ist Crème mit Waldgrün-Schrift. Der
+kleine pulsierende Punkt am Pilot-Hinweis bleibt, er ist ein Statuspunkt, kein Knopf.
+
+**Waldgrün als Token.** `--landing-wald` (#1F4732, der Tag-Wert von `--primary`) und
+`--landing-wald-ink` (Crème). Das Band ist in beiden Modi dunkelgrün; nachts wird es dunkler
+(eigener `.dark`-Wert) und bekommt einen Rahmen, wie die Bauern-Leiste. Die Crème-Schrift ist
+in beiden Modi gleich. `--primary` hätte nicht gepasst — es wird nachts ein helles Salbeigrün.
+
+**Kein Bild im Futter-Abschnitt (Rückfrage).** Es gibt kein eigenes Heu- oder Futterfoto.
+`corn-1`/`corn-3` (Weizenähren aus dem Hero-Clip) wären denkbar, ihre Herkunft ist aber
+nirgends festgehalten (`public/landing/README.md` ist leer) — also ohne Bild.
+
+**Der Kopf wächst mit dem Inhalt.** Er war fest `h-[70vh]` mit `overflow-hidden`; mit Satz und
+zwei Knöpfen wäre die Überschrift auf kleinen Handys oben abgeschnitten worden. Jetzt
+`min-h-[max(70vh,420px)]`, der Inhalt steht unten und schiebt den Kopf bei Bedarf höher. Der
+Seitenverlauf hat seine Endfarbe bei 55 % erreicht, ein höherer Kopf trifft sie genauso.
+
+**Offen:** Die Ansicht bei 375 px und 1280 px in beiden Modi ist nicht maschinell geprüft
+(`agent-browser` ist in der Sitzung nicht installiert) — Checkliste im PR.
+
+---
+
 ## Nützliche Befehle
 
 ```bash
