@@ -23,7 +23,6 @@ vi.mock('@/lib/stripe', () => ({
 import { POST as checkout } from '@/app/api/checkout/route'
 import { prisma } from '@/lib/prisma'
 import { sendOnsiteConfirmation } from '@/lib/email'
-import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import {
   checkoutAnfrage,
   erstelleHof,
@@ -92,34 +91,22 @@ describe('POST /api/checkout — Idempotenz in der echten Datenbank', () => {
     await vi.waitFor(() => expect(sendOnsiteConfirmation).toHaveBeenCalledTimes(1))
   })
 
-  it('erzeugt bei zwei gleichzeitigen Anfragen mit demselben Schlüssel nie eine zweite Bestellung', async () => {
-    // WAS DIESER TEST BEHAUPTET UND WAS NICHT — die CI hat das erst
-    // richtiggestellt (er behauptete zuerst „beide antworten 200"):
-    //
-    // Von außen ist der WEG der zweiten Anfrage nicht feststellbar. Je nach
-    // Verschränkung findet sie die Bestellung in Schritt 0, läuft in Schritt 9
-    // in den eindeutigen Index — oder sie kommt erst an, nachdem die Gewinnerin
-    // in Schritt 10 die Halte der Sitzung gelöscht hat, und wird dann mit
-    // „Reservierung abgelaufen" abgewiesen. Alle drei sind gültige Ausgänge, und
-    // welcher eintritt, entscheidet die Maschine, nicht der Code.
-    //
-    // Die Aussage ist deshalb der ZUSTAND, der in jeder Verschränkung gelten
-    // muss: eine Bestellung, eine Position, einmal abgebucht. Genau das schützt
-    // das Geld; welcher Weg dorthin führte, tut es nicht.
+  it('beantwortet zwei gleichzeitige Anfragen mit demselben Schlüssel beide mit 200 und derselben Bestellung', async () => {
+    // Je nach Verschränkung findet die zweite Anfrage die Bestellung in
+    // Schritt 0, läuft in Schritt 9 in den eindeutigen Index — oder kommt erst
+    // an, nachdem die Gewinnerin die Halte der Sitzung gelöscht hat. Früher
+    // bekam sie im letzten Fall „Reservierung abgelaufen", obwohl ihre
+    // Bestellung längst stand. Seit dem letzten Blick vor jedem 409
+    // (konflikt() in der Route) enden alle drei Wege in derselben 200.
     const { farm, produkt, anfrage } = await vorbereiten()
 
     const antworten = await Promise.all([anfrage(), anfrage()])
 
-    // Mindestens eine muss durchkommen — beide abzulehnen wäre ein Fehler.
-    const erfolge = antworten.filter((r) => r.status === 200)
-    expect(erfolge.length).toBeGreaterThanOrEqual(1)
-
-    // Wird eine abgelehnt, dann NUR wegen der gelöschten Halte. Ein
-    // Bestandsfehler wäre hier keiner: 5 auf Lager, 1 bestellt.
-    for (const abgelehnt of antworten.filter((r) => r.status !== 200)) {
-      expect(abgelehnt.status).toBe(409)
-      expect(await abgelehnt.json()).toMatchObject({ code: CODE_RESERVIERUNG_ABGELAUFEN })
-    }
+    expect(antworten.map((r) => r.status)).toEqual([200, 200])
+    const [a, b] = await Promise.all(antworten.map((r) => r.json()))
+    expect(a.orderId).toBe(b.orderId)
+    // Genau eine Antwort trägt `wiederholt` — die Gewinnerin kennt das Feld nicht.
+    expect([a.wiederholt, b.wiederholt].filter(Boolean)).toHaveLength(1)
 
     const bestellungen = await prisma.order.findMany({
       where: { farmId: farm.id },
@@ -134,14 +121,6 @@ describe('POST /api/checkout — Idempotenz in der echten Datenbank', () => {
     expect(await prisma.product.findUniqueOrThrow({ where: { id: produkt.id } })).toMatchObject({
       stock: 4,
     })
-
-    // Kommen beide durch, ist es dieselbe Bestellung, und genau eine Antwort
-    // trägt `wiederholt` — die Gewinnerin kennt das Feld nicht.
-    if (erfolge.length === 2) {
-      const [a, b] = await Promise.all(erfolge.map((r) => r.json()))
-      expect(a.orderId).toBe(b.orderId)
-      expect([a.wiederholt, b.wiederholt].filter(Boolean)).toHaveLength(1)
-    }
   })
 
   it('erzeugt ohne Schlüssel zwei Bestellungen — die Idempotenz hängt am Schlüssel, nicht am Zufall', async () => {

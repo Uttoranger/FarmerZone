@@ -30,7 +30,9 @@ Stand: 2026-09. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 - `z.string().email()` ist deprecated → `z.email()`.
 - Fehlerliste heißt `error.issues`, nicht `error.errors`.
 
-**pnpm-Einstellungen:** `overrides`, `allowBuilds` und `onlyBuiltDependencies` stehen in `pnpm-workspace.yaml`, **nicht** im Feld `"pnpm"` der `package.json` — das Feld ist abgekündigt. Ein neuer Sicherheits-Override kommt dorthin; danach muss er im Kopf von `pnpm-lock.yaml` unter `overrides:` stehen.
+**pnpm-Einstellungen:** `overrides` und `allowBuilds` stehen in `pnpm-workspace.yaml`, **nicht** im Feld `"pnpm"` der `package.json` — das Feld ist abgekündigt. Ein neuer Sicherheits-Override kommt dorthin; danach muss er im Kopf von `pnpm-lock.yaml` unter `overrides:` stehen.
+
+**Sentry-Quelltextkarten (`@sentry/nextjs` 10.66):** `withSentryConfig` in `next.config.ts` trägt `org: 'farmerzone'` und `project: 'javascript-nextjs'` fest; geheim ist nur `authToken`, gelesen aus `process.env.SENTRY_AUTH_TOKEN` (Build-Werkzeug, deshalb nicht über `@/lib/env`; in Vercel für Production und Preview). Keine `SENTRY_URL`: Der Organisations-Token (`sntrys_…`) trägt die Adresse seiner Region (de.sentry.io), und sentry-cli zieht sie der voreingestellten sentry.io vor. `sourcemaps.deleteSourcemapsAfterUpload: true` löscht die Karten nach dem Upload — ausgeliefert werden sie nie. Ohne Token überspringt der Build den Upload und bleibt grün. Das Upload-Programm kommt aus dem Einrichtungs-Skript von `@sentry/cli`; es muss deshalb in `allowBuilds` stehen (pnpm 10.33 liest nur diese Liste, `onlyBuiltDependencies` gibt es nicht mehr daneben). Fehlt es dort, meldet `pnpm ignored-builds` das Paket.
 
 **Tailwind 4:** Konfiguration lebt in `src/app/globals.css` per `@theme` / `@import "tailwindcss"`. **Keine** `tailwind.config.js` anlegen. Keine `content`-Pfade pflegen.
 
@@ -106,7 +108,7 @@ Nach der Freigabe: hier in die Tabelle eintragen.
 - **Cron im Hobby-Tarif: einmal täglich.** Nie eine Frist oder Geschäftsregel von einem Cron abhängig machen. Cron ist Aufräumer, nie die Wahrheit.
 - **Kein Dateisystem-Schreibzugriff.** Uploads gehen an Vercel Blob.
 - **Kalte Starts.** Nichts Teures auf Modulebene ausführen.
-- **Env-Variablen** ausschließlich über `@/lib/env` (Zod-validiert). Nie `process.env.X` direkt lesen — Ausnahme: `NODE_ENV`.
+- **Env-Variablen** ausschließlich über `@/lib/env` (Zod-validiert). Nie `process.env.X` direkt lesen — Ausnahmen: `NODE_ENV` und die Build-Konfiguration `next.config.ts` (läuft vor der App, `SENTRY_AUTH_TOKEN`).
 - **Die Adresse der App** (`APP_URL`) und die Umgebung (`UMGEBUNG`: produktion / preview / lokal) ausschließlich über `@/lib/umgebung-server`. Nie `NEXT_PUBLIC_APP_URL` selbst lesen, nie `?? 'http://localhost:3000'` in einer Datei — in Previews ist die Variable nicht gesetzt, und genau dieser Ersatz hat dort den Login zerstört. Die Entscheidung selbst ist rein und getestet: `@/lib/umgebung`. Im Browser gibt es die Adresse nur als Prop vom Server (Vorbild: `onboarding/page.tsx`), nie über `process.env`.
 
 ---
