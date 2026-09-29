@@ -369,7 +369,7 @@ export function CheckoutForm({
   // legte eine zweite an. Der Zahlungsschritt hat sein eigenes „Zurück" zum
   // Formular (StripePaymentStep, onBack).
   const kopf = bestellungAngelegt ? null : (
-    <KundenKopf seite={{ art: 'checkout', hofSlug: farm.slug }} titel="Bestellung" hofName={farm.name} />
+    <KundenKopf seite={{ art: 'checkout', hofSlug: farm.slug }} hofName={farm.name} />
   )
 
   // Stripe payment step

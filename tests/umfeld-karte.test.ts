@@ -52,7 +52,9 @@ function statischErreichbar(einstiege: string[]): Set<string> {
   return gesehen
 }
 
-const relativ = (menge: Set<string>) => [...menge].map((d) => (d.startsWith('paket:') ? d : path.relative(WURZEL, d)))
+// Schrägstriche auch unter Windows — die erwarteten Pfade sind so geschrieben.
+const relativ = (menge: Set<string>) =>
+  [...menge].map((d) => (d.startsWith('paket:') ? d : path.relative(WURZEL, d).split(path.sep).join('/')))
 
 const AUSWERTUNG = [
   'src/app/layout.tsx',

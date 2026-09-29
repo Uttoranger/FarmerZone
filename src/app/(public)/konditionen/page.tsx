@@ -34,7 +34,7 @@ const CTA_MAILTO = `mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent('Mein H
 export default function KonditionenPage() {
   return (
     <div className="min-h-screen bg-background">
-      <KundenKopf seite={{ art: 'info' }} titel="Konditionen" />
+      <KundenKopf seite={{ art: 'info' }} />
       <div className="max-w-2xl mx-auto px-4 py-10">
         {/* Kicker im Stil der Startseite */}
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">

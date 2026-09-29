@@ -90,13 +90,13 @@ describe('rueckweg — übrige Seiten', () => {
 })
 
 describe('kopfForm — welche Seite welche Form bekommt', () => {
-  it('nur die Hofseite hat am Handy die Knöpfe über dem Titelbild', () => {
-    expect(kopfForm(HOFSEITE).handy).toBe('titelbild-knoepfe')
-    for (const seite of [CHECKOUT, BESTAETIGUNG, BESTELLUNG, BESTELLUNG_UNGUELTIG, HOFUEBERSICHT, INFO]) {
-      expect(kopfForm(seite).handy, seite.art).toBe('leiste')
+  it('Zurück in der Handy-Leiste überall, wo es woanders hinführt als das F-Icon', () => {
+    for (const seite of [HOFSEITE, FUTTER_HOFSEITE, CHECKOUT, BESTAETIGUNG, BESTELLUNG, BESTELLUNG_UNGUELTIG, INFO]) {
+      expect(kopfForm(seite).zurueck, seite.art).toBe(true)
     }
+    // Die Hofübersicht führt hinauf zur Startseite — das tut das F-Icon schon.
+    expect(kopfForm(HOFUEBERSICHT).zurueck).toBe(false)
   })
-
   it('Warenkorb-Symbol weder auf der Hofseite noch im Bestellweg — sonst ja', () => {
     expect(kopfForm(HOFSEITE).warenkorb).toBe(false)
     for (const seite of [CHECKOUT, BESTAETIGUNG, BESTELLUNG, BESTELLUNG_UNGUELTIG]) {
@@ -306,7 +306,9 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
       for (const eintrag of fs.readdirSync(ordner, { withFileTypes: true })) {
         const voll = path.join(ordner, eintrag.name)
         if (eintrag.isDirectory()) durchsuche(voll)
-        else if (eintrag.name === 'page.tsx') seiten.push(path.relative(path.resolve(__dirname, '..'), voll))
+        // Schrägstriche auch unter Windows — die Schlüssel oben sind so geschrieben.
+        else if (eintrag.name === 'page.tsx')
+          seiten.push(path.relative(path.resolve(__dirname, '..'), voll).split(path.sep).join('/'))
       }
     }
     durchsuche(wurzel)
@@ -321,11 +323,13 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     }
   })
 
-  it('die Hofseite: Kopf und Titelbild-Knöpfe nur für Kundinnen, nie in der Vorschau des Bauern-Bereichs', () => {
+  it('die Hofseite: Kopf und Teilen-Knopf nur für Kundinnen, nie in der Vorschau des Bauern-Bereichs', () => {
     const text = lies('src/components/farm/farm-page-view.tsx')
     expect(text).toMatch(/art: 'hofseite'/)
     expect(text).toMatch(/\{!ownerMode && \(\s*<KundenKopf seite=\{kundenSeite\}/)
-    expect(text).toMatch(/\{!ownerMode && <TitelbildKnoepfe/)
+    expect(text).toMatch(/\{!ownerMode && <TitelbildTeilen/)
+    // Über dem Titelbild steht nur noch Teilen — Zurück und Menü trägt die Leiste darüber.
+    expect(text).not.toMatch(/TitelbildKnoepfe/)
     // Der Leer-Zustand (ohne Titelbild) liegt schon hinter `if (!ownerMode)`.
     expect(text.match(/<KundenKopf /g)).toHaveLength(2)
   })

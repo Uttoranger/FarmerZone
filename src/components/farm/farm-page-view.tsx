@@ -30,7 +30,7 @@ import {
   KundenKopf,
   SPRUNGZIEL_OHNE_KOPF,
   SPRUNGZIEL_UNTER_KOPF,
-  TitelbildKnoepfe,
+  TitelbildTeilen,
 } from '@/components/shared/kunden-kopf'
 import { hofseiteSektionen, naechsterAktiverReiter } from '@/lib/hofseite-sektionen'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
@@ -636,11 +636,13 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
     [sections, farm.farmPhotos.length]
   )
 
+  // Scrollt der Hofname aus dem Blick, zeigt ihn die Handy-Leiste (kunden-kopf.tsx).
+  const hofNameUeberschrift = useRef<HTMLHeadingElement>(null)
+
   // Kopfzeile der Kundenansicht (kunden-kopf.tsx). Ihr Rückweg führt in den
   // Bereich, den das Produktraster gerade ZEIGT — nicht in den der URL: Ein
   // reiner Futterhof zeigt Futter auch ohne ?bereich, und geteilte Links
   // tragen keinen. Dieselbe Produktmenge wie das Raster der Kundenansicht.
-  const titelbild = useRef<HTMLDivElement>(null)
   const bereichWunsch = useBereichWunsch()
   const bereich = useMemo(
     () => angezeigterBereich(farm.products.filter((p) => p.isAvailable), bereichWunsch),
@@ -712,8 +714,8 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
     if (farm.products.length === 0 && farm.pickupSlots.length === 0) {
       return (
         <>
-        {/* Ohne Titelbild: die Leiste steht von Anfang an. */}
-        <KundenKopf seite={kundenSeite} titel={farm.name} />
+        {/* Der Name steht groß in der Karte darunter — die Leiste braucht ihn nicht. */}
+        <KundenKopf seite={kundenSeite} />
         <main
           // Die Kopfleiste steht darüber: zusammen genau ein Bildschirm.
           className="min-h-[calc(100dvh-3.5rem)] md:min-h-[calc(100dvh-4rem)] flex items-center justify-center p-6"
@@ -790,7 +792,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
 
       {/* Nur für Kundinnen — die Vorschau im Bauern-Bereich hat dessen Navigation. */}
       {!ownerMode && (
-        <KundenKopf seite={kundenSeite} titel={farm.name} titelbild={titelbild} />
+        <KundenKopf seite={kundenSeite} hofName={farm.name} hofNameUeberschrift={hofNameUeberschrift} />
       )}
 
       {/* Mode banner */}
@@ -856,7 +858,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           Fenster — in der Eigentümer-Vorschau nimmt die Seitenleiste 224px —
           fällt das Band zwischen md und etwa 1050px höher aus als das reine
           Verhältnis ergäbe. Ab dem Deckel ist es wieder identisch. */}
-      <div ref={titelbild} className="relative w-full h-[260px] md:h-[33vw] lg:h-[40vw] max-h-[420px]">
+      <div className="relative w-full h-[260px] md:h-[33vw] lg:h-[40vw] max-h-[420px]">
         {bannerBg === null ? (
           <Image
             src={farm.bannerUrl!}
@@ -877,8 +879,8 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
             background: 'linear-gradient(180deg, rgba(20,30,22,0) 45%, rgba(20,30,22,0.5) 100%)',
           }}
         />
-        {/* Handy: Zurück und Teilen über dem Bild, solange es im Blick ist. */}
-        {!ownerMode && <TitelbildKnoepfe seite={kundenSeite} onTeilen={handleShare} />}
+        {/* Handy: nur Teilen über dem Bild — Zurück und Menü trägt die Leiste darüber. */}
+        {!ownerMode && <TitelbildTeilen onTeilen={handleShare} />}
         {/* Titelbild ändern + Fokus anpassen (edit only) */}
         {isEdit && adjustingFocus && (
           <CoverFocusAdjust
@@ -940,8 +942,9 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                 />
               )}
               {/* Am Handy etwas kleiner: Der Block wächst nach oben, und oben
-                  stehen die runden Knöpfe (TitelbildKnoepfe). */}
+                  steht der Teilen-Knopf (TitelbildTeilen). */}
               <h1
+                ref={hofNameUeberschrift}
                 className="font-heading text-[32px] md:text-[38px] font-semibold text-white leading-tight"
                 style={{ textShadow: '0 2px 14px rgba(0,0,0,0.4)' }}
               >
