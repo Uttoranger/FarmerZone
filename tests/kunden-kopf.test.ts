@@ -306,7 +306,7 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
       for (const eintrag of fs.readdirSync(ordner, { withFileTypes: true })) {
         const voll = path.join(ordner, eintrag.name)
         if (eintrag.isDirectory()) durchsuche(voll)
-        else if (eintrag.name === 'page.tsx') seiten.push(path.relative(path.resolve(__dirname, '..'), voll))
+        else if (eintrag.name === 'page.tsx') seiten.push(path.relative(path.resolve(__dirname, '..'), voll).split(path.sep).join('/'))
       }
     }
     durchsuche(wurzel)
