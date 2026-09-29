@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Check, ChevronRight } from 'lucide-react'
 import { ERSTE_SCHRITTE_WARTET, type ErsteSchritteErgebnis } from '@/lib/erste-schritte'
+import { ErsteSchritteSchalter } from '@/components/farmer/erste-schritte-schalter'
 
 /**
  * Einstiegs-Checkliste auf der Übersicht.
@@ -14,7 +15,9 @@ import { ERSTE_SCHRITTE_WARTET, type ErsteSchritteErgebnis } from '@/lib/erste-s
  * die sich selbst abbaut.
  *
  * Die Karte wird nur gerendert, wenn `anzeigen` true ist — die Entscheidung
- * darüber trifft die reine Funktion, nicht die Anzeige.
+ * darüber trifft die reine Funktion, nicht die Anzeige. Ob der Hof sie
+ * weggeklickt hat, entscheidet die Seite vorher (ersteSchritteAnzeige);
+ * „Ausblenden" im Kopf setzt nur den Cookie.
  */
 export function ErsteSchritteKarte({
   ergebnis,
@@ -32,8 +35,11 @@ export function ErsteSchritteKarte({
       <CardContent className="pt-5 pb-4">
         <div className="flex items-baseline justify-between gap-3">
           <p className="font-semibold text-foreground">Erste Schritte</p>
-          <p className="shrink-0 text-[13px] font-medium" style={{ color: 'var(--app-ink-faint)' }}>
-            {erledigt} von {gesamt} erledigt
+          <p className="flex shrink-0 items-center gap-3 text-[13px] font-medium" style={{ color: 'var(--app-ink-faint)' }}>
+            <span>
+              {erledigt} von {gesamt} erledigt
+            </span>
+            <ErsteSchritteSchalter richtung="aus" className="-my-2 px-1" />
           </p>
         </div>
 

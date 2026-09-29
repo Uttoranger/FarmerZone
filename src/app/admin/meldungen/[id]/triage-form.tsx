@@ -20,7 +20,7 @@ export type TriageWerte = {
 
 /**
  * Die Triage-Felder des Betreibers. Alles außer der Antwort bleibt intern —
- * die Antwort ist das EINZIGE Feld, das der Hof unter „Meine Meldungen" liest,
+ * die Antwort ist das EINZIGE Feld, das der Hof unter „Hilfe und Rückmeldung" liest,
  * und steht deshalb sichtbar so beschriftet. Native Elemente statt Select-
  * Komponente: sieben Status passen in ein <select>, und das tippt sich bei
  * 375px zuverlässig.
@@ -154,7 +154,7 @@ export function TriageForm({
           onChange={(e) => setze('antwortAnMelder', e.target.value)}
           maxLength={500}
           rows={3}
-          placeholder={hatHof ? 'Kurz und in Alltagssprache — der Hof liest das unter „Meine Meldungen".' : 'Ohne Hof-Konto liest das niemand — nur für die Akte.'}
+          placeholder={hatHof ? 'Kurz und in Alltagssprache — der Hof liest das unter „Hilfe und Rückmeldung".' : 'Ohne Hof-Konto liest das niemand — nur für die Akte.'}
         />
         <p className="mt-1 text-[11px] text-muted-foreground">{form.antwortAnMelder.length}/500</p>
       </div>

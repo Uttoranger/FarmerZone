@@ -12,16 +12,16 @@ import { hofInitialen } from '@/lib/hof-initialen'
  * soll das zeigen. Deshalb steht der Hofname hier als größtes Textelement der
  * ganzen Leiste, mit Logo daneben und einer Vorschau-Schaltfläche darunter.
  *
- * Sie sitzt an ZWEI Stellen (Desktop-Seitenleiste und mobiles „Mehr"-Menü),
- * beide auf demselben dunkelgrünen Grund (#24523A) — deshalb genau eine
- * Farbfassung, keine Varianten.
+ * Sie sitzt in der Desktop-Seitenleiste auf dunkelgrünem Grund (#24523A).
+ * Im mobilen „Mehr"-Blatt stand sie bis zur Bauern-Navigation mit „Mein Hof"
+ * in der Leiste; dort gehört der Kopf jetzt der Person (farmer-nav.tsx).
  *
  * Was sie bewusst NICHT tut:
  *  - Sie zeigt nicht die öffentliche Hof-URL. Die trägt der Shop-Link-Balken
  *    (shop-link-banner.tsx) mit Kopieren und Teilen; hier führt die
  *    Schaltfläche in die Eigentümer-Vorschau /farm-page.
- *  - Sie ersetzt den Freigabe-Balken nicht. Der Punkt „Wartet auf
- *    Freischaltung" ist eine Zustandsanzeige an der Identität, die Erklärung
+ *  - Sie ersetzt den Freigabe-Balken nicht. Der Punkt „Noch nicht
+ *    freigegeben" ist eine Zustandsanzeige an der Identität, die Erklärung
  *    samt Hof-ID und Rückfrage-Link bleibt beim Balken
  *    (pending-approval-banner.tsx).
  */
@@ -29,13 +29,10 @@ export function FarmIdentityCard({
   farmName,
   logoUrl,
   wartetAufFreigabe,
-  onNavigate,
 }: {
   farmName: string
   logoUrl: string | null
   wartetAufFreigabe: boolean
-  /** Nur im mobilen Sheet gesetzt: der Klick muss es auch schließen. */
-  onNavigate?: () => void
 }) {
   const initialen = hofInitialen(farmName)
 
@@ -88,8 +85,10 @@ export function FarmIdentityCard({
             style={{ background: '#A9CFE3' }}
             aria-hidden="true"
           />
+          {/* Derselbe Wortlaut wie das Schild im Kopf von Mein Hof — am
+              Desktop stehen beide zugleich auf dem Bildschirm. */}
           <span className="text-[11px] leading-tight" style={{ color: 'rgba(207,228,214,0.75)' }}>
-            Wartet auf Freischaltung
+            Noch nicht freigegeben
           </span>
         </div>
       )}
@@ -100,7 +99,6 @@ export function FarmIdentityCard({
           Seitenleiste; 36px waren am Telefon gemessen zu knapp. */}
       <Link
         href="/farm-page"
-        onClick={onNavigate}
         className="mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border px-3 text-[13px] font-semibold transition-colors hover:bg-white/10"
         style={{ borderColor: 'rgba(255,255,255,0.28)', color: 'var(--app-bar-ink)' }}
       >

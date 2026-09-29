@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import Link from 'next/link'
 import {
   ChevronRight,
@@ -17,10 +17,13 @@ import { getFarmForUser } from '@/server/queries/dashboard'
 import { getHeute } from '@/server/queries/heute'
 import { Card, CardContent } from '@/components/ui/card'
 import { ErsteSchritteKarte } from '@/components/farmer/erste-schritte-karte'
+import { ErsteSchritteSchalter } from '@/components/farmer/erste-schritte-schalter'
+import { ERSTE_SCHRITTE_AUS_COOKIE, ersteSchritteAnzeige, ersteSchritteAusgeblendet } from '@/lib/erste-schritte'
 import {
   ABHOL_CHIP_TEXT,
   begruessung,
   datumLang,
+  naechsteAbholungText,
   vergleichText,
   type AbholChip,
   type BrauchtDichEintrag,
@@ -82,9 +85,17 @@ export default async function HeutePage() {
 
   // Ein Zeitpunkt für die ganze Seite: Gruß, Datum, Tag und Woche passen zusammen.
   const jetzt = new Date()
-  const { abholungen, morgenAnzahl, brauchtDich, woche, ersteSchritte, wartetAufFreigabe } = await getHeute(
+  const { abholungen, naechsteAbholung, brauchtDich, woche, ersteSchritte, wartetAufFreigabe } = await getHeute(
     farm.id,
     jetzt
+  )
+
+  // Der Cookie entscheidet auf dem Server, ob die Karte oder die Zeile
+  // „Erste Schritte einblenden" kommt — so blitzt nichts auf und nichts rutscht nach.
+  const cookieJar = await cookies()
+  const ersteSchritteZeigen = ersteSchritteAnzeige(
+    ersteSchritte,
+    ersteSchritteAusgeblendet(cookieJar.get(ERSTE_SCHRITTE_AUS_COOKIE)?.value, farm.id)
   )
 
   const vorname = session.user.name?.trim().split(/\s+/)[0] ?? ''
@@ -102,8 +113,11 @@ export default async function HeutePage() {
       </div>
 
       {/* Für einen frisch registrierten Hof das Wichtigste — sie rendert sich
-          selbst weg, sobald alles erledigt ist. */}
-      <ErsteSchritteKarte ergebnis={ersteSchritte} wartetAufFreigabe={wartetAufFreigabe} />
+          selbst weg, sobald alles erledigt ist; weggeklickt kommt sie über die
+          Zeile ganz unten zurück. */}
+      {ersteSchritteZeigen === 'karte' && (
+        <ErsteSchritteKarte ergebnis={ersteSchritte} wartetAufFreigabe={wartetAufFreigabe} />
+      )}
 
       {/* ── Heute abholen ─────────────────────────────────────────────── */}
       <Abschnitt
@@ -155,14 +169,14 @@ export default async function HeutePage() {
               <ChevronRight className="size-4 shrink-0 text-app-ink-soft" aria-hidden="true" />
             </Link>
           )}
-          {morgenAnzahl > 0 && (
+          {/* Der nächste Abholtag mit offenen Bestellungen — „Morgen", „Mittwoch"
+              oder „Mittwoch, 14. Oktober"; ohne einen solchen Tag entfällt die Zeile. */}
+          {naechsteAbholung && (
             <Link
               href="/orders"
               className="flex items-center gap-3 border-t border-border bg-muted/30 px-4 py-2.5 text-[13px] text-app-ink-soft transition-colors hover:bg-muted/60 outline-none focus-visible:bg-muted/60"
             >
-              <span className="flex-1">
-                Morgen: {morgenAnzahl} {morgenAnzahl === 1 ? 'Bestellung' : 'Bestellungen'} →
-              </span>
+              <span className="flex-1">{naechsteAbholungText(naechsteAbholung)} →</span>
             </Link>
           )}
         </Card>
@@ -245,6 +259,12 @@ export default async function HeutePage() {
           </CardContent>
         </Card>
       </Abschnitt>
+
+      {ersteSchritteZeigen === 'zeile' && (
+        <p className="mt-2 text-center">
+          <ErsteSchritteSchalter richtung="ein" className="px-3" />
+        </p>
+      )}
     </div>
   )
 }

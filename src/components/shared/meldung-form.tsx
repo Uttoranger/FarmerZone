@@ -141,13 +141,13 @@ export function MeldungForm({
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
           {alsHof
-            ? 'Den Stand deiner Meldung findest du unter „Meine Meldungen“.'
+            ? 'Den Stand deiner Meldung findest du unter „Hilfe und Rückmeldung“.'
             : 'Merk dir die Kurznummer, falls du nachfragen möchtest.'}
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {alsHof && (
             <Link href="/meldungen" className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90">
-              Meine Meldungen
+              Zu deinen Meldungen
             </Link>
           )}
           <button

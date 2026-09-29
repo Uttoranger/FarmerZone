@@ -25,8 +25,7 @@ export type NavPunktId =
   | 'verkaeufe'
   | 'auswertung'
   | 'einstellungen'
-  | 'fehler-melden'
-  | 'meldungen'
+  | 'hilfe'
   | 'admin'
 
 export type NavPunkt = {
@@ -34,8 +33,9 @@ export type NavPunkt = {
   label: string
   href: string
   /**
-   * Weitere Pfade, auf denen der Punkt aktiv ist — nur bei „Mein Hof", der
-   * mit /products startet und auch /farm-page und /status umfasst.
+   * Weitere Pfade, auf denen der Punkt aktiv ist: „Mein Hof" startet mit
+   * /products und umfasst auch /farm-page und /status; „Hilfe und Rückmeldung"
+   * führt nach /meldungen und leuchtet auch auf /fehler-melden.
    */
   auchAktivAuf?: readonly string[]
   /** Eine Zahl am Punkt: offene Bestellungen bzw. Meldungen, die auf den Betreiber warten. */
@@ -108,11 +108,16 @@ export const VERKAUF_UND_KUNDEN: readonly NavPunkt[] = [
 
 export const VERKAUF_UND_KUNDEN_TITEL = 'Verkauf und Kunden'
 
-/** Unten: Einstellungen, Briefkasten, Admin — danach folgt „Abmelden" (eine Handlung, kein Ziel). */
+/**
+ * Unten: Einstellungen, Hilfe, Admin — danach folgt „Abmelden" (eine Handlung,
+ * kein Ziel). „Hilfe und Rückmeldung" ist EIN Punkt für Melden und Nachsehen:
+ * Die Seite /meldungen zeigt den Stand und trägt den Knopf „Fehler melden";
+ * zwei Einträge nebeneinander („Fehler melden", „Meine Meldungen") las sich
+ * wie zwei verschiedene Dinge.
+ */
 export const UNTEN: readonly NavPunkt[] = [
   { id: 'einstellungen', label: 'Einstellungen', href: '/settings' },
-  { id: 'fehler-melden', label: 'Fehler melden', href: '/fehler-melden' },
-  { id: 'meldungen', label: 'Meine Meldungen', href: '/meldungen' },
+  { id: 'hilfe', label: 'Hilfe und Rückmeldung', href: '/meldungen', auchAktivAuf: ['/fehler-melden'] },
   { id: 'admin', label: 'Admin', href: '/admin', nurAdmin: true, zahl: 'admin' },
 ]
 

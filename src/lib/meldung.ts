@@ -216,7 +216,7 @@ export type MeldungVollstaendig = {
   diagKennung?: string | null
 }
 
-/** Genau das, was ein Hof unter „Meine Meldungen" sieht. */
+/** Genau das, was ein Hof unter „Hilfe und Rückmeldung" (/meldungen) sieht. */
 export type MeldungFuerHof = {
   id: string
   kurznummer: string

@@ -8,11 +8,24 @@
  *  - Die Reihenfolge liegt fest (sie ist die Arbeitsreihenfolge).
  *  - Ist alles erledigt, sagt `anzeigen` false — die Karte verschwindet
  *    vollständig statt ein „Alles erledigt" stehen zu lassen.
+ *  - Weggeklickt wird über einen Cookie mit der Hof-ID: nur genau diese ID
+ *    blendet aus; dann kommt statt der Karte die Zeile zum Einblenden, und
+ *    ist alles erledigt, keins von beiden.
  *
  * Ohne Datenbank: die Funktion bekommt nur Zählwerte und Ja/Nein.
  */
 import { describe, it, expect } from 'vitest'
-import { ersteSchritte, ersteSchritteDaten, type ErsteSchritteDaten } from '@/lib/erste-schritte'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import {
+  ERSTE_SCHRITTE_AUS_COOKIE,
+  ERSTE_SCHRITTE_AUS_DAUER_S,
+  ersteSchritte,
+  ersteSchritteAnzeige,
+  ersteSchritteAusgeblendet,
+  ersteSchritteDaten,
+  type ErsteSchritteDaten,
+} from '@/lib/erste-schritte'
 
 /** Ein Hof direkt nach der Registrierung: nichts eingerichtet. */
 const FRISCH: ErsteSchritteDaten = {
@@ -199,5 +212,42 @@ describe('ersteSchritteDaten — Stammdaten des Hofs → Checkliste', () => {
 
   it('ohne Hof ist alles offen', () => {
     expect(ersteSchritteDaten(null, { produkte: 0, aktiveAbholzeiten: 0 })).toEqual(FRISCH)
+  })
+})
+
+describe('ausblenden über den Cookie', () => {
+  it('ausgeblendet nur, wenn der Cookie genau diese Hof-ID trägt', () => {
+    expect(ersteSchritteAusgeblendet('hof-a', 'hof-a')).toBe(true)
+    expect(ersteSchritteAusgeblendet('hof-b', 'hof-a')).toBe(false) // ein anderer Hof im selben Browser
+    expect(ersteSchritteAusgeblendet(undefined, 'hof-a')).toBe(false)
+    expect(ersteSchritteAusgeblendet('', 'hof-a')).toBe(false)
+    expect(ersteSchritteAusgeblendet('hof-a ', 'hof-a')).toBe(false)
+  })
+
+  it('Karte, solange offen und nicht weggeklickt; weggeklickt die Zeile; fertig nichts', () => {
+    const offen = ersteSchritte(FRISCH)
+    const fertig = ersteSchritte(FERTIG)
+    expect(ersteSchritteAnzeige(offen, false)).toBe('karte')
+    expect(ersteSchritteAnzeige(offen, true)).toBe('zeile')
+    expect(ersteSchritteAnzeige(fertig, false)).toBe('nichts')
+    expect(ersteSchritteAnzeige(fertig, true)).toBe('nichts')
+  })
+
+  it('der Cookie heißt fz-erste-schritte-aus und hält ein Jahr', () => {
+    expect(ERSTE_SCHRITTE_AUS_COOKIE).toBe('fz-erste-schritte-aus')
+    expect(ERSTE_SCHRITTE_AUS_DAUER_S).toBe(365 * 24 * 60 * 60)
+  })
+
+  it('die Action setzt ihn SameSite=Lax mit der Hof-ID der Sitzung, Heute liest ihn auf dem Server', () => {
+    const action = readFileSync(join(process.cwd(), 'src/server/actions/erste-schritte.ts'), 'utf8')
+    expect(action).toContain("sameSite: 'lax'")
+    expect(action).toContain('value: farm.id')
+    expect(action).toContain('maxAge: ERSTE_SCHRITTE_AUS_DAUER_S')
+    expect(action).toContain("revalidatePath('/dashboard')")
+    const seite = readFileSync(join(process.cwd(), 'src/app/(farmer)/dashboard/page.tsx'), 'utf8')
+    expect(seite).toContain('cookieJar.get(ERSTE_SCHRITTE_AUS_COOKIE)?.value')
+    expect(seite).toContain("ersteSchritteZeigen === 'karte' && (")
+    expect(seite).toContain("ersteSchritteZeigen === 'zeile' && (")
+    expect(seite).not.toContain('localStorage')
   })
 })
