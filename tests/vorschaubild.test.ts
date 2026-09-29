@@ -7,12 +7,14 @@
  *    (Verlauf, fehlende Adresse) das Startseiten-Bild.
  *  - Es gibt keine Datei opengraph-image/twitter-image im app-Ordner: Sie
  *    überschriebe nach Nexts Dateikonvention die Titelbilder der Hofseiten.
- *  - metadataBase ist im Root-Layout gesetzt, die Hofseite nutzt den Rückfall.
+ *  - metadataBase kommt aus der Adresse der Umgebung — nur, wenn sie gültig
+ *    ist; eine Adresse ohne Schema legt keine Seite lahm.
+ *  - Die Hofseite nutzt den Rückfall.
  */
 import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { STARTSEITE_VORSCHAUBILD, hofVorschaubild } from '@/lib/vorschaubild'
+import { STARTSEITE_VORSCHAUBILD, hofVorschaubild, metadatenBasis } from '@/lib/vorschaubild'
 
 const wurzel = process.cwd()
 
@@ -72,8 +74,18 @@ describe('Konvention', () => {
     expect(treffer).toEqual([])
   })
 
-  it('metadataBase steht im Root-Layout', () => {
+  it('metadataBase: eine gültige Adresse wird die Basis, alles andere keine — nie ein Wurf', () => {
+    expect(metadatenBasis('https://hof.example')?.href).toBe('https://hof.example/')
+    expect(metadatenBasis('https://vorschau-zweig.example')?.origin).toBe('https://vorschau-zweig.example')
+    expect(metadatenBasis(null)).toBeUndefined()
+    // Ohne Schema würfe new URL — und mit ihm jede Seite.
+    expect(() => metadatenBasis('hof.example')).not.toThrow()
+    expect(metadatenBasis('hof.example')).toBeUndefined()
+  })
+
+  it('das Root-Layout setzt metadataBase über metadatenBasis aus der Adresse der Umgebung', () => {
     const layout = readFileSync(join(wurzel, 'src/app/layout.tsx'), 'utf8')
-    expect(layout).toContain('metadataBase: new URL(APP_URL)')
+    expect(layout).toContain('metadataBase: metadatenBasis(UMGEBUNG.appUrl)')
+    expect(layout).not.toMatch(/new URL\(APP_URL\)/)
   })
 })

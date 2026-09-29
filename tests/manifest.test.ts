@@ -8,10 +8,10 @@
  *    app-icon-256.png stehen nicht mehr im Manifest.
  *  - favicon.ico und apple-icon.png liegen in src/app — dort wirken sie über
  *    die Dateikonvention.
- *  - app-icon-256.png ist weg und wird nirgends mehr verwendet.
+ *  - app-icon-256.png ist weg, und nichts in src/ oder public/ verweist mehr darauf.
  */
 import { describe, it, expect } from 'vitest'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import manifest from '@/app/manifest'
 
@@ -50,8 +50,21 @@ describe('Icons über die Dateikonvention', () => {
     expect(pngGroesse(join(wurzel, 'src/app/apple-icon.png'))).toBe('180x180')
   })
 
-  it('das alte app-icon-256.png ist weg', () => {
+  it('das alte app-icon-256.png ist weg, und nichts in src/ oder public/ verweist darauf', () => {
     expect(existsSync(join(wurzel, 'public/app-icon-256.png'))).toBe(false)
-    expect(readFileSync(join(wurzel, 'src/app/manifest.ts'), 'utf8')).not.toContain("'/app-icon-256.png'")
+    const verweise: string[] = []
+    const suche = (ordner: string) => {
+      for (const name of readdirSync(ordner)) {
+        const pfad = join(ordner, name)
+        if (statSync(pfad).isDirectory()) suche(pfad)
+        else if (/\.(tsx?|jsx?|json|css|html|webmanifest)$/.test(name)) {
+          // Der Manifest-Kommentar darf den alten Namen nicht mehr nennen — Code erst recht nicht.
+          if (readFileSync(pfad, 'utf8').includes('app-icon-256')) verweise.push(pfad)
+        }
+      }
+    }
+    suche(join(wurzel, 'src'))
+    suche(join(wurzel, 'public'))
+    expect(verweise).toEqual([])
   })
 })

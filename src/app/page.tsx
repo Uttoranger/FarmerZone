@@ -210,7 +210,7 @@ function KategorieKachel({ name, href, bild }: { name: string; href: string; bil
     <li>
       <Link
         href={href}
-        className="group block rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="group block rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <span className="relative block aspect-square overflow-hidden rounded-2xl bg-muted dark:ring-1 dark:ring-border">
           {bild && (

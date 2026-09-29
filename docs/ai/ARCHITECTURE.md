@@ -45,7 +45,7 @@ Vorbild: `src/lib/reservierung.ts` entscheidet (rein, 174 Tests ohne DB), `src/s
 | `tests/` | Alle Tests, flach | — |
 
 ### `src/lib/` ist voll — Regel beim Hinzufügen
-67 Dateien (Stand 2026-09-24), gemischter Zweck. Bevor eine neue entsteht:
+86 Dateien (Stand 2026-09-29), gemischter Zweck. Bevor eine neue entsteht:
 1. Passt es in eine bestehende Datei? Dann dorthin.
 2. Ist es eine **Fachregel**? → eigene Datei, rein, ohne Import von `prisma`/`auth`/`stripe`.
 3. Ist es eine **Infrastrukturkapsel** (externer Dienst)? → `server-only` importieren.
@@ -158,8 +158,8 @@ Client-Komponente → Server Action → Zod → Fachregel (lib) → Prisma → r
 - Die Kopfzeile klebt (`sticky`, Ebene 40): Umgebungsbanner (60) darüber, Sheets/Dialoge (50) davor, Sektionsleiste (30) darunter. Ausnahme Hofseite am Handy: Die Leiste ist `fixed` und wird erst eingehängt, wenn das Titelbild verschwindet — `sticky` verschöbe beim Einhängen den Inhalt. Eigene Stapelebenen (`isolate`) um alles mit hohen z-Werten (Leaflet), sonst liegt es über der Kopfzeile.
 
 ### Vorschaubild und Icons
-- Das Vorschaubild beim Teilen kommt aus `src/lib/vorschaubild.ts`: Startseite `STARTSEITE_VORSCHAUBILD` (`public/og/startseite.jpg`), Hofseite `hofVorschaubild` — ihr Titelbild (`titelbildFoto`), sonst das der Startseite. **Nie** eine Datei `opengraph-image.*` oder `twitter-image.*` unter `src/app/`: Nach Nexts Dateikonvention gälte sie für alle Seiten darunter und überschriebe die Titelbilder der Hofseiten (`tests/vorschaubild.test.ts`).
-- Relative Bildpfade in den Metadaten löst `metadataBase` im Root-Layout auf (`APP_URL`).
+- Das Vorschaubild beim Teilen kommt aus `src/lib/vorschaubild.ts`: Startseite `STARTSEITE_VORSCHAUBILD` (`public/og/startseite.jpg`), Hofseite `hofVorschaubild` — ihr Titelbild (`titelbildFoto`), sonst das der Startseite. **Nie** eine Datei `opengraph-image.*` oder `twitter-image.*` unter `src/app/` (`tests/vorschaubild.test.ts`; warum: `DEVELOPMENT.md`, „Marke und Startseite").
+- Relative Bildpfade in den Metadaten löst `metadataBase` im Root-Layout auf — nur über `metadatenBasis(UMGEBUNG.appUrl)`, nie `new URL(...)` direkt.
 - Favicon (`src/app/favicon.ico`) und Apple-Icon (`src/app/apple-icon.png`) wirken über die Dateikonvention; das Manifest (`src/app/manifest.ts`) führt nur `public/icons/` — `tests/manifest.test.ts` prüft Datei und Größe jedes Eintrags.
 
 ### Bauern-Bereich: Navigation
@@ -221,6 +221,7 @@ Nicht nachahmen. Beim Anfassen der Datei mit aufräumen, nicht als eigener Sprin
 | `src/lib/preis-format.ts` hält noch ein zweites `formatEuro` (Symbol hinten) für Warenkorb-Summe, Bestellsummen und Servicegebühr-Einstellung | `format.ts` ist kanonisch. Neue Formatierung nur dort. Wer eine dieser drei Stellen anfasst, stellt sie um; danach fällt die Datei. |
 | Server Actions mischen `throw new Error()` und `return { error }` | Neuer Code: `return { error }` (→ `CODING_STANDARDS.md`) |
 | Einen gemeinsamen Footer haben nur Startseite und Hofseite | Neue öffentliche Seite bekommt `KundenKopf` (§4, Pflicht); den Footer, sobald es eine gemeinsame Komponente gibt |
+| Produktraster (`product-grid.tsx`), Produktblatt (`produkt-detail.tsx`) und Produktliste (`product-list.tsx`) zeigen die Kategorie-Illustrationen nachts ungedämpft | Neue Stellen dämpfen und rahmen sie (`CODING_STANDARDS.md` §7, Vorbild `KategorieKachel`); wer eine dieser drei anfasst, zieht sie nach |
 | Geld teils `Decimal`, teils `Int` in Cent | Neue Geldfelder: `Decimal(10,2)`. Bestehende `*Cents` nicht umbauen. |
 | Enum-Werte `FUTTERMITTEL` (Kategorie) und `EINZELFUTTERMITTEL`, `MISCHFUTTERMITTEL`, `ERGAENZUNGSFUTTERMITTEL` (Unterkategorie) aus Taxonomie 1 | Nie wählbar anbieten, nie schreiben; Zod lehnt sie ab. Lesen nur über `istAltlastKategorie` / `istAltlastUnterkategorie`. Entfernen im Cleanup-Sprint. |
 | `FutterKennzeichnung.registrierungsnummer` — die Nummer gehört dem Hof (`Farm.betriebsnummer`) | Nie schreiben. Lesen nur als Rückfall über `betriebsnummerFuerAnzeige`. Entfernen im Cleanup-Sprint. |

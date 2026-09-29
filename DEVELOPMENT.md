@@ -2405,9 +2405,14 @@ PNG-Kopf, statt der Angabe im Manifest zu glauben.
 trägt eine große X-/Twitter-Karte. Hofseiten zeigen ihr Titelbild, ohne Titelbild dasselbe
 Bild wie die Startseite. „Mit Titelbild" heißt jetzt `titelbildFoto` — vorher nahm die
 Hofseite `bannerUrl` auch bei gewähltem Verlauf, also ein nicht mehr gezeigtes altes Foto.
-`metadataBase` fehlte ganz; es kommt jetzt aus `APP_URL`, sonst hätte Next die Adresse der
-relativen Bildpfade geraten. Eine Datei `opengraph-image` im app-Ordner gibt es bewusst nicht
-— sie überschriebe die Titelbilder der Hofseiten.
+`metadataBase` fehlte ganz; es kommt jetzt aus der Adresse der Umgebung
+(`metadatenBasis(UMGEBUNG.appUrl)`) — nur, wenn sie bekannt und gültig ist. `new URL(APP_URL)`
+hätte bei einer Adresse ohne Schema jede Seite auf 500 gebracht, und ohne konfigurierte
+Adresse fiele `APP_URL` auf localhost zurück; dann ist Nexts eigene Vercel-Adresse die
+bessere Wahl. Ein lokaler `pnpm build` ohne `NEXT_PUBLIC_APP_URL` warnt deshalb, dass
+`metadataBase` fehlt — das ist gewollt und betrifft keine Umgebung mit Adresse. Eine Datei `opengraph-image` im app-Ordner gibt es bewusst nicht: Nach Nexts
+Dateikonvention gälte sie für alle Seiten darunter und überschriebe die Titelbilder der
+Hofseiten.
 
 **Startseite aus einem Guss.** Der dunkelgrüne Futter-Block aus #140 ist ersetzt durch das
 Kachelraster „Was suchst du?" direkt nach dem Kopf: „Für die Küche" (Eier, Fleisch & Wurst,
@@ -2426,7 +2431,8 @@ deshalb in beiden Modi gleich.
 - Die Ansicht bei 375 px und 1280 px in beiden Modi ist nicht maschinell geprüft
   (`agent-browser` ist in der Sitzung nicht installiert) — Checkliste im PR.
 - Honig heißt auf der Kachel „Honig & Bienenprodukte" (der Name aus `KATEGORIE_LABEL`).
-- Im Produktraster und in der Produktliste stehen die Illustrationen nachts ungedämpft.
+- Im Produktraster, im Produktblatt und in der Produktliste stehen die Illustrationen nachts
+  ungedämpft — als Altlast in ARCHITECTURE §6 geführt.
 
 ---
 
