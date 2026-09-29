@@ -7,7 +7,7 @@
  * im Gestern, auch wenn der Server in UTC rechnet.
  */
 import type { Prisma } from '@prisma/client'
-import { tagVersetzt, wienKalendertag, wienWochenMontag, wienWochenbeginn } from '@/lib/kalender'
+import { tagVersetzt, wienKalendertag } from '@/lib/kalender'
 import { wienerMitternacht } from '@/lib/servicegebuehr'
 
 // ─── Tage ───────────────────────────────────────────────────────────────────
@@ -303,30 +303,8 @@ export function brauchtDich(daten: BrauchtDichDaten): BrauchtDichEintrag[] {
 
 // ─── Diese Woche ────────────────────────────────────────────────────────────
 
-/**
- * Diese Woche bis jetzt gegen die Vorwoche bis zum selben Wochentag und zur
- * selben Uhrzeit — sonst stünde am Dienstag eine halbe Woche gegen eine ganze.
- * Woche ab Montag 0 Uhr Wiener Zeit (kalender.ts wienWochenbeginn).
- *
- * „Selbe Uhrzeit" ist die Zeit seit Wiener Mitternacht des Tages; nur an den
- * zwei Tagen der Zeitumstellung weicht das um eine Stunde von der Wanduhr ab.
- * Am 25-Stunden-Sonntag (Umstellung auf Winterzeit) reichte die Vorwoche nach
- * 23 Uhr sonst in die laufende hinein — deshalb endet sie spätestens dort,
- * wo diese Woche beginnt.
- */
-export function wochenfenster(jetzt: Date): { dieseWoche: Zeitraum; vorwoche: Zeitraum } {
-  const heute = wienKalendertag(jetzt)
-  const seitMitternacht = jetzt.getTime() - mitternacht(heute).getTime()
-  const wochenbeginn = wienWochenbeginn(jetzt)
-  const vorwocheBisZeit = mitternacht(tagVersetzt(heute, -7)).getTime() + seitMitternacht
-  return {
-    dieseWoche: { von: wochenbeginn, bis: jetzt },
-    vorwoche: {
-      von: mitternacht(tagVersetzt(wienWochenMontag(jetzt), -7)),
-      bis: new Date(Math.min(vorwocheBisZeit, wochenbeginn.getTime() - 1)),
-    },
-  }
-}
+// Die Fenster (diese Woche bis jetzt, Vorwoche bis zum selben Zeitpunkt)
+// kommen aus der gemeinsamen Umsatzregel: umsatzfenster in src/lib/umsatz.ts.
 
 export type Wochenvergleich = {
   dieseWocheCent: number

@@ -15,10 +15,12 @@ import { SaleDialog } from './sale-dialog'
 import { SalesFeedList } from './sales-feed-list'
 import { PageHeader } from '@/components/farmer/page-header'
 import { useUrlAuftrag } from '@/lib/use-url-auftrag'
+import { formatEuro } from '@/lib/format'
 
 type Props = {
   overview: SalesOverview
   products: ProductData[]
+  topProduktIds: string[]
   stripeReady: boolean
 }
 
@@ -46,11 +48,7 @@ function StripePayoutLink() {
   )
 }
 
-function formatEuro(amount: number) {
-  return new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(amount)
-}
-
-export function SalesClient({ overview, products, stripeReady }: Props) {
+export function SalesClient({ overview, products, topProduktIds, stripeReady }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingSale, setEditingSale] = useState<ManualSaleData | null>(null)
   const [prefillSale, setPrefillSale] = useState<ManualSaleData | null>(null)
@@ -197,6 +195,7 @@ export function SalesClient({ overview, products, stripeReady }: Props) {
         editingSale={editingSale}
         prefillSale={prefillSale}
         products={products}
+        topProduktIds={topProduktIds}
         onClose={handleClose}
       />
     </>
