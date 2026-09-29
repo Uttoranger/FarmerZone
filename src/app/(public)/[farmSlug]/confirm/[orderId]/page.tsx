@@ -92,7 +92,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
   return (
     <div className="min-h-screen bg-background">
       {/* Zurück führt hier NIE durch den Verlauf — davor stehen Stripe und die Bank (kunden-kopf.ts). */}
-      <KundenKopf seite={{ art: 'bestaetigung', hofSlug: order.farm.slug }} titel="Bestellung" hofName={order.farm.name} />
+      <KundenKopf seite={{ art: 'bestaetigung', hofSlug: order.farm.slug }} hofName={order.farm.name} />
       {/* Always clear the cart when reaching the confirm page — the order has been submitted */}
       <ClearCartOnMount />
       <div className="max-w-lg mx-auto px-4 py-10">

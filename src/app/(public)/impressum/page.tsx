@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: 'Impressum — FarmerZone' }
 export default function ImpressumPage() {
   return (
     <div className="min-h-screen bg-background">
-      <KundenKopf seite={{ art: 'info' }} titel="Impressum" />
+      <KundenKopf seite={{ art: 'info' }} />
       <div className="max-w-2xl mx-auto px-4 py-10">
         <h1 className="text-2xl font-semibold text-foreground mb-8">Impressum</h1>
 

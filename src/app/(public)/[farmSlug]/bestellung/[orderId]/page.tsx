@@ -36,7 +36,7 @@ function LinkUngueltig() {
     <div className="min-h-screen bg-background">
       {/* Ohne gültige Signatur ist nicht einmal der Hof bestätigt — der
           Rückweg führt deshalb zur Hofübersicht, nicht zu /{farmSlug}. */}
-      <KundenKopf seite={{ art: 'bestellung-ungueltig' }} titel="Bestellung" />
+      <KundenKopf seite={{ art: 'bestellung-ungueltig' }} />
       <div className="mx-auto max-w-lg px-4 py-16 text-center">
         <h1 className="font-heading text-2xl font-semibold text-foreground">
           Dieser Link ist nicht gültig
@@ -117,7 +117,7 @@ export default async function BestellungPage({ params, searchParams }: Props) {
   return (
     <div className="min-h-screen bg-background">
       {/* Zurück führt hier NIE durch den Verlauf — die Seite kommt aus einer Mail (kunden-kopf.ts). */}
-      <KundenKopf seite={{ art: 'bestellung', hofSlug: order.farm.slug }} titel="Deine Bestellung" hofName={order.farm.name} />
+      <KundenKopf seite={{ art: 'bestellung', hofSlug: order.farm.slug }} hofName={order.farm.name} />
       <div className="mx-auto max-w-lg px-4 py-10">
         <p className="text-sm text-muted-foreground">
           Deine Bestellung bei{' '}

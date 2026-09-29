@@ -141,7 +141,9 @@ describe('fremdtext-lesen.mjs — was darüber hinaus gesperrt ist', () => {
       expect(grep({ pattern: 'TOKEN', glob: muster }).code, muster).toBe(2)
     }
     expect(glob({ pattern: '**/*' }).code).toBe(2)
-  })
+    // Neun Hook-Prozesse nacheinander — unter Windows dauert jeder Start
+    // spürbar, zusammen länger als die üblichen 5 s.
+  }, 30_000)
 
   it('im Wurzelverzeichnis träfe „*.json" auch .vercel/project.json — in src nicht', () => {
     expect(grep({ pattern: 'x', glob: '*.json' }).code).toBe(2)

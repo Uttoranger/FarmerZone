@@ -26,8 +26,12 @@ export type KundenSeite =
   | { art: 'info' }
 
 export type KopfForm = {
-  /** Handy: runde Knöpfe über dem Titelbild, die schmale Leiste erst beim Scrollen — oder die Leiste von Anfang an. */
-  handy: 'titelbild-knoepfe' | 'leiste'
+  /**
+   * Handy: der Zurück-Knopf in der Leiste. Nur, wo „Zurück" woanders hinführt
+   * als das F-Icon daneben — auf der Hofübersicht ginge er zur Startseite:
+   * zwei Knöpfe mit demselben Ziel nebeneinander.
+   */
+  zurueck: boolean
   /**
    * Das Warenkorb-Symbol (Handy-Leiste und Browser-Kopfzeile). Auf der
    * Hofseite nicht — dort sitzt der Warenkorb-Knopf unten, wie bei den
@@ -40,21 +44,21 @@ export type KopfForm = {
 }
 
 export function kopfForm(seite: KundenSeite): KopfForm {
+  const zurueck = rueckweg(seite, false).href !== '/'
   switch (seite.art) {
     case 'hofseite':
-      return { handy: 'titelbild-knoepfe', warenkorb: false, rueckwegZeile: true }
     case 'checkout':
     case 'bestaetigung':
     case 'bestellung':
-      return { handy: 'leiste', warenkorb: false, rueckwegZeile: true }
+      return { zurueck, warenkorb: false, rueckwegZeile: true }
     case 'bestellung-ungueltig':
       // Kein Hof, zu dem eine Rückweg-Zeile führen könnte — die Kopfzeile
       // führt zur Hofübersicht.
-      return { handy: 'leiste', warenkorb: false, rueckwegZeile: false }
+      return { zurueck, warenkorb: false, rueckwegZeile: false }
     case 'hofuebersicht':
     case 'info':
       // Im Browser führen „FarmerZone" und „Höfe entdecken" schon zurück.
-      return { handy: 'leiste', warenkorb: true, rueckwegZeile: false }
+      return { zurueck, warenkorb: true, rueckwegZeile: false }
   }
 }
 

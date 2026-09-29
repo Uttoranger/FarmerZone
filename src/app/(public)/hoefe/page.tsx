@@ -36,7 +36,7 @@ export default async function HoefePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <KundenKopf seite={{ art: 'hofuebersicht' }} titel="Höfe entdecken" />
+      <KundenKopf seite={{ art: 'hofuebersicht' }} />
 
       {/* Ab lg trägt die Seite den Splitscreen (Liste links, Karte rechts)
           und braucht dafür die volle Breite. */}

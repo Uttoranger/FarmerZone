@@ -1,13 +1,16 @@
 'use client'
 
 import { useEffect, useState, type MouseEvent, type RefObject } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Share2, ShoppingCart } from 'lucide-react'
+import { ArrowLeft, Menu, Share2, ShoppingCart, X } from 'lucide-react'
 import { kopfForm, rueckweg, tippAufRueckweg, type KundenSeite } from '@/lib/kunden-kopf'
+import { menuePunkte, type AngezeigterMenuePunkt } from '@/lib/kunden-menue'
 import { useWarenkorbKopf } from '@/lib/use-warenkorb-kopf'
 import { eigenerVorgaengerJetzt, merkeHinauf } from '@/components/shared/rueckweg-merker'
 import { Wortmarke } from '@/components/shared/wortmarke'
+import { Sheet, SheetClose, SheetContent, SheetTitle } from '@/components/ui/sheet'
 
 /**
  * Wie weit ein Sprungziel der Hofseite (Übersicht, Fotos, Produkte, Kategorien)
@@ -20,44 +23,45 @@ export const SPRUNGZIEL_OHNE_KOPF = 'scroll-mt-14'
 
 /**
  * Die Kopfzeile aller Kundenseiten außer der Startseite (die hat LandingNav).
- * Was sie zeigt und wohin „Zurück" führt, entscheidet src/lib/kunden-kopf.ts.
+ * Was sie zeigt und wohin „Zurück" führt, entscheidet src/lib/kunden-kopf.ts,
+ * die Menüpunkte src/lib/kunden-menue.ts.
  *
- * HANDY (unter md): eine schmale Leiste, 56 px — Zurück, Seitentitel, rechts
- * der Warenkorb. Auf der Hofseite steht sie erst, wenn das Titelbild aus dem
- * Blick ist; bis dahin tragen zwei runde Knöpfe über dem Bild (TitelbildKnoepfe)
- * Zurück und Teilen. Vorbild: foodpanda, Deliveroo, Careem. Dort ist die
- * Leiste `fixed` und wird erst eingehängt, wenn das Bild verschwindet — als
- * `sticky` nähme sie beim Erscheinen 56 px im Fluss ein, und der Inhalt spränge.
+ * HANDY (unter md): eine klebende Leiste, 56 px, auf jeder Kundenseite von
+ * Anfang an — auch auf der Hofseite, dort ÜBER dem Titelbild. Links Zurück
+ * (wo es woanders hinführt als nach Hause) und das F-Icon mit „FarmerZone"
+ * als Weg zur Startseite, rechts der Warenkorb und das Menü. Kundenseiten
+ * haben keine Leiste unten; diese eine Leiste trägt alle Wege, die im
+ * Browser die Kopfzeile trägt. Auf der Hofseite erscheint in der Mitte der
+ * Hofname, sobald die Überschrift aus dem Blick ist — dann tritt das Wort
+ * „FarmerZone" zurück und nur das F-Icon bleibt als Weg nach Hause.
  *
  * BROWSER (ab md): eine Kopfzeile, 64 px — FarmerZone, Höfe entdecken, Für
  * Höfe, Hofbetreiber-Login, Warenkorb. Wo sie selbst nicht zurückführt
  * (Hofseite, Bestellweg), steht darunter ein Rückweg-Link.
  *
- * Sonst kleben beide (`sticky`) statt fest zu stehen: Das Umgebungsbanner der
- * Testumgebung liegt im Fluss darüber und läge sonst beim Laden über ihr.
+ * Beide kleben (`sticky`) statt fest zu stehen: Das Umgebungsbanner der
+ * Testumgebung liegt im Fluss darüber und läge sonst beim Laden über ihnen.
  * Ebene 40: über der Sektionsleiste der Hofseite (30), unter Sheets,
  * Dialogen und der Lightbox (50).
  */
 export function KundenKopf({
   seite,
-  titel,
   hofName,
-  titelbild,
+  hofNameUeberschrift,
 }: {
   seite: KundenSeite
-  /** Handy: der Titel in der Mitte der Leiste — Hofname oder Seitentitel. */
-  titel: string
-  /** Bestellweg: für den Rückweg-Link im Browser („‹ {Hofname}"). */
+  /** Hofseite: der Name in der Mitte der Handy-Leiste. Bestellweg: der Rückweg-Link im Browser („‹ {Hofname}"). */
   hofName?: string
-  /** Hofseite mit Titelbild: solange es im Blick ist, steht am Handy keine Leiste. */
-  titelbild?: RefObject<HTMLElement | null>
+  /** Hofseite: die Überschrift mit dem Hofnamen — ist sie aus dem Blick, steht der Name in der Leiste. */
+  hofNameUeberschrift?: RefObject<HTMLElement | null>
 }) {
   const form = kopfForm(seite)
   const korb = useWarenkorbKopf()
-  const titelbildImBlick = useTitelbildImBlick(titelbild)
+  const nameInLeiste = useUeberschriftWeggescrollt(hofNameUeberschrift) && hofName !== undefined
+  const tinte = seite.art === 'hofseite' ? 'text-app-ink' : 'text-foreground'
 
-  // Ein fester Platz für das Symbol, auch solange noch keins da ist (beim
-  // Server-Rendern gibt es keinen Korb) — sonst sprängen Titel und Links,
+  // Browser: ein fester Platz für das Symbol, auch solange noch keins da ist
+  // (beim Server-Rendern gibt es keinen Korb) — sonst sprängen die Links,
   // sobald es erscheint.
   const warenkorbPlatz =
     form.warenkorb && korb ? (
@@ -66,33 +70,41 @@ export function KundenKopf({
       <span className="size-11" aria-hidden="true" />
     )
 
-  const leiste = (
-    <div className="grid h-14 grid-cols-[2.75rem_1fr_2.75rem] items-center gap-2 border-b border-border bg-card px-2">
-      <ZurueckKnopf seite={seite} />
-      {/* Auf der Hofseite die Schrift der Hofseite (app-*), sonst zwei Dunkeltöne übereinander. */}
-      <p
-        className={`truncate text-center text-[15px] font-semibold ${seite.art === 'hofseite' ? 'text-app-ink' : 'text-foreground'}`}
-      >
-        {titel}
-      </p>
-      {warenkorbPlatz}
-    </div>
-  )
-
   return (
     <>
       {/* ── Handy ── */}
-      {titelbild ? (
-        // Hofseite mit Titelbild: die Leiste erscheint, sobald das Bild aus
-        // dem Blick ist. Kein Einblenden bei reduzierter Bewegung.
-        !titelbildImBlick && (
-          <div className="fixed inset-x-0 top-0 z-40 print:hidden md:hidden motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
-            {leiste}
+      <div className="sticky top-0 z-40 print:hidden md:hidden">
+        <div className="relative flex h-14 items-center justify-between gap-1 border-b border-border bg-card px-2">
+          <div className={`flex items-center ${form.zurueck ? '' : 'pl-2'}`}>
+            {form.zurueck && <ZurueckKnopf seite={seite} />}
+            <Link
+              href="/"
+              aria-label="FarmerZone — zur Startseite"
+              className={`flex h-11 min-w-11 items-center justify-center gap-2 rounded-lg px-1 ${FOKUS}`}
+            >
+              <FIcon />
+              {!nameInLeiste && (
+                <span className="whitespace-nowrap font-heading text-lg font-bold text-brand-text">FarmerZone</span>
+              )}
+            </Link>
           </div>
-        )
-      ) : (
-        <div className="sticky top-0 z-40 print:hidden md:hidden">{leiste}</div>
-      )}
+          {/* Mitte der Leiste, nicht der Restfläche: links stehen Zurück und
+              F-Icon, rechts nur das Menü — gleicher Abstand zu beiden Rändern
+              (6rem = 8px Rand + zwei 44-px-Knöpfe). Die Schrift der Hofseite
+              (app-*), sonst zwei Dunkeltöne übereinander. */}
+          {nameInLeiste && (
+            <p
+              className={`pointer-events-none absolute inset-x-24 top-1/2 -translate-y-1/2 truncate text-center text-[15px] font-semibold ${tinte} motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200`}
+            >
+              {hofName}
+            </p>
+          )}
+          <div className="flex items-center">
+            {form.warenkorb && korb && <WarenkorbSymbol anzahl={korb.anzahl} href={korb.href} />}
+            <MenueBlatt tinte={tinte} />
+          </div>
+        </div>
+      </div>
 
       {/* ── Browser ── */}
       <header className="sticky top-0 z-40 hidden h-16 border-b border-border bg-card print:hidden md:block">
@@ -126,13 +138,13 @@ export function KundenKopf({
 }
 
 /**
- * Die zwei runden Knöpfe über dem Titelbild der Hofseite (Handy): links
- * Zurück, rechts Teilen. Gehört in den Behälter des Titelbilds (relative).
+ * Der Teilen-Knopf über dem Titelbild der Hofseite (Handy). Zurück, der Weg
+ * nach Hause und das Menü stehen in der Leiste darüber — über dem Bild bleibt
+ * nur, was zum Hof gehört. Gehört in den Behälter des Titelbilds (relative).
  */
-export function TitelbildKnoepfe({ seite, onTeilen }: { seite: KundenSeite; onTeilen: () => void }) {
+export function TitelbildTeilen({ onTeilen }: { onTeilen: () => void }) {
   return (
-    <div className="absolute inset-x-3 top-3 z-10 flex items-center justify-between md:hidden">
-      <ZurueckKnopf seite={seite} rund />
+    <div className="absolute right-3 top-3 z-10 md:hidden">
       <button type="button" onClick={onTeilen} aria-label="Hof teilen" className={RUND}>
         <Share2 className="size-5" strokeWidth={1.7} aria-hidden="true" />
       </button>
@@ -153,6 +165,76 @@ const TEXTLINK = 'rounded-md text-sm font-medium text-foreground/80 transition-c
  */
 const RUND =
   'inline-flex size-11 items-center justify-center rounded-full bg-white/90 text-[#2D5F3F] shadow-[0_2px_8px_rgba(0,0,0,0.18)] transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2D5F3F] focus-visible:ring-offset-2 focus-visible:ring-offset-white'
+
+/**
+ * Das F-Icon — dasselbe Bild wie das App-Symbol auf dem Startbildschirm.
+ * Behält seine Farben in beiden Modi (ein Logo, das je nach Einstellung
+ * anders aussieht, ist kein Logo mehr); die dunkelgrüne Fläche trägt sich
+ * auf hellem und dunklem Grund.
+ */
+function FIcon() {
+  return (
+    <Image src="/icons/icon-192.png" alt="" width={32} height={32} className="size-8 shrink-0 rounded-lg" aria-hidden="true" />
+  )
+}
+
+/**
+ * Das Menü als Blatt von rechts. Escape, ein Tipp daneben und der Schließen-
+ * Knopf schließen es; solange es offen ist, bleibt der Fokus darin und geht
+ * danach zurück auf den Menü-Knopf (Base UI Dialog). Welche Seite gerade
+ * offen ist, liest es erst beim Öffnen aus der Adresse — useSearchParams
+ * verlangte auf den statischen Rechtsseiten eine Suspense-Grenze.
+ */
+function MenueBlatt({ tinte }: { tinte: string }) {
+  const [offen, setOffen] = useState(false)
+  const [punkte, setPunkte] = useState<AngezeigterMenuePunkt[]>([])
+
+  function beimWechsel(jetztOffen: boolean) {
+    if (jetztOffen) setPunkte(menuePunkte(window.location.pathname, window.location.search))
+    setOffen(jetztOffen)
+  }
+
+  return (
+    <Sheet open={offen} onOpenChange={beimWechsel}>
+      <button
+        type="button"
+        onClick={() => beimWechsel(true)}
+        aria-haspopup="dialog"
+        aria-expanded={offen}
+        aria-label="Menü öffnen"
+        className={`inline-flex size-11 items-center justify-center rounded-full ${tinte} transition-colors hover:bg-muted ${FOKUS}`}
+      >
+        <Menu className="size-5" strokeWidth={1.7} aria-hidden="true" />
+      </button>
+      <SheetContent side="right" showCloseButton={false} className="gap-0 p-0">
+        <div className="flex h-14 items-center justify-between border-b border-border pl-5 pr-2">
+          <SheetTitle className="text-base font-semibold">Menü</SheetTitle>
+          <SheetClose
+            aria-label="Menü schließen"
+            className={`inline-flex size-11 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted ${FOKUS}`}
+          >
+            <X className="size-5" strokeWidth={1.7} aria-hidden="true" />
+          </SheetClose>
+        </div>
+        <nav aria-label="Menü" className="flex flex-col overflow-y-auto px-2 py-2">
+          {punkte.map((punkt, i) => (
+            <Link
+              key={punkt.href}
+              href={punkt.href}
+              onClick={() => setOffen(false)}
+              aria-current={punkt.aktuell ? 'page' : undefined}
+              className={`flex min-h-12 items-center rounded-lg px-3 text-[15px] font-semibold transition-colors hover:bg-muted ${
+                punkt.aktuell ? 'text-brand-text' : 'text-foreground'
+              } ${i > 0 && punkt.gruppe !== punkte[i - 1].gruppe ? 'mt-2 border-t border-border pt-2' : ''} ${FOKUS}`}
+            >
+              {punkt.text}
+            </Link>
+          ))}
+        </nav>
+      </SheetContent>
+    </Sheet>
+  )
+}
 
 /**
  * Der Klick eines Rückwegs (Entscheidung: tippAufRueckweg): ein Schritt im
@@ -179,7 +261,7 @@ function useRueckwegKlick(seite: KundenSeite, form: 'knopf' | 'zeile') {
  * Tab). Steht vor dieser Seite eine eigene, führt ein Tipp stattdessen einen
  * Schritt im Verlauf zurück.
  */
-function ZurueckKnopf({ seite, rund = false }: { seite: KundenSeite; rund?: boolean }) {
+function ZurueckKnopf({ seite }: { seite: KundenSeite }) {
   // Beim Server-Rendern und ersten Anzeigen gilt der Link; ob der Verlauf
   // zählt, entscheidet erst der Tipp — sonst wiche das HTML vom Server ab.
   const ersatz = rueckweg(seite, false)
@@ -190,11 +272,7 @@ function ZurueckKnopf({ seite, rund = false }: { seite: KundenSeite; rund?: bool
       href={ersatz.href}
       onClick={beimTipp}
       aria-label="Zurück"
-      className={
-        rund
-          ? RUND
-          : `inline-flex size-11 items-center justify-center rounded-full ${seite.art === 'hofseite' ? 'text-app-ink' : 'text-foreground'} transition-colors hover:bg-muted ${FOKUS}`
-      }
+      className={`inline-flex size-11 items-center justify-center rounded-full ${seite.art === 'hofseite' ? 'text-app-ink' : 'text-foreground'} transition-colors hover:bg-muted ${FOKUS}`}
     >
       <ArrowLeft className="size-5" strokeWidth={1.7} aria-hidden="true" />
     </Link>
@@ -246,21 +324,24 @@ function WarenkorbSymbol({ anzahl, href }: { anzahl: number; href: string }) {
 }
 
 /**
- * Ob das Titelbild im Blick ist — per IntersectionObserver, nicht per
- * Scroll-Ereignis. Der obere Rand zählt um die Leistenhöhe (56 px) weniger:
- * Die Leiste steht, bevor die Sektionsleiste (top-14) an ihr andockt.
- * Ohne Titelbild und beim Server-Rendern: im Blick (keine Leiste über dem Bild).
+ * Ob die Überschrift nach oben aus dem Blick gescrollt ist — per
+ * IntersectionObserver, nicht per Scroll-Ereignis. Der obere Rand zählt um
+ * die Leistenhöhe (56 px) weniger: Was unter der Leiste liegt, ist nicht zu
+ * sehen. Nur „nach oben weg" zählt; eine Überschrift, die noch unter dem
+ * Bildschirm liegt, ist nicht vorbei. Ohne Überschrift und beim
+ * Server-Rendern: nicht weggescrollt.
  */
-function useTitelbildImBlick(titelbild?: RefObject<HTMLElement | null>): boolean {
-  const [imBlick, setImBlick] = useState(true)
+function useUeberschriftWeggescrollt(ueberschrift?: RefObject<HTMLElement | null>): boolean {
+  const [weg, setWeg] = useState(false)
   useEffect(() => {
-    const el = titelbild?.current
+    const el = ueberschrift?.current
     if (!el) return
-    const beobachter = new IntersectionObserver(([eintrag]) => setImBlick(eintrag.isIntersecting), {
-      rootMargin: '-56px 0px 0px 0px',
-    })
+    const beobachter = new IntersectionObserver(
+      ([eintrag]) => setWeg(!eintrag.isIntersecting && eintrag.boundingClientRect.top < 56),
+      { rootMargin: '-56px 0px 0px 0px' }
+    )
     beobachter.observe(el)
     return () => beobachter.disconnect()
-  }, [titelbild])
-  return imBlick
+  }, [ueberschrift])
+  return weg
 }

@@ -260,7 +260,9 @@ describe('Öffentliche Hof-Query', () => {
     const arg = farmFindUnique.mock.calls[0]?.[0] as { select: Record<string, unknown> }
     expect(arg.select.isPaused).toBe(true)
     expect(arg.select.pauseMessage).toBe(true)
-  })
+    // Der erste Import von queries/farm lädt den halben Server-Baum; unter der
+    // vollen Suite dauert das auf Windows länger als die üblichen 5 s.
+  }, 30_000)
 
   it('Owner-Query liefert die Pausen-Felder ebenfalls (Hinweisbalken in Edit und Vorschau)', async () => {
     const { getOwnerFarm } = await import('@/server/queries/farm')
