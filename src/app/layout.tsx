@@ -7,6 +7,7 @@ import { CookieBanner } from '@/components/cookie-banner'
 import { UmgebungsBanner } from '@/components/shared/umgebungs-banner'
 import { RueckwegMerker } from '@/components/shared/rueckweg-merker'
 import { UMGEBUNG, ZEIGE_UMGEBUNGSBANNER } from '@/lib/umgebung-server'
+import { metadatenBasis } from '@/lib/vorschaubild'
 import './globals.css'
 
 const geist = Geist({
@@ -29,6 +30,11 @@ const TITEL_PRAEFIX = ZEIGE_UMGEBUNGSBANNER ? '[TEST] ' : ''
 
 export function generateMetadata(): Metadata {
   return {
+    // Löst relative Bildpfade der Vorschau (openGraph.images, src/lib/vorschaubild.ts)
+    // zu vollen Adressen auf — Messenger laden nur absolute URLs. Die Adresse
+    // der Umgebung (Produktion, Preview-Branch, lokal); ist keine bekannt
+    // oder ungültig, bleibt es bei Nexts eigener Vercel-Adresse.
+    metadataBase: metadatenBasis(UMGEBUNG.appUrl),
     title: {
       default: `${TITEL_PRAEFIX}FarmerZone`,
       template: `${TITEL_PRAEFIX}%s`,

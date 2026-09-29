@@ -7,7 +7,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { describe, it, expect } from 'vitest'
-import { categoryImagePath } from '@/lib/product-image'
+import { CATEGORY_SLUGS, categoryImagePath } from '@/lib/product-image'
 
 describe('categoryImagePath', () => {
   it('mappt Kategorien auf /categories/{slug}.webp, wenn die Datei existiert', () => {
@@ -37,6 +37,21 @@ describe('categoryImagePath', () => {
     // ankommt). Der Rückfall selbst steht oben mit `() => false` unter Test.
     const gemuese = fs.existsSync(path.join(process.cwd(), 'public', 'categories', 'gemuese.webp'))
     expect(categoryImagePath('GEMUESE')).toBe(gemuese ? '/categories/gemuese.webp' : null)
+  })
+
+  it('die Futter-Kategorien haben eigene Bilder; nur die Altlast FUTTERMITTEL bleibt bei Sonstiges', () => {
+    expect(CATEGORY_SLUGS.HEU_STROH).toBe('heu-stroh')
+    expect(CATEGORY_SLUGS.GETREIDE_KOERNER).toBe('getreide-koerner')
+    expect(CATEGORY_SLUGS.MISCHFUTTER).toBe('mischfutter')
+    expect(CATEGORY_SLUGS.ERGAENZUNGSFUTTER).toBe('ergaenzungsfutter')
+    expect(CATEGORY_SLUGS.FUTTERMITTEL).toBe('sonstiges')
+  })
+
+  it('zu jeder Kategorie in CATEGORY_SLUGS liegt die Datei in public/categories', () => {
+    for (const [kategorie, slug] of Object.entries(CATEGORY_SLUGS)) {
+      const datei = path.join(process.cwd(), 'public', 'categories', `${slug}.webp`)
+      expect(fs.existsSync(datei), `${kategorie} → ${slug}.webp`).toBe(true)
+    }
   })
 
   it('fragt die Existenz mit dem relativen public-Pfad ab', () => {

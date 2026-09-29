@@ -283,6 +283,11 @@ Fotos und Hof-Banner werden nicht abgedunkelt. Schleier über Fotos, weiße
 Schrift auf Fotos, Kartenkacheln samt Pins (siehe `hoefe-karte.tsx`), die
 Bildmarke und fremde Markenfarben (WhatsApp-Grün, Stripes Eingabemaske) bleiben,
 wie sie sind. Wo das so ist, gehört ein Kommentar daneben, der es begründet.
+Ausnahme: Die Kategorie-Illustrationen (`public/categories/`) sind keine Fotos,
+ihr heller Crème-Grund würde nachts als Fläche leuchten. Jede NEUE Stelle, die
+eine Illustration zeigt, dämpft sie im Dunkeln (`dark:brightness-[…]
+dark:saturate-[…]`) und rahmt sie statt eines Schattens — Vorbild
+`KategorieKachel` in `src/app/page.tsx`. Ältere Stellen: ARCHITECTURE §6.
 
 ### Diagramme
 Recharts schreibt Farben als SVG-Attribute — `var(--token)` greift dort **nicht**.

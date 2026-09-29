@@ -5,11 +5,15 @@ import type { Metadata } from 'next'
 import { ArrowRight, ChevronDown } from 'lucide-react'
 import { LandingNav } from '@/components/landing/landing-nav'
 import { hoefeLink } from '@/lib/bereiche-anzeige'
+import { categoryImagePath } from '@/lib/product-image'
+import { STARTSEITE_KACHELGRUPPEN, kachelnVon } from '@/lib/startseite-kacheln'
 import { KONTAKT_EMAIL } from '@/lib/support'
+import { STARTSEITE_VORSCHAUBILD } from '@/lib/vorschaubild'
 
 // Futter steht im Titel und in der Beschreibung: Wer „Heu kaufen" sucht, soll
-// die Startseite finden, nicht erst eine Hofseite. Open Graph sagt dasselbe,
-// damit ein geteilter Link dieselbe Karte zeigt.
+// die Startseite finden, nicht erst eine Hofseite. Open Graph und die
+// X-/Twitter-Karte sagen dasselbe und zeigen das große Vorschaubild
+// (src/lib/vorschaubild.ts), damit ein geteilter Link dieselbe Karte zeigt.
 const SEITEN_TITEL = 'FarmerZone — Lebensmittel und Futter direkt vom Hof'
 const SEITEN_BESCHREIBUNG =
   'Lebensmittel für die Küche, Heu, Stroh und Futter für den Stall — direkt von den Höfen der Region bestellen und abholen. Pilotbetrieb mit ausgewählten Höfen.'
@@ -17,7 +21,19 @@ const SEITEN_BESCHREIBUNG =
 export const metadata: Metadata = {
   title: SEITEN_TITEL,
   description: SEITEN_BESCHREIBUNG,
-  openGraph: { title: SEITEN_TITEL, description: SEITEN_BESCHREIBUNG, type: 'website', siteName: 'FarmerZone' },
+  openGraph: {
+    title: SEITEN_TITEL,
+    description: SEITEN_BESCHREIBUNG,
+    type: 'website',
+    siteName: 'FarmerZone',
+    images: [STARTSEITE_VORSCHAUBILD],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: SEITEN_TITEL,
+    description: SEITEN_BESCHREIBUNG,
+    images: [STARTSEITE_VORSCHAUBILD],
+  },
 }
 
 // Alle Texte als Konstanten statt als JSX-Text: so stehen die Wortlaute an
@@ -94,34 +110,18 @@ const STEPS = [
   'Abholen am vereinbarten Tag — fertig gepackt.',
 ]
 
-// Der Kopf: ein Satz für beide Einstiege, darunter die zwei Wege. Der
-// Hofladen bleibt der erste und gefüllte Knopf, Futter der zweite als Umriss.
+// Der Kopf: ein Satz für beide Einstiege und EIN Knopf — die Wahl zwischen
+// Küche und Stall treffen darunter die Kacheln „Was suchst du?".
 const HERO_SATZ =
   'Lebensmittel für die Küche, Heu und Futter für den Stall — direkt von den Höfen der Region. Bestellen, abholen, fertig.'
-const HERO_HOFLADEN = 'Hofladen entdecken'
-const HERO_FUTTER = 'Heu & Futter finden'
+const HERO_KNOPF = 'Höfe in deiner Nähe'
 
-// Der zweite Einstieg: Heu, Stroh und Futter. Jeder Punkt beschreibt, was es
-// heute schon gibt — der Kilopreis jedes Futtermittels auf der Hofseite
-// (formatGrundpreisNetto aus der Nettomenge, auch bei Ballen und Big Bag),
-// die Großgebinde BALLEN und BIGBAG, die Kennzeichnung mit Zusammensetzung,
-// analytischen Bestandteilen und Betriebsnummer im Produktblatt.
-// Bewusst ohne Bild: Es gibt kein eigenes Heu- oder Futterfoto, und fremde
-// oder Stockbilder kommen nicht auf die Seite.
-const FUTTER = {
-  kicker: 'Für Pferdehalter, Tierhalter und Betriebe',
-  title: 'Heu, Stroh und Futter vom Nachbarhof',
-  punkte: [
-    'Fair vergleichen — jeder Ballen und jeder Big Bag mit Kilopreis',
-    'Vom Kleinballen bis zum Big Bag',
-    'Alle Angaben vor dem Kauf — Zusammensetzung, Inhaltsstoffe und Betriebsnummer stehen schon auf der Hofseite',
-  ],
-  knopf: 'Futter in der Nähe finden',
-}
+// Das Kachelraster direkt nach dem Kopf (src/lib/startseite-kacheln.ts).
+const KACHELN_TITEL = 'Was suchst du?'
 
 // „Für Höfe": der Futter-Verkauf als eigener Punkt unter den drei Bildzeilen
-// — ohne Bild, aus demselben Grund wie oben. „Nur für Betriebe" ist die
-// Abgabe NUR_BETRIEBE, die der Hof je Futtermittel wählt.
+// — ohne Bild. „Nur für Betriebe" ist die Abgabe NUR_BETRIEBE, die der Hof je
+// Futtermittel wählt.
 const FARM_FUTTER = 'Auch Heu und Futter verkaufen — die Pflichtangaben füllst du Schritt für Schritt aus, auf Wunsch nur für Betriebe.'
 
 const VISION =
@@ -168,13 +168,13 @@ const SEITEN_HINTERGRUND = 'var(--landing-base)'
 
 const CTA_MAILTO = `mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent('Mein Hof auf FarmerZone')}`
 
-/** Kleine Versalzeile über einer Überschrift. `tone` für das dunkle Vision-Band und das Waldgrün-Band. */
-function Kicker({ children, tone = 'dark' }: { children: string; tone?: 'dark' | 'light' | 'wald' }) {
+/** Kleine Versalzeile über einer Überschrift. `tone` für das dunkle Vision-Band. */
+function Kicker({ children, tone = 'dark' }: { children: string; tone?: 'dark' | 'light' }) {
   return (
     <p
       className={`mb-3 text-xs font-semibold uppercase tracking-[0.18em] ${
         // tone="light" steht auf dem Foto-Band und bleibt in beiden Modi weiß.
-        tone === 'light' ? 'text-white/75' : tone === 'wald' ? 'text-landing-wald-ink/75' : 'text-muted-foreground'
+        tone === 'light' ? 'text-white/75' : 'text-muted-foreground'
       }`}
     >
       {children}
@@ -186,24 +186,57 @@ function Kicker({ children, tone = 'dark' }: { children: string; tone?: 'dark' |
  * Ein Punkt in der Form „Stichwort — Erklärung": das Stichwort hervorgehoben,
  * der Satz im Wortlaut. Ohne Gedankenstrich ist der ganze Punkt das Stichwort.
  */
-function Punkt({ text, tone }: { text: string; tone: 'seite' | 'wald' }) {
+function Punkt({ text }: { text: string }) {
   const trenner = text.indexOf(' — ')
   const stichwort = trenner === -1 ? text : text.slice(0, trenner)
   const rest = trenner === -1 ? '' : text.slice(trenner)
   return (
-    <p className={`text-base leading-relaxed ${tone === 'wald' ? 'text-landing-wald-ink/80' : 'text-muted-foreground'}`}>
-      <strong className={`font-semibold ${tone === 'wald' ? 'text-landing-wald-ink' : 'text-foreground'}`}>
-        {stichwort}
-      </strong>
+    <p className="text-base leading-relaxed text-muted-foreground">
+      <strong className="font-semibold text-foreground">{stichwort}</strong>
       {rest}
     </p>
   )
 }
 
-function SectionHeading({ kicker, children }: { kicker: string; children: string }) {
+/**
+ * Eine Kategorie-Kachel: Illustration quadratisch mit runden Ecken, darunter
+ * der Name. Die Illustrationen haben einen hellen Crème-Grund — nachts
+ * gedämpft (brightness/saturate) und mit Rahmen statt Schatten, damit sie auf
+ * dem dunklen Grund nicht als helle Flächen leuchten. Das Bild ist Schmuck
+ * (alt=""): Den Namen trägt die Zeile darunter, und der ganze Block ist der Link.
+ */
+function KategorieKachel({ name, href, bild }: { name: string; href: string; bild: string | null }) {
+  return (
+    <li>
+      <Link
+        href={href}
+        className="group block rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <span className="relative block aspect-square overflow-hidden rounded-2xl bg-muted dark:ring-1 dark:ring-border">
+          {bild && (
+            <Image
+              src={bild}
+              alt=""
+              fill
+              sizes="(min-width: 768px) 180px, 30vw"
+              className="object-cover transition-transform duration-[250ms] ease-out group-hover:scale-[1.03] dark:brightness-[0.78] dark:saturate-[0.9]"
+            />
+          )}
+        </span>
+        {/* Silbentrennung (lang="de"): „Ergänzungsfutter" ist breiter als
+            eine Handy-Kachel und bräche sonst über den Rand. */}
+        <span className="mt-2 block text-center text-[13px] font-medium leading-snug text-foreground hyphens-auto break-words sm:text-sm">
+          {name}
+        </span>
+      </Link>
+    </li>
+  )
+}
+
+function SectionHeading({ kicker, children }: { kicker?: string; children: string }) {
   return (
     <div className="mb-12">
-      <Kicker>{kicker}</Kicker>
+      {kicker && <Kicker>{kicker}</Kicker>}
       <h2 className="font-heading text-3xl md:text-5xl font-semibold text-foreground text-balance">
         {children}
       </h2>
@@ -397,23 +430,15 @@ export default function HomePage() {
               </h1>
               <p className="text-lg text-white/90 max-w-lg leading-relaxed">{HERO_SATZ}</p>
               {/* Kein Orange: Das gehört einmal pro Seite dem Band „Hof
-                  anmelden". Der Hofladen ist der gefüllte Knopf (Crème mit
-                  Waldgrün), Futter der Umriss. Beide stehen auf dem Foto und
-                  folgen dem Modus deshalb nicht — der Umriss bleibt weiß. */}
-              <div className="mt-7 flex flex-wrap gap-3">
-                <Link
-                  href={hoefeLink('LEBENSMITTEL')}
-                  className="inline-flex min-h-12 items-center rounded-full bg-landing-wald-ink px-6 text-sm font-semibold text-landing-wald transition-[transform,opacity] duration-[250ms] ease-out hover:opacity-90 hover:-translate-y-0.5 active:translate-y-0"
-                >
-                  {HERO_HOFLADEN}
-                </Link>
-                <Link
-                  href={hoefeLink('FUTTERMITTEL')}
-                  className="inline-flex min-h-12 items-center rounded-full border border-white/80 px-6 text-sm font-semibold text-white transition-colors duration-[250ms] hover:bg-white/10"
-                >
-                  {HERO_FUTTER}
-                </Link>
-              </div>
+                  anmelden". Der Knopf ist Crème mit Waldgrün; er steht auf dem
+                  Foto und folgt dem Modus deshalb nicht. */}
+              <Link
+                href={hoefeLink('LEBENSMITTEL')}
+                className="mt-7 inline-flex min-h-12 items-center gap-2 rounded-full bg-landing-wald-ink px-6 text-sm font-semibold text-landing-wald transition-[transform,opacity] duration-[250ms] ease-out hover:opacity-90 hover:-translate-y-0.5 active:translate-y-0"
+              >
+                {HERO_KNOPF}
+                <ArrowRight className="size-4" aria-hidden="true" />
+              </Link>
             </div>
           </div>
 
@@ -431,16 +456,16 @@ export default function HomePage() {
           </a>
         </section>
 
-        {/* A — Für Höfe: abwechselnde Editorial-Zeilen statt Karten.
-            Trägt jetzt id="weiter" — das ist das Ziel des Scroll-Pfeils im
-            Hero; es saß vorher auf dem entfernten Karten-Block. */}
-        {/* scroll-mt-20: Die klebende Leiste ist 56 px hoch — ohne diesen
+        {/* 0 — Was suchst du? Das Kachelraster direkt nach dem Kopf: Küche
+            und Stall als zwei gleich gebaute Gruppen, kein farbiger
+            Sonderblock (src/lib/startseite-kacheln.ts). Trägt id="weiter",
+            das Ziel des Scroll-Pfeils im Hero.
+            scroll-mt-20: Die klebende Leiste ist 56 px hoch — ohne diesen
             Abstand verdeckte sie beim Sprung die Überschrift. */}
         <section id="weiter" className="scroll-mt-20 px-6 pt-14 pb-20 md:pt-20 md:pb-28">
           <div className="mx-auto max-w-6xl">
-            {/* Pilot-Hinweis, Wortlaut unverändert — steht jetzt hier oben,
-                mittig und mit Luft, damit der Übergang aus dem Hero ruhig
-                bleibt und der Abschnitt trotzdem sofort beginnt. */}
+            {/* Pilot-Hinweis, Wortlaut unverändert — oben, mittig und mit
+                Luft, damit der Übergang aus dem Hero ruhig bleibt. */}
             <div className="mb-14 flex justify-center md:mb-20">
               <span className="inline-flex items-center gap-2 bg-card/80 border border-border rounded-full px-3.5 py-1.5 text-xs text-muted-foreground">
                 <span className="size-1.5 rounded-full bg-accent animate-pulse" />
@@ -448,6 +473,33 @@ export default function HomePage() {
               </span>
             </div>
 
+            <SectionHeading>{KACHELN_TITEL}</SectionHeading>
+            <div className="space-y-12 md:space-y-16">
+              {STARTSEITE_KACHELGRUPPEN.map((gruppe) => (
+                <div key={gruppe.titel}>
+                  <h3 className="font-heading text-xl md:text-2xl font-semibold text-foreground">{gruppe.titel}</h3>
+                  {gruppe.untertitel && (
+                    <p className="mt-1 max-w-prose text-sm leading-relaxed text-muted-foreground">{gruppe.untertitel}</p>
+                  )}
+                  <ul className="mt-5 grid grid-cols-3 gap-x-3 gap-y-6 sm:grid-cols-4 sm:gap-x-4 md:grid-cols-6">
+                    {kachelnVon(gruppe).map((kachel) => (
+                      <KategorieKachel
+                        key={kachel.kategorie}
+                        name={kachel.name}
+                        href={kachel.href}
+                        bild={categoryImagePath(kachel.kategorie)}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* A — Für Höfe: abwechselnde Editorial-Zeilen statt Karten. */}
+        <section className="px-6 pb-20 md:pb-28">
+          <div className="mx-auto max-w-6xl">
             <SectionHeading kicker={SECTION_TITLES.farms.kicker}>
               {SECTION_TITLES.farms.title}
             </SectionHeading>
@@ -467,7 +519,7 @@ export default function HomePage() {
             {/* Der Futter-Verkauf als ruhiger Punkt unter den Bildzeilen —
                 ohne Bild, mit denselben feinen Linien wie die Stichpunkte. */}
             <div className="mt-16 max-w-3xl border-y border-border/60 py-6 md:mt-24">
-              <Punkt text={FARM_FUTTER} tone="seite" />
+              <Punkt text={FARM_FUTTER} />
             </div>
           </div>
         </section>
@@ -512,37 +564,6 @@ export default function HomePage() {
                 </li>
               ))}
             </ol>
-          </div>
-        </section>
-
-        {/* C2 — Heu und Futter: der zweite Einstieg, als Waldgrün-Band.
-            Ein gerundeter Block statt eines vollbreiten Bands: Direkt darunter
-            folgt die Vision als dunkles Foto-Band, zwei vollbreite dunkle
-            Flächen hintereinander wären eine Wand. Ohne Bild (siehe FUTTER).
-            Der Knopf ist Crème auf Waldgrün, kein Orange — das gehört dem
-            Band „Hof anmelden". */}
-        <section className="px-6 pb-20 md:pb-28">
-          {/* Nachts trägt der Rahmen die Abgrenzung (CODING_STANDARDS §7, Tiefe). */}
-          <div className="mx-auto max-w-6xl rounded-3xl bg-landing-wald px-6 py-12 sm:px-10 md:px-14 md:py-16 dark:ring-1 dark:ring-border">
-            <Kicker tone="wald">{FUTTER.kicker}</Kicker>
-            <h2 className="font-heading text-3xl md:text-5xl font-semibold text-landing-wald-ink text-balance">
-              {FUTTER.title}
-            </h2>
-            <span className="mt-6 block h-px w-12 rounded-full bg-landing-green" />
-            <ul className="mt-10 grid gap-6 md:grid-cols-3 md:gap-10">
-              {FUTTER.punkte.map((punkt) => (
-                <li key={punkt} className="border-t border-landing-wald-ink/20 pt-4">
-                  <Punkt text={punkt} tone="wald" />
-                </li>
-              ))}
-            </ul>
-            <Link
-              href={hoefeLink('FUTTERMITTEL')}
-              className="mt-10 inline-flex min-h-12 items-center gap-2 rounded-full bg-landing-wald-ink px-7 text-sm font-semibold text-landing-wald transition-[transform,opacity] duration-[250ms] ease-out hover:opacity-90 hover:-translate-y-0.5 active:translate-y-0"
-            >
-              {FUTTER.knopf}
-              <ArrowRight className="size-4" aria-hidden="true" />
-            </Link>
           </div>
         </section>
 

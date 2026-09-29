@@ -4,6 +4,7 @@ import { getPublicFarm } from '@/server/queries/farm'
 import { getActiveStatusPost } from '@/server/queries/status-posts'
 import { verifyReorderToken } from '@/lib/reorder-token'
 import { prisma } from '@/lib/prisma'
+import { hofVorschaubild } from '@/lib/vorschaubild'
 import { FarmPageView } from '@/components/farm/farm-page-view'
 
 export const dynamic = 'force-dynamic'
@@ -24,7 +25,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: farm.name,
       description: desc,
       type: 'website',
-      ...(farm.bannerUrl ? { images: [{ url: farm.bannerUrl }] } : {}),
+      // Das Titelbild, ohne Titelbild das der Startseite — ein geteilter
+      // Hof-Link soll nie ohne Bild ankommen (src/lib/vorschaubild.ts).
+      images: [hofVorschaubild(farm)],
     },
   }
 }

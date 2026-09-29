@@ -7,10 +7,13 @@ import type { MetadataRoute } from 'next'
  * auf dem cloud-ausgelagerte Fotos zuverlässig ankommen, während der
  * Datei-Picker für sie tote Referenzen liefert.
  *
- * Die Icons sind das VORHANDENE Favicon: die 256er-Ebene daraus 1:1 als PNG
- * extrahiert (public/app-icon-256.png), nichts neu gestaltet. Ein eigenes
- * 512er-Icon existiert im Repo nicht — fürs Installieren genügt 256,
- * lediglich der Splash-Screen bliebe damit einfacher.
+ * Die Icons (Sprint „Marke und Startseite aus einem Guss"): 192 und 512 für
+ * Startbildschirm und Splash-Screen (purpose any), dazu eine maskierbare
+ * Fassung mit Schutzrand, die Android in Kreis oder Tropfen beschneiden darf.
+ * Das Favicon (src/app/favicon.ico) und das Apple-Icon (src/app/apple-icon.png)
+ * gehören NICHT hierher: Sie wirken über Nexts Dateikonvention als <link> im
+ * Kopf jeder Seite. tests/manifest.test.ts prüft, dass jedes Icon hier in
+ * public/ liegt und die angegebene Größe hat.
  *
  * Farben aus den Haus-Tokens (globals.css), in Hex umgerechnet:
  * --primary oklch(0.30 0.082 155) → #00391A, --background → #F8F2E5.
@@ -32,8 +35,9 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: '#00391A',
     background_color: '#F8F2E5',
     icons: [
-      { src: '/app-icon-256.png', sizes: '256x256', type: 'image/png' },
-      { src: '/favicon.ico', sizes: '48x48 32x32 16x16', type: 'image/x-icon' },
+      { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
     share_target: {
       action: '/teilen',

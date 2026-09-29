@@ -6,18 +6,17 @@ import type { ProductCategory } from '@prisma/client'
 // Nur serverseitig verwenden (fs) — Client-Komponenten bekommen die fertige URL.
 //
 // Die Zuordnung ist VOLLSTÄNDIG (Record über das Prisma-Enum — TypeScript
-// erzwingt jeden Wert), die Dateien sind es noch nicht: Heute liegen in
-// public/categories/ nur brennholz, eier, fleisch, milch und sonstiges. Für
-// fisch, gemuese, obst, brot, honig und getraenke steht der Dateiname hier
-// schon fest; der Betreiber muss die Illustration nur noch unter genau diesem
-// Namen ablegen. Bis dahin greift der Rückfall unten (null → die Kachel
-// rendert ohne Bild, kein gebrochenes <img>, kein Fehler im Log).
+// erzwingt jeden Wert), und seit dem Sprint „Marke und Startseite aus einem
+// Guss" liegt zu jedem Dateinamen hier eine Illustration in public/categories/
+// (tests/product-image.test.ts prüft das). Der Rückfall unten bleibt trotzdem:
+// Fehlt eine Datei, rendert die Kachel ohne Bild — kein gebrochenes <img>,
+// kein Fehler im Log.
 // ACHTUNG Existenz-Cache (unten): Eine einmal als fehlend erkannte Datei
 // bleibt für die Lebensdauer des Prozesses „fehlend". Auf Vercel ist das
 // egal (jede Ablage ist ein Deployment = neuer Prozess); ein laufender
 // `next dev` muss nach dem Ablegen neu gestartet werden.
 
-const CATEGORY_SLUGS: Record<ProductCategory, string> = {
+export const CATEGORY_SLUGS: Record<ProductCategory, string> = {
   MILCH: 'milch',
   EIER: 'eier',
   FLEISCH: 'fleisch',
@@ -27,15 +26,14 @@ const CATEGORY_SLUGS: Record<ProductCategory, string> = {
   BROT: 'brot',
   HONIG: 'honig',
   GETRAENKE: 'getraenke',
-  // Bewusst KEINE eigene Illustration (Sprint Taxonomie 1): Futtermittel
-  // teilt sich die neutrale Kachel mit Sonstiges, damit die Karte nicht leer
-  // bleibt. Eine eigene Datei wäre ein neuer Illustrationsauftrag.
+  // Die Altlast aus Taxonomie 1 bekommt keine eigene Illustration: Sie steht
+  // nur noch an Bestandsdaten und teilt sich die neutrale Kachel mit Sonstiges.
   FUTTERMITTEL: 'sonstiges',
-  // Dasselbe für die vier Futter-Kategorien aus Sprint Bereiche 1.
-  HEU_STROH: 'sonstiges',
-  GETREIDE_KOERNER: 'sonstiges',
-  MISCHFUTTER: 'sonstiges',
-  ERGAENZUNGSFUTTER: 'sonstiges',
+  // Die vier Futter-Kategorien aus Bereiche 1 — mit eigener Illustration.
+  HEU_STROH: 'heu-stroh',
+  GETREIDE_KOERNER: 'getreide-koerner',
+  MISCHFUTTER: 'mischfutter',
+  ERGAENZUNGSFUTTER: 'ergaenzungsfutter',
   BRENNHOLZ: 'brennholz',
   SONSTIGES: 'sonstiges',
 }
