@@ -32,7 +32,7 @@ export default async function StatusPage() {
 
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto">
-      <MeinHofKopf hof={kopf} aktiv="beitraege" produktZahl={produktZahl} />
+      <MeinHofKopf hof={kopf} aktiv="beitraege" produktZahl={produktZahl} beitraegeZahl={posts.length} />
       <PageHeader
         title="Status & Updates"
         subtitle="Informiere deine Kunden über Neuigkeiten vom Hof"

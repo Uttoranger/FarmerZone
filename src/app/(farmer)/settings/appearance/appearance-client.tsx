@@ -87,14 +87,15 @@ interface Props {
 }
 
 // ── Logo upload sub-component ─────────────────────────────────────────────────
+// Auch im Hofseiten-Editor ab lg (components/farmer/hofseite-editor.tsx).
 
-function LogoUpload({
+export function LogoUpload({
   logoUrl,
   onUploaded,
 }: {
   logoUrl: string | null
   onUploaded: (url: string | null) => void
-}) {
+}): React.JSX.Element {
   const [, startTransition] = useTransition()
 
   const { isUploading, progress, openFilePicker, fileInput } = useImageUpload({
@@ -350,7 +351,18 @@ function GalleryPhotoItem({
 
 const GALLERY_LIMIT = 8
 
-function GallerySection({ initialPhotos }: { initialPhotos: FarmPhotoData[] }) {
+/**
+ * Die Galerie — hier und im Hofseiten-Editor ab lg
+ * (components/farmer/hofseite-editor.tsx), der über `onGespeichert` nach
+ * jeder Änderung seine Vorschau neu lädt.
+ */
+export function GallerySection({
+  initialPhotos,
+  onGespeichert,
+}: {
+  initialPhotos: FarmPhotoData[]
+  onGespeichert?: () => void
+}): React.JSX.Element {
   const [photos, setPhotos] = useState<FarmPhotoData[]>(initialPhotos)
 
   const canUpload = photos.length < GALLERY_LIMIT
@@ -369,16 +381,19 @@ function GallerySection({ initialPhotos }: { initialPhotos: FarmPhotoData[] }) {
       if (result.photo) {
         setPhotos((prev) => [...prev, result.photo!])
         if (!batch) toast.success('Foto hinzugefügt')
+        onGespeichert?.()
       }
     },
   })
 
   function handleDeleted(id: string) {
     setPhotos((prev) => prev.filter((p) => p.id !== id).map((p, i) => ({ ...p, sortOrder: i })))
+    onGespeichert?.()
   }
 
   function handleCaptionChange(id: string, caption: string) {
     setPhotos((prev) => prev.map((p) => (p.id === id ? { ...p, caption: caption || null } : p)))
+    onGespeichert?.()
   }
 
   async function handleMove(id: string, dir: 'up' | 'down') {
@@ -387,6 +402,7 @@ function GallerySection({ initialPhotos }: { initialPhotos: FarmPhotoData[] }) {
       toast.error(result.error)
       return
     }
+    onGespeichert?.()
     setPhotos((prev) => {
       const next = [...prev]
       const idx = next.findIndex((p) => p.id === id)

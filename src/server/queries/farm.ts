@@ -805,3 +805,14 @@ export async function getMeinHofKopf(ownerId: string): Promise<MeinHofKopfDaten 
     zustand: hofZustand(hof),
   }
 }
+
+/**
+ * Der Besitzer eines Hofs zu seinem Slug — nur die Kennung, für den
+ * Vorschau-Zugriff der Hofseite (src/lib/hofseite-vorschau.ts). null, wenn es
+ * den Hof nicht gibt; ob er freigegeben ist, spielt hier keine Rolle: Der
+ * Besitzer darf seine Seite auch vorher sehen.
+ */
+export async function getHofBesitzer(slug: string): Promise<string | null> {
+  const hof = await prisma.farm.findUnique({ where: { slug }, select: { ownerId: true } })
+  return hof?.ownerId ?? null
+}
