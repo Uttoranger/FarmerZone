@@ -168,3 +168,39 @@ export function ersteSchritteDaten(
     zahlungBereit: hof?.stripeAccountReady === true,
   }
 }
+
+// ─── Ausblenden ─────────────────────────────────────────────────────────────
+
+/**
+ * Wer die Karte nicht mehr sehen will, klickt sie weg; gemerkt wird das in
+ * einem Cookie, nicht in localStorage: Der Server liest ihn beim Rendern der
+ * Seite und lässt die Karte gleich weg — kein Aufblitzen, kein Nachrutschen
+ * des Inhalts. Der Wert ist die Hof-ID, damit ein anderer Hof im selben
+ * Browser die Karte weiter sieht. Keine Spalte in der Datenbank: Die Karte
+ * misst echten Zustand, das Wegklicken ist eine Gerätevorliebe.
+ */
+export const ERSTE_SCHRITTE_AUS_COOKIE = 'fz-erste-schritte-aus'
+
+/** Ein Jahr — länger als jede Einrichtung dauert, kürzer als für immer. */
+export const ERSTE_SCHRITTE_AUS_DAUER_S = 365 * 24 * 60 * 60
+
+/**
+ * Liest den Cookie: ausgeblendet nur, wenn er genau diese Hof-ID trägt.
+ * Ein leerer, fremder oder fehlender Wert heißt: Karte zeigen.
+ */
+export function ersteSchritteAusgeblendet(cookieWert: string | undefined, farmId: string): boolean {
+  return cookieWert !== undefined && cookieWert.length > 0 && cookieWert === farmId
+}
+
+export type ErsteSchritteAnzeige = 'karte' | 'zeile' | 'nichts'
+
+/**
+ * Was Heute für die Erste-Schritte-Karte zeigt: die Karte, solange etwas
+ * offen ist und der Hof sie nicht weggeklickt hat; sonst unten die schmale
+ * Zeile „Erste Schritte einblenden"; ist alles erledigt, gar nichts — auch
+ * die Zeile nicht, sie würde eine leere Karte zurückholen.
+ */
+export function ersteSchritteAnzeige(ergebnis: { anzeigen: boolean }, ausgeblendet: boolean): ErsteSchritteAnzeige {
+  if (!ergebnis.anzeigen) return 'nichts'
+  return ausgeblendet ? 'zeile' : 'karte'
+}

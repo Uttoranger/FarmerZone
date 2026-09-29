@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { hofZustand, titelbildFoto, type HofZustand } from '@/lib/mein-hof'
+import { hofAdresse, hofZustand, titelbildFoto, type HofZustand } from '@/lib/mein-hof'
+import { APP_URL } from '@/lib/umgebung-server'
 import { categoryImagePath } from '@/lib/product-image'
 import { DEFAULT_SECTIONS, type SectionConfig } from './appearance'
 import { PRODUCT_ORDER_BY } from './products'
@@ -767,6 +768,8 @@ export async function getOeffentlicheHoefe(
 export type MeinHofKopfDaten = {
   name: string
   slug: string
+  /** Die öffentliche Adresse der Hofseite — zum Anzeigen ohne Protokoll, zum Öffnen und Kopieren vollständig. */
+  adresse: { anzeige: string; url: string }
   logoUrl: string | null
   /** Ein hochgeladenes Titelbild; null = Verlauf (bannerValue). */
   titelbildUrl: string | null
@@ -797,6 +800,7 @@ export async function getMeinHofKopf(ownerId: string): Promise<MeinHofKopfDaten 
   return {
     name: hof.name,
     slug: hof.slug,
+    adresse: hofAdresse(APP_URL, hof.slug),
     logoUrl: hof.logoUrl,
     titelbildUrl: titelbildFoto(hof),
     bannerValue: hof.bannerValue,

@@ -3,8 +3,9 @@ import Link from 'next/link'
 import { Eye } from 'lucide-react'
 import { MEIN_HOF_REITER, type MeinHofReiterId } from '@/lib/bauern-navigation'
 import { hofInitialen } from '@/lib/hof-initialen'
-import { titelbildVerlauf, type HofZustandArt } from '@/lib/mein-hof'
+import { titelbildVerlauf, type SchildFarbe } from '@/lib/mein-hof'
 import type { MeinHofKopfDaten } from '@/server/queries/farm'
+import { AdresseKopierenKnopf } from '@/components/farmer/adresse-kopieren-knopf'
 import { HofTeilenKnopf } from '@/components/farmer/hof-teilen-knopf'
 import { cn } from '@/lib/utils'
 
@@ -19,12 +20,11 @@ import { cn } from '@/lib/utils'
  * Kopf fragt nicht selbst, sonst käme eine Datenbankrunde hinterher.
  */
 
-/** Bedeutungsfarben des Zustandspunkts, in beiden Modi sichtbar. */
-const PUNKT_FARBE: Record<HofZustandArt, string> = {
-  sichtbar: 'bg-green-600 dark:bg-green-400',
-  pausiert: 'bg-amber-500 dark:bg-amber-400',
-  wartet: 'bg-sky-600 dark:bg-sky-400',
-  aus: 'bg-app-ink-faint',
+/** Bedeutungsfarben des Schilds, in beiden Modi lesbar (CODING_STANDARDS §7). */
+const SCHILD_FARBE: Record<SchildFarbe, string> = {
+  gruen: 'bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-200',
+  bernstein: 'bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200',
+  grau: 'bg-app-chip text-app-chip-ink',
 }
 
 const KNOPF =
@@ -79,17 +79,50 @@ export function MeinHofKopf({
                 </span>
               )}
             </div>
-            <div className="min-w-0 pt-2">
+            <div className="min-w-0 flex-1 pt-2">
               {/* Kein h1: Die Überschrift gehört der Seite darunter. */}
               <p className="font-heading text-xl font-semibold leading-snug text-app-ink break-words">{hof.name}</p>
-              <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-app-ink-soft">
-                <span className={cn('size-2 shrink-0 rounded-full', PUNKT_FARBE[hof.zustand.art])} aria-hidden="true" />
-                {hof.zustand.text}
-              </p>
+              {/* Die Adresse der Hofseite. Öffentlich: Link in neuem Tab und
+                  Kopieren daneben. Nicht öffentlich: reiner Text — ein Link
+                  oder eine kopierte Adresse führte Kundinnen auf „nicht
+                  gefunden". */}
+              <div className="mt-0.5 flex min-w-0 items-center gap-1">
+                {hof.zustand.oeffentlich ? (
+                  <>
+                    <a
+                      href={hof.adresse.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="min-w-0 truncate text-[13px] text-app-ink-soft underline-offset-2 hover:text-app-ink hover:underline"
+                    >
+                      {hof.adresse.anzeige}
+                      <span className="sr-only"> (öffnet in neuem Tab)</span>
+                    </a>
+                    <AdresseKopierenKnopf url={hof.adresse.url} />
+                  </>
+                ) : (
+                  <span className="min-w-0 truncate text-[13px] text-app-ink-soft">{hof.adresse.anzeige}</span>
+                )}
+              </div>
+              {/* Das Schild: grün „Öffentlich", bernstein „Pausiert", grau
+                  „Noch nicht freigegeben". Stillgelegt trägt keins — das
+                  sagt der Balken über der Seite. */}
+              {hof.zustand.schild && (
+                <span
+                  className={cn(
+                    'mt-1.5 inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+                    SCHILD_FARBE[hof.zustand.schild.farbe]
+                  )}
+                >
+                  {hof.zustand.schild.text}
+                </span>
+              )}
             </div>
           </div>
 
-          {/* Nur wenn die Hofseite öffentlich ist — ein Link ins Leere wäre irreführend. */}
+          {/* Nur wenn die Hofseite öffentlich ist — ein Link ins Leere wäre
+              irreführend. Kundenansicht bleibt neben der Adresse: Der eine
+              Knopf ist am Handy leichter zu treffen als eine Textzeile. */}
           {hof.zustand.oeffentlich && (
             <div className="mt-3 grid grid-cols-2 gap-2">
               <Link href={`/${hof.slug}`} target="_blank" rel="noopener noreferrer" className={KNOPF}>

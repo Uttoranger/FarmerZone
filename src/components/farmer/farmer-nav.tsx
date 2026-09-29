@@ -7,10 +7,9 @@ import { Menu } from '@base-ui/react/menu'
 import {
   Banknote,
   BarChart3,
-  Bug,
   CalendarCheck,
   Home,
-  Inbox,
+  LifeBuoy,
   LogOut,
   Megaphone,
   MoreHorizontal,
@@ -25,6 +24,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { signOut } from '@/lib/auth-client'
+import { hofInitialen } from '@/lib/hof-initialen'
 import { FarmIdentityCard } from '@/components/farmer/farm-identity-card'
 import { ThemeUmschalter, ThemeUmschalterZeile } from '@/components/shared/theme-umschalter'
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -58,8 +58,8 @@ const SYMBOL: Record<NavPunktId, LucideIcon> = {
   verkaeufe: Tag,
   auswertung: BarChart3,
   einstellungen: SlidersHorizontal,
-  'fehler-melden': Bug,
-  meldungen: Inbox,
+  // Ein Rettungsring: Hilfe holen und Rückmeldung geben, an einem Ort.
+  hilfe: LifeBuoy,
   admin: ShieldCheck,
 }
 
@@ -171,6 +171,39 @@ function NeuInhalt({ punkt }: { punkt: NeuPunkt }) {
         <span className="block text-[13px] leading-snug opacity-80">{punkt.satz}</span>
       </span>
     </>
+  )
+}
+
+/**
+ * Wer angemeldet ist — Initialen und Name. Das Menü unten gehört der Person,
+ * nicht dem Hof: Einstellungen, Hilfe, Abmelden sind ihre Handlungen; der Hof
+ * hat mit „Mein Hof" seinen eigenen Platz in der Leiste. Kein Foto: Es gibt
+ * keins, und Initialen sehen aus wie eine Entscheidung, ein Platzhalter wie
+ * ein Fehler (hof-initialen.ts — die Ableitung passt für einen Personennamen
+ * genauso).
+ */
+function Person({ name, handy }: { name: string; handy: boolean }) {
+  const anzeige = name.trim() || 'Dein Konto'
+  return (
+    <div className={cn('flex items-center gap-3 px-3', handy ? 'min-h-[48px] py-2' : 'min-h-10 py-2')}>
+      <span
+        className="flex size-8 shrink-0 items-center justify-center rounded-full font-heading text-xs font-semibold"
+        /* Sand-Plakette auf der dunkelgrünen Leiste, wie an der Hofkarte — die
+           Leiste ist in beiden Modi dunkel, die Plakette bleibt deshalb hell. */
+        style={{ background: '#F2E5D3', color: '#8B6B4F' }}
+        aria-hidden="true"
+      >
+        {hofInitialen(anzeige)}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'rgba(207,228,214,0.55)' }}>
+          Angemeldet
+        </span>
+        <span className="block truncate text-sm" style={{ color: 'var(--app-bar-ink)' }}>
+          {anzeige}
+        </span>
+      </span>
+    </div>
   )
 }
 
@@ -376,16 +409,13 @@ export function FarmerNav({
                   className={blattKlasse}
                   style={blattStil}
                 >
-                  {/* Kopf des Blatts: die Hof-Visitenkarte, daneben Hell/Dunkel
-                      und Schließen — wie bisher. */}
-                  <div className="mb-1 flex items-start justify-between gap-2 px-1 pt-1">
+                  {/* Kopf des Blatts: die Person, daneben Hell/Dunkel und
+                      Schließen. Die Hofkarte stand hier bis „Mein Hof" seinen
+                      Platz in der Leiste bekam — das Blatt ist jetzt Betrieb
+                      und Konto, kein zweiter Hof-Auftritt. */}
+                  <div className="mb-1 flex items-center justify-between gap-2 px-1 pt-1">
                     <div className="min-w-0 flex-1">
-                      <FarmIdentityCard
-                        farmName={farmName}
-                        logoUrl={farmLogoUrl}
-                        wartetAufFreigabe={farmPending}
-                        onNavigate={schliessen}
-                      />
+                      <Person name={userName} handy />
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
                       <ThemeUmschalter className="rounded-full hover:bg-white/10" style={RUHIG} />
@@ -422,13 +452,10 @@ export function FarmerNav({
         className="hidden md:fixed md:inset-y-0 md:left-0 md:z-40 md:flex md:w-56 md:flex-col print:hidden"
         style={{ background: 'var(--app-bar)', borderRight: '1px solid rgba(255,255,255,0.08)' }}
       >
-        {/* Hof-Visitenkarte am Kopf. Der Nutzername darunter sagt, WER
-            angemeldet ist — das beantwortet die Karte nicht. */}
+        {/* Hof-Visitenkarte am Kopf: der Hof tritt auf. WER angemeldet ist,
+            steht unten bei den Handlungen der Person. */}
         <div className="shrink-0 px-4 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
           <FarmIdentityCard farmName={farmName} logoUrl={farmLogoUrl} wartetAufFreigabe={farmPending} />
-          <div className="mt-2.5 truncate text-xs" style={{ color: 'var(--app-bar-ink-soft)', opacity: 0.7 }}>
-            {userName}
-          </div>
         </div>
 
         {/* Alles darunter scrollt als eine Spalte: Auf niedrigen Bildschirmen
@@ -475,6 +502,7 @@ export function FarmerNav({
           </nav>
 
           <div className="mt-auto space-y-0.5 px-2 py-3" style={{ borderTop: '1px solid rgba(255,255,255,0.10)' }}>
+            <Person name={userName} handy={false} />
             {nav.unten.map((punkt) => (
               <NavZeile key={punkt.id} punkt={punkt} handy={false} istAktiv={aktiv === punkt.id} ariaCurrent={ariaAktuell(pathname, punkt)} anzahl={zahlVon(punkt)} />
             ))}

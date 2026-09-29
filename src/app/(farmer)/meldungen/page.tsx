@@ -11,12 +11,14 @@ import { Marke } from '@/components/ui/marke'
 export const dynamic = 'force-dynamic'
 
 /**
- * „Meine Meldungen" (Sprint fehlerbriefkasten, Teil C): nur die eigenen
- * Meldungen des Hofes (farmId der Sitzung, hart in der Query), nur die Felder
- * der Sichtbarkeitsregel — Art, Datum, erste Zeile, öffentlicher Status und
- * die Antwort des Betreibers, falls es eine gibt.
+ * „Hilfe und Rückmeldung" — der eine Ort für Melden und Nachsehen (vorher
+ * „Meine Meldungen", Sprint fehlerbriefkasten, Teil C): oben der Knopf
+ * „Fehler melden", darunter nur die eigenen Meldungen des Hofes (farmId der
+ * Sitzung, hart in der Query), nur die Felder der Sichtbarkeitsregel — Art,
+ * Datum, erste Zeile, öffentlicher Status und die Antwort des Betreibers,
+ * falls es eine gibt.
  */
-export default async function MeineMeldungenPage() {
+export default async function HilfeUndRueckmeldungPage() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) redirect('/login')
   const farm = await getFarmForUser(session.user.id)
@@ -27,7 +29,8 @@ export default async function MeineMeldungenPage() {
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto">
       <PageHeader
-        title="Meine Meldungen"
+        title="Hilfe und Rückmeldung"
+        subtitle="Fehler, Wunsch oder Frage — hier meldest du und siehst den Stand."
         action={
           <Link
             href="/fehler-melden"

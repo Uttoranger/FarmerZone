@@ -2436,6 +2436,84 @@ deshalb in beiden Modi gleich.
 
 ---
 
+## Nachschliff Bauern-Navigation und Heute — die sieben Entscheidungen (2026-09-29)
+
+Nachtrag zu #136/#137/#142, nach einem Gespräch über die Hofkarte und den
+Heute-Bildschirm. Der Mensch hat sieben Punkte entschieden; fünf davon sind Code.
+
+**1. Hilfe und Rückmeldung.** „Fehler melden" und „Meine Meldungen" waren zwei
+Einträge im Menü unten und lasen sich wie zwei verschiedene Dinge. Jetzt ist es
+EIN Punkt „Hilfe und Rückmeldung" (Rettungsring) nach `/meldungen`; die Seite
+heißt so, trägt oben den Knopf „Fehler melden" und darunter den Stand der
+eigenen Meldungen. Der Punkt leuchtet auch auf `/fehler-melden` (`auchAktivAuf`,
+wie bei Mein Hof). Die Danke-Karte nach dem Melden und die Hinweise im Admin
+sagen jetzt „Hilfe und Rückmeldung" statt „Meine Meldungen".
+
+**2. „Shop" bleibt an zwei Stellen.** Die Pause-Seite und der Produktschalter
+„Im Shop" bleiben, wie sie sind (Entscheidung des Menschen). Offen, siehe unten.
+
+**3. Der Kopf von Mein Hof zeigt die Adresse und ein Schild.** Unter dem Hofnamen
+steht die Adresse der Hofseite ohne Protokoll (`hofAdresse`: „farmerzone.at/
+muellerhof", Host aus `APP_URL`, damit Previews ihre eigene Adresse zeigen).
+Ist die Hofseite öffentlich (sichtbar oder pausiert): Link in neuem Tab und ein
+Kopier-Knopf daneben. Ist sie es nicht: reiner Text, kein Link, kein Kopieren —
+eine kopierte Adresse, die auf „nicht gefunden" führt, wäre irreführend. Statt
+des Zustandspunkts mit Text ein Schild: grün „Öffentlich", bernstein „Pausiert",
+grau „Noch nicht freigegeben" (auch für `isActive false`, das heute nirgends
+gesetzt wird — für den Hof heißt beides dasselbe). Ein stillgelegter Hof trägt
+KEIN Schild: Der bernsteinfarbene Balken über jeder Seite sagt es schon, ein
+zweites Schild darunter wäre Nachhall. Dafür hat `hofZustand` die Art
+`stillgelegt` bekommen; „Im Shop sichtbar" als Text gibt es nicht mehr.
+
+**4. Die nächste Abholung statt nur „Morgen".** Die schmale Zeile unter „Heute
+abholen" zählte nur den morgigen Tag; an einem leeren Morgen stand da nichts,
+obwohl am Mittwoch vier Kunden kommen. Jetzt fragt `naechsteAbholungWhere` die
+früheste offene Bestellung nach dem Wiener Heute, zählt den Tag über
+`abholWhere` (dieselbe Bedingung wie „Heute abholen") und nennt ihn nach
+`abholtagName`: „Morgen" · bis fünf Tage voraus der Wochentag („Donnerstag") ·
+ab sechs Tagen mit Datum („Montag, 5. Oktober") — sechs Tage voraus wäre der
+bloße Wochentag zweideutig. Gibt es keinen solchen Tag, entfällt die Zeile.
+Link weiterhin auf `/orders`.
+
+**5. Das Menü unten gehört der Person.** Im Mehr-Blatt am Handy stand die
+Hofkarte; seit „Mein Hof" in der Leiste ist, war das ein zweiter Hof-Auftritt.
+Jetzt steht dort — und im Browser am Kopf des unteren Blocks (Einstellungen,
+Hilfe, Abmelden) — die Person: Initialen auf Sandplakette und der Name,
+Beschriftung „Angemeldet". Initialen genügen (Entscheidung des Menschen), ein
+Personenfoto gibt es nicht. Die Hofkarte bleibt am Kopf der Seitenleiste; der
+Nutzername darunter ist weg, er steht jetzt unten.
+
+**6. Erste Schritte aus- und einblenden, gemerkt im Cookie.** Die Karte hat
+oben „Ausblenden". Das setzt über eine Server Action den Cookie
+`fz-erste-schritte-aus=<farmId>` (ein Jahr, `SameSite=Lax`, `httpOnly`,
+`secure` außerhalb der lokalen Entwicklung). Die Dashboard-Seite liest ihn auf
+dem Server (`cookies()`) und entscheidet über die reine Funktion
+`ersteSchritteAnzeige`: Karte, oder unten auf Heute die Zeile „Erste Schritte
+einblenden", oder nichts, wenn alles erledigt ist — die Zeile würde sonst eine
+leere Karte zurückholen. Cookie statt localStorage, weil der Server die Seite
+so gleich richtig rendert: kein Aufblitzen, kein Nachrutschen. Der Wert ist die
+Hof-ID, damit ein anderer Hof im selben Browser die Karte weiter sieht;
+melden sich zwei Höfe am selben Gerät abwechselnd an, gewinnt der zuletzt
+gesetzte. Keine Spalte in der Datenbank: Die Karte misst echten Zustand, das
+Wegklicken ist eine Gerätevorliebe.
+
+**7. Browser-Prüfung.** agent-browser wurde nicht installiert: Ohne
+`.env.local` und Datenbank startet die App in der Agenten-Umgebung nicht, und
+die PR-Preview ist geschützt. Die Prüfung läuft nach Checkliste im PR auf der
+Preview.
+
+**Offen:**
+- Die Pause-Seite sollte später „Bestellungen pausieren" heißen und nicht mit
+  „Shop" arbeiten (Entscheidung 2: jetzt lassen, später umbenennen).
+- Der Shop-Link-Balken oben (Layout) bietet weiter Kopieren und Teilen an, und
+  die Hofkarte in der Seitenleiste führt mit „Hofseite ansehen" nach
+  `/farm-page` — beides kann jetzt der Kopf von Mein Hof. Doppelt, seit #137.
+- `pnpm lint` ist auf `main` rot (27 Fehler, vor allem
+  `react-hooks/set-state-in-effect` in älteren Client-Komponenten); die CI
+  läuft lint mit `continue-on-error`. Keine dieser Dateien wurde hier angefasst.
+
+---
+
 ## Nützliche Befehle
 
 ```bash
@@ -2461,4 +2539,4 @@ pnpm briefkasten export   # Briefkasten als Markdown (nur lesend; Leseroute oder
 
 ---
 
-*Zuletzt aktualisiert: 2026-09-24 — Stand nach Testfundament 1 (Integrationstests gegen echtes Postgres)*
+*Zuletzt aktualisiert: 2026-09-29 — Stand nach dem Nachschliff der Bauern-Navigation (Hilfe und Rückmeldung, nächste Abholung, Erste Schritte per Cookie)*

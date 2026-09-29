@@ -9,6 +9,8 @@
  *  - „Mein Hof" ist auf Produkte, Hofseite und Beiträge aktiv; die Reiter
  *    darunter kennen ihre Seite.
  *  - Aktiv ist der längste passende Punkt; „Mehr" für alles, was im Blatt liegt.
+ *  - „Hilfe und Rückmeldung" ist EIN Punkt nach /meldungen, aktiv auch auf
+ *    /fehler-melden; die Seite trägt den Titel und den Knopf „Fehler melden".
  *  - „Admin" nur für den Betreiber.
  *  - Jede Seite unter src/app/(farmer) ist über die Navigation erreichbar.
  *  - Der Kopf von Mein Hof sitzt über genau den drei Seiten, mit ihrem Reiter.
@@ -69,8 +71,13 @@ describe('Reihenfolge', () => {
     ])
   })
 
-  it('Unten: Einstellungen, Fehler melden, Meine Meldungen, Admin', () => {
-    expect(UNTEN.map((p) => p.label)).toEqual(['Einstellungen', 'Fehler melden', 'Meine Meldungen', 'Admin'])
+  it('Unten: Einstellungen, Hilfe und Rückmeldung, Admin — kein zweiter Eintrag fürs Melden', () => {
+    expect(UNTEN.map((p) => [p.label, p.href])).toEqual([
+      ['Einstellungen', '/settings'],
+      ['Hilfe und Rückmeldung', '/meldungen'],
+      ['Admin', '/admin'],
+    ])
+    expect(UNTEN.map((p) => p.href)).not.toContain('/fehler-melden')
   })
 
   it('das Mehr-Blatt kennt weder Hofseite noch Beiträge', () => {
@@ -120,6 +127,23 @@ describe('Mein Hof', () => {
   })
 })
 
+describe('Hilfe und Rückmeldung', () => {
+  const hilfe = UNTEN.find((p) => p.id === 'hilfe')!
+
+  it('leuchtet auf /meldungen und auf /fehler-melden', () => {
+    expect(aktiverPunkt('/meldungen')).toBe('hilfe')
+    expect(aktiverPunkt('/fehler-melden')).toBe('hilfe')
+    expect(ariaAktuell('/meldungen', hilfe)).toBe('page')
+    expect(ariaAktuell('/fehler-melden', hilfe)).toBe('true')
+  })
+
+  it('die Seite heißt so und trägt den Knopf „Fehler melden" nach /fehler-melden', () => {
+    const seite = quelle('src/app/(farmer)/meldungen/page.tsx')
+    expect(seite).toContain('title="Hilfe und Rückmeldung"')
+    expect(seite).toMatch(/href="\/fehler-melden"[\s\S]{0,400}Fehler melden/)
+  })
+})
+
 describe('aria-current', () => {
   const meinHof = HAUPT.find((p) => p.id === 'mein-hof')!
   const bestellungen = HAUPT.find((p) => p.id === 'bestellungen')!
@@ -142,8 +166,8 @@ describe('Admin nur für Admins', () => {
   it('ohne Betreiberrechte fehlt Admin, sonst ist alles gleich', () => {
     const bauer = fuerNutzer({ isAdmin: false })
     const betreiber = fuerNutzer({ isAdmin: true })
-    expect(bauer.unten.map((p) => p.id)).toEqual(['einstellungen', 'fehler-melden', 'meldungen'])
-    expect(betreiber.unten.map((p) => p.id)).toEqual(['einstellungen', 'fehler-melden', 'meldungen', 'admin'])
+    expect(bauer.unten.map((p) => p.id)).toEqual(['einstellungen', 'hilfe'])
+    expect(betreiber.unten.map((p) => p.id)).toEqual(['einstellungen', 'hilfe', 'admin'])
     expect(bauer.haupt).toEqual(betreiber.haupt)
     expect(bauer.verkaufUndKunden).toEqual(betreiber.verkaufUndKunden)
     expect(bauer.neu).toEqual(betreiber.neu)
@@ -169,8 +193,8 @@ describe('aktive Pfade', () => {
     ['/sales', 'verkaeufe'],
     ['/analytics/umfeld', 'auswertung'],
     ['/settings/pickup-slots', 'einstellungen'],
-    ['/fehler-melden', 'fehler-melden'],
-    ['/meldungen', 'meldungen'],
+    ['/fehler-melden', 'hilfe'],
+    ['/meldungen', 'hilfe'],
     ['/admin/meldungen', 'admin'],
   ])('%s → %s', (pfad, id) => {
     expect(aktiverPunkt(pfad)).toBe(id)

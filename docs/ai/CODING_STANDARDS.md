@@ -59,7 +59,7 @@ Bei **jeder** Codeänderung lesen.
 - Der Tag und die Woche eines Hofs sind **Wiener** Tag und Woche, nie Serverzeit (Vercel rechnet in UTC — um 0:30 Uhr stünde der Hof sonst im Gestern).
 - Werkzeuge: `wienKalendertag`, `tagVersetzt`, `wienWochenMontag`, `wienWochenbeginn` (`src/lib/kalender.ts`), `wienerMitternacht` (`src/lib/servicegebuehr.ts`), `abholtage` und `wochenfenster` (`src/lib/heute.ts`).
 - Verboten für neue Abfragen: `setHours(0, 0, 0, 0)`, `getHours()`, `startOfWeek` aus `date-fns` auf einem Serverzeitpunkt, `toLocaleDateString` ohne `timeZone: 'Europe/Vienna'`.
-- Bestellungen eines Abholtags: `abholWhere(farmId, tag)` — dieselbe Bedingung für „Heute abholen" und die Packliste.
+- Bestellungen eines Abholtags: `abholWhere(farmId, tag)` — dieselbe Bedingung für „Heute abholen", die nächste Abholung und die Packliste. Wie ein künftiger Tag heißt („Morgen", Wochentag, Wochentag mit Datum), sagt `abholtagName` — nie ein eigenes Datumsformat daneben.
 
 ### Serialisierung an Client-Komponenten
 - `Decimal` und `Date` nicht roh übergeben.

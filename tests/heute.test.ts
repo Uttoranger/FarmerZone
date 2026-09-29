@@ -9,6 +9,8 @@
  *    stornierte und nicht abgeholte Bestellungen.
  *  - Woche ab Montag 0 Uhr Wien, auch über die Zeitumstellung; die Vorwoche
  *    zählt bis zum selben Wochentag und zur selben Uhrzeit.
+ *  - Die nächste Abholung heißt „Morgen", bis fünf Tage voraus nach dem
+ *    Wochentag, weiter weg mit Datum — an leeren Tagen gibt es keine Zeile.
  *  - Braucht dich: jede Art mit ihrem Ziel, leer bleibt leer.
  *  - Wochenvergleich in Cent, ohne Vorwochenumsatz kein Prozent.
  */
@@ -19,12 +21,15 @@ import {
   ABHOLUNG_ERLEDIGT,
   abholChip,
   abholtage,
+  abholtagName,
   abholWhere,
   abholZeilen,
   begruessung,
   brauchtDich,
   datumLang,
   kurzname,
+  naechsteAbholungText,
+  naechsteAbholungWhere,
   positionenKurz,
   ueberfaelligWhere,
   vergleichText,
@@ -87,6 +92,41 @@ describe('abholWhere — eine Bedingung für Heute und Packliste', () => {
     })
     // Die Abholung vom 28. ist um 0:30 Uhr am 29. vorbei.
     expect(abholtag('2026-09-28') < new Date('2026-09-28T22:00:00.000Z')).toBe(true)
+  })
+})
+
+describe('nächste Abholung', () => {
+  it('fragt alles nach dem Wiener Heute, mit denselben erledigten Status wie abholWhere', () => {
+    const jetzt = new Date('2026-09-28T22:30:00Z') // Dienstag, 29.9., 0:30 Wien
+    const where = naechsteAbholungWhere('hof-1', jetzt)
+    expect(where.farmId).toBe('hof-1')
+    expect(where.pickupDate).toEqual({ gt: abholtage(jetzt).heute.bis })
+    expect(where.status).toEqual({ notIn: [...ABHOLUNG_ERLEDIGT] })
+    // Die heutige Abholung gehört nicht dazu, die von morgen schon.
+    expect(abholtag('2026-09-29') > abholtage(jetzt).heute.bis).toBe(false)
+    expect(abholtag('2026-09-30') > abholtage(jetzt).heute.bis).toBe(true)
+  })
+
+  it('abholtagName: Morgen, dann der Wochentag, ab sechs Tagen mit Datum', () => {
+    const heute = '2026-09-29' // Dienstag
+    expect(abholtagName(heute, '2026-09-30')).toBe('Morgen')
+    expect(abholtagName(heute, '2026-10-01')).toBe('Donnerstag')
+    expect(abholtagName(heute, '2026-10-04')).toBe('Sonntag') // +5
+    // +6 wäre „Montag" — zweideutig mit dem Montag in einer Woche, also mit Datum.
+    expect(abholtagName(heute, '2026-10-05')).toBe('Montag, 5. Oktober')
+    expect(abholtagName(heute, '2026-10-14')).toBe('Mittwoch, 14. Oktober')
+    expect(abholtagName('2026-12-30', '2027-01-08')).toBe('Freitag, 8. Jänner')
+  })
+
+  it('der Name folgt dem Wiener Tag, nicht dem UTC-Tag', () => {
+    // 0:30 Wien am 29.9. ist in UTC noch der 28.9. — „Morgen" ist der 30.9.
+    const heute = tagVersetzt('2026-09-28', 1)
+    expect(abholtagName(heute, '2026-09-30')).toBe('Morgen')
+  })
+
+  it('Zeile: Einzahl und Mehrzahl', () => {
+    expect(naechsteAbholungText({ tag: '2026-09-30', name: 'Morgen', anzahl: 1 })).toBe('Morgen: 1 Bestellung')
+    expect(naechsteAbholungText({ tag: '2026-10-01', name: 'Donnerstag', anzahl: 4 })).toBe('Donnerstag: 4 Bestellungen')
   })
 })
 
@@ -347,11 +387,14 @@ describe('Kopf in Wiener Zeit', () => {
 describe('an den Seiten — Heute und Packliste teilen die Abfrage', () => {
   const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 
-  it('„Heute abholen" und „Morgen" fragen über abholWhere mit dem Wiener Tag', () => {
+  it('„Heute abholen" und die nächste Abholung fragen über abholWhere mit dem Wiener Tag', () => {
     const abfrage = quelle('src/server/queries/heute.ts')
     expect(abfrage).toContain('where: abholWhere(farmId, heute)')
-    expect(abfrage).toContain('where: abholWhere(farmId, morgen)')
+    expect(abfrage).toContain('where: naechsteAbholungWhere(farmId, jetzt)')
+    // Die Anzahl des nächsten Tags zählt über dieselbe Bedingung wie „Heute abholen".
+    expect(abfrage).toContain('where: abholWhere(farmId, wienerTag(tag))')
     expect(abfrage).toContain('ueberfaelligWhere(farmId, jetzt)')
+    expect(abfrage).not.toContain('morgen')
   })
 
   it('die Packliste nimmt dieselbe Bedingung, keine eigene Tagesgrenze mehr', () => {
@@ -369,7 +412,10 @@ describe('an den Seiten — Heute und Packliste teilen die Abfrage', () => {
     expect(seite).not.toContain('Kunden gesamt')
     expect(seite).not.toContain('wa.me')
     expect(seite).toContain('Alles erledigt.')
-    expect(seite).toContain('{morgenAnzahl > 0 && (')
+    // Die Zeile unter „Heute abholen" entfällt ohne nächsten Abholtag und führt nach /orders.
+    expect(seite).toContain('{naechsteAbholung && (')
+    expect(seite).toMatch(/\{naechsteAbholung && \(\s*<Link\s+href="\/orders"/)
+    expect(seite).not.toContain('Morgen:')
     expect(seite).toContain('href="/orders/today/print"')
     expect(seite).not.toContain('getHours()')
   })

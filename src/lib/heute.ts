@@ -33,10 +33,9 @@ export function wienerTag(kalendertag: string): Zeitraum {
 }
 
 /**
- * Heute und morgen in Wien — die Grundlage für „Heute abholen", die
- * Packliste und „Morgen: n Bestellungen". pickupDate steht um 12:00 des
- * Abholtags (Serverzeit, siehe kalender.ts wienKalendertag) und fällt damit
- * sicher in den Wiener Tag.
+ * Heute und morgen in Wien — die Grundlage für „Heute abholen" und die
+ * Packliste. pickupDate steht um 12:00 des Abholtags (Serverzeit, siehe
+ * kalender.ts wienKalendertag) und fällt damit sicher in den Wiener Tag.
  */
 export function abholtage(jetzt: Date): { heute: Zeitraum; morgen: Zeitraum } {
   const heute = wienKalendertag(jetzt)
@@ -44,7 +43,7 @@ export function abholtage(jetzt: Date): { heute: Zeitraum; morgen: Zeitraum } {
 }
 
 /**
- * Die EINE Bedingung für „Heute abholen", „Morgen: n Bestellungen" und die
+ * Die EINE Bedingung für „Heute abholen", die nächste Abholung und die
  * Packliste /orders/today/print — Bildschirm und Papier zeigen dieselben
  * Bestellungen. Abgeholte, stornierte und nicht abgeholte fallen weg.
  */
@@ -67,6 +66,59 @@ export function ueberfaelligWhere(farmId: string, jetzt: Date): Prisma.OrderWher
     pickupDate: { lt: abholtage(jetzt).heute.von },
     status: { notIn: [...ABHOLUNG_ERLEDIGT] },
   }
+}
+
+// ─── Nächste Abholung ───────────────────────────────────────────────────────
+
+/**
+ * Alles, was nach dem Wiener Heute abgeholt wird und noch offen ist — die
+ * früheste Bestellung davon nennt den nächsten Abholtag. Vorher zählte die
+ * Zeile nur „Morgen"; an einem leeren Morgen stand da nichts, obwohl am
+ * Mittwoch vier Kunden kommen.
+ */
+export function naechsteAbholungWhere(farmId: string, jetzt: Date): Prisma.OrderWhereInput {
+  return {
+    farmId,
+    pickupDate: { gt: abholtage(jetzt).heute.bis },
+    status: { notIn: [...ABHOLUNG_ERLEDIGT] },
+  }
+}
+
+const WOCHENTAG = new Intl.DateTimeFormat('de-AT', { timeZone: 'Europe/Vienna', weekday: 'long' })
+const WOCHENTAG_DATUM = new Intl.DateTimeFormat('de-AT', {
+  timeZone: 'Europe/Vienna',
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+})
+
+/**
+ * Wie die Zeile den nächsten Abholtag nennt, gesehen vom Wiener Heute:
+ * „Morgen" · innerhalb der nächsten Woche der Wochentag („Mittwoch") ·
+ * weiter weg der Wochentag mit Datum („Mittwoch, 14. Oktober"). Ab sechs
+ * Tagen wäre der bloße Wochentag zweideutig — „Montag" hieße sonst heute in
+ * einer Woche oder übermorgen.
+ */
+export function abholtagName(heuteKalendertag: string, abholKalendertag: string): string {
+  if (abholKalendertag === tagVersetzt(heuteKalendertag, 1)) return 'Morgen'
+  const zeitpunkt = mitternacht(abholKalendertag)
+  for (let tage = 2; tage <= 5; tage++) {
+    if (abholKalendertag === tagVersetzt(heuteKalendertag, tage)) return WOCHENTAG.format(zeitpunkt)
+  }
+  return WOCHENTAG_DATUM.format(zeitpunkt)
+}
+
+export type NaechsteAbholung = {
+  /** Der Kalendertag (JJJJ-MM-TT, Wien) — die Abfrage zählt damit die Bestellungen des Tags. */
+  tag: string
+  /** „Morgen", „Mittwoch" oder „Mittwoch, 14. Oktober". */
+  name: string
+  anzahl: number
+}
+
+/** Die schmale Zeile unter „Heute abholen": „Morgen: 3 Bestellungen". */
+export function naechsteAbholungText(a: NaechsteAbholung): string {
+  return `${a.name}: ${a.anzahl} ${a.anzahl === 1 ? 'Bestellung' : 'Bestellungen'}`
 }
 
 // ─── Heute abholen ──────────────────────────────────────────────────────────

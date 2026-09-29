@@ -1,15 +1,20 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { wienKalendertag } from '@/lib/kalender'
 import {
   UEBERFAELLIG_EINZELN,
   type AbholZeile,
   type BrauchtDichEintrag,
+  type NaechsteAbholung,
   type Wochenvergleich,
   abholtage,
+  abholtagName,
   abholWhere,
   abholZeilen,
   brauchtDich,
+  naechsteAbholungWhere,
   ueberfaelligWhere,
+  wienerTag,
   wochenfenster,
   wochenvergleich,
 } from '@/lib/heute'
@@ -43,8 +48,8 @@ async function umsatzCent(farmId: string, zeitraum: { von: Date; bis: Date }): P
 
 export type Heute = {
   abholungen: AbholZeile[]
-  /** Bestellungen für morgen — nur für die schmale Zeile „Morgen: n Bestellungen". */
-  morgenAnzahl: number
+  /** Der nächste Abholtag nach heute mit offenen Bestellungen; null = keiner in Sicht (die Zeile entfällt). */
+  naechsteAbholung: NaechsteAbholung | null
   brauchtDich: BrauchtDichEintrag[]
   woche: Wochenvergleich
   ersteSchritte: ErsteSchritteErgebnis
@@ -52,12 +57,12 @@ export type Heute = {
 }
 
 export async function getHeute(farmId: string, jetzt: Date = new Date()): Promise<Heute> {
-  const { heute, morgen } = abholtage(jetzt)
+  const { heute } = abholtage(jetzt)
   const { dieseWoche, vorwoche } = wochenfenster(jetzt)
 
   const [
     heutige,
-    morgenAnzahl,
+    naechste,
     ueberfaelligAnzahl,
     ueberfaelligJuengste,
     ausverkauft,
@@ -81,7 +86,11 @@ export async function getHeute(farmId: string, jetzt: Date = new Date()): Promis
         items: { select: { productName: true, quantity: true } },
       },
     }),
-    prisma.order.count({ where: abholWhere(farmId, morgen) }),
+    prisma.order.findFirst({
+      where: naechsteAbholungWhere(farmId, jetzt),
+      orderBy: { pickupDate: 'asc' },
+      select: { pickupDate: true },
+    }),
     prisma.order.count({ where: ueberfaelligWhere(farmId, jetzt) }),
     prisma.order.findMany({
       where: ueberfaelligWhere(farmId, jetzt),
@@ -126,9 +135,18 @@ export async function getHeute(farmId: string, jetzt: Date = new Date()): Promis
     prisma.pickupSlot.count({ where: { farmId, isActive: true } }),
   ])
 
+  // Erst der Tag, dann seine Bestellungen — über dieselbe Bedingung wie
+  // „Heute abholen", damit Zeile und Bestellliste dieselben Bestellungen zählen.
+  let naechsteAbholung: NaechsteAbholung | null = null
+  if (naechste) {
+    const tag = wienKalendertag(naechste.pickupDate)
+    const anzahl = await prisma.order.count({ where: abholWhere(farmId, wienerTag(tag)) })
+    naechsteAbholung = { tag, name: abholtagName(wienKalendertag(jetzt), tag), anzahl }
+  }
+
   return {
     abholungen: abholZeilen(heutige),
-    morgenAnzahl,
+    naechsteAbholung,
     brauchtDich: brauchtDich({
       ueberfaellig: { anzahl: ueberfaelligAnzahl, juengste: ueberfaelligJuengste },
       ausverkauft,

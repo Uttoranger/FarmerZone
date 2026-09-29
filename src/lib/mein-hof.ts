@@ -29,21 +29,32 @@ export function titelbildFoto(hof: { bannerType: string; bannerUrl: string | nul
   return hof.bannerType === 'PHOTO' && hof.bannerUrl ? hof.bannerUrl : null
 }
 
-export type HofZustandArt = 'sichtbar' | 'pausiert' | 'wartet' | 'aus'
+export type HofZustandArt = 'sichtbar' | 'pausiert' | 'wartet' | 'aus' | 'stillgelegt'
+
+/** Farbe des Schilds — Bedeutungsfarben, die Komponente ordnet Klassen zu. */
+export type SchildFarbe = 'gruen' | 'bernstein' | 'grau'
 
 export type HofZustand = {
   art: HofZustandArt
-  text: string
-  /** Die Hofseite ist öffentlich erreichbar — nur dann gibt es Kundenansicht und Teilen. */
+  /**
+   * Das Schild im Kopf. null bei einem stillgelegten Hof: Den Zustand sagt
+   * der Balken über jeder Seite, ein zweites Schild darunter wäre Nachhall.
+   */
+  schild: { text: string; farbe: SchildFarbe } | null
+  /** Die Hofseite ist öffentlich erreichbar — nur dann gibt es Link, Kopieren, Kundenansicht und Teilen. */
   oeffentlich: boolean
 }
 
+const NOCH_NICHT_FREIGEGEBEN = { text: 'Noch nicht freigegeben', farbe: 'grau' } as const
+
 /**
  * Der Zustand des Hofs in einem Wort. Reihenfolge nach farm-approval.ts:
- * stillgelegt → nicht freigeschaltet → pausiert; „Nicht öffentlich"
- * (isActive false) steht nach „Stillgelegt", weil das dem Hof mehr sagt.
+ * stillgelegt → nicht öffentlich → nicht freigeschaltet → pausiert.
  * Ein pausierter Hof bleibt öffentlich (mit Hinweis), die anderen nicht —
- * einen Link zu teilen, der ins Leere führt, wäre irreführend.
+ * einen Link zu teilen, der ins Leere führt, wäre irreführend. Nicht
+ * öffentlich (isActive false, wird heute nirgends gesetzt) und „wartet"
+ * tragen dasselbe graue Schild: Für den Hof heißt beides, dass Kundinnen die
+ * Seite noch nicht sehen.
  */
 export function hofZustand(hof: {
   isActive: boolean
@@ -51,9 +62,26 @@ export function hofZustand(hof: {
   approvedAt: Date | null
   archivedAt: Date | null
 }): HofZustand {
-  if (hof.archivedAt) return { art: 'aus', text: 'Stillgelegt', oeffentlich: false }
-  if (!hof.isActive) return { art: 'aus', text: 'Nicht öffentlich', oeffentlich: false }
-  if (!hof.approvedAt) return { art: 'wartet', text: 'Wartet auf Freischaltung', oeffentlich: false }
-  if (hof.isPaused) return { art: 'pausiert', text: 'Pausiert', oeffentlich: true }
-  return { art: 'sichtbar', text: 'Im Shop sichtbar', oeffentlich: true }
+  if (hof.archivedAt) return { art: 'stillgelegt', schild: null, oeffentlich: false }
+  if (!hof.isActive) return { art: 'aus', schild: NOCH_NICHT_FREIGEGEBEN, oeffentlich: false }
+  if (!hof.approvedAt) return { art: 'wartet', schild: NOCH_NICHT_FREIGEGEBEN, oeffentlich: false }
+  if (hof.isPaused) return { art: 'pausiert', schild: { text: 'Pausiert', farbe: 'bernstein' }, oeffentlich: true }
+  return { art: 'sichtbar', schild: { text: 'Öffentlich', farbe: 'gruen' }, oeffentlich: true }
+}
+
+/**
+ * Die Adresse der Hofseite, wie der Kopf sie zeigt: Host und Slug, ohne
+ * Protokoll („farmerzone.at/muellerhof"). Ein Bauer liest eine Adresse, kein
+ * „https://". Die vollständige Adresse (zum Öffnen und Kopieren) bleibt
+ * daneben; ein ungültiger appUrl fällt auf den rohen Wert zurück.
+ */
+export function hofAdresse(appUrl: string, slug: string): { anzeige: string; url: string } {
+  const url = `${appUrl.replace(/\/+$/, '')}/${slug}`
+  let host = appUrl
+  try {
+    host = new URL(appUrl).host
+  } catch {
+    // Kein gültiger Ursprung (z. B. leer) — dann steht die Adresse eben roh da.
+  }
+  return { anzeige: `${host}/${slug}`, url }
 }
