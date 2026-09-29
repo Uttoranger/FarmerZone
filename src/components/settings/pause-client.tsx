@@ -27,7 +27,7 @@ export function PauseClient({
         toast.error(res.error)
       } else {
         setIsPaused(newPaused)
-        toast.success(newPaused ? 'Shop pausiert' : 'Shop wieder aktiv')
+        toast.success(newPaused ? 'Bestellungen pausiert' : 'Du nimmst wieder Bestellungen an')
       }
     })
   }
@@ -56,11 +56,11 @@ export function PauseClient({
             )}
             <div>
               <p className={`font-semibold ${isPaused ? 'text-amber-800 dark:text-amber-200' : 'text-green-800 dark:text-green-200'}`}>
-                {isPaused ? 'Shop ist pausiert' : 'Shop ist aktiv'}
+                {isPaused ? 'Bestellungen sind pausiert' : 'Du nimmst Bestellungen an'}
               </p>
               <p className="text-sm text-muted-foreground">
                 {isPaused
-                  ? 'Kunden sehen eine Pause-Meldung statt deiner Produkte.'
+                  ? 'Deine Hofseite bleibt sichtbar, mit deiner Nachricht. Bestellen kann gerade niemand.'
                   : 'Kunden können Produkte sehen und bestellen.'}
               </p>
             </div>
@@ -77,9 +77,9 @@ export function PauseClient({
             {isPending ? (
               <Loader2 className="size-4 animate-spin" />
             ) : isPaused ? (
-              'Shop aktivieren'
+              'Bestellungen annehmen'
             ) : (
-              'Shop pausieren'
+              'Bestellungen pausieren'
             )}
           </Button>
         </div>
@@ -91,7 +91,7 @@ export function PauseClient({
           Nachricht für Kunden (optional)
         </Label>
         <p className="text-xs text-muted-foreground">
-          Wird angezeigt, wenn der Shop pausiert ist — z.B. "Ich bin im Urlaub vom 1.–14. Juli."
+          Steht auf deiner Hofseite, solange Bestellungen pausiert sind — z. B. „Ich bin im Urlaub vom 1.–14. Juli.“
         </p>
         <Textarea
           id="pauseMessage"

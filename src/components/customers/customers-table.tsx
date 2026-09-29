@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { Bell, Phone, ChevronUp, ChevronDown } from 'lucide-react'
 import type { CustomerSummary, CustomerStatus } from '@/server/queries/customers'
+import { formatEuro } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 type ColSort = 'name' | 'orders' | 'spent' | 'last'
@@ -30,9 +31,6 @@ function statusBadgeClass(status: CustomerStatus): string {
   }
 }
 
-function formatEuro(n: number): string {
-  return `€ ${n.toFixed(2).replace('.', ',')}`
-}
 
 function SortIcon({ col, activeCol, dir }: { col: ColSort; activeCol: ColSort; dir: SortDir }) {
   if (col !== activeCol) return <ChevronDown className="size-3 text-muted-foreground/40 ml-0.5 inline" />
@@ -113,7 +111,7 @@ export function CustomersTable({ customers }: { customers: CustomerSummary[] }) 
               key={c.customerEmail}
               className="hover:bg-muted/40 transition-colors cursor-pointer"
               onClick={() => {
-                window.location.href = `/customers/${encodeURIComponent(c.customerEmail)}`
+                window.location.href = `/customers/${c.kundeId}`
               }}
             >
               {/* Avatar */}

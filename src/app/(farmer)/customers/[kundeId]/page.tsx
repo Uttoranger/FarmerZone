@@ -1,20 +1,18 @@
-import { notFound, redirect } from 'next/navigation'
+import { notFound, permanentRedirect, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { headers } from 'next/headers'
 import { Bell, Phone, Mail, MessageCircle } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
-import { getCustomerDetail } from '@/server/queries/customers'
+import { findeKundenEmail, getCustomerDetail, kundeIdFuer } from '@/server/queries/customers'
 import type { CustomerStatus } from '@/server/queries/customers'
 import { statusLabel, statusColor } from '@/components/orders/order-status'
 import { toWaPhone } from '@/lib/whatsapp'
+import { formatEuro } from '@/lib/format'
+import { KUNDE_ID_MUSTER, alteKundenAdresse } from '@/lib/kunden-id'
 import { cn } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
-
-function formatEuro(n: number) {
-  return `€ ${n.toFixed(2).replace('.', ',')}`
-}
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/)
@@ -39,7 +37,7 @@ function customerBadgeClass(status: CustomerStatus): string {
 }
 
 interface Props {
-  params: Promise<{ customerEmail: string }>
+  params: Promise<{ kundeId: string }>
 }
 
 export default async function CustomerDetailPage({ params }: Props) {
@@ -49,10 +47,19 @@ export default async function CustomerDetailPage({ params }: Props) {
   const farm = await getFarmForUser(session.user.id)
   if (!farm) redirect('/login')
 
-  const { customerEmail } = await params
-  const decodedEmail = decodeURIComponent(customerEmail)
+  const { kundeId } = await params
 
-  const customer = await getCustomerDetail(farm.id, decodedEmail)
+  // Alte Adresse mit der E-Mail im Pfad (Lesezeichen, Verlauf): dauerhaft
+  // (308) auf die Kennung umleiten, damit die E-Mail nicht weiter in
+  // Protokollen und Statistik landet.
+  const alteEmail = alteKundenAdresse(kundeId)
+  if (alteEmail) permanentRedirect(`/customers/${kundeIdFuer(farm.id, alteEmail)}`)
+  if (!KUNDE_ID_MUSTER.test(kundeId)) notFound()
+
+  const email = await findeKundenEmail(farm.id, kundeId)
+  if (!email) notFound()
+
+  const customer = await getCustomerDetail(farm.id, email)
   if (!customer) notFound()
 
   const firstOrderFormatted = new Date(customer.firstOrderDate).toLocaleDateString('de-AT', {

@@ -12,16 +12,19 @@ import {
   GEBUEHR_ERSTATTUNG_OFFEN_HINWEIS,
   barZuKassierenCents,
   bestellSummen,
+  centsAlsEuro,
   gebuehrEntfallen,
   gebuehrErstattungOffen,
 } from '@/lib/servicegebuehr'
+import { formatEuro } from '@/lib/format'
 
 /** Aus diesen Status darf der Hof „nicht abgeholt" setzen (actions/orders.ts). */
 export const NICHT_ABGEHOLT_STATUS: readonly string[] = ['PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY']
 
-// Schreibweise wie der übrige Bauern-Bereich („€ 20.98")
+// Über format.ts wie der übrige Bauern-Bereich („€ 20,98") — vorher stand
+// hier und auf der Bestellseite „€ 20.98" mit Punkt.
 function euro(cents: number): string {
-  return `€ ${(cents / 100).toFixed(2)}`
+  return formatEuro(centsAlsEuro(cents))
 }
 
 type BetragOrder = {

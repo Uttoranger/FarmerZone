@@ -9,7 +9,6 @@ import { zaehleZuEntscheiden } from '@/server/queries/meldung'
 import { FarmerNav } from '@/components/farmer/farmer-nav'
 import { ServiceWorkerAnmeldung } from '@/components/shared/service-worker-anmeldung'
 import { SentryNutzer } from '@/components/farmer/sentry-nutzer'
-import { ShopLinkBanner } from '@/components/farmer/shop-link-banner'
 import { ArchivedFarmBanner } from '@/components/farmer/archived-farm-banner'
 import { PendingApprovalBanner } from '@/components/farmer/pending-approval-banner'
 import { alsLand } from '@/lib/laender'
@@ -65,8 +64,9 @@ export default async function FarmerLayout({ children }: { children: React.React
             Viewport wachsen — sonst greift kein overflow-x-auto der Kinder */}
         <main className="flex-1 min-w-0 pb-24 md:pb-0 md:ml-56 print:ml-0 print:pb-0">
           {/* Reihenfolge wie bei der Server-Prüfung: stillgelegt sticht
-              „wartet auf Freigabe", beide ersetzen den Shop-Link-Banner —
-              einen Shop-Link zu teilen, der ins Leere führt, wäre irreführend. */}
+              „wartet auf Freigabe". Einen Balken mit dem Shop-Link gibt es
+              nicht mehr: Adresse, Kopieren und Teilen stehen im Kopf von
+              Mein Hof — über jeder Seite nahm er nur Platz weg. */}
           {isArchived ? (
             <ArchivedFarmBanner />
           ) : isPending ? (
@@ -75,9 +75,7 @@ export default async function FarmerLayout({ children }: { children: React.React
               farmName={bannerState.name}
               land={alsLand(bannerState.country)}
             />
-          ) : (
-            <ShopLinkBanner farmSlug={farm.slug} />
-          )}
+          ) : null}
           {children}
         </main>
       </div>

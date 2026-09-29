@@ -1,4 +1,27 @@
 import { prisma } from '@/lib/prisma'
+import { env } from '@/lib/env'
+import { kundeIdAus } from '@/lib/kunden-id'
+
+/** Die Kennung einer Kundin dieses Hofs für die Adresse /customers/<kundeId>. */
+export function kundeIdFuer(farmId: string, email: string): string {
+  return kundeIdAus(env.BETTER_AUTH_SECRET, farmId, email)
+}
+
+/**
+ * Die E-Mail der Kundin zu einer Kennung — nur unter den Kundinnen des
+ * eigenen Hofs gesucht (Besitz steckt in der WHERE-Klausel). Eine Kennung
+ * lässt sich nicht zurückrechnen, also rechnen wir alle Kennungen des Hofs
+ * vorwärts; für einen Hof sind das einige hundert Adressen.
+ */
+export async function findeKundenEmail(farmId: string, kundeId: string): Promise<string | null> {
+  const zeilen = await prisma.order.findMany({
+    where: { farmId },
+    select: { customerEmail: true },
+    distinct: ['customerEmail'],
+  })
+  const treffer = zeilen.find((z) => kundeIdFuer(farmId, z.customerEmail) === kundeId)
+  return treffer?.customerEmail ?? null
+}
 
 export type CustomerStatus =
   | 'Stammkunde'
@@ -8,6 +31,8 @@ export type CustomerStatus =
   | null
 
 export interface CustomerSummary {
+  /** Für den Link auf die Kundenseite — nie die E-Mail in eine Adresse. */
+  kundeId: string
   customerEmail: string
   customerName: string
   customerPhone: string
@@ -142,6 +167,7 @@ export async function getCustomersForFarm(farmId: string): Promise<CustomerSumma
     const status = computeStatus(orderCount, daysSinceLastOrder, firstOrderDaysAgo)
 
     result.push({
+      kundeId: kundeIdFuer(farmId, emailKey),
       customerEmail: lastOrder.customerEmail,
       customerName: lastOrder.customerName,
       customerPhone: lastOrder.customerPhone,
@@ -253,6 +279,7 @@ export async function getCustomerDetail(
   const status = computeStatus(orderCount, daysSinceLastOrder, firstOrderDaysAgo)
 
   return {
+    kundeId: kundeIdFuer(farmId, customerEmail),
     customerEmail: lastOrder.customerEmail,
     customerName: lastOrder.customerName,
     customerPhone: lastOrder.customerPhone,

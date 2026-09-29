@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label'
 import { setStock, updateStock } from '@/server/actions/products'
 import type { ProductData } from '@/server/queries/products'
 import { UNIT_LABELS } from '@/schemas/product'
+import { bestandNach } from '@/lib/produkt-zeile'
 
 type Props = {
   product: ProductData | null
@@ -38,17 +39,19 @@ export function StockDialog({ product, currentStock, onClose, onOptimisticUpdate
 
   function handleQuickAdjust(delta: number) {
     if (!product) return
-    const newStock = Math.max(0, currentStock + delta)
-    onOptimisticUpdate(product.id, newStock)
+    const newStock = bestandNach(currentStock, delta)
 
+    // Der vorgezogene Bestand ist ein useOptimistic-Wert der Liste: Er muss
+    // INNERHALB der Transition gesetzt werden und fällt bei einem Fehler von
+    // selbst auf den Serverstand zurück — kein Zurücksetzen von Hand.
     startTransition(async () => {
+      onOptimisticUpdate(product.id, newStock)
       try {
         await updateStock(product.id, delta)
         toast.success(`Bestand: ${newStock} ${UNIT_LABELS[product.unit] ?? product.unit}`)
         onClose()
       } catch {
-        onOptimisticUpdate(product.id, currentStock)
-        toast.error('Fehler beim Speichern')
+        toast.error('Wir konnten den Bestand nicht speichern. Bitte versuch es noch einmal.')
       }
     })
   }
@@ -61,17 +64,16 @@ export function StockDialog({ product, currentStock, onClose, onOptimisticUpdate
       return
     }
     const newStock = Math.max(0, parsed)
-    onOptimisticUpdate(product.id, newStock)
 
     startTransition(async () => {
+      onOptimisticUpdate(product.id, newStock)
       try {
         await setStock(product.id, newStock)
         toast.success(`Bestand: ${newStock} ${UNIT_LABELS[product.unit] ?? product.unit}`)
         setInputValue('')
         onClose()
       } catch {
-        onOptimisticUpdate(product.id, currentStock)
-        toast.error('Fehler beim Speichern')
+        toast.error('Wir konnten den Bestand nicht speichern. Bitte versuch es noch einmal.')
       }
     })
   }

@@ -13,6 +13,7 @@ import { publishStatusPost } from '@/server/actions/status-posts'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { formatEuro } from '@/lib/format'
 import { renderStatusBodyWithChip } from '@/lib/status-body'
 
 type Anlass = 'FRESH_PRODUCT' | 'NEW_SEASON' | 'PROMOTION' | 'ANNOUNCEMENT'
@@ -338,7 +339,7 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
                           : 'border-border text-muted-foreground hover:border-foreground/30',
                       )}
                     >
-                      {p.name} — € {p.price.toFixed(2).replace('.', ',')}
+                      {p.name} — {formatEuro(p.price)}
                     </button>
                   ))}
                 </div>
@@ -471,7 +472,7 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
                         key={p.id}
                         className="text-xs bg-muted rounded-full px-3 py-1 text-foreground"
                       >
-                        {p.name} — € {p.price.toFixed(2).replace('.', ',')}
+                        {p.name} — {formatEuro(p.price)}
                       </span>
                     ))}
                 </div>

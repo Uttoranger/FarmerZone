@@ -118,7 +118,9 @@ describe('fremdtext-lesen.mjs — die Fälle aus dem Auftrag', () => {
   })
 })
 
-describe('fremdtext-lesen.mjs — was darüber hinaus gesperrt ist', () => {
+// Eigenes Zeitlimit: Jeder Fall startet den Hook als Prozess, dazu ripgrep —
+// unter Last dauerte ein Block bis 7 s. Geprüft wird der Ausgang, nicht die Zeit.
+describe('fremdtext-lesen.mjs — was darüber hinaus gesperrt ist', { timeout: 30_000 }, () => {
   it('absolute Pfade außerhalb des Projekts, ~ und Links nach draußen', () => {
     expect(read('/etc/passwd').code).toBe(2)
     expect(read('~/.ssh/id_rsa').code).toBe(2)
@@ -154,7 +156,7 @@ describe('fremdtext-lesen.mjs — was darüber hinaus gesperrt ist', () => {
   })
 })
 
-describe('fremdtext-lesen.mjs — was erlaubt bleibt', () => {
+describe('fremdtext-lesen.mjs — was erlaubt bleibt', { timeout: 30_000 }, () => {
   it('Grep über das ganze Projekt ohne Glob — lässt gitignorierte Dateien aus', () => {
     expect(grep({ pattern: 'process\\.env\\.TRIAGE_TOKEN' }).code).toBe(0)
   })

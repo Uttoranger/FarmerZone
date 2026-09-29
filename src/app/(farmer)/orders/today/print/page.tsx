@@ -7,7 +7,8 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { PrintButton } from '@/components/orders/print-button'
 import { unitSuffix } from '@/lib/order-line'
-import { barZuKassierenCents, bestellSummen } from '@/lib/servicegebuehr'
+import { barZuKassierenCents, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
+import { formatEuro } from '@/lib/format'
 import { abholtage, abholWhere, datumLang } from '@/lib/heute'
 
 export const dynamic = 'force-dynamic'
@@ -22,18 +23,18 @@ function PacklistenBetrag({
   if (kassieren === null) {
     return (
       <span className="text-right text-sm font-semibold text-gray-800">
-        € {(summen.warenpreisCents / 100).toFixed(2)}
+        {formatEuro(centsAlsEuro(summen.warenpreisCents))}
       </span>
     )
   }
   return (
     <span className="text-right">
       <span className="block text-sm font-semibold text-gray-800">
-        Bar zu kassieren: € {(kassieren / 100).toFixed(2)}
+        Bar zu kassieren: {formatEuro(centsAlsEuro(kassieren))}
       </span>
       {summen.gebuehrCents > 0 && (
         <span className="block text-xs text-gray-500">
-          inkl. € {(summen.gebuehrCents / 100).toFixed(2)} Servicegebühr
+          inkl. {formatEuro(centsAlsEuro(summen.gebuehrCents))} Servicegebühr
         </span>
       )}
     </span>

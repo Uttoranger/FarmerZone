@@ -250,7 +250,10 @@ describe('/api/reserve bei aktivem Shop', () => {
 
 // ── Hof-Queries ─────────────────────────────────────────────────────────────
 
-describe('Öffentliche Hof-Query', () => {
+// Eigenes Zeitlimit: Der erste dynamische Import von queries/farm zieht einen
+// großen Modulgraphen durch den Transform — bei einer ausgelasteten Maschine
+// (parallele Sitzungen) dauerte er bis 9 s, gemessen wird hier aber nur das select.
+describe('Öffentliche Hof-Query', { timeout: 30_000 }, () => {
   it('liefert isPaused und pauseMessage mit — sonst könnte die Seite die Pause nicht zeigen', async () => {
     const { getPublicFarm } = await import('@/server/queries/farm')
     farmFindUnique.mockResolvedValue(null)

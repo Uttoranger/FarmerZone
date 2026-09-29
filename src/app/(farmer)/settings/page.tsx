@@ -35,7 +35,7 @@ const SECTIONS = [
     href: '/settings/pause',
     icon: PauseCircle,
     title: 'Pause / Urlaub',
-    description: 'Shop pausieren und Kunden informieren',
+    description: 'Bestellungen pausieren und Kunden informieren',
   },
   {
     href: '/settings/account',

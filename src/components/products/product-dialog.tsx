@@ -106,7 +106,6 @@ import {
   paketpreisAntworten,
   PAKETPREIS_FRAGE,
   preisFeldLabel,
-  vergleichsKilopreis,
 } from './produkt-preis'
 import {
   ABSCHNITT_TITEL,
@@ -389,7 +388,6 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
   const futterBereich = istFuttermittel(category)
   const grossgebinde = istGrossgebindeEinheit(werte.unit)
   const fehlerhafteAbschnitte = abschnitteMitFehlern(form.formState.errors)
-  const preisVorschau = kundenVorschau(werte.price, werte.unit, werte.unitSize)
   const preisFraglich = paketpreisFraglich({
     price: werte.price,
     unitSize: werte.unitSize,
@@ -410,10 +408,14 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
         ? null
         : formatBestand(werte.stock, werte.unit, werte.unitSize)
   const mwstVorschlag = mwstStandard(category)
-  const kilopreisVergleich =
-    werte.futter && !altesGebinde
-      ? vergleichsKilopreis(werte.price, werte.unit, werte.futter.nettoMenge, werte.futter.nettoEinheit)
-      : null
+  // Eine Zeile „Kunden sehen: … · € 0,15 / kg" — beim Futtermittel mit dem
+  // Kilopreis aus dem Gewicht je Gebinde (nicht beim Altfall mit Gebindegröße).
+  const preisVorschau = kundenVorschau(
+    werte.price,
+    werte.unit,
+    werte.unitSize,
+    werte.futter && !altesGebinde ? werte.futter : null
+  )
   // Nur ein Vorschlag, nie eine Wahl — und nur, solange keine Kategorie gewählt ist.
   const vorschlag = category == null ? kategorieVorschlag(werte.name) : null
   const fehlend = fehlendeAngaben(werte, schema)
@@ -1161,13 +1163,6 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                       {preisVorschau && (
                         <p className="text-xs text-muted-foreground -mt-1" aria-live="polite">
                           {preisVorschau}
-                        </p>
-                      )}
-                      {/* Nur für den Hof: Kunden sehen den Kilopreis eines
-                          Futtermittels erst mit Bereiche 2 — deshalb nicht „Kunden sehen". */}
-                      {kilopreisVergleich && (
-                        <p className="text-xs text-foreground" aria-live="polite">
-                          {kilopreisVergleich}
                         </p>
                       )}
                       {preisFraglich && (

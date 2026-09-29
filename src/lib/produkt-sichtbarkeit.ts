@@ -65,19 +65,6 @@ export function streifenText(zustand: ProduktZustand): string {
   }
 }
 
-/** Die Marke in der Produktliste — kürzer als der Streifen, gleiche Wörter. */
-export function markeText(zustand: ProduktZustand): string {
-  switch (zustand.art) {
-    case 'nicht-im-shop':
-      return NICHT_IM_SHOP
-    case 'ausverkauft':
-      return 'Ausverkauft'
-    case 'knapp':
-    case 'im-shop':
-      return 'Aktiv'
-  }
-}
-
 /**
  * Der Satz nach dem Umschalten. Er nennt das Produkt, weil der Toast auch dann
  * noch steht, wenn der Hof schon weitergescrollt hat.

@@ -7,8 +7,8 @@ import { getOrderDetail } from '@/server/queries/orders'
 import { OrderActions } from '@/components/orders/order-actions'
 import { statusLabel, statusColor, paymentLabel } from '@/components/orders/order-status'
 import { BetragMitGebuehr } from '@/components/orders/servicegebuehr-anzeige'
-import { formatPosition } from '@/lib/format'
-import { bestellSummen } from '@/lib/servicegebuehr'
+import { formatEuro, formatPosition } from '@/lib/format'
+import { bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
 import { Card, CardContent } from '@/components/ui/card'
 import { ArrowLeft, Printer } from 'lucide-react'
 
@@ -117,7 +117,7 @@ export default async function OrderDetailPage({
                     {formatPosition({ name: item.productName, quantity: item.quantity, unit: item.product?.unit ?? null, unitSize: item.product?.unitSize ?? null })}
                   </span>
                   <span className="text-foreground font-medium">
-                    € {Number(item.totalPrice).toFixed(2)}
+                    {formatEuro(Number(item.totalPrice))}
                   </span>
                 </div>
               ))}
@@ -127,21 +127,21 @@ export default async function OrderDetailPage({
                 <>
                   <div className="flex justify-between text-sm border-t border-border pt-2 mt-1">
                     <span className="text-muted-foreground">Zwischensumme (Warenpreis)</span>
-                    <span className="text-foreground">€ {(summen.warenpreisCents / 100).toFixed(2)}</span>
+                    <span className="text-foreground">{formatEuro(centsAlsEuro(summen.warenpreisCents))}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Servicegebühr</span>
-                    <span className="text-foreground">€ {(summen.gebuehrCents / 100).toFixed(2)}</span>
+                    <span className="text-foreground">{formatEuro(centsAlsEuro(summen.gebuehrCents))}</span>
                   </div>
                   <div className="flex justify-between text-base font-semibold">
                     <span>Gesamt (zahlt der Kunde)</span>
-                    <span>€ {(summen.gesamtCents / 100).toFixed(2)}</span>
+                    <span>{formatEuro(centsAlsEuro(summen.gesamtCents))}</span>
                   </div>
                 </>
               ) : (
                 <div className="flex justify-between text-base font-semibold border-t border-border pt-2 mt-1">
                   <span>Gesamt</span>
-                  <span>€ {Number(order.totalAmount).toFixed(2)}</span>
+                  <span>{formatEuro(Number(order.totalAmount))}</span>
                 </div>
               )}
             </div>
