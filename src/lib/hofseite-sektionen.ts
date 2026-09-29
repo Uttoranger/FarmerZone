@@ -89,3 +89,18 @@ export function naechsterAktiverReiter(input: {
 
   return bisher
 }
+
+/**
+ * Wohin die Seite nach dem Schließen der Bildansicht gehört — null, wenn sie
+ * sich nicht bewegt hat.
+ *
+ * Die Sperre über body.style.overflow hält nicht überall: Auf iOS greift sie
+ * bei eingeklappter Safari-Leiste nicht (so auch der Kommentar in Base UIs
+ * useScrollLock), und eine Wischgeste über dem Bild schiebt die Seite darunter
+ * weiter. Ohne Rückweg stünde man nach dem Schließen in einem anderen
+ * Abschnitt (Meldung cmua8bof). Unter einem Pixel ist kein Weg: Hochauflösende
+ * Bildschirme melden krumme Werte, ein Rücksprung darum wäre selbst ein Ruckeln.
+ */
+export function scrollNachBildansicht(stand: { beimOeffnen: number; jetzt: number }): number | null {
+  return Math.abs(stand.jetzt - stand.beimOeffnen) < 1 ? null : stand.beimOeffnen
+}

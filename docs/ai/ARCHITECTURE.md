@@ -156,6 +156,7 @@ Client-Komponente → Server Action → Zod → Fachregel (lib) → Prisma → r
 - Wer über den Ersatz-Link hinaufsteigt, hat dort keinen eigenen Vorgänger (`merkeHinauf`) — sonst pendelt „Zurück" zwischen zwei Seiten. Die Browser-Zeile („‹ Alle Höfe") nimmt den Verlauf nur, wenn er genau zu ihrem Ziel führt (`zeileNimmtVerlauf`).
 - Im Checkout keine Kopfzeile, sobald eine Bestellung angelegt ist (Zahlungsschritt, auch nach dessen „Zurück"): Ein Weg hinaus und zurück ergäbe eine zweite. Bekannte Grenze: Solange die Anfrage an `/api/checkout` läuft, steht die Kopfzeile noch.
 - Der Rückweg der Hofseite nimmt den **angezeigten** Bereich (`angezeigterBereich` in `src/lib/bereiche-anzeige.ts`), nicht den URL-Parameter.
+- Overlays über der Seite sind `ui/sheet` oder `ui/dialog`: Base UI sperrt das Scrollen und gibt den Fokus ohne Scrollen zurück. Die einzige eigene Ebene ist die Bildansicht der Hofseite; wer eine eigene baut, merkt sich beim Öffnen die Scrollstelle, stellt sie beim Schließen wieder her (`scrollNachBildansicht`) und fokussiert mit `preventScroll` — `overflow: hidden` allein hält auf iOS nicht (`tests/hofseite-bildansicht.test.ts`).
 - Die Kopfzeile klebt (`sticky`, Ebene 40): Umgebungsbanner (60) darüber, Sheets/Dialoge (50) davor, Sektionsleiste (30) darunter. Ausnahme Hofseite am Handy: Die Leiste ist `fixed` und wird erst eingehängt, wenn das Titelbild verschwindet — `sticky` verschöbe beim Einhängen den Inhalt. Eigene Stapelebenen (`isolate`) um alles mit hohen z-Werten (Leaflet), sonst liegt es über der Kopfzeile.
 
 ### Vorschaubild und Icons

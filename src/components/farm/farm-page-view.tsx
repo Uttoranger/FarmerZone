@@ -32,7 +32,7 @@ import {
   SPRUNGZIEL_UNTER_KOPF,
   TitelbildTeilen,
 } from '@/components/shared/kunden-kopf'
-import { hofseiteSektionen, naechsterAktiverReiter } from '@/lib/hofseite-sektionen'
+import { hofseiteSektionen, naechsterAktiverReiter, scrollNachBildansicht } from '@/lib/hofseite-sektionen'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { ProductGrid, useBereichWunsch } from './product-grid'
 import { stripStatusVariables, renderStatusBodyWithChip } from '@/lib/status-body'
@@ -221,19 +221,25 @@ function GallerySection({ farm, isEdit }: { farm: PublicFarm; isEdit: boolean })
 
   function schliesseLightbox() {
     setLightboxIdx(null)
-    // Ohne das landet der Fokus wieder am Seitenanfang und der Browser scrollt dorthin.
-    ausloeser.current?.focus()
+    // Ohne das landet der Fokus wieder am Seitenanfang. preventScroll: Wohin die
+    // Seite gehört, entscheidet die Sperre unten, nicht der Browser beim Fokussieren.
+    ausloeser.current?.focus({ preventScroll: true })
   }
 
   // Solange das Bild offen ist, darf die Seite dahinter nicht mitscrollen. Sonst
   // wandert die Seite unter dem Overlay weg — auf dem Telefon bei jeder Wischgeste —
   // und nach dem Schließen steht man in einem ganz anderen Abschnitt (Meldung cmua8bof).
+  // Die Sperre allein hält auf iOS nicht immer; deshalb holt das Aufheben die
+  // Seite an die Stelle zurück, an der das Bild geöffnet wurde.
   useEffect(() => {
     if (!lightboxOffen) return
+    const beimOeffnen = window.scrollY
     const vorher = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
       document.body.style.overflow = vorher
+      const ziel = scrollNachBildansicht({ beimOeffnen, jetzt: window.scrollY })
+      if (ziel !== null) window.scrollTo(0, ziel)
     }
   }, [lightboxOffen])
 
