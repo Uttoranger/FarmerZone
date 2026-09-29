@@ -378,6 +378,8 @@ Dazu das zweite gemeldete Symptom: Die **Lightbox sperrte das Scrollen der Seite
 
 **Nicht behoben:** Die Hofseite wertet `sectionsConfig.order` weiterhin nicht aus. Der Hof kann die Sektionen unter Einstellungen → Erscheinungsbild per Drag sortieren, die öffentliche Seite rendert aber eine feste Reihenfolge. Das Bedienelement verspricht damit mehr, als es hält — eigener Sprint.
 
+**Nachtrag 2026-09-29 (`fix/nachlese-oktober`):** Mit dem Stand nach #145 (Leiste über dem Titelbild) bei 375 px in Chromium nachgestellt, mit agent-browser gegen eine lokale Wegwerf-Datenbank. Die Sprungmarken landen genau unter der Sektionsleiste; die Leiste scrollt nie selbst; kein Bild liegt in einem Link. Öffnen und Schließen der Bildansicht lassen die Seite stehen — solange die Sperre hält. Verrutscht die Seite unter dem offenen Bild (auf iOS greift `overflow: hidden` bei eingeklappter Safari-Leiste nicht, so auch Base UIs `useScrollLock`), stand man nach dem Schließen im nächsten Abschnitt: nachgestellt 826 → 1725 px, Reiter „Produkte". Seither merkt sich die Sperre die Stelle und stellt sie beim Aufheben wieder her (`stelleNachBildansicht` in `src/lib/hofseite-sektionen.ts`), aber nur beim echten Schließen: Wer die Hofseite bei offenem Bild verlässt, bekäme sonst die neue Seite auf die Stelle der alten geschoben (Befund der Prüfung). Der Fokus geht ohne Scrollen an die Kachel zurück. Am iPhone selbst nicht geprüft.
+
 ### BUG: Status-Inkonsistenz bei Online-Zahlungen (behoben 2026-06-22)
 
 **Symptom:** Order HM-2206-E3CC zeigte `status=PENDING_CONFIRMATION` + `paymentLabel="Online bezahlt"` — optisch widersprüchlich.
@@ -2514,6 +2516,33 @@ Preview.
 
 ---
 
+## Vier parallele Sprints — Aufzeichnungen in `docs/entwicklung/` (2026-09-29)
+
+Am 29.09. liefen vier Sprints gleichzeitig, und `DEVELOPMENT.md` sowie `docs/ai/*`
+waren für sie gesperrt. Jeder hat seinen Verlauf deshalb in einer eigenen Datei
+festgehalten. Regeln, die noch nach `docs/ai/` gehören, stehen in
+`bauern-nachschliff.md` („Regeln, die nach `docs/ai/` gehören") und unter „Offen"
+in `verkauf-auswertung.md`.
+
+- [`docs/entwicklung/technik-nachlese.md`](docs/entwicklung/technik-nachlese.md) (#144):
+  Sentry bekommt Quelltextkarten und zeigt Fehler lesbar statt als gepressten Code,
+  die Listen erlaubter Build-Skripte in `pnpm-workspace.yaml` sind zusammengelegt,
+  dazu Kleinkram am Server (Mengengrenze, Produkt-DTO, Idempotenz beim Checkout,
+  Onboarding-Felder) und das Aufräumen der Branches auf origin.
+- [`docs/entwicklung/kunden-navigation-handy.md`](docs/entwicklung/kunden-navigation-handy.md) (#145):
+  Am Handy trägt auf den Kundenseiten außer der Startseite eine obere Leiste mit
+  F-Icon, Zurück und Menü-Blatt die Wege, die dort vorher fehlten.
+- [`docs/entwicklung/bauern-nachschliff.md`](docs/entwicklung/bauern-nachschliff.md) (#146):
+  Mein Hof bekommt am Desktop eine Produkttabelle und einen Kopf mit Adresse und
+  Teilen, der Shop-Balken entfällt, die Kundenseite trägt eine Kennung statt der
+  E-Mail im Pfad, und Bestell-, Druck-, Kunden- und Statusseiten zeigen Geld über
+  `formatEuro`.
+- [`docs/entwicklung/verkauf-auswertung.md`](docs/entwicklung/verkauf-auswertung.md) (#147):
+  Eine Umsatzregel für Heute, Verkauf, Auswertung und die 55.000-€-Grenze,
+  „Verkauf eintragen" mit dem Betrag zuerst und eine Auswertung mit fairem Vergleich.
+
+---
+
 ## Nützliche Befehle
 
 ```bash
@@ -2539,4 +2568,4 @@ pnpm briefkasten export   # Briefkasten als Markdown (nur lesend; Leseroute oder
 
 ---
 
-*Zuletzt aktualisiert: 2026-09-29 — Stand nach dem Nachschliff der Bauern-Navigation (Hilfe und Rückmeldung, nächste Abholung, Erste Schritte per Cookie)*
+*Zuletzt aktualisiert: 2026-09-29 — Stand nach der Nachlese der vier parallelen Sprints (Bildansicht der Hofseite, Verweise auf `docs/entwicklung/`)*
