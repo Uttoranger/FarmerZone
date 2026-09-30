@@ -2543,6 +2543,13 @@ in `verkauf-auswertung.md`.
 
 ---
 
+## Redesign-Kit an die Zielpfade verschoben (2026-09-30)
+
+Die Dateien aus `farmerzone-redesign-kit/` liegen jetzt dort, wo `CLAUDE.md` sie nennt: `docs/ai/DESIGN_SYSTEM.md`, `docs/umsetzungsprompt.md`, `docs/mockups/` (19 Dateien).
+Der Kit-Ordner (seine `CLAUDE.md` war ein Duplikat der Root-Version) und `design_handoff_hof_seite/` (unvollständig, widersprach dem Design-System) sind gelöscht.
+
+---
+
 ## Nützliche Befehle
 
 ```bash
@@ -2568,4 +2575,4 @@ pnpm briefkasten export   # Briefkasten als Markdown (nur lesend; Leseroute oder
 
 ---
 
-*Zuletzt aktualisiert: 2026-09-29 — Stand nach der Nachlese der vier parallelen Sprints (Bildansicht der Hofseite, Verweise auf `docs/entwicklung/`)*
+*Zuletzt aktualisiert: 2026-09-30 — Redesign-Kit an die Zielpfade verschoben (`docs/ai/DESIGN_SYSTEM.md`, `docs/umsetzungsprompt.md`, `docs/mockups/`)*
