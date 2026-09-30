@@ -36,6 +36,8 @@ Stand: 2026-09. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 
 **Tailwind 4:** Konfiguration lebt in `src/app/globals.css` per `@theme` / `@import "tailwindcss"`. **Keine** `tailwind.config.js` anlegen. Keine `content`-Pfade pflegen.
 
+**Schriften:** ausschließlich über `next/font/google` in `src/app/layout.tsx` (self-gehostet, kein CDN, keine Schriftdateien im Repo); welche und wie sie verdrahtet sind, steht in `docs/ai/DESIGN_SYSTEM.md`, „Technische Regeln".
+
 **Next 16:**
 - `params` und `searchParams` sind **Promises** → `const { farmSlug } = await params`.
 - Langsame Arbeit nach der Antwort: `after()` aus `next/server`, gekapselt in `nachDerAntwort()` (`src/lib/nach-der-antwort.ts`). Nie `after()` direkt aufrufen.

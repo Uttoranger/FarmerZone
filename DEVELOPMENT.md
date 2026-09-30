@@ -2554,6 +2554,51 @@ Der Kit-Ordner (seine `CLAUDE.md` war ein Duplikat der Root-Version) und `design
 
 ---
 
+## Redesign Schritt 1: Tokens und Theme-Schalter (2026-09-30)
+
+Das erste Gate aus `docs/umsetzungsprompt.md`. Die Regeln stehen in
+`docs/ai/DESIGN_SYSTEM.md` („Technische Regeln"); hier das Warum.
+
+- **Präfix `--fz-`.** Die Tabelle des Design-Systems nennt `--border`, `--primary`,
+  `--accent` — genau die Namen, die shadcn schon vergibt und die der Bestand mit
+  anderer Bedeutung nutzt (`--primary` war die Waldgrün-Fläche, `--accent` das
+  Orange des CTA). Ohne Präfix hätte die erste Zeile jeden Knopf im Bestand
+  umgefärbt. Die Werte stehen als oklch mit dem Hexwert daneben, weil
+  CODING_STANDARDS §7 das so will; `tests/design-tokens.test.ts` rechnet sie
+  zurück und vergleicht mit der Tabelle, damit beide nie auseinanderlaufen.
+- **Geltungsbereich statt Umschalten auf einen Schlag.** `CLAUDE.md` verbietet
+  den Big Bang, der Plan will Route für Route. Deshalb zeigen die shadcn-Variablen
+  erst dann auf die neuen Tokens, wenn ein Element `data-design="neu"` im
+  Dokument steht — über `:root:has(…)`, damit auch Portale (Dialog, Sheet, Toast)
+  mitgehen, die außerhalb der Shell in `<body>` hängen. Eine umgestellte Route
+  ist eine, deren Shell den Marker trägt; der Rest sieht aus wie gestern.
+- **`data-theme` statt Klasse `dark`.** Das Design-System schaltet über das
+  Attribut; next-themes kann beides und setzt es per Inline-Skript vor der
+  Hydration — kein Flackern, Erstbesuch nach `prefers-color-scheme`, Wahl im
+  localStorage des Geräts. Die Wahl bleibt beim Gerät und nicht am Nutzerprofil,
+  wie es die erste Fassung des Design-Systems wollte: Dafür gäbe es eine
+  Spalte, die niemand freigegeben hat, und Besucher einer Hofseite sollen
+  ohnehin ihr eigenes Gerät sehen. Die `dark:`-Utilities laufen über die
+  Variante `[data-theme="dark"]`; alles Bestehende funktioniert unverändert.
+- **Schriften.** Fraunces und Instrument Sans kommen über `next/font/google`:
+  Next lädt sie beim Build und liefert sie vom eigenen Ursprung aus, der
+  Browser spricht nie mit Google. Instrument Sans gilt im Geltungsbereich als
+  `font-sans`; außerhalb bleibt Geist, bis die letzte Route umgezogen ist.
+- **Lint.** Die Regel gegen Farbliterale gilt für alles unter `src/`; die
+  43 Dateien, die heute begründete Inline-Farben tragen (Overlays auf Fotos,
+  Kartenkacheln, Metafarben, E-Mails), stehen in einer Ausnahmeliste, die nur
+  schrumpfen darf — eine Positivliste hätte jede neue Datei außerhalb von
+  `src/components/ui` ungeschützt gelassen.
+- **Grüner Text ist nicht das Knopf-Grün.** `--fz-accent` (#2E6B45) erreicht
+  auf dem dunklen Grund nur 3:1 — als Fläche unter heller Schrift fein, als
+  Text zu wenig. `--brand-text` und der Fokusring nehmen deshalb
+  `--fz-status-fertig`, das am Tag dasselbe Grün ist und nachts helles Salbei.
+- Umrechnung Hex ↔ OKLCH und der WCAG-Kontrast liegen in `src/lib/farbraum.ts`,
+  rein, ohne Abhängigkeit — auch für den Kontrast-Test der Tabelle (≥ 4,5:1 in
+  beiden Modi, je Zustandsfarbe die Variante ihres Modus).
+
+---
+
 ## Nützliche Befehle
 
 ```bash
@@ -2579,4 +2624,4 @@ pnpm briefkasten export   # Briefkasten als Markdown (nur lesend; Leseroute oder
 
 ---
 
-*Zuletzt aktualisiert: 2026-09-30 — Redesign-Kit an die Zielpfade verschoben (`docs/ai/DESIGN_SYSTEM.md`, `docs/umsetzungsprompt.md`, `docs/mockups/`)*
+*Zuletzt aktualisiert: 2026-09-30 — Redesign Schritt 1: Tokens `--fz-*`, `data-theme`, Schriften über next/font, Geltungsbereich `data-design="neu"`*

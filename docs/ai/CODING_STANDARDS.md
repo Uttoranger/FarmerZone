@@ -222,13 +222,19 @@ export function istGueltig(reservierung: EigeneReservierung, jetzt: Date): boole
 
 ## 7. Farben
 
-Es gibt **zwei Modi**: hell und dunkel (`next-themes`, Klasse `dark` am `<html>`).
-Jede Farbe muss in beiden funktionieren.
+Es gibt **zwei Modi**: hell und dunkel (`next-themes`, `data-theme="light|dark"` am
+`<html>`, gesetzt vor der Hydration). Jede Farbe muss in beiden funktionieren.
+
+**Neues Design (Redesign, `docs/ai/DESIGN_SYSTEM.md`):** Innerhalb einer Route, deren
+Shell `data-design="neu"` trägt, gelten die Tokens und Farbrollen des Design-Systems —
+`primary` ist dort Orange (Hofbereich), `accent` Grün (Kundenaktion), die Werte
+kommen aus `--fz-*`. Die Tabelle unten beschreibt den Bestand außerhalb dieses
+Geltungsbereichs; beim Umzug einer Route gilt das Design-System.
 
 ### Grundregel
 - **Keine Farbe hart in eine Komponente schreiben.** Kein `#2D5F3F`, kein
   `bg-slate-700`, kein `style={{ color: '…' }}`. Farben kommen aus Tokens in
-  `src/app/globals.css` (`:root` = hell, `.dark` = dunkel).
+  `src/app/globals.css` (`:root` = hell, `[data-theme="dark"]` = dunkel).
 - Tokens werden in **oklch** geschrieben, nie in Hex. Der Hex-Wert darf als
   Kommentar danebenstehen.
 - Beim Ersetzen einer alten Hex-Farbe: das Token nehmen, das im **hellen** Modus
