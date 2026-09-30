@@ -14,8 +14,8 @@ import {
   type GeokodierungsErgebnis,
   type RueckwaertsAdresse,
 } from '@/lib/geokodierung'
-import { LAENDER, LAND_GENITIV, alsLand, type Land } from '@/lib/laender'
-import { hofBetriebsnummerSchema, betriebsstatusSchema } from '@/schemas/betrieb'
+import { LAND_GENITIV, alsLand, type Land } from '@/lib/laender'
+import { profileSchema } from '@/schemas/hofprofil'
 
 async function getAuthFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -25,34 +25,11 @@ async function getAuthFarm() {
 
 // ─── Profile ────────────────────────────────────────────────────────────────
 
-const profileSchema = z.object({
-  name: z.string().min(2, 'Name muss mindestens 2 Zeichen haben'),
-  ownerName: z.string().min(2, 'Name muss mindestens 2 Zeichen haben'),
-  description: z.string().min(10, 'Beschreibung muss mindestens 10 Zeichen haben'),
-  address: z.string().min(3),
-  postalCode: z.string().min(4),
-  city: z.string().min(2),
-  // Die Spalte ist ein String mit Default (prisma/schema.prisma) — ERLAUBT
-  // sind aber nur AT und DE, und das erzwingt genau diese Zeile. Ein drittes
-  // Land kostet damit einen Eintrag in src/lib/laender.ts, keine Migration.
-  country: z.enum(LAENDER, { message: 'Bitte Österreich oder Deutschland wählen' }),
-  phone: z.string().min(4),
-  email: z.string().email('Ungültige E-Mail-Adresse'),
-  // Der Kartenpunkt wird MIT dem Profil gespeichert — es gibt keinen eigenen
-  // Bestätigen-Schritt mehr. null heißt: (noch) kein Punkt gesetzt; ein
-  // gespeicherter Punkt wird dann NICHT angerührt (siehe updateProfile).
-  latitude: z.number().nullable(),
-  longitude: z.number().nullable(),
-  // Betriebsnummer des Hofs (Sprint Bereiche 1, Rückfrage F6) — Vorbelegung
-  // im Checkout, Anzeige in der Futter-Kennzeichnung. Leer ist erlaubt.
-  betriebsnummer: hofBetriebsnummerSchema,
-  betriebsstatus: betriebsstatusSchema,
-  // Logo und Titelbild gehören zu „Mein Auftritt" (echter Datei-Upload) und
-  // stehen bewusst NICHT mehr im Profil-Formular. Sie fehlen hier auch im
-  // Schreibpfad: sonst würde jedes Profil-Speichern die dort hochgeladenen
-  // Bilder auf null zurücksetzen. Die DB-Felder selbst bleiben unverändert.
-})
-
+// Das Schema liegt in src/schemas/hofprofil.ts — der Hofseiten-Editor prüft
+// einzelne Felder daraus, ohne es abzuschreiben. Der Typ steht hier als
+// Alias, nicht als `export type { … }`: Ein Re-Export in einer
+// 'use server'-Datei registriert Next als Server-Aktion und bricht zur
+// Laufzeit („ProfileFormData is not defined").
 export type ProfileFormData = z.infer<typeof profileSchema>
 export type ProfileResult = { error?: string }
 

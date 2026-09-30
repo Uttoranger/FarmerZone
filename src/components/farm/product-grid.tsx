@@ -18,6 +18,7 @@ import { formatGrundpreis, formatGrundpreisNetto } from '@/lib/format'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 import { BereichUmschalter } from '@/components/shared/bereich-umschalter'
 import { SHOP_PAUSED_BUTTON_LABEL } from '@/lib/shop-pause'
+import { VORSCHAU_KAUF_HINWEIS, korbErlaubt } from '@/lib/hofseite-vorschau'
 import { produktZustand, streifenText, type ProduktZustand } from '@/lib/produkt-sichtbarkeit'
 import { ImShopSchalter } from '@/components/products/im-shop-schalter'
 import { teileHofseite, zeigeKaufknopf } from '@/lib/bereiche-anzeige'
@@ -49,6 +50,12 @@ type Props = {
    * den Rückweg.
    */
   onVorschau?: () => void
+  /**
+   * Vorschau-Modus der öffentlichen Seite (?vorschau=1, src/lib/hofseite-vorschau.ts):
+   * Der Hof sieht die Kundenansicht, aber Kaufen ist wirkungslos — kein Korb,
+   * keine Reservierung, nur der Hinweis.
+   */
+  vorschau?: boolean
 }
 
 
@@ -507,8 +514,12 @@ export function ProductGrid({
   mode = 'preview',
   isPaused = false,
   onVorschau,
+  vorschau = false,
 }: Props) {
   const isEditMode = ownerMode && mode !== 'preview'
+  // EINE Regel für jeden Weg in den Korb (Kaufknopf, Nachbestell-Link,
+  // #warenkorb-Anker, Korb-Knopf, Sheet) — src/lib/hofseite-vorschau.ts.
+  const mitKorb = korbErlaubt({ isEditMode, vorschau })
 
   // Hofladen | Futtermittel (Bereiche 2): Die Wahl steht in der URL
   // (?bereich=futter), damit /hoefe direkt beim Futter landen kann und ein
@@ -595,16 +606,16 @@ export function ProductGrid({
   // dem ersten Bild: Das Sheet gleitet sichtbar herein, statt beim Laden
   // schon offen dazustehen.
   useEffect(() => {
-    if (isEditMode || !isHydrated) return
+    if (!mitKorb || !isHydrated) return
     if (window.location.hash !== `#${WARENKORB_ANKER}`) return
     window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
     if (count > 0) requestAnimationFrame(() => setCartOpen(true))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHydrated])
 
-  // Prefill cart from reorder token (not in edit mode)
+  // Den Korb aus dem Nachbestell-Link füllen — nur, wo es einen Korb gibt.
   useEffect(() => {
-    if (isEditMode) return
+    if (!mitKorb) return
     if (!isHydrated || !initialReorderItems || initialReorderItems.length === 0) return
     if (items.length > 0) return
 
@@ -639,6 +650,12 @@ export function ProductGrid({
   }, [isHydrated])
 
   async function handleAddToCart(product: PublicProduct) {
+    // Vorschau des Hofs: kein Korb, keine Reservierung — nur der Hinweis,
+    // und zwar VOR dem ersten Griff in den Korb.
+    if (!mitKorb) {
+      toast.info(VORSCHAU_KAUF_HINWEIS)
+      return
+    }
     setAddingId(product.id)
     const result = await addItem(
       {
@@ -666,8 +683,8 @@ export function ProductGrid({
 
   return (
     <>
-      {/* Welcome-back banner */}
-      {!isEditMode && showWelcomeBack && (
+      {/* Willkommen-zurück-Banner — nur, wo es einen Korb gibt (der Nachbestell-Effekt setzt es ohnehin nur dann). */}
+      {mitKorb && showWelcomeBack && (
         <div className="pb-4">
           <div
             className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3"
@@ -815,8 +832,8 @@ export function ProductGrid({
         />
       )}
 
-      {/* Sticky cart button (not in edit mode) */}
-      {!isEditMode && isHydrated && count > 0 && (
+      {/* Der klebende Korb-Knopf — nicht im Bearbeitungsmodus, nicht in der Vorschau. */}
+      {mitKorb && isHydrated && count > 0 && (
         <button
           onClick={() => setCartOpen(true)}
           // Befund 6: über dem Home-Balken des iPhones. Wirkt erst mit
@@ -835,8 +852,8 @@ export function ProductGrid({
         </button>
       )}
 
-      {/* Cart sheet */}
-      {!isEditMode && (
+      {/* Cart sheet — in der Vorschau des Hofs gibt es keinen Korb. */}
+      {mitKorb && (
         <CartSheet
           open={cartOpen}
           onOpenChange={setCartOpen}

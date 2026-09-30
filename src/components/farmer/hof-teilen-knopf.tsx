@@ -12,15 +12,18 @@ export function HofTeilenKnopf({
   name,
   slug,
   className,
+  label = 'Hof teilen',
 }: {
   name: string
   slug: string
   className?: string
+  /** Die kompakte Zeile ab lg sagt nur „Teilen" — der Hof steht daneben. */
+  label?: string
 }): React.JSX.Element {
   return (
     <button type="button" onClick={() => void teileHof({ name, slug })} className={className}>
       <Share2 className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-      Hof teilen
+      {label}
     </button>
   )
 }

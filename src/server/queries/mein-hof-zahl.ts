@@ -10,3 +10,8 @@ import { prisma } from '@/lib/prisma'
 export async function zaehleProdukte(farmId: string): Promise<number> {
   return prisma.product.count({ where: { farmId } })
 }
+
+/** Die Zahl hinter dem Reiter „Beiträge" (ab lg) — jeder eigene Beitrag, auch Entwürfe und vergangene: Der Reiter sagt, was hinter ihm liegt. */
+export async function zaehleBeitraege(farmId: string): Promise<number> {
+  return prisma.statusPost.count({ where: { farmId } })
+}

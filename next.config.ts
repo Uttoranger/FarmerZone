@@ -1,6 +1,19 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
+// Jede eigene Route auf oberster Ebene unter src/app — damit die Regel für
+// die Vorschau unten wirklich nur eine HOFSEITE (/<slug>) trifft und nie
+// /login?vorschau=1 oder /dashboard?vorschau=1. tests/sicherheits-header.test.ts
+// gleicht die Liste mit den Ordnern ab; ein neuer Ordner fällt dort auf.
+const KEINE_HOFSEITE = [
+  'account', 'admin', 'analytics', 'api', 'customers', 'dashboard', 'datenschutz',
+  'farm-page', 'fehler-melden', 'forgot-password', 'hoefe', 'impressum', 'konditionen',
+  'login', 'meldungen', 'onboarding', 'orders', 'problem-melden', 'products', 'register',
+  'reset-password', 'sales', 'settings', 'status', 'teilen', 'verify',
+];
+// Genau EIN Pfadstück aus Slug-Zeichen (src/lib/slug.ts), das keine Route ist.
+const HOFSEITEN_QUELLE = `/:farmSlug((?!(?:${KEINE_HOFSEITE.join('|')})$)[a-z0-9-]+)`;
+
 const nextConfig: NextConfig = {
   // sharp bleibt ein externes Server-Modul (native Binärdateien lassen sich
   // nicht bundeln). Steht hier ausdrücklich, auch wenn es dem Next-Standard
@@ -84,6 +97,21 @@ const nextConfig: NextConfig = {
         source: '/hoefe',
         headers: [
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self)' },
+        ],
+      },
+      {
+        // NUR die Hofseite MIT ?vorschau=1 darf eingebettet werden — und nur
+        // von uns selbst: Der Editor unter /farm-page zeigt sie im Browser als
+        // Handy-Vorschau im iframe (src/lib/hofseite-vorschau.ts). Ohne den
+        // Parameter, für jede andere Seite und für Unterseiten der Hofseite
+        // bleibt die Sperre oben (DENY) — auch das steht im Test. Beide
+        // Header, weil ältere Browser nur X-Frame-Options lesen; „self" und
+        // SAMEORIGIN sagen dasselbe.
+        source: HOFSEITEN_QUELLE,
+        has: [{ type: 'query', key: 'vorschau', value: '1' }],
+        headers: [
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
         ],
       },
     ]
