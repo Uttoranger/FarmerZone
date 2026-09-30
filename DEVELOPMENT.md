@@ -2599,6 +2599,52 @@ Das erste Gate aus `docs/umsetzungsprompt.md`. Die Regeln stehen in
 
 ---
 
+## Mein Hof v2: Produkte in die Seitenleiste, Neu-Menü, Vorschau Handy/Web (2026-09-30)
+
+Bestand-Look, kein `data-design="neu"`. Was gebaut ist, steht in
+`docs/entwicklung/hofseite-editor-browser.md` („v2"); hier das Warum.
+
+- **Produkte raus aus Mein Hof.** Produkte sind Tagesgeschäft (Lagerstand,
+  Preis, Foto), die Hofseite ist Auftritt. Der Sidebar-Eintrag steht deshalb
+  zwischen Bestellungen und Mein Hof, und „Neu → Neues Produkt" landet dort.
+  Am Handy bleiben die fünf Plätze der Leiste (Entscheidung vom 28.09.);
+  Produkte steht oben im Mehr-Blatt statt einen Platz zu verdrängen.
+- **Der Umschalter ist Gerät, Vergrößern ist Größe.** Zwei Fragen, zwei
+  Bedienelemente — ein „Vollbild" allein hätte offen gelassen, ob man die
+  Handy- oder die Desktop-Seite sieht. Handy und Web teilen sich ein iframe,
+  damit der Wechsel nichts neu lädt und die Markierung der offenen Zeile
+  bleibt. Der Maßstab wird gemessen und gerechnet, weil die Panelbreite von
+  Fenster und Seitenleiste abhängt; ein hart codierter Faktor stimmte nur bei
+  einer Breite.
+- **Web erst ab 1280 px neben der Bearbeitung.** Darunter bliebe für die
+  Bearbeitung weniger als 400 px oder für die Seite ein Maßstab unter 0,3 —
+  unlesbar. Dann öffnet „Web" das Overlay, das ohnehin da ist.
+- **„Online fehlt" statt Haken, aber die Zeile bleibt fertig.** Bar und Karte
+  vor Ort reichen zum Verkaufen; Online-Zahlung ist ein Plus, kein Muss. Ein
+  offener Punkt im Fortschritt hätte Höfe ohne Stripe dauerhaft auf 10 von 11
+  gehalten. Das Badge sagt trotzdem, was fehlt. Kein neuer Stripe-Weg — der
+  Hof richtet Online-Zahlung weiter unter Einstellungen → Zahlungen ein.
+- **Leiser Text in `--app-ink-soft`.** `--app-ink-faint` erreicht auf Creme
+  2,4 : 1; die Axe-Prüfung des Sprints („ohne Fehler") ließ sich nur mit dem
+  nächststärkeren Token erfüllen. Die Regel steht in CODING_STANDARDS §7 bei
+  der Palette `--app-*` — nicht im Design-System, das die `--fz-`-Tokens
+  regelt.
+- **Der Hofname bleibt Text, keine H1.** Als H1 hätte `/status` zwei
+  (dazu „Status & Updates") und `/farm-page` unter lg auch (die Hofseite
+  bringt ihre eigene). Ab lg bekommt der Editor-Block darum eine H1 nur für
+  Screenreader.
+- **Seitenleiste aus der Lint-Ausnahmeliste.** Wer eine gelistete Datei
+  umbaut, nimmt sie heraus (DESIGN_SYSTEM „Lint"). Schatten und Ränder sind
+  jetzt Tailwind-Klassen mit Token-Deckkraft; das funktioniert, weil Tailwind 4
+  bei `shadow-[…]` ohne Farbe `var(--tw-shadow-color)` einsetzt und
+  `shadow-black/25` sie liefert.
+- **Nicht gelöst, Altbestand:** Kontrast der Initialen-Kreise (Inline-Farben
+  aus der Ausnahmeliste) und des Worts „Mein Hof" in der Seitenleiste; die
+  Fokus-Wächter von Base UI in Menü, Blatt und Dialog, die Axe als
+  `aria-hidden-focus` zählt.
+
+---
+
 ## Nützliche Befehle
 
 ```bash

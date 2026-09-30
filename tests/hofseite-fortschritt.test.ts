@@ -134,11 +134,23 @@ describe('fertig oder fehlt', () => {
     expect(ohne.fertig).toBe(false)
   })
 
-  it('Zahlungsarten: online ist die Kür — ohne Stripe trotzdem fertig', () => {
-    expect(alleZeilen(VOLL).find((z) => z.id === 'zahlung')!.wert).toBe('Online mit Karte · vor Ort bar und mit Karte')
-    const bar = alleZeilen({ ...VOLL, stripeAccountReady: false }).find((z) => z.id === 'zahlung')!
+  it('Zahlungsarten: online ist die Kür — ohne Stripe trotzdem fertig, aber mit dem Warnschild „Online fehlt"', () => {
+    const zahlung = (stand: Parameters<typeof alleZeilen>[0]) => {
+      const zeile = alleZeilen(stand).find((z) => z.id === 'zahlung')
+      if (!zeile) throw new Error('Zeile „zahlung" fehlt')
+      return zeile
+    }
+    const online = zahlung(VOLL)
+    expect(online.wert).toBe('Online mit Karte · vor Ort bar und mit Karte')
+    expect(online.marke).toBeNull()
+    const bar = zahlung({ ...VOLL, stripeAccountReady: false })
     expect(bar.fertig).toBe(true)
-    expect(bar.wert).toBe('Vor Ort bar und mit Karte · online noch nicht eingerichtet')
+    expect(bar.wert).toBe('Vor Ort bar und mit Karte · Online-Zahlung noch nicht eingerichtet')
+    expect(bar.marke).toEqual({ text: 'Online fehlt', farbe: 'bernstein' })
+    // Das Schild ist eine Warnung, kein Fehlen: Fortschritt und Satz zählen es nicht.
+    const ohneOnline = hofseiteFortschritt({ ...VOLL, stripeAccountReady: false })
+    expect(ohneOnline.fehlend).not.toContain('Zahlungsarten')
+    expect(ohneOnline.erledigt).toBe(hofseiteFortschritt(VOLL).erledigt)
   })
 
   it('Kontakt: Telefon und E-Mail in der Zeile', () => {

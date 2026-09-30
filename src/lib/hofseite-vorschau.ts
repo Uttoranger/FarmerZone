@@ -89,6 +89,36 @@ export function verlaesstRahmen(link: { href: string; target: string }, hier: st
   return ziel.origin !== jetzt.origin || ziel.pathname !== jetzt.pathname
 }
 
+/** Das Gerät, das die Vorschau nachstellt — der Umschalter im Editor (DESIGN_SYSTEM „Vorschau im Hofbereich"). */
+export type VorschauGeraet = 'handy' | 'web'
+
+/** Breite der Kundenseite je Gerät in CSS-Pixeln: Handy rendert ihr Handy-Layout, Web das Browser-Layout der Mockups. */
+export const VORSCHAU_SEITENBREITE: Record<VorschauGeraet, number> = { handy: 390, web: 1440 }
+
+/** Die Höhe eines Handy-Bildschirms in der Vorschau — der Rahmen zeigt genau diesen Ausschnitt. */
+export const VORSCHAU_HANDY_HOEHE = 844
+
+/** Ab dieser Fensterbreite passt die Web-Vorschau neben die Bearbeitung (useMindestbreite); darunter öffnet „Web" das Overlay. */
+export const VORSCHAU_WEB_MINDESTBREITE = 1280
+
+/** So schmal darf die Bearbeitung neben der Web-Vorschau werden — die Vorschau nimmt den Rest der Breite. */
+export const VORSCHAU_BEARBEITUNG_BREITE = 400
+
+/**
+ * Der Maßstab, mit dem die Seite in einen Rahmen passt — berechnet aus der
+ * Rahmenbreite, nie hart codiert; nie größer als 1 (eine Seite wird nicht
+ * aufgeblasen). Für das Handy zählt auch die Höhe, wenn der Rahmen eine hat
+ * (Overlay); die Web-Seite scrollt im Rahmen und braucht keine.
+ */
+export function vorschauMassstab(rahmen: { breite: number; hoehe?: number }, geraet: VorschauGeraet): number {
+  if (rahmen.breite <= 0) return 1
+  let massstab = Math.min(1, rahmen.breite / VORSCHAU_SEITENBREITE[geraet])
+  if (geraet === 'handy' && rahmen.hoehe !== undefined && rahmen.hoehe > 0) {
+    massstab = Math.min(massstab, rahmen.hoehe / VORSCHAU_HANDY_HOEHE)
+  }
+  return massstab
+}
+
 /** Die Adresse der Vorschau zu einem Hof — `stand` erzwingt ein Neuladen nach dem Speichern. */
 export function vorschauAdresse(slug: string, stand: number): string {
   return `/${slug}?${VORSCHAU_PARAMETER}=1&stand=${stand}`

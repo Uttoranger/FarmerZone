@@ -3,16 +3,17 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Menu } from '@base-ui/react/menu'
 import {
   Banknote,
   BarChart3,
   CalendarCheck,
+  ChevronDown,
   Home,
   LifeBuoy,
   LogOut,
   Megaphone,
   MoreHorizontal,
+  Package,
   PackagePlus,
   Plus,
   ReceiptText,
@@ -28,6 +29,7 @@ import { hofInitialen } from '@/lib/hof-initialen'
 import { FarmIdentityCard } from '@/components/farmer/farm-identity-card'
 import { ThemeUmschalter, ThemeUmschalterZeile } from '@/components/shared/theme-umschalter'
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuLinkItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import {
   ABMELDEN_LABEL,
   HANDY_LEISTE,
@@ -52,7 +54,9 @@ import { cn } from '@/lib/utils'
 const SYMBOL: Record<NavPunktId, LucideIcon> = {
   heute: CalendarCheck,
   bestellungen: ReceiptText,
-  // Ein Haus: „Mein Hof" bündelt Produkte, Hofseite und Beiträge.
+  // Ein Paket: Produkte sind Tagesgeschäft und haben ihren eigenen Platz.
+  produkte: Package,
+  // Ein Haus: „Mein Hof" bündelt Hofseite und Beiträge.
   'mein-hof': Home,
   kunden: Users,
   verkaeufe: Tag,
@@ -143,9 +147,11 @@ function NavZeile({
         'flex items-center gap-3 rounded-xl px-3 text-sm transition-colors duration-[250ms]',
         handy ? 'min-h-[48px] py-2.5' : 'min-h-10 py-2',
         !istAktiv && 'hover:bg-white/10',
+        // Im Browser hebt sich der aktive Punkt mit einem leichten Schatten von der Leiste ab.
+        istAktiv && !handy && 'shadow-[0_1px_4px] shadow-black/16',
         FOKUS
       )}
-      style={istAktiv ? { ...AKTIV, ...(handy ? {} : { boxShadow: '0 1px 4px rgba(0,0,0,0.16)' }) } : RUHIG}
+      style={istAktiv ? AKTIV : RUHIG}
     >
       <Symbol className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} aria-hidden="true" />
       <span className="flex-1">{punkt.label}</span>
@@ -191,6 +197,7 @@ function Person({ name, handy }: { name: string; handy: boolean }) {
         /* Dieselbe Sand-Plakette wie an der Hofkarte (farm-identity-card.tsx),
            bewusst dieselben Werte: Die Leiste ist in beiden Modi dunkel, dafür
            gibt es kein Token — zwei Plaketten in zwei Tönen wären ein Fehler. */
+        /* eslint-disable-next-line no-restricted-syntax -- Sand-Plakette auf der in beiden Modi dunklen Leiste, kein Token passt (siehe oben) */
         style={{ background: '#F2E5D3', color: '#8B6B4F' }}
         aria-hidden="true"
       >
@@ -289,10 +296,10 @@ export function FarmerNav({
     bottom: '4rem',
     background: 'var(--app-bar)',
     color: 'var(--app-bar-ink)',
-    borderTop: '1px solid rgba(255,255,255,0.10)',
-    boxShadow: '0 -8px 24px rgba(0,0,0,0.25)',
   }
-  const blattKlasse = 'gap-0 rounded-t-2xl border-t-0 px-3 pt-3 pb-3 max-h-[calc(100dvh-5rem)] overflow-y-auto md:hidden'
+  // Feine helle Oberkante und ein Schatten nach oben, damit sich das Blatt von der Leiste löst.
+  const blattKlasse =
+    'gap-0 rounded-t-2xl border-t border-white/10 shadow-[0_-8px_24px] shadow-black/25 px-3 pt-3 pb-3 max-h-[calc(100dvh-5rem)] overflow-y-auto md:hidden'
 
   return (
     <>
@@ -342,10 +349,10 @@ export function FarmerNav({
                     <SheetTrigger
                       aria-label="Neu anlegen"
                       className={cn(
-                        '-mt-4 flex size-14 items-center justify-center rounded-full bg-accent text-accent-foreground',
+                        // Ein 4-px-Kragen in der Leistenfarbe trennt den Kreis vom Rand, darunter ein Schatten.
+                        '-mt-4 flex size-14 items-center justify-center rounded-full bg-accent text-accent-foreground ring-4 ring-(--app-bar) shadow-[0_6px_16px] shadow-black/28',
                         FOKUS
                       )}
-                      style={{ boxShadow: '0 0 0 4px var(--app-bar), 0 6px 16px rgba(0,0,0,0.28)' }}
                     >
                       <Plus
                         className={cn(
@@ -432,11 +439,15 @@ export function FarmerNav({
                       </SheetClose>
                     </div>
                   </div>
+                  {/* Hauptpunkte ohne Platz in der Leiste — Produkte — stehen zuoberst. */}
+                  {nav.nurImMehr.map((punkt) => (
+                    <NavZeile key={punkt.id} punkt={punkt} handy istAktiv={aktiv === punkt.id} ariaCurrent={ariaAktuell(pathname, punkt)} anzahl={zahlVon(punkt)} onNavigate={schliessen} />
+                  ))}
                   <Gruppe>{VERKAUF_UND_KUNDEN_TITEL}</Gruppe>
                   {nav.verkaufUndKunden.map((punkt) => (
                     <NavZeile key={punkt.id} punkt={punkt} handy istAktiv={aktiv === punkt.id} ariaCurrent={ariaAktuell(pathname, punkt)} anzahl={zahlVon(punkt)} onNavigate={schliessen} />
                   ))}
-                  <div className="my-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.10)' }} />
+                  <div className="my-2 border-t border-white/10" />
                   {nav.unten.map((punkt) => (
                     <NavZeile key={punkt.id} punkt={punkt} handy istAktiv={aktiv === punkt.id} ariaCurrent={ariaAktuell(pathname, punkt)} anzahl={zahlVon(punkt)} onNavigate={schliessen} />
                   ))}
@@ -450,12 +461,12 @@ export function FarmerNav({
 
       {/* ===== BROWSER: Seitenleiste ===== */}
       <aside
-        className="hidden md:fixed md:inset-y-0 md:left-0 md:z-40 md:flex md:w-56 md:flex-col print:hidden"
-        style={{ background: 'var(--app-bar)', borderRight: '1px solid rgba(255,255,255,0.08)' }}
+        className="hidden border-r border-white/8 md:fixed md:inset-y-0 md:left-0 md:z-40 md:flex md:w-56 md:flex-col print:hidden"
+        style={{ background: 'var(--app-bar)' }}
       >
         {/* Hof-Visitenkarte am Kopf: der Hof tritt auf. WER angemeldet ist,
             steht unten bei den Handlungen der Person. */}
-        <div className="shrink-0 px-4 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
+        <div className="shrink-0 border-b border-white/10 px-4 py-4">
           <FarmIdentityCard farmName={farmName} logoUrl={farmLogoUrl} wartetAufFreigabe={farmPending} />
         </div>
 
@@ -463,33 +474,35 @@ export function FarmerNav({
             bleibt so jeder Punkt erreichbar, auf hohen sitzt der Rest unten. */}
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <div className="px-2 pt-3">
-            <Menu.Root>
-              <Menu.Trigger
+            {/* Der Neu-Knopf nach dem Mockup (hof-sidebar-komponente.html): volle
+                Breite, deshalb Radius 13 statt Pille (DESIGN_SYSTEM „Form"),
+                Symbol links, Pfeil rechts, unten eine dünne dunkle Kante aus
+                der Schriftfarbe des Knopfs. Das Menü zeigt die zwei Dinge, die
+                auf der Hofseite landen (NEU_BROWSER). */}
+            <DropdownMenu>
+              <DropdownMenuTrigger
                 className={cn(
-                  'flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent px-3 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover',
+                  // Rand und Unterkante im Ton der Schrift, wie im Mockup: 1 px Rand bei 30 %, innen unten 1 px bei 20 %.
+                  'group flex min-h-11 w-full items-center gap-2.5 rounded-[13px] border border-accent-foreground/30 bg-accent px-3.5 text-left text-[14.5px] font-semibold text-accent-foreground shadow-[inset_0_-1px_0_0] shadow-accent-foreground/20 transition-colors hover:bg-accent-hover',
                   FOKUS
                 )}
               >
-                <Plus className="size-4" strokeWidth={2} aria-hidden="true" />
-                Neu
-              </Menu.Trigger>
-              <Menu.Portal>
-                <Menu.Positioner side="bottom" align="start" sideOffset={6} className="z-50 outline-none">
-                  <Menu.Popup className="w-72 origin-[var(--transform-origin)] rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-lg outline-none transition-[opacity,transform] duration-150 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
-                    {nav.neu.map((punkt) => (
-                      <Menu.LinkItem
-                        key={punkt.id}
-                        closeOnClick
-                        render={<Link href={punkt.href} />}
-                        className="flex items-center gap-3 rounded-lg px-2.5 py-2 outline-none data-[highlighted]:bg-muted"
-                      >
-                        <NeuInhalt punkt={punkt} />
-                      </Menu.LinkItem>
-                    ))}
-                  </Menu.Popup>
-                </Menu.Positioner>
-              </Menu.Portal>
-            </Menu.Root>
+                <Plus className="size-4 shrink-0" strokeWidth={2} aria-hidden="true" />
+                <span className="flex-1">Neu</span>
+                <ChevronDown
+                  className="size-4 shrink-0 opacity-80 transition-transform group-data-[popup-open]:rotate-180"
+                  strokeWidth={2}
+                  aria-hidden="true"
+                />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-72">
+                {nav.neuBrowser.map((punkt) => (
+                  <DropdownMenuLinkItem key={punkt.id} render={<Link href={punkt.href} />}>
+                    <NeuInhalt punkt={punkt} />
+                  </DropdownMenuLinkItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <nav aria-label="Hauptnavigation" className="space-y-0.5 px-2 py-3">
@@ -502,7 +515,7 @@ export function FarmerNav({
             ))}
           </nav>
 
-          <div className="mt-auto space-y-0.5 px-2 py-3" style={{ borderTop: '1px solid rgba(255,255,255,0.10)' }}>
+          <div className="mt-auto space-y-0.5 border-t border-white/10 px-2 py-3">
             <Person name={userName} handy={false} />
             {nav.unten.map((punkt) => (
               <NavZeile key={punkt.id} punkt={punkt} handy={false} istAktiv={aktiv === punkt.id} ariaCurrent={ariaAktuell(pathname, punkt)} anzahl={zahlVon(punkt)} />

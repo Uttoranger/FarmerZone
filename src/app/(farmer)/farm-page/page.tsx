@@ -4,7 +4,7 @@ import { auth } from '@/lib/auth'
 import { getFarmSettings, getMeinHofKopf, getOwnerFarm } from '@/server/queries/farm'
 import { getAppearanceData } from '@/server/queries/appearance'
 import { getActiveStatusPost, getPastStatusCount } from '@/server/queries/status-posts'
-import { zaehleBeitraege, zaehleProdukte } from '@/server/queries/mein-hof-zahl'
+import { zaehleBeitraege } from '@/server/queries/mein-hof-zahl'
 import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
 import { FarmPageClient } from '@/components/farmer/farm-page-client'
 import { HofseiteEditor } from '@/components/farmer/hofseite-editor'
@@ -26,11 +26,10 @@ export default async function FarmPageOwnerRoute() {
   const farm = await getOwnerFarm(session.user.id)
   if (!farm) redirect('/onboarding')
 
-  const [activeStatus, pastStatusCount, kopf, produktZahl, beitraegeZahl, einstellungen, auftritt] = await Promise.all([
+  const [activeStatus, pastStatusCount, kopf, beitraegeZahl, einstellungen, auftritt] = await Promise.all([
     getActiveStatusPost(farm.id),
     getPastStatusCount(farm.id),
     getMeinHofKopf(session.user.id),
-    zaehleProdukte(farm.id),
     zaehleBeitraege(farm.id),
     getFarmSettings(session.user.id),
     getAppearanceData(session.user.id),
@@ -43,7 +42,7 @@ export default async function FarmPageOwnerRoute() {
     <>
       {/* Der Kopf von „Mein Hof" — unter lg über der Hofseite, ab lg über der Liste. */}
       <div className="px-4 pt-6 max-w-2xl mx-auto lg:max-w-none lg:px-8">
-        <MeinHofKopf hof={kopf} aktiv="hofseite" produktZahl={produktZahl} beitraegeZahl={beitraegeZahl} />
+        <MeinHofKopf hof={kopf} aktiv="hofseite" beitraegeZahl={beitraegeZahl} />
       </div>
 
       {/* Unter lg: die Hofseite mit Stiften, wie bisher. */}
@@ -54,10 +53,15 @@ export default async function FarmPageOwnerRoute() {
       {/* Ab lg: Liste links, Vorschau rechts. Nur, was der Editor braucht —
           kein Date und kein Decimal über die Grenze (CODING_STANDARDS §2). */}
       <div className="hidden px-8 pb-12 lg:block">
+        {/* Die Überschrift der Seite ab lg — unter lg trägt sie die Hofseite selbst.
+            Sichtbar ist der Hofname im Kopf; die H1 hört nur der Screenreader. */}
+        <h1 className="sr-only">Hofseite bearbeiten</h1>
         <HofseiteEditor
           fortschritt={fortschritt}
           hof={{
             slug: farm.slug,
+            name: farm.name,
+            adresse: kopf?.adresse.anzeige ?? '',
             logoUrl: farm.logoUrl,
             bannerType: farm.bannerType,
             bannerUrl: farm.bannerUrl,

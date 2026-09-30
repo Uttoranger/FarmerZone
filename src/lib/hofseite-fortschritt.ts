@@ -175,13 +175,16 @@ function zeilen(stand: HofseiteStand): HofseiteZeile[] {
         : 'Noch keine — erst dann können Kunden bestellen',
       stand.abholzeiten.length > 0
     ),
-    // Bar vor Ort geht immer (settings/payments) — online ist die Kür, nie ein Fehlen.
+    // Bar vor Ort geht immer (settings/payments) — online ist die Kür, nie ein
+    // Fehlen: Die Zeile zählt als fertig, trägt ohne Online-Zahlung aber das
+    // Warnschild „Online fehlt" statt des Häkchens (Mockup hof-mein-hof-v2-desktop).
     zeile(
       'zahlung',
       'abholen-bezahlen',
       'Zahlungsarten',
-      online ? 'Online mit Karte · vor Ort bar und mit Karte' : 'Vor Ort bar und mit Karte · online noch nicht eingerichtet',
-      true
+      online ? 'Online mit Karte · vor Ort bar und mit Karte' : 'Vor Ort bar und mit Karte · Online-Zahlung noch nicht eingerichtet',
+      true,
+      online ? null : { text: 'Online fehlt', farbe: 'bernstein' }
     ),
     zeile(
       'kontakt',

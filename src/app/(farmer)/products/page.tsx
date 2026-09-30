@@ -3,10 +3,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getProductsForFarm, getHofBetriebsnummer } from '@/server/queries/products'
-import { getMeinHofKopf } from '@/server/queries/farm'
 import { ProductList } from '@/components/products/product-list'
-import { MeinHofKopf } from '@/components/farmer/mein-hof-kopf'
-import { zaehleBeitraege } from '@/server/queries/mein-hof-zahl'
 
 // ?neu=1 und ?edit=<id> liest die Liste selbst (src/lib/use-url-auftrag.ts).
 export default async function ProductsPage() {
@@ -16,18 +13,20 @@ export default async function ProductsPage() {
   const farm = await getFarmForUser(session.user.id)
   if (!farm) redirect('/login')
 
-  const [products, hofBetriebsnummer, kopf, beitraegeZahl] = await Promise.all([
-    getProductsForFarm(farm.id),
-    getHofBetriebsnummer(farm.id),
-    getMeinHofKopf(session.user.id),
-    zaehleBeitraege(farm.id),
-  ])
+  const [products, hofBetriebsnummer] = await Promise.all([getProductsForFarm(farm.id), getHofBetriebsnummer(farm.id)])
 
   return (
     // Ab lg über die volle Inhaltsbreite: Dort steht die Liste als Tabelle mit
     // fünf Spalten, die in 672 px nicht Platz hätte. Am Handy bleiben Karten.
     <div className="px-4 py-6 max-w-2xl mx-auto lg:max-w-none lg:px-8">
-      <MeinHofKopf hof={kopf} aktiv="produkte" produktZahl={products.length} beitraegeZahl={beitraegeZahl} />
+      {/* Produkte sind Tagesgeschäft mit eigenem Platz in der Leiste — kein
+          Kopf von „Mein Hof" mehr darüber (Mockup hof-sidebar-komponente.html). */}
+      <header className="mb-6 print:hidden">
+        <h1 className="font-heading text-2xl font-semibold text-app-ink">Produkte</h1>
+        <p className="mt-1 text-sm text-app-ink-soft">
+          {products.length === 1 ? 'Ein Produkt' : `${products.length} Produkte`} · Foto, Preis, Lagerstand.
+        </p>
+      </header>
       <ProductList products={products} hofBetriebsnummer={hofBetriebsnummer} />
     </div>
   )
