@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Geist, Fraunces } from 'next/font/google'
+import { Geist, Fraunces, Instrument_Sans } from 'next/font/google'
 import { ThemeProvider } from 'next-themes'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/sonner'
@@ -16,11 +16,27 @@ const geist = Geist({
   display: 'swap',
 })
 
+// Beide Schriften des Design-Systems (docs/ai/DESIGN_SYSTEM.md) kommen über
+// next/font: beim Build geladen, vom eigenen Ursprung ausgeliefert — der
+// Browser spricht nie mit Google. Die <link>-Schriften in docs/mockups/ sind
+// nur Referenz. Fraunces für Überschriften und Kennzahlen, Instrument Sans
+// für den übrigen Text im neuen Design (globals.css, --font-sans-aktiv);
+// Geist bleibt, bis die letzte Route umgestellt ist.
 const fraunces = Fraunces({
   variable: '--font-fraunces',
   subsets: ['latin'],
   display: 'swap',
   style: ['normal', 'italic'],
+})
+
+const instrumentSans = Instrument_Sans({
+  variable: '--font-instrument-sans',
+  subsets: ['latin'],
+  display: 'swap',
+  // Noch nicht vorladen: Bis die erste Route den Marker data-design="neu"
+  // trägt, nutzt keine Seite die Schrift — jede Bestandsseite lüde sonst
+  // eine woff2 umsonst. Gate 2 stellt auf true, sobald die Shell steht.
+  preload: false,
 })
 
 // In der Testumgebung trägt JEDER Browser-Tab das Präfix „[TEST] " — auch
@@ -45,7 +61,7 @@ export function generateMetadata(): Metadata {
 
 // Färbt die Browserleiste auf dem Handy wie den Seitenhintergrund. Die Werte
 // sind die sRGB-Entsprechungen von --background aus globals.css (:root und
-// .dark). Die Media-Query folgt der Systemeinstellung — wer im Konto von Hand
+// [data-theme="dark"]). Die Media-Query folgt der Systemeinstellung — wer im Konto von Hand
 // auf Hell oder Dunkel stellt, behält die Leiste des Systems. Das lässt sich
 // ohne JavaScript im <head> nicht anders lösen und ist bewusst so.
 const THEME_COLOR_PRODUKTION: Viewport['themeColor'] = [
@@ -68,21 +84,23 @@ export function generateViewport(): Viewport {
   }
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
-    // suppressHydrationWarning: next-themes setzt die Klasse "dark" per Inline-
-    // Skript vor dem ersten Paint. Der Server kann sie nicht kennen, deshalb
-    // weicht das <html>-Element planmäßig ab — nur hier, nicht im Inhalt.
+    // suppressHydrationWarning: next-themes setzt data-theme per Inline-Skript
+    // im <head> vor dem ersten Paint — Erstbesuch nach prefers-color-scheme,
+    // danach die gemerkte Wahl (localStorage „theme"). Der Server kann den
+    // Wert nicht kennen, deshalb weicht das <html>-Element planmäßig ab —
+    // nur hier, nicht im Inhalt.
     <html
       lang="de"
       suppressHydrationWarning
-      className={`${geist.variable} ${fraunces.variable} h-full antialiased`}
+      className={`${geist.variable} ${fraunces.variable} ${instrumentSans.variable} h-full antialiased`}
     >
       <body className="min-h-full font-sans">
         {/* Vor dem ThemeProvider: Der Balken folgt keinem Modus. */}
         <UmgebungsBanner />
         <ThemeProvider
-          attribute="class"
+          attribute="data-theme"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange

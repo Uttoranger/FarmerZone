@@ -2,14 +2,26 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/* Der Modus hängt am <html> als data-theme="light|dark" — gesetzt von
+   next-themes per Inline-Skript vor der Hydration (src/app/layout.tsx), also
+   ohne Flackern. dark:-Utilities folgen diesem Attribut, nicht einer Klasse
+   (docs/ai/DESIGN_SYSTEM.md, „Technische Regeln"). Mit :is, nicht :where —
+   dieselbe Spezifität wie die frühere Klasse, sonst schlügen hover: und
+   aria-*: im Dunkeln die dark:-Klasse derselben Eigenschaft. */
+@custom-variant dark (&:is([data-theme="dark"] *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  /* Die Fließschrift wechselt mit dem Design: Geist im bisherigen Bestand,
+     Instrument Sans im neuen (Geltungsbereich data-design="neu", unten). */
+  --font-sans: var(--font-sans-aktiv);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-fraunces);
+  /* Zustandsfarben des Design-Systems (docs/ai/DESIGN_SYSTEM.md): offen/zum
+     Packen, erledigt/gepackt. Als Text- und Symbolfarbe, je Modus eigen. */
+  --color-status-offen: var(--fz-status-offen);
+  --color-status-fertig: var(--fz-status-fertig);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -155,7 +167,8 @@
   --landing-green: oklch(0.703 0.081 150); /* #7BAE85 */
   /* Der gefüllte Knopf im Kopf der Startseite: Crème mit Waldgrün-Schrift.
      Er steht auf dem Foto, das dem Modus nicht folgt — deshalb in beiden
-     Modi gleich und nur hier, nicht noch einmal in .dark.
+     Modi gleich und nur hier, nicht noch einmal im Nacht-Block
+     ([data-theme="dark"]).
      Werte = --primary / --primary-foreground am Tag. */
   --landing-wald: oklch(0.30 0.082 155); /* #1F4732 */
   --landing-wald-ink: oklch(0.95 0.018 87); /* #F5EFE0 */
@@ -178,7 +191,7 @@
      --foreground, ein eigener Seitenton, Sand- und Grün-Chips. Sie lag
      als Hex in Inline-Styles über rund vierzig Dateien verstreut.
      Die Tag-Werte hier sind exakt die bisherigen — nichts verschiebt
-     sich; erst der .dark-Block gibt ihnen eine zweite Lesart.
+     sich; erst der Block [data-theme="dark"] gibt ihnen eine zweite Lesart.
 
      Für Weiß (--card) und die feinen 1px-Rahmen (--border) gibt es
      KEIN eigenes Token: Dort waren die Werte ohnehin deckungsgleich. */
@@ -194,7 +207,7 @@
   --app-bar: oklch(0.399 0.066 158.6); /* #24523A — Bauern-Leiste */
   /* Die Bauern-Leiste ist in BEIDEN Modi dunkelgrün — sie war es schon am
      Tag. Ihre Schrift ändert sich deshalb nicht und steht nur hier, nicht
-     noch einmal in .dark. */
+     noch einmal im Nacht-Block ([data-theme="dark"]). */
   --app-bar-ink: oklch(0.964 0.007 88.6); /* #F5F3EE */
   --app-bar-ink-soft: oklch(0.899 0.029 156.6); /* #CFE4D6 */
   --app-trough: oklch(0.946 0.011 89.7); /* #F0EDE5 — Wanne der Segmentwahl */
@@ -204,9 +217,32 @@
   --notice-line: oklch(0.898 0.04 67.3); /* #F0D9C2 */
   --notice-icon: oklch(0.601 0.124 54.9); /* #B86A2E */
   --notice-ink: oklch(0.48 0.105 54.9); /* #8A4B18 */
+
+  /* Fließschrift des bisherigen Bestands (siehe @theme inline). */
+  --font-sans-aktiv: var(--font-geist-sans);
+
+  /* ── Design-System (docs/ai/DESIGN_SYSTEM.md, Farbtokens) ─────────
+     Die Tokens des Redesigns, Präfix fz-, damit sie nicht mit den
+     shadcn-Variablen gleichen Namens (--border, --primary, --accent)
+     zusammenstoßen, die der Bestand mit anderer Bedeutung nutzt. Werte
+     als oklch (CODING_STANDARDS §7), der Hexwert der Tabelle daneben;
+     tests/design-tokens.test.ts gleicht beide ab. Hier der helle Satz,
+     der dunkle steht bei [data-theme="dark"]. Gebraucht werden sie über
+     die shadcn-Variablen im Geltungsbereich data-design="neu" (unten). */
+  --fz-bg: oklch(0.9577 0.0136 93.0); /* #F4F1E7 */
+  --fz-surface: oklch(0.9817 0.0095 93.6); /* #FBF9F2 */
+  --fz-border: oklch(0.8961 0.0273 95.4); /* #E2DDC9 */
+  --fz-text: oklch(0.2499 0.0174 148.5); /* #1C241D */
+  --fz-text-muted: oklch(0.5089 0.0269 143.2); /* #5D6A5C */
+  --fz-accent: oklch(0.4765 0.0886 153.9); /* #2E6B45 — Grün: Kundenaktion, erledigt */
+  --fz-on-accent: oklch(0.9660 0.0134 97.4); /* #F6F4EA */
+  --fz-primary: oklch(0.6847 0.1414 44.8); /* #E07A4A — Orange: Hofbereich, offen */
+  --fz-on-primary: oklch(0.2034 0.0338 50.7); /* #231208 */
+  --fz-status-offen: oklch(0.5109 0.1198 47.2); /* #9C4D20 */
+  --fz-status-fertig: oklch(0.4765 0.0886 153.9); /* #2E6B45 */
 }
 
-.dark {
+[data-theme="dark"] {
   /* ── Warm Harvest – Nacht ───────────────────────────────────────
      Gleiche Marke, andere Tageszeit: dunkles Waldgrün als Grund, warmes
      Crème als Schrift. Tiefe entsteht über Rahmen, nicht über Schatten —
@@ -296,6 +332,69 @@
   --notice-line: oklch(0.36 0.06 62);
   --notice-icon: oklch(0.78 0.12 62);
   --notice-ink: oklch(0.87 0.07 75);
+
+  /* Design-System bei Nacht — Markenfarben und ihre Schrift bleiben, Grund,
+     Fläche, Rahmen und Text kippen, die Zustandsfarben werden heller. */
+  --fz-bg: oklch(0.1660 0.0115 150.9); /* #0B100C */
+  --fz-surface: oklch(0.2115 0.0181 148.3); /* #131B14 */
+  --fz-border: oklch(0.2955 0.0295 150.4); /* #223125 */
+  --fz-text: oklch(0.9484 0.0150 94.2); /* #F1EEE3 */
+  --fz-text-muted: oklch(0.7162 0.0266 143.4); /* #9AA899 */
+  --fz-accent: oklch(0.4765 0.0886 153.9); /* #2E6B45 */
+  --fz-on-accent: oklch(0.9660 0.0134 97.4); /* #F6F4EA */
+  --fz-primary: oklch(0.6847 0.1414 44.8); /* #E07A4A */
+  --fz-on-primary: oklch(0.2034 0.0338 50.7); /* #231208 */
+  --fz-status-offen: oklch(0.7512 0.1071 50.3); /* #E59A6F */
+  --fz-status-fertig: oklch(0.8140 0.0691 155.1); /* #9FD0AF */
+}
+
+/* ── Neues Design im Geltungsbereich ─────────────────────────────────
+   Das Redesign kommt Route für Route (docs/umsetzungsprompt.md, kein Big
+   Bang): Sobald ein Element data-design="neu" trägt — die Shell einer
+   umgestellten Route —, bekommen die shadcn-Variablen im GANZEN Dokument
+   die Werte des Design-Systems, also auch Portale (Dialog, Sheet, Toast),
+   die außerhalb der Shell in <body> hängen. Ohne Marker bleibt alles beim
+   Bestand. Komponenten schreiben weiter bg-background, bg-card, bg-primary
+   usw. — die Zuordnung steht nur hier. Werte, die das Design-System nicht
+   nennt (Hover, muted, secondary), sind abgeleitet und so gekennzeichnet. */
+:root:is([data-design="neu"], :has([data-design="neu"])) {
+  --font-sans-aktiv: var(--font-instrument-sans);
+
+  --background: var(--fz-bg);
+  --foreground: var(--fz-text);
+  --card: var(--fz-surface);
+  --card-foreground: var(--fz-text);
+  --popover: var(--fz-surface);
+  --popover-foreground: var(--fz-text);
+  --primary: var(--fz-primary);
+  --primary-foreground: var(--fz-on-primary);
+  --accent: var(--fz-accent);
+  --accent-foreground: var(--fz-on-accent);
+  /* abgeleitet: Hover eine Spur zum Text hin, in beiden Modi sichtbar */
+  --accent-hover: color-mix(in oklch, var(--fz-accent) 88%, var(--fz-text));
+  /* Grün als TEXT und als Fokusring: das Knopf-Grün (--fz-accent) hätte im
+     Dunkeln nur 3:1 auf dem Grund. --fz-status-fertig ist am Tag dasselbe
+     Grün und nachts das helle Salbei — ≥ 4,5:1 auf Grund und Fläche. */
+  --brand-text: var(--fz-status-fertig);
+  --ring: var(--fz-status-fertig);
+  /* abgeleitet: Wannen und Nebenflächen liegen zwischen Fläche und Rahmen —
+     der reine Rahmenton brächte den leisen Text darauf unter 4,5:1 */
+  --muted: color-mix(in oklch, var(--fz-surface) 60%, var(--fz-border));
+  --muted-foreground: var(--fz-text-muted);
+  --secondary: color-mix(in oklch, var(--fz-surface) 60%, var(--fz-border));
+  --secondary-foreground: var(--fz-text);
+  --border: var(--fz-border);
+  --input: var(--fz-border);
+  --sidebar: var(--fz-surface);
+  --sidebar-foreground: var(--fz-text);
+  --sidebar-primary: var(--fz-primary);
+  --sidebar-primary-foreground: var(--fz-on-primary);
+  --sidebar-accent: var(--fz-border);
+  --sidebar-accent-foreground: var(--fz-text);
+  --sidebar-border: var(--fz-border);
+  --sidebar-ring: var(--fz-status-fertig);
+  /* Karten 14–16 px, Knöpfe als Pille (rounded-full) — DESIGN_SYSTEM „Form“ */
+  --radius: 1rem;
 }
 
 @layer base {

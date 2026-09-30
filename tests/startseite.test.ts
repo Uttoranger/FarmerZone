@@ -165,7 +165,7 @@ describe('Farben', () => {
   it('der Knopf im Kopf ist Crème mit Waldgrün — in beiden Modi gleich, weil er auf dem Foto steht', () => {
     const css = quelle('src/app/globals.css')
     expect(css).toContain('--color-landing-wald: var(--landing-wald);')
-    const nachtBeginn = css.indexOf('.dark {')
+    const nachtBeginn = css.indexOf('[data-theme="dark"] {')
     expect(nachtBeginn).toBeGreaterThan(-1)
     expect(css.slice(0, nachtBeginn)).toMatch(/--landing-wald: oklch\(/)
     expect(css.slice(nachtBeginn)).not.toContain('--landing-wald')
