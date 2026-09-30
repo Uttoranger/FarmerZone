@@ -1,7 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowUpRight, Eye } from 'lucide-react'
-import { MEIN_HOF_REITER, type MeinHofReiterId } from '@/lib/bauern-navigation'
+import { MEIN_HOF_HINWEIS, MEIN_HOF_REITER, type MeinHofReiterId } from '@/lib/bauern-navigation'
 import { hofInitialen } from '@/lib/hof-initialen'
 import { titelbildVerlauf } from '@/lib/mein-hof'
 import type { MeinHofKopfDaten } from '@/server/queries/farm'
@@ -11,9 +11,10 @@ import { Schild } from '@/components/farmer/schild'
 import { cn } from '@/lib/utils'
 
 /*
- * Der gemeinsame Kopf von „Mein Hof" über drei vorhandenen Seiten: Produkte
- * (/products), Hofseite (/farm-page), Beiträge (/status). Die Seiten selbst
- * bleiben, wie sie sind; jede rendert diesen Kopf mit ihrem Reiter. Die
+ * Der gemeinsame Kopf von „Mein Hof" über zwei vorhandenen Seiten: Hofseite
+ * (/farm-page) und Beiträge (/status). Produkte hat seinen eigenen Platz in
+ * der Leiste. Die Seiten selbst bleiben, wie sie sind; jede rendert diesen
+ * Kopf mit ihrem Reiter. Die
  * Unterseiten (/status/new usw.) bekommen ihn bewusst nicht — dort wird
  * etwas getan, nicht gewechselt.
  *
@@ -101,13 +102,10 @@ function ZustandSchild({ hof, className }: { hof: MeinHofKopfDaten; className?: 
 export function MeinHofKopf({
   hof,
   aktiv,
-  produktZahl,
   beitraegeZahl,
 }: {
   hof: MeinHofKopfDaten | null
   aktiv: MeinHofReiterId
-  /** Steht hinter dem Reiter „Produkte" („Produkte · 2"). */
-  produktZahl?: number
   /** Steht ab lg hinter dem Reiter „Beiträge" — unter lg bleibt der Reiter, wie er war. */
   beitraegeZahl?: number
 }): React.JSX.Element | null {
@@ -193,12 +191,12 @@ export function MeinHofKopf({
         )}
       </div>
 
-      <nav aria-label="Mein Hof" className="mt-3 flex border-b border-border">
+      {/* Die Reiter kompakt links gruppiert, nicht über die Breite verteilt
+          (Mockup hof-mein-hof-v2-desktop.html); rechts, sobald die Seitenleiste
+          da ist, der Hinweis, wo Produkte jetzt liegen. */}
+      <nav aria-label="Mein Hof" className="mt-3 flex items-center gap-6 border-b border-border">
         {MEIN_HOF_REITER.map((reiter) => {
           const istAktiv = reiter.id === aktiv
-          // Als EIN Text wie bisher: Getrennte Textknoten setzt der Browser
-          // um Bruchteile eines Pixels anders — unter lg soll sich nichts ändern.
-          const label = reiter.id === 'produkte' && produktZahl != null ? `${reiter.label} · ${produktZahl}` : reiter.label
           return (
             <Link
               key={reiter.id}
@@ -207,13 +205,13 @@ export function MeinHofKopf({
               className={cn(
                 // Fokus als Rahmen, nicht als Fläche: Die Reiter stehen auf dem
                 // Seitengrund, eine halbdurchsichtige Fläche sähe man dort kaum.
-                '-mb-px flex min-h-11 flex-1 items-center justify-center rounded-t-md border-b-2 px-2 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+                '-mb-px flex min-h-11 items-center rounded-t-md border-b-2 px-0.5 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
                 istAktiv
                   ? 'border-brand-text font-semibold text-app-ink'
                   : 'border-transparent text-app-ink-soft hover:text-app-ink'
               )}
             >
-              {label}
+              {reiter.label}
               {reiter.id === 'beitraege' && beitraegeZahl != null && (
                 <span className="hidden lg:inline">
                   {' · '}
@@ -223,6 +221,7 @@ export function MeinHofKopf({
             </Link>
           )
         })}
+        <p className="ml-auto hidden text-xs text-app-ink-soft md:block">{MEIN_HOF_HINWEIS}</p>
       </nav>
     </header>
   )

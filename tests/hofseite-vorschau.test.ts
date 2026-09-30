@@ -20,13 +20,17 @@ import { join } from 'node:path'
 import { BEREIT_TYP, MARKIERUNG_TYP, markierungSchema } from '@/schemas/hofseite-vorschau'
 import {
   VORSCHAU_KAUF_HINWEIS,
+  VORSCHAU_SEITENBREITE,
+  VORSCHAU_WEB_MINDESTBREITE,
   korbErlaubt,
   leseBereit,
   leseMarkierung,
   verlaesstRahmen,
   vorschauAdresse,
   vorschauGewuenscht,
+  vorschauMassstab,
   vorschauZugriff,
+  VORSCHAU_BEARBEITUNG_BREITE,
 } from '@/lib/hofseite-vorschau'
 
 const quelltext = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
@@ -136,6 +140,34 @@ describe('Bereit-Meldung', () => {
     expect(BEREIT_TYP).not.toBe(MARKIERUNG_TYP)
     expect(BEREIT_TYP.startsWith('farmerzone:')).toBe(true)
     expect(MARKIERUNG_TYP.startsWith('farmerzone:')).toBe(true)
+  })
+})
+
+describe('Maßstab und Gerät der Vorschau', () => {
+  it('Web: Rahmenbreite geteilt durch 1440, nie über 1', () => {
+    expect(vorschauMassstab({ breite: 720 }, 'web')).toBeCloseTo(0.5, 6)
+    expect(vorschauMassstab({ breite: 644 }, 'web')).toBeCloseTo(644 / 1440, 6)
+    expect(vorschauMassstab({ breite: 2000 }, 'web')).toBe(1)
+    // Die Höhe spielt im Web keine Rolle — die Seite scrollt im Rahmen.
+    expect(vorschauMassstab({ breite: 720, hoehe: 100 }, 'web')).toBeCloseTo(0.5, 6)
+  })
+
+  it('Handy: Rahmenbreite geteilt durch 390; mit Höhe zählt die engere Seite', () => {
+    expect(vorschauMassstab({ breite: 304 }, 'handy')).toBeCloseTo(304 / 390, 6)
+    expect(vorschauMassstab({ breite: 390 }, 'handy')).toBe(1)
+    expect(vorschauMassstab({ breite: 600, hoehe: 422 }, 'handy')).toBeCloseTo(0.5, 6)
+    expect(vorschauMassstab({ breite: 0 }, 'handy')).toBe(1)
+  })
+
+  it('die Web-Vorschau passt erst ab 1280 px neben die Bearbeitung, die dann 400 px behält', () => {
+    expect(VORSCHAU_WEB_MINDESTBREITE).toBe(1280)
+    expect(VORSCHAU_BEARBEITUNG_BREITE).toBe(400)
+    // Der Editor fragt die Fensterbreite genau mit dieser Grenze ab.
+    expect(quelltext('src/components/farmer/hofseite-editor.tsx')).toContain('useMindestbreite(VORSCHAU_WEB_MINDESTBREITE)')
+  })
+
+  it('die Seitenbreiten sind die der Mockups', () => {
+    expect(VORSCHAU_SEITENBREITE).toEqual({ handy: 390, web: 1440 })
   })
 })
 

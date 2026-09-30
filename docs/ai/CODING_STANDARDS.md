@@ -261,6 +261,11 @@ Palette `--app-*` (`app-page`, `app-ink`, `app-ink-soft`, `app-ink-faint`,
 baut, nimmt diese Tokens — nicht `foreground`/`card`, sonst stehen zwei
 Grautöne nebeneinander. Begründung in `DEVELOPMENT.md`.
 
+`app-ink-faint` ist nur für Symbole und Trenner, nie für Lesetext — auch nicht
+für Hinweise, Bildunterschriften oder Gruppenüberschriften: Auf den Flächen
+liegt der Kontrast unter 4,5:1 (Axe `color-contrast`). Leiser Lesetext nimmt
+`app-ink-soft`.
+
 **`--brand-text` ist neu und nicht dasselbe wie `--primary`.** `--primary` ist die
 *Fläche* des Hauptknopfs und wird im Dunkeln hell (heller Salbei, damit dunkle
 Schrift darauf sitzt). Markentext braucht den umgekehrten Weg: hell ist er das

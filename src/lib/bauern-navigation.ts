@@ -2,24 +2,32 @@
  * Die Navigation des Bauern-Bereichs — EINE Ordnung für Handy und Browser.
  *
  * Am Handy: Heute · Bestellungen · ➕ · Mein Hof · Mehr. Im Browser dieselbe
- * Reihenfolge als Seitenleiste: Hof-Visitenkarte, „Neu", die Hauptpunkte,
- * die Gruppe „Verkauf und Kunden", unten der Rest. Die Komponente
+ * Ordnung als Seitenleiste: Hof-Visitenkarte, „Neu", die Hauptpunkte
+ * (dort zusätzlich „Produkte" zwischen Bestellungen und Mein Hof), die Gruppe
+ * „Verkauf und Kunden", unten der Rest. Die Komponente
  * (components/farmer/farmer-nav.tsx) ordnet nur Symbole zu und zeichnet —
  * welcher Punkt wohin gehört und wann er aktiv ist, steht hier und ist
  * getestet (tests/bauern-navigation.test.ts).
  *
+ * „Produkte" ist Tagesgeschäft und deshalb ein eigener Punkt (Mockup
+ * hof-sidebar-komponente.html). Am Handy hat die Leiste nur fünf Plätze —
+ * dort liegt Produkte oben im Mehr-Blatt (NUR_IM_MEHR).
+ *
  * Das Plus in der Mitte ist eine bewusste Entscheidung für die drei
  * häufigsten Handlungen; es öffnet die vorhandenen Dialoge über die
- * URL-Parameter ?neu=1 (lib/url-auftrag.ts), keine neuen.
+ * URL-Parameter ?neu=1 (lib/url-auftrag.ts), keine neuen. Der „Neu"-Knopf
+ * der Seitenleiste zeigt nach dem Mockup nur die beiden Dinge, die auf der
+ * Hofseite landen (NEU_BROWSER).
  *
- * „Mein Hof" bündelt drei vorhandene Seiten unter einem gemeinsamen Kopf
- * mit Reitern (components/farmer/mein-hof-kopf.tsx): Produkte, Hofseite,
- * Beiträge. Der Punkt ist auf allen dreien aktiv.
+ * „Mein Hof" bündelt zwei vorhandene Seiten unter einem gemeinsamen Kopf
+ * mit Reitern (components/farmer/mein-hof-kopf.tsx): Hofseite, Beiträge.
+ * Der Punkt ist auf beiden aktiv.
  */
 
 export type NavPunktId =
   | 'heute'
   | 'bestellungen'
+  | 'produkte'
   | 'mein-hof'
   | 'kunden'
   | 'verkaeufe'
@@ -34,8 +42,8 @@ export type NavPunkt = {
   href: string
   /**
    * Weitere Pfade, auf denen der Punkt aktiv ist: „Mein Hof" startet mit
-   * /products und umfasst auch /farm-page und /status; „Hilfe und Rückmeldung"
-   * führt nach /meldungen und leuchtet auch auf /fehler-melden.
+   * /farm-page und umfasst auch /status; „Hilfe und Rückmeldung" führt nach
+   * /meldungen und leuchtet auch auf /fehler-melden.
    */
   auchAktivAuf?: readonly string[]
   /** Eine Zahl am Punkt: offene Bestellungen bzw. Meldungen, die auf den Betreiber warten. */
@@ -54,21 +62,24 @@ export type NeuPunkt = {
   href: string
 }
 
-/** Die Reiter unter dem Kopf von „Mein Hof" — Produkte ist der Standard. */
-export type MeinHofReiterId = 'produkte' | 'hofseite' | 'beitraege'
+/** Die Reiter unter dem Kopf von „Mein Hof" — Hofseite ist der Standard. */
+export type MeinHofReiterId = 'hofseite' | 'beitraege'
 
 export type MeinHofReiter = { id: MeinHofReiterId; label: string; href: string }
 
 export const MEIN_HOF_REITER: readonly MeinHofReiter[] = [
-  { id: 'produkte', label: 'Produkte', href: '/products' },
   { id: 'hofseite', label: 'Hofseite', href: '/farm-page' },
   { id: 'beitraege', label: 'Beiträge', href: '/status' },
 ]
 
-/** Die drei Hauptpunkte — am Handy direkt in der Leiste. */
+/** Der Hinweis rechts neben den Reitern im Browser — Produkte hat seinen eigenen Platz in der Leiste. */
+export const MEIN_HOF_HINWEIS = 'Produkte verwaltest du links unter „Produkte".'
+
+/** Die Hauptpunkte — im Browser alle vier in der Leiste, am Handy drei davon direkt. */
 export const HAUPT: readonly NavPunkt[] = [
   { id: 'heute', label: 'Heute', href: '/dashboard' },
   { id: 'bestellungen', label: 'Bestellungen', href: '/orders', zahl: 'bestellungen' },
+  { id: 'produkte', label: 'Produkte', href: '/products' },
   {
     id: 'mein-hof',
     label: 'Mein Hof',
@@ -77,7 +88,13 @@ export const HAUPT: readonly NavPunkt[] = [
   },
 ]
 
-/** Plus bzw. „Neu": die drei häufigsten Handlungen. */
+function hauptPunkt(id: NavPunktId): NavPunkt {
+  const punkt = HAUPT.find((p) => p.id === id)
+  if (!punkt) throw new Error(`Kein Hauptpunkt „${id}"`)
+  return punkt
+}
+
+/** Plus am Handy: die drei häufigsten Handlungen. */
 export const NEU: readonly NeuPunkt[] = [
   {
     id: 'verkauf-eintragen',
@@ -97,6 +114,12 @@ export const NEU: readonly NeuPunkt[] = [
     satz: 'Etwas Neues für deinen Hofladen.',
     href: '/products?neu=1',
   },
+]
+
+/** „Neu" in der Seitenleiste: was auf der Hofseite landet (Mockup hof-mein-hof-v2-desktop.html). */
+export const NEU_BROWSER: readonly NeuPunkt[] = [
+  { id: 'produkt-anlegen', label: 'Neues Produkt', satz: 'Foto, Preis, Lagerstand', href: '/products?neu=1' },
+  { id: 'status-posten', label: 'Neuer Beitrag', satz: 'Neuigkeit auf deiner Hofseite', href: '/status/new' },
 ]
 
 /** „Verkauf und Kunden" — am Handy im Mehr-Blatt, im Browser als eigene Gruppe. */
@@ -127,16 +150,23 @@ export const ABMELDEN_LABEL = 'Abmelden'
 export type LeistenPlatz = { art: 'punkt'; punkt: NavPunkt } | { art: 'neu' } | { art: 'mehr' }
 
 export const HANDY_LEISTE: readonly LeistenPlatz[] = [
-  { art: 'punkt', punkt: HAUPT[0] },
-  { art: 'punkt', punkt: HAUPT[1] },
+  { art: 'punkt', punkt: hauptPunkt('heute') },
+  { art: 'punkt', punkt: hauptPunkt('bestellungen') },
   { art: 'neu' },
-  { art: 'punkt', punkt: HAUPT[2] },
+  { art: 'punkt', punkt: hauptPunkt('mein-hof') },
   { art: 'mehr' },
 ]
+
+/** Hauptpunkte ohne Platz in der Handy-Leiste — sie stehen oben im Mehr-Blatt. */
+export const NUR_IM_MEHR: readonly NavPunkt[] = HAUPT.filter(
+  (p) => !HANDY_LEISTE.some((platz) => platz.art === 'punkt' && platz.punkt.id === p.id)
+)
 
 export type Navigation = {
   haupt: readonly NavPunkt[]
   neu: readonly NeuPunkt[]
+  neuBrowser: readonly NeuPunkt[]
+  nurImMehr: readonly NavPunkt[]
   verkaufUndKunden: readonly NavPunkt[]
   unten: readonly NavPunkt[]
 }
@@ -147,6 +177,8 @@ export function fuerNutzer({ isAdmin }: { isAdmin: boolean }): Navigation {
   return {
     haupt: HAUPT.filter(sichtbar),
     neu: NEU,
+    neuBrowser: NEU_BROWSER,
+    nurImMehr: NUR_IM_MEHR.filter(sichtbar),
     verkaufUndKunden: VERKAUF_UND_KUNDEN.filter(sichtbar),
     unten: UNTEN.filter(sichtbar),
   }
@@ -179,13 +211,13 @@ export function aktiverPunkt(pfad: string): NavPunktId | null {
 /** „Mehr" gilt als aktiv für jeden Pfad, dessen Ziel im Mehr-Blatt liegt. */
 export function mehrAktiv(pfad: string): boolean {
   const id = aktiverPunkt(pfad)
-  return id !== null && [...VERKAUF_UND_KUNDEN, ...UNTEN].some((p) => p.id === id)
+  return id !== null && [...NUR_IM_MEHR, ...VERKAUF_UND_KUNDEN, ...UNTEN].some((p) => p.id === id)
 }
 
 /**
  * aria-current für einen Punkt: 'page' nur, wenn der Link genau auf diese
  * Seite führt; 'true', wenn er nur für sie steht (Unterseite, oder „Mein Hof"
- * auf /farm-page) — sonst hörte der Screenreader zwei Links mit
+ * auf /status) — sonst hörte der Screenreader zwei Links mit
  * verschiedenen Zielen als „aktuelle Seite".
  */
 export function ariaAktuell(pfad: string, punkt: NavPunkt): 'page' | 'true' | undefined {

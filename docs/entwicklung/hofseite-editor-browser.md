@@ -168,3 +168,105 @@ veraltet; fehlende Felder rührt `saveAppearanceAction` nicht an.
 - Das Hofprofil (`components/settings/profile-form.tsx`) prüft weiter mit
   einer eigenen Abschrift des Schemas; es könnte `src/schemas/hofprofil.ts`
   nutzen — nicht Teil dieses Sprints.
+
+---
+
+## v2 (2026-09-30): Produkte in die Seitenleiste, Neu-Menü, Vorschau Handy/Web
+
+Branch `feature/mein-hof-v2`. Vorlage: `docs/mockups/hof-mein-hof-v2-desktop.html`,
+`hof-mein-hof-v2-web-vorschau.html`, `hof-vorschau-vergroessert-overlay.html`,
+`hof-sidebar-komponente.html` (die frühere `hof-mein-hof-editor-desktop.html`
+ist gelöscht, `docs/mockups/README.md` nennt die Zuordnung). Bestand-Look —
+die Route trägt kein `data-design="neu"`. Was oben unter „Was jetzt gilt"
+steht, gilt weiter, mit diesen Änderungen:
+
+- **Navigation** (`src/lib/bauern-navigation.ts`): „Produkte" ist ein eigener
+  Eintrag der Seitenleiste zwischen Bestellungen und Mein Hof (`/products`).
+  Am Handy behält die Leiste ihre fünf Plätze; Produkte steht oben im
+  Mehr-Blatt (`NUR_IM_MEHR`), und `/products` zählt für „Mehr" als aktiv.
+  „Mein Hof" hat nur noch die Reiter Hofseite | Beiträge
+  (`MEIN_HOF_REITER`), kompakt links, rechts ab md der Hinweis
+  `MEIN_HOF_HINWEIS`. `/products` hat einen eigenen Kopf (H1 „Produkte",
+  Zahl) statt des Mein-Hof-Kopfs; `zaehleProdukte` ist weg.
+- **Neu-Knopf** (`farmer-nav.tsx`): Radius 13 px, linksbündig mit Plus,
+  Chevron rechts (dreht bei offenem Menü), 1-px-Rand und innere Unterkante im
+  Ton der Schrift als Tailwind-Klassen mit Token-Deckkraft
+  (`border-accent-foreground/30`, `shadow-accent-foreground/20`), keine
+  Inline-Farbe; Hover über `--accent-hover`.
+  Öffnet ein Dropdown (`components/ui/dropdown-menu.tsx`, dünne Hülle um
+  `@base-ui/react/menu` im shadcn-Stil, von Hand geschrieben — die Registry
+  ist aus der Agenten-Umgebung nicht erreichbar) mit `NEU_BROWSER`: „Neues
+  Produkt · Foto, Preis, Lagerstand" (`/products?neu=1`) und „Neuer Beitrag ·
+  Neuigkeit auf deiner Hofseite" (`/status/new`). Enter öffnet, Esc schließt,
+  der Fokus kehrt zum Knopf zurück. Das Plus-Blatt am Handy (`NEU`, drei
+  Einträge) bleibt, wie es war.
+- **Vorschau** (`hofseite-vorschau-rahmen.tsx`, `src/lib/hofseite-vorschau.ts`):
+  Der Umschalter bedeutet Gerät. **Handy** = Telefonrahmen wie bisher, 390 px
+  Seite auf 304 px. **Web** = die Spalte wächst auf `calc(100% − 400px − 2rem)`
+  (Breiten-Transition 200 ms, `motion-reduce` ohne), die Bearbeitung rückt auf
+  400 px zusammen; darin die Desktop-Kundenseite 1440 px breit in einem
+  Browser-Rähmchen (drei Punkte, Adresse), scrollbar, Höhe 680 px. Maßstab =
+  Panelbreite ÷ 1440, gemessen per ResizeObserver und gerechnet
+  (`vorschauMassstab`, rein, getestet) — nie hart codiert. Beide Geräte teilen
+  sich EIN iframe: Der Wechsel ändert nur seine Breite; nichts lädt neu, die
+  Markierung bleibt. Unter 1280 px Fensterbreite (`VORSCHAU_WEB_MINDESTBREITE`,
+  `useMindestbreite` per matchMedia, Server-Wert false) öffnet „Web" das
+  Overlay statt inline zu wachsen. **Vergrößern** bedeutet Größe: Dialog mit
+  Titel „Vorschau", Hofname, Umschalter mittig, „In neuem Tab öffnen", X;
+  Handy in echter Größe (Maßstab aus Breite UND Höhe der Fläche), Web auf
+  Overlay-Breite abzüglich Kopfleiste (36 px, `h-9`). Die Fläche wird über eine
+  Callback-Ref gemessen: Der Dialog hängt in einem Portal, das erst nach dem
+  ersten Effekt steht — mit einer Objekt-Ref blieb die Fläche 0 × 0 und das
+  iframe kam nie. Beim Schließen geht der Fokus zurück auf das Element, das
+  geöffnet hat — „Vergrößern" oder „Web" ohne Platz (`finalFocus`,
+  `document.activeElement` beim Öffnen). Umschalter, Vergrößern, Neuer Tab
+  und Schließen sind 44 px hoch (DESIGN_SYSTEM „Qualität"), auch wenn das
+  Mockup 38 px zeichnet.
+- **Zahlungsarten** (`src/lib/hofseite-fortschritt.ts`): Ohne Online-Zahlung
+  bleibt die Zeile „fertig" (bar und Karte vor Ort genügen), zeigt aber statt
+  des Hakens das Badge „Online fehlt" (bernstein) und den Wert „Vor Ort bar und
+  mit Karte · Online-Zahlung noch nicht eingerichtet". Kein neuer Stripe-Weg;
+  die Zeile führt weiter zu `/settings/payments`.
+- **Kontrast:** Hinweise, Bildunterschriften und Gruppenüberschriften in
+  Kopf, Editor und Vorschau nutzen `--app-ink-soft` statt `--app-ink-faint`
+  (2,4 : 1 auf Creme, Axe `color-contrast`); Regel in
+  `docs/ai/CODING_STANDARDS.md` §7 bei der Palette `--app-*`. Ab lg trägt
+  `/farm-page` eine H1 nur für Screenreader („Hofseite bearbeiten",
+  `sr-only`, Axe `page-has-heading-one`); unter lg hat die Hofseite selbst
+  eine, `/status` bringt seine eigene mit. Der Hofname im Kopf bleibt Text.
+- **Seitenleiste ohne Farbliterale:** `farmer-nav.tsx` ist aus
+  `FARBLITERAL_BESTAND` gestrichen (DESIGN_SYSTEM „Lint": wer umbaut, nimmt
+  heraus). Schatten und Ränder sind Tailwind-Klassen mit Token-Deckkraft
+  (`shadow-black/25`, `border-white/10`, `ring-(--app-bar)`); nur die
+  Sand-Plakette der Initialen trägt die begründete Einzelausnahme.
+- **Tests** (`tests/hofseite-editor.test.ts`, `tests/bauern-navigation.test.ts`,
+  `tests/hofseite-vorschau.test.ts`): am Quelltext nur Regeln — Konstanten,
+  Ursprung der Nachrichten, Fokus-Rückgabe, Overlay-Weg —, keine Klassennamen.
+  `VORSCHAU_BEARBEITUNG_BREITE` (400) und `vorschauMassstab` haben eigene
+  Verhaltenstests.
+
+### Geprüft (agent-browser, Seed-Datenbank, `bauer-a@example.com`)
+
+- 1440 px hell und dunkel: Seitenleiste mit Produkte; Reiter kompakt mit
+  Hinweis; Neu-Knopf Radius 13 px mit Unterkante; Enter öffnet das Menü mit
+  beiden Einträgen (Links `/products?neu=1`, `/status/new`), Esc schließt,
+  Fokus zurück auf „Neu"; Zahlungsarten mit „Online fehlt"; Web: Spalte 720 px,
+  Bearbeitung 400 px, iframe 1440 px, `scale(0.5)` = 720 ÷ 1440, Adresse im
+  Rähmchen; Vergrößern: Web `scale(0.9556)` = (1408 − 32) ÷ 1440, Rahmen endet
+  über dem Fußtext; Handy im Overlay `scale(0.803)`, Rahmen 694 px in 694 px
+  Fläche; Esc schließt, Fokus auf „Vergrößern".
+- 1280 px: Web inline, `scale(0.3889)` = 560 ÷ 1440. 1279 px: „Web" öffnet das
+  Overlay (Web), die Vorschau daneben bleibt Handy.
+- 375 px: Reiter kompakt, Hinweis versteckt, Mehr-Blatt mit Produkte oben.
+- Axe (axe-core 4.10, Skript im Scratchpad, ohne Dev-Overlay und ohne den
+  Inhalt des iframes), 1440 hell und dunkel, Handy/Web/Overlay/Menü offen/
+  Zeile offen, 375 mit Mehr-Blatt, `/products`, `/status`: keine Verstöße aus
+  diesem Sprint. Übrig, alle Altbestand: die Initialen-Kreise (Hof und
+  Nutzer, `#8b6b4f` auf `#F2E5D3`, 3,9 : 1 — Inline-Farben aus der
+  Ausnahmeliste), das Wort „Mein Hof" über dem Hofnamen in der Seitenleiste
+  (`rgba` 55 %, 3,2 : 1, `farm-identity-card.tsx`), und bei offenem Menü die
+  Fokus-Wächter von Base UI (`aria-hidden` mit `tabindex="0"`,
+  `aria-hidden-focus`) sowie das Popup außerhalb eines Landmarks (`region`) —
+  beides Bibliotheksverhalten, das jedes Blatt und jeder Dialog im Bestand
+  teilt. In der Konsole weiter nur die Hydrations-Warnung des sortierbaren
+  Produktrasters (`DndDescribedBy`, Altbestand, unter lg gerendert).

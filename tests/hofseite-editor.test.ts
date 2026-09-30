@@ -11,8 +11,12 @@
  *  - „Hofseite ansehen" in der Seitenleiste entfällt ab lg.
  *  - Der Editor speichert nur über die vorhandenen Aktionen aus farm.ts und
  *    appearance.ts — keine neue Server-Aktion.
- *  - Die Vorschau ist die echte Hofseite im Vorschau-Modus, 390 px breit,
- *    und die Markierung geht nur an den eigenen Ursprung.
+ *  - Die Vorschau ist die echte Hofseite im Vorschau-Modus — Handy (390 px)
+ *    oder Web (1440 px) in EINEM iframe, der Maßstab gerechnet, nie hart
+ *    codiert; die Markierung geht nur an den eigenen Ursprung.
+ *  - Web neben der Bearbeitung nur ab 1280 px Fensterbreite (Spalte ~400 px,
+ *    Breiten-Transition 200 ms), darunter im Overlay; „Vergrößern" öffnet
+ *    das Overlay mit Titel und Umschalter.
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -26,7 +30,8 @@ describe('/farm-page', () => {
 
   it('unter lg die alte Hofseite, ab lg der Editor', () => {
     expect(seite).toMatch(/<div className="lg:hidden">\s*<FarmPageClient/)
-    expect(seite).toMatch(/<div className="hidden px-8 pb-12 lg:block">\s*<HofseiteEditor/)
+    // Ab lg trägt der Editor-Block die H1 der Seite — nur für Screenreader; sichtbar ist der Hofname im Kopf.
+    expect(seite).toMatch(/<div className="hidden px-8 pb-12 lg:block">[\s\S]*?<h1 className="sr-only">Hofseite bearbeiten<\/h1>\s*<HofseiteEditor/)
   })
 
   it('der Kopf steht genau einmal', () => {
@@ -97,17 +102,46 @@ describe('Editor', () => {
 
   it('nur eine Zeile offen zugleich, und die geht an die Vorschau', () => {
     expect(editor).toContain("setOffen((jetzt) => (jetzt === zeile.id ? null : zeile.id))")
-    expect(editor).toMatch(/<HofseiteVorschauRahmen slug=\{hof\.slug\} stand=\{stand\} markiert=\{offen\} \/>/)
+    expect(editor).toMatch(/<HofseiteVorschauRahmen\s+slug=\{hof\.slug\}\s+stand=\{stand\}\s+markiert=\{offen\}/)
+  })
+
+  it('Web neben der Bearbeitung nur ab der Mindestbreite; die Bearbeitung behält ihre Mindestbreite aus der Regel', () => {
+    expect(editor).toContain('useMindestbreite(VORSCHAU_WEB_MINDESTBREITE)')
+    expect(editor).toContain("const webInline = geraet === 'web' && breit")
+    expect(editor).toContain('${VORSCHAU_BEARBEITUNG_BREITE}px')
+    expect(editor).toContain('webInlineMoeglich={breit}')
+    // Der Server kennt die Fensterbreite nicht: der Hook liefert dort false, sonst spränge die Seite beim Hydrieren.
+    const hook = quelltext('src/lib/use-mindestbreite.ts')
+    expect(hook).toContain('useSyncExternalStore(anmelden, lesen, () => false)')
   })
 })
 
 describe('Vorschau-Rahmen', () => {
   const rahmen = quelltext('src/components/farmer/hofseite-vorschau-rahmen.tsx')
 
-  it('390 px breite Seite, verkleinert in den Rahmen; die Markierung nur an den eigenen Ursprung', () => {
-    expect(rahmen).toContain('const SEITEN_BREITE = 390')
-    // Der erste Stand im src, jeder weitere per location.replace — sonst
-    // legte jedes Speichern einen Eintrag im Browserverlauf an.
+  it('Breite aus VORSCHAU_SEITENBREITE, Maßstab gemessen und gerechnet, nie hart codiert', () => {
+    expect(rahmen).not.toMatch(/SEITEN_BREITE = 390/)
+    expect(rahmen).toContain('VORSCHAU_SEITENBREITE[geraet]')
+    expect(rahmen).toContain("vorschauMassstab({ breite: panelBreite }, 'web')")
+    expect(rahmen).not.toMatch(/scale\(0\.\d+\)/)
+    expect(rahmen).toContain('new ResizeObserver(')
+  })
+
+  it('der Umschalter ist Gerät, nicht Tab: gedrückte Knöpfe; Web ohne Platz daneben geht ins Overlay', () => {
+    expect(rahmen).toContain('aria-pressed={wert === id}')
+    expect(rahmen).toMatch(/if \(g === 'web' && !webInlineMoeglich\) \{\s*oeffneOverlay\('web'\)/)
+  })
+
+  it('das Overlay hat Titel und Beschreibung und gibt den Fokus an sein öffnendes Element zurück', () => {
+    expect(rahmen).toContain('<DialogTitle')
+    expect(rahmen).toContain('<DialogDescription')
+    expect(rahmen).toContain('aria-label="Vorschau schließen"')
+    expect(rahmen).toContain('finalFocus={ausloeser}')
+    expect(rahmen).toContain('ausloeser.current = document.activeElement instanceof HTMLElement ? document.activeElement : null')
+  })
+
+  it('der erste Stand im src, jeder weitere per location.replace; die Markierung nur an den eigenen Ursprung', () => {
+    // Sonst legte jedes Speichern einen Eintrag im Browserverlauf an.
     expect(rahmen).toMatch(/src=\{vorschauAdresse\(slug, anfang\)\}/)
     expect(rahmen).toContain('location.replace(vorschauAdresse(slug, stand))')
     expect(rahmen.match(/postMessage\([^)]*window\.location\.origin\)/g)).toHaveLength(1)

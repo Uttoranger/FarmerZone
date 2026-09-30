@@ -36,6 +36,8 @@ import { alsLand } from '@/lib/laender'
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
 import { ABSCHNITT_LABEL, type HofseiteFortschritt, type HofseiteZeile } from '@/lib/hofseite-fortschritt'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
+import { VORSCHAU_BEARBEITUNG_BREITE, VORSCHAU_WEB_MINDESTBREITE, type VorschauGeraet } from '@/lib/hofseite-vorschau'
+import { useMindestbreite } from '@/lib/use-mindestbreite'
 import { CoverEditButton, CoverFocusAdjust, TITELBILD_KNOPF_STIL } from '@/components/farm/farm-page-view'
 import { SCHATTEN } from '@/components/farmer/mein-hof-kopf'
 import { GallerySection, LogoUpload } from '@/app/(farmer)/settings/appearance/appearance-client'
@@ -69,6 +71,9 @@ import { cn } from '@/lib/utils'
 /** Was der Editor über den Hof braucht — ohne Date, ohne Decimal (CODING_STANDARDS §2). */
 export type HofseiteEditorHof = {
   slug: string
+  /** Für Overlay und Browser-Rähmchen der Vorschau: Name und die Adresse, wie sie Kundinnen sehen. */
+  name: string
+  adresse: string
   logoUrl: string | null
   bannerType: 'GRADIENT' | 'PHOTO'
   bannerUrl: string | null
@@ -262,7 +267,7 @@ function KontaktForm({ einstellungen, onGespeichert, onAbbrechen }: FormularProp
           <Input id="hofseite-email" type="email" {...register('email')} />
         </Feld>
       </div>
-      <p className="text-xs text-app-ink-faint">Beides steht für Kunden auf der Hofseite.</p>
+      <p className="text-xs text-app-ink-soft">Beides steht für Kunden auf der Hofseite.</p>
       <Aktionen pending={pending} onAbbrechen={onAbbrechen} />
     </form>
   )
@@ -344,7 +349,7 @@ function AbschnitteForm({
             <li key={s.key} className="flex min-h-11 items-center justify-between gap-3 py-1">
               <Label htmlFor={`abschnitt-${s.key}`} className="text-sm text-app-ink">
                 {ABSCHNITT_LABEL[s.key] ?? s.key}
-                {fest && <span className="text-app-ink-faint"> · immer sichtbar</span>}
+                {fest && <span className="text-app-ink-soft"> · immer sichtbar</span>}
               </Label>
               <Switch
                 id={`abschnitt-${s.key}`}
@@ -358,7 +363,7 @@ function AbschnitteForm({
           )
         })}
       </ul>
-      <p className="mt-2 text-xs text-app-ink-faint">Die Reihenfolge änderst du unter Einstellungen → Mein Auftritt.</p>
+      <p className="mt-2 text-xs text-app-ink-soft">Die Reihenfolge änderst du unter Einstellungen → Mein Auftritt.</p>
       <Aktionen pending={pending} onAbbrechen={onAbbrechen} />
     </form>
   )
@@ -419,7 +424,7 @@ function TitelbildZeile({ hof, onGespeichert }: { hof: HofseiteEditorHof; onGesp
           </div>
         )}
       </div>
-      <p className="mt-2 text-xs text-app-ink-faint">
+      <p className="mt-2 text-xs text-app-ink-soft">
         Querformat wirkt am besten. Der Ausschnitt gilt für das hohe Titelbild auf der Hofseite.
       </p>
     </div>
@@ -485,6 +490,11 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt }: Pr
   const [offen, setOffen] = useState<HofseiteZeileId | null>(null)
   // Zählt bei jedem erfolgreichen Speichern hoch; die Vorschau lädt dann neu.
   const [stand, setStand] = useState(0)
+  // Das Gerät der Vorschau. Web passt erst ab 1280 px neben die Bearbeitung
+  // (dann rückt sie auf ~400 px zusammen); darunter zeigt der Rahmen Web im Overlay.
+  const [geraet, setGeraet] = useState<VorschauGeraet>('handy')
+  const breit = useMindestbreite(VORSCHAU_WEB_MINDESTBREITE)
+  const webInline = geraet === 'web' && breit
 
   function nachSpeichern() {
     setStand((s) => s + 1)
@@ -507,7 +517,7 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt }: Pr
           <div>
             {/* Der Schlüssel wechselt mit dem Logo: Nach dem Refresh zeigt der Baustein den neuen Stand. */}
             <LogoUpload key={hof.logoUrl ?? 'kein-logo'} logoUrl={hof.logoUrl} onUploaded={nachSpeichern} />
-            <p className="mt-2 text-xs text-app-ink-faint">Quadratisch wirkt am besten · sonst zeigen wir den Anfangsbuchstaben.</p>
+            <p className="mt-2 text-xs text-app-ink-soft">Quadratisch wirkt am besten · sonst zeigen wir den Anfangsbuchstaben.</p>
           </div>
         )
       case 'name':
@@ -543,8 +553,8 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt }: Pr
   }
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="min-w-0 space-y-6">
+    <div className="flex items-start gap-8">
+      <div className="min-w-0 flex-1 space-y-6">
         {/* Fortschritt */}
         <div className={cn('rounded-2xl bg-card p-5 ring-1 ring-border/60 dark:ring-border', SCHATTEN)}>
           <div className="flex items-baseline justify-between gap-3">
@@ -562,7 +572,7 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt }: Pr
 
         {fortschritt.gruppen.map((gruppe) => (
           <section key={gruppe.id} aria-labelledby={`hofseite-gruppe-${gruppe.id}`}>
-            <h3 id={`hofseite-gruppe-${gruppe.id}`} className="px-1 text-[11px] font-semibold uppercase tracking-wider text-app-ink-faint">
+            <h3 id={`hofseite-gruppe-${gruppe.id}`} className="px-1 text-[11px] font-semibold uppercase tracking-wider text-app-ink-soft">
               {gruppe.titel}
             </h3>
             <ul className={cn('mt-2 overflow-hidden rounded-2xl bg-card ring-1 ring-border/60 dark:ring-border', SCHATTEN)}>
@@ -581,7 +591,24 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt }: Pr
         ))}
       </div>
 
-      <HofseiteVorschauRahmen slug={hof.slug} stand={stand} markiert={offen} />
+      {/* Die Vorschau-Spalte: 320 px (ab xl 360 px) fürs Handy; im Web-Modus
+          wächst sie auf alles außer ~400 px für die Bearbeitung, mit einer
+          kurzen Breiten-Transition — die Liste links rückt zusammen. */}
+      <div
+        className={cn('w-[320px] shrink-0 transition-[width] duration-200 motion-reduce:transition-none', !webInline && 'xl:w-[360px]')}
+        style={webInline ? { width: `calc(100% - ${VORSCHAU_BEARBEITUNG_BREITE}px - 2rem)` } : undefined}
+      >
+        <HofseiteVorschauRahmen
+          slug={hof.slug}
+          stand={stand}
+          markiert={offen}
+          hofName={hof.name}
+          adresse={hof.adresse}
+          geraet={geraet}
+          onGeraet={setGeraet}
+          webInlineMoeglich={breit}
+        />
+      </div>
     </div>
   )
 }
