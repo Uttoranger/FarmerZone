@@ -2540,6 +2540,10 @@ in `verkauf-auswertung.md`.
 - [`docs/entwicklung/verkauf-auswertung.md`](docs/entwicklung/verkauf-auswertung.md) (#147):
   Eine Umsatzregel für Heute, Verkauf, Auswertung und die 55.000-€-Grenze,
   „Verkauf eintragen" mit dem Betrag zuerst und eine Auswertung mit fairem Vergleich.
+- [`docs/entwicklung/hofseite-editor-browser.md`](docs/entwicklung/hofseite-editor-browser.md):
+  Ab lg steht der Hof nur noch einmal oben, der Reiter Hofseite ist eine Liste
+  mit Fortschritt und die echte Hofseite eine Handy-Vorschau daneben; dazu der
+  Vorschau-Modus der öffentlichen Seite mit eigener Einbett-Regel.
 
 ---
 

@@ -35,6 +35,7 @@ import {
 import { hofseiteSektionen, naechsterAktiverReiter, stelleNachBildansicht } from '@/lib/hofseite-sektionen'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { ProductGrid, useBereichWunsch } from './product-grid'
+import { VorschauImRahmen } from './vorschau-im-rahmen'
 import { stripStatusVariables, renderStatusBodyWithChip } from '@/lib/status-body'
 // Ersatz-Titelbild ohne Foto — gemeinsam mit dem Kopf von „Mein Hof".
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
@@ -46,9 +47,19 @@ const ANLASS_META: Record<string, { label: string; icon: ReactNode }> = {
   ANNOUNCEMENT:  { label: 'Mitteilung',        icon: <MessageCircle className="size-3" strokeWidth={1.7} /> },
 }
 
-function WoodCard({ children, className = '' }: { children: ReactNode; className?: string }) {
+function WoodCard({
+  children,
+  className = '',
+  abschnitt,
+}: {
+  children: ReactNode
+  className?: string
+  /** Ziel der Markierung aus dem Editor (vorschau-im-rahmen.tsx). */
+  abschnitt?: string
+}) {
   return (
     <div
+      data-abschnitt={abschnitt}
       className={`bg-card rounded-[14px] overflow-hidden dark:ring-1 dark:ring-border ${className}`}
       style={{ boxShadow: '0 2px 10px rgba(45,95,63,0.06)' }}
     >
@@ -478,7 +489,29 @@ function GallerySection({ farm, isEdit }: { farm: PublicFarm; isEdit: boolean })
 
 // ── Cover upload hook ─────────────────────────────────────────────────────────
 
-function CoverEditButton({ currentBannerUrl }: { currentBannerUrl: string | null }) {
+/**
+ * Knöpfe, die auf dem Titelbildfoto liegen (hier zweimal und im Editor ab lg,
+ * hofseite-editor.tsx): in beiden Modi eine weiße Marke mit dunkelgrüner
+ * Schrift — das Foto darunter folgt keinem Modus, ein Token passte nicht.
+ */
+export const TITELBILD_KNOPF_STIL = {
+  background: 'rgba(255,255,255,0.94)',
+  color: '#2D5F3F',
+  boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+} as const
+
+/**
+ * „Titelbild ersetzen" — auf der Hofseite im Bearbeitungsmodus und im
+ * Editor ab lg (hofseite-editor.tsx), der über `onGespeichert` seine
+ * Vorschau neu lädt.
+ */
+export function CoverEditButton({
+  currentBannerUrl,
+  onGespeichert,
+}: {
+  currentBannerUrl: string | null
+  onGespeichert?: () => void
+}): React.JSX.Element {
   const [, startTransition] = useTransition()
   const router = useRouter()
 
@@ -493,6 +526,7 @@ function CoverEditButton({ currentBannerUrl }: { currentBannerUrl: string | null
         } else {
           toast.success('Titelbild aktualisiert')
           router.refresh()
+          onGespeichert?.()
         }
       })
     },
@@ -506,9 +540,7 @@ function CoverEditButton({ currentBannerUrl }: { currentBannerUrl: string | null
         onClick={openFilePicker}
         disabled={isUploading}
         className="flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-60"
-        // Liegt auf dem Bannerfoto, nicht auf der Seite: bleibt in beiden
-        // Modi eine weiße Marke mit dunkelgrüner Schrift.
-        style={{ background: 'rgba(255,255,255,0.94)', color: '#2D5F3F', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}
+        style={TITELBILD_KNOPF_STIL}
       >
         <Camera className="size-3.5" strokeWidth={1.7} />
         {isUploading ? (progress ? stufenText(progress) : 'Lädt…') : 'Titelbild ersetzen'}
@@ -518,8 +550,9 @@ function CoverEditButton({ currentBannerUrl }: { currentBannerUrl: string | null
 }
 
 // ── Titelbild-Fokuspunkt: Anpass-Zustand (Drag mit Maus & Touch) ──────────────
+// Auch im Editor ab lg (hofseite-editor.tsx) über einem kleinen Abbild des Titelbilds.
 
-function CoverFocusAdjust({
+export function CoverFocusAdjust({
   focusY,
   onChange,
   onSave,
@@ -531,7 +564,7 @@ function CoverFocusAdjust({
   onSave: () => void
   onCancel: () => void
   saving: boolean
-}) {
+}): React.JSX.Element {
   const drag = useRef<{ startY: number; startFocus: number; height: number } | null>(null)
 
   return (
@@ -607,9 +640,15 @@ type Props = {
   pastStatusCount?: number
   /** Wechselt in die Kundenansicht — nur im Bauern-Bereich gesetzt, wo `mode` lebt. */
   onVorschau?: () => void
+  /**
+   * Vorschau-Modus der öffentlichen Seite (?vorschau=1, nur für den Besitzer):
+   * Kaufen ist wirkungslos, und der Editor im Bauern-Bereich darf Abschnitte
+   * markieren (vorschau-im-rahmen.tsx).
+   */
+  vorschau?: boolean
 }
 
-export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = false, mode = 'edit', pastStatusCount = 0, onVorschau }: Props) {
+export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = false, mode = 'edit', pastStatusCount = 0, onVorschau, vorschau = false }: Props) {
   const isEdit = ownerMode && mode !== 'preview'
   // Pausen-Banner: was Kundinnen und was der Hof sieht, entschieden in lib/shop-pause.ts.
   const pausen = pausenBanner({ ownerMode, vorschau: mode === 'preview', pauseMessage: farm.pauseMessage })
@@ -811,6 +850,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
       {!ownerMode && (
         <KundenKopf seite={kundenSeite} hofName={farm.name} hofNameUeberschrift={hofNameUeberschrift} />
       )}
+      {vorschau && <VorschauImRahmen />}
 
       {/* Mode banner */}
       {ownerMode && (
@@ -875,7 +915,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           Fenster — in der Eigentümer-Vorschau nimmt die Seitenleiste 224px —
           fällt das Band zwischen md und etwa 1050px höher aus als das reine
           Verhältnis ergäbe. Ab dem Deckel ist es wieder identisch. */}
-      <div className="relative w-full h-[260px] md:h-[33vw] lg:h-[40vw] max-h-[420px]">
+      <div data-abschnitt="titelbild" className="relative w-full h-[260px] md:h-[33vw] lg:h-[40vw] max-h-[420px]">
         {bannerBg === null ? (
           <Image
             src={farm.bannerUrl!}
@@ -915,9 +955,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                 type="button"
                 onClick={() => setFocusDraft(farm.bannerFocusY)}
                 className="flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90"
-                // Liegt auf dem Bannerfoto, nicht auf der Seite: bleibt in beiden
-        // Modi eine weiße Marke mit dunkelgrüner Schrift.
-        style={{ background: 'rgba(255,255,255,0.94)', color: '#2D5F3F', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}
+        style={TITELBILD_KNOPF_STIL}
               >
                 <MoveVertical className="size-3.5" strokeWidth={1.7} />
                 Anpassen
@@ -1012,7 +1050,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           Owner-Sicht (Edit UND Vorschau): unübersehbarer Hinweis mit Weg zurück,
           damit eine vergessene Pause nicht wochenlang Bestellungen kostet. */}
       {farm.isPaused && (
-        <div className="px-4 md:px-10 py-3" style={{ background: 'var(--notice)', borderBottom: '1px solid var(--notice-line)' }}>
+        <div data-abschnitt="bestellungen" className="px-4 md:px-10 py-3" style={{ background: 'var(--notice)', borderBottom: '1px solid var(--notice-line)' }}>
           <div className="max-w-[960px] mx-auto flex items-start gap-2.5">
             <PauseCircle className="size-[18px] shrink-0 mt-px" strokeWidth={1.8} style={{ color: 'var(--notice-icon)' }} />
             {pausen.hofHinweis ? (
@@ -1098,6 +1136,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
       {/* Tab-Leiste (Scroll-Navigation, sticky — Referenz 17) */}
       {!isEdit && (
         <nav
+          data-abschnitt="abschnitte"
           // Unter der Kopfleiste (56 px, ab md 64 px); in der Vorschau des
           // Bauern-Bereichs gibt es keine, dort bleibt sie oben.
           className={`sticky z-30 px-4 md:px-10 ${ownerMode ? 'top-0' : 'top-14 md:top-16'}`}
@@ -1136,6 +1175,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
             kann, wäre ein leeres Versprechen. */}
         {!isEdit && !farm.isPaused && pickupDays.length > 0 && (
           <div
+            data-abschnitt="abholung"
             className="bg-card rounded-[14px] p-[18px] mb-[18px] dark:ring-1 dark:ring-border"
             style={{ boxShadow: '0 2px 10px rgba(45,95,63,0.06)' }}
           >
@@ -1169,7 +1209,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
         )}
 
         {/* Zahlung & Kontakt */}
-        <WoodCard>
+        <WoodCard abschnitt="kontakt">
           <div className="px-5 pt-[18px] pb-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: 'var(--app-ink)' }}>
@@ -1346,7 +1386,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
             aus, während eine Serie noch lief. Die Reihenfolge stellt der
             Effekt in GallerySection richtig, nicht ein Neuaufbau. */}
         {showGallery && (
-          <div id="fotos" className={`mt-[26px] ${ownerMode ? SPRUNGZIEL_OHNE_KOPF : SPRUNGZIEL_UNTER_KOPF}`}>
+          <div id="fotos" data-abschnitt="fotos" className={`mt-[26px] ${ownerMode ? SPRUNGZIEL_OHNE_KOPF : SPRUNGZIEL_UNTER_KOPF}`}>
             <GallerySection farm={farm} isEdit={isEdit} />
           </div>
         )}
@@ -1377,6 +1417,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           mode={mode}
           isPaused={farm.isPaused}
           onVorschau={onVorschau}
+          vorschau={vorschau}
         />
         </div>{/* Ende #produkte */}
 

@@ -45,7 +45,7 @@ Vorbild: `src/lib/reservierung.ts` entscheidet (rein, 174 Tests ohne DB), `src/s
 | `tests/` | Alle Tests, flach | — |
 
 ### `src/lib/` ist voll — Regel beim Hinzufügen
-86 Dateien (Stand 2026-09-29), gemischter Zweck. Bevor eine neue entsteht:
+94 Dateien (Stand 2026-09-29), gemischter Zweck. Bevor eine neue entsteht:
 1. Passt es in eine bestehende Datei? Dann dorthin.
 2. Ist es eine **Fachregel**? → eigene Datei, rein, ohne Import von `prisma`/`auth`/`stripe`.
 3. Ist es eine **Infrastrukturkapsel** (externer Dienst)? → `server-only` importieren.
@@ -173,6 +173,8 @@ Client-Komponente → Server Action → Zod → Fachregel (lib) → Prisma → r
 - Titelbild: Foto oder Verlauf entscheidet `titelbildFoto`, den Verlauf `titelbildVerlauf` (`src/lib/mein-hof.ts`) — nie die Bedingung nachschreiben.
 - Neue Seite unter `src/app/(farmer)/`: Punkt in der Konfiguration **und** Eintrag in `FARMER_PATHS` samt `matcher` von `src/proxy.ts`. `tests/bauern-navigation.test.ts` und `tests/proxy-pfade.test.ts` fallen sonst rot.
 - Handlungen („Verkauf eintragen", „Produkt anlegen") sind Einträge in `NEU` und öffnen den vorhandenen Dialog über den URL-Auftrag (§4 State-Regeln), keinen eigenen.
+- **Vorschau der Hofseite** (`/[farmSlug]?vorschau=1`): Zugriff entscheidet allein `vorschauZugriff` (`src/lib/hofseite-vorschau.ts`), geladen wird nur über `ladeHofseite` (`src/server/hofseite-vorschau.ts`, mit nachgebildeter Sitzung getestet; die Seite nimmt die `cache`-Fassung `ladeHofseiteGeteilt`, damit Metadaten und Seite einmal laden) — nur der angemeldete Besitzer, auch vor der Freigabe; alle anderen sehen die Seite wie ohne Parameter. Immer `noindex`, sobald der Parameter dasteht. Ob die Hofseite einen Korb führt, sagt **eine** Regel, `korbErlaubt` — jeder Weg in den Korb (Kaufknopf, Nachbestell-Link, Anker, Knopf, Sheet) fragt sie; kein zweiter Maßstab daneben. Einbetten erlaubt **nur** diese Route mit dem Parameter, und nur für uns selbst (`next.config.ts`, `frame-ancestors 'self'`); jede andere Seite bleibt `DENY` — `tests/sicherheits-header.test.ts` prüft das mit Nexts Pfadvergleich und gleicht die Ausschlussliste `KEINE_HOFSEITE` mit den Ordnern unter `src/app` ab. Ein neuer Routenordner gehört in diese Liste.
+- Der Editor ab lg (`components/farmer/hofseite-editor.tsx`) speichert nur über die vorhandenen Aktionen der Einstellungen; was er zeigt, entscheidet `src/lib/hofseite-fortschritt.ts`. Seine Formulare prüfen mit den Schemas der Aktionen selbst (`src/schemas/hofprofil.ts`, `src/schemas/auftritt.ts`, per `.pick()`) — ein Schema, das ein Client-Formular wiederverwendet, liegt in `src/schemas/`, nicht in der `'use server'`-Datei. Nachrichten zwischen Editor und Vorschau gehen durch `src/schemas/hofseite-vorschau.ts` und prüfen den Ursprung (`leseMarkierung`, `leseBereit`). Details: `docs/entwicklung/hofseite-editor-browser.md`.
 - Die Blätter „Neu" und „Mehr" sind `ui/sheet` (Base UI Dialog): Escape, Tipp daneben, Fokus im Blatt. Die Leiste hebt sich nur, solange eines offen ist, auf Ebene 60 — sonst bleibt sie auf 50, damit andere Dialoge sie verdecken.
 
 ## 5. Domänen-Invarianten

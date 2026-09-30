@@ -57,7 +57,18 @@ function sortSlots(list: Slot[]): Slot[] {
   )
 }
 
-export function PickupSlotsClient({ initialSlots }: { initialSlots: Slot[] }) {
+/**
+ * Die Abholzeiten — unter /settings/pickup-slots und im Hofseiten-Editor ab lg
+ * (components/farmer/hofseite-editor.tsx), der über `onGespeichert` nach jeder
+ * Änderung seine Vorschau neu lädt.
+ */
+export function PickupSlotsClient({
+  initialSlots,
+  onGespeichert,
+}: {
+  initialSlots: Slot[]
+  onGespeichert?: () => void
+}): React.JSX.Element {
   const router = useRouter()
   const [slots, setSlots] = useState(initialSlots)
   const [isPending, startTransition] = useTransition()
@@ -112,6 +123,7 @@ export function PickupSlotsClient({ initialSlots }: { initialSlots: Slot[] }) {
       } else {
         toast.success('Abholzeit hinzugefügt')
         router.refresh()
+        onGespeichert?.()
       }
     })
   }
@@ -128,6 +140,7 @@ export function PickupSlotsClient({ initialSlots }: { initialSlots: Slot[] }) {
       } else {
         toast.success('Abholzeit gelöscht')
         router.refresh()
+        onGespeichert?.()
       }
     })
   }
@@ -143,6 +156,7 @@ export function PickupSlotsClient({ initialSlots }: { initialSlots: Slot[] }) {
         toast.error(res.error)
       } else {
         router.refresh()
+        onGespeichert?.()
       }
     })
   }

@@ -96,10 +96,12 @@ export function FarmIdentityCard({
       {/* Outline-Stil auf dunklem Grund: heller Rahmen statt Fläche, damit die
           Schaltfläche nicht mit dem aktiven Menüpunkt (helle Fläche) verwechselt
           wird. min-h-11 = 44px — dasselbe Tippmaß wie die Menüpunkte der
-          Seitenleiste; 36px waren am Telefon gemessen zu knapp. */}
+          Seitenleiste; 36px waren am Telefon gemessen zu knapp.
+          Ab lg entfällt der Knopf: Dort steht „Kundenansicht" im Kopf von
+          Mein Hof, und die Hofseite ist über den Reiter einen Klick entfernt. */}
       <Link
         href="/farm-page"
-        className="mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border px-3 text-[13px] font-semibold transition-colors hover:bg-white/10"
+        className="mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border px-3 text-[13px] font-semibold transition-colors hover:bg-white/10 lg:hidden"
         style={{ borderColor: 'rgba(255,255,255,0.28)', color: 'var(--app-bar-ink)' }}
       >
         <Eye className="size-3.5 shrink-0" strokeWidth={1.8} aria-hidden="true" />

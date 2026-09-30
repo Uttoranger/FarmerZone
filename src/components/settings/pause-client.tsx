@@ -8,13 +8,20 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { setPause } from '@/server/actions/farm'
 
+/**
+ * Pause — unter /settings/pause und im Hofseiten-Editor ab lg
+ * (components/farmer/hofseite-editor.tsx), der über `onGespeichert` nach
+ * jeder Änderung seine Vorschau neu lädt.
+ */
 export function PauseClient({
   initialPaused,
   initialMessage,
+  onGespeichert,
 }: {
   initialPaused: boolean
   initialMessage: string | null
-}) {
+  onGespeichert?: () => void
+}): React.JSX.Element {
   const [isPaused, setIsPaused] = useState(initialPaused)
   const [message, setMessage] = useState(initialMessage ?? '')
   const [isPending, startTransition] = useTransition()
@@ -28,6 +35,7 @@ export function PauseClient({
       } else {
         setIsPaused(newPaused)
         toast.success(newPaused ? 'Bestellungen pausiert' : 'Du nimmst wieder Bestellungen an')
+        onGespeichert?.()
       }
     })
   }
@@ -39,6 +47,7 @@ export function PauseClient({
         toast.error(res.error)
       } else {
         toast.success('Nachricht gespeichert')
+        onGespeichert?.()
       }
     })
   }

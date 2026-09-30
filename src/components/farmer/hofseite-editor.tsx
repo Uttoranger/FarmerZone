@@ -1,0 +1,587 @@
+'use client'
+
+import { useState, useTransition, type FormEvent } from 'react'
+import Link from 'next/link'
+import Image from 'next/image'
+import { useRouter } from 'next/navigation'
+import { useForm, type FieldError } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { toast } from 'sonner'
+import {
+  AlignLeft,
+  ArrowRight,
+  Check,
+  ChevronRight,
+  Clock3,
+  CreditCard,
+  ImageIcon,
+  Images,
+  LayoutList,
+  MapPin,
+  MoveVertical,
+  PenLine,
+  Phone,
+  ShoppingBag,
+  Stamp,
+  type LucideIcon,
+} from 'lucide-react'
+import { updateProfile } from '@/server/actions/farm'
+import { saveAppearanceAction, updateBannerFocusAction } from '@/server/actions/appearance'
+import { profileSchema, type ProfileFormData } from '@/schemas/hofprofil'
+import { appearanceSchema, type AppearanceSaveInput } from '@/schemas/auftritt'
+import type { FarmSettings } from '@/server/queries/farm'
+import type { AppearanceData, SectionConfig } from '@/server/queries/appearance'
+import { alsLand } from '@/lib/laender'
+import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
+import { ABSCHNITT_LABEL, type HofseiteFortschritt, type HofseiteZeile } from '@/lib/hofseite-fortschritt'
+import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
+import { CoverEditButton, CoverFocusAdjust, TITELBILD_KNOPF_STIL } from '@/components/farm/farm-page-view'
+import { SCHATTEN } from '@/components/farmer/mein-hof-kopf'
+import { GallerySection, LogoUpload } from '@/app/(farmer)/settings/appearance/appearance-client'
+import { PickupSlotsClient } from '@/components/settings/pickup-slots-client'
+import { PauseClient } from '@/components/settings/pause-client'
+import { Schild } from '@/components/farmer/schild'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
+import { HofseiteVorschauRahmen } from '@/components/farmer/hofseite-vorschau-rahmen'
+import { cn } from '@/lib/utils'
+
+/*
+ * Der Reiter „Hofseite" von Mein Hof ab lg: links die Hofseite als Liste mit
+ * Fortschritt, rechts die echte Seite als Handy-Vorschau. Was die Liste sagt,
+ * entscheidet src/lib/hofseite-fortschritt.ts; hier wird gezeichnet und
+ * gespeichert — ausschließlich über die vorhandenen Server-Aktionen der
+ * Einstellungen. Unter lg bleibt die Hofseite mit Stiften (farm-page-client.tsx).
+ *
+ * Einfache Felder (Name, Kurzbeschreibung, Über uns, Adresse, Kontakt) sind
+ * Formulare direkt in der Zeile. Die Profil-Aktion verlangt das ganze Profil,
+ * deshalb reicht jedes Formular die übrigen Felder unverändert mit
+ * (profilBasis); dasselbe für den Auftritt (auftrittBasis). Komplexe Teile
+ * kommen als die vorhandenen Bausteine: Titelbild und Ausschnitt aus der
+ * Hofseite, Logo und Fotos aus „Mein Auftritt", Abholzeiten und Pause aus den
+ * Einstellungen. Standort (Karte) und Zahlungen (Stripe) bleiben Links.
+ */
+
+/** Was der Editor über den Hof braucht — ohne Date, ohne Decimal (CODING_STANDARDS §2). */
+export type HofseiteEditorHof = {
+  slug: string
+  logoUrl: string | null
+  bannerType: 'GRADIENT' | 'PHOTO'
+  bannerUrl: string | null
+  bannerValue: string | null
+  bannerFocusY: number
+  isPaused: boolean
+  pauseMessage: string | null
+}
+
+type Props = {
+  fortschritt: HofseiteFortschritt
+  hof: HofseiteEditorHof
+  einstellungen: FarmSettings
+  auftritt: AppearanceData
+}
+
+const SYMBOL: Record<HofseiteZeileId, LucideIcon> = {
+  titelbild: ImageIcon,
+  logo: Stamp,
+  name: PenLine,
+  'ueber-uns': AlignLeft,
+  fotos: Images,
+  adresse: MapPin,
+  abholzeiten: Clock3,
+  zahlung: CreditCard,
+  kontakt: Phone,
+  bestellungen: ShoppingBag,
+  abschnitte: LayoutList,
+}
+
+/** Das ganze Profil, wie updateProfile es verlangt — die Zeile ändert nur ihre Felder. */
+function profilBasis(e: FarmSettings): ProfileFormData {
+  return {
+    name: e.name,
+    ownerName: e.ownerName,
+    description: e.description,
+    address: e.address,
+    postalCode: e.postalCode,
+    city: e.city,
+    country: alsLand(e.country),
+    phone: e.phone,
+    email: e.email,
+    latitude: e.latitude,
+    longitude: e.longitude,
+    betriebsnummer: e.betriebsnummer,
+    betriebsstatus: e.betriebsstatus,
+  }
+}
+
+/**
+ * Der Auftritt, wie saveAppearanceAction ihn verlangt (Vorbild: handleSave in
+ * appearance-client.tsx) — OHNE Logo und Titelbild: Die lädt der Editor über
+ * eigene Aktionen hoch, und bis `router.refresh()` zurück ist, wären die
+ * Props hier veraltet. Lässt man die Felder weg, rührt die Aktion sie nicht an.
+ */
+function auftrittBasis(a: AppearanceData): AppearanceSaveInput {
+  return {
+    tagline: a.tagline,
+    foundedYear: a.foundedYear,
+    aboutText: a.aboutText,
+    sectionsConfig: a.sectionsConfig,
+    farmValues: a.farmValues.map((v, i) => ({ icon: v.icon, title: v.title, subtitle: v.subtitle || null, sortOrder: i })),
+  }
+}
+
+// ── Formular-Bausteine ────────────────────────────────────────────────────────
+
+function Feld({
+  id,
+  label,
+  fehler,
+  children,
+}: {
+  id: string
+  label: string
+  fehler?: FieldError
+  children: React.ReactNode
+}) {
+  return (
+    <div>
+      <Label htmlFor={id} className="mb-1 block text-sm text-app-ink-soft">
+        {label}
+      </Label>
+      {children}
+      {fehler?.message && <p className="mt-1 text-xs text-destructive">{fehler.message}</p>}
+    </div>
+  )
+}
+
+function Aktionen({ pending, onAbbrechen }: { pending: boolean; onAbbrechen: () => void }) {
+  return (
+    <div className="mt-4 flex justify-end gap-2">
+      <Button type="button" variant="outline" size="lg" onClick={onAbbrechen} disabled={pending}>
+        Abbrechen
+      </Button>
+      <Button type="submit" size="lg" disabled={pending}>
+        {pending ? 'Speichert…' : 'Speichern'}
+      </Button>
+    </div>
+  )
+}
+
+type FormularProps = { einstellungen: FarmSettings; onGespeichert: () => void; onAbbrechen: () => void }
+
+/** Speichert Profilfelder über updateProfile — der Rest des Profils geht unverändert mit. */
+function useProfilSpeichern(einstellungen: FarmSettings, onGespeichert: () => void) {
+  const [pending, start] = useTransition()
+  const speichern = (teil: Partial<ProfileFormData>) =>
+    start(async () => {
+      const res = await updateProfile({ ...profilBasis(einstellungen), ...teil })
+      if (res.error) {
+        toast.error(res.error)
+      } else {
+        toast.success('Gespeichert')
+        onGespeichert()
+      }
+    })
+  return { pending, speichern }
+}
+
+// Die Regeln je Feld kommen aus dem Profil-Schema selbst (src/schemas/hofprofil.ts) —
+// keine zweite Abschrift, die auseinanderlaufen könnte.
+const nameSchema = profileSchema.pick({ name: true, description: true })
+
+function NameForm({ einstellungen, onGespeichert, onAbbrechen }: FormularProps) {
+  const { pending, speichern } = useProfilSpeichern(einstellungen, onGespeichert)
+  const { register, handleSubmit, formState } = useForm<z.infer<typeof nameSchema>>({
+    resolver: zodResolver(nameSchema),
+    defaultValues: { name: einstellungen.name, description: einstellungen.description },
+  })
+  return (
+    <form onSubmit={handleSubmit(speichern)} className="space-y-3">
+      <Feld id="hofseite-name" label="Hofname" fehler={formState.errors.name}>
+        <Input id="hofseite-name" {...register('name')} />
+      </Feld>
+      <Feld id="hofseite-beschreibung" label="Kurzbeschreibung — ein Satz, der unter dem Namen steht" fehler={formState.errors.description}>
+        <Textarea id="hofseite-beschreibung" rows={2} {...register('description')} />
+      </Feld>
+      <Aktionen pending={pending} onAbbrechen={onAbbrechen} />
+    </form>
+  )
+}
+
+const adresseSchema = profileSchema.pick({ address: true, postalCode: true, city: true })
+
+function AdresseForm({ einstellungen, onGespeichert, onAbbrechen }: FormularProps) {
+  const { pending, speichern } = useProfilSpeichern(einstellungen, onGespeichert)
+  const { register, handleSubmit, formState } = useForm<z.infer<typeof adresseSchema>>({
+    resolver: zodResolver(adresseSchema),
+    defaultValues: { address: einstellungen.address, postalCode: einstellungen.postalCode, city: einstellungen.city },
+  })
+  const hatPunkt = einstellungen.latitude != null && einstellungen.longitude != null
+  return (
+    <form onSubmit={handleSubmit(speichern)} className="space-y-3">
+      <Feld id="hofseite-strasse" label="Straße und Hausnummer" fehler={formState.errors.address}>
+        <Input id="hofseite-strasse" {...register('address')} />
+      </Feld>
+      <div className="grid grid-cols-[120px_1fr] gap-3">
+        <Feld id="hofseite-plz" label="PLZ" fehler={formState.errors.postalCode}>
+          <Input id="hofseite-plz" inputMode="numeric" {...register('postalCode')} />
+        </Feld>
+        <Feld id="hofseite-ort" label="Ort" fehler={formState.errors.city}>
+          <Input id="hofseite-ort" {...register('city')} />
+        </Feld>
+      </div>
+      {/* Der Kartenpunkt braucht die Karte — die gibt es im Hofprofil. */}
+      <Link href="/settings/profile" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-brand-text underline-offset-2 hover:underline">
+        {hatPunkt ? 'Standort auf der Karte ändern' : 'Standort auf der Karte setzen'}
+        <ArrowRight className="size-4" strokeWidth={1.7} aria-hidden="true" />
+      </Link>
+      <Aktionen pending={pending} onAbbrechen={onAbbrechen} />
+    </form>
+  )
+}
+
+const kontaktSchema = profileSchema.pick({ phone: true, email: true })
+
+function KontaktForm({ einstellungen, onGespeichert, onAbbrechen }: FormularProps) {
+  const { pending, speichern } = useProfilSpeichern(einstellungen, onGespeichert)
+  const { register, handleSubmit, formState } = useForm<z.infer<typeof kontaktSchema>>({
+    resolver: zodResolver(kontaktSchema),
+    defaultValues: { phone: einstellungen.phone, email: einstellungen.email },
+  })
+  return (
+    <form onSubmit={handleSubmit(speichern)} className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <Feld id="hofseite-telefon" label="Telefon" fehler={formState.errors.phone}>
+          <Input id="hofseite-telefon" type="tel" {...register('phone')} />
+        </Feld>
+        <Feld id="hofseite-email" label="E-Mail" fehler={formState.errors.email}>
+          <Input id="hofseite-email" type="email" {...register('email')} />
+        </Feld>
+      </div>
+      <p className="text-xs text-app-ink-faint">Beides steht für Kunden auf der Hofseite.</p>
+      <Aktionen pending={pending} onAbbrechen={onAbbrechen} />
+    </form>
+  )
+}
+
+const ueberUnsSchema = appearanceSchema.pick({ aboutText: true })
+
+function UeberUnsForm({
+  auftritt,
+  onGespeichert,
+  onAbbrechen,
+}: {
+  auftritt: AppearanceData
+  onGespeichert: () => void
+  onAbbrechen: () => void
+}) {
+  const [pending, start] = useTransition()
+  const { register, handleSubmit, formState } = useForm<z.infer<typeof ueberUnsSchema>>({
+    resolver: zodResolver(ueberUnsSchema),
+    defaultValues: { aboutText: auftritt.aboutText ?? '' },
+  })
+  const speichern = (daten: z.infer<typeof ueberUnsSchema>) =>
+    start(async () => {
+      const res = await saveAppearanceAction({ ...auftrittBasis(auftritt), aboutText: (daten.aboutText ?? '').trim() || null })
+      if (res.error) {
+        toast.error(res.error)
+      } else {
+        toast.success('Gespeichert')
+        onGespeichert()
+      }
+    })
+  return (
+    <form onSubmit={handleSubmit(speichern)} className="space-y-3">
+      <Feld id="hofseite-ueber-uns" label="Was sollen Kunden über euren Hof wissen?" fehler={formState.errors.aboutText}>
+        <Textarea
+          id="hofseite-ueber-uns"
+          rows={5}
+          placeholder="Zum Beispiel: Seit drei Generationen bauen wir Gemüse an — alles aus eigener Hand."
+          {...register('aboutText')}
+        />
+      </Feld>
+      <Aktionen pending={pending} onAbbrechen={onAbbrechen} />
+    </form>
+  )
+}
+
+function AbschnitteForm({
+  auftritt,
+  onGespeichert,
+  onAbbrechen,
+}: {
+  auftritt: AppearanceData
+  onGespeichert: () => void
+  onAbbrechen: () => void
+}) {
+  const [sektionen, setSektionen] = useState<SectionConfig[]>(auftritt.sectionsConfig)
+  const [pending, start] = useTransition()
+  const sortiert = sektionen.slice().sort((a, b) => a.order - b.order)
+
+  function speichern(e: FormEvent) {
+    e.preventDefault()
+    start(async () => {
+      const res = await saveAppearanceAction({ ...auftrittBasis(auftritt), sectionsConfig: sektionen })
+      if (res.error) {
+        toast.error(res.error)
+      } else {
+        toast.success('Gespeichert')
+        onGespeichert()
+      }
+    })
+  }
+
+  return (
+    <form onSubmit={speichern}>
+      <ul className="divide-y divide-border">
+        {sortiert.map((s) => {
+          const fest = s.key === 'products'
+          return (
+            <li key={s.key} className="flex min-h-11 items-center justify-between gap-3 py-1">
+              <Label htmlFor={`abschnitt-${s.key}`} className="text-sm text-app-ink">
+                {ABSCHNITT_LABEL[s.key] ?? s.key}
+                {fest && <span className="text-app-ink-faint"> · immer sichtbar</span>}
+              </Label>
+              <Switch
+                id={`abschnitt-${s.key}`}
+                checked={s.visible}
+                disabled={fest}
+                onCheckedChange={(sichtbar) =>
+                  setSektionen((prev) => prev.map((x) => (x.key === s.key ? { ...x, visible: sichtbar } : x)))
+                }
+              />
+            </li>
+          )
+        })}
+      </ul>
+      <p className="mt-2 text-xs text-app-ink-faint">Die Reihenfolge änderst du unter Einstellungen → Mein Auftritt.</p>
+      <Aktionen pending={pending} onAbbrechen={onAbbrechen} />
+    </form>
+  )
+}
+
+/** Titelbild: Abbild mit den vorhandenen Knöpfen der Hofseite — Foto ersetzen, Ausschnitt ziehen. */
+function TitelbildZeile({ hof, onGespeichert }: { hof: HofseiteEditorHof; onGespeichert: () => void }) {
+  const [focusDraft, setFocusDraft] = useState<number | null>(null)
+  const [pending, start] = useTransition()
+  const foto = titelbildFoto(hof)
+  const focus = focusDraft ?? hof.bannerFocusY
+
+  function speichern() {
+    const wert = focusDraft
+    if (wert === null) return
+    start(async () => {
+      const res = await updateBannerFocusAction(wert)
+      if (res.error) {
+        toast.error(res.error)
+      } else {
+        toast.success('Bildausschnitt gespeichert')
+        onGespeichert()
+      }
+      setFocusDraft(null)
+    })
+  }
+
+  return (
+    <div>
+      <div className="relative aspect-[5/2] overflow-hidden rounded-xl bg-muted">
+        {foto ? (
+          <Image src={foto} alt="" fill sizes="640px" className="object-cover" style={{ objectPosition: `50% ${focus}%` }} />
+        ) : (
+          <div className="absolute inset-0" style={{ background: titelbildVerlauf(hof.bannerValue) }} />
+        )}
+        {focusDraft !== null ? (
+          <CoverFocusAdjust
+            focusY={focus}
+            onChange={setFocusDraft}
+            onSave={speichern}
+            onCancel={() => setFocusDraft(null)}
+            saving={pending}
+          />
+        ) : (
+          <div className="absolute right-3 top-3 flex items-center gap-2">
+            {foto && (
+              <button
+                type="button"
+                onClick={() => setFocusDraft(hof.bannerFocusY)}
+                className="flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-sm font-semibold transition-opacity hover:opacity-90"
+                style={TITELBILD_KNOPF_STIL}
+              >
+                <MoveVertical className="size-3.5" strokeWidth={1.7} aria-hidden="true" />
+                Ausschnitt anpassen
+              </button>
+            )}
+            <CoverEditButton currentBannerUrl={hof.bannerUrl} onGespeichert={onGespeichert} />
+          </div>
+        )}
+      </div>
+      <p className="mt-2 text-xs text-app-ink-faint">
+        Querformat wirkt am besten. Der Ausschnitt gilt für das hohe Titelbild auf der Hofseite.
+      </p>
+    </div>
+  )
+}
+
+// ── Zeile und Gruppe ──────────────────────────────────────────────────────────
+
+function Zeile({
+  zeile,
+  offen,
+  onToggle,
+  children,
+}: {
+  zeile: HofseiteZeile
+  offen: boolean
+  onToggle: () => void
+  children: React.ReactNode
+}) {
+  const Zeichen = SYMBOL[zeile.id]
+  const inhaltId = `hofseite-zeile-${zeile.id}`
+  return (
+    <li className={cn('border-t border-border first:border-t-0', offen && 'bg-muted/30')}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={offen}
+        aria-controls={inhaltId}
+        className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      >
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-app-chip text-app-chip-ink">
+          <Zeichen className="size-4" strokeWidth={1.7} aria-hidden="true" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-app-ink">{zeile.titel}</span>
+          <span className="block truncate text-[13px] text-app-ink-soft">{zeile.wert}</span>
+        </span>
+        {zeile.marke ? (
+          <Schild farbe={zeile.marke.farbe}>{zeile.marke.text}</Schild>
+        ) : (
+          <>
+            <Check className="size-4 shrink-0 text-brand-text" strokeWidth={2.2} aria-hidden="true" />
+            <span className="sr-only">fertig</span>
+          </>
+        )}
+        <ChevronRight
+          className={cn('size-4 shrink-0 text-app-ink-faint transition-transform', offen && 'rotate-90')}
+          aria-hidden="true"
+        />
+      </button>
+      {offen && (
+        <div id={inhaltId} className="px-4 pb-5 pl-16">
+          {children}
+        </div>
+      )}
+    </li>
+  )
+}
+
+export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt }: Props): React.JSX.Element {
+  const router = useRouter()
+  // Nur eine Zeile offen zugleich — und genau die markiert die Vorschau.
+  const [offen, setOffen] = useState<HofseiteZeileId | null>(null)
+  // Zählt bei jedem erfolgreichen Speichern hoch; die Vorschau lädt dann neu.
+  const [stand, setStand] = useState(0)
+
+  function nachSpeichern() {
+    setStand((s) => s + 1)
+    router.refresh()
+  }
+  // Formulare schließen sich nach dem Speichern: Der Refresh liefert neue
+  // Startwerte, und ein offenes Formular hielte die alten fest.
+  function nachFormular() {
+    nachSpeichern()
+    setOffen(null)
+  }
+  const schliessen = () => setOffen(null)
+
+  function inhalt(id: HofseiteZeileId): React.ReactNode {
+    switch (id) {
+      case 'titelbild':
+        return <TitelbildZeile hof={hof} onGespeichert={nachSpeichern} />
+      case 'logo':
+        return (
+          <div>
+            {/* Der Schlüssel wechselt mit dem Logo: Nach dem Refresh zeigt der Baustein den neuen Stand. */}
+            <LogoUpload key={hof.logoUrl ?? 'kein-logo'} logoUrl={hof.logoUrl} onUploaded={nachSpeichern} />
+            <p className="mt-2 text-xs text-app-ink-faint">Quadratisch wirkt am besten · sonst zeigen wir den Anfangsbuchstaben.</p>
+          </div>
+        )
+      case 'name':
+        return <NameForm einstellungen={einstellungen} onGespeichert={nachFormular} onAbbrechen={schliessen} />
+      case 'ueber-uns':
+        return <UeberUnsForm auftritt={auftritt} onGespeichert={nachFormular} onAbbrechen={schliessen} />
+      case 'fotos':
+        return <GallerySection initialPhotos={auftritt.farmPhotos} onGespeichert={nachSpeichern} />
+      case 'adresse':
+        return <AdresseForm einstellungen={einstellungen} onGespeichert={nachFormular} onAbbrechen={schliessen} />
+      case 'abholzeiten':
+        return <PickupSlotsClient initialSlots={einstellungen.pickupSlots} onGespeichert={nachSpeichern} />
+      case 'zahlung':
+        return (
+          <div className="space-y-2">
+            <p className="text-sm text-app-ink-soft">
+              Bar oder mit Karte vor Ort geht immer. Online-Zahlung läuft über ein Stripe-Konto — das richtest du in den
+              Einstellungen ein.
+            </p>
+            <Link href="/settings/payments" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-brand-text underline-offset-2 hover:underline">
+              Zahlungen einrichten
+              <ArrowRight className="size-4" strokeWidth={1.7} aria-hidden="true" />
+            </Link>
+          </div>
+        )
+      case 'kontakt':
+        return <KontaktForm einstellungen={einstellungen} onGespeichert={nachFormular} onAbbrechen={schliessen} />
+      case 'bestellungen':
+        return <PauseClient initialPaused={hof.isPaused} initialMessage={hof.pauseMessage} onGespeichert={nachSpeichern} />
+      case 'abschnitte':
+        return <AbschnitteForm auftritt={auftritt} onGespeichert={nachFormular} onAbbrechen={schliessen} />
+    }
+  }
+
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="min-w-0 space-y-6">
+        {/* Fortschritt */}
+        <div className={cn('rounded-2xl bg-card p-5 ring-1 ring-border/60 dark:ring-border', SCHATTEN)}>
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="font-heading text-lg font-semibold text-app-ink">
+              Deine Hofseite ist zu {fortschritt.erledigt} von {fortschritt.gesamt} fertig
+            </h2>
+            <p className="shrink-0 text-sm font-semibold tabular-nums text-app-ink-soft">{fortschritt.prozent} %</p>
+          </div>
+          {/* Der Wert steht daneben als Text; der Balken ist Veranschaulichung. */}
+          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-app-trough" aria-hidden="true">
+            <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${fortschritt.prozent}%`, background: 'var(--app-button)' }} />
+          </div>
+          <p className="mt-3 text-sm text-app-ink-soft">{fortschritt.satz}</p>
+        </div>
+
+        {fortschritt.gruppen.map((gruppe) => (
+          <section key={gruppe.id} aria-labelledby={`hofseite-gruppe-${gruppe.id}`}>
+            <h3 id={`hofseite-gruppe-${gruppe.id}`} className="px-1 text-[11px] font-semibold uppercase tracking-wider text-app-ink-faint">
+              {gruppe.titel}
+            </h3>
+            <ul className={cn('mt-2 overflow-hidden rounded-2xl bg-card ring-1 ring-border/60 dark:ring-border', SCHATTEN)}>
+              {gruppe.zeilen.map((zeile) => (
+                <Zeile
+                  key={zeile.id}
+                  zeile={zeile}
+                  offen={offen === zeile.id}
+                  onToggle={() => setOffen((jetzt) => (jetzt === zeile.id ? null : zeile.id))}
+                >
+                  {inhalt(zeile.id)}
+                </Zeile>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+
+      <HofseiteVorschauRahmen slug={hof.slug} stand={stand} markiert={offen} />
+    </div>
+  )
+}
