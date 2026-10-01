@@ -6,6 +6,12 @@
  * Diese Seite erreicht man über einen signierten Link aus der E-Mail, oft am
  * Handy und oft unterwegs — also genau dort, wo das Warten am längsten
  * dauert und ein leerer Bildschirm wie ein toter Link aussieht.
+ *
+ * Die Rückweg-Zeile ab md steht hier unbedingt, obwohl die Seite sie bei
+ * einer UNGÜLTIGEN Signatur nicht rendert (`bestellung-ungueltig` →
+ * `rueckwegZeile: false`). Das ist Absicht: Dieser Zweig antwortet ohne
+ * Datenbankzugriff, also sofort, und zeigt dieses Skeleton kaum. Maßstab ist
+ * der Fall, in dem wirklich gewartet wird — der gültige Link.
  */
 export default function BestellungLaden() {
   return (

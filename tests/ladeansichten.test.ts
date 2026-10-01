@@ -50,6 +50,46 @@ function existiert(relativ: string): boolean {
 /** Emojis und Piktogramme — als Illustration im Produkt nicht erlaubt. */
 const PIKTOGRAMM = /\p{Extended_Pictographic}/u
 
+/** Ein drehender Kreis, in seinen drei Gestalten im Haus. */
+const SPINNER = /animate-spin|Loader2|<Spinner/
+
+/** Technisches, das auf einer Fehlerseite nichts zu suchen hat. */
+const TECHNISCHES = /\{error\.message\}|\{error\.stack\}|\{error\.name\}|\{fehler\.message\}/
+
+/** Eine Farbe als Literal statt als Token (Lint-Regel, CODING_STANDARDS §7). */
+const FARBLITERAL = /#[0-9a-f]{3,8}\b|rgb\(|hsl\(|oklch\(/i
+
+describe('Gegenproben — schlagen die Muster überhaupt an?', () => {
+  // TESTING_GUIDELINES §2: Ein Quelltext-Test braucht die Gegenprobe. Alle
+  // Prüfungen unten sind negativ („kommt nicht vor") und wären bei einem
+  // Tippfehler im Muster stillschweigend wahr — hier steht, dass sie greifen.
+  it('erkennt ein Piktogramm', () => {
+    expect(PIKTOGRAMM.test('⚠️ Fehler')).toBe(true)
+    expect(PIKTOGRAMM.test('🌾')).toBe(true)
+    expect(PIKTOGRAMM.test('Fehler, ohne Bild')).toBe(false)
+  })
+
+  it('erkennt einen Spinner in seinen drei Gestalten', () => {
+    expect(SPINNER.test('<Loader2 className="size-6 animate-spin" />')).toBe(true)
+    expect(SPINNER.test('<div className="animate-spin" />')).toBe(true)
+    expect(SPINNER.test('<Spinner />')).toBe(true)
+    expect(SPINNER.test('<div className="animate-pulse" />')).toBe(false)
+  })
+
+  it('erkennt eine angezeigte Fehlermeldung', () => {
+    expect(TECHNISCHES.test('<p>{error.message}</p>')).toBe(true)
+    expect(TECHNISCHES.test('<pre>{error.stack}</pre>')).toBe(true)
+    expect(TECHNISCHES.test('<p>{error.digest}</p>')).toBe(false)
+  })
+
+  it('erkennt eine Farbe als Literal', () => {
+    expect(FARBLITERAL.test('bg-[#2D5F3F]')).toBe(true)
+    expect(FARBLITERAL.test('rgb(0,0,0)')).toBe(true)
+    expect(FARBLITERAL.test('oklch(0.95 0.01 93)')).toBe(true)
+    expect(FARBLITERAL.test('bg-card text-foreground')).toBe(false)
+  })
+})
+
 /**
  * Die öffentlichen Routen, die auf Serverdaten warten, und die Datei, die
  * Next.js dort als Ladeansicht erwartet.
@@ -98,7 +138,7 @@ describe('Ladeansichten — jede öffentliche Route, die auf Daten wartet, zeigt
       expect(text, `${ansicht.zweck} ohne animate-pulse`).toContain('animate-pulse')
       // Gesucht ist die VERWENDUNG, nicht das Wort: „kein Spinner" steht als
       // Begründung in den Kopfkommentaren.
-      expect(text, `${ansicht.zweck} mit Spinner`).not.toMatch(/animate-spin|Loader2|<Spinner/)
+      expect(text, `${ansicht.zweck} mit Spinner`).not.toMatch(SPINNER)
     }
   })
 
@@ -121,9 +161,7 @@ describe('Ladeansichten — jede öffentliche Route, die auf Daten wartet, zeigt
   it('setzt keine Farbe als Literal — nur Tokens', () => {
     // CODING_STANDARDS §7 und die Lint-Regel: kein Hex, kein rgb(), kein oklch().
     for (const ansicht of LADEANSICHTEN) {
-      expect(ansichtsText(ansicht), `${ansicht.zweck} mit Farbliteral`).not.toMatch(
-        /#[0-9a-f]{3,8}\b|rgb\(|hsl\(|oklch\(/i
-      )
+      expect(ansichtsText(ansicht), `${ansicht.zweck} mit Farbliteral`).not.toMatch(FARBLITERAL)
     }
   })
 
@@ -269,9 +307,7 @@ describe('500 — dieselbe Ansicht an beiden Grenzen', () => {
     }
     for (const datei of FEHLERSEITEN) {
       const text = liesDatei(datei)
-      expect(text, `${datei} zeigt eine Fehlermeldung`).not.toMatch(
-        /\{error\.message\}|\{error\.stack\}|\{error\.name\}|\{fehler\.message\}/
-      )
+      expect(text, `${datei} zeigt eine Fehlermeldung`).not.toMatch(TECHNISCHES)
     }
   })
 
@@ -306,11 +342,16 @@ describe('global-error — greift, wenn das Root-Layout selbst scheitert', () =>
     expect(liesDatei(datei)).toMatch(/import '\.\/globals\.css'/)
   })
 
-  it('meldet den Fehler nach Sentry — hier und nur hier', () => {
-    // Ein Fehler im Root-Layout erreicht keine andere Grenze und wäre sonst
-    // unsichtbar. error.tsx meldet bewusst NICHT mit, das wäre ein Doppel.
-    expect(liesDatei(datei)).toContain('Sentry.captureException(error)')
-    expect(liesDatei('src/app/error.tsx')).not.toContain('captureException')
+  it('meldet den Fehler nach Sentry — wie die andere Grenze auch', () => {
+    // BEIDE Grenzen melden, und das ist kein Doppel: Sie schließen sich aus.
+    // global-error greift nur für Fehler im Root-Layout und für solche, die
+    // error.tsx selbst wirft. Ein Render-Fehler im Seitenbaum landet in
+    // error.tsx — und wäre ohne den Aufruf dort stumm, weil onRequestError
+    // nur den Server abdeckt und eine React-Fehlergrenze den Client-SDK nicht
+    // von selbst erreicht.
+    for (const seite of ['src/app/global-error.tsx', 'src/app/error.tsx']) {
+      expect(liesDatei(seite), `${seite} meldet nicht`).toContain('Sentry.captureException(error)')
+    }
   })
 
   it('ist eine Client-Komponente — sie bekommt reset()', () => {

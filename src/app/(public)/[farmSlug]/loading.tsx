@@ -14,7 +14,7 @@
  */
 export default function HofseiteLaden() {
   return (
-    <div className="min-h-screen animate-pulse bg-background" aria-busy="true" aria-label="Hofseite wird geladen">
+    <div className="min-h-screen animate-pulse bg-app-page" aria-busy="true" aria-label="Hofseite wird geladen">
       {/* Kopfleiste; ab md darunter die Rückweg-Zeile („‹ Alle Höfe") */}
       <div className="h-14 border-b border-border bg-card md:h-16" />
       <div className="hidden md:block" aria-hidden="true">
@@ -51,7 +51,7 @@ export default function HofseiteLaden() {
 
       {/* Reiterleiste */}
       <div className="border-b border-border bg-card px-4 md:px-10">
-        <div className="mx-auto flex max-w-[960px] gap-6 py-3">
+        <div className="mx-auto flex max-w-[960px] gap-[26px] pt-[13px] pb-[14px]">
           <div className="h-4 w-20 rounded bg-muted" />
           <div className="h-4 w-16 rounded bg-muted" />
           <div className="h-4 w-20 rounded bg-muted" />
@@ -60,7 +60,7 @@ export default function HofseiteLaden() {
 
       <div className="mx-auto max-w-[960px] px-4 pt-[26px] pb-12 md:px-10">
         {/* Karte „Nächste Abholung" */}
-        <div className="mb-[18px] rounded-[14px] border border-border bg-card p-[18px]">
+        <div className="mb-[18px] rounded-[14px] bg-card dark:ring-1 dark:ring-border p-[18px]">
           <div className="mb-3 h-4 w-40 rounded bg-app-trough" />
           <div className="flex gap-2">
             <div className="h-14 flex-1 rounded-[10px] bg-muted" />
@@ -70,7 +70,7 @@ export default function HofseiteLaden() {
         </div>
 
         {/* Karte „Zahlung & Kontakt" — oben die Holzleiste, 7 px */}
-        <div className="overflow-hidden rounded-[14px] border border-border bg-card">
+        <div className="overflow-hidden rounded-[14px] bg-card dark:ring-1 dark:ring-border">
           <div className="h-[7px] bg-app-trough" />
           <div className="px-5 pt-[18px] pb-5">
             <div className="h-4 w-44 rounded bg-app-trough" />
@@ -92,7 +92,7 @@ export default function HofseiteLaden() {
         {/* Produktraster — Bildfläche 170 px wie im echten Raster */}
         <div className="grid grid-cols-2 gap-5 md:grid-cols-3">
           {[0, 1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="overflow-hidden rounded-[12px] border border-border bg-card">
+            <div key={i} className="overflow-hidden rounded-[12px] bg-card dark:ring-1 dark:ring-border">
               {/* Bildfläche wie im echten Raster: feste 170 px auf --app-chip */}
               <div className="h-[170px] bg-app-chip" />
               <div className="p-3">

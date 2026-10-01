@@ -11,7 +11,7 @@
  * Kundin, die auf einen alten Link getippt hat, braucht einen Weg zurück,
  * keinen Statuscode.
  */
-import { MELDUNG_KENNUNG_MAX } from '@/lib/meldung'
+import { kennungAusUrlSchema } from '@/schemas/fehlerseite'
 
 /** 404 — irgendeine Adresse, die es nicht gibt. */
 export const NICHT_GEFUNDEN_TITEL = 'Diese Seite gibt es nicht (mehr)'
@@ -45,29 +45,14 @@ export const PROBLEM_MELDEN = 'Problem melden'
 export const KENNUNG_PARAMETER = 'kennung'
 
 /**
- * Was als Fehlernummer durchgeht.
+ * Die Fehlernummer, geprüft — leer, wenn nichts Brauchbares übrig bleibt.
  *
- * `error.digest` ist in Next.js ein Hash aus Ziffern; die Zeichenklasse ist
- * trotzdem streng, denn der Wert landet in einer URL und von dort in ein
- * Formularfeld: Erlaubt sind nur Buchstaben, Ziffern, Bindestrich und
- * Unterstrich. Alles andere fällt weg, nicht die ganze Kennung — ein Hash mit
- * einem Leerzeichen am Ende ist noch brauchbar.
- */
-const ERLAUBT = /[^A-Za-z0-9_-]/g
-
-/**
- * Bereinigt eine Fehlernummer für URL und Formular. Leer, wenn nichts
- * Brauchbares übrig bleibt.
- *
- * ZU LANG HEISST LEER, nicht abgeschnitten: Das Feld im Briefkasten nimmt
- * höchstens MELDUNG_KENNUNG_MAX Zeichen (`src/schemas/meldung.ts`), und eine
- * abgeschnittene Fehlernummer zeigt auf den falschen Fehler. Die vollständige
- * Nummer steht auf der Fehlerseite selbst — von dort lässt sie sich kopieren.
+ * Die Regel samt Begründung steht im Schema (`src/schemas/fehlerseite.ts`);
+ * hier bleibt nur der bequeme Griff, den Seite und Link benutzen. `parse`
+ * wirft nicht: Das Schema fällt über `.catch` auf den leeren Text zurück.
  */
 export function bereinigeKennung(roh: unknown): string {
-  if (typeof roh !== 'string') return ''
-  const sauber = roh.trim().replace(ERLAUBT, '')
-  return sauber.length === 0 || sauber.length > MELDUNG_KENNUNG_MAX ? '' : sauber
+  return kennungAusUrlSchema.parse(roh)
 }
 
 /**

@@ -20,8 +20,9 @@ import './globals.css'
  *   Seite hell. Dafür hängt sie an keinem Provider, der gerade kaputt ist —
  *   und genau das ist ihre Aufgabe.
  *
- * Gemeldet wird von hier, und nur von hier: Ein Fehler im Root-Layout erreicht
- * keine andere Grenze, wäre also unsichtbar. Der Filter aus
+ * Gemeldet wird von hier wie aus `error.tsx` — doppelt wird es nicht, weil
+ * sich die beiden Grenzen ausschließen: Diese greift nur für Fehler im
+ * Root-Layout und für solche, die `error.tsx` selbst wirft. Der Filter aus
  * src/lib/sentry-hygiene.ts hängt am Client-Haken (`beforeSend`) und gilt auch
  * für diesen Aufruf.
  */
@@ -38,7 +39,9 @@ export default function GlobalError({
 
   return (
     <html lang="de">
-      <body className="min-h-full">
+      {/* Keine Höhenklasse am body: Das eigene <html> trägt kein h-full, und
+          die Ansicht bringt min-h-screen selbst mit. */}
+      <body>
         <FehlerAnsicht fehlernummer={error.digest} nochmal={reset} />
       </body>
     </html>
