@@ -15,10 +15,11 @@
  * einer Nachbildung — so gilt auch die Lookahead-Schreibweise der Quelle.
  */
 import { describe, it, expect, beforeAll } from 'vitest'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { getPathMatch } from 'next/dist/shared/lib/router/utils/path-match'
 import { matchHas } from 'next/dist/shared/lib/router/utils/prepare-destination'
+import { ansichtsModus } from '@/lib/ansichts-modus'
 
 type Regel = {
   source: string
@@ -89,11 +90,13 @@ describe('Einbetten', () => {
     expect(headerFuer('/hof-test', { vorschau: '11' })['X-Frame-Options']).toBe('DENY')
   })
 
-  it('steht der Parameter mehrfach, zählt bei Next der letzte Wert — die Seite liest ihn genauso', () => {
+  it('steht der Parameter mehrfach, zählt bei Next der letzte Wert — ansichtsModus liest ihn genauso', async () => {
     expect(headerFuer('/hof-test', { vorschau: ['0', '1'] })['X-Frame-Options']).toBe('SAMEORIGIN')
     expect(headerFuer('/hof-test', { vorschau: ['1', '0'] })['X-Frame-Options']).toBe('DENY')
-    const seite = readFileSync(join(process.cwd(), 'src/app/(public)/[farmSlug]/page.tsx'), 'utf8')
-    expect(seite).toContain('Array.isArray(wert) ? wert.at(-1) : wert')
+    // Dieselbe Adresse, derselbe Schluss: Vorschau genau dort, wo der Rahmen erlaubt ist.
+    const besitzer = { angemeldeterNutzer: async () => 'user_hof', besitzer: async () => 'user_hof' }
+    expect((await ansichtsModus({ vorschau: ['0', '1'] }, besitzer)).art).toBe('vorschau')
+    expect((await ansichtsModus({ vorschau: ['1', '0'] }, besitzer)).art).toBe('kundin')
   })
 
   it('Unterseiten der Hofseite und die Startseite bleiben gesperrt, auch mit Parameter', () => {

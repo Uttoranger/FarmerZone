@@ -88,16 +88,19 @@ veraltet; fehlende Felder rührt `saveAppearanceAction` nicht an.
 
 ## Vorschau-Modus der öffentlichen Hofseite
 
-`/[farmSlug]?vorschau=1` (`src/lib/hofseite-vorschau.ts`, `vorschauZugriff`):
+`/[farmSlug]?vorschau=1` (seit der Ergänzung vom 2026-10-01 entschieden von
+`ansichtsModus` in `src/lib/ansichts-modus.ts`, siehe unten; davor
+`vorschauZugriff` in `src/lib/hofseite-vorschau.ts`):
 
 - Nur der angemeldete Besitzer genau dieses Hofs bekommt die Vorschau — und
   sieht seine Seite auch vor der Freigabe (`getOwnerFarm` statt
   `getPublicFarm`). Abgemeldet, fremder Nutzer, anderer Wert: wie ohne
   Parameter. Sitzung und Besitzer (`getHofBesitzer`) werden nur mit dem
-  Parameter gelesen. Das entscheidet `ladeHofseite`
-  (`src/server/hofseite-vorschau.ts` — eigene Datei, weil eine Seite nichts
-  anderes exportieren darf; `tests/hofseite-vorschau-laden.test.ts` prüft die
-  Wahl mit nachgebildeter Sitzung, auch für den nicht freigegebenen Hof).
+  Parameter gelesen. Das entscheidet `ansichtsModus`, aufgerufen im Lader
+  `ladeHofseite` (`src/server/hofseite-vorschau.ts` — eigene Datei, weil eine
+  Seite nichts anderes exportieren darf; `tests/hofseite-vorschau-laden.test.ts`
+  prüft die Wahl der Abfrage mit nachgebildeter Sitzung, auch für den nicht
+  freigegebenen Hof).
   Steht der Parameter mehrfach in der Adresse, zählt der letzte Wert — wie bei
   Nexts Header-Regel.
 - Immer `noindex`, sobald der Parameter dasteht — auch mit falschem Wert oder
@@ -270,3 +273,58 @@ steht, gilt weiter, mit diesen Änderungen:
   beides Bibliotheksverhalten, das jedes Blatt und jeder Dialog im Bestand
   teilt. In der Konsole weiter nur die Hydrations-Warnung des sortierbaren
   Produktrasters (`DndDescribedBy`, Altbestand, unter lg gerendert).
+
+---
+
+## Ergänzung (2026-10-01): Die Hofseite gibt es genau einmal
+
+Branch `feature/mein-hof-v2`, neu ab `main` nach #152.
+
+- **`ansichtsModus`** (`src/lib/ansichts-modus.ts`) entscheidet alle
+  Unterschiede der Vorschau zur Seite für Kundinnen: `art` (kundin/vorschau),
+  `besitzerVorFreigabe` (der Besitzer sieht seinen Hof auch vor der Freigabe),
+  `noindex` (sobald der Parameter dasteht, mit jedem Wert), `kaufen`
+  (wirkungslos in der Vorschau). Sie nimmt die ganzen Suchparameter und zwei
+  Quellen (angemeldeter Nutzer, Besitzer des Slugs), die sie nur fragt, wenn
+  sie zählen — ohne `?vorschau=1` keine Sitzung, abgemeldet kein Besitzer. Der
+  „letzte Wert zählt" wie in der Header-Regel. Aufgerufen nur im Lader
+  `ladeHofseite` (`src/server/hofseite-vorschau.ts`); an die Seite geht
+  `SeitenAnsicht` ohne Nutzer-ID. `vorschauGewuenscht` und `vorschauZugriff`
+  sind entfallen; `korbErlaubt` fragt jetzt `kaufen` statt `vorschau`.
+- **Die Seite** (`src/app/(public)/[farmSlug]/page.tsx`) reicht ihre
+  Suchparameter unverändert an den Lader und liest nur `ansicht`: `noindex`
+  für die Metadaten, `kaufen` für den Nachbestell-Link, die ganze Ansicht für
+  `FarmPageView`. `ladeHofseiteGeteilt` schlüsselt den `cache` nach dem Text der
+  Suchparameter, weil Metadaten und Seite nicht zwingend dasselbe Objekt
+  bekommen.
+- **`FarmPageView`** nimmt `ansicht` statt `vorschau` und gibt `kaufen` ans
+  Produktraster; der Kopf-Kommentar nennt die zwei Stellen, die sie einbinden,
+  was jede braucht und dass die Besitzer-Zweige mit dem Umzug der Handyansicht
+  auf Liste und Vorschau entfallen.
+- **Architektur-Tests** (`tests/hofseite-einmal.test.ts`): Lesestellen des
+  Parameters in `src/` — Index, URLSearchParams, jede Eigenschaft `.vorschau`
+  (bis auf `eingabe.vorschau` im Pausen-Banner), Zerlegen, `vorschau=` im Text,
+  das Wort als Literal außerhalb von `art`, die Konstante außerhalb von
+  `hofseite-vorschau.ts` und `ansichtsModus` (deshalb schreibt der Rahmen seine
+  „Neuer Tab"-Links jetzt über `vorschauLink`); außerhalb von `src/` nur
+  `next.config.ts`. Aufrufer von `ansichtsModus` (nur der Lader, kein
+  Client-Modul, auch nicht relativ oder dynamisch eingebunden), Einbinder von
+  `FarmPageView` (genau zwei — benannt, Namensraum, weitergereicht, dynamisch,
+  `Hof.FarmPageView`), `ownerMode` auf der Hofseite (immer `false`). Dazu ein
+  echter Render mit `react-dom/server`: Kundin und Vorschau ohne Stift,
+  Werkzeugleiste, Bearbeitungs-Hinweis, „… bearbeiten"-Ziele, Titelbild-Knopf,
+  Status-Pflege und Pausen-Hinweis für den Hof; Gegenproben je Quelle
+  (FarmPageView im Bearbeitungsmodus für ihre Elemente, farm-page-client für
+  die Werkzeugleiste). Der Korb (`CartSheet`, im Test durch ein Merkmal
+  ersetzt) hängt nur bei Kundinnen — nicht in der Vorschau, nicht im
+  Bearbeitungsmodus. Jede Suche hat eine Gegenprobe; sieben absichtliche
+  Verstöße schlugen an (Seite liest den Parameter, dritte Einbindung benannt
+  und als Namensraum, Stift für Kundinnen, `kaufen` geht verloren,
+  `sp.vorschau` in einer Komponente, Client importiert `ansichtsModus`
+  relativ).
+- **Nachbestell-Link:** `?reorder=` geht jetzt durch Zod
+  (`src/schemas/nachbestellung.ts`, `nachbestellToken`) und wird nur geladen,
+  wo Kaufen wirkt.
+- **Regeln:** ARCHITECTURE §4 „Die Hofseite gibt es genau einmal …";
+  TESTING_GUIDELINES §1 (serverseitiges Rendern für Architektur-Aussagen) und
+  §2 (Architektur-Regeln mit Gegenprobe); Prüfpunkt im Agenten `pruefer`.

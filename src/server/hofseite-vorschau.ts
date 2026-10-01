@@ -2,14 +2,14 @@ import { cache } from 'react'
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { getHofBesitzer, getOwnerFarm, getPublicFarm, type PublicFarm } from '@/server/queries/farm'
-import { vorschauGewuenscht, vorschauZugriff } from '@/lib/hofseite-vorschau'
+import { ansichtsModus, type SeitenAnsicht, type Suchparameter } from '@/lib/ansichts-modus'
 
 /**
- * Der Hof zu einem Slug — öffentlich, oder als Vorschau für den Besitzer
- * (?vorschau=1, src/lib/hofseite-vorschau.ts), der seine Seite auch vor der
- * Freigabe sieht: Dann lädt `getOwnerFarm` ohne die Sichtbarkeitsregel, sonst
- * `getPublicFarm` mit ihr. Sitzung und Besitzer werden nur mit dem Parameter
- * gelesen; die öffentliche Seite bleibt ohne Auth-Runde.
+ * Der Hof zu einem Slug und wer ihn sieht. Was die Vorschau (?vorschau=1)
+ * von der Seite für Kundinnen unterscheidet, entscheidet `ansichtsModus`
+ * (src/lib/ansichts-modus.ts) — hier, auf dem Server, mit Sitzung und Besitzer
+ * als Quellen. Sieht der Besitzer seine Vorschau, lädt `getOwnerFarm` ohne die
+ * Sichtbarkeitsregel (auch vor der Freigabe), sonst `getPublicFarm` mit ihr.
  *
  * Eigene Datei statt in der Seite: So lässt sich die Wahl zwischen den beiden
  * Abfragen mit nachgebildeter Sitzung prüfen (tests/hofseite-vorschau-laden.test.ts);
@@ -17,20 +17,32 @@ import { vorschauGewuenscht, vorschauZugriff } from '@/lib/hofseite-vorschau'
  */
 export async function ladeHofseite(
   farmSlug: string,
-  parameter: string | undefined
-): Promise<{ farm: PublicFarm | null; vorschau: boolean }> {
-  const nutzerId = vorschauGewuenscht(parameter)
-    ? ((await auth.api.getSession({ headers: await headers() }))?.user.id ?? null)
-    : null
-  // Der Besitzer interessiert nur, wenn jemand angemeldet ist — abgemeldet
-  // bleibt es bei der öffentlichen Seite, ohne zweite Abfrage.
-  const besitzerId = nutzerId ? await getHofBesitzer(farmSlug) : null
-  const zugriff = vorschauZugriff({ parameter, angemeldeterNutzerId: nutzerId, besitzerId })
-  const farm = zugriff === 'vorschau' && nutzerId ? await getOwnerFarm(nutzerId) : await getPublicFarm(farmSlug)
+  suche: Suchparameter
+): Promise<{ farm: PublicFarm | null; ansicht: SeitenAnsicht }> {
+  const { besitzerVorFreigabe, ...ansicht } = await ansichtsModus(suche, {
+    angemeldeterNutzer: async () => (await auth.api.getSession({ headers: await headers() }))?.user.id ?? null,
+    besitzer: () => getHofBesitzer(farmSlug),
+  })
+  const farm = besitzerVorFreigabe ? await getOwnerFarm(besitzerVorFreigabe) : await getPublicFarm(farmSlug)
   // Der Besitzer hat genau einen Hof (ownerId ist eindeutig) — der Abgleich
   // ist eine Absicherung, keine Unterscheidung.
-  return { farm: farm && farm.slug === farmSlug ? farm : null, vorschau: zugriff === 'vorschau' }
+  return { farm: farm && farm.slug === farmSlug ? farm : null, ansicht }
 }
 
+// React `cache` vergleicht Argumente nach Identität: Metadaten und Seite
+// bekommen ihre Suchparameter nicht zwingend als dasselbe Objekt. Der Schlüssel
+// ist deshalb ihr Text — dieselbe Adresse, dieselbe Antwort, einmal geladen.
+const geteilt = cache((farmSlug: string, sucheAlsText: string) =>
+  // Der Text stammt aus JSON.stringify in ladeHofseiteGeteilt darunter, nie von
+  // außen: Er ist genau das Suchparameter-Objekt, das hineinging — deshalb der
+  // Cast statt einer Prüfung. Was darin steht, prüft ansichtsModus (Zod).
+  ladeHofseite(farmSlug, JSON.parse(sucheAlsText) as Suchparameter)
+)
+
 /** Dieselbe Antwort für Metadaten und Seite eines Aufrufs, statt zweimal zu laden. */
-export const ladeHofseiteGeteilt = cache(ladeHofseite)
+export function ladeHofseiteGeteilt(
+  farmSlug: string,
+  suche: Suchparameter
+): Promise<{ farm: PublicFarm | null; ansicht: SeitenAnsicht }> {
+  return geteilt(farmSlug, JSON.stringify(suche))
+}

@@ -3,12 +3,11 @@
  * src/schemas/hofseite-vorschau.ts).
  *
  * Beweist:
- *  - Die Vorschau bekommt nur der angemeldete Besitzer genau dieses Hofs;
- *    abgemeldet, fremder Hof, falscher Parameter: wie ohne Parameter.
- *    (Nicht freigegebener Hof: tests/hofseite-vorschau-laden.test.ts.)
- *  - Einen Korb gibt es nur in der öffentlichen Kundenansicht — nicht im
- *    Bearbeitungsmodus, nicht in der Vorschau; und product-grid kennt keinen
- *    zweiten Maßstab neben dieser Regel.
+ *  - (Wer die Vorschau bekommt: tests/ansichts-modus.test.ts; nicht
+ *    freigegebener Hof: tests/hofseite-vorschau-laden.test.ts.)
+ *  - Einen Korb gibt es nur, wo Kaufen wirkt und nicht bearbeitet wird —
+ *    nicht im Bearbeitungsmodus, nicht in der Vorschau; und product-grid kennt
+ *    keinen zweiten Maßstab neben dieser Regel.
  *  - Markierung und Bereit-Meldung werden nur vom eigenen Ursprung und nur in
  *    der vereinbarten Form gelesen.
  *  - Die Seite lädt den Hof nur über den Lader und setzt noindex; im
@@ -27,45 +26,12 @@ import {
   leseMarkierung,
   verlaesstRahmen,
   vorschauAdresse,
-  vorschauGewuenscht,
+  vorschauLink,
   vorschauMassstab,
-  vorschauZugriff,
   VORSCHAU_BEARBEITUNG_BREITE,
 } from '@/lib/hofseite-vorschau'
 
 const quelltext = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
-
-describe('vorschauZugriff', () => {
-  const BESITZER = 'user-hof'
-
-  it('der angemeldete Besitzer mit ?vorschau=1 sieht die Vorschau', () => {
-    expect(vorschauZugriff({ parameter: '1', angemeldeterNutzerId: BESITZER, besitzerId: BESITZER })).toBe('vorschau')
-  })
-
-  it('abgemeldet: wie ohne Parameter', () => {
-    expect(vorschauZugriff({ parameter: '1', angemeldeterNutzerId: null, besitzerId: BESITZER })).toBe('oeffentlich')
-  })
-
-  it('ein fremder angemeldeter Nutzer: wie ohne Parameter', () => {
-    expect(vorschauZugriff({ parameter: '1', angemeldeterNutzerId: 'user-anderer', besitzerId: BESITZER })).toBe(
-      'oeffentlich'
-    )
-  })
-
-  it('ohne Hof zu diesem Slug: wie ohne Parameter', () => {
-    expect(vorschauZugriff({ parameter: '1', angemeldeterNutzerId: BESITZER, besitzerId: null })).toBe('oeffentlich')
-  })
-
-  it('nur genau „1" zählt — kein Parameter, ein anderer Wert, eine Liste', () => {
-    for (const parameter of [undefined, '', '0', 'ja', '11', ['1', '1']]) {
-      expect(vorschauGewuenscht(parameter), String(parameter)).toBe(false)
-      expect(vorschauZugriff({ parameter, angemeldeterNutzerId: BESITZER, besitzerId: BESITZER }), String(parameter)).toBe(
-        'oeffentlich'
-      )
-    }
-    expect(vorschauGewuenscht('1')).toBe(true)
-  })
-})
 
 describe('verlaesstRahmen — welcher Klick im Rahmen einen neuen Tab öffnet', () => {
   const HIER = 'https://farmerzone.example/hof-test?vorschau=1&stand=2'
@@ -96,11 +62,11 @@ describe('verlaesstRahmen — welcher Klick im Rahmen einen neuen Tab öffnet', 
 })
 
 describe('korbErlaubt', () => {
-  it('nur die öffentliche Kundenansicht führt einen Korb', () => {
-    expect(korbErlaubt({ isEditMode: false, vorschau: false })).toBe(true)
-    expect(korbErlaubt({ isEditMode: true, vorschau: false })).toBe(false)
-    expect(korbErlaubt({ isEditMode: false, vorschau: true })).toBe(false)
-    expect(korbErlaubt({ isEditMode: true, vorschau: true })).toBe(false)
+  it('einen Korb gibt es nur, wo Kaufen wirkt und nicht bearbeitet wird', () => {
+    expect(korbErlaubt({ isEditMode: false, kaufen: true })).toBe(true)
+    expect(korbErlaubt({ isEditMode: true, kaufen: true })).toBe(false)
+    expect(korbErlaubt({ isEditMode: false, kaufen: false })).toBe(false)
+    expect(korbErlaubt({ isEditMode: true, kaufen: false })).toBe(false)
   })
 })
 
@@ -174,31 +140,33 @@ describe('Maßstab und Gerät der Vorschau', () => {
 describe('Vorschau-Adresse', () => {
   it('trägt den Parameter und einen Stand, der das Neuladen erzwingt', () => {
     expect(vorschauAdresse('hof-test', 3)).toBe('/hof-test?vorschau=1&stand=3')
+    expect(vorschauLink('hof-test')).toBe('/hof-test?vorschau=1')
   })
 })
 
 describe('am Quelltext', () => {
-  it('die Hofseite lädt nur über den Lader, der den Zugriff über die Regel entscheidet, und setzt noindex', () => {
+  it('die Hofseite lädt nur über den Lader, der ansichtsModus fragt, und setzt noindex nach seinem Ergebnis', () => {
     const seite = quelltext('src/app/(public)/[farmSlug]/page.tsx')
     expect(seite).toContain('ladeHofseiteGeteilt(')
     expect(seite).not.toContain('getPublicFarm')
-    expect(seite).toMatch(/robots:\s*\{\s*index:\s*false/)
+    expect(seite).toMatch(/ansicht\.noindex \? \{ robots: \{ index: false/)
     const lader = quelltext('src/server/hofseite-vorschau.ts')
-    expect(lader).toContain('vorschauZugriff(')
-    expect(lader).toMatch(/zugriff === 'vorschau' && nutzerId \? await getOwnerFarm\(nutzerId\) : await getPublicFarm\(farmSlug\)/)
+    expect(lader).toContain('await ansichtsModus(suche, {')
+    // Vor der Freigabe sichtbar nur, wenn ansichtsModus den Besitzer nennt.
+    expect(lader).toContain('besitzerVorFreigabe ? await getOwnerFarm(besitzerVorFreigabe) : await getPublicFarm(farmSlug)')
   })
 
-  it('die Seite lädt den Nachbestell-Link in der Vorschau gar nicht erst', () => {
+  it('die Seite lädt den Nachbestell-Link nur, wo Kaufen wirkt', () => {
     const seite = quelltext('src/app/(public)/[farmSlug]/page.tsx')
-    expect(seite).toMatch(/suche\.reorder && !istVorschau/)
+    expect(seite).toMatch(/reorder && ansicht\.kaufen \? await loadReorderItems/)
   })
 
   it('jeder Weg in den Korb läuft über korbErlaubt — Kaufknopf, Nachbestell-Link, Anker, Knopf, Sheet', () => {
     const raster = quelltext('src/components/farm/product-grid.tsx')
-    expect(raster).toContain('const mitKorb = korbErlaubt({ isEditMode, vorschau })')
+    expect(raster).toContain('const mitKorb = korbErlaubt({ isEditMode, kaufen })')
     // Kein zweiter Maßstab neben der Regel.
-    expect(raster).not.toMatch(/!isEditMode && !vorschau/)
-    expect(raster).not.toMatch(/if \(vorschau\)/)
+    expect(raster).not.toMatch(/!isEditMode && kaufen/)
+    expect(raster).not.toMatch(/if \(!?kaufen\)/)
     expect(raster).not.toMatch(/if \(isEditMode\) return/)
     // Nachbestell-Link: der Effekt bricht vor dem ersten addItem ab.
     const nachbestellung = raster.slice(raster.indexOf('Den Korb aus dem Nachbestell-Link'), raster.indexOf('async function handleAddToCart'))

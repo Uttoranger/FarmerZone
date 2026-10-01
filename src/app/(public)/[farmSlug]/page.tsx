@@ -5,33 +5,29 @@ import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'
 import { verifyReorderToken } from '@/lib/reorder-token'
 import { prisma } from '@/lib/prisma'
 import { hofVorschaubild } from '@/lib/vorschaubild'
-import { VORSCHAU_PARAMETER } from '@/lib/hofseite-vorschau'
+import type { Suchparameter } from '@/lib/ansichts-modus'
+import { nachbestellToken } from '@/schemas/nachbestellung'
 import { FarmPageView } from '@/components/farm/farm-page-view'
 
 export const dynamic = 'force-dynamic'
 
+/*
+ * DIE Hofseite — es gibt sie genau einmal. Kundinnen sehen sie hier, und die
+ * Vorschau im Bauern-Bereich ist dieselbe Route mit ?vorschau=1, nie ein
+ * Nachbau (ARCHITECTURE §4). Was die Vorschau anders macht, entscheidet
+ * `ansichtsModus` im Lader; diese Seite liest nur das Ergebnis (`ansicht`),
+ * nie den Parameter selbst (tests/hofseite-einmal.test.ts).
+ */
+
 type Props = {
   params: Promise<{ farmSlug: string }>
-  searchParams: Promise<{ reorder?: string; [VORSCHAU_PARAMETER]?: string | string[] }>
-}
-
-/**
- * Der Parameter, wie Next ihn für die Header-Regel liest (next.config.ts,
- * `has: query`): steht er mehrfach in der Adresse, zählt der letzte Wert.
- * Seite und Header sollen dieselbe Adresse gleich verstehen.
- */
-function vorschauParameter(wert: string | string[] | undefined): string | undefined {
-  return Array.isArray(wert) ? wert.at(-1) : wert
+  searchParams: Promise<Suchparameter>
 }
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { farmSlug } = await params
-  const vorschau = vorschauParameter((await searchParams)[VORSCHAU_PARAMETER])
-  const { farm } = await ladeHofseiteGeteilt(farmSlug, vorschau)
-  // Eine Adresse mit dem Parameter ist nie eine Seite für Suchmaschinen —
-  // auch dann nicht, wenn jemand ohne Recht oder mit falschem Wert kommt und
-  // die öffentliche Seite bekommt.
-  const robots = vorschau !== undefined ? { robots: { index: false, follow: false } } : {}
+  const { farm, ansicht } = await ladeHofseiteGeteilt(farmSlug, await searchParams)
+  const robots = ansicht.noindex ? { robots: { index: false, follow: false } } : {}
   if (!farm) return { title: 'Hof nicht gefunden', ...robots }
 
   const desc = (farm.aboutText ?? farm.description).slice(0, 155)
@@ -72,14 +68,15 @@ async function loadReorderItems(token: string, farmId: string): Promise<ReorderI
 export default async function FarmPage({ params, searchParams }: Props) {
   const { farmSlug } = await params
   const suche = await searchParams
-  const { farm, vorschau: istVorschau } = await ladeHofseiteGeteilt(farmSlug, vorschauParameter(suche[VORSCHAU_PARAMETER]))
+  const { farm, ansicht } = await ladeHofseiteGeteilt(farmSlug, suche)
 
   if (!farm) notFound()
 
   const activeStatus = await getActiveStatusPost(farm.id)
-  // In der Vorschau gibt es keinen Korb — also auch nichts, was ein
-  // Nachbestell-Link hineinlegen dürfte (korbErlaubt, src/lib/hofseite-vorschau.ts).
-  const reorderItems = suche.reorder && !istVorschau ? await loadReorderItems(suche.reorder, farm.id) : []
+  // Wo Kaufen nicht wirkt (Vorschau), gibt es keinen Korb — also auch nichts,
+  // was ein Nachbestell-Link hineinlegen dürfte (korbErlaubt, src/lib/hofseite-vorschau.ts).
+  const reorder = nachbestellToken(suche.reorder)
+  const reorderItems = reorder && ansicht.kaufen ? await loadReorderItems(reorder, farm.id) : []
 
   return (
     <FarmPageView
@@ -87,7 +84,7 @@ export default async function FarmPage({ params, searchParams }: Props) {
       activeStatus={activeStatus}
       reorderItems={reorderItems}
       ownerMode={false}
-      vorschau={istVorschau}
+      ansicht={ansicht}
     />
   )
 }

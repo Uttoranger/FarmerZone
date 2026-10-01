@@ -51,11 +51,11 @@ type Props = {
    */
   onVorschau?: () => void
   /**
-   * Vorschau-Modus der öffentlichen Seite (?vorschau=1, src/lib/hofseite-vorschau.ts):
-   * Der Hof sieht die Kundenansicht, aber Kaufen ist wirkungslos — kein Korb,
-   * keine Reservierung, nur der Hinweis.
+   * Ob Kaufen wirkt — entschieden von `ansichtsModus` (src/lib/ansichts-modus.ts).
+   * In der Vorschau des Hofs (?vorschau=1) nicht: kein Korb, keine
+   * Reservierung, nur der Hinweis. Ohne Angabe wirkt es.
    */
-  vorschau?: boolean
+  kaufen?: boolean
 }
 
 
@@ -514,12 +514,12 @@ export function ProductGrid({
   mode = 'preview',
   isPaused = false,
   onVorschau,
-  vorschau = false,
+  kaufen = true,
 }: Props) {
   const isEditMode = ownerMode && mode !== 'preview'
   // EINE Regel für jeden Weg in den Korb (Kaufknopf, Nachbestell-Link,
   // #warenkorb-Anker, Korb-Knopf, Sheet) — src/lib/hofseite-vorschau.ts.
-  const mitKorb = korbErlaubt({ isEditMode, vorschau })
+  const mitKorb = korbErlaubt({ isEditMode, kaufen })
 
   // Hofladen | Futtermittel (Bereiche 2): Die Wahl steht in der URL
   // (?bereich=futter), damit /hoefe direkt beim Futter landen kann und ein
