@@ -33,6 +33,9 @@ export async function ladeHofseite(
 // bekommen ihre Suchparameter nicht zwingend als dasselbe Objekt. Der Schlüssel
 // ist deshalb ihr Text — dieselbe Adresse, dieselbe Antwort, einmal geladen.
 const geteilt = cache((farmSlug: string, sucheAlsText: string) =>
+  // Der Text stammt aus JSON.stringify in ladeHofseiteGeteilt darunter, nie von
+  // außen: Er ist genau das Suchparameter-Objekt, das hineinging — deshalb der
+  // Cast statt einer Prüfung. Was darin steht, prüft ansichtsModus (Zod).
   ladeHofseite(farmSlug, JSON.parse(sucheAlsText) as Suchparameter)
 )
 

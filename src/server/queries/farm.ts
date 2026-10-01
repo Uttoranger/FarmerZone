@@ -808,7 +808,7 @@ export async function getMeinHofKopf(ownerId: string): Promise<MeinHofKopfDaten 
 
 /**
  * Der Besitzer eines Hofs zu seinem Slug — nur die Kennung, für den
- * Vorschau-Zugriff der Hofseite (src/lib/hofseite-vorschau.ts). null, wenn es
+ * Vorschau-Zugriff der Hofseite (`ansichtsModus`, src/lib/ansichts-modus.ts). null, wenn es
  * den Hof nicht gibt; ob er freigegeben ist, spielt hier keine Rolle: Der
  * Besitzer darf seine Seite auch vorher sehen.
  */

@@ -2668,8 +2668,21 @@ Ergänzung zu „Mein Hof v2". Was gebaut ist, steht in
   Stelle `FarmPageView` einbindet, wenn jemand den Parameter anderswo liest
   oder wenn ein Stift auf der Seite für Kundinnen oder in der Vorschau
   auftaucht. Für den letzten Punkt rendert der Test die echte Komponente
-  serverseitig; die bisherige Regel „kein Rendering-Test möglich" in den
-  Testrichtlinien war zu streng und ist angepasst — kein neues Paket, kein DOM.
+  serverseitig. Die Testrichtlinien sagten bis hier „Kein Rendering-Test
+  möglich" — als Feststellung über die Node-Umgebung, und die war falsch:
+  `react-dom/server` rendert ohne DOM und ohne neues Paket. Der Auftrag
+  verlangte ausdrücklich „die öffentliche Seite und die Vorschau rendern ohne
+  diese Elemente"; das geht nur mit einem Render. Die Regel ist deshalb
+  enger gefasst statt aufgehoben: kein DOM, keine Interaktion, keine
+  Schnappschüsse, keine Layout-Klassen — nur die Frage, ob ein Element in einem
+  Modus vorkommt, mit Gegenprobe aus derselben Komponente. Zur Freigabe im PR
+  vorgelegt.
+- **Kaufen wirkt — im Render sichtbar.** Ob die Hofseite einen Korb führt, ist
+  im statischen HTML sonst nicht zu sehen (der Korb-Knopf erscheint erst nach
+  dem Hydrieren). Der Test ersetzt deshalb `CartSheet` durch ein Merkmal: Bei
+  Kundinnen steht es da, in der Vorschau und im Bearbeitungsmodus nicht. Ginge
+  `kaufen` auf dem Weg zum Produktraster verloren, würde die Vorschau Bestand
+  reservieren — genau das fängt der Test.
 - **Ausnahme `next.config.ts`.** Die Header-Regel für das Einbetten liest den
   Parameter, bevor eine Seite läuft; Next kennt dafür nur die Konfiguration.
   Der Test erlaubt dort genau diese eine Stelle.

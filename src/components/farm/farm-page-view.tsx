@@ -10,7 +10,8 @@
  *    Vorschau anders macht, kommt fertig entschieden als `ansicht` aus
  *    `ansichtsModus` (src/lib/ansichts-modus.ts): `kaufen` (wirkungslos in der
  *    Vorschau) und `art` (der Empfänger für die Markierung des Editors,
- *    VorschauImRahmen). Kein Stift, keine Werkzeugleiste, kein
+ *    VorschauImRahmen). Dazu `reorderItems` aus dem Nachbestell-Link — nur,
+ *    wo Kaufen wirkt. Kein Stift, keine Werkzeugleiste, kein
  *    Bearbeitungs-Hinweis.
  *
  * 2. src/components/farmer/farm-page-client.tsx — der Besitzer am Handy unter
@@ -18,7 +19,9 @@
  *    Kundenansicht), `pastStatusCount` und `onVorschau`. Nur hier gibt es
  *    Stifte, Titelbild- und Fotoknöpfe, den Bearbeitungs-Hinweis und den
  *    Pausen-Hinweis für den Hof; die Werkzeugleiste steht in
- *    farm-page-client.tsx selbst.
+ *    farm-page-client.tsx selbst. Ohne `ansicht` gilt die Seite für
+ *    Kundinnen (`kaufen: true`): In seiner Kundenansicht führt der Besitzer
+ *    deshalb einen Korb — wie schon vor ansichtsModus.
  *
  * Die Besitzer-Verzweigungen (`ownerMode`, `isEdit`, `mode`, `onVorschau`,
  * `pastStatusCount`) entfallen, sobald auch die Handyansicht auf Liste und

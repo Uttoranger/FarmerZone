@@ -97,7 +97,16 @@ export function vorschauMassstab(rahmen: { breite: number; hoehe?: number }, ger
   return massstab
 }
 
-/** Die Adresse der Vorschau zu einem Hof — `stand` erzwingt ein Neuladen nach dem Speichern. */
+/**
+ * Die Adresse der Vorschau zu einem Hof — für „In neuem Tab öffnen". Wer eine
+ * Vorschau-Adresse braucht, nimmt diese oder `vorschauAdresse`; die Konstante
+ * selbst steht nur hier und in ansichtsModus (tests/hofseite-einmal.test.ts).
+ */
+export function vorschauLink(slug: string): string {
+  return `/${slug}?${VORSCHAU_PARAMETER}=1`
+}
+
+/** Die Adresse der Vorschau im Editor-Rahmen — `stand` erzwingt ein Neuladen nach dem Speichern. */
 export function vorschauAdresse(slug: string, stand: number): string {
-  return `/${slug}?${VORSCHAU_PARAMETER}=1&stand=${stand}`
+  return `${vorschauLink(slug)}&stand=${stand}`
 }

@@ -6,6 +6,7 @@ import { verifyReorderToken } from '@/lib/reorder-token'
 import { prisma } from '@/lib/prisma'
 import { hofVorschaubild } from '@/lib/vorschaubild'
 import type { Suchparameter } from '@/lib/ansichts-modus'
+import { nachbestellToken } from '@/schemas/nachbestellung'
 import { FarmPageView } from '@/components/farm/farm-page-view'
 
 export const dynamic = 'force-dynamic'
@@ -74,7 +75,7 @@ export default async function FarmPage({ params, searchParams }: Props) {
   const activeStatus = await getActiveStatusPost(farm.id)
   // Wo Kaufen nicht wirkt (Vorschau), gibt es keinen Korb — also auch nichts,
   // was ein Nachbestell-Link hineinlegen dürfte (korbErlaubt, src/lib/hofseite-vorschau.ts).
-  const reorder = typeof suche.reorder === 'string' ? suche.reorder : undefined
+  const reorder = nachbestellToken(suche.reorder)
   const reorderItems = reorder && ansicht.kaufen ? await loadReorderItems(reorder, farm.id) : []
 
   return (

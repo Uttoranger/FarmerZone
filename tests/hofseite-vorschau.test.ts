@@ -26,6 +26,7 @@ import {
   leseMarkierung,
   verlaesstRahmen,
   vorschauAdresse,
+  vorschauLink,
   vorschauMassstab,
   VORSCHAU_BEARBEITUNG_BREITE,
 } from '@/lib/hofseite-vorschau'
@@ -139,6 +140,7 @@ describe('Maßstab und Gerät der Vorschau', () => {
 describe('Vorschau-Adresse', () => {
   it('trägt den Parameter und einen Stand, der das Neuladen erzwingt', () => {
     expect(vorschauAdresse('hof-test', 3)).toBe('/hof-test?vorschau=1&stand=3')
+    expect(vorschauLink('hof-test')).toBe('/hof-test?vorschau=1')
   })
 })
 

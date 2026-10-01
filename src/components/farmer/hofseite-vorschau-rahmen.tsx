@@ -5,10 +5,10 @@ import { ArrowUpRight, Maximize2, Monitor, Smartphone, X } from 'lucide-react'
 import { MARKIERUNG_TYP, type HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 import {
   VORSCHAU_HANDY_HOEHE,
-  VORSCHAU_PARAMETER,
   VORSCHAU_SEITENBREITE,
   leseBereit,
   vorschauAdresse,
+  vorschauLink,
   vorschauMassstab,
   type VorschauGeraet,
 } from '@/lib/hofseite-vorschau'
@@ -250,7 +250,7 @@ function VorschauOverlay({
             <GeraetUmschalter wert={geraet} onWert={onGeraet} />
           </div>
           <a
-            href={`/${slug}?${VORSCHAU_PARAMETER}=1`}
+            href={vorschauLink(slug)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border px-4 text-[13px] font-medium text-app-ink transition-colors hover:bg-muted/50"
@@ -362,7 +362,7 @@ export function HofseiteVorschauRahmen({
           Vergrößern
         </button>
         <a
-          href={`/${slug}?${VORSCHAU_PARAMETER}=1`}
+          href={vorschauLink(slug)}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium text-app-ink-soft transition-colors hover:text-app-ink outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
