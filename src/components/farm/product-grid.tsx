@@ -30,6 +30,7 @@ import { ReorderContext } from '@/components/shared/reorder-context'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { CartSheet } from './cart-sheet'
 import { ProduktDetail, type HofFuerDetail } from './produkt-detail'
+import { cn } from '@/lib/utils'
 
 type ReorderItem = { productId: string; productName: string; quantity: number }
 
@@ -153,7 +154,14 @@ function ProductImageArea({
             alt={product.name}
             fill
             sizes="(min-width: 768px) 33vw, 50vw"
-            className="object-contain"
+            // Nur die Kategorie-Illustration wird im Dunkeln gedämpft, sonst
+            // leuchtet ihr Crème-Grund als Fläche; Fotos bleiben, wie sie sind
+            // (CODING_STANDARDS §7, Altlast aus ARCHITECTURE §6 beim Anfassen
+            // nachgezogen — Werte wie in produkt-zeile-teile.tsx).
+            className={cn(
+              'object-contain',
+              !product.imageUrl && 'dark:brightness-[0.85] dark:saturate-[0.9]'
+            )}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -295,7 +303,15 @@ function ProductCard({
     <>
       <ProductImageArea product={product} dim={dim} isEditMode={isEditMode} />
       <div className="px-[15px] pt-[14px]" style={{ opacity: dim }}>
-        <p className="font-semibold text-sm leading-snug" style={{ color: 'var(--app-ink)' }}>{product.name}</p>
+        {/* Höchstens zwei Zeilen: Ein langer Name schöbe sonst Preis und
+            Kaufknopf aus der Flucht der Nachbarkarten. Voller Name im title. */}
+        <p
+          className="line-clamp-2 font-semibold text-sm leading-snug break-words"
+          style={{ color: 'var(--app-ink)' }}
+          title={product.name}
+        >
+          {product.name}
+        </p>
         <p className="text-[17px] font-bold mt-[5px]" style={{ color: 'var(--app-ink)' }}>
           {formatGrundpreis(product.price, product.unit, product.unitSize)}
         </p>

@@ -1,0 +1,53 @@
+/**
+ * Obergrenzen für Namen und Freitexte — EINE Quelle für die Zod-Schemas
+ * (src/schemas/), die Zeichenzähler der Formulare und die Tests.
+ *
+ * Ohne Grenze landete beliebig langer Text in der Datenbank und sprengte
+ * Hofkarte, Seitenleiste und Bestellzeilen. Die Zahlen lassen echten Namen
+ * Luft; wer anstößt, hat meist etwas ins falsche Feld getippt.
+ */
+
+export const HOFNAME_MAX = 80
+export const PERSONENNAME_MAX = 80
+export const TELEFON_MAX = 30
+export const NOTIZ_MAX = 500
+/** Mehr lässt das Mailprotokoll nicht zu (RFC 5321). */
+export const EMAIL_MAX = 254
+/** Wie im Produktformular — eine Checkout-Position trägt den Produktnamen. */
+export const PRODUKTNAME_MAX = 100
+
+/** Die Meldung am Feld, wenn ein neuer Wert zu lang ist — mit dem Ausweg. */
+export const ZU_LANG = {
+  hofname: `Der Hofname darf höchstens ${HOFNAME_MAX} Zeichen haben — bitte kürzen.`,
+  personenname: `Der Name darf höchstens ${PERSONENNAME_MAX} Zeichen haben — bitte kürzen.`,
+  telefon: `Die Telefonnummer darf höchstens ${TELEFON_MAX} Zeichen haben — bitte kürzen.`,
+  notiz: `Die Notiz darf höchstens ${NOTIZ_MAX} Zeichen haben — bitte kürzen.`,
+  email: `Die E-Mail-Adresse darf höchstens ${EMAIL_MAX} Zeichen haben.`,
+  produktname: `Der Produktname darf höchstens ${PRODUKTNAME_MAX} Zeichen haben.`,
+} as const
+
+/**
+ * Passt ein Wert in die Grenze? Beim Bearbeiten zählt der gespeicherte Wert
+ * als passend, solange er unverändert bleibt: Ein Hof, dessen Name vor der
+ * Grenze länger gespeichert wurde, bleibt speicherbar, ohne ihn erst umbauen
+ * zu müssen (CODING_STANDARDS §8). Jeder neue Wert hält die Grenze ein.
+ */
+export function passtInGrenze(wert: string, max: number, bestand?: string | null): boolean {
+  return wert.length <= max || (bestand != null && wert === bestand)
+}
+
+/** Was der Zähler unter einem Feld zeigt. */
+export type ZeichenStand = { sichtbar: false } | { sichtbar: true; text: string; zuLang: boolean }
+
+/**
+ * Der Zähler erscheint ab 80 % Füllung — vorher lenkt er nur ab. Über der
+ * Grenze sagt er „Bitte kürzen", als Hinweis und nicht als Fehler: Ob der Wert
+ * so gespeichert werden darf, entscheidet das Schema erst beim Speichern
+ * (ein unveränderter Altwert darf es, siehe passtInGrenze).
+ */
+export function zeichenStand(laenge: number, max: number): ZeichenStand {
+  // Ganzzahlig statt laenge / max >= 0.8 — keine Rundungsfrage an der Schwelle.
+  if (laenge * 5 < max * 4) return { sichtbar: false }
+  const zuLang = laenge > max
+  return { sichtbar: true, zuLang, text: zuLang ? `${laenge} / ${max} · Bitte kürzen` : `${laenge} / ${max}` }
+}

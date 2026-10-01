@@ -1,5 +1,13 @@
 import { z } from 'zod'
 import { KAEUFER_ART_VALUES, pruefeBetriebsnachweis } from '@/lib/betriebsnachweis'
+import {
+  NOTIZ_MAX,
+  PERSONENNAME_MAX,
+  PRODUKTNAME_MAX,
+  TELEFON_MAX,
+  ZU_LANG,
+} from '@/lib/eingabegrenzen'
+import { emailSchema } from '@/schemas/email'
 
 /**
  * Die Reihenfolge der Felder auf der Seite — maßgeblich dafür, zu welchem
@@ -21,10 +29,16 @@ export const CHECKOUT_FELD_REIHENFOLGE = [
 // Client-side form schema (no items/sessionId/farmId — those are added on submit)
 export const checkoutFormSchema = z
   .object({
-    customerName: z.string().min(2, 'Name muss mindestens 2 Zeichen haben'),
-    customerEmail: z.string().email('Ungültige E-Mail-Adresse'),
-    customerPhone: z.string().min(4, 'Telefonnummer ist zu kurz'),
-    customerNote: z.string().optional(),
+    customerName: z
+      .string()
+      .min(2, 'Name muss mindestens 2 Zeichen haben')
+      .max(PERSONENNAME_MAX, ZU_LANG.personenname),
+    customerEmail: emailSchema('Ungültige E-Mail-Adresse'),
+    customerPhone: z
+      .string()
+      .min(4, 'Telefonnummer ist zu kurz')
+      .max(TELEFON_MAX, ZU_LANG.telefon),
+    customerNote: z.string().max(NOTIZ_MAX, ZU_LANG.notiz).optional(),
     // "YYYY-MM-DD|HH:MM|HH:MM" — encoded slot key
     pickupSlotKey: z.string().min(1, 'Bitte wähle einen Abholtermin'),
     paymentMethod: z.enum(['ONLINE', 'ONSITE_CASH', 'ONSITE_CARD']),
@@ -71,10 +85,13 @@ export const checkoutRequestSchema = z.object({
   // bestehende Bestellung statt einer zweiten (Bug-Report Befund 4).
   // Optional, damit ein alter, noch offener Tab nicht in einen 400 läuft.
   idempotencyKey: z.string().min(8).max(100).optional(),
-  customerName: z.string().min(2),
-  customerEmail: z.string().email(),
-  customerPhone: z.string().min(4),
-  customerNote: z.string().optional(),
+  // Dieselben Obergrenzen wie im Formular — der Server ist die Wahrheit. Die
+  // E-Mail kommt bereinigt und klein geschrieben heraus: Mit ihr sucht der
+  // Handler das Kundenkonto (src/schemas/email.ts).
+  customerName: z.string().min(2).max(PERSONENNAME_MAX, ZU_LANG.personenname),
+  customerEmail: emailSchema(),
+  customerPhone: z.string().min(4).max(TELEFON_MAX, ZU_LANG.telefon),
+  customerNote: z.string().max(NOTIZ_MAX, ZU_LANG.notiz).optional(),
   pickupDate: z.string().min(1),       // ISO date string "YYYY-MM-DD"
   pickupTimeStart: z.string().min(1),  // "HH:MM"
   pickupTimeEnd: z.string().min(1),
@@ -89,7 +106,9 @@ export const checkoutRequestSchema = z.object({
     .array(
       z.object({
         productId: z.string().min(1),
-        name: z.string().min(1),
+        // Der Name landet als Momentaufnahme in OrderItem.productName — nie
+        // länger, als ein Produktname sein darf.
+        name: z.string().min(1).max(PRODUKTNAME_MAX, ZU_LANG.produktname),
         quantity: z.number().int().positive(),
         unitPrice: z.number().positive(),
       })

@@ -66,12 +66,16 @@ export function FarmIdentityCard({
           <div className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: 'rgba(207,228,214,0.55)' }}>
             Mein Hof
           </div>
-          {/* Größtes Textelement der Navigation. Kein truncate: ein langer
-              Hofname darf bei 375px umbrechen, statt abgeschnitten zu werden —
-              er ist der Name des Betriebs, nicht eine Beschriftung. */}
+          {/* Größtes Textelement der Navigation. Kein einzeiliges truncate:
+              ein langer Hofname darf umbrechen, statt nach wenigen Wörtern
+              abgeschnitten zu werden — er ist der Name des Betriebs, nicht
+              eine Beschriftung. Aber höchstens zwei Zeilen: 80 Zeichen
+              (die Obergrenze) schöben sonst die ganze Leiste nach unten; der
+              volle Name steht im title. */}
           <div
-            className="font-heading text-[15px] font-semibold leading-snug break-words"
+            className="line-clamp-2 font-heading text-[15px] font-semibold leading-snug break-words"
             style={{ color: 'var(--app-bar-ink)' }}
+            title={farmName}
           >
             {farmName}
           </div>

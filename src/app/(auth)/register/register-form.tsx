@@ -7,6 +7,9 @@ import { registerFarmer } from '@/server/actions/register'
 import { FARM_PENDING_AFTER_SIGNUP } from '@/lib/farm-approval'
 import { validatePassword } from '@/lib/password-rules'
 import { signIn } from '@/lib/auth-client'
+import { vollerName } from '@/schemas/register'
+import { EMAIL_MAX, PERSONENNAME_MAX } from '@/lib/eingabegrenzen'
+import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/ui/password-input'
@@ -76,7 +79,9 @@ export function RegisterForm({ formToken }: { formToken: string }) {
     }
 
     // User created + FARMER role set. Now sign in client-side to get session cookie.
-    const { error: signInError } = await signIn.email({ email, password })
+    // Ohne Ränder, wie registerFarmer das Konto angelegt hat — Better Auth
+    // lehnt eine Adresse mit Leerzeichen am Rand als ungültig ab.
+    const { error: signInError } = await signIn.email({ email: email.trim(), password })
     if (signInError) {
       setFehler('Konto erstellt, aber Anmeldung fehlgeschlagen. Bitte manuell einloggen.')
       setLaedt(false)
@@ -167,6 +172,10 @@ export function RegisterForm({ formToken }: { formToken: string }) {
                   className="h-11 text-base"
                 />
               </div>
+              {/* Die Grenze gilt für den ganzen Namen, so wie registerFarmer ihn speichert. */}
+              <div className="col-span-2 -mt-2 empty:hidden">
+                <ZeichenZaehler laenge={vollerName(firstName, lastName).length} max={PERSONENNAME_MAX} />
+              </div>
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -183,6 +192,7 @@ export function RegisterForm({ formToken }: { formToken: string }) {
                 required
                 className="h-11 text-base"
               />
+              <ZeichenZaehler laenge={email.trim().length} max={EMAIL_MAX} />
             </div>
 
             {/* Password with live checklist */}

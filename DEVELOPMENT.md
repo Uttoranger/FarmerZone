@@ -254,6 +254,64 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 
 ## Bekannte Bugs & Fixes
 
+### BUG: Namen und Freitexte ohne Obergrenze, jede Schreibweise der E-Mail ein neuer Kunde (behoben 2026-10-01)
+
+**Befund:** Der Produktname hatte `max(100)`, aber Hofname, Inhabername,
+Personenname (Registrierung, Checkout), Telefon, Bestellnotiz und der
+Positionsname im Checkout hatten keine Obergrenze. Beliebig langer Text landete
+in der Datenbank und sprengte Hofkarte, Seitenleiste, Produktkarte,
+Bestellzeile und das Teilen-Bild. Die E-Mail wurde nicht normalisiert.
+
+**Ursache:** Die Schemas prüften nur nach unten (`min`), und `createFarm`
+(Onboarding, hier entsteht der Hofname) schrieb ganz ohne Schema. Die
+Checkout-Route sucht das Kundenkonto per `findUnique` auf `User.email`. Postgres
+vergleicht genau, Better Auth speichert Adressen klein. „Max@…" und „max@…"
+waren deshalb zwei Kundenkonten, und das groß geschriebene fand der Anmeldelink
+(`/account/login`) nie.
+
+**Fix:**
+- Die Grenzen stehen an einer Stelle: `src/lib/eingabegrenzen.ts` (Hofname 80,
+  Personenname 80, Telefon 30, Notiz 500, E-Mail 254, Produktname 100), mit
+  Meldungen, die sagen, was zu tun ist.
+- E-Mail über `emailSchema` (`src/schemas/email.ts`): ohne Ränder, klein,
+  höchstens 254. Gilt für Registrierung, Hofprofil und Checkout (Formular und
+  Server). Damit sucht und legt der Checkout das Konto immer klein an.
+- `createFarm` prüft mit `hofAnlegenSchema`, nur die Grenzen und Ränder. Die
+  Pflichtfelder hält weiter das Formular.
+- `registerFarmer` reicht die geprüfte Adresse an Better Auth weiter. Vorher
+  scheiterte schon ein Leerzeichen am Rand.
+- Zeichenzähler ab 80 % Füllung in Checkout, Hofprofil, Hofseiten-Editor,
+  Onboarding und Registrierung. Er zeigt einen Hinweis („Bitte kürzen"), keinen
+  Fehler. Geprüft wird beim Speichern.
+- Anzeige: höchstens zwei Zeilen bzw. eine, der volle Name im `title`
+  (Hofkarte auf /hoefe und im Karten-Karussell, Seitenleiste, Produktkarte,
+  Bestellzeile in Bestellungen und „Heute abholen", Teilen-Bild).
+
+**Entscheidung Altbestand:** Der Auftrag verlangte „nicht sperren, Hinweis
+statt Fehler, erst beim Speichern prüfen". Ein Hofname, Inhabername oder eine
+Telefonnummer, die vor der Grenze länger gespeichert wurde, geht beim Speichern
+unverändert durch (`profilBearbeitenSchema`, CODING_STANDARDS §8: Bestandsdaten
+bleiben speicherbar). Nur ein geänderter Wert muss die Grenze einhalten. Sollen
+Altwerte beim nächsten Speichern gekürzt werden müssen, ersetzt man
+`profilBearbeitenSchema` durch `profileSchema` (`updateProfile` und die beiden
+Formulare).
+
+**Offen, mit Absicht nicht angefasst:**
+- Kundenkonten, die frühere Bestellungen mit Großbuchstaben angelegt haben,
+  werden nicht zusammengeführt. Die nächste Bestellung derselben Kundin legt
+  ein klein geschriebenes Konto an. Die Hofansichten gruppieren ohnehin nach
+  der klein geschriebenen Adresse (`src/server/queries/customers.ts`), betroffen
+  ist nur `Order.customerId`. Zusammenführen wäre eine Datenmigration.
+- Produktnamen aus dem Onboarding (`createOnboardingProducts`, ohne Schema)
+  haben weiter keine Obergrenze. Die Checkout-Position verlangt jetzt
+  höchstens 100 Zeichen. Ein längerer Name würde den Checkout dieses Produkts
+  mit 400 ablehnen.
+
+**Tests:** `tests/eingabegrenzen.test.ts` (Schemas, Grenzwerte 80/81 usw.,
+Zähler, Altbestand), `tests/eingabegrenzen-aktionen.test.ts` (`createFarm`,
+`registerFarmer`, `updateProfile`), `tests/checkout-kunde.test.ts` (echter
+Handler: zwei Schreibweisen ergeben einen Kunden). Vor dem Fix 31 von 39 rot.
+
 ### BUG: Verwaiste Bestellungen hielten den Bestand für immer (behoben 2026-10-01, K3)
 
 **Befund:** Der Checkout bucht den Bestand, bevor bezahlt (online) oder per

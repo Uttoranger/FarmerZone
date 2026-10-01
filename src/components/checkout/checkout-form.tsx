@@ -42,6 +42,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { StripePaymentStep } from './stripe-payment'
 import { KundenKopf } from '@/components/shared/kunden-kopf'
+import { FeldZaehler } from '@/components/shared/zeichen-zaehler'
+import { EMAIL_MAX, NOTIZ_MAX, PERSONENNAME_MAX, TELEFON_MAX } from '@/lib/eingabegrenzen'
 
 /**
  * Den Warenkorb auf den vom Server berichtigten Stand bringen: gekürzte Mengen
@@ -553,6 +555,7 @@ export function CheckoutForm({
               placeholder="Maria Muster"
               className={form.formState.errors.customerName ? 'border-destructive' : ''}
             />
+            <FeldZaehler control={form.control} name="customerName" max={PERSONENNAME_MAX} />
             {form.formState.errors.customerName && (
               <p id="customerName-fehler" className="text-xs text-destructive mt-1">
                 {form.formState.errors.customerName.message}
@@ -575,6 +578,7 @@ export function CheckoutForm({
               placeholder="maria@beispiel.at"
               className={form.formState.errors.customerEmail ? 'border-destructive' : ''}
             />
+            <FeldZaehler control={form.control} name="customerEmail" max={EMAIL_MAX} />
             {form.formState.errors.customerEmail && (
               <p id="customerEmail-fehler" className="text-xs text-destructive mt-1">
                 {form.formState.errors.customerEmail.message}
@@ -597,6 +601,7 @@ export function CheckoutForm({
               placeholder="+43 664 123 4567"
               className={form.formState.errors.customerPhone ? 'border-destructive' : ''}
             />
+            <FeldZaehler control={form.control} name="customerPhone" max={TELEFON_MAX} />
             {form.formState.errors.customerPhone && (
               <p id="customerPhone-fehler" className="text-xs text-destructive mt-1">
                 {form.formState.errors.customerPhone.message}
@@ -610,9 +615,20 @@ export function CheckoutForm({
             <Textarea
               id="customerNote"
               {...form.register('customerNote')}
+              aria-invalid={form.formState.errors.customerNote ? true : undefined}
+              aria-describedby={form.formState.errors.customerNote ? 'customerNote-fehler' : undefined}
               placeholder="z. B. Ich komme erst gegen 17:30"
               rows={2}
+              className={form.formState.errors.customerNote ? 'border-destructive' : ''}
             />
+            <FeldZaehler control={form.control} name="customerNote" max={NOTIZ_MAX} />
+            {/* Seit die Notiz eine Obergrenze hat, kann sie scheitern — die
+                Meldung steht am Feld wie bei den Pflichtfeldern. */}
+            {form.formState.errors.customerNote && (
+              <p id="customerNote-fehler" className="text-xs text-destructive mt-1">
+                {form.formState.errors.customerNote.message}
+              </p>
+            )}
           </div>
         </div>
 

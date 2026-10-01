@@ -567,6 +567,10 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
                 type="button"
                 onClick={() => eintragGewaehlt(hof.slug)}
                 aria-label={`${hof.name} auf der Karte zeigen`}
+                // Die Überlagerung liegt über dem Namen und fängt den Zeiger —
+                // deshalb trägt SIE den vollen Namen als title, nicht nur die
+                // gekappte Überschrift darunter.
+                title={hof.name}
                 className="absolute inset-0 cursor-pointer rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
               />
             ) : (
@@ -575,6 +579,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
               <Link
                 href={hofseitenLink(hof.slug, bereich)}
                 aria-label={`${hof.name} ansehen`}
+                title={hof.name}
                 className="absolute inset-0 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
               />
             )}
@@ -624,7 +629,10 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
               )}
 
               <div className="min-w-0 flex-1">
-                <h2 className="font-heading text-lg font-semibold leading-snug text-foreground">
+                {/* Höchstens zwei Zeilen — ein Hofname mit 80 Zeichen (die
+                    Obergrenze) stünde sonst über vier Zeilen und drückte Ort
+                    und Kategorien aus der Karte. Der volle Name: title oben. */}
+                <h2 className="line-clamp-2 font-heading text-lg font-semibold leading-snug text-foreground break-words">
                   {hof.name}
                 </h2>
                 <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">

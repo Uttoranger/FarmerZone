@@ -144,7 +144,10 @@ export default async function HeutePage() {
                 <li key={a.id}>
                   <Link href={`/orders/${a.id}`} className={ZEILE}>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm text-app-ink">
+                      {/* Eine Zeile wie die Positionen darunter — ein langer
+                          Name (bis 80 Zeichen) bricht sonst über mehrere
+                          Zeilen; der volle Name steht im title. */}
+                      <p className="truncate text-sm text-app-ink" title={a.kunde}>
                         <span className="font-semibold tabular-nums">{a.uhrzeit}</span>
                         <span className="text-app-ink-soft"> · </span>
                         <span className="font-medium">{a.kunde}</span>

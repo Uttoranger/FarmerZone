@@ -16,6 +16,8 @@ import {
 } from '@/server/actions/onboarding'
 import { generateSlug } from '@/lib/slug'
 import { findBatchSlotError } from '@/lib/pickup-slot-rules'
+import { EMAIL_MAX, HOFNAME_MAX, PERSONENNAME_MAX, TELEFON_MAX } from '@/lib/eingabegrenzen'
+import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
 
 type Step = 1 | 2 | 3 | 4
 // Preis und Bestand als Zahl (DezimalFeld liest Komma wie Punkt); leer ist null.
@@ -361,6 +363,8 @@ export function OnboardingClient({ userEmail, appUrl }: { userEmail: string; app
                 }
                 className="h-11"
               />
+              {/* Gezählt wird ohne Ränder — so prüft und speichert createFarm (hofAnlegenSchema). */}
+              <ZeichenZaehler laenge={farmName.trim().length} max={HOFNAME_MAX} />
               {slugPreview && (
                 <p
                   className={`text-xs mt-0.5 ${
@@ -394,6 +398,7 @@ export function OnboardingClient({ userEmail, appUrl }: { userEmail: string; app
                 aria-describedby={se('ownerName') ? 'ownerName-error' : undefined}
                 className="h-11"
               />
+              <ZeichenZaehler laenge={ownerName.trim().length} max={PERSONENNAME_MAX} />
               {se('ownerName') && <FieldErr id="ownerName-error" msg={s1e.ownerName} />}
             </div>
 
@@ -479,6 +484,7 @@ export function OnboardingClient({ userEmail, appUrl }: { userEmail: string; app
                   aria-describedby={se('phone') ? 'phone-error' : undefined}
                   className="h-11"
                 />
+                <ZeichenZaehler laenge={phone.trim().length} max={TELEFON_MAX} />
                 {se('phone') && <FieldErr id="phone-error" msg={s1e.phone} />}
               </div>
               <div className="flex flex-col gap-1.5">
@@ -490,6 +496,7 @@ export function OnboardingClient({ userEmail, appUrl }: { userEmail: string; app
                   onChange={(e) => setFarmEmail(e.target.value)}
                   className="h-11"
                 />
+                <ZeichenZaehler laenge={farmEmail.trim().length} max={EMAIL_MAX} />
               </div>
             </div>
 

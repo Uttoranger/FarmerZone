@@ -95,7 +95,10 @@ describe('Editor', () => {
   it('prüft die Felder mit den Schemas der Aktionen selbst, nicht mit einer Abschrift', () => {
     expect(editor).toContain("from '@/schemas/hofprofil'")
     expect(editor).toContain("from '@/schemas/auftritt'")
-    expect(editor.match(/profileSchema\.pick\(/g)).toHaveLength(3)
+    // Name und Kontakt haben Obergrenzen — dort das Bearbeiten-Schema mit dem
+    // gezeigten Stand, damit ein zu langer Altwert das Speichern nicht sperrt.
+    expect(editor.match(/profileSchema\.pick\(/g)).toHaveLength(1)
+    expect(editor.match(/profilBearbeitenSchema\(bestandVon\(einstellungen\)\)\.pick\(/g)).toHaveLength(2)
     expect(editor).toContain('appearanceSchema.pick({ aboutText: true })')
     expect(editor).not.toMatch(/z\.object\(/)
   })

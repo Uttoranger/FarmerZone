@@ -143,6 +143,9 @@ export default function HoefeKarussell({
             <Link
               href={hofseitenLink(hof.slug, bereich)}
               aria-label={`${hof.name} ansehen`}
+              // Der Link liegt über dem gekappten Namen und fängt den Zeiger —
+              // er trägt deshalb den vollen Namen als title.
+              title={hof.name}
               tabIndex={sichtbar ? 0 : -1}
               className="absolute inset-0 rounded-2xl"
             />
