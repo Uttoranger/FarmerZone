@@ -113,19 +113,29 @@ function funde(pfad: string, roh: string): Fund[] {
   return liste
 }
 
-/** Wo ein Fund erlaubt ist: Adressen schreiben in hofseite-vorschau.ts, lesen nur in ansichtsModus. */
+/** Ob eine Stelle im Rumpf einer Funktion liegt (bis zur ersten Zeile, die mit `}` beginnt). */
+function imRumpf(code: string, kopf: string, stelle: number): boolean {
+  const anfang = code.indexOf(kopf)
+  const ende = code.indexOf('\n}\n', anfang)
+  return anfang > -1 && stelle > anfang && stelle < ende
+}
+
+/** Die Zeile, in der eine Stelle steht. */
+function zeileVon(code: string, stelle: number): string {
+  const ende = code.indexOf('\n', stelle)
+  return code.slice(code.lastIndexOf('\n', stelle) + 1, ende === -1 ? undefined : ende)
+}
+
+/** Wo ein Fund erlaubt ist: die Adresse schreiben nur in vorschauLink, lesen nur in ansichtsModus. */
 function erlaubt(fund: Fund, text: string): boolean {
   const code = ohneKommentare(text)
   if (fund.pfad === 'src/lib/hofseite-vorschau.ts' && fund.art === 'Konstante') {
-    const davor = code.slice(Math.max(0, fund.stelle - 13), fund.stelle)
-    const danach = code.slice(fund.stelle, fund.stelle + 'VORSCHAU_PARAMETER}=1'.length)
-    return davor === 'export const ' || danach === 'VORSCHAU_PARAMETER}=1'
+    if (code.slice(Math.max(0, fund.stelle - 13), fund.stelle) === 'export const ') return true
+    return imRumpf(code, 'export function vorschauLink(', fund.stelle)
   }
   if (fund.pfad === 'src/lib/ansichts-modus.ts' && (fund.art === 'Konstante' || fund.art === 'Index')) {
-    const anfang = code.indexOf('export async function ansichtsModus(')
-    const ende = code.indexOf('\n}\n', anfang)
-    const imImport = /^import\s*\{[^}]*\}\s*from\s*'@\/lib\/hofseite-vorschau'/m.test(code.slice(code.lastIndexOf('\n', fund.stelle) + 1))
-    return imImport || (fund.stelle > anfang && fund.stelle < ende)
+    const imImport = /^import\s*\{[^}]*\}\s*from\s*'@\/lib\/hofseite-vorschau'\s*$/.test(zeileVon(code, fund.stelle))
+    return imImport || imRumpf(code, 'export async function ansichtsModus(', fund.stelle)
   }
   return false
 }
@@ -162,6 +172,13 @@ describe('der Parameter „vorschau" wird nur in ansichtsModus() gelesen', () =>
       'const href = vorschauLink(slug)',
     ]
     for (const zeile of harmlos) expect(verboten('src/irgendwo.tsx', zeile), zeile).toEqual([])
+
+    // Auch in den beiden erlaubten Dateien zählt nur der eine Ort: Lesen außerhalb
+    // von vorschauLink bzw. ansichtsModus fällt auf, ein Import weiter unten ändert daran nichts.
+    const leseInDerAdressdatei = "export function vorschauLink(slug: string): string {\n  return `/${slug}?${VORSCHAU_PARAMETER}=1`\n}\nexport const hier = location.search.includes(`${VORSCHAU_PARAMETER}=1`)\n"
+    expect(verboten('src/lib/hofseite-vorschau.ts', leseInDerAdressdatei)).toHaveLength(1)
+    const leseVorDemModus = "const w = suche[VORSCHAU_PARAMETER]\nimport { VORSCHAU_PARAMETER } from '@/lib/hofseite-vorschau'\n"
+    expect(verboten('src/lib/ansichts-modus.ts', leseVorDemModus).map((f) => f.art)).toEqual(['Index', 'Konstante'])
   })
 
   it('in src/ liest ihn nur ansichtsModus — keine Seite, kein Lader, keine Komponente', () => {
@@ -201,7 +218,8 @@ describe('FarmPageView binden genau zwei Stellen ein', () => {
   const EINBINDEN = [
     /import\s*\{[^}]*\bFarmPageView\b[^}]*\}\s*from/, // benannt
     /import\s*\*\s*as\s+\w+\s+from\s+['"][^'"]*farm-page-view['"]/, // Namensraum
-    /export\s*(?:\*|\{[^}]*\bFarmPageView\b[^}]*\})\s*from/, // weitergereicht
+    /export\s*\{[^}]*\bFarmPageView\b[^}]*\}\s*from/, // weitergereicht, benannt
+    /export\s*\*(?:\s*as\s+\w+)?\s*from\s*['"][^'"]*farm-page-view['"]/, // weitergereicht, alles
     /import\(\s*['"][^'"]*farm-page-view['"]\s*\)/, // dynamisch
     /<(?:\w+\.)?FarmPageView\b/, // im JSX, auch als Hof.FarmPageView
   ]
@@ -212,12 +230,14 @@ describe('FarmPageView binden genau zwei Stellen ein', () => {
       "import { FarmPageView } from '@/components/farm/farm-page-view'",
       "import * as Hof from '@/components/farm/farm-page-view'",
       "export { FarmPageView } from './farm-page-view'",
+      "export * as Hof from '@/components/farm/farm-page-view'",
       "const Seite = dynamic(() => import('@/components/farm/farm-page-view'))",
       '<Hof.FarmPageView farm={farm} />',
     ]) {
       expect(bindetEin(zeile), zeile).toBe(true)
     }
     expect(bindetEin("import { CoverEditButton } from '@/components/farm/farm-page-view'")).toBe(false)
+    expect(bindetEin("export * from './andere-datei'")).toBe(false)
   })
 
   it('die Hofseite und farm-page-client.tsx — eine dritte Stelle lässt den Test fehlschlagen', () => {

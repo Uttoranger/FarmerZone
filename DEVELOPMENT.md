@@ -2672,11 +2672,9 @@ Ergänzung zu „Mein Hof v2". Was gebaut ist, steht in
   möglich" — als Feststellung über die Node-Umgebung, und die war falsch:
   `react-dom/server` rendert ohne DOM und ohne neues Paket. Der Auftrag
   verlangte ausdrücklich „die öffentliche Seite und die Vorschau rendern ohne
-  diese Elemente"; das geht nur mit einem Render. Die Regel ist deshalb
-  enger gefasst statt aufgehoben: kein DOM, keine Interaktion, keine
-  Schnappschüsse, keine Layout-Klassen — nur die Frage, ob ein Element in einem
-  Modus vorkommt, mit Gegenprobe aus derselben Komponente. Zur Freigabe im PR
-  vorgelegt.
+  diese Elemente"; das geht nur mit einem Render. Die Regel ist deshalb enger
+  gefasst statt aufgehoben — wie, steht in TESTING_GUIDELINES §1 „Folge der
+  Node-Umgebung". Zur Freigabe im PR vorgelegt.
 - **Kaufen wirkt — im Render sichtbar.** Ob die Hofseite einen Korb führt, ist
   im statischen HTML sonst nicht zu sehen (der Korb-Knopf erscheint erst nach
   dem Hydrieren). Der Test ersetzt deshalb `CartSheet` durch ein Merkmal: Bei
