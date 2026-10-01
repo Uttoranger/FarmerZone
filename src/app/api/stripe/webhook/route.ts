@@ -55,13 +55,21 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    if (event.type === 'payment_intent.succeeded') {
+    // Ereignisse verbundener Hof-Konten (Connect-Endpunkt, `event.account`
+    // gesetzt) betreffen nur das Konto selbst — Zahlungen laufen als
+    // Destination Charge auf der Plattform und kommen ohne `account`.
+    if (event.account) {
+      if (event.type === 'account.updated') {
+        await handleKontoAktualisiert(event.data.object as Stripe.Account)
+      }
+    } else if (event.type === 'payment_intent.succeeded') {
       await handlePaymentSucceeded(event.data.object as Stripe.PaymentIntent)
     } else if (event.type === 'payment_intent.payment_failed') {
       await handlePaymentFailed(event.data.object as Stripe.PaymentIntent)
     } else if (event.type === 'payment_intent.canceled') {
       await handlePaymentCanceled(event.data.object as Stripe.PaymentIntent)
     } else if (event.type === 'account.updated') {
+      // Auch über den Plattform-Endpunkt möglich (abonniert); dieselbe Regel.
       await handleKontoAktualisiert(event.data.object as Stripe.Account)
     }
   } catch (err) {
@@ -162,9 +170,16 @@ async function handlePaymentFailed(pi: Stripe.PaymentIntent) {
  * dieser Konto-ID (fremdes Konto, das Plattformkonto selbst): nichts zu tun.
  */
 async function handleKontoAktualisiert(konto: Stripe.Account) {
-  await prisma.farm.updateMany({
-    where: { stripeAccountId: konto.id },
-    data: { stripeAccountReady: stripeKontoBereit(konto) },
+  const hof = await prisma.farm.findFirst({ where: { stripeAccountId: konto.id }, select: { id: true } })
+  if (!hof) return
+  // Stripe liefert Ereignisse nicht garantiert in der richtigen Reihenfolge.
+  // Ein verspätetes, älteres account.updated überschriebe sonst einen
+  // neueren Stand — also den aktuellen nachlesen. Scheitert das: 500, Stripe
+  // stellt erneut zu.
+  const aktuell = await stripe.accounts.retrieve(konto.id)
+  await prisma.farm.update({
+    where: { id: hof.id },
+    data: { stripeAccountReady: stripeKontoBereit(aktuell) },
   })
 }
 

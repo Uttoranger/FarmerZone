@@ -19,14 +19,42 @@ export function stripeKontoBereit(konto: {
 }
 
 /**
- * Der Hof will online kassieren, aber Stripe lässt es gerade nicht zu (Angaben
- * fehlen, Konto in Prüfung). Dann bietet der Checkout Online nicht an, und
- * Heute zeigt den Hinweis mit dem Weg zu Stripe.
+ * Der Hof will online kassieren, hat ein Stripe-Konto, aber Stripe lässt es
+ * gerade nicht zu (Angaben fehlen, Konto gesperrt oder in Prüfung). Dann
+ * bietet der Checkout Online nicht an, und Heute zeigt den Hinweis mit dem Weg
+ * zu Stripe.
+ *
+ * NUR MIT KONTO: `acceptsOnline` steht für jeden neuen Hof vorbelegt auf true.
+ * Ohne die Bedingung stünde „pausiert" ab Tag eins bei jedem Hof, der Stripe
+ * nie eingerichtet hat — dafür hat die Erste-Schritte-Karte ihren eigenen
+ * Schritt „Online-Zahlung einrichten".
  */
-export function onlineZahlungPausiert(hof: { acceptsOnline: boolean; stripeAccountReady: boolean }): boolean {
-  return hof.acceptsOnline && !hof.stripeAccountReady
+export function onlineZahlungPausiert(hof: {
+  acceptsOnline: boolean
+  stripeAccountReady: boolean
+  stripeAccountId: string | null
+}): boolean {
+  return hof.acceptsOnline && !hof.stripeAccountReady && hof.stripeAccountId !== null
 }
 
-/** Der Hinweis auf Heute — ein Satz, ohne Fachbegriffe. */
-export const ONLINE_PAUSIERT_TEXT =
-  'Online-Zahlung ist pausiert – Stripe braucht noch Angaben von dir. Bis dahin können Kunden nur bar bei Abholung bestellen.'
+/**
+ * Der Hinweis auf Heute — ein Satz, ohne Fachbegriffe. Ohne Barzahlung gibt
+ * es keinen Ausweg für die Kunden; dann darf der Satz ihn nicht versprechen.
+ */
+export function onlinePausiertText(barMoeglich: boolean): string {
+  return barMoeglich
+    ? 'Online-Zahlung ist pausiert – Stripe braucht noch Angaben von dir. Bis dahin können Kunden nur bar bei Abholung bestellen.'
+    : 'Online-Zahlung ist pausiert – Stripe braucht noch Angaben von dir. Bis dahin können Kunden bei dir nicht bestellen.'
+}
+
+/**
+ * Antwort des Checkouts, wenn Stripe den Zahlungsvorgang nicht anlegen
+ * konnte — Code für den Browser, Satz für die Kundin.
+ */
+export const CODE_ZAHLUNG_NICHT_MOEGLICH = 'ZAHLUNG_NICHT_MOEGLICH'
+
+export function zahlungNichtMoeglichText(barMoeglich: boolean): string {
+  return barMoeglich
+    ? 'Online-Zahlung ist gerade nicht möglich. Bitte versuch es später oder wähle Barzahlung.'
+    : 'Online-Zahlung ist gerade nicht möglich. Bitte versuch es später noch einmal.'
+}

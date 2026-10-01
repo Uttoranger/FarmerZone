@@ -17,14 +17,18 @@ import { NextRequest } from 'next/server'
 import { Prisma } from '@prisma/client'
 
 vi.mock('@/lib/stripe', () => ({
-  stripe: { webhooks: { constructEvent: vi.fn() }, refunds: { create: vi.fn() } },
+  stripe: {
+    webhooks: { constructEvent: vi.fn() },
+    refunds: { create: vi.fn() },
+    accounts: { retrieve: vi.fn() },
+  },
 }))
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     webhookEvent: { findUnique: vi.fn(), create: vi.fn() },
     order: { findUnique: vi.fn(), updateMany: vi.fn() },
-    farm: { updateMany: vi.fn() },
+    farm: { findFirst: vi.fn(), update: vi.fn() },
   },
 }))
 
@@ -372,6 +376,12 @@ describe('Connect-Endpunkt: account.updated mit eigenem Secret', () => {
 
   it('passt das Plattform-Secret nicht, gilt das Connect-Secret — und der Hof wird nicht mehr als bereit geführt', async () => {
     vi.stubEnv('STRIPE_CONNECT_WEBHOOK_SECRET', 'whsec_connect_dummy')
+    vi.mocked(prisma.farm.findFirst).mockResolvedValue({ id: 'farm_1' } as never)
+    vi.mocked(stripe.accounts.retrieve).mockResolvedValue({
+      id: 'acct_hof_1',
+      charges_enabled: false,
+      payouts_enabled: true,
+    } as never)
     constructEvent
       .mockImplementationOnce(() => {
         throw new Error('No signatures found matching the expected signature')
@@ -383,10 +393,27 @@ describe('Connect-Endpunkt: account.updated mit eigenem Secret', () => {
     expect(res.status).toBe(200)
     expect(constructEvent).toHaveBeenNthCalledWith(1, '{}', 'sig_test', 'whsec_test_dummy')
     expect(constructEvent).toHaveBeenNthCalledWith(2, '{}', 'sig_test', 'whsec_connect_dummy')
-    expect(vi.mocked(prisma.farm.updateMany)).toHaveBeenCalledWith({
-      where: { stripeAccountId: 'acct_hof_1' },
+    // Der Stand kommt frisch von Stripe, nicht aus dem (womöglich verspäteten) Ereignis.
+    expect(stripe.accounts.retrieve).toHaveBeenCalledWith('acct_hof_1')
+    expect(vi.mocked(prisma.farm.update)).toHaveBeenCalledWith({
+      where: { id: 'farm_1' },
       data: { stripeAccountReady: false },
     })
+  })
+
+  it('Ereignisse verbundener Konten laufen nur durch account.updated — nie durch die Zahlungs-Handler', async () => {
+    constructEvent.mockReturnValue({
+      id: 'evt_fremd_pi',
+      type: 'payment_intent.succeeded',
+      account: 'acct_hof_1',
+      data: { object: { id: 'pi_test_1' } },
+    } as unknown as ReturnType<typeof constructEvent>)
+
+    const res = await POST(makeRequest())
+
+    expect(res.status).toBe(200)
+    expect(orderUpdateMany).not.toHaveBeenCalled()
+    expect(webhookEventCreate).toHaveBeenCalledTimes(1)
   })
 
   it('ohne Connect-Secret gibt es nur einen Versuch', async () => {

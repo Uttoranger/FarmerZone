@@ -25,6 +25,7 @@ import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { fristVon } from '@/lib/fristen'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
+import { CODE_ZAHLUNG_NICHT_MOEGLICH, zahlungNichtMoeglichText } from '@/lib/stripe-konto'
 import {
   pruefeBetriebsnachweis,
   betriebsnummerFuerBestellung,
@@ -93,7 +94,6 @@ async function gibBestandZurueck(gebucht: Array<{ productId: string; quantity: n
 
 const CODE_BESTELLUNG_IN_ARBEIT = 'BESTELLUNG_IN_ARBEIT'
 const CODE_BESTELLUNG_BEENDET = 'BESTELLUNG_BEENDET'
-const CODE_ZAHLUNG_NICHT_MOEGLICH = 'ZAHLUNG_NICHT_MOEGLICH'
 
 /** Storno-Grund, wenn Stripe den Zahlungsvorgang nicht anlegen konnte. */
 const GRUND_ZAHLUNG_NICHT_GESTARTET = 'Zahlung konnte nicht gestartet werden'
@@ -109,8 +109,26 @@ const INTENT_WARTEZEIT_MS = 2 * 60 * 1000
  * Stripe-Idempotenz-Schlüssel je Bestellung: Eine Wiederholung bekommt
  * DENSELBEN PaymentIntent, statt einen zweiten anzulegen — auch dann, wenn
  * nur das Speichern der Intent-ID gescheitert war.
+ *
+ * Kurze Leine: Drei Versuche à 20 s bleiben sicher unter der Wartezeit von
+ * zwei Minuten. Mit der SDK-Vorgabe (80 s je Versuch) konnte die erste
+ * Anfrage ihren Intent noch speichern, nachdem eine Wiederholung die
+ * Bestellung schon als gescheitert storniert hatte.
  */
-const stripeSchluessel = (orderId: string) => `pi-${orderId}`
+const intentOptionen = (orderId: string) => ({
+  idempotencyKey: `pi-${orderId}`,
+  timeout: 20_000,
+  maxNetworkRetries: 2,
+})
+
+/**
+ * 409 von Stripe: Eine zweite Anfrage mit demselben Schlüssel läuft gerade
+ * (Doppelklick). Das ist kein Ausfall — die andere bekommt den Intent.
+ * Stripe meldet das als 409, das SDK als StripeAPIError mit diesem Status.
+ */
+function istStripeKonflikt(err: unknown): boolean {
+  return (err as { statusCode?: unknown } | null)?.statusCode === 409
+}
 
 /**
  * Die Parameter des PaymentIntents — aus den GESPEICHERTEN Werten der
@@ -158,19 +176,55 @@ function intentParameter(
  * Bestellung ohne Zahlungsweg stehen zu lassen. Scheitert auch der Storno,
  * räumt die Frist auf (src/server/verwaiste-bestellungen.ts).
  */
-async function zahlungNichtMoeglich(orderId: string): Promise<NextResponse> {
+async function zahlungNichtMoeglich(orderId: string, barMoeglich: boolean): Promise<NextResponse> {
   try {
     await storniereUnbezahlteBestellung(orderId, GRUND_ZAHLUNG_NICHT_GESTARTET)
   } catch (err) {
     Sentry.captureException(err, { tags: { aufgabe: 'checkout', grund: 'storno_nach_zahlungsfehler' }, extra: { orderId } })
   }
   return NextResponse.json(
-    {
-      code: CODE_ZAHLUNG_NICHT_MOEGLICH,
-      error: 'Online-Zahlung ist gerade nicht möglich. Bitte versuch es später oder wähle Barzahlung.',
-    },
+    { code: CODE_ZAHLUNG_NICHT_MOEGLICH, error: zahlungNichtMoeglichText(barMoeglich) },
     { status: 503 }
   )
+}
+
+const inArbeit = () =>
+  NextResponse.json(
+    {
+      error: 'Deine Bestellung wird gerade angelegt. Bitte versuch es in ein paar Sekunden noch einmal.',
+      code: CODE_BESTELLUNG_IN_ARBEIT,
+    },
+    { status: 409 }
+  )
+
+const beendet = () =>
+  NextResponse.json(
+    {
+      error: 'Diese Bestellung gibt es nicht mehr. Lade die Seite neu, um noch einmal zu bestellen.',
+      code: CODE_BESTELLUNG_BEENDET,
+    },
+    { status: 409 }
+  )
+
+/**
+ * Den Intent an die Bestellung hängen — nur, solange sie noch auf die Zahlung
+ * wartet (ARCHITECTURE.md §5: der bedingte Wechsel ist die Sperre). Wurde sie
+ * inzwischen storniert (Wiederholung nach der Wartezeit, Frist), wird der
+ * Intent abgebrochen: Sonst bekäme die Kundin ein bezahlbares Client-Secret
+ * für eine Bestellung ohne Ware. `false` heißt: Die Bestellung ist weg.
+ */
+async function haengeIntentAn(orderId: string, intentId: string): Promise<boolean> {
+  const { count } = await prisma.order.updateMany({
+    where: { id: orderId, status: 'PENDING_CONFIRMATION' },
+    data: { stripePaymentIntentId: intentId },
+  })
+  if (count === 1) return true
+  try {
+    await stripe.paymentIntents.cancel(intentId, { cancellation_reason: 'abandoned' })
+  } catch (err) {
+    Sentry.captureException(err, { tags: { aufgabe: 'checkout', grund: 'intent_ohne_bestellung' }, extra: { orderId } })
+  }
+  return false
 }
 
 /**
@@ -179,7 +233,8 @@ async function zahlungNichtMoeglich(orderId: string): Promise<NextResponse> {
  * den letzten Blick vor jedem 409.
  */
 async function antwortFuerBestehendeBestellung(
-  idempotencyKey: string | undefined
+  idempotencyKey: string | undefined,
+  sessionId: string
 ): Promise<NextResponse | null> {
   if (!idempotencyKey) return null
   const bestehend = await prisma.order.findUnique({
@@ -197,7 +252,7 @@ async function antwortFuerBestehendeBestellung(
       totalAmount: true,
       platformFeeAmount: true,
       serviceFeeCents: true,
-      farm: { select: { stripeAccountId: true } },
+      farm: { select: { stripeAccountId: true, acceptsOnsite: true } },
     },
   })
   if (!bestehend) return null
@@ -205,53 +260,47 @@ async function antwortFuerBestehendeBestellung(
   // Kundin aus dem Zahlungsschritt zurück ins Formular ging und erst nach der
   // Frist erneut abschickte. Die alte Bestellung samt abgebrochenem
   // PaymentIntent zurückzugeben, führte in eine Zahlung, die nicht mehr geht.
-  if (bestehend.status === 'CANCELLED') {
-    return NextResponse.json(
-      {
-        error: 'Diese Bestellung gibt es nicht mehr. Lade die Seite neu, um noch einmal zu bestellen.',
-        code: CODE_BESTELLUNG_BEENDET,
-      },
-      { status: 409 }
-    )
-  }
+  if (bestehend.status === 'CANCELLED') return beendet()
   if (bestehend.paymentMethod === 'ONLINE') {
     // Noch kein PaymentIntent gespeichert. Drei Möglichkeiten: Die erste
     // Anfrage läuft noch, oder Stripe legte den Intent an und nur das
     // Speichern der ID scheiterte, oder alles scheiterte unbemerkt.
     if (!bestehend.stripePaymentIntentId) {
       // Nach zwei Minuten ist die erste Anfrage sicher vorbei: gescheitert.
-      if (Date.now() - bestehend.createdAt.getTime() > INTENT_WARTEZEIT_MS || !bestehend.farm.stripeAccountId) {
-        return zahlungNichtMoeglich(bestehend.id)
+      if (Date.now() - bestehend.createdAt.getTime() > INTENT_WARTEZEIT_MS) {
+        return zahlungNichtMoeglich(bestehend.id, bestehend.farm.acceptsOnsite)
       }
+      // Ohne Hof-Konto kein Intent — noch kein Urteil, solange die erste
+      // Anfrage laufen kann; nach der Wartezeit greift oben der Storno.
+      const hofKonto = bestehend.farm.stripeAccountId
+      if (!hofKonto) return inArbeit()
       // Derselbe Stripe-Schlüssel liefert denselben Intent — egal, ob die
-      // erste Anfrage ihn schon anlegte. Die ID wird bedingt nachgetragen.
+      // erste Anfrage ihn schon anlegte.
+      let intent: Stripe.PaymentIntent
       try {
-        const intent = await stripe.paymentIntents.create(
-          intentParameter(bestehend, bestehend.farm.stripeAccountId),
-          { idempotencyKey: stripeSchluessel(bestehend.id) }
-        )
-        await prisma.order.updateMany({
-          where: { id: bestehend.id, stripePaymentIntentId: null },
-          data: { stripePaymentIntentId: intent.id },
-        })
-        return NextResponse.json({
-          orderId: bestehend.id,
-          orderNumber: bestehend.orderNumber,
-          clientSecret: intent.client_secret,
-          reserviertBis: fristVon(bestehend).toISOString(),
-          wiederholt: true,
-        })
-      } catch {
-        // Stripe gerade nicht erreichbar: noch kein Urteil — ein zweiter
-        // Versuch in ein paar Sekunden, nach zwei Minuten greift oben der Storno.
-        return NextResponse.json(
-          {
-            error: 'Deine Bestellung wird gerade angelegt. Bitte versuch es in ein paar Sekunden noch einmal.',
-            code: CODE_BESTELLUNG_IN_ARBEIT,
-          },
-          { status: 409 }
-        )
+        intent = await stripe.paymentIntents.create(intentParameter(bestehend, hofKonto), intentOptionen(bestehend.id))
+      } catch (err) {
+        // Konflikt: Die erste Anfrage legt den Intent gerade an — erwartbar.
+        // Alles andere soll jemand sehen: Ein dauerhafter Fehler (etwa
+        // abweichende Parameter) endete sonst nach zwei Minuten im stillen Storno.
+        if (!istStripeKonflikt(err)) {
+          Sentry.captureException(err, {
+            tags: { aufgabe: 'checkout', grund: 'zahlung_wiederholung' },
+            extra: { orderId: bestehend.id },
+          })
+        }
+        return inArbeit()
       }
+      if (!(await haengeIntentAn(bestehend.id, intent.id))) return beendet()
+      // Die erste Anfrage kam nicht mehr dazu, die Halte der Sitzung freizugeben.
+      await prisma.stockReservation.deleteMany({ where: { sessionId } })
+      return NextResponse.json({
+        orderId: bestehend.id,
+        orderNumber: bestehend.orderNumber,
+        clientSecret: intent.client_secret,
+        reserviertBis: fristVon(bestehend).toISOString(),
+        wiederholt: true,
+      })
     }
     // Für die Zahlungsmaske braucht der Browser das Client-Secret erneut.
     const intent = await stripe.paymentIntents.retrieve(bestehend.stripePaymentIntentId)
@@ -280,9 +329,13 @@ async function antwortFuerBestehendeBestellung(
  * stimmt für sie nicht, denn ihre Bestellung gibt es ja. Der letzte Blick
  * macht daraus die 200 mit genau dieser Bestellung.
  */
-async function konflikt(idempotencyKey: string | undefined, inhalt: object): Promise<NextResponse> {
+async function konflikt(
+  idempotencyKey: string | undefined,
+  sessionId: string,
+  inhalt: object
+): Promise<NextResponse> {
   return (
-    (await antwortFuerBestehendeBestellung(idempotencyKey)) ??
+    (await antwortFuerBestehendeBestellung(idempotencyKey, sessionId)) ??
     NextResponse.json(inhalt, { status: 409 })
   )
 }
@@ -322,7 +375,7 @@ export async function POST(request: NextRequest) {
   // 0. IDEMPOTENZ — vor allem anderen. Kennt der Server den Schlüssel schon,
   //    ist die Bestellung bereits angelegt; sie wird zurückgegeben, nichts
   //    Zweites entsteht, kein Bestand wird ein zweites Mal gebucht.
-  const wiederholung = await antwortFuerBestehendeBestellung(data.idempotencyKey)
+  const wiederholung = await antwortFuerBestehendeBestellung(data.idempotencyKey, data.sessionId)
   if (wiederholung) return wiederholung
 
   // 1. Load farm
@@ -338,21 +391,21 @@ export async function POST(request: NextRequest) {
   // Zustand sticht den vorübergehenden, damit ein stillgelegter Hof nie die
   // Pausen-Meldung ausgibt ("bald wieder da" wäre eine falsche Zusage).
   if (farm.archivedAt) {
-    return konflikt(data.idempotencyKey, { error: FARM_ARCHIVED_MESSAGE })
+    return konflikt(data.idempotencyKey, data.sessionId, { error: FARM_ARCHIVED_MESSAGE })
   }
 
   // 1b². Freischaltung — nach der Stilllegung, aber VOR der Pause: ein noch
   // nicht freigeschalteter Hof darf keine Pausen-Meldung ausgeben, denn er
   // war nie offen (siehe src/lib/farm-approval.ts).
   if (!farm.approvedAt) {
-    return konflikt(data.idempotencyKey, { error: FARM_NOT_APPROVED_MESSAGE })
+    return konflikt(data.idempotencyKey, data.sessionId, { error: FARM_NOT_APPROVED_MESSAGE })
   }
 
   // 1c. Shop-Pause — fail-closed VOR jeder Bestell- und Zahlungslogik:
   // vor der Bestandsprüfung, vor prisma.order.create und vor jedem Stripe-Aufruf.
   // Eine ausgeblendete Schaltfläche ist keine Durchsetzung; die Wahrheit steht hier.
   if (farm.isPaused) {
-    return konflikt(data.idempotencyKey, { error: SHOP_PAUSED_MESSAGE })
+    return konflikt(data.idempotencyKey, data.sessionId, { error: SHOP_PAUSED_MESSAGE })
   }
 
   // 2. Validate payment method availability
@@ -386,6 +439,7 @@ export async function POST(request: NextRequest) {
   if (pruefung.befund.etwasAbgelaufen || pruefung.befund.etwasGeaendert) {
     return konflikt(
       data.idempotencyKey,
+      data.sessionId,
       {
         error: pruefung.meldung ?? 'Dein Warenkorb hat sich geändert.',
         code: pruefung.befund.etwasAbgelaufen ? CODE_RESERVIERUNG_ABGELAUFEN : 'WARENKORB_GEAENDERT',
@@ -407,6 +461,7 @@ export async function POST(request: NextRequest) {
   if (data.items.some((i) => !produktJeId.has(i.productId))) {
     return konflikt(
       data.idempotencyKey,
+      data.sessionId,
       { error: 'Dein Warenkorb hat sich geändert. Bitte prüfe ihn noch einmal.', code: 'WARENKORB_GEAENDERT' },
     )
   }
@@ -422,6 +477,7 @@ export async function POST(request: NextRequest) {
     const namen = abweichend.map((a) => `„${a.name}“`).join(', ')
     return konflikt(
       data.idempotencyKey,
+      data.sessionId,
       {
         error:
           abweichend.length === 1
@@ -504,6 +560,7 @@ export async function POST(request: NextRequest) {
       await gibBestandZurueck(gebucht)
       return konflikt(
         data.idempotencyKey,
+        data.sessionId,
         {
           error: `"${item.name}" wurde gerade von jemand anderem gekauft. Bitte prüfe deinen Warenkorb.`,
           code: 'WARENKORB_GEAENDERT',
@@ -581,7 +638,7 @@ export async function POST(request: NextRequest) {
     // Zwei Requests mit demselben Schlüssel gleichzeitig: Der zweite läuft in
     // den eindeutigen Index. Dann gewinnt der erste, und der zweite bekommt
     // dessen Bestellung — kein Fehler für die Kundin.
-    const wiederholung = await antwortFuerBestehendeBestellung(data.idempotencyKey)
+    const wiederholung = await antwortFuerBestehendeBestellung(data.idempotencyKey, data.sessionId)
     if (wiederholung) return wiederholung
     console.error('[/api/checkout] Bestellung konnte nicht angelegt werden', e)
     return NextResponse.json(
@@ -632,21 +689,29 @@ export async function POST(request: NextRequest) {
     let paymentIntent: Stripe.PaymentIntent
     try {
       // Das ! ist sicher: Schritt 2 lehnt ONLINE ohne stripeAccountId ab.
-      paymentIntent = await stripe.paymentIntents.create(intentParameter(order, farm.stripeAccountId!), {
-        idempotencyKey: stripeSchluessel(order.id),
-      })
+      paymentIntent = await stripe.paymentIntents.create(
+        intentParameter(order, farm.stripeAccountId!),
+        intentOptionen(order.id)
+      )
     } catch (err) {
+      // Doppelklick: Die zweite Anfrage legt mit demselben Schlüssel gerade
+      // denselben Intent an. Kein Ausfall, kein Storno — sie bekommt ihn.
+      if (istStripeKonflikt(err)) return inArbeit()
       console.error('[/api/checkout] PaymentIntent nicht angelegt', order.id)
       Sentry.captureException(err, { tags: { aufgabe: 'checkout', grund: 'zahlung_nicht_gestartet' }, extra: { orderId: order.id } })
-      return zahlungNichtMoeglich(order.id)
+      return zahlungNichtMoeglich(order.id, farm.acceptsOnsite)
     }
 
-    // Scheitert NUR das Speichern, holt die Wiederholung mit demselben
-    // Idempotenz-Schlüssel denselben Intent und trägt die ID nach.
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { stripePaymentIntentId: paymentIntent.id },
-    })
+    // Bedingt: Wurde die Bestellung während des Stripe-Aufrufs storniert,
+    // wird der Intent abgebrochen statt herausgegeben. Scheitert NUR das
+    // Speichern (wirft), holt die Wiederholung mit demselben Schlüssel
+    // denselben Intent und trägt die ID nach.
+    if (!(await haengeIntentAn(order.id, paymentIntent.id))) {
+      return NextResponse.json(
+        { code: CODE_ZAHLUNG_NICHT_MOEGLICH, error: zahlungNichtMoeglichText(farm.acceptsOnsite) },
+        { status: 503 }
+      )
+    }
     await gibHalteFrei()
 
     return NextResponse.json({

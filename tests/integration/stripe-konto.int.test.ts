@@ -10,13 +10,13 @@
  * Signaturprüfung, signiert wird mit den Platzhalter-Secrets der
  * Integrationsschicht.
  */
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
 vi.mock('@/lib/stripe', async () => {
   const { default: Stripe } = await import('stripe')
   const echt = new Stripe('sk_test_integration_dummy')
-  return { stripe: { webhooks: echt.webhooks, refunds: { create: vi.fn() } } }
+  return { stripe: { webhooks: echt.webhooks, refunds: { create: vi.fn() }, accounts: { retrieve: vi.fn() } } }
 })
 vi.mock('@/lib/email', () => ({
   sendOrderConfirmation: vi.fn(),
@@ -31,11 +31,21 @@ import { stripe } from '@/lib/stripe'
 import { INTEGRATIONS_ENV } from './setup/integrations-umgebung'
 import { erstelleHof, intKennung, raeumeAuf } from './setup/basis'
 
+/** Was Stripe auf `accounts.retrieve` antwortet — der aktuelle Stand je Konto. */
+const kontoStand = new Map<string, { id: string; charges_enabled: boolean; payouts_enabled: boolean }>()
+
+beforeEach(() => {
+  kontoStand.clear()
+  vi.mocked(stripe.accounts.retrieve).mockImplementation((async (id: string) => kontoStand.get(id)) as never)
+})
+
 afterEach(async () => {
   await raeumeAuf()
 })
 
+/** Ein account.updated — und (Normalfall) derselbe Stand bei Stripe. */
 function kontoEreignis(kontoId: string, konto: { charges_enabled: boolean; payouts_enabled: boolean }) {
+  kontoStand.set(kontoId, { id: kontoId, ...konto })
   return {
     id: intKennung('evt'),
     object: 'event',
@@ -104,6 +114,19 @@ describe('account.updated über den Connect-Endpunkt', () => {
     )
 
     expect(antwort.status).toBe(200)
+    expect(await bereit(farm.id)).toBe(true)
+  })
+})
+
+describe('Reihenfolge der Ereignisse', () => {
+  it('ein verspätetes, älteres account.updated überschreibt nicht den aktuellen Stand bei Stripe', async () => {
+    const { farm, kontoId } = await hofMitKonto(true)
+    const veraltet = kontoEreignis(kontoId, { charges_enabled: false, payouts_enabled: false })
+    // Inzwischen ist das Konto wieder frei.
+    kontoStand.set(kontoId, { id: kontoId, charges_enabled: true, payouts_enabled: true })
+
+    await zustellen(veraltet, CONNECT)
+
     expect(await bereit(farm.id)).toBe(true)
   })
 })

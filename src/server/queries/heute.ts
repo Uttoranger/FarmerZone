@@ -38,10 +38,9 @@ export type Heute = {
   wartetAufFreigabe: boolean
   /**
    * Der Hof will online kassieren, Stripe lässt es gerade nicht zu — dann der
-   * Hinweis mit dem Weg zu Stripe; `kontoVorhanden` entscheidet, ob der Knopf
-   * erst ein Konto anlegt.
+   * Hinweis mit dem Weg zu Stripe; `barMoeglich` wählt den Satz.
    */
-  onlinePausiert: { kontoVorhanden: boolean } | null
+  onlinePausiert: { barMoeglich: boolean } | null
 }
 
 export async function getHeute(farmId: string, jetzt: Date = new Date()): Promise<Heute> {
@@ -119,6 +118,7 @@ export async function getHeute(farmId: string, jetzt: Date = new Date()): Promis
         stripeAccountReady: true,
         stripeAccountId: true,
         acceptsOnline: true,
+        acceptsOnsite: true,
         approvedAt: true,
       },
     }),
@@ -147,7 +147,6 @@ export async function getHeute(farmId: string, jetzt: Date = new Date()): Promis
     woche: wochenvergleich(umsatzDieseWoche, umsatzVorwoche),
     ersteSchritte: ersteSchritte(ersteSchritteDaten(hof, { produkte, aktiveAbholzeiten })),
     wartetAufFreigabe: hof?.approvedAt == null,
-    onlinePausiert:
-      hof && onlineZahlungPausiert(hof) ? { kontoVorhanden: hof.stripeAccountId != null } : null,
+    onlinePausiert: hof && onlineZahlungPausiert(hof) ? { barMoeglich: hof.acceptsOnsite } : null,
   }
 }

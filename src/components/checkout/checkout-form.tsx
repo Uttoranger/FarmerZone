@@ -41,6 +41,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { StripePaymentStep } from './stripe-payment'
+import { CODE_ZAHLUNG_NICHT_MOEGLICH } from '@/lib/stripe-konto'
 import { KundenKopf } from '@/components/shared/kunden-kopf'
 
 /**
@@ -340,7 +341,7 @@ export function CheckoutForm({
         // Online-Zahlung konnte nicht starten — die Bestellung ist storniert,
         // die Ware wieder frei. Ein NEUER Schlüssel, damit der nächste Versuch
         // (etwa mit Barzahlung) eine neue Bestellung wird statt der alten.
-        if (err.code === 'ZAHLUNG_NICHT_MOEGLICH') {
+        if (err.code === CODE_ZAHLUNG_NICHT_MOEGLICH) {
           idempotencyKeyRef.current = crypto.randomUUID()
           toast.error(err.error ?? 'Online-Zahlung ist gerade nicht möglich.')
           return

@@ -25,7 +25,13 @@ vi.mock('@/lib/prisma', () => ({
     product: { findUnique: vi.fn(), update: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
     stockReservation: { aggregate: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn() },
     user: { findUnique: vi.fn(), create: vi.fn() },
-    order: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
+    order: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      // Der Intent hängt sich bedingt an die offene Bestellung (route.ts, haengeIntentAn).
+      updateMany: vi.fn(async () => ({ count: 1 })),
+    },
     customerFarmSubscription: { findUnique: vi.fn(), upsert: vi.fn() },
   },
 }))

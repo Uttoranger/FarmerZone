@@ -122,7 +122,7 @@ export default async function HeutePage() {
 
       {/* Online-Zahlung pausiert: Stripe braucht Angaben — vor allem anderen,
           denn bis dahin können Kunden nur bar bestellen. */}
-      {onlinePausiert && <OnlinePausiertHinweis kontoVorhanden={onlinePausiert.kontoVorhanden} />}
+      {onlinePausiert && <OnlinePausiertHinweis barMoeglich={onlinePausiert.barMoeglich} />}
 
       {/* Für einen frisch registrierten Hof das Wichtigste — sie rendert sich
           selbst weg, sobald alles erledigt ist; weggeklickt kommt sie über die

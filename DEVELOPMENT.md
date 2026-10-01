@@ -294,6 +294,23 @@ weiter an.
   `STRIPE_WEBHOOK_SECRET` und das neue, optionale
   `STRIPE_CONNECT_WEBHOOK_SECRET`. Sie setzt `stripeAccountReady` für den Hof
   mit dieser `stripeAccountId`. Ein fremdes Konto ändert nichts.
+  - Den Stand liest sie bei Stripe frisch nach, denn Ereignisse kommen nicht
+    garantiert in Reihenfolge.
+  - Ereignisse verbundener Konten (`event.account`) laufen nur durch
+    `account.updated`, nie durch die Zahlungs-Handler.
+  - Fehlt das Secret in Produktion, meldet die Umgebungsprüfung eine Warnung
+    an Sentry.
+- **Wettläufe** (Prüferbefund):
+  - Ein Stripe-409, weil eine zweite Anfrage mit demselben Schlüssel läuft
+    (Doppelklick), führt nicht zum Storno, sondern zu 409 „wird gerade
+    angelegt“.
+  - Die Intent-ID kommt nur an eine noch offene Bestellung
+    (`haengeIntentAn`). Wurde sie während des Stripe-Aufrufs storniert, wird
+    der Intent abgebrochen und kein Client-Secret herausgegeben.
+  - Die Stripe-Aufrufe haben eine kurze Leine (20 Sekunden, zwei
+    Wiederholungen) und bleiben damit unter der Wartezeit von zwei Minuten.
+  - Die Wiederholung gibt die Halte der Sitzung frei, wenn sie den Intent
+    nachträgt.
 - **Eine Bereit-Regel:** `stripeKontoBereit` in `src/lib/stripe-konto.ts`
   verlangt Zahlungen UND Auszahlungen frei. Sie gilt jetzt auch beim
   Onboarding und bei „Status prüfen“, dort galt bisher
@@ -305,8 +322,14 @@ weiter an.
   Heute (Web und Handy) „Online-Zahlung ist pausiert – Stripe braucht noch
   Angaben von dir. Bis dahin können Kunden nur bar bei Abholung bestellen.“
   Der Knopf „Bei Stripe ergänzen“ führt über einen Account Link direkt zu
-  Stripe; gibt es noch kein Konto, legt er es vorher an. Der Checkout bot
-  Online ohnehin nur bei `stripeAccountReady` an.
+  Stripe. Der Checkout bot Online ohnehin nur bei `stripeAccountReady` an.
+  - **Abweichung vom Wortlaut:** Der Hinweis erscheint nur, wenn der Hof schon
+    ein Stripe-Konto hat. `acceptsOnline` ist für jeden neuen Hof
+    vorbelegt; sonst stünde „pausiert“ ab Tag eins bei jedem Hof, der Stripe
+    nie eingerichtet hat. Dafür hat die Erste-Schritte-Karte ihren eigenen
+    Schritt.
+  - Ohne Barzahlung verspricht der Satz sie nicht: „… können Kunden bei dir
+    nicht bestellen.“ Dasselbe gilt für die 503-Antwort im Checkout.
 
 **Manueller Schritt:** Im Stripe-Dashboard einen Connect-Webhook-Endpunkt
 anlegen („Events von verbundenen Konten“, dieselbe URL, Event
@@ -316,18 +339,19 @@ in Vercel, Production und Preview (README, „Stripe Webhook für Produktion“)
 **Offen, mit Absicht nicht angefasst:**
 - Die Hofseite zeigt unter „Zahlung & Kontakt“ „Online (Karte)“ allein nach
   `acceptsOnline`, also auch, wenn Online pausiert ist.
-- Der PaymentIntent im Checkout nutzt die SDK-Vorgaben für Timeout und
-  Wiederholung, bis zu 80 Sekunden je Versuch. Kommt eine Wiederholung erst
-  nach zwei Minuten und die erste Anfrage hängt noch, kann die Bestellung
-  storniert werden, während der erste Intent doch noch entsteht. Zahlt die
-  Kundin ihn, greift die späte Erstattung aus K2.
 
 **Tests:**
 - `tests/integration/checkout-zahlung-start.int.test.ts` (echtes Postgres):
-  Stripe wirft; danach Barzahlung; Wiederholung nach gescheitertem Speichern;
-  älter als 2 Minuten; jung bei Stripe-Ausfall; Erfolgsweg mit Schlüssel.
+  - Stripe wirft; danach Barzahlung;
+  - Stripe-409 ohne Storno;
+  - Storno während des Stripe-Aufrufs;
+  - Wiederholung nach gescheitertem Speichern;
+  - dieselben Parameter beim ersten und zweiten Aufruf;
+  - älter als 2 Minuten; jung ohne Konto; jung bei Stripe-Ausfall;
+  - Erfolgsweg mit Schlüssel.
 - `tests/integration/stripe-konto.int.test.ts`: `account.updated` mit echter
-  Signatur gegen beide Secrets; ein fremdes Secret ergibt 400.
+  Signatur gegen beide Secrets; ein verspätetes Ereignis überschreibt nicht
+  den aktuellen Stand; ein fremdes Secret ergibt 400.
 - Vor dem Fix waren 10 von 12 rot.
 - `tests/stripe-konto.test.ts`, `tests/webhook.test.ts`: Bereit-Regel und
   Signatur mit Connect-Secret.
