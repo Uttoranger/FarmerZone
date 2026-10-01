@@ -149,13 +149,21 @@ function PaymentForm({
 
     // If we get here, payment failed (redirect didn't happen)
     if (error) {
+      // Schon bezahlt oder in Bearbeitung (etwa nach Zurück und erneutem
+      // Tippen): Stripe meldet das als Fehler, das Geld ist aber unterwegs.
+      // Nie „nichts abgebucht" sagen — zur Bestellung, die zeigt den Stand.
+      const zahlungsStand = error.payment_intent?.status
+      if (zahlungsStand === 'succeeded' || zahlungsStand === 'processing') {
+        window.location.assign(`/${farmSlug}/confirm/${orderId}`)
+        return
+      }
       toast.error(error.message ?? 'Zahlung fehlgeschlagen')
       // Abgebrochener PaymentIntent (Frist vorbei) oder Frist schon um: kein
       // neuer Versuch möglich. Nur eine Ablehnung der Karte sagt sicher
       // „nichts abgebucht, versuch es noch einmal"; unvollständige Eingaben
       // zeigt Stripe ohnehin am Feld, Netzfehler lassen wir ohne Zusatz.
       const fristUm = reserviertBis !== null && Date.now() >= new Date(reserviertBis).getTime()
-      if (error.code === 'payment_intent_unexpected_state' || fristUm) onHinweis('abgelaufen')
+      if (zahlungsStand === 'canceled' || fristUm) onHinweis('abgelaufen')
       else if (error.type === 'card_error') onHinweis('abgelehnt')
       else onHinweis(null)
       setIsProcessing(false)

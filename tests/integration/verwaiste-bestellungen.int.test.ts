@@ -126,7 +126,12 @@ describe('online — Zahlungsfrist 30 Minuten', () => {
     await gibVerwaisteBestellungenFrei(new Date(), farm.id)
 
     expect(abbrechen).toHaveBeenCalledTimes(1)
-    expect(abbrechen).toHaveBeenCalledWith(paymentIntentId, { cancellation_reason: 'abandoned' })
+    // Mit kurzer Leine: Im Lesepfad wartet niemand bei einer Stripe-Störung.
+    expect(abbrechen).toHaveBeenCalledWith(
+      paymentIntentId,
+      { cancellation_reason: 'abandoned' },
+      { timeout: 5000, maxNetworkRetries: 0 }
+    )
     const danach = await zustand(bestellung.id)
     expect(danach.status).toBe('CANCELLED')
     expect(danach.cancelledAt).not.toBeNull()
@@ -173,6 +178,20 @@ describe('online — Zahlungsfrist 30 Minuten', () => {
 
     await gibVerwaisteBestellungenFrei(new Date(jetzt.getTime() + 6 * MINUTE), farm.id)
     expect(holen).toHaveBeenCalledTimes(2)
+  })
+
+  it('Stripe gestört: Fehler gemeldet, danach fünf Minuten Ruhe statt jedes Mal zu warten', async () => {
+    const { farm, bestellung } = await offeneBestellung({ zahlart: 'ONLINE', bestelltVorMinuten: 45 })
+    holen.mockRejectedValue(new Error('Zeitüberschreitung'))
+    const jetzt = new Date()
+
+    const erster = await gibVerwaisteBestellungenFrei(jetzt, farm.id)
+    await gibVerwaisteBestellungenFrei(new Date(jetzt.getTime() + 60 * 1000), farm.id)
+
+    expect(erster.fehler).toBe(1)
+    expect(holen).toHaveBeenCalledTimes(1)
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), expect.objectContaining({ extra: { orderId: bestellung.id } }))
+    expect((await zustand(bestellung.id)).status).toBe('PENDING_CONFIRMATION')
   })
 
   it('Intent wird gerade bezahlt (processing): bleibt unangetastet', async () => {
@@ -229,7 +248,7 @@ describe('bar — Bestätigungsfrist 2 Stunden', () => {
     await vi.waitFor(() => expect(sendBestellungVerfallen).toHaveBeenCalledTimes(1))
   })
 
-  it('Altfall (Frist seit über einem Tag vorbei): storniert, Bestand zurück, aber keine Mail', async () => {
+  it('Altfall (Frist seit über zwei Tagen vorbei): storniert, Bestand zurück, aber keine Mail', async () => {
     // Der erste Lauf nach dem Deploy trifft Bestellungen, die schon lange liegen.
     const { farm, produkt, bestellung } = await offeneBestellung({
       zahlart: 'ONSITE_CASH',

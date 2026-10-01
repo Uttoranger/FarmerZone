@@ -52,8 +52,20 @@ const ABBRECHBAR = new Set([
 const STRIPE_PAUSE_MS = 5 * 60 * 1000
 const zuletztBeiStripe = new Map<string, number>()
 
-/** Die Mail nur für frisch verfallene Bestellungen — nicht für Wochen alte Altfälle (Erstlauf nach dem Deploy). */
-const MAIL_HOECHSTENS_MS = 24 * 60 * 60 * 1000
+/**
+ * Die Mail nur für frisch verfallene Bestellungen — nicht für Wochen alte
+ * Altfälle (Erstlauf nach dem Deploy). 48 statt 24 Stunden: Der Cron läuft
+ * täglich, im Hobby-Tarif nur auf die Stunde genau; bei 24 Stunden fiele eine
+ * Bestellung, deren Hof einen Tag lang niemand aufruft, knapp ohne Mail durch.
+ */
+const MAIL_HOECHSTENS_MS = 48 * 60 * 60 * 1000
+
+/**
+ * Stripe im Lesepfad kurz angebunden: Hofseite, Reservieren und Checkout
+ * warten sonst bei einer Stripe-Störung bis zu 80 Sekunden je Versuch
+ * (SDK-Vorgabe) — für eine Aufräumarbeit, die der nächste Aufruf nachholt.
+ */
+const STRIPE_KURZ = { timeout: 5000, maxNetworkRetries: 0 }
 
 export type FreigabeErgebnis = {
   /** Von diesem Aufruf storniert. */
@@ -124,6 +136,9 @@ export async function gibVerwaisteBestellungenFrei(jetzt: Date, farmId?: string)
       }
     } catch (err) {
       ergebnis.fehler += 1
+      // Auch nach einem Fehler (Stripe gestört, Zeitüberschreitung) Pause —
+      // sonst wartete jeder Lesezugriff des Hofs erneut auf Stripe.
+      if (bestellung.paymentMethod === 'ONLINE') zuletztBeiStripe.set(bestellung.id, jetzt.getTime())
       // Nur die Bestell-ID — keine Kundendaten (sentry-hygiene.ts filtert zusätzlich).
       Sentry.captureException(err, {
         tags: { aufgabe: 'verwaiste-bestellungen' },
@@ -145,17 +160,17 @@ async function brichZahlungAb(paymentIntentId: string | null): Promise<boolean> 
   // Es gibt nichts, womit die Kundin noch zahlen könnte.
   if (!paymentIntentId) return true
 
-  const intent = await stripe.paymentIntents.retrieve(paymentIntentId)
+  const intent = await stripe.paymentIntents.retrieve(paymentIntentId, {}, STRIPE_KURZ)
   if (intent.status === 'canceled') return true
   if (!ABBRECHBAR.has(intent.status)) return false
 
   try {
-    await stripe.paymentIntents.cancel(paymentIntentId, { cancellation_reason: 'abandoned' })
+    await stripe.paymentIntents.cancel(paymentIntentId, { cancellation_reason: 'abandoned' }, STRIPE_KURZ)
     return true
   } catch (err) {
     // Zwischen Abfrage und Abbruch kann die Zahlung durchgegangen oder ein
     // zweiter Aufruf schneller gewesen sein. Nachsehen statt raten.
-    const jetzt = await stripe.paymentIntents.retrieve(paymentIntentId)
+    const jetzt = await stripe.paymentIntents.retrieve(paymentIntentId, {}, STRIPE_KURZ)
     if (jetzt.status === 'canceled') return true
     if (!ABBRECHBAR.has(jetzt.status)) return false
     throw err

@@ -306,12 +306,15 @@ für ein Fenster kurz nach Mitternacht.
 - **Stripe nicht dauernd fragen:** Ist eine überfällige Online-Bestellung bei
   Stripe bezahlt oder in Bearbeitung, bleibt sie offen, bis der Webhook kommt.
   Bei SEPA dauert das Tage. Der Lesepfad fragt Stripe dann höchstens alle fünf
-  Minuten je Bestellung, der Merker gilt je Server-Instanz. Stehen solche
-  Bestellungen beim täglichen Lauf noch offen, meldet der Cron ihre IDs an
-  Sentry, denn vermutlich fehlt ein Webhook.
+  Minuten je Bestellung, der Merker gilt je Server-Instanz. Nach einem
+  Stripe-Fehler gilt dieselbe Pause. Dazu kommen kurze Anfragen
+  (5 Sekunden, keine Wiederholung): Eine Stripe-Störung bremst sonst die
+  Hofseite. Stehen solche Bestellungen beim täglichen Lauf noch offen, meldet
+  der Cron ihre IDs an Sentry, denn vermutlich fehlt ein Webhook.
 - **Mail nur für frisch Verfallenes:** Die „verfallen“-Mail geht nur raus, wenn
-  die Frist höchstens 24 Stunden zurückliegt. Der erste Lauf nach dem Deploy
-  schreibt so niemandem zu Wochen alten Bestellungen.
+  die Frist höchstens 48 Stunden zurückliegt. Der erste Lauf nach dem Deploy
+  schreibt so niemandem zu Wochen alten Bestellungen. 48 statt 24 Stunden,
+  weil der tägliche Cron im Hobby-Tarif nur auf die Stunde genau läuft.
 - **Bestätigung per Link bedingt:** Sie las den Status und schrieb CONFIRMED
   danach unbedingt. Seit K3 storniert die Freigabe solche Bestellungen. Lief
   sie genau zwischen Lesen und Schreiben, wäre die Bestellung bestätigt worden,
@@ -338,7 +341,9 @@ für ein Fenster kurz nach Mitternacht.
     ergänzt, der Auftrag ließ sie aus. Der Satz kommt nur bei einer echten
     Ablehnung der Karte (`card_error`). Ist die Frist um oder der PaymentIntent
     schon abgebrochen, steht dort „Deine Reservierung ist abgelaufen, es wurde
-    nichts abgebucht.“ und ein Weg zurück zum Hof.
+    nichts abgebucht.“ und ein Weg zurück zum Hof. Ist die Zahlung bei Stripe
+    schon gelungen oder in Bearbeitung, etwa nach Zurück und erneutem Tippen,
+    geht es zur Bestellseite. „Nichts abgebucht“ wäre dann falsch.
   - Eine verfallene Barbestellung zeigt auf ihrer Seite „Bestellung
     verfallen“.
 
