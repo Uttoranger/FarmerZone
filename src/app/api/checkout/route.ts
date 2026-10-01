@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type Stripe from 'stripe'
+import * as Sentry from '@sentry/nextjs'
+import type { Prisma } from '@prisma/client'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
 import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
@@ -21,6 +24,7 @@ import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { fristVon } from '@/lib/fristen'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
+import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
 import {
   pruefeBetriebsnachweis,
   betriebsnummerFuerBestellung,
@@ -89,6 +93,85 @@ async function gibBestandZurueck(gebucht: Array<{ productId: string; quantity: n
 
 const CODE_BESTELLUNG_IN_ARBEIT = 'BESTELLUNG_IN_ARBEIT'
 const CODE_BESTELLUNG_BEENDET = 'BESTELLUNG_BEENDET'
+const CODE_ZAHLUNG_NICHT_MOEGLICH = 'ZAHLUNG_NICHT_MOEGLICH'
+
+/** Storno-Grund, wenn Stripe den Zahlungsvorgang nicht anlegen konnte. */
+const GRUND_ZAHLUNG_NICHT_GESTARTET = 'Zahlung konnte nicht gestartet werden'
+
+/**
+ * So lange darf eine Online-Bestellung ohne PaymentIntent als „wird gerade
+ * angelegt" gelten. Danach ist die erste Anfrage sicher vorbei — ohne Intent
+ * ist sie gescheitert, und eine Wiederholung bekäme sonst für immer 409.
+ */
+const INTENT_WARTEZEIT_MS = 2 * 60 * 1000
+
+/**
+ * Stripe-Idempotenz-Schlüssel je Bestellung: Eine Wiederholung bekommt
+ * DENSELBEN PaymentIntent, statt einen zweiten anzulegen — auch dann, wenn
+ * nur das Speichern der Intent-ID gescheitert war.
+ */
+const stripeSchluessel = (orderId: string) => `pi-${orderId}`
+
+/**
+ * Die Parameter des PaymentIntents — aus den GESPEICHERTEN Werten der
+ * Bestellung, damit die Wiederholung mit `pi-<id>` exakt dieselben schickt
+ * (Stripe lehnt einen Schlüssel mit anderen Parametern ab).
+ *
+ * LADUNGSTYP: destination charge (transfer_data.destination) OHNE
+ * on_behalf_of — die Zahlung entsteht auf dem PLATTFORMKONTO, Stripe zieht
+ * seine Gebühren dort ab. Überwiesen wird dem Hof der VOLLE Betrag (kein
+ * transfer_data.amount); die application_fee_amount geht danach vom Hof an
+ * die Plattform — netto bleibt ihm amount − application_fee_amount.
+ * Deshalb: amount = Warenpreis + Servicegebühr und
+ * application_fee_amount = Servicegebühr (+ Plattformgebühr, im Pilot 0)
+ * → dem Hof fließt exakt der Warenpreis zu, FarmerZone trägt die
+ * Stripe-Kosten aus der Servicegebühr. Der Storno holt das spiegelbildlich
+ * zurück — reverse_transfer UND refund_application_fee (cancelOrder). Wer
+ * den Ladungstyp hier ändert, ändert ihn dort mit
+ * (tests/storno-erstattung.test.ts, Ladungstyp-Wache).
+ */
+function intentParameter(
+  bestellung: {
+    id: string
+    orderNumber: string
+    farmId: string
+    totalAmount: Prisma.Decimal
+    platformFeeAmount: Prisma.Decimal
+    serviceFeeCents: number
+  },
+  hofKonto: string
+): Stripe.PaymentIntentCreateParams {
+  const amountCents = decimalZuCents(bestellung.totalAmount) + bestellung.serviceFeeCents
+  const feeAmountCents = decimalZuCents(bestellung.platformFeeAmount) + bestellung.serviceFeeCents
+  return {
+    amount: amountCents,
+    currency: 'eur',
+    metadata: { orderId: bestellung.id, orderNumber: bestellung.orderNumber, farmId: bestellung.farmId },
+    transfer_data: { destination: hofKonto },
+    ...(feeAmountCents > 0 ? { application_fee_amount: feeAmountCents } : {}),
+  }
+}
+
+/**
+ * Stripe konnte den Zahlungsvorgang nicht anlegen (Ausfall, Hof-Konto
+ * eingeschränkt): Bestellung stornieren und Ware zurückbuchen, statt eine
+ * Bestellung ohne Zahlungsweg stehen zu lassen. Scheitert auch der Storno,
+ * räumt die Frist auf (src/server/verwaiste-bestellungen.ts).
+ */
+async function zahlungNichtMoeglich(orderId: string): Promise<NextResponse> {
+  try {
+    await storniereUnbezahlteBestellung(orderId, GRUND_ZAHLUNG_NICHT_GESTARTET)
+  } catch (err) {
+    Sentry.captureException(err, { tags: { aufgabe: 'checkout', grund: 'storno_nach_zahlungsfehler' }, extra: { orderId } })
+  }
+  return NextResponse.json(
+    {
+      code: CODE_ZAHLUNG_NICHT_MOEGLICH,
+      error: 'Online-Zahlung ist gerade nicht möglich. Bitte versuch es später oder wähle Barzahlung.',
+    },
+    { status: 503 }
+  )
+}
 
 /**
  * Gibt es zu diesem Schlüssel schon eine Bestellung, die Antwort mit ihr —
@@ -104,12 +187,17 @@ async function antwortFuerBestehendeBestellung(
     select: {
       id: true,
       orderNumber: true,
+      farmId: true,
       paymentMethod: true,
       stripePaymentIntentId: true,
       status: true,
       createdAt: true,
       pickupDate: true,
       pickupTimeStart: true,
+      totalAmount: true,
+      platformFeeAmount: true,
+      serviceFeeCents: true,
+      farm: { select: { stripeAccountId: true } },
     },
   })
   if (!bestehend) return null
@@ -127,18 +215,43 @@ async function antwortFuerBestehendeBestellung(
     )
   }
   if (bestehend.paymentMethod === 'ONLINE') {
-    // Die Gewinnerin legt den PaymentIntent erst NACH der Bestellung an. In
-    // diesem Fenster gibt es noch kein Client-Secret — eine 200 ohne ließe die
-    // Zahlungsmaske abstürzen. Also bitten wir um einen zweiten Versuch; dann
-    // steht der Intent, und die Antwort unten trägt ihn.
+    // Noch kein PaymentIntent gespeichert. Drei Möglichkeiten: Die erste
+    // Anfrage läuft noch, oder Stripe legte den Intent an und nur das
+    // Speichern der ID scheiterte, oder alles scheiterte unbemerkt.
     if (!bestehend.stripePaymentIntentId) {
-      return NextResponse.json(
-        {
-          error: 'Deine Bestellung wird gerade angelegt. Bitte versuch es in ein paar Sekunden noch einmal.',
-          code: CODE_BESTELLUNG_IN_ARBEIT,
-        },
-        { status: 409 }
-      )
+      // Nach zwei Minuten ist die erste Anfrage sicher vorbei: gescheitert.
+      if (Date.now() - bestehend.createdAt.getTime() > INTENT_WARTEZEIT_MS || !bestehend.farm.stripeAccountId) {
+        return zahlungNichtMoeglich(bestehend.id)
+      }
+      // Derselbe Stripe-Schlüssel liefert denselben Intent — egal, ob die
+      // erste Anfrage ihn schon anlegte. Die ID wird bedingt nachgetragen.
+      try {
+        const intent = await stripe.paymentIntents.create(
+          intentParameter(bestehend, bestehend.farm.stripeAccountId),
+          { idempotencyKey: stripeSchluessel(bestehend.id) }
+        )
+        await prisma.order.updateMany({
+          where: { id: bestehend.id, stripePaymentIntentId: null },
+          data: { stripePaymentIntentId: intent.id },
+        })
+        return NextResponse.json({
+          orderId: bestehend.id,
+          orderNumber: bestehend.orderNumber,
+          clientSecret: intent.client_secret,
+          reserviertBis: fristVon(bestehend).toISOString(),
+          wiederholt: true,
+        })
+      } catch {
+        // Stripe gerade nicht erreichbar: noch kein Urteil — ein zweiter
+        // Versuch in ein paar Sekunden, nach zwei Minuten greift oben der Storno.
+        return NextResponse.json(
+          {
+            error: 'Deine Bestellung wird gerade angelegt. Bitte versuch es in ein paar Sekunden noch einmal.',
+            code: CODE_BESTELLUNG_IN_ARBEIT,
+          },
+          { status: 409 }
+        )
+      }
     }
     // Für die Zahlungsmaske braucht der Browser das Client-Secret erneut.
     const intent = await stripe.paymentIntents.retrieve(bestehend.stripePaymentIntentId)
@@ -402,7 +515,17 @@ export async function POST(request: NextRequest) {
 
   // 9. Bestellung anlegen. Scheitert das, wird der Bestand wieder gutgeschrieben —
   //    sonst wäre Ware verschwunden, die nie verkauft wurde.
-  let order: { id: string; createdAt: Date }
+  // Die Geldwerte kommen so zurück, wie die Datenbank sie gespeichert hat —
+  // genau daraus rechnet intentParameter, auch bei einer Wiederholung.
+  let order: {
+    id: string
+    createdAt: Date
+    orderNumber: string
+    farmId: string
+    totalAmount: Prisma.Decimal
+    platformFeeAmount: Prisma.Decimal
+    serviceFeeCents: number
+  }
   try {
     order = await prisma.order.create({
       data: {
@@ -443,7 +566,15 @@ export async function POST(request: NextRequest) {
           })),
         },
       },
-      select: { id: true, createdAt: true },
+      select: {
+        id: true,
+        createdAt: true,
+        orderNumber: true,
+        farmId: true,
+        totalAmount: true,
+        platformFeeAmount: true,
+        serviceFeeCents: true,
+      },
     })
   } catch (e) {
     await gibBestandZurueck(gebucht)
@@ -459,10 +590,11 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 10. Release session reservations
-  await prisma.stockReservation.deleteMany({
-    where: { sessionId: data.sessionId },
-  })
+  // 10. Die Halte der Sitzung werden erst frei, wenn die Bestellung steht —
+  //     online also NACH dem PaymentIntent (11a). Scheitert Stripe, wird die
+  //     Bestellung storniert, und die Kundin kann mit ihren Halten sofort bar
+  //     bestellen, statt an „Reservierung abgelaufen" zu scheitern.
+  const gibHalteFrei = () => prisma.stockReservation.deleteMany({ where: { sessionId: data.sessionId } })
 
   // 10b. Newsletter opt-in — only upsert if customer explicitly opted in
   if (data.optInEmail || data.optInWhatsApp) {
@@ -492,39 +624,30 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  // 11a. ONLINE — create Stripe PaymentIntent
+  // 11a. ONLINE — PaymentIntent anlegen (Ladungstyp: intentParameter oben).
+  //      Mit festem Stripe-Schlüssel je Bestellung und NIE ungeschützt:
+  //      Bestellung und Bestand stehen schon. Scheitert Stripe, wird storniert
+  //      und zurückgebucht, statt beides ohne Zahlungsweg stehen zu lassen.
   if (data.paymentMethod === 'ONLINE') {
-    // LADUNGSTYP: destination charge (transfer_data.destination) OHNE
-    // on_behalf_of — die Zahlung entsteht auf dem PLATTFORMKONTO, Stripe zieht
-    // seine Gebühren dort ab. Überwiesen wird dem Hof der VOLLE Betrag (kein
-    // transfer_data.amount); die application_fee_amount geht danach vom Hof an
-    // die Plattform — netto bleibt ihm amount − application_fee_amount.
-    // Deshalb: amount = Warenpreis + Servicegebühr und
-    // application_fee_amount = Servicegebühr (+ Plattformgebühr, im Pilot 0)
-    // → dem Hof fließt exakt der Warenpreis zu, FarmerZone trägt die
-    // Stripe-Kosten aus der Servicegebühr. Der Storno holt das spiegelbildlich
-    // zurück — reverse_transfer UND refund_application_fee (cancelOrder). Wer
-    // den Ladungstyp hier ändert, ändert ihn dort mit
-    // (tests/storno-erstattung.test.ts, Ladungstyp-Wache).
-    const amountCents = warenpreisCents + servicegebuehr.gebuehrCents
-    const feeAmountCents = decimalZuCents(platformFeeAmount) + servicegebuehr.gebuehrCents
-
-    const intentParams: Parameters<typeof stripe.paymentIntents.create>[0] = {
-      amount: amountCents,
-      currency: 'eur',
-      metadata: { orderId: order.id, orderNumber, farmId: farm.id },
-      transfer_data: { destination: farm.stripeAccountId! },
-    }
-    if (feeAmountCents > 0) {
-      intentParams.application_fee_amount = feeAmountCents
+    let paymentIntent: Stripe.PaymentIntent
+    try {
+      // Das ! ist sicher: Schritt 2 lehnt ONLINE ohne stripeAccountId ab.
+      paymentIntent = await stripe.paymentIntents.create(intentParameter(order, farm.stripeAccountId!), {
+        idempotencyKey: stripeSchluessel(order.id),
+      })
+    } catch (err) {
+      console.error('[/api/checkout] PaymentIntent nicht angelegt', order.id)
+      Sentry.captureException(err, { tags: { aufgabe: 'checkout', grund: 'zahlung_nicht_gestartet' }, extra: { orderId: order.id } })
+      return zahlungNichtMoeglich(order.id)
     }
 
-    const paymentIntent = await stripe.paymentIntents.create(intentParams)
-
+    // Scheitert NUR das Speichern, holt die Wiederholung mit demselben
+    // Idempotenz-Schlüssel denselben Intent und trägt die ID nach.
     await prisma.order.update({
       where: { id: order.id },
       data: { stripePaymentIntentId: paymentIntent.id },
     })
+    await gibHalteFrei()
 
     return NextResponse.json({
       orderId: order.id,
@@ -542,6 +665,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 11b. ONSITE — Bestätigungs-Token jetzt, E-Mail NACH der Antwort.
+  await gibHalteFrei()
   const confirmationToken = nanoid(32)
   await prisma.order.update({
     where: { id: order.id },

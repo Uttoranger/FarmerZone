@@ -24,6 +24,7 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     webhookEvent: { findUnique: vi.fn(), create: vi.fn() },
     order: { findUnique: vi.fn(), updateMany: vi.fn() },
+    farm: { updateMany: vi.fn() },
   },
 }))
 
@@ -358,6 +359,45 @@ describe('payment_intent.canceled', () => {
 
     expect(res.status).toBe(500)
     expect(webhookEventCreate).not.toHaveBeenCalled()
+  })
+})
+
+describe('Connect-Endpunkt: account.updated mit eigenem Secret', () => {
+  const kontoEreignis = {
+    id: 'evt_konto_1',
+    type: 'account.updated',
+    account: 'acct_hof_1',
+    data: { object: { id: 'acct_hof_1', charges_enabled: false, payouts_enabled: true } },
+  } as unknown as ReturnType<typeof constructEvent>
+
+  it('passt das Plattform-Secret nicht, gilt das Connect-Secret — und der Hof wird nicht mehr als bereit geführt', async () => {
+    vi.stubEnv('STRIPE_CONNECT_WEBHOOK_SECRET', 'whsec_connect_dummy')
+    constructEvent
+      .mockImplementationOnce(() => {
+        throw new Error('No signatures found matching the expected signature')
+      })
+      .mockReturnValueOnce(kontoEreignis)
+
+    const res = await POST(makeRequest())
+
+    expect(res.status).toBe(200)
+    expect(constructEvent).toHaveBeenNthCalledWith(1, '{}', 'sig_test', 'whsec_test_dummy')
+    expect(constructEvent).toHaveBeenNthCalledWith(2, '{}', 'sig_test', 'whsec_connect_dummy')
+    expect(vi.mocked(prisma.farm.updateMany)).toHaveBeenCalledWith({
+      where: { stripeAccountId: 'acct_hof_1' },
+      data: { stripeAccountReady: false },
+    })
+  })
+
+  it('ohne Connect-Secret gibt es nur einen Versuch', async () => {
+    constructEvent.mockImplementation(() => {
+      throw new Error('No signatures found matching the expected signature')
+    })
+
+    const res = await POST(makeRequest())
+
+    expect(res.status).toBe(400)
+    expect(constructEvent).toHaveBeenCalledTimes(1)
   })
 })
 

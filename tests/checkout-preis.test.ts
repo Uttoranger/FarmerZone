@@ -106,7 +106,13 @@ beforeEach(() => {
   farmFindUnique.mockResolvedValue(HOF as never)
   userFindUnique.mockResolvedValue({ id: 'user_1' } as never)
   orderFindUnique.mockResolvedValue(null)
-  orderCreate.mockResolvedValue({ id: 'order_1', createdAt: new Date() } as never)
+  // Wie Prisma: Die angelegte Bestellung kommt mit ihren gespeicherten Werten
+  // zurück — daraus rechnet der Checkout die Stripe-Parameter (intentParameter).
+  orderCreate.mockImplementation((async ({ data }: { data: Record<string, unknown> }) => ({
+    id: 'order_1',
+    createdAt: new Date(),
+    ...data,
+  })) as never)
   orderUpdate.mockResolvedValue({} as never)
   intentCreate.mockResolvedValue({ id: 'pi_test', client_secret: 'secret_test' } as never)
   mail.mockResolvedValue(undefined)

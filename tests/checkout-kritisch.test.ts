@@ -15,6 +15,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
+import { Prisma } from '@prisma/client'
 
 vi.mock('@/lib/rate-limit', () => ({ enforceRateLimit: vi.fn(() => null) }))
 vi.mock('@/lib/stripe', () => ({
@@ -128,7 +129,13 @@ beforeEach(() => {
   farmFindUnique.mockResolvedValue(HOF as never)
   userFindUnique.mockResolvedValue({ id: 'user_1' } as never)
   orderFindUnique.mockResolvedValue(null)
-  orderCreate.mockResolvedValue({ id: 'order_1', createdAt: new Date() } as never)
+  // Wie Prisma: Die angelegte Bestellung kommt mit ihren gespeicherten Werten
+  // zurück — daraus rechnet der Checkout die Stripe-Parameter (intentParameter).
+  orderCreate.mockImplementation((async ({ data }: { data: Record<string, unknown> }) => ({
+    id: 'order_1',
+    createdAt: new Date(),
+    ...data,
+  })) as never)
   orderUpdate.mockResolvedValue({} as never)
   productUpdate.mockResolvedValue({} as never)
   mail.mockResolvedValue(undefined)
@@ -279,9 +286,26 @@ describe('Idempotenz', () => {
     orderFindUnique.mockImplementation((({ where }: { where: Record<string, unknown> }) =>
       Promise.resolve(
         where.idempotencyKey
-          ? { id: 'order_online', orderNumber: 'BH-2009-DDDD', paymentMethod: 'ONLINE', stripePaymentIntentId: null }
+          ? {
+              id: 'order_online',
+              orderNumber: 'BH-2009-DDDD',
+              farmId: 'farm_1',
+              paymentMethod: 'ONLINE',
+              stripePaymentIntentId: null,
+              status: 'PENDING_CONFIRMATION',
+              // Gerade erst angelegt — die erste Anfrage läuft womöglich noch.
+              createdAt: new Date(),
+              pickupDate: new Date(),
+              pickupTimeStart: '15:00',
+              totalAmount: new Prisma.Decimal(20),
+              platformFeeAmount: new Prisma.Decimal(0),
+              serviceFeeCents: 0,
+              farm: { stripeAccountId: 'acct_1' },
+            }
           : null
       )) as never)
+    // Stripe gerade nicht erreichbar: noch kein Urteil, 409 statt Storno.
+    vi.mocked(stripe.paymentIntents.create).mockRejectedValue(new Error('Stripe nicht erreichbar'))
 
     const res = await POST(anfrage({ idempotencyKey: 'online-im-fenster', paymentMethod: 'ONLINE' }))
 

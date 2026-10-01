@@ -149,7 +149,13 @@ beforeEach(() => {
   reservationAggregate.mockResolvedValue({ _sum: { quantity: 0 } } as never)
   userFindUnique.mockResolvedValue({ id: 'cust_1' } as never)
   orderFindUnique.mockResolvedValue(null)
-  orderCreate.mockResolvedValue({ id: 'order_1', createdAt: new Date() } as never)
+  // Wie Prisma: Die angelegte Bestellung kommt mit ihren gespeicherten Werten
+  // zurück — daraus rechnet der Checkout die Stripe-Parameter (intentParameter).
+  orderCreate.mockImplementation((async ({ data }: { data: Record<string, unknown> }) => ({
+    id: 'order_1',
+    createdAt: new Date(),
+    ...data,
+  })) as never)
   orderUpdate.mockResolvedValue({} as never)
   productUpdate.mockResolvedValue({} as never)
   reservationDeleteMany.mockResolvedValue({ count: 0 } as never)

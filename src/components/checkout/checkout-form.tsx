@@ -337,6 +337,14 @@ export function CheckoutForm({
           toast.error(err.error ?? 'Dein Warenkorb hat sich geändert.')
           return
         }
+        // Online-Zahlung konnte nicht starten — die Bestellung ist storniert,
+        // die Ware wieder frei. Ein NEUER Schlüssel, damit der nächste Versuch
+        // (etwa mit Barzahlung) eine neue Bestellung wird statt der alten.
+        if (err.code === 'ZAHLUNG_NICHT_MOEGLICH') {
+          idempotencyKeyRef.current = crypto.randomUUID()
+          toast.error(err.error ?? 'Online-Zahlung ist gerade nicht möglich.')
+          return
+        }
         // Betriebsnachweis fehlt (Sprint Bereiche 1): Fehler am Feld zeigen
         // und dorthin springen, wie bei jedem anderen Pflichtfeld.
         if (err.code === CODE_BETRIEBSNACHWEIS_FEHLT) {
