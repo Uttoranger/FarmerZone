@@ -9,7 +9,7 @@ export interface PasswordResetProps {
 export function PasswordResetEmail({ resetUrl }: PasswordResetProps) {
   return (
     <EmailLayout previewText="Passwort zurücksetzen — Link gültig 1 Stunde">
-      <Text style={h1}>Passwort zurücksetzen 🔑</Text>
+      <Text style={h1}>Passwort zurücksetzen</Text>
       <Text style={bodyText}>
         Hallo,
         <br />
@@ -24,7 +24,7 @@ export function PasswordResetEmail({ resetUrl }: PasswordResetProps) {
       </div>
 
       <Text style={{ ...mutedText, margin: '0 0 6px' }}>
-        ⏱ Dieser Link ist <strong>1 Stunde</strong> gültig und kann nur einmal verwendet werden.
+        Dieser Link ist <strong>1 Stunde</strong> gültig und kann nur einmal verwendet werden.
       </Text>
       <Text style={mutedText}>
         Falls du das nicht angefordert hast, ignoriere diese E-Mail. Dein Passwort bleibt

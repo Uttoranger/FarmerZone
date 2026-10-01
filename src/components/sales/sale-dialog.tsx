@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
-import { Building2, CalendarDays, ChevronDown, MessageCircle, ShoppingBasket, Store, type LucideIcon } from 'lucide-react'
+import { CalendarDays, Check, ChevronDown } from 'lucide-react'
+import { KANAL_SYMBOL } from '@/components/sales/kanal-symbol'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,13 +26,6 @@ import { HAUPTKANAELE, datumKurz, istOhneProdukt, knopfText, produktChips } from
  * groß der Betrag, darunter der Weg, alles andere freiwillig und klein. Der
  * Knopf nennt den Betrag, damit vor dem Tippen klar ist, was gespeichert wird.
  */
-
-const KANAL_SYMBOL: Record<(typeof HAUPTKANAELE)[number]['value'], LucideIcon> = {
-  HOFLADEN: Store,
-  MARKT: ShoppingBasket,
-  WHATSAPP: MessageCircle,
-  BUSINESS: Building2,
-}
 
 type FormWerte = {
   totalAmount: number | null
@@ -272,11 +266,13 @@ export function SaleDialog({ open, editingSale, prefillSale, products, topProduk
                 aria-pressed={werte.channel === 'OTHER'}
                 onClick={() => form.setValue('channel', 'OTHER')}
                 className={cn(
-                  'mt-2 min-h-9 text-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded',
+                  'mt-2 inline-flex min-h-9 items-center gap-1 text-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded',
                   werte.channel === 'OTHER' ? 'font-semibold text-brand-text' : 'text-muted-foreground'
                 )}
               >
-                {werte.channel === 'OTHER' ? '✓ Anderer Weg' : 'Anderer Weg'}
+                {/* Gewählt sagt aria-pressed — der Haken ist nur fürs Auge. */}
+                {werte.channel === 'OTHER' && <Check className="size-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />}
+                Anderer Weg
               </button>
             </fieldset>
 

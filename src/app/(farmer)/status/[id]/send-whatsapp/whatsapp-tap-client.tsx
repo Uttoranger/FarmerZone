@@ -55,7 +55,7 @@ export function WhatsAppTapClient({
     const phone = toWaPhone(sub.phone)
     const firstName = sub.name.split(' ')[0]
     const farmUrl = `${APP_URL}/${farmSlug}`
-    const message = `Hallo ${firstName}! 🌿\n\n*${title}*\n\n${body}\n\nMehr auf: ${farmUrl}`
+    const message = `Hallo ${firstName}!\n\n*${title}*\n\n${body}\n\nMehr auf: ${farmUrl}`
     return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
   }
 

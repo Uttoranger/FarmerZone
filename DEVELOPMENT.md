@@ -2866,6 +2866,77 @@ Ergänzung zu „Mein Hof v2". Was gebaut ist, steht in
 
 ---
 
+## Hand-Zeiger, „Schließen" statt „Close", Symbole statt Emojis (2026-10-01)
+
+**Hand-Zeiger.** Tailwind 4 setzt im Preflight keinen `cursor: pointer` mehr auf
+Knöpfe (v3 tat es), und die shadcn-Vorlage von `button.tsx` hat ihn auch nicht:
+96 `<Button>` und 171 rohe `<button>` in 57 Dateien zeigten den Pfeil. `Button` trägt
+die Hand jetzt in der Grundklasse. In `@layer base` von `globals.css` gilt sie für
+`[role="button"]` und `label[for]` (wie beauftragt) und zusätzlich für native
+`button` — ohne diesen Selektor wären die 171 rohen Knöpfe beim Pfeil geblieben;
+Tailwinds Upgrade-Leitfaden empfiehlt genau diese Regel, und die Mockups zeigen an
+jedem Knopf die Hand. Gesperrte (`:disabled`, `aria-disabled="true"`) bekommen keine.
+Von den 23 manuellen `cursor-pointer` waren danach 4 doppelt und sind entfernt (ein
+`<Button>`, zwei rohe `<button>`, ein Label mit `for`). Die 19 übrigen sitzen an
+Labels um Checkboxen ohne `for`, an `<summary>`, Tabellenzeilen, einer
+Vorschlagsliste (`role="option"`), einer Kachel mit `role="link"` und am Switch, den
+Base UI 1.5 als `<span role="switch">` rendert — dort greift keine der Regeln.
+
+**Deutsch für den Screenreader.** Dialog und Sheet sagten „Close" (am Kreuz; im Fuß
+des Dialogs sogar sichtbar). Bei der Browser-Prüfung kam die Toast-Region dazu:
+sonner meldet sich als „Notifications alt+T" und nennt sein Kreuz „Close toast".
+Jetzt „Schließen" und „Benachrichtigungen".
+
+**Emojis.** Die Prototypen trugen Emojis als Platzhalter, beim Nachbauen blieben sie
+stehen. Ein Scan über den Syntaxbaum (Zeichenketten, Vorlagen, JSX-Text — keine
+Kommentare) fand 64 Stellen in 33 Dateien: 61 Emojis und 3 Haken „✓"; der Auftrag
+nannte 56. Nicht dazu gezählt: viermal „©" (Pflichtangabe von OpenStreetMap,
+Fußzeilen) und ein „✓" im Server-Log des Mailversands.
+- Oberfläche: lucide-Symbole mit `aria-hidden`. Die Zahlungsarten im Checkout trugen
+  das Emoji im Text der Auswahl, der Screenreader las es mit. Jetzt stehen Symbol und
+  Text getrennt.
+- Verkaufswege: `CHANNEL_ICONS` (Emojis im Schema) ist weg; Listen, Feed, Schnellwahl
+  und Dialog nehmen `KANAL_SYMBOL`. Plattform-Bestellungen zeigen im Feed den
+  Warenkorb, weil der Korb dem Markt gehört.
+- Werte der Hofseite: Der Katalog speicherte sein Emoji in `FarmValue.icon` und
+  erkannte gewählte Werte daran. Jetzt erkennt er sie am Titel
+  (`src/lib/hof-werte.ts`); neue Werte speichern einen Schlüssel („tierwohl"), alte
+  behalten ihr Emoji. Angezeigt wird die Spalte nirgends — die Hofseite zeigt einen
+  Haken. Keine Migration, keine Datenänderung. Lokal geprüft: Ein alter Wert mit Emoji
+  erscheint als gewählt, Speichern schreibt den Schlüssel.
+- Ausgehende Vorlagen wie die Mails: 13 Mail-Vorlagen ohne Emoji, die
+  WhatsApp-Nachricht beginnt mit „Hallo Anna!", die Story-Grafik zeigt im Schild nur
+  den Anlass und im grünen Kästchen die Initialen des Hofs statt eines Emojis.
+
+**Browser-Prüfung.** Erstmals lokal mit agent-browser (Anleitung in
+`docs/ai/TESTING_GUIDELINES.md`, „Browser-Prüfung in der Agenten-Umgebung"): Checkout
+nur mit der Tastatur bis zur Bestätigung, 17 Stationen, jede mit sichtbarem Fokus;
+Bestelldetail; Dialog „Bestellung zurücknehmen?" — das Kreuz heißt im
+Barrierefreiheitsbaum „Schließen". Axe zeigte Befunde, die nicht von dieser Änderung
+stammen (siehe Offen).
+
+**Offen (aufgefallen, nicht behoben):**
+- Die Navigation des Hofbereichs hat keinen sichtbaren Tastatur-Fokus. `FOKUS` in
+  `farmer-nav.tsx` setzt `outline-none` und `focus-visible:outline-2`; in Tailwind 4
+  übernimmt `outline-2` die Rahmenart „none" von `outline-none` (gemessen: Stil none,
+  Breite 0). Abhilfe: `focus-visible:outline-solid` ergänzen. Seit #136.
+- Axe im Checkout: kein `<main>`, Inhalt außerhalb von Landmarken (moderat). Im
+  Bestelldetail Kontrast an 9 Stellen: Initialen-Plaketten der Navigation (3,9:1),
+  graue Abschnittsüberschriften (3,1:1), Datum (2,9:1), Schild „Wartet auf
+  Kunden-Bestätigung" (2,3:1), roter Knopf „Zurücknehmen" (3,6:1).
+- Ein gesperrter Switch zeigt die Hand und volle Deckkraft: `disabled:` greift am
+  `<span>` von Base UI nicht, `data-disabled:` wäre richtig (Hofseiten-Editor,
+  Abschnitt „immer sichtbar").
+- Verschachtelte Bedienelemente: ein Knopf im Link „Zum Checkout" (Warenkorb) und im
+  Link „Abbrechen" (Abmelden von Neuigkeiten).
+- Sortierbare Spaltenköpfe und klickbare Zeilen der Kundentabelle sind per Tastatur
+  nicht erreichbar.
+- `sale-list.tsx` wird nirgends eingebunden.
+- Die Preview-Seite für Komponenten gibt es noch nicht (Redesign Schritt 2); die
+  Änderung an `Button` ist dort noch nicht abgenommen.
+
+---
+
 ## Nützliche Befehle
 
 ```bash
@@ -2891,4 +2962,4 @@ pnpm briefkasten export   # Briefkasten als Markdown (nur lesend; Leseroute oder
 
 ---
 
-*Zuletzt aktualisiert: 2026-10-01 — Vollstorno mit `reverse_transfer` und `refund_application_fee`; Beträge im Storno-Dialog*
+*Zuletzt aktualisiert: 2026-10-01 — Hand-Zeiger an allen Knöpfen, „Schließen" statt „Close", Symbole statt Emojis*

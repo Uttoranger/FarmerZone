@@ -405,6 +405,16 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Hand-Zeiger für alles, was man anklicken kann. Tailwind v4 setzt ihn in
+     seinem Preflight nicht mehr (v3 tat es) — ohne diese Regel zeigten alle
+     rohen <button> den Pfeil. Gesperrt keine Hand: Dort nimmt nichts einen
+     Klick an. In @layer base, damit eine Utility wie cursor-not-allowed
+     gewinnt. Die Button-Komponente trägt cursor-pointer zusätzlich selbst. */
+  button:not(:disabled):not([aria-disabled="true"]),
+  [role="button"]:not([aria-disabled="true"]),
+  label[for] {
+    cursor: pointer;
+  }
   html {
     @apply font-sans;
     -webkit-font-smoothing: antialiased;

@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useEffect } from 'react'
+import { TriangleAlert } from 'lucide-react'
 
 export default function ErrorPage({
   error,
@@ -15,7 +16,7 @@ export default function ErrorPage({
 
   return (
     <div className="min-h-screen bg-muted/30 flex flex-col items-center justify-center px-4 text-center">
-      <span className="text-6xl mb-6">⚠️</span>
+      <TriangleAlert className="mb-6 size-12 text-amber-600 dark:text-amber-400" strokeWidth={1.5} aria-hidden="true" />
       <h1 className="text-2xl font-bold text-foreground mb-3">Etwas ist schiefgelaufen</h1>
       <p className="text-muted-foreground mb-8 max-w-sm leading-relaxed">
         Ein unerwarteter Fehler ist aufgetreten. Bitte versuche es erneut.

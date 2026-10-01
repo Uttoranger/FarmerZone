@@ -5,8 +5,16 @@ import Link from 'next/link'
 import Image from 'next/image'
 import {
   Check, ChevronUp, ChevronDown, Trash2, Loader2, ExternalLink, Plus, Upload,
-  Camera, X, GripVertical,
+  Camera, X, GripVertical, Flower2, Hand, House, Leaf, MapPin, PawPrint,
+  type LucideIcon,
 } from 'lucide-react'
+import {
+  WERTE_KATALOG,
+  istGewaehlt,
+  katalogEintrag,
+  type WertKatalogEintrag,
+  type WertSchluessel,
+} from '@/lib/hof-werte'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -48,14 +56,22 @@ const BANNER_PRESETS = [
   },
 ]
 
-const VALUE_CATALOG = [
-  { icon: '🐄', title: 'Tierwohl' },
-  { icon: '🌿', title: 'Bio-zertifiziert' },
-  { icon: '🌸', title: 'Saisonal' },
-  { icon: '📍', title: 'Regional' },
-  { icon: '👐', title: 'Handarbeit' },
-  { icon: '🏡', title: 'Familienbetrieb' },
-]
+/** Das Symbol je Katalogwert — der Katalog selbst steht in src/lib/hof-werte.ts. */
+const WERT_SYMBOL: Record<WertSchluessel, LucideIcon> = {
+  tierwohl: PawPrint,
+  bio: Leaf,
+  saisonal: Flower2,
+  regional: MapPin,
+  handarbeit: Hand,
+  familie: House,
+}
+
+/** Das Symbol eines gespeicherten Werts; außerhalb des Katalogs ein Haken wie auf der Hofseite. */
+function WertSymbol({ wert, className }: { wert: { title: string }; className?: string }) {
+  const eintrag = katalogEintrag(wert)
+  const Symbol = eintrag ? WERT_SYMBOL[eintrag.schluessel] : Check
+  return <Symbol className={className} strokeWidth={1.7} aria-hidden="true" />
+}
 
 const SECTION_LABELS: Record<string, string> = {
   status:   'Aktuelle Updates',
@@ -523,16 +539,17 @@ export function AppearanceClient({ initialData }: Props) {
 
   // ── Values helpers ──────────────────────────────────────────────────────────
 
-  function toggleCatalogValue(item: { icon: string; title: string }) {
-    const exists = farmValues.some((v) => v.icon === item.icon && v.title === item.title)
-    if (exists) {
-      setFarmValues((prev) => prev.filter((v) => !(v.icon === item.icon && v.title === item.title)))
+  // Am Titel erkannt, nicht am icon-Feld: Ältere Werte tragen dort noch ein
+  // Emoji, neue den Schlüssel (src/lib/hof-werte.ts).
+  function toggleCatalogValue(item: WertKatalogEintrag) {
+    if (istGewaehlt(farmValues, item)) {
+      setFarmValues((prev) => prev.filter((v) => v.title !== item.titel))
     } else {
       if (farmValues.length >= 4) {
         toast.error('Maximal 4 Werte möglich.')
         return
       }
-      setFarmValues((prev) => [...prev, { icon: item.icon, title: item.title, subtitle: '' }])
+      setFarmValues((prev) => [...prev, { icon: item.schluessel, title: item.titel, subtitle: '' }])
     }
   }
 
@@ -802,13 +819,12 @@ export function AppearanceClient({ initialData }: Props) {
 
         {/* Catalog */}
         <div className="grid grid-cols-3 gap-2 mb-4">
-          {VALUE_CATALOG.map((item) => {
-            const selected = farmValues.some(
-              (v) => v.icon === item.icon && v.title === item.title,
-            )
+          {WERTE_KATALOG.map((item) => {
+            const selected = istGewaehlt(farmValues, item)
+            const Symbol = WERT_SYMBOL[item.schluessel]
             return (
               <button
-                key={item.title}
+                key={item.titel}
                 onClick={() => toggleCatalogValue(item)}
                 className={cn(
                   'flex items-center gap-2 p-2.5 rounded-xl border-2 text-sm transition-all text-left',
@@ -817,8 +833,8 @@ export function AppearanceClient({ initialData }: Props) {
                     : 'border-border text-muted-foreground hover:border-border/80 hover:bg-muted/40',
                 )}
               >
-                <span className="text-lg leading-none">{item.icon}</span>
-                <span className="text-xs font-medium flex-1">{item.title}</span>
+                <Symbol className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+                <span className="text-xs font-medium flex-1">{item.titel}</span>
                 {selected && <Check className="size-3.5 shrink-0" />}
               </button>
             )
@@ -836,7 +852,7 @@ export function AppearanceClient({ initialData }: Props) {
                 key={`${v.icon}-${i}`}
                 className="flex items-start gap-2 bg-muted/40 rounded-xl p-3"
               >
-                <span className="text-xl leading-none mt-0.5">{v.icon}</span>
+                <WertSymbol wert={v} className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
                 <div className="flex-1 min-w-0 space-y-1.5">
                   <div className="text-sm font-semibold text-foreground">{v.title}</div>
                   <input

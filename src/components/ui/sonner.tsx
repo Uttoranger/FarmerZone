@@ -11,6 +11,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      // sonner bringt englische Screenreader-Texte mit („Notifications",
+      // „Close toast") — hier deutsch, wie Dialog und Sheet („Schließen").
+      containerAriaLabel="Benachrichtigungen"
       icons={{
         success: (
           <CircleCheckIcon className="size-4" />
@@ -40,6 +43,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
         classNames: {
           toast: "cn-toast",
         },
+        closeButtonAriaLabel: "Schließen",
       }}
       {...props}
     />

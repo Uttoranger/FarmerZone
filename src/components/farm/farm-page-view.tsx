@@ -38,7 +38,7 @@ import {
   MapPin, Phone, Mail, CreditCard, Banknote,
   Pencil, Eye, Leaf, CalendarDays, Tag, MessageCircle,
   Check, Camera, Plus, ChevronLeft, ChevronRight, X, MoveVertical,
-  Share2, Navigation, PauseCircle,
+  Share2, Navigation, PauseCircle, Sprout,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { DragEndEvent } from '@dnd-kit/core'
@@ -415,7 +415,7 @@ function GallerySection({ farm, isEdit }: { farm: PublicFarm; isEdit: boolean })
             <button
               key={photo.id}
               type="button"
-              className="relative cursor-pointer rounded-[10px] overflow-hidden text-left"
+              className="relative rounded-[10px] overflow-hidden text-left"
               style={{
                 gridColumn: isFirst ? 'span 2' : undefined,
                 gridRow: isFirst ? 'span 2' : undefined,
@@ -814,7 +814,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
             className="text-center max-w-sm bg-card rounded-3xl p-10 dark:ring-1 dark:ring-border"
             style={{ boxShadow: '0 8px 24px rgba(45,95,63,0.08)' }}
           >
-            <div className="text-5xl mb-5">🌱</div>
+            <Sprout className="mx-auto mb-5 size-10 text-brand-text" strokeWidth={1.5} aria-hidden="true" />
             <h1 className="font-heading text-xl font-semibold mb-3" style={{ color: 'var(--app-ink)' }}>{farm.name}</h1>
             <p className="leading-relaxed text-sm" style={{ color: 'var(--app-ink-soft)' }}>
               Dieser Hof richtet gerade seinen Shop ein. Schau bald wieder vorbei!

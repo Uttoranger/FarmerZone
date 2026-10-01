@@ -21,7 +21,7 @@ export function OrderReadyEmail(p: OrderReadyProps) {
 
   return (
     <EmailLayout previewText={`Deine Bestellung bei ${p.farmName} ist bereit zur Abholung!`}>
-      <Text style={h1}>Deine Bestellung ist bereit! 🎉</Text>
+      <Text style={h1}>Deine Bestellung ist bereit!</Text>
       <Text style={bodyText}>
         Hallo {p.customerName},<br />
         deine Bestellung bei <strong>{p.farmName}</strong> ist abholbereit.
@@ -33,7 +33,7 @@ export function OrderReadyEmail(p: OrderReadyProps) {
         <Text style={highlightValue}>{p.pickupDate}</Text>
         <Text style={{ ...highlightValue, fontSize: '15px' }}>{p.pickupTime} Uhr</Text>
         <Link href={mapsUrl} style={{ color: '#15803d', fontSize: '13px' }}>
-          📍 {p.farmAddress}, {p.farmCity}
+          {p.farmAddress}, {p.farmCity}
         </Link>
       </div>
 
@@ -56,7 +56,7 @@ export function OrderReadyEmail(p: OrderReadyProps) {
       {p.reorderUrl && (
         <div style={{ textAlign: 'center', marginTop: '20px' }}>
           <Link href={p.reorderUrl} style={{ ...ctaButton, backgroundColor: '#1a4f30', fontSize: '14px', padding: '12px 24px' }}>
-            🔁 Nochmal bestellen
+            Nochmal bestellen
           </Link>
         </div>
       )}

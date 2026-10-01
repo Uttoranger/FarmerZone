@@ -276,7 +276,7 @@ export function OrderCard({
               <Button
                 size="sm"
                 variant="outline"
-                className="h-10 px-4 text-muted-foreground cursor-pointer"
+                className="h-10 px-4 text-muted-foreground"
                 onClick={() => {
                   setNotifyCustomer(true)
                   setRevertDialog(canRevertReady ? 'ready' : 'pickedUp')

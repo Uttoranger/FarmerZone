@@ -34,7 +34,7 @@ export function OrderNotReadyEmail(p: OrderNotReadyProps) {
         <Text style={highlightValue}>{p.pickupDate}</Text>
         <Text style={{ ...highlightValue, fontSize: '15px' }}>{p.pickupTime} Uhr</Text>
         <Link href={mapsUrl} style={{ color: '#15803d', fontSize: '13px' }}>
-          📍 {p.farmAddress}, {p.farmCity}
+          {p.farmAddress}, {p.farmCity}
         </Link>
       </div>
 

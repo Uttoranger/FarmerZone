@@ -12,7 +12,7 @@ export function CustomerMagicLinkEmail({ firstName, magicUrl }: CustomerMagicLin
 
   return (
     <EmailLayout previewText="Dein Login-Link für FarmerZone — gültig 15 Minuten">
-      <Text style={h1}>Dein Login-Link 🔐</Text>
+      <Text style={h1}>Dein Login-Link</Text>
       <Text style={bodyText}>
         {greeting}
         <br />
@@ -27,7 +27,7 @@ export function CustomerMagicLinkEmail({ firstName, magicUrl }: CustomerMagicLin
       </div>
 
       <Text style={{ ...mutedText, margin: '0 0 6px' }}>
-        ⏱ Dieser Link ist <strong>15 Minuten</strong> gültig und kann nur einmal verwendet werden.
+        Dieser Link ist <strong>15 Minuten</strong> gültig und kann nur einmal verwendet werden.
       </Text>
       <Text style={mutedText}>
         Falls du keinen Login angefragt hast, kannst du diese E-Mail einfach ignorieren — dein

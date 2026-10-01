@@ -26,7 +26,7 @@ export function NewOrderNotificationEmail(p: NewOrderNotificationProps) {
   return (
     <EmailLayout previewText={`Neue Bestellung ${p.orderNumber} – ${p.customerName}`}>
       <Text style={h1}>
-        {p.isOnline ? '💳 Neue bezahlte Bestellung' : '🛒 Neue Bestellung eingegangen'}
+        {p.isOnline ? 'Neue bezahlte Bestellung' : 'Neue Bestellung eingegangen'}
       </Text>
       <Text style={bodyText}>
         Hallo {p.farmerName},<br />

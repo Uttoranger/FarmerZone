@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { TriangleAlert } from 'lucide-react'
 import { KundenKopf } from '@/components/shared/kunden-kopf'
 import { KONTAKT_EMAIL } from '@/lib/support'
 
@@ -15,8 +16,9 @@ export default function ImpressumPage() {
 
           <section>
             <h2 className="font-semibold text-foreground text-base mb-3">Angaben gemäß § 5 ECG (Österreich)</h2>
-            <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-lg px-4 py-3 text-amber-800 dark:text-amber-200 text-xs mb-4">
-              ⚠ Pilotbetrieb — FarmerZone wird derzeit mit ausgewählten Höfen erprobt. Kein kommerzieller Betrieb.
+            <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-lg px-4 py-3 text-amber-800 dark:text-amber-200 text-xs mb-4">
+              <TriangleAlert className="mt-px size-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+              <span>Pilotbetrieb — FarmerZone wird derzeit mit ausgewählten Höfen erprobt. Kein kommerzieller Betrieb.</span>
             </div>
             <p className="mb-1"><strong>Betreiber der Plattform:</strong></p>
             <address className="not-italic text-muted-foreground space-y-0.5">

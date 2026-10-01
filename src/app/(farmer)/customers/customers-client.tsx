@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Bell, Phone, ChevronDown } from 'lucide-react'
+import { Search, Bell, Phone, ChevronDown, Users } from 'lucide-react'
 import type { CustomerSummary, CustomerStatus } from '@/server/queries/customers'
 import { CustomersTable } from '@/components/customers/customers-table'
 import { formatEuro } from '@/lib/format'
@@ -106,7 +106,7 @@ export function CustomersClient({ customers }: { customers: CustomerSummary[] })
   if (customers.length === 0) {
     return (
       <div className="text-center py-16">
-        <div className="text-5xl mb-4">👥</div>
+        <Users className="mx-auto mb-4 size-10 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
         <p className="font-medium text-foreground mb-1">Noch keine Kunden</p>
         <p className="text-sm text-muted-foreground">
           Sobald jemand bestellt, taucht er hier auf.

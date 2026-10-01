@@ -34,11 +34,11 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps) {
       {p.reorderUrl && (
         <div style={{ textAlign: 'center', margin: '0 0 8px' }}>
           <Link href={p.reorderUrl} style={{ ...ctaButton, backgroundColor: '#1a4f30', fontSize: '14px', padding: '12px 24px' }}>
-            🔁 Nochmal bestellen
+            Nochmal bestellen
           </Link>
         </div>
       )}
-      <Text style={h1}>Zahlung erfolgreich ✓</Text>
+      <Text style={h1}>Zahlung erfolgreich</Text>
       <Text style={bodyText}>
         Hallo {p.customerName},<br />
         deine Bestellung bei <strong>{p.farmName}</strong> wurde erfolgreich bezahlt.
@@ -49,7 +49,7 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps) {
         <Text style={highlightValue}>{p.pickupDate}</Text>
         <Text style={{ ...highlightValue, fontSize: '15px' }}>{p.pickupTime} Uhr</Text>
         <Link href={mapsUrl} style={{ color: '#15803d', fontSize: '13px' }}>
-          📍 {p.farmAddress}, {p.farmCity}
+          {p.farmAddress}, {p.farmCity}
         </Link>
       </div>
 

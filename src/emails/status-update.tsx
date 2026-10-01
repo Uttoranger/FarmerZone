@@ -3,10 +3,10 @@ import { Text, Link, Img } from '@react-email/components'
 import { EmailLayout, h1, bodyText, ctaButton } from './_layout'
 
 const ANLASS_LABEL: Record<string, string> = {
-  FRESH_PRODUCT: '🥬 Frisches Produkt',
-  NEW_SEASON: '🌱 Neue Saison',
-  PROMOTION: '🏷️ Aktion',
-  ANNOUNCEMENT: '📢 Mitteilung',
+  FRESH_PRODUCT: 'Frisches Produkt',
+  NEW_SEASON: 'Neue Saison',
+  PROMOTION: 'Aktion',
+  ANNOUNCEMENT: 'Mitteilung',
 }
 
 const ANLASS_COLOR: Record<string, string> = {
@@ -38,7 +38,7 @@ export function StatusUpdateEmail({
   appUrl = 'https://farmerzone.at',
 }: StatusUpdateEmailProps) {
   const farmUrl = `${appUrl}/${farmSlug}`
-  const anlassLabel = ANLASS_LABEL[anlass] ?? '📢 Mitteilung'
+  const anlassLabel = ANLASS_LABEL[anlass] ?? 'Mitteilung'
   const anlassColor = ANLASS_COLOR[anlass] ?? '#374151'
 
   return (

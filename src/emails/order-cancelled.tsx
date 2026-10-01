@@ -33,7 +33,7 @@ export function OrderCancelledEmail(p: OrderCancelledProps) {
           margin: '20px 0',
         }}>
           <Text style={{ ...bodyText, margin: 0, color: '#15803d', fontWeight: '600' }}>
-            💰 Wir haben dir € {p.refundAmount.toFixed(2)} zurückerstattet.
+            Wir haben dir € {p.refundAmount.toFixed(2)} zurückerstattet.
           </Text>
           <Text style={{ ...mutedText, margin: '6px 0 0' }}>
             Die Rückerstattung erscheint in 5–10 Werktagen auf deinem Konto.

@@ -2,15 +2,9 @@ import { ImageResponse } from 'next/og'
 import { prisma } from '@/lib/prisma'
 import { NextRequest } from 'next/server'
 import { stripStatusVariables } from '@/lib/status-body'
+import { hofInitialen } from '@/lib/hof-initialen'
 
 export const runtime = 'nodejs'
-
-const ANLASS_EMOJI: Record<string, string> = {
-  FRESH_PRODUCT: '🥬',
-  NEW_SEASON: '🌱',
-  PROMOTION: '🏷️',
-  ANNOUNCEMENT: '📢',
-}
 
 const ANLASS_LABEL: Record<string, string> = {
   FRESH_PRODUCT: 'Frisches Produkt',
@@ -34,7 +28,6 @@ export async function GET(
     return new Response('Not found', { status: 404 })
   }
 
-  const emoji = ANLASS_EMOJI[post.anlass] ?? '📢'
   const anlassLabel = ANLASS_LABEL[post.anlass] ?? 'Mitteilung'
   const cleanBody = stripStatusVariables(post.body)
   const displayBody = cleanBody.length > 180 ? cleanBody.slice(0, 180) + '…' : cleanBody
@@ -81,7 +74,7 @@ export async function GET(
               fontWeight: 600,
             }}
           >
-            {emoji} {anlassLabel}
+            {anlassLabel}
           </div>
 
           {/* Title */}
@@ -128,10 +121,14 @@ export async function GET(
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '36px',
+                fontSize: '28px',
+                fontWeight: 700,
+                color: 'white',
               }}
             >
-              🌱
+              {/* Die Initialen des Hofs statt eines Emojis — wie in der
+                  Navigation, wenn ein Hof noch kein Logo hat. */}
+              {hofInitialen(post.farm.name)}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <div style={{ fontSize: '36px', fontWeight: 700, color: '#1A2B22' }}>

@@ -140,7 +140,7 @@ function SchalterZeile({
   return (
     <label
       htmlFor={id}
-      className="flex min-h-14 cursor-pointer items-center gap-3 rounded-lg border border-border p-3"
+      className="flex min-h-14 items-center gap-3 rounded-lg border border-border p-3"
     >
       <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} />
       <span className="flex flex-col gap-0.5">

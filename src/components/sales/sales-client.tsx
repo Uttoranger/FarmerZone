@@ -10,7 +10,8 @@ import { toast } from 'sonner'
 import { createStripeDashboardLinkAction } from '@/server/actions/stripe-connect'
 import type { ManualSaleData, SalesOverview } from '@/server/queries/manual-sales'
 import type { ProductData } from '@/server/queries/products'
-import { CHANNEL_ICONS, CHANNEL_LABELS } from '@/schemas/manual-sale'
+import { CHANNEL_LABELS } from '@/schemas/manual-sale'
+import { KanalSymbol } from '@/components/sales/kanal-symbol'
 import { SaleDialog } from './sale-dialog'
 import { SalesFeedList } from './sales-feed-list'
 import { PageHeader } from '@/components/farmer/page-header'
@@ -165,9 +166,7 @@ export function SalesClient({ overview, products, topProduktIds, stripeReady }: 
                 onClick={() => openFromQuick(sale)}
                 className="flex items-start gap-3 p-3 rounded-xl border border-border bg-card hover:border-green-300 hover:bg-primary/8 active:scale-[0.98] transition-all text-left"
               >
-                <span className="text-2xl shrink-0 mt-0.5">
-                  {CHANNEL_ICONS[sale.channel] ?? '·'}
-                </span>
+                <KanalSymbol kanal={sale.channel} className="mt-0.5 size-6 text-muted-foreground" />
                 <div className="min-w-0">
                   <p className="font-medium text-sm text-foreground truncate leading-tight">
                     {sale.productName}

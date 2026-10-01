@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil, ReceiptText, Trash2 } from 'lucide-react'
+import { KanalSymbol } from '@/components/sales/kanal-symbol'
 import {
   Dialog,
   DialogContent,
@@ -13,7 +14,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { deleteManualSale } from '@/server/actions/manual-sales'
 import type { ManualSaleData } from '@/server/queries/manual-sales'
-import { CHANNEL_LABELS, CHANNEL_ICONS } from '@/schemas/manual-sale'
+import { CHANNEL_LABELS } from '@/schemas/manual-sale'
 
 type Props = {
   sales: ManualSaleData[]
@@ -48,7 +49,7 @@ export function SaleList({ sales, onEdit }: Props) {
   if (sales.length === 0) {
     return (
       <div className="text-center py-12">
-        <div className="text-4xl mb-3">🧾</div>
+        <ReceiptText className="mx-auto mb-3 size-9 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
         <p className="font-medium text-foreground mb-1">Noch keine Verkäufe eingetragen</p>
         <p className="text-sm text-muted-foreground/70">Trage deine ersten Direktverkäufe ein, um Statistiken zu sehen.</p>
       </div>
@@ -62,7 +63,7 @@ export function SaleList({ sales, onEdit }: Props) {
           <div key={sale.id} className="flex items-center gap-3 py-2.5">
             {/* Channel icon + date */}
             <div className="shrink-0 w-10 text-center">
-              <div className="text-base leading-none">{CHANNEL_ICONS[sale.channel] ?? '·'}</div>
+              <KanalSymbol kanal={sale.channel} className="mx-auto text-muted-foreground" />
               <div className="text-[10px] text-muted-foreground/70 mt-0.5">{formatDate(sale.saleDate)}</div>
             </div>
 
