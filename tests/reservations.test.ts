@@ -17,6 +17,10 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
+// Die Freigabe verwaister Bestellungen hat eigene Tests
+// (tests/integration/verwaiste-bestellungen.int.test.ts); hier zählt nur die Reservierung.
+vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteFreiFuerProdukte: vi.fn() }))
+
 import { POST } from '@/app/api/reserve/route'
 import { prisma } from '@/lib/prisma'
 

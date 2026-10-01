@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getOrdersForFarm } from '@/server/queries/orders'
+import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { OrdersClient } from '@/components/orders/orders-client'
 import { PageHeader } from '@/components/farmer/page-header'
 
@@ -14,6 +15,10 @@ export default async function OrdersPage() {
 
   const farm = await getFarmForUser(session.user.id)
   if (!farm) redirect('/login')
+
+  // Frist gilt beim Lesen: Verwaiste Bestellungen geben ihre Ware frei, bevor
+  // die Seite Bestand und Bestellungen zeigt (src/lib/fristen.ts). Fehler nur gemeldet.
+  await gibVerwaisteFreiOhneRisiko(farm.id)
 
   const orders = await getOrdersForFarm(farm.id)
 

@@ -7,6 +7,8 @@ import { bestellungPfad } from '@/lib/bestell-link'
 import { ClearCartOnMount } from '@/components/checkout/clear-cart-on-mount'
 import { BestellSummenZeilen } from '@/components/checkout/bestell-summen'
 import { KundenKopf } from '@/components/shared/kunden-kopf'
+import { GRUND_NICHT_BESTAETIGT, fristVon, tagInWorten, uhrzeitInWien } from '@/lib/fristen'
+import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 
 interface Props {
   params: Promise<{ farmSlug: string; orderId: string }>
@@ -27,6 +29,8 @@ async function getOrder(orderId: string) {
       serviceFeeRefundedAt: true,
       customerName: true,
       customerEmail: true,
+      createdAt: true,
+      cancelReason: true,
       pickupDate: true,
       pickupTimeStart: true,
       pickupTimeEnd: true,
@@ -58,6 +62,11 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
   const { farmSlug, orderId } = await params
   const { confirmed, redirect_status } = await searchParams
 
+  // Frist gilt beim Lesen (src/lib/fristen.ts): Ist die Bestätigungsfrist
+  // vorbei, verfällt die Bestellung, bevor die Seite „Fast geschafft" zeigt.
+  const vorab = await prisma.order.findUnique({ where: { id: orderId }, select: { farmId: true } })
+  if (vorab) await gibVerwaisteFreiOhneRisiko(vorab.farmId)
+
   const order = await getOrder(orderId)
 
   // Stillgelegter Hof: auch diese Unterseite verhält sich wie eine unbekannte
@@ -81,6 +90,15 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
     order.paymentMethod !== 'ONLINE' &&
     order.status === 'PENDING_CONFIRMATION' &&
     confirmed !== 'true'
+
+  // Nicht rechtzeitig bestätigt und deshalb verfallen (src/server/verwaiste-bestellungen.ts).
+  const isOnsiteVerfallen =
+    order.paymentMethod !== 'ONLINE' &&
+    order.status === 'CANCELLED' &&
+    order.cancelReason === GRUND_NICHT_BESTAETIGT
+
+  const jetzt = new Date()
+  const bestaetigenBis = fristVon(order)
 
   const pickupDate = order.pickupDate.toLocaleDateString('de-AT', {
     weekday: 'long',
@@ -120,11 +138,35 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
         {isOnsitePending && (
           <div className="flex flex-col items-center text-center mb-8">
             <Clock className="size-14 text-amber-500 mb-3" />
-            <h1 className="font-heading text-2xl font-semibold text-foreground">Fast geschafft!</h1>
+            <h1 className="font-heading text-2xl font-semibold text-foreground">
+              Fast geschafft – bitte bestätige per E-Mail
+            </h1>
             <p className="text-muted-foreground mt-1">
-              Bitte bestätige deine Bestellung über den Link in der E-Mail an{' '}
-              <strong>{order.customerEmail}</strong>.
+              Den Link haben wir an <strong>{order.customerEmail}</strong> geschickt.
             </p>
+            <p className="text-foreground mt-3">
+              <strong>
+                Bestätigen bis {tagInWorten(bestaetigenBis, jetzt)}, {uhrzeitInWien(bestaetigenBis)} Uhr.
+              </strong>{' '}
+              Danach geben wir die Ware wieder frei – ohne Kosten für dich.
+            </p>
+          </div>
+        )}
+
+        {isOnsiteVerfallen && (
+          <div className="flex flex-col items-center text-center mb-8">
+            <Clock className="size-14 text-muted-foreground mb-3" />
+            <h1 className="font-heading text-2xl font-semibold text-foreground">Bestellung verfallen</h1>
+            <p className="text-muted-foreground mt-1">
+              Die Bestellung wurde nicht rechtzeitig bestätigt. Wir haben die Ware wieder
+              freigegeben – dir entstehen keine Kosten.
+            </p>
+            <Link
+              href={`/${farmSlug}`}
+              className="mt-4 inline-flex items-center justify-center rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accent-foreground hover:bg-accent-hover"
+            >
+              Neu bestellen
+            </Link>
           </div>
         )}
 

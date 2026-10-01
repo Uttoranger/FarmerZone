@@ -21,6 +21,9 @@ vi.mock('@/lib/stripe', () => ({
   stripe: { paymentIntents: { create: vi.fn(), retrieve: vi.fn() } },
 }))
 vi.mock('@/lib/email', () => ({ sendOnsiteConfirmation: vi.fn() }))
+// Die Freigabe verwaister Bestellungen hat eigene Tests
+// (tests/integration/verwaiste-bestellungen.int.test.ts); hier zählt nur der Checkout.
+vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteFreiOhneRisiko: vi.fn() }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     farm: { findUnique: vi.fn() },
@@ -292,7 +295,16 @@ describe('Idempotenz', () => {
     orderFindUnique.mockImplementation((({ where }: { where: Record<string, unknown> }) =>
       Promise.resolve(
         where.idempotencyKey
-          ? { id: 'order_online', orderNumber: 'BH-2009-EEEE', paymentMethod: 'ONLINE', stripePaymentIntentId: 'pi_1' }
+          ? {
+              id: 'order_online',
+              orderNumber: 'BH-2009-EEEE',
+              paymentMethod: 'ONLINE',
+              stripePaymentIntentId: 'pi_1',
+              status: 'PENDING_CONFIRMATION',
+              createdAt: new Date('2026-10-01T08:00:00Z'),
+              pickupDate: new Date('2026-10-02T12:00:00Z'),
+              pickupTimeStart: '15:00',
+            }
           : null
       )) as never)
     vi.mocked(stripe.paymentIntents.retrieve).mockResolvedValue({ client_secret: 'geheim_1' } as never)
@@ -300,7 +312,13 @@ describe('Idempotenz', () => {
     const res = await POST(anfrage({ idempotencyKey: 'online-fertig', paymentMethod: 'ONLINE' }))
 
     expect(res.status).toBe(200)
-    expect(await res.json()).toMatchObject({ orderId: 'order_online', clientSecret: 'geheim_1', wiederholt: true })
+    expect(await res.json()).toMatchObject({
+      orderId: 'order_online',
+      clientSecret: 'geheim_1',
+      // 30 Minuten ab Bestellung (src/lib/fristen.ts) — der Zahlungsschritt zeigt die Uhrzeit.
+      reserviertBis: '2026-10-01T08:30:00.000Z',
+      wiederholt: true,
+    })
   })
 
   it('ohne Bestellung zum Schlüssel bleibt es beim 409', async () => {
