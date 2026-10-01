@@ -19,6 +19,8 @@ import { berechneServicegebuehr } from '@/lib/servicegebuehr'
 import { pruefeSitzungsWarenkorb } from '@/server/warenkorb'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
+import { fristVon } from '@/lib/fristen'
+import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import {
   pruefeBetriebsnachweis,
   betriebsnummerFuerBestellung,
@@ -86,6 +88,7 @@ async function gibBestandZurueck(gebucht: Array<{ productId: string; quantity: n
 }
 
 const CODE_BESTELLUNG_IN_ARBEIT = 'BESTELLUNG_IN_ARBEIT'
+const CODE_BESTELLUNG_BEENDET = 'BESTELLUNG_BEENDET'
 
 /**
  * Gibt es zu diesem Schlüssel schon eine Bestellung, die Antwort mit ihr —
@@ -98,9 +101,31 @@ async function antwortFuerBestehendeBestellung(
   if (!idempotencyKey) return null
   const bestehend = await prisma.order.findUnique({
     where: { idempotencyKey },
-    select: { id: true, orderNumber: true, paymentMethod: true, stripePaymentIntentId: true },
+    select: {
+      id: true,
+      orderNumber: true,
+      paymentMethod: true,
+      stripePaymentIntentId: true,
+      status: true,
+      createdAt: true,
+      pickupDate: true,
+      pickupTimeStart: true,
+    },
   })
   if (!bestehend) return null
+  // Inzwischen storniert — meist verfallen (src/lib/fristen.ts), weil die
+  // Kundin aus dem Zahlungsschritt zurück ins Formular ging und erst nach der
+  // Frist erneut abschickte. Die alte Bestellung samt abgebrochenem
+  // PaymentIntent zurückzugeben, führte in eine Zahlung, die nicht mehr geht.
+  if (bestehend.status === 'CANCELLED') {
+    return NextResponse.json(
+      {
+        error: 'Diese Bestellung gibt es nicht mehr. Lade die Seite neu, um noch einmal zu bestellen.',
+        code: CODE_BESTELLUNG_BEENDET,
+      },
+      { status: 409 }
+    )
+  }
   if (bestehend.paymentMethod === 'ONLINE') {
     // Die Gewinnerin legt den PaymentIntent erst NACH der Bestellung an. In
     // diesem Fenster gibt es noch kein Client-Secret — eine 200 ohne ließe die
@@ -121,6 +146,7 @@ async function antwortFuerBestehendeBestellung(
       orderId: bestehend.id,
       orderNumber: bestehend.orderNumber,
       clientSecret: intent.client_secret,
+      reserviertBis: fristVon(bestehend).toISOString(),
       wiederholt: true,
     })
   }
@@ -173,6 +199,12 @@ export async function POST(request: NextRequest) {
   // steht erst nach dem Parsen fest, deshalb hier und nicht ganz oben.
   const sitzungsLimit = enforceRateLimit('checkout', request, data.sessionId)
   if (sitzungsLimit) return sitzungsLimit
+
+  // 0a. FRIST GILT BEIM LESEN: Verwaiste Bestellungen dieses Hofs geben ihre
+  //     Ware frei, bevor Bestand gelesen oder eine Wiederholung beantwortet
+  //     wird (src/lib/fristen.ts). Ein Fehler darin bleibt gemeldet, der
+  //     Checkout läuft weiter.
+  await gibVerwaisteFreiOhneRisiko(data.farmId)
 
   // 0. IDEMPOTENZ — vor allem anderen. Kennt der Server den Schlüssel schon,
   //    ist die Bestellung bereits angelegt; sie wird zurückgegeben, nichts
@@ -498,6 +530,14 @@ export async function POST(request: NextRequest) {
       orderId: order.id,
       orderNumber,
       clientSecret: paymentIntent.client_secret,
+      // Bis dahin hält die Bestellung ihre Ware (src/lib/fristen.ts) — der
+      // Zahlungsschritt zeigt die Uhrzeit.
+      reserviertBis: fristVon({
+        paymentMethod: 'ONLINE',
+        createdAt: order.createdAt,
+        pickupDate,
+        pickupTimeStart: data.pickupTimeStart,
+      }).toISOString(),
     })
   }
 

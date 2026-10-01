@@ -155,6 +155,7 @@ export function CheckoutForm({
   const [paymentStep, setPaymentStep] = useState<{
     clientSecret: string
     orderId: string
+    reserviertBis: string | null
   } | null>(null)
 
   const router = useRouter()
@@ -352,7 +353,11 @@ export function CheckoutForm({
 
       if (data.paymentMethod === 'ONLINE') {
         setBestellungAngelegt(true)
-        setPaymentStep({ clientSecret: result.clientSecret, orderId: result.orderId })
+        setPaymentStep({
+          clientSecret: result.clientSecret,
+          orderId: result.orderId,
+          reserviertBis: typeof result.reserviertBis === 'string' ? result.reserviertBis : null,
+        })
       } else {
         leereWarenkorb()
         router.push(`/${farm.slug}/confirm/${result.orderId}`)
@@ -379,6 +384,7 @@ export function CheckoutForm({
         clientSecret={paymentStep.clientSecret}
         orderId={paymentStep.orderId}
         farmSlug={farm.slug}
+        reserviertBis={paymentStep.reserviertBis}
         onClearCart={leereWarenkorb}
         onBack={() => setPaymentStep(null)}
       />

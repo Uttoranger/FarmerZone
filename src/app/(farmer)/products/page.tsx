@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getProductsForFarm, getHofBetriebsnummer } from '@/server/queries/products'
+import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { ProductList } from '@/components/products/product-list'
 
 // ?neu=1 und ?edit=<id> liest die Liste selbst (src/lib/use-url-auftrag.ts).
@@ -12,6 +13,10 @@ export default async function ProductsPage() {
 
   const farm = await getFarmForUser(session.user.id)
   if (!farm) redirect('/login')
+
+  // Frist gilt beim Lesen: Verwaiste Bestellungen geben ihre Ware frei, bevor
+  // die Seite Bestand und Bestellungen zeigt (src/lib/fristen.ts). Fehler nur gemeldet.
+  await gibVerwaisteFreiOhneRisiko(farm.id)
 
   const [products, hofBetriebsnummer] = await Promise.all([getProductsForFarm(farm.id), getHofBetriebsnummer(farm.id)])
 

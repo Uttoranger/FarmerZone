@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { cronBerechtigt } from '@/lib/geheimnis'
 
-// Called by Vercel Cron every 5 minutes (see vercel.json)
+// Aufruf durch Vercel Cron einmal täglich (vercel.json: `0 3 * * *`, UTC —
+// mehr erlaubt der Hobby-Tarif nicht). Er räumt nur auf: Die
+// Reservierungsfrist gilt beim Lesen (src/lib/reservierung.ts).
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-
-  // Fail-closed: ohne konfiguriertes Secret bleibt der Endpoint gesperrt
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  // Fail-closed und in konstanter Zeit: ohne konfiguriertes Secret bleibt der
+  // Endpoint gesperrt, und die Laufzeit verrät nichts über das Secret.
+  if (!cronBerechtigt(request.headers.get('authorization'), process.env.CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

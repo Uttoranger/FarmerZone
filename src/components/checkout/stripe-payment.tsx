@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import {
   Elements,
   PaymentElement,
@@ -11,6 +12,7 @@ import { ArrowLeft, Loader2, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { getStripePromise } from '@/lib/stripe-client'
+import { uhrzeitInWien } from '@/lib/fristen'
 
 const stripePromise = getStripePromise()
 
@@ -18,6 +20,8 @@ interface StripePaymentStepProps {
   clientSecret: string
   orderId: string
   farmSlug: string
+  /** Bis dahin hält die Bestellung ihre Ware (ISO, aus /api/checkout; src/lib/fristen.ts). */
+  reserviertBis: string | null
   onClearCart: () => void
   onBack: () => void
 }
@@ -26,9 +30,17 @@ export function StripePaymentStep({
   clientSecret,
   orderId,
   farmSlug,
+  reserviertBis,
   onClearCart,
   onBack,
 }: StripePaymentStepProps) {
+  // Abgelehnt: Wir sagen, dass nichts abgebucht wurde und wie lange die Ware
+  // noch wartet — die Kundin kann es gleich erneut versuchen. Abgelaufen: Die
+  // Frist ist vorbei und die Zahlung abgebrochen (src/server/verwaiste-bestellungen.ts)
+  // — ein neuer Versuch geht hier nicht mehr, nur ein neuer Einkauf.
+  const [hinweis, setHinweis] = useState<'abgelehnt' | 'abgelaufen' | null>(null)
+  const bisUhrzeit = reserviertBis ? uhrzeitInWien(new Date(reserviertBis)) : null
+
   return (
     <div className="max-w-lg mx-auto px-4 py-6">
       <button
@@ -41,7 +53,14 @@ export function StripePaymentStep({
 
       <h1 className="text-xl font-semibold text-foreground mb-2">Zahlung</h1>
       <p className="text-sm text-muted-foreground mb-6">
-        Deine Bestellung ist reserviert. Bitte gib jetzt deine Zahlungsdaten ein.
+        {bisUhrzeit ? (
+          <>
+            Deine Ware ist bis <strong className="text-foreground">{bisUhrzeit} Uhr</strong> für dich
+            reserviert. Bitte gib jetzt deine Zahlungsdaten ein.
+          </>
+        ) : (
+          'Deine Bestellung ist reserviert. Bitte gib jetzt deine Zahlungsdaten ein.'
+        )}
       </p>
 
       {/* Bewusst WEISS in beiden Modi: Darin steckt Stripes eigenes
@@ -68,9 +87,28 @@ export function StripePaymentStep({
             orderId={orderId}
             farmSlug={farmSlug}
             onClearCart={onClearCart}
+            reserviertBis={reserviertBis}
+            onHinweis={setHinweis}
           />
         </Elements>
       </div>
+
+      {/* Außerhalb des weißen Kastens: Dort drin hätte gedämpfter Text im
+          dunklen Modus keinen Kontrast. */}
+      {hinweis === 'abgelehnt' && (
+        <p role="status" className="mt-4 text-sm text-foreground">
+          Es wurde nichts abgebucht. Versuch es noch einmal oder nimm eine andere Zahlungsart
+          {bisUhrzeit ? ` – deine Ware bleibt bis ${bisUhrzeit} Uhr reserviert.` : '.'}
+        </p>
+      )}
+      {hinweis === 'abgelaufen' && (
+        <p role="status" className="mt-4 text-sm text-foreground">
+          Deine Reservierung ist abgelaufen, es wurde nichts abgebucht.{' '}
+          <Link href={`/${farmSlug}`} className="font-semibold underline underline-offset-2">
+            Zurück zum Hof und neu bestellen
+          </Link>
+        </p>
+      )}
 
       <div className="flex items-center justify-center gap-2 mt-4 text-xs text-muted-foreground/60">
         <Lock className="size-3" />
@@ -84,10 +122,14 @@ function PaymentForm({
   orderId,
   farmSlug,
   onClearCart,
+  reserviertBis,
+  onHinweis,
 }: {
   orderId: string
   farmSlug: string
   onClearCart: () => void
+  reserviertBis: string | null
+  onHinweis: (hinweis: 'abgelehnt' | 'abgelaufen' | null) => void
 }) {
   const stripe = useStripe()
   const elements = useElements()
@@ -107,7 +149,23 @@ function PaymentForm({
 
     // If we get here, payment failed (redirect didn't happen)
     if (error) {
+      // Schon bezahlt oder in Bearbeitung (etwa nach Zurück und erneutem
+      // Tippen): Stripe meldet das als Fehler, das Geld ist aber unterwegs.
+      // Nie „nichts abgebucht" sagen — zur Bestellung, die zeigt den Stand.
+      const zahlungsStand = error.payment_intent?.status
+      if (zahlungsStand === 'succeeded' || zahlungsStand === 'processing') {
+        window.location.assign(`/${farmSlug}/confirm/${orderId}`)
+        return
+      }
       toast.error(error.message ?? 'Zahlung fehlgeschlagen')
+      // Abgebrochener PaymentIntent (Frist vorbei) oder Frist schon um: kein
+      // neuer Versuch möglich. Nur eine Ablehnung der Karte sagt sicher
+      // „nichts abgebucht, versuch es noch einmal"; unvollständige Eingaben
+      // zeigt Stripe ohnehin am Feld, Netzfehler lassen wir ohne Zusatz.
+      const fristUm = reserviertBis !== null && Date.now() >= new Date(reserviertBis).getTime()
+      if (zahlungsStand === 'canceled' || fristUm) onHinweis('abgelaufen')
+      else if (error.type === 'card_error') onHinweis('abgelehnt')
+      else onHinweis(null)
       setIsProcessing(false)
     }
     // On success Stripe redirects — no else branch needed

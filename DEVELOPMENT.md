@@ -254,6 +254,133 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 
 ## Bekannte Bugs & Fixes
 
+### BUG: Verwaiste Bestellungen hielten den Bestand für immer (behoben 2026-10-01, K3)
+
+**Befund:** Der Checkout bucht den Bestand, bevor bezahlt (online) oder per
+E-Mail-Link bestätigt (vor Ort) wird. Ohne Zahlung oder Klick blieb die
+Bestellung für immer in PENDING_CONFIRMATION und hielt ihre Ware fest. Einen
+Aufräumweg gab es nicht.
+
+**Fachlich festgelegt (vom Betreiber bestätigt):**
+- Online: 30 Minuten ab Bestellung bis zur Zahlung.
+- Vor Ort: 2 Stunden bis zur Bestätigung, spätestens bis zum Bestellschluss
+  des gewählten Abholfensters, je nachdem, was früher eintritt.
+- Beide Werte stehen nur in `src/lib/fristen.ts`.
+
+**Bestellschluss — Annahme:** Einen eigenen Bestellschluss kennt die App
+nicht. Als Bestellschluss gilt deshalb der **Beginn des gewählten
+Abholfensters** (Wiener Ortszeit). Der Checkout bietet ohnehin erst Fenster ab
+morgen an. Die Grenze greift also praktisch nur bei Bestellungen spät am Abend
+für ein Fenster kurz nach Mitternacht.
+
+**Fix:**
+- `gibVerwaisteBestellungenFrei(jetzt, farmId?)`
+  (`src/server/verwaiste-bestellungen.ts`) sucht offene Bestellungen über
+  ihrer Frist:
+  - **Online:** Zuerst wird der PaymentIntent abgebrochen
+    (`cancellation_reason: 'abandoned'`), danach folgt
+    `storniereUnbezahlteBestellung`. Ist der PaymentIntent inzwischen
+    `succeeded` oder `processing`, bleibt die Bestellung stehen, der Webhook
+    gewinnt. Scheitert der Abbruch, wird nachgesehen statt geraten. Eine
+    Bestellung ohne PaymentIntent (der Checkout brach nach dem Anlegen ab)
+    wird direkt storniert.
+  - **Vor Ort:** Die Bestellung wird storniert, und die Kundin bekommt nach
+    der Antwort die Mail „Deine Bestellung ist verfallen, weil sie nicht
+    bestätigt wurde".
+  - Mehrfache und gleichzeitige Aufrufe sind unschädlich, weil der bedingte
+    Storno die Sperre ist. Die Mail schickt nur, wer storniert hat.
+- **Frist gilt beim Lesen:** Der Aufruf steht am Anfang von `/api/reserve`,
+  `/api/warenkorb/pruefen` und `/api/checkout`, beim Laden von Heute,
+  Bestellungen und Produkte des Hofs und, über den Auftrag hinaus, an drei
+  weiteren Stellen:
+  - **auf der Hofseite** (`ladeHofseite`): Sie zeigt bei Bestand 0
+    „Ausverkauft“ ohne Knopf, `/api/reserve` würde also nie gerufen, und die
+    Ware bliebe für Kundinnen bis zum Cron unsichtbar. Das ist ein
+    Prüferbefund.
+  - in der Bestätigung per Link: Ein Klick nach der Frist bestätigt nicht mehr;
+  - auf der Bestellseite der Kundin: Sie zeigt „verfallen" statt einer
+    abgelaufenen Uhrzeit.
+
+  Fehler werden nur gemeldet, der Request läuft weiter
+  (`gibVerwaisteFreiOhneRisiko`, `…FuerProdukte`, `…FuerSlug`).
+- **Stripe nicht dauernd fragen:** Ist eine überfällige Online-Bestellung bei
+  Stripe bezahlt oder in Bearbeitung, bleibt sie offen, bis der Webhook kommt.
+  Bei SEPA dauert das Tage. Der Lesepfad fragt Stripe dann höchstens alle fünf
+  Minuten je Bestellung, der Merker gilt je Server-Instanz. Nach einem
+  Stripe-Fehler gilt dieselbe Pause. Dazu kommen kurze Anfragen
+  (5 Sekunden, keine Wiederholung): Eine Stripe-Störung bremst sonst die
+  Hofseite. Stehen solche Bestellungen beim täglichen Lauf noch offen, meldet
+  der Cron ihre IDs an Sentry, denn vermutlich fehlt ein Webhook.
+- **Mail nur für frisch Verfallenes:** Die „verfallen“-Mail geht nur raus, wenn
+  die Frist höchstens 48 Stunden zurückliegt. Der erste Lauf nach dem Deploy
+  schreibt so niemandem zu Wochen alten Bestellungen. 48 statt 24 Stunden,
+  weil der tägliche Cron im Hobby-Tarif nur auf die Stunde genau läuft.
+- **Bestätigung per Link bedingt:** Sie las den Status und schrieb CONFIRMED
+  danach unbedingt. Seit K3 storniert die Freigabe solche Bestellungen. Lief
+  sie genau zwischen Lesen und Schreiben, wäre die Bestellung bestätigt worden,
+  obwohl ihre Ware schon zurückgebucht war. Jetzt läuft das als `updateMany`
+  mit Statusbedingung.
+- **Checkout-Wiederholung:** Ging die Kundin aus dem Zahlungsschritt zurück und
+  schickte erst nach der Frist erneut ab, gab der Checkout die stornierte
+  Bestellung samt abgebrochenem PaymentIntent zurück. Jetzt antwortet er mit
+  409 `BESTELLUNG_BEENDET` und der Bitte, die Seite neu zu laden.
+- **Netz darunter:** `/api/cron/verwaiste-bestellungen` läuft täglich um
+  03:30 UTC für alle Höfe. Der Vergleich mit `CRON_SECRET` ist jetzt
+  zeitkonstant (`cronBerechtigt`), auch in `cleanup-reservations`. Dort stand
+  zudem fälschlich „every 5 minutes“ im Kommentar.
+- **Sichtbar:**
+  - Der Zahlungsschritt zeigt „Deine Ware ist bis HH:MM Uhr für dich
+    reserviert“.
+  - Nach dem Barbestellen erscheint „Fast geschafft – bitte bestätige per
+    E-Mail“ mit „Bestätigen bis heute, HH:MM Uhr. Danach geben wir die Ware
+    wieder frei – ohne Kosten für dich.“ Zeigt die Frist auf den nächsten
+    Wiener Kalendertag, steht dort „morgen“.
+  - Bei einer abgelehnten Zahlung erscheint unter der Zahlungsmaske „Es wurde
+    nichts abgebucht. Versuch es noch einmal oder nimm eine andere Zahlungsart
+    – deine Ware bleibt bis HH:MM Uhr reserviert.“ Die Mitte des Satzes ist
+    ergänzt, der Auftrag ließ sie aus. Der Satz kommt nur bei einer echten
+    Ablehnung der Karte (`card_error`). Ist die Frist um oder der PaymentIntent
+    schon abgebrochen, steht dort „Deine Reservierung ist abgelaufen, es wurde
+    nichts abgebucht.“ und ein Weg zurück zum Hof. Ist die Zahlung bei Stripe
+    schon gelungen oder in Bearbeitung, etwa nach Zurück und erneutem Tippen,
+    geht es zur Bestellseite. „Nichts abgebucht“ wäre dann falsch.
+  - Eine verfallene Barbestellung zeigt auf ihrer Seite „Bestellung
+    verfallen“.
+
+**Zeitzone:** Abholfenster sind Wiener Ortszeit, der Server läuft in UTC.
+`wienerZeitpunkt` rechnet über `Intl` und stimmt auch an den Tagen der
+Zeitumstellung. Das prüft `tests/fristen.test.ts`.
+
+**Erstlauf nach dem Deploy — Entscheidung des Betreibers:** Der erste Aufruf
+storniert ALLE offenen Bestellungen über ihrer Frist, auch Wochen alte, und
+bucht deren Menge zurück (`increment`). Hat ein Hof seinen Bestand seither von
+Hand neu gesetzt, entsteht so Phantombestand. Vor dem Merge deshalb in
+Produktion nur lesend zählen, was betroffen ist. Danach entscheidet der
+Betreiber, ob die Altfälle so laufen oder vorher mit dem Hof bereinigt werden.
+
+**Offen, mit Absicht nicht angefasst:**
+- Jede Reservierung kostet zwei Abfragen mehr (Hof des Produkts, offene
+  Bestellungen des Hofs). Bei wenigen offenen Bestellungen je Hof ist das
+  vertretbar.
+- Die Bestätigungsmail für Barbestellungen nennt die Frist nicht. Die Kundin
+  sieht sie nur auf der Seite nach dem Bestellen.
+- `/api/cron/briefkasten` vergleicht `CRON_SECRET` noch mit `!==`.
+- Die Bestätigung per Link wartet ihre zwei Mails weiterhin im Antwortpfad ab.
+- Die Bestätigungsseite (`redirect_status=failed`) leert weiter den Warenkorb.
+  „Erneut versuchen“ legt eine neue Bestellung an.
+
+**Tests:**
+- `tests/fristen.test.ts`: Konstanten, Fristen, Bestellschluss als Grenze,
+  Zeitumstellung, Anzeige.
+- `tests/integration/verwaiste-bestellungen.int.test.ts` (echtes Postgres). Mit
+  einer leeren Freigabe sind 6 von 12 Kernfällen rot, darunter „verfallene
+  Barbestellung blockiert den letzten Bestand in `/api/reserve`“. Dazu kommen
+  Fälle für Bestätigungslink und Checkout-Wiederholung.
+- `tests/cron-verwaiste-bestellungen.test.ts`: Zugang der beiden Cron-Routen,
+  Eintrag in `vercel.json`, Meldung übersprungener Bestellungen.
+- `tests/verwaiste-ohne-risiko.test.ts`: Die Wrapper im Lesepfad werfen nie.
+- `tests/bestellung-verfallen-email.test.ts`: die neue Mail.
+
 ### BUG: payment_failed stornierte endgültig — ein zweiter Zahlungsversuch belebte die Bestellung ohne Bestand (behoben 2026-10-01)
 
 **Befund (statisch belegt, kein Kundenfall bekannt):** Der Webhook behandelte
@@ -319,7 +446,8 @@ Ohne dieses Abo wird eine abgebrochene Zahlung nie storniert.
 - Stripe bricht einen PaymentIntent nicht von selbst ab. Eine Bestellung, deren
   Zahlung scheitert und die die Kundin danach liegen lässt, hält ihre Ware, bis
   jemand den PaymentIntent abbricht. Das räumt K3 auf. Bis dahin ist das
-  derselbe Zustand wie bei einer nie versuchten Zahlung.
+  derselbe Zustand wie bei einer nie versuchten Zahlung. — Gelöst mit K3,
+  siehe „Verwaiste Bestellungen hielten den Bestand für immer".
 - **Folge für den Bestand, bis K3 läuft:** Die Bestätigungsseite leert bei
   `redirect_status=failed` den Warenkorb (`ClearCartOnMount`). „Erneut
   versuchen" führt dann in den Checkout und legt eine NEUE Bestellung an, die
@@ -327,7 +455,7 @@ Ohne dieses Abo wird eine abgebrochene Zahlung nie storniert.
   Ist die Ware knapp, scheitert der neue Versuch mit „gerade von jemand anderem
   gekauft", obwohl die Kundin sie selbst blockiert. Vorher gab ein
   Fehlschlag die Ware sofort frei. Auflösen kann es nur der Hof (Storno) oder
-  K3.
+  K3. — Mit K3 hält die alte Bestellung ihre Ware höchstens 30 Minuten.
 - Die offenen Online-Bestellungen erscheinen beim Hof weiter unter „Wartet auf
   Kunden-Bestätigung" (`OPEN_STATUSES`). Jetzt gilt das auch nach einem
   gescheiterten Versuch.

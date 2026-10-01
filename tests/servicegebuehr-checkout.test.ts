@@ -16,6 +16,9 @@ import { NextRequest } from 'next/server'
 vi.mock('@/lib/rate-limit', () => ({ enforceRateLimit: vi.fn(() => null) }))
 vi.mock('@/lib/stripe', () => ({ stripe: { paymentIntents: { create: vi.fn() } } }))
 vi.mock('@/lib/email', () => ({ sendOnsiteConfirmation: vi.fn() }))
+// Die Freigabe verwaister Bestellungen hat eigene Tests
+// (tests/integration/verwaiste-bestellungen.int.test.ts); hier zählt nur der Checkout.
+vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteFreiOhneRisiko: vi.fn() }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     farm: { findUnique: vi.fn() },
@@ -146,7 +149,7 @@ beforeEach(() => {
   reservationAggregate.mockResolvedValue({ _sum: { quantity: 0 } } as never)
   userFindUnique.mockResolvedValue({ id: 'cust_1' } as never)
   orderFindUnique.mockResolvedValue(null)
-  orderCreate.mockResolvedValue({ id: 'order_1' } as never)
+  orderCreate.mockResolvedValue({ id: 'order_1', createdAt: new Date() } as never)
   orderUpdate.mockResolvedValue({} as never)
   productUpdate.mockResolvedValue({} as never)
   reservationDeleteMany.mockResolvedValue({ count: 0 } as never)

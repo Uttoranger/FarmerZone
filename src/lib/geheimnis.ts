@@ -16,3 +16,13 @@ export function geheimnisGleich(a: string, b: string): boolean {
   if (pa.length !== pb.length) return false
   return timingSafeEqual(pa, pb)
 }
+
+/**
+ * Darf dieser Aufruf eine Cron-Route auslösen? Vercel schickt
+ * `Authorization: Bearer <CRON_SECRET>`. Fail-closed: Ohne konfiguriertes
+ * Secret ist jede Cron-Route gesperrt.
+ */
+export function cronBerechtigt(authorization: string | null, cronSecret: string | undefined): boolean {
+  if (!cronSecret) return false
+  return geheimnisGleich(authorization ?? '', `Bearer ${cronSecret}`)
+}
