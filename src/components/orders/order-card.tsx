@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/dialog'
 import { statusLabel, statusColor, paymentLabel } from './order-status'
 import { formatPosition } from '@/lib/format'
-import { BetragMitGebuehr, NichtAbgeholtDialog, NICHT_ABGEHOLT_STATUS } from './servicegebuehr-anzeige'
+import { BetragMitGebuehr, NichtAbgeholtDialog, NICHT_ABGEHOLT_STATUS, StornoGeldHinweis } from './servicegebuehr-anzeige'
 
 export function OrderCard({
   order,
@@ -300,12 +300,8 @@ export function OrderCard({
             Die Bestellung von{' '}
             <span className="font-medium text-foreground">{order.customerName}</span> wird
             storniert. Der Kunde erhält eine Benachrichtigung.
-            {isOnline && (
-              <span className="block mt-1 text-destructive font-medium">
-                Online-Zahlung wird automatisch rückerstattet.
-              </span>
-            )}
           </p>
+          <StornoGeldHinweis kundenName={order.customerName} paymentMethod={order.paymentMethod} betraege={order.storno} />
           <DialogFooter>
             <Button
               variant="ghost"

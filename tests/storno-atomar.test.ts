@@ -80,6 +80,7 @@ function barBestellung() {
     customerEmail: 'anna@example.com',
     customerPhone: '+43 660 0000000',
     totalAmount: { toString: () => '20.00' },
+    platformFeeAmount: { toString: () => '0.00' },
     serviceFeeCents: 0,
     serviceFeeRefundedAt: null,
     pickupDate: new Date('2026-09-25T12:00:00Z'),
@@ -200,7 +201,8 @@ describe('cancelOrder — Doppelausführung', () => {
   it('zweiter Aufruf NACH erfolgreicher Stornierung: Fehler, kein weiteres increment', async () => {
     datenbankMit(barBestellung())
 
-    expect(await cancelOrder('order_1')).toEqual({})
+    // Bar: nichts erstattet, nichts vom Hof abgezogen.
+    expect(await cancelOrder('order_1')).toEqual({ erstattetCents: 0, vomHofCents: 0 })
     expect(rueckbuchungen()).toBe(2)
 
     const zweite = await cancelOrder('order_1')
@@ -277,9 +279,14 @@ describe('cancelOrder — Erstattung erst nach der Sperre', () => {
 
     const result = await cancelOrder('order_1')
 
-    expect(result).toEqual({})
-    // Voll erstattet: nur der Intent, kein Betrag, kein zweiter Parameter.
-    expect(refundCreate).toHaveBeenCalledWith({ payment_intent: 'pi_1' })
+    expect(result).toEqual({ erstattetCents: 2000, vomHofCents: 2000 })
+    // Voll erstattet, kein Betrag: die Überweisung an den Hof wird zurückgeholt
+    // (Destination Charge, tests/storno-erstattung.test.ts). Ohne Gebühr gibt es
+    // keine application_fee zu erstatten. Fester Schlüssel gegen Doppelerstattung.
+    expect(refundCreate).toHaveBeenCalledWith(
+      { payment_intent: 'pi_1', reverse_transfer: true },
+      { idempotencyKey: 'storno-order_1' }
+    )
     expect(orderUpdateMany.mock.invocationCallOrder[0]).toBeLessThan(
       refundCreate.mock.invocationCallOrder[0]
     )
@@ -323,7 +330,7 @@ describe('cancelOrder — Erstattung erst nach der Sperre', () => {
     const result = await cancelOrder('order_1')
 
     // Das Geld IST zurück — „Rückerstattung fehlgeschlagen" wäre gelogen.
-    expect(result).toEqual({})
+    expect(result).toEqual({ erstattetCents: 2000, vomHofCents: 2000 })
     expect(mailStorno).toHaveBeenCalledWith(expect.objectContaining({ orderNumber: 'TH-1' }), 20)
     expect(sentryMeldung).toHaveBeenCalledTimes(1)
     const [, kontext] = sentryMeldung.mock.calls[0] as [unknown, { tags?: Record<string, unknown> }]
@@ -339,7 +346,7 @@ describe('cancelOrder — Erstattung erst nach der Sperre', () => {
       new Promise<'timeout'>((r) => setTimeout(() => r('timeout'), 1500)),
     ])
 
-    expect(ergebnis).toEqual({})
+    expect(ergebnis).toEqual({ erstattetCents: 0, vomHofCents: 0 })
     expect(mailStorno).toHaveBeenCalledTimes(1)
   })
 })

@@ -232,6 +232,7 @@ describe('cancelOrder — Gebühren-Vermerk bei Storno', () => {
     customerEmail: 'anna@test.local',
     customerPhone: '+43',
     totalAmount: { toString: () => '20.00' },
+    platformFeeAmount: { toString: () => '0.00' },
     serviceFeeCents: 98,
     serviceFeeRefundedAt: null,
     pickupDate: new Date('2026-09-25T12:00:00Z'),
@@ -246,7 +247,7 @@ describe('cancelOrder — Gebühren-Vermerk bei Storno', () => {
   it('bar storniert: Gebühr als entfallen vermerkt (nie kassiert), kein Stripe', async () => {
     orderFindFirst.mockResolvedValue(STORNO_BAR as never)
     const result = await cancelOrder('order_bar')
-    expect(result).toEqual({})
+    expect(result).toEqual({ erstattetCents: 0, vomHofCents: 0 })
     expect(refundCreate).not.toHaveBeenCalled()
     expect(stornoDaten().at(-1)).toEqual(
       expect.objectContaining({ status: 'CANCELLED', serviceFeeRefundedAt: expect.any(Date) })
@@ -259,7 +260,7 @@ describe('cancelOrder — Gebühren-Vermerk bei Storno', () => {
     expect(stornoDaten().at(-1)).not.toHaveProperty('serviceFeeRefundedAt')
   })
 
-  it('online bezahlt: volle Erstattung wie bisher (unverändert), dazu der Vermerk', async () => {
+  it('online bezahlt: volle Erstattung mit Rückholung beim Hof, dazu der Vermerk', async () => {
     orderFindFirst.mockResolvedValue({
       ...STORNO_BAR,
       id: 'order_online',
@@ -271,8 +272,13 @@ describe('cancelOrder — Gebühren-Vermerk bei Storno', () => {
 
     await cancelOrder('order_online')
 
-    // Unverändert: volle Erstattung nur über den Intent (Warenpreis-Umgang bleibt)
-    expect(refundCreate).toHaveBeenCalledWith({ payment_intent: 'pi_1' })
+    // Volle Erstattung: Der Hof gibt den Warenpreis zurück (reverse_transfer),
+    // die Gebühr bekommt er als application_fee zurück (refund_application_fee) —
+    // so erstattet die Plattform die Servicegebühr (tests/storno-erstattung.test.ts).
+    expect(refundCreate).toHaveBeenCalledWith(
+      { payment_intent: 'pi_1', reverse_transfer: true, refund_application_fee: true },
+      { idempotencyKey: 'storno-order_online' }
+    )
     expect(stornoDaten().at(-1)).toEqual(
       expect.objectContaining({ status: 'CANCELLED', serviceFeeRefundedAt: expect.any(Date) })
     )

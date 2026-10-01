@@ -464,11 +464,16 @@ export async function POST(request: NextRequest) {
   if (data.paymentMethod === 'ONLINE') {
     // LADUNGSTYP: destination charge (transfer_data.destination) OHNE
     // on_behalf_of — die Zahlung entsteht auf dem PLATTFORMKONTO, Stripe zieht
-    // seine Gebühren dort ab, der Hof bekommt amount − application_fee_amount
-    // überwiesen. Deshalb: amount = Warenpreis + Servicegebühr und
+    // seine Gebühren dort ab. Überwiesen wird dem Hof der VOLLE Betrag (kein
+    // transfer_data.amount); die application_fee_amount geht danach vom Hof an
+    // die Plattform — netto bleibt ihm amount − application_fee_amount.
+    // Deshalb: amount = Warenpreis + Servicegebühr und
     // application_fee_amount = Servicegebühr (+ Plattformgebühr, im Pilot 0)
     // → dem Hof fließt exakt der Warenpreis zu, FarmerZone trägt die
-    // Stripe-Kosten aus der Servicegebühr.
+    // Stripe-Kosten aus der Servicegebühr. Der Storno holt das spiegelbildlich
+    // zurück — reverse_transfer UND refund_application_fee (cancelOrder). Wer
+    // den Ladungstyp hier ändert, ändert ihn dort mit
+    // (tests/storno-erstattung.test.ts, Ladungstyp-Wache).
     const amountCents = warenpreisCents + servicegebuehr.gebuehrCents
     const feeAmountCents = decimalZuCents(platformFeeAmount) + servicegebuehr.gebuehrCents
 

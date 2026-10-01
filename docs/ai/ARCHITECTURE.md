@@ -195,6 +195,12 @@ Diese Regeln sind fachlich, nicht technisch. Verletzung kostet Geld oder Vertrau
 - **Archivierte und nicht freigegebene Höfe** sind öffentlich unsichtbar. Bei jeder neuen öffentlichen Abfrage mitprüfen. **Pausierte Höfe** bleiben öffentlich sichtbar, mit Hinweis, und nehmen keine Bestellungen an: `/api/reserve` und `/api/checkout` lehnen sie mit 409 ab (`SHOP_PAUSED_MESSAGE`).
 - **Migrationen laufen vor dem Code.** Eine NOT-NULL-Spalte ohne Default darf auf eine bestehende Tabelle nur, wenn die Tabelle nachweislich leer ist oder die Spalte in zwei Schritten kommt: erst nullable plus Code, der sie schreibt; im nächsten Sprint NOT NULL. Dasselbe gilt für das Entfernen von Spalten, die alter Code noch liest. — Grund: `vercel-build` schaltet die Migration Minuten vor dem Code live; in diesem Deploy-Fenster schreibt der alte Code ins neue Schema (Vorfall 2026-09-23, `DEVELOPMENT.md` → Vorfälle). Durchgesetzt von `tests/migrationen-wache.test.ts`; begründete Ausnahmen tragen einen `-- EXPAND-CONTRACT:`-Marker in den fünf Zeilen vor dem `ALTER TABLE`.
 
+### Zahlungen
+
+- **Vollerstattung bei Destination Charges immer mit `reverse_transfer` — und mit `refund_application_fee`, sobald die Zahlung eine `application_fee` trägt; Gebühren-Teilerstattung ohne beides.** Das gilt auch für eine Erstattung von Hand im Stripe-Dashboard. Vorlage: `cancelOrder`; Teilerstattung: `lasseServicegebuehrEntfallen`. Warum: `DEVELOPMENT.md`, „Vollstorno ohne reverse_transfer".
+- **Jede Erstattung trägt einen festen Idempotenz-Schlüssel je Bestellung und Anlass** (`storno-<id>`, `servicegebuehr-nicht-abgeholt-<id>`): Erreicht ein zweiter Aufruf Stripe, kommt dieselbe Erstattung zurück, keine zweite.
+- **Was ein Storno an Geld bewegt, rechnet `src/lib/storno.ts`** — dieselbe Funktion für den Storno-Dialog und für `cancelOrder`. Wer den Ladungstyp im Checkout ändert, ändert den Storno mit; `tests/storno-erstattung.test.ts` (Ladungstyp-Wache) schlägt sonst an.
+
 ### Taxonomie (Kategorien, Unterkategorien, Siegel)
 
 `src/lib/taxonomie.ts` ist die **einzige** Quelle für Werte und Labels. Kein zweites Label-Verzeichnis, kein Hof-Sonderfall anderswo. Anzeige nur über `formatKategorie` in `format.ts`.

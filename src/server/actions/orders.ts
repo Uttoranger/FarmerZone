@@ -9,8 +9,23 @@ import { sendOrderReady, sendOrderCancelled, sendOrderNotReady, type OrderForEma
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import * as Sentry from '@sentry/nextjs'
 import type { OrderStatus } from '@prisma/client'
+import { plattformgebuehrCents, stornoBetraege } from '@/lib/storno'
+import { alsCents } from '@/lib/order-totals'
 
 export type ActionResult = { error?: string }
+
+/**
+ * Was ein Storno zurückmeldet: die Beträge aus derselben Rechnung wie im
+ * Storno-Dialog (src/lib/storno.ts), sobald Stripe erstattet hat — vor Ort
+ * bezahlt beide 0. Scheitert die Erstattung, `erstattungOffen` statt Beträgen.
+ */
+export type StornoErgebnis = ActionResult & {
+  /** Was die Kundin zurückbekommen hat (Warenpreis + Servicegebühr). */
+  erstattetCents?: number
+  /** Was von der nächsten Auszahlung des Hofs abgezogen wird (Warenpreis). */
+  vomHofCents?: number
+  erstattungOffen?: boolean
+}
 
 // Für den Fall, dass ein bedingter Statuswechsel nichts mehr trifft: Die
 // Bestellung gibt es, sie hat sich nur seit dem Laden der Seite geändert
@@ -91,6 +106,8 @@ const ORDER_EMAIL_SELECT = {
   customerEmail: true,
   customerPhone: true,
   totalAmount: true,
+  // Provision: Teil der application_fee — der Storno gibt sie dem Hof zurück (src/lib/storno.ts)
+  platformFeeAmount: true,
   // Servicegebühr-Snapshot: für die Mails (Gesamtbetrag) und den Storno-Vermerk
   serviceFeeCents: true,
   serviceFeeRefundedAt: true,
@@ -280,7 +297,7 @@ export async function revertOrderStatus(orderId: string, previousStatus: string)
   return {}
 }
 
-export async function cancelOrder(orderId: string, reason?: string): Promise<ActionResult> {
+export async function cancelOrder(orderId: string, reason?: string): Promise<StornoErgebnis> {
   const farm = await getAuthFarm()
   if (!farm) return { error: 'Nicht angemeldet' }
 
@@ -292,6 +309,17 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Act
     select: ORDER_EMAIL_SELECT,
   })
   if (!order) return { error: 'Bestellung nicht gefunden' }
+
+  // Dieselbe Rechnung wie im Storno-Dialog (src/lib/storno.ts) — was der Hof
+  // sah, kommt zurück. Nur online bezahlt gibt es Beträge, sonst null. VOR der
+  // Transaktion: Was hier scheitern könnte, scheitert, bevor etwas storniert ist.
+  const betraege = stornoBetraege({
+    stripePaymentIntentId: order.stripePaymentIntentId,
+    paymentStatus: order.paymentStatus,
+    warenpreisCents: alsCents(order.totalAmount),
+    provisionCents: alsCents(order.platformFeeAmount),
+    serviceFeeCents: order.serviceFeeCents,
+  })
 
   // Der bedingte Statuswechsel IST die Sperre: updateMany mit Statusbedingung
   // gewinnt genau einmal, der zweite Aufruf trifft count 0 und bucht nichts
@@ -343,12 +371,31 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Act
   // nicht eigenmächtig angelegt — Schema-Änderung nur mit Freigabe).
   let refundAmount: number | null = null
   let erstattungOffen = false
-
-  if (order.stripePaymentIntentId && order.paymentStatus === 'PAID') {
+  if (order.stripePaymentIntentId && betraege) {
     try {
-      const refund = await stripe.refunds.create({
-        payment_intent: order.stripePaymentIntentId,
-      })
+      const refund = await stripe.refunds.create(
+        {
+          payment_intent: order.stripePaymentIntentId,
+          // LADUNGSTYP destination charge mit application_fee_amount
+          // (/api/checkout): Der Hof bekam den VOLLEN Betrag überwiesen und gab
+          // Provision + Servicegebühr als application_fee an die Plattform ab.
+          // reverse_transfer holt die ganze Überweisung vom Hof zurück,
+          // refund_application_fee gibt ihm die ganze Gebühr zurück — zusammen
+          // gibt der Hof genau seinen Warenpreis zurück, und die Servicegebühr
+          // erstattet die Plattform aus der einbehaltenen Gebühr. Ohne
+          // reverse_transfer zahlte die Plattform die ganze Erstattung aus
+          // ihrem Saldo; ohne refund_application_fee zahlte der Hof die
+          // Servicegebühr mit. Anders die Gebühren-Teilerstattung in
+          // lasseServicegebuehrEntfallen: dort bewusst ohne beides.
+          reverse_transfer: true,
+          // Wie im Checkout: eine application_fee gibt es nur bei Gebühr > 0.
+          ...(plattformgebuehrCents(betraege) > 0 ? { refund_application_fee: true } : {}),
+        },
+        // Idempotenz: Erreicht ein zweiter Storno Stripe (Vermerk gescheitert
+        // und Bestellung wieder geöffnet), liefert Stripe dieselbe Erstattung
+        // statt einer zweiten.
+        { idempotencyKey: `storno-${order.id}` }
+      )
       refundAmount = refund.amount / 100
     } catch (err) {
       console.error('[cancelOrder] Stripe refund failed:', err)
@@ -359,7 +406,9 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Act
       // Kundendaten (sentry-hygiene.ts filtert zusätzlich).
       Sentry.captureException(err, {
         tags: { aktion: 'cancelOrder', grund: 'erstattung_offen' },
-        extra: { orderId },
+        // Die Handerstattung im Dashboard braucht dieselben zwei Haken wie
+        // der Code — sonst trägt die Plattform den Warenpreis doch wieder.
+        extra: { orderId, handerstattung: 'Überweisung zurückbuchen und Plattformgebühr erstatten' },
       })
       erstattungOffen = true
     }
@@ -397,9 +446,16 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Act
 
   revalidatePath('/orders')
   revalidatePath(`/orders/${orderId}`)
-  return erstattungOffen
-    ? { error: 'Rückerstattung fehlgeschlagen. Bitte manuell über das Stripe Dashboard erstatten.' }
-    : {}
+  if (erstattungOffen) {
+    return {
+      error: 'Rückerstattung fehlgeschlagen. Bitte manuell über das Stripe Dashboard erstatten.',
+      erstattungOffen: true,
+    }
+  }
+  // Vor Ort bezahlt (oder online nie bezahlt): nichts erstattet, nichts vom Hof abgezogen.
+  return betraege && refundAmount !== null
+    ? { erstattetCents: betraege.erstattetCents, vomHofCents: betraege.vomHofCents }
+    : { erstattetCents: 0, vomHofCents: 0 }
 }
 
 /**

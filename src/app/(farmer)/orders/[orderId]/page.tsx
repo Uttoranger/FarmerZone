@@ -185,6 +185,8 @@ export default async function OrderDetailPage({
           status={order.status}
           paymentMethod={order.paymentMethod}
           serviceFeeCents={order.serviceFeeCents}
+          kundenName={order.customerName}
+          storno={order.storno}
         />
       </div>
     </div>
