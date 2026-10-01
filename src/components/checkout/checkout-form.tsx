@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { format, addDays } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { ShoppingCart, Loader2, Info } from 'lucide-react'
+import { KasseSkelett } from '@/components/checkout/kasse-skelett'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -385,14 +386,15 @@ export function CheckoutForm({
     )
   }
 
-  // Loading state
+  // Warten auf den Warenkorb aus dem localStorage. Platzhalter in Kartenform,
+  // kein drehender Kreis (DESIGN_SYSTEM, „Zustände") — und dieselben Karten
+  // wie im loading.tsx dieser Route, damit zwischen den beiden Wartezeiten
+  // nichts springt.
   if (!isHydrated) {
     return (
       <>
         {kopf}
-        <div className="flex items-center justify-center py-24">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
-        </div>
+        <KasseSkelett />
       </>
     )
   }

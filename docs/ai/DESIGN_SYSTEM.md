@@ -69,6 +69,24 @@ Jeder Screen liefert vier Zustände:
 - **Laden** — Skeleton in Kartenform, kein Spinner.
 - **Fehler** — inline am Feld bzw. an der Karte, kein Modal.
 
+### Ladeansicht einer Route (`loading.tsx`)
+
+- **Nur wo auf den Server gewartet wird.** Eine synchrone Seite ohne Datenabruf bekommt keine — das Skeleton wäre ein Blitzen ohne Anlass.
+- **Reichweite prüfen, bevor die Datei entsteht.** Next.js nimmt die nächstgelegene `loading.tsx` nach oben; eine im Wurzelsegment gilt auch für `/login`, `/admin` und `/account`. Eine Ladeansicht gehört deshalb in das Segment, dessen Form sie zeigt, nie höher.
+- **Die Kopfleiste gehört ins Skeleton.** Kundenseiten rendern sie selbst (es gibt kein `(public)/layout.tsx`), also fehlt sie während des Ladens, wenn das Skeleton sie nicht mitbringt: 56 px, ab `md` 64 px, `border-b border-border bg-card`.
+- **Gleiche Maße wie der fertige Inhalt**, von der echten Seite abgenommen — sonst springt sie beim Umschalten.
+- **Nur zeigen, was immer da ist.** Bedingte Teile (Filter-Chips, Fotostreifen, Hinweisbänder) weglassen: Reservierter Platz, in den nichts einrückt, lässt den Inhalt nach oben springen.
+- **Die serverseitige Gestalt zeigen**, nicht die hydrierte. Wo ein Client-Teil erst nach der Hydration umbricht (`/hoefe`: Splitscreen ab `lg`), zeigt das Skeleton die schmale Form — sonst springt es zweimal.
+- **Farbstaffelung** wie in `src/app/(farmer)/loading.tsx`: `bg-border` für Überschriften, `bg-app-trough` für Zweitzeilen, `bg-app-chip` für leise Zeilen, `bg-muted` für Flächen. Ein `animate-pulse` auf dem Rahmen, `aria-busy="true"` dazu.
+
+### Ganzseitige Fehlerseiten (404, 500)
+
+- Texte und Knopfbeschriftungen kommen aus `src/lib/fehlerseite.ts` — die 500 gibt es zweimal (`error.tsx` und `global-error.tsx`), und zwei Wortlaute laufen auseinander.
+- **Kein Emoji als Illustration**, in keinem Zustand.
+- Die 500 zeigt die **Fehlernummer** (`error.digest`) und sonst nichts Technisches: keine Fehlermeldung, kein Stapel, kein Dateiname.
+- Die 500 trägt **keine Kopfleiste**: War sie selbst die Ursache, risse sie die Fehlerseite mit. Der Weg nach Hause steht als Knopf, als gewöhnlicher Link (Vollaufbau) statt `<Link>`.
+- `global-error.tsx` bringt `<html>`, `<body>` und den Import des Stylesheets selbst mit und meldet nach Sentry — sie ist die einzige Grenze, die ein Fehler im Root-Layout erreicht.
+
 ## Qualität
 
 - Kontrast ≥ 4,5:1 in beiden Themes; Touch-Ziele ≥ 44 px; genau **ein** primärer Call-to-Action pro Screen, alles Weitere outline oder ghost.

@@ -4,43 +4,48 @@ import { Search } from 'lucide-react'
 import { KundenKopf } from '@/components/shared/kunden-kopf'
 import {
   HOEFE_ENTDECKEN,
-  NICHT_GEFUNDEN_TEXT,
-  NICHT_GEFUNDEN_TITEL,
+  HOF_NICHT_GEFUNDEN_TEXT,
+  HOF_NICHT_GEFUNDEN_TITEL,
   ZUR_STARTSEITE,
 } from '@/lib/fehlerseite'
 import { SUCHTEXT_MAX, SUCHTEXT_PARAMETER } from '@/schemas/hoefe-filter'
 
 export const metadata: Metadata = {
-  title: 'Seite nicht gefunden — FarmerZone',
+  title: 'Hof nicht gefunden — FarmerZone',
   robots: { index: false, follow: false },
 }
 
 /**
- * Die 404 des ganzen Hauses — und damit auch das, was jemand ohne Admin-Rechte
- * unter /admin sieht (`verlangeAdminSeite` wirft bewusst notFound() statt 403,
- * damit der Bereich sich nicht verrät). Deshalb steht hier nichts, was einen
- * Bereich preisgibt, und auch kein Hof-Login: Das ist eine Kundenseite.
+ * Die 404 unter einer Hof-Adresse. Hier landet mehr als ein Fall, und das ist
+ * der Grund für den vorsichtigen Wortlaut:
  *
- * Das Suchfeld ist ein gewöhnliches GET-Formular auf /hoefe und braucht kein
- * JavaScript. Den Text liest dort `leseHoefeFilter` als Parameter — eine
- * Systemgrenze, die seit Bereiche 2 geprüft ist und Müll verwirft, statt eine
- * Fehlerseite zu zeigen.
+ * - ein Slug, den es nie gab;
+ * - ein STILLGELEGTER Hof (`archivedAt`), ein abgeschalteter (`isActive`) und
+ *   ein noch nicht freigeschalteter — alle drei fallen schon aus der Query
+ *   (`OEFFENTLICH_SICHTBAR`, src/server/queries/farm.ts), die Seite sieht sie
+ *   gar nicht und kann sie deshalb auch nicht verraten;
+ * - ein unbekannter Bestell-Link unter /confirm und ein Hof in Pause unter
+ *   /checkout, denn deren notFound() fängt ebenfalls diese Datei.
+ *
+ * Deshalb behauptet der Text keinen Grund („vielleicht … oder …"): Warum ein
+ * Hof nicht mehr da ist, ist seine Sache. Der primäre Weg ist hier nicht die
+ * Startseite, sondern die Hofübersicht — wer einen Hof sucht, sucht einen Hof.
  */
-export default function NotFound() {
+export default function HofNichtGefunden() {
   return (
     <div className="min-h-screen bg-background">
       <KundenKopf seite={{ art: 'info' }} />
 
       <main className="mx-auto max-w-xl px-4 py-14 sm:py-20">
         <h1 className="font-heading text-2xl font-semibold text-balance text-foreground sm:text-3xl">
-          {NICHT_GEFUNDEN_TITEL}
+          {HOF_NICHT_GEFUNDEN_TITEL}
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
-          {NICHT_GEFUNDEN_TEXT}
+          {HOF_NICHT_GEFUNDEN_TEXT}
         </p>
 
         <form action="/hoefe" method="get" role="search" className="mt-8">
-          <label htmlFor="nicht-gefunden-suche" className="mb-1.5 block text-sm font-medium text-foreground">
+          <label htmlFor="hof-nicht-gefunden-suche" className="mb-1.5 block text-sm font-medium text-foreground">
             Hof oder Produkt suchen
           </label>
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -50,7 +55,7 @@ export default function NotFound() {
                 aria-hidden="true"
               />
               <input
-                id="nicht-gefunden-suche"
+                id="hof-nicht-gefunden-suche"
                 type="search"
                 name={SUCHTEXT_PARAMETER}
                 maxLength={SUCHTEXT_MAX}
@@ -67,19 +72,18 @@ export default function NotFound() {
           </div>
         </form>
 
-        {/* Genau ein primärer Weg (DESIGN_SYSTEM, „Qualität"); der zweite ist outline. */}
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
           <Link
-            href="/"
+            href="/hoefe"
             className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
           >
-            {ZUR_STARTSEITE}
+            {HOEFE_ENTDECKEN}
           </Link>
           <Link
-            href="/hoefe"
+            href="/"
             className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/40"
           >
-            {HOEFE_ENTDECKEN}
+            {ZUR_STARTSEITE}
           </Link>
         </div>
       </main>

@@ -1,7 +1,17 @@
-﻿'use client'
+'use client'
 
 import { useEffect } from 'react'
+import { FehlerAnsicht } from '@/components/shared/fehler-ansicht'
 
+/**
+ * Die Fehlergrenze innerhalb des Root-Layouts: Hier landet alles, was beim
+ * Rendern einer Seite scheitert. Reißt das Layout selbst, greift stattdessen
+ * `global-error.tsx` — dieselbe Ansicht, eigenes `<html>`.
+ *
+ * Nach Sentry gemeldet wird von hier NICHT: Server-Fehler fängt die
+ * Instrumentierung, Client-Fehler die Grenze in `global-error.tsx`. Eine
+ * zweite Meldung an derselben Stelle wäre ein doppelter Eintrag.
+ */
 export default function ErrorPage({
   error,
   reset,
@@ -10,23 +20,11 @@ export default function ErrorPage({
   reset: () => void
 }) {
   useEffect(() => {
-    console.error(error)
+    // Nur außerhalb der Produktion auf die Konsole — dort steht sonst ein
+    // Fehlertext, den niemand liest und der etwas verraten kann (Muster aus
+    // src/lib/upload-fehler.ts).
+    if (process.env.NODE_ENV !== 'production') console.error(error)
   }, [error])
 
-  return (
-    <div className="min-h-screen bg-muted/30 flex flex-col items-center justify-center px-4 text-center">
-      <span className="text-6xl mb-6">⚠️</span>
-      <h1 className="text-2xl font-bold text-foreground mb-3">Etwas ist schiefgelaufen</h1>
-      <p className="text-muted-foreground mb-8 max-w-sm leading-relaxed">
-        Ein unerwarteter Fehler ist aufgetreten. Bitte versuche es erneut.
-      </p>
-      <button
-        onClick={reset}
-        className="bg-primary text-primary-foreground hover:opacity-90 font-semibold rounded-xl px-5 py-2.5 transition-colors"
-      >
-        Erneut versuchen
-      </button>
-    </div>
-  )
+  return <FehlerAnsicht fehlernummer={error.digest} nochmal={reset} />
 }
-

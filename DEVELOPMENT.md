@@ -2866,6 +2866,37 @@ Ergänzung zu „Mein Hof v2". Was gebaut ist, steht in
 
 ---
 
+## Ladeansichten und Fehlerseiten der Kundenseiten (2026-10-01)
+
+Ausgangslage: Von 48 Seiten hatte **eine** eine Ladeansicht (`(farmer)/loading.tsx`, Tempo-Pass 1). Eine `global-error.tsx` gab es nicht — scheiterte das Root-Layout, zeigte Next.js seine eigene englische Seite. Die 404 und die 500 trugen je ein Emoji als einzige Illustration, die 404 außerdem „Hofbetreiber-Login" als zweiten Weg: auf einer Kundenseite die falsche Tür, und sie ist zugleich das, was ein Fremder unter `/admin` sieht (`verlangeAdminSeite` wirft `notFound()`, nicht 403).
+
+**Sechs Ladeansichten, und bewusst keine siebte.** Je eine für Hofseite, Hofübersicht, Kasse, Bestätigung und Bestellverfolgung, dazu eine gemeinsame für die Infoseiten der Gruppe `(public)`. Die Maße sind von den echten Seiten abgenommen (Kopfleiste 56/64 px, Titelbild-Band 260 px / 33vw / 40vw bis 420 px, Aktionsleiste 68 px, Reiterleiste ~45 px, Produktbild 170 px, Spalten 960 / 768 / 672 / 512 px).
+
+**Die Startseite bekommt keine** — zwei nachgeprüfte Gründe:
+
+1. `HomePage` ist synchron und holt keine Daten. Es gibt nichts zu suspendieren; das Skeleton wäre ein Blitzen ohne Anlass.
+2. Eine `loading.tsx` im **Wurzelsegment** wäre der Fallback für jede Route ohne nähere — auch `/login`, `/admin`, `/account`. Die zeigten dann das Startseiten-Skeleton samt Landing-Navigation.
+
+Ein Test hält beides fest: dass die Datei nicht existiert, und dass `HomePage` synchron bleibt. Wird sie eines Tages `async`, fällt der Test und erinnert daran, dass dann auch eine Ladeansicht dazugehört — mit einem Blick auf die Reichweite.
+
+**Die Kopfleiste steht im Skeleton, nicht die echte.** Kundenseiten rendern `KundenKopf` selbst (es gibt kein `(public)/layout.tsx`), also fehlt sie beim Laden, wenn das Skeleton sie auslässt. Eingebaut ist ein Platzhalter gleicher Höhe, nicht die Komponente: `loading.tsx` bekommt **keine** Routenparameter, und vier der sechs Varianten brauchen den Hof-Slug. Ein Mechanismus für alle sechs ist besser als zwei.
+
+**Was die Skeletons absichtlich NICHT zeigen:** Filter-Chips, Fotostreifen, Hinweisbänder — alles, was von Daten abhängt. Reservierter Platz, in den nichts einrückt, lässt den Inhalt nach **oben** springen, und das ist schlimmer als ein Element, das dazukommt. Ebenso zeigt `/hoefe` eine Spalte statt des Splitscreens: Den baut erst die Hydration (`useIstBreit` liefert serverseitig `false`), ein zweispaltiges Skeleton spränge zweimal.
+
+**Die Texte der Fehlerseiten liegen in `src/lib/fehlerseite.ts`.** Die 500 gibt es zweimal — `error.tsx` innerhalb des Root-Layouts, `global-error.tsx` statt seiner —, und zwei Wortlaute laufen auseinander. Beide Grenzen rendern dieselbe Ansicht (`src/components/shared/fehler-ansicht.tsx`).
+
+**Drei Entscheidungen an der 500:**
+
+- **Keine Kopfleiste.** War sie selbst die Ursache, risse sie die Fehlerseite mit. Der Weg nach Hause steht als Knopf — als gewöhnlicher `<a>`, weil ein Vollaufbau hier das Ziel ist und nicht der Umweg: `<Link>` navigiert im selben, gerade zerbrochenen Baum weiter, und in `global-error` gibt es den Router-Kontext ohnehin nicht verlässlich. Dafür steht dort ein begründetes `eslint-disable`.
+- **Nur die Fehlernummer** (`error.digest`), nichts sonst: keine Fehlermeldung, kein Stapel, kein Dateiname. Was der Mensch sieht, soll er vorlesen können — nicht verstehen müssen.
+- **„Problem melden" füllt sie ein.** `meldungLinkMitKennung` baut `/problem-melden?kennung=…`; die Seite liest den Parameter durch `bereinigeKennung` (nur `[A-Za-z0-9_-]`) und gibt ihn als Startwert in das Feld. **Zu lang heißt leer, nicht abgeschnitten**: Das Feld nimmt 20 Zeichen (`MELDUNG_KENNUNG_MAX`), und eine abgeschnittene Fehlernummer zeigt auf den falschen Fehler. Die vollständige steht auf der Seite und lässt sich kopieren.
+
+**`global-error.tsx` ist karger als die 500, mit Absicht.** Sie bringt `<html>`, `<body>` und den Import von `globals.css` selbst mit (der Import im Root-Layout ist mit dem Layout weg). Was fehlt: die Schrift-Variablen (Systemschrift statt Fraunces) und `next-themes` — ohne `data-theme` gelten die Werte aus `:root`, die Seite erscheint also **hell**, auch für jemanden im Dunkelmodus. Dafür hängt sie an keinem Provider, der gerade kaputt ist. Sie ist außerdem die einzige Stelle, die von sich aus nach Sentry meldet: Ein Fehler im Root-Layout erreicht keine andere Grenze und wäre sonst unsichtbar.
+
+**Ein stillgelegter Hof braucht keine eigene Behandlung.** `OEFFENTLICH_SICHTBAR` (`isActive`, `archivedAt: null`, `approvedAt: { not: null }`) filtert ihn schon in der Query; die Seite sieht ihn gar nicht und ruft `notFound()`. Die neue `(public)/[farmSlug]/not-found.tsx` fängt das — und dazu zwei Fälle mehr, die zum selben Segment gehören: den unbekannten Bestell-Link unter `/confirm` und den Hof in Pause unter `/checkout`. Deshalb behauptet ihr Text keinen Grund („vielleicht … oder …"): Warum ein Hof nicht mehr da ist, ist seine Sache.
+
+---
+
 ## Nützliche Befehle
 
 ```bash

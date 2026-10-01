@@ -77,6 +77,13 @@ const gebindeSchema = z.enum(['klein', 'gross']).nullable().catch(null)
 const sortSchema = z.enum(['grundpreis']).nullable().catch(null)
 const ansichtSchema = z.enum(['liste', 'karte']).catch('liste')
 
+/**
+ * Der Name des Suchparameters, auch für Seiten, die nur AUF die Suche zeigen
+ * (die 404 schickt ihr Suchfeld als GET-Formular auf /hoefe). Gelesen wird er
+ * unten über P.suchtext — es ist derselbe Wert, nur einmal geschrieben.
+ */
+export const SUCHTEXT_PARAMETER = 'q'
+
 /** Die Namen der Parameter — eine Stelle, damit Lesen und Schreiben nicht auseinanderlaufen. */
 const P = {
   bereich: 'bereich',
@@ -86,7 +93,7 @@ const P = {
   tiere: 'tiere',
   gebinde: 'gebinde',
   sortierung: 'sort',
-  suchtext: 'q',
+  suchtext: SUCHTEXT_PARAMETER,
   suchMarken: 'such',
   ansicht: 'ansicht',
 } as const
