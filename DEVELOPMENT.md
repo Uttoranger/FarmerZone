@@ -306,10 +306,10 @@ wenn der PaymentIntent eine `application_fee_amount` trägt.
 **Scheitert die späte Erstattung,** antwortet der Webhook 500, und Stripe
 stellt das Ereignis erneut zu. Derselbe Schlüssel verhindert eine doppelte
 Erstattung. Scheitert nur der Vermerk REFUNDED, ist das Geld trotzdem zurück:
-Dann gibt es Sentry, aber keine 500. Antwortet Stripe mit einem
-Idempotenz-Konflikt (409), erstattet gerade eine gleichzeitige Zustellung mit
-demselben Schlüssel. Dann gibt es nur die 500 und keinen Sentry-Aufruf zur
-Handerstattung.
+Dann gibt es Sentry, aber keine 500. Einen 409 durch eine gleichzeitige
+Zustellung mit demselben Schlüssel wiederholt das Stripe-SDK selbst, zweimal
+(`maxNetworkRetries`). Was danach noch scheitert, meldet Sentry als offene
+Erstattung.
 
 **Manueller Schritt:** Im Stripe-Dashboard muss der Webhook-Endpunkt
 `payment_intent.canceled` abonnieren (README, „Stripe Webhook für Produktion").

@@ -190,15 +190,14 @@ async function erstatteSpaeteZahlung(
     )
     erstattetCents = refund.amount
   } catch (err) {
-    // Idempotenz-Konflikt (409): Eine gleichzeitige Zustellung desselben
-    // Ereignisses erstattet gerade mit demselben Schlüssel. Das Geld geht also
-    // zurück — keine Aufforderung zur Handerstattung, nur die Wiederholung.
-    if (!istIdempotenzKonflikt(err)) {
-      Sentry.captureException(err, {
-        tags: { webhook: 'payment_intent.succeeded', grund: 'erstattung_offen' },
-        extra: { orderId: order.id, handerstattung: 'Überweisung zurückbuchen und Plattformgebühr erstatten' },
-      })
-    }
+    // Jeder Fehler hier heißt: Das Geld ist (noch) nicht zurück. Einen
+    // 409 durch eine gleichzeitige Zustellung mit demselben Schlüssel
+    // wiederholt das Stripe-SDK schon selbst; was danach noch übrig ist,
+    // soll alarmieren.
+    Sentry.captureException(err, {
+      tags: { webhook: 'payment_intent.succeeded', grund: 'erstattung_offen' },
+      extra: { orderId: order.id, handerstattung: 'Überweisung zurückbuchen und Plattformgebühr erstatten' },
+    })
     throw err
   }
 
@@ -254,11 +253,6 @@ function verschickeBezahltMails(order: Prisma.OrderGetPayload<{ include: typeof 
     await mailOhneRisiko('bestaetigung_kundin', order.id, () => sendOrderConfirmation(emailOrder))
     await mailOhneRisiko('bestellung_hof', order.id, () => sendOrderPaidToFarmer(emailOrder))
   })
-}
-
-/** Stripe-Fehlerklasse über `type`, wie das SDK es empfiehlt — ohne Laufzeit-Import des SDK. */
-function istIdempotenzKonflikt(err: unknown): boolean {
-  return (err as { type?: unknown } | null)?.type === 'StripeIdempotencyError'
 }
 
 /** Ein Mailfehler wird gemeldet, nie weitergeworfen. Nur die Bestell-ID, keine Adresse. */
