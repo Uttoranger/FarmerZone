@@ -266,6 +266,20 @@ describe('payment_intent.succeeded', () => {
       expect(sendZahlungZuSpaet).not.toHaveBeenCalled()
     })
 
+    it('Idempotenz-Konflikt (gleichzeitige Zustellung erstattet gerade): 500, aber KEIN Aufruf zur Handerstattung', async () => {
+      constructEvent.mockReturnValue(succeededEvent())
+      erstatten.mockRejectedValue(
+        Object.assign(new Error('another in-progress request'), { type: 'StripeIdempotencyError' })
+      )
+
+      const res = await POST(makeRequest())
+
+      expect(res.status).toBe(500)
+      expect(webhookEventCreate).not.toHaveBeenCalled()
+      expect(Sentry.captureException).not.toHaveBeenCalled()
+      expect(sendZahlungZuSpaet).not.toHaveBeenCalled()
+    })
+
     it('hat eine parallele Zustellung den Vermerk schon gesetzt: keine zweite Mail', async () => {
       constructEvent.mockReturnValue(succeededEvent())
       // Erster Aufruf (bedingtes PAID) count 0 aus dem beforeEach, der Vermerk

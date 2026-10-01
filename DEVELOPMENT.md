@@ -275,8 +275,9 @@ das falsche Ereignis als Endpunkt: Endgültig ist bei Stripe erst
   auf PENDING_CONFIRMATION. Bestellung und Bestand bleiben stehen.
 - `payment_intent.canceled` ist neu und läuft über
   `storniereUnbezahlteBestellung` (`src/server/unbezahlte-bestellung.ts`):
-  bedingter Storno und Rückbuchung in einer Transaktion. Dieselbe Funktion
-  nutzt K3 für liegen gebliebene Bestellungen.
+  bedingter Storno, Vermerk „Servicegebühr entfallen" (wie `cancelOrder`) und
+  Rückbuchung in einer Transaktion. Dieselbe Funktion nutzt K3 für liegen
+  gebliebene Bestellungen.
 - `succeeded` setzt PAID nur noch aus PENDING_CONFIRMATION. Trifft die
   Bedingung nichts, wird die Bestellung geladen:
   - Bei CANCELLED mit paymentStatus PENDING oder FAILED war nie eine Zahlung
@@ -305,7 +306,10 @@ wenn der PaymentIntent eine `application_fee_amount` trägt.
 **Scheitert die späte Erstattung,** antwortet der Webhook 500, und Stripe
 stellt das Ereignis erneut zu. Derselbe Schlüssel verhindert eine doppelte
 Erstattung. Scheitert nur der Vermerk REFUNDED, ist das Geld trotzdem zurück:
-Dann gibt es Sentry, aber keine 500.
+Dann gibt es Sentry, aber keine 500. Antwortet Stripe mit einem
+Idempotenz-Konflikt (409), erstattet gerade eine gleichzeitige Zustellung mit
+demselben Schlüssel. Dann gibt es nur die 500 und keinen Sentry-Aufruf zur
+Handerstattung.
 
 **Manueller Schritt:** Im Stripe-Dashboard muss der Webhook-Endpunkt
 `payment_intent.canceled` abonnieren (README, „Stripe Webhook für Produktion").
@@ -316,16 +320,30 @@ Ohne dieses Abo wird eine abgebrochene Zahlung nie storniert.
   Zahlung scheitert und die die Kundin danach liegen lässt, hält ihre Ware, bis
   jemand den PaymentIntent abbricht. Das räumt K3 auf. Bis dahin ist das
   derselbe Zustand wie bei einer nie versuchten Zahlung.
-- „Erneut versuchen" auf der Bestätigungsseite (`redirect_status=failed`) führt
-  zurück in den Checkout und legt eine NEUE Bestellung an. Die alte bleibt
-  offen, bis K3 sie beendet.
+- **Folge für den Bestand, bis K3 läuft:** Die Bestätigungsseite leert bei
+  `redirect_status=failed` den Warenkorb (`ClearCartOnMount`). „Erneut
+  versuchen" führt dann in den Checkout und legt eine NEUE Bestellung an, die
+  Ware muss also neu gebucht werden. Die alte Bestellung hält ihre Ware weiter.
+  Ist die Ware knapp, scheitert der neue Versuch mit „gerade von jemand anderem
+  gekauft", obwohl die Kundin sie selbst blockiert. Vorher gab ein
+  Fehlschlag die Ware sofort frei. Auflösen kann es nur der Hof (Storno) oder
+  K3.
 - Die offenen Online-Bestellungen erscheinen beim Hof weiter unter „Wartet auf
   Kunden-Bestätigung" (`OPEN_STATUSES`). Jetzt gilt das auch nach einem
   gescheiterten Versuch.
+- Altfälle vom alten `payment_failed`-Handler (CANCELLED, FAILED) tragen keinen
+  Vermerk `serviceFeeRefundedAt`. Die Admin-Spalte „entfallen" zählt sie nicht.
+- Wettlauf in `cancelOrder` (Altlast, nicht Teil dieses Auftrags): Die Aktion
+  liest `paymentStatus` vor ihrer Transaktion. Setzt ein `succeeded` genau in
+  diesem Fenster PAID, storniert sie die jetzt bezahlte Bestellung ohne
+  Erstattung und ohne Alarm. Der Webhook greift dann auch nicht mehr, denn er
+  hat ja schon bezahlt. Lösung: In der Transaktion bedingt auch auf den
+  gelesenen `paymentStatus` prüfen.
 
 **Tests:**
 - `tests/integration/webhook-zahlung.int.test.ts` (echtes Postgres, echte
-  Signaturprüfung): vor dem Fix 8 von 9 rot.
+  Signaturprüfung; die späte Zahlung trifft eine Bestellung, die der Hof über
+  das echte `cancelOrder` storniert hat): vor dem Fix 9 von 10 rot.
 - `tests/webhook.test.ts` (Unit, auf das neue Verhalten umgestellt).
 - `tests/zahlung-zu-spaet-email.test.ts` (die neue Mail).
 

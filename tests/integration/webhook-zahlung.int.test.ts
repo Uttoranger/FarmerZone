@@ -12,12 +12,21 @@
  * die stornierte Bestellung blind auf PAID — bezahlt, aber ohne Ware im
  * Bestand. Endgültig ist erst `payment_intent.canceled`.
  *
- * Echt sind Datenbank, Transaktion und die Signaturprüfung von Stripe (das
- * Ereignis wird mit dem Platzhalter-Secret der Integrationsschicht signiert).
- * Gemockt sind Erstattung, Mail und Sentry — kein Netz, kein Geld.
+ * WIE EINE ZAHLUNG „ZU SPÄT" KOMMT: Ein abgebrochener PaymentIntent
+ * (`canceled`) kann bei Stripe nicht mehr gelingen. Spät wird eine Zahlung,
+ * wenn die Bestellung storniert wurde, während der PaymentIntent noch
+ * bezahlbar war — vom Hof über `cancelOrder` (hier echt aufgerufen, mit echter
+ * Anmeldung), früher auch vom alten `payment_failed`-Handler.
+ *
+ * Echt sind Datenbank, Transaktion, Anmeldung des Hofes und die
+ * Signaturprüfung von Stripe (das Ereignis wird mit dem Platzhalter-Secret der
+ * Integrationsschicht signiert). Gemockt sind Erstattung, Mail, Sentry und der
+ * Request-Kontext — kein Netz, kein Geld.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
+vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
 vi.mock('@/lib/stripe', async () => {
   // Die echten Webhook-Helfer des SDK — Signatur prüfen und im Test erzeugen —,
@@ -30,16 +39,21 @@ vi.mock('@/lib/email', () => ({
   sendOrderConfirmation: vi.fn(),
   sendOrderPaidToFarmer: vi.fn(),
   sendZahlungZuSpaet: vi.fn(),
+  sendOrderCancelled: vi.fn(),
+  sendOrderReady: vi.fn(),
+  sendOrderNotReady: vi.fn(),
 }))
 
 import { NextRequest } from 'next/server'
+import { headers } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
 import { POST } from '@/app/api/stripe/webhook/route'
+import { cancelOrder } from '@/server/actions/orders'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { sendOrderConfirmation, sendOrderPaidToFarmer, sendZahlungZuSpaet } from '@/lib/email'
 import { INTEGRATIONS_ENV } from './setup/integrations-umgebung'
-import { erstelleHof, erstelleProdukt, intKennung, raeumeAuf } from './setup/basis'
+import { erstelleHofMitAnmeldung, erstelleProdukt, intKennung, raeumeAuf } from './setup/basis'
 
 const erstatten = vi.mocked(stripe.refunds.create)
 
@@ -64,10 +78,12 @@ type Ereignistyp =
 
 /**
  * Eine Online-Bestellung, wie der Checkout sie hinterlässt: wartet auf die
- * Zahlung, Bestand schon gebucht, PaymentIntent vermerkt.
+ * Zahlung, Bestand schon gebucht, PaymentIntent vermerkt. Der Hof ist
+ * angemeldet, damit `cancelOrder` echt laufen kann.
  */
 async function offeneOnlineBestellung() {
-  const { farm } = await erstelleHof({ acceptsOnline: true })
+  const { farm, cookie } = await erstelleHofMitAnmeldung({ acceptsOnline: true })
+  vi.mocked(headers).mockResolvedValue(new Headers({ cookie }) as never)
   const produkt = await erstelleProdukt(farm.id, { stock: BESTAND_NACH_CHECKOUT })
   const paymentIntentId = intKennung('pi')
 
@@ -196,10 +212,14 @@ describe('payment_intent.canceled — endgültig', () => {
     const danach = await zustand(bestellung.id)
     expect(danach).toMatchObject({ status: 'CANCELLED', cancelReason: 'Zahlung abgebrochen' })
     expect(danach.cancelledAt).not.toBeNull()
+    // Die Servicegebühr entfällt — derselbe Vermerk wie bei cancelOrder.
+    expect(danach.serviceFeeRefundedAt).not.toBeNull()
     // 5 + 2: genau einmal zurück. Zweimal wären es 9.
     expect(await bestand(produkt.id)).toBe(BESTAND_NACH_CHECKOUT + MENGE)
   })
 
+  // Wache für die Bedingung: Stripe schickt nach succeeded kein canceled —
+  // käme es doch (oder rufe K3 die Funktion zu spät), bleibt die Bestellung bezahlt.
   it('lässt eine bezahlte Bestellung unberührt', async () => {
     const { produkt, bestellung, paymentIntentId } = await offeneOnlineBestellung()
     await zustellen(ereignis('payment_intent.succeeded', paymentIntentId))
@@ -212,9 +232,12 @@ describe('payment_intent.canceled — endgültig', () => {
 })
 
 describe('payment_intent.succeeded — nur aus „wartet auf Zahlung"', () => {
-  it('auf eine stornierte Bestellung: voll erstatten, Alarm, Mail — kein PAID, kein Bestand', async () => {
+  it('auf eine vom Hof stornierte, unbezahlte Bestellung: voll erstatten, Alarm, Mail — kein PAID, kein Bestand', async () => {
     const { produkt, bestellung, paymentIntentId } = await offeneOnlineBestellung()
-    await zustellen(ereignis('payment_intent.canceled', paymentIntentId))
+    // Der Hof storniert, während die Kundin noch an der Zahlung sitzt.
+    expect((await cancelOrder(bestellung.id, 'Ware ausgegangen')).error).toBeUndefined()
+    vi.clearAllMocks()
+    erstatten.mockResolvedValue({ id: 're_int_test', amount: 2100 } as never)
 
     const antwort = await zustellen(ereignis('payment_intent.succeeded', paymentIntentId))
 
@@ -236,16 +259,16 @@ describe('payment_intent.succeeded — nur aus „wartet auf Zahlung"', () => {
     // Der Bestand bleibt, wie der Storno ihn hinterließ.
     expect(await bestand(produkt.id)).toBe(BESTAND_NACH_CHECKOUT + MENGE)
     expect(Sentry.captureMessage).toHaveBeenCalledTimes(1)
-    await vi.waitFor(() => expect(sendZahlungZuSpaet).toHaveBeenCalledTimes(1))
     // Der Betrag aus der Erstattung, in Cent.
-    expect(vi.mocked(sendZahlungZuSpaet).mock.calls[0]![1]).toBe(2100)
+    await vi.waitFor(() => expect(sendZahlungZuSpaet).toHaveBeenCalledWith(expect.anything(), 2100))
+    expect(sendZahlungZuSpaet).toHaveBeenCalledTimes(1)
     expect(sendOrderConfirmation).not.toHaveBeenCalled()
     expect(sendOrderPaidToFarmer).not.toHaveBeenCalled()
   })
 
   it('dieselbe späte Zahlung zweimal gleichzeitig zugestellt: ein Schlüssel, eine Mail', async () => {
     const { bestellung, paymentIntentId } = await offeneOnlineBestellung()
-    await zustellen(ereignis('payment_intent.canceled', paymentIntentId))
+    expect((await cancelOrder(bestellung.id)).error).toBeUndefined()
     const spaet = ereignis('payment_intent.succeeded', paymentIntentId)
 
     const antworten = await Promise.all([zustellen(spaet), zustellen(spaet)])

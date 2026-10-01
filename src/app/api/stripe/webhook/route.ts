@@ -117,8 +117,9 @@ async function handlePaymentSucceeded(pi: Stripe.PaymentIntent) {
 
   // Storniert, OHNE dass je eine Zahlung vermerkt wurde: Das Geld kam zu spät.
   // Hat dagegen der Hof eine bezahlte Bestellung storniert (paymentStatus PAID
-  // oder REFUNDED), hat cancelOrder die Erstattung schon übernommen — dann ist
-  // dies nur eine Wiederholung des Ereignisses.
+  // oder REFUNDED), ist die Erstattung Sache von cancelOrder — dann ist dies
+  // nur eine Wiederholung des Ereignisses. (Bekannte Lücke dort: DEVELOPMENT.md,
+  // „payment_failed stornierte endgültig", Offen.)
   if (order.status === 'CANCELLED' && (order.paymentStatus === 'PENDING' || order.paymentStatus === 'FAILED')) {
     await erstatteSpaeteZahlung(pi, order)
   }
@@ -159,6 +160,11 @@ async function handlePaymentCanceled(pi: Stripe.PaymentIntent) {
  * Scheitert die Erstattung, wirft sie: 500, das Ereignis bleibt unverarbeitet
  * und Stripe stellt es erneut zu — derselbe Idempotenz-Schlüssel verhindert
  * dabei eine zweite Erstattung.
+ *
+ * AUSNAHME von „erst bedingt schreiben, dann Stripe" (ARCHITECTURE.md §5): Der
+ * Vermerk REFUNDED darf erst stehen, wenn das Geld zurück ist — sonst sperrte
+ * er die Wiederholung nach einer gescheiterten Erstattung aus. Vor doppelter
+ * Erstattung schützt der Schlüssel, der Vermerk sperrt nur die Mail.
  */
 async function erstatteSpaeteZahlung(
   pi: Stripe.PaymentIntent,
@@ -184,10 +190,15 @@ async function erstatteSpaeteZahlung(
     )
     erstattetCents = refund.amount
   } catch (err) {
-    Sentry.captureException(err, {
-      tags: { webhook: 'payment_intent.succeeded', grund: 'erstattung_offen' },
-      extra: { orderId: order.id, handerstattung: 'Überweisung zurückbuchen und Plattformgebühr erstatten' },
-    })
+    // Idempotenz-Konflikt (409): Eine gleichzeitige Zustellung desselben
+    // Ereignisses erstattet gerade mit demselben Schlüssel. Das Geld geht also
+    // zurück — keine Aufforderung zur Handerstattung, nur die Wiederholung.
+    if (!istIdempotenzKonflikt(err)) {
+      Sentry.captureException(err, {
+        tags: { webhook: 'payment_intent.succeeded', grund: 'erstattung_offen' },
+        extra: { orderId: order.id, handerstattung: 'Überweisung zurückbuchen und Plattformgebühr erstatten' },
+      })
+    }
     throw err
   }
 
@@ -243,6 +254,11 @@ function verschickeBezahltMails(order: Prisma.OrderGetPayload<{ include: typeof 
     await mailOhneRisiko('bestaetigung_kundin', order.id, () => sendOrderConfirmation(emailOrder))
     await mailOhneRisiko('bestellung_hof', order.id, () => sendOrderPaidToFarmer(emailOrder))
   })
+}
+
+/** Stripe-Fehlerklasse über `type`, wie das SDK es empfiehlt — ohne Laufzeit-Import des SDK. */
+function istIdempotenzKonflikt(err: unknown): boolean {
+  return (err as { type?: unknown } | null)?.type === 'StripeIdempotencyError'
 }
 
 /** Ein Mailfehler wird gemeldet, nie weitergeworfen. Nur die Bestell-ID, keine Adresse. */
