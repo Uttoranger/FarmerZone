@@ -197,7 +197,7 @@ Diese Regeln sind fachlich, nicht technisch. Verletzung kostet Geld oder Vertrau
 
 ### Zahlungen
 
-- **Vollerstattung bei Destination Charges immer mit `reverse_transfer` — und mit `refund_application_fee`, sobald die Zahlung eine `application_fee` trägt; Gebühren-Teilerstattung ohne beides.** Der Checkout überweist dem Hof den vollen Betrag und zieht Provision + Servicegebühr als `application_fee` wieder ein (`src/app/api/checkout/route.ts`); nur beide Flags zusammen holen beim Storno genau den Warenpreis vom Hof, die Servicegebühr erstattet die Plattform. Vorlage: `cancelOrder`; Teilerstattung: `lasseServicegebuehrEntfallen`. Warum: `DEVELOPMENT.md`, „Vollstorno ohne reverse_transfer".
+- **Vollerstattung bei Destination Charges immer mit `reverse_transfer` — und mit `refund_application_fee`, sobald die Zahlung eine `application_fee` trägt; Gebühren-Teilerstattung ohne beides.** Das gilt auch für eine Erstattung von Hand im Stripe-Dashboard. Vorlage: `cancelOrder`; Teilerstattung: `lasseServicegebuehrEntfallen`. Warum: `DEVELOPMENT.md`, „Vollstorno ohne reverse_transfer".
 - **Jede Erstattung trägt einen festen Idempotenz-Schlüssel je Bestellung und Anlass** (`storno-<id>`, `servicegebuehr-nicht-abgeholt-<id>`): Erreicht ein zweiter Aufruf Stripe, kommt dieselbe Erstattung zurück, keine zweite.
 - **Was ein Storno an Geld bewegt, rechnet `src/lib/storno.ts`** — dieselbe Funktion für den Storno-Dialog und für `cancelOrder`. Wer den Ladungstyp im Checkout ändert, ändert den Storno mit; `tests/storno-erstattung.test.ts` (Ladungstyp-Wache) schlägt sonst an.
 

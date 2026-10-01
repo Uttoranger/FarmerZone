@@ -10,12 +10,14 @@ import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import * as Sentry from '@sentry/nextjs'
 import type { OrderStatus } from '@prisma/client'
 import { plattformgebuehrCents, stornoBetraege } from '@/lib/storno'
+import { alsCents } from '@/lib/order-totals'
 
 export type ActionResult = { error?: string }
 
 /**
- * Was ein Storno zurückmeldet: die Beträge, die der Hof im Storno-Dialog sah
- * (src/lib/storno.ts) — bar beide 0. Scheitert die Erstattung, `erstattungOffen`.
+ * Was ein Storno zurückmeldet: die Beträge aus derselben Rechnung wie im
+ * Storno-Dialog (src/lib/storno.ts), sobald Stripe erstattet hat — vor Ort
+ * bezahlt beide 0. Scheitert die Erstattung, `erstattungOffen` statt Beträgen.
  */
 export type StornoErgebnis = ActionResult & {
   /** Was die Kundin zurückbekommen hat (Warenpreis + Servicegebühr). */
@@ -314,8 +316,8 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Sto
   const betraege = stornoBetraege({
     stripePaymentIntentId: order.stripePaymentIntentId,
     paymentStatus: order.paymentStatus,
-    warenpreis: order.totalAmount,
-    provision: order.platformFeeAmount,
+    warenpreisCents: alsCents(order.totalAmount),
+    provisionCents: alsCents(order.platformFeeAmount),
     serviceFeeCents: order.serviceFeeCents,
   })
 
@@ -368,7 +370,6 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Sto
   // das Enum kennt kein „Erstattung ausstehend" (Vorschlag: REFUND_PENDING,
   // nicht eigenmächtig angelegt — Schema-Änderung nur mit Freigabe).
   let refundAmount: number | null = null
-  let erstattetCents: number | null = null
   let erstattungOffen = false
   if (order.stripePaymentIntentId && betraege) {
     try {
@@ -395,7 +396,6 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Sto
         // statt einer zweiten.
         { idempotencyKey: `storno-${order.id}` }
       )
-      erstattetCents = refund.amount
       refundAmount = refund.amount / 100
     } catch (err) {
       console.error('[cancelOrder] Stripe refund failed:', err)
@@ -406,7 +406,9 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Sto
       // Kundendaten (sentry-hygiene.ts filtert zusätzlich).
       Sentry.captureException(err, {
         tags: { aktion: 'cancelOrder', grund: 'erstattung_offen' },
-        extra: { orderId },
+        // Die Handerstattung im Dashboard braucht dieselben zwei Haken wie
+        // der Code — sonst trägt die Plattform den Warenpreis doch wieder.
+        extra: { orderId, handerstattung: 'Überweisung zurückbuchen und Plattformgebühr erstatten' },
       })
       erstattungOffen = true
     }
@@ -450,9 +452,9 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Sto
       erstattungOffen: true,
     }
   }
-  // Bar (oder online nie bezahlt): nichts erstattet, nichts vom Hof abgezogen.
-  return betraege && erstattetCents !== null
-    ? { erstattetCents, vomHofCents: betraege.vomHofCents }
+  // Vor Ort bezahlt (oder online nie bezahlt): nichts erstattet, nichts vom Hof abgezogen.
+  return betraege && refundAmount !== null
+    ? { erstattetCents: betraege.erstattetCents, vomHofCents: betraege.vomHofCents }
     : { erstattetCents: 0, vomHofCents: 0 }
 }
 

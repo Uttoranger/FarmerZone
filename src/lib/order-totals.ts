@@ -38,6 +38,15 @@ export function decimalZuCents(betrag: Decimal): number {
   return betrag.times(100).toDecimalPlaces(0, Decimal.ROUND_HALF_UP).toNumber()
 }
 
+/**
+ * Ein Geldbetrag aus der Datenbank (Prisma-Decimal) → ganze Cent — die
+ * Servergrenze für Fachregeln, die in Cent rechnen (CODING_STANDARDS §2).
+ * Über Decimal, nie über `Number(betrag) * 100`.
+ */
+export function alsCents(betrag: DecimalEingabe): number {
+  return decimalZuCents(new Decimal(betrag.toString()))
+}
+
 // Euro → Cents für die ANZEIGE im Browser (Warenkorb-Summe, Gebühren-Vorschau).
 // Rundet Float-Artefakte weg; abgerechnet wird damit nicht — das tut der Server
 // mit decimalZuCents.

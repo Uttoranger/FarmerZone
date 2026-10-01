@@ -304,6 +304,11 @@ den Warenpreis ohne die Provision zurück — genau, was er bekam
 **Ohne Gebühr** setzt der Checkout kein `application_fee_amount`; der Storno
 setzt dann auch kein `refund_application_fee`.
 
+**Vor Ort bezahlt** (bar oder Karte bei Abholung) gibt es nichts zu erstatten;
+der Dialog sagt das je Zahlungsart. Der Auftrag nannte nur den Satz für
+Barzahlung — für „Karte bei Abholung" steht derselbe Satz mit
+„Kartenzahlung vor Ort".
+
 **Idempotenz:** Schlüssel `storno-<Bestell-ID>`. Ein zweiter Aufruf erreicht
 Stripe nur über die bekannte Altlast (Vermerk gescheitert, Bestellung von
 einem blind schreibenden Statuswechsel wieder geöffnet, siehe „Storno-
@@ -314,11 +319,20 @@ gescheiterte Erstattung erledigt der Betreiber ohnehin im Dashboard.
 **Scheitert die Erstattung** (z. B. reicht der Saldo des Hofs nicht für die
 Rückholung): wie bisher — storniert, Ware zurück, Sentry, keine Storno-Mail,
 dieselbe Meldung an den Hof; `cancelOrder` meldet zusätzlich `erstattungOffen`.
+Erstattet der Betreiber dann von Hand im Stripe-Dashboard, braucht er dieselben
+zwei Haken: „Überweisung zurückbuchen" und „Plattformgebühr erstatten" — sonst
+trägt die Plattform den Warenpreis auf dem Handweg doch wieder. Der Hinweis
+steht deshalb auch in der Sentry-Meldung (`extra.handerstattung`).
 
 **Dialog:** Der Storno-Dialog nennt vorher, wer was zurückbekommt und was von
 der nächsten Auszahlung abgezogen wird; `cancelOrder` gibt dieselben Beträge
 zurück (`erstattetCents`, `vomHofCents`). Gerechnet wird einmal, in
-`src/lib/storno.ts`, auf dem Server mit Decimal.
+`src/lib/storno.ts`, in ganzen Cent; Decimal wird an der Servergrenze
+gewandelt (`alsCents` in `src/lib/order-totals.ts`, CODING_STANDARDS §2).
+
+**Woher das Missverständnis kam:** Der Kommentar im Checkout sagte „der Hof
+bekommt amount − application_fee_amount überwiesen" — das ist der Nettofluss,
+nicht die Überweisung. Er nennt jetzt beides und verweist auf den Storno.
 
 Wache: `tests/storno-erstattung.test.ts` — Parameter und Schlüssel, ein
 idempotentes Stripe-Double (zweiter Aufruf, eine Erstattung), Fehlerpfad,

@@ -61,6 +61,7 @@ vi.mock('@/lib/prisma', () => {
 
 import { cancelOrder } from '@/server/actions/orders'
 import { plattformgebuehrCents, stornoBetraege, stornoGeldSaetze } from '@/lib/storno'
+import { alsCents } from '@/lib/order-totals'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
@@ -227,19 +228,22 @@ describe('Vollstorno online — der Hof gibt genau seinen Warenpreis zurück', (
   })
 })
 
-describe('Storno bar', () => {
-  it('erstattet nichts — die Bestellung entfällt', async () => {
-    datenbankMit(bestellung({ paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', stripePaymentIntentId: null, status: 'CONFIRMED' }))
+describe('Storno vor Ort bezahlt', () => {
+  it('bar und Karte bei Abholung erstatten nichts — die Bestellung entfällt', async () => {
+    for (const paymentMethod of ['ONSITE_CASH', 'ONSITE_CARD']) {
+      vi.clearAllMocks()
+      datenbankMit(bestellung({ paymentMethod, paymentStatus: 'PENDING', stripePaymentIntentId: null, status: 'CONFIRMED' }))
 
-    const ergebnis = await cancelOrder('order_1')
+      const ergebnis = await cancelOrder('order_1')
 
-    expect(refundCreate).not.toHaveBeenCalled()
-    expect(ergebnis).toEqual({ erstattetCents: 0, vomHofCents: 0 })
+      expect(refundCreate, paymentMethod).not.toHaveBeenCalled()
+      expect(ergebnis, paymentMethod).toEqual({ erstattetCents: 0, vomHofCents: 0 })
+    }
   })
 })
 
 describe('stornoBetraege — eine Rechnung für Dialog und cancelOrder', () => {
-  const ONLINE = { stripePaymentIntentId: 'pi_1', paymentStatus: 'PAID', warenpreis: '24.00', provision: '0.00', serviceFeeCents: 150 }
+  const ONLINE = { stripePaymentIntentId: 'pi_1', paymentStatus: 'PAID', warenpreisCents: 2400, provisionCents: 0, serviceFeeCents: 150 }
 
   it('online bezahlt: die Kundin bekommt Warenpreis + Servicegebühr, vom Hof geht genau der Warenpreis', () => {
     const betraege = stornoBetraege(ONLINE)
@@ -249,14 +253,16 @@ describe('stornoBetraege — eine Rechnung für Dialog und cancelOrder', () => {
   })
 
   it('mit Provision: vom Hof der Warenpreis ohne die Provision — er hat sie nie bekommen', () => {
-    const betraege = stornoBetraege({ ...ONLINE, provision: '1.20' })
+    const betraege = stornoBetraege({ ...ONLINE, provisionCents: 120 })
     expect(betraege).toEqual({ erstattetCents: 2550, vomHofCents: 2280, servicegebuehrCents: 150, provisionCents: 120 })
     if (!betraege) throw new Error('Beträge fehlen')
     expect(plattformgebuehrCents(betraege)).toBe(270)
   })
 
-  it('rechnet in Decimal — 19,99 € werden 1999 Cent, nicht 1998', () => {
-    expect(stornoBetraege({ ...ONLINE, warenpreis: '19.99', serviceFeeCents: 0 })?.vomHofCents).toBe(1999)
+  it('die Servergrenze wandelt über Decimal — 19,99 € werden 1999 Cent, nicht 1998', () => {
+    expect(alsCents('19.99')).toBe(1999)
+    expect(alsCents({ toString: () => '0.10' })).toBe(10)
+    expect(stornoBetraege({ ...ONLINE, warenpreisCents: alsCents('19.99'), serviceFeeCents: 0 })?.vomHofCents).toBe(1999)
   })
 
   it('bar oder online nie bezahlt: nichts zu erstatten', () => {
@@ -290,9 +296,12 @@ describe('stornoGeldSaetze — was der Hof im Storno-Dialog liest', () => {
     )
   })
 
-  it('bar: nichts erstattet — online nie bezahlt: kein Satz über Geld', () => {
+  it('vor Ort: nichts erstattet, je Zahlungsart beim Namen — online nie bezahlt: kein Satz über Geld', () => {
     expect(stornoGeldSaetze({ kundenName: 'Anna Muster', paymentMethod: 'ONSITE_CASH', betraege: null })).toEqual([
       'Bei Barzahlung wird nichts erstattet – die Bestellung entfällt.',
+    ])
+    expect(stornoGeldSaetze({ kundenName: 'Anna Muster', paymentMethod: 'ONSITE_CARD', betraege: null })).toEqual([
+      'Bei Kartenzahlung vor Ort wird nichts erstattet – die Bestellung entfällt.',
     ])
     expect(stornoGeldSaetze({ kundenName: 'Anna Muster', paymentMethod: 'ONLINE', betraege: null })).toEqual([])
   })
