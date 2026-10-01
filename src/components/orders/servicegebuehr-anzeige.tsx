@@ -17,6 +17,7 @@ import {
   gebuehrErstattungOffen,
 } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
+import { stornoGeldSaetze, type StornoBetraege } from '@/lib/storno'
 
 /** Aus diesen Status darf der Hof „nicht abgeholt" setzen (actions/orders.ts). */
 export const NICHT_ABGEHOLT_STATUS: readonly string[] = ['PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY']
@@ -162,5 +163,30 @@ export function NichtAbgeholtDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/**
+ * Was ein Storno an Geld bewegt, in Worten (src/lib/storno.ts) — im
+ * Storno-Dialog der Karte und der Bestellseite. Gerechnet hat der Server;
+ * online nie bezahlt gibt es keinen Satz.
+ */
+export function StornoGeldHinweis({
+  kundenName,
+  paymentMethod,
+  betraege,
+}: {
+  kundenName: string
+  paymentMethod: string
+  betraege: StornoBetraege | null
+}): React.JSX.Element | null {
+  const saetze = stornoGeldSaetze({ kundenName, paymentMethod, betraege })
+  if (saetze.length === 0) return null
+  return (
+    <div className="space-y-1 text-sm text-foreground">
+      {saetze.map((satz) => (
+        <p key={satz}>{satz}</p>
+      ))}
+    </div>
   )
 }

@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { stornoBetraege } from '@/lib/storno'
 
 const ORDER_INCLUDE = {
   items: {
@@ -25,6 +26,16 @@ function serialize(order: RawOrder) {
     // Servicegebühr-Snapshot: Cent bleiben Int, der Prozentsatz ist ein Decimal
     serviceFeePercentApplied:
       order.serviceFeePercentApplied == null ? null : Number(order.serviceFeePercentApplied),
+    // Was ein Storno an Geld bewegt (src/lib/storno.ts) — hier mit Decimal
+    // gerechnet, über die Grenze als ganze Cent; der Storno-Dialog zeigt es,
+    // cancelOrder rechnet dasselbe.
+    storno: stornoBetraege({
+      stripePaymentIntentId: order.stripePaymentIntentId,
+      paymentStatus: order.paymentStatus,
+      warenpreis: order.totalAmount,
+      provision: order.platformFeeAmount,
+      serviceFeeCents: order.serviceFeeCents,
+    }),
     items: order.items.map((i) => ({
       ...i,
       unitPrice: Number(i.unitPrice),

@@ -254,6 +254,77 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 
 ## Bekannte Bugs & Fixes
 
+### BUG: Vollstorno ohne reverse_transfer — die Plattform zahlte den Warenpreis (behoben 2026-10-01)
+
+**Befund:** `cancelOrder` erstattete online bezahlte Bestellungen mit
+`stripe.refunds.create({ payment_intent })`, ohne weitere Parameter.
+
+**Ursache:** Die Zahlung ist eine Destination Charge auf dem Plattformkonto
+(`src/app/api/checkout/route.ts`). Ohne `reverse_transfer` zahlt Stripe die
+Erstattung ganz aus dem Plattformsaldo — der Hof behält, was ihm überwiesen
+wurde. Jeder Online-Storno kostete FarmerZone den Warenpreis.
+
+**Warum `reverse_transfer` allein nicht reicht.** Der Checkout setzt kein
+`transfer_data.amount` („if no amount is set, the full amount is
+transferred") und zieht die Gebühr als `application_fee_amount` ein. Der
+Geldfluss einer Bestellung über 24,00 € mit 1,50 € Servicegebühr:
+
+| Schritt | Kundin | Hof | Plattform |
+|---|---|---|---|
+| Zahlung | −25,50 | +25,50 (Überweisung) | — |
+| application_fee | | −1,50 | +1,50 |
+| Storno, nur `reverse_transfer` | +25,50 | −25,50 | (zahlt 25,50, bekommt 25,50 zurück) |
+| → Ergebnis | 0 | **−1,50** | **+1,50** |
+| Storno, `reverse_transfer` + `refund_application_fee` | +25,50 | −25,50 + 1,50 | −1,50 |
+| → Ergebnis | 0 | 0 | 0 (ohne Stripe-Kosten) |
+
+`reverse_transfer` holt die Überweisung „proportionally to the amount being
+refunded" zurück, bei Vollerstattung also ganz: 25,50 €, nicht 24,00 €. Ohne
+`refund_application_fee` behielte die Plattform die Servicegebühr, und der
+Hof zahlte sie aus eigener Tasche — „Von deiner nächsten Auszahlung
+abgezogen: genau der Warenpreis" wäre falsch. Erst beide Flags zusammen
+ergeben, was der Auftrag wollte: Der Hof gibt genau den Warenpreis zurück,
+die Servicegebühr erstattet FarmerZone aus der einbehaltenen Gebühr. **Der
+Auftrag sagte „refund_application_fee NICHT setzen"** — das hätte bei diesem
+Ladungstyp das Gegenteil seines eigenen Ziels bewirkt; im PR zur Entscheidung
+vorgelegt. Quelle: die Beschreibungen in den Stripe-Typen
+(`node_modules/stripe/…/Refunds.d.ts`, `PaymentIntents.d.ts`), gleichlautend
+mit der API-Referenz; docs.stripe.com ist aus der Agenten-Umgebung gesperrt.
+
+**Gebühren-Teilerstattung bleibt ohne beides** (`lasseServicegebuehrEntfallen`):
+Dort erstattet die Plattform nur die Gebühr aus ihrem Saldo; `reverse_transfer`
+holte anteilig Geld vom Hof, `refund_application_fee` gäbe dem Hof Gebühr
+zurück, die die Kundin bekommen soll.
+
+**Provision:** Ist sie einmal größer als 0, steckt sie in derselben
+`application_fee` und geht beim Storno an den Hof zurück. Der Hof gibt dann
+den Warenpreis ohne die Provision zurück — genau, was er bekam
+(`src/lib/storno.ts`, `vomHofCents`).
+
+**Ohne Gebühr** setzt der Checkout kein `application_fee_amount`; der Storno
+setzt dann auch kein `refund_application_fee`.
+
+**Idempotenz:** Schlüssel `storno-<Bestell-ID>`. Ein zweiter Aufruf erreicht
+Stripe nur über die bekannte Altlast (Vermerk gescheitert, Bestellung von
+einem blind schreibenden Statuswechsel wieder geöffnet, siehe „Storno-
+Rückbuchung" unten) — dann kommt dieselbe Erstattung zurück. Grenze: Stripe
+merkt sich auch einen Fehlschlag 24 Stunden unter dem Schlüssel; eine
+gescheiterte Erstattung erledigt der Betreiber ohnehin im Dashboard.
+
+**Scheitert die Erstattung** (z. B. reicht der Saldo des Hofs nicht für die
+Rückholung): wie bisher — storniert, Ware zurück, Sentry, keine Storno-Mail,
+dieselbe Meldung an den Hof; `cancelOrder` meldet zusätzlich `erstattungOffen`.
+
+**Dialog:** Der Storno-Dialog nennt vorher, wer was zurückbekommt und was von
+der nächsten Auszahlung abgezogen wird; `cancelOrder` gibt dieselben Beträge
+zurück (`erstattetCents`, `vomHofCents`). Gerechnet wird einmal, in
+`src/lib/storno.ts`, auf dem Server mit Decimal.
+
+Wache: `tests/storno-erstattung.test.ts` — Parameter und Schlüssel, ein
+idempotentes Stripe-Double (zweiter Aufruf, eine Erstattung), Fehlerpfad,
+bar, die Beträge und Dialogsätze, und eine Ladungstyp-Wache, die anschlägt,
+sobald der Checkout die Zahlung anders anlegt.
+
 ### BUG: Pausen-Nachricht ging verloren und fehlte in der Kundenansicht (behoben 2026-09-24)
 
 **Meldung:** Briefkasten, Hof meldet, die Abwesenheitsnachricht erscheine in
@@ -2712,4 +2783,4 @@ pnpm briefkasten export   # Briefkasten als Markdown (nur lesend; Leseroute oder
 
 ---
 
-*Zuletzt aktualisiert: 2026-10-01 — Die Hofseite gibt es genau einmal: `ansichtsModus`, Architektur-Tests*
+*Zuletzt aktualisiert: 2026-10-01 — Vollstorno mit `reverse_transfer` und `refund_application_fee`; Beträge im Storno-Dialog*

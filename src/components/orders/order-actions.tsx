@@ -18,19 +18,26 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { NichtAbgeholtDialog, NICHT_ABGEHOLT_STATUS } from './servicegebuehr-anzeige'
+import { NichtAbgeholtDialog, NICHT_ABGEHOLT_STATUS, StornoGeldHinweis } from './servicegebuehr-anzeige'
+import type { StornoBetraege } from '@/lib/storno'
 
 export function OrderActions({
   orderId,
   status,
   paymentMethod,
   serviceFeeCents = 0,
+  kundenName,
+  storno,
 }: {
   orderId: string
   status: string
   paymentMethod: string
   /** Servicegebühr-Snapshot in Cent — für den Wortlaut des Nicht-abgeholt-Dialogs. */
   serviceFeeCents?: number
+  /** Für den Storno-Dialog: wer das Geld zurückbekommt … */
+  kundenName: string
+  /** … und wie viel (src/lib/storno.ts, auf dem Server gerechnet). */
+  storno: StornoBetraege | null
 }) {
   const [isPending, startTransition] = useTransition()
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
@@ -161,12 +168,8 @@ export function OrderActions({
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             Die Bestellung wird storniert und der Kunde erhält eine Benachrichtigung.
-            {isOnline && (
-              <span className="block mt-1 text-destructive font-medium">
-                Online-Zahlung wird automatisch rückerstattet.
-              </span>
-            )}
           </p>
+          <StornoGeldHinweis kundenName={kundenName} paymentMethod={paymentMethod} betraege={storno} />
           <DialogFooter>
             <Button
               variant="ghost"
