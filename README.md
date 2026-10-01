@@ -105,7 +105,7 @@ Wichtig für Produktion:
 
 Im [Stripe Dashboard](https://dashboard.stripe.com/webhooks) einen neuen Webhook anlegen:
 - **URL:** `https://deine-domain.at/api/stripe/webhook`
-- **Events:** `payment_intent.succeeded`, `payment_intent.payment_failed`
+- **Events:** `payment_intent.succeeded`, `payment_intent.payment_failed`, `payment_intent.canceled` — ohne `canceled` wird eine abgebrochene Zahlung nie storniert und ihre Ware bleibt reserviert.
 - Den Signing Secret als `STRIPE_WEBHOOK_SECRET` in Vercel eintragen.
 
 ### 4. Cron-Job einrichten
