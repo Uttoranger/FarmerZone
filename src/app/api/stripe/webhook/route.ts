@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type Stripe from 'stripe'
 import { Prisma } from '@prisma/client'
+import * as Sentry from '@sentry/nextjs'
 import { stripe } from '@/lib/stripe'
 import { env } from '@/lib/env'
 import { prisma } from '@/lib/prisma'
-import { sendOrderConfirmation, sendOrderPaidToFarmer } from '@/lib/email'
+import { nachDerAntwort } from '@/lib/nach-der-antwort'
+import { sendOrderConfirmation, sendOrderPaidToFarmer, sendZahlungZuSpaet } from '@/lib/email'
+import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
 
 // Next.js App Router does not pre-parse the body — raw text needed for Stripe sig verification
 export async function POST(request: NextRequest) {
@@ -43,6 +46,8 @@ export async function POST(request: NextRequest) {
       await handlePaymentSucceeded(event.data.object as Stripe.PaymentIntent)
     } else if (event.type === 'payment_intent.payment_failed') {
       await handlePaymentFailed(event.data.object as Stripe.PaymentIntent)
+    } else if (event.type === 'payment_intent.canceled') {
+      await handlePaymentCanceled(event.data.object as Stripe.PaymentIntent)
     }
   } catch (err) {
     // 500 → Stripe retried das Event; es wurde noch nicht persistiert und gilt als unverarbeitet
@@ -67,24 +72,37 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ received: true })
 }
 
+const BESTELLUNG_FUER_MAIL = {
+  farm: {
+    select: {
+      id: true, name: true, slug: true, email: true, ownerName: true,
+      address: true, postalCode: true, city: true, phone: true,
+    },
+  },
+  items: {
+    select: {
+      productName: true, quantity: true, unitPrice: true, totalPrice: true,
+      // Einheit nur für die E-Mail-Anzeige gejoint
+      product: { select: { unit: true, unitSize: true } },
+    },
+  },
+} satisfies Prisma.OrderInclude
+
+/**
+ * Bezahlt wird NUR aus „wartet auf Zahlung" heraus — der bedingte Wechsel ist
+ * die Sperre (ARCHITECTURE.md §5). Vorher schrieb der Handler blind PAID und
+ * belebte damit eine stornierte Bestellung wieder, deren Ware schon
+ * zurückgebucht war.
+ */
 async function handlePaymentSucceeded(pi: Stripe.PaymentIntent) {
+  const { count } = await prisma.order.updateMany({
+    where: { stripePaymentIntentId: pi.id, status: 'PENDING_CONFIRMATION' },
+    data: { status: 'PAID', paymentStatus: 'PAID', paidAt: new Date() },
+  })
+
   const order = await prisma.order.findUnique({
     where: { stripePaymentIntentId: pi.id },
-    include: {
-      farm: {
-        select: {
-          id: true, name: true, slug: true, email: true, ownerName: true,
-          address: true, postalCode: true, city: true, phone: true,
-        },
-      },
-      items: {
-        select: {
-          productName: true, quantity: true, unitPrice: true, totalPrice: true,
-          // Einheit nur für die E-Mail-Anzeige gejoint
-          product: { select: { unit: true, unitSize: true } },
-        },
-      },
-    },
+    include: BESTELLUNG_FUER_MAIL,
   })
 
   if (!order) {
@@ -92,11 +110,114 @@ async function handlePaymentSucceeded(pi: Stripe.PaymentIntent) {
     return
   }
 
-  await prisma.order.update({
-    where: { id: order.id },
-    data: { status: 'PAID', paymentStatus: 'PAID', paidAt: new Date() },
+  if (count === 1) {
+    verschickeBezahltMails(order)
+    return
+  }
+
+  // Storniert, OHNE dass je eine Zahlung vermerkt wurde: Das Geld kam zu spät.
+  // Hat dagegen der Hof eine bezahlte Bestellung storniert (paymentStatus PAID
+  // oder REFUNDED), hat cancelOrder die Erstattung schon übernommen — dann ist
+  // dies nur eine Wiederholung des Ereignisses.
+  if (order.status === 'CANCELLED' && (order.paymentStatus === 'PENDING' || order.paymentStatus === 'FAILED')) {
+    await erstatteSpaeteZahlung(pi, order)
+  }
+  // Sonst schon bezahlt (PAID oder weiter im Ablauf): nichts zu tun.
+}
+
+/**
+ * Nur vermerken. `payment_failed` ist bei Stripe KEIN Endzustand: Der
+ * PaymentIntent bleibt bezahlbar, die Kundin kann es mit einer anderen Karte
+ * gleich noch einmal versuchen. Bestellung und Bestand bleiben deshalb stehen;
+ * endgültig beendet erst `payment_intent.canceled`.
+ */
+async function handlePaymentFailed(pi: Stripe.PaymentIntent) {
+  await prisma.order.updateMany({
+    where: { stripePaymentIntentId: pi.id, status: 'PENDING_CONFIRMATION' },
+    data: { paymentStatus: 'FAILED' },
+  })
+}
+
+/** Der PaymentIntent ist endgültig abgebrochen — jetzt erst stornieren und die Ware freigeben. */
+async function handlePaymentCanceled(pi: Stripe.PaymentIntent) {
+  const order = await prisma.order.findUnique({
+    where: { stripePaymentIntentId: pi.id },
+    select: { id: true },
+  })
+  if (!order) return
+
+  await storniereUnbezahlteBestellung(order.id, 'Zahlung abgebrochen')
+}
+
+/**
+ * Die Zahlung kam, als die Bestellung schon storniert und ihre Ware
+ * freigegeben war: sofort voll erstatten. Wie beim Vollstorno
+ * (ARCHITECTURE.md §5) mit reverse_transfer und — sobald die Zahlung eine
+ * Gebühr trägt — refund_application_fee, sonst trüge die Plattform den
+ * Warenpreis bzw. der Hof die Servicegebühr.
+ *
+ * Scheitert die Erstattung, wirft sie: 500, das Ereignis bleibt unverarbeitet
+ * und Stripe stellt es erneut zu — derselbe Idempotenz-Schlüssel verhindert
+ * dabei eine zweite Erstattung.
+ */
+async function erstatteSpaeteZahlung(
+  pi: Stripe.PaymentIntent,
+  order: Prisma.OrderGetPayload<{ include: typeof BESTELLUNG_FUER_MAIL }>
+) {
+  // Alarm vor dem Geld: Der Betreiber soll den Fall sehen, auch wenn die
+  // Erstattung scheitert. Nur die Bestell-ID, keine Kundendaten.
+  Sentry.captureMessage('Zahlung nach dem Storno eingegangen — wird voll erstattet', {
+    level: 'error',
+    tags: { webhook: 'payment_intent.succeeded', grund: 'spaet_bezahlt' },
+    extra: { orderId: order.id },
   })
 
+  let erstattetCents: number
+  try {
+    const refund = await stripe.refunds.create(
+      {
+        payment_intent: pi.id,
+        reverse_transfer: true,
+        ...((pi.application_fee_amount ?? 0) > 0 ? { refund_application_fee: true } : {}),
+      },
+      { idempotencyKey: `spaet-bezahlt-${order.id}` }
+    )
+    erstattetCents = refund.amount
+  } catch (err) {
+    Sentry.captureException(err, {
+      tags: { webhook: 'payment_intent.succeeded', grund: 'erstattung_offen' },
+      extra: { orderId: order.id, handerstattung: 'Überweisung zurückbuchen und Plattformgebühr erstatten' },
+    })
+    throw err
+  }
+
+  // Der Vermerk ist die Sperre für die Mail: Zwei gleichzeitige Zustellungen
+  // desselben Ereignisses erstatten beide (Stripe liefert über den Schlüssel
+  // dieselbe Erstattung), aber nur wer den Vermerk setzt, schreibt der Kundin.
+  // Getrennt abgefangen: Scheitert nur er, ist das Geld trotzdem zurück. Ein
+  // Wurf hier hieße 500 und eine Wiederholung, die nach Ablauf des
+  // Idempotenz-Schlüssels an „schon erstattet" scheiterte.
+  let vermerkt = true
+  try {
+    const { count } = await prisma.order.updateMany({
+      where: { id: order.id, status: 'CANCELLED', paymentStatus: { in: ['PENDING', 'FAILED'] } },
+      data: { paymentStatus: 'REFUNDED' },
+    })
+    vermerkt = count === 1
+  } catch (err) {
+    Sentry.captureException(err, {
+      tags: { webhook: 'payment_intent.succeeded', grund: 'vermerk_fehlgeschlagen' },
+      extra: { orderId: order.id },
+    })
+  }
+  if (!vermerkt) return
+
+  nachDerAntwort(async () => {
+    await mailOhneRisiko('zahlung_zu_spaet', order.id, () => sendZahlungZuSpaet(order, erstattetCents))
+  })
+}
+
+function verschickeBezahltMails(order: Prisma.OrderGetPayload<{ include: typeof BESTELLUNG_FUER_MAIL }>) {
   const emailOrder = {
     id: order.id,
     orderNumber: order.orderNumber,
@@ -114,39 +235,22 @@ async function handlePaymentSucceeded(pi: Stripe.PaymentIntent) {
     items: order.items,
   }
 
-  await sendOrderConfirmation(emailOrder)
-  await sendOrderPaidToFarmer(emailOrder)
+  // Nach der Antwort und je Mail einzeln abgesichert: Ein Mailfehler im
+  // Antwortpfad hieß 500, Stripe stellte das Ereignis erneut zu — und beide
+  // Mails gingen ein zweites Mal raus. Scheitert die Mail an die Kundin,
+  // bekommt der Hof seine trotzdem.
+  nachDerAntwort(async () => {
+    await mailOhneRisiko('bestaetigung_kundin', order.id, () => sendOrderConfirmation(emailOrder))
+    await mailOhneRisiko('bestellung_hof', order.id, () => sendOrderPaidToFarmer(emailOrder))
+  })
 }
 
-async function handlePaymentFailed(pi: Stripe.PaymentIntent) {
-  const order = await prisma.order.findUnique({
-    where: { stripePaymentIntentId: pi.id },
-    select: { id: true, status: true, items: { select: { productId: true, quantity: true } } },
-  })
-
-  if (!order) return
-
-  // Bereits storniert (z. B. früherer, vollständig gelaufener Versuch dieses Events):
-  // Bestand nicht noch einmal zurückbuchen
-  if (order.status === 'CANCELLED') return
-
-  // Atomar: Storno + Bestands-Rückbuchung ganz oder gar nicht — sonst würde ein
-  // Stripe-Retry nach Teilfehler den Bestand doppelt erhöhen
-  await prisma.$transaction([
-    prisma.order.update({
-      where: { id: order.id },
-      data: {
-        status: 'CANCELLED',
-        paymentStatus: 'FAILED',
-        cancelledAt: new Date(),
-        cancelReason: 'Zahlung fehlgeschlagen',
-      },
-    }),
-    ...order.items.map((item) =>
-      prisma.product.update({
-        where: { id: item.productId },
-        data: { stock: { increment: item.quantity } },
-      })
-    ),
-  ])
+/** Ein Mailfehler wird gemeldet, nie weitergeworfen. Nur die Bestell-ID, keine Adresse. */
+async function mailOhneRisiko(mail: string, orderId: string, senden: () => Promise<void>) {
+  try {
+    await senden()
+  } catch (err) {
+    console.error(`[Webhook] Mail ${mail} fehlgeschlagen für Bestellung ${orderId}`)
+    Sentry.captureException(err, { tags: { webhook: 'mail', mail }, extra: { orderId } })
+  }
 }

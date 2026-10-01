@@ -5,42 +5,54 @@
  * Idempotenz-Check → Verarbeitung → Event erst bei ERFOLG persistieren →
  * bei Verarbeitungsfehler 500 (Stripe retried).
  *
- * Stripe-Signaturprüfung, Prisma und E-Mail sind gemockt — kein Netzwerk, keine DB.
+ * Und die Zustandsregel: Ein Zahlungsereignis ändert eine Bestellung nur aus
+ * dem Zustand heraus, für den es gilt (bedingtes `updateMany`). Dieselben
+ * Fälle gegen die echte Datenbank: tests/integration/webhook-zahlung.int.test.ts.
+ *
+ * Stripe-Signaturprüfung, Prisma, E-Mail und Sentry sind gemockt — kein
+ * Netzwerk, keine DB.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { Prisma } from '@prisma/client'
 
 vi.mock('@/lib/stripe', () => ({
-  stripe: { webhooks: { constructEvent: vi.fn() } },
+  stripe: { webhooks: { constructEvent: vi.fn() }, refunds: { create: vi.fn() } },
 }))
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     webhookEvent: { findUnique: vi.fn(), create: vi.fn() },
-    order: { findUnique: vi.fn(), update: vi.fn() },
-    product: { update: vi.fn() },
-    $transaction: vi.fn(),
+    order: { findUnique: vi.fn(), updateMany: vi.fn() },
   },
 }))
 
 vi.mock('@/lib/email', () => ({
   sendOrderConfirmation: vi.fn(),
   sendOrderPaidToFarmer: vi.fn(),
+  sendZahlungZuSpaet: vi.fn(),
 }))
 
+vi.mock('@/server/unbezahlte-bestellung', () => ({
+  storniereUnbezahlteBestellung: vi.fn(),
+}))
+
+vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
+
+import * as Sentry from '@sentry/nextjs'
 import { POST } from '@/app/api/stripe/webhook/route'
 import { stripe } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
-import { sendOrderConfirmation, sendOrderPaidToFarmer } from '@/lib/email'
+import { sendOrderConfirmation, sendOrderPaidToFarmer, sendZahlungZuSpaet } from '@/lib/email'
+import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
 
 const constructEvent = vi.mocked(stripe.webhooks.constructEvent)
+const erstatten = vi.mocked(stripe.refunds.create)
 const webhookEventFindUnique = vi.mocked(prisma.webhookEvent.findUnique)
 const webhookEventCreate = vi.mocked(prisma.webhookEvent.create)
 const orderFindUnique = vi.mocked(prisma.order.findUnique)
-const orderUpdate = vi.mocked(prisma.order.update)
-const productUpdate = vi.mocked(prisma.product.update)
-const transaction = vi.mocked(prisma.$transaction)
+const orderUpdateMany = vi.mocked(prisma.order.updateMany)
+const stornieren = vi.mocked(storniereUnbezahlteBestellung)
 
 function makeRequest(body = '{}', headers: Record<string, string> = { 'stripe-signature': 'sig_test' }) {
   return new NextRequest('http://localhost/api/stripe/webhook', {
@@ -50,29 +62,30 @@ function makeRequest(body = '{}', headers: Record<string, string> = { 'stripe-si
   })
 }
 
-function succeededEvent(id = 'evt_success_1') {
+function piEvent(
+  type: 'payment_intent.succeeded' | 'payment_intent.payment_failed' | 'payment_intent.canceled',
+  id = 'evt_1',
+  pi: Record<string, unknown> = {}
+) {
   return {
     id,
-    type: 'payment_intent.succeeded',
-    data: { object: { id: 'pi_test_1' } },
-  } as ReturnType<typeof constructEvent>
+    type,
+    data: { object: { id: 'pi_test_1', application_fee_amount: 100, ...pi } },
+  } as unknown as ReturnType<typeof constructEvent>
 }
 
-function failedEvent(id = 'evt_failed_1') {
-  return {
-    id,
-    type: 'payment_intent.payment_failed',
-    data: { object: { id: 'pi_test_1' } },
-  } as ReturnType<typeof constructEvent>
-}
+const succeededEvent = (id = 'evt_success_1') => piEvent('payment_intent.succeeded', id)
 
-const paidOrderFixture = {
+const orderFixture = {
   id: 'order_1',
   orderNumber: 'TST-0101-AAAA',
+  status: 'PAID',
+  paymentStatus: 'PAID',
   customerName: 'Test Kunde',
   customerEmail: 'kunde@example.com',
   customerPhone: '+43 660 0000000',
   totalAmount: 33,
+  serviceFeeCents: 100,
   pickupDate: new Date('2026-07-20T12:00:00Z'),
   pickupTimeStart: '09:00',
   pickupTimeEnd: '12:00',
@@ -91,12 +104,13 @@ beforeEach(() => {
   // Happy-Path-Defaults; einzelne Tests überschreiben gezielt
   webhookEventFindUnique.mockResolvedValue(null)
   webhookEventCreate.mockResolvedValue({} as never)
-  orderFindUnique.mockResolvedValue(paidOrderFixture as never)
-  orderUpdate.mockResolvedValue({} as never)
-  productUpdate.mockReturnValue({} as never)
-  transaction.mockResolvedValue([] as never)
+  orderFindUnique.mockResolvedValue(orderFixture as never)
+  orderUpdateMany.mockResolvedValue({ count: 1 })
+  stornieren.mockResolvedValue(true)
+  erstatten.mockResolvedValue({ id: 're_test_1', amount: 3400 } as never)
   vi.mocked(sendOrderConfirmation).mockResolvedValue(undefined)
   vi.mocked(sendOrderPaidToFarmer).mockResolvedValue(undefined)
+  vi.mocked(sendZahlungZuSpaet).mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -104,21 +118,19 @@ afterEach(() => {
 })
 
 describe('payment_intent.succeeded', () => {
-  it('setzt die Bestellung auf PAID, verschickt beide Mails, persistiert das Event und antwortet 200', async () => {
+  it('setzt die Bestellung BEDINGT auf PAID, verschickt beide Mails, persistiert das Event und antwortet 200', async () => {
     constructEvent.mockReturnValue(succeededEvent())
 
     const res = await POST(makeRequest())
 
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ received: true })
-    expect(orderUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'order_1' },
-        data: expect.objectContaining({ status: 'PAID', paymentStatus: 'PAID' }),
-      })
-    )
+    expect(orderUpdateMany).toHaveBeenCalledWith({
+      where: { stripePaymentIntentId: 'pi_test_1', status: 'PENDING_CONFIRMATION' },
+      data: expect.objectContaining({ status: 'PAID', paymentStatus: 'PAID' }),
+    })
+    await vi.waitFor(() => expect(sendOrderPaidToFarmer).toHaveBeenCalledTimes(1))
     expect(sendOrderConfirmation).toHaveBeenCalledTimes(1)
-    expect(sendOrderPaidToFarmer).toHaveBeenCalledTimes(1)
     expect(webhookEventCreate).toHaveBeenCalledWith({
       data: { stripeEventId: 'evt_success_1', type: 'payment_intent.succeeded' },
     })
@@ -133,14 +145,14 @@ describe('payment_intent.succeeded', () => {
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ received: true, skipped: true })
     expect(orderFindUnique).not.toHaveBeenCalled()
-    expect(orderUpdate).not.toHaveBeenCalled()
+    expect(orderUpdateMany).not.toHaveBeenCalled()
     expect(sendOrderConfirmation).not.toHaveBeenCalled()
     expect(webhookEventCreate).not.toHaveBeenCalled()
   })
 
   it('antwortet 500 und persistiert das Event NICHT, wenn die Verarbeitung fehlschlägt (Stripe darf retrien)', async () => {
     constructEvent.mockReturnValue(succeededEvent())
-    orderUpdate.mockRejectedValue(new Error('DB down'))
+    orderUpdateMany.mockRejectedValue(new Error('DB down'))
 
     const res = await POST(makeRequest())
 
@@ -148,18 +160,24 @@ describe('payment_intent.succeeded', () => {
     expect(webhookEventCreate).not.toHaveBeenCalled()
   })
 
-  it('bleibt erfolgreich (200 + Event persistiert), wenn der Mail-Versand fehlschlägt — email.ts wirft nie', async () => {
+  it('bleibt erfolgreich (200 + Event persistiert), wenn eine Mail WIRFT — und der Hof bekommt seine trotzdem', async () => {
     constructEvent.mockReturnValue(succeededEvent())
-    // Kontrakt von lib/email: Fehler werden intern gefangen, die Promise resolved
-    // trotzdem (siehe tests/email-sendraw.test.ts, der genau das am echten Modul beweist)
-    vi.mocked(sendOrderConfirmation).mockResolvedValue(undefined)
-    vi.mocked(sendOrderPaidToFarmer).mockResolvedValue(undefined)
+    // Nicht nur Resend-Fehler (die fängt sendRaw), auch ein Wurf beim Rendern
+    // oder beim Token darf keine 500 und damit keine Doppel-Mails auslösen.
+    vi.mocked(sendOrderConfirmation).mockRejectedValue(new Error('Render kaputt'))
 
     const res = await POST(makeRequest())
 
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ received: true })
     expect(webhookEventCreate).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(sendOrderPaidToFarmer).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() =>
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ extra: { orderId: 'order_1' } })
+      )
+    )
   })
 
   it('behandelt parallele Zustellung (Unique-Verletzung beim Persistieren) als skipped, nicht als Fehler', async () => {
@@ -176,64 +194,170 @@ describe('payment_intent.succeeded', () => {
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ received: true, skipped: true })
   })
-})
 
-describe('payment_intent.payment_failed', () => {
-  const failedOrderFixture = {
-    id: 'order_2',
-    status: 'PENDING_CONFIRMATION',
-    items: [
-      { productId: 'prod_1', quantity: 2 },
-      { productId: 'prod_2', quantity: 1 },
-    ],
-  }
-
-  it('storniert die Bestellung und bucht den Bestand atomar (Transaktion) zurück', async () => {
-    constructEvent.mockReturnValue(failedEvent())
-    orderFindUnique.mockResolvedValue(failedOrderFixture as never)
+  it('schon bezahlt (Bedingung trifft nichts): keine Mails, keine Erstattung', async () => {
+    constructEvent.mockReturnValue(succeededEvent())
+    orderUpdateMany.mockResolvedValue({ count: 0 })
 
     const res = await POST(makeRequest())
 
     expect(res.status).toBe(200)
-    expect(transaction).toHaveBeenCalledTimes(1)
-    expect(orderUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'order_2' },
-        data: expect.objectContaining({ status: 'CANCELLED', paymentStatus: 'FAILED' }),
-      })
-    )
-    expect(productUpdate).toHaveBeenCalledTimes(2)
-    expect(productUpdate).toHaveBeenCalledWith({
-      where: { id: 'prod_1' },
-      data: { stock: { increment: 2 } },
+    expect(erstatten).not.toHaveBeenCalled()
+    expect(sendOrderConfirmation).not.toHaveBeenCalled()
+    expect(webhookEventCreate).toHaveBeenCalledTimes(1)
+  })
+
+  describe('auf eine stornierte Bestellung (Zahlung kam zu spät)', () => {
+    const stornierteUnbezahlte = { ...orderFixture, status: 'CANCELLED', paymentStatus: 'FAILED' }
+
+    beforeEach(() => {
+      orderUpdateMany.mockResolvedValueOnce({ count: 0 })
+      orderFindUnique.mockResolvedValue(stornierteUnbezahlte as never)
     })
+
+    it('erstattet voll mit reverse_transfer und refund_application_fee, festem Schlüssel, Alarm und Mail', async () => {
+      constructEvent.mockReturnValue(succeededEvent())
+
+      const res = await POST(makeRequest())
+
+      expect(res.status).toBe(200)
+      expect(erstatten).toHaveBeenCalledWith(
+        { payment_intent: 'pi_test_1', reverse_transfer: true, refund_application_fee: true },
+        { idempotencyKey: 'spaet-bezahlt-order_1' }
+      )
+      expect(orderUpdateMany).toHaveBeenLastCalledWith({
+        where: { id: 'order_1', status: 'CANCELLED', paymentStatus: { in: ['PENDING', 'FAILED'] } },
+        data: { paymentStatus: 'REFUNDED' },
+      })
+      expect(Sentry.captureMessage).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ level: 'error', extra: { orderId: 'order_1' } })
+      )
+      await vi.waitFor(() => expect(sendZahlungZuSpaet).toHaveBeenCalledWith(stornierteUnbezahlte, 3400))
+      expect(sendOrderConfirmation).not.toHaveBeenCalled()
+      expect(sendOrderPaidToFarmer).not.toHaveBeenCalled()
+    })
+
+    it('ohne Gebühr auf der Zahlung kein refund_application_fee', async () => {
+      constructEvent.mockReturnValue(
+        piEvent('payment_intent.succeeded', 'evt_ohne_gebuehr', { application_fee_amount: null })
+      )
+
+      await POST(makeRequest())
+
+      expect(erstatten).toHaveBeenCalledWith(
+        { payment_intent: 'pi_test_1', reverse_transfer: true },
+        { idempotencyKey: 'spaet-bezahlt-order_1' }
+      )
+    })
+
+    it('scheitert die Erstattung: 500, Event NICHT persistiert (Stripe stellt erneut zu), Sentry, keine Mail', async () => {
+      constructEvent.mockReturnValue(succeededEvent())
+      erstatten.mockRejectedValue(new Error('Saldo reicht nicht'))
+
+      const res = await POST(makeRequest())
+
+      expect(res.status).toBe(500)
+      expect(webhookEventCreate).not.toHaveBeenCalled()
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ tags: expect.objectContaining({ grund: 'erstattung_offen' }) })
+      )
+      expect(sendZahlungZuSpaet).not.toHaveBeenCalled()
+    })
+
+    it('hat eine parallele Zustellung den Vermerk schon gesetzt: keine zweite Mail', async () => {
+      constructEvent.mockReturnValue(succeededEvent())
+      // Erster Aufruf (bedingtes PAID) count 0 aus dem beforeEach, der Vermerk
+      // trifft ebenfalls nichts mehr.
+      orderUpdateMany.mockResolvedValueOnce({ count: 0 })
+
+      const res = await POST(makeRequest())
+
+      expect(res.status).toBe(200)
+      expect(erstatten).toHaveBeenCalledTimes(1)
+      await new Promise((r) => setTimeout(r, 0))
+      expect(sendZahlungZuSpaet).not.toHaveBeenCalled()
+    })
+
+    it('scheitert nur der Vermerk: trotzdem 200 und Mail — das Geld ist zurück', async () => {
+      constructEvent.mockReturnValue(succeededEvent())
+      // Erster Aufruf (bedingtes PAID) liefert count 0 aus dem beforeEach,
+      // der zweite — der Vermerk REFUNDED — scheitert.
+      orderUpdateMany.mockRejectedValueOnce(new Error('DB weg'))
+
+      const res = await POST(makeRequest())
+
+      expect(res.status).toBe(200)
+      expect(webhookEventCreate).toHaveBeenCalledTimes(1)
+      await vi.waitFor(() => expect(sendZahlungZuSpaet).toHaveBeenCalledTimes(1))
+    })
+  })
+
+  it('storniert vom Hof NACH der Zahlung (REFUNDED): keine zweite Erstattung', async () => {
+    constructEvent.mockReturnValue(succeededEvent())
+    orderUpdateMany.mockResolvedValue({ count: 0 })
+    orderFindUnique.mockResolvedValue({ ...orderFixture, status: 'CANCELLED', paymentStatus: 'REFUNDED' } as never)
+
+    const res = await POST(makeRequest())
+
+    expect(res.status).toBe(200)
+    expect(erstatten).not.toHaveBeenCalled()
+    expect(sendZahlungZuSpaet).not.toHaveBeenCalled()
+  })
+})
+
+describe('payment_intent.payment_failed', () => {
+  it('vermerkt nur — bedingt, ohne Storno und ohne Bestand', async () => {
+    constructEvent.mockReturnValue(piEvent('payment_intent.payment_failed', 'evt_failed_1'))
+
+    const res = await POST(makeRequest())
+
+    expect(res.status).toBe(200)
+    expect(orderUpdateMany).toHaveBeenCalledTimes(1)
+    expect(orderUpdateMany).toHaveBeenCalledWith({
+      where: { stripePaymentIntentId: 'pi_test_1', status: 'PENDING_CONFIRMATION' },
+      data: { paymentStatus: 'FAILED' },
+    })
+    expect(stornieren).not.toHaveBeenCalled()
     expect(webhookEventCreate).toHaveBeenCalledWith({
       data: { stripeEventId: 'evt_failed_1', type: 'payment_intent.payment_failed' },
     })
   })
+})
 
-  it('bucht bei bereits stornierter Bestellung den Bestand NICHT erneut zurück (Retry-Guard)', async () => {
-    constructEvent.mockReturnValue(failedEvent())
-    orderFindUnique.mockResolvedValue({ ...failedOrderFixture, status: 'CANCELLED' } as never)
+describe('payment_intent.canceled', () => {
+  it('storniert über storniereUnbezahlteBestellung mit Grund „Zahlung abgebrochen"', async () => {
+    constructEvent.mockReturnValue(piEvent('payment_intent.canceled', 'evt_canceled_1'))
+    orderFindUnique.mockResolvedValue({ id: 'order_2' } as never)
 
     const res = await POST(makeRequest())
 
     expect(res.status).toBe(200)
-    expect(transaction).not.toHaveBeenCalled()
-    expect(productUpdate).not.toHaveBeenCalled()
-    // Event wird trotzdem als erledigt markiert
+    expect(stornieren).toHaveBeenCalledWith('order_2', 'Zahlung abgebrochen')
     expect(webhookEventCreate).toHaveBeenCalledTimes(1)
   })
 
   it('ignoriert PaymentIntents ohne zugehörige Bestellung, Event gilt als verarbeitet', async () => {
-    constructEvent.mockReturnValue(failedEvent())
+    constructEvent.mockReturnValue(piEvent('payment_intent.canceled', 'evt_canceled_2'))
     orderFindUnique.mockResolvedValue(null)
 
     const res = await POST(makeRequest())
 
     expect(res.status).toBe(200)
-    expect(transaction).not.toHaveBeenCalled()
+    expect(stornieren).not.toHaveBeenCalled()
     expect(webhookEventCreate).toHaveBeenCalledTimes(1)
+  })
+
+  it('antwortet 500, wenn die Stornierung scheitert (Stripe stellt erneut zu)', async () => {
+    constructEvent.mockReturnValue(piEvent('payment_intent.canceled', 'evt_canceled_3'))
+    orderFindUnique.mockResolvedValue({ id: 'order_2' } as never)
+    stornieren.mockRejectedValue(new Error('DB down'))
+
+    const res = await POST(makeRequest())
+
+    expect(res.status).toBe(500)
+    expect(webhookEventCreate).not.toHaveBeenCalled()
   })
 })
 
@@ -247,7 +371,7 @@ describe('Signatur- und Konfigurationsfehler', () => {
 
     expect(res.status).toBe(400)
     expect(webhookEventFindUnique).not.toHaveBeenCalled()
-    expect(orderUpdate).not.toHaveBeenCalled()
+    expect(orderUpdateMany).not.toHaveBeenCalled()
     expect(webhookEventCreate).not.toHaveBeenCalled()
   })
 

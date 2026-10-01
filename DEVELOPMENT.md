@@ -254,6 +254,81 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 
 ## Bekannte Bugs & Fixes
 
+### BUG: payment_failed stornierte endgültig — ein zweiter Zahlungsversuch belebte die Bestellung ohne Bestand (behoben 2026-10-01)
+
+**Befund (statisch belegt, kein Kundenfall bekannt):** Der Webhook behandelte
+`payment_intent.payment_failed` als Ende: Storno, Ware zurück in den Bestand.
+Bei Stripe ist das kein Endzustand. Der PaymentIntent bleibt bezahlbar, und die
+Zahlungsmaske lässt die Kundin gleich mit einer anderen Karte weiterprobieren.
+Gelingt das, kommt `payment_intent.succeeded`, und `handlePaymentSucceeded`
+setzte die stornierte Bestellung ohne jede Statusprüfung auf PAID. Ergebnis:
+Die Bestellung ist bezahlt, ihre Ware aber schon wieder freigegeben und
+womöglich an jemand anderen verkauft.
+
+**Ursache:** Beide Handler lasen und schrieben blind, statt bedingt zu
+schreiben (ARCHITECTURE §5, „Ein Statuswechsel … ist die Sperre"). Dazu kam
+das falsche Ereignis als Endpunkt: Endgültig ist bei Stripe erst
+`payment_intent.canceled`, und das war gar nicht abonniert.
+
+**Fix:**
+- `payment_failed` vermerkt nur noch `paymentStatus` FAILED, und zwar bedingt
+  auf PENDING_CONFIRMATION. Bestellung und Bestand bleiben stehen.
+- `payment_intent.canceled` ist neu und läuft über
+  `storniereUnbezahlteBestellung` (`src/server/unbezahlte-bestellung.ts`):
+  bedingter Storno und Rückbuchung in einer Transaktion. Dieselbe Funktion
+  nutzt K3 für liegen gebliebene Bestellungen.
+- `succeeded` setzt PAID nur noch aus PENDING_CONFIRMATION. Trifft die
+  Bedingung nichts, wird die Bestellung geladen:
+  - Bei CANCELLED mit paymentStatus PENDING oder FAILED war nie eine Zahlung
+    vermerkt, das Geld kam also zu spät. Dann wird sofort voll erstattet (wie
+    beim Vollstorno mit `reverse_transfer` und, bei Gebühr, mit
+    `refund_application_fee`; Schlüssel `spaet-bezahlt-<id>`). Dazu ein
+    Sentry-Alarm und die Mail „Zahlung kam zu spät, Geld ist zurück". Danach
+    steht paymentStatus auf REFUNDED. Dieser Vermerk ist bedingt und sperrt
+    die Mail: Kommt dasselbe Ereignis zweimal gleichzeitig, geht nur eine
+    raus.
+  - Bei CANCELLED mit PAID oder REFUNDED hat der Hof nach der Zahlung
+    storniert, und `cancelOrder` hat schon erstattet. Das Ereignis ist dann
+    eine Wiederholung, es passiert nichts.
+- Die Mails im Webhook laufen nach der Antwort (`nachDerAntwort`), jede
+  einzeln abgefangen. Vorher wurden sie im Antwortpfad abgewartet. Warf eine
+  davon, etwa beim Rendern (`sendRaw` fängt nur Resend-Fehler), antwortete der
+  Webhook 500. Stripe stellte das Ereignis dann erneut zu, und beide Mails
+  gingen ein zweites Mal raus.
+
+**Warum `refund_application_fee` auch hier:** Der Auftrag nannte nur
+`reverse_transfer: true`. Die Zahlung ist aber dieselbe Destination Charge wie
+beim Vollstorno, und ohne das Flag zahlte der Hof die Servicegebühr mit
+(Herleitung im Eintrag „Vollstorno ohne reverse_transfer"). Gesetzt wird es nur,
+wenn der PaymentIntent eine `application_fee_amount` trägt.
+
+**Scheitert die späte Erstattung,** antwortet der Webhook 500, und Stripe
+stellt das Ereignis erneut zu. Derselbe Schlüssel verhindert eine doppelte
+Erstattung. Scheitert nur der Vermerk REFUNDED, ist das Geld trotzdem zurück:
+Dann gibt es Sentry, aber keine 500.
+
+**Manueller Schritt:** Im Stripe-Dashboard muss der Webhook-Endpunkt
+`payment_intent.canceled` abonnieren (README, „Stripe Webhook für Produktion").
+Ohne dieses Abo wird eine abgebrochene Zahlung nie storniert.
+
+**Offen, mit Absicht nicht angefasst:**
+- Stripe bricht einen PaymentIntent nicht von selbst ab. Eine Bestellung, deren
+  Zahlung scheitert und die die Kundin danach liegen lässt, hält ihre Ware, bis
+  jemand den PaymentIntent abbricht. Das räumt K3 auf. Bis dahin ist das
+  derselbe Zustand wie bei einer nie versuchten Zahlung.
+- „Erneut versuchen" auf der Bestätigungsseite (`redirect_status=failed`) führt
+  zurück in den Checkout und legt eine NEUE Bestellung an. Die alte bleibt
+  offen, bis K3 sie beendet.
+- Die offenen Online-Bestellungen erscheinen beim Hof weiter unter „Wartet auf
+  Kunden-Bestätigung" (`OPEN_STATUSES`). Jetzt gilt das auch nach einem
+  gescheiterten Versuch.
+
+**Tests:**
+- `tests/integration/webhook-zahlung.int.test.ts` (echtes Postgres, echte
+  Signaturprüfung): vor dem Fix 8 von 9 rot.
+- `tests/webhook.test.ts` (Unit, auf das neue Verhalten umgestellt).
+- `tests/zahlung-zu-spaet-email.test.ts` (die neue Mail).
+
 ### BUG: Vollstorno ohne reverse_transfer — die Plattform zahlte den Warenpreis (behoben 2026-10-01)
 
 **Befund:** `cancelOrder` erstattete online bezahlte Bestellungen mit
@@ -444,7 +519,8 @@ GLEICHZEITIGE `cancelOrder` gegen echtes Postgres → Bestand exakt einmal zurü
   setzen, und NOT_PICKED_UP ist jetzt gegen einen zweiten Storno gesperrt.
 - Altlast Webhook: `handlePaymentFailed`/`handlePaymentSucceeded` prüfen lesend
   und schreiben unbedingt — `handlePaymentSucceeded` kann eine stornierte
-  Bestellung wieder auf PAID setzen. Eigener Fix.
+  Bestellung wieder auf PAID setzen. Eigener Fix. — Behoben 2026-10-01, siehe
+  „payment_failed stornierte endgültig".
 
 ### BUG: Sprungmarken der Hofseite sprangen falsch (behoben 2026-09-20)
 

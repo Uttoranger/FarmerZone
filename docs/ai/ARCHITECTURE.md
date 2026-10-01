@@ -198,7 +198,12 @@ Diese Regeln sind fachlich, nicht technisch. Verletzung kostet Geld oder Vertrau
 ### Zahlungen
 
 - **Vollerstattung bei Destination Charges immer mit `reverse_transfer` — und mit `refund_application_fee`, sobald die Zahlung eine `application_fee` trägt; Gebühren-Teilerstattung ohne beides.** Das gilt auch für eine Erstattung von Hand im Stripe-Dashboard. Vorlage: `cancelOrder`; Teilerstattung: `lasseServicegebuehrEntfallen`. Warum: `DEVELOPMENT.md`, „Vollstorno ohne reverse_transfer".
-- **Jede Erstattung trägt einen festen Idempotenz-Schlüssel je Bestellung und Anlass** (`storno-<id>`, `servicegebuehr-nicht-abgeholt-<id>`): Erreicht ein zweiter Aufruf Stripe, kommt dieselbe Erstattung zurück, keine zweite.
+- **Jede Erstattung trägt einen festen Idempotenz-Schlüssel je Bestellung und Anlass** (`storno-<id>`, `servicegebuehr-nicht-abgeholt-<id>`, `spaet-bezahlt-<id>`): Erreicht ein zweiter Aufruf Stripe, kommt dieselbe Erstattung zurück, keine zweite.
+- **Ein Stripe-Ereignis ändert eine Bestellung nur aus dem Zustand, für den es gilt** — bedingtes `updateMany` wie oben, nie Lesen und blind Schreiben (`src/app/api/stripe/webhook/route.ts`).
+  - `payment_intent.payment_failed` ist kein Endzustand, der PaymentIntent bleibt bezahlbar: nur `paymentStatus` FAILED vermerken, nie stornieren, nie Bestand.
+  - Endgültig ist `payment_intent.canceled`. Eine unbezahlte Bestellung beendet nur `storniereUnbezahlteBestellung` (`src/server/unbezahlte-bestellung.ts`): Storno aus PENDING_CONFIRMATION und Rückbuchung in einer Transaktion.
+  - `payment_intent.succeeded` setzt PAID nur aus PENDING_CONFIRMATION. Trifft es eine Bestellung, die storniert wurde, ohne je bezahlt gewesen zu sein: sofort voll erstatten (Regel oben), Sentry-Alarm, Mail an die Kundin — nie wiederbeleben.
+- **Im Webhook kein Mailversand im Antwortpfad.** Mails laufen über `nachDerAntwort`, jede einzeln abgefangen. Eine 500 heißt für Stripe „erneut zustellen" — sie ist nur erlaubt, wenn Daten oder Geld nicht verarbeitet sind, sonst gehen die Mails doppelt raus.
 - **Was ein Storno an Geld bewegt, rechnet `src/lib/storno.ts`** — dieselbe Funktion für den Storno-Dialog und für `cancelOrder`. Wer den Ladungstyp im Checkout ändert, ändert den Storno mit; `tests/storno-erstattung.test.ts` (Ladungstyp-Wache) schlägt sonst an.
 
 ### Taxonomie (Kategorien, Unterkategorien, Siegel)

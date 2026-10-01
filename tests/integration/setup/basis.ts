@@ -246,4 +246,7 @@ export async function raeumeAuf(): Promise<void> {
   })
   await prisma.farm.deleteMany({ where: { slug: { startsWith: INT_PRAEFIX } } })
   await prisma.user.deleteMany({ where: { email: { startsWith: INT_PRAEFIX } } })
+  // Die Webhook-Tests vergeben Event-IDs mit Präfix; ohne Aufräumen hielte
+  // die Idempotenz-Tabelle sie fest, und ein nächster Lauf sähe „schon erledigt".
+  await prisma.webhookEvent.deleteMany({ where: { stripeEventId: { startsWith: INT_PRAEFIX } } })
 }

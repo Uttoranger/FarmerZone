@@ -9,6 +9,7 @@ import { OrderConfirmedEmail } from '@/emails/order-confirmed'
 import { OrderReadyEmail } from '@/emails/pickup-reminder'
 import { OrderCancelledEmail } from '@/emails/order-cancelled'
 import { OrderNotReadyEmail } from '@/emails/order-not-ready'
+import { ZahlungZuSpaetEmail } from '@/emails/zahlung-zu-spaet'
 import { CustomerMagicLinkEmail } from '@/emails/customer-magic-link'
 import { PasswordResetEmail } from '@/emails/password-reset'
 import { NewFarmNotificationEmail } from '@/emails/new-farm-notification'
@@ -472,4 +473,22 @@ export async function sendOrderCancelled(
     `Deine Bestellung ${order.orderNumber} wurde storniert`,
     html
   )
+}
+
+/** Zahlung nach dem Storno eingegangen und sofort voll erstattet → Kunde */
+export async function sendZahlungZuSpaet(
+  order: Pick<OrderForEmail, 'customerName' | 'customerEmail' | 'orderNumber'> & {
+    farm: Pick<OrderForEmail['farm'], 'name'>
+  },
+  erstattetCents: number
+): Promise<void> {
+  const html = await toHtml(React.createElement(ZahlungZuSpaetEmail, {
+    customerName: order.customerName,
+    orderNumber: order.orderNumber,
+    farmName: order.farm.name,
+    erstattet: centsAlsEuro(erstattetCents),
+    supportEmail: SUPPORT_EMAIL,
+  }))
+
+  await send(order.customerEmail, 'Deine Zahlung kam zu spät – das Geld ist zurück', html)
 }
