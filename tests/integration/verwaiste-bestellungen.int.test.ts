@@ -25,7 +25,7 @@ vi.mock('@/lib/email', () => ({
 
 import { NextRequest } from 'next/server'
 import * as Sentry from '@sentry/nextjs'
-import { gibVerwaisteBestellungenFrei } from '@/server/verwaiste-bestellungen'
+import { gibVerwaisteBestellungenFrei, gibVerwaisteFreiFuerSlug } from '@/server/verwaiste-bestellungen'
 import { POST as reservieren } from '@/app/api/reserve/route'
 import { GET as bestaetigen } from '@/app/api/orders/confirm/[token]/route'
 import { POST as bestellen } from '@/app/api/checkout/route'
@@ -159,6 +159,22 @@ describe('online — Zahlungsfrist 30 Minuten', () => {
     expect(await bestand(produkt.id)).toBe(BESTAND_NACH_CHECKOUT)
   })
 
+  it('bezahlt, Webhook steht aus: Stripe wird höchstens alle fünf Minuten gefragt', async () => {
+    const { farm, bestellung, paymentIntentId } = await offeneBestellung({ zahlart: 'ONLINE', bestelltVorMinuten: 45 })
+    intentStatus.set(paymentIntentId!, 'succeeded')
+    const jetzt = new Date()
+
+    const erster = await gibVerwaisteBestellungenFrei(jetzt, farm.id)
+    await gibVerwaisteBestellungenFrei(new Date(jetzt.getTime() + 60 * 1000), farm.id)
+    await gibVerwaisteBestellungenFrei(new Date(jetzt.getTime() + 4 * MINUTE), farm.id)
+
+    expect(holen).toHaveBeenCalledTimes(1)
+    expect(erster.uebersprungenIds).toEqual([bestellung.id])
+
+    await gibVerwaisteBestellungenFrei(new Date(jetzt.getTime() + 6 * MINUTE), farm.id)
+    expect(holen).toHaveBeenCalledTimes(2)
+  })
+
   it('Intent wird gerade bezahlt (processing): bleibt unangetastet', async () => {
     const { farm, bestellung, paymentIntentId } = await offeneBestellung({ zahlart: 'ONLINE', bestelltVorMinuten: 45 })
     intentStatus.set(paymentIntentId!, 'processing')
@@ -213,6 +229,21 @@ describe('bar — Bestätigungsfrist 2 Stunden', () => {
     await vi.waitFor(() => expect(sendBestellungVerfallen).toHaveBeenCalledTimes(1))
   })
 
+  it('Altfall (Frist seit über einem Tag vorbei): storniert, Bestand zurück, aber keine Mail', async () => {
+    // Der erste Lauf nach dem Deploy trifft Bestellungen, die schon lange liegen.
+    const { farm, produkt, bestellung } = await offeneBestellung({
+      zahlart: 'ONSITE_CASH',
+      bestelltVorMinuten: 3 * 24 * 60,
+    })
+
+    await gibVerwaisteBestellungenFrei(new Date(), farm.id)
+
+    expect((await zustand(bestellung.id)).status).toBe('CANCELLED')
+    expect(await bestand(produkt.id)).toBe(BESTAND_NACH_CHECKOUT + MENGE)
+    await new Promise((r) => setTimeout(r, 50))
+    expect(sendBestellungVerfallen).not.toHaveBeenCalled()
+  })
+
   it('in der Frist: unberührt', async () => {
     const { farm, bestellung } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 100 })
 
@@ -257,6 +288,17 @@ describe('Wiederholung und Nebenläufigkeit', () => {
 
     expect((await zustand(bestaetigt.bestellung.id)).status).toBe('CONFIRMED')
     expect(await bestand(bestaetigt.produkt.id)).toBe(BESTAND_NACH_CHECKOUT)
+  })
+})
+
+describe('Frist gilt beim Lesen — Hofseite (über den Slug)', () => {
+  it('gibt die Ware einer verfallenen Bestellung frei, bevor die Hofseite den Bestand zeigt', async () => {
+    const { farm, produkt, bestellung } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 180, bestand: 0 })
+
+    await gibVerwaisteFreiFuerSlug(farm.slug)
+
+    expect((await zustand(bestellung.id)).status).toBe('CANCELLED')
+    expect(await bestand(produkt.id)).toBe(MENGE)
   })
 })
 

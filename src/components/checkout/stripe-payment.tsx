@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import {
   Elements,
   PaymentElement,
@@ -33,9 +34,11 @@ export function StripePaymentStep({
   onClearCart,
   onBack,
 }: StripePaymentStepProps) {
-  // Wurde eine Zahlung abgelehnt, sagen wir, dass nichts abgebucht wurde und
-  // wie lange die Ware noch wartet — die Kundin kann es gleich erneut versuchen.
-  const [abgelehnt, setAbgelehnt] = useState(false)
+  // Abgelehnt: Wir sagen, dass nichts abgebucht wurde und wie lange die Ware
+  // noch wartet — die Kundin kann es gleich erneut versuchen. Abgelaufen: Die
+  // Frist ist vorbei und die Zahlung abgebrochen (src/server/verwaiste-bestellungen.ts)
+  // — ein neuer Versuch geht hier nicht mehr, nur ein neuer Einkauf.
+  const [hinweis, setHinweis] = useState<'abgelehnt' | 'abgelaufen' | null>(null)
   const bisUhrzeit = reserviertBis ? uhrzeitInWien(new Date(reserviertBis)) : null
 
   return (
@@ -84,17 +87,26 @@ export function StripePaymentStep({
             orderId={orderId}
             farmSlug={farmSlug}
             onClearCart={onClearCart}
-            onAbgelehnt={() => setAbgelehnt(true)}
+            reserviertBis={reserviertBis}
+            onHinweis={setHinweis}
           />
         </Elements>
       </div>
 
       {/* Außerhalb des weißen Kastens: Dort drin hätte gedämpfter Text im
           dunklen Modus keinen Kontrast. */}
-      {abgelehnt && (
+      {hinweis === 'abgelehnt' && (
         <p role="status" className="mt-4 text-sm text-foreground">
           Es wurde nichts abgebucht. Versuch es noch einmal oder nimm eine andere Zahlungsart
           {bisUhrzeit ? ` – deine Ware bleibt bis ${bisUhrzeit} Uhr reserviert.` : '.'}
+        </p>
+      )}
+      {hinweis === 'abgelaufen' && (
+        <p role="status" className="mt-4 text-sm text-foreground">
+          Deine Reservierung ist abgelaufen, es wurde nichts abgebucht.{' '}
+          <Link href={`/${farmSlug}`} className="font-semibold underline underline-offset-2">
+            Zurück zum Hof und neu bestellen
+          </Link>
         </p>
       )}
 
@@ -110,12 +122,14 @@ function PaymentForm({
   orderId,
   farmSlug,
   onClearCart,
-  onAbgelehnt,
+  reserviertBis,
+  onHinweis,
 }: {
   orderId: string
   farmSlug: string
   onClearCart: () => void
-  onAbgelehnt: () => void
+  reserviertBis: string | null
+  onHinweis: (hinweis: 'abgelehnt' | 'abgelaufen' | null) => void
 }) {
   const stripe = useStripe()
   const elements = useElements()
@@ -136,8 +150,14 @@ function PaymentForm({
     // If we get here, payment failed (redirect didn't happen)
     if (error) {
       toast.error(error.message ?? 'Zahlung fehlgeschlagen')
-      // Unvollständige Eingaben zeigt Stripe am Feld — das ist keine Ablehnung.
-      if (error.type !== 'validation_error') onAbgelehnt()
+      // Abgebrochener PaymentIntent (Frist vorbei) oder Frist schon um: kein
+      // neuer Versuch möglich. Nur eine Ablehnung der Karte sagt sicher
+      // „nichts abgebucht, versuch es noch einmal"; unvollständige Eingaben
+      // zeigt Stripe ohnehin am Feld, Netzfehler lassen wir ohne Zusatz.
+      const fristUm = reserviertBis !== null && Date.now() >= new Date(reserviertBis).getTime()
+      if (error.code === 'payment_intent_unexpected_state' || fristUm) onHinweis('abgelaufen')
+      else if (error.type === 'card_error') onHinweis('abgelehnt')
+      else onHinweis(null)
       setIsProcessing(false)
     }
     // On success Stripe redirects — no else branch needed

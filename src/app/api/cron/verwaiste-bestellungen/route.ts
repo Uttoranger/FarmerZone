@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { env } from '@/lib/env'
 import { cronBerechtigt } from '@/lib/geheimnis'
 import { gibVerwaisteBestellungenFrei } from '@/server/verwaiste-bestellungen'
@@ -21,7 +22,19 @@ export async function GET(request: NextRequest) {
   }
 
   const jetzt = new Date()
-  const ergebnis = await gibVerwaisteBestellungenFrei(jetzt)
+  const { uebersprungenIds, ...ergebnis } = await gibVerwaisteBestellungenFrei(jetzt)
+
+  // Überfällig, aber bei Stripe bezahlt oder in Bearbeitung: Normalerweise
+  // setzt der Webhook sie gleich auf bezahlt. Stehen sie beim täglichen Lauf
+  // noch offen, fehlt vermutlich ein Webhook — das soll jemand sehen. Nur
+  // Bestell-IDs, keine Kundendaten.
+  if (uebersprungenIds.length > 0) {
+    Sentry.captureMessage('Überfällige Online-Bestellungen mit bezahlter oder laufender Zahlung', {
+      level: 'warning',
+      tags: { aufgabe: 'verwaiste-bestellungen' },
+      extra: { orderIds: uebersprungenIds },
+    })
+  }
 
   return NextResponse.json({ ...ergebnis, at: jetzt.toISOString() })
 }

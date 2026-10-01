@@ -15,6 +15,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
+// Die Freigabe verwaister Bestellungen hat eigene Tests; hier zählt nur, welche Abfrage lädt.
+vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteFreiFuerSlug: vi.fn() }))
 vi.mock('@/server/queries/farm', () => ({
   getHofBesitzer: vi.fn(),
   getOwnerFarm: vi.fn(),

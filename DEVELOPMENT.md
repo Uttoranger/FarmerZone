@@ -291,14 +291,27 @@ für ein Fenster kurz nach Mitternacht.
     Storno die Sperre ist. Die Mail schickt nur, wer storniert hat.
 - **Frist gilt beim Lesen:** Der Aufruf steht am Anfang von `/api/reserve`,
   `/api/warenkorb/pruefen` und `/api/checkout`, beim Laden von Heute,
-  Bestellungen und Produkte des Hofs und, über den Auftrag hinaus, an zwei
+  Bestellungen und Produkte des Hofs und, über den Auftrag hinaus, an drei
   weiteren Stellen:
+  - **auf der Hofseite** (`ladeHofseite`): Sie zeigt bei Bestand 0
+    „Ausverkauft“ ohne Knopf, `/api/reserve` würde also nie gerufen, und die
+    Ware bliebe für Kundinnen bis zum Cron unsichtbar. Das ist ein
+    Prüferbefund.
   - in der Bestätigung per Link: Ein Klick nach der Frist bestätigt nicht mehr;
   - auf der Bestellseite der Kundin: Sie zeigt „verfallen" statt einer
     abgelaufenen Uhrzeit.
 
   Fehler werden nur gemeldet, der Request läuft weiter
-  (`gibVerwaisteFreiOhneRisiko`).
+  (`gibVerwaisteFreiOhneRisiko`, `…FuerProdukte`, `…FuerSlug`).
+- **Stripe nicht dauernd fragen:** Ist eine überfällige Online-Bestellung bei
+  Stripe bezahlt oder in Bearbeitung, bleibt sie offen, bis der Webhook kommt.
+  Bei SEPA dauert das Tage. Der Lesepfad fragt Stripe dann höchstens alle fünf
+  Minuten je Bestellung, der Merker gilt je Server-Instanz. Stehen solche
+  Bestellungen beim täglichen Lauf noch offen, meldet der Cron ihre IDs an
+  Sentry, denn vermutlich fehlt ein Webhook.
+- **Mail nur für frisch Verfallenes:** Die „verfallen“-Mail geht nur raus, wenn
+  die Frist höchstens 24 Stunden zurückliegt. Der erste Lauf nach dem Deploy
+  schreibt so niemandem zu Wochen alten Bestellungen.
 - **Bestätigung per Link bedingt:** Sie las den Status und schrieb CONFIRMED
   danach unbedingt. Seit K3 storniert die Freigabe solche Bestellungen. Lief
   sie genau zwischen Lesen und Schreiben, wäre die Bestellung bestätigt worden,
@@ -322,7 +335,10 @@ für ein Fenster kurz nach Mitternacht.
   - Bei einer abgelehnten Zahlung erscheint unter der Zahlungsmaske „Es wurde
     nichts abgebucht. Versuch es noch einmal oder nimm eine andere Zahlungsart
     – deine Ware bleibt bis HH:MM Uhr reserviert.“ Die Mitte des Satzes ist
-    ergänzt, der Auftrag ließ sie aus.
+    ergänzt, der Auftrag ließ sie aus. Der Satz kommt nur bei einer echten
+    Ablehnung der Karte (`card_error`). Ist die Frist um oder der PaymentIntent
+    schon abgebrochen, steht dort „Deine Reservierung ist abgelaufen, es wurde
+    nichts abgebucht.“ und ein Weg zurück zum Hof.
   - Eine verfallene Barbestellung zeigt auf ihrer Seite „Bestellung
     verfallen“.
 
@@ -330,7 +346,17 @@ für ein Fenster kurz nach Mitternacht.
 `wienerZeitpunkt` rechnet über `Intl` und stimmt auch an den Tagen der
 Zeitumstellung. Das prüft `tests/fristen.test.ts`.
 
+**Erstlauf nach dem Deploy — Entscheidung des Betreibers:** Der erste Aufruf
+storniert ALLE offenen Bestellungen über ihrer Frist, auch Wochen alte, und
+bucht deren Menge zurück (`increment`). Hat ein Hof seinen Bestand seither von
+Hand neu gesetzt, entsteht so Phantombestand. Vor dem Merge deshalb in
+Produktion nur lesend zählen, was betroffen ist. Danach entscheidet der
+Betreiber, ob die Altfälle so laufen oder vorher mit dem Hof bereinigt werden.
+
 **Offen, mit Absicht nicht angefasst:**
+- Jede Reservierung kostet zwei Abfragen mehr (Hof des Produkts, offene
+  Bestellungen des Hofs). Bei wenigen offenen Bestellungen je Hof ist das
+  vertretbar.
 - Die Bestätigungsmail für Barbestellungen nennt die Frist nicht. Die Kundin
   sieht sie nur auf der Seite nach dem Bestellen.
 - `/api/cron/briefkasten` vergleicht `CRON_SECRET` noch mit `!==`.
@@ -346,7 +372,8 @@ Zeitumstellung. Das prüft `tests/fristen.test.ts`.
   Barbestellung blockiert den letzten Bestand in `/api/reserve`“. Dazu kommen
   Fälle für Bestätigungslink und Checkout-Wiederholung.
 - `tests/cron-verwaiste-bestellungen.test.ts`: Zugang der beiden Cron-Routen,
-  Eintrag in `vercel.json`.
+  Eintrag in `vercel.json`, Meldung übersprungener Bestellungen.
+- `tests/verwaiste-ohne-risiko.test.ts`: Die Wrapper im Lesepfad werfen nie.
 - `tests/bestellung-verfallen-email.test.ts`: die neue Mail.
 
 ### BUG: payment_failed stornierte endgültig — ein zweiter Zahlungsversuch belebte die Bestellung ohne Bestand (behoben 2026-10-01)

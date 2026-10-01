@@ -76,7 +76,7 @@ describe('fristVon', () => {
   })
 
   it('bar: 2 Stunden ab Bestellung, wenn das Abholfenster später beginnt', () => {
-    for (const paymentMethod of ['ONSITE_CASH', 'ONSITE_CARD']) {
+    for (const paymentMethod of ['ONSITE_CASH', 'ONSITE_CARD'] as const) {
       const frist = fristVon({
         paymentMethod,
         createdAt: bestelltAm,
@@ -122,7 +122,7 @@ describe('fristVon', () => {
 
 describe('istVerwaist — die Frist gilt auf die Sekunde', () => {
   const online = {
-    paymentMethod: 'ONLINE',
+    paymentMethod: 'ONLINE' as const,
     createdAt: new Date('2026-10-01T08:00:00Z'),
     pickupDate: abholtag('2026-10-02'),
     pickupTimeStart: '14:00',
@@ -146,5 +146,12 @@ describe('Anzeige', () => {
     // 00:30 in Wien ist schon der nächste Tag, obwohl UTC noch den 1. zeigt.
     expect(tagInWorten(new Date('2026-10-01T22:30:00Z'), jetzt)).toBe('morgen')
     expect(tagInWorten(new Date('2026-10-03T10:00:00Z'), jetzt)).toBe('am Samstag, 3. Oktober')
+  })
+
+  it('tagInWorten: „morgen" auch in der Nacht der Zeitumstellung', () => {
+    // 28. März 2026, 23:30 in Wien (Winterzeit); die Frist um 01:30 liegt am
+    // 29. März — dieser Tag hat nur 23 Stunden, +24 h landete schon am 30.
+    const jetzt = new Date('2026-03-28T22:30:00Z')
+    expect(tagInWorten(new Date('2026-03-29T00:30:00Z'), jetzt)).toBe('morgen')
   })
 })

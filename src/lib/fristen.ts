@@ -27,7 +27,9 @@
  * Rein und ohne Datenbank: läuft im Server und im Browser
  * (tests/fristen.test.ts).
  */
+import type { PaymentMethod } from '@prisma/client'
 import { kalendertagInWien } from '@/lib/servicegebuehr'
+import { tagVersetzt } from '@/lib/kalender'
 
 export const ZAHLUNGSFRIST_ONLINE_MINUTEN = 30
 export const BESTAETIGUNGSFRIST_BAR_MINUTEN = 2 * 60
@@ -39,7 +41,7 @@ export const GRUND_NICHT_BESTAETIGT = 'Nicht rechtzeitig bestätigt'
 const MINUTE_MS = 60 * 1000
 
 export type FristBestellung = {
-  paymentMethod: string
+  paymentMethod: PaymentMethod
   createdAt: Date
   /** Der Abholtag, wie der Checkout ihn speichert (12:00 des Tages). */
   pickupDate: Date
@@ -117,11 +119,16 @@ export function uhrzeitInWien(zeitpunkt: Date): string {
   }).format(zeitpunkt)
 }
 
-/** „heute", „morgen" oder „am Samstag, 3. Oktober" — vom Wiener Kalendertag aus. */
+/**
+ * „heute", „morgen" oder „am Samstag, 3. Oktober" — vom Wiener Kalendertag
+ * aus. „Morgen" über `tagVersetzt`, nicht über +24 Stunden: In der Nacht der
+ * Zeitumstellung hat ein Tag 23 oder 25 Stunden (CODING_STANDARDS §2).
+ */
 export function tagInWorten(zeitpunkt: Date, jetzt: Date): string {
   const tag = kalendertagInWien(zeitpunkt)
-  if (tag === kalendertagInWien(jetzt)) return 'heute'
-  if (tag === kalendertagInWien(new Date(jetzt.getTime() + 24 * 60 * MINUTE_MS))) return 'morgen'
+  const heute = kalendertagInWien(jetzt)
+  if (tag === heute) return 'heute'
+  if (tag === tagVersetzt(heute, 1)) return 'morgen'
   const datum = new Intl.DateTimeFormat('de-AT', {
     timeZone: 'Europe/Vienna',
     weekday: 'long',

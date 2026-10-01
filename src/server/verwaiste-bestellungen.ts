@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { sendBestellungVerfallen } from '@/lib/email'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
-import { GRUND_NICHT_BESTAETIGT, GRUND_ZAHLUNG_VERFALLEN, istVerwaist } from '@/lib/fristen'
+import { GRUND_NICHT_BESTAETIGT, GRUND_ZAHLUNG_VERFALLEN, fristVon, istVerwaist } from '@/lib/fristen'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
 
 /**
@@ -14,9 +14,10 @@ import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
  * hinterlässt eine offene Bestellung, die ihre Ware festhält. Über ihrer
  * Frist (src/lib/fristen.ts) wird sie hier storniert.
  *
- * WER RUFT: alle, die Bestand lesen — `/api/reserve`, `/api/warenkorb/pruefen`,
- * `/api/checkout`, die Bestätigung per Link und die Seiten Heute,
- * Bestellungen und Produkte des Hofs (Frist gilt beim Lesen). Dazu einmal
+ * WER RUFT: alle, die Bestand lesen — die Hofseite, `/api/reserve`,
+ * `/api/warenkorb/pruefen`, `/api/checkout`, die Bestätigung per Link, die
+ * Bestellseite der Kundin und die Seiten Heute, Bestellungen und Produkte des
+ * Hofs (Frist gilt beim Lesen). Dazu einmal
  * täglich der Cron für alle Höfe. Im Lesepfad nur über
  * `gibVerwaisteFreiOhneRisiko`: Ein Fehler hier darf den eigentlichen Request
  * nie scheitern lassen.
@@ -26,9 +27,12 @@ import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
  * Rückbuchung in derselben Transaktion. Zwei Aufrufe für dieselbe Bestellung
  * buchen einmal zurück; die Mail schickt nur, wer storniert hat.
  *
- * ONLINE ZUERST BEI STRIPE ABBRECHEN: Sonst könnte die Kundin die verfallene
- * Bestellung noch bezahlen. Ist der PaymentIntent inzwischen bezahlt oder in
- * Bearbeitung, bleibt die Bestellung unangetastet — der Webhook gewinnt.
+ * ONLINE ZUERST BEI STRIPE ABBRECHEN — Ausnahme von „erst bedingt
+ * schreiben, dann Stripe" (ARCHITECTURE.md §5): Sonst könnte die Kundin die
+ * verfallene Bestellung noch bezahlen. Ist der PaymentIntent inzwischen
+ * bezahlt oder in Bearbeitung, bleibt die Bestellung unangetastet — der
+ * Webhook gewinnt. Solche Bestellungen fragt der Lesepfad höchstens alle
+ * paar Minuten erneut bei Stripe an (siehe `STRIPE_PAUSE_MS`).
  */
 
 /** Diese Zustände kann Stripe noch abbrechen (`processing` nur selten — nicht anfassen). */
@@ -39,17 +43,31 @@ const ABBRECHBAR = new Set([
   'requires_capture',
 ])
 
+/**
+ * Eine überfällige Online-Bestellung, deren Zahlung bezahlt oder in
+ * Bearbeitung ist, bleibt offen, bis der Webhook kommt — bei SEPA Tage. Ohne
+ * Pause fragte JEDER Lesezugriff des Hofs Stripe erneut. Der Merker gilt je
+ * Server-Instanz; ein Kaltstart fragt eben einmal mehr.
+ */
+const STRIPE_PAUSE_MS = 5 * 60 * 1000
+const zuletztBeiStripe = new Map<string, number>()
+
+/** Die Mail nur für frisch verfallene Bestellungen — nicht für Wochen alte Altfälle (Erstlauf nach dem Deploy). */
+const MAIL_HOECHSTENS_MS = 24 * 60 * 60 * 1000
+
 export type FreigabeErgebnis = {
   /** Von diesem Aufruf storniert. */
   storniert: number
   /** Über der Frist, aber bezahlt oder in Bearbeitung — stehen gelassen. */
   uebersprungen: number
+  /** Ihre IDs — der Cron meldet sie: Bleiben sie stehen, fehlt vermutlich ein Webhook. */
+  uebersprungenIds: string[]
   /** Gescheitert, an Sentry gemeldet; der nächste Aufruf versucht es erneut. */
   fehler: number
 }
 
 export async function gibVerwaisteBestellungenFrei(jetzt: Date, farmId?: string): Promise<FreigabeErgebnis> {
-  const ergebnis: FreigabeErgebnis = { storniert: 0, uebersprungen: 0, fehler: 0 }
+  const ergebnis: FreigabeErgebnis = { storniert: 0, uebersprungen: 0, uebersprungenIds: [], fehler: 0 }
 
   // Alle offenen Bestellungen des Hofs — wenige Zeilen. Die Frist hängt bei
   // vor Ort auch am Abholfenster und wird deshalb hier gerechnet, nicht in SQL.
@@ -73,10 +91,15 @@ export async function gibVerwaisteBestellungenFrei(jetzt: Date, farmId?: string)
     if (!istVerwaist(bestellung, jetzt)) continue
     try {
       if (bestellung.paymentMethod === 'ONLINE') {
-        if (!(await brichZahlungAb(bestellung.stripePaymentIntentId))) {
+        const zuletzt = zuletztBeiStripe.get(bestellung.id)
+        const inPause = zuletzt !== undefined && jetzt.getTime() - zuletzt < STRIPE_PAUSE_MS
+        if (inPause || !(await brichZahlungAb(bestellung.stripePaymentIntentId))) {
+          if (!inPause) zuletztBeiStripe.set(bestellung.id, jetzt.getTime())
           ergebnis.uebersprungen += 1
+          ergebnis.uebersprungenIds.push(bestellung.id)
           continue
         }
+        zuletztBeiStripe.delete(bestellung.id)
         if (await storniereUnbezahlteBestellung(bestellung.id, GRUND_ZAHLUNG_VERFALLEN)) {
           ergebnis.storniert += 1
         }
@@ -85,6 +108,9 @@ export async function gibVerwaisteBestellungenFrei(jetzt: Date, farmId?: string)
 
       if (await storniereUnbezahlteBestellung(bestellung.id, GRUND_NICHT_BESTAETIGT)) {
         ergebnis.storniert += 1
+        // Lag die Frist lange zurück (Altfall vor diesem Fix), keine Mail:
+        // Eine Nachricht zu einer Wochen alten Bestellung verwirrt mehr, als sie hilft.
+        if (jetzt.getTime() - fristVon(bestellung).getTime() > MAIL_HOECHSTENS_MS) continue
         nachDerAntwort(async () => {
           try {
             await sendBestellungVerfallen(bestellung)
@@ -146,6 +172,17 @@ export async function gibVerwaisteFreiOhneRisiko(farmId: string, jetzt: Date = n
   } catch (err) {
     console.error('[verwaiste-bestellungen] Freigabe fehlgeschlagen für Hof', farmId)
     Sentry.captureException(err, { tags: { aufgabe: 'verwaiste-bestellungen' }, extra: { farmId } })
+  }
+}
+
+/** Wie oben, für die Hofseite — sie kennt nur den Slug. */
+export async function gibVerwaisteFreiFuerSlug(farmSlug: string, jetzt: Date = new Date()): Promise<void> {
+  try {
+    const hof = await prisma.farm.findUnique({ where: { slug: farmSlug }, select: { id: true } })
+    if (hof) await gibVerwaisteFreiOhneRisiko(hof.id, jetzt)
+  } catch (err) {
+    console.error('[verwaiste-bestellungen] Hof zum Slug nicht lesbar')
+    Sentry.captureException(err, { tags: { aufgabe: 'verwaiste-bestellungen' } })
   }
 }
 

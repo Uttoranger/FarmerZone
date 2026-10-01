@@ -14,12 +14,14 @@ import path from 'node:path'
 
 vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteBestellungenFrei: vi.fn() }))
 vi.mock('@/lib/prisma', () => ({ prisma: { stockReservation: { deleteMany: vi.fn() } } }))
+vi.mock('@sentry/nextjs', () => ({ captureMessage: vi.fn(), captureException: vi.fn() }))
 
 import { GET as verwaiste } from '@/app/api/cron/verwaiste-bestellungen/route'
 import { GET as reservierungen } from '@/app/api/cron/cleanup-reservations/route'
 import { gibVerwaisteBestellungenFrei } from '@/server/verwaiste-bestellungen'
 import { prisma } from '@/lib/prisma'
 import { cronBerechtigt } from '@/lib/geheimnis'
+import * as Sentry from '@sentry/nextjs'
 
 const freigeben = vi.mocked(gibVerwaisteBestellungenFrei)
 const aufraeumen = vi.mocked(prisma.stockReservation.deleteMany)
@@ -31,7 +33,7 @@ function anfrage(pfad: string, auth?: string) {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.stubEnv('CRON_SECRET', 'geheim-123')
-  freigeben.mockResolvedValue({ storniert: 2, uebersprungen: 1, fehler: 0 })
+  freigeben.mockResolvedValue({ storniert: 2, uebersprungen: 1, uebersprungenIds: ['order_x'], fehler: 0 })
   aufraeumen.mockResolvedValue({ count: 3 })
 })
 
@@ -87,6 +89,23 @@ describe('/api/cron/verwaiste-bestellungen', () => {
     expect(freigeben.mock.calls[0]).toHaveLength(1)
     expect(freigeben.mock.calls[0][0]).toBeInstanceOf(Date)
     expect(await res.json()).toMatchObject({ storniert: 2, uebersprungen: 1, fehler: 0 })
+  })
+
+  it('meldet übersprungene Bestellungen an Sentry — nur IDs, ein vermutlich fehlender Webhook', async () => {
+    await verwaiste(anfrage('/api/cron/verwaiste-bestellungen', 'Bearer geheim-123'))
+
+    expect(Sentry.captureMessage).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ level: 'warning', extra: { orderIds: ['order_x'] } })
+    )
+  })
+
+  it('ohne übersprungene Bestellungen: keine Meldung', async () => {
+    freigeben.mockResolvedValue({ storniert: 0, uebersprungen: 0, uebersprungenIds: [], fehler: 0 })
+
+    await verwaiste(anfrage('/api/cron/verwaiste-bestellungen', 'Bearer geheim-123'))
+
+    expect(Sentry.captureMessage).not.toHaveBeenCalled()
   })
 
   it('steht täglich in vercel.json', () => {

@@ -82,8 +82,12 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
   const isOnlineFailed =
     order.paymentMethod === 'ONLINE' && redirect_status === 'failed'
 
+  // `confirmed=true` kommt aus der Bestätigung per Link. Ein Lesezeichen damit
+  // darf eine inzwischen stornierte (z. B. verfallene) Bestellung nicht als
+  // bestätigt zeigen.
   const isOnsiteConfirmed =
     order.paymentMethod !== 'ONLINE' &&
+    order.status !== 'CANCELLED' &&
     (order.status === 'CONFIRMED' || confirmed === 'true')
 
   const isOnsitePending =
