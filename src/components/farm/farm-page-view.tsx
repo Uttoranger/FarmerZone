@@ -1,5 +1,31 @@
 'use client'
 
+/*
+ * FarmPageView — DIE Hofseite. Es gibt sie genau einmal (ARCHITECTURE §4);
+ * genau zwei Stellen binden sie ein, tests/hofseite-einmal.test.ts lässt eine
+ * dritte fehlschlagen:
+ *
+ * 1. src/app/(public)/[farmSlug]/page.tsx — Kundinnen und die Vorschau des
+ *    Hofs (?vorschau=1, dieselbe Route). Immer `ownerMode={false}`; was die
+ *    Vorschau anders macht, kommt fertig entschieden als `ansicht` aus
+ *    `ansichtsModus` (src/lib/ansichts-modus.ts): `kaufen` (wirkungslos in der
+ *    Vorschau) und `art` (der Empfänger für die Markierung des Editors,
+ *    VorschauImRahmen). Kein Stift, keine Werkzeugleiste, kein
+ *    Bearbeitungs-Hinweis.
+ *
+ * 2. src/components/farmer/farm-page-client.tsx — der Besitzer am Handy unter
+ *    lg auf /farm-page. `ownerMode`, dazu `mode` (Bearbeiten oder
+ *    Kundenansicht), `pastStatusCount` und `onVorschau`. Nur hier gibt es
+ *    Stifte, Titelbild- und Fotoknöpfe, den Bearbeitungs-Hinweis und den
+ *    Pausen-Hinweis für den Hof; die Werkzeugleiste steht in
+ *    farm-page-client.tsx selbst.
+ *
+ * Die Besitzer-Verzweigungen (`ownerMode`, `isEdit`, `mode`, `onVorschau`,
+ * `pastStatusCount`) entfallen, sobald auch die Handyansicht auf Liste und
+ * Vorschau umzieht (wie ab lg, components/farmer/hofseite-editor.tsx) — dann
+ * bleibt nur die erste Stelle.
+ */
+
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
@@ -39,6 +65,7 @@ import { VorschauImRahmen } from './vorschau-im-rahmen'
 import { stripStatusVariables, renderStatusBodyWithChip } from '@/lib/status-body'
 // Ersatz-Titelbild ohne Foto — gemeinsam mit dem Kopf von „Mein Hof".
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
+import type { SeitenAnsicht } from '@/lib/ansichts-modus'
 
 const ANLASS_META: Record<string, { label: string; icon: ReactNode }> = {
   FRESH_PRODUCT: { label: 'Frisches Produkt', icon: <Leaf className="size-3" strokeWidth={1.7} /> },
@@ -641,14 +668,17 @@ type Props = {
   /** Wechselt in die Kundenansicht — nur im Bauern-Bereich gesetzt, wo `mode` lebt. */
   onVorschau?: () => void
   /**
-   * Vorschau-Modus der öffentlichen Seite (?vorschau=1, nur für den Besitzer):
-   * Kaufen ist wirkungslos, und der Editor im Bauern-Bereich darf Abschnitte
-   * markieren (vorschau-im-rahmen.tsx).
+   * Wer die öffentliche Seite sieht, entschieden von `ansichtsModus`
+   * (src/lib/ansichts-modus.ts): In der Vorschau ist Kaufen wirkungslos, und
+   * der Editor im Bauern-Bereich darf Abschnitte markieren (vorschau-im-rahmen.tsx).
+   * Ohne Angabe: die Seite für Kundinnen.
    */
-  vorschau?: boolean
+  ansicht?: Pick<SeitenAnsicht, 'art' | 'kaufen'>
 }
 
-export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = false, mode = 'edit', pastStatusCount = 0, onVorschau, vorschau = false }: Props) {
+const FUER_KUNDINNEN: Pick<SeitenAnsicht, 'art' | 'kaufen'> = { art: 'kundin', kaufen: true }
+
+export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = false, mode = 'edit', pastStatusCount = 0, onVorschau, ansicht = FUER_KUNDINNEN }: Props) {
   const isEdit = ownerMode && mode !== 'preview'
   // Pausen-Banner: was Kundinnen und was der Hof sieht, entschieden in lib/shop-pause.ts.
   const pausen = pausenBanner({ ownerMode, vorschau: mode === 'preview', pauseMessage: farm.pauseMessage })
@@ -850,7 +880,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
       {!ownerMode && (
         <KundenKopf seite={kundenSeite} hofName={farm.name} hofNameUeberschrift={hofNameUeberschrift} />
       )}
-      {vorschau && <VorschauImRahmen />}
+      {ansicht.art === 'vorschau' && <VorschauImRahmen />}
 
       {/* Mode banner */}
       {ownerMode && (
@@ -1417,7 +1447,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           mode={mode}
           isPaused={farm.isPaused}
           onVorschau={onVorschau}
-          vorschau={vorschau}
+          kaufen={ansicht.kaufen}
         />
         </div>{/* Ende #produkte */}
 

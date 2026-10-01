@@ -95,7 +95,8 @@ pnpm test:integration                        # Integration (braucht .env.test)
   einem `postgres:17`-Dienst.
 
 ### Folge der Node-Umgebung
-- **Kein Rendering-Test möglich.** Keine Testing-Library, kein `render()`, kein Snapshot von JSX.
+- **Kein DOM, keine Interaktion.** Keine Testing-Library, kein Klicken, kein Snapshot von JSX.
+- **Serverseitig rendern geht** — mit `renderToStaticMarkup` aus `react-dom/server` (schon Abhängigkeit, kein neues Paket). Nur für Architektur-Aussagen der Art „dieses Element erscheint in diesem Modus nie": `next/navigation`, `next/image`, `next/link` und die Server-Aktionen per `vi.mock` ersetzen, die echte Komponente rendern, im HTML nach Merkmalen suchen — und immer eine Gegenprobe rendern, in der die Merkmale vorkommen müssen, sonst beweist ein leerer Fund nichts. Vorbild: `tests/hofseite-einmal.test.ts`. Effekte laufen dabei nicht; Verhalten bleibt Sache der reinen Funktionen.
 - **Kein E2E vorhanden.** Kein Playwright, kein Cypress.
 - Wer Verhalten testen will, muss die Entscheidung **aus der Komponente herausziehen** — genau der Grund für die Schichtung in `ARCHITECTURE.md`.
 - Testing-Library oder Playwright **nicht eigenmächtig einführen**. Vorschlagen und fragen.
@@ -113,6 +114,7 @@ pnpm test:integration                        # Integration (braucht .env.test)
 | Jeder Token-/Signaturweg | `geheimnis.test.ts` |
 | Jeder behobene Bug | ein Test, der ihn vorher gefangen hätte |
 | Jede Migration gegen das Deploy-Fenster | `migrationen-wache.test.ts` |
+| Jede Architektur-Regel, die sich am Quelltext prüfen lässt (wer was einbindet, wo ein Parameter gelesen wird) — mit Gegenprobe, dass die Suche anschlägt | `hofseite-einmal.test.ts`, `design-tokens.test.ts` |
 | Jeder Geldweg, bei dem die Datenbank die Antwort gibt, **zusätzlich** in der Integrationsschicht | `checkout-bestand.int.test.ts`, `storno-nebenlaeufig.int.test.ts` |
 
 Die **Migrationswache** ist ein normaler Unit-Test der Suite (reine Dateiarbeit,

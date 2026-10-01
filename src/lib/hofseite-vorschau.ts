@@ -1,11 +1,13 @@
 /**
- * Der Vorschau-Modus der öffentlichen Hofseite (/[farmSlug]?vorschau=1):
- * Der Hof sieht seine Seite so, wie Kundinnen sie sehen — auch, solange sie
- * noch nicht freigegeben ist. Rein und ohne Datenbank prüfbar
- * (tests/hofseite-vorschau.test.ts); die Seite fragt nur hier.
+ * Rund um die Vorschau der Hofseite (/[farmSlug]?vorschau=1): Adresse,
+ * Korb-Regel, Nachrichten zwischen Editor und Rahmen, Maße. WER die Vorschau
+ * bekommt und was dann anders ist, entscheidet nicht diese Datei, sondern
+ * `ansichtsModus` (src/lib/ansichts-modus.ts) — nur dort wird der Parameter
+ * gelesen. Rein und ohne Datenbank prüfbar (tests/hofseite-vorschau.test.ts).
  */
-import { bereitSchema, markierungSchema, vorschauParameterSchema, type HofseiteZeileId } from '@/schemas/hofseite-vorschau'
+import { bereitSchema, markierungSchema, type HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 
+/** Der Name des Parameters — zum Schreiben von Adressen. Gelesen wird er nur in ansichtsModus. */
 export const VORSCHAU_PARAMETER = 'vorschau'
 
 /** Statt „In den Warenkorb" — im Vorschau-Modus wird nichts bestellt und kein Korb angelegt. */
@@ -15,35 +17,11 @@ export const VORSCHAU_KAUF_HINWEIS = 'Vorschau — hier wird nichts bestellt'
  * Ob die Hofseite überhaupt einen Warenkorb führen darf. EINE Regel für
  * jeden Weg in den Korb — Kaufknopf, Nachbestell-Link, #warenkorb-Anker,
  * Korb-Knopf und Sheet (product-grid.tsx). Der Bearbeitungsmodus des Hofs
- * kennt keinen Korb, die Vorschau auch nicht: Ein Korb reserviert Bestand.
+ * kennt keinen Korb; ob Kaufen überhaupt wirkt, sagt `ansichtsModus` —
+ * in der Vorschau nie, denn ein Korb reserviert Bestand.
  */
-export function korbErlaubt(lage: { isEditMode: boolean; vorschau: boolean }): boolean {
-  return !lage.isEditMode && !lage.vorschau
-}
-
-export type VorschauZugriff = 'vorschau' | 'oeffentlich'
-
-/** Ob die Adresse die Vorschau verlangt — nur genau `?vorschau=1`. */
-export function vorschauGewuenscht(parameter: string | string[] | undefined): boolean {
-  return vorschauParameterSchema.safeParse(parameter).success
-}
-
-/**
- * Wer den Parameter bekommt: nur der angemeldete Besitzer GENAU dieses Hofs.
- * Alle anderen — abgemeldet, fremder Hof, falscher Wert — sehen die Seite,
- * als stünde der Parameter nicht da. Ein nicht freigegebener Hof ist dann
- * weiter „nicht gefunden".
- */
-export function vorschauZugriff(eingabe: {
-  parameter: string | string[] | undefined
-  angemeldeterNutzerId: string | null
-  /** ownerId des Hofs zu diesem Slug — null, wenn es den Hof nicht gibt. */
-  besitzerId: string | null
-}): VorschauZugriff {
-  const { parameter, angemeldeterNutzerId, besitzerId } = eingabe
-  if (!vorschauGewuenscht(parameter)) return 'oeffentlich'
-  if (!angemeldeterNutzerId || !besitzerId) return 'oeffentlich'
-  return angemeldeterNutzerId === besitzerId ? 'vorschau' : 'oeffentlich'
+export function korbErlaubt(lage: { isEditMode: boolean; kaufen: boolean }): boolean {
+  return !lage.isEditMode && lage.kaufen
 }
 
 /**

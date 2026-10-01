@@ -2645,6 +2645,37 @@ Bestand-Look, kein `data-design="neu"`. Was gebaut ist, steht in
 
 ---
 
+## Die Hofseite gibt es genau einmal (2026-10-01)
+
+Ergänzung zu „Mein Hof v2". Was gebaut ist, steht in
+`docs/entwicklung/hofseite-editor-browser.md` („Ergänzung"); hier das Warum.
+
+- **Eine Funktion statt verstreuter Fragen.** Vorher las die Seite den
+  Parameter selbst (für `noindex`), der Lader fragte `vorschauGewuenscht` und
+  `vorschauZugriff`, und Seite, Ansicht und Raster reichten ein `vorschau` durch.
+  Jede neue Abweichung der Vorschau hätte eine weitere Stelle bekommen — und
+  mit jeder Stelle wächst die Gefahr, dass die Vorschau etwas anderes zeigt als
+  die Seite, die Kundinnen sehen. Jetzt liefert `ansichtsModus` ein Ergebnis,
+  und alles darunter liest nur das.
+- **Quellen als Funktionen.** Die Seite für Kundinnen soll ohne Auth-Runde
+  bleiben. Deshalb bekommt `ansichtsModus` Sitzung und Besitzer nicht als
+  Werte, sondern als Fragen, die sie nur stellt, wenn sie zählen — rein
+  testbar ohne Datenbank, und trotzdem kein zusätzlicher Aufruf.
+- **Die Nutzer-ID bleibt im Lader.** Die Vorschau braucht sie, um den Hof vor
+  der Freigabe zu laden; an die Client-Komponente geht nur `SeitenAnsicht`.
+- **Architektur als Test.** Dass die Vorschau kein Nachbau ist, war bisher
+  eine Absicht in Kommentaren. Jetzt schlägt ein Test an, wenn eine dritte
+  Stelle `FarmPageView` einbindet, wenn jemand den Parameter anderswo liest
+  oder wenn ein Stift auf der Seite für Kundinnen oder in der Vorschau
+  auftaucht. Für den letzten Punkt rendert der Test die echte Komponente
+  serverseitig; die bisherige Regel „kein Rendering-Test möglich" in den
+  Testrichtlinien war zu streng und ist angepasst — kein neues Paket, kein DOM.
+- **Ausnahme `next.config.ts`.** Die Header-Regel für das Einbetten liest den
+  Parameter, bevor eine Seite läuft; Next kennt dafür nur die Konfiguration.
+  Der Test erlaubt dort genau diese eine Stelle.
+
+---
+
 ## Nützliche Befehle
 
 ```bash
@@ -2670,4 +2701,4 @@ pnpm briefkasten export   # Briefkasten als Markdown (nur lesend; Leseroute oder
 
 ---
 
-*Zuletzt aktualisiert: 2026-09-30 — Redesign Schritt 1: Tokens `--fz-*`, `data-theme`, Schriften über next/font, Geltungsbereich `data-design="neu"`*
+*Zuletzt aktualisiert: 2026-10-01 — Die Hofseite gibt es genau einmal: `ansichtsModus`, Architektur-Tests*

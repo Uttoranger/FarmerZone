@@ -20,7 +20,9 @@ den tatsächlichen Diff, nicht die Absicht dahinter.
    keinem Diff, du musst sie lesen. Nie `--staged`: vor dem Commit ist
    bei uns nichts gestaged.
 2. Die Checkliste aus dem Skill `pruefen` Punkt für Punkt durchgehen.
-3. Zwei Prüfungen zusätzlich, immer:
+3. Drei Prüfungen zusätzlich, immer:
+   - Berührt die Änderung die Hofseite oder farm-page-view: in drei
+     Zusammenhängen prüfen — als Kundin, als Vorschau, als Besitzer am Handy.
    - Zod ↔ Prisma synchron? Jeder Enum in prisma/schema.prisma, der im
      Diff berührt wird, hat eine Zod-Liste in src/schemas/ oder
      src/lib/taxonomie.ts — Werte vergleichen, Abweichung ist ein
