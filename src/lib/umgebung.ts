@@ -37,6 +37,7 @@ export type UmgebungsWerte = {
   NEXT_PUBLIC_APP_URL?: string
   DATABASE_URL?: string
   STRIPE_SECRET_KEY?: string
+  STRIPE_CONNECT_WEBHOOK_SECRET?: string
 }
 
 export type Umgebung = {
@@ -239,6 +240,12 @@ export function bestimmeUmgebung(werte: UmgebungsWerte): Umgebung {
   if (art === 'produktion') {
     if (datenbank === 'dev') warnungen.push('Produktion läuft gegen die Dev-Datenbank.')
     if (stripe === 'test') warnungen.push('Stripe TEST in Produktion — keine echten Zahlungen möglich.')
+    // Ohne Connect-Endpunkt kommt account.updated nie an: Sperrt Stripe ein
+    // Hof-Konto, bietet der Checkout Online weiter an — und ein frisch
+    // angebundener Hof wird nie „bereit" (src/lib/stripe-konto.ts).
+    if (!bereinigt(werte.STRIPE_CONNECT_WEBHOOK_SECRET)) {
+      warnungen.push('Kein STRIPE_CONNECT_WEBHOOK_SECRET — gesperrte oder frisch freigegebene Hof-Konten bleiben unbemerkt.')
+    }
   }
 
   return { art, appUrl, trustedOrigins, datenbank, stripe, branch, warnungen }

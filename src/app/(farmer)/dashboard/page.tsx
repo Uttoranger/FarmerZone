@@ -19,6 +19,7 @@ import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { Card, CardContent } from '@/components/ui/card'
 import { ErsteSchritteKarte } from '@/components/farmer/erste-schritte-karte'
 import { ErsteSchritteSchalter } from '@/components/farmer/erste-schritte-schalter'
+import { OnlinePausiertHinweis } from '@/components/farmer/online-pausiert-hinweis'
 import { Schild } from '@/components/farmer/schild'
 import type { SchildFarbe } from '@/lib/mein-hof'
 import { ERSTE_SCHRITTE_AUS_COOKIE, ersteSchritteAnzeige, ersteSchritteAusgeblendet } from '@/lib/erste-schritte'
@@ -92,7 +93,7 @@ export default async function HeutePage() {
 
   // Ein Zeitpunkt für die ganze Seite: Gruß, Datum, Tag und Woche passen zusammen.
   const jetzt = new Date()
-  const { abholungen, naechsteAbholung, brauchtDich, woche, ersteSchritte, wartetAufFreigabe } = await getHeute(
+  const { abholungen, naechsteAbholung, brauchtDich, woche, ersteSchritte, wartetAufFreigabe, onlinePausiert } = await getHeute(
     farm.id,
     jetzt
   )
@@ -118,6 +119,10 @@ export default async function HeutePage() {
         <h1 className="font-heading text-[27px] font-semibold text-app-ink mt-0.5">Heute</h1>
         <p className="text-app-ink-soft text-sm mt-0.5">{datumLang(jetzt)}</p>
       </div>
+
+      {/* Online-Zahlung pausiert: Stripe braucht Angaben — vor allem anderen,
+          denn bis dahin können Kunden nicht online bezahlen. */}
+      {onlinePausiert && <OnlinePausiertHinweis barMoeglich={onlinePausiert.barMoeglich} />}
 
       {/* Für einen frisch registrierten Hof das Wichtigste — sie rendert sich
           selbst weg, sobald alles erledigt ist; weggeklickt kommt sie über die

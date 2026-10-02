@@ -311,13 +311,16 @@ describe('Ladungstyp-Wache: der Checkout legt die Zahlung so an, wie der Storno 
   const checkout = readFileSync(join(process.cwd(), 'src/app/api/checkout/route.ts'), 'utf8')
 
   it('Destination Charge ohne transfer_data.amount und ohne on_behalf_of — der volle Betrag geht an den Hof', () => {
-    expect(checkout).toContain('transfer_data: { destination: farm.stripeAccountId! }')
+    // Seit dem Fix „Zahlungsstart" rechnet intentParameter die Parameter aus der gespeicherten Bestellung.
+    expect(checkout).toContain('transfer_data: { destination: hofKonto }')
     expect(checkout).not.toMatch(/transfer_data:\s*\{[^}]*\bamount\b/)
     expect(checkout).not.toMatch(/on_behalf_of\s*:/)
   })
 
   it('application_fee = Provision + Servicegebühr, nur bei > 0 — dieselbe Summe, die der Storno zurückgibt', () => {
-    expect(checkout).toContain('const feeAmountCents = decimalZuCents(platformFeeAmount) + servicegebuehr.gebuehrCents')
-    expect(checkout).toMatch(/if \(feeAmountCents > 0\) \{\s*intentParams\.application_fee_amount = feeAmountCents/)
+    expect(checkout).toContain(
+      'const feeAmountCents = decimalZuCents(bestellung.platformFeeAmount) + bestellung.serviceFeeCents'
+    )
+    expect(checkout).toContain('...(feeAmountCents > 0 ? { application_fee_amount: feeAmountCents } : {})')
   })
 })

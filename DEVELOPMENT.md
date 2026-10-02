@@ -254,6 +254,108 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 
 ## Bekannte Bugs & Fixes
 
+### BUG: Stripe-Fehler beim Zahlungsstart hinterließ Bestellung und Bestand ohne Zahlung (behoben 2026-10-01, K4)
+
+**Befund:** Im Checkout stand `paymentIntents.create` ohne `try` und ohne
+Stripe-Idempotenz-Schlüssel, und zwar NACH dem Anlegen der Bestellung und der
+Buchung des Bestands. Scheiterte Stripe (Ausfall, Hof-Konto eingeschränkt),
+blieben Bestellung und gebuchter Bestand ohne PaymentIntent stehen. Jede
+Wiederholung mit demselben Idempotenz-Schlüssel bekam für immer 409 „wird
+gerade angelegt“. Dazu setzte nur das Onboarding `stripeAccountReady`. Eine
+spätere Sperre durch Stripe blieb unbemerkt, und der Checkout bot Online
+weiter an.
+
+**Fix:**
+- `paymentIntents.create` hat jetzt den Schlüssel `pi-<Bestell-ID>` und ist
+  abgefangen. Scheitert Stripe, wird die Bestellung über
+  `storniereUnbezahlteBestellung` beendet (Grund „Zahlung konnte nicht
+  gestartet werden“), die Ware ist zurück, und die Antwort ist 503
+  `ZAHLUNG_NICHT_MOEGLICH`: „Online-Zahlung ist gerade nicht möglich. Bitte
+  versuch es später oder wähle Barzahlung.“
+- Die Parameter rechnet `intentParameter` aus den **gespeicherten** Werten der
+  Bestellung. Nur so schickt eine Wiederholung exakt dieselben, sonst lehnt
+  Stripe den Schlüssel ab. Der Ladungstyp ist unverändert, die Wache in
+  `tests/storno-erstattung.test.ts` prüft ihn jetzt dort.
+- **Wiederholung ohne gespeicherte Intent-ID** (dasselbe Idempotenz-Merkmal im
+  Checkout):
+  - jünger als 2 Minuten: Derselbe Stripe-Schlüssel liefert denselben Intent.
+    Die ID wird bedingt nachgetragen, die Antwort ist 200 mit Client-Secret.
+  - Ist Stripe gerade nicht erreichbar, bleibt es bei 409 „wird gerade
+    angelegt“.
+  - älter als 2 Minuten oder der Hof ohne Konto: gescheitert. Die Bestellung
+    wird storniert, die Ware ist zurück, die Antwort ist 503 mit Code.
+- **Barzahlung danach wirklich möglich:** Die Halte der Sitzung werden erst
+  frei, wenn die Bestellung steht, online also nach dem PaymentIntent. Vorher
+  löschte der Checkout sie vor dem Stripe-Aufruf; der Barversuch nach dem 503
+  wäre dann an „Reservierung abgelaufen“ gescheitert. Dazu nimmt der Browser
+  nach `ZAHLUNG_NICHT_MOEGLICH` einen neuen Idempotenz-Schlüssel, sonst bekäme
+  er die stornierte Bestellung zurück.
+- **`account.updated`:** Die Webhook-Route prüft die Signatur gegen
+  `STRIPE_WEBHOOK_SECRET` und das neue, optionale
+  `STRIPE_CONNECT_WEBHOOK_SECRET`. Sie setzt `stripeAccountReady` für den Hof
+  mit dieser `stripeAccountId`. Ein fremdes Konto ändert nichts.
+  - Den Stand liest sie bei Stripe frisch nach, denn Ereignisse kommen nicht
+    garantiert in Reihenfolge.
+  - Ereignisse verbundener Konten (`event.account`) laufen nur durch
+    `account.updated`, nie durch die Zahlungs-Handler.
+  - Fehlt das Secret in Produktion, meldet die Umgebungsprüfung eine Warnung
+    an Sentry.
+- **Wettläufe** (Prüferbefund):
+  - Ein Stripe-409, weil eine zweite Anfrage mit demselben Schlüssel läuft
+    (Doppelklick), führt nicht zum Storno, sondern zu 409 „wird gerade
+    angelegt“.
+  - Die Intent-ID kommt nur an eine noch offene Bestellung
+    (`haengeIntentAn`). Wurde sie während des Stripe-Aufrufs storniert, wird
+    der Intent abgebrochen und kein Client-Secret herausgegeben.
+  - Die Stripe-Aufrufe haben eine kurze Leine (20 Sekunden, zwei
+    Wiederholungen) und bleiben damit unter der Wartezeit von zwei Minuten.
+  - Die Wiederholung gibt die Halte der Sitzung frei, wenn sie den Intent
+    nachträgt.
+- **Eine Bereit-Regel:** `stripeKontoBereit` in `src/lib/stripe-konto.ts`
+  verlangt Zahlungen UND Auszahlungen frei. Sie gilt jetzt auch beim
+  Onboarding und bei „Status prüfen“, dort galt bisher
+  `charges_enabled && details_submitted`. Mit zwei Regeln wäre der Wert je nach
+  Schreiber hin- und hergesprungen. Folge: Ein Hof gilt nach dem Onboarding
+  erst als bereit, wenn Stripe auch Auszahlungen freigibt. Den Wechsel meldet
+  `account.updated`.
+- **Heute:** Will der Hof online kassieren und Stripe lässt es nicht zu, zeigt
+  Heute (Web und Handy) „Online-Zahlung ist pausiert – Stripe braucht noch
+  Angaben von dir. Bis dahin können Kunden nur bar bei Abholung bestellen.“
+  Der Knopf „Bei Stripe ergänzen“ führt über einen Account Link direkt zu
+  Stripe. Der Checkout bot Online ohnehin nur bei `stripeAccountReady` an.
+  - **Abweichung vom Wortlaut:** Der Hinweis erscheint nur, wenn der Hof schon
+    ein Stripe-Konto hat. `acceptsOnline` ist für jeden neuen Hof
+    vorbelegt; sonst stünde „pausiert“ ab Tag eins bei jedem Hof, der Stripe
+    nie eingerichtet hat. Dafür hat die Erste-Schritte-Karte ihren eigenen
+    Schritt.
+  - Ohne Barzahlung verspricht der Satz sie nicht: „… können Kunden bei dir
+    nicht bestellen.“ Dasselbe gilt für die 503-Antwort im Checkout.
+
+**Manueller Schritt:** Im Stripe-Dashboard einen Connect-Webhook-Endpunkt
+anlegen („Events von verbundenen Konten“, dieselbe URL, Event
+`account.updated`). Dessen Secret kommt als `STRIPE_CONNECT_WEBHOOK_SECRET`
+in Vercel, Production und Preview (README, „Stripe Webhook für Produktion“).
+
+**Offen, mit Absicht nicht angefasst:**
+- Die Hofseite zeigt unter „Zahlung & Kontakt“ „Online (Karte)“ allein nach
+  `acceptsOnline`, also auch, wenn Online pausiert ist.
+
+**Tests:**
+- `tests/integration/checkout-zahlung-start.int.test.ts` (echtes Postgres):
+  - Stripe wirft; danach Barzahlung;
+  - Stripe-409 ohne Storno;
+  - Storno während des Stripe-Aufrufs;
+  - Wiederholung nach gescheitertem Speichern;
+  - dieselben Parameter beim ersten und zweiten Aufruf;
+  - älter als 2 Minuten; jung ohne Konto; jung bei Stripe-Ausfall;
+  - Erfolgsweg mit Schlüssel.
+- `tests/integration/stripe-konto.int.test.ts`: `account.updated` mit echter
+  Signatur gegen beide Secrets; ein verspätetes Ereignis überschreibt nicht
+  den aktuellen Stand; ein fremdes Secret ergibt 400.
+- Vor dem Fix waren 10 von 12 rot.
+- `tests/stripe-konto.test.ts`, `tests/webhook.test.ts`: Bereit-Regel und
+  Signatur mit Connect-Secret.
+
 ### BUG: Verwaiste Bestellungen hielten den Bestand für immer (behoben 2026-10-01, K3)
 
 **Befund:** Der Checkout bucht den Bestand, bevor bezahlt (online) oder per
@@ -2994,6 +3096,39 @@ Ergänzung zu „Mein Hof v2". Was gebaut ist, steht in
 
 ---
 
+## Ladeansichten und Fehlerseiten der Kundenseiten (2026-10-01)
+
+Ausgangslage: Von 48 Seiten hatte **eine** eine Ladeansicht (`(farmer)/loading.tsx`, Tempo-Pass 1). Eine `global-error.tsx` gab es nicht — scheiterte das Root-Layout, zeigte Next.js seine eigene englische Seite. Die 404 und die 500 trugen je ein Emoji als einzige Illustration, die 404 außerdem „Hofbetreiber-Login" als zweiten Weg: auf einer Kundenseite die falsche Tür, und sie ist zugleich das, was ein Fremder unter `/admin` sieht (`verlangeAdminSeite` wirft `notFound()`, nicht 403).
+
+**Sechs Ladeansichten, und bewusst keine siebte.** Je eine für Hofseite, Hofübersicht, Kasse, Bestätigung und Bestellverfolgung, dazu eine gemeinsame für die Infoseiten der Gruppe `(public)`. Die Maße sind von den echten Seiten abgenommen (Kopfleiste 56/64 px, Titelbild-Band 260 px / 33vw / 40vw bis 420 px, Aktionsleiste 68 px, Reiterleiste ~45 px, Produktbild 170 px, Spalten 960 / 768 / 672 / 512 px).
+
+**Die Startseite bekommt keine** — zwei nachgeprüfte Gründe:
+
+1. `HomePage` ist synchron und holt keine Daten. Es gibt nichts zu suspendieren; das Skeleton wäre ein Blitzen ohne Anlass.
+2. Eine `loading.tsx` im **Wurzelsegment** wäre der Fallback für jede Route ohne nähere — auch `/login`, `/admin`, `/account`. Die zeigten dann das Startseiten-Skeleton samt Landing-Navigation.
+
+Ein Test hält beides fest: dass die Datei nicht existiert, und dass `HomePage` synchron bleibt. Wird sie eines Tages `async`, fällt der Test und erinnert daran, dass dann auch eine Ladeansicht dazugehört — mit einem Blick auf die Reichweite.
+
+**Die Kopfleiste steht im Skeleton, nicht die echte.** Kundenseiten rendern `KundenKopf` selbst (es gibt kein `(public)/layout.tsx`), also fehlt sie beim Laden, wenn das Skeleton sie auslässt. Eingebaut ist ein Platzhalter gleicher Höhe, nicht die Komponente: `loading.tsx` bekommt **keine** Routenparameter, und vier der sechs Varianten brauchen den Hof-Slug. Ein Mechanismus für alle sechs ist besser als zwei.
+
+**Was die Skeletons absichtlich NICHT zeigen:** Filter-Chips, Fotostreifen, Hinweisbänder — alles, was von Daten abhängt. Reservierter Platz, in den nichts einrückt, lässt den Inhalt nach **oben** springen, und das ist schlimmer als ein Element, das dazukommt. Ebenso zeigt `/hoefe` eine Spalte statt des Splitscreens: Den baut erst die Hydration (`useIstBreit` liefert serverseitig `false`), ein zweispaltiges Skeleton spränge zweimal.
+
+**Die Texte der Fehlerseiten liegen in `src/lib/fehlerseite.ts`.** Die 500 gibt es zweimal — `error.tsx` innerhalb des Root-Layouts, `global-error.tsx` statt seiner —, und zwei Wortlaute laufen auseinander. Beide Grenzen rendern dieselbe Ansicht (`src/components/shared/fehler-ansicht.tsx`).
+
+**Drei Entscheidungen an der 500:**
+
+- **Keine Kopfleiste.** War sie selbst die Ursache, risse sie die Fehlerseite mit. Der Weg nach Hause steht als Knopf — als gewöhnlicher `<a>`, weil ein Vollaufbau hier das Ziel ist und nicht der Umweg: `<Link>` navigiert im selben, gerade zerbrochenen Baum weiter, und in `global-error` gibt es den Router-Kontext ohnehin nicht verlässlich. Dafür steht dort ein begründetes `eslint-disable`.
+- **Nur die Fehlernummer** (`error.digest`), nichts sonst: keine Fehlermeldung, kein Stapel, kein Dateiname. Was der Mensch sieht, soll er vorlesen können — nicht verstehen müssen.
+- **„Problem melden" füllt sie ein.** `meldungLinkMitKennung` baut `/problem-melden?kennung=…`; die Seite liest den Parameter durch `bereinigeKennung` (nur `[A-Za-z0-9_-]`) und gibt ihn als Startwert in das Feld. **Zu lang heißt leer, nicht abgeschnitten**: Das Feld nimmt 20 Zeichen (`MELDUNG_KENNUNG_MAX`), und eine abgeschnittene Fehlernummer zeigt auf den falschen Fehler. Die vollständige steht auf der Seite und lässt sich kopieren.
+
+**`global-error.tsx` ist karger als die 500, mit Absicht.** Sie bringt `<html>`, `<body>` und den Import von `globals.css` selbst mit (der Import im Root-Layout ist mit dem Layout weg). Was fehlt: die Schrift-Variablen (Systemschrift statt Fraunces) und `next-themes` — ohne `data-theme` gelten die Werte aus `:root`, die Seite erscheint also **hell**, auch für jemanden im Dunkelmodus. Dafür hängt sie an keinem Provider, der gerade kaputt ist.
+
+**Beide Fehlergrenzen melden nach Sentry, und das ist kein Doppel:** Sie schließen sich aus. `global-error.tsx` greift nur für Fehler im Root-Layout und für solche, die `error.tsx` selbst wirft; ein Render-Fehler im Seitenbaum landet in `error.tsx`. Ohne den Aufruf dort wäre er **stumm** — `onRequestError` (`src/instrumentation.ts`) deckt nur den Server ab, und ein Fehler, den eine React-Fehlergrenze gefangen hat, erreicht den Client-SDK nicht von selbst. Bei einem reinen Client-Fehler ist `error.digest` außerdem `undefined`: Dann gibt es keine Fehlernummer zum Vorlesen, und Sentry ist die einzige Spur. Der Befund kam aus der Prüfung, nachdem die erste Fassung genau diese Lücke hatte.
+
+**Ein stillgelegter Hof braucht keine eigene Behandlung.** `OEFFENTLICH_SICHTBAR` (`isActive`, `archivedAt: null`, `approvedAt: { not: null }`) filtert ihn schon in der Query; die Seite sieht ihn gar nicht und ruft `notFound()`. Die neue `(public)/[farmSlug]/not-found.tsx` fängt das — und dazu zwei Fälle mehr, die zum selben Segment gehören: den unbekannten Bestell-Link unter `/confirm` und den Hof in Pause unter `/checkout`. Deshalb behauptet ihr Text keinen Grund („vielleicht … oder …"): Warum ein Hof nicht mehr da ist, ist seine Sache.
+
+---
+
 ## Hand-Zeiger, „Schließen" statt „Close", Symbole statt Emojis (2026-10-01)
 
 **Hand-Zeiger.** Tailwind 4 setzt im Preflight keinen `cursor: pointer` mehr auf
@@ -3023,6 +3158,8 @@ Fußzeilen) und ein „✓" im Server-Log des Mailversands.
 - Oberfläche: lucide-Symbole mit `aria-hidden`. Die Zahlungsarten im Checkout trugen
   das Emoji im Text der Auswahl, der Screenreader las es mit. Jetzt stehen Symbol und
   Text getrennt.
+  Fehlerseite und 404 hat #157 parallel neu gebaut, ohne Emoji; beim Zusammenführen
+  gilt deren Fassung.
 - Verkaufswege: `CHANNEL_ICONS` (Emojis im Schema) ist weg; Listen, Feed, Schnellwahl
   und Dialog nehmen `KANAL_SYMBOL`. Plattform-Bestellungen zeigen im Feed den
   Warenkorb, weil der Korb dem Markt gehört.

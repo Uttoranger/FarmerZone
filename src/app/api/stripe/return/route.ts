@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
+import { stripeKontoBereit } from '@/lib/stripe-konto'
 
 export async function GET(request: NextRequest) {
   const accountId = request.nextUrl.searchParams.get('account_id')
@@ -30,7 +31,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const account = await stripe.accounts.retrieve(accountId)
-    const ready = !!(account.charges_enabled && account.details_submitted)
+    // Dieselbe Regel wie account.updated (src/lib/stripe-konto.ts).
+    const ready = stripeKontoBereit(account)
 
     await prisma.farm.update({
       where: { id: farm.id },

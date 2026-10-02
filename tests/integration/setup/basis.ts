@@ -186,6 +186,7 @@ export function checkoutAnfrage(eingabe: {
   kaeuferArt?: 'PRIVAT' | 'BETRIEB'
   betriebsnummer?: string
   customerEmail?: string
+  paymentMethod?: 'ONSITE_CASH' | 'ONSITE_CARD' | 'ONLINE'
 }): NextRequest {
   const morgen = new Date(Date.now() + 24 * 60 * 60 * 1000)
   const datum = `${morgen.getFullYear()}-${String(morgen.getMonth() + 1).padStart(2, '0')}-${String(
@@ -203,7 +204,7 @@ export function checkoutAnfrage(eingabe: {
     pickupDate: datum,
     pickupTimeStart: '15:00',
     pickupTimeEnd: '18:00',
-    paymentMethod: 'ONSITE_CASH',
+    paymentMethod: eingabe.paymentMethod ?? 'ONSITE_CASH',
     kaeuferArt: eingabe.kaeuferArt ?? 'PRIVAT',
     betriebsnummer: eingabe.betriebsnummer,
     items: eingabe.positionen,
