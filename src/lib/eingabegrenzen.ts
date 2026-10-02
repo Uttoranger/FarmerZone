@@ -16,6 +16,17 @@ export const EMAIL_MAX = 254
 /** Wie im Produktformular — eine Checkout-Position trägt den Produktnamen. */
 export const PRODUKTNAME_MAX = 100
 
+/**
+ * Der Name einer Bestellposition — immer der Name des Produkts aus der
+ * Datenbank, nie, was der Browser schickt. GEKÜRZT statt abgelehnt: Ein
+ * Produkt, dessen Name vor der Grenze länger gespeichert wurde (auch aus dem
+ * Onboarding), muss kaufbar bleiben. Gezählt wird in Zeichen, nicht in
+ * UTF-16-Einheiten, damit kein Zeichen in der Mitte zerschnitten wird.
+ */
+export function bestellPositionsName(produktname: string): string {
+  return [...produktname].slice(0, PRODUKTNAME_MAX).join('')
+}
+
 /** Die Meldung am Feld, wenn ein neuer Wert zu lang ist — mit dem Ausweg. */
 export const ZU_LANG = {
   hofname: `Der Hofname darf höchstens ${HOFNAME_MAX} Zeichen haben — bitte kürzen.`,

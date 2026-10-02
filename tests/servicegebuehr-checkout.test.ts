@@ -58,7 +58,7 @@ function warenkorbBereit() {
     return w?.id?.in ?? w?.productId?.in ?? []
   }
   vi.mocked(prisma.product.findMany).mockImplementation(((a: unknown) =>
-    Promise.resolve(ids(a).map((id) => ({ id, stock: 999, isAvailable: true, price: einzelpreis })))) as never)
+    Promise.resolve(ids(a).map((id) => ({ id, name: 'Wels', stock: 999, isAvailable: true, price: einzelpreis })))) as never)
   vi.mocked(prisma.stockReservation.findMany).mockImplementation(((a: unknown) => {
     const sess = (a as { where?: { sessionId?: unknown } })?.where?.sessionId
     // { not: ... } = fremde Sitzungen; die blockieren hier nichts.

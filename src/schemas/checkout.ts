@@ -3,7 +3,6 @@ import { KAEUFER_ART_VALUES, pruefeBetriebsnachweis } from '@/lib/betriebsnachwe
 import {
   NOTIZ_MAX,
   PERSONENNAME_MAX,
-  PRODUKTNAME_MAX,
   TELEFON_MAX,
   ZU_LANG,
 } from '@/lib/eingabegrenzen'
@@ -106,15 +105,14 @@ export const checkoutRequestSchema = z.object({
     .array(
       z.object({
         productId: z.string().min(1),
-        // Der Name landet als Momentaufnahme in OrderItem.productName — nie
-        // länger, als ein Produktname sein darf. GEKÜRZT statt abgelehnt: Ein
-        // Produkt, dessen Name vor der Grenze länger gespeichert wurde (auch
-        // aus dem Onboarding), muss kaufbar bleiben — eine Ablehnung hier
-        // wäre eine verlorene Bestellung ohne Ausweg für die Kundin.
-        name: z
-          .string()
-          .min(1)
-          .transform((n) => [...n].slice(0, PRODUKTNAME_MAX).join('')),
+        // NUR GEDULDET, NIE GELESEN: Der Name kommt aus dem Browser und ist
+        // Fremdtext. Die Bestellung nimmt den Produktnamen aus der Datenbank
+        // (route.ts, bestellPositionsName; tests/checkout-produktname.test.ts).
+        // Das Feld steht hier, weil offene Tabs mit altem Code es noch
+        // schicken und der neue Code es weiter mitsendet — optional, damit
+        // eine Anfrage ohne Namen genauso durchgeht. Nicht mehr Pflicht und
+        // nicht mehr gekürzt: Gelesen wird es nicht.
+        name: z.string().optional(),
         quantity: z.number().int().positive(),
         unitPrice: z.number().positive(),
       })
