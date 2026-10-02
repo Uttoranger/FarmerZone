@@ -170,7 +170,7 @@ export function CheckoutForm({
   const [bestellungAngelegt, setBestellungAngelegt] = useState(false)
   const [paymentStep, setPaymentStep] = useState<{
     clientSecret: string
-    orderId: string
+    bestaetigung: string
     reserviertBis: string | null
   } | null>(null)
 
@@ -385,17 +385,21 @@ export function CheckoutForm({
       }
 
       const result = await res.json()
+      // Der signierte Pfad der Bestätigungsseite kommt vom Server — das
+      // Geheimnis der Signatur gehört nie in den Browser. Fehlt er (sollte
+      // nie sein), führt der Weg zurück zum Hof statt auf eine leere Seite.
+      const bestaetigung: string = typeof result.bestaetigung === 'string' ? result.bestaetigung : `/${farm.slug}`
 
       if (data.paymentMethod === 'ONLINE') {
         setBestellungAngelegt(true)
         setPaymentStep({
           clientSecret: result.clientSecret,
-          orderId: result.orderId,
+          bestaetigung,
           reserviertBis: typeof result.reserviertBis === 'string' ? result.reserviertBis : null,
         })
       } else {
         leereWarenkorb()
-        router.push(`/${farm.slug}/confirm/${result.orderId}`)
+        router.push(bestaetigung)
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Fehler beim Checkout')
@@ -417,7 +421,7 @@ export function CheckoutForm({
     return (
       <StripePaymentStep
         clientSecret={paymentStep.clientSecret}
-        orderId={paymentStep.orderId}
+        bestaetigung={paymentStep.bestaetigung}
         farmSlug={farm.slug}
         reserviertBis={paymentStep.reserviertBis}
         onClearCart={leereWarenkorb}

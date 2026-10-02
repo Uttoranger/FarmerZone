@@ -254,6 +254,52 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 
 ## Bekannte Bugs & Fixes
 
+### BUG: Bestätigungsseite zeigte Name und E-Mail der Kundin ohne signierten Link (behoben 2026-10-02)
+
+**Befund:** `/{hof}/confirm/{orderId}` lud die Bestellung allein über die ID
+(cuid, ratbar, steht u. a. in den Stripe-Metadaten) und zeigte Name, E-Mail,
+Artikel und Beträge — und verteilte selbst den signierten Link auf die
+Bestellseite („Bestellung ansehen & Link merken"). `?confirmed=true` und
+`?redirect_status=succeeded` steuerten „bestätigt" bzw. „Zahlung erfolgreich"
+ohne Blick in die Datenbank.
+
+**Fix:**
+- Die Seite verlangt `?sig=` (`bestellLinkGilt`, dieselbe Signatur wie die
+  Bestellseite). Ohne gültige Signatur: „Deine Bestellung ist eingegangen –
+  alle Details stehen in deiner E-Mail", keine Datenbankabfrage.
+- Die Wege dorthin tragen die Signatur: `/api/checkout` liefert
+  `bestaetigung` (signierter Pfad) für neue Bestellungen und Wiederholungen;
+  Formular (`router.push`) und Stripe-Schritt (`return_url`,
+  `window.location.assign`) nehmen genau ihn — Stripe hängt seine Parameter
+  an, `sig` bleibt. Der Bestätigungslink der Mail (`/api/orders/confirm/{token}`)
+  leitet signiert weiter, ohne `?confirmed`. Die Mail-Links auf die
+  Bestellseite waren schon signiert (jetzt mit Test).
+- Der Zustand kommt aus `bestaetigungsZustand` (`src/lib/bestaetigung.ts`):
+  bezahlt nur bei `paymentStatus` PAID, bestätigt nur aus dem Status;
+  `redirect_status=succeeded` ergibt vor dem Webhook „Zahlung wird geprüft".
+  Storniert schlägt PAID (Erstattung noch nicht durch). Die Zahlungszeile
+  unten kommt aus `zahlungsAnzeige` statt pauschal „Online bezahlt".
+- `sig` und `redirect_status` laufen durch Zod (`src/schemas/bestaetigung.ts`);
+  doppelt oder falsch geformt gilt als fehlend. Sentry entfernt `sig` aus
+  URLs (`sentry-hygiene.ts`). Die neutrale Seite verlinkt die Hofübersicht,
+  nicht den Hof aus der ungeprüften Adresse.
+- Der Stripe-Schritt hängt beim Sprung ohne Stripe-Rückleitung (Zahlung
+  schon unterwegs) selbst `redirect_status` an — sonst stünde dort kein Hinweis.
+- `noindex` und `Referrer-Policy: no-referrer` (Metadaten und Header in
+  `next.config.ts`).
+
+**Folge:** Alte, unsignierte Adressen der Seite (Lesezeichen, Browser-Verlauf)
+zeigen nur noch „eingegangen". Der Weg zur Bestellung bleibt der signierte
+Link aus der Mail.
+
+**Tests:** `tests/bestaetigung-zugang.test.ts` (Seite und Bestätigungslink;
+vorher 9 von 13 rot), `tests/bestaetigung.test.ts` (Zustand),
+`tests/bestaetigung-links-mail.test.ts` (Mail-Links),
+`tests/bestaetigung-schema.test.ts` (Parameter), `sig` in
+`tests/beobachtbarkeit.test.ts`, Signatur der
+Checkout-Antwort in `tests/checkout-kunde.test.ts` und
+`tests/checkout-kritisch.test.ts`, Header in `tests/sicherheits-header.test.ts`.
+
 ### BUG: Abholtermin wurde serverseitig nicht geprüft (behoben 2026-10-02)
 
 **Befund:** `pickupDate`, `pickupTimeStart`, `pickupTimeEnd` waren im Schema

@@ -18,7 +18,8 @@ const stripePromise = getStripePromise()
 
 interface StripePaymentStepProps {
   clientSecret: string
-  orderId: string
+  /** Signierter Pfad der Bestätigungsseite (aus /api/checkout; src/lib/bestell-link.ts). */
+  bestaetigung: string
   farmSlug: string
   /** Bis dahin hält die Bestellung ihre Ware (ISO, aus /api/checkout; src/lib/fristen.ts). */
   reserviertBis: string | null
@@ -28,7 +29,7 @@ interface StripePaymentStepProps {
 
 export function StripePaymentStep({
   clientSecret,
-  orderId,
+  bestaetigung,
   farmSlug,
   reserviertBis,
   onClearCart,
@@ -84,8 +85,7 @@ export function StripePaymentStep({
           }}
         >
           <PaymentForm
-            orderId={orderId}
-            farmSlug={farmSlug}
+            bestaetigung={bestaetigung}
             onClearCart={onClearCart}
             reserviertBis={reserviertBis}
             onHinweis={setHinweis}
@@ -119,14 +119,12 @@ export function StripePaymentStep({
 }
 
 function PaymentForm({
-  orderId,
-  farmSlug,
+  bestaetigung,
   onClearCart,
   reserviertBis,
   onHinweis,
 }: {
-  orderId: string
-  farmSlug: string
+  bestaetigung: string
   onClearCart: () => void
   reserviertBis: string | null
   onHinweis: (hinweis: 'abgelehnt' | 'abgelaufen' | null) => void
@@ -140,7 +138,9 @@ function PaymentForm({
 
     setIsProcessing(true)
 
-    const returnUrl = `${window.location.origin}/${farmSlug}/confirm/${orderId}`
+    // Signiert vom Server: Stripe hängt payment_intent und redirect_status
+    // an, `sig` bleibt stehen — die Seite zeigt die Bestellung nur damit.
+    const returnUrl = `${window.location.origin}${bestaetigung}`
 
     const { error } = await stripe.confirmPayment({
       elements,
@@ -154,7 +154,9 @@ function PaymentForm({
       // Nie „nichts abgebucht" sagen — zur Bestellung, die zeigt den Stand.
       const zahlungsStand = error.payment_intent?.status
       if (zahlungsStand === 'succeeded' || zahlungsStand === 'processing') {
-        window.location.assign(`/${farmSlug}/confirm/${orderId}`)
+        // Wie Stripes eigene Rückleitung: Der Hinweis zeigt „Zahlung wird
+        // geprüft", bis der Webhook den Stand in die Datenbank schreibt.
+        window.location.assign(`${bestaetigung}&redirect_status=${zahlungsStand}`)
         return
       }
       toast.error(error.message ?? 'Zahlung fehlgeschlagen')

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendOrderConfirmation, sendOrderConfirmedToFarmer } from '@/lib/email'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
+import { bestaetigungsPfad } from '@/lib/bestell-link'
 
 export async function GET(
   request: NextRequest,
@@ -32,7 +33,9 @@ export async function GET(
     return NextResponse.redirect(new URL('/', request.url))
   }
 
-  const bestellSeite = new URL(`/${order.farm.slug}/confirm/${order.id}`, request.url)
+  // Signiert: Die Seite zeigt die Bestellung nur mit gültiger Signatur. Ob sie
+  // bestätigt ist, liest sie aus der Datenbank — kein ?confirmed mehr.
+  const bestellSeite = new URL(bestaetigungsPfad(order.farm.slug, order.id), request.url)
 
   // Frist gilt beim Lesen (src/lib/fristen.ts): Ist die Bestätigungsfrist
   // vorbei, verfällt die Bestellung JETZT — auch wenn der tägliche Cron noch
@@ -71,6 +74,5 @@ export async function GET(
   await sendOrderConfirmation(emailOrder)
   await sendOrderConfirmedToFarmer(emailOrder)
 
-  bestellSeite.searchParams.set('confirmed', 'true')
   return NextResponse.redirect(bestellSeite)
 }

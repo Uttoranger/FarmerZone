@@ -46,6 +46,7 @@ vi.mock('@/lib/prisma', () => ({
 
 import { POST } from '@/app/api/checkout/route'
 import { prisma } from '@/lib/prisma'
+import { bestellLinkGilt } from '@/lib/bestell-link'
 import { sendOnsiteConfirmation } from '@/lib/email'
 
 const farmFindUnique = vi.mocked(prisma.farm.findUnique)
@@ -174,6 +175,24 @@ describe('Kundenkonto im Checkout', () => {
 
     expect(kundeDerBestellung(0)).toBe('kunde_bestand')
     expect(userCreate).not.toHaveBeenCalled()
+  })
+})
+
+describe('Weg zur Bestätigungsseite', () => {
+  it('die Antwort trägt den signierten Pfad der Bestätigungsseite — Formular und Stripe nehmen genau ihn', async () => {
+    const res = await POST(anfrage())
+
+    const { bestaetigung } = await res.json()
+    const ziel = new URL(bestaetigung, 'http://localhost')
+    expect(ziel.pathname).toBe('/hof-test/confirm/order_1')
+    expect(bestellLinkGilt('order_1', ziel.searchParams.get('sig') ?? '')).toBe(true)
+  })
+
+  it('Stripe hängt seine Parameter an — die Signatur bleibt gültig', async () => {
+    const { bestaetigung } = await (await POST(anfrage())).json()
+
+    const rueckkehr = new URL(`http://localhost${bestaetigung}&payment_intent=pi_1&redirect_status=succeeded`)
+    expect(bestellLinkGilt('order_1', rueckkehr.searchParams.get('sig') ?? '')).toBe(true)
   })
 })
 

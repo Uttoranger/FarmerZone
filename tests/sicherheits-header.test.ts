@@ -126,3 +126,16 @@ describe('Standort', () => {
     expect(headerFuer('/dashboard')['Permissions-Policy']).toContain('geolocation=()')
   })
 })
+
+describe('Bestätigungsseite', () => {
+  it('schickt keinen Referrer und steht in keinem Suchindex — die Adresse trägt die Signatur', () => {
+    const header = headerFuer('/hof-test/confirm/order-1', { sig: 'abc' })
+    expect(header['Referrer-Policy']).toBe('no-referrer')
+    expect(header['X-Robots-Tag']).toBe('noindex, nofollow')
+  })
+
+  it('die übrigen Seiten behalten ihre Referrer-Regel — Gegenprobe', () => {
+    expect(headerFuer('/hof-test')['Referrer-Policy']).toBe('strict-origin-when-cross-origin')
+    expect(headerFuer('/hof-test/bestellung/order-1')['X-Robots-Tag']).toBeUndefined()
+  })
+})
