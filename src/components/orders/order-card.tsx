@@ -150,7 +150,9 @@ export function OrderCard({
               >
                 {order.orderNumber}
               </Link>
-              <div className="font-medium text-foreground truncate">{order.customerName}</div>
+              <div className="font-medium text-foreground truncate" title={order.customerName}>
+                {order.customerName}
+              </div>
               <div className="flex items-center gap-2">
                 <a
                   href={`tel:${order.customerPhone}`}

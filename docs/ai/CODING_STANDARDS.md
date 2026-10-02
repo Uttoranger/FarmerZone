@@ -333,6 +333,24 @@ gegen `background` **und** gegen `card`.
   `*AnlegenSchema` für die neue Pflicht; `create*` prüft damit, `update*` mit
   dem alten. Bestandsdaten müssen speicherbar bleiben, ohne sie erst umzubauen.
   Vorbild: `productAnlegenSchema`.
+- **Obergrenzen für Text stehen in `src/lib/eingabegrenzen.ts`** (Hofname 80,
+  Personenname 80, Telefon 30, Notiz 500, E-Mail 254, Produktname 100) samt
+  Meldung mit Ausweg (`ZU_LANG`). Schema und Formular nehmen dieselbe
+  Konstante. Das Formular zeigt den Zähler (`FeldZaehler` für react-hook-form,
+  sonst `ZeichenZaehler`, `src/components/shared/zeichen-zaehler.tsx`) — er
+  erscheint ab 80 % Füllung und sagt über der Grenze „Bitte kürzen", als
+  Hinweis, nicht als Fehler. Nie `maxLength` am Feld: Eingefügtes würde stumm
+  abgeschnitten.
+- **Eine nachträgliche Obergrenze sperrt keinen Bestand.** Beim Bearbeiten
+  prüft ein Schema mit dem gespeicherten Stand: Ein Altwert über der Grenze
+  darf unverändert bleiben, jeder geänderte Wert hält sie ein
+  (`passtInGrenze`). Server und Formular bauen es aus derselben Funktion —
+  der Server mit dem Stand aus der Datenbank. Vorbild: `profilBearbeitenSchema`.
+- **E-Mail immer über `emailSchema`** (`src/schemas/email.ts`): ohne Ränder,
+  klein geschrieben, höchstens 254 Zeichen. Postgres vergleicht genau, Better
+  Auth speichert klein — eine roh gespeicherte Adresse ergibt einen zweiten
+  Kunden, den der Anmeldelink nie findet. Nachgeordnete Aufrufe (Better Auth,
+  Prisma) bekommen den geprüften Wert, nie die rohe Eingabe.
 - **Pflichtfelder am Feld, nicht in `superRefine`.** Zod 4 überspringt
   Querprüfungen, solange ein anderes Feld ungültig ist. Was sofort zählen soll
   (Fehlerzähler im Button, Markierung beim ersten Absenden), gehört als

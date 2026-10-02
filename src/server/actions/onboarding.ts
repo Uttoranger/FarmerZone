@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { findBatchSlotError } from '@/lib/pickup-slot-rules'
 import { ProductUnit } from '@prisma/client'
 import { generateSlug, RESERVED_SLUGS } from '@/lib/slug'
+import { hofAnlegenSchema } from '@/schemas/hofprofil'
 
 export async function checkSlugAvailability(name: string): Promise<{ available: boolean; slug: string }> {
   const slug = generateSlug(name)
@@ -27,13 +28,19 @@ export async function createFarm(data: {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return { error: 'Nicht angemeldet.' }
 
+  // Hier entsteht der Hofname zum ersten Mal — ohne Schema lief beliebig
+  // langer Text in die Datenbank. Das Schema schneidet auch die Ränder ab.
+  const parsed = hofAnlegenSchema.safeParse(data)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Bitte prüfe deine Angaben.' }
+  const hof = parsed.data
+
   const existingFarm = await prisma.farm.findUnique({
     where: { ownerId: session.user.id },
     select: { id: true, slug: true },
   })
   if (existingFarm) return { farmId: existingFarm.id, farmSlug: existingFarm.slug }
 
-  const baseSlug = generateSlug(data.name)
+  const baseSlug = generateSlug(hof.name)
   let slug = baseSlug
   let suffix = 2
   while (RESERVED_SLUGS.has(slug) || await prisma.farm.findUnique({ where: { slug }, select: { id: true } })) {
@@ -44,14 +51,7 @@ export async function createFarm(data: {
     const farm = await prisma.farm.create({
       data: {
         slug,
-        name: data.name.trim(),
-        ownerName: data.ownerName.trim(),
-        description: data.description.trim(),
-        address: data.address.trim(),
-        postalCode: data.postalCode.trim(),
-        city: data.city.trim(),
-        phone: data.phone.trim(),
-        email: data.email.trim(),
+        ...hof,
         ownerId: session.user.id,
       },
     })

@@ -15,7 +15,7 @@ import {
   type RueckwaertsAdresse,
 } from '@/lib/geokodierung'
 import { LAND_GENITIV, alsLand, type Land } from '@/lib/laender'
-import { profileSchema } from '@/schemas/hofprofil'
+import { profileSchema, profilBearbeitenSchema } from '@/schemas/hofprofil'
 
 async function getAuthFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -43,7 +43,15 @@ export async function updateProfile(data: ProfileFormData): Promise<ProfileResul
   const farm = await getAuthFarm()
   if (!farm) return { error: 'Nicht angemeldet' }
 
-  const parsed = profileSchema.safeParse(data)
+  // Mit dem gespeicherten Stand: Ein Hofname, Inhabername oder eine Nummer,
+  // die vor den Obergrenzen länger gespeichert wurde, darf unverändert
+  // bleiben — sonst ließe sich der Hof nicht mehr speichern, ohne ihn erst
+  // umzubauen. Jeder neue Wert hält die Grenze ein.
+  const parsed = profilBearbeitenSchema({
+    name: farm.name,
+    ownerName: farm.ownerName,
+    phone: farm.phone,
+  }).safeParse(data)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Ungültige Daten' }
 
   const { latitude, longitude, ...profil } = parsed.data

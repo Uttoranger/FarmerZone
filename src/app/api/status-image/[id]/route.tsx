@@ -133,8 +133,25 @@ export async function GET(
             >
               🌱
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={{ fontSize: '36px', fontWeight: 700, color: '#1A2B22' }}>
+            {/* flex 1 + minWidth 0: Die Spalte nimmt den Platz neben dem
+                Symbol und keinen Pixel mehr — sonst liefe ein langer Hofname
+                über den Kartenrand hinaus. */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: 0 }}>
+              {/* Höchstens zwei Zeilen mit „…" (Satori kappt nur mit
+                  display block + lineClamp); wordBreak, damit auch ein Name
+                  ohne Leerzeichen umbricht statt über den Rand zu laufen. Ein
+                  Bild hat kein title — der volle Name steht auf der Hofseite,
+                  zu der das Bild führt. */}
+              <div
+                style={{
+                  display: 'block',
+                  lineClamp: 2,
+                  wordBreak: 'break-word',
+                  fontSize: '36px',
+                  fontWeight: 700,
+                  color: '#1A2B22',
+                }}
+              >
                 {post.farm.name}
               </div>
               <div style={{ fontSize: '28px', color: '#5C6F65' }}>via FarmerZone</div>

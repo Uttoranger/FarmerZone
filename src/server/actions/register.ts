@@ -3,7 +3,7 @@
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { registrationSchema } from '@/schemas/register'
+import { registrationSchema, vollerName } from '@/schemas/register'
 import { checkFormToken, FORM_EXPIRED_MESSAGE } from '@/lib/form-token'
 
 // Single server action for the full registration flow:
@@ -60,17 +60,22 @@ export async function registerFarmer(data: {
   }
 
   // 1. Zod validation (defense-in-depth, same rules as client checklist)
-  const name = `${data.firstName.trim()} ${data.lastName.trim()}`
-  const validated = registrationSchema.safeParse({ email: data.email, password: data.password, name })
+  const validated = registrationSchema.safeParse({
+    email: data.email,
+    password: data.password,
+    name: vollerName(data.firstName, data.lastName),
+  })
   if (!validated.success) {
     return { error: validated.error.issues[0].message }
   }
 
   // 2. Create user record (no cookie set here — client calls signIn.email afterwards)
+  // Mit den GEPRÜFTEN Werten: Das Schema schneidet die Ränder der E-Mail ab —
+  // die rohe Eingabe mit Leerzeichen lehnte Better Auth als ungültig ab.
   let userId: string
   try {
     const result = await auth.api.signUpEmail({
-      body: { email: data.email, password: data.password, name },
+      body: { email: validated.data.email, password: data.password, name: validated.data.name },
     })
     userId = result.user.id
   } catch (err: unknown) {
