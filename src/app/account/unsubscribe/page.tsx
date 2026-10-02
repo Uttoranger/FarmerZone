@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Unlink } from 'lucide-react'
 import { UnsubscribeClient } from './unsubscribe-client'
 
 interface Props {
@@ -12,7 +13,7 @@ export default async function UnsubscribePage({ searchParams }: Props) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center px-4">
         <div className="text-center max-w-sm">
-          <div className="text-4xl mb-4">🔗</div>
+          <Unlink className="mx-auto mb-4 size-10 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
           <h1 className="font-heading text-xl font-semibold text-foreground mb-2">
             Ungültiger Link
           </h1>

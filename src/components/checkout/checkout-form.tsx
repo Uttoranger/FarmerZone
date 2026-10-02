@@ -6,7 +6,7 @@ import { useForm, type FieldErrors, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format, addDays } from 'date-fns'
 import { de } from 'date-fns/locale'
-import { ShoppingCart, Loader2, Info } from 'lucide-react'
+import { ShoppingCart, Loader2, Info, Banknote, CreditCard, type LucideIcon } from 'lucide-react'
 import { KasseSkelett } from '@/components/checkout/kasse-skelett'
 import { toast } from 'sonner'
 import Link from 'next/link'
@@ -91,10 +91,12 @@ function uebernehmePreise(
 // Einheiten und Preise kommen aus src/lib/format.ts — EINE Schreibweise für
 // Warenkorb, Checkout, Bestätigung, E-Mail und Bauern-Backend (Befund 13).
 
-const PAYMENT_LABELS: Record<string, string> = {
-  ONLINE: '💳 Online (Karte / Überweisung)',
-  ONSITE_CASH: '💵 Bar bei Abholung',
-  ONSITE_CARD: '💳 Karte bei Abholung',
+// Symbol und Text getrennt: Das Symbol ist Schmuck (aria-hidden), vorgelesen
+// wird nur der Text — vorher las der Screenreader „Kreditkarte" mit.
+const ZAHLART: Record<'ONLINE' | 'ONSITE_CASH' | 'ONSITE_CARD', { label: string; Symbol: LucideIcon }> = {
+  ONLINE: { label: 'Online (Karte / Überweisung)', Symbol: CreditCard },
+  ONSITE_CASH: { label: 'Bar bei Abholung', Symbol: Banknote },
+  ONSITE_CARD: { label: 'Karte bei Abholung', Symbol: CreditCard },
 }
 
 type PickupOption = {
@@ -220,13 +222,13 @@ export function CheckoutForm({
   const pickupOptions = generatePickupOptions(farm.pickupSlots)
 
   // Build available payment methods
-  const paymentMethods: Array<{ value: string; label: string }> = []
+  const paymentMethods: Array<{ value: string; label: string; Symbol: LucideIcon }> = []
   if (farm.acceptsOnline && farm.stripeAccountReady) {
-    paymentMethods.push({ value: 'ONLINE', label: PAYMENT_LABELS.ONLINE })
+    paymentMethods.push({ value: 'ONLINE', ...ZAHLART.ONLINE })
   }
   if (farm.acceptsOnsite) {
-    paymentMethods.push({ value: 'ONSITE_CASH', label: PAYMENT_LABELS.ONSITE_CASH })
-    paymentMethods.push({ value: 'ONSITE_CARD', label: PAYMENT_LABELS.ONSITE_CARD })
+    paymentMethods.push({ value: 'ONSITE_CASH', ...ZAHLART.ONSITE_CASH })
+    paymentMethods.push({ value: 'ONSITE_CARD', ...ZAHLART.ONSITE_CARD })
   }
 
   const defaultPayment = paymentMethods[0]?.value ?? 'ONSITE_CASH'
@@ -769,6 +771,7 @@ export function CheckoutForm({
                     {...form.register('paymentMethod')}
                     className="accent-primary"
                   />
+                  <pm.Symbol className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
                   <span className="text-sm text-foreground">{pm.label}</span>
                 </label>
               ))}

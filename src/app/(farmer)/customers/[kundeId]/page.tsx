@@ -224,7 +224,7 @@ export default async function CustomerDetailPage({ params }: Props) {
           </h2>
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm">
-              <span>📧</span>
+              <Mail className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
               <span className="text-foreground">E-Mail-Updates:</span>
               <span
                 className={
@@ -237,7 +237,7 @@ export default async function CustomerDetailPage({ params }: Props) {
               </span>
             </div>
             <div className="flex items-center gap-2 text-sm">
-              <span>💬</span>
+              <MessageCircle className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
               <span className="text-foreground">WhatsApp-Updates:</span>
               <span
                 className={

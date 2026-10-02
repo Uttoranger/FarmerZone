@@ -52,6 +52,14 @@ Alle Farben kommen aus CSS-Custom-Properties auf `:root`, umgeschaltet über `da
 - Während Feature-Arbeit sind Änderungen an bestehenden Komponenten nur **additiv** (neue Variante, kein geändertes Verhalten).
 - Preis-, Zeit- und Datumsformatierung kommt aus gemeinsamen Formatierern neben den Komponenten; nie pro Screen duplizieren.
 
+## Symbole, Zeiger, Texte
+
+- **Keine Emojis als Bedeutungsträger in der Oberfläche – Icons aus lucide-react.** Strichstärke 1.7 (große Symbole in Leerzuständen 1.5), Farbe aus einem Token. Steht Text daneben, trägt das Symbol `aria-hidden="true"` und der Text die Bedeutung; ein Knopf nur mit Symbol bekommt ein `aria-label`.
+- Ausgehende Vorlagen — E-Mails, WhatsApp-Nachricht, Story-Grafik — tragen ebenfalls keine Emojis; dort steht Text. Fremdtext (Produktnamen, Beiträge der Höfe) bleibt, wie der Hof ihn geschrieben hat. `tests/keine-emojis.test.ts` prüft jede Zeichenkette und jeden JSX-Text unter `src/`; ausgenommen sind ©, ®, ™ und Server-Logs (`console.*`).
+- Ein Symbol, das für eine Sache steht, wird an genau einer Stelle zugeordnet, nicht je Liste neu: Verkaufswege `KANAL_SYMBOL` (`src/components/sales/kanal-symbol.tsx`), Werte der Hofseite `WERT_SYMBOL` über den Katalog in `src/lib/hof-werte.ts`. Einen Wert erkennt der Editor am Titel (`istGewaehlt`, `katalogEintrag`), nie an der Spalte `FarmValue.icon` — sie wird nirgends angezeigt.
+- **Was man anklicken kann, zeigt die Hand.** `Button` trägt `cursor-pointer` in der Grundklasse; rohe `<button>`, `[role="button"]` und `label[for]` bekommen sie aus `@layer base` in `src/app/globals.css`, gesperrte nicht. Selbst setzen nur dort, wo diese Regel nicht greift: Label um eine Checkbox ohne `for`, `<summary>`, Zeilen und Kacheln mit `onClick`, `role="option"`, der Switch (`<span role="switch">`). Ein doppeltes `cursor-pointer` an Knopf oder `label[for]` weist `tests/knopf-zeiger.test.ts` ab.
+- **Texte der Basiskomponenten sind deutsch**, auch der Screenreader-Text („Schließen", nie „Close"). Eine übernommene shadcn-Vorlage wird im selben Zug übersetzt; Standardtexte einer Bibliothek werden über ihre Optionen gesetzt (sonner: `containerAriaLabel`, `closeButtonAriaLabel`). `tests/schliessen-text.test.ts` prüft beides.
+
 ## Navigation (AppShells)
 
 - Zwei Shells, je Welt eine; Seiten hängen nur Inhalt ein, Navigation wird nie pro Seite dupliziert.

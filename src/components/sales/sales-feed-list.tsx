@@ -6,7 +6,8 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil, ReceiptText, ShoppingCart, Trash2 } from 'lucide-react'
+import { KanalSymbol } from '@/components/sales/kanal-symbol'
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,7 @@ import { Button } from '@/components/ui/button'
 import { deleteManualSale } from '@/server/actions/manual-sales'
 import type { ManualSaleData } from '@/server/queries/manual-sales'
 import type { SalesFeedEntry } from '@/lib/sales-summary'
-import { CHANNEL_LABELS, CHANNEL_ICONS } from '@/schemas/manual-sale'
+import { CHANNEL_LABELS } from '@/schemas/manual-sale'
 
 type Props = {
   feed: SalesFeedEntry<ManualSaleData>[]
@@ -68,7 +69,7 @@ export function SalesFeedList({ feed, onEdit }: Props) {
   if (feed.length === 0) {
     return (
       <div className="text-center py-12 bg-card rounded-xl border border-border">
-        <div className="text-4xl mb-3">🧾</div>
+        <ReceiptText className="mx-auto mb-3 size-9 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
         <p className="font-medium text-foreground mb-1">Noch keine Verkäufe</p>
         <p className="text-sm text-muted-foreground">
           Abgeholte Bestellungen und eingetragene Direktverkäufe erscheinen hier.
@@ -88,7 +89,7 @@ export function SalesFeedList({ feed, onEdit }: Props) {
               className="flex items-center gap-3 py-3 hover:bg-muted/30 transition-colors -mx-4 px-4"
             >
               <div className="shrink-0 w-10 text-center">
-                <div className="text-base leading-none">🧺</div>
+                <ShoppingCart className="mx-auto size-4 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
                 <div className="text-[10px] text-muted-foreground/70 mt-0.5">
                   {formatDate(entry.when)}
                 </div>
@@ -116,7 +117,7 @@ export function SalesFeedList({ feed, onEdit }: Props) {
           ) : (
             <div key={`sale-${entry.sale.id}`} className="flex items-center gap-3 py-3">
               <div className="shrink-0 w-10 text-center">
-                <div className="text-base leading-none">{CHANNEL_ICONS[entry.sale.channel] ?? '·'}</div>
+                <KanalSymbol kanal={entry.sale.channel} className="mx-auto text-muted-foreground" />
                 <div className="text-[10px] text-muted-foreground/70 mt-0.5">
                   {formatDate(entry.when)}
                 </div>

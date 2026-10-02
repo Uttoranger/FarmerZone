@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { BellOff, CheckCircle } from 'lucide-react'
+import { BellOff, CheckCircle, TriangleAlert } from 'lucide-react'
 import { unsubscribeWithToken } from '@/server/actions/subscriptions'
 import { Button } from '@/components/ui/button'
 
@@ -64,7 +64,7 @@ export function UnsubscribeClient({ token }: { token: string }) {
 
         {state === 'error' && (
           <>
-            <div className="text-4xl mb-4">⚠️</div>
+            <TriangleAlert className="mx-auto mb-4 size-12 text-status-offen" strokeWidth={1.5} aria-hidden="true" />
             <h1 className="font-heading text-xl font-semibold text-foreground mb-2">
               Link ungültig
             </h1>

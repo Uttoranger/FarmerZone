@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
+import { Inbox, PartyPopper } from 'lucide-react'
 import type { FarmerOrder } from '@/server/queries/orders'
 import { OrderCard } from './order-card'
 import { ACTIVE_STATUSES, DONE_STATUSES } from './order-status'
@@ -75,7 +76,12 @@ export function OrdersClient({
 
       {grouped.length === 0 ? (
         <div className="text-center py-16">
-          <div className="text-5xl mb-4">📬</div>
+          {/* Alles erledigt ist ein Grund zur Freude, kein leerer Briefkasten. */}
+          {filter === 'active' && orders.length > 0 ? (
+            <PartyPopper className="mx-auto mb-4 size-10 text-brand-text" strokeWidth={1.5} aria-hidden="true" />
+          ) : (
+            <Inbox className="mx-auto mb-4 size-10 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
+          )}
           {filter === 'active' && orders.length === 0 ? (
             <>
               <p className="font-medium text-foreground mb-1">Noch keine Bestellungen</p>
@@ -98,7 +104,7 @@ export function OrdersClient({
             </>
           ) : filter === 'active' ? (
             <>
-              <p className="font-semibold text-foreground mb-1">Alle Bestellungen erledigt! 🎉</p>
+              <p className="font-semibold text-foreground mb-1">Alle Bestellungen erledigt!</p>
               <p className="text-sm text-muted-foreground">Super, du hast alles abgearbeitet.</p>
             </>
           ) : (

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Loader2, Plus, Trash2, Check, ExternalLink } from 'lucide-react'
+import { Loader2, Plus, Trash2, Check, ExternalLink, PartyPopper } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -786,7 +786,7 @@ export function OnboardingClient({ userEmail, appUrl }: { userEmail: string; app
           className="bg-card rounded-3xl p-8 text-center dark:ring-1 dark:ring-border"
           style={{ boxShadow: '0 8px 24px oklch(0.18 0.03 150 / 0.08)' }}
         >
-          <div className="text-6xl mb-4">🎉</div>
+          <PartyPopper className="mx-auto mb-4 size-12 text-brand-text" strokeWidth={1.5} aria-hidden="true" />
           <h2 className="font-heading text-2xl font-semibold text-foreground mb-2">
             Dein Hof ist online!
           </h2>

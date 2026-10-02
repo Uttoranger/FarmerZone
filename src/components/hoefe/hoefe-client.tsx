@@ -571,7 +571,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }) {
                 // deshalb trägt SIE den vollen Namen als title, nicht nur die
                 // gekappte Überschrift darunter.
                 title={hof.name}
-                className="absolute inset-0 cursor-pointer rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+                className="absolute inset-0 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
               />
             ) : (
               /* SCHMALE LISTE: Die GANZE Karte verlinkt auf die Hofseite

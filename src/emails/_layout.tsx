@@ -97,7 +97,7 @@ export function EmailLayout({ previewText, children, manageUrl }: EmailLayoutPro
           <Section style={header}>
             <div style={logoMark}>
               <div>
-                <Text style={logoText}>🌱 FarmerZone</Text>
+                <Text style={logoText}>FarmerZone</Text>
                 <Text style={logoSub}>Regionale Lebensmittel</Text>
               </div>
             </div>

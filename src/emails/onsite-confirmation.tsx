@@ -40,7 +40,7 @@ export function OnsiteConfirmationEmail(p: OnsiteConfirmationProps) {
 
       <div style={amberBox}>
         <Text style={{ ...mutedText, margin: 0, fontWeight: '600', color: '#92400e' }}>
-          💵 Du bezahlst {`€ ${p.total.toFixed(2)}`} bei der Abholung vor Ort.
+          Du bezahlst {`€ ${p.total.toFixed(2)}`} bei der Abholung vor Ort.
         </Text>
       </div>
 
@@ -49,7 +49,7 @@ export function OnsiteConfirmationEmail(p: OnsiteConfirmationProps) {
         <Text style={highlightValue}>{p.pickupDate}</Text>
         <Text style={{ ...highlightValue, fontSize: '15px' }}>{p.pickupTime} Uhr</Text>
         <Link href={mapsUrl} style={{ color: '#15803d', fontSize: '13px' }}>
-          📍 {p.farmAddress}, {p.farmCity}
+          {p.farmAddress}, {p.farmCity}
         </Link>
       </div>
 

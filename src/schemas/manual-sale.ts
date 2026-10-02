@@ -11,15 +11,6 @@ export const CHANNEL_LABELS: Record<string, string> = {
   OTHER: 'Sonstiges',
 }
 
-export const CHANNEL_ICONS: Record<string, string> = {
-  PLATFORM: '🖥️',
-  WHATSAPP: '💬',
-  HOFLADEN: '🏡',
-  MARKT: '🛒',
-  BUSINESS: '🤝',
-  OTHER: '···',
-}
-
 // Betrag zuerst, alles andere freiwillig: Ohne Produkt und Menge speichert
 // die Action „Ohne Angabe" und 1 (verkaufOhneAngaben in
 // src/lib/verkauf-eintragen.ts) — Name und Menge sind im Schema Pflicht.

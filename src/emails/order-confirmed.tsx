@@ -24,7 +24,7 @@ export function OrderConfirmedEmail(p: OrderConfirmedProps) {
   const kassieren = p.barZuKassieren ?? p.total
   return (
     <EmailLayout previewText={`Vor-Ort-Bestellung ${p.orderNumber} bestätigt – ${p.customerName}`}>
-      <Text style={h1}>Vor-Ort-Bestellung bestätigt ✓</Text>
+      <Text style={h1}>Vor-Ort-Bestellung bestätigt</Text>
       <Text style={bodyText}>
         Hallo {p.farmerName},<br />
         <strong>{p.customerName}</strong> hat ihre Bestellung per E-Mail bestätigt
@@ -33,7 +33,7 @@ export function OrderConfirmedEmail(p: OrderConfirmedProps) {
 
       <div style={amberBox}>
         <Text style={{ ...mutedText, margin: 0, fontWeight: '600', color: '#92400e' }}>
-          💵 Bar zu kassieren: € {kassieren.toFixed(2)}
+          Bar zu kassieren: € {kassieren.toFixed(2)}
         </Text>
         {mitGebuehr && (
           <Text style={{ ...mutedText, margin: '4px 0 0', color: '#92400e' }}>
