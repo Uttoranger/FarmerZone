@@ -32,8 +32,8 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 
 | Nr | Gate | Abschnitt im Umsetzungsprompt | Braucht Freigabe |
 |---|---|---|---|
-| 01 | H1 Abholtermin prüfen inkl. maxOrders | Gate 3.1 | – |
-| 02 | H4 Bestätigungsseite nur mit Signatur | Gate 3.2 | – |
+| 01 | H1 Abholtermin prüfen inkl. maxOrders (erledigt, #163) | Gate 3.1 | – |
+| 02 | H4 Bestätigungsseite nur mit Signatur (erledigt, #164) | Gate 3.2 | – |
 | 03 | H3 Bar-Bestätigung per Knopf | Gate 3.3 | – |
 | 04 | Servicegebühr Rundung und Satz | Gate 3.4 | E4 |
 | 05 | Bausteine und Shells | Gate 2 | – |

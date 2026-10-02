@@ -1,6 +1,6 @@
 # Umsetzungsprompt v3: Redesign, Kaufstrecke, Futter & Brennmaterial, Teilen, Admin
 
-Stand: Oktober 2026 · Basis: `main` @ `a17d82c` · Ersetzt v2.
+Stand: Oktober 2026 · Basis: `main` @ `1a2357d` · Ersetzt v2.
 **Plan-Dokument, kein Regelwerk.** Dauerhafte Regeln stehen in `CLAUDE.md` und `docs/ai/*` (vor allem `DESIGN_SYSTEM.md`, inklusive Abschnitt „Ergänzungen aus den Mockups"). Fachkonzepte: `docs/konzepte/bereiche.md`, `docs/konzepte/umfeld.md`. Visuelle Referenz: `docs/mockups/` (92 Dateien, Index mit Route je Datei in `docs/mockups/README.md`).
 
 ---
@@ -19,7 +19,7 @@ Stand: Oktober 2026 · Basis: `main` @ `a17d82c` · Ersetzt v2.
 
 ## 1. Ausgangslage – was es schon gibt (nicht neu bauen)
 
-**Erledigt seit v2:** Gate 1 (Tokens, Theme ohne Flash, Lint gegen Farbliterale, Schriften self-hosted) · K1 Storno mit `reverse_transfer` · K2 Webhook-Statuslogik · K3 verwaiste Bestellungen (Freigabe beim Lesen, `src/lib/fristen.ts`) · K4 Stripe-Fehler im Checkout, `account.updated` · Fix A Hand-Zeiger, „Schließen", keine Emojis · Fix B Ladeansichten, 404/500, `global-error.tsx` · Fix C Eingabegrenzen (`src/lib/eingabegrenzen.ts`) · H2 Produktname aus der Datenbank · Briefkasten-Cron zeitkonstant.
+**Erledigt seit v2:** Gate 1 (Tokens, Theme ohne Flash, Lint gegen Farbliterale, Schriften self-hosted) · K1 Storno mit `reverse_transfer` · K2 Webhook-Statuslogik · K3 verwaiste Bestellungen (Freigabe beim Lesen, `src/lib/fristen.ts`) · K4 Stripe-Fehler im Checkout, `account.updated` · Fix A Hand-Zeiger, „Schließen", keine Emojis · Fix B Ladeansichten, 404/500, `global-error.tsx` · Fix C Eingabegrenzen (`src/lib/eingabegrenzen.ts`) · H2 Produktname aus der Datenbank · Briefkasten-Cron zeitkonstant · H1 Abholtermin inkl. `maxOrders` (#163) · H4 Bestätigungsseite nur mit Signatur (#164).
 
 **Vorhanden und wiederzuverwenden:**
 
@@ -43,7 +43,7 @@ Stand: Oktober 2026 · Basis: `main` @ `a17d82c` · Ersetzt v2.
 | Admin | `/admin` (Höfe, Freischaltung, Servicegebühr je Hof), `/admin/finanzen` | Nur Umbau, Ergänzungen in Gate 8 |
 | Navigation Hof | `src/lib/bauern-navigation.ts` | Wird nach DESIGN_SYSTEM.md neu geordnet |
 
-**Noch offen aus dem Sicherheits-Audit (vor Gate 4 erledigen, siehe Gate 3):** H1 Abholtermin unvalidiert und `maxOrders` nicht durchgesetzt · H3 Bar-Bestätigung per GET · H4 Bestätigungsseite ohne Signatur.
+**Noch offen aus dem Sicherheits-Audit (vor Gate 4 erledigen, siehe Gate 3):** H3 Bar-Bestätigung per GET.
 
 ---
 
@@ -133,9 +133,9 @@ Jedes Gate: **Ziel · Mockups · Routen · Aufgaben · Abnahme · Tests · Siche
 ### Gate 3 · Sicherheits-Restposten und Datenmodell (Expand)
 
 - **Ziel:** Kein offener Hoch-Befund mehr, bevor neue öffentliche Seiten live gehen; Schema für Gate 4–8 vorbereitet.
-- **Aufgaben** (je eigener PR, Reihenfolge H1 → H4 → H3, danach Schema):
-  1. **H1** Abholtermin prüfen: Format, Wochentag in Wiener Zeit, Zeiten = aktiver `PickupSlot`, Bestellschluss (`bestellschluss()` aus `fristen.ts`) in der Zukunft, im angebotenen Zeitraum, **`maxOrders` in derselben Transaktion** wie das Anlegen. Fehlercodes `ABHOLFENSTER_UNGUELTIG` / `ABHOLFENSTER_VOLL`, Formular lädt Fenster neu; volle Fenster „ausgebucht".
-  2. **H4** Bestätigungsseite nur mit `?sig=` (`bestellLinkGilt`); alle Linkquellen signieren (checkout-form, stripe-payment `return_url`, Bestätigungs-Route, E-Mails); Status nur aus der Datenbank; `noindex`, `Referrer-Policy: no-referrer`.
+- **Aufgaben** (je eigener PR; H1 und H4 sind erledigt, es bleiben H3, Servicegebühr und Schema):
+  1. ~~**H1**~~ *erledigt (#163).* Abholtermin prüfen: Format, Wochentag in Wiener Zeit, Zeiten = aktiver `PickupSlot`, Bestellschluss (`bestellschluss()` aus `fristen.ts`) in der Zukunft, im angebotenen Zeitraum, **`maxOrders` in derselben Transaktion** wie das Anlegen. Fehlercodes `ABHOLFENSTER_UNGUELTIG` / `ABHOLFENSTER_VOLL`, Formular lädt Fenster neu; volle Fenster „ausgebucht".
+  2. ~~**H4**~~ *erledigt (#164).* Bestätigungsseite nur mit `?sig=` (`bestellLinkGilt`); alle Linkquellen signieren (checkout-form, stripe-payment `return_url`, Bestätigungs-Route, E-Mails); Status nur aus der Datenbank; `noindex`, `Referrer-Policy: no-referrer`.
   3. **H3** Bar-Bestätigung: GET leitet auf `/[farmSlug]/bestaetigen/[token]` (Mockup `web-k3-bar-bestellung-bestaetigen-link-aus-mail.html`), erst der Knopf bestätigt (bedingtes `updateMany`, Frist aus `fristVon`, Token danach `null`), Mails nach der Antwort, „Doch nicht" storniert über `storniereUnbezahlteBestellung`, Route in `sentry-hygiene.ts`.
   4. **E4** Servicegebühr: Rundung auf **aufrunden**, Satz nach Entscheidung; Tests: 1030 → 52, 2000 → 100, 1001 → 51, 250 → 50, 1000 → 50 Cent.
   5. **Schema-Expand** aus Abschnitt 5 für alles, was bestätigt ist (Migration zeigen, Freigabe).

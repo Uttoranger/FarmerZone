@@ -4,8 +4,8 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 
 | Nr | Gate | Status | Branch | PR | Basis | Weggelassen / offen | Datum |
 |---|---|---|---|---|---|---|---|
-| 01 | H1 Abholtermin | offen | | | | | |
-| 02 | H4 Signatur Bestätigung | offen | | | | | |
+| 01 | H1 Abholtermin | fertig | (von Hand) | #163 | main | – | Okt 2026 |
+| 02 | H4 Signatur Bestätigung | fertig | (von Hand) | #164 | main | – | Okt 2026 |
 | 03 | H3 Bar-Bestätigung | offen | | | | | |
 | 04 | Servicegebühr | offen | | | | | |
 | 05 | Bausteine und Shells | offen | | | | | |
