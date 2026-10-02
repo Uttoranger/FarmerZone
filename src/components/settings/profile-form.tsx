@@ -1,10 +1,9 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import { useMemo, useRef, useState, useTransition } from 'react'
 import dynamic from 'next/dynamic'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -33,30 +32,21 @@ import {
   type Land,
 } from '@/lib/laender'
 import type { KartenZiel } from '@/components/settings/standort-karte'
-import { hofBetriebsnummerSchema, betriebsstatusSchema } from '@/schemas/betrieb'
 import { BETRIEBSSTATUS, BETRIEBSSTATUS_VALUES, type BetriebsstatusValue } from '@/lib/taxonomie'
+import { profilBearbeitenSchema } from '@/schemas/hofprofil'
+import { EMAIL_MAX, HOFNAME_MAX, PERSONENNAME_MAX, TELEFON_MAX } from '@/lib/eingabegrenzen'
+import { FeldZaehler } from '@/components/shared/zeichen-zaehler'
 
 // Nur clientseitig: Leaflet greift beim Import auf window zu.
 const StandortKarte = dynamic(() => import('@/components/settings/standort-karte'), { ssr: false })
 
-const schema = z.object({
-  name: z.string().min(2, 'Mindestens 2 Zeichen'),
-  ownerName: z.string().min(2, 'Mindestens 2 Zeichen'),
-  description: z.string().min(10, 'Mindestens 10 Zeichen'),
-  address: z.string().min(3, 'Pflichtfeld'),
-  postalCode: z.string().min(4, 'Pflichtfeld'),
-  city: z.string().min(2, 'Pflichtfeld'),
-  phone: z.string().min(4, 'Pflichtfeld'),
-  email: z.string().email('Ungültige E-Mail'),
-  country: z.enum(LAENDER),
-  // Der Kartenpunkt ist ein Formularwert wie jedes andere Feld: Er wird beim
-  // Schieben gesetzt und erst mit „Profil speichern" gespeichert.
-  latitude: z.number().nullable(),
-  longitude: z.number().nullable(),
-  // Dieselben Regeln wie auf dem Server (src/schemas/betrieb.ts).
-  betriebsnummer: hofBetriebsnummerSchema,
-  betriebsstatus: betriebsstatusSchema,
-})
+/** Obergrenzen je Feld — dieselben, die updateProfile prüft (src/lib/eingabegrenzen.ts). */
+const GRENZE: Partial<Record<keyof ProfileFormData, number>> = {
+  name: HOFNAME_MAX,
+  ownerName: PERSONENNAME_MAX,
+  phone: TELEFON_MAX,
+  email: EMAIL_MAX,
+}
 
 export function ProfileForm({ farm }: { farm: FarmSettings }) {
   const [isPending, startTransition] = useTransition()
@@ -84,7 +74,15 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
       ? { lat: farm.latitude, lon: farm.longitude, zoom: 17 }
       : { lat: RUECKFALL_PUNKTE[startLand].lat, lon: RUECKFALL_PUNKTE[startLand].lon, zoom: 8 }
 
-  const { register, handleSubmit, getValues, setValue, formState: { errors } } = useForm<ProfileFormData>({
+  // Dasselbe Schema wie updateProfile, mit dem Stand, den das Formular zeigt:
+  // Ein Hofname, Inhabername oder eine Nummer, die vor den Obergrenzen länger
+  // gespeichert wurde, sperrt das Speichern nicht — am Feld steht dann
+  // „Bitte kürzen", geprüft wird beim Speichern (src/schemas/hofprofil.ts).
+  const schema = useMemo(
+    () => profilBearbeitenSchema({ name: farm.name, ownerName: farm.ownerName, phone: farm.phone }),
+    [farm.name, farm.ownerName, farm.phone]
+  )
+  const { register, handleSubmit, getValues, setValue, control, formState: { errors } } = useForm<ProfileFormData>({
     // Cast wie im Produktformular: Die Vorverarbeitung (leer → null) macht den
     // Eingabetyp des Schemas zu unknown; der Ausgabetyp ist ProfileFormData.
     resolver: zodResolver(schema) as Resolver<ProfileFormData>,
@@ -195,6 +193,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
   }
 
   function field(id: 'name' | 'ownerName' | 'address' | 'phone' | 'email' | 'betriebsnummer', label: string, placeholder?: string) {
+    const max = GRENZE[id]
     return (
       <div>
         <Label htmlFor={id} className="text-sm text-muted-foreground mb-1 block">{label}</Label>
@@ -204,6 +203,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
           placeholder={placeholder}
           className={errors[id] ? 'border-destructive' : ''}
         />
+        {max !== undefined && <FeldZaehler control={control} name={id} max={max} />}
         {errors[id] && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{errors[id]?.message}</p>}
       </div>
     )

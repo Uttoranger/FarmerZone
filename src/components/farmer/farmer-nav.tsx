@@ -207,7 +207,7 @@ function Person({ name, handy }: { name: string; handy: boolean }) {
         <span className="block text-[10px] font-semibold uppercase tracking-widest" style={RUHIG}>
           Angemeldet
         </span>
-        <span className="block truncate text-sm" style={{ color: 'var(--app-bar-ink)' }}>
+        <span className="block truncate text-sm" style={{ color: 'var(--app-bar-ink)' }} title={anzeige}>
           {anzeige}
         </span>
       </span>

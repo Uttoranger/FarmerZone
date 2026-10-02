@@ -28,7 +28,14 @@ import {
 } from 'lucide-react'
 import { updateProfile } from '@/server/actions/farm'
 import { saveAppearanceAction, updateBannerFocusAction } from '@/server/actions/appearance'
-import { profileSchema, type ProfileFormData } from '@/schemas/hofprofil'
+import {
+  profilBearbeitenSchema,
+  profileSchema,
+  type ProfilBestand,
+  type ProfileFormData,
+} from '@/schemas/hofprofil'
+import { EMAIL_MAX, HOFNAME_MAX, TELEFON_MAX } from '@/lib/eingabegrenzen'
+import { FeldZaehler } from '@/components/shared/zeichen-zaehler'
 import { appearanceSchema, type AppearanceSaveInput } from '@/schemas/auftritt'
 import type { FarmSettings } from '@/server/queries/farm'
 import type { AppearanceData, SectionConfig } from '@/server/queries/appearance'
@@ -195,12 +202,19 @@ function useProfilSpeichern(einstellungen: FarmSettings, onGespeichert: () => vo
 }
 
 // Die Regeln je Feld kommen aus dem Profil-Schema selbst (src/schemas/hofprofil.ts) —
-// keine zweite Abschrift, die auseinanderlaufen könnte.
-const nameSchema = profileSchema.pick({ name: true, description: true })
+// keine zweite Abschrift, die auseinanderlaufen könnte. Für Felder mit
+// Obergrenze das Bearbeiten-Schema mit dem gezeigten Stand: Ein Altwert, der
+// vor der Grenze länger gespeichert wurde, sperrt das Speichern nicht.
+function bestandVon(e: FarmSettings): ProfilBestand {
+  return { name: e.name, ownerName: e.ownerName, phone: e.phone }
+}
+
+type NameDaten = Pick<ProfileFormData, 'name' | 'description'>
 
 function NameForm({ einstellungen, onGespeichert, onAbbrechen }: FormularProps) {
   const { pending, speichern } = useProfilSpeichern(einstellungen, onGespeichert)
-  const { register, handleSubmit, formState } = useForm<z.infer<typeof nameSchema>>({
+  const nameSchema = profilBearbeitenSchema(bestandVon(einstellungen)).pick({ name: true, description: true })
+  const { register, handleSubmit, control, formState } = useForm<NameDaten>({
     resolver: zodResolver(nameSchema),
     defaultValues: { name: einstellungen.name, description: einstellungen.description },
   })
@@ -208,6 +222,7 @@ function NameForm({ einstellungen, onGespeichert, onAbbrechen }: FormularProps) 
     <form onSubmit={handleSubmit(speichern)} className="space-y-3">
       <Feld id="hofseite-name" label="Hofname" fehler={formState.errors.name}>
         <Input id="hofseite-name" {...register('name')} />
+        <FeldZaehler control={control} name="name" max={HOFNAME_MAX} leise="text-app-ink-soft" />
       </Feld>
       <Feld id="hofseite-beschreibung" label="Kurzbeschreibung — ein Satz, der unter dem Namen steht" fehler={formState.errors.description}>
         <Textarea id="hofseite-beschreibung" rows={2} {...register('description')} />
@@ -249,11 +264,12 @@ function AdresseForm({ einstellungen, onGespeichert, onAbbrechen }: FormularProp
   )
 }
 
-const kontaktSchema = profileSchema.pick({ phone: true, email: true })
+type KontaktDaten = Pick<ProfileFormData, 'phone' | 'email'>
 
 function KontaktForm({ einstellungen, onGespeichert, onAbbrechen }: FormularProps) {
   const { pending, speichern } = useProfilSpeichern(einstellungen, onGespeichert)
-  const { register, handleSubmit, formState } = useForm<z.infer<typeof kontaktSchema>>({
+  const kontaktSchema = profilBearbeitenSchema(bestandVon(einstellungen)).pick({ phone: true, email: true })
+  const { register, handleSubmit, control, formState } = useForm<KontaktDaten>({
     resolver: zodResolver(kontaktSchema),
     defaultValues: { phone: einstellungen.phone, email: einstellungen.email },
   })
@@ -262,9 +278,11 @@ function KontaktForm({ einstellungen, onGespeichert, onAbbrechen }: FormularProp
       <div className="grid grid-cols-2 gap-3">
         <Feld id="hofseite-telefon" label="Telefon" fehler={formState.errors.phone}>
           <Input id="hofseite-telefon" type="tel" {...register('phone')} />
+          <FeldZaehler control={control} name="phone" max={TELEFON_MAX} leise="text-app-ink-soft" />
         </Feld>
         <Feld id="hofseite-email" label="E-Mail" fehler={formState.errors.email}>
           <Input id="hofseite-email" type="email" {...register('email')} />
+          <FeldZaehler control={control} name="email" max={EMAIL_MAX} leise="text-app-ink-soft" />
         </Feld>
       </div>
       <p className="text-xs text-app-ink-soft">Beides steht für Kunden auf der Hofseite.</p>

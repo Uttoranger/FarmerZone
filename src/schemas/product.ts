@@ -21,6 +21,7 @@ import {
 } from '@/lib/taxonomie'
 import { mwstStandard } from '@/lib/mwst'
 import { nachkommastellen, parseDezimal } from '@/lib/format'
+import { PRODUKTNAME_MAX, ZU_LANG } from '@/lib/eingabegrenzen'
 
 // Kategorien, Unterkategorien und Siegel leben seit Sprint Taxonomie 1 in
 // src/lib/taxonomie.ts — der EINEN Quelle. Die drei Namen bleiben hier
@@ -258,7 +259,8 @@ export type FutterKennzeichnungFormData = z.infer<typeof futterKennzeichnungSche
 const kategorieFeld = z.preprocess(leerZuNull, z.enum(PRODUCT_CATEGORY_VALUES).nullable()).default(null)
 
 const produktFelder = z.object({
-  name: z.string().min(2, 'Mindestens 2 Zeichen').max(100),
+  // Dieselbe Grenze trägt die Checkout-Position (src/schemas/checkout.ts).
+  name: z.string().min(2, 'Mindestens 2 Zeichen').max(PRODUKTNAME_MAX, ZU_LANG.produktname),
   description: z.string().max(1000, 'Maximal 1000 Zeichen').optional().or(z.literal('')),
   imageUrl: z.string().optional().or(z.literal('')),
   category: kategorieFeld,
@@ -423,7 +425,7 @@ export const sichtbarkeitSchema = z
 
 /** Anfrage des Dual-Use-Hinweises (pruefeDualUse) — Name, Kategorie und beim Bearbeiten die eigene ID. */
 export const dualUseAnfrageSchema = z.object({
-  name: z.string().max(100),
+  name: z.string().max(PRODUKTNAME_MAX),
   category: z.enum(PRODUCT_CATEGORY_VALUES).nullable(),
   productId: z.string().min(1).max(100).optional(),
 })

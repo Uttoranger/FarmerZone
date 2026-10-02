@@ -98,4 +98,5 @@ Jeder Screen liefert vier Zustände:
 ## Qualität
 
 - Kontrast ≥ 4,5:1 in beiden Themes; Touch-Ziele ≥ 44 px; genau **ein** primärer Call-to-Action pro Screen, alles Weitere outline oder ghost.
+- Namen (Hof, Person, Produkt) in Karten, Zeilen und Leisten halten jede Länge bis zur Obergrenze aus (`src/lib/eingabegrenzen.ts`, 80 bzw. 100 Zeichen): höchstens zwei Zeilen (`line-clamp-2 break-words`) oder eine (`truncate`), der volle Text im `title`. Liegt ein gestreckter Link über der Karte, trägt er den `title` — er fängt den Zeiger. Im Teilen-Bild (Satori) `display: 'block'` + `lineClamp` + `wordBreak: 'break-word'`.
 - Jeder UI-PR verlinkt das zugehörige Mockup aus `docs/mockups/` namentlich und wird dagegen abgenommen.
