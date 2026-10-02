@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { sendOrderConfirmation, sendOrderPaidToFarmer, sendZahlungZuSpaet } from '@/lib/email'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
+import { stripeKontoBereit } from '@/lib/stripe-konto'
 
 // Next.js App Router does not pre-parse the body — raw text needed for Stripe sig verification
 export async function POST(request: NextRequest) {
@@ -24,13 +25,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 })
   }
 
-  let event: Stripe.Event
-  try {
-    event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret)
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Unknown error'
-    console.error('[Webhook] Signature verification failed:', msg)
-    return NextResponse.json({ error: `Webhook signature invalid: ${msg}` }, { status: 400 })
+  // Zwei Endpunkte in Stripe, eine Route: Plattform-Events (Zahlungen) und
+  // Connect-Events der verbundenen Höfe (account.updated) kommen mit je
+  // eigenem Signatur-Secret. Gültig ist, was gegen eines davon passt.
+  const secrets = [webhookSecret, env.STRIPE_CONNECT_WEBHOOK_SECRET].filter(
+    (s): s is string => typeof s === 'string' && s.length > 0
+  )
+  let event: Stripe.Event | null = null
+  let letzterFehler = 'Unknown error'
+  for (const secret of secrets) {
+    try {
+      event = stripe.webhooks.constructEvent(rawBody, sig, secret)
+      break
+    } catch (err) {
+      letzterFehler = err instanceof Error ? err.message : 'Unknown error'
+    }
+  }
+  if (!event) {
+    console.error('[Webhook] Signature verification failed:', letzterFehler)
+    return NextResponse.json({ error: `Webhook signature invalid: ${letzterFehler}` }, { status: 400 })
   }
 
   // Idempotency: skip already-processed events
@@ -42,12 +55,22 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    if (event.type === 'payment_intent.succeeded') {
+    // Ereignisse verbundener Hof-Konten (Connect-Endpunkt, `event.account`
+    // gesetzt) betreffen nur das Konto selbst — Zahlungen laufen als
+    // Destination Charge auf der Plattform und kommen ohne `account`.
+    if (event.account) {
+      if (event.type === 'account.updated') {
+        await handleKontoAktualisiert(event.data.object as Stripe.Account)
+      }
+    } else if (event.type === 'payment_intent.succeeded') {
       await handlePaymentSucceeded(event.data.object as Stripe.PaymentIntent)
     } else if (event.type === 'payment_intent.payment_failed') {
       await handlePaymentFailed(event.data.object as Stripe.PaymentIntent)
     } else if (event.type === 'payment_intent.canceled') {
       await handlePaymentCanceled(event.data.object as Stripe.PaymentIntent)
+    } else if (event.type === 'account.updated') {
+      // Auch über den Plattform-Endpunkt möglich (abonniert); dieselbe Regel.
+      await handleKontoAktualisiert(event.data.object as Stripe.Account)
     }
   } catch (err) {
     // 500 → Stripe retried das Event; es wurde noch nicht persistiert und gilt als unverarbeitet
@@ -136,6 +159,28 @@ async function handlePaymentFailed(pi: Stripe.PaymentIntent) {
   await prisma.order.updateMany({
     where: { stripePaymentIntentId: pi.id, status: 'PENDING_CONFIRMATION' },
     data: { paymentStatus: 'FAILED' },
+  })
+}
+
+/**
+ * Stripe hat das Konto eines Hofs geändert — etwa gesperrt, weil Angaben
+ * fehlen, oder wieder freigegeben. Vorher setzte nur das Onboarding
+ * `stripeAccountReady`; eine spätere Sperre blieb unbemerkt, der Checkout bot
+ * Online weiter an, und jede Zahlung scheiterte erst bei Stripe. Kein Hof mit
+ * dieser Konto-ID (fremdes Konto, das Plattformkonto selbst): nichts zu tun.
+ */
+async function handleKontoAktualisiert(konto: Stripe.Account) {
+  const hof = await prisma.farm.findFirst({ where: { stripeAccountId: konto.id }, select: { id: true } })
+  if (!hof) return
+  // Stripe liefert Ereignisse nicht garantiert in der richtigen Reihenfolge.
+  // Ein verspätetes, älteres account.updated überschriebe sonst einen
+  // neueren Stand — also den aktuellen nachlesen. Scheitert das: 500, Stripe
+  // stellt erneut zu.
+  // Kurze Leine: Hängt Stripe, bricht die Zustellung sonst ab und kommt erneut.
+  const aktuell = await stripe.accounts.retrieve(konto.id, {}, { timeout: 10_000, maxNetworkRetries: 1 })
+  await prisma.farm.update({
+    where: { id: hof.id },
+    data: { stripeAccountReady: stripeKontoBereit(aktuell) },
   })
 }
 

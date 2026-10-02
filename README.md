@@ -108,6 +108,11 @@ Im [Stripe Dashboard](https://dashboard.stripe.com/webhooks) einen neuen Webhook
 - **Events:** `payment_intent.succeeded`, `payment_intent.payment_failed`, `payment_intent.canceled` — ohne `canceled` wird eine abgebrochene Zahlung nie storniert und ihre Ware bleibt reserviert.
 - Den Signing Secret als `STRIPE_WEBHOOK_SECRET` in Vercel eintragen.
 
+Dazu einen **zweiten** Endpunkt für die verbundenen Höfe („Events von verbundenen Konten“ / Connect):
+- **URL:** dieselbe, `https://deine-domain.at/api/stripe/webhook`
+- **Events:** `account.updated` — hält „Online-Zahlung bereit“ aktuell, wenn Stripe ein Hof-Konto sperrt oder wieder freigibt.
+- Dessen Signing Secret als `STRIPE_CONNECT_WEBHOOK_SECRET` in Vercel eintragen (Production und Preview). Die Route prüft gegen beide Secrets.
+
 ### 4. Cron-Job einrichten
 
 `vercel.json` enthält bereits die Cron-Jobs (einmal täglich, mehr erlaubt der Hobby-Tarif nicht):

@@ -254,6 +254,108 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 
 ## Bekannte Bugs & Fixes
 
+### BUG: Stripe-Fehler beim Zahlungsstart hinterließ Bestellung und Bestand ohne Zahlung (behoben 2026-10-01, K4)
+
+**Befund:** Im Checkout stand `paymentIntents.create` ohne `try` und ohne
+Stripe-Idempotenz-Schlüssel, und zwar NACH dem Anlegen der Bestellung und der
+Buchung des Bestands. Scheiterte Stripe (Ausfall, Hof-Konto eingeschränkt),
+blieben Bestellung und gebuchter Bestand ohne PaymentIntent stehen. Jede
+Wiederholung mit demselben Idempotenz-Schlüssel bekam für immer 409 „wird
+gerade angelegt“. Dazu setzte nur das Onboarding `stripeAccountReady`. Eine
+spätere Sperre durch Stripe blieb unbemerkt, und der Checkout bot Online
+weiter an.
+
+**Fix:**
+- `paymentIntents.create` hat jetzt den Schlüssel `pi-<Bestell-ID>` und ist
+  abgefangen. Scheitert Stripe, wird die Bestellung über
+  `storniereUnbezahlteBestellung` beendet (Grund „Zahlung konnte nicht
+  gestartet werden“), die Ware ist zurück, und die Antwort ist 503
+  `ZAHLUNG_NICHT_MOEGLICH`: „Online-Zahlung ist gerade nicht möglich. Bitte
+  versuch es später oder wähle Barzahlung.“
+- Die Parameter rechnet `intentParameter` aus den **gespeicherten** Werten der
+  Bestellung. Nur so schickt eine Wiederholung exakt dieselben, sonst lehnt
+  Stripe den Schlüssel ab. Der Ladungstyp ist unverändert, die Wache in
+  `tests/storno-erstattung.test.ts` prüft ihn jetzt dort.
+- **Wiederholung ohne gespeicherte Intent-ID** (dasselbe Idempotenz-Merkmal im
+  Checkout):
+  - jünger als 2 Minuten: Derselbe Stripe-Schlüssel liefert denselben Intent.
+    Die ID wird bedingt nachgetragen, die Antwort ist 200 mit Client-Secret.
+  - Ist Stripe gerade nicht erreichbar, bleibt es bei 409 „wird gerade
+    angelegt“.
+  - älter als 2 Minuten oder der Hof ohne Konto: gescheitert. Die Bestellung
+    wird storniert, die Ware ist zurück, die Antwort ist 503 mit Code.
+- **Barzahlung danach wirklich möglich:** Die Halte der Sitzung werden erst
+  frei, wenn die Bestellung steht, online also nach dem PaymentIntent. Vorher
+  löschte der Checkout sie vor dem Stripe-Aufruf; der Barversuch nach dem 503
+  wäre dann an „Reservierung abgelaufen“ gescheitert. Dazu nimmt der Browser
+  nach `ZAHLUNG_NICHT_MOEGLICH` einen neuen Idempotenz-Schlüssel, sonst bekäme
+  er die stornierte Bestellung zurück.
+- **`account.updated`:** Die Webhook-Route prüft die Signatur gegen
+  `STRIPE_WEBHOOK_SECRET` und das neue, optionale
+  `STRIPE_CONNECT_WEBHOOK_SECRET`. Sie setzt `stripeAccountReady` für den Hof
+  mit dieser `stripeAccountId`. Ein fremdes Konto ändert nichts.
+  - Den Stand liest sie bei Stripe frisch nach, denn Ereignisse kommen nicht
+    garantiert in Reihenfolge.
+  - Ereignisse verbundener Konten (`event.account`) laufen nur durch
+    `account.updated`, nie durch die Zahlungs-Handler.
+  - Fehlt das Secret in Produktion, meldet die Umgebungsprüfung eine Warnung
+    an Sentry.
+- **Wettläufe** (Prüferbefund):
+  - Ein Stripe-409, weil eine zweite Anfrage mit demselben Schlüssel läuft
+    (Doppelklick), führt nicht zum Storno, sondern zu 409 „wird gerade
+    angelegt“.
+  - Die Intent-ID kommt nur an eine noch offene Bestellung
+    (`haengeIntentAn`). Wurde sie während des Stripe-Aufrufs storniert, wird
+    der Intent abgebrochen und kein Client-Secret herausgegeben.
+  - Die Stripe-Aufrufe haben eine kurze Leine (20 Sekunden, zwei
+    Wiederholungen) und bleiben damit unter der Wartezeit von zwei Minuten.
+  - Die Wiederholung gibt die Halte der Sitzung frei, wenn sie den Intent
+    nachträgt.
+- **Eine Bereit-Regel:** `stripeKontoBereit` in `src/lib/stripe-konto.ts`
+  verlangt Zahlungen UND Auszahlungen frei. Sie gilt jetzt auch beim
+  Onboarding und bei „Status prüfen“, dort galt bisher
+  `charges_enabled && details_submitted`. Mit zwei Regeln wäre der Wert je nach
+  Schreiber hin- und hergesprungen. Folge: Ein Hof gilt nach dem Onboarding
+  erst als bereit, wenn Stripe auch Auszahlungen freigibt. Den Wechsel meldet
+  `account.updated`.
+- **Heute:** Will der Hof online kassieren und Stripe lässt es nicht zu, zeigt
+  Heute (Web und Handy) „Online-Zahlung ist pausiert – Stripe braucht noch
+  Angaben von dir. Bis dahin können Kunden nur bar bei Abholung bestellen.“
+  Der Knopf „Bei Stripe ergänzen“ führt über einen Account Link direkt zu
+  Stripe. Der Checkout bot Online ohnehin nur bei `stripeAccountReady` an.
+  - **Abweichung vom Wortlaut:** Der Hinweis erscheint nur, wenn der Hof schon
+    ein Stripe-Konto hat. `acceptsOnline` ist für jeden neuen Hof
+    vorbelegt; sonst stünde „pausiert“ ab Tag eins bei jedem Hof, der Stripe
+    nie eingerichtet hat. Dafür hat die Erste-Schritte-Karte ihren eigenen
+    Schritt.
+  - Ohne Barzahlung verspricht der Satz sie nicht: „… können Kunden bei dir
+    nicht bestellen.“ Dasselbe gilt für die 503-Antwort im Checkout.
+
+**Manueller Schritt:** Im Stripe-Dashboard einen Connect-Webhook-Endpunkt
+anlegen („Events von verbundenen Konten“, dieselbe URL, Event
+`account.updated`). Dessen Secret kommt als `STRIPE_CONNECT_WEBHOOK_SECRET`
+in Vercel, Production und Preview (README, „Stripe Webhook für Produktion“).
+
+**Offen, mit Absicht nicht angefasst:**
+- Die Hofseite zeigt unter „Zahlung & Kontakt“ „Online (Karte)“ allein nach
+  `acceptsOnline`, also auch, wenn Online pausiert ist.
+
+**Tests:**
+- `tests/integration/checkout-zahlung-start.int.test.ts` (echtes Postgres):
+  - Stripe wirft; danach Barzahlung;
+  - Stripe-409 ohne Storno;
+  - Storno während des Stripe-Aufrufs;
+  - Wiederholung nach gescheitertem Speichern;
+  - dieselben Parameter beim ersten und zweiten Aufruf;
+  - älter als 2 Minuten; jung ohne Konto; jung bei Stripe-Ausfall;
+  - Erfolgsweg mit Schlüssel.
+- `tests/integration/stripe-konto.int.test.ts`: `account.updated` mit echter
+  Signatur gegen beide Secrets; ein verspätetes Ereignis überschreibt nicht
+  den aktuellen Stand; ein fremdes Secret ergibt 400.
+- Vor dem Fix waren 10 von 12 rot.
+- `tests/stripe-konto.test.ts`, `tests/webhook.test.ts`: Bereit-Regel und
+  Signatur mit Connect-Secret.
+
 ### BUG: Verwaiste Bestellungen hielten den Bestand für immer (behoben 2026-10-01, K3)
 
 **Befund:** Der Checkout bucht den Bestand, bevor bezahlt (online) oder per

@@ -20,6 +20,7 @@ import { umsatzfenster } from '@/lib/umsatz'
 import { umsatzCent } from '@/server/queries/umsatz'
 import { statusReminder } from '@/lib/dashboard-hints'
 import { ersteSchritte, ersteSchritteDaten, type ErsteSchritteErgebnis } from '@/lib/erste-schritte'
+import { onlineZahlungPausiert } from '@/lib/stripe-konto'
 
 /**
  * Alles für den Heute-Bildschirm (/dashboard) in einem Zug. Die Regeln stehen
@@ -35,6 +36,11 @@ export type Heute = {
   woche: Wochenvergleich
   ersteSchritte: ErsteSchritteErgebnis
   wartetAufFreigabe: boolean
+  /**
+   * Der Hof will online kassieren, Stripe lässt es gerade nicht zu — dann der
+   * Hinweis mit dem Weg zu Stripe; `barMoeglich` wählt den Satz.
+   */
+  onlinePausiert: { barMoeglich: boolean } | null
 }
 
 export async function getHeute(farmId: string, jetzt: Date = new Date()): Promise<Heute> {
@@ -110,6 +116,9 @@ export async function getHeute(farmId: string, jetzt: Date = new Date()): Promis
         bannerType: true,
         bannerUrl: true,
         stripeAccountReady: true,
+        stripeAccountId: true,
+        acceptsOnline: true,
+        acceptsOnsite: true,
         approvedAt: true,
       },
     }),
@@ -138,5 +147,6 @@ export async function getHeute(farmId: string, jetzt: Date = new Date()): Promis
     woche: wochenvergleich(umsatzDieseWoche, umsatzVorwoche),
     ersteSchritte: ersteSchritte(ersteSchritteDaten(hof, { produkte, aktiveAbholzeiten })),
     wartetAufFreigabe: hof?.approvedAt == null,
+    onlinePausiert: hof && onlineZahlungPausiert(hof) ? { barMoeglich: hof.acceptsOnsite } : null,
   }
 }

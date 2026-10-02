@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
+import { stripeKontoBereit } from '@/lib/stripe-konto'
 import { APP_URL } from '@/lib/umgebung-server'
 
 async function getAuthenticatedFarm() {
@@ -93,7 +94,8 @@ export async function checkConnectStatus(): Promise<{ ready: boolean; error?: st
   }
 
   const account = await stripe.accounts.retrieve(farm.stripeAccountId)
-  const ready = !!(account.charges_enabled && account.details_submitted)
+  // Dieselbe Regel wie account.updated (src/lib/stripe-konto.ts).
+  const ready = stripeKontoBereit(account)
 
   await prisma.farm.update({
     where: { id: farm.id },

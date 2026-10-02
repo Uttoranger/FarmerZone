@@ -17,6 +17,11 @@ const serverEnvSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(1),
   STRIPE_SECRET_KEY: z.string().min(1),
   STRIPE_WEBHOOK_SECRET: z.string().min(1),
+  // OPTIONAL: Das Signatur-Secret des Connect-Endpunkts („Events von
+  // verbundenen Konten", z. B. account.updated). Eigener Endpunkt in Stripe,
+  // dieselbe Route /api/stripe/webhook — sie prüft gegen beide Secrets. Fehlt
+  // es, kommen nur Plattform-Events an; ein Deploy scheitert daran nicht.
+  STRIPE_CONNECT_WEBHOOK_SECRET: optional(),
   // OPTIONAL, und zwar unbedingt: Ein fehlender (oder leerer) DSN darf
   // niemals einen Deploy verhindern — dann startet die App normal und
   // Sentry bleibt schlicht still (src/instrumentation*.ts prüfen selbst).
