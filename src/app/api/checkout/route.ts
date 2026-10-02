@@ -22,6 +22,7 @@ import { berechneServicegebuehr } from '@/lib/servicegebuehr'
 import { pruefeSitzungsWarenkorb } from '@/server/warenkorb'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
+import { bestellPositionsName } from '@/lib/eingabegrenzen'
 import { fristVon } from '@/lib/fristen'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
@@ -452,7 +453,7 @@ export async function POST(request: NextRequest) {
   //     Browser schickt. Nur Produkte DIESES Hofs zählen.
   const produkte = await prisma.product.findMany({
     where: { id: { in: data.items.map((i) => i.productId) }, farmId: farm.id },
-    select: { id: true, price: true, vatRate: true, abgabe: true },
+    select: { id: true, name: true, price: true, vatRate: true, abgabe: true },
   })
   const produktJeId = new Map(produkte.map((p) => [p.id, p]))
   if (data.items.some((i) => !produktJeId.has(i.productId))) {
@@ -469,7 +470,19 @@ export async function POST(request: NextRequest) {
   // Summe (dasselbe Muster wie bei gekürzten Mengen).
   // Decimal bleibt Decimal — gerechnet wird damit, nicht mit number.
   const dbPreise = new Map(produkte.map((p) => [p.id, p.price]))
-  const abweichend = preisAbweichungen(data.items, dbPreise)
+  // Die Positionen nehmen aus dem Request NUR Produkt, Menge und den
+  // gesehenen Preis (für den Abgleich). Der Name kommt wie Preis, MwSt und
+  // Abgabe aus der Datenbank — items.name ist Fremdtext und wird nie gelesen.
+  // Vorher stand hier `{ ...i }`: So landete jeder Text aus einem gebauten
+  // Request in Bestellung, Packliste, Hof-Mail und Abrechnung.
+  // Das ! ist sicher: 3b hat oben jedes Produkt der Anfrage in produktJeId gefunden.
+  const angefragt = data.items.map((i) => ({
+    productId: i.productId,
+    quantity: i.quantity,
+    unitPrice: i.unitPrice,
+    name: bestellPositionsName(produktJeId.get(i.productId)!.name),
+  }))
+  const abweichend = preisAbweichungen(angefragt, dbPreise)
   if (abweichend.length > 0) {
     const namen = abweichend.map((a) => `„${a.name}“`).join(', ')
     return konflikt(
@@ -487,7 +500,7 @@ export async function POST(request: NextRequest) {
   }
   // Ab hier rechnet alles mit dem Preis aus der DB — auch wenn er gleich war.
   // Das ! ist sicher: 3b hat oben jedes Produkt der Anfrage in produktJeId gefunden.
-  const positionen = data.items.map((i) => ({ ...i, unitPrice: dbPreise.get(i.productId)! }))
+  const positionen = angefragt.map((i) => ({ ...i, unitPrice: dbPreise.get(i.productId)! }))
 
   // 3c. BETRIEBSNACHWEIS — serverseitig erneut, auch wenn das Formular schon
   //     geprüft hat. Vor jeder Buchung: Ein Verstoß bucht keinen Bestand und
@@ -548,7 +561,7 @@ export async function POST(request: NextRequest) {
   //    fehl (count 0), wenn zwischen Prüfung und Buchung jemand schneller war;
   //    ein blindes `decrement` hätte den Bestand ins Minus gezogen.
   const gebucht: Array<{ productId: string; quantity: number }> = []
-  for (const item of data.items) {
+  for (const item of positionen) {
     const res = await prisma.product.updateMany({
       where: { id: item.productId, stock: { gte: item.quantity } },
       data: { stock: { decrement: item.quantity } },

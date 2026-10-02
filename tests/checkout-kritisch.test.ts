@@ -93,10 +93,13 @@ const ids = (a: unknown): string[] => {
   return w?.id?.in ?? w?.productId?.in ?? []
 }
 
+/** Produktnamen wie in der Datenbank — der Checkout liest sie aus Product.name. */
+const NAME: Record<string, string> = { prod_1: 'Tomaten', prod_2: 'Gurken' }
+
 /** Normalfall: Ware da, eigener Halt gültig, Buchung geht durch. */
 function warenkorbBereit(haltMs = 600_000, bestand = 999) {
   productFindMany.mockImplementation(((a: unknown) =>
-    Promise.resolve(ids(a).map((id) => ({ id, stock: bestand, isAvailable: true, price: PREIS[id] ?? 5 })))) as never)
+    Promise.resolve(ids(a).map((id) => ({ id, name: NAME[id] ?? 'Tomaten', stock: bestand, isAvailable: true, price: PREIS[id] ?? 5 })))) as never)
   reservationFindMany.mockImplementation(((a: unknown) => {
     const sess = (a as { where?: { sessionId?: unknown } })?.where?.sessionId
     if (sess && typeof sess === 'object') return Promise.resolve([]) // fremde Sitzungen

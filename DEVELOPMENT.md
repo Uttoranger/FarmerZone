@@ -3295,6 +3295,34 @@ außerhalb des Projekts installiert worden):
 
 ---
 
+## Produktname der Bestellung aus der Datenbank (2026-10-02)
+
+Der Checkout (`/api/checkout`) baute seine Positionen mit `{ ...i }` aus dem
+Request und ersetzte danach nur den Preis. Der Name, den der Browser schickte,
+landete so unverändert in `OrderItem.productName` — also in Bestellliste,
+Packliste, Hof-Mail und Abrechnung — und in der Bestätigungsmail; zwei
+Fehlermeldungen (Preis geändert, Bestand weg) zeigten ihn ebenfalls. Ein gebauter
+Request mit „Gratis" als Name ging durch, der Preis stimmte ja.
+
+Jetzt nimmt der Checkout aus dem Request nur Produkt, Menge und den gesehenen
+Preis (für den Abgleich). Der Name kommt aus `Product.name`, gekürzt auf
+`PRODUKTNAME_MAX` (`bestellPositionsName` in `src/lib/eingabegrenzen.ts`) —
+gekürzt statt abgelehnt, damit ein Produkt mit altem, langem Namen kaufbar
+bleibt. `items.name` bleibt im Schema optional, weil offene Tabs mit altem Code
+es noch schicken, wird aber nirgends gelesen. Keine Schema-Änderung.
+
+Verkaufsgrößen („Produktname, Größenname") gibt es im Datenmodell nicht; der Name
+ist deshalb der Produktname allein. Kommen Größen, gehört ihr Name an dieselbe
+Stelle (`bestellPositionsName`).
+
+**Offen:** `items.name` könnte auch ganz aus dem Schema fallen — Zod entfernt
+unbekannte Felder still, alte Tabs würden nicht abgewiesen. Dann erzwänge der
+Typecheck, dass niemand den Namen aus dem Request liest; heute sichert das nur
+`tests/checkout-produktname.test.ts`. Das Feld bleibt vorerst auf Wunsch des
+Menschen. `checkout-form.tsx` schickt den Namen weiter mit.
+
+---
+
 ## Nützliche Befehle
 
 ```bash

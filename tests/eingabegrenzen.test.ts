@@ -16,7 +16,7 @@ import { hofAnlegenSchema, profilBearbeitenSchema, profileSchema } from '@/schem
 import { registrationSchema, vollerName } from '@/schemas/register'
 import { checkoutFormSchema, checkoutRequestSchema } from '@/schemas/checkout'
 import { productFormSchema } from '@/schemas/product'
-import { PRODUKTNAME_MAX, passtInGrenze, zeichenStand } from '@/lib/eingabegrenzen'
+import { PRODUKTNAME_MAX, bestellPositionsName, passtInGrenze, zeichenStand } from '@/lib/eingabegrenzen'
 
 /** Ein Text mit genau `laenge` Zeichen. */
 const text = (laenge: number, zeichen = 'x'): string => zeichen.repeat(laenge)
@@ -179,15 +179,18 @@ describe('Checkout-Anfrage — Obergrenzen auf dem Server', () => {
   it('kürzt den Positionsnamen auf 100 Zeichen, statt die Bestellung abzulehnen', () => {
     // Ein Produkt, dessen Name vor der Grenze länger gespeichert wurde, muss
     // kaufbar bleiben — nur die Momentaufnahme in der Bestellung wird gekürzt.
-    const mitName = (name: string) => ({ ...CHECKOUT_ANFRAGE, items: [{ ...CHECKOUT_ANFRAGE.items[0], name }] })
-    expect(checkoutRequestSchema.parse(mitName(text(100))).items[0].name).toBe(text(100))
-    expect(checkoutRequestSchema.parse(mitName(text(130))).items[0].name).toBe(text(100))
+    // Der Name kommt aus Product.name (route.ts), nicht aus dem Request.
+    expect(bestellPositionsName(text(100))).toBe(text(100))
+    expect(bestellPositionsName(text(130))).toBe(text(100))
   })
 
   it('kürzt den Positionsnamen nicht mitten in einem Emoji', () => {
-    const mitName = (name: string) => ({ ...CHECKOUT_ANFRAGE, items: [{ ...CHECKOUT_ANFRAGE.items[0], name }] })
-    const name = checkoutRequestSchema.parse(mitName(`${text(99)}🥕🥕`)).items[0].name
-    expect(name).toBe(`${text(99)}🥕`)
+    expect(bestellPositionsName(`${text(99)}🥕🥕`)).toBe(`${text(99)}🥕`)
+  })
+
+  it('items.name im Request ist nur geduldet: fehlt er, ist die Anfrage gültig', () => {
+    const ohneName = { ...CHECKOUT_ANFRAGE, items: [{ productId: CHECKOUT_ANFRAGE.items[0].productId, quantity: 1, unitPrice: 5 }] }
+    expect(checkoutRequestSchema.safeParse(ohneName).success).toBe(true)
   })
 
   it('gibt die E-Mail ohne Ränder und klein geschrieben an den Handler weiter', () => {

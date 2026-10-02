@@ -108,12 +108,16 @@ function anfrage(overrides: Record<string, unknown> = {}): NextRequest {
 const kundeDerBestellung = (n: number): unknown =>
   (orderCreate.mock.calls[n][0] as { data: { customerId: string } }).data.customerId
 
+/** Name des Produkts in der „Datenbank" — der Checkout liest ihn aus Product.name. */
+let produktName = 'Erdäpfel'
+
 beforeEach(() => {
   vi.clearAllMocks()
   kunden = new Map()
+  produktName = 'Erdäpfel'
   farmFindUnique.mockResolvedValue(HOF as never)
   productFindMany.mockImplementation(((a: unknown) =>
-    Promise.resolve(ids(a).map((id) => ({ id, stock: 999, isAvailable: true, price: 5, abgabe: 'ALLE', vatRate: 10 })))) as never)
+    Promise.resolve(ids(a).map((id) => ({ id, name: produktName, stock: 999, isAvailable: true, price: 5, abgabe: 'ALLE', vatRate: 10 })))) as never)
   reservationFindMany.mockImplementation(((a: unknown) => {
     const sitzung = (a as { where?: { sessionId?: unknown } })?.where?.sessionId
     if (sitzung && typeof sitzung === 'object') return Promise.resolve([]) // fremde Sitzungen
@@ -174,9 +178,9 @@ describe('Obergrenzen am Checkout-Handler', () => {
   })
 
   it('nimmt ein Produkt mit zu langem Altnamen an und kürzt nur die Momentaufnahme', async () => {
-    const res = await POST(
-      anfrage({ items: [{ productId: 'prod_1', name: 'x'.repeat(130), quantity: 1, unitPrice: 5 }] })
-    )
+    // Der Name kommt aus der Datenbank (Product.name), nicht aus dem Request.
+    produktName = 'x'.repeat(130)
+    const res = await POST(anfrage({ items: [{ productId: 'prod_1', quantity: 1, unitPrice: 5 }] }))
 
     expect(res.status).toBe(200)
     const daten = (orderCreate.mock.calls[0][0] as { data: { items: { create: { productName: string }[] } } }).data

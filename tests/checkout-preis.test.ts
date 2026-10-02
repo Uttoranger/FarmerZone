@@ -94,6 +94,7 @@ beforeEach(() => {
           stock: 999,
           isAvailable: true,
           farmId: 'farm_1',
+          name: id === 'tomaten' ? 'Tomaten' : 'Eier',
           vatRate: { toString: () => '10.00' },
           abgabe: 'ALLE',
           price: { toString: () => preise[id] },
