@@ -16,6 +16,8 @@ import { emailSchema } from '@/schemas/email'
  * bekommen haben. Ein längerer Altwert darf beim Bearbeiten unverändert
  * stehen bleiben (passtInGrenze in src/lib/eingabegrenzen.ts).
  */
+// Bewusst ausgeschrieben statt Pick<ProfileFormData, …>: Das Schema nimmt den
+// Bestand als Parameter, ein abgeleiteter Typ wäre ein Zirkelbezug (TS2456).
 export type ProfilBestand = { name: string; ownerName: string; phone: string }
 
 function profilSchemaFuer(bestand?: ProfilBestand) {
@@ -98,7 +100,15 @@ export const hofAnlegenSchema = z.object({
   postalCode: z.string().trim(),
   city: z.string().trim(),
   phone: z.string().trim().max(TELEFON_MAX, ZU_LANG.telefon),
-  // Die Hof-E-Mail ist im Onboarding freiwillig: leer bleibt leer. Klein
-  // geschrieben aus demselben Grund wie in emailSchema (src/schemas/email.ts).
-  email: z.string().trim().toLowerCase().max(EMAIL_MAX, ZU_LANG.email),
+  // Die Hof-E-Mail ist im Onboarding freiwillig: leer bleibt leer. Sonst gilt
+  // emailSchema (src/schemas/email.ts) — klein, ohne Ränder, gültiges Format.
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .max(EMAIL_MAX, ZU_LANG.email)
+    .refine(
+      (v) => v === '' || emailSchema().safeParse(v).success,
+      'Bitte gib eine gültige Hof-E-Mail an — oder lass das Feld leer.'
+    ),
 })

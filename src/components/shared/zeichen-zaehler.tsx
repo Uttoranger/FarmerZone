@@ -31,7 +31,9 @@ export function ZeichenZaehler({
       className={cn(
         'mt-1 text-right text-xs tabular-nums',
         // Bedeutungsfarbe „Achtung": heller Wert mit dunkler Entsprechung (CODING_STANDARDS §7).
-        stand.zuLang ? 'font-medium text-amber-700 dark:text-amber-300' : leise
+        // amber-800 statt -700: auf dem Crème-Seitengrund des neuen Designs
+        // käme -700 bei text-xs nur auf ~4,4:1.
+        stand.zuLang ? 'font-medium text-amber-800 dark:text-amber-300' : leise
       )}
     >
       {stand.text}

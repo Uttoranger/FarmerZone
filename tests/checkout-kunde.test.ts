@@ -173,6 +173,16 @@ describe('Obergrenzen am Checkout-Handler', () => {
     expect(orderCreate).not.toHaveBeenCalled()
   })
 
+  it('nimmt ein Produkt mit zu langem Altnamen an und kürzt nur die Momentaufnahme', async () => {
+    const res = await POST(
+      anfrage({ items: [{ productId: 'prod_1', name: 'x'.repeat(130), quantity: 1, unitPrice: 5 }] })
+    )
+
+    expect(res.status).toBe(200)
+    const daten = (orderCreate.mock.calls[0][0] as { data: { items: { create: { productName: string }[] } } }).data
+    expect(daten.items.create[0].productName).toBe('x'.repeat(100))
+  })
+
   it('nimmt eine Notiz mit genau 500 Zeichen an', async () => {
     const res = await POST(anfrage({ customerNote: 'x'.repeat(500) }))
 

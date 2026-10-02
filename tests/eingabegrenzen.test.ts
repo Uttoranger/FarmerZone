@@ -176,10 +176,18 @@ describe('Checkout-Anfrage — Obergrenzen auf dem Server', () => {
     expect(checkoutRequestSchema.safeParse({ ...CHECKOUT_ANFRAGE, customerEmail: adresse(255) }).success).toBe(false)
   })
 
-  it('begrenzt den Positionsnamen wie den Produktnamen auf 100 Zeichen', () => {
+  it('kürzt den Positionsnamen auf 100 Zeichen, statt die Bestellung abzulehnen', () => {
+    // Ein Produkt, dessen Name vor der Grenze länger gespeichert wurde, muss
+    // kaufbar bleiben — nur die Momentaufnahme in der Bestellung wird gekürzt.
     const mitName = (name: string) => ({ ...CHECKOUT_ANFRAGE, items: [{ ...CHECKOUT_ANFRAGE.items[0], name }] })
-    expect(checkoutRequestSchema.safeParse(mitName(text(100))).success).toBe(true)
-    expect(checkoutRequestSchema.safeParse(mitName(text(101))).success).toBe(false)
+    expect(checkoutRequestSchema.parse(mitName(text(100))).items[0].name).toBe(text(100))
+    expect(checkoutRequestSchema.parse(mitName(text(130))).items[0].name).toBe(text(100))
+  })
+
+  it('kürzt den Positionsnamen nicht mitten in einem Emoji', () => {
+    const mitName = (name: string) => ({ ...CHECKOUT_ANFRAGE, items: [{ ...CHECKOUT_ANFRAGE.items[0], name }] })
+    const name = checkoutRequestSchema.parse(mitName(`${text(99)}🥕🥕`)).items[0].name
+    expect(name).toBe(`${text(99)}🥕`)
   })
 
   it('gibt die E-Mail ohne Ränder und klein geschrieben an den Handler weiter', () => {
@@ -197,6 +205,14 @@ describe('Checkout-Anfrage — Obergrenzen auf dem Server', () => {
     })
     expect(produkt.success).toBe(true)
     expect(position.success).toBe(true)
+  })
+
+  it('das Produktformular meldet einen zu langen Namen auf Deutsch', () => {
+    const r = productFormSchema.safeParse({ name: text(PRODUKTNAME_MAX + 1), price: '5', unit: 'KG' })
+    expect(r.success).toBe(false)
+    expect(r.error?.issues.find((i) => i.path[0] === 'name')?.message).toBe(
+      'Der Produktname darf höchstens 100 Zeichen haben.'
+    )
   })
 })
 
@@ -275,6 +291,13 @@ describe('hofAnlegenSchema — der erste Schritt des Onboardings', () => {
 
   it('lässt die freiwillige Hof-E-Mail leer', () => {
     expect(hofAnlegenSchema.parse(ANLAGE).email).toBe('')
+    expect(hofAnlegenSchema.parse({ ...ANLAGE, email: '   ' }).email).toBe('')
+  })
+
+  it('lehnt eine Hof-E-Mail ohne gültiges Format ab — mit Ausweg', () => {
+    const r = hofAnlegenSchema.safeParse({ ...ANLAGE, email: 'hof at example' })
+    expect(r.success).toBe(false)
+    expect(r.error?.issues[0]?.message).toBe('Bitte gib eine gültige Hof-E-Mail an — oder lass das Feld leer.')
   })
 })
 

@@ -276,8 +276,12 @@ waren deshalb zwei Kundenkonten, und das groß geschriebene fand der Anmeldelink
 - E-Mail über `emailSchema` (`src/schemas/email.ts`): ohne Ränder, klein,
   höchstens 254. Gilt für Registrierung, Hofprofil und Checkout (Formular und
   Server). Damit sucht und legt der Checkout das Konto immer klein an.
-- `createFarm` prüft mit `hofAnlegenSchema`, nur die Grenzen und Ränder. Die
-  Pflichtfelder hält weiter das Formular.
+- `createFarm` prüft mit `hofAnlegenSchema`: Grenzen, Ränder und das Format
+  einer angegebenen Hof-E-Mail (leer bleibt erlaubt). Die Pflichtfelder hält
+  weiter das Formular.
+- Der Positionsname im Checkout wird auf 100 Zeichen **gekürzt**, nicht
+  abgelehnt: Er ist nur die Momentaufnahme des Produktnamens, und ein Produkt
+  mit längerem Altnamen muss kaufbar bleiben.
 - `registerFarmer` reicht die geprüfte Adresse an Better Auth weiter. Vorher
   scheiterte schon ein Leerzeichen am Rand.
 - Zeichenzähler ab 80 % Füllung in Checkout, Hofprofil, Hofseiten-Editor,
@@ -303,9 +307,9 @@ Formulare).
   der klein geschriebenen Adresse (`src/server/queries/customers.ts`), betroffen
   ist nur `Order.customerId`. Zusammenführen wäre eine Datenmigration.
 - Produktnamen aus dem Onboarding (`createOnboardingProducts`, ohne Schema)
-  haben weiter keine Obergrenze. Die Checkout-Position verlangt jetzt
-  höchstens 100 Zeichen. Ein längerer Name würde den Checkout dieses Produkts
-  mit 400 ablehnen.
+  haben weiter keine Obergrenze. Der Checkout kürzt ihre Momentaufnahme, die
+  Hofseite kappt die Anzeige auf zwei Zeilen; im Produktformular muss der Hof
+  so einen Namen beim nächsten Speichern auf 100 Zeichen kürzen.
 
 **Tests:** `tests/eingabegrenzen.test.ts` (Schemas, Grenzwerte 80/81 usw.,
 Zähler, Altbestand), `tests/eingabegrenzen-aktionen.test.ts` (`createFarm`,

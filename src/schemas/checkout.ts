@@ -107,8 +107,14 @@ export const checkoutRequestSchema = z.object({
       z.object({
         productId: z.string().min(1),
         // Der Name landet als Momentaufnahme in OrderItem.productName — nie
-        // länger, als ein Produktname sein darf.
-        name: z.string().min(1).max(PRODUKTNAME_MAX, ZU_LANG.produktname),
+        // länger, als ein Produktname sein darf. GEKÜRZT statt abgelehnt: Ein
+        // Produkt, dessen Name vor der Grenze länger gespeichert wurde (auch
+        // aus dem Onboarding), muss kaufbar bleiben — eine Ablehnung hier
+        // wäre eine verlorene Bestellung ohne Ausweg für die Kundin.
+        name: z
+          .string()
+          .min(1)
+          .transform((n) => [...n].slice(0, PRODUKTNAME_MAX).join('')),
         quantity: z.number().int().positive(),
         unitPrice: z.number().positive(),
       })
