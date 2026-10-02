@@ -87,16 +87,23 @@ export function MeldungForm({
   formToken,
   alsHof,
   hofName,
+  kennungVorbelegt = '',
 }: {
   /** Signierter Zeitstempel aus dem Seitenaufbau (Zweck 'meldung'). */
   formToken: string
   /** Eingeloggter Hof: Screenshot möglich, keine E-Mail-Abfrage. */
   alsHof: boolean
   hofName?: string
+  /**
+   * Die Fehlernummer aus der Adresse, schon geprüft (`bereinigeKennung`,
+   * src/lib/fehlerseite.ts). Wer von der Fehlerseite kommt, soll sie nicht
+   * abtippen müssen. Nur der Startwert — danach gehört das Feld dem Menschen.
+   */
+  kennungVorbelegt?: string
 }) {
   const [art, setArt] = useState<MeldungArt>('FEHLER')
   const [text, setText] = useState('')
-  const [kennung, setKennung] = useState('')
+  const [kennung, setKennung] = useState(kennungVorbelegt)
   const [email, setEmail] = useState('')
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null)
   const [website, setWebsite] = useState('')

@@ -1,7 +1,26 @@
-﻿'use client'
+'use client'
 
 import { useEffect } from 'react'
+import * as Sentry from '@sentry/nextjs'
+import { FehlerAnsicht } from '@/components/shared/fehler-ansicht'
 
+/**
+ * Die Fehlergrenze innerhalb des Root-Layouts: Hier landet alles, was beim
+ * Rendern einer Seite scheitert. Reißt das Layout selbst, greift stattdessen
+ * `global-error.tsx` — dieselbe Ansicht, eigenes `<html>`.
+ *
+ * GEMELDET WIRD VON HIER, und das ist nicht doppelt: Die zwei Grenzen
+ * schließen sich aus (global-error fängt nur Fehler im Root-Layout und solche,
+ * die diese Datei selbst wirft). Ein Render-Fehler im Seitenbaum landet also
+ * genau hier — und wäre ohne diesen Aufruf STUMM: `onRequestError`
+ * (src/instrumentation.ts) deckt nur den Server ab, und ein Fehler, den eine
+ * React-Fehlergrenze gefangen hat, erreicht den Client-SDK nicht von selbst.
+ * Der Filter aus src/lib/sentry-hygiene.ts hängt am `beforeSend` und gilt auch
+ * für diesen Aufruf.
+ *
+ * Bei einem reinen Client-Fehler ist `error.digest` übrigens `undefined` —
+ * dann zeigt die Ansicht keine Fehlernummer, und Sentry ist die einzige Spur.
+ */
 export default function ErrorPage({
   error,
   reset,
@@ -10,23 +29,12 @@ export default function ErrorPage({
   reset: () => void
 }) {
   useEffect(() => {
-    console.error(error)
+    Sentry.captureException(error)
+    // Zusätzlich auf die Konsole, aber nur außerhalb der Produktion: dort
+    // stünde ein Fehlertext, den niemand liest und der etwas verraten kann
+    // (Muster aus src/lib/upload-fehler.ts).
+    if (process.env.NODE_ENV !== 'production') console.error(error)
   }, [error])
 
-  return (
-    <div className="min-h-screen bg-muted/30 flex flex-col items-center justify-center px-4 text-center">
-      <span className="text-6xl mb-6">⚠️</span>
-      <h1 className="text-2xl font-bold text-foreground mb-3">Etwas ist schiefgelaufen</h1>
-      <p className="text-muted-foreground mb-8 max-w-sm leading-relaxed">
-        Ein unerwarteter Fehler ist aufgetreten. Bitte versuche es erneut.
-      </p>
-      <button
-        onClick={reset}
-        className="bg-primary text-primary-foreground hover:opacity-90 font-semibold rounded-xl px-5 py-2.5 transition-colors"
-      >
-        Erneut versuchen
-      </button>
-    </div>
-  )
+  return <FehlerAnsicht fehlernummer={error.digest} nochmal={reset} />
 }
-

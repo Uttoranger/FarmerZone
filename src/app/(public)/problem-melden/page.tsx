@@ -5,6 +5,7 @@ import { getFarmForUser } from '@/server/queries/dashboard'
 import { KundenKopf } from '@/components/shared/kunden-kopf'
 import { MeldungForm } from '@/components/shared/meldung-form'
 import { generateFormToken } from '@/lib/form-token'
+import { KENNUNG_PARAMETER, bereinigeKennung } from '@/lib/fehlerseite'
 
 export const metadata: Metadata = {
   title: 'Problem melden — FarmerZone',
@@ -21,10 +22,18 @@ export const dynamic = 'force-dynamic'
  * ist über den Hof bekannt, die Action würde sie ohnehin verwerfen) und mit
  * Screenshot-Weg.
  */
-export default async function ProblemMeldenPage() {
+export default async function ProblemMeldenPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
   const session = await auth.api.getSession({ headers: await headers() })
   const rolle = session?.user ? (session.user as typeof session.user & { role?: string }).role : undefined
   const farm = session?.user && rolle === 'FARMER' ? await getFarmForUser(session.user.id) : null
+  // Die Adresse ist eine Systemgrenze (CODING_STANDARDS §3): Die Fehlernummer
+  // von der Fehlerseite geht durch bereinigeKennung, und was nicht passt,
+  // wird verworfen — nie ein Fehler, nur ein leeres Feld.
+  const kennung = bereinigeKennung((await searchParams)[KENNUNG_PARAMETER])
 
   return (
     <div className="min-h-screen bg-background">
@@ -35,7 +44,12 @@ export default async function ProblemMeldenPage() {
           Etwas funktioniert nicht, fehlt dir oder ist unklar? Schreib es uns — kurz und in deinen
           Worten.
         </p>
-        <MeldungForm formToken={generateFormToken('meldung')} alsHof={farm !== null} hofName={farm?.name} />
+        <MeldungForm
+          formToken={generateFormToken('meldung')}
+          alsHof={farm !== null}
+          hofName={farm?.name}
+          kennungVorbelegt={kennung}
+        />
       </div>
     </div>
   )
