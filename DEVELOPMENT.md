@@ -3036,12 +3036,27 @@ Fußzeilen) und ein „✓" im Server-Log des Mailversands.
   WhatsApp-Nachricht beginnt mit „Hallo Anna!", die Story-Grafik zeigt im Schild nur
   den Anlass und im grünen Kästchen die Initialen des Hofs statt eines Emojis.
 
-**Browser-Prüfung.** Erstmals lokal mit agent-browser (Anleitung in
-`docs/ai/TESTING_GUIDELINES.md`, „Browser-Prüfung in der Agenten-Umgebung"): Checkout
+**Browser-Prüfung.** Erstmals lokal mit agent-browser (Ablauf unten): Checkout
 nur mit der Tastatur bis zur Bestätigung, 17 Stationen, jede mit sichtbarem Fokus;
 Bestelldetail; Dialog „Bestellung zurücknehmen?" — das Kreuz heißt im
 Barrierefreiheitsbaum „Schließen". Axe zeigte Befunde, die nicht von dieser Änderung
 stammen (siehe Offen).
+
+**So lief die Browser-Prüfung** (noch keine Regel — ob sie nach
+`docs/ai/TESTING_GUIDELINES.md` gehört, entscheidet der Mensch; agent-browser ist dafür
+außerhalb des Projekts installiert worden):
+1. Den Postgres-Cluster des Containers starten (`pg_ctlcluster 16 main start`), eine
+   Wegwerf-Rolle und -Datenbank anlegen.
+2. `.env.local` nur mit Platzhaltern: `DATABASE_URL` und `DIRECT_URL` auf `localhost`,
+   `BETTER_AUTH_SECRET` zufällig, `STRIPE_SECRET_KEY=sk_test_…`,
+   `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_APP_URL=http://localhost:3000`. Ohne
+   `RESEND_API_KEY` landen Mails nur im Log.
+3. `pnpm exec dotenv -e .env.local -- prisma migrate deploy`, `pnpm db:seed`
+   (erfundene Daten), `pnpm dev`.
+4. agent-browser mit pnpm global in ein Verzeichnis im Scratchpad (`npm` sperrt der
+   Hook), Browser über `AGENT_BROWSER_EXECUTABLE_PATH` auf das vorinstallierte
+   Chromium, `--allowed-domains localhost`. Axe: `agent-browser a11y`.
+5. Danach `.env.local` gelöscht, Datenbank und Rolle entfernt, Cluster gestoppt.
 
 **Offen (aufgefallen, nicht behoben):**
 - Die Navigation des Hofbereichs hat keinen sichtbaren Tastatur-Fokus. `FOKUS` in
@@ -3060,8 +3075,13 @@ stammen (siehe Offen).
 - Sortierbare Spaltenköpfe und klickbare Zeilen der Kundentabelle sind per Tastatur
   nicht erreichbar.
 - `sale-list.tsx` wird nirgends eingebunden.
-- Die Preview-Seite für Komponenten gibt es noch nicht (Redesign Schritt 2); die
-  Änderung an `Button` ist dort noch nicht abgenommen.
+- Die Preview-Seite für Komponenten gibt es noch nicht (Redesign Schritt 2). Die
+  Änderungen an `Button` (Hand in der Grundklasse) und `DialogFooter` (Text
+  „Schließen") sind deshalb dort nicht abgenommen und keine rein additive Änderung,
+  wie DESIGN_SYSTEM sie während Feature-Arbeit verlangt — im PR als Abweichung vorgelegt.
+- `label[for]` zeigt die Hand auch, wenn das zugehörige Feld gesperrt ist.
+- In den angefassten Mailzeilen stehen Beträge noch über `toFixed(2)` statt
+  `format.ts`; der Haken an den Werten (Auftritt, Hofseite) hat kein `aria-hidden`.
 
 ---
 

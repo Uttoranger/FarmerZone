@@ -38,7 +38,7 @@ describe('Button', () => {
     }
   })
 
-  it('gesperrt nimmt der Knopf keine Klicks an — die Hand erscheint dort nicht', () => {
+  it('gesperrt bleibt pointer-events-none — der Knopf nimmt keine Klicks an', () => {
     const klassen = buttonVariants().split(/\s+/)
     expect(klassen).toContain('disabled:pointer-events-none')
     expect(klassen).toContain('disabled:opacity-50')

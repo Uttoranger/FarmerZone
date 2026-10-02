@@ -64,7 +64,7 @@ export function UnsubscribeClient({ token }: { token: string }) {
 
         {state === 'error' && (
           <>
-            <TriangleAlert className="mx-auto mb-4 size-12 text-amber-600 dark:text-amber-400" strokeWidth={1.5} aria-hidden="true" />
+            <TriangleAlert className="mx-auto mb-4 size-12 text-status-offen" strokeWidth={1.5} aria-hidden="true" />
             <h1 className="font-heading text-xl font-semibold text-foreground mb-2">
               Link ungültig
             </h1>

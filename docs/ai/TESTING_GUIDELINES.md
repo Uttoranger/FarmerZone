@@ -101,14 +101,6 @@ pnpm test:integration                        # Integration (braucht .env.test)
 - Wer Verhalten testen will, muss die Entscheidung **aus der Komponente herausziehen** — genau der Grund für die Schichtung in `ARCHITECTURE.md`.
 - Testing-Library oder Playwright **nicht eigenmächtig einführen**. Vorschlagen und fragen.
 
-### Browser-Prüfung in der Agenten-Umgebung
-Was nur der Browser zeigt (Tastatur-Durchlauf, Axe, Zeiger, Screenreader-Namen), prüft agent-browser gegen die App auf `localhost` — nie gegen Dev oder Produktion:
-1. Den Postgres-Cluster des Containers starten (`pg_ctlcluster 16 main start`), eine Wegwerf-Rolle und -Datenbank anlegen.
-2. `.env.local` nur mit Platzhaltern: `DATABASE_URL` und `DIRECT_URL` auf `localhost`, `BETTER_AUTH_SECRET` zufällig, `STRIPE_SECRET_KEY=sk_test_…`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_APP_URL=http://localhost:3000`. Ohne `RESEND_API_KEY` landen Mails nur im Log.
-3. `pnpm exec dotenv -e .env.local -- prisma migrate deploy`, `pnpm db:seed` (erfundene Daten, Anmeldungen im Seed-Bericht), `pnpm dev`.
-4. agent-browser mit pnpm global in ein Verzeichnis außerhalb des Projekts (`PNPM_HOME=<scratchpad>/pnpm-global pnpm add -g agent-browser` — `npm` sperrt der Hook), Browser über `AGENT_BROWSER_EXECUTABLE_PATH` auf das vorinstallierte Chromium, immer mit `--allowed-domains localhost`. Axe: `agent-browser a11y`.
-5. Danach `.env.local` löschen, Datenbank und Rolle entfernen, den Cluster stoppen.
-
 ---
 
 ## 2. Was getestet wird

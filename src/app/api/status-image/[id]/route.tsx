@@ -123,6 +123,8 @@ export async function GET(
                 justifyContent: 'center',
                 fontSize: '28px',
                 fontWeight: 700,
+                // ImageResponse kennt keine CSS-Variablen — Weiß auf dem
+                // dunkelgrünen Kästchen wie die übrigen festen Farben der Grafik.
                 color: 'white',
               }}
             >
