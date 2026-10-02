@@ -11,6 +11,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
+// Der Abholtermin hat eigene Tests (tests/checkout-abholfenster.test.ts):
+// Hier gilt jedes Fenster als angeboten und unbegrenzt, der Rest des Moduls läuft echt.
+vi.mock('@/server/abholfenster', async (original) => ({
+  ...(await original<typeof import('@/server/abholfenster')>()),
+  pruefeAbholfenster: vi.fn(async () => ({
+    ok: true,
+    fenster: { datum: '', start: '', ende: '', slot: { id: 'slot_1', dayOfWeek: 0, startTime: '', endTime: '', maxOrders: null, isActive: true } },
+  })),
+}))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     farm: { findUnique: vi.fn() },

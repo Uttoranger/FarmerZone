@@ -2,6 +2,13 @@
 // PickupSlots (wöchentlich wiederkehrend, dayOfWeek = JS getDay(), 0 = Sonntag).
 
 export type WeeklySlot = { dayOfWeek: number; startTime: string; endTime: string }
+
+/**
+ * So weit voraus wird angeboten: heute und die 13 Tage danach. Gilt für die
+ * Tageskarten hier und für die Abholfenster im Checkout (src/lib/abholfenster.ts),
+ * die der Server genauso prüft.
+ */
+export const ABHOL_VORLAUF_TAGE = 14
 export type PickupDay = { date: Date; label: string; times: string }
 
 const WEEKDAY_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
@@ -35,7 +42,7 @@ export function nextPickupDays(
   const nowHm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
   const days: PickupDay[] = []
 
-  for (let offset = 0; offset < 14 && days.length < count; offset++) {
+  for (let offset = 0; offset < ABHOL_VORLAUF_TAGE && days.length < count; offset++) {
     const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset, 12, 0, 0)
     let daySlots = slots.filter((s) => s.dayOfWeek === date.getDay())
     if (offset === 0) daySlots = daySlots.filter((s) => s.endTime > nowHm)

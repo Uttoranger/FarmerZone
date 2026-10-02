@@ -254,6 +254,53 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 
 ## Bekannte Bugs & Fixes
 
+### BUG: Abholtermin wurde serverseitig nicht geprüft (behoben 2026-10-02)
+
+**Befund:** `pickupDate`, `pickupTimeStart`, `pickupTimeEnd` waren im Schema
+nur `z.string().min(1)`. Der Checkout prüfte weder Form noch Zukunft noch, ob
+der Hof das Fenster anbietet; `PickupSlot.maxOrders` war ein Einstellungsfeld
+ohne Wirkung. Ein über Nacht offener Tab bestellte für gestern, ein kaputtes
+Datum endete als 500. Das Formular rechnete die Termine mit Uhr und Kalender
+des Browsers.
+
+**Fix:**
+- Schema: Datum `JJJJ-MM-TT`, Zeiten `HH:MM` — falsche Form ist 400.
+- `src/lib/abholfenster.ts` (rein): welche Fenster wählbar sind — Wiener
+  Kalendertag und Wochentag, Bestellschluss = Beginn des Fensters
+  (`src/lib/fristen.ts`), heute bis 13 Tage voraus (`ABHOL_VORLAUF_TAGE`, wie die
+  Tageskarten der Hofseite). Formular und Handler nutzen dieselbe Funktion.
+- `src/server/abholfenster.ts`: Vorprüfung vor der Bestandsbuchung, und das
+  Anlegen unter der Sperre der Fensterzeile mit erneuter Zählung, wenn das
+  Fenster eine Höchstzahl hat. Gezählt werden alle nicht stornierten
+  Bestellungen des Hofs an diesem Wiener Tag in diesem Fenster.
+- 409 `ABHOLFENSTER_UNGUELTIG` bzw. `ABHOLFENSTER_VOLL` mit „Dieses Zeitfenster
+  ist leider nicht mehr verfügbar – bitte wähle ein anderes." Das Formular
+  setzt die Wahl zurück, markiert das Feld und lädt die Seite (Fenster und
+  Belegung) neu; volle Fenster zeigt es ausgegraut mit „ausgebucht".
+- Die Checkout-Seite gibt vor dem Zählen verwaiste Bestellungen frei (Frist
+  gilt beim Lesen) und zählt die Belegung mit EINER Abfrage (`groupBy`).
+  Belegt ist jede nicht stornierte Bestellung — bewusst nicht `abholWhere`,
+  das Erledigtes für die Packliste ausblendet.
+
+**Geändert für Kundinnen:** Der Checkout bietet jetzt auch das heutige Fenster
+an, solange es nicht begonnen hat (die Hofseite zeigte „Heute" schon vorher an),
+und keinen Tag mehr in genau 14 Tagen — so wie die Tageskarten der Hofseite.
+
+**Offen, mit Absicht nicht angefasst:**
+- Die Tageskarten der Hofseite (`nextPickupDays`) rechnen weiter mit der Uhr
+  des Servers bzw. Browsers statt in Wiener Zeit und zeigen „Heute" bis zum
+  ENDE des Fensters, der Checkout nur bis zum Beginn.
+- Ändert der Hof Zeiten eines Fensters, zählen Bestellungen mit den alten
+  Zeiten nicht mehr auf das neue Fenster.
+
+**Tests:** `tests/checkout-abholfenster.test.ts` (echter Handler; vorher 15 von
+18 rot), `tests/abholfenster.test.ts` (reine Regel, Zeitumstellung),
+`tests/integration/checkout-abholfenster.int.test.ts` (echtes Postgres: zwei
+gleichzeitige Bestellungen auf den letzten Platz — gegen den alten Stand rot,
+beide kamen durch). Die übrigen Checkout-Unit-Tests ersetzen
+`pruefeAbholfenster` durch „gültig, unbegrenzt"; die Testhöfe der
+Integrationsschicht haben täglich ein Fenster 15–18 Uhr.
+
 ### BUG: Briefkasten-Cron verglich CRON_SECRET nicht in konstanter Zeit (behoben 2026-10-02)
 
 `/api/cron/briefkasten` prüfte den Header mit `authHeader !== \`Bearer …\``.
