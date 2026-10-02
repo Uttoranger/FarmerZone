@@ -3416,6 +3416,25 @@ Menschen. `checkout-form.tsx` schickt den Namen weiter mit.
 
 ---
 
+## Alte Mockups entfernt, Nachtlauf-Ablagen ignoriert (2026-10-03)
+
+Mit dem neuen Satz Mockups (92 Dateien, `web-`/`mobil-`/`admin-`/`fehler-`/`system-`)
+wurde `docs/mockups/README.md` neu geschrieben; die 20 Dateien des ersten Redesign-Kits
+(`hof-*`, `kunde-*`, `design-tokens.html`) standen in keiner Tabelle mehr und sind
+gelöscht. Danach: 92 HTML und README, jeder Eintrag hat seine Datei und umgekehrt.
+`DESIGN_SYSTEM.md` zeigt für die Farbtokens auf `system-farbtokens.html`.
+
+`.gitignore` nimmt `.nachtlauf/` und `nachtlauf-*.log` aus — Ablagen und Protokolle der
+nächtlichen Läufe (`docs/nachtlauf.md`) bleiben lokal.
+
+**Offen:** Code-Kommentare nennen noch die alten Dateien (`farmer-nav.tsx`,
+`mein-hof-kopf.tsx`, `bauern-navigation.ts`, `products/page.tsx`: `hof-sidebar-komponente.html`,
+`hof-mein-hof-v2-desktop.html`); Nachfolger wäre u. a.
+`system-komponente-seitenleiste-hof.html`. Die Einträge in `docs/entwicklung/` sind
+Verlauf und bleiben, wie sie sind.
+
+---
+
 ## Nützliche Befehle
 
 ```bash
