@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neues Produkt – Hofbereich Mobil</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&amp;family=Instrument+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'Instrument Sans',system-ui,sans-serif;background:#0b100c}
+a{color:#9fd0af}a:hover{color:#c2e3cc}
+</style>
+</head>
+<body style="margin:0;background:#0b100c">
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #0b100c; color: #f1eee3; display: flex; flex-direction: column; position: relative; overflow: hidden; font-family: 'Instrument Sans', system-ui, sans-serif">
+
+  <div style="height: 52px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 8px">
+    <button aria-label="Abbrechen" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: none; border: none; color: #f1eee3; cursor: pointer">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    </button>
+    <div style="font-family: Fraunces, Georgia, serif; font-size: 17px; font-weight: 600">Neues Produkt</div>
+    <div style="flex-grow: 1"></div>
+    <div style="padding-right: 8px; font-size: 12.5px; color: #9aa899">Entwurf gespeichert</div>
+  </div>
+
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 8px 16px 0; min-height: 0">
+
+    <button style="flex: none; height: 120px; border: 1px dashed #3a4a3d; border-radius: 16px; background: #10170f; color: #9aa899; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2v11Z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+      <span style="font-size: 13px; font-weight: 500">Foto hinzufügen</span>
+      <span style="font-size: 11.5px; color: #7c8a7b">Ein eigenes Foto hilft Kunden bei der Auswahl.</span>
+    </button>
+
+    <div style="flex: none; background: #131b14; border: 1px solid #223125; border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 12px">
+      <div>
+        <label for="pname" style="display: block; font-size: 12px; font-weight: 600; color: #9aa899; margin-bottom: 6px">Name</label>
+        <input id="pname" value="Freilandeier" style="width: 100%; height: 44px; box-sizing: border-box; border-radius: 12px; background: #0e150f; border: 1px solid #26352a; color: #f1eee3; font-family: inherit; font-size: 14.5px; padding: 0 14px; outline: none">
+      </div>
+      <div>
+        <div style="font-size: 12px; font-weight: 600; color: #9aa899; margin-bottom: 6px">Kategorie</div>
+        <button style="width: 100%; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border: 1px solid #26352a; border-radius: 12px; background: #0e150f; color: #f1eee3; font-family: inherit; font-size: 14.5px; text-align: left; cursor: pointer">
+          <span style="flex: 1">Eier &amp; Milch</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#62705f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+        </button>
+      </div>
+      <div style="display: flex; gap: 10px">
+        <div style="flex: 1">
+          <label for="pprice" style="display: block; font-size: 12px; font-weight: 600; color: #9aa899; margin-bottom: 6px">Preis</label>
+          <input id="pprice" value="€ 4,50" style="width: 100%; height: 44px; box-sizing: border-box; border-radius: 12px; background: #0e150f; border: 1px solid #26352a; color: #f1eee3; font-family: inherit; font-size: 14.5px; padding: 0 14px; outline: none">
+        </div>
+        <div style="flex: 1">
+          <label for="punit" style="display: block; font-size: 12px; font-weight: 600; color: #9aa899; margin-bottom: 6px">Einheit</label>
+          <input id="punit" value="10 Stück" style="width: 100%; height: 44px; box-sizing: border-box; border-radius: 12px; background: #0e150f; border: 1px solid #26352a; color: #f1eee3; font-family: inherit; font-size: 14.5px; padding: 0 14px; outline: none">
+        </div>
+      </div>
+    </div>
+
+    <div style="flex: none; background: #131b14; border: 1px solid #223125; border-radius: 16px; overflow: hidden">
+      <div style="display: flex; align-items: center; gap: 12px; padding: 13px 14px">
+        <div style="flex: 1">
+          <div style="font-size: 14px; font-weight: 600">Verfügbar</div>
+          <div style="margin-top: 2px; font-size: 12px; color: #9aa899">Kunden können sofort bestellen</div>
+        </div>
+        <span aria-label="Verfügbar an" style="flex: none; width: 42px; height: 24px; border-radius: 999px; background: #e07a4a; position: relative">
+          <span style="position: absolute; top: 3px; right: 3px; width: 18px; height: 18px; border-radius: 999px; background: #231208"></span>
+        </span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-top: 1px solid #1f2c21">
+        <div style="flex: 1">
+          <div style="font-size: 14px; font-weight: 600">Lagerstand pro Woche</div>
+          <div style="margin-top: 2px; font-size: 12px; color: #9aa899">Bei 0 automatisch „ausverkauft"</div>
+        </div>
+        <div style="flex: none; display: flex; align-items: center; gap: 10px; border: 1px solid #2f3f31; border-radius: 999px; padding: 4px 8px">
+          <button aria-label="Weniger" style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border: none; border-radius: 999px; background: #1c281e; color: #f1eee3; cursor: pointer">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"></path></svg>
+          </button>
+          <span style="font-size: 14px; font-weight: 600; min-width: 22px; text-align: center">24</span>
+          <button aria-label="Mehr" style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border: none; border-radius: 999px; background: #1c281e; color: #f1eee3; cursor: pointer">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+          </button>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-top: 1px solid #1f2c21">
+        <div style="flex: 1">
+          <div style="font-size: 14px; font-weight: 600">Nur diese Woche</div>
+          <div style="margin-top: 2px; font-size: 12px; color: #9aa899">Für saisonale oder einmalige Angebote</div>
+        </div>
+        <span aria-label="Nur diese Woche aus" style="flex: none; width: 42px; height: 24px; border-radius: 999px; background: #2c3a2e; position: relative">
+          <span style="position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 999px; background: #8b9a8b"></span>
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="flex: none; padding: 12px 16px 18px; border-top: 1px solid #1f2c21; background: #0e150f">
+    <button style="width: 100%; height: 52px; display: flex; align-items: center; justify-content: center; gap: 10px; border: none; border-radius: 999px; background: #e07a4a; color: #231208; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer">
+      Produkt veröffentlichen
+    </button>
+    <div style="margin-top: 8px; text-align: center; font-size: 11.5px; color: #8b9a8b">Erscheint sofort auf deiner Hofseite unter „Eier &amp; Milch".</div>
+  </div>
+
+</div>
+</body>
+</html>

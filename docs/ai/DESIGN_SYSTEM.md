@@ -100,3 +100,50 @@ Jeder Screen liefert vier Zustände:
 - Kontrast ≥ 4,5:1 in beiden Themes; Touch-Ziele ≥ 44 px; genau **ein** primärer Call-to-Action pro Screen, alles Weitere outline oder ghost.
 - Namen (Hof, Person, Produkt) in Karten, Zeilen und Leisten halten jede Länge bis zur Obergrenze aus (`src/lib/eingabegrenzen.ts`, 80 bzw. 100 Zeichen): höchstens zwei Zeilen (`line-clamp-2 break-words`) oder eine (`truncate`), der volle Text im `title`. Liegt ein gestreckter Link über der Karte, trägt er den `title` — er fängt den Zeiger. Im Teilen-Bild (Satori) `display: 'block'` + `lineClamp` + `wordBreak: 'break-word'`.
 - Jeder UI-PR verlinkt das zugehörige Mockup aus `docs/mockups/` namentlich und wird dagegen abgenommen.
+
+## Ergänzungen aus den Mockups (Stand Oktober 2026)
+
+Diese Regeln stammen aus der Mockup-Runde (`docs/mockups/`, Index im dortigen README) und gelten für jede Route, die in den Geltungsbereich `data-design="neu"` umzieht.
+
+### Shells und Navigation – feste Einträge
+
+- **Kunde Web, abgemeldet:** Logo · Höfe entdecken · So funktioniert's · Für Höfe · [Anmelden]. **Angemeldet:** Logo · Suche · Höfe entdecken · Meine Bestellungen · Warenkorb (mit Anzahl) · Profil. Öffentliche Seiten zeigen die Variante passend zur Sitzung, nie eine dritte.
+- **Kunde Handy, Unterleiste:** Entdecken · Meine Höfe · [Warenkorb] · Bestellungen · Konto. Die Suche sitzt oben in „Entdecken", nicht als eigener Reiter.
+- **Hof Web, Seitenleiste (Reihenfolge fest):** Hofkarte · [+ Neu ▾] · Heute · Bestellungen · Produkte · Mein Hof · *Verkauf und Kunden:* Kunden · Verkäufe · Auswertung · Region · *unten:* Einstellungen · Hilfe und Rückmeldung · Admin (nur für Admins, Zahl = alles, was zu entscheiden ist) · Konto.
+- **Hof Handy, Unterleiste:** Heute · Bestellungen · [+ Neu] · Produkte · Mehr. „Mehr" enthält Mein Hof, Kunden, Verkäufe, Auswertung, Region, Einstellungen, Hilfe und Rückmeldung, Admin, Darstellung, Abmelden.
+- **Neu-Menü (Web Dropdown, Handy Blatt):** „Was legst du an?" mit Lebensmittel · Futtermittel · Brennmaterial, darunter Beitrag und Verkauf eintragen. Die Wahl bestimmt das Formular.
+- **Admin:** eigene Kopfzeile mit Reitern Höfe · Briefkasten · Finanzen (mit Zählern) und „← Zu meinem Hof". Keine Hof-Seitenleiste im Admin.
+- **Fokus-Seiten ohne Unterleiste:** Produktdetail, Checkout, Zahlung, Bestätigung, Bar-Bestätigung. Dort gibt es genau eine feste Leiste unten (Aktion), nie zwei übereinander.
+
+### Links und Filter
+
+- Alles, was navigiert, ist ein echter Link (`<a href>`): Hofkarten, Kategorie-Chips, Filter, Navigation, Produktkacheln. Filter stehen in der URL (siehe Konzept Bereiche §6.2), damit Teilen, Zurück und Mittelklick funktionieren.
+- Ein Knopf ist nur, was etwas auslöst (In den Korb, Speichern, Teilen).
+
+### Kaufstrecke
+
+- **Mini-Warenkorb am Desktop:** Sobald etwas im Korb liegt, steht er oben in der rechten Spalte der Hofseite („Dein Korb · 2 Artikel · € … zzgl. Servicegebühr · Zur Kasse"), sticky. In der Hof-Vorschau des Editors nie.
+- **Servicegebühr** steht überall als eigene Zeile und vor dem Warenkorb als Hinweis („Preise zzgl. … % Servicegebühr, mind. € 0,50 – einmal pro Bestellung"). Nie in den Produktpreis eingerechnet anzeigen.
+- **Verkaufsgrößen** (Futter, Brennmaterial, alles mit Gebinden): Kacheln mit Größe, Menge, Preis, Grundpreis (€/kg, €/rm) und Vorrat. Knapp = orangener Hinweis „nur noch N", ausverkauft = ausgegraut. In Listen heißt der Knopf „Größe wählen ›", nicht „In den Korb".
+- **Leerzustand mit Ausweg:** Nie nur „nichts gefunden". Immer eine nächste Handlung: Umkreis erweitern, Filter lockern, „Benachrichtige mich" (nur mit Einwilligung).
+
+### Futtermittel und Brennmaterial
+
+- Unter jedem Futter: grünes Schild „Registrierter Futtermittelbetrieb · LFBIS <Nummer>" bzw. die jeweilige Nummer. Fehlt die nötige Registrierung für eine Größe, erscheint diese Größe beim Kunden nicht; im Formular trägt sie ein Schloss mit Begründung.
+- Brennmaterial nennt Holzart, Scheitlänge und Trocknung (Restfeuchte) immer sichtbar; Hackschnitzel Wassergehalt (W) und Körnung (P). Raummeter, Schüttraummeter und Festmeter werden beim ersten Vorkommen auf der Seite erklärt.
+
+### Teilen
+
+- **Teilen-Karte auf Heute:** groß an Tagen ohne Abholung, schmale orangene Zeile an Abholtagen – die Packliste hat Vorrang.
+- **Teilen-Momente** (Hof freigeschaltet, Ware wieder da, Produkt gespeichert): höchstens einmal je Anlass, immer „Nicht jetzt", in den Einstellungen abschaltbar.
+- Das Teilen-Bild ist dasselbe wie das Vorschaubild (Open Graph) der Hofseite. Teilen des Hofs = Orange (Hof-Aktion); Kunden teilen über einen Outline-Knopf.
+
+### Dialoge und Blätter
+
+- Web: zentrierter Dialog (480–820 px) über abgedunkeltem Hintergrund, Titel links, Schließen rechts, Aktionen rechts unten (zerstörende Aktion in Orange-Outline, nie Grün).
+- Handy: Blatt von unten mit Griff, Hauptaktion volle Breite unten, „Abbrechen" als Textknopf darunter.
+
+### Lesbarkeit
+
+- Kleinster Hinweistext auf Karten mindestens `--fz-text-muted` (#9AA899 dunkel / #5D6A5C hell). Dunklere Grautöne (in alten Mockups #62705F, 3,35 : 1) sind verboten.
+- E-Mails sind die einzige Ausnahme vom Dunkel-Standard: hell (Creme), weil Mailprogramme dunkle Mails unzuverlässig darstellen.
