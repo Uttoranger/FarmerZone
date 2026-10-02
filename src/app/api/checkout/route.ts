@@ -25,6 +25,8 @@ import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { bestellPositionsName } from '@/lib/eingabegrenzen'
 import { fristVon } from '@/lib/fristen'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
+import { AbholfensterVoll, imAbholfenster, pruefeAbholfenster } from '@/server/abholfenster'
+import { ABHOLFENSTER_NICHT_VERFUEGBAR, CODE_ABHOLFENSTER_VOLL } from '@/lib/abholfenster'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
 import { CODE_ZAHLUNG_NICHT_MOEGLICH, zahlungNichtMoeglichText } from '@/lib/stripe-konto'
 import {
@@ -423,6 +425,17 @@ export async function POST(request: NextRequest) {
 
   const now = new Date()
 
+  // 2b. ABHOLFENSTER — vor Warenkorb und Bestand. Der Server nimmt nur ein
+  //     Fenster an, das der Hof jetzt anbietet (src/lib/abholfenster.ts):
+  //     aktiv, dieser Wochentag, genau diese Zeiten, Bestellschluss in der
+  //     Zukunft, im Zeitraum der Tageskarten — und bei einer Höchstzahl mit
+  //     freiem Platz. Verbindlich zählt das Anlegen in Schritt 9.
+  const abholwahl = { datum: data.pickupDate, start: data.pickupTimeStart, ende: data.pickupTimeEnd }
+  const abholung = await pruefeAbholfenster(farm.id, abholwahl, now)
+  if (!abholung.ok) {
+    return konflikt(data.idempotencyKey, data.sessionId, { error: ABHOLFENSTER_NICHT_VERFUEGBAR, code: abholung.code })
+  }
+
   // 3. RESERVIERUNGSFRIST UND BESTAND — eine Prüfung für beides, dieselbe
   //    Funktion wie im Warenkorb (src/server/warenkorb.ts). Eine verfallene
   //    eigene Reservierung wird hier NICHT stillschweigend hingenommen: Die
@@ -594,7 +607,9 @@ export async function POST(request: NextRequest) {
     serviceFeeCents: number
   }
   try {
-    order = await prisma.order.create({
+    // Bei einem Fenster mit Höchstzahl: zählen und anlegen in EINER
+    // Transaktion unter der Sperre des Fensters (src/server/abholfenster.ts).
+    order = await imAbholfenster(farm.id, abholung.fenster, (db) => db.order.create({
       data: {
         orderNumber,
         idempotencyKey: data.idempotencyKey ?? null,
@@ -642,9 +657,17 @@ export async function POST(request: NextRequest) {
         platformFeeAmount: true,
         serviceFeeCents: true,
       },
-    })
+    }))
   } catch (e) {
     await gibBestandZurueck(gebucht)
+    // Der letzte Platz im Fenster ging an eine gleichzeitige Bestellung: keine
+    // Bestellung, Bestand zurück, die Kundin wählt ein anderes Fenster.
+    if (e instanceof AbholfensterVoll) {
+      return konflikt(data.idempotencyKey, data.sessionId, {
+        error: ABHOLFENSTER_NICHT_VERFUEGBAR,
+        code: CODE_ABHOLFENSTER_VOLL,
+      })
+    }
     // Zwei Requests mit demselben Schlüssel gleichzeitig: Der zweite läuft in
     // den eindeutigen Index. Dann gewinnt der erste, und der zweite bekommt
     // dessen Bestellung — kein Fehler für die Kundin.

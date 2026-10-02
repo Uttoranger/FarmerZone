@@ -25,6 +25,11 @@ export const CHECKOUT_FELD_REIHENFOLGE = [
   'onsiteConfirmed',
 ] as const
 
+/** JJJJ-MM-TT — der Wiener Kalendertag des Abholfensters. */
+const KALENDERTAG = /^\d{4}-\d{2}-\d{2}$/
+/** HH:MM — Wiener Ortszeit, wie PickupSlot.startTime/endTime. */
+const UHRZEIT = /^\d{2}:\d{2}$/
+
 // Client-side form schema (no items/sessionId/farmId — those are added on submit)
 export const checkoutFormSchema = z
   .object({
@@ -91,9 +96,12 @@ export const checkoutRequestSchema = z.object({
   customerEmail: emailSchema(),
   customerPhone: z.string().min(4).max(TELEFON_MAX, ZU_LANG.telefon),
   customerNote: z.string().max(NOTIZ_MAX, ZU_LANG.notiz).optional(),
-  pickupDate: z.string().min(1),       // ISO date string "YYYY-MM-DD"
-  pickupTimeStart: z.string().min(1),  // "HH:MM"
-  pickupTimeEnd: z.string().min(1),
+  // Nur die Form — ob es das Fenster beim Hof gibt, ob es in der Zukunft
+  // liegt und noch Platz hat, prüft der Handler (src/lib/abholfenster.ts).
+  // Ohne Form landete „morgen" als ungültiges Datum in der DB: ein 500.
+  pickupDate: z.string().regex(KALENDERTAG, 'Ungültiges Abholdatum'), // "YYYY-MM-DD"
+  pickupTimeStart: z.string().regex(UHRZEIT, 'Ungültige Uhrzeit'), // "HH:MM", Wiener Zeit
+  pickupTimeEnd: z.string().regex(UHRZEIT, 'Ungültige Uhrzeit'),
   paymentMethod: z.enum(['ONLINE', 'ONSITE_CASH', 'ONSITE_CARD']),
   optInEmail: z.boolean().optional().default(false),
   optInWhatsApp: z.boolean().optional().default(false),

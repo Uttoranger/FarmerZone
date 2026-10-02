@@ -4,8 +4,6 @@ import { useState, useEffect, useRef, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, type FieldErrors, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { format, addDays } from 'date-fns'
-import { de } from 'date-fns/locale'
 import { ShoppingCart, Loader2, Info, Banknote, CreditCard, type LucideIcon } from 'lucide-react'
 import { KasseSkelett } from '@/components/checkout/kasse-skelett'
 import { toast } from 'sonner'
@@ -19,6 +17,14 @@ import {
 import { formatEuro, formatMenge } from '@/lib/format'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
+import {
+  ABHOLFENSTER_NICHT_VERFUEGBAR,
+  CODE_ABHOLFENSTER_UNGUELTIG,
+  CODE_ABHOLFENSTER_VOLL,
+  abholSchluessel,
+  angeboteneAbholfenster,
+} from '@/lib/abholfenster'
+import { wienerZeitpunkt } from '@/lib/fristen'
 import { BETRIEBSNACHWEIS_FEHLER, CODE_BETRIEBSNACHWEIS_FEHLT } from '@/lib/betriebsnachweis'
 import type { PublicFarm } from '@/server/queries/farm'
 import type { CartItem } from '@/lib/use-cart'
@@ -102,35 +108,36 @@ const ZAHLART: Record<'ONLINE' | 'ONSITE_CASH' | 'ONSITE_CARD', { label: string;
 type PickupOption = {
   key: string // "YYYY-MM-DD|HH:MM|HH:MM"
   label: string
-  date: string
-  timeStart: string
-  timeEnd: string
+  ausgebucht: boolean
 }
 
-function generatePickupOptions(
-  slots: PublicFarm['pickupSlots']
-): PickupOption[] {
-  const options: PickupOption[] = []
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+/** „Samstag, 10. Oktober" — der Abholtag im Wiener Kalender, egal wo der Browser steht. */
+const ABHOLTAG = new Intl.DateTimeFormat('de-AT', {
+  timeZone: 'Europe/Vienna',
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+})
 
-  for (let i = 1; i <= 14; i++) {
-    const d = addDays(today, i)
-    const dow = d.getDay()
-    const matching = slots.filter((s) => s.dayOfWeek === dow)
-    for (const slot of matching) {
-      const dateStr = format(d, 'yyyy-MM-dd')
-      const label = `${format(d, 'EEEE, d. MMMM', { locale: de })}, ${slot.startTime}–${slot.endTime} Uhr`
-      options.push({
-        key: `${dateStr}|${slot.startTime}|${slot.endTime}`,
-        label,
-        date: dateStr,
-        timeStart: slot.startTime,
-        timeEnd: slot.endTime,
-      })
+/**
+ * Die wählbaren Abholfenster — mit derselben Regel, die der Checkout-Handler
+ * prüft (src/lib/abholfenster.ts): heute bis zum Beginn eines Fensters, sonst
+ * die nächsten Tage. Volle Fenster bleiben sichtbar, aber nicht wählbar.
+ */
+function abholOptionen(
+  slots: PublicFarm['pickupSlots'],
+  jetzt: Date,
+  ausgebucht: readonly string[]
+): PickupOption[] {
+  return angeboteneAbholfenster(slots, jetzt).map((fenster) => {
+    const key = abholSchluessel(fenster)
+    const tag = wienerZeitpunkt(fenster.datum, '12:00')
+    return {
+      key,
+      label: `${tag ? ABHOLTAG.format(tag) : fenster.datum}, ${fenster.start}–${fenster.ende} Uhr`,
+      ausgebucht: ausgebucht.includes(key),
     }
-  }
-  return options
+  })
 }
 
 
@@ -138,8 +145,11 @@ export function CheckoutForm({
   farm,
   nurBetriebeIds,
   vorbelegung,
+  ausgebuchteAbholfenster,
 }: {
   farm: PublicFarm
+  /** Fenster mit erreichter Höchstzahl (abholSchluessel) — vom Server gezählt. */
+  ausgebuchteAbholfenster: string[]
   /** Produkte dieses Hofs mit abgabe = NUR_BETRIEBE — aus der DB, nicht aus dem Korb. */
   nurBetriebeIds: string[]
   /** Ist der Besteller selbst ein Hof: Käuferart Betrieb und seine Nummer (Konzept 6.4). */
@@ -219,7 +229,7 @@ export function CheckoutForm({
     }
   }, [farm.id, farm.slug])
 
-  const pickupOptions = generatePickupOptions(farm.pickupSlots)
+  const pickupOptions = abholOptionen(farm.pickupSlots, new Date(), ausgebuchteAbholfenster)
 
   // Build available payment methods
   const paymentMethods: Array<{ value: string; label: string; Symbol: LucideIcon }> = []
@@ -341,6 +351,17 @@ export function CheckoutForm({
             uebernehmePreise(cart, err.preise, { farmId: farm.id, farmSlug: farm.slug }, setCart)
           }
           toast.error(err.error ?? 'Dein Warenkorb hat sich geändert.')
+          return
+        }
+        // Das Fenster gibt es nicht mehr oder es ist voll (der Tab war über
+        // Nacht offen, jemand war schneller): Wahl zurücksetzen, Fenster und
+        // Belegung neu laden (router.refresh rendert die Seite auf dem Server
+        // neu, das Formular bleibt ausgefüllt) und zum Feld springen.
+        if (err.code === CODE_ABHOLFENSTER_UNGUELTIG || err.code === CODE_ABHOLFENSTER_VOLL) {
+          form.setValue('pickupSlotKey', '')
+          form.setError('pickupSlotKey', { type: 'server', message: err.error ?? ABHOLFENSTER_NICHT_VERFUEGBAR })
+          router.refresh()
+          window.setTimeout(() => onInvalid(form.formState.errors), 50)
           return
         }
         // Online-Zahlung konnte nicht starten — die Bestellung ist storniert,
@@ -528,15 +549,26 @@ export function CheckoutForm({
               {pickupOptions.map((opt) => (
                 <label
                   key={opt.key}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/8 transition-colors"
+                  className={`flex items-center gap-3 p-3 rounded-lg border border-border transition-colors ${
+                    opt.ausgebucht
+                      ? 'cursor-not-allowed opacity-60'
+                      : 'cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/8'
+                  }`}
                 >
                   <input
                     type="radio"
                     value={opt.key}
                     {...form.register('pickupSlotKey')}
+                    disabled={opt.ausgebucht}
                     className="accent-primary"
                   />
-                  <span className="text-sm text-foreground">{opt.label}</span>
+                  <span className={`text-sm ${opt.ausgebucht ? 'text-muted-foreground' : 'text-foreground'}`}>
+                    {opt.label}
+                  </span>
+                  {/* Voll heißt: Der Hof nimmt für dieses Fenster nichts mehr an (maxOrders). */}
+                  {opt.ausgebucht && (
+                    <span className="ml-auto shrink-0 text-xs font-medium text-muted-foreground">ausgebucht</span>
+                  )}
                 </label>
               ))}
             </div>

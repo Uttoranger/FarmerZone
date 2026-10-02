@@ -18,6 +18,8 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { neueFrist } from '@/lib/reservierung'
+import { kalendertagInWien } from '@/lib/servicegebuehr'
+import { tagVersetzt } from '@/lib/kalender'
 import type { Abgabe, Farm, Prisma, Product, User } from '@prisma/client'
 
 export const INT_PRAEFIX = 'int-'
@@ -71,6 +73,12 @@ export async function erstelleHof(
       betriebsnummer: 'LFBIS 0000000',
       betriebsstatus: 'PRIMAERPRODUKTION',
       ownerId: owner.id,
+      // Ein Abholfenster an jedem Tag, 15–18 Uhr, ohne Höchstzahl: Der
+      // Checkout nimmt nur Fenster an, die der Hof anbietet
+      // (src/lib/abholfenster.ts) — checkoutAnfrage bestellt für morgen 15–18.
+      pickupSlots: {
+        create: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({ dayOfWeek, startTime: '15:00', endTime: '18:00' })),
+      },
       ...abweichend,
     },
   })
@@ -173,6 +181,11 @@ export type CheckoutPosition = {
   unitPrice: number
 }
 
+/** Der morgige Kalendertag in Wien (JJJJ-MM-TT) — der Abholtag von checkoutAnfrage. */
+export function morgenInWien(): string {
+  return tagVersetzt(kalendertagInWien(new Date()), 1)
+}
+
 /**
  * Eine echte POST-Anfrage an /api/checkout — kein HTTP-Server, kein
  * Next-Prozess: Der Handler wird direkt importiert und mit dieser Anfrage
@@ -188,10 +201,8 @@ export function checkoutAnfrage(eingabe: {
   customerEmail?: string
   paymentMethod?: 'ONSITE_CASH' | 'ONSITE_CARD' | 'ONLINE'
 }): NextRequest {
-  const morgen = new Date(Date.now() + 24 * 60 * 60 * 1000)
-  const datum = `${morgen.getFullYear()}-${String(morgen.getMonth() + 1).padStart(2, '0')}-${String(
-    morgen.getDate()
-  ).padStart(2, '0')}`
+  // Morgen im Wiener Kalender — so prüft der Checkout das Abholfenster.
+  const datum = morgenInWien()
 
   const koerper = {
     farmId: eingabe.farm.id,
