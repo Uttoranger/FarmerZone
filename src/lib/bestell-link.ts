@@ -39,3 +39,16 @@ export function bestellLinkGilt(orderId: string, signatur: string): boolean {
 export function bestellungPfad(farmSlug: string, orderId: string): string {
   return `/${farmSlug}/bestellung/${orderId}?s=${bestellSignatur(orderId)}`
 }
+
+/**
+ * Der Pfad der Bestätigungsseite (/{hof}/confirm/{id}) samt Signatur — nach
+ * dem Checkout, als Stripe-return_url und nach dem Bestätigungslink. Die
+ * Seite zeigt Name, E-Mail, Artikel und Beträge nur mit gültiger Signatur;
+ * die Bestell-ID allein ist ratbar. Parameter `sig`: Stripe hängt seine
+ * eigenen (payment_intent, redirect_status …) an die return_url an, `sig`
+ * bleibt dabei stehen. Den Pfad baut nur der Server — das Geheimnis gehört
+ * nie in den Browser.
+ */
+export function bestaetigungsPfad(farmSlug: string, orderId: string): string {
+  return `/${farmSlug}/confirm/${orderId}?sig=${bestellSignatur(orderId)}`
+}

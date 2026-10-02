@@ -100,6 +100,17 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // Die Bestätigungsseite trägt die signierte Adresse (?sig=) und zeigt
+        // Name und E-Mail der Kundin: Beim Klick auf einen Link (Hofseite,
+        // Stripe) geht sie NICHT als Referrer mit, und in keinen Suchindex.
+        // Steht nach der allgemeinen Regel, damit sie dort gewinnt.
+        source: '/:farmSlug/confirm/:orderId',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        ],
+      },
+      {
         // NUR die Hofseite MIT ?vorschau=1 darf eingebettet werden — und nur
         // von uns selbst: Der Editor unter /farm-page zeigt sie im Browser als
         // Handy-Vorschau im iframe (src/lib/hofseite-vorschau.ts). Ohne den

@@ -1,18 +1,50 @@
+import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { CheckCircle, Clock, XCircle, MapPin, Calendar, Package } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { formatEuro, formatPosition } from '@/lib/format'
-import { bestellungPfad } from '@/lib/bestell-link'
+import { bestellLinkGilt, bestellungPfad } from '@/lib/bestell-link'
+import { bestaetigungsZustand } from '@/lib/bestaetigung'
 import { ClearCartOnMount } from '@/components/checkout/clear-cart-on-mount'
 import { BestellSummenZeilen } from '@/components/checkout/bestell-summen'
 import { KundenKopf } from '@/components/shared/kunden-kopf'
-import { GRUND_NICHT_BESTAETIGT, fristVon, tagInWorten, uhrzeitInWien } from '@/lib/fristen'
+import { fristVon, tagInWorten, uhrzeitInWien } from '@/lib/fristen'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 
 interface Props {
   params: Promise<{ farmSlug: string; orderId: string }>
-  searchParams: Promise<{ confirmed?: string; redirect_status?: string }>
+  searchParams: Promise<{ sig?: string; redirect_status?: string }>
+}
+
+// Eine Seite mit Name, E-Mail und Bestellung: nie in einen Suchindex, und die
+// signierte Adresse geht beim Klick auf einen Link nicht als Referrer mit
+// (dazu der Header in next.config.ts).
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+  referrer: 'no-referrer',
+}
+
+/**
+ * Ohne gültige Signatur: nur „eingegangen" — kein Name, keine E-Mail, keine
+ * Artikel, keine Beträge, und keine Datenbankabfrage (auch nicht, ob es die
+ * Bestellung gibt). Die Bestell-ID im Pfad ist ratbar und steht u. a. in den
+ * Stripe-Metadaten; den signierten Link haben nur die Kundin und ihre Mails.
+ */
+function BestellungEingegangen({ farmSlug }: { farmSlug: string }) {
+  return (
+    <div className="min-h-screen bg-background">
+      <KundenKopf seite={{ art: 'bestaetigung', hofSlug: farmSlug }} />
+      <ClearCartOnMount />
+      <div className="max-w-lg mx-auto px-4 py-10 flex flex-col items-center text-center">
+        <CheckCircle className="size-14 text-green-600 dark:text-green-400 mb-3" />
+        <h1 className="font-heading text-2xl font-semibold text-foreground">
+          Deine Bestellung ist eingegangen
+        </h1>
+        <p className="text-muted-foreground mt-1">– alle Details stehen in deiner E-Mail.</p>
+      </div>
+    </div>
+  )
 }
 
 async function getOrder(orderId: string) {
@@ -60,7 +92,9 @@ async function getOrder(orderId: string) {
 
 export default async function ConfirmPage({ params, searchParams }: Props) {
   const { farmSlug, orderId } = await params
-  const { confirmed, redirect_status } = await searchParams
+  const { sig, redirect_status } = await searchParams
+
+  if (!sig || !bestellLinkGilt(orderId, sig)) return <BestellungEingegangen farmSlug={farmSlug} />
 
   // Frist gilt beim Lesen (src/lib/fristen.ts): Ist die Bestätigungsfrist
   // vorbei, verfällt die Bestellung, bevor die Seite „Fast geschafft" zeigt.
@@ -75,31 +109,9 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
   // kein laufender Bestätigungs-Ablauf dran.
   if (!order || order.farm.slug !== farmSlug || order.farm.archivedAt) notFound()
 
-  const isOnlinePaid =
-    order.paymentMethod === 'ONLINE' &&
-    (order.paymentStatus === 'PAID' || redirect_status === 'succeeded')
-
-  const isOnlineFailed =
-    order.paymentMethod === 'ONLINE' && redirect_status === 'failed'
-
-  // `confirmed=true` kommt aus der Bestätigung per Link. Ein Lesezeichen damit
-  // darf eine inzwischen stornierte (z. B. verfallene) Bestellung nicht als
-  // bestätigt zeigen.
-  const isOnsiteConfirmed =
-    order.paymentMethod !== 'ONLINE' &&
-    order.status !== 'CANCELLED' &&
-    (order.status === 'CONFIRMED' || confirmed === 'true')
-
-  const isOnsitePending =
-    order.paymentMethod !== 'ONLINE' &&
-    order.status === 'PENDING_CONFIRMATION' &&
-    confirmed !== 'true'
-
-  // Nicht rechtzeitig bestätigt und deshalb verfallen (src/server/verwaiste-bestellungen.ts).
-  const isOnsiteVerfallen =
-    order.paymentMethod !== 'ONLINE' &&
-    order.status === 'CANCELLED' &&
-    order.cancelReason === GRUND_NICHT_BESTAETIGT
+  // „Bezahlt" und „bestätigt" nur aus der Datenbank; redirect_status ist
+  // höchstens ein Hinweis (src/lib/bestaetigung.ts).
+  const zustand = bestaetigungsZustand(order, redirect_status)
 
   const jetzt = new Date()
   const bestaetigenBis = fristVon(order)
@@ -118,7 +130,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
       {/* Always clear the cart when reaching the confirm page — the order has been submitted */}
       <ClearCartOnMount />
       <div className="max-w-lg mx-auto px-4 py-10">
-        {isOnlinePaid && (
+        {zustand === 'bezahlt' && (
           <div className="flex flex-col items-center text-center mb-8">
             <CheckCircle className="size-14 text-green-600 dark:text-green-400 mb-3" />
             <h1 className="font-heading text-2xl font-semibold text-foreground">Zahlung erfolgreich!</h1>
@@ -128,7 +140,18 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
           </div>
         )}
 
-        {isOnsiteConfirmed && (
+        {zustand === 'zahlung-wird-geprueft' && (
+          <div className="flex flex-col items-center text-center mb-8">
+            <Clock className="size-14 text-amber-500 mb-3" />
+            <h1 className="font-heading text-2xl font-semibold text-foreground">Zahlung wird geprüft</h1>
+            <p className="text-muted-foreground mt-1">
+              Das dauert meist nur ein paar Sekunden. Lade die Seite gleich neu – sobald die
+              Zahlung bestätigt ist, siehst du es hier und bekommst eine E-Mail.
+            </p>
+          </div>
+        )}
+
+        {zustand === 'bestaetigt' && (
           <div className="flex flex-col items-center text-center mb-8">
             <CheckCircle className="size-14 text-green-600 dark:text-green-400 mb-3" />
             <h1 className="font-heading text-2xl font-semibold text-foreground">Bestellung bestätigt!</h1>
@@ -139,7 +162,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
           </div>
         )}
 
-        {isOnsitePending && (
+        {zustand === 'bestaetigung-offen' && (
           <div className="flex flex-col items-center text-center mb-8">
             <Clock className="size-14 text-amber-500 mb-3" />
             <h1 className="font-heading text-2xl font-semibold text-foreground">
@@ -157,7 +180,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
           </div>
         )}
 
-        {isOnsiteVerfallen && (
+        {zustand === 'verfallen' && (
           <div className="flex flex-col items-center text-center mb-8">
             <Clock className="size-14 text-muted-foreground mb-3" />
             <h1 className="font-heading text-2xl font-semibold text-foreground">Bestellung verfallen</h1>
@@ -174,7 +197,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
           </div>
         )}
 
-        {isOnlineFailed && (
+        {zustand === 'zahlung-fehlgeschlagen' && (
           <div className="flex flex-col items-center text-center mb-8">
             <XCircle className="size-14 text-red-500 mb-3" />
             <h1 className="font-heading text-2xl font-semibold text-foreground">Zahlung fehlgeschlagen</h1>

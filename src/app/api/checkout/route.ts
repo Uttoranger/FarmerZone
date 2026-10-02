@@ -25,6 +25,7 @@ import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { bestellPositionsName } from '@/lib/eingabegrenzen'
 import { fristVon } from '@/lib/fristen'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
+import { bestaetigungsPfad } from '@/lib/bestell-link'
 import { AbholfensterVoll, imAbholfenster, pruefeAbholfenster } from '@/server/abholfenster'
 import { ABHOLFENSTER_NICHT_VERFUEGBAR, CODE_ABHOLFENSTER_VOLL } from '@/lib/abholfenster'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
@@ -252,7 +253,7 @@ async function antwortFuerBestehendeBestellung(
       totalAmount: true,
       platformFeeAmount: true,
       serviceFeeCents: true,
-      farm: { select: { stripeAccountId: true, acceptsOnsite: true } },
+      farm: { select: { slug: true, stripeAccountId: true, acceptsOnsite: true } },
     },
   })
   if (!bestehend) return null
@@ -299,6 +300,7 @@ async function antwortFuerBestehendeBestellung(
         orderNumber: bestehend.orderNumber,
         clientSecret: intent.client_secret,
         reserviertBis: fristVon(bestehend).toISOString(),
+        bestaetigung: bestaetigungsPfad(bestehend.farm.slug, bestehend.id),
         wiederholt: true,
       })
     }
@@ -309,6 +311,7 @@ async function antwortFuerBestehendeBestellung(
       orderNumber: bestehend.orderNumber,
       clientSecret: intent.client_secret,
       reserviertBis: fristVon(bestehend).toISOString(),
+      bestaetigung: bestaetigungsPfad(bestehend.farm.slug, bestehend.id),
       wiederholt: true,
     })
   }
@@ -316,6 +319,7 @@ async function antwortFuerBestehendeBestellung(
     orderId: bestehend.id,
     orderNumber: bestehend.orderNumber,
     requiresConfirmation: true,
+    bestaetigung: bestaetigungsPfad(bestehend.farm.slug, bestehend.id),
     wiederholt: true,
   })
 }
@@ -751,6 +755,8 @@ export async function POST(request: NextRequest) {
       orderId: order.id,
       orderNumber,
       clientSecret: paymentIntent.client_secret,
+      // Die signierte Bestätigungsseite — Stripes return_url (src/lib/bestell-link.ts).
+      bestaetigung: bestaetigungsPfad(farm.slug, order.id),
       // Bis dahin hält die Bestellung ihre Ware (src/lib/fristen.ts) — der
       // Zahlungsschritt zeigt die Uhrzeit.
       reserviertBis: fristVon({
@@ -830,5 +836,10 @@ export async function POST(request: NextRequest) {
     }
   })
 
-  return NextResponse.json({ orderId: order.id, orderNumber, requiresConfirmation: true })
+  return NextResponse.json({
+    orderId: order.id,
+    orderNumber,
+    requiresConfirmation: true,
+    bestaetigung: bestaetigungsPfad(farm.slug, order.id),
+  })
 }

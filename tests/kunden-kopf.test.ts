@@ -288,7 +288,8 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     'src/app/(public)/hoefe/page.tsx': ['hofuebersicht'],
     // Der Checkout rendert den Kopf in CheckoutForm (siehe unten).
     'src/app/(public)/[farmSlug]/checkout/page.tsx': [],
-    'src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx': ['bestaetigung'],
+    // Zweimal: die neutrale Ansicht ohne gültige Signatur und die Bestellung selbst.
+    'src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx': ['bestaetigung', 'bestaetigung'],
     // Ungültiger Link: nicht einmal der Hof ist bestätigt → zur Hofübersicht.
     'src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx': ['bestellung-ungueltig', 'bestellung'],
     'src/app/(public)/impressum/page.tsx': ['info'],

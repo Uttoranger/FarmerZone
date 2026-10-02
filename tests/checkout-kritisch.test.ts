@@ -55,6 +55,7 @@ import { POST } from '@/app/api/checkout/route'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { sendOnsiteConfirmation } from '@/lib/email'
+import { bestellSignatur } from '@/lib/bestell-link'
 import { CODE_RESERVIERUNG_ABGELAUFEN, RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 
 const farmFindUnique = vi.mocked(prisma.farm.findUnique)
@@ -205,7 +206,7 @@ describe('Idempotenz', () => {
     orderFindUnique.mockImplementation((({ where }: { where: Record<string, unknown> }) =>
       Promise.resolve(
         where.idempotencyKey
-          ? { id: 'order_alt', orderNumber: 'BH-2009-AAAA', paymentMethod: 'ONSITE_CASH', stripePaymentIntentId: null }
+          ? { id: 'order_alt', orderNumber: 'BH-2009-AAAA', paymentMethod: 'ONSITE_CASH', stripePaymentIntentId: null, farm: { slug: 'beispielhof' } }
           : null
       )) as never)
 
@@ -213,6 +214,8 @@ describe('Idempotenz', () => {
 
     expect(res.status).toBe(200)
     const body = await res.json()
+    // Auch die Wiederholung führt auf die signierte Bestätigungsseite.
+    expect(body.bestaetigung).toBe(`/beispielhof/confirm/order_alt?sig=${bestellSignatur('order_alt')}`)
     expect(body).toMatchObject({ orderId: 'order_alt', orderNumber: 'BH-2009-AAAA', wiederholt: true })
     expect(orderCreate).not.toHaveBeenCalled()
     expect(productUpdateMany).not.toHaveBeenCalled()
@@ -247,6 +250,7 @@ describe('Idempotenz', () => {
         orderNumber: 'BH-2009-BBBB',
         paymentMethod: 'ONSITE_CASH',
         stripePaymentIntentId: null,
+        farm: { slug: 'beispielhof' },
       })
     }) as never)
 
@@ -274,6 +278,7 @@ describe('Idempotenz', () => {
         orderNumber: 'BH-2009-CCCC',
         paymentMethod: 'ONSITE_CASH',
         stripePaymentIntentId: null,
+        farm: { slug: 'beispielhof' },
       })
     }) as never)
   }
@@ -342,6 +347,7 @@ describe('Idempotenz', () => {
               orderNumber: 'BH-2009-EEEE',
               paymentMethod: 'ONLINE',
               stripePaymentIntentId: 'pi_1',
+              farm: { slug: 'beispielhof' },
               status: 'PENDING_CONFIRMATION',
               createdAt: new Date('2026-10-01T08:00:00Z'),
               pickupDate: new Date('2026-10-02T12:00:00Z'),

@@ -362,7 +362,9 @@ describe('Frist gilt beim Lesen — Bestätigung per Link', () => {
 
     const antwort = await klick(bestellung.confirmationToken!)
 
-    expect(antwort.headers.get('location')).toContain('confirmed=true')
+    // Kein ?confirmed mehr: Die Bestätigungsseite liest den Stand aus der
+    // Datenbank und öffnet sich nur mit Signatur (tests/bestaetigung-zugang.test.ts).
+    expect(antwort.headers.get('location')).toMatch(/\/confirm\/[^?]+\?sig=[0-9a-f]{64}$/)
     expect((await zustand(bestellung.id)).status).toBe('CONFIRMED')
     expect(await bestand(produkt.id)).toBe(BESTAND_NACH_CHECKOUT)
   })
