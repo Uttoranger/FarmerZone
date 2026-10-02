@@ -394,7 +394,7 @@ describe('Connect-Endpunkt: account.updated mit eigenem Secret', () => {
     expect(constructEvent).toHaveBeenNthCalledWith(1, '{}', 'sig_test', 'whsec_test_dummy')
     expect(constructEvent).toHaveBeenNthCalledWith(2, '{}', 'sig_test', 'whsec_connect_dummy')
     // Der Stand kommt frisch von Stripe, nicht aus dem (womöglich verspäteten) Ereignis.
-    expect(stripe.accounts.retrieve).toHaveBeenCalledWith('acct_hof_1')
+    expect(stripe.accounts.retrieve).toHaveBeenCalledWith('acct_hof_1', {}, { timeout: 10_000, maxNetworkRetries: 1 })
     expect(vi.mocked(prisma.farm.update)).toHaveBeenCalledWith({
       where: { id: 'farm_1' },
       data: { stripeAccountReady: false },

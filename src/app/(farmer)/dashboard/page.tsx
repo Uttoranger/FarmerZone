@@ -121,7 +121,7 @@ export default async function HeutePage() {
       </div>
 
       {/* Online-Zahlung pausiert: Stripe braucht Angaben — vor allem anderen,
-          denn bis dahin können Kunden nur bar bestellen. */}
+          denn bis dahin können Kunden nicht online bezahlen. */}
       {onlinePausiert && <OnlinePausiertHinweis barMoeglich={onlinePausiert.barMoeglich} />}
 
       {/* Für einen frisch registrierten Hof das Wichtigste — sie rendert sich

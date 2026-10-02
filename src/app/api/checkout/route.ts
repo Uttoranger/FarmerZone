@@ -115,11 +115,8 @@ const INTENT_WARTEZEIT_MS = 2 * 60 * 1000
  * Anfrage ihren Intent noch speichern, nachdem eine Wiederholung die
  * Bestellung schon als gescheitert storniert hatte.
  */
-const intentOptionen = (orderId: string) => ({
-  idempotencyKey: `pi-${orderId}`,
-  timeout: 20_000,
-  maxNetworkRetries: 2,
-})
+const STRIPE_LEINE = { timeout: 20_000, maxNetworkRetries: 2 }
+const intentOptionen = (orderId: string) => ({ idempotencyKey: `pi-${orderId}`, ...STRIPE_LEINE })
 
 /**
  * 409 von Stripe: Eine zweite Anfrage mit demselben Schlüssel läuft gerade
@@ -220,7 +217,7 @@ async function haengeIntentAn(orderId: string, intentId: string): Promise<boolea
   })
   if (count === 1) return true
   try {
-    await stripe.paymentIntents.cancel(intentId, { cancellation_reason: 'abandoned' })
+    await stripe.paymentIntents.cancel(intentId, { cancellation_reason: 'abandoned' }, STRIPE_LEINE)
   } catch (err) {
     Sentry.captureException(err, { tags: { aufgabe: 'checkout', grund: 'intent_ohne_bestellung' }, extra: { orderId } })
   }

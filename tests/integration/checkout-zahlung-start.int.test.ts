@@ -135,7 +135,11 @@ describe('Stripe scheitert beim Anlegen des PaymentIntents', () => {
 
     expect(antwort.status).toBe(503)
     expect(JSON.stringify(await antwort.json())).not.toContain('geheim_zu_spaet')
-    expect(abbrechen).toHaveBeenCalledWith('pi_int_zu_spaet', { cancellation_reason: 'abandoned' })
+    expect(abbrechen).toHaveBeenCalledWith(
+      'pi_int_zu_spaet',
+      { cancellation_reason: 'abandoned' },
+      { timeout: 20_000, maxNetworkRetries: 2 }
+    )
     expect((await prisma.order.findUniqueOrThrow({ where: { idempotencyKey: schluessel } })).stripePaymentIntentId).toBeNull()
   })
 

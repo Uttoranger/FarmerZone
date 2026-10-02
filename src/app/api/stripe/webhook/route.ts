@@ -176,7 +176,8 @@ async function handleKontoAktualisiert(konto: Stripe.Account) {
   // Ein verspätetes, älteres account.updated überschriebe sonst einen
   // neueren Stand — also den aktuellen nachlesen. Scheitert das: 500, Stripe
   // stellt erneut zu.
-  const aktuell = await stripe.accounts.retrieve(konto.id)
+  // Kurze Leine: Hängt Stripe, bricht die Zustellung sonst ab und kommt erneut.
+  const aktuell = await stripe.accounts.retrieve(konto.id, {}, { timeout: 10_000, maxNetworkRetries: 1 })
   await prisma.farm.update({
     where: { id: hof.id },
     data: { stripeAccountReady: stripeKontoBereit(aktuell) },
