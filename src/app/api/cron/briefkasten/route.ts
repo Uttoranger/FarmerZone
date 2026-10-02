@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { del } from '@vercel/blob'
 import { env } from '@/lib/env'
+import { cronBerechtigt } from '@/lib/geheimnis'
 import { brauchtZusammenfassung, screenshotsVon, waehleZuLoeschende } from '@/lib/meldung'
 import { findeLoeschKandidaten, loescheMeldungen, zaehleFuerWochenlauf } from '@/server/queries/meldung'
 import { sendBriefkastenZusammenfassung } from '@/lib/email'
@@ -27,10 +28,8 @@ import { sendBriefkastenZusammenfassung } from '@/lib/email'
  * Aufräumen läuft zuerst, damit die Zusammenfassung den Stand danach nennt.
  */
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = env.CRON_SECRET
-
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  // Konstante Zeit, fail-closed — wie alle Cron-Routen (ARCHITECTURE §5).
+  if (!cronBerechtigt(request.headers.get('authorization'), env.CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

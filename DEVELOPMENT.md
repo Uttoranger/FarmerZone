@@ -254,6 +254,17 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 
 ## Bekannte Bugs & Fixes
 
+### BUG: Briefkasten-Cron verglich CRON_SECRET nicht in konstanter Zeit (behoben 2026-10-02)
+
+`/api/cron/briefkasten` prüfte den Header mit `authHeader !== \`Bearer …\``.
+Die Antworten waren richtig (401/200), aber ein solcher Vergleich bricht beim
+ersten abweichenden Zeichen ab, und an der Laufzeit lässt sich das Secret
+Zeichen für Zeichen erraten. Jetzt `cronBerechtigt` wie die beiden anderen
+Cron-Routen (ARCHITECTURE §5). Messen lässt sich der Unterschied im Unit-Test
+nicht. Deshalb prüft `tests/cron-verwaiste-bestellungen.test.ts` den
+Quelltext **jeder** Route unter `src/app/api/cron/`, mit Gegenprobe; eine
+künftige Route mit eigenem Vergleich fällt dort auf.
+
 ### BUG: Namen und Freitexte ohne Obergrenze, jede Schreibweise der E-Mail ein neuer Kunde (behoben 2026-10-01)
 
 **Befund:** Der Produktname hatte `max(100)`, aber Hofname, Inhabername,
