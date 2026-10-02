@@ -10,6 +10,7 @@ import { OrderReadyEmail } from '@/emails/pickup-reminder'
 import { OrderCancelledEmail } from '@/emails/order-cancelled'
 import { OrderNotReadyEmail } from '@/emails/order-not-ready'
 import { ZahlungZuSpaetEmail } from '@/emails/zahlung-zu-spaet'
+import { BestellungVerfallenEmail } from '@/emails/bestellung-verfallen'
 import { CustomerMagicLinkEmail } from '@/emails/customer-magic-link'
 import { PasswordResetEmail } from '@/emails/password-reset'
 import { NewFarmNotificationEmail } from '@/emails/new-farm-notification'
@@ -491,4 +492,19 @@ export async function sendZahlungZuSpaet(
   }))
 
   await send(order.customerEmail, 'Deine Zahlung kam zu spät – das Geld ist zurück', html)
+}
+
+/** Vor-Ort-Bestellung nicht rechtzeitig bestätigt, Ware freigegeben → Kunde */
+export async function sendBestellungVerfallen(
+  order: Pick<OrderForEmail, 'customerName' | 'customerEmail' | 'orderNumber'> & {
+    farm: Pick<OrderForEmail['farm'], 'name'>
+  }
+): Promise<void> {
+  const html = await toHtml(React.createElement(BestellungVerfallenEmail, {
+    customerName: order.customerName,
+    orderNumber: order.orderNumber,
+    farmName: order.farm.name,
+  }))
+
+  await send(order.customerEmail, 'Deine Bestellung ist verfallen, weil sie nicht bestätigt wurde', html)
 }

@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { getHofBesitzer, getOwnerFarm, getPublicFarm, type PublicFarm } from '@/server/queries/farm'
 import { ansichtsModus, type SeitenAnsicht, type Suchparameter } from '@/lib/ansichts-modus'
+import { gibVerwaisteFreiFuerSlug } from '@/server/verwaiste-bestellungen'
 
 /**
  * Der Hof zu einem Slug und wer ihn sieht. Was die Vorschau (?vorschau=1)
@@ -19,6 +20,12 @@ export async function ladeHofseite(
   farmSlug: string,
   suche: Suchparameter
 ): Promise<{ farm: PublicFarm | null; ansicht: SeitenAnsicht }> {
+  // Frist gilt beim Lesen (src/lib/fristen.ts): Verwaiste Bestellungen geben
+  // ihre Ware frei, BEVOR die Hofseite den Bestand zeigt — sonst stünde ein
+  // Produkt als „Ausverkauft" da, und niemand riefe /api/reserve auf, das
+  // sonst freigäbe. Fehler werden nur gemeldet.
+  await gibVerwaisteFreiFuerSlug(farmSlug)
+
   const { besitzerVorFreigabe, ...ansicht } = await ansichtsModus(suche, {
     angemeldeterNutzer: async () => (await auth.api.getSession({ headers: await headers() }))?.user.id ?? null,
     besitzer: () => getHofBesitzer(farmSlug),

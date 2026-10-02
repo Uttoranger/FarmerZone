@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { pruefeSitzungsWarenkorb, erneuereHalte, loescheHalte } from '@/server/warenkorb'
+import { gibVerwaisteFreiFuerProdukte } from '@/server/verwaiste-bestellungen'
 
 /**
  * Warenkorb gegen die Wirklichkeit abgleichen (Bug-Report Befund 3).
@@ -48,6 +49,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const jetzt = new Date()
+    // Frist gilt beim Lesen: erst verwaiste Bestellungen freigeben, dann den
+    // Bestand prüfen. Ein Fehler darin bleibt gemeldet, nie die Antwort.
+    await gibVerwaisteFreiFuerProdukte(items.map((i) => i.productId), jetzt)
     const { befund, meldung, berichtigt } = await pruefeSitzungsWarenkorb(items, sessionId, jetzt)
 
     // Halte nachführen: erneuern, was bleibt; löschen, was rausfällt.

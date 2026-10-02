@@ -15,6 +15,7 @@ import {
 import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getHeute } from '@/server/queries/heute'
+import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { Card, CardContent } from '@/components/ui/card'
 import { ErsteSchritteKarte } from '@/components/farmer/erste-schritte-karte'
 import { ErsteSchritteSchalter } from '@/components/farmer/erste-schritte-schalter'
@@ -84,6 +85,10 @@ export default async function HeutePage() {
 
   const farm = await getFarmForUser(session.user.id)
   if (!farm) redirect('/login')
+
+  // Frist gilt beim Lesen: Verwaiste Bestellungen geben ihre Ware frei, bevor
+  // die Seite Bestand und Bestellungen zeigt (src/lib/fristen.ts). Fehler nur gemeldet.
+  await gibVerwaisteFreiOhneRisiko(farm.id)
 
   // Ein Zeitpunkt für die ganze Seite: Gruß, Datum, Tag und Woche passen zusammen.
   const jetzt = new Date()

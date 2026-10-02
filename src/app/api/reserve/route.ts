@@ -5,6 +5,7 @@ import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { gibVerwaisteFreiFuerProdukte } from '@/server/verwaiste-bestellungen'
 
 const MAX_MENGE = 10_000
 
@@ -51,6 +52,11 @@ export async function POST(request: NextRequest) {
   const expiresAt = new Date(now.getTime() + RESERVATION_TTL_MS)
 
   try {
+    // 0. Frist gilt beim Lesen: Verwaiste Bestellungen dieses Hofs geben ihre
+    //    Ware frei, BEVOR der Bestand gelesen wird (src/lib/fristen.ts).
+    //    Scheitert das, wird nur gemeldet — die Reservierung läuft weiter.
+    await gibVerwaisteFreiFuerProdukte([productId], now)
+
     // 1. Clean up expired reservations for this product
     await prisma.stockReservation.deleteMany({
       where: { productId, expiresAt: { lt: now } },

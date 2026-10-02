@@ -110,8 +110,10 @@ Im [Stripe Dashboard](https://dashboard.stripe.com/webhooks) einen neuen Webhook
 
 ### 4. Cron-Job einrichten
 
-`vercel.json` enthält bereits den Cron-Job für tägliche Reservierungs-Bereinigung.
-`CRON_SECRET` muss in Vercel gesetzt sein.
+`vercel.json` enthält bereits die Cron-Jobs (einmal täglich, mehr erlaubt der Hobby-Tarif nicht):
+Reservierungs-Bereinigung, Freigabe verwaister Bestellungen (`/api/cron/verwaiste-bestellungen`)
+und den Wochenlauf des Briefkastens. `CRON_SECRET` muss in Vercel gesetzt sein — ohne bleiben
+alle Cron-Routen gesperrt.
 
 ---
 
