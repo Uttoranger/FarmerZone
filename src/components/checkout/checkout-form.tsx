@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { format, addDays } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { ShoppingCart, Loader2, Info } from 'lucide-react'
+import { KasseSkelett } from '@/components/checkout/kasse-skelett'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -41,6 +42,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { StripePaymentStep } from './stripe-payment'
+import { CODE_ZAHLUNG_NICHT_MOEGLICH } from '@/lib/stripe-konto'
 import { KundenKopf } from '@/components/shared/kunden-kopf'
 import { FeldZaehler } from '@/components/shared/zeichen-zaehler'
 import { EMAIL_MAX, NOTIZ_MAX, PERSONENNAME_MAX, TELEFON_MAX } from '@/lib/eingabegrenzen'
@@ -339,6 +341,14 @@ export function CheckoutForm({
           toast.error(err.error ?? 'Dein Warenkorb hat sich geändert.')
           return
         }
+        // Online-Zahlung konnte nicht starten — die Bestellung ist storniert,
+        // die Ware wieder frei. Ein NEUER Schlüssel, damit der nächste Versuch
+        // (etwa mit Barzahlung) eine neue Bestellung wird statt der alten.
+        if (err.code === CODE_ZAHLUNG_NICHT_MOEGLICH) {
+          idempotencyKeyRef.current = crypto.randomUUID()
+          toast.error(err.error ?? 'Online-Zahlung ist gerade nicht möglich.')
+          return
+        }
         // Betriebsnachweis fehlt (Sprint Bereiche 1): Fehler am Feld zeigen
         // und dorthin springen, wie bei jedem anderen Pflichtfeld.
         if (err.code === CODE_BETRIEBSNACHWEIS_FEHLT) {
@@ -393,14 +403,15 @@ export function CheckoutForm({
     )
   }
 
-  // Loading state
+  // Warten auf den Warenkorb aus dem localStorage. Platzhalter in Kartenform,
+  // kein drehender Kreis (DESIGN_SYSTEM, „Zustände") — und dieselben Karten
+  // wie im loading.tsx dieser Route, damit zwischen den beiden Wartezeiten
+  // nichts springt.
   if (!isHydrated) {
     return (
       <>
         {kopf}
-        <div className="flex items-center justify-center py-24">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
-        </div>
+        <KasseSkelett />
       </>
     )
   }

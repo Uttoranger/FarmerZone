@@ -37,6 +37,7 @@ const PRODUKTION: UmgebungsWerte = {
   NEXT_PUBLIC_APP_URL: 'https://farmerzone.example',
   DATABASE_URL: FREMDE_DB,
   STRIPE_SECRET_KEY: 'sk_live_abc',
+  STRIPE_CONNECT_WEBHOOK_SECRET: 'whsec_connect_platzhalter',
 }
 
 const LOKAL: UmgebungsWerte = {
@@ -312,6 +313,13 @@ describe('bestimmeUmgebung — Warnungen', () => {
     expect(u.warnungen).toEqual([
       'Produktion läuft gegen die Dev-Datenbank.',
       'Stripe TEST in Produktion — keine echten Zahlungen möglich.',
+    ])
+  })
+
+  it('warnt in Produktion, wenn der Connect-Endpunkt kein Secret hat — account.updated käme nie an', () => {
+    const u = bestimmeUmgebung({ ...PRODUKTION, STRIPE_CONNECT_WEBHOOK_SECRET: undefined })
+    expect(u.warnungen).toEqual([
+      'Kein STRIPE_CONNECT_WEBHOOK_SECRET — gesperrte oder frisch freigegebene Hof-Konten bleiben unbemerkt.',
     ])
   })
 

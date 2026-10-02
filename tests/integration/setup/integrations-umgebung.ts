@@ -15,6 +15,9 @@ export const INTEGRATIONS_ENV = {
   BETTER_AUTH_SECRET: 'vitest-secret-nicht-fuer-produktion',
   STRIPE_SECRET_KEY: 'sk_test_integration_dummy',
   STRIPE_WEBHOOK_SECRET: 'whsec_integration_dummy',
+  // Das Secret des Connect-Endpunkts (Events der verbundenen Höfe) — eigenes
+  // Secret, dieselbe Route (src/app/api/stripe/webhook/route.ts).
+  STRIPE_CONNECT_WEBHOOK_SECRET: 'whsec_connect_integration_dummy',
   RESEND_API_KEY: 're_integration_dummy',
   // Better Auth leitet seine baseURL daraus ab (src/lib/umgebung-server.ts).
   // Ohne Adresse bliebe sie leer und die echte Anmeldung im Storno-Test

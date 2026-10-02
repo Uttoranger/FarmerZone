@@ -23,7 +23,13 @@ vi.mock('@/lib/prisma', () => ({
     product: { findUnique: vi.fn(), update: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
     stockReservation: { aggregate: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn() },
     user: { findUnique: vi.fn(), create: vi.fn() },
-    order: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
+    order: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      // Der Intent hängt sich bedingt an die offene Bestellung (route.ts, haengeIntentAn).
+      updateMany: vi.fn(async () => ({ count: 1 })),
+    },
     customerFarmSubscription: { findUnique: vi.fn(), upsert: vi.fn() },
   },
 }))
@@ -106,7 +112,13 @@ beforeEach(() => {
   farmFindUnique.mockResolvedValue(HOF as never)
   userFindUnique.mockResolvedValue({ id: 'user_1' } as never)
   orderFindUnique.mockResolvedValue(null)
-  orderCreate.mockResolvedValue({ id: 'order_1', createdAt: new Date() } as never)
+  // Wie Prisma: Die angelegte Bestellung kommt mit ihren gespeicherten Werten
+  // zurück — daraus rechnet der Checkout die Stripe-Parameter (intentParameter).
+  orderCreate.mockImplementation((async ({ data }: { data: Record<string, unknown> }) => ({
+    id: 'order_1',
+    createdAt: new Date(),
+    ...data,
+  })) as never)
   orderUpdate.mockResolvedValue({} as never)
   intentCreate.mockResolvedValue({ id: 'pi_test', client_secret: 'secret_test' } as never)
   mail.mockResolvedValue(undefined)
