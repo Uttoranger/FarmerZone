@@ -255,6 +255,22 @@ describe('bereinigeEreignis — der beforeSend-Filter', () => {
     expect(e.request?.query_string).toBe('seite=2&sortierung=neu')
   })
 
+  it('entfernt auch die Signatur der Bestätigungsseite (?sig=…) — Stripes Parameter wie redirect_status bleiben', () => {
+    const e = bereinigeEreignis(
+      ereignis({
+        request: {
+          // sig öffnet /{hof}/confirm/{id} mit Name und E-Mail der Kundin
+          // (bestell-link.ts, bestaetigungsPfad) — ein Zugangsgeheimnis.
+          url: 'https://farmerzone.at/hof/confirm/abc?sig=deadbeef&redirect_status=succeeded',
+          query_string: 'sig=deadbeef&redirect_status=succeeded',
+        },
+      })
+    )
+
+    expect(e.request?.url).toBe('https://farmerzone.at/hof/confirm/abc?redirect_status=succeeded')
+    expect(e.request?.query_string).toBe('redirect_status=succeeded')
+  })
+
   it('entfernt eine Objekt-Gestalt des Query-Strings ganz — die URL trägt das Unbedenkliche', () => {
     const e = bereinigeEreignis(
       ereignis({

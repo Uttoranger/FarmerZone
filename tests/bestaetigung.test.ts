@@ -39,6 +39,10 @@ describe('Online-Zahlung', () => {
     expect(bestaetigungsZustand(storniert, 'failed')).toBeNull()
   })
 
+  it('storniert, aber noch PAID (Erstattung läuft): nicht „bezahlt"', () => {
+    expect(bestaetigungsZustand(online({ status: 'CANCELLED', paymentStatus: 'PAID' }), undefined)).toBeNull()
+  })
+
   it('ohne Hinweis und ohne Zahlung: nichts', () => {
     expect(bestaetigungsZustand(online(), undefined)).toBeNull()
   })

@@ -366,6 +366,8 @@ describe('Idempotenz', () => {
       // 30 Minuten ab Bestellung (src/lib/fristen.ts) — der Zahlungsschritt zeigt die Uhrzeit.
       reserviertBis: '2026-10-01T08:30:00.000Z',
       wiederholt: true,
+      // Die return_url für Stripe — signiert, sonst zeigte die Seite nach der Zahlung nur „eingegangen".
+      bestaetigung: `/beispielhof/confirm/order_online?sig=${bestellSignatur('order_online')}`,
     })
   })
 
@@ -423,9 +425,13 @@ describe('Bestätigungsmail', () => {
       id: 'pi_1',
       client_secret: 'cs_1',
     } as never)
-    await POST(anfrage({ paymentMethod: 'ONLINE' }))
+    const res = await POST(anfrage({ paymentMethod: 'ONLINE' }))
     await new Promise((r) => setTimeout(r, 0))
     expect(mail).not.toHaveBeenCalled()
+    // Neue Online-Bestellung: die return_url für Stripe ist signiert.
+    const ziel = new URL((await res.json()).bestaetigung, 'http://localhost')
+    expect(ziel.pathname).toMatch(/\/confirm\/order_1$/)
+    expect(ziel.searchParams.get('sig')).toBe(bestellSignatur('order_1'))
   })
 })
 

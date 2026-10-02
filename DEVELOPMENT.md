@@ -277,6 +277,14 @@ ohne Blick in die Datenbank.
 - Der Zustand kommt aus `bestaetigungsZustand` (`src/lib/bestaetigung.ts`):
   bezahlt nur bei `paymentStatus` PAID, bestätigt nur aus dem Status;
   `redirect_status=succeeded` ergibt vor dem Webhook „Zahlung wird geprüft".
+  Storniert schlägt PAID (Erstattung noch nicht durch). Die Zahlungszeile
+  unten kommt aus `zahlungsAnzeige` statt pauschal „Online bezahlt".
+- `sig` und `redirect_status` laufen durch Zod (`src/schemas/bestaetigung.ts`);
+  doppelt oder falsch geformt gilt als fehlend. Sentry entfernt `sig` aus
+  URLs (`sentry-hygiene.ts`). Die neutrale Seite verlinkt die Hofübersicht,
+  nicht den Hof aus der ungeprüften Adresse.
+- Der Stripe-Schritt hängt beim Sprung ohne Stripe-Rückleitung (Zahlung
+  schon unterwegs) selbst `redirect_status` an — sonst stünde dort kein Hinweis.
 - `noindex` und `Referrer-Policy: no-referrer` (Metadaten und Header in
   `next.config.ts`).
 
@@ -286,7 +294,9 @@ Link aus der Mail.
 
 **Tests:** `tests/bestaetigung-zugang.test.ts` (Seite und Bestätigungslink;
 vorher 9 von 13 rot), `tests/bestaetigung.test.ts` (Zustand),
-`tests/bestaetigung-links-mail.test.ts` (Mail-Links), Signatur der
+`tests/bestaetigung-links-mail.test.ts` (Mail-Links),
+`tests/bestaetigung-schema.test.ts` (Parameter), `sig` in
+`tests/beobachtbarkeit.test.ts`, Signatur der
 Checkout-Antwort in `tests/checkout-kunde.test.ts` und
 `tests/checkout-kritisch.test.ts`, Header in `tests/sicherheits-header.test.ts`.
 

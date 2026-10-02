@@ -30,9 +30,10 @@ export function bestaetigungsZustand(
   redirectStatus: string | undefined
 ): BestaetigungsZustand | null {
   if (order.paymentMethod === 'ONLINE') {
-    if (order.paymentStatus === 'PAID') return 'bezahlt'
-    // Storniert (Frist vorbei, Hof) — kein Hinweis aus der URL macht daraus etwas anderes.
+    // Storniert (Frist vorbei, Hof) — weder ein Hinweis aus der URL noch ein
+    // stehengebliebenes PAID (Erstattung noch nicht durch) macht daraus „bezahlt".
     if (order.status === 'CANCELLED') return null
+    if (order.paymentStatus === 'PAID') return 'bezahlt'
     if (order.paymentStatus === 'FAILED' || redirectStatus === 'failed') return 'zahlung-fehlgeschlagen'
     if (redirectStatus === 'succeeded' || redirectStatus === 'processing') return 'zahlung-wird-geprueft'
     return null

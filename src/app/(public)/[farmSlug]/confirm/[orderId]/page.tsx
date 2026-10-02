@@ -6,6 +6,8 @@ import { prisma } from '@/lib/prisma'
 import { formatEuro, formatPosition } from '@/lib/format'
 import { bestellLinkGilt, bestellungPfad } from '@/lib/bestell-link'
 import { bestaetigungsZustand } from '@/lib/bestaetigung'
+import { zahlungsAnzeige } from '@/lib/bestellstatus'
+import { bestaetigungsParameterSchema } from '@/schemas/bestaetigung'
 import { ClearCartOnMount } from '@/components/checkout/clear-cart-on-mount'
 import { BestellSummenZeilen } from '@/components/checkout/bestell-summen'
 import { KundenKopf } from '@/components/shared/kunden-kopf'
@@ -14,7 +16,7 @@ import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 
 interface Props {
   params: Promise<{ farmSlug: string; orderId: string }>
-  searchParams: Promise<{ sig?: string; redirect_status?: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }
 
 // Eine Seite mit Name, E-Mail und Bestellung: nie in einen Suchindex, und die
@@ -31,13 +33,15 @@ export const metadata: Metadata = {
  * Bestellung gibt). Die Bestell-ID im Pfad ist ratbar und steht u. a. in den
  * Stripe-Metadaten; den signierten Link haben nur die Kundin und ihre Mails.
  */
-function BestellungEingegangen({ farmSlug }: { farmSlug: string }) {
+function BestellungEingegangen() {
   return (
     <div className="min-h-screen bg-background">
-      <KundenKopf seite={{ art: 'bestaetigung', hofSlug: farmSlug }} />
+      {/* Ohne Signatur ist nicht einmal der Hof aus der Adresse bestätigt — der
+          Kopf führt zur Hofübersicht, nicht zu einem beliebigen Pfad. */}
+      <KundenKopf seite={{ art: 'bestellung-ungueltig' }} />
       <ClearCartOnMount />
       <div className="max-w-lg mx-auto px-4 py-10 flex flex-col items-center text-center">
-        <CheckCircle className="size-14 text-green-600 dark:text-green-400 mb-3" />
+        <CheckCircle className="size-14 text-status-fertig mb-3" aria-hidden="true" />
         <h1 className="font-heading text-2xl font-semibold text-foreground">
           Deine Bestellung ist eingegangen
         </h1>
@@ -92,9 +96,9 @@ async function getOrder(orderId: string) {
 
 export default async function ConfirmPage({ params, searchParams }: Props) {
   const { farmSlug, orderId } = await params
-  const { sig, redirect_status } = await searchParams
+  const { sig, redirect_status } = bestaetigungsParameterSchema.parse(await searchParams)
 
-  if (!sig || !bestellLinkGilt(orderId, sig)) return <BestellungEingegangen farmSlug={farmSlug} />
+  if (!sig || !bestellLinkGilt(orderId, sig)) return <BestellungEingegangen />
 
   // Frist gilt beim Lesen (src/lib/fristen.ts): Ist die Bestätigungsfrist
   // vorbei, verfällt die Bestellung, bevor die Seite „Fast geschafft" zeigt.
@@ -112,6 +116,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
   // „Bezahlt" und „bestätigt" nur aus der Datenbank; redirect_status ist
   // höchstens ein Hinweis (src/lib/bestaetigung.ts).
   const zustand = bestaetigungsZustand(order, redirect_status)
+  const zahlung = zahlungsAnzeige(order.paymentMethod, order.paymentStatus)
 
   const jetzt = new Date()
   const bestaetigenBis = fristVon(order)
@@ -142,7 +147,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
 
         {zustand === 'zahlung-wird-geprueft' && (
           <div className="flex flex-col items-center text-center mb-8">
-            <Clock className="size-14 text-amber-500 mb-3" />
+            <Clock className="size-14 text-status-offen mb-3" aria-hidden="true" />
             <h1 className="font-heading text-2xl font-semibold text-foreground">Zahlung wird geprüft</h1>
             <p className="text-muted-foreground mt-1">
               Das dauert meist nur ein paar Sekunden. Lade die Seite gleich neu – sobald die
@@ -259,12 +264,9 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
           </div>
           {/* Dieselben Zeilen wie im Checkout — aus dem Snapshot der Bestellung */}
           <BestellSummenZeilen order={order} />
+          {/* Der Zahlungsstand aus der Datenbank — nie pauschal „bezahlt". */}
           <p className="text-xs text-muted-foreground mt-2">
-            {order.paymentMethod === 'ONLINE'
-              ? 'Online bezahlt'
-              : order.paymentMethod === 'ONSITE_CASH'
-              ? 'Bar bei Abholung'
-              : 'Karte bei Abholung'}
+            {zahlung.art} · {zahlung.zustand}
           </p>
         </div>
 

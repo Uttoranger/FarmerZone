@@ -154,7 +154,9 @@ function PaymentForm({
       // Nie „nichts abgebucht" sagen — zur Bestellung, die zeigt den Stand.
       const zahlungsStand = error.payment_intent?.status
       if (zahlungsStand === 'succeeded' || zahlungsStand === 'processing') {
-        window.location.assign(bestaetigung)
+        // Wie Stripes eigene Rückleitung: Der Hinweis zeigt „Zahlung wird
+        // geprüft", bis der Webhook den Stand in die Datenbank schreibt.
+        window.location.assign(`${bestaetigung}&redirect_status=${zahlungsStand}`)
         return
       }
       toast.error(error.message ?? 'Zahlung fehlgeschlagen')

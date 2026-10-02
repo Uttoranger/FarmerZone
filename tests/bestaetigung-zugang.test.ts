@@ -128,6 +128,16 @@ describe('Bestätigungsseite — Zugang nur mit Signatur', () => {
     expect(findUnique).not.toHaveBeenCalled()
   })
 
+  it('eine doppelt angegebene Signatur gilt als fehlend', async () => {
+    const element = await ConfirmPage({
+      params: Promise.resolve({ farmSlug: 'hof-test', orderId: 'order-1' }),
+      searchParams: Promise.resolve({ sig: [GUELTIG, GUELTIG] }),
+    })
+
+    expect(await elementText(element)).toContain('Deine Bestellung ist eingegangen')
+    expect(findUnique).not.toHaveBeenCalled()
+  })
+
   it('die Signatur einer anderen Bestellung öffnet diese nicht', async () => {
     const text = await seite({ sig: bestellSignatur('order-2') })
 
@@ -183,6 +193,21 @@ describe('Bestätigungsseite — Zustand nur aus der Datenbank', () => {
 
     expect(text).not.toContain('Zahlung erfolgreich')
     expect(text).not.toContain('Zahlung wird geprüft')
+  })
+
+  it('Online und noch nicht bezahlt: die Zahlungszeile sagt „Noch offen", nicht „bezahlt"', async () => {
+    findUnique.mockResolvedValue(bestellung({ paymentMethod: 'ONLINE', paymentStatus: 'PENDING' }) as never)
+
+    const text = await seite({ sig: GUELTIG })
+
+    expect(text).not.toContain('Online bezahlt')
+    expect(text).toContain('Online · Noch offen')
+  })
+
+  it('ein unbekannter redirect_status ist kein Hinweis', async () => {
+    findUnique.mockResolvedValue(bestellung({ paymentMethod: 'ONLINE', paymentStatus: 'PENDING' }) as never)
+
+    expect(await seite({ sig: GUELTIG, redirect_status: 'paid' })).not.toContain('Zahlung wird geprüft')
   })
 })
 
