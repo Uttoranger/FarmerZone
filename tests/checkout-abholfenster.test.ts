@@ -253,6 +253,9 @@ describe('Abholtermin — volles Fenster: 409 ABHOLFENSTER_VOLL', () => {
       pickupTimeStart: '09:00',
       pickupTimeEnd: '12:00',
       status: { not: 'CANCELLED' },
+      // Nur dieser Wiener Tag (Samstag, 10.10.): Mitternacht bis Mitternacht
+      // in Sommerzeit — Bestellungen anderer Samstage zählen nicht mit.
+      pickupDate: { gte: new Date('2026-10-09T22:00:00.000Z'), lte: new Date('2026-10-10T21:59:59.999Z') },
     })
   })
 

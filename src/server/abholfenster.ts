@@ -1,5 +1,7 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { wienerTag } from '@/lib/heute'
+import { kalendertagInWien } from '@/lib/servicegebuehr'
 import {
   CODE_ABHOLFENSTER_UNGUELTIG,
   CODE_ABHOLFENSTER_VOLL,
@@ -7,7 +9,6 @@ import {
   angeboteneAbholfenster,
   findeAbholfenster,
   istVoll,
-  tagesZeitraum,
   type Abholwahl,
   type AngebotenesFenster,
 } from '@/lib/abholfenster'
@@ -26,36 +27,43 @@ import {
 
 type Db = Prisma.TransactionClient | typeof prisma
 
+const SLOT_AUSWAHL = {
+  id: true,
+  dayOfWeek: true,
+  startTime: true,
+  endTime: true,
+  maxOrders: true,
+  isActive: true,
+} satisfies Prisma.PickupSlotSelect
+
 /** Ein Fenster aus der Datenbank — mit Zeile (für die Sperre) und Höchstzahl. */
-export type HofSlot = {
-  id: string
-  dayOfWeek: number
-  startTime: string
-  endTime: string
-  maxOrders: number | null
-  isActive: boolean
-}
+export type HofSlot = Prisma.PickupSlotGetPayload<{ select: typeof SLOT_AUSWAHL }>
 export type HofFenster = AngebotenesFenster<HofSlot>
 
 /** Die aktiven Fenster des Hofs. */
 function ladeSlots(farmId: string): Promise<HofSlot[]> {
-  return prisma.pickupSlot.findMany({
-    where: { farmId, isActive: true },
-    select: { id: true, dayOfWeek: true, startTime: true, endTime: true, maxOrders: true, isActive: true },
-  })
+  return prisma.pickupSlot.findMany({ where: { farmId, isActive: true }, select: SLOT_AUSWAHL })
 }
 
-/** Nicht stornierte Bestellungen dieses Hofs für Tag und Fenster. */
-async function belegung(db: Db, farmId: string, wahl: Abholwahl): Promise<number> {
-  const tag = tagesZeitraum(wahl.datum)
-  if (!tag) return 0
+/**
+ * Was einen Platz im Fenster belegt: jede nicht stornierte Bestellung — auch
+ * abgeholte und „nicht abgeholt" markierte. Bewusst NICHT `abholWhere`
+ * (src/lib/heute.ts): Das blendet Erledigtes aus, weil es um die Packliste
+ * geht; hier geht es um die Zusage des Hofs, wie viele Bestellungen er für
+ * dieses Fenster annimmt.
+ */
+const BELEGT: Prisma.OrderWhereInput = { status: { not: 'CANCELLED' } }
+
+/** Belegte Plätze dieses Hofs für Tag (Wiener Kalendertag) und Fenster. */
+function belegung(db: Db, farmId: string, wahl: Abholwahl): Promise<number> {
+  const tag = wienerTag(wahl.datum)
   return db.order.count({
     where: {
+      ...BELEGT,
       farmId,
-      pickupDate: { gte: tag.von, lt: tag.bis },
+      pickupDate: { gte: tag.von, lte: tag.bis },
       pickupTimeStart: wahl.start,
       pickupTimeEnd: wahl.ende,
-      status: { not: 'CANCELLED' },
     },
   })
 }
@@ -104,14 +112,31 @@ export async function imAbholfenster<T>(
 
 /**
  * Die ausgebuchten Fenster der nächsten Tage als Schlüssel (`abholSchluessel`)
- * — der Checkout zeigt sie ausgegraut. Nur Fenster mit Höchstzahl werden
- * gezählt.
+ * — der Checkout zeigt sie ausgegraut. Eine Abfrage für den ganzen Zeitraum
+ * (groupBy), nicht eine je Fenster: Sie läuft beim Rendern der Seite.
  */
 export async function ausgebuchteAbholfenster(farmId: string, jetzt: Date): Promise<string[]> {
   const begrenzt = angeboteneAbholfenster(await ladeSlots(farmId), jetzt).filter((f) => f.slot.maxOrders !== null)
-  const voll: string[] = []
-  for (const fenster of begrenzt) {
-    if (istVoll(await belegung(prisma, farmId, fenster), fenster.slot.maxOrders)) voll.push(abholSchluessel(fenster))
+  if (begrenzt.length === 0) return []
+
+  const erster = wienerTag(begrenzt[0].datum).von
+  const letzter = wienerTag(begrenzt[begrenzt.length - 1].datum).bis
+  const gruppen = await prisma.order.groupBy({
+    by: ['pickupDate', 'pickupTimeStart', 'pickupTimeEnd'],
+    where: { ...BELEGT, farmId, pickupDate: { gte: erster, lte: letzter } },
+    _count: { _all: true },
+  })
+  const belegt = new Map<string, number>()
+  for (const g of gruppen) {
+    const schluessel = abholSchluessel({
+      datum: kalendertagInWien(g.pickupDate),
+      start: g.pickupTimeStart,
+      ende: g.pickupTimeEnd,
+    })
+    belegt.set(schluessel, (belegt.get(schluessel) ?? 0) + g._count._all)
   }
-  return voll
+
+  return begrenzt
+    .filter((f) => istVoll(belegt.get(abholSchluessel(f)) ?? 0, f.slot.maxOrders))
+    .map(abholSchluessel)
 }

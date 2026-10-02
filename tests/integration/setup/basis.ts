@@ -200,9 +200,11 @@ export function checkoutAnfrage(eingabe: {
   betriebsnummer?: string
   customerEmail?: string
   paymentMethod?: 'ONSITE_CASH' | 'ONSITE_CARD' | 'ONLINE'
+  /** Abholtag JJJJ-MM-TT, Standard: morgen in Wien. */
+  pickupDate?: string
 }): NextRequest {
   // Morgen im Wiener Kalender — so prüft der Checkout das Abholfenster.
-  const datum = morgenInWien()
+  const datum = eingabe.pickupDate ?? morgenInWien()
 
   const koerper = {
     farmId: eingabe.farm.id,

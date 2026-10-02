@@ -6,6 +6,7 @@ import { getPublicFarm } from '@/server/queries/farm'
 import { getBetriebsVorbelegung, getNurBetriebeProduktIds } from '@/server/queries/products'
 import { CheckoutForm } from '@/components/checkout/checkout-form'
 import { ausgebuchteAbholfenster } from '@/server/abholfenster'
+import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 
 interface Props {
   params: Promise<{ farmSlug: string }>
@@ -28,6 +29,11 @@ export default async function CheckoutPage({ params }: Props) {
   // Session wird hier auf dem Server gelesen wie im Bauern-Bereich; kein
   // zusätzlicher Request aus dem Browser. Gast bleibt Gast.
   const session = await auth.api.getSession({ headers: await headers() })
+  // Frist gilt beim Lesen (src/lib/fristen.ts): Verwaiste Bestellungen geben
+  // ihren Platz im Abholfenster frei, BEVOR gezählt wird — sonst stünde ein
+  // Fenster als „ausgebucht" da, das /api/checkout annehmen würde.
+  await gibVerwaisteFreiOhneRisiko(farm.id)
+
   // Volle Abholfenster (maxOrders erreicht) zeigt das Formular ausgegraut —
   // dieselbe Zählung, mit der /api/checkout ablehnt (src/server/abholfenster.ts).
   const [nurBetriebeIds, vorbelegung, ausgebucht] = await Promise.all([

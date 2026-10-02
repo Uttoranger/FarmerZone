@@ -91,13 +91,3 @@ export function findeAbholfenster<S extends AbholSlot>(
 export function istVoll(belegt: number, maxOrders: number | null): boolean {
   return maxOrders !== null && belegt >= maxOrders
 }
-
-/**
- * Der Zeitraum eines Wiener Kalendertags [von, bis) — so findet die Zählung
- * die Bestellungen eines Tages, egal zu welcher Uhrzeit pickupDate steht.
- */
-export function tagesZeitraum(datum: string): { von: Date; bis: Date } | null {
-  const von = wienerZeitpunkt(datum, '00:00')
-  const bis = wienerZeitpunkt(tagVersetzt(datum, 1), '00:00')
-  return von && bis ? { von, bis } : null
-}

@@ -13,7 +13,6 @@ import {
   angeboteneAbholfenster,
   findeAbholfenster,
   istVoll,
-  tagesZeitraum,
   type AbholSlot,
 } from '@/lib/abholfenster'
 
@@ -89,19 +88,5 @@ describe('istVoll', () => {
     expect(istVoll(2, 2)).toBe(true)
     expect(istVoll(3, 2)).toBe(true)
     expect(istVoll(1000, null)).toBe(false)
-  })
-})
-
-describe('tagesZeitraum', () => {
-  it('umfasst den Wiener Kalendertag — am Umstellungstag 25 Stunden', () => {
-    const normal = tagesZeitraum('2026-10-07')!
-    expect(normal.von.toISOString()).toBe('2026-10-06T22:00:00.000Z')
-    expect(normal.bis.getTime() - normal.von.getTime()).toBe(24 * 3600_000)
-    const umstellung = tagesZeitraum('2026-10-25')!
-    expect(umstellung.bis.getTime() - umstellung.von.getTime()).toBe(25 * 3600_000)
-  })
-
-  it('ein Datum, das es nicht gibt, hat keinen Zeitraum', () => {
-    expect(tagesZeitraum('2027-02-31')).toBeNull()
   })
 })

@@ -277,6 +277,10 @@ des Browsers.
   ist leider nicht mehr verfügbar – bitte wähle ein anderes." Das Formular
   setzt die Wahl zurück, markiert das Feld und lädt die Seite (Fenster und
   Belegung) neu; volle Fenster zeigt es ausgegraut mit „ausgebucht".
+- Die Checkout-Seite gibt vor dem Zählen verwaiste Bestellungen frei (Frist
+  gilt beim Lesen) und zählt die Belegung mit EINER Abfrage (`groupBy`).
+  Belegt ist jede nicht stornierte Bestellung — bewusst nicht `abholWhere`,
+  das Erledigtes für die Packliste ausblendet.
 
 **Geändert für Kundinnen:** Der Checkout bietet jetzt auch das heutige Fenster
 an, solange es nicht begonnen hat (die Hofseite zeigte „Heute" schon vorher an),

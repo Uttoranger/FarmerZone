@@ -23,6 +23,8 @@ vi.mock('@/lib/stripe', () => ({
 import { POST as checkout } from '@/app/api/checkout/route'
 import { prisma } from '@/lib/prisma'
 import { CODE_ABHOLFENSTER_VOLL } from '@/lib/abholfenster'
+import { kalendertagInWien } from '@/lib/servicegebuehr'
+import { tagVersetzt } from '@/lib/kalender'
 import { checkoutAnfrage, erstelleHof, erstelleProdukt, intKennung, raeumeAuf, setzeHalt } from './setup/basis'
 
 beforeEach(() => {
@@ -42,11 +44,12 @@ async function hofMitHoechstzahl(max: number) {
 }
 
 /** Eine Bestellung einer eigenen Kundin mit eigener Sitzung und eigenem Halt. */
-async function bestellung(farm: { id: string; slug: string }, produktId: string) {
+async function bestellung(farm: { id: string; slug: string }, produktId: string, pickupDate?: string) {
   const sitzung = intKennung('sitzung')
   await setzeHalt(produktId, sitzung, 1)
   return checkoutAnfrage({
     farm,
+    pickupDate,
     sessionId: sitzung,
     customerEmail: `${intKennung('kundin')}@example.com`,
     positionen: [{ productId: produktId, name: 'Testprodukt', quantity: 1, unitPrice: 10 }],
@@ -64,8 +67,8 @@ describe('POST /api/checkout — Höchstzahl des Abholfensters in der echten Dat
     const antworten = await Promise.all([checkout(anfrageA), checkout(anfrageB)])
 
     expect(antworten.map((r) => r.status).sort()).toEqual([200, 409])
-    const abgelehnt = antworten.find((r) => r.status === 409)!
-    expect((await abgelehnt.json()).code).toBe(CODE_ABHOLFENSTER_VOLL)
+    const abgelehnt = antworten.find((r) => r.status === 409)
+    expect((await abgelehnt?.json())?.code).toBe(CODE_ABHOLFENSTER_VOLL)
 
     // Der Zustand: eine Bestellung im Fenster, und nur ihre Ware ist gebucht.
     expect(await offeneBestellungen(farm.id)).toBe(1)
@@ -93,5 +96,16 @@ describe('POST /api/checkout — Höchstzahl des Abholfensters in der echten Dat
 
     expect(zweite.status).toBe(200)
     expect(await offeneBestellungen(farm.id)).toBe(1)
+  })
+
+  it('zählt je Tag: das volle Fenster von morgen sperrt dasselbe Fenster übermorgen nicht', async () => {
+    const { farm, produkt } = await hofMitHoechstzahl(1)
+    const morgen = tagVersetzt(kalendertagInWien(new Date()), 1)
+    expect((await checkout(await bestellung(farm, produkt.id, morgen))).status).toBe(200)
+
+    const uebermorgen = await checkout(await bestellung(farm, produkt.id, tagVersetzt(morgen, 1)))
+
+    expect(uebermorgen.status).toBe(200)
+    expect(await offeneBestellungen(farm.id)).toBe(2)
   })
 })
