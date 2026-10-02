@@ -49,7 +49,7 @@ describe('angeboteneAbholfenster', () => {
   })
 
   it('nimmt Fenster ohne isActive (öffentliche Hofseite, schon gefiltert) als aktiv', () => {
-    const { isActive: _weg, ...ohne } = MI
+    const ohne: AbholSlot = { dayOfWeek: MI.dayOfWeek, startTime: MI.startTime, endTime: MI.endTime }
     expect(daten([ohne], MITTWOCH_10_UHR)).toHaveLength(2)
   })
 
