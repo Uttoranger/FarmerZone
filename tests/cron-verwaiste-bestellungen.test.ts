@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
 vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteBestellungenFrei: vi.fn() }))
@@ -54,6 +54,45 @@ describe('cronBerechtigt', () => {
     expect(cronBerechtigt('Bearer ', undefined)).toBe(false)
     expect(cronBerechtigt('Bearer ', '')).toBe(false)
     expect(cronBerechtigt('Bearer undefined', undefined)).toBe(false)
+  })
+})
+
+/**
+ * ARCHITECTURE §5: Jede Cron-Route prüft das Secret mit cronBerechtigt — nie
+ * selbst mit `!==`. Ein eigener Vergleich gibt dieselben Antworten (401/200),
+ * nur nicht in konstanter Zeit; im Unit-Test ist das nicht messbar, deshalb
+ * prüft dieser Test den Quelltext jeder Route unter src/app/api/cron/.
+ */
+describe('Alle Cron-Routen — Secret nur über cronBerechtigt', () => {
+  const ORDNER = path.join(process.cwd(), 'src/app/api/cron')
+  const routen = readdirSync(ORDNER).map((name) => ({
+    name,
+    quelle: readFileSync(path.join(ORDNER, name, 'route.ts'), 'utf8'),
+  }))
+  /** Ein eigener Vergleich mit dem Header oder dem „Bearer …"-Text. */
+  const EIGENER_VERGLEICH = /[!=]==?\s*`Bearer|authHeader\s*[!=]==?|[!=]==?\s*authHeader/
+
+  it('findet die Cron-Routen — Gegenprobe, sonst bewiese ein leerer Fund nichts', () => {
+    expect(routen.map((r) => r.name)).toEqual(
+      expect.arrayContaining(['briefkasten', 'cleanup-reservations', 'verwaiste-bestellungen'])
+    )
+    expect(EIGENER_VERGLEICH.test('if (!cronSecret || authHeader !== `Bearer ${cronSecret}`)')).toBe(true)
+  })
+
+  it.each(['briefkasten', 'cleanup-reservations', 'verwaiste-bestellungen'])(
+    '%s prüft mit cronBerechtigt und vergleicht nicht selbst',
+    (name) => {
+      const quelle = routen.find((r) => r.name === name)?.quelle ?? ''
+      expect(quelle).toMatch(/cronBerechtigt\(request\.headers\.get\('authorization'\)/)
+      expect(quelle).not.toMatch(EIGENER_VERGLEICH)
+    }
+  )
+
+  it('auch jede künftige Cron-Route', () => {
+    for (const { name, quelle } of routen) {
+      expect(quelle, name).toContain('cronBerechtigt(')
+      expect(quelle, name).not.toMatch(EIGENER_VERGLEICH)
+    }
   })
 })
 
