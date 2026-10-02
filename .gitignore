@@ -60,3 +60,8 @@ TASK.md
 # Worktrees paralleler Sitzungen — ein `git add .` nähme sie sonst als
 # eingebettetes Repo auf, samt ihrer lokalen Umgebungsdateien mit Geheimnissen
 .claude/worktrees/
+
+# Nachtlauf — Ablagen und Protokolle der nächtlichen Läufe (docs/nachtlauf.md)
+# bleiben lokal
+.nachtlauf/
+nachtlauf-*.log
