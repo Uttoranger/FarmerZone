@@ -23,7 +23,9 @@ import {
   TIERART_LABEL,
   CATEGORY_OPTIONS,
   VORBEREITETE_UNTERKATEGORIEN,
+  ZUGEORDNETE_UNTERKATEGORIEN,
   gehoertZu,
+  istZugeordneteUnterkategorie,
   hatUnterkategorien,
   kategorieVon,
   unterkategorienVon,
@@ -98,9 +100,17 @@ describe('TAXONOMIE — jede L2 gehört zu genau einer L1', () => {
     expect(alle.length + VORBEREITETE_UNTERKATEGORIEN.length).toBe(PRODUCT_SUBCATEGORY_VALUES.length)
   })
 
+  it('ZUGEORDNETE_UNTERKATEGORIEN ist genau TAXONOMIE, in Enum-Reihenfolge vor den vorbereiteten', () => {
+    expect([...ZUGEORDNETE_UNTERKATEGORIEN].sort()).toEqual(Object.values(TAXONOMIE).flat().sort())
+    expect([...PRODUCT_SUBCATEGORY_VALUES]).toEqual([...ZUGEORDNETE_UNTERKATEGORIEN, ...VORBEREITETE_UNTERKATEGORIEN])
+    for (const l2 of PRODUCT_SUBCATEGORY_VALUES) {
+      const vorbereitet: readonly string[] = VORBEREITETE_UNTERKATEGORIEN
+      expect(istZugeordneteUnterkategorie(l2), l2).toBe(!vorbereitet.includes(l2))
+    }
+  })
+
   it('jede zugeordnete Unterkategorie gehört zu genau einer Kategorie', () => {
-    const vorbereitet: readonly string[] = VORBEREITETE_UNTERKATEGORIEN
-    for (const l2 of PRODUCT_SUBCATEGORY_VALUES.filter((w) => !vorbereitet.includes(w))) {
+    for (const l2 of ZUGEORDNETE_UNTERKATEGORIEN) {
       const zugehoerig = PRODUCT_CATEGORY_VALUES.filter((l1) => gehoertZu(l1, l2))
       expect(zugehoerig, l2).toHaveLength(1)
       expect(kategorieVon(l2)).toBe(zugehoerig[0])
@@ -127,8 +137,16 @@ describe('TAXONOMIE — jede L2 gehört zu genau einer L1', () => {
     for (const l2 of VORBEREITETE_UNTERKATEGORIEN) {
       expect(zugeordnet, l2).not.toContain(l2)
       expect(PRODUCT_CATEGORY_VALUES.filter((l1) => gehoertZu(l1, l2)), l2).toEqual([])
-      expect(() => kategorieVon(l2)).toThrow()
     }
+  })
+
+  it('kategorieVon nimmt keine vorbereitete Unterkategorie an — das prüft der Compiler (pnpm typecheck)', () => {
+    // @ts-expect-error Eine vorbereitete L2 hat keine Kategorie; kategorieVon
+    // nimmt nur ZugeordneteUnterkategorie. Fällt dieser Fehler weg, prüft der
+    // Typ nicht mehr, und kategorieVorschlag könnte wieder zur Laufzeit werfen.
+    const aufruf = () => kategorieVon('BRENNHOLZ_SCHEIT')
+    // Zur Laufzeit bliebe es ein Fehler statt eines falschen Rückfalls.
+    expect(aufruf).toThrow('Unterkategorie ohne Kategorie')
   })
 
   it('hatUnterkategorien ohne Kategorie ist false', () => {

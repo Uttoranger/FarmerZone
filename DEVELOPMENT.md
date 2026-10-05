@@ -3645,6 +3645,23 @@ spielt sie auf die befüllte lokale Testdatenbank ein; `prisma migrate diff
 --from-config-datasource --to-schema` meldet danach „No difference detected";
 ein zweiter Lauf derselben SQL läuft fehlerfrei durch.
 
+**Nachbesserung 1 (Prüfer-Befund, Absturz):** `kategorieVorschlag` lief über
+alle `PRODUCT_SUBCATEGORY_VALUES` — damit auch über die vorbereiteten
+Brennmaterial-Arten. Traf deren Label einen Produktnamen („Brennholz Buche",
+„Hackschnitzel", „Anzündholz", „Buche Scheite"), warf `kategorieVon`
+(„Unterkategorie ohne Kategorie"). `produktHinweise` ruft das für jedes Produkt
+ohne Kategorie in der Produktliste auf, der Produktdialog bei jedem Tastendruck
+im Namen: Ein Bestandsprodukt „Brennholz …" ohne Kategorie hätte die Liste des
+Hofs abgerissen. Ursache: Der Typ `ProductSubcategoryValue` umfasste nach dem
+Expand auch Werte ohne Kategorie, `kategorieVon` nahm ihn trotzdem an — der
+Compiler sicherte nicht mehr ab, was der Kommentar versprach. Fix:
+`ZugeordneteUnterkategorie` (nur TAXONOMIE) und `ZUGEORDNETE_UNTERKATEGORIEN`;
+`kategorieVon` nimmt nur diesen Typ, `kategorieVorschlag` läuft nur über die
+zugeordneten. Ein Differenztest gegen den Stand vor dem Expand (über 5000 Namen
+aus allen Labels und Paaren) ergab keine Abweichung; neue Tests in
+`kategorie-vorschlag.test.ts`, `produkt-hinweise.test.ts`, `taxonomie.test.ts`
+(dort mit `@ts-expect-error` als Beleg, dass der Compiler den Aufruf abweist).
+
 ## Nützliche Befehle
 
 ```bash

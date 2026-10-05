@@ -34,4 +34,15 @@ describe('produktHinweise', () => {
       { art: 'unterkategorie-ergaenzen' },
     ])
   })
+  // Nachbesserung 1 zu Nr. 06: Ein Bestandsprodukt ohne Kategorie, dessen Name
+  // das Label einer vorbereiteten Brennmaterial-Art trifft, riss die ganze
+  // Produktliste des Hofs ab (kategorieVon warf).
+  it('Brennholz-Namen ohne Kategorie werfen nicht und ergeben dasselbe wie vor dem Schema-Expand', () => {
+    expect(produktHinweise({ ...produkt, name: 'Brennholz Buche' })).toEqual([
+      { art: 'kategorie-uebernehmen', vorschlag: { category: 'BRENNHOLZ', subcategory: null } },
+    ])
+    for (const name of ['Hackschnitzel', 'Anzündholz', 'Buche Scheite']) {
+      expect(produktHinweise({ ...produkt, name }), name).toEqual([{ art: 'kategorie-ergaenzen' }])
+    }
+  })
 })
