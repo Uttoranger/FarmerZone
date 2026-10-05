@@ -134,6 +134,18 @@ describe('Bestätigungsseite', () => {
     expect(header['X-Robots-Tag']).toBe('noindex, nofollow')
   })
 
+  it('die Seite der Bar-Bestätigung genauso — die Adresse trägt den Einmal-Token (H3)', () => {
+    const header = headerFuer('/hof-test/bestaetigen/V1StGXR8_Z5jdHi6BmyT9pqLnv2wYc4k')
+    expect(header['Referrer-Policy']).toBe('no-referrer')
+    expect(header['X-Robots-Tag']).toBe('noindex, nofollow')
+  })
+
+  it('der Mail-Link, der dorthin weiterleitet, auch', () => {
+    const header = headerFuer('/api/orders/confirm/V1StGXR8_Z5jdHi6BmyT9pqLnv2wYc4k')
+    expect(header['Referrer-Policy']).toBe('no-referrer')
+    expect(header['X-Robots-Tag']).toBe('noindex, nofollow')
+  })
+
   it('die übrigen Seiten behalten ihre Referrer-Regel — Gegenprobe', () => {
     expect(headerFuer('/hof-test')['Referrer-Policy']).toBe('strict-origin-when-cross-origin')
     expect(headerFuer('/hof-test/bestellung/order-1')['X-Robots-Tag']).toBeUndefined()

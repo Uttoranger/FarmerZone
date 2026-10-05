@@ -13,6 +13,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
+// revalidatePath braucht den Request-Kontext von Next, den es hier nicht gibt.
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/stripe', () => ({
   stripe: { paymentIntents: { retrieve: vi.fn(), cancel: vi.fn() } },
 }))
@@ -27,7 +29,7 @@ import { NextRequest } from 'next/server'
 import * as Sentry from '@sentry/nextjs'
 import { gibVerwaisteBestellungenFrei, gibVerwaisteFreiFuerSlug } from '@/server/verwaiste-bestellungen'
 import { POST as reservieren } from '@/app/api/reserve/route'
-import { GET as bestaetigen } from '@/app/api/orders/confirm/[token]/route'
+import { bestaetigeBarBestellung, storniereBarBestellung } from '@/server/actions/bar-bestaetigung'
 import { POST as bestellen } from '@/app/api/checkout/route'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
@@ -339,34 +341,68 @@ describe('Frist gilt beim Lesen — /api/reserve', () => {
   })
 })
 
-describe('Frist gilt beim Lesen — Bestätigung per Link', () => {
-  async function klick(token: string) {
-    return bestaetigen(new NextRequest(`http://localhost:3000/api/orders/confirm/${token}`), {
-      params: Promise.resolve({ token }),
-    })
+describe('Frist gilt beim Lesen — Bestätigung per Knopf (H3)', () => {
+  /** Der Knopf auf /{hof}/bestaetigen/{token} — eine Server Action, die am Ende weiterleitet. */
+  async function knopf(
+    aktion: typeof bestaetigeBarBestellung,
+    token: string
+  ): Promise<{ ziel: string | null; error?: string }> {
+    const daten = new FormData()
+    daten.set('token', token)
+    try {
+      const antwort = await aktion({}, daten)
+      return { ziel: null, error: antwort.error }
+    } catch (e) {
+      // redirect() wirft; die Adresse steht im digest: NEXT_REDIRECT;<art>;<ziel>;<status>;
+      const digest = String((e as { digest?: unknown }).digest ?? '')
+      if (!digest.startsWith('NEXT_REDIRECT')) throw e
+      return { ziel: digest.split(';')[2] }
+    }
   }
 
   it('nach der Frist: verfällt statt zu bestätigen, Ware zurück', async () => {
     const { produkt, bestellung } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 121 })
 
-    const antwort = await klick(bestellung.confirmationToken!)
+    const { ziel } = await knopf(bestaetigeBarBestellung, bestellung.confirmationToken!)
 
-    expect(antwort.status).toBe(307)
-    expect(antwort.headers.get('location')).not.toContain('confirmed=true')
+    expect(ziel).toContain('/bestaetigen/')
     expect((await zustand(bestellung.id)).status).toBe('CANCELLED')
     expect(await bestand(produkt.id)).toBe(BESTAND_NACH_CHECKOUT + MENGE)
   })
 
-  it('in der Frist: bestätigt, Bestand bleibt gebucht', async () => {
+  it('in der Frist: bestätigt, Token verbraucht, Bestand bleibt gebucht', async () => {
     const { produkt, bestellung } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 30 })
 
-    const antwort = await klick(bestellung.confirmationToken!)
+    const { ziel } = await knopf(bestaetigeBarBestellung, bestellung.confirmationToken!)
 
-    // Kein ?confirmed mehr: Die Bestätigungsseite liest den Stand aus der
-    // Datenbank und öffnet sich nur mit Signatur (tests/bestaetigung-zugang.test.ts).
-    expect(antwort.headers.get('location')).toMatch(/\/confirm\/[^?]+\?sig=[0-9a-f]{64}$/)
-    expect((await zustand(bestellung.id)).status).toBe('CONFIRMED')
+    // Weiter zur signierten Bestätigungsseite, die den Stand aus der
+    // Datenbank liest (tests/bestaetigung-zugang.test.ts).
+    expect(ziel).toMatch(/\/confirm\/[^?]+\?sig=[0-9a-f]{64}$/)
+    const danach = await zustand(bestellung.id)
+    expect(danach.status).toBe('CONFIRMED')
+    expect(danach.confirmationToken).toBeNull()
     expect(await bestand(produkt.id)).toBe(BESTAND_NACH_CHECKOUT)
+  })
+
+  it('zwei Klicks gleichzeitig: einmal bestätigt, der Token gilt danach nicht mehr', async () => {
+    const { bestellung } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 30 })
+    const token = bestellung.confirmationToken!
+
+    await Promise.all([knopf(bestaetigeBarBestellung, token), knopf(bestaetigeBarBestellung, token)])
+
+    expect((await zustand(bestellung.id)).status).toBe('CONFIRMED')
+    expect((await knopf(bestaetigeBarBestellung, token)).error).toMatch(/gilt nicht mehr/)
+  })
+
+  it('„Doch nicht": storniert, Ware zurück, bestätigen geht danach nicht mehr', async () => {
+    const { produkt, bestellung } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 30 })
+    const token = bestellung.confirmationToken!
+
+    await knopf(storniereBarBestellung, token)
+    await knopf(bestaetigeBarBestellung, token)
+
+    expect((await zustand(bestellung.id)).status).toBe('CANCELLED')
+    expect(await bestand(produkt.id)).toBe(BESTAND_NACH_CHECKOUT + MENGE)
   })
 })
 

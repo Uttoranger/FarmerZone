@@ -107,6 +107,7 @@ const LADEANSICHTEN: ReadonlyArray<{ zweck: string; datei: string; teile?: reado
   },
   { zweck: 'Bestellbestätigung', datei: 'src/app/(public)/[farmSlug]/confirm/[orderId]/loading.tsx' },
   { zweck: 'Bestellverfolgung', datei: 'src/app/(public)/[farmSlug]/bestellung/[orderId]/loading.tsx' },
+  { zweck: 'Bar-Bestätigung per Knopf', datei: 'src/app/(public)/[farmSlug]/bestaetigen/[token]/loading.tsx' },
 ]
 
 /** Der Quelltext einer Ladeansicht samt der Bauteile, die sie rendert. */

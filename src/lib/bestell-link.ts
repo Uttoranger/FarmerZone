@@ -52,3 +52,14 @@ export function bestellungPfad(farmSlug: string, orderId: string): string {
 export function bestaetigungsPfad(farmSlug: string, orderId: string): string {
   return `/${farmSlug}/confirm/${orderId}?sig=${bestellSignatur(orderId)}`
 }
+
+/**
+ * Der Pfad der Bar-Bestätigung (/{hof}/bestaetigen/{token}, H3) — für die
+ * Mail „Bitte bestätige deine Bestellung" und die Weiterleitung alter Links.
+ * Keine Signatur: Der Token selbst ist das Einmal-Geheimnis (nanoid(32)) und
+ * verfällt mit der Bestätigung. Die Seite bestätigt nicht beim Aufruf, erst
+ * der Knopf darauf.
+ */
+export function barBestaetigungsPfad(farmSlug: string, token: string): string {
+  return `/${farmSlug}/bestaetigen/${encodeURIComponent(token)}`
+}

@@ -5,8 +5,8 @@
  * Bestätigung, „Abholbereit" und Bestätigungslink führen zur Bestellung; die
  * Seiten zeigen Name, E-Mail und Bestellung nur mit gültiger Signatur
  * (src/lib/bestell-link.ts). Der Bestätigungslink selbst ist ein Token-Link
- * (/api/orders/confirm/{token}); dessen signierte Weiterleitung prüft
- * tests/bestaetigung-zugang.test.ts.
+ * auf die Seite mit dem Knopf (/{hof}/bestaetigen/{token}, H3); was dort
+ * passiert, prüft tests/bar-bestaetigung-zugang.test.ts.
  *
  * Nur das Resend-SDK ist gemockt — die Mails werden echt gerendert.
  */
@@ -92,11 +92,12 @@ describe('Kunden-Mails — jeder Link zur Bestellung ist signiert', () => {
     }
   })
 
-  it('die Mail „Bitte bestätigen" verlinkt nur die Token-Route, nie die Seite ohne Signatur', async () => {
+  it('die Mail „Bitte bestätigen" führt zur Seite mit dem Knopf — nie zu einem Link, der selbst bestätigt', async () => {
     await email.sendOnsiteConfirmation(BESTELLUNG, 'token-1')
 
     const html = String(sendMock.mock.calls.at(-1)?.[0]?.html ?? '')
-    expect(html).toContain('/api/orders/confirm/token-1')
+    expect(html).toContain('/hof-test/bestaetigen/token-1')
+    expect(html).not.toContain('/api/orders/confirm/')
     for (const link of bestellLinks()) {
       expect(bestellLinkGilt('order-1', link.searchParams.get('s') ?? link.searchParams.get('sig') ?? '')).toBe(true)
     }

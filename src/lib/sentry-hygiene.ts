@@ -15,7 +15,8 @@
  * - Fehlertexte und Brotkrumen: E-Mail-Adressen, Telefonnummern.
  * - URLs, auch im PFAD, nicht nur in der Query: /customers/<kundin@…> legt
  *   die Kunden-E-Mail (%40-kodiert) in den Pfad, /api/orders/confirm/<token>
- *   einen gültigen Bestätigungs-Token — Query-Filter allein reicht nicht.
+ *   und /<hof>/bestaetigen/<token> (Bar-Bestätigung, H3) einen gültigen
+ *   Einmal-Token — Query-Filter allein reicht nicht.
  * - request-Daten: Cookies, Authorization, Referer (trägt die volle
  *   Vorgänger-URL), der POST-Körper (data) komplett.
  * - contexts.nextjs.request_path: von onRequestError roh angehängt.
@@ -91,9 +92,19 @@ function bereinigeQuery(query: string): string {
 /** Bereinigt den Pfad-Teil: E-Mails (roh und kodiert), Telefonnummern und
  *  undurchsichtige Kennungs-Segmente. */
 function bereinigePfad(pfad: string): string {
-  return bereinigeText(pfad)
-    .split('/')
-    .map((segment) => (KENNUNG_SEGMENT_MUSTER.test(segment) ? '[kennung entfernt]' : segment))
+  const segmente = bereinigeText(pfad).split('/')
+  return segmente
+    .map((segment, i) => {
+      if (KENNUNG_SEGMENT_MUSTER.test(segment)) return '[kennung entfernt]'
+      // Bestätigungs-Token der Barbestellung: Was nach /bestaetigen/ bzw.
+      // /orders/confirm/ steht, fällt IMMER — die Route entscheidet, nicht
+      // die Länge des Tokens.
+      const davor = segmente[i - 1]
+      if (segment && (davor === 'bestaetigen' || (davor === 'confirm' && segmente[i - 2] === 'orders'))) {
+        return '[kennung entfernt]'
+      }
+      return segment
+    })
     .join('/')
 }
 

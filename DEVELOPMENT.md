@@ -254,6 +254,59 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 
 ## Bekannte Bugs & Fixes
 
+### BUG: Der Mail-Link bestätigte Barbestellungen schon beim Aufruf (behoben 2026-10-05, H3)
+
+**Befund:** `GET /api/orders/confirm/{token}` bestätigte die Bestellung
+verbindlich, sobald jemand den Link aufrief. Link-Scanner der Mailprogramme
+(Outlook, Firmen-Filter), Vorschauen und Vorabrufe tun das ungefragt — die
+Kundin hatte dann „verbindlich bestätigt", ohne je zu klicken, und der Hof
+packte. Der Token blieb danach gültig.
+
+**Fix:**
+- Die Mail verlinkt die neue Seite `/{hof}/bestaetigen/{token}` (Mockups
+  `web-k3-bar-bestellung-bestaetigen-link-aus-mail.html`,
+  `mobil-k3-bar-bestaetigen.html`). Der alte GET-Link leitet nur noch dorthin
+  weiter — für Mails, die vor der Umstellung verschickt wurden.
+- Die Seite zeigt Hof, Frist („Bitte bestätige bis heute, 14:00 Uhr"),
+  Positionen, Servicegebühr, Barbetrag, Abholung und zwei Knöpfe. Name und
+  E-Mail der Kundin zeigt sie nie (der Link kann weitergeleitet sein).
+  Unbekannter oder schon benutzter Token: „Dieser Link gilt nicht mehr",
+  ohne Bestelldaten; falsch geformt: ohne Datenbankabfrage.
+- „Ja, ich hole verbindlich ab" (Server Action): verwaiste Bestellungen des
+  Hofs freigeben, dann `barBestaetigungsAnsicht` mit der Zeit NACH der
+  Freigabe (die dauert bei Stripe mitunter Sekunden; diese Zeit ist auch
+  `confirmedAt`) — nur „offen" (in der Frist aus `fristVon`) bestätigt —, dann `updateMany` auf PENDING_CONFIRMATION und
+  genau diesen Token, Token im selben Schreiben `null`. Mails an Kundin und
+  Hof über `nachDerAntwort`, jede für sich abgefangen. Weiter zur signierten
+  Bestätigungsseite.
+- „Doch nicht – Bestellung stornieren": `storniereUnbezahlteBestellung` mit
+  dem Grund `GRUND_KUNDIN_STORNIERT` (Rückbuchung in derselben Transaktion);
+  danach zeigt dieselbe Seite „Bestellung storniert". Der Token bleibt dabei
+  stehen — er kann nichts mehr auslösen. Eine schon bestätigte Bestellung
+  storniert der Link nicht, das bleibt beim Hof. Keine Mail beim Storno: Der
+  Hof hatte von der unbestätigten Bestellung noch keine bekommen.
+- `noindex`, `Referrer-Policy: no-referrer` (Metadaten und Header in
+  `next.config.ts`, auch für den alten GET-Link); `sentry-hygiene.ts`
+  entfernt den Token nach `/bestaetigen/` und `/orders/confirm/` unabhängig
+  von seiner Länge.
+
+**Folge:** Ein zweiter Klick auf den Mail-Link nach dem Bestätigen zeigt
+„Dieser Link gilt nicht mehr" (neue Mails) bzw. führt alte Mails auf die
+Startseite. Alte, schon bestätigte Bestellungen haben ihren Token noch — die
+Seite leitet sie zur signierten Bestätigungsseite.
+
+**Nachtrag:** Die Mail „Bitte bestätige" schrieb „Der Link ist 48 Stunden
+gültig", die Frist ist aber höchstens zwei Stunden (`fristen.ts`). Seither:
+„Unbestätigte Bestellungen geben wir nach spätestens zwei Stunden wieder frei"
+(`tests/bar-bestaetigung-mail.test.ts`).
+
+**Tests:** `tests/bar-bestaetigung.test.ts` (Regel und Token-Schema),
+`tests/bar-bestaetigung-zugang.test.ts` (GET, Seite, beide Knöpfe; vorher rot),
+`tests/integration/verwaiste-bestellungen.int.test.ts` (echtes Postgres: Frist,
+Token verbraucht, zwei gleichzeitige Klicks, „Doch nicht" bucht zurück),
+angepasst: `bestaetigung-zugang`, `bestaetigung-links-mail`,
+`beobachtbarkeit`, `sicherheits-header`, `kunden-kopf`, `ladeansichten`.
+
 ### BUG: Bestätigungsseite zeigte Name und E-Mail der Kundin ohne signierten Link (behoben 2026-10-02)
 
 **Befund:** `/{hof}/confirm/{orderId}` lud die Bestellung allein über die ID

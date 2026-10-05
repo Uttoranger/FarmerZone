@@ -87,7 +87,7 @@ export function OnsiteConfirmationEmail(p: OnsiteConfirmationProps) {
       <Text style={mutedText}><strong>Bestellnummer:</strong> {p.orderNumber}</Text>
       <Text style={{ ...mutedText, color: '#94a3b8', fontSize: '12px', marginTop: '16px' }}>
         Falls du diese Bestellung nicht aufgegeben hast, ignoriere diese E-Mail einfach.
-        Der Link ist 48 Stunden gültig.
+        Bitte bestätige bald: Unbestätigte Bestellungen geben wir nach spätestens zwei Stunden wieder frei.
       </Text>
     </EmailLayout>
   )
