@@ -273,8 +273,9 @@ packte. Der Token blieb danach gültig.
   Unbekannter oder schon benutzter Token: „Dieser Link gilt nicht mehr",
   ohne Bestelldaten; falsch geformt: ohne Datenbankabfrage.
 - „Ja, ich hole verbindlich ab" (Server Action): verwaiste Bestellungen des
-  Hofs freigeben, dann `barBestaetigungsAnsicht` — nur „offen" (in der Frist
-  aus `fristVon`) bestätigt —, dann `updateMany` auf PENDING_CONFIRMATION und
+  Hofs freigeben, dann `barBestaetigungsAnsicht` mit der Zeit NACH der
+  Freigabe (die dauert bei Stripe mitunter Sekunden; diese Zeit ist auch
+  `confirmedAt`) — nur „offen" (in der Frist aus `fristVon`) bestätigt —, dann `updateMany` auf PENDING_CONFIRMATION und
   genau diesen Token, Token im selben Schreiben `null`. Mails an Kundin und
   Hof über `nachDerAntwort`, jede für sich abgefangen. Weiter zur signierten
   Bestätigungsseite.

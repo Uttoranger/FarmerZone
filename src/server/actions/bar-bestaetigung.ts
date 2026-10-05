@@ -1,6 +1,7 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
 import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
 import { sendOrderConfirmation, sendOrderConfirmedToFarmer } from '@/lib/email'
@@ -59,15 +60,21 @@ export async function bestaetigeBarBestellung(_vorher: BarAktionStand, formular:
   const order = await leseBestellung(token)
   if (!order) return { error: LINK_UNGUELTIG }
 
-  const jetzt = new Date()
   // Frist gilt beim Lesen: Über der Frist verfällt die Bestellung JETZT
   // (mit Rückbuchung und Mail an die Kundin), nicht erst im Cron.
-  await gibVerwaisteFreiOhneRisiko(order.farmId, jetzt)
+  await gibVerwaisteFreiOhneRisiko(order.farmId)
+
+  // Die Zeit erst NACH der Freigabe nehmen: Die bricht bei verwaisten
+  // Online-Bestellungen Zahlungen bei Stripe ab und kann Sekunden dauern.
+  // Mit der Zeit vom Anfang des Klicks rutschte eine Bestellung, deren Frist
+  // genau in diesen Sekunden abläuft, noch als bestätigt durch.
+  const jetzt = new Date()
 
   // Die Frist hängt nur an Feldern, die nach dem Anlegen nie mehr wechseln
   // (Zahlart, Bestellzeit, Abholfenster) — sie aus dem Lesen zu rechnen ist
   // sicher. Der Status dagegen kann sich seither geändert haben: den prüft
-  // erst die Bedingung des Schreibens.
+  // erst die Bedingung des Schreibens. Zwischen dieser Prüfung und dem
+  // Schreiben liegt kein await mehr außer dem Schreiben selbst.
   const ansicht = barBestaetigungsAnsicht(order, jetzt)
   if (ansicht === 'ungueltig') return { error: LINK_UNGUELTIG }
   if (ansicht !== 'offen') redirect(barBestaetigungsPfad(order.farm.slug, token))
@@ -86,6 +93,10 @@ export async function bestaetigeBarBestellung(_vorher: BarAktionStand, formular:
     data: { status: 'CONFIRMED', confirmedAt: jetzt, confirmationToken: null },
   })
   if (count === 0) redirect(bestaetigungsPfad(order.farm.slug, order.id))
+
+  // Wie cancelOrder: Die Bestellliste des Hofs zeigt den neuen Stand sofort.
+  revalidatePath('/orders')
+  revalidatePath(`/orders/${order.id}`)
 
   const mailBestellung = {
     id: order.id,
@@ -139,8 +150,9 @@ export async function storniereBarBestellung(_vorher: BarAktionStand, formular: 
   })
   if (!order) return { error: LINK_UNGUELTIG }
 
+  await gibVerwaisteFreiOhneRisiko(order.farmId)
+  // Zeit erst nach der Freigabe nehmen — wie beim Bestätigen.
   const jetzt = new Date()
-  await gibVerwaisteFreiOhneRisiko(order.farmId, jetzt)
 
   const ansicht = barBestaetigungsAnsicht(order, jetzt)
   if (ansicht === 'ungueltig') return { error: LINK_UNGUELTIG }
@@ -149,7 +161,11 @@ export async function storniereBarBestellung(_vorher: BarAktionStand, formular: 
   if (ansicht === 'offen') {
     // Bedingt aus PENDING_CONFIRMATION, Rückbuchung in derselben Transaktion.
     // false heißt: jemand anderes war schneller — die Seite zeigt den Stand.
-    await storniereUnbezahlteBestellung(order.id, GRUND_KUNDIN_STORNIERT)
+    if (await storniereUnbezahlteBestellung(order.id, GRUND_KUNDIN_STORNIERT)) {
+      // Wie cancelOrder: Die Bestellliste des Hofs zeigt den neuen Stand sofort.
+      revalidatePath('/orders')
+      revalidatePath(`/orders/${order.id}`)
+    }
   }
   // Der Token bleibt bei einer stornierten Bestellung stehen: Er kann nichts
   // mehr auslösen, und die Seite sagt damit „storniert" statt „gilt nicht mehr".

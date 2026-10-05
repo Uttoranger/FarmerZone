@@ -33,6 +33,7 @@ vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteFreiOhneRisiko: 
 vi.mock('@/server/unbezahlte-bestellung', () => ({ storniereUnbezahlteBestellung: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendOrderConfirmation: vi.fn(), sendOrderConfirmedToFarmer: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 // Der Nachlauf wird gesammelt statt sofort gestartet — so ist prüfbar, dass
 // die Mails NICHT im Antwortpfad laufen.
 vi.mock('@/lib/nach-der-antwort', () => ({
@@ -55,6 +56,7 @@ vi.mock('@/components/checkout/bar-bestaetigen-knoepfe', () => ({
 }))
 
 import * as Sentry from '@sentry/nextjs'
+import { revalidatePath } from 'next/cache'
 import BestaetigenSeite, { metadata } from '@/app/(public)/[farmSlug]/bestaetigen/[token]/page'
 import { GET as mailLink } from '@/app/api/orders/confirm/[token]/route'
 import { bestaetigeBarBestellung, storniereBarBestellung } from '@/server/actions/bar-bestaetigung'
@@ -322,7 +324,7 @@ describe('Knopf „Ja, ich hole verbindlich ab" — bestaetigeBarBestellung', ()
   it('gibt vorher verwaiste Bestellungen des Hofs frei', async () => {
     await weiterleitungVon(bestaetigeBarBestellung({}, formular()))
 
-    expect(freigabe).toHaveBeenCalledWith('farm-1', IN_DER_FRIST)
+    expect(freigabe).toHaveBeenCalledWith('farm-1')
     expect(freigabe.mock.invocationCallOrder[0]).toBeLessThan(updateMany.mock.invocationCallOrder[0])
   })
 
@@ -356,6 +358,39 @@ describe('Knopf „Ja, ich hole verbindlich ab" — bestaetigeBarBestellung', ()
     expect(updateMany).not.toHaveBeenCalled()
     expect(nachlauf).toHaveLength(0)
     expect(ziel).toBe(`/hof-test/bestaetigen/${TOKEN}`)
+  })
+
+  it('Uhr läuft während der Freigabe über die Frist (Stripe hakt): bestätigt NICHT', async () => {
+    // Die Freigabe kann bei verwaisten Online-Bestellungen Sekunden dauern.
+    // Geprüft wird mit der Zeit DANACH, nicht mit der vom Anfang des Klicks.
+    freigabe.mockImplementationOnce(async () => {
+      vi.setSystemTime(NACH_DER_FRIST)
+    })
+
+    const ziel = await weiterleitungVon(bestaetigeBarBestellung({}, formular()))
+
+    expect(updateMany).not.toHaveBeenCalled()
+    expect(nachlauf).toHaveLength(0)
+    expect(ziel).toBe(`/hof-test/bestaetigen/${TOKEN}`)
+  })
+
+  it('confirmedAt ist der Zeitpunkt nach der Freigabe', async () => {
+    const NACH_FREIGABE = new Date('2026-10-02T08:30:07Z')
+    freigabe.mockImplementationOnce(async () => {
+      vi.setSystemTime(NACH_FREIGABE)
+    })
+
+    await weiterleitungVon(bestaetigeBarBestellung({}, formular()))
+
+    const aufruf = updateMany.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(aufruf.data.confirmedAt).toEqual(NACH_FREIGABE)
+  })
+
+  it('aktualisiert die Bestellliste des Hofs — wie cancelOrder', async () => {
+    await weiterleitungVon(bestaetigeBarBestellung({}, formular()))
+
+    expect(revalidatePath).toHaveBeenCalledWith('/orders')
+    expect(revalidatePath).toHaveBeenCalledWith('/orders/order-1')
   })
 
   it('verfallen und schon storniert: bestätigt nie', async () => {
@@ -399,6 +434,21 @@ describe('Knopf „Doch nicht – Bestellung stornieren" — storniereBarBestell
 
     expect(stornieren).toHaveBeenCalledWith('order-1', GRUND_KUNDIN_STORNIERT)
     expect(updateMany).not.toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'CONFIRMED' }) }))
+  })
+
+  it('aktualisiert die Bestellliste des Hofs — wie cancelOrder', async () => {
+    await weiterleitungVon(storniereBarBestellung({}, formular()))
+
+    expect(revalidatePath).toHaveBeenCalledWith('/orders')
+    expect(revalidatePath).toHaveBeenCalledWith('/orders/order-1')
+  })
+
+  it('jemand anderes war schneller: nichts zu aktualisieren', async () => {
+    stornieren.mockResolvedValue(false)
+
+    await weiterleitungVon(storniereBarBestellung({}, formular()))
+
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 
   it('zeigt danach dieselbe Seite — dort steht „storniert"', async () => {

@@ -13,6 +13,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
+// revalidatePath braucht den Request-Kontext von Next, den es hier nicht gibt.
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/stripe', () => ({
   stripe: { paymentIntents: { retrieve: vi.fn(), cancel: vi.fn() } },
 }))
