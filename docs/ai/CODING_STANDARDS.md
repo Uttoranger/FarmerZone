@@ -51,6 +51,7 @@ Bei **jeder** Codeänderung lesen.
   Cent stünden in keinem Monat (`kostenImMonat`).
 - **Ausnahme Grundpreis-Vergleich:** Kilo-, Liter-, Tonnen- und Doppelzentnerpreise zum Vergleichen (Kilopreis-Sortierung auf /hoefe, Umfeld) rechnen als Zahl — `Decimal` → Zahl an der Servergrenze, dann `kilopreisNetto` bzw. `grundpreisJeKg`, Spanne und Median. Sie sind nur Anzeige, werden gerundet gezeigt und fließen **nie** in eine Abrechnung, einen Warenkorb oder einen Stripe-Betrag.
 - Rechnen in den vorhandenen Helfern: `src/lib/order-totals.ts`, `src/lib/servicegebuehr.ts`, `src/lib/finanzen.ts`.
+- **Die Servicegebühr entsteht nur in `berechneServicegebuehr`** — immer aufgerundet auf den nächsten Cent, ganzzahlig in Hundertstel-Prozent gerechnet. Wer sie anzeigt, bildet den Warenpreis auf demselben Weg wie `/api/checkout` (`calcTotalAmount` → `decimalZuCents`); nach dem Bestellen gilt nur noch der Snapshot `Order.serviceFeeCents` (`bestellSummen`), nie eine Neuberechnung aus der Hofeinstellung. Den Satz für neue Höfe nehmen `SERVICEGEBUEHR_STANDARD_PROZENT`/`_MIND_CENTS`, nie eine Zahl im Code.
 - Anzeigen ausschließlich über `src/lib/format.ts` (`formatEuro`, `formatMenge`, `formatPosition`, `formatGrundpreis`).
 - **Preis-Semantik:** `price` ist der Preis je Gebinde, `unitSize` die Gebindegröße. Mit Gebinde schreibt die Anzeige „€ 50,00 für 2 kg" (nie „/ 2 kg"), darunter die Grundpreis-Zeile „€ 25,00 / kg" über `<GrundpreisZeile>` aus `src/components/shared/`. Bei Stück und Paket gibt es keine Grundpreis-Zeile. `grundpreisJeEinheit` ist nur Anzeige, nie Abrechnung.
 - Nie ein eigenes Preisformat erfinden. Nie `toFixed(2) + ' €'`.
@@ -149,13 +150,11 @@ return <span>{gesamt.toFixed(2)} €</span>                 // eigenes Format, f
 // ✅ GOOD
 import { berechneServicegebuehr } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
+import { calcTotalAmount, decimalZuCents } from '@/lib/order-totals'
 
-const { gesamtCents } = berechneServicegebuehr({
-  warenpreis: order.totalAmount,
-  prozent: farm.serviceFeePercent,
-  minCents: farm.serviceFeeMinCents,
-})
-return <span>{formatEuro(gesamtCents / 100)}</span>       // € 10,49
+const warenpreisCents = decimalZuCents(calcTotalAmount(positionen))
+const { gebuehrCents } = berechneServicegebuehr(warenpreisCents, farm, new Date())
+return <span>{formatEuro((warenpreisCents + gebuehrCents) / 100)}</span>   // € 10,50
 ```
 
 ### Beispiel 2 — Server Action ohne Besitzprüfung

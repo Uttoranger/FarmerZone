@@ -7,6 +7,7 @@ import { findBatchSlotError } from '@/lib/pickup-slot-rules'
 import { ProductUnit } from '@prisma/client'
 import { generateSlug, RESERVED_SLUGS } from '@/lib/slug'
 import { hofAnlegenSchema } from '@/schemas/hofprofil'
+import { SERVICEGEBUEHR_STANDARD_MIND_CENTS, SERVICEGEBUEHR_STANDARD_PROZENT } from '@/lib/servicegebuehr'
 
 export async function checkSlugAvailability(name: string): Promise<{ available: boolean; slug: string }> {
   const slug = generateSlug(name)
@@ -53,6 +54,11 @@ export async function createFarm(data: {
         slug,
         ...hof,
         ownerId: session.user.id,
+        // Satz nach E4 ausdrücklich setzen: Der Spalten-Default im Schema steht
+        // noch auf dem alten Satz. Gebührenfrei bleibt der Hof trotzdem, bis
+        // der Betreiber im Admin „gilt ab" setzt (serviceFeeActiveFrom bleibt leer).
+        serviceFeePercent: SERVICEGEBUEHR_STANDARD_PROZENT,
+        serviceFeeMinCents: SERVICEGEBUEHR_STANDARD_MIND_CENTS,
       },
     })
 

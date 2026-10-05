@@ -2,15 +2,18 @@
  * Tests für die Servicegebühr (src/lib/servicegebuehr.ts) — reine Rechnung.
  *
  * Beweist: gebührenfrei (kein Datum) → 0; Datum in der Zukunft → 0; 20 € bei
- * 4,9 % → 98 Cent; 6 € → Mindestgebühr 50 Cent; kaufmännische Rundung am
- * Halbcent-Fall (5 € × 4,9 % = 24,5 → 25 Cent); der angewendete Prozentsatz
- * steht im Ergebnis. Snapshot: Die Summen einer Bestellung kommen aus IHREM
+ * 4,9 % → 98 Cent; 6 € → Mindestgebühr 50 Cent; IMMER AUFRUNDEN auf den
+ * nächsten Cent (E4: 4,99 € × 4,9 % = 24,451 → 25 Cent), ein glatter Betrag
+ * bleibt glatt; der Satz für neue Höfe ist 5 % / mind. 50 Cent mit den
+ * Pflichtfällen aus Gate 3.4; der angewendete Prozentsatz steht im Ergebnis. Snapshot: Die Summen einer Bestellung kommen aus IHREM
  * Snapshot — eine spätere Änderung der Hofeinstellung ändert nichts. Dazu
  * „Bar zu kassieren", der abgeleitete Erstattungs-Vermerk und die Wiener
  * Mitternacht für „Gebühr gilt ab".
  */
 import { describe, expect, it } from 'vitest'
 import {
+  SERVICEGEBUEHR_STANDARD_MIND_CENTS,
+  SERVICEGEBUEHR_STANDARD_PROZENT,
   barZuKassierenCents,
   berechneServicegebuehr,
   bestellSummen,
@@ -70,11 +73,33 @@ describe('berechneServicegebuehr', () => {
     })
   })
 
-  it('rundet kaufmännisch: 5 € × 4,9 % = 24,5 Cent → 25 Cent (ohne Mindestgebühr)', () => {
+  it('rundet immer auf (E4): jeder angefangene Cent zählt — auch 24,451 → 25', () => {
     const ohneMindest = { ...AKTIV, serviceFeeMinCents: 0 }
+    // 5 € × 4,9 % = 24,5 Cent → 25
     expect(berechneServicegebuehr(500, ohneMindest, BESTELLT).gebuehrCents).toBe(25)
-    // Gegenprobe knapp darunter: 4,99 € × 4,9 % = 24,451 → 24
-    expect(berechneServicegebuehr(499, ohneMindest, BESTELLT).gebuehrCents).toBe(24)
+    // 4,99 € × 4,9 % = 24,451 Cent → 25 (kaufmännisch wären es 24 gewesen)
+    expect(berechneServicegebuehr(499, ohneMindest, BESTELLT).gebuehrCents).toBe(25)
+    // 0,01 € × 4,9 % = 0,049 Cent → 1 Cent, nicht 0
+    expect(berechneServicegebuehr(1, ohneMindest, BESTELLT).gebuehrCents).toBe(1)
+  })
+
+  it('ein glatter Betrag bleibt glatt: kein Cent zu viel durch die Aufrundung', () => {
+    const ohneMindest = { ...AKTIV, serviceFeeMinCents: 0 }
+    // 20 € × 4,9 % = genau 98 Cent → 98, nicht 99
+    expect(berechneServicegebuehr(2000, ohneMindest, BESTELLT).gebuehrCents).toBe(98)
+    // 3 € × 7 % = genau 21 Cent; als Float wären es 21,000000000000004 → 22
+    expect(berechneServicegebuehr(300, { ...ohneMindest, serviceFeePercent: 7 }, BESTELLT).gebuehrCents).toBe(21)
+    // 0 € → 0 Cent (ohne Mindestgebühr)
+    expect(berechneServicegebuehr(0, ohneMindest, BESTELLT).gebuehrCents).toBe(0)
+  })
+
+  it('Prozentsätze, die als Gleitkommazahl krumm sind, rechnen trotzdem exakt (4,35 % → 435 Hundertstel)', () => {
+    // 4.35 * 100 = 434.99999999999994 — ohne Runden auf Hundertstel würde
+    // 100 € × 4,35 % = 435 Cent als 434,99… und damit falsch gerechnet.
+    const krumm = { ...AKTIV, serviceFeePercent: 4.35, serviceFeeMinCents: 0 }
+    expect(berechneServicegebuehr(10000, krumm, BESTELLT).gebuehrCents).toBe(435)
+    // 1 € × 4,35 % = 4,35 Cent → 5
+    expect(berechneServicegebuehr(100, krumm, BESTELLT).gebuehrCents).toBe(5)
   })
 
   it('rechnet mit dem Prisma-Decimal (String-Form) genauso wie mit der Zahl', () => {
@@ -93,6 +118,38 @@ describe('berechneServicegebuehr', () => {
     const kaputt = { serviceFeePercent: 'abc', serviceFeeMinCents: -5, serviceFeeActiveFrom: AKTIV.serviceFeeActiveFrom }
     expect(berechneServicegebuehr(2000, kaputt, BESTELLT)).toEqual({ gebuehrCents: 0, prozentAngewendet: 0 })
     expect(berechneServicegebuehr(-100, AKTIV, BESTELLT).gebuehrCents).toBe(50)
+  })
+})
+
+describe('E4: Satz für neue Höfe 5 %, mind. 50 Cent, immer aufrunden (Gate 3.4)', () => {
+  const FUENF: ServicegebuehrEinstellung = {
+    serviceFeePercent: SERVICEGEBUEHR_STANDARD_PROZENT,
+    serviceFeeMinCents: SERVICEGEBUEHR_STANDARD_MIND_CENTS,
+    serviceFeeActiveFrom: AKTIV.serviceFeeActiveFrom,
+  }
+
+  it('der Standardsatz ist 5 % mit 50 Cent Mindestgebühr', () => {
+    expect(SERVICEGEBUEHR_STANDARD_PROZENT).toBe(5)
+    expect(SERVICEGEBUEHR_STANDARD_MIND_CENTS).toBe(50)
+  })
+
+  it.each([
+    [1030, 52], // 51,5 → 52
+    [2000, 100], // glatt
+    [1001, 51], // 50,05 → 51
+    [250, 50], // 12,5 → 13, Mindestgebühr hebt auf 50
+    [1000, 50], // glatt 50
+  ])('%i Cent Warenpreis → %i Cent Servicegebühr', (waren, gebuehr) => {
+    expect(berechneServicegebuehr(waren, FUENF, BESTELLT)).toEqual({
+      gebuehrCents: gebuehr,
+      prozentAngewendet: 5,
+    })
+  })
+
+  it('der Satz aus der Datenbank (Decimal „5.00") rechnet genauso', () => {
+    const decimal = { ...FUENF, serviceFeePercent: { toString: () => '5.00' } }
+    expect(berechneServicegebuehr(1030, decimal, BESTELLT).gebuehrCents).toBe(52)
+    expect(berechneServicegebuehr(1001, decimal, BESTELLT).gebuehrCents).toBe(51)
   })
 })
 

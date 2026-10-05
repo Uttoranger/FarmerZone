@@ -113,6 +113,18 @@ describe('createFarm — Obergrenzen beim Anlegen', () => {
     const daten = (farmCreate.mock.calls[0][0] as { data: { email: string } }).data
     expect(daten.email).toBe('hof@example.org')
   })
+
+  it('belegt die Servicegebühr eines neuen Hofes mit 5 % / mind. 50 Cent vor — gebührenfrei bis zum Datum (E4)', async () => {
+    // Der Spalten-Default im Schema steht noch auf 4,9; ohne ausdrücklichen
+    // Wert bekäme jeder neue Hof den alten Satz (DEVELOPMENT.md, Servicegebühr E4).
+    await createFarm(ANLAGE)
+
+    const daten = (farmCreate.mock.calls[0][0] as { data: Record<string, unknown> }).data
+    expect(daten.serviceFeePercent).toBe(5)
+    expect(daten.serviceFeeMinCents).toBe(50)
+    // „gilt ab" setzt nur der Betreiber im Admin — bis dahin bleibt der Hof gebührenfrei.
+    expect(daten).not.toHaveProperty('serviceFeeActiveFrom')
+  })
 })
 
 // ── registerFarmer ──────────────────────────────────────────────────────────

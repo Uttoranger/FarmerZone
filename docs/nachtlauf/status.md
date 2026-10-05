@@ -7,7 +7,7 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 01 | H1 Abholtermin | fertig | (von Hand) | #163 | main | – | Okt 2026 |
 | 02 | H4 Signatur Bestätigung | fertig | (von Hand) | #164 | main | – | Okt 2026 |
 | 03 | H3 Bar-Bestätigung | fertig | nacht/2026-10-02/03-bar-bestaetigung | #166 | main | Mail-Text „48 Stunden" im selben PR korrigiert; Mockup-Abweichungen (Untertitel-Grau, Handy-Kopf bis Gate 2, Knopf 44 px) freigegeben | 05.10.2026 |
-| 04 | Servicegebühr | offen | | | | | |
+| 04 | Servicegebühr | fertig | `nacht/2026-10-02/04-servicegebuehr` | #167 | 03 (#166) | Spalten-Default `@default(4.9)` bleibt (Migration nicht freigegeben); Pilothof-Satz im Admin auf 5 % stellen | 05.10.2026 |
 | 05 | Bausteine und Shells | offen | | | | | |
 | 06 | Schema-Expand | offen | | | | | |
 | 07 | Startseite | offen | | | | | |
