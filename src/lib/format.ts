@@ -229,7 +229,10 @@ export function grundpreisJeEinheit(
  * Fließkomma knapp unter 1,005 liegt. Der Preis hat zwei Nachkommastellen
  * (Decimal(10,2)), die Menge höchstens drei (Decimal(10,3)) — beide werden
  * vorher zu ganzen Zahlen. null ohne Preis > 0 oder Menge > 0.
- * NUR Anzeige (Grundpreis-Zeile, Kilopreis) — nie Abrechnung.
+ * DIE Rundungsstelle für jeden gezeigten Grundpreis (Grundpreis-Zeile,
+ * Kilopreis auf Hof- und Produktseite, Produkttreffer und „ab €" auf /hoefe).
+ * Preis 0 ergibt null: Zod lässt ihn nicht zu (positive), und „€ 0,00 / kg"
+ * sagte nichts — dann steht keine Zeile da. NUR Anzeige — nie Abrechnung.
  */
 function grundpreisCents(price: number, menge: number): number | null {
   if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(menge)) return null
@@ -323,11 +326,13 @@ export function formatNettoBestand(
 }
 
 /**
- * DIE Rechenstelle für den Kilo- bzw. Literpreis eines Futtermittels:
- * Gebindepreis ÷ Nettomenge, ungerundet (die Sortierung auf /hoefe braucht
- * die volle Zahl). NUR Anzeige und Sortierung, nie Abrechnung. null ohne
- * brauchbaren Preis oder Menge. Hofkarte, Produktkarte und Detail rechnen
- * alle hierüber, damit sie nicht auseinanderlaufen.
+ * Der Kilo- bzw. Literpreis eines Futtermittels als volle Zahl: Gebindepreis
+ * ÷ Nettomenge, UNGERUNDET — nur zum Sortieren und Vergleichen (/hoefe,
+ * Umfeld), nie Abrechnung. null ohne brauchbaren Preis oder Menge.
+ * Gezeigt wird diese Zahl nie direkt: Jede Ausgabe eines Grundpreises
+ * (formatGrundpreisNetto, formatKilopreis, formatGrundpreisZeile) rundet über
+ * grundpreisCents aus Preis und Menge — eine Rundungsstelle, damit /hoefe,
+ * Hofseite und Produktseite nie auseinanderlaufen (Nr. 11, Nachbesserung 1).
  */
 export function kilopreisNetto(
   price: number,
@@ -409,16 +414,21 @@ export function formatGrundpreisNetto(
  * nach Kilopreis sortiert wird (Bereiche 2). Ohne ihn wirkte die Reihenfolge
  * zufällig. Nur Anzeige, auf Cent gerundet.
  */
-export function formatAbGrundpreis(grundpreis: { wert: number; einheit: NettoEinheitValue }): string {
-  return `ab ${formatKilopreis(grundpreis)}`
+export function formatAbGrundpreis(grundpreis: KilopreisQuelle): string | null {
+  const text = formatKilopreis(grundpreis)
+  return text === null ? null : `ab ${text}`
 }
 
 /**
  * „€ 0,15 / kg" — der Kilo- bzw. Literpreis EINES Futtermittels aus seiner
  * Kennzeichnung (Produkttreffer auf /hoefe, Nr. 09). Nur Anzeige, auf Cent
- * gerundet.
+ * gerundet. null ohne brauchbaren Preis oder Menge.
  */
-export function formatKilopreis(grundpreis: { wert: number; einheit: NettoEinheitValue }): string {
-  // wert kommt aus kilopreisNetto — dieselbe Rundung wie formatGrundpreisNetto.
-  return `${formatEuro(Math.round(grundpreis.wert * 100) / 100)} / ${NETTO_EINHEIT_LABEL[grundpreis.einheit]}`
+export function formatKilopreis(grundpreis: KilopreisQuelle): string | null {
+  // Aus Preis und Menge, nicht aus dem ungerundeten `wert`: Wer den selbst
+  // rundet, zeigt für € 2,01 / 2 kg „€ 1,00" statt „€ 1,01" wie die Hofseite.
+  return formatGrundpreisNetto(grundpreis.preis, grundpreis.menge, grundpreis.einheit)
 }
+
+/** Was ein Kilopreis zur Anzeige braucht: Gebindepreis, Nettomenge, Einheit. */
+export type KilopreisQuelle = { preis: number; menge: number; einheit: NettoEinheitValue }

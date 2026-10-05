@@ -62,7 +62,7 @@ const heu = (teil: Partial<AngebotsZeile> = {}) =>
     category: 'HEU_STROH',
     subcategory: 'WIESENHEU',
     tiere: ['PFERD'],
-    grundpreis: { wert: 0.15, einheit: 'KG' },
+    grundpreis: { wert: 0.15, einheit: 'KG', preis: 45, menge: 300 },
     grossgebinde: true,
     ...teil,
   })
@@ -118,7 +118,7 @@ describe('istKaufbar', () => {
 
 describe('grundpreisAusKennzeichnung', () => {
   it('Preis je Gebinde ÷ Nettomenge', () => {
-    expect(grundpreisAusKennzeichnung(45, { nettoMenge: 300, nettoEinheit: 'KG' })).toEqual({ wert: 0.15, einheit: 'KG' })
+    expect(grundpreisAusKennzeichnung(45, { nettoMenge: 300, nettoEinheit: 'KG' })).toEqual({ wert: 0.15, einheit: 'KG', preis: 45, menge: 300 })
   })
 
   it('ohne Kennzeichnung, ohne Menge oder ohne Preis: null', () => {
@@ -241,15 +241,15 @@ describe('Chips', () => {
 })
 
 describe('Kilopreis', () => {
-  const teuer = { name: 'teuer', angebot: [heu({ grundpreis: { wert: 0.3, einheit: 'KG' } })] }
+  const teuer = { name: 'teuer', angebot: [heu({ grundpreis: { wert: 0.3, einheit: 'KG', preis: 9, menge: 30 } })] }
   const billig = {
     name: 'billig',
-    angebot: [heu({ grundpreis: { wert: 0.5, einheit: 'KG' } }), heu({ grundpreis: { wert: 0.12, einheit: 'KG' } })],
+    angebot: [heu({ grundpreis: { wert: 0.5, einheit: 'KG', preis: 10, menge: 20 } }), heu({ grundpreis: { wert: 0.12, einheit: 'KG', preis: 36, menge: 300 } })],
   }
   const ohne = { name: 'ohne', angebot: [heu({ grundpreis: null })] }
 
   it('abGrundpreis ist der günstigste PASSENDE Kilopreis', () => {
-    expect(abGrundpreis(billig, FUTTER)).toEqual({ wert: 0.12, einheit: 'KG' })
+    expect(abGrundpreis(billig, FUTTER)).toEqual({ wert: 0.12, einheit: 'KG', preis: 36, menge: 300 })
     expect(abGrundpreis(ohne, FUTTER)).toBeNull()
   })
 
@@ -269,8 +269,8 @@ describe('berechneHofAuswahl mit Bereich — Liste und Karte teilen die Menge', 
   })
   const HOEFE = [
     hof('Eierhof', [eier()]),
-    hof('Futterhof', [heu({ grundpreis: { wert: 0.3, einheit: 'KG' } })]),
-    hof('Gemischter Hof', [eier(), heu({ grundpreis: { wert: 0.12, einheit: 'KG' } })]),
+    hof('Futterhof', [heu({ grundpreis: { wert: 0.3, einheit: 'KG', preis: 9, menge: 30 } })]),
+    hof('Gemischter Hof', [eier(), heu({ grundpreis: { wert: 0.12, einheit: 'KG', preis: 36, menge: 300 } })]),
   ]
   const BASIS = { ...LEERER_HOEFE_FILTER, bezugspunkt: null, umkreis: null }
 
@@ -440,13 +440,13 @@ describe('teileHofseite', () => {
 
 describe('formatAbGrundpreis', () => {
   it('schreibt den günstigsten Kilopreis mit „ab" und auf Cent gerundet', () => {
-    expect(formatAbGrundpreis({ wert: 0.1234, einheit: 'KG' })).toBe('ab € 0,12 / kg')
-    expect(formatAbGrundpreis({ wert: 2, einheit: 'LITER' })).toBe('ab € 2,00 / L')
+    expect(formatAbGrundpreis({ einheit: 'KG', preis: 12.34, menge: 100 })).toBe('ab € 0,12 / kg')
+    expect(formatAbGrundpreis({ einheit: 'LITER', preis: 2, menge: 1 })).toBe('ab € 2,00 / L')
   })
 
   it('formatKilopreis: derselbe Wert ohne „ab" — für ein einzelnes Angebot (Nr. 09)', () => {
-    expect(formatKilopreis({ wert: 0.1234, einheit: 'KG' })).toBe('€ 0,12 / kg')
-    expect(formatAbGrundpreis({ wert: 0.1234, einheit: 'KG' })).toBe(`ab ${formatKilopreis({ wert: 0.1234, einheit: 'KG' })}`)
+    expect(formatKilopreis({ einheit: 'KG', preis: 12.34, menge: 100 })).toBe('€ 0,12 / kg')
+    expect(formatAbGrundpreis({ einheit: 'KG', preis: 12.34, menge: 100 })).toBe(`ab ${formatKilopreis({ einheit: 'KG', preis: 12.34, menge: 100 })}`)
   })
 })
 

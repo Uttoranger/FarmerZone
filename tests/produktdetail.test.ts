@@ -20,8 +20,8 @@
  *  - Links: Produktseite, Vorschau, Rückweg zu allen Produkten.
  */
 import { describe, it, expect } from 'vitest'
-import { formatGrundpreisNetto, formatGrundpreisZeile, grundpreisJeEinheit } from '@/lib/format'
-import { kartenZustand } from '@/lib/bereiche-anzeige'
+import { formatGrundpreisNetto, formatGrundpreisZeile, formatKilopreis, grundpreisJeEinheit } from '@/lib/format'
+import { grundpreisAusKennzeichnung, kartenZustand } from '@/lib/bereiche-anzeige'
 import {
   alleProdukteLink,
   bestaetigtAmText,
@@ -157,6 +157,13 @@ describe('Grundpreis centgenau', () => {
     expect(formatGrundpreisNetto(2.01, 2, 'KG')).toBe('€ 1,01 / kg')
     expect(formatGrundpreisZeile(2.01, 'KG', 2)).toBe('€ 1,01 / kg')
     expect(grundpreisJeEinheit(2.01, 2)).toBe(1.01)
+  })
+
+  it('Gegenprobe: Produktseite und Hofseiten-Karte (zweitePreiszeile) schreiben denselben Kilopreis wie /hoefe', () => {
+    const hoefe = formatKilopreis(grundpreisAusKennzeichnung(2.01, { nettoMenge: 2, nettoEinheit: 'KG' })!)
+    expect(hoefe).toBe('€ 1,01 / kg')
+    expect(zweitePreiszeile(produkt('sack', { price: 2.01, futter: futter({ nettoMenge: 2 }) }))).toBe(hoefe)
+    expect(zweitePreiszeile(produkt('kilo', { price: 2.01, unit: 'KG', unitSize: 2 }))).toBe(hoefe)
   })
 
   it('Gegenprobe: dieselben Werte wie bisher, wo Fließkomma nicht stolpert', () => {

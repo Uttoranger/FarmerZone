@@ -42,7 +42,7 @@ import {
 import HoefeUmkreis from '@/components/hoefe/hoefe-umkreis'
 import { HoefeSuche } from '@/components/hoefe/hoefe-suche'
 import { kategorieReihe, leerzustand } from '@/lib/hoefe-entdecken'
-import type { AngebotsProdukt } from '@/lib/bereiche-anzeige'
+import { grundpreisAusKennzeichnung, type AngebotsProdukt } from '@/lib/bereiche-anzeige'
 import { LEERER_HOEFE_FILTER, SUCHTEXT_MAX, type HoefeFilter } from '@/schemas/hoefe-filter'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
@@ -130,11 +130,21 @@ describe('Produktzeile — die Suche zeigt Produkte statt Höfe', () => {
   })
 
   it('ohne Standort steht der Ort statt der Entfernung; Futter zeigt den Kilopreis aus der Kennzeichnung', () => {
-    const heu: AngebotsProdukt = { ...BROT, name: 'Heu', category: 'HEU_STROH', labels: [], price: 45, unit: 'BALLEN', grundpreis: { wert: 0.15, einheit: 'KG' } }
+    const heu: AngebotsProdukt = { ...BROT, name: 'Heu', category: 'HEU_STROH', labels: [], price: 45, unit: 'BALLEN', grundpreis: { wert: 0.15, einheit: 'KG', preis: 45, menge: 300 } }
     const zeile = html(createElement(ProduktZeile, { treffer: { hof: HOF, produkt: heu }, bereich: 'FUTTERMITTEL' }))
     expect(zeile).toContain('Hof Test · 1010 Wien')
     expect(zeile).toContain('€ 0,15 / kg')
     expect(zeile).toContain('href="/hof-test?bereich=futter"')
+  })
+
+  it('der Kilopreis rundet wie Hof- und Produktseite: € 2,01 für 2 kg zeigt € 1,01 / kg (Nr. 11, Nachbesserung 1)', () => {
+    const sack: AngebotsProdukt = {
+      ...BROT, name: 'Hafer im Sack', category: 'GETREIDE_KOERNER', labels: [], price: 2.01, unit: 'STUECK',
+      grundpreis: grundpreisAusKennzeichnung(2.01, { nettoMenge: 2, nettoEinheit: 'KG' }),
+    }
+    const zeile = html(createElement(ProduktZeile, { treffer: { hof: HOF, produkt: sack }, bereich: 'FUTTERMITTEL' }))
+    expect(zeile).toContain('€ 1,01 / kg')
+    expect(zeile).not.toContain('€ 1,00 / kg')
   })
 })
 

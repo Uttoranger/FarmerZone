@@ -152,10 +152,12 @@ export type PublicFarm = {
   // Servicegebühr-Einstellung des Hofes (Sprint servicegebuehr): Der Checkout
   // zeigt die Gebühr VORAB mit derselben Rechnung wie der Server
   // (src/lib/servicegebuehr.ts). Prozent als Zahl (Decimal ist nicht über die
-  // RSC-Grenze serialisierbar), Datum als Date oder null (= gebührenfrei).
+  // RSC-Grenze serialisierbar), Datum als ISO-Text oder null (= gebührenfrei)
+  // — dieser Typ geht an Client-Komponenten (CODING_STANDARDS: Date nicht roh);
+  // servicegebuehr.ts nimmt Date und Text gleich.
   serviceFeePercent: number
   serviceFeeMinCents: number
-  serviceFeeActiveFrom: Date | null
+  serviceFeeActiveFrom: string | null
   /**
    * Welche Nummer in Farm.betriebsnummer steht (Nr. 11): Das Schild
    * „Futtermittelbetrieb · LFBIS …" (E9) braucht den Status Primärproduktion.
@@ -346,6 +348,7 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
     sectionsConfig: sections,
     farmPhotos: farm.farmPhotos,
     serviceFeePercent: Number(farm.serviceFeePercent),
+    serviceFeeActiveFrom: farm.serviceFeeActiveFrom?.toISOString() ?? null,
     products: farm.products.map((p) => alsOeffentlichesProdukt(p, { betriebsnummer })),
   }
 }
@@ -418,6 +421,7 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
     sectionsConfig: sections,
     farmPhotos: farm.farmPhotos,
     serviceFeePercent: Number(farm.serviceFeePercent),
+    serviceFeeActiveFrom: farm.serviceFeeActiveFrom?.toISOString() ?? null,
     products: farm.products.map((p) => alsOeffentlichesProdukt(p, { betriebsnummer })),
   }
 }

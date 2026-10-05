@@ -447,7 +447,7 @@ describe('getOeffentlicheHoefe — die Query', () => {
         subcategory: 'WIESENHEU',
         labels: ['BIO'],
         tiere: ['PFERD', 'RIND'],
-        grundpreis: { wert: 0.15, einheit: 'KG' },
+        grundpreis: { wert: 0.15, einheit: 'KG', preis: 45, menge: 300 },
         grossgebinde: true,
         // Für die Produktsuche (Nr. 09): Kennung, Preis je Gebinde, Einheit, Gebinde, Bild.
         id: 'prod_heu',

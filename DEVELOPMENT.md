@@ -1006,7 +1006,7 @@ Dazu das zweite gemeldete Symptom: Die **Lightbox sperrte das Scrollen der Seite
 
 **Nicht behoben:** Die Hofseite wertet `sectionsConfig.order` weiterhin nicht aus. Der Hof kann die Sektionen unter Einstellungen → Erscheinungsbild per Drag sortieren, die öffentliche Seite rendert aber eine feste Reihenfolge. Das Bedienelement verspricht damit mehr, als es hält — eigener Sprint.
 
-**Nachtrag 2026-09-29 (`fix/nachlese-oktober`):** Mit dem Stand nach #145 (Leiste über dem Titelbild) bei 375 px in Chromium nachgestellt, mit agent-browser gegen eine lokale Wegwerf-Datenbank. Die Sprungmarken landen genau unter der Sektionsleiste; die Leiste scrollt nie selbst; kein Bild liegt in einem Link. Öffnen und Schließen der Bildansicht lassen die Seite stehen — solange die Sperre hält. Verrutscht die Seite unter dem offenen Bild (auf iOS greift `overflow: hidden` bei eingeklappter Safari-Leiste nicht, so auch Base UIs `useScrollLock`), stand man nach dem Schließen im nächsten Abschnitt: nachgestellt 826 → 1725 px, Reiter „Produkte". Seither merkt sich die Sperre die Stelle und stellt sie beim Aufheben wieder her (`stelleNachBildansicht` in `src/lib/hofseite-sektionen.ts`), aber nur beim echten Schließen: Wer die Hofseite bei offenem Bild verlässt, bekäme sonst die neue Seite auf die Stelle der alten geschoben (Befund der Prüfung). Der Fokus geht ohne Scrollen an die Kachel zurück. Am iPhone selbst nicht geprüft.
+**Nachtrag 2026-09-29 (`fix/nachlese-oktober`):** Mit dem Stand nach #145 (Leiste über dem Titelbild) bei 375 px in Chromium nachgestellt, mit agent-browser gegen eine lokale Wegwerf-Datenbank. Die Sprungmarken landen genau unter der Sektionsleiste; die Leiste scrollt nie selbst; kein Bild liegt in einem Link (gemeint sind Fotos und Bildansicht der Hofseite; Produktkarten verlinken seit Nr. 11 Bild und Name auf die Produktseite, Regel in `docs/ai/DESIGN_SYSTEM.md`). Öffnen und Schließen der Bildansicht lassen die Seite stehen — solange die Sperre hält. Verrutscht die Seite unter dem offenen Bild (auf iOS greift `overflow: hidden` bei eingeklappter Safari-Leiste nicht, so auch Base UIs `useScrollLock`), stand man nach dem Schließen im nächsten Abschnitt: nachgestellt 826 → 1725 px, Reiter „Produkte". Seither merkt sich die Sperre die Stelle und stellt sie beim Aufheben wieder her (`stelleNachBildansicht` in `src/lib/hofseite-sektionen.ts`), aber nur beim echten Schließen: Wer die Hofseite bei offenem Bild verlässt, bekäme sonst die neue Seite auf die Stelle der alten geschoben (Befund der Prüfung). Der Fokus geht ohne Scrollen an die Kachel zurück. Am iPhone selbst nicht geprüft.
 
 ### BUG: Status-Inkonsistenz bei Online-Zahlungen (behoben 2026-06-22)
 
@@ -4019,6 +4019,17 @@ E3, E4, E8, E9, E10/E11 (nur Anzeige).
   Gate 6), Sperre einzelner Größen ohne passende Registrierung (S7, Gate 6),
   Bündeln der Familie zu einer Karte auf der Hofseite (Gate 6), Produkt-JSON-LD,
   „Merken" (E8).
+- **Nachbesserung 1:** Der Kilopreis auf /hoefe (Produkttreffer, „ab €")
+  rundete noch selbst aus dem ungerundeten `wert` — derselbe Sack (€ 2,01 /
+  2 kg) zeigte dort € 1,00, auf Hof- und Produktseite € 1,01. `Grundpreis`
+  trägt jetzt Preis und Menge mit, `formatKilopreis` geht über
+  `formatGrundpreisNetto` (eine Rundungsstelle `grundpreisCents`); `wert`
+  bleibt nur zum Sortieren. Preis 0 ergibt bewusst keinen Grundpreis (Zod
+  verlangt Preis > 0; „€ 0,00 / kg" sagte nichts). Die Besitzer-Vorschau im
+  Hofbereich (`HofseiteBesitzer`) verlinkte die öffentliche Produktseite — vor
+  der Freigabe 404; sie verlinkt jetzt die Vorschau. `PublicFarm` reicht den
+  Gebühren-Stichtag als ISO-Text statt `Date` an die Client-Komponenten
+  (Hofseite, Produktseite, Checkout, Hofbereich).
 
 ## Nützliche Befehle
 

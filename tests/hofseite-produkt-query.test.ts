@@ -147,6 +147,14 @@ describe.each([
     findUnique.mockResolvedValue(rohHof(null, null) as never)
     expect((await laden())!.products[0]!.futter).toBeNull()
   })
+
+  it('der Gebühren-Stichtag geht als ISO-Text an den Browser, nicht als Date (Nr. 11, Nachbesserung 1)', async () => {
+    findUnique.mockResolvedValue({ ...rohHof(null, null), serviceFeeActiveFrom: new Date('2026-01-01T00:00:00.000Z') } as never)
+    expect((await laden())!.serviceFeeActiveFrom).toBe('2026-01-01T00:00:00.000Z')
+    // Gegenprobe: ohne Stichtag (gebührenfrei) bleibt es null.
+    findUnique.mockResolvedValue(rohHof(null, null) as never)
+    expect((await laden())!.serviceFeeActiveFrom).toBeNull()
+  })
 })
 
 describe.each([

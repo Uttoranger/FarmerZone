@@ -86,7 +86,7 @@ const HOF: PublicFarm = {
   tagline: null, foundedYear: null, aboutText: 'Ein kleiner Familienbetrieb.', bannerType: 'GRADIENT', bannerValue: null, bannerFocusY: 50,
   sectionsConfig: [], farmValues: [], farmPhotos: [],
   acceptsOnline: true, acceptsOnsite: true, stripeAccountReady: true, isPaused: false, pauseMessage: null,
-  serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: new Date('2026-01-01T00:00:00Z'),
+  serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: '2026-01-01T00:00:00.000Z',
   betriebsstatus: null,
   products: [
     produkt('p_holz', 'Buchenscheite', 'BRENNHOLZ'),
@@ -390,6 +390,19 @@ describe('Produktkarten verlinken auf die Produktseite (Nr. 11)', () => {
   it('in der Vorschau des Hofs bleibt der Link in der Vorschau', () => {
     const html = seite({ suche: 'reiter=produkte', ansicht: { art: 'vorschau', kaufen: false } })
     expect(html).toContain('href="/hof-test/produkt/p_karotten?vorschau=1"')
+  })
+
+  it('in der Besitzer-Vorschau (Hofbereich, mode preview) bleibt der Link in der Vorschau — vor der Freigabe gäbe es sonst 404', () => {
+    adresse.suche = ''
+    const html = renderToStaticMarkup(
+      createElement(FarmPageView, { farm: HOF, activeStatus: null, reorderItems: [], ownerMode: true, mode: 'preview' })
+    )
+    expect(html).toContain('href="/hof-test/produkt/p_karotten?vorschau=1"')
+    expect(html).not.toContain('href="/hof-test/produkt/p_karotten"')
+    // Gegenprobe: die Kundenansicht verlinkt die öffentliche Produktseite, ohne Vorschau.
+    const kundin = seite({ suche: 'reiter=produkte' })
+    expect(kundin).toContain('href="/hof-test/produkt/p_karotten"')
+    expect(kundin).not.toContain('p_karotten?vorschau=1')
   })
 
   it('das alte Produktblatt gibt es nicht mehr — eine Darstellung der Produktdetails', () => {

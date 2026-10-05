@@ -98,7 +98,7 @@ const HOF: PublicFarm = {
   tagline: null, foundedYear: null, aboutText: null, bannerType: 'GRADIENT', bannerValue: null, bannerFocusY: 50,
   sectionsConfig: [], farmValues: [], farmPhotos: [],
   acceptsOnline: true, acceptsOnsite: true, stripeAccountReady: true, isPaused: false, pauseMessage: null,
-  serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: new Date('2026-01-01T00:00:00Z'),
+  serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: '2026-01-01T00:00:00.000Z',
   betriebsstatus: 'PRIMAERPRODUKTION',
   products: [
     produkt('p_1kg', { ...HEU, name: 'Bergwiesen-Heu 1 kg-Sackerl', price: 2.5, futter: futter(1) }),
