@@ -75,6 +75,38 @@ describe('bereinigeEreignis — der beforeSend-Filter', () => {
     expect(e.request?.url).toBe('https://farmerzone.at/api/orders/confirm/[kennung entfernt]')
   })
 
+  it('entfernt den Token der Bar-Bestätigung (/{hof}/bestaetigen/{token}) — Seite und Brotkrume', () => {
+    const e = bereinigeEreignis(
+      ereignis({
+        request: { url: 'https://farmerzone.at/hof-test/bestaetigen/V1StGXR8_Z5jdHi6BmyT9pqLnv2wYc4k' },
+        breadcrumbs: [{ data: { from: '/hof-test/bestaetigen/V1StGXR8_Z5jdHi6BmyT9pqLnv2wYc4k', to: '/hof-test' } }],
+        contexts: { nextjs: { request_path: '/hof-test/bestaetigen/V1StGXR8_Z5jdHi6BmyT9pqLnv2wYc4k' } },
+      })
+    )
+
+    expect(e.request?.url).toBe('https://farmerzone.at/hof-test/bestaetigen/[kennung entfernt]')
+    expect(e.breadcrumbs?.[0].data?.from).toBe('/hof-test/bestaetigen/[kennung entfernt]')
+    expect((e.contexts?.nextjs as { request_path: string }).request_path).toBe('/hof-test/bestaetigen/[kennung entfernt]')
+  })
+
+  it('der Token nach /bestaetigen/ und /api/orders/confirm/ fällt auch, wenn er kurz ist — die Route entscheidet, nicht die Länge', () => {
+    const e = bereinigeEreignis(
+      ereignis({
+        request: { url: 'https://farmerzone.at/hof-test/bestaetigen/kurz-123?x=1' },
+        breadcrumbs: [{ data: { url: '/api/orders/confirm/kurz-123' } }],
+      })
+    )
+
+    expect(e.request?.url).toBe('https://farmerzone.at/hof-test/bestaetigen/[kennung entfernt]?x=1')
+    expect(e.breadcrumbs?.[0].data?.url).toBe('/api/orders/confirm/[kennung entfernt]')
+  })
+
+  it('kurze Pfadteile anderer Routen bleiben lesbar — Gegenprobe', () => {
+    const e = bereinigeEreignis(ereignis({ request: { url: 'https://farmerzone.at/hof-test/bestellung/abc' } }))
+
+    expect(e.request?.url).toBe('https://farmerzone.at/hof-test/bestellung/abc')
+  })
+
   it('dampft Blob-Speicher-URLs auf den Ursprung ein — der Pfad trägt den Geräte-Dateinamen', () => {
     const e = bereinigeEreignis(
       ereignis({

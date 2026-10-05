@@ -10,7 +10,8 @@
  *  - ?confirmed=true und ?redirect_status=succeeded ändern den angezeigten
  *    Zustand nicht; „bestätigt" und „bezahlt" kommen nur aus der Datenbank.
  *  - Jeder Weg zur Seite trägt eine gültige Signatur: Checkout-Antwort
- *    (tests/checkout-kunde.test.ts), Bestätigungslink aus der Mail (hier),
+ *    (tests/checkout-kunde.test.ts), der Knopf der Bar-Bestätigung
+ *    (tests/bar-bestaetigung-zugang.test.ts),
  *    und kein Code baut den Pfad an bestell-link.ts vorbei (Quelltext-Prüfung).
  *
  * Gelesen wird der Text des Elementbaums, wie in tests/bestellverfolgung-zugang.test.ts.
@@ -28,7 +29,7 @@ vi.mock('@/lib/email', () => ({ sendOrderConfirmation: vi.fn(), sendOrderConfirm
 
 import ConfirmPage from '@/app/(public)/[farmSlug]/confirm/[orderId]/page'
 import { GET as bestaetigeLink } from '@/app/api/orders/confirm/[token]/route'
-import { bestellLinkGilt, bestellSignatur } from '@/lib/bestell-link'
+import { bestellSignatur } from '@/lib/bestell-link'
 import { prisma } from '@/lib/prisma'
 
 const findUnique = vi.mocked(prisma.order.findUnique)
@@ -212,31 +213,28 @@ describe('Bestätigungsseite — Zustand nur aus der Datenbank', () => {
 })
 
 describe('Bestätigungslink aus der Mail (/api/orders/confirm/[token])', () => {
+  // Seit H3 bestätigt der Link nicht mehr selbst: Er führt zur Seite mit dem
+  // Knopf (/{hof}/bestaetigen/{token}); erst der Knopf bestätigt und leitet
+  // dann signiert hierher weiter (tests/bar-bestaetigung-zugang.test.ts).
+  const MAIL_TOKEN = 'mail-token-0123456789abcdef'
   const klick = () =>
-    bestaetigeLink(new NextRequest('http://localhost:3000/api/orders/confirm/token-1'), {
-      params: Promise.resolve({ token: 'token-1' }),
+    bestaetigeLink(new NextRequest(`http://localhost:3000/api/orders/confirm/${MAIL_TOKEN}`), {
+      params: Promise.resolve({ token: MAIL_TOKEN }),
     })
 
-  /** Die Weiterleitung führt zur Bestätigungsseite dieser Bestellung — mit gültiger Signatur. */
-  function erwarteSignierteWeiterleitung(antwort: Response): URL {
-    const ziel = new URL(antwort.headers.get('location') ?? '')
-    expect(ziel.pathname).toBe('/hof-test/confirm/order-1')
-    expect(bestellLinkGilt('order-1', ziel.searchParams.get('sig') ?? '')).toBe(true)
-    return ziel
-  }
+  it('leitet auf die Seite mit dem Knopf weiter — ohne ?confirmed, ohne zu bestätigen', async () => {
+    const ziel = new URL((await klick()).headers.get('location') ?? '')
 
-  it('leitet nach dem Bestätigen auf die signierte Seite weiter — ohne ?confirmed', async () => {
-    updateMany.mockResolvedValue({ count: 1 } as never)
-
-    const ziel = erwarteSignierteWeiterleitung(await klick())
-
+    expect(ziel.pathname).toBe(`/hof-test/bestaetigen/${MAIL_TOKEN}`)
     expect(ziel.searchParams.has('confirmed')).toBe(false)
+    expect(updateMany).not.toHaveBeenCalled()
   })
 
-  it('auch der zweite Klick (schon bestätigt) landet signiert', async () => {
-    updateMany.mockResolvedValue({ count: 0 } as never)
+  it('auch der zweite Klick schreibt nichts', async () => {
+    await klick()
+    await klick()
 
-    erwarteSignierteWeiterleitung(await klick())
+    expect(updateMany).not.toHaveBeenCalled()
   })
 })
 

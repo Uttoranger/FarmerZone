@@ -21,7 +21,7 @@ import { SUPPORT_EMAIL } from '@/lib/support'
 import { StatusUpdateEmail } from '@/emails/status-update'
 import { generateReorderToken } from '@/lib/reorder-token'
 import { formatPosition } from '@/lib/format'
-import { bestellungPfad } from '@/lib/bestell-link'
+import { barBestaetigungsPfad, bestellungPfad } from '@/lib/bestell-link'
 import type { OrderLineProduct } from '@/lib/order-line'
 import { bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
 import { APP_URL } from '@/lib/umgebung-server'
@@ -302,7 +302,9 @@ export async function sendOnsiteConfirmation(
   order: OrderForEmail,
   confirmationToken: string
 ): Promise<void> {
-  const confirmationUrl = `${APP_URL}/api/orders/confirm/${confirmationToken}`
+  // Zur Seite mit dem Knopf (H3) — der Link selbst bestätigt nichts, damit
+  // Link-Scanner der Mailprogramme keine Bestellung auslösen.
+  const confirmationUrl = `${APP_URL}${barBestaetigungsPfad(order.farm.slug, confirmationToken)}`
 
   const html = await toHtml(React.createElement(OnsiteConfirmationEmail, {
     customerName: order.customerName,

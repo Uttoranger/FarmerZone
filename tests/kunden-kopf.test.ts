@@ -292,6 +292,9 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     'src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx': ['bestellung-ungueltig', 'bestaetigung'],
     // Ungültiger Link: nicht einmal der Hof ist bestätigt → zur Hofübersicht.
     'src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx': ['bestellung-ungueltig', 'bestellung'],
+    // Bar-Bestätigung (H3): Token unbekannt → zur Hofübersicht; sonst wie die
+    // Bestätigungsseite (nie durch den Verlauf, davor steht das Mailprogramm).
+    'src/app/(public)/[farmSlug]/bestaetigen/[token]/page.tsx': ['bestaetigung', 'bestellung-ungueltig'],
     'src/app/(public)/impressum/page.tsx': ['info'],
     'src/app/(public)/datenschutz/page.tsx': ['info'],
     'src/app/(public)/konditionen/page.tsx': ['info'],

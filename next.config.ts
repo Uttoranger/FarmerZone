@@ -111,6 +111,23 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // Die Bar-Bestätigung (H3) trägt den Einmal-Token im Pfad und zeigt
+        // Hof, Positionen und Betrag ohne Anmeldung (S1) — gleiche Regel. Der
+        // Mail-Link älterer Mails, der dorthin weiterleitet, ebenso.
+        source: '/:farmSlug/bestaetigen/:token',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        ],
+      },
+      {
+        source: '/api/orders/confirm/:token',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        ],
+      },
+      {
         // NUR die Hofseite MIT ?vorschau=1 darf eingebettet werden — und nur
         // von uns selbst: Der Editor unter /farm-page zeigt sie im Browser als
         // Handy-Vorschau im iframe (src/lib/hofseite-vorschau.ts). Ohne den
