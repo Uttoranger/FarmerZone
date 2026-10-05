@@ -112,18 +112,6 @@ export function bestellCodeFehlerText(fehler: BestellCodeFehler | 'ZU_VIELE' | '
   }
 }
 
-/**
- * Ein ILIKE-Muster, das nur genau diesen Text trifft (ohne Rücksicht auf
- * Groß-/Kleinschreibung). Prisma übersetzt `equals` mit `mode: 'insensitive'`
- * in ein ILIKE OHNE Maskierung — „_" und „%" wären dort Platzhalter. Eine
- * Adresse wie „a_b@example.com" (gültig, „_" ist erlaubt) träfe sonst auch
- * die Bestellungen von „axb@example.com". Gemessen gegen die Test-Datenbank
- * am 05.10.2026 (Bericht Nr. 14).
- */
-export function genauesIlikeMuster(text: string): string {
-  return text.replace(/[\\%_]/g, (zeichen) => `\\${zeichen}`)
-}
-
 // ─── Die Liste ───────────────────────────────────────────────────────────────
 
 /** Eine Bestellung, so weit die Liste sie braucht — Betrag schon in Cent, Link schon signiert. */

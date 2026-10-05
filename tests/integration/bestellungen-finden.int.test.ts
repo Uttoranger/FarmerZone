@@ -101,7 +101,15 @@ let bestellZaehler = 0
 async function legeBestellungAn(
   farmId: string,
   customerEmail: string,
-  teil: { status?: OrderStatus; paymentMethod?: PaymentMethod; createdAt?: Date; pickupDate?: Date; customerId?: string } = {}
+  teil: {
+    status?: OrderStatus
+    paymentMethod?: PaymentMethod
+    createdAt?: Date
+    pickupDate?: Date
+    customerId?: string
+    totalAmount?: string
+    serviceFeeCents?: number
+  } = {}
 ) {
   bestellZaehler += 1
   return prisma.order.create({
@@ -114,8 +122,8 @@ async function legeBestellungAn(
       status: teil.status ?? 'PAID',
       paymentMethod: teil.paymentMethod ?? 'ONLINE',
       paymentStatus: teil.status === 'PAID' || teil.status === undefined ? 'PAID' : 'PENDING',
-      totalAmount: 10,
-      serviceFeeCents: 50,
+      totalAmount: teil.totalAmount ?? 10,
+      serviceFeeCents: teil.serviceFeeCents ?? 50,
       pickupDate: teil.pickupDate ?? new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
       pickupTimeStart: '15:00',
       pickupTimeEnd: '18:00',
@@ -266,6 +274,16 @@ describe('die Liste: nur die bewiesene Adresse', () => {
     expect(liste.map((b) => b.id).sort()).toEqual([eigen.id, grossGeschrieben.id].sort())
     expect(liste[0]).toMatchObject({ hofName: 'Hof Test', gesamtCents: 1050, artikel: 0 })
     expect(liste[0].link).toMatch(new RegExp(`^/${farm.slug}/confirm/[^?]+\\?sig=[0-9a-f]{64}$`))
+  })
+
+  it('Betrag aus bestellSummen: Warenpreis in Cent plus Gebühr, eine negative Gebühr zählt als 0', async () => {
+    const { farm } = await erstelleHof()
+    const email = neueAdresse()
+    await legeBestellungAn(farm.id, email, { totalAmount: '12.34', serviceFeeCents: 66 })
+    await legeBestellungAn(farm.id, email, { totalAmount: '10.00', serviceFeeCents: -30 })
+
+    const liste = await instanzA.ladeBestellungenZurAdresse(email)
+    expect(liste.map((b) => b.gesamtCents).sort((a, b) => a - b)).toEqual([1000, 1300])
   })
 
   it('„_" ist kein Platzhalter: a_b@ sieht die Bestellungen von axb@ nicht (Gegenprobe: die eigenen schon)', async () => {

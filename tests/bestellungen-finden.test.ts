@@ -11,7 +11,8 @@
  *    gilt nur für die Adresse, für die er angelegt wurde.
  *  - Der Cookie: gültig → Adresse; manipuliert (Adresse, Ablauf, Signatur) →
  *    nichts; abgelaufen → „abgelaufen", keine Adresse; fremdes Format → nichts.
- *  - Das ILIKE-Muster macht aus „_" und „%" keine Platzhalter.
+ *  - Das ILIKE-Muster prüft tests/ilike-muster.test.ts (eine Quelle:
+ *    src/lib/ilike-muster.ts).
  *  - Die Liste: laufende oben (nächster Abholtag zuerst), frühere darunter
  *    (neueste zuerst); Marke, Ton, Betrag, Zahlung aus den gemeinsamen Quellen.
  */
@@ -26,7 +27,6 @@ import {
   bestellEintrag,
   codeWert,
   entscheideCodeVersuch,
-  genauesIlikeMuster,
   leseCodeWert,
   teileBestellungen,
   type ListenBestellung,
@@ -147,15 +147,6 @@ describe('signierter Cookie', () => {
   it('auch ein abgelaufener, manipulierter Cookie verrät nicht, dass er abgelaufen ist', () => {
     const [adresse, ablauf] = token.split('.')
     expect(leseBestellZugang(`${adresse}.${ablauf}.${'f'.repeat(64)}`, new Date(JETZT.getTime() + 3_600_000))).toEqual({ art: 'keiner' })
-  })
-})
-
-describe('genauesIlikeMuster', () => {
-  it('„_" und „%" bleiben Zeichen, keine Platzhalter', () => {
-    expect(genauesIlikeMuster('a_b@example.com')).toBe('a\\_b@example.com')
-    expect(genauesIlikeMuster('a%b@example.com')).toBe('a\\%b@example.com')
-    expect(genauesIlikeMuster('a\\b')).toBe('a\\\\b')
-    expect(genauesIlikeMuster('kundin@example.com')).toBe('kundin@example.com')
   })
 })
 

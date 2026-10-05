@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import { prisma } from '@/lib/prisma'
-import { alsCents } from '@/lib/order-totals'
+import { genauesIlikeMuster } from '@/lib/ilike-muster'
+import { bestellSummen } from '@/lib/servicegebuehr'
 import { bestaetigungsPfad } from '@/lib/bestell-link'
 import {
   BESTELLCODE_GUELTIG_SEKUNDEN,
@@ -8,7 +9,6 @@ import {
   bestellCodeKennung,
   codeWert,
   entscheideCodeVersuch,
-  genauesIlikeMuster,
   type BestellCodeFehler,
   type ListenBestellung,
 } from '@/lib/bestellungen-finden'
@@ -139,7 +139,8 @@ export async function ladeBestellungenZurAdresse(email: string, jetzt: Date = ne
     pickupTimeStart: b.pickupTimeStart,
     pickupTimeEnd: b.pickupTimeEnd,
     createdAt: b.createdAt,
-    gesamtCents: alsCents(b.totalAmount) + b.serviceFeeCents,
+    // Eine Quelle für „Warenpreis + Gebühr" (schneidet eine Gebühr unter 0 ab).
+    gesamtCents: bestellSummen(b).gesamtCents,
     artikel: b._count.items,
   }))
 }

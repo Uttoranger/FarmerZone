@@ -4090,6 +4090,7 @@ Gate 4, Nr. 14 „Konto und Meine Höfe" — laut Freigabe (E8, §4) ersetzt dur
 - **Navigation:** „Meine Bestellungen" führt in beiden Zuständen auf `/bestellungen` und steht auch abgemeldet im Web-Kopf. Damit der Kopf bei 768 px nicht umbricht, zeigen Links mit Kurzname dort den Kurznamen.
 - **/account/profile, /account/unsubscribe** in der KundeShell und mit Tokens, Inhalt unverändert. Neu sind nur ein Ausweg im Leerzustand der Abos („Höfe entdecken"), `role="switch"` mit Hof im Namen statt „Aktivieren/Deaktivieren" und ein beschrifteter Link zur Hofseite.
 - **Annahme:** Auch eine angemeldete Kundin bestätigt auf `/bestellungen` mit Code — eine Better-Auth-Sitzung beweist die Adresse nicht (Registrierung mit Passwort ohne E-Mail-Bestätigung möglich), und ein zweiter Zugangsweg wäre ein zweites Risiko.
+- **Nachbesserung 1:** `genauesIlikeMuster` gab es nach dem Merge von Nr. 08 zweimal (gleiche Maskierung von `\`, `%`, `_`); die Kopie in `src/lib/bestellungen-finden.ts` ist entfernt, eine Quelle ist `src/lib/ilike-muster.ts` (ein Test hält das fest). Der Betrag der Liste kommt aus `bestellSummen(...).gesamtCents` statt aus einem Nachbau — der schnitt eine Gebühr unter 0 nicht ab.
 
 ## Nützliche Befehle
 
