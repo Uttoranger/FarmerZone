@@ -244,6 +244,9 @@ describe('kein Big Bang', () => {
     '(auth)/login/page.tsx',
     '(public)/hoefe/page.tsx',
     '(public)/[farmSlug]/page.tsx',
+    // Nr. 11: die Produktseite (Fokus-Variante der KundeShell, ohne Unterleiste) und ihre 404.
+    '(public)/[farmSlug]/produkt/[id]/page.tsx',
+    '(public)/[farmSlug]/produkt/[id]/not-found.tsx',
   ]
 
   it('nur die Vorschau unter /intern und die umgestellten Routen binden eine Shell ein', () => {

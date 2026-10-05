@@ -27,7 +27,7 @@ import { updateProductImageAction, reorderProductsAction } from '@/server/action
 import { ReorderContext } from '@/components/shared/reorder-context'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { CartSheet } from './cart-sheet'
-import { ProduktDetail, type HofFuerDetail } from './produkt-detail'
+import { produktPfad } from '@/lib/produktdetail'
 import { ProduktKarte } from '@/components/hofseite/produkt-karte'
 import { ProduktAbschnitte } from '@/components/hofseite/produkt-abschnitte'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -40,8 +40,6 @@ type Props = {
   products: PublicProduct[]
   farmId: string
   farmSlug: string
-  /** Für das Produktdetail: der Hof als Verantwortlicher der Futter-Kennzeichnung. */
-  hof: HofFuerDetail
   initialReorderItems?: ReorderItem[]
   ownerMode?: boolean
   mode?: 'edit' | 'preview'
@@ -62,8 +60,8 @@ type Props = {
   /**
    * Kundenansicht (Nr. 10): welcher Teil der Produkte im offenen Reiter steht
    * — die Auswahl der Übersicht, alle Abschnitte im Reiter Produkte oder
-   * keiner (Beiträge). Das Raster bleibt in jedem Reiter eingehängt: Korb,
-   * Produktdetail und Nachbestell-Link leben hier und überstehen den Wechsel.
+   * keiner (Beiträge). Das Raster bleibt in jedem Reiter eingehängt: Korb
+   * und Nachbestell-Link leben hier und überstehen den Wechsel.
    */
   teil?: 'auswahl' | 'alle' | 'keins'
   /** „Preise zzgl. 5 % Servicegebühr … einmal pro Bestellung" über den Abschnitten — null ohne Gebühr. */
@@ -73,6 +71,11 @@ type Props = {
   /** Abschnitt, zu dem der Reiter Produkte beim Öffnen springt (?bereich=futter). */
   springeZu?: string | null
   onGesprungen?: () => void
+  /**
+   * Wohin Bild und Name einer Produktkarte führen (Nr. 11: die Produktseite;
+   * in der Vorschau des Hofs die Vorschau davon). Ohne Angabe die Produktseite.
+   */
+  produktLink?: (id: string) => string
 }
 
 
@@ -480,7 +483,6 @@ export function ProductGrid({
   products,
   farmId,
   farmSlug,
-  hof,
   initialReorderItems,
   ownerMode = false,
   mode = 'preview',
@@ -492,18 +494,12 @@ export function ProductGrid({
   gebuehrKorb = null,
   springeZu = null,
   onGesprungen,
+  produktLink = (id) => produktPfad(farmSlug, id),
 }: Props) {
   const isEditMode = ownerMode && mode !== 'preview'
   // EINE Regel für jeden Weg in den Korb (Kaufknopf, Nachbestell-Link,
   // #warenkorb-Anker, Korb-Knopf, Sheet) — src/lib/hofseite-vorschau.ts.
   const mitKorb = korbErlaubt({ isEditMode, kaufen })
-
-  const [detail, setDetail] = useState<PublicProduct | null>(null)
-  const [detailOffen, setDetailOffen] = useState(false)
-  function detailOeffnen(produkt: PublicProduct) {
-    setDetail(produkt)
-    setDetailOffen(true)
-  }
 
   // Sprint 18: optimistische Sortier-Reihenfolge (null = Server-Stand)
   const [orderedIds, setOrderedIds] = useState<string[] | null>(null)
@@ -634,9 +630,6 @@ export function ProductGrid({
 
     if (result.ok) {
       toast.success(`${product.name} hinzugefügt`, { duration: 2000 })
-      // Aus dem Detail heraus: erst das Detail schließen, dann der Warenkorb —
-      // zwei Sheets übereinander wären eines zu viel.
-      setDetailOffen(false)
       setCartOpen(true)
     } else {
       toast.error(result.error ?? 'Produkt nicht verfügbar')
@@ -687,7 +680,7 @@ export function ProductGrid({
         zustand={kartenZustand(p, isPaused)}
         imKorb={imKorb(p.id)}
         wirdHinzugefuegt={addingId === p.id}
-        onDetails={detailOeffnen}
+        href={produktLink(p.id)}
         onInDenKorb={handleAddToCart}
         onMenge={mengeAendern}
       />
@@ -831,19 +824,6 @@ export function ProductGrid({
       </div>
       </ReorderContext>
       </>
-      )}
-
-      {/* EIN Produktdetail und EIN Warenkorb für beide Bereiche. */}
-      {!isEditMode && (
-        <ProduktDetail
-          produkt={detail}
-          hof={hof}
-          offen={detailOffen}
-          onOpenChange={setDetailOffen}
-          onAddToCart={handleAddToCart}
-          wirdHinzugefuegt={detail !== null && addingId === detail.id}
-          isPaused={isPaused}
-        />
       )}
 
       {/* Die Korb-Leiste — nicht im Bearbeitungsmodus, nicht in der Vorschau.

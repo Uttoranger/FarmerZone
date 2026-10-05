@@ -9,6 +9,7 @@
  * Zurück-Knopf des Browsers weiter — und der führte zurück zu WhatsApp.
  */
 import { hoefeLink } from '@/lib/bereiche-anzeige'
+import { REITER_PARAMETER } from '@/schemas/hofseite-reiter'
 import type { AnzeigeBereich } from '@/lib/taxonomie'
 
 /** Die Kundenseiten mit Kopfzeile. Die Startseite trägt die KundeShell (Nr. 07). */
@@ -17,6 +18,8 @@ export type KundenSeite =
    *  Ein reiner Futterhof zeigt Futter auch ohne `?bereich`, und geteilte Links tragen keinen. */
   | { art: 'hofseite'; hofSlug: string; bereich: AnzeigeBereich }
   | { art: 'checkout'; hofSlug: string }
+  /** Produktseite /[hof]/produkt/[id] (Nr. 11) — zurück zu allen Produkten des Hofs. */
+  | { art: 'produkt'; hofSlug: string }
   | { art: 'bestaetigung'; hofSlug: string }
   | { art: 'bestellung'; hofSlug: string }
   /** Bestellverfolgung mit ungültigem Link: nicht einmal der Hof ist bestätigt. */
@@ -47,6 +50,7 @@ export function kopfForm(seite: KundenSeite): KopfForm {
   const zurueck = rueckweg(seite, false).href !== '/'
   switch (seite.art) {
     case 'hofseite':
+    case 'produkt':
     case 'checkout':
     case 'bestaetigung':
     case 'bestellung':
@@ -86,6 +90,10 @@ export function rueckweg(seite: KundenSeite, vorgaengerEigen: boolean): Rueckweg
   switch (seite.art) {
     case 'hofseite':
       return { href: hoefeLink(seite.bereich), verlauf: vorgaengerEigen }
+    case 'produkt':
+      // Zum Reiter Produkte der Hofseite; kam die Kundin von dort, ein Schritt
+      // im Verlauf zurück — mit Reiter und Scrollstelle (zeileNimmtVerlauf).
+      return { href: `/${seite.hofSlug}?${REITER_PARAMETER}=produkte`, verlauf: vorgaengerEigen }
     case 'checkout':
       return { href: `/${seite.hofSlug}`, verlauf: vorgaengerEigen }
     case 'bestaetigung':

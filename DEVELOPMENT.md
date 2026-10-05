@@ -3965,6 +3965,61 @@ Zahlung, Gebührenwortlaut, Korb-Anker) und `bereiche-anzeige.ts`
 - **Stepper mit Obergrenze.** „+" endet am Bestand (`stepperObergrenze`, dieselbe Zahl wie „knapp"); lehnt `/api/reserve` trotzdem ab (andere waren schneller), sagt ein Hinweis es (`mengeAbgelehntText`). Dafür gibt `useCart().updateQuantity` das Ergebnis zurück, statt still zu scheitern — sonst ist `use-cart.ts` unverändert.
 - **Hydration.** „vor 3 Stunden", der Gebührensatz ab Stichtag und die Abholtage der rechten Spalte rechneten mit der Uhr beim Rendern. `page.tsx` bestimmt den Zeitpunkt einmal und reicht ihn als `jetzt` durch. Im Browser danach: Hofseite ohne Meldung im Dev-Overlay; auf `/farm-page` bleibt eine — `aria-describedby="DndDescribedBy-N"` aus dnd-kit im Besitzer-Bearbeiten (`ReorderContext` ohne feste `id`), Bestand vor Nr. 10. Offen außerdem: `nextPickupDays` rechnet in der Zeitzone der Laufzeit (`getHours`), auf Vercel UTC, im Browser Wien — am späten Abend können „Heute"/„Morgen" zwischen Server und Browser abweichen; gehört in eine Wiener Fassung von `nextPickupDays` (eigener Auftrag).
 
+## Produktseite /[farmSlug]/produkt/[id] (Nachtlauf Nr. 11, 2026-10-05)
+
+Gate 4, Mockups `web-k2-futter-groesse-waehlen`, `web-k2-brennmaterial-brennholz`,
+`mobil-k2-futter-groesse-waehlen`, `mobil-k2-brennmaterial-brennholz`. Freigaben
+E3, E4, E8, E9, E10/E11 (nur Anzeige).
+
+- **Eine Darstellung statt zwei.** Die Hofseiten-Karten öffneten bisher ein Blatt
+  (`produkt-detail.tsx`). Blatt und Seite nebeneinander hätten dieselben Angaben
+  zweimal gepflegt — und DESIGN_SYSTEM verlangt für Produktkacheln echte Links.
+  Deshalb verlinken die Karten jetzt auf die Seite, das Blatt ist gelöscht; der
+  Korb der Hofseite bleibt, wie er war. Die zweite Preiszeile der Karte kommt aus
+  derselben Regel wie die Seite (`zweitePreiszeile`).
+- **Sichtbarkeit über den Lader der Hofseite.** Die Seite nimmt
+  `ladeHofseiteGeteilt` (öffentliche Höfe, Fristfreigabe beim Lesen, Vorschau
+  nur für den Besitzer) und sucht das Produkt in der Liste dieses Hofs
+  (`sichtbaresProdukt`: im Shop, ausverkauft bleibt sichtbar). Keine eigene
+  Produktabfrage, die auseinanderlaufen könnte; fremde, ausgeblendete,
+  unbekannte Produkte und falsche Slugs enden alle in derselben 404. Wie die
+  Hofseite antwortet `next dev` dabei mit Status 200 und `noindex` (Streaming
+  wegen `loading.tsx`) — Bestandsverhalten.
+- **Vorschau.** Aus der Vorschau des Hofs (`?vorschau=1`) bleiben die Links in
+  der Vorschau (`vorschauLink(slug, 'produkt/<id>')`): Der Rahmen öffnet sie in
+  einem neuen Tab (`verlaesstRahmen`), und ein Hof vor der Freigabe sähe sonst
+  eine 404 statt seines Produkts. Kaufen ist dort wirkungslos (`korbErlaubt`).
+- **Produktfamilie (E3).** `Product.familieId`, `brennmaterial` und
+  `Farm.betriebsstatus` gehen jetzt in die öffentliche Abfrage (ohne Datum und
+  Kennungen). Kacheln erst ab zwei sichtbaren Größen; die Kachel heißt wie das
+  Produkt ohne den gemeinsamen Namensanfang (eine eigene Spalte „Größenname"
+  gibt es nicht). Die Wahl steht als `?groesse=` in der Adresse statt im Pfad:
+  So bleibt der Pfad der Einstieg, und der Rückweg-Merker zählt den Wechsel als
+  „nur Suchparameter" — „‹ Alle Produkte" führt weiter im Verlauf zurück zur
+  Hofseite. Heute setzt noch kein Formular `familieId` (Gate 6); die Seite
+  funktioniert mit und ohne.
+- **Grundpreis centgenau.** `formatGrundpreisNetto` und die Grundpreis-Zeile
+  rundeten `Math.round(preis / menge * 100)`: € 2,01 für 2 kg zeigte € 1,00 / kg
+  (2,01 / 2 liegt in Fließkomma knapp unter 1,005). Jetzt `grundpreisCents`
+  in ganzen Zahlen — Hofseite, Produktseite und Bauern-Bereich zeigen dieselbe,
+  richtige Zahl.
+- **Schild (E9)** nur bei Status Primärproduktion: Nur dann ist die Nummer eine
+  LFBIS-Nummer. Für registrierte und zugelassene Betriebe fehlt ein
+  entschiedener Wortlaut — dort steht die Nummer nur in der Kennzeichnung.
+  Steht das Kürzel schon in der Nummer („LFBIS 1234567", wie im Seed), wird es
+  nicht doppelt geschrieben.
+- **Gefunden beim Bauen:** `gemeinsamerAnfang` lief ohne Namen endlos
+  (`Math.min()` ist `Infinity`) — jede Seite ohne Familie hing. Test dafür ist
+  da. Und: Die grüne `StatusBadge` erreicht auf dem hellen Seitengrund nur
+  4,37 : 1 (Axe) — Siegel stehen auf der Produktseite deshalb mit normaler
+  Schrift und grünem Symbol. Auf der Hofseite (Werte in „Über uns" auf der
+  Karte) fiel das nicht auf; dort liegt die Marke auf der helleren Kartenfläche.
+- **Nicht gebaut:** Hinweise „Anhänger/Frontlader" (kein Feld im Schema, in
+  Nr. 06 bewusst weggelassen), Erklärbox rm/srm/fm (Einheiten noch gesperrt,
+  Gate 6), Sperre einzelner Größen ohne passende Registrierung (S7, Gate 6),
+  Bündeln der Familie zu einer Karte auf der Hofseite (Gate 6), Produkt-JSON-LD,
+  „Merken" (E8).
+
 ## Nützliche Befehle
 
 ```bash

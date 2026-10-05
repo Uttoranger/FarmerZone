@@ -75,6 +75,7 @@ function produkt(id: string, name: string, category: ProductCategoryValue | null
     price: 4.5, unit: 'STUECK', unitSize: null, stock, isAvailable: true, allergens: [],
     isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
     unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
+    familieId: null, brennmaterial: null,
   }
 }
 
@@ -86,6 +87,7 @@ const HOF: PublicFarm = {
   sectionsConfig: [], farmValues: [], farmPhotos: [],
   acceptsOnline: true, acceptsOnsite: true, stripeAccountReady: true, isPaused: false, pauseMessage: null,
   serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: new Date('2026-01-01T00:00:00Z'),
+  betriebsstatus: null,
   products: [
     produkt('p_holz', 'Buchenscheite', 'BRENNHOLZ'),
     produkt('p_heu', 'Bergwiesen-Heu', 'HEU_STROH'),
@@ -181,10 +183,10 @@ describe('die rechte Spalte ist EINE Komponente', () => {
     for (const titel of KARTEN) expect(aside, titel).toContain(titel)
   })
 
-  it('nur hofseite-kunde.tsx bindet sie ein, und die Karten stehen nirgends sonst', () => {
+  it('nur die Hofseite und die Produktseite (Nr. 11) binden sie ein, und die Karten stehen nirgends sonst', () => {
     const src = dateien('src')
     const einbinder = src.filter((p) => /<HofseiteSeitenspalte\b/.test(quelle(p)))
-    expect(einbinder).toEqual(['src/components/hofseite/hofseite-kunde.tsx'])
+    expect(einbinder.sort()).toEqual(['src/components/hofseite/hofseite-kunde.tsx', 'src/components/produktdetail/produktdetail-kunde.tsx'])
     const mitKartentitel = dateien('src/components/hofseite').filter((p) => />\s*Abholzeiten\s*</.test(quelle(p)))
     expect(mitKartentitel).toEqual(['src/components/hofseite/hofseite-seitenspalte.tsx'])
   })
@@ -273,7 +275,6 @@ describe('beide Themes: nur Tokens in den Teilen der Hofseite', () => {
       'src/app/(public)/[farmSlug]/page.tsx',
       'src/app/(public)/[farmSlug]/loading.tsx',
       'src/components/farm/cart-sheet.tsx',
-      'src/components/farm/produkt-detail.tsx',
       ...dateien('src/components/hofseite'),
     ]
     for (const pfad of route) {
@@ -347,7 +348,7 @@ describe('Stepper der Produktkarte endet am Bestand', () => {
     return renderToStaticMarkup(
       createElement(ProduktKarte, {
         produkt: p, zustand: kartenZustand(p, false), imKorb, wirdHinzugefuegt: false,
-        onDetails: () => {}, onInDenKorb: () => {}, onMenge: () => {},
+        href: '/hof-test/produkt/p_karotten', onInDenKorb: () => {}, onMenge: () => {},
       })
     )
   }
@@ -373,5 +374,27 @@ describe('Hydration: kein Zeitpunkt aus der Uhr beim Rendern', () => {
     const text = quelle('src/components/hofseite/hofseite-kunde.tsx')
     expect(text).not.toMatch(/Date\.now\(\)|new Date\(\)/)
     expect(quelle('src/app/(public)/[farmSlug]/page.tsx')).toMatch(/jetzt=\{/)
+  })
+})
+
+// ─── Nr. 11: Produktseite ───────────────────────────────────────────────────
+
+describe('Produktkarten verlinken auf die Produktseite (Nr. 11)', () => {
+  it('Bild und Name sind ein echter Link — kein Blatt mehr', () => {
+    const html = seite({ suche: 'reiter=produkte' })
+    expect(html).toContain('href="/hof-test/produkt/p_karotten"')
+    expect(html).toContain('href="/hof-test/produkt/p_honig"')
+    expect(html).not.toContain('Details ansehen')
+  })
+
+  it('in der Vorschau des Hofs bleibt der Link in der Vorschau', () => {
+    const html = seite({ suche: 'reiter=produkte', ansicht: { art: 'vorschau', kaufen: false } })
+    expect(html).toContain('href="/hof-test/produkt/p_karotten?vorschau=1"')
+  })
+
+  it('das alte Produktblatt gibt es nicht mehr — eine Darstellung der Produktdetails', () => {
+    const src = dateien('src')
+    expect(src).not.toContain('src/components/farm/produkt-detail.tsx')
+    expect(src.filter((p) => /\bProduktDetail\b/.test(quelle(p)))).toEqual([])
   })
 })

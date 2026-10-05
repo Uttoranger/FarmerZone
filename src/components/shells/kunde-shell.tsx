@@ -55,10 +55,18 @@ function WarenkorbKopf({ anzahl, href }: { anzahl: number; href: string }) {
 export type KundeShellProps = {
   /** Ob eine Kundensitzung besteht (freiwillige Anmeldung unter /account). */
   angemeldet: boolean
+  /**
+   * Fokus-Seite mit Kopf (Produktseite, Nr. 11): `false` lässt die
+   * Unterleiste am Handy weg — die Seite bringt genau eine feste Leiste mit
+   * ihrer Hauptaktion (DESIGN_SYSTEM, „Fokus-Seiten ohne Unterleiste"). Der
+   * Warenkorb steht dann auch am Handy im Kopf, sonst wäre er dort
+   * unerreichbar. Ohne Angabe: mit Unterleiste.
+   */
+  unterleiste?: boolean
   children: ReactNode
 }
 
-export function KundeShell({ angemeldet, children }: KundeShellProps): React.JSX.Element {
+export function KundeShell({ angemeldet, unterleiste = true, children }: KundeShellProps): React.JSX.Element {
   const pathname = usePathname()
   const nav = kundenNavigation({ angemeldet })
   const korb = useWarenkorbKopf()
@@ -111,7 +119,7 @@ export function KundeShell({ angemeldet, children }: KundeShellProps): React.JSX
 
           <div className="flex items-center gap-1 md:gap-2">
             {korb && (
-              <span className="hidden md:block">
+              <span className={unterleiste ? 'hidden md:block' : undefined}>
                 <WarenkorbKopf anzahl={korb.anzahl} href={korb.href} />
               </span>
             )}
@@ -149,43 +157,45 @@ export function KundeShell({ angemeldet, children }: KundeShellProps): React.JSX
         {children}
       </main>
 
-      <BottomNav>
-        {nav.handy.map((platz) => {
-          if (platz.art === 'warenkorb') {
-            // Leer gibt es keinen Korb, aber einen Ausweg: zu den Höfen (DESIGN_SYSTEM, „Leerzustand mit Ausweg").
+      {unterleiste && (
+        <BottomNav>
+          {nav.handy.map((platz) => {
+            if (platz.art === 'warenkorb') {
+              // Leer gibt es keinen Korb, aber einen Ausweg: zu den Höfen (DESIGN_SYSTEM, „Leerzustand mit Ausweg").
+              return (
+                <BottomNavMitte key="warenkorb">
+                  <Link
+                    href={korb?.href ?? '/hoefe'}
+                    aria-label={korb ? `Warenkorb öffnen, ${korb.anzahl} Artikel` : 'Warenkorb ist leer – Höfe entdecken'}
+                    className={mittelknopfKlassen('gruen')}
+                  >
+                    <ShoppingBasket className="size-6" strokeWidth={1.7} aria-hidden="true" />
+                    {korb && (
+                      <Zaehler
+                        anzahl={korb.anzahl}
+                        wofuer="Artikel im Korb"
+                        ton="orange"
+                        className="absolute -top-1 -right-1 ring-2 ring-card"
+                      />
+                    )}
+                  </Link>
+                </BottomNavMitte>
+              )
+            }
+            const { punkt } = platz
+            const Symbol = SYMBOL[punkt.id] ?? Compass
             return (
-              <BottomNavMitte key="warenkorb">
-                <Link
-                  href={korb?.href ?? '/hoefe'}
-                  aria-label={korb ? `Warenkorb öffnen, ${korb.anzahl} Artikel` : 'Warenkorb ist leer – Höfe entdecken'}
-                  className={mittelknopfKlassen('gruen')}
-                >
-                  <ShoppingBasket className="size-6" strokeWidth={1.7} aria-hidden="true" />
-                  {korb && (
-                    <Zaehler
-                      anzahl={korb.anzahl}
-                      wofuer="Artikel im Korb"
-                      ton="orange"
-                      className="absolute -top-1 -right-1 ring-2 ring-card"
-                    />
-                  )}
-                </Link>
-              </BottomNavMitte>
+              <BottomNavLink
+                key={punkt.id}
+                href={punkt.href}
+                label={punkt.kurz ?? punkt.label}
+                symbol={Symbol}
+                aktuell={kundenAriaAktuell(pathname, punkt)}
+              />
             )
-          }
-          const { punkt } = platz
-          const Symbol = SYMBOL[punkt.id] ?? Compass
-          return (
-            <BottomNavLink
-              key={punkt.id}
-              href={punkt.href}
-              label={punkt.kurz ?? punkt.label}
-              symbol={Symbol}
-              aktuell={kundenAriaAktuell(pathname, punkt)}
-            />
-          )
-        })}
-      </BottomNav>
+          })}
+        </BottomNav>
+      )}
     </div>
   )
 }

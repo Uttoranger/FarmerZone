@@ -142,6 +142,10 @@ describe('Vorschau-Adresse', () => {
     expect(vorschauAdresse('hof-test', 3)).toBe('/hof-test?vorschau=1&stand=3')
     expect(vorschauLink('hof-test')).toBe('/hof-test?vorschau=1')
   })
+
+  it('eine Unterseite des Hofs (Produktseite, Nr. 11) bleibt in der Vorschau', () => {
+    expect(vorschauLink('hof-test', 'produkt/p_1')).toBe('/hof-test/produkt/p_1?vorschau=1')
+  })
 })
 
 describe('am Quelltext', () => {

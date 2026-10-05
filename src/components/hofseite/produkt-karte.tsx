@@ -1,23 +1,19 @@
 'use client'
 
 import Image from 'next/image'
+import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import type { PublicProduct } from '@/server/queries/farm'
-import { formatGrundpreis, formatGrundpreisNetto, formatGrundpreisZeile } from '@/lib/format'
+import { formatGrundpreis } from '@/lib/format'
 import { knappText, type KartenZustand } from '@/lib/bereiche-anzeige'
 import { stepperObergrenze } from '@/lib/hofseite-kunde'
+import { zweitePreiszeile } from '@/lib/produktdetail'
 import { produktInitiale } from '@/lib/hofuebersicht'
 import { SHOP_PAUSED_BUTTON_LABEL } from '@/lib/shop-pause'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Stepper } from '@/components/ui/stepper'
-
-/** Die zweite Preiszeile: Kilopreis aus der Nettomenge bei Futter, sonst der Grundpreis — null bei Stück und Paket. */
-function zweitePreiszeile(p: PublicProduct): string | null {
-  if (p.futter) return formatGrundpreisNetto(p.price, p.futter.nettoMenge, p.futter.nettoEinheit)
-  return formatGrundpreisZeile(p.price, p.unit, p.unitSize)
-}
 
 /** Die erste Zeile der Beschreibung als Unterzeile der Karte — der Rest steht im Produktdetail. */
 function kurzbeschreibung(p: PublicProduct): string | null {
@@ -45,8 +41,10 @@ function Preis({ produkt, className }: { produkt: PublicProduct; className?: str
  * − und +; „+" endet am Bestand (stepperObergrenze), damit es nicht still an
  * der Reservierung scheitert.
  *
- * Bild und Name öffnen das bestehende Produktdetail (ein Knopf, kein Link —
- * die Produktseite kommt mit Nr. 11). Den Zustand (knapp, ausverkauft,
+ * Bild und Name sind seit Nr. 11 ein echter Link auf die Produktseite
+ * (/[hof]/produkt/[id]) — die eine Darstellung der Produktdetails; das Blatt
+ * von vorher gibt es nicht mehr. Die zweite Preiszeile kommt aus derselben
+ * Regel wie dort (zweitePreiszeile). Den Zustand (knapp, ausverkauft,
  * pausiert) entscheidet kartenZustand, die Karte zeigt ihn nur: knapp als
  * orangene Marke „Nur noch …", ausverkauft ausgegraut — nie über opacity auf
  * Text (Kontrast). Ohne „Merken" (E8, S11).
@@ -56,7 +54,7 @@ export function ProduktKarte({
   zustand,
   imKorb,
   wirdHinzugefuegt,
-  onDetails,
+  href,
   onInDenKorb,
   onMenge,
 }: {
@@ -65,7 +63,8 @@ export function ProduktKarte({
   /** Menge dieses Produkts im Korb — 0, wenn keins drin liegt. */
   imKorb: number
   wirdHinzugefuegt: boolean
-  onDetails: (p: PublicProduct) => void
+  /** Die Produktseite (produktLink — in der Vorschau des Hofs bleibt sie in der Vorschau). */
+  href: string
   onInDenKorb: (p: PublicProduct) => void
   onMenge: (p: PublicProduct, menge: number) => void
 }): React.JSX.Element {
@@ -82,10 +81,8 @@ export function ProduktKarte({
 
   return (
     <article className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 md:h-full md:flex-col md:items-stretch md:gap-0 md:overflow-hidden md:p-0">
-      <button
-        type="button"
-        onClick={() => onDetails(produkt)}
-        aria-label={`${produkt.name} – Details ansehen`}
+      <Link
+        href={href}
         title={produkt.name}
         className={cn(
           'flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left md:flex-none md:flex-col md:items-stretch md:gap-0 md:rounded-none',
@@ -119,7 +116,7 @@ export function ProduktKarte({
           {/* Am Handy nur „knapp" als Marke — „Ausverkauft" steht schon rechts, wo sonst der Knopf ist. */}
           {zustand.art === 'knapp' && <span className="mt-0.5 md:hidden">{marke}</span>}
         </span>
-      </button>
+      </Link>
 
       <div className="flex shrink-0 items-center gap-2 md:mt-auto md:px-3.5 md:pt-2 md:pb-3.5">
         <Preis produkt={produkt} className="hidden flex-1 md:flex" />

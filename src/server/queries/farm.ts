@@ -15,6 +15,7 @@ import type {
   ProductLabel,
   ProductSubcategory,
   Tierart,
+  Trocknung,
 } from '@prisma/client'
 import { baueAngebotsZeile, fasseAngebotZusammen, type AngebotsProdukt } from '@/lib/bereiche-anzeige'
 import { anzeigeBereichVon, betriebsnummerFuerAnzeige, type AnzeigeBereich } from '@/lib/taxonomie'
@@ -51,6 +52,29 @@ export type PublicProduct = {
   labels: ProductLabel[]
   abgabe: Abgabe
   futter: PublicFutter | null
+  /**
+   * Seit Nr. 11 (E3): Verkaufsgrößen als Produktfamilie — was dieselbe
+   * familieId trägt, zeigt die Produktseite als Größenkacheln. null =
+   * Einzelprodukt (heute alle, bis das Formular in Gate 6 sie setzt).
+   */
+  familieId: string | null
+  /** Seit Nr. 11 (E11): Angaben zu Brennmaterial, null ohne. */
+  brennmaterial: PublicBrennmaterial | null
+}
+
+/**
+ * Was die Kundin über Brennmaterial liest (Produktseite, Nr. 11). Ohne
+ * Kennungen und ohne Datum — `gelagertSeit` bleibt auf dem Server, bis eine
+ * Anzeige es braucht (dann als Wiener Tag, CODING_STANDARDS §2).
+ */
+export type PublicBrennmaterial = {
+  holzart: string
+  scheitlaengeCm: number | null
+  trocknung: Trocknung
+  restfeuchteMax: number | null
+  wassergehalt: number | null
+  koernung: number | null
+  ueberdacht: boolean
 }
 
 /**
@@ -132,6 +156,12 @@ export type PublicFarm = {
   serviceFeePercent: number
   serviceFeeMinCents: number
   serviceFeeActiveFrom: Date | null
+  /**
+   * Welche Nummer in Farm.betriebsnummer steht (Nr. 11): Das Schild
+   * „Futtermittelbetrieb · LFBIS …" (E9) braucht den Status Primärproduktion.
+   * Die Nummer selbst geht nur aufgelöst in der Kennzeichnung mit.
+   */
+  betriebsstatus: Betriebsstatus | null
   products: PublicProduct[]
   pickupSlots: PublicPickupSlot[]
 }
@@ -194,6 +224,19 @@ const OEFFENTLICHES_PRODUKT_SELECT = {
       rohasche: true,
       registrierungsnummer: true,
       bestaetigtAm: true,
+    },
+  },
+  // Seit Nr. 11: Produktfamilie (E3) und Brennmaterial (E11) für die Produktseite.
+  familieId: true,
+  brennmaterial: {
+    select: {
+      holzart: true,
+      scheitlaengeCm: true,
+      trocknung: true,
+      restfeuchteMax: true,
+      wassergehalt: true,
+      koernung: true,
+      ueberdacht: true,
     },
   },
 } satisfies Prisma.ProductSelect
@@ -274,6 +317,8 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
       // Die Betriebsnummer des Hofs zeigt das Produktdetail in der
       // Futter-Kennzeichnung (Rückfrage F6); sie geht nur aufgelöst weiter.
       betriebsnummer: true,
+      // Für das Schild nach E9 (Nr. 11): welche Nummer das ist.
+      betriebsstatus: true,
       products: {
         orderBy: PRODUCT_ORDER_BY,
         select: OEFFENTLICHES_PRODUKT_SELECT,
@@ -344,6 +389,8 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
       // Die Betriebsnummer des Hofs zeigt das Produktdetail in der
       // Futter-Kennzeichnung (Rückfrage F6); sie geht nur aufgelöst weiter.
       betriebsnummer: true,
+      // Für das Schild nach E9 (Nr. 11): welche Nummer das ist.
+      betriebsstatus: true,
       products: {
         orderBy: PRODUCT_ORDER_BY,
         select: OEFFENTLICHES_PRODUKT_SELECT,

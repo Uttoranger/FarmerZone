@@ -138,7 +138,7 @@ Umgesetzt in `src/components/shells/` (KundeShell, KundeFokusShell, HofShell, Ad
 - **Hof Handy, Unterleiste:** Heute · Bestellungen · [+ Neu] · Produkte · Mehr. „Mehr" enthält Mein Hof, Kunden, Verkäufe, Auswertung, Region, Einstellungen, Hilfe und Rückmeldung, Admin, Darstellung, Abmelden.
 - **Neu-Menü (Web Dropdown, Handy Blatt):** „Was legst du an?" mit Lebensmittel · Futtermittel · Brennmaterial, darunter Beitrag und Verkauf eintragen. Die Wahl bestimmt das Formular.
 - **Admin:** eigene Kopfzeile mit Reitern Höfe · Briefkasten · Finanzen (mit Zählern) und „← Zu meinem Hof". Keine Hof-Seitenleiste im Admin.
-- **Fokus-Seiten ohne Unterleiste:** Produktdetail, Checkout, Zahlung, Bestätigung, Bar-Bestätigung. Dort gibt es genau eine feste Leiste unten (Aktion), nie zwei übereinander.
+- **Fokus-Seiten ohne Unterleiste:** Produktdetail, Checkout, Zahlung, Bestätigung, Bar-Bestätigung. Dort gibt es genau eine feste Leiste unten (Aktion), nie zwei übereinander. Eine Fokus-Seite mit Kopfzeile (Produktdetail) nimmt `KundeShell`/`KundeShellMitSitzung` mit `unterleiste={false}` — der Warenkorb steht dann auch am Handy im Kopf; `KundeFokusShell` ist die Form ohne Navigation (Checkout ff.).
 
 ### Links und Filter
 
@@ -166,9 +166,18 @@ Umgesetzt in `src/components/shells/` (KundeShell, KundeFokusShell, HofShell, Ad
 - **Eine Seite, Abschnitte je Kategorie (E1).** Kein Umschalter Hofladen | Futtermittel mehr: Hofladen-Kategorien in der Reihenfolge des Hofs, Sonstiges zuletzt, dann EIN Abschnitt Futtermittel und EIN Abschnitt Brennmaterial (`kategorieAbschnitte`, `src/lib/bereiche-anzeige.ts`). Chips darüber sind Sprungmarken (echte Links `#kategorie-…`, Zahl dahinter), markiert nach `naechsterAktiverReiter`. `?bereich=futter` öffnet den Reiter Produkte und springt einmal zum Futter-Abschnitt.
 - **Reiter Übersicht · Produkte · Beiträge** als Links mit `?reiter=` (Übersicht ohne Parameter); „Beiträge" nur, wenn die Seite einen Beitrag zeigt. Geschrieben per `history.replaceState(null, …)` — nie mit `window.history.state`, sonst gleicht Next `useSearchParams` nicht ab.
 - **Rechte Spalte = EINE Komponente** (`HofseiteSeitenspalte`): Mini-Warenkorb (ab 1024 px, klebend), Nächste Abholung, Abholzeiten, Zahlung & Kontakt mit Gebührenhinweis, Anfahrt. Ab 1024 px rechts, darunter in der Übersicht VOR dem Inhalt, in den anderen Reitern ausgeblendet. Zahlung nur „Online bezahlen" (mit fertigem Stripe-Konto) und „Bar bei Abholung" (E5) — nie „Karte bei Abholung". Gebührensatz aus der Hofeinstellung (`servicegebuehrSatz`), Wortlaute aus `gebuehrHinweis`.
-- **Produktkarte:** am Handy Zeile (Bild 64 px, Name, Preis, runder Plus-Knopf), ab 768 px Kachel; im Korb Menge mit `Stepper`. Knapp = orangene `StatusBadge` „Nur noch …", ausverkauft = neutrale Marke, Bild entsättigt, statt Knopf „Ausverkauft". Kein „Merken" (E8/S11). Der Zustand kommt aus `kartenZustand`.
+- **Produktkarte:** am Handy Zeile (Bild 64 px, Name, Preis, runder Plus-Knopf), ab 768 px Kachel; im Korb Menge mit `Stepper`. Knapp = orangene `StatusBadge` „Nur noch …", ausverkauft = neutrale Marke, Bild entsättigt, statt Knopf „Ausverkauft". Kein „Merken" (E8/S11). Der Zustand kommt aus `kartenZustand`. Bild und Name sind ein Link auf die Produktseite (`produktLink`, seit Nr. 11) — ein Blatt mit Produktdetails gibt es nicht mehr.
 - **Korb am Handy:** grüne Leiste über der Unterleiste („N Artikel · € … + Gebühr · Zum Warenkorb") bis 1024 px; darüber der Mini-Warenkorb. Der Warenkorb der Shell öffnet auf der eigenen Hofseite den Korb (`oeffnetKorbHier`).
 - **Bildansicht:** `useBildansicht` + `BildansichtEbene` (`src/components/hofseite/bildansicht.tsx`) — Schleier `primary-foreground/90`, Knöpfe `accent-foreground`, Ebene 70 (über der Unterleiste).
+
+### Produktseite (/[farmSlug]/produkt/[id], seit Nr. 11)
+
+- **Die eine Darstellung der Produktdetails.** Hofseiten-Karten, „Gleich mit abholen" und (künftig) Suchtreffer verlinken hierher; Links baut nur `produktLink`/`produktPfad` (`src/lib/produktdetail.ts`), aus der Vorschau des Hofs bleiben sie in der Vorschau.
+- **Aufbau:** Web — Kopfzeile, „‹ Alle Produkte" (Reiter Produkte der Hofseite), Bild 300 × 300 neben Kicker (Kategorie · Hof), Name, Marken, Schild, Beschreibung; darunter die Kaufkarte, die Kennzeichnung (`<details>`, zugeklappt) und „Gleich mit abholen"; ab 1024 px rechts `HofseiteSeitenspalte` (dieselbe Komponente wie auf der Hofseite, mit Mini-Warenkorb). Handy — keine Unterleiste, Bild über die volle Breite mit rundem Zurück-Knopf, Menge und „In den Korb · € …" als EINE feste Leiste unten (dasselbe Element, ab 768 px in der Kaufkarte).
+- **Größenkacheln** (`GroessenWahl`/`Groessenkachel`) nur bei einer Produktfamilie mit mindestens zwei sichtbaren Größen; der Name auf der Kachel ist der Produktname ohne den Anfang, den alle Größen teilen. Die Wahl steht als `?groesse=` in der Adresse (per `replaceState(null, …)`, reload-fest), Pfeiltasten über die Radio-Gruppe.
+- **Menge:** `Stepper` von 1 bis Bestand minus Korb (`mengeNochMoeglich`); der Betrag am Knopf in Cent (`kaufBetragCents`). Ablehnung durch `/api/reserve` steht inline als orangene Hinweiskarte an der Kaufkarte, kein Toast.
+- **Schild** „Futtermittelbetrieb · LFBIS <Nummer>" nur bei Futter, Betriebsstatus Primärproduktion und Nummer (`futterSchild`, E9); andere Status bekommen (noch) kein Schild. Siegel als Marke mit normaler Schrift und grünem Symbol — die grüne `StatusBadge` erreicht auf dem hellen Seitengrund nur 4,37 : 1.
+- **Brennmaterial:** Holzart, Scheitlänge, Trocknung (Restfeuchte), bei Hackschnitzeln Wassergehalt/Körnung immer sichtbar als kleine Kacheln (`brennmaterialZeilen`); Marke „Nur Abholung am Hof".
 
 ### Anmelden
 

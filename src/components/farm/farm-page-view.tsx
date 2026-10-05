@@ -1332,7 +1332,6 @@ function HofseiteBesitzer({
           products={productsForGrid}
           farmId={farm.id}
           farmSlug={farm.slug}
-          hof={{ name: farm.name, address: farm.address, postalCode: farm.postalCode, city: farm.city }}
           ownerMode={ownerMode}
           mode={mode}
           isPaused={farm.isPaused}

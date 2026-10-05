@@ -218,7 +218,32 @@ export function grundpreisJeEinheit(
   if (unitSize == null) return price
   const size = gebindeGroesse(unitSize)
   if (size == null) return null
-  return Math.round((price / size) * 100) / 100
+  const cents = grundpreisCents(price, size)
+  return cents === null ? null : cents / 100
+}
+
+/**
+ * Gebindepreis ÷ Menge in ganzen Cent, kaufmännisch gerundet — in ganzen
+ * Zahlen statt über Fließkomma: € 2,01 für 2 kg sind € 1,005 / kg, also
+ * € 1,01. `Math.round(2.01 / 2 * 100)` ergäbe 100, weil 2,01 / 2 in
+ * Fließkomma knapp unter 1,005 liegt. Der Preis hat zwei Nachkommastellen
+ * (Decimal(10,2)), die Menge höchstens drei (Decimal(10,3)) — beide werden
+ * vorher zu ganzen Zahlen. null ohne Preis > 0 oder Menge > 0.
+ * NUR Anzeige (Grundpreis-Zeile, Kilopreis) — nie Abrechnung.
+ */
+function grundpreisCents(price: number, menge: number): number | null {
+  if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(menge)) return null
+  const preisCents = Math.round(price * 100)
+  const mengeTausendstel = Math.round(menge * 1000)
+  if (mengeTausendstel <= 0) return null
+  // round-half-up(a / b) = floor((2a + b) / 2b), exakt in ganzen Zahlen.
+  const zaehler = 2 * preisCents * 1000 + mengeTausendstel
+  const nenner = 2 * mengeTausendstel
+  let q = Math.trunc(zaehler / nenner)
+  // Die Division oben ist Fließkomma — hier auf die exakte Ganzzahl gerückt.
+  while (q * nenner > zaehler) q--
+  while ((q + 1) * nenner <= zaehler) q++
+  return q
 }
 
 /**
@@ -372,9 +397,11 @@ export function formatGrundpreisNetto(
   nettoMenge: number | { toString(): string } | null | undefined,
   nettoEinheit: NettoEinheitValue
 ): string | null {
-  const wert = kilopreisNetto(price, nettoMenge)
-  if (wert == null) return null
-  return `${formatEuro(Math.round(wert * 100) / 100)} / ${NETTO_EINHEIT_LABEL[nettoEinheit]}`
+  const menge = gebindeGroesse(nettoMenge)
+  const cents = menge == null ? null : grundpreisCents(price, menge)
+  if (cents == null) return null
+  // Centgenau gerundet (grundpreisCents) — derselbe Weg wie die Grundpreis-Zeile.
+  return `${formatEuro(cents / 100)} / ${NETTO_EINHEIT_LABEL[nettoEinheit]}`
 }
 
 /**
