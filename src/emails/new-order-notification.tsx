@@ -43,7 +43,7 @@ export function NewOrderNotificationEmail(p: NewOrderNotificationProps) {
         <Text style={{ ...highlightValue, fontSize: '15px' }}>{p.pickupTime} Uhr</Text>
       </div>
 
-      <Text style={{ ...mutedText, fontWeight: '600', color: MAIL_FARBE.textFliess, margin: '0 0 8px' }}>
+      <Text style={{ ...mutedText, fontWeight: '600', color: MAIL_FARBE.text, margin: '0 0 8px' }}>
         Bestellte Produkte
       </Text>
       {p.items.map((item, i) => (

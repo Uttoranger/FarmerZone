@@ -105,6 +105,9 @@ function links(html: string): URL[] {
 
 const BILDZEICHEN = /\p{Extended_Pictographic}|[✓✗]/u
 
+/** Mails werden später gelesen als verschickt — relative Tagesangaben veralten über Nacht. */
+const RELATIVER_TAG = /\b(heute|morgen|übermorgen|gestern)\b/i
+
 const KUNDEN_MAILS: Array<[string, () => Promise<void>]> = [
   ['Bestätigung online', () => email.sendOrderConfirmation(bestellung())],
   ['Bestätigung bar', () => email.sendOrderConfirmation(bestellung({ paymentMethod: 'ONSITE_CASH' }))],
@@ -134,6 +137,12 @@ describe.each(KUNDEN_MAILS)('Kunden-Mail „%s"', (_name, senden) => {
       const signatur = link.searchParams.get('s') ?? link.searchParams.get('sig') ?? ''
       expect(bestellLinkGilt('order-1', signatur), link.href).toBe(true)
     }
+  })
+
+  it('Tage stehen fest da — nie „heute" oder „morgen" (die Mail wird später gelesen als verschickt)', async () => {
+    await senden()
+    const { text, subject } = zuletzt()
+    expect(`${subject} ${text}`).not.toMatch(RELATIVER_TAG)
   })
 
   it('Beträge nur als „€ 1.234,56" — nie mit Dezimalpunkt', async () => {
@@ -192,8 +201,23 @@ describe('„Bitte bestätige" — Frist aus fristen.ts', () => {
   it('nennt die konkrete Uhrzeit: zwei Stunden ab der Bestellung, vor dem Abholbeginn', async () => {
     await email.sendOnsiteConfirmation(bestellung({ paymentMethod: 'ONSITE_CASH' }), 'token-1')
     const { text } = zuletzt()
-    expect(text).toContain('Bitte bestätige bis heute, 12:12 Uhr.')
+    expect(text).toContain('Bitte bestätige bis Montag, 5. Oktober, 12:12 Uhr.')
     expect(text).toMatch(/Bar bei Abholung\s*€ 10,82/)
+  })
+
+  it('Bestellung kurz vor Mitternacht: die Frist steht als fester Tag — gelesen nach Mitternacht stimmt sie noch', async () => {
+    vi.setSystemTime(new Date('2026-10-05T21:35:00Z')) // 23:35 in Wien
+    await email.sendOnsiteConfirmation(
+      bestellung({
+        paymentMethod: 'ONSITE_CASH',
+        createdAt: new Date('2026-10-05T21:30:00Z'),
+        pickupDate: new Date('2026-10-06T12:00:00Z'),
+      }),
+      'token-1'
+    )
+    const { text } = zuletzt()
+    expect(text).toContain('Bitte bestätige bis Dienstag, 6. Oktober, 01:30 Uhr.')
+    expect(text).not.toMatch(RELATIVER_TAG)
   })
 
   it('ohne Bestellzeitpunkt bleibt der allgemeine Satz — nie eine erfundene Uhrzeit', async () => {
@@ -233,6 +257,48 @@ describe('Quelltext der Vorlagen', () => {
 
   it('kein toFixed — Beträge gehen über formatEuro (src/lib/format.ts)', () => {
     expect(vorlagen.filter((n) => TO_FIXED.test(lies(n)))).toEqual([])
+  })
+
+  it('keine Mail rechnet relativ zum Versand: weder Vorlagen noch src/lib/email.ts rufen relative Tageshelfer auf', () => {
+    // tagInWorten (fristen.ts), abholZeitText/kurzerTag/fristKurz (bestaetigung.ts)
+    // sagen „heute"/„morgen" — richtig auf einer Seite, die beim Lesen rechnet,
+    // falsch in einer Mail, die erst nach Mitternacht geöffnet wird.
+    const RELATIVE_HELFER = /\b(tagInWorten|abholZeitText|kurzerTag|fristKurz)\b/
+    // Gegenprobe: die Suche schlägt am alten Fehler an.
+    expect(RELATIVE_HELFER.test('bestaetigenBis: `${tagInWorten(frist, new Date())}, ${uhrzeitInWien(frist)} Uhr`')).toBe(true)
+    const mailCode = join(process.cwd(), 'src', 'lib', 'email.ts')
+    const treffer = [...vorlagen.map((n) => [n, lies(n)] as const), ['src/lib/email.ts', readFileSync(mailCode, 'utf8')] as const]
+      .filter(([, inhalt]) => RELATIVE_HELFER.test(inhalt))
+      .map(([n]) => n)
+    expect(treffer).toEqual([])
+  })
+
+  it('die Mail-Palette nimmt nur helle Tokens aus DESIGN_SYSTEM.md und die vorgerechneten Hinweiskarten-Tönungen', async () => {
+    const { MAIL_FARBE } = await import('@/emails/_layout')
+    const doku = readFileSync(join(process.cwd(), 'docs', 'ai', 'DESIGN_SYSTEM.md'), 'utf8')
+    // Tabelle „Farbtokens": | --name | dunkel | hell |
+    const hell = new Map(
+      [...doku.matchAll(/^\| (--[\w-]+)[^|]*\| (#[0-9A-Fa-f]{6}) \| (#[0-9A-Fa-f]{6}) \|/gm)].map((m) => [m[1], m[3].toUpperCase()])
+    )
+    const mische = (vorne: string, grund: string, anteil: number) =>
+      '#' +
+      [1, 3, 5]
+        .map((i) => Math.round(anteil * parseInt(vorne.slice(i, i + 2), 16) + (1 - anteil) * parseInt(grund.slice(i, i + 2), 16)))
+        .map((n) => n.toString(16).padStart(2, '0'))
+        .join('')
+        .toUpperCase()
+    const flaeche = hell.get('--surface') ?? ''
+    const erlaubt = new Set([
+      ...hell.values(),
+      // Hinweiskarte: 12 % Fläche, 45 % Rand auf --surface
+      ...[hell.get('--accent') ?? '', hell.get('--primary') ?? ''].flatMap((f) => [mische(f, flaeche, 0.12), mische(f, flaeche, 0.45)]),
+    ])
+    // Gegenprobe: die Tabelle wird gelesen, und frei gewählte Zwischentöne fallen auf.
+    expect(hell.size).toBeGreaterThan(8)
+    expect(erlaubt.has('#C9C3AD')).toBe(false)
+    expect(erlaubt.has('#3D4A3E')).toBe(false)
+    const fremd = Object.entries(MAIL_FARBE).filter(([, wert]) => !erlaubt.has(wert.toUpperCase()))
+    expect(fremd).toEqual([])
   })
 
   it('Farben nur in der Mail-Palette von _layout.tsx — alle Mails bleiben ein Stil', () => {

@@ -192,7 +192,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
             hofName={order.farm.name}
             adresse={adresse}
             routeHref={buildMapsUrl(order.farm.address, order.farm.postalCode, order.farm.city)}
-            kalenderHref={kalenderPfad(farmSlug, order.id)}
+            kalenderHref={bloecke.kalender ? kalenderPfad(farmSlug, order.id) : null}
           />
         )}
 

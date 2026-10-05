@@ -54,9 +54,9 @@ export function OrderReadyEmail(p: OrderReadyProps) {
         </Link>
       </Text>
 
-      {/* Leise am Ende statt als Knopf über der Mail: ein Service zur
-          Bestellung, keine Werbung (S11). Einziger Weg zur Nachbestellung,
-          deshalb nicht gestrichen (Bericht Nr. 13). */}
+      {/* Leise am Ende statt als Knopf über der Mail. Offene Ausnahme von
+          „Vertragsmails ohne Werbung" (S11, DESIGN_SYSTEM „E-Mails"): Ob der
+          Link bleibt, entscheidet der Mensch (Bericht Nr. 13). */}
       {p.reorderUrl && (
         <Text style={kleinText}>
           <Link href={p.reorderUrl} style={textLink}>

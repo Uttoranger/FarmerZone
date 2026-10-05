@@ -213,6 +213,23 @@ describe('bestaetigungsBloecke — was die Seite in welchem Zustand zeigt', () =
     }
   })
 
+  it('„In den Kalender" erst, wenn die Bestellung steht — nicht während die Zahlung geprüft wird', () => {
+    for (const z of ['bezahlt', 'bestaetigt'] as const) {
+      expect(bestaetigungsBloecke(z, 'CONFIRMED').kalender).toBe(true)
+    }
+    // Abholkarte mit Route ja, Termin in den Kalender noch nicht: die Zahlung kann scheitern.
+    expect(bestaetigungsBloecke('zahlung-wird-geprueft', 'PENDING_CONFIRMATION')).toMatchObject({ abholkarte: true, kalender: false })
+    for (const [z, s] of [
+      ['bestaetigung-offen', 'PENDING_CONFIRMATION'],
+      ['zahlung-fehlgeschlagen', 'PENDING_CONFIRMATION'],
+      ['verfallen', 'CANCELLED'],
+      ['bezahlt', 'CANCELLED'],
+      [null, 'NOT_PICKED_UP'],
+    ] as const) {
+      expect(bestaetigungsBloecke(z, s).kalender, `${z} ${s}`).toBe(false)
+    }
+  })
+
   it('bar offen: Frist-Hinweis statt Abholkarte, kein Teilen', () => {
     expect(bestaetigungsBloecke('bestaetigung-offen', 'PENDING_CONFIRMATION')).toMatchObject({
       abholkarte: false,

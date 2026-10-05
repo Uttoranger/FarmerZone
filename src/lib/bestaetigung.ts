@@ -240,8 +240,10 @@ export function bestaetigungsKopf(zustand: BestaetigungsZustand | null, order: K
 }
 
 export type BestaetigungsBloecke = {
-  /** Bestellnummer, Abholung, „Route planen", „In den Kalender". */
+  /** Bestellnummer, Abholung, „Route planen". */
   abholkarte: boolean
+  /** „In den Kalender" — erst, wenn die Bestellung steht (bezahlt bzw. bar bestätigt). */
+  kalender: boolean
   /** Bar offen: bis wann bestätigt sein muss. */
   fristHinweis: boolean
   /** „Erzähl's weiter" — nur, wenn die Bestellung wirklich steht. */
@@ -256,6 +258,9 @@ export function bestaetigungsBloecke(zustand: BestaetigungsZustand | null, statu
   const laeuft = steht || zustand === 'zahlung-wird-geprueft'
   return {
     abholkarte: laeuft && status !== 'CANCELLED',
+    // Nicht schon bei „Zahlung wird geprüft": Scheitert die Zahlung, stünde ein
+    // Termin im Kalender, den es nicht gibt.
+    kalender: steht && status !== 'CANCELLED' && status !== 'NOT_PICKED_UP',
     fristHinweis: zustand === 'bestaetigung-offen',
     teilen: steht && status !== 'CANCELLED' && status !== 'NOT_PICKED_UP',
     aktion:

@@ -18,6 +18,7 @@ import {
   istVerwaist,
   tagInWorten,
   uhrzeitInWien,
+  zeitpunktFuerMail,
   wienerZeitpunkt,
 } from '@/lib/fristen'
 
@@ -153,5 +154,16 @@ describe('Anzeige', () => {
     // 29. März — dieser Tag hat nur 23 Stunden, +24 h landete schon am 30.
     const jetzt = new Date('2026-03-28T22:30:00Z')
     expect(tagInWorten(new Date('2026-03-29T00:30:00Z'), jetzt)).toBe('morgen')
+  })
+})
+
+describe('zeitpunktFuerMail — fester Tag mit Wochentag, nie „heute"/„morgen"', () => {
+  it('Wochentag, Datum und Uhrzeit in Wiener Zeit (Sommer- und Winterzeit)', () => {
+    expect(zeitpunktFuerMail(new Date('2026-10-05T10:12:00Z'))).toBe('Montag, 5. Oktober, 12:12 Uhr')
+    expect(zeitpunktFuerMail(new Date('2026-11-02T10:12:00Z'))).toBe('Montag, 2. November, 11:12 Uhr')
+  })
+
+  it('nach Mitternacht in Wien schon der nächste Tag, obwohl UTC noch den Vortag zeigt', () => {
+    expect(zeitpunktFuerMail(new Date('2026-10-05T22:30:00Z'))).toBe('Dienstag, 6. Oktober, 00:30 Uhr')
   })
 })

@@ -238,6 +238,16 @@ describe('Status aus der Datenbank', () => {
     expect(html).toMatch(/data-schritt="abgeholt"[^>]*data-stand="naechster"/)
   })
 
+  it('Zahlung wird geprüft: Abholkarte ohne „In den Kalender" — der Termin steht erst mit der Zahlung', async () => {
+    findUnique.mockResolvedValue(bestellung({ paymentMethod: 'ONLINE', paymentStatus: 'PENDING' }) as never)
+    const html = await seite({ sig: GUELTIG, redirect_status: 'succeeded' })
+    expect(text(html)).toContain('Zahlung wird geprüft')
+    // Gegenprobe: die Abholkarte ist da (Route), nur der Kalender fehlt.
+    expect(text(html)).toContain('Route planen')
+    expect(html).not.toContain('/kalender')
+    expect(text(html)).not.toContain('In den Kalender')
+  })
+
   it('storniert: keine Schritte, kein Kalender, kein Teilen — aber ein Weg zur Bestellung', async () => {
     findUnique.mockResolvedValue(bestellung({ status: 'CANCELLED', cancelReason: 'Vom Hof storniert' }) as never)
     const html = await seite()

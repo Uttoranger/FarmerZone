@@ -18,12 +18,8 @@ export const MAIL_FARBE = {
   flaeche: '#FBF9F2',
   /** --border hell */
   rand: '#E2DDC9',
-  /** Rand der Rahmen-Knöpfe (Mockup) */
-  randKnopf: '#C9C3AD',
   /** --text hell */
   text: '#1C241D',
-  /** Fließtext im Mockup, zwischen text und textLeise */
-  textFliess: '#3D4A3E',
   /** --text-muted hell — leiser Text, nie dunkler (DESIGN_SYSTEM, „Lesbarkeit") */
   textLeise: '#5D6A5C',
   /** --accent: Knopf und grüner Text (am Tag dasselbe Grün wie --status-fertig) */
@@ -143,7 +139,9 @@ export const h1: React.CSSProperties = {
 }
 
 export const bodyText: React.CSSProperties = {
-  color: MAIL_FARBE.textFliess,
+  // Das Mockup tönt Fließtext zwischen text und textLeise; die Palette kennt
+  // nur Tokens — text ist der nächste und liest sich am besten (15:1).
+  color: MAIL_FARBE.text,
   fontSize: '14px',
   lineHeight: '1.55',
   margin: '0 0 14px',
@@ -224,7 +222,8 @@ export const ctaButton: React.CSSProperties = {
 export const rahmenButton: React.CSSProperties = {
   ...ctaButton,
   backgroundColor: 'transparent',
-  border: `1px solid ${MAIL_FARBE.randKnopf}`,
+  // Wie der Rahmen-Knopf der Seite (border-border); lesbar macht ihn die Beschriftung (text, 15:1).
+  border: `1px solid ${MAIL_FARBE.rand}`,
   color: MAIL_FARBE.text,
   fontWeight: '500',
 }

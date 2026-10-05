@@ -26,7 +26,7 @@ import { barBestaetigungsPfad, bestellungPfad } from '@/lib/bestell-link'
 import type { OrderLineProduct } from '@/lib/order-line'
 import { bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
 import { alsCents, calcLineTotal, decimalZuCents } from '@/lib/order-totals'
-import { fristVon, tagInWorten, uhrzeitInWien } from '@/lib/fristen'
+import { fristVon, zeitpunktFuerMail } from '@/lib/fristen'
 import { buildMapsUrl } from '@/lib/customer-links'
 import type { MailZahlart } from '@/emails/order-confirmation'
 import { APP_URL } from '@/lib/umgebung-server'
@@ -350,8 +350,9 @@ export async function sendOnsiteConfirmation(
   // Link-Scanner der Mailprogramme keine Bestellung auslösen.
   const confirmationUrl = `${APP_URL}${barBestaetigungsPfad(order.farm.slug, confirmationToken)}`
   // Die Frist, nach der die Bestellung verfällt — dieselbe Rechnung wie
-  // verwaiste-bestellungen.ts und die Bestätigungsseite (fristen.ts). Die
-  // Mail geht direkt nach dem Bestellen hinaus; „heute"/„morgen" zählt ab da.
+  // verwaiste-bestellungen.ts und die Bestätigungsseite (fristen.ts). Als
+  // fester Tag, nie „heute"/„morgen": Wer die Mail nach Mitternacht öffnet,
+  // läse sonst den falschen Tag.
   const frist = order.createdAt
     ? fristVon({
         // Vor Ort, nie online: Diese Mail gibt es nur für Barbestellungen.
@@ -373,7 +374,7 @@ export async function sendOnsiteConfirmation(
     serviceFee: betraege(order).gebuehr,
     total: betraege(order).gesamt,
     confirmationUrl,
-    bestaetigenBis: frist ? `${tagInWorten(frist, new Date())}, ${uhrzeitInWien(frist)} Uhr` : undefined,
+    bestaetigenBis: frist ? zeitpunktFuerMail(frist) : undefined,
   }))
 
   await send(

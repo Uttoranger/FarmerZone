@@ -31,8 +31,9 @@ export interface OnsiteConfirmationProps {
   /** Zur Seite mit dem Knopf (/{hof}/bestaetigen/{token}) — der Link selbst bestätigt nichts. */
   confirmationUrl: string
   /**
-   * „heute, 12:12 Uhr" — die Frist aus fristen.ts (fristVon), wenn der
-   * Bestellzeitpunkt bekannt ist. Fehlt sie, bleibt der allgemeine Satz.
+   * „Montag, 5. Oktober, 12:12 Uhr" — die Frist aus fristen.ts (fristVon) als
+   * fester Tag (zeitpunktFuerMail), wenn der Bestellzeitpunkt bekannt ist.
+   * Fehlt sie, bleibt der allgemeine Satz.
    */
   bestaetigenBis?: string
 }
