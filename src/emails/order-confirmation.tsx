@@ -1,10 +1,24 @@
 import * as React from 'react'
-import { Text, Link, Hr } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton } from './_layout'
+import { Text, Link } from '@react-email/components'
+import {
+  EmailLayout,
+  BestellnummerKasten,
+  BetragsZeile,
+  Knopf,
+  KnopfReihe,
+  Trenner,
+  h1,
+  bodyText,
+  kleinText,
+  textLink,
+} from './_layout'
 import { SERVICEGEBUEHR_BEZEICHNUNG, SERVICEGEBUEHR_HINWEIS } from '@/lib/servicegebuehr'
+import { formatEuro } from '@/lib/format'
+
+/** Wie bezahlt wird — entscheidet nur der Satz und die Gesamtzeile, nie der Betrag. */
+export type MailZahlart = 'online' | 'bar' | 'karte'
 
 export interface OrderConfirmationProps {
-  customerName: string
   orderNumber: string
   farmName: string
   farmPhone: string
@@ -12,97 +26,74 @@ export interface OrderConfirmationProps {
   farmCity: string
   pickupDate: string
   pickupTime: string
-  items: Array<{ name: string; quantity: number; unitPrice: number }>
-  /** Warenpreis (Zwischensumme) — nur nötig, wenn eine Servicegebühr anfällt. */
-  subtotal?: number
-  /** Servicegebühr in Euro; 0 oder fehlend = keine Zeile. */
+  /** Online bezahlt (Webhook) oder vor Ort bestätigt (Bar-Knopf, alte Karte-Bestellungen). */
+  zahlart: MailZahlart
+  /** Positionen mit fertig gerechnetem Zeilenbetrag in Euro (src/lib/email.ts, über Decimal). */
+  items: Array<{ name: string; betrag: number }>
+  /** Servicegebühr in Euro aus dem Snapshot; 0 oder fehlend = keine Zeile. */
   serviceFee?: number
-  /** Was die Kundin bezahlt hat: Warenpreis + Servicegebühr. */
+  /** Was die Kundin zahlt bzw. gezahlt hat: Warenpreis + Servicegebühr. */
   total: number
+  /** Google-Maps-Suche nach der Hofadresse (buildMapsUrl). */
+  routeUrl: string
   manageUrl?: string
-  reorderUrl?: string
   /** Der signierte Link zur Bestellseite — der Weg zurück zur Bestellung. */
   orderUrl?: string
 }
 
+const GESAMT_LABEL: Record<MailZahlart, string> = {
+  online: 'Online bezahlt',
+  bar: 'Bar bei Abholung',
+  karte: 'Karte bei Abholung',
+}
+
+/**
+ * „Danke für deine Bestellung!" — Mail 1 aus dem Mockup
+ * web-k3-e-mails-web-mobil. Geht nach der Online-Zahlung (Webhook) UND nach
+ * der Bar-Bestätigung per Knopf (bar-bestaetigung.ts): Satz und Gesamtzeile
+ * folgen deshalb der Zahlart — eine bar bestätigte Bestellung ist nicht
+ * „bezahlt". Vertragsmail ohne Werbung (S11): kein „Nochmal bestellen".
+ */
 export function OrderConfirmationEmail(p: OrderConfirmationProps) {
-  const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(`${p.farmAddress}, ${p.farmCity}`)}`
   const mitGebuehr = (p.serviceFee ?? 0) > 0
+  const satz =
+    p.zahlart === 'online'
+      ? `Deine Zahlung ist angekommen – ${p.farmName} packt deine Sachen.`
+      : `Deine Bestellung ist bestätigt – ${p.farmName} packt deine Sachen.`
 
   return (
-    <EmailLayout previewText={`Bestellung ${p.orderNumber} bestätigt – Abholung ${p.pickupDate}`} manageUrl={p.manageUrl}>
-      {p.reorderUrl && (
-        <div style={{ textAlign: 'center', margin: '0 0 8px' }}>
-          <Link href={p.reorderUrl} style={{ ...ctaButton, backgroundColor: '#1a4f30', fontSize: '14px', padding: '12px 24px' }}>
-            Nochmal bestellen
-          </Link>
-        </div>
-      )}
-      <Text style={h1}>Zahlung erfolgreich</Text>
-      <Text style={bodyText}>
-        Hallo {p.customerName},<br />
-        deine Bestellung bei <strong>{p.farmName}</strong> wurde erfolgreich bezahlt.
-      </Text>
+    <EmailLayout previewText={`Bestellung ${p.orderNumber} – Abholung ${p.pickupDate}, ${p.pickupTime} Uhr`} manageUrl={p.manageUrl}>
+      <Text style={h1}>Danke für deine Bestellung!</Text>
+      <Text style={bodyText}>{`${satz} Nenn bei der Abholung einfach deine Bestellnummer:`}</Text>
 
-      <div style={highlightBox}>
-        <Text style={highlightLabel}>Abholtermin</Text>
-        <Text style={highlightValue}>{p.pickupDate}</Text>
-        <Text style={{ ...highlightValue, fontSize: '15px' }}>{p.pickupTime} Uhr</Text>
-        <Link href={mapsUrl} style={{ color: '#15803d', fontSize: '13px' }}>
-          {p.farmAddress}, {p.farmCity}
-        </Link>
-      </div>
+      <BestellnummerKasten nummer={p.orderNumber} />
 
-      {/* Der Weg zurück zur Bestellung, wenn der Tab längst zu ist: Status,
-          Abholzeit, Positionen und Kalendereintrag — ohne Anmeldung. */}
-      {p.orderUrl && (
-        <div style={{ textAlign: 'center', margin: '0 0 16px' }}>
-          <Link href={p.orderUrl} style={{ ...ctaButton, margin: '0' }}>
-            Bestellung ansehen
-          </Link>
-        </div>
-      )}
-
-      <Text style={{ ...mutedText, fontWeight: '600', color: '#374151', margin: '0 0 8px' }}>
-        Deine Bestellung
-      </Text>
+      <BetragsZeile umbrechen links="Abholung" rechts={`${p.pickupDate}, ${p.pickupTime} Uhr`} />
+      <BetragsZeile umbrechen links="Adresse" rechts={`${p.farmAddress}, ${p.farmCity}`} />
+      <Trenner />
       {p.items.map((item, i) => (
-        <div key={i} style={{ padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
-          <Text style={{ ...mutedText, margin: 0 }}>
-            {item.name}
-            <span style={{ float: 'right' }}>€ {(item.unitPrice * item.quantity).toFixed(2)}</span>
-          </Text>
-        </div>
+        <BetragsZeile key={i} links={item.name} rechts={formatEuro(item.betrag)} />
       ))}
-      {/* Die Gebührenzeile — identisch zum Checkout: zwischen Zwischensumme
-          und Gesamt, mit demselben Hinweis. Ohne Gebühr entfällt sie. */}
-      {mitGebuehr && (
-        <div style={{ padding: '8px 0 0' }}>
-          <Text style={{ ...mutedText, margin: 0 }}>
-            Zwischensumme
-            <span style={{ float: 'right' }}>€ {(p.subtotal ?? 0).toFixed(2)}</span>
-          </Text>
-          <Text style={{ ...mutedText, margin: '4px 0 0' }}>
-            {SERVICEGEBUEHR_BEZEICHNUNG}
-            <span style={{ float: 'right' }}>€ {(p.serviceFee ?? 0).toFixed(2)}</span>
-          </Text>
-          <Text style={{ ...mutedText, fontSize: '12px', color: '#94a3b8', margin: '2px 0 0' }}>
-            {SERVICEGEBUEHR_HINWEIS}
-          </Text>
-        </div>
-      )}
-      <div style={{ padding: '10px 0 0' }}>
-        <Text style={{ ...bodyText, fontWeight: '700', margin: 0 }}>
-          Gesamt (bezahlt)
-          <span style={{ float: 'right', color: '#15803d' }}>€ {p.total.toFixed(2)}</span>
-        </Text>
-      </div>
+      {mitGebuehr && <BetragsZeile links={SERVICEGEBUEHR_BEZEICHNUNG} rechts={formatEuro(p.serviceFee ?? 0)} />}
+      <BetragsZeile stark links={GESAMT_LABEL[p.zahlart]} rechts={formatEuro(p.total)} />
 
-      <Hr style={{ borderColor: '#e2e8f0', margin: '20px 0' }} />
-      <Text style={mutedText}><strong>Bestellnummer:</strong> {p.orderNumber}</Text>
-      <Text style={mutedText}>
+      <KnopfReihe>
+        {/* Der Weg zurück zur Bestellung, wenn der Tab längst zu ist: Status,
+            Abholzeit, Positionen und Kalendereintrag — ohne Anmeldung. */}
+        {p.orderUrl && <Knopf href={p.orderUrl}>Bestellung ansehen</Knopf>}
+        <Knopf href={p.routeUrl} art={p.orderUrl ? 'rahmen' : 'gruen'}>
+          Route planen
+        </Knopf>
+      </KnopfReihe>
+
+      {p.zahlart === 'bar' && <Text style={kleinText}>{`Bring bitte ${formatEuro(p.total)} in bar mit.`}</Text>}
+      {p.zahlart === 'karte' && <Text style={kleinText}>{`Bitte zahle ${formatEuro(p.total)} bei der Abholung mit Karte.`}</Text>}
+      {mitGebuehr && <Text style={kleinText}>{SERVICEGEBUEHR_BEZEICHNUNG}: {SERVICEGEBUEHR_HINWEIS}</Text>}
+      <Text style={kleinText}>
         Fragen? Ruf direkt beim Hof an:{' '}
-        <Link href={`tel:${p.farmPhone}`} style={{ color: '#15803d' }}>{p.farmPhone}</Link>
+        <Link href={`tel:${p.farmPhone}`} style={textLink}>
+          {p.farmPhone}
+        </Link>
       </Text>
     </EmailLayout>
   )

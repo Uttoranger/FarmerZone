@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Text, Link } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton, amberBox } from './_layout'
+import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton, amberBox, textLink, MAIL_FARBE } from './_layout'
+import { formatEuro } from '@/lib/format'
 
 export interface OrderConfirmedProps {
   farmerName: string
@@ -32,13 +33,13 @@ export function OrderConfirmedEmail(p: OrderConfirmedProps) {
       </Text>
 
       <div style={amberBox}>
-        <Text style={{ ...mutedText, margin: 0, fontWeight: '600', color: '#92400e' }}>
-          Bar zu kassieren: € {kassieren.toFixed(2)}
+        <Text style={{ ...mutedText, margin: 0, fontWeight: '600', color: MAIL_FARBE.orangeText }}>
+          Bar zu kassieren: {formatEuro(kassieren)}
         </Text>
         {mitGebuehr && (
-          <Text style={{ ...mutedText, margin: '4px 0 0', color: '#92400e' }}>
-            davon Servicegebühr € {(p.serviceFee ?? 0).toFixed(2)} — die schuldest du der
-            Monatsabrechnung; Warenpreis € {p.total.toFixed(2)} bleibt dir.
+          <Text style={{ ...mutedText, margin: '4px 0 0', color: MAIL_FARBE.orangeText }}>
+            davon Servicegebühr {formatEuro(p.serviceFee ?? 0)} — die schuldest du der
+            Monatsabrechnung; Warenpreis {formatEuro(p.total)} bleibt dir.
           </Text>
         )}
       </div>
@@ -49,7 +50,7 @@ export function OrderConfirmedEmail(p: OrderConfirmedProps) {
         <Text style={{ ...highlightValue, fontSize: '15px' }}>{p.pickupTime} Uhr</Text>
       </div>
 
-      <Text style={{ ...mutedText, fontWeight: '600', color: '#374151', margin: '0 0 8px' }}>
+      <Text style={{ ...mutedText, fontWeight: '600', color: MAIL_FARBE.textFliess, margin: '0 0 8px' }}>
         Bestellte Produkte
       </Text>
       {p.items.map((item, i) => (
@@ -63,7 +64,7 @@ export function OrderConfirmedEmail(p: OrderConfirmedProps) {
       </Text>
       <Text style={mutedText}>
         <strong>Kunde:</strong> {p.customerName} ·{' '}
-        <Link href={`tel:${p.customerPhone}`} style={{ color: '#15803d' }}>{p.customerPhone}</Link>
+        <Link href={`tel:${p.customerPhone}`} style={textLink}>{p.customerPhone}</Link>
       </Text>
 
       <Link href={p.dashboardUrl} style={ctaButton}>Im Dashboard ansehen →</Link>

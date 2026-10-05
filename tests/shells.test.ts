@@ -247,6 +247,8 @@ describe('kein Big Bang', () => {
     // Nr. 11: die Produktseite (Fokus-Variante der KundeShell, ohne Unterleiste) und ihre 404.
     '(public)/[farmSlug]/produkt/[id]/page.tsx',
     '(public)/[farmSlug]/produkt/[id]/not-found.tsx',
+    // Nr. 13: die Bestätigungsseite (KundeShell ohne Unterleiste, mit und ohne Signatur).
+    '(public)/[farmSlug]/confirm/[orderId]/page.tsx',
   ]
 
   it('nur die Vorschau unter /intern und die umgestellten Routen binden eine Shell ein', () => {

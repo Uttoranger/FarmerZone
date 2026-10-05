@@ -1,9 +1,8 @@
 import * as React from 'react'
 import { Text, Link } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton } from './_layout'
+import { EmailLayout, BetragsZeile, Knopf, KnopfReihe, h1, bodyText, kleinText, textLink } from './_layout'
 
 export interface OrderReadyProps {
-  customerName: string
   orderNumber: string
   farmName: string
   farmPhone: string
@@ -11,54 +10,59 @@ export interface OrderReadyProps {
   farmCity: string
   pickupDate: string
   pickupTime: string
+  /** Google-Maps-Suche nach der Hofadresse (buildMapsUrl). */
+  routeUrl: string
   reorderUrl?: string
   /** Der signierte Link zur Bestellseite — der Weg zurück zur Bestellung. */
   orderUrl?: string
 }
 
+/**
+ * „Deine Bestellung liegt bereit" — die Abholerinnerung aus dem Mockup
+ * web-k3-e-mails-web-mobil (Mail 2). Der Dateiname ist älter: Verschickt wird
+ * sie, wenn der Hof die Bestellung als abholbereit markiert (sendOrderReady,
+ * src/server/actions/orders.ts) — einen eigenen Versand am Abholtag um 9 Uhr
+ * gibt es nicht (Bericht Nr. 13). Deshalb nennt sie den Tag ausdrücklich,
+ * statt „heute" zu sagen.
+ */
 export function OrderReadyEmail(p: OrderReadyProps) {
-  const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(`${p.farmAddress}, ${p.farmCity}`)}`
-
   return (
-    <EmailLayout previewText={`Deine Bestellung bei ${p.farmName} ist bereit zur Abholung!`}>
-      <Text style={h1}>Deine Bestellung ist bereit!</Text>
+    <EmailLayout previewText={`Deine Bestellung bei ${p.farmName} liegt bereit`}>
+      <Text style={h1}>Deine Bestellung liegt bereit</Text>
       <Text style={bodyText}>
-        Hallo {p.customerName},<br />
-        deine Bestellung bei <strong>{p.farmName}</strong> ist abholbereit.
-        Wir freuen uns auf deinen Besuch!
+        Deine Bestellung <strong>{p.orderNumber}</strong> liegt bei {p.farmName} für dich bereit –{' '}
+        <strong>{`${p.pickupDate}, ${p.pickupTime} Uhr`}</strong>, {`${p.farmAddress}, ${p.farmCity}`}.
       </Text>
 
-      <div style={highlightBox}>
-        <Text style={highlightLabel}>Abholtermin</Text>
-        <Text style={highlightValue}>{p.pickupDate}</Text>
-        <Text style={{ ...highlightValue, fontSize: '15px' }}>{p.pickupTime} Uhr</Text>
-        <Link href={mapsUrl} style={{ color: '#15803d', fontSize: '13px' }}>
-          {p.farmAddress}, {p.farmCity}
-        </Link>
-      </div>
+      <BetragsZeile umbrechen links="Abholung" rechts={`${p.pickupDate}, ${p.pickupTime} Uhr`} />
+      <BetragsZeile links="Bestellnummer" rechts={p.orderNumber} />
 
-      {/* Der Weg zurück zur Bestellung: Positionen, Status und der
-          Kalendereintrag zum Abholtermin — ohne Anmeldung. */}
-      {p.orderUrl && (
-        <div style={{ textAlign: 'center', margin: '0 0 16px' }}>
-          <Link href={p.orderUrl} style={{ ...ctaButton, margin: '0' }}>
+      <KnopfReihe>
+        <Knopf href={p.routeUrl}>Route planen</Knopf>
+        {/* Positionen, Status und Kalendereintrag — ohne Anmeldung, signiert. */}
+        {p.orderUrl && (
+          <Knopf href={p.orderUrl} art="rahmen">
             Bestellung ansehen
-          </Link>
-        </div>
-      )}
+          </Knopf>
+        )}
+      </KnopfReihe>
 
-      <Text style={mutedText}><strong>Bestellnummer:</strong> {p.orderNumber}</Text>
-      <Text style={mutedText}>
-        Fragen?{' '}
-        <Link href={`tel:${p.farmPhone}`} style={{ color: '#15803d' }}>{p.farmPhone}</Link>
+      <Text style={kleinText}>
+        Du schaffst es nicht? Gib dem Hof kurz Bescheid:{' '}
+        <Link href={`tel:${p.farmPhone}`} style={textLink}>
+          Anrufen ({p.farmPhone})
+        </Link>
       </Text>
 
+      {/* Leise am Ende statt als Knopf über der Mail: ein Service zur
+          Bestellung, keine Werbung (S11). Einziger Weg zur Nachbestellung,
+          deshalb nicht gestrichen (Bericht Nr. 13). */}
       {p.reorderUrl && (
-        <div style={{ textAlign: 'center', marginTop: '20px' }}>
-          <Link href={p.reorderUrl} style={{ ...ctaButton, backgroundColor: '#1a4f30', fontSize: '14px', padding: '12px 24px' }}>
-            Nochmal bestellen
+        <Text style={kleinText}>
+          <Link href={p.reorderUrl} style={textLink}>
+            Dieselbe Bestellung nochmal aufgeben
           </Link>
-        </div>
+        </Text>
       )}
     </EmailLayout>
   )

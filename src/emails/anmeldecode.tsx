@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Text } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText } from './_layout'
+import { EmailLayout, h1, bodyText, mutedText, MAIL_FARBE } from './_layout'
 
 export interface AnmeldecodeProps {
   code: string
@@ -9,8 +9,8 @@ export interface AnmeldecodeProps {
 }
 
 const codeKasten: React.CSSProperties = {
-  backgroundColor: '#E8F0E8',
-  border: '1px solid #C4D9C8',
+  backgroundColor: MAIL_FARBE.gruenFlaeche,
+  border: `1px solid ${MAIL_FARBE.gruenRand}`,
   borderRadius: '12px',
   padding: '18px 12px',
   margin: '24px 0',
@@ -18,7 +18,7 @@ const codeKasten: React.CSSProperties = {
 }
 
 const codeText: React.CSSProperties = {
-  color: '#1A2B22',
+  color: MAIL_FARBE.text,
   fontSize: '34px',
   fontWeight: '700',
   letterSpacing: '0.3em',

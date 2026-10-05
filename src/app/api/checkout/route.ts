@@ -827,6 +827,8 @@ export async function POST(request: NextRequest) {
           customerPhone: data.customerPhone,
           totalAmount,
           serviceFeeCents: servicegebuehr.gebuehrCents,
+          // Nur für die Frist im Mailtext (fristVon) — dieselbe Zeit, ab der die Bestellung verfällt.
+          createdAt: order.createdAt,
           pickupDate,
           pickupTimeStart: data.pickupTimeStart,
           pickupTimeEnd: data.pickupTimeEnd,

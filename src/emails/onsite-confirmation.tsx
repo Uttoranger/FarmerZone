@@ -1,91 +1,88 @@
 import * as React from 'react'
-import { Text, Link, Hr } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton, amberBox } from './_layout'
+import { Text } from '@react-email/components'
+import {
+  EmailLayout,
+  BetragsZeile,
+  Knopf,
+  KnopfReihe,
+  Trenner,
+  amberBox,
+  h1,
+  bodyText,
+  kleinText,
+  MAIL_FARBE,
+} from './_layout'
 import { SERVICEGEBUEHR_BEZEICHNUNG, SERVICEGEBUEHR_HINWEIS } from '@/lib/servicegebuehr'
+import { formatEuro } from '@/lib/format'
 
 export interface OnsiteConfirmationProps {
-  customerName: string
   orderNumber: string
   farmName: string
   farmAddress: string
   farmCity: string
   pickupDate: string
   pickupTime: string
-  items: Array<{ name: string; quantity: number; unitPrice: number }>
-  /** Warenpreis (Zwischensumme) — nur nötig, wenn eine Servicegebühr anfällt. */
-  subtotal?: number
-  /** Servicegebühr in Euro; 0 oder fehlend = keine Zeile. */
+  /** Positionen mit fertig gerechnetem Zeilenbetrag in Euro (src/lib/email.ts, über Decimal). */
+  items: Array<{ name: string; betrag: number }>
+  /** Servicegebühr in Euro aus dem Snapshot; 0 oder fehlend = keine Zeile. */
   serviceFee?: number
   /** Was die Kundin vor Ort bezahlt: Warenpreis + Servicegebühr. */
   total: number
+  /** Zur Seite mit dem Knopf (/{hof}/bestaetigen/{token}) — der Link selbst bestätigt nichts. */
   confirmationUrl: string
+  /**
+   * „heute, 12:12 Uhr" — die Frist aus fristen.ts (fristVon), wenn der
+   * Bestellzeitpunkt bekannt ist. Fehlt sie, bleibt der allgemeine Satz.
+   */
+  bestaetigenBis?: string
 }
 
+/**
+ * „Bitte bestätige deine Bestellung" — Barbestellung, vor der Bestätigung.
+ * Gleiche Gestalt wie die Bestätigungs-Mail (Mockup web-k3-e-mails-web-mobil),
+ * Hauptaktion ist der Knopf zur Bestätigungsseite (H3).
+ */
 export function OnsiteConfirmationEmail(p: OnsiteConfirmationProps) {
-  const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(`${p.farmAddress}, ${p.farmCity}`)}`
   const mitGebuehr = (p.serviceFee ?? 0) > 0
 
   return (
     <EmailLayout previewText={`Bestellung bei ${p.farmName} bestätigen – Abholung ${p.pickupDate}`}>
-      <Text style={h1}>Bestellung verbindlich bestätigen</Text>
+      <Text style={h1}>Bitte bestätige deine Bestellung</Text>
       <Text style={bodyText}>
-        Hallo {p.customerName},<br />
-        du hast eine Bestellung bei <strong>{p.farmName}</strong> aufgegeben.
-        Bitte bestätige sie mit einem Klick, damit der Hof sie vorbereiten kann.
+        {`Du hast bei ${p.farmName} bestellt. Erst mit deiner Bestätigung packt der Hof deine Sachen.`}
       </Text>
 
-      <Link href={p.confirmationUrl} style={ctaButton}>
-        Bestellung bestätigen →
-      </Link>
-
-      <div style={amberBox}>
-        <Text style={{ ...mutedText, margin: 0, fontWeight: '600', color: '#92400e' }}>
-          Du bezahlst {`€ ${p.total.toFixed(2)}`} bei der Abholung vor Ort.
-        </Text>
-      </div>
-
-      <div style={highlightBox}>
-        <Text style={highlightLabel}>Abholtermin</Text>
-        <Text style={highlightValue}>{p.pickupDate}</Text>
-        <Text style={{ ...highlightValue, fontSize: '15px' }}>{p.pickupTime} Uhr</Text>
-        <Link href={mapsUrl} style={{ color: '#15803d', fontSize: '13px' }}>
-          {p.farmAddress}, {p.farmCity}
-        </Link>
-      </div>
-
-      <Text style={{ ...mutedText, fontWeight: '600', color: '#374151', margin: '0 0 8px' }}>
-        Bestellübersicht
-      </Text>
-      {p.items.map((item, i) => (
-        <Text key={i} style={{ ...mutedText, margin: '2px 0' }}>
-          {item.name}
-          <span style={{ float: 'right' }}>€ {(item.unitPrice * item.quantity).toFixed(2)}</span>
-        </Text>
-      ))}
-      {/* Gebührenzeile identisch zum Checkout; ohne Gebühr entfällt sie. */}
-      {mitGebuehr && (
-        <div style={{ padding: '8px 0 0', borderTop: '1px solid #f1f5f9' }}>
-          <Text style={{ ...mutedText, margin: '6px 0 0' }}>
-            Zwischensumme
-            <span style={{ float: 'right' }}>€ {(p.subtotal ?? 0).toFixed(2)}</span>
+      {p.bestaetigenBis && (
+        <div style={amberBox}>
+          <Text style={{ ...bodyText, color: MAIL_FARBE.text, fontWeight: '600', margin: 0 }}>
+            {`Bitte bestätige bis ${p.bestaetigenBis}.`}
           </Text>
-          <Text style={{ ...mutedText, margin: '4px 0 0' }}>
-            {SERVICEGEBUEHR_BEZEICHNUNG}
-            <span style={{ float: 'right' }}>€ {(p.serviceFee ?? 0).toFixed(2)}</span>
-          </Text>
-          <Text style={{ ...mutedText, fontSize: '12px', color: '#94a3b8', margin: '2px 0 0' }}>
-            {SERVICEGEBUEHR_HINWEIS}
-          </Text>
-          <Text style={{ ...bodyText, fontWeight: '700', margin: '6px 0 0' }}>
-            Gesamt
-            <span style={{ float: 'right' }}>€ {p.total.toFixed(2)}</span>
+          <Text style={{ ...kleinText, margin: '2px 0 0' }}>
+            Danach geben wir die Ware wieder frei – ohne Kosten für dich.
           </Text>
         </div>
       )}
 
-      <Hr style={{ borderColor: '#e2e8f0', margin: '16px 0' }} />
-      <Text style={mutedText}><strong>Bestellnummer:</strong> {p.orderNumber}</Text>
-      <Text style={{ ...mutedText, color: '#94a3b8', fontSize: '12px', marginTop: '16px' }}>
+      <KnopfReihe>
+        <Knopf href={p.confirmationUrl}>Bestellung bestätigen</Knopf>
+      </KnopfReihe>
+
+      <BetragsZeile links="Bestellnummer" rechts={p.orderNumber} />
+      <BetragsZeile umbrechen links="Abholung" rechts={`${p.pickupDate}, ${p.pickupTime} Uhr`} />
+      <BetragsZeile umbrechen links="Adresse" rechts={`${p.farmAddress}, ${p.farmCity}`} />
+      <Trenner />
+      {p.items.map((item, i) => (
+        <BetragsZeile key={i} links={item.name} rechts={formatEuro(item.betrag)} />
+      ))}
+      {mitGebuehr && <BetragsZeile links={SERVICEGEBUEHR_BEZEICHNUNG} rechts={formatEuro(p.serviceFee ?? 0)} />}
+      <BetragsZeile stark links="Bar bei Abholung" rechts={formatEuro(p.total)} />
+
+      {mitGebuehr && (
+        <Text style={{ ...kleinText, marginTop: '12px' }}>
+          {SERVICEGEBUEHR_BEZEICHNUNG}: {SERVICEGEBUEHR_HINWEIS}
+        </Text>
+      )}
+      <Text style={{ ...kleinText, marginTop: '12px' }}>
         Falls du diese Bestellung nicht aufgegeben hast, ignoriere diese E-Mail einfach.
         Bitte bestätige bald: Unbestätigte Bestellungen geben wir nach spätestens zwei Stunden wieder frei.
       </Text>

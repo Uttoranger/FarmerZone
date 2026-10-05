@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { Text, Hr } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue } from './_layout'
+import { Text } from '@react-email/components'
+import { EmailLayout, Trenner, h1, bodyText, mutedText, kleinText, highlightBox, highlightLabel, highlightValue } from './_layout'
 import { formatEuro } from '@/lib/format'
 
 export interface ZahlungZuSpaetProps {
@@ -40,8 +40,8 @@ export function ZahlungZuSpaetEmail(p: ZahlungZuSpaetProps) {
         noch möchtest, bestell einfach neu.
       </Text>
 
-      <Hr style={{ margin: '20px 0' }} />
-      <Text style={mutedText}>Bei Fragen schreib uns an {p.supportEmail}.</Text>
+      <Trenner />
+      <Text style={kleinText}>Bei Fragen schreib uns an {p.supportEmail}.</Text>
     </EmailLayout>
   )
 }
