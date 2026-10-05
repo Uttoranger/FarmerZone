@@ -101,6 +101,18 @@ export function codeVersandErlaubt(rolle: string | null | undefined): boolean {
   return rolle === null || rolle === undefined || rolle === 'CUSTOMER'
 }
 
+/**
+ * Die Rolle hinter einer Adresse aus ALLEN Konten, die sie (ohne Rücksicht
+ * auf Groß-/Kleinschreibung) trifft. Ein einziger Hof oder Admin darunter
+ * genügt für „kein Code" — sonst entschiede die zufällige Reihenfolge der
+ * Datenbank, ob ein Hof neben einem gleichnamigen Kundenkonto einen Code
+ * bekommt. Kein Treffer: `null` (neue Adresse).
+ */
+export function rolleAusTreffern(rollen: readonly string[]): string | null {
+  if (rollen.length === 0) return null
+  return rollen.find((rolle) => rolle !== 'CUSTOMER') ?? 'CUSTOMER'
+}
+
 /** Nur Ziffern, höchstens so viele, wie der Code hat — „481 234" aus der Mail wird „481234". */
 export function normalisiereCode(eingabe: string): string {
   return eingabe.replace(/\D/g, '').slice(0, ANMELDECODE_LAENGE)
