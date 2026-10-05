@@ -1,10 +1,12 @@
 'use client'
 
 import { useMemo, useSyncExternalStore } from 'react'
+import type { WarenkorbPosition } from '@/schemas/warenkorb-speicher'
 import {
   WARENKORB_EREIGNIS,
   WARENKORB_SCHLUESSEL,
   leseWarenkorb,
+  positionenFuer,
   warenkorbImKopf,
 } from '@/lib/warenkorb-speicher'
 
@@ -40,4 +42,15 @@ function stand(): string | null {
 export function useWarenkorbKopf(): { anzahl: number; href: string } | null {
   const roh = useSyncExternalStore(abonniere, stand, () => null)
   return useMemo(() => warenkorbImKopf(leseWarenkorb(roh)), [roh])
+}
+
+/**
+ * Die Positionen im Korb DIESES Hofs — für den Mini-Warenkorb der Hofseite
+ * (Nr. 10). Liest denselben Stand wie das Symbol der Kopfzeile und folgt
+ * jedem Schreiben über WARENKORB_EREIGNIS; geschrieben wird nur über useCart.
+ * Liegt der Korb bei einem anderen Hof, ist er hier leer.
+ */
+export function useWarenkorbVomHof(farmId: string): WarenkorbPosition[] {
+  const roh = useSyncExternalStore(abonniere, stand, () => null)
+  return useMemo(() => positionenFuer(leseWarenkorb(roh), farmId), [roh, farmId])
 }

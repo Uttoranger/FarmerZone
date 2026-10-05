@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Pencil, Eye, Copy, Share2, Check } from 'lucide-react'
 import { FarmPageView } from '@/components/farm/farm-page-view'
+import { vorschauLink } from '@/lib/hofseite-vorschau'
 import type { PublicFarm } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 
@@ -111,14 +112,27 @@ export function FarmPageClient({ farm, activeStatus, pastStatusCount }: Props) {
         </div>
       </div>
 
-      <FarmPageView
-        farm={farm}
-        activeStatus={activeStatus}
-        ownerMode={true}
-        mode={mode}
-        pastStatusCount={pastStatusCount}
-        onVorschau={() => setMode('preview')}
-      />
+      {mode === 'preview' ? (
+        // Die Kundenansicht ist die echte Hofseite (?vorschau=1, dieselbe
+        // Route wie für Kundinnen, samt Navigation im neuen Design) — kein
+        // Nachbau (ARCHITECTURE §4, „Die Hofseite gibt es genau einmal").
+        // Einbetten ist nur für diese Adresse und nur für uns selbst erlaubt
+        // (next.config.ts, frame-ancestors 'self'); Kaufen wirkt dort nicht.
+        <iframe
+          src={vorschauLink(farm.slug)}
+          title="So sehen Kunden deine Hofseite"
+          className="block h-[calc(100dvh-8.5rem)] w-full border-0 bg-background"
+        />
+      ) : (
+        <FarmPageView
+          farm={farm}
+          activeStatus={activeStatus}
+          ownerMode={true}
+          mode={mode}
+          pastStatusCount={pastStatusCount}
+          onVorschau={() => setMode('preview')}
+        />
+      )}
     </>
   )
 }

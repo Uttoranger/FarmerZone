@@ -537,5 +537,7 @@ describe('kennzeichnungsZeilen — Pflichtangaben vor dem Kauf', () => {
     expect(zeilen.find((z) => z.titel === 'Für')?.wert).toBe('Pferde, Rinder')
     expect(zeilen.find((z) => z.titel === 'Gehalte')?.wert).toBe('Rohprotein 12 % · Rohasche 8,5 %')
     expect(zeilen.find((z) => z.titel === 'Nettomenge')?.wert).toBe('12,5 kg je Gebinde')
+    // E9: Die Plattform prüft die Nummer nicht — die Kennzeichnung sagt, woher sie kommt.
+    expect(zeilen.find((z) => z.titel === 'Betriebsnummer')?.wert).toBe('LFBIS-1234567 (laut Angabe des Hofs)')
   })
 })

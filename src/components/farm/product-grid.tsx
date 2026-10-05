@@ -3,26 +3,24 @@
 import { useState, useEffect, useMemo, useOptimistic, useTransition } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ShoppingCart, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff, Camera, Loader2, GripVertical } from 'lucide-react'
+import { ShoppingCart, ShoppingBasket, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff, Camera, Loader2, GripVertical, ChevronRight, Sprout } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCart } from '@/lib/use-cart'
 import { WARENKORB_ANKER } from '@/lib/warenkorb-speicher'
-import { SPRUNGZIEL_OHNE_KOPF, SPRUNGZIEL_UNTER_KOPF } from '@/components/shared/kunden-kopf'
 import { MONTH_SHORT, seasonLabel } from '@/schemas/product'
-import { formatEuro } from '@/lib/preis-format'
-import { formatGrundpreis, formatGrundpreisNetto } from '@/lib/format'
+import { formatEuro, formatGrundpreis, formatGrundpreisNetto, mitAnzahl } from '@/lib/format'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
-import { BereichUmschalter } from '@/components/shared/bereich-umschalter'
 import { SHOP_PAUSED_BUTTON_LABEL } from '@/lib/shop-pause'
 import { VORSCHAU_KAUF_HINWEIS, korbErlaubt } from '@/lib/hofseite-vorschau'
 import { produktZustand, streifenText, type ProduktZustand } from '@/lib/produkt-sichtbarkeit'
 import { ImShopSchalter } from '@/components/products/im-shop-schalter'
-import { teileHofseite, zeigeKaufknopf } from '@/lib/bereiche-anzeige'
-import { bereichAusParameter, bereichParameter } from '@/schemas/hoefe-filter'
+import { kartenZustand, kategorieAbschnitte, zeigeKaufknopf } from '@/lib/bereiche-anzeige'
+import { oeffnetKorbHier, uebersichtProdukte } from '@/lib/hofseite-kunde'
+import { bereichAusParameter } from '@/schemas/hoefe-filter'
 import type { AnzeigeBereich } from '@/lib/taxonomie'
 import type { PublicProduct } from '@/server/queries/farm'
 import { updateProductImageAction, reorderProductsAction } from '@/server/actions/products'
@@ -30,6 +28,10 @@ import { ReorderContext } from '@/components/shared/reorder-context'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { CartSheet } from './cart-sheet'
 import { ProduktDetail, type HofFuerDetail } from './produkt-detail'
+import { ProduktKarte } from '@/components/hofseite/produkt-karte'
+import { ProduktAbschnitte } from '@/components/hofseite/produkt-abschnitte'
+import { EmptyState } from '@/components/ui/empty-state'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
 
 type ReorderItem = { productId: string; productName: string; quantity: number }
@@ -57,6 +59,20 @@ type Props = {
    * Reservierung, nur der Hinweis. Ohne Angabe wirkt es.
    */
   kaufen?: boolean
+  /**
+   * Kundenansicht (Nr. 10): welcher Teil der Produkte im offenen Reiter steht
+   * — die Auswahl der Übersicht, alle Abschnitte im Reiter Produkte oder
+   * keiner (Beiträge). Das Raster bleibt in jedem Reiter eingehängt: Korb,
+   * Produktdetail und Nachbestell-Link leben hier und überstehen den Wechsel.
+   */
+  teil?: 'auswahl' | 'alle' | 'keins'
+  /** „Preise zzgl. 5 % Servicegebühr … einmal pro Bestellung" über den Abschnitten — null ohne Gebühr. */
+  gebuehrHinweis?: string | null
+  /** „+ Gebühr" an der Korb-Leiste und im Korb — null ohne Gebühr. */
+  gebuehrKorb?: string | null
+  /** Abschnitt, zu dem der Reiter Produkte beim Öffnen springt (?bereich=futter). */
+  springeZu?: string | null
+  onGesprungen?: () => void
 }
 
 
@@ -450,66 +466,6 @@ function ProductCard({
 }
 
 /**
- * Die Produkte der Kundenansicht: Umschalter „Hofladen | Futtermittel" (nur,
- * wenn der Hof in BEIDEN Bereichen anbietet), darunter Sektionen je Kategorie,
- * ab SPRUNGMARKEN_AB Produkten mit Sprungmarken. Was wohin gehört und in
- * welcher Reihenfolge, entscheidet teileHofseite (src/lib/bereiche-anzeige.ts);
- * Produkte des anderen Bereichs werden gar nicht erst gerendert.
- */
-function HofseitenSektionen({
-  products,
-  bereichWunsch,
-  onBereichWechsel,
-  renderKarte,
-  sprungzielKlasse,
-}: {
-  products: PublicProduct[]
-  bereichWunsch: AnzeigeBereich | null
-  onBereichWechsel: (bereich: AnzeigeBereich) => void
-  renderKarte: (p: PublicProduct) => React.ReactNode
-  /** Abstand der Sprungziele nach oben — unter Kopfleiste und Sektionsleiste. */
-  sprungzielKlasse: string
-}) {
-  const aufteilung = useMemo(() => teileHofseite(products, bereichWunsch), [products, bereichWunsch])
-  if (aufteilung.aktiv === null) return null
-
-  return (
-    <>
-      {aufteilung.umschalter && (
-        <BereichUmschalter aktiv={aufteilung.aktiv} onWechsel={onBereichWechsel} className="mb-5" />
-      )}
-
-      {aufteilung.sprungmarken && (
-        <nav aria-label="Zu einer Kategorie springen" className="-mx-1 mb-5 flex flex-wrap gap-2 px-1">
-          {aufteilung.sektionen.map((s) => (
-            <button
-              key={s.anker}
-              type="button"
-              onClick={() => document.getElementById(s.anker)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-              className="min-h-9 rounded-full border border-border bg-card px-3 text-[13px] font-medium text-app-ink transition-colors hover:bg-app-chip"
-            >
-              {s.titel}
-              <span className="ml-1.5 tabular-nums text-app-ink-faint">{s.produkte.length}</span>
-            </button>
-          ))}
-        </nav>
-      )}
-
-      <div className="space-y-8">
-        {aufteilung.sektionen.map((s) => (
-          <section key={s.anker} id={s.anker} aria-labelledby={`${s.anker}-titel`} className={sprungzielKlasse}>
-            <h3 id={`${s.anker}-titel`} className="mb-3 font-heading text-lg font-semibold text-app-ink">
-              {s.titel}
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-5">{s.produkte.map((p) => renderKarte(p))}</div>
-          </section>
-        ))}
-      </div>
-    </>
-  )
-}
-
-/**
  * Der gewünschte Bereich aus der URL (?bereich=futter) — null, wenn keiner
  * gewählt ist. Welcher dann wirklich angezeigt wird, entscheidet
  * teileHofseite; die Kopfzeile der Hofseite fragt dieselbe Stelle, damit ihr
@@ -531,27 +487,17 @@ export function ProductGrid({
   isPaused = false,
   onVorschau,
   kaufen = true,
+  teil = 'alle',
+  gebuehrHinweis = null,
+  gebuehrKorb = null,
+  springeZu = null,
+  onGesprungen,
 }: Props) {
   const isEditMode = ownerMode && mode !== 'preview'
   // EINE Regel für jeden Weg in den Korb (Kaufknopf, Nachbestell-Link,
   // #warenkorb-Anker, Korb-Knopf, Sheet) — src/lib/hofseite-vorschau.ts.
   const mitKorb = korbErlaubt({ isEditMode, kaufen })
 
-  // Hofladen | Futtermittel (Bereiche 2): Die Wahl steht in der URL
-  // (?bereich=futter), damit /hoefe direkt beim Futter landen kann und ein
-  // Reload sie behält. Gewechselt wird per replaceState — die Seite wird
-  // nicht neu geladen, andere Parameter (reorder-Token) bleiben stehen.
-  const suchParameter = useSearchParams()
-  const pfad = usePathname()
-  const bereichWunsch = useBereichWunsch()
-  function bereichWechseln(neu: AnzeigeBereich) {
-    const params = new URLSearchParams(suchParameter.toString())
-    const wert = bereichParameter(neu)
-    if (wert) params.set('bereich', wert)
-    else params.delete('bereich')
-    const query = params.toString()
-    window.history.replaceState(null, '', query ? `${pfad}?${query}` : pfad)
-  }
   const [detail, setDetail] = useState<PublicProduct | null>(null)
   const [detailOffen, setDetailOffen] = useState(false)
   function detailOeffnen(produkt: PublicProduct) {
@@ -697,59 +643,107 @@ export function ProductGrid({
     }
   }
 
+  // Der Warenkorb der Shell (Kopf, Mittelknopf am Handy) zeigt auf
+  // /{hof}#warenkorb. Steht man schon auf dieser Hofseite, lädt der Link
+  // nichts neu und der Anker allein öffnete nichts — dann öffnet die Seite
+  // den Korb selbst (oeffnetKorbHier). Abgefangen in der Einfangphase, vor
+  // Nexts Link; Mittelklick und neuer Tab bleiben dem Link.
+  useEffect(() => {
+    if (!mitKorb) return
+    function beiKlick(e: MouseEvent) {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+      const link = e.target instanceof Element ? e.target.closest('a[href]') : null
+      const href = link?.getAttribute('href')
+      if (!href || !oeffnetKorbHier(href, window.location.href)) return
+      e.preventDefault()
+      setCartOpen(true)
+    }
+    document.addEventListener('click', beiKlick, true)
+    return () => document.removeEventListener('click', beiKlick, true)
+  }, [mitKorb])
+
+  /** Menge eines Produkts im Korb — in der Vorschau gibt es keinen Korb, also nie eine. */
+  function imKorb(produktId: string): number {
+    if (!mitKorb) return 0
+    return items.find((i) => i.productId === produktId)?.quantity ?? 0
+  }
+
+  function mengeAendern(produkt: PublicProduct, menge: number) {
+    if (!mitKorb) {
+      toast.info(VORSCHAU_KAUF_HINWEIS)
+      return
+    }
+    void updateQuantity(produkt.id, menge)
+  }
+
+  function karte(p: PublicProduct) {
+    return (
+      <ProduktKarte
+        produkt={p}
+        zustand={kartenZustand(p, isPaused)}
+        imKorb={imKorb(p.id)}
+        wirdHinzugefuegt={addingId === p.id}
+        onDetails={detailOeffnen}
+        onInDenKorb={handleAddToCart}
+        onMenge={mengeAendern}
+      />
+    )
+  }
+
+  const korbLeiste = mitKorb && isHydrated && count > 0
+
   return (
     <>
-      {/* Willkommen-zurück-Banner — nur, wo es einen Korb gibt (der Nachbestell-Effekt setzt es ohnehin nur dann). */}
+      {/* Willkommen-zurück-Hinweis — nur, wo es einen Korb gibt (der Nachbestell-Effekt setzt ihn ohnehin nur dann). */}
       {mitKorb && showWelcomeBack && (
-        <div className="pb-4">
-          <div
-            className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3"
-            style={{ background: 'color-mix(in srgb, var(--primary) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--primary) 16%, transparent)' }}
+        <div className="relative mb-4 rounded-2xl border border-accent/45 bg-accent/12 py-2 pr-12 pl-4 text-[13.5px] font-medium text-foreground">
+          <p className="flex min-h-9 items-center">Willkommen zurück! Dein letzter Einkauf liegt wieder im Korb.</p>
+          <button
+            type="button"
+            onClick={() => setShowWelcomeBack(false)}
+            className={cn('absolute top-1 right-1 flex size-11 items-center justify-center rounded-full text-muted-foreground hover:text-foreground', FOKUS_RAHMEN)}
+            aria-label="Schließen"
           >
-            <p className="text-sm font-medium" style={{ color: 'var(--app-ink)' }}>
-              Willkommen zurück! Dein letzter Einkauf wurde vorgeladen.
-            </p>
-            <button
-              onClick={() => setShowWelcomeBack(false)}
-              className="shrink-0 transition-colors"
-              style={{ color: 'var(--app-ink-faint)' }}
-              aria-label="Schließen"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
+            <X className="size-4" strokeWidth={1.7} aria-hidden="true" />
+          </button>
         </div>
       )}
 
-      {/* Empty state (public) */}
-      {!ownerMode && products.length === 0 && (
-        <p className="text-sm pb-4" style={{ color: 'var(--app-ink-faint)' }}>
-          Aktuell sind keine Produkte verfügbar.
-        </p>
-      )}
-
-      {/* Kundenansicht (und Vorschau des Hofs): nach Bereich getrennt, darin
-          nach Kategorie. Der Bearbeitungsmodus bleibt EINE flache, ziehbare
-          Liste — die Reihenfolge dort bestimmt auch die der Sektionen. */}
+      {/* Kundenansicht (und Vorschau des Hofs): Abschnitte je Kategorie (E1)
+          bzw. die Auswahl der Übersicht. Der Bearbeitungsmodus bleibt EINE
+          flache, ziehbare Liste — ihre Reihenfolge bestimmt auch die der
+          Abschnitte. */}
       {!isEditMode ? (
-        <HofseitenSektionen
-          products={displayProducts}
-          bereichWunsch={bereichWunsch}
-          sprungzielKlasse={ownerMode ? SPRUNGZIEL_OHNE_KOPF : SPRUNGZIEL_UNTER_KOPF}
-          onBereichWechsel={bereichWechseln}
-          renderKarte={(p) => (
-            <ProductCard
-              key={p.id}
-              product={p}
-              onAddToCart={handleAddToCart}
-              onDetails={detailOeffnen}
-              isAddingId={addingId}
-              ownerMode={ownerMode}
-              isEditMode={false}
-              isPaused={isPaused}
-            />
-          )}
-        />
+        teil === 'keins' ? null : products.length === 0 ? (
+          // Leer, mit Ausweg (DESIGN_SYSTEM, „Zustände").
+          <EmptyState
+            symbol={Sprout}
+            titel="Gerade keine Produkte"
+            satz="Dieser Hof hat im Moment nichts im Angebot. Schau bald wieder vorbei – oder such dir einen anderen Hof in der Nähe."
+            aktion={
+              <Link
+                href="/hoefe"
+                className={cn('inline-flex min-h-11 items-center rounded-full border border-border px-4 text-[14px] font-semibold text-foreground hover:bg-muted', FOKUS_RAHMEN)}
+              >
+                Andere Höfe entdecken
+              </Link>
+            }
+          />
+        ) : teil === 'auswahl' ? (
+          <ul className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-2 xl:grid-cols-3">
+            {uebersichtProdukte(displayProducts, isPaused).map((p) => (
+              <li key={p.id}>{karte(p)}</li>
+            ))}
+          </ul>
+        ) : (
+          <ProduktAbschnitte
+            abschnitte={kategorieAbschnitte(displayProducts)}
+            gebuehrHinweis={gebuehrHinweis}
+            springeZu={springeZu}
+            onGesprungen={onGesprungen}
+            renderKarte={karte}
+          />
+        )
       ) : (
       <>
       {/* Aus dem Hinweissatz ist ein Knopf geworden: Er beschreibt die
@@ -764,7 +758,7 @@ export function ProductGrid({
           style={{ color: 'var(--app-ink-soft)' }}
         >
           <span>
-            Kunden sehen deine Produkte getrennt nach Hofladen und Futter.{' '}
+            Kunden sehen deine Produkte nach Kategorien geordnet.{' '}
             <span className="font-semibold whitespace-nowrap" style={{ color: 'var(--brand-text)' }}>
               Ansehen →
             </span>
@@ -772,7 +766,7 @@ export function ProductGrid({
         </button>
       ) : (
         <p className="mb-4 text-sm" style={{ color: 'var(--app-ink-soft)' }}>
-          Kunden sehen deine Produkte getrennt nach Hofladen und Futter.
+          Kunden sehen deine Produkte nach Kategorien geordnet.
         </p>
       )}
       {/* Grid — 3 cols, 20px gap; im Edit-Modus sortierbar */}
@@ -848,25 +842,32 @@ export function ProductGrid({
         />
       )}
 
-      {/* Der klebende Korb-Knopf — nicht im Bearbeitungsmodus, nicht in der Vorschau. */}
+      {/* Die Korb-Leiste — nicht im Bearbeitungsmodus, nicht in der Vorschau.
+          Am Handy über der Unterleiste der Shell (68 px + Home-Balken), bis
+          1024 px unten rechts; ab 1024 px trägt der Mini-Warenkorb der
+          rechten Spalte den Korb (hofseite-seitenspalte.tsx). */}
       {mitKorb && isHydrated && count > 0 && (
         <button
+          type="button"
           onClick={() => setCartOpen(true)}
-          // Befund 6: über dem Home-Balken des iPhones. Wirkt erst mit
-          // viewport-fit=cover (offener Punkt) — ohne liefert env() 0.
-          className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] inset-x-4 sm:inset-x-auto sm:right-6 sm:left-auto z-40 flex items-center justify-center gap-2.5 rounded-full px-6 py-3.5 transition-all duration-[250ms] active:scale-[0.98]"
-          style={{
-            background: 'var(--accent)',
-            color: '#fff',
-            boxShadow: '0 8px 24px rgba(232,133,74,0.35)',
-          }}
+          className={cn(
+            'fixed inset-x-4 bottom-[calc(68px+env(safe-area-inset-bottom,0px)+1.75rem)] z-40 flex min-h-12 items-center gap-2.5 rounded-2xl bg-accent px-4 py-3 text-accent-foreground shadow-lg transition-transform duration-[250ms] active:scale-[0.98] md:inset-x-auto md:right-6 md:bottom-6 md:rounded-full md:px-5 lg:hidden',
+            FOKUS_RAHMEN
+          )}
         >
-          <ShoppingCart className="w-5 h-5" strokeWidth={1.7} />
-          <span className="font-semibold text-sm">
-            {count} {count === 1 ? 'Artikel' : 'Artikel'} · {formatEuro(total)}
+          <ShoppingBasket className="size-5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+          <span className="min-w-0 truncate text-[13px] font-semibold">
+            {mitAnzahl(count, 'Artikel', 'Artikel')} · {formatEuro(total)}
+            {gebuehrKorb && <span className="font-normal"> + Gebühr</span>}
+          </span>
+          <span className="ml-auto flex shrink-0 items-center gap-0.5 text-[13px] font-semibold">
+            Zum Warenkorb
+            <ChevronRight className="size-4" strokeWidth={1.7} aria-hidden="true" />
           </span>
         </button>
       )}
+      {/* Platz unter dem Inhalt, damit die Leiste das letzte Produkt nicht verdeckt. */}
+      {korbLeiste && <div aria-hidden="true" className="h-24 lg:hidden" />}
 
       {/* Cart sheet — in der Vorschau des Hofs gibt es keinen Korb. */}
       {mitKorb && (
@@ -878,6 +879,7 @@ export function ProductGrid({
           farmSlug={farmSlug}
           onUpdateQuantity={updateQuantity}
           onRemoveItem={removeItem}
+          gebuehrKorb={gebuehrKorb}
         />
       )}
     </>

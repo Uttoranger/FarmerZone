@@ -68,3 +68,21 @@ export function pickupWeekdaysLabel(slots: WeeklySlot[]): string {
   const sorted = order.filter((d) => present.includes(d)).map((d) => WEEKDAY_SHORT[d])
   return sorted.join(' & ')
 }
+
+const WEEKDAY_LONG = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag']
+
+/**
+ * Die Karte „Abholzeiten" der Hofseite (Nr. 10): je Wochentag eine Zeile,
+ * Montag zuerst, mehrere Fenster eines Tages nach Beginn mit " · " verbunden —
+ * „Mittwoch, 15–18 Uhr". Dieselbe Schreibweise der Zeiten wie die Tageskarten.
+ */
+export function abholzeitenJeWochentag(slots: WeeklySlot[]): string[] {
+  const order = [1, 2, 3, 4, 5, 6, 0]
+  return order.flatMap((tag) => {
+    const fenster = slots
+      .filter((s) => s.dayOfWeek === tag)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime))
+      .map((s) => `${formatSlotTime(s.startTime)}–${formatSlotTime(s.endTime)}`)
+    return fenster.length > 0 ? [`${WEEKDAY_LONG[tag]}, ${fenster.join(' · ')} Uhr`] : []
+  })
+}

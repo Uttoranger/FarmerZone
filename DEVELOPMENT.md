@@ -3908,6 +3908,55 @@ Blatt ist durch Link-Chips ersetzt (`hoefe-facetten.tsx` entfällt).
 - **Schwarz/Weiß sind keine Tokens.** Der Schleier der Karten-Vorschau (`from-black/25`) und die Punkte im Fotostreifen (`bg-white`) nehmen jetzt `primary-foreground` bzw. `accent-foreground` — beide im neuen Design in beiden Themes gleich. Der Token-Test der Route erkennt `black`/`white` als Farbklasse. Die Startseite (Nr. 07) trägt noch `from-black/…` auf Foto und Kartenbild; das gehört in ihren eigenen Branch.
 - Klein: „Zum Hof" im Splitscreen mit 44 px Trefferfläche (`before:`-Rand wie die Chips), das PLZ-Formular in `div` statt `span`, Suchfeld `maxLength` = `SUCHTEXT_MAX`.
 
+## Hofseite im neuen Design (Nachtlauf Nr. 10, 2026-10-05)
+
+Gate 4, Route `/[farmSlug]` in der KundeShell (über `KundeShellMitSitzung`),
+Mockups `web-k2-hofseite`, `web-k2-alle-produkte-nach-kategorie`,
+`mobil-k2-hofseite`, `mobil-k2-produkte`. Neue Teile in
+`src/components/hofseite/`, Regeln in `src/lib/hofseite-kunde.ts` (Reiter,
+Zahlung, Gebührenwortlaut, Korb-Anker) und `bereiche-anzeige.ts`
+(`kategorieAbschnitte`, `kartenZustand`).
+
+- **E1 statt Bereiche 2.** Der Umschalter Hofladen | Futtermittel ist weg; eine
+  Seite mit Abschnitten je Kategorie, Futter als ein Abschnitt, Brennmaterial
+  zuletzt. Die Reihenfolge der Hofladen-Abschnitte bleibt die aus Bereiche 2
+  (erstes Produkt in der Sortierung des Hofs), Sonstiges rückt neu ans Ende.
+  `teileHofseite` lebt nur noch für `angezeigterBereich` (Rückweg).
+  `?bereich=futter` öffnet den Reiter Produkte und springt einmal zum
+  Futter-Abschnitt — die Links von `/hoefe` und aus dem Umfeld bleiben gültig.
+- **„Genau einmal" bleibt.** `FarmPageView` ist weiterhin die einzige
+  Einbindung; sie verzweigt in `HofseiteKunde` (Kundin und `?vorschau=1`) und
+  die Bestandsansicht des Besitzers (Bearbeiten unter lg). Dessen
+  „Kundenansicht" zeigte bisher dieselbe Komponente mit `ownerMode` — jetzt
+  wäre das eine zweite, alte Fassung der Kundenseite gewesen. Stattdessen ein
+  `<iframe>` auf die echte Route (`vorschauLink`), wie der Editor ab lg. Der
+  übrige Hofbereich ist unverändert (Gate 5).
+- **Rechte Spalte als eine Komponente**, am Handy in der Übersicht vor dem
+  Inhalt (das Mockup zeigt dort nur Abholung und Zahlung, darunter folgen
+  hier auch Abholzeiten und Anfahrt). Anfahrt ist ein Bild der Gegend mit
+  Link zu Google Maps wie bisher „Anfahrt", kein Kartendienst (Leaflet und
+  Kacheln bleiben `/hoefe`; die öffentliche Hofabfrage lädt keine
+  Koordinaten). Kontakt zeigt die Telefonnummer wie im Mockup; die E-Mail
+  steht nicht mehr sichtbar auf der Seite (weiter in den strukturierten Daten).
+- **Mini-Warenkorb** liest den Korb aus dem Speicher (`useWarenkorbVomHof`),
+  geschrieben wird nur über `useCart` im Produktraster. Das Raster bleibt in
+  jedem Reiter eingehängt (Korb, Detail, Nachbestell-Link). Der Warenkorb der
+  Shell zeigt auf `/{hof}#warenkorb`; auf der eigenen Hofseite lud dieser Link
+  nichts neu — ein Klick-Abfang in der Einfangphase öffnet dort den Korb.
+- **Gefunden im Browser:** `replaceState(window.history.state, …)` ließ Next
+  `useSearchParams` nicht abgleichen — die Adresse wechselte, der Reiter
+  nicht. Jetzt `replaceState(null, …)` wie auf `/hoefe`, mit Test am Quelltext.
+  Und: Die Produktliste lief am Handy über die Breite (Rasterspalte `auto`
+  statt `minmax(0,1fr)`), behoben mit `grid-cols-1`.
+- **E9:** In der Kennzeichnung steht die Betriebsnummer mit „(laut Angabe des
+  Hofs)". Ein Schild auf den Futterkarten gibt es noch nicht — dafür fehlt der
+  Betriebsstatus in der öffentlichen Abfrage (LFBIS oder Registrierung); das
+  baut Nr. 20.
+- **Nicht gebaut:** „Merken" (E8/S11), „ab Sa wieder da" (kein Datum im
+  Schema), Sortierung „Verfügbare zuerst", „Größe wählen" (Produktfamilien
+  kommen mit Gate 6), Produktdetail-Seite (Nr. 11, die Karten öffnen weiter
+  das Blatt).
+
 ## Nützliche Befehle
 
 ```bash

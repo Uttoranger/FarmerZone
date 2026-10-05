@@ -300,7 +300,7 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     'src/app/(public)/datenschutz/page.tsx': ['info'],
     'src/app/(public)/konditionen/page.tsx': ['info'],
     'src/app/(public)/problem-melden/page.tsx': ['info'],
-    // Die Hofseite rendert FarmPageView — dort steht der Kopf (siehe unten).
+    // Die Hofseite trägt seit Nr. 10 die KundeShell (siehe unten).
     'src/app/(public)/[farmSlug]/page.tsx': [],
   }
 
@@ -326,15 +326,17 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     }
   })
 
-  it('die Hofseite: Kopf und Teilen-Knopf nur für Kundinnen, nie in der Vorschau des Bauern-Bereichs', () => {
-    const text = lies('src/components/farm/farm-page-view.tsx')
-    expect(text).toMatch(/art: 'hofseite'/)
-    expect(text).toMatch(/\{!ownerMode && \(\s*<KundenKopf seite=\{kundenSeite\}/)
-    expect(text).toMatch(/\{!ownerMode && <TitelbildTeilen/)
-    // Über dem Titelbild steht nur noch Teilen — Zurück und Menü trägt die Leiste darüber.
-    expect(text).not.toMatch(/TitelbildKnoepfe/)
-    // Der Leer-Zustand (ohne Titelbild) liegt schon hinter `if (!ownerMode)`.
-    expect(text.match(/<KundenKopf /g)).toHaveLength(2)
+  it('die Hofseite trägt die KundeShell des neuen Designs und keine zweite Kopfzeile (Nr. 10)', () => {
+    expect(lies('src/app/(public)/[farmSlug]/page.tsx')).toMatch(/<KundeShellMitSitzung>/)
+    for (const datei of ['src/components/farm/farm-page-view.tsx', 'src/components/hofseite/hofseite-kunde.tsx']) {
+      expect(lies(datei), datei).not.toMatch(/<KundenKopf\b|TitelbildTeilen/)
+    }
+    // Der Rückweg „‹ Alle Höfe" kommt aus derselben Regel wie bisher — in den angezeigten Bereich.
+    const kunde = lies('src/components/hofseite/hofseite-kunde.tsx')
+    expect(kunde).toMatch(/art: 'hofseite'/)
+    expect(kunde).toMatch(/rueckweg\(kundenSeite, false\)/)
+    expect(kunde).toMatch(/useRueckwegKlick\(kundenSeite, 'zeile'\)/)
+    expect(kunde).toMatch(/angezeigterBereich\(produkte, bereichWunsch\)/)
   })
 
   it('der Checkout: kein Kopf, sobald eine Bestellung angelegt ist — und nie im Zahlungsschritt', () => {
