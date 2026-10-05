@@ -215,6 +215,43 @@ describe('Kundenkarte — Code-Schritt', () => {
     expect(codeSchritt({ laedt: true, code: '481234' })).toMatch(/<button[^>]*type="submit"[^>]*disabled=""/)
   })
 
+  it('laden: das Code-Feld bleibt fokussierbar (readonly + aria-busy statt disabled)', () => {
+    // disabled nähme dem Feld beim automatischen Absenden den Fokus — der
+    // Screenreader stünde nach einem Fehler im Nichts.
+    const feld = (html: string) => html.match(/<input[^>]*autocomplete="one-time-code"[^>]*>/i)?.[0] ?? ''
+    const laedt = feld(codeSchritt({ laedt: true, code: '481234' }))
+    expect(laedt).toMatch(/readonly=""/i)
+    expect(laedt).toMatch(/aria-busy="true"/)
+    expect(laedt).not.toMatch(/disabled/)
+    // Gegenprobe: ohne Laden frei beschreibbar.
+    const frei = feld(codeSchritt({ code: '481' }))
+    expect(frei).not.toMatch(/readonly|aria-busy/i)
+  })
+
+  it('laden: „Einen Moment …" steht in einer Live-Region (role="status"), die immer da ist', () => {
+    const status = (html: string) => html.match(/<p[^>]*role="status"[^>]*>([^<]*)<\/p>/)
+    expect(status(codeSchritt({ laedt: true, code: '481234' }))?.[1]).toContain('Einen Moment')
+    // Die Region steht auch ohne Laden schon da (leer) — sonst sagt der
+    // Screenreader die erste Meldung nicht an.
+    const ohne = status(codeSchritt({ code: '481' }))
+    expect(ohne).not.toBeNull()
+    expect(ohne?.[1]).toBe('')
+    expect(status(emailSchritt({ laedt: true, email: 'kundin@example.com' }))?.[1]).toContain('Einen Moment')
+  })
+
+  it('320 px: sechs Kästchen teilen sich die Breite (flexibel), bleiben aber ≥ 44 px hoch', () => {
+    const html = codeSchritt({ code: '481' })
+    const kaestchen = html.match(/<span[^>]*data-kaestchen=""[^>]*>/g) ?? []
+    expect(kaestchen).toHaveLength(6)
+    for (const k of kaestchen) {
+      expect(k).toMatch(/\bmin-w-0\b/)
+      expect(k).toMatch(/\bflex-1\b/)
+      expect(k).toMatch(/\bmax-w-\[46px\]/)
+      expect(k).not.toMatch(/(?<![-\w])w-\[46px\]/)
+      expect(k).toMatch(/\bh-\[54px\]/)
+    }
+  })
+
   it('hält eine 80 Zeichen lange Adresse aus (bricht um statt zu überlaufen)', () => {
     const lang = `${'k'.repeat(68)}@example.com`
     const html = codeSchritt({ email: lang })

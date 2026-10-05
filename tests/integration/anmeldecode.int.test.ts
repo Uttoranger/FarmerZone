@@ -12,7 +12,15 @@
  *    mehr an.
  *  - Der richtige Code meldet an, genau einmal.
  *  - Ein abgelaufener Code nimmt nicht an (Frist beim Lesen, nicht per Cron).
- *  - Ein Hof bekommt keinen Code (E7: Höfe bleiben bei Passwort).
+ *  - Ein Hof oder Admin bekommt keinen Code: Es entsteht gar keine
+ *    Code-Zeile, auch nicht bei anderer Groß-/Kleinschreibung der Adresse
+ *    (E7: Höfe bleiben bei Passwort) — und die Antwort ist dieselbe wie bei
+ *    einer Kundin.
+ *  - Selbst mit einem gültigen Code (serverseitig angelegt, wie ein Code aus
+ *    der Zeit vor der Nachbesserung) meldet /sign-in/email-otp keinen Hof und
+ *    keinen Admin an — Antwort wie bei falschem Code, das Passwort bleibt.
+ *  - Die Mail geht erst nach der Antwort raus (nachDerAntwort), damit die
+ *    Antwortzeit nicht verrät, ob hinter einer Adresse ein Hof steht.
  *  - Nur der Typ „sign-in" darf angefordert werden.
  *  - HTTP: Magic Links lassen sich nicht mehr anfordern, alte Links prüft
  *    der Endpunkt noch (Übergang); die ungenutzten Code-Pfade sind zu.
@@ -25,6 +33,19 @@ import { prisma } from '@/lib/prisma'
 import { intKennung, raeumeAuf } from './setup/basis'
 
 const versand = vi.hoisted(() => ({ codes: [] as Array<{ email: string; code: string }> }))
+// Was nach der Antwort laufen soll, sammelt der Test und startet es selbst —
+// so ist beweisbar, dass die Mail NICHT im Antwortpfad liegt.
+const nachlauf = vi.hoisted(() => ({ aufgaben: [] as Array<() => Promise<void>> }))
+
+vi.mock('@/lib/nach-der-antwort', () => ({
+  nachDerAntwort: (aufgabe: () => Promise<void>) => {
+    nachlauf.aufgaben.push(aufgabe)
+  },
+}))
+
+async function arbeiteNachlaufAb(): Promise<void> {
+  while (nachlauf.aufgaben.length > 0) await nachlauf.aufgaben.shift()!()
+}
 
 vi.mock('@/lib/email', () => ({
   sendAnmeldeCodeEmail: vi.fn(async (email: string, code: string) => {
@@ -50,6 +71,7 @@ beforeAll(async () => {
 
 afterEach(async () => {
   versand.codes.length = 0
+  nachlauf.aufgaben.length = 0
   await prisma.verification.deleteMany({ where: { identifier: { contains: 'otp-int-' } } })
   await raeumeAuf()
 })
@@ -60,6 +82,7 @@ function neueAdresse(): string {
 
 async function fordereCodeAn(auth: Auth, email: string): Promise<string> {
   await auth.api.sendVerificationOTP({ body: { email, type: 'sign-in' } })
+  await arbeiteNachlaufAb()
   const gesendet = versand.codes.findLast((c) => c.email === email)
   if (!gesendet) throw new Error('Kein Code verschickt')
   return gesendet.code
@@ -140,15 +163,104 @@ describe('Anmeldecode in der Datenbank', () => {
     expect(await prisma.session.count({ where: { user: { email } } })).toBe(0)
   })
 
-  it('ein Hof bekommt keinen Code', async () => {
+  it('die Mail geht erst nach der Antwort raus', async () => {
     const email = neueAdresse()
+    const antwort = await instanzA.api.sendVerificationOTP({ body: { email, type: 'sign-in' } })
+
+    expect(antwort).toEqual({ success: true })
+    expect(versand.codes).toHaveLength(0)
+    expect(nachlauf.aufgaben).toHaveLength(1)
+    await arbeiteNachlaufAb()
+    expect(versand.codes.filter((c) => c.email === email)).toHaveLength(1)
+  })
+})
+
+describe('Höfe und Admins bekommen keinen Code und werden nicht per Code angemeldet', () => {
+  async function legeNutzerAn(
+    rolle: 'FARMER' | 'ADMIN' | 'CUSTOMER',
+    optionen: { email?: string; emailVerified?: boolean; passwort?: boolean } = {}
+  ): Promise<{ id: string; email: string }> {
+    const id = intKennung(`nutzer-${rolle.toLowerCase()}`)
+    const email = optionen.email ?? `${id}@example.com`
     await prisma.user.create({
-      data: { id: intKennung('hof-nutzer'), email, name: 'Max Mustermann', role: 'FARMER', emailVerified: true },
+      data: { id, email, name: 'Max Mustermann', role: rolle, emailVerified: optionen.emailVerified ?? true },
+    })
+    if (optionen.passwort) {
+      await prisma.account.create({
+        data: { id: `${id}-konto`, userId: id, accountId: id, providerId: 'credential', password: 'int-kein-echter-hash' },
+      })
+    }
+    return { id, email }
+  }
+
+  async function codeZeilen(email: string): Promise<number> {
+    return prisma.verification.count({ where: { identifier: `sign-in-otp-${email.toLowerCase()}` } })
+  }
+
+  for (const rolle of ['FARMER', 'ADMIN'] as const) {
+    it(`${rolle}: Anfordern legt KEINEN Code ab, verschickt nichts und antwortet wie bei einer Kundin`, async () => {
+      const { email } = await legeNutzerAn(rolle)
+
+      const antwort = await instanzA.api.sendVerificationOTP({ body: { email, type: 'sign-in' } })
+      await arbeiteNachlaufAb()
+
+      expect(antwort).toEqual({ success: true })
+      expect(await codeZeilen(email)).toBe(0)
+      expect(versand.codes).toHaveLength(0)
     })
 
-    await instanzA.api.sendVerificationOTP({ body: { email, type: 'sign-in' } })
+    it(`${rolle}: auch ein gültiger Code meldet nicht an — Fehler wie bei falschem Code, Passwort bleibt`, async () => {
+      // emailVerified=false: Ohne Sperre entzöge Better Auth beim Treffer
+      // das Passwort (revokeUnprovenAccountAccess).
+      const { id, email } = await legeNutzerAn(rolle, { emailVerified: false, passwort: true })
+      const code = await instanzA.api.createVerificationOTP({ body: { email, type: 'sign-in' } })
 
-    expect(versand.codes.filter((c) => c.email === email)).toHaveLength(0)
+      expect(await versuche(instanzA, email, code)).toEqual({ ok: false, code: 'INVALID_OTP' })
+      expect(await prisma.session.count({ where: { userId: id } })).toBe(0)
+      expect(await prisma.account.count({ where: { userId: id, providerId: 'credential' } })).toBe(1)
+      expect((await prisma.user.findUnique({ where: { id } }))?.emailVerified).toBe(false)
+    })
+  }
+
+  it('Gegenprobe: eine Kundin mit demselben Aufbau wird angemeldet', async () => {
+    const { id, email } = await legeNutzerAn('CUSTOMER', { emailVerified: false })
+    const code = await instanzA.api.createVerificationOTP({ body: { email, type: 'sign-in' } })
+
+    expect(await versuche(instanzA, email, code)).toEqual({ ok: true })
+    expect(await prisma.session.count({ where: { userId: id } })).toBe(1)
+  })
+
+  it('Gegenprobe: eine Kundin fordert an — Code-Zeile da, Mail im Nachlauf', async () => {
+    const { email } = await legeNutzerAn('CUSTOMER')
+    await fordereCodeAn(instanzA, email)
+    expect(await codeZeilen(email)).toBe(1)
+  })
+
+  it('ein Hof mit Großbuchstaben in der gespeicherten Adresse gilt nicht als „unbekannt"', async () => {
+    const kennung = intKennung('hof-gross')
+    const gespeichert = `${kennung}@Example.COM`
+    const getippt = `${kennung}@example.com`
+    const { id } = await legeNutzerAn('FARMER', { email: gespeichert })
+
+    await instanzA.api.sendVerificationOTP({ body: { email: getippt, type: 'sign-in' } })
+    await arbeiteNachlaufAb()
+    expect(await codeZeilen(getippt)).toBe(0)
+    expect(versand.codes).toHaveLength(0)
+
+    const code = await instanzA.api.createVerificationOTP({ body: { email: getippt, type: 'sign-in' } })
+    expect(await versuche(instanzA, getippt, code)).toEqual({ ok: false, code: 'INVALID_OTP' })
+    // Kein zweites Konto (CUSTOMER) neben dem Hof, keine Sitzung.
+    expect(await prisma.user.count({ where: { email: { equals: getippt, mode: 'insensitive' } } })).toBe(1)
+    expect(await prisma.session.count({ where: { userId: id } })).toBe(0)
+  })
+
+  it('ein Code aus der Zeit vor der Nachbesserung verschwindet, sobald der Hof erneut anfordert', async () => {
+    const { email } = await legeNutzerAn('FARMER')
+    await instanzA.api.createVerificationOTP({ body: { email, type: 'sign-in' } })
+    expect(await codeZeilen(email)).toBe(1)
+
+    await instanzA.api.sendVerificationOTP({ body: { email, type: 'sign-in' } })
+    expect(await codeZeilen(email)).toBe(0)
   })
 
   it('nur „sign-in" darf angefordert werden — kein Passwort-Zurücksetzen per Code', async () => {
@@ -193,6 +305,30 @@ describe('HTTP-Pfade', () => {
     const email = neueAdresse()
     const antwort = await post('/email-otp/send-verification-otp', { email, type: 'sign-in' })
     expect(antwort.status).toBe(200)
+    await arbeiteNachlaufAb()
     expect(versand.codes.some((c) => c.email === email)).toBe(true)
+  })
+
+  it('Hof und Kundin bekommen über HTTP dieselbe Antwort — beim Anfordern und beim Anmelden', async () => {
+    const hof = `${intKennung('hof-http')}@example.com`
+    await prisma.user.create({
+      data: { id: intKennung('hof-http-nutzer'), email: hof, name: 'Max Mustermann', role: 'FARMER', emailVerified: true },
+    })
+    const kundin = neueAdresse()
+
+    const anfordernHof = await post('/email-otp/send-verification-otp', { email: hof, type: 'sign-in' })
+    const anfordernKundin = await post('/email-otp/send-verification-otp', { email: kundin, type: 'sign-in' })
+    expect(anfordernHof.status).toBe(anfordernKundin.status)
+    expect(await anfordernHof.json()).toEqual(await anfordernKundin.json())
+
+    const codeHof = await instanzA.api.createVerificationOTP({ body: { email: hof, type: 'sign-in' } })
+    await arbeiteNachlaufAb()
+    const codeKundin = versand.codes.findLast((c) => c.email === kundin)!.code
+    const anmeldenHof = await post('/sign-in/email-otp', { email: hof, otp: codeHof })
+    const anmeldenKundinFalsch = await post('/sign-in/email-otp', { email: kundin, otp: falscherCode(codeKundin) })
+    expect(anmeldenHof.status).toBe(400)
+    expect(anmeldenHof.status).toBe(anmeldenKundinFalsch.status)
+    expect(await anmeldenHof.json()).toEqual(await anmeldenKundinFalsch.json())
+    expect(anmeldenHof.headers.get('set-cookie')).toBeNull()
   })
 })

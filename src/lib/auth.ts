@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { UMGEBUNG } from '@/lib/umgebung-server'
 import { ANMELDECODE_PLUGIN_OPTIONEN, GESPERRTE_AUTH_PFADE, codeVersandErlaubt } from '@/lib/anmeldecode'
 import { erzeugeAnforderungsSperre } from '@/lib/anmeldecode-sperre'
+import { nachDerAntwort } from '@/lib/nach-der-antwort'
 
 // Franz-tauglich: 10 Login-Versuche pro Minute pro IP sperren keinen echten
 // Nutzer aus (auch nicht bei Tippfehlern), bremsen aber Passwort-Rater.
@@ -16,6 +17,31 @@ const AUTH_RATE_LIMIT_MAX = 10
 // Höchstens 5 Anmeldecodes je Adresse in 15 Minuten (src/lib/anmeldecode.ts),
 // je Instanz — gegen ein Postfach, das von vielen IPs aus zugeschüttet wird.
 const codeAnforderungen = erzeugeAnforderungsSperre()
+
+/**
+ * Die Rolle hinter einer Adresse, ohne Rücksicht auf Groß-/Kleinschreibung.
+ * Better Auth schreibt Adressen klein, ältere oder von Hand angelegte Konten
+ * können Großbuchstaben tragen — ein exakter Vergleich hielte einen Hof dann
+ * für „unbekannt", schickte ihm einen Code und legte beim Anmelden ein
+ * zweites Kundenkonto an. `null` = kein Konto.
+ */
+async function rolleZurAdresse(email: string): Promise<string | null> {
+  const nutzer = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: 'insensitive' } },
+    select: { role: true },
+  })
+  return nutzer ? nutzer.role : null
+}
+
+/**
+ * Dieselbe Antwort wie bei einem falschen Code — Form und Text so, wie das
+ * emailOTP-Plugin sie wirft (EMAIL_OTP_ERROR_CODES.INVALID_OTP, nicht
+ * exportiert). Wer eine Hof-Adresse probiert, soll nicht erfahren, dass sie
+ * einem Hof gehört.
+ */
+function falscherCodeFehler(): APIError {
+  return APIError.from('BAD_REQUEST', { code: 'INVALID_OTP', message: 'Invalid OTP' })
+}
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
@@ -68,8 +94,23 @@ export const auth = betterAuth({
   // emailOTP-Plugins. Begründung je Pfad in src/lib/anmeldecode.ts.
   disabledPaths: [...GESPERRTE_AUTH_PFADE],
 
+  // ROLLEN-TRENNUNG (E7): Höfe und Admins melden sich NIE mit Code an. Das
+  // muss vor dem Plugin passieren: Es legt den Code an, BEVOR es
+  // sendVerificationOTP ruft, und /sign-in/email-otp fragt nach keiner Rolle.
+  // Ein unterdrückter Mailversand allein hieße: Der Code liegt gültig in der
+  // Datenbank, wer rät, ist als Hof angemeldet — und einem unbestätigten Hof
+  // nähme Better Auth dabei das Passwort (revokeUnprovenAccountAccess).
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path === '/sign-in/email-otp') {
+        const body = ctx.body as { email?: unknown } | undefined
+        if (typeof body?.email !== 'string') return
+        // Antwort wie bei falschem Code; der Code (falls einer liegt) bleibt
+        // unberührt und läuft nach 10 Minuten ab.
+        if (!codeVersandErlaubt(await rolleZurAdresse(body.email.trim()))) throw falscherCodeFehler()
+        return
+      }
+
       if (ctx.path !== '/email-otp/send-verification-otp') return
       // Nur die Anmeldung. Der Typ „forget-password" schickte sonst einem Hof
       // einen Code fürs Passwort, „email-verification" eine Bestätigung, die
@@ -78,13 +119,24 @@ export const auth = betterAuth({
       if (body?.type !== 'sign-in') {
         throw new APIError('BAD_REQUEST', { message: 'Unbekannte Anfrage.' })
       }
+      if (typeof body.email !== 'string') return
       // Wie alle Speicher-Grenzen nur in Produktion (src/lib/rate-limit.ts).
-      if (
-        process.env.NODE_ENV === 'production' &&
-        typeof body.email === 'string' &&
-        !codeAnforderungen.erlaubt(body.email)
-      ) {
+      // Vor der Rollenprüfung: Ein Hof wird genauso gebremst wie eine Kundin.
+      if (process.env.NODE_ENV === 'production' && !codeAnforderungen.erlaubt(body.email)) {
         throw new APIError('TOO_MANY_REQUESTS', { message: 'Zu viele Anfragen.' })
+      }
+      // Hof oder Admin: KEIN Code wird angelegt — der Hook antwortet selbst,
+      // genau wie das Plugin bei einer Kundin ({ success: true }), und der
+      // Endpunkt läuft gar nicht erst. Die Adresse geht so in die Abfrage,
+      // wie das Plugin sie prüft (klein geschrieben, nicht getrimmt): Eine
+      // Adresse, die das Plugin als ungültig ablehnte, soll auch hier nicht
+      // anders antworten.
+      const email = body.email.toLowerCase()
+      if (!codeVersandErlaubt(await rolleZurAdresse(email))) {
+        // Ein Code aus der Zeit vor dieser Sperre verschwindet dabei — und
+        // die Datenbank schreibt einmal, wie bei einer Kundin (Antwortzeit).
+        await prisma.verification.deleteMany({ where: { identifier: `sign-in-otp-${email}` } })
+        return ctx.json({ success: true })
       }
     }),
   },
@@ -97,24 +149,32 @@ export const auth = betterAuth({
       ...ANMELDECODE_PLUGIN_OPTIONEN,
       sendVerificationOTP: async ({ email, otp, type }) => {
         if (type !== 'sign-in') return
-        // Höfe melden sich mit Passwort an — sie bekommen keinen Code. Die
-        // Antwort an den Browser bleibt dieselbe (keine Auskunft, wer ein Hof ist).
-        const nutzer = await prisma.user.findUnique({ where: { email }, select: { role: true } })
-        if (!codeVersandErlaubt(nutzer ? nutzer.role : null)) return
-        try {
-          const { sendAnmeldeCodeEmail } = await import('@/lib/email')
-          const ergebnis = await sendAnmeldeCodeEmail(email, otp)
-          // Ohne Versand (lokal ohne RESEND_API_KEY) steht der Code im
-          // Terminal, sonst käme niemand an ihn heran. Code und Adresse
-          // dürfen NIE in die Produktions-Logs (Vercel) — auch nicht bei
-          // einem Resend-Fehler.
-          if (!ergebnis.id && process.env.NODE_ENV !== 'production') {
-            console.log(`[DEV] Anmeldecode für ${email}: ${otp}`)
+        // Die Mail erst NACH der Antwort (CODING_STANDARDS „nachDerAntwort"):
+        // Sonst antwortete eine Kunden-Adresse um die Dauer von Rendern und
+        // Resend langsamer als eine Hof-Adresse (die der Hook oben ohne Mail
+        // beantwortet) — die Antwortzeit verriete, wer ein Hof ist. Better
+        // Auth läuft im Routen-Handler (app/api/auth/[...all]), dort greift
+        // after(); `advanced.backgroundTasks` hätte dasselbe geleistet, gälte
+        // aber für alle Hintergrundaufgaben von Better Auth.
+        nachDerAntwort(async () => {
+          // Zweite Sicherung, falls der Hook je umgangen würde: kein Code an
+          // einen Hof. (Der Hook legt für Höfe gar keinen an.)
+          if (!codeVersandErlaubt(await rolleZurAdresse(email))) return
+          try {
+            const { sendAnmeldeCodeEmail } = await import('@/lib/email')
+            const ergebnis = await sendAnmeldeCodeEmail(email, otp)
+            // Ohne Versand (lokal ohne RESEND_API_KEY) steht der Code im
+            // Terminal, sonst käme niemand an ihn heran. Code und Adresse
+            // dürfen NIE in die Produktions-Logs (Vercel) — auch nicht bei
+            // einem Resend-Fehler.
+            if (!ergebnis.id && process.env.NODE_ENV !== 'production') {
+              console.log(`[DEV] Anmeldecode für ${email}: ${otp}`)
+            }
+          } catch (err) {
+            // Nur die Art des Fehlers — sein Text könnte die Adresse tragen.
+            console.error('[Anmeldecode] E-Mail-Fehler:', err instanceof Error ? err.name : 'unbekannt')
           }
-        } catch (err) {
-          // Nur die Art des Fehlers — sein Text könnte die Adresse tragen.
-          console.error('[Anmeldecode] E-Mail-Fehler:', err instanceof Error ? err.name : 'unbekannt')
-        }
+        })
       },
     }),
     // Übergang: Neue Magic Links gibt es nicht mehr (disabledPaths oben),

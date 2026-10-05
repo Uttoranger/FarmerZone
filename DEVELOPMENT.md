@@ -3787,6 +3787,7 @@ in der `KundeShell`.
   einem noch unbestätigten Konto beim ersten Code das Passwort
   (`revokeUnprovenAccountAccess`, so schon beim Magic Link). Die Antwort an den
   Browser ist dieselbe wie bei einer Kundin — keine Auskunft, wer ein Hof ist.
+  Durchgesetzt im `before`-Hook, nicht im Versand (siehe Nachbesserung 1).
 - **Neue Adresse** bekommt beim ersten Anmelden ein Kundenkonto ohne Passwort —
   wie bisher beim Magic Link (bestehende freiwillige Anmeldung, E8 lässt sie
   bestehen). Kein Konto-Angebot auf der Seite, kein „Konto anlegen".
@@ -3804,12 +3805,55 @@ in der `KundeShell`.
   Produktion nie. Sentry entfernt `otp`-Parameter und Ziffern hinter
   „Code"/„OTP".
 - **Weiterleitung:** `?ziel=` auf `/account/login` nur über `zielNachAnmeldung`
-  (eigener relativer Pfad, kein `//`, kein Rückstrich, nicht `/api`), sonst
+  (eigener relativer Pfad, kein `//` — auch nicht nach dem Auflösen von „."
+  und „.." —, kein Rückstrich, nicht `/api`), sonst
   `/account/profile` wie bisher. Hof-Ziel unverändert nur `/teilen`
   (`zielNachHofAnmeldung`, aus dem alten `login-client.tsx` gezogen).
 - **Für Nr. 14 („Bestellungen finden"):** `KundeCodeFormular` mit eigenem `ziel`
   und `zielNachAnmeldung(roh, standard)` wiederverwenden; Ablauf, Texte und
-  Bremsen bleiben dieselben.
+  Bremsen bleiben dieselben. **Achtung (E8):** `disableSignUp: false` legt beim
+  ersten Code-Login ein Kundenkonto an — für die freiwillige Anmeldung
+  vereinbar, für „Bestellungen finden" wäre es ein stilles Konto bei jeder
+  Bestellsuche. Nr. 14 braucht dort einen eigenen Weg (ohne Sitzung bzw. ohne
+  Anlegen).
+
+### Nachbesserung 1 (Prüfung Nr. 08)
+
+- **Rollen-Trennung war nur halb.** Better Auth legt den Code an, BEVOR
+  `sendVerificationOTP` läuft (`resolveOTP`), und `/sign-in/email-otp` fragt
+  nach keiner Rolle. Das frühere `return` im Versand unterdrückte nur die Mail:
+  Für eine Hof- oder Admin-Adresse lag trotzdem ein gültiger Code in
+  `Verification`. Wer ihn riet (jede neue Anforderung = neuer Code mit
+  5 Versuchen, Bremsen nur im Speicher), war als Hof angemeldet; bei
+  `emailVerified=false` nahm Better Auth dem Konto dabei das Passwort. Jetzt
+  zwei Sperren im `before`-Hook (`auth.ts`): Anfordern für Nicht-Kundinnen legt
+  keinen Code an, sondern antwortet selbst mit `{ success: true }` (ein Hook,
+  der ein Objekt ohne `context` zurückgibt, ersetzt in `better-auth@1.6.23`
+  den Endpunkt, `api/dispatch.mjs` `runBeforeHooks`) und löscht dabei einen
+  alten Code; `/sign-in/email-otp` wirft für Nicht-Kundinnen dieselbe
+  `INVALID_OTP`-Antwort wie ein falscher Code — auch mit gültigem Code.
+- **Groß-/Kleinschreibung:** Die Rolle wird case-insensitiv gesucht
+  (`findFirst` mit `mode: 'insensitive'`), sonst galt ein Hof mit
+  Großbuchstaben in der gespeicherten Adresse als „unbekannt", bekam einen Code
+  und beim Anmelden ein zweites Kundenkonto.
+- **Antwortzeit:** Die Code-Mail läuft über `nachDerAntwort()`, also nach der
+  Antwort (`after()` im Routen-Handler `app/api/auth/[...all]`). Vorher wartete
+  die Antwort bei Kundinnen auf Rendern und Resend, bei Höfen nicht — die Zeit
+  verriet, wer ein Hof ist. `advanced.backgroundTasks` hätte dasselbe
+  geleistet, gälte aber für alle Hintergrundaufgaben von Better Auth.
+- **Offene Weiterleitung:** `zielNachAnmeldung` prüfte nur die Eingabe; die
+  Auflösung der Punkt-Segmente machte aus `/.//boese.at`, `/a/..//boese.at`,
+  `/%2e//boese.at` den Pfad `//boese.at` (gegen den Prüf-Ursprung derselbe
+  Ursprung, im Browser ein fremder Rechner). Jetzt wird auch das Ergebnis
+  geprüft.
+- **Code-Feld:** beim Prüfen `readOnly` + `aria-busy` statt `disabled` (der
+  Fokus blieb sonst nach einem Fehler im Nichts), nach einem Fehler Fokus
+  zurück ins Feld, „Einen Moment …" in einer ständigen `role="status"`-Region;
+  die Kästchen teilen sich die Breite (höchstens 46 px), bei 320 px lief die
+  Reihe über.
+- **Zur Kenntnis:** `storeOTP: 'hashed'` ist ein ungesalzener Hash über nur
+  10^6 mögliche Codes — wer die Tabelle liest, rechnet ihn zurück; vertretbar,
+  weil ein Code 10 Minuten gilt und die Tabelle ohnehin Sitzungen enthält.
 
 ## Nützliche Befehle
 

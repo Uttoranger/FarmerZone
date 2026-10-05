@@ -247,8 +247,40 @@ describe('zielNachAnmeldung — keine offene Weiterleitung', () => {
     }
   })
 
+  it('auch nach dem Normalisieren nie ein fremder Ursprung („/.//", „/a/..//", kodierte Punkte)', () => {
+    // Die Eingabe beginnt mit genau einem „/", erst die Auflösung der
+    // Punkt-Segmente macht daraus „//boese.example.com" — der Browser liest
+    // das als fremden Rechner (Nachbesserung 1).
+    for (const boese of [
+      '/.//boese.example.com',
+      '/a/..//boese.example.com',
+      '/%2e//boese.example.com',
+      '/%2E//boese.example.com',
+      '/x/%2e%2e//boese.example.com',
+      '/x/%2E%2E//boese.example.com',
+      '/././/boese.example.com',
+      '/.//boese.example.com/account?x=1#y',
+      '/a/../\\boese.example.com',
+      '/a/..%5C%5Cboese.example.com',
+      '/.%5C/boese.example.com',
+      '/.\t//boese.example.com',
+      '/%09//boese.example.com',
+      '/.%09//boese.example.com',
+      '/%2e%2e//boese.example.com',
+    ]) {
+      expect(zielNachAnmeldung(boese), boese).toBe('/account/profile')
+    }
+  })
+
+  it('Gegenprobe: Punkt-Segmente, die lokal bleiben, gehen normalisiert durch', () => {
+    expect(zielNachAnmeldung('/a/../account/profile')).toBe('/account/profile')
+    expect(zielNachAnmeldung('/./hof-test')).toBe('/hof-test')
+  })
+
   it('keine Ziele in die Schnittstellen — ein Link soll nie eine Aktion auslösen', () => {
     expect(zielNachAnmeldung('/api/auth/sign-out')).toBe('/account/profile')
+    expect(zielNachAnmeldung('/%61pi/auth/sign-out')).toBe('/account/profile')
+    expect(zielNachAnmeldung('/x/../api/auth/sign-out')).toBe('/account/profile')
   })
 
   it('verwirft Nicht-Text und überlange Ziele', () => {

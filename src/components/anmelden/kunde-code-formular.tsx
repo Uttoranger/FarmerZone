@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState, type Ref } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
@@ -88,6 +88,7 @@ export function CodeEmailSchritt({ email, onEmail, onAbsenden, laedt, fehler }: 
           'Code schicken'
         )}
       </button>
+      <LadeStatus laedt={laedt} />
     </form>
   )
 }
@@ -105,6 +106,8 @@ export type CodeEingabeSchrittProps = {
   hinweis: string | null
   /** Sekunden, bis „Code erneut senden" wieder geht; 0 = jetzt. */
   wartezeit: number
+  /** Für den Fokus zurück ins Feld nach einem Fehler. */
+  codeFeldRef?: Ref<HTMLInputElement>
 }
 
 export function CodeEingabeSchritt({
@@ -118,6 +121,7 @@ export function CodeEingabeSchritt({
   fehler,
   hinweis,
   wartezeit,
+  codeFeldRef,
 }: CodeEingabeSchrittProps): React.JSX.Element {
   const feldId = useId()
   const meldungId = useId()
@@ -145,6 +149,7 @@ export function CodeEingabeSchritt({
         ungueltig={Boolean(fehler)}
         beschreibtVon={fehler || hinweis ? meldungId : undefined}
         gesperrt={laedt}
+        feldRef={codeFeldRef}
       />
       {fehler && (
         <p id={meldungId} role="alert" className={FEHLER_TEXT}>
@@ -166,6 +171,7 @@ export function CodeEingabeSchritt({
           'Anmelden'
         )}
       </button>
+      <LadeStatus laedt={laedt} />
       <div className="flex flex-wrap justify-between gap-x-2">
         <button type="button" onClick={onErneut} disabled={laedt || wartezeit > 0} className={TEXTKNOPF}>
           {wartezeit > 0 ? `Code erneut senden (${wartezeit} s)` : 'Code erneut senden'}
@@ -178,6 +184,20 @@ export function CodeEingabeSchritt({
         Der Code wird beim Antippen automatisch aus der E-Mail übernommen, wenn dein Telefon das kann.
       </p>
     </form>
+  )
+}
+
+/**
+ * „Einen Moment …" für den Screenreader. Der Knopftext allein wird nicht
+ * angesagt — besonders nicht beim automatischen Absenden, wenn der Fokus im
+ * Code-Feld steht. Die Region steht immer da (leer, solange nichts lädt),
+ * sonst sagen Screenreader die erste Meldung nicht an.
+ */
+function LadeStatus({ laedt }: { laedt: boolean }): React.JSX.Element {
+  return (
+    <p role="status" className="sr-only">
+      {laedt ? 'Einen Moment …' : ''}
+    </p>
   )
 }
 
@@ -198,6 +218,7 @@ export function KundeCodeFormular({ ziel }: { ziel: string }): React.JSX.Element
   const [hinweis, setHinweis] = useState<string | null>(null)
   const [gesendetUm, setGesendetUm] = useState<number | null>(null)
   const [jetzt, setJetzt] = useState(() => Date.now())
+  const codeFeldRef = useRef<HTMLInputElement>(null)
 
   const wartezeit = restWartezeitSekunden(gesendetUm, jetzt)
 
@@ -253,6 +274,9 @@ export function KundeCodeFormular({ ziel }: { ziel: string }): React.JSX.Element
         // vorn — der Fehlertext bleibt stehen.
         setCode('')
         setLaedt(false)
+        // Zurück ins Feld (readOnly hält den Fokus meist schon; nach einem
+        // Klick auf „Anmelden" stand er auf dem gesperrten Knopf).
+        codeFeldRef.current?.focus()
         return
       }
       // Angemeldet. Das Ziel ist auf dem Server geprüft (zielNachAnmeldung).
@@ -261,6 +285,7 @@ export function KundeCodeFormular({ ziel }: { ziel: string }): React.JSX.Element
     } catch {
       setFehler(anmeldeFehlerText({}, 'pruefen'))
       setLaedt(false)
+      codeFeldRef.current?.focus()
     }
   }
 
@@ -298,6 +323,7 @@ export function KundeCodeFormular({ ziel }: { ziel: string }): React.JSX.Element
       fehler={fehler}
       hinweis={hinweis}
       wartezeit={wartezeit}
+      codeFeldRef={codeFeldRef}
     />
   )
 }

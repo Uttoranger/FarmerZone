@@ -46,7 +46,8 @@ export const CODE_ANFORDERUNGEN_JE_ADRESSE = { max: 5, fensterMs: 15 * 60_000 } 
  * - `disableSignUp: false`: wie der Magic Link bisher — eine neue Adresse
  *   bekommt beim ersten Anmelden ein Kundenkonto ohne Passwort. Das ist die
  *   bestehende freiwillige Kunden-Anmeldung (E8: sie bleibt erhalten), kein
- *   Konto beim Bestellen.
+ *   Konto beim Bestellen. „Bestellungen finden" (Nr. 14) darf deshalb NICHT
+ *   einfach diesen Weg nehmen — jede Bestellsuche legte sonst still ein Konto an.
  */
 export const ANMELDECODE_PLUGIN_OPTIONEN = {
   otpLength: ANMELDECODE_LAENGE,
@@ -93,7 +94,8 @@ export const ZIEL_MAX = 512
  * ein Code würde einem noch unbestätigten Hof-Konto über Better Auth das
  * Passwort entziehen (revokeUnprovenAccountAccess). Die Antwort an den
  * Browser ist in beiden Fällen dieselbe — wer eine Adresse eintippt, erfährt
- * nicht, ob dahinter ein Hof steht.
+ * nicht, ob dahinter ein Hof steht. Durchgesetzt im before-Hook von auth.ts
+ * (kein Code wird angelegt, keine Anmeldung mit Code), nicht erst im Versand.
  */
 export function codeVersandErlaubt(rolle: string | null | undefined): boolean {
   return rolle === null || rolle === undefined || rolle === 'CUSTOMER'
@@ -150,8 +152,9 @@ const PRUEF_URSPRUNG = 'https://farmerzone.invalid'
  * — sonst wäre die Anmeldeseite ein Sprungbrett auf fremde Seiten (offene
  * Weiterleitung, beliebt für Phishing: „melde dich auf farmerzone.at an" und
  * landet woanders). Abgelehnt wird alles, was nicht mit genau einem „/"
- * beginnt, Rückstriche und Steuerzeichen trägt, kodiert mit „//" beginnt oder
- * in die Schnittstellen (/api) führt. Im Zweifel das Standardziel.
+ * beginnt, Rückstriche und Steuerzeichen trägt, kodiert mit „//" beginnt,
+ * NACH dem Auflösen von „." und „.." mit „//" beginnt oder in die
+ * Schnittstellen (/api) führt. Im Zweifel das Standardziel.
  */
 export function zielNachAnmeldung(roh: unknown, standard: string = STANDARD_ZIEL_NACH_CODE): string {
   if (typeof roh !== 'string' || roh.length === 0 || roh.length > ZIEL_MAX) return standard
@@ -165,11 +168,28 @@ export function zielNachAnmeldung(roh: unknown, standard: string = STANDARD_ZIEL
     return standard
   }
   if (entschluesselt.startsWith('//') || entschluesselt.includes('\\')) return standard
+  if (/[\u0000-\u001f\u007f]/.test(entschluesselt)) return standard
 
   const url = new URL(roh, PRUEF_URSPRUNG)
   if (url.origin !== PRUEF_URSPRUNG) return standard
-  if (url.pathname === '/api' || url.pathname.startsWith('/api/')) return standard
-  return `${url.pathname}${url.search}${url.hash}`
+  // Geprüft wird das ERGEBNIS, nicht nur die Eingabe: Die Auflösung der
+  // Punkt-Segmente macht aus „/.//boese.at", „/a/..//boese.at" oder
+  // „/%2e//boese.at" den Pfad „//boese.at" — gegen den Prüf-Ursprung bleibt
+  // der Ursprung gleich, im Browser (router.replace) ist es ein fremder
+  // Rechner. Deshalb hier noch einmal alles, was ein Browser als
+  // Rechnerangabe lesen könnte.
+  const pfad = url.pathname
+  if (pfad.startsWith('//') || pfad.startsWith('/\\')) return standard
+  let pfadEntschluesselt: string
+  try {
+    pfadEntschluesselt = decodeURIComponent(pfad)
+  } catch {
+    return standard
+  }
+  if (pfadEntschluesselt.startsWith('//') || pfadEntschluesselt.includes('\\')) return standard
+  // Auch kodiert („/%61pi/…") nicht in die Schnittstellen.
+  for (const p of [pfad, pfadEntschluesselt]) if (p === '/api' || p.startsWith('/api/')) return standard
+  return `${pfad}${url.search}${url.hash}`
 }
 
 /**
