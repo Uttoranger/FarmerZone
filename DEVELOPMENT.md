@@ -3538,6 +3538,22 @@ bleibt trotzdem gebührenfrei, bis der Betreiber im Admin „gilt ab" setzt
 
 ---
 
+## Redesign Gate 2: Bausteine und Shells (Nachtlauf Nr. 05, 2026-10-05)
+
+**Was entstand:** zwölf Bausteine in `src/components/ui` (Liste in `docs/ai/DESIGN_SYSTEM.md`, „Komponenten"), die Sheet-Variante `SheetBlatt`, vier Shells in `src/components/shells/` und die Vorschau `/intern/bausteine` samt Shell-Vorschauen. Keine bestehende Route nutzt sie — das Redesign zieht Route für Route mit den folgenden Gates um.
+
+**Warum die Hof-Ordnung zweimal in `bauern-navigation.ts` steht:** Die HofShell folgt dem Mockup (Handy: Produkte statt Mein Hof in der Leiste, „Region" in Verkauf und Kunden). Hätte ich die Bestandsexporte umgestellt, wäre die laufende Bauern-Navigation (`farmer-nav.tsx`) über Nacht umgesprungen — ein Big Bang durch die Hintertür. `hofNavigation` baut deshalb aus denselben Punkten, die Bestandsexporte bleiben, bis die letzte Hof-Route in der Shell ist; dann fällt der Bestandsteil weg.
+
+**E8 in der KundeShell:** Ohne Kundenkonto gibt es weder „Meine Höfe" noch „Merken"; die Handy-Leiste hat drei Plätze. Eine Seite mit den eigenen Bestellungen gibt es noch nicht — „Bestellungen" führt vorläufig zur bestehenden Kunden-Anmeldung (`/account/login`), bis Nr. 08 „Bestellungen finden" (E-Mail und Code) baut. „So funktioniert’s" zeigt auf `/#so-funktionierts`; die Sprungmarke setzt der Umbau der Startseite (Nr. 07).
+
+**Neu-Menü:** „Was legst du an?" mit Produkt, Neuer Beitrag, Verkauf eintragen (E13). Die Dreiteilung Lebensmittel · Futtermittel · Brennmaterial aus dem Mockup kommt mit Nr. 18, wenn die Wahl das Formular bestimmt — vorher führten drei Einträge auf denselben Dialog.
+
+**Altbefund Fokus:** `outline-none` + `focus-visible:outline-2` zeigt in Tailwind 4 keinen Rahmen (Rahmenart bleibt „none"). Die neuen Bausteine nehmen `FOKUS_RAHMEN` mit `outline-solid`; `farmer-nav.tsx` ist unverändert und hat den Fehler noch (die Gegenprobe in `tests/fokus-sichtbar.test.ts` zeigt ihn) — er verschwindet mit dem Umzug in die HofShell.
+
+**Base-UI-Fallen, die in der Abnahme auffielen:** ToggleGroup setzt `aria-orientation` an `role="group"` (Axe `aria-allowed-attr`) — das Segment rendert als `role="toolbar"`. Progress formatiert den Wert als Prozent, auch wenn `max` nicht 100 ist („3 von 8" stand als „3 %") — die ProgressBar rechnet den Anteil selbst.
+
+**Cookie-Hinweis:** steht jetzt in einer eigenen Landmarke (`section`, „Hinweis zu Cookies"), der Link „Mehr erfahren" nimmt `text-brand-text` statt `text-primary` und ist immer unterstrichen — im neuen Design wäre Orange als Schrift zu schwach gewesen, im Bestand ist der Ton am Tag gleich.
+
 ## Nützliche Befehle
 
 ```bash

@@ -7,7 +7,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 // gleicht die Liste mit den Ordnern ab; ein neuer Ordner fällt dort auf.
 const KEINE_HOFSEITE = [
   'account', 'admin', 'analytics', 'api', 'customers', 'dashboard', 'datenschutz',
-  'farm-page', 'fehler-melden', 'forgot-password', 'hoefe', 'impressum', 'konditionen',
+  'farm-page', 'fehler-melden', 'forgot-password', 'hoefe', 'impressum', 'intern', 'konditionen',
   'login', 'meldungen', 'onboarding', 'orders', 'problem-melden', 'products', 'register',
   'reset-password', 'sales', 'settings', 'status', 'teilen', 'verify',
 ];

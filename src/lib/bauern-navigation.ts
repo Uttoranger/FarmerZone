@@ -192,20 +192,28 @@ function treffer(pfad: string, ziel: string): number {
   return pfad === ohneSuche || pfad.startsWith(ohneSuche + '/') ? ohneSuche.length : -1
 }
 
-/**
- * Der aktive Punkt zu einem Pfad — der längste passende, damit ein
- * Unterpfad nie zwei Punkte zugleich hervorhebt. null = kein Punkt
- * (z. B. /onboarding).
- */
-export function aktiverPunkt(pfad: string): NavPunktId | null {
-  let bester: { id: NavPunktId; laenge: number } | null = null
-  for (const punkt of ALLE) {
+/** Der längste passende Punkt einer Liste — gemeinsam für Bestand und HofShell. */
+function aktivIn<Id extends string>(
+  liste: readonly { id: Id; href: string; auchAktivAuf?: readonly string[] }[],
+  pfad: string
+): Id | null {
+  let bester: { id: Id; laenge: number } | null = null
+  for (const punkt of liste) {
     for (const ziel of [punkt.href, ...(punkt.auchAktivAuf ?? [])]) {
       const laenge = treffer(pfad, ziel)
       if (laenge >= 0 && (!bester || laenge > bester.laenge)) bester = { id: punkt.id, laenge }
     }
   }
   return bester?.id ?? null
+}
+
+/**
+ * Der aktive Punkt zu einem Pfad — der längste passende, damit ein
+ * Unterpfad nie zwei Punkte zugleich hervorhebt. null = kein Punkt
+ * (z. B. /onboarding).
+ */
+export function aktiverPunkt(pfad: string): NavPunktId | null {
+  return aktivIn(ALLE, pfad)
 }
 
 /** „Mehr" gilt als aktiv für jeden Pfad, dessen Ziel im Mehr-Blatt liegt. */
@@ -222,5 +230,103 @@ export function mehrAktiv(pfad: string): boolean {
  */
 export function ariaAktuell(pfad: string, punkt: NavPunkt): 'page' | 'true' | undefined {
   if (aktiverPunkt(pfad) !== punkt.id) return undefined
+  return pfad === punkt.href.split('?')[0] ? 'page' : 'true'
+}
+
+// ─── Neue HofShell (Redesign, Gate 2) ───────────────────────────────────────
+//
+// Die Ordnung der HofShell (components/shells/hof-shell.tsx) nach
+// docs/ai/DESIGN_SYSTEM.md, „Shells und Navigation – feste Einträge". Sie baut
+// aus denselben Punkten wie die Bestandsnavigation oben und steht deshalb in
+// derselben Datei — EINE Quelle für die Welt des Hofs. Getrennt bleibt sie,
+// solange noch keine Route in die HofShell umgezogen ist: Die Bestandsleiste
+// (farmer-nav.tsx) behält ihre Ordnung (Mein Hof in der Handy-Leiste, kein
+// „Region"), damit nichts auf einmal umspringt (kein Big Bang). Zieht die
+// letzte Seite um, fällt der Bestandsteil weg.
+//
+// Unterschiede zum Bestand, alle aus dem Mockup:
+//  - Handy: Produkte statt Mein Hof in der Leiste; Mein Hof steht in „Mehr".
+//  - „Verkauf und Kunden" bekommt „Region". Eine eigene Route /region gibt es
+//    erst mit Gate 8 — bis dahin führt der Punkt auf das heutige Umfeld.
+//  - „Beiträge" ist ein Reiter in Mein Hof (E12), kein eigener Punkt.
+//  - Das Neu-Menü fragt „Was legst du an?". Die Wahl Lebensmittel ·
+//    Futtermittel · Brennmaterial bestimmt erst mit Nr. 18 das Formular; bis
+//    dahin führt „Produkt" auf den vorhandenen Dialog, der alle drei kann.
+
+/** Punkte der HofShell: die des Bestands plus „Region". */
+export type HofNavId = NavPunktId | 'region'
+
+export type HofNavPunkt = Omit<NavPunkt, 'id'> & { id: HofNavId }
+
+const REGION: HofNavPunkt = { id: 'region', label: 'Region', href: '/analytics/umfeld' }
+
+/** „Verkauf und Kunden" der HofShell — im Browser als Gruppe, am Handy in „Mehr". */
+const HOF_VERKAUF_UND_KUNDEN: readonly HofNavPunkt[] = [...VERKAUF_UND_KUNDEN, REGION]
+
+export const HOF_NEU_TITEL = 'Was legst du an?'
+
+/** Das Neu-Menü (Browser: Aufklappmenü am Neu-Knopf, Handy: Blatt hinter dem Plus). */
+const HOF_NEU: readonly NeuPunkt[] = [
+  { id: 'produkt-anlegen', label: 'Produkt', satz: 'Lebensmittel, Futter oder Brennholz', href: '/products?neu=1' },
+  { id: 'status-posten', label: 'Neuer Beitrag', satz: 'Neuigkeit auf deiner Hofseite', href: '/status/new' },
+  { id: 'verkauf-eintragen', label: 'Verkauf eintragen', satz: 'Was du am Hof oder am Markt verkauft hast', href: '/sales?neu=1' },
+]
+
+export type HofLeistenPlatz = { art: 'punkt'; punkt: HofNavPunkt } | { art: 'neu' } | { art: 'mehr' }
+
+const HOF_HANDY_LEISTE: readonly HofLeistenPlatz[] = [
+  { art: 'punkt', punkt: hauptPunkt('heute') },
+  { art: 'punkt', punkt: hauptPunkt('bestellungen') },
+  { art: 'neu' },
+  { art: 'punkt', punkt: hauptPunkt('produkte') },
+  { art: 'mehr' },
+]
+
+const HOF_ALLE: readonly HofNavPunkt[] = [...HAUPT, ...HOF_VERKAUF_UND_KUNDEN, ...UNTEN]
+
+/** Was in „Mehr" steht: alle Ziele der Seitenleiste ohne Platz in der Handy-Leiste, in Leistenreihenfolge. */
+const HOF_MEHR: readonly HofNavPunkt[] = HOF_ALLE.filter(
+  (p) => !HOF_HANDY_LEISTE.some((platz) => platz.art === 'punkt' && platz.punkt.id === p.id)
+)
+
+export type HofNavigation = {
+  /** Seitenleiste oben: Heute · Bestellungen · Produkte · Mein Hof. */
+  haupt: readonly HofNavPunkt[]
+  verkaufUndKunden: readonly HofNavPunkt[]
+  /** Seitenleiste unten, danach folgen Darstellung und Abmelden (Handlungen, keine Ziele). */
+  unten: readonly HofNavPunkt[]
+  neu: readonly NeuPunkt[]
+  handyLeiste: readonly HofLeistenPlatz[]
+  /** Das Mehr-Blatt am Handy, danach Darstellung und Abmelden. */
+  mehr: readonly HofNavPunkt[]
+}
+
+/** Die Ordnung der HofShell für dieses Konto — „Admin" nur für den Betreiber. */
+export function hofNavigation({ isAdmin }: { isAdmin: boolean }): HofNavigation {
+  const sichtbar = (p: HofNavPunkt) => isAdmin || !p.nurAdmin
+  return {
+    haupt: HAUPT.filter(sichtbar),
+    verkaufUndKunden: HOF_VERKAUF_UND_KUNDEN.filter(sichtbar),
+    unten: UNTEN.filter(sichtbar),
+    neu: HOF_NEU,
+    handyLeiste: HOF_HANDY_LEISTE,
+    mehr: HOF_MEHR.filter(sichtbar),
+  }
+}
+
+/** Der aktive Punkt der HofShell — wie `aktiverPunkt`, mit „Region". */
+export function hofAktiverPunkt(pfad: string): HofNavId | null {
+  return aktivIn(HOF_ALLE, pfad)
+}
+
+/** „Mehr" gilt als aktiv für jeden Pfad, dessen Ziel im Mehr-Blatt der HofShell liegt. */
+export function hofMehrAktiv(pfad: string): boolean {
+  const id = hofAktiverPunkt(pfad)
+  return id !== null && HOF_MEHR.some((p) => p.id === id)
+}
+
+/** aria-current für einen Punkt der HofShell — Regel wie `ariaAktuell`. */
+export function hofAriaAktuell(pfad: string, punkt: HofNavPunkt): 'page' | 'true' | undefined {
+  if (hofAktiverPunkt(pfad) !== punkt.id) return undefined
   return pfad === punkt.href.split('?')[0] ? 'page' : 'true'
 }
