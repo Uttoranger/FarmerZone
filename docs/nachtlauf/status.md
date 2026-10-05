@@ -9,7 +9,8 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 03 | H3 Bar-Bestätigung | fertig | nacht/2026-10-02/03-bar-bestaetigung | #166 | main | Mail-Text „48 Stunden" im selben PR korrigiert; Mockup-Abweichungen (Untertitel-Grau, Handy-Kopf bis Gate 2, Knopf 44 px) freigegeben | 05.10.2026 |
 | 04 | Servicegebühr | fertig | `nacht/2026-10-02/04-servicegebuehr` | #167 | 03 (#166) | Spalten-Default `@default(4.9)` bleibt (Migration nicht freigegeben); Pilothof-Satz im Admin auf 5 % stellen | 05.10.2026 |
 | 05 | Bausteine und Shells | fertig | `nacht/2026-10-02/05-bausteine-shells` | #168 | 04 (#167) | Vor Merge: Slug `intern` in Produktion prüfen; Cookie-Hinweis-Änderung und Mockup-Abweichungen freigeben; vorläufige Ziele „Bestellungen“/„Region“ | 05.10.2026 |
-| 06 | Schema-Expand | offen | | | | | |
+| 06 | Schema-Expand | fertig | `nacht/2026-10-02/06-schema-expand` | #169 | 05 (#168) | Geldfelder Variante A, Migrationsweg `prisma migrate diff` freigegeben (freigabe.md §6) | 05.10.2026 |
+| 06b | Reservierte Slugs vollständig | offen | | | | | |
 | 07 | Startseite | offen | | | | | |
 | 08 | Anmelden | offen | | | | | |
 | 09 | Entdecken | offen | | | | | |

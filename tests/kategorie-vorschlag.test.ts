@@ -8,7 +8,12 @@
  * Dual-Use-Wörter verhindern jeden Vorschlag.
  */
 import { describe, it, expect } from 'vitest'
-import { kategorieVorschlag } from '@/lib/taxonomie'
+import {
+  PRODUCT_SUBCATEGORY_VALUES,
+  UNTERKATEGORIE_LABEL,
+  VORBEREITETE_UNTERKATEGORIEN,
+  kategorieVorschlag,
+} from '@/lib/taxonomie'
 
 describe('kategorieVorschlag — eindeutige Treffer', () => {
   it('„Lammfleisch" → Fleisch › Lamm (Label am Wortanfang)', () => {
@@ -89,5 +94,39 @@ describe('kategorieVorschlag — kein Vorschlag', () => {
 
   it('Treffer in zwei Kategorien → nichts', () => {
     expect(kategorieVorschlag('Lamm mit Käse')).toBeNull()
+  })
+})
+
+// Nachbesserung 1 zu Nr. 06 (Schema-Expand): Die vorbereiteten
+// Brennmaterial-Arten stehen im Enum und haben Labels, gehören aber zu keiner
+// Kategorie. Trafen ihre Labels einen Produktnamen, warf kategorieVon — und
+// mit ihm die Produktliste (produktHinweise) und das Tippen im Produktdialog.
+// Erwartet ist genau das Ergebnis von vor dem Schema-Expand.
+describe('kategorieVorschlag — vorbereitete Unterkategorien lösen nie etwas aus', () => {
+  it('„Brennholz Buche" → Brennholz ohne Unterkategorie, wie vor dem Schema-Expand', () => {
+    expect(kategorieVorschlag('Brennholz Buche')).toEqual({ category: 'BRENNHOLZ', subcategory: null })
+  })
+
+  it('„Hackschnitzel", „Anzündholz", „Buche Scheite" werfen nicht und ergeben nichts', () => {
+    for (const name of ['Hackschnitzel', 'Anzündholz', 'Buche Scheite']) {
+      expect(() => kategorieVorschlag(name), name).not.toThrow()
+      expect(kategorieVorschlag(name), name).toBeNull()
+    }
+  })
+
+  it('kein Label einer vorbereiteten Unterkategorie bringt kategorieVorschlag zum Werfen', () => {
+    expect(VORBEREITETE_UNTERKATEGORIEN.length).toBeGreaterThan(0)
+    for (const l2 of VORBEREITETE_UNTERKATEGORIEN) {
+      const label = UNTERKATEGORIE_LABEL[l2]
+      for (const name of [label, `${label} Buche`, `Buche ${label}`, `Bio ${label}`]) {
+        expect(() => kategorieVorschlag(name), name).not.toThrow()
+      }
+    }
+  })
+
+  it('kein Label irgendeiner Unterkategorie bringt kategorieVorschlag zum Werfen', () => {
+    for (const l2 of PRODUCT_SUBCATEGORY_VALUES) {
+      expect(() => kategorieVorschlag(UNTERKATEGORIE_LABEL[l2]), l2).not.toThrow()
+    }
   })
 })

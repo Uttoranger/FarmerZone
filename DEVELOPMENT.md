@@ -3557,6 +3557,111 @@ bleibt trotzdem gebührenfrei, bis der Betreiber im Admin „gilt ab" setzt
 
 **Abmelden in der HofShell:** `fuehreAbmeldenAus` (`src/lib/abmelden.ts`) wertet beide Fehlerwege von Better Auth (Antwort `{ error }`, Wurf ohne Netz) als „noch angemeldet" und zeigt einen Satz statt weiterzuleiten. Die Vorschau unter `/intern` gibt einen Ersatz mit — sonst hätte ein Klick den Admin vor der Vorschau abgemeldet.
 
+## Schema-Expand Redesign (Gate 3, Nachtlauf Nr. 06, 2026-10-05)
+
+Migration `20261005120000_schema_expand_redesign`, nur die in
+`docs/nachtlauf/freigabe.md` (Abschnitt 2) angehakten Punkte, rein additiv. Kein
+Code liest oder schreibt die neuen Strukturen; sie kommen mit Gate 5 bis 8.
+**Eingespielt wird die Migration erst nach dem Merge durch den Menschen.**
+
+**Was neu ist:**
+- Enum-Werte: `ProductUnit` + `RAUMMETER`, `SCHUETTRAUMMETER`;
+  `ProductSubcategory` + `BRENNHOLZ_SCHEIT`, `ANZUENDHOLZ`, `HACKSCHNITZEL` (E11).
+- Neue Enums: `Verpackung` (LOSE_BALLEN, ABGEPACKT_ETIKETT, E10), `Trocknung`
+  (OFENFERTIG, LUFTTROCKEN, FRISCH), `TeilenKanal` (WHATSAPP, WHATSAPP_STATUS,
+  FACEBOOK, INSTAGRAM, EMAIL, QR, LINK — je ein Wert für die Link-Kürzel aus
+  Gate 7), `Tarif` (HOFTOR, HOFLADEN, E6).
+- `Farm.tarif?`, `Farm.sepaMandatAm?`; `Product.familieId?` + Index,
+  `Product.verpackung?`; `Order.serviceFeeMinCentsApplied?`,
+  `Order.erstattetCents` (Default 0), `Order.teilenKanal?`; `OrderItem.fehltSeit?`.
+- Tabellen `BrennmaterialAngaben` (1:1 Produkt, Kaskade), `TeilenAufruf`
+  (eindeutig je Hof/Kanal/Tag, Kaskade), `Monatsabrechnung` (eindeutig je
+  Hof/Monat, RESTRICT wie Order). Alle drei mit RLS wie der Rest.
+
+**Weggelassen, weil nicht freigegeben:** `Farm.betriebsnummerGeprueftAm` (E9:
+die Plattform prüft nicht), `Merkliste` (E8: kein Kundenkonto),
+`RueckrufAnfrage` (nie besprochen).
+
+**Entscheidungen, wo die Vorlage offen war:**
+- **`Farm.tarif` ohne Default.** Kein heutiger Hof hat einen Tarif gewählt.
+  HOFTOR hieße Grenzen (3 Produkte, 1 Abholzeit), HOFLADEN 19 € im Monat —
+  jeder Default würde Bestandshöfen etwas unterstellen. null heißt „bisheriges
+  Modell", genau der heutige Zustand; kein UPDATE auf Bestandszeilen.
+- **Beträge in ganzen Cent (Int)**, nicht `Decimal(10,2)`: `erstattetCents` heißt
+  in der Freigabe so, und alle neuen Beträge rechnen gegen `serviceFeeCents`
+  und Stripe-Beträge, die schon in Cent sind (wie `src/server/queries/admin.ts`,
+  „Alle Beträge in Cent"). Das weicht von der Altlast-Zeile in
+  `ARCHITECTURE.md` §6 ab („Neue Geldfelder: Decimal(10,2)") — im Bericht Nr. 06
+  zur Entscheidung gestellt, die Regel ist nicht geändert.
+- **Teilstorno (E14) so knapp wie möglich:** `OrderItem.fehltSeit` (welche
+  Position nicht übergeben wird), `Order.erstattetCents` (Summe der
+  Teilerstattungen an die Kundin — die Grenze „nie mehr als bezahlt" setzt der
+  Schreibweg per bedingtem `updateMany` durch) und der Snapshot
+  `Order.serviceFeeMinCentsApplied`: Ohne ihn müsste die Neuberechnung der
+  Gebühr die heutige Hofeinstellung lesen. Den schreibt der Checkout noch nicht
+  (kein Feature-Code in diesem Schritt); Gate 5 muss für `null` (alle älteren
+  Bestellungen) einen Rückfall festlegen. Ob Gate 5 `totalAmount` und
+  `serviceFeeCents` nach einem Teilstorno überschreibt oder daneben eine
+  „aktuelle Gebühr" führt, ist offen gelassen — beides geht ohne weitere
+  Spalte bzw. additiv. Hinweis für Gate 5: Ein späterer Vollstorno
+  (`stornoBetraege`) muss `erstattetCents` abziehen.
+- **Brennmaterial:** `holzart` Freitext (offene Liste, Enum-Werte sind
+  endgültig); Wassergehalt und Körnung als Zahl der Klasse (W20 → 20, P31 → 31)
+  statt Enum aus demselben Grund; `gelagertSeit` als Datum, damit „seit 2 Jahren"
+  nicht veraltet; `ueberdacht` Default false. Die Käufer-Hinweise aus dem
+  Mockup (Anhänger nötig, Frontlader, selbst aufladen) stehen nicht in der
+  Vorlage und fehlen bewusst.
+- **`TeilenAufruf` ohne Zeitstempel** — nur Hof, Kanal, Kalendertag, zwei Zähler.
+- **`Monatsabrechnung`** nach dem Mockup der Auswertung: Monat (DATE, der
+  Erste), Tarif als Snapshot, Grundgebühr, Bar-Servicegebühren und deren Zahl,
+  Online-Gebühren (nur informativ), Zahl „nicht abgeholt", Lastschrift-Summe,
+  `eingezogenAm`. Kein Status-Enum und keine Stripe-ID: Wie die Lastschrift
+  läuft, ist noch nicht gebaut; beides kommt additiv mit Gate 8.
+
+**Vorbereitete Unterkategorien:** Der Abgleich-Test verlangt, dass
+`PRODUCT_SUBCATEGORY_VALUES` das Prisma-Enum spiegelt. Die drei Brennmaterial-
+Arten stehen deshalb in `VORBEREITETE_UNTERKATEGORIEN` (`src/lib/taxonomie.ts`)
+mit Labels, aber nicht in `TAXONOMIE.BRENNHOLZ`: Sonst hätte jedes
+Brennholz-Produkt sofort den Hinweis „Unterkategorie ergänzen" bekommen und das
+Formular eine Auswahl gezeigt. `gehoertZu` sagt für sie false, Zod lehnt sie ab.
+Die neuen Einheiten brauchten keine Code-Änderung: `PRODUCT_UNIT_VALUES` kennt
+sie nicht, Zod lehnt sie ab, kein Formular bietet sie an.
+
+**Rückrollen hinter diesen Schritt:** Die fünf neuen Werte an `ProductUnit` und
+`ProductSubcategory` und die vier neuen Enum-Typen sind endgültig (PostgreSQL
+kennt kein `DROP VALUE`). Solange keine Zeile einen neuen Wert trägt — bis
+Gate 6 schreibt niemand einen —, ist das Rückrollen des Codes gefahrlos; die
+neuen Spalten und Tabellen stören alten Code nicht. Trägt eine Zeile einen
+neuen Wert, wirft Code von vor diesem Schritt beim Lesen (wie bei
+`VERMUTLICH_WUNSCH`, siehe Triage): vorher die betroffenen Produkte umstellen,
+z. B. `UPDATE "Product" SET unit = 'M3' WHERE unit IN ('RAUMMETER', 'SCHUETTRAUMMETER');`
+und `UPDATE "Product" SET subcategory = NULL WHERE subcategory IN ('BRENNHOLZ_SCHEIT', 'ANZUENDHOLZ', 'HACKSCHNITZEL');`.
+
+**Wie die Migration entstand:** Der vorgesehene Weg
+`prisma migrate dev --create-only` scheitert an der Shadow-Datenbank (P3006 bei
+`20260804091431_enable_rls`: dort fehlt `_prisma_migrations`). Deshalb von Hand
+geschrieben und wiederholbar wie die früheren. Belege: `pnpm test:integration`
+spielt sie auf die befüllte lokale Testdatenbank ein; `prisma migrate diff
+--from-config-datasource --to-schema` meldet danach „No difference detected";
+ein zweiter Lauf derselben SQL läuft fehlerfrei durch.
+
+**Nachbesserung 1 (Prüfer-Befund, Absturz):** `kategorieVorschlag` lief über
+alle `PRODUCT_SUBCATEGORY_VALUES` — damit auch über die vorbereiteten
+Brennmaterial-Arten. Traf deren Label einen Produktnamen („Brennholz Buche",
+„Hackschnitzel", „Anzündholz", „Buche Scheite"), warf `kategorieVon`
+(„Unterkategorie ohne Kategorie"). `produktHinweise` ruft das für jedes Produkt
+ohne Kategorie in der Produktliste auf, der Produktdialog bei jedem Tastendruck
+im Namen: Ein Bestandsprodukt „Brennholz …" ohne Kategorie hätte die Liste des
+Hofs abgerissen. Ursache: Der Typ `ProductSubcategoryValue` umfasste nach dem
+Expand auch Werte ohne Kategorie, `kategorieVon` nahm ihn trotzdem an — der
+Compiler sicherte nicht mehr ab, was der Kommentar versprach. Fix:
+`ZugeordneteUnterkategorie` (nur TAXONOMIE) und `ZUGEORDNETE_UNTERKATEGORIEN`;
+`kategorieVon` nimmt nur diesen Typ, `kategorieVorschlag` läuft nur über die
+zugeordneten. Ein Differenztest gegen den Stand vor dem Expand (über 5000 Namen
+aus allen Labels und Paaren) ergab keine Abweichung; neue Tests in
+`kategorie-vorschlag.test.ts`, `produkt-hinweise.test.ts`, `taxonomie.test.ts`
+(dort mit `@ts-expect-error` als Beleg, dass der Compiler den Aufruf abweist).
+
 ## Nützliche Befehle
 
 ```bash

@@ -8,7 +8,9 @@
  * keine Prisma-Typen, sondern eigene Literale.
  *
  * DIE REGELN:
- *   Jede Unterkategorie (L2) gehört zu GENAU EINER Kategorie (L1). Fisch,
+ *   Jede Unterkategorie (L2) gehört zu GENAU EINER Kategorie (L1) — einzige
+ *   Ausnahme sind die VORBEREITETEN_UNTERKATEGORIEN (Expand vor Gate 6), die
+ *   noch zu keiner gehören und deshalb nirgends wählbar sind. Fisch,
  *   Brot, Getränke, Brennholz, Sonstiges, Mischfutter und Ergänzungsfutter
  *   haben bewusst keine L2.
  *   Der BEREICH (Lebensmittel, Futtermittel, Sonstiges) ist eine Funktion der
@@ -105,12 +107,40 @@ export const TAXONOMIE = {
   SONSTIGES: [],
 } as const satisfies Record<ProductCategoryValue, readonly string[]>
 
-export type ProductSubcategoryValue = (typeof TAXONOMIE)[ProductCategoryValue][number]
+/**
+ * Unterkategorien, die schon im Prisma-Enum stehen, aber noch zu KEINER
+ * Kategorie gehören (Schema-Expand Redesign, Gate 3, E11 Brennmaterial).
+ * Enum-Werte müssen vor dem Code in die Datenbank (Expand); wählbar werden sie
+ * erst mit dem Brennmaterial-Formular (Gate 6), das sie nach TAXONOMIE.BRENNHOLZ
+ * verschiebt und diese Liste leert.
+ *
+ * Bis dahin gilt: gehoertZu sagt für jede Kategorie false — Zod lehnt sie
+ * deshalb ab („passt nicht zu …"), kein Formular, kein Filter und keine
+ * Hofseite bietet sie an, und hatUnterkategorien('BRENNHOLZ') bleibt false.
+ * Bewusst NICHT schon in TAXONOMIE.BRENNHOLZ: Das hätte jedem Brennholz-Produkt
+ * den Hinweis „Unterkategorie ergänzen" eingebracht und die Auswahl geöffnet —
+ * eine Verhaltensänderung vor dem Formular, das die Angaben dazu erfasst.
+ */
+export const VORBEREITETE_UNTERKATEGORIEN = ['BRENNHOLZ_SCHEIT', 'ANZUENDHOLZ', 'HACKSCHNITZEL'] as const
 
-/** Alle L2 in Enum-Reihenfolge (Fleisch, Eier, Milch, Gemüse, Obst, Honig,
- *  Futtermittel-Altlast, Heu & Stroh, Getreide & Körner — so steht es im
- *  Prisma-Enum, nicht in L1-Reihenfolge). */
-export const PRODUCT_SUBCATEGORY_VALUES = [
+/** Eine L2, die in TAXONOMIE steht und damit genau eine Kategorie hat. */
+export type ZugeordneteUnterkategorie = (typeof TAXONOMIE)[ProductCategoryValue][number]
+
+export type VorbereiteteUnterkategorie = (typeof VORBEREITETE_UNTERKATEGORIEN)[number]
+
+/**
+ * Jeder Wert des Prisma-Enums — was in der Datenbank stehen kann. Wer eine
+ * KATEGORIE zu einer L2 braucht (kategorieVon), nimmt ZugeordneteUnterkategorie:
+ * Ein vorbereiteter Wert hat keine, und der Compiler soll das verhindern, nicht
+ * ein Absturz zur Laufzeit (Nachbesserung 1 zu Nr. 06).
+ */
+export type ProductSubcategoryValue = ZugeordneteUnterkategorie | VorbereiteteUnterkategorie
+
+/** Die L2 aus TAXONOMIE in Enum-Reihenfolge (Fleisch, Eier, Milch, Gemüse,
+ *  Obst, Honig, Futtermittel-Altlast, Heu & Stroh, Getreide & Körner — so steht
+ *  es im Prisma-Enum, nicht in L1-Reihenfolge). Wer über L2 läuft und dabei
+ *  eine Kategorie braucht, läuft hierüber, nie über PRODUCT_SUBCATEGORY_VALUES. */
+export const ZUGEORDNETE_UNTERKATEGORIEN = [
   ...TAXONOMIE.FLEISCH,
   ...TAXONOMIE.EIER,
   ...TAXONOMIE.MILCH,
@@ -120,6 +150,13 @@ export const PRODUCT_SUBCATEGORY_VALUES = [
   ...TAXONOMIE.FUTTERMITTEL,
   ...TAXONOMIE.HEU_STROH,
   ...TAXONOMIE.GETREIDE_KOERNER,
+] as const satisfies readonly ZugeordneteUnterkategorie[]
+
+/** Alle L2 des Prisma-Enums: die zugeordneten, dann die vorbereiteten
+ *  Brennmaterial-Arten. Für Zod und den Abgleich mit dem Schema. */
+export const PRODUCT_SUBCATEGORY_VALUES = [
+  ...ZUGEORDNETE_UNTERKATEGORIEN,
+  ...VORBEREITETE_UNTERKATEGORIEN,
 ] as const satisfies readonly ProductSubcategoryValue[]
 
 // Deutsch, mit Umlauten. Die L1 steht in der Anzeige daneben — deshalb
@@ -179,6 +216,10 @@ export const UNTERKATEGORIE_LABEL: Record<ProductSubcategoryValue, string> = {
   WEIZEN: 'Weizen',
   ROGGEN: 'Roggen',
   TRITICALE: 'Triticale',
+  // Brennmaterial — vorbereitet, noch nicht wählbar (VORBEREITETE_UNTERKATEGORIEN)
+  BRENNHOLZ_SCHEIT: 'Brennholz (Scheite)',
+  ANZUENDHOLZ: 'Anzündholz',
+  HACKSCHNITZEL: 'Hackschnitzel',
 }
 
 /** L2 aus Taxonomie 1, die seit Bereiche 1 nicht mehr gewählt werden dürfen. */
@@ -189,7 +230,7 @@ export function istAltlastUnterkategorie(l2: ProductSubcategoryValue | null | un
 }
 
 /** Die Unterkategorien einer Kategorie in Anzeigereihenfolge; leer ohne L2. */
-export function unterkategorienVon(l1: ProductCategoryValue): readonly ProductSubcategoryValue[] {
+export function unterkategorienVon(l1: ProductCategoryValue): readonly ZugeordneteUnterkategorie[] {
   return TAXONOMIE[l1]
 }
 
@@ -207,11 +248,18 @@ export function gehoertZu(
   return (TAXONOMIE[l1] as readonly ProductSubcategoryValue[]).includes(l2)
 }
 
-/** Die L1, zu der eine L2 gehört — es gibt genau eine. */
-export function kategorieVon(l2: ProductSubcategoryValue): ProductCategoryValue {
+/** Steht die L2 in TAXONOMIE, hat sie also eine Kategorie? */
+export function istZugeordneteUnterkategorie(l2: ProductSubcategoryValue): l2 is ZugeordneteUnterkategorie {
+  return (ZUGEORDNETE_UNTERKATEGORIEN as readonly ProductSubcategoryValue[]).includes(l2)
+}
+
+/** Die L1, zu der eine L2 gehört — es gibt genau eine. Nimmt nur zugeordnete
+ *  L2; eine vorbereitete (ohne Kategorie) weist schon der Compiler ab. */
+export function kategorieVon(l2: ZugeordneteUnterkategorie): ProductCategoryValue {
   const treffer = PRODUCT_CATEGORY_VALUES.find((l1) => gehoertZu(l1, l2))
-  // Jede L2 steht in TAXONOMIE — das sichert der Typ. Ohne Treffer wäre die
-  // Tabelle kaputt, nicht die Eingabe; deshalb ein Fehler statt eines Rückfalls.
+  // Jede ZugeordneteUnterkategorie steht in TAXONOMIE — das sichert der Typ.
+  // Ohne Treffer wäre die Tabelle kaputt, nicht die Eingabe; deshalb ein
+  // Fehler statt eines Rückfalls.
   if (!treffer) throw new Error(`Unterkategorie ohne Kategorie: ${l2}`)
   return treffer
 }
@@ -573,7 +621,7 @@ export const DUAL_USE = [
  * Unterkategorie meinen. Zählen nur als GANZES Wort — „Heu" darf nicht
  * „Heumilch" treffen; Heumilch ist in Österreich ein eigener Begriff.
  */
-const SYNONYME: Readonly<Record<string, ProductSubcategoryValue>> = {
+const SYNONYME: Readonly<Record<string, ZugeordneteUnterkategorie>> = {
   Heu: 'WIESENHEU',
   Heuballen: 'WIESENHEU',
   Heumilch: 'TRINKMILCH',
@@ -601,7 +649,7 @@ const SYNONYME: Readonly<Record<string, ProductSubcategoryValue>> = {
  * zählen nur, wenn im Namen auch ihre Kategorie steht — sonst würde
  * „Bio-Lammfleisch" zu Eier › Bio.
  */
-const ALLGEMEINE_L2: readonly ProductSubcategoryValue[] = ['EIER_BIO', 'EIER_FREILAND', 'EIER_BODENHALTUNG']
+const ALLGEMEINE_L2: readonly ZugeordneteUnterkategorie[] = ['EIER_BIO', 'EIER_FREILAND', 'EIER_BODENHALTUNG']
 
 /** Kategorien, die nie vorgeschlagen werden: Altlast und „Sonstiges" (sagt nichts). */
 const OHNE_VORSCHLAG: readonly ProductCategoryValue[] = ['FUTTERMITTEL', 'SONSTIGES']
@@ -636,7 +684,7 @@ const trifftWortanfang = (namensWoerter: string[], schluessel: string[]) =>
 
 export type KategorieVorschlag = {
   category: ProductCategoryValue
-  subcategory: ProductSubcategoryValue | null
+  subcategory: ZugeordneteUnterkategorie | null
 }
 
 /**
@@ -666,8 +714,11 @@ export function kategorieVorschlag(name: string): KategorieVorschlag | null {
   // „Ei" ist zu kurz für einen Wortanfang („Eis", „Eintopf") — nur als ganzes Wort.
   if (namensWoerter.includes('ei')) l1Treffer.add('EIER')
 
-  const l2Treffer = new Set<ProductSubcategoryValue>()
-  for (const l2 of PRODUCT_SUBCATEGORY_VALUES) {
+  // Nur zugeordnete L2: Eine vorbereitete (Brennholz-Scheite, Anzündholz,
+  // Hackschnitzel) hat keine Kategorie, die man vorschlagen könnte — ihr Label
+  // träfe Bestandsprodukte wie „Brennholz Buche" und kategorieVon würfe.
+  const l2Treffer = new Set<ZugeordneteUnterkategorie>()
+  for (const l2 of ZUGEORDNETE_UNTERKATEGORIEN) {
     if (istAltlastUnterkategorie(l2)) continue
     if (!trifftWortanfang(namensWoerter, labelSchluessel(UNTERKATEGORIE_LABEL[l2]))) continue
     if (ALLGEMEINE_L2.includes(l2) && !l1Treffer.has(kategorieVon(l2))) continue

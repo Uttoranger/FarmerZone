@@ -258,6 +258,10 @@ export async function raeumeAuf(): Promise<void> {
       OR: [{ id: { startsWith: INT_PRAEFIX } }, { farm: { slug: { startsWith: INT_PRAEFIX } } }],
     },
   })
+  // Monatsabrechnung → Farm ist RESTRICT (Aufbewahrungspflicht), sie muss vor
+  // dem Hof weg. TeilenAufruf und BrennmaterialAngaben hängen kaskadierend an
+  // Hof bzw. Produkt.
+  await prisma.monatsabrechnung.deleteMany({ where: { farm: { slug: { startsWith: INT_PRAEFIX } } } })
   await prisma.farm.deleteMany({ where: { slug: { startsWith: INT_PRAEFIX } } })
   await prisma.user.deleteMany({ where: { email: { startsWith: INT_PRAEFIX } } })
   // Die Webhook-Tests vergeben Event-IDs mit Präfix; ohne Aufräumen hielte

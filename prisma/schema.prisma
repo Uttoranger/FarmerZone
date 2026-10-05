@@ -67,6 +67,13 @@ enum ProductUnit {
   // und Sonstiges angeboten (Brennholz im Big Bag).
   BALLEN
   BIGBAG
+  // Schema-Expand Redesign (Gate 3, E11) — Brennmaterial. M3 ist für Holz
+  // mehrdeutig (gestapelt oder geschüttet) und bleibt nur für Altdaten. Die
+  // beiden Werte sind angelegt, aber noch nicht wählbar: PRODUCT_UNIT_VALUES
+  // (src/schemas/product.ts) kennt sie nicht, Zod lehnt sie ab. Gate 6 schaltet
+  // sie frei.
+  RAUMMETER // 1 m³ ordentlich gestapelt (rm)
+  SCHUETTRAUMMETER // 1 m³ lose geschüttet (srm)
 }
 
 // Reihenfolge = Reihenfolge in PostgreSQL. Die vier Futter-Kategorien kamen per
@@ -154,6 +161,12 @@ enum ProductSubcategory {
   WEIZEN
   ROGGEN
   TRITICALE
+  // Brennmaterial (Schema-Expand Redesign, Gate 3, E11). Angelegt, aber noch
+  // keiner Kategorie zugeordnet und nicht wählbar (VORBEREITETE_UNTERKATEGORIEN
+  // in src/lib/taxonomie.ts). Gate 6 ordnet sie BRENNHOLZ zu.
+  BRENNHOLZ_SCHEIT
+  ANZUENDHOLZ
+  HACKSCHNITZEL
 }
 
 // === BEREICHE (Sprint Bereiche 1, docs/konzepte/bereiche.md) ===
@@ -259,6 +272,51 @@ enum KostenRhythmus {
   MONATLICH
   JAEHRLICH
   EINMALIG
+}
+
+// === SCHEMA-EXPAND REDESIGN (Gate 3, docs/umsetzungsprompt.md Abschnitt 5) ===
+//
+// Nur angelegt, noch von keinem Code gelesen oder geschrieben. Jede Spalte an
+// einer bestehenden Tabelle ist nullable oder hat einen Default — im
+// Deploy-Fenster schreibt alter Code weiter, ohne sie zu kennen.
+
+// Wie ein Gebinde verpackt ist (E10). Entscheidet später die Sperre je Gebinde:
+// abgepacktes Heimtierfutter mit eigenem Etikett braucht Betriebsstatus
+// REGISTRIERT (BAES-Meldung), lose Ware und Ballen aus eigener Ernte genügt
+// PRIMAERPRODUKTION (LFBIS).
+enum Verpackung {
+  LOSE_BALLEN
+  ABGEPACKT_ETIKETT
+}
+
+// Trocknungsgrad von Brennmaterial (E11), wie im Formular-Mockup:
+// ofenfertig (unter 20 % Restfeuchte), lufttrocken (20–25 %), frisch (zum
+// selbst Trocknen). Die Prozentangabe steht in BrennmaterialAngaben.restfeuchteMax.
+enum Trocknung {
+  OFENFERTIG
+  LUFTTROCKEN
+  FRISCH
+}
+
+// Über welchen geteilten Link jemand kam (Gate 7, S8). Ein Wert je Kürzel im
+// Link (?k=wa, wa-status, fb, ig, mail, qr, link). Nur zur Zählung je Hof,
+// Kanal und Tag — nie einer Person, einem Gerät oder einer IP zugeordnet.
+enum TeilenKanal {
+  WHATSAPP
+  WHATSAPP_STATUS
+  FACEBOOK
+  INSTAGRAM
+  EMAIL
+  QR
+  LINK
+}
+
+// Tarif des Hofs (E6): Hoftor 0 €/Monat (begrenzt), Hofladen 19 €/Monat.
+// Farm.tarif = null heißt: kein Tarif vereinbart, es gilt das bisherige
+// Modell (keine Grundgebühr, keine Grenzen) — so stehen alle Bestandshöfe da.
+enum Tarif {
+  HOFTOR
+  HOFLADEN
 }
 
 // === ENTITÄTEN ===
@@ -419,6 +477,15 @@ model Farm {
   betriebsnummer String?
   betriebsstatus Betriebsstatus?
 
+  // Tarif und SEPA (Schema-Expand Redesign, E6). Bewusst OHNE Default: Kein
+  // heutiger Hof hat einen Tarif gewählt, und jeder Wert würde etwas
+  // behaupten — HOFTOR hieße Grenzen (3 Produkte, 1 Abholzeit), HOFLADEN eine
+  // Grundgebühr. null = bisheriges Modell, unverändert. Gesetzt wird erst, wenn
+  // der Hof einen Tarif wählt (Gate 8). sepaMandatAm: Zeitpunkt, zu dem der
+  // Hof das SEPA-Lastschriftmandat für die Monatsabrechnung erteilt hat.
+  tarif        Tarif?
+  sepaMandatAm DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -434,6 +501,8 @@ model Farm {
   farmValues    FarmValue[]
   farmPhotos    FarmPhoto[]
   meldungen     Meldung[]
+  teilenAufrufe      TeilenAufruf[]
+  monatsabrechnungen Monatsabrechnung[]
 
   @@index([slug])
 }
@@ -463,6 +532,18 @@ model Product {
   futter      FutterKennzeichnung? // nur im Bereich Futtermittel (bereichVon)
   abgabe      Abgabe               @default(ALLE) // ≠ ALLE nur im Bereich Futtermittel
 
+  // Schema-Expand Redesign (Gate 3) — noch von keinem Code benutzt.
+  // familieId (E3): Verkaufsgrößen als Produktfamilie. Jede Größe bleibt ein
+  // eigenes Produkt mit eigenem Preis, Bestand und eigener Kennzeichnung; was
+  // dieselbe familieId trägt, zeigt die Oberfläche als eine Karte mit
+  // Größenwahl. Kein Fremdschlüssel, keine Familien-Tabelle: Die Familie hat
+  // keine eigenen Daten. null = Einzelprodukt (alle Bestandsprodukte).
+  // verpackung (E10): Verpackung dieses Gebindes, null = keine Angabe.
+  // brennmaterial (E11): Pflichtangaben für Brennmaterial, 1:1.
+  familieId     String?
+  verpackung    Verpackung?
+  brennmaterial BrennmaterialAngaben?
+
   // Lebensmittel-spezifisch
   allergens       String[] @default([])
   // isOrganic: Altlast, wird in einem späteren Sprint entfernt. Seit Sprint
@@ -489,6 +570,7 @@ model Product {
   @@index([farmId])
   @@index([isAvailable])
   @@index([category])
+  @@index([familieId])
 }
 
 // Futtermittel-Kennzeichnung (Sprint Taxonomie 1, erweitert in Bereiche 1).
@@ -520,6 +602,36 @@ model FutterKennzeichnung {
   rohasche                Decimal?  @db.Decimal(5, 2)
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+// Brennmaterial-Angaben (Schema-Expand Redesign, Gate 3, E11) — die Fragen,
+// die jeder Käufer stellt. 1:1 zum Produkt, stirbt mit ihm, wie
+// FutterKennzeichnung. Welche Felder je Art Pflicht sind (Scheitlänge bei
+// Brennholz, Wassergehalt und Körnung bei Hackschnitzeln), entscheidet später
+// das Zod-Schema, nicht die Datenbank.
+//   holzart         Freitext (Buche, Eiche, Fichte, Birke, gemischt …) — kein
+//                   Enum, weil die Liste offen ist und Enum-Werte endgültig sind
+//   scheitlaengeCm  25, 33, 50, 100 … in Zentimetern
+//   restfeuchteMax  höchste Restfeuchte in ganzen Prozent („unter 20 %" → 20)
+//   wassergehalt    Wassergehaltsklasse als Zahl (W20 → 20), Hackschnitzel
+//   koernung        Körnungsklasse als Zahl (P31 → 31), Hackschnitzel
+//   gelagertSeit    Kalenderdatum, ab dem das Holz lagert; „seit 2 Jahren"
+//                   rechnet die Anzeige, damit die Angabe nicht veraltet
+model BrennmaterialAngaben {
+  id             String    @id @default(cuid())
+  productId      String    @unique
+  holzart        String
+  scheitlaengeCm Int?
+  trocknung      Trocknung
+  restfeuchteMax Int?
+  wassergehalt   Int?
+  koernung       Int?
+  gelagertSeit   DateTime? @db.Date
+  ueberdacht     Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
@@ -600,6 +712,27 @@ model Order {
   serviceFeePercentApplied Decimal?  @db.Decimal(5, 2)
   serviceFeeRefundedAt     DateTime?
 
+  // Teilstorno „Artikel fehlt" (Schema-Expand Redesign, E14) — noch von
+  // keinem Code benutzt.
+  //   serviceFeeMinCentsApplied  SNAPSHOT der Mindestgebühr zur Bestellzeit.
+  //                              E14 rechnet die Gebühr auf den verbleibenden
+  //                              Warenwert mit derselben Regel neu; ohne
+  //                              Snapshot müsste sie die heutige
+  //                              Hofeinstellung lesen. null = Bestellung von
+  //                              vor diesem Feld.
+  //   erstattetCents             Summe aller Teilerstattungen an die Kundin
+  //                              (Artikelpreis + Gebührendifferenz), in Cent.
+  //                              Bestandsbestellungen 0, kein Backfill. Nie
+  //                              mehr als bezahlt (totalAmount + serviceFeeCents)
+  //                              — durchgesetzt beim Schreiben (bedingtes
+  //                              updateMany), nicht von der Datenbank.
+  serviceFeeMinCentsApplied Int?
+  erstattetCents            Int  @default(0)
+
+  // Über welchen geteilten Link die Bestellung kam (Gate 7, S8). Nur der Kanal,
+  // nie eine Kennung der Person oder des Geräts. null = unbekannt/direkt.
+  teilenKanal TeilenKanal?
+
   // Käuferart (Sprint Bereiche 1). BETRIEB ist Pflicht, sobald eine Position
   // mit abgabe = NUR_BETRIEBE im Korb liegt — geprüft im Checkout-Handler.
   // betriebsnummer ist ein Snapshot der Eingabe, nur bei BETRIEB gesetzt.
@@ -639,6 +772,11 @@ model OrderItem {
   // Product.vatRate geschrieben, nie nachgelesen, nie rückwirkend geändert.
   // Bewusst ohne @default: Jede neue Position muss den Satz mitbringen.
   vatRate     Decimal @db.Decimal(5, 2)
+  // Teilstorno „Artikel fehlt" (Schema-Expand Redesign, E14): gesetzt, wenn
+  // der Hof die Position als fehlend markiert — sie wird nicht übergeben und
+  // trägt keine Servicegebühr mehr. Die Snapshot-Spalten darüber bleiben
+  // unverändert. null = Position wird übergeben (alle Bestandspositionen).
+  fehltSeit   DateTime?
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
@@ -837,4 +975,58 @@ model Kostenposten {
   notiz     String?
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
+}
+
+// Teilen-Wirkung (Schema-Expand Redesign, Gate 7, S8): Aufrufe und
+// Bestellungen über geteilte Links, NUR als Zähler je Hof, Kanal und
+// Wiener Kalendertag. Diese Tabelle enthält nie Personen-, Geräte- oder
+// IP-Daten — keine Sitzung, kein Cookie, kein User-Agent, kein Zeitstempel
+// eines einzelnen Aufrufs. Gezählt wird per Upsert auf den eindeutigen
+// Schlüssel (farmId, kanal, tag) mit increment.
+model TeilenAufruf {
+  id           String      @id @default(cuid())
+  farmId       String
+  kanal        TeilenKanal
+  tag          DateTime    @db.Date
+  besuche      Int         @default(0)
+  bestellungen Int         @default(0)
+
+  farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  // Der eindeutige Index deckt auch Abfragen nach farmId (erste Spalte).
+  @@unique([farmId, kanal, tag])
+}
+
+// Monatsabrechnung eines Hofs (Schema-Expand Redesign, E6 = Tarife): was die
+// Plattform per SEPA-Lastschrift einzieht — Grundgebühr des Tarifs plus die
+// Servicegebühren aus Barbestellungen, die die Kundinnen dem Hof bar
+// mitbezahlt haben. Online-Gebühren sind bei der Zahlung schon einbehalten
+// und stehen nur informativ dabei. Alle Beträge sind SNAPSHOTS in Cent zum
+// Zeitpunkt der Abrechnung (wie Order.serviceFeeCents), nie neu berechnet.
+//   monat   der ERSTE des Monats als Kalenderdatum (wie Kostenposten.ab) —
+//           ein Zeitstempel könnte durch die Wiener Zeit in den Vormonat rutschen
+//   tarif   Tarif des Hofs in diesem Monat (Snapshot)
+//   summeCents  Betrag der Lastschrift = grundgebuehrCents + servicegebuehrBarCents
+//   eingezogenAm  gesetzt, sobald die Lastschrift eingezogen ist
+// Kein Löschen mit dem Hof (Restrict, wie Order): Abrechnungen unterliegen
+// der Aufbewahrungspflicht.
+model Monatsabrechnung {
+  id                        String    @id @default(cuid())
+  farmId                    String
+  monat                     DateTime  @db.Date
+  tarif                     Tarif
+  grundgebuehrCents         Int
+  servicegebuehrBarCents    Int
+  barBestellungen           Int
+  servicegebuehrOnlineCents Int
+  nichtAbgeholtBestellungen Int
+  summeCents                Int
+  eingezogenAm              DateTime?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  farm Farm @relation(fields: [farmId], references: [id])
+
+  // Eine Abrechnung je Hof und Monat; deckt auch Abfragen nach farmId.
+  @@unique([farmId, monat])
 }
