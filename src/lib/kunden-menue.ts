@@ -22,8 +22,8 @@ export const MENUE_PUNKTE: readonly MenuePunkt[] = [
   { href: '/', text: 'Startseite', gruppe: 'kunden' },
   { href: hoefeLink('LEBENSMITTEL'), text: 'Hofladen entdecken', gruppe: 'kunden' },
   { href: hoefeLink('FUTTERMITTEL'), text: 'Heu & Futter finden', gruppe: 'kunden' },
-  // Sprungmarke auf den Abschnitt der Startseite (id="weiter"), wie im Browser.
-  { href: '/#weiter', text: 'Für Höfe', gruppe: 'hoefe' },
+  // Sprungmarke auf das Band „Für Höfe" der Startseite (id="fuer-hoefe"), wie im Browser.
+  { href: '/#fuer-hoefe', text: 'Für Höfe', gruppe: 'hoefe' },
   { href: '/login', text: 'Hofbetreiber-Login', gruppe: 'hoefe' },
   { href: '/problem-melden', text: 'Problem melden', gruppe: 'hilfe' },
 ]

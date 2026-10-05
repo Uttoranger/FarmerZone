@@ -11,7 +11,7 @@
 import { hoefeLink } from '@/lib/bereiche-anzeige'
 import type { AnzeigeBereich } from '@/lib/taxonomie'
 
-/** Die Kundenseiten mit Kopfzeile. Die Startseite hat ihre eigene (LandingNav). */
+/** Die Kundenseiten mit Kopfzeile. Die Startseite trägt die KundeShell (Nr. 07). */
 export type KundenSeite =
   /** `bereich` ist der tatsächlich angezeigte (teileHofseite), nicht der URL-Parameter:
    *  Ein reiner Futterhof zeigt Futter auch ohne `?bereich`, und geteilte Links tragen keinen. */

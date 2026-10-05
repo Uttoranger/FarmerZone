@@ -348,9 +348,9 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     expect(text.match(/\{kopf\}/g)).toHaveLength(3)
   })
 
-  it('die Startseite behält ihre LandingNav und bekommt keine zweite Kopfzeile', () => {
+  it('die Startseite trägt die KundeShell des neuen Designs und keine zweite Kopfzeile', () => {
     const text = lies('src/app/page.tsx')
-    expect(text).toMatch(/<LandingNav/)
-    expect(text).not.toMatch(/KundenKopf/)
+    expect(text).toMatch(/<KundeShell /)
+    expect(text).not.toMatch(/KundenKopf|LandingNav/)
   })
 })

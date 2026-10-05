@@ -14,9 +14,10 @@
  *  - Web und Handy bekommen aus derselben Quelle dieselben Ziele: Jedes Ziel
  *    der Leiste bietet die Kopfzeile derselben Sitzung auch an.
  *  - Aktiv ist der längste passende Punkt; ein Anker auf der Startseite nie.
+ *  - Als angemeldet zählt nur die Kunden-Anmeldung, nicht die eines Hofs.
  */
 import { describe, it, expect } from 'vitest'
-import { kundenAktiverPunkt, kundenAriaAktuell, kundenNavigation } from '@/lib/kunden-navigation'
+import { istKundensitzung, kundenAktiverPunkt, kundenAriaAktuell, kundenNavigation } from '@/lib/kunden-navigation'
 
 describe('Web', () => {
   it('abgemeldet: Höfe entdecken · So funktioniert’s · Für Höfe · Anmelden', () => {
@@ -128,5 +129,21 @@ describe('aktive Punkte', () => {
     const entdecken = kundenNavigation({ angemeldet: false }).web[0]
     expect(kundenAriaAktuell('/hoefe', entdecken)).toBe('page')
     expect(kundenAriaAktuell('/account/profile', entdecken)).toBeUndefined()
+  })
+})
+
+describe('istKundensitzung', () => {
+  it('zählt die freiwillige Kunden-Anmeldung als angemeldet', () => {
+    expect(istKundensitzung({ role: 'CUSTOMER' })).toBe(true)
+  })
+
+  it('ein angemeldeter Hof sieht die Kundenseite abgemeldet — ohne „Mein Konto" der Kunden', () => {
+    expect(istKundensitzung({ role: 'FARMER' })).toBe(false)
+  })
+
+  it('ohne Sitzung abgemeldet', () => {
+    expect(istKundensitzung(null)).toBe(false)
+    expect(istKundensitzung(undefined)).toBe(false)
+    expect(istKundensitzung({})).toBe(false)
   })
 })

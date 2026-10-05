@@ -3684,6 +3684,52 @@ können einen Slug ändern. Dateirouten auf oberster Ebene (`manifest.ts`,
 `favicon.ico`, `apple-icon.png`) tragen einen Punkt im Pfad, den `generateSlug`
 nie erzeugt — sie brauchen keinen Eintrag.
 
+## Startseite im neuen Design (Nachtlauf Nr. 07, 2026-10-05)
+
+Gate 4, erste Route: `/` zieht in die `KundeShell` (Kopfzeile im Browser,
+Unterleiste am Handy) und ins Design der Mockups `web-k0-startseite` und
+`mobil-k0-startseite`. `LandingNav` und `src/lib/startseite-kacheln.ts` sind weg;
+Abschnitte in `src/components/startseite/`, Texte, Links und Rechnungen in
+`src/lib/startseite.ts`.
+
+- **Sitzung und Laden.** Die Seite ist jetzt dynamisch: Sie liest die Sitzung
+  für die Kopfzeile (ohne Cookie ohne Datenbank, sonst aus dem Sitzungs-Cache).
+  Als angemeldet zählt nur die Kunden-Anmeldung (`istKundensitzung`, Rolle
+  CUSTOMER) — ein angemeldeter Hof sähe sonst „Mein Konto" mit den Kunden-Abos.
+  Die Höfe kommen aus derselben gecachten Liste wie `/hoefe`
+  (`getOeffentlicheHoefe`, fünf Minuten, Etikett `HOEFE_CACHE_TAG`) hinter einer
+  Suspense-Grenze mit Skelett; scheitert das Laden, steht der Fehler inline an
+  den Karten und geht nach Sentry. Keine `src/app/loading.tsx` (gälte für jede
+  Route).
+- **Suche.** Das Feld schickt `q` an `/hoefe` — den einzigen Suchparameter, den
+  `/hoefe` heute versteht (Hof- und Produktnamen). Eine PLZ oder einen Ort nimmt
+  `/hoefe` bewusst nicht aus der Adresse (Standort nie in die URL); der Link
+  „In deiner Nähe suchen" führt zur Umkreissuche dort. Das Mockup sagt „PLZ oder
+  Ort" — offene Entscheidung für Nr. 08 (Entdecken).
+- **Karte rechts** ist ein Bild der Gegend mit Link zur Kartenansicht von
+  `/hoefe`, kein Kartendienst: Leaflet und Kacheln kosten Skript und
+  Fremdabrufe, die die Startseite nicht braucht. Davor der erste Hof.
+- **Höfe in deiner Nähe** ohne Standort: Reihenfolge der Übersicht, pausierte ans
+  Ende, PLZ und Ort statt Kilometer (`waehleStartseitenHoefe`).
+- **Brennmaterial-Band** nur Oktober bis März, Wiener Monat
+  (`istBrennmaterialSaison`); Grenzen um Mitternacht Wiener Zeit getestet.
+- **Weggelassen, bis es stimmt:** Preisangaben der Mockups („ab € 2,50",
+  „ab € 0,18 / kg", „ab € 8,90") — erfundene Beispieldaten; „nur registrierte
+  Futtermittelbetriebe" und „Registrierung bei Ballen gleich mit an" — gibt es
+  erst mit Gate 6; „Holzart, Restfeuchte und Körnung stehen immer dabei" — kommt
+  mit dem Brennmaterial-Formular. Die Konto-Antwort der Fragen widersprach E8
+  und lautet jetzt „ohne Konto".
+- **Sprungmarken:** `#so-funktionierts` und `#fuer-hoefe`; die alte Marke
+  `#weiter` gibt es nicht mehr, `KundenKopf`, `kunden-menue.ts` und
+  `kunden-navigation.ts` zeigen auf `#fuer-hoefe`. Die Anmeldung der Höfe
+  (früher „Hofbetreiber-Login" in der Kopfleiste) steht im Fuß.
+- **Leistung:** Standbild bleibt LCP-Kandidat (`priority`), Video `preload="none"`
+  nur bei erlaubter Bewegung. Produktionsbuild mit Platzhalter-Umgebung: Skripte
+  der Startseite 410,1 → 426,7 KiB gzip (+16,6 KiB: KundeShell mit Warenkorb-
+  Zähler und Theme-Schalter, Akkordeon der Fragen); Schrift-Vorladen kommt jetzt
+  als `Link`-Header statt im HTML; Antwortzeit lokal ~25 ms. Ein
+  Lighthouse-Lauf steht aus (kein Paket).
+
 ## Nützliche Befehle
 
 ```bash

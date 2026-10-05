@@ -12,8 +12,9 @@
  *    Plätzen; die Fokus-Variante hat keine Unterleiste.
  *  - AdminShell: Reiter Höfe · Briefkasten · Finanzen mit Zählern und der Weg
  *    zurück zum Hof, keine Hof-Seitenleiste.
- *  - Kein Big Bang: Außer der Vorschau unter /intern bindet keine Route eine
- *    Shell ein (mit Gegenprobe).
+ *  - Kein Big Bang: Außer der Vorschau unter /intern binden nur die Routen
+ *    eine Shell ein, deren Gate sie umgestellt hat (Liste UMGESTELLT, mit
+ *    Gegenprobe).
  */
 import { describe, it, expect, vi } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
@@ -235,8 +236,21 @@ describe('kein Big Bang', () => {
   suche(wurzel)
   const nutzer = dateien.filter((d) => readFileSync(d, 'utf8').includes('@/components/shells/'))
 
-  it('nur die Vorschau unter /intern bindet eine Shell ein — keine bestehende Route', () => {
-    for (const datei of nutzer) expect(relative(wurzel, datei), datei).toMatch(/^intern\//)
+  // Route für Route: Eine Route kommt hier dazu, wenn ihr Gate sie umstellt
+  // (Nr. 07: die Startseite in die KundeShell).
+  const UMGESTELLT = ['page.tsx']
+
+  it('nur die Vorschau unter /intern und die umgestellten Routen binden eine Shell ein', () => {
+    for (const datei of nutzer) {
+      const pfad = relative(wurzel, datei)
+      if (UMGESTELLT.includes(pfad)) continue
+      expect(pfad, datei).toMatch(/^intern\//)
+    }
+  })
+
+  it('die umgestellten Routen binden ihre Shell wirklich ein', () => {
+    const umgestellt = nutzer.map((d) => relative(wurzel, d)).filter((p) => UMGESTELLT.includes(p))
+    expect(umgestellt.sort()).toEqual([...UMGESTELLT].sort())
   })
 
   it('Gegenprobe: die Vorschau bindet alle drei Shells ein, die Suche findet sie also', () => {

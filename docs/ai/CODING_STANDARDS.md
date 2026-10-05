@@ -297,7 +297,7 @@ Ausnahme: Die Kategorie-Illustrationen (`public/categories/`) sind keine Fotos,
 ihr heller Crème-Grund würde nachts als Fläche leuchten. Jede NEUE Stelle, die
 eine Illustration zeigt, dämpft sie im Dunkeln (`dark:brightness-[…]
 dark:saturate-[…]`) und rahmt sie statt eines Schattens — Vorbild
-`KategorieKachel` in `src/app/page.tsx`. Ältere Stellen: ARCHITECTURE §6.
+`Illustration` in `src/components/startseite/startseite-abschnitte.tsx`. Ältere Stellen: ARCHITECTURE §6.
 
 ### Diagramme
 Recharts schreibt Farben als SVG-Attribute — `var(--token)` greift dort **nicht**.
