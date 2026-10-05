@@ -354,6 +354,12 @@ gegen `background` **und** gegen `card`.
   Auth speichert klein — eine roh gespeicherte Adresse ergibt einen zweiten
   Kunden, den der Anmeldelink nie findet. Nachgeordnete Aufrufe (Better Auth,
   Prisma) bekommen den geprüften Wert, nie die rohe Eingabe.
+- **Case-insensitiv vergleichen nur mit maskiertem Muster.** Prisma macht aus
+  `equals` mit `mode: 'insensitive'` ein ILIKE ohne Maskierung: `_` und `%`
+  im Wert sind Platzhalter und treffen fremde Zeilen. Den Wert immer durch
+  `genauesIlikeMuster` (`src/lib/ilike-muster.ts`) schicken. Hängt an dem
+  Ergebnis eine Berechtigung, zählen ALLE Treffer (`findMany`), nie der erste
+  beliebige (`findFirst`) — Vorbild `rolleZurAdresse` in `src/lib/auth.ts`.
 - **Pflichtfelder am Feld, nicht in `superRefine`.** Zod 4 überspringt
   Querprüfungen, solange ein anderes Feld ungültig ist. Was sofort zählen soll
   (Fehlerzähler im Button, Markierung beim ersten Absenden), gehört als
