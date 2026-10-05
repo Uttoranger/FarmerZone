@@ -36,7 +36,7 @@ const SYMBOL: Partial<Record<KundenNavId, LucideIcon>> = {
 }
 
 const TEXTLINK = cn(
-  'relative inline-flex min-h-11 items-center rounded-lg px-1 text-[14px] text-muted-foreground transition-colors duration-[250ms] hover:text-foreground aria-[current]:font-semibold aria-[current]:text-foreground',
+  'relative inline-flex min-h-11 items-center rounded-lg px-1 text-[14px] whitespace-nowrap text-muted-foreground transition-colors duration-[250ms] hover:text-foreground aria-[current]:font-semibold aria-[current]:text-foreground',
   FOKUS_RAHMEN
 )
 
@@ -77,7 +77,7 @@ export function KundeShell({ angemeldet, unterleiste = true, children }: KundeSh
     <div data-design="neu" className="min-h-dvh bg-background text-foreground">
       <SprungLink />
       <header className="sticky top-0 z-40 border-b border-border bg-background print:hidden">
-        <div className="mx-auto flex h-14 max-w-[1200px] items-center gap-3 px-4 md:h-16 md:gap-[22px] md:px-6">
+        <div className="mx-auto flex h-14 max-w-[1200px] items-center gap-3 px-4 md:h-16 md:gap-3 md:px-6 lg:gap-[22px]">
           <Link href="/" aria-label="FarmerZone – zur Startseite" className={cn('rounded-md', FOKUS_RAHMEN)}>
             <Wortmarke />
           </Link>
@@ -108,11 +108,21 @@ export function KundeShell({ angemeldet, unterleiste = true, children }: KundeSh
           <span className="flex-1" />
 
           <nav aria-label="Hauptnavigation" className="hidden md:block">
-            <ul className="flex items-center gap-[22px]">
+            <ul className="flex items-center gap-4 lg:gap-[22px]">
               {nav.web.map((punkt) => (
                 <li key={punkt.id}>
                   <Link href={punkt.href} aria-current={kundenAriaAktuell(pathname, punkt)} className={TEXTLINK}>
-                    {punkt.label}
+                    {/* Zwischen 768 und 1024 px der kurze Name („Entdecken",
+                        „Bestellungen"): Seit Nr. 14 stehen abgemeldet vier
+                        Links im Kopf, mit den langen Namen bräche er um. */}
+                    {punkt.kurz ? (
+                      <>
+                        <span className="lg:hidden">{punkt.kurz}</span>
+                        <span className="hidden lg:inline">{punkt.label}</span>
+                      </>
+                    ) : (
+                      punkt.label
+                    )}
                   </Link>
                 </li>
               ))}

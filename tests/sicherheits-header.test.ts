@@ -146,6 +146,14 @@ describe('Bestätigungsseite', () => {
     expect(header['X-Robots-Tag']).toBe('noindex, nofollow')
   })
 
+  it('„Bestellungen finden" genauso — nach dem Code stehen dort Beträge und signierte Links (Nr. 14)', () => {
+    const header = headerFuer('/bestellungen')
+    expect(header['Referrer-Policy']).toBe('no-referrer')
+    expect(header['X-Robots-Tag']).toBe('noindex, nofollow')
+    // Keine Hofseite — und damit auch keine Einbettung, auch nicht mit ?vorschau=1.
+    expect(headerFuer('/bestellungen', { vorschau: '1' })['X-Frame-Options']).toBe('DENY')
+  })
+
   it('die übrigen Seiten behalten ihre Referrer-Regel — Gegenprobe', () => {
     expect(headerFuer('/hof-test')['Referrer-Policy']).toBe('strict-origin-when-cross-origin')
     expect(headerFuer('/hof-test/bestellung/order-1')['X-Robots-Tag']).toBeUndefined()

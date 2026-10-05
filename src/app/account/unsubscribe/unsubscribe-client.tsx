@@ -3,10 +3,13 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { BellOff, CheckCircle, TriangleAlert } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { unsubscribeWithToken } from '@/server/actions/subscriptions'
-import { Button } from '@/components/ui/button'
+import { KNOPF_GRUEN, KNOPF_RAHMEN } from '@/components/bestaetigung/bestaetigung-teile'
+import { AbmeldenKarte, TEXTLINK } from './abmelden-karte'
 
-export function UnsubscribeClient({ token }: { token: string }) {
+// Seit Nr. 14 im neuen Design; Ablauf und Texte unverändert.
+export function UnsubscribeClient({ token }: { token: string }): React.JSX.Element {
   const [state, setState] = useState<'confirm' | 'done' | 'error'>('confirm')
   const [loading, setLoading] = useState(false)
 
@@ -21,62 +24,41 @@ export function UnsubscribeClient({ token }: { token: string }) {
     }
   }
 
+  if (state === 'done') {
+    return (
+      <AbmeldenKarte symbol={CheckCircle} ton="gruen" titel="Erfolgreich abgemeldet">
+        <p className="text-[13.5px] leading-normal text-muted-foreground">Du erhältst keine Neuigkeiten mehr von diesem Hof.</p>
+        <Link href="/account/profile" className={TEXTLINK}>
+          Alle Abonnements verwalten
+        </Link>
+      </AbmeldenKarte>
+    )
+  }
+
+  if (state === 'error') {
+    return (
+      <AbmeldenKarte symbol={TriangleAlert} ton="orange" titel="Link ungültig">
+        <p className="text-[13.5px] leading-normal text-muted-foreground">Dieser Abmelde-Link ist nicht mehr gültig.</p>
+        <Link href="/account/profile" className={TEXTLINK}>
+          Abonnements selbst verwalten
+        </Link>
+      </AbmeldenKarte>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <div className="text-center max-w-sm w-full">
-        {state === 'confirm' && (
-          <>
-            <BellOff className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h1 className="font-heading text-xl font-semibold text-foreground mb-2">
-              Abmelden?
-            </h1>
-            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-              Möchtest du dich von den Benachrichtigungen dieses Hofes abmelden?
-              Du kannst dich jederzeit wieder anmelden.
-            </p>
-            <div className="flex flex-col gap-2">
-              <Button onClick={handleUnsubscribe} disabled={loading} variant="destructive">
-                {loading ? 'Abmelden…' : 'Ja, abmelden'}
-              </Button>
-              <Link href="/">
-                <Button variant="ghost" className="w-full">
-                  Abbrechen
-                </Button>
-              </Link>
-            </div>
-          </>
-        )}
-
-        {state === 'done' && (
-          <>
-            <CheckCircle className="w-12 h-12 text-primary mx-auto mb-4" />
-            <h1 className="font-heading text-xl font-semibold text-foreground mb-2">
-              Erfolgreich abgemeldet
-            </h1>
-            <p className="text-sm text-muted-foreground mb-6">
-              Du erhältst keine Neuigkeiten mehr von diesem Hof.
-            </p>
-            <Link href="/account/profile" className="text-sm text-primary underline underline-offset-2">
-              Alle Abonnements verwalten →
-            </Link>
-          </>
-        )}
-
-        {state === 'error' && (
-          <>
-            <TriangleAlert className="mx-auto mb-4 size-12 text-status-offen" strokeWidth={1.5} aria-hidden="true" />
-            <h1 className="font-heading text-xl font-semibold text-foreground mb-2">
-              Link ungültig
-            </h1>
-            <p className="text-sm text-muted-foreground mb-6">
-              Dieser Abmelde-Link ist nicht mehr gültig.
-            </p>
-            <Link href="/account/profile" className="text-sm text-primary underline underline-offset-2">
-              Abonnements selbst verwalten →
-            </Link>
-          </>
-        )}
+    <AbmeldenKarte symbol={BellOff} titel="Abmelden?">
+      <p className="text-[13.5px] leading-relaxed text-muted-foreground">
+        Möchtest du dich von den Benachrichtigungen dieses Hofes abmelden? Du kannst dich jederzeit wieder anmelden.
+      </p>
+      <div className="mt-2 flex w-full flex-col gap-2">
+        <button type="button" onClick={handleUnsubscribe} disabled={loading} className={cn(KNOPF_GRUEN, 'w-full disabled:opacity-60')}>
+          {loading ? 'Abmelden…' : 'Ja, abmelden'}
+        </button>
+        <Link href="/" className={cn(KNOPF_RAHMEN, 'w-full border-transparent')}>
+          Abbrechen
+        </Link>
       </div>
-    </div>
+    </AbmeldenKarte>
   )
 }
