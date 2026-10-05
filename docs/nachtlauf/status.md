@@ -17,8 +17,8 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 10 | Hofseite | fertig | `nacht/2026-10-05/10-hofseite` | #174 | 09 (#173) | Geld-Blocker und JSON-LD-XSS behoben; Reiter „Beiträge“ bestätigen; Mockup-Abweichungen | 05.10.2026 |
 | 11 | Produktdetail | fertig | `nacht/2026-10-05/11-produktdetail` | #175 | 10 (#174) | Grundpreis eine Rundungsstelle; Produktkarten verlinken die Produktseite (Blatt gelöscht); Gate-6-Teile weggelassen | 05.10.2026 |
 | 12 | Checkout | fertig | `nacht/2026-10-05/12-checkout` | #176 | 11 (#175) | E5 umgesetzt; E8: Checkout legt weiter ruhendes Konto an (Entscheidung nötig); EPS/Wallets im Stripe-Dashboard | 05.10.2026 |
-| 13 | Bestätigungen und E-Mails | läuft | `nacht/2026-10-05/13-bestaetigungen` | | 12 (#176) | | 05.10.2026 |
-| 14 | Konto und Meine Höfe | offen | | | | | |
+| 13 | Bestätigungen und E-Mails | fertig | `nacht/2026-10-05/13-bestaetigungen` | #177 | 12 (#176) | „Nochmal bestellen“ in Abholbereit-Mail entscheiden; Opt-in ohne Double-Opt-in; Kalender-Route-Altlasten | 05.10.2026 |
+| 14 | Konto und Meine Höfe | läuft | `nacht/2026-10-05/14-bestellungen-finden` | | 13 (#177) | laut Freigabe: „Bestellungen finden“ per Code + Umbau /account | 05.10.2026 |
 | 15 | Für Höfe, Registrieren, Einrichten | offen | | | | | |
 | 16 | Mein Hof | offen | | | | | |
 | 17 | Heute | offen | | | | | |
