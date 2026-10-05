@@ -31,6 +31,11 @@ import {
   aktiverPunkt,
   ariaAktuell,
   fuerNutzer,
+  hofAktiverPunkt,
+  hofAriaAktuell,
+  hofMehrAktiv,
+  hofNavigation,
+  HOF_NEU_TITEL,
   mehrAktiv,
 } from '@/lib/bauern-navigation'
 
@@ -262,5 +267,129 @@ describe('Vollständigkeit', () => {
     for (const name of ordner) {
       expect(aktiverPunkt(`/${name}`), name).not.toBeNull()
     }
+  })
+})
+
+// ─── Neue HofShell (Gate 2, Redesign) ────────────────────────────────────────
+// Die Ordnung nach docs/ai/DESIGN_SYSTEM.md, „Shells und Navigation – feste
+// Einträge". Sie steht in derselben Datei wie die Bestandsnavigation und baut
+// aus denselben Punkten; die Bestandsnavigation oben bleibt unverändert, bis
+// die erste Route in die HofShell umzieht.
+describe('HofShell: Seitenleiste', () => {
+  it('Hauptpunkte: Heute · Bestellungen · Produkte · Mein Hof — dieselben Punkte wie im Bestand', () => {
+    const nav = hofNavigation({ isAdmin: false })
+    expect(nav.haupt.map((p) => p.label)).toEqual(['Heute', 'Bestellungen', 'Produkte', 'Mein Hof'])
+    expect(nav.haupt).toEqual(HAUPT)
+  })
+
+  it('„Verkauf und Kunden": Kunden · Verkäufe · Auswertung · Region', () => {
+    const nav = hofNavigation({ isAdmin: false })
+    expect(nav.verkaufUndKunden.map((p) => [p.label, p.href])).toEqual([
+      ['Kunden', '/customers'],
+      ['Verkäufe', '/sales'],
+      ['Auswertung', '/analytics'],
+      // Region gibt es als eigene Route erst mit Gate 8; bis dahin ist es das Umfeld.
+      ['Region', '/analytics/umfeld'],
+    ])
+  })
+
+  it('unten: Einstellungen · Hilfe und Rückmeldung · Admin (nur Betreiber, mit Zahl)', () => {
+    expect(hofNavigation({ isAdmin: false }).unten.map((p) => p.id)).toEqual(['einstellungen', 'hilfe'])
+    const betreiber = hofNavigation({ isAdmin: true }).unten
+    expect(betreiber.map((p) => p.id)).toEqual(['einstellungen', 'hilfe', 'admin'])
+    expect(betreiber.find((p) => p.id === 'admin')?.zahl).toBe('admin')
+  })
+
+  it('„Beiträge" ist kein eigener Punkt neben „Mein Hof" (E12: Reiter in Mein Hof)', () => {
+    const nav = hofNavigation({ isAdmin: true })
+    const alle = [...nav.haupt, ...nav.verkaufUndKunden, ...nav.unten, ...nav.mehr]
+    expect(alle.map((p) => p.href)).not.toContain('/status')
+    expect(alle.map((p) => p.label)).not.toContain('Beiträge')
+  })
+
+  it('Neu-Menü: „Was legst du an?" mit Produkt, Beitrag und Verkauf eintragen (E13) — auf die vorhandenen Dialoge', () => {
+    expect(HOF_NEU_TITEL).toBe('Was legst du an?')
+    expect(hofNavigation({ isAdmin: false }).neu.map((p) => [p.label, p.href])).toEqual([
+      ['Produkt', '/products?neu=1'],
+      ['Neuer Beitrag', '/status/new'],
+      ['Verkauf eintragen', '/sales?neu=1'],
+    ])
+    for (const p of hofNavigation({ isAdmin: false }).neu) expect(NEU.map((n) => n.href)).toContain(p.href)
+  })
+})
+
+describe('HofShell: Handy', () => {
+  it('Unterleiste: Heute · Bestellungen · Plus · Produkte · Mehr', () => {
+    const leiste = hofNavigation({ isAdmin: false }).handyLeiste
+    expect(leiste.map((p) => (p.art === 'punkt' ? p.punkt.label : p.art))).toEqual([
+      'Heute',
+      'Bestellungen',
+      'neu',
+      'Produkte',
+      'mehr',
+    ])
+  })
+
+  it('„Mehr": Mein Hof, Kunden, Verkäufe, Auswertung, Region, Einstellungen, Hilfe und Rückmeldung, Admin', () => {
+    expect(hofNavigation({ isAdmin: true }).mehr.map((p) => p.label)).toEqual([
+      'Mein Hof',
+      'Kunden',
+      'Verkäufe',
+      'Auswertung',
+      'Region',
+      'Einstellungen',
+      'Hilfe und Rückmeldung',
+      'Admin',
+    ])
+    expect(hofNavigation({ isAdmin: false }).mehr.map((p) => p.id)).not.toContain('admin')
+  })
+
+  it('Web und Handy bekommen dieselben Einträge — jeder Punkt der Seitenleiste steckt in Leiste oder „Mehr", als derselbe Eintrag', () => {
+    for (const isAdmin of [false, true]) {
+      const nav = hofNavigation({ isAdmin })
+      const web = [...nav.haupt, ...nav.verkaufUndKunden, ...nav.unten]
+      const handy = [
+        ...nav.handyLeiste.flatMap((p) => (p.art === 'punkt' ? [p.punkt] : [])),
+        ...nav.mehr,
+      ]
+      expect(handy.map((p) => p.id).sort()).toEqual(web.map((p) => p.id).sort())
+      for (const punkt of handy) expect(web).toContainEqual(punkt)
+    }
+  })
+})
+
+describe('HofShell: aktive Punkte', () => {
+  it.each([
+    ['/dashboard', 'heute'],
+    ['/orders/abc', 'bestellungen'],
+    ['/products', 'produkte'],
+    ['/status/new', 'mein-hof'],
+    ['/analytics', 'auswertung'],
+    ['/analytics/umfeld', 'region'],
+    ['/admin/finanzen', 'admin'],
+  ])('%s → %s', (pfad, id) => {
+    expect(hofAktiverPunkt(pfad)).toBe(id)
+  })
+
+  it('„Mehr" leuchtet für alles im Mehr-Blatt, nicht für die Leiste', () => {
+    for (const pfad of ['/farm-page', '/status', '/customers', '/analytics/umfeld', '/settings', '/meldungen']) {
+      expect(hofMehrAktiv(pfad), pfad).toBe(true)
+    }
+    for (const pfad of ['/dashboard', '/orders', '/products', '/onboarding']) {
+      expect(hofMehrAktiv(pfad), pfad).toBe(false)
+    }
+  })
+
+  it("aria-current: 'page' auf der Zielseite, 'true' auf Unterseiten", () => {
+    const nav = hofNavigation({ isAdmin: false })
+    const region = nav.verkaufUndKunden.find((p) => p.id === 'region')
+    const auswertung = nav.verkaufUndKunden.find((p) => p.id === 'auswertung')
+    expect(region && hofAriaAktuell('/analytics/umfeld', region)).toBe('page')
+    expect(auswertung && hofAriaAktuell('/analytics/umfeld', auswertung)).toBeUndefined()
+    expect(auswertung && hofAriaAktuell('/analytics', auswertung)).toBe('page')
+  })
+
+  it('die Bestandsnavigation bleibt, wie sie ist: /analytics/umfeld gehört dort weiter zur Auswertung', () => {
+    expect(aktiverPunkt('/analytics/umfeld')).toBe('auswertung')
   })
 })

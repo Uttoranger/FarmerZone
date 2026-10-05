@@ -5,6 +5,8 @@ export const RESERVED_SLUGS = new Set([
   // Öffentliche Hofübersicht: Ein Hof namens „Höfe" bekäme sonst den Slug
   // hoefe — und die statische Route gewänne dauerhaft gegen seine Hofseite.
   'hoefe',
+  // Werkzeugseiten des Betreibers (/intern/bausteine) — aus demselben Grund.
+  'intern',
 ])
 
 export function generateSlug(name: string): string {

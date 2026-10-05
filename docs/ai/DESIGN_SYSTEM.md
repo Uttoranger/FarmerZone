@@ -48,6 +48,27 @@ Alle Farben kommen aus CSS-Custom-Properties auf `:root`, umgeschaltet über `da
 
 - Basiskomponenten liegen an genau **einem** Ort (`src/components/ui`); Kundenseite und Hofbereich importieren nur von dort. Kein Duplizieren in Feature-Ordner.
 - Bestand: Button (accent, primary, outline, ghost), Card, StatusBadge (offen/fertig/neutral), Input mit Label, Select, Stepper, Toggle, Tabs, Filter-Chips, BottomNav mit Mittelbutton-Slot, Sidebar, ListRow, Table, ProgressBar, EmptyState, Skeleton, Toast.
+- **Bausteine des neuen Designs (Gate 2, `src/components/ui`)** — Vorschau `/intern/bausteine` (nur Admin), Render-Test `tests/bausteine.test.ts`:
+
+  | Datei | Baustein | Regel |
+  |---|---|---|
+  | `chip.tsx` | `Chip`, `FilterChip`, `FilterChipReihe` | Filter ist ein Link (`href`), der gewählte trägt `aria-current="page"`; sichtbar 36 px, Trefferfläche 44 px über `::before` |
+  | `stepper.tsx` | `Stepper` | Base UI NumberField; `max` setzt der Aufrufer, verbindlich prüft der Server |
+  | `segment.tsx` | `Segment` | Base UI ToggleGroup als `role="toolbar"`, genau eine Wahl, nicht abwählbar; für Seitenzustand — Filter in der URL sind FilterChips |
+  | `list-row.tsx` | `ListGruppe`, `ListRow` | mit `href` Link mit Pfeil, sonst Anzeige; ≥ 50 px; Titel `truncate` mit `title` |
+  | `progress-bar.tsx` | `ProgressBar` | Anteil aus `wert`/`max`, Text über `formatZahl`, `aria-valuetext` gleich |
+  | `empty-state.tsx` | `EmptyState` | Symbol (Strich 1,5), Titel, Satz, Aktion als Kind — immer ein Ausweg |
+  | `status-badge.tsx` | `StatusBadge` | `offen`/`fertig`/`neutral`; Schrift `text-status-*`, Fläche Markenfarbe 14–18 % |
+  | `groessenkachel.tsx` | `GroessenWahl`, `Groessenkachel` | Base UI RadioGroup; Preise kommen formatiert, `zustand` (`knapp`/`ausverkauft`) entscheidet der Aufrufer |
+  | `hinweiskarte.tsx` | `Hinweiskarte` | `ton="gruen"` (Kunde, Gutes) / `"orange"` (Hof, Offenes); Fläche 12 %, Rand 45 %, Text normale Textfarbe |
+  | `bottom-nav.tsx` | `BottomNav`, `BottomNavLink`, `BottomNavMitte`, `mittelknopfKlassen`, `bottomNavEintragKlassen` | ordnet nichts selbst — Reihenfolge aus der Navigations-Quelle; Mittelknopf 54 px, grün/orange; Safe-Area unten |
+  | `sidebar-gruppe.tsx` | `SidebarGruppe`, `SidebarEintrag` | Überschrift leise in Großbuchstaben; aktiv in umgekehrter Textfarbe; ≥ 44 px |
+  | `zaehler.tsx` | `Zaehler` | Orange = wartet auf dich, Grün = Korb; ab 100 „99+", genaue Zahl und Bedeutung als `sr-only` |
+  | `sheet.tsx` | `SheetBlatt` (neue Variante) | Blatt von unten mit Griff, ohne Kreuz; „Abbrechen" als `SheetClose`-Textknopf; Kinder schrumpfen nie, das Blatt scrollt |
+  | `fokus.ts` | `FOKUS_RAHMEN`, `FOKUS_RAHMEN_INNEN` | der sichtbare Fokus aller neuen Bausteine und Shells (s. u.) |
+
+- **Sichtbarer Fokus im neuen Design:** `FOKUS_RAHMEN` aus `src/components/ui/fokus.ts`. Wer einen eigenen Fokusrahmen schreibt, setzt neben `focus-visible:outline-2` immer `focus-visible:outline-solid` — Tailwind 4 behält nach `outline-none` sonst die Rahmenart „none", der Fokus ist unsichtbar. `tests/fokus-sichtbar.test.ts` prüft Bausteine, Shells und `/intern`.
+- **Neue Bausteine nutzen die shadcn-Namen** (`bg-accent`, `bg-primary`, `text-muted-foreground`). Ihre Farben stimmen nur im Geltungsbereich `data-design="neu"` — außerhalb ist `accent` noch das alte Orange. Deshalb erst einsetzen, wenn die Route in eine Shell umgezogen ist.
 - Neue oder geänderte Komponente: zuerst auf der Preview-Seite in beiden Themes und beiden Breakpoints abnehmen, dann in Screens verwenden.
 - Während Feature-Arbeit sind Änderungen an bestehenden Komponenten nur **additiv** (neue Variante, kein geändertes Verhalten).
 - Preis-, Zeit- und Datumsformatierung kommt aus gemeinsamen Formatierern neben den Komponenten; nie pro Screen duplizieren.
@@ -106,6 +127,8 @@ Jeder Screen liefert vier Zustände:
 Diese Regeln stammen aus der Mockup-Runde (`docs/mockups/`, Index im dortigen README) und gelten für jede Route, die in den Geltungsbereich `data-design="neu"` umzieht.
 
 ### Shells und Navigation – feste Einträge
+
+Umgesetzt in `src/components/shells/` (KundeShell, KundeFokusShell, HofShell, AdminShell); Einträge aus `src/lib/kunden-navigation.ts`, `hofNavigation` in `src/lib/bauern-navigation.ts` und `src/lib/admin-navigation.ts` (ARCHITECTURE §4). Abweichend von der Liste unten gilt bis auf Weiteres **E8 (kein Kundenkonto)**: Kunde Handy nur Entdecken · [Warenkorb] · Bestellungen; Kunde Web angemeldet ohne „Meine Höfe"/„Merken", „Profil" ist die bestehende Seite „Mein Konto" (`/account/profile`). „Meine Bestellungen" steht im Web-Kopf erst, wenn es eine Seite mit den eigenen Bestellungen gibt; bis dahin führt „Bestellungen" am Handy abgemeldet zur Anmeldung, angemeldet zu „Mein Konto" — ein Handy-Ziel ist immer eines, das die Kopfzeile derselben Sitzung auch anbietet (`bestellungenPunkt`).
 
 - **Kunde Web, abgemeldet:** Logo · Höfe entdecken · So funktioniert's · Für Höfe · [Anmelden]. **Angemeldet:** Logo · Suche · Höfe entdecken · Meine Bestellungen · Warenkorb (mit Anzahl) · Profil. Öffentliche Seiten zeigen die Variante passend zur Sitzung, nie eine dritte.
 - **Kunde Handy, Unterleiste:** Entdecken · Meine Höfe · [Warenkorb] · Bestellungen · Konto. Die Suche sitzt oben in „Entdecken", nicht als eigener Reiter.

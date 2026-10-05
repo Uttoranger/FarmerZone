@@ -80,6 +80,39 @@ function SheetContent({
   )
 }
 
+/**
+ * Blatt mit Griff: die Handy-Form eines Dialogs (docs/ai/DESIGN_SYSTEM.md,
+ * „Dialoge und Blätter") — von unten, oben rund (22 px), ein Griff als
+ * Zeichen, dass es ein Blatt ist. Kein Kreuz: Geschlossen wird mit
+ * „Abbrechen" als Textknopf unter der Hauptaktion (SheetClose), mit Escape
+ * oder einem Tipp daneben; Fokus und Scroll-Sperre kommen von Base UI wie bei
+ * SheetContent. Eine zusätzliche Variante — SheetContent bleibt, wie es ist.
+ * Ist der Inhalt höher als das Fenster, scrollt das Blatt; gestaucht wird
+ * nichts (*:shrink-0 — sonst schnitten Listen mit overflow-hidden ihre
+ * letzte Zeile ab).
+ *
+ * Jedes Blatt braucht einen SheetTitle (oder ein aria-label), sonst hat der
+ * Dialog keinen Namen.
+ */
+function SheetBlatt({ className, children, ...props }: SheetPrimitive.Popup.Props) {
+  return (
+    <SheetPortal>
+      <SheetOverlay />
+      <SheetPrimitive.Popup
+        data-slot="sheet-blatt"
+        className={cn(
+          "fixed inset-x-0 bottom-0 z-50 flex max-h-[calc(100dvh-2rem)] flex-col gap-3 overflow-y-auto *:shrink-0 rounded-t-[22px] border-t border-border bg-popover px-[18px] pt-2.5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] text-sm text-popover-foreground shadow-lg outline-none transition duration-200 ease-out data-ending-style:translate-y-10 data-ending-style:opacity-0 data-starting-style:translate-y-10 data-starting-style:opacity-0",
+          className
+        )}
+        {...props}
+      >
+        <div data-slot="sheet-griff" aria-hidden="true" className="h-1 w-10 shrink-0 self-center rounded-full bg-muted-foreground/40" />
+        {children}
+      </SheetPrimitive.Popup>
+    </SheetPortal>
+  )
+}
+
 function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -131,6 +164,7 @@ export {
   SheetTrigger,
   SheetClose,
   SheetContent,
+  SheetBlatt,
   SheetHeader,
   SheetFooter,
   SheetTitle,

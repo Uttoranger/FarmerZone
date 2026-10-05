@@ -33,9 +33,10 @@ const instrumentSans = Instrument_Sans({
   variable: '--font-instrument-sans',
   subsets: ['latin'],
   display: 'swap',
-  // Noch nicht vorladen: Bis die erste Route den Marker data-design="neu"
-  // trägt, nutzt keine Seite die Schrift — jede Bestandsseite lüde sonst
-  // eine woff2 umsonst. Gate 2 stellt auf true, sobald die Shell steht.
+  // Noch nicht vorladen: Bis die erste Route in eine Shell des neuen Designs
+  // umzieht (data-design="neu"), nutzt nur die interne Vorschau die Schrift —
+  // jede Bestandsseite lüde sonst eine woff2 umsonst. Das Gate, das die erste
+  // Route umstellt, setzt preload auf true.
   preload: false,
 })
 
