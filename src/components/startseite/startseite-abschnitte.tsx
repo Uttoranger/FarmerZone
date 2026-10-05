@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { Check, HandCoins, MapPin } from 'lucide-react'
+import { Check, ChevronDown, HandCoins, MapPin } from 'lucide-react'
 import {
   BRENNMATERIAL_ADRESSE,
   FUTTER_ZIELGRUPPEN,
@@ -15,7 +15,6 @@ import { categoryImagePath } from '@/lib/product-image'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { StatusBadge } from '@/components/ui/status-badge'
-import { Accordion, AccordionItem, AccordionPanel, AccordionTrigger } from '@/components/ui/accordion'
 import { Wortmarke } from '@/components/shared/wortmarke'
 import { Kicker } from '@/components/startseite/kicker'
 
@@ -23,8 +22,8 @@ import { Kicker } from '@/components/startseite/kicker'
  * Die Abschnitte der Startseite unter „Höfe in deiner Nähe", in der Reihenfolge
  * des Mockups (web-k0-startseite, mobil-k0-startseite): Futter vom Hof,
  * Brennmaterial (nur in der Saison), So funktioniert's + Warum direkt vom Hof,
- * Für Höfe, Fragen, Fuß. Alles Server-Komponenten bis auf das Akkordeon der
- * Fragen (Base UI) — die Startseite bringt sonst kein eigenes Skript mit.
+ * Für Höfe, Fragen, Fuß. Alles Server-Komponenten ohne eigenes Skript — auch
+ * die Fragen: <details> klappt der Browser selbst auf und zu.
  *
  * Texte, Links und Rechnungen kommen aus src/lib/startseite.ts.
  */
@@ -143,7 +142,7 @@ const SCHRITTE = [
     titel: 'Bestellen und Zeitfenster wählen',
     text: 'Online oder bar bei Abholung bezahlen. Die Ware ist für dich reserviert, sobald du bestellst.',
   },
-  { titel: 'Am Hof abholen', text: 'Zur gewählten Zeit vorbeikommen, Abholcode zeigen, mitnehmen. Keine Lieferkosten.' },
+  { titel: 'Am Hof abholen', text: 'Zur gewählten Zeit vorbeikommen, Bestellnummer zeigen, mitnehmen. Keine Lieferkosten.' },
 ] as const
 
 /** Eine Zeile der Beispielrechnung. */
@@ -263,7 +262,7 @@ export function FuerHoefeBand(): React.JSX.Element {
               Du hast einen Hof? Dein Hofladen, online.
             </h2>
             <p className="text-[13.5px] leading-normal text-foreground md:text-[15px]">
-              In zehn Minuten eingerichtet. Kunden bestellen vorab, du packst und übergibst – und behältst den vollen
+              Schnell eingerichtet. Kunden bestellen vorab, du packst und übergibst – und behältst den vollen
               Warenpreis.
             </p>
           </div>
@@ -287,7 +286,15 @@ export function FuerHoefeBand(): React.JSX.Element {
   )
 }
 
-/** „Gut zu wissen" — das Akkordeon der Bausteine; die erste Frage steht offen wie im Mockup. */
+/**
+ * „Gut zu wissen" — <details name="fragen"> statt des Base-UI-Akkordeons:
+ * dasselbe Aussehen ohne Client-Skript (DESIGN_SYSTEM schreibt keinen
+ * Baustein vor). Der gemeinsame `name` lässt immer nur eine Frage offen wie
+ * beim Akkordeon (Browser ohne Unterstützung öffnen mehrere — harmlos). Die
+ * erste steht offen wie im Mockup; die Antworten stehen auch zugeklappt im
+ * HTML — für die Suche im Browser und für Suchmaschinen. Tastatur und
+ * Bildschirmleser bedienen <summary> wie einen Knopf.
+ */
 export function Fragen(): React.JSX.Element {
   return (
     <section aria-labelledby="fragen-titel" className="pt-6 pb-14 md:pb-20">
@@ -298,17 +305,26 @@ export function Fragen(): React.JSX.Element {
             Gut zu wissen
           </h2>
         </div>
-        <Accordion defaultValue={['frage-0']} className="flex-1 border-t border-border">
+        <div className="flex flex-1 flex-col border-t border-border">
           {STARTSEITE_FRAGEN.map((eintrag, i) => (
-            <AccordionItem key={eintrag.frage} value={`frage-${i}`}>
-              <AccordionTrigger className={cn('py-4 text-[15px] font-semibold', FOKUS_RAHMEN)}>{eintrag.frage}</AccordionTrigger>
-              {/* keepMounted: Die Antworten stehen auch zugeklappt im HTML — für die Suche im Browser und für Suchmaschinen. */}
-              <AccordionPanel keepMounted>
-                <p className="text-[13.5px] leading-normal text-muted-foreground">{eintrag.antwort}</p>
-              </AccordionPanel>
-            </AccordionItem>
+            <details key={eintrag.frage} name="fragen" open={i === 0} className="group border-b border-border last:border-b-0">
+              <summary
+                className={cn(
+                  // list-none + Marker weg: Der Pfeil rechts ersetzt das Dreieck des Browsers.
+                  'flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-md py-4 text-left text-[15px] font-semibold text-foreground transition-colors hover:text-brand-text [&::-webkit-details-marker]:hidden',
+                  FOKUS_RAHMEN
+                )}
+              >
+                {eintrag.frage}
+                <ChevronDown
+                  className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180"
+                  aria-hidden="true"
+                />
+              </summary>
+              <p className="pb-4 text-[13.5px] leading-normal text-muted-foreground">{eintrag.antwort}</p>
+            </details>
           ))}
-        </Accordion>
+        </div>
       </div>
     </section>
   )

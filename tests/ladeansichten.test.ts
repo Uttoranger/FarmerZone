@@ -190,16 +190,17 @@ describe('Startseite — bewusst OHNE src/app/loading.tsx', () => {
     expect(existiert('src/app/loading.tsx')).toBe(false)
   })
 
-  it('wartet nur auf die Sitzung — die Höfe laden hinter Suspense mit eigenem Skelett', () => {
-    // Seit Nr. 07 ist die Startseite async: Sitzung für die KundeShell und
-    // Höfe aus der Datenbank. Die Ladeansicht dafür ist die Suspense-Grenze
-    // um die Hofkarten (Skelett in Kartenform), nicht eine Datei im
-    // Wurzelsegment. Wer auf der Seite ein weiteres await einführt, sieht
-    // hier, dass es nur die Sitzung sein darf.
+  it('wartet auf nichts — die Seite ist statisch, die Höfe laden hinter Suspense mit eigenem Skelett', () => {
+    // Seit der Nachbesserung zu Nr. 07 ist die Startseite wieder statisch
+    // (ISR, revalidate = 300): Die Sitzung für die Kopfzeile liest
+    // KundeShellMitSitzung im Browser, die Höfe kommen aus dem Cache. Die
+    // Ladeansicht ist die Suspense-Grenze um die Hofkarten (Skelett in
+    // Kartenform), nicht eine Datei im Wurzelsegment. Wer auf der Seite ein
+    // await einführt, sieht hier, dass sie dafür nicht gebaut ist.
     const seite = liesDatei('src/app/page.tsx')
-    const komponente = seite.slice(seite.indexOf('export default async function HomePage('))
-    expect(komponente.match(/\bawait\b/g)).toHaveLength(2) // getSession(...) und headers()
-    expect(komponente).toMatch(/await auth\.api\.getSession\(\{ headers: await headers\(\) \}\)/)
+    const komponente = seite.slice(seite.indexOf('export default function HomePage('))
+    expect(komponente.length).toBeLessThan(seite.length)
+    expect(komponente).not.toMatch(/\bawait\b/)
     expect(komponente).toMatch(/<Suspense fallback=\{<HofKartenSkelett \/>\}>/)
   })
 })

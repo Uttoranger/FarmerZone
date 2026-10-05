@@ -40,13 +40,12 @@ vi.mock('next/image', () => ({
   default: (p: { src: string; alt: string }) => createElement('img', { src: p.src, alt: p.alt }),
 }))
 // Die Seite selbst wird nur als Quelltext gelesen; ihre Metadaten importieren
-// wir echt — dafür brauchen Sitzung, Datenbank und Cache Attrappen.
-vi.mock('next/headers', () => ({ headers: async () => new Headers() }))
+// wir echt — dafür brauchen Sitzungs-Client, Datenbank und Cache Attrappen.
 vi.mock('next/cache', () => ({ unstable_cache: (fn: unknown) => fn }))
-vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: async () => null } } }))
+vi.mock('@/lib/auth-client', () => ({ useSession: () => ({ data: null, isPending: false }) }))
 vi.mock('@/server/queries/farm', () => ({ getOeffentlicheHoefe: async () => [] }))
 
-import { metadata } from '@/app/page'
+import { metadata, revalidate } from '@/app/page'
 import {
   BRENNMATERIAL_ADRESSE,
   FUTTER_ZIELGRUPPEN,
@@ -173,6 +172,12 @@ describe('Wege auf /hoefe — /hoefe liest jeden wieder', () => {
     for (const adresse of adressen) expect(adresse).not.toMatch(/[?&](lat|lon|lng|plz|ort|umkreis)=/i)
   })
 
+  it('keine Zusage, die die Plattform nicht hält (Gebinde, Staub, Verladen sind Sache des Hofs)', () => {
+    const texte = FUTTER_ZIELGRUPPEN.flatMap((g) => [g.kicker, g.titel, ...g.punkte]).join(' ')
+    expect(texte).not.toMatch(/staubarm|Frontlader|ab 1 kg/i)
+    expect(texte).toMatch(/je nach Hof/)
+  })
+
   it('keine Zusage, die es erst mit Gate 6 gibt (Registrierung bei Ballen)', () => {
     const texte = FUTTER_ZIELGRUPPEN.flatMap((g) => [g.kicker, g.titel, ...g.punkte]).join(' ')
     expect(texte).not.toMatch(/registriert/i)
@@ -265,6 +270,10 @@ describe('Kopf — Video, Standbild und Suche', () => {
     expect(video).toMatch(/<source media="\(prefers-reduced-motion: no-preference\)"/)
     expect(video).toMatch(/class="[^"]*\bhidden\b[^"]*motion-safe:block/)
     expect(video).toContain('preload="none"')
+    // Kein poster: Das Standbild darunter (next/image, verkleinert) zeigt sich
+    // durch, solange das Video noch kein Bild hat — mit poster lud der
+    // Browser dasselbe Foto ein zweites Mal im Original.
+    expect(video).not.toMatch(/poster=/)
     // Das Standbild steht außerhalb des Videos und damit immer da.
     const standbild = kopf.indexOf('src="/landing/hero-poster.jpg"')
     expect(standbild).toBeGreaterThanOrEqual(0)
@@ -382,6 +391,18 @@ describe('Abschnitte', () => {
     expect(html(createElement(SoFunktionierts, { rechnung: beispielRechnung(JETZT) }))).toMatch(/€/)
   })
 
+  it('„So funktioniert’s": Bestellnummer statt eines Abholcodes, den es nicht gibt', () => {
+    const text = html(createElement(SoFunktionierts, { rechnung: beispielRechnung(JETZT) }))
+    expect(text).toContain('Bestellnummer zeigen')
+    expect(text).not.toMatch(/Abholcode/)
+  })
+
+  it('Für Höfe: keine unbelegte Zeitangabe', () => {
+    const text = html(createElement(FuerHoefeBand))
+    expect(text).not.toMatch(/zehn Minuten|Minuten/)
+    expect(text).toContain('Schnell eingerichtet')
+  })
+
   it('Für Höfe: registrieren in Orange, „Mehr für Höfe" zu den Konditionen', () => {
     const text = html(createElement(FuerHoefeBand))
     expect(text).toMatch(/<a href="\/register"[^>]*bg-primary/)
@@ -394,7 +415,24 @@ describe('Abschnitte', () => {
       expect(text).toContain(frage)
       expect(text).toContain(antwort.replace(/&/g, '&amp;'))
     }
-    expect(text).toMatch(/data-slot="accordion"/)
+  })
+
+  it('Fragen ohne Skript: <details name="fragen">, nur die erste offen, Fokus sichtbar', () => {
+    const text = html(createElement(Fragen))
+    const details = text.match(/<details\b[^>]*>/g) ?? []
+    expect(details).toHaveLength(STARTSEITE_FRAGEN.length)
+    for (const tag of details) expect(tag).toContain('name="fragen"')
+    expect(details[0]).toMatch(/\bopen=""/)
+    for (const tag of details.slice(1)) expect(tag).not.toMatch(/\bopen\b/)
+    expect(text.match(/<summary\b[^>]*focus-visible:outline-solid/g)).toHaveLength(STARTSEITE_FRAGEN.length)
+    expect(text).not.toMatch(/data-slot="accordion"/)
+    expect(quelle('src/components/startseite/startseite-abschnitte.tsx')).not.toMatch(/@\/components\/ui\/accordion/)
+  })
+
+  it('die Servicegebühr in Euro, nicht in Cent', () => {
+    const zahlung = STARTSEITE_FRAGEN.find((f) => f.frage === 'Wie bezahle ich?')
+    expect(zahlung?.antwort).toContain('mindestens € 0,50')
+    expect(zahlung?.antwort).not.toMatch(/Cent/)
   })
 
   it('keine Konto-Zusage (E8): Bestellen ohne Konto', () => {
@@ -445,14 +483,28 @@ describe('Themes: Farben nur über Tokens', () => {
 describe('Aufbau der Seite', () => {
   const seite = quelle('src/app/page.tsx')
 
-  it('in der KundeShell, ohne die alte LandingNav', () => {
-    expect(seite).toMatch(/<KundeShell angemeldet=\{istKundensitzung\(sitzung\?\.user\)\}>/)
+  it('in der KundeShell (Sitzung aus dem Browser), ohne die alte LandingNav', () => {
+    expect(seite).toMatch(/<KundeShellMitSitzung>/)
     expect(seite).not.toMatch(/LandingNav|KundenKopf/)
+  })
+
+  it('statisch vom CDN: weder headers() noch cookies() noch auth.api, alle fünf Minuten neu (ISR)', () => {
+    // Liest die Seite die Anfrage, wird sie dynamisch: Jeder Besuch startet
+    // dann eine Serverless-Funktion, und Kopf und LCP-Standbild warten darauf.
+    // Nur der Code zählt — die Kommentare der Seite erklären genau diese Regel.
+    const code = seite.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    expect(code).not.toMatch(/\bheaders\(\)|\bcookies\(\)|auth\.api\b|next\/headers|from '@\/lib\/auth'/)
+    expect(revalidate).toBe(300)
+    expect(seite).toMatch(/^export const revalidate = 300$/m)
+    // Gegenprobe: Dieselbe Suche findet alle drei auf einer Seite, die die
+    // Sitzung auf dem Server liest.
+    const dynamisch = quelle('src/app/account/profile/page.tsx').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    expect(dynamisch).toMatch(/\bheaders\(\)/)
+    expect(dynamisch).toMatch(/auth\.api\b/)
   })
 
   it('die Höfe hinter Suspense mit Skelett — Kopf und Suche warten nicht auf die Datenbank', () => {
     expect(seite).toMatch(/<Suspense fallback=\{<HofKartenSkelett \/>\}>\s*<HofKartenGeladen \/>/)
-    expect(seite).toMatch(/tags: \[HOEFE_CACHE_TAG\]/)
   })
 
   it('das Brennmaterial-Band nur in der Saison', () => {

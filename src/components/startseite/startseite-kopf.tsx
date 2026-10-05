@@ -39,9 +39,13 @@ export function StartseiteKopf({ kartenHof }: { kartenHof?: ReactNode }): React.
       {/* Stumm, in Schleife, ohne Bedienelemente — reiner Hintergrund
           (aria-hidden). Zweimal dieselbe Bedingung: Die Klasse blendet das
           Element nur bei erlaubter Bewegung ein, die media-Bedingung an der
-          Quelle entscheidet, ob das Video überhaupt geladen wird. preload="none":
-          Das Standbild soll zuerst da sein, das Video holt der Browser erst,
-          wenn die Wiedergabe anläuft. */}
+          Quelle entscheidet, ob das Video überhaupt geladen wird.
+          preload="none" hält das Laden NICHT auf: autoPlay geht vor, das
+          Video lädt sofort an. Es bleibt nur für Browser stehen, die die
+          automatische Wiedergabe sperren (etwa im Datensparmodus) — dort lädt
+          dann gar nichts. Kein poster: Das Standbild darunter (next/image,
+          verkleinert) zeigt sich durch, solange das Video noch kein Bild hat;
+          ein poster lud dasselbe Foto ein zweites Mal im Original. */}
       <video
         className="absolute inset-0 -z-10 hidden h-full w-full object-cover motion-safe:block"
         autoPlay
@@ -49,7 +53,6 @@ export function StartseiteKopf({ kartenHof }: { kartenHof?: ReactNode }): React.
         loop
         playsInline
         preload="none"
-        poster="/landing/hero-poster.jpg"
         aria-hidden="true"
       >
         <source media="(prefers-reduced-motion: no-preference)" src="/landing/hero-loop.mp4" type="video/mp4" />

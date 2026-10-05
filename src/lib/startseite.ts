@@ -18,7 +18,9 @@ import {
   SERVICEGEBUEHR_STANDARD_MIND_CENTS,
   SERVICEGEBUEHR_STANDARD_PROZENT,
   berechneServicegebuehr,
+  centsAlsEuro,
 } from '@/lib/servicegebuehr'
+import { formatEuro } from '@/lib/format'
 
 /** Eine Adresse der Hofübersicht mit genau diesen Filtern; ohne Filter die nackte /hoefe. */
 export function hoefeAdresse(teil: Partial<HoefeFilter> = {}): string {
@@ -68,7 +70,9 @@ export type FutterZielgruppe = {
 
 /**
  * Wortlaut aus dem Mockup. „Kleinmengen" und „Ballen" sind die Gebinde-
- * Facette von /hoefe (bis 25 kg | darüber). Bewusst NICHT übernommen:
+ * Facette von /hoefe (bis 25 kg | darüber). Neutral statt Mockup: „Sackerl ab
+ * 1 kg", „staubarm" und „Verladen mit Frontlader" sind Sache des einzelnen
+ * Hofs, die Plattform sagt sie nicht zu — deshalb „je nach Hof". Bewusst NICHT übernommen:
  * „nur registrierte Futtermittelbetriebe" und „Bei Ballen zeigen wir die
  * Registrierung des Hofs gleich mit an" — beides gibt es erst mit Gate 6
  * (Sperre je Gebinde, Schild nach E9); vorher wäre es ein Versprechen, das
@@ -78,7 +82,7 @@ export const FUTTER_ZIELGRUPPEN: readonly FutterZielgruppe[] = [
   {
     kicker: 'Für Hase & Meerschwein',
     titel: 'Heu und Einstreu in kleinen Mengen',
-    punkte: ['Sackerl ab 1 kg – passt ins Auto', 'staubarm, direkt vom Hof', 'mit Eiern und Gemüse gleich mitbestellen'],
+    punkte: ['Kleine Mengen – Gebinde je nach Hof', 'direkt vom Hof aus der Region', 'mit Eiern und Gemüse gleich mitbestellen'],
     knopf: 'Kleinmengen finden',
     filter: { bereich: 'FUTTERMITTEL', gebinde: 'KLEIN' },
     bild: 'HEU_STROH',
@@ -86,7 +90,7 @@ export const FUTTER_ZIELGRUPPEN: readonly FutterZielgruppe[] = [
   {
     kicker: 'Für Pferd, Rind & Schaf',
     titel: 'Ballen und Futtergetreide',
-    punkte: ['Kleinballen und Rundballen', 'Verladen mit Frontlader am Hof'],
+    punkte: ['Kleinballen und Rundballen', 'Verladen am Hof – je nach Hof'],
     knopf: 'Ballen finden',
     filter: { bereich: 'FUTTERMITTEL', gebinde: 'GROSS' },
     bild: 'GETREIDE_KOERNER',
@@ -218,7 +222,7 @@ export const STARTSEITE_FRAGEN: readonly Frage[] = [
   },
   {
     frage: 'Wie bezahle ich?',
-    antwort: `Online beim Bestellen oder bar bei der Abholung – was der Hof anbietet, siehst du vor dem Bestellen. Zum Warenpreis kommen ${SERVICEGEBUEHR_STANDARD_PROZENT} % Servicegebühr, mindestens ${SERVICEGEBUEHR_STANDARD_MIND_CENTS} Cent, als eigene Zeile im Warenkorb.`,
+    antwort: `Online beim Bestellen oder bar bei der Abholung – was der Hof anbietet, siehst du vor dem Bestellen. Zum Warenpreis kommen ${SERVICEGEBUEHR_STANDARD_PROZENT} % Servicegebühr, mindestens ${formatEuro(centsAlsEuro(SERVICEGEBUEHR_STANDARD_MIND_CENTS))}, als eigene Zeile im Warenkorb.`,
   },
   {
     frage: 'Was, wenn ich nicht abholen kann?',

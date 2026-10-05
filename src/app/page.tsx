@@ -1,17 +1,12 @@
 import { Suspense, cache } from 'react'
 import type { Metadata } from 'next'
-import { headers } from 'next/headers'
-import { unstable_cache } from 'next/cache'
 import { unstable_rethrow } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
-import { auth } from '@/lib/auth'
-import { getOeffentlicheHoefe } from '@/server/queries/farm'
-import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
+import { ladeOeffentlicheHoefe } from '@/server/queries/oeffentliche-hoefe'
 import { beispielRechnung, waehleStartseitenHoefe, type StartseitenHof } from '@/lib/startseite'
 import { istBrennmaterialSaison } from '@/lib/brennmaterial-saison'
-import { istKundensitzung } from '@/lib/kunden-navigation'
 import { STARTSEITE_VORSCHAUBILD } from '@/lib/vorschaubild'
-import { KundeShell } from '@/components/shells/kunde-shell'
+import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { StartseiteKopf } from '@/components/startseite/startseite-kopf'
 import {
   HoefeInDerNaehe,
@@ -55,24 +50,28 @@ export const metadata: Metadata = {
   },
 }
 
-// Dieselbe Hofliste wie /hoefe, fünf Minuten gecacht und unter demselben
-// Etikett — wer dort den Cache leert (Produkt aus-/eingeblendet, Hof
-// freigeschaltet), leert ihn hier mit. Wie dort altert die „Heute"-Angabe der
-// nächsten Abholung höchstens fünf Minuten.
-const ladeHoefe = unstable_cache(() => getOeffentlicheHoefe(), ['startseite-hoefe'], {
-  revalidate: 300,
-  tags: [HOEFE_CACHE_TAG],
-})
+// Statisch vom CDN, alle fünf Minuten neu gebaut (ISR) — im selben Takt wie
+// die Hofliste (src/server/queries/oeffentliche-hoefe.ts). Leert eine
+// Produktaktion deren Etikett, baut Next die Seite sofort neu. Deshalb liest
+// die Seite NICHTS aus der Anfrage (kein headers(), cookies(), auth.api): Das
+// machte sie dynamisch, und jeder Besuch wartete auf eine Serverless-Funktion.
+// Die Sitzung für die Kopfzeile liest KundeShellMitSitzung im Browser.
+// „Saison" des Brennmaterial-Bands, Beispielrechnung und Jahr im Fuß gelten
+// damit je Bau — höchstens fünf Minuten alt.
+export const revalidate = 300
 
 /**
- * Die Höfe der Startseite — einmal je Anfrage (cache), obwohl Kopf und
+ * Die Höfe der Startseite — einmal je Bau (cache), obwohl Kopf und
  * Abschnitt sie beide brauchen. Scheitert das Laden, zeigt die Seite den
  * Fehler inline an den Karten (DESIGN_SYSTEM, „Zustände") statt der 500 für
- * die ganze Startseite; der Fehler geht trotzdem nach Sentry.
+ * die ganze Startseite; der Fehler geht trotzdem nach Sentry. BEWUSST IN KAUF
+ * GENOMMEN: Diese Fassung bleibt dann bis zum nächsten Bau stehen (höchstens
+ * fünf Minuten) — ein Wurf statt der Startseite wäre schlimmer, und beim Bau
+ * ohne Datenbank (Build-Umgebung) bräche er den ganzen Build ab.
  */
 const ladeStartseitenHoefe = cache(async (): Promise<StartseitenHof[] | 'fehler'> => {
   try {
-    return waehleStartseitenHoefe(await ladeHoefe())
+    return waehleStartseitenHoefe(await ladeOeffentlicheHoefe())
   } catch (err) {
     // Nexts eigene Steuersignale (Umleitung, dynamisches Rendern) gehören
     // nicht in die Fehleranzeige.
@@ -97,18 +96,16 @@ async function KartenHofGeladen() {
  * mobil-k0-startseite) in der KundeShell: Kopfzeile im Browser, Unterleiste
  * am Handy.
  *
- * Gewartet wird nur auf die Sitzung (für die Kopfzeile; ohne Anmelde-Cookie
- * antwortet sie ohne Datenbank, mit Cookie aus dem Sitzungs-Cache). Die Höfe
- * laden hinter Suspense-Grenzen mit eigenem Skelett — Kopf, Video und Suche
- * stehen sofort. Deshalb gibt es keine src/app/loading.tsx: Sie gälte für
- * jede Route ohne eigene Ladeansicht (DESIGN_SYSTEM, „Ladeansicht").
+ * Die Seite wartet auf nichts: Die Höfe laden hinter Suspense-Grenzen mit
+ * eigenem Skelett, die Sitzung liest der Browser. Deshalb gibt es keine
+ * src/app/loading.tsx: Sie gälte für jede Route ohne eigene Ladeansicht
+ * (DESIGN_SYSTEM, „Ladeansicht").
  */
-export default async function HomePage() {
-  const sitzung = await auth.api.getSession({ headers: await headers() })
+export default function HomePage() {
   const jetzt = new Date()
 
   return (
-    <KundeShell angemeldet={istKundensitzung(sitzung?.user)}>
+    <KundeShellMitSitzung>
       <StartseiteKopf
         kartenHof={
           <Suspense fallback={null}>
@@ -127,6 +124,6 @@ export default async function HomePage() {
       <FuerHoefeBand />
       <Fragen />
       <StartseiteFuss jahr={jetzt.getFullYear()} />
-    </KundeShell>
+    </KundeShellMitSitzung>
   )
 }

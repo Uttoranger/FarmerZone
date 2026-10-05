@@ -3730,6 +3730,29 @@ Abschnitte in `src/components/startseite/`, Texte, Links und Rechnungen in
   als `Link`-Header statt im HTML; Antwortzeit lokal ~25 ms. Ein
   Lighthouse-Lauf steht aus (kein Paket).
 
+### Nachbesserung 1 zu Nr. 07 (2026-10-05)
+
+- **Startseite wieder statisch.** `auth.api.getSession({ headers })` machte `/`
+  dynamisch: Jeder Besuch startete eine Serverless-Funktion samt Kaltstart, Kopf
+  und LCP-Standbild warteten darauf — nur für „Anmelden" ↔ „Mein Konto". Jetzt
+  `export const revalidate = 300` (Takt der Hofliste) und
+  `KundeShellMitSitzung` (Client, `useSession`). Preis: Angemeldete Kundinnen
+  sehen „Mein Konto" einen Augenblick nach dem ersten Bild; die Seite fragt im
+  Browser einmal `/api/auth/get-session` an, ohne dass etwas darauf wartet.
+  Scheitert das Laden der Höfe beim Bau, bleibt der Inline-Fehler bis zum
+  nächsten Bau stehen (höchstens fünf Minuten) — ein Wurf bräche den Build ab.
+- **Ein Cache-Eintrag für die Hofliste:** `ladeOeffentlicheHoefe`
+  (`src/server/queries/oeffentliche-hoefe.ts`) für Startseite und `/hoefe`;
+  vorher zwei Einträge mit verschiedenen Schlüsseln.
+- **Fragen ohne Skript:** `<details name="fragen">` statt Base-UI-Akkordeon.
+- **Texte:** „Bestellnummer zeigen" statt „Abholcode" (es gibt nur die
+  Bestellnummer), „Schnell eingerichtet" statt „In zehn Minuten", Futter-Punkte
+  „je nach Hof" statt „Sackerl ab 1 kg", „staubarm", „Frontlader" — die
+  Plattform sagt das nicht zu. Mindestgebühr als „€ 0,50" statt „50 Cent".
+- **Standbild nur einmal:** Das Video hat kein `poster` mehr (lud das Foto ein
+  zweites Mal im Original); `preload="none"` wirkt neben `autoPlay` nicht —
+  der Kommentar sagt das jetzt.
+
 ## Nützliche Befehle
 
 ```bash

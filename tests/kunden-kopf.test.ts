@@ -350,7 +350,9 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
 
   it('die Startseite trägt die KundeShell des neuen Designs und keine zweite Kopfzeile', () => {
     const text = lies('src/app/page.tsx')
-    expect(text).toMatch(/<KundeShell /)
+    // Über die Hülle, die die Sitzung im Browser liest — die Seite bleibt statisch.
+    expect(text).toMatch(/<KundeShellMitSitzung>/)
+    expect(lies('src/components/shells/kunde-shell-mit-sitzung.tsx')).toMatch(/<KundeShell angemeldet=/)
     expect(text).not.toMatch(/KundenKopf|LandingNav/)
   })
 })
