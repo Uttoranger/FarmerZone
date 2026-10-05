@@ -3855,6 +3855,26 @@ in der `KundeShell`.
   10^6 mögliche Codes — wer die Tabelle liest, rechnet ihn zurück; vertretbar,
   weil ein Code 10 Minuten gilt und die Tabelle ohnehin Sitzungen enthält.
 
+### Nachbesserung 3 (Sicherheitsfix aus Nr. 14)
+
+- **Platzhalter in der Rollenabfrage.** `findFirst` mit `mode: 'insensitive'`
+  wird bei Prisma zu einem ILIKE ohne Maskierung (gemessen:
+  `b_uer-01@example.com` fand `bauer-01@example.com`). Ein Hof mit `_` oder
+  `%` in der Adresse neben einem passenden Kundenkonto — das jeder per
+  Checkout anlegen kann — galt dem Hook als Kundin; bei `%` meldete
+  `/sign-in/email-otp` den Hof mit einem gültigen Code tatsächlich an (im
+  roten Test nachgewiesen). Jetzt: Muster maskiert (`genauesIlikeMuster`,
+  dieselbe Funktion wie in Nr. 14), `findMany`, und ein einziger
+  Nicht-Kundinnen-Treffer genügt für „kein Code" (`rolleAusTreffern`).
+- **Warum nicht `lower(email) = lower($1)` per `$queryRaw`:** hätte gar
+  keine Platzhalter-Semantik, ist aber Roh-SQL ohne Not (TECH_STACK.md) und
+  nicht typisiert. Das Risiko der Maskierung — Prisma maskierte eines Tages
+  selbst, das Muster wäre doppelt maskiert und fände den Hof nicht mehr —
+  fängt der Integrationstest „Hof …_hof" ab.
+- **Betreiber-Recht:** `/admin` prüft `isAdmin`, nicht die Rolle; ein
+  Betreiber ohne Hof kann `CUSTOMER` sein. Er zählt in der Rollenabfrage jetzt
+  als `ADMIN` (vorher hätte er einen Code bekommen).
+
 ## Nützliche Befehle
 
 ```bash

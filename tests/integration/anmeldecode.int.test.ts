@@ -30,6 +30,14 @@
  *  - Scheitert die Code-Mail im Nachlauf (Resend-Fehler, Datenbankfehler),
  *    erfährt Sentry es — ohne Adresse und ohne Code, und ohne dass der
  *    Nachlauf eine unbehandelte Ablehnung hinterlässt (Nachbesserung 2).
+ *  - „_" und „%" in einer Adresse sind keine Platzhalter: Ein Hof mit
+ *    „max_hof@…" wird nicht für die Kundin „max-hof@…" gehalten (die ein
+ *    Angreifer per Checkout anlegen kann), bekommt keinen Code und wird nicht
+ *    per Code angemeldet; die Kundin selbst schon (Nachbesserung 3).
+ *  - Mehrere Konten in verschiedener Schreibweise: Ist eines davon ein Hof,
+ *    gibt es keinen Code — nicht „irgendein" Treffer entscheidet.
+ *  - Das Betreiber-Recht (isAdmin) zählt wie die Rolle ADMIN — auch bei
+ *    Rolle CUSTOMER kein Code.
  *
  * Gegenprobe zur Zählung: Vor dem fünften Fehlversuch nimmt der richtige
  * Code noch an (eigener Test).
@@ -279,7 +287,7 @@ describe('Höfe und Admins bekommen keinen Code und werden nicht per Code angeme
     const { id } = await legeNutzerAn('FARMER', { email: gespeichert, emailVerified: false, passwort: true })
     const code = await instanzA.api.createVerificationOTP({ body: { email: getippt, type: 'sign-in' } })
 
-    const suche = vi.spyOn(prisma.user, 'findFirst')
+    const suche = vi.spyOn(prisma.user, 'findMany')
     expect(await versuche(instanzA, getippt, code)).toEqual({ ok: false, code: 'INVALID_OTP' })
     // Unabhängig von der Collation dieser Test-Datenbank: Der Hook fragt mit
     // der klein geschriebenen Form, nicht mit der getippten.
@@ -305,6 +313,132 @@ describe('Höfe und Admins bekommen keinen Code und werden nicht per Code angeme
       instanzA.api.sendVerificationOTP({ body: { email, type: 'forget-password' } })
     ).rejects.toMatchObject({ status: 'BAD_REQUEST' })
     expect(versand.codes).toHaveLength(0)
+  })
+})
+
+describe('Platzhalter und mehrere Schreibweisen (Nachbesserung 3)', () => {
+  // Die Kundin entsteht ZUERST: Ein findFirst ohne Reihenfolge lieferte dann
+  // in der Regel ihre Zeile — genau der Angriff, bei dem der Hook die
+  // Hof-Adresse für eine Kundin hielt.
+  async function legeAn(rolle: 'FARMER' | 'CUSTOMER', email: string, hofZugang = false): Promise<string> {
+    const id = intKennung(`platzhalter-${rolle.toLowerCase()}`)
+    await prisma.user.create({
+      data: { id, email, name: 'Max Mustermann', role: rolle, emailVerified: !hofZugang },
+    })
+    if (hofZugang) {
+      await prisma.account.create({
+        data: { id: `${id}-konto`, userId: id, accountId: id, providerId: 'credential', password: 'int-kein-echter-hash' },
+      })
+    }
+    return id
+  }
+
+  async function codeZeilen(email: string): Promise<number> {
+    return prisma.verification.count({ where: { identifier: `sign-in-otp-${email}` } })
+  }
+
+  async function pruefeKeinCodeFuerHof(hofAdresse: string, hofId: string): Promise<void> {
+    // Eine Adresse mit „%" lehnt das Plugin beim Anfordern selbst ab
+    // („Invalid email"); dann genügt: kein Code, keine Mail.
+    const antwort = await instanzA.api
+      .sendVerificationOTP({ body: { email: hofAdresse, type: 'sign-in' } })
+      .catch((e: { body?: { code?: string } }) => ({ abgelehnt: e.body?.code }))
+    await arbeiteNachlaufAb()
+    if (hofAdresse.includes('%')) expect([{ success: true }, { abgelehnt: 'INVALID_EMAIL' }]).toContainEqual(antwort)
+    else expect(antwort).toEqual({ success: true })
+    expect(await codeZeilen(hofAdresse)).toBe(0)
+    expect(versand.codes).toHaveLength(0)
+
+    // Auch ein serverseitig angelegter, gültiger Code meldet den Hof nicht an.
+    const code = await instanzA.api.createVerificationOTP({ body: { email: hofAdresse, type: 'sign-in' } })
+    expect(await versuche(instanzA, hofAdresse, code)).toEqual({ ok: false, code: 'INVALID_OTP' })
+    expect(await prisma.session.count({ where: { userId: hofId } })).toBe(0)
+    expect(await prisma.account.count({ where: { userId: hofId, providerId: 'credential' } })).toBe(1)
+    expect((await prisma.user.findUnique({ where: { id: hofId } }))?.emailVerified).toBe(false)
+  }
+
+  it('„_" ist kein Platzhalter: Hof „…_hof" neben Kundin „…-hof" bekommt keinen Code und wird nicht angemeldet', async () => {
+    const kennung = intKennung('unterstrich')
+    await legeAn('CUSTOMER', `${kennung}-hof@example.com`)
+    const hofAdresse = `${kennung}_hof@example.com`
+    const hofId = await legeAn('FARMER', hofAdresse, true)
+
+    await pruefeKeinCodeFuerHof(hofAdresse, hofId)
+  })
+
+  it('Gegenprobe: die Kundin „…-hof" neben dem Hof „…_hof" bekommt ihren Code und wird angemeldet', async () => {
+    const kennung = intKennung('unterstrich-gegen')
+    const kundinAdresse = `${kennung}-hof@example.com`
+    const kundinId = await legeAn('CUSTOMER', kundinAdresse)
+    await legeAn('FARMER', `${kennung}_hof@example.com`, true)
+
+    const code = await fordereCodeAn(instanzA, kundinAdresse)
+    expect(await codeZeilen(kundinAdresse)).toBe(1)
+    expect(await versuche(instanzA, kundinAdresse, code)).toEqual({ ok: true })
+    expect(await prisma.session.count({ where: { userId: kundinId } })).toBe(1)
+  })
+
+  it('„%" ist kein Platzhalter: Hof „…%hof" neben Kundin „…-mein-hof" bekommt keinen Code und wird nicht angemeldet', async () => {
+    const kennung = intKennung('prozent')
+    await legeAn('CUSTOMER', `${kennung}-mein-hof@example.com`)
+    const hofAdresse = `${kennung}%hof@example.com`
+    const hofId = await legeAn('FARMER', hofAdresse, true)
+
+    await pruefeKeinCodeFuerHof(hofAdresse, hofId)
+  })
+
+  it('„%" in der getippten Adresse trifft kein fremdes Konto — ein Hof „…x" bleibt unberührt', async () => {
+    const kennung = intKennung('prozent-fremd')
+    const hofId = await legeAn('FARMER', `${kennung}x@example.com`, true)
+    const suche = vi.spyOn(prisma.user, 'findMany')
+
+    await instanzA.api.sendVerificationOTP({ body: { email: `${kennung}%@example.com`, type: 'sign-in' } }).catch(() => {})
+    await arbeiteNachlaufAb()
+
+    // Der Hook hat das Hof-Konto nicht gefunden (es gibt kein Konto mit
+    // genau dieser Adresse) — was das Plugin dann mit der Adresse macht,
+    // betrifft den Hof nicht.
+    const ergebnisse = await Promise.all(suche.mock.results.map((r) => r.value as Promise<Array<{ role: string }>>))
+    expect(ergebnisse.length).toBeGreaterThan(0)
+    for (const treffer of ergebnisse) expect(treffer).toEqual([])
+    expect(await prisma.session.count({ where: { userId: hofId } })).toBe(0)
+    expect(await prisma.account.count({ where: { userId: hofId, providerId: 'credential' } })).toBe(1)
+  })
+
+  it('Betreiber-Recht (isAdmin) bei Rolle CUSTOMER: kein Code, keine Anmeldung per Code', async () => {
+    // /admin prüft isAdmin, nicht die Rolle — ein Betreiber ohne Hof kann
+    // Rolle CUSTOMER tragen. Ein Code wäre der Weg in den Admin-Bereich.
+    const id = intKennung('betreiber')
+    const email = `${id}@example.com`
+    await prisma.user.create({
+      data: { id, email, name: 'Max Mustermann', role: 'CUSTOMER', isAdmin: true, emailVerified: true },
+    })
+
+    await instanzA.api.sendVerificationOTP({ body: { email, type: 'sign-in' } })
+    await arbeiteNachlaufAb()
+    expect(await codeZeilen(email)).toBe(0)
+    expect(versand.codes).toHaveLength(0)
+
+    const code = await instanzA.api.createVerificationOTP({ body: { email, type: 'sign-in' } })
+    expect(await versuche(instanzA, email, code)).toEqual({ ok: false, code: 'INVALID_OTP' })
+    expect(await prisma.session.count({ where: { userId: id } })).toBe(0)
+  })
+
+  it('zwei Schreibweisen derselben Adresse, Kundin UND Hof: kein Code', async () => {
+    const kennung = intKennung('zwei-schreibweisen')
+    const klein = `${kennung}@example.com`
+    await legeAn('CUSTOMER', klein)
+    await legeAn('FARMER', `${kennung}@EXAMPLE.com`)
+
+    const antwort = await instanzA.api.sendVerificationOTP({ body: { email: klein, type: 'sign-in' } })
+    await arbeiteNachlaufAb()
+
+    expect(antwort).toEqual({ success: true })
+    expect(await codeZeilen(klein)).toBe(0)
+    expect(versand.codes).toHaveLength(0)
+
+    const code = await instanzA.api.createVerificationOTP({ body: { email: klein, type: 'sign-in' } })
+    expect(await versuche(instanzA, klein, code)).toEqual({ ok: false, code: 'INVALID_OTP' })
   })
 })
 
@@ -334,7 +468,7 @@ describe('Scheitert die Code-Mail, erfährt es Sentry — ohne Adresse und Code'
   it('die Datenbank fällt im Nachlauf aus — gemeldet, keine unbehandelte Ablehnung', async () => {
     const email = neueAdresse()
     await instanzA.api.sendVerificationOTP({ body: { email, type: 'sign-in' } })
-    vi.spyOn(prisma.user, 'findFirst').mockRejectedValueOnce(new Error(`Verbindung weg bei ${email}`))
+    vi.spyOn(prisma.user, 'findMany').mockRejectedValueOnce(new Error(`Verbindung weg bei ${email}`))
 
     await expect(arbeiteNachlaufAb()).resolves.toBeUndefined()
 
