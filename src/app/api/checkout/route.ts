@@ -279,8 +279,9 @@ async function antwortFuerBestehendeBestellung(
       // Derselbe Stripe-Schlüssel liefert denselben Intent — egal, ob die
       // erste Anfrage ihn schon anlegte.
       let intent: Stripe.PaymentIntent
+      const parameter = intentParameter(bestehend, hofKonto)
       try {
-        intent = await stripe.paymentIntents.create(intentParameter(bestehend, hofKonto), intentOptionen(bestehend.id))
+        intent = await stripe.paymentIntents.create(parameter, intentOptionen(bestehend.id))
       } catch (err) {
         // Konflikt: Die erste Anfrage legt den Intent gerade an — erwartbar.
         // Alles andere soll jemand sehen: Ein dauerhafter Fehler (etwa
@@ -303,6 +304,9 @@ async function antwortFuerBestehendeBestellung(
         reserviertBis: fristVon(bestehend).toISOString(),
         bestaetigung: bestaetigungsPfad(bestehend.farm.slug, bestehend.id),
         wiederholt: true,
+        // Nur Anzeige: genau der Betrag, den Stripe abbucht (siehe 11a).
+        amountCents: parameter.amount,
+        serviceFeeCents: bestehend.serviceFeeCents,
       })
     }
     // Für die Zahlungsmaske braucht der Browser das Client-Secret erneut.
@@ -314,6 +318,9 @@ async function antwortFuerBestehendeBestellung(
       reserviertBis: fristVon(bestehend).toISOString(),
       bestaetigung: bestaetigungsPfad(bestehend.farm.slug, bestehend.id),
       wiederholt: true,
+      // Nur Anzeige: der Betrag des bestehenden Zahlungsvorgangs, wie Stripe ihn führt.
+      amountCents: intent.amount,
+      serviceFeeCents: bestehend.serviceFeeCents,
     })
   }
   return NextResponse.json({
@@ -737,12 +744,10 @@ export async function POST(request: NextRequest) {
   //      und zurückgebucht, statt beides ohne Zahlungsweg stehen zu lassen.
   if (data.paymentMethod === 'ONLINE') {
     let paymentIntent: Stripe.PaymentIntent
+    // Das ! ist sicher: Schritt 2 lehnt ONLINE ohne stripeAccountId ab.
+    const parameter = intentParameter(order, farm.stripeAccountId!)
     try {
-      // Das ! ist sicher: Schritt 2 lehnt ONLINE ohne stripeAccountId ab.
-      paymentIntent = await stripe.paymentIntents.create(
-        intentParameter(order, farm.stripeAccountId!),
-        intentOptionen(order.id)
-      )
+      paymentIntent = await stripe.paymentIntents.create(parameter, intentOptionen(order.id))
     } catch (err) {
       // Doppelklick: Die zweite Anfrage legt mit demselben Schlüssel gerade
       // denselben Intent an. Kein Ausfall, kein Storno — sie bekommt ihn.
@@ -778,6 +783,12 @@ export async function POST(request: NextRequest) {
         pickupDate,
         pickupTimeStart: data.pickupTimeStart,
       }).toISOString(),
+      // Nur Anzeige: Der Zahlungsschritt zeigt GENAU den Betrag, den Stripe
+      // abbucht — aus denselben Parametern wie der Aufruf oben, nicht neu
+      // gerechnet. Sonst rechnete der Browser mit seiner Uhr weiter und stünde
+      // nach einem Wechsel der Gebühreneinstellung mit einem anderen Betrag da.
+      amountCents: parameter.amount,
+      serviceFeeCents: order.serviceFeeCents,
     })
   }
 

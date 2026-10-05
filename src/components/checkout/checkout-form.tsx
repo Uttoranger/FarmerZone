@@ -7,7 +7,12 @@ import { useForm, type FieldErrors, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Info, Loader2, ShoppingBasket } from 'lucide-react'
 import { KasseSkelett } from '@/components/checkout/kasse-skelett'
-import { checkoutFormSchema, CHECKOUT_FELD_REIHENFOLGE, type CheckoutFormData } from '@/schemas/checkout'
+import {
+  checkoutFormSchema,
+  checkoutZahlungsBetragSchema,
+  CHECKOUT_FELD_REIHENFOLGE,
+  type CheckoutFormData,
+} from '@/schemas/checkout'
 import { formatEuro } from '@/lib/format'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import { ABHOLFENSTER_NICHT_VERFUEGBAR, CODE_ABHOLFENSTER_UNGUELTIG, CODE_ABHOLFENSTER_VOLL } from '@/lib/abholfenster'
@@ -27,12 +32,15 @@ import { centsAlsEuro } from '@/lib/servicegebuehr'
 import {
   CODE_ZAHLART_NICHT_ANGEBOTEN,
   abholKacheln,
+  angezeigteBetraege,
   bestellschlussHeute,
   gebuehrBezeichnung,
   kassenBetraege,
   kassenZahlarten,
   kassenZurueck,
   reservierungsStand,
+  zahlungsGebuehrText,
+  type ZahlungsBetrag,
 } from '@/lib/kasse'
 import { CODE_ZAHLUNG_NICHT_MOEGLICH } from '@/lib/stripe-konto'
 import { EMAIL_MAX, NOTIZ_MAX, PERSONENNAME_MAX, TELEFON_MAX } from '@/lib/eingabegrenzen'
@@ -122,7 +130,10 @@ type Zahlung = {
   clientSecret: string
   bestaetigung: string
   reserviertBis: string | null
+  /** Der Betrag, den der Server an Stripe gab — ab jetzt der einzige, den die Kasse zeigt. */
+  betrag: ZahlungsBetrag
   /** Was beim Anlegen feststand — der Zahlungsschritt zeigt es nur noch an. */
+  gebuehrText: string
   abholung: string
   name: string
   email: string
@@ -281,9 +292,11 @@ export function CheckoutForm({
 
   // Beträge in Cent auf demselben Weg wie /api/checkout (kassenBetraege:
   // calcTotalAmount → decimalZuCents → berechneServicegebuehr). Verbindlich
-  // rechnet der Server mit den Preisen der Datenbank.
-  const betraege = kassenBetraege(cart, farm, jetzt)
-  const gebuehrText = gebuehrBezeichnung(farm, jetzt)
+  // rechnet der Server mit den Preisen der Datenbank. Steht die Bestellung,
+  // gilt nur noch ihr Betrag bei Stripe (angezeigteBetraege) — die Uhr läuft
+  // weiter, die Gebühr der Bestellung nicht.
+  const betraege = angezeigteBetraege(kassenBetraege(cart, farm, jetzt), zahlung?.betrag ?? null)
+  const gebuehrText = zahlung?.gebuehrText ?? gebuehrBezeichnung(farm, jetzt)
   const gesamt = formatEuro(centsAlsEuro(betraege.gesamtCents))
   const hof = { farmId: farm.id, farmSlug: farm.slug }
 
@@ -412,11 +425,20 @@ export function CheckoutForm({
       // (Idempotenz), geht es in deren Zahlung — nie mit einer unbezahlten
       // Online-Bestellung auf die Bestätigung, als wäre sie bar bestellt.
       if (typeof result.clientSecret === 'string') {
+        // Ohne den Betrag des Servers keinen Zahlungsschritt: Eine eigene
+        // Rechnung könnte von dem abweichen, was Stripe abbucht.
+        const betrag = checkoutZahlungsBetragSchema.safeParse(result)
+        if (!betrag.success) {
+          setFehler('Wir konnten die Zahlung nicht starten. Lade die Seite neu und versuch es noch einmal.')
+          return
+        }
         setBestellungAngelegt(true)
         setZahlung({
           clientSecret: result.clientSecret,
           bestaetigung,
           reserviertBis: typeof result.reserviertBis === 'string' ? result.reserviertBis : null,
+          betrag: betrag.data,
+          gebuehrText: zahlungsGebuehrText(farm, new Date(), betrag.data),
           abholung: gewaehlt ? abholSatz(gewaehlt.tag, gewaehlt.zeit) : '',
           name: data.customerName,
           email: data.customerEmail,
@@ -493,8 +515,8 @@ export function CheckoutForm({
         farmSlug={farm.slug}
         reserviertBis={zahlung.reserviertBis}
         stand={reservierungsStand(zahlung.reserviertBis, jetzt)}
-        betraege={betraege}
-        gebuehrText={gebuehrText}
+        betrag={zahlung.betrag}
+        gebuehrText={zahlung.gebuehrText}
         korb={<KorbKarte hofName={farm.name} positionen={korbPositionen} zeilenCents={betraege.zeilenCents} />}
         angaben={<FesteAngaben zahlung={zahlung} adresse={hofAdresse(farm)} />}
         fussnote={`${zahlung.abholung ? `Abholung ${zahlung.abholung} · ` : ''}Bezahlung sicher über Stripe`}

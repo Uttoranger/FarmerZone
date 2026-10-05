@@ -217,7 +217,14 @@ describe('Wiederholung mit demselben Idempotenz-Schlüssel', () => {
     const antwort = await nochmal()
 
     expect(antwort.status).toBe(200)
-    expect(await antwort.json()).toMatchObject({ orderId: bestellung.id, clientSecret: 'geheim_derselbe', wiederholt: true })
+    // amountCents: genau der Betrag des Stripe-Aufrufs darunter, aus der gespeicherten Bestellung (Nr. 12, Nachbesserung 1).
+    expect(await antwort.json()).toMatchObject({
+      orderId: bestellung.id,
+      clientSecret: 'geheim_derselbe',
+      wiederholt: true,
+      amountCents: 2100,
+      serviceFeeCents: 100,
+    })
     // Dieselben Parameter wie beim ersten Anlegen — sonst lehnt Stripe den Schlüssel ab.
     expect(anlegen).toHaveBeenCalledWith(
       {

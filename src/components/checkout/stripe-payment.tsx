@@ -6,7 +6,14 @@ import { Loader2, Lock } from 'lucide-react'
 import { getStripePromise } from '@/lib/stripe-client'
 import { formatEuro } from '@/lib/format'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
-import { reservierungsStand, zahlungsFehlerArt, type KassenBetraege, type ReservierungsStand } from '@/lib/kasse'
+import {
+  bestaetigungMitStatus,
+  reservierungsStand,
+  zahlungsBetraege,
+  zahlungsFehlerArt,
+  type ReservierungsStand,
+  type ZahlungsBetrag,
+} from '@/lib/kasse'
 import {
   AktionsLeiste,
   HINWEIS,
@@ -24,9 +31,11 @@ const stripePromise = getStripePromise()
 /*
  * Der Zahlungsschritt der Kasse (Nachtlauf Nr. 12; Mockups
  * web-k3-zahlung-abgelehnt, mobil-k3-zahlung-abgelehnt). Er erscheint, wenn
- * /api/checkout die Bestellung samt Zahlungsvorgang angelegt hat — der
- * Geldweg ist unverändert: Betrag und Zahlungsvorgang kommen vom Server, hier
- * wird nur Stripes Zahlungsfeld gezeigt und bestätigt.
+ * /api/checkout die Bestellung samt Zahlungsvorgang angelegt hat. Zahlungsvorgang
+ * UND angezeigter Betrag kommen vom Server: Knopf und Übersicht zeigen genau
+ * `amountCents` aus der Antwort — den Betrag, den Stripe abbucht. Hier wird
+ * nichts gerechnet (keine Uhr, keine Hofeinstellung), nur Stripes Zahlungsfeld
+ * gezeigt und bestätigt.
  *
  * Welche Wege das Feld anbietet (Karte, EPS, Apple/Google Pay), entscheiden
  * die Einstellungen im Stripe-Dashboard und das Gerät — nicht dieser Code.
@@ -41,8 +50,9 @@ export type StripeZahlungProps = {
   reserviertBis: string | null
   /** Der Stand dieser Frist — die Kasse zählt mit einer Uhr herunter. */
   stand: ReservierungsStand
-  /** Nur Anzeige; der Betrag des Zahlungsvorgangs steht beim Server fest. */
-  betraege: Pick<KassenBetraege, 'warenCents' | 'gebuehrCents' | 'gesamtCents'>
+  /** Der Betrag, den /api/checkout an Stripe gab (amountCents, serviceFeeCents) — angezeigt wie geliefert. */
+  betrag: ZahlungsBetrag
+  /** Bezeichnung der Gebührenzeile, beim Anlegen festgehalten (zahlungsGebuehrText). */
   gebuehrText: string
   /** Korb (ohne „ändern") und die festen Angaben zur Abholung — vom Formular gebaut. */
   korb: ReactNode
@@ -81,7 +91,7 @@ function ZahlungsInhalt({
   farmSlug,
   reserviertBis,
   stand,
-  betraege,
+  betrag,
   gebuehrText,
   korb,
   angaben,
@@ -98,6 +108,7 @@ function ZahlungsInhalt({
 
   const abgelaufen = abgebrochen || stand.zustand === 'abgelaufen'
   const bisUhrzeit = stand.zustand === 'laeuft' ? stand.uhrzeit : null
+  const betraege = zahlungsBetraege(betrag)
   const gesamt = formatEuro(centsAlsEuro(betraege.gesamtCents))
 
   async function bezahle() {
@@ -123,7 +134,7 @@ function ZahlungsInhalt({
     if (art === 'bezahlt') {
       // Wie Stripes eigene Rückleitung: Die Seite zeigt „Zahlung wird
       // geprüft", bis der Webhook den Stand in die Datenbank schreibt.
-      window.location.assign(`${bestaetigung}&redirect_status=${error.payment_intent?.status ?? 'processing'}`)
+      window.location.assign(bestaetigungMitStatus(bestaetigung, window.location.origin, error.payment_intent?.status ?? 'processing'))
       return
     }
     if (art === 'abgelaufen') setAbgebrochen(true)

@@ -98,6 +98,46 @@ export function kassenBetraege(
   return { zeilenCents, warenCents, gebuehrCents, gesamtCents: warenCents + gebuehrCents }
 }
 
+/** Was /api/checkout an Stripe gab (checkoutZahlungsBetragSchema in src/schemas/checkout.ts). */
+export type ZahlungsBetrag = { amountCents: number; serviceFeeCents: number }
+
+/**
+ * Die Beträge, sobald die Bestellung steht — nur aus dem Betrag, den der Server
+ * an Stripe gab. Keine eigene Rechnung mit Uhr oder Hofeinstellung: Der Server
+ * friert die Gebühr beim Anlegen ein (Order.serviceFeeCents); rechnete die
+ * Kasse mit ihrer Uhr weiter, stünde nach einem Wechsel der Gebühreneinstellung
+ * auf dem Knopf ein anderer Betrag, als Stripe abbucht (Nachbesserung 1, Nr. 12).
+ */
+export function zahlungsBetraege(betrag: ZahlungsBetrag): Pick<KassenBetraege, 'warenCents' | 'gebuehrCents' | 'gesamtCents'> {
+  return {
+    warenCents: betrag.amountCents - betrag.serviceFeeCents,
+    gebuehrCents: betrag.serviceFeeCents,
+    gesamtCents: betrag.amountCents,
+  }
+}
+
+/**
+ * Was die Kasse zeigt: vor dem Anlegen die eigene Vorschau, danach die Summen
+ * des Servers. Die Zeilen des Korbs bleiben — ihre Preise hat der Server beim
+ * Anlegen mit der Datenbank abgeglichen (WARENKORB_GEAENDERT sonst).
+ */
+export function angezeigteBetraege(lokal: KassenBetraege, vomServer: ZahlungsBetrag | null): KassenBetraege {
+  if (!vomServer) return lokal
+  return { ...lokal, ...zahlungsBetraege(vomServer) }
+}
+
+/**
+ * Die Bezeichnung der Gebührenzeile im Zahlungsschritt, einmal beim Anlegen
+ * festgehalten. Den Satz nennt sie nur, wenn er zum Betrag des Servers passt —
+ * sonst (Wechsel der Einstellung genau beim Anlegen) nur „Servicegebühr",
+ * statt einen Satz zu nennen, der nicht zum Betrag gehört.
+ */
+export function zahlungsGebuehrText(hof: ServicegebuehrEinstellung, jetzt: Date, betrag: ZahlungsBetrag): string {
+  const { warenCents, gebuehrCents } = zahlungsBetraege(betrag)
+  if (berechneServicegebuehr(warenCents, hof, jetzt).gebuehrCents !== gebuehrCents) return SERVICEGEBUEHR_BEZEICHNUNG
+  return gebuehrBezeichnung(hof, jetzt)
+}
+
 /** „Servicegebühr · 5 %, mind. € 0,50" — Satz und Mindestgebühr aus der Hofeinstellung. */
 export function gebuehrBezeichnung(hof: ServicegebuehrEinstellung, jetzt: Date): string {
   const satz = servicegebuehrSatz(hof, jetzt)
@@ -172,6 +212,20 @@ export function zahlungAbgelehntText(bisUhrzeit: string | null): { titel: string
     titel: 'Deine Karte wurde abgelehnt',
     text: bisUhrzeit ? `${grund} – deine Ware bleibt bis ${bisUhrzeit} Uhr für dich reserviert.` : `${grund}.`,
   }
+}
+
+/**
+ * Die Bestätigungsseite mit `redirect_status`, wie Stripe sie nach der Zahlung
+ * aufruft — für den Fall, dass die Zahlung schon durch ist und wir selbst
+ * weiterleiten. Über URL gebaut statt mit angehängtem „&": Der Pfad vom Server
+ * trägt heute `?sig=…`, ein Pfad ohne Abfrage ergäbe sonst eine kaputte
+ * Adresse. Zurück kommt nur Pfad und Abfrage — die Weiterleitung bleibt auf
+ * der eigenen Seite.
+ */
+export function bestaetigungMitStatus(pfad: string, origin: string, status: string): string {
+  const url = new URL(pfad, origin)
+  url.searchParams.set('redirect_status', status)
+  return `${url.pathname}${url.search}`
 }
 
 /**

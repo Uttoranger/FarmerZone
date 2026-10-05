@@ -12,6 +12,9 @@
  *  - „Nichts abgebucht" sagt die Kasse nur bei einer abgelehnten Karte, nie
  *    bei einer Zahlung, die schon durch oder unterwegs ist.
  *  - Der Rückweg führt nur aus der Kasse hinaus, solange keine Bestellung steht.
+ *  - Nachbesserung 1: Steht die Bestellung, zeigt die Kasse den Betrag, den
+ *    der Server an Stripe gab — auch wenn sich danach Uhr oder Gebühr ändern.
+ *    Die Rückleitung „bezahlt" hängt redirect_status sauber an (mit und ohne `?`).
  */
 import { describe, it, expect } from 'vitest'
 import {
@@ -27,7 +30,12 @@ import {
   zahlartFuerNeueBestellung,
   zahlungAbgelehntText,
   zahlungsFehlerArt,
+  angezeigteBetraege,
+  bestaetigungMitStatus,
+  zahlungsBetraege,
+  zahlungsGebuehrText,
 } from '@/lib/kasse'
+import { checkoutZahlungsBetragSchema } from '@/schemas/checkout'
 import { berechneServicegebuehr } from '@/lib/servicegebuehr'
 import { calcTotalAmount, decimalZuCents } from '@/lib/order-totals'
 
@@ -245,5 +253,79 @@ describe('abholKacheln — dieselben Fenster wie der Server (angeboteneAbholfens
     expect(bestellschlussHeute(abholKacheln(zwei, JETZT, []))).toBe('17:00')
     expect(bestellschlussHeute(abholKacheln(zwei, JETZT, ['2026-10-05|17:00|19:00']))).toBe('15:00')
     expect(bestellschlussHeute(abholKacheln(slots, new Date('2026-10-05T14:00:00.000Z'), []))).toBeNull()
+  })
+})
+
+describe('Nachbesserung 1: nach dem Anlegen gilt der Betrag des Servers', () => {
+  const KORB = [
+    { productId: 'eier', price: 4.5, quantity: 1 },
+    { productId: 'brot', price: 5.8, quantity: 1 },
+  ]
+  // Die Gebühr gilt erst ab einer Minute nach JETZT: Beim Anlegen (JETZT) war
+  // die Bestellung gebührenfrei, eine Uhr-Runde später rechnete die Kasse € 0,52 dazu.
+  const GEBUEHR_AB_GLEICH = { ...GEBUEHR_5, serviceFeeActiveFrom: new Date(JETZT.getTime() + 60_000) }
+  const SPAETER = new Date(JETZT.getTime() + 75_000)
+  // Was /api/checkout beim Anlegen an Stripe gab: Warenpreis € 10,30, keine Gebühr.
+  const VOM_SERVER = { amountCents: 1030, serviceFeeCents: 0 }
+
+  it('zahlungsBetraege: Warenpreis, Gebühr und Gesamt nur aus dem Stripe-Betrag', () => {
+    expect(zahlungsBetraege({ amountCents: 1082, serviceFeeCents: 52 })).toEqual({ warenCents: 1030, gebuehrCents: 52, gesamtCents: 1082 })
+    expect(zahlungsBetraege({ amountCents: 330, serviceFeeCents: 0 })).toEqual({ warenCents: 330, gebuehrCents: 0, gesamtCents: 330 })
+  })
+
+  it('zeigt den Server-Betrag, auch wenn die lokale Rechnung inzwischen etwas anderes ergibt', () => {
+    const lokal = kassenBetraege(KORB, GEBUEHR_AB_GLEICH, SPAETER)
+    // Gegenprobe: Die lokale Rechnung ist wirklich gewandert.
+    expect(lokal.gesamtCents).toBe(1082)
+    expect(kassenBetraege(KORB, GEBUEHR_AB_GLEICH, JETZT).gesamtCents).toBe(1030)
+
+    const angezeigt = angezeigteBetraege(lokal, VOM_SERVER)
+
+    expect(angezeigt.gesamtCents).toBe(1030)
+    expect(angezeigt.gebuehrCents).toBe(0)
+    expect(angezeigt.warenCents).toBe(1030)
+    // Die Zeilen des Korbs bleiben (Preise hat der Server beim Anlegen abgeglichen).
+    expect(angezeigt.zeilenCents.get('eier')).toBe(450)
+  })
+
+  it('ohne Bestellung gilt die Vorschau der Kasse', () => {
+    const lokal = kassenBetraege(KORB, GEBUEHR_5, JETZT)
+    expect(angezeigteBetraege(lokal, null)).toBe(lokal)
+  })
+
+  it('zahlungsGebuehrText: Satz nur, wenn er zum Betrag des Servers passt — sonst nur das Wort', () => {
+    expect(zahlungsGebuehrText(GEBUEHR_5, JETZT, { amountCents: 1082, serviceFeeCents: 52 })).toBe('Servicegebühr · 5 %, mind. € 0,50')
+    // Satz gewechselt: Der Text nennt keinen Satz, der nicht zum Betrag passt.
+    expect(zahlungsGebuehrText({ ...GEBUEHR_5, serviceFeePercent: 10 }, JETZT, { amountCents: 1082, serviceFeeCents: 52 })).toBe('Servicegebühr')
+  })
+
+  it('das Schema der Antwort nimmt nur ganze, plausible Cent', () => {
+    expect(checkoutZahlungsBetragSchema.safeParse({ clientSecret: 'x', amountCents: 1082, serviceFeeCents: 52 }).success).toBe(true)
+    expect(checkoutZahlungsBetragSchema.safeParse({ clientSecret: 'x' }).success).toBe(false)
+    expect(checkoutZahlungsBetragSchema.safeParse({ amountCents: 10.5, serviceFeeCents: 0 }).success).toBe(false)
+    expect(checkoutZahlungsBetragSchema.safeParse({ amountCents: 100, serviceFeeCents: 101 }).success).toBe(false)
+    expect(checkoutZahlungsBetragSchema.safeParse({ amountCents: 0, serviceFeeCents: 0 }).success).toBe(false)
+  })
+})
+
+describe('bestaetigungMitStatus — Rückleitung, wenn die Zahlung schon durch ist', () => {
+  const HIER = 'https://farmerzone.example'
+
+  it('hängt redirect_status an einen signierten Pfad an', () => {
+    expect(bestaetigungMitStatus('/hof-test/confirm/o1?sig=abc', HIER, 'processing')).toBe('/hof-test/confirm/o1?sig=abc&redirect_status=processing')
+  })
+
+  it('setzt ein `?`, wenn der Pfad noch keine Abfrage hat', () => {
+    expect(bestaetigungMitStatus('/hof-test', HIER, 'succeeded')).toBe('/hof-test?redirect_status=succeeded')
+  })
+
+  it('ersetzt einen vorhandenen redirect_status statt ihn doppelt anzuhängen', () => {
+    expect(bestaetigungMitStatus('/hof-test/confirm/o1?sig=abc&redirect_status=failed', HIER, 'succeeded')).toBe(
+      '/hof-test/confirm/o1?sig=abc&redirect_status=succeeded'
+    )
+  })
+
+  it('bleibt auf der eigenen Seite, auch bei einem fremden Ziel', () => {
+    expect(bestaetigungMitStatus('https://fremd.example/x?sig=1', HIER, 'processing')).toBe('/x?sig=1&redirect_status=processing')
   })
 })

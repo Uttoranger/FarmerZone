@@ -15,6 +15,10 @@
  *  - „Zahlung abgelehnt" sagt „Es wurde nichts abgebucht".
  *  - E8: kein Satz zu einem Konto, kein Link zu /account in der Kasse.
  *  - Beide Themes: nur Tokens, keine Farbliterale, kein bg-white/black.
+ *  - Nachbesserung 1: Der Zahlungsschritt zeigt auf Knopf und Übersicht den
+ *    Betrag, den /api/checkout an Stripe gab — er bekommt weder Hofeinstellung
+ *    noch Uhr und rechnet nicht selbst; die Kasse reicht `zahlung.betrag` durch.
+ *    Die Rückleitung „bezahlt" baut die Adresse über bestaetigungMitStatus.
  */
 import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -22,6 +26,15 @@ import { join } from 'node:path'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
+// Stripes Zahlungsfeld läuft im iframe und braucht ein DOM — hier nur Hülle,
+// damit der Zahlungsschritt selbst serverseitig rendert.
+vi.mock('@stripe/react-stripe-js', () => ({
+  Elements: ({ children }: { children?: ReactNode }) => children,
+  PaymentElement: () => null,
+  useStripe: () => null,
+  useElements: () => null,
+}))
+vi.mock('@/lib/stripe-client', () => ({ getStripePromise: () => null }))
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
 }))
@@ -34,6 +47,7 @@ import {
   ZahlungAbgelehnt,
 } from '@/components/checkout/kasse-teile'
 import { gebuehrBezeichnung, kassenBetraege, kassenZahlarten, reservierungsStand } from '@/lib/kasse'
+import { StripeZahlung } from '@/components/checkout/stripe-payment'
 import { checkoutFormSchema, checkoutRequestSchema } from '@/schemas/checkout'
 import { paymentLabel } from '@/components/orders/order-status'
 import { zahlungsAnzeige } from '@/lib/bestellstatus'
@@ -161,6 +175,75 @@ describe('Reservierungsfrist sichtbar', () => {
 
   it('ohne bekannte Frist: nichts', () => {
     expect(renderToStaticMarkup(createElement(ReservierungsHinweis, { stand: { zustand: 'unbekannt' }, schritt: 'formular' }))).toBe('')
+  })
+})
+
+describe('Nachbesserung 1: der Zahlungsschritt zeigt den Betrag des Servers', () => {
+  const korb = [
+    { productId: 'eier', price: 4.5, quantity: 1 },
+    { productId: 'brot', price: 5.8, quantity: 1 },
+  ]
+  // Die Gebühr gilt erst eine Minute nach JETZT — die Bestellung entstand
+  // gebührenfrei; eine Uhr-Runde später rechnet die Kasse € 0,52 dazu.
+  const GEBUEHR_AB_GLEICH = { ...GEBUEHR_5, serviceFeeActiveFrom: new Date(JETZT.getTime() + 60_000).toISOString() }
+  const SPAETER = new Date(JETZT.getTime() + 75_000)
+
+  function zahlungsschritt(betrag: { amountCents: number; serviceFeeCents: number }): string {
+    return renderToStaticMarkup(
+      createElement(StripeZahlung, {
+        clientSecret: 'pi_test_secret',
+        bestaetigung: '/hof-test/confirm/o1?sig=abc',
+        farmSlug: 'hof-test',
+        reserviertBis: new Date(JETZT.getTime() + 30 * 60_000).toISOString(),
+        stand: reservierungsStand(new Date(JETZT.getTime() + 30 * 60_000).toISOString(), SPAETER),
+        betrag,
+        gebuehrText: 'Servicegebühr',
+        korb: null,
+        angaben: null,
+        fussnote: 'Bezahlung sicher über Stripe',
+      })
+    )
+  }
+
+  it('Knopf und Übersicht zeigen den Stripe-Betrag, auch wenn die lokale Rechnung inzwischen höher ist', () => {
+    // Gegenprobe: Die lokale Rechnung ist wirklich gewandert (€ 10,30 → € 10,82).
+    expect(kassenBetraege(korb, GEBUEHR_AB_GLEICH, JETZT).gesamtCents).toBe(1030)
+    expect(kassenBetraege(korb, GEBUEHR_AB_GLEICH, SPAETER).gesamtCents).toBe(1082)
+
+    const html = zahlungsschritt({ amountCents: 1030, serviceFeeCents: 0 })
+
+    expect(html).toContain('Jetzt bezahlen · € 10,30')
+    expect(html).not.toContain('€ 10,82')
+    expect(html).not.toContain('€ 0,52')
+  })
+
+  it('Gegenprobe: mit Gebühr im Server-Betrag steht sie als Zeile da', () => {
+    const html = zahlungsschritt({ amountCents: 1082, serviceFeeCents: 52 })
+
+    expect(html).toContain('Jetzt bezahlen · € 10,82')
+    expect(html).toContain('€ 10,30')
+    expect(html).toContain('€ 0,52')
+  })
+
+  it('der Zahlungsschritt kennt weder Hofeinstellung noch Uhr für den Betrag, die Kasse reicht den Server-Betrag durch', () => {
+    const zahlung = lies('src/components/checkout/stripe-payment.tsx')
+    expect(zahlung).not.toMatch(/kassenBetraege|gebuehrBezeichnung|berechneServicegebuehr/)
+    expect(zahlung).toMatch(/zahlungsBetraege\(betrag\)/)
+    const kasse = lies('src/components/checkout/checkout-form.tsx')
+    expect(kasse).toMatch(/betrag=\{zahlung\.betrag\}/)
+    expect(kasse).toMatch(/checkoutZahlungsBetragSchema\.safeParse\(/)
+    const alteUebergabe = /<StripeZahlung[^<]*betraege=\{betraege\}/
+    // Gegenprobe: Das Muster findet die alte Übergabe (Stand vor der Nachbesserung).
+    expect('<StripeZahlung\n        stand={stand}\n        betraege={betraege}\n        korb={<KorbKarte />}').toMatch(alteUebergabe)
+    expect(kasse).not.toMatch(alteUebergabe)
+  })
+
+  it('die Rückleitung „bezahlt" baut die Adresse über bestaetigungMitStatus, nie mit angehängtem „&"', () => {
+    const zahlung = lies('src/components/checkout/stripe-payment.tsx')
+    expect(zahlung).toMatch(/bestaetigungMitStatus\(/)
+    expect(zahlung).not.toMatch(/\}&redirect_status=/)
+    // Gegenprobe: Das Muster findet die alte Schreibweise.
+    expect('`${bestaetigung}&redirect_status=x`').toMatch(/\}&redirect_status=/)
   })
 })
 

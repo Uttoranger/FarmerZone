@@ -136,3 +136,18 @@ export const checkoutRequestSchema = z.object({
 })
 
 export type CheckoutRequest = z.infer<typeof checkoutRequestSchema>
+
+/**
+ * Der Betrag, den /api/checkout beim Anlegen an Stripe gegeben hat — kommt mit
+ * jeder Antwort, die ein Client-Secret trägt. Der Zahlungsschritt zeigt nur
+ * diesen Wert (src/lib/kasse.ts, zahlungsBetraege); die Antwort ist für den
+ * Browser eine Systemgrenze und wird deshalb geprüft.
+ */
+export const checkoutZahlungsBetragSchema = z
+  .object({
+    amountCents: z.number().int().positive(),
+    serviceFeeCents: z.number().int().min(0),
+  })
+  .refine((b) => b.serviceFeeCents <= b.amountCents)
+
+export type CheckoutZahlungsBetrag = z.infer<typeof checkoutZahlungsBetragSchema>

@@ -11,6 +11,9 @@
  *    Antwort — die Regel gilt nur für neue Bestellungen.
  *  - Die Gebührenzeile der Kasse (kassenBetraege) zeigt genau den Betrag, den
  *    der Server als Snapshot speichert und Stripe berechnet.
+ *  - Nachbesserung 1: Jede Antwort mit Client-Secret trägt `amountCents` — genau
+ *    den Betrag, den Stripe abbucht — und den Gebühren-Snapshot, auch bei der
+ *    Wiederholung zu einer bestehenden Bestellung (mit und ohne gespeicherten Intent).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
@@ -48,6 +51,7 @@ import { stripe } from '@/lib/stripe'
 import { sendOnsiteConfirmation } from '@/lib/email'
 import { CODE_ZAHLART_NICHT_ANGEBOTEN, ZAHLART_NICHT_ANGEBOTEN, kassenBetraege } from '@/lib/kasse'
 import { alsCents } from '@/lib/order-totals'
+import { Decimal } from '@prisma/client/runtime/index-browser'
 
 const JETZT = new Date('2026-10-05T08:00:00.000Z')
 
@@ -236,4 +240,80 @@ describe('Gebührenzeile der Kasse = Betrag des Servers', () => {
       expect(intent.amount).toBe(anzeige.gesamtCents)
     })
   }
+})
+
+describe('Nachbesserung 1: die Antwort nennt den Betrag, den Stripe abbucht', () => {
+  /** Eine schon angelegte Online-Bestellung zum Schlüssel: Warenpreis € 10,30, Gebühr € 0,52. */
+  function bestehendeOnlineBestellung(stripePaymentIntentId: string | null) {
+    vi.mocked(prisma.order.findUnique).mockImplementation((({ where }: { where: { idempotencyKey?: string } }) =>
+      Promise.resolve(
+        where.idempotencyKey === 'schluessel-0001'
+          ? {
+              id: 'order_alt',
+              orderNumber: 'HT-0510-CCCC',
+              farmId: 'farm_1',
+              paymentMethod: 'ONLINE',
+              stripePaymentIntentId,
+              status: 'PENDING_CONFIRMATION',
+              createdAt: JETZT,
+              pickupDate: JETZT,
+              pickupTimeStart: '14:00',
+              totalAmount: new Decimal('10.30'),
+              platformFeeAmount: new Decimal('0'),
+              serviceFeeCents: 52,
+              farm: { slug: 'hof-test', stripeAccountId: 'acct_test_platzhalter', acceptsOnsite: true },
+            }
+          : null
+      )) as never)
+  }
+
+  it('neue Online-Bestellung: amountCents ist der Stripe-Betrag, serviceFeeCents der Snapshot', async () => {
+    const items = [{ productId: 'eier', quantity: 1, unitPrice: 4.5 }, { productId: 'brot', quantity: 1, unitPrice: 5.8 }]
+
+    const res = await POST(anfrage({ paymentMethod: 'ONLINE', items }))
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    const intent = vi.mocked(stripe.paymentIntents.create).mock.calls[0][0] as { amount: number }
+    expect(body.amountCents).toBe(intent.amount)
+    expect(body.amountCents).toBe(1082)
+    expect(body.serviceFeeCents).toBe(createData().serviceFeeCents)
+  })
+
+  it('Wiederholung mit gespeichertem Intent: amountCents aus dem PaymentIntent, ohne neuen anzulegen', async () => {
+    bestehendeOnlineBestellung('pi_alt')
+    vi.mocked(stripe.paymentIntents.retrieve).mockResolvedValue({ id: 'pi_alt', client_secret: 'pi_alt_secret', amount: 1082 } as never)
+
+    const res = await POST(anfrage({ paymentMethod: 'ONLINE' }))
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual(
+      expect.objectContaining({ clientSecret: 'pi_alt_secret', amountCents: 1082, serviceFeeCents: 52, wiederholt: true })
+    )
+    expect(stripe.paymentIntents.create).not.toHaveBeenCalled()
+    expect(orderCreate).not.toHaveBeenCalled()
+  })
+
+  it('Wiederholung ohne gespeicherten Intent: amountCents ist der Betrag, den der neue Stripe-Aufruf bekommt', async () => {
+    bestehendeOnlineBestellung(null)
+    vi.mocked(stripe.paymentIntents.create).mockResolvedValue({ id: 'pi_neu', client_secret: 'pi_neu_secret' } as never)
+
+    const res = await POST(anfrage({ paymentMethod: 'ONLINE' }))
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    const intent = vi.mocked(stripe.paymentIntents.create).mock.calls[0][0] as { amount: number }
+    expect(body).toEqual(expect.objectContaining({ clientSecret: 'pi_neu_secret', wiederholt: true, serviceFeeCents: 52 }))
+    expect(body.amountCents).toBe(intent.amount)
+    expect(body.amountCents).toBe(1082)
+    expect(orderCreate).not.toHaveBeenCalled()
+  })
+
+  it('Gegenprobe: bar gibt keinen Zahlungsbetrag heraus (kein Zahlungsschritt)', async () => {
+    const res = await POST(anfrage({ paymentMethod: 'ONSITE_CASH' }))
+
+    const body = await res.json()
+    expect(body.requiresConfirmation).toBe(true)
+    expect(body).not.toHaveProperty('amountCents')
+  })
 })
