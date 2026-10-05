@@ -39,9 +39,11 @@ import {
   type KartenHof,
   type TrefferHof,
 } from '@/components/hoefe/entdecken-teile'
+import HoefeUmkreis from '@/components/hoefe/hoefe-umkreis'
+import { HoefeSuche } from '@/components/hoefe/hoefe-suche'
 import { kategorieReihe, leerzustand } from '@/lib/hoefe-entdecken'
 import type { AngebotsProdukt } from '@/lib/bereiche-anzeige'
-import { LEERER_HOEFE_FILTER, type HoefeFilter } from '@/schemas/hoefe-filter'
+import { LEERER_HOEFE_FILTER, SUCHTEXT_MAX, type HoefeFilter } from '@/schemas/hoefe-filter'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 const html = (el: ReturnType<typeof createElement>) => renderToStaticMarkup(el)
@@ -97,6 +99,17 @@ describe('Hofkarte', () => {
     expect(split).toContain('Zum Hof')
   })
 
+  it('„Zum Hof" hat eine Trefferfläche von mindestens 44 px', () => {
+    const split = html(createElement(HofKarte, { hof: HOF, bereich: 'LEBENSMITTEL', produktNamen: [], split: true, ausgewaehlt: false }))
+    const klassen = split.match(/<a href="\/hof-test" class="([^"]*)"[^>]*>Zum Hof/)?.[1] ?? ''
+    // h-9 (36 px) reicht nur mit dem unsichtbaren Rand darüber und darunter (4 + 36 + 4).
+    const reicht = (k: string) => /\bh-11\b|\bmin-h-11\b/.test(k) || (/\bh-9\b/.test(k) && k.includes('before:-inset-y-1') && k.includes('before:absolute'))
+    expect(klassen).not.toBe('')
+    expect(reicht(klassen)).toBe(true)
+    // Gegenprobe: der alte Knopf ohne Erweiterung fiele durch.
+    expect(reicht('relative inline-flex h-9 items-center')).toBe(false)
+  })
+
   it('ein Name mit 80 Zeichen steht ganz im title und wird höchstens zweizeilig gezeigt', () => {
     const lang = 'Hof '.repeat(20).trim()
     const karte = html(createElement(HofKarte, { hof: { ...HOF, name: lang }, bereich: 'LEBENSMITTEL', produktNamen: [], split: false, ausgewaehlt: false }))
@@ -148,6 +161,61 @@ describe('Chips und aktive Filter sind echte Links', () => {
     expect(zeile).toMatch(/<a href="\/hoefe"[^>]*>Alle zurücksetzen<\/a>/)
     // Gegenprobe: ohne Filter keine Zeile.
     expect(html(createElement(AktiveFilterZeile, { filter: LEERER_HOEFE_FILTER }))).toBe('')
+  })
+
+  it('der Umkreis steht als eigener Eintrag in „Aktive Filter" — ein Knopf, kein Link (er lebt nicht in der URL)', () => {
+    const zeile = html(createElement(AktiveFilterZeile, { filter: LEERER_HOEFE_FILTER, umkreis: 25 }))
+    expect(zeile).toContain('Aktive Filter:')
+    expect(zeile).toMatch(/<button type="button"[^>]*aria-label="Umkreis: 25 km entfernen"/)
+    expect(zeile).toContain('Alle zurücksetzen')
+    // Gegenprobe: „Alle" ist kein Filter.
+    expect(html(createElement(AktiveFilterZeile, { filter: LEERER_HOEFE_FILTER, umkreis: null }))).toBe('')
+  })
+
+  it('„Alle zurücksetzen" und der Umkreis-Eintrag heben den Umkreis auf', () => {
+    // Die Zeile hat keine Hooks — ihr Baum lässt sich direkt durchsuchen.
+    type Knoten = { type?: unknown; props?: Record<string, unknown> & { children?: unknown } }
+    const finde = (knoten: unknown, passt: (k: Knoten) => boolean): Knoten | null => {
+      if (Array.isArray(knoten)) {
+        for (const kind of knoten) {
+          const treffer = finde(kind, passt)
+          if (treffer) return treffer
+        }
+        return null
+      }
+      if (!knoten || typeof knoten !== 'object') return null
+      const k = knoten as Knoten
+      if (passt(k)) return k
+      return finde(k.props?.children, passt)
+    }
+    const text = (k: Knoten) => JSON.stringify(k.props?.children ?? '')
+    const gewaehlt: HoefeFilter[] = []
+    let aufgehoben = 0
+    const baum = AktiveFilterZeile({
+      filter: { ...LEERER_HOEFE_FILTER, siegel: ['BIO'] },
+      umkreis: 10,
+      onWahl: (f) => gewaehlt.push(f),
+      onUmkreisAufheben: () => (aufgehoben += 1),
+    })
+    const ereignis = { preventDefault() {} }
+    const alle = finde(baum, (k) => typeof k.props?.onNavigate === 'function' && text(k).includes('Alle zurücksetzen'))
+    expect(alle).not.toBeNull()
+    ;(alle!.props!.onNavigate as (e: typeof ereignis) => void)(ereignis)
+    expect(aufgehoben).toBe(1)
+    expect(gewaehlt).toEqual([LEERER_HOEFE_FILTER])
+    const umkreis = finde(baum, (k) => k.props?.['aria-label'] === 'Umkreis: 10 km entfernen')
+    ;(umkreis!.props!.onClick as () => void)()
+    expect(aufgehoben).toBe(2)
+    // Gegenprobe: „Bio entfernen" lässt den Umkreis stehen.
+    const bio = finde(baum, (k) => k.props?.['aria-label'] === 'Bio entfernen')
+    ;(bio!.props!.onNavigate as (e: typeof ereignis) => void)(ereignis)
+    expect(aufgehoben).toBe(2)
+  })
+
+  it('der Seitenzustand verdrahtet den Umkreis in „Aktive Filter" und in „Zurücksetzen" im Filterblatt', () => {
+    const client = quelle('src/components/hoefe/hoefe-client.tsx')
+    expect(client).toMatch(/<AktiveFilterZeile[^>]*umkreis=\{aktiverUmkreis\}[^>]*onUmkreisAufheben=/)
+    expect(client).toMatch(/beimNavigieren\(zuruecksetzenZiel, schreibeUrl, umkreisAufheben\)/)
   })
 })
 
@@ -204,12 +272,21 @@ describe('beide Themes: nur Tokens in den Teilen von Entdecken', () => {
   // Farben der Tailwind-Palette (text-amber-700, dark:text-red-300) folgen
   // keinem Token — im anderen Theme stimmt der Kontrast nicht mehr.
   const PALETTE = /\b(?:text|bg|border|ring|from|to|via)-(?:red|amber|green|emerald|lime|yellow|orange|slate|gray|zinc|neutral|stone|sky|blue|teal)-\d{2,3}\b/
+  // Schwarz und Weiß sind auch keine Tokens (from-black/25, bg-white/50) —
+  // Schleier und Punkte auf Fotos nehmen die theme-festen Tokens
+  // (DESIGN_SYSTEM.md, „Bild-Overlays"). Eine Ausnahme sieht das Design-System nicht vor.
+  const SCHWARZ_WEISS = /\b(?:text|bg|border|ring|from|to|via|fill|stroke|outline|shadow|divide|decoration)-(?:black|white)(?![\w-])/
   const HEX = /#[0-9a-fA-F]{3,8}\b/
 
-  it('erkennt Palettenfarben und Hexwerte (Gegenprobe)', () => {
+  it('erkennt Palettenfarben, Schwarz/Weiß und Hexwerte (Gegenprobe)', () => {
     expect(PALETTE.test('text-amber-700 dark:text-amber-300')).toBe(true)
     expect(HEX.test("'#E8F0E2'")).toBe(true)
     expect(PALETTE.test('text-status-offen bg-accent/12')).toBe(false)
+    expect(SCHWARZ_WEISS.test('bg-linear-150 from-black/25 via-transparent')).toBe(true)
+    expect(SCHWARZ_WEISS.test("i === aktiv ? 'bg-white' : 'bg-white/50'")).toBe(true)
+    expect(SCHWARZ_WEISS.test('dark:text-white')).toBe(true)
+    // Gegenprobe: Wörter, die nur so klingen, und die Tokens fallen nicht darunter.
+    expect(SCHWARZ_WEISS.test('whitespace-nowrap text-foreground from-primary-foreground/25 bg-accent-foreground/50')).toBe(false)
   })
 
   it('keine Datei der Route nutzt sie', () => {
@@ -223,7 +300,27 @@ describe('beide Themes: nur Tokens in den Teilen von Entdecken', () => {
     for (const datei of dateien) {
       const text = quelle(datei)
       expect(PALETTE.test(text), datei).toBe(false)
+      expect(SCHWARZ_WEISS.test(text), datei).toBe(false)
       expect(HEX.test(text), datei).toBe(false)
     }
+  })
+})
+
+describe('gültiges HTML und Grenzen der Felder', () => {
+  it('das PLZ-Formular steckt in keinem <span> (ein Formular ist ein Block)', () => {
+    const umkreis = html(createElement(HoefeUmkreis, { bezugspunkt: null, onBezugspunkt: () => {}, onAufheben: () => {} }))
+    const vorher = umkreis.slice(0, umkreis.indexOf('<form'))
+    expect(umkreis).toContain('<form')
+    const offeneSpans = (t: string) => (t.match(/<span\b/g) ?? []).length - (t.match(/<\/span>/g) ?? []).length
+    expect(offeneSpans(vorher)).toBe(0)
+    // Gegenprobe: die Zählung erkennt ein offenes <span> davor.
+    expect(offeneSpans('<div><span class="x"><span>a</span>')).toBe(1)
+  })
+
+  it('das Suchfeld nimmt höchstens so viele Zeichen an, wie die Adresse trägt', () => {
+    const suche = html(createElement(HoefeSuche, { suchtext: '', vorschlaege: [], status: '', onSuchtext: () => {}, onUebernehmen: () => {} }))
+    expect(suche).toContain(`maxLength="${SUCHTEXT_MAX}"`)
+    // Gegenprobe: ein längerer Suchtext fiele beim Lesen der Adresse weg.
+    expect(SUCHTEXT_MAX).toBe(100)
   })
 })

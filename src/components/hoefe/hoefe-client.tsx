@@ -139,6 +139,8 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
   // Konto, keine URL-Parameter — „Ort ändern" macht ihn spurlos fort.
   const [bezugspunkt, setBezugspunkt] = useState<Bezugspunkt | null>(null)
   const [umkreis, setUmkreis] = useState<UmkreisStufe>(null)
+  // Ohne Bezugspunkt wirkt kein Umkreis — dann steht er auch in keiner Filter-Anzeige.
+  const aktiverUmkreis = bezugspunkt ? umkreis : null
   const eintraege = useRef(new Map<string, HTMLLIElement>())
   // Der Stand beim Öffnen des Filter-Blatts — „Abbrechen" stellt ihn wieder her.
   const blattStand = useRef<{ filter: HoefeFilter; umkreis: UmkreisStufe } | null>(null)
@@ -244,12 +246,15 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
     />
   )
 
+  // „Zurücksetzen" heißt ALLES: die Filter in der Adresse und der Umkreis im
+  // Zustand — sonst bliebe die Liste nach dem Zurücksetzen still eingeschränkt.
   const zuruecksetzenZiel = alleZuruecksetzen(filter)
+  const umkreisAufheben = () => setUmkreis(null)
   const zuruecksetzenLink =
-    zaehleFilter(filter) > 0 || filter.suchMarken.length > 0 || filter.suchtext.trim() !== '' ? (
+    zaehleFilter(filter, aktiverUmkreis) > 0 || filter.suchMarken.length > 0 || filter.suchtext.trim() !== '' ? (
       <Link
         href={hoefeHref(zuruecksetzenZiel)}
-        onNavigate={beimNavigieren(zuruecksetzenZiel, schreibeUrl)}
+        onNavigate={beimNavigieren(zuruecksetzenZiel, schreibeUrl, umkreisAufheben)}
         prefetch={false}
         className={cn('inline-flex min-h-11 items-center rounded-full px-3 text-sm font-semibold text-status-fertig hover:bg-muted', FOKUS_RAHMEN)}
       >
@@ -361,7 +366,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
 
   const filterblatt = (
     <EntdeckenFilterblatt
-      anzahlFilter={zaehleFilter(filter)}
+      anzahlFilter={zaehleFilter(filter, aktiverUmkreis)}
       anzeigenText={`${zahlText} anzeigen`}
       zuruecksetzen={zuruecksetzenLink}
       onOeffnen={() => {
@@ -441,7 +446,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
       />
       {filterReihenBrowser}
       {futterHinweis}
-      <AktiveFilterZeile filter={filter} onWahl={schreibeUrl} />
+      <AktiveFilterZeile filter={filter} onWahl={schreibeUrl} umkreis={aktiverUmkreis} onUmkreisAufheben={umkreisAufheben} />
     </div>
   )
 
@@ -551,7 +556,10 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
               aria-label="Karte öffnen"
               className={cn('relative block h-[120px] overflow-hidden rounded-2xl border border-border bg-accent', FOKUS_RAHMEN)}
             >
-              <span aria-hidden="true" className="absolute inset-0 bg-linear-150 from-black/25 via-transparent via-55% to-primary/25" />
+              {/* Der dunkle Schleier: primary-foreground ist im neuen Design in
+                  beiden Themes fast schwarz — theme-fest wie jedes Bild-Overlay
+                  (DESIGN_SYSTEM.md), aber ein Token statt Tailwind-Schwarz. */}
+              <span aria-hidden="true" className="absolute inset-0 bg-linear-150 from-primary-foreground/25 via-transparent via-55% to-primary/25" />
               <span aria-hidden="true" className="absolute top-[58px] -left-6 h-1.5 w-[520px] rotate-[-8deg] rounded-full bg-accent-foreground/15" />
               <span aria-hidden="true" className="absolute -top-6 left-[30%] h-[200px] w-1 rotate-[12deg] rounded-full bg-accent-foreground/12" />
               {['left-[26%] top-[30%]', 'left-[58%] top-[52%]', 'left-[78%] top-[24%]'].map((lage) => (

@@ -237,12 +237,13 @@ export default function HoefeUmkreis({
         </Hinweiskarte>
       ) : (
         <Hinweiskarte symbol={MapPin}>
-          <span className="flex flex-col gap-3">
+          {/* div statt span: Darin steckt ein <form>, und ein Formular ist ein Block. */}
+          <div className="flex flex-col gap-3">
             <span>
               Wo bist du? Gib deine Postleitzahl ein oder nutze deinen Standort – dann stehen die nächsten Höfe oben.
               Nichts wird gespeichert.
             </span>
-            <span className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               <form onSubmit={ortSuchen} className="flex min-w-0 flex-1 items-center gap-2 sm:max-w-sm">
                 <input
                   ref={plzFeld}
@@ -291,8 +292,8 @@ export default function HoefeUmkreis({
                 )}
                 Standort nutzen
               </button>
-            </span>
-          </span>
+            </div>
+          </div>
         </Hinweiskarte>
       )}
 

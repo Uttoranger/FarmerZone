@@ -3902,6 +3902,12 @@ ODER; Umkreis-Stufen als `Segment` (Seitenzustand, nie URL) mit „Alle" statt
 „Zum Hof" (Entscheidung des Betreibers aus #82). Die Tier-Auswahl im eigenen
 Blatt ist durch Link-Chips ersetzt (`hoefe-facetten.tsx` entfällt).
 
+## Nachbesserung 1 zu Nr. 09 — Entdecken (2026-10-05)
+
+- **Umkreis als aktiver Filter.** Der Umkreis stand im Filterblatt, aber nicht in „Aktive Filter", und „Alle zurücksetzen" ließ ihn stehen — die Liste blieb nach dem Zurücksetzen still eingeschränkt. Jetzt nimmt `aktiveFilter(filter, umkreis)` ihn als eigenen Eintrag („Umkreis: 25 km", markiert mit `umkreis: true`), er zählt am Filter-Knopf mit, und `beimNavigieren(ziel, onWahl, danach)` hebt ihn bei jedem „Zurücksetzen" auf. In die URL kommt er weiterhin nicht (#130); sein Entfernen-Eintrag ist deshalb ein Knopf. Ohne Bezugspunkt gilt kein Umkreis (`aktiverUmkreis`).
+- **Schwarz/Weiß sind keine Tokens.** Der Schleier der Karten-Vorschau (`from-black/25`) und die Punkte im Fotostreifen (`bg-white`) nehmen jetzt `primary-foreground` bzw. `accent-foreground` — beide im neuen Design in beiden Themes gleich. Der Token-Test der Route erkennt `black`/`white` als Farbklasse. Die Startseite (Nr. 07) trägt noch `from-black/…` auf Foto und Kartenbild; das gehört in ihren eigenen Branch.
+- Klein: „Zum Hof" im Splitscreen mit 44 px Trefferfläche (`before:`-Rand wie die Chips), das PLZ-Formular in `div` statt `span`, Suchfeld `maxLength` = `SUCHTEXT_MAX`.
+
 ## Nützliche Befehle
 
 ```bash

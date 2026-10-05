@@ -280,6 +280,23 @@ describe('aktive Filter und „Alle zurücksetzen"', () => {
   it('die Zahl am Filter-Knopf zählt alles außer der Suche (die steht im Feld)', () => {
     expect(zaehleFilter(gesetzt)).toBe(5)
   })
+
+  // Der Umkreis lebt nur im Seitenzustand (nie in der URL, #130) — aktiv ist
+  // er trotzdem: Im Filterblatt steht er, also auch in „Aktive Filter".
+  it('ein gesetzter Umkreis ist ein eigener aktiver Eintrag, der die URL nicht ändert', () => {
+    const liste = aktiveFilter(LEERER_HOEFE_FILTER, 25)
+    expect(liste.map((f) => f.label)).toEqual(['Umkreis: 25 km'])
+    expect(liste[0].umkreis).toBe(true)
+    // Entfernen ändert keinen URL-Filter — nur der Zustand fällt weg.
+    expect(liste[0].ohne).toEqual(LEERER_HOEFE_FILTER)
+    expect(zaehleFilter(LEERER_HOEFE_FILTER, 25)).toBe(1)
+    // Reihenfolge: nach der Suche, vor dem Bereich.
+    expect(aktiveFilter(gesetzt, 10).map((f) => f.label).slice(0, 4)).toEqual(['Suche: Stroh', 'Suche: Heu', 'Umkreis: 10 km', 'Futtermittel'])
+    expect(zaehleFilter(gesetzt, 10)).toBe(6)
+    // Gegenprobe: „Alle" (null) ist kein Filter, und kein anderer Eintrag trägt die Marke.
+    expect(aktiveFilter(LEERER_HOEFE_FILTER, null)).toEqual([])
+    expect(aktiveFilter(gesetzt).some((f) => f.umkreis)).toBe(false)
+  })
 })
 
 describe('Kopf und Ergebniszahl', () => {

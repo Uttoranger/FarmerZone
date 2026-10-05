@@ -50,12 +50,17 @@ export type FilterWahl = (ziel: HoefeFilter) => void
  */
 export function beimNavigieren(
   ziel: HoefeFilter,
-  onWahl?: FilterWahl
+  onWahl?: FilterWahl,
+  /** Was zusätzlich wegfällt, das nicht in der Adresse steht (der Umkreis). */
+  danach?: () => void
 ): ((ereignis: { preventDefault: () => void }) => void) | undefined {
-  if (!onWahl) return undefined
+  if (!onWahl && !danach) return undefined
   return (ereignis: { preventDefault: () => void }) => {
-    ereignis.preventDefault()
-    onWahl(ziel)
+    if (onWahl) {
+      ereignis.preventDefault()
+      onWahl(ziel)
+    }
+    danach?.()
   }
 }
 
@@ -105,10 +110,32 @@ export function ChipReihe({
  * „Aktive Filter: [Suche: Eier ×] [Bio ×] Alle zurücksetzen" (Mockup
  * web-k1-suche-filter). Jeder Eintrag ist ein Link auf die Adresse ohne ihn.
  */
-export function AktiveFilterZeile({ filter, onWahl }: { filter: HoefeFilter; onWahl?: FilterWahl }): React.JSX.Element | null {
-  const aktiv = aktiveFilter(filter)
+export function AktiveFilterZeile({
+  filter,
+  onWahl,
+  umkreis = null,
+  onUmkreisAufheben,
+}: {
+  filter: HoefeFilter
+  onWahl?: FilterWahl
+  /** Der Umkreis lebt nur im Seitenzustand (nie in der URL) — er kommt deshalb eigens herein. */
+  umkreis?: UmkreisStufe
+  onUmkreisAufheben?: () => void
+}): React.JSX.Element | null {
+  const aktiv = aktiveFilter(filter, umkreis)
   if (aktiv.length === 0) return null
   const zurueck = alleZuruecksetzen(filter)
+  const eintrag = cn(
+    "relative inline-flex h-9 max-w-full items-center gap-1.5 rounded-full border border-border bg-card px-3 text-[13px] text-foreground transition-colors duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] hover:bg-muted",
+    FOKUS_RAHMEN
+  )
+  const inhalt = (label: string) => (
+    <>
+      {/* Gekürzt statt übergelaufen: Ein Suchbegriff darf 100 Zeichen lang sein. */}
+      <span className="min-w-0 truncate">{label}</span>
+      <X className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
+    </>
+  )
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
       <span id="aktive-filter" className="text-[13px] text-muted-foreground">
@@ -117,27 +144,29 @@ export function AktiveFilterZeile({ filter, onWahl }: { filter: HoefeFilter; onW
       <ul aria-labelledby="aktive-filter" className="flex min-w-0 flex-wrap gap-2">
         {aktiv.map((f) => (
           <li key={f.schluessel} className="min-w-0">
-            <Link
-              href={hoefeHref(f.ohne)}
-              onNavigate={beimNavigieren(f.ohne, onWahl)}
-              prefetch={onWahl ? false : undefined}
-              aria-label={`${f.label} entfernen`}
-              title={f.label}
-              className={cn(
-                "relative inline-flex h-9 max-w-full items-center gap-1.5 rounded-full border border-border bg-card px-3 text-[13px] text-foreground transition-colors duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] hover:bg-muted",
-                FOKUS_RAHMEN
-              )}
-            >
-              {/* Gekürzt statt übergelaufen: Ein Suchbegriff darf 100 Zeichen lang sein. */}
-              <span className="min-w-0 truncate">{f.label}</span>
-              <X className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-            </Link>
+            {f.umkreis ? (
+              // Ein Knopf, kein Link: Der Umkreis steht in keiner Adresse.
+              <button type="button" onClick={onUmkreisAufheben} aria-label={`${f.label} entfernen`} title={f.label} className={eintrag}>
+                {inhalt(f.label)}
+              </button>
+            ) : (
+              <Link
+                href={hoefeHref(f.ohne)}
+                onNavigate={beimNavigieren(f.ohne, onWahl)}
+                prefetch={onWahl ? false : undefined}
+                aria-label={`${f.label} entfernen`}
+                title={f.label}
+                className={eintrag}
+              >
+                {inhalt(f.label)}
+              </Link>
+            )}
           </li>
         ))}
       </ul>
       <Link
         href={hoefeHref(zurueck)}
-        onNavigate={beimNavigieren(zurueck, onWahl)}
+        onNavigate={beimNavigieren(zurueck, onWahl, onUmkreisAufheben)}
         prefetch={onWahl ? false : undefined}
         className={cn(
           'inline-flex min-h-11 items-center rounded-lg px-1 text-[13px] font-semibold text-status-fertig hover:underline',
@@ -348,7 +377,8 @@ export function HofKarte({
               <Link
                 href={ziel}
                 className={cn(
-                  'pointer-events-auto relative z-10 inline-flex h-9 items-center gap-1 rounded-full border border-border bg-card px-3.5 text-[13px] font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted',
+                  // before: der unsichtbare Rand oben und unten — 36 px Knopf, 44 px Trefferfläche (wie die Chips).
+                  "pointer-events-auto relative z-10 inline-flex h-9 items-center gap-1 rounded-full border border-border bg-card px-3.5 text-[13px] font-semibold text-foreground transition-colors duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] hover:bg-muted",
                   FOKUS_RAHMEN
                 )}
               >

@@ -3,6 +3,7 @@
 import { useId, useState } from 'react'
 import { Search } from 'lucide-react'
 import { tasteInVorschlaegen, type ProduktVorschlag, type VorschlagsLage } from '@/lib/hofuebersicht'
+import { SUCHTEXT_MAX } from '@/schemas/hoefe-filter'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 
@@ -66,6 +67,9 @@ export function HoefeSuche({
           type="search"
           role="combobox"
           value={suchtext}
+          // Mehr trägt die Adresse nicht (SUCHTEXT_MAX) — ein längerer Text
+          // fiele beim nächsten Lesen der URL weg und das Feld stünde leer da.
+          maxLength={SUCHTEXT_MAX}
           onChange={(e) => {
             setVorschlagsLage({ offen: true, markiert: null })
             onSuchtext(e.target.value)

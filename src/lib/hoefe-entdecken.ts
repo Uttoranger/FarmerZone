@@ -231,14 +231,20 @@ export function sortierReihe(filter: HoefeFilter): EntdeckenChip[] {
 // ─── Aktive Filter ──────────────────────────────────────────────────────────
 
 /** Ein gesetzter Filter: wie er heißt und welcher Filter ohne ihn gilt. */
-export type AktiverFilter = { schluessel: string; label: string; ohne: HoefeFilter }
+/**
+ * `umkreis: true` markiert den Umkreis-Eintrag: Er lebt nur im Seitenzustand,
+ * nie in der URL (#130) — sein `ohne` ist deshalb die unveränderte Adresse,
+ * entfernt wird er über den Zustand, nicht über einen Link.
+ */
+export type AktiverFilter = { schluessel: string; label: string; ohne: HoefeFilter; umkreis?: true }
 
 /**
- * Jeder gesetzte Filter einzeln, in der Reihenfolge Suche → Bereich →
- * Kategorien → Sorten → Siegel → Tiere → Menge → Sortierung. Die Ansicht
- * (Liste/Karte) ist kein Filter und steht hier nie.
+ * Jeder gesetzte Filter einzeln, in der Reihenfolge Suche → Umkreis →
+ * Bereich → Kategorien → Sorten → Siegel → Tiere → Menge → Sortierung. Die
+ * Ansicht (Liste/Karte) ist kein Filter und steht hier nie, der Umkreis
+ * „Alle" (null) auch nicht.
  */
-export function aktiveFilter(filter: HoefeFilter): AktiverFilter[] {
+export function aktiveFilter(filter: HoefeFilter, umkreis: UmkreisStufe = null): AktiverFilter[] {
   const liste: AktiverFilter[] = []
   for (const marke of filter.suchMarken) {
     liste.push({
@@ -249,6 +255,9 @@ export function aktiveFilter(filter: HoefeFilter): AktiverFilter[] {
   }
   if (filter.suchtext.trim() !== '') {
     liste.push({ schluessel: 'suchtext', label: `Suche: ${filter.suchtext.trim()}`, ohne: { ...filter, suchtext: '' } })
+  }
+  if (umkreis !== null) {
+    liste.push({ schluessel: 'umkreis', label: `Umkreis: ${umkreis} km`, ohne: filter, umkreis: true })
   }
   if (filter.bereich === 'FUTTERMITTEL') {
     liste.push({ schluessel: 'futter', label: 'Futtermittel', ohne: wechsleBereich(filter, 'LEBENSMITTEL') })
@@ -274,14 +283,18 @@ export function aktiveFilter(filter: HoefeFilter): AktiverFilter[] {
   return liste
 }
 
-/** „Alle zurücksetzen": kein Filter mehr — die Ansicht (Liste/Karte) bleibt, sie ist keiner. */
+/**
+ * „Alle zurücksetzen": kein Filter mehr in der Adresse — die Ansicht
+ * (Liste/Karte) bleibt, sie ist keiner. Den Umkreis (Zustand, nicht URL)
+ * hebt der Aufrufer zugleich auf.
+ */
 export function alleZuruecksetzen(filter: HoefeFilter): HoefeFilter {
   return { ...LEERER_HOEFE_FILTER, ansicht: filter.ansicht }
 }
 
 /** Die Zahl am Filter-Knopf („Filter · 2"): alles außer der Suche, die steht im Feld. */
-export function zaehleFilter(filter: HoefeFilter): number {
-  return aktiveFilter(filter).filter((f) => !f.label.startsWith('Suche: ')).length
+export function zaehleFilter(filter: HoefeFilter, umkreis: UmkreisStufe = null): number {
+  return aktiveFilter(filter, umkreis).filter((f) => !f.label.startsWith('Suche: ')).length
 }
 
 // ─── Kopf, Ergebnisart, Zahl ────────────────────────────────────────────────
