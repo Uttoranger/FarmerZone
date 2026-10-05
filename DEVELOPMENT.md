@@ -295,9 +295,10 @@ packte. Der Token blieb danach gültig.
 Startseite. Alte, schon bestätigte Bestellungen haben ihren Token noch — die
 Seite leitet sie zur signierten Bestätigungsseite.
 
-**Offen:** Die Mail „Bitte bestätige" schreibt noch „Der Link ist 48 Stunden
-gültig", die Frist ist aber höchstens zwei Stunden (`fristen.ts`) — gehört in
-den Umbau der E-Mails (Gate 4, Nr. 13).
+**Nachtrag:** Die Mail „Bitte bestätige" schrieb „Der Link ist 48 Stunden
+gültig", die Frist ist aber höchstens zwei Stunden (`fristen.ts`). Seither:
+„Unbestätigte Bestellungen geben wir nach spätestens zwei Stunden wieder frei"
+(`tests/bar-bestaetigung-mail.test.ts`).
 
 **Tests:** `tests/bar-bestaetigung.test.ts` (Regel und Token-Schema),
 `tests/bar-bestaetigung-zugang.test.ts` (GET, Seite, beide Knöpfe; vorher rot),
