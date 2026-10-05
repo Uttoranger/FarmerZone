@@ -3855,6 +3855,53 @@ in der `KundeShell`.
   10^6 mögliche Codes — wer die Tabelle liest, rechnet ihn zurück; vertretbar,
   weil ein Code 10 Minuten gilt und die Tabelle ohnehin Sitzungen enthält.
 
+## Entdecken im neuen Design (Nachtlauf Nr. 09, 2026-10-05)
+
+`/hoefe` steht in der `KundeShell` (über `KundeShellMitSitzung`) und im neuen
+Design (Mockups `web-k1-*`, `mobil-k1-*`). Die Seite bleibt `force-dynamic`
+wie seit Bereiche 2 — ein geteilter Link soll schon im Server-HTML gefiltert
+aussehen; schlechter wird sie nicht, weil die Sitzung nicht mehr auf dem
+Server gelesen wird und die Hofdaten weiter aus `ladeOeffentlicheHoefe`
+kommen.
+
+**Filter als Links.** Jeder Chip ist ein `FilterChip` mit der Adresse seines
+Ziel-Filters. Ein gewöhnlicher Klick läuft über Nexts `onNavigate`, schreibt
+die Adresse per `history.replaceState` und filtert im Browser; Mittelklick und
+„In neuem Tab" folgen dem echten Link. `prefetch` ist für diese Links aus —
+bei einer dynamischen Seite wäre es eine Serveranfrage je sichtbarem Chip.
+Die Logik (Reihen, aktive Filter, Kopf, Produkttreffer, Leerzustand) steht rein
+in `src/lib/hoefe-entdecken.ts`.
+
+**E2.** Futtermittel ist ein Chip in der Kategorie-Reihe (setzt
+`bereich=futter`), die frühere Weiche „Hofladen | Futtermittel" ist auf
+`/hoefe` weg (`BereichUmschalter` bleibt für Hofseite und Umfeld). Im Futter
+erscheint die Mengen-Facette als „Kleinmengen | Ballen & mehr", Grenze
+unverändert 25 kg. Brennmaterial ist `kat=BRENNHOLZ` (wie der Chip der
+Startseite); das Taxonomie-Label „Brennholz" ändert erst Gate 6.
+
+**Produkte statt Höfe.** Bei einer Suche und im Futter zeigt die Seite
+Produktzeilen (`produktTreffer`). Dafür trägt jede Angebotszeile der
+ungedeckelten Zeilen-Abfrage zusätzlich Kennung, Preis, Einheit, Gebinde und
+Bild (`AngebotsProdukt`) — die acht Vorschau-Zeilen je Hof wären ein falsches
+Negativ ab Platz neun. Die Zeile führt zur Hofseite; In-den-Korb bleibt dort
+(Reservierung), das Produktdetail kommt mit Nr. 11.
+
+**Bewusst nicht gebaut.** `?plz=` in der Adresse: Die Regel „nie ein Standort
+in der URL" (ARCHITECTURE §4) wurde schon einmal auf Anweisung wiederhergestellt
+(Liste | Karte, #130), und eine PLZ in einen Punkt aufzulösen braucht Nominatim
+— ein externer Dienst, der dann jede geteilte Adresse sähe. Die Startseite
+bleibt bei `q`. Ebenso nicht: Filter „Abholung heute" und „Online bezahlen"
+(gibt es heute nicht, Daten fehlen in der Liste), „Pausiert bis …" (kein
+Enddatum im Schema), „Benachrichtige mich" (S11), „Hof vorschlagen" (keine
+Funktion), eine aus der IP geschätzte Region und die Karte „Über einen
+geteilten Link" (Vorschaubild der Hofseite, Gate 7).
+
+**Annahmen.** Kategorie-Chips ohne Zahl (Mockup), Mehrfachwahl bleibt ein
+ODER; Umkreis-Stufen als `Segment` (Seitenzustand, nie URL) mit „Alle" statt
+„egal"; die Hofkarte im Splitscreen wählt weiter den Hof, zur Hofseite führt
+„Zum Hof" (Entscheidung des Betreibers aus #82). Die Tier-Auswahl im eigenen
+Blatt ist durch Link-Chips ersetzt (`hoefe-facetten.tsx` entfällt).
+
 ## Nützliche Befehle
 
 ```bash

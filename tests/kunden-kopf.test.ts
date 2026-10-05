@@ -285,7 +285,8 @@ describe('hoefeLink', () => {
 describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
   const lies = (datei: string) => fs.readFileSync(path.resolve(__dirname, '..', datei), 'utf8')
   const ARTEN: Record<string, KundenSeite['art'][]> = {
-    'src/app/(public)/hoefe/page.tsx': ['hofuebersicht'],
+    // Seit Nr. 09 in der KundeShell des neuen Designs (siehe unten) — ohne KundenKopf.
+    'src/app/(public)/hoefe/page.tsx': [],
     // Der Checkout rendert den Kopf in CheckoutForm (siehe unten).
     'src/app/(public)/[farmSlug]/checkout/page.tsx': [],
     // Ohne gültige Signatur ist nicht einmal der Hof bestätigt → zur Hofübersicht.
@@ -354,5 +355,14 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     expect(text).toMatch(/<KundeShellMitSitzung>/)
     expect(lies('src/components/shells/kunde-shell-mit-sitzung.tsx')).toMatch(/<KundeShell angemeldet=/)
     expect(text).not.toMatch(/KundenKopf|LandingNav/)
+  })
+
+  it('Entdecken (/hoefe) trägt die KundeShell des neuen Designs und keine zweite Kopfzeile (Nr. 09)', () => {
+    const text = lies('src/app/(public)/hoefe/page.tsx')
+    // Über die Hülle, die die Sitzung im Browser liest — keine Sitzungsabfrage je Aufruf.
+    expect(text).toMatch(/<KundeShellMitSitzung>/)
+    expect(text).not.toMatch(/KundenKopf|headers\(\)|auth\.api/)
+    // Gegenprobe: Die Suche findet KundenKopf, wo er noch steht.
+    expect(lies('src/app/(public)/impressum/page.tsx')).toMatch(/KundenKopf/)
   })
 })

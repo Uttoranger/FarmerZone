@@ -17,8 +17,6 @@ import { formatAbGrundpreis } from '@/lib/format'
 import { HoefeProduktzeilen } from '@/components/hoefe/hoefe-produktzeilen'
 import { zentrierterIndex } from '@/lib/hoefe-anzeige'
 import { hofInitialen } from '@/lib/hof-initialen'
-import { MARKE_GRUEN } from '@/lib/bestellstatus'
-import { Marke } from '@/components/ui/marke'
 import type { HofUebersichtEintrag } from '@/server/queries/farm'
 
 /**
@@ -219,23 +217,23 @@ export default function HoefeKarussell({
               return <HoefeProduktzeilen produkte={vorschau.produkte} weitere={0} />
             })()}
 
-            {/* Grüne Marke statt grauer Zeile — dasselbe Element wie der
-                Status auf der Bestellseite (siehe hoefe-client.tsx). */}
-            {hof.naechsteAbholung && (
-              <p className="mt-1.5">
-                <Marke farbe={MARKE_GRUEN}>
-                  Abholung {formatiereAbholung(hof.naechsteAbholung)}
-                </Marke>
+            {/* Seit Nr. 09 in den Zustandsfarben des neuen Designs (/hoefe
+                steht in der KundeShell): Termin grün, Pause orange — als
+                Text, nie in der Knopffarbe (Kontrast auf Creme). */}
+            {hof.naechsteAbholung && !hof.isPaused && (
+              <p className="mt-1.5 text-xs font-semibold text-status-fertig">
+                Abholung {formatiereAbholung(hof.naechsteAbholung)}
               </p>
             )}
             {hof.isPaused && (
-              <p className="mt-1.5 text-xs text-amber-700 dark:text-amber-300">
+              <p className="mt-1.5 text-xs font-semibold text-status-offen">
                 Macht gerade Pause
               </p>
             )}
 
             <p className="mt-2">
-              <span className="pointer-events-none inline-flex min-h-9 items-center rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground">
+              {/* Kundenaktion = Grün (DESIGN_SYSTEM, „Farbrollen"); im neuen Design wäre primary Orange. */}
+              <span className="pointer-events-none inline-flex min-h-9 items-center rounded-full bg-accent px-3.5 text-xs font-semibold text-accent-foreground">
                 Zum Hof
               </span>
             </p>

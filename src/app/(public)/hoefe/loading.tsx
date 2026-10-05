@@ -1,63 +1,69 @@
 /**
- * Ladeansicht der Hofübersicht. Maße von src/app/(public)/hoefe/page.tsx und
- * src/components/hoefe/hoefe-client.tsx abgenommen: Kopfleiste 56/64 px,
- * Spalte max. 768 px (ab lg 1152), Kicker, Fraunges-Überschrift,
- * Bereichs-Umschalter, Suchfeld, Filter-Chips, dann die Hofkarten.
+ * Ladeansicht von Entdecken (/hoefe, neues Design seit Nr. 09). Maße von
+ * src/components/hoefe/hoefe-client.tsx und der KundeShell abgenommen:
+ * Kopfzeile 56/64 px, Inhalt max. 1200 px, Überschrift und Unterzeile,
+ * Suchfeld (48/44 px), Einstiegshinweis, dann die Hofkarten in der schmalen
+ * Gestalt — so rendert der Server die Liste; der Splitscreen mit Karte
+ * entsteht erst nach der Hydration (useIstBreit liefert serverseitig false).
+ * Am Handy steht unten die Unterleiste der Shell.
  *
- * Gezeigt werden vier Karten: So hoch ist die Liste beim Pilotbestand
- * ungefähr, und mehr Platzhalter als später Inhalt lassen die Seite beim
- * Umschalten zusammenfallen.
+ * Die Seite steht in der KundeShell und damit im Geltungsbereich
+ * data-design="neu" — diese Ansicht nicht: Sie kommt vor der Shell. Deshalb
+ * setzt sie den Marker selbst, sonst blitzten beim Umschalten die alten
+ * Farben auf.
  *
- * Die Farbstaffelung folgt der vorhandenen Ladeansicht des Hofbereichs:
- * --border für Überschriften, --app-trough für Zweitzeilen, --app-chip für
- * leise Zeilen, --muted für Flächen.
+ * BEWUSST OHNE Filter-Chips: Wie viele es gibt, entscheiden die Daten;
+ * Platz zu reservieren, in den nichts einrückt, lässt die Liste springen.
+ *
+ * Farbstaffelung wie src/app/(farmer)/loading.tsx: --border für
+ * Überschriften, --app-trough für Zweitzeilen, --app-chip für leise Zeilen,
+ * --muted für Flächen.
  */
 export default function HoefeLaden() {
   return (
-    <div className="min-h-screen animate-pulse bg-background" aria-busy="true" aria-label="Höfe werden geladen">
-      <div className="h-14 border-b border-border bg-card md:h-16" />
+    <div data-design="neu" className="min-h-dvh animate-pulse bg-background" aria-busy="true" aria-label="Höfe werden geladen">
+      <div className="h-14 border-b border-border bg-background md:h-16" />
 
-      <main className="mx-auto max-w-3xl px-4 pt-6 pb-16 sm:pt-10 lg:max-w-6xl">
-        {/* Kicker und Überschrift */}
-        <div className="mb-3 h-3 w-28 rounded bg-app-chip" />
-        <div className="h-9 w-64 rounded-lg bg-border sm:h-10 sm:w-80" />
-
-        {/* Bereichs-Umschalter: Hofladen | Futtermittel */}
-        <div className="mt-5 grid w-full grid-cols-2 gap-1 rounded-xl border border-border bg-card p-1">
-          <div className="h-11 rounded-lg bg-muted" />
-          <div className="h-11 rounded-lg bg-app-trough" />
+      <main className="mx-auto flex max-w-[1200px] flex-col gap-4 px-4 pt-5 pb-28 md:px-6 md:pt-7">
+        {/* Überschrift und Unterzeile */}
+        <div>
+          <div className="h-8 w-64 rounded-lg bg-border md:h-9 md:w-80" />
+          <div className="mt-2 h-4 w-72 max-w-full rounded bg-app-chip" />
         </div>
 
         {/* Suchfeld */}
-        <div className="mt-3 h-11 w-full rounded-xl border border-border bg-card" />
+        <div className="h-12 w-full rounded-full border border-border bg-card md:h-11" />
 
-        {/* BEWUSST OHNE Filter-Chips: Wie viele es gibt, entscheiden die Daten
-            (Kategorien, Sorten, Siegel) — im Hofladen ohne Siegel keine. Platz
-            zu reservieren, in den nichts einrückt, lässt die Liste nach OBEN
-            springen, und das ist schlimmer als ein Chip, der dazukommt. */}
+        {/* Einstiegshinweis (Postleitzahl oder Standort) */}
+        <div className="h-[118px] rounded-2xl border border-border bg-muted sm:h-[92px]" />
 
-        {/* Hofkarten — eine Spalte, wie der Server sie rendert: Der
-            Desktop-Splitscreen entsteht erst nach der Hydration
-            (useIstBreit liefert serverseitig false). */}
-        <ul className="mt-4 space-y-3">
+        {/* Karten-Vorschau (nur schmal) und Ergebniszahl */}
+        <div className="h-[120px] rounded-2xl border border-border bg-muted lg:hidden" />
+        <div className="h-4 w-16 rounded bg-app-chip" />
+
+        {/* Hofkarten — eine Spalte, wie der Server sie rendert. */}
+        <ul className="flex flex-col gap-3">
           {[0, 1, 2, 3].map((i) => (
-            <li key={i} className="rounded-2xl border border-border bg-card">
-              <div className="flex items-start gap-3 p-4">
-                <div className="size-12 shrink-0 rounded-full bg-muted" />
+            <li key={i} className="rounded-2xl border border-border bg-card p-3">
+              <div className="flex items-start gap-3.5">
+                <div className="size-11 shrink-0 rounded-full bg-muted" />
                 <div className="min-w-0 flex-1">
                   <div className="h-5 w-40 rounded bg-app-trough" />
-                  <div className="mt-2 h-4 w-full max-w-xs rounded bg-app-chip" />
-                  <div className="mt-2 flex gap-2">
+                  <div className="mt-2 h-3.5 w-28 rounded bg-app-chip" />
+                  <div className="mt-2 flex gap-1.5">
+                    <div className="h-5 w-14 rounded-full bg-app-chip" />
                     <div className="h-5 w-16 rounded-full bg-app-chip" />
-                    <div className="h-5 w-20 rounded-full bg-app-chip" />
                   </div>
+                  <div className="mt-2 h-3.5 w-48 max-w-full rounded bg-app-chip" />
                 </div>
-                <div className="h-9 w-20 shrink-0 rounded-lg bg-muted" />
               </div>
             </li>
           ))}
         </ul>
       </main>
+
+      {/* Die Unterleiste der Shell am Handy — sonst schöbe sie sich nach dem Laden ins Bild. */}
+      <div className="fixed inset-x-0 bottom-0 h-[72px] border-t border-border bg-card md:hidden" />
     </div>
   )
 }

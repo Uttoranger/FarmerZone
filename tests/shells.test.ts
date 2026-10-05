@@ -238,7 +238,7 @@ describe('kein Big Bang', () => {
 
   // Route für Route: Eine Route kommt hier dazu, wenn ihr Gate sie umstellt
   // (Nr. 07: die Startseite in die KundeShell).
-  const UMGESTELLT = ['page.tsx', 'account/login/page.tsx', '(auth)/login/page.tsx']
+  const UMGESTELLT = ['page.tsx', 'account/login/page.tsx', '(auth)/login/page.tsx', '(public)/hoefe/page.tsx']
 
   it('nur die Vorschau unter /intern und die umgestellten Routen binden eine Shell ein', () => {
     for (const datei of nutzer) {
