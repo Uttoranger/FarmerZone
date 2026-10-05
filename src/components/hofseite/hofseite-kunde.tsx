@@ -31,9 +31,11 @@ import {
   hofseiteReiter,
   reiterAdresse,
   verfuegbarText,
+  vorWieLange,
   zahlungsarten,
   type HofReiterId,
 } from '@/lib/hofseite-kunde'
+import { jsonLdSicher } from '@/lib/json-ld'
 import { korbErlaubt } from '@/lib/hofseite-vorschau'
 import { rueckweg, type KundenSeite } from '@/lib/kunden-kopf'
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
@@ -96,25 +98,23 @@ const TEXTLINK = cn(
   FOKUS_RAHMEN
 )
 
-/** Wie lange ein Beitrag her ist — „heute", „vor 3 Stunden", „vor 2 Tagen". */
-function vorWieLange(iso: string): string {
-  const stunden = Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60))
-  if (stunden < 1) return 'heute'
-  if (stunden < 24) return stunden === 1 ? 'vor 1 Stunde' : `vor ${stunden} Stunden`
-  const tage = Math.floor(stunden / 24)
-  return tage === 1 ? 'vor 1 Tag' : `vor ${tage} Tagen`
-}
-
 export function HofseiteKunde({
   farm,
   activeStatus,
   reorderItems,
   ansicht,
+  jetzt,
 }: {
   farm: PublicFarm
   activeStatus: ActiveStatusPost | null
   reorderItems?: ReorderItem[]
   ansicht: Pick<SeitenAnsicht, 'art' | 'kaufen'>
+  /**
+   * Der Zeitpunkt der Anfrage als ISO-Text, einmal auf dem Server bestimmt
+   * (page.tsx): Gebührensatz und „vor 2 Tagen" rechnen davon, nicht von der
+   * Uhr beim Rendern — sonst wichen Server und Browser ab (Hydration).
+   */
+  jetzt: string
 }): React.JSX.Element {
   const suche = useSearchParams()
   const pfad = usePathname()
@@ -143,7 +143,7 @@ export function HofseiteKunde({
     () => bereichWunsch === 'FUTTERMITTEL' && produkte.some((p) => anzeigeBereichVon(p.category) === 'FUTTERMITTEL')
   )
 
-  const satz = servicegebuehrSatz(farm, new Date())
+  const satz = servicegebuehrSatz(farm, new Date(jetzt))
   const gebuehr = gebuehrHinweis(satz)
   const mitKorb = korbErlaubt({ isEditMode: false, kaufen: ansicht.kaufen })
   const kartenLink = buildMapsUrl(farm.address, farm.postalCode, farm.city)
@@ -234,7 +234,7 @@ export function HofseiteKunde({
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdSicher(jsonLd) }} />
       {ansicht.art === 'vorschau' && <VorschauImRahmen />}
 
       {rueckwegZeile}
@@ -382,6 +382,7 @@ export function HofseiteKunde({
           gebuehrKurz={gebuehr?.kurz ?? null}
           gebuehrKorb={gebuehr?.korb ?? null}
           mitKorb={mitKorb}
+          jetzt={jetzt}
           // Am Handy nur in der Übersicht, dort vor dem Inhalt (Mockup mobil-k2-hofseite).
           className={cn('mb-[26px] lg:col-start-2 lg:row-start-1 lg:mb-0', offen !== 'uebersicht' && 'hidden lg:flex')}
         />
@@ -435,7 +436,7 @@ export function HofseiteKunde({
             </div>
           ) : null}
 
-          {offen === 'beitraege' && beitrag ? <Beitrag beitrag={beitrag} /> : null}
+          {offen === 'beitraege' && beitrag ? <Beitrag beitrag={beitrag} jetzt={jetzt} /> : null}
 
           <div id="produkte">
             <ProductGrid
@@ -461,7 +462,7 @@ export function HofseiteKunde({
 }
 
 /** Der Beitrag des Hofs (aktiver Status) im Reiter „Beiträge". */
-function Beitrag({ beitrag }: { beitrag: ActiveStatusPost }): ReactNode {
+function Beitrag({ beitrag, jetzt }: { beitrag: ActiveStatusPost; jetzt: string }): ReactNode {
   const anlass = ANLASS[beitrag.anlass] ?? ANLASS.ANNOUNCEMENT
   const Symbol = anlass.symbol
   return (
@@ -471,7 +472,7 @@ function Beitrag({ beitrag }: { beitrag: ActiveStatusPost }): ReactNode {
           <Symbol className="size-3 shrink-0" strokeWidth={1.7} aria-hidden="true" />
           {anlass.label}
         </StatusBadge>
-        <span className="text-[13px] text-muted-foreground">Aktuell · {vorWieLange(beitrag.publishedAt)}</span>
+        <span className="text-[13px] text-muted-foreground">Aktuell · {vorWieLange(beitrag.publishedAt, jetzt)}</span>
       </div>
       <h2 id="beitrag-titel" className="font-heading text-xl font-semibold break-words text-foreground">
         {beitrag.title}

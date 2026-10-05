@@ -19,7 +19,7 @@ import { VORSCHAU_KAUF_HINWEIS, korbErlaubt } from '@/lib/hofseite-vorschau'
 import { produktZustand, streifenText, type ProduktZustand } from '@/lib/produkt-sichtbarkeit'
 import { ImShopSchalter } from '@/components/products/im-shop-schalter'
 import { kartenZustand, kategorieAbschnitte, zeigeKaufknopf } from '@/lib/bereiche-anzeige'
-import { oeffnetKorbHier, uebersichtProdukte } from '@/lib/hofseite-kunde'
+import { mengeAbgelehntText, oeffnetKorbHier, uebersichtProdukte } from '@/lib/hofseite-kunde'
 import { bereichAusParameter } from '@/schemas/hoefe-filter'
 import type { AnzeigeBereich } from '@/lib/taxonomie'
 import type { PublicProduct } from '@/server/queries/farm'
@@ -673,7 +673,11 @@ export function ProductGrid({
       toast.info(VORSCHAU_KAUF_HINWEIS)
       return
     }
-    void updateQuantity(produkt.id, menge)
+    // Lehnt die Reservierung ab (jemand war schneller), sagt die Karte es —
+    // die Menge bleibt dann, wie sie war.
+    void updateQuantity(produkt.id, menge).then((ergebnis) => {
+      if (!ergebnis.ok) toast.error(mengeAbgelehntText(ergebnis.error))
+    })
   }
 
   function karte(p: PublicProduct) {

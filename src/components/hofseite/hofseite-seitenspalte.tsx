@@ -10,7 +10,8 @@ import { buildMapsUrl } from '@/lib/customer-links'
 import { formatEuro, mitAnzahl } from '@/lib/format'
 import { warenkorbAnzahl } from '@/lib/warenkorb-speicher'
 import { useWarenkorbVomHof } from '@/lib/use-warenkorb-kopf'
-import type { Zahlungsart } from '@/lib/hofseite-kunde'
+import { korbBetraege, type Zahlungsart } from '@/lib/hofseite-kunde'
+import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 
@@ -54,6 +55,7 @@ export function HofseiteSeitenspalte({
   gebuehrKurz,
   gebuehrKorb,
   mitKorb,
+  jetzt,
   className,
 }: {
   hof: SeitenspalteHof
@@ -64,9 +66,11 @@ export function HofseiteSeitenspalte({
   gebuehrKorb: string | null
   /** Ob die Seite einen Korb führt (korbErlaubt) — in der Vorschau des Hofs nie. */
   mitKorb: boolean
+  /** Zeitpunkt der Anfrage (ISO) vom Server — die Abholtage rechnen davon, nicht von der Uhr beim Rendern. */
+  jetzt: string
   className?: string
 }): React.JSX.Element {
-  const tage = useMemo(() => nextPickupDays(hof.pickupSlots, 3), [hof.pickupSlots])
+  const tage = useMemo(() => nextPickupDays(hof.pickupSlots, 3, new Date(jetzt)), [hof.pickupSlots, jetzt])
   const zeiten = useMemo(() => abholzeitenJeWochentag(hof.pickupSlots), [hof.pickupSlots])
   const kartenLink = buildMapsUrl(hof.address, hof.postalCode, hof.city)
 
@@ -184,8 +188,9 @@ function MiniWarenkorb({ farmId, slug, gebuehrKorb }: { farmId: string; slug: st
   const positionen = useWarenkorbVomHof(farmId)
   if (positionen.length === 0) return null
   const anzahl = warenkorbAnzahl(positionen)
-  // Anzeige wie im Korb selbst (use-cart.ts) — verbindlich rechnet der Checkout mit den Preisen aus der Datenbank.
-  const summe = positionen.reduce((s, p) => s + p.price * p.quantity, 0)
+  // In ganzen Cent auf dem Weg des Checkouts (korbBetraege), nie price × Menge
+  // in Fließkomma — verbindlich rechnet der Checkout mit den Preisen aus der Datenbank.
+  const { zeilenCents, summeCents } = korbBetraege(positionen)
 
   return (
     <section
@@ -205,12 +210,12 @@ function MiniWarenkorb({ farmId, slug, gebuehrKorb }: { farmId: string; slug: st
               {p.quantity > 1 && <span className="tabular-nums">{p.quantity} × </span>}
               {p.name}
             </span>
-            <span className="shrink-0 tabular-nums text-foreground">{formatEuro(p.price * p.quantity)}</span>
+            <span className="shrink-0 tabular-nums text-foreground">{formatEuro(centsAlsEuro(zeilenCents.get(p.productId) ?? 0))}</span>
           </li>
         ))}
       </ul>
       <p className="border-t border-border pt-2.5 text-[15px] font-semibold text-foreground">
-        <span className="tabular-nums">{formatEuro(summe)}</span>
+        <span className="tabular-nums">{formatEuro(centsAlsEuro(summeCents))}</span>
         {gebuehrKorb && <span className="text-[13px] font-normal text-muted-foreground">&nbsp;{gebuehrKorb}</span>}
       </p>
       <Link

@@ -3957,6 +3957,14 @@ Zahlung, Gebührenwortlaut, Korb-Anker) und `bereiche-anzeige.ts`
   kommen mit Gate 6), Produktdetail-Seite (Nr. 11, die Karten öffnen weiter
   das Blatt).
 
+## Nachbesserung 1 zu Nr. 10 — Hofseite (2026-10-05)
+
+- **Geld im Mini-Warenkorb in Cent.** Zeilen und Summe rechneten `price * quantity` in Fließkomma. Jetzt `korbBetraege` (`src/lib/hofseite-kunde.ts`) auf dem Weg des Checkouts (`calcLineTotal` → `decimalZuCents`), angezeigt über `centsAlsEuro` + `formatEuro`. An der Anzeige änderte das in den geprüften Fällen nichts (`formatEuro` rundet die Fließkomma-Reste weg) — die Regel gilt trotzdem, weil die Rechnung sonst irgendwann in eine Summe wandert. Korb-Blatt und Korb-Leiste rechnen noch über `useCart().total` (Bestand vor Nr. 10).
+- **JSON-LD konnte den `<script>`-Block verlassen.** `JSON.stringify` maskiert `<` nicht; ein Hofname oder eine Beschreibung mit `</script>` hätte Skript eingeschleust (der Text kommt vom Hof). `jsonLdSicher` (`src/lib/json-ld.ts`) schreibt `<`, `>`, `&`, U+2028/U+2029 als `\u`-Folgen; im Browser mit einer präparierten Beschreibung nachgeprüft. Es ist die einzige JSON-LD-Stelle im Code.
+- **„mind. € 0,00"** entfällt, wenn ein Hof keine Mindestgebühr hat.
+- **Stepper mit Obergrenze.** „+" endet am Bestand (`stepperObergrenze`, dieselbe Zahl wie „knapp"); lehnt `/api/reserve` trotzdem ab (andere waren schneller), sagt ein Hinweis es (`mengeAbgelehntText`). Dafür gibt `useCart().updateQuantity` das Ergebnis zurück, statt still zu scheitern — sonst ist `use-cart.ts` unverändert.
+- **Hydration.** „vor 3 Stunden", der Gebührensatz ab Stichtag und die Abholtage der rechten Spalte rechneten mit der Uhr beim Rendern. `page.tsx` bestimmt den Zeitpunkt einmal und reicht ihn als `jetzt` durch. Im Browser danach: Hofseite ohne Meldung im Dev-Overlay; auf `/farm-page` bleibt eine — `aria-describedby="DndDescribedBy-N"` aus dnd-kit im Besitzer-Bearbeiten (`ReorderContext` ohne feste `id`), Bestand vor Nr. 10. Offen außerdem: `nextPickupDays` rechnet in der Zeitzone der Laufzeit (`getHours`), auf Vercel UTC, im Browser Wien — am späten Abend können „Heute"/„Morgen" zwischen Server und Browser abweichen; gehört in eine Wiener Fassung von `nextPickupDays` (eigener Auftrag).
+
 ## Nützliche Befehle
 
 ```bash

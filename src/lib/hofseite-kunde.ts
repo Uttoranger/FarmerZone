@@ -11,6 +11,11 @@
  */
 import { formatEuro, formatZahl } from '@/lib/format'
 import { zeigeKaufknopf } from '@/lib/bereiche-anzeige'
+import { calcLineTotal, decimalZuCents } from '@/lib/order-totals'
+import { centsAlsEuro } from '@/lib/servicegebuehr'
+import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
+import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
+import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
 import { WARENKORB_ANKER } from '@/lib/warenkorb-speicher'
 import { bereichAusParameter } from '@/schemas/hoefe-filter'
 import { REITER_PARAMETER, reiterSchema, type HofReiterId } from '@/schemas/hofseite-reiter'
@@ -118,12 +123,75 @@ export function gebuehrHinweis(
   satz: { prozent: number; mindestCents: number } | null
 ): { kurz: string; produkte: string; korb: string } | null {
   if (!satz) return null
-  const grund = `Preise zzgl. ${formatZahl(satz.prozent)} % Servicegebühr (mind. ${formatEuro(satz.mindestCents / 100)})`
+  // Ohne Mindestgebühr kein „(mind. € 0,00)" — eine Untergrenze von null ist keine.
+  const mindestens = satz.mindestCents > 0 ? ` (mind. ${formatEuro(centsAlsEuro(satz.mindestCents))})` : ''
+  const grund = `Preise zzgl. ${formatZahl(satz.prozent)} % Servicegebühr${mindestens}`
   return {
     kurz: `${grund} – im Warenkorb einzeln ausgewiesen. Der Hof bekommt den vollen Preis.`,
     produkte: `${grund} – einmal pro Bestellung, egal wie viel du in den Korb legst.`,
     korb: 'zzgl. Servicegebühr',
   }
+}
+
+// ─── Mini-Warenkorb und Mengen ──────────────────────────────────────────────
+
+/**
+ * Zeilen und Summe des Korbs in ganzen Cent — auf demselben Weg wie der
+ * Checkout (calcLineTotal → decimalZuCents, CODING_STANDARDS §2), nie als
+ * `price * quantity` in Fließkomma: 3 × 1,10 € wären dort 3,3000000000000003 €.
+ * Nur Anzeige; verbindlich rechnet der Server mit den Preisen der Datenbank.
+ */
+export function korbBetraege(
+  positionen: readonly { productId: string; price: number; quantity: number }[]
+): { zeilenCents: Map<string, number>; summeCents: number } {
+  const zeilenCents = new Map<string, number>()
+  let summeCents = 0
+  for (const p of positionen) {
+    const cents = decimalZuCents(calcLineTotal(p.price, p.quantity))
+    zeilenCents.set(p.productId, cents)
+    summeCents += cents
+  }
+  return { zeilenCents, summeCents }
+}
+
+/**
+ * Bis wohin „+" im Mengen-Stepper der Produktkarte geht: der Bestand, an dem
+ * auch „knapp" und „ausverkauft" hängen (kartenZustand). Liegt schon mehr im
+ * Korb, als noch da ist (der Hof hat nachgezählt), bleibt die Korbmenge die
+ * Grenze — „−" geht, „+" nicht. Verbindlich prüft /api/reserve.
+ */
+export function stepperObergrenze(bestand: number, imKorb: number): number {
+  return Math.max(bestand, imKorb)
+}
+
+const MENGE_NICHT_GEAENDERT = 'Wir konnten die Menge nicht ändern. Versuch es gleich noch einmal.'
+const VERSTAENDLICH = new Set<string>([SHOP_PAUSED_MESSAGE, FARM_ARCHIVED_MESSAGE, FARM_NOT_APPROVED_MESSAGE])
+
+/**
+ * Was die Kundin liest, wenn /api/reserve eine neue Menge ablehnt — statt
+ * Stille. „Nur noch N verfügbar" und die Sätze zu Pause/Stilllegung sind
+ * verständlich und bleiben; Fachwörter („Ungültige Parameter") nicht.
+ */
+export function mengeAbgelehntText(fehler: string | undefined): string {
+  if (fehler && /^Nur noch \d+ verfügbar$/.test(fehler)) return `${fehler} – mehr hat der Hof gerade nicht.`
+  if (fehler && VERSTAENDLICH.has(fehler)) return fehler
+  return MENGE_NICHT_GEAENDERT
+}
+
+// ─── Beiträge ───────────────────────────────────────────────────────────────
+
+/**
+ * Wie lange ein Beitrag her ist — „heute", „vor 3 Stunden", „vor 2 Tagen".
+ * Gerechnet vom übergebenen Zeitpunkt, den page.tsx einmal auf dem Server
+ * bestimmt: Mit der Uhr beim Rendern wichen Server und Browser voneinander ab
+ * (Hydration-Fehler).
+ */
+export function vorWieLange(iso: string, jetztIso: string): string {
+  const stunden = Math.floor((new Date(jetztIso).getTime() - new Date(iso).getTime()) / (1000 * 60 * 60))
+  if (stunden < 1) return 'heute'
+  if (stunden < 24) return stunden === 1 ? 'vor 1 Stunde' : `vor ${stunden} Stunden`
+  const tage = Math.floor(stunden / 24)
+  return tage === 1 ? 'vor 1 Tag' : `vor ${tage} Tagen`
 }
 
 // ─── Warenkorb-Anker ────────────────────────────────────────────────────────

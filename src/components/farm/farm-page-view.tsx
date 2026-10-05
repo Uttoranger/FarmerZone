@@ -613,14 +613,21 @@ type Props = {
    * Ohne Angabe: die Seite für Kundinnen.
    */
   ansicht?: Pick<SeitenAnsicht, 'art' | 'kaufen'>
+  /**
+   * Zeitpunkt der Anfrage (ISO), einmal auf dem Server bestimmt — page.tsx
+   * setzt ihn immer. Nur die Kundenansicht braucht ihn (HofseiteKunde).
+   */
+  jetzt?: string
 }
 
 const FUER_KUNDINNEN: Pick<SeitenAnsicht, 'art' | 'kaufen'> = { art: 'kundin', kaufen: true }
 
-export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = false, mode = 'edit', pastStatusCount = 0, onVorschau, ansicht = FUER_KUNDINNEN }: Props) {
+export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = false, mode = 'edit', pastStatusCount = 0, onVorschau, ansicht = FUER_KUNDINNEN, jetzt }: Props) {
   // Kundinnen und die Vorschau des Hofs: die Hofseite im neuen Design (Nr. 10).
   if (!ownerMode) {
-    return <HofseiteKunde farm={farm} activeStatus={activeStatus} reorderItems={reorderItems} ansicht={ansicht} />
+    // Ohne Zeitpunkt vom Server (kein Aufrufer heute) die eigene Uhr — dann
+    // kann „vor N Stunden" zwischen Server und Browser abweichen.
+    return <HofseiteKunde farm={farm} activeStatus={activeStatus} reorderItems={reorderItems} ansicht={ansicht} jetzt={jetzt ?? new Date().toISOString()} />
   }
   return <HofseiteBesitzer farm={farm} activeStatus={activeStatus} mode={mode} pastStatusCount={pastStatusCount} onVorschau={onVorschau} />
 }

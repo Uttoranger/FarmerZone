@@ -5,6 +5,7 @@ import { Plus } from 'lucide-react'
 import type { PublicProduct } from '@/server/queries/farm'
 import { formatGrundpreis, formatGrundpreisNetto, formatGrundpreisZeile } from '@/lib/format'
 import { knappText, type KartenZustand } from '@/lib/bereiche-anzeige'
+import { stepperObergrenze } from '@/lib/hofseite-kunde'
 import { produktInitiale } from '@/lib/hofuebersicht'
 import { SHOP_PAUSED_BUTTON_LABEL } from '@/lib/shop-pause'
 import { cn } from '@/lib/utils'
@@ -41,7 +42,8 @@ function Preis({ produkt, className }: { produkt: PublicProduct; className?: str
  * und mobil-k2-produkte): am Handy eine Zeile mit Bild, Name, Preis und
  * Plus-Knopf, ab 768 px eine Kachel mit Bild oben und „In den Korb" rechts
  * neben dem Preis. Liegt das Produkt schon im Korb, steht dort die Menge mit
- * − und +.
+ * − und +; „+" endet am Bestand (stepperObergrenze), damit es nicht still an
+ * der Reservierung scheitert.
  *
  * Bild und Name öffnen das bestehende Produktdetail (ein Knopf, kein Link —
  * die Produktseite kommt mit Nr. 11). Den Zustand (knapp, ausverkauft,
@@ -122,7 +124,12 @@ export function ProduktKarte({
       <div className="flex shrink-0 items-center gap-2 md:mt-auto md:px-3.5 md:pt-2 md:pb-3.5">
         <Preis produkt={produkt} className="hidden flex-1 md:flex" />
         {kaufbar && imKorb > 0 ? (
-          <Stepper beschriftung={`Menge ${produkt.name}`} wert={imKorb} onWertChange={(menge) => onMenge(produkt, menge)} />
+          <Stepper
+            beschriftung={`Menge ${produkt.name}`}
+            wert={imKorb}
+            max={stepperObergrenze(produkt.stock, imKorb)}
+            onWertChange={(menge) => onMenge(produkt, menge)}
+          />
         ) : kaufbar ? (
           <button
             type="button"

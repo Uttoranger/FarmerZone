@@ -50,6 +50,8 @@ vi.mock('@/server/actions/farm-photos', () => ({ addFarmPhotoAction: vi.fn(), re
 vi.mock('@/server/actions/products', () => ({ updateProductImageAction: vi.fn(), reorderProductsAction: vi.fn() }))
 
 import { FarmPageView } from '@/components/farm/farm-page-view'
+import { ProduktKarte } from '@/components/hofseite/produkt-karte'
+import { kartenZustand } from '@/lib/bereiche-anzeige'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
@@ -103,10 +105,13 @@ type Ansicht = { art: 'kundin' | 'vorschau'; kaufen: boolean }
 const KUNDIN: Ansicht = { art: 'kundin', kaufen: true }
 
 /** Genau wie page.tsx: die KundeShell um FarmPageView. */
-function seite({ suche = '', farm = HOF, status = STATUS as ActiveStatusPost | null, ansicht = KUNDIN } = {}): string {
+/** Der Zeitpunkt, den page.tsx einmal auf dem Server bestimmt (Nachbesserung 1: kein Date.now() beim Rendern). */
+const JETZT = '2026-10-02T08:00:00.000Z'
+
+function seite({ suche = '', farm = HOF, status = STATUS as ActiveStatusPost | null, ansicht = KUNDIN, jetzt = JETZT } = {}): string {
   adresse.suche = suche
   return renderToStaticMarkup(
-    createElement(KundeShellMitSitzung, null, createElement(FarmPageView, { farm, activeStatus: status, reorderItems: [], ownerMode: false, ansicht }))
+    createElement(KundeShellMitSitzung, null, createElement(FarmPageView, { farm, activeStatus: status, reorderItems: [], ownerMode: false, ansicht, jetzt }))
   )
 }
 
@@ -293,5 +298,80 @@ describe('Reiter und Chips schreiben die Adresse so, dass Next sie abgleicht', (
       expect(text, pfad).toMatch(/history\.replaceState\(null,/)
       expect(text, pfad).not.toMatch(/replaceState\(window\.history\.state/)
     }
+  })
+})
+
+// ─── Nachbesserung 1 ────────────────────────────────────────────────────────
+
+describe('JSON-LD: Text des Hofs bleibt im <script>', () => {
+  const ANGRIFF = '</script><script>alert(1)</script>'
+  const html = seite({ farm: { ...HOF, name: `Hof ${ANGRIFF}`, description: ANGRIFF } })
+  const block = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)
+
+  it('der Block endet erst nach dem JSON, und das JSON trägt Name und Beschreibung', () => {
+    expect(block).not.toBeNull()
+    expect(JSON.parse(block![1])).toMatchObject({ name: `Hof ${ANGRIFF}`, description: ANGRIFF })
+  })
+
+  it('kein eingeschleustes <script>alert', () => {
+    expect(html).not.toContain('<script>alert(1)')
+  })
+
+  it('die Seite nimmt dafür jsonLdSicher, nie JSON.stringify direkt im Script', () => {
+    const text = quelle('src/components/hofseite/hofseite-kunde.tsx')
+    expect(text).toContain('jsonLdSicher(')
+    expect(text).not.toMatch(/__html:\s*JSON\.stringify/)
+  })
+})
+
+describe('Mini-Warenkorb rechnet in Cent, nicht in Fließkomma', () => {
+  it('keine Multiplikation oder Summe über price in der rechten Spalte', () => {
+    const text = quelle('src/components/hofseite/hofseite-seitenspalte.tsx')
+    expect(text).not.toMatch(/\.price\s*\*/)
+    expect(text).toContain('korbBetraege(')
+    expect(text).toContain('centsAlsEuro(')
+  })
+})
+
+describe('Gebührenhinweis bei Mindestgebühr 0', () => {
+  it('kein „mind. € 0,00"', () => {
+    const html = seite({ farm: { ...HOF, serviceFeeMinCents: 0 } })
+    expect(html).toContain('Preise zzgl. 5 % Servicegebühr – im Warenkorb')
+    expect(html).not.toContain('mind. € 0,00')
+  })
+})
+
+describe('Stepper der Produktkarte endet am Bestand', () => {
+  const karte = (stock: number, imKorb: number) => {
+    const p = { ...HOF.products[4]!, stock }
+    return renderToStaticMarkup(
+      createElement(ProduktKarte, {
+        produkt: p, zustand: kartenZustand(p, false), imKorb, wirdHinzugefuegt: false,
+        onDetails: () => {}, onInDenKorb: () => {}, onMenge: () => {},
+      })
+    )
+  }
+  const plus = (html: string) => html.match(/<button[^>]*aria-label="Menge Karotten: eins mehr"[^>]*>/)?.[0] ?? ''
+
+  // Base UI sperrt über aria-disabled (die Klasse „disabled:…" zählt nicht).
+  it('alles im Korb, was da ist: „+" ist gesperrt', () => {
+    expect(plus(karte(3, 3))).toContain('aria-disabled="true"')
+  })
+
+  it('Gegenprobe: unter dem Bestand geht „+"', () => {
+    expect(plus(karte(20, 3))).toContain('aria-disabled="false"')
+  })
+})
+
+describe('Hydration: kein Zeitpunkt aus der Uhr beim Rendern', () => {
+  it('„vor 2 Tagen" aus dem übergebenen Zeitpunkt', () => {
+    expect(seite({ suche: 'reiter=beitraege' })).toContain('vor 2 Tagen')
+    expect(seite({ suche: 'reiter=beitraege', jetzt: '2026-09-30T10:00:00.000Z' })).toContain('vor 2 Stunden')
+  })
+
+  it('weder Date.now() noch new Date() in der Kundenansicht; page.tsx bestimmt den Zeitpunkt', () => {
+    const text = quelle('src/components/hofseite/hofseite-kunde.tsx')
+    expect(text).not.toMatch(/Date\.now\(\)|new Date\(\)/)
+    expect(quelle('src/app/(public)/[farmSlug]/page.tsx')).toMatch(/jetzt=\{/)
   })
 })

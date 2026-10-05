@@ -103,6 +103,9 @@ export default async function FarmPage({ params, searchParams }: Props) {
   // was ein Nachbestell-Link hineinlegen dürfte (korbErlaubt, src/lib/hofseite-vorschau.ts).
   const reorder = nachbestellToken(suche.reorder)
   const reorderItems = reorder && ansicht.kaufen ? await loadReorderItems(reorder, farm.id) : []
+  // Einmal hier, auf dem Server: Gebührensatz und „vor 2 Tagen" rechnen in
+  // Server und Browser vom selben Zeitpunkt (sonst Hydration-Abweichung).
+  const jetzt = new Date()
 
   return (
     <KundeShellMitSitzung>
@@ -112,9 +115,10 @@ export default async function FarmPage({ params, searchParams }: Props) {
         reorderItems={reorderItems}
         ownerMode={false}
         ansicht={ansicht}
+        jetzt={jetzt.toISOString()}
       />
       {/* Der Fuß der Startseite — ein Server-Teil, deshalb hier statt in der Client-Komponente. */}
-      <StartseiteFuss jahr={new Date().getFullYear()} />
+      <StartseiteFuss jahr={jetzt.getFullYear()} />
     </KundeShellMitSitzung>
   )
 }

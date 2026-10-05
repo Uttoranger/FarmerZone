@@ -30,10 +30,14 @@ import {
   aktiverReiter,
   gebuehrHinweis,
   hofseiteReiter,
+  korbBetraege,
+  mengeAbgelehntText,
   oeffnetKorbHier,
   reiterAdresse,
+  stepperObergrenze,
   uebersichtProdukte,
   verfuegbarText,
+  vorWieLange,
   zahlungsarten,
 } from '@/lib/hofseite-kunde'
 import { abholzeitenJeWochentag } from '@/lib/pickup-days'
@@ -249,5 +253,70 @@ describe('abholzeitenJeWochentag — die Karte „Abholzeiten"', () => {
       ])
     ).toEqual(['Mittwoch, 8–10 · 15–18 Uhr', 'Samstag, 9–12 Uhr', 'Sonntag, 10–11:30 Uhr'])
     expect(abholzeitenJeWochentag([])).toEqual([])
+  })
+})
+
+// ─── Nachbesserung 1 ────────────────────────────────────────────────────────
+
+describe('korbBetraege — Geld im Mini-Warenkorb exakt in Cent (CODING_STANDARDS §2)', () => {
+  const pos = (productId: string, price: number, quantity: number) => ({ productId, price, quantity })
+
+  it('Gegenprobe: in Fließkomma ergibt 3 × 1,10 € nicht 3,30 €, 19,99 € × 7 nicht 139,93 €, 0,70 € + 0,10 € nicht 0,80 €', () => {
+    expect(1.1 * 3).not.toBe(3.3)
+    expect(19.99 * 7).not.toBe(139.93)
+    expect(0.7 + 0.1).not.toBe(0.8)
+  })
+
+  it('Zeilen und Summe in ganzen Cent, wie der Checkout (calcLineTotal → decimalZuCents)', () => {
+    const betraege = korbBetraege([pos('a', 1.1, 3), pos('b', 0.7, 1), pos('c', 0.1, 1), pos('d', 4.99, 3)])
+    expect(betraege.zeilenCents).toEqual(new Map([['a', 330], ['b', 70], ['c', 10], ['d', 1497]]))
+    expect(betraege.summeCents).toBe(1907)
+    expect(korbBetraege([pos('b', 0.7, 1), pos('c', 0.1, 1)]).summeCents).toBe(80)
+    expect(korbBetraege([pos('x', 19.99, 7)]).summeCents).toBe(13993)
+    expect(korbBetraege([]).summeCents).toBe(0)
+  })
+})
+
+describe('gebuehrHinweis — ohne Mindestgebühr kein „mind. € 0,00"', () => {
+  it('Mindestgebühr 0: nur der Satz', () => {
+    const hinweis = gebuehrHinweis({ prozent: 5, mindestCents: 0 })
+    expect(hinweis?.kurz).toBe('Preise zzgl. 5 % Servicegebühr – im Warenkorb einzeln ausgewiesen. Der Hof bekommt den vollen Preis.')
+    expect(hinweis?.produkte).not.toContain('mind.')
+  })
+
+  it('Gegenprobe: mit Mindestgebühr steht sie da', () => {
+    expect(gebuehrHinweis({ prozent: 5, mindestCents: 120 })?.kurz).toContain('(mind. € 1,20)')
+  })
+})
+
+describe('stepperObergrenze — „+" endet am Bestand', () => {
+  it('der Bestand ist die Grenze', () => {
+    expect(stepperObergrenze(5, 2)).toBe(5)
+  })
+
+  it('liegt schon mehr im Korb, als noch da ist, geht nur noch weniger', () => {
+    expect(stepperObergrenze(2, 4)).toBe(4)
+  })
+})
+
+describe('mengeAbgelehntText — was die Kundin liest, wenn der Hof keine Menge mehr reservieren kann', () => {
+  it('„Nur noch N verfügbar" vom Server bleibt, mit Erklärung', () => {
+    expect(mengeAbgelehntText('Nur noch 3 verfügbar')).toBe('Nur noch 3 verfügbar – mehr hat der Hof gerade nicht.')
+  })
+
+  it('Fachwörter oder nichts: ein verständlicher Satz statt Stille', () => {
+    expect(mengeAbgelehntText('Ungültige Parameter')).toBe('Wir konnten die Menge nicht ändern. Versuch es gleich noch einmal.')
+    expect(mengeAbgelehntText(undefined)).toBe('Wir konnten die Menge nicht ändern. Versuch es gleich noch einmal.')
+  })
+})
+
+describe('vorWieLange — rechnet vom übergebenen Zeitpunkt, nicht von der Uhr beim Rendern', () => {
+  const jetzt = '2026-10-02T08:00:00.000Z'
+  it('heute, Stunden, Tage', () => {
+    expect(vorWieLange('2026-10-02T07:30:00.000Z', jetzt)).toBe('heute')
+    expect(vorWieLange('2026-10-02T07:00:00.000Z', jetzt)).toBe('vor 1 Stunde')
+    expect(vorWieLange('2026-10-01T23:00:00.000Z', jetzt)).toBe('vor 9 Stunden')
+    expect(vorWieLange('2026-10-01T08:00:00.000Z', jetzt)).toBe('vor 1 Tag')
+    expect(vorWieLange('2026-09-30T08:00:00.000Z', jetzt)).toBe('vor 2 Tagen')
   })
 })
