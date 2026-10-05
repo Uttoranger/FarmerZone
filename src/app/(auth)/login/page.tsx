@@ -1,23 +1,31 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
-import { LoginClient } from './login-client'
+import { STANDARD_ZIEL_NACH_CODE } from '@/lib/anmeldecode'
+import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
+import { AnmeldenSeite } from '@/components/anmelden/anmelden-seite'
+
+export const metadata: Metadata = {
+  title: 'Anmelden',
+}
 
 /**
+ * Hof-Anmeldung mit E-Mail und Passwort (Gate 4 Nr. 08) — dieselbe Seite wie
+ * /account/login (Mockup web-k0-anmelden-kunde-code-hof-passwort), am Handy
+ * mit der Hofkarte vorn. Die Anmeldelogik ist unverändert
+ * (components/anmelden/hof-anmeldung.tsx).
+ *
  * Wer schon angemeldet ist, hat auf dem Anmeldeformular nichts verloren.
- *
- * Vorher war /login eine reine Client-Komponente ohne Sitzungsprüfung: Ein
- * Bauer mit laufender Sitzung sah das Formular und musste sich fragen, ob er
- * eigentlich noch eingeloggt ist. Die Prüfung folgt dem Muster aus
- * src/app/(farmer)/layout.tsx — Sitzung holen, Rolle ansehen, umleiten.
- *
  * Nur FARMER wird umgeleitet: Für andere Rollen führt /dashboard ins Leere
  * (das Farmer-Layout schickt sie zurück), das wäre eine Schleife. Sie sehen
- * das Formular und können sich mit einem anderen Konto anmelden.
+ * das Formular und können sich mit einem anderen Konto anmelden. Muster aus
+ * src/app/(farmer)/layout.tsx — Sitzung holen, Rolle ansehen, umleiten.
  *
- * Das Formular selbst ist unverändert und liegt jetzt in login-client.tsx.
+ * Die Kundenkarte daneben führt nach der Anmeldung immer auf „Mein Konto" —
+ * ein `?ziel=` liest nur /account/login.
  */
-export default async function LoginPage() {
+export default async function LoginPage(): Promise<React.JSX.Element> {
   const session = await auth.api.getSession({ headers: await headers() })
 
   if (session?.user) {
@@ -25,5 +33,9 @@ export default async function LoginPage() {
     if (role === 'FARMER') redirect('/dashboard')
   }
 
-  return <LoginClient />
+  return (
+    <KundeShellMitSitzung>
+      <AnmeldenSeite aktiv="hof" ziel={STANDARD_ZIEL_NACH_CODE} />
+    </KundeShellMitSitzung>
+  )
 }

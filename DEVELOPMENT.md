@@ -3753,6 +3753,64 @@ Abschnitte in `src/components/startseite/`, Texte, Links und Rechnungen in
   zweites Mal im Original); `preload="none"` wirkt neben `autoPlay` nicht —
   der Kommentar sagt das jetzt.
 
+## Anmelden: Kundin mit Code, Hof mit Passwort (Nachtlauf Nr. 08, 2026-10-05)
+
+Gate 4, Route `/account/login` und `/login`. Entscheidung E7: Kundinnen melden
+sich mit einem 6-stelligen Code aus der E-Mail an (Better Auth `emailOTP`, im
+installierten Paket enthalten, kein neues Paket); Höfe bleiben bei E-Mail und
+Passwort. Beide Routen zeigen dieselbe Seite nach Mockup
+`web-k0-anmelden-kunde-code-hof-passwort` (zwei Karten nebeneinander) bzw.
+`mobil-k0-anmelden-mit-code` (Umschalter aus zwei Links, Karte der Route vorn)
+in der `KundeShell`.
+
+- **Warum Code statt Link.** Der Magic Link meldete per GET an — Link-Scanner der
+  Mailprogramme verbrauchen ihn, und er klappt nicht, wenn die Mail am Handy und
+  der Einkauf am Laptop ist. Der Code geht überall und ändert per Mail nichts.
+- **Regeln** (Länge 6, 10 Minuten, 5 Versuche, Bremsen, Fehlertexte, Ziele) in
+  `src/lib/anmeldecode.ts`; das Plugin übernimmt sie (`ANMELDECODE_PLUGIN_OPTIONEN`).
+  Der Code liegt nur gehasht in `Verification`, Wert `<hash>:<versuche>`.
+  **Die Versuche zählt das Plugin in der Datenbank** (`atomicVerifyOTP` in
+  `better-auth/dist/plugins/email-otp/routes.mjs`: Zeile in einer Transaktion
+  verbrauchen, bei falschem Code mit `versuche + 1` und derselben Frist neu
+  anlegen) — damit gilt S4 über alle Serverless-Instanzen; belegt in
+  `tests/integration/anmeldecode.int.test.ts` mit zwei frisch geladenen
+  Auth-Instanzen. Die Frist prüft das Plugin beim Lesen. Keine Schema-Änderung
+  nötig.
+- **Bremsen:** Better Auth je IP 3 Anforderungen bzw. 3 Anmeldeversuche je
+  Minute (Plugin-Regel, Speicher je Instanz, nur Produktion); dazu höchstens
+  5 Codes je Adresse in 15 Minuten (`erzeugeAnforderungsSperre`, Hook in
+  `auth.ts`, je Instanz) gegen ein zugeschüttetes Postfach. Die harte Grenze
+  sind die 5 Versuche je Code. Ein Rate-Limit-Speicher in der Datenbank
+  (`rateLimit.storage: 'database'`) bräuchte eine eigene Tabelle — nicht in
+  Gate 4, offen für später.
+- **Höfe bekommen keinen Code.** Neben E7 der zweite Grund: Better Auth entzieht
+  einem noch unbestätigten Konto beim ersten Code das Passwort
+  (`revokeUnprovenAccountAccess`, so schon beim Magic Link). Die Antwort an den
+  Browser ist dieselbe wie bei einer Kundin — keine Auskunft, wer ein Hof ist.
+- **Neue Adresse** bekommt beim ersten Anmelden ein Kundenkonto ohne Passwort —
+  wie bisher beim Magic Link (bestehende freiwillige Anmeldung, E8 lässt sie
+  bestehen). Kein Konto-Angebot auf der Seite, kein „Konto anlegen".
+- **Magic Link im Übergang:** `/sign-in/magic-link` ist über `disabledPaths`
+  zu, `/magic-link/verify` bleibt offen, damit Links aus Mails von kurz vor dem
+  Deployment (15 Minuten gültig) noch gehen. Das Plugin und
+  `customer-magic-link.tsx` können in einem Aufräum-PR entfallen. Ebenfalls zu:
+  die Code-Wege fürs Passwort-Zurücksetzen, E-Mail-Bestätigung und
+  E-Mail-Wechsel — sonst gäbe es einen zweiten Weg, das Passwort eines Hofs zu
+  ändern. Anfordern nimmt nur den Typ `sign-in` an.
+- **Mail:** Code groß im Text, „10 Minuten", kein Link. Der Code steht nicht im
+  Betreff und nicht im Vorschautext: `sendRaw` schreibt den Betreff auch in
+  Produktion ins Log, und der Sperrbildschirm zeigt beides. Ohne
+  `RESEND_API_KEY` steht der Code lokal im Terminal (`[DEV] Anmeldecode …`), in
+  Produktion nie. Sentry entfernt `otp`-Parameter und Ziffern hinter
+  „Code"/„OTP".
+- **Weiterleitung:** `?ziel=` auf `/account/login` nur über `zielNachAnmeldung`
+  (eigener relativer Pfad, kein `//`, kein Rückstrich, nicht `/api`), sonst
+  `/account/profile` wie bisher. Hof-Ziel unverändert nur `/teilen`
+  (`zielNachHofAnmeldung`, aus dem alten `login-client.tsx` gezogen).
+- **Für Nr. 14 („Bestellungen finden"):** `KundeCodeFormular` mit eigenem `ziel`
+  und `zielNachAnmeldung(roh, standard)` wiederverwenden; Ablauf, Texte und
+  Bremsen bleiben dieselben.
+
 ## Nützliche Befehle
 
 ```bash

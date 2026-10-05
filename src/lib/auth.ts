@@ -1,14 +1,21 @@
 import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
-import { magicLink } from 'better-auth/plugins'
+import { emailOTP, magicLink } from 'better-auth/plugins'
+import { APIError, createAuthMiddleware } from 'better-auth/api'
 import { prisma } from '@/lib/prisma'
 import { UMGEBUNG } from '@/lib/umgebung-server'
+import { ANMELDECODE_PLUGIN_OPTIONEN, GESPERRTE_AUTH_PFADE, codeVersandErlaubt } from '@/lib/anmeldecode'
+import { erzeugeAnforderungsSperre } from '@/lib/anmeldecode-sperre'
 
 // Franz-tauglich: 10 Login-Versuche pro Minute pro IP sperren keinen echten
 // Nutzer aus (auch nicht bei Tippfehlern), bremsen aber Passwort-Rater.
 // Better-Auth wendet das Limit auf alle /api/auth/*-Endpunkte an.
 const AUTH_RATE_LIMIT_WINDOW_SECONDS = 60
 const AUTH_RATE_LIMIT_MAX = 10
+
+// Höchstens 5 Anmeldecodes je Adresse in 15 Minuten (src/lib/anmeldecode.ts),
+// je Instanz — gegen ein Postfach, das von vielen IPs aus zugeschüttet wird.
+const codeAnforderungen = erzeugeAnforderungsSperre()
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
@@ -56,7 +63,64 @@ export const auth = betterAuth({
     },
   },
 
+  // Was die App nicht anbietet, ist über HTTP gar nicht erreichbar: das
+  // Anfordern neuer Magic Links (E7) und die ungenutzten Code-Wege des
+  // emailOTP-Plugins. Begründung je Pfad in src/lib/anmeldecode.ts.
+  disabledPaths: [...GESPERRTE_AUTH_PFADE],
+
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== '/email-otp/send-verification-otp') return
+      // Nur die Anmeldung. Der Typ „forget-password" schickte sonst einem Hof
+      // einen Code fürs Passwort, „email-verification" eine Bestätigung, die
+      // es in dieser App nicht gibt.
+      const body = ctx.body as { type?: unknown; email?: unknown } | undefined
+      if (body?.type !== 'sign-in') {
+        throw new APIError('BAD_REQUEST', { message: 'Unbekannte Anfrage.' })
+      }
+      // Wie alle Speicher-Grenzen nur in Produktion (src/lib/rate-limit.ts).
+      if (
+        process.env.NODE_ENV === 'production' &&
+        typeof body.email === 'string' &&
+        !codeAnforderungen.erlaubt(body.email)
+      ) {
+        throw new APIError('TOO_MANY_REQUESTS', { message: 'Zu viele Anfragen.' })
+      }
+    }),
+  },
+
   plugins: [
+    // Kunden-Anmeldung mit Code aus der E-Mail (E7). Länge, Laufzeit,
+    // Versuche und Bremsen stehen in src/lib/anmeldecode.ts; die Versuche
+    // zählt das Plugin in der Verification-Tabelle — über alle Instanzen.
+    emailOTP({
+      ...ANMELDECODE_PLUGIN_OPTIONEN,
+      sendVerificationOTP: async ({ email, otp, type }) => {
+        if (type !== 'sign-in') return
+        // Höfe melden sich mit Passwort an — sie bekommen keinen Code. Die
+        // Antwort an den Browser bleibt dieselbe (keine Auskunft, wer ein Hof ist).
+        const nutzer = await prisma.user.findUnique({ where: { email }, select: { role: true } })
+        if (!codeVersandErlaubt(nutzer ? nutzer.role : null)) return
+        try {
+          const { sendAnmeldeCodeEmail } = await import('@/lib/email')
+          const ergebnis = await sendAnmeldeCodeEmail(email, otp)
+          // Ohne Versand (lokal ohne RESEND_API_KEY) steht der Code im
+          // Terminal, sonst käme niemand an ihn heran. Code und Adresse
+          // dürfen NIE in die Produktions-Logs (Vercel) — auch nicht bei
+          // einem Resend-Fehler.
+          if (!ergebnis.id && process.env.NODE_ENV !== 'production') {
+            console.log(`[DEV] Anmeldecode für ${email}: ${otp}`)
+          }
+        } catch (err) {
+          // Nur die Art des Fehlers — sein Text könnte die Adresse tragen.
+          console.error('[Anmeldecode] E-Mail-Fehler:', err instanceof Error ? err.name : 'unbekannt')
+        }
+      },
+    }),
+    // Übergang: Neue Magic Links gibt es nicht mehr (disabledPaths oben),
+    // Links aus Mails, die vor dem Deployment verschickt wurden, prüft
+    // /magic-link/verify noch (15 Minuten gültig). Kann in einem späteren
+    // Aufräum-PR samt customer-magic-link.tsx entfallen.
     magicLink({
       expiresIn: 900, // 15 Minuten
       sendMagicLink: async ({ email, url }) => {

@@ -12,6 +12,7 @@ import { OrderNotReadyEmail } from '@/emails/order-not-ready'
 import { ZahlungZuSpaetEmail } from '@/emails/zahlung-zu-spaet'
 import { BestellungVerfallenEmail } from '@/emails/bestellung-verfallen'
 import { CustomerMagicLinkEmail } from '@/emails/customer-magic-link'
+import { AnmeldecodeEmail } from '@/emails/anmeldecode'
 import { PasswordResetEmail } from '@/emails/password-reset'
 import { NewFarmNotificationEmail } from '@/emails/new-farm-notification'
 import { FreischaltungEmail } from '@/emails/freischaltung'
@@ -25,6 +26,7 @@ import { barBestaetigungsPfad, bestellungPfad } from '@/lib/bestell-link'
 import type { OrderLineProduct } from '@/lib/order-line'
 import { bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
 import { APP_URL } from '@/lib/umgebung-server'
+import { ANMELDECODE_GUELTIG_SEKUNDEN } from '@/lib/anmeldecode'
 
 const apiKey = process.env.RESEND_API_KEY
 const resend = apiKey ? new Resend(apiKey) : null
@@ -159,6 +161,18 @@ function betraege(order: OrderForEmail): { warenpreis: number; gebuehr: number; 
 export async function sendMagicLinkEmail(email: string, url: string, firstName?: string): Promise<void> {
   const html = await toHtml(React.createElement(CustomerMagicLinkEmail, { firstName, magicUrl: url }))
   await send(email, 'Dein Login-Link für FarmerZone', html)
+}
+
+/**
+ * Anmeldecode → Kundin (E7). Der Betreff trägt den Code NICHT: sendRaw
+ * schreibt den Betreff auch in Produktion ins Log, und der Sperrbildschirm
+ * zeigt ihn jedem, der danebensteht. Gibt das Versandergebnis zurück — ohne
+ * ID (kein Schlüssel, Resend-Fehler) schreibt auth.ts den Code lokal ins Log.
+ */
+export async function sendAnmeldeCodeEmail(email: string, code: string): Promise<{ id?: string; error?: string }> {
+  const minuten = ANMELDECODE_GUELTIG_SEKUNDEN / 60
+  const html = await toHtml(React.createElement(AnmeldecodeEmail, { code, minuten }))
+  return sendRaw(email, 'Dein Anmeldecode für FarmerZone', html)
 }
 
 /** Passwort-Reset → Bauer */
