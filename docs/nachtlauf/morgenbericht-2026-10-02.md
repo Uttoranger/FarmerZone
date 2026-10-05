@@ -28,18 +28,18 @@ Die PRs sind gestapelt. Nach jedem Merge stellt GitHub die Basis des nächsten P
 1. **#166** Nr. 03, Basis `main`.
 2. **#167** Nr. 04.
 3. **#168** Nr. 05. Vorher den Slug in der Produktion prüfen, siehe Abschnitt 3.
-4. **#169** Nr. 06. Den PR erst aus dem Entwurf nehmen, wenn die Geldfeld-Frage entschieden ist. **Nach dem Merge die Migration einspielen** (`pnpm db:migrate` gegen Produktion, wie üblich durch dich).
+4. **#169** Nr. 06. Den PR erst aus dem Entwurf nehmen, wenn die Geldfeld-Frage entschieden ist. Die Migration spielt der Produktions-Build beim Merge automatisch ein (vercel-build). `pnpm db:migrate` ist `migrate dev` und darf nie gegen Produktion laufen.
 
 Gibt es zwischendurch einen Konflikt in `docs/nachtlauf/status.md`, ist er rein mechanisch: Es gilt jeweils die neueste Zeile.
 
 ## 3. Fragen und fehlende Freigaben
 
 **Vor einem Merge zu klären:**
-- **#169, Geldfelder:** Willst du Int-Cent (A) oder `Decimal(10,2)` (B)?
+- **#169, Geldfelder:** Willst du Int-Cent (A) oder `Decimal(10,2)` (B)? – entschieden 05.10.2026, siehe freigabe.md §6
   - Betroffen sind `Order.erstattetCents` und die Beträge der `Monatsabrechnung`.
   - Variante A ist die Empfehlung des Prüfers. Sie behält Cent wie `serviceFeeCents` und braucht eine Ausnahme in `docs/ai/ARCHITECTURE.md`.
   - Variante B muss vor dem Einspielen umgesetzt werden, weil die Umstellung danach destruktiv wäre.
-- **#169, Migration von Hand:** Bitte die Abweichung abnicken.
+- **#169, Migration von Hand:** Bitte die Abweichung abnicken. – entschieden 05.10.2026, siehe freigabe.md §6
   - Der vorgeschriebene Befehl `migrate dev --create-only` scheitert an der Shadow-Datenbank mit P3006, und zwar für jede Migration.
   - Vorschlag für Regel 3 in `docs/nachtlauf.md`: `prisma migrate diff --from-schema … --to-schema … --script`. Das kommt ganz ohne Datenbank aus.
   - Beim selben Anlass sollte Regel 3 beachten, dass `prisma.config.ts` die Variable `DIRECT_URL` vor `DATABASE_URL` liest.

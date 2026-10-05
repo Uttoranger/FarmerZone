@@ -79,5 +79,12 @@ Alles andere: Gate überspringen und im Morgenbericht nachfragen.
 
 ## 5. Haltepunkt und Rahmen
 
-- Letzte Nummer, die in diesem Lauf noch bearbeitet werden darf: **06** (erste Nacht: H3 Bar-Bestätigung, Servicegebühr, Bausteine und Shells, Schema-Expand; 01 und 02 sind schon erledigt)
+- Letzte Nummer, die in diesem Lauf noch bearbeitet werden darf: **14** (erste Nacht endete bei 06; 01 bis 06 erledigt, siehe §6)
 - Kostenrahmen: **40 USD** (wird zusätzlich beim Start als `--max-budget-usd` gesetzt; mit Abo gelten dessen Nutzungsgrenzen)
+
+## 6. Nachtrag 05.10.2026 (uttoranger)
+
+- Geldfelder: Variante A (Int-Cent), Ausnahme in ARCHITECTURE.md.
+- Migrationsweg `prisma migrate diff` statt `migrate dev --create-only` freigegeben.
+- Mockup-Abweichungen und Cookie-Änderung aus Nr. 05 freigegeben.
+- Haltepunkt für den nächsten Lauf: **14**.
