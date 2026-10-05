@@ -35,6 +35,7 @@ import {
   codeVollstaendig,
   normalisiereCode,
   restWartezeitSekunden,
+  rolleAusTreffern,
   zielNachAnmeldung,
   zielNachHofAnmeldung,
 } from '@/lib/anmeldecode'
@@ -129,6 +130,28 @@ describe('codeVersandErlaubt', () => {
     expect(codeVersandErlaubt('FARMER')).toBe(false)
     expect(codeVersandErlaubt('ADMIN')).toBe(false)
     expect(codeVersandErlaubt('')).toBe(false)
+  })
+})
+
+describe('rolleAusTreffern', () => {
+  it('kein Konto: null — eine neue Adresse wird Kundin', () => {
+    expect(rolleAusTreffern([])).toBeNull()
+  })
+
+  it('nur Kundinnen-Konten: CUSTOMER', () => {
+    expect(rolleAusTreffern(['CUSTOMER'])).toBe('CUSTOMER')
+    expect(rolleAusTreffern(['CUSTOMER', 'CUSTOMER'])).toBe('CUSTOMER')
+  })
+
+  it('ein einziger Hof oder Admin unter den Treffern genügt — egal an welcher Stelle', () => {
+    expect(rolleAusTreffern(['CUSTOMER', 'FARMER'])).toBe('FARMER')
+    expect(rolleAusTreffern(['FARMER', 'CUSTOMER'])).toBe('FARMER')
+    expect(rolleAusTreffern(['CUSTOMER', 'ADMIN', 'CUSTOMER'])).toBe('ADMIN')
+    expect(codeVersandErlaubt(rolleAusTreffern(['CUSTOMER', 'FARMER']))).toBe(false)
+  })
+
+  it('eine unbekannte Rolle zählt nicht als Kundin', () => {
+    expect(codeVersandErlaubt(rolleAusTreffern(['CUSTOMER', '']))).toBe(false)
   })
 })
 

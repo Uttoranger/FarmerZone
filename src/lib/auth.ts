@@ -5,7 +5,8 @@ import { emailOTP, magicLink } from 'better-auth/plugins'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
 import { prisma } from '@/lib/prisma'
 import { UMGEBUNG } from '@/lib/umgebung-server'
-import { ANMELDECODE_PLUGIN_OPTIONEN, GESPERRTE_AUTH_PFADE, codeVersandErlaubt } from '@/lib/anmeldecode'
+import { ANMELDECODE_PLUGIN_OPTIONEN, GESPERRTE_AUTH_PFADE, codeVersandErlaubt, rolleAusTreffern } from '@/lib/anmeldecode'
+import { genauesIlikeMuster } from '@/lib/ilike-muster'
 import { erzeugeAnforderungsSperre } from '@/lib/anmeldecode-sperre'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 
@@ -25,13 +26,24 @@ const codeAnforderungen = erzeugeAnforderungsSperre()
  * können Großbuchstaben tragen — ein exakter Vergleich hielte einen Hof dann
  * für „unbekannt", schickte ihm einen Code und legte beim Anmelden ein
  * zweites Kundenkonto an. `null` = kein Konto.
+ *
+ * Genau diese Adresse, keine Platzhalter: Prisma macht aus dem Vergleich ein
+ * ILIKE, in dem „_" und „%" sonst ein fremdes Konto träfen — ein Hof
+ * „max_hof@…" hielte der Hook für die Kundin „max-hof@…" (die jeder per
+ * Checkout anlegen kann), und der Code meldete den Hof an. ALLE Treffer
+ * zählen (rolleAusTreffern), nicht der erste beliebige; das Betreiber-Recht
+ * (isAdmin) zählt wie die Rolle ADMIN. Maskiert statt per $queryRaw mit
+ * lower(): kein Roh-SQL ohne Not (TECH_STACK.md), typisiert über Prisma, und
+ * dieselbe Funktion wie in der Bestellsuche (Nr. 14).
  */
 async function rolleZurAdresse(email: string): Promise<string | null> {
-  const nutzer = await prisma.user.findFirst({
-    where: { email: { equals: email, mode: 'insensitive' } },
-    select: { role: true },
+  const treffer = await prisma.user.findMany({
+    where: { email: { equals: genauesIlikeMuster(email), mode: 'insensitive' } },
+    select: { role: true, isAdmin: true },
   })
-  return nutzer ? nutzer.role : null
+  // /admin prüft isAdmin, nicht die Rolle (src/server/admin-wache.ts): Ein
+  // Betreiber ohne Hof kann CUSTOMER sein und zählt hier trotzdem als Admin.
+  return rolleAusTreffern(treffer.map((nutzer) => (nutzer.isAdmin ? 'ADMIN' : nutzer.role)))
 }
 
 /**
