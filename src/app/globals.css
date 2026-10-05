@@ -428,4 +428,13 @@
   input::-ms-clear {
     display: none;
   }
+  /* Fokus nie verdeckt (WCAG 2.4.11): Hat eine Seite die feste Aktionsleiste
+     unten am Handy (data-feste-leiste, die Kasse) und den klebenden Kopf der
+     Fokus-Shell, scrollt der Browser ein fokussiertes Feld nicht darunter. */
+  @media (max-width: 767px) {
+    html:has([data-feste-leiste]) {
+      scroll-padding-top: 4.5rem;
+      scroll-padding-bottom: 9.5rem;
+    }
+  }
 }

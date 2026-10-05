@@ -85,7 +85,7 @@ export default async function PaymentsPage({
         <CardHeader>
           <CardTitle>Vor-Ort-Zahlung</CardTitle>
           <CardDescription>
-            Kunden zahlen bei der Abholung (Bar oder Karte).
+            Kunden zahlen bei der Abholung bar.
           </CardDescription>
         </CardHeader>
         <CardContent>

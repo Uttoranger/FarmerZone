@@ -30,6 +30,7 @@ import { AbholfensterVoll, imAbholfenster, pruefeAbholfenster } from '@/server/a
 import { ABHOLFENSTER_NICHT_VERFUEGBAR, CODE_ABHOLFENSTER_VOLL } from '@/lib/abholfenster'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
 import { CODE_ZAHLUNG_NICHT_MOEGLICH, zahlungNichtMoeglichText } from '@/lib/stripe-konto'
+import { CODE_ZAHLART_NICHT_ANGEBOTEN, ZAHLART_NICHT_ANGEBOTEN, zahlartFuerNeueBestellung } from '@/lib/kasse'
 import {
   pruefeBetriebsnachweis,
   betriebsnummerFuerBestellung,
@@ -410,6 +411,18 @@ export async function POST(request: NextRequest) {
   // Eine ausgeblendete Schaltfläche ist keine Durchsetzung; die Wahrheit steht hier.
   if (farm.isPaused) {
     return konflikt(data.idempotencyKey, data.sessionId, { error: SHOP_PAUSED_MESSAGE })
+  }
+
+  // 2a. E5: Karte bei Abholung gibt es für NEUE Bestellungen nicht mehr.
+  //     Erst hier, nach Schritt 0: Eine schon bestehende Bestellung mit
+  //     ONSITE_CARD (alter Tab, gleicher Schlüssel) bekommt oben weiter ihre
+  //     Antwort. Der Enum-Wert bleibt (Expand/Contract), bis keine offene
+  //     Bestellung ihn mehr trägt (src/lib/kasse.ts).
+  if (!zahlartFuerNeueBestellung(data.paymentMethod)) {
+    return NextResponse.json(
+      { error: ZAHLART_NICHT_ANGEBOTEN, code: CODE_ZAHLART_NICHT_ANGEBOTEN },
+      { status: 400 }
+    )
   }
 
   // 2. Validate payment method availability

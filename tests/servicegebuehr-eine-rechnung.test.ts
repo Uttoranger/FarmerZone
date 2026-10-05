@@ -57,13 +57,21 @@ describe('Servicegebühr: eine Rechnung', () => {
     expect(funde).toEqual([])
   })
 
+  // Seit Nr. 12 rechnet die Kasse über kassenBetraege (src/lib/kasse.ts) —
+  // die Anzeige-Rechnung steht dort, das Formular ruft nur sie.
   it.each([
-    ['src/components/checkout/checkout-form.tsx'],
+    ['src/lib/kasse.ts'],
     ['src/app/api/checkout/route.ts'],
   ])('%s rechnet mit berechneServicegebuehr und demselben Warenpreis-Weg', (datei) => {
     const text = readFileSync(join(WURZEL, datei), 'utf8')
     expect(text).toMatch(/berechneServicegebuehr\(/)
     expect(text).toMatch(/calcTotalAmount\(/)
     expect(text).toMatch(/decimalZuCents\(/)
+  })
+
+  it('das Kassen-Formular rechnet nicht selbst, sondern über kassenBetraege', () => {
+    const text = readFileSync(join(WURZEL, 'src/components/checkout/checkout-form.tsx'), 'utf8')
+    expect(text).toMatch(/kassenBetraege\(/)
+    expect(text).not.toMatch(/berechneServicegebuehr\(|price \* |\.price \*/)
   })
 })

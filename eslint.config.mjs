@@ -31,7 +31,6 @@ const FARBLITERAL_BESTAND = [
   'src/app/api/status-image/\\[id\\]/route.tsx',
   'src/app/layout.tsx',
   'src/app/manifest.ts',
-  'src/components/checkout/stripe-payment.tsx',
   'src/components/cookie-banner.tsx',
   'src/components/farm/farm-page-view.tsx',
   'src/components/farm/product-grid.tsx',

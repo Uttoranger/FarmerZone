@@ -152,11 +152,20 @@ describe('Ladeansichten — jede öffentliche Route, die auf Daten wartet, zeigt
   it('bringt die Kopfleiste in ihrer echten Höhe mit — die Gruppe hat kein Layout', () => {
     // Die Kundenseiten rendern ihre Kopfleiste selbst (56 px, ab md 64).
     // Fehlt sie im Skeleton, springt die Seite beim Umschalten um ihre Höhe.
+    // Die Kasse steht seit Nr. 12 in der Fokus-Shell: deren Kopf ist 52 px
+    // hoch (ab md 64) — der Platzhalter hat genau diese Maße.
+    const FOKUS_SHELL = new Set(['src/app/(public)/[farmSlug]/checkout/loading.tsx'])
     for (const ansicht of LADEANSICHTEN) {
       expect(liesDatei(ansicht.datei), `${ansicht.zweck} ohne Kopfleisten-Platzhalter`).toMatch(
-        /h-14[^"]*md:h-16/
+        FOKUS_SHELL.has(ansicht.datei) ? /h-\[52px\][^"]*md:h-16/ : /h-14[^"]*md:h-16/
       )
     }
+  })
+
+  it('die Kasse: Kopf-Platzhalter in den Maßen der Fokus-Shell', () => {
+    // Gegenprobe zur Ausnahme oben: Die Shell hat wirklich 52 px / ab md 64 px.
+    expect(liesDatei('src/components/shells/kunde-shell.tsx')).toMatch(/h-\[52px\][^"]*md:h-16/)
+    expect(liesDatei('src/app/(public)/[farmSlug]/checkout/loading.tsx')).toContain('data-design="neu"')
   })
 
   it('setzt keine Farbe als Literal — nur Tokens', () => {

@@ -552,7 +552,7 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt }: Pr
         return (
           <div className="space-y-2">
             <p className="text-sm text-app-ink-soft">
-              Bar oder mit Karte vor Ort geht immer. Online-Zahlung läuft über ein Stripe-Konto — das richtest du in den
+              Bar bei Abholung geht immer. Online-Zahlung läuft über ein Stripe-Konto — das richtest du in den
               Einstellungen ein.
             </p>
             <Link href="/settings/payments" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-brand-text underline-offset-2 hover:underline">

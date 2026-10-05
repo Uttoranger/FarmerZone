@@ -4031,6 +4031,18 @@ E3, E4, E8, E9, E10/E11 (nur Anzeige).
   Gebühren-Stichtag als ISO-Text statt `Date` an die Client-Komponenten
   (Hofseite, Produktseite, Checkout, Hofbereich).
 
+## Kasse /[farmSlug]/checkout im neuen Design (Nachtlauf Nr. 12, 2026-10-05)
+
+Gate 4, Route Checkout. Mockups `web-k3-warenkorb-bezahlen`, `web-k3-zahlung-abgelehnt`, `mobil-k3-warenkorb-bezahlen`, `mobil-k3-zahlung-abgelehnt`. Ein Oberflächen-Umbau; der Geldweg von `/api/checkout` bleibt bis auf E5 unverändert (Bericht `docs/nachtlauf/berichte/12.md`, Abschnitt „Geldpfad unverändert?").
+
+- **Fokus-Shell, eine Regelquelle.** `src/lib/kasse.ts` hält Zahlarten (E5), Beträge in Cent (`kassenBetraege`, derselbe Weg wie der Server), Gebührenzeile, Reservierungsstand, die Deutung von Stripe-Fehlern (`zahlungsFehlerArt`), den Rückweg und die Abholkacheln. Die Komponenten zeigen nur an.
+- **E5 — Karte bei Abholung.** Für NEUE Bestellungen weder angeboten noch angenommen. Die Route prüft erst nach der Idempotenz-Antwort: Ein alter Tab mit demselben Schlüssel bekommt seine bestehende ONSITE_CARD-Bestellung zurück, eine neue wird mit 400 abgelehnt. Enum, Anzeige, Storno und Abrechnung alter Bestellungen bleiben. Die Texte in den Hof-Einstellungen („Bar oder Karte") sagen jetzt „bar" — nur Wortlaut, kein Verhalten.
+- **Sichtbare Frist.** `/api/warenkorb/pruefen` gibt die Frist der eben erneuerten Halte zurück; die Kasse zählt herunter. Abgelaufen heißt: andere können kaufen; „Verfügbarkeit neu prüfen" setzt die Halte neu (dieselbe Prüfung wie beim Öffnen). **Gefundene Sackgasse:** `/api/checkout` erneuert keine Halte — nach `RESERVIERUNG_ABGELAUFEN` lief bisher jeder weitere Versuch in dieselbe Ablehnung, bis die Seite neu geladen wurde. Die Kasse ruft deshalb danach die Prüfung erneut.
+- **Gefundene Fehlleitung:** Nach „Zurück" aus der Zahlung, Wechsel auf „Bar" und erneutem Absenden kam über den Idempotenz-Schlüssel die bestehende ONLINE-Bestellung zurück — die Kasse leerte trotzdem den Korb und zeigte die Bestätigung, als wäre bar bestellt. Jetzt folgt die Weiche der Antwort (`clientSecret` → Zahlung), und nach dem Anlegen stehen die Angaben fest.
+- **„Nichts abgebucht"** steht nur bei einer abgelehnten Karte (`card_error`): Der PaymentIntent steht dann wieder auf „Zahlungsart fehlt", Bestellung und Ware bleiben bis zur Frist. Schon bezahlt/in Bearbeitung → zur Bestätigung; abgebrochen oder Frist um → „abgelaufen, nichts abgebucht" mit Weg zurück zum Hof; Knopf gesperrt.
+- **Barzahlung: „Zahlungspflichtig bestellen".** Für Bar ist der Knopf der verbindliche Abschluss; die Zahlungspflicht steht deshalb auf dem Knopf (Mockup: „Jetzt bestellen"). Online schließt erst „Jetzt bezahlen" ab.
+- **E8 offen:** Der Checkout legt weiterhin ein ruhendes Kundenkonto an (`prisma.user.create` mit Rolle CUSTOMER, `emailVerified: false`, Schritt 4 in `route.ts`), wenn es zur E-Mail noch keines gibt, und hängt die Bestellung über `customerId` daran. Das widerspricht „kein automatisches Konto beim Checkout"; nicht umgebaut (Geldpfad, Anmeldung per Code hängt an der Rolle) — Entscheidung beim Menschen.
+
 ## Nützliche Befehle
 
 ```bash

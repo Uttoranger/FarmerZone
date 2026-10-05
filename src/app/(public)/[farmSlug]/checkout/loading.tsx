@@ -7,21 +7,19 @@ import { KasseSkelett } from '@/components/checkout/kasse-skelett'
  * den beiden Wartezeiten springt deshalb nichts (src/components/checkout/
  * kasse-skelett.tsx).
  *
- * Die Kopfleiste baut diese Datei selbst nach: Auf der Kasse rendert sie erst
- * die CheckoutForm, es gibt also kein Layout, das sie hielte. Ab md kommt die
- * Rückweg-Zeile („‹ Zum Hof") dazu — ohne sie rutschte der ganze Inhalt am
- * Browser um ihre Höhe nach oben.
+ * Seit Nr. 12 steht die Kasse in der Fokus-Shell: deren Kopf (Zurück, Titel,
+ * Hofname) ist 52 px hoch, ab md 64 px — der Platzhalter hat genau diese Maße
+ * und den Marker des neuen Designs, damit die Tokens dieselben sind.
  */
 export default function CheckoutLaden() {
   return (
-    <div className="min-h-screen bg-background">
-      <div className="h-14 border-b border-border bg-card md:h-16" />
-      <div className="hidden animate-pulse md:block" aria-hidden="true">
-        <div className="mx-auto max-w-6xl px-6 pt-4">
-          <div className="h-5 w-24 rounded bg-app-chip" />
+    <div data-design="neu" className="min-h-dvh bg-background">
+      <div className="h-[52px] border-b border-border bg-background md:h-16" aria-hidden="true">
+        <div className="mx-auto flex h-full max-w-[1200px] animate-pulse items-center gap-3 px-3.5 md:px-8">
+          <div className="size-6 rounded-full bg-app-chip" />
+          <div className="h-5 w-28 rounded bg-border" />
         </div>
       </div>
-
       <KasseSkelett />
     </div>
   )

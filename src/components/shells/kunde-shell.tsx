@@ -24,8 +24,10 @@ import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
  * Mockups: web-k1-entdecken-einstieg (Kopf), mobil-k1-entdecken und
  * mobil-k2-hofseite (Unterleiste), mobil-k3-warenkorb-bezahlen (Fokus).
  *
- * Noch nutzt keine Route diese Shell (kein Big Bang): Kundenseiten zeigen
- * weiter KundenKopf (components/shared/kunden-kopf.tsx).
+ * Route für Route (kein Big Bang): Nur Seiten, deren Gate sie umgestellt hat,
+ * tragen diese Shells (tests/shells.test.ts, UMGESTELLT) — die Fokus-Shell
+ * seit Nr. 12 die Kasse. Alle anderen Kundenseiten zeigen weiter KundenKopf
+ * (components/shared/kunden-kopf.tsx).
  */
 
 const SYMBOL: Partial<Record<KundenNavId, LucideIcon>> = {
@@ -203,8 +205,13 @@ export function KundeShell({ angemeldet, unterleiste = true, children }: KundeSh
 export type KundeFokusShellProps = {
   /** Die Überschrift der Seite („Warenkorb", „Bestätigung") — die Seite setzt kein eigenes h1. */
   titel: string
-  /** Wohin „Zurück" führt: immer ein echtes Ziel, nie der Verlauf (ARCHITECTURE §4, „Rückweg"). */
-  zurueck: { href: string; label: string }
+  /**
+   * Wohin „Zurück" führt: immer ein echtes Ziel, nie der Verlauf (ARCHITECTURE §4, „Rückweg").
+   * Ein Knopf (`onClick`) nur für einen Schritt innerhalb derselben Seite — die
+   * Kasse, sobald eine Bestellung steht und kein Weg hinausführen darf
+   * (`kassenZurueck`, src/lib/kasse.ts).
+   */
+  zurueck: { href: string; label: string } | { onClick: () => void; label: string }
   /** Rechts im Kopf, z. B. der Hofname. */
   rechts?: ReactNode
   /** Die eine feste Leiste unten (Hauptaktion); am Handy fest, im Browser unter dem Inhalt. */
@@ -222,14 +229,26 @@ export function KundeFokusShell({ titel, zurueck, rechts, aktion, children }: Ku
       <SprungLink />
       <header className="sticky top-0 z-40 border-b border-border bg-background print:hidden">
         <div className="mx-auto flex h-[52px] max-w-[1200px] items-center gap-1.5 px-2 md:h-16 md:px-6">
-          <Link
-            href={zurueck.href}
-            aria-label={zurueck.label}
-            title={zurueck.label}
-            className={cn('flex size-11 shrink-0 items-center justify-center rounded-full text-foreground hover:bg-muted', FOKUS_RAHMEN)}
-          >
-            <ChevronLeft className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
-          </Link>
+          {'href' in zurueck ? (
+            <Link
+              href={zurueck.href}
+              aria-label={zurueck.label}
+              title={zurueck.label}
+              className={cn('flex size-11 shrink-0 items-center justify-center rounded-full text-foreground hover:bg-muted', FOKUS_RAHMEN)}
+            >
+              <ChevronLeft className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={zurueck.onClick}
+              aria-label={zurueck.label}
+              title={zurueck.label}
+              className={cn('flex size-11 shrink-0 items-center justify-center rounded-full text-foreground hover:bg-muted', FOKUS_RAHMEN)}
+            >
+              <ChevronLeft className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
+            </button>
+          )}
           <h1 className="min-w-0 truncate font-heading text-[17px] font-semibold md:text-xl">{titel}</h1>
           <span className="flex-1" />
           {rechts && <div className="min-w-0 truncate pr-2.5 text-[12.5px] text-muted-foreground">{rechts}</div>}

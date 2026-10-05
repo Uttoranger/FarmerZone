@@ -7,6 +7,7 @@ import {
   ZU_LANG,
 } from '@/lib/eingabegrenzen'
 import { emailSchema } from '@/schemas/email'
+import { NEUE_BESTELLUNG_ZAHLARTEN } from '@/lib/kasse'
 
 /**
  * Die Reihenfolge der Felder auf der Seite — maßgeblich dafür, zu welchem
@@ -45,7 +46,11 @@ export const checkoutFormSchema = z
     customerNote: z.string().max(NOTIZ_MAX, ZU_LANG.notiz).optional(),
     // "YYYY-MM-DD|HH:MM|HH:MM" — encoded slot key
     pickupSlotKey: z.string().min(1, 'Bitte wähle einen Abholtermin'),
-    paymentMethod: z.enum(['ONLINE', 'ONSITE_CASH', 'ONSITE_CARD']),
+    // E5: Das Formular bietet nur noch online und bar an
+    // (NEUE_BESTELLUNG_ZAHLARTEN, src/lib/kasse.ts). Die Anfrage an den
+    // Server (unten) kennt ONSITE_CARD weiter — dort entscheidet die Route
+    // NACH der Idempotenz, ob es eine neue Bestellung wäre.
+    paymentMethod: z.enum(NEUE_BESTELLUNG_ZAHLARTEN, 'Bitte wähle, wie du bezahlen möchtest'),
     onsiteConfirmed: z.boolean().optional(),
     optInEmail: z.boolean().default(false),
     optInWhatsApp: z.boolean().default(false),
@@ -62,8 +67,7 @@ export const checkoutFormSchema = z
   // (Bug-Report Befund 5). Nur so erzeugt sie denselben sichtbaren Fehler wie
   // die übrigen Pflichtfelder und nimmt am Sprung zum ersten Fehler teil.
   .superRefine((daten, ctx) => {
-    const vorOrt = daten.paymentMethod === 'ONSITE_CASH' || daten.paymentMethod === 'ONSITE_CARD'
-    if (vorOrt && !daten.onsiteConfirmed) {
+    if (daten.paymentMethod === 'ONSITE_CASH' && !daten.onsiteConfirmed) {
       ctx.addIssue({
         code: 'custom',
         path: ['onsiteConfirmed'],
@@ -102,6 +106,9 @@ export const checkoutRequestSchema = z.object({
   pickupDate: z.string().regex(KALENDERTAG, 'Ungültiges Abholdatum'), // "YYYY-MM-DD"
   pickupTimeStart: z.string().regex(UHRZEIT, 'Ungültige Uhrzeit'), // "HH:MM", Wiener Zeit
   pickupTimeEnd: z.string().regex(UHRZEIT, 'Ungültige Uhrzeit'),
+  // Mit ONSITE_CARD: Ein alter Tab mit gleichem Schlüssel bekommt seine
+  // bestehende Bestellung zurück; eine NEUE lehnt die Route ab (E5,
+  // zahlartFuerNeueBestellung in src/lib/kasse.ts).
   paymentMethod: z.enum(['ONLINE', 'ONSITE_CASH', 'ONSITE_CARD']),
   optInEmail: z.boolean().optional().default(false),
   optInWhatsApp: z.boolean().optional().default(false),

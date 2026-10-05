@@ -15,7 +15,7 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { farmSlug } = await params
   const farm = await getPublicFarm(farmSlug)
-  return { title: farm ? `Checkout — ${farm.name}` : 'Checkout' }
+  return { title: farm ? `Bestellen — ${farm.name}` : 'Bestellen' }
 }
 
 export default async function CheckoutPage({ params }: Props) {
@@ -42,15 +42,15 @@ export default async function CheckoutPage({ params }: Props) {
     ausgebuchteAbholfenster(farm.id, new Date()),
   ])
 
+  // Die Fokus-Shell (Nachtlauf Nr. 12) rendert CheckoutForm selbst: Ihr
+  // „Zurück" hängt am Zustand im Browser — hinaus zum Hof nur, solange keine
+  // Bestellung steht (kassenZurueck, src/lib/kasse.ts).
   return (
-    <div className="min-h-screen bg-background">
-      {/* Die Kopfzeile rendert CheckoutForm selbst — im Zahlungsschritt nicht. */}
-      <CheckoutForm
-        farm={farm}
-        nurBetriebeIds={nurBetriebeIds}
-        vorbelegung={vorbelegung}
-        ausgebuchteAbholfenster={ausgebucht}
-      />
-    </div>
+    <CheckoutForm
+      farm={farm}
+      nurBetriebeIds={nurBetriebeIds}
+      vorbelegung={vorbelegung}
+      ausgebuchteAbholfenster={ausgebucht}
+    />
   )
 }
