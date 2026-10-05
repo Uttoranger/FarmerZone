@@ -6,8 +6,8 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 |---|---|---|---|---|---|---|---|
 | 01 | H1 Abholtermin | fertig | (von Hand) | #163 | main | – | Okt 2026 |
 | 02 | H4 Signatur Bestätigung | fertig | (von Hand) | #164 | main | – | Okt 2026 |
-| 03 | H3 Bar-Bestätigung | offen | | | | | |
-| 04 | Servicegebühr | offen | | | | | |
+| 03 | H3 Bar-Bestätigung | fertig | `nacht/2026-10-02/03-bar-bestaetigung` | #166 | main | Mockup-Abweichungen zur Freigabe (Untertitel-Grau, Handy-Kopf bis Nr. 05, Knopfhöhe 44 px); Mailtext „48 Stunden“ → Nr. 13; Axe in geteilten Bauteilen → Nr. 05 | 05.10.2026 |
+| 04 | Servicegebühr | läuft | `nacht/2026-10-02/04-servicegebuehr` | | 03 | | 05.10.2026 |
 | 05 | Bausteine und Shells | offen | | | | | |
 | 06 | Schema-Expand | offen | | | | | |
 | 07 | Startseite | offen | | | | | |
