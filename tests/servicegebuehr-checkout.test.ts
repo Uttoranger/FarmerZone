@@ -235,6 +235,43 @@ describe('Checkout ONLINE mit Servicegebühr', () => {
   })
 })
 
+describe('Checkout mit 5 % und Aufrundung (E4)', () => {
+  const HOF_FUENF = { ...HOF, serviceFeePercent: { toString: () => '5.00' } }
+
+  it('online, 10,30 €: 51,5 Cent → 52 Cent im Snapshot und bei Stripe (1082 / application_fee 52)', async () => {
+    farmFindUnique.mockResolvedValue(HOF_FUENF as never)
+    einzelpreis = 10.3
+    warenkorbBereit()
+
+    const res = await POST(anfrage({ items: [{ productId: 'prod_1', name: 'Wels', quantity: 1, unitPrice: 10.3 }] }))
+
+    expect(res.status).toBe(200)
+    expect(createData()).toEqual(
+      expect.objectContaining({ totalAmount: 10.3, serviceFeeCents: 52, serviceFeePercentApplied: 5 })
+    )
+    expect(intentParams()).toEqual(expect.objectContaining({ amount: 1082, application_fee_amount: 52 }))
+  })
+
+  it('bar, 10,01 €: 50,05 Cent → 51 Cent, die Mail kennt dieselbe Gebühr', async () => {
+    farmFindUnique.mockResolvedValue(HOF_FUENF as never)
+    einzelpreis = 10.01
+    warenkorbBereit()
+
+    await POST(
+      anfrage({
+        paymentMethod: 'ONSITE_CASH',
+        items: [{ productId: 'prod_1', name: 'Wels', quantity: 1, unitPrice: 10.01 }],
+      })
+    )
+
+    expect(createData()).toEqual(expect.objectContaining({ totalAmount: 10.01, serviceFeeCents: 51 }))
+    expect(sendOnsiteConfirmation).toHaveBeenCalledWith(
+      expect.objectContaining({ serviceFeeCents: 51 }),
+      expect.any(String)
+    )
+  })
+})
+
 describe('Checkout BAR mit Servicegebühr', () => {
   it('6 €: Mindestgebühr 50 Cent im Snapshot, kein Stripe, Bestätigungs-Mail kennt die Gebühr', async () => {
     einzelpreis = 6

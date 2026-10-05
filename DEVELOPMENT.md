@@ -3485,6 +3485,57 @@ nächtlichen Läufe (`docs/nachtlauf.md`) bleiben lokal.
 `system-komponente-seitenleiste-hof.html`. Die Einträge in `docs/entwicklung/` sind
 Verlauf und bleiben, wie sie sind.
 
+## Servicegebühr: 5 % und immer aufrunden (E4, 2026-10-05)
+
+Entscheidung E4 aus `docs/umsetzungsprompt.md`, freigegeben in
+`docs/nachtlauf/freigabe.md`: **5 %, mindestens € 0,50, immer aufrunden**
+(Preismodell des Betreibers, „Es wird aufgerundet"). Vorher rundete
+`berechneServicegebuehr` kaufmännisch, und neue Höfe bekamen 4,9 %.
+
+**Die Fachregel:** `gebühr = max(Mindestgebühr, aufrunden(Warenpreis × Prozent / 100))`
+auf ganze Cent. Gerechnet wird ganzzahlig: Prozent als Hundertstel (5 % → 500),
+Warenpreis in Cent, das Produkt in Zehntausendstel-Cent; bleibt beim Teilen
+durch 10 000 ein Rest, kommt ein Cent dazu. Beispiele bei 5 % / mind. 50 Cent:
+10,30 € → 52 Cent (51,5), 10,01 € → 51 Cent (50,05), 20,00 € → 100 Cent (glatt,
+kein Cent zu viel), 2,50 € → 50 Cent (Mindestgebühr), 10,00 € → 50 Cent. Kein
+`Math.ceil` auf einer Gleitkommazahl: `300 × 0,07` ist als Float
+21,000000000000004, aufgerundet also 22 statt 21 Cent.
+
+**Eine Rechnung.** Aus Warenpreis und Hofeinstellung wird die Gebühr nur in
+`berechneServicegebuehr`. Es rufen sie: die Anzeige im Checkout-Formular,
+`/api/checkout` (Snapshot `Order.serviceFeeCents`, Stripe `amount` und
+`application_fee_amount`) und der Seed. Alles danach — Mails, Bestellseiten,
+Druckansichten, Storno (`stornoBetraege`), „nicht abgeholt", Admin-Monatsspalten,
+`/admin/finanzen` — liest nur den Snapshot und rechnet nie neu. Bei der Prüfung
+fand sich keine zweite Gebührenrechnung. Eine Lücke gab es beim Warenpreis selbst:
+Das Formular summierte `price × quantity` als Gleitkommazahl und rundete auf Cent,
+der Server rechnet mit Decimal (`calcTotalAmount` → `decimalZuCents`). Bei ganzen
+Mengen und Preisen mit zwei Nachkommastellen kam dasselbe heraus, aber weil jetzt
+jeder angefangene Cent der Gebühr zählt, nimmt das Formular denselben Weg wie
+der Server. `tests/servicegebuehr-eine-rechnung.test.ts` wacht darüber (kein
+Modul rechnet mit `serviceFeePercent`/`serviceFeeMinCents`, beide Stellen nutzen
+denselben Warenpreis-Weg).
+
+**Satz für neue Höfe:** `SERVICEGEBUEHR_STANDARD_PROZENT = 5` und
+`SERVICEGEBUEHR_STANDARD_MIND_CENTS = 50` in `src/lib/servicegebuehr.ts`.
+`createFarm` (Onboarding) setzt beide ausdrücklich, der Seed auch. Ein neuer Hof
+bleibt trotzdem gebührenfrei, bis der Betreiber im Admin „gilt ab" setzt
+(`serviceFeeActiveFrom` bleibt beim Anlegen leer).
+
+**Was bewusst so bleibt:**
+- Der **Spalten-Default** im Schema steht weiter auf `@default(4.9)`
+  (`Farm.serviceFeePercent`, Migration `20260916192259_servicegebuehr`). Ihn zu
+  ändern wäre eine Schema-Migration; die war für diesen Schritt nicht
+  freigegeben. Weil das Anlegen den Satz ausdrücklich setzt, greift der Default
+  nur noch bei Höfen, die an `createFarm` vorbei entstehen.
+- **Bestehende Höfe behalten ihren gespeicherten Satz**, auch der Pilothof. Der
+  Betreiber stellt ihn im Admin auf 5 % (gilt nur für neue Bestellungen).
+- **Alte Bestellungen werden nie neu berechnet.** Ihr Snapshot
+  (`serviceFeeCents`, `serviceFeePercentApplied`) ist die Wahrheit; die
+  Aufrundung gilt für Bestellungen, die nach dem Deployment entstehen.
+- Die Teilerstattung „Artikel fehlt" (E14) ist ein eigener Schritt (Gate 5);
+  sie rechnet die Gebühr auf den verbleibenden Warenwert mit genau dieser Funktion.
+
 ---
 
 ## Nützliche Befehle

@@ -1,5 +1,9 @@
 import type { Prisma } from '@prisma/client'
-import { berechneServicegebuehr } from '../src/lib/servicegebuehr'
+import {
+  SERVICEGEBUEHR_STANDARD_MIND_CENTS,
+  SERVICEGEBUEHR_STANDARD_PROZENT,
+  berechneServicegebuehr,
+} from '../src/lib/servicegebuehr'
 import {
   SEED_BESTELLUNGEN,
   SEED_HANDVERKAEUFE,
@@ -90,12 +94,13 @@ type HofStand = {
 /** Die Servicegebühr gilt ab hier — sonst wären alle Bestellungen gebührenfrei. */
 const GEBUEHR_AKTIV_VOR_TAGEN = 200
 
-/** Die Gebühreneinstellung der NEUEN Höfe — dieselben Werte wie die
- *  Schema-Vorgaben. Sie wird auf den Hof GESCHRIEBEN, und die Bestellrechnung
+/** Die Gebühreneinstellung der NEUEN Höfe — derselbe Satz, den createFarm
+ *  setzt (E4: 5 %, mind. 50 Cent; der ältere Spalten-Default im Schema zählt
+ *  hier nicht). Sie wird auf den Hof GESCHRIEBEN, und die Bestellrechnung
  *  liest sie danach von dort zurück: Sonst stünde in den Bestellungen eine
  *  Gebühr, die nicht zu der Einstellung passt, aus der /admin/finanzen rechnet. */
-const GEBUEHR_PROZENT = 4.9
-const GEBUEHR_MIND_CENTS = 50
+const GEBUEHR_PROZENT = SERVICEGEBUEHR_STANDARD_PROZENT
+const GEBUEHR_MIND_CENTS = SERVICEGEBUEHR_STANDARD_MIND_CENTS
 
 const TAG_MS = 24 * 60 * 60 * 1000
 

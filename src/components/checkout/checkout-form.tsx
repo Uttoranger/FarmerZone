@@ -36,7 +36,7 @@ import {
   positionenFuer,
   schreibeWarenkorb,
 } from '@/lib/warenkorb-speicher'
-import { eurosToCents } from '@/lib/order-totals'
+import { calcTotalAmount, decimalZuCents } from '@/lib/order-totals'
 import {
   SERVICEGEBUEHR_BEZEICHNUNG,
   SERVICEGEBUEHR_HINWEIS,
@@ -271,12 +271,18 @@ export function CheckoutForm({
   const paymentMethod = form.watch('paymentMethod')
   const customerPhone = form.watch('customerPhone')
   const isOnsite = paymentMethod === 'ONSITE_CASH' || paymentMethod === 'ONSITE_CARD'
-  const total = cart.reduce((s, i) => s + i.price * i.quantity, 0)
+  // Warenpreis auf demselben Weg wie der Server (calcTotalAmount → decimalZuCents
+  // in /api/checkout): Weil die Gebühr jetzt jeden angefangenen Cent aufrundet,
+  // muss schon der Warenpreis in Cent auf beiden Seiten derselbe sein.
+  const warenpreisCents = decimalZuCents(
+    calcTotalAmount(cart.map((i) => ({ unitPrice: i.price, quantity: i.quantity })))
+  )
+  const total = centsAlsEuro(warenpreisCents)
   // Servicegebühr — dieselbe Rechnung wie der Server (/api/checkout rechnet
   // verbindlich, mit der Hofeinstellung zum Bestellzeitpunkt). Bei Online-
   // UND Barzahlung gleich; ist sie 0, entfällt die Zeile ersatzlos.
-  const gebuehr = berechneServicegebuehr(eurosToCents(total), farm, new Date())
-  const gesamt = centsAlsEuro(eurosToCents(total) + gebuehr.gebuehrCents)
+  const gebuehr = berechneServicegebuehr(warenpreisCents, farm, new Date())
+  const gesamt = centsAlsEuro(warenpreisCents + gebuehr.gebuehrCents)
 
   /**
    * Nach einer fehlgeschlagenen Prüfung zum ERSTEN Fehlerfeld springen und es

@@ -13,9 +13,22 @@
  * nichts verloren, siehe order-totals.ts für das Float-Artefakt 3 × 1,10.
  */
 
+/**
+ * Der Satz, den ein NEUER Hof beim Anlegen bekommt (Entscheidung E4, Preismodell
+ * des Betreibers: 5 %, mindestens € 0,50). Der Spalten-Default im Schema
+ * (`Farm.serviceFeePercent @default(4.9)`) ist älter und bleibt bis zu einer
+ * eigens freigegebenen Migration stehen — deshalb setzt das Anlegen den Satz
+ * ausdrücklich (createFarm, Seed), statt sich auf den Default zu verlassen.
+ * Bestehende Höfe behalten ihren gespeicherten Satz; umgestellt wird im Admin.
+ */
+export const SERVICEGEBUEHR_STANDARD_PROZENT = 5
+
+/** Mindestgebühr eines neuen Hofes in Cent (E4). */
+export const SERVICEGEBUEHR_STANDARD_MIND_CENTS = 50
+
 /** Die Hofeinstellung, so wie sie im Schema steht (Farm.serviceFee*). */
 export type ServicegebuehrEinstellung = {
-  /** Prozentsatz auf den Warenpreis, z. B. 4.9 — Decimal aus Prisma erlaubt. */
+  /** Prozentsatz auf den Warenpreis, z. B. 5 — Decimal aus Prisma erlaubt. */
   serviceFeePercent: number | string | { toString(): string }
   /** Mindestgebühr in Cent, z. B. 50. */
   serviceFeeMinCents: number
@@ -58,15 +71,21 @@ function alsZeitpunkt(wert: Date | string | null): Date | null {
 }
 
 /**
- * Berechnet die Servicegebühr für eine Bestellung.
+ * Berechnet die Servicegebühr für eine Bestellung — die EINZIGE Stelle, an der
+ * aus Warenpreis und Hofeinstellung eine Gebühr wird. Checkout-Anzeige im
+ * Browser, /api/checkout (Snapshot und Stripe) und der Seed rufen genau diese
+ * Funktion; alles danach (Mails, Bestellseiten, Storno, Abrechnung) liest nur
+ * noch den Snapshot `Order.serviceFeeCents` und rechnet nie neu.
  *
  * Gebührenfrei (0 Cent, Prozent null), wenn serviceFeeActiveFrom null ist oder
- * NACH dem Bestellzeitpunkt liegt. Sonst max(rund(warenpreis × Prozent / 100),
- * Mindestgebühr) — kaufmännisch auf ganze Cent gerundet (24,5 → 25).
+ * NACH dem Bestellzeitpunkt liegt. Sonst max(Mindestgebühr,
+ * aufrunden(warenpreis × Prozent / 100)) — IMMER AUF den nächsten ganzen Cent
+ * (E4, „Es wird aufgerundet"): 51,5 → 52, 50,05 → 51, glatte 100 bleiben 100.
  *
- * Die Rundung läuft in GANZEN ZAHLEN: Prozent als Hundertstel (4,9 % → 490),
- * Produkt in Zehntausendstel-Cent, dann +5000 und abschneiden. Math.round auf
- * einem Float käme bei 0,5-Fällen aus Darstellungsgründen mal so, mal so.
+ * Die Rundung läuft in GANZEN ZAHLEN: Prozent als Hundertstel (5 % → 500),
+ * Produkt in Zehntausendstel-Cent, dann ganzzahlig geteilt und bei jedem Rest
+ * ein Cent dazu. Math.ceil auf einem Float käme bei glatten Beträgen einen
+ * Cent zu hoch heraus: 3 € × 7 % ist als Float 21,000000000000004 → 22.
  */
 export function berechneServicegebuehr(
   warenpreisCents: number,
@@ -83,7 +102,10 @@ export function berechneServicegebuehr(
   const mindest = Math.max(0, Math.round(alsZahl(einstellung.serviceFeeMinCents)))
   const waren = Math.max(0, Math.round(warenpreisCents))
 
-  const anteil = Math.floor((waren * prozentHundertstel + 5000) / 10000)
+  // Zehntausendstel-Cent als ganze Zahl — exakt, solange das Produkt unter
+  // 2^53 bleibt (bei 100 % wären das 90 Milliarden Euro Warenpreis).
+  const zehntausendstel = waren * prozentHundertstel
+  const anteil = Math.floor(zehntausendstel / 10000) + (zehntausendstel % 10000 > 0 ? 1 : 0)
   const gebuehr = Math.max(anteil, mindest)
 
   return { gebuehrCents: gebuehr, prozentAngewendet: prozentHundertstel / 100 }
@@ -306,7 +328,7 @@ export function monatsgrenzenWien(jetzt: Date): { von: Date; bis: Date; bezeichn
 
 /**
  * Kurzfassung der Hofeinstellung für die Admin-Liste, z. B.
- * „4,9 % · mind. 0,50 € · gilt ab 01.10.2026" oder „gebührenfrei".
+ * „5,0 % · mind. 0,50 € · gilt ab 01.10.2026" oder „gebührenfrei".
  */
 export function einstellungKurz(einstellung: ServicegebuehrEinstellung): string {
   const giltAb = alsZeitpunkt(einstellung.serviceFeeActiveFrom)

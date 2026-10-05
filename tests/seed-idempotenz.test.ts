@@ -259,7 +259,7 @@ describe('seed — zweiter Lauf', () => {
 
   it('rechnet die Gebühr aus der Einstellung DES HOFES, nicht aus einer Konstante', async () => {
     // TD-0001: sechs Liter Heumilch à 1,40 € = 8,40 € Warenpreis.
-    //   Vorgabe 4,9 % / mind. 50 → 41 Cent, angehoben auf 50.
+    //   Vorgabe 5 % / mind. 50 → 42 Cent, angehoben auf 50.
     //   Dieser Hof: 3,0 % / mind. 30 → 25 Cent, angehoben auf 30.
     // Steht 50 in der Bestellung, rechnet der Seed an der Hofeinstellung vorbei.
     const s = macheSpeicher()
@@ -294,7 +294,7 @@ describe('seed — zweiter Lauf', () => {
     expect(laender.filter((l) => l === 'AT').length).toBeGreaterThanOrEqual(35)
   })
 
-  it('nimmt bei einem neuen Hof die Vorgabe 4,9 % / mind. 50 Cent', async () => {
+  it('nimmt bei einem neuen Hof die Vorgabe 5 % / mind. 50 Cent (E4)', async () => {
     const s = macheSpeicher()
     await seed(s.prisma, s.auth, JETZT)
 
@@ -302,10 +302,10 @@ describe('seed — zweiter Lauf', () => {
       (c) => c.tabelle === 'order' && c.daten['orderNumber'] === 'TD-0001'
     )
     expect(erste!.daten['serviceFeeCents']).toBe(50)
-    expect(erste!.daten['serviceFeePercentApplied']).toBe('4.90')
+    expect(erste!.daten['serviceFeePercentApplied']).toBe('5.00')
 
     const hof = s.creates.find((c) => c.tabelle === 'farm')
-    expect(hof!.daten['serviceFeePercent']).toBe('4.90')
+    expect(hof!.daten['serviceFeePercent']).toBe('5.00')
     expect(hof!.daten['serviceFeeMinCents']).toBe(50)
   })
 
