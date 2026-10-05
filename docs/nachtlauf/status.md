@@ -15,8 +15,8 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 08 | Anmelden | fertig | `nacht/2026-10-05/08-anmelden` | #172 | 07 (#171) | 2 Sicherheitsbefunde behoben; Fehler-Token (Kontrast 4,22:1) entscheiden; Konto beim Code-Login, für Nr. 14 eigener Weg | 05.10.2026 |
 | 09 | Entdecken | fertig | `nacht/2026-10-05/09-entdecken` | #173 | 08 (#172) | PLZ in URL weggelassen (Regel #130); 9 Mockup-Abweichungen; Startseite-Overlay noch `from-black` | 05.10.2026 |
 | 10 | Hofseite | fertig | `nacht/2026-10-05/10-hofseite` | #174 | 09 (#173) | Geld-Blocker und JSON-LD-XSS behoben; Reiter „Beiträge“ bestätigen; Mockup-Abweichungen | 05.10.2026 |
-| 11 | Produktdetail | läuft | `nacht/2026-10-05/11-produktdetail` | | 10 (#174) | | 05.10.2026 |
-| 12 | Checkout | offen | | | | | |
+| 11 | Produktdetail | fertig | `nacht/2026-10-05/11-produktdetail` | #175 | 10 (#174) | Grundpreis eine Rundungsstelle; Produktkarten verlinken die Produktseite (Blatt gelöscht); Gate-6-Teile weggelassen | 05.10.2026 |
+| 12 | Checkout | läuft | `nacht/2026-10-05/12-checkout` | | 11 (#175) | | 05.10.2026 |
 | 13 | Bestätigungen und E-Mails | offen | | | | | |
 | 14 | Konto und Meine Höfe | offen | | | | | |
 | 15 | Für Höfe, Registrieren, Einrichten | offen | | | | | |
