@@ -5,6 +5,8 @@ import { withSentryConfig } from "@sentry/nextjs";
 // die Vorschau unten wirklich nur eine HOFSEITE (/<slug>) trifft und nie
 // /login?vorschau=1 oder /dashboard?vorschau=1. tests/sicherheits-header.test.ts
 // gleicht die Liste mit den Ordnern ab; ein neuer Ordner fällt dort auf.
+// Dieselbe Menge steht als RESERVED_SLUGS in src/lib/slug.ts, damit kein Hof
+// einen dieser Slugs bekommt (tests/reservierte-slugs.test.ts).
 const KEINE_HOFSEITE = [
   'account', 'admin', 'analytics', 'api', 'customers', 'dashboard', 'datenschutz',
   'farm-page', 'fehler-melden', 'forgot-password', 'hoefe', 'impressum', 'intern', 'konditionen',

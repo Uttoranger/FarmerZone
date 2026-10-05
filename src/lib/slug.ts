@@ -1,12 +1,14 @@
+// Jeder feste Routenordner auf oberster Ebene unter src/app (auch in den
+// Routengruppen). Ein Hof mit einem dieser Slugs wäre nie erreichbar: Die
+// feste Route gewinnt dauerhaft gegen /[farmSlug]. Dieselbe Menge steht als
+// KEINE_HOFSEITE in next.config.ts — tests/reservierte-slugs.test.ts gleicht
+// beide mit den echten Ordnern ab; ein neuer Ordner fällt dort auf.
+// Bestehende Höfe bleiben unberührt: Die Liste wirkt nur beim Anlegen.
 export const RESERVED_SLUGS = new Set([
-  'login', 'register', 'onboarding', 'account', 'api',
-  'impressum', 'datenschutz', 'settings', 'orders', 'customers',
-  'status', 'products', 'sales', 'analytics', 'dashboard', 'admin',
-  // Öffentliche Hofübersicht: Ein Hof namens „Höfe" bekäme sonst den Slug
-  // hoefe — und die statische Route gewänne dauerhaft gegen seine Hofseite.
-  'hoefe',
-  // Werkzeugseiten des Betreibers (/intern/bausteine) — aus demselben Grund.
-  'intern',
+  'account', 'admin', 'analytics', 'api', 'customers', 'dashboard', 'datenschutz',
+  'farm-page', 'fehler-melden', 'forgot-password', 'hoefe', 'impressum', 'intern', 'konditionen',
+  'login', 'meldungen', 'onboarding', 'orders', 'problem-melden', 'products', 'register',
+  'reset-password', 'sales', 'settings', 'status', 'teilen', 'verify',
 ])
 
 export function generateSlug(name: string): string {
