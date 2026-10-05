@@ -22,6 +22,7 @@ import {
   SIEGEL,
   TIERART_LABEL,
   CATEGORY_OPTIONS,
+  VORBEREITETE_UNTERKATEGORIEN,
   gehoertZu,
   hatUnterkategorien,
   kategorieVon,
@@ -93,11 +94,13 @@ describe('TAXONOMIE — jede L2 gehört zu genau einer L1', () => {
   it('keine Unterkategorie kommt doppelt vor', () => {
     const alle = Object.values(TAXONOMIE).flat()
     expect(new Set(alle).size).toBe(alle.length)
-    expect(alle.length).toBe(PRODUCT_SUBCATEGORY_VALUES.length)
+    // Zugeordnete und vorbereitete zusammen ergeben genau das Prisma-Enum.
+    expect(alle.length + VORBEREITETE_UNTERKATEGORIEN.length).toBe(PRODUCT_SUBCATEGORY_VALUES.length)
   })
 
-  it('jede Unterkategorie gehört zu genau einer Kategorie', () => {
-    for (const l2 of PRODUCT_SUBCATEGORY_VALUES) {
+  it('jede zugeordnete Unterkategorie gehört zu genau einer Kategorie', () => {
+    const vorbereitet: readonly string[] = VORBEREITETE_UNTERKATEGORIEN
+    for (const l2 of PRODUCT_SUBCATEGORY_VALUES.filter((w) => !vorbereitet.includes(w))) {
       const zugehoerig = PRODUCT_CATEGORY_VALUES.filter((l1) => gehoertZu(l1, l2))
       expect(zugehoerig, l2).toHaveLength(1)
       expect(kategorieVon(l2)).toBe(zugehoerig[0])
@@ -115,6 +118,16 @@ describe('TAXONOMIE — jede L2 gehört zu genau einer L1', () => {
     for (const l1 of ['MILCH', 'EIER', 'FLEISCH', 'GEMUESE', 'OBST', 'HONIG', 'FUTTERMITTEL', 'HEU_STROH', 'GETREIDE_KOERNER'] as const) {
       expect(hatUnterkategorien(l1)).toBe(true)
       expect(unterkategorienVon(l1).length).toBeGreaterThan(0)
+    }
+  })
+
+  it('vorbereitete Brennmaterial-Arten gehören noch zu keiner Kategorie und stehen nicht in TAXONOMIE (Expand vor Gate 6)', () => {
+    expect([...VORBEREITETE_UNTERKATEGORIEN]).toEqual(['BRENNHOLZ_SCHEIT', 'ANZUENDHOLZ', 'HACKSCHNITZEL'])
+    const zugeordnet: readonly string[] = Object.values(TAXONOMIE).flat()
+    for (const l2 of VORBEREITETE_UNTERKATEGORIEN) {
+      expect(zugeordnet, l2).not.toContain(l2)
+      expect(PRODUCT_CATEGORY_VALUES.filter((l1) => gehoertZu(l1, l2)), l2).toEqual([])
+      expect(() => kategorieVon(l2)).toThrow()
     }
   })
 

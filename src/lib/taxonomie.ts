@@ -8,7 +8,9 @@
  * keine Prisma-Typen, sondern eigene Literale.
  *
  * DIE REGELN:
- *   Jede Unterkategorie (L2) gehört zu GENAU EINER Kategorie (L1). Fisch,
+ *   Jede Unterkategorie (L2) gehört zu GENAU EINER Kategorie (L1) — einzige
+ *   Ausnahme sind die VORBEREITETEN_UNTERKATEGORIEN (Expand vor Gate 6), die
+ *   noch zu keiner gehören und deshalb nirgends wählbar sind. Fisch,
  *   Brot, Getränke, Brennholz, Sonstiges, Mischfutter und Ergänzungsfutter
  *   haben bewusst keine L2.
  *   Der BEREICH (Lebensmittel, Futtermittel, Sonstiges) ist eine Funktion der
@@ -105,11 +107,29 @@ export const TAXONOMIE = {
   SONSTIGES: [],
 } as const satisfies Record<ProductCategoryValue, readonly string[]>
 
-export type ProductSubcategoryValue = (typeof TAXONOMIE)[ProductCategoryValue][number]
+/**
+ * Unterkategorien, die schon im Prisma-Enum stehen, aber noch zu KEINER
+ * Kategorie gehören (Schema-Expand Redesign, Gate 3, E11 Brennmaterial).
+ * Enum-Werte müssen vor dem Code in die Datenbank (Expand); wählbar werden sie
+ * erst mit dem Brennmaterial-Formular (Gate 6), das sie nach TAXONOMIE.BRENNHOLZ
+ * verschiebt und diese Liste leert.
+ *
+ * Bis dahin gilt: gehoertZu sagt für jede Kategorie false — Zod lehnt sie
+ * deshalb ab („passt nicht zu …"), kein Formular, kein Filter und keine
+ * Hofseite bietet sie an, und hatUnterkategorien('BRENNHOLZ') bleibt false.
+ * Bewusst NICHT schon in TAXONOMIE.BRENNHOLZ: Das hätte jedem Brennholz-Produkt
+ * den Hinweis „Unterkategorie ergänzen" eingebracht und die Auswahl geöffnet —
+ * eine Verhaltensänderung vor dem Formular, das die Angaben dazu erfasst.
+ */
+export const VORBEREITETE_UNTERKATEGORIEN = ['BRENNHOLZ_SCHEIT', 'ANZUENDHOLZ', 'HACKSCHNITZEL'] as const
+
+export type ProductSubcategoryValue =
+  | (typeof TAXONOMIE)[ProductCategoryValue][number]
+  | (typeof VORBEREITETE_UNTERKATEGORIEN)[number]
 
 /** Alle L2 in Enum-Reihenfolge (Fleisch, Eier, Milch, Gemüse, Obst, Honig,
- *  Futtermittel-Altlast, Heu & Stroh, Getreide & Körner — so steht es im
- *  Prisma-Enum, nicht in L1-Reihenfolge). */
+ *  Futtermittel-Altlast, Heu & Stroh, Getreide & Körner, die vorbereiteten
+ *  Brennmaterial-Arten — so steht es im Prisma-Enum, nicht in L1-Reihenfolge). */
 export const PRODUCT_SUBCATEGORY_VALUES = [
   ...TAXONOMIE.FLEISCH,
   ...TAXONOMIE.EIER,
@@ -120,6 +140,7 @@ export const PRODUCT_SUBCATEGORY_VALUES = [
   ...TAXONOMIE.FUTTERMITTEL,
   ...TAXONOMIE.HEU_STROH,
   ...TAXONOMIE.GETREIDE_KOERNER,
+  ...VORBEREITETE_UNTERKATEGORIEN,
 ] as const satisfies readonly ProductSubcategoryValue[]
 
 // Deutsch, mit Umlauten. Die L1 steht in der Anzeige daneben — deshalb
@@ -179,6 +200,10 @@ export const UNTERKATEGORIE_LABEL: Record<ProductSubcategoryValue, string> = {
   WEIZEN: 'Weizen',
   ROGGEN: 'Roggen',
   TRITICALE: 'Triticale',
+  // Brennmaterial — vorbereitet, noch nicht wählbar (VORBEREITETE_UNTERKATEGORIEN)
+  BRENNHOLZ_SCHEIT: 'Brennholz (Scheite)',
+  ANZUENDHOLZ: 'Anzündholz',
+  HACKSCHNITZEL: 'Hackschnitzel',
 }
 
 /** L2 aus Taxonomie 1, die seit Bereiche 1 nicht mehr gewählt werden dürfen. */
@@ -207,11 +232,13 @@ export function gehoertZu(
   return (TAXONOMIE[l1] as readonly ProductSubcategoryValue[]).includes(l2)
 }
 
-/** Die L1, zu der eine L2 gehört — es gibt genau eine. */
+/** Die L1, zu der eine L2 gehört — es gibt genau eine (außer bei den
+ *  VORBEREITETEN_UNTERKATEGORIEN, die noch keine haben: dort wirft sie). */
 export function kategorieVon(l2: ProductSubcategoryValue): ProductCategoryValue {
   const treffer = PRODUCT_CATEGORY_VALUES.find((l1) => gehoertZu(l1, l2))
-  // Jede L2 steht in TAXONOMIE — das sichert der Typ. Ohne Treffer wäre die
-  // Tabelle kaputt, nicht die Eingabe; deshalb ein Fehler statt eines Rückfalls.
+  // Jede wählbare L2 steht in TAXONOMIE. Ohne Treffer ist es eine vorbereitete
+  // L2, die nichts schreiben kann (Zod lehnt sie ab), oder die Tabelle ist
+  // kaputt — nicht die Eingabe; deshalb ein Fehler statt eines Rückfalls.
   if (!treffer) throw new Error(`Unterkategorie ohne Kategorie: ${l2}`)
   return treffer
 }
