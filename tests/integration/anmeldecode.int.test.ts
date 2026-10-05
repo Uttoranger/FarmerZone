@@ -24,12 +24,20 @@
  *  - Nur der Typ „sign-in" darf angefordert werden.
  *  - HTTP: Magic Links lassen sich nicht mehr anfordern, alte Links prüft
  *    der Endpunkt noch (Übergang); die ungenutzten Code-Pfade sind zu.
+ *  - Die Rollenprüfung beim Anmelden fragt mit genau der Adresse, die das
+ *    Plugin benutzt (JS-toLowerCase) — auch beim Kelvin-Zeichen U+212A, das
+ *    JS zu „k" macht, eine reine C-Collation aber nicht (Nachbesserung 2).
+ *  - Scheitert die Code-Mail im Nachlauf (Resend-Fehler, Datenbankfehler),
+ *    erfährt Sentry es — ohne Adresse und ohne Code, und ohne dass der
+ *    Nachlauf eine unbehandelte Ablehnung hinterlässt (Nachbesserung 2).
  *
  * Gegenprobe zur Zählung: Vor dem fünften Fehlversuch nimmt der richtige
  * Code noch an (eigener Test).
  */
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
+import { sendAnmeldeCodeEmail } from '@/lib/email'
 import { intKennung, raeumeAuf } from './setup/basis'
 
 const versand = vi.hoisted(() => ({ codes: [] as Array<{ email: string; code: string }> }))
@@ -46,6 +54,8 @@ vi.mock('@/lib/nach-der-antwort', () => ({
 async function arbeiteNachlaufAb(): Promise<void> {
   while (nachlauf.aufgaben.length > 0) await nachlauf.aufgaben.shift()!()
 }
+
+vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
 
 vi.mock('@/lib/email', () => ({
   sendAnmeldeCodeEmail: vi.fn(async (email: string, code: string) => {
@@ -70,6 +80,9 @@ beforeAll(async () => {
 })
 
 afterEach(async () => {
+  vi.restoreAllMocks()
+  vi.mocked(Sentry.captureException).mockClear()
+  vi.mocked(Sentry.captureMessage).mockClear()
   versand.codes.length = 0
   nachlauf.aufgaben.length = 0
   await prisma.verification.deleteMany({ where: { identifier: { contains: 'otp-int-' } } })
@@ -254,6 +267,29 @@ describe('Höfe und Admins bekommen keinen Code und werden nicht per Code angeme
     expect(await prisma.session.count({ where: { userId: id } })).toBe(0)
   })
 
+  it('Kelvin-Zeichen (U+212A): Anmelden prüft die Adresse so, wie das Plugin sie liest', async () => {
+    // Gespeichert mit „k", getippt mit dem Kelvin-Zeichen: JS macht daraus
+    // „k" — das Plugin fände also den Hof. Eine Datenbank mit reiner
+    // C-Collation faltet U+212A nicht; fragte der Hook mit der getippten
+    // Form, hielte er den Hof für unbekannt und das Plugin meldete ihn an.
+    const kennung = intKennung('hof-kelvin')
+    const gespeichert = `${kennung}@example.com`
+    const getippt = gespeichert.replace('k', '\u212A')
+    expect(getippt.toLowerCase()).toBe(gespeichert)
+    const { id } = await legeNutzerAn('FARMER', { email: gespeichert, emailVerified: false, passwort: true })
+    const code = await instanzA.api.createVerificationOTP({ body: { email: getippt, type: 'sign-in' } })
+
+    const suche = vi.spyOn(prisma.user, 'findFirst')
+    expect(await versuche(instanzA, getippt, code)).toEqual({ ok: false, code: 'INVALID_OTP' })
+    // Unabhängig von der Collation dieser Test-Datenbank: Der Hook fragt mit
+    // der klein geschriebenen Form, nicht mit der getippten.
+    const gefragt = suche.mock.calls.map(([argumente]) => JSON.stringify(argumente?.where))
+    expect(gefragt.some((w) => w.includes(gespeichert))).toBe(true)
+    expect(gefragt.some((w) => w.includes('\u212A'))).toBe(false)
+    expect(await prisma.session.count({ where: { userId: id } })).toBe(0)
+    expect(await prisma.account.count({ where: { userId: id, providerId: 'credential' } })).toBe(1)
+  })
+
   it('ein Code aus der Zeit vor der Nachbesserung verschwindet, sobald der Hof erneut anfordert', async () => {
     const { email } = await legeNutzerAn('FARMER')
     await instanzA.api.createVerificationOTP({ body: { email, type: 'sign-in' } })
@@ -269,6 +305,48 @@ describe('Höfe und Admins bekommen keinen Code und werden nicht per Code angeme
       instanzA.api.sendVerificationOTP({ body: { email, type: 'forget-password' } })
     ).rejects.toMatchObject({ status: 'BAD_REQUEST' })
     expect(versand.codes).toHaveLength(0)
+  })
+})
+
+describe('Scheitert die Code-Mail, erfährt es Sentry — ohne Adresse und Code', () => {
+  function sentryAufrufe(): string {
+    return JSON.stringify([
+      vi.mocked(Sentry.captureException).mock.calls,
+      vi.mocked(Sentry.captureMessage).mock.calls,
+    ])
+  }
+
+  it('Resend meldet einen Fehler (sendRaw wirft nicht, gibt { error } zurück)', async () => {
+    const email = neueAdresse()
+    vi.mocked(sendAnmeldeCodeEmail).mockImplementationOnce(async (an: string, code: string) => {
+      versand.codes.push({ email: an, code })
+      return { error: `{"message":"Invalid to: ${an}","code":${code}}` }
+    })
+    await instanzA.api.sendVerificationOTP({ body: { email, type: 'sign-in' } })
+    await arbeiteNachlaufAb()
+
+    const code = versand.codes.findLast((c) => c.email === email)!.code
+    expect(vi.mocked(Sentry.captureMessage).mock.calls.length + vi.mocked(Sentry.captureException).mock.calls.length).toBe(1)
+    expect(sentryAufrufe()).not.toContain(email)
+    expect(sentryAufrufe()).not.toContain(code)
+  })
+
+  it('die Datenbank fällt im Nachlauf aus — gemeldet, keine unbehandelte Ablehnung', async () => {
+    const email = neueAdresse()
+    await instanzA.api.sendVerificationOTP({ body: { email, type: 'sign-in' } })
+    vi.spyOn(prisma.user, 'findFirst').mockRejectedValueOnce(new Error(`Verbindung weg bei ${email}`))
+
+    await expect(arbeiteNachlaufAb()).resolves.toBeUndefined()
+
+    expect(versand.codes).toHaveLength(0)
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1)
+    expect(sentryAufrufe()).not.toContain(email)
+  })
+
+  it('Gegenprobe: geht die Mail raus, bleibt Sentry still', async () => {
+    await fordereCodeAn(instanzA, neueAdresse())
+    expect(Sentry.captureException).not.toHaveBeenCalled()
+    expect(Sentry.captureMessage).not.toHaveBeenCalled()
   })
 })
 

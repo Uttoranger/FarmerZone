@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs'
 import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import { emailOTP, magicLink } from 'better-auth/plugins'
@@ -31,6 +32,36 @@ async function rolleZurAdresse(email: string): Promise<string | null> {
     select: { role: true },
   })
   return nutzer ? nutzer.role : null
+}
+
+/**
+ * Die Adresse so, wie das emailOTP-Plugin sie liest: in JS klein geschrieben,
+ * nicht getrimmt. Beide Hooks prüfen GENAU diese Form — das Kleinschreiben
+ * darf nicht der Datenbank überlassen bleiben: JS macht aus dem Kelvin-
+ * Zeichen (U+212A) ein „k", eine reine C-Collation nicht. Fragte der Hook
+ * mit der getippten Form, hielte er einen Hof für unbekannt, den das Plugin
+ * anschließend findet und anmeldet.
+ */
+function adresseWieDasPlugin(email: string): string {
+  return email.toLowerCase()
+}
+
+/**
+ * Meldet einen gescheiterten Code-Versand an Sentry — nur WAS schiefging,
+ * nie Adresse oder Code. Der Text ist fest, vom Fehler geht nur seine Art
+ * mit: Ein Datenbank- oder Resend-Fehlertext kann die Adresse tragen, und
+ * der Adressfilter in src/lib/sentry-hygiene.ts (beforeSend) erkennt nicht
+ * jede Schreibweise. Ohne Meldung bliebe eine Kundin still ohne Code.
+ */
+function meldeCodeVersandFehler(grund: 'resend_fehler' | 'nachlauf_fehler', err?: unknown): void {
+  const kontext = { tags: { aufgabe: 'anmeldecode', grund } }
+  if (err === undefined) {
+    Sentry.captureMessage('Anmeldecode-Mail nicht verschickt', { level: 'error', ...kontext })
+    return
+  }
+  const meldung = new Error('Anmeldecode-Mail nicht verschickt')
+  meldung.name = err instanceof Error ? err.name : 'Unbekannt'
+  Sentry.captureException(meldung, kontext)
 }
 
 /**
@@ -107,7 +138,7 @@ export const auth = betterAuth({
         if (typeof body?.email !== 'string') return
         // Antwort wie bei falschem Code; der Code (falls einer liegt) bleibt
         // unberührt und läuft nach 10 Minuten ab.
-        if (!codeVersandErlaubt(await rolleZurAdresse(body.email.trim()))) throw falscherCodeFehler()
+        if (!codeVersandErlaubt(await rolleZurAdresse(adresseWieDasPlugin(body.email)))) throw falscherCodeFehler()
         return
       }
 
@@ -131,7 +162,7 @@ export const auth = betterAuth({
       // wie das Plugin sie prüft (klein geschrieben, nicht getrimmt): Eine
       // Adresse, die das Plugin als ungültig ablehnte, soll auch hier nicht
       // anders antworten.
-      const email = body.email.toLowerCase()
+      const email = adresseWieDasPlugin(body.email)
       if (!codeVersandErlaubt(await rolleZurAdresse(email))) {
         // Ein Code aus der Zeit vor dieser Sperre verschwindet dabei — und
         // die Datenbank schreibt einmal, wie bei einer Kundin (Antwortzeit).
@@ -157,12 +188,18 @@ export const auth = betterAuth({
         // after(); `advanced.backgroundTasks` hätte dasselbe geleistet, gälte
         // aber für alle Hintergrundaufgaben von Better Auth.
         nachDerAntwort(async () => {
-          // Zweite Sicherung, falls der Hook je umgangen würde: kein Code an
-          // einen Hof. (Der Hook legt für Höfe gar keinen an.)
-          if (!codeVersandErlaubt(await rolleZurAdresse(email))) return
+          // Alles im try, auch die Rollenabfrage: Ein Fehler darf nicht als
+          // unbehandelte Ablehnung in after() enden, sondern muss gemeldet
+          // werden — sonst wartet eine Kundin auf einen Code, und niemand
+          // erfährt davon.
           try {
+            // Zweite Sicherung, falls der Hook je umgangen würde: kein Code
+            // an einen Hof. (Der Hook legt für Höfe gar keinen an.)
+            if (!codeVersandErlaubt(await rolleZurAdresse(email))) return
             const { sendAnmeldeCodeEmail } = await import('@/lib/email')
             const ergebnis = await sendAnmeldeCodeEmail(email, otp)
+            // sendRaw wirft nie, ein Resend-Fehler kommt als { error } zurück.
+            if (ergebnis.error) meldeCodeVersandFehler('resend_fehler')
             // Ohne Versand (lokal ohne RESEND_API_KEY) steht der Code im
             // Terminal, sonst käme niemand an ihn heran. Code und Adresse
             // dürfen NIE in die Produktions-Logs (Vercel) — auch nicht bei
@@ -173,6 +210,7 @@ export const auth = betterAuth({
           } catch (err) {
             // Nur die Art des Fehlers — sein Text könnte die Adresse tragen.
             console.error('[Anmeldecode] E-Mail-Fehler:', err instanceof Error ? err.name : 'unbekannt')
+            meldeCodeVersandFehler('nachlauf_fehler', err)
           }
         })
       },
