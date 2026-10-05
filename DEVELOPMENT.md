@@ -3545,7 +3545,7 @@ bleibt trotzdem gebührenfrei, bis der Betreiber im Admin „gilt ab" setzt
 
 **Warum die Hof-Ordnung zweimal in `bauern-navigation.ts` steht:** Die HofShell folgt dem Mockup (Handy: Produkte statt Mein Hof in der Leiste, „Region" in Verkauf und Kunden). Hätte ich die Bestandsexporte umgestellt, wäre die laufende Bauern-Navigation (`farmer-nav.tsx`) über Nacht umgesprungen — ein Big Bang durch die Hintertür. `hofNavigation` baut deshalb aus denselben Punkten, die Bestandsexporte bleiben, bis die letzte Hof-Route in der Shell ist; dann fällt der Bestandsteil weg.
 
-**E8 in der KundeShell:** Ohne Kundenkonto gibt es weder „Meine Höfe" noch „Merken"; die Handy-Leiste hat drei Plätze. Eine Seite mit den eigenen Bestellungen gibt es noch nicht — „Bestellungen" führt vorläufig zur bestehenden Kunden-Anmeldung (`/account/login`), bis Nr. 08 „Bestellungen finden" (E-Mail und Code) baut. „So funktioniert’s" zeigt auf `/#so-funktionierts`; die Sprungmarke setzt der Umbau der Startseite (Nr. 07).
+**E8 in der KundeShell:** Ohne Kundenkonto gibt es weder „Meine Höfe" noch „Merken"; die Handy-Leiste hat drei Plätze. Eine Seite mit den eigenen Bestellungen gibt es noch nicht — „Bestellungen" führt am Handy vorläufig abgemeldet zur bestehenden Kunden-Anmeldung (`/account/login`), angemeldet zu „Mein Konto", bis Nr. 08 „Bestellungen finden" (E-Mail und Code) baut. Im Web-Kopf der Angemeldeten stand anfangs „Meine Bestellungen" mit Ziel Anmeldeseite; die prüft keine Sitzung und hätte einer Angemeldeten nur das Formular noch einmal gezeigt — der Punkt fiel in der Nachbesserung weg. „So funktioniert’s" zeigt auf `/#so-funktionierts`; die Sprungmarke setzt der Umbau der Startseite (Nr. 07).
 
 **Neu-Menü:** „Was legst du an?" mit Produkt, Neuer Beitrag, Verkauf eintragen (E13). Die Dreiteilung Lebensmittel · Futtermittel · Brennmaterial aus dem Mockup kommt mit Nr. 18, wenn die Wahl das Formular bestimmt — vorher führten drei Einträge auf denselben Dialog.
 
@@ -3553,7 +3553,9 @@ bleibt trotzdem gebührenfrei, bis der Betreiber im Admin „gilt ab" setzt
 
 **Base-UI-Fallen, die in der Abnahme auffielen:** ToggleGroup setzt `aria-orientation` an `role="group"` (Axe `aria-allowed-attr`) — das Segment rendert als `role="toolbar"`. Progress formatiert den Wert als Prozent, auch wenn `max` nicht 100 ist („3 von 8" stand als „3 %") — die ProgressBar rechnet den Anteil selbst.
 
-**Cookie-Hinweis:** steht jetzt in einer eigenen Landmarke (`section`, „Hinweis zu Cookies"), der Link „Mehr erfahren" nimmt `text-brand-text` statt `text-primary` und ist immer unterstrichen — im neuen Design wäre Orange als Schrift zu schwach gewesen, im Bestand ist der Ton am Tag gleich.
+**Cookie-Hinweis:** steht jetzt in einer eigenen Landmarke (`section`, „Hinweis zu Cookies"), der Link „Mehr erfahren" nimmt `text-brand-text` statt `text-primary` und ist immer unterstrichen — im neuen Design wäre Orange als Schrift zu schwach gewesen. Das ist eine kleine Änderung am Bestand (Root-Layout, jede Seite): am Tag gleicher Ton, aber immer unterstrichen; nachts heller (`--brand-text` statt `--primary`). Im Bericht Nr. 05 zur Freigabe gestellt.
+
+**Abmelden in der HofShell:** `fuehreAbmeldenAus` (`src/lib/abmelden.ts`) wertet beide Fehlerwege von Better Auth (Antwort `{ error }`, Wurf ohne Netz) als „noch angemeldet" und zeigt einen Satz statt weiterzuleiten. Die Vorschau unter `/intern` gibt einen Ersatz mit — sonst hätte ein Klick den Admin vor der Vorschau abgemeldet.
 
 ## Nützliche Befehle
 

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { toast } from 'sonner'
 import { CalendarCheck, Package, Share2 } from 'lucide-react'
 import { HofShell } from '@/components/shells/hof-shell'
 import { KundeFokusShell, KundeShell } from '@/components/shells/kunde-shell'
@@ -11,6 +12,7 @@ import { ProgressBar } from '@/components/ui/progress-bar'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
+import { ABMELDEN_IN_VORSCHAU } from '@/lib/abmelden'
 import type { ShellVariante } from './varianten'
 
 /*
@@ -98,7 +100,15 @@ export function ShellVorschau({ variante }: { variante: ShellVariante }): React.
       )
     case 'hof':
       return (
-        <HofShell hofName="Hof Beispiel" hofSlug="hof-beispiel" personName="Max Mustermann" isAdmin zahlen={{ bestellungen: 3, admin: 5 }}>
+        // Vor der Vorschau sitzt ein echter Admin — „Abmelden" darf ihn hier nicht abmelden.
+        <HofShell
+          hofName="Hof Beispiel"
+          hofSlug="hof-beispiel"
+          personName="Max Mustermann"
+          isAdmin
+          zahlen={{ bestellungen: 3, admin: 5 }}
+          onAbmelden={() => toast(ABMELDEN_IN_VORSCHAU)}
+        >
           <Beispielinhalt titel="Heute" welt="hof" />
         </HofShell>
       )

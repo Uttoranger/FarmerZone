@@ -186,7 +186,7 @@ Client-Komponente → Server Action → Zod → Fachregel (lib) → Prisma → r
 - Zahlen (offene Bestellungen, Meldungen, wartende Höfe) und `isAdmin` lädt das Layout serverseitig und gibt sie als Props hinein; die Shell lädt nichts.
 
 ### `/intern` — Werkzeugseiten des Betreibers
-- `/intern/bausteine` (Vorschau aller Bausteine) und `/intern/bausteine/shell/<variante>` (jede Shell in voller Fenstergröße mit erfundenem Inhalt). Jede Seite ruft `verlangeAdminSeite()`; `robots: noindex, nofollow`. `intern` steht in `RESERVED_SLUGS` (`src/lib/slug.ts`) und in `KEINE_HOFSEITE` (`next.config.ts`).
+- `/intern/bausteine` (Vorschau aller Bausteine) und `/intern/bausteine/shell/<variante>` (jede Shell in voller Fenstergröße mit erfundenem Inhalt). Jede Seite ruft als erste Anweisung `await verlangeAdminSeite()`; das Layout `src/app/intern/layout.tsx` setzt `robots: noindex, nofollow`, und keine Seite darf das mit einem eigenen `robots` aufheben (Next.js ersetzt den Schlüssel flach). `tests/intern-wache.test.ts` prüft beides für jede `page.tsx` darunter. Was in der Vorschau echte Wirkung hätte (Abmelden), bekommt dort einen Ersatz-Handler (`onAbmelden` der HofShell). `intern` steht in `RESERVED_SLUGS` (`src/lib/slug.ts`) und in `KEINE_HOFSEITE` (`next.config.ts`).
 - Beide Themes werden über den Theme-Schalter abgenommen, nicht nebeneinander: Die Tokens hängen am `<html>`, ein verschachteltes `data-theme` erreicht die shadcn-Zuordnung nicht.
 
 ## 5. Domänen-Invarianten

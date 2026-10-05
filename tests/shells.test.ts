@@ -159,6 +159,20 @@ describe('KundeShell', () => {
     expect(kopf).not.toContain('>Anmelden<')
   })
 
+  it('angemeldet: kein „Meine Bestellungen" im Kopf, kein Weg zur Anmeldung; am Handy führt „Bestellungen" zu Mein Konto', () => {
+    const html = kunde(true)
+    const kopf = abschnitt(html, '<header', '</header>')
+    expect(kopf).not.toContain('Meine Bestellungen')
+    expect(html).not.toContain('href="/account/login"')
+    const leiste = abschnitt(html, 'data-slot="bottom-nav"', '</nav>')
+    expect(leiste).toMatch(/<a [^>]*href="\/account\/profile"[^>]*>[\s\S]*?Bestellungen/)
+  })
+
+  it('Gegenprobe: abgemeldet führt „Bestellungen" am Handy zur Anmeldung', () => {
+    const leiste = abschnitt(kunde(false), 'data-slot="bottom-nav"', '</nav>')
+    expect(leiste).toMatch(/<a [^>]*href="\/account\/login"[^>]*>[\s\S]*?Bestellungen/)
+  })
+
   it('E8: weder „Meine Höfe" noch „Merken" — in keinem Zustand', () => {
     for (const html of [kunde(false), kunde(true)]) {
       expect(html).not.toContain('Meine Höfe')

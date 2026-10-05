@@ -25,7 +25,9 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { signOut } from '@/lib/auth-client'
+import { fuehreAbmeldenAus } from '@/lib/abmelden'
 import { hofInitialen } from '@/lib/hof-initialen'
 import { vorschauLink } from '@/lib/hofseite-vorschau'
 import {
@@ -93,6 +95,11 @@ export type HofShellProps = {
   isAdmin: boolean
   /** Offene Bestellungen und Meldungen, die auf den Betreiber warten. */
   zahlen?: { bestellungen?: number; admin?: number }
+  /**
+   * Nur für die Vorschau unter /intern: ersetzt das echte Abmelden, damit der
+   * Admin vor der Vorschau angemeldet bleibt. Echte Routen lassen es weg.
+   */
+  onAbmelden?: () => void
   children: ReactNode
 }
 
@@ -206,7 +213,7 @@ function NeuInhalt({ punkt }: { punkt: NeuPunkt }) {
   )
 }
 
-export function HofShell({ hofName, hofSlug, personName, isAdmin, zahlen, children }: HofShellProps): React.JSX.Element {
+export function HofShell({ hofName, hofSlug, personName, isAdmin, zahlen, onAbmelden, children }: HofShellProps): React.JSX.Element {
   const pathname = usePathname()
   const router = useRouter()
   const nav = hofNavigation({ isAdmin })
@@ -235,9 +242,15 @@ export function HofShell({ hofName, hofSlug, personName, isAdmin, zahlen, childr
   }, [])
 
   async function abmelden() {
-    await signOut()
-    router.push('/login')
-    router.refresh()
+    await fuehreAbmeldenAus({
+      ersatz: onAbmelden,
+      abmelden: () => signOut(),
+      beiFehler: (satz) => toast.error(satz),
+      danach: () => {
+        router.push('/login')
+        router.refresh()
+      },
+    })
   }
 
   const abmeldenKnopf = (klassen: string) => (
