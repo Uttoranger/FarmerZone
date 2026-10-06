@@ -66,6 +66,8 @@ describe('setzeVorrat — bedingt auf den erwarteten alten Vorrat', () => {
     expect(JSON.stringify(aufruf.data)).not.toMatch(/increment|decrement/)
     expect(revalidatePath).toHaveBeenCalledWith('/products')
     expect(revalidatePath).toHaveBeenCalledWith('/testhof')
+    // Heute nennt in der Teilen-Karte Produkte mit Bestand.
+    expect(revalidatePath).toHaveBeenCalledWith('/dashboard')
   })
 
   it('0 → mehr als 0 meldet „wieder da"', async () => {

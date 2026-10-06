@@ -34,6 +34,9 @@ function revalidate(farmSlug: string) {
   revalidatePath('/products')
   revalidatePath(`/${farmSlug}`)
   revalidatePath('/farm-page')
+  // Heute nennt in der Teilen-Karte Produkte mit Bestand (getHeute) — nach
+  // Vorrat oder Sichtbarkeit sonst ein veralteter Satz.
+  revalidatePath('/dashboard')
   // Die Hofübersicht hängt an einem eigenen Fünf-Minuten-Cache, den kein
   // revalidatePath erreicht (src/app/(public)/hoefe/page.tsx). Ohne diese Zeile
   // stand ein ausgeblendetes, umbenanntes oder ausverkauftes Produkt dort bis

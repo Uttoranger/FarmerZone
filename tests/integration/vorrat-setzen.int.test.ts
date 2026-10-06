@@ -40,6 +40,36 @@ async function angemeldeterHof() {
   return farm
 }
 
+/**
+ * Die Reihenfolge erzwingen: Eine Transaktion bucht 2 ab wie der Checkout
+ * (`updateMany` mit `stock >= 2`) und hält die Zeilensperre. Erst wenn das
+ * Schreiben von `zweites` nachweislich auf diese Sperre wartet (pg_locks,
+ * nicht gewährt), wird committet. `wartete` belegt, dass es vor dem Commit
+ * noch nicht fertig war.
+ */
+async function mitOffenerBuchung<T>(productId: string, zweites: () => Promise<T>): Promise<{ gesetzt: Promise<T>; wartete: boolean }> {
+  let gesetzt: Promise<T> | null = null
+  let fertig = false
+  await prisma.$transaction(
+    async (tx) => {
+      const { count } = await tx.product.updateMany({ where: { id: productId, stock: { gte: 2 } }, data: { stock: { decrement: 2 } } })
+      if (count !== 1) throw new Error('Buchung in der Transaktion fehlgeschlagen')
+      gesetzt = zweites().finally(() => {
+        fertig = true
+      })
+      for (let i = 0; i < 100; i++) {
+        const [{ wartend }] = await prisma.$queryRaw<{ wartend: bigint }[]>`select count(*) as wartend from pg_locks where not granted`
+        if (Number(wartend) > 0) break
+        await new Promise((r) => setTimeout(r, 50))
+      }
+    },
+    { timeout: 15_000 }
+  )
+  const wartete = !fertig
+  if (!gesetzt) throw new Error('zweiter Schritt nicht gestartet')
+  return { gesetzt, wartete }
+}
+
 const vorrat = async (id: string) => (await prisma.product.findUniqueOrThrow({ where: { id }, select: { stock: true } })).stock
 
 describe('setzeVorrat — bedingt in der echten Datenbank', () => {
@@ -89,6 +119,33 @@ describe('setzeVorrat — bedingt in der echten Datenbank', () => {
       expect(gesetzt).toMatchObject({ code: 'GEAENDERT', vorrat: 3 })
       expect(danach).toBe(3)
     }
+  })
+
+  it('Reihenfolge erzwungen: Buchung hält die Zeile, setzeVorrat wartet und setzt danach NICHT', async () => {
+    const farm = await angemeldeterHof()
+    const produkt = await erstelleProdukt(farm.id, { stock: 5 })
+
+    const { gesetzt, wartete } = await mitOffenerBuchung(produkt.id, () => setzeVorrat({ productId: produkt.id, vorher: 5, neu: 8 }))
+
+    expect(wartete).toBe(true)
+    expect(await gesetzt).toMatchObject({ code: 'GEAENDERT', vorrat: 3 })
+    expect(await vorrat(produkt.id)).toBe(3)
+  })
+
+  it('Gegenprobe: dieselbe Abfolge mit blindem Setzen (lesen, dann schreiben) verliert die Buchung', async () => {
+    const farm = await angemeldeterHof()
+    const produkt = await erstelleProdukt(farm.id, { stock: 5 })
+
+    // So arbeitete das alte updateStock: Stand lesen, neuen Wert ohne Bedingung schreiben.
+    const gelesen = await vorrat(produkt.id)
+    const { gesetzt, wartete } = await mitOffenerBuchung(produkt.id, () =>
+      prisma.product.update({ where: { id: produkt.id }, data: { stock: gelesen + 3 } })
+    )
+    await gesetzt
+
+    expect(wartete).toBe(true)
+    // 8 statt 6: Die 2 verkauften stehen wieder im Shop — genau das verhindert setzeVorrat.
+    expect(await vorrat(produkt.id)).toBe(8)
   })
 
   it('zwei gleichzeitige Änderungen mit demselben Stand: genau eine gewinnt', async () => {
