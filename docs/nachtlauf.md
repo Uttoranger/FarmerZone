@@ -52,15 +52,21 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 11 | Produktdetail | Gate 4, `/[farmSlug]/produkt/[id]` | E3 (für Größen), sonst ohne Größen |
 | 12 | Checkout | Gate 4, Checkout | E5, E8 |
 | 13 | Bestätigungen und E-Mails | Gate 4 | – |
-| 14 | Konto und Meine Höfe | Gate 4 | E8, Schema „Merkliste" |
+| 14 | Bestellungen finden und `/account` (statt „Konto und Meine Höfe", E8) | Gate 4 | E7, E8 |
 | 15 | Für Höfe, Registrieren, Einrichten | Gate 5 | E6 (nur Preis-Texte) |
 | 16 | Mein Hof mit Vorschau | Gate 5 | E12 |
 | 17 | Heute | Gate 5 | – |
+| 17a | E8 – Checkout ohne Kundenkonto | Register E8, `freigabe.md` §8 | E8 |
+| 17b | E-Mail-Bestätigung für neue Höfe | Register S3, `freigabe.md` §8 | S3 |
+| 17c | Slug-Prüfung absichern | Altlast aus Nr. 15, `freigabe.md` §8 | – |
+| 17d | Konditionen-Übergang | Register K1, `freigabe.md` §8 | K1 mit Datum, sonst überspringen |
 | 18 | Produkte und „Was legst du an?" | Gate 5 | E13 |
 | 19 | Bestellungen, Storno, Artikel fehlt | Gate 5 | E14 |
 | 20 | Futter und Brennmaterial | Gate 6 | E3, E9, E10, E11, Schema |
 | 21 | Teilen | Gate 7 | Schema „TeilenAufruf", Paket für QR |
 | 22 | Auswerten, Region, Einstellungen, Konditionen, Hilfe, Admin | Gate 8 | E6 für Konditionen-Inhalt |
+
+**17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8.
 
 **06b – Reservierte Slugs vollständig:** `RESERVED_SLUGS` in `src/lib/slug.ts` um alle Ordner aus `KEINE_HOFSEITE` (`next.config.ts`) ergänzen (u. a. `teilen`, `verify`, `konditionen`, `meldungen`, `fehler-melden`, `problem-melden`, `farm-page`, `forgot-password`, `reset-password`, `intern`), plus Test, der beide Listen gegeneinander prüft. Braucht keine Freigabe. In Produktion ist keiner dieser Slugs belegt (geprüft am 05.10.2026).
 
@@ -102,8 +108,9 @@ Beim Stopp: offenen Zwischenstand als WIP-Commit auf dem eigenen Branch sichern 
 
 Am Ende jedes Laufs schreibt der Dirigent `docs/nachtlauf/morgenbericht-<datum>.md` und committet ihn auf dem letzten Branch:
 
-- Tabelle aller bearbeiteten Nummern: Status, PR-Link, was weggelassen wurde und warum.
-- **Merge-Reihenfolge** für den Menschen.
+- Tabelle aller bearbeiteten Nummern: Status, PR-Link, **Vorschau-Link** (Vercel-Vorschau des PR), **„enthält Migration: ja/nein"**, was weggelassen wurde und warum.
+- **Merge-Reihenfolge** für den Menschen, mit dem Hinweis: **Gestapelte PRs per Merge-Commit mergen, nicht per Squash** (sonst entstehen Konflikte in den darauf gestapelten Branches).
+- Abschnitt **„Für dich zu tun"**: alles, was nur der Mensch erledigen kann (Entscheidungen, Prüfungen in Produktion, Stripe- oder Vercel-Einstellungen, Freigaben für den nächsten Lauf), als Liste zum Abhaken.
 - Gesammelte Fragen und fehlende Freigaben, damit der nächste Lauf weiterkommt.
 - Wo die Screenshots liegen.
 

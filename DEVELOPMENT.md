@@ -4128,6 +4128,24 @@ Entscheidungen und Gründe:
 - **Freischaltungs-Moment ohne Schema:** Zeitfenster 14 Tage nach `approvedAt` (Server) UND Gerätemerker im localStorage. Ohne lesbaren Speicher kein Moment, weil „höchstens einmal" sonst nicht hält. Grenze: Ein zweites Gerät zeigt ihn im Fenster noch einmal; „in den Einstellungen abschaltbar" (DESIGN_SYSTEM „Teilen") braucht eine Spalte und kommt mit Gate 7.
 - **Nicht gebaut:** Kennzahl „Neue Kunden" (es gibt keine Regel dafür), Besuchszahlen in der Teilen-Karte (Zählung erst mit Nr. 21), Wege „WhatsApp an Stammkunden" und „Plakat drucken" im Moment (Gate 7), Abhaken „gepackt" direkt auf Heute (Statusübergänge kommen mit Nr. 19). Mit dem Umzug entfielen der alte `OnlinePausiertHinweis` (mit Stripe-Aufruf), `onlinePausiertText`, `umsatzCent`, `ABHOL_CHIP_TEXT` und `begruessung` — nirgends mehr benutzt.
 
+## Entscheidungsregister und Vorbereitung Lauf 4 (2026-10-06)
+
+Nach dem Merge von #170–#181 lagen Entscheidungen verstreut in `freigabe.md`, Morgenberichten und PR-Texten. Teilweise widersprachen sie dem Umsetzungsprompt (E8 „automatisches Konto", E9 „Nummer prüfen", `Merkliste`). Deshalb gibt es jetzt **ein Register**: `docs/entscheidungen.md`. Bei Widerspruch gilt es.
+
+- **Inhalt des Registers:**
+  - E1–E14 und G1/G2 (Int-Cent, `prisma migrate diff`);
+  - die Freigaben nach dem Merge (F1–F5: Mockup-Abweichungen, Reiter „Beiträge", Produktseite, Heute, Servicegebühr 5 % der aktiven Höfe);
+  - K1 Konditionen-Übergang, Datum noch offen;
+  - S3 E-Mail-Bestätigung für neue Höfe;
+  - die offenen Punkte O1–O5.
+- **Nachgezogen:**
+  - CLAUDE.md: Migrationsweg und Produktion nur über `vercel-build`, `main` nachziehen, gestapelte PRs per Merge-Commit, Seed-Konten nie in Produktion, Verweis aufs Register.
+  - `docs/umsetzungsprompt.md`: Spalte „Entschieden", E8/E9 mit der tatsächlichen Entscheidung, Fortschritt, S5 neu.
+  - Kunden-Navigation in DESIGN_SYSTEM.md, K4-Mockups im README.
+  - Nachtlauf-Doku: Morgenbericht mit Vorschau-Link, Migrationsangabe und „Für dich zu tun"; Start-Text ohne `--create-only`.
+- **Lauf 4:** Haltepunkt 19, davor die Aufträge 17a–17d (`freigabe.md` §8). 17d läuft erst, wenn K1 ein Datum hat.
+- **Warum Merge-Commit statt Squash:** Ein Squash ersetzt die Commits eines Stapel-PRs durch einen neuen. Die darauf gestapelten Branches kennen diesen Commit nicht und bekommen beim nächsten Abgleich Konflikte (so bei #166–#170).
+
 ## Nützliche Befehle
 
 ```bash

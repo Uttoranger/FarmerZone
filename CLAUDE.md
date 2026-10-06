@@ -19,7 +19,8 @@ Solo-Entwickler, ein Pilothof. **Produktivsystem mit echten Bestellungen und ech
 | Typecheck | `pnpm typecheck` |
 | Lint | `pnpm lint` |
 | Build (lokal) | `pnpm build` |
-| Migration erstellen | `pnpm db:migrate` |
+| Migration erstellen | `pnpm exec prisma migrate diff --from-schema <Schema von main> --to-schema prisma/schema.prisma --script` (Regel 3 in `docs/nachtlauf.md`) |
+| Migration lokal anwenden | `pnpm db:migrate` — nur lokal, scheitert an Supabase (P3006) |
 | Seed | `pnpm db:seed` |
 | Prisma Studio | `pnpm db:studio` |
 
@@ -49,6 +50,7 @@ Kein Commit mit rotem Typecheck oder roten Tests. Keine Ausnahme, auch nicht "nu
 - **Niemals** einen Workflow mit `pull_request_target` anlegen. Nur `pull_request`.
 - **Niemals** Secrets, Tokens oder E-Mail-Adressen loggen oder an Sentry senden → `src/lib/sentry-hygiene.ts`.
 - **Niemals** eine Ressource allein über eine ratbare ID absichern. Öffentliche Links brauchen ein signiertes Token.
+- Seed-Konten (`@example.com`, Passwort aus `prisma/seed-daten.ts`) nur in Entwicklung und Test, nie in Produktion.
 - **Niemals** Claude in Chrome verwenden. Browser-Prüfungen laufen ausschließlich über agent-browser — eigene Chromium-Instanz ohne Anmeldungen.
 
 ### Fremdtext
@@ -56,7 +58,9 @@ Kein Commit mit rotem Typecheck oder roten Tests. Keine Ausnahme, auch nicht "nu
 - Agenten, die Fremdtext lesen (`kurator`, `waechter`), können keine Secrets lesen: `.env*` (außer `.env.example`), `.vercel/` und alles außerhalb des Projekts sperrt ein Hook in ihrem Frontmatter.
 
 ### Datenbank
-- **Niemals** `prisma db push` gegen Produktion. Nur Migrationen (`pnpm db:migrate`).
+- **Niemals** `prisma db push` gegen Produktion. Nur Migrationen, erzeugt nach Regel 3 in `docs/nachtlauf.md` (`prisma migrate diff`).
+- Produktion bekommt Migrationen ausschließlich über `vercel-build` beim Merge auf `main`; `pnpm db:migrate`/`migrate dev` nie gegen Produktion.
+- Ein Push mit Migration spielt sie über den Vorschau-Build in die Entwicklungsdatenbank ein; gepushte Migrationsdateien werden nie mehr geändert.
 - **Niemals** eine Schema-Änderung ohne Rückfrage ausführen. Migration zeigen, auf Freigabe warten.
 - **Niemals** destruktive Migrationen (Spalte löschen, Typ ändern) ohne ausdrückliche Zustimmung.
 - **Niemals** eine NOT-NULL-Spalte ohne Default auf eine bestehende Tabelle und keine Spalte entfernen, die alter Code noch liest — im Deploy-Fenster läuft alter Code auf neuem Schema; Expand/Contract nach `docs/ai/ARCHITECTURE.md`, Abschnitt 5.
@@ -69,10 +73,13 @@ Kein Commit mit rotem Typecheck oder roten Tests. Keine Ausnahme, auch nicht "nu
 ### Prozess
 - **Niemals** direkt auf `main` committen. Immer Feature-Branch + PR.
 - **Niemals** mehr als eine Aufgabe in einen Branch mischen.
+- Vor Arbeit auf einem bestehenden Branch `git merge origin/main`.
+- Gestapelte PRs per Merge-Commit mergen, nicht per Squash.
 - **Niemals** `git stash`. Der Stash-Stapel ist für alle Worktrees gemeinsam; parallele Sitzungen holen sich sonst gegenseitig ihre Stände zurück (Vorfall in Bereiche 2). Zwischenstände als WIP-Commit auf dem eigenen Branch sichern.
 - **Niemals** unaufgefordert Pakete installieren. Vorschlagen und fragen.
 - Pakete nur mit der in package.json festgelegten pnpm-Version installieren (corepack). Eine andere Version kann den Lockfile ohne die Sicherheits-Overrides neu schreiben.
 - **Niemals** Features bauen, die nicht beauftragt sind. Im Zweifel fragen.
+- Entscheidungen stehen in `docs/entscheidungen.md`; bei Widerspruch gilt das Register.
 
 ---
 
@@ -87,6 +94,7 @@ Vor Codeänderungen lesen — nicht raten:
 | `docs/ai/CODING_STANDARDS.md` | Bei **jeder** Codeänderung |
 | `docs/ai/TESTING_GUIDELINES.md` | Bei jedem Test, bei jeder Änderung an getestetem Code |
 | `docs/ai/DESIGN_SYSTEM.md` | Bei **jeder** UI-Änderung: Tokens, Themes, Komponenten, Zustände |
+| `docs/entscheidungen.md` | Vor jeder Arbeit, die eine Entscheidung berührt (Redesign, Geld, Konto, Konditionen): was entschieden und was offen ist |
 | `docs/umsetzungsprompt.md` | Bei Arbeit am Redesign: Reihenfolge, Gates, Parallelisierung, Definition of Done |
 | `docs/mockups/README.md` | Vor dem Bau oder Umbau eines Screens: welches Mockup gilt |
 | `DEVELOPMENT.md` | Für Historie und Domänenwissen (siehe unten) |
