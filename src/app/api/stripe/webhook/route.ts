@@ -287,11 +287,17 @@ async function erstatteSpaeteZahlung(
  */
 async function handleErstattungGescheitert(refund: Stripe.Refund, typ: 'refund.failed' | 'charge.refund.updated') {
   const ausgang = await nimmGescheiterteErstattungZurueck(refund)
-  if (ausgang.art === 'nicht_gescheitert' || ausgang.art === 'schon_erledigt') return
-  // Die Zurücknahme selbst gelingt nur einmal (das zweite Ereignis findet sie
-  // erledigt). Was NICHTS ändert, meldete jedes Ereignis erneut — deshalb ein
-  // Vermerk je Erstattung in der Idempotenz-Tabelle der Ereignisse.
-  if (ausgang.art !== 'zurueckgenommen' && !(await ersteMeldung(refund.id))) return
+  if (ausgang.art === 'nicht_gescheitert') return
+  // Einmal melden je Erstattung — über einen Vermerk in der Idempotenz-Tabelle
+  // der Ereignisse; das zweite Ereignis derselben Erstattung bleibt still.
+  // Die Zurücknahme selbst gelingt nur einmal, sie wird deshalb immer
+  // gemeldet (der Vermerk hält danach nur das Folgeereignis still). Auch
+  // „schon erledigt" meldet sich: Die Datenbank zählte die Erstattung nie
+  // (verlorene Antwort) — das Geld steht trotzdem aus. Scheitert der Vermerk
+  // nach einer Zurücknahme, gibt es eine 500; die Neuzustellung findet sie
+  // erledigt und meldet dann — verloren geht die Meldung nicht.
+  const erste = await ersteMeldung(refund.id)
+  if (ausgang.art !== 'zurueckgenommen' && !erste) return
 
   const meldung = gescheitertMeldung(ausgang, refund)
   const orderId = ausgang.bestellung?.id ?? null
@@ -340,10 +346,19 @@ async function ersteMeldung(refundId: string): Promise<boolean> {
 }
 
 function gescheitertMeldung(
-  ausgang: Exclude<GescheitertAusgang, { art: 'nicht_gescheitert' | 'schon_erledigt' }>,
+  ausgang: Exclude<GescheitertAusgang, { art: 'nicht_gescheitert' }>,
   refund: Stripe.Refund
 ): { titel: string; grund: string; was: string; handanweisung: string } {
   const betrag = formatEuro(centsAlsEuro(refund.amount))
+  if (ausgang.art === 'schon_erledigt') {
+    return {
+      titel: 'Erstattung gescheitert — in der Datenbank nicht (mehr) gezählt',
+      grund: 'erstattung_gescheitert_nicht_gezaehlt',
+      was: `Stripe meldet eine Erstattung über ${betrag} an die Kundin als gescheitert. Die App zählt sie nicht als erstattet (sie war dort nie vermerkt) – das Geld steht noch aus.`,
+      handanweisung:
+        'In Stripe prüfen, ob der Kundin der Betrag inzwischen auf anderem Weg erstattet wurde; sonst erneut erstatten – über Stripe ohne reverse_transfer und ohne refund_application_fee – und sie informieren.',
+    }
+  }
   if (ausgang.art === 'zurueckgenommen') {
     return {
       titel: 'Erstattung gescheitert — in der Datenbank zurückgenommen',

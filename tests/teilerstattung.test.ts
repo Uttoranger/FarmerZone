@@ -213,6 +213,23 @@ describe('ladeStripeStand — bezahlter Betrag', () => {
     expect((await ladeStripeStand('pi_1', 'order_1')).bezahltCents).toBe(1082)
   })
 
+  it('Zahlung ohne Überweisung: unklar (nichts buchen, melden), kein einfacher Fehler', async () => {
+    vi.mocked(stripe.paymentIntents.retrieve).mockResolvedValue({ latest_charge: { transfer: null, amount: 1082 } } as never)
+    await expect(ladeStripeStand('pi_1', 'order_1')).rejects.toMatchObject({ grund: 'ohne_ueberweisung' })
+  })
+
+  it('die als gescheitert gemeldete Erstattung zählt nie mit, auch wenn die Liste sie noch als pending führt', async () => {
+    vi.mocked(stripe.refunds.list).mockResolvedValue({
+      has_more: false,
+      data: [
+        { id: 're_a', amount: 582, status: 'pending', metadata: { orderId: 'order_1', anlass: 'teilstorno', positionId: 'p1' } },
+        { id: 're_b', amount: 500, status: 'succeeded', metadata: { orderId: 'order_1', anlass: 'reststorno' } },
+      ],
+    } as never)
+    expect((await ladeStripeStand('pi_1', 'order_1', { gescheitert: 're_a' })).erstattungen).toEqual([{ anlass: 'reststorno', positionId: null, betrag: 500 }])
+    expect((await ladeStripeStand('pi_1', 'order_1')).erstattungen).toHaveLength(2)
+  })
+
   it('ohne Betrag an der Zahlung: unbekannt (null), nicht 0', async () => {
     expect((await ladeStripeStand('pi_1', 'order_1')).bezahltCents).toBeNull()
   })

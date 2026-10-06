@@ -139,11 +139,12 @@ function scheitert(erstattung: Erstattung): void {
 
 type Ereignistyp = 'refund.failed' | 'charge.refund.updated'
 
-function ereignis(typ: Ereignistyp, erstattung: Erstattung, paymentIntentId: string, id: string = intKennung('evt')) {
+function ereignis(typ: Ereignistyp, erstattung: Erstattung, paymentIntentId: string, id: string = intKennung('evt'), account?: string) {
   return {
     id,
     object: 'event',
     type: typ,
+    ...(account ? { account } : {}),
     data: {
       object: {
         id: erstattung.id,
@@ -303,6 +304,73 @@ describe('Erstattungen, die nicht nachweislich zu einer unserer Buchungen gehör
 
     expect(antwort.status).toBe(200)
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).erstattetCents).toBe(582)
+    expect(Sentry.captureMessage).not.toHaveBeenCalled()
+    expect(sendErstattungOffen).not.toHaveBeenCalled()
+  })
+})
+
+describe('Nachbesserung Runde 1', () => {
+  it('die Liste führt die gescheiterte Erstattung noch als pending: trotzdem genau einmal zurückgenommen', async () => {
+    const { order, paymentIntentId, teil } = await nachBrotFehlt()
+    // Das Ereignis sagt verbindlich „gescheitert", refunds.list hinkt hinterher.
+    teil.status = 'pending'
+    const ev = ereignis('refund.failed', { ...teil, status: 'failed' }, paymentIntentId)
+
+    const antworten = [await zustellen(ev), await zustellen(ereignis('charge.refund.updated', { ...teil, status: 'failed' }, paymentIntentId))]
+
+    expect(antworten.map((a) => a.status)).toEqual([200, 200])
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).erstattetCents).toBe(0)
+    expect(meldungen('erstattung_gescheitert_zurueckgenommen')).toBe(1)
+    await vi.waitFor(() => expect(sendErstattungOffen).toHaveBeenCalledTimes(1))
+  })
+
+  it('nie gezählt (Datenbank = Stripe ohne die gescheiterte): nichts geändert, genau eine Meldung, auch beim zweiten Ereignis', async () => {
+    const { order, paymentIntentId, teil } = await nachBrotFehlt()
+    await prisma.order.update({ where: { id: order.id }, data: { erstattetCents: 0 } })
+    scheitert(teil)
+
+    await zustellen(ereignis('refund.failed', teil, paymentIntentId))
+    await zustellen(ereignis('charge.refund.updated', teil, paymentIntentId))
+
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).erstattetCents).toBe(0)
+    expect(meldungen('erstattung_gescheitert_nicht_gezaehlt')).toBe(1)
+    expect(vi.mocked(Sentry.captureMessage)).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(sendErstattungOffen).toHaveBeenCalledTimes(1))
+  })
+
+  it('Zahlung ohne Überweisung: 200, nichts geändert, als unklar gemeldet (keine stumme Neuzustellung)', async () => {
+    const { order, paymentIntentId, teil } = await nachBrotFehlt()
+    vi.mocked(stripe.paymentIntents.retrieve).mockResolvedValue({ latest_charge: { id: 'ch_test', transfer: null, amount: 1082 } } as never)
+    scheitert(teil)
+
+    const antwort = await zustellen(ereignis('refund.failed', teil, paymentIntentId))
+
+    expect(antwort.status).toBe(200)
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).erstattetCents).toBe(582)
+    expect(meldungen('erstattung_gescheitert_unklar')).toBe(1)
+  })
+
+  it('charge.refund.updated mit Status pending: still, nichts geändert', async () => {
+    const { order, paymentIntentId, teil } = await nachBrotFehlt()
+    teil.status = 'pending'
+
+    const antwort = await zustellen(ereignis('charge.refund.updated', teil, paymentIntentId))
+
+    expect(antwort.status).toBe(200)
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).erstattetCents).toBe(582)
+    expect(Sentry.captureMessage).not.toHaveBeenCalled()
+    expect(sendErstattungOffen).not.toHaveBeenCalled()
+  })
+
+  it('refund.failed eines verbundenen Hof-Kontos (event.account gesetzt): ignoriert', async () => {
+    const { order, paymentIntentId, teil } = await nachBrotFehlt()
+    scheitert(teil)
+
+    const antwort = await zustellen(ereignis('refund.failed', teil, paymentIntentId, intKennung('evt'), 'acct_int_hof'))
+
+    expect(antwort.status).toBe(200)
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).erstattetCents).toBe(582)
+    expect(stripe.refunds.list).not.toHaveBeenCalled()
     expect(Sentry.captureMessage).not.toHaveBeenCalled()
     expect(sendErstattungOffen).not.toHaveBeenCalled()
   })

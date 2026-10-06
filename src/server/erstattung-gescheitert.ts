@@ -40,7 +40,7 @@ export type GescheitertAusgang =
   | { art: 'fremd'; bestellung: Bestellbezug | null }
   /** Unsere Buchung, aber das Bild passt nicht: nichts geändert, melden. */
   | { art: 'unklar'; bestellung: Bestellbezug; grund: string }
-  /** Schon zurückgenommen (oder nie gezählt): nichts mehr zu tun. */
+  /** Schon zurückgenommen (oder nie gezählt): nichts mehr zu ändern — gemeldet wird trotzdem einmal. */
   | { art: 'schon_erledigt'; bestellung: Bestellbezug }
   | {
       art: 'zurueckgenommen'
@@ -89,7 +89,11 @@ export async function nimmGescheiterteErstattungZurueck(refund: Stripe.Refund): 
 
   let erstattetCentsStripe: number
   try {
-    const stand = await ladeStripeStand(paymentIntentId, bestellung.id)
+    // Die Erstattung des Ereignisses zählt ausdrücklich NICHT mit: Das
+    // Ereignis sagt verbindlich „gescheitert", die Liste kann sie noch als
+    // `pending` führen — dann sähe es aus wie „schon zurückgenommen", und die
+    // Zurücknahme fiele still aus.
+    const stand = await ladeStripeStand(paymentIntentId, bestellung.id, { gescheitert: refund.id })
     erstattetCentsStripe = stand.erstattungen.reduce((summe, b) => summe + b.betrag, 0)
   } catch (err) {
     if (err instanceof StripeStandUnklar) return { art: 'unklar', bestellung: bezug(bestellung), grund: `stripe_${err.grund}` }
