@@ -32,9 +32,15 @@ import {
   istVorOrtZahlung,
 } from '@/lib/servicegebuehr'
 import { onlineBezahlt } from '@/lib/storno'
+import type { OrderStatus } from '@prisma/client'
 
 /** Aus diesen Status darf der Hof einen Artikel als fehlend melden — solange nichts übergeben ist. */
-export const ARTIKEL_FEHLT_STATUS: readonly string[] = ['PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY']
+export const ARTIKEL_FEHLT_STATUS = ['PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY'] as const satisfies readonly OrderStatus[]
+
+/** Darf aus diesem Status „Artikel fehlt" gemeldet werden? */
+export function artikelFehltErlaubt(status: string): boolean {
+  return ARTIKEL_FEHLT_STATUS.some((s) => s === status)
+}
 
 /** Der Stand einer Bestellung, so weit ihn die Rechnung braucht — alle Beträge in Cent. */
 export type ArtikelFehltBestellung = {
@@ -123,7 +129,7 @@ export function neueServicegebuehrCents(
 
 /** Was „Artikel fehlt" für diese Position bedeutet — vom aktuellen Stand aus. */
 export function artikelFehltRechnung(b: ArtikelFehltBestellung, positionId: string): ArtikelFehltErgebnis {
-  if (!ARTIKEL_FEHLT_STATUS.includes(b.status)) return { art: 'abgelehnt', grund: 'status' }
+  if (!artikelFehltErlaubt(b.status)) return { art: 'abgelehnt', grund: 'status' }
   const position = b.positionen.find((p) => p.id === positionId)
   if (!position) return { art: 'abgelehnt', grund: 'position_unbekannt' }
   if (position.fehlt) return { art: 'abgelehnt', grund: 'schon_fehlend' }

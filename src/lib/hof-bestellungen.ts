@@ -11,7 +11,7 @@
 import { tagVersetzt, wienKalendertag } from '@/lib/kalender'
 import { abholChip, abholtagName, PACK_MARKE } from '@/lib/heute'
 import { formatSlotTime } from '@/lib/pickup-days'
-import { ARTIKEL_FEHLT_STATUS } from '@/lib/artikel-fehlt'
+import { artikelFehltErlaubt } from '@/lib/artikel-fehlt'
 import type { HofBestellFilter } from '@/schemas/hof-bestellungen'
 /** Die Töne der StatusBadge (src/components/ui/status-badge.tsx). */
 type StatusTon = 'offen' | 'fertig' | 'neutral'
@@ -205,8 +205,8 @@ export function bestellAktionen(b: { status: string; paymentMethod: string; offe
     packen: PACKEN_STATUS.includes(b.status),
     abgeholt: b.status === 'READY' && online,
     abgeholtBezahlt: b.status === 'READY' && !online,
-    artikelFehlt: ARTIKEL_FEHLT_STATUS.includes(b.status) && b.offenePositionen > 0,
-    nichtAbgeholt: ARTIKEL_FEHLT_STATUS.includes(b.status),
+    artikelFehlt: artikelFehltErlaubt(b.status) && b.offenePositionen > 0,
+    nichtAbgeholt: artikelFehltErlaubt(b.status),
     stornieren: !STORNIERBAR_NICHT.includes(b.status),
     dochNichtGepackt: b.status === 'READY',
     abholungZurueck: b.status === 'PICKED_UP',

@@ -105,3 +105,28 @@ export function stornoGeldSaetze(eingabe: {
 export function nachTeilerstattung(order: { erstattetCents: number; fehlendePositionen: number }): boolean {
   return order.erstattetCents > 0 || order.fehlendePositionen > 0
 }
+
+/**
+ * Der Rest eines Stornos nach „Artikel fehlt" — aus dem, was Stripe WIRKLICH
+ * gebucht hat, nicht aus dem Stand der Datenbank: So stimmt er auch, wenn eine
+ * Teilerstattung dort fehlt (verlorene Antwort) oder eine Rückbuchung vom Hof
+ * gescheitert ist (sie wird hier nachgeholt).
+ *
+ *   Kundin  = bezahlt − alle Teilerstattungen        (nie über Stripes Rest)
+ *   vom Hof = Warenpreis der Bestellung − Provision − alle Teil-Rückbuchungen
+ *
+ * `bezahltCents` ist aktueller Warenpreis + aktuelle Gebühr + `erstattetCents`
+ * der Datenbank; `warenOriginalCents` die Summe der Positions-Snapshots.
+ */
+export function restNachTeilerstattung(e: {
+  bezahltCents: number
+  warenOriginalCents: number
+  provisionCents: number
+  teilErstattetCents: number
+  teilZurueckgebuchtCents: number
+}): { erstattungCents: number; vomHofCents: number } {
+  return {
+    erstattungCents: Math.max(0, e.bezahltCents - e.teilErstattetCents),
+    vomHofCents: Math.max(0, e.warenOriginalCents - e.provisionCents - e.teilZurueckgebuchtCents),
+  }
+}

@@ -15,6 +15,17 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic'
 
 /*
+ * Laufzeit der Funktion: „Artikel fehlt" hält eine Transaktion bis
+ * TRANSAKTION_MS (42 s, src/server/artikel-fehlt.ts) plus bis zu 10 s Warten
+ * auf eine Verbindung. Die Server Actions laufen mit der Laufzeit dieser Seite
+ * — endete die Funktion vorher, rollte die Datenbank zurück, während Stripe
+ * schon gebucht hat (der nächste Versuch trüge nach, aber der Hof sähe einen
+ * Fehler). Vercel: Hobby erlaubt bis 60 s, Pro mehr — beim Plan prüfen.
+ * tests/teilerstattung.test.ts hält die Rechnung fest.
+ */
+export const maxDuration = 60
+
+/*
  * Bestellungen in der HofShell (Gate 5, Nachtlauf Nr. 19; Mockups
  * web-h3-bestellungen-packen-uebergeben, mobil-h3-bestellungen). Die Shell
  * kommt aus dem Layout der Routengruppe (hof). Ab 1024 px steht rechts die

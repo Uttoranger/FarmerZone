@@ -1,5 +1,4 @@
 import { Prisma } from '@prisma/client'
-import type { OrderStatus } from '@prisma/client'
 import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
 import { alsCents } from '@/lib/order-totals'
@@ -15,9 +14,11 @@ import {
   NACHTRAGEN_HOECHSTENS,
   STRIPE_AUFRUFE_HOECHSTENS,
   STRIPE_OPTIONEN,
+  StripeStandUnklar,
   bucheVomHofZurueck,
   erstatteKundin,
   ladeStripeStand,
+  type Buchung,
   type StripeStand,
 } from '@/server/teilerstattung'
 
@@ -64,6 +65,9 @@ import {
 
 /** Stripe-Zeitgrenzen aller Aufrufe plus 10 s für die Datenbank. */
 export const TRANSAKTION_MS = STRIPE_AUFRUFE_HOECHSTENS * STRIPE_OPTIONEN.timeout + 10_000
+
+/** So lange wartet die Transaktion höchstens auf eine Verbindung, bevor sie beginnt. */
+export const VERBINDUNG_WARTEN_MS = 10_000
 
 export type ArtikelFehltAusgang =
   | { art: 'abgelehnt'; grund: ArtikelFehltAblehnung | 'nicht_gefunden' }
@@ -130,68 +134,75 @@ export async function meldeFehlendenArtikel(eingabe: {
 
       const paymentIntentId = vorab.art === 'teil' && vorab.zahlung === 'online' ? stand.stripePaymentIntentId : null
       const stripeStand: StripeStand | null = paymentIntentId ? await ladeStripeStand(paymentIntentId, orderId) : null
-      const gebucht: Gebucht[] = []
 
-      // 2. Verlorene Erstattungen nachtragen — die gemeldete Position zuletzt,
-      //    damit sie vom berichtigten Stand aus gerechnet wird.
-      if (stripeStand && paymentIntentId) {
+      // 2. Verlorene Erstattungen nachtragen — ERST planen und prüfen, dann
+      //    buchen: Ist irgendetwas unklar (zu viele, nicht nachtragbar),
+      //    wird nichts gebucht (StripeStandUnklar, Sentry, Hof meldet sich).
+      //    Die gemeldete Position zuletzt, damit sie vom berichtigten Stand
+      //    aus gerechnet wird.
+      const plan: Array<{ positionId: string; rechnung: ArtikelFehltTeil; erstattetCents: number }> = []
+      if (stripeStand) {
         const verloren = stripeStand.erstattungen
-          .filter((e) => e.anlass === 'teilstorno' && e.positionId !== null)
+          .filter((e): e is Buchung & { positionId: string } => e.anlass === 'teilstorno' && e.positionId !== null)
           .filter((e) => zustand.positionen.some((p) => p.id === e.positionId && !p.fehlt))
           .toSorted((a, b) => Number(a.positionId === itemId) - Number(b.positionId === itemId))
-          .slice(-NACHTRAGEN_HOECHSTENS)
+        if (verloren.length > NACHTRAGEN_HOECHSTENS) {
+          throw new StripeStandUnklar('zu_viele_nachtraege', { orderId, anzahl: verloren.length })
+        }
         for (const e of verloren) {
-          const positionId = e.positionId as string // oben auf nicht-null gefiltert
-          const r = artikelFehltRechnung(zustand, positionId)
+          const r = artikelFehltRechnung(zustand, e.positionId)
           if (r.art !== 'teil') {
-            Sentry.captureException(new Error('Artikel fehlt: verlorene Erstattung nicht nachtragbar'), {
-              tags: { aktion: 'artikelFehlt', grund: 'nachtrag_unmoeglich' },
-              extra: { orderId, positionId, erstattetCents: e.betrag },
-            })
-            continue
+            // Fachlich nicht vorgesehen (eine Teilerstattung gibt es nie für den
+            // letzten Artikel) — nicht raten, nichts buchen.
+            throw new StripeStandUnklar('nachtrag_unklar', { orderId, positionId: e.positionId, erstattetCents: e.betrag })
           }
           if (e.betrag !== r.erstattungCents) {
             // Stripe hat vom damaligen Stand gerechnet. Eingetragen wird, was
             // gebucht ist; den Unterschied sieht der Betreiber.
             Sentry.captureException(new Error('Artikel fehlt: nachgetragene Erstattung weicht ab'), {
               tags: { aktion: 'artikelFehlt', grund: 'erstattung_abweichend' },
-              extra: { orderId, positionId, gebuchtCents: e.betrag, gerechnetCents: r.erstattungCents },
+              extra: { orderId, positionId: e.positionId, gebuchtCents: e.betrag, gerechnetCents: r.erstattungCents },
             })
           }
-          const rueckbuchungOffen = await rueckbuchen(stripeStand, orderId, positionId, r.vomHofCents)
-          gebucht.push({ positionId, rechnung: r, erstattetCents: e.betrag, rueckbuchungOffen })
-          zustand = nachFehlendemArtikel(zustand, positionId, r, e.betrag)
+          plan.push({ positionId: e.positionId, rechnung: r, erstattetCents: e.betrag })
+          zustand = nachFehlendemArtikel(zustand, e.positionId, r, e.betrag)
         }
       }
+      const gemeldetNachgetragen = plan.some((g) => g.positionId === itemId)
+      const gemeldet = gemeldetNachgetragen ? null : artikelFehltRechnung(zustand, itemId)
 
-      // 3. Die gemeldete Position — falls nicht eben schon nachgetragen.
+      // Ab hier wird gebucht. Rückbuchungen der nachgetragenen Positionen
+      // (sofern Stripe sie nicht schon hat), dann die gemeldete Position.
+      const gebucht: Gebucht[] = []
+      for (const g of plan) {
+        const rueckbuchungOffen = stripeStand ? await rueckbuchen(stripeStand, orderId, g.positionId, g.rechnung.vomHofCents) : false
+        gebucht.push({ ...g, rueckbuchungOffen })
+      }
+
       let ergebnis: ArtikelFehltAusgang
       const schonGebucht = gebucht.find((g) => g.positionId === itemId)
       if (schonGebucht) {
         ergebnis = { art: 'teil', rechnung: schonGebucht.rechnung, erstattetCents: schonGebucht.erstattetCents, rueckbuchungOffen: schonGebucht.rueckbuchungOffen }
+      } else if (!gemeldet || gemeldet.art !== 'teil') {
+        ergebnis = gemeldet ?? { art: 'abgelehnt', grund: 'schon_fehlend' }
       } else {
-        const r = artikelFehltRechnung(zustand, itemId)
-        if (r.art !== 'teil') {
-          ergebnis = r
-        } else {
-          let erstattetCents = 0
-          let rueckbuchungOffen = false
-          if (stripeStand && paymentIntentId && r.zahlung === 'online') {
-            const kundin = await erstatteKundin(stripeStand, {
-              paymentIntentId,
-              orderId,
-              anlass: 'teilstorno',
-              positionId: itemId,
-              betragCents: r.erstattungCents,
-              schluessel: `teilstorno-${orderId}-${itemId}`,
-            })
-            erstattetCents = kundin.erstattetCents
-            rueckbuchungOffen = await rueckbuchen(stripeStand, orderId, itemId, r.vomHofCents)
-          }
-          gebucht.push({ positionId: itemId, rechnung: r, erstattetCents, rueckbuchungOffen })
-          zustand = nachFehlendemArtikel(zustand, itemId, r, erstattetCents)
-          ergebnis = { art: 'teil', rechnung: r, erstattetCents, rueckbuchungOffen }
+        let erstattetCents = 0
+        let rueckbuchungOffen = false
+        if (stripeStand && paymentIntentId && gemeldet.zahlung === 'online') {
+          const kundin = await erstatteKundin(stripeStand, {
+            paymentIntentId,
+            orderId,
+            anlass: 'teilstorno',
+            positionId: itemId,
+            betragCents: gemeldet.erstattungCents,
+            schluessel: `teilstorno-${orderId}-${itemId}`,
+          })
+          erstattetCents = kundin.erstattetCents
+          rueckbuchungOffen = await rueckbuchen(stripeStand, orderId, itemId, gemeldet.vomHofCents)
         }
+        gebucht.push({ positionId: itemId, rechnung: gemeldet, erstattetCents, rueckbuchungOffen })
+        zustand = nachFehlendemArtikel(zustand, itemId, gemeldet, erstattetCents)
+        ergebnis = { art: 'teil', rechnung: gemeldet, erstattetCents, rueckbuchungOffen }
       }
 
       // Schreiben, was gebucht ist — auch wenn die gemeldete Position danach
@@ -210,7 +221,7 @@ export async function meldeFehlendenArtikel(eingabe: {
           where: {
             id: orderId,
             farmId,
-            status: { in: ARTIKEL_FEHLT_STATUS as OrderStatus[] },
+            status: { in: [...ARTIKEL_FEHLT_STATUS] },
             serviceFeeCents: stand.serviceFeeCents,
             erstattetCents: stand.erstattetCents,
           },
@@ -225,7 +236,7 @@ export async function meldeFehlendenArtikel(eingabe: {
 
       return ergebnis
     },
-    { timeout: TRANSAKTION_MS, maxWait: 10_000 }
+    { timeout: TRANSAKTION_MS, maxWait: VERBINDUNG_WARTEN_MS }
   )
 }
 

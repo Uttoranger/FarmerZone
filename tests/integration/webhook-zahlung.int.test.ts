@@ -33,7 +33,7 @@ vi.mock('@/lib/stripe', async () => {
   // aber keine echte Erstattung.
   const { default: Stripe } = await import('stripe')
   const echt = new Stripe('sk_test_integration_dummy')
-  return { stripe: { webhooks: echt.webhooks, refunds: { create: vi.fn() } } }
+  return { stripe: { webhooks: echt.webhooks, refunds: { create: vi.fn(), list: vi.fn(async () => ({ data: [], has_more: false })) } } }
 })
 vi.mock('@/lib/email', () => ({
   sendOrderConfirmation: vi.fn(),

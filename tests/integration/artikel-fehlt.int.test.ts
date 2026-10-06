@@ -109,9 +109,11 @@ beforeEach(() => {
   }) as never)
   refundList.mockImplementation((async () => ({
     data: erstattungen.map((b) => ({ amount: b.betrag, metadata: b.metadata, status: 'succeeded' })),
+    has_more: false,
   })) as never)
   reversalList.mockImplementation((async () => ({
     data: rueckbuchungen.map((b) => ({ amount: b.betrag, metadata: b.metadata })),
+    has_more: false,
   })) as never)
   intentRetrieve.mockResolvedValue({ id: 'pi_test', latest_charge: { id: 'ch_test', transfer: 'tr_test' } } as never)
 })
@@ -551,5 +553,121 @@ describe('Kennzahlen zählen fehlende Artikel nicht als verkauft', () => {
     expect((await getTopProdukte(farm.id, fenster)).map((t) => t.name)).toEqual(['Eier'])
     expect(await getMeistverkaufteProduktIds(farm.id)).toEqual([produkte[0]!.id])
     expect(await getYtdRevenue(farm.id)).toBe(4.5)
+  })
+})
+
+/** Eine Buchung, die Stripe schon kennt — von Hand im Dashboard, aus altem Format oder einem früheren Versuch. */
+function stripeKennt(liste: Buchung[], betrag: number, metadata: Record<string, string>): void {
+  liste.push({ schluessel: null, werte: '', betrag, metadata })
+}
+
+describe('Im Zweifel nicht buchen (Nachbesserung 2)', () => {
+  async function unveraendert(orderId: string) {
+    expect(await stand(orderId)).toMatchObject({ warenCents: 1030, gebuehrCents: 52, erstattetCents: 0, fehlend: [] })
+    expect(refundCreate).not.toHaveBeenCalled()
+    expect(reversalCreate).not.toHaveBeenCalled()
+    expect(sendArtikelFehlt).not.toHaveBeenCalled()
+  }
+
+  it('eine Erstattung ohne Zuordnung (von Hand im Dashboard): nichts gebucht, Hof soll sich melden, Sentry', async () => {
+    const { order, position } = await bestellung({ zahlung: 'online', positionen: EIER_BROT, gebuehrCents: 52 })
+    stripeKennt(erstattungen, 300, {})
+
+    const ergebnis = await meldeArtikelFehlt({ orderId: order.id, itemId: position('Brot').id })
+
+    expect(ergebnis.error).toContain('bitte melde dich bei uns')
+    await unveraendert(order.id)
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ tags: expect.objectContaining({ grund: 'stripe_unklar_ohne_zuordnung' }) })
+    )
+  })
+
+  it('Teilstorno im alten Format (ohne Position): nichts gebucht', async () => {
+    const { order, position } = await bestellung({ zahlung: 'online', positionen: EIER_BROT, gebuehrCents: 52 })
+    stripeKennt(erstattungen, 582, { orderId: order.id, grund: 'artikel_fehlt' })
+
+    expect((await meldeArtikelFehlt({ orderId: order.id, itemId: position('Brot').id })).error).toContain('bitte melde dich bei uns')
+    await unveraendert(order.id)
+  })
+
+  it('mehr als eine Seite Erstattungen: nichts gebucht', async () => {
+    const { order, position } = await bestellung({ zahlung: 'online', positionen: EIER_BROT, gebuehrCents: 52 })
+    refundList.mockResolvedValueOnce({ data: [], has_more: true } as never)
+
+    expect((await meldeArtikelFehlt({ orderId: order.id, itemId: position('Brot').id })).error).toContain('bitte melde dich bei uns')
+    await unveraendert(order.id)
+  })
+
+  it('Stripe meldet die Erstattung als gescheitert: nicht als erstattet vermerkt', async () => {
+    const { order, position } = await bestellung({ zahlung: 'online', positionen: EIER_BROT, gebuehrCents: 52 })
+    refundCreate.mockResolvedValueOnce({ id: 're_x', amount: 582, status: 'failed', metadata: {} } as never)
+
+    expect((await meldeArtikelFehlt({ orderId: order.id, itemId: position('Brot').id })).error).toContain('bitte melde dich bei uns')
+    expect(await stand(order.id)).toMatchObject({ warenCents: 1030, gebuehrCents: 52, erstattetCents: 0, fehlend: [] })
+    expect(reversalCreate).not.toHaveBeenCalled()
+  })
+
+  it('ein Nachtrag, der fachlich nicht aufgeht (Teilerstattung auch für den letzten Artikel): nichts gebucht', async () => {
+    const { order, position } = await bestellung({ zahlung: 'online', positionen: EIER_BROT, gebuehrCents: 52 })
+    stripeKennt(erstattungen, 502, { orderId: order.id, anlass: 'teilstorno', positionId: position('Eier').id })
+    stripeKennt(erstattungen, 580, { orderId: order.id, anlass: 'teilstorno', positionId: position('Brot').id })
+
+    expect((await meldeArtikelFehlt({ orderId: order.id, itemId: position('Brot').id })).error).toContain('bitte melde dich bei uns')
+    expect(await stand(order.id)).toMatchObject({ erstattetCents: 0, fehlend: [] })
+    expect(refundCreate).not.toHaveBeenCalled()
+    expect(reversalCreate).not.toHaveBeenCalled()
+  })
+
+  it('mehr verlorene Positionen als die Grenze: nichts gebucht, nichts still liegen gelassen', async () => {
+    const namen = ['A', 'B', 'C', 'D', 'E']
+    const { order, position } = await bestellung({
+      zahlung: 'online',
+      positionen: namen.map((name) => ({ name, preisCents: 1000 })),
+      gebuehrCents: 250,
+    })
+    for (const name of namen.slice(0, 4)) {
+      stripeKennt(erstattungen, 1000, { orderId: order.id, anlass: 'teilstorno', positionId: position(name).id })
+    }
+
+    expect((await meldeArtikelFehlt({ orderId: order.id, itemId: position('E').id })).error).toContain('bitte melde dich bei uns')
+    expect(await stand(order.id)).toMatchObject({ erstattetCents: 0, fehlend: [] })
+    expect(refundCreate).not.toHaveBeenCalled()
+  })
+
+  it('Storno nach verlorener Teilstorno-Antwort: der Rest kommt aus Stripes Buchungen, Summe = bezahlt, Hof genau der Warenpreis', async () => {
+    const { order, position } = await bestellung({ zahlung: 'online', positionen: EIER_BROT, gebuehrCents: 52 })
+    const echt = refundCreate.getMockImplementation()!
+    refundCreate.mockImplementationOnce((async (werte: never, optionen: never) => {
+      await echt(werte, optionen)
+      throw new Error('Verbindung abgebrochen')
+    }) as never)
+    expect((await meldeArtikelFehlt({ orderId: order.id, itemId: position('Brot').id })).error).toBeDefined()
+    // Die Datenbank weiß nichts von den 582 — Stripe schon; zurückgebucht wurde noch nichts.
+
+    const storno = await cancelOrder(order.id)
+
+    expect(storno).toEqual({ erstattetCents: 500, vomHofCents: 1030 })
+    expect(erstattungen.map((b) => b.betrag)).toEqual([582, 500])
+    expect(rueckbuchungen.map((b) => [b.schluessel, b.betrag])).toEqual([[`storno-hof-${order.id}`, 1030]])
+    const danach = await prisma.order.findUniqueOrThrow({ where: { id: order.id } })
+    expect(danach.status).toBe('CANCELLED')
+    expect(danach.paymentStatus).toBe('REFUNDED')
+    expect(danach.erstattetCents).toBe(1082)
+  })
+
+  it('Storno mit einer Erstattung ohne Zuordnung: storniert, aber Geld nicht automatisch bewegt (Betreiber prüft)', async () => {
+    const { order } = await bestellung({ zahlung: 'online', positionen: EIER_BROT, gebuehrCents: 52 })
+    stripeKennt(erstattungen, 300, {})
+
+    const storno = await cancelOrder(order.id)
+
+    expect(storno.erstattungOffen).toBe(true)
+    expect(refundCreate).not.toHaveBeenCalled()
+    expect(reversalCreate).not.toHaveBeenCalled()
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ tags: expect.objectContaining({ grund: 'stripe_unklar_ohne_zuordnung' }) })
+    )
   })
 })

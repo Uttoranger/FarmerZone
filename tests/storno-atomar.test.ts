@@ -20,7 +20,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
-vi.mock('@/lib/stripe', () => ({ stripe: { refunds: { create: vi.fn() } } }))
+// Seit Nachbesserung 2 (Nr. 19) fragt der Storno vor der Vollerstattung, ob
+// Stripe schon Erstattungen kennt — hier keine.
+vi.mock('@/lib/stripe', () => ({
+  stripe: { refunds: { create: vi.fn(), list: vi.fn(async () => ({ data: [], has_more: false })) } },
+}))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
 vi.mock('@/lib/email', () => ({
   sendOrderReady: vi.fn(),

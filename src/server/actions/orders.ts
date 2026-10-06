@@ -9,11 +9,11 @@ import { sendOrderReady, sendOrderCancelled, sendOrderNotReady, type OrderForEma
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import * as Sentry from '@sentry/nextjs'
 import type { OrderStatus } from '@prisma/client'
-import { nachTeilerstattung, plattformgebuehrCents, stornoBetraege } from '@/lib/storno'
+import { nachTeilerstattung, plattformgebuehrCents, restNachTeilerstattung, stornoBetraege } from '@/lib/storno'
 import { alsCents } from '@/lib/order-totals'
 import { artikelFehltEingabeSchema, stornoEingabeSchema } from '@/schemas/hof-bestellungen'
 import { meldeFehlendenArtikel } from '@/server/artikel-fehlt'
-import { erstatteMitFestemBetrag } from '@/server/teilerstattung'
+import { StripeStandUnklar, bucheVomHofZurueck, erstatteKundin, hatErstattungen, ladeStripeStand, teilstornoSumme } from '@/server/teilerstattung'
 import { sendArtikelFehlt } from '@/lib/email'
 
 export type ActionResult = { error?: string }
@@ -344,7 +344,7 @@ const STORNO_STAND = {
   erstattetCents: true,
   paymentStatus: true,
   stripePaymentIntentId: true,
-  items: { select: { productId: true, quantity: true, fehltSeit: true } },
+  items: { select: { productId: true, quantity: true, totalPrice: true, fehltSeit: true } },
 } as const
 
 /**
@@ -426,7 +426,7 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
     provisionCents: alsCents(storno.platformFeeAmount),
     serviceFeeCents: storno.serviceFeeCents,
   })
-  const restNachTeilerstattung = nachTeilerstattung({
+  const teilweiseErstattet = nachTeilerstattung({
     erstattetCents: storno.erstattetCents ?? 0,
     fehlendePositionen: storno.items.filter((i) => i.fehltSeit).length,
   })
@@ -438,39 +438,64 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
   // nicht eigenmächtig angelegt — Schema-Änderung nur mit Freigabe).
   let refundAmount: number | null = null
   let erstattungOffen = false
+  let festeBetraege: { erstattetCents: number; vomHofCents: number } | null = null
   if (storno.stripePaymentIntentId && betraege) {
     try {
-      if (restNachTeilerstattung) {
-        // Nach „Artikel fehlt": den Rest mit festen Beträgen (src/lib/storno.ts,
-        // nachTeilerstattung) — die Kundin bekommt den aktuellen Betrag, der Hof
-        // gibt genau den aktuellen Warenpreis zurück.
-        const rest = await erstatteMitFestemBetrag({
-          paymentIntentId: storno.stripePaymentIntentId,
+      // Nach „Artikel fehlt" — oder wenn Stripe schon Erstattungen kennt, die
+      // die Datenbank nicht hat (verlorene Antwort): den Rest mit festen
+      // Beträgen aus dem, was Stripe gebucht hat (restNachTeilerstattung).
+      // Die Vollerstattung mit reverse_transfer stimmt nur, solange noch
+      // nichts erstattet ist.
+      if (teilweiseErstattet || (await hatErstattungen(storno.stripePaymentIntentId))) {
+        const pi = storno.stripePaymentIntentId
+        const stand = await ladeStripeStand(pi, order.id)
+        const rest = restNachTeilerstattung({
+          bezahltCents: alsCents(storno.totalAmount) + storno.serviceFeeCents + (storno.erstattetCents ?? 0),
+          warenOriginalCents: storno.items.reduce((summe, i) => summe + alsCents(i.totalPrice), 0),
+          provisionCents: alsCents(storno.platformFeeAmount),
+          teilErstattetCents: teilstornoSumme(stand.erstattungen),
+          teilZurueckgebuchtCents: teilstornoSumme(stand.rueckbuchungen),
+        })
+        const erstattet =
+          rest.erstattungCents > 0
+            ? (
+                await erstatteKundin(stand, {
+                  paymentIntentId: pi,
+                  orderId: order.id,
+                  anlass: 'reststorno',
+                  positionId: null,
+                  betragCents: rest.erstattungCents,
+                  schluessel: `storno-${order.id}`,
+                })
+              ).erstattetCents
+            : 0
+        await bucheVomHofZurueck(stand, {
           orderId: order.id,
-          erstattungCents: betraege.erstattetCents,
-          vomHofCents: betraege.vomHofCents,
-          schluessel: `storno-${order.id}`,
-          schluesselHof: `storno-hof-${order.id}`,
-          onRueckbuchungFehler: (err) => {
+          anlass: 'reststorno',
+          positionId: null,
+          betragCents: rest.vomHofCents,
+          schluessel: `storno-hof-${order.id}`,
+          onFehler: (err) => {
             Sentry.captureException(err, {
               tags: { aktion: 'cancelOrder', grund: 'rueckbuchung_offen' },
-              extra: { orderId, vomHofCents: betraege.vomHofCents, handbuchung: 'Überweisung mit diesem Betrag zurückbuchen' },
+              extra: { orderId, vomHofCents: rest.vomHofCents, handbuchung: 'Überweisung mit diesem Betrag zurückbuchen' },
             })
           },
         })
-        refundAmount = rest.erstattetCents / 100
-        if (rest.erstattetCents > 0) {
-          try {
-            await prisma.order.updateMany({
-              where: { id: orderId, status: 'CANCELLED' },
-              data: { erstattetCents: { increment: rest.erstattetCents } },
-            })
-          } catch (err) {
-            Sentry.captureException(err, {
-              tags: { aktion: 'cancelOrder', grund: 'erstattet_vermerk_fehlgeschlagen' },
-              extra: { orderId },
-            })
-          }
+        refundAmount = erstattet / 100
+        festeBetraege = { erstattetCents: erstattet, vomHofCents: rest.vomHofCents }
+        try {
+          // Alles, was Stripe erstattet hat — auch eine Teilerstattung, deren
+          // Antwort damals verloren ging.
+          await prisma.order.updateMany({
+            where: { id: orderId, status: 'CANCELLED' },
+            data: { erstattetCents: teilstornoSumme(stand.erstattungen) + erstattet },
+          })
+        } catch (err) {
+          Sentry.captureException(err, {
+            tags: { aktion: 'cancelOrder', grund: 'erstattet_vermerk_fehlgeschlagen' },
+            extra: { orderId },
+          })
         }
       } else {
         const refund = await stripe.refunds.create(
@@ -506,11 +531,11 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
       // Plattformkonto (Destination Charge). Nur die Bestell-ID, keine
       // Kundendaten (sentry-hygiene.ts filtert zusätzlich).
       Sentry.captureException(err, {
-        tags: { aktion: 'cancelOrder', grund: 'erstattung_offen' },
+        tags: { aktion: 'cancelOrder', grund: err instanceof StripeStandUnklar ? `stripe_unklar_${err.grund}` : 'erstattung_offen' },
         // Die Handerstattung im Dashboard braucht dieselben zwei Haken wie
         // der Code — sonst trägt die Plattform den Warenpreis doch wieder.
         // Nach einer Teilerstattung stattdessen feste Beträge.
-        extra: restNachTeilerstattung
+        extra: teilweiseErstattet
           ? { orderId, handerstattung: 'Rest mit festen Beträgen erstatten', erstattungCents: betraege.erstattetCents, vomHofCents: betraege.vomHofCents }
           : { orderId, handerstattung: 'Überweisung zurückbuchen und Plattformgebühr erstatten' },
       })
@@ -562,6 +587,7 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
     }
   }
   // Vor Ort bezahlt (oder online nie bezahlt): nichts erstattet, nichts vom Hof abgezogen.
+  if (festeBetraege) return festeBetraege
   return betraege && refundAmount !== null
     ? { erstattetCents: betraege.erstattetCents, vomHofCents: betraege.vomHofCents }
     : { erstattetCents: 0, vomHofCents: 0 }
@@ -587,6 +613,19 @@ export async function meldeArtikelFehlt(input: unknown): Promise<ArtikelFehltErg
   try {
     ausgang = await meldeFehlendenArtikel({ farmId: farm.id, orderId, itemId, jetzt: new Date() })
   } catch (err) {
+    if (err instanceof StripeStandUnklar) {
+      // Im Zweifel nicht buchen: Bei Stripe gibt es etwas, das wir keiner
+      // Position zuordnen können (von Hand erstattet, mehr als eine Seite,
+      // gescheiterte Erstattung …). Nichts ist geschrieben; der Betreiber
+      // prüft von Hand.
+      Sentry.captureException(err, {
+        tags: { aktion: 'artikelFehlt', grund: `stripe_unklar_${err.grund}` },
+        extra: { orderId, itemId, ...err.extra, handpruefung: 'Erstattung ohne Zuordnung – bitte von Hand prüfen' },
+      })
+      return {
+        error: 'Bei der Zahlung dieser Bestellung gibt es etwas, das wir erst prüfen müssen. Wir haben nichts gebucht – bitte melde dich bei uns.',
+      }
+    }
     // Stripe hat nicht bestätigt, oder das Schreiben danach ist gescheitert:
     // Die Transaktion ist zurückgerollt. Hat Stripe trotzdem schon erstattet
     // (Antwort verloren), findet der nächste Versuch die Erstattung über ihre
