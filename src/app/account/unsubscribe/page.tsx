@@ -1,32 +1,31 @@
 import Link from 'next/link'
 import { Unlink } from 'lucide-react'
+import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
+import { AbmeldenKarte, TEXTLINK } from './abmelden-karte'
 import { UnsubscribeClient } from './unsubscribe-client'
 
 interface Props {
   searchParams: Promise<{ token?: string }>
 }
 
-export default async function UnsubscribePage({ searchParams }: Props) {
+// Seit Nr. 14 im neuen Design (KundeShell); Ablauf und Texte unverändert (E8).
+export default async function UnsubscribePage({ searchParams }: Props): Promise<React.JSX.Element> {
   const { token } = await searchParams
 
-  if (!token) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-4">
-        <div className="text-center max-w-sm">
-          <Unlink className="mx-auto mb-4 size-10 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
-          <h1 className="font-heading text-xl font-semibold text-foreground mb-2">
-            Ungültiger Link
-          </h1>
-          <p className="text-sm text-muted-foreground mb-6">
+  return (
+    <KundeShellMitSitzung>
+      {token ? (
+        <UnsubscribeClient token={token} />
+      ) : (
+        <AbmeldenKarte symbol={Unlink} titel="Ungültiger Link">
+          <p className="text-[13.5px] leading-normal text-muted-foreground">
             Dieser Abmelde-Link ist nicht gültig oder wurde bereits verwendet.
           </p>
-          <Link href="/account/profile" className="text-sm text-primary underline underline-offset-2">
-            Abonnements selbst verwalten →
+          <Link href="/account/profile" className={TEXTLINK}>
+            Abonnements selbst verwalten
           </Link>
-        </div>
-      </div>
-    )
-  }
-
-  return <UnsubscribeClient token={token} />
+        </AbmeldenKarte>
+      )}
+    </KundeShellMitSitzung>
+  )
 }

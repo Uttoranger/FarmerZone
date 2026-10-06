@@ -6,7 +6,28 @@ export interface AnmeldecodeProps {
   code: string
   /** Gültigkeit in Minuten — kommt aus ANMELDECODE_GUELTIG_SEKUNDEN, nie eine zweite Zahl. */
   minuten: number
+  /**
+   * Wofür der Code ist: die Anmeldung (Nr. 08, Standard) oder „Bestellungen
+   * finden" (Nr. 14) — dort meldet er nicht an, er zeigt nur die Bestellungen
+   * dieser Adresse auf diesem Gerät.
+   */
+  zweck?: 'anmelden' | 'bestellungen'
 }
+
+const TEXTE = {
+  anmelden: {
+    titel: 'Dein Anmeldecode',
+    wozu: 'gib diesen Code auf FarmerZone ein, um dich anzumelden:',
+    nichtDu: 'Du wolltest dich nicht anmelden?',
+    kurztext: 'Dein Code für FarmerZone',
+  },
+  bestellungen: {
+    titel: 'Dein Code für deine Bestellungen',
+    wozu: 'gib diesen Code auf FarmerZone ein, um deine Bestellungen zu sehen:',
+    nichtDu: 'Du wolltest deine Bestellungen nicht ansehen?',
+    kurztext: 'Dein Code für deine Bestellungen',
+  },
+} as const
 
 const codeKasten: React.CSSProperties = {
   backgroundColor: MAIL_FARBE.gruenFlaeche,
@@ -38,14 +59,15 @@ const codeText: React.CSSProperties = {
  * Bewusst OHNE Code im Vorschautext und im Betreff (src/lib/email.ts): beide
  * stehen auf dem Sperrbildschirm, der Betreff zusätzlich im Server-Log.
  */
-export function AnmeldecodeEmail({ code, minuten }: AnmeldecodeProps) {
+export function AnmeldecodeEmail({ code, minuten, zweck = 'anmelden' }: AnmeldecodeProps) {
+  const text = TEXTE[zweck]
   return (
-    <EmailLayout previewText={`Dein Code für FarmerZone – ${minuten} Minuten gültig`}>
-      <Text style={h1}>Dein Anmeldecode</Text>
+    <EmailLayout previewText={`${text.kurztext} – ${minuten} Minuten gültig`}>
+      <Text style={h1}>{text.titel}</Text>
       <Text style={bodyText}>
         Hallo,
         <br />
-        gib diesen Code auf FarmerZone ein, um dich anzumelden:
+        {text.wozu}
       </Text>
 
       <div style={codeKasten}>
@@ -56,7 +78,7 @@ export function AnmeldecodeEmail({ code, minuten }: AnmeldecodeProps) {
         Der Code ist <strong>{minuten} Minuten</strong> gültig und funktioniert nur einmal.
       </Text>
       <Text style={mutedText}>
-        Du wolltest dich nicht anmelden? Dann kannst du diese E-Mail einfach ignorieren. Gib den Code
+        {text.nichtDu} Dann kannst du diese E-Mail einfach ignorieren. Gib den Code
         nie an andere weiter – wir fragen dich nie danach.
       </Text>
     </EmailLayout>

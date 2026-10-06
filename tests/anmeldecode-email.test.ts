@@ -90,3 +90,35 @@ describe('sendAnmeldeCodeEmail', () => {
     expect(sendMock).not.toHaveBeenCalled()
   })
 })
+
+// Nr. 14: derselbe Baustein für „Bestellungen finden" — eigener Text, gleiche Regeln.
+describe('sendBestellCodeEmail', () => {
+  async function versendeBestellCode(code = '481234') {
+    const ergebnis = await email.sendBestellCodeEmail('kundin@example.com', code)
+    return { ergebnis, aufruf: sendMock.mock.calls[0][0] as { to: string; subject: string; html: string } }
+  }
+
+  it('Betreff nennt die Bestellungen, nicht den Code', async () => {
+    const { aufruf, ergebnis } = await versendeBestellCode()
+    expect(aufruf.to).toBe('kundin@example.com')
+    expect(aufruf.subject).toBe('Dein Code für deine Bestellungen · FarmerZone')
+    expect(aufruf.subject).not.toMatch(/\d{6}/)
+    expect(ergebnis.id).toBe('email_1')
+  })
+
+  it('Text „Dein Code für deine Bestellungen", Code einmal, 10 Minuten, nichts von Anmelden', async () => {
+    const { aufruf } = await versendeBestellCode('905173')
+    expect(aufruf.html).toContain('Dein Code für deine Bestellungen')
+    expect(aufruf.html).toContain('deine Bestellungen zu sehen')
+    expect(aufruf.html).toContain('10 Minuten')
+    expect(aufruf.html.indexOf('905173')).toBe(aufruf.html.lastIndexOf('905173'))
+    expect(aufruf.html).not.toMatch(/anzumelden|Anmeldecode/)
+    expect(aufruf.html).not.toMatch(/<a [^>]*href=/)
+  })
+
+  it('Gegenprobe: die Anmelde-Mail bleibt beim alten Text', async () => {
+    const { aufruf } = await versende()
+    expect(aufruf.html).toContain('Dein Anmeldecode')
+    expect(aufruf.html).toContain('anzumelden')
+  })
+})

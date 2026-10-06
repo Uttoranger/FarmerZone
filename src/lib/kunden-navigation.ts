@@ -10,21 +10,14 @@
  * Höfe" noch „Merken" noch „Neuigkeiten deiner Höfe", und die Handy-Leiste hat
  * drei Plätze statt fünf: Entdecken · [Warenkorb] · Bestellungen.
  *
- * Angemeldet heißt heute: über die bestehende freiwillige Kunden-Anmeldung
- * (/account/login). Gezeigt wird nur, was es dafür schon gibt — die Seite
- * „Mein Konto" (/account/profile). Eine Seite mit den eigenen Bestellungen
- * gibt es unter /account noch nicht (dort liegen nur login, profile und
- * unsubscribe). Deshalb:
- *  - Im Browser steht „Meine Bestellungen" angemeldet NICHT im Kopf — ein
- *    Punkt, der nur zur Anmeldung führt, die man schon hinter sich hat, wäre
- *    ein Link ins Leere.
- *  - Am Handy bleibt „Bestellungen" (E8 legt die drei Plätze fest). Er führt
- *    abgemeldet vorläufig zur Anmeldung, angemeldet zu „Mein Konto" — die
- *    Anmeldeseite prüft keine Sitzung und böte einer Angemeldeten nur das
- *    Anmeldeformular noch einmal an.
- * Beide Ziele kommen aus bestellungenPunkt(); Nr. 14 „Bestellungen finden"
- * (E-Mail und Code, E7/E8) ändert nur dort das Ziel und nimmt den Punkt
- * wieder in den Kopf.
+ * „Meine Bestellungen" führt seit Nr. 14 in beiden Zuständen auf
+ * /bestellungen: Dort findet die Kundin ihre Bestellungen mit E-Mail und Code
+ * (E7/E8, nur für diese Sitzung, kein Konto). Der Punkt steht deshalb auch im
+ * Web-Kopf — abgemeldet wie angemeldet —, denn das Ziel der Handy-Leiste muss
+ * die Kopfzeile derselben Sitzung auch anbieten.
+ *
+ * Angemeldet heißt: über die bestehende freiwillige Kunden-Anmeldung
+ * (/account/login). Dazu gehört „Mein Konto" (/account/profile) rechts im Kopf.
  *
  * Bestehende Kundenseiten nutzen weiter KundenKopf (src/lib/kunden-kopf.ts);
  * diese Quelle gilt erst, wenn eine Route in die KundeShell umzieht.
@@ -51,25 +44,20 @@ const ANMELDEN: KundenNavPunkt = { id: 'anmelden', label: 'Anmelden', href: '/ac
 const KONTO: KundenNavPunkt = { id: 'konto', label: 'Mein Konto', href: '/account/profile' }
 
 /**
- * „Bestellungen" mit seinem vorläufigen Ziel, siehe Kopf der Datei: immer eine
- * Seite, die die Kopfzeile derselben Sitzung auch anbietet (abgemeldet
- * „Anmelden", angemeldet „Mein Konto") — so führen Web und Handy aus dieser
- * einen Quelle nie an verschiedene Orte.
+ * „Bestellungen finden" (Nr. 14) — dasselbe Ziel für alle: Die Seite zeigt
+ * ohne bewiesene Adresse das Formular, danach die Liste. Der Pfad steht in
+ * src/lib/bestellungen-finden.ts (BESTELLUNGEN_PFAD); hier als Text, damit
+ * die Navigation keine Fachregeln lädt.
  */
-function bestellungenPunkt(angemeldet: boolean): KundenNavPunkt {
-  return {
-    id: 'bestellungen',
-    label: 'Meine Bestellungen',
-    kurz: 'Bestellungen',
-    href: angemeldet ? KONTO.href : ANMELDEN.href,
-  }
-}
+const BESTELLUNGEN: KundenNavPunkt = { id: 'bestellungen', label: 'Meine Bestellungen', kurz: 'Bestellungen', href: '/bestellungen' }
 
 export type KundenLeistenPlatz = { art: 'punkt'; punkt: KundenNavPunkt } | { art: 'warenkorb' }
 
-function handyLeiste(angemeldet: boolean): readonly KundenLeistenPlatz[] {
-  return [{ art: 'punkt', punkt: ENTDECKEN }, { art: 'warenkorb' }, { art: 'punkt', punkt: bestellungenPunkt(angemeldet) }]
-}
+const HANDY_LEISTE: readonly KundenLeistenPlatz[] = [
+  { art: 'punkt', punkt: ENTDECKEN },
+  { art: 'warenkorb' },
+  { art: 'punkt', punkt: BESTELLUNGEN },
+]
 
 export type KundenNavigation = {
   /** Die Textlinks der Kopfzeile im Browser, links nach rechts. Suche und Warenkorb zeichnet die Shell. */
@@ -85,15 +73,12 @@ export type KundenNavigation = {
 /** Die Navigation passend zur Sitzung — öffentliche Seiten kennen genau diese zwei Varianten. */
 export function kundenNavigation({ angemeldet }: { angemeldet: boolean }): KundenNavigation {
   return angemeldet
-    ? { web: [ENTDECKEN], anmelden: null, konto: KONTO, handy: handyLeiste(true) }
-    : { web: [ENTDECKEN, SO_GEHTS, FUER_HOEFE], anmelden: ANMELDEN, konto: null, handy: handyLeiste(false) }
+    ? { web: [ENTDECKEN, BESTELLUNGEN], anmelden: null, konto: KONTO, handy: HANDY_LEISTE }
+    : { web: [ENTDECKEN, SO_GEHTS, FUER_HOEFE, BESTELLUNGEN], anmelden: ANMELDEN, konto: null, handy: HANDY_LEISTE }
 }
 
-// Ohne Anmelden: Bestellungen hat (vorläufig) dasselbe Ziel und ist der Punkt,
-// der in der Leiste leuchten soll. Angemeldet teilt er sich das Ziel mit „Mein
-// Konto" — dort leuchtet das Konto, nicht ein Punkt, der nur Platzhalter ist.
-// Anker (#…) sind nie eine eigene Seite.
-const AKTIVIERBAR: readonly KundenNavPunkt[] = [ENTDECKEN, bestellungenPunkt(false), KONTO]
+// Jeder Punkt mit eigener Seite. Anker (#…) sind nie eine eigene Seite.
+const AKTIVIERBAR: readonly KundenNavPunkt[] = [ENTDECKEN, BESTELLUNGEN, ANMELDEN, KONTO]
 
 /** Der aktive Punkt zu einem Pfad — der längste passende; null auf Startseite, Hofseite und allem anderen. */
 export function kundenAktiverPunkt(pfad: string): KundenNavId | null {
@@ -108,8 +93,7 @@ export function kundenAktiverPunkt(pfad: string): KundenNavId | null {
 
 /**
  * aria-current: 'page' auf genau der Zielseite, 'true' auf Unterseiten, sonst
- * nichts. Der Punkt muss selbst dorthin führen — sonst leuchtete „Bestellungen"
- * der Angemeldeten auf der Anmeldeseite, zu der er gar nicht führt.
+ * nichts. Der Punkt muss selbst dorthin führen.
  */
 export function kundenAriaAktuell(pfad: string, punkt: KundenNavPunkt): 'page' | 'true' | undefined {
   if (kundenAktiverPunkt(pfad) !== punkt.id) return undefined

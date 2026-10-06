@@ -4,11 +4,14 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Mail, MessageCircle, Trash2, Bell, BellOff, ExternalLink, LogOut } from 'lucide-react'
+import { Mail, MessageCircle, Trash2, BellOff, ExternalLink, LogOut } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
+import { cn } from '@/lib/utils'
 import { updateSubscription, deleteCustomerAccount } from '@/server/actions/subscriptions'
-import { Card, CardContent } from '@/components/ui/card'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Button } from '@/components/ui/button'
+import { KARTE, KNOPF_GRUEN, KNOPF_RAHMEN } from '@/components/bestaetigung/bestaetigung-teile'
 import {
   Dialog,
   DialogContent,
@@ -16,6 +19,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+
+/*
+ * „Mein Konto" der freiwilligen Kunden-Anmeldung — seit Nr. 14 im neuen Design
+ * (KundeShell, Tokens), inhaltlich unverändert (E8: keine neuen
+ * Konto-Funktionen): Abonnements je Hof, Abmelden, Konto löschen.
+ * Zerstörendes steht orange umrandet, nie grün (DESIGN_SYSTEM, „Dialoge").
+ */
 
 interface SubscriptionRow {
   farmId: string
@@ -31,7 +41,15 @@ interface Props {
   subscriptions: SubscriptionRow[]
 }
 
-export function ProfileClient({ user, subscriptions: initialSubs }: Props) {
+const ETIKETT = 'text-[11px] font-semibold tracking-[1.1px] text-muted-foreground uppercase'
+
+/** Zerstörende Aktion: orange Rahmen, oranger Text (text-status-offen hält 4,5:1 in beiden Themes). */
+const KNOPF_ZERSTOEREND = cn(
+  'inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-primary/60 px-[18px] text-[14px] font-semibold text-status-offen transition-colors duration-[250ms] hover:bg-primary/12',
+  FOKUS_RAHMEN
+)
+
+export function ProfileClient({ user, subscriptions: initialSubs }: Props): React.JSX.Element {
   const [subs, setSubs] = useState(initialSubs)
   const [isPending, startTransition] = useTransition()
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -96,99 +114,98 @@ export function ProfileClient({ user, subscriptions: initialSubs }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-background px-4 py-10 max-w-lg mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold text-foreground">Mein Konto</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{user.email}</p>
+    <div className="mx-auto flex w-full max-w-[640px] flex-col gap-8 px-4 pt-6 pb-12 md:pt-10">
+      {/* Kopf */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-heading text-[26px] leading-tight font-semibold md:text-[30px]">Mein Konto</h1>
+          <p className="mt-0.5 text-[13.5px] break-words text-muted-foreground [overflow-wrap:anywhere]">{user.email}</p>
         </div>
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <LogOut className="w-4 h-4" />
+        <button type="button" onClick={handleLogout} className={KNOPF_RAHMEN}>
+          <LogOut className="size-4" strokeWidth={1.7} aria-hidden="true" />
           Abmelden
         </button>
       </div>
 
-      {/* Subscriptions */}
-      <section className="mb-10">
-        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
+      {/* Abonnements */}
+      <section aria-labelledby="abos-titel" className="flex flex-col gap-3">
+        <h2 id="abos-titel" className={ETIKETT}>
           Meine Abonnements
         </h2>
 
         {subs.length === 0 ? (
-          <Card>
-            <CardContent className="py-10 text-center">
-              <BellOff className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">
-                Du hast noch keine Benachrichtigungen abonniert.
-              </p>
-              <p className="text-xs text-muted-foreground/70 mt-1">
-                Beim nächsten Einkauf kannst du dich für Neuigkeiten anmelden.
-              </p>
-            </CardContent>
-          </Card>
+          <EmptyState
+            symbol={BellOff}
+            titel="Du hast noch keine Benachrichtigungen abonniert."
+            satz="Beim nächsten Einkauf kannst du dich für Neuigkeiten anmelden."
+            aktion={
+              <Link href="/hoefe" className={KNOPF_GRUEN}>
+                Höfe entdecken
+              </Link>
+            }
+          />
         ) : (
-          <div className="space-y-3">
+          <ul className="flex flex-col gap-3">
             {subs.map((sub) => (
-              <Card key={sub.farmId} className={isPending ? 'opacity-70' : ''}>
-                <CardContent className="py-4 px-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="font-medium text-foreground">{sub.farmName}</p>
-                    </div>
-                    <Link
-                      href={`/${sub.farmSlug}`}
-                      target="_blank"
-                      className="text-muted-foreground hover:text-primary transition-colors"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </Link>
-                  </div>
+              <li key={sub.farmId} className={cn(KARTE, 'transition-opacity', isPending && 'opacity-70')}>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="min-w-0 truncate font-semibold" title={sub.farmName}>
+                    {sub.farmName}
+                  </p>
+                  <Link
+                    href={`/${sub.farmSlug}`}
+                    target="_blank"
+                    aria-label={`Hofseite von ${sub.farmName} öffnen (neuer Tab)`}
+                    className={cn(
+                      'flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
+                      FOKUS_RAHMEN
+                    )}
+                  >
+                    <ExternalLink className="size-4" strokeWidth={1.7} aria-hidden="true" />
+                  </Link>
+                </div>
 
-                  <div className="flex flex-col gap-2">
-                    <ToggleRow
-                      icon={<Mail className="w-4 h-4" />}
-                      label="E-Mail-Neuigkeiten"
-                      active={sub.optInEmail}
-                      onToggle={() => toggleEmail(sub.farmId)}
-                    />
-                    <ToggleRow
-                      icon={<MessageCircle className="w-4 h-4" />}
-                      label="WhatsApp-Neuigkeiten"
-                      active={sub.optInWhatsApp}
-                      disabled={!sub.customerPhone}
-                      disabledNote="Keine Telefonnummer hinterlegt"
-                      onToggle={() => toggleWhatsApp(sub.farmId)}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+                <div className="flex flex-col">
+                  <ToggleRow
+                    icon={Mail}
+                    label="E-Mail-Neuigkeiten"
+                    hof={sub.farmName}
+                    active={sub.optInEmail}
+                    onToggle={() => toggleEmail(sub.farmId)}
+                  />
+                  <ToggleRow
+                    icon={MessageCircle}
+                    label="WhatsApp-Neuigkeiten"
+                    hof={sub.farmName}
+                    active={sub.optInWhatsApp}
+                    disabled={!sub.customerPhone}
+                    disabledNote="Keine Telefonnummer hinterlegt"
+                    onToggle={() => toggleWhatsApp(sub.farmId)}
+                  />
+                </div>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </section>
 
       {/* Konto löschen */}
-      <section>
-        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
+      <section aria-labelledby="konto-titel" className="flex flex-col gap-3">
+        <h2 id="konto-titel" className={ETIKETT}>
           Konto
         </h2>
-        <button
-          onClick={() => setDeleteDialogOpen(true)}
-          className="flex items-center gap-2 text-sm text-destructive hover:opacity-80 transition-opacity"
-        >
-          <Trash2 className="w-4 h-4" />
-          Konto und alle Abos löschen (DSGVO)
-        </button>
-        <p className="text-xs text-muted-foreground mt-1">
-          Deine Bestellungen bleiben aus steuerlichen Gründen gespeichert.
-        </p>
+        <div className={cn(KARTE, 'flex flex-col items-start gap-2')}>
+          <button type="button" onClick={() => setDeleteDialogOpen(true)} className={KNOPF_ZERSTOEREND}>
+            <Trash2 className="size-4" strokeWidth={1.7} aria-hidden="true" />
+            Konto und alle Abos löschen (DSGVO)
+          </button>
+          <p className="text-[12.5px] leading-normal text-muted-foreground">
+            Deine Bestellungen bleiben aus steuerlichen Gründen gespeichert.
+          </p>
+        </div>
       </section>
 
-      {/* Delete confirm */}
+      {/* Löschen bestätigen */}
       <Dialog open={deleteDialogOpen} onOpenChange={(o) => !o && setDeleteDialogOpen(false)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -202,9 +219,9 @@ export function ProfileClient({ user, subscriptions: initialSubs }: Props) {
             <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
               Abbrechen
             </Button>
-            <Button variant="destructive" onClick={handleDeleteAccount} disabled={isDeleting}>
+            <button type="button" onClick={handleDeleteAccount} disabled={isDeleting} className={cn(KNOPF_ZERSTOEREND, 'disabled:opacity-60')}>
               {isDeleting ? 'Lösche…' : 'Konto löschen'}
-            </Button>
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -213,50 +230,53 @@ export function ProfileClient({ user, subscriptions: initialSubs }: Props) {
 }
 
 function ToggleRow({
-  icon,
+  icon: Symbol,
   label,
+  hof,
   active,
   disabled,
   disabledNote,
   onToggle,
 }: {
-  icon: React.ReactNode
+  icon: typeof Mail
   label: string
+  hof: string
   active: boolean
   disabled?: boolean
   disabledNote?: string
   onToggle: () => void
 }) {
   return (
-    <div className="flex items-center justify-between py-1">
-      <div className="flex items-center gap-2.5">
-        <span className={disabled ? 'text-muted-foreground/40' : 'text-muted-foreground'}>
-          {icon}
-        </span>
-        <div>
-          <span className={`text-sm ${disabled ? 'text-muted-foreground/50' : 'text-foreground'}`}>
-            {label}
-          </span>
-          {disabled && disabledNote && (
-            <p className="text-xs text-muted-foreground/50">{disabledNote}</p>
-          )}
+    <div className="flex min-h-11 items-center justify-between gap-3 py-1">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <Symbol className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
+        <div className="min-w-0">
+          <span className={cn('text-[14px]', disabled ? 'text-muted-foreground' : 'text-foreground')}>{label}</span>
+          {disabled && disabledNote && <p className="text-[12px] text-muted-foreground">{disabledNote}</p>}
         </div>
       </div>
+      {/* Ein Schalter: Rolle „switch" sagt dem Screenreader Zustand und Zweck.
+          Sichtbar 24 px hoch, die Trefferfläche über ::before 44 px. */}
       <button
+        type="button"
+        role="switch"
+        aria-checked={active}
+        aria-label={`${label} von ${hof}`}
         onClick={onToggle}
         disabled={disabled}
-        className={`relative w-11 h-6 rounded-full transition-colors duration-200 disabled:opacity-30 ${
-          active ? 'bg-primary' : 'bg-muted-foreground/20'
-        }`}
-        aria-label={active ? 'Deaktivieren' : 'Aktivieren'}
+        className={cn(
+          "relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 before:absolute before:-inset-x-0 before:-inset-y-2.5 before:content-[''] disabled:cursor-not-allowed disabled:opacity-40",
+          active ? 'bg-accent' : 'bg-muted-foreground/45',
+          FOKUS_RAHMEN
+        )}
       >
-        {/* Der Schieber bleibt in beiden Modi weiß: Er liegt sowohl auf der
-            hellen Salbei-Schiene (aktiv) als auch auf der dunklen (inaktiv)
-            und muss auf beiden zu sehen sein. */}
+        {/* Der Schieber in Crème (accent-foreground): im neuen Design in beiden
+            Themes hell — er liegt auf grüner wie auf grauer Schiene sichtbar. */}
         <span
-          className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
+          className={cn(
+            'absolute top-0.5 left-0.5 size-5 rounded-full bg-accent-foreground shadow transition-transform duration-200',
             active ? 'translate-x-5' : 'translate-x-0'
-          }`}
+          )}
         />
       </button>
     </div>

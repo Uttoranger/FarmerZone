@@ -322,6 +322,8 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     'src/app/(public)/[farmSlug]/page.tsx': [],
     // Die Produktseite trägt seit Nr. 11 die KundeShell ohne Unterleiste.
     'src/app/(public)/[farmSlug]/produkt/[id]/page.tsx': [],
+    // „Bestellungen finden" ist mit Nr. 14 gleich in der KundeShell entstanden.
+    'src/app/(public)/bestellungen/page.tsx': [],
   }
 
   it('kennt jede Seite unter (public) — eine neue Seite fällt hier auf', () => {

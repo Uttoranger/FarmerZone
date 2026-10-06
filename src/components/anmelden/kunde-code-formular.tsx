@@ -23,8 +23,11 @@ const MINUTEN = ANMELDECODE_GUELTIG_SEKUNDEN / 60
  * web-k0-anmelden-kunde-code-hof-passwort (linke Karte),
  * mobil-k0-anmelden-mit-code.
  *
- * Wiederverwendbar für „Bestellungen finden" (Nr. 14): KundeCodeFormular mit
- * eigenem `ziel` — Ablauf, Texte und Bremsen bleiben dieselben. Entschieden
+ * „Bestellungen finden" (Nr. 14) nimmt NICHT KundeCodeFormular — dessen
+ * Prüfung meldet über Better Auth an und legt beim ersten Mal ein Konto an
+ * (E8: kein Konto). Es nimmt nur die beiden Darstellungen mit
+ * `variante="bestellungen"` und einen eigenen Ablauf ohne Anmeldung
+ * (components/bestellungen/bestellungen-finden-formular.tsx). Entschieden
  * wird nichts hier: Fehlertexte, Wartezeit und Code-Form kommen aus
  * src/lib/anmeldecode.ts, die Prüfung macht Better Auth auf dem Server.
  *
@@ -33,15 +36,30 @@ const MINUTEN = ANMELDECODE_GUELTIG_SEKUNDEN / 60
  * (tests/anmelden-seite.test.ts).
  */
 
+/**
+ * Wofür die Schritte stehen: die Anmeldung (Nr. 08, Standard) oder „Bestellungen
+ * finden" (Nr. 14). Nur die Texte unterscheiden sich — dort wird niemand
+ * angemeldet, also kein „Kein Passwort nötig" und kein „Anmelden".
+ */
+export type CodeVariante = 'anmelden' | 'bestellungen'
+
 export type CodeEmailSchrittProps = {
   email: string
   onEmail: (email: string) => void
   onAbsenden: () => void
   laedt: boolean
   fehler: string | null
+  variante?: CodeVariante
 }
 
-export function CodeEmailSchritt({ email, onEmail, onAbsenden, laedt, fehler }: CodeEmailSchrittProps): React.JSX.Element {
+export function CodeEmailSchritt({
+  email,
+  onEmail,
+  onAbsenden,
+  laedt,
+  fehler,
+  variante = 'anmelden',
+}: CodeEmailSchrittProps): React.JSX.Element {
   const feldId = useId()
   const fehlerId = useId()
   return (
@@ -54,7 +72,14 @@ export function CodeEmailSchritt({ email, onEmail, onAbsenden, laedt, fehler }: 
       className="flex flex-col gap-3"
     >
       <p className={HINWEIS_TEXT}>
-        Kein Passwort nötig. Wir schicken dir einen {ANMELDECODE_LAENGE}-stelligen Code an deine E-Mail-Adresse.
+        {variante === 'bestellungen' ? (
+          <>
+            Gib die E-Mail-Adresse ein, mit der du bestellt hast. Wir schicken dir einen {ANMELDECODE_LAENGE}-stelligen
+            Code – ein Konto brauchst du dafür nicht.
+          </>
+        ) : (
+          <>Kein Passwort nötig. Wir schicken dir einen {ANMELDECODE_LAENGE}-stelligen Code an deine E-Mail-Adresse.</>
+        )}
       </p>
       <div className="flex flex-col gap-1.5">
         <label htmlFor={feldId} className={FELD_LABEL}>
@@ -108,6 +133,7 @@ export type CodeEingabeSchrittProps = {
   wartezeit: number
   /** Für den Fokus zurück ins Feld nach einem Fehler. */
   codeFeldRef?: Ref<HTMLInputElement>
+  variante?: CodeVariante
 }
 
 export function CodeEingabeSchritt({
@@ -122,6 +148,7 @@ export function CodeEingabeSchritt({
   hinweis,
   wartezeit,
   codeFeldRef,
+  variante = 'anmelden',
 }: CodeEingabeSchrittProps): React.JSX.Element {
   const feldId = useId()
   const meldungId = useId()
@@ -135,7 +162,7 @@ export function CodeEingabeSchritt({
       className="flex flex-col gap-3"
     >
       <p className={HINWEIS_TEXT}>
-        Kein Passwort nötig. Wir haben dir einen {ANMELDECODE_LAENGE}-stelligen Code an{' '}
+        {variante === 'anmelden' && 'Kein Passwort nötig. '}Wir haben dir einen {ANMELDECODE_LAENGE}-stelligen Code an{' '}
         <strong className="font-semibold break-words text-foreground">{email}</strong> geschickt. Er gilt {MINUTEN}{' '}
         Minuten.
       </p>
@@ -167,6 +194,8 @@ export function CodeEingabeSchritt({
             <Loader2 className="size-4 animate-spin" strokeWidth={1.7} aria-hidden="true" />
             Einen Moment …
           </>
+        ) : variante === 'bestellungen' ? (
+          'Bestellungen anzeigen'
         ) : (
           'Anmelden'
         )}

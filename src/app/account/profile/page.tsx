@@ -2,9 +2,12 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { ProfileClient } from './profile-client'
 
 export const dynamic = 'force-dynamic'
+
+// Seit Nr. 14 im neuen Design (KundeShell); Inhalt und Zugang unverändert (E8).
 
 export default async function AccountProfilePage() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -19,20 +22,22 @@ export default async function AccountProfilePage() {
   })
 
   return (
-    <ProfileClient
-      user={{
-        id: session.user.id,
-        name: session.user.name ?? '',
-        email: session.user.email,
-      }}
-      subscriptions={subscriptions.map((s) => ({
-        farmId: s.farmId,
-        farmName: s.farm.name,
-        farmSlug: s.farm.slug,
-        optInEmail: s.optInEmail,
-        optInWhatsApp: s.optInWhatsApp,
-        customerPhone: s.customerPhone ?? null,
-      }))}
-    />
+    <KundeShellMitSitzung>
+      <ProfileClient
+        user={{
+          id: session.user.id,
+          name: session.user.name ?? '',
+          email: session.user.email,
+        }}
+        subscriptions={subscriptions.map((s) => ({
+          farmId: s.farmId,
+          farmName: s.farm.name,
+          farmSlug: s.farm.slug,
+          optInEmail: s.optInEmail,
+          optInWhatsApp: s.optInWhatsApp,
+          customerPhone: s.customerPhone ?? null,
+        }))}
+      />
+    </KundeShellMitSitzung>
   )
 }

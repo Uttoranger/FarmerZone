@@ -5,7 +5,7 @@
 // beide mit den echten Ordnern ab; ein neuer Ordner fällt dort auf.
 // Bestehende Höfe bleiben unberührt: Die Liste wirkt nur beim Anlegen.
 export const RESERVED_SLUGS = new Set([
-  'account', 'admin', 'analytics', 'api', 'customers', 'dashboard', 'datenschutz',
+  'account', 'admin', 'analytics', 'api', 'bestellungen', 'customers', 'dashboard', 'datenschutz',
   'farm-page', 'fehler-melden', 'forgot-password', 'hoefe', 'impressum', 'intern', 'konditionen',
   'login', 'meldungen', 'onboarding', 'orders', 'problem-melden', 'products', 'register',
   'reset-password', 'sales', 'settings', 'status', 'teilen', 'verify',

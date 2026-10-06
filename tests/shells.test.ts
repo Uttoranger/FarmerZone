@@ -160,18 +160,20 @@ describe('KundeShell', () => {
     expect(kopf).not.toContain('>Anmelden<')
   })
 
-  it('angemeldet: kein „Meine Bestellungen" im Kopf, kein Weg zur Anmeldung; am Handy führt „Bestellungen" zu Mein Konto', () => {
-    const html = kunde(true)
+  // Nr. 14: „Bestellungen finden" (/bestellungen) ist das Ziel für alle — im Kopf und in der Leiste.
+  it.each([false, true])('„Meine Bestellungen" im Kopf und „Bestellungen" am Handy führen auf /bestellungen (angemeldet: %s)', (angemeldet) => {
+    const html = kunde(angemeldet)
     const kopf = abschnitt(html, '<header', '</header>')
-    expect(kopf).not.toContain('Meine Bestellungen')
-    expect(html).not.toContain('href="/account/login"')
+    // Ab 1024 px der lange Name, darunter der kurze — sonst bräche der Kopf bei 768 px um.
+    expect(kopf).toMatch(/<a [^>]*href="\/bestellungen"[^>]*>[\s\S]*?<span class="hidden lg:inline">Meine Bestellungen<\/span><\/a>/)
+    expect(kopf).toMatch(/<a [^>]*href="\/bestellungen"[^>]*><span class="lg:hidden">Bestellungen<\/span>/)
     const leiste = abschnitt(html, 'data-slot="bottom-nav"', '</nav>')
-    expect(leiste).toMatch(/<a [^>]*href="\/account\/profile"[^>]*>[\s\S]*?Bestellungen/)
+    expect(leiste).toMatch(/<a [^>]*href="\/bestellungen"[^>]*>[\s\S]*?Bestellungen/)
   })
 
-  it('Gegenprobe: abgemeldet führt „Bestellungen" am Handy zur Anmeldung', () => {
-    const leiste = abschnitt(kunde(false), 'data-slot="bottom-nav"', '</nav>')
-    expect(leiste).toMatch(/<a [^>]*href="\/account\/login"[^>]*>[\s\S]*?Bestellungen/)
+  it('angemeldet: kein Weg zur Anmeldung; Gegenprobe: abgemeldet steht sie im Kopf', () => {
+    expect(kunde(true)).not.toContain('href="/account/login"')
+    expect(abschnitt(kunde(false), '<header', '</header>')).toContain('href="/account/login"')
   })
 
   it('E8: weder „Meine Höfe" noch „Merken" — in keinem Zustand', () => {
@@ -249,6 +251,10 @@ describe('kein Big Bang', () => {
     '(public)/[farmSlug]/produkt/[id]/not-found.tsx',
     // Nr. 13: die Bestätigungsseite (KundeShell ohne Unterleiste, mit und ohne Signatur).
     '(public)/[farmSlug]/confirm/[orderId]/page.tsx',
+    // Nr. 14: „Bestellungen finden" (neu) und die bestehenden Seiten unter /account.
+    '(public)/bestellungen/page.tsx',
+    'account/profile/page.tsx',
+    'account/unsubscribe/page.tsx',
   ]
 
   it('nur die Vorschau unter /intern und die umgestellten Routen binden eine Shell ein', () => {

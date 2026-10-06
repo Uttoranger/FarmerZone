@@ -207,6 +207,17 @@ export async function sendAnmeldeCodeEmail(email: string, code: string): Promise
   return sendRaw(email, 'Dein Anmeldecode für FarmerZone', html)
 }
 
+/**
+ * Code für „Bestellungen finden" (Nr. 14) → wer seine Bestellungen sehen will.
+ * Dieselbe Vorlage wie der Anmeldecode, eigener Text; Betreff und Vorschau
+ * ohne Code (Begründung wie oben). Gibt das Versandergebnis zurück.
+ */
+export async function sendBestellCodeEmail(email: string, code: string): Promise<{ id?: string; error?: string }> {
+  const minuten = ANMELDECODE_GUELTIG_SEKUNDEN / 60
+  const html = await toHtml(React.createElement(AnmeldecodeEmail, { code, minuten, zweck: 'bestellungen' }))
+  return sendRaw(email, 'Dein Code für deine Bestellungen · FarmerZone', html)
+}
+
 /** Passwort-Reset → Bauer */
 export async function sendPasswordResetEmail(email: string, url: string): Promise<void> {
   const html = await toHtml(React.createElement(PasswordResetEmail, { resetUrl: url }))

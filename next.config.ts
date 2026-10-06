@@ -8,7 +8,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 // Dieselbe Menge steht als RESERVED_SLUGS in src/lib/slug.ts, damit kein Hof
 // einen dieser Slugs bekommt (tests/reservierte-slugs.test.ts).
 const KEINE_HOFSEITE = [
-  'account', 'admin', 'analytics', 'api', 'customers', 'dashboard', 'datenschutz',
+  'account', 'admin', 'analytics', 'api', 'bestellungen', 'customers', 'dashboard', 'datenschutz',
   'farm-page', 'fehler-melden', 'forgot-password', 'hoefe', 'impressum', 'intern', 'konditionen',
   'login', 'meldungen', 'onboarding', 'orders', 'problem-melden', 'products', 'register',
   'reset-password', 'sales', 'settings', 'status', 'teilen', 'verify',
@@ -117,6 +117,18 @@ const nextConfig: NextConfig = {
         // Hof, Positionen und Betrag ohne Anmeldung (S1) — gleiche Regel. Der
         // Mail-Link älterer Mails, der dorthin weiterleitet, ebenso.
         source: '/:farmSlug/bestaetigen/:token',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        ],
+      },
+      {
+        // „Bestellungen finden" (Nr. 14, S1): Nach dem Code zeigt die Seite
+        // Höfe, Beträge und signierte Links zu den Bestellungen der Adresse.
+        // Kein Referrer beim Klick hinaus, in keinen Suchindex. Zwischen-
+        // speichern verhindert die Seite selbst: Sie liest den Cookie und ist
+        // damit dynamisch (Next schickt „private, no-cache, no-store").
+        source: '/bestellungen',
         headers: [
           { key: 'Referrer-Policy', value: 'no-referrer' },
           { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
