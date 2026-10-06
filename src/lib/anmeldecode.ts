@@ -102,6 +102,19 @@ export function codeVersandErlaubt(rolle: string | null | undefined): boolean {
 }
 
 /**
+ * Ist die Adresse der Sitzung bewiesen? Nur dann zeigt und ändert /account
+ * Daten zur Adresse (Abos aus dem Checkout, Bestellungen). Seit der Checkout
+ * kein Konto mehr anlegt (E8, Nr. 17a), kann eine Adresse mit Bestellungen
+ * und Abos ohne Konto sein — wer sie kennt, könnte sie mit Passwort
+ * registrieren (`requireEmailVerification: false`) und wäre damit angemeldet.
+ * Den Besitz beweist nur die Code-Anmeldung: Better Auth setzt dabei
+ * `emailVerified` (bei neuem wie bestehendem Konto).
+ */
+export function adresseBestaetigt(nutzer: { emailVerified?: boolean | null } | null | undefined): boolean {
+  return nutzer?.emailVerified === true
+}
+
+/**
  * Die Rolle hinter einer Adresse aus ALLEN Konten, die sie (ohne Rücksicht
  * auf Groß-/Kleinschreibung) trifft. Ein einziger Hof oder Admin darunter
  * genügt für „kein Code" — sonst entschiede die zufällige Reihenfolge der

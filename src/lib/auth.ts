@@ -29,8 +29,8 @@ const codeAnforderungen = erzeugeAnforderungsSperre()
  *
  * Genau diese Adresse, keine Platzhalter: Prisma macht aus dem Vergleich ein
  * ILIKE, in dem „_" und „%" sonst ein fremdes Konto träfen — ein Hof
- * „max_hof@…" hielte der Hook für die Kundin „max-hof@…" (die jeder per
- * Checkout anlegen kann), und der Code meldete den Hof an. ALLE Treffer
+ * „max_hof@…" hielte der Hook für die Kundin „max-hof@…" (die bis Nr. 17a
+ * jeder per Checkout anlegen konnte), und der Code meldete den Hof an. ALLE Treffer
  * zählen (rolleAusTreffern), nicht der erste beliebige; das Betreiber-Recht
  * (isAdmin) zählt wie die Rolle ADMIN. Maskiert statt per $queryRaw mit
  * lower(): kein Roh-SQL ohne Not (TECH_STACK.md), typisiert über Prisma, und

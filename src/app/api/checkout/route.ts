@@ -554,25 +554,12 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 4. Find or create customer account (dormant — no password)
-  let customer = await prisma.user.findUnique({
-    where: { email: data.customerEmail },
-    select: { id: true },
-  })
-
-  if (!customer) {
-    customer = await prisma.user.create({
-      data: {
-        id: nanoid(),
-        email: data.customerEmail,
-        name: data.customerName,
-        phone: data.customerPhone,
-        role: 'CUSTOMER',
-        emailVerified: false,
-      },
-      select: { id: true },
-    })
-  }
+  // 4. KEIN KUNDENKONTO (E8, Nr. 17a). Die Kundin bestellt als Gast: kein
+  //    ruhendes Konto, keine Verknüpfung mit einem Konto derselben Adresse —
+  //    `customerId` bleibt null. Wer sie ist, sagt die bereinigte, klein
+  //    geschriebene `customerEmail` (emailSchema); Name und Telefon stehen als
+  //    Momentaufnahme auf der Bestellung. Vorher landete eine Bestellung hier
+  //    am Konto, das zufällig dieselbe Adresse trug, auch an dem eines Hofs.
 
   // 5. Totals — totalAmount ist und bleibt der WARENPREIS (Umsatz des Hofes)
   const totalAmount = calcTotalAmount(positionen)
@@ -638,7 +625,6 @@ export async function POST(request: NextRequest) {
         orderNumber,
         idempotencyKey: data.idempotencyKey ?? null,
         farmId: farm.id,
-        customerId: customer.id,
         customerEmail: data.customerEmail,
         customerName: data.customerName,
         customerPhone: data.customerPhone,

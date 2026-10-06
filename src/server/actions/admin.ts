@@ -139,6 +139,11 @@ export async function rejectFarmAction(farmId: string): Promise<{ error?: string
 
   // 4. Keine Bestellungen am Inhaber-Konto — sonst kappt SET NULL still die
   //    Kundenzuordnung von Bestellungen, die diesen Hof gar nichts angehen.
+  //    Seit E8 (Nr. 17a) hängt der Checkout keine Bestellung mehr an ein Konto;
+  //    verknüpft sind nur noch Bestellungen aus der Zeit davor. Die Sperre
+  //    bleibt bewusst: Sie fasst keine Altdaten an (keine Datenänderung ohne
+  //    Auftrag). Bewusst NICHT nach der Adresse zählen — dann sperrte jede
+  //    Gast-Bestellung unter der Adresse des Inhabers das Ablehnen.
   const eigeneBestellungen = await prisma.order.count({ where: { customerId: farm.ownerId } })
   if (eigeneBestellungen > 0) return { error: FARM_REJECT_OWNER_HAS_ORDERS_MESSAGE }
 

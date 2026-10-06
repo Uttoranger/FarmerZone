@@ -67,7 +67,7 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
   - Handy-Unterleiste: Entdecken · [Warenkorb] · Bestellungen.
 - **Begründung:** Weniger Personendaten und weniger Pflichten. Das Bestellen bleibt ohne Hürde.
 - **Dateien:** `src/lib/kunden-navigation.ts` (#168), `src/lib/bestellungen-finden.ts` und `/bestellungen` (#178), `src/app/api/checkout/route.ts`.
-- **Stand:** `/api/checkout` legt noch ein ruhendes CUSTOMER-Konto an bzw. hängt die Bestellung an ein bestehendes Konto. Das behebt 17a (freigabe.md §8).
+- **Stand:** Umgesetzt mit 17a (06.10.2026): `/api/checkout` legt kein Konto mehr an und verknüpft keine Bestellung mit einem Konto (`customerId` bleibt null); `/account` zeigt Abos nur zur bestätigten Adresse. Ruhende Altkonten bleiben unangetastet.
 
 ### E9 · Keine Prüfung der Futtermittel-Nummer (02.10.2026)
 - **Entscheidung:** Die Plattform prüft die Nummer nicht.

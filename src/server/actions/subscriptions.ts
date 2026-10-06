@@ -4,6 +4,11 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { verifyUnsubscribeToken } from '@/lib/unsubscribe'
+import { adresseBestaetigt } from '@/lib/anmeldecode'
+
+// Abos hängen an der Adresse, nicht an einem Konto. Ändern oder löschen darf
+// sie nur, wer die Adresse mit Code bewiesen hat (E8, Nr. 17a; adresseBestaetigt).
+const ADRESSE_UNBESTAETIGT = 'Melde dich bitte mit dem Code aus deiner E-Mail an, dann kannst du deine Abos ändern.'
 
 export type ActionResult = { error?: string }
 
@@ -14,6 +19,7 @@ export async function updateSubscription(
 ): Promise<ActionResult> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return { error: 'Nicht angemeldet' }
+  if (!adresseBestaetigt(session.user)) return { error: ADRESSE_UNBESTAETIGT }
 
   const customerEmail = session.user.email.toLowerCase()
   const customerPhone = (session.user as typeof session.user & { phone?: string }).phone ?? null
@@ -45,7 +51,10 @@ export async function deleteCustomerAccount(): Promise<ActionResult> {
 
   const email = session.user.email.toLowerCase()
 
-  await prisma.customerFarmSubscription.deleteMany({ where: { customerEmail: email } })
+  // Ohne bewiesene Adresse gehören die Abos zu ihr womöglich jemand anderem.
+  if (adresseBestaetigt(session.user)) {
+    await prisma.customerFarmSubscription.deleteMany({ where: { customerEmail: email } })
+  }
   await prisma.user.delete({ where: { id: session.user.id } })
 
   return {}

@@ -51,9 +51,8 @@ describe('POST /api/checkout — Bestandsabzug in der echten Datenbank', () => {
     const sitzung = intKennung('sitzung')
     await setzeHalt(produkt.id, sitzung, 1)
 
-    // Wiederkehrende Kundin: Das Konto gibt es schon. Sonst legten beide
-    // Anfragen gleichzeitig denselben Nutzer an — ein anderer Wettlauf, nicht
-    // der, um den es hier geht.
+    // Wiederkehrende Kundin mit ruhendem Konto aus der Zeit vor Nr. 17a — der
+    // Checkout fasst es nicht an (E8); um diesen Wettlauf geht es hier nicht.
     const kundin = `${intKennung('kundin')}@example.com`
     await prisma.user.create({
       data: { id: intKennung('user'), email: kundin, name: 'Erika Mustermann', role: 'CUSTOMER' },

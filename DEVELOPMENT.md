@@ -4146,6 +4146,17 @@ Nach dem Merge von #170–#181 lagen Entscheidungen verstreut in `freigabe.md`, 
 - **Lauf 4:** Haltepunkt 19, davor die Aufträge 17a–17d (`freigabe.md` §8). 17d setzt K1 mit dem Datum 1. Februar 2027 um.
 - **Warum Merge-Commit statt Squash:** Ein Squash ersetzt die Commits eines Stapel-PRs durch einen neuen. Die darauf gestapelten Branches kennen diesen Commit nicht und bekommen beim nächsten Abgleich Konflikte (so bei #166–#170).
 
+## Checkout ohne Kundenkonto (Nachtlauf Nr. 17a, Oktober 2026)
+
+Auftrag `freigabe.md` §8, Entscheidung E8. Keine Schema-Änderung (`Order.customerId` war schon nullable), keine Daten-Migration, kein Paket. Bericht: `docs/nachtlauf/berichte/17a.md`.
+
+- **Was wegfiel:** `/api/checkout` suchte bisher per `user.findUnique` ein Konto mit der Adresse und legte sonst ein ruhendes CUSTOMER-Konto an; die Bestellung bekam dessen `customerId`. Beides ist weg. Folgen: Eine Bestellung unter der Adresse eines Hofs hängt nicht mehr am Hof-Konto (Morgenbericht Lauf 3, Folge 2), und der Wettlauf zweier gleichzeitiger Erstbestellungen um dasselbe Konto (eindeutiger Index auf `User.email`) entfällt. Beträge, Bestand, Fristen und Stripe sind unverändert.
+- **Wer `customerId` las:** im Code nur noch die Ablehnungssperre in `rejectFarmAction` (`admin.ts`). Mails, „Bestellungen finden", Hof-Kundenliste und Kennzahlen lasen schon vorher nach `customerEmail`. Die Kundenliste fasst unverändert nach der klein geschriebenen Adresse zusammen — Gast-Bestellungen und alte Bestellungen am ruhenden Konto ergeben eine Kundin (Integrationstest).
+- **Ablehnungssperre bleibt:** Sie zählt weiter nur Bestellungen mit `customerId` = Inhaber (nur noch Altbestand). Löschen des Inhabers setzte deren `customerId` per SET NULL still auf null; ob das unbedenklich ist, entscheidet der Mensch, nicht ein Nachtlauf (keine Datenänderung ohne Auftrag). Nach der Adresse zählt sie bewusst nicht.
+- **`/account` nur mit bestätigter Adresse:** Ohne ruhendes Konto ist eine Adresse mit Bestellungen und Abos oft frei — jemand könnte sie mit Passwort registrieren (ohne Bestätigung, bis S3/17b) und auf `/account/profile` die Abos samt Telefonnummer sehen oder löschen. Vorher verhinderte das das ruhende Konto (Adresse belegt). Deshalb liest und ändert `/account` Abos nur noch bei `emailVerified` (`adresseBestaetigt`); die Code-Anmeldung setzt es bei neuem wie bestehendem Konto. Für Kundinnen nach der Code-Anmeldung ändert sich nichts.
+- **Code-Anmeldung ohne Konto:** Better Auth legt beim ersten richtigen Code ein bestätigtes CUSTOMER-Konto an (`disableSignUp: false`); das deckte `tests/integration/anmeldecode.int.test.ts` schon ab. Die Rollenprüfung (`rolleZurAdresse`) ist unverändert.
+- **Bekannte Grenze:** Registriert jemand einen Hof mit der Adresse einer Gast-Kundin, bekommt diese Adresse keinen Anmeldecode mehr (Hof-Adresse). „Bestellungen finden" bleibt ihr. Die E-Mail-Bestätigung für neue Höfe (S3, Nr. 17b) entschärft das.
+
 ## Nützliche Befehle
 
 ```bash

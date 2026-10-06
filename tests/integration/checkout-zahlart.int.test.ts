@@ -55,7 +55,7 @@ describe('POST /api/checkout — E5 in der echten Datenbank', () => {
     expect(await prisma.order.count({ where: { farmId: farm.id } })).toBe(0)
     expect((await prisma.product.findUniqueOrThrow({ where: { id: produkt.id } })).stock).toBe(5)
     expect(await prisma.stockReservation.count({ where: { sessionId: sitzung } })).toBe(1)
-    // Die Ablehnung steht vor Schritt 4 (Kundenkonto): kein ruhendes Konto zur Adresse.
+    // Kein Konto zur Adresse — der Checkout legt seit Nr. 17a ohnehin keines an (E8).
     expect(await prisma.user.count({ where: { email } })).toBe(0)
     expect(await prisma.user.count()).toBe(kontenVorher)
     expect(sendOnsiteConfirmation).not.toHaveBeenCalled()
