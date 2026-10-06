@@ -120,7 +120,7 @@ export function KundenKopf({
           </nav>
           <div className="flex items-center gap-5">
             {/* Ein Wort, ein Ziel: das Band „Für Höfe" der Startseite (id="fuer-hoefe"). */}
-            <Link href="/#fuer-hoefe" className={`${TEXTLINK} ${FOKUS}`}>
+            <Link href="/fuer-hoefe" className={`${TEXTLINK} ${FOKUS}`}>
               Für Höfe
             </Link>
             <Link

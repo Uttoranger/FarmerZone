@@ -46,7 +46,7 @@ const KNOPF_UMRISS = cn(
  * Crème-Grund und ist kein Foto — nachts gedämpft und gerahmt statt
  * leuchtend (CODING_STANDARDS §7).
  */
-function Illustration({ src, sizes, className }: { src: string | null; sizes: string; className?: string }) {
+export function Illustration({ src, sizes, className }: { src: string | null; sizes: string; className?: string }) {
   return (
     <span className={cn('relative block overflow-hidden bg-muted dark:ring-1 dark:ring-border', className)}>
       {src && <Image src={src} alt="" fill sizes={sizes} className="object-cover dark:brightness-[0.78] dark:saturate-[0.9]" />}
@@ -247,9 +247,9 @@ export function SoFunktionierts({ rechnung }: { rechnung: Beispielrechnung }): R
 /**
  * Das Band „Für Höfe" — der eine orange Knopf der Seite (Hofwelt, DESIGN_SYSTEM
  * „Farbrollen"). Es trägt die Sprungmarke #fuer-hoefe für die Navigation.
- * „Mehr für Höfe" führt zu den Konditionen, bis es eine eigene Seite für Höfe
- * gibt (Mockup web-h0-fuer-hoefe, noch nicht gebaut). Preise nennt das Band
- * keine (E6: dann nur die beschlossenen Tarife).
+ * „Mehr für Höfe" führt seit Nr. 15 auf die eigene Seite /fuer-hoefe. Preise
+ * nennt das Band keine — die stehen nur dort und auf /konditionen
+ * (src/lib/konditionen.ts).
  */
 export function FuerHoefeBand(): React.JSX.Element {
   return (
@@ -267,7 +267,7 @@ export function FuerHoefeBand(): React.JSX.Element {
             </p>
           </div>
           <div className="flex flex-col gap-2.5 md:flex-row">
-            <Link href="/konditionen" className={cn(KNOPF_UMRISS, 'rounded-[14px] md:rounded-full')}>
+            <Link href="/fuer-hoefe" className={cn(KNOPF_UMRISS, 'rounded-[14px] md:rounded-full')}>
               Mehr für Höfe
             </Link>
             <Link

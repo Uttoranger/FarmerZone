@@ -9,7 +9,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 // einen dieser Slugs bekommt (tests/reservierte-slugs.test.ts).
 const KEINE_HOFSEITE = [
   'account', 'admin', 'analytics', 'api', 'bestellungen', 'customers', 'dashboard', 'datenschutz',
-  'farm-page', 'fehler-melden', 'forgot-password', 'hoefe', 'impressum', 'intern', 'konditionen',
+  'farm-page', 'fehler-melden', 'forgot-password', 'fuer-hoefe', 'hoefe', 'impressum', 'intern', 'konditionen',
   'login', 'meldungen', 'onboarding', 'orders', 'problem-melden', 'products', 'register',
   'reset-password', 'sales', 'settings', 'status', 'teilen', 'verify',
 ];

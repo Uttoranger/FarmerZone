@@ -49,7 +49,7 @@ describe('Web', () => {
     for (const angemeldet of [false, true]) {
       const nav = kundenNavigation({ angemeldet })
       for (const p of [...nav.web, nav.anmelden, nav.konto]) {
-        if (p) expect(p.href, p.label).toMatch(/^\/(hoefe|bestellungen|account\/login|account\/profile|#[a-z-]+)?$/)
+        if (p) expect(p.href, p.label).toMatch(/^\/(hoefe|bestellungen|fuer-hoefe|account\/login|account\/profile|#[a-z-]+)?$/)
       }
     }
   })
@@ -100,6 +100,7 @@ describe('aktive Punkte', () => {
     ['/account/profile', 'konto'],
     ['/account/login', 'anmelden'],
     ['/bestellungen', 'bestellungen'],
+    ['/fuer-hoefe', 'fuer-hoefe'],
   ])('%s → %s', (pfad, id) => {
     expect(kundenAktiverPunkt(pfad)).toBe(id)
   })

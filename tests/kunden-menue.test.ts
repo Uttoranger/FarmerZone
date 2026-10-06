@@ -11,7 +11,7 @@ describe('MENUE_PUNKTE — die Wege des Menüs', () => {
       ['Startseite', '/'],
       ['Hofladen entdecken', '/hoefe'],
       ['Heu & Futter finden', '/hoefe?bereich=futter'],
-      ['Für Höfe', '/#fuer-hoefe'],
+      ['Für Höfe', '/fuer-hoefe'],
       ['Hofbetreiber-Login', '/login'],
       ['Problem melden', '/problem-melden'],
     ])
@@ -55,7 +55,8 @@ describe('menuePunkte — die aktuelle Seite', () => {
     }
   })
 
-  it('Für Höfe ist nie aktuell — ein Anker ist keine Seite', () => {
+  it('Für Höfe ist seit Nr. 15 eine eigene Seite — auf ihr aktuell, auf der Startseite nicht', () => {
     expect(aktuelle('/', '')).toEqual(['Startseite'])
+    expect(aktuelle('/fuer-hoefe', '')).toEqual(['Für Höfe'])
   })
 })

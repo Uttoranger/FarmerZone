@@ -1,45 +1,78 @@
-﻿import { redirect } from 'next/navigation'
+import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
-import { getFarmForUser } from '@/server/queries/dashboard'
-import { OnboardingClient } from './onboarding-client'
-import { APP_URL } from '@/lib/umgebung-server'
+import { einrichtenStand, vorname } from '@/lib/einrichten'
+import { ladeEinrichtenHof } from '@/server/queries/einrichten'
+import { getOpenOrdersCount } from '@/server/queries/orders'
+import { isAdminUser } from '@/server/queries/admin'
+import { zaehleZuEntscheiden } from '@/server/queries/meldung'
+import { HofShell } from '@/components/shells/hof-shell'
+import { KundeFokusShell } from '@/components/shells/kunde-shell'
+import { EinrichtenSeite } from '@/components/einrichten/einrichten-seite'
+
+export const metadata: Metadata = {
+  title: 'Hof einrichten — FarmerZone',
+}
 
 export const dynamic = 'force-dynamic'
 
-export default async function OnboardingPage() {
+/**
+ * „Hof einrichten" (Gate 5, Nr. 15; Mockups web-h1-einrichten und
+ * mobil-h1-einrichten): sechs Schritte, ihr Stand aus src/lib/einrichten.ts.
+ *
+ * Bisher führte die Seite einen Hof mit Hof nach /dashboard und war sonst ein
+ * Assistent (Hofdaten, Produkte, Abholzeiten). Jetzt:
+ *  - ohne Hof: Fokus-Shell (es gibt noch keinen Hof für die Seitenleiste),
+ *    Schritt 2 trägt das Formular „Hof anlegen" (createFarm, unverändert);
+ *  - mit Hof: HofShell wie im Mockup, die Schritte verlinken in die
+ *    bestehenden Seiten (Mein Hof, Produkte, Zahlung). Produkte und
+ *    Abholzeiten legt der Hof dort an, nicht mehr im Assistenten — dort gelten
+ *    alle Regeln (Kategorie-Pflicht, Abholzeiten-Prüfung).
+ *
+ * Nur Höfe: Andere Rollen schickt die Seite wie das Bauern-Layout zur
+ * Anmeldung — sonst legte ein Kundenkonto hier einen Hof an, den es danach
+ * nie erreicht.
+ */
+export default async function OnboardingPage(): Promise<React.JSX.Element> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) redirect('/login')
+  const rolle = (session.user as typeof session.user & { role?: string }).role
+  if (rolle !== 'FARMER') redirect('/login')
 
-  const farm = await getFarmForUser(session.user.id)
-  if (farm) redirect('/dashboard')
+  const hof = await ladeEinrichtenHof(session.user.id)
+  const person = { name: session.user.name ?? '', email: session.user.email ?? '' }
+  const stand = einrichtenStand({ personName: person.name, email: person.email, hof })
+  const inhalt = (
+    <EinrichtenSeite
+      stand={stand}
+      vorname={vorname(person.name)}
+      person={person}
+      tarif={hof?.tarif ?? null}
+      freigeschaltet={hof?.freigeschaltet ?? false}
+    />
+  )
 
+  if (!hof) {
+    return (
+      <KundeFokusShell titel="Hof einrichten" zurueck={{ href: '/', label: 'Zur Startseite' }}>
+        {inhalt}
+      </KundeFokusShell>
+    )
+  }
+
+  // Zahlen und Admin-Recht wie im Bauern-Layout — frisch aus der Datenbank.
+  const [offeneBestellungen, isAdmin] = await Promise.all([getOpenOrdersCount(hof.id), isAdminUser(session.user.id)])
+  const zuEntscheiden = isAdmin ? await zaehleZuEntscheiden() : 0
   return (
-    <main
-      className="min-h-screen px-4 py-12"
-      style={{ background: 'var(--auth-gradient)' }}
+    <HofShell
+      hofName={hof.name}
+      hofSlug={hof.slug}
+      personName={person.name}
+      isAdmin={isAdmin}
+      zahlen={{ bestellungen: offeneBestellungen, admin: zuEntscheiden }}
     >
-      <div className="max-w-2xl mx-auto">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary mb-4 shadow-[0_4px_16px_oklch(0.30_0.082_155_/_0.30)]">
-            <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M16 28 C16 28 6 22 6 13 C6 8 10.5 4 16 4 C21.5 4 26 8 26 13 C26 22 16 28 16 28Z" fill="white" opacity="0.9" />
-              <path d="M16 28 L16 18" stroke="oklch(0.68 0.071 148)" strokeWidth="1.75" strokeLinecap="round" />
-              <path d="M16 21 C13.5 19.5 10 19 8.5 16" stroke="oklch(0.68 0.071 148)" strokeWidth="1.25" strokeLinecap="round" />
-            </svg>
-          </div>
-          <h1 className="font-heading text-2xl font-semibold text-foreground">Hof einrichten</h1>
-          <p className="text-muted-foreground text-sm mt-1.5">
-            Nur wenige Schritte bis zu deinem eigenen Bauernshop
-          </p>
-        </div>
-
-        {/* Die Adresse kommt vom Server: Im Browser gäbe es NEXT_PUBLIC_APP_URL
-            nur, wenn sie zur Build-Zeit gesetzt war — in Previews ist sie es nicht. */}
-        <OnboardingClient userEmail={session.user.email ?? ''} appUrl={APP_URL} />
-      </div>
-    </main>
+      {inhalt}
+    </HofShell>
   )
 }
-
-
