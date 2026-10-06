@@ -46,7 +46,8 @@ const PICKED_ORDER_SELECT = {
   totalAmount: true,
   stripePaymentIntentId: true,
   pickedUpAt: true,
-  items: { select: { quantity: true, productName: true, product: { select: { unit: true, unitSize: true } } } },
+  // Fehlende Artikel (E14) wurden nicht übergeben.
+  items: { where: { fehltSeit: null }, select: { quantity: true, productName: true, product: { select: { unit: true, unitSize: true } } } },
 } as const
 
 type PickedOrderRow = {
@@ -140,7 +141,8 @@ export async function getMeistverkaufteProduktIds(farmId: string, jetzt: Date = 
   const fenster = { von: new Date(jetzt.getTime() - 90 * 24 * 60 * 60 * 1000), bis: jetzt }
   const [positionen, verkaeufe] = await Promise.all([
     prisma.orderItem.findMany({
-      where: { order: umsatzBestellungWhere(farmId, fenster) },
+      // Fehlende Artikel (E14) wurden nicht verkauft.
+      where: { order: umsatzBestellungWhere(farmId, fenster), fehltSeit: null },
       select: { productId: true, totalPrice: true },
     }),
     prisma.manualSale.findMany({

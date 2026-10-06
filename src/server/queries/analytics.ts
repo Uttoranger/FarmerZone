@@ -77,7 +77,8 @@ export async function getUmsatzAuswertung(
 export async function getTopProdukte(farmId: string, fenster: Umsatzfenster, anzahl = 3): Promise<TopProdukt[]> {
   const [positionen, verkaeufe] = await Promise.all([
     prisma.orderItem.findMany({
-      where: { order: umsatzBestellungWhere(farmId, fenster) },
+      // Fehlende Artikel (E14) wurden nicht verkauft — sie zählen nicht.
+      where: { order: umsatzBestellungWhere(farmId, fenster), fehltSeit: null },
       select: {
         productId: true,
         productName: true,
@@ -131,6 +132,8 @@ export async function getYtdRevenue(farmId: string, jetzt: Date = new Date()): P
       where: umsatzBestellungWhere(farmId, jahr),
       select: {
         items: {
+          // Fehlende Artikel (E14) wurden nicht verkauft — sie zählen nicht.
+          where: { fehltSeit: null },
           select: {
             totalPrice: true,
             product: { select: { countsTowardLimit: true } },

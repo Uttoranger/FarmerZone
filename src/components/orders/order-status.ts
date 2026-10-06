@@ -42,7 +42,7 @@ export function paymentLabel(method: string): string {
 
 // Hinweis zu IN_PREPARATION („In Vorbereitung"): Der Status wird überall
 // GELESEN — Beschriftung und Farbe oben, ACTIVE_STATUSES hier, die Abholbereit-
-// Schaltfläche in order-card.tsx/order-actions.tsx, OPEN_STATUSES in den
+// Schaltfläche (bestellAktionen in src/lib/hof-bestellungen.ts), OPEN_STATUSES in den
 // Queries und die Rückschritt-Whitelist in actions/orders.ts —, aber kein
 // Codepfad SETZT ihn je. Bestellungen springen direkt von PAID/CONFIRMED auf
 // READY. Der Status bleibt bewusst erhalten (Enum und Anzeige unverändert),

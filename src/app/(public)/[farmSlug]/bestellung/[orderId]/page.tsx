@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { bestellLinkGilt, bestellSignatur } from '@/lib/bestell-link'
 import { bestellStatusAnzeige, formatiereAbholtermin, zahlungsAnzeige } from '@/lib/bestellstatus'
 import { formatEuro, formatPosition } from '@/lib/format'
+import { alsCents } from '@/lib/order-totals'
+import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { Marke } from '@/components/ui/marke'
 import { BestellSummenZeilen } from '@/components/checkout/bestell-summen'
 import { KundenKopf } from '@/components/shared/kunden-kopf'
@@ -84,6 +86,8 @@ export default async function BestellungPage({ params, searchParams }: Props) {
           quantity: true,
           unitPrice: true,
           totalPrice: true,
+          // „Artikel fehlt" (E14): die Position steht da, ist aber nicht mehr im Betrag.
+          fehltSeit: true,
           // Einheit nur zur Anzeige gejoint — dieselbe Schreibweise wie auf
           // der Bestätigungsseite (formatPosition, src/lib/format.ts).
           product: { select: { unit: true, unitSize: true } },
@@ -173,10 +177,17 @@ export default async function BestellungPage({ params, searchParams }: Props) {
           <div className="space-y-2">
             {order.items.map((item, i) => (
               <div key={i} className="flex justify-between gap-3 text-sm">
-                <span className="text-foreground">{formatPosition({ name: item.productName, quantity: item.quantity, unit: item.product?.unit ?? null, unitSize: item.product?.unitSize ?? null })}</span>
-                <span className="shrink-0 text-foreground">
-                  {formatEuro(Number(item.totalPrice))}
+                <span className="text-foreground">
+                  {formatPosition({ name: item.productName, quantity: item.quantity, unit: item.product?.unit ?? null, unitSize: item.product?.unitSize ?? null })}
+                  {item.fehltSeit && ' · fehlt leider'}
                 </span>
+                {item.fehltSeit ? (
+                  <span className="shrink-0 text-muted-foreground">nicht berechnet</span>
+                ) : (
+                  <span className="shrink-0 text-foreground">
+                    {formatEuro(centsAlsEuro(alsCents(item.totalPrice)))}
+                  </span>
+                )}
               </div>
             ))}
           </div>

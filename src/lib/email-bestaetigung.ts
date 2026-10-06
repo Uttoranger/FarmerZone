@@ -20,16 +20,16 @@
 /**
  * Ab hier angelegte Konten müssen ihre Adresse bestätigen; ältere bleiben
  * unberührt, auch wenn sie unbestätigt sind (keine Datenänderung in
- * Produktion). Wiener Mitternacht.
+ * Produktion).
  *
- * VOR DEM MERGE AUF DEN DEPLOY-TAG SETZEN (Bericht 17b, „Bitte entscheiden").
- * Der Nachtlauf hat ein Datum gewählt, das sicher nach dem 06.10.2026 liegt:
- * Liegt der Stichtag vor dem Deploy, müssten Konten aus der Zeit dazwischen
- * bestätigen, ohne je eine Mail bekommen zu haben (sie könnten sie nur neu
- * anfordern); liegt er danach, entkommen Konten aus der Zeit dazwischen der
- * Pflicht.
+ * Der Zeitpunkt ist der Merge von #184 (06.10.2026, 20:21 Uhr Wiener Zeit),
+ * bewusst NICHT Mitternacht: Am 06.10. um 18:07 Uhr wurde ein Hof angelegt
+ * und freigeschaltet, bevor es die Bestätigung gab. Mit Mitternacht wären
+ * seine Foto-Uploads nachträglich gesperrt, obwohl er nie eine Mail bekommen
+ * hat. Ein späterer Stichtag (der Platzhalter lag auf dem 15.10.) ließe
+ * dagegen alle Höfe aus der Zeit dazwischen ohne Bestätigung durch.
  */
-export const EMAIL_BESTAETIGUNG_STICHTAG = new Date('2026-10-15T00:00:00+02:00')
+export const EMAIL_BESTAETIGUNG_STICHTAG = new Date('2026-10-06T20:21:00+02:00')
 
 /** So lange gilt der Link aus der Mail. Better Auth übernimmt den Wert (`expiresIn`). */
 export const BESTAETIGUNG_GUELTIG_SEKUNDEN = 24 * 60 * 60

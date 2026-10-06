@@ -90,7 +90,8 @@ export async function getCustomersForFarm(farmId: string): Promise<CustomerSumma
         status: true,
         totalAmount: true,
         createdAt: true,
-        items: { select: { productName: true, quantity: true } },
+        // Fehlende Artikel (E14) wurden nicht übergeben.
+        items: { where: { fehltSeit: null }, select: { productName: true, quantity: true } },
       },
       orderBy: { createdAt: 'asc' },
     }),
@@ -212,7 +213,8 @@ export async function getCustomerDetail(
         totalAmount: true,
         createdAt: true,
         pickupDate: true,
-        items: { select: { productName: true, quantity: true } },
+        // Fehlende Artikel (E14) wurden nicht übergeben.
+        items: { where: { fehltSeit: null }, select: { productName: true, quantity: true } },
       },
       orderBy: { createdAt: 'desc' },
     }),

@@ -8,6 +8,7 @@ import { NewOrderNotificationEmail } from '@/emails/new-order-notification'
 import { OrderConfirmedEmail } from '@/emails/order-confirmed'
 import { OrderReadyEmail } from '@/emails/pickup-reminder'
 import { OrderCancelledEmail } from '@/emails/order-cancelled'
+import { ArtikelFehltEmail } from '@/emails/artikel-fehlt'
 import { OrderNotReadyEmail } from '@/emails/order-not-ready'
 import { ZahlungZuSpaetEmail } from '@/emails/zahlung-zu-spaet'
 import { BestellungVerfallenEmail } from '@/emails/bestellung-verfallen'
@@ -536,7 +537,9 @@ export async function sendStatusUpdateEmail(opts: {
 /** Storno → Kunde */
 export async function sendOrderCancelled(
   order: OrderForEmail,
-  refundAmount: number | null
+  refundAmount: number | null,
+  /** Der Grund aus dem Storno-Dialog (Nr. 19) — Text des Hofs, React escaped ihn. */
+  cancelReason?: string | null
 ): Promise<void> {
   const html = await toHtml(React.createElement(OrderCancelledEmail, {
     customerName: order.customerName,
@@ -544,6 +547,7 @@ export async function sendOrderCancelled(
     farmName: order.farm.name,
     total: n(order.totalAmount),
     refundAmount,
+    cancelReason: cancelReason ?? undefined,
   }))
 
   await send(
@@ -551,6 +555,39 @@ export async function sendOrderCancelled(
     `Deine Bestellung ${order.orderNumber} wurde storniert`,
     html
   )
+}
+
+/**
+ * „Artikel fehlt" → Kunde (E14, Nr. 19): sofort nach dem Speichern, damit die
+ * Kundin den neuen Betrag kennt, bevor sie losfährt. Beträge kommen fertig
+ * gerechnet in Cent (src/lib/artikel-fehlt.ts), die Vorlage formatiert nur.
+ */
+export async function sendArtikelFehlt(
+  order: OrderForEmail,
+  fehlt: {
+    position: OrderForEmail['items'][number]
+    zahlung: 'online' | 'vor_ort'
+    bisherCents: number
+    neuCents: number
+    erstattetCents: number | null
+  }
+): Promise<void> {
+  const html = await toHtml(React.createElement(ArtikelFehltEmail, {
+    customerName: order.customerName,
+    orderNumber: order.orderNumber,
+    farmName: order.farm.name,
+    farmPhone: order.farm.phone,
+    artikel: positionsZeile(fehlt.position),
+    pickupDate: formatPickupDate(order.pickupDate),
+    pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
+    zahlung: fehlt.zahlung,
+    bisher: centsAlsEuro(fehlt.bisherCents),
+    neu: centsAlsEuro(fehlt.neuCents),
+    erstattet: fehlt.erstattetCents === null ? null : centsAlsEuro(fehlt.erstattetCents),
+    orderUrl: `${APP_URL}${bestellungPfad(order.farm.slug, order.id)}`,
+  }))
+
+  await send(order.customerEmail, `Ein Artikel fehlt in deiner Bestellung ${order.orderNumber}`, html)
 }
 
 /** Zahlung nach dem Storno eingegangen und sofort voll erstattet → Kunde */

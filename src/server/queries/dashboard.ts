@@ -57,7 +57,8 @@ export async function getDashboardStats(farmId: string) {
         totalAmount: true,
         paymentMethod: true,
         status: true,
-        items: { select: { productName: true, quantity: true } },
+        // Fehlende Artikel (E14) werden nicht übergeben.
+        items: { where: { fehltSeit: null }, select: { productName: true, quantity: true } },
       },
       orderBy: { pickupTimeStart: 'asc' },
     }),
