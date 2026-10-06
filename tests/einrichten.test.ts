@@ -86,6 +86,9 @@ describe('einrichtenStand — mit Hof', () => {
     const s = schritt(mitHof(), 'sepa')
     expect(s).toMatchObject({ zustand: 'hinweis', aktion: null })
     expect(s.text).toContain('Jetzt ist nichts zu tun')
+    // Keine Zusage, für die es keinen Weg gibt (Nachbesserung 1): Ob und wann
+    // eine Monatsabrechnung kommt, ist noch nicht entschieden.
+    expect(s.text).not.toMatch(/melden uns|bevor/)
   })
 
   it('Freischaltung wartet auf den Betreiber, bis approvedAt gesetzt ist', () => {

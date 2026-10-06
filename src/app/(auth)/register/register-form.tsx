@@ -56,7 +56,8 @@ const TEXTLINK = cn('rounded-sm font-semibold text-status-fertig underline-offse
  * Unverändert: registerFarmer (Better Auth E-Mail/Passwort, Rolle FARMER,
  * Honigtopf, Zeitschranke, Rate-Limit von Better Auth), danach die Anmeldung
  * im Browser und der Weg nach /onboarding. Neu im Formular: Hofname mit der
- * künftigen Adresse, Passwortstärke, der Haken bei den Konditionen. Den Hof
+ * künftigen Adresse, Passwortstärke, ein Link zu den Konditionen (ohne
+ * Zustimmungs-Haken, siehe registrierenFormularSchema). Den Hof
  * selbst legt weiter Einrichten an; der Name wartet bis dahin im
  * sessionStorage (hofname-entwurf.ts).
  */
@@ -72,7 +73,7 @@ export function RegisterForm({ formToken }: { formToken: string }): React.JSX.El
   const form = useForm<RegistrierenFormular>({
     resolver: zodResolver(registrierenFormularSchema) as Resolver<RegistrierenFormular>,
     mode: 'onTouched',
-    defaultValues: { hofname: '', name: '', email: '', password: '', konditionen: false },
+    defaultValues: { hofname: '', name: '', email: '', password: '' },
   })
   const { errors, isSubmitting } = form.formState
   const [hofname, name, email, password] = useWatch({ control: form.control, name: ['hofname', 'name', 'email', 'password'] })
@@ -249,27 +250,14 @@ export function RegisterForm({ formToken }: { formToken: string }): React.JSX.El
             )}
           </div>
 
-          <div>
-            <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-[13.5px] leading-snug">
-              <input
-                type="checkbox"
-                aria-invalid={errors.konditionen ? true : undefined}
-                aria-describedby={errors.konditionen ? fehlerId('konditionen') : undefined}
-                className={cn('mt-0.5 size-5 shrink-0 accent-accent', FOKUS_RAHMEN)}
-                {...form.register('konditionen')}
-              />
-              {/* Eine AGB-Seite gibt es nicht (Bericht Nr. 15) — der Haken gilt
-                  den Konditionen, die es zum Nachlesen gibt. */}
-              <span>
-                Ich akzeptiere die{' '}
-                <Link href="/konditionen" target="_blank" className={TEXTLINK}>
-                  Konditionen für Höfe
-                </Link>
-                .
-              </span>
-            </label>
-            {errors.konditionen?.message && <FeldFehler id={fehlerId('konditionen')}>{errors.konditionen.message}</FeldFehler>}
-          </div>
+          {/* Nur zum Nachlesen, keine Zustimmung: Welche Konditionen für neu
+              registrierte Höfe gelten, ist noch offen (Bericht Nr. 15,
+              „Bitte entscheiden"). Eine AGB-Seite gibt es nicht. */}
+          <p className="text-[13.5px] leading-snug text-muted-foreground">
+            <Link href="/konditionen" target="_blank" className={cn(TEXTLINK, 'inline-flex min-h-11 items-center')}>
+              Konditionen für Höfe ansehen
+            </Link>
+          </p>
 
           {fehler && (
             <div role="alert">

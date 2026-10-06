@@ -14,6 +14,7 @@
  * kommt aus servicegebuehr.ts (E4) und steht hier nicht ein zweites Mal;
  * Beträge laufen über formatEuro (format.ts).
  */
+import type { Tarif } from '@prisma/client'
 import { formatEuro, formatZahl } from '@/lib/format'
 import {
   SERVICEGEBUEHR_STANDARD_MIND_CENTS,
@@ -21,8 +22,11 @@ import {
   centsAlsEuro,
 } from '@/lib/servicegebuehr'
 
-/** Dieselben Werte wie das Prisma-Enum `Tarif` (tests/konditionen.test.ts gleicht ab). */
-export type TarifId = 'HOFTOR' | 'HOFLADEN'
+/**
+ * Die Tarif-Kennung ist das Prisma-Enum `Tarif` — nur als Typ eingebunden,
+ * src/lib bleibt ohne Prisma-Client (ARCHITECTURE §1).
+ */
+export type TarifId = Tarif
 
 /** Was der Tarif Hoftor erlaubt — als Zahl, damit der Text nie von ihr abweicht. */
 export const HOFTOR_PRODUKTE = 3

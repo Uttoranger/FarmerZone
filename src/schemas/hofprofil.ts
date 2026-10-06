@@ -90,7 +90,8 @@ export function profilBearbeitenSchema(bestand: ProfilBestand): typeof profileSc
  * src/server/actions/onboarding.ts): Hier entsteht der Hofname zum ersten
  * Mal, also gelten hier dieselben Obergrenzen wie im Profil. Ränder fallen
  * weg wie bisher in der Aktion. Mehr prüft das Schema bewusst nicht — die
- * Pflichtfelder hält das Formular selbst nach (onboarding-client.tsx).
+ * Pflichtfelder prüft das Formular „Hof anlegen" mit hofAnlegenFormularSchema
+ * (src/components/einrichten/hof-anlegen-formular.tsx).
  */
 export const hofAnlegenSchema = z.object({
   name: z.string().trim().max(HOFNAME_MAX, ZU_LANG.hofname),

@@ -170,7 +170,7 @@ export function einrichtenStand(daten: EinrichtenDaten): EinrichtenStand {
     id: 'sepa',
     titel: 'SEPA-Mandat für die Monatsabrechnung',
     titelKurz: 'SEPA-Mandat',
-    text: 'Für Grundgebühr und Servicegebühren aus Barbestellungen. Jetzt ist nichts zu tun – wir melden uns, bevor die erste Monatsabrechnung ansteht.',
+    text: 'Für Grundgebühr und Servicegebühren aus Barbestellungen. Jetzt ist nichts zu tun.',
     textKurz: 'für die Monatsabrechnung · jetzt nichts zu tun',
     zustand: 'hinweis',
     aktion: null,

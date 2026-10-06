@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { checkSlugAvailability } from '@/server/actions/onboarding'
 import { generateSlug } from '@/lib/slug'
+import { frageAdresseAb, type AdressStand } from '@/lib/hof-adresse'
 
 /**
  * „Wird zu deiner Adresse: farmerzone.at/…" unter dem Hofnamen — auf
@@ -12,15 +13,17 @@ import { generateSlug } from '@/lib/slug'
  * Zahl an.
  */
 export function HofAdresseVorschau({ hofname, id }: { hofname: string; id: string }): React.JSX.Element {
-  const [stand, setStand] = useState<{ slug: string; frei: boolean } | null>(null)
+  const [stand, setStand] = useState<AdressStand | null>(null)
   const slug = hofname.trim() ? generateSlug(hofname) : ''
 
   useEffect(() => {
     if (!hofname.trim()) return
     let aktuell = true
     const warte = setTimeout(async () => {
-      const ergebnis = await checkSlugAvailability(hofname)
-      if (aktuell) setStand({ slug: ergebnis.slug, frei: ergebnis.available })
+      // Ohne Antwort (Netzfehler) bleibt der alte Stand stehen; er passt nicht
+      // zum neuen Slug und zählt daher nicht — die Vorschau ist neutral.
+      const neu = await frageAdresseAb(hofname, checkSlugAvailability)
+      if (aktuell && neu) setStand(neu)
     }, 400)
     return () => {
       aktuell = false

@@ -16,7 +16,13 @@ vi.mock('@/server/actions/onboarding', () => ({ checkSlugAvailability: vi.fn(), 
 vi.mock('@/lib/auth-client', () => ({ signIn: { email: vi.fn() } }))
 
 import { passwortStaerke, validatePassword } from '@/lib/password-rules'
-import { registrierenFehler, registrationSchema, vollerName, type RegistrierenFormular } from '@/schemas/register'
+import {
+  registrierenFehler,
+  registrierenFormularSchema,
+  registrationSchema,
+  vollerName,
+  type RegistrierenFormular,
+} from '@/schemas/register'
 import {
   HOFNAME_ENTWURF_SCHLUESSEL,
   leseHofnameEntwurf,
@@ -57,7 +63,6 @@ const GUELTIG: RegistrierenFormular = {
   name: 'Max Mustermann',
   email: 'max@example.com',
   password: 'Abcdefg1',
-  konditionen: true,
 }
 
 describe('registrierenFehler — Pflichtfelder', () => {
@@ -66,14 +71,14 @@ describe('registrierenFehler — Pflichtfelder', () => {
   })
 
   it('leer: jedes Feld meldet sich, mit Ausweg im Satz', () => {
-    const fehler = registrierenFehler({ hofname: '', name: '', email: '', password: '', konditionen: false })
-    expect(Object.keys(fehler).sort()).toEqual(['email', 'hofname', 'konditionen', 'name', 'password'])
+    const fehler = registrierenFehler({ hofname: '', name: '', email: '', password: '' })
+    expect(Object.keys(fehler).sort()).toEqual(['email', 'hofname', 'name', 'password'])
     expect(fehler.hofname).toBe('Bitte gib den Namen deines Hofs an.')
-    expect(fehler.konditionen).toBe('Bitte bestätige die Konditionen für Höfe.')
   })
 
-  it('ohne Haken bei den Konditionen geht es nicht', () => {
-    expect(registrierenFehler({ ...GUELTIG, konditionen: false })).toEqual({ konditionen: 'Bitte bestätige die Konditionen für Höfe.' })
+  it('kein Haken bei den Konditionen nötig — welche Konditionen gelten, ist noch offen (Nachbesserung 1)', () => {
+    expect(registrierenFehler(GUELTIG)).toEqual({})
+    expect(Object.keys(registrierenFormularSchema.shape)).not.toContain('konditionen')
   })
 
   it('Leerzeichen allein sind kein Hofname, 81 Zeichen sind zu lang', () => {
@@ -145,16 +150,18 @@ describe('Hofname vom Registrieren bis Einrichten', () => {
 describe('RegisterForm — gerendert', () => {
   const html = renderToStaticMarkup(createElement(RegisterForm, { formToken: 'token' }))
 
-  it('Felder nach Mockup: Hofname mit Adresse, ein Name, E-Mail, Passwort mit Stärke, Haken', () => {
+  it('Felder nach Mockup: Hofname mit Adresse, ein Name, E-Mail, Passwort mit Stärke', () => {
     for (const text of ['Name deines Hofs', 'Wird zu deiner Adresse: farmerzone.at/dein-hof', 'Dein Name', 'E-Mail', 'Passwort', 'Konto erstellen']) {
       expect(html).toContain(text)
     }
-    expect(html).toContain('type="checkbox"')
     expect(html).toContain('Mindestens 8 Zeichen, mit Groß- und Kleinbuchstaben und einer Zahl.')
   })
 
-  it('der Haken verweist auf die Konditionen — eine AGB-Seite gibt es nicht', () => {
+  it('kein Zustimmungs-Haken: nur ein Link zum Nachlesen der Konditionen', () => {
+    expect(html).not.toContain('type="checkbox"')
+    expect(html).not.toMatch(/akzeptier|bestätige|zustimm/i)
     expect(html).toContain('href="/konditionen"')
+    expect(html).toContain('Konditionen für Höfe ansehen')
     expect(html).not.toMatch(/AGB/)
   })
 

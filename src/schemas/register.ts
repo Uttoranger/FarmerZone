@@ -34,8 +34,11 @@ export function vollerName(vorname: string, nachname: string): string {
 
 /**
  * Das Registrieren-Formular im Browser (Nr. 15). Strenger als
- * registrationSchema: Hofname und der Haken bei den Konditionen sind Pflicht.
- * Beides prüft nur das Formular — der Server (registerFarmer) bleibt
+ * registrationSchema: Der Hofname ist Pflicht. Einen Haken „Konditionen
+ * akzeptieren" gibt es bewusst nicht (Nachbesserung 1): Welche Konditionen für
+ * neu registrierte Höfe gelten — Tarife oder Gründungsplatz —, entscheidet
+ * der Mensch noch; eine Zustimmung zu etwas Offenem wäre eine Vertragszusage.
+ * Den Hofnamen prüft nur das Formular — der Server (registerFarmer) bleibt
  * unverändert und legt wie bisher nur das Konto an; den Hof legt Einrichten an
  * (createFarm), vorbelegt mit diesem Namen (src/lib/hofname-entwurf.ts).
  * Pflichtfelder stehen am Feld, nicht in superRefine (CODING_STANDARDS §8).
@@ -53,7 +56,6 @@ export const registrierenFormularSchema = z.object({
     .max(PERSONENNAME_MAX, ZU_LANG.personenname),
   email: emailSchema('Bitte gib eine gültige E-Mail-Adresse an.'),
   password: passwordSchema,
-  konditionen: z.boolean().refine((v) => v, 'Bitte bestätige die Konditionen für Höfe.'),
 })
 
 export type RegistrierenFormular = z.input<typeof registrierenFormularSchema>
