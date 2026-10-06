@@ -59,7 +59,7 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 17a | E8 – Checkout ohne Kundenkonto | Register E8, `freigabe.md` §8 | E8 |
 | 17b | E-Mail-Bestätigung für neue Höfe | Register S3, `freigabe.md` §8 | S3 |
 | 17c | Slug-Prüfung absichern | Altlast aus Nr. 15, `freigabe.md` §8 | – |
-| 17d | Konditionen-Übergang | Register K1, `freigabe.md` §8 | K1 mit Datum, sonst überspringen |
+| 17d | Konditionen-Übergang | Register K1, `freigabe.md` §8 | K1 (Datum 1. Februar 2027) |
 | 18 | Produkte und „Was legst du an?" | Gate 5 | E13 |
 | 19 | Bestellungen, Storno, Artikel fehlt | Gate 5 | E14 |
 | 20 | Futter und Brennmaterial | Gate 6 | E3, E9, E10, E11, Schema |

@@ -118,8 +118,8 @@ Alles andere: Gate überspringen und im Morgenbericht nachfragen.
 - `checkSlugAvailability`: Zod (Länge, Format wie Slug-Regeln), Rate-Limit, Antwort nur „frei" oder „vergeben" ohne Hinweis auf den Freischaltungsstand; reservierte Slugs gelten als vergeben. Tests.
 
 ### 17d K1 – Konditionen-Übergang
-- Nur ausführen, wenn K1 im Register ein Datum hat; sonst überspringen.
-- Text aus `src/lib/konditionen.ts` auf `/fuer-hoefe`, `/konditionen` und am Registrieren-Link: „In der Startphase kostenlos. Die Tarife gelten ab <DATUM>. Bereits freigeschaltete Höfe behalten ihre zugesagten Konditionen."
+- Datum laut Register K1: **1. Februar 2027** (gesetzt am 06.10.2026). Das Datum steht nur in `src/lib/konditionen.ts`.
+- Text aus `src/lib/konditionen.ts` auf `/fuer-hoefe`, `/konditionen` und am Registrieren-Link: „In der Startphase kostenlos. Die Tarife gelten ab 1. Februar 2027. Bereits freigeschaltete Höfe behalten ihre zugesagten Konditionen."
 - Admin-Freischaltung unverändert, dort ein Hinweis, welches Modell derzeit gilt. Tests: Text aus einer Quelle.
 
 ### Danach

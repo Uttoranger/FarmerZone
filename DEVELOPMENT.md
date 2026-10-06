@@ -4135,7 +4135,7 @@ Nach dem Merge von #170–#181 lagen Entscheidungen verstreut in `freigabe.md`, 
 - **Inhalt des Registers:**
   - E1–E14 und G1/G2 (Int-Cent, `prisma migrate diff`);
   - die Freigaben nach dem Merge (F1–F5: Mockup-Abweichungen, Reiter „Beiträge", Produktseite, Heute, Servicegebühr 5 % der aktiven Höfe);
-  - K1 Konditionen-Übergang, Datum noch offen;
+  - K1 Konditionen-Übergang, Tarife ab 1. Februar 2027;
   - S3 E-Mail-Bestätigung für neue Höfe;
   - die offenen Punkte O1–O5.
 - **Nachgezogen:**
@@ -4143,7 +4143,7 @@ Nach dem Merge von #170–#181 lagen Entscheidungen verstreut in `freigabe.md`, 
   - `docs/umsetzungsprompt.md`: Spalte „Entschieden", E8/E9 mit der tatsächlichen Entscheidung, Fortschritt, S5 neu.
   - Kunden-Navigation in DESIGN_SYSTEM.md, K4-Mockups im README.
   - Nachtlauf-Doku: Morgenbericht mit Vorschau-Link, Migrationsangabe und „Für dich zu tun"; Start-Text ohne `--create-only`.
-- **Lauf 4:** Haltepunkt 19, davor die Aufträge 17a–17d (`freigabe.md` §8). 17d läuft erst, wenn K1 ein Datum hat.
+- **Lauf 4:** Haltepunkt 19, davor die Aufträge 17a–17d (`freigabe.md` §8). 17d setzt K1 mit dem Datum 1. Februar 2027 um.
 - **Warum Merge-Commit statt Squash:** Ein Squash ersetzt die Commits eines Stapel-PRs durch einen neuen. Die darauf gestapelten Branches kennen diesen Commit nicht und bekommen beim nächsten Abgleich Konflikte (so bei #166–#170).
 
 ## Nützliche Befehle
