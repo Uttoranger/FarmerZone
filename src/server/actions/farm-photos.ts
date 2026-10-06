@@ -6,7 +6,8 @@ import { del } from '@vercel/blob'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
-import { farmFotoHinzufuegenSchema } from '@/schemas/farm-foto'
+import { farmFotoHinzufuegenSchema, farmFotoUnterschriftSchema } from '@/schemas/farm-foto'
+import { BILDUNTERSCHRIFT_MAX } from '@/lib/eingabegrenzen'
 
 const GALLERY_LIMIT = 8
 const BLOB_HOST = /\.public\.blob\.vercel-storage\.com\//
@@ -57,6 +58,11 @@ export async function updateFarmPhotoCaptionAction(
   id: string,
   caption: string,
 ): Promise<{ error?: string }> {
+  // Grenze an der Systemgrenze: Die Unterschrift setzt nur diese Aktion, also
+  // gilt BILDUNTERSCHRIFT_MAX hier und nicht nur beim Hinzufügen.
+  const eingabe = farmFotoUnterschriftSchema.safeParse({ id, caption })
+  if (!eingabe.success) return { error: `Die Bildunterschrift darf höchstens ${BILDUNTERSCHRIFT_MAX} Zeichen lang sein.` }
+
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return { error: 'Nicht angemeldet' }
 

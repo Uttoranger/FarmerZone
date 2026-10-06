@@ -27,7 +27,7 @@ vi.mock('@/lib/prisma', () => {
   return {
     prisma: {
       farm: { findUnique: vi.fn(), update: vi.fn() },
-      farmPhoto: { count: vi.fn(), create: vi.fn() },
+      farmPhoto: { count: vi.fn(), create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
       farmValue: { deleteMany: vi.fn(), createMany: vi.fn() },
       product: { create: vi.fn(), update: vi.fn(), findFirst: vi.fn() },
       statusPost: { create: vi.fn(), findFirst: vi.fn() },
@@ -41,7 +41,7 @@ vi.mock('@/lib/prisma', () => {
 })
 
 import { blobSpeicherAusSchluessel, istEigeneBildUrl } from '@/lib/upload-pfade'
-import { addFarmPhotoAction } from '@/server/actions/farm-photos'
+import { addFarmPhotoAction, updateFarmPhotoCaptionAction } from '@/server/actions/farm-photos'
 import { saveAppearanceAction, updateFarmBannerAction, updateFarmLogoAction } from '@/server/actions/appearance'
 import { createProduct, updateProduct, updateProductImageAction } from '@/server/actions/products'
 import { publishStatusPost } from '@/server/actions/status-posts'
@@ -129,6 +129,25 @@ describe('istEigeneBildUrl — nur fertige Bilder dieses Hofes aus unserem Speic
 
   it('ohne bekannten Speicher ist nichts erlaubt (fail-closed)', () => {
     expect(istEigeneBildUrl(EIGEN, HOF, null)).toBe(false)
+  })
+})
+
+describe('updateFarmPhotoCaptionAction (Bildunterschrift)', () => {
+  beforeEach(() => {
+    vi.mocked(prisma.farm.findUnique).mockResolvedValue({ id: HOF, slug: 'mein-hof' } as never)
+    vi.mocked(prisma.farmPhoto.findUnique).mockResolvedValue({ farmId: HOF } as never)
+    vi.mocked(prisma.farmPhoto.update).mockResolvedValue({} as never)
+  })
+
+  it('dieselbe Längengrenze wie beim Hinzufügen: zu lang → nichts gespeichert', async () => {
+    const ergebnis = await updateFarmPhotoCaptionAction('p1', 'x'.repeat(BILDUNTERSCHRIFT_MAX + 1))
+    expect(ergebnis.error).toContain(String(BILDUNTERSCHRIFT_MAX))
+    expect(prisma.farmPhoto.update).not.toHaveBeenCalled()
+  })
+
+  it('Gegenprobe: an der Grenze wird gespeichert', async () => {
+    expect((await updateFarmPhotoCaptionAction('p1', 'x'.repeat(BILDUNTERSCHRIFT_MAX))).error).toBeUndefined()
+    expect(prisma.farmPhoto.update).toHaveBeenCalledTimes(1)
   })
 })
 
