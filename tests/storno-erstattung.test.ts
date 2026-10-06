@@ -49,6 +49,7 @@ vi.mock('@/lib/email', () => ({
   sendOrderReady: vi.fn(),
   sendOrderCancelled: vi.fn(),
   sendOrderNotReady: vi.fn(),
+  sendErstattungOffen: vi.fn(),
 }))
 vi.mock('@/lib/prisma', () => {
   const order = { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() }
@@ -220,7 +221,7 @@ describe('Vollstorno online — der Hof gibt genau seinen Warenpreis zurück', (
     const ergebnis = await cancelOrder('order_1')
 
     expect(ergebnis).toEqual({
-      error: 'Rückerstattung fehlgeschlagen. Bitte manuell über das Stripe Dashboard erstatten.',
+      error: 'Rückerstattung fehlgeschlagen. Wir kümmern uns um die Erstattung und melden uns.',
       erstattungOffen: true,
     })
     expect(satz.status).toBe('CANCELLED')

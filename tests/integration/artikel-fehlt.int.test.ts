@@ -37,6 +37,7 @@ vi.mock('@/lib/email', () => ({
   sendOrderNotReady: vi.fn(),
   sendArtikelFehlt: vi.fn(),
   sendOnsiteConfirmation: vi.fn(),
+  sendErstattungOffen: vi.fn(),
 }))
 
 import { headers } from 'next/headers'
@@ -49,7 +50,7 @@ import { getMeistverkaufteProduktIds } from '@/server/queries/manual-sales'
 import { POST as checkout } from '@/app/api/checkout/route'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
-import { sendArtikelFehlt, sendOrderCancelled } from '@/lib/email'
+import { sendArtikelFehlt, sendErstattungOffen, sendOrderCancelled } from '@/lib/email'
 import {
   checkoutAnfrage,
   erstelleHof,
@@ -71,6 +72,8 @@ type Buchung = { schluessel: string | null; werte: string; betrag: number; metad
 /** Was Stripe „wirklich" getan hat: je Schlüssel EINE Buchung, mit ihren Merkmalen. */
 let erstattungen: Buchung[] = []
 let rueckbuchungen: Buchung[] = []
+/** Was die Kundin laut Stripe bezahlt hat (latest_charge.amount) — setzt `bestellung()`. */
+let bezahltBeiStripe = 0
 
 /** Wie Stripe: derselbe Schlüssel mit denselben Werten liefert dieselbe Buchung, mit anderen einen Fehler. */
 function idempotent(
@@ -115,7 +118,10 @@ beforeEach(() => {
     data: rueckbuchungen.map((b) => ({ amount: b.betrag, metadata: b.metadata })),
     has_more: false,
   })) as never)
-  intentRetrieve.mockResolvedValue({ id: 'pi_test', latest_charge: { id: 'ch_test', transfer: 'tr_test' } } as never)
+  intentRetrieve.mockImplementation((async () => ({
+    id: 'pi_test',
+    latest_charge: { id: 'ch_test', transfer: 'tr_test', amount: bezahltBeiStripe },
+  })) as never)
 })
 
 afterEach(async () => {
@@ -139,6 +145,7 @@ async function bestellung(eingabe: {
   )
   const warenCents = eingabe.positionen.reduce((s, p) => s + p.preisCents * (p.menge ?? 1), 0)
   const online = eingabe.zahlung === 'online'
+  bezahltBeiStripe = online ? warenCents + eingabe.gebuehrCents : 0
 
   const order = await prisma.order.create({
     data: {
@@ -669,5 +676,75 @@ describe('Im Zweifel nicht buchen (Nachbesserung 2)', () => {
       expect.anything(),
       expect.objectContaining({ tags: expect.objectContaining({ grund: 'stripe_unklar_ohne_zuordnung' }) })
     )
+  })
+})
+
+describe('Rest-Storno mit Stripes bezahltem Betrag (Nr. 19c)', () => {
+  it('bezahlt laut Stripe weicht von der Datenbank ab: storniert, aber nichts gebucht, Sentry, Betreiber gemeldet', async () => {
+    const { order, position } = await bestellung({ zahlung: 'online', positionen: EIER_BROT, gebuehrCents: 52 })
+    await meldeArtikelFehlt({ orderId: order.id, itemId: position('Brot').id })
+    // Stripe kennt einen anderen Betrag als die Datenbank (bezahlt = 450 + 50 + 582 = 1082).
+    bezahltBeiStripe = 1100
+
+    const storno = await cancelOrder(order.id)
+
+    expect(storno).toEqual({ error: 'Rückerstattung fehlgeschlagen. Wir kümmern uns um die Erstattung und melden uns.', erstattungOffen: true })
+    expect(erstattungen.map((b) => b.betrag)).toEqual([582])
+    expect(rueckbuchungen.map((b) => b.betrag)).toEqual([580])
+    const danach = await prisma.order.findUniqueOrThrow({ where: { id: order.id } })
+    expect(danach.status).toBe('CANCELLED')
+    expect(danach.paymentStatus).toBe('PAID')
+    expect(danach.erstattetCents).toBe(582)
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ grund: 'stripe_unklar_bezahlt_abweichend' }),
+        extra: expect.objectContaining({ orderId: order.id, bezahltStripeCents: 1100, bezahltDatenbankCents: 1082 }),
+      })
+    )
+    await vi.waitFor(() => expect(sendErstattungOffen).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(sendErstattungOffen).mock.calls[0]![0]).toMatchObject({ bestellId: order.id })
+    expect(sendOrderCancelled).not.toHaveBeenCalled()
+  })
+
+  it('Rest-Erstattung scheitert: die Anweisung nennt eine TEILerstattung mit den Beträgen aus dem Rest', async () => {
+    const { order, position } = await bestellung({ zahlung: 'online', positionen: EIER_BROT, gebuehrCents: 52 })
+    await meldeArtikelFehlt({ orderId: order.id, itemId: position('Brot').id })
+    refundCreate.mockRejectedValueOnce(new Error('Stripe nicht erreichbar'))
+
+    const storno = await cancelOrder(order.id)
+
+    expect(storno.erstattungOffen).toBe(true)
+    const [, kontext] = vi.mocked(Sentry.captureException).mock.calls.at(-1) as [unknown, { tags: Record<string, string>; extra: Record<string, unknown> }]
+    expect(kontext.tags.grund).toBe('erstattung_offen')
+    expect(kontext.extra).toMatchObject({ orderId: order.id, erstattungCents: 500, vomHofCents: 450 })
+    expect(String(kontext.extra.handerstattung)).toContain('Teilerstattung')
+    expect(String(kontext.extra.handerstattung)).not.toContain('Plattformgebühr erstatten')
+    await vi.waitFor(() => expect(sendErstattungOffen).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(sendErstattungOffen).mock.calls[0]![0]).toMatchObject({
+      betraege: [
+        { label: expect.stringContaining('Kundin'), cents: 500 },
+        { label: expect.stringContaining('Hof'), cents: 450 },
+      ],
+    })
+  })
+
+  it('Rest nach verlorener Teilstorno-Antwort scheitert: ebenfalls Teilerstattung, nicht „Plattformgebühr erstatten"', async () => {
+    const { order, position } = await bestellung({ zahlung: 'online', positionen: EIER_BROT, gebuehrCents: 52 })
+    const echt = refundCreate.getMockImplementation()!
+    refundCreate.mockImplementationOnce((async (werte: never, optionen: never) => {
+      await echt(werte, optionen)
+      throw new Error('Verbindung abgebrochen')
+    }) as never)
+    await meldeArtikelFehlt({ orderId: order.id, itemId: position('Brot').id })
+    refundCreate.mockRejectedValueOnce(new Error('Stripe nicht erreichbar'))
+
+    const storno = await cancelOrder(order.id)
+
+    expect(storno.erstattungOffen).toBe(true)
+    const [, kontext] = vi.mocked(Sentry.captureException).mock.calls.at(-1) as [unknown, { extra: Record<string, unknown> }]
+    expect(kontext.extra).toMatchObject({ orderId: order.id, erstattungCents: 500, vomHofCents: 1030 })
+    expect(String(kontext.extra.handerstattung)).toContain('Teilerstattung')
+    expect(String(kontext.extra.handerstattung)).not.toContain('Plattformgebühr erstatten')
   })
 })

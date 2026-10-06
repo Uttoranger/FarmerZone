@@ -9,12 +9,19 @@ import { sendOrderReady, sendOrderCancelled, sendOrderNotReady, type OrderForEma
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import * as Sentry from '@sentry/nextjs'
 import type { OrderStatus } from '@prisma/client'
-import { nachTeilerstattung, plattformgebuehrCents, restNachTeilerstattung, stornoBetraege } from '@/lib/storno'
+import {
+  nachTeilerstattung,
+  plattformgebuehrCents,
+  restNachTeilerstattung,
+  stornoBetraege,
+  type RestStorno,
+  type StornoBetraege,
+} from '@/lib/storno'
 import { alsCents } from '@/lib/order-totals'
 import { artikelFehltEingabeSchema, stornoEingabeSchema } from '@/schemas/hof-bestellungen'
 import { meldeFehlendenArtikel } from '@/server/artikel-fehlt'
 import { StripeStandUnklar, bucheVomHofZurueck, erstatteKundin, hatErstattungen, ladeStripeStand, teilstornoSumme } from '@/server/teilerstattung'
-import { sendArtikelFehlt } from '@/lib/email'
+import { sendArtikelFehlt, sendErstattungOffen } from '@/lib/email'
 
 export type ActionResult = { error?: string }
 
@@ -336,6 +343,54 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Sto
   return storniere(farm, eingabe.data.orderId, eingabe.data.grund || undefined)
 }
 
+/**
+ * Welchen Weg die Erstattung eines Stornos nimmt: `voll` (nichts vorher
+ * erstattet, reverse_transfer), `rest` (nach einer Teilerstattung, feste
+ * Beträge) oder `unbekannt` (Stripe war nicht zu fragen, ob schon erstattet ist).
+ */
+type ErstattungsPfad = 'voll' | 'rest' | 'unbekannt'
+
+type Handbuchung = { anweisung: string; betraege: Array<{ label: string; cents: number }> }
+
+/**
+ * Was der Betreiber von Hand tun muss, wenn die Erstattung eines Stornos
+ * scheitert — passend zum Weg, der wirklich genommen wurde. Die Anweisung
+ * geht an Sentry und in die Mail an den Betreiber.
+ */
+function handbuchungFuer(pfad: ErstattungsPfad, rest: RestStorno | null, betraege: StornoBetraege): Handbuchung {
+  if (pfad === 'rest' && rest) {
+    return {
+      anweisung:
+        'Teilerstattung, KEINE Vollerstattung: der Kundin den Rest über den Betrag erstatten (ohne reverse_transfer, ohne refund_application_fee) und vom Hof den Betrag per Rückbuchung der Überweisung holen. Vorher in Stripe prüfen, was davon schon gebucht ist.',
+      betraege: [
+        { label: 'An die Kundin erstatten', cents: rest.erstattungCents },
+        { label: 'Vom Hof zurückbuchen', cents: rest.vomHofCents },
+      ],
+    }
+  }
+  if (pfad === 'rest') {
+    return {
+      anweisung:
+        'Teilerstattung, KEINE Vollerstattung: Beträge erst aus den Stripe-Buchungen bestimmen – Kundin = bezahlt laut Stripe − alle Teilerstattungen, Hof = Warenpreis der Bestellung − Provision − alle Teil-Rückbuchungen. Buchungen ohne Zuordnung und einen abweichenden bezahlten Betrag vorher klären.',
+      betraege: [],
+    }
+  }
+  if (pfad === 'voll') {
+    return {
+      anweisung: 'Überweisung zurückbuchen und Plattformgebühr erstatten',
+      betraege: [
+        { label: 'An die Kundin erstatten', cents: betraege.erstattetCents },
+        { label: 'Davon vom Hof (über die Rückbuchung der Überweisung)', cents: betraege.vomHofCents },
+      ],
+    }
+  }
+  return {
+    anweisung:
+      'Stand bei Stripe unbekannt: erst prüfen, ob es zu dieser Zahlung schon Erstattungen gibt. Keine → Überweisung zurückbuchen und Plattformgebühr erstatten; sonst Teilerstattung mit festen Beträgen (Rest).',
+    betraege: [],
+  }
+}
+
 /** Der Stand, aus dem ein Storno rechnet — frisch gelesen, NACHDEM die Sperre steht. */
 const STORNO_STAND = {
   totalAmount: true,
@@ -438,33 +493,54 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
   // nicht eigenmächtig angelegt — Schema-Änderung nur mit Freigabe).
   let refundAmount: number | null = null
   let erstattungOffen = false
-  let festeBetraege: { erstattetCents: number; vomHofCents: number } | null = null
+  let festeBetraege: RestStorno | null = null
+  // Für die Handbuchung, falls Stripe scheitert: welcher Weg genommen wurde
+  // und mit welchen Beträgen. Nach einer Teilerstattung wäre eine
+  // Vollerstattung von Hand falsch (Stripe kehrte Überweisung und Gebühr
+  // anteilig um, der Hof gäbe nicht genau seinen Warenpreis zurück).
+  let pfad: ErstattungsPfad = teilweiseErstattet ? 'rest' : 'unbekannt'
+  let rest: RestStorno | null = null
+  let handbuchungOffen: Handbuchung | null = null
   if (storno.stripePaymentIntentId && betraege) {
+    const pi = storno.stripePaymentIntentId
     try {
       // Nach „Artikel fehlt" — oder wenn Stripe schon Erstattungen kennt, die
       // die Datenbank nicht hat (verlorene Antwort): den Rest mit festen
       // Beträgen aus dem, was Stripe gebucht hat (restNachTeilerstattung).
       // Die Vollerstattung mit reverse_transfer stimmt nur, solange noch
       // nichts erstattet ist.
-      if (teilweiseErstattet || (await hatErstattungen(storno.stripePaymentIntentId))) {
-        const pi = storno.stripePaymentIntentId
+      if (!teilweiseErstattet) pfad = (await hatErstattungen(pi)) ? 'rest' : 'voll'
+      if (pfad === 'rest') {
         const stand = await ladeStripeStand(pi, order.id)
-        const rest = restNachTeilerstattung({
-          bezahltCents: alsCents(storno.totalAmount) + storno.serviceFeeCents + (storno.erstattetCents ?? 0),
+        const bezahltDatenbankCents = alsCents(storno.totalAmount) + storno.serviceFeeCents + (storno.erstattetCents ?? 0)
+        rest = restNachTeilerstattung({
+          bezahltStripeCents: stand.bezahltCents,
+          bezahltDatenbankCents,
           warenOriginalCents: storno.items.reduce((summe, i) => summe + alsCents(i.totalPrice), 0),
           provisionCents: alsCents(storno.platformFeeAmount),
           teilErstattetCents: teilstornoSumme(stand.erstattungen),
           teilZurueckgebuchtCents: teilstornoSumme(stand.rueckbuchungen),
         })
+        if (!rest) {
+          // Im Zweifel nichts buchen: Stripe und Datenbank sind sich über den
+          // bezahlten Betrag nicht einig — die Kundin bekäme still zu wenig
+          // oder zu viel. Der Betreiber erstattet von Hand.
+          throw new StripeStandUnklar('bezahlt_abweichend', {
+            orderId: order.id,
+            bezahltStripeCents: stand.bezahltCents ?? 'unbekannt',
+            bezahltDatenbankCents,
+          })
+        }
+        const { erstattungCents, vomHofCents } = rest
         const erstattet =
-          rest.erstattungCents > 0
+          erstattungCents > 0
             ? (
                 await erstatteKundin(stand, {
                   paymentIntentId: pi,
                   orderId: order.id,
                   anlass: 'reststorno',
                   positionId: null,
-                  betragCents: rest.erstattungCents,
+                  betragCents: erstattungCents,
                   schluessel: `storno-${order.id}`,
                 })
               ).erstattetCents
@@ -473,17 +549,17 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
           orderId: order.id,
           anlass: 'reststorno',
           positionId: null,
-          betragCents: rest.vomHofCents,
+          betragCents: vomHofCents,
           schluessel: `storno-hof-${order.id}`,
           onFehler: (err) => {
             Sentry.captureException(err, {
               tags: { aktion: 'cancelOrder', grund: 'rueckbuchung_offen' },
-              extra: { orderId, vomHofCents: rest.vomHofCents, handbuchung: 'Überweisung mit diesem Betrag zurückbuchen' },
+              extra: { orderId, vomHofCents, handbuchung: 'Überweisung mit diesem Betrag zurückbuchen' },
             })
           },
         })
         refundAmount = erstattet / 100
-        festeBetraege = { erstattetCents: erstattet, vomHofCents: rest.vomHofCents }
+        festeBetraege = { erstattungCents: erstattet, vomHofCents }
         try {
           // Alles, was Stripe erstattet hat — auch eine Teilerstattung, deren
           // Antwort damals verloren ging.
@@ -498,9 +574,12 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
           })
         }
       } else {
+        // Läuft NACH der Transaktion, nicht in einer Sperre — deshalb ohne die
+        // kurzen STRIPE_OPTIONEN (die SDK-Wiederholung ist hier erwünscht,
+        // der Schlüssel verhindert eine zweite Erstattung).
         const refund = await stripe.refunds.create(
           {
-            payment_intent: storno.stripePaymentIntentId,
+            payment_intent: pi,
             // LADUNGSTYP destination charge mit application_fee_amount
             // (/api/checkout): Der Hof bekam den VOLLEN Betrag überwiesen und gab
             // Provision + Servicegebühr als application_fee an die Plattform ab.
@@ -528,16 +607,18 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
       // Offenes Geld darf nicht nur im Log stehen: Die Bestellung ist
       // storniert, ein zweiter Anlauf in der App ist durch die Sperre
       // ausgeschlossen — erstatten kann nur der Betreiber über das
-      // Plattformkonto (Destination Charge). Nur die Bestell-ID, keine
-      // Kundendaten (sentry-hygiene.ts filtert zusätzlich).
+      // Plattformkonto (Destination Charge). Die Anweisung folgt dem Weg, der
+      // wirklich genommen wurde, mit den Beträgen aus `rest`. Nur die
+      // Bestell-ID, keine Kundendaten (sentry-hygiene.ts filtert zusätzlich).
+      handbuchungOffen = handbuchungFuer(pfad, rest, betraege)
       Sentry.captureException(err, {
         tags: { aktion: 'cancelOrder', grund: err instanceof StripeStandUnklar ? `stripe_unklar_${err.grund}` : 'erstattung_offen' },
-        // Die Handerstattung im Dashboard braucht dieselben zwei Haken wie
-        // der Code — sonst trägt die Plattform den Warenpreis doch wieder.
-        // Nach einer Teilerstattung stattdessen feste Beträge.
-        extra: teilweiseErstattet
-          ? { orderId, handerstattung: 'Rest mit festen Beträgen erstatten', erstattungCents: betraege.erstattetCents, vomHofCents: betraege.vomHofCents }
-          : { orderId, handerstattung: 'Überweisung zurückbuchen und Plattformgebühr erstatten' },
+        extra: {
+          ...(err instanceof StripeStandUnklar ? err.extra : {}),
+          orderId,
+          handerstattung: handbuchungOffen.anweisung,
+          ...(rest ? { erstattungCents: rest.erstattungCents, vomHofCents: rest.vomHofCents } : {}),
+        },
       })
       erstattungOffen = true
     }
@@ -577,17 +658,37 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
     })
   }
 
+  // Offenes Geld meldet sich auch beim Betreiber per Mail — der Hof kann
+  // nicht erstatten (kein Zugang zum Plattformkonto). Nach der Antwort; ein
+  // Mailfehler rollt nichts zurück. Ohne Daten der Kundin.
+  if (handbuchungOffen) {
+    const hand = handbuchungOffen
+    mailNachDerAntwort('erstattung_offen', orderId, () =>
+      sendErstattungOffen({
+        was: 'Der Hof hat die Bestellung storniert, die Erstattung über Stripe hat aber nicht geklappt. Die Bestellung ist storniert, das Geld steht noch aus.',
+        bestellId: orderId,
+        bestellnummer: order.orderNumber,
+        hofName: farm.name,
+        betraege: hand.betraege,
+        handanweisung: hand.anweisung,
+        stripeKennung: null,
+      })
+    )
+  }
+
   revalidatePath('/orders')
   revalidatePath(`/orders/${orderId}`)
   revalidatePath('/dashboard')
   if (erstattungOffen) {
     return {
-      error: 'Rückerstattung fehlgeschlagen. Bitte manuell über das Stripe Dashboard erstatten.',
+      // Der Hof hat keinen Zugang zum Plattformkonto — erstatten kann nur der
+      // Betreiber, und der bekommt die Meldung (Sentry + Mail oben).
+      error: 'Rückerstattung fehlgeschlagen. Wir kümmern uns um die Erstattung und melden uns.',
       erstattungOffen: true,
     }
   }
   // Vor Ort bezahlt (oder online nie bezahlt): nichts erstattet, nichts vom Hof abgezogen.
-  if (festeBetraege) return festeBetraege
+  if (festeBetraege) return { erstattetCents: festeBetraege.erstattungCents, vomHofCents: festeBetraege.vomHofCents }
   return betraege && refundAmount !== null
     ? { erstattetCents: betraege.erstattetCents, vomHofCents: betraege.vomHofCents }
     : { erstattetCents: 0, vomHofCents: 0 }

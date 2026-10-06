@@ -106,27 +106,76 @@ export function nachTeilerstattung(order: { erstattetCents: number; fehlendePosi
   return order.erstattetCents > 0 || order.fehlendePositionen > 0
 }
 
+/** Was ein Storno nach Teilerstattung noch bewegt — mit festen Beträgen. */
+export type RestStorno = { erstattungCents: number; vomHofCents: number }
+
 /**
  * Der Rest eines Stornos nach „Artikel fehlt" — aus dem, was Stripe WIRKLICH
  * gebucht hat, nicht aus dem Stand der Datenbank: So stimmt er auch, wenn eine
  * Teilerstattung dort fehlt (verlorene Antwort) oder eine Rückbuchung vom Hof
  * gescheitert ist (sie wird hier nachgeholt).
  *
- *   Kundin  = bezahlt − alle Teilerstattungen        (nie über Stripes Rest)
+ *   Kundin  = bezahlt laut Stripe − alle Teilerstattungen
  *   vom Hof = Warenpreis der Bestellung − Provision − alle Teil-Rückbuchungen
  *
- * `bezahltCents` ist aktueller Warenpreis + aktuelle Gebühr + `erstattetCents`
- * der Datenbank; `warenOriginalCents` die Summe der Positions-Snapshots.
+ * BEZAHLT kommt aus Stripe (`latest_charge.amount`), nicht aus der Datenbank.
+ * Die Datenbank kennt bezahlt nur rechnerisch (aktueller Warenpreis +
+ * aktuelle Gebühr + `erstattetCents`); nach einem Nachtrag mit abweichendem
+ * Betrag oder einer zurückgenommenen Erstattung stimmt das nicht mehr, und
+ * die Kundin bekäme still zu wenig oder zu viel. Weichen beide ab — oder
+ * nennt Stripe keinen Betrag —, gibt es keinen Rest: null heißt NICHTS BUCHEN
+ * (der Aufrufer meldet es, der Betreiber erstattet von Hand).
+ *
+ * Nie über Stripes Rest: `teilErstattetCents` ist die Summe ALLER zählenden
+ * Teilerstattungen, die Stripe kennt — eine Erstattung ohne Zuordnung lässt
+ * `ladeStripeStand` gar nicht erst durch (StripeStandUnklar).
  */
 export function restNachTeilerstattung(e: {
-  bezahltCents: number
+  /** latest_charge.amount — null, wenn Stripe keinen Betrag nennt. */
+  bezahltStripeCents: number | null
+  /** Aktueller Warenpreis + aktuelle Gebühr + erstattetCents der Datenbank. */
+  bezahltDatenbankCents: number
+  /** Summe der Positions-Snapshots (auch der fehlenden). */
   warenOriginalCents: number
   provisionCents: number
   teilErstattetCents: number
   teilZurueckgebuchtCents: number
-}): { erstattungCents: number; vomHofCents: number } {
+}): RestStorno | null {
+  if (e.bezahltStripeCents === null || e.bezahltStripeCents !== e.bezahltDatenbankCents) return null
   return {
-    erstattungCents: Math.max(0, e.bezahltCents - e.teilErstattetCents),
+    erstattungCents: Math.max(0, e.bezahltStripeCents - e.teilErstattetCents),
     vomHofCents: Math.max(0, e.warenOriginalCents - e.provisionCents - e.teilZurueckgebuchtCents),
   }
+}
+
+export type Zuruecknahme =
+  | { art: 'zuruecknehmen'; erstattetCentsNeu: number }
+  | { art: 'schon_erledigt' }
+  | { art: 'unklar' }
+
+/**
+ * Eine Erstattung ist NACH dem Buchen gescheitert (Webhook `refund.failed` /
+ * `charge.refund.updated`): Was wird aus `erstattetCents`?
+ *
+ * Nicht „um den Betrag senken" — das senkte bei jeder Zustellung erneut (zwei
+ * Ereignisse je Erstattung, Wiederholungen). Stattdessen gilt Stripes Summe
+ * der zählenden, zugeordneten Erstattungen (die gescheiterte zählt dort nicht
+ * mehr) als Ziel, und die Datenbank darf nur genau um die gescheiterte davon
+ * abweichen:
+ *   - Datenbank = Stripe + gescheitert → auf Stripes Summe zurück.
+ *   - Datenbank = Stripe → schon zurückgenommen (oder nie gezählt): nichts.
+ *   - alles andere → unklar, nichts ändern, melden.
+ * So ist die Zurücknahme je Erstattung idempotent, ohne Spalte dafür.
+ */
+export function zuruecknahmeNachGescheiterterErstattung(e: {
+  erstattetCentsDatenbank: number
+  erstattetCentsStripe: number
+  gescheitertCents: number
+}): Zuruecknahme {
+  if (e.gescheitertCents <= 0) return { art: 'unklar' }
+  if (e.erstattetCentsDatenbank === e.erstattetCentsStripe) return { art: 'schon_erledigt' }
+  if (e.erstattetCentsDatenbank === e.erstattetCentsStripe + e.gescheitertCents) {
+    return { art: 'zuruecknehmen', erstattetCentsNeu: e.erstattetCentsStripe }
+  }
+  return { art: 'unklar' }
 }
