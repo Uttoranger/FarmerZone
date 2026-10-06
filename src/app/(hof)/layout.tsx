@@ -6,7 +6,8 @@ import { SentryNutzer } from '@/components/farmer/sentry-nutzer'
 
 /*
  * Die Routen des Hofbereichs, die ihr Gate schon in die HofShell umgestellt
- * hat (Redesign, kein Big Bang) — seit Nachtlauf Nr. 16: /farm-page.
+ * hat (Redesign, kein Big Bang) — seit Nachtlauf Nr. 16: /farm-page, seit
+ * Nr. 17: /dashboard (Heute).
  *
  * Warum eine eigene Routengruppe und keine Weiche im Bestandslayout: Ein
  * Layout kennt seinen Pfad nicht (nur über einen Header-Umweg aus der

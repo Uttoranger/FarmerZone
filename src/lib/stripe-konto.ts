@@ -58,3 +58,17 @@ export function zahlungNichtMoeglichText(barMoeglich: boolean): string {
     ? 'Online-Zahlung ist gerade nicht möglich. Bitte versuch es später oder wähle Barzahlung.'
     : 'Online-Zahlung ist gerade nicht möglich. Bitte versuch es später noch einmal.'
 }
+
+/**
+ * Derselbe Hinweis als Titel und Satz für die Hinweiskarte auf Heute (Mockup
+ * „Online-Zahlung pausiert", Nachtlauf Nr. 17). Der Satz folgt derselben
+ * Regel wie onlinePausiertText: ohne Barzahlung kein Ausweg versprochen.
+ */
+export function onlinePausiertHinweis(barMoeglich: boolean): { titel: string; satz: string } {
+  return {
+    titel: 'Online-Zahlung ist pausiert',
+    satz: barMoeglich
+      ? 'Stripe braucht noch Angaben von dir. Bis dahin können Kunden nur bar bei Abholung bestellen.'
+      : 'Stripe braucht noch Angaben von dir. Bis dahin können Kunden bei dir nicht bestellen.',
+  }
+}

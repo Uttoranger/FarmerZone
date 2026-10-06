@@ -368,19 +368,21 @@ describe('an den Seiten — Heute und Packliste teilen die Abfrage', () => {
     expect(packliste).toContain('datumLang(jetzt)')
   })
 
-  it('/dashboard ist Heute: kein Produkt-Knopf, keine Kennzahlen, Leerzustand „Alles erledigt."', () => {
-    const seite = quelle('src/app/(farmer)/dashboard/page.tsx')
+  it('/dashboard ist Heute: kein Produkt-Knopf, keine Gesamtzahlen der alten Übersicht, Leerzustand „Alles erledigt."', () => {
+    // Seit Nr. 17 in der HofShell: Seite in (hof), Bausteine in components/heute.
+    const seite = quelle('src/app/(hof)/dashboard/page.tsx')
+    const teile = quelle('src/components/heute/heute-teile.tsx')
+    const beide = seite + teile
     expect(seite).toContain('getHeute(')
-    expect(seite).not.toContain('getDashboardStats')
-    expect(seite).not.toContain('Produkt anlegen')
-    expect(seite).not.toContain('Kunden gesamt')
-    expect(seite).not.toContain('wa.me')
-    expect(seite).toContain('Alles erledigt.')
-    // Die Zeile unter „Heute abholen" entfällt ohne nächsten Abholtag und führt nach /orders.
-    expect(seite).toContain('{naechsteAbholung && (')
-    expect(seite).toMatch(/\{naechsteAbholung && \(\s*<Link\s+href="\/orders"/)
-    expect(seite).not.toContain('Morgen:')
-    expect(seite).toContain('href="/orders/today/print"')
-    expect(seite).not.toContain('getHours()')
+    expect(beide).not.toContain('getDashboardStats')
+    expect(beide).not.toContain('Produkt anlegen')
+    expect(beide).not.toContain('Kunden gesamt')
+    expect(beide).not.toContain('wa.me')
+    expect(teile).toContain('Alles erledigt.')
+    // Die Zeile zum nächsten Abholtag entfällt ohne ihn und führt nach /orders.
+    expect(teile).toMatch(/\{naechsteAbholung && \(\s*<Link\s+href="\/orders"/)
+    expect(beide).not.toContain('Morgen:')
+    expect(teile).toContain('href="/orders/today/print"')
+    expect(beide).not.toContain('getHours()')
   })
 })
