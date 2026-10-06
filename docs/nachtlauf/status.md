@@ -19,8 +19,8 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 12 | Checkout | fertig | `nacht/2026-10-05/12-checkout` | #176 | 11 (#175) | E5 umgesetzt; E8: Checkout legt weiter ruhendes Konto an (Entscheidung nötig); EPS/Wallets im Stripe-Dashboard | 05.10.2026 |
 | 13 | Bestätigungen und E-Mails | fertig | `nacht/2026-10-05/13-bestaetigungen` | #177 | 12 (#176) | „Nochmal bestellen“ in Abholbereit-Mail entscheiden; Opt-in ohne Double-Opt-in; Kalender-Route-Altlasten | 05.10.2026 |
 | 14 | Konto und Meine Höfe | fertig | `nacht/2026-10-05/14-bestellungen-finden` | #178 | 13 (#177) | laut Freigabe ersetzt durch „Bestellungen finden“ per Code (kein Konto) + /account im neuen Design; Slug `bestellungen` in Produktion prüfen | 05.10.2026 |
-| 15 | Für Höfe, Registrieren, Einrichten | läuft | `nacht/2026-10-06/15-fuer-hoefe` | | 14 (#178) | | 06.10.2026 |
-| 16 | Mein Hof | offen | | | | | |
+| 15 | Für Höfe, Registrieren, Einrichten | fertig (Entwurf) | `nacht/2026-10-06/15-fuer-hoefe` | #179 | 14 (#178) | Konditionen: Tarife (öffentlich) vs. Gründungsplatz (Admin) entscheiden; Pilothof; S3 offen | 06.10.2026 |
+| 16 | Mein Hof | läuft | `nacht/2026-10-06/16-mein-hof` | | 15 (#179) | | 06.10.2026 |
 | 17 | Heute | offen | | | | | |
 | 18 | Produkte | offen | | | | | |
 | 19 | Bestellungen | offen | | | | | |
