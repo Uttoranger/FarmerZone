@@ -15,6 +15,8 @@ export const NOTIZ_MAX = 500
 export const EMAIL_MAX = 254
 /** Wie im Produktformular — eine Checkout-Position trägt den Produktnamen. */
 export const PRODUKTNAME_MAX = 100
+/** Grund eines Stornos — steht in der Mail an die Kundin (Nr. 19). */
+export const STORNO_GRUND_MAX = 200
 /**
  * Der höchste Vorrat, den der Hof in der Produkttabelle direkt eintippt
  * (Nachtlauf Nr. 18). Fängt Tippfehler ab („99999" statt „99") und bleibt weit
@@ -42,6 +44,7 @@ export const ZU_LANG = {
   notiz: `Die Notiz darf höchstens ${NOTIZ_MAX} Zeichen haben — bitte kürzen.`,
   email: `Die E-Mail-Adresse darf höchstens ${EMAIL_MAX} Zeichen haben.`,
   produktname: `Der Produktname darf höchstens ${PRODUKTNAME_MAX} Zeichen haben.`,
+  stornoGrund: `Der Grund darf höchstens ${STORNO_GRUND_MAX} Zeichen haben — bitte kürzen.`,
 } as const
 
 /**

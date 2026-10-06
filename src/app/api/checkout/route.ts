@@ -641,6 +641,10 @@ export async function POST(request: NextRequest) {
         // lassen diese Bestellung unverändert (prisma/schema.prisma, Order).
         serviceFeeCents: servicegebuehr.gebuehrCents,
         serviceFeePercentApplied: servicegebuehr.prozentAngewendet,
+        // Snapshot der Mindestgebühr (E14, Nr. 19): „Artikel fehlt" rechnet die
+        // Gebühr auf den Rest mit genau dieser Regel neu, nie mit der heutigen
+        // Hofeinstellung. null, wenn keine Gebühr gilt — wie der Prozentsatz.
+        serviceFeeMinCentsApplied: servicegebuehr.prozentAngewendet === null ? null : farm.serviceFeeMinCents,
         kaeuferArt: data.kaeuferArt,
         betriebsnummer: betriebsnummerFuerBestellung(data.kaeuferArt, data.betriebsnummer),
         items: {

@@ -111,9 +111,12 @@ export default async function OrderPrintPage({
           <tbody>
             {order.items.map((item) => (
               <tr key={item.id} className="border-b border-slate-100">
-                <td className="py-1.5">{item.productName}</td>
+                <td className={`py-1.5 ${item.fehltSeit ? 'line-through' : ''}`}>
+                  {item.productName}
+                  {item.fehltSeit && <span className="no-underline"> (fehlt)</span>}
+                </td>
                 <td className="text-center py-1.5">{item.quantity}×</td>
-                <td className="text-right py-1.5">{formatEuro(Number(item.totalPrice))}</td>
+                <td className="text-right py-1.5">{item.fehltSeit ? '–' : formatEuro(Number(item.totalPrice))}</td>
               </tr>
             ))}
           </tbody>

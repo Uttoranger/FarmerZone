@@ -55,6 +55,8 @@ export default async function PrintPacklistPage() {
     where: abholWhere(farm.id, abholtage(jetzt).heute),
     include: {
       items: {
+        // Fehlende Artikel (E14) werden nicht gepackt — sie stehen nicht auf dem Papier.
+        where: { fehltSeit: null },
         select: {
           productName: true,
           quantity: true,

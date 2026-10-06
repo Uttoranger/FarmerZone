@@ -116,6 +116,8 @@ async function getOrder(orderId: string) {
           quantity: true,
           unitPrice: true,
           totalPrice: true,
+          // „Artikel fehlt" (E14): die Position steht da, ist aber nicht mehr im Betrag.
+          fehltSeit: true,
           // Einheit nur zur Anzeige gejoint — kein Schema-Change
           product: { select: { unit: true, unitSize: true } },
         },
@@ -174,6 +176,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
     }),
     // Decimal → Cent an der Servergrenze (CODING_STANDARDS §2, Geld).
     betragCents: alsCents(item.totalPrice),
+    fehlt: Boolean(item.fehltSeit),
   }))
 
   return (

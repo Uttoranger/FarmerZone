@@ -183,7 +183,8 @@ export function BestellPositionen({
   zahlung,
   fuss,
 }: {
-  positionen: ReadonlyArray<{ text: string; betragCents: number }>
+  /** `fehlt`: Der Hof hat die Position als fehlend gemeldet (E14) — sie ist nicht mehr im Betrag. */
+  positionen: ReadonlyArray<{ text: string; betragCents: number; fehlt?: boolean }>
   summen: {
     totalAmount: number | string | { toString(): string }
     serviceFeeCents: number
@@ -200,8 +201,15 @@ export function BestellPositionen({
       <ul className="flex flex-col gap-3">
         {positionen.map((p, i) => (
           <li key={i} className="flex items-baseline gap-2 text-[13.5px]">
-            <span className="min-w-0 flex-1 break-words text-muted-foreground">{p.text}</span>
-            <span className="shrink-0 tabular-nums">{formatEuro(centsAlsEuro(p.betragCents))}</span>
+            <span className="min-w-0 flex-1 break-words text-muted-foreground">
+              {p.text}
+              {p.fehlt && <span className="text-foreground"> · fehlt leider</span>}
+            </span>
+            {p.fehlt ? (
+              <span className="shrink-0 text-[12.5px] text-muted-foreground">nicht berechnet</span>
+            ) : (
+              <span className="shrink-0 tabular-nums">{formatEuro(centsAlsEuro(p.betragCents))}</span>
+            )}
           </li>
         ))}
         {s.gebuehrCents > 0 && (
