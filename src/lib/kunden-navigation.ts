@@ -22,7 +22,7 @@
  *    abgemeldet vorläufig zur Anmeldung, angemeldet zu „Mein Konto" — die
  *    Anmeldeseite prüft keine Sitzung und böte einer Angemeldeten nur das
  *    Anmeldeformular noch einmal an.
- * Beide Ziele kommen aus bestellungenPunkt(); Nr. 08 „Bestellungen finden"
+ * Beide Ziele kommen aus bestellungenPunkt(); Nr. 14 „Bestellungen finden"
  * (E-Mail und Code, E7/E8) ändert nur dort das Ziel und nimmt den Punkt
  * wieder in den Kopf.
  *

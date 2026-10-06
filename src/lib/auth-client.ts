@@ -1,5 +1,5 @@
 import { createAuthClient } from 'better-auth/react'
-import { magicLinkClient } from 'better-auth/client/plugins'
+import { emailOTPClient } from 'better-auth/client/plugins'
 
 // Bewusst OHNE baseURL: Auth-Server und Seite laufen immer unter derselben
 // Adresse, und genau dann darf sie laut Better-Auth-Doku („If the auth server
@@ -8,7 +8,7 @@ import { magicLinkClient } from 'better-auth/client/plugins'
 // Vorher stand hier NEXT_PUBLIC_APP_URL mit localhost-Ersatz: In Previews, wo
 // die Variable fehlt, rief der Browser damit einen fremden Rechner an.
 export const authClient = createAuthClient({
-  plugins: [magicLinkClient()],
+  plugins: [emailOTPClient()],
 })
 
 export const { signIn, signOut, signUp, useSession } = authClient

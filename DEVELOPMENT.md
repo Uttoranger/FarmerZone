@@ -3753,6 +3753,128 @@ Abschnitte in `src/components/startseite/`, Texte, Links und Rechnungen in
   zweites Mal im Original); `preload="none"` wirkt neben `autoPlay` nicht —
   der Kommentar sagt das jetzt.
 
+## Anmelden: Kundin mit Code, Hof mit Passwort (Nachtlauf Nr. 08, 2026-10-05)
+
+Gate 4, Route `/account/login` und `/login`. Entscheidung E7: Kundinnen melden
+sich mit einem 6-stelligen Code aus der E-Mail an (Better Auth `emailOTP`, im
+installierten Paket enthalten, kein neues Paket); Höfe bleiben bei E-Mail und
+Passwort. Beide Routen zeigen dieselbe Seite nach Mockup
+`web-k0-anmelden-kunde-code-hof-passwort` (zwei Karten nebeneinander) bzw.
+`mobil-k0-anmelden-mit-code` (Umschalter aus zwei Links, Karte der Route vorn)
+in der `KundeShell`.
+
+- **Warum Code statt Link.** Der Magic Link meldete per GET an — Link-Scanner der
+  Mailprogramme verbrauchen ihn, und er klappt nicht, wenn die Mail am Handy und
+  der Einkauf am Laptop ist. Der Code geht überall und ändert per Mail nichts.
+- **Regeln** (Länge 6, 10 Minuten, 5 Versuche, Bremsen, Fehlertexte, Ziele) in
+  `src/lib/anmeldecode.ts`; das Plugin übernimmt sie (`ANMELDECODE_PLUGIN_OPTIONEN`).
+  Der Code liegt nur gehasht in `Verification`, Wert `<hash>:<versuche>`.
+  **Die Versuche zählt das Plugin in der Datenbank** (`atomicVerifyOTP` in
+  `better-auth/dist/plugins/email-otp/routes.mjs`: Zeile in einer Transaktion
+  verbrauchen, bei falschem Code mit `versuche + 1` und derselben Frist neu
+  anlegen) — damit gilt S4 über alle Serverless-Instanzen; belegt in
+  `tests/integration/anmeldecode.int.test.ts` mit zwei frisch geladenen
+  Auth-Instanzen. Die Frist prüft das Plugin beim Lesen. Keine Schema-Änderung
+  nötig.
+- **Bremsen:** Better Auth je IP 3 Anforderungen bzw. 3 Anmeldeversuche je
+  Minute (Plugin-Regel, Speicher je Instanz, nur Produktion); dazu höchstens
+  5 Codes je Adresse in 15 Minuten (`erzeugeAnforderungsSperre`, Hook in
+  `auth.ts`, je Instanz) gegen ein zugeschüttetes Postfach. Die harte Grenze
+  sind die 5 Versuche je Code. Ein Rate-Limit-Speicher in der Datenbank
+  (`rateLimit.storage: 'database'`) bräuchte eine eigene Tabelle — nicht in
+  Gate 4, offen für später.
+- **Höfe bekommen keinen Code.** Neben E7 der zweite Grund: Better Auth entzieht
+  einem noch unbestätigten Konto beim ersten Code das Passwort
+  (`revokeUnprovenAccountAccess`, so schon beim Magic Link). Die Antwort an den
+  Browser ist dieselbe wie bei einer Kundin — keine Auskunft, wer ein Hof ist.
+  Durchgesetzt im `before`-Hook, nicht im Versand (siehe Nachbesserung 1).
+- **Neue Adresse** bekommt beim ersten Anmelden ein Kundenkonto ohne Passwort —
+  wie bisher beim Magic Link (bestehende freiwillige Anmeldung, E8 lässt sie
+  bestehen). Kein Konto-Angebot auf der Seite, kein „Konto anlegen".
+- **Magic Link im Übergang:** `/sign-in/magic-link` ist über `disabledPaths`
+  zu, `/magic-link/verify` bleibt offen, damit Links aus Mails von kurz vor dem
+  Deployment (15 Minuten gültig) noch gehen. Das Plugin und
+  `customer-magic-link.tsx` können in einem Aufräum-PR entfallen. Ebenfalls zu:
+  die Code-Wege fürs Passwort-Zurücksetzen, E-Mail-Bestätigung und
+  E-Mail-Wechsel — sonst gäbe es einen zweiten Weg, das Passwort eines Hofs zu
+  ändern. Anfordern nimmt nur den Typ `sign-in` an.
+- **Mail:** Code groß im Text, „10 Minuten", kein Link. Der Code steht nicht im
+  Betreff und nicht im Vorschautext: `sendRaw` schreibt den Betreff auch in
+  Produktion ins Log, und der Sperrbildschirm zeigt beides. Ohne
+  `RESEND_API_KEY` steht der Code lokal im Terminal (`[DEV] Anmeldecode …`), in
+  Produktion nie. Sentry entfernt `otp`-Parameter und Ziffern hinter
+  „Code"/„OTP".
+- **Weiterleitung:** `?ziel=` auf `/account/login` nur über `zielNachAnmeldung`
+  (eigener relativer Pfad, kein `//` — auch nicht nach dem Auflösen von „."
+  und „.." —, kein Rückstrich, nicht `/api`), sonst
+  `/account/profile` wie bisher. Hof-Ziel unverändert nur `/teilen`
+  (`zielNachHofAnmeldung`, aus dem alten `login-client.tsx` gezogen).
+- **Für Nr. 14 („Bestellungen finden"):** `KundeCodeFormular` mit eigenem `ziel`
+  und `zielNachAnmeldung(roh, standard)` wiederverwenden; Ablauf, Texte und
+  Bremsen bleiben dieselben. **Achtung (E8):** `disableSignUp: false` legt beim
+  ersten Code-Login ein Kundenkonto an — für die freiwillige Anmeldung
+  vereinbar, für „Bestellungen finden" wäre es ein stilles Konto bei jeder
+  Bestellsuche. Nr. 14 braucht dort einen eigenen Weg (ohne Sitzung bzw. ohne
+  Anlegen).
+
+### Nachbesserung 1 (Prüfung Nr. 08)
+
+- **Rollen-Trennung war nur halb.** Better Auth legt den Code an, BEVOR
+  `sendVerificationOTP` läuft (`resolveOTP`), und `/sign-in/email-otp` fragt
+  nach keiner Rolle. Das frühere `return` im Versand unterdrückte nur die Mail:
+  Für eine Hof- oder Admin-Adresse lag trotzdem ein gültiger Code in
+  `Verification`. Wer ihn riet (jede neue Anforderung = neuer Code mit
+  5 Versuchen, Bremsen nur im Speicher), war als Hof angemeldet; bei
+  `emailVerified=false` nahm Better Auth dem Konto dabei das Passwort. Jetzt
+  zwei Sperren im `before`-Hook (`auth.ts`): Anfordern für Nicht-Kundinnen legt
+  keinen Code an, sondern antwortet selbst mit `{ success: true }` (ein Hook,
+  der ein Objekt ohne `context` zurückgibt, ersetzt in `better-auth@1.6.23`
+  den Endpunkt, `api/dispatch.mjs` `runBeforeHooks`) und löscht dabei einen
+  alten Code; `/sign-in/email-otp` wirft für Nicht-Kundinnen dieselbe
+  `INVALID_OTP`-Antwort wie ein falscher Code — auch mit gültigem Code.
+- **Groß-/Kleinschreibung:** Die Rolle wird case-insensitiv gesucht
+  (`findFirst` mit `mode: 'insensitive'`), sonst galt ein Hof mit
+  Großbuchstaben in der gespeicherten Adresse als „unbekannt", bekam einen Code
+  und beim Anmelden ein zweites Kundenkonto.
+- **Antwortzeit:** Die Code-Mail läuft über `nachDerAntwort()`, also nach der
+  Antwort (`after()` im Routen-Handler `app/api/auth/[...all]`). Vorher wartete
+  die Antwort bei Kundinnen auf Rendern und Resend, bei Höfen nicht — die Zeit
+  verriet, wer ein Hof ist. `advanced.backgroundTasks` hätte dasselbe
+  geleistet, gälte aber für alle Hintergrundaufgaben von Better Auth.
+- **Offene Weiterleitung:** `zielNachAnmeldung` prüfte nur die Eingabe; die
+  Auflösung der Punkt-Segmente machte aus `/.//boese.at`, `/a/..//boese.at`,
+  `/%2e//boese.at` den Pfad `//boese.at` (gegen den Prüf-Ursprung derselbe
+  Ursprung, im Browser ein fremder Rechner). Jetzt wird auch das Ergebnis
+  geprüft.
+- **Code-Feld:** beim Prüfen `readOnly` + `aria-busy` statt `disabled` (der
+  Fokus blieb sonst nach einem Fehler im Nichts), nach einem Fehler Fokus
+  zurück ins Feld, „Einen Moment …" in einer ständigen `role="status"`-Region;
+  die Kästchen teilen sich die Breite (höchstens 46 px), bei 320 px lief die
+  Reihe über.
+- **Zur Kenntnis:** `storeOTP: 'hashed'` ist ein ungesalzener Hash über nur
+  10^6 mögliche Codes — wer die Tabelle liest, rechnet ihn zurück; vertretbar,
+  weil ein Code 10 Minuten gilt und die Tabelle ohnehin Sitzungen enthält.
+
+### Nachbesserung 3 (Sicherheitsfix aus Nr. 14)
+
+- **Platzhalter in der Rollenabfrage.** `findFirst` mit `mode: 'insensitive'`
+  wird bei Prisma zu einem ILIKE ohne Maskierung (gemessen:
+  `b_uer-01@example.com` fand `bauer-01@example.com`). Ein Hof mit `_` oder
+  `%` in der Adresse neben einem passenden Kundenkonto — das jeder per
+  Checkout anlegen kann — galt dem Hook als Kundin; bei `%` meldete
+  `/sign-in/email-otp` den Hof mit einem gültigen Code tatsächlich an (im
+  roten Test nachgewiesen). Jetzt: Muster maskiert (`genauesIlikeMuster`,
+  dieselbe Funktion wie in Nr. 14), `findMany`, und ein einziger
+  Nicht-Kundinnen-Treffer genügt für „kein Code" (`rolleAusTreffern`).
+- **Warum nicht `lower(email) = lower($1)` per `$queryRaw`:** hätte gar
+  keine Platzhalter-Semantik, ist aber Roh-SQL ohne Not (TECH_STACK.md) und
+  nicht typisiert. Das Risiko der Maskierung — Prisma maskierte eines Tages
+  selbst, das Muster wäre doppelt maskiert und fände den Hof nicht mehr —
+  fängt der Integrationstest „Hof …_hof" ab.
+- **Betreiber-Recht:** `/admin` prüft `isAdmin`, nicht die Rolle; ein
+  Betreiber ohne Hof kann `CUSTOMER` sein. Er zählt in der Rollenabfrage jetzt
+  als `ADMIN` (vorher hätte er einen Code bekommen).
+
 ## Nützliche Befehle
 
 ```bash

@@ -350,6 +350,34 @@ describe('bereinigeEreignis — der beforeSend-Filter', () => {
     expect(e.breadcrumbs?.[0].data?.url).toBe('/upload?art=logo')
     expect(e.breadcrumbs?.[1].message).toBe('Seite geladen')
   })
+
+  // Anmeldecode (E7, Nr. 08): Der Code ist für zehn Minuten ein Zugang wie
+  // ein Passwort — er darf weder als Parameter noch im Text nach Sentry.
+  it('entfernt den Anmeldecode aus Parametern (otp) und aus Text neben „Code"/„OTP"', () => {
+    const e = bereinigeEreignis(
+      ereignis({
+        message: 'Anmeldung fehlgeschlagen für kundin@example.com mit Code 481234',
+        exception: { values: [{ value: 'otp: 905173 abgelehnt' }] },
+        request: {
+          url: 'https://farmerzone.at/api/auth/sign-in/email-otp?otp=481234&seite=2',
+          query_string: 'otp=481234&seite=2',
+        },
+        breadcrumbs: [{ message: 'Anmeldecode 112233 eingegeben', data: { url: '/account/login?otp=112233' } }],
+      })
+    )
+
+    expect(e.message).toBe('Anmeldung fehlgeschlagen für [e-mail entfernt] mit Code [code entfernt]')
+    expect(e.exception?.values?.[0].value).toBe('otp: [code entfernt] abgelehnt')
+    expect(e.request?.url).toBe('https://farmerzone.at/api/auth/sign-in/email-otp?seite=2')
+    expect(e.request?.query_string).toBe('seite=2')
+    expect(e.breadcrumbs?.[0].message).toBe('Anmeldecode [code entfernt] eingegeben')
+    expect(e.breadcrumbs?.[0].data?.url).toBe('/account/login')
+  })
+
+  it('Gegenprobe Anmeldecode: Bestellnummern, Fehlercodes und Zahlen ohne „Code" davor bleiben', () => {
+    const text = 'Bestellung 481234 mit Fehlercode 500, Statuscode 404, Zeitstempel 1696500000'
+    expect(bereinigeEreignis(ereignis({ message: text })).message).toBe(text)
+  })
 })
 
 describe('ermittleUmgebung', () => {

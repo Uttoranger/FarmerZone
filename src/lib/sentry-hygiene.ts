@@ -62,8 +62,16 @@ const TELEFON_MUSTER = /(?:\+|\(?0)\d(?:[\s/\-.()]{0,3}\d){7,}/g
  *  samt Geräte-Dateinamen. `s` ist die Signatur des Bestell-Links
  *  (src/lib/bestell-link.ts) — ein Zugangsgeheimnis; `reorder` trägt den
  *  selbsttragenden Nachbestell-Token (reorder-token.ts), gleiche Lage;
- *  `sig` ist dieselbe Signatur für die Bestätigungsseite (bestaetigungsPfad). */
-const HEIKLE_PARAMETER = /token|code|secret|email|pathname|reorder|^(s|sig)$/i
+ *  `sig` ist dieselbe Signatur für die Bestätigungsseite (bestaetigungsPfad);
+ *  `otp` der Anmeldecode der Kundinnen (E7, src/lib/anmeldecode.ts). */
+const HEIKLE_PARAMETER = /token|code|secret|email|pathname|reorder|otp|^(s|sig)$/i
+
+/** Der Anmeldecode im Text (6 Ziffern) — nur, wo „Code" oder „OTP" als
+ *  eigenes Wort direkt davorsteht: Zehn Minuten lang ist er ein Zugang wie
+ *  ein Passwort. Bestellnummern, Fehlercodes („Fehlercode 500") und
+ *  Zeitstempel bleiben stehen, eine nackte Ziffernfolge ist nicht erkennbar
+ *  als Code — der Code steht deshalb nie in einem Log (auth.ts). */
+const ANMELDECODE_MUSTER = /\b(code|otp|anmeldecode)(\W{1,3})\d{6}\b/gi
 
 /** Undurchsichtige Kennungen als GANZES Pfadsegment (Bestätigungs-Token der
  *  Bestellungen ist ein nanoid(32)). Trifft bewusst auch lange Hof-Slugs —
@@ -76,6 +84,7 @@ function bereinigeText(text: string): string {
     .replace(EMAIL_MUSTER, '[e-mail entfernt]')
     .replace(EMAIL_KODIERT_MUSTER, '[e-mail entfernt]')
     .replace(TELEFON_MUSTER, '[telefon entfernt]')
+    .replace(ANMELDECODE_MUSTER, '$1$2[code entfernt]')
 }
 
 /** Entfernt heikle Parameter aus einem Query-String ('a=1&token=x' → 'a=1'). */

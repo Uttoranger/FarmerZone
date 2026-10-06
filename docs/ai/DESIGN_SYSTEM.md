@@ -151,6 +151,12 @@ Umgesetzt in `src/components/shells/` (KundeShell, KundeFokusShell, HofShell, Ad
 - **Verkaufsgrößen** (Futter, Brennmaterial, alles mit Gebinden): Kacheln mit Größe, Menge, Preis, Grundpreis (€/kg, €/rm) und Vorrat. Knapp = orangener Hinweis „nur noch N", ausverkauft = ausgegraut. In Listen heißt der Knopf „Größe wählen ›", nicht „In den Korb".
 - **Leerzustand mit Ausweg:** Nie nur „nichts gefunden". Immer eine nächste Handlung: Umkreis erweitern, Filter lockern, „Benachrichtige mich" (nur mit Einwilligung).
 
+### Anmelden
+
+- **Eine Seite für beide Wege:** `/account/login` (Kunde, Code) und `/login` (Hof, Passwort) rendern `AnmeldenSeite` (`src/components/anmelden/`). Im Browser zwei Karten nebeneinander („Ich kaufe ein" grün, „Ich habe einen Hof" orange), am Handy nur die Karte der Route und darüber ein Umschalter aus zwei echten Links (`aria-current`). Kein Konto-Angebot für Kundinnen (E8).
+- **Code-Feld:** sechs Kästchen über EINEM unsichtbaren, beschrifteten Eingabefeld (`autocomplete="one-time-code"`, `inputmode="numeric"`, 16 px) — so setzt das Telefon den Code aus der Mail ein, Einfügen und Löschen funktionieren, und der Screenreader sagt ein Feld an. Fokus: Rahmen um alle Kästchen (`outline-solid`) und das nächste Kästchen hervorgehoben. Nie `maxLength`, Eingaben gehen durch `normalisiereCode`. Während geprüft wird: Feld `readOnly` + `aria-busy`, nie `disabled` (der Fokus bliebe sonst nach einem Fehler im Nichts); nach einem Fehler Fokus zurück ins Feld; „Einen Moment …" steht zusätzlich in einer ständig vorhandenen `role="status"`-Region. Die Kästchen teilen sich die Breite (`min-w-0 flex-1`, höchstens 46 px, 54 px hoch) — bei 320 px passen sechs feste Kästchen nicht.
+- **„Code erneut senden"** wartet sichtbar („Code erneut senden (45 s)"), so lange wie die IP-Grenze; ein falscher Code leert das Feld, der Fehler steht inline darunter.
+
 ### Futtermittel und Brennmaterial
 
 - Unter jedem Futter: grünes Schild „Registrierter Futtermittelbetrieb · LFBIS <Nummer>" bzw. die jeweilige Nummer. Fehlt die nötige Registrierung für eine Größe, erscheint diese Größe beim Kunden nicht; im Formular trägt sie ein Schloss mit Begründung.
