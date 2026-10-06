@@ -19,10 +19,13 @@
  * der Seitenleiste zeigt nach dem Mockup nur die beiden Dinge, die auf der
  * Hofseite landen (NEU_BROWSER).
  *
- * „Mein Hof" bündelt zwei vorhandene Seiten unter einem gemeinsamen Kopf
- * mit Reitern (components/farmer/mein-hof-kopf.tsx): Hofseite, Beiträge.
- * Der Punkt ist auf beiden aktiv.
+ * „Mein Hof" bündelt Hofseite und Beiträge unter einem Kopf mit Reitern —
+ * in der HofShell beide auf /farm-page (?reiter=beitraege, E12,
+ * components/mein-hof/seitenkopf.tsx), im Bestand /status mit dem alten
+ * Kopf (components/farmer/mein-hof-kopf.tsx). Der Punkt ist auf beiden aktiv.
  */
+
+import { MEIN_HOF_REITER_PARAMETER, MEIN_HOF_REITER_VALUES, meinHofReiterSchema } from '@/schemas/mein-hof-reiter'
 
 export type NavPunktId =
   | 'heute'
@@ -63,14 +66,37 @@ export type NeuPunkt = {
 }
 
 /** Die Reiter unter dem Kopf von „Mein Hof" — Hofseite ist der Standard. */
-export type MeinHofReiterId = 'hofseite' | 'beitraege'
+export type MeinHofReiterId = (typeof MEIN_HOF_REITER_VALUES)[number]
 
 export type MeinHofReiter = { id: MeinHofReiterId; label: string; href: string }
 
+/**
+ * Die Reiter des Bestandskopfs (components/farmer/mein-hof-kopf.tsx), den
+ * nur noch /status trägt: dort ist „Beiträge" die eigene Seite.
+ */
 export const MEIN_HOF_REITER: readonly MeinHofReiter[] = [
   { id: 'hofseite', label: 'Hofseite', href: '/farm-page' },
   { id: 'beitraege', label: 'Beiträge', href: '/status' },
 ]
+
+/**
+ * Die Reiter von „Mein Hof" in der HofShell (E12, Nachtlauf Nr. 16): beide
+ * auf /farm-page, der Reiter steht in der Adresse. /status bleibt als Route
+ * bestehen und wird aus dem Reiter „Beiträge" verlinkt.
+ */
+export const MEIN_HOF_REITER_HOFBEREICH: readonly MeinHofReiter[] = [
+  { id: 'hofseite', label: 'Hofseite', href: '/farm-page' },
+  { id: 'beitraege', label: 'Beiträge', href: `/farm-page?${MEIN_HOF_REITER_PARAMETER}=beitraege` },
+]
+
+/**
+ * Der Reiter aus dem Suchparameter der Seite. Next liefert einen doppelten
+ * Parameter als Liste — dann zählt der erste. Alles andere fällt über das
+ * Schema still auf „hofseite".
+ */
+export function meinHofReiterAus(wert: string | string[] | undefined): MeinHofReiterId {
+  return meinHofReiterSchema.parse(Array.isArray(wert) ? wert[0] : wert)
+}
 
 /** Der Hinweis rechts neben den Reitern im Browser — Produkte hat seinen eigenen Platz in der Leiste. */
 export const MEIN_HOF_HINWEIS = 'Produkte verwaltest du links unter „Produkte".'

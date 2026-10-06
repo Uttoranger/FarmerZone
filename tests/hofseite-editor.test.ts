@@ -26,16 +26,22 @@ import { hofseiteStand } from '@/lib/hofseite-fortschritt'
 const quelltext = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 
 describe('/farm-page', () => {
-  const seite = quelltext('src/app/(farmer)/farm-page/page.tsx')
+  const seite = quelltext('src/app/(hof)/farm-page/page.tsx')
 
-  it('unter lg die alte Hofseite, ab lg der Editor', () => {
-    expect(seite).toMatch(/<div className="lg:hidden">\s*<FarmPageClient/)
+  it('unter lg Checkliste und die alte Hofseite, ab lg der Editor', () => {
+    expect(seite).toMatch(/<div className="lg:hidden">[\s\S]*?<ChecklisteKompakt fortschritt=\{fortschritt\} \/>[\s\S]*?<FarmPageClient/)
     // Ab lg trägt der Editor-Block die H1 der Seite — nur für Screenreader; sichtbar ist der Hofname im Kopf.
     expect(seite).toMatch(/<div className="hidden px-8 pb-12 lg:block">[\s\S]*?<h1 className="sr-only">Hofseite bearbeiten<\/h1>\s*<HofseiteEditor/)
   })
 
-  it('der Kopf steht genau einmal', () => {
-    expect(seite.match(/<MeinHofKopf /g)).toHaveLength(1)
+  it('der Kopf steht genau einmal je Reiter', () => {
+    // Zwei Zweige, die sich ausschließen: Beiträge kehrt vorher zurück.
+    const beitraege = seite.slice(seite.indexOf("if (reiter === 'beitraege')"), seite.indexOf('const [activeStatus'))
+    const hofseite = seite.slice(seite.indexOf('const [activeStatus'))
+    expect(beitraege.match(/<MeinHofSeitenkopf [^>]*aktiv="beitraege"/g)).toHaveLength(1)
+    expect(hofseite.match(/<MeinHofSeitenkopf /g)).toHaveLength(1)
+    expect(hofseite).toMatch(/<MeinHofSeitenkopf [^>]*aktiv="hofseite"/)
+    expect(beitraege).toMatch(/return \(/)
   })
 
   it('der Editor bekommt keinen ganzen Hof mit Date oder Decimal, nur seine Felder', () => {

@@ -1,11 +1,4 @@
-import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
-import { auth } from '@/lib/auth'
-import { getFarmForUser } from '@/server/queries/dashboard'
-import { getOpenOrdersCount } from '@/server/queries/orders'
-import { getFarmBannerState } from '@/server/queries/farm'
-import { isAdminUser } from '@/server/queries/admin'
-import { zaehleZuEntscheiden } from '@/server/queries/meldung'
+import { ladeHofbereich } from '@/server/hofbereich'
 import { FarmerNav } from '@/components/farmer/farmer-nav'
 import { ServiceWorkerAnmeldung } from '@/components/shared/service-worker-anmeldung'
 import { SentryNutzer } from '@/components/farmer/sentry-nutzer'
@@ -13,30 +6,15 @@ import { ArchivedFarmBanner } from '@/components/farmer/archived-farm-banner'
 import { PendingApprovalBanner } from '@/components/farmer/pending-approval-banner'
 import { alsLand } from '@/lib/laender'
 
-export default async function FarmerLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth.api.getSession({ headers: await headers() })
-
-  if (!session?.user) {
-    redirect('/login')
-  }
-
-  const role = (session.user as typeof session.user & { role: string }).role
-  if (role !== 'FARMER') {
-    redirect('/login')
-  }
-
-  const farm = await getFarmForUser(session.user.id)
-  if (!farm) redirect('/onboarding')
-
-  const openOrdersCount = await getOpenOrdersCount(farm.id)
-  // Ein Zugriff für beide Balken (stillgelegt / wartet auf Freigabe)
-  const bannerState = await getFarmBannerState(session.user.id)
-  const isArchived = bannerState?.archivedAt != null
-  const isPending = bannerState != null && bannerState.approvedAt == null
-  // Menüpunkt „Admin" nur für den Betreiber — frisch aus der DB, nicht aus der Sitzung.
-  const isAdmin = await isAdminUser(session.user.id)
-  // Die Zählabfrage nur für den Betreiber — kein Hof bezahlt dafür.
-  const zuEntscheiden = isAdmin ? await zaehleZuEntscheiden() : 0
+/*
+ * Das Bestandslayout des Hofbereichs (FarmerNav). Routen, die ihr Gate in die
+ * HofShell umgestellt hat, liegen in der Routengruppe (hof) mit eigenem
+ * Layout (seit Nachtlauf Nr. 16: /farm-page) — hier springt nichts um, bis
+ * die jeweilige Route umzieht. Zugang, Zahlen und Balken lädt für beide
+ * Layouts derselbe Lader (src/server/hofbereich.ts).
+ */
+export default async function FarmerLayout({ children }: { children: React.ReactNode }): Promise<React.JSX.Element> {
+  const { hof, personName, offeneBestellungen, balken, isAdmin, zuEntscheiden } = await ladeHofbereich()
 
   return (
     <div className="min-h-screen bg-background">
@@ -46,16 +24,16 @@ export default async function FarmerLayout({ children }: { children: React.React
       <ServiceWorkerAnmeldung />
       {/* Sentry-Nutzerkennung: ausschließlich die Farm-ID (nie E-Mail, nie
           Name) — hier gesetzt, weil jeder Bauer über dieses Layout kommt. */}
-      <SentryNutzer farmId={farm.id} />
+      <SentryNutzer farmId={hof.id} />
       <div className="flex min-h-screen">
         <FarmerNav
-          farmName={farm.name}
-          userName={session.user.name ?? ''}
-          ordersBadge={openOrdersCount > 0 ? openOrdersCount : undefined}
-          farmLogoUrl={farm.logoUrl}
+          farmName={hof.name}
+          userName={personName}
+          ordersBadge={offeneBestellungen > 0 ? offeneBestellungen : undefined}
+          farmLogoUrl={hof.logoUrl}
           // Derselbe Zustand, der den Freigabe-Balken auslöst — die Karte zeigt
           // ihn nur zusätzlich als ruhigen Punkt an der Hof-Identität an.
-          farmPending={isPending}
+          farmPending={balken?.art === 'wartet'}
           isAdmin={isAdmin}
           adminBadge={zuEntscheiden > 0 ? zuEntscheiden : undefined}
         />
@@ -63,18 +41,14 @@ export default async function FarmerLayout({ children }: { children: React.React
         {/* min-w-0: als Flex-Item darf main nicht mit breitem Inhalt über den
             Viewport wachsen — sonst greift kein overflow-x-auto der Kinder */}
         <main className="flex-1 min-w-0 pb-24 md:pb-0 md:ml-56 print:ml-0 print:pb-0">
-          {/* Reihenfolge wie bei der Server-Prüfung: stillgelegt sticht
-              „wartet auf Freigabe". Einen Balken mit dem Shop-Link gibt es
-              nicht mehr: Adresse, Kopieren und Teilen stehen im Kopf von
-              Mein Hof — über jeder Seite nahm er nur Platz weg. */}
-          {isArchived ? (
+          {/* Stillgelegt sticht „wartet auf Freigabe" (entschieden im Lader).
+              Einen Balken mit dem Shop-Link gibt es nicht mehr: Adresse,
+              Kopieren und Teilen stehen im Kopf von Mein Hof — über jeder
+              Seite nahm er nur Platz weg. */}
+          {balken?.art === 'stillgelegt' ? (
             <ArchivedFarmBanner />
-          ) : isPending ? (
-            <PendingApprovalBanner
-              farmId={bannerState.id}
-              farmName={bannerState.name}
-              land={alsLand(bannerState.country)}
-            />
+          ) : balken?.art === 'wartet' ? (
+            <PendingApprovalBanner farmId={balken.farmId} farmName={balken.farmName} land={alsLand(balken.country)} />
           ) : null}
           {children}
         </main>

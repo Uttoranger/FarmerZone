@@ -259,6 +259,10 @@ describe('kein Big Bang', () => {
     '(public)/fuer-hoefe/page.tsx',
     '(auth)/register/page.tsx',
     '(auth)/onboarding/page.tsx',
+    // Nr. 16: die Routengruppe (hof) — ihr Layout trägt die HofShell für jede
+    // Route darin (seit Nr. 16 /farm-page); umgestellt wird durch Umzug des
+    // Ordners von (farmer) nach (hof).
+    '(hof)/layout.tsx',
   ]
 
   it('nur die Vorschau unter /intern und die umgestellten Routen binden eine Shell ein', () => {

@@ -80,3 +80,18 @@ export function farmPendingMailBody(farmName: string, farmId: string): string {
     'Vielen Dank!',
   ].join('\n')
 }
+
+/**
+ * Der mailto-Link „Frage zur Freischaltung stellen" — Betreff und Text mit der
+ * Hof-ID schon eingetragen. Für den Warte-Balken des Bestands und den der
+ * HofShell (components/hofbereich/hof-balken.tsx). URLSearchParams kodiert
+ * Leerzeichen als „+", was manche Mail-Programme wörtlich übernehmen — daher
+ * %20 (gleiches Muster wie src/lib/support.ts).
+ */
+export function freischaltungsMailto(supportEmail: string, farmName: string, farmId: string): string {
+  const params = new URLSearchParams({
+    subject: farmPendingMailSubject(farmName),
+    body: farmPendingMailBody(farmName, farmId),
+  })
+  return `mailto:${supportEmail}?${params.toString().replace(/\+/g, '%20')}`
+}

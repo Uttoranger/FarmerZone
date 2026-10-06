@@ -32,7 +32,6 @@ const FARBLITERAL_BESTAND = [
   'src/components/farm/farm-page-view.tsx',
   'src/components/farm/product-grid.tsx',
   'src/components/farmer/farm-identity-card.tsx',
-  'src/components/farmer/farm-page-client.tsx',
   'src/components/farmer/segment-control.tsx',
   'src/components/hoefe/hoefe-karte.tsx',
   'src/components/orders/order-status.ts',

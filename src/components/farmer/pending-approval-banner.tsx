@@ -1,11 +1,6 @@
 import { Clock } from 'lucide-react'
 import { SUPPORT_EMAIL } from '@/lib/support'
-import {
-  FARM_PENDING_OWNER_BANNER,
-  FARM_PENDING_OWNER_HINT,
-  farmPendingMailSubject,
-  farmPendingMailBody,
-} from '@/lib/farm-approval'
+import { FARM_PENDING_OWNER_BANNER, FARM_PENDING_OWNER_HINT, freischaltungsMailto } from '@/lib/farm-approval'
 import { DE_VORBEREITUNG_HINWEIS, type Land } from '@/lib/laender'
 
 /**
@@ -34,13 +29,7 @@ export function PendingApprovalBanner({
   farmName: string
   land?: Land
 }) {
-  const params = new URLSearchParams({
-    subject: farmPendingMailSubject(farmName),
-    body: farmPendingMailBody(farmName, farmId),
-  })
-  // URLSearchParams kodiert Leerzeichen als "+", was manche Mail-Programme
-  // wörtlich übernehmen — daher %20 (gleiches Muster wie src/lib/support.ts).
-  const mailto = `mailto:${SUPPORT_EMAIL}?${params.toString().replace(/\+/g, '%20')}`
+  const mailto = freischaltungsMailto(SUPPORT_EMAIL, farmName, farmId)
 
   return (
     <div className="mx-4 mt-3 print:hidden">

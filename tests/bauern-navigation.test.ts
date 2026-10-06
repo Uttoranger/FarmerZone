@@ -15,13 +15,14 @@
  *  - Jede Seite unter src/app/(farmer) ist über die Navigation erreichbar.
  */
 import { describe, it, expect } from 'vitest'
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   HANDY_LEISTE,
   HAUPT,
   MEIN_HOF_HINWEIS,
   MEIN_HOF_REITER,
+  MEIN_HOF_REITER_HOFBEREICH,
   NEU,
   NEU_BROWSER,
   NUR_IM_MEHR,
@@ -40,6 +41,16 @@ import {
 } from '@/lib/bauern-navigation'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
+
+/** Die Routengruppen des Hofbereichs: Bestand (FarmerNav) und HofShell (seit Nr. 16). */
+const HOF_GRUPPEN = ['src/app/(farmer)', 'src/app/(hof)'] as const
+
+/** Die page.tsx einer Hof-Route — in welcher der beiden Gruppen sie gerade liegt. */
+function hofSeite(href: string): string {
+  const treffer = HOF_GRUPPEN.map((g) => `${g}${href}/page.tsx`).filter((p) => existsSync(join(process.cwd(), p)))
+  expect(treffer, href).toHaveLength(1)
+  return treffer[0]
+}
 
 describe('Reihenfolge', () => {
   it('Handy: Heute · Bestellungen · Plus · Mein Hof · Mehr', () => {
@@ -121,11 +132,17 @@ describe('Mein Hof', () => {
   })
 
   it('der Kopf sitzt über jeder Reiter-Seite, mit genau ihrem Reiter und parallel geladenen Daten', () => {
-    for (const reiter of MEIN_HOF_REITER) {
-      const seite = quelle(`src/app/(farmer)${reiter.href}/page.tsx`)
-      expect(seite, reiter.href).toMatch(new RegExp(`<MeinHofKopf[^>]*aktiv="${reiter.id}"`))
-      expect(seite, reiter.href).toContain('getMeinHofKopf(session.user.id)')
+    // Bestand: /status mit dem Bestandskopf (Reiter „Beiträge" ist dort die eigene Seite).
+    const status = quelle(hofSeite('/status'))
+    expect(status).toMatch(/<MeinHofKopf[^>]*aktiv="beitraege"/)
+    expect(status).toContain('getMeinHofKopf(session.user.id)')
+    // HofShell (Nr. 16): /farm-page trägt beide Reiter selbst, der Reiter steht in der Adresse.
+    const meinHof = quelle(hofSeite('/farm-page'))
+    for (const reiter of MEIN_HOF_REITER_HOFBEREICH) {
+      expect(reiter.href.split('?')[0]).toBe('/farm-page')
+      expect(meinHof, reiter.id).toMatch(new RegExp(`<MeinHofSeitenkopf[^>]*aktiv="${reiter.id}"`))
     }
+    expect(meinHof).toContain('getMeinHofKopf(session.user.id)')
   })
 
   it('Produkte trägt den Kopf nicht mehr, sondern eine eigene Überschrift', () => {
@@ -151,7 +168,7 @@ describe('Mein Hof', () => {
       }
     }
     for (const reiter of MEIN_HOF_REITER) {
-      const wurzel = join(process.cwd(), `src/app/(farmer)${reiter.href}`)
+      const wurzel = join(process.cwd(), hofSeite(reiter.href).replace(/\/page\.tsx$/, ''))
       for (const name of readdirSync(wurzel)) {
         if (statSync(join(wurzel, name)).isDirectory()) suche(join(wurzel, name))
       }
@@ -260,12 +277,18 @@ describe('aktive Pfade', () => {
 })
 
 describe('Vollständigkeit', () => {
-  it('jede Seite unter src/app/(farmer) hat ihren Punkt in der Navigation', () => {
-    const wurzel = join(process.cwd(), 'src/app/(farmer)')
-    const ordner = readdirSync(wurzel).filter((n) => statSync(join(wurzel, n)).isDirectory())
+  it('jede Seite unter src/app/(farmer) und src/app/(hof) hat ihren Punkt in der Navigation', () => {
+    const ordner = HOF_GRUPPEN.flatMap((gruppe) => {
+      const wurzel = join(process.cwd(), gruppe)
+      return readdirSync(wurzel).filter((n) => statSync(join(wurzel, n)).isDirectory())
+    })
     expect(ordner.length).toBeGreaterThan(5)
+    // Gegenprobe: Die Suche erreicht beide Gruppen.
+    expect(ordner).toContain('farm-page')
+    expect(ordner).toContain('status')
     for (const name of ordner) {
       expect(aktiverPunkt(`/${name}`), name).not.toBeNull()
+      expect(hofAktiverPunkt(`/${name}`), name).not.toBeNull()
     }
   })
 })

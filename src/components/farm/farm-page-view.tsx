@@ -17,7 +17,9 @@
  *
  * 2. src/components/farmer/farm-page-client.tsx — der Besitzer am Handy unter
  *    lg auf /farm-page, im Bearbeitungsmodus (`ownerMode`, `mode`,
- *    `pastStatusCount`, `onVorschau`), noch im Bestandsdesign. Nur hier gibt
+ *    `pastStatusCount`, `onVorschau`). Seit Nachtlauf Nr. 16 in der HofShell;
+ *    die Bestandsfarben (--app-*) bekommen dort über data-app-palette die
+ *    Werte des Design-Systems, der Aufbau ist unverändert. Nur hier gibt
  *    es Stifte, Titelbild- und Fotoknöpfe, den Bearbeitungs-Hinweis und den
  *    Pausen-Hinweis für den Hof; die Werkzeugleiste steht in
  *    farm-page-client.tsx selbst. Seine „Kundenansicht" zeigt seit Nr. 10 die

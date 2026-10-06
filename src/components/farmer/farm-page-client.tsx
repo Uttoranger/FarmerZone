@@ -1,13 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { Pencil, Eye, Copy, Share2, Check } from 'lucide-react'
 import { FarmPageView } from '@/components/farm/farm-page-view'
 import { vorschauLink } from '@/lib/hofseite-vorschau'
 import type { PublicFarm } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
+import { Segment } from '@/components/ui/segment'
 
 type Mode = 'edit' | 'preview'
+
+const MODI = [
+  { wert: 'edit', label: 'Bearbeiten' },
+  { wert: 'preview', label: 'Kundenansicht' },
+] as const
 
 interface Props {
   farm: PublicFarm
@@ -15,101 +20,30 @@ interface Props {
   pastStatusCount: number
 }
 
-export function FarmPageClient({ farm, activeStatus, pastStatusCount }: Props) {
+/*
+ * Mein Hof unter lg: die Hofseite mit Stiften (Bearbeiten) oder die echte
+ * Hofseite im Rahmen (Kundenansicht). Seit Nachtlauf Nr. 16 in der HofShell;
+ * der Umschalter ist der Segment-Baustein. Adresse, Kopieren und Teilen
+ * standen hier ein zweites Mal — sie sitzen im Kopf von Mein Hof
+ * (components/mein-hof/seitenkopf.tsx), und dort nur, solange die Hofseite
+ * öffentlich ist; hier kopierte die Leiste auch einen Link ins Leere.
+ */
+export function FarmPageClient({ farm, activeStatus, pastStatusCount }: Props): React.JSX.Element {
   const [mode, setMode] = useState<Mode>('edit')
-  const [copied, setCopied] = useState(false)
-
-  async function handleCopy() {
-    const url = `${window.location.origin}/${farm.slug}`
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // clipboard not available
-    }
-  }
-
-  function handleShare() {
-    const url = `${window.location.origin}/${farm.slug}`
-    const text = `Schau dir unseren Hof-Shop an: ${url}`
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
-  }
 
   return (
     <>
-      {/* v3 Top bar — only on /farm-page */}
-      <div
-        className="flex items-center gap-2.5 flex-wrap"
-        style={{
-          background: 'var(--card)',
-          borderBottom: '1px solid var(--border)',
-          padding: '13px 28px',
-        }}
-      >
-        <span
-          className="text-[11px] font-bold uppercase tracking-[0.06em]"
-          style={{ color: 'var(--app-ink-faint)' }}
-        >
-          Shop
-        </span>
-        <span className="text-sm mr-1.5" style={{ color: 'var(--app-ink)' }}>
-          farmerzone.at/<strong>{farm.slug}</strong>
-        </span>
-        <button
-          onClick={handleCopy}
-          className="flex items-center gap-1.5 h-[38px] px-3.5 rounded-lg text-[13px] font-semibold transition-colors hover:opacity-90"
-          style={{
-            border: '1px solid var(--border)',
-            background: 'var(--card)',
-            color: 'var(--app-ink-soft)',
-          }}
-        >
-          {copied
-            ? <Check className="size-[15px]" strokeWidth={1.7} />
-            : <Copy className="size-[15px]" strokeWidth={1.7} />
-          }
-          {copied ? 'Kopiert' : 'Kopieren'}
-        </button>
-        <button
-          onClick={handleShare}
-          className="flex items-center gap-1.5 h-[38px] px-3.5 rounded-lg text-[13px] font-semibold transition-colors hover:opacity-90"
-          style={{
-            border: '1px solid var(--border)',
-            background: 'var(--card)',
-            color: 'var(--app-ink-soft)',
-          }}
-        >
-          <Share2 className="size-[15px]" strokeWidth={1.7} />
-          Teilen
-        </button>
-
-        <div className="ml-auto flex gap-2">
-          <button
-            onClick={() => setMode('edit')}
-            className="flex items-center gap-1.5 h-[38px] px-4 rounded-lg text-[13px] font-semibold transition-colors"
-            style={
-              mode === 'edit'
-                ? { background: 'var(--app-bar)', color: '#fff', border: '1px solid var(--app-bar)' }
-                : { background: 'var(--card)', color: 'var(--app-ink-soft)', border: '1px solid var(--border)' }
-            }
-          >
-            <Pencil className="size-3.5" strokeWidth={1.7} />
-            Bearbeiten
-          </button>
-          <button
-            onClick={() => setMode('preview')}
-            className="flex items-center gap-1.5 h-[38px] px-4 rounded-lg text-[13px] font-semibold transition-colors"
-            style={
-              mode === 'preview'
-                ? { background: 'var(--app-bar)', color: '#fff', border: '1px solid var(--app-bar)' }
-                : { background: 'var(--card)', color: 'var(--app-ink-soft)', border: '1px solid var(--border)' }
-            }
-          >
-            <Eye className="size-3.5" strokeWidth={1.7} />
-            Kundenansicht
-          </button>
-        </div>
+      <div className="flex items-center justify-between gap-3 border-y border-border bg-card px-4 py-2.5 md:px-8">
+        <p className="text-[13px] text-muted-foreground">
+          {mode === 'edit' ? 'Tippe auf einen Stift, um etwas zu ändern.' : 'So sehen Kunden deine Hofseite.'}
+        </p>
+        <Segment
+          beschriftung="Ansicht der Hofseite"
+          optionen={MODI}
+          wert={mode}
+          onWertChange={(wert) => setMode(wert === 'preview' ? 'preview' : 'edit')}
+          className="shrink-0"
+        />
       </div>
 
       {mode === 'preview' ? (
@@ -118,20 +52,25 @@ export function FarmPageClient({ farm, activeStatus, pastStatusCount }: Props) {
         // Nachbau (ARCHITECTURE §4, „Die Hofseite gibt es genau einmal").
         // Einbetten ist nur für diese Adresse und nur für uns selbst erlaubt
         // (next.config.ts, frame-ancestors 'self'); Kaufen wirkt dort nicht.
+        // Höhe: ein Bildschirm abzüglich der Unterleiste der HofShell.
         <iframe
           src={vorschauLink(farm.slug)}
           title="So sehen Kunden deine Hofseite"
-          className="block h-[calc(100dvh-8.5rem)] w-full border-0 bg-background"
+          className="block h-[calc(100dvh-9.5rem)] w-full border-0 bg-background"
         />
       ) : (
-        <FarmPageView
-          farm={farm}
-          activeStatus={activeStatus}
-          ownerMode={true}
-          mode={mode}
-          pastStatusCount={pastStatusCount}
-          onVorschau={() => setMode('preview')}
-        />
+        // Die Bestandsfarben der Hofseite (--app-*) nehmen hier die Werte des
+        // Design-Systems an (data-app-palette, globals.css).
+        <div data-app-palette="neu">
+          <FarmPageView
+            farm={farm}
+            activeStatus={activeStatus}
+            ownerMode={true}
+            mode={mode}
+            pastStatusCount={pastStatusCount}
+            onVorschau={() => setMode('preview')}
+          />
+        </div>
       )}
     </>
   )

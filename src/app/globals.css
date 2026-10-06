@@ -397,6 +397,38 @@
   --radius: 1rem;
 }
 
+/* ── Bestandsteile im neuen Design ───────────────────────────────────
+   Manche Bestandskomponenten ziehen mit ihrer Route in eine Shell, ohne
+   neu gebaut zu werden (Nachtlauf Nr. 16: die Hofseite mit Stiften und die
+   Formulare des Hofseiten-Editors auf /farm-page). Sie zeichnen mit der
+   gewachsenen Palette --app-* und dem Hinweis-Kasten --notice*. Ein
+   Vorfahre mit data-app-palette="neu" gibt diesen Variablen für seinen
+   Teilbaum die Werte des Design-Systems — nur dort, nicht dokumentweit:
+   Ladeansichten und Teile anderer umgestellter Routen nutzen --app-* mit
+   ihren eigenen Werten. Beide Themes folgen, weil die --fz-Tokens am
+   <html> umschalten. Abgeleitet (nicht in der Tabelle des Design-Systems):
+   Chip und Wanne = --muted, Grün-Chip und Hinweis-Kasten als Tönung wie
+   die Hinweiskarte (12 % Fläche, 45 % Rand). */
+[data-app-palette="neu"] {
+  --app-page: var(--fz-bg);
+  --app-ink: var(--fz-text);
+  --app-ink-soft: var(--fz-text-muted);
+  --app-ink-faint: var(--fz-text-muted);
+  --app-line-firm: var(--fz-border);
+  --app-chip: var(--muted);
+  --app-chip-ink: var(--fz-text-muted);
+  --app-chip-green: color-mix(in oklch, var(--fz-accent) 12%, var(--fz-surface));
+  --app-button: var(--fz-accent);
+  --app-bar: var(--fz-accent);
+  --app-bar-ink: var(--fz-on-accent);
+  --app-bar-ink-soft: var(--fz-on-accent);
+  --app-trough: var(--muted);
+  --notice: color-mix(in oklch, var(--fz-primary) 12%, var(--fz-surface));
+  --notice-line: color-mix(in oklch, var(--fz-primary) 45%, var(--fz-surface));
+  --notice-icon: var(--fz-status-offen);
+  --notice-ink: var(--fz-text);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
