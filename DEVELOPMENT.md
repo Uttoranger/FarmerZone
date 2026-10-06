@@ -4201,6 +4201,11 @@ Entscheidungen und Gründe:
 - **Moment „wieder da":** nur bei 0 → mehr als 0 (vom Server bestätigt), nur bei sichtbarem Hof und Produkt, je Produkt und Wiener Woche einmal je Gerät (localStorage, ohne Speicher nie). Geteilt wird die Hofseite mit dem Satz „Wieder da bei uns: … Abholung …" über `teileHof`. Nicht gebaut: „N Kunden haben zuletzt … gekauft" (keine Regel für „zuletzt"), Abschalten in den Einstellungen (Spalte, Gate 7), Zählung (Nr. 21), Moment „gespeichert" (Gate 7).
 - **Weggefallen**, weil nirgends mehr benutzt: `product-list.tsx`, `stock-dialog.tsx`, `produkt-zeile-teile.tsx`, `src/lib/produkt-zeile.ts` (samt Test), `kopfzeileProdukte`/`zaehleImShop`; ihre Zusicherungen stehen jetzt in `tests/produkte-seite.test.ts`. Die Altlast „Produktliste zeigt Illustrationen nachts ungedämpft" (ARCHITECTURE §6) ist damit erledigt.
 
+## Entscheidung B1 und Vorbereitung Lauf 5 (2026-10-06)
+
+- **B1 – keine Servicegebühr bei Barzahlung bis zum SEPA-Start:** Die Bargebühr kassiert der Hof, eingezogen werden soll sie über die SEPA-Monatsabrechnung. Die gibt es erst ab `TARIFE_AB` (1. Februar 2027, K1). Bis dahin zahlte die Kundin eine Gebühr, die nie bei der Plattform ankommt. Deshalb fällt sie bei Barzahlung bis zum Stichtag `BAR_SERVICEGEBUEHR_AB` weg. Online behält Stripe sie direkt ein, dort bleibt sie. Der Stichtag ist eine eigene Konstante (Standard `TARIFE_AB`): Verschiebt sich die Abrechnung, wird nur er verschoben. Umsetzung 19a.
+- **Lauf 5:** Haltepunkt 22f. Gate 8 ist aufgeteilt in 22a–22f, davor die Aufträge 19a (B1) und 19b (Sicherheits-Altlasten aus Lauf 4). Reihenfolge und Umfang stehen in `docs/nachtlauf/freigabe.md` §9.
+
 ## Nützliche Befehle
 
 ```bash

@@ -25,9 +25,16 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 17a | E8 – Checkout ohne Kundenkonto | fertig | `nacht/2026-10-06/17a-checkout-ohne-konto` | #183 | main | Altlast-Sperre beim Ablehnen; „/account" auf Abos umgedeutet; Name/Telefon nach fremder Registrierung (Vorschlag) | 06.10.2026 |
 | 17b | E-Mail-Bestätigung für neue Höfe (S3) | fertig | `nacht/2026-10-06/17b-email-bestaetigung` | #184 | 17a (#183) | Stichtag vor Merge auf Deploy-Tag setzen; Pre-Hijacking-Blocker behoben (HTTP-Registrierung gesperrt) | 06.10.2026 |
 | 17c | Slug-Prüfung absichern | fertig | `nacht/2026-10-06/17c-slug-pruefung` | #185 | 17b (#184) | – | 06.10.2026 |
-| 17d | Konditionen-Übergang (K1) | fertig | `nacht/2026-10-06/17d-konditionen-uebergang` | #186 | 17c (#185) | Bar-Gebühren vor Stichtag entscheiden; Satz zweimal auf /fuer-hoefe bestätigen | 06.10.2026 |
-| 18 | Produkte | läuft | `nacht/2026-10-06/18-produkte` | | 17d (#186) | | 06.10.2026 |
-| 19 | Bestellungen | offen | | | | | |
+| 17d | Konditionen-Übergang (K1) | fertig | `nacht/2026-10-06/17d-konditionen-uebergang` | #186 | 17c (#185) | Bar-Gebühren vor Stichtag entschieden (B1 → 19a); Satz zweimal auf /fuer-hoefe bestätigen | 06.10.2026 |
+| 18 | Produkte | fertig | `nacht/2026-10-06/18-produkte` | #187 | 17d (#186) | Bestandsfehler im Bearbeiten-Dialog mitbehoben; „Verkauf eintragen" mit /sales; Entwurf vs. „Nicht im Shop" | 06.10.2026 |
+| 19 | Bestellungen | fertig (Entwurf) | `nacht/2026-10-06/19-bestellungen` | #188 | 18 (#187) | Geldpfad: 4 Sollte-Punkte nach 2 Runden offen (Fix-PR vorgeschlagen); `maxDuration` mit Vercel-Plan abgleichen | 06.10.2026 |
+| 19a | B1 – keine Bargebühr bis zum Stichtag | offen | | | | | |
+| 19b | Sicherheits-Altlasten aus Lauf 4 | offen | | | | | |
 | 20 | Futter und Brennmaterial | offen | | | | | |
 | 21 | Teilen | offen | | | | | |
-| 22 | Auswerten, Region, Einstellungen, Hilfe, Admin | offen | | | | | |
+| 22a | Kunden und Kundendetail | offen | | | | | |
+| 22b | Verkäufe und „Verkauf eintragen" | offen | | | | | |
+| 22c | Auswertung und Region | offen | | | | | |
+| 22d | Einstellungen | offen | | | | | |
+| 22e | Beiträge, Hilfe, Meine Meldungen | offen | | | | | |
+| 22f | Admin in der AdminShell | offen | | | | | |
