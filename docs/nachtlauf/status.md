@@ -16,12 +16,16 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 09 | Entdecken | fertig | `nacht/2026-10-05/09-entdecken` | #173 | 08 (#172) | PLZ in URL weggelassen (Regel #130); 9 Mockup-Abweichungen; Startseite-Overlay noch `from-black` | 05.10.2026 |
 | 10 | Hofseite | fertig | `nacht/2026-10-05/10-hofseite` | #174 | 09 (#173) | Geld-Blocker und JSON-LD-XSS behoben; Reiter „Beiträge“ bestätigen; Mockup-Abweichungen | 05.10.2026 |
 | 11 | Produktdetail | fertig | `nacht/2026-10-05/11-produktdetail` | #175 | 10 (#174) | Grundpreis eine Rundungsstelle; Produktkarten verlinken die Produktseite (Blatt gelöscht); Gate-6-Teile weggelassen | 05.10.2026 |
-| 12 | Checkout | fertig | `nacht/2026-10-05/12-checkout` | #176 | 11 (#175) | E5 umgesetzt; E8: Checkout legt weiter ruhendes Konto an (Entscheidung nötig); EPS/Wallets im Stripe-Dashboard | 05.10.2026 |
+| 12 | Checkout | fertig | `nacht/2026-10-05/12-checkout` | #176 | 11 (#175) | E5 umgesetzt; E8: Checkout legt weiter ruhendes Konto an (→ 17a); EPS/Wallets im Stripe-Dashboard | 05.10.2026 |
 | 13 | Bestätigungen und E-Mails | fertig | `nacht/2026-10-05/13-bestaetigungen` | #177 | 12 (#176) | „Nochmal bestellen“ in Abholbereit-Mail entscheiden; Opt-in ohne Double-Opt-in; Kalender-Route-Altlasten | 05.10.2026 |
 | 14 | Konto und Meine Höfe | fertig | `nacht/2026-10-05/14-bestellungen-finden` | #178 | 13 (#177) | laut Freigabe ersetzt durch „Bestellungen finden“ per Code (kein Konto) + /account im neuen Design; Slug `bestellungen` in Produktion prüfen | 05.10.2026 |
-| 15 | Für Höfe, Registrieren, Einrichten | fertig (Entwurf) | `nacht/2026-10-06/15-fuer-hoefe` | #179 | 14 (#178) | Konditionen: Tarife (öffentlich) vs. Gründungsplatz (Admin) entscheiden; Pilothof; S3 offen | 06.10.2026 |
+| 15 | Für Höfe, Registrieren, Einrichten | fertig | `nacht/2026-10-06/15-fuer-hoefe` | #179 | 14 (#178) | Konditionen entschieden (Register K1 → 17d); S3 freigegeben (→ 17b) | 06.10.2026 |
 | 16 | Mein Hof | fertig | `nacht/2026-10-06/16-mein-hof` | #180 | 15 (#179) | erste Route in HofShell (`(hof)`); Handy: Bearbeiten unter Checkliste entscheiden | 06.10.2026 |
 | 17 | Heute | fertig | `nacht/2026-10-06/17-heute` | #181 | 16 (#180) | Stripe-Hinweis: Bestandsregel mit Konto statt wörtlicher Gate-Bedingung entscheiden; Teilen abschaltbar → Gate 7 | 06.10.2026 |
+| 17a | E8 – Checkout ohne Kundenkonto | offen | | | | | |
+| 17b | E-Mail-Bestätigung für neue Höfe (S3) | offen | | | | | |
+| 17c | Slug-Prüfung absichern | offen | | | | | |
+| 17d | Konditionen-Übergang (K1) | offen | | | | | |
 | 18 | Produkte | offen | | | | | |
 | 19 | Bestellungen | offen | | | | | |
 | 20 | Futter und Brennmaterial | offen | | | | | |

@@ -21,6 +21,13 @@ Stand: Oktober 2026 · Basis: `main` @ `1a2357d` · Ersetzt v2.
 
 **Erledigt seit v2:** Gate 1 (Tokens, Theme ohne Flash, Lint gegen Farbliterale, Schriften self-hosted) · K1 Storno mit `reverse_transfer` · K2 Webhook-Statuslogik · K3 verwaiste Bestellungen (Freigabe beim Lesen, `src/lib/fristen.ts`) · K4 Stripe-Fehler im Checkout, `account.updated` · Fix A Hand-Zeiger, „Schließen", keine Emojis · Fix B Ladeansichten, 404/500, `global-error.tsx` · Fix C Eingabegrenzen (`src/lib/eingabegrenzen.ts`) · H2 Produktname aus der Datenbank · Briefkasten-Cron zeitkonstant · H1 Abholtermin inkl. `maxOrders` (#163) · H4 Bestätigungsseite nur mit Signatur (#164) · H3 Bar-Bestätigung per Knopf (#166).
 
+**Fortschritt Redesign** (Stand 06.10.2026, Einzelheiten in `docs/nachtlauf/status.md`):
+- Gate 2 Bausteine und Shells: **erledigt** (#168).
+- Gate 3 Sicherheit und Schema: **erledigt** (E4 #167, Schema-Expand #169, reservierte Slugs #170).
+- Gate 4 Kaufstrecke: **erledigt** (#171–#178).
+- Gate 5 Hof-Kernflow: Für Höfe/Registrieren/Einrichten (#179), Mein Hof (#180) und Heute (#181) **erledigt**; Produkte (Nr. 18) und Bestellungen (Nr. 19) offen.
+- Gate 6–9: offen.
+
 **Vorhanden und wiederzuverwenden:**
 
 | Bereich | Wo | Hinweis für dich |
@@ -37,7 +44,7 @@ Stand: Oktober 2026 · Basis: `main` @ `1a2357d` · Ersetzt v2.
 | Servicegebühr | `Farm.serviceFeePercent` (Default 4,9), `serviceFeeMinCents` 50, `serviceFeeActiveFrom`, `src/lib/servicegebuehr.ts` | Rundung und Satz: E4 |
 | Zahlungsarten | `PaymentMethod { ONLINE, ONSITE_CASH, ONSITE_CARD }`, Stripe `PaymentElement` | E5 |
 | Signierte Bestell-Links | `src/lib/bestell-link.ts` (`bestellSignatur`, `bestellLinkGilt`, `bestellungPfad`) | Für H4 und alle neuen Links |
-| Kunden-Anmeldung | Better Auth `magicLink` | E7 |
+| Kunden-Anmeldung | Better Auth `emailOTP` (Code, seit #172) | E7 |
 | Pausieren | `Farm.isPaused`, `/settings/pause` | „Urlaubsmodus" in den Mockups |
 | Briefkasten | `/fehler-melden`, `/meldungen`, `/admin/meldungen(/[id])` mit KI-Vorschlag und Triage | Nur Umbau ins neue Design |
 | Admin | `/admin` (Höfe, Freischaltung, Servicegebühr je Hof), `/admin/finanzen` | Nur Umbau, Ergänzungen in Gate 8 |
@@ -49,7 +56,7 @@ Stand: Oktober 2026 · Basis: `main` @ `1a2357d` · Ersetzt v2.
 
 ## 2. Zielbild
 
-**Kunde:** K0 Ankommen (Startseite, Anmelden) → K1 Finden (Entdecken, Filter, Suche, Leerzustand, geteilter Link) → K2 Ansehen (Hofseite nach Kategorien, Produktdetail mit Größenwahl) → K3 Kaufen (Warenkorb & Bezahlen, Zahlung abgelehnt, Bestätigung, Bar-Bestätigung, E-Mails) → K4 Danach (Meine Bestellungen, Meine Höfe, Konto).
+**Kunde:** K0 Ankommen (Startseite, Anmelden) → K1 Finden (Entdecken, Filter, Suche, Leerzustand, geteilter Link) → K2 Ansehen (Hofseite nach Kategorien, Produktdetail mit Größenwahl) → K3 Kaufen (Warenkorb & Bezahlen, Zahlung abgelehnt, Bestätigung, Bar-Bestätigung, E-Mails) → K4 Danach (Bestellungen finden per E-Mail-Code, bestehende `/account`-Seiten; „Meine Höfe“ und Konto zurückgestellt, E8).
 
 **Hof:** H0 Kennenlernen (Für Höfe, Registrieren) → H1 Starten (Einrichten, Mein Hof mit Vorschau, Einstellungen, Konditionen, Freischaltung) → H2 Angebot (Produkte, „Was legst du an?", Formulare Lebensmittel / Futter / Brennmaterial) → H3 Tagesgeschäft (Heute mit Teilen-Karte, Bestellungen mit Detail, Storno, Artikel fehlt) → H4 Teilen (Teilen-Fenster mit Bild, QR-Plakat) → H5 Auswerten (Auswertung mit Monatsabrechnung und Teilen-Wirkung, Region mit Preise vergleichen und Futter kaufen) → H6 Hilfe (Meldung abgeben, Meine Meldungen).
 
@@ -61,24 +68,24 @@ Navigation je Shell: verbindlich in `DESIGN_SYSTEM.md` → „Shells und Navigat
 
 ## 3. Entscheidungen – vor dem jeweiligen Gate vom Menschen bestätigen
 
-Trage bei jeder Zeile „bestätigt am …" bzw. die abweichende Entscheidung ein, bevor das betroffene Gate startet. Die Empfehlung ist der Vorschlag aus der Mockup-Runde, **keine** Erlaubnis, ohne Bestätigung loszulegen.
+Alle Punkte sind entschieden. **Maßgeblich ist das Register `docs/entscheidungen.md`**; bei Widerspruch gilt das Register. Die Spalte „Empfehlung" bleibt als Verlauf der Mockup-Runde stehen.
 
-| # | Frage | Empfehlung | Betrifft |
-|---|---|---|---|
-| E1 | Hofseite: Abschnitte je Kategorie inkl. Futtermittel und Brennmaterial auf **einer** Seite (Mockup) statt Umschalter Hofladen\|Futtermittel (Konzept Bereiche §6.3)? | Eine Seite mit Kategorie-Abschnitten und Kategorie-Chips; `?bereich=futter` springt zum Futter-Abschnitt. Der Bereich bleibt Datenmodell. | Gate 4 |
-| E2 | `/hoefe`: Futtermittel als Kategorie-Chip in derselben Reihe (Mockup) statt eigener Weiche darüber? | Ja, als Chip; er setzt intern `bereich=futter` und blendet die Gebinde-Facette ein (Wortlaut „Kleinmengen \| Ballen & mehr", Grenze bleibt 25 kg). | Gate 4 |
-| E3 | Verkaufsgrößen = **Produktfamilie** (mehrere Produkte, je Gebinde eins) statt Varianten innerhalb eines Produkts? | Produktfamilie: `Product.familieId`. Hält die Invarianten „ein Produkt = ein Gebinde, `stock` zählt Gebinde, Kennzeichnung je Gebinde". | Gate 6 |
-| E4 | Servicegebühr: 4,9 % (Code-Default) oder 5 % (Preismodell)? Rundung: Code rundet kaufmännisch, Entscheidung lautet **immer aufrunden**. | 5 %, aufrunden auf den nächsten Cent: `max(min, ceil(waren × prozent / 100))` in Hundertstel-Prozent gerechnet, nur in `berechneServicegebuehr`. Gespeicherte Beträge alter Bestellungen nie neu berechnen. | Gate 3 |
-| E5 | Bleibt „Karte bei Abholung" (`ONSITE_CARD`)? Preismodell kennt nur online und bar. | Für neue Bestellungen ausblenden (Expand/Contract: Wert bleibt im Enum, bis keine offene Bestellung ihn nutzt). | Gate 4 |
-| E6 | Preismodell: Tarife Hoftor (0 €) / Hofladen (19 €/Monat), Grundgebühr und Monatsabrechnung per SEPA – oder vorerst weiter Gründungshof? `/konditionen` zeigt heute das Gründungshof-Modell. | Eigene Entscheidung des Menschen. Bis dahin baut Gate 8 die Konditionen-Seite **inhaltsneutral** (Texte aus einer Quelle `src/lib/konditionen.ts`), damit nichts Widersprüchliches live geht. | Gate 8 |
-| E7 | Kundenanmeldung: Magic Link (heute) oder 6-stelliger Code (Mockup)? | Code per E-Mail (Better Auth `emailOTP`) zusätzlich zum Link: funktioniert, wenn Mail am Handy und Einkauf am Laptop. | Gate 4 |
-| E8 | Kundenkonto automatisch mit der ersten Bestellung (Variante A) oder Gast mit signiertem Link (Variante B)? | A, aber Bestellhistorie erst nach bestätigter E-Mail sichtbar (siehe S5). Im Checkout der Satz „Wir legen dir ein Konto ohne Passwort an – löschen kannst du es jederzeit." | Gate 4 |
-| E9 | Prüft der Admin die Futtermittel-Nummer bei der Freischaltung (Mockup) oder bleibt „Plattform prüft nicht" (Konzept)? | Admin sieht Nummer und Status in der Freischaltung, Schild beim Kunden erst nach Haken „geprüft"; bis dahin „Angaben des Hofs". | Gate 6/8 |
-| E10 | Gilt der Hinweis „Abgepacktes Heimtierfutter braucht BAES-Meldung, Ballen aus eigener Ernte nur LFBIS" so (aus der fachlichen Klärung)? | Ja; Texte vor dem Livegang von Landwirtschaftskammer/BAES gegenlesen lassen. | Gate 6 |
-| E11 | Brennmaterial: Kategorie-Name, Unterarten Brennholz / Anzündholz / Hackschnitzel, Einheiten Raummeter, Schüttraummeter (statt mehrdeutig M3)? | Ja. Neue Enum-Werte RAUMMETER, SCHUETTRAUMMETER (Expand), M3 bleibt für Altdaten. | Gate 6 |
-| E12 | „Beiträge" bleibt eigener Menüpunkt (Code) oder Reiter in „Mein Hof" (Mockup)? | Reiter in Mein Hof; `/status` bleibt als Route bestehen und wird von dort verlinkt. | Gate 5 |
-| E13 | „Verkauf eintragen" (gibt es im Code, fehlt in den Mockups) | Bleibt im Neu-Menü unter „Beitrag"; Formular nur ins neue Design ziehen. | Gate 5 |
-| E14 | „Artikel fehlt": Teilerstattung bei Online-Zahlung | Erstattung = Artikelpreis + Differenz der Servicegebühr; vom Hof wird **genau der Artikelpreis** zurückgeholt (Transfer-Reversal mit Betrag), Gebührendifferenz trägt die Plattform. | Gate 5 |
+| # | Frage | Empfehlung | Betrifft | Entschieden |
+|---|---|---|---|---|
+| E1 | Hofseite: Abschnitte je Kategorie inkl. Futtermittel und Brennmaterial auf **einer** Seite (Mockup) statt Umschalter Hofladen\|Futtermittel (Konzept Bereiche §6.3)? | Eine Seite mit Kategorie-Abschnitten und Kategorie-Chips; `?bereich=futter` springt zum Futter-Abschnitt. Der Bereich bleibt Datenmodell. | Gate 4 | 02.10.2026, wie empfohlen → Register E1 |
+| E2 | `/hoefe`: Futtermittel als Kategorie-Chip in derselben Reihe (Mockup) statt eigener Weiche darüber? | Ja, als Chip; er setzt intern `bereich=futter` und blendet die Gebinde-Facette ein (Wortlaut „Kleinmengen \| Ballen & mehr", Grenze bleibt 25 kg). | Gate 4 | 02.10.2026, wie empfohlen → Register E2 |
+| E3 | Verkaufsgrößen = **Produktfamilie** (mehrere Produkte, je Gebinde eins) statt Varianten innerhalb eines Produkts? | Produktfamilie: `Product.familieId`. Hält die Invarianten „ein Produkt = ein Gebinde, `stock` zählt Gebinde, Kennzeichnung je Gebinde". | Gate 6 | 02.10.2026, wie empfohlen → Register E3 |
+| E4 | Servicegebühr: 4,9 % (Code-Default) oder 5 % (Preismodell)? Rundung: Code rundet kaufmännisch, Entscheidung lautet **immer aufrunden**. | 5 %, aufrunden auf den nächsten Cent: `max(min, ceil(waren × prozent / 100))` in Hundertstel-Prozent gerechnet, nur in `berechneServicegebuehr`. Gespeicherte Beträge alter Bestellungen nie neu berechnen. | Gate 3 | 02.10.2026: 5 %, immer aufrunden → Register E4 |
+| E5 | Bleibt „Karte bei Abholung" (`ONSITE_CARD`)? Preismodell kennt nur online und bar. | Für neue Bestellungen ausblenden (Expand/Contract: Wert bleibt im Enum, bis keine offene Bestellung ihn nutzt). | Gate 4 | 02.10.2026, wie empfohlen → Register E5 |
+| E6 | Preismodell: Tarife Hoftor (0 €) / Hofladen (19 €/Monat), Grundgebühr und Monatsabrechnung per SEPA – oder vorerst weiter Gründungshof? `/konditionen` zeigt heute das Gründungshof-Modell. | Eigene Entscheidung des Menschen. Bis dahin baut Gate 8 die Konditionen-Seite **inhaltsneutral** (Texte aus einer Quelle `src/lib/konditionen.ts`), damit nichts Widersprüchliches live geht. | Gate 8 | 02.10.2026: Tarife; Übergang nach K1 → Register E6, K1 |
+| E7 | Kundenanmeldung: Magic Link (heute) oder 6-stelliger Code (Mockup)? | Code per E-Mail (Better Auth `emailOTP`) zusätzlich zum Link: funktioniert, wenn Mail am Handy und Einkauf am Laptop. | Gate 4 | 02.10.2026: Code (`emailOTP`) für Anmeldung und „Bestellungen finden"; Höfe Passwort → Register E7 |
+| E8 | Kundenkonto automatisch mit der ersten Bestellung (Variante A) oder Gast mit signiertem Link (Variante B)? | *Nicht übernommen:* A, aber Bestellhistorie erst nach bestätigter E-Mail sichtbar (siehe S5). Im Checkout der Satz „Wir legen dir ein Konto ohne Passwort an – löschen kannst du es jederzeit." | Gate 4 | 02.10.2026: **vorläufig kein Kundenkonto** – Gast mit signiertem Link, „Bestellungen finden" per E-Mail-Code, kein automatisches Konto, kein Kontosatz, keine „Meine Höfe" → Register E8 |
+| E9 | Prüft der Admin die Futtermittel-Nummer bei der Freischaltung (Mockup) oder bleibt „Plattform prüft nicht" (Konzept)? | *Nicht übernommen:* Admin sieht Nummer und Status in der Freischaltung, Schild beim Kunden erst nach Haken „geprüft"; bis dahin „Angaben des Hofs". | Gate 6/8 | 02.10.2026: **keine Prüfung durch die Plattform** – Hof bestätigt selbst, Schild sofort, Zusatz „laut Angabe des Hofs", im Admin nur Anzeige → Register E9 |
+| E10 | Gilt der Hinweis „Abgepacktes Heimtierfutter braucht BAES-Meldung, Ballen aus eigener Ernte nur LFBIS" so (aus der fachlichen Klärung)? | Ja; Texte vor dem Livegang von Landwirtschaftskammer/BAES gegenlesen lassen. | Gate 6 | 02.10.2026, wie empfohlen → Register E10 |
+| E11 | Brennmaterial: Kategorie-Name, Unterarten Brennholz / Anzündholz / Hackschnitzel, Einheiten Raummeter, Schüttraummeter (statt mehrdeutig M3)? | Ja. Neue Enum-Werte RAUMMETER, SCHUETTRAUMMETER (Expand), M3 bleibt für Altdaten. | Gate 6 | 02.10.2026, wie empfohlen → Register E11 |
+| E12 | „Beiträge" bleibt eigener Menüpunkt (Code) oder Reiter in „Mein Hof" (Mockup)? | Reiter in Mein Hof; `/status` bleibt als Route bestehen und wird von dort verlinkt. | Gate 5 | 02.10.2026, wie empfohlen → Register E12 |
+| E13 | „Verkauf eintragen" (gibt es im Code, fehlt in den Mockups) | Bleibt im Neu-Menü unter „Beitrag"; Formular nur ins neue Design ziehen. | Gate 5 | 02.10.2026, wie empfohlen → Register E13 |
+| E14 | „Artikel fehlt": Teilerstattung bei Online-Zahlung | Erstattung = Artikelpreis + Differenz der Servicegebühr; vom Hof wird **genau der Artikelpreis** zurückgeholt (Transfer-Reversal mit Betrag), Gebührendifferenz trägt die Plattform. | Gate 5 | 02.10.2026: Vorschlag aus `freigabe.md` 1a – Gebühr nur auf das Übergebene, neu berechnet; vom Hof genau der Artikelpreis → Register E14 |
 
 ---
 
@@ -90,12 +97,14 @@ Trage bei jeder Zeile „bestätigt am …" bzw. die abweichende Entscheidung ei
 - **Teilen** baut auf Beiträgen (`/status`) und WhatsApp-Versand auf, nicht daneben.
 - **Urlaubsmodus** = `isPaused`. Pausierte Höfe erscheinen in Entdecken ausgegraut mit „Pausiert bis …", nicht versteckt.
 - **Meldungen/Admin**: Funktion vorhanden, nur Umbau plus die Ergänzungen aus Gate 8.
-- **Mockups ohne Gegenstück im Code (neu):** Produktdetail-Route, „Was legst du an?", Produktfamilie, Brennmaterial-Angaben, Artikel fehlt, Mini-Warenkorb, Meine Höfe, Für-Höfe-Seite, Einstellungen-Übersicht, Teilen-Fenster mit Bild, QR-Plakat, Teilen-Momente, Teilen-Zählung, Monatsabrechnung, Bar-Bestätigungsseite (H3), Rückruf anfordern.
+- **Mockups ohne Gegenstück im Code (neu):** Produktdetail-Route, „Was legst du an?", Produktfamilie, Brennmaterial-Angaben, Artikel fehlt, Mini-Warenkorb, Meine Höfe (zurückgestellt, E8), Für-Höfe-Seite, Einstellungen-Übersicht, Teilen-Fenster mit Bild, QR-Plakat, Teilen-Momente, Teilen-Zählung, Monatsabrechnung, Bar-Bestätigungsseite (H3), Rückruf anfordern.
 - **Code ohne Mockup (nur nach Design-System umbauen, keine neuen Funktionen):** Kunden, Kundendetail, Verkäufe, Druckansichten, Einstellungen-Unterseiten (Profil, Abholzeiten, Zahlung, Pause, Konto, Darstellung), Passwort vergessen/zurücksetzen, E-Mail bestätigen, Datenschutz, Impressum, `/teilen`, `/account/unsubscribe`.
 
 ---
 
 ## 5. Datenmodell – Änderungen (alle als Expand/Contract, Migration zeigen, Freigabe abwarten)
+
+**Schema-Expand erledigt (#169)** für alle freigegebenen Punkte. Geldfelder in **Int-Cent** (`Order.erstattetCents`, Beträge der `Monatsabrechnung`), Register G1.
 
 | Änderung | Zweck | Expand | Contract (eigener PR, später) |
 |---|---|---|---|
@@ -104,8 +113,8 @@ Trage bei jeder Zeile „bestätigt am …" bzw. die abweichende Entscheidung ei
 | `ProductUnit` + `RAUMMETER`, `SCHUETTRAUMMETER` | Brennmaterial (E11) | Werte ergänzen | M3 für neue Produkte im Formular ausblenden |
 | `ProductSubcategory` + `BRENNHOLZ_SCHEIT`, `ANZUENDHOLZ`, `HACKSCHNITZEL` | Brennmaterial-Arten | ergänzen | – |
 | `model BrennmaterialAngaben` (1:1 Product): `holzart`, `scheitlaengeCm?`, `trocknung enum`, `restfeuchteMax?`, `wassergehalt? (W)`, `koernung? (P)`, `gelagertSeit?`, `ueberdacht Boolean` | Pflichtangaben für Käufer | neue Tabelle | – |
-| `Farm.betriebsnummerGeprueftAm DateTime?` | Admin-Prüfung (E9) | nullable | – |
-| `model Merkliste` (`userId`, `farmId`, `createdAt`, unique) | Meine Höfe | neue Tabelle | – |
+| ~~`Farm.betriebsnummerGeprueftAm DateTime?`~~ | **entfällt (E9)** – keine Prüfung durch die Plattform | – | – |
+| ~~`model Merkliste`~~ | **entfällt (E8)** – kein Kundenkonto, keine „Meine Höfe" | – | – |
 | `model TeilenAufruf` (`farmId`, `kanal enum`, `tag Date`, `besuche Int`, `bestellungen Int`) | Teilen-Wirkung, nur aggregiert (S8) | neue Tabelle | – |
 | `Order.teilenKanal enum?` | Bestellung einem Kanal zuordnen, ohne Person | nullable | – |
 | `model RueckrufAnfrage` (`farmId`, `telefon`, `wunschzeit`, `erledigtAm?`, Löschfrist) | „Rückruf anfordern" | neue Tabelle | – |
@@ -137,13 +146,13 @@ Jedes Gate: **Ziel · Mockups · Routen · Aufgaben · Abnahme · Tests · Siche
   1. ~~**H1**~~ *erledigt (#163).* Abholtermin prüfen: Format, Wochentag in Wiener Zeit, Zeiten = aktiver `PickupSlot`, Bestellschluss (`bestellschluss()` aus `fristen.ts`) in der Zukunft, im angebotenen Zeitraum, **`maxOrders` in derselben Transaktion** wie das Anlegen. Fehlercodes `ABHOLFENSTER_UNGUELTIG` / `ABHOLFENSTER_VOLL`, Formular lädt Fenster neu; volle Fenster „ausgebucht".
   2. ~~**H4**~~ *erledigt (#164).* Bestätigungsseite nur mit `?sig=` (`bestellLinkGilt`); alle Linkquellen signieren (checkout-form, stripe-payment `return_url`, Bestätigungs-Route, E-Mails); Status nur aus der Datenbank; `noindex`, `Referrer-Policy: no-referrer`.
   3. ~~**H3**~~ *erledigt (#166).* Bar-Bestätigung: GET leitet auf `/[farmSlug]/bestaetigen/[token]` (Mockup `web-k3-bar-bestellung-bestaetigen-link-aus-mail.html`), erst der Knopf bestätigt (bedingtes `updateMany`, Frist aus `fristVon`, Token danach `null`), Mails nach der Antwort, „Doch nicht" storniert über `storniereUnbezahlteBestellung`, Route in `sentry-hygiene.ts`.
-  4. **E4** Servicegebühr: Rundung auf **aufrunden**, Satz nach Entscheidung; Tests: 1030 → 52, 2000 → 100, 1001 → 51, 250 → 50, 1000 → 50 Cent.
-  5. **Schema-Expand** aus Abschnitt 5 für alles, was bestätigt ist (Migration zeigen, Freigabe).
+  4. ~~**E4**~~ *erledigt (#167).* Servicegebühr: Rundung auf **aufrunden**, Satz nach Entscheidung; Tests: 1030 → 52, 2000 → 100, 1001 → 51, 250 → 50, 1000 → 50 Cent.
+  5. ~~**Schema-Expand**~~ *erledigt (#169).* Schema-Expand aus Abschnitt 5 für alles, was bestätigt ist (Migration zeigen, Freigabe).
 - **Abnahme:** Tests aus den Aufträgen grün; Migrationen freigegeben und eingespielt; keine Verhaltensänderung für Bestandsdaten.
 
 ### Gate 4 · Kaufstrecke im neuen Design (K0–K4)
 
-Route für Route, jede ein eigener PR in dieser Reihenfolge: Startseite → Entdecken → Hofseite → Produktdetail (neu) → Checkout → Bestätigungen → Konto/Meine Höfe.
+Route für Route, jede ein eigener PR in dieser Reihenfolge: Startseite → Entdecken → Hofseite → Produktdetail (neu) → Checkout → Bestätigungen → Bestellungen finden und `/account`. **Erledigt (#171–#178).**
 
 | Route | Mockups | Kernpunkte |
 |---|---|---|
@@ -152,10 +161,10 @@ Route für Route, jede ein eigener PR in dieser Reihenfolge: Startseite → Entd
 | `/hoefe` | `web-k1-*`, `mobil-k1-*` | Einstiegshinweis Standort (grob, nichts gespeichert), Kategorie-Chips inkl. Futtermittel und Brennmaterial (E2), Filterzeile, Liste + Karte (Karte randlos rechts), pausierte Höfe ausgegraut, aktive Filter mit „Alle zurücksetzen", Produktsuche zeigt Produkte statt Höfe, Leerzustand mit Ausweg; Handy: Filter als Blatt |
 | `/[farmSlug]` | `web-k2-hofseite`, `web-k2-alle-produkte-nach-kategorie`, `mobil-k2-hofseite`, `mobil-k2-produkte` | Reiter Übersicht/Produkte/Beiträge, rechte Spalte (Nächste Abholung, Abholzeiten, Zahlung & Kontakt mit Gebührenhinweis, Anfahrt mit Karte) als **eine** Komponente, Kategorie-Abschnitte (E1), Zustände knapp/ausverkauft („Merken" nur, wenn E-Mail-Benachrichtigung gebaut wird, sonst weglassen), **Mini-Warenkorb** rechts |
 | `/[farmSlug]/produkt/[id]` (neu) | `web-k2-futter-groesse-waehlen`, `web-k2-brennmaterial-brennholz`, `mobil-k2-*` | Größenkacheln der Produktfamilie, Grundpreis, Vorrat, Schild, Hinweise (Anhänger, Frontlader), „Gleich mit abholen – eine Bestellung, eine Gebühr", Kennzeichnung im Akkordeon (Konzept §6.3); Handy ohne Unterleiste |
-| `/[farmSlug]/checkout` | `web-k3-warenkorb-bezahlen`, `web-k3-zahlung-abgelehnt`, `mobil-k3-*` | Abholung und E-Mail nebeneinander (Web), Reservierungsfrist sichtbar, Gebühr als eigene Zeile, Zahlungsarten: Apple/Google Pay (je nach Gerät), Karte, EPS, Bar bei Abholung (E5), Kontosatz (E8), Fehlerzustand mit „nichts abgebucht"; Fokus-Shell |
+| `/[farmSlug]/checkout` | `web-k3-warenkorb-bezahlen`, `web-k3-zahlung-abgelehnt`, `mobil-k3-*` | Abholung und E-Mail nebeneinander (Web), Reservierungsfrist sichtbar, Gebühr als eigene Zeile, Zahlungsarten: Apple/Google Pay (je nach Gerät), Karte, EPS, Bar bei Abholung (E5), kein Kontosatz (E8), Fehlerzustand mit „nichts abgebucht"; Fokus-Shell |
 | `/[farmSlug]/confirm/[orderId]` | `web-k3-bestaetigung-…`, `web-k3-bar-wartet-…`, `mobil-k3-bestaetigung` | Abholcode (nur Anzeige, nie Berechtigung), Status-Schritte, „Erzähl's weiter", Bar: „bitte per E-Mail bestätigen bis …" |
 | E-Mails | `web-k3-e-mails-web-mobil` | hell, Bestätigung + Abholerinnerung, ohne Emojis, Links signiert |
-| `/account/profile`, `/account/hoefe` (neu) | `web-k4-*`, `mobil-k4-*` | Laufende Bestellung mit Code und Status, frühere mit „Nochmal bestellen", Benachrichtigungen (Werbung nur mit Opt-in), Konto löschen (S10), Meine Höfe aus `Merkliste` und früheren Bestellungen |
+| `/bestellungen`, `/account/*` | `web-k4-meine-bestellungen-konto`, `mobil-k4-meine-bestellungen` | Bestellungen finden per E-Mail-Code + Umbau `/account`; keine neuen Konto-Funktionen (E8) |
 
 - **Abnahme:** Kompletter Einkauf am Handy und am Laptop im Stripe-Testmodus mit jeder Zahlungsart; alle Seiten in beiden Themes; Lighthouse-Leistung der Startseite nicht schlechter als vorher.
 - **Tests:** E2E (agent-browser bzw. Playwright) für: Startseite → Hof → Produkt → Checkout → Bestätigung (online und bar); Zahlung abgelehnt → erneut bezahlen; Filter in der URL reload-fest; Leerzustand.
@@ -165,7 +174,7 @@ Route für Route, jede ein eigener PR in dieser Reihenfolge: Startseite → Entd
 | Route | Mockups | Kernpunkte |
 |---|---|---|
 | `/fuer-hoefe` (neu) | `web-h0-fuer-hoefe`, `mobil-h0-fuer-hoefe` | Eingebettete echte „Heute"-Ansicht als Bild der App; Preise aus `src/lib/konditionen.ts` (E6) |
-| `/register` | `web-h0-hof-registrieren`, `mobil-h0-registrieren` | Hofname → Adresse, Passwortstärke, AGB-Haken; E-Mail-Bestätigung vor Uploads (S3) |
+| `/register` | `web-h0-hof-registrieren`, `mobil-h0-registrieren` | Hofname → Adresse, Passwortstärke; AGB-Haken erst, wenn die AGB vorliegen (Register O4); E-Mail-Bestätigung nach Register S3 |
 | `/onboarding` | `web-h1-einrichten`, `mobil-h1-einrichten` | Sechs Schritte inkl. Stripe und SEPA (SEPA nur bei E6 = Tarife) |
 | `/farm-page` | `web-h1-mein-hof-*`, `web-h1-vorschau-vergroessert`, `mobil-h1-mein-hof` | Reiter Hofseite \| Beiträge (E12), Checkliste, Vorschau Handy/Web inline, Vergrößern als Overlay; Vorschau = echte Kundenseite im selben `data-design`-Zustand |
 | `/dashboard` | `web-h3-heute-mit-teilen-karte`, `web-h3-heute-online-zahlung-pausiert`, `mobil-h3-heute-*`, `web-h1-freigeschaltet-jetzt-teilen` | Teilen-Karte schmal an Abholtagen, Packliste zuerst, Stripe-Hinweis bei `acceptsOnline && !stripeAccountReady`, Freischaltungs-Moment einmalig |
@@ -206,7 +215,7 @@ Route für Route, jede ein eigener PR in dieser Reihenfolge: Startseite → Entd
 | `/settings` | `web-h1-einstellungen-uebersicht`, `mobil-h5-einstellungen` | Übersicht mit acht Bereichen und Status-Punkt; Unterseiten ins neue Design |
 | `/settings/konditionen` (neu) und `/konditionen` | `web-h1-einstellungen-konditionen` | Texte aus `src/lib/konditionen.ts`; Inhalt nach E6; Gründungshof-Texte nur, solange E6 nicht entschieden ist |
 | `/fehler-melden`, `/meldungen`, `/problem-melden` | `web-h6-*`, `mobil-h6-*`, `fehler-500-problem-melden-kunde` | Drei Arten, Zähler, Foto optional, Kontext sichtbar, Fehlernummer übernommen; Meine Meldungen mit Antwort; Kunde: schlanker Dialog, E-Mail optional |
-| `/admin`, `/admin/meldungen(/[id])`, `/admin/finanzen` | `admin-*` | Admin-Shell; Freischalten gesperrt ohne Stripe; Nummer prüfen (E9); Servicegebühr je Hof (gilt nur für neue Bestellungen); Briefkasten-Filter, Wunschliste gebündelt; Meldung entscheiden mit KI-Vorschlag als **Vorschlag**; Finanzen mit Break-even; Handy-Ansicht |
+| `/admin`, `/admin/meldungen(/[id])`, `/admin/finanzen` | `admin-*` | Admin-Shell; Freischalten gesperrt ohne Stripe; Futtermittel-Nummer nur anzeigen (E9); Servicegebühr je Hof (gilt nur für neue Bestellungen); Briefkasten-Filter, Wunschliste gebündelt; Meldung entscheiden mit KI-Vorschlag als **Vorschlag**; Finanzen mit Break-even; Handy-Ansicht |
 
 - **Zusätzlich:** „Rückruf anfordern" (Einrichten, Für Höfe, Hilfe) speichert in `RueckrufAnfrage`, Benachrichtigung an Admin, Löschung nach Erledigung + 30 Tagen.
 - **Tests:** Umleitung `/analytics/umfeld` → `/region`; Admin-Aktionen nur mit Admin-Rolle serverseitig; Antwort im Admin erscheint unter „Meine Meldungen".
@@ -241,16 +250,16 @@ Nie gleichzeitig: zwei Stränge an derselben Shell, an `src/components/ui` mit V
 |---|---|
 | S1 | Jede Seite, die personenbezogene Daten oder Beträge zeigt und ohne Login erreichbar ist, verlangt eine Signatur (`bestell-link.ts`) oder ein Einmal-Token; `noindex`, `Referrer-Policy: no-referrer`. Abholcode ist nie Berechtigung. |
 | S2 | Zustandsänderungen nur per POST/Server Action, nie per GET; Statusübergänge bedingt (`updateMany` mit Ausgangsstatus). |
-| S3 | Registrierung: E-Mail-Bestätigung, bevor Uploads, öffentliche Hofseite oder Teilen möglich sind. Uploads nur `image/*` außer SVG; Originale werden auch ohne Verarbeitung nach 24 h gelöscht. |
+| S3 | Registrierung: E-Mail-Bestätigung, bevor Uploads, öffentliche Hofseite oder Teilen möglich sind (Umfang nach Register S3: nur Konten ab einem Stichtag; gesperrt sind Foto-Uploads und „Hof online stellen", Einrichten bleibt erlaubt). Uploads nur `image/*` außer SVG; Originale werden auch ohne Verarbeitung nach 24 h gelöscht. |
 | S4 | Rate-Limits für Anmeldung (Code/Link), Registrierung, Problem melden, Rückruf, Checkout. Da In-Memory pro Instanz gilt: zusätzlich Zähler in der Datenbank für Anmelde-Codes (max. 5 Versuche je Code, 10 Minuten gültig). |
-| S5 | Automatisches Kundenkonto (E8): Bestellhistorie und „Meine Höfe" erst nach bestätigter E-Mail sichtbar; Bestellungen unter fremder E-Mail tauchen nie ungefragt in einem Konto auf. |
+| S5 | Kein automatisches Konto (E8): Der Checkout legt kein Kundenkonto an und verknüpft keine Bestellung mit einem Konto. Bestellungen erreicht die Kundin über den signierten Link oder „Bestellungen finden" per E-Mail-Code; Bestellungen unter fremder E-Mail tauchen nie ungefragt auf. |
 | S6 | Geld: Beträge nur serverseitig berechnet (Gebühr, Teilstorno, Erstattung); Erstattungen mit Idempotenz-Schlüssel; Teilstorno holt exakt den Artikelpreis vom Hof zurück (E14). |
 | S7 | Futter-Sperre je Gebinde serverseitig beim Veröffentlichen und beim Checkout erneut prüfen, nie nur im Formular. |
 | S8 | Teilen-Zählung ohne Cookies, ohne IP, ohne Geräte-ID; nur Aggregate je Hof/Kanal/Tag. Keine Drittanbieter-Pixel. |
 | S9 | Open-Graph-Bild und QR-Plakat: nur öffentliche Hofdaten; Texte escaped; Bildgenerierung mit Zeit- und Größenlimit; Cache je Hof mit Invalidierung bei Änderung. |
 | S10 | „Konto löschen": Personendaten löschen bzw. anonymisieren; Bestellungen bleiben für die Aufbewahrungspflicht des Hofs mit anonymisiertem Kunden erhalten. |
 | S11 | Werbliche Nachrichten („Neuigkeiten deiner Höfe", „Benachrichtige mich") nur mit Double-Opt-in und Abmeldelink; Vertragsmails (Bestätigung, Erinnerung) ohne. |
-| S12 | Admin: Rolle serverseitig in jeder Action (`verlangeAdminSeite`); Freischalten, Ablehnen, Gebühr ändern, Nummer prüfen werden protokolliert (wer, wann, alt → neu). |
+| S12 | Admin: Rolle serverseitig in jeder Action (`verlangeAdminSeite`); Freischalten, Ablehnen, Gebühr ändern werden protokolliert (wer, wann, alt → neu). |
 | S13 | KI im Briefkasten: Meldungstext ist Fremdtext, wird nie als Anweisung behandelt; der Vorschlag löst nie selbst eine Aktion aus; keine Secrets im Prompt. |
 | S14 | Vorschau-Frames nur Same-Origin (`frame-ancestors 'self'`); die Vorschau zeigt keine Daten, die die Kundenseite nicht auch zeigt. |
 | S15 | Rückruf-Telefonnummern: Zweck nur Rückruf, Löschfrist, nicht im Klartext in Logs oder Sentry (`sentry-hygiene.ts` erweitern). |
@@ -273,9 +282,9 @@ Nie gleichzeitig: zwei Stränge an derselben Shell, an `src/components/ui` mit V
 
 - Stripe: Webhook-Event `payment_intent.canceled` abonniert; Connect-Webhook mit `account.updated`, Secret als `STRIPE_CONNECT_WEBHOOK_SECRET` in Vercel (Production und Preview).
 - Stripe: EPS für die Plattform aktiviert; Apple Pay / Google Pay: Zahlungsdomains registriert – `farmerzone.at` **und** die Vercel-Vorschau-Domains.
-- Entscheidungen E1–E14 in Abschnitt 3 eingetragen.
+- ~~Entscheidungen E1–E14 in Abschnitt 3 eingetragen.~~ *erledigt, siehe `docs/entscheidungen.md`.*
 - Futtermittel-Texte (sieben Fälle, Kleinmengen-Ausnahme nur DE) von Landwirtschaftskammer oder BAES gegengelesen.
-- Rechtstexte: Datenschutzerklärung (Stripe als Auftragsverarbeiter, Teilen-Zählung, Rückruf, automatisches Konto), AGB (Servicegebühr, Tarife nach E6, Widerruf bei Brennmaterial prüfen lassen), Impressum.
+- Rechtstexte: Datenschutzerklärung (Stripe als Auftragsverarbeiter, Teilen-Zählung, Rückruf), AGB (Servicegebühr, Tarife nach E6, Widerruf bei Brennmaterial prüfen lassen), Impressum.
 - Mehrwertsteuersatz für Brennmaterial mit dem Steuerberater geklärt.
 - Supabase: prüfen, dass die automatische Datenschnittstelle gesperrt ist bzw. Row Level Security greift (Projektkennungen stehen öffentlich im Test).
 

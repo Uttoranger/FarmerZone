@@ -6,6 +6,8 @@ Vom Menschen auszufüllen, **bevor** der Nachtlauf startet. Nur was hier angehak
 
 Freigegeben am: **02.10.2026** · von: **uttoranger** (Repo-Inhaber, im Chat erteilt)
 
+> **Entscheidungen stehen ab 06.10.2026 im Register `docs/entscheidungen.md`.** Bei Widerspruch gilt das Register. Diese Datei hält fest, was ein Lauf tun darf (Schema, Pakete, Haltepunkt, Aufträge); die Tabelle in Abschnitt 1 bleibt als Nachweis der ersten Freigabe stehen.
+
 ## 1. Entscheidungen
 
 | # | Thema | Empfehlung übernehmen | Eigene Entscheidung / Quelle |
@@ -79,7 +81,7 @@ Alles andere: Gate überspringen und im Morgenbericht nachfragen.
 
 ## 5. Haltepunkt und Rahmen
 
-- Letzte Nummer, die in diesem Lauf noch bearbeitet werden darf: **17** (Lauf 2 endete bei 14; siehe §7)
+- Letzte Nummer, die in diesem Lauf noch bearbeitet werden darf: **19** (Lauf 4, siehe §8; Lauf 3 endete bei 17)
 - Kostenrahmen: **40 USD** (wird zusätzlich beim Start als `--max-budget-usd` gesetzt; mit Abo gelten dessen Nutzungsgrenzen)
 
 ## 6. Nachtrag 05.10.2026 (uttoranger)
@@ -92,3 +94,33 @@ Alles andere: Gate überspringen und im Morgenbericht nachfragen.
 ## 7. Nachtrag 06.10.2026 (uttoranger, im Chat erteilt)
 
 - Haltepunkt für Lauf 3: **17** (Nr. 15 Für Höfe/Registrieren/Einrichten, 16 Mein Hof mit Vorschau, 17 Heute). Gestapelt auf #178, solange #170–#178 offen sind.
+
+## 8. Lauf 4 (06.10.2026, uttoranger)
+
+- **Haltepunkt: 19.** Reihenfolge: 17a → 17b → 17c → 17d → 18 → 19. Alle Stapel bis #181 sind gemergt; das erste Gate zweigt von `main` ab.
+- Entscheidungen dazu: Register `docs/entscheidungen.md` (E8, S3, K1).
+
+### 17a E8 – Checkout ohne Kundenkonto
+- `/api/checkout` legt kein User-Konto mehr an und verknüpft keine Bestellung mit einem Konto (`customerId` bleibt `null`). Keine Migration.
+- Alles, was bisher `customerId` las (Mails, `/account`, Kennzahlen), arbeitet mit der normalisierten `customerEmail`.
+- `/account` zeigt nach Code-Anmeldung nur Bestellungen der bestätigten, angemeldeten Adresse.
+- Bestehende ruhende Konten bleiben unangetastet (keine Datenänderung in Produktion).
+- Tests: Checkout erzeugt keinen User; zwei Bestellungen mit gleicher Adresse verknüpfen nichts; `/account` zeigt nur die eigene Adresse; Hof-Kundenliste unverändert.
+
+### 17b S3 – E-Mail-Bestätigung für neue Höfe
+- Better Auth `emailVerification` mit Versand über den bestehenden Mailweg; `/verify` im neuen Design („Bestätige deine E-Mail", „Erneut senden" mit Bremse).
+- Anmelden bleibt möglich. Bis zur Bestätigung gesperrt: Foto-Uploads und „Hof online stellen"; Einrichten (Texte, Abholzeiten) erlaubt.
+- Gilt nur für Konten, die nach einem Stichtag angelegt werden (Konstante, Tag des Deploys). Bestehende Höfe unberührt, keine Datenänderung in Produktion.
+- Admin-Liste zeigt „E-Mail bestätigt: ja/nein".
+- Tests für Sperren, Stichtag und Erneut-senden-Bremse.
+
+### 17c Slug-Prüfung absichern
+- `checkSlugAvailability`: Zod (Länge, Format wie Slug-Regeln), Rate-Limit, Antwort nur „frei" oder „vergeben" ohne Hinweis auf den Freischaltungsstand; reservierte Slugs gelten als vergeben. Tests.
+
+### 17d K1 – Konditionen-Übergang
+- Datum laut Register K1: **1. Februar 2027** (gesetzt am 06.10.2026). Das Datum steht nur in `src/lib/konditionen.ts`.
+- Text aus `src/lib/konditionen.ts` auf `/fuer-hoefe`, `/konditionen` und am Registrieren-Link: „In der Startphase kostenlos. Die Tarife gelten ab 1. Februar 2027. Bereits freigeschaltete Höfe behalten ihre zugesagten Konditionen."
+- Admin-Freischaltung unverändert, dort ein Hinweis, welches Modell derzeit gilt. Tests: Text aus einer Quelle.
+
+### Danach
+Wie geplant **18** Produkte und „Was legst du an?" und **19** Bestellungen, Storno, Artikel fehlt (Freigaben E13, E14 aus Abschnitt 1).

@@ -6,7 +6,7 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 
 **Dateinamen:** `web-` oder `mobil-`, dann der Schritt im Ablauf (`k0`–`k4` Kunde, `h0`–`h6` Hof), dann der Bildschirm. `admin-`, `fehler-` und `system-` sind Querschnitt.
 
-**Spalte Arbeit:** *Umbau* = bestehende Route ins neue Design und um die gezeigten Funktionen erweitern · *neu* = Route oder Funktion gibt es noch nicht · *Zustand* = Variante einer Route (leer, Fehler, Hinweis).
+**Spalte Arbeit:** *Umbau* = bestehende Route ins neue Design und um die gezeigten Funktionen erweitern · *neu* = Route oder Funktion gibt es noch nicht · *Zustand* = Variante einer Route (leer, Fehler, Hinweis) · *zurückgestellt* = wird vorerst nicht gebaut, Grund im Entscheidungsregister `../entscheidungen.md`.
 
 
 ## WEB · Kunde – K0 Ankommen (vor dem Anmelden)
@@ -49,7 +49,7 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 
 | Datei | Bildschirm | Route im Code | Arbeit | Größe |
 |---|---|---|---|---|
-| `web-k4-meine-bestellungen-konto.html` | K4 · Meine Bestellungen & Konto | `/account/profile` | Umbau | 1440×1060 |
+| `web-k4-meine-bestellungen-konto.html` | K4 · Meine Bestellungen & Konto | `/account/profile` | nur Umbau bestehender `/account`-Seiten (E8) | 1440×1060 |
 
 ## WEB · Hof – H0 Kennenlernen (vor dem Registrieren)
 
@@ -149,8 +149,8 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 
 | Datei | Bildschirm | Route im Code | Arbeit | Größe |
 |---|---|---|---|---|
-| `mobil-k4-meine-bestellungen.html` | K4 · Meine Bestellungen | `/account/profile` | Umbau | 390×844 |
-| `mobil-k4-meine-hoefe.html` | K4 · Meine Höfe | `/account/hoefe (neu)` | neu | 390×844 |
+| `mobil-k4-meine-bestellungen.html` | K4 · Meine Bestellungen | `/account/profile` | nur Umbau bestehender `/account`-Seiten (E8) | 390×844 |
+| `mobil-k4-meine-hoefe.html` | K4 · Meine Höfe | `/account/hoefe` | zurückgestellt (E8) | 390×844 |
 
 ## MOBIL · Hof – H0 Kennenlernen
 
