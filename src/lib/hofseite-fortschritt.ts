@@ -207,7 +207,7 @@ function zeilen(stand: HofseiteStand): HofseiteZeile[] {
 }
 
 /** „Logo", „Logo und Über uns", „Logo, Über uns und Fotos". */
-function aufzaehlung(teile: readonly string[]): string {
+export function aufzaehlung(teile: readonly string[]): string {
   if (teile.length <= 1) return teile.join('')
   return `${teile.slice(0, -1).join(', ')} und ${teile[teile.length - 1]}`
 }

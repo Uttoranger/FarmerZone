@@ -35,10 +35,11 @@ export type KundenNavPunkt = {
 
 const ENTDECKEN: KundenNavPunkt = { id: 'entdecken', label: 'Höfe entdecken', kurz: 'Entdecken', href: '/hoefe' }
 
-// Sprungmarken auf die Abschnitte der Startseite (src/components/startseite/
-// startseite-abschnitte.tsx: SoFunktionierts und FuerHoefeBand tragen sie).
+// Sprungmarke auf den Abschnitt der Startseite (src/components/startseite/
+// startseite-abschnitte.tsx: SoFunktionierts trägt sie).
 const SO_GEHTS: KundenNavPunkt = { id: 'so-gehts', label: 'So funktioniert’s', href: '/#so-funktionierts' }
-const FUER_HOEFE: KundenNavPunkt = { id: 'fuer-hoefe', label: 'Für Höfe', href: '/#fuer-hoefe' }
+// Seit Nr. 15 eine eigene Seite (/fuer-hoefe) statt der Sprungmarke auf der Startseite.
+const FUER_HOEFE: KundenNavPunkt = { id: 'fuer-hoefe', label: 'Für Höfe', href: '/fuer-hoefe' }
 
 const ANMELDEN: KundenNavPunkt = { id: 'anmelden', label: 'Anmelden', href: '/account/login' }
 const KONTO: KundenNavPunkt = { id: 'konto', label: 'Mein Konto', href: '/account/profile' }
@@ -78,7 +79,7 @@ export function kundenNavigation({ angemeldet }: { angemeldet: boolean }): Kunde
 }
 
 // Jeder Punkt mit eigener Seite. Anker (#…) sind nie eine eigene Seite.
-const AKTIVIERBAR: readonly KundenNavPunkt[] = [ENTDECKEN, BESTELLUNGEN, ANMELDEN, KONTO]
+const AKTIVIERBAR: readonly KundenNavPunkt[] = [ENTDECKEN, FUER_HOEFE, BESTELLUNGEN, ANMELDEN, KONTO]
 
 /** Der aktive Punkt zu einem Pfad — der längste passende; null auf Startseite, Hofseite und allem anderen. */
 export function kundenAktiverPunkt(pfad: string): KundenNavId | null {

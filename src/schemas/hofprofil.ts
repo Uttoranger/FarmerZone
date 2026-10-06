@@ -90,7 +90,8 @@ export function profilBearbeitenSchema(bestand: ProfilBestand): typeof profileSc
  * src/server/actions/onboarding.ts): Hier entsteht der Hofname zum ersten
  * Mal, also gelten hier dieselben Obergrenzen wie im Profil. Ränder fallen
  * weg wie bisher in der Aktion. Mehr prüft das Schema bewusst nicht — die
- * Pflichtfelder hält das Formular selbst nach (onboarding-client.tsx).
+ * Pflichtfelder prüft das Formular „Hof anlegen" mit hofAnlegenFormularSchema
+ * (src/components/einrichten/hof-anlegen-formular.tsx).
  */
 export const hofAnlegenSchema = z.object({
   name: z.string().trim().max(HOFNAME_MAX, ZU_LANG.hofname),
@@ -112,3 +113,25 @@ export const hofAnlegenSchema = z.object({
       'Bitte gib eine gültige Hof-E-Mail an — oder lass das Feld leer.'
     ),
 })
+
+/**
+ * Das Formular „Hof anlegen" auf Einrichten (Nr. 15) — strenger als
+ * hofAnlegenSchema, das createFarm prüft: Die Pflichtfelder und die
+ * Postleitzahl hielt bisher das Formular von Hand nach, jetzt an den Feldern
+ * selbst (CODING_STANDARDS §8, „Anlegen strenger als Bearbeiten → zwei
+ * Schemas"). Die Meldungen sind die bisherigen.
+ */
+export const hofAnlegenFormularSchema = hofAnlegenSchema.extend({
+  name: hofAnlegenSchema.shape.name.min(1, 'Bitte gib den Namen deines Hofs an.'),
+  ownerName: hofAnlegenSchema.shape.ownerName.min(1, 'Bitte gib deinen Vor- und Nachnamen an.'),
+  address: hofAnlegenSchema.shape.address.min(1, 'Bitte gib die Straße und Hausnummer an.'),
+  postalCode: hofAnlegenSchema.shape.postalCode
+    .min(1, 'Bitte gib eine PLZ an.')
+    .regex(/^\d{4}$/, 'Die PLZ muss genau 4 Ziffern haben.'),
+  city: hofAnlegenSchema.shape.city.min(1, 'Bitte gib den Ort an.'),
+  phone: hofAnlegenSchema.shape.phone
+    .min(1, 'Bitte gib eine Telefonnummer an.')
+    .min(6, 'Bitte gib eine gültige Telefonnummer an.'),
+})
+
+export type HofAnlegenFormular = z.input<typeof hofAnlegenFormularSchema>

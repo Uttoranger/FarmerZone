@@ -324,6 +324,8 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     'src/app/(public)/[farmSlug]/produkt/[id]/page.tsx': [],
     // „Bestellungen finden" ist mit Nr. 14 gleich in der KundeShell entstanden.
     'src/app/(public)/bestellungen/page.tsx': [],
+    // „Für Höfe" ist mit Nr. 15 gleich in der KundeShell entstanden.
+    'src/app/(public)/fuer-hoefe/page.tsx': [],
   }
 
   it('kennt jede Seite unter (public) — eine neue Seite fällt hier auf', () => {

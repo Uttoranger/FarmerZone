@@ -353,9 +353,12 @@ describe('Sprungmarken für die Navigation der KundeShell', () => {
     expect(html(createElement(SoFunktionierts, { rechnung: beispielRechnung(JETZT) }))).toMatch(/<section id="so-funktionierts"/)
   })
 
-  it('„Für Höfe" zeigt auf #fuer-hoefe — und das Band trägt die Marke', () => {
-    expect(web).toContain('/#fuer-hoefe')
-    expect(html(createElement(FuerHoefeBand))).toMatch(/<section id="fuer-hoefe"/)
+  it('„Für Höfe" führt seit Nr. 15 auf die eigene Seite — das Band verlinkt sie und behält seine Marke', () => {
+    expect(web).toContain('/fuer-hoefe')
+    expect(web).not.toContain('/#fuer-hoefe')
+    const band = html(createElement(FuerHoefeBand))
+    expect(band).toMatch(/<section id="fuer-hoefe"/)
+    expect(band).toContain('href="/fuer-hoefe"')
   })
 })
 
@@ -403,10 +406,10 @@ describe('Abschnitte', () => {
     expect(text).toContain('Schnell eingerichtet')
   })
 
-  it('Für Höfe: registrieren in Orange, „Mehr für Höfe" zu den Konditionen', () => {
+  it('Für Höfe: registrieren in Orange, „Mehr für Höfe" zur Seite für Höfe (seit Nr. 15)', () => {
     const text = html(createElement(FuerHoefeBand))
     expect(text).toMatch(/<a href="\/register"[^>]*bg-primary/)
-    expect(text).toContain('href="/konditionen"')
+    expect(text).toContain('href="/fuer-hoefe"')
   })
 
   it('Fragen: alle Antworten im HTML, auch zugeklappt — die erste offen', () => {

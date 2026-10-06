@@ -255,6 +255,10 @@ describe('kein Big Bang', () => {
     '(public)/bestellungen/page.tsx',
     'account/profile/page.tsx',
     'account/unsubscribe/page.tsx',
+    // Nr. 15: „Für Höfe" (neu, KundeShell), Registrieren (Fokus-Shell) und Einrichten (HofShell).
+    '(public)/fuer-hoefe/page.tsx',
+    '(auth)/register/page.tsx',
+    '(auth)/onboarding/page.tsx',
   ]
 
   it('nur die Vorschau unter /intern und die umgestellten Routen binden eine Shell ein', () => {

@@ -2,22 +2,21 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { KundenKopf } from '@/components/shared/kunden-kopf'
 import { KONTAKT_EMAIL } from '@/lib/support'
+import { GRUENDUNGS_AUFNAHME_SCHRITTE } from '@/lib/gruendungshof'
 import {
-  MAX_GRUENDUNGSHOEFE,
-  GRUENDUNGSPHASE_ENDE_TEXT,
-  GRUENDUNGS_PROVISION_PROZENT,
-  GRUENDUNGS_ANGEBOT,
-  GRUENDUNGS_KEINE_ZUGANGSGRENZE,
-  GRUENDUNGS_ZAHLUNGSGEBUEHREN,
-  GRUENDUNGS_AUFNAHME_SCHRITTE,
-} from '@/lib/gruendungshof'
+  KONDITIONEN_STAND,
+  MONATSABRECHNUNG_TEXT,
+  PRO_MONAT,
+  SERVICEGEBUEHR_SATZ_TEXT,
+  SERVICEGEBUEHR_ZAHLT_KUNDE,
+  TARIFE,
+} from '@/lib/konditionen'
 
 export const metadata: Metadata = {
   title: 'Konditionen für Höfe — FarmerZone',
   description:
-    `Was FarmerZone kostet: Die ersten ${MAX_GRUENDUNGSHOEFE} freigeschalteten Höfe zahlen bis ` +
-    `${GRUENDUNGSPHASE_ENDE_TEXT} keine Plattformgebühr, danach dauerhaft ` +
-    `${GRUENDUNGS_PROVISION_PROZENT} % pro Online-Bestellung.`,
+    `Was FarmerZone kostet: ${TARIFE.map((t) => `${t.name} ${t.preis} ${PRO_MONAT}`).join(', ')}. ` +
+    `Die Servicegebühr von ${SERVICEGEBUEHR_SATZ_TEXT} zahlt der Kunde.`,
 }
 
 const CTA_MAILTO = `mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent('Mein Hof auf FarmerZone')}`
@@ -29,8 +28,11 @@ const CTA_MAILTO = `mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent('Mein H
 // gleiche Zurück-Navigation, gleiche Abschnitts-Typografie): eine Seite über
 // Geld soll aussehen wie die anderen verbindlichen Seiten, nicht wie Werbung.
 //
-// ALLE Zahlen und das Datum kommen aus src/lib/gruendungshof.ts. Steht hier
-// eine Zahl im Text, ist das ein Fehler.
+// ALLE Preise kommen aus src/lib/konditionen.ts — derselben Quelle wie
+// /fuer-hoefe (Nr. 15, E6 = Tarife: „damit nichts Widersprüchliches live
+// geht"). Steht hier eine Zahl im Text, ist das ein Fehler
+// (tests/konditionen-seiten.test.ts). Bis Nr. 15 stand hier das
+// Gründungshof-Angebot; den Umbau der Seite ins neue Design macht Gate 8.
 export default function KonditionenPage() {
   return (
     <div className="min-h-screen bg-background">
@@ -45,16 +47,24 @@ export default function KonditionenPage() {
         <div className="space-y-8 text-sm text-muted-foreground leading-relaxed">
 
           <section>
-            <h2 className="font-semibold text-foreground text-base mb-3">Das Gründungshof-Angebot</h2>
-            <p>{GRUENDUNGS_ANGEBOT}</p>
-            <div className="mt-4 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
-              <p className="text-foreground">{GRUENDUNGS_KEINE_ZUGANGSGRENZE}</p>
-            </div>
+            <h2 className="font-semibold text-foreground text-base mb-3">Tarife</h2>
+            <ul className="space-y-3">
+              {TARIFE.map((tarif) => (
+                <li key={tarif.id} className="rounded-lg border border-border px-4 py-3">
+                  <p className="text-foreground">
+                    <strong className="font-semibold">{tarif.name}</strong> · {tarif.preis} {PRO_MONAT}
+                  </p>
+                  <p>{tarif.zusatz}</p>
+                  <p>{tarif.leistungen.join(' · ')}</p>
+                </li>
+              ))}
+            </ul>
           </section>
 
           <section>
-            <h2 className="font-semibold text-foreground text-base mb-3">Zahlungsgebühren</h2>
-            <p>{GRUENDUNGS_ZAHLUNGSGEBUEHREN}</p>
+            <h2 className="font-semibold text-foreground text-base mb-3">Servicegebühr und Abrechnung</h2>
+            <p>{SERVICEGEBUEHR_ZAHLT_KUNDE}</p>
+            <p className="mt-3">{MONATSABRECHNUNG_TEXT}</p>
           </section>
 
           <section>
@@ -100,7 +110,7 @@ export default function KonditionenPage() {
           </section>
 
           <p className="text-xs text-muted-foreground pt-4 border-t border-border">
-            Stand: August 2026
+            Stand: {KONDITIONEN_STAND}
           </p>
         </div>
       </div>

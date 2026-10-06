@@ -22,8 +22,8 @@ export const MENUE_PUNKTE: readonly MenuePunkt[] = [
   { href: '/', text: 'Startseite', gruppe: 'kunden' },
   { href: hoefeLink('LEBENSMITTEL'), text: 'Hofladen entdecken', gruppe: 'kunden' },
   { href: hoefeLink('FUTTERMITTEL'), text: 'Heu & Futter finden', gruppe: 'kunden' },
-  // Sprungmarke auf das Band „Für Höfe" der Startseite (id="fuer-hoefe"), wie im Browser.
-  { href: '/#fuer-hoefe', text: 'Für Höfe', gruppe: 'hoefe' },
+  // Die Seite für Höfe (seit Nr. 15, vorher eine Sprungmarke auf die Startseite).
+  { href: '/fuer-hoefe', text: 'Für Höfe', gruppe: 'hoefe' },
   { href: '/login', text: 'Hofbetreiber-Login', gruppe: 'hoefe' },
   { href: '/problem-melden', text: 'Problem melden', gruppe: 'hilfe' },
 ]
@@ -34,7 +34,7 @@ export type AngezeigterMenuePunkt = MenuePunkt & { aktuell: boolean }
  * Die Punkte mit Markierung der aktuellen Seite (aria-current). Verglichen
  * wird der Pfad und — für /hoefe — der Bereich: „Hofladen entdecken" und
  * „Heu & Futter finden" führen auf dieselbe Seite, aber nicht zum selben
- * Inhalt. „Für Höfe" ist ein Anker auf der Startseite und nie „aktuell".
+ * Inhalt. „Für Höfe" ist seit Nr. 15 eine eigene Seite (/fuer-hoefe).
  */
 export function menuePunkte(pfad: string, suche: string): AngezeigterMenuePunkt[] {
   const futter = new URLSearchParams(suche).get('bereich') === 'futter'

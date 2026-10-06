@@ -19,9 +19,6 @@ const KEINE_FARBLITERALE =
 const FARBLITERAL_BESTAND = [
   'src/emails/**',
   'src/app/(auth)/forgot-password/page.tsx',
-  'src/app/(auth)/onboarding/onboarding-client.tsx',
-  'src/app/(auth)/onboarding/page.tsx',
-  'src/app/(auth)/register/register-form.tsx',
   'src/app/(auth)/reset-password/page.tsx',
   'src/app/(farmer)/customers/customers-client.tsx',
   'src/app/(farmer)/settings/appearance/appearance-client.tsx',

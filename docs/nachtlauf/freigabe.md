@@ -79,7 +79,7 @@ Alles andere: Gate überspringen und im Morgenbericht nachfragen.
 
 ## 5. Haltepunkt und Rahmen
 
-- Letzte Nummer, die in diesem Lauf noch bearbeitet werden darf: **14** (erste Nacht endete bei 06; 01 bis 06 erledigt, siehe §6)
+- Letzte Nummer, die in diesem Lauf noch bearbeitet werden darf: **17** (Lauf 2 endete bei 14; siehe §7)
 - Kostenrahmen: **40 USD** (wird zusätzlich beim Start als `--max-budget-usd` gesetzt; mit Abo gelten dessen Nutzungsgrenzen)
 
 ## 6. Nachtrag 05.10.2026 (uttoranger)
@@ -88,3 +88,7 @@ Alles andere: Gate überspringen und im Morgenbericht nachfragen.
 - Migrationsweg `prisma migrate diff` statt `migrate dev --create-only` freigegeben.
 - Mockup-Abweichungen und Cookie-Änderung aus Nr. 05 freigegeben.
 - Haltepunkt für den nächsten Lauf: **14**.
+
+## 7. Nachtrag 06.10.2026 (uttoranger, im Chat erteilt)
+
+- Haltepunkt für Lauf 3: **17** (Nr. 15 Für Höfe/Registrieren/Einrichten, 16 Mein Hof mit Vorschau, 17 Heute). Gestapelt auf #178, solange #170–#178 offen sind.
