@@ -32,14 +32,17 @@ import {
 const STICHTAG = EMAIL_BESTAETIGUNG_STICHTAG.getTime()
 
 describe('Stichtag', () => {
-  it('liegt auf einer Wiener Mitternacht', () => {
-    const teile = new Intl.DateTimeFormat('de-AT', {
-      timeZone: 'Europe/Vienna',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    }).format(EMAIL_BESTAETIGUNG_STICHTAG)
-    expect(teile).toBe('00:00')
+  it('liegt auf dem Merge von #184: 06.10.2026, 20:21 Uhr Wiener Zeit', () => {
+    expect(EMAIL_BESTAETIGUNG_STICHTAG.toISOString()).toBe('2026-10-06T18:21:00.000Z')
+  })
+
+  it('Grenzfall 06.10.: ein Hof von 18:07 Uhr bleibt ausgenommen, einer von 20:22 Uhr muss bestätigen', () => {
+    // Der Hof von 18:07 Uhr ist angelegt und freigeschaltet, bevor es die
+    // Bestätigung gab — ein Stichtag auf Mitternacht würde ihn nachträglich sperren.
+    expect(bestaetigungPflichtig({ createdAt: new Date('2026-10-06T18:07:00+02:00') })).toBe(false)
+    expect(bestaetigungOffen({ createdAt: new Date('2026-10-06T18:07:00+02:00'), emailVerified: false })).toBe(false)
+    expect(bestaetigungPflichtig({ createdAt: new Date('2026-10-06T20:22:00+02:00') })).toBe(true)
+    expect(bestaetigungOffen({ createdAt: new Date('2026-10-06T20:22:00+02:00'), emailVerified: false })).toBe(true)
   })
 
   it('ein Konto ab dem Stichtag muss bestätigen', () => {
