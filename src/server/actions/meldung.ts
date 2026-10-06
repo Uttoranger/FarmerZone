@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { checkFormToken, FORM_EXPIRED_MESSAGE } from '@/lib/form-token'
 import { meldungEingabeSchema } from '@/schemas/meldung'
 import { MELDUNGEN_PRO_STUNDE, ZU_VIELE_MELDUNGEN, kurznummer } from '@/lib/meldung'
-import { darfGeloeschtWerden } from '@/lib/upload-pfade'
+import { istEigenesBild } from '@/server/bild-url'
 import { createRateLimiter, getClientIp } from '@/lib/rate-limit'
 import { sendMeldungNotification } from '@/lib/email'
 
@@ -108,7 +108,7 @@ export async function meldungAbsenden(data: MeldungFormularDaten): Promise<Meldu
   //    wird deshalb verworfen statt gespeichert.
   let screenshotUrl: string | null = null
   if (eingabe.screenshotUrl && hof) {
-    if (!darfGeloeschtWerden(eingabe.screenshotUrl, hof.id)) {
+    if (!istEigenesBild(eingabe.screenshotUrl, hof.id)) {
       return { error: 'Der Screenshot gehört nicht zu diesem Hof.' }
     }
     screenshotUrl = eingabe.screenshotUrl

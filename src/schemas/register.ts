@@ -11,6 +11,16 @@ export const passwordSchema = z
   .min(8, 'Mindestens 8 Zeichen')
   .refine((pw) => validatePassword(pw).valid, { message: PASSWORD_SCHEMA_MESSAGE })
 
+/**
+ * Die Antwort, wenn es zur Adresse schon ein Konto gibt (Nr. 19b). Sie sagt
+ * nicht „bereits registriert" — sonst ließe sich mit dem Formular abfragen,
+ * welche Adressen bei uns ein Konto haben —, gibt der echten Person aber
+ * beide Auswege. Hier statt in register.ts: Eine 'use server'-Datei
+ * exportiert nur asynchrone Funktionen.
+ */
+export const KONTO_VIELLEICHT_VORHANDEN =
+  'Das hat nicht geklappt. Wenn es zu dieser Adresse schon ein Konto gibt, melde dich an oder setze dein Passwort zurück.'
+
 export const registrationSchema = z.object({
   email: emailSchema('Ungültige E-Mail-Adresse.'),
   password: passwordSchema,

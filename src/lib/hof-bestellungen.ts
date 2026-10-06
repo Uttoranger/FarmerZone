@@ -212,3 +212,36 @@ export function bestellAktionen(b: { status: string; paymentMethod: string; offe
     abholungZurueck: b.status === 'PICKED_UP',
   }
 }
+
+/** Der Zahlstand, den ein Rückweg liest — so, wie er in der Bestellung steht. */
+export type ZahlstandFuerRueckweg = {
+  paymentMethod: string
+  paymentStatus: string
+  paidAt: Date | null
+  pickedUpAt: Date | null
+}
+
+/**
+ * Was „Rückgängig" im Hinweis (revertOrderStatus) an der Zahlung ändert —
+ * `null` heißt: nichts. Zahlstatus und Zahlzeitpunkt bleiben dabei immer
+ * stimmig (Nr. 19b; vorher löschte der Rückweg nur `paidAt`).
+ *
+ * Fachlich konservativ: Eine Zahlung, die nicht genau dieser Schritt
+ * verbucht hat, bleibt stehen.
+ * - Online liegt das Geld bei Stripe; ein Rückweg im Hofbereich ändert daran
+ *   nichts, also auch nicht am Vermerk.
+ * - Bar, zurück aus „Abgeholt und kassiert" (`ausStatus` PICKED_UP):
+ *   `markAsPickedUpAndPaid` schreibt Abholung und Zahlung mit DEMSELBEN
+ *   Zeitpunkt. Stimmen beide überein, war das Kassieren Teil des
+ *   zurückgenommenen Schritts — die Bestellung ist wieder offen zu kassieren.
+ * - Zurück aus „Gepackt" (`ausStatus` READY) hat nie etwas kassiert.
+ */
+export function zahlungNachRueckweg(
+  b: ZahlstandFuerRueckweg,
+  ausStatus: 'READY' | 'PICKED_UP'
+): { paymentStatus: 'PENDING'; paidAt: null } | null {
+  if (ausStatus !== 'PICKED_UP') return null
+  if (b.paymentMethod === 'ONLINE' || b.paymentStatus !== 'PAID') return null
+  if (!b.paidAt || !b.pickedUpAt || b.paidAt.getTime() !== b.pickedUpAt.getTime()) return null
+  return { paymentStatus: 'PENDING', paidAt: null }
+}

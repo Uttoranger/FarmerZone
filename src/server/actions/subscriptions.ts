@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { verifyUnsubscribeToken } from '@/lib/unsubscribe'
 import { bestaetigteAdresse } from '@/server/kunden-adresse'
+import { aboAenderungSchema } from '@/schemas/abo'
 
 // Abos hängen an der Adresse, nicht an einem Konto. Ändern oder löschen darf
 // sie nur, wer die Adresse mit Code bewiesen hat (E8, Nr. 17a) — frisch aus
@@ -20,6 +21,10 @@ export async function updateSubscription(
   optInEmail: boolean,
   optInWhatsApp: boolean,
 ): Promise<ActionResult> {
+  // Die Argumente kommen aus dem Browser — erst prüfen, dann lesen (Nr. 19b).
+  const eingabe = aboAenderungSchema.safeParse({ farmId, optInEmail, optInWhatsApp })
+  if (!eingabe.success) return { error: 'Das hat nicht geklappt. Bitte lade die Seite neu und versuch es noch einmal.' }
+
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return { error: 'Nicht angemeldet' }
   const customerEmail = await bestaetigteAdresse(session.user.id)
@@ -28,10 +33,17 @@ export async function updateSubscription(
   // Keine Telefonnummer aus dem Konto: Sie kann aus einer Registrierung mit
   // Passwort stammen, die die Adresse nie bewiesen hat — Better Auth behält
   // sie beim ersten Code. Die Nummer eines Abos kommt nur aus dem Checkout.
+  const geprueft = eingabe.data
   await prisma.customerFarmSubscription.upsert({
-    where: { customerEmail_farmId: { customerEmail, farmId } },
-    create: { customerEmail, farmId, optInEmail, optInWhatsApp, customerPhone: null },
-    update: { optInEmail, optInWhatsApp },
+    where: { customerEmail_farmId: { customerEmail, farmId: geprueft.farmId } },
+    create: {
+      customerEmail,
+      farmId: geprueft.farmId,
+      optInEmail: geprueft.optInEmail,
+      optInWhatsApp: geprueft.optInWhatsApp,
+      customerPhone: null,
+    },
+    update: { optInEmail: geprueft.optInEmail, optInWhatsApp: geprueft.optInWhatsApp },
   })
 
   return {}

@@ -76,6 +76,9 @@ function alsKundin() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Screenshots nur aus unserem Speicher (Nr. 19b) — erfundener Schlüssel,
+  // dessen Speicher-Kennung zu den Adressen unten passt.
+  vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_abc123_nurFuerTests')
   alsHof()
   meldungCount.mockResolvedValue(0)
   meldungCreate.mockResolvedValue({ id: NEUE_ID, createdAt: new Date('2026-09-01T10:00:10.000Z') } as never)
@@ -330,6 +333,13 @@ describe('meldungAbsenden — Zuordnung', () => {
 
   it('lehnt einen Screenshot aus einem fremden Hof-Ordner ab', async () => {
     const url = 'https://abc123.public.blob.vercel-storage.com/farms/farm_FREMD/meldung/1.webp'
+    const result = await meldungAbsenden(meldung({ screenshotUrl: url }))
+    expect(result).toEqual({ error: 'Der Screenshot gehört nicht zu diesem Hof.' })
+    expect(meldungCreate).not.toHaveBeenCalled()
+  })
+
+  it('lehnt einen Screenshot aus einem fremden Blob-Speicher ab, auch mit unserem Pfad (Nr. 19b)', async () => {
+    const url = 'https://boese99.public.blob.vercel-storage.com/farms/farm_1/meldung/1.webp'
     const result = await meldungAbsenden(meldung({ screenshotUrl: url }))
     expect(result).toEqual({ error: 'Der Screenshot gehört nicht zu diesem Hof.' })
     expect(meldungCreate).not.toHaveBeenCalled()

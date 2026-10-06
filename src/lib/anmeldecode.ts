@@ -63,16 +63,18 @@ export const ANMELDECODE_PLUGIN_OPTIONEN = {
  * Pfade, die die App nicht anbietet und die deshalb über HTTP gar nicht erst
  * erreichbar sind (Better Auth `disabledPaths`, gilt nur für HTTP).
  *
- * - `/sign-in/magic-link`: Neue Magic Links gibt es nicht mehr (E7). Das
- *   Prüfen alter Links (`/magic-link/verify`) bleibt offen, solange das
- *   Plugin in auth.ts steht — Links, die vor dem Deployment verschickt
- *   wurden, gelten noch 15 Minuten.
+ * - `/sign-in/magic-link` und `/magic-link/verify`: Neue Magic Links gibt es
+ *   nicht mehr (E7). Das Prüfen alter Links war nur ein Übergang für Links,
+ *   die vor dem Deployment verschickt wurden (15 Minuten gültig); seit
+ *   Nr. 19b ist auch er zu — ein offener Prüfweg ohne erzeugte Links wäre nur
+ *   noch Angriffsfläche.
  * - Die Code-Wege für Passwort-Zurücksetzen, E-Mail-Bestätigung und
  *   E-Mail-Wechsel: Das Plugin bringt sie mit, die App nutzt sie nicht. Offen
  *   gelassen wären sie ein zweiter Weg, das Passwort eines Hofs zu ändern.
  */
 export const GESPERRTE_AUTH_PFADE = [
   '/sign-in/magic-link',
+  '/magic-link/verify',
   '/email-otp/request-password-reset',
   '/email-otp/reset-password',
   '/forget-password/email-otp',

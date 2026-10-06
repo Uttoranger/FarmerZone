@@ -252,6 +252,20 @@ export type BestaetigungsBloecke = {
   aktion: 'bestellung' | 'neu-bestellen' | 'erneut-versuchen' | 'keine'
 }
 
+/**
+ * Gibt es zu diesem Bestellstatus einen Abholtermin für den Kalender? Nur,
+ * solange die Bestellung steht und die Abholung noch aussteht (Nr. 19b) —
+ * dieselbe Antwort für den Knopf auf der Bestätigungsseite und für die
+ * ICS-Route, die ein Link auch ohne Knopf erreicht. Eine offene Bestellung
+ * (PENDING_CONFIRMATION) bekommt keinen: Vor ihrer Frist (fristen.ts) ist
+ * sie noch nicht bezahlt bzw. bestätigt, danach verfallen — gilt beim Lesen,
+ * ohne auf den Cron zu warten. Storniert, abgeholt, nicht abgeholt: kein
+ * Termin mehr.
+ */
+export function kalenderTerminGilt(status: OrderStatus): boolean {
+  return status === 'PAID' || status === 'CONFIRMED' || status === 'IN_PREPARATION' || status === 'READY'
+}
+
 /** Welche Teile die Seite zeigt — eine Stelle statt Bedingungen im JSX. */
 export function bestaetigungsBloecke(zustand: BestaetigungsZustand | null, status: OrderStatus): BestaetigungsBloecke {
   const steht = zustand === 'bezahlt' || zustand === 'bestaetigt'
@@ -260,7 +274,7 @@ export function bestaetigungsBloecke(zustand: BestaetigungsZustand | null, statu
     abholkarte: laeuft && status !== 'CANCELLED',
     // Nicht schon bei „Zahlung wird geprüft": Scheitert die Zahlung, stünde ein
     // Termin im Kalender, den es nicht gibt.
-    kalender: steht && status !== 'CANCELLED' && status !== 'NOT_PICKED_UP',
+    kalender: steht && kalenderTerminGilt(status),
     fristHinweis: zustand === 'bestaetigung-offen',
     teilen: steht && status !== 'CANCELLED' && status !== 'NOT_PICKED_UP',
     aktion:

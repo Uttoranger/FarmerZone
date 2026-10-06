@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { del } from '@vercel/blob'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
 
 const GALLERY_LIMIT = 8
 const BLOB_HOST = /\.public\.blob\.vercel-storage\.com\//
@@ -29,13 +30,18 @@ export async function addFarmPhotoAction(input: {
   const farm = await getSessionFarm(session.user.id)
   if (!farm) return { error: 'Kein Hof gefunden' }
 
+  // Nur ein fertiges Bild dieses Hofes aus unserem Speicher (Nr. 19b) —
+  // vorher stand jede Zeichenkette, die der Browser schickte, auf der Hofseite.
+  const url = typeof input?.url === 'string' ? input.url : ''
+  if (!url || !(await bildUrlErlaubt(url, farm.id))) return { error: BILD_NICHT_UEBERNOMMEN }
+
   const count = await prisma.farmPhoto.count({ where: { farmId: farm.id } })
   if (count >= GALLERY_LIMIT) return { error: `Maximal ${GALLERY_LIMIT} Fotos erlaubt` }
 
   const photo = await prisma.farmPhoto.create({
     data: {
       farmId: farm.id,
-      url: input.url,
+      url,
       caption: input.caption ?? null,
       sortOrder: count,
     },

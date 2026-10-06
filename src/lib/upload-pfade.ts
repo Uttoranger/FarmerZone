@@ -135,10 +135,55 @@ function liegtImEigenenPfad(url: string, prefix: string): boolean {
   if (zerlegt.protocol !== 'https:') return false
   if (!BLOB_HOST.test(zerlegt.hostname)) return false
 
-  // `pathname` beginnt mit „/", der Blob-Pfad nicht.
-  const pfad = decodeURIComponent(zerlegt.pathname).replace(/^\/+/, '')
+  // `pathname` beginnt mit „/", der Blob-Pfad nicht. Ein kaputt kodierter
+  // Pfad (`%E0`) ist kein Pfad, den unser Upload je erzeugt hätte.
+  let pfad: string
+  try {
+    pfad = decodeURIComponent(zerlegt.pathname).replace(/^\/+/, '')
+  } catch {
+    return false
+  }
+
+  // Punkt-Segmente löst der URL-Parser nur auf, solange der Schrägstrich
+  // nicht kodiert ist: `farms/meineId%2F..%2Ffremd/…` hieße entschlüsselt
+  // `farms/meineId/../fremd/…` und bestünde die Präfix-Prüfung unten.
+  if (pfad.split('/').some((teil) => teil === '..' || teil === '.')) return false
 
   // Kein `includes`: Der Präfix muss am ANFANG stehen. Sonst genügte ein Pfad
   // wie `originals/fremd/originals/meineId/…`, um die Prüfung zu bestehen.
   return pfad.startsWith(prefix)
+}
+
+/**
+ * Die Kennung des eigenen Blob-Speichers, gelesen aus seinem Schlüssel
+ * (`vercel_blob_rw_<speicher>_<geheimnis>`) — genau so, wie @vercel/blob sie
+ * selbst liest und daraus die Adresse `<speicher>.public.blob.vercel-storage.com`
+ * baut. Klein geschrieben, weil der URL-Parser Hostnamen klein schreibt.
+ * Ohne brauchbaren Schlüssel `null`: Dann ist keine Adresse „unsere".
+ */
+export function blobSpeicherAusSchluessel(schluessel: string | null | undefined): string | null {
+  if (!schluessel) return null
+  const [anbieter, art, recht, speicher] = schluessel.split('_')
+  if (anbieter !== 'vercel' || art !== 'blob' || recht !== 'rw' || !speicher) return null
+  return /^[a-z0-9]+$/i.test(speicher) ? speicher.toLowerCase() : null
+}
+
+/**
+ * Ist diese Adresse ein fertiges Bild GENAU DIESES Hofes in UNSEREM Speicher?
+ *
+ * Die Prüfung für jede Aktion, die eine Bild-Adresse speichert (Galerie,
+ * Titelbild, Logo, Produktbild, Beitragsfoto, Screenshot einer Meldung).
+ * Strenger als `darfGeloeschtWerden`: Das Host-Muster allein trifft jeden
+ * Blob-Speicher bei Vercel — auch einen, den ein Angreifer selbst anlegt und
+ * in dem er einen Pfad `farms/<unsereHofId>/…` frei wählen kann. Deshalb
+ * zählt zusätzlich der Speicher (`speicher` aus `blobSpeicherAusSchluessel`).
+ * Ohne Speicher-Kennung ist nichts erlaubt (fail-closed). Keine Anmeldedaten,
+ * keine Abfrage, kein Anker: Nichts davon erzeugt unser Upload je.
+ */
+export function istEigeneBildUrl(url: string, farmId: string, speicher: string | null): boolean {
+  if (!speicher || !farmId) return false
+  if (!liegtImEigenenPfad(url, zielPrefix(farmId))) return false
+  const zerlegt = new URL(url)
+  if (zerlegt.username || zerlegt.password || zerlegt.search || zerlegt.hash) return false
+  return zerlegt.hostname.toLowerCase() === `${speicher}.public.blob.vercel-storage.com`
 }

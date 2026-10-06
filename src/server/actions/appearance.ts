@@ -7,6 +7,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import type { SectionConfig } from '@/server/queries/appearance'
 import { appearanceSchema } from '@/schemas/auftritt'
+import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
 
 // Das Schema liegt in src/schemas/auftritt.ts — der Hofseiten-Editor prüft
 // „Über uns" daraus, ohne es abzuschreiben. Der Typ steht hier als Alias,
@@ -37,6 +38,16 @@ export async function saveAppearanceAction(
     sectionsConfig,
     farmValues,
   } = parsed.data
+
+  // Der Editor schickt Logo und Titelbild bei jedem Speichern mit: Ein schon
+  // gespeichertes (auch älteres) Bild bleibt erlaubt, ein neues nur aus
+  // unserem Speicher und dem Ordner dieses Hofes (Nr. 19b).
+  if (
+    !(await bildUrlErlaubt(bannerUrl, farm.id, async () => farm.bannerUrl)) ||
+    !(await bildUrlErlaubt(logoUrl, farm.id, async () => farm.logoUrl))
+  ) {
+    return { error: BILD_NICHT_UEBERNOMMEN }
+  }
 
   await prisma.$transaction([
     prisma.farm.update({
@@ -78,8 +89,9 @@ export async function updateFarmLogoAction(logoUrl: string | null): Promise<{ er
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return { error: 'Nicht angemeldet' }
 
-  const farm = await prisma.farm.findUnique({ where: { ownerId: session.user.id }, select: { id: true, slug: true } })
+  const farm = await prisma.farm.findUnique({ where: { ownerId: session.user.id }, select: { id: true, slug: true, logoUrl: true } })
   if (!farm) return { error: 'Hof nicht gefunden' }
+  if (!(await bildUrlErlaubt(logoUrl, farm.id, async () => farm.logoUrl))) return { error: BILD_NICHT_UEBERNOMMEN }
 
   await prisma.farm.update({ where: { id: farm.id }, data: { logoUrl } })
 
@@ -97,8 +109,9 @@ export async function updateFarmBannerAction(
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return { error: 'Nicht angemeldet' }
 
-  const farm = await prisma.farm.findUnique({ where: { ownerId: session.user.id }, select: { id: true, slug: true } })
+  const farm = await prisma.farm.findUnique({ where: { ownerId: session.user.id }, select: { id: true, slug: true, bannerUrl: true } })
   if (!farm) return { error: 'Hof nicht gefunden' }
+  if (!(await bildUrlErlaubt(bannerUrl, farm.id, async () => farm.bannerUrl))) return { error: BILD_NICHT_UEBERNOMMEN }
 
   await prisma.farm.update({ where: { id: farm.id }, data: { bannerType, bannerUrl } })
 

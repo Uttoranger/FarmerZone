@@ -3,7 +3,7 @@
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { registrationSchema, vollerName } from '@/schemas/register'
+import { KONTO_VIELLEICHT_VORHANDEN, registrationSchema, vollerName } from '@/schemas/register'
 import { checkFormToken, FORM_EXPIRED_MESSAGE } from '@/lib/form-token'
 
 // Single server action for the full registration flow:
@@ -82,7 +82,8 @@ export async function registerFarmer(data: {
     const message = err instanceof Error ? err.message : String(err)
     const lower = message.toLowerCase()
     if (lower.includes('already') || lower.includes('exist') || lower.includes('duplicate') || lower.includes('unique')) {
-      return { error: 'Diese E-Mail-Adresse ist bereits registriert.' }
+      // Neutral statt „bereits registriert" (Nr. 19b): keine Kontenaufzählung.
+      return { error: KONTO_VIELLEICHT_VORHANDEN }
     }
     console.error('[registerFarmer] signUpEmail error:', err)
     return { error: 'Registrierung fehlgeschlagen. Bitte versuche es erneut.' }

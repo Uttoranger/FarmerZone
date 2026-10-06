@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { bestellLinkGilt, bestellungPfad } from '@/lib/bestell-link'
+import { bestellLinkGilt } from '@/lib/bestell-link'
+import { kalenderTerminGilt } from '@/lib/bestaetigung'
 import { erzeugeIcs, wienKalendertag } from '@/lib/kalender'
-import { APP_URL } from '@/lib/umgebung-server'
 
 // Die ICS-Datei zum Abholtermin — derselbe signierte Zugang wie die
 // Bestellseite darüber. Jede Ablehnung antwortet IDENTISCH (Text + 404),
@@ -42,14 +42,18 @@ export async function GET(
   })
 
   if (!order || order.farm.slug !== farmSlug || order.farm.archivedAt) return abgelehnt()
-  // Für eine stornierte Bestellung gibt es keinen Termin mehr — die Seite
-  // zeigt den Knopf dann auch nicht an.
-  if (order.status === 'CANCELLED') return abgelehnt()
+  // Termin nur, solange die Bestellung steht und die Abholung aussteht —
+  // dieselbe Regel wie der Knopf (kalenderTerminGilt): offen (vor der Frist
+  // unbestätigt, danach verfallen), storniert, abgeholt → kein Termin.
+  if (!kalenderTerminGilt(order.status)) return abgelehnt()
 
   const ics = erzeugeIcs({
     titel: `Abholung ${order.farm.name}`,
     ort: `${order.farm.address}, ${order.farm.postalCode} ${order.farm.city}`,
-    beschreibung: `Bestellung ${order.orderNumber}\n${APP_URL}${bestellungPfad(order.farm.slug, order.id)}`,
+    // KEIN signierter Bestell-Link (Nr. 19b): Kalender werden synchronisiert,
+    // geteilt und an Dritte weitergereicht — der Link öffnete dort Name,
+    // E-Mail und Beträge der Kundin. Den Link hat sie in ihrer Mail.
+    beschreibung: `Bestellung ${order.orderNumber}\nDeine Bestellung öffnest du über den Link in deiner Bestätigungs-E-Mail.`,
     datum: wienKalendertag(order.pickupDate),
     beginn: order.pickupTimeStart,
     ende: order.pickupTimeEnd,

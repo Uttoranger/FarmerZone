@@ -225,6 +225,8 @@ describe('bestaetigungsBloecke — was die Seite in welchem Zustand zeigt', () =
       ['verfallen', 'CANCELLED'],
       ['bezahlt', 'CANCELLED'],
       [null, 'NOT_PICKED_UP'],
+      // Nr. 19b: abgeholt — der Termin ist vorbei, die ICS-Route lehnt ab.
+      ['bezahlt', 'PICKED_UP'],
     ] as const) {
       expect(bestaetigungsBloecke(z, s).kalender, `${z} ${s}`).toBe(false)
     }

@@ -11,4 +11,6 @@ export const authClient = createAuthClient({
   plugins: [emailOTPClient()],
 })
 
-export const { signIn, signOut, signUp, useSession } = authClient
+// Kein signUp: Passwort-Konten entstehen nur über registerFarmer (Server),
+// /sign-up/email ist über HTTP zu — ein Export hier wäre ein toter Weg.
+export const { signIn, signOut, useSession } = authClient

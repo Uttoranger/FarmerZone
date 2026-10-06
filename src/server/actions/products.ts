@@ -21,6 +21,7 @@ import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 import { istWiederDa } from '@/lib/produkte-hof'
 import { formatZahl } from '@/lib/format'
 import { bestandVorherSchema, vorratSetzenSchema } from '@/schemas/vorrat'
+import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
 
 async function getAuthenticatedFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -134,6 +135,8 @@ export async function createProduct(data: ProductFormData): Promise<ProduktErgeb
   const geprueft = productAnlegenSchema.safeParse(data)
   if (!geprueft.success) return { error: 'Bitte prüfe deine Eingaben.' }
   const v = geprueft.data
+  // Produktbild nur aus unserem Speicher und dem Ordner dieses Hofes (Nr. 19b).
+  if (!(await bildUrlErlaubt(v.imageUrl, farm.id))) return { error: BILD_NICHT_UEBERNOMMEN }
   const futter = futterAus(v)
 
   await prisma.product.create({
@@ -181,6 +184,12 @@ export async function updateProduct(
   if (bestandVorher !== undefined && !bestandVorherSchema.safeParse(bestandVorher).success) {
     return { error: 'Bitte lade die Seite neu und versuch es noch einmal.' }
   }
+  // Wie beim Anlegen; ein unverändertes Altbild bleibt speicherbar.
+  const bildErlaubt = await bildUrlErlaubt(v.imageUrl, farm.id, async () => {
+    const bisher = await prisma.product.findFirst({ where: { id: productId, farmId: farm.id }, select: { imageUrl: true } })
+    return bisher?.imageUrl
+  })
+  if (!bildErlaubt) return { error: BILD_NICHT_UEBERNOMMEN }
   const futter = futterAus(v)
   const vorratSetzen = bestandVorher !== undefined && v.stock !== bestandVorher
 
@@ -339,6 +348,7 @@ export async function updateProductImageAction(
 
   const existing = await prisma.product.findFirst({ where: { id: productId, farmId: farm.id } })
   if (!existing) return { error: 'Produkt nicht gefunden' }
+  if (!(await bildUrlErlaubt(imageUrl, farm.id, async () => existing.imageUrl))) return { error: BILD_NICHT_UEBERNOMMEN }
 
   await prisma.product.update({ where: { id: productId }, data: { imageUrl } })
 

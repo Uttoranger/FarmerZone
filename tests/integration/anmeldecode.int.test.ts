@@ -500,11 +500,11 @@ describe('HTTP-Pfade', () => {
     expect(antwort.status).toBe(404)
   })
 
-  it('alte Magic Links prüft der Endpunkt noch (Übergang), ungültige leiten mit Fehler weiter', async () => {
+  it('alte Magic Links prüft der Endpunkt nicht mehr — der Übergang ist zu (Nr. 19b)', async () => {
     const antwort = await instanzA.handler(
       new Request(`${basis}/magic-link/verify?token=int-ungueltig&callbackURL=%2Faccount%2Fprofile`)
     )
-    expect(antwort.status).not.toBe(404)
+    expect(antwort.status).toBe(404)
   })
 
   it('ungenutzte Code-Pfade sind zu', async () => {
