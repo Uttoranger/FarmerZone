@@ -270,6 +270,17 @@ function grundpreisCents(price: number, menge: number): number | null {
 }
 
 /**
+ * Die Verkaufseinheit einer Zeile in der Produkttabelle (Nachtlauf Nr. 18):
+ * mit Gebinde „10 Stück", „500 g"; ohne Gebinde „je kg", „je Stück" — dann
+ * gilt der Preis für eine Einheit.
+ */
+export function formatGebinde(unit: string, unitSize?: number | { toString(): string } | null): string {
+  const size = gebindeGroesse(unitSize)
+  if (size && size !== 1) return `${formatZahl(size)} ${einheitLabel(unit, size)}`
+  return `je ${einheitLabel(unit)}`
+}
+
+/**
  * Das Label des Bestandsfelds: ohne Gebinde die Einheit („Bestand (kg)",
  * „Bestand (Stück)"), mit Gebinde zählt der Bestand Pakete („Bestand (Pakete)").
  */

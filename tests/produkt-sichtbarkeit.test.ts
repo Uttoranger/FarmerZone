@@ -12,11 +12,9 @@ import { describe, it, expect } from 'vitest'
 import {
   IM_SHOP,
   NICHT_IM_SHOP,
-  kopfzeileProdukte,
   produktZustand,
   streifenText,
   umschaltMeldung,
-  zaehleImShop,
 } from '@/lib/produkt-sichtbarkeit'
 
 const p = (isAvailable: boolean, stock: number) => ({ isAvailable, stock })
@@ -95,25 +93,5 @@ describe('Beschriftungen', () => {
   it('nennt im Toast das Produkt, in beide Richtungen', () => {
     expect(umschaltMeldung('Bio-Eier', false)).toBe('Bio-Eier ist nicht mehr im Shop')
     expect(umschaltMeldung('Bio-Eier', true)).toBe('Bio-Eier ist wieder im Shop')
-  })
-})
-
-describe('zaehleImShop und kopfzeileProdukte', () => {
-  it('zählt die sichtbaren, nicht die vorrätigen', () => {
-    // Das ausverkaufte Produkt IST im Shop — die Kundin sieht es mit Hinweis.
-    const produkte = [p(true, 0), p(true, 7), p(false, 7)]
-    expect(zaehleImShop(produkte)).toEqual({ imShop: 2, gesamt: 3 })
-  })
-
-  it('schreibt die Kopfzeile mit beiden Zahlen', () => {
-    expect(kopfzeileProdukte([p(true, 1), p(false, 1)])).toBe('1 im Shop · 2 gesamt')
-  })
-
-  it('sagt bei leerer Liste, dass es nichts gibt — statt „0 im Shop · 0 gesamt"', () => {
-    expect(kopfzeileProdukte([])).toBe('Noch keine Produkte')
-  })
-
-  it('nennt auch den Fall, in dem alles abgeschaltet ist', () => {
-    expect(kopfzeileProdukte([p(false, 3), p(false, 4)])).toBe('0 im Shop · 2 gesamt')
   })
 })

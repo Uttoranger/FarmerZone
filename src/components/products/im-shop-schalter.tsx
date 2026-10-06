@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { produktSichtbarkeitSetzen } from '@/server/actions/products'
 import { IM_SHOP, umschaltMeldung } from '@/lib/produkt-sichtbarkeit'
 import { cn } from '@/lib/utils'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 
 /**
  * Der Schalter „Im Shop" — ein Tipp blendet ein Produkt aus oder ein.
@@ -39,7 +40,12 @@ type Props = {
    * damit React den Wert hält, bis die Aktion durch ist.
    */
   setzeOptimistisch: (imShop: boolean) => void
-  variante?: 'zeile' | 'kompakt'
+  /**
+   * `neu`: die Spalte „Sichtbar" der Produkttabelle im neuen Design
+   * (Nachtlauf Nr. 18) — grüne Schiene wie die Schalter auf /account, Schieber
+   * crème, 44 px Tippfläche, Fokusrahmen des Design-Systems.
+   */
+  variante?: 'zeile' | 'kompakt' | 'neu'
   className?: string
 }
 
@@ -75,6 +81,32 @@ export function ImShopSchalter({
         },
       })
     })
+  }
+
+  if (variante === 'neu') {
+    return (
+      <button
+        type="button"
+        role="switch"
+        aria-checked={imShop}
+        aria-label={`${name} sichtbar`}
+        disabled={laeuft}
+        onClick={() => umschalten(!imShop)}
+        className={cn('flex size-11 shrink-0 items-center justify-center rounded-full disabled:opacity-60', FOKUS_RAHMEN, className)}
+      >
+        <span
+          aria-hidden="true"
+          className={cn('relative block h-6 w-10 shrink-0 rounded-full transition-colors duration-[250ms]', imShop ? 'bg-accent' : 'bg-border')}
+        >
+          <span
+            className={cn(
+              'absolute top-[3px] block size-[18px] rounded-full transition-transform duration-[250ms]',
+              imShop ? 'translate-x-[19px] bg-accent-foreground' : 'translate-x-[3px] bg-muted-foreground'
+            )}
+          />
+        </span>
+      </button>
+    )
   }
 
   const schmal = variante === 'kompakt'

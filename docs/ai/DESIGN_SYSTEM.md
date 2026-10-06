@@ -257,6 +257,20 @@ Umgesetzt in `src/components/shells/` (KundeShell, KundeFokusShell, HofShell, Ad
 - **Wochenbalken:** sieben Balken Mo–So, heute `bg-primary`, andere `bg-accent/45`, leere Tage als Strich `bg-border`; Balken `aria-hidden`, Werte als `sr-only`-Liste.
 - **Bestandsteile:** Erste-Schritte-Karte und -Schalter stehen unter `data-app-palette="neu"`.
 
+### Produkte (/products, seit Nr. 18)
+
+- **In der HofShell** (Routengruppe `(hof)`). Kopf: h1 „Produkte", darunter „N Produkte · M sichtbar" (`produkteKopfzeile`, gezählt wird „sichtbar", nicht der Vorrat); ab 768 px rechts genau ein oranger Knopf „+ Neues Produkt" — er öffnet „Was legst du an?". Am Handy legt das Plus der Unterleiste an.
+- **Filter** als `FilterChip`-Links in der Adresse (`?filter=`): Alle · N, Lebensmittel, Futtermittel, Brennmaterial (nur, wenn es welches gibt), Entwürfe · N; daneben die Suche „Produkt suchen …" (`?suche=`, Pille, am Handy volle Breite, 16 px). Angewandt im Browser per `replaceState(null, …)`.
+- **Tabelle ab 1024 px** (Mockup web-h2-produkte): Bild 44 px · Produkt · Einheit (eigene Spalte ab 1280 px, darunter unter dem Namen) · Preis (`formatEuro`, darunter `GrundpreisZeile`) · Vorrat · Status · Sichtbar. **Darunter Karten-Zeilen** (Mockup mobil-h2-produkte): Bild 46 px, Name, „Einheit · Preis", Marke, rechts der Vorrat. Namen höchstens zwei Zeilen mit `title`; der Name ist der Knopf zum Bearbeiten.
+- **Status** als `StatusBadge` aus `produktStatus`: Sichtbar (grün), Nur noch N (orange, Schwelle wie Hofseite), Ausverkauft (neutral), Entwurf (neutral, = ausgeblendet). „N Größen warten auf Meldung" kommt mit Gate 6.
+- **Vorrat direkt ändern** (`VorratFeld`): `Stepper` (Base UI NumberField, −/+ 44 px, Zahl eintippbar, Pfeiltasten); gespeichert wird beim Loslassen bzw. Verlassen des Felds, bedingt (ARCHITECTURE §5 „Vorrat setzen ist bedingt"). Wurde inzwischen bestellt: Feld zeigt den Stand des Servers, darunter der Satz orange (`text-status-offen`), in einer ständig vorhandenen Live-Region. Unter der Tabelle der Satz `VORRAT_HINWEIS`.
+- **Sichtbar** = `ImShopSchalter` Variante `neu`: grüne Schiene (`bg-accent`), Schieber crème, aus `bg-border`/`bg-muted-foreground`, 44 px; Toast mit „Rückgängig" wie bisher.
+- **Hinweise** (Kategorie übernehmen, Kategorie ergänzen, Einheit prüfen) als gestrichelte Chips unter dem Namen — orange statt der alten Bernstein-Klassen.
+- **Leer:** `EmptyState` „Noch keine Produkte" mit „+ Neues Produkt"; **kein Treffer:** `EmptyState` „Kein Produkt passt" mit „Alle Produkte zeigen". **Laden:** `(hof)/products/loading.tsx` in der Form der Seite.
+- **„Was legst du an?"** (`WasLegstDuAn`): ab 768 px Dialog (820 px) mit drei Karten Lebensmittel · Futtermittel · Brennmaterial (Fläche `bg-accent/15`, Symbol `text-status-fertig`) und „Oder etwas anderes:" mit Umriss-Pillen Neuer Beitrag, Verkauf eintragen; darunter `SheetBlatt` mit Zeilen. Einträge aus `HOF_NEU` — dieselben wie im Neu-Menü der Shell (dort zwei Gruppen mit Trenner).
+- **Produktdialog** im Geltungsbereich: am Handy über die ganze Fläche, ab 640 px Dialog; `data-app-palette="neu"` am Inhalt. Titel nach der Wahl („Neues Produkt", „Neues Futtermittel", „Neues Brennmaterial"); Hauptknopf „Produkt veröffentlichen" bzw. „Als Entwurf speichern" (aus `speichernText`); beim Bearbeiten links „Löschen" (orange Text), die Rückfrage mit Orange-Umriss.
+- **Moment „wieder da"** (`WiederDaMoment`): ab 768 px schwebende Karte unten rechts (400 px, Rand `primary/55`, ohne Schleier, Escape und „Nicht jetzt" schließen, Live-Region), darunter `SheetBlatt`. Häkchen grün, Titel „Wieder da: <Name>", Satz mit Menge, Zitat mit dem Teilen-Text, „Teilen" (orange, `teileHof` mit Text) und „Nicht jetzt". Nur bei sichtbarem Hof und Produkt, je Produkt und Wiener Woche einmal je Gerät. „In den Einstellungen abschaltbar" kommt mit Gate 7 (braucht eine Spalte).
+
 ### Futtermittel und Brennmaterial
 
 - Unter jedem Futter: grünes Schild „Registrierter Futtermittelbetrieb · LFBIS <Nummer>" bzw. die jeweilige Nummer. Fehlt die nötige Registrierung für eine Größe, erscheint diese Größe beim Kunden nicht; im Formular trägt sie ein Schloss mit Begründung.

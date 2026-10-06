@@ -19,20 +19,34 @@ export function Stepper({
   wert,
   standardWert,
   onWertChange,
+  onWertBestaetigt,
   min = 0,
   max,
   disabled,
+  laeuft,
   className,
+  eingabeClassName,
 }: {
   /** Wofür die Zahl steht, für Screenreader: „Menge Freilandeier". */
   beschriftung: string
   wert?: number
   standardWert?: number
   onWertChange?: (wert: number) => void
+  /**
+   * Der Wert ist fertig: nach dem Loslassen von − oder +, nach dem Tippen beim
+   * Verlassen des Felds, bei Pfeiltasten sofort (Base UI `onValueCommitted`).
+   * Für Werte, die erst dann zum Server gehen (Vorrat in der Produkttabelle) —
+   * nicht bei jedem Tastendruck.
+   */
+  onWertBestaetigt?: (wert: number) => void
   min?: number
   max?: number
   disabled?: boolean
+  /** Ein Speichern läuft: `aria-busy`, bedienbar bleibt der Stepper (kein Fokusverlust). */
+  laeuft?: boolean
   className?: string
+  /** Breite des Zahlenfelds, wenn mehr als zwei Stellen erwartet werden (Vorrat). */
+  eingabeClassName?: string
 }): React.JSX.Element {
   const knopf = cn(
     'group/knopf flex size-11 shrink-0 items-center justify-center rounded-full disabled:cursor-not-allowed disabled:opacity-40',
@@ -45,10 +59,12 @@ export function Stepper({
       value={wert}
       defaultValue={standardWert}
       onValueChange={(neu) => onWertChange?.(neu ?? min)}
+      onValueCommitted={onWertBestaetigt ? (neu) => onWertBestaetigt(neu ?? min) : undefined}
       min={min}
       max={max}
       disabled={disabled}
       data-slot="stepper"
+      aria-busy={laeuft || undefined}
       className={cn('inline-flex', className)}
     >
       <NumberField.Group className="flex items-center">
@@ -59,7 +75,7 @@ export function Stepper({
         </NumberField.Decrement>
         <NumberField.Input
           aria-label={beschriftung}
-          className={cn('h-11 w-10 rounded-lg bg-transparent text-center text-[15px] font-semibold tabular-nums', FOKUS_RAHMEN)}
+          className={cn('h-11 w-10 rounded-lg bg-transparent text-center text-[15px] font-semibold tabular-nums', FOKUS_RAHMEN, eingabeClassName)}
         />
         <NumberField.Increment aria-label={`${beschriftung}: eins mehr`} className={knopf}>
           <span className={kreis}>

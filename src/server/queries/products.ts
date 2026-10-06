@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { categoryImagePath } from '@/lib/product-image'
 import { zuProduktDto } from '@/lib/produkt-dto'
+import { heuteHofSichtbar, naechstesAbholfenster, type NaechstesFenster } from '@/lib/heute'
 import type {
   Abgabe,
   Futtermittelart,
@@ -130,14 +131,46 @@ export async function getProductsForFarm(farmId: string): Promise<ProductData[]>
   }))
 }
 
+export type ProdukteSeite = {
+  products: ProductData[]
+  /** Betriebsnummer aus den Hof-Einstellungen — Anzeige in der Futter-Kennzeichnung (Rückfrage F6). */
+  hofBetriebsnummer: string | null
+  /** heuteHofSichtbar: freigegeben, nicht pausiert, nicht stillgelegt — Bedingung für „wieder da". */
+  hofSichtbar: boolean
+  /** Das nächste Abholfenster für den Teilen-Text des Moments „wieder da". */
+  naechstesFenster: NaechstesFenster | null
+}
+
 /**
- * Die Betriebsnummer des Hofs für die Anzeige in der Futter-Kennzeichnung
- * (Sprint Bereiche 1, Rückfrage F6). Eigene kleine Abfrage statt einer
+ * Alles für /products in einem Zug (Nachtlauf Nr. 18): die Produkte und vom
+ * Hof nur, was die Seite braucht. Eigene kleine Abfrage statt einer
  * Erweiterung von getFarmForUser — die läuft in jedem Layout-Aufruf mit.
  */
-export async function getHofBetriebsnummer(farmId: string): Promise<string | null> {
-  const farm = await prisma.farm.findUnique({ where: { id: farmId }, select: { betriebsnummer: true } })
-  return farm?.betriebsnummer ?? null
+export async function getProdukteSeite(farmId: string, jetzt: Date): Promise<ProdukteSeite> {
+  const [products, hof] = await Promise.all([
+    getProductsForFarm(farmId),
+    prisma.farm.findUnique({
+      where: { id: farmId },
+      select: {
+        betriebsnummer: true,
+        isActive: true,
+        isPaused: true,
+        approvedAt: true,
+        archivedAt: true,
+        pickupSlots: {
+          where: { isActive: true },
+          orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+          select: { dayOfWeek: true, startTime: true, endTime: true },
+        },
+      },
+    }),
+  ])
+  return {
+    products,
+    hofBetriebsnummer: hof?.betriebsnummer ?? null,
+    hofSichtbar: hof ? heuteHofSichtbar(hof) : false,
+    naechstesFenster: naechstesAbholfenster(hof?.pickupSlots ?? [], jetzt),
+  }
 }
 
 /**

@@ -86,11 +86,12 @@ describe('ohneAuftrag — die Adresse nach dem Öffnen', () => {
 
 describe('an den Seiten', () => {
   it('/products öffnet über useUrlAuftrag — neu und bearbeiten, ohne den alten Einmal-Effekt', () => {
-    const liste = quelle('src/components/products/product-list.tsx')
+    // Seit Nr. 18 die Ansicht im neuen Design (Route in der HofShell).
+    const liste = quelle('src/components/produkte/produkte-ansicht.tsx')
     expect(liste).toContain('useUrlAuftrag(')
     expect(liste).toContain("auftrag.art === 'neu'")
     expect(liste).not.toContain('initialEditId')
-    expect(quelle('src/app/(farmer)/products/page.tsx')).not.toContain('initialEditId')
+    expect(quelle('src/app/(hof)/products/page.tsx')).not.toContain('initialEditId')
   })
 
   it('/sales öffnet „Verkauf eintragen" über useUrlAuftrag', () => {

@@ -176,7 +176,7 @@ function ProductImageArea({
             // Nur die Kategorie-Illustration wird im Dunkeln gedämpft, sonst
             // leuchtet ihr Crème-Grund als Fläche; Fotos bleiben, wie sie sind
             // (CODING_STANDARDS §7, Altlast aus ARCHITECTURE §6 beim Anfassen
-            // nachgezogen — Werte wie in produkt-zeile-teile.tsx).
+            // nachgezogen — Werte wie in components/produkte/produkte-ansicht.tsx).
             className={cn(
               'object-contain',
               !product.imageUrl && 'dark:brightness-[0.85] dark:saturate-[0.9]'

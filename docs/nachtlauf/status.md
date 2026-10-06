@@ -25,8 +25,8 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 17a | E8 – Checkout ohne Kundenkonto | fertig | `nacht/2026-10-06/17a-checkout-ohne-konto` | #183 | main | Altlast-Sperre beim Ablehnen; „/account" auf Abos umgedeutet; Name/Telefon nach fremder Registrierung (Vorschlag) | 06.10.2026 |
 | 17b | E-Mail-Bestätigung für neue Höfe (S3) | fertig | `nacht/2026-10-06/17b-email-bestaetigung` | #184 | 17a (#183) | Stichtag vor Merge auf Deploy-Tag setzen; Pre-Hijacking-Blocker behoben (HTTP-Registrierung gesperrt) | 06.10.2026 |
 | 17c | Slug-Prüfung absichern | fertig | `nacht/2026-10-06/17c-slug-pruefung` | #185 | 17b (#184) | – | 06.10.2026 |
-| 17d | Konditionen-Übergang (K1) | läuft | `nacht/2026-10-06/17d-konditionen-uebergang` | | 17c (#185) | | 06.10.2026 |
-| 18 | Produkte | offen | | | | | |
+| 17d | Konditionen-Übergang (K1) | fertig | `nacht/2026-10-06/17d-konditionen-uebergang` | #186 | 17c (#185) | Bar-Gebühren vor Stichtag entscheiden; Satz zweimal auf /fuer-hoefe bestätigen | 06.10.2026 |
+| 18 | Produkte | läuft | `nacht/2026-10-06/18-produkte` | | 17d (#186) | | 06.10.2026 |
 | 19 | Bestellungen | offen | | | | | |
 | 20 | Futter und Brennmaterial | offen | | | | | |
 | 21 | Teilen | offen | | | | | |

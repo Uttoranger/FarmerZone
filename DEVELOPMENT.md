@@ -4189,6 +4189,18 @@ Auftrag `freigabe.md` §8, Entscheidung K1 (Datum 1. Februar 2027, festgelegt am
 - **Unverändert:** Gründungsplatz-Vergabe und Zusage im Admin (`gruendungshof.ts`), Einrichten-Schritt SEPA, die Bauern-Mail „Vor-Ort-Bestellung bestätigt" (Servicegebühr „schuldest du der Monatsabrechnung" — die Servicegebühr zahlt die Kundin, sie ist keine Hof-Kondition). Ob ab dem Stichtag neu freigeschaltete Höfe noch einen Gründungsplatz bekommen, regelt Gate 8.
 - **Nebenbei:** `/konditionen` hat jetzt eine `<main>`-Landmarke (Axe `landmark-one-main`).
 
+## Produkte und „Was legst du an?" (Nachtlauf Nr. 18, Oktober 2026)
+
+Gate 5, Zeile `/products`, Freigabe E13. Die Seite zog von `(farmer)` nach `(hof)` (gleiche Adresse, Zugang über `ladeHofbereich`) und ist nach den Mockups H2 gebaut: Tabelle mit Vorrat, Status und Schalter „Sichtbar", am Handy Karten-Zeilen; das Neu-Menü fragt „Was legst du an?". Alle Bestandsfunktionen bleiben: Anlegen, Bearbeiten, Fotos (Upload-Sperre aus 17b sitzt in der Upload-Route), Kategorien samt Vorschlag-Chips, Sichtbarkeit, Abgabe nur an Betriebe, Futter-Kennzeichnung, Löschen.
+
+Entscheidungen und Gründe:
+- **Vorrat setzen ist ein bedingtes Setzen.** Der Hof meint „jetzt liegen 12 da". Die alte `updateStock` las erst und schrieb dann den neuen Wert blind (`stock + delta`), `setStock` ebenso — eine Bestellung dazwischen ging verloren, und verkaufte Ware stand wieder im Shop. `setzeVorrat` schreibt nur, wenn die Zeile noch den Vorrat hält, den der Browser gesehen hat; sonst meldet sie den aktuellen Stand. Beide alten Aktionen und der Eintipp-Dialog (+5/+10/+20) entfielen; eintippen geht jetzt direkt im Feld.
+- **Derselbe Fehler im Bearbeiten-Dialog:** `updateProduct` schrieb bei jedem Speichern den Vorrat vom Öffnen zurück — wer während einer Bestellung den Namen änderte, machte sie rückgängig. Jetzt bleibt ein unveränderter Vorrat unberührt, ein geänderter wird bedingt gesetzt; bei Konflikt zeigt der Dialog den neuen Stand, und das nächste Speichern bezieht sich darauf.
+- **Entwurf = ausgeblendet** (`isAvailable = false`). Eine eigene Spalte gibt es nicht; der Bestand nannte es „Nicht im Shop". Die Hofseite des Besitzers spricht weiter so, bis sie umgebaut wird.
+- **Neu-Menü:** Lebensmittel, Futtermittel und Brennmaterial führen alle in den vorhandenen Produktdialog, mit `?bereich=` vorbelegt (Brennmaterial setzt Brennholz, Futtermittel öffnet die Kategorie bei den Futtermitteln). Der Dialog kann Futter (Kennzeichnung) und Brennholz schon; die neuen Formulare mit Verkaufsgrößen kommen mit Gate 6. „Verkauf eintragen" (E13) führt wie bisher auf `/sales?neu=1` — `/sales` ist nicht Teil dieses Gates, das Formular bleibt bis zu seinem Umzug im Bestandsdesign.
+- **Moment „wieder da":** nur bei 0 → mehr als 0 (vom Server bestätigt), nur bei sichtbarem Hof und Produkt, je Produkt und Wiener Woche einmal je Gerät (localStorage, ohne Speicher nie). Geteilt wird die Hofseite mit dem Satz „Wieder da bei uns: … Abholung …" über `teileHof`. Nicht gebaut: „N Kunden haben zuletzt … gekauft" (keine Regel für „zuletzt"), Abschalten in den Einstellungen (Spalte, Gate 7), Zählung (Nr. 21), Moment „gespeichert" (Gate 7).
+- **Weggefallen**, weil nirgends mehr benutzt: `product-list.tsx`, `stock-dialog.tsx`, `produkt-zeile-teile.tsx`, `src/lib/produkt-zeile.ts` (samt Test), `kopfzeileProdukte`/`zaehleImShop`; ihre Zusicherungen stehen jetzt in `tests/produkte-seite.test.ts`. Die Altlast „Produktliste zeigt Illustrationen nachts ungedämpft" (ARCHITECTURE §6) ist damit erledigt.
+
 ## Nützliche Befehle
 
 ```bash

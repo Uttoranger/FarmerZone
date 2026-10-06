@@ -15,6 +15,13 @@ export const NOTIZ_MAX = 500
 export const EMAIL_MAX = 254
 /** Wie im Produktformular — eine Checkout-Position trägt den Produktnamen. */
 export const PRODUKTNAME_MAX = 100
+/**
+ * Der höchste Vorrat, den der Hof in der Produkttabelle direkt eintippt
+ * (Nachtlauf Nr. 18). Fängt Tippfehler ab („99999" statt „99") und bleibt weit
+ * unter der Grenze der Int-Spalte. Ein Altbestand darüber darf sinken, nie
+ * steigen (src/schemas/vorrat.ts).
+ */
+export const VORRAT_MAX = 99_999
 
 /**
  * Der Name einer Bestellposition — immer der Name des Produkts aus der

@@ -154,10 +154,22 @@ export function fehlendeAngaben(werte: unknown, schema: z.ZodType): number {
 }
 
 /** Der Text des Speichern-Buttons. */
-export function speichernText(fehlend: number, bearbeiten: boolean): string {
+export function speichernText(fehlend: number, bearbeiten: boolean, sichtbar?: boolean): string {
   if (fehlend === 1) return 'Noch 1 Angabe fehlt'
   if (fehlend > 1) return `Noch ${fehlend} Angaben fehlen`
-  return bearbeiten ? 'Speichern' : 'Anlegen'
+  if (bearbeiten) return 'Speichern'
+  // Im neuen Design (Mockup mobil-h2-neues-produkt, Nr. 18) sagt der Knopf,
+  // was danach passiert: sichtbar geht es sofort auf die Hofseite.
+  if (sichtbar === undefined) return 'Anlegen'
+  return sichtbar ? 'Produkt veröffentlichen' : 'Als Entwurf speichern'
+}
+
+/** Der Titel des Produktdialogs — beim Anlegen nach der Wahl aus „Was legst du an?". */
+export function dialogTitel(bearbeiten: boolean, vorwahl: 'lebensmittel' | 'futter' | 'brennmaterial' | null): string {
+  if (bearbeiten) return 'Produkt bearbeiten'
+  if (vorwahl === 'futter') return 'Neues Futtermittel'
+  if (vorwahl === 'brennmaterial') return 'Neues Brennmaterial'
+  return 'Neues Produkt'
 }
 
 /**
