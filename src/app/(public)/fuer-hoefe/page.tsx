@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { SERVICEGEBUEHR_SATZ_TEXT, START_TARIF } from '@/lib/konditionen'
+import { SERVICEGEBUEHR_SATZ_TEXT, STARTPHASE_SATZ, TARIFE_AB_SATZ } from '@/lib/konditionen'
 import { STARTSEITE_VORSCHAUBILD } from '@/lib/vorschaubild'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { StartseiteFuss } from '@/components/startseite/startseite-abschnitte'
@@ -16,7 +16,8 @@ import {
 const SEITEN_TITEL = 'Für Höfe — FarmerZone'
 const SEITEN_BESCHREIBUNG =
   `Dein Hofladen, online: Kunden bestellen vorab, du packst nach Liste und übergibst zur Abholzeit. ` +
-  `Start mit dem Tarif ${START_TARIF.name} ab ${START_TARIF.preis}, die Servicegebühr von ${SERVICEGEBUEHR_SATZ_TEXT} zahlt der Kunde.`
+  // Kein Tarif als sofort gültig (Register K1): erst kostenlos, die Tarife ab dem Stichtag.
+  `${STARTPHASE_SATZ} ${TARIFE_AB_SATZ} Die Servicegebühr von ${SERVICEGEBUEHR_SATZ_TEXT} zahlt der Kunde.`
 
 export const metadata: Metadata = {
   title: SEITEN_TITEL,
@@ -39,8 +40,8 @@ export const revalidate = 86400
 
 /**
  * „Für Höfe" (Gate 5, Nr. 15) — Mockups web-h0-fuer-hoefe und
- * mobil-h0-fuer-hoefe. Preise ausschließlich aus src/lib/konditionen.ts
- * (E6), dieselbe Quelle wie /konditionen.
+ * mobil-h0-fuer-hoefe. Preise und der Übergang (K1) ausschließlich aus
+ * src/lib/konditionen.ts, dieselbe Quelle wie /konditionen.
  */
 export default function FuerHoefePage(): React.JSX.Element {
   return (

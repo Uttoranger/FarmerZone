@@ -10,7 +10,7 @@ import { registerFarmer } from '@/server/actions/register'
 import { passwortStaerke } from '@/lib/password-rules'
 import { signIn } from '@/lib/auth-client'
 import { schreibeHofnameEntwurf, sitzungsSpeicher } from '@/lib/hofname-entwurf'
-import { REGISTRIEREN_TARIF } from '@/lib/konditionen'
+import { KONDITIONEN_UEBERGANG } from '@/lib/konditionen'
 import { REGISTRIEREN_SCHRITTE } from '@/lib/fuer-hoefe'
 import { KONTAKT_EMAIL } from '@/lib/support'
 import { EMAIL_MAX, HOFNAME_MAX, PERSONENNAME_MAX } from '@/lib/eingabegrenzen'
@@ -117,7 +117,8 @@ export function RegisterForm({ formToken }: { formToken: string }): React.JSX.El
   return (
     <div className="mx-auto grid max-w-[1000px] gap-8 px-4 pt-5 pb-12 md:px-6 md:pt-10 lg:grid-cols-[minmax(0,580px)_minmax(0,1fr)] lg:gap-14">
       <div className="rounded-2xl border border-border bg-card p-5 md:p-7">
-        <p className="mb-5 text-[14px] text-muted-foreground">{REGISTRIEREN_TARIF}</p>
+        {/* Der Übergang aus konditionen.ts (Register K1) statt eines Tarifs, der heute gälte. */}
+        <p className="mb-5 text-[14px] leading-normal text-muted-foreground">{KONDITIONEN_UEBERGANG}</p>
 
         <form onSubmit={form.handleSubmit(absenden)} noValidate className="flex flex-col gap-4">
           {/* Honigtopf — unsichtbar für Menschen, verlockend für Skripte.
@@ -250,9 +251,8 @@ export function RegisterForm({ formToken }: { formToken: string }): React.JSX.El
             )}
           </div>
 
-          {/* Nur zum Nachlesen, keine Zustimmung: Welche Konditionen für neu
-              registrierte Höfe gelten, ist noch offen (Bericht Nr. 15,
-              „Bitte entscheiden"). Eine AGB-Seite gibt es nicht. */}
+          {/* Nur zum Nachlesen, keine Zustimmung: AGB und Nutzungsbedingungen
+              sind offen (Register O4), bis dahin kein Haken. */}
           <p className="text-[13.5px] leading-snug text-muted-foreground">
             <Link href="/konditionen" target="_blank" className={cn(TEXTLINK, 'inline-flex min-h-11 items-center')}>
               Konditionen für Höfe ansehen

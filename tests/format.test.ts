@@ -26,6 +26,7 @@ import {
   einheitLabel,
   mitAnzahl,
   plural,
+  formatDatumLang,
 } from '@/lib/format'
 import { abGrundpreis, baueAngebotsZeile, grundpreisAusKennzeichnung } from '@/lib/bereiche-anzeige'
 import { LEERER_HOEFE_FILTER } from '@/schemas/hoefe-filter'
@@ -403,5 +404,20 @@ describe('Singular und Plural', () => {
   it('liefert auf Wunsch nur das Wort', () => {
     expect(plural(1, 'Hof', 'Höfe')).toBe('Hof')
     expect(plural(3, 'Hof', 'Höfe')).toBe('Höfe')
+  })
+})
+
+describe('formatDatumLang — ein Tag in Wiener Zeit', () => {
+  it('schreibt Tag, Monat ausgeschrieben und Jahr', () => {
+    // Wiener Mitternacht im Winter ist 23:00 UTC des Vortags.
+    expect(formatDatumLang(new Date('2027-01-31T23:00:00.000Z'))).toBe('1. Februar 2027')
+  })
+
+  it('rechnet in Wien, nicht in UTC: 23:30 UTC ist in Wien schon der nächste Tag', () => {
+    expect(formatDatumLang(new Date('2026-10-06T23:30:00.000Z'))).toBe('7. Oktober 2026')
+  })
+
+  it('österreichisch: Jänner', () => {
+    expect(formatDatumLang(new Date('2027-01-15T12:00:00.000Z'))).toBe('15. Jänner 2027')
   })
 })

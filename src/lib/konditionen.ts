@@ -9,17 +9,22 @@
  * (noch) keine Tarif-Grenzen, keine Grundgebühr und keinen SEPA-Einzug im
  * Code; `Farm.tarif` bleibt für jeden Hof leer, bis Gate 8 die Wahl baut.
  *
+ * Übergang (Register K1, Nachtlauf 17d): In der Startphase ist FarmerZone
+ * kostenlos, die Tarife gelten erst ab `TARIFE_AB`. Jede Seite, die Tarife
+ * zeigt, nennt dazu `KONDITIONEN_UEBERGANG` — das Datum steht nur hier.
+ *
  * Regel für Anzeigen (wie früher gruendungshof.ts): Eine Zahl steht nie als
  * Literal in einer Seite, sondern kommt von hier. Der Satz der Servicegebühr
  * kommt aus servicegebuehr.ts (E4) und steht hier nicht ein zweites Mal;
  * Beträge laufen über formatEuro (format.ts).
  */
 import type { Tarif } from '@prisma/client'
-import { formatEuro, formatZahl } from '@/lib/format'
+import { formatDatumLang, formatEuro, formatZahl } from '@/lib/format'
 import {
   SERVICEGEBUEHR_STANDARD_MIND_CENTS,
   SERVICEGEBUEHR_STANDARD_PROZENT,
   centsAlsEuro,
+  wienerMitternacht,
 } from '@/lib/servicegebuehr'
 
 /**
@@ -101,21 +106,53 @@ export const SERVICEGEBUEHR_ZAHLT_KUNDE =
 /** Kurzfassung für Karten (Einrichten, Vorteile). */
 export const VOLLER_WARENPREIS = 'Die Servicegebühr zahlt der Kunde – du behältst den vollen Warenpreis.'
 
-/** Wie abgerechnet wird (E6). Beschreibt das Preismodell, nicht einen laufenden Einzug. */
+// ─── Übergang: Startphase, Tarife ab einem Stichtag (Register K1) ─────────────
+
+/**
+ * Ab diesem Wiener Kalendertag gelten die Tarife — festgelegt am 06.10.2026
+ * (Register K1). Das EINZIGE Datum dazu im Code; alles andere leitet sich ab
+ * (tests/konditionen-uebergang.test.ts sucht nach einem zweiten Exemplar).
+ */
+export const TARIFE_AB_TAG = '2027-02-01'
+
+/** Der Stichtag als Zeitpunkt: Mitternacht in Wien, nicht in UTC. */
+export const TARIFE_AB: Date = stichtag(TARIFE_AB_TAG)
+
+function stichtag(kalendertag: string): Date {
+  const zeitpunkt = wienerMitternacht(kalendertag)
+  // Ein Tippfehler im Datum soll beim Bauen auffallen, nicht als „Invalid Date" auf der Seite.
+  if (!zeitpunkt) throw new Error(`Ungültiger Stichtag: ${kalendertag}`)
+  return zeitpunkt
+}
+
+/** „1. Februar 2027" — über den gemeinsamen Formatierer. */
+export const TARIFE_AB_TEXT = formatDatumLang(TARIFE_AB)
+
+/** Die drei Sätze des Übergangs einzeln — die Metadaten brauchen nur die ersten beiden. */
+export const STARTPHASE_SATZ = 'In der Startphase kostenlos.'
+export const TARIFE_AB_SATZ = `Die Tarife gelten ab ${TARIFE_AB_TEXT}.`
+export const BESTANDSHOEFE_SATZ = 'Bereits freigeschaltete Höfe behalten ihre zugesagten Konditionen.'
+
+/**
+ * Der Übergang in einem Satz (Register K1, wörtlich) — für /fuer-hoefe,
+ * /konditionen, Registrieren und Einrichten. Keine Seite schreibt ihn ab.
+ */
+export const KONDITIONEN_UEBERGANG = [STARTPHASE_SATZ, TARIFE_AB_SATZ, BESTANDSHOEFE_SATZ].join(' ')
+
+/**
+ * Für den Betreiber im Freischalten-Dialog: welches Modell öffentlich gilt.
+ * Die Gründungsplatz-Vergabe daneben bleibt, bis die Abrechnung gebaut ist (Gate 8).
+ */
+export const KONDITIONEN_DERZEIT = `Derzeit gilt: ${KONDITIONEN_UEBERGANG}`
+
+/**
+ * Wie abgerechnet wird (E6). Beschreibt das Preismodell, nicht einen
+ * laufenden Einzug: Die Grundgebühr gibt es erst ab dem Stichtag (K1).
+ */
 export const MONATSABRECHNUNG_TEXT =
-  'Grundgebühr und Servicegebühren aus Barbestellungen rechnen wir einmal im Monat ab, per SEPA-Lastschrift. ' +
+  `Die Monatsabrechnung per SEPA-Lastschrift umfasst die Grundgebühr (ab ${TARIFE_AB_TEXT}) ` +
+  'und die Servicegebühren aus Barbestellungen. ' +
   'Bei Online-Zahlungen ist die Servicegebühr schon beim Bezahlen erledigt.'
-
-// ─── Wortlaute für die Einstiege ────────────────────────────────────────────
-
-/** Unter den Knöpfen oben auf /fuer-hoefe. */
-export const EINSTIEG_HINWEIS = `Mit dem Tarif ${START_TARIF.name} ab ${START_TARIF.preis} – monatlich kündbar.`
-
-/** Unter der Überschrift „Hof registrieren" (Web) bzw. kürzer am Handy. */
-export const REGISTRIEREN_TARIF = `Kostenlos starten mit dem Tarif ${START_TARIF.name}. Wechseln kannst du jederzeit.`
-
-/** Unter dem Hofladen-Preis am Handy. */
-export const HOFTOR_ALTERNATIVE = `Oder ${START_TARIF.name} ab ${START_TARIF.preis} zum Reinschnuppern`
 
 /** Wann der Text dieser Seite zuletzt geändert wurde. */
 export const KONDITIONEN_STAND = 'Oktober 2026'

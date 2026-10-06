@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Check, Mail, MailCheck } from 'lucide-react'
 import type { EinrichtenSchritt, EinrichtenStand } from '@/lib/einrichten'
-import { PRO_MONAT, VOLLER_WARENPREIS, tarifKarte, type TarifId } from '@/lib/konditionen'
+import { KONDITIONEN_UEBERGANG, PRO_MONAT, VOLLER_WARENPREIS, tarifKarte, type TarifId } from '@/lib/konditionen'
 import { KONTAKT_EMAIL } from '@/lib/support'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -138,6 +138,8 @@ function TarifKarte({ tarif }: { tarif: TarifId | null }) {
           </li>
         ))}
       </ul>
+      {/* Die Preise gelten erst ab dem Stichtag (Register K1). */}
+      <p className="mt-2 text-[13px] leading-normal text-muted-foreground">{KONDITIONEN_UEBERGANG}</p>
       <p className="mt-2 text-[13px] text-foreground">{VOLLER_WARENPREIS}</p>
       <Link
         href="/konditionen"
