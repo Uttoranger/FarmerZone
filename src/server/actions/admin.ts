@@ -13,6 +13,7 @@ import {
 import { servicegebuehrEinstellungSchema } from '@/schemas/servicegebuehr'
 import { wienerMitternacht } from '@/lib/servicegebuehr'
 import { triageEingabeSchema } from '@/schemas/meldung'
+import { FREISCHALTUNG_EMAIL_OFFEN_TEXT, bestaetigungOffen } from '@/lib/email-bestaetigung'
 
 function revalidateAll(slug: string) {
   revalidatePath('/admin')
@@ -32,9 +33,14 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
 
   const farm = await prisma.farm.findUnique({
     where: { id: farmId },
-    select: { name: true, slug: true, owner: { select: { email: true } } },
+    select: { name: true, slug: true, owner: { select: { email: true, emailVerified: true, createdAt: true } } },
   })
   if (!farm) return { error: 'Hof nicht gefunden.' }
+
+  // S3 (Nr. 17b): „Hof online stellen" ist bis zur bestätigten E-Mail
+  // gesperrt — und online geht ein Hof nur über diesen Klick. Konten vor dem
+  // Stichtag bleiben unberührt. Frisch aus der Datenbank gelesen (oben).
+  if (bestaetigungOffen(farm.owner)) return { error: FREISCHALTUNG_EMAIL_OFFEN_TEXT }
 
   await prisma.farm.update({ where: { id: farmId }, data: { approvedAt: new Date() } })
   revalidateAll(farm.slug)

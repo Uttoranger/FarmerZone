@@ -4,11 +4,12 @@ import { prismaAdapter } from 'better-auth/adapters/prisma'
 import { emailOTP, magicLink } from 'better-auth/plugins'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
 import { prisma } from '@/lib/prisma'
-import { UMGEBUNG } from '@/lib/umgebung-server'
+import { APP_URL, UMGEBUNG } from '@/lib/umgebung-server'
 import { ANMELDECODE_PLUGIN_OPTIONEN, GESPERRTE_AUTH_PFADE, codeVersandErlaubt, rolleAusTreffern } from '@/lib/anmeldecode'
 import { genauesIlikeMuster } from '@/lib/ilike-muster'
 import { erzeugeAnforderungsSperre } from '@/lib/anmeldecode-sperre'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
+import { BESTAETIGUNG_GESPERRTE_AUTH_PFADE, BESTAETIGUNG_GUELTIG_SEKUNDEN, bestaetigungsPfad } from '@/lib/email-bestaetigung'
 
 // Franz-tauglich: 10 Login-Versuche pro Minute pro IP sperren keinen echten
 // Nutzer aus (auch nicht bei Tippfehlern), bremsen aber Passwort-Rater.
@@ -77,6 +78,21 @@ function meldeCodeVersandFehler(grund: 'resend_fehler' | 'nachlauf_fehler', err?
 }
 
 /**
+ * Meldet eine gescheiterte Bestätigungs-Mail (S3, Nr. 17b) — wie oben nur die
+ * Art, nie Adresse oder Link (der Link trägt einen gültigen Token).
+ */
+function meldeBestaetigungsFehler(grund: 'resend_fehler' | 'nachlauf_fehler', err?: unknown): void {
+  const kontext = { tags: { aufgabe: 'email-bestaetigung', grund } }
+  if (err === undefined) {
+    Sentry.captureMessage('Bestätigungs-Mail nicht verschickt', { level: 'error', ...kontext })
+    return
+  }
+  const meldung = new Error('Bestätigungs-Mail nicht verschickt')
+  meldung.name = err instanceof Error ? err.name : 'Unbekannt'
+  Sentry.captureException(meldung, kontext)
+}
+
+/**
  * Dieselbe Antwort wie bei einem falschen Code — Form und Text so, wie das
  * emailOTP-Plugin sie wirft (EMAIL_OTP_ERROR_CODES.INVALID_OTP, nicht
  * exportiert). Wer eine Hof-Adresse probiert, soll nicht erfahren, dass sie
@@ -108,6 +124,8 @@ export const auth = betterAuth({
 
   emailAndPassword: {
     enabled: true,
+    // Bleibt false (S3): true sperrte das Anmelden unbestätigter Höfe. Was
+    // bis zur Bestätigung gesperrt ist, steht bei emailVerification unten.
     requireEmailVerification: false,
     // Better-Auth-Default, jetzt sichtbar konfiguriert — muss zur Zod-Regel
     // min(8) in src/schemas/register.ts und zur Checkliste (password-rules) passen
@@ -132,10 +150,50 @@ export const auth = betterAuth({
     },
   },
 
+  // E-Mail-Bestätigung für neue Höfe (S3, Nr. 17b). Anmelden bleibt ohne
+  // Bestätigung möglich (requireEmailVerification oben bleibt false) — was bis
+  // dahin gesperrt ist (Foto-Uploads, Freischaltung), entscheidet
+  // src/lib/email-bestaetigung.ts nach dem frischen Stand in der Datenbank.
+  // Der Token ist ein von Better Auth signierter JWT (keine ratbare ID). Die
+  // Mail verlinkt /verify, nicht Better Auths GET /verify-email: Bestätigt
+  // wird per Knopf (ARCHITECTURE §5), beide HTTP-Wege sind unten gesperrt.
+  emailVerification: {
+    // Jede Registrierung mit Passwort bekommt die Mail — das sind die Höfe
+    // (registerFarmer); Kundinnen melden sich mit Code an und sind dabei
+    // bestätigt.
+    sendOnSignUp: true,
+    // Der Token beweist das Postfach, er meldet niemanden an.
+    autoSignInAfterVerification: false,
+    expiresIn: BESTAETIGUNG_GUELTIG_SEKUNDEN,
+    sendVerificationEmail: async ({ user, token }) => {
+      // Wie beim Anmeldecode erst NACH der Antwort: Registrieren soll nicht
+      // auf Rendern und Resend warten, und ein Mailfehler darf die
+      // Registrierung nicht scheitern lassen.
+      nachDerAntwort(async () => {
+        try {
+          const link = `${APP_URL}${bestaetigungsPfad(token)}`
+          const { sendEmailBestaetigung } = await import('@/lib/email')
+          const ergebnis = await sendEmailBestaetigung(user.email, link)
+          if (ergebnis.error) meldeBestaetigungsFehler('resend_fehler')
+          // Lokal ohne RESEND_API_KEY steht der Link im Terminal — sonst käme
+          // niemand an ihn heran. Link und Adresse NIE in Produktions-Logs.
+          if (!ergebnis.id && process.env.NODE_ENV !== 'production') {
+            console.log(`[DEV] E-Mail-Bestätigung für ${user.email}: ${link}`)
+          }
+        } catch (err) {
+          console.error('[E-Mail-Bestätigung] E-Mail-Fehler:', err instanceof Error ? err.name : 'unbekannt')
+          meldeBestaetigungsFehler('nachlauf_fehler', err)
+        }
+      })
+    },
+  },
+
   // Was die App nicht anbietet, ist über HTTP gar nicht erreichbar: das
-  // Anfordern neuer Magic Links (E7) und die ungenutzten Code-Wege des
-  // emailOTP-Plugins. Begründung je Pfad in src/lib/anmeldecode.ts.
-  disabledPaths: [...GESPERRTE_AUTH_PFADE],
+  // Anfordern neuer Magic Links (E7), die ungenutzten Code-Wege des
+  // emailOTP-Plugins (Begründung je Pfad in src/lib/anmeldecode.ts) und
+  // Better Auths eigene Wege der E-Mail-Bestätigung (src/lib/email-
+  // bestaetigung.ts) — die ruft nur der Server über auth.api.
+  disabledPaths: [...GESPERRTE_AUTH_PFADE, ...BESTAETIGUNG_GESPERRTE_AUTH_PFADE],
 
   // ROLLEN-TRENNUNG (E7): Höfe und Admins melden sich NIE mit Code an. Das
   // muss vor dem Plugin passieren: Es legt den Code an, BEVOR es
@@ -156,8 +214,8 @@ export const auth = betterAuth({
 
       if (ctx.path !== '/email-otp/send-verification-otp') return
       // Nur die Anmeldung. Der Typ „forget-password" schickte sonst einem Hof
-      // einen Code fürs Passwort, „email-verification" eine Bestätigung, die
-      // es in dieser App nicht gibt.
+      // einen Code fürs Passwort, „email-verification" eine Bestätigung als
+      // Code — bestätigt wird in dieser App nur über den Link (Nr. 17b).
       const body = ctx.body as { type?: unknown; email?: unknown } | undefined
       if (body?.type !== 'sign-in') {
         throw new APIError('BAD_REQUEST', { message: 'Unbekannte Anfrage.' })

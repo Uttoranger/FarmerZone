@@ -16,6 +16,7 @@ import {
   type FarmAktivitaet,
 } from '@/lib/farm-aktivitaet'
 import { DE_ADMIN_KLAERUNG, LAND_LABEL, type Land } from '@/lib/laender'
+import { FREISCHALTUNG_EMAIL_OFFEN_TEXT } from '@/lib/email-bestaetigung'
 import type { AdminMonatsSpalten } from '@/server/queries/admin'
 import { ServicegebuehrEinstellung } from './servicegebuehr-einstellung'
 import { Button } from '@/components/ui/button'
@@ -32,6 +33,9 @@ type Farm = {
   name: string
   slug: string
   ownerEmail: string
+  /** S3 (Nr. 17b): E-Mail des Inhabers bestätigt; offen = Pflicht und noch nicht bestätigt. */
+  emailBestaetigt: boolean
+  emailBestaetigungOffen: boolean
   createdAt: Date
   approvedAt: Date | null
   archivedAt: Date | null
@@ -184,6 +188,12 @@ export function AdminFarmList({
                   <dt className="shrink-0">Inhaber:</dt>
                   <dd className="break-all">{farm.ownerEmail}</dd>
                 </div>
+                <div className="flex gap-1.5 min-w-0">
+                  <dt className="shrink-0">E-Mail bestätigt:</dt>
+                  <dd className={farm.emailBestaetigungOffen ? 'font-medium text-foreground' : undefined}>
+                    {farm.emailBestaetigt ? 'ja' : farm.emailBestaetigungOffen ? 'nein' : 'nein (Konto vor der Pflicht)'}
+                  </dd>
+                </div>
                 <div className="flex gap-1.5">
                   <dt className="shrink-0">Registriert:</dt>
                   <dd>{formatDate(farm.createdAt)}</dd>
@@ -248,12 +258,21 @@ export function AdminFarmList({
                 </p>
               )}
 
+              {/* S3 (Nr. 17b): „Hof online stellen" wartet auf die bestätigte
+                  E-Mail — die Sperre sitzt in approveFarmAction, hier steht
+                  nur, warum der Knopf ruht. */}
+              {farm.approvedAt === null && farm.emailBestaetigungOffen && (
+                <p className="mt-2 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                  {FREISCHALTUNG_EMAIL_OFFEN_TEXT}
+                </p>
+              )}
+
               <div className="mt-3 flex flex-wrap gap-2">
                 {farm.approvedAt === null ? (
                   <>
                     <Button
                       size="sm"
-                      disabled={isPending}
+                      disabled={isPending || farm.emailBestaetigungOffen}
                       onClick={() => setDialog({ farm, action: 'approve' })}
                     >
                       Freischalten

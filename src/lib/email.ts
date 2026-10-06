@@ -14,6 +14,7 @@ import { BestellungVerfallenEmail } from '@/emails/bestellung-verfallen'
 import { CustomerMagicLinkEmail } from '@/emails/customer-magic-link'
 import { AnmeldecodeEmail } from '@/emails/anmeldecode'
 import { PasswordResetEmail } from '@/emails/password-reset'
+import { EmailBestaetigungEmail } from '@/emails/email-bestaetigung'
 import { NewFarmNotificationEmail } from '@/emails/new-farm-notification'
 import { FreischaltungEmail } from '@/emails/freischaltung'
 import { MeldungNotificationEmail } from '@/emails/meldung-notification'
@@ -31,6 +32,7 @@ import { buildMapsUrl } from '@/lib/customer-links'
 import type { MailZahlart } from '@/emails/order-confirmation'
 import { APP_URL } from '@/lib/umgebung-server'
 import { ANMELDECODE_GUELTIG_SEKUNDEN } from '@/lib/anmeldecode'
+import { BESTAETIGUNG_GUELTIG_SEKUNDEN } from '@/lib/email-bestaetigung'
 
 const apiKey = process.env.RESEND_API_KEY
 const resend = apiKey ? new Resend(apiKey) : null
@@ -216,6 +218,16 @@ export async function sendBestellCodeEmail(email: string, code: string): Promise
   const minuten = ANMELDECODE_GUELTIG_SEKUNDEN / 60
   const html = await toHtml(React.createElement(AnmeldecodeEmail, { code, minuten, zweck: 'bestellungen' }))
   return sendRaw(email, 'Dein Code für deine Bestellungen · FarmerZone', html)
+}
+
+/**
+ * „Bestätige deine E-Mail" → neuer Hof (S3, Nachtlauf Nr. 17b). `url` ist die
+ * volle Adresse von /verify mit dem signierten Token. Der Betreff trägt
+ * keinen Link; gibt das Versandergebnis zurück (sendRaw wirft nie).
+ */
+export async function sendEmailBestaetigung(email: string, url: string): Promise<{ id?: string; error?: string }> {
+  const html = await toHtml(React.createElement(EmailBestaetigungEmail, { url, stunden: BESTAETIGUNG_GUELTIG_SEKUNDEN / 3600 }))
+  return sendRaw(email, 'Bestätige deine E-Mail-Adresse · FarmerZone', html)
 }
 
 /** Passwort-Reset → Bauer */

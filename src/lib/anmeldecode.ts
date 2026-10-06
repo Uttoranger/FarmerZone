@@ -222,11 +222,14 @@ export function zielNachAnmeldung(roh: unknown, standard: string = STANDARD_ZIEL
 }
 
 /**
- * Wohin es nach der Hof-Anmeldung geht: ins Dashboard. Einzige Ausnahme ist
+ * Wohin es nach der Hof-Anmeldung geht: ins Dashboard. Ausnahmen sind
  * /teilen — es schickt Abgemeldete mit ?von=/teilen her, damit geteilte Fotos
- * nach dem Anmelden nicht in der Ablage stranden. Streng auf genau diesen
- * Pfad geprüft (unverändert aus dem bisherigen Formular übernommen).
+ * nach dem Anmelden nicht in der Ablage stranden — und /verify (Nr. 17b:
+ * „Erneut senden" braucht die Anmeldung). Streng auf genau diese Pfade
+ * geprüft, nie ein Ziel aus der Adresse ungeprüft.
  */
+const HOF_RUECKKEHR_ZIELE: readonly string[] = ['/teilen', '/verify']
+
 export function zielNachHofAnmeldung(von: string | null): string {
-  return von === '/teilen' ? '/teilen' : '/dashboard'
+  return von !== null && HOF_RUECKKEHR_ZIELE.includes(von) ? von : '/dashboard'
 }

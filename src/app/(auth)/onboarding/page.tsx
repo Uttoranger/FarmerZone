@@ -4,6 +4,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { einrichtenStand, vorname } from '@/lib/einrichten'
 import { ladeEinrichtenHof } from '@/server/queries/einrichten'
+import { ladeBestaetigungsStand, restWartezeitBestaetigung } from '@/server/email-bestaetigung'
 import { getOpenOrdersCount } from '@/server/queries/orders'
 import { isAdminUser } from '@/server/queries/admin'
 import { zaehleZuEntscheiden } from '@/server/queries/meldung'
@@ -40,9 +41,14 @@ export default async function OnboardingPage(): Promise<React.JSX.Element> {
   const rolle = (session.user as typeof session.user & { role?: string }).role
   if (rolle !== 'FARMER') redirect('/login')
 
-  const hof = await ladeEinrichtenHof(session.user.id)
+  const [hof, bestaetigung] = await Promise.all([
+    ladeEinrichtenHof(session.user.id),
+    // S3 (Nr. 17b): frisch aus der Datenbank, nie session.user.emailVerified.
+    ladeBestaetigungsStand(session.user.id),
+  ])
+  const emailOffen = bestaetigung?.offen ?? false
   const person = { name: session.user.name ?? '', email: session.user.email ?? '' }
-  const stand = einrichtenStand({ personName: person.name, email: person.email, hof })
+  const stand = einrichtenStand({ personName: person.name, email: person.email, hof, emailOffen })
   const inhalt = (
     <EinrichtenSeite
       stand={stand}
@@ -50,6 +56,11 @@ export default async function OnboardingPage(): Promise<React.JSX.Element> {
       person={person}
       tarif={hof?.tarif ?? null}
       freigeschaltet={hof?.freigeschaltet ?? false}
+      emailBestaetigung={
+        bestaetigung?.offen
+          ? { email: bestaetigung.email, warteSekunden: await restWartezeitBestaetigung(session.user.id) }
+          : null
+      }
     />
   )
 

@@ -4,6 +4,8 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { MAX_ORIGINAL_BYTES, originalPrefix } from '@/lib/upload-pfade'
+import { UPLOAD_GESPERRT_TEXT } from '@/lib/email-bestaetigung'
+import { emailBestaetigungOffen } from '@/server/email-bestaetigung'
 
 /**
  * Ausgabestelle für signierte Upload-Token.
@@ -18,16 +20,34 @@ import { MAX_ORIGINAL_BYTES, originalPrefix } from '@/lib/upload-pfade'
  * Diese Route vergibt nur die Erlaubnis dafür — und zwar so eng wie möglich.
  */
 
-/** Wer darf hochladen, und für welchen Hof? Eine Antwort für beide Handler. */
-async function hofDerSitzung(): Promise<{ id: string } | null> {
+/**
+ * Wer darf hochladen, und für welchen Hof? Eine Antwort für beide Handler.
+ *
+ * Seit Nr. 17b (S3) zusätzlich: Ein neues Konto lädt erst nach bestätigter
+ * E-Mail-Adresse hoch — frisch aus der Datenbank, nie aus der Sitzung
+ * (Cookie-Cache). Galerie, Produktbilder, Titelbild, Logo, Beiträge und
+ * /teilen nehmen alle diesen Weg (tests/upload-sperre.test.ts).
+ */
+async function hofDerSitzung(): Promise<{ id: string } | 'email-offen' | null> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return null
 
   const rolle = (session.user as typeof session.user & { role?: string }).role
   if (rolle !== 'FARMER') return null
 
-  return prisma.farm.findUnique({ where: { ownerId: session.user.id }, select: { id: true } })
+  const farm = await prisma.farm.findUnique({ where: { ownerId: session.user.id }, select: { id: true } })
+  if (!farm) return null
+  if (await emailBestaetigungOffen(session.user.id)) return 'email-offen'
+  return farm
 }
+
+/** Satz für den Bauern und Code für unseren Client (image-upload.tsx). */
+function emailOffenAntwort(status: number): NextResponse {
+  return NextResponse.json({ error: UPLOAD_GESPERRT_TEXT, code: 'EMAIL_UNBESTAETIGT' }, { status })
+}
+
+/** Erkennbar im catch unten — der Text geht so nicht an den Client. */
+class EmailOffenFehler extends Error {}
 
 /**
  * Die Hof-Kennung für den Client.
@@ -43,6 +63,7 @@ async function hofDerSitzung(): Promise<{ id: string } | null> {
  */
 export async function GET() {
   const farm = await hofDerSitzung()
+  if (farm === 'email-offen') return emailOffenAntwort(403)
   if (!farm) return NextResponse.json({ error: 'Kein Zugriff' }, { status: 403 })
 
   return NextResponse.json({ farmId: farm.id })
@@ -57,6 +78,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       request,
       onBeforeGenerateToken: async (pathname) => {
         const farm = await hofDerSitzung()
+        if (farm === 'email-offen') throw new EmailOffenFehler()
         if (!farm) throw new Error('Kein Zugriff')
 
         // DIE eigentliche Sperre: Der Token gilt ausschließlich für den
@@ -92,6 +114,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(antwort)
   } catch (fehler) {
+    if (fehler instanceof EmailOffenFehler) return emailOffenAntwort(403)
     // Der Wortlaut geht an unseren eigenen Client, nicht an den Bauern — die
     // Meldung für ihn baut der Hook aus der Fehlerart.
     const text = fehler instanceof Error ? fehler.message : 'Upload nicht erlaubt'

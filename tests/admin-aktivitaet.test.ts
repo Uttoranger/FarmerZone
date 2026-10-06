@@ -20,6 +20,7 @@ vi.mock('@/lib/prisma', () => ({
 }))
 
 import { getAdminFarms } from '@/server/queries/admin'
+import { EMAIL_BESTAETIGUNG_STICHTAG } from '@/lib/email-bestaetigung'
 import { aktivitaetsTeile, istOhneInhalt, AKTIVITAET_LEER } from '@/lib/farm-aktivitaet'
 import { prisma } from '@/lib/prisma'
 
@@ -45,7 +46,8 @@ function dbZeile(overrides: Record<string, unknown> = {}) {
     serviceFeePercent: { toString: () => '4.90' },
     serviceFeeMinCents: 50,
     serviceFeeActiveFrom: null,
-    owner: { email: 'franz@test.local' },
+    // Altes Konto ohne Bestätigung — vor dem Stichtag keine Pflicht (S3, 17b).
+    owner: { email: 'franz@test.local', emailVerified: false, createdAt: ANGELEGT },
     _count: { products: 3, farmPhotos: 2, pickupSlots: 1 },
     ...overrides,
   }
@@ -313,5 +315,40 @@ describe('getAdminFarms — das Land des Hofes', () => {
     const hoefe = await getAdminFarms()
 
     expect(hoefe.map((h) => h.land)).toEqual(['AT', 'AT'])
+  })
+})
+
+describe('getAdminFarms — E-Mail bestätigt (S3, Nr. 17b)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    queryRaw.mockResolvedValue([] as never)
+  })
+
+  const NEU = new Date(EMAIL_BESTAETIGUNG_STICHTAG.getTime() + 1)
+
+  it('liest die Bestätigung des Inhabers mit — in derselben Abfrage', async () => {
+    farmFindMany.mockResolvedValue([dbZeile()] as never)
+    await getAdminFarms()
+    expect(farmFindMany).toHaveBeenCalledTimes(1)
+    const arg = farmFindMany.mock.calls[0]?.[0] as { select: { owner: { select: Record<string, boolean> } } }
+    expect(arg.select.owner.select).toMatchObject({ emailVerified: true, createdAt: true })
+  })
+
+  it('neues Konto unbestätigt: nein, Freischalten gesperrt', async () => {
+    farmFindMany.mockResolvedValue([dbZeile({ owner: { email: 'neu@example.com', emailVerified: false, createdAt: NEU } })] as never)
+    const [hof] = await getAdminFarms()
+    expect(hof).toMatchObject({ emailBestaetigt: false, emailBestaetigungOffen: true })
+  })
+
+  it('neues Konto bestätigt: ja, nichts gesperrt', async () => {
+    farmFindMany.mockResolvedValue([dbZeile({ owner: { email: 'neu@example.com', emailVerified: true, createdAt: NEU } })] as never)
+    const [hof] = await getAdminFarms()
+    expect(hof).toMatchObject({ emailBestaetigt: true, emailBestaetigungOffen: false })
+  })
+
+  it('altes Konto unbestätigt: nein, aber nichts gesperrt (bestehende Höfe unberührt)', async () => {
+    farmFindMany.mockResolvedValue([dbZeile()] as never)
+    const [hof] = await getAdminFarms()
+    expect(hof).toMatchObject({ emailBestaetigt: false, emailBestaetigungOffen: false })
   })
 })

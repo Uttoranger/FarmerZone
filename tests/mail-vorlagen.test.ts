@@ -240,6 +240,19 @@ describe('Abholbereit-Mail (Vorlage pickup-reminder.tsx)', () => {
   })
 })
 
+describe('„Bestätige deine E-Mail" (S3, Nr. 17b)', () => {
+  it('ein Knopf auf /verify mit dem Token — nie Better Auths GET-Pfad, ohne Emojis, Betreff ohne Link', async () => {
+    await email.sendEmailBestaetigung('neu@example.com', 'https://farmerzone.example/verify?token=kopf.inhalt.signatur')
+    const { html, text, subject } = zuletzt()
+    expect(text).toContain('Bestätige deine E-Mail-Adresse')
+    expect(text).toContain('24 Stunden')
+    expect(links(html).map((l) => `${l.pathname}${l.search}`)).toEqual(['/verify?token=kopf.inhalt.signatur'])
+    expect(html).not.toContain('verify-email')
+    expect(subject).not.toMatch(/https?:|token/i)
+    expect(BILDZEICHEN.test(`${subject} ${text}`)).toBe(false)
+  })
+})
+
 describe('Quelltext der Vorlagen', () => {
   const ORDNER = join(process.cwd(), 'src', 'emails')
   const vorlagen = readdirSync(ORDNER).filter((n) => n.endsWith('.tsx'))

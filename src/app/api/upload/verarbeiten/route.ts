@@ -12,6 +12,8 @@ import {
   istUploadZweck,
   zielPfad,
 } from '@/lib/upload-pfade'
+import { UPLOAD_GESPERRT_TEXT } from '@/lib/email-bestaetigung'
+import { emailBestaetigungOffen } from '@/server/email-bestaetigung'
 
 /**
  * Verkleinert ein hochgeladenes Original und legt das Ergebnis ab.
@@ -69,6 +71,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   })
   if (!farm) {
     return NextResponse.json({ error: 'Kein Hof gefunden', art: 'server' }, { status: 403 })
+  }
+
+  // S3 (Nr. 17b): Ohne bestätigte E-Mail gibt es schon keinen Upload-Token
+  // (api/upload/token) — die Sperre hier fängt Originale ab, die auf anderem
+  // Weg im Ordner lägen. Frisch aus der Datenbank, nie aus der Sitzung.
+  if (await emailBestaetigungOffen(session.user.id)) {
+    return NextResponse.json({ error: UPLOAD_GESPERRT_TEXT, code: 'EMAIL_UNBESTAETIGT', art: 'server' }, { status: 403 })
   }
 
   let daten: { url?: unknown; zweck?: unknown; altUrl?: unknown }

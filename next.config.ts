@@ -135,6 +135,16 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // „E-Mail bestätigen" (S3, Nr. 17b): Der Link aus der Mail trägt einen
+        // gültigen Token (?token=). Beim Klick hinaus geht er nicht als
+        // Referrer mit, und die Seite kommt in keinen Suchindex.
+        source: '/verify',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        ],
+      },
+      {
         source: '/api/orders/confirm/:token',
         headers: [
           { key: 'Referrer-Policy', value: 'no-referrer' },

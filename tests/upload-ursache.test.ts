@@ -16,6 +16,7 @@ const { upload } = vi.hoisted(() => ({ upload: vi.fn() }))
 vi.mock('@vercel/blob/client', () => ({ upload }))
 
 import { ladeFotoHoch } from '@/components/shared/image-upload'
+import { UPLOAD_GESPERRT_TEXT } from '@/lib/email-bestaetigung'
 import {
   bildFehlerArtVon,
   IMAGE_NETWORK_ERROR,
@@ -400,6 +401,18 @@ describe('Kennung — auch dort bleibt die Ursache erhalten', () => {
       schritt: 'kennung',
       anlaeufe: [{ klasse: 'HttpAntwort', meldung: 'Kennung abgelehnt', status: 403, dauerMs: 250 }],
     })
+  })
+
+  it('ohne bestätigte E-Mail (S3, Nr. 17b): der Satz aus unserer Quelle, nicht „Kein Zugriff"', async () => {
+    vi.stubGlobal(
+      'fetch',
+      routen({ kennung: () => nach(250, () => json({ error: 'beliebiger Text', code: 'EMAIL_UNBESTAETIGT' }, 403)) })
+    )
+
+    const { fehler } = await lauf(ladeFrisch)
+
+    expect(fehler?.message).toBe(UPLOAD_GESPERRT_TEXT)
+    expect(upload).not.toHaveBeenCalled()
   })
 
   it('nennt den Netzfehler mit seiner Klasse', async () => {

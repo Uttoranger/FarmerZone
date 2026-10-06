@@ -11,6 +11,7 @@ import { bestaetigteAdresse } from '@/server/kunden-adresse'
 // der Datenbank geprüft, nie aus der Sitzung (bestaetigteAdresse).
 const ADRESSE_UNBESTAETIGT = 'Melde dich bitte mit dem Code aus deiner E-Mail an, dann kannst du deine Abos ändern.'
 const KONTO_ADRESSE_UNBESTAETIGT = 'Melde dich bitte mit dem Code aus deiner E-Mail an, dann kannst du dein Konto löschen.'
+const KONTO_NUR_KUNDIN = 'Ein Hof-Konto lässt sich hier nicht löschen. Schreib uns, wir helfen dir weiter.'
 
 export type ActionResult = { error?: string }
 
@@ -58,8 +59,19 @@ export async function deleteCustomerAccount(): Promise<ActionResult> {
   const email = await bestaetigteAdresse(session.user.id)
   if (!email) return { error: KONTO_ADRESSE_UNBESTAETIGT }
 
-  await prisma.customerFarmSubscription.deleteMany({ where: { customerEmail: email } })
-  await prisma.user.delete({ where: { id: session.user.id } })
+  // Nur Kundinnen-Konten (Nr. 17b). Seit neue Höfe ihre E-Mail bestätigen,
+  // reicht die bestätigte Adresse als Schutz nicht mehr: Ein Hof löschte
+  // sonst die Abos zu seiner Adresse und scheiterte danach am Konto
+  // (Farm.ownerId ist RESTRICT); ein Betreiber-Konto (isAdmin) gehört nie
+  // hierher. Frisch aus der Datenbank, nie aus der Sitzung.
+  const konto = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true, isAdmin: true } })
+  if (konto?.role !== 'CUSTOMER' || konto.isAdmin) return { error: KONTO_NUR_KUNDIN }
+
+  // Zusammen oder gar nicht — nie Abos weg und Konto noch da (oder umgekehrt).
+  await prisma.$transaction([
+    prisma.customerFarmSubscription.deleteMany({ where: { customerEmail: email } }),
+    prisma.user.delete({ where: { id: session.user.id } }),
+  ])
 
   return {}
 }
