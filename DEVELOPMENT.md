@@ -4267,6 +4267,16 @@ Die sieben Punkte aus Morgenbericht Lauf 4 §7 (dort „Altlasten, nicht behoben
 - **Kalender ohne signierten Link.** Die ICS-Datei nennt in `DESCRIPTION` nur noch die Bestellnummer und den Hinweis auf die Bestätigungs-Mail: Kalender werden synchronisiert und geteilt, der signierte Link öffnete dort Name, E-Mail und Beträge. Einen Termin gibt es nur noch für PAID, CONFIRMED, IN_PREPARATION und READY (`kalenderTerminGilt`, auch für den Knopf der Bestätigungsseite) — eine offene Bestellung ist vor ihrer Frist nicht bestätigt und danach verfallen, also nie ein Termin; das ist strenger als eine eigene Fristrechnung und braucht keinen Cron. Abgeholt zeigt die Seite den Knopf nicht mehr. Ein Rate-Limit bekommt die Route nicht: Sie liest nur, und ohne gültige Signatur fragt sie nicht einmal die Datenbank.
 - **Admin-Knopf „Ablehnen & löschen":** rote Schrift jetzt auf `bg-card` in beiden Themes und beim Darüberfahren (Rückmeldung per Unterstreichung) — 4,76:1 hell, 6,2:1 dunkel; vorher 4,27:1 auf Crème.
 
+## Kunden und Kundendetail in der HofShell (Nachtlauf Nr. 22a, Oktober 2026)
+
+Gate 8 „Code ohne Mockup": `/customers` und `/customers/[kundeId]` sind von `(farmer)` nach `(hof)` gezogen (Adressen gleich) und nach DESIGN_SYSTEM.md neu gezeichnet. Keine neue Funktion, keine Schema-Änderung, keine Migration.
+
+- **Fachregel Kundin:** alle Bestellungen eines Hofs mit derselben E-Mail, normalisiert klein und ohne Rand (`kundenSchluessel`, wie die Kennung). Vorher fasste die Liste nur nach Kleinschreibung zusammen (eine Bestellung unter „erika@… " mit Leerzeichen war eine zweite Kundin), und das Detail suchte per ILIKE nur eine Schreibweise (im Integrationstest gegengeprüft). Seit dem Checkout mit `emailSchema` entstehen solche Schreibweisen nicht mehr; es geht um Altbestand. Status unverändert: Stammkunde ab 3 Bestellungen, Neu bei genau einer jünger als 14 Tage, Lange nicht gesehen ab 2 Bestellungen und über 60 Tagen, Diesen Monat aktiv bis 30 Tage. Umsatz = Warenpreis (`totalAmount`, nach „Artikel fehlt" der aktuelle Stand) ohne Storno und Nicht-Abholung; Lieblingsprodukte ohne Storno und ohne fehlende Artikel.
+- **Geld in Cent:** `totalSpent`/`totalAmount` als `Number(Decimal)` sind ersetzt durch `umsatzCents`/`betragCents` über `alsCents`; Anzeige über `centsAlsEuro` + `formatEuro`.
+- **ILIKE-Altlast aus Lauf 2 erledigt:** Das Detail fragt die genauen Schreibweisen ab (`findeKundenAdressen` → `customerEmail: { in }`), das Abo mit `genauesIlikeMuster`. „a_b@…" und „axb@…" bleiben zwei Kundinnen.
+- **Kleinkorrekturen beim Umbau:** „N weitere Bestellungen" zählt jetzt alle Bestellungen (vorher höchstens fünf, weil nur zehn geladen waren); „Kunde seit" rechnet in Wiener Zeit; der Link dorthin öffnet `/orders?filter=alle` (der Standardfilter „Offen" hätte die alten Bestellungen versteckt). Die Spaltensortierung der Tabelle (auf- und absteigend je Spalte) ist eine Sortierwahl für alle Breiten geworden (dieselben fünf Reihenfolgen wie bisher am Handy).
+- Entfernt: `customers-client.tsx` (Farbliterale, aus `FARBLITERAL_BESTAND` gestrichen) und `src/components/customers/customers-table.tsx`.
+
 ## Nützliche Befehle
 
 ```bash
