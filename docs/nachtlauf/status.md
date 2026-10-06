@@ -21,7 +21,7 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 14 | Konto und Meine Höfe | fertig | `nacht/2026-10-05/14-bestellungen-finden` | #178 | 13 (#177) | laut Freigabe ersetzt durch „Bestellungen finden“ per Code (kein Konto) + /account im neuen Design; Slug `bestellungen` in Produktion prüfen | 05.10.2026 |
 | 15 | Für Höfe, Registrieren, Einrichten | fertig (Entwurf) | `nacht/2026-10-06/15-fuer-hoefe` | #179 | 14 (#178) | Konditionen: Tarife (öffentlich) vs. Gründungsplatz (Admin) entscheiden; Pilothof; S3 offen | 06.10.2026 |
 | 16 | Mein Hof | fertig | `nacht/2026-10-06/16-mein-hof` | #180 | 15 (#179) | erste Route in HofShell (`(hof)`); Handy: Bearbeiten unter Checkliste entscheiden | 06.10.2026 |
-| 17 | Heute | läuft | `nacht/2026-10-06/17-heute` | | 16 (#180) | | 06.10.2026 |
+| 17 | Heute | fertig | `nacht/2026-10-06/17-heute` | #181 | 16 (#180) | Stripe-Hinweis: Bestandsregel mit Konto statt wörtlicher Gate-Bedingung entscheiden; Teilen abschaltbar → Gate 7 | 06.10.2026 |
 | 18 | Produkte | offen | | | | | |
 | 19 | Bestellungen | offen | | | | | |
 | 20 | Futter und Brennmaterial | offen | | | | | |
