@@ -38,16 +38,6 @@ export function onlineZahlungPausiert(hof: {
 }
 
 /**
- * Der Hinweis auf Heute — ein Satz, ohne Fachbegriffe. Ohne Barzahlung gibt
- * es keinen Ausweg für die Kunden; dann darf der Satz ihn nicht versprechen.
- */
-export function onlinePausiertText(barMoeglich: boolean): string {
-  return barMoeglich
-    ? 'Online-Zahlung ist pausiert – Stripe braucht noch Angaben von dir. Bis dahin können Kunden nur bar bei Abholung bestellen.'
-    : 'Online-Zahlung ist pausiert – Stripe braucht noch Angaben von dir. Bis dahin können Kunden bei dir nicht bestellen.'
-}
-
-/**
  * Antwort des Checkouts, wenn Stripe den Zahlungsvorgang nicht anlegen
  * konnte — Code für den Browser, Satz für die Kundin.
  */
@@ -60,9 +50,10 @@ export function zahlungNichtMoeglichText(barMoeglich: boolean): string {
 }
 
 /**
- * Derselbe Hinweis als Titel und Satz für die Hinweiskarte auf Heute (Mockup
- * „Online-Zahlung pausiert", Nachtlauf Nr. 17). Der Satz folgt derselben
- * Regel wie onlinePausiertText: ohne Barzahlung kein Ausweg versprochen.
+ * Der Hinweis auf Heute als Titel und Satz für die Hinweiskarte (Mockup
+ * „Online-Zahlung pausiert", Nachtlauf Nr. 17), ohne Fachbegriffe. Ohne
+ * Barzahlung gibt es keinen Ausweg für die Kunden; dann darf der Satz ihn
+ * nicht versprechen.
  */
 export function onlinePausiertHinweis(barMoeglich: boolean): { titel: string; satz: string } {
   return {

@@ -66,7 +66,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
     ersteSchritteAusgeblendet(cookieJar.get(ERSTE_SCHRITTE_AUS_COOKIE)?.value, farm.id)
   )
 
-  const teilen = teilenKarte({ oeffentlich: heute.hof.oeffentlich, abholtag: heute.abholfensterHeute !== null })
+  const teilen = teilenKarte({ sichtbar: heute.hof.sichtbar, abholtag: heute.abholfensterHeute !== null })
   const aufbau = heuteAufbau({
     stripeHinweis: heute.onlinePausiert !== null,
     teilen,
@@ -129,7 +129,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
         )}
       </div>
 
-      {freischaltMomentMoeglich({ approvedAt: heute.hof.approvedAt, oeffentlich: heute.hof.oeffentlich }, jetzt) && (
+      {freischaltMomentMoeglich({ approvedAt: heute.hof.approvedAt, sichtbar: heute.hof.sichtbar }, jetzt) && (
         <FreischaltMoment farmId={farm.id} hofName={farm.name} hofSlug={farm.slug} />
       )}
     </div>

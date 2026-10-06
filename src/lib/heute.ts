@@ -11,6 +11,8 @@ import { tagVersetzt, wienKalendertag } from '@/lib/kalender'
 import { wienerMitternacht } from '@/lib/servicegebuehr'
 import { wienerZeitpunkt } from '@/lib/fristen'
 import { formatSlotTime } from '@/lib/pickup-days'
+import { hofZustand } from '@/lib/mein-hof'
+import { summeCent, type UmsatzBuchung } from '@/lib/umsatz'
 
 // ─── Tage ───────────────────────────────────────────────────────────────────
 
@@ -141,12 +143,6 @@ export function positionenKurz(items: readonly { productName: string; quantity: 
 }
 
 export type AbholChip = 'bereit' | 'vorbereiten' | 'wartet'
-
-export const ABHOL_CHIP_TEXT: Record<AbholChip, string> = {
-  bereit: 'bereit',
-  vorbereiten: 'vorbereiten',
-  wartet: 'wartet auf Kunde',
-}
 
 /**
  * Der Chip einer heutigen Abholung. PENDING_CONFIRMATION heißt: Die Kundin
@@ -326,16 +322,6 @@ export function wochenvergleich(dieseWocheCent: number, vorwocheCent: number): W
 
 // ─── Kopf ───────────────────────────────────────────────────────────────────
 
-function wienStunde(jetzt: Date): number {
-  return Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Vienna', hour: 'numeric', hourCycle: 'h23' }).format(jetzt))
-}
-
-/** Gruß nach der Wiener Uhrzeit. */
-export function begruessung(jetzt: Date): string {
-  const stunde = wienStunde(jetzt)
-  return stunde < 12 ? 'Guten Morgen' : stunde < 18 ? 'Guten Tag' : 'Guten Abend'
-}
-
 /** „Montag, 28. September 2026" — in Wien. */
 export function datumLang(jetzt: Date): string {
   return new Intl.DateTimeFormat('de-AT', {
@@ -468,24 +454,71 @@ export function naechstesAbholfenster(slots: readonly HeuteFenster[], jetzt: Dat
   return null
 }
 
+/**
+ * Wie viele Bestellungen auf das nächste Fenster warten: liegt es heute, die
+ * Packliste (ohne Abgeholte, Stornierte, Nicht-Abgeholte — packliste); liegt
+ * es später, die Zahl des nächsten Abholtags mit Bestellungen, aber nur, wenn
+ * das genau dieser Tag ist. Sonst 0 — nie die Bestellungen eines anderen Tags.
+ */
+export function fensterAnzahl(
+  fenster: NaechstesFenster | null,
+  heuteKalendertag: string,
+  heutige: readonly PacklistenZeile[],
+  naechsteAbholung: NaechsteAbholung | null
+): number {
+  if (!fenster) return 0
+  if (fenster.tag === heuteKalendertag) return heutige.length
+  return naechsteAbholung?.tag === fenster.tag ? naechsteAbholung.anzahl : 0
+}
+
+// ─── Umsatz heute ───────────────────────────────────────────────────────────
+
+/**
+ * „Umsatz heute": von Wiener Mitternacht bis jetzt, nach der gemeinsamen
+ * Umsatzregel (summeCent — Abholungen nach pickedUpAt, manuelle Verkäufe mit
+ * ihrem ganzen Wiener Tag). Welche Bestellungen Buchungen sind (nur
+ * PICKED_UP), entscheidet umsatzBestellungWhere in der Abfrage.
+ */
+export function umsatzHeuteCent(buchungen: UmsatzBuchung[], jetzt: Date): number {
+  return summeCent(buchungen, { von: abholtage(jetzt).heute.von, bis: jetzt })
+}
+
 // ─── Teilen-Karte ───────────────────────────────────────────────────────────
 
 export type TeilenForm = 'schmal' | 'gross' | null
 
 /**
- * DESIGN_SYSTEM „Teilen": groß an Tagen ohne Abholung, schmale orange Zeile an
- * Abholtagen — die Packliste hat Vorrang. Nie, solange der Hof nicht
- * öffentlich ist (hofZustand): ein Link ins Leere wäre irreführend.
+ * Sehen Kunden den Hof und können sie bei ihm bestellen? Nur im Zustand
+ * „sichtbar" (hofZustand). Pausiert ist die Hofseite zwar öffentlich, aber
+ * Kunden können gerade nicht bestellen — Teilen und „Ab jetzt können Kunden
+ * bei dir bestellen" wären dort falsch.
  */
-export function teilenKarte({ oeffentlich, abholtag }: { oeffentlich: boolean; abholtag: boolean }): TeilenForm {
-  if (!oeffentlich) return null
+export function heuteHofSichtbar(hof: {
+  isActive: boolean
+  isPaused: boolean
+  approvedAt: Date | null
+  archivedAt: Date | null
+}): boolean {
+  return hofZustand(hof).art === 'sichtbar'
+}
+
+/**
+ * DESIGN_SYSTEM „Teilen": groß an Tagen ohne Abholung, schmale orange Zeile an
+ * Abholtagen — die Packliste hat Vorrang. Nie, solange der Hof nicht sichtbar
+ * ist (heuteHofSichtbar): ein Link ins Leere oder auf einen pausierten Hof
+ * wäre irreführend.
+ */
+export function teilenKarte({ sichtbar, abholtag }: { sichtbar: boolean; abholtag: boolean }): TeilenForm {
+  if (!sichtbar) return null
   return abholtag ? 'schmal' : 'gross'
 }
 
 /** „Eier, Erdäpfel, Heu – Abholung Samstag, 9–12 Uhr" — was es gibt und wann man es holt. */
 export function teilenSatz(angebot: readonly string[], fenster: NaechstesFenster | null): string {
   const was = angebot.join(', ')
-  const wann = fenster ? `Abholung ${fenster.name}, ${fenster.zeit}` : ''
+  // Mitten im Satz klein: „Abholung heute, …", „Abholung morgen, …" — Wochentage bleiben groß.
+  const tag = fenster && (fenster.name === 'Heute' || fenster.name === 'Morgen') ? fenster.name.toLowerCase() : fenster?.name
+  const wann = fenster ? `Abholung ${tag}, ${fenster.zeit}` : ''
   if (was && wann) return `${was} – ${wann}`
   return was || wann || 'Erzähl deinen Kunden, was es bei dir gibt.'
 }

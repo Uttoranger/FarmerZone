@@ -18,15 +18,6 @@ export function centAusDecimal(betrag: Prisma.Decimal | null): number {
   return betrag ? decimalZuCents(betrag) : 0
 }
 
-/** Umsatz eines Fensters in Cent: abgeholte Bestellungen plus manuelle Verkäufe. */
-export async function umsatzCent(farmId: string, fenster: Umsatzfenster): Promise<number> {
-  const [bestellungen, verkaeufe] = await Promise.all([
-    prisma.order.aggregate({ where: umsatzBestellungWhere(farmId, fenster), _sum: { totalAmount: true } }),
-    prisma.manualSale.aggregate({ where: umsatzVerkaufWhere(farmId, fenster), _sum: { totalAmount: true } }),
-  ])
-  return centAusDecimal(bestellungen._sum.totalAmount) + centAusDecimal(verkaeufe._sum.totalAmount)
-}
-
 /** Alle Buchungen eines Fensters, einzeln — für Balken, Kanäle und den fairen Vergleich im Speicher. */
 export async function umsatzBuchungen(farmId: string, fenster: Umsatzfenster): Promise<UmsatzBuchung[]> {
   const [bestellungen, verkaeufe] = await Promise.all([

@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
  * „Dein Hof ist online!" (Mockup web-h1-freigeschaltet-jetzt-teilen,
  * Nachtlauf Nr. 17). Die Seite bindet ihn nur ein, wenn der Server
  * `freischaltMomentMoeglich` bejaht hat (Zeitfenster nach der Freigabe, Hof
- * öffentlich); hier zählt nur noch der Merker des Geräts. Er wird gesetzt,
+ * sichtbar, nicht pausiert); hier zählt nur noch der Merker des Geräts. Er wird gesetzt,
  * sobald der Moment aufgeht — höchstens einmal, auch wenn die Seite danach
  * ohne Schließen neu lädt. Ohne lesbaren Speicher kommt er gar nicht.
  *
@@ -43,7 +43,7 @@ export function FreischaltMoment({
   useEffect(() => {
     // Der Speicher existiert erst im Browser — deshalb nach dem Einhängen, nie beim Rendern.
     const speicher = browserSpeicher()
-    if (!freischaltMomentOeffnen(true, leseFreischaltGesehen(speicher, farmId))) return
+    if (!freischaltMomentOeffnen(leseFreischaltGesehen(speicher, farmId))) return
     merkeFreischaltGesehen(speicher, farmId)
     // eslint-disable-next-line react-hooks/set-state-in-effect -- einmaliges Öffnen nach dem Lesen des Gerätespeichers, den der Server nicht kennt
     setOffen(true)

@@ -178,10 +178,11 @@ export function TeilenKarte({
           href={`/${hofSlug}`}
           target="_blank"
           rel="noopener noreferrer"
-          className={cn('mt-1 block max-w-full truncate rounded-md text-[13px] font-medium text-status-fertig underline-offset-2 hover:underline', FOKUS_RAHMEN)}
+          // min-h-11: 44 px Trefferfläche; der Text kürzt im inneren span (truncate braucht block).
+          className={cn('flex min-h-11 max-w-full items-center rounded-md text-[13px] font-medium text-status-fertig underline-offset-2 hover:underline', FOKUS_RAHMEN)}
           title={adresse}
         >
-          {adresse}
+          <span className="min-w-0 truncate">{adresse}</span>
         </a>
       </div>
       <HofTeilenKnopf name={hofName} slug={hofSlug} label="Hof teilen" className={cn(KNOPF_ORANGE, 'w-full rounded-[14px]')} />

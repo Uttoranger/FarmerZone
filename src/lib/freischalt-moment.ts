@@ -5,7 +5,8 @@
  * Es gibt kein Feld „gesehen" in der Datenbank, und eine Schema-Änderung ist in
  * diesem Gate nicht vorgesehen. Deshalb zwei Bedingungen, beide nötig:
  *  - Zeitfenster: nur in den ersten FREISCHALT_MOMENT_TAGE Tagen nach
- *    `approvedAt` (Server entscheidet, mit dem Zeitpunkt der Seite). So sieht
+ *    `approvedAt` und nur bei sichtbarem (nicht pausiertem) Hof — der Server
+ *    entscheidet, mit dem Zeitpunkt der Seite. So sieht
  *    ein Hof, der lange freigeschaltet ist, ihn auf einem neuen Gerät nie.
  *  - Gerätemerker im localStorage, je Hof ein Schlüssel. Fehlt der Speicher
  *    oder wirft er (privates Fenster, gesperrte Website-Daten), erscheint der
@@ -20,12 +21,17 @@ import { freischaltGesehenSchema } from '@/schemas/freischalt-moment'
 export const FREISCHALT_MOMENT_TAGE = 14
 const FENSTER_MS = FREISCHALT_MOMENT_TAGE * 24 * 60 * 60 * 1000
 
-/** Darf der Moment überhaupt kommen? Öffentlich, freigeschaltet, Freigabe jünger als das Zeitfenster. */
+/**
+ * Darf der Moment überhaupt kommen? Hof sichtbar (heuteHofSichtbar: nicht
+ * pausiert — sonst stimmt „Ab jetzt können Kunden bei dir bestellen" nicht),
+ * freigeschaltet, Freigabe jünger als das Zeitfenster. Entscheidet der
+ * Server; die Seite bindet den Moment nur dann ein.
+ */
 export function freischaltMomentMoeglich(
-  hof: { approvedAt: Date | null; oeffentlich: boolean },
+  hof: { approvedAt: Date | null; sichtbar: boolean },
   jetzt: Date
 ): boolean {
-  if (!hof.oeffentlich || !hof.approvedAt) return false
+  if (!hof.sichtbar || !hof.approvedAt) return false
   const seit = jetzt.getTime() - hof.approvedAt.getTime()
   return seit >= 0 && seit < FENSTER_MS
 }
@@ -67,7 +73,11 @@ export function merkeFreischaltGesehen(speicher: Speicher | null, farmId: string
   }
 }
 
-/** Öffnen nur, wenn er kommen darf und das Gerät ihn sicher noch nicht gezeigt hat. */
-export function freischaltMomentOeffnen(moeglich: boolean, gesehen: FreischaltGesehen): boolean {
-  return moeglich && gesehen === 'nein'
+/**
+ * Öffnen nur, wenn das Gerät ihn sicher noch nicht gezeigt hat. Ob er kommen
+ * DARF, steht vorher fest (freischaltMomentMoeglich auf dem Server) — die
+ * Komponente gibt es nur in diesem Fall.
+ */
+export function freischaltMomentOeffnen(gesehen: FreischaltGesehen): boolean {
+  return gesehen === 'nein'
 }

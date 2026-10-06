@@ -34,18 +34,22 @@ vi.mock('next/link', () => ({
 import {
   PACK_MARKE,
   abholfensterHeute,
+  fensterAnzahl,
   fensterText,
   heuteAufbau,
+  heuteHofSichtbar,
   naechstesAbholfenster,
   packliste,
   packlistenZahlen,
   teilenKarte,
   teilenSatz,
+  umsatzHeuteCent,
   wochenBalken,
   type PacklistenBestellung,
   type PacklistenZeile,
 } from '@/lib/heute'
 import { onlinePausiertHinweis, onlineZahlungPausiert } from '@/lib/stripe-konto'
+import { umsatzBestellungWhere } from '@/lib/umsatz'
 import {
   FREISCHALT_MOMENT_TAGE,
   freischaltMomentMoeglich,
@@ -150,11 +154,23 @@ describe('Abholfenster — Wiener Wochentag', () => {
 // ─── Teilen-Karte ───────────────────────────────────────────────────────────
 
 describe('Teilen-Karte', () => {
-  it('schmal an Abholtagen, groß sonst — nur wenn der Hof öffentlich ist', () => {
-    expect(teilenKarte({ oeffentlich: true, abholtag: true })).toBe('schmal')
-    expect(teilenKarte({ oeffentlich: true, abholtag: false })).toBe('gross')
-    expect(teilenKarte({ oeffentlich: false, abholtag: true })).toBeNull()
-    expect(teilenKarte({ oeffentlich: false, abholtag: false })).toBeNull()
+  it('schmal an Abholtagen, groß sonst — nur wenn Kunden den Hof sehen und bei ihm bestellen können', () => {
+    expect(teilenKarte({ sichtbar: true, abholtag: true })).toBe('schmal')
+    expect(teilenKarte({ sichtbar: true, abholtag: false })).toBe('gross')
+    expect(teilenKarte({ sichtbar: false, abholtag: true })).toBeNull()
+    expect(teilenKarte({ sichtbar: false, abholtag: false })).toBeNull()
+  })
+
+  it('sichtbar heißt: freigegeben, aktiv, nicht stillgelegt und NICHT pausiert', () => {
+    const freigabe = new Date('2026-10-01T09:00:00Z')
+    const basis = { isActive: true, isPaused: false, approvedAt: freigabe, archivedAt: null }
+    expect(heuteHofSichtbar(basis)).toBe(true)
+    // Pausiert ist öffentlich (die Hofseite steht), aber Kunden können nicht bestellen —
+    // „Ab jetzt können Kunden bei dir bestellen" und Teilen wären dort falsch.
+    expect(heuteHofSichtbar({ ...basis, isPaused: true })).toBe(false)
+    expect(heuteHofSichtbar({ ...basis, approvedAt: null })).toBe(false)
+    expect(heuteHofSichtbar({ ...basis, isActive: false })).toBe(false)
+    expect(heuteHofSichtbar({ ...basis, archivedAt: freigabe })).toBe(false)
   })
 
   it('Satz aus Angebot und nächster Abholung, ohne beides ein Aufruf', () => {
@@ -163,6 +179,12 @@ describe('Teilen-Karte', () => {
     expect(teilenSatz([], fenster)).toBe('Abholung Samstag, 9–12 Uhr')
     expect(teilenSatz(['Eier'], null)).toBe('Eier')
     expect(teilenSatz([], null)).toBe('Erzähl deinen Kunden, was es bei dir gibt.')
+  })
+
+  it('„heute" und „morgen" mitten im Satz klein, Wochentage groß', () => {
+    expect(teilenSatz(['Eier'], { tag: '2026-10-06', name: 'Heute', zeit: '15–18 Uhr' })).toBe('Eier – Abholung heute, 15–18 Uhr')
+    expect(teilenSatz([], { tag: '2026-10-07', name: 'Morgen', zeit: '15–18 Uhr' })).toBe('Abholung morgen, 15–18 Uhr')
+    expect(teilenSatz([], { tag: '2026-10-13', name: 'Dienstag, 13. Oktober', zeit: '15–18 Uhr' })).toBe('Abholung Dienstag, 13. Oktober, 15–18 Uhr')
   })
 })
 
@@ -234,7 +256,7 @@ describe('Stripe-Hinweis', () => {
 describe('Freischaltungs-Moment', () => {
   const freigabe = new Date('2026-10-01T09:00:00Z')
   const tag = 24 * 60 * 60 * 1000
-  const oeffentlich = { approvedAt: freigabe, oeffentlich: true }
+  const oeffentlich = { approvedAt: freigabe, sichtbar: true }
 
   it('nur im Zeitfenster nach der Freigabe', () => {
     expect(FREISCHALT_MOMENT_TAGE).toBe(14)
@@ -244,9 +266,11 @@ describe('Freischaltungs-Moment', () => {
     expect(freischaltMomentMoeglich(oeffentlich, new Date(freigabe.getTime() - 1))).toBe(false)
   })
 
-  it('nicht ohne Freigabe und nicht, solange der Hof nicht öffentlich ist', () => {
-    expect(freischaltMomentMoeglich({ approvedAt: null, oeffentlich: false }, freigabe)).toBe(false)
-    expect(freischaltMomentMoeglich({ approvedAt: freigabe, oeffentlich: false }, freigabe)).toBe(false)
+  it('nicht ohne Freigabe und nicht, solange der Hof nicht sichtbar ist (auch nicht pausiert)', () => {
+    expect(freischaltMomentMoeglich({ approvedAt: null, sichtbar: false }, freigabe)).toBe(false)
+    expect(freischaltMomentMoeglich({ approvedAt: freigabe, sichtbar: false }, freigabe)).toBe(false)
+    const pausiert = heuteHofSichtbar({ isActive: true, isPaused: true, approvedAt: freigabe, archivedAt: null })
+    expect(freischaltMomentMoeglich({ approvedAt: freigabe, sichtbar: pausiert }, freigabe)).toBe(false)
   })
 
   type Speicher = Pick<Storage, 'getItem' | 'setItem'>
@@ -276,10 +300,14 @@ describe('Freischaltungs-Moment', () => {
   })
 
   it('öffnet nur bei „noch nicht gesehen" — fehlender oder werfender Speicher zeigt ihn nie', () => {
-    expect(freischaltMomentOeffnen(true, 'nein')).toBe(true)
-    expect(freischaltMomentOeffnen(true, 'ja')).toBe(false)
-    expect(freischaltMomentOeffnen(true, 'unbekannt')).toBe(false)
-    expect(freischaltMomentOeffnen(false, 'nein')).toBe(false)
+    expect(freischaltMomentOeffnen('nein')).toBe(true)
+    expect(freischaltMomentOeffnen('ja')).toBe(false)
+    expect(freischaltMomentOeffnen('unbekannt')).toBe(false)
+  })
+
+  it('ob er überhaupt kommen darf, entscheidet allein der Server: die Seite bindet ihn nur dann ein', () => {
+    const seite = quelle('src/app/(hof)/dashboard/page.tsx')
+    expect(seite).toMatch(/freischaltMomentMoeglich\([\s\S]*?\) && \(\s*<FreischaltMoment/)
   })
 
   it('merkt sich das Zeigen und wirft nie', () => {
@@ -296,6 +324,80 @@ describe('Freischaltungs-Moment', () => {
     expect(moment).not.toMatch(/wa\.me|whatsapp|plakat|qrcode/i)
     expect(moment).toContain('Dein Hof ist online!')
     expect(moment).toContain('Später')
+  })
+})
+
+// ─── Nächstes Fenster: Bestellungen ────────────────────────────────────────
+
+describe('fensterAnzahl — wie viele Bestellungen auf das nächste Fenster warten', () => {
+  const heute = '2026-10-06'
+  const fenster = (tag: string) => ({ tag, name: 'x', zeit: '15–18 Uhr' })
+  const zeilenAus = (status: string[]) =>
+    packliste(
+      status.map((s, i) => ({
+        id: `b${i}`,
+        status: s,
+        customerName: 'Test Kunde',
+        pickupTimeStart: '15:00',
+        pickupTimeEnd: '18:00',
+        paymentMethod: 'ONSITE_CASH',
+        items: [],
+        gesamtCents: 100,
+      }))
+    )
+
+  it('heute: die Packliste — Abgeholte, Stornierte und Nicht-Abgeholte zählen nicht', () => {
+    const zeilen = zeilenAus(['CONFIRMED', 'READY', 'PENDING_CONFIRMATION', 'PICKED_UP', 'CANCELLED', 'NOT_PICKED_UP'])
+    expect(fensterAnzahl(fenster(heute), heute, zeilen, null)).toBe(3)
+  })
+
+  it('ein späterer Tag: die Zahl des nächsten Abholtags, wenn er genau dieser Tag ist, sonst 0', () => {
+    const naechste = { tag: '2026-10-08', name: 'Donnerstag', anzahl: 4 }
+    expect(fensterAnzahl(fenster('2026-10-08'), heute, [], naechste)).toBe(4)
+    // Das Fenster ist Mittwoch, die Bestellungen gelten erst Donnerstag.
+    expect(fensterAnzahl(fenster('2026-10-07'), heute, [], naechste)).toBe(0)
+    expect(fensterAnzahl(fenster('2026-10-07'), heute, [], null)).toBe(0)
+  })
+
+  it('heutige Bestellungen zählen nicht für ein Fenster an einem anderen Tag', () => {
+    expect(fensterAnzahl(fenster('2026-10-07'), heute, zeilenAus(['CONFIRMED', 'READY']), null)).toBe(0)
+  })
+
+  it('ohne Fenster 0, leer 0', () => {
+    expect(fensterAnzahl(null, heute, zeilenAus(['CONFIRMED']), null)).toBe(0)
+    expect(fensterAnzahl(fenster(heute), heute, [], null)).toBe(0)
+  })
+})
+
+// ─── Umsatz heute ───────────────────────────────────────────────────────────
+
+describe('umsatzHeuteCent — vom Wiener Mitternacht bis jetzt', () => {
+  // Dienstag 6.10.2026, 14:00 Wien (MESZ, UTC+2). Wiener Mitternacht = 5.10. 22:00 UTC.
+  const jetzt = new Date('2026-10-06T12:00:00Z')
+  const bestellung = (iso: string, cent: number) => ({ quelle: 'bestellung' as const, zeitpunkt: new Date(iso), cent })
+  const verkauf = (iso: string, cent: number) => ({ quelle: 'verkauf' as const, zeitpunkt: new Date(iso), cent, kanal: 'HOFLADEN' })
+
+  it('Abholungen zählen ab 0:00 Uhr Wien bis jetzt — genau an den Grenzen', () => {
+    expect(umsatzHeuteCent([bestellung('2026-10-05T22:00:00.000Z', 500)], jetzt)).toBe(500) // 0:00 Wien
+    expect(umsatzHeuteCent([bestellung('2026-10-05T21:59:59.999Z', 500)], jetzt)).toBe(0) // gestern 23:59
+    expect(umsatzHeuteCent([bestellung('2026-10-06T12:00:00.000Z', 500)], jetzt)).toBe(500) // genau jetzt
+    expect(umsatzHeuteCent([bestellung('2026-10-06T12:00:00.001Z', 500)], jetzt)).toBe(0) // nach jetzt
+  })
+
+  it('manuelle Verkäufe zählen mit ihrem ganzen Wiener Tag (gespeichert um 12:00)', () => {
+    expect(umsatzHeuteCent([verkauf('2026-10-06T10:00:00Z', 1200)], new Date('2026-10-05T22:30:00Z'))).toBe(1200)
+    expect(umsatzHeuteCent([verkauf('2026-10-05T10:00:00Z', 1200)], jetzt)).toBe(0)
+  })
+
+  it('summiert in Cent, leer ist 0', () => {
+    expect(umsatzHeuteCent([bestellung('2026-10-06T08:00:00Z', 1030), verkauf('2026-10-06T10:00:00Z', 990)], jetzt)).toBe(2020)
+    expect(umsatzHeuteCent([], jetzt)).toBe(0)
+  })
+
+  it('stornierte und nicht abgeholte Bestellungen sind keine Buchung: die Abfrage nimmt nur PICKED_UP', () => {
+    // Die Regel der Datenbank-Bedingung ist dieselbe wie für Woche und Auswertung.
+    expect(umsatzBestellungWhere('hof', { von: jetzt, bis: jetzt }).status).toBe('PICKED_UP')
+    expect(quelle('src/server/queries/heute.ts')).toContain('umsatzHeuteCent(buchungen, jetzt)')
   })
 })
 
@@ -418,6 +520,8 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     expect(gross).toContain('href="/hof-test"')
     expect(gross).toContain('farmerzone.at/hof-test')
     expect(gross).not.toContain('Besuche')
+    // Der Adress-Link hat 44 px Trefferfläche und kürzt trotzdem mit Auslassung.
+    expect(gross).toMatch(/<a [^>]*class="[^"]*min-h-11[^"]*"[^>]*href="\/hof-test"|<a [^>]*href="\/hof-test"[^>]*class="[^"]*min-h-11/)
   })
 
   it('Seitenspalte: nächste Abholung, Woche mit Balken und Vergleich, Hofseite mit Fortschritt', () => {

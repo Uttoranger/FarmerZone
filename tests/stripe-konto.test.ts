@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import {
-  onlinePausiertText,
+  onlinePausiertHinweis,
   onlineZahlungPausiert,
   stripeKontoBereit,
   zahlungNichtMoeglichText,
@@ -39,8 +39,9 @@ describe('onlineZahlungPausiert', () => {
 
 describe('Texte — Barzahlung nur versprechen, wenn es sie gibt', () => {
   it('Hinweis auf Heute', () => {
-    expect(onlinePausiertText(true)).toContain('nur bar bei Abholung')
-    expect(onlinePausiertText(false)).not.toContain('bar')
+    // Seit Nr. 17 als Titel und Satz der Hinweiskarte (onlinePausiertHinweis).
+    expect(onlinePausiertHinweis(true).satz).toContain('nur bar bei Abholung')
+    expect(onlinePausiertHinweis(false).satz).not.toContain('bar')
   })
 
   it('Antwort des Checkouts', () => {

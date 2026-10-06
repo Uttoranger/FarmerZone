@@ -14,22 +14,24 @@ import {
   abholtagName,
   abholWhere,
   brauchtDich,
+  fensterAnzahl,
+  heuteHofSichtbar,
   naechsteAbholungWhere,
   naechstesAbholfenster,
   packliste,
   packlistenZahlen,
   ueberfaelligWhere,
+  umsatzHeuteCent,
   wienerTag,
   wochenBalken,
   wochenvergleich,
 } from '@/lib/heute'
-import { auswerten, summeCent, umsatzfenster } from '@/lib/umsatz'
+import { auswerten, umsatzfenster } from '@/lib/umsatz'
 import { umsatzBuchungen } from '@/server/queries/umsatz'
 import { statusReminder } from '@/lib/dashboard-hints'
 import { ersteSchritte, ersteSchritteDaten, type ErsteSchritteErgebnis } from '@/lib/erste-schritte'
 import { onlineZahlungPausiert } from '@/lib/stripe-konto'
 import { bestellSummen } from '@/lib/servicegebuehr'
-import { hofZustand } from '@/lib/mein-hof'
 import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
 import { DEFAULT_SECTIONS, type SectionConfig } from '@/server/queries/appearance'
 
@@ -62,8 +64,8 @@ export type Heute = {
    * Hinweis mit dem Weg zu Stripe; `barMoeglich` wählt den Satz.
    */
   onlinePausiert: { barMoeglich: boolean } | null
-  /** Was Teilen-Karte und Freischaltungs-Moment brauchen — öffentlich nach hofZustand. */
-  hof: { oeffentlich: boolean; approvedAt: Date | null }
+  /** Was Teilen-Karte und Freischaltungs-Moment brauchen — sichtbar = öffentlich UND nicht pausiert (heuteHofSichtbar). */
+  hof: { sichtbar: boolean; approvedAt: Date | null }
   /** Bis zu drei Produkte im Shop mit Bestand, in der Reihenfolge des Hofs. */
   angebot: string[]
   /** „Deine Hofseite": dieselbe Rechnung wie die Checkliste in Mein Hof. */
@@ -197,15 +199,7 @@ export async function getHeute(farmId: string, jetzt: Date = new Date()): Promis
   )
   const slots = hof?.pickupSlots ?? []
   const fenster = naechstesAbholfenster(slots, jetzt)
-  // Wie viele Bestellungen auf das nächste Fenster warten: heute die
-  // Packliste, sonst der nächste Abholtag mit Bestellungen, wenn er es ist.
-  const fensterAnzahl = !fenster
-    ? 0
-    : fenster.tag === wienKalendertag(jetzt)
-      ? zeilen.length
-      : naechsteAbholung?.tag === fenster.tag
-        ? naechsteAbholung.anzahl
-        : 0
+  const fensterZahl = fensterAnzahl(fenster, wienKalendertag(jetzt), zeilen, naechsteAbholung)
   const auswertung = auswerten(buchungen, wochenfenster)
   const sektionen = hof?.sectionsConfig
   const fortschritt = hof
@@ -225,10 +219,10 @@ export async function getHeute(farmId: string, jetzt: Date = new Date()): Promis
     abholungen: zeilen,
     zahlen: {
       ...packlistenZahlen(zeilen),
-      umsatzHeuteCent: summeCent(buchungen, { von: heute.von, bis: jetzt }),
+      umsatzHeuteCent: umsatzHeuteCent(buchungen, jetzt),
     },
     abholfensterHeute: abholfensterHeute(slots, jetzt),
-    naechstesFenster: fenster ? { fenster, anzahl: fensterAnzahl } : null,
+    naechstesFenster: fenster ? { fenster, anzahl: fensterZahl } : null,
     naechsteAbholung,
     brauchtDich: brauchtDich({
       ueberfaellig: { anzahl: ueberfaelligAnzahl, juengste: ueberfaelligJuengste },
@@ -241,7 +235,7 @@ export async function getHeute(farmId: string, jetzt: Date = new Date()): Promis
     ersteSchritte: ersteSchritte(ersteSchritteDaten(hof, { produkte, aktiveAbholzeiten: slots.length })),
     wartetAufFreigabe: hof?.approvedAt == null,
     onlinePausiert: hof && onlineZahlungPausiert(hof) ? { barMoeglich: hof.acceptsOnsite } : null,
-    hof: { oeffentlich: hof ? hofZustand(hof).oeffentlich : false, approvedAt: hof?.approvedAt ?? null },
+    hof: { sichtbar: hof ? heuteHofSichtbar(hof) : false, approvedAt: hof?.approvedAt ?? null },
     angebot: angebot.map((p) => p.name),
     hofseite: fortschritt
       ? { prozent: fortschritt.prozent, satz: fortschritt.satz, fertig: fortschritt.fehlend.length === 0 }

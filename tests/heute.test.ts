@@ -24,7 +24,6 @@ import {
   abholtagName,
   abholWhere,
   abholZeilen,
-  begruessung,
   brauchtDich,
   datumLang,
   kurzname,
@@ -324,13 +323,6 @@ describe('brauchtDich', () => {
 })
 
 describe('Kopf in Wiener Zeit', () => {
-  it('Gruß nach der Wiener Stunde, nicht nach der Serverzeit', () => {
-    expect(begruessung(new Date('2026-09-28T09:59:00Z'))).toBe('Guten Morgen') // 11:59
-    expect(begruessung(new Date('2026-09-28T10:00:00Z'))).toBe('Guten Tag') // 12:00
-    expect(begruessung(new Date('2026-09-28T16:00:00Z'))).toBe('Guten Abend') // 18:00
-    expect(begruessung(new Date('2026-09-28T22:30:00Z'))).toBe('Guten Morgen') // 0:30
-  })
-
   it('Datum ist der Wiener Tag', () => {
     expect(datumLang(new Date('2026-09-28T22:30:00Z'))).toBe('Dienstag, 29. September 2026')
   })
