@@ -111,6 +111,24 @@ export function berechneServicegebuehr(
   return { gebuehrCents: gebuehr, prozentAngewendet: prozentHundertstel / 100 }
 }
 
+/**
+ * Der Satz, den die Hofseite VOR dem Bestellen nennt („Preise zzgl. 5 %
+ * Servicegebühr, mind. € 0,50") — abgeleitet aus berechneServicegebuehr,
+ * nicht daneben gerechnet: Bei Warenpreis 0 liefert sie genau die
+ * Mindestgebühr und den angewendeten Satz, gebührenfrei `prozentAngewendet`
+ * null. null heißt: Jetzt fällt keine Gebühr an (kein Datum, Datum in der
+ * Zukunft oder Satz und Mindestgebühr 0) — dann steht auch kein Hinweis da.
+ */
+export function servicegebuehrSatz(
+  einstellung: ServicegebuehrEinstellung,
+  jetzt: Date
+): { prozent: number; mindestCents: number } | null {
+  const { gebuehrCents, prozentAngewendet } = berechneServicegebuehr(0, einstellung, jetzt)
+  if (prozentAngewendet === null) return null
+  if (prozentAngewendet === 0 && gebuehrCents === 0) return null
+  return { prozent: prozentAngewendet, mindestCents: gebuehrCents }
+}
+
 /** Ein Bestell-Snapshot, so weit ihn die Summen brauchen. */
 export type BestellungMitGebuehr = {
   /** Der WARENPREIS in Euro (Order.totalAmount) — Decimal, String oder Zahl. */

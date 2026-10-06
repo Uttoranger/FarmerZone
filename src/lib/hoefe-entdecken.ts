@@ -26,6 +26,7 @@ import {
   type HoefeFilter,
 } from '@/schemas/hoefe-filter'
 import {
+  BRENNMATERIAL_TITEL,
   hatProduktfilter,
   kategorieChips,
   siegelChips,
@@ -75,7 +76,7 @@ export const KILOPREIS_LABEL = 'Günstigster Kilopreis'
  * (src/lib/startseite.ts, E11). Die Kategorie selbst (BRENNHOLZ) und ihr
  * Label in der Taxonomie ändert erst Gate 6.
  */
-const BRENNMATERIAL_LABEL = 'Brennmaterial'
+const BRENNMATERIAL_LABEL = BRENNMATERIAL_TITEL
 
 function kategorieLabel(k: ProductCategoryValue): string {
   return k === 'BRENNHOLZ' ? BRENNMATERIAL_LABEL : KATEGORIE_LABEL[k]

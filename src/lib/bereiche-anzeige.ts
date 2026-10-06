@@ -37,7 +37,8 @@ import {
   type TierartValue,
 } from '@/lib/taxonomie'
 import type { GebindeWahl, HoefeFilter } from '@/schemas/hoefe-filter'
-import { formatZahl, kilopreisNetto } from '@/lib/format'
+import { formatMenge, formatZahl, kilopreisNetto } from '@/lib/format'
+import { produktZustand } from '@/lib/produkt-sichtbarkeit'
 
 // ─── Kaufbar ────────────────────────────────────────────────────────────────
 
@@ -331,6 +332,48 @@ export function zeigeKaufknopf(p: { isAvailable: boolean; stock: number }, isPau
   return p.isAvailable && p.stock > 0 && !isPaused
 }
 
+/**
+ * Der Zustand einer Produktkarte auf der Hofseite (Nr. 10, Mockup
+ * web-k2-alle-produkte-nach-kategorie): knapp und ausverkauft aus dem echten
+ * Bestand, über dieselbe Ableitung wie die Sicht des Hofs (produktZustand,
+ * Schwelle LOW_STOCK_THRESHOLD). Wie zeigeKaufknopf OHNE Reservierungen
+ * anderer — ob die Menge frei ist, entscheidet /api/reserve. Der Kaufknopf
+ * steht genau bei `kaufbar` und `knapp` (Test gegen zeigeKaufknopf).
+ *
+ * „Merken" gibt es nicht: Eine Benachrichtigung, wenn die Ware wieder da ist,
+ * bräuchte Kundenkonto oder Double-Opt-in (E8, S11) — ausverkauft heißt
+ * deshalb nur „Ausverkauft". Ein Datum „ab Sa wieder da" kennt das Schema nicht.
+ */
+export type KartenZustand =
+  | { art: 'kaufbar' }
+  | { art: 'knapp'; bestand: number }
+  | { art: 'ausverkauft' }
+  | { art: 'pausiert' }
+  | { art: 'nicht-verfuegbar'; grund: string }
+
+export function kartenZustand(
+  p: { isAvailable: boolean; stock: number; unavailableReason: string | null },
+  isPaused: boolean
+): KartenZustand {
+  if (isPaused) return { art: 'pausiert' }
+  const zustand = produktZustand(p)
+  switch (zustand.art) {
+    case 'nicht-im-shop':
+      return { art: 'nicht-verfuegbar', grund: p.unavailableReason?.trim() || 'Nicht verfügbar' }
+    case 'ausverkauft':
+      return { art: 'ausverkauft' }
+    case 'knapp':
+      return { art: 'knapp', bestand: zustand.bestand }
+    case 'im-shop':
+      return { art: 'kaufbar' }
+  }
+}
+
+/** „Nur noch 3 kg" · „Nur noch 3 Stück" · „Nur noch 3 × 2 kg" — der Bestand zählt Gebinde, wo es eines gibt. */
+export function knappText(bestand: number, unit: string, unitSize: number | null): string {
+  return `Nur noch ${formatMenge(bestand, unit, unitSize)}`
+}
+
 // ─── Links ──────────────────────────────────────────────────────────────────
 
 /** Der Weg zur Hofseite; im Futter-Bereich landet der Kunde direkt beim Futter. */
@@ -428,6 +471,80 @@ export function angezeigterBereich(
   return teileHofseite(produkte, wunsch).aktiv ?? 'LEBENSMITTEL'
 }
 
+// ─── Hofseite: Kategorie-Abschnitte (E1) ────────────────────────────────────
+
+/**
+ * Brennholz heißt in der Oberfläche „Brennmaterial" (E11, Startseite und
+ * /hoefe). Die Kategorie selbst und ihr Taxonomie-Label ändert erst Gate 6 —
+ * bis dahin steht das Wort hier, an EINER Stelle.
+ */
+export const BRENNMATERIAL_TITEL = 'Brennmaterial'
+
+/** Der Abschnitt Futtermittel — Ziel von ?bereich=futter (Links von /hoefe und aus dem Umfeld). */
+export const FUTTER_ABSCHNITT_ANKER = 'kategorie-futtermittel'
+export const BRENNMATERIAL_ABSCHNITT_ANKER = 'kategorie-brennmaterial'
+
+export type KategorieAbschnitt<P> = {
+  art: 'hofladen' | 'futter' | 'brennmaterial'
+  titel: string
+  /** Sprungziel und Chip-Adresse — stabil, ohne Sonderzeichen. */
+  anker: string
+  produkte: P[]
+}
+
+/**
+ * Die Abschnitte der Hofseite (E1, freigegeben: „Ordne die Hofseiten wieder
+ * nach Kategorie an"). Statt des Umschalters Hofladen | Futtermittel steht
+ * alles auf EINER Seite, der Bereich bleibt Datenmodell (anzeigeBereichVon):
+ *   1. Hofladen je Kategorie, in der Reihenfolge des jeweils ersten Produkts
+ *      in der Sortierung des Hofs (wie teileHofseite: Wer sein Lamm nach oben
+ *      zieht, bekommt Fleisch zuerst). Sonstiges — auch ohne Kategorie —
+ *      schließt den Hofladen ab.
+ *   2. Futtermittel: EIN Abschnitt für alle Futter-Kategorien (Mockup), mit
+ *      festem Anker.
+ *   3. Brennmaterial ganz am Ende — dieselbe Ordnung wie die Kategorie-Reihe
+ *      auf /hoefe (E2).
+ * Innerhalb eines Abschnitts bleibt die Reihenfolge des Hofs.
+ */
+export function kategorieAbschnitte<P extends { category: ProductCategoryValue | null }>(
+  produkte: readonly P[]
+): KategorieAbschnitt<P>[] {
+  const hofladen = new Map<ProductCategoryValue, KategorieAbschnitt<P>>()
+  const futter: P[] = []
+  const brennmaterial: P[] = []
+  for (const p of produkte) {
+    if (anzeigeBereichVon(p.category) === 'FUTTERMITTEL') {
+      futter.push(p)
+      continue
+    }
+    if (p.category === 'BRENNHOLZ') {
+      brennmaterial.push(p)
+      continue
+    }
+    const kategorie = p.category ?? 'SONSTIGES'
+    const abschnitt = hofladen.get(kategorie) ?? {
+      art: 'hofladen' as const,
+      titel: KATEGORIE_LABEL[kategorie],
+      anker: `kategorie-${kategorie.toLowerCase()}`,
+      produkte: [],
+    }
+    abschnitt.produkte.push(p)
+    hofladen.set(kategorie, abschnitt)
+  }
+  const sonstiges = hofladen.get('SONSTIGES')
+  hofladen.delete('SONSTIGES')
+  return [
+    ...hofladen.values(),
+    ...(sonstiges ? [sonstiges] : []),
+    ...(futter.length > 0
+      ? [{ art: 'futter' as const, titel: ANZEIGE_BEREICHE.FUTTERMITTEL.titel, anker: FUTTER_ABSCHNITT_ANKER, produkte: futter }]
+      : []),
+    ...(brennmaterial.length > 0
+      ? [{ art: 'brennmaterial' as const, titel: BRENNMATERIAL_TITEL, anker: BRENNMATERIAL_ABSCHNITT_ANKER, produkte: brennmaterial }]
+      : []),
+  ]
+}
+
 // ─── Produktdetail: Futter-Kennzeichnung ────────────────────────────────────
 
 export type KennzeichnungsEingabe = {
@@ -492,8 +609,10 @@ export function kennzeichnungsZeilen(
     wert: `${formatZahl(k.nettoMenge)} ${NETTO_EINHEIT_LABEL[k.nettoEinheit]} je Gebinde`,
   })
   if (k.gebrauchshinweis?.trim()) zeilen.push({ titel: 'Gebrauchshinweis', wert: k.gebrauchshinweis.trim() })
+  // E9: Die Plattform prüft die Nummer nicht — der Hof bestätigt sie selbst.
+  const nummer = k.betriebsnummer?.trim()
   zeilen.push(
-    { titel: 'Betriebsnummer', wert: k.betriebsnummer?.trim() || 'Nicht angegeben' },
+    { titel: 'Betriebsnummer', wert: nummer ? `${nummer} (laut Angabe des Hofs)` : 'Nicht angegeben' },
     { titel: 'Verantwortlich', wert: `${hof.name}, ${hof.address}, ${hof.postalCode} ${hof.city}` }
   )
   return zeilen

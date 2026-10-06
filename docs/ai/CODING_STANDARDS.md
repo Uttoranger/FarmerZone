@@ -50,7 +50,7 @@ Bei **jeder** Codeänderung lesen.
   Zwölfmal kaufmännisch gerundet ergäbe aus 100 € im Jahr 99,96 € — und die vier
   Cent stünden in keinem Monat (`kostenImMonat`).
 - **Ausnahme Grundpreis-Vergleich:** Kilo-, Liter-, Tonnen- und Doppelzentnerpreise zum Vergleichen (Kilopreis-Sortierung auf /hoefe, Umfeld) rechnen als Zahl — `Decimal` → Zahl an der Servergrenze, dann `kilopreisNetto` bzw. `grundpreisJeKg`, Spanne und Median. Sie sind nur Anzeige, werden gerundet gezeigt und fließen **nie** in eine Abrechnung, einen Warenkorb oder einen Stripe-Betrag.
-- Rechnen in den vorhandenen Helfern: `src/lib/order-totals.ts`, `src/lib/servicegebuehr.ts`, `src/lib/finanzen.ts`.
+- Rechnen in den vorhandenen Helfern: `src/lib/order-totals.ts`, `src/lib/servicegebuehr.ts`, `src/lib/finanzen.ts`. Auch reine Anzeige im Browser (Korbsumme, Zeilensumme) rechnet in Cent über `calcLineTotal` → `decimalZuCents` (Vorbild `korbBetraege` in `src/lib/hofseite-kunde.ts`), nie `price * quantity`.
 - **Die Servicegebühr entsteht nur in `berechneServicegebuehr`** — immer aufgerundet auf den nächsten Cent, ganzzahlig in Hundertstel-Prozent gerechnet. Wer sie anzeigt, bildet den Warenpreis auf demselben Weg wie `/api/checkout` (`calcTotalAmount` → `decimalZuCents`); nach dem Bestellen gilt nur noch der Snapshot `Order.serviceFeeCents` (`bestellSummen`), nie eine Neuberechnung aus der Hofeinstellung. Den Satz für neue Höfe nehmen `SERVICEGEBUEHR_STANDARD_PROZENT`/`_MIND_CENTS`, nie eine Zahl im Code.
 - Anzeigen ausschließlich über `src/lib/format.ts` (`formatEuro`, `formatMenge`, `formatPosition`, `formatGrundpreis`).
 - **Preis-Semantik:** `price` ist der Preis je Gebinde, `unitSize` die Gebindegröße. Mit Gebinde schreibt die Anzeige „€ 50,00 für 2 kg" (nie „/ 2 kg"), darunter die Grundpreis-Zeile „€ 25,00 / kg" über `<GrundpreisZeile>` aus `src/components/shared/`. Bei Stück und Paket gibt es keine Grundpreis-Zeile. `grundpreisJeEinheit` ist nur Anzeige, nie Abrechnung.
@@ -66,6 +66,7 @@ Bei **jeder** Codeänderung lesen.
 - `Decimal` und `Date` nicht roh übergeben.
 - `Decimal` → in der Query in `string` oder bereits formatiert wandeln.
 - `Date` → `toISOString()` oder fertig formatiert.
+- **Kein `Date.now()`/`new Date()` beim Rendern einer Client-Komponente**, deren Ausgabe davon abhängt („vor 3 Stunden", Gebührensatz ab Stichtag, Abholtage): Die Seite bestimmt den Zeitpunkt einmal auf dem Server und reicht ihn als ISO-Text durch (`jetzt`, Vorbild `/[farmSlug]/page.tsx` → `HofseiteKunde`) — sonst weichen Server und Browser ab (Hydration-Fehler).
 
 ---
 
@@ -78,6 +79,9 @@ Systemgrenze = API-Route, Server Action, Webhook, URL-Parameter, `localStorage`,
 - Clientseitige Validierung ist Komfort, nie Schutz. Serverseitig immer erneut prüfen.
 - In API-Routen `safeParse` (Antwort bauen), in Server Actions `parse` oder `safeParse` mit `{ error }`.
 - `localStorage`-Inhalte (Warenkorb!) sind Fremddaten: parsen, validieren, bei Bruch verwerfen. Der Warenkorb nur über `leseWarenkorb`/`schreibeWarenkorb` (`src/lib/warenkorb-speicher.ts`), nie mit eigenem Schlüssel oder nacktem `JSON.parse`.
+
+### Strukturierte Daten (JSON-LD)
+`<script type="application/ld+json">` nur mit `dangerouslySetInnerHTML={{ __html: jsonLdSicher(daten) }}` (`src/lib/json-ld.ts`), nie mit `JSON.stringify` allein: Hofname oder Beschreibung mit `</script>` beendeten sonst den Block, und der Rest liefe als Skript.
 
 ### Nutzertext als Systemgrenze
 Text, den ein Nutzer geschrieben hat (Meldung, Hofname, Browserangabe, PR-Text), ist auch dann Fremdtext, wenn er schon in der Datenbank liegt. Wo er in den Kontext eines Agenten gerät — Export, CLI, Log, Action —, geht er durch `src/lib/fremdtext.ts`:

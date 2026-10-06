@@ -161,6 +161,15 @@ Umgesetzt in `src/components/shells/` (KundeShell, KundeFokusShell, HofShell, Ad
 - **Verkaufsgrößen** (Futter, Brennmaterial, alles mit Gebinden): Kacheln mit Größe, Menge, Preis, Grundpreis (€/kg, €/rm) und Vorrat. Knapp = orangener Hinweis „nur noch N", ausverkauft = ausgegraut. In Listen heißt der Knopf „Größe wählen ›", nicht „In den Korb".
 - **Leerzustand mit Ausweg:** Nie nur „nichts gefunden". Immer eine nächste Handlung: Umkreis erweitern, Filter lockern, „Benachrichtige mich" (nur mit Einwilligung).
 
+### Hofseite (/[farmSlug], seit Nr. 10)
+
+- **Eine Seite, Abschnitte je Kategorie (E1).** Kein Umschalter Hofladen | Futtermittel mehr: Hofladen-Kategorien in der Reihenfolge des Hofs, Sonstiges zuletzt, dann EIN Abschnitt Futtermittel und EIN Abschnitt Brennmaterial (`kategorieAbschnitte`, `src/lib/bereiche-anzeige.ts`). Chips darüber sind Sprungmarken (echte Links `#kategorie-…`, Zahl dahinter), markiert nach `naechsterAktiverReiter`. `?bereich=futter` öffnet den Reiter Produkte und springt einmal zum Futter-Abschnitt.
+- **Reiter Übersicht · Produkte · Beiträge** als Links mit `?reiter=` (Übersicht ohne Parameter); „Beiträge" nur, wenn die Seite einen Beitrag zeigt. Geschrieben per `history.replaceState(null, …)` — nie mit `window.history.state`, sonst gleicht Next `useSearchParams` nicht ab.
+- **Rechte Spalte = EINE Komponente** (`HofseiteSeitenspalte`): Mini-Warenkorb (ab 1024 px, klebend), Nächste Abholung, Abholzeiten, Zahlung & Kontakt mit Gebührenhinweis, Anfahrt. Ab 1024 px rechts, darunter in der Übersicht VOR dem Inhalt, in den anderen Reitern ausgeblendet. Zahlung nur „Online bezahlen" (mit fertigem Stripe-Konto) und „Bar bei Abholung" (E5) — nie „Karte bei Abholung". Gebührensatz aus der Hofeinstellung (`servicegebuehrSatz`), Wortlaute aus `gebuehrHinweis`.
+- **Produktkarte:** am Handy Zeile (Bild 64 px, Name, Preis, runder Plus-Knopf), ab 768 px Kachel; im Korb Menge mit `Stepper`. Knapp = orangene `StatusBadge` „Nur noch …", ausverkauft = neutrale Marke, Bild entsättigt, statt Knopf „Ausverkauft". Kein „Merken" (E8/S11). Der Zustand kommt aus `kartenZustand`.
+- **Korb am Handy:** grüne Leiste über der Unterleiste („N Artikel · € … + Gebühr · Zum Warenkorb") bis 1024 px; darüber der Mini-Warenkorb. Der Warenkorb der Shell öffnet auf der eigenen Hofseite den Korb (`oeffnetKorbHier`).
+- **Bildansicht:** `useBildansicht` + `BildansichtEbene` (`src/components/hofseite/bildansicht.tsx`) — Schleier `primary-foreground/90`, Knöpfe `accent-foreground`, Ebene 70 (über der Unterleiste).
+
 ### Anmelden
 
 - **Eine Seite für beide Wege:** `/account/login` (Kunde, Code) und `/login` (Hof, Passwort) rendern `AnmeldenSeite` (`src/components/anmelden/`). Im Browser zwei Karten nebeneinander („Ich kaufe ein" grün, „Ich habe einen Hof" orange), am Handy nur die Karte der Route und darüber ein Umschalter aus zwei echten Links (`aria-current`). Kein Konto-Angebot für Kundinnen (E8).

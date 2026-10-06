@@ -8,10 +8,12 @@
  *    die Seite wandert unter dem Bild weg.
  *  - Nur beim echten Schließen: Wer die Hofseite bei offenem Bild verlässt,
  *    bekommt die neue Seite nicht auf die Stelle der alten geschoben.
- *  - Die Fotoansicht nutzt diese Regel beim Aufheben der Sperre, setzt den
- *    Merker nur beim regulären Schließen und gibt den Fokus ohne Scrollen an
- *    die Kachel zurück — ein focus() ohne preventScroll entschiede sonst
- *    selbst, wohin die Seite rollt.
+ *  - Die Bildansicht (EIN Hook, src/components/hofseite/bildansicht.tsx, seit
+ *    Nr. 10 für die Kundenansicht und die Galerie des Besitzers) nutzt diese
+ *    Regel beim Aufheben der Sperre, setzt den Merker nur beim regulären
+ *    Schließen und gibt den Fokus ohne Scrollen an die Kachel zurück — ein
+ *    focus() ohne preventScroll entschiede sonst selbst, wohin die Seite rollt.
+ *  - Beide Galerien nutzen den Hook und sperren nicht selbst daneben.
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -42,12 +44,12 @@ describe('stelleNachBildansicht', () => {
 })
 
 describe('Bildansicht der Hofseite — am Quelltext', () => {
-  const text = quelltext('src/components/farm/farm-page-view.tsx')
+  const text = quelltext('src/components/hofseite/bildansicht.tsx')
 
   it('merkt sich beim Sperren die Stelle und stellt sie beim Aufheben über die Regel wieder her', () => {
     const sperre = text.slice(
       text.indexOf("document.body.style.overflow = 'hidden'") - 400,
-      text.indexOf('}, [lightboxOffen])')
+      text.indexOf('}, [istOffen])')
     )
     expect(sperre).toContain('window.scrollY')
     expect(sperre).toMatch(/stelleNachBildansicht\(\{/)
@@ -57,9 +59,10 @@ describe('Bildansicht der Hofseite — am Quelltext', () => {
 
   it('setzt den Merker nur im regulären Schließen — nicht beim Verlassen der Seite', () => {
     const schliessen = text.slice(
-      text.indexOf('function schliesseLightbox()'),
+      text.indexOf('const schliesse = useCallback('),
       text.indexOf('ausloeser.current?.focus')
     )
+    expect(schliessen.length).toBeGreaterThan(0)
     expect(schliessen).toMatch(/regulaerGeschlossen\.current = true/)
     // Genau eine Stelle setzt ihn; die Sperre nimmt ihn beim Öffnen zurück.
     expect(text.match(/regulaerGeschlossen\.current = true/g)).toHaveLength(1)
@@ -69,5 +72,17 @@ describe('Bildansicht der Hofseite — am Quelltext', () => {
   it('gibt den Fokus ohne Scrollen an die Kachel zurück', () => {
     expect(text).toMatch(/ausloeser\.current\?\.focus\(\{\s*preventScroll:\s*true\s*\}\)/)
     expect(text).not.toMatch(/ausloeser\.current\?\.focus\(\)/)
+  })
+})
+
+describe('beide Galerien nutzen den einen Hook', () => {
+  it('Kundenansicht und Besitzer-Galerie binden useBildansicht ein und sperren nicht selbst', () => {
+    for (const pfad of ['src/components/hofseite/hofseite-fotos.tsx', 'src/components/farm/farm-page-view.tsx']) {
+      const text = quelltext(pfad)
+      expect(text, pfad).toMatch(/useBildansicht\(/)
+      expect(text, pfad).not.toContain('document.body.style.overflow')
+    }
+    // Gegenprobe: Die Suche findet die Sperre dort, wo sie steht.
+    expect(quelltext('src/components/hofseite/bildansicht.tsx')).toContain('document.body.style.overflow')
   })
 })

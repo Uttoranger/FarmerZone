@@ -243,7 +243,7 @@ function MenueBlatt({ tinte }: { tinte: string }) {
  * steigt damit hinauf; das merkt sich der RueckwegMerker, damit „Zurück" dort
  * nicht wieder hinunterführt. Neuer Tab und neues Fenster tut der Link selbst.
  */
-function useRueckwegKlick(seite: KundenSeite, form: 'knopf' | 'zeile') {
+export function useRueckwegKlick(seite: KundenSeite, form: 'knopf' | 'zeile'): (e: MouseEvent<HTMLAnchorElement>) => void {
   const router = useRouter()
   return function beimTipp(e: MouseEvent<HTMLAnchorElement>) {
     if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return

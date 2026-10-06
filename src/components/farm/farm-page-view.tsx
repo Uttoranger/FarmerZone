@@ -6,27 +6,28 @@
  * dritte fehlschlagen:
  *
  * 1. src/app/(public)/[farmSlug]/page.tsx — Kundinnen und die Vorschau des
- *    Hofs (?vorschau=1, dieselbe Route). Immer `ownerMode={false}`; was die
- *    Vorschau anders macht, kommt fertig entschieden als `ansicht` aus
- *    `ansichtsModus` (src/lib/ansichts-modus.ts): `kaufen` (wirkungslos in der
- *    Vorschau) und `art` (der Empfänger für die Markierung des Editors,
- *    VorschauImRahmen). Dazu `reorderItems` aus dem Nachbestell-Link — nur,
- *    wo Kaufen wirkt. Kein Stift, keine Werkzeugleiste, kein
- *    Bearbeitungs-Hinweis.
+ *    Hofs (?vorschau=1, dieselbe Route). Immer `ownerMode={false}`; gerendert
+ *    wird die Hofseite im neuen Design (components/hofseite/hofseite-kunde.tsx,
+ *    Nachtlauf Nr. 10) in der KundeShell der Seite. Was die Vorschau anders
+ *    macht, kommt fertig entschieden als `ansicht` aus `ansichtsModus`
+ *    (src/lib/ansichts-modus.ts): `kaufen` (wirkungslos in der Vorschau) und
+ *    `art` (der Empfänger für die Markierung des Editors, VorschauImRahmen).
+ *    Dazu `reorderItems` aus dem Nachbestell-Link — nur, wo Kaufen wirkt. Kein
+ *    Stift, keine Werkzeugleiste, kein Bearbeitungs-Hinweis.
  *
  * 2. src/components/farmer/farm-page-client.tsx — der Besitzer am Handy unter
- *    lg auf /farm-page. `ownerMode`, dazu `mode` (Bearbeiten oder
- *    Kundenansicht), `pastStatusCount` und `onVorschau`. Nur hier gibt es
- *    Stifte, Titelbild- und Fotoknöpfe, den Bearbeitungs-Hinweis und den
+ *    lg auf /farm-page, im Bearbeitungsmodus (`ownerMode`, `mode`,
+ *    `pastStatusCount`, `onVorschau`), noch im Bestandsdesign. Nur hier gibt
+ *    es Stifte, Titelbild- und Fotoknöpfe, den Bearbeitungs-Hinweis und den
  *    Pausen-Hinweis für den Hof; die Werkzeugleiste steht in
- *    farm-page-client.tsx selbst. Ohne `ansicht` gilt die Seite für
- *    Kundinnen (`kaufen: true`): In seiner Kundenansicht führt der Besitzer
- *    deshalb einen Korb — wie schon vor ansichtsModus.
+ *    farm-page-client.tsx selbst. Seine „Kundenansicht" zeigt seit Nr. 10 die
+ *    echte Route im Rahmen (?vorschau=1) — kein zweiter Nachbau der Seite für
+ *    Kundinnen.
  *
- * Die Besitzer-Verzweigungen (`ownerMode`, `isEdit`, `mode`, `onVorschau`,
- * `pastStatusCount`) entfallen, sobald auch die Handyansicht auf Liste und
- * Vorschau umzieht (wie ab lg, components/farmer/hofseite-editor.tsx) — dann
- * bleibt nur die erste Stelle.
+ * Die Besitzer-Ansicht (HofseiteBesitzer) entfällt, sobald auch die
+ * Handyansicht auf Liste und Vorschau umzieht (wie ab lg,
+ * components/farmer/hofseite-editor.tsx; Gate 5) — dann bleibt nur die erste
+ * Stelle.
  */
 
 import type { ReactNode } from 'react'
@@ -38,7 +39,7 @@ import {
   MapPin, Phone, Mail, CreditCard, Banknote,
   Pencil, Eye, Leaf, CalendarDays, Tag, MessageCircle,
   Check, Camera, Plus, ChevronLeft, ChevronRight, X, MoveVertical,
-  Share2, Navigation, PauseCircle, Sprout,
+  Share2, Navigation, PauseCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { DragEndEvent } from '@dnd-kit/core'
@@ -52,19 +53,13 @@ import { ReorderContext } from '@/components/shared/reorder-context'
 import { nextPickupDays, pickupWeekdaysLabel } from '@/lib/pickup-days'
 import { pausenBanner } from '@/lib/shop-pause'
 import { buildMapsUrl } from '@/lib/customer-links'
-import { angezeigterBereich } from '@/lib/bereiche-anzeige'
-import type { KundenSeite } from '@/lib/kunden-kopf'
 import { teileHof } from '@/components/shared/hof-teilen'
-import {
-  KundenKopf,
-  SPRUNGZIEL_OHNE_KOPF,
-  SPRUNGZIEL_UNTER_KOPF,
-  TitelbildTeilen,
-} from '@/components/shared/kunden-kopf'
-import { hofseiteSektionen, naechsterAktiverReiter, stelleNachBildansicht } from '@/lib/hofseite-sektionen'
+import { SPRUNGZIEL_OHNE_KOPF } from '@/components/shared/kunden-kopf'
+import { hofseiteSektionen, naechsterAktiverReiter } from '@/lib/hofseite-sektionen'
+import { useBildansicht } from '@/components/hofseite/bildansicht'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
-import { ProductGrid, useBereichWunsch } from './product-grid'
-import { VorschauImRahmen } from './vorschau-im-rahmen'
+import { ProductGrid } from './product-grid'
+import { HofseiteKunde } from '@/components/hofseite/hofseite-kunde'
 import { stripStatusVariables, renderStatusBodyWithChip } from '@/lib/status-body'
 // Ersatz-Titelbild ohne Foto — gemeinsam mit dem Kopf von „Mein Hof".
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
@@ -155,7 +150,7 @@ function SortableGalleryTile({
 }: {
   photo: PublicFarmPhoto
   isFirst: boolean
-  onClick: () => void
+  onClick: (e: React.MouseEvent<HTMLDivElement>) => void
   children: ReactNode
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
@@ -184,12 +179,8 @@ function SortableGalleryTile({
 }
 
 function GallerySection({ farm, isEdit }: { farm: PublicFarm; isEdit: boolean }) {
-  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
   const [, startTransition] = useTransition()
   const router = useRouter()
-
-  // Die Kachel, aus der die Lightbox geöffnet wurde — dorthin kehrt der Fokus zurück.
-  const ausloeser = useRef<HTMLButtonElement | null>(null)
 
   // Sprint 18: optimistische Foto-Reihenfolge (null = Server-Stand).
   // Dieser Effekt ist auch der Grund, aus dem die Galerie nach einem neuen Foto
@@ -208,6 +199,11 @@ function GallerySection({ farm, isEdit }: { farm: PublicFarm; isEdit: boolean })
     const ordered = photoOrder.map((id) => byId.get(id)).filter(Boolean) as PublicFarmPhoto[]
     return ordered.length === farm.farmPhotos.length ? ordered : farm.farmPhotos
   }, [farm.farmPhotos, photoOrder, isEdit])
+
+  // Sperre, Rücksprung, Fokus und Tasten der Bildansicht: EIN Hook für die
+  // Kundenansicht und diese Galerie (components/hofseite/bildansicht.tsx).
+  const bild = useBildansicht(photos.length)
+  const lightboxIdx = bild.offen
 
   function handlePhotoDragEnd(event: DragEndEvent) {
     const { active, over } = event
@@ -243,66 +239,6 @@ function GallerySection({ farm, isEdit }: { farm: PublicFarm; isEdit: boolean })
 
   const visiblePhotos = photos.slice(0, GALLERY_MAX_VISIBLE)
   const hiddenCount = Math.max(0, photos.length - GALLERY_MAX_VISIBLE)
-
-  function prev() {
-    if (lightboxIdx === null || photos.length === 0) return
-    setLightboxIdx((lightboxIdx - 1 + photos.length) % photos.length)
-  }
-  function next() {
-    if (lightboxIdx === null || photos.length === 0) return
-    setLightboxIdx((lightboxIdx + 1) % photos.length)
-  }
-
-  const lightboxOffen = lightboxIdx !== null
-
-  function oeffneLightbox(i: number, kachel: HTMLButtonElement | null) {
-    ausloeser.current = kachel
-    setLightboxIdx(i)
-  }
-
-  // Gesetzt nur von schliesseLightbox: Die Aufräumfunktion der Sperre unten läuft
-  // auch, wenn die Hofseite bei offenem Bild verlassen wird — dann darf sie die
-  // NEUE Seite nicht auf die Stelle der Hofseite schieben.
-  const regulaerGeschlossen = useRef(false)
-
-  function schliesseLightbox() {
-    regulaerGeschlossen.current = true
-    setLightboxIdx(null)
-    // Ohne das landet der Fokus wieder am Seitenanfang. preventScroll: Wohin die
-    // Seite gehört, entscheidet die Sperre unten, nicht der Browser beim Fokussieren.
-    ausloeser.current?.focus({ preventScroll: true })
-  }
-
-  // Solange das Bild offen ist, darf die Seite dahinter nicht mitscrollen. Sonst
-  // wandert die Seite unter dem Overlay weg — auf dem Telefon bei jeder Wischgeste —
-  // und nach dem Schließen steht man in einem ganz anderen Abschnitt (Meldung cmua8bof).
-  // Die Sperre allein hält auf iOS nicht immer; deshalb holt das Aufheben die
-  // Seite an die Stelle zurück, an der das Bild geöffnet wurde.
-  useEffect(() => {
-    if (!lightboxOffen) return
-    regulaerGeschlossen.current = false
-    const beimOeffnen = window.scrollY
-    const vorher = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = vorher
-      const ziel = stelleNachBildansicht({
-        beimOeffnen,
-        jetzt: window.scrollY,
-        geschlossen: regulaerGeschlossen.current,
-      })
-      if (ziel !== null) window.scrollTo(0, ziel)
-    }
-  }, [lightboxOffen])
-
-  useEffect(() => {
-    if (!lightboxOffen) return
-    function beiTaste(e: KeyboardEvent) {
-      if (e.key === 'Escape') schliesseLightbox()
-    }
-    window.addEventListener('keydown', beiTaste)
-    return () => window.removeEventListener('keydown', beiTaste)
-  }, [lightboxOffen])
 
   return (
     <>
@@ -404,7 +340,7 @@ function GallerySection({ farm, isEdit }: { farm: PublicFarm; isEdit: boolean })
               key={photo.id}
               photo={photo}
               isFirst={isFirst}
-              onClick={() => setLightboxIdx(i)}
+              onClick={(e) => bild.oeffne(i, e.currentTarget)}
             >
               {tileContent}
             </SortableGalleryTile>
@@ -421,7 +357,7 @@ function GallerySection({ farm, isEdit }: { farm: PublicFarm; isEdit: boolean })
                 gridRow: isFirst ? 'span 2' : undefined,
                 touchAction: 'manipulation',
               }}
-              onClick={(e) => oeffneLightbox(i, e.currentTarget)}
+              onClick={(e) => bild.oeffne(i, e.currentTarget)}
               aria-label={photo.caption ?? `Foto ${i + 1} vergrößern`}
             >
               {tileContent}
@@ -460,11 +396,11 @@ function GallerySection({ farm, isEdit }: { farm: PublicFarm; isEdit: boolean })
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.88)' }}
-          onClick={schliesseLightbox}
+          onClick={bild.schliesse}
         >
           <button
             className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20"
-            onClick={schliesseLightbox}
+            onClick={bild.schliesse}
             aria-label="Schließen"
           >
             <X className="size-5" />
@@ -474,14 +410,14 @@ function GallerySection({ farm, isEdit }: { farm: PublicFarm; isEdit: boolean })
             <>
               <button
                 className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20"
-                onClick={(e) => { e.stopPropagation(); prev() }}
+                onClick={(e) => { e.stopPropagation(); bild.zurueck() }}
                 aria-label="Zurück"
               >
                 <ChevronLeft className="size-5" />
               </button>
               <button
                 className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20"
-                onClick={(e) => { e.stopPropagation(); next() }}
+                onClick={(e) => { e.stopPropagation(); bild.vor() }}
                 aria-label="Weiter"
               >
                 <ChevronRight className="size-5" />
@@ -677,12 +613,48 @@ type Props = {
    * Ohne Angabe: die Seite für Kundinnen.
    */
   ansicht?: Pick<SeitenAnsicht, 'art' | 'kaufen'>
+  /**
+   * Zeitpunkt der Anfrage (ISO), einmal auf dem Server bestimmt — page.tsx
+   * setzt ihn immer. Nur die Kundenansicht braucht ihn (HofseiteKunde).
+   */
+  jetzt?: string
 }
 
 const FUER_KUNDINNEN: Pick<SeitenAnsicht, 'art' | 'kaufen'> = { art: 'kundin', kaufen: true }
 
-export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = false, mode = 'edit', pastStatusCount = 0, onVorschau, ansicht = FUER_KUNDINNEN }: Props) {
-  const isEdit = ownerMode && mode !== 'preview'
+export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = false, mode = 'edit', pastStatusCount = 0, onVorschau, ansicht = FUER_KUNDINNEN, jetzt }: Props) {
+  // Kundinnen und die Vorschau des Hofs: die Hofseite im neuen Design (Nr. 10).
+  if (!ownerMode) {
+    // Ohne Zeitpunkt vom Server (kein Aufrufer heute) die eigene Uhr — dann
+    // kann „vor N Stunden" zwischen Server und Browser abweichen.
+    return <HofseiteKunde farm={farm} activeStatus={activeStatus} reorderItems={reorderItems} ansicht={ansicht} jetzt={jetzt ?? new Date().toISOString()} />
+  }
+  return <HofseiteBesitzer farm={farm} activeStatus={activeStatus} mode={mode} pastStatusCount={pastStatusCount} onVorschau={onVorschau} />
+}
+
+/**
+ * Der Besitzer am Handy unter lg auf /farm-page (farm-page-client.tsx):
+ * Bearbeiten mit Stiften im Bestandsdesign. Seine Kundenansicht ist seit
+ * Nr. 10 die echte Route im Rahmen (?vorschau=1), nicht mehr diese
+ * Komponente; der Umbau von Mein Hof folgt mit Gate 5.
+ */
+function HofseiteBesitzer({
+  farm,
+  activeStatus,
+  mode,
+  pastStatusCount,
+  onVorschau,
+}: {
+  farm: PublicFarm
+  activeStatus: ActiveStatusPost | null
+  mode: 'edit' | 'preview'
+  pastStatusCount: number
+  onVorschau?: () => void
+}) {
+  // Die Verzweigungen unten stammen aus der Zeit, als Kundinnen und Besitzer
+  // dieselbe Ansicht teilten; hier ist es immer der Besitzer (Gate 5 baut um).
+  const ownerMode = true
+  const isEdit = mode !== 'preview'
   // Pausen-Banner: was Kundinnen und was der Hof sieht, entschieden in lib/shop-pause.ts.
   const pausen = pausenBanner({ ownerMode, vorschau: mode === 'preview', pauseMessage: farm.pauseMessage })
 
@@ -725,19 +697,6 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
     [sections, farm.farmPhotos.length]
   )
 
-  // Scrollt der Hofname aus dem Blick, zeigt ihn die Handy-Leiste (kunden-kopf.tsx).
-  const hofNameUeberschrift = useRef<HTMLHeadingElement>(null)
-
-  // Kopfzeile der Kundenansicht (kunden-kopf.tsx). Ihr Rückweg führt in den
-  // Bereich, den das Produktraster gerade ZEIGT — nicht in den der URL: Ein
-  // reiner Futterhof zeigt Futter auch ohne ?bereich, und geteilte Links
-  // tragen keinen. Dieselbe Produktmenge wie das Raster der Kundenansicht.
-  const bereichWunsch = useBereichWunsch()
-  const bereich = useMemo(
-    () => angezeigterBereich(farm.products.filter((p) => p.isAvailable), bereichWunsch),
-    [farm.products, bereichWunsch]
-  )
-  const kundenSeite: KundenSeite = { art: 'hofseite', hofSlug: farm.slug, bereich }
   const [activeTab, setActiveTab] = useState('uebersicht')
 
   // Ziel eines angetippten Sprungs. Solange es steht, hält der Beobachter still —
@@ -796,60 +755,6 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
     return () => observer.disconnect()
   }, [isEdit, sektionen])
 
-  if (!ownerMode) {
-    // Pause übernimmt die Seite NICHT mehr: der Hof bleibt mit Fotos, Kontakt
-    // und Status sichtbar, nur die Kauf-Wege sind zu (Banner + tote Buttons
-    // weiter unten). Er verschwindet nicht, er macht Pause.
-    if (farm.products.length === 0 && farm.pickupSlots.length === 0) {
-      return (
-        <>
-        {/* Der Name steht groß in der Karte darunter — die Leiste braucht ihn nicht. */}
-        <KundenKopf seite={kundenSeite} />
-        <main
-          // Die Kopfleiste steht darüber: zusammen genau ein Bildschirm.
-          className="min-h-[calc(100dvh-3.5rem)] md:min-h-[calc(100dvh-4rem)] flex items-center justify-center p-6"
-          style={{ background: 'linear-gradient(160deg, var(--landing-top) 0%, var(--app-chip-green) 100%)' }}
-        >
-          <div
-            className="text-center max-w-sm bg-card rounded-3xl p-10 dark:ring-1 dark:ring-border"
-            style={{ boxShadow: '0 8px 24px rgba(45,95,63,0.08)' }}
-          >
-            <Sprout className="mx-auto mb-5 size-10 text-brand-text" strokeWidth={1.5} aria-hidden="true" />
-            <h1 className="font-heading text-xl font-semibold mb-3" style={{ color: 'var(--app-ink)' }}>{farm.name}</h1>
-            <p className="leading-relaxed text-sm" style={{ color: 'var(--app-ink-soft)' }}>
-              Dieser Hof richtet gerade seinen Shop ein. Schau bald wieder vorbei!
-            </p>
-            <a
-              href={`tel:${farm.phone}`}
-              className="mt-6 inline-flex items-center gap-1.5 text-sm hover:underline underline-offset-2"
-              style={{ color: 'var(--brand-text)' }}
-            >
-              <Phone className="w-3.5 h-3.5" strokeWidth={1.7} />
-              {farm.phone}
-            </a>
-          </div>
-        </main>
-        </>
-      )
-    }
-  }
-
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'LocalBusiness',
-    name: farm.name,
-    description: farm.description,
-    telephone: farm.phone,
-    email: farm.email,
-    address: {
-      '@type': 'PostalAddress',
-      streetAddress: farm.address,
-      postalCode: farm.postalCode,
-      addressLocality: farm.city,
-      addressCountry: 'AT',
-    },
-  }
-
   const bannerBg = titelbildFoto(farm) ? null : titelbildVerlauf(farm.bannerValue)
 
   const productsForGrid = isEdit
@@ -872,19 +777,6 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--app-page)' }}>
-      {!ownerMode && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
-      )}
-
-      {/* Nur für Kundinnen — die Vorschau im Bauern-Bereich hat dessen Navigation. */}
-      {!ownerMode && (
-        <KundenKopf seite={kundenSeite} hofName={farm.name} hofNameUeberschrift={hofNameUeberschrift} />
-      )}
-      {ansicht.art === 'vorschau' && <VorschauImRahmen />}
-
       {/* Mode banner */}
       {ownerMode && (
         <div className="max-w-[960px] mx-auto px-4 md:px-10 pt-6 pb-[22px]">
@@ -969,8 +861,6 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
             background: 'linear-gradient(180deg, rgba(20,30,22,0) 45%, rgba(20,30,22,0.5) 100%)',
           }}
         />
-        {/* Handy: nur Teilen über dem Bild — Zurück und Menü trägt die Leiste darüber. */}
-        {!ownerMode && <TitelbildTeilen onTeilen={handleShare} />}
         {/* Titelbild ändern + Fokus anpassen (edit only) */}
         {isEdit && adjustingFocus && (
           <CoverFocusAdjust
@@ -1029,10 +919,8 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
                   style={{ boxShadow: '0 2px 10px rgba(0,0,0,0.25)' }}
                 />
               )}
-              {/* Am Handy etwas kleiner: Der Block wächst nach oben, und oben
-                  steht der Teilen-Knopf (TitelbildTeilen). */}
+              {/* Am Handy etwas kleiner: Der Block wächst nach oben. */}
               <h1
-                ref={hofNameUeberschrift}
                 className="font-heading text-[32px] md:text-[38px] font-semibold text-white leading-tight"
                 style={{ textShadow: '0 2px 14px rgba(0,0,0,0.4)' }}
               >
@@ -1172,7 +1060,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           data-abschnitt="abschnitte"
           // Unter der Kopfleiste (56 px, ab md 64 px); in der Vorschau des
           // Bauern-Bereichs gibt es keine, dort bleibt sie oben.
-          className={`sticky z-30 px-4 md:px-10 ${ownerMode ? 'top-0' : 'top-14 md:top-16'}`}
+          className="sticky top-0 z-30 px-4 md:px-10"
           style={{ background: 'var(--card)', borderBottom: '1px solid var(--border)', boxShadow: '0 2px 10px rgba(45,95,63,0.06)' }}
         >
           <div className="max-w-[960px] mx-auto flex gap-[26px]">
@@ -1201,7 +1089,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           die Markierung immer wieder auf „Übersicht" zurück (Meldung cmua8bof).
           Die drei Abschnitte sind jetzt Geschwister. */}
       <div className="max-w-[960px] mx-auto px-4 md:px-10 pt-[26px] pb-12">
-      <div id="uebersicht" className={ownerMode ? SPRUNGZIEL_OHNE_KOPF : SPRUNGZIEL_UNTER_KOPF}>
+      <div id="uebersicht" className={SPRUNGZIEL_OHNE_KOPF}>
 
         {/* Nächste Abholung (Referenz 17, nur Kundenansicht).
             Bei Pause ausgeblendet: Termine anzukündigen, die man nicht buchen
@@ -1419,7 +1307,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
             aus, während eine Serie noch lief. Die Reihenfolge stellt der
             Effekt in GallerySection richtig, nicht ein Neuaufbau. */}
         {showGallery && (
-          <div id="fotos" data-abschnitt="fotos" className={`mt-[26px] ${ownerMode ? SPRUNGZIEL_OHNE_KOPF : SPRUNGZIEL_UNTER_KOPF}`}>
+          <div id="fotos" data-abschnitt="fotos" className={`mt-[26px] ${SPRUNGZIEL_OHNE_KOPF}`}>
             <GallerySection farm={farm} isEdit={isEdit} />
           </div>
         )}
@@ -1428,7 +1316,7 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
             Das Sprungziel umfasst Überschrift UND Raster. Vorher hing es nur an der
             Überschriftenzeile: eine flache Box, die nach dem Sprung oberhalb des
             Erkennungsstreifens lag und deshalb nie markiert wurde. */}
-        <div id="produkte" className={ownerMode ? SPRUNGZIEL_OHNE_KOPF : SPRUNGZIEL_UNTER_KOPF}>
+        <div id="produkte" className={SPRUNGZIEL_OHNE_KOPF}>
         <div className="flex items-baseline gap-3 mt-[34px] mb-[18px]">
           <h2 className="font-heading text-[26px] font-semibold" style={{ color: 'var(--app-ink)' }}>
             Unsere Produkte
@@ -1445,27 +1333,13 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
           farmId={farm.id}
           farmSlug={farm.slug}
           hof={{ name: farm.name, address: farm.address, postalCode: farm.postalCode, city: farm.city }}
-          initialReorderItems={reorderItems && reorderItems.length > 0 ? reorderItems : undefined}
           ownerMode={ownerMode}
           mode={mode}
           isPaused={farm.isPaused}
           onVorschau={onVorschau}
-          kaufen={ansicht.kaufen}
         />
         </div>{/* Ende #produkte */}
 
-        {/* Footer (public only) */}
-        {!ownerMode && (
-          <footer className="py-8 border-t mt-6" style={{ borderColor: 'var(--border)' }}>
-            <div className="flex flex-wrap items-center gap-5 text-xs" style={{ color: 'var(--app-ink-faint)' }}>
-              <span>© {new Date().getFullYear()} {farm.name}</span>
-              <Link href="/impressum" className="hover:text-app-ink transition-colors">Impressum</Link>
-              <Link href="/datenschutz" className="hover:text-app-ink transition-colors">Datenschutz</Link>
-              <Link href="/account/profile" className="hover:text-app-ink transition-colors">Mein Konto</Link>
-              <Link href="/problem-melden" className="hover:text-app-ink transition-colors">Problem melden</Link>
-            </div>
-          </footer>
-        )}
       </div>
     </div>
   )

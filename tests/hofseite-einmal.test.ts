@@ -16,6 +16,9 @@
  *  - FarmPageView binden genau zwei Stellen ein: die Hofseite und
  *    farm-page-client.tsx (Besitzer am Handy). Eine dritte — benannt, als
  *    Namensraum, weitergereicht oder dynamisch — lässt den Test fehlschlagen.
+ *    Die Seite für Kundinnen im neuen Design (HofseiteKunde, Nr. 10) bindet
+ *    nur FarmPageView ein; die Kundenansicht des Besitzers ist die echte Route
+ *    im Rahmen (?vorschau=1 über vorschauLink), kein Nachbau.
  *  - Bearbeitungs-Elemente (Stifte, Werkzeugleiste, Bearbeitungs-Hinweis und
  *    die übrigen Knöpfe des Hofs) erscheinen nur mit ownerMode: Die Seite für
  *    Kundinnen und die Vorschau rendern ohne sie. Gerendert wird echt
@@ -52,9 +55,11 @@ vi.mock('@/server/actions/appearance', () => ({ updateFarmBannerAction: vi.fn(),
 vi.mock('@/server/actions/farm-photos', () => ({ addFarmPhotoAction: vi.fn(), reorderPhotosAction: vi.fn() }))
 vi.mock('@/server/actions/products', () => ({ updateProductImageAction: vi.fn(), reorderProductsAction: vi.fn() }))
 vi.mock('@/components/farm/cart-sheet', () => ({ CartSheet: () => createElement('div', { 'data-merkmal': 'korb' }) }))
+vi.mock('@/lib/auth-client', () => ({ useSession: () => ({ data: null }), signOut: vi.fn() }))
 
 import { FarmPageView } from '@/components/farm/farm-page-view'
 import { FarmPageClient } from '@/components/farmer/farm-page-client'
+import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 
@@ -247,6 +252,19 @@ describe('FarmPageView binden genau zwei Stellen ein', () => {
     expect(stellen).toEqual(['src/app/(public)/[farmSlug]/page.tsx', 'src/components/farmer/farm-page-client.tsx'])
   })
 
+  it('die Seite für Kundinnen (HofseiteKunde) bindet nur FarmPageView ein', () => {
+    const stellen = SRC.filter((pfad) => pfad !== 'src/components/hofseite/hofseite-kunde.tsx')
+      .filter((pfad) => /<HofseiteKunde\b|import\s*\{[^}]*\bHofseiteKunde\b[^}]*\}\s*from/.test(ohneKommentare(quelle(pfad))))
+    expect(stellen).toEqual(['src/components/farm/farm-page-view.tsx'])
+  })
+
+  it('die Kundenansicht des Besitzers ist die echte Route im Rahmen, kein Nachbau', () => {
+    const besitzer = ohneKommentare(quelle('src/components/farmer/farm-page-client.tsx'))
+    expect(besitzer).toMatch(/<iframe[\s\S]*?src=\{vorschauLink\(farm\.slug\)\}/)
+    // FarmPageView rendert dort nur noch den Bearbeitungsmodus.
+    expect(besitzer).toMatch(/mode === 'preview' \? \(\s*\/?\/?[\s\S]*?<iframe/)
+  })
+
   it('die Hofseite rendert sie immer ohne ownerMode; farm-page-client steht nur auf der Besitzer-Route', () => {
     const seite = ohneKommentare(quelle('src/app/(public)/[farmSlug]/page.tsx'))
     expect(seite.match(/ownerMode=\{[^}]*\}/g)).toEqual(['ownerMode={false}'])
@@ -310,9 +328,11 @@ type Ansicht = { art: 'kundin' | 'vorschau'; kaufen: boolean }
 const KUNDIN: Ansicht = { art: 'kundin', kaufen: true }
 const VORSCHAU: Ansicht = { art: 'vorschau', kaufen: false }
 
-/** Genau so, wie die Hofseite FarmPageView rendert — mit der Ansicht aus ansichtsModus. */
+/** Genau so, wie die Hofseite FarmPageView rendert — in der KundeShell, mit der Ansicht aus ansichtsModus. */
 function hofseite(ansicht: Ansicht, farm: PublicFarm = HOF): string {
-  return renderToStaticMarkup(createElement(FarmPageView, { farm, activeStatus: STATUS, reorderItems: [], ownerMode: false, ansicht }))
+  return renderToStaticMarkup(
+    createElement(KundeShellMitSitzung, null, createElement(FarmPageView, { farm, activeStatus: STATUS, reorderItems: [], ownerMode: false, ansicht }))
+  )
 }
 
 describe('Bearbeitungs-Elemente erscheinen nur mit ownerMode', () => {
@@ -337,11 +357,12 @@ describe('Bearbeitungs-Elemente erscheinen nur mit ownerMode', () => {
   it('die Vorschau rendert ohne sie — mit derselben Kopfzeile wie für Kundinnen, kein Nachbau', () => {
     const html = hofseite(VORSCHAU)
     expect(gefunden(html, [...IN_DER_ANSICHT, WERKZEUGLEISTE])).toEqual([])
-    // Die Navigation der Kundenseite (KundenKopf) samt Hofname, wie bei Kundinnen.
+    // Die Navigation der Kundenseite (KundeShell) samt Hofname, wie bei Kundinnen.
     for (const seite of [html, hofseite(KUNDIN)]) {
       expect(seite).toMatch(/<header\b/)
+      expect(seite).toContain('data-design="neu"')
       expect(seite).toContain('Hof Test')
-      expect(seite).toContain('Unsere Produkte')
+      expect(seite).toContain('Kartoffeln')
     }
   })
 })

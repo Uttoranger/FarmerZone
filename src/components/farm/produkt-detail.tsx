@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
-import { Building2, Leaf, Package, ShoppingCart, Snowflake, Thermometer } from 'lucide-react'
+import { Building2, Leaf, Package, ShoppingBasket, Snowflake, Thermometer } from 'lucide-react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Accordion, AccordionItem, AccordionPanel, AccordionTrigger } from '@/components/ui/accordion'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
@@ -19,14 +19,16 @@ export type HofFuerDetail = { name: string; address: string; postalCode: string;
 /** Kleine runde Marke für Kategorie und Sorte. */
 function Pill({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center rounded-full bg-app-chip px-2.5 py-0.5 text-xs font-medium text-app-chip-ink">
+    <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
       {children}
     </span>
   )
 }
 
 /**
- * Das Produktdetail der Hofseite (Sprint Bereiche 2) — für JEDES Produkt:
+ * Das Produktdetail der Hofseite (Sprint Bereiche 2; seit Nr. 10 nur noch in
+ * der Kundenansicht im neuen Design — Farben aus den Tokens des Design-Systems,
+ * Siegel grün, „Nur an Betriebe" orange) — für JEDES Produkt:
  * Vor Bereiche 2 pflegten die Höfe eine Kurzbeschreibung, die nirgends
  * erschien. Futtermittel zeigen zusätzlich die Kennzeichnung, zugeklappt, mit
  * allen Pflichtangaben (Fernabsatz: einsehbar VOR dem Kauf), und den Hinweis
@@ -87,12 +89,19 @@ function Inhalt({
       {/* Scrollt als Flex-Kind mit min-h-0 — sonst wächst er auf Inhaltshöhe
           und der Kaufknopf rutscht aus dem Sheet (DEVELOPMENT.md, Dialoge). */}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="relative h-48 bg-app-chip">
+        <div className="relative h-48 bg-muted">
           {bild ? (
-            <Image src={bild} alt={produkt.name} fill sizes="(min-width: 640px) 512px, 100vw" className="object-contain" />
+            <Image
+              src={bild}
+              alt={produkt.name}
+              fill
+              sizes="(min-width: 640px) 512px, 100vw"
+              // Nur die Kategorie-Illustration wird im Dunkeln gedämpft (CODING_STANDARDS §7); Fotos bleiben.
+              className={produkt.imageUrl ? 'object-contain' : 'object-contain dark:brightness-[0.85] dark:saturate-[0.9]'}
+            />
           ) : (
             <div className="flex h-full items-center justify-center">
-              <Package className="size-10 text-app-line-firm" aria-hidden="true" />
+              <Package className="size-10 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
             </div>
           )}
         </div>
@@ -123,14 +132,14 @@ function Inhalt({
               {produkt.labels.map((l) => (
                 <span
                   key={l}
-                  className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground"
+                  className="inline-flex items-center gap-1 rounded-full border border-accent/50 bg-accent/18 px-2.5 py-0.5 text-xs font-semibold text-status-fertig"
                 >
                   {l === 'BIO' && <Leaf className="size-3" aria-hidden="true" />}
                   {SIEGEL[l].name}
                 </span>
               ))}
               {produkt.abgabe === 'NUR_BETRIEBE' && (
-                <span className="inline-flex items-center gap-1 rounded-md border border-notice-line bg-notice px-2.5 py-0.5 text-xs font-semibold text-notice-ink">
+                <span className="inline-flex items-center gap-1 rounded-md border border-primary/45 bg-primary/14 px-2.5 py-0.5 text-xs font-semibold text-status-offen">
                   <Building2 className="size-3" aria-hidden="true" />
                   Nur an Betriebe
                 </span>
@@ -209,11 +218,11 @@ function Inhalt({
             disabled={wirdHinzugefuegt}
             className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-accent text-sm font-semibold text-accent-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
           >
-            <ShoppingCart className="size-4" aria-hidden="true" />
-            In den Warenkorb
+            <ShoppingBasket className="size-4" strokeWidth={1.7} aria-hidden="true" />
+            In den Korb
           </button>
         ) : (
-          <p className="flex min-h-11 items-center justify-center rounded-lg bg-app-chip px-3 text-center text-sm text-app-chip-ink">
+          <p className="flex min-h-11 items-center justify-center rounded-lg bg-muted px-3 text-center text-sm text-muted-foreground">
             {isPaused
               ? SHOP_PAUSED_BUTTON_LABEL
               : !produkt.isAvailable

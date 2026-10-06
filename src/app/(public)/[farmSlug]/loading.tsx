@@ -1,107 +1,98 @@
 /**
- * Ladeansicht der Hofseite — Platzhalter in der Form des fertigen Inhalts
- * (DESIGN_SYSTEM, „Zustände": Skeleton in Kartenform, kein Spinner).
+ * Ladeansicht der Hofseite (neues Design seit Nr. 10) — Platzhalter in der
+ * Form des fertigen Inhalts (DESIGN_SYSTEM, „Zustände": Skeleton in
+ * Kartenform, kein Spinner). Maße von der KundeShell und
+ * src/components/hofseite/hofseite-kunde.tsx abgenommen: Kopfzeile 56/64 px,
+ * Rückweg-Zeile 44 px, Titelbild 220 px (ab md 300 px), Aktionen 44 px,
+ * Reiterleiste 48 px, Inhalt max. 1200 px; ab 1024 px rechts die Spalte
+ * (340/360 px). Gezeigt wird die Übersicht — der häufigste Einstieg.
  *
- * Die Maße sind von der echten Seite abgenommen (src/components/farm/
- * farm-page-view.tsx), damit beim Umschalten nichts springt: Kopfleiste 56 px
- * (ab md 64), Titelbild-Band 260 px (ab md 33vw, ab lg 40vw, höchstens 420),
- * Aktionsleiste 68 px, Reiterleiste ~45 px, Inhaltsspalte max. 960 px,
- * Produktkacheln mit fester Bildfläche von 170 px.
+ * Die Seite steht in der KundeShell und damit im Geltungsbereich
+ * data-design="neu" — diese Ansicht kommt vor der Shell und setzt den Marker
+ * deshalb selbst, sonst blitzten beim Umschalten die alten Farben auf.
  *
- * Die Kopfleiste ist hier ein Platzhalter, nicht die echte `KundenKopf`: Die
- * trägt den Hofnamen und die Rückweg-Logik und bräuchte Daten, die es in
- * diesem Moment noch nicht gibt. Gleiche Höhe, gleicher Rahmen, ruhig.
+ * BEWUSST OHNE Pausen-Hinweis, Fotos und Mini-Warenkorb: Ob es sie gibt,
+ * entscheiden die Daten; Platz, in den nichts einrückt, ließe die Seite
+ * springen.
  */
 export default function HofseiteLaden() {
   return (
-    <div className="min-h-screen animate-pulse bg-app-page" aria-busy="true" aria-label="Hofseite wird geladen">
-      {/* Kopfleiste; ab md darunter die Rückweg-Zeile („‹ Alle Höfe") */}
-      <div className="h-14 border-b border-border bg-card md:h-16" />
-      <div className="hidden md:block" aria-hidden="true">
-        <div className="mx-auto max-w-6xl px-6 pt-4">
-          <div className="h-5 w-24 rounded bg-app-chip" />
+    <div data-design="neu" className="min-h-dvh animate-pulse bg-background" aria-busy="true" aria-label="Hofseite wird geladen">
+      <div className="h-14 border-b border-border bg-background md:h-16" />
+
+      <div className="mx-auto max-w-[1200px] px-4 pt-1 md:px-6 md:pt-3">
+        <div className="flex h-11 items-center">
+          <div className="h-4 w-24 rounded bg-app-chip" />
         </div>
       </div>
 
-      {/* Titelbild-Band mit Namensblock */}
-      <div className="relative max-h-[420px] h-[260px] w-full bg-muted md:h-[33vw] lg:h-[40vw]">
-        <div className="absolute inset-x-0 bottom-0">
-          <div className="mx-auto max-w-[960px] px-4 pb-5 md:px-10">
-            <div className="flex items-center gap-3">
-              <div className="size-14 rounded-full bg-muted-foreground/20 md:size-[72px]" />
-              <div className="h-8 w-52 rounded-lg bg-muted-foreground/20 md:h-9 md:w-72" />
-            </div>
-            <div className="mt-2 flex gap-2">
-              <div className="h-[26px] w-20 rounded-2xl bg-muted-foreground/20" />
-              <div className="h-[26px] w-24 rounded-2xl bg-muted-foreground/20" />
-            </div>
-            <div className="mt-1.5 h-4 w-44 rounded bg-muted-foreground/20" />
+      {/* Titelbild */}
+      <div className="h-[220px] w-full bg-muted md:h-[300px]" />
+
+      {/* Name und Aktionen: am Handy die Knöpfe unter dem Bild, ab md Hofzeichen, Name und Knöpfe in einer Reihe */}
+      <div className="mx-auto max-w-[1200px] px-4 md:flex md:items-end md:gap-6 md:px-6">
+        <div className="hidden md:-mt-11 md:flex md:flex-1 md:items-end md:gap-6">
+          <div className="size-24 shrink-0 rounded-full border-[3px] border-background bg-border" />
+          <div className="pb-1">
+            <div className="h-9 w-72 rounded-lg bg-border" />
+            <div className="mt-2 h-4 w-56 rounded bg-app-chip" />
           </div>
         </div>
-      </div>
-
-      {/* Aktionsleiste: Anrufen · Anfahrt · Teilen */}
-      <div className="border-b border-border bg-card px-4 py-3.5 md:px-10">
-        <div className="mx-auto flex max-w-[960px] justify-end gap-2">
-          <div className="h-10 w-24 rounded-lg bg-muted" />
-          <div className="h-10 w-24 rounded-lg bg-muted" />
-          <div className="h-10 w-10 rounded-lg bg-muted" />
+        <div className="flex gap-2 pt-3.5 md:gap-2.5 md:pt-0 md:pb-1.5">
+          <div className="h-11 flex-1 rounded-full border border-border md:w-28 md:flex-none" />
+          <div className="h-11 flex-1 rounded-full border border-border md:w-28 md:flex-none" />
+          <div className="hidden h-11 w-28 rounded-full border border-border md:block" />
+          <div className="h-11 flex-1 rounded-full bg-muted md:w-40 md:flex-none" />
         </div>
       </div>
 
       {/* Reiterleiste */}
-      <div className="border-b border-border bg-card px-4 md:px-10">
-        <div className="mx-auto flex max-w-[960px] gap-[26px] pt-[13px] pb-[14px]">
-          <div className="h-4 w-20 rounded bg-muted" />
-          <div className="h-4 w-16 rounded bg-muted" />
-          <div className="h-4 w-20 rounded bg-muted" />
+      <div className="mt-5 border-b border-border md:mt-7">
+        <div className="mx-auto flex h-12 max-w-[1200px] items-center gap-7 px-4 md:px-6">
+          <div className="h-4 w-20 rounded bg-border" />
+          <div className="h-4 w-24 rounded bg-app-chip" />
         </div>
       </div>
 
-      <div className="mx-auto max-w-[960px] px-4 pt-[26px] pb-12 md:px-10">
-        {/* Karte „Nächste Abholung" */}
-        <div className="mb-[18px] rounded-[14px] bg-card dark:ring-1 dark:ring-border p-[18px]">
-          <div className="mb-3 h-4 w-40 rounded bg-app-trough" />
-          <div className="flex gap-2">
-            <div className="h-14 flex-1 rounded-[10px] bg-muted" />
-            <div className="h-14 flex-1 rounded-[10px] bg-muted" />
-            <div className="h-14 flex-1 rounded-[10px] bg-muted" />
-          </div>
-        </div>
-
-        {/* Karte „Zahlung & Kontakt" — oben die Holzleiste, 7 px */}
-        <div className="overflow-hidden rounded-[14px] bg-card dark:ring-1 dark:ring-border">
-          <div className="h-[7px] bg-app-trough" />
-          <div className="px-5 pt-[18px] pb-5">
-            <div className="h-4 w-44 rounded bg-app-trough" />
-            <div className="mt-3.5 flex gap-2">
-              <div className="h-8 w-28 rounded-full bg-app-chip" />
-              <div className="h-8 w-24 rounded-full bg-app-chip" />
+      <div className="mx-auto max-w-[1200px] px-4 pt-6 pb-28 md:px-6 md:pt-7 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_360px]">
+        {/* Rechte Spalte (am Handy vor dem Inhalt): Nächste Abholung, Zahlung & Kontakt */}
+        <div className="mb-[26px] flex flex-col gap-[18px] lg:col-start-2 lg:row-start-1 lg:mb-0">
+          <div className="rounded-2xl border border-border bg-card p-[18px]">
+            <div className="h-4 w-36 rounded bg-app-trough" />
+            <div className="mt-3 flex gap-2">
+              <div className="h-[62px] flex-1 rounded-xl bg-muted" />
+              <div className="h-[62px] flex-1 rounded-xl bg-muted" />
+              <div className="h-[62px] flex-1 rounded-xl bg-muted" />
             </div>
-            <div className="mt-4 h-4 w-40 rounded bg-app-chip" />
-            <div className="mt-2 h-4 w-52 rounded bg-app-chip" />
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-[18px]">
+            <div className="h-4 w-40 rounded bg-app-trough" />
+            <div className="mt-3 h-4 w-44 rounded bg-app-chip" />
+            <div className="mt-2.5 h-4 w-36 rounded bg-app-chip" />
+            <div className="mt-2.5 h-4 w-32 rounded bg-app-chip" />
           </div>
         </div>
 
-        {/* Produktkopf */}
-        <div className="mt-[34px] mb-[18px] flex items-baseline gap-3">
-          <div className="h-7 w-48 rounded-lg bg-border" />
-          <div className="h-4 w-20 rounded bg-app-chip" />
-        </div>
-
-        {/* Produktraster — Bildfläche 170 px wie im echten Raster */}
-        <div className="grid grid-cols-2 gap-5 md:grid-cols-3">
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="overflow-hidden rounded-[12px] bg-card dark:ring-1 dark:ring-border">
-              {/* Bildfläche wie im echten Raster: feste 170 px auf --app-chip */}
-              <div className="h-[170px] bg-app-chip" />
-              <div className="p-3">
-                <div className="h-4 w-3/4 rounded bg-app-trough" />
-                <div className="mt-2 h-3 w-1/2 rounded bg-app-chip" />
-                <div className="mt-3 h-9 w-full rounded-lg bg-muted" />
+        {/* Inhalt der Übersicht: Über uns, Produkte */}
+        <div className="flex flex-col gap-[26px] lg:col-start-1 lg:row-start-1">
+          <div className="rounded-2xl border border-border bg-card p-[22px]">
+            <div className="h-5 w-28 rounded bg-border" />
+            <div className="mt-3 h-4 w-full rounded bg-app-chip" />
+            <div className="mt-2 h-4 w-5/6 rounded bg-app-chip" />
+          </div>
+          <div className="h-5 w-32 rounded bg-border" />
+          <div className="grid gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-2 xl:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 md:flex-col md:items-stretch md:gap-0 md:p-0">
+                <div className="size-16 shrink-0 rounded-xl bg-muted md:h-[140px] md:w-full md:rounded-none md:rounded-t-2xl" />
+                <div className="min-w-0 flex-1 md:p-3.5">
+                  <div className="h-4 w-3/4 rounded bg-app-trough" />
+                  <div className="mt-2 h-4 w-1/3 rounded bg-app-chip" />
+                </div>
+                <div className="size-11 shrink-0 rounded-full bg-muted md:mx-3.5 md:mb-3.5 md:h-9 md:w-28 md:self-end" />
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </div>

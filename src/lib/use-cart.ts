@@ -22,7 +22,7 @@ export type Warenkorb = {
   sessionId: string
   isHydrated: boolean
   addItem: (product: Omit<CartItem, 'quantity'>, qty?: number) => Promise<{ ok: boolean; error?: string }>
-  updateQuantity: (productId: string, qty: number) => Promise<void>
+  updateQuantity: (productId: string, qty: number) => Promise<{ ok: boolean; error?: string }>
   removeItem: (productId: string) => void
   clearCart: () => void
 }
@@ -91,10 +91,10 @@ export function useCart(farmId: string, farmSlug: string): Warenkorb {
     return { ok: true }
   }
 
-  async function updateQuantity(productId: string, qty: number) {
+  async function updateQuantity(productId: string, qty: number): Promise<{ ok: boolean; error?: string }> {
     if (qty <= 0) {
       persist(items.filter((i) => i.productId !== productId))
-      return
+      return { ok: true }
     }
 
     const res = await fetch('/api/reserve', {
@@ -105,8 +105,12 @@ export function useCart(farmId: string, farmSlug: string): Warenkorb {
 
     if (res.ok) {
       persist(items.map((i) => (i.productId === productId ? { ...i, quantity: qty } : i)))
+      return { ok: true }
     }
-    // On failure keep existing quantity — reservation will ensure correctness
+    // Bei Ablehnung bleibt die alte Menge; den Grund gibt es zurück, damit die
+    // Hofseite ihn zeigen kann (Nr. 10) — wer ihn nicht braucht, ignoriert ihn.
+    const err = await res.json().catch(() => ({}))
+    return { ok: false, error: err.error }
   }
 
   function removeItem(productId: string) {
