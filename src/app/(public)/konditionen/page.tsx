@@ -5,17 +5,21 @@ import { KONTAKT_EMAIL } from '@/lib/support'
 import { GRUENDUNGS_AUFNAHME_SCHRITTE } from '@/lib/gruendungshof'
 import {
   KONDITIONEN_STAND,
+  KONDITIONEN_UEBERGANG,
   MONATSABRECHNUNG_TEXT,
   PRO_MONAT,
   SERVICEGEBUEHR_SATZ_TEXT,
   SERVICEGEBUEHR_ZAHLT_KUNDE,
+  STARTPHASE_SATZ,
   TARIFE,
+  TARIFE_AB_SATZ,
 } from '@/lib/konditionen'
 
 export const metadata: Metadata = {
   title: 'Konditionen für Höfe — FarmerZone',
   description:
-    `Was FarmerZone kostet: ${TARIFE.map((t) => `${t.name} ${t.preis} ${PRO_MONAT}`).join(', ')}. ` +
+    `Was FarmerZone kostet: ${STARTPHASE_SATZ} ${TARIFE_AB_SATZ} ` +
+    `${TARIFE.map((t) => `${t.name} ${t.preis} ${PRO_MONAT}`).join(', ')}. ` +
     `Die Servicegebühr von ${SERVICEGEBUEHR_SATZ_TEXT} zahlt der Kunde.`,
 }
 
@@ -37,7 +41,8 @@ export default function KonditionenPage() {
   return (
     <div className="min-h-screen bg-background">
       <KundenKopf seite={{ art: 'info' }} />
-      <div className="max-w-2xl mx-auto px-4 py-10">
+      {/* Landmarke für Axe (landmark-one-main, region) — sonst stand der Inhalt außerhalb jeder Region. */}
+      <main className="max-w-2xl mx-auto px-4 py-10">
         {/* Kicker im Stil der Startseite */}
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Was es kostet
@@ -48,6 +53,8 @@ export default function KonditionenPage() {
 
           <section>
             <h2 className="font-semibold text-foreground text-base mb-3">Tarife</h2>
+            {/* Vor den Preisen, damit keiner als heute fällig gelesen wird (Register K1). */}
+            <p className="mb-3 font-medium text-foreground">{KONDITIONEN_UEBERGANG}</p>
             <ul className="space-y-3">
               {TARIFE.map((tarif) => (
                 <li key={tarif.id} className="rounded-lg border border-border px-4 py-3">
@@ -113,7 +120,7 @@ export default function KonditionenPage() {
             Stand: {KONDITIONEN_STAND}
           </p>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

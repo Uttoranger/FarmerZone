@@ -5,9 +5,6 @@
 import { describe, expect, it } from 'vitest'
 import { Tarif } from '@prisma/client'
 import {
-  EINSTIEG_HINWEIS,
-  HOFTOR_ALTERNATIVE,
-  REGISTRIEREN_TARIF,
   SERVICEGEBUEHR_SATZ_TEXT,
   SERVICEGEBUEHR_ZAHLT_KUNDE,
   START_TARIF,
@@ -40,9 +37,6 @@ describe('Tarife (E6)', () => {
   it('gestartet wird mit dem günstigsten Tarif', () => {
     const guenstigster = [...TARIFE].sort((a, b) => a.grundgebuehrCents - b.grundgebuehrCents)[0]
     expect(START_TARIF.id).toBe(guenstigster.id)
-    expect(EINSTIEG_HINWEIS).toBe('Mit dem Tarif Hoftor ab € 0 – monatlich kündbar.')
-    expect(REGISTRIEREN_TARIF).toContain('Tarif Hoftor')
-    expect(HOFTOR_ALTERNATIVE).toContain('€ 0')
   })
 })
 

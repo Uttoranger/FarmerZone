@@ -68,6 +68,26 @@ export function formatZahl(n: number): string {
   return mengenFormat.format(Number.isFinite(n) ? n : 0)
 }
 
+const datumLangFormat = new Intl.DateTimeFormat('de-AT', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  // Ein Stichtag ist ein Wiener Tag, nie der Tag der Serveruhr (Vercel rechnet in UTC).
+  timeZone: 'Europe/Vienna',
+})
+
+/**
+ * „7. Oktober 2026" — ein Tag ausgeschrieben, in Wiener Zeit; österreichisch
+ * mit „Jänner". Für Stichtage in Texten (Konditionen), nicht für Abholtage —
+ * die benennt `abholtagName`.
+ *
+ * Nach dem Tag steht ein geschütztes Leerzeichen: Sonst bleibt „1." am Handy
+ * allein am Zeilenende stehen und der Monat rutscht in die nächste Zeile.
+ */
+export function formatDatumLang(zeitpunkt: Date): string {
+  return datumLangFormat.format(zeitpunkt).replace(/^(\d+\.) /, '$1\u00a0')
+}
+
 /**
  * Dezimalzahl aus getipptem Text — für Preis, Gebindegröße und MwSt im
  * Produktformular. Komma UND Punkt gelten als Dezimaltrenner (die Tastatur

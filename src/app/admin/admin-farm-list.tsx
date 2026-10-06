@@ -17,6 +17,7 @@ import {
 } from '@/lib/farm-aktivitaet'
 import { DE_ADMIN_KLAERUNG, LAND_LABEL, type Land } from '@/lib/laender'
 import { FREISCHALTUNG_EMAIL_OFFEN_TEXT } from '@/lib/email-bestaetigung'
+import { KONDITIONEN_DERZEIT } from '@/lib/konditionen'
 import type { AdminMonatsSpalten } from '@/server/queries/admin'
 import { ServicegebuehrEinstellung } from './servicegebuehr-einstellung'
 import { Button } from '@/components/ui/button'
@@ -345,6 +346,9 @@ export function AdminFarmList({
                   keinen Gründungsplatz. Freischalten ist trotzdem möglich.
                 </p>
               )}
+              {/* Nur ein Hinweis (Register K1): Was öffentlich gilt, steht neben
+                  der Gründungsplatz-Zusage, die bis zur Abrechnung (Gate 8) bleibt. */}
+              <p className="text-xs">{KONDITIONEN_DERZEIT}</p>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">

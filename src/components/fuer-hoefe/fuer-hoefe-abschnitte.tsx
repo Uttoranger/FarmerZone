@@ -7,7 +7,7 @@ import {
   FUER_HOEFE_SCHRITTE,
   FUER_HOEFE_VORTEILE,
 } from '@/lib/fuer-hoefe'
-import { EINSTIEG_HINWEIS, PRO_MONAT, SERVICEGEBUEHR_ZAHLT_KUNDE, TARIFE, type TarifText } from '@/lib/konditionen'
+import { KONDITIONEN_UEBERGANG, PRO_MONAT, SERVICEGEBUEHR_ZAHLT_KUNDE, TARIFE, type TarifText } from '@/lib/konditionen'
 import { categoryImagePath } from '@/lib/product-image'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -62,7 +62,7 @@ export function FuerHoefeEinstieg(): React.JSX.Element {
               Konditionen ansehen
             </Link>
           </div>
-          <p className="text-[13px] text-muted-foreground">{EINSTIEG_HINWEIS}</p>
+          <p className="max-w-[34rem] text-[13px] leading-normal text-muted-foreground">{KONDITIONEN_UEBERGANG}</p>
         </div>
         <HeuteBild />
       </div>
@@ -134,6 +134,9 @@ export function FuerHoefePreise(): React.JSX.Element {
           <h2 id="preise-titel" className={H2}>
             Einfach und fair
           </h2>
+          {/* Die Karten zeigen die Tarife ab dem Stichtag — der Satz davor sagt
+              das, damit kein Preis als heute fällig gelesen wird (K1). */}
+          <p className="text-[14.5px] leading-normal font-semibold text-foreground">{KONDITIONEN_UEBERGANG}</p>
           <p className="text-[14.5px] leading-normal text-foreground">{SERVICEGEBUEHR_ZAHLT_KUNDE}</p>
           <Link
             href="/konditionen"
