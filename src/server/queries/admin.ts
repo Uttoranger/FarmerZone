@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import type { FarmAktivitaet } from '@/lib/farm-aktivitaet'
 import { alsLand, type Land } from '@/lib/laender'
 import { monatsgrenzenWien } from '@/lib/servicegebuehr'
+import { bestaetigungOffen } from '@/lib/email-bestaetigung'
 
 /**
  * Die Monatsspalten je Hof (Sprint servicegebuehr, E-3) — das Fundament der
@@ -34,6 +35,10 @@ export type AdminFarmRow = {
   name: string
   slug: string
   ownerEmail: string
+  /** E-Mail des Inhabers bestätigt (S3, Nr. 17b) — frisch aus der Datenbank. */
+  emailBestaetigt: boolean
+  /** Bestätigung steht aus und ist Pflicht (Konto ab Stichtag): Freischalten gesperrt. */
+  emailBestaetigungOffen: boolean
   createdAt: Date
   approvedAt: Date | null
   archivedAt: Date | null
@@ -142,7 +147,7 @@ export async function getAdminFarms(jetzt: Date = new Date()): Promise<AdminFarm
         serviceFeePercent: true,
         serviceFeeMinCents: true,
         serviceFeeActiveFrom: true,
-        owner: { select: { email: true } },
+        owner: { select: { email: true, emailVerified: true, createdAt: true } },
         _count: { select: { products: true, farmPhotos: true, pickupSlots: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -155,6 +160,8 @@ export async function getAdminFarms(jetzt: Date = new Date()): Promise<AdminFarm
     name: f.name,
     slug: f.slug,
     ownerEmail: f.owner.email,
+    emailBestaetigt: f.owner.emailVerified === true,
+    emailBestaetigungOffen: bestaetigungOffen(f.owner),
     createdAt: f.createdAt,
     approvedAt: f.approvedAt,
     archivedAt: f.archivedAt,

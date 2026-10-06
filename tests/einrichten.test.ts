@@ -120,3 +120,26 @@ describe('vorname', () => {
     expect(vorname('')).toBe('')
   })
 })
+
+describe('einrichtenStand — E-Mail noch nicht bestätigt (S3, Nr. 17b)', () => {
+  it('die Freischaltung wartet auf die Bestätigung, nicht auf uns', () => {
+    const s = schritt({ ...mitHof(), emailOffen: true }, 'freischaltung')
+    expect(s).toMatchObject({ zustand: 'gesperrt', aktion: { art: 'link', href: '/verify', primaer: false } })
+    expect(s.text).toContain('E-Mail')
+  })
+
+  it('Einrichten bleibt offen: Hofseite und Produkte führen weiter in ihre Seiten', () => {
+    const daten = { ...mitHof(), emailOffen: true }
+    expect(schritt(daten, 'hofseite')).toMatchObject({ zustand: 'offen', aktion: { href: '/farm-page' } })
+    expect(schritt(daten, 'produkte')).toMatchObject({ zustand: 'offen', aktion: { href: '/products?neu=1' } })
+  })
+
+  it('Gegenprobe: bestätigt (oder alte Konten ohne Pflicht) wartet die Freischaltung wie bisher auf uns', () => {
+    expect(schritt({ ...mitHof(), emailOffen: false }, 'freischaltung').zustand).toBe('wartet')
+    expect(schritt(mitHof(), 'freischaltung').zustand).toBe('wartet')
+  })
+
+  it('ein freigeschalteter Hof bleibt erledigt', () => {
+    expect(schritt({ ...mitHof({ freigeschaltet: true }), emailOffen: true }, 'freischaltung').zustand).toBe('erledigt')
+  })
+})

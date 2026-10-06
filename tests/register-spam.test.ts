@@ -20,7 +20,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('@/lib/auth', () => ({
-  auth: { api: { getSession: vi.fn(), signUpEmail: vi.fn() } },
+  auth: { api: { getSession: vi.fn(), signUpEmail: vi.fn(), sendVerificationEmail: vi.fn() } },
 }))
 vi.mock('@/lib/prisma', () => ({
   prisma: { user: { update: vi.fn() } },
@@ -216,5 +216,35 @@ describe('checkFormToken', () => {
   it('lehnt ein gültig signiertes Token anderen Zwecks ab', () => {
     // Gleiches Geheimnis, gleiches Verfahren — aber kein Registrierungs-Token.
     expect(checkFormToken(generateReorderToken('order-1', 'farm-1'))).toBe('ungueltig')
+  })
+})
+
+describe('Bestätigungs-Mail erst nach der Rolle (Nr. 17b, Nachbesserung Runde 1)', () => {
+  it('stößt den Versand NACH dem Setzen der Rolle FARMER an, mit der geprüften Adresse', async () => {
+    const reihenfolge: string[] = []
+    vi.mocked(prisma.user.update).mockImplementation((async () => {
+      reihenfolge.push('rolle')
+      return {}
+    }) as never)
+    vi.mocked(auth.api.sendVerificationEmail).mockImplementation((async () => {
+      reihenfolge.push('mail')
+      return { status: true }
+    }) as never)
+
+    expect(await registerFarmer(echteAnmeldung())).toEqual({ ok: true })
+
+    expect(reihenfolge).toEqual(['rolle', 'mail'])
+    const aufruf = vi.mocked(auth.api.sendVerificationEmail).mock.calls[0]?.[0] as { body: { email: string } }
+    expect(aufruf.body.email).toBe(echteAnmeldung().email.trim().toLowerCase())
+  })
+
+  it('ein gescheiterter Anstoß lässt die Registrierung nicht scheitern', async () => {
+    vi.mocked(auth.api.sendVerificationEmail).mockRejectedValue(new Error('kaputt'))
+    expect(await registerFarmer(echteAnmeldung())).toEqual({ ok: true })
+  })
+
+  it('der Bot (Honigtopf) bekommt keine Mail', async () => {
+    await registerFarmer(echteAnmeldung({ website: 'x' }))
+    expect(auth.api.sendVerificationEmail).not.toHaveBeenCalled()
   })
 })

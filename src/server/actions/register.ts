@@ -96,6 +96,18 @@ export async function registerFarmer(data: {
     // Non-fatal: user is created and logged in; role can be fixed manually
   }
 
+  // 4. Bestätigungs-Mail (S3, Nr. 17b) — erst JETZT, mit Rolle FARMER: Der
+  //    Versand geht nur an Höfe (auth.ts prüft die Rolle frisch). Ohne
+  //    Sitzung findet Better Auth das Konto über die Adresse und schickt nur,
+  //    solange es unbestätigt ist; die Mail selbst geht nach der Antwort raus.
+  //    Ein Fehler hier lässt die Registrierung nicht scheitern — der Hof kann
+  //    die Mail auf /verify neu anfordern.
+  try {
+    await auth.api.sendVerificationEmail({ body: { email: validated.data.email } })
+  } catch (err) {
+    console.error('[registerFarmer] Bestätigungs-Mail nicht angestoßen:', err instanceof Error ? err.name : 'unbekannt')
+  }
+
   return { ok: true }
 }
 

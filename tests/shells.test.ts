@@ -263,6 +263,8 @@ describe('kein Big Bang', () => {
     // Route darin (seit Nr. 16 /farm-page); umgestellt wird durch Umzug des
     // Ordners von (farmer) nach (hof).
     '(hof)/layout.tsx',
+    // Nr. 17b: „E-Mail bestätigen" (neu, Fokus-Shell wie /register).
+    '(auth)/verify/page.tsx',
   ]
 
   it('nur die Vorschau unter /intern und die umgestellten Routen binden eine Shell ein', () => {

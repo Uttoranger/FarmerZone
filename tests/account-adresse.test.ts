@@ -36,6 +36,8 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     customerFarmSubscription: { findMany: vi.fn(), upsert: vi.fn(), deleteMany: vi.fn(), updateMany: vi.fn() },
     user: { delete: vi.fn(), findUnique: vi.fn() },
+    // Löschen läuft seit Nr. 17b in einer Transaktion: Abos und Konto zusammen.
+    $transaction: vi.fn(async (schritte: Promise<unknown>[]) => Promise.all(schritte)),
   },
 }))
 // Die Darstellung hat eigene Wege (Browser-Prüfung); hier zählt, was die Seite ihr übergibt.
@@ -44,7 +46,7 @@ vi.mock('@/app/account/profile/profile-client', () => ({ ProfileClient: () => nu
 
 import AccountProfilePage from '@/app/account/profile/page'
 import { updateSubscription, deleteCustomerAccount } from '@/server/actions/subscriptions'
-import { adresseBestaetigt } from '@/lib/anmeldecode'
+import { adresseBestaetigt, kundinnenKonto } from '@/lib/anmeldecode'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
@@ -67,7 +69,11 @@ const ABO = {
  * Sitzung und Datenbank getrennt: `inDb` ist der frische Stand des Kontos,
  * `imCookie` der zwischengespeicherte im Sitzungsobjekt (Standard: gleich).
  */
-function sitzung(inDb: boolean, imCookie: boolean = inDb): void {
+function sitzung(
+  inDb: boolean,
+  imCookie: boolean = inDb,
+  konto: { role: string; isAdmin: boolean } = { role: 'CUSTOMER', isAdmin: false }
+): void {
   getSession.mockResolvedValue({
     user: {
       id: 'user_1',
@@ -78,7 +84,7 @@ function sitzung(inDb: boolean, imCookie: boolean = inDb): void {
       phone: '+43 660 0000001',
     },
   } as never)
-  userFindUnique.mockResolvedValue({ email: 'erika.mustermann@example.org', emailVerified: inDb } as never)
+  userFindUnique.mockResolvedValue({ email: 'erika.mustermann@example.org', emailVerified: inDb, ...konto } as never)
 }
 
 type ProfilProps = { subscriptions: unknown[]; user: Record<string, unknown> }
@@ -137,7 +143,7 @@ describe('/account/profile — nur die eigene, bestätigte Adresse', () => {
 
     const abos = await aboAnzeige()
 
-    expect(userFindUnique).toHaveBeenCalledWith({ where: { id: 'user_1' }, select: { email: true, emailVerified: true } })
+    expect(userFindUnique).toHaveBeenCalledWith({ where: { id: 'user_1' }, select: { email: true, emailVerified: true, role: true, isAdmin: true } })
     expect(abos).toHaveLength(1)
   })
 
@@ -241,5 +247,57 @@ describe('Abos ändern und löschen — nur mit bestätigter Adresse', () => {
 
     expect(aboDeleteMany).toHaveBeenCalledWith({ where: { customerEmail: 'erika.mustermann@example.org' } })
     expect(userDelete).toHaveBeenCalledWith({ where: { id: 'user_1' } })
+  })
+
+  it('ein bestätigter Hof löscht über „Konto löschen" weder Abos noch Konto (Nr. 17b)', async () => {
+    // Seit 17b sind neue Höfe bestätigt — vorher schützte nur, dass Hof-Konten
+    // unbestätigt waren. Ohne Rollenprüfung verschwänden die Abos zur Adresse,
+    // und das Löschen des Kontos scheiterte danach an Farm.ownerId.
+    sitzung(true, true, { role: 'FARMER', isAdmin: false })
+
+    expect((await deleteCustomerAccount()).error).toBeTruthy()
+    expect(aboDeleteMany).not.toHaveBeenCalled()
+    expect(userDelete).not.toHaveBeenCalled()
+  })
+
+  it('ein Betreiber-Konto (isAdmin, Rolle CUSTOMER) löscht sich so nicht', async () => {
+    sitzung(true, true, { role: 'CUSTOMER', isAdmin: true })
+
+    expect((await deleteCustomerAccount()).error).toBeTruthy()
+    expect(aboDeleteMany).not.toHaveBeenCalled()
+    expect(userDelete).not.toHaveBeenCalled()
+  })
+
+  it('Abos und Konto gehen in EINER Transaktion', async () => {
+    sitzung(true)
+
+    expect(await deleteCustomerAccount()).toEqual({})
+    expect(prisma.$transaction).toHaveBeenCalledOnce()
+  })
+})
+
+describe('/account nur für Kundinnen-Konten (Nr. 17b, Nachbesserung Runde 1)', () => {
+  it('ein bestätigter Hof mit der Adresse der Abos sieht keine Abos und ändert keine', async () => {
+    sitzung(true, true, { role: 'FARMER', isAdmin: false })
+
+    expect(await aboAnzeige()).toEqual([])
+    expect((await updateSubscription('farm_1', false, false)).error).toBeTruthy()
+    expect(aboFindMany).not.toHaveBeenCalled()
+    expect(aboUpsert).not.toHaveBeenCalled()
+  })
+
+  it('ein Betreiber-Konto ebenso', async () => {
+    sitzung(true, true, { role: 'CUSTOMER', isAdmin: true })
+
+    expect(await aboAnzeige()).toEqual([])
+    expect((await updateSubscription('farm_1', false, false)).error).toBeTruthy()
+  })
+
+  it('kundinnenKonto: nur CUSTOMER ohne isAdmin', () => {
+    expect(kundinnenKonto({ role: 'CUSTOMER', isAdmin: false })).toBe(true)
+    expect(kundinnenKonto({ role: 'FARMER', isAdmin: false })).toBe(false)
+    expect(kundinnenKonto({ role: 'CUSTOMER', isAdmin: true })).toBe(false)
+    expect(kundinnenKonto({ role: 'ADMIN' })).toBe(false)
+    expect(kundinnenKonto(null)).toBe(false)
   })
 })

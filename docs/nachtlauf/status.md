@@ -22,8 +22,8 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 15 | Für Höfe, Registrieren, Einrichten | fertig | `nacht/2026-10-06/15-fuer-hoefe` | #179 | 14 (#178) | Konditionen entschieden (Register K1 → 17d); S3 freigegeben (→ 17b) | 06.10.2026 |
 | 16 | Mein Hof | fertig | `nacht/2026-10-06/16-mein-hof` | #180 | 15 (#179) | erste Route in HofShell (`(hof)`); Handy: Bearbeiten unter Checkliste entscheiden | 06.10.2026 |
 | 17 | Heute | fertig | `nacht/2026-10-06/17-heute` | #181 | 16 (#180) | Stripe-Hinweis: Bestandsregel mit Konto statt wörtlicher Gate-Bedingung entscheiden; Teilen abschaltbar → Gate 7 | 06.10.2026 |
-| 17a | E8 – Checkout ohne Kundenkonto | offen | | | | | |
-| 17b | E-Mail-Bestätigung für neue Höfe (S3) | offen | | | | | |
+| 17a | E8 – Checkout ohne Kundenkonto | fertig | `nacht/2026-10-06/17a-checkout-ohne-konto` | #183 | main | Altlast-Sperre beim Ablehnen; „/account" auf Abos umgedeutet; Name/Telefon nach fremder Registrierung (Vorschlag) | 06.10.2026 |
+| 17b | E-Mail-Bestätigung für neue Höfe (S3) | läuft | `nacht/2026-10-06/17b-email-bestaetigung` | | 17a (#183) | | 06.10.2026 |
 | 17c | Slug-Prüfung absichern | offen | | | | | |
 | 17d | Konditionen-Übergang (K1) | offen | | | | | |
 | 18 | Produkte | offen | | | | | |

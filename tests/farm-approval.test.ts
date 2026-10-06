@@ -61,6 +61,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
+import { EMAIL_BESTAETIGUNG_STICHTAG, FREISCHALTUNG_EMAIL_OFFEN_TEXT } from '@/lib/email-bestaetigung'
 import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
 
@@ -341,7 +342,8 @@ describe('Freigabe-Actions', () => {
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
-      owner: { email: 'bauer@testhof.at' },
+      // Konto vor dem Stichtag, unbestätigt: bestehende Höfe bleiben unberührt (17b).
+      owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: false },
     } as never)
 
     const result = await approveFarmAction('farm_1')
@@ -359,7 +361,8 @@ describe('Freigabe-Actions', () => {
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
-      owner: { email: 'bauer@testhof.at' },
+      // Konto vor dem Stichtag, unbestätigt: bestehende Höfe bleiben unberührt (17b).
+      owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: false },
     } as never)
 
     await approveFarmAction('farm_1')
@@ -379,13 +382,41 @@ describe('Freigabe-Actions', () => {
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
-      owner: { email: 'bauer@testhof.at' },
+      // Konto vor dem Stichtag, unbestätigt: bestehende Höfe bleiben unberührt (17b).
+      owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: false },
     } as never)
     freischaltMail.mockRejectedValueOnce(new Error('Resend down'))
 
     const result = await approveFarmAction('farm_1')
 
     expect(result.error).toBeUndefined()
+    expect(farmUpdate).toHaveBeenCalledTimes(1)
+  })
+
+  it('schaltet ein neues Konto ohne bestätigte E-Mail NICHT frei — „Hof online stellen" ist gesperrt (S3, 17b)', async () => {
+    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    farmFindUnique.mockResolvedValue({
+      name: 'Testhof',
+      slug: 'testhof',
+      owner: { email: 'bauer@testhof.at', createdAt: new Date(EMAIL_BESTAETIGUNG_STICHTAG.getTime() + 1), emailVerified: false },
+    } as never)
+
+    const result = await approveFarmAction('farm_1')
+
+    expect(result.error).toBe(FREISCHALTUNG_EMAIL_OFFEN_TEXT)
+    expect(farmUpdate).not.toHaveBeenCalled()
+    expect(freischaltMail).not.toHaveBeenCalled()
+  })
+
+  it('Gegenprobe: ein neues Konto MIT bestätigter E-Mail wird freigeschaltet', async () => {
+    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    farmFindUnique.mockResolvedValue({
+      name: 'Testhof',
+      slug: 'testhof',
+      owner: { email: 'bauer@testhof.at', createdAt: new Date(EMAIL_BESTAETIGUNG_STICHTAG.getTime() + 1), emailVerified: true },
+    } as never)
+
+    expect((await approveFarmAction('farm_1')).error).toBeUndefined()
     expect(farmUpdate).toHaveBeenCalledTimes(1)
   })
 

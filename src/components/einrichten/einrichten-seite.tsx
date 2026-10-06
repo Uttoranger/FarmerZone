@@ -1,11 +1,13 @@
 import Link from 'next/link'
-import { Check, Mail } from 'lucide-react'
+import { Check, Mail, MailCheck } from 'lucide-react'
 import type { EinrichtenSchritt, EinrichtenStand } from '@/lib/einrichten'
 import { PRO_MONAT, VOLLER_WARENPREIS, tarifKarte, type TarifId } from '@/lib/konditionen'
 import { KONTAKT_EMAIL } from '@/lib/support'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { HofAnlegenFormular } from '@/components/einrichten/hof-anlegen-formular'
+import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { ErneutSendenKnopf } from '@/components/email-bestaetigung/erneut-senden'
 
 /*
  * „Hof einrichten" (/onboarding, Gate 5 Nr. 15) nach den Mockups
@@ -169,18 +171,43 @@ function HilfeKarte() {
   )
 }
 
+/**
+ * „Bestätige deine E-Mail" (S3, Nr. 17b) — kein Mockup, gebaut nach
+ * DESIGN_SYSTEM.md als orange Hinweiskarte (Hof, Offenes) über dem
+ * Fortschritt. „Erneut senden" als Umriss: Der eine orange Knopf der Seite
+ * bleibt „Mit Stripe einrichten".
+ */
+function EmailBestaetigenHinweis({ email, warteSekunden }: { email: string; warteSekunden: number }): React.JSX.Element {
+  return (
+    <Hinweiskarte
+      ton="orange"
+      symbol={MailCheck}
+      titel="Bestätige deine E-Mail"
+      aktion={<ErneutSendenKnopf warteSekunden={warteSekunden} />}
+    >
+      <p>
+        Wir haben dir einen Link an <strong className="font-semibold break-all">{email}</strong> geschickt. Einrichten
+        kannst du schon jetzt – Fotos hochladen und die Freischaltung gehen, sobald die Adresse bestätigt ist.
+      </p>
+    </Hinweiskarte>
+  )
+}
+
 export function EinrichtenSeite({
   stand,
   vorname,
   person,
   tarif,
   freigeschaltet,
+  emailBestaetigung = null,
 }: {
   stand: EinrichtenStand
   vorname: string
   person: { name: string; email: string }
   tarif: TarifId | null
   freigeschaltet: boolean
+  /** Nur wenn die Bestätigung aussteht (bestaetigungOffen, frisch aus der Datenbank). */
+  emailBestaetigung?: { email: string; warteSekunden: number } | null
 }): React.JSX.Element {
   return (
     <div className="mx-auto max-w-[1180px] px-4 pt-5 pb-12 md:px-8 md:pt-8">
@@ -192,6 +219,7 @@ export function EinrichtenSeite({
       </header>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-7">
         <div className="flex min-w-0 flex-col gap-3">
+          {emailBestaetigung && <EmailBestaetigenHinweis {...emailBestaetigung} />}
           <Fortschritt stand={stand} freigeschaltet={freigeschaltet} />
           <section aria-labelledby="einrichten-schritte">
             <h2 id="einrichten-schritte" className="sr-only">

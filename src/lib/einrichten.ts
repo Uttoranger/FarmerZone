@@ -22,6 +22,12 @@ export type EinrichtenDaten = {
   /** Name aus dem Konto (User.name). */
   personName: string
   email: string
+  /**
+   * Muss die E-Mail-Adresse noch bestätigt werden (S3, Nr. 17b; bestaetigungOffen,
+   * frisch aus der Datenbank)? Dann wartet die Freischaltung auf den Hof,
+   * nicht auf uns. Fehlt die Angabe, gilt nein (Konten vor dem Stichtag).
+   */
+  emailOffen?: boolean
   /** null = noch kein Hof angelegt. */
   hof: {
     name: string
@@ -186,15 +192,27 @@ export function einrichtenStand(daten: EinrichtenDaten): EinrichtenStand {
         zustand: 'erledigt',
         aktion: null,
       }
-    : {
-        id: 'freischaltung',
-        titel: 'Prüfung und Freischaltung',
-        titelKurz: 'Freischaltung',
-        text: 'Wir schauen kurz drüber und melden uns per E-Mail – dann ist dein Hof öffentlich.',
-        textKurz: 'wir melden uns per E-Mail',
-        zustand: hof ? 'wartet' : 'gesperrt',
-        aktion: null,
-      }
+    : hof && daten.emailOffen
+      ? {
+          // Einrichten geht weiter (Texte, Abholzeiten); nur online gehen
+          // wartet auf die Bestätigung — der Link führt zu „Erneut senden".
+          id: 'freischaltung',
+          titel: 'Prüfung und Freischaltung',
+          titelKurz: 'Freischaltung',
+          text: 'Bestätige zuerst deine E-Mail-Adresse – danach schauen wir drüber und schalten deinen Hof frei.',
+          textKurz: 'erst nach der E-Mail-Bestätigung',
+          zustand: 'gesperrt',
+          aktion: { art: 'link', href: '/verify', label: 'E-Mail bestätigen', primaer: false },
+        }
+      : {
+          id: 'freischaltung',
+          titel: 'Prüfung und Freischaltung',
+          titelKurz: 'Freischaltung',
+          text: 'Wir schauen kurz drüber und melden uns per E-Mail – dann ist dein Hof öffentlich.',
+          textKurz: 'wir melden uns per E-Mail',
+          zustand: hof ? 'wartet' : 'gesperrt',
+          aktion: null,
+        }
 
   const schritte = [konto, hofSchritt, produkte, zahlung, sepa, freischaltung].map((s, i) => ({ ...s, nummer: i + 1 }))
   const zaehlend = schritte.filter((s) => s.zustand !== 'hinweis')

@@ -19,6 +19,7 @@ import {
 } from '@/lib/foto-wege'
 import { summarizeUploadBatch, type BatchSkip } from '@/lib/upload-batch'
 import { meldeUploadFehler } from '@/lib/upload-meldung'
+import { UPLOAD_GESPERRT_TEXT } from '@/lib/email-bestaetigung'
 import {
   befundVon,
   leseFehlerBefund,
@@ -128,13 +129,19 @@ function holeHofKennung(): Promise<string> {
               new UploadSchrittFehler(IMAGE_NETWORK_ERROR, { ...befundVon(e), status: r.status })
             )
           )
-        : Promise.reject(
-            new UploadSchrittFehler('Kein Zugriff', {
-              klasse: 'HttpAntwort',
-              meldung: 'Kennung abgelehnt',
-              status: r.status,
-            })
-          )
+        : // Ohne bestätigte E-Mail (S3, Nr. 17b) sagt der Satz, was zu tun
+          // ist — den Wortlaut nehmen wir aus unserer Quelle, nicht aus der Antwort.
+          r
+            .json()
+            .catch(() => null)
+            .then((d: unknown) =>
+              Promise.reject(
+                new UploadSchrittFehler(
+                  (d as { code?: unknown } | null)?.code === 'EMAIL_UNBESTAETIGT' ? UPLOAD_GESPERRT_TEXT : 'Kein Zugriff',
+                  { klasse: 'HttpAntwort', meldung: 'Kennung abgelehnt', status: r.status }
+                )
+              )
+            )
     )
     .then((d: { farmId: string }) => d.farmId)
     .catch((e) => {
@@ -642,7 +649,11 @@ export function useImageUpload({
       // Weg, Versuche, Originalfehler je Anlauf, Ausgang der Lese-Stufe; kein
       // Dateiname (siehe upload-meldung.ts). So ist ohne Bildschirmfoto
       // nachvollziehbar, woran es scheiterte.
-      meldeUploadFehler(e, { datei: file, weg: auswahl.weg, wahl: auswahl.wahl, versuche, diagnose, lesen })
+      // Ausnahme: die gewollte Sperre ohne bestätigte E-Mail (S3, Nr. 17b) —
+      // kein Fehler, nur ein Hinweis an den Bauern.
+      if (!(e instanceof Error && e.message === UPLOAD_GESPERRT_TEXT)) {
+        meldeUploadFehler(e, { datei: file, weg: auswahl.weg, wahl: auswahl.wahl, versuche, diagnose, lesen })
+      }
       // Ein BildFehler bringt seine Ursache mit und bekommt den passenden
       // Text; alles andere behält seine eigene Meldung. Liegt es am Foto
       // oder am Weg, kommt statt der Meldung die Karte.

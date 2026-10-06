@@ -325,6 +325,13 @@ describe('zielNachHofAnmeldung', () => {
     expect(zielNachHofAnmeldung('https://boese.example.com')).toBe('/dashboard')
     expect(zielNachHofAnmeldung('/products')).toBe('/dashboard')
   })
+
+  it('/verify darf als Rückkehr stehen — genau dieser Pfad (Nr. 17b, „Erneut senden" nach dem Anmelden)', () => {
+    expect(zielNachHofAnmeldung('/verify')).toBe('/verify')
+    expect(zielNachHofAnmeldung('/verify?token=x')).toBe('/dashboard')
+    expect(zielNachHofAnmeldung('/verify/../admin')).toBe('/dashboard')
+    expect(zielNachHofAnmeldung('//verify')).toBe('/dashboard')
+  })
 })
 
 describe('Schemas', () => {

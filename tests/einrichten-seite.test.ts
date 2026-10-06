@@ -12,6 +12,7 @@ vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
 }))
 vi.mock('@/server/actions/onboarding', () => ({ checkSlugAvailability: vi.fn(), createFarm: vi.fn() }))
+vi.mock('@/server/actions/email-bestaetigung', () => ({ sendeBestaetigungErneut: vi.fn() }))
 
 import { EinrichtenSeite } from '@/components/einrichten/einrichten-seite'
 import { einrichtenStand, type EinrichtenDaten } from '@/lib/einrichten'
@@ -107,5 +108,39 @@ describe('hofAnlegenFormularSchema — strenger als createFarm', () => {
 
   it('der Server bleibt nachsichtig wie bisher (hofAnlegenSchema unverändert)', () => {
     expect(hofAnlegenSchema.safeParse({ ...gueltig, postalCode: '10100' }).success).toBe(true)
+  })
+})
+
+describe('EinrichtenSeite — E-Mail noch nicht bestätigt (S3, Nr. 17b)', () => {
+  function mitHinweis(emailBestaetigung: { email: string; warteSekunden: number } | null): string {
+    return renderToStaticMarkup(
+      createElement(EinrichtenSeite, {
+        stand: einrichtenStand({ personName: person.name, email: person.email, hof: HOF, emailOffen: emailBestaetigung !== null }),
+        vorname: 'Max',
+        person,
+        tarif: null,
+        freigeschaltet: false,
+        emailBestaetigung,
+      })
+    )
+  }
+
+  it('zeigt „Bestätige deine E-Mail" mit Adresse und „E-Mail erneut senden" — Einrichten bleibt offen', () => {
+    const html = mitHinweis({ email: 'max@example.com', warteSekunden: 0 })
+    expect(html).toContain('Bestätige deine E-Mail')
+    expect(html).toContain('max@example.com')
+    expect(html).toContain('E-Mail erneut senden')
+    expect(html).toContain('href="/verify"')
+    for (const ziel of ['/farm-page', '/products?neu=1']) expect(html).toContain(`href="${ziel}"`)
+  })
+
+  it('der Knopf wartet sichtbar, solange die Bremse greift', () => {
+    expect(mitHinweis({ email: 'max@example.com', warteSekunden: 42 })).toContain('E-Mail erneut senden (42 s)')
+  })
+
+  it('Gegenprobe: ohne offene Bestätigung kein Hinweis', () => {
+    const html = mitHinweis(null)
+    expect(html).not.toContain('Bestätige deine E-Mail')
+    expect(html).not.toContain('E-Mail erneut senden')
   })
 })
