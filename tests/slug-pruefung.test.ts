@@ -110,7 +110,7 @@ describe('checkSlugAvailability — Eingabe', () => {
   it('leer, nur Leerzeichen, kein Text → neutral, keine Abfrage', async () => {
     const { checkSlugAvailability } = await ladeAktionen()
     for (const eingabe of ['', '   ', 42, null, undefined, { name: 'Hof' }, ['Hof']] as unknown[]) {
-      expect(await checkSlugAvailability(eingabe as string), String(eingabe)).toBeNull()
+      expect(await checkSlugAvailability(eingabe), String(eingabe)).toBeNull()
     }
     expect(prisma.farm.findUnique).not.toHaveBeenCalled()
   })
