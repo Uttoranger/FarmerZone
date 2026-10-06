@@ -8,10 +8,18 @@
  * Adresse nur durch die Code-Anmeldung (Better Auth setzt dabei
  * `emailVerified`). Beweist am echten Code (Seite und Server Actions; Auth,
  * Prisma und die Darstellung gemockt):
+ *  - Entschieden wird nach dem FRISCHEN Stand des Kontos in der Datenbank,
+ *    nie nach dem Sitzungsobjekt: Better Auth legt nach der Code-Anmeldung
+ *    eines vorher unbestätigten Kontos den alten Stand (`emailVerified:
+ *    false`) für fünf Minuten in den Cookie-Cache (Nachbesserung Runde 1).
  *  - Bestätigte Adresse: Die Abos werden genau nach DIESER Adresse gelesen
  *    (klein geschrieben), nach nichts anderem — keine Kunden-ID, kein Konto.
  *  - Unbestätigte Adresse: keine Abfrage, keine Abos; Ändern und Löschen der
- *    Abos wirken nicht. Das eigene Konto löschen bleibt möglich.
+ *    Abos wirken nicht; Konto löschen wird ebenfalls abgelehnt, statt das
+ *    Konto zu löschen und die Abos zur Adresse stehen zu lassen.
+ *  - Ein neues Abo übernimmt keine Telefonnummer aus dem Konto (die kann von
+ *    einer unbewiesenen Registrierung stammen); die Seite gibt den Kontonamen
+ *    nicht an den Browser.
  *  - Ohne Sitzung: weiter zur Anmeldung.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -27,7 +35,7 @@ vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     customerFarmSubscription: { findMany: vi.fn(), upsert: vi.fn(), deleteMany: vi.fn(), updateMany: vi.fn() },
-    user: { delete: vi.fn() },
+    user: { delete: vi.fn(), findUnique: vi.fn() },
   },
 }))
 // Die Darstellung hat eigene Wege (Browser-Prüfung); hier zählt, was die Seite ihr übergibt.
@@ -45,6 +53,7 @@ const aboFindMany = vi.mocked(prisma.customerFarmSubscription.findMany)
 const aboUpsert = vi.mocked(prisma.customerFarmSubscription.upsert)
 const aboDeleteMany = vi.mocked(prisma.customerFarmSubscription.deleteMany)
 const userDelete = vi.mocked(prisma.user.delete)
+const userFindUnique = vi.mocked(prisma.user.findUnique)
 
 const ABO = {
   farmId: 'farm_1',
@@ -54,16 +63,34 @@ const ABO = {
   customerPhone: null,
 }
 
-function sitzung(emailVerified: boolean): void {
+/**
+ * Sitzung und Datenbank getrennt: `inDb` ist der frische Stand des Kontos,
+ * `imCookie` der zwischengespeicherte im Sitzungsobjekt (Standard: gleich).
+ */
+function sitzung(inDb: boolean, imCookie: boolean = inDb): void {
   getSession.mockResolvedValue({
-    user: { id: 'user_1', name: 'Erika Mustermann', email: 'Erika.Mustermann@Example.org', emailVerified, role: 'CUSTOMER' },
+    user: {
+      id: 'user_1',
+      name: 'Fremder Name',
+      email: 'Erika.Mustermann@Example.org',
+      emailVerified: imCookie,
+      role: 'CUSTOMER',
+      phone: '+43 660 0000001',
+    },
   } as never)
+  userFindUnique.mockResolvedValue({ email: 'erika.mustermann@example.org', emailVerified: inDb } as never)
 }
 
-/** Die Abos, die die Seite an ProfileClient übergibt. */
+type ProfilProps = { subscriptions: unknown[]; user: Record<string, unknown> }
+
+/** Was die Seite an ProfileClient übergibt. */
+async function profilProps(): Promise<ProfilProps> {
+  const seite = (await AccountProfilePage()) as ReactElement<{ children: ReactElement<ProfilProps> }>
+  return seite.props.children.props
+}
+
 async function aboAnzeige(): Promise<unknown[]> {
-  const seite = (await AccountProfilePage()) as ReactElement<{ children: ReactElement<{ subscriptions: unknown[] }> }>
-  return seite.props.children.props.subscriptions
+  return (await profilProps()).subscriptions
 }
 
 beforeEach(() => {
@@ -105,6 +132,38 @@ describe('/account/profile — nur die eigene, bestätigte Adresse', () => {
     expect(abos).toEqual([])
   })
 
+  it('veraltete Sitzung nach der Code-Anmeldung (Cookie unbestätigt, Datenbank bestätigt): Abos sichtbar', async () => {
+    sitzung(true, false)
+
+    const abos = await aboAnzeige()
+
+    expect(userFindUnique).toHaveBeenCalledWith({ where: { id: 'user_1' }, select: { email: true, emailVerified: true } })
+    expect(abos).toHaveLength(1)
+  })
+
+  it('umgekehrt (Cookie bestätigt, Datenbank nicht): keine Abos', async () => {
+    sitzung(false, true)
+
+    expect(await aboAnzeige()).toEqual([])
+    expect(aboFindMany).not.toHaveBeenCalled()
+  })
+
+  it('das Konto gibt es nicht mehr: keine Abos', async () => {
+    sitzung(true)
+    userFindUnique.mockResolvedValue(null)
+
+    expect(await aboAnzeige()).toEqual([])
+    expect(aboFindMany).not.toHaveBeenCalled()
+  })
+
+  it('gibt den Kontonamen nicht an den Browser (er kann aus einer unbewiesenen Registrierung stammen)', async () => {
+    sitzung(true)
+
+    const { user } = await profilProps()
+
+    expect(user).toEqual({ id: 'user_1', email: 'Erika.Mustermann@Example.org' })
+  })
+
   it('ohne Sitzung: weiter zur Anmeldung, nichts gelesen', async () => {
     getSession.mockResolvedValue(null as never)
 
@@ -134,13 +193,44 @@ describe('Abos ändern und löschen — nur mit bestätigter Adresse', () => {
     })
   })
 
-  it('unbestätigt: Konto löschen lässt fremde Abos zur Adresse stehen, das eigene Konto geht', async () => {
+  it('veraltete Sitzung (Cookie unbestätigt, Datenbank bestätigt): Ändern wirkt', async () => {
+    sitzung(true, false)
+
+    expect(await updateSubscription('farm_1', true, false)).toEqual({})
+    expect(aboUpsert).toHaveBeenCalledOnce()
+  })
+
+  it('umgekehrt (Cookie bestätigt, Datenbank nicht): Ändern wirkt nicht', async () => {
+    sitzung(false, true)
+
+    expect((await updateSubscription('farm_1', true, false)).error).toBeTruthy()
+    expect(aboUpsert).not.toHaveBeenCalled()
+  })
+
+  it('ein neues Abo übernimmt keine Telefonnummer aus dem Konto', async () => {
+    sitzung(true)
+
+    await updateSubscription('farm_1', true, true)
+
+    expect(aboUpsert.mock.calls[0][0].create).toMatchObject({ customerPhone: null })
+    expect(aboUpsert.mock.calls[0][0].update).toEqual({ optInEmail: true, optInWhatsApp: true })
+  })
+
+  it('unbestätigt: Konto löschen wird abgelehnt — weder Konto noch Abos verschwinden', async () => {
     sitzung(false)
 
     const ergebnis = await deleteCustomerAccount()
 
-    expect(ergebnis).toEqual({})
+    expect(ergebnis.error).toBeTruthy()
     expect(aboDeleteMany).not.toHaveBeenCalled()
+    expect(userDelete).not.toHaveBeenCalled()
+  })
+
+  it('veraltete Sitzung (Cookie unbestätigt, Datenbank bestätigt): löscht Abos UND Konto', async () => {
+    sitzung(true, false)
+
+    expect(await deleteCustomerAccount()).toEqual({})
+    expect(aboDeleteMany).toHaveBeenCalledWith({ where: { customerEmail: 'erika.mustermann@example.org' } })
     expect(userDelete).toHaveBeenCalledWith({ where: { id: 'user_1' } })
   })
 
@@ -150,5 +240,6 @@ describe('Abos ändern und löschen — nur mit bestätigter Adresse', () => {
     await deleteCustomerAccount()
 
     expect(aboDeleteMany).toHaveBeenCalledWith({ where: { customerEmail: 'erika.mustermann@example.org' } })
+    expect(userDelete).toHaveBeenCalledWith({ where: { id: 'user_1' } })
   })
 })

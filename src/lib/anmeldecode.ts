@@ -102,13 +102,17 @@ export function codeVersandErlaubt(rolle: string | null | undefined): boolean {
 }
 
 /**
- * Ist die Adresse der Sitzung bewiesen? Nur dann zeigt und ändert /account
+ * Ist die Adresse eines Kontos bewiesen? Nur dann zeigt und ändert /account
  * Daten zur Adresse (Abos aus dem Checkout, Bestellungen). Seit der Checkout
  * kein Konto mehr anlegt (E8, Nr. 17a), kann eine Adresse mit Bestellungen
  * und Abos ohne Konto sein — wer sie kennt, könnte sie mit Passwort
  * registrieren (`requireEmailVerification: false`) und wäre damit angemeldet.
  * Den Besitz beweist nur die Code-Anmeldung: Better Auth setzt dabei
- * `emailVerified` (bei neuem wie bestehendem Konto).
+ * `emailVerified` in der Datenbank. Bei einem vorher unbestätigten Konto
+ * (ruhende Altkonten) steht in der Sitzung bis zu fünf Minuten noch der alte
+ * Stand (Cookie-Cache) — deshalb nie mit `session.user` aufrufen, sondern
+ * über `bestaetigteAdresse` (src/server/kunden-adresse.ts) mit dem frischen
+ * Stand aus der Datenbank.
  */
 export function adresseBestaetigt(nutzer: { emailVerified?: boolean | null } | null | undefined): boolean {
   return nutzer?.emailVerified === true
