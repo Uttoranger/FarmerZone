@@ -13,6 +13,7 @@ Präfixe:
 - **G** – technische Grundsätze
 - **F** – Freigaben nach der Umsetzung
 - **K** – Konditionen
+- **B** – Bezahlung und Gebühren
 - **S** – Sicherheitsanforderung aus Umsetzungsprompt Abschnitt 8
 - **O** – offen
 
@@ -40,7 +41,7 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 ### E4 · Servicegebühr 5 %, immer aufrunden (02.10.2026)
 - **Entscheidung:** **5 %** und mindestens € 0,50, **immer aufgerundet** auf den nächsten Cent. Gerechnet wird nur in `berechneServicegebuehr`. Gespeicherte Beträge alter Bestellungen werden nie neu berechnet.
 - **Begründung:** Preismodell aus der Excel („Es wird aufgerundet").
-- **Dateien:** `src/lib/servicegebuehr.ts` (#167). Den Satz der aktiven Höfe regelt F5.
+- **Dateien:** `src/lib/servicegebuehr.ts` (#167). Den Satz der aktiven Höfe regelt F5. Ausnahme für Barzahlung bis zum SEPA-Start: B1.
 
 ### E5 · Keine „Karte bei Abholung" für neue Bestellungen (02.10.2026)
 - **Entscheidung:** Neue Bestellungen kennen nur online und bar bei Abholung. Der Wert `ONSITE_CARD` bleibt im Enum, bis keine offene Bestellung ihn mehr nutzt (Expand/Contract).
@@ -170,6 +171,23 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Dateien:** `src/lib/konditionen.ts`, `/fuer-hoefe`, `/konditionen`, Registrieren-Link, `src/app/admin/admin-farm-list.tsx`, `src/lib/gruendungshof.ts`.
 - **Datum:** **1. Februar 2027** (festgelegt am 06.10.2026, uttoranger im Chat). Damit ist 17d freigegeben (freigabe.md §8).
 - **Stand:** umgesetzt in 17d.
+
+---
+
+## B – Bezahlung und Gebühren
+
+### B1 · Keine Servicegebühr bei Barzahlung bis zum SEPA-Start (06.10.2026)
+- **Entscheidung (uttoranger):**
+  - Bis zum Start der SEPA-Monatsabrechnung fällt bei Barzahlung keine Servicegebühr an.
+  - Online-Zahlungen behalten die Gebühr, weil Stripe sie direkt einbehält.
+  - Stichtag ist die Konstante `BAR_SERVICEGEBUEHR_AB`. Sie steht standardmäßig auf `TARIFE_AB` (1. Februar 2027). Verschiebt sich die SEPA-Abrechnung, wird nur dieser Stichtag verschoben.
+  - Bestehende Bestellungen behalten ihre gespeicherten Beträge.
+- **Begründung:** Der Hof kassiert die Bargebühr, eingezogen wird sie mangels SEPA aber nicht. Eine Gebühr, die niemand einzieht, würde die Kundin bezahlen, ohne dass die Plattform sie bekommt.
+- **Verhältnis zu anderen Einträgen:**
+  - Ausnahme zu E4 für Barzahlung vor dem Stichtag.
+  - E14 rechnet bei Barbestellungen vor dem Stichtag mit Gebühr 0.
+  - Beantwortet die offene Frage aus 17d (#186): Gebühren aus Barbestellungen vor dem Stichtag werden nicht eingezogen.
+- **Dateien:** `src/lib/servicegebuehr.ts` (`berechneServicegebuehr` bekommt die Zahlungsart), `src/lib/konditionen.ts` (Konstante neben `TARIFE_AB`), Checkout-Server, Kasse/Warenkorb, Artikel fehlt, Admin-Finanzen, Mail „Vor-Ort-Bestellung bestätigt", `/konditionen`, `/fuer-hoefe`, Startseiten-Beispiel. Umsetzung 19a (freigabe.md §9).
 
 ---
 

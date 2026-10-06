@@ -4222,6 +4222,11 @@ Weitere Entscheidungen:
 - **Ein Artikel je Speichern:** Das Mockup zeigt Marken je Position; gespeichert wird je Position einzeln, damit jede Erstattung ihren eigenen Schlüssel und ihren eigenen Stand hat.
 - **Weggefallen**, weil nirgends mehr benutzt: `orders-client.tsx`, `order-card.tsx`, `order-actions.tsx`, `servicegebuehr-anzeige.tsx`. `src/lib/order-groups.ts` samt Test bleibt (nicht Teil des Gates).
 
+## Entscheidung B1 und Vorbereitung Lauf 5 (2026-10-06)
+
+- **B1 – keine Servicegebühr bei Barzahlung bis zum SEPA-Start:** Die Bargebühr kassiert der Hof, eingezogen werden soll sie über die SEPA-Monatsabrechnung. Die gibt es erst ab `TARIFE_AB` (1. Februar 2027, K1). Bis dahin zahlte die Kundin eine Gebühr, die nie bei der Plattform ankommt. Deshalb fällt sie bei Barzahlung bis zum Stichtag `BAR_SERVICEGEBUEHR_AB` weg. Online behält Stripe sie direkt ein, dort bleibt sie. Der Stichtag ist eine eigene Konstante (Standard `TARIFE_AB`): Verschiebt sich die Abrechnung, wird nur er verschoben. Umsetzung 19a.
+- **Lauf 5:** Haltepunkt 22f. Gate 8 ist aufgeteilt in 22a–22f, davor die Aufträge 19c (offene Geldpfad-Punkte aus #188, Morgenbericht Lauf 4 §4), 19a (B1) und 19b (Sicherheits-Altlasten aus Lauf 4). 19c steht vor 19a, weil beide dieselbe Geldlogik berühren. Reihenfolge und Umfang stehen in `docs/nachtlauf/freigabe.md` §9.
+
 ## Nützliche Befehle
 
 ```bash

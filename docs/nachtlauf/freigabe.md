@@ -81,7 +81,7 @@ Alles andere: Gate überspringen und im Morgenbericht nachfragen.
 
 ## 5. Haltepunkt und Rahmen
 
-- Letzte Nummer, die in diesem Lauf noch bearbeitet werden darf: **19** (Lauf 4, siehe §8; Lauf 3 endete bei 17)
+- Letzte Nummer, die in diesem Lauf noch bearbeitet werden darf: **22f** (Lauf 5, siehe §9; Lauf 4 endete bei 19)
 - Kostenrahmen: **40 USD** (wird zusätzlich beim Start als `--max-budget-usd` gesetzt; mit Abo gelten dessen Nutzungsgrenzen)
 
 ## 6. Nachtrag 05.10.2026 (uttoranger)
@@ -124,3 +124,68 @@ Alles andere: Gate überspringen und im Morgenbericht nachfragen.
 
 ### Danach
 Wie geplant **18** Produkte und „Was legst du an?" und **19** Bestellungen, Storno, Artikel fehlt (Freigaben E13, E14 aus Abschnitt 1).
+
+## 9. Lauf 5 (06.10.2026, uttoranger)
+
+- **Haltepunkt: 22f.**
+- **Reihenfolge:** 19c → 19a → 19b → 22a → 22b → 22d → 22e → 20 → 21 → 22c → 22f. 19c steht vor 19a, weil beide dieselbe Geldlogik berühren.
+- Entscheidungen dazu: Register `docs/entscheidungen.md` (B1, E3, E9, E10, E11, E12, E13, K1).
+- **Basis:** #188 (Nr. 19) ist gemergt, ohne die vier offenen Punkte aus Morgenbericht Lauf 4 §4. Deshalb kommt zuerst 19c. Das erste Gate zweigt von `main` ab.
+- **Migrationen:** Braucht eine Nummer eine, gilt Regel 3 in `docs/nachtlauf.md`: nur Expand, und im Morgenbericht hervorheben.
+- **Offen und NICHT anfassen:**
+  - Wortwahl „Entwurf"/„Nicht im Shop";
+  - Name und Telefon aus Alt-Registrierungen;
+  - Ablehnungssperre für den Altbestand;
+  - Fehler-Token (O1);
+  - S11 (O3);
+  - Rückruf (O5).
+
+### 19c Geldpfad „Artikel fehlt" nachziehen (Morgenbericht Lauf 4 §4)
+- Rest-Storno: bezahlten Betrag aus Stripe (`latest_charge.amount`) statt aus der Datenbank; bei Abweichung nichts buchen, Sentry.
+- Sentry-Anweisung im Rest-Pfad korrekt formulieren (Teil-, nicht Vollerstattung).
+- Hof-Text „manuell über das Stripe Dashboard erstatten" ersetzen durch „Wir kümmern uns um die Erstattung und melden uns." plus Meldung an den Admin.
+- Webhook für `refund.failed` / `charge.refund.updated`: gescheiterte Erstattung zurücknehmen und melden.
+- Test für `restNachTeilerstattung` mit Provision > 0.
+
+### 19a B1 – Bargebühr bis Stichtag
+- `berechneServicegebuehr` bekommt die Zahlungsart: `ONSITE_CASH` vor `BAR_SERVICEGEBUEHR_AB` → 0; online immer nach bestehender Regel. Konstante neben `TARIFE_AB`, Standard = `TARIFE_AB`.
+- Dieselbe Funktion in Checkout-Server, Kasse/Warenkorb, Artikel fehlt (E14), Admin-Finanzen. Im Checkout beim Wechsel auf Bar sofort neu rechnen, Hinweis „Bei Barzahlung bis <Vortag des Stichtags> ohne Servicegebühr".
+- Mail „Vor-Ort-Bestellung bestätigt", `/konditionen`, `/fuer-hoefe` und Startseiten-Beispiel ehrlich angleichen (Text aus einer Quelle).
+- Bestehende Bestellungen unverändert. Keine Migration.
+- Tests: Matrix bar/online × vor/nach Stichtag, Grenzzeitpunkt, Artikel fehlt bei Bar ohne Gebühr, Admin-Summen.
+
+### 19b Sicherheits-Altlasten (Morgenbericht Lauf 4 §7)
+- `addFarmPhotoAction`: URL nur aus dem eigenen Blob-Speicher und dem Pfad des eigenen Hofs, sonst ablehnen.
+- Registrierung: neutrale Meldung statt „bereits registriert".
+- Übergangsweg `/magic-link/verify` mit alten Tokens schließen, falls nicht mehr gebraucht; toten Export `authClient.signUp` entfernen.
+- Zod für `updateSubscription` (`farmId`) und `loeseOrtAuf`.
+- `revertOrderStatus`: `paymentStatus` mit `paidAt` stimmig halten; `queries/orders.ts`: Geld als Int-Cent statt `Number(…)`.
+- Kalender-Route: Frist prüfen, signierten Link aus `DESCRIPTION` nehmen.
+- Admin-Knopf „Ablehnen & löschen": Kontrast ≥ 4,5:1.
+- Tests je Punkt.
+
+### 22a Kunden und Kundendetail
+Route in die Gruppe `(hof)` (HofShell), ohne Mockup nach `docs/ai/DESIGN_SYSTEM.md`.
+
+### 22b Verkäufe und „Verkauf eintragen"
+In die HofShell (E13).
+
+### 22d Einstellungen
+Übersicht nach Mockup, alle sechs Unterseiten in die HofShell, `/settings/konditionen` nach K1.
+
+### 22e Beiträge, Hilfe, Meine Meldungen
+Beiträge als Reiter in Mein Hof (E12, `/status` leitet um), Hilfe und Meine Meldungen in die HofShell.
+
+### 20 Futter und Brennmaterial
+Nach Gate 6 (E3, E9 ohne Prüfung, E10, E11). Das Schema aus #169 ist vorhanden, eine neue Migration wird nicht erwartet.
+
+### 21 Teilen
+Nach Gate 7 (`TeilenAufruf` aus #169, Paket `qrcode` erlaubt, siehe §3).
+
+### 22c Auswertung und Region
+- `/region` als eigene Route mit den Reitern Preise vergleichen | Futter kaufen.
+- `/analytics/umfeld` leitet um, die Navigation zeigt auf `/region`.
+- Die Auswertung bekommt die Teilen-Wirkung (aus 21) und die Servicegebühren dieses Monats (ohne SEPA bis zum Stichtag, B1).
+
+### 22f Admin
+In eine eigene AdminShell nach den admin-Mockups. Freischalten bleibt gesperrt ohne Stripe; keine Nummernprüfung (E9).

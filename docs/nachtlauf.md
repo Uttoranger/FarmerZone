@@ -62,11 +62,21 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 17d | Konditionen-Übergang | Register K1, `freigabe.md` §8 | K1 (Datum 1. Februar 2027) |
 | 18 | Produkte und „Was legst du an?" | Gate 5 | E13 |
 | 19 | Bestellungen, Storno, Artikel fehlt | Gate 5 | E14 |
+| 19c | Geldpfad „Artikel fehlt" nachziehen | Morgenbericht Lauf 4 §4, `freigabe.md` §9 | – |
+| 19a | B1 – keine Bargebühr bis zum Stichtag | Register B1, `freigabe.md` §9 | B1 |
+| 19b | Sicherheits-Altlasten aus Lauf 4 | Morgenbericht Lauf 4 §7, `freigabe.md` §9 | – |
 | 20 | Futter und Brennmaterial | Gate 6 | E3, E9, E10, E11, Schema |
 | 21 | Teilen | Gate 7 | Schema „TeilenAufruf", Paket für QR |
-| 22 | Auswerten, Region, Einstellungen, Konditionen, Hilfe, Admin | Gate 8 | E6 für Konditionen-Inhalt |
+| 22a | Kunden und Kundendetail in die HofShell | Gate 8 (Code ohne Mockup) | – |
+| 22b | Verkäufe und „Verkauf eintragen" in die HofShell | Gate 8 | E13 |
+| 22c | Auswertung und Region (`/region`) | Gate 8, `/analytics`, `/region` | B1 (Gebühren dieses Monats), Teilen-Wirkung aus 21 |
+| 22d | Einstellungen (Übersicht, sechs Unterseiten, Konditionen) | Gate 8, `/settings` | K1 |
+| 22e | Beiträge als Reiter in Mein Hof, Hilfe und Meine Meldungen | Gate 8 | E12 |
+| 22f | Admin in der AdminShell | Gate 8, `/admin` | E9 (keine Nummernprüfung) |
 
-**17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8.
+**17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
+
+**Reihenfolge in Lauf 5** (weicht von der Tabellenreihenfolge ab, maßgeblich ist `freigabe.md` §9): 19c → 19a → 19b → 22a → 22b → 22d → 22e → 20 → 21 → 22c → 22f. 19c kommt vor 19a, weil beide dieselbe Geldlogik berühren; 22c nach 21, weil die Auswertung die Teilen-Wirkung braucht.
 
 **06b – Reservierte Slugs vollständig:** `RESERVED_SLUGS` in `src/lib/slug.ts` um alle Ordner aus `KEINE_HOFSEITE` (`next.config.ts`) ergänzen (u. a. `teilen`, `verify`, `konditionen`, `meldungen`, `fehler-melden`, `problem-melden`, `farm-page`, `forgot-password`, `reset-password`, `intern`), plus Test, der beide Listen gegeneinander prüft. Braucht keine Freigabe. In Produktion ist keiner dieser Slugs belegt (geprüft am 05.10.2026).
 
