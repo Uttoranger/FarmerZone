@@ -31,6 +31,17 @@ export const HOF_NICHT_GEFUNDEN_TEXT =
   'Vielleicht hat sich der Link geändert, oder der Hof ist nicht mehr dabei. ' +
   'Andere Höfe in deiner Nähe findest du hier.'
 
+/**
+ * 404 der Produktseite (Nr. 11) — der Hof, das Produkt oder beides gibt es
+ * hier nicht (mehr), oder es steht gerade nicht im Shop. Auch hier kein Grund:
+ * Die Seite unterscheidet die Fälle bewusst nicht (ein ausgeblendetes Produkt
+ * soll sich nicht verraten).
+ */
+export const PRODUKT_NICHT_GEFUNDEN_TITEL = 'Dieses Produkt gibt es hier nicht (mehr)'
+export const PRODUKT_NICHT_GEFUNDEN_TEXT =
+  'Vielleicht ist es gerade nicht im Angebot, oder der Link hat sich geändert. ' +
+  'Frische Produkte von Höfen in deiner Nähe findest du hier.'
+
 /** 500 — unser Fehler. Beide Fehlerseiten sagen denselben Satz. */
 export const FEHLER_TITEL = 'Da ist etwas schiefgelaufen'
 export const FEHLER_TEXT = 'Das liegt an uns, nicht an dir. Deine Bestellungen und Daten sind sicher.'

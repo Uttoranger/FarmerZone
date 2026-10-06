@@ -55,8 +55,12 @@ export function istKaufbar(p: { isAvailable: boolean; stock: number; reservedSto
 
 // ─── Das Angebot eines Hofs ─────────────────────────────────────────────────
 
-/** Kilo- bzw. Literpreis eines Futtermittels — nur Anzeige und Sortierung, nie Abrechnung. */
-export type Grundpreis = { wert: number; einheit: NettoEinheitValue }
+/**
+ * Kilo- bzw. Literpreis eines Futtermittels — nur Anzeige und Sortierung, nie
+ * Abrechnung. `wert` ist ungerundet und nur zum Sortieren; gezeigt wird über
+ * formatKilopreis aus `preis` und `menge` (eine Rundungsstelle, format.ts).
+ */
+export type Grundpreis = { wert: number; einheit: NettoEinheitValue; preis: number; menge: number }
 
 /** Ein KAUFBARES Produkt, so schmal, wie Chips, Facetten und Suche es brauchen. */
 export type AngebotsZeile = {
@@ -97,7 +101,7 @@ export function grundpreisAusKennzeichnung(
 ): Grundpreis | null {
   if (!kennzeichnung) return null
   const wert = kilopreisNetto(price, kennzeichnung.nettoMenge)
-  return wert === null ? null : { wert, einheit: kennzeichnung.nettoEinheit }
+  return wert === null ? null : { wert, einheit: kennzeichnung.nettoEinheit, preis: price, menge: kennzeichnung.nettoMenge }
 }
 
 /** Die Rohzeile der Query → Angebotszeile; null, wenn das Produkt nicht kaufbar ist. */

@@ -411,7 +411,7 @@ function preise(p: AngebotsProdukt): {
 } {
   return {
     preis: formatGrundpreis(p.price, p.unit, p.unitSize),
-    grundpreis: p.grundpreis ? formatKilopreis(p.grundpreis) : formatGrundpreisZeile(p.price, p.unit, p.unitSize),
+    grundpreis: (p.grundpreis && formatKilopreis(p.grundpreis)) || formatGrundpreisZeile(p.price, p.unit, p.unitSize),
   }
 }
 

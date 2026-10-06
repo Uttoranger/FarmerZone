@@ -546,6 +546,22 @@ export function betriebsnummerFuerAnzeige(
 }
 
 // ---------------------------------------------------------------------------
+// Brennmaterial (E11)
+// ---------------------------------------------------------------------------
+
+/** Trocknungsgrad von Brennmaterial — dieselben Werte wie das Prisma-Enum `Trocknung`. */
+export const TROCKNUNG_VALUES = ['OFENFERTIG', 'LUFTTROCKEN', 'FRISCH'] as const
+
+export type TrocknungValue = (typeof TROCKNUNG_VALUES)[number]
+
+/** Wie die Kundin den Trocknungsgrad liest (Produktseite, Nr. 11). Das Formular kommt mit Gate 6. */
+export const TROCKNUNG_LABEL: Record<TrocknungValue, string> = {
+  OFENFERTIG: 'Ofenfertig',
+  LUFTTROCKEN: 'Lufttrocken',
+  FRISCH: 'Frisch, zum selbst Trocknen',
+}
+
+// ---------------------------------------------------------------------------
 // Siegel
 // ---------------------------------------------------------------------------
 

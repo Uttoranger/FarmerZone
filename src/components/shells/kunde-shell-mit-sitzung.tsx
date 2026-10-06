@@ -17,11 +17,22 @@ import { KundeShell } from '@/components/shells/kunde-shell'
  * Konto" einen Augenblick später. Als angemeldet zählt nur die
  * Kunden-Anmeldung (istKundensitzung).
  */
-export function KundeShellMitSitzung({ children }: { children: ReactNode }): React.JSX.Element {
+export function KundeShellMitSitzung({
+  unterleiste,
+  children,
+}: {
+  /** Durchgereicht an die KundeShell — `false` für Fokus-Seiten mit Kopf (Produktseite). */
+  unterleiste?: boolean
+  children: ReactNode
+}): React.JSX.Element {
   const { data } = useSession()
   // Die Rolle ist ein Zusatzfeld (src/lib/auth.ts), das der Sitzungs-Client
   // nicht im Typ kennt — sie steht aber in der Antwort.
   const nutzer = data?.user
   const rolle = nutzer && 'role' in nutzer && typeof nutzer.role === 'string' ? nutzer.role : null
-  return <KundeShell angemeldet={istKundensitzung({ role: rolle })}>{children}</KundeShell>
+  return (
+    <KundeShell angemeldet={istKundensitzung({ role: rolle })} unterleiste={unterleiste}>
+      {children}
+    </KundeShell>
+  )
 }

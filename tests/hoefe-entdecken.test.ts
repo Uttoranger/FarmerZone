@@ -59,9 +59,9 @@ function hof(name: string, zeilen: AngebotsProdukt[]) {
 const eier = angebot({ name: 'Freilandeier', category: 'EIER' })
 const brot = angebot({ name: 'Bauernbrot', category: 'BROT', labels: ['BIO'] })
 const holz = angebot({ name: 'Buche, ofenfertig', category: 'BRENNHOLZ' })
-const heuKlein = angebot({ name: 'Heu im Sackerl', category: 'HEU_STROH', grossgebinde: false, grundpreis: { wert: 0.9, einheit: 'KG' } })
-const heuBallen = angebot({ name: 'Heu Rundballen', category: 'HEU_STROH', grossgebinde: true, grundpreis: { wert: 0.18, einheit: 'KG' } })
-const hafer = angebot({ name: 'Hafer', category: 'GETREIDE_KOERNER', grossgebinde: false, grundpreis: { wert: 0.6, einheit: 'KG' } })
+const heuKlein = angebot({ name: 'Heu im Sackerl', category: 'HEU_STROH', grossgebinde: false, grundpreis: { wert: 0.9, einheit: 'KG', preis: 4.5, menge: 5 } })
+const heuBallen = angebot({ name: 'Heu Rundballen', category: 'HEU_STROH', grossgebinde: true, grundpreis: { wert: 0.18, einheit: 'KG', preis: 54, menge: 300 } })
+const hafer = angebot({ name: 'Hafer', category: 'GETREIDE_KOERNER', grossgebinde: false, grundpreis: { wert: 0.6, einheit: 'KG', preis: 15, menge: 25 } })
 
 const HOEFE = [hof('Hof Müller', [eier, brot, heuKlein]), hof('Waldhof', [holz, heuBallen, hafer])]
 

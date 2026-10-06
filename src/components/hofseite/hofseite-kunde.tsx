@@ -37,6 +37,7 @@ import {
 } from '@/lib/hofseite-kunde'
 import { jsonLdSicher } from '@/lib/json-ld'
 import { korbErlaubt } from '@/lib/hofseite-vorschau'
+import { produktLink } from '@/lib/produktdetail'
 import { rueckweg, type KundenSeite } from '@/lib/kunden-kopf'
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
 import { servicegebuehrSatz } from '@/lib/servicegebuehr'
@@ -72,8 +73,9 @@ import { HofseiteFotos } from '@/components/hofseite/hofseite-fotos'
  * Übersicht · Produkte · Beiträge (in der Adresse, ?reiter=, geschrieben per
  * replaceState), darunter zweispaltig ab 1024 px: der Inhalt des Reiters und
  * die rechte Spalte (EINE Komponente, hofseite-seitenspalte.tsx). Das
- * Produktraster bleibt in jedem Reiter an derselben Stelle eingehängt — Korb,
- * Produktdetail und Nachbestell-Link überstehen so den Wechsel.
+ * Produktraster bleibt in jedem Reiter an derselben Stelle eingehängt — Korb
+ * und Nachbestell-Link überstehen so den Wechsel. Die Karten führen zur
+ * Produktseite (Nr. 11).
  *
  * Was entschieden wird (Reiter, Abschnitte, Zustände, Zahlung, Gebühr), steht
  * in src/lib/hofseite-kunde.ts und bereiche-anzeige.ts.
@@ -443,7 +445,6 @@ export function HofseiteKunde({
               products={produkte}
               farmId={farm.id}
               farmSlug={farm.slug}
-              hof={{ name: farm.name, address: farm.address, postalCode: farm.postalCode, city: farm.city }}
               initialReorderItems={reorderItems && reorderItems.length > 0 ? reorderItems : undefined}
               ownerMode={false}
               isPaused={farm.isPaused}
@@ -453,6 +454,8 @@ export function HofseiteKunde({
               gebuehrKorb={gebuehr?.korb ?? null}
               springeZu={futterSprung ? FUTTER_ABSCHNITT_ANKER : null}
               onGesprungen={() => setFutterSprung(false)}
+              // Karten führen zur Produktseite (Nr. 11) — aus der Vorschau in deren Vorschau.
+              produktLink={(id) => produktLink(farm.slug, id, ansicht.art === 'vorschau')}
             />
           </div>
         </div>

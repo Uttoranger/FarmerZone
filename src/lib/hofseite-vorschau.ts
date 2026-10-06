@@ -102,8 +102,10 @@ export function vorschauMassstab(rahmen: { breite: number; hoehe?: number }, ger
  * Vorschau-Adresse braucht, nimmt diese oder `vorschauAdresse`; die Konstante
  * selbst steht nur hier und in ansichtsModus (tests/hofseite-einmal.test.ts).
  */
-export function vorschauLink(slug: string): string {
-  return `/${slug}?${VORSCHAU_PARAMETER}=1`
+export function vorschauLink(slug: string, unterseite?: string): string {
+  // Eine Unterseite des Hofs (die Produktseite, Nr. 11) bleibt in der Vorschau:
+  // Der Lader dort fragt ansichtsModus wie die Hofseite.
+  return `/${slug}${unterseite ? `/${unterseite}` : ''}?${VORSCHAU_PARAMETER}=1`
 }
 
 /** Die Adresse der Vorschau im Editor-Rahmen — `stand` erzwingt ein Neuladen nach dem Speichern. */

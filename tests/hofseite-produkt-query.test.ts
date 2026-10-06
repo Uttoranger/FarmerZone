@@ -42,7 +42,7 @@ function futter(teil: Record<string, unknown> = {}) {
   }
 }
 
-function rohHof(betriebsnummer: string | null, produktFutter: unknown) {
+function rohHof(betriebsnummer: string | null, produktFutter: unknown, extra: Record<string, unknown> = {}) {
   return {
     id: 'farm_1',
     slug: 'hof-test',
@@ -72,6 +72,7 @@ function rohHof(betriebsnummer: string | null, produktFutter: unknown) {
     serviceFeeMinCents: 0,
     serviceFeeActiveFrom: null,
     betriebsnummer,
+    betriebsstatus: 'PRIMAERPRODUKTION',
     farmValues: [],
     farmPhotos: [],
     pickupSlots: [],
@@ -97,6 +98,9 @@ function rohHof(betriebsnummer: string | null, produktFutter: unknown) {
         seasonEnd: null,
         unavailableReason: null,
         futter: produktFutter,
+        familieId: null,
+        brennmaterial: null,
+        ...extra,
       },
     ],
   }
@@ -142,5 +146,46 @@ describe.each([
   it('ein Produkt ohne Kennzeichnung hat futter: null', async () => {
     findUnique.mockResolvedValue(rohHof(null, null) as never)
     expect((await laden())!.products[0]!.futter).toBeNull()
+  })
+
+  it('der Gebühren-Stichtag geht als ISO-Text an den Browser, nicht als Date (Nr. 11, Nachbesserung 1)', async () => {
+    findUnique.mockResolvedValue({ ...rohHof(null, null), serviceFeeActiveFrom: new Date('2026-01-01T00:00:00.000Z') } as never)
+    expect((await laden())!.serviceFeeActiveFrom).toBe('2026-01-01T00:00:00.000Z')
+    // Gegenprobe: ohne Stichtag (gebührenfrei) bleibt es null.
+    findUnique.mockResolvedValue(rohHof(null, null) as never)
+    expect((await laden())!.serviceFeeActiveFrom).toBeNull()
+  })
+})
+
+describe.each([
+  ['getPublicFarm', () => getPublicFarm('hof-test')],
+  ['getOwnerFarm', () => getOwnerFarm('user_1')],
+])('%s — Produktfamilie, Brennmaterial und Betriebsstatus (Nr. 11)', (_name, laden) => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('reicht familieId und den Betriebsstatus durch (für Größenkacheln und Schild)', async () => {
+    findUnique.mockResolvedValue(rohHof('1234567', futter(), { familieId: 'fam_heu' }) as never)
+    const farm = await laden()
+    expect(farm!.products[0]!.familieId).toBe('fam_heu')
+    expect(farm!.betriebsstatus).toBe('PRIMAERPRODUKTION')
+  })
+
+  it('Brennmaterial-Angaben ohne Datum und Kennungen — nur, was die Kundin liest', async () => {
+    const brennmaterial = {
+      holzart: 'Buche', scheitlaengeCm: 33, trocknung: 'OFENFERTIG', restfeuchteMax: 20,
+      wassergehalt: null, koernung: null, ueberdacht: true,
+    }
+    findUnique.mockResolvedValue(rohHof(null, null, { brennmaterial }) as never)
+    const farm = await laden()
+    expect(farm!.products[0]!.brennmaterial).toEqual(brennmaterial)
+  })
+
+  it('fragt beides in der Datenbank ab', async () => {
+    findUnique.mockResolvedValue(rohHof(null, null) as never)
+    await laden()
+    const select = findUnique.mock.calls[0]![0]!.select as { betriebsstatus?: unknown; products: { select: Record<string, unknown> } }
+    expect(select.betriebsstatus).toBe(true)
+    expect(select.products.select.familieId).toBe(true)
+    expect(select.products.select.brennmaterial).toBeTruthy()
   })
 })

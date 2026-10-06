@@ -63,6 +63,7 @@ import { HofseiteKunde } from '@/components/hofseite/hofseite-kunde'
 import { stripStatusVariables, renderStatusBodyWithChip } from '@/lib/status-body'
 // Ersatz-Titelbild ohne Foto — gemeinsam mit dem Kopf von „Mein Hof".
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
+import { produktLink } from '@/lib/produktdetail'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
 
 const ANLASS_META: Record<string, { label: string; icon: ReactNode }> = {
@@ -1332,11 +1333,13 @@ function HofseiteBesitzer({
           products={productsForGrid}
           farmId={farm.id}
           farmSlug={farm.slug}
-          hof={{ name: farm.name, address: farm.address, postalCode: farm.postalCode, city: farm.city }}
           ownerMode={ownerMode}
           mode={mode}
           isPaused={farm.isPaused}
           onVorschau={onVorschau}
+          // Immer die Vorschau der Produktseite: Hier schaut der Besitzer, und
+          // vor der Freigabe ist die öffentliche Produktseite 404 (OEFFENTLICH_SICHTBAR).
+          produktLink={(id) => produktLink(farm.slug, id, true)}
         />
         </div>{/* Ende #produkte */}
 

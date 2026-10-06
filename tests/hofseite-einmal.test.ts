@@ -281,6 +281,7 @@ function produkt(id: string, name: string, sichtbar: boolean): PublicProduct {
     price: 3.5, unit: 'kg', unitSize: 1, stock: 10, isAvailable: sichtbar, allergens: [],
     isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
     unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
+    familieId: null, brennmaterial: null,
   }
 }
 
@@ -292,7 +293,7 @@ const HOF: PublicFarm = {
   tagline: null, foundedYear: null, aboutText: null, bannerType: 'GRADIENT', bannerValue: null, bannerFocusY: 50,
   sectionsConfig: [], farmValues: [], farmPhotos: [{ id: 'foto_1', url: '/foto.jpg', caption: null, sortOrder: 0 }],
   acceptsOnline: false, acceptsOnsite: true, stripeAccountReady: false, isPaused: true, pauseMessage: null,
-  serviceFeePercent: 0, serviceFeeMinCents: 0, serviceFeeActiveFrom: null,
+  serviceFeePercent: 0, serviceFeeMinCents: 0, serviceFeeActiveFrom: null, betriebsstatus: null,
   products: [produkt('prod_1', 'Kartoffeln', true), produkt('prod_2', 'Zwiebeln', false)],
   pickupSlots: [{ dayOfWeek: 5, startTime: '15:00', endTime: '18:00' }],
 }

@@ -27,7 +27,8 @@ const BESTELLUNG: KundenSeite = { art: 'bestellung', hofSlug: 'testhof' }
 const HOFUEBERSICHT: KundenSeite = { art: 'hofuebersicht' }
 const INFO: KundenSeite = { art: 'info' }
 const BESTELLUNG_UNGUELTIG: KundenSeite = { art: 'bestellung-ungueltig' }
-const ALLE = [HOFSEITE, FUTTER_HOFSEITE, CHECKOUT, BESTAETIGUNG, BESTELLUNG, BESTELLUNG_UNGUELTIG, HOFUEBERSICHT, INFO]
+const PRODUKT: KundenSeite = { art: 'produkt', hofSlug: 'testhof' }
+const ALLE = [HOFSEITE, FUTTER_HOFSEITE, CHECKOUT, BESTAETIGUNG, BESTELLUNG, BESTELLUNG_UNGUELTIG, HOFUEBERSICHT, INFO, PRODUKT]
 
 describe('rueckweg — Hofseite', () => {
   it('vom eigenen Verlauf: einen Schritt zurück, dorthin, wo der Kunde herkam', () => {
@@ -66,6 +67,23 @@ describe('rueckweg — Bestellweg', () => {
   it('Bestellverfolgung mit ungültigem Link: nie über den Verlauf, zur Hofübersicht — der Hof ist nicht bestätigt', () => {
     expect(rueckweg(BESTELLUNG_UNGUELTIG, true)).toEqual({ href: '/hoefe', verlauf: false })
     expect(rueckweg(BESTELLUNG_UNGUELTIG, false)).toEqual({ href: '/hoefe', verlauf: false })
+  })
+})
+
+describe('rueckweg — Produktseite (Nr. 11)', () => {
+  it('zu allen Produkten des Hofs; vom eigenen Verlauf einen Schritt zurück', () => {
+    expect(rueckweg(PRODUKT, false)).toEqual({ href: '/testhof?reiter=produkte', verlauf: false })
+    expect(rueckweg(PRODUKT, true)).toEqual({ href: '/testhof?reiter=produkte', verlauf: true })
+  })
+
+  it('die Zeile nimmt den Verlauf nur, wenn die Hofseite davor stand — dann mit Reiter und Scrollstelle', () => {
+    expect(zeileNimmtVerlauf(PRODUKT, '/testhof')).toBe(true)
+    expect(zeileNimmtVerlauf(PRODUKT, '/hoefe')).toBe(false)
+    expect(zeileNimmtVerlauf(PRODUKT, null)).toBe(false)
+  })
+
+  it('Form wie im Bestellweg: Zurück und Rückweg-Zeile', () => {
+    expect(kopfForm(PRODUKT)).toEqual({ zurueck: true, warenkorb: false, rueckwegZeile: true })
   })
 })
 
@@ -302,6 +320,8 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     'src/app/(public)/problem-melden/page.tsx': ['info'],
     // Die Hofseite trägt seit Nr. 10 die KundeShell (siehe unten).
     'src/app/(public)/[farmSlug]/page.tsx': [],
+    // Die Produktseite trägt seit Nr. 11 die KundeShell ohne Unterleiste.
+    'src/app/(public)/[farmSlug]/produkt/[id]/page.tsx': [],
   }
 
   it('kennt jede Seite unter (public) — eine neue Seite fällt hier auf', () => {

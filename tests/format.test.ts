@@ -12,6 +12,9 @@ import {
   formatPosition,
   formatGrundpreis,
   formatGrundpreisZeile,
+  formatGrundpreisNetto,
+  formatKilopreis,
+  formatAbGrundpreis,
   grundpreisJeEinheit,
   grundpreisJeKg,
   formatPreisSpanne,
@@ -24,6 +27,8 @@ import {
   mitAnzahl,
   plural,
 } from '@/lib/format'
+import { abGrundpreis, baueAngebotsZeile, grundpreisAusKennzeichnung } from '@/lib/bereiche-anzeige'
+import { LEERER_HOEFE_FILTER } from '@/schemas/hoefe-filter'
 
 /** Intl setzt ein schmales geschütztes Leerzeichen als Tausendertrenner. */
 const norm = (s: string) => s.replace(/[  ]/g, ' ')
@@ -212,6 +217,65 @@ describe('grundpreisJeEinheit — nur zur Anzeige', () => {
 
   it('nimmt Prisma-Decimal-artige Werte an', () => {
     expect(grundpreisJeEinheit(89, { toString: () => '5.000' })).toBe(17.8)
+  })
+})
+
+describe('Grundpreis — EINE Rundungsstelle für jede Ausgabe (Nr. 11, Nachbesserung 1)', () => {
+  // € 2,01 für 2 kg = € 1,005 / kg. 2.01 / 2 * 100 ist in Fließkomma
+  // 100,49999999999999 — wer dort selbst rundet, zeigt € 1,00.
+  const sack = grundpreisAusKennzeichnung(2.01, { nettoMenge: 2, nettoEinheit: 'KG' })
+
+  it('/hoefe, Produkttreffer: € 2,01 für 2 kg zeigt € 1,01 / kg', () => {
+    expect(sack).not.toBeNull()
+    expect(formatKilopreis(sack!)).toBe('€ 1,01 / kg')
+  })
+
+  it('/hoefe, „ab €" (Sortierung nach Kilopreis): derselbe Sack zeigt „ab € 1,01 / kg"', () => {
+    const zeile = baueAngebotsZeile({
+      name: 'Hafer im Sack', isAvailable: true, stock: 5, reservedStock: 0, price: 2.01,
+      category: 'GETREIDE_KOERNER', subcategory: null, labels: [],
+      futter: { zielTierarten: [], nettoMenge: 2, nettoEinheit: 'KG' },
+    })
+    expect(zeile?.grundpreis).not.toBeNull()
+    const ab = abGrundpreis({ angebot: [zeile!] }, { ...LEERER_HOEFE_FILTER, bereich: 'FUTTERMITTEL' })
+    expect(formatAbGrundpreis(ab!)).toBe('ab € 1,01 / kg')
+  })
+
+  it('Gegenprobe: /hoefe, Hofseite und Produktseite schreiben denselben Text', () => {
+    const hoefe = formatKilopreis(sack!)
+    expect(formatGrundpreisNetto(2.01, 2, 'KG')).toBe(hoefe)
+    expect(formatGrundpreisZeile(2.01, 'KG', 2)).toBe(hoefe)
+    expect(formatAbGrundpreis(sack!)).toBe(`ab ${hoefe}`)
+  })
+
+  it('Gebinde mit drei Nachkommastellen (0,125 kg) und ein Halbcent-Fall (0,016 kg)', () => {
+    expect(grundpreisJeEinheit(1.23, 0.125)).toBe(9.84)
+    expect(formatGrundpreisZeile(1.23, 'KG', 0.125)).toBe('€ 9,84 / kg')
+    expect(formatGrundpreisNetto(4.99, 0.125, 'KG')).toBe('€ 39,92 / kg')
+    expect(formatKilopreis(grundpreisAusKennzeichnung(4.99, { nettoMenge: 0.125, nettoEinheit: 'KG' })!)).toBe('€ 39,92 / kg')
+    // 0,01 € / 0,016 kg = 0,625 € / kg → kaufmännisch € 0,63.
+    expect(grundpreisJeEinheit(0.01, 0.016)).toBe(0.63)
+    expect(formatGrundpreisNetto(0.01, 0.016, 'KG')).toBe('€ 0,63 / kg')
+    expect(formatKilopreis(grundpreisAusKennzeichnung(0.01, { nettoMenge: 0.016, nettoEinheit: 'KG' })!)).toBe('€ 0,63 / kg')
+  })
+
+  it('Einheiten g, ml und m³ — je ihre eigene Einheit hinter dem Schrägstrich', () => {
+    expect(formatGrundpreisZeile(3, 'G', 500)).toBe('€ 0,01 / g')
+    expect(formatGrundpreisZeile(2.5, 'ML', 250)).toBe('€ 0,01 / ml')
+    expect(formatGrundpreisZeile(120, 'M3', 2)).toBe('€ 60,00 / m³')
+    expect(formatGrundpreisZeile(100.01, 'M3', 2)).toBe('€ 50,01 / m³')
+    expect(formatGrundpreisZeile(4.5, 'LITER', 5)).toBe('€ 0,90 / L')
+    expect(formatGrundpreisNetto(2.01, 2, 'LITER')).toBe('€ 1,01 / L')
+  })
+
+  it('Preis 0 hat keinen Grundpreis (Zod lässt ihn nicht zu: positive) — keine Zeile statt „€ 0,00 / kg"', () => {
+    expect(grundpreisJeEinheit(0, 2)).toBeNull()
+    expect(formatGrundpreisZeile(0, 'KG', 2)).toBeNull()
+    expect(formatGrundpreisNetto(0, 2, 'KG')).toBeNull()
+    expect(grundpreisAusKennzeichnung(0, { nettoMenge: 2, nettoEinheit: 'KG' })).toBeNull()
+    // Gegenprobe: ohne Gebinde bleibt der Preis selbst, wie bisher.
+    expect(grundpreisJeEinheit(0)).toBe(0)
+    expect(grundpreisJeEinheit(0.01, 2)).toBe(0.01)
   })
 })
 
