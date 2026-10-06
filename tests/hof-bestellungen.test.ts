@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   abholTag,
+  abholungKurz,
   bestellAktionen,
   bestellKopfzeile,
   bestellMarke,
@@ -13,6 +14,7 @@ import {
   fensterZeit,
   gruppiereNachAbholfenster,
   passtZumFilter,
+  positionenText,
   vorname,
   zahlartText,
 } from '@/lib/hof-bestellungen'
@@ -81,7 +83,8 @@ describe('gruppiereNachAbholfenster', () => {
   it('offen: je Tag und Fenster, früh nach spät, mit Zahl', () => {
     const gruppen = gruppiereNachAbholfenster(LISTE, 'offen', JETZT)
     expect(gruppen.map((g) => [g.titel, g.bestellungen.map((x) => x.id)])).toEqual([
-      ['Heute, 15–18 Uhr · 3 Bestellungen', ['anna', 'thomas', 'lena']],
+      // Im selben Fenster fest nach Kennung — eine Zeile springt nicht nach jedem Speichern.
+      ['Heute, 15–18 Uhr · 3 Bestellungen', ['anna', 'lena', 'thomas']],
       ['Samstag, 9–12 Uhr · 1 Bestellung', ['markus']],
     ])
   })
@@ -118,6 +121,11 @@ describe('Kleinigkeiten der Anzeige', () => {
     expect(abholTag(SAMSTAG_MITTAG, JETZT)).toBe('Samstag')
   })
 
+  it('abholungKurz: „heute" klein, Wochentage groß', () => {
+    expect(abholungKurz(HEUTE_MITTAG, '15:00', '18:00', JETZT)).toBe('heute, 15–18 Uhr')
+    expect(abholungKurz(SAMSTAG_MITTAG, '09:00', '12:00', JETZT)).toBe('Samstag, 9–12 Uhr')
+  })
+
   it('Marken: zum Packen orange, gepackt grün, wartet und Erledigtes neutral', () => {
     expect(bestellMarke('CONFIRMED')).toEqual({ text: 'Zum Packen', ton: 'offen' })
     expect(bestellMarke('READY')).toEqual({ text: 'Gepackt', ton: 'fertig' })
@@ -133,6 +141,17 @@ describe('Kleinigkeiten der Anzeige', () => {
     expect(zahlartText('ONLINE', 'REFUNDED')).toBe('Online, erstattet')
     expect(zahlartText('ONSITE_CASH', 'PENDING')).toBe('Bar bei Abholung')
     expect(zahlartText('ONSITE_CARD', 'PENDING')).toBe('Karte bei Abholung')
+  })
+
+  it('positionenText trennt mit Punkt (Namen tragen Kommas), der Rest als Zahl', () => {
+    const items = [
+      { productName: 'Eier, 10 Stück', quantity: 1 },
+      { productName: 'Brot', quantity: 2 },
+      { productName: 'Honig', quantity: 1 },
+      { productName: 'Käse', quantity: 1 },
+    ]
+    expect(positionenText(items)).toBe('1× Eier, 10 Stück · 2× Brot · 1× Honig +1')
+    expect(positionenText([])).toBe('')
   })
 
   it('vorname: erster Teil, sonst „Die Kundin"', () => {

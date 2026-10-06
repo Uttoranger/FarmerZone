@@ -101,7 +101,8 @@ export async function getHeute(farmId: string, jetzt: Date = new Date()): Promis
         status: true,
         totalAmount: true,
         serviceFeeCents: true,
-        items: { select: { productName: true, quantity: true } },
+        // Fehlende Artikel (E14) werden nicht gepackt.
+        items: { where: { fehltSeit: null }, select: { productName: true, quantity: true } },
       },
     }),
     prisma.order.findFirst({

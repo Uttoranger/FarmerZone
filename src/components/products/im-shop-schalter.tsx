@@ -25,7 +25,7 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
  *
  * KEINE RÜCKFRAGE VOR DEM UMSCHALTEN. Ausblenden ist nichts Endgültiges: Der
  * Toast hält sechs Sekunden „Rückgängig" bereit (wie die Bestell-Aktionen,
- * src/components/orders/order-card.tsx). Eine Rückfrage vor jedem Tipp würde
+ * src/components/hof-bestellungen/bestell-detail.tsx). Eine Rückfrage vor jedem Tipp würde
  * den Schalter unbrauchbar machen — man schaltet damit zwanzig Produkte durch.
  */
 

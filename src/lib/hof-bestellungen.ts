@@ -86,6 +86,13 @@ export function abholTag(pickupDate: Date, jetzt: Date): string {
   return abholtagName(heute, tag)
 }
 
+/** „heute, 15–18 Uhr" bzw. „Samstag, 9–12 Uhr" — mitten im Satz klein, Wochentage bleiben groß. */
+export function abholungKurz(pickupDate: Date, start: string, ende: string, jetzt: Date): string {
+  const tag = abholTag(pickupDate, jetzt)
+  const imSatz = tag === 'Heute' || tag === 'Morgen' || tag === 'Gestern' ? tag.toLowerCase() : tag
+  return `${imSatz}, ${fensterZeit(start, ende)}`
+}
+
 export type BestellGruppe<T> = {
   schluessel: string
   /** „Heute, 15–18 Uhr · 3 Bestellungen" */
@@ -110,7 +117,8 @@ export function gruppiereNachAbholfenster<T extends ListenBestellung>(
         wienKalendertag(a.pickupDate).localeCompare(wienKalendertag(b.pickupDate)) ||
         a.pickupTimeStart.localeCompare(b.pickupTimeStart) ||
         a.pickupTimeEnd.localeCompare(b.pickupTimeEnd)
-      return absteigend ? -vergleich : vergleich
+      // Innerhalb eines Fensters fest nach Kennung — sonst springt eine Zeile nach jedem Speichern.
+      return (absteigend ? -vergleich : vergleich) || a.id.localeCompare(b.id)
     })
 
   const gruppen: BestellGruppe<T>[] = []
@@ -128,6 +136,13 @@ export function gruppiereNachAbholfenster<T extends ListenBestellung>(
       titel: `${abholTag(erste.pickupDate, jetzt)}, ${fensterZeit(erste.pickupTimeStart, erste.pickupTimeEnd)} · ${anzahl} ${anzahl === 1 ? 'Bestellung' : 'Bestellungen'}`,
     }
   })
+}
+
+/** „1× Eier · 2× Bauernbrot +1" — Produktnamen tragen oft selbst Kommas, deshalb der Punkt als Trenner. */
+export function positionenText(items: readonly { productName: string; quantity: number }[], hoechstens = 3): string {
+  const gezeigt = items.slice(0, hoechstens).map((i) => `${i.quantity}× ${i.productName}`)
+  const rest = items.length - gezeigt.length
+  return rest > 0 ? `${gezeigt.join(' · ')} +${rest}` : gezeigt.join(' · ')
 }
 
 /** Die Marke einer Bestellung — offen orange, gepackt grün, alles andere neutral. */

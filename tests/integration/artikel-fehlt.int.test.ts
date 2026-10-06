@@ -43,6 +43,7 @@ import { headers } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
 import { Prisma } from '@prisma/client'
 import { cancelOrder, meldeArtikelFehlt } from '@/server/actions/orders'
+import { getHofBestellDetail } from '@/server/queries/orders'
 import { POST as checkout } from '@/app/api/checkout/route'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
@@ -428,5 +429,26 @@ describe('Checkout — Snapshot der Mindestgebühr', () => {
     const bestellt = await prisma.order.findFirstOrThrow({ where: { farmId: farm.id } })
     expect(bestellt.serviceFeeCents).toBe(0)
     expect(bestellt.serviceFeeMinCentsApplied).toBeNull()
+  })
+})
+
+describe('Seitenlader der Bestellung (/orders/[orderId])', () => {
+  it('zeigt eine Bestellung nur dem eigenen Hof, mit der Vorschau aus derselben Rechnung und ohne Geheimnisse', async () => {
+    const { farm, order, position } = await bestellung({ zahlung: 'online', positionen: EIER_BROT, gebuehrCents: 52 })
+    const fremd = await erstelleHof()
+
+    expect(await getHofBestellDetail(fremd.farm, order.id, new Date())).toBeNull()
+
+    const detail = await getHofBestellDetail(farm, order.id, new Date())
+    expect(detail?.positionen.find((p) => p.id === position('Brot').id)?.fehltVorschau).toMatchObject({
+      art: 'teil',
+      erstattungCents: 582,
+      vomHofCents: 580,
+    })
+    // Kein Token, kein Schlüssel, keine PaymentIntent-ID an den Browser.
+    const text = JSON.stringify(detail)
+    expect(text).not.toContain('pi_')
+    expect(detail).not.toHaveProperty('confirmationToken')
+    expect(detail).not.toHaveProperty('idempotencyKey')
   })
 })
