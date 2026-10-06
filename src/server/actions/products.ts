@@ -18,6 +18,9 @@ import { dualUseHinweis, normiereProduktname, DUAL_USE_MIN_ZEICHEN } from '@/lib
 import { dualUseAnfrageSchema } from '@/schemas/product'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
+import { istWiederDa } from '@/lib/produkte-hof'
+import { formatZahl } from '@/lib/format'
+import { bestandVorherSchema, vorratSetzenSchema } from '@/schemas/vorrat'
 
 async function getAuthenticatedFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -45,9 +48,15 @@ function revalidate(farmSlug: string) {
   updateTag(HOEFE_CACHE_TAG)
 }
 
-export type ProduktErgebnis = { ok: true } | { error: string }
+/** GEAENDERT: Der Vorrat hat sich seit dem Öffnen geändert — `vorrat` ist der aktuelle Stand. */
+export type ProduktErgebnis = { ok: true } | { error: string; code?: 'GEAENDERT'; vorrat?: number }
 
-/** Die Produktspalten aus dem geprüften Formular — für create und update dieselben. */
+/**
+ * Die Produktspalten aus dem geprüften Formular — für create und update
+ * dieselben. OHNE den Vorrat: Den schreibt createProduct beim Anlegen und
+ * updateProduct nur bedingt (siehe dort) — ein blindes Setzen überschriebe
+ * eine Bestellung, die während des Bearbeitens kam.
+ */
 function produktDaten(v: ProductFormData) {
   return {
     name: v.name,
@@ -62,7 +71,6 @@ function produktDaten(v: ProductFormData) {
     vatRate: v.vatRate,
     unit: v.unit,
     unitSize: v.unitSize ?? null,
-    stock: v.stock,
     isAvailable: v.isAvailable,
     allergens: v.allergens,
     // isOrganic wird bewusst NICHT mehr geschrieben — Bio lebt in labels.
@@ -129,12 +137,18 @@ export async function createProduct(data: ProductFormData): Promise<ProduktErgeb
     data: {
       farmId: farm.id,
       ...produktDaten(v),
+      stock: v.stock,
       ...(futter ? { futter: { create: futterDaten(futter, new Date()) } } : {}),
     },
   })
 
   revalidate(farm.slug)
   return { ok: true }
+}
+
+/** Der Satz, wenn eine Bestellung den Vorrat geändert hat, während der Hof ihn bearbeitet hat. */
+function vorratGeaendertText(aktuell: number): string {
+  return `Der Vorrat hat sich inzwischen geändert, zum Beispiel durch eine Bestellung. Er steht jetzt bei ${formatZahl(aktuell)} – bitte prüf ihn noch einmal.`
 }
 
 /**
@@ -145,19 +159,40 @@ export async function createProduct(data: ProductFormData): Promise<ProduktErgeb
  * Transaktion, damit nie ein Produkt ohne Kategorie Futtermittel eine
  * Kennzeichnung behält. Der Besitz steht in der WHERE-Klausel des Updates.
  */
-export async function updateProduct(productId: string, data: ProductFormData): Promise<ProduktErgebnis> {
+export async function updateProduct(
+  productId: string,
+  data: ProductFormData,
+  /**
+   * Der Vorrat, den der Dialog beim Öffnen gesehen hat. Hat der Hof ihn
+   * geändert, wird nur gesetzt, wenn die Datenbank noch diesen Wert hält —
+   * wie setzeVorrat. Unverändert (oder ohne Angabe) bleibt der Vorrat
+   * unberührt: Vorher schrieb jedes Speichern den alten Vorrat zurück und
+   * machte eine Bestellung, die während des Bearbeitens kam, wieder verfügbar.
+   */
+  bestandVorher?: number
+): Promise<ProduktErgebnis> {
   const farm = await getAuthenticatedFarm()
   const geprueft = productFormSchema.safeParse(data)
   if (!geprueft.success) return { error: 'Bitte prüfe deine Eingaben.' }
   const v = geprueft.data
+  if (bestandVorher !== undefined && !bestandVorherSchema.safeParse(bestandVorher).success) {
+    return { error: 'Bitte lade die Seite neu und versuch es noch einmal.' }
+  }
   const futter = futterAus(v)
+  const vorratSetzen = bestandVorher !== undefined && v.stock !== bestandVorher
 
   const ergebnis = await prisma.$transaction(async (tx) => {
     const { count } = await tx.product.updateMany({
-      where: { id: productId, farmId: farm.id },
-      data: produktDaten(v),
+      where: vorratSetzen ? { id: productId, farmId: farm.id, stock: bestandVorher } : { id: productId, farmId: farm.id },
+      data: vorratSetzen ? { ...produktDaten(v), stock: v.stock } : produktDaten(v),
     })
-    if (count === 0) return 'nicht-gefunden' as const
+    if (count === 0) {
+      if (!vorratSetzen) return 'nicht-gefunden' as const
+      // Fehlt das Produkt, oder hat eine Bestellung den Vorrat inzwischen
+      // geändert? Der Hof steht auch hier in der WHERE-Klausel.
+      const aktuell = await tx.product.findFirst({ where: { id: productId, farmId: farm.id }, select: { stock: true } })
+      return aktuell ? ({ geaendert: aktuell.stock } as const) : ('nicht-gefunden' as const)
+    }
 
     if (futter) {
       const daten = futterDaten(futter, new Date())
@@ -174,6 +209,7 @@ export async function updateProduct(productId: string, data: ProductFormData): P
   })
 
   if (ergebnis === 'nicht-gefunden') return { error: 'Produkt nicht gefunden.' }
+  if (typeof ergebnis === 'object') return { error: vorratGeaendertText(ergebnis.geaendert), code: 'GEAENDERT', vorrat: ergebnis.geaendert }
 
   revalidate(farm.slug)
   return { ok: true }
@@ -307,40 +343,60 @@ export async function updateProductImageAction(
   return {}
 }
 
-export async function updateStock(productId: string, delta: number): Promise<number> {
-  const farm = await getAuthenticatedFarm()
+export type VorratErgebnis =
+  | { ok: true; vorrat: number; wiederDa: boolean }
+  | { error: string; code?: 'GEAENDERT'; vorrat?: number }
 
-  const existing = await prisma.product.findFirst({
-    where: { id: productId, farmId: farm.id },
-  })
-  if (!existing) throw new Error('Produkt nicht gefunden')
+/**
+ * Vorrat direkt in der Produkttabelle ändern (Nachtlauf Nr. 18) — Stepper
+ * oder eingetippte Zahl.
+ *
+ * EIN SETZEN, KEIN ADDIEREN, UND NUR BEDINGT. Der Hof meint „jetzt liegen 12
+ * da", nicht „12 mehr". Gesetzt wird mit `updateMany`, dessen WHERE-Klausel
+ * Produkt, Hof UND den Vorrat nennt, den der Browser gesehen hat (`vorher`).
+ * Hat inzwischen der Checkout gebucht (`stock >= Menge`, ebenfalls bedingt,
+ * src/app/api/checkout/route.ts) oder ein Storno zurückgebucht, trifft die
+ * Bedingung nicht mehr: Es wird nichts geschrieben, und der Hof bekommt den
+ * aktuellen Stand zurück (GEAENDERT). So überschreibt ein Setzen nie eine
+ * Buchung, die der Hof nicht gesehen hat — und ein blindes increment/decrement
+ * (CLAUDE.md) gibt es nicht.
+ *
+ * Reservierungen (`StockReservation`) buchen keinen Bestand ab
+ * (ARCHITECTURE §5): Setzt der Hof den Vorrat unter das, was gerade in
+ * Warenkörben liegt, scheitert der Checkout dort an der Bedingung
+ * `stock >= Menge` — die Kundin bekommt die bekannte Meldung, der Bestand
+ * fällt nie unter 0. Ein Absenken ist genau die Absicht des Hofs.
+ */
+export async function setzeVorrat(input: unknown): Promise<VorratErgebnis> {
+  const geprueft = vorratSetzenSchema.safeParse(input)
+  if (!geprueft.success) {
+    const amFeld = geprueft.error.issues.find((i) => i.path[0] === 'neu')?.message
+    return { error: amFeld ?? 'Bitte eine ganze Zahl ab 0 eintippen.' }
+  }
+  const { productId, vorher, neu } = geprueft.data
 
-  const newStock = Math.max(0, existing.stock + delta)
-  await prisma.product.update({
-    where: { id: productId },
-    data: { stock: newStock },
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) return { error: 'Bitte melde dich neu an.' }
+  const farm = await getFarmForUser(session.user.id)
+  if (!farm) return { error: 'Kein Hof gefunden.' }
+
+  // Nichts zu ändern — auch kein Schreiben, das eine Buchung überholen könnte.
+  if (neu === vorher) return { ok: true, vorrat: neu, wiederDa: false }
+
+  const { count } = await prisma.product.updateMany({
+    where: { id: productId, farmId: farm.id, stock: vorher },
+    data: { stock: neu },
   })
+
+  if (count === 0) {
+    // Fremd oder unbekannt → keine Auskunft; eigen → der aktuelle Stand.
+    const aktuell = await prisma.product.findFirst({ where: { id: productId, farmId: farm.id }, select: { stock: true } })
+    if (!aktuell) return { error: 'Produkt nicht gefunden.' }
+    return { error: vorratGeaendertText(aktuell.stock), code: 'GEAENDERT', vorrat: aktuell.stock }
+  }
 
   revalidate(farm.slug)
-  return newStock
-}
-
-export async function setStock(productId: string, newStock: number): Promise<number> {
-  const farm = await getAuthenticatedFarm()
-
-  const existing = await prisma.product.findFirst({
-    where: { id: productId, farmId: farm.id },
-  })
-  if (!existing) throw new Error('Produkt nicht gefunden')
-
-  const clamped = Math.max(0, Math.round(newStock))
-  await prisma.product.update({
-    where: { id: productId },
-    data: { stock: clamped },
-  })
-
-  revalidate(farm.slug)
-  return clamped
+  return { ok: true, vorrat: neu, wiederDa: istWiederDa(vorher, neu) }
 }
 
 export async function deleteProduct(productId: string) {

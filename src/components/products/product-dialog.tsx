@@ -95,6 +95,7 @@ import {
   formatBestand,
 } from '@/lib/format'
 import { KategorieSheet } from './kategorie-sheet'
+import type { NeuBereich } from '@/schemas/url-auftrag'
 import { cn } from '@/lib/utils'
 import {
   gewichtFrage,
@@ -115,6 +116,7 @@ import {
   fehlendeAngaben,
   saisonVorbelegung,
   speichernText,
+  dialogTitel,
   zusammensetzungVorbelegung,
   type Abschnitt,
 } from './produkt-abschnitte'
@@ -157,6 +159,15 @@ type Props = {
   onClose: () => void
   /** Betriebsnummer aus den Hof-Einstellungen — nur Anzeige in der Kennzeichnung (F6). */
   hofBetriebsnummer: string | null
+  /**
+   * Die Wahl aus „Was legst du an?" (Nachtlauf Nr. 18), nur beim Anlegen:
+   * Brennmaterial setzt Brennholz, Futtermittel startet die Kategorie bei den
+   * Futtermitteln, Lebensmittel bei den Lebensmitteln. Die Formulare für
+   * Futter und Brennmaterial mit Verkaufsgrößen kommen mit Gate 6 (Nr. 20).
+   */
+  vorwahl?: NeuBereich | null
+  /** Beim Bearbeiten: „Löschen" im Fuß — die Rückfrage stellt der Aufrufer. */
+  onLoeschen?: (product: ProductData) => void
 }
 
 /** Eine leere Kennzeichnung — sobald eine Futter-Kategorie gewählt ist. */
@@ -305,7 +316,7 @@ function chipKlasse(aktiv: boolean): string {
   )
 }
 
-export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Props) {
+export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwahl = null, onLoeschen }: Props) {
   const isEdit = product !== null
   const [isSubmitting, setIsSubmitting] = useState(false)
   // Nur während des Foto-Uploads gesetzt — danach zeigt der Knopf wieder
@@ -342,6 +353,10 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
   // An zeigt das Feld — auch wenn noch nichts drinsteht.
   const [festePakete, setFestePakete] = useState(false)
   const [saisonal, setSaisonal] = useState(false)
+  // Der Vorrat, auf den sich ein geänderter Vorrat bezieht (updateProduct setzt
+  // bedingt). Beim Öffnen der des Produkts; meldet der Server „inzwischen
+  // geändert", der neue Stand — sonst scheiterte jedes weitere Speichern.
+  const [bestandBasis, setBestandBasis] = useState<number | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
   // Über welchen Weg und warum das gewählte Foto kam — nur für die
   // Sentry-Meldung; der Upload läuft hier erst beim Absenden, also bis dahin merken.
@@ -442,6 +457,9 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
       // Beim Bearbeiten stehen die Schalter so, wie das Produkt gespeichert ist.
       setFestePakete(isEdit && product.unitSize != null)
       setSaisonal(isEdit && product.seasonStart != null && product.seasonEnd != null)
+      setBestandBasis(isEdit ? product.stock : null)
+      // „Brennmaterial" im Neu-Menü: Es gibt genau eine Kategorie dafür.
+      if (!isEdit && vorwahl === 'brennmaterial') kategorieSetzen('BRENNHOLZ', null)
     } else {
       // Zu, mit oder ohne Speichern: Der Dialog bleibt eingehängt, die Kopie
       // (bis 25 MB) würde sonst bis zum nächsten Öffnen im Speicher liegen.
@@ -754,11 +772,19 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
 
       const payload: ProductFormData = { ...data, imageUrl }
 
+      // Der Vorrat beim Öffnen: updateProduct setzt einen geänderten Vorrat nur,
+      // wenn inzwischen keine Bestellung gebucht hat (sonst Meldung, nichts gespeichert).
       const ergebnis = isEdit
-        ? await updateProduct(product.id, payload)
+        ? await updateProduct(product.id, payload, bestandBasis ?? product.stock)
         : await createProduct(payload)
       if ('error' in ergebnis) {
         toast.error(ergebnis.error)
+        if ('code' in ergebnis && ergebnis.code === 'GEAENDERT' && ergebnis.vorrat !== undefined) {
+          // Das Feld zeigt jetzt den echten Stand; der Hof prüft und speichert erneut.
+          setBestandBasis(ergebnis.vorrat)
+          form.setValue('stock', ergebnis.vorrat, { shouldDirty: true })
+          abschnittOeffnen('preis')
+        }
         return
       }
       toast.success(isEdit ? 'Produkt gespeichert' : 'Produkt angelegt')
@@ -796,9 +822,16 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
           Inhalt mit allen Abschnitten, Fuß fest. overflow-hidden hält alles im
           Radius; min-h-0 auf dem Inhalt ist die Bedingung dafür, dass er selbst
           scrollt statt den ganzen Dialog aufzublähen. */}
-      <DialogContent className="max-w-lg max-h-[92dvh] flex flex-col gap-0 overflow-hidden p-0">
+      {/* Im neuen Design (/products in der HofShell, Nr. 18) am Handy über die
+          ganze Fläche wie im Mockup mobil-h2-neues-produkt, ab 640 px als
+          Dialog. data-app-palette gibt den Bestandsfarben (--notice*,
+          --app-*) im Teilbaum die Werte des Design-Systems (DESIGN_SYSTEM „Mein Hof"). */}
+      <DialogContent
+        data-app-palette="neu"
+        className="flex h-[100dvh] max-h-[100dvh] max-w-full flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[92dvh] sm:max-w-lg sm:rounded-2xl"
+      >
         <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
-          <DialogTitle>{isEdit ? 'Produkt bearbeiten' : 'Neues Produkt'}</DialogTitle>
+          <DialogTitle className="font-heading text-xl font-semibold">{dialogTitel(isEdit, vorwahl)}</DialogTitle>
         </DialogHeader>
 
         {/* Die drei Datei-Felder bewusst HIER, außerhalb des Akkordeons (#135):
@@ -948,7 +981,11 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                               className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-input bg-card px-3 text-left text-sm"
                             >
                               <span className={cn(!category && 'text-muted-foreground')}>
-                                {category ? formatKategorie(category, werte.subcategory) : 'Keine Angabe'}
+                                {category
+                                  ? formatKategorie(category, werte.subcategory)
+                                  : !isEdit && vorwahl === 'futter'
+                                    ? 'Futtermittel wählen …'
+                                    : 'Keine Angabe'}
                               </span>
                               <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                             </button>
@@ -1793,6 +1830,18 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                 negativen Ränder (die von DialogFooter ragten bei p-0 über die
                 Kante). Hintergrund card, feine Linie oben, Safe-Area-Abstand. */}
             <div className="flex shrink-0 flex-row justify-end gap-2 border-t border-border bg-card px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+              {/* Löschen nur beim Bearbeiten, links und leise — die Rückfrage stellt die Liste. */}
+              {isEdit && onLoeschen && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => onLoeschen(product)}
+                  disabled={isSubmitting}
+                  className="mr-auto text-status-offen hover:bg-primary/10"
+                >
+                  Löschen
+                </Button>
+              )}
               <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>
                 Abbrechen
               </Button>
@@ -1805,7 +1854,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
                   ? uploadFortschritt
                     ? stufenText(uploadFortschritt)
                     : 'Speichere…'
-                  : speichernText(fehlend, isEdit)}
+                  : speichernText(fehlend, isEdit, isAvailable)}
               </Button>
             </div>
           </form>
@@ -1817,6 +1866,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer }: Pro
       open={kategorieSheetOffen}
       onOpenChange={setKategorieSheetOffen}
       wert={{ category, subcategory: werte.subcategory }}
+      startBereich={!isEdit && vorwahl === 'futter' ? 'FUTTERMITTEL' : undefined}
       keineAngabeErlaubt={isEdit}
       onUebernehmen={({ category: neu, subcategory: sorte }) => kategorieUebernehmen(neu, sorte)}
     />

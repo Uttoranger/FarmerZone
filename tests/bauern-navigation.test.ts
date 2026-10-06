@@ -146,7 +146,8 @@ describe('Mein Hof', () => {
   })
 
   it('Produkte trägt den Kopf nicht mehr, sondern eine eigene Überschrift', () => {
-    const seite = quelle('src/app/(farmer)/products/page.tsx')
+    // Seit Nr. 18 in der HofShell: Die Überschrift steht in der Ansicht der Seite.
+    const seite = quelle('src/app/(hof)/products/page.tsx') + quelle('src/components/produkte/produkte-ansicht.tsx')
     expect(seite).not.toContain('MeinHofKopf')
     expect(seite).toMatch(/<h1[^>]*>Produkte<\/h1>/)
   })
@@ -330,14 +331,20 @@ describe('HofShell: Seitenleiste', () => {
     expect(alle.map((p) => p.label)).not.toContain('Beiträge')
   })
 
-  it('Neu-Menü: „Was legst du an?" mit Produkt, Beitrag und Verkauf eintragen (E13) — auf die vorhandenen Dialoge', () => {
+  it('Neu-Menü: „Was legst du an?" mit den drei Bereichen, Beitrag und Verkauf eintragen (E13) — auf die vorhandenen Dialoge', () => {
     expect(HOF_NEU_TITEL).toBe('Was legst du an?')
     expect(hofNavigation({ isAdmin: false }).neu.map((p) => [p.label, p.href])).toEqual([
-      ['Produkt', '/products?neu=1'],
+      ['Lebensmittel', '/products?neu=1&bereich=lebensmittel'],
+      ['Futtermittel', '/products?neu=1&bereich=futter'],
+      ['Brennmaterial', '/products?neu=1&bereich=brennmaterial'],
       ['Neuer Beitrag', '/status/new'],
       ['Verkauf eintragen', '/sales?neu=1'],
     ])
-    for (const p of hofNavigation({ isAdmin: false }).neu) expect(NEU.map((n) => n.href)).toContain(p.href)
+    // Jeder Eintrag führt in einen vorhandenen Dialog — der Bereich ist nur ein Zusatz zum Auftrag.
+    for (const p of hofNavigation({ isAdmin: false }).neu) {
+      const ohneBereich = p.href.replace(/&bereich=[a-z]+$/, '')
+      expect(NEU.map((n) => n.href)).toContain(ohneBereich)
+    }
   })
 })
 

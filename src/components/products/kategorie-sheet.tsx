@@ -68,10 +68,16 @@ export function KategorieSheet({
   wert,
   keineAngabeErlaubt,
   onUebernehmen,
+  startBereich,
 }: {
   open: boolean
   onOpenChange: (offen: boolean) => void
   wert: Wahl
+  /**
+   * Welche Kachel offen ist, solange noch keine Kategorie gewählt ist — „Futtermittel"
+   * aus dem Neu-Menü (Nr. 18). Mit Kategorie entscheidet weiter die Kategorie.
+   */
+  startBereich?: AnzeigeBereich
   /**
    * Darf „Keine Angabe" gewählt werden? Nur beim Bearbeiten — Bestandsprodukte
    * ohne Kategorie bleiben speicherbar. Beim Anlegen ist die Kategorie Pflicht.
@@ -87,7 +93,9 @@ export function KategorieSheet({
       >
         {/* Der Inhalt wird bei jedem Öffnen neu aufgebaut — so startet der
             Entwurf immer beim gespeicherten Wert, ohne Effekt zum Zurücksetzen. */}
-        {open && <SheetInhalt wert={wert} keineAngabeErlaubt={keineAngabeErlaubt} onUebernehmen={onUebernehmen} />}
+        {open && (
+          <SheetInhalt wert={wert} keineAngabeErlaubt={keineAngabeErlaubt} onUebernehmen={onUebernehmen} startBereich={startBereich} />
+        )}
       </SheetContent>
     </Sheet>
   )
@@ -97,14 +105,18 @@ function SheetInhalt({
   wert,
   keineAngabeErlaubt,
   onUebernehmen,
+  startBereich,
 }: {
   wert: Wahl
   keineAngabeErlaubt: boolean
   onUebernehmen: (wahl: Wahl) => void
+  startBereich?: AnzeigeBereich
 }) {
   const start = bereinigt(wert)
   // Die Altlast FUTTERMITTEL öffnet die Futter-Kachel, auch wenn sie leer startet.
-  const [kachel, setKachel] = useState<AnzeigeBereich>(anzeigeBereichVon(wert.category))
+  const [kachel, setKachel] = useState<AnzeigeBereich>(
+    wert.category == null && startBereich ? startBereich : anzeigeBereichVon(wert.category)
+  )
   const [entwurf, setEntwurf] = useState<Wahl>(start)
 
   const kategorien = ANZEIGE_BEREICHE[kachel].kategorien as readonly ProductCategoryValue[]

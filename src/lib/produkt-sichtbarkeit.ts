@@ -72,27 +72,3 @@ export function streifenText(zustand: ProduktZustand): string {
 export function umschaltMeldung(name: string, imShop: boolean): string {
   return imShop ? `${name} ist wieder im Shop` : `${name} ist nicht mehr im Shop`
 }
-
-/**
- * Die Kopfzeile der Produktliste.
- *
- * Gezählt wird `isAvailable`, NICHT der Bestand: Ein ausverkauftes Produkt ist
- * im Shop und wird dort auch gezeigt („Ausverkauft"). Wer es aus der Zählung
- * nähme, ließe den Hof glauben, er habe weniger eingestellt, als die Kundin
- * sieht.
- */
-export function zaehleImShop(produkte: readonly { isAvailable: boolean }[]): {
-  imShop: number
-  gesamt: number
-} {
-  return {
-    imShop: produkte.filter((p) => p.isAvailable).length,
-    gesamt: produkte.length,
-  }
-}
-
-export function kopfzeileProdukte(produkte: readonly { isAvailable: boolean }[]): string {
-  const { imShop, gesamt } = zaehleImShop(produkte)
-  if (gesamt === 0) return 'Noch keine Produkte'
-  return `${imShop} im Shop · ${gesamt} gesamt`
-}

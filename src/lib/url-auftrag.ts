@@ -3,6 +3,7 @@
  * aus „Braucht dich" direkt in einen VORHANDENEN Dialog führen:
  *   /sales?neu=1         → „Verkauf eintragen"
  *   /products?neu=1      → „Produkt anlegen"
+ *   /products?neu=1&bereich=futter → „Produkt anlegen" im Bereich (Neu-Menü, Nr. 18)
  *   /products?edit=<id>  → Produkt bearbeiten
  *
  * Der Dialog öffnet einmal, danach nimmt die Seite den Parameter per
@@ -10,22 +11,28 @@
  * Neuladen öffnet ihn nicht noch einmal. Rein und ohne Browser prüfbar
  * (tests/url-auftrag.test.ts).
  */
-import { urlAuftragSchema } from '@/schemas/url-auftrag'
+import { urlAuftragSchema, type NeuBereich } from '@/schemas/url-auftrag'
 
-export type UrlAuftrag = { art: 'neu' } | { art: 'bearbeiten'; id: string }
+/** `bereich` fehlt, wenn keiner (oder ein unbekannter) in der Adresse stand. */
+export type UrlAuftrag = { art: 'neu'; bereich?: NeuBereich } | { art: 'bearbeiten'; id: string }
 
 /** Die Parameter einer Adresse lesen — `edit` sticht `neu`, Unpassendes ist kein Auftrag. */
 export function leseAuftrag(parameter: { get(name: string): string | null }): UrlAuftrag | null {
-  const { neu, edit } = urlAuftragSchema.parse({ neu: parameter.get('neu'), edit: parameter.get('edit') })
+  const { neu, bereich, edit } = urlAuftragSchema.parse({
+    neu: parameter.get('neu'),
+    bereich: parameter.get('bereich'),
+    edit: parameter.get('edit'),
+  })
   if (edit) return { art: 'bearbeiten', id: edit }
-  if (neu) return { art: 'neu' }
+  if (neu) return bereich ? { art: 'neu', bereich } : { art: 'neu' }
   return null
 }
 
-/** Ein Schlüssel je Auftrag — ändert er sich, ist es ein neuer Auftrag. */
+/** Ein Schlüssel je Auftrag — ändert er sich, ist es ein neuer Auftrag (auch ein anderer Bereich). */
 export function auftragsSchluessel(auftrag: UrlAuftrag | null): string | null {
   if (!auftrag) return null
-  return auftrag.art === 'neu' ? 'neu' : `bearbeiten:${auftrag.id}`
+  if (auftrag.art === 'bearbeiten') return `bearbeiten:${auftrag.id}`
+  return auftrag.bereich ? `neu:${auftrag.bereich}` : 'neu'
 }
 
 /**
@@ -44,6 +51,7 @@ export function auftragsSchritt(
 export function ohneAuftrag(pfad: string, suche: string, anker = ''): string {
   const parameter = new URLSearchParams(suche)
   parameter.delete('neu')
+  parameter.delete('bereich')
   parameter.delete('edit')
   const rest = parameter.toString()
   return `${pfad}${rest ? `?${rest}` : ''}${anker}`

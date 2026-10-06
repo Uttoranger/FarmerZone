@@ -513,12 +513,20 @@ export function teilenKarte({ sichtbar, abholtag }: { sichtbar: boolean; abholta
   return abholtag ? 'schmal' : 'gross'
 }
 
+/**
+ * „Abholung Samstag, 9–12 Uhr" — mitten im Satz klein: „Abholung heute, …",
+ * „Abholung morgen, …"; Wochentage bleiben groß. Ohne Fenster leer.
+ */
+export function abholungText(fenster: NaechstesFenster | null): string {
+  if (!fenster) return ''
+  const tag = fenster.name === 'Heute' || fenster.name === 'Morgen' ? fenster.name.toLowerCase() : fenster.name
+  return `Abholung ${tag}, ${fenster.zeit}`
+}
+
 /** „Eier, Erdäpfel, Heu – Abholung Samstag, 9–12 Uhr" — was es gibt und wann man es holt. */
 export function teilenSatz(angebot: readonly string[], fenster: NaechstesFenster | null): string {
   const was = angebot.join(', ')
-  // Mitten im Satz klein: „Abholung heute, …", „Abholung morgen, …" — Wochentage bleiben groß.
-  const tag = fenster && (fenster.name === 'Heute' || fenster.name === 'Morgen') ? fenster.name.toLowerCase() : fenster?.name
-  const wann = fenster ? `Abholung ${tag}, ${fenster.zeit}` : ''
+  const wann = abholungText(fenster)
   if (was && wann) return `${was} – ${wann}`
   return was || wann || 'Erzähl deinen Kunden, was es bei dir gibt.'
 }

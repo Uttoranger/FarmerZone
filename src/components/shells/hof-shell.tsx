@@ -4,7 +4,6 @@ import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  Banknote,
   BarChart3,
   CalendarCheck,
   ChevronDown,
@@ -13,10 +12,8 @@ import {
   Home,
   LifeBuoy,
   LogOut,
-  Megaphone,
   MoreHorizontal,
   Package,
-  PackagePlus,
   Plus,
   ReceiptText,
   ShieldCheck,
@@ -31,6 +28,7 @@ import { fuehreAbmeldenAus } from '@/lib/abmelden'
 import { hofInitialen } from '@/lib/hof-initialen'
 import { vorschauLink } from '@/lib/hofseite-vorschau'
 import {
+  HOF_NEU_ANDERES_TITEL,
   HOF_NEU_TITEL,
   VERKAUF_UND_KUNDEN_TITEL,
   ABMELDEN_LABEL,
@@ -39,8 +37,7 @@ import {
   hofNavigation,
   type HofNavId,
   type HofNavPunkt,
-  type NeuId,
-  type NeuPunkt,
+  type HofNeuPunkt,
 } from '@/lib/bauern-navigation'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
@@ -49,9 +46,18 @@ import { SidebarEintrag, SidebarGruppe } from '@/components/ui/sidebar-gruppe'
 import { ListGruppe, ListRow } from '@/components/ui/list-row'
 import { Zaehler } from '@/components/ui/zaehler'
 import { Sheet, SheetBlatt, SheetClose, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuLinkItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuLinkItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { ThemeUmschalterZeile } from '@/components/shared/theme-umschalter'
 import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
+import { NEU_SYMBOL } from '@/components/hofbereich/neu-symbol'
 
 /*
  * Die Shell des Hofbereichs im neuen Design (Gate 2). Ordnung, aktive Punkte
@@ -79,11 +85,6 @@ const SYMBOL: Record<HofNavId, LucideIcon> = {
   admin: ShieldCheck,
 }
 
-const NEU_SYMBOL: Record<NeuId, LucideIcon> = {
-  'produkt-anlegen': PackagePlus,
-  'status-posten': Megaphone,
-  'verkauf-eintragen': Banknote,
-}
 
 export type HofShellProps = {
   hofName: string
@@ -198,7 +199,7 @@ function Person({ name }: { name: string }) {
 }
 
 /** Ein Eintrag im Neu-Menü: Symbol, Titel, ein Satz. */
-function NeuInhalt({ punkt }: { punkt: NeuPunkt }) {
+function NeuInhalt({ punkt }: { punkt: HofNeuPunkt }) {
   const Symbol = NEU_SYMBOL[punkt.id]
   return (
     <>
@@ -217,6 +218,8 @@ export function HofShell({ hofName, hofSlug, personName, isAdmin, zahlen, onAbme
   const pathname = usePathname()
   const router = useRouter()
   const nav = hofNavigation({ isAdmin })
+  const neuAnlegen = nav.neu.filter((p) => p.gruppe === 'anlegen')
+  const neuAnderes = nav.neu.filter((p) => p.gruppe === 'anderes')
 
   // Höchstens ein Blatt offen: „Neu" oder „Mehr" (Muster aus farmer-nav.tsx).
   const [offen, setOffen] = useState<'neu' | 'mehr' | null>(null)
@@ -302,7 +305,16 @@ export function HofShell({ hofName, hofSlug, personName, isAdmin, zahlen, onAbme
             <DropdownMenuContent className="w-72">
               <DropdownMenuGroup>
                 <DropdownMenuLabel>{HOF_NEU_TITEL}</DropdownMenuLabel>
-                {nav.neu.map((punkt) => (
+                {neuAnlegen.map((punkt) => (
+                  <DropdownMenuLinkItem key={punkt.id} render={<Link href={punkt.href} />}>
+                    <NeuInhalt punkt={punkt} />
+                  </DropdownMenuLinkItem>
+                ))}
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>{HOF_NEU_ANDERES_TITEL}</DropdownMenuLabel>
+                {neuAnderes.map((punkt) => (
                   <DropdownMenuLinkItem key={punkt.id} render={<Link href={punkt.href} />}>
                     <NeuInhalt punkt={punkt} />
                   </DropdownMenuLinkItem>
@@ -396,19 +408,25 @@ export function HofShell({ hofName, hofSlug, personName, isAdmin, zahlen, onAbme
                   </SheetTrigger>
                   <SheetBlatt className={ueberDerLeiste}>
                     <SheetTitle className="font-heading text-xl font-semibold">{HOF_NEU_TITEL}</SheetTitle>
-                    <ul className="flex flex-col gap-1">
-                      {nav.neu.map((punkt) => (
-                        <li key={punkt.id}>
-                          <Link
-                            href={punkt.href}
-                            onClick={schliessen}
-                            className={cn('flex min-h-14 items-center gap-3 rounded-xl px-2 py-2 hover:bg-muted', FOKUS_RAHMEN)}
-                          >
-                            <NeuInhalt punkt={punkt} />
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
+                    {[neuAnlegen, neuAnderes].map((gruppe, i) => (
+                      <ul
+                        key={i}
+                        aria-label={i === 0 ? HOF_NEU_TITEL : HOF_NEU_ANDERES_TITEL}
+                        className={cn('flex flex-col gap-1', i > 0 && 'border-t border-border pt-2')}
+                      >
+                        {gruppe.map((punkt) => (
+                          <li key={punkt.id}>
+                            <Link
+                              href={punkt.href}
+                              onClick={schliessen}
+                              className={cn('flex min-h-14 items-center gap-3 rounded-xl px-2 py-2 hover:bg-muted', FOKUS_RAHMEN)}
+                            >
+                              <NeuInhalt punkt={punkt} />
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    ))}
                     <SheetClose
                       className={cn('mx-auto min-h-11 rounded-full px-5 text-sm font-semibold text-brand-text hover:bg-muted', FOKUS_RAHMEN)}
                     >

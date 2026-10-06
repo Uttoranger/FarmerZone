@@ -275,9 +275,10 @@ export function ariaAktuell(pfad: string, punkt: NavPunkt): 'page' | 'true' | un
 //  - „Verkauf und Kunden" bekommt „Region". Eine eigene Route /region gibt es
 //    erst mit Gate 8 — bis dahin führt der Punkt auf das heutige Umfeld.
 //  - „Beiträge" ist ein Reiter in Mein Hof (E12), kein eigener Punkt.
-//  - Das Neu-Menü fragt „Was legst du an?". Die Wahl Lebensmittel ·
-//    Futtermittel · Brennmaterial bestimmt erst mit Nr. 18 das Formular; bis
-//    dahin führt „Produkt" auf den vorhandenen Dialog, der alle drei kann.
+//  - Das Neu-Menü fragt „Was legst du an?". Seit Nr. 18 bestimmt die Wahl
+//    Lebensmittel · Futtermittel · Brennmaterial das Formular (?bereich= am
+//    Anlegen-Auftrag, lib/url-auftrag.ts); darunter „Oder etwas anderes":
+//    Beitrag und Verkauf eintragen (E13).
 
 /** Punkte der HofShell: die des Bestands plus „Region". */
 export type HofNavId = NavPunktId | 'region'
@@ -291,11 +292,34 @@ const HOF_VERKAUF_UND_KUNDEN: readonly HofNavPunkt[] = [...VERKAUF_UND_KUNDEN, R
 
 export const HOF_NEU_TITEL = 'Was legst du an?'
 
-/** Das Neu-Menü (Browser: Aufklappmenü am Neu-Knopf, Handy: Blatt hinter dem Plus). */
-const HOF_NEU: readonly NeuPunkt[] = [
-  { id: 'produkt-anlegen', label: 'Produkt', satz: 'Lebensmittel, Futter oder Brennholz', href: '/products?neu=1' },
-  { id: 'status-posten', label: 'Neuer Beitrag', satz: 'Neuigkeit auf deiner Hofseite', href: '/status/new' },
-  { id: 'verkauf-eintragen', label: 'Verkauf eintragen', satz: 'Was du am Hof oder am Markt verkauft hast', href: '/sales?neu=1' },
+/** Die zweite Gruppe des Neu-Menüs (Mockup web-h2-neu-was-legst-du-an). */
+export const HOF_NEU_ANDERES_TITEL = 'Oder etwas anderes'
+
+export type HofNeuId = 'lebensmittel' | 'futtermittel' | 'brennmaterial' | 'status-posten' | 'verkauf-eintragen'
+
+/** Ein Eintrag im Neu-Menü der HofShell: oben die Bereiche (anlegen), darunter der Rest. */
+export type HofNeuPunkt = {
+  id: HofNeuId
+  label: string
+  satz: string
+  href: string
+  gruppe: 'anlegen' | 'anderes'
+}
+
+/**
+ * Das Neu-Menü (Browser: Aufklappmenü am Neu-Knopf und der Dialog hinter
+ * „+ Neues Produkt", Handy: Blatt hinter dem Plus) — EINE Liste für alle drei.
+ * Futtermittel und Brennmaterial führen bis Gate 6 (Nr. 20) in den
+ * vorhandenen Produktdialog, der beide schon kann (Kennzeichnung, Brennholz):
+ * Nichts geht verloren, und nichts verspricht Verkaufsgrößen, die es noch
+ * nicht gibt.
+ */
+export const HOF_NEU: readonly HofNeuPunkt[] = [
+  { id: 'lebensmittel', label: 'Lebensmittel', satz: 'Eier, Gemüse, Fleisch, Brot, Honig …', href: '/products?neu=1&bereich=lebensmittel', gruppe: 'anlegen' },
+  { id: 'futtermittel', label: 'Futtermittel', satz: 'Heu, Stroh, Getreide, Silage', href: '/products?neu=1&bereich=futter', gruppe: 'anlegen' },
+  { id: 'brennmaterial', label: 'Brennmaterial', satz: 'Brennholz, Anzündholz, Hackschnitzel', href: '/products?neu=1&bereich=brennmaterial', gruppe: 'anlegen' },
+  { id: 'status-posten', label: 'Neuer Beitrag', satz: 'Neuigkeit auf deiner Hofseite', href: '/status/new', gruppe: 'anderes' },
+  { id: 'verkauf-eintragen', label: 'Verkauf eintragen', satz: 'Was du am Hof oder am Markt verkauft hast', href: '/sales?neu=1', gruppe: 'anderes' },
 ]
 
 export type HofLeistenPlatz = { art: 'punkt'; punkt: HofNavPunkt } | { art: 'neu' } | { art: 'mehr' }
@@ -321,7 +345,7 @@ export type HofNavigation = {
   verkaufUndKunden: readonly HofNavPunkt[]
   /** Seitenleiste unten, danach folgen Darstellung und Abmelden (Handlungen, keine Ziele). */
   unten: readonly HofNavPunkt[]
-  neu: readonly NeuPunkt[]
+  neu: readonly HofNeuPunkt[]
   handyLeiste: readonly HofLeistenPlatz[]
   /** Das Mehr-Blatt am Handy, danach Darstellung und Abmelden. */
   mehr: readonly HofNavPunkt[]
