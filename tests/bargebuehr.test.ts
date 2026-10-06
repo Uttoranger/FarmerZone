@@ -361,8 +361,10 @@ describe('gebuehrFuerMonatsabrechnung — die Frage hinter jedem Hof-Satz zur Mo
       /betrag\.gebuehrFuerAbrechnung \? ' – die Gebühr holt die Monatsabrechnung\.'/
     )
     expect(lies('src/server/queries/orders.ts')).toMatch(/gebuehrFuerAbrechnung: gebuehrFuerMonatsabrechnung\(\{/)
-    // Gegenprobe: die alte Bedingung fiele auf.
-    expect("betrag.gebuehrCents > 0 ? ' – die Gebühr holt").not.toMatch(/betrag\.gebuehrFuerAbrechnung \?/)
+    // Gegenprobe: die alte Bedingung (jede Gebühr > 0, auch bar vor dem Stichtag) ist weg.
+    expect(lies('src/components/hof-bestellungen/bestell-detail.tsx')).not.toContain(
+      "betrag.gebuehrCents > 0 ? ' – die Gebühr holt"
+    )
   })
 })
 
