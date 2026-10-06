@@ -94,6 +94,8 @@ Der Briefkasten hat zwei API-Routen, weil ihre Aufrufer extern sind (CLI, GitHub
 4. Zod-Validierung des Arguments.
 5. `revalidatePath()` für jede betroffene Route.
 
+**Öffentliche Server Action (ohne Anmeldung)** — Punkte 2 und 3 entfallen, dafür: Argument als `unknown` annehmen und mit Zod prüfen (Längengrenzen aus `src/lib/eingabegrenzen.ts`), Bremse je IP mit einer modulweiten `createRateLimiter`-Instanz und `getClientIp(await headers())` (`src/lib/rate-limit.ts`), wie `enforceRateLimit` nur bei `NODE_ENV === 'production'`; das Limit als Konstante in einem reinen Modul, damit der Test es importieren kann (eine `'use server'`-Datei exportiert nur asynchrone Funktionen). Über dem Limit eine Antwort, die die Oberfläche ruhig behandelt — eine neutrale (`null`, leere Liste) bei reinen Hinweisen, `{ error, code: 'ZU_VIELE' }` bei Aktionen, auf die jemand wartet. Die Antwort verrät nichts, was der Aufrufer nicht schon weiß (keine Unterscheidung nach Freischaltung, Rolle, Bestand). Vorbilder: `checkSlugAvailability` (`src/server/actions/onboarding.ts`, neutral `null`, Antwort nur frei/vergeben), `loeseOrtAuf` (`hoefe.ts`, leere Liste), „Bestellungen finden" (`ZU_VIELE`).
+
 ### Die Admin-Prüfung: `src/server/admin-wache.ts`
 
 Für den Betreiber-Bereich gibt es **eine** Antwort auf „darf dieser Mensch die

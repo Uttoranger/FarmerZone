@@ -3,7 +3,8 @@
  * Einrichten, Nr. 15 Nachbesserung 1): Ein Netzfehler darf nie als
  * unbehandelter Promise-Fehler im Browser enden — die Vorschau bleibt dann
  * neutral („Wird zu deiner Adresse: …"), statt „vergeben" oder „frei" zu
- * behaupten.
+ * behaupten. Dasselbe gilt, wenn die Prüfung selbst neutral antwortet
+ * (null: Eingabe ungültig oder Bremse erreicht, Nr. 17c).
  */
 import { describe, expect, it, vi } from 'vitest'
 import { frageAdresseAb } from '@/lib/hof-adresse'
@@ -24,6 +25,11 @@ describe('frageAdresseAb', () => {
     const pruefe = vi.fn(() => {
       throw new Error('kaputt')
     })
+    await expect(frageAdresseAb('Hof Test', pruefe)).resolves.toBeNull()
+  })
+
+  it('neutrale Antwort der Prüfung (Bremse, ungültige Eingabe): kein Stand', async () => {
+    const pruefe = vi.fn().mockResolvedValue(null)
     await expect(frageAdresseAb('Hof Test', pruefe)).resolves.toBeNull()
   })
 })

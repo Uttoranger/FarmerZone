@@ -119,10 +119,10 @@ describe('Onboarding weicht reservierten Slugs aus', () => {
 
   it('meldet einen Hofnamen, der eine Route ergäbe, als nicht verfügbar', async () => {
     for (const name of ['Teilen', 'Verify', 'Problem melden', 'Farm-Page']) {
-      expect((await checkSlugAvailability(name)).available, name).toBe(false)
+      expect((await checkSlugAvailability(name))?.available, name).toBe(false)
     }
     // Gegenprobe: ein gewöhnlicher Name ist frei.
-    expect((await checkSlugAvailability('Hof am Bach')).available).toBe(true)
+    expect((await checkSlugAvailability('Hof am Bach'))?.available).toBe(true)
   })
 
   it('legt einen Hof namens „Teilen" unter teilen-2 an, nie unter teilen', async () => {

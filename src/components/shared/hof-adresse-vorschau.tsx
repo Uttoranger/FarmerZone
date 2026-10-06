@@ -20,8 +20,9 @@ export function HofAdresseVorschau({ hofname, id }: { hofname: string; id: strin
     if (!hofname.trim()) return
     let aktuell = true
     const warte = setTimeout(async () => {
-      // Ohne Antwort (Netzfehler) bleibt der alte Stand stehen; er passt nicht
-      // zum neuen Slug und zählt daher nicht — die Vorschau ist neutral.
+      // Ohne Antwort (Netzfehler) oder ohne Auskunft (Bremse erreicht, Name zu
+      // lang — Nr. 17c) bleibt der alte Stand stehen; er passt nicht zum neuen
+      // Slug und zählt daher nicht — die Vorschau ist neutral.
       const neu = await frageAdresseAb(hofname, checkSlugAvailability)
       if (aktuell && neu) setStand(neu)
     }, 400)
