@@ -7,10 +7,49 @@ import { findBatchSlotError } from '@/lib/pickup-slot-rules'
 import { ProductUnit } from '@prisma/client'
 import { generateSlug, RESERVED_SLUGS } from '@/lib/slug'
 import { hofAnlegenSchema } from '@/schemas/hofprofil'
+import { adressPruefungSchema, hofSlugSchema } from '@/schemas/hof-adresse'
+import { ADRESS_PRUEFUNG_MAX_PRO_MINUTE, type AdressPruefung } from '@/lib/hof-adresse'
+import { createRateLimiter, getClientIp } from '@/lib/rate-limit'
 import { SERVICEGEBUEHR_STANDARD_MIND_CENTS, SERVICEGEBUEHR_STANDARD_PROZENT } from '@/lib/servicegebuehr'
 
-export async function checkSlugAvailability(name: string): Promise<{ available: boolean; slug: string }> {
-  const slug = generateSlug(name)
+// Modul-Zustand: eine Bremse für alle Aufrufe dieser Instanz (serverless
+// gilt sie damit je Instanz — bewusst, siehe Kaveat in rate-limit.ts).
+const adressPruefungJeIp = createRateLimiter({ max: ADRESS_PRUEFUNG_MAX_PRO_MINUTE })
+
+/**
+ * Ist die Adresse farmerzone.at/<slug> zum Hofnamen noch frei? Für die
+ * Vorschau unter dem Hofnamen (HofAdresseVorschau) auf Registrieren und
+ * Einrichten — öffentlich, ohne Anmeldung, daher abgesichert (Nr. 17c):
+ *
+ * - Zod auf den Namen (Grenzen wie beim Anlegen) und auf den erzeugten Slug.
+ * - Bremse je IP wie im Hausmuster (loeseOrtAuf, Bestellungen finden): nur in
+ *   Produktion, gezählt werden nur gültige Anfragen — die, die die Datenbank
+ *   erreichen könnten.
+ * - Antwort nur „frei" oder „vergeben". Ein Slug ist vergeben, sobald ihn
+ *   irgendein Hof trägt — freigeschaltet oder nicht —, denn createFarm weicht
+ *   ihm genauso aus. Deshalb fragt die Abfrage den Freischaltungsstand gar
+ *   nicht erst ab, und die Antwort kann ihn nicht verraten. Reservierte Slugs
+ *   (feste Routen) sind ebenfalls vergeben.
+ * - Der Slug in der Antwort ist genau der, den der Browser aus dem Namen
+ *   selbst errechnet (generateSlug); keine Ausweich-Adresse mit Zahl.
+ *
+ * Ungültige Eingabe oder erreichte Bremse → null („keine Auskunft"): Die
+ * Vorschau bleibt neutral, es gibt keinen Fehler und keine Meldung. Die
+ * Eindeutigkeit beim Anlegen sichert weiter createFarm.
+ */
+export async function checkSlugAvailability(name: unknown): Promise<AdressPruefung> {
+  const geprueft = adressPruefungSchema.safeParse(name)
+  if (!geprueft.success) return null
+
+  const slugGeprueft = hofSlugSchema.safeParse(generateSlug(geprueft.data))
+  if (!slugGeprueft.success) return null
+  const slug = slugGeprueft.data
+
+  if (process.env.NODE_ENV === 'production') {
+    const ip = getClientIp(await headers())
+    if (!adressPruefungJeIp.check(`adresse:${ip}`)) return null
+  }
+
   if (RESERVED_SLUGS.has(slug)) return { available: false, slug }
   const existing = await prisma.farm.findUnique({ where: { slug }, select: { id: true } })
   return { available: !existing, slug }

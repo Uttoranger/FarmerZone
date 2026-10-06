@@ -4169,6 +4169,16 @@ Auftrag `freigabe.md` §8, Entscheidung S3. Keine Schema-Änderung (Better Auth 
 - **`deleteCustomerAccount` (Altlast, durch 17b scharf):** prüfte keine Rolle; geschützt hat bisher nur, dass Hof-Konten unbestätigt waren. Jetzt nur Rolle CUSTOMER ohne `isAdmin`, Abos und Konto in einer Transaktion.
 - **Nachbesserung Runde 1 (Pre-Hijacking):** `/sign-up/email` war über HTTP offen (Rolle CUSTOMER), und `sendOnSignUp` schickte jedem Passwort-Konto die Bestätigung. Ein Angreifer hätte ein Konto auf die Adresse einer Kundin angelegt; klickte sie „E-Mail bestätigen", wäre SEIN Konto bestätigt gewesen — `/account` gab ihm ihre Abos frei, sein Passwort blieb (Better Auth entzieht es nur unbestätigten Konten). Dasselbe über `registerFarmer` mit Hof-Rolle. Jetzt: `/sign-up/email` per HTTP zu (einzige Registrierung ist `registerFarmer` über `auth.api`; eine Kundinnen-Registrierung mit Passwort gibt es nicht), Mail und Bestätigung nur für FARMER (frisch aus der Datenbank, `beforeEmailVerification`), `sendOnSignUp` aus und Versand aus `registerFarmer` nach dem Setzen der Rolle, `bestaetigteAdresse` nur für CUSTOMER ohne `isAdmin`. Für Kundinnen beweist weiter nur der Code die Adresse.
 
+## Slug-Prüfung abgesichert (Nachtlauf Nr. 17c, Oktober 2026)
+
+Altlast aus Bericht 15 (d): `checkSlugAvailability` (`src/server/actions/onboarding.ts`) ist eine öffentliche Server Action — seit Nr. 15 ruft sie auch die Registrierung ohne Anmeldung (Vorschau „Wird zu deiner Adresse", entprellt 400 ms). Sie hatte keine Längengrenze und keine Bremse; wer Hofnamen durchprobierte, erfuhr in beliebiger Menge, welche Höfe sich angemeldet haben — auch solche, die noch nicht freigeschaltet und damit nirgends öffentlich sind.
+
+- **Zod:** Hofname mit denselben Grenzen wie beim Anlegen (`adressPruefungSchema`, `src/schemas/hof-adresse.ts`: Ränder weg, 1 bis `HOFNAME_MAX`), dahinter der erzeugte Slug (`hofSlugSchema`: `SLUG_MUSTER`, `SLUG_MAX` aus `src/lib/slug.ts`). `SLUG_MAX` ist `2 × HOFNAME_MAX`, weil ä/ö/ü/ß zu zwei Buchstaben werden — eine kleinere Grenze lehnte Namen ab, die `createFarm` anlegt.
+- **Bremse:** 30 Prüfungen je IP und Minute (`ADRESS_PRUEFUNG_MAX_PRO_MINUTE`, `src/lib/hof-adresse.ts`), nur in Produktion und je Instanz wie alle Speicher-Bremsen. Gezählt werden nur gültige Anfragen.
+- **Antwort nur „frei" oder „vergeben":** `{ available, slug }` — sonst nichts. Ein Slug ist vergeben, sobald irgendein Hof ihn trägt, freigeschaltet oder nicht (`createFarm` weicht ihm genauso aus); die Abfrage liest den Freischaltungsstand gar nicht. Reservierte Slugs sind vergeben, ohne Abfrage. Der Slug in der Antwort ist der, den der Browser aus dem Namen selbst errechnet — keine Ausweich-Adresse mit Zahl.
+- **Neutral (`null`):** bei ungültiger Eingabe und erreichter Bremse. `frageAdresseAb` macht daraus „kein Stand", die Vorschau zeigt dann nur „Wird zu deiner Adresse: farmerzone.at/…" ohne frei/vergeben — kein Fehler, keine Meldung, kein Sentry.
+- **Bekannte Grenze:** Dass ein Name vergeben ist, bleibt auch für einen wartenden Hof sichtbar — sonst hieße es „frei" und `createFarm` hängte doch eine Zahl an. Die Bremse macht das Durchprobieren nur langsam, nicht unmöglich (je Instanz, `unknown`-IP teilt sich ein Limit).
+
 ## Nützliche Befehle
 
 ```bash
