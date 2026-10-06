@@ -287,6 +287,18 @@ describe('Verkauf anlegen, ändern, löschen — nur am eigenen Hof, ohne Bestan
     expect(db.manualSale.create).not.toHaveBeenCalled()
   })
 
+  it('die Zukunft zählt nach dem Wiener Tag, nicht nach UTC — kurz vor Mitternacht (Sommer- und Winterzeit)', async () => {
+    // 22:30 UTC am 06.10. ist in Wien schon der 07.10. (MESZ): der 07. ist heute, der 08. Zukunft.
+    vi.setSystemTime(new Date('2026-10-06T22:30:00Z'))
+    expect(await createManualSale({ ...eingabe, saleDate: '2026-10-07' })).toEqual({ ok: true })
+    expect(await createManualSale({ ...eingabe, saleDate: '2026-10-08' })).toEqual({ error: expect.stringContaining('Zukunft') })
+    // 23:30 UTC am 06.12. ist in Wien schon der 07.12. (MEZ).
+    vi.setSystemTime(new Date('2026-12-06T23:30:00Z'))
+    expect(await createManualSale({ ...eingabe, saleDate: '2026-12-07' })).toEqual({ ok: true })
+    expect(await createManualSale({ ...eingabe, saleDate: '2026-12-08' })).toEqual({ error: expect.stringContaining('Zukunft') })
+    vi.setSystemTime(JETZT)
+  })
+
   it('ein Produkt eines anderen Hofs wird nicht verknüpft', async () => {
     db.product.findFirst.mockResolvedValue(null)
     const antwort = await createManualSale({ ...eingabe, productId: 'fremd' })
