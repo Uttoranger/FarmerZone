@@ -3662,6 +3662,28 @@ aus allen Labels und Paaren) ergab keine Abweichung; neue Tests in
 `kategorie-vorschlag.test.ts`, `produkt-hinweise.test.ts`, `taxonomie.test.ts`
 (dort mit `@ts-expect-error` als Beleg, dass der Compiler den Aufruf abweist).
 
+## Reservierte Slugs vollständig (Nachtlauf Nr. 06b, 2026-10-05)
+
+Altlast aus Nr. 05: `RESERVED_SLUGS` (`src/lib/slug.ts`) kannte nur 18 Namen,
+`KEINE_HOFSEITE` (`next.config.ts`) schon 27. Ein Hof namens „Teilen", „Verify"
+oder „Konditionen" hätte seinen Namen als Slug bekommen — die feste Route gewinnt
+gegen `/[farmSlug]`, die Hofseite wäre nie erreichbar gewesen. Ergänzt um
+`farm-page`, `fehler-melden`, `forgot-password`, `konditionen`, `meldungen`,
+`problem-melden`, `reset-password`, `teilen`, `verify`; beide Listen sind jetzt
+dieselbe Menge. In Produktion war keiner dieser Slugs belegt (geprüft am
+05.10.2026), es gibt also nichts umzubenennen.
+
+`tests/reservierte-slugs.test.ts` liest die echten Ordner unter `src/app` (durch
+alle Routengruppen, auch verschachtelte; ohne `[…]`, `_…`, `@…`) und die
+Ausschlussliste aus der geladenen Header-Konfiguration — nicht aus einer
+Abschrift. Gegenprobe: ein vorübergehend angelegter Ordner
+`(public)/probe-ordner` ließ den Test rot werden. Die Sperre wirkt an genau einer
+Stelle, beim Anlegen (`checkSlugAvailability`, `createFarm` in
+`src/server/actions/onboarding.ts`); weder die Einstellungen noch der Admin
+können einen Slug ändern. Dateirouten auf oberster Ebene (`manifest.ts`,
+`favicon.ico`, `apple-icon.png`) tragen einen Punkt im Pfad, den `generateSlug`
+nie erzeugt — sie brauchen keinen Eintrag.
+
 ## Nützliche Befehle
 
 ```bash
