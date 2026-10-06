@@ -12,6 +12,8 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 06 | Schema-Expand | fertig | `nacht/2026-10-02/06-schema-expand` | #169 | 05 (#168) | Geldfelder Variante A, Migrationsweg `prisma migrate diff` freigegeben (freigabe.md §6) | 05.10.2026 |
 | 06b | Reservierte Slugs vollständig | fertig | `nacht/2026-10-05/06b-reservierte-slugs` | #170 | main | – | 05.10.2026 |
 | 07 | Startseite | läuft | `nacht/2026-10-05/07-startseite` | | 06b (#170) | | 05.10.2026 |
+| 06b | Reservierte Slugs vollständig | läuft | `nacht/2026-10-05/06b-reservierte-slugs` | | main | | 05.10.2026 |
+| 07 | Startseite | offen | | | | | |
 | 08 | Anmelden | offen | | | | | |
 | 09 | Entdecken | offen | | | | | |
 | 10 | Hofseite | offen | | | | | |
