@@ -38,21 +38,34 @@ export function Chip({
  *
  * Sichtbar 36 px hoch wie im Mockup; die Trefferfläche reicht über ein
  * unsichtbares ::before auf 44 px (Touch-Ziel).
+ *
+ * `onNavigate` (zusätzlich, Nr. 09) reicht an Nexts Link weiter: Er läuft
+ * nur bei einem gewöhnlichen Klick in der App, nie bei Mittelklick, Strg-Klick
+ * oder „In neuem Tab öffnen". Eine Seite, die ihre Filter selbst im Browser
+ * anwendet (/hoefe), schreibt dort die Adresse per `history.replaceState` und
+ * ruft `preventDefault()` — so bleibt der Chip ein echter Link, und der Tipp
+ * kostet keinen Server-Aufruf.
  */
 export function FilterChip({
   href,
   aktiv = false,
   children,
   className,
+  onNavigate,
 }: {
   href: string
   aktiv?: boolean
   children: ReactNode
   className?: string
+  onNavigate?: (ereignis: { preventDefault: () => void }) => void
 }): React.JSX.Element {
   return (
     <Link
       href={href}
+      onNavigate={onNavigate}
+      // Wer selbst anwendet, braucht die Seite nicht vorab vom Server: Bei
+      // einer dynamischen Seite wäre das eine Anfrage je sichtbarem Chip.
+      prefetch={onNavigate ? false : undefined}
       data-slot="filter-chip"
       aria-current={aktiv ? 'page' : undefined}
       className={cn(

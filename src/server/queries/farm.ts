@@ -16,7 +16,7 @@ import type {
   ProductSubcategory,
   Tierart,
 } from '@prisma/client'
-import { baueAngebotsZeile, fasseAngebotZusammen, type AngebotsZeile } from '@/lib/bereiche-anzeige'
+import { baueAngebotsZeile, fasseAngebotZusammen, type AngebotsProdukt } from '@/lib/bereiche-anzeige'
 import { anzeigeBereichVon, betriebsnummerFuerAnzeige, type AnzeigeBereich } from '@/lib/taxonomie'
 import {
   baueFotostreifen,
@@ -542,8 +542,10 @@ export type HofUebersichtEintrag = {
    *  suchNamen, deshalb zählen Chips und Suche dasselbe. */
   kategorien: ProductCategory[]
   /** Jedes KAUFBARE Produkt als schmale Zeile — Grundlage für Bereich,
-   *  Facetten, Karte und Kilopreis-Sortierung (src/lib/bereiche-anzeige.ts). */
-  angebot: AngebotsZeile[]
+   *  Facetten, Karte und Kilopreis-Sortierung (src/lib/bereiche-anzeige.ts)
+   *  und seit Nr. 09 für die Produkttreffer der Suche (produktTreffer in
+   *  src/lib/hoefe-entdecken.ts). */
+  angebot: AngebotsProdukt[]
   /** Der nächste anstehende Abholtermin — null ohne aktive Fenster. */
   naechsteAbholung: NaechsteAbholung | null
   /** Die Produktvorschau der Karte: höchstens VORSCHAU_LADE_DECKEL Zeilen,
@@ -603,6 +605,13 @@ export async function getOeffentlicheHoefe(
       stock: true,
       reservedStock: true,
       futter: { select: { zielTierarten: true, nettoMenge: true, nettoEinheit: true } },
+      // Seit Nr. 09 zeigt die Produktsuche Produkte statt Höfe: Kennung,
+      // Einheit und Gebinde für die Preiszeile — aus DIESER ungedeckelten
+      // Abfrage, nicht aus den acht Vorschau-Zeilen (falsches Negativ ab
+      // Platz neun, wie oben bei den Suchnamen).
+      id: true,
+      unit: true,
+      unitSize: true,
     },
   })
 
@@ -688,7 +697,7 @@ export async function getOeffentlicheHoefe(
   // und keine zweite Einbindung derselben Relation, die Prisma im selben
   // select ohnehin verbietet.
   const schmaleZeilen = await zeilenJeHof
-  const angebotJeHof = new Map<string, AngebotsZeile[]>()
+  const angebotJeHof = new Map<string, AngebotsProdukt[]>()
   const produktFotosJeHof = new Map<string, string[]>()
   const jeBereich = new Map<string, Record<AnzeigeBereich, number>>()
   for (const zeile of schmaleZeilen) {
@@ -698,14 +707,24 @@ export async function getOeffentlicheHoefe(
     // Kategorien, Suche, Facetten und Karte hängen an EINER Regel
     // (istKaufbar in baueAngebotsZeile). Vorher zählten die Chips jedes
     // sichtbare Produkt, die Suche nur solche mit freiem Bestand.
+    const dto = zuProduktDto(zeile)
     const angebot = baueAngebotsZeile({
-      ...zuProduktDto(zeile),
+      ...dto,
       isAvailable: true, // die Abfrage liest nur sichtbare Produkte
       futter: zeile.futter ? { ...zeile.futter, nettoMenge: Number(zeile.futter.nettoMenge) } : null,
     })
     if (angebot) {
       const bisher = angebotJeHof.get(zeile.farmId) ?? []
-      bisher.push(angebot)
+      // Ausdrücklich gebaut, nie {...zeile}: In den Browser geht nur, was die
+      // Produktzeile auf /hoefe zeigt (Bestand und Reservierung bleiben hier).
+      bisher.push({
+        ...angebot,
+        id: zeile.id,
+        price: dto.price,
+        unit: zeile.unit,
+        unitSize: dto.unitSize,
+        imageUrl: zeile.imageUrl,
+      })
       angebotJeHof.set(zeile.farmId, bisher)
     }
     if (zeile.imageUrl) {

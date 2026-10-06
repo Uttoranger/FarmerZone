@@ -130,8 +130,10 @@ export default function HoefeFotostreifen({
             {fotos.map((url, i) => (
               <span
                 key={url}
+                // accent-foreground: im neuen Design in beiden Themes hell —
+                // die Punkte liegen auf dem Foto, nicht auf dem Seitengrund.
                 className={`size-1.5 rounded-full shadow ${
-                  i === aktiv ? 'bg-white' : 'bg-white/50'
+                  i === aktiv ? 'bg-accent-foreground' : 'bg-accent-foreground/50'
                 }`}
               />
             ))}

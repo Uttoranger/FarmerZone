@@ -12,8 +12,8 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 06 | Schema-Expand | fertig | `nacht/2026-10-02/06-schema-expand` | #169 | 05 (#168) | Geldfelder Variante A, Migrationsweg `prisma migrate diff` freigegeben (freigabe.md §6) | 05.10.2026 |
 | 06b | Reservierte Slugs vollständig | fertig | `nacht/2026-10-05/06b-reservierte-slugs` | #170 | main | – | 05.10.2026 |
 | 07 | Startseite | fertig | `nacht/2026-10-05/07-startseite` | #171 | 06b (#170) | Lighthouse vom Menschen messen; PLZ-Übergabe an `/hoefe` offen; 13 Mockup-Abweichungen zur Freigabe | 05.10.2026 |
-| 08 | Anmelden | läuft | `nacht/2026-10-05/08-anmelden` | | 07 (#171) | | 05.10.2026 |
-| 09 | Entdecken | offen | | | | | |
+| 08 | Anmelden | fertig | `nacht/2026-10-05/08-anmelden` | #172 | 07 (#171) | 2 Sicherheitsbefunde behoben; Fehler-Token (Kontrast 4,22:1) entscheiden; Konto beim Code-Login, für Nr. 14 eigener Weg | 05.10.2026 |
+| 09 | Entdecken | läuft | `nacht/2026-10-05/09-entdecken` | | 08 (#172) | | 05.10.2026 |
 | 10 | Hofseite | offen | | | | | |
 | 11 | Produktdetail | offen | | | | | |
 | 12 | Checkout | offen | | | | | |

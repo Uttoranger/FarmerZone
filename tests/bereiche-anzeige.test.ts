@@ -33,7 +33,7 @@ import {
   type ProduktFilter,
 } from '@/lib/bereiche-anzeige'
 import { berechneHofAuswahl } from '@/lib/hofuebersicht'
-import { formatAbGrundpreis, formatGrundpreisNetto, kilopreisNetto } from '@/lib/format'
+import { formatAbGrundpreis, formatGrundpreisNetto, formatKilopreis, kilopreisNetto } from '@/lib/format'
 import {
   LEERER_HOEFE_FILTER,
   SUCHTEXT_MAX,
@@ -442,6 +442,11 @@ describe('formatAbGrundpreis', () => {
   it('schreibt den günstigsten Kilopreis mit „ab" und auf Cent gerundet', () => {
     expect(formatAbGrundpreis({ wert: 0.1234, einheit: 'KG' })).toBe('ab € 0,12 / kg')
     expect(formatAbGrundpreis({ wert: 2, einheit: 'LITER' })).toBe('ab € 2,00 / L')
+  })
+
+  it('formatKilopreis: derselbe Wert ohne „ab" — für ein einzelnes Angebot (Nr. 09)', () => {
+    expect(formatKilopreis({ wert: 0.1234, einheit: 'KG' })).toBe('€ 0,12 / kg')
+    expect(formatAbGrundpreis({ wert: 0.1234, einheit: 'KG' })).toBe(`ab ${formatKilopreis({ wert: 0.1234, einheit: 'KG' })}`)
   })
 })
 

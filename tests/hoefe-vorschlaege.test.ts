@@ -163,7 +163,10 @@ describe('Kategorie-Chips zählen Höfe mit kaufbarem Angebot', () => {
 })
 
 describe('am Quelltext', () => {
-  const client = readFileSync(join(process.cwd(), 'src/components/hoefe/hoefe-client.tsx'), 'utf8')
+  // Seit Nr. 09 steht die Suche in einer eigenen Datei (hoefe-suche.tsx), die
+  // Chips in entdecken-teile.tsx; hoefe-client.tsx verdrahtet nur.
+  const client = readFileSync(join(process.cwd(), 'src/components/hoefe/hoefe-suche.tsx'), 'utf8')
+  const teile = readFileSync(join(process.cwd(), 'src/components/hoefe/entdecken-teile.tsx'), 'utf8')
 
   it('die Vorschläge sind eine Liste unter dem Suchfeld, mit Tastatur bedienbar', () => {
     expect(client).toContain('role="listbox"')
@@ -186,8 +189,12 @@ describe('am Quelltext', () => {
     expect(client).toContain('onMouseDown={(e) => e.preventDefault()}')
   })
 
-  it('die Kategorie-Chips zeigen ihre Zahl', () => {
-    const chips = client.slice(client.indexOf('const filterMarken'), client.indexOf('const sortenReihe'))
-    expect(chips).toContain('option.anzahl')
+  // Bis Nr. 09 trugen die Chips ihre Zahl („Eier · 3"). Die Mockups des neuen
+  // Designs (web-k1-*, mobil-k1-filter) zeigen keine; gezählt wird weiter
+  // (kategorieChips oben) — sie entscheidet, welche Chips überhaupt erscheinen.
+  it('die Kategorie-Chips sind echte Links aus kategorieReihe, ohne Zahl', () => {
+    expect(teile).toContain('<FilterChip')
+    expect(teile).toContain('href={hoefeHref(chip.ziel)}')
+    expect(teile).not.toContain('anzahl')
   })
 })

@@ -1,10 +1,13 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition } from 'react'
-import { Loader2, LocateFixed, X } from 'lucide-react'
+import { Loader2, LocateFixed, MapPin, X } from 'lucide-react'
 import { loeseOrtAuf, type OrtsTreffer } from '@/server/actions/hoefe'
-import { UMKREIS_STUFEN, type Bezugspunkt, type UmkreisStufe } from '@/lib/hofuebersicht'
+import type { Bezugspunkt } from '@/lib/hofuebersicht'
 import { hinweisMehrere } from '@/lib/geokodierung'
+import { cn } from '@/lib/utils'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 
 /**
  * Die Umkreissuche der Hofübersicht: zwei gleichrangige Wege zum
@@ -19,7 +22,15 @@ import { hinweisMehrere } from '@/lib/geokodierung'
  *
  * Nichts wird gemerkt: kein localStorage, kein Konto, keine URL-Parameter —
  * der Bezugspunkt lebt ausschließlich im Seitenzustand und ist mit
- * „Umkreis aufheben" wieder fort.
+ * „ändern" wieder fort.
+ *
+ * GESTALT seit Nr. 09 (Mockup web-k1-entdecken-einstieg): der
+ * Einstiegshinweis als grüne Hinweiskarte — ohne Bezugspunkt die Frage nach
+ * Postleitzahl oder Standort, mit Bezugspunkt „Wir zeigen Höfe rund um …".
+ * Einen „grob nach deiner Region geschätzten" Ort wie im Mockup gibt es
+ * nicht: Das bräuchte eine Ortung über die IP-Adresse, also einen Dienst,
+ * der jede Anfrage sieht. Die Umkreis-Stufen stehen in der Filterzeile
+ * (hoefe-client.tsx).
  *
  * ÜBER DIE GRENZE (AT/DE): Im Innviertel liegt Bayern näher als halb
  * Oberösterreich, deshalb sucht die Auflösung in beiden Ländern. Weil
@@ -54,17 +65,13 @@ const STANDORT_GEDULD_MS = 10_000
 
 export default function HoefeUmkreis({
   bezugspunkt,
-  stufe,
   onBezugspunkt,
-  onStufe,
   onAufheben,
 }: {
   bezugspunkt: Bezugspunkt | null
-  stufe: UmkreisStufe
   onBezugspunkt: (punkt: Bezugspunkt) => void
-  onStufe: (stufe: UmkreisStufe) => void
   onAufheben: () => void
-}) {
+}): React.JSX.Element {
   const [eingabe, setEingabe] = useState('')
   const [hinweis, setHinweis] = useState<string | null>(null)
   /** Mehrdeutige Treffer zur Auswahl — leer, sobald einer gewählt ist. */
@@ -191,68 +198,113 @@ export default function HoefeUmkreis({
     })
   }
 
-  return (
-    <div className="mt-3">
-      <div className="flex flex-wrap items-center gap-2">
-        {/* BEWUSST NICHT `disabled` während der Abfrage: Ein deaktivierter
-            Knopf verliert den Tastatur-Fokus an den Seitenanfang. Der
-            Doppelklick-Schutz sitzt in standortErfragen selbst. */}
-        <button
-          type="button"
-          onClick={standortErfragen}
-          aria-busy={ortet}
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/40 aria-busy:opacity-60"
-        >
-          {ortet ? (
-            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <LocateFixed className="size-4" aria-hidden="true" />
-          )}
-          In meiner Nähe
-        </button>
+  const knopf = cn(
+    'inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-4 text-[13.5px] font-semibold transition-colors duration-[250ms] aria-busy:opacity-60',
+    FOKUS_RAHMEN
+  )
 
-        <form onSubmit={ortSuchen} className="flex min-w-0 flex-1 items-center gap-2">
-          <input
-            ref={plzFeld}
-            value={eingabe}
-            onChange={(e) => {
-              setEingabe(e.target.value)
-              // Die Auswahl gehört zur GESUCHTEN Eingabe: Wer das Feld
-              // ändert, tippte sonst später einen Treffer an, der zu einem
-              // anderen Wort gehört.
-              if (kandidaten.length > 0) setKandidaten([])
-            }}
-            inputMode="text"
-            enterKeyHint="search"
-            aria-label="Postleitzahl oder Ort in Österreich oder Deutschland"
-            // Der Fokus springt bei abgelehntem Standort hierher — dann muss
-            // die Meldezeile mitgelesen werden.
-            aria-describedby="umkreis-meldung"
-            placeholder="PLZ oder Ort (AT/DE)"
-            className="min-h-11 w-full min-w-0 flex-1 rounded-lg border border-border bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground"
-          />
-          <button
-            type="submit"
-            aria-busy={laeuft}
-            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/40 aria-busy:opacity-60"
-          >
-            {laeuft && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-            Suchen
-          </button>
-        </form>
-      </div>
+  return (
+    <div className="flex flex-col gap-2">
+      {bezugspunkt ? (
+        <Hinweiskarte
+          symbol={MapPin}
+          aktion={
+            <button
+              type="button"
+              onClick={() => {
+                // Was noch unterwegs ist, gilt nicht mehr.
+                laufNr.current += 1
+                verwerfeWaechter()
+                setOrtet(false)
+                setEingabe('')
+                setHinweis(null)
+                setKandidaten([])
+                onAufheben()
+              }}
+              className={cn(knopf, 'border border-border bg-card text-foreground hover:bg-muted')}
+            >
+              <X className="size-4" strokeWidth={1.7} aria-hidden="true" />
+              Ort ändern
+            </button>
+          }
+        >
+          {/* break-words: Der Name kann lang sein („Simbach am Inn, Landkreis
+              Rottal-Inn, Bayern, 84359, Deutschland"). */}
+          <span className="break-words">
+            Wir zeigen Höfe rund um <strong className="font-semibold">{bezugspunkt.name ?? 'deinen Punkt'}</strong> – nichts
+            wird gespeichert.
+          </span>
+        </Hinweiskarte>
+      ) : (
+        <Hinweiskarte symbol={MapPin}>
+          {/* div statt span: Darin steckt ein <form>, und ein Formular ist ein Block. */}
+          <div className="flex flex-col gap-3">
+            <span>
+              Wo bist du? Gib deine Postleitzahl ein oder nutze deinen Standort – dann stehen die nächsten Höfe oben.
+              Nichts wird gespeichert.
+            </span>
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <form onSubmit={ortSuchen} className="flex min-w-0 flex-1 items-center gap-2 sm:max-w-sm">
+                <input
+                  ref={plzFeld}
+                  value={eingabe}
+                  onChange={(e) => {
+                    setEingabe(e.target.value)
+                    // Die Auswahl gehört zur GESUCHTEN Eingabe: Wer das Feld
+                    // ändert, tippte sonst später einen Treffer an, der zu einem
+                    // anderen Wort gehört.
+                    if (kandidaten.length > 0) setKandidaten([])
+                  }}
+                  inputMode="text"
+                  enterKeyHint="search"
+                  aria-label="Postleitzahl oder Ort in Österreich oder Deutschland"
+                  // Der Fokus springt bei abgelehntem Standort hierher — dann muss
+                  // die Meldezeile mitgelesen werden.
+                  aria-describedby="umkreis-meldung"
+                  placeholder="PLZ oder Ort"
+                  className={cn(
+                    'h-11 w-full min-w-0 flex-1 rounded-full border border-border bg-card px-4 text-base text-foreground placeholder:text-muted-foreground md:text-sm',
+                    FOKUS_RAHMEN
+                  )}
+                />
+                <button
+                  type="submit"
+                  aria-busy={laeuft}
+                  className={cn(knopf, 'border border-border bg-card text-foreground hover:bg-muted')}
+                >
+                  {laeuft && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+                  Suchen
+                </button>
+              </form>
+              {/* BEWUSST NICHT `disabled` während der Abfrage: Ein deaktivierter
+                  Knopf verliert den Tastatur-Fokus an den Seitenanfang. Der
+                  Doppelklick-Schutz sitzt in standortErfragen selbst. */}
+              <button
+                type="button"
+                onClick={standortErfragen}
+                aria-busy={ortet}
+                className={cn(knopf, 'bg-accent text-accent-foreground hover:opacity-90')}
+              >
+                {ortet ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <LocateFixed className="size-4" strokeWidth={1.7} aria-hidden="true" />
+                )}
+                Standort nutzen
+              </button>
+            </div>
+          </div>
+        </Hinweiskarte>
+      )}
 
       {/* Die Meldezeile steht DAUERHAFT im Baum (Hausmuster wie
           password-form.tsx): Eine Live-Region, die erst mit ihrem Text
-          entsteht, sprechen mehrere Vorleseprogramme nicht. Sie trägt beide
-          Fälle — den ruhigen Hinweis UND den gefundenen Bezugspunkt, damit
-          auch der Erfolg angesagt wird und sichtbar ist, worauf sich die
-          Entfernungen beziehen. */}
-      {/* `break-words`: Der gewählte Name kann sehr lang sein („Simbach am
-          Inn, Landkreis Rottal-Inn, Bayern, 84359, Deutschland") — ohne
-          Umbruch liefe er bei 375 px aus der Zeile. */}
+          entsteht, sprechen mehrere Vorleseprogramme nicht. Den gefundenen
+          Bezugspunkt sagt sie mit an. */}
+      {/* Sichtbar nur der Hinweis; „Entfernungen ab …" sagt die Karte darüber
+          schon und steht deshalb nur für Vorleseprogramme da. */}
       <p
-        className="mt-2 min-h-5 break-words text-sm text-muted-foreground"
+        className={hinweis ? 'text-[13px] break-words text-muted-foreground' : 'sr-only'}
         role="status"
         id="umkreis-meldung"
       >
@@ -260,11 +312,10 @@ export default function HoefeUmkreis({
       </p>
 
       {/* Die Auswahl bei mehrdeutigen Orten — untereinander statt nebeneinander:
-          Die Namen tragen Bezirk und Land („Simbach am Inn, …, Deutschland")
-          und wären in einer Zeile bei 375px unlesbar. `text-left` und
-          `break-words`, damit lange Namen umbrechen statt abzuschneiden. */}
+          Die Namen tragen Bezirk und Land und wären in einer Zeile bei 375 px
+          unlesbar. */}
       {kandidaten.length > 0 && (
-        <ul className="mt-2 space-y-1.5" aria-label="Welchen Ort meinst du?">
+        <ul className="flex flex-col gap-1.5" aria-label="Welchen Ort meinst du?">
           {kandidaten.map((treffer, i) => (
             /* Der Index gehört in den Schlüssel: Zwei Nominatim-Zeilen
                können dieselben Koordinaten tragen. */
@@ -272,15 +323,17 @@ export default function HoefeUmkreis({
               <button
                 type="button"
                 onClick={() => uebernimm(treffer)}
-                className="min-h-11 w-full rounded-lg border border-border bg-card px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted/40"
+                className={cn(
+                  'min-h-11 w-full rounded-xl border border-border bg-card px-4 py-2 text-left text-sm text-foreground transition-colors duration-[250ms] hover:bg-muted',
+                  FOKUS_RAHMEN
+                )}
               >
                 <span className="break-words">{treffer.name}</span>
               </button>
             </li>
           ))}
-          {/* Ein Ausstieg, der OHNE Bezugspunkt erreichbar ist: „Umkreis
-              aufheben" erscheint erst mit einem — wer die Rückfrage nicht
-              meinte, säße sonst darin fest. */}
+          {/* Ein Ausstieg ohne Bezugspunkt — wer die Rückfrage nicht meinte,
+              säße sonst darin fest. */}
           <li>
             <button
               type="button"
@@ -289,60 +342,16 @@ export default function HoefeUmkreis({
                 setHinweis(null)
                 plzFeld.current?.focus()
               }}
-              className="inline-flex min-h-9 items-center gap-1 rounded-full px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className={cn(
+                'inline-flex min-h-11 items-center gap-1 rounded-full px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground',
+                FOKUS_RAHMEN
+              )}
             >
-              <X className="size-3.5" aria-hidden="true" />
+              <X className="size-3.5" strokeWidth={1.7} aria-hidden="true" />
               Keiner davon
             </button>
           </li>
         </ul>
-      )}
-
-      {bezugspunkt && (
-        <div
-          className="mt-2 flex flex-wrap items-center gap-2"
-          role="group"
-          aria-label="Umkreis begrenzen"
-        >
-          <span className="text-sm text-muted-foreground" aria-hidden="true">Umkreis:</span>
-          {UMKREIS_STUFEN.map((wert) => {
-            const aktiv = stufe === wert
-            return (
-              <button
-                key={wert ?? 'egal'}
-                type="button"
-                onClick={() => onStufe(wert)}
-                aria-pressed={aktiv}
-                className={`min-h-9 rounded-full border px-3 text-[13px] font-medium transition-colors ${
-                  aktiv
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border bg-card text-foreground hover:bg-muted/40'
-                }`}
-              >
-                {wert === null ? 'egal' : `${wert} km`}
-              </button>
-            )
-          })}
-          <button
-            type="button"
-            onClick={() => {
-              // Auch hier: was noch unterwegs ist, gilt nicht mehr.
-              laufNr.current += 1
-              verwerfeWaechter()
-              setOrtet(false)
-              setEingabe('')
-              setHinweis(null)
-              // Auch eine offene Ortsauswahl gehört zum Aufheben — sonst
-              // stünde sie noch da, obwohl der Bezugspunkt fort ist.
-              setKandidaten([])
-              onAufheben()
-            }}
-            className="inline-flex min-h-9 items-center gap-1 rounded-full px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <X className="size-3.5" aria-hidden="true" />
-            Umkreis aufheben
-          </button>
-        </div>
       )}
     </div>
   )

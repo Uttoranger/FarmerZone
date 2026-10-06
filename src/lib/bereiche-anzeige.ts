@@ -72,6 +72,21 @@ export type AngebotsZeile = {
 }
 
 /**
+ * Eine Angebotszeile mit dem, was die Produktsuche auf /hoefe zeigt (Nr. 09:
+ * „Produkte statt Höfe"): Kennung, Preis je Gebinde, Einheit, Gebinde und
+ * Bild. Dieselbe schmale Abfrage wie die Zeile selbst — alle kaufbaren
+ * Produkte, ungedeckelt; die Vorschau-Zeilen der Karte (höchstens acht je
+ * Hof) wären für die Suche ein falsches Negativ ab Platz neun.
+ */
+export type AngebotsProdukt = AngebotsZeile & {
+  id: string
+  price: number
+  unit: string
+  unitSize: number | null
+  imageUrl: string | null
+}
+
+/**
  * Preis ÷ Nettomenge. Die Nettomenge ist der Inhalt EINES Gebindes (Konzept
  * §5), der Preis gilt je Gebinde — also ist das der Kilopreis.
  */

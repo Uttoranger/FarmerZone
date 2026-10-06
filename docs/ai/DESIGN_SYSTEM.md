@@ -23,6 +23,7 @@ Alle Farben kommen aus CSS-Custom-Properties auf `:root`, umgeschaltet über `da
 - Buttons behalten ihre Markenfarben in beiden Themes.
 - Status-Textfarben sind pro Theme definiert; nie die Variante des anderen Themes verwenden — sonst fällt der Kontrast auf Creme unter 4,5:1.
 - Bild-Overlays (Titelbilder, Cover) bleiben immer dunkel hinterlegt und sind theme-unabhängig.
+  Theme-fest heißt nicht Tailwind-`black`/`white`: Im neuen Design (`data-design="neu"`) sind `primary-foreground` (fast schwarz) und `accent-foreground` (Crème) in beiden Themes gleich — dunkler Schleier `from-primary-foreground/25`, helle Punkte auf Fotos `bg-accent-foreground/50`. Im Bestand haben beide andere Werte (`accent-foreground` ist dort dunkel) — das Muster gilt nur im neuen Design.
 - Theme-Default beim Erstbesuch aus `prefers-color-scheme`; die Wahl wird auf dem Gerät gespeichert (localStorage `theme`, siehe „Technische Regeln") — nicht am Nutzerprofil: Die Hofseite sieht für Besucher so aus, wie deren Gerät eingestellt ist, und eine Spalte dafür gibt es nicht (ARCHITECTURE §4). Schalter: „Mehr"-Menü (mobil) bzw. Sidebar (Desktop).
 
 ## Typografie und Form
@@ -52,7 +53,7 @@ Alle Farben kommen aus CSS-Custom-Properties auf `:root`, umgeschaltet über `da
 
   | Datei | Baustein | Regel |
   |---|---|---|
-  | `chip.tsx` | `Chip`, `FilterChip`, `FilterChipReihe` | Filter ist ein Link (`href`), der gewählte trägt `aria-current="page"`; sichtbar 36 px, Trefferfläche 44 px über `::before` |
+  | `chip.tsx` | `Chip`, `FilterChip`, `FilterChipReihe` | Filter ist ein Link (`href`), der gewählte trägt `aria-current="page"`; sichtbar 36 px, Trefferfläche 44 px über `::before`. Wendet die Seite Filter selbst im Browser an, gibt sie `onNavigate` mit (schreibt per `history.replaceState`, ruft `preventDefault()`; ohne Prefetch) — Mittelklick und neuer Tab folgen weiter dem Link |
   | `stepper.tsx` | `Stepper` | Base UI NumberField; `max` setzt der Aufrufer, verbindlich prüft der Server |
   | `segment.tsx` | `Segment` | Base UI ToggleGroup als `role="toolbar"`, genau eine Wahl, nicht abwählbar; für Seitenzustand — Filter in der URL sind FilterChips |
   | `list-row.tsx` | `ListGruppe`, `ListRow` | mit `href` Link mit Pfeil, sonst Anzeige; ≥ 50 px; Titel `truncate` mit `title` |
@@ -143,6 +144,15 @@ Umgesetzt in `src/components/shells/` (KundeShell, KundeFokusShell, HofShell, Ad
 
 - Alles, was navigiert, ist ein echter Link (`<a href>`): Hofkarten, Kategorie-Chips, Filter, Navigation, Produktkacheln. Filter stehen in der URL (siehe Konzept Bereiche §6.2), damit Teilen, Zurück und Mittelklick funktionieren.
 - Ein Knopf ist nur, was etwas auslöst (In den Korb, Speichern, Teilen).
+
+### Entdecken (/hoefe)
+
+- **Eine Kategorie-Reihe:** „Alle", die Hofladen-Kategorien mit Angebot, am Ende **Futtermittel** und **Brennmaterial** — beide immer sichtbar (E2). Der Futtermittel-Chip setzt `bereich=futter` und blendet die Mengen-Facette ein; Brennmaterial ist `kat=BRENNHOLZ`. Was ein Chip zeigt und wohin er führt, entscheidet `src/lib/hoefe-entdecken.ts`.
+- **Menge heißt „Kleinmengen | Ballen & mehr"** (Grenze 25 kg je Gebinde, `KLEINGEBINDE_BIS_KG`), darunter der Satz, was das heißt (`MENGEN_HINWEIS`). Nie „Klein | Groß".
+- **Aktive Filter** stehen als eigene Zeile mit je einem Entfernen-Link und „Alle zurücksetzen"; die Ansicht (Liste/Karte) ist kein Filter und bleibt. Ein Filter, der nur im Seitenzustand lebt (der Umkreis), steht dort auch — als Knopf statt Link —, und jedes „Zurücksetzen" hebt ihn mit auf.
+- **Produkte statt Höfe** bei einer Suche und im Futter (Angebote je Gebinde); sonst Hofkarten. Pausierte Höfe bleiben sichtbar, ausgegraut über Fläche, gestrichelten Rand und entsättigtes Bild — nie über `opacity` auf Text (Kontrast).
+- **Handy:** Filter im Blatt (`SheetBlatt`); Chips wirken sofort, die Hauptaktion „N … anzeigen" schließt nur, „Abbrechen" stellt den Stand vom Öffnen wieder her. Die Karte öffnet sich über eine Vorschau-Fläche, Leaflet lädt erst dann.
+- **Standort:** ein Einstiegshinweis als grüne Hinweiskarte (Postleitzahl oder Standort, „Nichts wird gespeichert"); nie eine geschätzte Region aus der IP-Adresse.
 
 ### Kaufstrecke
 

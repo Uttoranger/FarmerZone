@@ -383,6 +383,15 @@ export function formatGrundpreisNetto(
  * zufällig. Nur Anzeige, auf Cent gerundet.
  */
 export function formatAbGrundpreis(grundpreis: { wert: number; einheit: NettoEinheitValue }): string {
+  return `ab ${formatKilopreis(grundpreis)}`
+}
+
+/**
+ * „€ 0,15 / kg" — der Kilo- bzw. Literpreis EINES Futtermittels aus seiner
+ * Kennzeichnung (Produkttreffer auf /hoefe, Nr. 09). Nur Anzeige, auf Cent
+ * gerundet.
+ */
+export function formatKilopreis(grundpreis: { wert: number; einheit: NettoEinheitValue }): string {
   // wert kommt aus kilopreisNetto — dieselbe Rundung wie formatGrundpreisNetto.
-  return `ab ${formatEuro(Math.round(grundpreis.wert * 100) / 100)} / ${NETTO_EINHEIT_LABEL[grundpreis.einheit]}`
+  return `${formatEuro(Math.round(grundpreis.wert * 100) / 100)} / ${NETTO_EINHEIT_LABEL[grundpreis.einheit]}`
 }

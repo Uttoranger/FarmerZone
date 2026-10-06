@@ -3875,6 +3875,59 @@ in der `KundeShell`.
   Betreiber ohne Hof kann `CUSTOMER` sein. Er zählt in der Rollenabfrage jetzt
   als `ADMIN` (vorher hätte er einen Code bekommen).
 
+## Entdecken im neuen Design (Nachtlauf Nr. 09, 2026-10-05)
+
+`/hoefe` steht in der `KundeShell` (über `KundeShellMitSitzung`) und im neuen
+Design (Mockups `web-k1-*`, `mobil-k1-*`). Die Seite bleibt `force-dynamic`
+wie seit Bereiche 2 — ein geteilter Link soll schon im Server-HTML gefiltert
+aussehen; schlechter wird sie nicht, weil die Sitzung nicht mehr auf dem
+Server gelesen wird und die Hofdaten weiter aus `ladeOeffentlicheHoefe`
+kommen.
+
+**Filter als Links.** Jeder Chip ist ein `FilterChip` mit der Adresse seines
+Ziel-Filters. Ein gewöhnlicher Klick läuft über Nexts `onNavigate`, schreibt
+die Adresse per `history.replaceState` und filtert im Browser; Mittelklick und
+„In neuem Tab" folgen dem echten Link. `prefetch` ist für diese Links aus —
+bei einer dynamischen Seite wäre es eine Serveranfrage je sichtbarem Chip.
+Die Logik (Reihen, aktive Filter, Kopf, Produkttreffer, Leerzustand) steht rein
+in `src/lib/hoefe-entdecken.ts`.
+
+**E2.** Futtermittel ist ein Chip in der Kategorie-Reihe (setzt
+`bereich=futter`), die frühere Weiche „Hofladen | Futtermittel" ist auf
+`/hoefe` weg (`BereichUmschalter` bleibt für Hofseite und Umfeld). Im Futter
+erscheint die Mengen-Facette als „Kleinmengen | Ballen & mehr", Grenze
+unverändert 25 kg. Brennmaterial ist `kat=BRENNHOLZ` (wie der Chip der
+Startseite); das Taxonomie-Label „Brennholz" ändert erst Gate 6.
+
+**Produkte statt Höfe.** Bei einer Suche und im Futter zeigt die Seite
+Produktzeilen (`produktTreffer`). Dafür trägt jede Angebotszeile der
+ungedeckelten Zeilen-Abfrage zusätzlich Kennung, Preis, Einheit, Gebinde und
+Bild (`AngebotsProdukt`) — die acht Vorschau-Zeilen je Hof wären ein falsches
+Negativ ab Platz neun. Die Zeile führt zur Hofseite; In-den-Korb bleibt dort
+(Reservierung), das Produktdetail kommt mit Nr. 11.
+
+**Bewusst nicht gebaut.** `?plz=` in der Adresse: Die Regel „nie ein Standort
+in der URL" (ARCHITECTURE §4) wurde schon einmal auf Anweisung wiederhergestellt
+(Liste | Karte, #130), und eine PLZ in einen Punkt aufzulösen braucht Nominatim
+— ein externer Dienst, der dann jede geteilte Adresse sähe. Die Startseite
+bleibt bei `q`. Ebenso nicht: Filter „Abholung heute" und „Online bezahlen"
+(gibt es heute nicht, Daten fehlen in der Liste), „Pausiert bis …" (kein
+Enddatum im Schema), „Benachrichtige mich" (S11), „Hof vorschlagen" (keine
+Funktion), eine aus der IP geschätzte Region und die Karte „Über einen
+geteilten Link" (Vorschaubild der Hofseite, Gate 7).
+
+**Annahmen.** Kategorie-Chips ohne Zahl (Mockup), Mehrfachwahl bleibt ein
+ODER; Umkreis-Stufen als `Segment` (Seitenzustand, nie URL) mit „Alle" statt
+„egal"; die Hofkarte im Splitscreen wählt weiter den Hof, zur Hofseite führt
+„Zum Hof" (Entscheidung des Betreibers aus #82). Die Tier-Auswahl im eigenen
+Blatt ist durch Link-Chips ersetzt (`hoefe-facetten.tsx` entfällt).
+
+## Nachbesserung 1 zu Nr. 09 — Entdecken (2026-10-05)
+
+- **Umkreis als aktiver Filter.** Der Umkreis stand im Filterblatt, aber nicht in „Aktive Filter", und „Alle zurücksetzen" ließ ihn stehen — die Liste blieb nach dem Zurücksetzen still eingeschränkt. Jetzt nimmt `aktiveFilter(filter, umkreis)` ihn als eigenen Eintrag („Umkreis: 25 km", markiert mit `umkreis: true`), er zählt am Filter-Knopf mit, und `beimNavigieren(ziel, onWahl, danach)` hebt ihn bei jedem „Zurücksetzen" auf. In die URL kommt er weiterhin nicht (#130); sein Entfernen-Eintrag ist deshalb ein Knopf. Ohne Bezugspunkt gilt kein Umkreis (`aktiverUmkreis`).
+- **Schwarz/Weiß sind keine Tokens.** Der Schleier der Karten-Vorschau (`from-black/25`) und die Punkte im Fotostreifen (`bg-white`) nehmen jetzt `primary-foreground` bzw. `accent-foreground` — beide im neuen Design in beiden Themes gleich. Der Token-Test der Route erkennt `black`/`white` als Farbklasse. Die Startseite (Nr. 07) trägt noch `from-black/…` auf Foto und Kartenbild; das gehört in ihren eigenen Branch.
+- Klein: „Zum Hof" im Splitscreen mit 44 px Trefferfläche (`before:`-Rand wie die Chips), das PLZ-Formular in `div` statt `span`, Suchfeld `maxLength` = `SUCHTEXT_MAX`.
+
 ## Nützliche Befehle
 
 ```bash

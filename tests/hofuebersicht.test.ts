@@ -406,6 +406,11 @@ describe('getOeffentlicheHoefe — die Query', () => {
         stock: true,
         reservedStock: true,
         futter: { select: { zielTierarten: true, nettoMenge: true, nettoEinheit: true } },
+        // Seit Nr. 09: Die Produktsuche zeigt Produkte statt Höfe — mit
+        // Kennung, Einheit und Gebinde, aus derselben ungedeckelten Abfrage.
+        id: true,
+        unit: true,
+        unitSize: true,
       },
     })
   })
@@ -430,7 +435,7 @@ describe('getOeffentlicheHoefe — die Query', () => {
   it('das Angebot trägt Kilopreis, Tiere und Gebinde aus der Kennzeichnung', async () => {
     farmFindMany.mockResolvedValue([rohHof({})] as never)
     produktZeilen.mockResolvedValue([
-      { farmId: 'farm_1', category: 'HEU_STROH', subcategory: 'WIESENHEU', labels: ['BIO'], imageUrl: null, name: 'Heu', price: 45, stock: 3, reservedStock: 0, futter: { zielTierarten: ['PFERD', 'RIND'], nettoMenge: 300, nettoEinheit: 'KG' } },
+      { farmId: 'farm_1', id: 'prod_heu', unit: 'BALLEN', unitSize: null, category: 'HEU_STROH', subcategory: 'WIESENHEU', labels: ['BIO'], imageUrl: 'heu.jpg', name: 'Heu', price: 45, stock: 3, reservedStock: 0, futter: { zielTierarten: ['PFERD', 'RIND'], nettoMenge: 300, nettoEinheit: 'KG' } },
     ] as never)
 
     const [hof] = await getOeffentlicheHoefe({ wochentag: 3, uhrzeit: '12:00' })
@@ -444,6 +449,12 @@ describe('getOeffentlicheHoefe — die Query', () => {
         tiere: ['PFERD', 'RIND'],
         grundpreis: { wert: 0.15, einheit: 'KG' },
         grossgebinde: true,
+        // Für die Produktsuche (Nr. 09): Kennung, Preis je Gebinde, Einheit, Gebinde, Bild.
+        id: 'prod_heu',
+        price: 45,
+        unit: 'BALLEN',
+        unitSize: null,
+        imageUrl: 'heu.jpg',
       },
     ])
   })
