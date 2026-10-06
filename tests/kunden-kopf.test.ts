@@ -305,7 +305,7 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
   const ARTEN: Record<string, KundenSeite['art'][]> = {
     // Seit Nr. 09 in der KundeShell des neuen Designs (siehe unten) — ohne KundenKopf.
     'src/app/(public)/hoefe/page.tsx': [],
-    // Der Checkout rendert den Kopf in CheckoutForm (siehe unten).
+    // Die Kasse trägt seit Nr. 12 die Fokus-Shell, gerendert in CheckoutForm (siehe unten).
     'src/app/(public)/[farmSlug]/checkout/page.tsx': [],
     // Ohne gültige Signatur ist nicht einmal der Hof bestätigt → zur Hofübersicht.
     'src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx': ['bestellung-ungueltig', 'bestaetigung'],
@@ -359,16 +359,19 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     expect(kunde).toMatch(/angezeigterBereich\(produkte, bereichWunsch\)/)
   })
 
-  it('der Checkout: kein Kopf, sobald eine Bestellung angelegt ist — und nie im Zahlungsschritt', () => {
+  it('der Checkout: kein Weg hinaus, sobald eine Bestellung angelegt ist — und nie im Zahlungsschritt (Nr. 12)', () => {
+    // Seit Nr. 12 steht die Kasse in der Fokus-Shell; ihr „Zurück" ist der
+    // einzige Weg hinaus. Ob es ein Link zum Hof oder ein Knopf zwischen
+    // Angaben und Zahlung ist, entscheidet kassenZurueck (tests/kasse.test.ts).
     const text = lies('src/components/checkout/checkout-form.tsx')
-    // Ab angelegter Bestellung keine Kopfzeile — auch nach „Zurück" aus dem Zahlungsschritt.
-    expect(text).toMatch(/const kopf = bestellungAngelegt \? null : \(\s*<KundenKopf seite=\{\{ art: 'checkout'/)
-    expect(text).toMatch(/setBestellungAngelegt\(true\)\s*setPaymentStep\(/)
-    const zahlungsschritt = text.slice(text.indexOf('if (paymentStep) {'), text.indexOf('if (!isHydrated) {'))
-    expect(zahlungsschritt).toMatch(/<StripePaymentStep/)
-    expect(zahlungsschritt).not.toMatch(/\{kopf\}/)
-    // Laden, leerer Korb, Formular
-    expect(text.match(/\{kopf\}/g)).toHaveLength(3)
+    expect(text).not.toMatch(/<KundenKopf\b/)
+    expect(text).toMatch(/kassenZurueck\(\{ farmSlug: farm\.slug, schritt, bestellungAngelegt \}\)/)
+    // Nur die Link-Form führt hinaus; die Knopf-Form wechselt nur den Schritt.
+    expect(text).toMatch(/zurueck\.art === 'link'\s*\?\s*\{ href: zurueck\.href, label: zurueck\.label \}\s*:\s*\{ label: zurueck\.label, onClick: \(\) => zeigeSchritt\(zurueck\.ziel\) \}/)
+    expect(text).toMatch(/setBestellungAngelegt\(true\)\s*setZahlung\(/)
+    // Laden, leerer Korb, Zahlung und Formular — alle in derselben Fokus-Shell.
+    expect(text.match(/fokusShell\(/g)?.length).toBeGreaterThanOrEqual(4)
+    expect(text.match(/<KundeFokusShell\b/g)).toHaveLength(1)
   })
 
   it('die Startseite trägt die KundeShell des neuen Designs und keine zweite Kopfzeile', () => {

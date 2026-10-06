@@ -296,10 +296,16 @@ describe('Checkout BAR mit Servicegebühr', () => {
     expect(alsZahl(mailBestellung.totalAmount)).toBe(6)
   })
 
-  it('Karte beim Hof zählt wie bar: derselbe Snapshot, kein Stripe', async () => {
-    await POST(anfrage({ paymentMethod: 'ONSITE_CARD' }))
+  // Bis Nr. 12 stand hier „Karte beim Hof zählt wie bar: derselbe Snapshot".
+  // Seit E5 (docs/nachtlauf/freigabe.md) nimmt der Checkout keine NEUE
+  // Bestellung mit Karte bei Abholung mehr an; wie alte Bestellungen mit
+  // ONSITE_CARD abgerechnet werden (wie bar), prüfen barZuKassierenCents
+  // (tests/servicegebuehr.test.ts) und tests/storno-erstattung.test.ts.
+  it('Karte beim Hof (E5): eine neue Bestellung wird abgelehnt — kein Snapshot, kein Stripe', async () => {
+    const res = await POST(anfrage({ paymentMethod: 'ONSITE_CARD' }))
 
-    expect(createData()).toEqual(expect.objectContaining({ totalAmount: 20, serviceFeeCents: 98 }))
+    expect(res.status).toBe(400)
+    expect(vi.mocked(prisma.order.create)).not.toHaveBeenCalled()
     expect(paymentIntentCreate).not.toHaveBeenCalled()
   })
 })

@@ -262,6 +262,42 @@ describe('kein Big Bang', () => {
     expect(umgestellt.sort()).toEqual([...UMGESTELLT].sort())
   })
 
+  // Nr. 12: Die Kasse rendert die Fokus-Shell in ihrer Client-Komponente —
+  // „Zurück" hängt am Zustand im Browser (kassenZurueck). Die Seite bindet die
+  // Komponente ein, die Komponente die Shell; sonst nutzt keine Datei unter
+  // src/components eine Shell.
+  const UMGESTELLT_UEBER_KOMPONENTE: Record<string, string> = {
+    '(public)/[farmSlug]/checkout/page.tsx': 'src/components/checkout/checkout-form.tsx',
+  }
+
+  it('Routen, die ihre Shell über eine Komponente einbinden, tun das wirklich', () => {
+    for (const [seite, komponente] of Object.entries(UMGESTELLT_UEBER_KOMPONENTE)) {
+      const modul = komponente.replace(/^src\//, '@/').replace(/\.tsx$/, '')
+      expect(readFileSync(join(wurzel, seite), 'utf8'), seite).toContain(`'${modul}'`)
+      expect(readFileSync(join(process.cwd(), komponente), 'utf8'), komponente).toMatch(/@\/components\/shells\/kunde-shell'/)
+    }
+  })
+
+  it('außer diesen Komponenten bindet nichts unter src/components eine Shell ein', () => {
+    const komponenten: string[] = []
+    const sammle = (ordner: string) => {
+      for (const name of readdirSync(ordner)) {
+        const p = join(ordner, name)
+        if (statSync(p).isDirectory()) sammle(p)
+        else if (/\.tsx?$/.test(name)) komponenten.push(p)
+      }
+    }
+    sammle(join(process.cwd(), 'src/components'))
+    const erlaubt = new Set(Object.values(UMGESTELLT_UEBER_KOMPONENTE))
+    const fremd = komponenten
+      .map((d) => relative(process.cwd(), d).split('\\').join('/'))
+      .filter((d) => !d.startsWith('src/components/shells/') && !erlaubt.has(d))
+      .filter((d) => /@\/components\/shells\//.test(readFileSync(join(process.cwd(), d), 'utf8')))
+    // Gegenprobe: Die erlaubte Komponente findet die Suche.
+    expect([...erlaubt].every((d) => /@\/components\/shells\//.test(readFileSync(join(process.cwd(), d), 'utf8')))).toBe(true)
+    expect(fremd).toEqual([])
+  })
+
   it('Gegenprobe: die Vorschau bindet alle drei Shells ein, die Suche findet sie also', () => {
     const text = nutzer.map((d) => readFileSync(d, 'utf8')).join('\n')
     for (const shell of ['hof-shell', 'kunde-shell', 'admin-shell']) expect(text).toContain(`@/components/shells/${shell}'`)

@@ -138,7 +138,7 @@ Umgesetzt in `src/components/shells/` (KundeShell, KundeFokusShell, HofShell, Ad
 - **Hof Handy, Unterleiste:** Heute · Bestellungen · [+ Neu] · Produkte · Mehr. „Mehr" enthält Mein Hof, Kunden, Verkäufe, Auswertung, Region, Einstellungen, Hilfe und Rückmeldung, Admin, Darstellung, Abmelden.
 - **Neu-Menü (Web Dropdown, Handy Blatt):** „Was legst du an?" mit Lebensmittel · Futtermittel · Brennmaterial, darunter Beitrag und Verkauf eintragen. Die Wahl bestimmt das Formular.
 - **Admin:** eigene Kopfzeile mit Reitern Höfe · Briefkasten · Finanzen (mit Zählern) und „← Zu meinem Hof". Keine Hof-Seitenleiste im Admin.
-- **Fokus-Seiten ohne Unterleiste:** Produktdetail, Checkout, Zahlung, Bestätigung, Bar-Bestätigung. Dort gibt es genau eine feste Leiste unten (Aktion), nie zwei übereinander. Eine Fokus-Seite mit Kopfzeile (Produktdetail) nimmt `KundeShell`/`KundeShellMitSitzung` mit `unterleiste={false}` — der Warenkorb steht dann auch am Handy im Kopf; `KundeFokusShell` ist die Form ohne Navigation (Checkout ff.).
+- **Fokus-Seiten ohne Unterleiste:** Produktdetail, Checkout, Zahlung, Bestätigung, Bar-Bestätigung. Dort gibt es genau eine feste Leiste unten (Aktion), nie zwei übereinander. Eine Fokus-Seite mit Kopfzeile (Produktdetail) nimmt `KundeShell`/`KundeShellMitSitzung` mit `unterleiste={false}` — der Warenkorb steht dann auch am Handy im Kopf; `KundeFokusShell` ist die Form ohne Navigation (seit Nr. 12 die Kasse).
 
 ### Links und Filter
 
@@ -178,6 +178,18 @@ Umgesetzt in `src/components/shells/` (KundeShell, KundeFokusShell, HofShell, Ad
 - **Menge:** `Stepper` von 1 bis Bestand minus Korb (`mengeNochMoeglich`); der Betrag am Knopf in Cent (`kaufBetragCents`). Ablehnung durch `/api/reserve` steht inline als orangene Hinweiskarte an der Kaufkarte, kein Toast.
 - **Schild** „Futtermittelbetrieb · LFBIS <Nummer>" nur bei Futter, Betriebsstatus Primärproduktion und Nummer (`futterSchild`, E9); andere Status bekommen (noch) kein Schild. Siegel als Marke mit normaler Schrift und grünem Symbol — die grüne `StatusBadge` erreicht auf dem hellen Seitengrund nur 4,37 : 1.
 - **Brennmaterial:** Holzart, Scheitlänge, Trocknung (Restfeuchte), bei Hackschnitzeln Wassergehalt/Körnung immer sichtbar als kleine Kacheln (`brennmaterialZeilen`); Marke „Nur Abholung am Hof".
+
+### Kasse (/[farmSlug]/checkout, seit Nr. 12)
+
+- **Fokus-Shell ohne Navigation** (`KundeFokusShell`, Titel „Bestellen" bzw. „Bezahlen", rechts der Hofname). „Zurück" entscheidet `kassenZurueck` (`src/lib/kasse.ts`): Link zum Hof nur, solange keine Bestellung steht; danach ein Knopf zwischen Angaben und Zahlung (die Shell nimmt dafür additiv `zurueck: { onClick, label }`).
+- **Aufbau** (`KassenRaster`, `src/components/checkout/kasse-teile.tsx`): ab 1024 px links Korb, darunter Abholung und Deine Daten nebeneinander (ab 768 px), Bezahlen, Neuigkeiten; rechts die klebende Übersicht. Am Handy alles in einer Spalte, die Übersicht direkt unter dem Korb (CSS `order`), im Quelltext aber ZULETZT — die Tastatur erreicht den Hauptknopf nach den Angaben.
+- **Übersicht:** Reservierungsfrist („Deine Ware ist bis 14:32 Uhr für dich reserviert (noch 12 Minuten)."), Warenpreis, Servicegebühr als eigene Zeile mit Satz („Servicegebühr · 5 %, mind. € 0,50", `gebuehrBezeichnung`), `SERVICEGEBUEHR_HINWEIS`, Gesamt, Hauptknopf. Beträge nur aus `kassenBetraege` (Cent, Rechenweg des Servers). Die Restzeit wird nicht vorgelesen; erst das Ablaufen (`role="alert"`, orange Hinweiskarte mit „Verfügbarkeit neu prüfen").
+- **Hauptknopf** grün, volle Breite: online „Weiter zur Zahlung · € …", bar „Zahlungspflichtig bestellen · € …" (der Knopf ist dort der verbindliche Abschluss), im Zahlungsschritt „Jetzt bezahlen · € …", nach Ablehnung „Erneut bezahlen · € …". Am Handy die EINE feste Leiste (`AktionsLeiste`, `data-feste-leiste`), ab 768 px dasselbe Element in der Übersicht. Seiten mit `data-feste-leiste` bekommen am Handy `scroll-padding` (globals.css), damit ein fokussiertes Feld nie unter Kopf oder Leiste liegt.
+- **Zahlarten (E5):** nur „Online bezahlen" und „Bar bei Abholung" (`kassenZahlarten`), echte Radioknöpfe als Zeilen. Welche Online-Wege es gibt (Karte, EPS, Apple/Google Pay), zeigt Stripes Zahlungsfeld (`PaymentElement`, Layout `accordion` mit Radios) — die Kasse verspricht keinen bestimmten Weg.
+- **Abholung:** Kacheln mit „Heute"/„Morgen"/Wochentag und Uhrzeit (`abholKacheln`, dieselbe Regel wie der Server), volle Fenster gestrichelt mit „ausgebucht". Darunter „Bestellschluss für heute: HH:MM Uhr".
+- **Kein Satz zu einem Konto (E8).** Unter der E-Mail steht `KONTAKT_HINWEIS` (Bestätigung mit Link zur Bestellung).
+- **Stripes Zahlungsfeld** sitzt auf `bg-accent-foreground` (Crème, in beiden Themes hell) mit `theme: 'stripe'`; der Zahlungsvorgang selbst bleibt unverändert.
+- **Fehler:** am Feld orange (`FeldFehler`, `text-status-offen` — es gibt keinen Fehler-Token, Bericht Nr. 08), Fehler der Anfrage als orange Hinweiskarte an der Übersicht, „Zahlung abgelehnt" als orange Hinweiskarte im Bezahlen-Block (`ZahlungAbgelehnt`, „Es wurde nichts abgebucht …" nur bei `zahlungsFehlerArt` = abgelehnt). Kein Toast.
 
 ### Anmelden
 

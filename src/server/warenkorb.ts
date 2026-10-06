@@ -96,7 +96,7 @@ export async function erneuereHalte(
   positionen: readonly WarenkorbPosition[],
   sessionId: string,
   jetzt: Date = new Date()
-): Promise<void> {
+): Promise<Date | null> {
   const bis = neueFrist(jetzt)
   for (const p of positionen) {
     await prisma.stockReservation.upsert({
@@ -105,6 +105,9 @@ export async function erneuereHalte(
       update: { quantity: p.quantity, expiresAt: bis },
     })
   }
+  // Die Frist, die jetzt in den Halten steht — die Kasse zeigt sie an
+  // (Nachtlauf Nr. 12). Ohne Positionen gibt es keinen Halt und keine Frist.
+  return positionen.length > 0 ? bis : null
 }
 
 /** Halte dieser Sitzung für Produkte, die aus dem Warenkorb geflogen sind, aufräumen. */

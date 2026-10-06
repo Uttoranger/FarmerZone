@@ -56,11 +56,13 @@ export async function POST(request: NextRequest) {
 
     // Halte nachführen: erneuern, was bleibt; löschen, was rausfällt.
     const entfallen = befund.positionen.filter((p) => p.moeglich === 0).map((p) => p.productId)
-    await erneuereHalte(berichtigt, sessionId, jetzt)
+    const reserviertBis = await erneuereHalte(berichtigt, sessionId, jetzt)
     await loescheHalte(entfallen, sessionId)
 
     return NextResponse.json({
       meldung,
+      // Bis dahin gelten die eben erneuerten Halte — die Kasse zeigt die Frist.
+      reserviertBis: reserviertBis?.toISOString() ?? null,
       etwasAbgelaufen: befund.etwasAbgelaufen,
       etwasGeaendert: befund.etwasGeaendert,
       items: berichtigt,
