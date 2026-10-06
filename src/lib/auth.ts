@@ -9,7 +9,13 @@ import { ANMELDECODE_PLUGIN_OPTIONEN, GESPERRTE_AUTH_PFADE, codeVersandErlaubt, 
 import { genauesIlikeMuster } from '@/lib/ilike-muster'
 import { erzeugeAnforderungsSperre } from '@/lib/anmeldecode-sperre'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
-import { BESTAETIGUNG_GESPERRTE_AUTH_PFADE, BESTAETIGUNG_GUELTIG_SEKUNDEN, bestaetigungsPfad } from '@/lib/email-bestaetigung'
+import {
+  BESTAETIGUNG_GESPERRTE_AUTH_PFADE,
+  BESTAETIGUNG_GUELTIG_SEKUNDEN,
+  REGISTRIERUNG_GESPERRTE_AUTH_PFADE,
+  bestaetigungPerLinkErlaubt,
+  bestaetigungsPfad,
+} from '@/lib/email-bestaetigung'
 
 // Franz-tauglich: 10 Login-Versuche pro Minute pro IP sperren keinen echten
 // Nutzer aus (auch nicht bei Tippfehlern), bremsen aber Passwort-Rater.
@@ -158,19 +164,36 @@ export const auth = betterAuth({
   // Mail verlinkt /verify, nicht Better Auths GET /verify-email: Bestätigt
   // wird per Knopf (ARCHITECTURE §5), beide HTTP-Wege sind unten gesperrt.
   emailVerification: {
-    // Jede Registrierung mit Passwort bekommt die Mail — das sind die Höfe
-    // (registerFarmer); Kundinnen melden sich mit Code an und sind dabei
-    // bestätigt.
-    sendOnSignUp: true,
+    // NICHT beim Sign-up: Da hat das Konto noch die Rolle CUSTOMER.
+    // registerFarmer setzt erst FARMER und stößt dann den Versand an
+    // (Nachbesserung Runde 1).
+    sendOnSignUp: false,
     // Der Token beweist das Postfach, er meldet niemanden an.
     autoSignInAfterVerification: false,
     expiresIn: BESTAETIGUNG_GUELTIG_SEKUNDEN,
+    // Der Link beweist nur die Adresse eines HOFS. Ein Kundinnen- oder
+    // Betreiber-Konto bestätigt so nie — für Kundinnen zählt allein die
+    // Code-Anmeldung (Pre-Hijacking, src/lib/email-bestaetigung.ts). Die
+    // Rolle frisch aus der Datenbank; Werfen bricht das Bestätigen ab, bevor
+    // Better Auth `emailVerified` schreibt.
+    beforeEmailVerification: async (user) => {
+      const konto = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } })
+      if (!bestaetigungPerLinkErlaubt(konto?.role)) {
+        throw APIError.from('FORBIDDEN', { code: 'NUR_HOEFE', message: 'Bestätigung per Link nur für Höfe' })
+      }
+    },
     sendVerificationEmail: async ({ user, token }) => {
       // Wie beim Anmeldecode erst NACH der Antwort: Registrieren soll nicht
       // auf Rendern und Resend warten, und ein Mailfehler darf die
       // Registrierung nicht scheitern lassen.
       nachDerAntwort(async () => {
         try {
+          // Nur an Höfe — frisch aus der Datenbank. Kundinnen bekommen nie
+          // eine Bestätigungs-Mail (sie könnten damit ein fremdes Konto
+          // bestätigen), und jede Mail an eine beliebige Adresse schadet dem
+          // Ruf der Absenderadresse.
+          const konto = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } })
+          if (!bestaetigungPerLinkErlaubt(konto?.role)) return
           const link = `${APP_URL}${bestaetigungsPfad(token)}`
           const { sendEmailBestaetigung } = await import('@/lib/email')
           const ergebnis = await sendEmailBestaetigung(user.email, link)
@@ -193,7 +216,8 @@ export const auth = betterAuth({
   // emailOTP-Plugins (Begründung je Pfad in src/lib/anmeldecode.ts) und
   // Better Auths eigene Wege der E-Mail-Bestätigung (src/lib/email-
   // bestaetigung.ts) — die ruft nur der Server über auth.api.
-  disabledPaths: [...GESPERRTE_AUTH_PFADE, ...BESTAETIGUNG_GESPERRTE_AUTH_PFADE],
+  // Registrieren mit Passwort nur über registerFarmer (auth.api).
+  disabledPaths: [...GESPERRTE_AUTH_PFADE, ...BESTAETIGUNG_GESPERRTE_AUTH_PFADE, ...REGISTRIERUNG_GESPERRTE_AUTH_PFADE],
 
   // ROLLEN-TRENNUNG (E7): Höfe und Admins melden sich NIE mit Code an. Das
   // muss vor dem Plugin passieren: Es legt den Code an, BEVOR es

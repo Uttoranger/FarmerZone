@@ -46,7 +46,7 @@ vi.mock('@/app/account/profile/profile-client', () => ({ ProfileClient: () => nu
 
 import AccountProfilePage from '@/app/account/profile/page'
 import { updateSubscription, deleteCustomerAccount } from '@/server/actions/subscriptions'
-import { adresseBestaetigt } from '@/lib/anmeldecode'
+import { adresseBestaetigt, kundinnenKonto } from '@/lib/anmeldecode'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
@@ -143,7 +143,7 @@ describe('/account/profile — nur die eigene, bestätigte Adresse', () => {
 
     const abos = await aboAnzeige()
 
-    expect(userFindUnique).toHaveBeenCalledWith({ where: { id: 'user_1' }, select: { email: true, emailVerified: true } })
+    expect(userFindUnique).toHaveBeenCalledWith({ where: { id: 'user_1' }, select: { email: true, emailVerified: true, role: true, isAdmin: true } })
     expect(abos).toHaveLength(1)
   })
 
@@ -273,5 +273,31 @@ describe('Abos ändern und löschen — nur mit bestätigter Adresse', () => {
 
     expect(await deleteCustomerAccount()).toEqual({})
     expect(prisma.$transaction).toHaveBeenCalledOnce()
+  })
+})
+
+describe('/account nur für Kundinnen-Konten (Nr. 17b, Nachbesserung Runde 1)', () => {
+  it('ein bestätigter Hof mit der Adresse der Abos sieht keine Abos und ändert keine', async () => {
+    sitzung(true, true, { role: 'FARMER', isAdmin: false })
+
+    expect(await aboAnzeige()).toEqual([])
+    expect((await updateSubscription('farm_1', false, false)).error).toBeTruthy()
+    expect(aboFindMany).not.toHaveBeenCalled()
+    expect(aboUpsert).not.toHaveBeenCalled()
+  })
+
+  it('ein Betreiber-Konto ebenso', async () => {
+    sitzung(true, true, { role: 'CUSTOMER', isAdmin: true })
+
+    expect(await aboAnzeige()).toEqual([])
+    expect((await updateSubscription('farm_1', false, false)).error).toBeTruthy()
+  })
+
+  it('kundinnenKonto: nur CUSTOMER ohne isAdmin', () => {
+    expect(kundinnenKonto({ role: 'CUSTOMER', isAdmin: false })).toBe(true)
+    expect(kundinnenKonto({ role: 'FARMER', isAdmin: false })).toBe(false)
+    expect(kundinnenKonto({ role: 'CUSTOMER', isAdmin: true })).toBe(false)
+    expect(kundinnenKonto({ role: 'ADMIN' })).toBe(false)
+    expect(kundinnenKonto(null)).toBe(false)
   })
 })

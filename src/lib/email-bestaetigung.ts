@@ -47,6 +47,29 @@ export const BESTAETIGUNG_GUELTIG_SEKUNDEN = 24 * 60 * 60
  */
 export const BESTAETIGUNG_GESPERRTE_AUTH_PFADE = ['/verify-email', '/send-verification-email'] as const
 
+/**
+ * Wessen Adresse der Bestätigungs-Link beweisen darf: nur die eines Hofs
+ * (Nachbesserung Runde 1). Für Kundinnen zählt als Beweis NUR die
+ * Code-Anmeldung (E7, `adresseBestaetigt` in anmeldecode.ts) — sonst legte
+ * jemand ein Passwort-Konto auf die Adresse einer Kundin an, die Kundin
+ * klickte die Bestätigung, und das Konto des Fremden wäre bestätigt
+ * (Pre-Hijacking: Abos auf /account, sein Passwort bliebe). Durchgesetzt beim
+ * Versand (auth.ts, sendVerificationEmail) und beim Bestätigen
+ * (beforeEmailVerification), beides nach der Rolle frisch aus der Datenbank.
+ */
+export function bestaetigungPerLinkErlaubt(rolle: string | null | undefined): boolean {
+  return rolle === 'FARMER'
+}
+
+/**
+ * Registrieren mit Passwort nur über den Server (Nachbesserung Runde 1): Der
+ * einzige Weg ist `registerFarmer` (Honigtopf, Zeitschranke, Rolle FARMER)
+ * über `auth.api.signUpEmail`. Offen hätte `/sign-up/email` jedem erlaubt,
+ * ein Passwort-Konto (Rolle CUSTOMER) auf eine fremde Adresse anzulegen.
+ * Eine Registrierung für Kundinnen mit Passwort gibt es nicht (E7).
+ */
+export const REGISTRIERUNG_GESPERRTE_AUTH_PFADE = ['/sign-up/email'] as const
+
 export type BestaetigungsKonto = { createdAt: Date }
 
 /** Muss dieses Konto bestätigen? Nur ab dem Stichtag angelegte. */

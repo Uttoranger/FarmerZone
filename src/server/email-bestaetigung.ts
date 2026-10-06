@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import {
   ERNEUT_SENDEN,
   bestaetigungOffen,
+  bestaetigungPerLinkErlaubt,
   bestaetigungPflichtig,
   erneutSendenEntscheidung,
   leseVersandZeiten,
@@ -24,7 +25,7 @@ import {
 export type BestaetigungsStand = {
   email: string
   emailVerified: boolean
-  /** Konto ab dem Stichtag — sonst ist nichts zu bestätigen. */
+  /** Hof-Konto ab dem Stichtag — sonst ist nichts zu bestätigen. */
   pflichtig: boolean
   /** Pflichtig und unbestätigt: Foto-Uploads und Freischaltung gesperrt. */
   offen: boolean
@@ -33,14 +34,17 @@ export type BestaetigungsStand = {
 export async function ladeBestaetigungsStand(userId: string): Promise<BestaetigungsStand | null> {
   const konto = await prisma.user.findUnique({
     where: { id: userId },
-    select: { email: true, emailVerified: true, createdAt: true },
+    select: { email: true, emailVerified: true, createdAt: true, role: true },
   })
   if (!konto) return null
+  // Nur Höfe bestätigen per Link (Nachbesserung Runde 1) — für jedes andere
+  // Konto gibt es hier nichts zu tun und nichts zu senden.
+  const hof = bestaetigungPerLinkErlaubt(konto.role)
   return {
     email: konto.email,
     emailVerified: konto.emailVerified === true,
-    pflichtig: bestaetigungPflichtig(konto),
-    offen: bestaetigungOffen(konto),
+    pflichtig: hof && bestaetigungPflichtig(konto),
+    offen: hof && bestaetigungOffen(konto),
   }
 }
 

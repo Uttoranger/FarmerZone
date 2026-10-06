@@ -17,8 +17,10 @@ import {
   EMAIL_BESTAETIGUNG_STICHTAG,
   ERNEUT_SENDEN,
   bestaetigungOffen,
+  bestaetigungPerLinkErlaubt,
   bestaetigungPflichtig,
   bestaetigungsPfad,
+  REGISTRIERUNG_GESPERRTE_AUTH_PFADE,
   erneutSendenEntscheidung,
   erneutWarteText,
   leseVersandZeiten,
@@ -146,5 +148,16 @@ describe('Link und gesperrte Pfade', () => {
 
   it('Better Auths Wege über HTTP sind zu: Bestätigen per GET und offenes Anfordern', () => {
     expect(BESTAETIGUNG_GESPERRTE_AUTH_PFADE).toEqual(['/verify-email', '/send-verification-email'])
+  })
+})
+
+describe('Bestätigung per Link nur für Höfe (Nachbesserung Runde 1)', () => {
+  it('nur die Rolle FARMER — Kundinnen beweisen ihre Adresse nur mit Code', () => {
+    expect(bestaetigungPerLinkErlaubt('FARMER')).toBe(true)
+    for (const rolle of ['CUSTOMER', 'ADMIN', null, undefined, '']) expect(bestaetigungPerLinkErlaubt(rolle)).toBe(false)
+  })
+
+  it('Registrieren mit Passwort ist über HTTP zu', () => {
+    expect(REGISTRIERUNG_GESPERRTE_AUTH_PFADE).toEqual(['/sign-up/email'])
   })
 })

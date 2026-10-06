@@ -32,6 +32,11 @@ const nachlauf = vi.hoisted(() => ({ aufgaben: [] as Array<() => Promise<void>> 
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => anfrage.headers) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
+// Die Zeitschranke der Registrierung (drei Sekunden) prüft register-spam.test.ts.
+vi.mock('@/lib/form-token', async (original) => ({
+  ...(await original<typeof import('@/lib/form-token')>()),
+  checkFormToken: () => 'ok',
+}))
 vi.mock('@/lib/nach-der-antwort', () => ({
   nachDerAntwort: (aufgabe: () => Promise<void>) => {
     nachlauf.aufgaben.push(aufgabe)
@@ -55,11 +60,17 @@ type Auth = (typeof import('@/lib/auth'))['auth']
 let auth: Auth
 let aktionen: typeof import('@/server/actions/email-bestaetigung')
 let kennungGET: (typeof import('@/app/api/upload/token/route'))['GET']
+let registerFarmer: (typeof import('@/server/actions/register'))['registerFarmer']
+let abos: typeof import('@/server/actions/subscriptions')
+let bestaetigteAdresse: (typeof import('@/server/kunden-adresse'))['bestaetigteAdresse']
 
 beforeAll(async () => {
   auth = (await import('@/lib/auth')).auth
   aktionen = await import('@/server/actions/email-bestaetigung')
   kennungGET = (await import('@/app/api/upload/token/route')).GET
+  registerFarmer = (await import('@/server/actions/register')).registerFarmer
+  abos = await import('@/server/actions/subscriptions')
+  bestaetigteAdresse = (await import('@/server/kunden-adresse')).bestaetigteAdresse
 }, 30_000)
 
 afterEach(async () => {
@@ -75,7 +86,7 @@ afterEach(async () => {
   await raeumeAuf()
 })
 
-const PASSWORT = 'test-passwort-1234'
+const PASSWORT = 'Test-Passwort-1234'
 const NACH_STICHTAG = new Date(EMAIL_BESTAETIGUNG_STICHTAG.getTime() + 60_000)
 const VOR_STICHTAG = new Date(EMAIL_BESTAETIGUNG_STICHTAG.getTime() - 60_000)
 
@@ -87,8 +98,13 @@ const VOR_STICHTAG = new Date(EMAIL_BESTAETIGUNG_STICHTAG.getTime() - 60_000)
  */
 async function neuerHof(angelegt: Date = NACH_STICHTAG, mitHof = false): Promise<{ id: string; email: string }> {
   const email = `${intKennung('neu')}@example.com`
-  await auth.api.signUpEmail({ body: { email, password: PASSWORT, name: 'Max Mustermann' } })
-  const konto = await prisma.user.update({ where: { email }, data: { role: 'FARMER', createdAt: angelegt }, select: { id: true } })
+  // Der echte Weg: registerFarmer legt das Konto an, setzt die Rolle FARMER
+  // und stößt erst DANACH die Bestätigungs-Mail an (Nachbesserung Runde 1).
+  expect(
+    await registerFarmer({ firstName: 'Max', lastName: 'Mustermann', email, password: PASSWORT, website: '', formToken: 'egal' })
+  ).toEqual({ ok: true })
+  const konto = await prisma.user.update({ where: { email }, data: { createdAt: angelegt }, select: { id: true, role: true } })
+  expect(konto.role).toBe('FARMER')
   // Anmelden NACH dem Setzen der Rolle — wie das Registrieren-Formular
   // (registerFarmer, dann signIn.email): Die Upload-Route liest die Rolle
   // aus der Sitzung.
@@ -244,6 +260,91 @@ describe('Erneut senden — Bremse in der Datenbank', () => {
     expect(await aktionen.sendeBestaetigungErneut()).toMatchObject({ error: expect.any(String) })
     await arbeiteNachlaufAb()
     expect(versand.links).toHaveLength(0)
+  })
+})
+
+describe('Nachbesserung Runde 1: Bestätigung per Link nur für Höfe (Pre-Hijacking)', () => {
+  const basis = 'http://localhost:3000/api/auth'
+
+  /** Ein Passwort-Konto mit der Adresse einer Kundin — wie es ein Angreifer anlegen wollte. */
+  async function kundinnenKontoMitPasswort(): Promise<{ id: string; email: string }> {
+    const email = `${intKennung('kundin')}@example.com`
+    await auth.api.signUpEmail({ body: { email, password: PASSWORT, name: 'Fremder Name' } })
+    const { id } = await prisma.user.findUniqueOrThrow({ where: { email }, select: { id: true } })
+    return { id, email }
+  }
+
+  it('HTTP: /sign-up/email ist zu — niemand legt über HTTP ein Passwort-Konto an', async () => {
+    const email = `${intKennung('angreifer')}@example.com`
+    const antwort = await auth.handler(
+      new Request(`${basis}/sign-up/email`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost:3000' },
+        body: JSON.stringify({ email, password: PASSWORT, name: 'Angreifer' }),
+      })
+    )
+    await arbeiteNachlaufAb()
+
+    expect(antwort.status).toBe(404)
+    expect(await prisma.user.count({ where: { email } })).toBe(0)
+    expect(versand.links).toHaveLength(0)
+  })
+
+  it('ein Kundinnen-Konto mit Passwort bekommt keine Bestätigungs-Mail', async () => {
+    await kundinnenKontoMitPasswort()
+    await arbeiteNachlaufAb()
+    expect(versand.links).toHaveLength(0)
+  })
+
+  it('auch mit gültigem Token wird ein Kundinnen-Konto NICHT bestätigt — /account bleibt zu', async () => {
+    const { id, email } = await kundinnenKontoMitPasswort()
+    // Ein echter, signierter Token für diese Adresse (wie ihn Better Auth ausstellt).
+    const { createEmailVerificationToken } = await import('better-auth/api')
+    const token = await createEmailVerificationToken(process.env.BETTER_AUTH_SECRET ?? '', email)
+
+    expect(await aktionen.bestaetigeEmail({ token })).toMatchObject({ code: 'UNGUELTIG' })
+    expect((await prisma.user.findUniqueOrThrow({ where: { id } })).emailVerified).toBe(false)
+    expect(await bestaetigteAdresse(id)).toBeNull()
+  })
+
+  it('Gegenprobe: ein Hof bekommt die Mail und kann bestätigen', async () => {
+    const { id } = await neuerHof()
+    await arbeiteNachlaufAb()
+    expect(versand.links).toHaveLength(1)
+    expect(await aktionen.bestaetigeEmail({ token: tokenAus(versand.links[0]?.link ?? '') })).toEqual({ ok: true })
+    expect((await prisma.user.findUniqueOrThrow({ where: { id } })).emailVerified).toBe(true)
+  })
+
+  it('ein bestätigter Hof erreicht keine Abos zu seiner Adresse (/account nur für Kundinnen)', async () => {
+    const { id, email } = await neuerHof()
+    await arbeiteNachlaufAb()
+    expect(await aktionen.bestaetigeEmail({ token: tokenAus(versand.links[0]?.link ?? '') })).toEqual({ ok: true })
+    const andererHof = await prisma.farm.create({
+      data: {
+        slug: intKennung('hof'),
+        name: 'Hof Test',
+        ownerName: 'Max Mustermann',
+        description: 'Erfundener Hof.',
+        address: 'Teststraße 1',
+        postalCode: '8700',
+        city: 'Teststadt',
+        phone: '+43 660 0000000',
+        email: `${intKennung('anderer')}@example.com`,
+        owner: { create: { id: intKennung('besitzer'), email: `${intKennung('besitzer')}@example.com`, role: 'FARMER' } },
+      },
+    })
+    await prisma.customerFarmSubscription.create({
+      data: { customerEmail: email, farmId: andererHof.id, optInEmail: true, customerPhone: '+43 660 0000000' },
+    })
+
+    expect(await bestaetigteAdresse(id)).toBeNull()
+    expect((await abos.updateSubscription(andererHof.id, false, false)).error).toBeTruthy()
+    expect((await abos.deleteCustomerAccount()).error).toBeTruthy()
+    const abo = await prisma.customerFarmSubscription.findUniqueOrThrow({
+      where: { customerEmail_farmId: { customerEmail: email, farmId: andererHof.id } },
+    })
+    expect(abo.optInEmail).toBe(true)
+    await prisma.customerFarmSubscription.delete({ where: { id: abo.id } })
   })
 })
 
