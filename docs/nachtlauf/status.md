@@ -33,8 +33,8 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 19b | Sicherheits-Altlasten aus Lauf 4 | fertig | `nacht/2026-10-06/19b-sicherheit` | #193 | 19a (#192) | Foto-Upload nach Deploy prüfen; Registrierung: Aufzählung nicht ganz geschlossen | 06.10.2026 |
 | 20 | Futter und Brennmaterial | offen | | | | | |
 | 21 | Teilen | offen | | | | | |
-| 22a | Kunden und Kundendetail | läuft | `nacht/2026-10-06/22a-kunden` | | 19b (#193) | | 06.10.2026 |
-| 22b | Verkäufe und „Verkauf eintragen" | offen | | | | | |
+| 22a | Kunden und Kundendetail | fertig | `nacht/2026-10-06/22a-kunden` | #194 | 19b (#193) | Marken-Farben freigeben; ILIKE-Altlast customers.ts erledigt | 06.10.2026 |
+| 22b | Verkäufe und „Verkauf eintragen" | läuft | `nacht/2026-10-06/22b-verkaeufe` | | 22a (#194) | | 06.10.2026 |
 | 22c | Auswertung und Region | offen | | | | | |
 | 22d | Einstellungen | offen | | | | | |
 | 22e | Beiträge, Hilfe, Meine Meldungen | offen | | | | | |
