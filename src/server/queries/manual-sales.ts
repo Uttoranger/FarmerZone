@@ -1,12 +1,14 @@
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import {
   sumOnlinePaid,
   sumBarKassiert,
   sumWeekTotal,
   mergeSalesFeed,
   type SalesFeedOrder,
-  type SalesFeedEntry,
 } from '@/lib/sales-summary'
+import { verkaufsZeilen, type FeedVerkauf, type VerkaufsZeile } from '@/lib/hof-verkaeufe'
+import { wienKalendertag } from '@/lib/kalender'
 import { getYtdRevenue } from './analytics'
 import { formatPosition } from '@/lib/format'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
@@ -14,28 +16,18 @@ import { umsatzBestellungWhere, umsatzfenster, umsatzVerkaufWhere } from '@/lib/
 import { meistverkaufteProdukte } from '@/lib/verkauf-eintragen'
 import { centAusDecimal } from './umsatz'
 
-export type ManualSaleData = {
-  id: string
-  productId: string | null
-  productName: string
-  quantity: number
-  unit: string | null
-  totalAmount: number
-  channel: string
-  saleDate: Date
-  note: string | null
-}
-
-// Verkauf 2: Wochen-Summen (Online/Bar), Gesamt (YTD) und die vereinte
+// Verkäufe (/sales): Wochen-Summen (Online/Bar), Gesamt (YTD) und die vereinte
 // "Letzte Verkäufe"-Liste — Unterscheidung rein über stripePaymentIntentId,
 // KEIN Schema-Change. Zeitraum der Karten: laufende Woche nach der EINEN
-// Umsatzregel (src/lib/umsatz.ts) — dieselbe Zahl wie auf Heute.
+// Umsatzregel (src/lib/umsatz.ts) — dieselbe Zahl wie auf Heute. Seit
+// Nr. 22b gehen nur Text und Zahlen an den Browser (Zeilen aus
+// verkaufsZeilen, Beträge in Cent, Tage nach Wiener Zeit).
 export type SalesOverview = {
   weekTotal: number
   weekOnline: number
   weekBar: number
   ytdTotal: number
-  feed: SalesFeedEntry<ManualSaleData>[]
+  zeilen: VerkaufsZeile[]
 }
 
 const PICKED_ORDER_SELECT = {
@@ -55,19 +47,20 @@ type PickedOrderRow = {
   orderNumber: string
   customerName: string
   status: string
-  totalAmount: { toString(): string }
+  totalAmount: Prisma.Decimal
   stripePaymentIntentId: string | null
   pickedUpAt: Date | null
   items: { quantity: number; productName: string; product: { unit: string; unitSize: { toString(): string } | null } | null }[]
 }
 
+/** Eine abgeholte Bestellung im Feed — `totalAmount` in ganzen Cent (CODING_STANDARDS §2 Geld). */
 function toFeedOrder(o: PickedOrderRow): SalesFeedOrder {
   return {
     id: o.id,
     orderNumber: o.orderNumber,
     customerName: o.customerName,
     status: o.status,
-    totalAmount: Number(o.totalAmount),
+    totalAmount: centAusDecimal(o.totalAmount),
     stripePaymentIntentId: o.stripePaymentIntentId,
     pickedUpAt: o.pickedUpAt,
     itemsLabel: o.items.map((i) => formatPosition({ name: i.productName, quantity: i.quantity, unit: i.product?.unit ?? null, unitSize: i.product?.unitSize ?? null })).join(' · '),
@@ -92,14 +85,12 @@ export async function getSalesOverview(farmId: string, jetzt: Date = new Date())
       take: 10,
       select: PICKED_ORDER_SELECT,
     }),
-    getRecentManualSales(farmId, 10),
+    letzteVerkaeufe(farmId, 10),
     getYtdRevenue(farmId, jetzt),
   ])
 
-  // Summen in Cent (CODING_STANDARDS §2 Geld), erst zur Anzeige in Euro. Achtung:
-  // totalAmount trägt hier Cent, im Feed (toFeedOrder) Euro — die Summen-
-  // Funktionen rechnen einheitenlos, die Umrechnung steht nur hier.
-  const weekFeedOrders = weekOrders.map((o) => ({ ...toFeedOrder(o), totalAmount: centAusDecimal(o.totalAmount) }))
+  // Summen in Cent, erst zur Anzeige in Euro.
+  const weekFeedOrders = weekOrders.map(toFeedOrder)
   const weekFeedSales = weekSales.map((s) => ({ id: s.id, totalAmount: centAusDecimal(s.totalAmount), saleDate: s.saleDate }))
 
   return {
@@ -107,28 +98,38 @@ export async function getSalesOverview(farmId: string, jetzt: Date = new Date())
     weekOnline: centsAlsEuro(sumOnlinePaid(weekFeedOrders)),
     weekBar: centsAlsEuro(sumBarKassiert(weekFeedOrders, weekFeedSales)),
     ytdTotal,
-    feed: mergeSalesFeed(recentOrders.map(toFeedOrder), recentSales, 10),
+    zeilen: verkaufsZeilen(mergeSalesFeed(recentOrders.map(toFeedOrder), recentSales, 10), jetzt),
   }
 }
 
-export async function getRecentManualSales(farmId: string, limit = 20): Promise<ManualSaleData[]> {
+/** Die letzten Direktverkäufe des Hofs, Betrag einmal in Cent gewandelt. */
+async function letzteVerkaeufe(farmId: string, limit: number): Promise<FeedVerkauf[]> {
   const sales = await prisma.manualSale.findMany({
     where: { farmId },
     orderBy: { saleDate: 'desc' },
     take: limit,
+    select: { id: true, productId: true, productName: true, quantity: true, unit: true, totalAmount: true, channel: true, saleDate: true, note: true },
   })
 
-  return sales.map((s) => ({
-    id: s.id,
-    productId: s.productId,
-    productName: s.productName,
-    quantity: Number(s.quantity),
-    unit: s.unit,
-    totalAmount: Number(s.totalAmount),
-    channel: s.channel,
-    saleDate: s.saleDate,
-    note: s.note,
-  }))
+  return sales.map((s) => {
+    const cent = centAusDecimal(s.totalAmount)
+    return {
+      id: s.id,
+      totalAmount: cent,
+      saleDate: s.saleDate,
+      daten: {
+        id: s.id,
+        productId: s.productId,
+        productName: s.productName,
+        quantity: s.quantity.toNumber(),
+        unit: s.unit,
+        totalAmount: centsAlsEuro(cent),
+        channel: s.channel,
+        saleTag: wienKalendertag(s.saleDate),
+        note: s.note,
+      },
+    }
+  })
 }
 
 /**

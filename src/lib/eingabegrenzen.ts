@@ -33,6 +33,15 @@ export const BILD_URL_MAX = 2048
 export const VORRAT_MAX = 99_999
 
 /**
+ * Betrag und Menge eines eingetragenen Verkaufs (Nachtlauf Nr. 22b). Die
+ * Spalten (Decimal(10,2) bzw. Decimal(10,3)) fassen mehr; darüber schlüge das
+ * Speichern mit einem Datenbankfehler fehl statt mit einem Satz. Die Grenzen
+ * fangen Tippfehler ab und lassen jedem echten Hofverkauf Luft.
+ */
+export const VERKAUF_BETRAG_MAX = 1_000_000
+export const VERKAUF_MENGE_MAX = 999_999
+
+/**
  * Der Name einer Bestellposition — immer der Name des Produkts aus der
  * Datenbank, nie, was der Browser schickt. GEKÜRZT statt abgelehnt: Ein
  * Produkt, dessen Name vor der Grenze länger gespeichert wurde (auch aus dem

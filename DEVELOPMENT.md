@@ -4277,6 +4277,19 @@ Gate 8 „Code ohne Mockup": `/customers` und `/customers/[kundeId]` sind von `(
 - **Kleinkorrekturen beim Umbau:** „N weitere Bestellungen" zählt jetzt alle Bestellungen (vorher höchstens fünf, weil nur zehn geladen waren); „Kunde seit" rechnet in Wiener Zeit; der Link dorthin öffnet `/orders?filter=alle` (der Standardfilter „Offen" hätte die alten Bestellungen versteckt). Die Spaltensortierung der Tabelle (auf- und absteigend je Spalte) ist eine Sortierwahl für alle Breiten geworden: fünf Sortierungen, jede in beide Richtungen (`?richtung=`, Nachbesserung 1 — nichts geht verloren, auch nicht „wenigste Bestellungen" oder „Z bis A").
 - Entfernt: `customers-client.tsx` (Farbliterale, aus `FARBLITERAL_BESTAND` gestrichen) und `src/components/customers/customers-table.tsx`.
 
+## Verkäufe und „Verkauf eintragen" in der HofShell (Nachtlauf Nr. 22b, Oktober 2026)
+
+Gate 8 „Code ohne Mockup", Register E13: `/sales` ist von `(farmer)` nach `(hof)` gezogen (Adresse gleich), Seite und Formular „Verkauf eintragen" sind nach DESIGN_SYSTEM.md neu gezeichnet. Das Neu-Menü (`HOF_NEU`) führt weiter über `/sales?neu=1` direkt in das Formular. Keine neue Funktion, keine Schema-Änderung, keine Migration.
+
+- **Fachregel Direktverkauf = nur Umsatz:** Ein eingetragener Verkauf bucht keinen Bestand ab, auch nicht mit gewähltem Produkt — und deshalb beim Ändern oder Löschen auch nichts zurück. Er zählt in „Bar kassiert", in der Woche (Wiener Tag des Verkaufs, gespeichert 12:00 UTC) und mit Produkt in der Schnellwahl der meistverkauften Produkte. Unverändert seit Verkauf 2; jetzt im Integrationstest festgehalten (Vorrat bleibt beim Anlegen und Löschen gleich).
+- **Löschen mit Besitz in der WHERE-Klausel:** vorher Lesen (`findFirst` mit Hof) und dann `delete` nach ID allein, und bei fremdem Verkauf ein geworfener Fehler (im Browser nur „Fehler beim Löschen"). Jetzt `deleteMany({ id, farmId })` mit `{ ok } | { error }`; ohne Anmeldung antworten alle drei Actions mit einem Satz statt abzustürzen; die Kennung geht durch Zod (`verkaufIdSchema`).
+- **Server prüft den Tag:** Ein Verkauf nach dem heutigen Wiener Tag wird abgelehnt (vorher nur über `max` am Datumsfeld), und nur echte Kalendertage gelten (2026-02-31 war still der 3. März).
+- **Grenzen aus `eingabegrenzen.ts`:** Produktname (`PRODUKTNAME_MAX`) und Notiz (`NOTIZ_MAX`) mit den Sätzen aus `ZU_LANG` und `ZeichenZaehler` statt `maxLength`; neu `VERKAUF_BETRAG_MAX` (1 000 000, wie bisher) und `VERKAUF_MENGE_MAX` (999 999 — vorher ohne Grenze, eine größere Menge sprengte die Spalte `Decimal(10,3)` mit einem Datenbankfehler).
+- **Nur Text und Zahlen an den Browser:** Die Abfrage gibt Zeilen aus `verkaufsZeilen` weiter (Cent, Tag als „Heute"/„Gestern"/„Fr, 25. Sep" nach Wiener Zeit — vorher `toLocaleDateString` ohne Zeitzone, auf dem Server in UTC und im Browser in Ortszeit, also auch eine mögliche Hydration-Abweichung) statt `Date`-Objekten und `Number(Decimal)`; Produkte nur mit Kennung, Name und Einheit statt aller Produktdaten.
+- **Fehler inline:** Fehler beim Speichern und Löschen stehen orange im Formular bzw. in der Rückfrage statt als Toast; ein Ladefehler der Seite als Hinweiskarte statt der 500.
+- **Bewusst gleich geblieben:** „Gesamt" unter der Wochenzahl ist weiter `getYtdRevenue` (Wiener Kalenderjahr, ohne Produkte mit `countsTowardLimit = false`) — die Bezeichnung ist ungenau, ein anderes Wort wäre eine inhaltliche Entscheidung.
+- Entfernt: `sales-client.tsx` (Farbliterale, aus `FARBLITERAL_BESTAND` gestrichen), `sale-dialog.tsx`, `sales-feed-list.tsx` und das seit Verkauf 2 unbenutzte `sale-list.tsx` (alle `src/components/sales/`); `kanal-symbol.tsx` bleibt die eine Zuordnung der Wegsymbole.
+
 ## Nützliche Befehle
 
 ```bash

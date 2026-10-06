@@ -95,8 +95,9 @@ describe('an den Seiten', () => {
   })
 
   it('/sales öffnet „Verkauf eintragen" über useUrlAuftrag', () => {
-    const verkauf = quelle('src/components/sales/sales-client.tsx')
-    expect(verkauf).toMatch(/useUrlAuftrag\(\(auftrag\) => \{\s*if \(auftrag\.art === 'neu'\) openNewSale\(\)/)
+    // Seit Nr. 22b die Ansicht im neuen Design (Route in der HofShell).
+    const verkauf = quelle('src/components/hof-verkaeufe/verkaeufe-ansicht.tsx')
+    expect(verkauf).toMatch(/useUrlAuftrag\(\(auftrag\) => \{\s*if \(auftrag\.art === 'neu'\) neuerVerkauf\(\)/)
   })
 
   it('der Hook nimmt den Auftrag per replaceState aus der Adresse', () => {

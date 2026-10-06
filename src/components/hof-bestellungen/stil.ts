@@ -15,6 +15,8 @@ const PILLE =
 
 /** Grün = erledigt/gepackt und Kundenaktion (Farbrollen) — die eine Hauptaktion je Ansicht. */
 export const KNOPF_GRUEN = cn(PILLE, 'bg-accent text-accent-foreground hover:bg-accent/90', FOKUS_RAHMEN)
+/** Orange gefüllt = Hof-Aktion (erstellen, eintragen; Farbrollen) — höchstens einmal je Ansicht (Nr. 22b). */
+export const KNOPF_ORANGE = cn(PILLE, 'border border-primary-foreground/25 bg-primary text-primary-foreground hover:bg-primary/90', FOKUS_RAHMEN)
 /** Umriss für Nebenaktionen. */
 export const KNOPF_RAHMEN = cn(PILLE, 'border border-border font-medium text-foreground hover:bg-muted', FOKUS_RAHMEN)
 /** Zerstörend: Orange-Umriss, nie Grün (DESIGN_SYSTEM „Dialoge und Blätter"). */

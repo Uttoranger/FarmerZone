@@ -34,7 +34,6 @@ const FARBLITERAL_BESTAND = [
   'src/components/farmer/segment-control.tsx',
   'src/components/hoefe/hoefe-karte.tsx',
   'src/components/orders/order-status.ts',
-  'src/components/sales/sales-client.tsx',
   'src/components/shared/kunden-kopf.tsx',
   'src/components/shared/wortmarke.tsx',
   'src/lib/bestellstatus.ts',

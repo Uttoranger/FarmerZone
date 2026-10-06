@@ -5,18 +5,27 @@ import { revalidatePath } from 'next/cache'
 import { Prisma } from '@prisma/client'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { manualSaleFormSchema } from '@/schemas/manual-sale'
+import { manualSaleFormSchema, verkaufIdSchema } from '@/schemas/manual-sale'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { verkaufOhneAngaben } from '@/lib/verkauf-eintragen'
+import { wienKalendertag } from '@/lib/kalender'
 
-type Antwort = { ok: true } | { error: string }
+/*
+ * Direktverkäufe (Verkauf eintragen, ändern, löschen). Ein Direktverkauf ist
+ * nur Umsatz: Er bucht keinen Bestand ab und keinen zurück — auch nicht mit
+ * verknüpftem Produkt. Ändern und Löschen brauchen deshalb keine Gegenbuchung.
+ */
 
-async function getAuthenticatedFarm() {
+export type VerkaufAntwort = { ok: true } | { error: string }
+
+const NICHT_ANGEMELDET = 'Bitte melde dich neu an.'
+const NICHT_MEHR_DA = 'Diesen Verkauf gibt es nicht mehr. Lade die Seite neu.'
+
+/** Der Hof der Sitzung — oder null, dann antwortet die Action mit einem Satz statt abzustürzen. */
+async function eigenerHof(): Promise<{ id: string } | null> {
   const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) throw new Error('Nicht eingeloggt')
-  const farm = await getFarmForUser(session.user.id)
-  if (!farm) throw new Error('Kein Hof gefunden')
-  return farm
+  if (!session?.user) return null
+  return getFarmForUser(session.user.id)
 }
 
 // 12:00 UTC des gewählten Tages: liegt in Wien sicher auf demselben Tag
@@ -46,6 +55,13 @@ async function verkaufsDaten(
   const geprueft = manualSaleFormSchema.safeParse(data)
   if (!geprueft.success) return { error: geprueft.error.issues[0]?.message ?? 'Bitte prüf deine Eingaben.' }
   const v = geprueft.data
+
+  // Das Feld lässt keinen künftigen Tag zu — der Server prüft trotzdem
+  // (Wiener Tag, Textvergleich JJJJ-MM-TT): Ein Verkauf von morgen zählte
+  // heute noch nirgends und morgen plötzlich doppelt im Kopf des Hofs.
+  if (v.saleDate > wienKalendertag(new Date())) {
+    return { error: 'Ein Verkauf in der Zukunft geht nicht. Wähl heute oder einen Tag davor.' }
+  }
 
   const produkt = v.productId
     ? await prisma.product.findFirst({
@@ -77,8 +93,9 @@ async function verkaufsDaten(
   }
 }
 
-export async function createManualSale(data: unknown): Promise<Antwort> {
-  const farm = await getAuthenticatedFarm()
+export async function createManualSale(data: unknown): Promise<VerkaufAntwort> {
+  const farm = await eigenerHof()
+  if (!farm) return { error: NICHT_ANGEMELDET }
   const ergebnis = await verkaufsDaten(farm.id, data)
   if ('error' in ergebnis) return { error: ergebnis.error }
 
@@ -88,31 +105,36 @@ export async function createManualSale(data: unknown): Promise<Antwort> {
   return { ok: true }
 }
 
-export async function updateManualSale(saleId: string, data: unknown): Promise<Antwort> {
-  const farm = await getAuthenticatedFarm()
+export async function updateManualSale(saleId: unknown, data: unknown): Promise<VerkaufAntwort> {
+  const id = verkaufIdSchema.safeParse(saleId)
+  if (!id.success) return { error: NICHT_MEHR_DA }
+  const farm = await eigenerHof()
+  if (!farm) return { error: NICHT_ANGEMELDET }
   const ergebnis = await verkaufsDaten(farm.id, data)
   if ('error' in ergebnis) return { error: ergebnis.error }
 
   // Besitz und Schreiben in einem: nur ein Verkauf des eigenen Hofs.
   const { count } = await prisma.manualSale.updateMany({
-    where: { id: saleId, farmId: farm.id },
+    where: { id: id.data, farmId: farm.id },
     data: ergebnis.daten,
   })
-  if (count === 0) return { error: 'Diesen Verkauf gibt es nicht mehr. Lade die Seite neu.' }
+  if (count === 0) return { error: NICHT_MEHR_DA }
 
   revalidate()
   return { ok: true }
 }
 
-export async function deleteManualSale(saleId: string) {
-  const farm = await getAuthenticatedFarm()
+export async function deleteManualSale(saleId: unknown): Promise<VerkaufAntwort> {
+  const id = verkaufIdSchema.safeParse(saleId)
+  if (!id.success) return { error: NICHT_MEHR_DA }
+  const farm = await eigenerHof()
+  if (!farm) return { error: NICHT_ANGEMELDET }
 
-  const existing = await prisma.manualSale.findFirst({
-    where: { id: saleId, farmId: farm.id },
-  })
-  if (!existing) throw new Error('Verkauf nicht gefunden')
-
-  await prisma.manualSale.delete({ where: { id: saleId } })
+  // Besitz in der WHERE-Klausel statt Lesen-dann-Löschen: zwischen Prüfung
+  // und Schreiben bleibt keine Lücke, und ein fremder Verkauf ist schlicht 0.
+  const { count } = await prisma.manualSale.deleteMany({ where: { id: id.data, farmId: farm.id } })
+  if (count === 0) return { error: NICHT_MEHR_DA }
 
   revalidate()
+  return { ok: true }
 }
