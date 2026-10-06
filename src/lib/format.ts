@@ -80,9 +80,12 @@ const datumLangFormat = new Intl.DateTimeFormat('de-AT', {
  * „7. Oktober 2026" — ein Tag ausgeschrieben, in Wiener Zeit; österreichisch
  * mit „Jänner". Für Stichtage in Texten (Konditionen), nicht für Abholtage —
  * die benennt `abholtagName`.
+ *
+ * Nach dem Tag steht ein geschütztes Leerzeichen: Sonst bleibt „1." am Handy
+ * allein am Zeilenende stehen und der Monat rutscht in die nächste Zeile.
  */
 export function formatDatumLang(zeitpunkt: Date): string {
-  return datumLangFormat.format(zeitpunkt)
+  return datumLangFormat.format(zeitpunkt).replace(/^(\d+\.) /, '$1\u00a0')
 }
 
 /**

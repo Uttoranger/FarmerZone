@@ -146,12 +146,13 @@ export const KONDITIONEN_UEBERGANG = [STARTPHASE_SATZ, TARIFE_AB_SATZ, BESTANDSH
 export const KONDITIONEN_DERZEIT = `Derzeit gilt: ${KONDITIONEN_UEBERGANG}`
 
 /**
- * Wie abgerechnet wird (E6). Beschreibt das Preismodell, nicht einen
- * laufenden Einzug: Die Grundgebühr gibt es erst ab dem Stichtag (K1).
+ * Wie abgerechnet wird (E6), zeitlich eingeordnet (K1): Vor dem Stichtag läuft
+ * keine Abbuchung. Ob Servicegebühren aus Barbestellungen VOR dem Stichtag
+ * später eingezogen werden, ist nicht entschieden — der Satz sagt dazu nichts.
  */
 export const MONATSABRECHNUNG_TEXT =
-  `Die Monatsabrechnung per SEPA-Lastschrift umfasst die Grundgebühr (ab ${TARIFE_AB_TEXT}) ` +
-  'und die Servicegebühren aus Barbestellungen. ' +
+  `Ab dem ${TARIFE_AB_TEXT} rechnen wir einmal im Monat per SEPA-Lastschrift ab: ` +
+  'die Grundgebühr und die Servicegebühren aus Barbestellungen. ' +
   'Bei Online-Zahlungen ist die Servicegebühr schon beim Bezahlen erledigt.'
 
 /** Wann der Text dieser Seite zuletzt geändert wurde. */

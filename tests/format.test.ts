@@ -410,14 +410,18 @@ describe('Singular und Plural', () => {
 describe('formatDatumLang — ein Tag in Wiener Zeit', () => {
   it('schreibt Tag, Monat ausgeschrieben und Jahr', () => {
     // Wiener Mitternacht im Winter ist 23:00 UTC des Vortags.
-    expect(formatDatumLang(new Date('2027-01-31T23:00:00.000Z'))).toBe('1. Februar 2027')
+    expect(formatDatumLang(new Date('2027-01-31T23:00:00.000Z'))).toBe('1.\u00a0Februar 2027')
   })
 
   it('rechnet in Wien, nicht in UTC: 23:30 UTC ist in Wien schon der nächste Tag', () => {
-    expect(formatDatumLang(new Date('2026-10-06T23:30:00.000Z'))).toBe('7. Oktober 2026')
+    expect(formatDatumLang(new Date('2026-10-06T23:30:00.000Z'))).toBe('7.\u00a0Oktober 2026')
+  })
+
+  it('geschütztes Leerzeichen nach dem Tag, sonst gewöhnliche', () => {
+    expect(formatDatumLang(new Date('2026-12-24T12:00:00.000Z'))).toBe('24.\u00a0Dezember 2026')
   })
 
   it('österreichisch: Jänner', () => {
-    expect(formatDatumLang(new Date('2027-01-15T12:00:00.000Z'))).toBe('15. Jänner 2027')
+    expect(formatDatumLang(new Date('2027-01-15T12:00:00.000Z'))).toBe('15.\u00a0Jänner 2027')
   })
 })

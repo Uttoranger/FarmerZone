@@ -54,12 +54,14 @@ const WORTLAUT =
   'In der Startphase kostenlos. Die Tarife gelten ab 1. Februar 2027. ' +
   'Bereits freigeschaltete Höfe behalten ihre zugesagten Konditionen.'
 
+/** Das geschützte Leerzeichen nach dem Tag ist Satz, nicht Wortlaut — für den Vergleich mit dem Register. */
+const normal = (text: string): string => text.replace(/\u00a0/g, ' ')
 const lies = (datei: string): string => readFileSync(join(process.cwd(), datei), 'utf8')
 const entschaerft = (text: string): string => text.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
 
 describe('Quelle — src/lib/konditionen.ts', () => {
   it('der Satz steht wörtlich so da, wie das Register K1 ihn festlegt', () => {
-    expect(KONDITIONEN_UEBERGANG).toBe(WORTLAUT)
+    expect(normal(KONDITIONEN_UEBERGANG)).toBe(WORTLAUT)
   })
 
   it('das Datum ist EIN Kalendertag, Mitternacht in Wien', () => {
@@ -70,16 +72,19 @@ describe('Quelle — src/lib/konditionen.ts', () => {
 
   it('angezeigt über den gemeinsamen Formatierer, nicht als freier Text', () => {
     expect(TARIFE_AB_TEXT).toBe(formatDatumLang(TARIFE_AB))
-    expect(TARIFE_AB_TEXT).toBe('1. Februar 2027')
+    expect(normal(TARIFE_AB_TEXT)).toBe('1. Februar 2027')
+    // „1." bleibt am Handy beim Monat, statt allein am Zeilenende zu stehen.
+    expect(TARIFE_AB_TEXT).toBe('1.\u00a0Februar 2027')
     expect(KONDITIONEN_UEBERGANG).toContain(TARIFE_AB_TEXT)
   })
 
   it('der Admin-Hinweis sagt dasselbe, mit „Derzeit gilt"', () => {
-    expect(KONDITIONEN_DERZEIT).toBe(`Derzeit gilt: ${WORTLAUT}`)
+    expect(normal(KONDITIONEN_DERZEIT)).toBe(`Derzeit gilt: ${WORTLAUT}`)
   })
 
-  it('die Monatsabrechnung behauptet keinen laufenden Einzug der Grundgebühr', () => {
-    expect(MONATSABRECHNUNG_TEXT).toContain(`Grundgebühr (ab ${TARIFE_AB_TEXT})`)
+  it('die Monatsabrechnung beginnt erst am Stichtag — kein Einzug im Präsens', () => {
+    expect(MONATSABRECHNUNG_TEXT.startsWith(`Ab dem ${TARIFE_AB_TEXT} rechnen wir einmal im Monat per SEPA-Lastschrift ab:`)).toBe(true)
+    expect(MONATSABRECHNUNG_TEXT).not.toMatch(/Die Monatsabrechnung .* umfasst/)
   })
 })
 
@@ -92,8 +97,9 @@ function quelldateien(ordner: string): string[] {
   })
 }
 
-/** Das Jahr oder ein Teil des Satzes — außerhalb von konditionen.ts verboten. */
-const ZWEITES_EXEMPLAR = /2027|Startphase|Die Tarife gelten ab|zugesagten Konditionen/
+/** Der Stichtag in jeder üblichen Schreibweise oder ein Teil des Satzes — außerhalb von konditionen.ts verboten. */
+const ZWEITES_EXEMPLAR =
+  /2027-02-01|Februar[\s\u00a0]+2027|\b0?1\.[\s\u00a0]*0?2\.[\s\u00a0]*2027|Startphase|Die Tarife gelten ab|zugesagten Konditionen/
 
 describe('Kein zweites Exemplar unter src/', () => {
   const dateien = quelldateien(join(process.cwd(), 'src')).map((p) => relative(process.cwd(), p))
@@ -104,9 +110,19 @@ describe('Kein zweites Exemplar unter src/', () => {
   })
 
   it('Gegenprobe: die Suche schlägt bei Datum und Satzteilen an', () => {
-    for (const text of ['ab 1.2.2027', '2027-02-01', 'In der Startphase kostenlos', 'ihre zugesagten Konditionen']) {
+    for (const text of [
+      'ab 1.2.2027',
+      'bis 01.02.2027',
+      '2027-02-01',
+      'ab 1. Februar 2027',
+      'ab 1.\u00a0Februar 2027',
+      'In der Startphase kostenlos',
+      'ihre zugesagten Konditionen',
+    ]) {
       expect(text).toMatch(ZWEITES_EXEMPLAR)
     }
+    // Ein anderes Datum im selben Jahr ist kein zweites Exemplar.
+    for (const text of ['Stand: 15.03.2027', '2027-03-01', 'Juni 2027']) expect(text).not.toMatch(ZWEITES_EXEMPLAR)
     expect(dateien.length).toBeGreaterThan(100)
   })
 
