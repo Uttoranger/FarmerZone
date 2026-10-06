@@ -4116,6 +4116,18 @@ Gate 5, Zeile `/farm-page`. Mockups `web-h1-mein-hof-vorschau-handy`, `web-h1-me
 - **Hydration:** `ReorderContext` gibt `DndContext` eine feste `id` aus `useId` — der Befund `DndDescribedBy-N` aus Nr. 10 ist im Browser weg.
 - **Offen:** Die Handyansicht folgt dem Mockup nur teilweise (Checkliste ja, statt „Vorschau ansehen" die vorhandene Kundenansicht im Segment, darunter weiter die Hofseite mit Stiften) — ob die Stifte-Ansicht entfällt (Plan im Kopfkommentar von `farm-page-view.tsx`), entscheidet der Mensch. Axe meldet auf dem Reiter Hofseite `landmark-unique`, weil die eingebettete echte Hofseite ihre eigene Navigation und ihr eigenes `main` mitbringt. `StatusPostCard` (Bestand) rechnet „vor N Tagen" mit der Uhr beim Rendern.
 
+## Heute in der HofShell (Nachtlauf Nr. 17, Oktober 2026)
+
+Gate 5, Zeile `/dashboard`. Die Seite zog von `(farmer)` nach `(hof)` (gleiche Adresse, Zugang über `ladeHofbereich`) und ist nach den Mockups H3 „Heute" angeordnet. Fachlich bleibt der Inhalt: heutige Abholungen (jetzt als Packliste), Braucht dich, Woche mit Vorwochenvergleich, Erste Schritte. Neu angezeigt, aus bestehenden Regeln: „Umsatz heute" und Tagesbalken (gemeinsame Umsatzregel), „Deine Hofseite" (`hofseiteFortschritt`), nächstes Abholfenster aus den Abholzeiten.
+
+Entscheidungen und Gründe:
+- **Packliste-Reihenfolge:** offen → wartet auf Kunde → gepackt, je Gruppe nach Uhrzeit. Was Arbeit macht, steht oben; das Papier (`/orders/today/print`) zeigt dieselben Bestellungen.
+- **Abholtag** = aktives Abholfenster am Wiener Wochentag, den ganzen Tag lang (die Teilen-Karte springt nachmittags nicht auf groß). Nächstes Fenster: heute, solange eines nicht vorbei ist, sonst der nächste Tag innerhalb einer Woche.
+- **Stripe-Hinweis** bleibt bei der Bestandsregel `onlineZahlungPausiert` (`acceptsOnline && !stripeAccountReady` UND Stripe-Konto vorhanden). Der Umsetzungsprompt nennt nur die ersten zwei Bedingungen; ohne Konto stünde „pausiert" bei jedem neuen Hof ab Tag eins, dafür gibt es den Schritt „Online-Zahlung einrichten" der Erste-Schritte-Karte. Offen zur Entscheidung (Bericht Nr. 17).
+- **Sichtbar statt öffentlich:** Teilen-Karte und Freischaltungs-Moment nur bei `hofZustand(...).art === 'sichtbar'` (`heuteHofSichtbar`). Ein pausierter Hof ist zwar öffentlich (Hofseite steht), aber Kunden können nicht bestellen — „Ab jetzt können Kunden bei dir bestellen" wäre falsch (Nachbesserung Runde 1).
+- **Freischaltungs-Moment ohne Schema:** Zeitfenster 14 Tage nach `approvedAt` (Server) UND Gerätemerker im localStorage. Ohne lesbaren Speicher kein Moment, weil „höchstens einmal" sonst nicht hält. Grenze: Ein zweites Gerät zeigt ihn im Fenster noch einmal; „in den Einstellungen abschaltbar" (DESIGN_SYSTEM „Teilen") braucht eine Spalte und kommt mit Gate 7.
+- **Nicht gebaut:** Kennzahl „Neue Kunden" (es gibt keine Regel dafür), Besuchszahlen in der Teilen-Karte (Zählung erst mit Nr. 21), Wege „WhatsApp an Stammkunden" und „Plakat drucken" im Moment (Gate 7), Abhaken „gepackt" direkt auf Heute (Statusübergänge kommen mit Nr. 19). Mit dem Umzug entfielen der alte `OnlinePausiertHinweis` (mit Stripe-Aufruf), `onlinePausiertText`, `umsatzCent`, `ABHOL_CHIP_TEXT` und `begruessung` — nirgends mehr benutzt.
+
 ## Nützliche Befehle
 
 ```bash

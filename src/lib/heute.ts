@@ -9,6 +9,10 @@
 import type { Prisma } from '@prisma/client'
 import { tagVersetzt, wienKalendertag } from '@/lib/kalender'
 import { wienerMitternacht } from '@/lib/servicegebuehr'
+import { wienerZeitpunkt } from '@/lib/fristen'
+import { formatSlotTime } from '@/lib/pickup-days'
+import { hofZustand } from '@/lib/mein-hof'
+import { summeCent, type UmsatzBuchung } from '@/lib/umsatz'
 
 // ─── Tage ───────────────────────────────────────────────────────────────────
 
@@ -139,12 +143,6 @@ export function positionenKurz(items: readonly { productName: string; quantity: 
 }
 
 export type AbholChip = 'bereit' | 'vorbereiten' | 'wartet'
-
-export const ABHOL_CHIP_TEXT: Record<AbholChip, string> = {
-  bereit: 'bereit',
-  vorbereiten: 'vorbereiten',
-  wartet: 'wartet auf Kunde',
-}
 
 /**
  * Der Chip einer heutigen Abholung. PENDING_CONFIRMATION heißt: Die Kundin
@@ -324,16 +322,6 @@ export function wochenvergleich(dieseWocheCent: number, vorwocheCent: number): W
 
 // ─── Kopf ───────────────────────────────────────────────────────────────────
 
-function wienStunde(jetzt: Date): number {
-  return Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Vienna', hour: 'numeric', hourCycle: 'h23' }).format(jetzt))
-}
-
-/** Gruß nach der Wiener Uhrzeit. */
-export function begruessung(jetzt: Date): string {
-  const stunde = wienStunde(jetzt)
-  return stunde < 12 ? 'Guten Morgen' : stunde < 18 ? 'Guten Tag' : 'Guten Abend'
-}
-
 /** „Montag, 28. September 2026" — in Wien. */
 export function datumLang(jetzt: Date): string {
   return new Intl.DateTimeFormat('de-AT', {
@@ -364,4 +352,231 @@ export function vergleichText(prozent: number | null, jetzt: Date): string {
   if (prozent === null) return `Vorwoche ${bis}: noch kein Umsatz`
   const zahl = prozent > 0 ? `+${prozent}` : prozent < 0 ? `−${Math.abs(prozent)}` : '±0'
   return `${zahl} % gegenüber der Vorwoche ${bis}`
+}
+
+// ─── Packliste (Gate 5, Nachtlauf Nr. 17) ──────────────────────────────────
+
+/**
+ * Die Marke einer Zeile der Packliste — Wortlaut der Mockups H3 „Heute".
+ * READY heißt für den Hof „gepackt"; PENDING_CONFIRMATION wartet auf die
+ * Bestätigung der Kundin (abholChip), da ist nichts zu packen.
+ */
+export const PACK_MARKE: Record<AbholChip, { text: string; ton: 'offen' | 'fertig' | 'neutral' }> = {
+  vorbereiten: { text: 'Zum Packen', ton: 'offen' },
+  wartet: { text: 'Wartet auf Kunde', ton: 'neutral' },
+  bereit: { text: 'Gepackt', ton: 'fertig' },
+}
+
+// Was Arbeit macht, steht oben: erst packen, dann warten, zuletzt Erledigtes.
+const PACK_RANG: Record<AbholChip, number> = { vorbereiten: 0, wartet: 1, bereit: 2 }
+
+/** Eine heutige Abholung samt Betrag — den rechnet die Servergrenze in Cent (bestellSummen). */
+export type PacklistenBestellung = HeutigeAbholung & { gesamtCents: number }
+export type PacklistenZeile = AbholZeile & { gesamtCents: number }
+
+/**
+ * Die Packliste auf Heute: dieselben Bestellungen wie „Heute abholen" und das
+ * Papier (abholWhere), offen zuerst, dann „wartet auf Kunde", dann gepackt —
+ * innerhalb jeder Gruppe nach Uhrzeit (abholZeilen, stabil sortiert).
+ */
+export function packliste(bestellungen: readonly PacklistenBestellung[]): PacklistenZeile[] {
+  const cents = new Map(bestellungen.map((b) => [b.id, b.gesamtCents]))
+  return abholZeilen(bestellungen)
+    .map((z) => ({ ...z, gesamtCents: cents.get(z.id) ?? 0 }))
+    .toSorted((a, b) => PACK_RANG[a.chip] - PACK_RANG[b.chip])
+}
+
+export type PacklistenZahlen = { bestellungen: number; zuPacken: number }
+
+/** „Bestellungen heute" und „Noch zu packen" — gezählt an derselben Liste, die die Seite zeigt. */
+export function packlistenZahlen(zeilen: readonly PacklistenZeile[]): PacklistenZahlen {
+  return { bestellungen: zeilen.length, zuPacken: zeilen.filter((z) => z.chip === 'vorbereiten').length }
+}
+
+// ─── Abholfenster ───────────────────────────────────────────────────────────
+
+/** Ein wöchentliches Abholfenster, wie der Hof es eingetragen hat (dayOfWeek 0 = Sonntag). */
+export type HeuteFenster = { dayOfWeek: number; startTime: string; endTime: string; isActive?: boolean }
+
+function aktiveAm(slots: readonly HeuteFenster[], kalendertag: string): HeuteFenster[] {
+  const [j, m, t] = kalendertag.split('-').map(Number)
+  const wochentag = new Date(Date.UTC(j, m - 1, t)).getUTCDay()
+  return slots
+    .filter((s) => s.isActive !== false && s.dayOfWeek === wochentag)
+    .toSorted((a, b) => a.startTime.localeCompare(b.startTime))
+}
+
+/** „15–18 Uhr", mehrere Fenster nach Beginn: „9–12:30 · 15–18 Uhr" — Schreibweise der Hofseite (formatSlotTime). */
+export function fensterText(slots: readonly HeuteFenster[]): string {
+  const zeiten = slots
+    .toSorted((a, b) => a.startTime.localeCompare(b.startTime))
+    .map((s) => `${formatSlotTime(s.startTime)}–${formatSlotTime(s.endTime)}`)
+  return `${zeiten.join(' · ')} Uhr`
+}
+
+/**
+ * Ist heute (Wiener Tag) ein Abholtag? Dann die Zeiten, sonst null. Ganzer
+ * Tag: Auch nach dem letzten Fenster bleibt es ein Abholtag — die Teilen-Karte
+ * springt nicht nachmittags auf groß.
+ */
+export function abholfensterHeute(slots: readonly HeuteFenster[], jetzt: Date): string | null {
+  const heute = aktiveAm(slots, wienKalendertag(jetzt))
+  return heute.length > 0 ? fensterText(heute) : null
+}
+
+export type NaechstesFenster = {
+  /** Kalendertag JJJJ-MM-TT (Wien). */
+  tag: string
+  /** „Heute", „Morgen", „Samstag" oder „Dienstag, 13. Oktober" (abholtagName). */
+  name: string
+  zeit: string
+}
+
+/**
+ * Das nächste Abholfenster laut Abholzeiten: heute, solange eines davon noch
+ * nicht vorbei ist (Ende in Wiener Zeit), sonst der nächste Tag mit Fenster
+ * innerhalb einer Woche. Ohne aktive Fenster null.
+ */
+export function naechstesAbholfenster(slots: readonly HeuteFenster[], jetzt: Date): NaechstesFenster | null {
+  const heute = wienKalendertag(jetzt)
+  for (let versatz = 0; versatz <= 7; versatz++) {
+    const tag = tagVersetzt(heute, versatz)
+    let fenster = aktiveAm(slots, tag)
+    if (versatz === 0) {
+      fenster = fenster.filter((s) => {
+        const ende = wienerZeitpunkt(tag, s.endTime)
+        return ende !== null && ende.getTime() > jetzt.getTime()
+      })
+    }
+    if (fenster.length === 0) continue
+    return { tag, name: versatz === 0 ? 'Heute' : abholtagName(heute, tag), zeit: fensterText(fenster) }
+  }
+  return null
+}
+
+/**
+ * Wie viele Bestellungen auf das nächste Fenster warten: liegt es heute, die
+ * Packliste (ohne Abgeholte, Stornierte, Nicht-Abgeholte — packliste); liegt
+ * es später, die Zahl des nächsten Abholtags mit Bestellungen, aber nur, wenn
+ * das genau dieser Tag ist. Sonst 0 — nie die Bestellungen eines anderen Tags.
+ */
+export function fensterAnzahl(
+  fenster: NaechstesFenster | null,
+  heuteKalendertag: string,
+  heutige: readonly PacklistenZeile[],
+  naechsteAbholung: NaechsteAbholung | null
+): number {
+  if (!fenster) return 0
+  if (fenster.tag === heuteKalendertag) return heutige.length
+  return naechsteAbholung?.tag === fenster.tag ? naechsteAbholung.anzahl : 0
+}
+
+// ─── Umsatz heute ───────────────────────────────────────────────────────────
+
+/**
+ * „Umsatz heute": von Wiener Mitternacht bis jetzt, nach der gemeinsamen
+ * Umsatzregel (summeCent — Abholungen nach pickedUpAt, manuelle Verkäufe mit
+ * ihrem ganzen Wiener Tag). Welche Bestellungen Buchungen sind (nur
+ * PICKED_UP), entscheidet umsatzBestellungWhere in der Abfrage.
+ */
+export function umsatzHeuteCent(buchungen: UmsatzBuchung[], jetzt: Date): number {
+  return summeCent(buchungen, { von: abholtage(jetzt).heute.von, bis: jetzt })
+}
+
+// ─── Teilen-Karte ───────────────────────────────────────────────────────────
+
+export type TeilenForm = 'schmal' | 'gross' | null
+
+/**
+ * Sehen Kunden den Hof und können sie bei ihm bestellen? Nur im Zustand
+ * „sichtbar" (hofZustand). Pausiert ist die Hofseite zwar öffentlich, aber
+ * Kunden können gerade nicht bestellen — Teilen und „Ab jetzt können Kunden
+ * bei dir bestellen" wären dort falsch.
+ */
+export function heuteHofSichtbar(hof: {
+  isActive: boolean
+  isPaused: boolean
+  approvedAt: Date | null
+  archivedAt: Date | null
+}): boolean {
+  return hofZustand(hof).art === 'sichtbar'
+}
+
+/**
+ * DESIGN_SYSTEM „Teilen": groß an Tagen ohne Abholung, schmale orange Zeile an
+ * Abholtagen — die Packliste hat Vorrang. Nie, solange der Hof nicht sichtbar
+ * ist (heuteHofSichtbar): ein Link ins Leere oder auf einen pausierten Hof
+ * wäre irreführend.
+ */
+export function teilenKarte({ sichtbar, abholtag }: { sichtbar: boolean; abholtag: boolean }): TeilenForm {
+  if (!sichtbar) return null
+  return abholtag ? 'schmal' : 'gross'
+}
+
+/** „Eier, Erdäpfel, Heu – Abholung Samstag, 9–12 Uhr" — was es gibt und wann man es holt. */
+export function teilenSatz(angebot: readonly string[], fenster: NaechstesFenster | null): string {
+  const was = angebot.join(', ')
+  // Mitten im Satz klein: „Abholung heute, …", „Abholung morgen, …" — Wochentage bleiben groß.
+  const tag = fenster && (fenster.name === 'Heute' || fenster.name === 'Morgen') ? fenster.name.toLowerCase() : fenster?.name
+  const wann = fenster ? `Abholung ${tag}, ${fenster.zeit}` : ''
+  if (was && wann) return `${was} – ${wann}`
+  return was || wann || 'Erzähl deinen Kunden, was es bei dir gibt.'
+}
+
+// ─── Aufbau ─────────────────────────────────────────────────────────────────
+
+export type HeuteBlock =
+  | 'stripe'
+  | 'teilen-schmal'
+  | 'packliste'
+  | 'braucht-dich'
+  | 'teilen-gross'
+  | 'erste-schritte'
+  | 'naechste-abholung'
+  | 'woche'
+  | 'hofseite'
+
+/**
+ * Welche Blöcke wo stehen. Die Packliste beginnt immer die Hauptspalte
+ * (Gate 5: „Packliste zuerst"); oben stehen nur der Stripe-Hinweis (bis er
+ * erledigt ist, können Kunden nicht online zahlen) und die schmale
+ * Teilen-Zeile. Die Seitenspalte steht am Handy unter der Hauptspalte.
+ */
+export function heuteAufbau({
+  stripeHinweis,
+  teilen,
+  ersteSchritte,
+}: {
+  stripeHinweis: boolean
+  teilen: TeilenForm
+  ersteSchritte: boolean
+}): { oben: HeuteBlock[]; haupt: HeuteBlock[]; seite: HeuteBlock[] } {
+  const oben: HeuteBlock[] = []
+  if (stripeHinweis) oben.push('stripe')
+  if (teilen === 'schmal') oben.push('teilen-schmal')
+  const seite: HeuteBlock[] = []
+  if (teilen === 'gross') seite.push('teilen-gross')
+  if (ersteSchritte) seite.push('erste-schritte')
+  seite.push('naechste-abholung', 'woche', 'hofseite')
+  return { oben, haupt: ['packliste', 'braucht-dich'], seite }
+}
+
+// ─── Wochenbalken ───────────────────────────────────────────────────────────
+
+export type WochenBalken = { label: string; cent: number; heute: boolean; hoeheProzent: number }
+
+/**
+ * Die sieben Balken Mo–So aus der gemeinsamen Umsatzregel (auswerten), der
+ * Wiener Heute-Tag markiert, Höhe relativ zum besten Tag der Woche.
+ */
+export function wochenBalken(balken: readonly { label: string; cent: number }[], jetzt: Date): WochenBalken[] {
+  const [j, m, t] = wienKalendertag(jetzt).split('-').map(Number)
+  const heuteIndex = (new Date(Date.UTC(j, m - 1, t)).getUTCDay() + 6) % 7
+  const hoechster = Math.max(0, ...balken.map((b) => b.cent))
+  return balken.map((b, i) => ({
+    label: b.label,
+    cent: b.cent,
+    heute: i === heuteIndex,
+    hoeheProzent: hoechster > 0 ? Math.round((Math.max(0, b.cent) * 100) / hoechster) : 0,
+  }))
 }

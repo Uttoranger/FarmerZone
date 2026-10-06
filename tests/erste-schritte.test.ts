@@ -244,9 +244,10 @@ describe('ausblenden über den Cookie', () => {
     expect(action).toContain('value: farm.id')
     expect(action).toContain('maxAge: ERSTE_SCHRITTE_AUS_DAUER_S')
     expect(action).toContain("revalidatePath('/dashboard')")
-    const seite = readFileSync(join(process.cwd(), 'src/app/(farmer)/dashboard/page.tsx'), 'utf8')
+    // Seit Nr. 17 liegt Heute in (hof); ob die Karte kommt, reicht die Seite an heuteAufbau weiter.
+    const seite = readFileSync(join(process.cwd(), 'src/app/(hof)/dashboard/page.tsx'), 'utf8')
     expect(seite).toContain('cookieJar.get(ERSTE_SCHRITTE_AUS_COOKIE)?.value')
-    expect(seite).toContain("ersteSchritteZeigen === 'karte' && (")
+    expect(seite).toContain("ersteSchritte: ersteSchritteZeigen === 'karte'")
     expect(seite).toContain("ersteSchritteZeigen === 'zeile' && (")
     expect(seite).not.toContain('localStorage')
   })

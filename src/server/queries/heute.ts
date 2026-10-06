@@ -2,25 +2,41 @@ import { prisma } from '@/lib/prisma'
 import { wienKalendertag } from '@/lib/kalender'
 import {
   UEBERFAELLIG_EINZELN,
-  type AbholZeile,
   type BrauchtDichEintrag,
   type NaechsteAbholung,
+  type NaechstesFenster,
+  type PacklistenZeile,
+  type PacklistenZahlen,
   type Wochenvergleich,
+  type WochenBalken,
+  abholfensterHeute,
   abholtage,
   abholtagName,
   abholWhere,
-  abholZeilen,
   brauchtDich,
+  fensterAnzahl,
+  heuteHofSichtbar,
   naechsteAbholungWhere,
+  naechstesAbholfenster,
+  packliste,
+  packlistenZahlen,
   ueberfaelligWhere,
+  umsatzHeuteCent,
   wienerTag,
+  wochenBalken,
   wochenvergleich,
 } from '@/lib/heute'
-import { umsatzfenster } from '@/lib/umsatz'
-import { umsatzCent } from '@/server/queries/umsatz'
+import { auswerten, umsatzfenster } from '@/lib/umsatz'
+import { umsatzBuchungen } from '@/server/queries/umsatz'
 import { statusReminder } from '@/lib/dashboard-hints'
 import { ersteSchritte, ersteSchritteDaten, type ErsteSchritteErgebnis } from '@/lib/erste-schritte'
 import { onlineZahlungPausiert } from '@/lib/stripe-konto'
+import { bestellSummen } from '@/lib/servicegebuehr'
+import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
+import { DEFAULT_SECTIONS, type SectionConfig } from '@/server/queries/appearance'
+
+/** So viele Produkte nennt die Teilen-Karte („Eier, Erdäpfel, Heu"). */
+const TEILEN_ANGEBOT = 3
 
 /**
  * Alles für den Heute-Bildschirm (/dashboard) in einem Zug. Die Regeln stehen
@@ -29,11 +45,18 @@ import { onlineZahlungPausiert } from '@/lib/stripe-konto'
  */
 
 export type Heute = {
-  abholungen: AbholZeile[]
+  /** Die Packliste für heute (offen zuerst, packliste in src/lib/heute.ts). */
+  abholungen: PacklistenZeile[]
+  zahlen: PacklistenZahlen & { umsatzHeuteCent: number }
+  /** Die Zeiten, wenn heute (Wien) ein Abholtag ist; sonst null. */
+  abholfensterHeute: string | null
+  /** Das nächste Abholfenster laut Abholzeiten und wie viele Bestellungen dafür offen sind. */
+  naechstesFenster: { fenster: NaechstesFenster; anzahl: number } | null
   /** Der nächste Abholtag nach heute mit offenen Bestellungen; null = keiner in Sicht (die Zeile entfällt). */
   naechsteAbholung: NaechsteAbholung | null
   brauchtDich: BrauchtDichEintrag[]
   woche: Wochenvergleich
+  wochenBalken: WochenBalken[]
   ersteSchritte: ErsteSchritteErgebnis
   wartetAufFreigabe: boolean
   /**
@@ -41,6 +64,12 @@ export type Heute = {
    * Hinweis mit dem Weg zu Stripe; `barMoeglich` wählt den Satz.
    */
   onlinePausiert: { barMoeglich: boolean } | null
+  /** Was Teilen-Karte und Freischaltungs-Moment brauchen — sichtbar = öffentlich UND nicht pausiert (heuteHofSichtbar). */
+  hof: { sichtbar: boolean; approvedAt: Date | null }
+  /** Bis zu drei Produkte im Shop mit Bestand, in der Reihenfolge des Hofs. */
+  angebot: string[]
+  /** „Deine Hofseite": dieselbe Rechnung wie die Checkliste in Mein Hof. */
+  hofseite: { prozent: number; satz: string; fertig: boolean }
 }
 
 export async function getHeute(farmId: string, jetzt: Date = new Date()): Promise<Heute> {
@@ -56,11 +85,10 @@ export async function getHeute(farmId: string, jetzt: Date = new Date()): Promis
     ausverkauft,
     ohneKategorie,
     letzterStatus,
-    umsatzDieseWoche,
-    umsatzVorwoche,
+    buchungen,
     hof,
     produkte,
-    aktiveAbholzeiten,
+    angebot,
   ] = await Promise.all([
     prisma.order.findMany({
       where: abholWhere(farmId, heute),
@@ -71,6 +99,8 @@ export async function getHeute(farmId: string, jetzt: Date = new Date()): Promis
         pickupTimeEnd: true,
         paymentMethod: true,
         status: true,
+        totalAmount: true,
+        serviceFeeCents: true,
         items: { select: { productName: true, quantity: true } },
       },
     }),
@@ -103,27 +133,52 @@ export async function getHeute(farmId: string, jetzt: Date = new Date()): Promis
       orderBy: { publishedAt: 'desc' },
       select: { publishedAt: true },
     }),
-    umsatzCent(farmId, wochenfenster.aktuell),
-    umsatzCent(farmId, wochenfenster.vergleich),
-    // Einstiegs-Checkliste: dieselben Daten wie bisher auf der Übersicht.
+    // Die Buchungen von Montag der Vorwoche bis jetzt: daraus Woche, Vorwoche
+    // bis zum selben Zeitpunkt, die Tagesbalken und „Umsatz heute" — alles
+    // nach derselben Regel wie Verkauf und Auswertung (auswerten, summeCent).
+    umsatzBuchungen(farmId, { von: wochenfenster.vergleich.von, bis: wochenfenster.aktuell.bis }),
+    // Einstiegs-Checkliste, Hofseiten-Stand, Zustand und Abholzeiten in einem Zugriff.
     prisma.farm.findUnique({
       where: { id: farmId },
       select: {
+        name: true,
         description: true,
+        aboutText: true,
+        address: true,
+        postalCode: true,
+        city: true,
+        phone: true,
+        email: true,
         latitude: true,
         longitude: true,
         logoUrl: true,
         bannerType: true,
         bannerUrl: true,
+        sectionsConfig: true,
         stripeAccountReady: true,
         stripeAccountId: true,
         acceptsOnline: true,
         acceptsOnsite: true,
         approvedAt: true,
+        archivedAt: true,
+        isActive: true,
+        isPaused: true,
+        farmPhotos: { select: { id: true } },
+        pickupSlots: {
+          where: { isActive: true },
+          orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+          select: { dayOfWeek: true, startTime: true, endTime: true },
+        },
       },
     }),
     prisma.product.count({ where: { farmId } }),
-    prisma.pickupSlot.count({ where: { farmId, isActive: true } }),
+    // Was die Teilen-Karte nennt: im Shop und vorrätig (wie produktZustand).
+    prisma.product.findMany({
+      where: { farmId, isAvailable: true, stock: { gt: 0 } },
+      select: { name: true },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+      take: TEILEN_ANGEBOT,
+    }),
   ])
 
   // Erst der Tag, dann seine Bestellungen — über dieselbe Bedingung wie
@@ -135,8 +190,39 @@ export async function getHeute(farmId: string, jetzt: Date = new Date()): Promis
     naechsteAbholung = { tag, name: abholtagName(wienKalendertag(jetzt), tag), anzahl }
   }
 
+  const zeilen = packliste(
+    heutige.map(({ totalAmount, serviceFeeCents, ...b }) => ({
+      ...b,
+      // Der Betrag aus dem Snapshot der Bestellung (Ware + Gebühr), nie neu gerechnet.
+      gesamtCents: bestellSummen({ totalAmount, serviceFeeCents }).gesamtCents,
+    }))
+  )
+  const slots = hof?.pickupSlots ?? []
+  const fenster = naechstesAbholfenster(slots, jetzt)
+  const fensterZahl = fensterAnzahl(fenster, wienKalendertag(jetzt), zeilen, naechsteAbholung)
+  const auswertung = auswerten(buchungen, wochenfenster)
+  const sektionen = hof?.sectionsConfig
+  const fortschritt = hof
+    ? hofseiteFortschritt(
+        hofseiteStand(
+          {
+            ...hof,
+            sectionsConfig:
+              Array.isArray(sektionen) && sektionen.length > 0 ? (sektionen as SectionConfig[]) : DEFAULT_SECTIONS,
+          },
+          hof
+        )
+      )
+    : null
+
   return {
-    abholungen: abholZeilen(heutige),
+    abholungen: zeilen,
+    zahlen: {
+      ...packlistenZahlen(zeilen),
+      umsatzHeuteCent: umsatzHeuteCent(buchungen, jetzt),
+    },
+    abholfensterHeute: abholfensterHeute(slots, jetzt),
+    naechstesFenster: fenster ? { fenster, anzahl: fensterZahl } : null,
     naechsteAbholung,
     brauchtDich: brauchtDich({
       ueberfaellig: { anzahl: ueberfaelligAnzahl, juengste: ueberfaelligJuengste },
@@ -144,9 +230,15 @@ export async function getHeute(farmId: string, jetzt: Date = new Date()): Promis
       ohneKategorie,
       statusErinnerung: statusReminder(letzterStatus?.publishedAt ?? null, jetzt),
     }),
-    woche: wochenvergleich(umsatzDieseWoche, umsatzVorwoche),
-    ersteSchritte: ersteSchritte(ersteSchritteDaten(hof, { produkte, aktiveAbholzeiten })),
+    woche: wochenvergleich(auswertung.summeCent, auswertung.vergleichCent),
+    wochenBalken: wochenBalken(auswertung.balken, jetzt),
+    ersteSchritte: ersteSchritte(ersteSchritteDaten(hof, { produkte, aktiveAbholzeiten: slots.length })),
     wartetAufFreigabe: hof?.approvedAt == null,
     onlinePausiert: hof && onlineZahlungPausiert(hof) ? { barMoeglich: hof.acceptsOnsite } : null,
+    hof: { sichtbar: hof ? heuteHofSichtbar(hof) : false, approvedAt: hof?.approvedAt ?? null },
+    angebot: angebot.map((p) => p.name),
+    hofseite: fortschritt
+      ? { prozent: fortschritt.prozent, satz: fortschritt.satz, fertig: fortschritt.fehlend.length === 0 }
+      : { prozent: 0, satz: '', fertig: false },
   }
 }

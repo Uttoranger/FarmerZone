@@ -9,8 +9,8 @@ import { StatusBadge } from '@/components/ui/status-badge'
  * „Heute" als Bild der App für /fuer-hoefe (Gate 5: „Eingebettete echte
  * Heute-Ansicht als Bild der App"). Nachgebaut aus Tokens und Bausteinen statt
  * eines Screenshots:
- *  - Heute ist noch nicht im neuen Design (kommt mit Nr. 17) — ein Bild der
- *    heutigen Seite zeigte die alte Oberfläche und veraltete beim nächsten Gate.
+ *  - Heute steht seit Nr. 17 im neuen Design, aber ein Bildschirmfoto
+ *    veraltete beim nächsten Umbau und zeigte Daten eines echten Hofs.
  *  - Ein Bild folgt keinem Theme; diese Zeichnung steht hell wie dunkel richtig.
  *  - Nur erfundene Daten, kein Hof aus der Datenbank: Die Seite ist statisch
  *    und zeigt nichts, was einem echten Hof gehört.
@@ -229,7 +229,8 @@ function HandyBild() {
       <div className="mb-2 flex items-center gap-2 rounded-xl border border-primary/45 bg-primary/12 px-2 py-1.5">
         <span className="min-w-0 flex-1">
           <span className="block text-[10px] font-semibold">Diese Woche teilen</span>
-          <span className="block text-[9px] text-muted-foreground">14 Besuche letzte Woche</span>
+          {/* Keine Besuchszahlen: die Teilen-Zählung kommt erst mit Gate 7. */}
+          <span className="block text-[9px] text-muted-foreground">Eier, Erdäpfel, Heu – Sa 9–12</span>
         </span>
         <span className="rounded-full bg-primary px-2 py-0.5 text-[9px] font-semibold text-primary-foreground">Teilen</span>
       </div>
