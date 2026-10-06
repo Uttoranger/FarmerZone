@@ -84,7 +84,8 @@ describe('kassenBetraege — derselbe Weg wie /api/checkout', () => {
         { productId: 'brot', price: 5.8, quantity: 1 },
       ],
       GEBUEHR_5,
-      JETZT
+      JETZT,
+      'ONLINE'
     )
     expect(b).toEqual(expect.objectContaining({ warenCents: 1030, gebuehrCents: 52, gesamtCents: 1082 }))
     expect(b.zeilenCents.get('eier')).toBe(450)
@@ -92,7 +93,7 @@ describe('kassenBetraege — derselbe Weg wie /api/checkout', () => {
   })
 
   it('rechnet ohne Fließkommafehler: 3 × € 1,10 sind 330 Cent', () => {
-    const b = kassenBetraege([{ productId: 'p', price: 1.1, quantity: 3 }], GEBUEHRFREI, JETZT)
+    const b = kassenBetraege([{ productId: 'p', price: 1.1, quantity: 3 }], GEBUEHRFREI, JETZT, 'ONLINE')
     expect(b.zeilenCents.get('p')).toBe(330)
     expect(b.warenCents).toBe(330)
     expect(b.gebuehrCents).toBe(0)
@@ -108,8 +109,8 @@ describe('kassenBetraege — derselbe Weg wie /api/checkout', () => {
     ]
     for (const korb of koerbe) {
       const server = decimalZuCents(calcTotalAmount(korb.map((p) => ({ unitPrice: p.price, quantity: p.quantity }))))
-      const gebuehr = berechneServicegebuehr(server, GEBUEHR_5, JETZT).gebuehrCents
-      const b = kassenBetraege(korb, GEBUEHR_5, JETZT)
+      const gebuehr = berechneServicegebuehr(server, GEBUEHR_5, JETZT, 'ONLINE').gebuehrCents
+      const b = kassenBetraege(korb, GEBUEHR_5, JETZT, 'ONLINE')
       expect(b.warenCents).toBe(server)
       expect(b.gebuehrCents).toBe(gebuehr)
       expect(b.gesamtCents).toBe(server + gebuehr)
@@ -118,9 +119,9 @@ describe('kassenBetraege — derselbe Weg wie /api/checkout', () => {
   })
 
   it('leerer Korb: 0 Warenpreis, die Gebühr fällt trotzdem nur über berechneServicegebuehr an', () => {
-    const b = kassenBetraege([], GEBUEHR_5, JETZT)
+    const b = kassenBetraege([], GEBUEHR_5, JETZT, 'ONLINE')
     expect(b.warenCents).toBe(0)
-    expect(b.gebuehrCents).toBe(berechneServicegebuehr(0, GEBUEHR_5, JETZT).gebuehrCents)
+    expect(b.gebuehrCents).toBe(berechneServicegebuehr(0, GEBUEHR_5, JETZT, 'ONLINE').gebuehrCents)
   })
 })
 
@@ -274,10 +275,10 @@ describe('Nachbesserung 1: nach dem Anlegen gilt der Betrag des Servers', () => 
   })
 
   it('zeigt den Server-Betrag, auch wenn die lokale Rechnung inzwischen etwas anderes ergibt', () => {
-    const lokal = kassenBetraege(KORB, GEBUEHR_AB_GLEICH, SPAETER)
+    const lokal = kassenBetraege(KORB, GEBUEHR_AB_GLEICH, SPAETER, 'ONLINE')
     // Gegenprobe: Die lokale Rechnung ist wirklich gewandert.
     expect(lokal.gesamtCents).toBe(1082)
-    expect(kassenBetraege(KORB, GEBUEHR_AB_GLEICH, JETZT).gesamtCents).toBe(1030)
+    expect(kassenBetraege(KORB, GEBUEHR_AB_GLEICH, JETZT, 'ONLINE').gesamtCents).toBe(1030)
 
     const angezeigt = angezeigteBetraege(lokal, VOM_SERVER)
 
@@ -289,7 +290,7 @@ describe('Nachbesserung 1: nach dem Anlegen gilt der Betrag des Servers', () => 
   })
 
   it('ohne Bestellung gilt die Vorschau der Kasse', () => {
-    const lokal = kassenBetraege(KORB, GEBUEHR_5, JETZT)
+    const lokal = kassenBetraege(KORB, GEBUEHR_5, JETZT, 'ONLINE')
     expect(angezeigteBetraege(lokal, null)).toBe(lokal)
   })
 

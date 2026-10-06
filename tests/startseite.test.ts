@@ -243,6 +243,8 @@ describe('beispielRechnung', () => {
       mindestCents: 50,
       duZahlstCents: 2100,
       hofBekommtCents: 2000,
+      // Register B1: Das Beispiel ist die Online-Zahlung; bar kostet bis zum SEPA-Start nichts.
+      fussnote: 'Bei Online-Zahlung. Bei Barzahlung bis 31.\u00a0Jänner 2027 ohne Servicegebühr.',
     })
   })
 

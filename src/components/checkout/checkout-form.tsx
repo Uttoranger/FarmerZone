@@ -33,6 +33,7 @@ import {
   CODE_ZAHLART_NICHT_ANGEBOTEN,
   abholKacheln,
   angezeigteBetraege,
+  barHinweis,
   bestellschlussHeute,
   gebuehrBezeichnung,
   kassenBetraege,
@@ -256,8 +257,11 @@ export function CheckoutForm({
   // Dieselben Fenster, die der Handler annimmt (src/lib/abholfenster.ts).
   const kacheln = abholKacheln(farm.pickupSlots, jetzt, ausgebuchteAbholfenster)
   const bestellschluss = bestellschlussHeute(kacheln)
+  // B1: Solange bar keine Servicegebühr kostet, online aber schon, sagt die
+  // Kasse das unter den Zahlarten — und verspricht nicht „gleicher Betrag".
+  const hinweisBar = barHinweis(farm, jetzt)
   // E5: nur online (mit fertigem Stripe-Zugang) und bar bei Abholung.
-  const zahlarten = kassenZahlarten(farm)
+  const zahlarten = kassenZahlarten(farm, hinweisBar !== null)
   const defaultPayment = zahlarten[0]?.wert ?? 'ONSITE_CASH'
 
   const form = useForm<CheckoutFormData>({
@@ -294,8 +298,9 @@ export function CheckoutForm({
   // calcTotalAmount → decimalZuCents → berechneServicegebuehr). Verbindlich
   // rechnet der Server mit den Preisen der Datenbank. Steht die Bestellung,
   // gilt nur noch ihr Betrag bei Stripe (angezeigteBetraege) — die Uhr läuft
-  // weiter, die Gebühr der Bestellung nicht.
-  const betraege = angezeigteBetraege(kassenBetraege(cart, farm, jetzt), zahlung?.betrag ?? null)
+  // weiter, die Gebühr der Bestellung nicht. Mit der gewählten Zahlart (B1):
+  // Der Wechsel auf bar rechnet sofort neu, zurück auf online ebenso.
+  const betraege = angezeigteBetraege(kassenBetraege(cart, farm, jetzt, paymentMethod), zahlung?.betrag ?? null)
   const gebuehrText = zahlung?.gebuehrText ?? gebuehrBezeichnung(farm, jetzt)
   const gesamt = formatEuro(centsAlsEuro(betraege.gesamtCents))
   const hof = { farmId: farm.id, farmSlug: farm.slug }
@@ -765,6 +770,7 @@ export function CheckoutForm({
             ) : (
               <ZahlartWahl zahlarten={zahlarten} feld={form.register('paymentMethod')} fehler={fehlerAm.paymentMethod?.message} />
             )}
+            {hinweisBar && zahlarten.some((z) => z.wert === 'ONSITE_CASH') && <p className={HINWEIS}>{hinweisBar}</p>}
             {paymentMethod === 'ONSITE_CASH' && (
               <div className="mt-1">
                 <label className="flex min-h-11 cursor-pointer items-start gap-3">

@@ -386,7 +386,9 @@ export async function seed(
         serviceFeeMinCents: hofStand.serviceFeeMinCents,
         serviceFeeActiveFrom: hofStand.serviceFeeActiveFrom,
       },
-      eingang
+      eingang,
+      // Mit der Zahlart der Bestellung: Bar vor dem SEPA-Start ohne Gebühr (Register B1).
+      b.zahlart
     )
 
     const kunde = SEED_KONTEN.find((k) => k.email === b.kundenEmail)

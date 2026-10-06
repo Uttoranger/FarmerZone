@@ -4239,6 +4239,19 @@ Die vier offenen Punkte aus #188 (Morgenbericht Lauf 4 §4) und der fehlende Tes
 - **Nachbesserung 1:** Die Erstattung des Ereignisses zählt nie mit, auch wenn `refunds.list` sie bei der Zustellung noch als `pending` führt — sonst sah es aus wie „schon zurückgenommen“, und die Zurücknahme fiel still aus. „Schon erledigt“ (die Datenbank zählte die Erstattung nie) meldet sich einmal. Eine Zahlung ohne Überweisung ist `StripeStandUnklar` statt eines einfachen Fehlers (vorher 500 und drei Tage stumme Neuzustellung; bei „Artikel fehlt“ heißt es dann „bitte melde dich“ statt „versuch es noch einmal“).
 - **Vollerstattung im else-Zweig** läuft nach der Transaktion, nicht in einer Sperre — deshalb bleibt sie ohne `STRIPE_OPTIONEN` (Kommentar im Code).
 
+## Keine Bargebühr bis zum Stichtag (Nachtlauf Nr. 19a, Oktober 2026)
+
+Register B1 umgesetzt. Keine Schema-Änderung, keine Migration, keine Datenänderung.
+
+- **Regel:** `berechneServicegebuehr` bekommt die Zahlungsart. Bar (`ONSITE_CASH`) vor `BAR_SERVICEGEBUEHR_AB` (konditionen.ts, Standard `TARIFE_AB` = 1. Februar 2027, Wiener Mitternacht) → 0 Cent. Online immer nach der bestehenden Regel. Genau an der Grenze gilt die Gebühr schon (wie `serviceFeeActiveFrom`).
+- **Warum der Bestellzeitpunkt und nicht der Abholtag:** Was die Kundin beim Bestellen sieht, gilt — der Kassenhinweis nennt „bis 31. Jänner". Eine Bestellung am 31. Jänner mit Abholung im Februar bleibt also ohne Gebühr; die Plattform verzichtet auf diese wenigen Tage, statt der Kundin nachträglich mehr abzuverlangen. Dieselbe Konvention wie beim Gebührenstart je Hof.
+- **Snapshot:** bar vor dem Stichtag `serviceFeeCents` 0, Prozentsatz und Mindestgebühr null — derselbe Stand wie bei einem gebührenfreien Hof. „Artikel fehlt" bleibt damit bei 0 (`neueServicegebuehrCents`: 0 bleibt 0), Storno und „nicht abgeholt" setzen ohne Gebühr keinen Vermerk.
+- **Ältere Barbestellungen mit Gebühr** (vor dem Deploy angelegt) behalten ihre Beträge. „Artikel fehlt" rechnet sie mit IHRER Regel weiter (Zeitpunkt in `artikel-fehlt.ts` ist der Stichtag selbst, damit B1 nicht rückwirkend greift). Die Finanzseite und die Admin-Hofliste zählen ihre Gebühr aber nicht mehr als geschuldet: B1 sagt, Gebühren aus Barbestellungen vor dem Stichtag werden nicht eingezogen. „Karte bei Abholung" nennt B1 nicht und bleibt, wie sie war.
+- **Kasse:** rechnet beim Wechsel der Zahlart sofort neu (`kassenBetraege(…, paymentMethod)`), zeigt unter den Zahlarten „Bei Barzahlung bis 31. Jänner 2027 ohne Servicegebühr." und verspricht dann nicht mehr „gleicher Betrag" (`barHinweis`). Verbindlich bleibt der Server; nach dem Anlegen ist die Zahlart gesperrt, Stripe bekommt nur den Betrag der gespeicherten Bestellung.
+- **Texte aus einer Quelle (konditionen.ts):** `/konditionen` und `/fuer-hoefe` (Grundsatz und Frage „Wie werde ich bezahlt?"), Startseite (Fußnote unter dem Beispiel nach Stichtag, Frage „Wie bezahle ich?"), Mail „Vor-Ort-Bestellung bestätigt" an den Hof (der ganze Betrag bleibt dir; bei einer älteren Bestellung vor dem Stichtag kein „schuldest du der Monatsabrechnung"). Der Gebührenhinweis sagt nicht mehr „bei Online- und Barzahlung gleich".
+- **Ring vermieden:** `servicegebuehr.ts` liest den Stichtag aus `konditionen.ts`; deshalb holt `konditionen.ts` nichts mehr aus `servicegebuehr.ts`. Wiener Tage stehen in `wiener-tag.ts`, `centsAlsEuro` in `format.ts`, der Satz für neue Höfe in `konditionen.ts`; `servicegebuehr.ts` reicht alles weiter, kein Aufrufer musste umziehen.
+- **Statische Seiten:** `/konditionen`, `/fuer-hoefe` und die Startseiten-Frage nennen das Datum fest. Nach dem Stichtag ist der Satz Vergangenheit, bis jemand ihn entfernt (wie der K1-Satz); Kasse und Startseiten-Beispiel folgen der Uhr.
+
 ## Nützliche Befehle
 
 ```bash

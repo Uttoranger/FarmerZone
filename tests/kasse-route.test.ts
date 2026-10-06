@@ -228,7 +228,8 @@ describe('Gebührenzeile der Kasse = Betrag des Servers', () => {
       const anzeige = kassenBetraege(
         items.map((i) => ({ productId: i.productId, price: i.unitPrice, quantity: i.quantity })),
         { ...HOF, serviceFeePercent: 5 },
-        JETZT
+        JETZT,
+        'ONLINE'
       )
 
       const res = await POST(anfrage({ paymentMethod: 'ONLINE', items }))

@@ -13,6 +13,8 @@
  *
  *   bar/vor Ort  neuer Betrag = verbleibender Warenwert + neue Gebühr; keine
  *                Erstattung. Die Monatsabrechnung nimmt die neue Gebühr.
+ *                Bar vor dem SEPA-Start hat die Bestellung Gebühr 0 (Register
+ *                B1) — sie bleibt 0, neuer Betrag = verbleibender Warenwert.
  *   online       Kundin bekommt Artikelpreis + Gebührendifferenz zurück; vom
  *                Hof wird GENAU der Artikelpreis zurückgeholt (Rückbuchung mit
  *                festem Betrag); die Differenz trägt die einbehaltene Gebühr.
@@ -25,6 +27,7 @@
  * — die Summe der Erstattungen übersteigt nie den bezahlten Betrag.
  */
 import { formatEuro } from '@/lib/format'
+import { BAR_SERVICEGEBUEHR_AB } from '@/lib/konditionen'
 import {
   SERVICEGEBUEHR_STANDARD_MIND_CENTS,
   berechneServicegebuehr,
@@ -89,16 +92,22 @@ export type ArtikelFehltErgebnis =
 
 /*
  * Für berechneServicegebuehr: Die Regel der Bestellung GALT schon — ob sie
- * gilt, hat der Checkout entschieden (sonst wäre die Gebühr 0 und es bleibt
- * bei 0). Ein fester Zeitpunkt hält die Funktion rein.
+ * gilt, hat der Checkout entschieden und im Snapshot festgehalten: Hof
+ * gebührenfrei oder bar vor dem SEPA-Start (B1) heißt Gebühr 0, und 0 bleibt
+ * 0 (`neueServicegebuehrCents`). Gerechnet wird hier also nur, wenn die
+ * Bestellung eine Gebühr trägt — dann mit einem Zeitpunkt, zu dem die Regel
+ * für JEDE Zahlungsart gilt: dem Bar-Stichtag selbst. Ein fester Zeitpunkt
+ * hält die Funktion rein; eine Altbestellung mit Bargebühr behält so ihre
+ * Regel, statt rückwirkend unter B1 zu fallen (gespeicherte Beträge, E4).
  */
-const REGEL_GALT = new Date(0)
+const REGEL_GALT = BAR_SERVICEGEBUEHR_AB
 
-function gebuehrNachRegel(warenCents: number, prozent: number, mindestCents: number): number {
+function gebuehrNachRegel(warenCents: number, prozent: number, mindestCents: number, zahlungsart: string): number {
   return berechneServicegebuehr(
     warenCents,
     { serviceFeePercent: prozent, serviceFeeMinCents: mindestCents, serviceFeeActiveFrom: REGEL_GALT },
-    REGEL_GALT
+    REGEL_GALT,
+    zahlungsart
   ).gebuehrCents
 }
 
@@ -115,16 +124,21 @@ function gebuehrNachRegel(warenCents: number, prozent: number, mindestCents: num
  */
 export function neueServicegebuehrCents(
   restWarenCents: number,
-  b: Pick<ArtikelFehltBestellung, 'warenpreisCents' | 'serviceFeeCents' | 'serviceFeePercentApplied' | 'serviceFeeMinCentsApplied'>
+  b: Pick<
+    ArtikelFehltBestellung,
+    'paymentMethod' | 'warenpreisCents' | 'serviceFeeCents' | 'serviceFeePercentApplied' | 'serviceFeeMinCentsApplied'
+  >
 ): number {
+  // Ohne Gebühr bleibt es ohne Gebühr: gebührenfreier Hof oder bar vor dem
+  // SEPA-Start (B1, Snapshot 0 / Prozent null / Mindestgebühr null).
   if (b.serviceFeeCents <= 0) return 0
   const prozent = b.serviceFeePercentApplied ?? 0
   const mindest =
     b.serviceFeeMinCentsApplied ??
-    (b.serviceFeeCents > gebuehrNachRegel(b.warenpreisCents, prozent, 0)
+    (b.serviceFeeCents > gebuehrNachRegel(b.warenpreisCents, prozent, 0, b.paymentMethod)
       ? b.serviceFeeCents
       : SERVICEGEBUEHR_STANDARD_MIND_CENTS)
-  return Math.min(gebuehrNachRegel(restWarenCents, prozent, mindest), b.serviceFeeCents)
+  return Math.min(gebuehrNachRegel(restWarenCents, prozent, mindest, b.paymentMethod), b.serviceFeeCents)
 }
 
 /** Was „Artikel fehlt" für diese Position bedeutet — vom aktuellen Stand aus. */

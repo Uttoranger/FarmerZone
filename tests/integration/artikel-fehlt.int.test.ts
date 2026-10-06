@@ -199,6 +199,23 @@ const EIER_BROT: Position[] = [
 ]
 
 describe('Artikel fehlt — Rechenbeispiele der Freigabe in der Datenbank', () => {
+  it('bar vor dem SEPA-Start (Register B1, Snapshot ohne Gebühr): Brot fehlt → € 4,50, Gebühr bleibt 0', async () => {
+    // So schreibt der Checkout eine Barbestellung vor BAR_SERVICEGEBUEHR_AB.
+    const { order, position } = await bestellung({ zahlung: 'bar', positionen: EIER_BROT, gebuehrCents: 0, mindestCents: null })
+
+    const ergebnis = await meldeArtikelFehlt({ orderId: order.id, itemId: position('Brot').id })
+
+    expect(ergebnis).toEqual({ erstattetCents: 0, vomHofCents: 0, neuGesamtCents: 450 })
+    expect(await stand(order.id)).toEqual({
+      status: 'CONFIRMED',
+      warenCents: 450,
+      gebuehrCents: 0,
+      erstattetCents: 0,
+      fehlend: ['Brot'],
+    })
+    expect(refundCreate).not.toHaveBeenCalled()
+  })
+
   it('bar: Brot fehlt → € 5,00 zu kassieren, Gebühr € 0,50 für die Abrechnung, kein Stripe, Mail', async () => {
     const { order, position, produkte } = await bestellung({ zahlung: 'bar', positionen: EIER_BROT, gebuehrCents: 52 })
 
@@ -492,18 +509,30 @@ describe('Artikel fehlt — fehlt alles, ist es ein Storno', () => {
 })
 
 describe('Checkout — Snapshot der Mindestgebühr', () => {
+  // Online: Bar kostet bis zum SEPA-Start keine Gebühr (Register B1) — die
+  // Mindestgebühr steht dann gar nicht im Snapshot (nächster Test, und
+  // tests/integration/bargebuehr.int.test.ts).
   it('schreibt die Mindestgebühr des Hofs, wenn eine Gebühr gilt', async () => {
     const { farm } = await erstelleHof({
       serviceFeePercent: 5,
       serviceFeeMinCents: 50,
       serviceFeeActiveFrom: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      acceptsOnline: true,
+      stripeAccountReady: true,
+      stripeAccountId: intKennung('acct'),
     })
     const produkt = await erstelleProdukt(farm.id, { stock: 5 })
     const sitzung = intKennung('sitzung')
     await setzeHalt(produkt.id, sitzung, 1)
+    vi.mocked(stripe.paymentIntents.create).mockResolvedValue({ id: intKennung('pi'), client_secret: 'cs_test' } as never)
 
     const antwort = await checkout(
-      checkoutAnfrage({ farm, sessionId: sitzung, positionen: [{ productId: produkt.id, name: 'Testprodukt', quantity: 1, unitPrice: 10 }] })
+      checkoutAnfrage({
+        farm,
+        sessionId: sitzung,
+        paymentMethod: 'ONLINE',
+        positionen: [{ productId: produkt.id, name: 'Testprodukt', quantity: 1, unitPrice: 10 }],
+      })
     )
     expect(antwort.status).toBe(200)
 

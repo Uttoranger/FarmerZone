@@ -568,8 +568,10 @@ export async function POST(request: NextRequest) {
   // 5b. Servicegebühr — aus der Hofeinstellung ZUM BESTELLZEITPUNKT berechnet
   //     und im Snapshot der Bestellung eingefroren (src/lib/servicegebuehr.ts).
   //     Der Browser zeigt dieselbe Rechnung vorab; verbindlich ist diese hier.
+  //     Mit der Zahlungsart (Register B1): bar vor dem SEPA-Start 0 Cent, nach
+  //     der Server-Uhr dieses Requests — nie nach dem, was der Browser zeigte.
   const warenpreisCents = decimalZuCents(totalAmount)
-  const servicegebuehr = berechneServicegebuehr(warenpreisCents, farm, now)
+  const servicegebuehr = berechneServicegebuehr(warenpreisCents, farm, now, data.paymentMethod)
 
   // 6. Order number (retry on collision — astronomically unlikely)
   let orderNumber = generateOrderNumber(data.farmSlug)
@@ -643,7 +645,8 @@ export async function POST(request: NextRequest) {
         serviceFeePercentApplied: servicegebuehr.prozentAngewendet,
         // Snapshot der Mindestgebühr (E14, Nr. 19): „Artikel fehlt" rechnet die
         // Gebühr auf den Rest mit genau dieser Regel neu, nie mit der heutigen
-        // Hofeinstellung. null, wenn keine Gebühr gilt — wie der Prozentsatz.
+        // Hofeinstellung. null, wenn keine Gebühr gilt — wie der Prozentsatz,
+        // also auch bar vor dem SEPA-Start (B1): Gebühr 0 bleibt dort 0.
         serviceFeeMinCentsApplied: servicegebuehr.prozentAngewendet === null ? null : farm.serviceFeeMinCents,
         kaeuferArt: data.kaeuferArt,
         betriebsnummer: betriebsnummerFuerBestellung(data.kaeuferArt, data.betriebsnummer),

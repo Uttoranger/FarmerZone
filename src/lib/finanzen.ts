@@ -20,6 +20,7 @@
  */
 import { formatEuro } from '@/lib/format'
 import {
+  barOhneServicegebuehr,
   centsAlsEuro,
   gebuehrEntfallen,
   istVorOrtZahlung,
@@ -181,6 +182,10 @@ export type EinnahmenTopf = 'eingezogen' | 'geschuldet' | 'erwartet' | 'keiner'
  * Die REIHENFOLGE der Prüfungen ist die Regel, nicht Zufall:
  *
  * 1. Storniert oder Gebühr entfallen → nichts. Das sticht alles andere.
+ *    Ebenso bar vor dem SEPA-Start (`barOhneServicegebuehr`, Register B1):
+ *    Neue Barbestellungen tragen dort keine Gebühr, und die Gebühr älterer
+ *    Barbestellungen wird nicht eingezogen — die Plattform erwartet aus
+ *    ihnen nichts, sie zählen auch nicht als „Bestellung mit Einnahme".
  * 2. Online UND bezahlt → eingezogen. Nicht `status = 'PAID'`: Der
  *    Bestellstatus wandert weiter (CONFIRMED → READY → PICKED_UP), der
  *    Zahlungsstatus bleibt PAID.
@@ -204,6 +209,7 @@ export type EinnahmenTopf = 'eingezogen' | 'geschuldet' | 'erwartet' | 'keiner'
 export function topfVonBestellung(bestellung: BestellungFuerFinanzen): EinnahmenTopf {
   if (bestellung.status === 'CANCELLED') return 'keiner'
   if (gebuehrEntfallen(bestellung)) return 'keiner'
+  if (barOhneServicegebuehr(bestellung.paymentMethod, bestellung.createdAt)) return 'keiner'
   if (bestellung.paymentMethod === 'ONLINE' && bestellung.paymentStatus === 'PAID') {
     return 'eingezogen'
   }

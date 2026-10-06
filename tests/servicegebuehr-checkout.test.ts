@@ -10,7 +10,7 @@
  * Bestätigungs-Mail bekommt die Gebühr. Gebührenfrei: 0 und keine
  * application_fee_amount.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/rate-limit', () => ({ enforceRateLimit: vi.fn(() => null) }))
@@ -46,6 +46,7 @@ vi.mock('@/lib/prisma', () => ({
 }))
 
 import { POST } from '@/app/api/checkout/route'
+import { BAR_SERVICEGEBUEHR_AB } from '@/lib/konditionen'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { sendOnsiteConfirmation } from '@/lib/email'
@@ -153,6 +154,23 @@ function intentParams(): Record<string, unknown> {
   return paymentIntentCreate.mock.calls[0]?.[0] as unknown as Record<string, unknown>
 }
 
+/*
+ * Register B1: Bar kostet erst ab BAR_SERVICEGEBUEHR_AB eine Gebühr, und der
+ * Handler nimmt seine eigene Uhr (`new Date()`). Tests, die die Bargebühr
+ * selbst prüfen, stellen deshalb die Uhr — nur `Date`, Zeitgeber laufen echt.
+ */
+function uhrAuf(zeitpunkt: Date): void {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(zeitpunkt)
+}
+function abStichtag(): void {
+  uhrAuf(new Date(BAR_SERVICEGEBUEHR_AB.getTime() + 14 * 24 * 60 * 60 * 1000))
+}
+
+afterEach(() => {
+  vi.useRealTimers()
+})
+
 beforeEach(() => {
   einzelpreis = 10
   warenkorbBereit()
@@ -252,7 +270,8 @@ describe('Checkout mit 5 % und Aufrundung (E4)', () => {
     expect(intentParams()).toEqual(expect.objectContaining({ amount: 1082, application_fee_amount: 52 }))
   })
 
-  it('bar, 10,01 €: 50,05 Cent → 51 Cent, die Mail kennt dieselbe Gebühr', async () => {
+  it('bar ab dem SEPA-Start (B1), 10,01 €: 50,05 Cent → 51 Cent, die Mail kennt dieselbe Gebühr', async () => {
+    abStichtag()
     farmFindUnique.mockResolvedValue(HOF_FUENF as never)
     einzelpreis = 10.01
     warenkorbBereit()
@@ -272,8 +291,9 @@ describe('Checkout mit 5 % und Aufrundung (E4)', () => {
   })
 })
 
-describe('Checkout BAR mit Servicegebühr', () => {
+describe('Checkout BAR mit Servicegebühr (ab dem SEPA-Start, Register B1)', () => {
   it('6 €: Mindestgebühr 50 Cent im Snapshot, kein Stripe, Bestätigungs-Mail kennt die Gebühr', async () => {
+    abStichtag()
     einzelpreis = 6
     const res = await POST(
       anfrage({
@@ -307,5 +327,63 @@ describe('Checkout BAR mit Servicegebühr', () => {
     expect(res.status).toBe(400)
     expect(vi.mocked(prisma.order.create)).not.toHaveBeenCalled()
     expect(paymentIntentCreate).not.toHaveBeenCalled()
+  })
+})
+
+describe('Register B1 — keine Bargebühr bis zum Stichtag, am echten Handler', () => {
+  const KURZ_VORHER = new Date(BAR_SERVICEGEBUEHR_AB.getTime() - 1)
+  const GENAU = BAR_SERVICEGEBUEHR_AB
+  const LANGE_VORHER = new Date('2026-10-06T10:00:00.000Z')
+
+  it.each([
+    ['lange vor dem Stichtag', LANGE_VORHER],
+    ['eine Millisekunde vor dem Stichtag (Wiener Mitternacht)', KURZ_VORHER],
+  ])('bar %s: 0 Cent, Prozent und Mindestgebühr null, Mail ohne Gebühr, kein Stripe', async (_name, zeitpunkt) => {
+    uhrAuf(zeitpunkt)
+    const res = await POST(anfrage({ paymentMethod: 'ONSITE_CASH' }))
+
+    expect(res.status).toBe(200)
+    expect(createData()).toEqual(
+      expect.objectContaining({
+        totalAmount: 20,
+        serviceFeeCents: 0,
+        serviceFeePercentApplied: null,
+        // Derselbe Snapshot wie ein gebührenfreier Hof: „Artikel fehlt" bleibt bei 0.
+        serviceFeeMinCentsApplied: null,
+      })
+    )
+    expect(paymentIntentCreate).not.toHaveBeenCalled()
+    expect(sendOnsiteConfirmation).toHaveBeenCalledWith(
+      expect.objectContaining({ serviceFeeCents: 0 }),
+      expect.any(String)
+    )
+  })
+
+  it('bar genau am Stichtag (Wiener Mitternacht): die Gebühr gilt schon', async () => {
+    uhrAuf(GENAU)
+    await POST(anfrage({ paymentMethod: 'ONSITE_CASH' }))
+
+    expect(createData()).toEqual(
+      expect.objectContaining({ serviceFeeCents: 98, serviceFeePercentApplied: 4.9, serviceFeeMinCentsApplied: 50 })
+    )
+  })
+
+  it.each([
+    ['vor dem Stichtag', LANGE_VORHER],
+    ['eine Millisekunde davor', KURZ_VORHER],
+    ['genau am Stichtag', GENAU],
+  ])('online %s: unverändert mit Gebühr, Stripe bekommt 2098 mit application_fee 98', async (_name, zeitpunkt) => {
+    uhrAuf(zeitpunkt)
+    await POST(anfrage({ paymentMethod: 'ONLINE' }))
+
+    expect(createData()).toEqual(expect.objectContaining({ serviceFeeCents: 98, serviceFeePercentApplied: 4.9 }))
+    expect(intentParams()).toEqual(expect.objectContaining({ amount: 2098, application_fee_amount: 98 }))
+  })
+
+  it('verbindlich ist der Server: dieselbe Anfrage zahlt bar nichts, online die Gebühr — die Kundin kann nichts hineinschreiben', async () => {
+    uhrAuf(LANGE_VORHER)
+    // Ein Feld für die Gebühr gibt es in der Anfrage nicht; ein mitgeschicktes wird ignoriert.
+    await POST(anfrage({ paymentMethod: 'ONLINE', serviceFeeCents: 0 }))
+    expect(intentParams()).toEqual(expect.objectContaining({ amount: 2098, application_fee_amount: 98 }))
   })
 })

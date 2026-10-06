@@ -19,8 +19,10 @@ import {
   SERVICEGEBUEHR_STANDARD_PROZENT,
   berechneServicegebuehr,
   centsAlsEuro,
+  barOhneServicegebuehr,
 } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
+import { BAR_OHNE_GEBUEHR_HINWEIS } from '@/lib/konditionen'
 
 /** Eine Adresse der Hofübersicht mit genau diesen Filtern; ohne Filter die nackte /hoefe. */
 export function hoefeAdresse(teil: Partial<HoefeFilter> = {}): string {
@@ -173,7 +175,12 @@ export type Beispielrechnung = {
   mindestCents: number
   duZahlstCents: number
   hofBekommtCents: number
+  /** Der Satz unter dem Beispiel: für welche Zahlart es gilt (Register B1). */
+  fussnote: string
 }
+
+/** Unter dem Beispiel, sobald bar und online wieder gleich viel kosten. */
+export const BEISPIEL_GLEICH = 'Egal ob online oder bar bei Abholung.'
 
 /** Der Warenpreis des Beispiels im Mockup: € 20,00. */
 export const BEISPIEL_WARENPREIS_CENTS = 2000
@@ -181,8 +188,12 @@ export const BEISPIEL_WARENPREIS_CENTS = 2000
 /**
  * Die Beispielrechnung „Der Hof bekommt den vollen Preis" — gerechnet, nicht
  * abgeschrieben: über berechneServicegebuehr mit dem Satz für neue Höfe (E4),
- * damit Beispiel und Kasse nie auseinanderlaufen. `jetzt` nur, weil die Regel
- * einen Bestellzeitpunkt verlangt; die Gebühr gilt im Beispiel ab sofort.
+ * damit Beispiel und Kasse nie auseinanderlaufen. Die Gebühr gilt im Beispiel
+ * ab sofort.
+ *
+ * Gerechnet wird die ONLINE-Zahlung. Vor dem SEPA-Start kostet bar keine
+ * Gebühr (B1) — dann sagt die Fußnote genau das, statt „egal ob online oder
+ * bar". `jetzt` kommt von der Seite (Server-Uhr), wie überall.
  */
 export function beispielRechnung(jetzt: Date, warenpreisCents: number = BEISPIEL_WARENPREIS_CENTS): Beispielrechnung {
   const { gebuehrCents } = berechneServicegebuehr(
@@ -192,7 +203,8 @@ export function beispielRechnung(jetzt: Date, warenpreisCents: number = BEISPIEL
       serviceFeeMinCents: SERVICEGEBUEHR_STANDARD_MIND_CENTS,
       serviceFeeActiveFrom: jetzt,
     },
-    jetzt
+    jetzt,
+    'ONLINE'
   )
   return {
     warenpreisCents,
@@ -201,6 +213,9 @@ export function beispielRechnung(jetzt: Date, warenpreisCents: number = BEISPIEL
     mindestCents: SERVICEGEBUEHR_STANDARD_MIND_CENTS,
     duZahlstCents: warenpreisCents + gebuehrCents,
     hofBekommtCents: warenpreisCents,
+    fussnote: barOhneServicegebuehr('ONSITE_CASH', jetzt)
+      ? `Bei Online-Zahlung. ${BAR_OHNE_GEBUEHR_HINWEIS}`
+      : BEISPIEL_GLEICH,
   }
 }
 
@@ -222,7 +237,7 @@ export const STARTSEITE_FRAGEN: readonly Frage[] = [
   },
   {
     frage: 'Wie bezahle ich?',
-    antwort: `Online beim Bestellen oder bar bei der Abholung – was der Hof anbietet, siehst du vor dem Bestellen. Zum Warenpreis kommen ${SERVICEGEBUEHR_STANDARD_PROZENT} % Servicegebühr, mindestens ${formatEuro(centsAlsEuro(SERVICEGEBUEHR_STANDARD_MIND_CENTS))}, als eigene Zeile im Warenkorb.`,
+    antwort: `Online beim Bestellen oder bar bei der Abholung – was der Hof anbietet, siehst du vor dem Bestellen. Zum Warenpreis kommen ${SERVICEGEBUEHR_STANDARD_PROZENT} % Servicegebühr, mindestens ${formatEuro(centsAlsEuro(SERVICEGEBUEHR_STANDARD_MIND_CENTS))}, als eigene Zeile im Warenkorb. ${BAR_OHNE_GEBUEHR_HINWEIS}`,
   },
   {
     frage: 'Was, wenn ich nicht abholen kann?',

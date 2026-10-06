@@ -27,7 +27,7 @@ import { generateReorderToken } from '@/lib/reorder-token'
 import { formatEuro, formatPosition } from '@/lib/format'
 import { barBestaetigungsPfad, bestellungPfad } from '@/lib/bestell-link'
 import type { OrderLineProduct } from '@/lib/order-line'
-import { bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
+import { barOhneServicegebuehr, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
 import { alsCents, calcLineTotal, decimalZuCents } from '@/lib/order-totals'
 import { fristVon, zeitpunktFuerMail } from '@/lib/fristen'
 import { buildMapsUrl } from '@/lib/customer-links'
@@ -487,6 +487,9 @@ export async function sendOrderConfirmedToFarmer(order: OrderForEmail): Promise<
     total: betraege(order).warenpreis,
     serviceFee: betraege(order).gebuehr,
     barZuKassieren: betraege(order).gesamt,
+    // B1 nach dem BESTELLzeitpunkt, nicht nach dem Versand. Ohne Zeitpunkt der
+    // bisherige Satz — lieber kein Hinweis als ein falscher.
+    barOhneGebuehr: order.createdAt ? barOhneServicegebuehr(order.paymentMethod, order.createdAt) : false,
     dashboardUrl: `${APP_URL}/orders`,
   }))
 

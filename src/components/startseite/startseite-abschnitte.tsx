@@ -236,7 +236,7 @@ export function SoFunktionierts({ rechnung }: { rechnung: Beispielrechnung }): R
               <Zeile name="Du zahlst" betrag={rechnung.duZahlstCents} stark trenner />
               <Zeile name="Der Hof bekommt" betrag={rechnung.hofBekommtCents} stark gruen />
             </dl>
-            <p className="text-xs leading-normal text-muted-foreground">Egal ob online oder bar bei Abholung.</p>
+            <p className="text-xs leading-normal text-muted-foreground">{rechnung.fussnote}</p>
           </div>
         </div>
       </div>

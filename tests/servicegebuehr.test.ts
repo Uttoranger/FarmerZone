@@ -43,31 +43,31 @@ const BESTELLT = new Date('2026-09-16T10:00:00.000Z')
 describe('berechneServicegebuehr', () => {
   it('gebührenfrei: ohne Datum 0 Cent und kein Prozentsatz', () => {
     expect(
-      berechneServicegebuehr(2000, { ...AKTIV, serviceFeeActiveFrom: null }, BESTELLT)
+      berechneServicegebuehr(2000, { ...AKTIV, serviceFeeActiveFrom: null }, BESTELLT, 'ONLINE')
     ).toEqual({ gebuehrCents: 0, prozentAngewendet: null })
   })
 
   it('Datum in der Zukunft: noch 0 Cent — auch wenn nur eine Sekunde fehlt', () => {
     const morgen = { ...AKTIV, serviceFeeActiveFrom: new Date('2026-09-17T00:00:00.000Z') }
-    expect(berechneServicegebuehr(2000, morgen, BESTELLT).gebuehrCents).toBe(0)
+    expect(berechneServicegebuehr(2000, morgen, BESTELLT, 'ONLINE').gebuehrCents).toBe(0)
     const knapp = { ...AKTIV, serviceFeeActiveFrom: new Date(BESTELLT.getTime() + 1000) }
-    expect(berechneServicegebuehr(2000, knapp, BESTELLT).gebuehrCents).toBe(0)
+    expect(berechneServicegebuehr(2000, knapp, BESTELLT, 'ONLINE').gebuehrCents).toBe(0)
   })
 
   it('ab dem Zeitpunkt selbst gilt die Gebühr (Grenze einschließlich)', () => {
     const genau = { ...AKTIV, serviceFeeActiveFrom: BESTELLT }
-    expect(berechneServicegebuehr(2000, genau, BESTELLT).gebuehrCents).toBe(98)
+    expect(berechneServicegebuehr(2000, genau, BESTELLT, 'ONLINE').gebuehrCents).toBe(98)
   })
 
   it('20 € bei 4,9 % → 98 Cent, Prozentsatz im Ergebnis', () => {
-    expect(berechneServicegebuehr(2000, AKTIV, BESTELLT)).toEqual({
+    expect(berechneServicegebuehr(2000, AKTIV, BESTELLT, 'ONLINE')).toEqual({
       gebuehrCents: 98,
       prozentAngewendet: 4.9,
     })
   })
 
   it('6 € bei 4,9 % wären 29 Cent → Mindestgebühr 50 Cent greift', () => {
-    expect(berechneServicegebuehr(600, AKTIV, BESTELLT)).toEqual({
+    expect(berechneServicegebuehr(600, AKTIV, BESTELLT, 'ONLINE')).toEqual({
       gebuehrCents: 50,
       prozentAngewendet: 4.9,
     })
@@ -76,48 +76,48 @@ describe('berechneServicegebuehr', () => {
   it('rundet immer auf (E4): jeder angefangene Cent zählt — auch 24,451 → 25', () => {
     const ohneMindest = { ...AKTIV, serviceFeeMinCents: 0 }
     // 5 € × 4,9 % = 24,5 Cent → 25
-    expect(berechneServicegebuehr(500, ohneMindest, BESTELLT).gebuehrCents).toBe(25)
+    expect(berechneServicegebuehr(500, ohneMindest, BESTELLT, 'ONLINE').gebuehrCents).toBe(25)
     // 4,99 € × 4,9 % = 24,451 Cent → 25 (kaufmännisch wären es 24 gewesen)
-    expect(berechneServicegebuehr(499, ohneMindest, BESTELLT).gebuehrCents).toBe(25)
+    expect(berechneServicegebuehr(499, ohneMindest, BESTELLT, 'ONLINE').gebuehrCents).toBe(25)
     // 0,01 € × 4,9 % = 0,049 Cent → 1 Cent, nicht 0
-    expect(berechneServicegebuehr(1, ohneMindest, BESTELLT).gebuehrCents).toBe(1)
+    expect(berechneServicegebuehr(1, ohneMindest, BESTELLT, 'ONLINE').gebuehrCents).toBe(1)
   })
 
   it('ein glatter Betrag bleibt glatt: kein Cent zu viel durch die Aufrundung', () => {
     const ohneMindest = { ...AKTIV, serviceFeeMinCents: 0 }
     // 20 € × 4,9 % = genau 98 Cent → 98, nicht 99
-    expect(berechneServicegebuehr(2000, ohneMindest, BESTELLT).gebuehrCents).toBe(98)
+    expect(berechneServicegebuehr(2000, ohneMindest, BESTELLT, 'ONLINE').gebuehrCents).toBe(98)
     // 3 € × 7 % = genau 21 Cent; als Float wären es 21,000000000000004 → 22
-    expect(berechneServicegebuehr(300, { ...ohneMindest, serviceFeePercent: 7 }, BESTELLT).gebuehrCents).toBe(21)
+    expect(berechneServicegebuehr(300, { ...ohneMindest, serviceFeePercent: 7 }, BESTELLT, 'ONLINE').gebuehrCents).toBe(21)
     // 0 € → 0 Cent (ohne Mindestgebühr)
-    expect(berechneServicegebuehr(0, ohneMindest, BESTELLT).gebuehrCents).toBe(0)
+    expect(berechneServicegebuehr(0, ohneMindest, BESTELLT, 'ONLINE').gebuehrCents).toBe(0)
   })
 
   it('Prozentsätze, die als Gleitkommazahl krumm sind, rechnen trotzdem exakt (4,35 % → 435 Hundertstel)', () => {
     // 4.35 * 100 = 434.99999999999994 — ohne Runden auf Hundertstel würde
     // 100 € × 4,35 % = 435 Cent als 434,99… und damit falsch gerechnet.
     const krumm = { ...AKTIV, serviceFeePercent: 4.35, serviceFeeMinCents: 0 }
-    expect(berechneServicegebuehr(10000, krumm, BESTELLT).gebuehrCents).toBe(435)
+    expect(berechneServicegebuehr(10000, krumm, BESTELLT, 'ONLINE').gebuehrCents).toBe(435)
     // 1 € × 4,35 % = 4,35 Cent → 5
-    expect(berechneServicegebuehr(100, krumm, BESTELLT).gebuehrCents).toBe(5)
+    expect(berechneServicegebuehr(100, krumm, BESTELLT, 'ONLINE').gebuehrCents).toBe(5)
   })
 
   it('rechnet mit dem Prisma-Decimal (String-Form) genauso wie mit der Zahl', () => {
     const decimal = { ...AKTIV, serviceFeePercent: { toString: () => '4.90' } }
-    expect(berechneServicegebuehr(2000, decimal, BESTELLT).gebuehrCents).toBe(98)
+    expect(berechneServicegebuehr(2000, decimal, BESTELLT, 'ONLINE').gebuehrCents).toBe(98)
     const text = { ...AKTIV, serviceFeePercent: '4.9' }
-    expect(berechneServicegebuehr(2000, text, BESTELLT).prozentAngewendet).toBe(4.9)
+    expect(berechneServicegebuehr(2000, text, BESTELLT, 'ONLINE').prozentAngewendet).toBe(4.9)
   })
 
   it('das Datum darf als ISO-Text kommen (Serialisierung zum Browser)', () => {
     const text = { ...AKTIV, serviceFeeActiveFrom: '2026-09-01T00:00:00.000Z' }
-    expect(berechneServicegebuehr(2000, text, BESTELLT).gebuehrCents).toBe(98)
+    expect(berechneServicegebuehr(2000, text, BESTELLT, 'ONLINE').gebuehrCents).toBe(98)
   })
 
   it('Schutz vor Unsinn: negative oder unlesbare Werte werden zu 0, kein NaN', () => {
     const kaputt = { serviceFeePercent: 'abc', serviceFeeMinCents: -5, serviceFeeActiveFrom: AKTIV.serviceFeeActiveFrom }
-    expect(berechneServicegebuehr(2000, kaputt, BESTELLT)).toEqual({ gebuehrCents: 0, prozentAngewendet: 0 })
-    expect(berechneServicegebuehr(-100, AKTIV, BESTELLT).gebuehrCents).toBe(50)
+    expect(berechneServicegebuehr(2000, kaputt, BESTELLT, 'ONLINE')).toEqual({ gebuehrCents: 0, prozentAngewendet: 0 })
+    expect(berechneServicegebuehr(-100, AKTIV, BESTELLT, 'ONLINE').gebuehrCents).toBe(50)
   })
 })
 
@@ -140,7 +140,7 @@ describe('E4: Satz für neue Höfe 5 %, mind. 50 Cent, immer aufrunden (Gate 3.4
     [250, 50], // 12,5 → 13, Mindestgebühr hebt auf 50
     [1000, 50], // glatt 50
   ])('%i Cent Warenpreis → %i Cent Servicegebühr', (waren, gebuehr) => {
-    expect(berechneServicegebuehr(waren, FUENF, BESTELLT)).toEqual({
+    expect(berechneServicegebuehr(waren, FUENF, BESTELLT, 'ONLINE')).toEqual({
       gebuehrCents: gebuehr,
       prozentAngewendet: 5,
     })
@@ -148,21 +148,21 @@ describe('E4: Satz für neue Höfe 5 %, mind. 50 Cent, immer aufrunden (Gate 3.4
 
   it('der Satz aus der Datenbank (Decimal „5.00") rechnet genauso', () => {
     const decimal = { ...FUENF, serviceFeePercent: { toString: () => '5.00' } }
-    expect(berechneServicegebuehr(1030, decimal, BESTELLT).gebuehrCents).toBe(52)
-    expect(berechneServicegebuehr(1001, decimal, BESTELLT).gebuehrCents).toBe(51)
+    expect(berechneServicegebuehr(1030, decimal, BESTELLT, 'ONLINE').gebuehrCents).toBe(52)
+    expect(berechneServicegebuehr(1001, decimal, BESTELLT, 'ONLINE').gebuehrCents).toBe(51)
   })
 })
 
 describe('Snapshot: bestellSummen liest nur die Bestellung', () => {
   it('Hofeinstellung nach der Bestellung ändern → Summen der Bestellung unverändert', () => {
     // Bestellung zur Zeit der Einstellung A angelegt und eingefroren:
-    const zurBestellzeit = berechneServicegebuehr(2000, AKTIV, BESTELLT)
+    const zurBestellzeit = berechneServicegebuehr(2000, AKTIV, BESTELLT, 'ONLINE')
     const bestellung = { totalAmount: { toString: () => '20.00' }, serviceFeeCents: zurBestellzeit.gebuehrCents }
     const vorher = bestellSummen(bestellung)
 
     // Der Betreiber stellt den Hof um — auf 10 %, 2 € Mindestgebühr:
     const einstellungB = { serviceFeePercent: 10, serviceFeeMinCents: 200, serviceFeeActiveFrom: AKTIV.serviceFeeActiveFrom }
-    expect(berechneServicegebuehr(2000, einstellungB, BESTELLT).gebuehrCents).toBe(200)
+    expect(berechneServicegebuehr(2000, einstellungB, BESTELLT, 'ONLINE').gebuehrCents).toBe(200)
 
     // Die Bestellung kennt nur ihren Snapshot — nichts an ihr hat sich geändert:
     expect(bestellSummen(bestellung)).toEqual(vorher)
@@ -233,8 +233,8 @@ describe('„Gebühr gilt ab" in Wiener Ortszeit', () => {
     const einstellung = { ...AKTIV, serviceFeeActiveFrom: wienerMitternacht('2026-10-01')! }
     const vorher = new Date('2026-09-30T21:30:00.000Z') // 23:30 Wien am 30.9.
     const nachher = new Date('2026-09-30T22:30:00.000Z') // 00:30 Wien am 1.10.
-    expect(berechneServicegebuehr(2000, einstellung, vorher).gebuehrCents).toBe(0)
-    expect(berechneServicegebuehr(2000, einstellung, nachher).gebuehrCents).toBe(98)
+    expect(berechneServicegebuehr(2000, einstellung, vorher, 'ONLINE').gebuehrCents).toBe(0)
+    expect(berechneServicegebuehr(2000, einstellung, nachher, 'ONLINE').gebuehrCents).toBe(98)
   })
 })
 

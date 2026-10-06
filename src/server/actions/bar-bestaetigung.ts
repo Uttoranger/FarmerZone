@@ -106,6 +106,8 @@ export async function bestaetigeBarBestellung(_vorher: BarAktionStand, formular:
     customerPhone: order.customerPhone,
     totalAmount: order.totalAmount,
     serviceFeeCents: order.serviceFeeCents,
+    // Für den Hinweis „bei Barzahlung bis … keine Servicegebühr" in der Mail an den Hof (B1).
+    createdAt: order.createdAt,
     pickupDate: order.pickupDate,
     pickupTimeStart: order.pickupTimeStart,
     pickupTimeEnd: order.pickupTimeEnd,

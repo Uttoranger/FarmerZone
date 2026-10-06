@@ -7,7 +7,7 @@
  * Connect, „Nicht abgeholt" in servicegebuehr-Sprint, Pausieren über
  * Farm.isPaused) — keine Zusage darüber hinaus.
  */
-import { SERVICEGEBUEHR_SATZ_TEXT } from '@/lib/konditionen'
+import { BAR_OHNE_GEBUEHR_SATZ, SERVICEGEBUEHR_SATZ_TEXT } from '@/lib/konditionen'
 
 export type Vorteil = { titel: string; text: string; kurz: string }
 
@@ -75,7 +75,7 @@ export const FUER_HOEFE_FRAGEN: readonly Frage[] = [
     frage: 'Wie kommt das Geld zu mir?',
     antwort:
       'Online-Zahlungen laufen über Stripe und kommen direkt auf dein Konto. Barzahlungen kassierst du bei der ' +
-      `Abholung selbst. Die Servicegebühr von ${SERVICEGEBUEHR_SATZ_TEXT} zahlt der Kunde zusätzlich.`,
+      `Abholung selbst. Die Servicegebühr von ${SERVICEGEBUEHR_SATZ_TEXT} zahlt der Kunde zusätzlich. ${BAR_OHNE_GEBUEHR_SATZ}`,
   },
   {
     frage: 'Was, wenn ein Kunde nicht abholt?',
