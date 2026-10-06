@@ -104,6 +104,7 @@ Jeder Screen liefert vier Zustände:
 - **Reichweite prüfen, bevor die Datei entsteht.** Next.js nimmt die nächstgelegene `loading.tsx` nach oben; eine im Wurzelsegment gilt auch für `/login`, `/admin` und `/account`. Eine Ladeansicht gehört deshalb in das Segment, dessen Form sie zeigt, nie höher.
 - **Die Kopfleiste gehört ins Skeleton.** Kundenseiten rendern sie selbst (es gibt kein `(public)/layout.tsx`), also fehlt sie während des Ladens, wenn das Skeleton sie nicht mitbringt: 56 px, ab `md` 64 px, `border-b border-border bg-card`.
 - **Gleiche Maße wie der fertige Inhalt**, von der echten Seite abgenommen — sonst springt sie beim Umschalten.
+- **Wartet nur ein Teil der Seite, wartet nur dieser Teil.** Eine Suspense-Grenze mit Skelett in der Form des Teils statt einer `loading.tsx` — vor allem, wo die Datei ins Wurzelsegment müsste (Startseite: Hofkarten hinter `HofKartenSkelett`, Kopf und Suche stehen sofort).
 - **Nur zeigen, was im wartenden Fall sicher da ist.** Bedingte Teile (Filter-Chips, Fotostreifen, Hinweisbänder) weglassen: Reservierter Platz, in den nichts einrückt, lässt den Inhalt nach oben springen. Maßstab ist der Fall, in dem wirklich gewartet wird — ein Zweig, der ohne Datenbankzugriff sofort antwortet (etwa die Bestellverfolgung mit ungültiger Signatur), zeigt das Skeleton kaum und entscheidet seine Form nicht.
 - **Die serverseitige Gestalt zeigen**, nicht die hydrierte. Wo ein Client-Teil erst nach der Hydration umbricht (`/hoefe`: Splitscreen ab `lg`), zeigt das Skeleton die schmale Form — sonst springt es zweimal.
 - **Farbstaffelung** wie in `src/app/(farmer)/loading.tsx`: `bg-border` für Überschriften, `bg-app-trough` für Zweitzeilen, `bg-app-chip` für leise Zeilen, `bg-muted` für Flächen. Ein `animate-pulse` auf dem Rahmen, `aria-busy="true"` dazu.
@@ -153,6 +154,7 @@ Umgesetzt in `src/components/shells/` (KundeShell, KundeFokusShell, HofShell, Ad
 ### Futtermittel und Brennmaterial
 
 - Unter jedem Futter: grünes Schild „Registrierter Futtermittelbetrieb · LFBIS <Nummer>" bzw. die jeweilige Nummer. Fehlt die nötige Registrierung für eine Größe, erscheint diese Größe beim Kunden nicht; im Formular trägt sie ein Schloss mit Begründung.
+- Werbung für Brennmaterial (das Band der Startseite) nur in der Saison Oktober bis März, Wiener Monat: `istBrennmaterialSaison` (`src/lib/brennmaterial-saison.ts`). Die Kategorie selbst (Chip, `/hoefe?kat=BRENNHOLZ`) bleibt das ganze Jahr auffindbar.
 - Brennmaterial nennt Holzart, Scheitlänge und Trocknung (Restfeuchte) immer sichtbar; Hackschnitzel Wassergehalt (W) und Körnung (P). Raummeter, Schüttraummeter und Festmeter werden beim ersten Vorkommen auf der Seite erklärt.
 
 ### Teilen

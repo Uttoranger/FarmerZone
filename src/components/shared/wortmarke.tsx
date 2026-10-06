@@ -1,15 +1,14 @@
 /**
  * Bildmarke und „FarmerZone" — für die Kopfzeile der Kundenseiten.
  *
- * Dieselbe Marke steht in landing-nav.tsx; die Startseite behält ihre Leiste
- * bewusst unverändert, deshalb dort nicht auf diese Komponente umgestellt.
+ * Auch die KundeShell und der Fuß der Startseite zeigen sie.
  */
 export function Wortmarke() {
   return (
     <span className="flex min-w-0 items-center gap-2">
       {/* Die Bildmarke behält ihre Farben in beiden Modi — ein Logo, das je
           nach Einstellung anders aussieht, ist kein Logo mehr. Der helle Kreis
-          trägt sich auf dunklem Grund wie ein Aufkleber (wie landing-nav.tsx). */}
+          trägt sich auf dunklem Grund wie ein Aufkleber. */}
       <svg width="32" height="32" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <circle cx="40" cy="40" r="40" fill="#E8F0E8" />
         <path

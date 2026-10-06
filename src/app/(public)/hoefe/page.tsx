@@ -1,7 +1,5 @@
 import type { Metadata } from 'next'
-import { unstable_cache } from 'next/cache'
-import { getOeffentlicheHoefe } from '@/server/queries/farm'
-import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
+import { ladeOeffentlicheHoefe } from '@/server/queries/oeffentliche-hoefe'
 import { HoefeClient } from '@/components/hoefe/hoefe-client'
 import { KundenKopf } from '@/components/shared/kunden-kopf'
 
@@ -15,24 +13,15 @@ export const metadata: Metadata = {
 // (src/schemas/hoefe-filter.ts), und ein geteilter Link soll schon im
 // Server-HTML so aussehen, wie er gemeint ist — nicht erst nach der
 // Hydration. Die HOFDATEN bleiben trotzdem fünf Minuten gecacht (wie vorher
-// mit revalidate = 300): Gefiltert wird im Browser auf demselben Datensatz,
-// jeder Aufruf kostet also keine Datenbankabfrage.
+// mit revalidate = 300, src/server/queries/oeffentliche-hoefe.ts — derselbe
+// Eintrag wie auf der Startseite): Gefiltert wird im Browser auf demselben
+// Datensatz, jeder Aufruf kostet also keine Datenbankabfrage.
 // BEWUSST IN KAUF GENOMMEN: Auch die „Heute/Morgen"-Angabe der nächsten
 // Abholung wird mit den Daten gecacht und altert höchstens fünf Minuten.
 export const dynamic = 'force-dynamic'
 
-// `tags` ist nicht Zierde: OHNE Etikett gibt es keinen Weg, diesen Eintrag
-// vorzeitig zu leeren — `revalidatePath` erreicht einen Dateneintrag nicht, und
-// `updateTag`/`revalidateTag` brauchen ein Etikett. Genau deshalb blieb ein
-// ausgeblendetes Produkt hier bis zu fünf Minuten stehen, obwohl die
-// Produktaktionen längst revalidierten (Sprint Sichtbarkeits-Schalter).
-const ladeHoefe = unstable_cache(() => getOeffentlicheHoefe(), [HOEFE_CACHE_TAG], {
-  revalidate: 300,
-  tags: [HOEFE_CACHE_TAG],
-})
-
 export default async function HoefePage() {
-  const hoefe = await ladeHoefe()
+  const hoefe = await ladeOeffentlicheHoefe()
 
   return (
     <div className="min-h-screen bg-background">

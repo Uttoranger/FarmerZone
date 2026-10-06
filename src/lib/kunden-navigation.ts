@@ -42,11 +42,10 @@ export type KundenNavPunkt = {
 
 const ENTDECKEN: KundenNavPunkt = { id: 'entdecken', label: 'Höfe entdecken', kurz: 'Entdecken', href: '/hoefe' }
 
-// Sprungmarken auf die Startseite, wie im Bestand (kunden-menue.ts). „So
-// funktioniert’s" bekommt seine Marke mit dem Umbau der Startseite (Nr. 07);
-// bis dahin landet der Link oben auf der Startseite, nicht im Leeren.
+// Sprungmarken auf die Abschnitte der Startseite (src/components/startseite/
+// startseite-abschnitte.tsx: SoFunktionierts und FuerHoefeBand tragen sie).
 const SO_GEHTS: KundenNavPunkt = { id: 'so-gehts', label: 'So funktioniert’s', href: '/#so-funktionierts' }
-const FUER_HOEFE: KundenNavPunkt = { id: 'fuer-hoefe', label: 'Für Höfe', href: '/#weiter' }
+const FUER_HOEFE: KundenNavPunkt = { id: 'fuer-hoefe', label: 'Für Höfe', href: '/#fuer-hoefe' }
 
 const ANMELDEN: KundenNavPunkt = { id: 'anmelden', label: 'Anmelden', href: '/account/login' }
 const KONTO: KundenNavPunkt = { id: 'konto', label: 'Mein Konto', href: '/account/profile' }
@@ -116,4 +115,14 @@ export function kundenAriaAktuell(pfad: string, punkt: KundenNavPunkt): 'page' |
   if (kundenAktiverPunkt(pfad) !== punkt.id) return undefined
   if (pfad !== punkt.href && !pfad.startsWith(punkt.href + '/')) return undefined
   return pfad === punkt.href ? 'page' : 'true'
+}
+
+/**
+ * Ob eine Sitzung für die KundeShell als „angemeldet" zählt: nur die
+ * freiwillige Kunden-Anmeldung (Rolle CUSTOMER, /account/login). Ein Hof, der
+ * im Bauern-Bereich angemeldet ist, bekäme sonst „Mein Konto" mit den
+ * Kunden-Abos angeboten — für ihn bleibt die Kundenseite die abgemeldete.
+ */
+export function istKundensitzung(nutzer: { role?: string | null } | null | undefined): boolean {
+  return nutzer?.role === 'CUSTOMER'
 }

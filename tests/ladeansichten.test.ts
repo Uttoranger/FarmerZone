@@ -182,21 +182,26 @@ describe('Ladeansichten — jede öffentliche Route, die auf Daten wartet, zeigt
   })
 })
 
-describe('Startseite — bewusst OHNE eigene Ladeansicht', () => {
+describe('Startseite — bewusst OHNE src/app/loading.tsx', () => {
   it('hat kein src/app/loading.tsx', () => {
-    // Zwei Gründe, beide nachgeprüft:
-    // 1. HomePage ist synchron und holt keine Daten — es gibt nichts zu warten.
-    // 2. Eine Datei im Wurzelsegment wäre der Fallback für JEDE Route ohne
-    //    nähere Ladeansicht, auch /login, /admin und /account. Die sähen dann
-    //    das Startseiten-Skeleton samt Landing-Navigation.
+    // Eine Datei im Wurzelsegment wäre der Fallback für JEDE Route ohne
+    // nähere Ladeansicht, auch /login, /admin und /account. Die sähen dann
+    // das Startseiten-Skeleton.
     expect(existiert('src/app/loading.tsx')).toBe(false)
   })
 
-  it('bleibt synchron — sonst braucht sie doch eine', () => {
-    // Stolperdraht: Wird die Startseite eines Tages async (Höfe aus der
-    // Datenbank, Zahlen), fällt dieser Test und erinnert daran, dass dann
-    // auch eine Ladeansicht dazugehört — mit einem Blick auf die Reichweite.
-    expect(liesDatei('src/app/page.tsx')).toMatch(/export default function HomePage\(/)
+  it('wartet auf nichts — die Seite ist statisch, die Höfe laden hinter Suspense mit eigenem Skelett', () => {
+    // Seit der Nachbesserung zu Nr. 07 ist die Startseite wieder statisch
+    // (ISR, revalidate = 300): Die Sitzung für die Kopfzeile liest
+    // KundeShellMitSitzung im Browser, die Höfe kommen aus dem Cache. Die
+    // Ladeansicht ist die Suspense-Grenze um die Hofkarten (Skelett in
+    // Kartenform), nicht eine Datei im Wurzelsegment. Wer auf der Seite ein
+    // await einführt, sieht hier, dass sie dafür nicht gebaut ist.
+    const seite = liesDatei('src/app/page.tsx')
+    const komponente = seite.slice(seite.indexOf('export default function HomePage('))
+    expect(komponente.length).toBeLessThan(seite.length)
+    expect(komponente).not.toMatch(/\bawait\b/)
+    expect(komponente).toMatch(/<Suspense fallback=\{<HofKartenSkelett \/>\}>/)
   })
 })
 

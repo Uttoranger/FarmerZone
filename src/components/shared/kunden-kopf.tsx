@@ -22,7 +22,8 @@ export const SPRUNGZIEL_UNTER_KOPF = 'scroll-mt-[6.5rem] md:scroll-mt-28'
 export const SPRUNGZIEL_OHNE_KOPF = 'scroll-mt-14'
 
 /**
- * Die Kopfzeile aller Kundenseiten außer der Startseite (die hat LandingNav).
+ * Die Kopfzeile aller Kundenseiten, die noch nicht in die KundeShell umgezogen
+ * sind (die Startseite ist es seit Nr. 07).
  * Was sie zeigt und wohin „Zurück" führt, entscheidet src/lib/kunden-kopf.ts,
  * die Menüpunkte src/lib/kunden-menue.ts.
  *
@@ -118,8 +119,8 @@ export function KundenKopf({
             </Link>
           </nav>
           <div className="flex items-center gap-5">
-            {/* Wie auf der Startseite: ein Wort, ein Ziel (landing-nav.tsx). */}
-            <Link href="/#weiter" className={`${TEXTLINK} ${FOKUS}`}>
+            {/* Ein Wort, ein Ziel: das Band „Für Höfe" der Startseite (id="fuer-hoefe"). */}
+            <Link href="/#fuer-hoefe" className={`${TEXTLINK} ${FOKUS}`}>
               Für Höfe
             </Link>
             <Link

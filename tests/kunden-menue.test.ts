@@ -11,7 +11,7 @@ describe('MENUE_PUNKTE — die Wege des Menüs', () => {
       ['Startseite', '/'],
       ['Hofladen entdecken', '/hoefe'],
       ['Heu & Futter finden', '/hoefe?bereich=futter'],
-      ['Für Höfe', '/#weiter'],
+      ['Für Höfe', '/#fuer-hoefe'],
       ['Hofbetreiber-Login', '/login'],
       ['Problem melden', '/problem-melden'],
     ])
