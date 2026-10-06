@@ -128,9 +128,9 @@ Wie geplant **18** Produkte und „Was legst du an?" und **19** Bestellungen, St
 ## 9. Lauf 5 (06.10.2026, uttoranger)
 
 - **Haltepunkt: 22f.**
-- **Reihenfolge:** 19a → 19b → 22a → 22b → 22d → 22e → 20 → 21 → 22c → 22f.
+- **Reihenfolge:** 19c → 19a → 19b → 22a → 22b → 22d → 22e → 20 → 21 → 22c → 22f. 19c steht vor 19a, weil beide dieselbe Geldlogik berühren.
 - Entscheidungen dazu: Register `docs/entscheidungen.md` (B1, E3, E9, E10, E11, E12, E13, K1).
-- **Basis:** #188 (Nr. 19) ist beim Schreiben noch offen (Entwurf). Ist er beim Start gemergt, zweigt 19a von `main` ab. Sonst wird auf #188 gestapelt, weil 19a dieselben Geldstellen berührt (Artikel fehlt).
+- **Basis:** #188 (Nr. 19) ist gemergt, ohne die vier offenen Punkte aus Morgenbericht Lauf 4 §4. Deshalb kommt zuerst 19c. Das erste Gate zweigt von `main` ab.
 - **Migrationen:** Braucht eine Nummer eine, gilt Regel 3 in `docs/nachtlauf.md`: nur Expand, und im Morgenbericht hervorheben.
 - **Offen und NICHT anfassen:**
   - Wortwahl „Entwurf"/„Nicht im Shop";
@@ -139,6 +139,13 @@ Wie geplant **18** Produkte und „Was legst du an?" und **19** Bestellungen, St
   - Fehler-Token (O1);
   - S11 (O3);
   - Rückruf (O5).
+
+### 19c Geldpfad „Artikel fehlt" nachziehen (Morgenbericht Lauf 4 §4)
+- Rest-Storno: bezahlten Betrag aus Stripe (`latest_charge.amount`) statt aus der Datenbank; bei Abweichung nichts buchen, Sentry.
+- Sentry-Anweisung im Rest-Pfad korrekt formulieren (Teil-, nicht Vollerstattung).
+- Hof-Text „manuell über das Stripe Dashboard erstatten" ersetzen durch „Wir kümmern uns um die Erstattung und melden uns." plus Meldung an den Admin.
+- Webhook für `refund.failed` / `charge.refund.updated`: gescheiterte Erstattung zurücknehmen und melden.
+- Test für `restNachTeilerstattung` mit Provision > 0.
 
 ### 19a B1 – Bargebühr bis Stichtag
 - `berechneServicegebuehr` bekommt die Zahlungsart: `ONSITE_CASH` vor `BAR_SERVICEGEBUEHR_AB` → 0; online immer nach bestehender Regel. Konstante neben `TARIFE_AB`, Standard = `TARIFE_AB`.
