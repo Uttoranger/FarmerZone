@@ -3,17 +3,19 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Bell, Phone, Search, Users } from 'lucide-react'
+import { ArrowDownWideNarrow, ArrowUpNarrowWide, Bell, Phone, Search, Users } from 'lucide-react'
 import type { CustomerSummary } from '@/server/queries/customers'
 import {
   KUNDEN_FILTER_LABEL,
   KUNDEN_SORTIERUNG_LABEL,
   ZURUECKHOLEN_AB,
+  andereRichtung,
   filtereKunden,
   initialen,
   kundenAdresse,
   kundenKopfzeile,
   kundenMarke,
+  richtungText,
   sortiereKunden,
   vorTagenText,
   zaehleKundenFilter,
@@ -34,7 +36,7 @@ import { cn } from '@/lib/utils'
  * Kunden des Hofs in der HofShell (Gate 8 „Code ohne Mockup", Nachtlauf
  * Nr. 22a) — gebaut nach docs/ai/DESIGN_SYSTEM.md, Abschnitt „Kunden".
  * Ab 1024 px eine Tabelle, darunter Zeilen; Filter, Suche und Sortierung
- * stehen in der Adresse (?filter=, ?suche=, ?sortierung=) und werden im
+ * stehen in der Adresse (?filter=, ?suche=, ?sortierung=, ?richtung=) und werden im
  * Browser angewandt (replaceState, kein Server-Aufruf je Tipp). Was eine
  * Zeile sagt, entscheidet src/lib/hof-kunden.ts; hier wird nur angeordnet.
  */
@@ -51,7 +53,7 @@ export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.
   // Die Suche tippt lokal (Leerzeichen am Ende bleiben stehen); die Adresse bekommt sie bereinigt mit.
   const [suche, setSuche] = useState(ansicht.suche)
   const zahlen = zaehleKundenFilter(kunden)
-  const liste = sortiereKunden(filtereKunden(kunden, { filter: ansicht.filter, suche }), ansicht.sortierung)
+  const liste = sortiereKunden(filtereKunden(kunden, { filter: ansicht.filter, suche }), ansicht.sortierung, ansicht.richtung)
   const aktuell: Ansicht = { ...ansicht, suche }
 
   return (
@@ -121,26 +123,47 @@ export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.
             <p className={cn('text-[13px]', LEISE)} aria-live="polite">
               {mitAnzahl(liste.length, 'Kunde', 'Kunden')}
             </p>
-            <label className="flex items-center gap-2 text-[13px]">
-              <span className={LEISE}>Sortieren nach</span>
-              <select
-                value={ansicht.sortierung}
-                onChange={(e) => {
-                  const sortierung = kundenAnsichtSchema.shape.sortierung.parse(e.target.value)
-                  schreibeAdresse(kundenAdresse({ ...aktuell, sortierung }))
-                }}
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-2 text-[13px]">
+                <span className={LEISE}>Sortieren nach</span>
+                <select
+                  value={ansicht.sortierung}
+                  onChange={(e) => {
+                    const sortierung = kundenAnsichtSchema.shape.sortierung.parse(e.target.value)
+                    // Neue Sortierung beginnt in ihrer Standardrichtung (Name A–Z, sonst das Größte zuerst).
+                    schreibeAdresse(kundenAdresse({ ...aktuell, sortierung, richtung: undefined }))
+                  }}
+                  className={cn(
+                    'h-11 rounded-full border border-border bg-card px-4 text-base font-medium text-foreground md:h-9 md:text-[13px]',
+                    FOKUS_RAHMEN
+                  )}
+                >
+                  {KUNDEN_SORTIERUNG_WERTE.map((s) => (
+                    <option key={s} value={s}>
+                      {KUNDEN_SORTIERUNG_LABEL[s]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {/* Ein Knopf, kein Link: Die Richtung ist Seitenzustand neben der Auswahl;
+                  die Adresse bekommt sie trotzdem mit (Neuladen, Teilen). */}
+              <button
+                type="button"
+                onClick={() => schreibeAdresse(kundenAdresse({ ...aktuell, richtung: andereRichtung(ansicht.richtung) }))}
                 className={cn(
-                  'h-11 rounded-full border border-border bg-card px-4 text-base font-medium text-foreground md:h-9 md:text-[13px]',
+                  'inline-flex h-11 items-center gap-1.5 rounded-full border border-border bg-card px-4 text-base font-medium whitespace-nowrap text-foreground hover:bg-muted md:h-9 md:text-[13px]',
                   FOKUS_RAHMEN
                 )}
               >
-                {KUNDEN_SORTIERUNG_WERTE.map((s) => (
-                  <option key={s} value={s}>
-                    {KUNDEN_SORTIERUNG_LABEL[s]}
-                  </option>
-                ))}
-              </select>
-            </label>
+                {ansicht.richtung === 'auf' ? (
+                  <ArrowUpNarrowWide className="size-4" strokeWidth={1.7} aria-hidden="true" />
+                ) : (
+                  <ArrowDownWideNarrow className="size-4" strokeWidth={1.7} aria-hidden="true" />
+                )}
+                {richtungText(ansicht.sortierung, ansicht.richtung)}
+                <span className="sr-only"> – Reihenfolge umkehren</span>
+              </button>
+            </div>
           </div>
 
           {liste.length === 0 ? (
@@ -155,7 +178,7 @@ export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.
                   onNavigate={(e) => {
                     e.preventDefault()
                     setSuche('')
-                    schreibeAdresse(kundenAdresse({ filter: 'alle', suche: '', sortierung: ansicht.sortierung }))
+                    schreibeAdresse(kundenAdresse({ filter: 'alle', suche: '', sortierung: ansicht.sortierung, richtung: ansicht.richtung }))
                   }}
                   className={KNOPF_RAHMEN}
                 >
@@ -176,12 +199,12 @@ export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.
               titel="Tipp"
               aktion={
                 <Link
-                  href={kundenAdresse({ filter: 'lange', suche: '', sortierung: ansicht.sortierung })}
+                  href={kundenAdresse({ filter: 'lange', suche: '', sortierung: ansicht.sortierung, richtung: ansicht.richtung })}
                   prefetch={false}
                   onNavigate={(e) => {
                     e.preventDefault()
                     setSuche('')
-                    schreibeAdresse(kundenAdresse({ filter: 'lange', suche: '', sortierung: ansicht.sortierung }))
+                    schreibeAdresse(kundenAdresse({ filter: 'lange', suche: '', sortierung: ansicht.sortierung, richtung: ansicht.richtung }))
                   }}
                   className={KNOPF_RAHMEN}
                 >
@@ -225,10 +248,12 @@ function Neuigkeiten({ an }: { an: boolean }): React.JSX.Element | null {
 }
 
 function Anrufen({ kunde, klassen }: { kunde: CustomerSummary; klassen?: string }): React.JSX.Element | null {
-  if (!kunde.customerPhone) return null
+  // Wie im Detail: Ein Telefon aus Leerzeichen ist keins.
+  const telefon = kunde.customerPhone.trim()
+  if (!telefon) return null
   return (
     <a
-      href={`tel:${kunde.customerPhone}`}
+      href={`tel:${telefon}`}
       aria-label={`${kunde.customerName} anrufen`}
       className={cn('inline-flex size-11 shrink-0 items-center justify-center rounded-full text-foreground hover:bg-muted', FOKUS_RAHMEN, klassen)}
     >
@@ -336,7 +361,7 @@ function Zeilen({ kunden }: { kunden: CustomerSummary[] }): React.JSX.Element {
                 )}
               </span>
             </Link>
-            {k.customerPhone ? <Anrufen kunde={k} /> : <span aria-hidden="true" className="size-11 shrink-0" />}
+            {k.customerPhone.trim() ? <Anrufen kunde={k} /> : <span aria-hidden="true" className="size-11 shrink-0" />}
           </li>
         )
       })}

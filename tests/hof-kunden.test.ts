@@ -42,7 +42,7 @@ vi.mock('next/link', () => ({
 
 const db = vi.hoisted(() => ({
   order: { findMany: vi.fn() },
-  customerFarmSubscription: { findMany: vi.fn(), findFirst: vi.fn() },
+  customerFarmSubscription: { findMany: vi.fn() },
 }))
 vi.mock('@/lib/prisma', () => ({ prisma: db }))
 
@@ -55,6 +55,8 @@ import {
   kundenMarke,
   kundenSchluessel,
   kundenStatus,
+  andereRichtung,
+  richtungText,
   kundeSeitText,
   passtZurKundenSuche,
   sortiereKunden,
@@ -280,14 +282,43 @@ describe('Filter, Suche, Sortierung', () => {
     expect(LISTE[0].customerName).toBe('Zita Beispiel')
   })
 
+  it('jede Sortierung in beide Richtungen: wenigste Bestellungen, niedrigster Umsatz, am längsten her, Z bis A, älteste zuerst', () => {
+    const namen = (s: Parameters<typeof sortiereKunden>[1], r: 'auf' | 'ab') => sortiereKunden(LISTE, s, r).map((k) => k.customerName.split(' ')[0])
+    expect(namen('bestellungen', 'auf')).toEqual(['Anton', 'Berta', 'Zita'])
+    expect(namen('umsatz', 'auf')).toEqual(['Berta', 'Zita', 'Anton'])
+    expect(namen('zuletzt', 'auf')).toEqual(['Berta', 'Zita', 'Anton'])
+    expect(namen('name', 'ab')).toEqual(['Zita', 'Berta', 'Anton'])
+    expect(namen('neueste', 'auf')).toEqual(['Zita', 'Berta', 'Anton'])
+    // Ohne Richtung die Standardrichtung — dieselbe wie ausdrücklich genannt.
+    expect(namen('name', 'auf')).toEqual(sortiereKunden(LISTE, 'name').map((k) => k.customerName.split(' ')[0]))
+    expect(namen('umsatz', 'ab')).toEqual(sortiereKunden(LISTE, 'umsatz').map((k) => k.customerName.split(' ')[0]))
+  })
+
+  it('die Richtung heißt je Sortierung, was sie tut', () => {
+    expect(richtungText('bestellungen', 'auf')).toBe('Wenigste zuerst')
+    expect(richtungText('umsatz', 'auf')).toBe('Niedrigster zuerst')
+    expect(richtungText('zuletzt', 'auf')).toBe('Am längsten her zuerst')
+    expect(richtungText('name', 'ab')).toBe('Z bis A')
+    expect(richtungText('name', 'auf')).toBe('A bis Z')
+    expect(andereRichtung('auf')).toBe('ab')
+    expect(andereRichtung('ab')).toBe('auf')
+  })
+
   it('Adresse ohne Standardwerte, Suche bereinigt', () => {
     expect(kundenAdresse({ filter: 'alle', suche: '', sortierung: 'bestellungen' })).toBe('/customers')
     expect(kundenAdresse({ filter: 'lange', suche: '  anna ', sortierung: 'umsatz' })).toBe('/customers?filter=lange&suche=anna&sortierung=umsatz')
+    // Die Richtung nur, wenn sie von der Standardrichtung der Sortierung abweicht.
+    expect(kundenAdresse({ filter: 'alle', suche: '', sortierung: 'umsatz', richtung: 'ab' })).toBe('/customers?sortierung=umsatz')
+    expect(kundenAdresse({ filter: 'alle', suche: '', sortierung: 'umsatz', richtung: 'auf' })).toBe('/customers?sortierung=umsatz&richtung=auf')
+    expect(kundenAdresse({ filter: 'alle', suche: '', sortierung: 'name', richtung: 'auf' })).toBe('/customers?sortierung=name')
+    expect(kundenAdresse({ filter: 'alle', suche: '', sortierung: 'name', richtung: 'ab' })).toBe('/customers?sortierung=name&richtung=ab')
   })
 
   it('Schema: Unbekanntes fällt still auf den Standard, eine überlange Suche auf leer', () => {
-    expect(kundenAnsichtAus(new URLSearchParams('filter=neu&suche=%20erika%20&sortierung=name'))).toEqual({ filter: 'neu', suche: 'erika', sortierung: 'name' })
-    expect(kundenAnsichtAus(new URLSearchParams('filter=quatsch&sortierung=x'))).toEqual({ filter: 'alle', suche: '', sortierung: 'bestellungen' })
+    expect(kundenAnsichtAus(new URLSearchParams('filter=neu&suche=%20erika%20&sortierung=name'))).toEqual({ filter: 'neu', suche: 'erika', sortierung: 'name', richtung: 'auf' })
+    expect(kundenAnsichtAus(new URLSearchParams('filter=quatsch&sortierung=x'))).toEqual({ filter: 'alle', suche: '', sortierung: 'bestellungen', richtung: 'ab' })
+    expect(kundenAnsichtAus(new URLSearchParams('sortierung=umsatz&richtung=auf')).richtung).toBe('auf')
+    expect(kundenAnsichtAus(new URLSearchParams('sortierung=umsatz&richtung=quer')).richtung).toBe('ab')
     expect(kundenAnsichtAus(new URLSearchParams(`suche=${'a'.repeat(300)}`)).suche).toBe('')
   })
 
@@ -303,7 +334,6 @@ describe('Abfragen nur für den eigenen Hof', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     db.customerFarmSubscription.findMany.mockResolvedValue([])
-    db.customerFarmSubscription.findFirst.mockResolvedValue(null)
   })
 
   const zeile = (teil: Record<string, unknown>) => ({
@@ -347,15 +377,20 @@ describe('Abfragen nur für den eigenen Hof', () => {
     expect(await findeKundenAdressen('hof-a', kundeIdFuer('hof-a', 'erika@example.com'))).toEqual(['erika@example.com', 'Erika@example.com '])
   })
 
-  it('Detail: genaue Schreibweisen statt ILIKE, Abo mit maskiertem Muster, beides mit farmId', async () => {
+  it('Detail: genaue Schreibweisen statt ILIKE, Abo nach derselben Regel wie die Liste, beides mit farmId', async () => {
     db.order.findMany.mockResolvedValue([zeile({ customerEmail: 'a_b@example.com' })])
+    db.customerFarmSubscription.findMany.mockResolvedValue([
+      { customerEmail: 'axb@example.com', optInEmail: true, optInWhatsApp: true },
+      { customerEmail: ' A_B@Example.com ', optInEmail: false, optInWhatsApp: true },
+    ])
     const detail = await getCustomerDetail('hof-a', ['a_b@example.com', 'A_B@example.com'])
 
     const abfrage = db.order.findMany.mock.calls[0][0]
     expect(abfrage.where).toEqual({ farmId: 'hof-a', customerEmail: { in: ['a_b@example.com', 'A_B@example.com'] } })
     expect(abfrage.select.items.where).toEqual({ fehltSeit: null })
-    const abo = db.customerFarmSubscription.findFirst.mock.calls[0][0].where
-    expect(abo).toEqual({ farmId: 'hof-a', customerEmail: { equals: 'a\\_b@example.com', mode: 'insensitive' } })
+    expect(db.customerFarmSubscription.findMany.mock.calls[0][0].where).toEqual({ farmId: 'hof-a' })
+    // Klein und ohne Rand zugeordnet — „axb" ist nicht „a_b".
+    expect(detail?.subscription).toEqual({ optInEmail: false, optInWhatsApp: true })
     expect(detail?.recentOrders[0].betragCents).toBe(1999)
     expect(detail?.umsatzCents).toBe(1999)
   })
@@ -409,6 +444,27 @@ describe('Ansicht /customers — vier Zustände, lange Namen, Tokens', () => {
     expect(html).toContain('bekommt Neuigkeiten')
     expect(html).toContain('€ 90,00')
     expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgb\(|green-|amber-|purple-|blue-/)
+  })
+
+  it('Sortierung: Auswahl ohne Richtung, Umschalter nennt die Richtung; ?richtung=auf kehrt die Liste um', () => {
+    const ab = renderToStaticMarkup(createElement(KundenAnsicht, { kunden: LISTE }))
+    expect(ab).toContain('Anzahl Bestellungen')
+    expect(ab).toContain('Meiste zuerst')
+    expect(ab).toContain('Reihenfolge umkehren')
+    expect(ab).toContain('lucide-arrow-down-wide-narrow')
+    navigation.parameter = 'richtung=auf'
+    const auf = renderToStaticMarkup(createElement(KundenAnsicht, { kunden: LISTE }))
+    expect(auf).toContain('Wenigste zuerst')
+    expect(auf).toContain('lucide-arrow-up-narrow-wide')
+    const reihenfolge = (html: string) => [...html.matchAll(/<table[\s\S]*?<\/table>/g)][0][0].match(/href="\/customers\/([a-z])/g)
+    expect(reihenfolge(ab)).toEqual(['href="/customers/a', 'href="/customers/c', 'href="/customers/b'])
+    expect(reihenfolge(auf)).toEqual(['href="/customers/b', 'href="/customers/c', 'href="/customers/a'])
+  })
+
+  it('ein Telefon aus Leerzeichen ist keins — kein Anrufen-Link', () => {
+    const html = renderToStaticMarkup(createElement(KundenAnsicht, { kunden: [kunde({ kundeId: 'eeeeeeeeeeeeeeee', customerPhone: '   ' })] }))
+    expect(html).not.toContain('href="tel:')
+    expect(html).not.toContain('anrufen"')
   })
 
   it('Tipp ab drei Kundinnen, die lange nicht bestellt haben — mit Weg zum Filter', () => {

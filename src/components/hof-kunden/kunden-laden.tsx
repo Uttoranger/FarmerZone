@@ -34,9 +34,12 @@ function ListeLaden(): React.JSX.Element {
         </div>
         <div className="h-11 w-full rounded-full bg-muted md:h-9 md:max-w-[340px] xl:w-[280px]" />
       </div>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="h-4 w-20 rounded bg-muted" />
-        <div className="h-11 w-60 rounded-full bg-muted md:h-9" />
+        <div className="flex gap-2">
+          <div className="h-11 w-60 rounded-full bg-muted md:h-9" />
+          <div className="h-11 w-36 rounded-full bg-muted md:h-9" />
+        </div>
       </div>
       <div className="hidden overflow-hidden rounded-2xl border border-border bg-card lg:block">
         <div className="h-9 border-b border-border" />

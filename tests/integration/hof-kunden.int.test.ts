@@ -127,6 +127,22 @@ describe('Kunden des Hofs — nur der eigene Hof', () => {
     expect(detail?.umsatzCents).toBe(2029)
   })
 
+  it('das Abo gehört in Liste und Detail derselben Kundin — klein und ohne Rand zugeordnet', async () => {
+    const { farm } = await erstelleHof()
+    const email = `${intKennung('kundin')}@example.com`
+    await bestelle(farm.id, email)
+    // Ein Abo aus der Zeit vor emailSchema: groß geschrieben, mit Rand.
+    await prisma.customerFarmSubscription.create({
+      data: { farmId: farm.id, customerEmail: ` ${email.toUpperCase()} `, optInEmail: false, optInWhatsApp: true },
+    })
+
+    const [kundin] = await getCustomersForFarm(farm.id)
+    expect(kundin.isSubscribed).toBe(true)
+    const detail = await getCustomerDetail(farm.id, await findeKundenAdressen(farm.id, kundin.kundeId))
+    expect(detail?.isSubscribed).toBe(true)
+    expect(detail?.subscription).toEqual({ optInEmail: false, optInWhatsApp: true })
+  })
+
   it('fehlende Artikel zählen nicht als Lieblingsprodukt, Storno nicht als Umsatz', async () => {
     const { farm } = await erstelleHof()
     const email = `${intKennung('kundin')}@example.com`

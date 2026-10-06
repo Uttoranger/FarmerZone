@@ -2,7 +2,6 @@ import { prisma } from '@/lib/prisma'
 import { env } from '@/lib/env'
 import { kundeIdAus } from '@/lib/kunden-id'
 import { alsCents } from '@/lib/order-totals'
-import { genauesIlikeMuster } from '@/lib/ilike-muster'
 import { fasseKundinZusammen, kundenSchluessel, type KundenBestellung, type KundenZusammenfassung } from '@/lib/hof-kunden'
 
 /*
@@ -133,20 +132,24 @@ export async function getCustomerDetail(
   if (adressen.length === 0) return null
   const schluessel = kundenSchluessel(adressen[0])
 
-  const [orders, subscription] = await Promise.all([
+  const [orders, abos] = await Promise.all([
     prisma.order.findMany({
       where: { farmId, customerEmail: { in: [...adressen] } },
       select: { ...BESTELL_FELDER, id: true, orderNumber: true },
       orderBy: { createdAt: 'desc' },
     }),
-    // Abo-Adressen stehen klein; der Vergleich bleibt trotzdem ohne Platzhalter.
-    prisma.customerFarmSubscription.findFirst({
-      where: { farmId, customerEmail: { equals: genauesIlikeMuster(schluessel), mode: 'insensitive' } },
-      select: { optInEmail: true, optInWhatsApp: true },
+    // Dieselbe Zuordnung wie die Liste (kundenSchluessel: klein, ohne Rand) —
+    // im Code statt per ILIKE, das weder Rand noch Platzhalter richtig kennt.
+    // Abos eines Hofs sind höchstens so viele wie seine Kundinnen.
+    prisma.customerFarmSubscription.findMany({
+      where: { farmId },
+      select: { customerEmail: true, optInEmail: true, optInWhatsApp: true },
     }),
   ])
 
   if (orders.length === 0) return null
+  const abo = abos.find((a) => kundenSchluessel(a.customerEmail) === schluessel)
+  const subscription = abo ? { optInEmail: abo.optInEmail, optInWhatsApp: abo.optInWhatsApp } : null
 
   return {
     kundeId: kundeIdFuer(farmId, schluessel),
@@ -159,6 +162,6 @@ export async function getCustomerDetail(
       status: o.status,
       items: o.items,
     })),
-    subscription: subscription ?? null,
+    subscription,
   }
 }

@@ -9,7 +9,7 @@
  * keine Konto-Verknüpfung (`customerId` null). Geld in ganzen Cent
  * (CODING_STANDARDS §2); die Servergrenze wandelt Decimal einmal über alsCents.
  */
-import type { KundenFilter, KundenAnsicht, KundenSortierung } from '@/schemas/hof-kunden'
+import { STANDARD_RICHTUNG, type KundenFilter, type KundenAnsicht, type KundenRichtung, type KundenSortierung } from '@/schemas/hof-kunden'
 import { mitAnzahl } from '@/lib/format'
 
 /** Die Töne der StatusBadge (src/components/ui/status-badge.tsx). */
@@ -193,12 +193,30 @@ export const KUNDEN_FILTER_LABEL: Record<KundenFilter, string> = {
   neu: 'Neu',
 }
 
+/** Wonach sortiert wird — ohne Richtung; die nennt der Umschalter (`richtungText`). */
 export const KUNDEN_SORTIERUNG_LABEL: Record<KundenSortierung, string> = {
-  bestellungen: 'Häufigste Besteller',
-  umsatz: 'Höchster Umsatz',
+  bestellungen: 'Anzahl Bestellungen',
+  umsatz: 'Umsatz',
   zuletzt: 'Letzte Bestellung',
-  name: 'Alphabetisch',
-  neueste: 'Neueste Kunden',
+  name: 'Name',
+  neueste: 'Kunde seit',
+}
+
+const RICHTUNG_TEXT: Record<KundenSortierung, Record<KundenRichtung, string>> = {
+  bestellungen: { ab: 'Meiste zuerst', auf: 'Wenigste zuerst' },
+  umsatz: { ab: 'Höchster zuerst', auf: 'Niedrigster zuerst' },
+  zuletzt: { ab: 'Zuletzt bestellt zuerst', auf: 'Am längsten her zuerst' },
+  name: { auf: 'A bis Z', ab: 'Z bis A' },
+  neueste: { ab: 'Neueste zuerst', auf: 'Älteste zuerst' },
+}
+
+/** „Meiste zuerst", „Z bis A" — was die gewählte Richtung bei dieser Sortierung heißt. */
+export function richtungText(sortierung: KundenSortierung, richtung: KundenRichtung): string {
+  return RICHTUNG_TEXT[sortierung][richtung]
+}
+
+export function andereRichtung(richtung: KundenRichtung): KundenRichtung {
+  return richtung === 'auf' ? 'ab' : 'auf'
 }
 
 type FilterKunde = Pick<KundenZusammenfassung, 'isStammkunde' | 'isDiesenMonatAktiv' | 'isLangeNichtGesehen' | 'isNeu'>
@@ -242,31 +260,44 @@ export function filtereKunden<T extends FilterKunde & Pick<KundenZusammenfassung
 
 type SortierKunde = Pick<KundenZusammenfassung, 'orderCount' | 'umsatzCents' | 'lastOrderDate' | 'firstOrderDate' | 'customerName'>
 
-/** Eine sortierte Kopie — die Eingabe bleibt, wie sie ist. */
-export function sortiereKunden<T extends SortierKunde>(kunden: readonly T[], sortierung: KundenSortierung): T[] {
+/**
+ * Eine sortierte Kopie — die Eingabe bleibt, wie sie ist. Ohne Richtung die
+ * Standardrichtung der Sortierung (STANDARD_RICHTUNG). Gleichstand behält die
+ * Reihenfolge der Eingabe (sort ist stabil), in beiden Richtungen.
+ */
+export function sortiereKunden<T extends SortierKunde>(
+  kunden: readonly T[],
+  sortierung: KundenSortierung,
+  richtung: KundenRichtung = STANDARD_RICHTUNG[sortierung]
+): T[] {
   const zeit = (iso: string) => new Date(iso).getTime()
-  return [...kunden].sort((a, b) => {
+  const aufsteigend = (a: T, b: T): number => {
     switch (sortierung) {
       case 'umsatz':
-        return b.umsatzCents - a.umsatzCents
+        return a.umsatzCents - b.umsatzCents
       case 'zuletzt':
-        return zeit(b.lastOrderDate) - zeit(a.lastOrderDate)
+        return zeit(a.lastOrderDate) - zeit(b.lastOrderDate)
       case 'name':
         return a.customerName.localeCompare(b.customerName, 'de')
       case 'neueste':
-        return zeit(b.firstOrderDate) - zeit(a.firstOrderDate)
+        return zeit(a.firstOrderDate) - zeit(b.firstOrderDate)
       default:
-        return b.orderCount - a.orderCount
+        return a.orderCount - b.orderCount
     }
-  })
+  }
+  return [...kunden].sort((a, b) => (richtung === 'auf' ? aufsteigend(a, b) : aufsteigend(b, a)))
 }
 
-/** Die Adresse der Ansicht — Standardwerte bleiben draußen, die Suche bereinigt. */
-export function kundenAdresse(ansicht: KundenAnsicht): string {
+/**
+ * Die Adresse der Ansicht — Standardwerte bleiben draußen, die Suche bereinigt.
+ * Ohne Richtung gilt die Standardrichtung der Sortierung.
+ */
+export function kundenAdresse(ansicht: Omit<KundenAnsicht, 'richtung'> & { richtung?: KundenRichtung }): string {
   const parameter = new URLSearchParams()
   if (ansicht.filter !== 'alle') parameter.set('filter', ansicht.filter)
   if (ansicht.suche.trim()) parameter.set('suche', ansicht.suche.trim())
   if (ansicht.sortierung !== 'bestellungen') parameter.set('sortierung', ansicht.sortierung)
+  if (ansicht.richtung && ansicht.richtung !== STANDARD_RICHTUNG[ansicht.sortierung]) parameter.set('richtung', ansicht.richtung)
   const rest = parameter.toString()
   return `/customers${rest ? `?${rest}` : ''}`
 }
