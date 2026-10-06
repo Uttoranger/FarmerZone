@@ -224,10 +224,13 @@ describe('cancelOrder — Doppelausführung', () => {
       satz.status = String(arg.data.status)
       return { count: 1 }
     })
+    // Seit Nr. 19 liest der Storno Beträge und Positionen frisch UNTER der
+    // Sperre — auch das gehört in die Transaktion.
+    const txFindFirst = vi.fn(async () => { ablauf.push('lesen'); return satz })
     transaktion.mockImplementation((async (arg: unknown) => {
       ablauf.push('start')
       const ergebnis = await (arg as (tx: unknown) => Promise<unknown>)({
-        order: { updateMany: txUpdateMany },
+        order: { updateMany: txUpdateMany, findFirst: txFindFirst },
         product: { update: txProduktUpdate },
       })
       ablauf.push('ende')
@@ -236,7 +239,7 @@ describe('cancelOrder — Doppelausführung', () => {
 
     await cancelOrder('order_1')
 
-    expect(ablauf).toEqual(['start', 'sperre', 'buchung', 'buchung', 'ende'])
+    expect(ablauf).toEqual(['start', 'sperre', 'lesen', 'buchung', 'buchung', 'ende'])
     expect(productUpdate).not.toHaveBeenCalled()
     expect(orderUpdateMany).not.toHaveBeenCalled()
   })
@@ -293,7 +296,8 @@ describe('cancelOrder — Erstattung erst nach der Sperre', () => {
     expect(orderUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ data: { paymentStatus: 'REFUNDED' } })
     )
-    expect(mailStorno).toHaveBeenCalledWith(expect.objectContaining({ orderNumber: 'TH-1' }), 20)
+    // Dritter Wert: der Grund aus dem Storno-Dialog (Nr. 19) — hier keiner.
+    expect(mailStorno).toHaveBeenCalledWith(expect.objectContaining({ orderNumber: 'TH-1' }), 20, undefined)
   })
 
   it('scheitert die Erstattung: Storno bleibt, Ware bleibt zurückgebucht, KEINE Mail, Meldung an Sentry', async () => {
@@ -331,7 +335,8 @@ describe('cancelOrder — Erstattung erst nach der Sperre', () => {
 
     // Das Geld IST zurück — „Rückerstattung fehlgeschlagen" wäre gelogen.
     expect(result).toEqual({ erstattetCents: 2000, vomHofCents: 2000 })
-    expect(mailStorno).toHaveBeenCalledWith(expect.objectContaining({ orderNumber: 'TH-1' }), 20)
+    // Dritter Wert: der Grund aus dem Storno-Dialog (Nr. 19) — hier keiner.
+    expect(mailStorno).toHaveBeenCalledWith(expect.objectContaining({ orderNumber: 'TH-1' }), 20, undefined)
     expect(sentryMeldung).toHaveBeenCalledTimes(1)
     const [, kontext] = sentryMeldung.mock.calls[0] as [unknown, { tags?: Record<string, unknown> }]
     expect(kontext.tags).toEqual(expect.objectContaining({ grund: 'vermerk_fehlgeschlagen' }))

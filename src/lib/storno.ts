@@ -90,3 +90,18 @@ export function stornoGeldSaetze(eingabe: {
     (mitGebuehr ? ' Die Servicegebühr erstattet FarmerZone.' : '')
   return [zurueck, abgezogen]
 }
+
+/**
+ * Wurde vor dem Storno schon ein Teil erstattet bzw. ein Artikel als fehlend
+ * gebucht („Artikel fehlt", E14)? Dann darf der Storno NICHT die
+ * Vollerstattung mit reverse_transfer + refund_application_fee nehmen: Stripe
+ * kehrte die Überweisung und die Gebühr anteilig zum Restbetrag um, und der
+ * Hof gäbe nicht mehr genau seinen Warenpreis zurück. Stattdessen holt der
+ * Storno den Rest mit festen Beträgen: Erstattung = aktueller Warenpreis +
+ * aktuelle Gebühr (aus dem Plattformsaldo), Rückbuchung vom Hof = aktueller
+ * Warenpreis − Provision. Teilstorno + Reststorno ergeben für Kundin, Hof und
+ * Plattform genau dasselbe wie ein Vollstorno am Anfang.
+ */
+export function nachTeilerstattung(order: { erstattetCents: number; fehlendePositionen: number }): boolean {
+  return order.erstattetCents > 0 || order.fehlendePositionen > 0
+}

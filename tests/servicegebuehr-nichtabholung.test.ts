@@ -71,8 +71,19 @@ const ONLINE = {
   serviceFeeRefundedAt: null,
 }
 
+/**
+ * Was markAsNotPickedUp schreibt, in Aufrufreihenfolge: Seit Nr. 19 ist der
+ * Statuswechsel ein bedingtes updateMany (S2), der Gebühren-Vermerk bleibt
+ * ein update — beide zählen.
+ */
 function updateDaten(): Array<Record<string, unknown>> {
-  return orderUpdate.mock.calls.map((c) => (c[0] as { data: Record<string, unknown> }).data)
+  const aufrufe = [
+    ...orderUpdate.mock.calls.map((c, i) => ({ c, reihe: orderUpdate.mock.invocationCallOrder[i] })),
+    ...orderUpdateMany.mock.calls.map((c, i) => ({ c, reihe: orderUpdateMany.mock.invocationCallOrder[i] })),
+  ]
+  return aufrufe
+    .toSorted((a, b) => a.reihe - b.reihe)
+    .map(({ c }) => (c[0] as { data: Record<string, unknown> }).data)
 }
 
 /** Der Storno-Schreiber ist seit fix/storno-atomar das gesperrte updateMany. */
@@ -199,6 +210,11 @@ describe('markAsNotPickedUp — online', () => {
       reihenfolge.push('status' in arg.data ? 'status' : 'vermerk')
       return Promise.resolve({})
     }) as never)
+    // Der Statuswechsel ist seit Nr. 19 bedingt (updateMany, S2).
+    orderUpdateMany.mockImplementation(((arg: { data: Record<string, unknown> }) => {
+      reihenfolge.push('status' in arg.data ? 'status' : 'vermerk')
+      return Promise.resolve({ count: 1 })
+    }) as never)
     refundCreate.mockImplementation((() => {
       reihenfolge.push('stripe')
       return Promise.resolve({ id: 're_1' })
@@ -282,6 +298,6 @@ describe('cancelOrder — Gebühren-Vermerk bei Storno', () => {
     expect(stornoDaten().at(-1)).toEqual(
       expect.objectContaining({ status: 'CANCELLED', serviceFeeRefundedAt: expect.any(Date) })
     )
-    expect(sendOrderCancelled).toHaveBeenCalledWith(expect.objectContaining({ serviceFeeCents: 98 }), 20.98)
+    expect(sendOrderCancelled).toHaveBeenCalledWith(expect.objectContaining({ serviceFeeCents: 98 }), 20.98, undefined)
   })
 })
