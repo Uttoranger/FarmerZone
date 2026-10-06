@@ -8,7 +8,12 @@ import { prisma } from '@/lib/prisma'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { sendErstattungOffen, sendOrderConfirmation, sendOrderPaidToFarmer, sendZahlungZuSpaet } from '@/lib/email'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
-import { nimmGescheiterteErstattungZurueck, type GescheitertAusgang } from '@/server/erstattung-gescheitert'
+import {
+  MELDE_VERMERK_TYP,
+  meldeVermerk,
+  nimmGescheiterteErstattungZurueck,
+  type GescheitertAusgang,
+} from '@/server/erstattung-gescheitert'
 import { formatEuro } from '@/lib/format'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { stripeKontoBereit } from '@/lib/stripe-konto'
@@ -288,16 +293,14 @@ async function erstatteSpaeteZahlung(
 async function handleErstattungGescheitert(refund: Stripe.Refund, typ: 'refund.failed' | 'charge.refund.updated') {
   const ausgang = await nimmGescheiterteErstattungZurueck(refund)
   if (ausgang.art === 'nicht_gescheitert') return
-  // Einmal melden je Erstattung — über einen Vermerk in der Idempotenz-Tabelle
-  // der Ereignisse; das zweite Ereignis derselben Erstattung bleibt still.
-  // Die Zurücknahme selbst gelingt nur einmal, sie wird deshalb immer
-  // gemeldet (der Vermerk hält danach nur das Folgeereignis still). Auch
-  // „schon erledigt" meldet sich: Die Datenbank zählte die Erstattung nie
-  // (verlorene Antwort) — das Geld steht trotzdem aus. Scheitert der Vermerk
-  // nach einer Zurücknahme, gibt es eine 500; die Neuzustellung findet sie
-  // erledigt und meldet dann — verloren geht die Meldung nicht.
-  const erste = await ersteMeldung(refund.id)
-  if (ausgang.art !== 'zurueckgenommen' && !erste) return
+  // Genau eine Meldung je Erstattung, über einen Vermerk in der
+  // Idempotenz-Tabelle der Ereignisse. Die Zurücknahme gelingt nur einmal und
+  // legt den Vermerk in ihrer eigenen Transaktion an — sie meldet immer.
+  // Alles andere meldet nur, wer den Vermerk als Erster anlegt; „schon
+  // erledigt" nach einer Zurücknahme findet ihn also immer und bleibt still.
+  // Ohne Vermerk meldet sich „schon erledigt" einmal: Die Datenbank zählt die
+  // Erstattung nicht (mehr), das Geld steht trotzdem aus.
+  if (ausgang.art !== 'zurueckgenommen' && !(await ersteMeldung(refund.id))) return
 
   const meldung = gescheitertMeldung(ausgang, refund)
   const orderId = ausgang.bestellung?.id ?? null
@@ -336,7 +339,7 @@ async function handleErstattungGescheitert(refund: Stripe.Refund, typ: 'refund.f
 async function ersteMeldung(refundId: string): Promise<boolean> {
   try {
     await prisma.webhookEvent.create({
-      data: { stripeEventId: `${refundId}#gescheitert-gemeldet`, type: 'meldung.erstattung_gescheitert' },
+      data: { stripeEventId: meldeVermerk(refundId), type: MELDE_VERMERK_TYP },
     })
     return true
   } catch (err) {
@@ -354,7 +357,7 @@ function gescheitertMeldung(
     return {
       titel: 'Erstattung gescheitert — in der Datenbank nicht (mehr) gezählt',
       grund: 'erstattung_gescheitert_nicht_gezaehlt',
-      was: `Stripe meldet eine Erstattung über ${betrag} an die Kundin als gescheitert. Die App zählt sie nicht als erstattet (sie war dort nie vermerkt) – das Geld steht noch aus.`,
+      was: `Stripe meldet eine Erstattung über ${betrag} an die Kundin als gescheitert. Die App zählt sie nicht oder nicht mehr als erstattet – das Geld steht noch aus.`,
       handanweisung:
         'In Stripe prüfen, ob der Kundin der Betrag inzwischen auf anderem Weg erstattet wurde; sonst erneut erstatten – über Stripe ohne reverse_transfer und ohne refund_application_fee – und sie informieren.',
     }

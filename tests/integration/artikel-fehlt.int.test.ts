@@ -748,3 +748,19 @@ describe('Rest-Storno mit Stripes bezahltem Betrag (Nr. 19c)', () => {
     expect(String(kontext.extra.handerstattung)).not.toContain('Plattformgebühr erstatten')
   })
 })
+
+describe('Artikel fehlt — Sentry-Angabe je Grund (Nr. 19c, Nachbesserung 2)', () => {
+  it('Zahlung ohne Überweisung: nichts gebucht, die Handprüfung nennt die Überweisung, nicht „ohne Zuordnung"', async () => {
+    const { order, position } = await bestellung({ zahlung: 'online', positionen: EIER_BROT, gebuehrCents: 52 })
+    intentRetrieve.mockResolvedValueOnce({ id: 'pi_test', latest_charge: { id: 'ch_test', transfer: null, amount: 1082 } } as never)
+
+    const ergebnis = await meldeArtikelFehlt({ orderId: order.id, itemId: position('Brot').id })
+
+    expect(ergebnis.error).toContain('bitte melde dich bei uns')
+    expect(refundCreate).not.toHaveBeenCalled()
+    const [, kontext] = vi.mocked(Sentry.captureException).mock.calls.at(-1) as [unknown, { tags: Record<string, string>; extra: Record<string, unknown> }]
+    expect(kontext.tags.grund).toBe('stripe_unklar_ohne_ueberweisung')
+    expect(String(kontext.extra.handpruefung)).toContain('Überweisung')
+    expect(String(kontext.extra.handpruefung)).not.toContain('ohne Zuordnung')
+  })
+})

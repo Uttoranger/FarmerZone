@@ -55,6 +55,17 @@ export type GescheitertAusgang =
 /** Was eine Meldung zum Wiederfinden braucht — keine Daten der Kundin. */
 export type Bestellbezug = { id: string; orderNumber: string; hofName: string }
 
+/**
+ * Vermerk „diese gescheiterte Erstattung ist gemeldet" in der
+ * Idempotenz-Tabelle der Ereignisse (`WebhookEvent`, keine neue Spalte).
+ * Genau eine Meldung je Erstattung: Die Zurücknahme legt ihn in DERSELBEN
+ * Transaktion an, ein späteres „schon erledigt" findet ihn also immer.
+ */
+export const MELDE_VERMERK_TYP = 'meldung.erstattung_gescheitert'
+export function meldeVermerk(refundId: string): string {
+  return `${refundId}#gescheitert-gemeldet`
+}
+
 const BESTELLBEZUG = {
   id: true,
   orderNumber: true,
@@ -119,6 +130,14 @@ export async function nimmGescheiterteErstattungZurueck(refund: Stripe.Refund): 
     const offen = await tx.order.updateMany({
       where: { id: bestellung.id, paymentStatus: 'REFUNDED' },
       data: { paymentStatus: 'PAID' },
+    })
+    // Der Vermerk gehört zur Zurücknahme: Wer zurücknimmt, meldet; jede
+    // spätere Zustellung findet „schon erledigt" UND den Vermerk und bleibt
+    // still. skipDuplicates statt create — ein Unique-Fehler bräche die
+    // Transaktion ab.
+    await tx.webhookEvent.createMany({
+      data: [{ stripeEventId: meldeVermerk(refund.id), type: MELDE_VERMERK_TYP }],
+      skipDuplicates: true,
     })
     return offen.count === 1
   })

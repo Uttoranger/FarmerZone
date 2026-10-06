@@ -172,6 +172,11 @@ async function zustellen(ev: ReturnType<typeof ereignis>) {
   )
 }
 
+/** Den Nachlauf (Mails über nachDerAntwort) beider Zustellungen ganz abwarten, dann erst zählen. */
+async function nachlaufFertig(): Promise<void> {
+  await new Promise((fertig) => setTimeout(fertig, 200))
+}
+
 function meldungen(grund: string): number {
   return vi.mocked(Sentry.captureMessage).mock.calls.filter(([, kontext]) => {
     const tags = (kontext as { tags?: Record<string, string> } | undefined)?.tags
@@ -234,7 +239,12 @@ describe('refund.failed — Teilerstattung nach „Artikel fehlt" gescheitert', 
     // „Stripe stellt erneut zu" und ist ein gültiger Ausgang.
     for (const a of antworten) expect([200, 500]).toContain(a.status)
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).erstattetCents).toBe(0)
+    // Auch die Neuzustellung einer 500 meldet nichts mehr (Vermerk der Zurücknahme).
+    await zustellen(ereignis('refund.failed', teil, paymentIntentId))
+    await nachlaufFertig()
+    expect(Sentry.captureMessage).toHaveBeenCalledTimes(1)
     expect(meldungen('erstattung_gescheitert_zurueckgenommen')).toBe(1)
+    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
   })
 
   it('stimmt die Datenbank weder vorher noch nachher mit Stripe überein: nichts geändert, als unklar gemeldet', async () => {
@@ -330,12 +340,46 @@ describe('Nachbesserung Runde 1', () => {
     scheitert(teil)
 
     await zustellen(ereignis('refund.failed', teil, paymentIntentId))
+    expect(meldungen('erstattung_gescheitert_nicht_gezaehlt')).toBe(1)
+    vi.mocked(Sentry.captureMessage).mockClear()
     await zustellen(ereignis('charge.refund.updated', teil, paymentIntentId))
 
+    // Das zweite Ereignis meldet nichts.
+    expect(meldungen('erstattung_gescheitert_nicht_gezaehlt')).toBe(0)
+    expect(Sentry.captureMessage).not.toHaveBeenCalled()
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).erstattetCents).toBe(0)
-    expect(meldungen('erstattung_gescheitert_nicht_gezaehlt')).toBe(1)
-    expect(vi.mocked(Sentry.captureMessage)).toHaveBeenCalledTimes(1)
-    await vi.waitFor(() => expect(sendErstattungOffen).toHaveBeenCalledTimes(1))
+    await nachlaufFertig()
+    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
+  })
+
+  it('nie gezählt, beide Ereignisse gleichzeitig: genau eine Meldung und eine Mail', async () => {
+    const { order, paymentIntentId, teil } = await nachBrotFehlt()
+    await prisma.order.update({ where: { id: order.id }, data: { erstattetCents: 0 } })
+    scheitert(teil)
+
+    const antworten = await Promise.all([
+      zustellen(ereignis('refund.failed', teil, paymentIntentId)),
+      zustellen(ereignis('charge.refund.updated', teil, paymentIntentId)),
+    ])
+
+    expect(antworten.map((a) => a.status)).toEqual([200, 200])
+    await nachlaufFertig()
+    expect(Sentry.captureMessage).toHaveBeenCalledTimes(1)
+    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
+  })
+
+  it('zurückgenommen, danach das zweite Ereignis: es findet den Vermerk der Zurücknahme und meldet nichts', async () => {
+    const { paymentIntentId, teil } = await nachBrotFehlt()
+    scheitert(teil)
+
+    await zustellen(ereignis('refund.failed', teil, paymentIntentId))
+    expect(meldungen('erstattung_gescheitert_zurueckgenommen')).toBe(1)
+    vi.mocked(Sentry.captureMessage).mockClear()
+    await zustellen(ereignis('charge.refund.updated', teil, paymentIntentId))
+
+    expect(Sentry.captureMessage).not.toHaveBeenCalled()
+    await nachlaufFertig()
+    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
   })
 
   it('Zahlung ohne Überweisung: 200, nichts geändert, als unklar gemeldet (keine stumme Neuzustellung)', async () => {

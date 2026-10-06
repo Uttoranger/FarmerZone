@@ -20,7 +20,15 @@ import {
 import { alsCents } from '@/lib/order-totals'
 import { artikelFehltEingabeSchema, stornoEingabeSchema } from '@/schemas/hof-bestellungen'
 import { meldeFehlendenArtikel } from '@/server/artikel-fehlt'
-import { StripeStandUnklar, bucheVomHofZurueck, erstatteKundin, hatErstattungen, ladeStripeStand, teilstornoSumme } from '@/server/teilerstattung'
+import {
+  StripeStandUnklar,
+  bucheVomHofZurueck,
+  erstatteKundin,
+  hatErstattungen,
+  ladeStripeStand,
+  teilstornoSumme,
+  type UnklarGrund,
+} from '@/server/teilerstattung'
 import { sendArtikelFehlt, sendErstattungOffen } from '@/lib/email'
 
 export type ActionResult = { error?: string }
@@ -391,6 +399,17 @@ function handbuchungFuer(pfad: ErstattungsPfad, rest: RestStorno | null, betraeg
   }
 }
 
+/** Was der Betreiber bei „Artikel fehlt" von Hand prüft — je Grund, warum nichts gebucht wurde. */
+const HANDPRUEFUNG: Record<UnklarGrund, string> = {
+  mehr_als_eine_seite: 'Mehr als 100 Buchungen zu dieser Zahlung – bitte von Hand prüfen',
+  ohne_zuordnung: 'Erstattung oder Rückbuchung ohne Zuordnung – bitte von Hand prüfen',
+  nachtrag_unklar: 'Eine frühere Erstattung lässt sich nicht nachtragen – bitte von Hand prüfen',
+  zu_viele_nachtraege: 'Zu viele Erstattungen ohne Vermerk in der App – bitte von Hand prüfen',
+  erstattung_gescheitert: 'Stripe hat die Erstattung als gescheitert zurückgegeben – bitte von Hand prüfen',
+  bezahlt_abweichend: 'Bezahlter Betrag laut Stripe weicht von der App ab – bitte von Hand prüfen',
+  ohne_ueberweisung: 'Zahlung ohne Überweisung an den Hof – Ladungstyp bei Stripe prüfen',
+}
+
 /** Der Stand, aus dem ein Storno rechnet — frisch gelesen, NACHDEM die Sperre steht. */
 const STORNO_STAND = {
   totalAmount: true,
@@ -721,7 +740,7 @@ export async function meldeArtikelFehlt(input: unknown): Promise<ArtikelFehltErg
       // prüft von Hand.
       Sentry.captureException(err, {
         tags: { aktion: 'artikelFehlt', grund: `stripe_unklar_${err.grund}` },
-        extra: { orderId, itemId, ...err.extra, handpruefung: 'Erstattung ohne Zuordnung – bitte von Hand prüfen' },
+        extra: { orderId, itemId, ...err.extra, handpruefung: HANDPRUEFUNG[err.grund] },
       })
       return {
         error: 'Bei der Zahlung dieser Bestellung gibt es etwas, das wir erst prüfen müssen. Wir haben nichts gebucht – bitte melde dich bei uns.',
