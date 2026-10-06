@@ -27,7 +27,7 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 17c | Slug-Prüfung absichern | fertig | `nacht/2026-10-06/17c-slug-pruefung` | #185 | 17b (#184) | – | 06.10.2026 |
 | 17d | Konditionen-Übergang (K1) | fertig | `nacht/2026-10-06/17d-konditionen-uebergang` | #186 | 17c (#185) | Bar-Gebühren vor Stichtag entscheiden; Satz zweimal auf /fuer-hoefe bestätigen | 06.10.2026 |
 | 18 | Produkte | fertig | `nacht/2026-10-06/18-produkte` | #187 | 17d (#186) | Bestandsfehler im Bearbeiten-Dialog mitbehoben; „Verkauf eintragen" mit /sales; Entwurf vs. „Nicht im Shop" | 06.10.2026 |
-| 19 | Bestellungen | läuft | `nacht/2026-10-06/19-bestellungen` | | 18 (#187) | | 06.10.2026 |
+| 19 | Bestellungen | fertig (Entwurf) | `nacht/2026-10-06/19-bestellungen` | #188 | 18 (#187) | Geldpfad: 4 Sollte-Punkte nach 2 Runden offen (Fix-PR vorgeschlagen); `maxDuration` mit Vercel-Plan abgleichen | 06.10.2026 |
 | 20 | Futter und Brennmaterial | offen | | | | | |
 | 21 | Teilen | offen | | | | | |
 | 22 | Auswerten, Region, Einstellungen, Hilfe, Admin | offen | | | | | |
