@@ -17,7 +17,7 @@ import {
 } from '@/lib/hof-bestellungen'
 import { formatPosition } from '@/lib/format'
 import { zeitpunktFuerMail } from '@/lib/fristen'
-import { gebuehrEntfallen, gebuehrErstattungOffen, istVorOrtZahlung } from '@/lib/servicegebuehr'
+import { gebuehrEntfallen, gebuehrErstattungOffen, gebuehrFuerMonatsabrechnung, istVorOrtZahlung } from '@/lib/servicegebuehr'
 import { buildOrderReminderUrl } from '@/lib/whatsapp'
 import type { HofBestellFilter } from '@/schemas/hof-bestellungen'
 
@@ -195,6 +195,8 @@ export type HofBestellDetail = {
     erstattetCents: number
     gebuehrEntfallen: boolean
     gebuehrErstattungOffen: boolean
+    /** Vor Ort: holt die Monatsabrechnung die Gebühr? (B1: bar vor dem SEPA-Start nicht.) */
+    gebuehrFuerAbrechnung: boolean
   }
   positionen: HofBestellPosition[]
   storno: StornoBetraege | null
@@ -259,6 +261,7 @@ export async function getHofBestellDetail(
     serviceFeePercentApplied: o.serviceFeePercentApplied === null ? null : o.serviceFeePercentApplied.toNumber(),
     serviceFeeMinCentsApplied: o.serviceFeeMinCentsApplied,
     erstattetCents: o.erstattetCents,
+    bestelltAm: o.createdAt,
     positionen: o.items.map((i) => ({ id: i.id, betragCents: alsCents(i.totalPrice), fehlt: i.fehltSeit !== null })),
   }
   const offenePositionen = o.items.filter((i) => i.fehltSeit === null).length
@@ -287,6 +290,11 @@ export async function getHofBestellDetail(
       erstattetCents: o.erstattetCents,
       gebuehrEntfallen: gebuehrEntfallen(o),
       gebuehrErstattungOffen: gebuehrErstattungOffen(o),
+      gebuehrFuerAbrechnung: gebuehrFuerMonatsabrechnung({
+        paymentMethod: o.paymentMethod,
+        serviceFeeCents: o.serviceFeeCents,
+        bestelltAm: o.createdAt,
+      }),
     },
     positionen: o.items.map((i) => ({
       id: i.id,

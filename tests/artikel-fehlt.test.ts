@@ -32,6 +32,9 @@ function bestellung(abweichend: Partial<ArtikelFehltBestellung> = {}): ArtikelFe
     serviceFeePercentApplied: 5,
     serviceFeeMinCentsApplied: 50,
     erstattetCents: 0,
+    // Ab dem SEPA-Start bestellt: Bar trägt die Gebühr, die Monatsabrechnung nimmt sie
+    // (Register B1; bar davor: tests/bargebuehr.test.ts).
+    bestelltAm: new Date('2027-02-15T10:00:00.000Z'),
     positionen: [
       { id: 'eier', betragCents: 450, fehlt: false },
       { id: 'brot', betragCents: 580, fehlt: false },
@@ -62,6 +65,7 @@ describe('artikelFehltRechnung — Beispiele aus der Freigabe (E14)', () => {
       gebuehrDifferenzCents: 2,
       erstattungCents: 0,
       vomHofCents: 0,
+      monatsabrechnung: true,
     })
   })
 

@@ -489,7 +489,7 @@ export async function sendOrderConfirmedToFarmer(order: OrderForEmail): Promise<
     barZuKassieren: betraege(order).gesamt,
     // B1 nach dem BESTELLzeitpunkt, nicht nach dem Versand. Ohne Zeitpunkt der
     // bisherige Satz — lieber kein Hinweis als ein falscher.
-    barOhneGebuehr: order.createdAt ? barOhneServicegebuehr(order.paymentMethod, order.createdAt) : false,
+    barOhneGebuehr: order.paymentMethod === 'ONSITE_CASH' && order.createdAt ? barOhneServicegebuehr('ONSITE_CASH', order.createdAt) : false,
     dashboardUrl: `${APP_URL}/orders`,
   }))
 

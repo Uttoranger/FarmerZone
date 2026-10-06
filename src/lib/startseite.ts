@@ -22,7 +22,7 @@ import {
   barOhneServicegebuehr,
 } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
-import { BAR_OHNE_GEBUEHR_HINWEIS } from '@/lib/konditionen'
+import { BAR_OHNE_GEBUEHR_HINWEIS, mitBarAusnahme } from '@/lib/konditionen'
 
 /** Eine Adresse der Hofübersicht mit genau diesen Filtern; ohne Filter die nackte /hoefe. */
 export function hoefeAdresse(teil: Partial<HoefeFilter> = {}): string {
@@ -237,7 +237,7 @@ export const STARTSEITE_FRAGEN: readonly Frage[] = [
   },
   {
     frage: 'Wie bezahle ich?',
-    antwort: `Online beim Bestellen oder bar bei der Abholung – was der Hof anbietet, siehst du vor dem Bestellen. Zum Warenpreis kommen ${SERVICEGEBUEHR_STANDARD_PROZENT} % Servicegebühr, mindestens ${formatEuro(centsAlsEuro(SERVICEGEBUEHR_STANDARD_MIND_CENTS))}, als eigene Zeile im Warenkorb. ${BAR_OHNE_GEBUEHR_HINWEIS}`,
+    antwort: `Online beim Bestellen oder bar bei der Abholung – was der Hof anbietet, siehst du vor dem Bestellen. Zum Warenpreis kommen ${SERVICEGEBUEHR_STANDARD_PROZENT} % Servicegebühr, mindestens ${formatEuro(centsAlsEuro(SERVICEGEBUEHR_STANDARD_MIND_CENTS))}, als eigene Zeile im Warenkorb.`,
   },
   {
     frage: 'Was, wenn ich nicht abholen kann?',
@@ -250,3 +250,14 @@ export const STARTSEITE_FRAGEN: readonly Frage[] = [
       'Nein. Du holst deine Bestellung zur gewählten Zeit direkt am Hof ab – dafür gibt es keine Lieferkosten, und der Hof bekommt den vollen Preis.',
   },
 ]
+
+/**
+ * Die Fragen, wie die Startseite sie zeigt: vor dem Stichtag mit der
+ * Bar-Ausnahme in „Wie bezahle ich?" (Register B1), danach unverändert.
+ * `jetzt` von der Seite (Server-Uhr, revalidiert).
+ */
+export function startseitenFragen(jetzt: Date): readonly Frage[] {
+  return STARTSEITE_FRAGEN.map((f) =>
+    f.frage === 'Wie bezahle ich?' ? { ...f, antwort: mitBarAusnahme(f.antwort, jetzt, BAR_OHNE_GEBUEHR_HINWEIS) } : f
+  )
+}

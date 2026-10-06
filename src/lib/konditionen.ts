@@ -137,6 +137,24 @@ export const BAR_SERVICEGEBUEHR_AB: Date = TARIFE_AB
  */
 export const BAR_OHNE_GEBUEHR_BIS_TEXT = formatDatumLang(new Date(BAR_SERVICEGEBUEHR_AB.getTime() - 1))
 
+/**
+ * Liegt dieser Zeitpunkt vor dem Bar-Stichtag? Der EINE Datumsvergleich zu
+ * B1 — `barOhneServicegebuehr` (servicegebuehr.ts) und die Texte unten fragen
+ * hier, damit die Grenze nirgends ein zweites Mal geschrieben wird.
+ */
+export function vorBarStichtag(zeitpunkt: Date): boolean {
+  return zeitpunkt.getTime() < BAR_SERVICEGEBUEHR_AB.getTime()
+}
+
+/**
+ * Einen Text um die Bar-Ausnahme ergänzen — nur vor dem Stichtag; danach
+ * bleibt er, wie er war. Statische Seiten (/fuer-hoefe, /konditionen, die
+ * Startseite) entscheiden beim Bauen bzw. bei der Revalidierung.
+ */
+export function mitBarAusnahme(text: string, jetzt: Date, satz: string = BAR_OHNE_GEBUEHR_SATZ): string {
+  return vorBarStichtag(jetzt) ? `${text} ${satz}` : text
+}
+
 /** Der Hinweis für Kundinnen — Kasse und Startseite (Wortlaut freigabe.md §9, 19a). */
 export const BAR_OHNE_GEBUEHR_HINWEIS = `Bei Barzahlung bis ${BAR_OHNE_GEBUEHR_BIS_TEXT} ohne Servicegebühr.`
 
@@ -164,11 +182,20 @@ export const SERVICEGEBUEHR_SATZ_TEXT =
   `${formatZahl(SERVICEGEBUEHR_STANDARD_PROZENT)} % ` +
   `(mind. ${formatEuro(centsAlsEuro(SERVICEGEBUEHR_STANDARD_MIND_CENTS))})`
 
-/** Der Grundsatz — Preise-Abschnitt von /fuer-hoefe und /konditionen, mit der Bar-Ausnahme (B1). */
+/** Der Grundsatz — Preise-Abschnitt von /fuer-hoefe und /konditionen; mit Bar-Ausnahme über `servicegebuehrZahltKunde`. */
 export const SERVICEGEBUEHR_ZAHLT_KUNDE =
   `Die Servicegebühr von ${SERVICEGEBUEHR_SATZ_TEXT} zahlt der Kunde. ` +
-  `${BAR_OHNE_GEBUEHR_SATZ} ` +
   'Du bekommst immer den vollen Warenpreis – online wie bar.'
+
+/** Der Grundsatz, wie die Seiten ihn zeigen: vor dem Stichtag mit der Bar-Ausnahme (B1) in der Mitte. */
+export function servicegebuehrZahltKunde(jetzt: Date): string {
+  if (!vorBarStichtag(jetzt)) return SERVICEGEBUEHR_ZAHLT_KUNDE
+  return (
+    `Die Servicegebühr von ${SERVICEGEBUEHR_SATZ_TEXT} zahlt der Kunde. ` +
+    `${BAR_OHNE_GEBUEHR_SATZ} ` +
+    'Du bekommst immer den vollen Warenpreis – online wie bar.'
+  )
+}
 
 /** Kurzfassung für Karten (Einrichten, Vorteile). */
 export const VOLLER_WARENPREIS = 'Die Servicegebühr zahlt der Kunde – du behältst den vollen Warenpreis.'

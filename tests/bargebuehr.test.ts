@@ -31,6 +31,9 @@ import {
   MONATSABRECHNUNG_TEXT,
   SERVICEGEBUEHR_ZAHLT_KUNDE,
   TARIFE_AB,
+  mitBarAusnahme,
+  servicegebuehrZahltKunde,
+  vorBarStichtag,
 } from '@/lib/konditionen'
 import {
   SERVICEGEBUEHR_HINWEIS,
@@ -38,14 +41,16 @@ import {
   barZuKassierenCents,
   berechneServicegebuehr,
   gebuehrErstattungOffen,
+  gebuehrFuerMonatsabrechnung,
   type ServicegebuehrEinstellung,
 } from '@/lib/servicegebuehr'
 import { barHinweis, kassenBetraege, kassenZahlarten } from '@/lib/kasse'
 import { artikelFehltRechnung, artikelFehltZeilen, type ArtikelFehltBestellung } from '@/lib/artikel-fehlt'
 import { einnahmenImMonat, topfVonBestellung, type BestellungFuerFinanzen } from '@/lib/finanzen'
-import { BEISPIEL_GLEICH, STARTSEITE_FRAGEN, beispielRechnung } from '@/lib/startseite'
-import { FUER_HOEFE_FRAGEN } from '@/lib/fuer-hoefe'
+import { BEISPIEL_GLEICH, STARTSEITE_FRAGEN, beispielRechnung, startseitenFragen } from '@/lib/startseite'
+import { FUER_HOEFE_FRAGEN, fuerHoefeFragen } from '@/lib/fuer-hoefe'
 import { OrderConfirmedEmail } from '@/emails/order-confirmed'
+import { GEBUEHR_KORB_NUR_ONLINE, gebuehrHinweis, gebuehrHinweisFuerHof } from '@/lib/hofseite-kunde'
 
 const lies = (datei: string): string => readFileSync(join(process.cwd(), datei), 'utf8')
 const normal = (text: string): string => text.replace(/ /g, ' ')
@@ -202,6 +207,48 @@ describe('Kasse (Client-Vorschau) — derselbe Weg, mit der Zahlungsart', () => 
   })
 })
 
+describe('Hofseite, Produktseite, Mini-Warenkorb: der Gebührenhinweis vor dem Bestellen', () => {
+  const ALLES = { ...HOF, acceptsOnline: true, stripeAccountReady: true, acceptsOnsite: true }
+  const NUR_BAR = { ...ALLES, stripeAccountReady: false }
+  const NUR_ONLINE = { ...ALLES, acceptsOnsite: false }
+  const GRUND = 'Preise zzgl. 5 % Servicegebühr (mind. € 0,50)'
+
+  it('online und bar vor dem Stichtag: Satz wie bisher plus Bar-Ausnahme, im Korb „bei Online-Zahlung"', () => {
+    const h = gebuehrHinweisFuerHof(ALLES, LANGE_VORHER)
+    expect(h?.kurz).toBe(`${GRUND} – im Warenkorb einzeln ausgewiesen. Der Hof bekommt den vollen Preis. ${BAR_OHNE_GEBUEHR_HINWEIS}`)
+    expect(h?.produkte).toBe(`${GRUND} – einmal pro Bestellung, egal wie viel du in den Korb legst. ${BAR_OHNE_GEBUEHR_HINWEIS}`)
+    expect(h?.korb).toBe(GEBUEHR_KORB_NUR_ONLINE)
+  })
+
+  it('nur bar vor dem Stichtag: kein Gebührenhinweis — es fällt keine an', () => {
+    expect(gebuehrHinweisFuerHof(NUR_BAR, LANGE_VORHER)).toBeNull()
+    expect(gebuehrHinweisFuerHof(NUR_BAR, KURZ_VORHER)).toBeNull()
+  })
+
+  it('nur online: der bisherige Hinweis, ohne Bar-Satz', () => {
+    expect(gebuehrHinweisFuerHof(NUR_ONLINE, LANGE_VORHER)).toEqual(gebuehrHinweis({ prozent: 5, mindestCents: 50 }))
+  })
+
+  it('ab dem Stichtag überall der bisherige Text', () => {
+    const bisher = gebuehrHinweis({ prozent: 5, mindestCents: 50 })
+    expect(bisher?.korb).toBe('zzgl. Servicegebühr')
+    for (const hof of [ALLES, NUR_BAR, NUR_ONLINE]) expect(gebuehrHinweisFuerHof(hof, GENAU)).toEqual(bisher)
+  })
+
+  it('gebührenfreier Hof: kein Hinweis, vor wie nach dem Stichtag', () => {
+    expect(gebuehrHinweisFuerHof({ ...ALLES, serviceFeeActiveFrom: null }, LANGE_VORHER)).toBeNull()
+    expect(gebuehrHinweisFuerHof({ ...ALLES, serviceFeeActiveFrom: null }, DANACH)).toBeNull()
+  })
+
+  it('Hofseite und Produktseite nehmen gebuehrHinweisFuerHof', () => {
+    for (const datei of ['src/components/hofseite/hofseite-kunde.tsx', 'src/components/produktdetail/produktdetail-kunde.tsx']) {
+      const quelle = lies(datei)
+      expect(quelle, datei).toMatch(/gebuehrHinweisFuerHof\(farm, new Date\(jetzt\)\)/)
+      expect(quelle, datei).not.toMatch(/gebuehrHinweis\(/)
+    }
+  })
+})
+
 describe('„Artikel fehlt" (E14) bei Barzahlung', () => {
   /** Eier € 4,50 + Brot € 5,80, bar vor dem Stichtag bestellt: Snapshot wie der Checkout ihn schreibt. */
   function barOhneGebuehr(abweichend: Partial<ArtikelFehltBestellung> = {}): ArtikelFehltBestellung {
@@ -215,6 +262,7 @@ describe('„Artikel fehlt" (E14) bei Barzahlung', () => {
       serviceFeePercentApplied: null,
       serviceFeeMinCentsApplied: null,
       erstattetCents: 0,
+      bestelltAm: LANGE_VORHER,
       positionen: [
         { id: 'eier', betragCents: 450, fehlt: false },
         { id: 'brot', betragCents: 580, fehlt: false },
@@ -266,8 +314,18 @@ describe('„Artikel fehlt" (E14) bei Barzahlung', () => {
   it('eine ältere Barbestellung MIT Gebühr behält ihre Regel (gespeicherte Beträge, E4) — wie vor B1', () => {
     const alt = barOhneGebuehr({ serviceFeeCents: 52, serviceFeePercentApplied: 5, serviceFeeMinCentsApplied: 50 })
     expect(artikelFehltRechnung(alt, 'brot')).toEqual(
-      expect.objectContaining({ neuGebuehrCents: 50, neuGesamtCents: 500 })
+      expect.objectContaining({ neuGebuehrCents: 50, neuGesamtCents: 500, monatsabrechnung: false })
     )
+  })
+
+  it('… aber der Dialog verspricht keine Monatsabrechnung — eingezogen wird sie nicht (B1)', () => {
+    const alt = barOhneGebuehr({ serviceFeeCents: 52, serviceFeePercentApplied: 5, serviceFeeMinCentsApplied: 50 })
+    expect(artikelFehltZeilen(artikelFehltRechnung(alt, 'brot'), 'Anna')?.saetze).toEqual([])
+    // Gegenprobe: ab dem Stichtag bestellt, steht der Satz da.
+    const neu = { ...alt, bestelltAm: GENAU }
+    expect(artikelFehltZeilen(artikelFehltRechnung(neu, 'brot'), 'Anna')?.saetze).toEqual([
+      'Die Monatsabrechnung nimmt die neue Servicegebühr.',
+    ])
   })
 
   it('online ändert sich nichts: Kundin € 5,82 zurück, vom Hof € 5,80', () => {
@@ -283,6 +341,28 @@ describe('„Artikel fehlt" (E14) bei Barzahlung', () => {
     expect(artikelFehltRechnung(online, 'brot')).toEqual(
       expect.objectContaining({ neuGebuehrCents: 50, erstattungCents: 582, vomHofCents: 580 })
     )
+  })
+})
+
+describe('gebuehrFuerMonatsabrechnung — die Frage hinter jedem Hof-Satz zur Monatsabrechnung', () => {
+  it('nur vor Ort, nur mit Gebühr, nie bar vor dem Stichtag', () => {
+    const f = (paymentMethod: 'ONSITE_CASH' | 'ONSITE_CARD' | 'ONLINE', serviceFeeCents: number, bestelltAm: Date) =>
+      gebuehrFuerMonatsabrechnung({ paymentMethod, serviceFeeCents, bestelltAm })
+    expect(f('ONSITE_CASH', 52, DANACH)).toBe(true)
+    expect(f('ONSITE_CASH', 52, GENAU)).toBe(true)
+    expect(f('ONSITE_CASH', 52, KURZ_VORHER)).toBe(false)
+    expect(f('ONSITE_CASH', 0, DANACH)).toBe(false)
+    expect(f('ONSITE_CARD', 52, LANGE_VORHER)).toBe(true)
+    expect(f('ONLINE', 52, DANACH)).toBe(false)
+  })
+
+  it('die Bestellansicht des Hofs fragt sie (Satz „die Gebühr holt die Monatsabrechnung")', () => {
+    expect(lies('src/components/hof-bestellungen/bestell-detail.tsx')).toMatch(
+      /betrag\.gebuehrFuerAbrechnung \? ' – die Gebühr holt die Monatsabrechnung\.'/
+    )
+    expect(lies('src/server/queries/orders.ts')).toMatch(/gebuehrFuerAbrechnung: gebuehrFuerMonatsabrechnung\(\{/)
+    // Gegenprobe: die alte Bedingung fiele auf.
+    expect("betrag.gebuehrCents > 0 ? ' – die Gebühr holt").not.toMatch(/betrag\.gebuehrFuerAbrechnung \?/)
   })
 })
 
@@ -380,17 +460,31 @@ describe('Admin-Finanzen: Barbestellungen vor dem Stichtag tragen nichts bei', (
 })
 
 describe('Texte — ehrlich, aus einer Quelle', () => {
-  it('/konditionen und /fuer-hoefe: der Grundsatz nennt die Bar-Ausnahme', () => {
-    expect(SERVICEGEBUEHR_ZAHLT_KUNDE).toContain(BAR_OHNE_GEBUEHR_SATZ)
-    expect(normal(SERVICEGEBUEHR_ZAHLT_KUNDE)).toBe(
+  it('/konditionen und /fuer-hoefe: der Grundsatz nennt die Bar-Ausnahme — nur vor dem Stichtag', () => {
+    expect(normal(servicegebuehrZahltKunde(LANGE_VORHER))).toBe(
       'Die Servicegebühr von 5 % (mind. € 0,50) zahlt der Kunde. ' +
         'Bei Barzahlung fällt bis 31. Jänner 2027 keine Servicegebühr an. ' +
         'Du bekommst immer den vollen Warenpreis – online wie bar.'
     )
+    expect(servicegebuehrZahltKunde(KURZ_VORHER)).toContain(BAR_OHNE_GEBUEHR_SATZ)
+    expect(servicegebuehrZahltKunde(GENAU)).toBe(SERVICEGEBUEHR_ZAHLT_KUNDE)
+    expect(SERVICEGEBUEHR_ZAHLT_KUNDE).not.toContain(BAR_OHNE_GEBUEHR_SATZ)
   })
 
-  it('/fuer-hoefe „Wie werde ich bezahlt?" nennt sie auch', () => {
-    expect(FUER_HOEFE_FRAGEN.some((f) => f.antwort.includes(BAR_OHNE_GEBUEHR_SATZ))).toBe(true)
+  it('/fuer-hoefe „Wie kommt das Geld zu mir?" nennt sie vor dem Stichtag, danach nicht', () => {
+    const geld = (jetzt: Date) => fuerHoefeFragen(jetzt).find((f) => f.frage === 'Wie kommt das Geld zu mir?')?.antwort
+    expect(geld(LANGE_VORHER)).toContain(BAR_OHNE_GEBUEHR_SATZ)
+    expect(geld(GENAU)).not.toContain(BAR_OHNE_GEBUEHR_SATZ)
+    expect(geld(GENAU)).toBe(FUER_HOEFE_FRAGEN.find((f) => f.frage === 'Wie kommt das Geld zu mir?')?.antwort)
+    // Die übrigen Fragen bleiben unverändert.
+    expect(fuerHoefeFragen(LANGE_VORHER).filter((f) => f.antwort.includes(BAR_OHNE_GEBUEHR_SATZ))).toHaveLength(1)
+  })
+
+  it('mitBarAusnahme hängt nur vor dem Stichtag an', () => {
+    expect(mitBarAusnahme('Text.', KURZ_VORHER)).toBe(`Text. ${BAR_OHNE_GEBUEHR_SATZ}`)
+    expect(mitBarAusnahme('Text.', GENAU)).toBe('Text.')
+    expect(vorBarStichtag(KURZ_VORHER)).toBe(true)
+    expect(vorBarStichtag(GENAU)).toBe(false)
   })
 
   it('die Monatsabrechnung verspricht keinen Einzug aus der Zeit davor', () => {
@@ -410,8 +504,11 @@ describe('Texte — ehrlich, aus einer Quelle', () => {
     expect(beispielRechnung(DANACH)).toEqual(expect.objectContaining({ gebuehrCents: 100, fussnote: BEISPIEL_GLEICH }))
   })
 
-  it('Startseite „Wie bezahle ich?" nennt die Bar-Ausnahme', () => {
-    expect(STARTSEITE_FRAGEN.find((f) => f.frage === 'Wie bezahle ich?')?.antwort).toContain(BAR_OHNE_GEBUEHR_HINWEIS)
+  it('Startseite „Wie bezahle ich?" nennt die Bar-Ausnahme nur vor dem Stichtag', () => {
+    const zahlen = (jetzt: Date) => startseitenFragen(jetzt).find((f) => f.frage === 'Wie bezahle ich?')?.antwort
+    expect(zahlen(LANGE_VORHER)).toContain(BAR_OHNE_GEBUEHR_HINWEIS)
+    expect(zahlen(GENAU)).not.toContain(BAR_OHNE_GEBUEHR_HINWEIS)
+    expect(zahlen(GENAU)).toBe(STARTSEITE_FRAGEN.find((f) => f.frage === 'Wie bezahle ich?')?.antwort)
   })
 })
 

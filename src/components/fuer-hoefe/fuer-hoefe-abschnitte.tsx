@@ -1,13 +1,13 @@
 import Link from 'next/link'
 import { Check, ChevronDown } from 'lucide-react'
 import {
-  FUER_HOEFE_FRAGEN,
   FUER_HOEFE_FUTTER,
   FUER_HOEFE_SCHLUSS,
   FUER_HOEFE_SCHRITTE,
   FUER_HOEFE_VORTEILE,
+  fuerHoefeFragen,
 } from '@/lib/fuer-hoefe'
-import { KONDITIONEN_UEBERGANG, PRO_MONAT, SERVICEGEBUEHR_ZAHLT_KUNDE, TARIFE, type TarifText } from '@/lib/konditionen'
+import { KONDITIONEN_UEBERGANG, PRO_MONAT, TARIFE, servicegebuehrZahltKunde, type TarifText } from '@/lib/konditionen'
 import { categoryImagePath } from '@/lib/product-image'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -125,7 +125,8 @@ function TarifKarte({ tarif, hervorgehoben }: { tarif: TarifText; hervorgehoben:
   )
 }
 
-export function FuerHoefePreise(): React.JSX.Element {
+/** `jetzt` von der Seite (beim Bauen bzw. Revalidieren): die Bar-Ausnahme (B1) steht nur vor dem Stichtag da. */
+export function FuerHoefePreise({ jetzt }: { jetzt: Date }): React.JSX.Element {
   return (
     <section aria-labelledby="preise-titel" className="py-12 md:py-16">
       <div className={cn(CONTAINER, 'grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-10')}>
@@ -137,7 +138,7 @@ export function FuerHoefePreise(): React.JSX.Element {
           {/* Die Karten zeigen die Tarife ab dem Stichtag — der Satz davor sagt
               das, damit kein Preis als heute fällig gelesen wird (K1). */}
           <p className="text-[14.5px] leading-normal font-semibold text-foreground">{KONDITIONEN_UEBERGANG}</p>
-          <p className="text-[14.5px] leading-normal text-foreground">{SERVICEGEBUEHR_ZAHLT_KUNDE}</p>
+          <p className="text-[14.5px] leading-normal text-foreground">{servicegebuehrZahltKunde(jetzt)}</p>
           <Link
             href="/konditionen"
             className={cn(
@@ -176,7 +177,7 @@ export function FuerHoefeFutter(): React.JSX.Element {
   )
 }
 
-export function FuerHoefeFragen(): React.JSX.Element {
+export function FuerHoefeFragen({ jetzt }: { jetzt: Date }): React.JSX.Element {
   return (
     <section aria-labelledby="fragen-titel" className="pb-12 md:pb-16">
       <div className={cn(CONTAINER, 'flex flex-col gap-4 md:flex-row md:gap-[60px]')}>
@@ -187,7 +188,7 @@ export function FuerHoefeFragen(): React.JSX.Element {
           </h2>
         </div>
         <div className="flex flex-1 flex-col border-t border-border">
-          {FUER_HOEFE_FRAGEN.map((eintrag, i) => (
+          {fuerHoefeFragen(jetzt).map((eintrag, i) => (
             <details key={eintrag.frage} name="fragen-hoefe" open={i === 0} className="group border-b border-border last:border-b-0">
               <summary
                 className={cn(

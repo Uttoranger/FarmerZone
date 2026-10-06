@@ -27,7 +27,7 @@ import { buildMapsUrl } from '@/lib/customer-links'
 import { hofInitialen } from '@/lib/hof-initialen'
 import {
   aktiverReiter,
-  gebuehrHinweis,
+  gebuehrHinweisFuerHof,
   hofseiteReiter,
   reiterAdresse,
   verfuegbarText,
@@ -40,7 +40,6 @@ import { korbErlaubt } from '@/lib/hofseite-vorschau'
 import { produktLink } from '@/lib/produktdetail'
 import { rueckweg, type KundenSeite } from '@/lib/kunden-kopf'
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
-import { servicegebuehrSatz } from '@/lib/servicegebuehr'
 import { kundenPausenText } from '@/lib/shop-pause'
 import { stripStatusVariables } from '@/lib/status-body'
 import { anzeigeBereichVon } from '@/lib/taxonomie'
@@ -145,8 +144,8 @@ export function HofseiteKunde({
     () => bereichWunsch === 'FUTTERMITTEL' && produkte.some((p) => anzeigeBereichVon(p.category) === 'FUTTERMITTEL')
   )
 
-  const satz = servicegebuehrSatz(farm, new Date(jetzt))
-  const gebuehr = gebuehrHinweis(satz)
+  // Mit den Zahlarten des Hofs und der Bar-Ausnahme bis zum SEPA-Start (B1).
+  const gebuehr = gebuehrHinweisFuerHof(farm, new Date(jetzt))
   const mitKorb = korbErlaubt({ isEditMode: false, kaufen: ansicht.kaufen })
   const kartenLink = buildMapsUrl(farm.address, farm.postalCode, farm.city)
 

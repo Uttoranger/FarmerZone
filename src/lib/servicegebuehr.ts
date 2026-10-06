@@ -15,7 +15,8 @@
  * nichts verloren, siehe order-totals.ts für das Float-Artefakt 3 × 1,10.
  */
 
-import { BAR_SERVICEGEBUEHR_AB } from '@/lib/konditionen'
+import type { PaymentMethod } from '@prisma/client'
+import { vorBarStichtag } from '@/lib/konditionen'
 import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
 
 /*
@@ -27,6 +28,13 @@ import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
 export { SERVICEGEBUEHR_STANDARD_MIND_CENTS, SERVICEGEBUEHR_STANDARD_PROZENT } from '@/lib/konditionen'
 export { centsAlsEuro } from '@/lib/format'
 export { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
+
+/**
+ * Die Zahlungsart einer Bestellung — das Prisma-Enum, nur als Typ eingebunden
+ * (src/lib bleibt ohne Prisma-Client, ARCHITECTURE §1). Eng statt `string`:
+ * Ein Tippfehler wie 'BAR' fiele sonst still durch die B1-Regel.
+ */
+export type Zahlungsart = PaymentMethod
 
 /** Die Hofeinstellung, so wie sie im Schema steht (Farm.serviceFee*). */
 export type ServicegebuehrEinstellung = {
@@ -90,11 +98,11 @@ function alsZeitpunkt(wert: Date | string | null): Date | null {
  * dem Stichtag bringt der Plattform nichts ein, auch eine ältere mit Gebühr
  * nicht — eingezogen wird sie nicht (B1).
  */
-export function barOhneServicegebuehr(zahlungsart: string, bestellZeitpunkt: Date | string): boolean {
+export function barOhneServicegebuehr(zahlungsart: Zahlungsart, bestellZeitpunkt: Date | string): boolean {
   const zeitpunkt = alsZeitpunkt(bestellZeitpunkt)
   // Unlesbarer Zeitpunkt: nicht befreien — die Gebühr folgt dann der Regel des Hofs.
   if (zeitpunkt === null) return false
-  return zahlungsart === 'ONSITE_CASH' && zeitpunkt.getTime() < BAR_SERVICEGEBUEHR_AB.getTime()
+  return zahlungsart === 'ONSITE_CASH' && vorBarStichtag(zeitpunkt)
 }
 
 /**
@@ -122,7 +130,7 @@ export function berechneServicegebuehr(
   warenpreisCents: number,
   einstellung: ServicegebuehrEinstellung,
   bestellZeitpunkt: Date,
-  zahlungsart: string
+  zahlungsart: Zahlungsart
 ): ServicegebuehrErgebnis {
   if (barOhneServicegebuehr(zahlungsart, bestellZeitpunkt)) {
     return { gebuehrCents: 0, prozentAngewendet: null }
@@ -224,6 +232,22 @@ export function gebuehrErstattungOffen(b: BestellungFuerGebuehrStatus): boolean 
     b.serviceFeeCents > 0 &&
     !gebuehrEntfallen(b)
   )
+}
+
+/**
+ * Schuldet der Hof diese Gebühr der Monatsabrechnung? Nur wenn er sie vor Ort
+ * kassiert, sie über 0 liegt und die Bestellung nicht bar vor dem SEPA-Start
+ * aufgegeben wurde (Register B1: deren Gebühr wird nicht eingezogen, auch bei
+ * einer älteren Bestellung, die noch eine trägt). Die EINE Frage hinter jedem
+ * Hof-Satz „… holt / nimmt die Monatsabrechnung" (Bestellansicht, Dialog
+ * „Artikel fehlt"); ohne sie steht der Satz nicht da.
+ */
+export function gebuehrFuerMonatsabrechnung(b: {
+  paymentMethod: Zahlungsart
+  serviceFeeCents: number
+  bestelltAm: Date | string
+}): boolean {
+  return istVorOrtZahlung(b.paymentMethod) && b.serviceFeeCents > 0 && !barOhneServicegebuehr(b.paymentMethod, b.bestelltAm)
 }
 
 /** Vor-Ort-Zahlung (bar ODER Karte beim Hof): der Hof kassiert selbst. */

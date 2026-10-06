@@ -9,7 +9,7 @@ import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
 import { formatEuro, formatGrundpreis, formatKategorie } from '@/lib/format'
 import { kartenZustand, knappText } from '@/lib/bereiche-anzeige'
-import { gebuehrHinweis, mengeAbgelehntText, zahlungsarten } from '@/lib/hofseite-kunde'
+import { gebuehrHinweisFuerHof, mengeAbgelehntText, zahlungsarten } from '@/lib/hofseite-kunde'
 import { VORSCHAU_KAUF_HINWEIS, korbErlaubt } from '@/lib/hofseite-vorschau'
 import {
   alleProdukteLink,
@@ -29,7 +29,7 @@ import {
   zweitePreiszeile,
 } from '@/lib/produktdetail'
 import { produktInitiale } from '@/lib/hofuebersicht'
-import { centsAlsEuro, servicegebuehrSatz } from '@/lib/servicegebuehr'
+import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { SHOP_PAUSED_BUTTON_LABEL, kundenPausenText } from '@/lib/shop-pause'
 import { SIEGEL } from '@/lib/taxonomie'
 import type { KundenSeite } from '@/lib/kunden-kopf'
@@ -107,8 +107,8 @@ export function ProduktdetailKunde({
   const produkt = gewaehlteGroesse(familie, einstieg, gewaehlt)
   const zustand = kartenZustand(produkt, farm.isPaused)
   const kaufbar = zustand.art === 'kaufbar' || zustand.art === 'knapp'
-  const satz = servicegebuehrSatz(farm, new Date(jetzt))
-  const gebuehr = gebuehrHinweis(satz)
+  // Mit den Zahlarten des Hofs und der Bar-Ausnahme bis zum SEPA-Start (B1).
+  const gebuehr = gebuehrHinweisFuerHof(farm, new Date(jetzt))
   const link = (id: string) => produktLink(farm.slug, id, alsVorschau)
 
   function imKorb(id: string): number {

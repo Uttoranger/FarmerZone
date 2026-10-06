@@ -31,6 +31,7 @@ import {
   monatsschluesselInWien,
   zerlegeMonat,
   type Monatsschluessel,
+  type Zahlungsart,
 } from '@/lib/servicegebuehr'
 
 // ─── Kosten ──────────────────────────────────────────────────────────────────
@@ -154,7 +155,7 @@ export function kostenSummeImMonat(
 export type BestellungFuerFinanzen = {
   createdAt: Date
   status: string
-  paymentMethod: string
+  paymentMethod: Zahlungsart
   paymentStatus: string
   /** Die Servicegebühr aus dem Snapshot, in Cent. */
   serviceFeeCents: number

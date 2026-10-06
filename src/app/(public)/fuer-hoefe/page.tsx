@@ -44,16 +44,19 @@ export const revalidate = 86400
  * src/lib/konditionen.ts, dieselbe Quelle wie /konditionen.
  */
 export default function FuerHoefePage(): React.JSX.Element {
+  // Einmal je Bau bzw. Revalidierung (revalidate unten): Danach entscheidet sich,
+  // ob die Bar-Ausnahme bis zum Stichtag (Register B1) noch dasteht.
+  const jetzt = new Date()
   return (
     <KundeShellMitSitzung>
       <FuerHoefeEinstieg />
       <FuerHoefeVorteile />
       <FuerHoefeSchritte />
-      <FuerHoefePreise />
+      <FuerHoefePreise jetzt={jetzt} />
       <FuerHoefeFutter />
-      <FuerHoefeFragen />
+      <FuerHoefeFragen jetzt={jetzt} />
       <FuerHoefeSchluss />
-      <StartseiteFuss jahr={new Date().getFullYear()} />
+      <StartseiteFuss jahr={jetzt.getFullYear()} />
     </KundeShellMitSitzung>
   )
 }

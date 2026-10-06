@@ -11,9 +11,10 @@
  *    mit Gebühr nicht — und ab dem Stichtag wie bisher. Beide Sichten geben
  *    für denselben Monat dieselbe Summe.
  *
- * Der Checkout nimmt die Systemuhr (TESTING_GUIDELINES, „Zeit in der
- * Integrationsschicht"); die Checkout-Fälle laufen deshalb nur vor dem
- * Stichtag. Die Finanz-Fälle setzen `createdAt` selbst und laufen immer.
+ * Der Checkout nimmt seine eigene Uhr (`new Date()`). Die Checkout-Fälle
+ * stellen deshalb `Date` (nur `Date`, Zeitgeber und Datenbank laufen echt) auf
+ * Tage vor bzw. nach dem Stichtag — so laufen sie auch nach Februar 2027 und
+ * entfallen nie still. Die Finanz-Fälle setzen `createdAt` selbst.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
@@ -56,9 +57,22 @@ async function hofMitGebuehr() {
   return { farm, produkt }
 }
 
-const VOR_DEM_STICHTAG = Date.now() < BAR_SERVICEGEBUEHR_AB.getTime()
+const TAG_MS = 24 * 60 * 60 * 1000
 
-describe.runIf(VOR_DEM_STICHTAG)('Checkout vor dem Stichtag — echte Datenbank', () => {
+function uhrAuf(zeitpunkt: Date): void {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(zeitpunkt)
+}
+
+afterEach(() => {
+  vi.useRealTimers()
+})
+
+describe('Checkout vor dem Stichtag — echte Datenbank', () => {
+  beforeEach(() => {
+    uhrAuf(new Date(BAR_SERVICEGEBUEHR_AB.getTime() - 3 * TAG_MS))
+  })
+
   it('bar: 0 Cent, Prozent und Mindestgebühr leer, kein Stripe, die Mail kennt 0', async () => {
     const { farm, produkt } = await hofMitGebuehr()
     const sitzung = intKennung('sitzung')
@@ -104,6 +118,30 @@ describe.runIf(VOR_DEM_STICHTAG)('Checkout vor dem Stichtag — echte Datenbank'
     expect(bestellt.serviceFeeCents).toBe(100)
     expect(bestellt.serviceFeeMinCentsApplied).toBe(50)
     expect(anlegen.mock.calls[0]![0]).toMatchObject({ amount: 2100, application_fee_amount: 100 })
+  })
+})
+
+describe('Checkout ab dem Stichtag — echte Datenbank', () => {
+  it('bar: die Gebühr gilt wieder, mit Prozent und Mindestgebühr im Snapshot', async () => {
+    uhrAuf(new Date(BAR_SERVICEGEBUEHR_AB.getTime() + 2 * TAG_MS))
+    const { farm, produkt } = await hofMitGebuehr()
+    const sitzung = intKennung('sitzung')
+    await setzeHalt(produkt.id, sitzung, 2)
+
+    const antwort = await checkout(
+      checkoutAnfrage({
+        farm,
+        sessionId: sitzung,
+        paymentMethod: 'ONSITE_CASH',
+        positionen: [{ productId: produkt.id, name: 'Testprodukt', quantity: 2, unitPrice: 10 }],
+      })
+    )
+
+    expect(antwort.status).toBe(200)
+    const bestellt = await prisma.order.findFirstOrThrow({ where: { farmId: farm.id } })
+    expect(bestellt.serviceFeeCents).toBe(100)
+    expect(bestellt.serviceFeePercentApplied?.toNumber()).toBe(5)
+    expect(bestellt.serviceFeeMinCentsApplied).toBe(50)
   })
 })
 

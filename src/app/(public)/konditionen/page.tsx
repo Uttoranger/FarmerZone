@@ -9,10 +9,10 @@ import {
   MONATSABRECHNUNG_TEXT,
   PRO_MONAT,
   SERVICEGEBUEHR_SATZ_TEXT,
-  SERVICEGEBUEHR_ZAHLT_KUNDE,
   STARTPHASE_SATZ,
   TARIFE,
   TARIFE_AB_SATZ,
+  servicegebuehrZahltKunde,
 } from '@/lib/konditionen'
 
 export const metadata: Metadata = {
@@ -38,6 +38,8 @@ const CTA_MAILTO = `mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent('Mein H
 // (tests/konditionen-seiten.test.ts). Bis Nr. 15 stand hier das
 // Gründungshof-Angebot; den Umbau der Seite ins neue Design macht Gate 8.
 export default function KonditionenPage() {
+  // Statisch: Beim Bauen entscheidet sich, ob die Bar-Ausnahme bis zum Stichtag (B1) dasteht.
+  const jetzt = new Date()
   return (
     <div className="min-h-screen bg-background">
       <KundenKopf seite={{ art: 'info' }} />
@@ -70,7 +72,7 @@ export default function KonditionenPage() {
 
           <section>
             <h2 className="font-semibold text-foreground text-base mb-3">Servicegebühr und Abrechnung</h2>
-            <p>{SERVICEGEBUEHR_ZAHLT_KUNDE}</p>
+            <p>{servicegebuehrZahltKunde(jetzt)}</p>
             <p className="mt-3">{MONATSABRECHNUNG_TEXT}</p>
           </section>
 

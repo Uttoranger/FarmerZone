@@ -23,6 +23,7 @@ import {
   kalendertagInWien,
   servicegebuehrSatz,
   type ServicegebuehrEinstellung,
+  type Zahlungsart,
 } from '@/lib/servicegebuehr'
 
 // ─── Zahlarten (E5) ─────────────────────────────────────────────────────────
@@ -123,7 +124,7 @@ export function kassenBetraege(
   positionen: readonly { productId: string; price: number; quantity: number }[],
   hof: ServicegebuehrEinstellung,
   jetzt: Date,
-  zahlungsart: string
+  zahlungsart: Zahlungsart
 ): KassenBetraege {
   const { zeilenCents } = korbBetraege(positionen)
   const warenCents = decimalZuCents(calcTotalAmount(positionen.map((p) => ({ unitPrice: p.price, quantity: p.quantity }))))
