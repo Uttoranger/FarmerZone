@@ -38,6 +38,17 @@ export type HofZustandArt = 'sichtbar' | 'pausiert' | 'wartet' | 'aus' | 'stillg
  */
 export type SchildFarbe = 'gruen' | 'bernstein' | 'grau' | 'rot'
 
+/**
+ * Das Schild im neuen Design als StatusBadge-Ton (components/ui/status-badge.tsx):
+ * Grün = fertig, Bernstein = offen (Orange), Grau = neutral. Rot gibt es dort
+ * nicht — „Ausverkauft" und Ähnliches ist ein offener Zustand.
+ */
+export function schildTon(farbe: SchildFarbe): 'offen' | 'fertig' | 'neutral' {
+  if (farbe === 'gruen') return 'fertig'
+  if (farbe === 'grau') return 'neutral'
+  return 'offen'
+}
+
 export type HofZustand = {
   art: HofZustandArt
   /**

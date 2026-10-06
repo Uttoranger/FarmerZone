@@ -37,7 +37,7 @@ export function AdresseKopierenKnopf({ url, className }: { url: string; classNam
       )}
     >
       {kopiert ? (
-        <Check className="size-4 text-green-700 dark:text-green-300" strokeWidth={2} aria-hidden="true" />
+        <Check className="size-4 text-brand-text" strokeWidth={2} aria-hidden="true" />
       ) : (
         <Copy className="size-4" strokeWidth={1.7} aria-hidden="true" />
       )}

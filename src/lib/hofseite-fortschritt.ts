@@ -302,3 +302,24 @@ export const ZIEL_ABSCHNITT: Record<HofseiteZeileId, string> = {
   bestellungen: 'bestellungen',
   abschnitte: 'abschnitte',
 }
+
+/**
+ * Wo ein Punkt der Liste in den bestehenden Einstellungen bearbeitet wird —
+ * für die Checkliste am Handy (components/mein-hof/checkliste-kompakt.tsx),
+ * deren fehlende Punkte dorthin verlinken. Ab lg öffnen dieselben Punkte ihr
+ * Formular direkt in der Zeile (hofseite-editor.tsx). Jedes Ziel ist eine
+ * Seite unter src/app/(farmer)/settings (tests/mein-hof-seite.test.ts).
+ */
+export const EINSTELLUNG_FUER_ZEILE: Record<HofseiteZeileId, string> = {
+  titelbild: '/settings/appearance',
+  logo: '/settings/appearance',
+  name: '/settings/profile',
+  'ueber-uns': '/settings/appearance',
+  fotos: '/settings/appearance',
+  adresse: '/settings/profile',
+  abholzeiten: '/settings/pickup-slots',
+  zahlung: '/settings/payments',
+  kontakt: '/settings/profile',
+  bestellungen: '/settings/pause',
+  abschnitte: '/settings/appearance',
+}

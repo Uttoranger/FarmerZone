@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable'
 import { useReorderSensors } from './use-reorder-sensors'
@@ -19,11 +19,16 @@ export function ReorderContext({
   children: ReactNode
 }) {
   const sensors = useReorderSensors()
+  // Feste Kennung für Server und Browser: Ohne sie zählt dnd-kit seine
+  // Beschreibungs-IDs (aria-describedby="DndDescribedBy-N") je Umgebung
+  // selbst hoch, und die Zahlen weichen ab — Hydration-Fehler auf
+  // /farm-page (Befund Nachtlauf Nr. 10). useId ist in beiden gleich.
+  const id = useId()
 
   if (!enabled) return <>{children}</>
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+    <DndContext id={id} sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
       <SortableContext items={items} strategy={rectSortingStrategy}>
         {children}
       </SortableContext>

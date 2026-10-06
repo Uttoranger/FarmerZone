@@ -269,7 +269,7 @@ describe('FarmPageView binden genau zwei Stellen ein', () => {
     const seite = ohneKommentare(quelle('src/app/(public)/[farmSlug]/page.tsx'))
     expect(seite.match(/ownerMode=\{[^}]*\}/g)).toEqual(['ownerMode={false}'])
     const besitzerSeiten = SRC.filter((pfad) => /<FarmPageClient\b/.test(ohneKommentare(quelle(pfad))))
-    expect(besitzerSeiten).toEqual(['src/app/(farmer)/farm-page/page.tsx'])
+    expect(besitzerSeiten).toEqual(['src/app/(hof)/farm-page/page.tsx'])
   })
 })
 

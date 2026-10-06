@@ -11,7 +11,11 @@ import { Schild } from '@/components/farmer/schild'
 import { cn } from '@/lib/utils'
 
 /*
- * Der gemeinsame Kopf von „Mein Hof" über zwei vorhandenen Seiten: Hofseite
+ * Der Bestandskopf von „Mein Hof" — seit Nachtlauf Nr. 16 nur noch über
+ * /status (Bestandslayout). /farm-page steht in der HofShell und trägt
+ * components/mein-hof/seitenkopf.tsx; zieht /status um, fällt diese Datei.
+ *
+ * Ursprünglich der gemeinsame Kopf über zwei vorhandenen Seiten: Hofseite
  * (/farm-page) und Beiträge (/status). Produkte hat seinen eigenen Platz in
  * der Leiste. Die Seiten selbst bleiben, wie sie sind; jede rendert diesen
  * Kopf mit ihrem Reiter. Die

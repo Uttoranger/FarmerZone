@@ -14,6 +14,7 @@ import {
 } from '@/lib/hofseite-vorschau'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 
 /**
  * Die Vorschau im Editor ab lg: die echte öffentliche Hofseite im
@@ -75,7 +76,7 @@ function useElementGroesse(): { ref: (el: HTMLElement | null) => void; breite: n
 /** Handy | Web — zwei gedrückte Knöpfe, kein Tab: Die Bearbeitung daneben bleibt, nur das Gerät wechselt. */
 function GeraetUmschalter({ wert, onWert }: { wert: VorschauGeraet; onWert: (g: VorschauGeraet) => void }): React.JSX.Element {
   return (
-    <div role="group" aria-label="Gerät der Vorschau" className="flex gap-0.5 rounded-full bg-app-trough p-0.5 ring-1 ring-border/60">
+    <div role="group" aria-label="Gerät der Vorschau" className="flex gap-[3px] rounded-full border border-border bg-background p-[3px]">
       {GERAETE.map(({ id, label, Symbol }) => (
         <button
           key={id}
@@ -83,8 +84,9 @@ function GeraetUmschalter({ wert, onWert }: { wert: VorschauGeraet; onWert: (g: 
           aria-pressed={wert === id}
           onClick={() => onWert(id)}
           className={cn(
-            'inline-flex min-h-11 items-center gap-1.5 rounded-full px-3.5 text-[12.5px] transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-            wert === id ? 'bg-card font-semibold text-app-ink shadow-sm' : 'font-medium text-app-ink-soft hover:text-app-ink'
+            'inline-flex min-h-11 items-center gap-1.5 rounded-full px-3.5 text-[13px] transition-colors duration-[250ms]',
+            FOKUS_RAHMEN,
+            wert === id ? 'bg-border font-semibold text-foreground' : 'font-medium text-muted-foreground hover:text-foreground'
           )}
         >
           <Symbol className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
@@ -159,13 +161,13 @@ function VorschauSeite({
 /** Die Kopfleiste des Browser-Rähmchens: drei Punkte, die Adresse der Hofseite. */
 function BrowserLeiste({ adresse }: { adresse: string }): React.JSX.Element {
   return (
-    <div className="flex h-9 items-center gap-3 border-b border-border bg-app-trough px-3" aria-hidden="true">
+    <div className="flex h-9 items-center gap-3 border-b border-border bg-muted px-3" aria-hidden="true">
       <span className="flex gap-1.5">
-        <span className="size-2.5 rounded-full bg-app-ink-faint/60" />
-        <span className="size-2.5 rounded-full bg-app-ink-faint/60" />
-        <span className="size-2.5 rounded-full bg-app-ink-faint/60" />
+        <span className="size-2.5 rounded-full bg-muted-foreground/50" />
+        <span className="size-2.5 rounded-full bg-muted-foreground/50" />
+        <span className="size-2.5 rounded-full bg-muted-foreground/50" />
       </span>
-      <span className="mx-auto max-w-[70%] truncate rounded-full bg-card px-3 py-0.5 text-[11.5px] text-app-ink-soft ring-1 ring-border/60">
+      <span className="mx-auto max-w-[70%] truncate rounded-full bg-card px-3 py-0.5 text-[11.5px] text-muted-foreground ring-1 ring-border">
         {adresse}
       </span>
       <span className="w-9" />
@@ -187,11 +189,11 @@ function Geraeterahmen({
     <div
       className={cn(
         geraet === 'handy'
-          ? // Der Rahmen in der Tintenfarbe: in beiden Modi dunkler als die Karte
-            // darunter. Sein Schatten ist schwarz mit Deckkraft wie der der
-            // Titelbild-Knöpfe — er liegt auf der Fläche, nicht auf einer Karte.
-            'mx-auto w-fit rounded-[2.4rem] bg-app-ink p-2 shadow-[0_12px_32px] shadow-black/25'
-          : 'w-full overflow-hidden rounded-2xl bg-card ring-1 ring-border/60 dark:ring-border'
+          ? // Ein Gerät, kein Teil der Seite: fast schwarz in beiden Modi wie im
+            // Mockup — primary-foreground ist im neuen Design theme-fest dunkel
+            // (DESIGN_SYSTEM „Farbtokens"), der Schatten aus derselben Farbe.
+            'mx-auto w-fit rounded-[2.4rem] border border-border bg-primary-foreground p-2 shadow-[0_12px_32px] shadow-primary-foreground/30'
+          : 'w-full overflow-hidden rounded-2xl border border-border bg-card'
       )}
     >
       {geraet === 'web' && <BrowserLeiste adresse={adresse} />}
@@ -243,8 +245,8 @@ function VorschauOverlay({
       >
         <div className="flex shrink-0 items-center gap-4 border-b border-border px-6 py-3">
           <div className="flex min-w-0 items-baseline gap-2.5">
-            <DialogTitle className="font-heading text-[17px] font-semibold text-app-ink">Vorschau</DialogTitle>
-            <DialogDescription className="truncate text-[13.5px] text-app-ink-soft">{hofName} · so sehen Kunden deine Hofseite</DialogDescription>
+            <DialogTitle className="font-heading text-[17px] font-semibold text-foreground">Vorschau</DialogTitle>
+            <DialogDescription className="truncate text-[13.5px] text-muted-foreground">{hofName} · so sehen Kunden deine Hofseite</DialogDescription>
           </div>
           <div className="flex flex-1 justify-center">
             <GeraetUmschalter wert={geraet} onWert={onGeraet} />
@@ -253,7 +255,7 @@ function VorschauOverlay({
             href={vorschauLink(slug)}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border px-4 text-[13px] font-medium text-app-ink transition-colors hover:bg-muted/50"
+            className={cn('inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border px-4 text-[13px] font-medium text-foreground transition-colors hover:bg-muted', FOKUS_RAHMEN)}
           >
             In neuem Tab öffnen
             <ArrowUpRight className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
@@ -261,12 +263,12 @@ function VorschauOverlay({
           </a>
           <DialogClose
             aria-label="Vorschau schließen"
-            className="inline-flex size-11 items-center justify-center rounded-full text-app-ink-soft transition-colors hover:bg-muted/50 hover:text-app-ink outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            className={cn('inline-flex size-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground', FOKUS_RAHMEN)}
           >
             <X className="size-5" strokeWidth={1.7} aria-hidden="true" />
           </DialogClose>
         </div>
-        <div ref={flaeche} className="flex min-h-0 flex-1 items-start justify-center overflow-hidden bg-app-page p-4">
+        <div ref={flaeche} className="flex min-h-0 flex-1 items-start justify-center overflow-hidden bg-background p-4">
           {/* Erst messen, dann rendern: ein iframe ohne Maß lüde die Seite in 0 × 0. */}
           {breite > 0 && (
             <Geraeterahmen geraet={geraet} adresse={adresse}>
@@ -282,7 +284,7 @@ function VorschauOverlay({
             </Geraeterahmen>
           )}
         </div>
-        <p className="shrink-0 border-t border-border px-6 py-2 text-center text-xs text-app-ink-soft">
+        <p className="shrink-0 border-t border-border px-6 py-2 text-center text-xs text-muted-foreground">
           Scrollt wie im Browser · Der Umschalter oben wechselt zwischen Handy und Web
         </p>
       </DialogContent>
@@ -333,7 +335,7 @@ export function HofseiteVorschauRahmen({
   return (
     <aside className="sticky top-6" aria-label="Vorschau">
       <div className="flex items-center justify-between gap-3 px-1">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-app-ink-soft">Vorschau</p>
+        <p className="text-[11px] font-semibold tracking-[1.1px] text-muted-foreground uppercase">Vorschau</p>
         <GeraetUmschalter wert={angezeigt} onWert={waehle} />
       </div>
       <div ref={panel} className="mt-2">
@@ -356,7 +358,7 @@ export function HofseiteVorschauRahmen({
         <button
           type="button"
           onClick={() => oeffneOverlay(angezeigt)}
-          className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full border border-border text-[13px] font-medium text-app-ink transition-colors hover:bg-muted/50 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          className={cn('inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full border border-border bg-card text-[13px] font-medium text-foreground transition-colors hover:bg-muted', FOKUS_RAHMEN)}
         >
           <Maximize2 className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
           Vergrößern
@@ -365,14 +367,14 @@ export function HofseiteVorschauRahmen({
           href={vorschauLink(slug)}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium text-app-ink-soft transition-colors hover:text-app-ink outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          className={cn('inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground', FOKUS_RAHMEN)}
         >
           Neuer Tab
           <ArrowUpRight className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
           <span className="sr-only"> (öffnet in neuem Tab)</span>
         </a>
       </div>
-      <p className="mt-2 px-1 text-xs leading-relaxed text-app-ink-soft">
+      <p className="mt-2 px-1 text-xs leading-relaxed text-muted-foreground">
         {angezeigt === 'web'
           ? 'So sieht deine Hofseite im Browser aus. Du kannst darin blättern; nach dem Speichern zeigt sie den neuen Stand.'
           : 'Echte Kundenseite, inklusive Navigation. Die gerade geöffnete Zeile leuchtet in der Vorschau auf.'}

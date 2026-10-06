@@ -46,11 +46,12 @@ import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 import { VORSCHAU_BEARBEITUNG_BREITE, VORSCHAU_WEB_MINDESTBREITE, type VorschauGeraet } from '@/lib/hofseite-vorschau'
 import { useMindestbreite } from '@/lib/use-mindestbreite'
 import { CoverEditButton, CoverFocusAdjust, TITELBILD_KNOPF_STIL } from '@/components/farm/farm-page-view'
-import { SCHATTEN } from '@/components/farmer/mein-hof-kopf'
 import { GallerySection, LogoUpload } from '@/app/(farmer)/settings/appearance/appearance-client'
 import { PickupSlotsClient } from '@/components/settings/pickup-slots-client'
 import { PauseClient } from '@/components/settings/pause-client'
-import { Schild } from '@/components/farmer/schild'
+import { StatusBadge } from '@/components/ui/status-badge'
+import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
+import { schildTon } from '@/lib/mein-hof'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -161,11 +162,11 @@ function Feld({
 }) {
   return (
     <div>
-      <Label htmlFor={id} className="mb-1 block text-sm text-app-ink-soft">
+      <Label htmlFor={id} className="mb-1 block text-sm text-muted-foreground">
         {label}
       </Label>
       {children}
-      {fehler?.message && <p className="mt-1 text-xs text-destructive">{fehler.message}</p>}
+      {fehler?.message && <p className="mt-1 text-xs font-medium text-status-offen">{fehler.message}</p>}
     </div>
   )
 }
@@ -222,7 +223,7 @@ function NameForm({ einstellungen, onGespeichert, onAbbrechen }: FormularProps) 
     <form onSubmit={handleSubmit(speichern)} className="space-y-3">
       <Feld id="hofseite-name" label="Hofname" fehler={formState.errors.name}>
         <Input id="hofseite-name" {...register('name')} />
-        <FeldZaehler control={control} name="name" max={HOFNAME_MAX} leise="text-app-ink-soft" />
+        <FeldZaehler control={control} name="name" max={HOFNAME_MAX} leise="text-muted-foreground" />
       </Feld>
       <Feld id="hofseite-beschreibung" label="Kurzbeschreibung — ein Satz, der unter dem Namen steht" fehler={formState.errors.description}>
         <Textarea id="hofseite-beschreibung" rows={2} {...register('description')} />
@@ -255,7 +256,7 @@ function AdresseForm({ einstellungen, onGespeichert, onAbbrechen }: FormularProp
         </Feld>
       </div>
       {/* Der Kartenpunkt braucht die Karte — die gibt es im Hofprofil. */}
-      <Link href="/settings/profile" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-brand-text underline-offset-2 hover:underline">
+      <Link href="/settings/profile" className={cn('inline-flex min-h-11 items-center gap-1 rounded-sm text-sm font-semibold text-brand-text underline-offset-2 hover:underline', FOKUS_RAHMEN)}>
         {hatPunkt ? 'Standort auf der Karte ändern' : 'Standort auf der Karte setzen'}
         <ArrowRight className="size-4" strokeWidth={1.7} aria-hidden="true" />
       </Link>
@@ -278,14 +279,14 @@ function KontaktForm({ einstellungen, onGespeichert, onAbbrechen }: FormularProp
       <div className="grid grid-cols-2 gap-3">
         <Feld id="hofseite-telefon" label="Telefon" fehler={formState.errors.phone}>
           <Input id="hofseite-telefon" type="tel" {...register('phone')} />
-          <FeldZaehler control={control} name="phone" max={TELEFON_MAX} leise="text-app-ink-soft" />
+          <FeldZaehler control={control} name="phone" max={TELEFON_MAX} leise="text-muted-foreground" />
         </Feld>
         <Feld id="hofseite-email" label="E-Mail" fehler={formState.errors.email}>
           <Input id="hofseite-email" type="email" {...register('email')} />
-          <FeldZaehler control={control} name="email" max={EMAIL_MAX} leise="text-app-ink-soft" />
+          <FeldZaehler control={control} name="email" max={EMAIL_MAX} leise="text-muted-foreground" />
         </Feld>
       </div>
-      <p className="text-xs text-app-ink-soft">Beides steht für Kunden auf der Hofseite.</p>
+      <p className="text-xs text-muted-foreground">Beides steht für Kunden auf der Hofseite.</p>
       <Aktionen pending={pending} onAbbrechen={onAbbrechen} />
     </form>
   )
@@ -365,9 +366,9 @@ function AbschnitteForm({
           const fest = s.key === 'products'
           return (
             <li key={s.key} className="flex min-h-11 items-center justify-between gap-3 py-1">
-              <Label htmlFor={`abschnitt-${s.key}`} className="text-sm text-app-ink">
+              <Label htmlFor={`abschnitt-${s.key}`} className="text-sm text-foreground">
                 {ABSCHNITT_LABEL[s.key] ?? s.key}
-                {fest && <span className="text-app-ink-soft"> · immer sichtbar</span>}
+                {fest && <span className="text-muted-foreground"> · immer sichtbar</span>}
               </Label>
               <Switch
                 id={`abschnitt-${s.key}`}
@@ -381,7 +382,7 @@ function AbschnitteForm({
           )
         })}
       </ul>
-      <p className="mt-2 text-xs text-app-ink-soft">Die Reihenfolge änderst du unter Einstellungen → Mein Auftritt.</p>
+      <p className="mt-2 text-xs text-muted-foreground">Die Reihenfolge änderst du unter Einstellungen → Mein Auftritt.</p>
       <Aktionen pending={pending} onAbbrechen={onAbbrechen} />
     </form>
   )
@@ -442,7 +443,7 @@ function TitelbildZeile({ hof, onGespeichert }: { hof: HofseiteEditorHof; onGesp
           </div>
         )}
       </div>
-      <p className="mt-2 text-xs text-app-ink-soft">
+      <p className="mt-2 text-xs text-muted-foreground">
         Querformat wirkt am besten. Der Ausschnitt gilt für das hohe Titelbild auf der Hofseite.
       </p>
     </div>
@@ -471,17 +472,17 @@ function Zeile({
         onClick={onToggle}
         aria-expanded={offen}
         aria-controls={inhaltId}
-        className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        className={cn('flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted', FOKUS_RAHMEN_INNEN)}
       >
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-app-chip text-app-chip-ink">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-muted text-foreground">
           <Zeichen className="size-4" strokeWidth={1.7} aria-hidden="true" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold text-app-ink">{zeile.titel}</span>
-          <span className="block truncate text-[13px] text-app-ink-soft">{zeile.wert}</span>
+          <span className="block text-sm font-semibold text-foreground">{zeile.titel}</span>
+          <span className="block truncate text-[13px] text-muted-foreground">{zeile.wert}</span>
         </span>
         {zeile.marke ? (
-          <Schild farbe={zeile.marke.farbe}>{zeile.marke.text}</Schild>
+          <StatusBadge status={schildTon(zeile.marke.farbe)}>{zeile.marke.text}</StatusBadge>
         ) : (
           <>
             <Check className="size-4 shrink-0 text-brand-text" strokeWidth={2.2} aria-hidden="true" />
@@ -489,7 +490,7 @@ function Zeile({
           </>
         )}
         <ChevronRight
-          className={cn('size-4 shrink-0 text-app-ink-faint transition-transform', offen && 'rotate-90')}
+          className={cn('size-4 shrink-0 text-muted-foreground transition-transform', offen && 'rotate-90')}
           aria-hidden="true"
         />
       </button>
@@ -535,7 +536,7 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt }: Pr
           <div>
             {/* Der Schlüssel wechselt mit dem Logo: Nach dem Refresh zeigt der Baustein den neuen Stand. */}
             <LogoUpload key={hof.logoUrl ?? 'kein-logo'} logoUrl={hof.logoUrl} onUploaded={nachSpeichern} />
-            <p className="mt-2 text-xs text-app-ink-soft">Quadratisch wirkt am besten · sonst zeigen wir den Anfangsbuchstaben.</p>
+            <p className="mt-2 text-xs text-muted-foreground">Quadratisch wirkt am besten · sonst zeigen wir den Anfangsbuchstaben.</p>
           </div>
         )
       case 'name':
@@ -551,11 +552,11 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt }: Pr
       case 'zahlung':
         return (
           <div className="space-y-2">
-            <p className="text-sm text-app-ink-soft">
+            <p className="text-sm text-muted-foreground">
               Bar bei Abholung geht immer. Online-Zahlung läuft über ein Stripe-Konto — das richtest du in den
               Einstellungen ein.
             </p>
-            <Link href="/settings/payments" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-brand-text underline-offset-2 hover:underline">
+            <Link href="/settings/payments" className={cn('inline-flex min-h-11 items-center gap-1 rounded-sm text-sm font-semibold text-brand-text underline-offset-2 hover:underline', FOKUS_RAHMEN)}>
               Zahlungen einrichten
               <ArrowRight className="size-4" strokeWidth={1.7} aria-hidden="true" />
             </Link>
@@ -571,29 +572,32 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt }: Pr
   }
 
   return (
-    <div className="flex items-start gap-8">
+    // data-app-palette: Die eingebundenen Formulare der Einstellungen (Logo,
+    // Fotos, Abholzeiten, Pause, Titelbild) zeichnen noch mit --app-*; hier
+    // nehmen sie die Werte des Design-Systems an (globals.css).
+    <div data-app-palette="neu" className="flex items-start gap-6 xl:gap-8">
       <div className="min-w-0 flex-1 space-y-6">
         {/* Fortschritt */}
-        <div className={cn('rounded-2xl bg-card p-5 ring-1 ring-border/60 dark:ring-border', SCHATTEN)}>
+        <div className="rounded-2xl border border-border bg-card p-5">
           <div className="flex items-baseline justify-between gap-3">
-            <h2 className="font-heading text-lg font-semibold text-app-ink">
+            <h2 className="font-heading text-lg font-semibold text-foreground">
               Deine Hofseite ist zu {fortschritt.erledigt} von {fortschritt.gesamt} fertig
             </h2>
-            <p className="shrink-0 text-sm font-semibold tabular-nums text-app-ink-soft">{fortschritt.prozent} %</p>
+            <p className="shrink-0 text-sm font-semibold tabular-nums text-muted-foreground">{fortschritt.prozent} %</p>
           </div>
           {/* Der Wert steht daneben als Text; der Balken ist Veranschaulichung. */}
-          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-app-trough" aria-hidden="true">
-            <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${fortschritt.prozent}%`, background: 'var(--app-button)' }} />
+          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
+            <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${fortschritt.prozent}%` }} />
           </div>
-          <p className="mt-3 text-sm text-app-ink-soft">{fortschritt.satz}</p>
+          <p className="mt-3 text-sm text-muted-foreground">{fortschritt.satz}</p>
         </div>
 
         {fortschritt.gruppen.map((gruppe) => (
           <section key={gruppe.id} aria-labelledby={`hofseite-gruppe-${gruppe.id}`}>
-            <h3 id={`hofseite-gruppe-${gruppe.id}`} className="px-1 text-[11px] font-semibold uppercase tracking-wider text-app-ink-soft">
+            <h3 id={`hofseite-gruppe-${gruppe.id}`} className="px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               {gruppe.titel}
             </h3>
-            <ul className={cn('mt-2 overflow-hidden rounded-2xl bg-card ring-1 ring-border/60 dark:ring-border', SCHATTEN)}>
+            <ul className="mt-2 overflow-hidden rounded-2xl border border-border bg-card">
               {gruppe.zeilen.map((zeile) => (
                 <Zeile
                   key={zeile.id}
