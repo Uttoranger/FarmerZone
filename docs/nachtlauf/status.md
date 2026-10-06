@@ -30,10 +30,10 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 19 | Bestellungen | fertig | `nacht/2026-10-06/19-bestellungen` | #188 | 18 (#187) | 4 Geldpfad-Punkte offen → 19c; `maxDuration` mit Vercel-Plan abgleichen | 06.10.2026 |
 | 19c | Geldpfad „Artikel fehlt" nachziehen | fertig | `nacht/2026-10-06/19c-geldpfad` | #191 | main | Stripe-Abo `refund.failed`/`charge.refund.updated` setzen; gescheiterter Voll-Storno nur gemeldet | 06.10.2026 |
 | 19a | B1 – keine Bargebühr bis zum Stichtag | fertig | `nacht/2026-10-06/19a-bargebuehr` | #192 | 19c (#191) | Mockup-Abweichungen Kasse/Startseite freigeben | 06.10.2026 |
-| 19b | Sicherheits-Altlasten aus Lauf 4 | läuft | `nacht/2026-10-06/19b-sicherheit` | | 19a (#192) | | 06.10.2026 |
+| 19b | Sicherheits-Altlasten aus Lauf 4 | fertig | `nacht/2026-10-06/19b-sicherheit` | #193 | 19a (#192) | Foto-Upload nach Deploy prüfen; Registrierung: Aufzählung nicht ganz geschlossen | 06.10.2026 |
 | 20 | Futter und Brennmaterial | offen | | | | | |
 | 21 | Teilen | offen | | | | | |
-| 22a | Kunden und Kundendetail | offen | | | | | |
+| 22a | Kunden und Kundendetail | läuft | `nacht/2026-10-06/22a-kunden` | | 19b (#193) | | 06.10.2026 |
 | 22b | Verkäufe und „Verkauf eintragen" | offen | | | | | |
 | 22c | Auswertung und Region | offen | | | | | |
 | 22d | Einstellungen | offen | | | | | |
