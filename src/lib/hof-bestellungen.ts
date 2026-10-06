@@ -13,6 +13,7 @@ import { abholChip, abholtagName, PACK_MARKE } from '@/lib/heute'
 import { formatSlotTime } from '@/lib/pickup-days'
 import { artikelFehltErlaubt } from '@/lib/artikel-fehlt'
 import type { HofBestellFilter } from '@/schemas/hof-bestellungen'
+import type { PaymentMethod, PaymentStatus } from '@prisma/client'
 /** Die Töne der StatusBadge (src/components/ui/status-badge.tsx). */
 type StatusTon = 'offen' | 'fertig' | 'neutral'
 
@@ -215,8 +216,8 @@ export function bestellAktionen(b: { status: string; paymentMethod: string; offe
 
 /** Der Zahlstand, den ein Rückweg liest — so, wie er in der Bestellung steht. */
 export type ZahlstandFuerRueckweg = {
-  paymentMethod: string
-  paymentStatus: string
+  paymentMethod: PaymentMethod
+  paymentStatus: PaymentStatus
   paidAt: Date | null
   pickedUpAt: Date | null
 }

@@ -82,7 +82,9 @@ export async function registerFarmer(data: {
     const message = err instanceof Error ? err.message : String(err)
     const lower = message.toLowerCase()
     if (lower.includes('already') || lower.includes('exist') || lower.includes('duplicate') || lower.includes('unique')) {
-      // Neutral statt „bereits registriert" (Nr. 19b): keine Kontenaufzählung.
+      // Neutralere Wortwahl statt „bereits registriert" (Nr. 19b). Die
+      // Kontenaufzählung bleibt offen: Diese Antwort unterscheidet sich von
+      // der Erfolgsantwort (siehe KONTO_VIELLEICHT_VORHANDEN).
       return { error: KONTO_VIELLEICHT_VORHANDEN }
     }
     console.error('[registerFarmer] signUpEmail error:', err)

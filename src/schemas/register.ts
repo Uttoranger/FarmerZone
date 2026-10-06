@@ -12,11 +12,14 @@ export const passwordSchema = z
   .refine((pw) => validatePassword(pw).valid, { message: PASSWORD_SCHEMA_MESSAGE })
 
 /**
- * Die Antwort, wenn es zur Adresse schon ein Konto gibt (Nr. 19b). Sie sagt
- * nicht „bereits registriert" — sonst ließe sich mit dem Formular abfragen,
- * welche Adressen bei uns ein Konto haben —, gibt der echten Person aber
- * beide Auswege. Hier statt in register.ts: Eine 'use server'-Datei
- * exportiert nur asynchrone Funktionen.
+ * Die Antwort, wenn es zur Adresse schon ein Konto gibt (Nr. 19b): eine
+ * neutralere Wortwahl als „bereits registriert", mit beiden Auswegen für die
+ * echte Person. Die Kontenaufzählung schließt sie NICHT: Eine neue Adresse
+ * bekommt `{ ok: true }` (und wird angemeldet), eine vergebene diesen Satz —
+ * dazu ein Zeitunterschied. Wirklich neutral wäre nur dieselbe Antwort wie
+ * bei Erfolg plus eine Mail an das bestehende Konto (offen, Bericht 19b).
+ * Hier statt in register.ts: Eine 'use server'-Datei exportiert nur
+ * asynchrone Funktionen.
  */
 export const KONTO_VIELLEICHT_VORHANDEN =
   'Das hat nicht geklappt. Wenn es zu dieser Adresse schon ein Konto gibt, melde dich an oder setze dein Passwort zurück.'

@@ -250,9 +250,11 @@ describe('Bestätigungs-Mail erst nach der Rolle (Nr. 17b, Nachbesserung Runde 1
   })
 })
 
-// ── Keine Kontenaufzählung (Nr. 19b) ────────────────────────────────────────
+// ── Neutralere Wortwahl bei vergebener Adresse (Nr. 19b) ────────────────────
+// Schließt die Kontenaufzählung NICHT (Erfolg antwortet anders) — geprüft
+// wird nur der Wortlaut mit beiden Auswegen.
 
-describe('Vergebene Adresse — die Antwort verrät nicht, dass es ein Konto gibt', () => {
+describe('Vergebene Adresse — neutralere Wortwahl mit beiden Auswegen', () => {
   it('nennt die Adresse nicht „bereits registriert", sondern zeigt beide Auswege', async () => {
     signUpEmail.mockRejectedValue(new Error('User already exists. Use another email.'))
 

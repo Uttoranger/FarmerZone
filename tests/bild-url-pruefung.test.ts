@@ -16,6 +16,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }))
 vi.mock('@vercel/blob', () => ({ put: vi.fn(), del: vi.fn() }))
+vi.mock('@sentry/nextjs', () => ({ captureMessage: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/server/queries/dashboard', () => ({ getFarmForUser: vi.fn() }))
 vi.mock('@/lib/prisma', () => {
@@ -47,6 +48,8 @@ import { publishStatusPost } from '@/server/actions/status-posts'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getFarmForUser } from '@/server/queries/dashboard'
+import * as Sentry from '@sentry/nextjs'
+import { BILDUNTERSCHRIFT_MAX } from '@/lib/eingabegrenzen'
 
 type Tx = { product: { updateMany: ReturnType<typeof vi.fn> } }
 const tx = (prisma as unknown as { __tx: Tx }).__tx
@@ -116,6 +119,14 @@ describe('istEigeneBildUrl — nur fertige Bilder dieses Hofes aus unserem Speic
     expect(istEigeneBildUrl(`${EIGEN}#x`, HOF, SPEICHER)).toBe(false)
   })
 
+  it('eine Hof-Kennung, die mit der eigenen beginnt, ist ein anderer Hof — in beide Richtungen', () => {
+    const bild = (hof: string) => `https://${SPEICHER}.public.blob.vercel-storage.com/farms/${hof}/gallery/1.webp`
+    expect(istEigeneBildUrl(bild('abc'), 'abcd', SPEICHER)).toBe(false)
+    expect(istEigeneBildUrl(bild('abcd'), 'abc', SPEICHER)).toBe(false)
+    // Gegenprobe: genau die eigene Kennung geht durch.
+    expect(istEigeneBildUrl(bild('abc'), 'abc', SPEICHER)).toBe(true)
+  })
+
   it('ohne bekannten Speicher ist nichts erlaubt (fail-closed)', () => {
     expect(istEigeneBildUrl(EIGEN, HOF, null)).toBe(false)
   })
@@ -134,10 +145,26 @@ describe('addFarmPhotoAction (Galerie)', () => {
     expect(prisma.farmPhoto.create).not.toHaveBeenCalled()
   })
 
-  it('ohne Blob-Schlüssel wird nichts gespeichert', async () => {
+  it('ohne Blob-Schlüssel wird nichts gespeichert — und das fällt einmal laut auf, ohne Geheimnis', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
     vi.stubEnv('BLOB_READ_WRITE_TOKEN', '')
     expect((await addFarmPhotoAction({ url: EIGEN })).error).toBeTruthy()
+    expect((await addFarmPhotoAction({ url: EIGEN })).error).toBeTruthy()
     expect(prisma.farmPhoto.create).not.toHaveBeenCalled()
+    // Einmal je Instanz, nicht bei jedem Foto.
+    expect(Sentry.captureMessage).toHaveBeenCalledTimes(1)
+    expect(log).toHaveBeenCalledTimes(1)
+    expect(JSON.stringify([vi.mocked(Sentry.captureMessage).mock.calls, log.mock.calls])).not.toContain('vercel_blob_rw_')
+    log.mockRestore()
+  })
+
+  it('Form und Länge per Zod: keine Zeichenkette, zu lange Bildunterschrift → nichts gespeichert', async () => {
+    expect((await addFarmPhotoAction({ url: 42 })).error).toBeTruthy()
+    expect((await addFarmPhotoAction(null)).error).toBeTruthy()
+    expect((await addFarmPhotoAction({ url: EIGEN, caption: 'x'.repeat(BILDUNTERSCHRIFT_MAX + 1) })).error).toBeTruthy()
+    expect(prisma.farmPhoto.create).not.toHaveBeenCalled()
+    // Gegenprobe: an der Grenze geht es.
+    expect((await addFarmPhotoAction({ url: EIGEN, caption: 'x'.repeat(BILDUNTERSCHRIFT_MAX) })).error).toBeUndefined()
   })
 
   it('Gegenprobe: das eigene Bild wird gespeichert', async () => {

@@ -6,6 +6,7 @@ import { del } from '@vercel/blob'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
+import { farmFotoHinzufuegenSchema } from '@/schemas/farm-foto'
 
 const GALLERY_LIMIT = 8
 const BLOB_HOST = /\.public\.blob\.vercel-storage\.com\//
@@ -20,10 +21,11 @@ function revalidate(slug: string) {
   revalidatePath('/settings/appearance')
 }
 
-export async function addFarmPhotoAction(input: {
-  url: string
-  caption?: string
-}): Promise<{ photo?: { id: string; url: string; caption: string | null; sortOrder: number }; error?: string }> {
+export async function addFarmPhotoAction(input: unknown): Promise<{ photo?: { id: string; url: string; caption: string | null; sortOrder: number }; error?: string }> {
+  const eingabe = farmFotoHinzufuegenSchema.safeParse(input)
+  if (!eingabe.success) return { error: BILD_NICHT_UEBERNOMMEN }
+  const { url, caption } = eingabe.data
+
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return { error: 'Nicht angemeldet' }
 
@@ -32,8 +34,7 @@ export async function addFarmPhotoAction(input: {
 
   // Nur ein fertiges Bild dieses Hofes aus unserem Speicher (Nr. 19b) —
   // vorher stand jede Zeichenkette, die der Browser schickte, auf der Hofseite.
-  const url = typeof input?.url === 'string' ? input.url : ''
-  if (!url || !(await bildUrlErlaubt(url, farm.id))) return { error: BILD_NICHT_UEBERNOMMEN }
+  if (!(await bildUrlErlaubt(url, farm.id))) return { error: BILD_NICHT_UEBERNOMMEN }
 
   const count = await prisma.farmPhoto.count({ where: { farmId: farm.id } })
   if (count >= GALLERY_LIMIT) return { error: `Maximal ${GALLERY_LIMIT} Fotos erlaubt` }
@@ -42,7 +43,7 @@ export async function addFarmPhotoAction(input: {
     data: {
       farmId: farm.id,
       url,
-      caption: input.caption ?? null,
+      caption: caption ?? null,
       sortOrder: count,
     },
     select: { id: true, url: true, caption: true, sortOrder: true },
