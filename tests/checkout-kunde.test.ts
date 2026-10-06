@@ -1,14 +1,15 @@
 /**
- * Das Kundenkonto im Checkout (/api/checkout) — am echten Handler, Prisma,
+ * Kein Kundenkonto im Checkout (E8, Nr. 17a) — am echten Handler, Prisma,
  * Stripe und Mail gemockt.
  *
- * Beweist: Die Schreibweise der E-Mail entscheidet nicht darüber, wer der
- * Kunde ist. Die Datenbank vergleicht E-Mails genau (der eindeutige Index auf
- * User.email unterscheidet „Max@…" von „max@…"); vor dem Fix legte deshalb
- * jede andere Schreibweise ein zweites Kundenkonto an, während Better Auth
- * (Anmeldelink, Registrierung) Adressen immer klein speichert und das zweite
- * Konto beim Anmelden nicht fand. Die Nutzertabelle ist hier eine Map mit
- * genau diesem Vergleich.
+ * Beweist: /api/checkout legt kein Konto an und hängt keine Bestellung an ein
+ * Konto — auch nicht an ein bestehendes mit derselben Adresse, und zwei
+ * Bestellungen mit gleicher Adresse verknüpft nichts miteinander. Wer die
+ * Kundin ist, sagt allein die bereinigte, klein geschriebene `customerEmail`
+ * (emailSchema); Name und Telefon stehen als Momentaufnahme auf der
+ * Bestellung. Vorher entstand hier ein ruhendes CUSTOMER-Konto bzw. die
+ * Bestellung landete am Konto, das zufällig dieselbe Adresse trug — auch am
+ * Konto eines Hofs (Morgenbericht Lauf 3, Folge 2).
  *
  * Dazu die Obergrenze der Notiz am Handler selbst: Zu lang wird abgelehnt,
  * bevor Bestand gebucht oder eine Bestellung angelegt wird.
@@ -22,7 +23,7 @@ vi.mock('@/lib/stripe', () => ({
 }))
 vi.mock('@/lib/email', () => ({ sendOnsiteConfirmation: vi.fn() }))
 // Die Freigabe verwaister Bestellungen hat eigene Tests
-// (tests/integration/verwaiste-bestellungen.int.test.ts); hier zählt nur das Kundenkonto.
+// (tests/integration/verwaiste-bestellungen.int.test.ts); hier zählt nur, dass kein Konto entsteht.
 vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteFreiOhneRisiko: vi.fn() }))
 // Der Abholtermin hat eigene Tests (tests/checkout-abholfenster.test.ts):
 // Hier gilt jedes Fenster als angeboten und unbegrenzt, der Rest des Moduls läuft echt.
@@ -90,7 +91,7 @@ const ids = (a: unknown): string[] => {
 }
 
 /** Die Nutzertabelle: eindeutig über die E-Mail, Vergleich Zeichen für Zeichen — wie in Postgres. */
-let kunden: Map<string, { id: string }>
+let kunden: Map<string, { id: string; role: string }>
 
 function anfrage(overrides: Record<string, unknown> = {}): NextRequest {
   return new NextRequest('http://localhost/api/checkout', {
@@ -114,9 +115,15 @@ function anfrage(overrides: Record<string, unknown> = {}): NextRequest {
   })
 }
 
-/** Die Kunden-ID, mit der die n-te Bestellung angelegt wurde. */
-const kundeDerBestellung = (n: number): unknown =>
-  (orderCreate.mock.calls[n][0] as { data: { customerId: string } }).data.customerId
+/** Die Daten, mit denen die n-te Bestellung angelegt wurde. */
+const bestellDaten = (n: number): { customerId?: unknown; customer?: unknown; customerEmail: string } =>
+  (orderCreate.mock.calls[n][0] as { data: { customerId?: unknown; customer?: unknown; customerEmail: string } }).data
+
+/** Hängt die Bestellung an irgendeinem Konto? Fehlt das Feld, schreibt Prisma null. */
+const amKonto = (n: number): boolean => {
+  const daten = bestellDaten(n)
+  return (daten.customerId !== undefined && daten.customerId !== null) || daten.customer !== undefined
+}
 
 /** Name des Produkts in der „Datenbank" — der Checkout liest ihn aus Product.name. */
 let produktName = 'Erdäpfel'
@@ -137,7 +144,7 @@ beforeEach(() => {
   userFindUnique.mockImplementation((({ where }: { where: { email: string } }) =>
     Promise.resolve(kunden.get(where.email) ?? null)) as never)
   userCreate.mockImplementation((({ data }: { data: { email: string } }) => {
-    const kunde = { id: `kunde_${kunden.size + 1}` }
+    const kunde = { id: `kunde_${kunden.size + 1}`, role: 'CUSTOMER' }
     kunden.set(data.email, kunde)
     return Promise.resolve(kunde)
   }) as never)
@@ -147,34 +154,48 @@ beforeEach(() => {
   vi.mocked(sendOnsiteConfirmation).mockResolvedValue(undefined as never)
 })
 
-describe('Kundenkonto im Checkout', () => {
-  it('ordnet zwei Bestellungen mit verschieden geschriebener E-Mail demselben Kunden zu', async () => {
+describe('Kein Kundenkonto im Checkout (E8)', () => {
+  it('legt beim Bestellen kein Konto an und hängt die Bestellung an keines', async () => {
+    const res = await POST(anfrage())
+
+    expect(res.status).toBe(200)
+    expect(userCreate).not.toHaveBeenCalled()
+    expect(kunden.size).toBe(0)
+    expect(amKonto(0)).toBe(false)
+  })
+
+  it('zwei Bestellungen mit gleicher Adresse (verschieden geschrieben) verknüpfen nichts', async () => {
     const erste = await POST(anfrage({ customerEmail: 'Max.Mustermann@Example.org' }))
     const zweite = await POST(anfrage({ customerEmail: 'max.mustermann@example.org' }))
 
     expect(erste.status).toBe(200)
     expect(zweite.status).toBe(200)
-    expect(kundeDerBestellung(0)).toBe(kundeDerBestellung(1))
-    expect(kunden.size).toBe(1)
+    expect(amKonto(0)).toBe(false)
+    expect(amKonto(1)).toBe(false)
+    expect(userCreate).not.toHaveBeenCalled()
+    expect(kunden.size).toBe(0)
   })
 
-  it('legt das Kundenkonto mit der bereinigten, klein geschriebenen Adresse an', async () => {
+  it('ein bestehendes Konto mit derselben Adresse bekommt die Bestellung nicht — auch nicht das eines Hofs', async () => {
+    kunden.set('max.mustermann@example.org', { id: 'hof_inhaber', role: 'FARMER' })
+
+    const res = await POST(anfrage({ customerEmail: 'MAX.MUSTERMANN@EXAMPLE.ORG' }))
+
+    expect(res.status).toBe(200)
+    expect(amKonto(0)).toBe(false)
+    expect(userFindUnique).not.toHaveBeenCalled()
+    expect(userCreate).not.toHaveBeenCalled()
+  })
+
+  it('speichert die bereinigte, klein geschriebene Adresse samt Name und Telefon auf der Bestellung', async () => {
     const res = await POST(anfrage({ customerEmail: ' Max.Mustermann@Example.ORG ' }))
 
     expect(res.status).toBe(200)
-    expect([...kunden.keys()]).toEqual(['max.mustermann@example.org'])
-    expect((orderCreate.mock.calls[0][0] as { data: { customerEmail: string } }).data.customerEmail).toBe(
-      'max.mustermann@example.org'
-    )
-  })
-
-  it('findet ein bestehendes Konto auch, wenn die Kundin ihre Adresse groß schreibt', async () => {
-    kunden.set('max.mustermann@example.org', { id: 'kunde_bestand' })
-
-    await POST(anfrage({ customerEmail: 'MAX.MUSTERMANN@EXAMPLE.ORG' }))
-
-    expect(kundeDerBestellung(0)).toBe('kunde_bestand')
-    expect(userCreate).not.toHaveBeenCalled()
+    expect(bestellDaten(0)).toMatchObject({
+      customerEmail: 'max.mustermann@example.org',
+      customerName: 'Max Mustermann',
+      customerPhone: '+43 660 0000000',
+    })
   })
 })
 

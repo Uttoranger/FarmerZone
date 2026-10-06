@@ -88,7 +88,8 @@ export async function pruefeBestellCode(
  * Die Bestellungen der bewiesenen Adresse — nach `customerEmail`, ohne
  * Rücksicht auf Groß-/Kleinschreibung, aber sonst genau (ILIKE ohne
  * Platzhalter, genauesIlikeMuster). NICHT nach `customerId`: Das ist das
- * ruhende Konto aus dem Checkout (Befund Nr. 12) und sagt nichts darüber, wer
+ * ruhende Konto aus dem Checkout bis Nr. 17a (Befund Nr. 12; seither bleibt
+ * `customerId` null) und sagt nichts darüber, wer
  * die Mails zu einer Bestellung bekommt. Bewiesen ist nur die Adresse.
  *
  * Frist beim Lesen (ARCHITECTURE §5): Offene Bestellungen dieser Adresse

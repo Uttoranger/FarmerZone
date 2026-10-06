@@ -94,8 +94,9 @@ export const checkoutRequestSchema = z.object({
   // Optional, damit ein alter, noch offener Tab nicht in einen 400 läuft.
   idempotencyKey: z.string().min(8).max(100).optional(),
   // Dieselben Obergrenzen wie im Formular — der Server ist die Wahrheit. Die
-  // E-Mail kommt bereinigt und klein geschrieben heraus: Mit ihr sucht der
-  // Handler das Kundenkonto (src/schemas/email.ts).
+  // E-Mail kommt bereinigt und klein geschrieben heraus: Sie ist die einzige
+  // Kennung der Kundin auf der Bestellung, ein Konto gibt es nicht (E8;
+  // src/schemas/email.ts).
   customerName: z.string().min(2).max(PERSONENNAME_MAX, ZU_LANG.personenname),
   customerEmail: emailSchema(),
   customerPhone: z.string().min(4).max(TELEFON_MAX, ZU_LANG.telefon),

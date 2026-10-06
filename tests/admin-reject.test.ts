@@ -184,6 +184,23 @@ describe('rejectFarmAction — Guards', () => {
     expect(transaction).not.toHaveBeenCalled()
   })
 
+  it('eine Gast-Bestellung unter der Adresse des Inhabers sperrt das Ablehnen nicht (E8)', async () => {
+    // Seit Nr. 17a hängt der Checkout keine Bestellung mehr an ein Konto. Die
+    // Sperre zählt weiter nur echte Verknüpfungen (customerId) — die gibt es
+    // nur noch aus der Zeit davor. Nach der Adresse zu zählen, sperrte jeden
+    // Hof, unter dessen Adresse irgendwer bestellt (Morgenbericht Lauf 3, Folge 2).
+    const bestellungen: Array<Record<string, unknown>> = [
+      { customerId: null, customerEmail: 'user_bot@example.org', farmId: 'anderer_hof' },
+    ]
+    orderCount.mockImplementation((async ({ where }: { where: Record<string, unknown> }) =>
+      bestellungen.filter((b) => Object.entries(where).every(([feld, wert]) => b[feld] === wert)).length) as never)
+
+    const result = await rejectFarmAction('farm_1')
+
+    expect(result.error).toBeUndefined()
+    expect(transaction).toHaveBeenCalledOnce()
+  })
+
   it('fragt bei einem Hof ohne Produkte gar nicht erst nach Bestellpositionen', async () => {
     farmFindUnique.mockResolvedValue({ ...WARTENDER_HOF, products: [] } as never)
 

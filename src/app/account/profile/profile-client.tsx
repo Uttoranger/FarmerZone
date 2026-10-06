@@ -37,7 +37,7 @@ interface SubscriptionRow {
 }
 
 interface Props {
-  user: { id: string; name: string; email: string }
+  user: { id: string; email: string }
   subscriptions: SubscriptionRow[]
 }
 

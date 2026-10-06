@@ -32,7 +32,7 @@
  *    Nachlauf eine unbehandelte Ablehnung hinterlässt (Nachbesserung 2).
  *  - „_" und „%" in einer Adresse sind keine Platzhalter: Ein Hof mit
  *    „max_hof@…" wird nicht für die Kundin „max-hof@…" gehalten (die ein
- *    Angreifer per Checkout anlegen kann), bekommt keinen Code und wird nicht
+ *    Angreifer bis Nr. 17a per Checkout anlegen konnte), bekommt keinen Code und wird nicht
  *    per Code angemeldet; die Kundin selbst schon (Nachbesserung 3).
  *  - Mehrere Konten in verschiedener Schreibweise: Ist eines davon ein Hof,
  *    gibt es keinen Code — nicht „irgendein" Treffer entscheidet.
