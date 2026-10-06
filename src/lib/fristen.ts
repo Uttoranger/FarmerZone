@@ -137,3 +137,19 @@ export function tagInWorten(zeitpunkt: Date, jetzt: Date): string {
   }).format(zeitpunkt)
   return `am ${datum}`
 }
+
+/**
+ * „Montag, 5. Oktober, 12:12 Uhr" — fester Tag mit Wochentag in Wiener Zeit.
+ * Für Mails: Sie werden später gelesen als verschickt, „heute"/„morgen"
+ * (tagInWorten) stimmte nach Mitternacht nicht mehr. Seiten rechnen beim
+ * Lesen und dürfen relativ bleiben.
+ */
+export function zeitpunktFuerMail(zeitpunkt: Date): string {
+  const tag = new Intl.DateTimeFormat('de-AT', {
+    timeZone: 'Europe/Vienna',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(zeitpunkt)
+  return `${tag}, ${uhrzeitInWien(zeitpunkt)} Uhr`
+}

@@ -21,14 +21,13 @@ import { BESTAETIGUNGSFRIST_BAR_MINUTEN } from '@/lib/fristen'
 function mailText(): string {
   const html = renderToStaticMarkup(
     createElement(OnsiteConfirmationEmail, {
-      customerName: 'Erika Beispiel',
       orderNumber: 'FZ-TEST-1',
       farmName: 'Hof Beispiel',
       farmAddress: 'Feldweg 1',
       farmCity: 'Beispieldorf',
       pickupDate: 'Samstag, 10.10.2026',
       pickupTime: '09:00–12:00',
-      items: [{ name: 'Eier', quantity: 1, unitPrice: 4.5 }],
+      items: [{ name: 'Eier', betrag: 4.5 }],
       total: 4.5,
       confirmationUrl: 'http://localhost:3000/hof-beispiel/bestaetigen/token',
     })

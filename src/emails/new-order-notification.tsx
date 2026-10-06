@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Text, Link, Button, Hr } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton } from './_layout'
+import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton, textLink, MAIL_FARBE } from './_layout'
+import { formatEuro } from '@/lib/format'
 
 export interface NewOrderNotificationProps {
   farmerName: string
@@ -42,7 +43,7 @@ export function NewOrderNotificationEmail(p: NewOrderNotificationProps) {
         <Text style={{ ...highlightValue, fontSize: '15px' }}>{p.pickupTime} Uhr</Text>
       </div>
 
-      <Text style={{ ...mutedText, fontWeight: '600', color: '#374151', margin: '0 0 8px' }}>
+      <Text style={{ ...mutedText, fontWeight: '600', color: MAIL_FARBE.text, margin: '0 0 8px' }}>
         Bestellte Produkte
       </Text>
       {p.items.map((item, i) => (
@@ -51,15 +52,15 @@ export function NewOrderNotificationEmail(p: NewOrderNotificationProps) {
         </Text>
       ))}
 
-      <Hr style={{ borderColor: '#e2e8f0', margin: '16px 0' }} />
+      <Hr style={{ borderColor: MAIL_FARBE.rand, margin: '16px 0' }} />
       <Text style={{ ...bodyText, margin: '0 0 4px' }}>
-        <strong>{mitGebuehr ? 'Warenpreis (dein Anteil):' : 'Gesamtbetrag:'}</strong> € {p.total.toFixed(2)}
+        <strong>{mitGebuehr ? 'Warenpreis (dein Anteil):' : 'Gesamtbetrag:'}</strong> {formatEuro(p.total)}
       </Text>
       {mitGebuehr && (
         <Text style={{ ...mutedText, margin: '0 0 4px' }}>
-          <strong>Servicegebühr:</strong> € {(p.serviceFee ?? 0).toFixed(2)} — von der Plattform
-          einbehalten, dir wird der Warenpreis überwiesen. Die Kundin hat €{' '}
-          {(p.customerTotal ?? p.total).toFixed(2)} bezahlt.
+          <strong>Servicegebühr:</strong> {formatEuro(p.serviceFee ?? 0)} — von der Plattform
+          einbehalten, dir wird der Warenpreis überwiesen. Die Kundin hat{' '}
+          {formatEuro(p.customerTotal ?? p.total)} bezahlt.
         </Text>
       )}
       <Text style={{ ...mutedText, margin: '0 0 4px' }}>
@@ -70,7 +71,7 @@ export function NewOrderNotificationEmail(p: NewOrderNotificationProps) {
       </Text>
       <Text style={mutedText}>
         <strong>Kunde:</strong> {p.customerName} ·{' '}
-        <Link href={`tel:${p.customerPhone}`} style={{ color: '#15803d' }}>{p.customerPhone}</Link>
+        <Link href={`tel:${p.customerPhone}`} style={textLink}>{p.customerPhone}</Link>
       </Text>
 
       <Link href={p.dashboardUrl} style={ctaButton}>Im Dashboard ansehen →</Link>

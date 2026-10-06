@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { Text, Hr } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText } from './_layout'
+import { Text } from '@react-email/components'
+import { EmailLayout, Trenner, h1, bodyText, kleinText } from './_layout'
 
 export interface BestellungVerfallenProps {
   customerName: string
@@ -24,8 +24,8 @@ export function BestellungVerfallenEmail(p: BestellungVerfallenProps) {
       </Text>
       <Text style={bodyText}>Wenn du die Sachen noch möchtest, bestell einfach neu.</Text>
 
-      <Hr style={{ margin: '20px 0' }} />
-      <Text style={mutedText}>Bei Fragen wende dich direkt an {p.farmName}.</Text>
+      <Trenner />
+      <Text style={kleinText}>Bei Fragen wende dich direkt an {p.farmName}.</Text>
     </EmailLayout>
   )
 }

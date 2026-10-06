@@ -307,8 +307,8 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     'src/app/(public)/hoefe/page.tsx': [],
     // Die Kasse trägt seit Nr. 12 die Fokus-Shell, gerendert in CheckoutForm (siehe unten).
     'src/app/(public)/[farmSlug]/checkout/page.tsx': [],
-    // Ohne gültige Signatur ist nicht einmal der Hof bestätigt → zur Hofübersicht.
-    'src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx': ['bestellung-ungueltig', 'bestaetigung'],
+    // Die Bestätigungsseite trägt seit Nr. 13 die KundeShell ohne Unterleiste (siehe unten).
+    'src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx': [],
     // Ungültiger Link: nicht einmal der Hof ist bestätigt → zur Hofübersicht.
     'src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx': ['bestellung-ungueltig', 'bestellung'],
     // Bar-Bestätigung (H3): Token unbekannt → zur Hofübersicht; sonst wie die
@@ -372,6 +372,15 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     // Laden, leerer Korb, Zahlung und Formular — alle in derselben Fokus-Shell.
     expect(text.match(/fokusShell\(/g)?.length).toBeGreaterThanOrEqual(4)
     expect(text.match(/<KundeFokusShell\b/g)).toHaveLength(1)
+  })
+
+  it('die Bestätigungsseite trägt die KundeShell ohne Unterleiste, nie den Verlauf als Rückweg (Nr. 13)', () => {
+    const text = lies('src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx')
+    // Mit und ohne Signatur dieselbe Hülle, beide als Fokus-Seite mit Kopf.
+    expect(text.match(/<KundeShellMitSitzung unterleiste=\{false\}>/g)).toHaveLength(2)
+    expect(text).not.toMatch(/<KundenKopf\b|router\.back|history\.back/)
+    // Gegenprobe: Die Suche findet die Hülle ohne Unterleiste auf der Produktseite.
+    expect(lies('src/app/(public)/[farmSlug]/produkt/[id]/page.tsx')).toMatch(/<KundeShellMitSitzung unterleiste=\{false\}>/)
   })
 
   it('die Startseite trägt die KundeShell des neuen Designs und keine zweite Kopfzeile', () => {

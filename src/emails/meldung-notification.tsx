@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Text, Link } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton } from './_layout'
+import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton, textLink } from './_layout'
 
 export interface MeldungNotificationProps {
   kurznummer: string
@@ -45,7 +45,7 @@ export function MeldungNotificationEmail(p: MeldungNotificationProps) {
 
         {p.screenshotUrl && (
           <Text style={{ ...mutedText, marginTop: '14px' }}>
-            <Link href={p.screenshotUrl} style={{ color: '#15803d' }}>Screenshot öffnen</Link>
+            <Link href={p.screenshotUrl} style={textLink}>Screenshot öffnen</Link>
           </Text>
         )}
       </div>

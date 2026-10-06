@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Text, Link, Img } from '@react-email/components'
-import { EmailLayout, h1, bodyText, ctaButton } from './_layout'
+import { EmailLayout, h1, bodyText, ctaButton, MAIL_FARBE } from './_layout'
 
 const ANLASS_LABEL: Record<string, string> = {
   FRESH_PRODUCT: 'Frisches Produkt',
@@ -9,11 +9,13 @@ const ANLASS_LABEL: Record<string, string> = {
   ANNOUNCEMENT: 'Mitteilung',
 }
 
-const ANLASS_COLOR: Record<string, string> = {
-  FRESH_PRODUCT: '#2D5F3F',
-  NEW_SEASON: '#059669',
-  PROMOTION: '#D97706',
-  ANNOUNCEMENT: '#2563EB',
+// Farben aus der Mail-Palette (_layout.tsx): Grün für Frisches und Saison,
+// Orange für Aktionen, neutral für Mitteilungen — Schrift und Fläche je Anlass.
+const ANLASS_FARBE: Record<string, { schrift: string; flaeche: string }> = {
+  FRESH_PRODUCT: { schrift: MAIL_FARBE.gruen, flaeche: MAIL_FARBE.gruenFlaeche },
+  NEW_SEASON: { schrift: MAIL_FARBE.gruen, flaeche: MAIL_FARBE.gruenFlaeche },
+  PROMOTION: { schrift: MAIL_FARBE.orangeText, flaeche: MAIL_FARBE.orangeFlaeche },
+  ANNOUNCEMENT: { schrift: MAIL_FARBE.text, flaeche: MAIL_FARBE.seite },
 }
 
 interface StatusUpdateEmailProps {
@@ -39,7 +41,7 @@ export function StatusUpdateEmail({
 }: StatusUpdateEmailProps) {
   const farmUrl = `${appUrl}/${farmSlug}`
   const anlassLabel = ANLASS_LABEL[anlass] ?? 'Mitteilung'
-  const anlassColor = ANLASS_COLOR[anlass] ?? '#374151'
+  const anlassFarbe = ANLASS_FARBE[anlass] ?? ANLASS_FARBE.ANNOUNCEMENT
 
   return (
     <EmailLayout
@@ -50,8 +52,8 @@ export function StatusUpdateEmail({
       <div
         style={{
           display: 'inline-block',
-          backgroundColor: anlassColor + '18',
-          color: anlassColor,
+          backgroundColor: anlassFarbe.flaeche,
+          color: anlassFarbe.schrift,
           borderRadius: '100px',
           padding: '4px 12px',
           fontSize: '12px',
@@ -63,7 +65,7 @@ export function StatusUpdateEmail({
       </div>
 
       {/* Farm name */}
-      <Text style={{ ...bodyText, color: '#5C6F65', marginBottom: '4px' }}>
+      <Text style={{ ...bodyText, color: MAIL_FARBE.textLeise, marginBottom: '4px' }}>
         Neuigkeit von {farmName}
       </Text>
 
@@ -94,9 +96,9 @@ export function StatusUpdateEmail({
       </div>
 
       {/* Unsubscribe */}
-      <Text style={{ color: '#9CA3AF', fontSize: '11px', textAlign: 'center', marginTop: '16px' }}>
+      <Text style={{ color: MAIL_FARBE.textLeise, fontSize: '11px', textAlign: 'center', marginTop: '16px' }}>
         Du erhältst diese E-Mail, weil du E-Mail-Updates für {farmName} aktiviert hast.{' '}
-        <Link href={unsubscribeUrl} style={{ color: '#9CA3AF' }}>
+        <Link href={unsubscribeUrl} style={{ color: MAIL_FARBE.textLeise }}>
           Abmelden
         </Link>
       </Text>

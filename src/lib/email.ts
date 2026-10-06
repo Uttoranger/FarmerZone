@@ -25,6 +25,10 @@ import { formatPosition } from '@/lib/format'
 import { barBestaetigungsPfad, bestellungPfad } from '@/lib/bestell-link'
 import type { OrderLineProduct } from '@/lib/order-line'
 import { bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
+import { alsCents, calcLineTotal, decimalZuCents } from '@/lib/order-totals'
+import { fristVon, zeitpunktFuerMail } from '@/lib/fristen'
+import { buildMapsUrl } from '@/lib/customer-links'
+import type { MailZahlart } from '@/emails/order-confirmation'
 import { APP_URL } from '@/lib/umgebung-server'
 import { ANMELDECODE_GUELTIG_SEKUNDEN } from '@/lib/anmeldecode'
 
@@ -72,8 +76,9 @@ async function send(to: string, subject: string, html: string): Promise<void> {
 }
 
 function formatPickupDate(date: Date): string {
+  // Wiener Kalendertag, nie die Zeitzone des Servers (CODING_STANDARDS §2).
   return date.toLocaleDateString('de-AT', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Vienna',
   })
 }
 
@@ -89,6 +94,8 @@ export type OrderForEmail = {
   totalAmount: { toString(): string } | number
   /** Servicegebühr in Cent aus dem Bestell-Snapshot; fehlt sie, gilt 0. */
   serviceFeeCents?: number
+  /** Bestellzeitpunkt — für die Frist in „Bitte bestätige" (fristVon); fehlt er, bleibt der allgemeine Satz. */
+  createdAt?: Date
   pickupDate: Date
   pickupTimeStart: string
   pickupTimeEnd: string
@@ -139,6 +146,31 @@ function positionsZeile(i: {
 
 function n(v: { toString(): string } | number): number {
   return typeof v === 'number' ? v : Number(v.toString())
+}
+
+/**
+ * Der Zeilenbetrag einer Position in Euro, NUR zur Anzeige über formatEuro —
+ * gerechnet über Decimal und Cent (CODING_STANDARDS §2), nie `Preis × Menge`
+ * in Fließkomma: Der Snapshot `totalPrice`, sonst `calcLineTotal`.
+ */
+function zeilenBetrag(i: OrderForEmail['items'][number]): number {
+  const cents = i.totalPrice != null ? alsCents(i.totalPrice) : decimalZuCents(calcLineTotal(i.unitPrice, i.quantity))
+  return centsAlsEuro(cents)
+}
+
+/** Positionen für die Kunden-Mails: Zeile in der gemeinsamen Schreibweise, Betrag fertig gerechnet. */
+function mailPositionen(order: OrderForEmail): Array<{ name: string; betrag: number }> {
+  return order.items.map((i) => ({ name: positionsZeile(i), betrag: zeilenBetrag(i) }))
+}
+
+/** Online, bar oder (alte Bestellungen, E5) Karte vor Ort — für Satz und Gesamtzeile der Mail. */
+function mailZahlart(paymentMethod: string): MailZahlart {
+  if (paymentMethod === 'ONLINE') return 'online'
+  return paymentMethod === 'ONSITE_CARD' ? 'karte' : 'bar'
+}
+
+function routeUrl(order: OrderForEmail): string {
+  return buildMapsUrl(order.farm.address, order.farm.postalCode, order.farm.city)
 }
 
 /**
@@ -274,16 +306,18 @@ export async function sendBriefkastenZusammenfassung(z: {
   )
 }
 
-/** Online-Zahlung bestätigt → Kunde */
+/**
+ * Bestellung steht → Kunde: nach der Online-Zahlung (Webhook) und nach der
+ * Bar-Bestätigung per Knopf. Satz und Gesamtzeile folgen der Zahlart — eine
+ * bar bestätigte Bestellung ist nicht „bezahlt". Ohne „Nochmal bestellen"
+ * (Vertragsmail ohne Werbung, S11; Mockup web-k3-e-mails-web-mobil).
+ */
 export async function sendOrderConfirmation(order: OrderForEmail): Promise<void> {
-  const reorderToken = generateReorderToken(order.id, order.farm.id)
-  const reorderUrl = `${APP_URL}/${order.farm.slug}?reorder=${reorderToken}`
   // Der signierte Weg zurück zur Bestellung — der einzige, den die Kundin
   // nach dem Schließen des Tabs noch hat (kein Konto, keine Historie).
   const orderUrl = `${APP_URL}${bestellungPfad(order.farm.slug, order.id)}`
 
   const html = await toHtml(React.createElement(OrderConfirmationEmail, {
-    customerName: order.customerName,
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
     farmPhone: order.farm.phone,
@@ -291,16 +325,12 @@ export async function sendOrderConfirmation(order: OrderForEmail): Promise<void>
     farmCity: order.farm.city,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
-    items: order.items.map(i => ({
-      name: positionsZeile(i),
-      quantity: i.quantity,
-      unitPrice: n(i.unitPrice),
-    })),
-    subtotal: betraege(order).warenpreis,
+    zahlart: mailZahlart(order.paymentMethod),
+    items: mailPositionen(order),
     serviceFee: betraege(order).gebuehr,
     total: betraege(order).gesamt,
+    routeUrl: routeUrl(order),
     manageUrl: `${APP_URL}/account/profile`,
-    reorderUrl,
     orderUrl,
   }))
 
@@ -319,24 +349,32 @@ export async function sendOnsiteConfirmation(
   // Zur Seite mit dem Knopf (H3) — der Link selbst bestätigt nichts, damit
   // Link-Scanner der Mailprogramme keine Bestellung auslösen.
   const confirmationUrl = `${APP_URL}${barBestaetigungsPfad(order.farm.slug, confirmationToken)}`
+  // Die Frist, nach der die Bestellung verfällt — dieselbe Rechnung wie
+  // verwaiste-bestellungen.ts und die Bestätigungsseite (fristen.ts). Als
+  // fester Tag, nie „heute"/„morgen": Wer die Mail nach Mitternacht öffnet,
+  // läse sonst den falschen Tag.
+  const frist = order.createdAt
+    ? fristVon({
+        // Vor Ort, nie online: Diese Mail gibt es nur für Barbestellungen.
+        paymentMethod: 'ONSITE_CASH',
+        createdAt: order.createdAt,
+        pickupDate: order.pickupDate,
+        pickupTimeStart: order.pickupTimeStart,
+      })
+    : null
 
   const html = await toHtml(React.createElement(OnsiteConfirmationEmail, {
-    customerName: order.customerName,
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
     farmAddress: order.farm.address,
     farmCity: order.farm.city,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
-    items: order.items.map(i => ({
-      name: positionsZeile(i),
-      quantity: i.quantity,
-      unitPrice: n(i.unitPrice),
-    })),
-    subtotal: betraege(order).warenpreis,
+    items: mailPositionen(order),
     serviceFee: betraege(order).gebuehr,
     total: betraege(order).gesamt,
     confirmationUrl,
+    bestaetigenBis: frist ? zeitpunktFuerMail(frist) : undefined,
   }))
 
   await send(
@@ -406,7 +444,6 @@ export async function sendOrderReady(order: OrderForEmail): Promise<void> {
   const orderUrl = `${APP_URL}${bestellungPfad(order.farm.slug, order.id)}`
 
   const html = await toHtml(React.createElement(OrderReadyEmail, {
-    customerName: order.customerName,
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
     farmPhone: order.farm.phone,
@@ -414,6 +451,7 @@ export async function sendOrderReady(order: OrderForEmail): Promise<void> {
     farmCity: order.farm.city,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
+    routeUrl: routeUrl(order),
     reorderUrl,
     orderUrl,
   }))
@@ -429,7 +467,6 @@ export async function sendOrderReady(order: OrderForEmail): Promise<void> {
  *  die Abholbereit-Mail war schon draußen und wird hiermit relativiert */
 export async function sendOrderNotReady(order: OrderForEmail): Promise<void> {
   const html = await toHtml(React.createElement(OrderNotReadyEmail, {
-    customerName: order.customerName,
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
     farmPhone: order.farm.phone,
@@ -437,6 +474,7 @@ export async function sendOrderNotReady(order: OrderForEmail): Promise<void> {
     farmCity: order.farm.city,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
+    routeUrl: routeUrl(order),
   }))
 
   await send(

@@ -41,6 +41,14 @@ export function bestellungPfad(farmSlug: string, orderId: string): string {
 }
 
 /**
+ * Die ICS-Datei zum Abholtermin (/{hof}/bestellung/{id}/kalender) samt
+ * Signatur — derselbe Zugang wie die Bestellseite darüber.
+ */
+export function kalenderPfad(farmSlug: string, orderId: string): string {
+  return `/${farmSlug}/bestellung/${orderId}/kalender?s=${bestellSignatur(orderId)}`
+}
+
+/**
  * Der Pfad der Bestätigungsseite (/{hof}/confirm/{id}) samt Signatur — nach
  * dem Checkout, als Stripe-return_url und nach dem Bestätigungslink. Die
  * Seite zeigt Name, E-Mail, Artikel und Beträge nur mit gültiger Signatur;
