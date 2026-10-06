@@ -197,3 +197,25 @@ export function artikelFehltZeilen(r: ArtikelFehltErgebnis, kundenVorname: strin
     ],
   }
 }
+
+/**
+ * Der Stand nach einer gebuchten Position: sie fehlt, Warenpreis und Gebühr
+ * wie gerechnet, erstattet um den Betrag, den Stripe BESTÄTIGT hat (bei einer
+ * nachgetragenen Erstattung deren Betrag, nicht der heute gerechnete). So
+ * rechnet die nächste Position — auch in derselben Meldung — vom richtigen
+ * Stand.
+ */
+export function nachFehlendemArtikel(
+  b: ArtikelFehltBestellung,
+  positionId: string,
+  r: ArtikelFehltTeil,
+  erstattetCents: number
+): ArtikelFehltBestellung {
+  return {
+    ...b,
+    warenpreisCents: r.neuWarenCents,
+    serviceFeeCents: r.neuGebuehrCents,
+    erstattetCents: b.erstattetCents + erstattetCents,
+    positionen: b.positionen.map((p) => (p.id === positionId ? { ...p, fehlt: true } : p)),
+  }
+}

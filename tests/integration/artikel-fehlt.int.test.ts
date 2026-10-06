@@ -26,9 +26,9 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
 vi.mock('@/lib/stripe', () => ({
   stripe: {
-    refunds: { create: vi.fn() },
+    refunds: { create: vi.fn(), list: vi.fn() },
     paymentIntents: { create: vi.fn(), retrieve: vi.fn() },
-    transfers: { createReversal: vi.fn() },
+    transfers: { createReversal: vi.fn(), listReversals: vi.fn() },
   },
 }))
 vi.mock('@/lib/email', () => ({
@@ -44,6 +44,8 @@ import * as Sentry from '@sentry/nextjs'
 import { Prisma } from '@prisma/client'
 import { cancelOrder, meldeArtikelFehlt } from '@/server/actions/orders'
 import { getHofBestellDetail } from '@/server/queries/orders'
+import { getTopProdukte, getYtdRevenue } from '@/server/queries/analytics'
+import { getMeistverkaufteProduktIds } from '@/server/queries/manual-sales'
 import { POST as checkout } from '@/app/api/checkout/route'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
@@ -61,38 +63,56 @@ import {
 const refundCreate = vi.mocked(stripe.refunds.create)
 const reversalCreate = vi.mocked(stripe.transfers.createReversal)
 const intentRetrieve = vi.mocked(stripe.paymentIntents.retrieve)
+const refundList = vi.mocked(stripe.refunds.list)
+const reversalList = vi.mocked(stripe.transfers.listReversals)
 
-type Buchung = { schluessel: string; werte: string; betrag: number }
+type Buchung = { schluessel: string | null; werte: string; betrag: number; metadata: Record<string, string> }
 
-/** Was Stripe „wirklich" getan hätte: je Schlüssel EINE Buchung. */
+/** Was Stripe „wirklich" getan hat: je Schlüssel EINE Buchung, mit ihren Merkmalen. */
 let erstattungen: Buchung[] = []
 let rueckbuchungen: Buchung[] = []
 
 /** Wie Stripe: derselbe Schlüssel mit denselben Werten liefert dieselbe Buchung, mit anderen einen Fehler. */
-function idempotent(liste: () => Buchung[], schluessel: string, werte: object, betrag: number): Buchung {
+function idempotent(
+  liste: () => Buchung[],
+  schluessel: string,
+  werte: { amount?: number; metadata?: Record<string, string> },
+  betrag: number
+): Buchung {
   const vorhanden = liste().find((b) => b.schluessel === schluessel)
   const text = JSON.stringify(werte)
   if (vorhanden) {
     if (vorhanden.werte !== text) throw new Error('idempotency_error: Schlüssel mit anderen Werten')
     return vorhanden
   }
-  const neu = { schluessel, werte: text, betrag }
+  const neu = { schluessel, werte: text, betrag, metadata: werte.metadata ?? {} }
   liste().push(neu)
   return neu
+}
+
+/** Stripe vergisst Idempotenz-Schlüssel nach rund 24 Stunden — die Buchungen bleiben. */
+function schluesselVerfallen(): void {
+  for (const b of [...erstattungen, ...rueckbuchungen]) b.schluessel = null
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
   erstattungen = []
   rueckbuchungen = []
-  refundCreate.mockImplementation((async (werte: { amount?: number }, optionen: { idempotencyKey: string }) => {
+  refundCreate.mockImplementation((async (werte: { amount?: number; metadata?: Record<string, string> }, optionen: { idempotencyKey: string }) => {
     const b = idempotent(() => erstattungen, optionen.idempotencyKey, werte, werte.amount ?? -1)
-    return { id: `re_${b.schluessel}`, amount: b.betrag }
+    return { id: `re_${erstattungen.indexOf(b)}`, amount: b.betrag, metadata: b.metadata, status: 'succeeded' }
   }) as never)
-  reversalCreate.mockImplementation((async (_id: string, werte: { amount: number }, optionen: { idempotencyKey: string }) => {
+  reversalCreate.mockImplementation((async (_id: string, werte: { amount: number; metadata?: Record<string, string> }, optionen: { idempotencyKey: string }) => {
     const b = idempotent(() => rueckbuchungen, optionen.idempotencyKey, werte, werte.amount)
-    return { id: `trr_${b.schluessel}`, amount: b.betrag }
+    return { id: `trr_${rueckbuchungen.indexOf(b)}`, amount: b.betrag, metadata: b.metadata }
   }) as never)
+  refundList.mockImplementation((async () => ({
+    data: erstattungen.map((b) => ({ amount: b.betrag, metadata: b.metadata, status: 'succeeded' })),
+  })) as never)
+  reversalList.mockImplementation((async () => ({
+    data: rueckbuchungen.map((b) => ({ amount: b.betrag, metadata: b.metadata })),
+  })) as never)
   intentRetrieve.mockResolvedValue({ id: 'pi_test', latest_charge: { id: 'ch_test', transfer: 'tr_test' } } as never)
 })
 
@@ -208,6 +228,9 @@ describe('Artikel fehlt — Rechenbeispiele der Freigabe in der Datenbank', () =
     expect(rueckbuchungen).toEqual([
       expect.objectContaining({ schluessel: `teilstorno-hof-${order.id}-${brot.id}`, betrag: 580 }),
     ])
+    // Merkmale, an denen ein späterer Versuch die Buchung wiederfindet.
+    expect(erstattungen[0]!.metadata).toEqual({ orderId: order.id, anlass: 'teilstorno', art: 'kunde', positionId: brot.id })
+    expect(rueckbuchungen[0]!.metadata).toEqual({ orderId: order.id, anlass: 'teilstorno', art: 'hof', positionId: brot.id })
     // Fester Betrag, nicht anteilig: keine Vollerstattungs-Schalter.
     const [werte] = refundCreate.mock.calls[0]!
     expect(werte).not.toHaveProperty('reverse_transfer')
@@ -276,7 +299,7 @@ describe('Artikel fehlt — Doppeltipp, Fehler, Wiederholung', () => {
 
     const erster = await meldeArtikelFehlt({ orderId: order.id, itemId: brot.id })
 
-    expect(erster.error).toContain('nichts erstattet und nichts geändert')
+    expect(erster.error).toContain('nichts doppelt erstattet')
     expect(await stand(order.id)).toEqual({
       status: 'PAID',
       warenCents: 1030,
@@ -311,9 +334,74 @@ describe('Artikel fehlt — Doppeltipp, Fehler, Wiederholung', () => {
 
     const zweiter = await meldeArtikelFehlt({ orderId: order.id, itemId: brot.id })
 
-    expect(zweiter.error).toBeUndefined()
+    expect(zweiter).toEqual({ erstattetCents: 582, vomHofCents: 580, neuGesamtCents: 500 })
+    // Über die Merkmale gefunden und nachgetragen — gar nicht erst neu gebucht.
+    expect(refundCreate).toHaveBeenCalledTimes(1)
+    expect(erstattungen).toHaveLength(1)
+    expect(rueckbuchungen).toHaveLength(1)
+    expect(await stand(order.id)).toMatchObject({ erstattetCents: 582, fehlend: ['Brot'] })
+  })
+
+  it('verlorene Antwort, danach ein ANDERER Artikel: die erste Erstattung wird nachgetragen, keine doppelt, Summe stimmt', async () => {
+    // € 20 + € 10 + € 0,80, Gebühr 154 → bezahlt 3234
+    const { order, position } = await bestellung({
+      zahlung: 'online',
+      positionen: [
+        { name: 'Honig', preisCents: 2000 },
+        { name: 'Käse', preisCents: 1000 },
+        { name: 'Ei', preisCents: 80 },
+      ],
+      gebuehrCents: 154,
+    })
+    const echt = refundCreate.getMockImplementation()!
+    refundCreate.mockImplementationOnce((async (werte: never, optionen: never) => {
+      await echt(werte, optionen)
+      throw new Error('Verbindung abgebrochen')
+    }) as never)
+    expect((await meldeArtikelFehlt({ orderId: order.id, itemId: position('Honig').id })).error).toBeDefined()
+
+    const kaese = await meldeArtikelFehlt({ orderId: order.id, itemId: position('Käse').id })
+
+    // Honig nachgetragen (2100), Käse vom berichtigten Stand: Rest € 0,80 → Gebühr 50 → 1000 + 4.
+    expect(kaese).toEqual({ erstattetCents: 1004, vomHofCents: 1000, neuGesamtCents: 130 })
+    expect(erstattungen.map((b) => b.betrag)).toEqual([2100, 1004])
+    expect(rueckbuchungen.map((b) => b.betrag)).toEqual([2000, 1000])
+    const danach = await stand(order.id)
+    expect(danach).toMatchObject({ warenCents: 80, gebuehrCents: 50, erstattetCents: 3104, fehlend: ['Honig', 'Käse'] })
+    expect(danach.erstattetCents + danach.warenCents + danach.gebuehrCents).toBe(3234)
+  })
+
+  it('Wiederholung nach mehr als 24 Stunden (Schlüssel verfallen): keine zweite Erstattung', async () => {
+    const { order, position } = await bestellung({ zahlung: 'online', positionen: EIER_BROT, gebuehrCents: 52 })
+    const brot = position('Brot')
+    const echt = refundCreate.getMockImplementation()!
+    refundCreate.mockImplementationOnce((async (werte: never, optionen: never) => {
+      await echt(werte, optionen)
+      throw new Error('Zeitüberschreitung')
+    }) as never)
+    await meldeArtikelFehlt({ orderId: order.id, itemId: brot.id })
+    schluesselVerfallen()
+
+    const spaeter = await meldeArtikelFehlt({ orderId: order.id, itemId: brot.id })
+
+    expect(spaeter.error).toBeUndefined()
     expect(erstattungen).toHaveLength(1)
     expect(await stand(order.id)).toMatchObject({ erstattetCents: 582, fehlend: ['Brot'] })
+  })
+
+  it('jeder Stripe-Aufruf ohne SDK-Wiederholung und mit kurzer Zeitgrenze', async () => {
+    const { order, position } = await bestellung({ zahlung: 'online', positionen: EIER_BROT, gebuehrCents: 52 })
+
+    await meldeArtikelFehlt({ orderId: order.id, itemId: position('Brot').id })
+
+    const optionen = [
+      intentRetrieve.mock.calls[0]![2],
+      refundList.mock.calls[0]![1],
+      reversalList.mock.calls[0]![2],
+      refundCreate.mock.calls[0]![1],
+      reversalCreate.mock.calls[0]![2],
+    ]
+    for (const o of optionen) expect(o).toMatchObject({ maxNetworkRetries: 0, timeout: 4000 })
   })
 
   it('nur die Rückbuchung vom Hof scheitert: Kundin hat ihr Geld, gespeichert, Sentry meldet den offenen Betrag', async () => {
@@ -450,5 +538,18 @@ describe('Seitenlader der Bestellung (/orders/[orderId])', () => {
     expect(text).not.toContain('pi_')
     expect(detail).not.toHaveProperty('confirmationToken')
     expect(detail).not.toHaveProperty('idempotencyKey')
+  })
+})
+
+describe('Kennzahlen zählen fehlende Artikel nicht als verkauft', () => {
+  it('Top-Produkte, meistverkaufte Produkte und Jahresumsatz ohne die fehlende Position', async () => {
+    const { farm, order, position, produkte } = await bestellung({ zahlung: 'bar', positionen: EIER_BROT, gebuehrCents: 52 })
+    await meldeArtikelFehlt({ orderId: order.id, itemId: position('Brot').id })
+    await prisma.order.update({ where: { id: order.id }, data: { status: 'PICKED_UP', pickedUpAt: new Date(), paymentStatus: 'PAID' } })
+    const fenster = { von: new Date(Date.now() - 60 * 60 * 1000), bis: new Date(Date.now() + 60 * 60 * 1000) }
+
+    expect((await getTopProdukte(farm.id, fenster)).map((t) => t.name)).toEqual(['Eier'])
+    expect(await getMeistverkaufteProduktIds(farm.id)).toEqual([produkte[0]!.id])
+    expect(await getYtdRevenue(farm.id)).toBe(4.5)
   })
 })

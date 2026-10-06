@@ -15,6 +15,7 @@ import { describe, it, expect } from 'vitest'
 import {
   artikelFehltRechnung,
   artikelFehltZeilen,
+  nachFehlendemArtikel,
   neueServicegebuehrCents,
   type ArtikelFehltBestellung,
 } from '@/lib/artikel-fehlt'
@@ -240,5 +241,18 @@ describe('artikelFehltZeilen — was der Dialog vor dem Speichern zeigt', () => 
 
   it('Storno statt Teilstorno: kein Betragsblock', () => {
     expect(artikelFehltZeilen({ art: 'storno' }, 'Anna')).toBeNull()
+  })
+})
+
+describe('nachFehlendemArtikel — der Stand für die nächste Rechnung', () => {
+  it('übernimmt den von Stripe bestätigten Betrag und markiert die Position', () => {
+    const b = bestellung(ONLINE)
+    const r = artikelFehltRechnung(b, 'brot')
+    if (r.art !== 'teil') throw new Error('erwartet Teilstorno')
+    const danach = nachFehlendemArtikel(b, 'brot', r, 582)
+    expect(danach).toMatchObject({ warenpreisCents: 450, serviceFeeCents: 50, erstattetCents: 582 })
+    expect(danach.positionen.find((p) => p.id === 'brot')?.fehlt).toBe(true)
+    // bezahlt = Warenpreis + Gebühr + erstattet bleibt erhalten
+    expect(danach.warenpreisCents + danach.serviceFeeCents + danach.erstattetCents).toBe(1030 + 52)
   })
 })

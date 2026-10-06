@@ -383,6 +383,9 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
         status: 'CANCELLED',
         cancelledAt: new Date(),
         cancelReason: reason ?? null,
+        // Der Vermerk hängt am Stand VOR der Sperre — unbedenklich: „Artikel
+        // fehlt" senkt eine Gebühr nie auf 0 (Mindestgebühr), und
+        // serviceFeeRefundedAt setzen nur Status-gesperrte Wege.
         // Servicegebühr entfällt auch bei Storno: online steckt sie in der vollen
         // Erstattung unten (Stripe erstattet den ganzen Zahlungsbetrag), bar wurde
         // sie nie kassiert. Der Vermerk hält den Snapshot ehrlich — Admin-Spalte
@@ -448,7 +451,6 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
           vomHofCents: betraege.vomHofCents,
           schluessel: `storno-${order.id}`,
           schluesselHof: `storno-hof-${order.id}`,
-          grund: 'storno_nach_teilerstattung',
           onRueckbuchungFehler: (err) => {
             Sentry.captureException(err, {
               tags: { aktion: 'cancelOrder', grund: 'rueckbuchung_offen' },
@@ -542,7 +544,11 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
   // keine Storno-Mail; der Betreiber meldet sich mit der Erstattung.
   if (!erstattungOffen) {
     nachDerAntwort(async () => {
-      await sendOrderCancelled(toEmailOrder(order, farm), refundAmount, reason)
+      // Frisch gelesen: Hat „Artikel fehlt" kurz vor dem Storno Beträge
+      // geändert, zeigt die Mail den Stand, aus dem storniert wurde.
+      const fuerMail =
+        (await prisma.order.findFirst({ where: { id: orderId, farmId: farm.id }, select: ORDER_EMAIL_SELECT })) ?? order
+      await sendOrderCancelled(toEmailOrder(fuerMail, farm), refundAmount, reason)
     })
   }
 
@@ -582,15 +588,16 @@ export async function meldeArtikelFehlt(input: unknown): Promise<ArtikelFehltErg
     ausgang = await meldeFehlendenArtikel({ farmId: farm.id, orderId, itemId, jetzt: new Date() })
   } catch (err) {
     // Stripe hat nicht bestätigt, oder das Schreiben danach ist gescheitert:
-    // Die Transaktion ist zurückgerollt, die Bestellung unverändert. Ein
-    // zweiter Versuch ist sicher — der Schlüssel liefert eine schon erfolgte
-    // Erstattung zurück statt einer zweiten.
+    // Die Transaktion ist zurückgerollt. Hat Stripe trotzdem schon erstattet
+    // (Antwort verloren), findet der nächste Versuch die Erstattung über ihre
+    // Merkmale und trägt sie nach (src/server/teilerstattung.ts) — doppelt
+    // erstattet wird nie. Deshalb sagt der Text nicht „nichts erstattet".
     Sentry.captureException(err, {
       tags: { aktion: 'artikelFehlt', grund: 'nicht_gespeichert' },
       extra: { orderId, itemId },
     })
     return {
-      error: 'Wir konnten die Änderung nicht speichern. Es wurde nichts erstattet und nichts geändert – versuch es bitte gleich noch einmal.',
+      error: 'Wir konnten die Änderung nicht speichern. Versuch es bitte gleich noch einmal – es wird nichts doppelt erstattet.',
     }
   }
 
