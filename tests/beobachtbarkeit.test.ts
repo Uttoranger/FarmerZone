@@ -563,6 +563,38 @@ describe('bereinigeEreignis — keine IP-Adressen (Nr. 37)', () => {
     // Ein neues Objekt, nicht das Rohereignis (Vergleich ohne den werfenden Getter).
     expect(e === (roh as unknown)).toBe(false)
   })
+
+  it('bricht die Bereinigung VOR der Textbereinigung ab, bereinigt das Minimalereignis den Text selbst', () => {
+    const roh: Record<string, unknown> = {
+      event_id: 'e2',
+      level: 'error',
+      exception: {
+        values: [{ type: 'Error bei hof@beispiel.at', value: 'Link /reset-password?token=abc an hof@beispiel.at' }],
+      },
+      user: { id: 'farm_1', ip_address: '203.0.113.7' },
+    }
+    // Nur ein Getter, kein Setter: Schon das Zurückschreiben der bereinigten
+    // Nachricht — der allererste Schritt — wirft. Nachricht und Ausnahme
+    // sind dann noch roh; nur minimalEreignis kann sie bereinigen.
+    Object.defineProperty(roh, 'message', {
+      enumerable: true,
+      get: () => 'Mail an hof@beispiel.at, Rückruf +43 664 123 4567, code: 123456',
+    })
+
+    let e: ErrorEvent | undefined
+    expect(() => (e = bereinigeEreignis(ereignis(roh)))).not.toThrow()
+
+    expect(e).toEqual({
+      event_id: 'e2',
+      level: 'error',
+      message: 'Mail an [e-mail entfernt], Rückruf [telefon entfernt], code: [code entfernt]',
+      exception: {
+        values: [{ type: 'Error bei [e-mail entfernt]', value: 'Link /reset-password?token=abc an [e-mail entfernt]' }],
+      },
+      extra: { bereinigung: 'fehlgeschlagen' },
+    })
+    expect(JSON.stringify(e)).not.toMatch(/hof@beispiel\.at|203\.0\.113\.7|123456/)
+  })
 })
 
 describe('Sentry-Initialisierung — statisch: jeder init-Aufruf ohne Standard-PII', () => {
@@ -648,6 +680,16 @@ describe('Sentry-Initialisierung — statisch: jeder init-Aufruf ohne Standard-P
     if (!/\bsendDefaultPii\s*:\s*false\b/.test(optionen)) fehler.push('sendDefaultPii: false fehlt')
     if (!/\bbeforeSend\s*:\s*bereinigeEreignis\b/.test(optionen)) fehler.push('beforeSend fehlt')
     if (!/\bbeforeSendTransaction\s*:\s*bereinigeEreignis\b/.test(optionen)) fehler.push('beforeSendTransaction fehlt')
+    // Jede WEITERE Stelle mit anderem Wert — verschachtelt, als Variable oder
+    // als eigene Funktion — überstimmt womöglich die richtige. Der Leerraum
+    // steht IM Lookahead, sonst wiche \s* per Backtracking aus.
+    if (/\bsendDefaultPii\s*:(?!\s*false\b)/.test(optionen)) fehler.push('sendDefaultPii mit anderem Wert als false')
+    if (/\bbeforeSend\s*:(?!\s*bereinigeEreignis\b)/.test(optionen)) {
+      fehler.push('beforeSend mit anderem Wert als bereinigeEreignis')
+    }
+    if (/\bbeforeSendTransaction\s*:(?!\s*bereinigeEreignis\b)/.test(optionen)) {
+      fehler.push('beforeSendTransaction mit anderem Wert als bereinigeEreignis')
+    }
     // Ein gesetztes dataCollection schaltet im SDK (10.66) ALLE Vorgaben auf
     // „sammeln" — auch userInfo, also die IP — und überstimmt sendDefaultPii
     // (resolveDataCollectionOptions in @sentry/core). Ein Spread könnte es
@@ -713,6 +755,16 @@ describe('Sentry-Initialisierung — statisch: jeder init-Aufruf ohne Standard-P
       },
       { pfad: 'e.ts', text: `import Standard from '@sentry/nextjs'\nStandard.init({ ...basis, sendDefaultPii: false })` },
       { pfad: 'f.ts', text: `import * as Anderes from 'anderes-paket'\nAnderes.init({})` },
+      {
+        pfad: 'g.ts',
+        text: [
+          `import * as Sentry from '@sentry/nextjs'`,
+          // Das richtige Paar steht da — und daneben ein zweiter, anderer Wert.
+          `Sentry.init({ sendDefaultPii: false, beforeSend: bereinigeEreignis, beforeSendTransaction: bereinigeEreignis, integrations: [x({ sendDefaultPii: true })] })`,
+          `Sentry.init({ sendDefaultPii: pii, beforeSend: (e) => e, beforeSendTransaction: andererFilter })`,
+          `Sentry.init({ sendDefaultPii: false, beforeSend: bereinigeEreignis, beforeSendTransaction: bereinigeEreignis, x: { beforeSend: eigenerFilter } })`,
+        ].join('\n'),
+      },
     ]
 
     const ergebnis = sentryInitAufrufe(quellen).map((a) => ({
@@ -727,6 +779,9 @@ describe('Sentry-Initialisierung — statisch: jeder init-Aufruf ohne Standard-P
       'c.ts Sentry.init',
       'd.ts S.init',
       'e.ts Standard.init',
+      'g.ts Sentry.init',
+      'g.ts Sentry.init',
+      'g.ts Sentry.init',
     ])
     expect(ergebnis[0].fehler).toContain('sendDefaultPii: false fehlt')
     expect(ergebnis[1].fehler).toEqual(['sendDefaultPii: false fehlt'])
@@ -734,6 +789,16 @@ describe('Sentry-Initialisierung — statisch: jeder init-Aufruf ohne Standard-P
     expect(ergebnis[3].fehler).toEqual(['dataCollection gesetzt'])
     expect(ergebnis[4].fehler).toContain('kein Objekt-Literal (nicht prüfbar)')
     expect(ergebnis[5].fehler).toContain('Spread in den Optionen')
+    expect(ergebnis[6].fehler).toEqual(['sendDefaultPii mit anderem Wert als false'])
+    expect(ergebnis[7].fehler).toEqual([
+      'sendDefaultPii: false fehlt',
+      'beforeSend fehlt',
+      'beforeSendTransaction fehlt',
+      'sendDefaultPii mit anderem Wert als false',
+      'beforeSend mit anderem Wert als bereinigeEreignis',
+      'beforeSendTransaction mit anderem Wert als bereinigeEreignis',
+    ])
+    expect(ergebnis[8].fehler).toEqual(['beforeSend mit anderem Wert als bereinigeEreignis'])
   })
 })
 

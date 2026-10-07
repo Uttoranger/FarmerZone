@@ -26,8 +26,10 @@
  *   auch im Wurzel-Span (contexts.trace.data).
  * - IP-Adressen (Nr. 37): user.ip_address (auch „{{auto}}"), die Header, mit
  *   denen Proxies die Adresse weiterreichen (X-Forwarded-For & Co., jede
- *   Schreibweise), Vercels daraus abgeleitete Ortsangaben (x-vercel-ip-*),
- *   request.env (REMOTE_ADDR) und die IP-Attribute der Spans.
+ *   Schreibweise, auch x-original-forwarded-for und
+ *   x-envoy-external-address), die daraus abgeleiteten Ortsangaben von
+ *   Vercel und Cloudflare (x-vercel-ip-*, cf-ip*), request.env
+ *   (REMOTE_ADDR) und die IP-Attribute der Spans.
  *
  * Namen lassen sich nicht per Muster erkennen — gegen sie wirkt die
  * strukturelle Sperre: kein sendDefaultPii, als Nutzerkennung ausschließlich
@@ -251,20 +253,28 @@ function minimalEreignis<E extends SentryEvent>(event: E): E {
       // Getter, der wirft — Feld fällt weg.
     }
   }
+  // Jedes Feld genau EINMAL lesen und lokal halten: Ein Getter könnte beim
+  // zweiten Lesen etwas anderes (Rohes) liefern als beim geprüften ersten.
+  // Der Text wird hier selbst bereinigt — die Bereinigung kann abgebrochen
+  // sein, bevor sie ihn erreicht hat.
   try {
-    if (typeof roh.message === 'string') minimal.message = bereinigeText(roh.message)
+    const nachricht = roh.message
+    if (typeof nachricht === 'string') minimal.message = bereinigeText(nachricht)
   } catch {
     // Text nicht lesbar — fällt weg.
   }
   try {
-    const werte = istObjekt(roh.exception) ? roh.exception.values : undefined
-    const erste = Array.isArray(werte) && istObjekt(werte[0]) ? werte[0] : undefined
-    if (erste) {
+    const ausnahme = roh.exception
+    const werte = istObjekt(ausnahme) ? ausnahme.values : undefined
+    const erste = Array.isArray(werte) ? werte[0] : undefined
+    if (istObjekt(erste)) {
+      const typ = erste.type
+      const wert = erste.value
       minimal.exception = {
         values: [
           {
-            ...(typeof erste.type === 'string' ? { type: erste.type } : {}),
-            ...(typeof erste.value === 'string' ? { value: bereinigeText(erste.value) } : {}),
+            ...(typeof typ === 'string' ? { type: bereinigeText(typ) } : {}),
+            ...(typeof wert === 'string' ? { value: bereinigeText(wert) } : {}),
           },
         ],
       }
