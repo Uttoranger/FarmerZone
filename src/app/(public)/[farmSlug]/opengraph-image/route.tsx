@@ -3,11 +3,12 @@ import { NextRequest } from 'next/server'
 import * as Sentry from '@sentry/nextjs'
 import { hofSlugSchema } from '@/schemas/hof-adresse'
 import { teilenBildSucheSchema } from '@/schemas/teilen'
-import { teilenBildDaten, TEILEN_BILD_MASSE } from '@/lib/teilen-bild'
+import { bildProdukte, teilenBildDaten, teilenBildVersion, TEILEN_BILD_MASSE } from '@/lib/teilen-bild'
 import { teilenLink } from '@/lib/teilen-kanal'
 import { qrPfad } from '@/lib/qr-code'
 import { hofAdresse } from '@/lib/mein-hof'
 import { mitZeitlimit } from '@/lib/upload-zeitwaechter'
+import { enforceRateLimit } from '@/lib/rate-limit'
 import { APP_URL } from '@/lib/umgebung-server'
 import { ladeTeilenBildQuelle } from '@/server/queries/teilen-bild'
 import { TeilenBildGrafik } from '@/components/teilen/teilen-bild-grafik'
@@ -39,6 +40,11 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ farmSlug: string }> }
 ): Promise<Response> {
+  // Jede neue Adresse (p, v) geht am Zwischenspeicher vorbei und kostet eine
+  // Abfrage plus ein Rendering — dieselbe Bremse wie jede öffentliche Route.
+  const limited = enforceRateLimit('teilen-bild', request)
+  if (limited) return limited
+
   const { farmSlug } = await params
   const slug = hofSlugSchema.safeParse(farmSlug)
   if (!slug.success) return new Response('Nicht gefunden', { status: 404 })
@@ -57,23 +63,37 @@ export async function GET(
   }
   if (!quelle) return new Response('Nicht gefunden', { status: 404, headers: { 'Cache-Control': 'no-store' } })
 
+  // p nur mit erlaubten Werten: Kennungen, die als Eintrag ins Bild dürften.
+  // Bleibt keine übrig, gilt die Standardauswahl.
+  const erlaubt = new Set(bildProdukte(quelle.produkte, quelle.hof, null).map((e) => e.id))
+  const auswahl = suche.p?.filter((id) => erlaubt.has(id)) ?? []
+
   const daten = teilenBildDaten({
     hof: quelle.hof,
     produkte: quelle.produkte,
     slots: quelle.slots,
-    auswahl: suche.p ?? null,
+    auswahl: auswahl.length > 0 ? auswahl : null,
     adresse: hofAdresse(APP_URL, quelle.hof.slug).anzeige,
     jetzt: new Date(),
   })
   const qr = qrPfad(teilenLink(APP_URL, quelle.hof.slug, 'qr'))
-  const versioniert = request.nextUrl.searchParams.has('v')
+  // Lang zwischenspeichern nur, wenn `v` die Prüfsumme GENAU dieses Inhalts
+  // ist (S9) — ein erfundenes `v` bekäme sonst einen Tag lang einen eigenen
+  // Eintrag im CDN.
+  const versioniert = request.nextUrl.searchParams.get('v') === teilenBildVersion(daten)
 
-  return new ImageResponse(<TeilenBildGrafik daten={daten} format={suche.format} qr={qr} />, {
-    ...TEILEN_BILD_MASSE[suche.format],
-    headers: {
-      'Cache-Control': versioniert
-        ? 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400'
-        : 'public, max-age=60, s-maxage=60',
-    },
-  })
+  try {
+    return new ImageResponse(<TeilenBildGrafik daten={daten} format={suche.format} qr={qr} />, {
+      ...TEILEN_BILD_MASSE[suche.format],
+      headers: {
+        'Cache-Control': versioniert
+          ? 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400'
+          : 'public, max-age=60, s-maxage=60',
+      },
+    })
+  } catch (fehler) {
+    // Nur Kennungen des Hofs nach Sentry, keine Inhalte (sentry-hygiene bereinigt zusätzlich).
+    Sentry.captureException(fehler, { tags: { bereich: 'teilen-bild', farmId: quelle.farmId, slug: quelle.hof.slug } })
+    return new Response('Das Bild ist gerade nicht verfügbar.', { status: 503, headers: { 'Cache-Control': 'no-store' } })
+  }
 }

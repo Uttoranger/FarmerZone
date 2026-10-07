@@ -11,11 +11,17 @@ import type { QrPfad } from '@/lib/qr-code'
  * Satori kennt keine CSS-Variablen und keine Klassen — die Farben stehen
  * deshalb hier als Werte, genau die Token-Werte aus docs/ai/DESIGN_SYSTEM.md
  * (dunkles Theme, wie das Mockup; ein Bild hat kein Theme, es wird
- * verschickt). Jede Zeile mit eigener Ausnahme für die Lint-Regel.
+ * verschickt). Jede Zeile mit eigener Ausnahme für die Lint-Regel; das ist
+ * die EINE Stelle für Farben des Teilen-Bilds. Herkunft je Wert: `text` =
+ * --text (dunkel), `qrGrund` = --surface (hell), `qrModul` = --text (hell),
+ * `grund` = --accent (#2E6B45) als Mitte des Verlaufs, dessen Enden und
+ * `leise`/`zeile`/`kachel` stammen aus dem Mockup web-h4-teilen-fenster-mit-bild.
+ * tests/teilen-bild.test.ts gleicht die Token-Werte mit der Tabelle in
+ * docs/ai/DESIGN_SYSTEM.md ab. Freigabe als Ausnahme: Bericht 21, „Bitte entscheiden".
  * Alles Fremde (Hof-, Produkt-, Ortsname) steht nur als Text-Kind, nie als
  * HTML — Satori setzt Text, es parst nichts.
  */
-const FARBE = {
+export const TEILEN_BILD_FARBE = {
   // eslint-disable-next-line no-restricted-syntax -- Satori (next/og) kennt keine CSS-Variablen; Grün-Verlauf aus --accent wie im Mockup
   grund: 'linear-gradient(160deg, #24432f 0%, #2e6b45 55%, #1a3324 100%)',
   // eslint-disable-next-line no-restricted-syntax -- Satori: --text (dunkles Theme)
@@ -56,8 +62,8 @@ export function TeilenBildGrafik({
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        backgroundImage: FARBE.grund,
-        color: FARBE.text,
+        backgroundImage: TEILEN_BILD_FARBE.grund,
+        color: TEILEN_BILD_FARBE.text,
         padding: px(story ? 26 : 18),
         gap: px(story ? 14 : 9),
       }}
@@ -69,7 +75,7 @@ export function TeilenBildGrafik({
           fontWeight: 700,
           letterSpacing: px(1.4),
           textTransform: 'uppercase',
-          color: FARBE.leise,
+          color: TEILEN_BILD_FARBE.leise,
           marginTop: story ? px(40) : 0,
         }}
       >
@@ -98,11 +104,11 @@ export function TeilenBildGrafik({
                 alignItems: 'center',
                 gap: px(8),
                 padding: `${px(story ? 9 : 6)}px ${px(8)}px`,
-                backgroundColor: FARBE.zeile,
+                backgroundColor: TEILEN_BILD_FARBE.zeile,
                 borderRadius: px(9),
               }}
             >
-              <div style={{ display: 'flex', width: px(22), height: px(22), borderRadius: px(6), backgroundColor: FARBE.kachel }} />
+              <div style={{ display: 'flex', width: px(22), height: px(22), borderRadius: px(6), backgroundColor: TEILEN_BILD_FARBE.kachel }} />
               <div
                 style={{
                   display: 'block',
@@ -116,11 +122,11 @@ export function TeilenBildGrafik({
               >
                 {p.name}
               </div>
-              <div style={{ display: 'flex', fontSize: px(story ? 13 : 11), color: FARBE.leise }}>{p.preis}</div>
+              <div style={{ display: 'flex', fontSize: px(story ? 13 : 11), color: TEILEN_BILD_FARBE.leise }}>{p.preis}</div>
             </div>
           ))
         ) : (
-          <div style={{ display: 'flex', fontSize: px(story ? 15 : 12.5), color: FARBE.leise, lineHeight: 1.4 }}>
+          <div style={{ display: 'flex', fontSize: px(story ? 15 : 12.5), color: TEILEN_BILD_FARBE.leise, lineHeight: 1.4 }}>
             Regional einkaufen und am Hof abholen.
           </div>
         )}
@@ -131,13 +137,13 @@ export function TeilenBildGrafik({
           {daten.abholung && (
             <div style={{ display: 'flex', fontSize: px(story ? 14 : 11.5), fontWeight: 600 }}>{daten.abholung}</div>
           )}
-          <div style={{ display: 'block', lineClamp: 2, wordBreak: 'break-word', fontSize: px(story ? 12 : 10), color: FARBE.leise }}>
+          <div style={{ display: 'block', lineClamp: 2, wordBreak: 'break-word', fontSize: px(story ? 12 : 10), color: TEILEN_BILD_FARBE.leise }}>
             {daten.ort ? `${daten.ort} · ${daten.adresse}` : daten.adresse}
           </div>
         </div>
-        <div style={{ display: 'flex', padding: px(5), backgroundColor: FARBE.qrGrund, borderRadius: px(8) }}>
+        <div style={{ display: 'flex', padding: px(5), backgroundColor: TEILEN_BILD_FARBE.qrGrund, borderRadius: px(8) }}>
           <svg width={qrKante} height={qrKante} viewBox={`-2 -2 ${qr.groesse + 4} ${qr.groesse + 4}`}>
-            <path d={qr.pfad} fill={FARBE.qrModul} />
+            <path d={qr.pfad} fill={TEILEN_BILD_FARBE.qrModul} />
           </svg>
         </div>
       </div>

@@ -45,7 +45,9 @@ export const teilenBildSucheSchema = z.object({
         .split(',')
         .map((t) => t.trim())
         .filter((t) => /^[A-Za-z0-9_-]{1,40}$/.test(t))
-        .slice(0, 12)
+        // Nie mehr als ins Bild passen (TEILEN_BILD_PRODUKTE_MAX) — die Route
+        // behält danach nur Kennungen, die wirklich ins Bild dürfen.
+        .slice(0, 3)
     )
     .optional()
     .catch(undefined),

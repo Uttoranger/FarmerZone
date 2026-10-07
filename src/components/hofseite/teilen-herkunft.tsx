@@ -32,7 +32,11 @@ export function TeilenHerkunft({ farmSlug }: { farmSlug: string }): null {
           headers: { 'Content-Type': 'application/json' },
           body,
           keepalive: true,
-        }).catch(() => {})
+        }).catch(() => {
+          // Bewusst still: ein verlorener Zähler-Aufruf (offline, Seite schon
+          // verlassen) betrifft nur die Statistik des Hofs, nie die Kundin —
+          // eine Meldung hätte niemanden, der etwas tun kann.
+        })
       }
     }
     // Das Kürzel verlässt die Adresse: Teilt die Kundin die Seite weiter,

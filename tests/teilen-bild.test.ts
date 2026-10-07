@@ -15,13 +15,26 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createElement } from 'react'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/prisma', () => ({ prisma: { farm: { findFirst: vi.fn() } } }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
+// Satori/resvg brauchen wir hier nicht: Die Aussage ist, was die Route mit dem Bild macht (Kopf, Fehler).
+vi.mock('next/og', () => ({
+  ImageResponse: vi.fn(function (this: unknown, _el: unknown, optionen: { headers?: Record<string, string> }) {
+    return new Response('png', { headers: { 'content-type': 'image/png', ...optionen.headers } })
+  }),
+}))
 
 import { prisma } from '@/lib/prisma'
+import * as Sentry from '@sentry/nextjs'
+import { ImageResponse } from 'next/og'
+import { hofAdresse } from '@/lib/mein-hof'
+import { Decimal } from '@prisma/client/runtime/index-browser'
+import { APP_URL } from '@/lib/umgebung-server'
 import {
   bildProdukte,
   teilenAuswahl,
@@ -35,7 +48,7 @@ import {
 import { teilenBildPfad } from '@/lib/teilen-kanal'
 import { qrPfad } from '@/lib/qr-code'
 import { teilenBildSucheSchema } from '@/schemas/teilen'
-import { TeilenBildGrafik } from '@/components/teilen/teilen-bild-grafik'
+import { TEILEN_BILD_FARBE, TeilenBildGrafik } from '@/components/teilen/teilen-bild-grafik'
 import { GET as bildRoute } from '@/app/(public)/[farmSlug]/opengraph-image/route'
 
 const findFirst = vi.mocked(prisma.farm.findFirst)
@@ -267,5 +280,104 @@ describe('GET /[farmSlug]/opengraph-image', () => {
     const res = await aufruf('Hof%20Test')
     expect(res.status).toBe(404)
     expect(findFirst).not.toHaveBeenCalled()
+  })
+})
+
+describe('GET /[farmSlug]/opengraph-image — Zwischenspeicher, Bremse, Fehler (Nachbesserung Runde 1)', () => {
+  const ROH = {
+    id: 'farm-1',
+    name: 'Hof Test',
+    slug: 'hof-test',
+    city: 'Teststadt',
+    isPaused: false,
+    betriebsnummer: null,
+    betriebsstatus: null,
+    products: [
+      { id: 'eier', name: 'Freilandeier', price: new Decimal('4.50'), isAvailable: true, stock: 3, familieId: null, category: 'EIER', verpackung: null },
+    ],
+    // Ohne Abholfenster hängt der Inhalt nicht an der Uhr.
+    pickupSlots: [],
+  }
+  const aktuelleVersion = () =>
+    teilenBildVersion(
+      teilenBildDaten({
+        hof: HOF,
+        produkte: [produkt('eier', { name: 'Freilandeier', stock: 3 })],
+        slots: [],
+        auswahl: null,
+        adresse: hofAdresse(APP_URL, 'hof-test').anzeige,
+        jetzt: JETZT,
+      })
+    )
+  const aufruf = (suche = '', kopf: Record<string, string> = {}) =>
+    bildRoute(new NextRequest(`http://localhost/hof-test/opengraph-image${suche}`, { headers: kopf }), {
+      params: Promise.resolve({ farmSlug: 'hof-test' }),
+    })
+
+  beforeEach(() => {
+    findFirst.mockResolvedValue(ROH as never)
+  })
+
+  it('lang zwischengespeichert nur mit der Prüfsumme des aktuellen Inhalts', async () => {
+    const passend = await aufruf(`?v=${aktuelleVersion()}`)
+    expect(passend.status).toBe(200)
+    expect(passend.headers.get('cache-control')).toContain('s-maxage=86400')
+  })
+
+  it('ein beliebiges v bekommt nur den kurzen Zwischenspeicher (Gegenprobe)', async () => {
+    const fremd = await aufruf('?v=erfunden123')
+    expect(fremd.headers.get('cache-control')).toBe('public, max-age=60, s-maxage=60')
+    const ohne = await aufruf()
+    expect(ohne.headers.get('cache-control')).toBe('public, max-age=60, s-maxage=60')
+  })
+
+  it('p nur mit erlaubten Werten: höchstens drei Kennungen im Schema', () => {
+    expect(teilenBildSucheSchema.parse({ p: 'a,b,c,d,e' }).p).toEqual(['a', 'b', 'c'])
+  })
+
+  it('scheitert das Bild, kommt 503 ohne Zwischenspeicher, Sentry nur mit Hof-Kennung', async () => {
+    vi.mocked(ImageResponse).mockImplementationOnce(function () {
+      throw new Error('Satori kaputt')
+    })
+    const res = await aufruf()
+    expect(res.status).toBe(503)
+    expect(res.headers.get('cache-control')).toBe('no-store')
+    const [, kontext] = vi.mocked(Sentry.captureException).mock.calls[0]
+    expect(kontext).toEqual({ tags: { bereich: 'teilen-bild', farmId: 'farm-1', slug: 'hof-test' } })
+  })
+
+  it('gebremst wie jede öffentliche Route (in Produktion)', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    try {
+      const kopf = { 'x-forwarded-for': '198.51.100.21' }
+      const antworten = []
+      for (let i = 0; i < 21; i++) antworten.push((await aufruf('', kopf)).status)
+      expect(antworten.at(-1)).toBe(429)
+      expect(antworten.slice(0, 20).every((s) => s === 200)).toBe(true)
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+})
+
+describe('Farben des Teilen-Bilds kommen aus den Tokens (Satori-Ausnahme, eine Stelle)', () => {
+  const doku = readFileSync(join(process.cwd(), 'docs/ai/DESIGN_SYSTEM.md'), 'utf8')
+  const token = (name: string, spalte: 'dunkel' | 'hell'): string => {
+    const zeile = new RegExp(`^\\|\\s*--${name}[^|]*\\|\\s*(#[0-9A-Fa-f]{6})\\s*\\|\\s*(#[0-9A-Fa-f]{6})`, 'm').exec(doku)
+    if (!zeile) throw new Error(`Token --${name} fehlt in der Tabelle`)
+    return (spalte === 'dunkel' ? zeile[1] : zeile[2]).toLowerCase()
+  }
+
+  it('Schrift, QR-Grund und QR-Module sind genau die Token-Werte, der Verlauf hat das Akzent-Grün in der Mitte', () => {
+    expect(TEILEN_BILD_FARBE.text).toBe(token('text', 'dunkel'))
+    expect(TEILEN_BILD_FARBE.qrGrund).toBe(token('surface', 'hell'))
+    expect(TEILEN_BILD_FARBE.qrModul).toBe(token('text', 'hell'))
+    expect(TEILEN_BILD_FARBE.grund).toContain(`${token('accent', 'dunkel')} 55%`)
+  })
+
+  it('Farbwerte gibt es im Teilen-Bild nur im Objekt TEILEN_BILD_FARBE', () => {
+    const text = readFileSync(join(process.cwd(), 'src/components/teilen/teilen-bild-grafik.tsx'), 'utf8')
+    const ausserhalb = text.slice(text.indexOf('} as const'))
+    expect(ausserhalb).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/)
   })
 })
