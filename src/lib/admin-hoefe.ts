@@ -15,24 +15,30 @@ import { datumKurz } from '@/lib/verkauf-eintragen'
 import { einstellungKurz, kalendertagInWien } from '@/lib/servicegebuehr'
 
 /**
- * Freischalten geht erst mit fertigem Stripe-Konto (Gate 8, freigabe.md §9
- * „22f", Mockup: „Stripe fehlt – Freischalten erst nach Stripe möglich").
- * Die Sperre sitzt in approveFarmAction; hier steht nur, warum der Knopf ruht.
+ * Wer online kassieren will, braucht vor dem Freischalten ein fertiges
+ * Stripe-Konto (Gate 8, freigabe.md §9 „22f", Mockup: „Stripe fehlt –
+ * Freischalten erst nach Stripe möglich"). Die Sperre sitzt in
+ * approveFarmAction; hier steht nur, warum der Knopf ruht.
  */
 export const FREISCHALTUNG_STRIPE_OFFEN_TEXT = 'Stripe fehlt – Freischalten erst nach Stripe möglich.'
 
 /**
  * Warum ein wartender Hof (noch) nicht freigeschaltet werden kann — null, wenn
- * nichts im Weg steht. Die E-Mail zuerst (S3, Nr. 17b): Sie kann der Hof sofort
- * nachholen, Stripe dauert länger. Dieselbe Reihenfolge prüft der Server.
+ * nichts im Weg steht. EINE Regel für Liste und Action (approveFarmAction).
+ *
+ * - Die E-Mail zuerst (S3, Nr. 17b): Sie kann der Hof sofort nachholen.
+ * - Stripe nur, wenn der Hof online kassieren will (`acceptsOnline`): Ein Hof
+ *   darf bewusst nur bar kassieren — Online-Zahlung ist ein Plus, kein Muss
+ *   (hof-einstellungen.ts, DEVELOPMENT.md). Ein reiner Bar-Hof käme sonst nie
+ *   live. Lesart der Nachbesserung 22f, Runde 1 — zur Bestätigung (Bericht 22f).
  */
-export function freischaltSperre(hof: { emailBestaetigungOffen: boolean; stripeBereit: boolean }): string | null {
+export function freischaltSperre(hof: { emailBestaetigungOffen: boolean; stripeBereit: boolean; onlineGewuenscht: boolean }): string | null {
   if (hof.emailBestaetigungOffen) return FREISCHALTUNG_EMAIL_OFFEN_TEXT
-  if (!hof.stripeBereit) return FREISCHALTUNG_STRIPE_OFFEN_TEXT
+  if (hof.onlineGewuenscht && !hof.stripeBereit) return FREISCHALTUNG_STRIPE_OFFEN_TEXT
   return null
 }
 
-export type HofStatusId = 'wartet' | 'stillgelegt' | 'pausiert' | 'zahlung-fehlt' | 'online'
+export type HofStatusId = 'wartet' | 'stillgelegt' | 'pausiert' | 'zahlung-fehlt' | 'nur-bar' | 'online'
 
 /** Der Ton einer Marke — dieselben Werte wie StatusBadge (components/ui/status-badge.tsx). */
 export type HofTon = 'offen' | 'fertig' | 'neutral'
@@ -43,7 +49,8 @@ export type HofStatus = { id: HofStatusId; text: string; ton: HofTon }
  * Der Zustand eines Hofs in einem Wort (Mockup: Online, Pausiert, Zahlung
  * fehlt). Reihenfolge zählt: Stillgelegt und Wartet nehmen die Hofseite vom
  * Netz und stechen alles andere; Pausiert ist ein Wunsch des Hofs; „Zahlung
- * fehlt" heißt, Stripe ist nicht fertig — bar geht dann trotzdem.
+ * fehlt" heißt, der Hof will online kassieren und Stripe ist nicht fertig;
+ * „Nur bar" ist ein Hof, der bewusst nur bar kassiert — kein Mangel, neutral.
  * Orange nur, wo der Betreiber etwas tun kann (warten, nachfassen).
  */
 export function hofStatus(hof: {
@@ -51,16 +58,18 @@ export function hofStatus(hof: {
   archivedAt: Date | null
   isPaused: boolean
   stripeBereit: boolean
+  onlineGewuenscht: boolean
 }): HofStatus {
   if (hof.archivedAt) return { id: 'stillgelegt', text: 'Stillgelegt', ton: 'neutral' }
   if (hof.approvedAt === null) return { id: 'wartet', text: 'Wartet', ton: 'offen' }
   if (hof.isPaused) return { id: 'pausiert', text: 'Pausiert', ton: 'neutral' }
+  if (!hof.onlineGewuenscht) return { id: 'nur-bar', text: 'Nur bar', ton: 'neutral' }
   if (!hof.stripeBereit) return { id: 'zahlung-fehlt', text: 'Zahlung fehlt', ton: 'offen' }
   return { id: 'online', text: 'Online', ton: 'fertig' }
 }
 
 /** Die Filter über der Hofliste (Mockup: Alle · Online · Pausiert · Ohne Zahlung), dazu Stillgelegt. */
-export const HOF_FILTER_WERTE = ['alle', 'online', 'pausiert', 'ohne-zahlung', 'stillgelegt'] as const
+export const HOF_FILTER_WERTE = ['alle', 'online', 'pausiert', 'ohne-zahlung', 'nur-bar', 'stillgelegt'] as const
 export type HofFilter = (typeof HOF_FILTER_WERTE)[number]
 
 export const HOF_FILTER_LABEL: Record<HofFilter, string> = {
@@ -68,6 +77,7 @@ export const HOF_FILTER_LABEL: Record<HofFilter, string> = {
   online: 'Online',
   pausiert: 'Pausiert',
   'ohne-zahlung': 'Ohne Zahlung',
+  'nur-bar': 'Nur bar',
   stillgelegt: 'Stillgelegt',
 }
 
@@ -75,6 +85,7 @@ const FILTER_STATUS: Record<Exclude<HofFilter, 'alle'>, HofStatusId> = {
   online: 'online',
   pausiert: 'pausiert',
   'ohne-zahlung': 'zahlung-fehlt',
+  'nur-bar': 'nur-bar',
   stillgelegt: 'stillgelegt',
 }
 
@@ -101,7 +112,7 @@ export function filtereHoefe<T extends FilterHof>(hoefe: readonly T[], ansicht: 
 
 /** Die Zahl hinter jedem Filter-Chip — ohne Suche, wie in der Kundenliste. */
 export function zaehleHofFilter(hoefe: readonly FilterHof[]): Record<HofFilter, number> {
-  const zahlen: Record<HofFilter, number> = { alle: 0, online: 0, pausiert: 0, 'ohne-zahlung': 0, stillgelegt: 0 }
+  const zahlen: Record<HofFilter, number> = { alle: 0, online: 0, pausiert: 0, 'ohne-zahlung': 0, 'nur-bar': 0, stillgelegt: 0 }
   for (const h of hoefe) {
     if (h.status.id === 'wartet') continue
     zahlen.alle++
@@ -183,6 +194,8 @@ export type HofRohdaten = {
   monat: { bestellungen: number; gebuehrOnlineCents: number; gebuehrBarCents: number; gebuehrEntfallenCents: number }
   monatBezeichnung: string
   stripeBereit: boolean
+  /** Der Hof will online kassieren (Farm.acceptsOnline). */
+  onlineGewuenscht: boolean
   isPaused: boolean
   betriebsnummer: string | null
   sepaErteilt: boolean
@@ -208,6 +221,7 @@ export type AdminHofZeile = {
   /** Belegter Gründungsplatz (1 … 12) — null ohne Platz. */
   gruendungsplatz: number | null
   stripeBereit: boolean
+  onlineGewuenscht: boolean
   sepaErteilt: boolean
   nummer: string | null
   istDeutsch: boolean
@@ -243,6 +257,7 @@ export function adminHofZeile(
     // Ein wartender Hof hat noch keinen Platz, ein stillgelegter belegt keinen mehr.
     gruendungsplatz: hof.approvedAt && !hof.archivedAt ? platz : null,
     stripeBereit: hof.stripeBereit,
+    onlineGewuenscht: hof.onlineGewuenscht,
     sepaErteilt: hof.sepaErteilt,
     nummer: nummerAnzeige(hof.betriebsnummer),
     istDeutsch: hof.land === 'DE',

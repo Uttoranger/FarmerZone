@@ -62,6 +62,8 @@ export type AdminFarmRow = {
   monatBezeichnung: string
   /** Stripe-Konto fertig (Farm.stripeAccountReady) — Bedingung fürs Freischalten (Nr. 22f). */
   stripeBereit: boolean
+  /** Der Hof will online kassieren (Farm.acceptsOnline) — ohne Online-Wunsch braucht er kein Stripe (Nr. 22f, Runde 1). */
+  onlineGewuenscht: boolean
   /** Bestellungen pausiert (Urlaubsmodus) — nur für Status und Filter der Liste. */
   isPaused: boolean
   /** Betriebsnummer, wie der Hof sie angegeben hat (E9: nur Anzeige, nie geprüft). */
@@ -164,6 +166,7 @@ export async function getAdminFarms(jetzt: Date = new Date()): Promise<AdminFarm
         // Nr. 22f: Status, Freischalt-Sperre und Anzeige der Liste. Die
         // Stripe-Kennung selbst verlässt diese Funktion nicht.
         stripeAccountReady: true,
+        acceptsOnline: true,
         isPaused: true,
         betriebsnummer: true,
         sepaMandatAm: true,
@@ -205,6 +208,7 @@ export async function getAdminFarms(jetzt: Date = new Date()): Promise<AdminFarm
     monat: spalten.get(f.id) ?? MONAT_LEER,
     monatBezeichnung: monat.bezeichnung,
     stripeBereit: f.stripeAccountReady === true,
+    onlineGewuenscht: f.acceptsOnline !== false,
     isPaused: f.isPaused === true,
     betriebsnummer: nummerAnzeige(f.betriebsnummer ?? null),
     sepaErteilt: f.sepaMandatAm != null,

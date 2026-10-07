@@ -136,14 +136,25 @@ export async function zaehleMeldungenJeStatus(art: MeldungArt | null): Promise<P
 }
 
 /**
- * Die Nachbarn einer Meldung für „‹ Vorige" und „Nächste ›" (Nr. 22f): in der
- * Reihenfolge des Briefkastens (neueste zuerst) ist die vorige die nächst
- * jüngere, die nächste die nächst ältere. Nur Kennungen, nichts zum Anzeigen.
+ * Die Nachbarn einer Meldung für „‹ Vorige" und „Nächste ›" (Nr. 22f): über
+ * ALLE Meldungen, neueste zuerst — der Filter des Briefkastens gilt hier
+ * nicht (das Detail kennt ihn nicht). Die vorige ist die nächst jüngere, die
+ * nächste die nächst ältere; bei gleichem Zeitpunkt entscheidet die Kennung,
+ * damit keine übersprungen wird. Nur Kennungen, nichts zum Anzeigen.
  */
-export async function getMeldungNachbarn(meldung: { createdAt: Date }): Promise<{ vorige: string | null; naechste: string | null }> {
+export async function getMeldungNachbarn(meldung: { id: string; createdAt: Date }): Promise<{ vorige: string | null; naechste: string | null }> {
+  const zeit = meldung.createdAt
   const [juenger, aelter] = await Promise.all([
-    prisma.meldung.findFirst({ where: { createdAt: { gt: meldung.createdAt } }, orderBy: { createdAt: 'asc' }, select: { id: true } }),
-    prisma.meldung.findFirst({ where: { createdAt: { lt: meldung.createdAt } }, orderBy: { createdAt: 'desc' }, select: { id: true } }),
+    prisma.meldung.findFirst({
+      where: { OR: [{ createdAt: { gt: zeit } }, { createdAt: zeit, id: { gt: meldung.id } }] },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: { id: true },
+    }),
+    prisma.meldung.findFirst({
+      where: { OR: [{ createdAt: { lt: zeit } }, { createdAt: zeit, id: { lt: meldung.id } }] },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: { id: true },
+    }),
   ])
   return { vorige: juenger?.id ?? null, naechste: aelter?.id ?? null }
 }

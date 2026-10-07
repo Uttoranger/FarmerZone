@@ -13,8 +13,8 @@ import {
 import { servicegebuehrEinstellungSchema } from '@/schemas/servicegebuehr'
 import { wienerMitternacht } from '@/lib/servicegebuehr'
 import { triageEingabeSchema } from '@/schemas/meldung'
-import { FREISCHALTUNG_EMAIL_OFFEN_TEXT, bestaetigungOffen } from '@/lib/email-bestaetigung'
-import { FREISCHALTUNG_STRIPE_OFFEN_TEXT } from '@/lib/admin-hoefe'
+import { bestaetigungOffen } from '@/lib/email-bestaetigung'
+import { freischaltSperre } from '@/lib/admin-hoefe'
 
 function revalidateAll(slug: string) {
   revalidatePath('/admin')
@@ -38,20 +38,26 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
       name: true,
       slug: true,
       stripeAccountReady: true,
+      acceptsOnline: true,
       owner: { select: { email: true, emailVerified: true, createdAt: true } },
     },
   })
   if (!farm) return { error: 'Hof nicht gefunden.' }
 
-  // S3 (Nr. 17b): „Hof online stellen" ist bis zur bestätigten E-Mail
-  // gesperrt — und online geht ein Hof nur über diesen Klick. Konten vor dem
-  // Stichtag bleiben unberührt. Frisch aus der Datenbank gelesen (oben).
-  if (bestaetigungOffen(farm.owner)) return { error: FREISCHALTUNG_EMAIL_OFFEN_TEXT }
-
-  // Gate 8 (freigabe.md §9 „22f"): Freischalten erst mit fertigem
-  // Stripe-Konto — dieselbe Reihenfolge wie freischaltSperre in der Liste.
+  // Die Sperren aus EINER Regel (freischaltSperre, src/lib/admin-hoefe.ts),
+  // alles frisch aus der Datenbank gelesen (oben):
+  // - S3 (Nr. 17b): „Hof online stellen" ist bis zur bestätigten E-Mail
+  //   gesperrt — und online geht ein Hof nur über diesen Klick. Konten vor dem
+  //   Stichtag bleiben unberührt.
+  // - Gate 8 (freigabe.md §9 „22f"): Wer online kassieren will, braucht ein
+  //   fertiges Stripe-Konto. Ein reiner Bar-Hof (acceptsOnline false) nicht.
   // Bereits freigeschaltete Höfe berührt das nicht; es wirkt nur auf diesen Klick.
-  if (farm.stripeAccountReady !== true) return { error: FREISCHALTUNG_STRIPE_OFFEN_TEXT }
+  const sperre = freischaltSperre({
+    emailBestaetigungOffen: bestaetigungOffen(farm.owner),
+    stripeBereit: farm.stripeAccountReady === true,
+    onlineGewuenscht: farm.acceptsOnline !== false,
+  })
+  if (sperre) return { error: sperre }
 
   await prisma.farm.update({ where: { id: farmId }, data: { approvedAt: new Date() } })
   revalidateAll(farm.slug)
