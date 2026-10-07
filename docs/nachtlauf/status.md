@@ -57,4 +57,4 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 38 | Double-Opt-in (S11) | fertig (PR #217) | `nacht/2026-10-07/38-double-opt-in` | #217 | main | **Migration: ja (Expand)**; Sicherheitspfad, zwei Runden, zwei Nachprüfungen; ein „Sollte" offen (Rückgabetyp); Abonnentenzahl ermittelt der Mensch | 07.10.2026 |
 | 39 | Direktverkauf senkt den Vorrat (D1) | fertig (PR #216) | `nacht/2026-10-07/39-direktverkauf-vorrat` | #216 | main | Annahmen zur Freigabe (Grundeinheit, auf 0, Aufrunden); keine Migration | 07.10.2026 |
 | 40 | Rate-Limit über die Datenbank (R1) | fertig (PR #218) | `nacht/2026-10-07/40-rate-limit-db` | #218 | main | **Migration: ja (Expand, neue Tabelle + RLS)**; nach #217 mergen; Datenschutzsatz offen | 07.10.2026 |
-| Sammel | Sammel-PR Lauf 7 | läuft | `integration/lauf7` | | main | | 07.10.2026 |
+| Sammel | Sammel-PR Lauf 7 | fertig (PR #219) | `integration/lauf7` | #219 | main | #212–#218 zusammengeführt, keine Code-Konflikte; Gesamtstand grün (5456 Tests, Integration 328); Morgenbericht `morgenbericht-2026-10-07-lauf7.md` | 07.10.2026 |
