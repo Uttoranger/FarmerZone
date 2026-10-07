@@ -54,15 +54,20 @@ const mockFarmPhotoCount = vi.mocked(prisma.farmPhoto.count)
 const mockFarmPhotoCreate = vi.mocked(prisma.farmPhoto.create)
 
 const SESSION = { user: { id: 'user-1' } }
+// Seit Nr. 19b nimmt die Aktion nur fertige Bilder dieses Hofes aus unserem
+// Speicher an (tests/bild-url-pruefung.test.ts) — der Speicher kommt aus dem
+// Blob-Schlüssel, deshalb ein erfundener Schlüssel für den Test.
+const EIGENES_BILD = 'https://abc123.public.blob.vercel-storage.com/farms/farm-1/gallery/p.webp'
 
 describe('addFarmPhotoAction — Galerie-Limit', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_abc123_nurFuerTests')
     mockGetSession.mockResolvedValue(SESSION as never)
     mockFarmFindUnique.mockResolvedValue({ id: 'farm-1', slug: 'mein-hof' } as never)
     mockFarmPhotoCreate.mockResolvedValue({
       id: 'photo-9',
-      url: 'https://x.public.blob.vercel-storage.com/p.webp',
+      url: EIGENES_BILD,
       caption: null,
       sortOrder: 8,
     } as never)
@@ -70,14 +75,14 @@ describe('addFarmPhotoAction — Galerie-Limit', () => {
 
   it('erlaubt das 8. Foto (count = 7)', async () => {
     mockFarmPhotoCount.mockResolvedValue(7 as never)
-    const result = await addFarmPhotoAction({ url: 'https://x.public.blob.vercel-storage.com/p.webp' })
+    const result = await addFarmPhotoAction({ url: EIGENES_BILD })
     expect(result.error).toBeUndefined()
     expect(result.photo).toBeDefined()
   })
 
   it('lehnt das 9. Foto ab (count = 8)', async () => {
     mockFarmPhotoCount.mockResolvedValue(8 as never)
-    const result = await addFarmPhotoAction({ url: 'https://x.public.blob.vercel-storage.com/p.webp' })
+    const result = await addFarmPhotoAction({ url: EIGENES_BILD })
     expect(result.error).toMatch(/Maximal 8/)
     expect(mockFarmPhotoCreate).not.toHaveBeenCalled()
   })

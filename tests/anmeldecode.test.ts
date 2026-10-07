@@ -19,6 +19,8 @@
  * tests/integration/anmeldecode.int.test.ts.
  */
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { emailOTP } from 'better-auth/plugins'
 import {
   ANMELDECODE_GUELTIG_SEKUNDEN,
@@ -72,8 +74,11 @@ describe('Plugin-Einstellung', () => {
     expect(CODE_ERNEUT_WARTEZEIT_SEKUNDEN).toBe(ANMELDECODE_RATE_LIMIT.window)
   })
 
-  it('sperrt die ungenutzten Code-Pfade und das Anfordern von Magic Links', () => {
+  it('sperrt die ungenutzten Code-Pfade und den Magic Link ganz (Anfordern und Prüfen)', () => {
     expect(GESPERRTE_AUTH_PFADE).toContain('/sign-in/magic-link')
+    // Nr. 19b: Der Übergang für alte Links (15 Minuten nach dem Deployment
+    // von E7) ist längst vorbei — Prüfen alter Tokens ist zu.
+    expect(GESPERRTE_AUTH_PFADE).toContain('/magic-link/verify')
     for (const pfad of [
       '/email-otp/request-password-reset',
       '/email-otp/reset-password',
@@ -87,8 +92,8 @@ describe('Plugin-Einstellung', () => {
     }
   })
 
-  it('Gegenprobe: Anfordern, Anmelden und das Prüfen alter Magic Links bleiben offen', () => {
-    for (const pfad of ['/email-otp/send-verification-otp', '/sign-in/email-otp', '/magic-link/verify']) {
+  it('Gegenprobe: Code anfordern und mit Code anmelden bleiben offen', () => {
+    for (const pfad of ['/email-otp/send-verification-otp', '/sign-in/email-otp']) {
       expect(GESPERRTE_AUTH_PFADE, pfad).not.toContain(pfad)
     }
   })
@@ -353,5 +358,18 @@ describe('Schemas', () => {
     expect(zielParameterSchema.parse('/account/profile')).toBe('/account/profile')
     expect(zielParameterSchema.parse(undefined)).toBeUndefined()
     expect(zielParameterSchema.parse(['/a', '/b'])).toBeUndefined()
+  })
+})
+
+describe('auth-client — keine toten Wege zum Konto (Nr. 19b)', () => {
+  const quelle = readFileSync(join(process.cwd(), 'src/lib/auth-client.ts'), 'utf8')
+  const exportZeile = quelle.split('\n').find((zeile) => zeile.startsWith('export const {')) ?? ''
+
+  it('exportiert kein signUp — Passwort-Konten entstehen nur über registerFarmer', () => {
+    expect(exportZeile).not.toMatch(/\bsignUp\b/)
+  })
+
+  it('Gegenprobe: die Exportzeile ist gefunden und nennt signIn', () => {
+    expect(exportZeile).toMatch(/\bsignIn\b/)
   })
 })

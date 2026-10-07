@@ -41,10 +41,15 @@ const ORDER_INCLUDE = {
 type RawOrder = Awaited<ReturnType<typeof fetchOrders>>[number]
 
 function serialize(order: RawOrder) {
+  // Geld als ganze Cent, gewandelt über Decimal (alsCents) — nie Number(decimal)
+  // (CODING_STANDARDS §2, Nr. 19b). Der Warenpreis bleibt zusätzlich als Text
+  // für bestellSummen, das den Decimal-Text selbst in Cent wandelt.
+  const { totalAmount, platformFeeAmount, items, ...rest } = order
   return {
-    ...order,
-    totalAmount: Number(order.totalAmount),
-    platformFeeAmount: Number(order.platformFeeAmount),
+    ...rest,
+    totalAmount: totalAmount.toString(),
+    totalAmountCents: alsCents(totalAmount),
+    platformFeeAmountCents: alsCents(platformFeeAmount),
     // Servicegebühr-Snapshot: Cent bleiben Int, der Prozentsatz ist ein Decimal
     serviceFeePercentApplied:
       order.serviceFeePercentApplied == null ? null : Number(order.serviceFeePercentApplied),
@@ -54,14 +59,14 @@ function serialize(order: RawOrder) {
     storno: stornoBetraege({
       stripePaymentIntentId: order.stripePaymentIntentId,
       paymentStatus: order.paymentStatus,
-      warenpreisCents: alsCents(order.totalAmount),
-      provisionCents: alsCents(order.platformFeeAmount),
+      warenpreisCents: alsCents(totalAmount),
+      provisionCents: alsCents(platformFeeAmount),
       serviceFeeCents: order.serviceFeeCents,
     }),
-    items: order.items.map((i) => ({
+    items: items.map(({ unitPrice, totalPrice, ...i }) => ({
       ...i,
-      unitPrice: Number(i.unitPrice),
-      totalPrice: Number(i.totalPrice),
+      unitPriceCents: alsCents(unitPrice),
+      totalPriceCents: alsCents(totalPrice),
       // Decimal → number, sonst nicht über die RSC-Grenze serialisierbar
       product: i.product
         ? { unit: i.product.unit, unitSize: i.product.unitSize == null ? null : Number(i.product.unitSize) }

@@ -18,6 +18,7 @@ import {
   type StornoBetraege,
 } from '@/lib/storno'
 import { alsCents } from '@/lib/order-totals'
+import { zahlungNachRueckweg } from '@/lib/hof-bestellungen'
 import { artikelFehltEingabeSchema, stornoEingabeSchema } from '@/schemas/hof-bestellungen'
 import { meldeFehlendenArtikel } from '@/server/artikel-fehlt'
 import {
@@ -329,10 +330,30 @@ export async function revertOrderStatus(orderId: string, previousStatus: string)
   // „Bereit" → Storno → „Rückgängig" holte eine stornierte Bestellung zurück
   // (zweite Rückbuchung beim zweiten Storno), und „Bereit" → „Abgeholt" →
   // „Rückgängig" im ersten Toast machte abgeholte Ware wieder stornierbar.
-  const ausStatus: OrderStatus = previousStatus === 'READY' ? 'PICKED_UP' : 'READY'
-  const { count } = await prisma.order.updateMany({
+  const ausStatus = previousStatus === 'READY' ? 'PICKED_UP' : 'READY'
+
+  // Zahlstatus und Zahlzeitpunkt bleiben stimmig (Nr. 19b): Vorher setzte
+  // der Rückweg paidAt immer auf null und ließ paymentStatus stehen. Was er
+  // an der Zahlung ändert, entscheidet zahlungNachRueckweg — online nie, bar
+  // nur das Kassieren genau des zurückgenommenen Schritts.
+  const bestellung = await prisma.order.findFirst({
     where: { id: orderId, farmId: farm.id, status: ausStatus },
-    data: { status: previousStatus as OrderStatus, pickedUpAt: null, paidAt: null },
+    select: { paymentMethod: true, paymentStatus: true, paidAt: true, pickedUpAt: true },
+  })
+  if (!bestellung) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
+  const zahlung = zahlungNachRueckweg(bestellung, ausStatus)
+
+  // Bedingt auf genau den gelesenen Zahlstand: Erstattet oder kassiert
+  // jemand zwischen Lesen und Schreiben, gilt die Entscheidung nicht mehr.
+  const { count } = await prisma.order.updateMany({
+    where: {
+      id: orderId,
+      farmId: farm.id,
+      status: ausStatus,
+      paymentStatus: bestellung.paymentStatus,
+      paidAt: bestellung.paidAt,
+    },
+    data: { status: previousStatus as OrderStatus, pickedUpAt: null, ...(zahlung ?? {}) },
   })
   if (count === 0) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
 

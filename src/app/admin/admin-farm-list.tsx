@@ -282,7 +282,11 @@ export function AdminFarmList({
                       size="sm"
                       variant="outline"
                       disabled={isPending}
-                      className="text-destructive hover:text-destructive"
+                      // Kartenfläche statt Crème (bg-background), auch nachts und
+                      // beim Darüberfahren: Nur dort hält die rote Schrift 4,5:1
+                      // (Nr. 19b; tests/admin-knopf-kontrast.test.ts). Rückmeldung
+                      // beim Darüberfahren über die Unterstreichung.
+                      className="bg-card text-destructive hover:bg-card hover:text-destructive hover:underline dark:bg-card dark:hover:bg-card"
                       onClick={() => setDialog({ farm, action: 'reject' })}
                     >
                       Ablehnen &amp; löschen

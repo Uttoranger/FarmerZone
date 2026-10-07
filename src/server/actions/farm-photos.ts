@@ -5,6 +5,9 @@ import { revalidatePath } from 'next/cache'
 import { del } from '@vercel/blob'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
+import { farmFotoHinzufuegenSchema, farmFotoUnterschriftSchema } from '@/schemas/farm-foto'
+import { BILDUNTERSCHRIFT_MAX } from '@/lib/eingabegrenzen'
 
 const GALLERY_LIMIT = 8
 const BLOB_HOST = /\.public\.blob\.vercel-storage\.com\//
@@ -19,15 +22,20 @@ function revalidate(slug: string) {
   revalidatePath('/settings/appearance')
 }
 
-export async function addFarmPhotoAction(input: {
-  url: string
-  caption?: string
-}): Promise<{ photo?: { id: string; url: string; caption: string | null; sortOrder: number }; error?: string }> {
+export async function addFarmPhotoAction(input: unknown): Promise<{ photo?: { id: string; url: string; caption: string | null; sortOrder: number }; error?: string }> {
+  const eingabe = farmFotoHinzufuegenSchema.safeParse(input)
+  if (!eingabe.success) return { error: BILD_NICHT_UEBERNOMMEN }
+  const { url, caption } = eingabe.data
+
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return { error: 'Nicht angemeldet' }
 
   const farm = await getSessionFarm(session.user.id)
   if (!farm) return { error: 'Kein Hof gefunden' }
+
+  // Nur ein fertiges Bild dieses Hofes aus unserem Speicher (Nr. 19b) —
+  // vorher stand jede Zeichenkette, die der Browser schickte, auf der Hofseite.
+  if (!(await bildUrlErlaubt(url, farm.id))) return { error: BILD_NICHT_UEBERNOMMEN }
 
   const count = await prisma.farmPhoto.count({ where: { farmId: farm.id } })
   if (count >= GALLERY_LIMIT) return { error: `Maximal ${GALLERY_LIMIT} Fotos erlaubt` }
@@ -35,8 +43,8 @@ export async function addFarmPhotoAction(input: {
   const photo = await prisma.farmPhoto.create({
     data: {
       farmId: farm.id,
-      url: input.url,
-      caption: input.caption ?? null,
+      url,
+      caption: caption ?? null,
       sortOrder: count,
     },
     select: { id: true, url: true, caption: true, sortOrder: true },
@@ -50,6 +58,11 @@ export async function updateFarmPhotoCaptionAction(
   id: string,
   caption: string,
 ): Promise<{ error?: string }> {
+  // Grenze an der Systemgrenze: Die Unterschrift setzt nur diese Aktion, also
+  // gilt BILDUNTERSCHRIFT_MAX hier und nicht nur beim Hinzufügen.
+  const eingabe = farmFotoUnterschriftSchema.safeParse({ id, caption })
+  if (!eingabe.success) return { error: `Die Bildunterschrift darf höchstens ${BILDUNTERSCHRIFT_MAX} Zeichen lang sein.` }
+
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return { error: 'Nicht angemeldet' }
 

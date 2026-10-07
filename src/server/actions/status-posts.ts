@@ -8,6 +8,7 @@ import { getFarmForUser } from '@/server/queries/dashboard'
 import { generateUnsubscribeToken } from '@/lib/unsubscribe'
 import type { StatusPostAnlass } from '@prisma/client'
 import { APP_URL } from '@/lib/umgebung-server'
+import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
 
 async function getAuthorizedFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -35,6 +36,9 @@ export async function publishStatusPost(data: {
 }): Promise<{ postId?: string; emailCount?: number; whatsAppCount?: number; error?: string }> {
   try {
     const farm = await getAuthorizedFarm()
+    // Das Foto geht auf die Hofseite und in die Mail an Abonnentinnen — nur
+    // aus unserem Speicher und dem Ordner dieses Hofes (Nr. 19b).
+    if (!(await bildUrlErlaubt(data.photoUrl, farm.id))) return { error: BILD_NICHT_UEBERNOMMEN }
     const now = new Date()
     const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
 

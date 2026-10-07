@@ -149,6 +149,34 @@ describe('ICS-Route — die Signatur wird an der Route selbst durchgesetzt', () 
     const antwort = await icsAnfrage('order-1', bestellSignatur('order-1'))
     expect(antwort.status).toBe(404)
   })
+
+  // Nr. 19b: Termin nur für eine Bestellung, die steht — dieselbe Bedingung
+  // wie der Knopf auf der Bestätigungsseite. Eine offene Bestellung ist vor
+  // der Frist noch nicht bestätigt und danach verfallen (fristen.ts, beim
+  // Lesen); in beiden Fällen stünde ein Termin im Kalender, den es nicht gibt.
+  it.each(['PENDING_CONFIRMATION', 'NOT_PICKED_UP', 'PICKED_UP'])('%s: kein Termin, Antwort wie jede Ablehnung', async (status) => {
+    const ablehnung = await icsAnfrage('order-1', 'f'.repeat(64))
+    findUnique.mockResolvedValue(bestellung({ status }) as never)
+    const antwort = await icsAnfrage('order-1', bestellSignatur('order-1'))
+    expect(antwort.status).toBe(404)
+    expect(await antwort.text()).toBe(await ablehnung.text())
+  })
+
+  it.each(['PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY'])('Gegenprobe %s: die Datei kommt', async (status) => {
+    findUnique.mockResolvedValue(bestellung({ status }) as never)
+    const antwort = await icsAnfrage('order-1', bestellSignatur('order-1'))
+    expect(antwort.status).toBe(200)
+  })
+
+  it('kein signierter Link im Kalendereintrag — synchronisierte Kalender sind kein geschützter Ort', async () => {
+    findUnique.mockResolvedValue(bestellung() as never)
+    const ics = (await (await icsAnfrage('order-1', bestellSignatur('order-1'))).text()).replace(/\r\n /g, '')
+    expect(ics).not.toContain(bestellSignatur('order-1'))
+    expect(ics).not.toContain('?s=')
+    expect(ics).not.toContain('/bestellung/order-1')
+    // Gegenprobe: Die Beschreibung ist da und nennt die Bestellnummer.
+    expect(ics).toMatch(/DESCRIPTION:Bestellung HM-2611-A4F2/)
+  })
 })
 
 describe('Bestellseite — die Signatur wird an der Seite selbst durchgesetzt', () => {

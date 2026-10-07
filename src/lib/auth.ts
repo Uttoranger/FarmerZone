@@ -309,10 +309,9 @@ export const auth = betterAuth({
         })
       },
     }),
-    // Übergang: Neue Magic Links gibt es nicht mehr (disabledPaths oben),
-    // Links aus Mails, die vor dem Deployment verschickt wurden, prüft
-    // /magic-link/verify noch (15 Minuten gültig). Kann in einem späteren
-    // Aufräum-PR samt customer-magic-link.tsx entfallen.
+    // Ohne Wirkung: Anfordern UND Prüfen sind über disabledPaths zu (seit
+    // Nr. 19b auch /magic-link/verify), der Server erzeugt keine Links. Kann
+    // in einem Aufräum-PR samt customer-magic-link.tsx entfallen.
     magicLink({
       expiresIn: 900, // 15 Minuten
       sendMagicLink: async ({ email, url }) => {

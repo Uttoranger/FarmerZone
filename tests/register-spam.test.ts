@@ -27,6 +27,7 @@ vi.mock('@/lib/prisma', () => ({
 }))
 
 import { registerFarmer } from '@/server/actions/register'
+import { KONTO_VIELLEICHT_VORHANDEN } from '@/schemas/register'
 import {
   generateFormToken,
   checkFormToken,
@@ -246,5 +247,32 @@ describe('Bestätigungs-Mail erst nach der Rolle (Nr. 17b, Nachbesserung Runde 1
   it('der Bot (Honigtopf) bekommt keine Mail', async () => {
     await registerFarmer(echteAnmeldung({ website: 'x' }))
     expect(auth.api.sendVerificationEmail).not.toHaveBeenCalled()
+  })
+})
+
+// ── Neutralere Wortwahl bei vergebener Adresse (Nr. 19b) ────────────────────
+// Schließt die Kontenaufzählung NICHT (Erfolg antwortet anders) — geprüft
+// wird nur der Wortlaut mit beiden Auswegen.
+
+describe('Vergebene Adresse — neutralere Wortwahl mit beiden Auswegen', () => {
+  it('nennt die Adresse nicht „bereits registriert", sondern zeigt beide Auswege', async () => {
+    signUpEmail.mockRejectedValue(new Error('User already exists. Use another email.'))
+
+    const result = await registerFarmer(echteAnmeldung())
+
+    expect(result).toEqual({ error: KONTO_VIELLEICHT_VORHANDEN })
+    expect(KONTO_VIELLEICHT_VORHANDEN).not.toMatch(/bereits registriert/i)
+    expect(KONTO_VIELLEICHT_VORHANDEN).toMatch(/Wenn es zu dieser Adresse schon ein Konto gibt/)
+    expect(KONTO_VIELLEICHT_VORHANDEN).toMatch(/melde dich an/)
+    expect(KONTO_VIELLEICHT_VORHANDEN).toMatch(/Passwort zurück/)
+    expect(userUpdate).not.toHaveBeenCalled()
+  })
+
+  it('Gegenprobe: ein anderer Fehler bekommt weiter den allgemeinen Satz', async () => {
+    signUpEmail.mockRejectedValue(new Error('Netzwerk weg'))
+
+    const result = await registerFarmer(echteAnmeldung())
+
+    expect(result).toEqual({ error: 'Registrierung fehlgeschlagen. Bitte versuche es erneut.' })
   })
 })

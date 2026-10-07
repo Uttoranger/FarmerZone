@@ -17,6 +17,13 @@ export const EMAIL_MAX = 254
 export const PRODUKTNAME_MAX = 100
 /** Grund eines Stornos — steht in der Mail an die Kundin (Nr. 19). */
 export const STORNO_GRUND_MAX = 200
+/** Bildunterschrift eines Galeriefotos (Nr. 19b, Runde 1). */
+export const BILDUNTERSCHRIFT_MAX = 200
+/**
+ * Länge einer gespeicherten Bild-Adresse. Unsere Blob-Adressen sind weit
+ * kürzer; die Grenze hält nur Müll aus der Datenbank (Nr. 19b, Runde 1).
+ */
+export const BILD_URL_MAX = 2048
 /**
  * Der höchste Vorrat, den der Hof in der Produkttabelle direkt eintippt
  * (Nachtlauf Nr. 18). Fängt Tippfehler ab („99999" statt „99") und bleibt weit

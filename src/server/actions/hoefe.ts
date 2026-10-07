@@ -3,6 +3,7 @@
 import { headers } from 'next/headers'
 import { entdoppleTreffer, kandidatenBeschriftung, sucheOrtspunkt } from '@/lib/geokodierung'
 import { createRateLimiter, getClientIp } from '@/lib/rate-limit'
+import { ortssucheSchema } from '@/schemas/ortssuche'
 
 /**
  * Löst eine eingetippte Postleitzahl oder einen Ortsnamen zum Bezugspunkt
@@ -35,7 +36,6 @@ import { createRateLimiter, getClientIp } from '@/lib/rate-limit'
  */
 
 const ORTSSUCHE_MAX_PRO_MINUTE = 10
-const ORTSSUCHE_MAX_ZEICHEN = 60
 
 // Modul-Zustand: eine Drossel für alle Aufrufe dieser Instanz (serverless
 // gilt sie damit je Instanz — bewusst, siehe Kaveat in rate-limit.ts).
@@ -44,10 +44,11 @@ const drossel = createRateLimiter({ max: ORTSSUCHE_MAX_PRO_MINUTE })
 /** Ein Ortstreffer, wie ihn die Auswahlliste im Umkreisfeld zeigt. */
 export type OrtsTreffer = { lat: number; lon: number; name: string }
 
-export async function loeseOrtAuf(eingabe: string): Promise<OrtsTreffer[]> {
-  if (typeof eingabe !== 'string') return []
-  const text = eingabe.trim().slice(0, ORTSSUCHE_MAX_ZEICHEN)
-  if (text.length < 2) return []
+export async function loeseOrtAuf(eingabe: unknown): Promise<OrtsTreffer[]> {
+  // Text, Längenkappe und Mindestlänge aus dem Schema (src/schemas/ortssuche.ts).
+  const geprueft = ortssucheSchema.safeParse(eingabe)
+  if (!geprueft.success) return []
+  const text = geprueft.data
 
   // Wie im Hausmuster nur in Produktion — lokales `pnpm dev` bleibt frei.
   if (process.env.NODE_ENV === 'production') {
