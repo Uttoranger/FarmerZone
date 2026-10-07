@@ -137,7 +137,7 @@ export function istWiederDa(vorher: number, jetzt: number): boolean {
 /**
  * Darf der Moment kommen? Nur, wenn Kunden die Ware auch sehen: Hof sichtbar
  * (heuteHofSichtbar — freigegeben, nicht pausiert, nicht stillgelegt) und
- * Produkt sichtbar. Ein Teilen-Aufruf zu einem Entwurf oder einem pausierten
+ * Produkt sichtbar. Ein Teilen-Aufruf zu einem Produkt, das nicht im Shop steht, oder einem pausierten
  * Hof führte ins Leere. Seit Nr. 30 auch nicht, wenn der Hof die
  * Teilen-Momente abgeschaltet hat (Pflichtfeld, src/lib/teilen-momente.ts).
  */
@@ -181,7 +181,7 @@ export type ProduktAngelegt = { anlass: string; name: string; kaufbar: boolean }
 
 /**
  * Darf der Moment „gespeichert" kommen? Wie bei „wieder da": Hof sichtbar,
- * das Neue ist kaufbar (ein Entwurf, eine gesperrte Futter-Größe oder Ware
+ * das Neue ist kaufbar (ein Produkt, das nicht im Shop steht, eine gesperrte Futter-Größe oder Ware
  * ohne Vorrat — für Kunden „ausverkauft" — führte ins Leere) und die
  * Teilen-Momente sind nicht abgeschaltet.
  */
