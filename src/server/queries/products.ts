@@ -154,8 +154,10 @@ export type ProdukteSeite = {
   registrierung: HofRegistrierung
   /** heuteHofSichtbar: freigegeben, nicht pausiert, nicht stillgelegt — Bedingung für „wieder da". */
   hofSichtbar: boolean
-  /** Das nächste Abholfenster für den Teilen-Text des Moments „wieder da". */
+  /** Das nächste Abholfenster für den Teilen-Text der Momente „wieder da" und „gespeichert". */
   naechstesFenster: NaechstesFenster | null
+  /** Farm.teilenMomenteAus (Nr. 30): true = kein Teilen-Moment auf dieser Seite. */
+  teilenMomenteAus: boolean
 }
 
 /**
@@ -175,6 +177,7 @@ export async function getProdukteSeite(farmId: string, jetzt: Date): Promise<Pro
         isPaused: true,
         approvedAt: true,
         archivedAt: true,
+        teilenMomenteAus: true,
         pickupSlots: {
           where: { isActive: true },
           orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
@@ -194,6 +197,8 @@ export async function getProdukteSeite(farmId: string, jetzt: Date): Promise<Pro
     registrierung,
     hofSichtbar: hof ? heuteHofSichtbar(hof) : false,
     naechstesFenster: naechstesAbholfenster(hof?.pickupSlots ?? [], jetzt),
+    // Ohne Hof keine Momente — „aus" ist die sichere Seite.
+    teilenMomenteAus: hof?.teilenMomenteAus ?? true,
   }
 }
 

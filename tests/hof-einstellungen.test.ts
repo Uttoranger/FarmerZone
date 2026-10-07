@@ -116,6 +116,7 @@ function daten(teil: Partial<EinstellungenDaten> = {}, standTeil: Partial<Hofsei
     tarif: null,
     isPaused: false,
     stillgelegt: false,
+    teilenMomenteAus: false,
     ...teil,
   }
 }
@@ -139,7 +140,7 @@ const bereich = (liste: ReturnType<typeof einstellungenBereiche>, id: string) =>
 
 // ─── Routen ─────────────────────────────────────────────────────────────────
 
-const UNTERSEITEN = ['profile', 'pickup-slots', 'payments', 'pause', 'account', 'appearance', 'konditionen']
+const UNTERSEITEN = ['profile', 'pickup-slots', 'payments', 'pause', 'account', 'appearance', 'konditionen', 'teilen']
 
 describe('Routen in der HofShell', () => {
   it('/settings und alle Unterseiten liegen in (hof) mit Ladeansicht; (farmer) hat keine mehr', () => {
@@ -179,7 +180,7 @@ describe('Routen in der HofShell', () => {
 // ─── Übersicht ──────────────────────────────────────────────────────────────
 
 describe('einstellungenBereiche', () => {
-  it('acht Bereiche in fester Reihenfolge — keine Benachrichtigungen (gibt es nicht), dafür Mein Auftritt', () => {
+  it('neun Bereiche in fester Reihenfolge — keine Benachrichtigungen (gibt es nicht), dafür Mein Auftritt und an ihrer Stelle die Teilen-Hinweise (Nr. 30)', () => {
     const liste = einstellungenBereiche(daten(), VOR_STICHTAG)
     expect(liste.map((b) => b.id)).toEqual([
       'hofdaten',
@@ -188,6 +189,7 @@ describe('einstellungenBereiche', () => {
       'zahlung',
       'futtermittel',
       'konditionen',
+      'teilen',
       'urlaubsmodus',
       'konto',
     ])
@@ -247,6 +249,15 @@ describe('einstellungenBereiche', () => {
     expect(quelle('src/components/settings/profile-form.tsx')).toContain('BETRIEBSNUMMER_ANKER')
     const ohne = bereich(einstellungenBereiche(daten({ betriebsnummer: '  ' }), VOR_STICHTAG), 'futtermittel')
     expect(ohne.ton).toBe('neutral')
+  })
+
+  it('Teilen-Hinweise (Nr. 30): grau, sagt an oder aus und führt nach /settings/teilen', () => {
+    const an = bereich(einstellungenBereiche(daten(), VOR_STICHTAG), 'teilen')
+    expect(an).toMatchObject({ titel: 'Teilen-Hinweise', ton: 'neutral', href: '/settings/teilen' })
+    expect(an.zeile).toMatch(/^An · /)
+    const aus = bereich(einstellungenBereiche(daten({ teilenMomenteAus: true }), VOR_STICHTAG), 'teilen')
+    expect(aus.zeile).toMatch(/^Aus · /)
+    expect(aus.ton).toBe('neutral')
   })
 
   it('Urlaubsmodus an ist orange, aus grau; stillgelegt macht Konto orange', () => {
@@ -359,7 +370,7 @@ describe('Übersicht gerendert', () => {
   const bereiche = einstellungenBereiche(daten({ name: LANG }, { name: LANG }), VOR_STICHTAG)
   const markup = html(createElement(EinstellungenUebersicht, { bereiche }))
 
-  it('eine h1, acht Links auf die Bereiche, jeder Punkt mit Text für Screenreader', () => {
+  it('eine h1, neun Links auf die Bereiche, jeder Punkt mit Text für Screenreader', () => {
     expect(markup.match(/<h1\b/g)).toHaveLength(1)
     expect(markup).toContain('Einstellungen')
     for (const b of bereiche) {

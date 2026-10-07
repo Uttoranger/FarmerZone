@@ -4357,6 +4357,17 @@ Auftrag freigabe.md §10 „25" (#199), Register T1 und F6 (Teilen (a), (c), (d)
 - **Gelöscht:** `src/lib/teilen-herkunft.ts`, `checkoutTeilenKanalSchema`, `zaehleTeilenBestellung`, `zaehleBestellungNachDerAntwort`. Die Komponente heißt jetzt `TeilenBesuchMelden` (`src/components/hofseite/teilen-besuch.tsx`), die Regel `teilenBesuchAusAdresse` (`src/lib/teilen-besuch.ts`). Eine Wache (`tests/teilen-ohne-speicher.test.ts`) hält Teilen-Code und Checkout frei von Browser-Speicher und Bestell-Zuordnung.
 - **Contract später:** Die Spalten `Order.teilenKanal` und `TeilenAufruf.bestellungen` können in einem eigenen, freigegebenen Schritt entfernt werden; Code liest oder schreibt sie nicht mehr (nur Schema und Schema-Tests kennen sie).
 
+## Teilen-Momente: „gespeichert" und Abschalten in den Einstellungen (Nachtlauf Nr. 30, Oktober 2026)
+
+Auftrag freigabe.md §10 „30" (gestapelt auf Nr. 25), Gate 7 Aufgabe 5. **Enthält Migration:** `20261007120000_teilen_momente_aus` — nur Expand, eine Spalte `Farm.teilenMomenteAus BOOLEAN NOT NULL DEFAULT false`, erzeugt nach Regel 3 (`prisma migrate diff` gegen das Schema von `main`), wiederholbar (`IF NOT EXISTS`), `SET lock_timeout`. Keine neue Tabelle, also keine RLS. Keine Daten-Migration.
+
+- **Fachregel Schalter:** `Farm.teilenMomenteAus = true` heißt: keiner der drei Teilen-Momente (freigeschaltet, wieder da, gespeichert) kommt. Default false = wie bisher, deshalb ändert die Migration keinen bestehenden Hof. Im Deploy-Fenster kennt der alte Code die Spalte nicht; er schreibt Höfe ohne sie, und sie stehen auf false.
+- **Wo der Schalter wirkt:** `freischaltMomentMoeglich`, `wiederDaMomentMoeglich` und `gespeichertMomentMoeglich` verlangen `teilenMomenteAus` als Pflichtfeld — ein neuer Aufrufer kann ihn nicht vergessen, ohne dass der Typcheck rot wird. Den Wert liefern `getHeute` (`hof.teilenMomenteAus`) und `getProdukteSeite`; ohne Hof gilt „aus".
+- **Fachregel Moment „gespeichert":** Anlass ist das Anlegen — `createProduct` meldet `angelegt: { id, online }`, die Familien-Actions `familieId` (EIN Moment für alle Verkaufsgrößen). Er kommt nur, wenn der Hof sichtbar ist und mindestens eine Größe sofort im Shop steht (ein Entwurf oder eine gesperrte Futter-Größe führte ins Leere), nie nach dem Bearbeiten.
+- **Einmal-Regel unverändert:** wie bei den anderen Momenten „schon gezeigt" je Gerät im localStorage (`src/lib/gespeichert-moment.ts`, Schlüssel je Produkt bzw. Familie). Die neue Spalte erlaubt keine sauberere Regel: Sie sagt nur an/aus, nicht welcher Anlass schon gefragt hat — „gezeigt je Anlass" in der Datenbank bräuchte eine eigene Tabelle, und dafür gibt es keine Freigabe. Das ist kein Teilen-Kanal (T1): Gespeichert wird nur auf dem Gerät des Hofs, nichts über Kundinnen.
+- **Einstellungen:** neuer Bereich „Teilen-Hinweise" (`/settings/teilen`) an der Stelle, wo das Mockup „Benachrichtigungen" zeigt; die Übersicht hat damit neun Bereiche. Action `setzeTeilenMomente`: Zod strikt (`{ an: boolean }`), Hof aus der Sitzung, `updateMany` mit `id` UND `ownerId`.
+- **Text:** Mockup-Satz „Fragt nur einmal pro Produkt. Abschalten unter Einstellungen." als `GESPEICHERT_HINWEIS`. Statt der Beschreibung aus dem Mockup nennt der Teilen-Text die nächste Abholung („Neu bei uns: X. Abholung …"), wie bei „wieder da".
+
 ## Nützliche Befehle
 
 ```bash

@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Stepper } from '@/components/ui/stepper'
 import { DezimalFeld } from '@/components/shared/dezimal-feld'
 import { legeFutterFamilieAn } from '@/server/actions/produktfamilie'
+import type { ProduktAngelegt } from '@/lib/produkte-hof'
 import { FUTTER_KATEGORIEN, futterFamilieSchema, type FutterFamilieEingabe } from '@/schemas/produktfamilie'
 import {
   FUTTERMITTELART_ERKLAERUNG,
@@ -125,9 +126,12 @@ function artFuer(kategorie: (typeof FUTTER_KATEGORIEN)[number]): Futtermittelart
 export function FutterFormular({
   onClose,
   registrierung,
+  onAngelegt,
 }: {
   onClose: () => void
   registrierung: HofRegistrierung
+  /** Nach dem Anlegen: Anlass des Teilen-Moments „gespeichert" (Nr. 30); ob er kommt, entscheidet die Ansicht. */
+  onAngelegt?: (angelegt: ProduktAngelegt) => void
 }): React.JSX.Element {
   const naechster = useRef(0)
   const neuerSchluessel = () => `z${naechster.current++}`
@@ -238,6 +242,7 @@ export function FutterFormular({
       }
       toast.success(gespeichertText(name, ergebnis.online, ergebnis.wartend.length))
       onClose()
+      onAngelegt?.({ anlass: ergebnis.familieId, name: name.trim(), online: ergebnis.online > 0 })
     } catch {
       toast.error('Wir konnten das Futter nicht speichern. Bitte versuch es noch einmal.')
     } finally {

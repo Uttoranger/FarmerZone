@@ -4,7 +4,7 @@
  * (tests/hof-einstellungen.test.ts).
  *
  * Die Übersicht (Mockups web-h1-einstellungen-uebersicht, mobil-h5-einstellungen)
- * zeigt acht Bereiche mit Status-Punkt. Es stehen nur Bereiche da, die es gibt:
+ * zeigt neun Bereiche mit Status-Punkt. Es stehen nur Bereiche da, die es gibt:
  * „Benachrichtigungen" aus dem Mockup hat keine Einstellung im Code und fehlt
  * deshalb; „Mein Auftritt" (eine bestehende Seite ohne Platz im Mockup) steht
  * dafür da. Was fehlt, zählt dieselbe Liste wie „Mein Hof" und „Einrichten"
@@ -36,6 +36,7 @@ import { barOhneServicegebuehr, berechneServicegebuehr, type ServicegebuehrEinst
 import { calcPlatformFeeAmount, decimalZuCents, type DecimalEingabe } from '@/lib/order-totals'
 import { centsAlsEuro, formatDatumLang, formatEuro, formatZahl } from '@/lib/format'
 import { Decimal } from '@prisma/client/runtime/index-browser'
+import { TEILEN_MOMENTE_PFAD, TEILEN_MOMENTE_TITEL, teilenMomenteZeile } from '@/lib/teilen-momente'
 
 /** Weitergereicht: Das Sprungziel steht in taxonomie.ts, weil das Hofprofil (Client) es auch braucht. */
 export { BETRIEBSNUMMER_ANKER }
@@ -52,6 +53,7 @@ export type EinstellungBereichId =
   | 'zahlung'
   | 'futtermittel'
   | 'konditionen'
+  | 'teilen'
   | 'urlaubsmodus'
   | 'konto'
 
@@ -93,6 +95,8 @@ export type EinstellungenDaten = {
   tarif: Tarif | null
   isPaused: boolean
   stillgelegt: boolean
+  /** Farm.teilenMomenteAus (Nr. 30): true = die Teilen-Momente sind abgeschaltet. */
+  teilenMomenteAus: boolean
 }
 
 /** Die Titel der fehlenden Zeilen, deren Formular auf dieser Einstellungsseite liegt. */
@@ -105,8 +109,10 @@ function esFehlt(teile: readonly string[]): string {
 }
 
 /**
- * Die acht Bereiche der Übersicht, in der Reihenfolge des Mockups (Mein
- * Auftritt gleich nach den Hofdaten, wo er inhaltlich hingehört).
+ * Die neun Bereiche der Übersicht, in der Reihenfolge des Mockups (Mein
+ * Auftritt gleich nach den Hofdaten, wo er inhaltlich hingehört). Seit Nr. 30
+ * stehen die Teilen-Hinweise dort, wo das Mockup „Benachrichtigungen" zeigt —
+ * der einzige Schalter, der dort heute schon etwas bewirkt.
  */
 export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): EinstellungBereich[] {
   const profilFehlt = fehlendAuf(d.hofseiteZeilen, '/settings/profile')
@@ -172,6 +178,13 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
       zeile: konditionenZeile(d.tarif, jetzt),
       ton: 'neutral',
       href: '/settings/konditionen',
+    },
+    {
+      id: 'teilen',
+      titel: TEILEN_MOMENTE_TITEL,
+      zeile: teilenMomenteZeile(d.teilenMomenteAus),
+      ton: 'neutral',
+      href: TEILEN_MOMENTE_PFAD,
     },
     {
       id: 'urlaubsmodus',

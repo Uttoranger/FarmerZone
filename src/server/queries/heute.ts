@@ -64,8 +64,12 @@ export type Heute = {
    * Hinweis mit dem Weg zu Stripe; `barMoeglich` wählt den Satz.
    */
   onlinePausiert: { barMoeglich: boolean } | null
-  /** Was Teilen-Karte und Freischaltungs-Moment brauchen — sichtbar = öffentlich UND nicht pausiert (heuteHofSichtbar). */
-  hof: { sichtbar: boolean; approvedAt: Date | null }
+  /**
+   * Was Teilen-Karte und Freischaltungs-Moment brauchen — sichtbar = öffentlich
+   * UND nicht pausiert (heuteHofSichtbar); teilenMomenteAus = der Hof hat die
+   * Teilen-Momente abgeschaltet (Nr. 30, freischaltMomentMoeglich).
+   */
+  hof: { sichtbar: boolean; approvedAt: Date | null; teilenMomenteAus: boolean }
   /** Bis zu drei Produkte im Shop mit Bestand, in der Reihenfolge des Hofs. */
   angebot: string[]
   /** „Deine Hofseite": dieselbe Rechnung wie die Checkliste in Mein Hof. */
@@ -164,6 +168,7 @@ export async function getHeute(farmId: string, jetzt: Date = new Date()): Promis
         archivedAt: true,
         isActive: true,
         isPaused: true,
+        teilenMomenteAus: true,
         farmPhotos: { select: { id: true } },
         pickupSlots: {
           where: { isActive: true },
@@ -236,7 +241,12 @@ export async function getHeute(farmId: string, jetzt: Date = new Date()): Promis
     ersteSchritte: ersteSchritte(ersteSchritteDaten(hof, { produkte, aktiveAbholzeiten: slots.length })),
     wartetAufFreigabe: hof?.approvedAt == null,
     onlinePausiert: hof && onlineZahlungPausiert(hof) ? { barMoeglich: hof.acceptsOnsite } : null,
-    hof: { sichtbar: hof ? heuteHofSichtbar(hof) : false, approvedAt: hof?.approvedAt ?? null },
+    hof: {
+      sichtbar: hof ? heuteHofSichtbar(hof) : false,
+      approvedAt: hof?.approvedAt ?? null,
+      // Ohne Hof keine Momente — „aus" ist die sichere Seite.
+      teilenMomenteAus: hof?.teilenMomenteAus ?? true,
+    },
     angebot: angebot.map((p) => p.name),
     hofseite: fortschritt
       ? { prozent: fortschritt.prozent, satz: fortschritt.satz, fertig: fortschritt.fehlend.length === 0 }

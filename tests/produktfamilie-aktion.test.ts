@@ -95,6 +95,7 @@ describe('legeFutterFamilieAn', () => {
 
     expect(ergebnis).toEqual({
       ok: true,
+      familieId: expect.any(String),
       online: 2,
       wartend: [
         { bezeichnung: '1 kg-Sackerl', grund: SPERR_GRUND.heimtierfutter },
@@ -116,17 +117,19 @@ describe('legeFutterFamilieAn', () => {
 
     const ergebnis = await legeFutterFamilieAn(HEU)
 
-    expect(ergebnis).toEqual({ ok: true, online: 4, wartend: [] })
+    expect(ergebnis).toEqual({ ok: true, familieId: expect.any(String), online: 4, wartend: [] })
     expect(farmFindUnique).toHaveBeenCalledWith({ where: { id: 'farm_1' }, select: { betriebsnummer: true, betriebsstatus: true } })
   })
 
   it('je Größe ein Produkt derselben Familie, mit eigenem Preis, Vorrat, Verpackung und Kennzeichnung', async () => {
-    await legeFutterFamilieAn(HEU)
+    const ergebnis = await legeFutterFamilieAn(HEU)
 
     const produkte = angelegt()
     const familien = new Set(produkte.map((p) => p.familieId))
     expect(familien.size).toBe(1)
     expect(typeof produkte[0].familieId).toBe('string')
+    // Nr. 30: Die Antwort nennt genau diese Familie — Anlass des Moments „gespeichert".
+    expect('familieId' in ergebnis && ergebnis.familieId).toBe(produkte[0].familieId)
     expect(produkte.map((p) => [p.price, p.stock, p.unit, p.verpackung])).toEqual([
       [2.5, 20, 'STUECK', 'ABGEPACKT_ETIKETT'],
       [8, 10, 'STUECK', 'ABGEPACKT_ETIKETT'],
@@ -254,9 +257,11 @@ describe('legeBrennmaterialFamilieAn', () => {
   it('Brennholz mit drei Größen: alle online, Kategorie Brennholz, Art als Unterkategorie', async () => {
     const ergebnis = await legeBrennmaterialFamilieAn(BUCHE)
 
-    expect(ergebnis).toEqual({ ok: true, online: 3, wartend: [] })
+    expect(ergebnis).toEqual({ ok: true, familieId: expect.any(String), online: 3, wartend: [] })
     const produkte = angelegt()
     expect(new Set(produkte.map((p) => p.familieId)).size).toBe(1)
+    // Nr. 30: Die Antwort nennt genau die Familie, die angelegt wurde — Anlass des Moments „gespeichert".
+    expect('familieId' in ergebnis && ergebnis.familieId).toBe(produkte[0].familieId)
     expect(produkte.map((p) => [p.name, p.unit, p.price, p.stock, p.isAvailable])).toEqual([
       ['Buche, ofenfertig Sack ca. 15 kg', 'STUECK', 8.9, 30, true],
       ['Buche, ofenfertig Schüttraummeter', 'SCHUETTRAUMMETER', 99, 12, true],

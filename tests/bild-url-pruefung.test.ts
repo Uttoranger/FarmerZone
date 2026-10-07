@@ -254,7 +254,8 @@ describe('Produktbild: updateProductImageAction, createProduct, updateProduct', 
     expect('error' in (await createProduct({ ...produkt, imageUrl: FREMDER_SERVER } as never))).toBe(true)
     expect(prisma.product.create).not.toHaveBeenCalled()
 
-    expect(await createProduct({ ...produkt, imageUrl: EIGEN } as never)).toEqual({ ok: true })
+    vi.mocked(prisma.product.create).mockResolvedValue({ id: 'prod_neu', isAvailable: true } as never)
+    expect(await createProduct({ ...produkt, imageUrl: EIGEN } as never)).toEqual({ ok: true, angelegt: { id: 'prod_neu', online: true } })
     expect(prisma.product.create).toHaveBeenCalledTimes(1)
   })
 

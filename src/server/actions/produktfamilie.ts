@@ -28,6 +28,8 @@ import { mwstStandard } from '@/lib/mwst'
 export type FamilieErgebnis =
   | {
       ok: true
+      /** Die Kennung der neuen Familie — Anlass des Teilen-Moments „gespeichert" (Nr. 30). */
+      familieId: string
       /** Wie viele Größen sofort im Shop stehen. */
       online: number
       /** Größen, die als Entwurf warten — mit dem Grund. */
@@ -109,6 +111,7 @@ export async function legeFutterFamilieAn(eingabe: unknown): Promise<FamilieErge
   revalidiereProdukte(farm.slug)
   return {
     ok: true,
+    familieId,
     online: groessen.filter((g) => g.sperre === null).length,
     wartend: groessen.flatMap((g) => (g.sperre ? [{ bezeichnung: g.bezeichnung, grund: g.sperre.grund }] : [])),
   }
@@ -164,5 +167,5 @@ export async function legeBrennmaterialFamilieAn(eingabe: unknown): Promise<Fami
   )
 
   revalidiereProdukte(farm.slug)
-  return { ok: true, online: v.groessen.length, wartend: [] }
+  return { ok: true, familieId, online: v.groessen.length, wartend: [] }
 }

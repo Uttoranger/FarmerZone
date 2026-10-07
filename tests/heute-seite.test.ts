@@ -256,7 +256,7 @@ describe('Stripe-Hinweis', () => {
 describe('Freischaltungs-Moment', () => {
   const freigabe = new Date('2026-10-01T09:00:00Z')
   const tag = 24 * 60 * 60 * 1000
-  const oeffentlich = { approvedAt: freigabe, sichtbar: true }
+  const oeffentlich = { approvedAt: freigabe, sichtbar: true, teilenMomenteAus: false }
 
   it('nur im Zeitfenster nach der Freigabe', () => {
     expect(FREISCHALT_MOMENT_TAGE).toBe(14)
@@ -267,10 +267,10 @@ describe('Freischaltungs-Moment', () => {
   })
 
   it('nicht ohne Freigabe und nicht, solange der Hof nicht sichtbar ist (auch nicht pausiert)', () => {
-    expect(freischaltMomentMoeglich({ approvedAt: null, sichtbar: false }, freigabe)).toBe(false)
-    expect(freischaltMomentMoeglich({ approvedAt: freigabe, sichtbar: false }, freigabe)).toBe(false)
+    expect(freischaltMomentMoeglich({ approvedAt: null, sichtbar: false, teilenMomenteAus: false }, freigabe)).toBe(false)
+    expect(freischaltMomentMoeglich({ approvedAt: freigabe, sichtbar: false, teilenMomenteAus: false }, freigabe)).toBe(false)
     const pausiert = heuteHofSichtbar({ isActive: true, isPaused: true, approvedAt: freigabe, archivedAt: null })
-    expect(freischaltMomentMoeglich({ approvedAt: freigabe, sichtbar: pausiert }, freigabe)).toBe(false)
+    expect(freischaltMomentMoeglich({ approvedAt: freigabe, sichtbar: pausiert, teilenMomenteAus: false }, freigabe)).toBe(false)
   })
 
   type Speicher = Pick<Storage, 'getItem' | 'setItem'>

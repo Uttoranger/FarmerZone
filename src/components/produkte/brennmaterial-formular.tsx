@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Stepper } from '@/components/ui/stepper'
 import { DezimalFeld } from '@/components/shared/dezimal-feld'
 import { legeBrennmaterialFamilieAn } from '@/server/actions/produktfamilie'
+import type { ProduktAngelegt } from '@/lib/produkte-hof'
 import { BRENN_ARTEN, brennmaterialFamilieSchema, type BrennmaterialFamilieEingabe } from '@/schemas/produktfamilie'
 import { TROCKNUNG_VALUES, UNTERKATEGORIE_LABEL, type TrocknungValue } from '@/lib/taxonomie'
 import {
@@ -73,7 +74,14 @@ function startZeilen(art: BrennArt, schluessel: (i: number) => string): Zeile[] 
   return BRENN_VORLAGEN.filter((v) => BRENN_VORLAGEN_START[art].includes(v.id)).map((v, i) => zeileAus(v, schluessel(i)))
 }
 
-export function BrennmaterialFormular({ onClose }: { onClose: () => void }): React.JSX.Element {
+export function BrennmaterialFormular({
+  onClose,
+  onAngelegt,
+}: {
+  onClose: () => void
+  /** Nach dem Anlegen: Anlass des Teilen-Moments „gespeichert" (Nr. 30); ob er kommt, entscheidet die Ansicht. */
+  onAngelegt?: (angelegt: ProduktAngelegt) => void
+}): React.JSX.Element {
   const naechster = useRef(100)
   const neuerSchluessel = () => `z${naechster.current++}`
   const [name, setName] = useState('')
@@ -148,6 +156,7 @@ export function BrennmaterialFormular({ onClose }: { onClose: () => void }): Rea
       }
       toast.success(gespeichertText(name, ergebnis.online, ergebnis.wartend.length))
       onClose()
+      onAngelegt?.({ anlass: ergebnis.familieId, name: name.trim(), online: ergebnis.online > 0 })
     } catch {
       toast.error('Wir konnten das Brennmaterial nicht speichern. Bitte versuch es noch einmal.')
     } finally {

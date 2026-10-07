@@ -98,7 +98,7 @@ beforeEach(() => {
   vi.setSystemTime(JETZT)
   getSession.mockResolvedValue({ user: { id: 'user_1' } } as never)
   farmForUser.mockResolvedValue({ id: 'farm_1', slug: 'testhof', name: 'Hof Test' } as never)
-  productCreate.mockResolvedValue({ id: 'p_neu' } as never)
+  productCreate.mockResolvedValue({ id: 'p_neu', isAvailable: true } as never)
   tx.product.updateMany.mockResolvedValue({ count: 1 })
   tx.futterKennzeichnung.upsert.mockResolvedValue({})
   tx.futterKennzeichnung.deleteMany.mockResolvedValue({ count: 0 })
@@ -115,7 +115,8 @@ describe('createProduct', () => {
   it('schreibt Unterkategorie und Siegel — und isOrganic nie mehr', async () => {
     const ergebnis = await createProduct(basis as never)
 
-    expect(ergebnis).toEqual({ ok: true })
+    // Nr. 30: Die Antwort nennt das neue Produkt und ob es im Shop steht (Moment „gespeichert").
+    expect(ergebnis).toEqual({ ok: true, angelegt: { id: 'p_neu', online: true } })
     const data = productCreate.mock.calls[0][0].data as Record<string, unknown>
     expect(data.farmId).toBe('farm_1')
     expect(data.subcategory).toBe('RIND')

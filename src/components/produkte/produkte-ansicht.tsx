@@ -32,10 +32,15 @@ import {
   sichtbareProdukteFilter,
   wiederDaMomentMoeglich,
   wiederDaTexte,
+  gespeichertMomentMoeglich,
+  gespeichertTexte,
   zaehleProdukteFilter,
+  type ProduktAngelegt,
   type WiederDaTexte,
 } from '@/lib/produkte-hof'
 import { browserSpeicher, leseWiederDaGezeigt, merkeWiederDaGezeigt, wiederDaOeffnen } from '@/lib/wieder-da-moment'
+import { gespeichertOeffnen, leseGespeichertGezeigt, merkeGespeichertGezeigt } from '@/lib/gespeichert-moment'
+import { GESPEICHERT_HINWEIS } from '@/lib/teilen-momente'
 import { produkteAnsichtAus } from '@/schemas/produkte-filter'
 import type { NeuBereich } from '@/schemas/url-auftrag'
 import { formatEuro, formatGebinde, formatKategorie } from '@/lib/format'
@@ -53,7 +58,8 @@ type Props = {
   hofBetriebsnummer: string | null
   /** Nummer und Status des Hofs — „Deine Futtermittel-Registrierungen" im Futter-Formular (Nr. 20). */
   registrierung: HofRegistrierung
-  hof: { name: string; slug: string; sichtbar: boolean }
+  /** teilenMomenteAus: Farm.teilenMomenteAus (Nr. 30) — dann fragt kein Moment. */
+  hof: { name: string; slug: string; sichtbar: boolean; teilenMomenteAus: boolean }
   naechstesFenster: NaechstesFenster | null
 }
 
@@ -79,7 +85,8 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
   const [waehlerOffen, setWaehlerOffen] = useState(false)
   const [loeschen, setLoeschen] = useState<ProductData | null>(null)
   const [loeschtGerade, setLoeschtGerade] = useState(false)
-  const [moment, setMoment] = useState<WiederDaTexte | null>(null)
+  // Ein Moment zur Zeit: „wieder da" (Vorrat 0 → mehr) oder „gespeichert" (neu angelegt, Nr. 30).
+  const [moment, setMoment] = useState<{ art: 'wieder-da' | 'gespeichert'; texte: WiederDaTexte } | null>(null)
 
   useUrlAuftrag((auftrag) => {
     setWaehlerOffen(false)
@@ -109,15 +116,37 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
   const momentPruefen = useCallback(
     (product: ProductData, vorrat: number) => {
       // product trägt schon die vorgezogene Sichtbarkeit (die Zeilen kommen aus `products`).
-      if (!wiederDaMomentMoeglich({ hofSichtbar: hof.sichtbar, produktSichtbar: product.isAvailable, wiederDa: true })) return
+      if (
+        !wiederDaMomentMoeglich({
+          hofSichtbar: hof.sichtbar,
+          produktSichtbar: product.isAvailable,
+          wiederDa: true,
+          teilenMomenteAus: hof.teilenMomenteAus,
+        })
+      )
+        return
       const speicher = browserSpeicher()
       // Im Handler, nicht beim Rendern: Die Woche des Klicks, in Wiener Zeit.
       const woche = wienWochenMontag(new Date())
       if (!wiederDaOeffnen(leseWiederDaGezeigt(speicher, product.id, woche))) return
       merkeWiederDaGezeigt(speicher, product.id, woche)
-      setMoment(wiederDaTexte({ name: product.name, vorrat, unit: product.unit, unitSize: product.unitSize }, naechstesFenster))
+      setMoment({
+        art: 'wieder-da',
+        texte: wiederDaTexte({ name: product.name, vorrat, unit: product.unit, unitSize: product.unitSize }, naechstesFenster),
+      })
     },
-    [hof.sichtbar, naechstesFenster]
+    [hof.sichtbar, hof.teilenMomenteAus, naechstesFenster]
+  )
+  // Moment „gespeichert" (Nr. 30): nach dem Anlegen, einmal je Produkt bzw. Familie und Gerät.
+  const angelegtPruefen = useCallback(
+    (angelegt: ProduktAngelegt) => {
+      if (!gespeichertMomentMoeglich({ hofSichtbar: hof.sichtbar, online: angelegt.online, teilenMomenteAus: hof.teilenMomenteAus })) return
+      const speicher = browserSpeicher()
+      if (!gespeichertOeffnen(leseGespeichertGezeigt(speicher, angelegt.anlass))) return
+      merkeGespeichertGezeigt(speicher, angelegt.anlass)
+      setMoment({ art: 'gespeichert', texte: gespeichertTexte(angelegt.name, naechstesFenster) })
+    },
+    [hof.sichtbar, hof.teilenMomenteAus, naechstesFenster]
   )
   const momentSchliessen = useCallback(() => setMoment(null), [])
 
@@ -256,14 +285,17 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
 
       <WasLegstDuAn offen={waehlerOffen} onOffenChange={setWaehlerOffen} />
 
-      {familienFormular === 'futter' && <FutterFormular onClose={dialogSchliessen} registrierung={registrierung} />}
-      {familienFormular === 'brennmaterial' && <BrennmaterialFormular onClose={dialogSchliessen} />}
+      {familienFormular === 'futter' && (
+        <FutterFormular onClose={dialogSchliessen} registrierung={registrierung} onAngelegt={angelegtPruefen} />
+      )}
+      {familienFormular === 'brennmaterial' && <BrennmaterialFormular onClose={dialogSchliessen} onAngelegt={angelegtPruefen} />}
 
       <ProductDialog
         open={dialog.open && familienFormular === null}
         product={dialog.product}
         vorwahl={dialog.vorwahl}
         onClose={dialogSchliessen}
+        onAngelegt={angelegtPruefen}
         onLoeschen={(product) => {
           setDialog({ open: false, product: null, vorwahl: null })
           setLoeschen(product)
@@ -295,7 +327,17 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
         </DialogContent>
       </Dialog>
 
-      {moment && <WiederDaMoment texte={moment} hof={hof} onSchliessen={momentSchliessen} />}
+      {moment?.art === 'wieder-da' && <WiederDaMoment texte={moment.texte} hof={hof} onSchliessen={momentSchliessen} />}
+      {moment?.art === 'gespeichert' && (
+        <WiederDaMoment
+          texte={moment.texte}
+          hof={hof}
+          onSchliessen={momentSchliessen}
+          teilenLabel="Jetzt teilen"
+          schliessenLabel="Später"
+          hinweis={GESPEICHERT_HINWEIS}
+        />
+      )}
     </div>
   )
 }

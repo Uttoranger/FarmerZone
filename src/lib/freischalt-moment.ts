@@ -17,6 +17,7 @@
  * Rein; den Speicher bekommen die Funktionen hereingereicht (tests/heute-seite.test.ts).
  */
 import { freischaltGesehenSchema } from '@/schemas/freischalt-moment'
+import { teilenMomenteAn } from '@/lib/teilen-momente'
 
 export const FREISCHALT_MOMENT_TAGE = 14
 const FENSTER_MS = FREISCHALT_MOMENT_TAGE * 24 * 60 * 60 * 1000
@@ -24,13 +25,16 @@ const FENSTER_MS = FREISCHALT_MOMENT_TAGE * 24 * 60 * 60 * 1000
 /**
  * Darf der Moment überhaupt kommen? Hof sichtbar (heuteHofSichtbar: nicht
  * pausiert — sonst stimmt „Ab jetzt können Kunden bei dir bestellen" nicht),
- * freigeschaltet, Freigabe jünger als das Zeitfenster. Entscheidet der
+ * freigeschaltet, Freigabe jünger als das Zeitfenster, Teilen-Momente nicht
+ * abgeschaltet (Farm.teilenMomenteAus, Nr. 30). Entscheidet der
  * Server; die Seite bindet den Moment nur dann ein.
  */
 export function freischaltMomentMoeglich(
-  hof: { approvedAt: Date | null; sichtbar: boolean },
+  hof: { approvedAt: Date | null; sichtbar: boolean; teilenMomenteAus: boolean },
   jetzt: Date
 ): boolean {
+  // Seit Nr. 30: abgeschaltete Teilen-Momente (Pflichtfeld, src/lib/teilen-momente.ts).
+  if (!teilenMomenteAn(hof)) return false
   if (!hof.sichtbar || !hof.approvedAt) return false
   const seit = jetzt.getTime() - hof.approvedAt.getTime()
   return seit >= 0 && seit < FENSTER_MS

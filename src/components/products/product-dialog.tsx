@@ -49,6 +49,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { createProduct, updateProduct, pruefeDualUse } from '@/server/actions/products'
+import type { ProduktAngelegt } from '@/lib/produkte-hof'
 import type { ProductData } from '@/server/queries/products'
 import {
   productFormSchema,
@@ -176,6 +177,8 @@ type Props = {
   vorwahl?: NeuBereich | null
   /** Beim Bearbeiten: „Löschen" im Fuß — die Rückfrage stellt der Aufrufer. */
   onLoeschen?: (product: ProductData) => void
+  /** Nach dem Anlegen: Anlass des Teilen-Moments „gespeichert" (Nr. 30); ob er kommt, entscheidet der Aufrufer. */
+  onAngelegt?: (angelegt: ProduktAngelegt) => void
 }
 
 /** Eine leere Kennzeichnung — sobald eine Futter-Kategorie gewählt ist. */
@@ -325,7 +328,7 @@ function chipKlasse(aktiv: boolean): string {
   )
 }
 
-export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwahl = null, onLoeschen }: Props) {
+export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwahl = null, onLoeschen, onAngelegt }: Props) {
   const isEdit = product !== null
   const [isSubmitting, setIsSubmitting] = useState(false)
   // Nur während des Foto-Uploads gesetzt — danach zeigt der Knopf wieder
@@ -835,6 +838,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
       if (ergebnis.hinweis) toast.info(ergebnis.hinweis)
       // Schließen gibt auch die Kopie frei (Effekt auf `open`).
       onClose()
+      if (ergebnis.angelegt) onAngelegt?.({ anlass: ergebnis.angelegt.id, name: payload.name, online: ergebnis.angelegt.online })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Wir konnten das Produkt nicht speichern. Bitte versuch es noch einmal.')
     } finally {

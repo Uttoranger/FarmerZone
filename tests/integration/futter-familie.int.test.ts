@@ -195,7 +195,7 @@ describe('Brennmaterial mit Verkaufsgrößen — echte Datenbank', () => {
       ],
     })
 
-    expect(ergebnis).toEqual({ ok: true, online: 3, wartend: [] })
+    expect(ergebnis).toEqual({ ok: true, familieId: expect.any(String), online: 3, wartend: [] })
     const produkte = await familie(farm.id)
     expect(produkte.map((p) => [p.unit, p.isAvailable, p.category, p.subcategory])).toEqual([
       ['STUECK', true, 'BRENNHOLZ', 'BRENNHOLZ_SCHEIT'],
