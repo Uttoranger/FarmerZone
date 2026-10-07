@@ -25,6 +25,7 @@ import {
   type ServicegebuehrEinstellung,
   type Zahlungsart,
 } from '@/lib/servicegebuehr'
+import { mitKaeuferVorbelegung, type KaeuferVorbelegung } from '@/schemas/kaeufer-vorbelegung'
 
 // ─── Zahlarten (E5) ─────────────────────────────────────────────────────────
 
@@ -268,6 +269,36 @@ export function bestaetigungMitStatus(pfad: string, origin: string, status: stri
  * zur Bestellung ist der signierte Link in der Bestätigungsmail.
  */
 export const KONTAKT_HINWEIS = 'Dorthin schicken wir dir die Bestätigung mit dem Link zu deiner Bestellung.'
+
+// ─── Käuferart vorbelegen (Nr. 29) ──────────────────────────────────────────
+
+/** Startwert des Abschnitts „Betrieb" — dieselbe Form wie getBetriebsVorbelegung. */
+export type KassenVorbelegung = { kaeuferArt: 'BETRIEB'; betriebsnummer: string }
+
+/**
+ * Die Adresse der Kasse; aus „Region › Futter kaufen" mit `?kaeufer=betrieb`
+ * (src/schemas/kaeufer-vorbelegung.ts). Ohne Vorbelegung die bisherige Adresse.
+ */
+export function kassenAdresse(farmSlug: string, kaeufer: KaeuferVorbelegung | null): string {
+  return mitKaeuferVorbelegung(`/${farmSlug}/checkout`, kaeufer)
+}
+
+/**
+ * Womit der Abschnitt „Betrieb" startet. Die Vorbelegung aus dem eigenen Hof
+ * (getBetriebsVorbelegung, mit Betriebsnummer) geht vor; sonst belegt
+ * `?kaeufer=betrieb` nur den Haken vor, die Nummer bleibt leer. NUR der
+ * Startwert des Formulars: Die Kundin kann umstellen, ein verborgener
+ * Abschnitt schickt weiter PRIVAT, und ob die Käuferart reicht, prüft allein
+ * /api/checkout (pruefeBetriebsnachweis). Geld, Gebühr und Bestand berührt sie nicht.
+ */
+export function kassenVorbelegung(
+  ausHof: KassenVorbelegung | null,
+  ausAdresse: KaeuferVorbelegung | null
+): KassenVorbelegung | null {
+  if (ausHof) return ausHof
+  if (ausAdresse === 'betrieb') return { kaeuferArt: 'BETRIEB', betriebsnummer: '' }
+  return null
+}
 
 // ─── Rückweg ────────────────────────────────────────────────────────────────
 

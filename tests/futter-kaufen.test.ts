@@ -116,11 +116,11 @@ describe('Karten — je Familie eine, Schild nach E9', () => {
       abholung: 'Abholung Heute 08:00–12:00',
       schild: 'Futtermittelbetrieb · LFBIS 1234567',
       grundpreis: 'ab € 0,18 / kg',
-      bestellenHref: '/bergbauernhof/produkt/klein',
+      bestellenHref: '/bergbauernhof/produkt/klein?kaeufer=betrieb',
     })
     expect(karte.groessen).toEqual([
-      { id: 'klein', name: 'Kleinballen ~15 kg', preis: '€ 4,50', href: '/bergbauernhof/produkt/klein' },
-      { id: 'rund', name: 'Rundballen ~250 kg', preis: '€ 45,00', href: '/bergbauernhof/produkt/rund' },
+      { id: 'klein', name: 'Kleinballen ~15 kg', preis: '€ 4,50', href: '/bergbauernhof/produkt/klein?kaeufer=betrieb' },
+      { id: 'rund', name: 'Rundballen ~250 kg', preis: '€ 45,00', href: '/bergbauernhof/produkt/rund?kaeufer=betrieb' },
     ])
   })
 
