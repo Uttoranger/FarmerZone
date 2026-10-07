@@ -12,15 +12,18 @@ import { formatEuro, formatZahl } from '@/lib/format'
 import { uhrzeitInWien } from '@/lib/fristen'
 import { abholtagName } from '@/lib/heute'
 import { korbBetraege, zahlungsarten } from '@/lib/hofseite-kunde'
+import { BAR_OHNE_GEBUEHR_HINWEIS } from '@/lib/konditionen'
 import { calcTotalAmount, decimalZuCents } from '@/lib/order-totals'
 import { RESERVIERUNG_TTL_MS } from '@/lib/reservierung'
 import {
   SERVICEGEBUEHR_BEZEICHNUNG,
+  barOhneServicegebuehr,
   berechneServicegebuehr,
   centsAlsEuro,
   kalendertagInWien,
   servicegebuehrSatz,
   type ServicegebuehrEinstellung,
+  type Zahlungsart,
 } from '@/lib/servicegebuehr'
 
 // ─── Zahlarten (E5) ─────────────────────────────────────────────────────────
@@ -56,17 +59,42 @@ export type KassenZahlart = { wert: NeueZahlart; titel: string; zusatz: string }
  * Stripes Zahlungsfeld im nächsten Schritt — das hängt an den Einstellungen im
  * Stripe-Dashboard und am Gerät, nicht an uns. Deshalb verspricht der Zusatz
  * keinen bestimmten Weg.
+ *
+ * „gleicher Betrag" sagt der Zusatz nur, wenn es stimmt: Kostet bar gerade
+ * keine Gebühr, online aber schon (`barHinweis`, Register B1), fällt er weg —
+ * den Unterschied nennt dann der Hinweis unter den Zahlarten.
  */
-export function kassenZahlarten(hof: {
-  acceptsOnline: boolean
-  stripeAccountReady: boolean
-  acceptsOnsite: boolean
-}): KassenZahlart[] {
+export function kassenZahlarten(
+  hof: {
+    acceptsOnline: boolean
+    stripeAccountReady: boolean
+    acceptsOnsite: boolean
+  },
+  barGuenstiger = false
+): KassenZahlart[] {
   return zahlungsarten(hof).map((z) =>
     z.art === 'online'
       ? { wert: 'ONLINE', titel: 'Online bezahlen', zusatz: 'Karte und weitere Wege – du wählst im nächsten Schritt' }
-      : { wert: 'ONSITE_CASH', titel: 'Bar bei Abholung', zusatz: 'gleicher Betrag, du bestätigst per E-Mail' }
+      : {
+          wert: 'ONSITE_CASH',
+          titel: 'Bar bei Abholung',
+          zusatz: barGuenstiger ? 'du bestätigst per E-Mail' : 'gleicher Betrag, du bestätigst per E-Mail',
+        }
   )
+}
+
+/**
+ * Der Hinweis unter den Zahlarten (Register B1): „Bei Barzahlung bis
+ * <Vortag des Stichtags> ohne Servicegebühr." — nur, solange bar wirklich günstiger
+ * ist: vor dem Stichtag (`barOhneServicegebuehr`) UND bei einem Hof, dessen
+ * Online-Gebühr gerade gilt. Bei einem gebührenfreien Hof ist bar ohnehin
+ * gleich teuer, ab dem Stichtag zahlt bar wieder dieselbe Gebühr — dann
+ * null, kein Hinweis. `jetzt` wie überall in der Kasse aus der Uhr der Seite;
+ * verbindlich entscheidet /api/checkout mit der Server-Uhr.
+ */
+export function barHinweis(hof: ServicegebuehrEinstellung, jetzt: Date): string | null {
+  if (!barOhneServicegebuehr('ONSITE_CASH', jetzt)) return null
+  return servicegebuehrSatz(hof, jetzt) === null ? null : BAR_OHNE_GEBUEHR_HINWEIS
 }
 
 // ─── Beträge ────────────────────────────────────────────────────────────────
@@ -86,15 +114,21 @@ export type KassenBetraege = {
  * angefangenen Cent aufrundet, muss schon der Warenpreis in Cent auf beiden
  * Seiten derselbe sein. Nur Anzeige: Der Server rechnet mit den Preisen der
  * Datenbank und speichert den Snapshot.
+ *
+ * Mit der gewählten Zahlart (B1): Wechselt die Kundin auf bar, rechnet die
+ * Kasse sofort ohne Gebühr, solange der Stichtag nicht erreicht ist — und
+ * zurück auf online wieder mit. Was Stripe abbucht, bestimmt allein der
+ * Server aus der gespeicherten Bestellung (`zahlungsBetraege`).
  */
 export function kassenBetraege(
   positionen: readonly { productId: string; price: number; quantity: number }[],
   hof: ServicegebuehrEinstellung,
-  jetzt: Date
+  jetzt: Date,
+  zahlungsart: Zahlungsart
 ): KassenBetraege {
   const { zeilenCents } = korbBetraege(positionen)
   const warenCents = decimalZuCents(calcTotalAmount(positionen.map((p) => ({ unitPrice: p.price, quantity: p.quantity }))))
-  const { gebuehrCents } = berechneServicegebuehr(warenCents, hof, jetzt)
+  const { gebuehrCents } = berechneServicegebuehr(warenCents, hof, jetzt, zahlungsart)
   return { zeilenCents, warenCents, gebuehrCents, gesamtCents: warenCents + gebuehrCents }
 }
 
@@ -130,11 +164,12 @@ export function angezeigteBetraege(lokal: KassenBetraege, vomServer: ZahlungsBet
  * Die Bezeichnung der Gebührenzeile im Zahlungsschritt, einmal beim Anlegen
  * festgehalten. Den Satz nennt sie nur, wenn er zum Betrag des Servers passt —
  * sonst (Wechsel der Einstellung genau beim Anlegen) nur „Servicegebühr",
- * statt einen Satz zu nennen, der nicht zum Betrag gehört.
+ * statt einen Satz zu nennen, der nicht zum Betrag gehört. Den Zahlungsschritt
+ * gibt es nur online, deshalb die Regel für ONLINE.
  */
 export function zahlungsGebuehrText(hof: ServicegebuehrEinstellung, jetzt: Date, betrag: ZahlungsBetrag): string {
   const { warenCents, gebuehrCents } = zahlungsBetraege(betrag)
-  if (berechneServicegebuehr(warenCents, hof, jetzt).gebuehrCents !== gebuehrCents) return SERVICEGEBUEHR_BEZEICHNUNG
+  if (berechneServicegebuehr(warenCents, hof, jetzt, 'ONLINE').gebuehrCents !== gebuehrCents) return SERVICEGEBUEHR_BEZEICHNUNG
   return gebuehrBezeichnung(hof, jetzt)
 }
 

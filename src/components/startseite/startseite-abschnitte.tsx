@@ -4,7 +4,7 @@ import { Check, ChevronDown, HandCoins, MapPin } from 'lucide-react'
 import {
   BRENNMATERIAL_ADRESSE,
   FUTTER_ZIELGRUPPEN,
-  STARTSEITE_FRAGEN,
+  startseitenFragen,
   hoefeAdresse,
   type Beispielrechnung,
 } from '@/lib/startseite'
@@ -236,7 +236,7 @@ export function SoFunktionierts({ rechnung }: { rechnung: Beispielrechnung }): R
               <Zeile name="Du zahlst" betrag={rechnung.duZahlstCents} stark trenner />
               <Zeile name="Der Hof bekommt" betrag={rechnung.hofBekommtCents} stark gruen />
             </dl>
-            <p className="text-xs leading-normal text-muted-foreground">Egal ob online oder bar bei Abholung.</p>
+            <p className="text-xs leading-normal text-muted-foreground">{rechnung.fussnote}</p>
           </div>
         </div>
       </div>
@@ -295,7 +295,8 @@ export function FuerHoefeBand(): React.JSX.Element {
  * HTML — für die Suche im Browser und für Suchmaschinen. Tastatur und
  * Bildschirmleser bedienen <summary> wie einen Knopf.
  */
-export function Fragen(): React.JSX.Element {
+/** `jetzt` von der Seite: „Wie bezahle ich?" nennt die Bar-Ausnahme nur vor dem Stichtag (B1). */
+export function Fragen({ jetzt }: { jetzt: Date }): React.JSX.Element {
   return (
     <section aria-labelledby="fragen-titel" className="pt-6 pb-14 md:pb-20">
       <div className={cn(CONTAINER, 'flex flex-col gap-4 md:flex-row md:gap-[60px]')}>
@@ -306,7 +307,7 @@ export function Fragen(): React.JSX.Element {
           </h2>
         </div>
         <div className="flex flex-1 flex-col border-t border-border">
-          {STARTSEITE_FRAGEN.map((eintrag, i) => (
+          {startseitenFragen(jetzt).map((eintrag, i) => (
             <details key={eintrag.frage} name="fragen" open={i === 0} className="group border-b border-border last:border-b-0">
               <summary
                 className={cn(

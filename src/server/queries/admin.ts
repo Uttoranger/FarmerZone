@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import type { FarmAktivitaet } from '@/lib/farm-aktivitaet'
 import { alsLand, type Land } from '@/lib/laender'
 import { monatsgrenzenWien } from '@/lib/servicegebuehr'
+import { BAR_SERVICEGEBUEHR_AB } from '@/lib/konditionen'
 import { bestaetigungOffen } from '@/lib/email-bestaetigung'
 
 /**
@@ -13,7 +14,10 @@ import { bestaetigungOffen } from '@/lib/email-bestaetigung'
  *   gebuehrOnlineCents  online EINBEHALTEN: bezahlte Online-Bestellungen,
  *                       Gebühr nicht entfallen
  *   gebuehrBarCents     bar OFFEN: vor Ort kassierte (abgeholte) Bestellungen,
- *                       Gebühr nicht entfallen — schuldet der Hof der Abrechnung
+ *                       Gebühr nicht entfallen — schuldet der Hof der Abrechnung.
+ *                       Ohne Barzahlungen vor dem SEPA-Start (Register B1:
+ *                       keine Gebühr, ältere werden nicht eingezogen) — dieselbe
+ *                       Regel wie `barOhneServicegebuehr` in finanzen.ts.
  *   gebuehrEntfallenCents  entfallen (nicht abgeholt oder storniert)
  */
 export type AdminMonatsSpalten = {
@@ -89,6 +93,7 @@ async function monatsSpaltenJeHof(von: Date, bis: Date): Promise<Map<string, Adm
         WHERE "paymentMethod" IN ('ONSITE_CASH', 'ONSITE_CARD')
           AND "status" = 'PICKED_UP'
           AND "serviceFeeRefundedAt" IS NULL
+          AND NOT ("paymentMethod" = 'ONSITE_CASH' AND "createdAt" < ${BAR_SERVICEGEBUEHR_AB})
       ), 0)::int AS "bar",
       COALESCE(SUM("serviceFeeCents") FILTER (
         WHERE "serviceFeeRefundedAt" IS NOT NULL

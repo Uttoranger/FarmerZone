@@ -6,25 +6,35 @@
  * bei der Zahlung einbehalten (application_fee_amount, /api/checkout); bar
  * kassiert der Hof Warenpreis plus Gebühr und schuldet die Gebühr der späteren
  * Monatsabrechnung. Nicht abgeholte Bestellungen kosten keine Gebühr.
+ * Bis zum SEPA-Start (`BAR_SERVICEGEBUEHR_AB`, konditionen.ts) kostet eine
+ * Barzahlung keine Gebühr (Register B1, `barOhneServicegebuehr`).
  *
- * Rein und ohne Abhängigkeiten, damit Checkout (Server UND Anzeige im
+ * Rein (ohne Prisma, ohne Uhr — der Zeitpunkt ist Parameter), damit Checkout (Server UND Anzeige im
  * Browser), Bestell-Snapshot, Erstattung und Admin-Anzeige EINE Rechnung
  * teilen. Alle Beträge in CENT (ganze Zahlen) — Euro-Floats hätten hier
  * nichts verloren, siehe order-totals.ts für das Float-Artefakt 3 × 1,10.
  */
 
-/**
- * Der Satz, den ein NEUER Hof beim Anlegen bekommt (Entscheidung E4, Preismodell
- * des Betreibers: 5 %, mindestens € 0,50). Der Spalten-Default im Schema
- * (`Farm.serviceFeePercent @default(4.9)`) ist älter und bleibt bis zu einer
- * eigens freigegebenen Migration stehen — deshalb setzt das Anlegen den Satz
- * ausdrücklich (createFarm, Seed), statt sich auf den Default zu verlassen.
- * Bestehende Höfe behalten ihren gespeicherten Satz; umgestellt wird im Admin.
- */
-export const SERVICEGEBUEHR_STANDARD_PROZENT = 5
+import type { PaymentMethod } from '@prisma/client'
+import { vorBarStichtag } from '@/lib/konditionen'
+import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
 
-/** Mindestgebühr eines neuen Hofes in Cent (E4). */
-export const SERVICEGEBUEHR_STANDARD_MIND_CENTS = 50
+/*
+ * Weitergereicht, damit jeder Aufrufer die Gebühren-Werkzeuge an EINER Stelle
+ * findet. Die Werte stehen in konditionen.ts (Satz für neue Höfe, E4),
+ * wiener-tag.ts und format.ts — dort, weil konditionen.ts servicegebuehr.ts
+ * nicht einbinden darf (sonst ein Ring, siehe wiener-tag.ts).
+ */
+export { SERVICEGEBUEHR_STANDARD_MIND_CENTS, SERVICEGEBUEHR_STANDARD_PROZENT } from '@/lib/konditionen'
+export { centsAlsEuro } from '@/lib/format'
+export { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
+
+/**
+ * Die Zahlungsart einer Bestellung — das Prisma-Enum, nur als Typ eingebunden
+ * (src/lib bleibt ohne Prisma-Client, ARCHITECTURE §1). Eng statt `string`:
+ * Ein Tippfehler wie 'BAR' fiele sonst still durch die B1-Regel.
+ */
+export type Zahlungsart = PaymentMethod
 
 /** Die Hofeinstellung, so wie sie im Schema steht (Farm.serviceFee*). */
 export type ServicegebuehrEinstellung = {
@@ -46,9 +56,12 @@ export type ServicegebuehrErgebnis = {
 /** Die Zeile im Checkout, auf den Bestellseiten und in den Mails. */
 export const SERVICEGEBUEHR_BEZEICHNUNG = 'Servicegebühr'
 
-/** Der kurze Hinweis neben der Zeile — EIN Wortlaut an allen Stellen. */
-export const SERVICEGEBUEHR_HINWEIS =
-  'Für Bereitstellung, Abwicklung und Zahlungsservice der Plattform — bei Online- und Barzahlung gleich.'
+/**
+ * Der kurze Hinweis neben der Zeile — EIN Wortlaut an allen Stellen. Früher
+ * stand dahinter „bei Online- und Barzahlung gleich"; bis zum SEPA-Start
+ * stimmt das nicht (B1: bar ohne Gebühr), deshalb fehlt der Zusatz.
+ */
+export const SERVICEGEBUEHR_HINWEIS = 'Für Bereitstellung, Abwicklung und Zahlungsservice der Plattform.'
 
 /** Die Erklärung neben der Admin-Einstellung. */
 export const SERVICEGEBUEHR_ADMIN_ERKLAERUNG =
@@ -71,11 +84,37 @@ function alsZeitpunkt(wert: Date | string | null): Date | null {
 }
 
 /**
+ * Register B1: Kostet diese Zahlung KEINE Servicegebühr, weil sie bar vor dem
+ * SEPA-Start (`BAR_SERVICEGEBUEHR_AB`) bestellt wird? Maßgeblich ist der
+ * Bestellzeitpunkt, die Grenze liegt um Mitternacht in Wien — genau an der
+ * Grenze gilt die Gebühr schon (wie `serviceFeeActiveFrom`).
+ *
+ * Nur `ONSITE_CASH`: B1 nennt die Barzahlung. Online behält Stripe die Gebühr
+ * ein; „Karte bei Abholung" (ONSITE_CARD) nimmt seit E5 keine neue Bestellung
+ * mehr an, B1 sagt dazu nichts — sie bleibt, wie sie war.
+ *
+ * Dieselbe Frage stellt die Finanzseite (finanzen.ts, `topfVonBestellung`) und
+ * die Admin-Hofliste in rohem SQL (queries/admin.ts): Eine Barbestellung vor
+ * dem Stichtag bringt der Plattform nichts ein, auch eine ältere mit Gebühr
+ * nicht — eingezogen wird sie nicht (B1).
+ */
+export function barOhneServicegebuehr(zahlungsart: Zahlungsart, bestellZeitpunkt: Date | string): boolean {
+  const zeitpunkt = alsZeitpunkt(bestellZeitpunkt)
+  // Unlesbarer Zeitpunkt: nicht befreien — die Gebühr folgt dann der Regel des Hofs.
+  if (zeitpunkt === null) return false
+  return zahlungsart === 'ONSITE_CASH' && vorBarStichtag(zeitpunkt)
+}
+
+/**
  * Berechnet die Servicegebühr für eine Bestellung — die EINZIGE Stelle, an der
  * aus Warenpreis und Hofeinstellung eine Gebühr wird. Checkout-Anzeige im
  * Browser, /api/checkout (Snapshot und Stripe) und der Seed rufen genau diese
  * Funktion; alles danach (Mails, Bestellseiten, Storno, Abrechnung) liest nur
  * noch den Snapshot `Order.serviceFeeCents` und rechnet nie neu.
+ *
+ * Die Zahlungsart ist Pflicht (B1): Bar vor `BAR_SERVICEGEBUEHR_AB` → 0 Cent,
+ * Prozent null — derselbe Snapshot wie bei einem gebührenfreien Hof, damit
+ * „Artikel fehlt" (E14) bei 0 bleibt. Online gilt immer die Regel unten.
  *
  * Gebührenfrei (0 Cent, Prozent null), wenn serviceFeeActiveFrom null ist oder
  * NACH dem Bestellzeitpunkt liegt. Sonst max(Mindestgebühr,
@@ -90,8 +129,12 @@ function alsZeitpunkt(wert: Date | string | null): Date | null {
 export function berechneServicegebuehr(
   warenpreisCents: number,
   einstellung: ServicegebuehrEinstellung,
-  bestellZeitpunkt: Date
+  bestellZeitpunkt: Date,
+  zahlungsart: Zahlungsart
 ): ServicegebuehrErgebnis {
+  if (barOhneServicegebuehr(zahlungsart, bestellZeitpunkt)) {
+    return { gebuehrCents: 0, prozentAngewendet: null }
+  }
   const giltAb = alsZeitpunkt(einstellung.serviceFeeActiveFrom)
   if (giltAb === null || giltAb.getTime() > bestellZeitpunkt.getTime()) {
     return { gebuehrCents: 0, prozentAngewendet: null }
@@ -118,12 +161,15 @@ export function berechneServicegebuehr(
  * Mindestgebühr und den angewendeten Satz, gebührenfrei `prozentAngewendet`
  * null. null heißt: Jetzt fällt keine Gebühr an (kein Datum, Datum in der
  * Zukunft oder Satz und Mindestgebühr 0) — dann steht auch kein Hinweis da.
+ *
+ * Gefragt wird nach der Online-Zahlung: Sie kostet immer nach der Regel des
+ * Hofs. Dass bar bis zum SEPA-Start nichts dazukommt (B1), sagt die Kasse.
  */
 export function servicegebuehrSatz(
   einstellung: ServicegebuehrEinstellung,
   jetzt: Date
 ): { prozent: number; mindestCents: number } | null {
-  const { gebuehrCents, prozentAngewendet } = berechneServicegebuehr(0, einstellung, jetzt)
+  const { gebuehrCents, prozentAngewendet } = berechneServicegebuehr(0, einstellung, jetzt, 'ONLINE')
   if (prozentAngewendet === null) return null
   if (prozentAngewendet === 0 && gebuehrCents === 0) return null
   return { prozent: prozentAngewendet, mindestCents: gebuehrCents }
@@ -153,11 +199,6 @@ export function bestellSummen(bestellung: BestellungMitGebuehr): BestellSummen {
   const warenpreisCents = Math.round(alsZahl(bestellung.totalAmount) * 100)
   const gebuehrCents = Math.max(0, Math.round(bestellung.serviceFeeCents))
   return { warenpreisCents, gebuehrCents, gesamtCents: warenpreisCents + gebuehrCents }
-}
-
-/** Cent → Euro-Zahl für die bestehenden formatEuro-Bausteine. */
-export function centsAlsEuro(cents: number): number {
-  return cents / 100
 }
 
 /** Ein Bestellstand, so weit ihn der Erstattungs-Vermerk braucht. */
@@ -193,6 +234,22 @@ export function gebuehrErstattungOffen(b: BestellungFuerGebuehrStatus): boolean 
   )
 }
 
+/**
+ * Schuldet der Hof diese Gebühr der Monatsabrechnung? Nur wenn er sie vor Ort
+ * kassiert, sie über 0 liegt und die Bestellung nicht bar vor dem SEPA-Start
+ * aufgegeben wurde (Register B1: deren Gebühr wird nicht eingezogen, auch bei
+ * einer älteren Bestellung, die noch eine trägt). Die EINE Frage hinter jedem
+ * Hof-Satz „… holt / nimmt die Monatsabrechnung" (Bestellansicht, Dialog
+ * „Artikel fehlt"); ohne sie steht der Satz nicht da.
+ */
+export function gebuehrFuerMonatsabrechnung(b: {
+  paymentMethod: Zahlungsart
+  serviceFeeCents: number
+  bestelltAm: Date | string
+}): boolean {
+  return istVorOrtZahlung(b.paymentMethod) && b.serviceFeeCents > 0 && !barOhneServicegebuehr(b.paymentMethod, b.bestelltAm)
+}
+
 /** Vor-Ort-Zahlung (bar ODER Karte beim Hof): der Hof kassiert selbst. */
 export function istVorOrtZahlung(paymentMethod: string): boolean {
   return paymentMethod === 'ONSITE_CASH' || paymentMethod === 'ONSITE_CARD'
@@ -200,7 +257,7 @@ export function istVorOrtZahlung(paymentMethod: string): boolean {
 
 /**
  * „Bar zu kassieren": Was der Hof bei einer Vor-Ort-Bestellung entgegennimmt —
- * Warenpreis PLUS Gebühr (die Gebühr schuldet er der Monatsabrechnung).
+ * Warenpreis PLUS Gebühr aus dem Snapshot (bar vor dem SEPA-Start ist sie 0, B1).
  * Für Online-Bestellungen null: da kassiert der Hof nichts.
  */
 export function barZuKassierenCents(
@@ -212,45 +269,10 @@ export function barZuKassierenCents(
 
 // ─── Admin: „Gebühr gilt ab" als Kalendertag in Wiener Ortszeit ──────────────
 
-/**
- * Ein Kalendertag (JJJJ-MM-TT) → Mitternacht dieses Tages in Europe/Vienna,
- * als UTC-Zeitpunkt für die Datenbank. Der Betreiber denkt in Tagen („ab
- * 1. Oktober"), die Bestellung trägt einen Zeitpunkt — die Grenze muss um
- * Mitternacht WIENER Zeit liegen, nicht um Mitternacht UTC (das wäre 01:00
- * bzw. 02:00 Uhr in Wien, und eine Bestellung um 00:30 fiele auf die
- * falsche Seite).
+/*
+ * `wienerMitternacht` und `kalendertagInWien` stehen in wiener-tag.ts und
+ * werden oben weitergereicht.
  */
-export function wienerMitternacht(kalendertag: string): Date | null {
-  const treffer = /^(\d{4})-(\d{2})-(\d{2})$/.exec(kalendertag)
-  if (!treffer) return null
-  const [, j, m, t] = treffer
-  const utcMitternacht = Date.UTC(Number(j), Number(m) - 1, Number(t), 0, 0, 0)
-  if (Number.isNaN(utcMitternacht)) return null
-  // Welche Stunde ist es in Wien, wenn in UTC Mitternacht ist? (1 oder 2)
-  const wienStunde = Number(
-    new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Europe/Vienna',
-      hour: 'numeric',
-      hourCycle: 'h23',
-    }).format(new Date(utcMitternacht))
-  )
-  const ergebnis = new Date(utcMitternacht - wienStunde * 60 * 60 * 1000)
-  // Plausibilität: das Ergebnis muss in Wien genau auf den gewünschten Tag fallen.
-  if (kalendertagInWien(ergebnis) !== kalendertag) return null
-  return ergebnis
-}
-
-/** Ein Zeitpunkt → sein Kalendertag in Wien als JJJJ-MM-TT (für <input type="date">). */
-export function kalendertagInWien(zeitpunkt: Date): string {
-  const teile = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Vienna',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(zeitpunkt)
-  const wert = (typ: string) => teile.find((p) => p.type === typ)?.value ?? ''
-  return `${wert('year')}-${wert('month')}-${wert('day')}`
-}
 
 /**
  * Ein Kalendermonat als `JJJJ-MM` — die Form, in der die Adresse den Monat

@@ -15,17 +15,16 @@
  *
  * Regel für Anzeigen (wie früher gruendungshof.ts): Eine Zahl steht nie als
  * Literal in einer Seite, sondern kommt von hier. Der Satz der Servicegebühr
- * kommt aus servicegebuehr.ts (E4) und steht hier nicht ein zweites Mal;
+ * für neue Höfe (E4) steht hier EINMAL, servicegebuehr.ts reicht ihn weiter;
  * Beträge laufen über formatEuro (format.ts).
+ *
+ * Diese Datei bindet servicegebuehr.ts NICHT ein: servicegebuehr.ts liest den
+ * Bar-Stichtag von hier (Register B1), ein Ring beider Module wäre beim Laden
+ * eine Falle. Wiener Tage kommen aus wiener-tag.ts, Cent → Euro aus format.ts.
  */
 import type { Tarif } from '@prisma/client'
-import { formatDatumLang, formatEuro, formatZahl } from '@/lib/format'
-import {
-  SERVICEGEBUEHR_STANDARD_MIND_CENTS,
-  SERVICEGEBUEHR_STANDARD_PROZENT,
-  centsAlsEuro,
-  wienerMitternacht,
-} from '@/lib/servicegebuehr'
+import { centsAlsEuro, formatDatumLang, formatEuro, formatZahl } from '@/lib/format'
+import { wienerMitternacht } from '@/lib/wiener-tag'
 
 /**
  * Die Tarif-Kennung ist das Prisma-Enum `Tarif` — nur als Typ eingebunden,
@@ -91,21 +90,6 @@ export function tarifText(id: TarifId): TarifText {
 /** Der günstigste Tarif — mit ihm startet jeder Hof. */
 export const START_TARIF = tarifText('HOFTOR')
 
-// ─── Servicegebühr ──────────────────────────────────────────────────────────
-
-/** „5 % (mind. € 0,50)" — Satz und Mindestgebühr für neue Höfe (E4). */
-export const SERVICEGEBUEHR_SATZ_TEXT =
-  `${formatZahl(SERVICEGEBUEHR_STANDARD_PROZENT)} % ` +
-  `(mind. ${formatEuro(centsAlsEuro(SERVICEGEBUEHR_STANDARD_MIND_CENTS))})`
-
-/** Der Grundsatz in einem Satz — Preise-Abschnitt von /fuer-hoefe und /konditionen. */
-export const SERVICEGEBUEHR_ZAHLT_KUNDE =
-  `Die Servicegebühr von ${SERVICEGEBUEHR_SATZ_TEXT} zahlt der Kunde. ` +
-  'Du bekommst immer den vollen Warenpreis – online wie bar.'
-
-/** Kurzfassung für Karten (Einrichten, Vorteile). */
-export const VOLLER_WARENPREIS = 'Die Servicegebühr zahlt der Kunde – du behältst den vollen Warenpreis.'
-
 // ─── Übergang: Startphase, Tarife ab einem Stichtag (Register K1) ─────────────
 
 /**
@@ -128,6 +112,94 @@ function stichtag(kalendertag: string): Date {
 /** „1. Februar 2027" — über den gemeinsamen Formatierer. */
 export const TARIFE_AB_TEXT = formatDatumLang(TARIFE_AB)
 
+// ─── Barzahlung ohne Servicegebühr bis zum SEPA-Start (Register B1) ──────────
+
+/**
+ * Ab diesem Zeitpunkt kostet auch eine BARZAHLUNG Servicegebühr. Vorher nicht:
+ * Die Gebühr aus Barbestellungen kann erst die SEPA-Monatsabrechnung einziehen,
+ * und eine Gebühr, die niemand einzieht, soll die Kundin nicht zahlen (B1).
+ * Online bleibt die Gebühr, Stripe behält sie beim Bezahlen ein.
+ *
+ * Standard ist der Stichtag der Tarife. Verschiebt sich der SEPA-Start, wird
+ * NUR diese Zeile geändert (etwa `stichtag('2027-03-01')`) — Rechnung, Kasse,
+ * Finanzen und alle Texte leiten sich davon ab.
+ *
+ * Maßgeblich ist der BESTELLZEITPUNKT (Server-Uhr des Checkouts), nicht der
+ * Abholtag — wie bei `Farm.serviceFeeActiveFrom`: Was die Kundin beim
+ * Bestellen sieht, gilt. Grenze ist Mitternacht in Wien (wie `TARIFE_AB`);
+ * eine Bestellung genau zur Grenze zahlt schon.
+ */
+export const BAR_SERVICEGEBUEHR_AB: Date = TARIFE_AB
+
+/**
+ * Der letzte Tag ohne Bargebühr, „31. Jänner 2027": der Wiener Tag eine
+ * Millisekunde vor dem Stichtag, über den gemeinsamen Formatierer.
+ */
+export const BAR_OHNE_GEBUEHR_BIS_TEXT = formatDatumLang(new Date(BAR_SERVICEGEBUEHR_AB.getTime() - 1))
+
+/**
+ * Liegt dieser Zeitpunkt vor dem Bar-Stichtag? Der EINE Datumsvergleich zu
+ * B1 — `barOhneServicegebuehr` (servicegebuehr.ts) und die Texte unten fragen
+ * hier, damit die Grenze nirgends ein zweites Mal geschrieben wird.
+ */
+export function vorBarStichtag(zeitpunkt: Date): boolean {
+  return zeitpunkt.getTime() < BAR_SERVICEGEBUEHR_AB.getTime()
+}
+
+/**
+ * Einen Text um die Bar-Ausnahme ergänzen — nur vor dem Stichtag; danach
+ * bleibt er, wie er war. Statische Seiten (/fuer-hoefe, /konditionen, die
+ * Startseite) entscheiden beim Bauen bzw. bei der Revalidierung.
+ */
+export function mitBarAusnahme(text: string, jetzt: Date, satz: string = BAR_OHNE_GEBUEHR_SATZ): string {
+  return vorBarStichtag(jetzt) ? `${text} ${satz}` : text
+}
+
+/** Der Hinweis für Kundinnen — Kasse und Startseite (Wortlaut freigabe.md §9, 19a). */
+export const BAR_OHNE_GEBUEHR_HINWEIS = `Bei Barzahlung bis ${BAR_OHNE_GEBUEHR_BIS_TEXT} ohne Servicegebühr.`
+
+/** Derselbe Inhalt als Satz für Höfe — /konditionen, /fuer-hoefe und die Mail „Vor-Ort-Bestellung bestätigt". */
+export const BAR_OHNE_GEBUEHR_SATZ = `Bei Barzahlung fällt bis ${BAR_OHNE_GEBUEHR_BIS_TEXT} keine Servicegebühr an.`
+
+// ─── Servicegebühr ──────────────────────────────────────────────────────────
+
+/**
+ * Der Satz, den ein NEUER Hof beim Anlegen bekommt (Entscheidung E4, Preismodell
+ * des Betreibers: 5 %, mindestens € 0,50). Der Spalten-Default im Schema
+ * (`Farm.serviceFeePercent @default(4.9)`) ist älter und bleibt bis zu einer
+ * eigens freigegebenen Migration stehen — deshalb setzt das Anlegen den Satz
+ * ausdrücklich (createFarm, Seed), statt sich auf den Default zu verlassen.
+ * Bestehende Höfe behalten ihren gespeicherten Satz; umgestellt wird im Admin.
+ * servicegebuehr.ts reicht beide Werte unverändert weiter.
+ */
+export const SERVICEGEBUEHR_STANDARD_PROZENT = 5
+
+/** Mindestgebühr eines neuen Hofes in Cent (E4). */
+export const SERVICEGEBUEHR_STANDARD_MIND_CENTS = 50
+
+/** „5 % (mind. € 0,50)" — Satz und Mindestgebühr für neue Höfe (E4). */
+export const SERVICEGEBUEHR_SATZ_TEXT =
+  `${formatZahl(SERVICEGEBUEHR_STANDARD_PROZENT)} % ` +
+  `(mind. ${formatEuro(centsAlsEuro(SERVICEGEBUEHR_STANDARD_MIND_CENTS))})`
+
+/** Der Grundsatz — Preise-Abschnitt von /fuer-hoefe und /konditionen; mit Bar-Ausnahme über `servicegebuehrZahltKunde`. */
+export const SERVICEGEBUEHR_ZAHLT_KUNDE =
+  `Die Servicegebühr von ${SERVICEGEBUEHR_SATZ_TEXT} zahlt der Kunde. ` +
+  'Du bekommst immer den vollen Warenpreis – online wie bar.'
+
+/** Der Grundsatz, wie die Seiten ihn zeigen: vor dem Stichtag mit der Bar-Ausnahme (B1) in der Mitte. */
+export function servicegebuehrZahltKunde(jetzt: Date): string {
+  if (!vorBarStichtag(jetzt)) return SERVICEGEBUEHR_ZAHLT_KUNDE
+  return (
+    `Die Servicegebühr von ${SERVICEGEBUEHR_SATZ_TEXT} zahlt der Kunde. ` +
+    `${BAR_OHNE_GEBUEHR_SATZ} ` +
+    'Du bekommst immer den vollen Warenpreis – online wie bar.'
+  )
+}
+
+/** Kurzfassung für Karten (Einrichten, Vorteile). */
+export const VOLLER_WARENPREIS = 'Die Servicegebühr zahlt der Kunde – du behältst den vollen Warenpreis.'
+
 /** Die drei Sätze des Übergangs einzeln — die Metadaten brauchen nur die ersten beiden. */
 export const STARTPHASE_SATZ = 'In der Startphase kostenlos.'
 export const TARIFE_AB_SATZ = `Die Tarife gelten ab ${TARIFE_AB_TEXT}.`
@@ -147,8 +219,9 @@ export const KONDITIONEN_DERZEIT = `Derzeit gilt: ${KONDITIONEN_UEBERGANG}`
 
 /**
  * Wie abgerechnet wird (E6), zeitlich eingeordnet (K1): Vor dem Stichtag läuft
- * keine Abbuchung. Ob Servicegebühren aus Barbestellungen VOR dem Stichtag
- * später eingezogen werden, ist nicht entschieden — der Satz sagt dazu nichts.
+ * keine Abbuchung. Barbestellungen vor dem Stichtag tragen keine Gebühr, und
+ * Gebühren aus älteren Barbestellungen werden nicht eingezogen (B1) — deshalb
+ * gibt es vor dem Stichtag nichts, was die Abrechnung nachholen müsste.
  */
 export const MONATSABRECHNUNG_TEXT =
   `Ab dem ${TARIFE_AB_TEXT} rechnen wir einmal im Monat per SEPA-Lastschrift ab: ` +

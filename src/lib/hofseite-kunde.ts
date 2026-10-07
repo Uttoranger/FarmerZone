@@ -12,7 +12,13 @@
 import { formatEuro, formatZahl } from '@/lib/format'
 import { zeigeKaufknopf } from '@/lib/bereiche-anzeige'
 import { calcLineTotal, decimalZuCents } from '@/lib/order-totals'
-import { centsAlsEuro } from '@/lib/servicegebuehr'
+import { BAR_OHNE_GEBUEHR_HINWEIS } from '@/lib/konditionen'
+import {
+  barOhneServicegebuehr,
+  centsAlsEuro,
+  servicegebuehrSatz,
+  type ServicegebuehrEinstellung,
+} from '@/lib/servicegebuehr'
 import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
@@ -117,20 +123,57 @@ export function zahlungsarten(hof: { acceptsOnline: boolean; stripeAccountReady:
  * Die drei Wortlaute des Gebührenhinweises: in „Zahlung & Kontakt", über den
  * Produkten und im Mini-Warenkorb. Satz und Mindestgebühr kommen aus der
  * Hofeinstellung (servicegebuehrSatz); ohne Satz kein Hinweis. Nie in den
- * Produktpreis eingerechnet (DESIGN_SYSTEM, „Kaufstrecke").
+ * Produktpreis eingerechnet (DESIGN_SYSTEM, „Kaufstrecke"). Mit `zahlung`
+ * ehrlich zu Register B1 (bar vor dem SEPA-Start ohne Gebühr); Seiten rufen
+ * `gebuehrHinweisFuerHof`.
  */
 export function gebuehrHinweis(
-  satz: { prozent: number; mindestCents: number } | null
+  satz: { prozent: number; mindestCents: number } | null,
+  zahlung: GebuehrZahlung = OHNE_BAR_AUSNAHME
 ): { kurz: string; produkte: string; korb: string } | null {
   if (!satz) return null
+  // Register B1: Bar kostet bis zum SEPA-Start nichts. Bietet der Hof dann nur
+  // bar an, fällt gar keine Gebühr an — kein Hinweis auf etwas, das nicht kommt.
+  if (zahlung.barOhneGebuehr && !zahlung.online) return null
   // Ohne Mindestgebühr kein „(mind. € 0,00)" — eine Untergrenze von null ist keine.
   const mindestens = satz.mindestCents > 0 ? ` (mind. ${formatEuro(centsAlsEuro(satz.mindestCents))})` : ''
   const grund = `Preise zzgl. ${formatZahl(satz.prozent)} % Servicegebühr${mindestens}`
+  // Online UND bar vor dem Stichtag: die Ausnahme dazusagen, Satz aus konditionen.ts.
+  const barAusnahme = zahlung.barOhneGebuehr && zahlung.bar
+  const zusatz = barAusnahme ? ` ${BAR_OHNE_GEBUEHR_HINWEIS}` : ''
   return {
-    kurz: `${grund} – im Warenkorb einzeln ausgewiesen. Der Hof bekommt den vollen Preis.`,
-    produkte: `${grund} – einmal pro Bestellung, egal wie viel du in den Korb legst.`,
-    korb: 'zzgl. Servicegebühr',
+    kurz: `${grund} – im Warenkorb einzeln ausgewiesen. Der Hof bekommt den vollen Preis.${zusatz}`,
+    produkte: `${grund} – einmal pro Bestellung, egal wie viel du in den Korb legst.${zusatz}`,
+    korb: barAusnahme ? GEBUEHR_KORB_NUR_ONLINE : 'zzgl. Servicegebühr',
   }
+}
+
+/** Neben der Korbsumme, solange bar keine Gebühr kostet (B1) — kurz, weil der Platz dort knapp ist. */
+export const GEBUEHR_KORB_NUR_ONLINE = 'zzgl. Servicegebühr bei Online-Zahlung'
+
+/** Welche Zahlarten der Hof anbietet und ob bar gerade ohne Gebühr ist (B1). */
+export type GebuehrZahlung = { online: boolean; bar: boolean; barOhneGebuehr: boolean }
+
+/** Ohne Angabe: der Hinweis wie vor B1 (Satz gilt für jede Zahlart). */
+const OHNE_BAR_AUSNAHME: GebuehrZahlung = { online: true, bar: false, barOhneGebuehr: false }
+
+/**
+ * Der Gebührenhinweis für einen Hof, so wie Hofseite, Produktseite und
+ * Mini-Warenkorb ihn zeigen: Satz aus der Hofeinstellung (Online-Zahlung),
+ * Zahlarten aus derselben Regel wie die Kasse (`zahlungsarten`), die
+ * Bar-Ausnahme nach `barOhneServicegebuehr`. `jetzt` kommt von der Seite
+ * (Server-Uhr, als ISO-Text durchgereicht) — nie aus der Browser-Uhr beim Rendern.
+ */
+export function gebuehrHinweisFuerHof(
+  hof: ServicegebuehrEinstellung & { acceptsOnline: boolean; stripeAccountReady: boolean; acceptsOnsite: boolean },
+  jetzt: Date
+): { kurz: string; produkte: string; korb: string } | null {
+  const arten = zahlungsarten(hof)
+  return gebuehrHinweis(servicegebuehrSatz(hof, jetzt), {
+    online: arten.some((a) => a.art === 'online'),
+    bar: arten.some((a) => a.art === 'bar'),
+    barOhneGebuehr: barOhneServicegebuehr('ONSITE_CASH', jetzt),
+  })
 }
 
 // ─── Mini-Warenkorb und Mengen ──────────────────────────────────────────────

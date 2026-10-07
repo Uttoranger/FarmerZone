@@ -63,6 +63,15 @@ export function formatEuro(n: number, stellen: 0 | 2 = 2): string {
   return `€ ${betrag(n, stellen)}`
 }
 
+/**
+ * Cent → Euro-Zahl für formatEuro. Steht hier (nicht in servicegebuehr.ts, das
+ * sie unverändert weiterreicht), damit konditionen.ts Beträge zeigen kann,
+ * ohne servicegebuehr.ts einzubinden (siehe wiener-tag.ts).
+ */
+export function centsAlsEuro(cents: number): number {
+  return cents / 100
+}
+
 /** „0,5" · „2" · „1.234" — eine Zahl ohne Einheit, deutsch geschrieben. */
 export function formatZahl(n: number): string {
   return mengenFormat.format(Number.isFinite(n) ? n : 0)

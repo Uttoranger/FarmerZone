@@ -92,6 +92,7 @@ const STAND_AUSWAHL = {
   serviceFeePercentApplied: true,
   serviceFeeMinCentsApplied: true,
   erstattetCents: true,
+  createdAt: true,
   items: { select: { id: true, totalPrice: true, fehltSeit: true } },
 } satisfies Prisma.OrderSelect
 
@@ -124,6 +125,7 @@ export async function meldeFehlendenArtikel(eingabe: {
           stand.serviceFeePercentApplied === null ? null : stand.serviceFeePercentApplied.toNumber(),
         serviceFeeMinCentsApplied: stand.serviceFeeMinCentsApplied,
         erstattetCents: stand.erstattetCents,
+        bestelltAm: stand.createdAt,
         positionen: stand.items.map((i) => ({ id: i.id, betragCents: alsCents(i.totalPrice), fehlt: i.fehltSeit !== null })),
       }
 

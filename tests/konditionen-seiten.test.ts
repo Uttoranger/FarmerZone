@@ -30,7 +30,7 @@ vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
 
 import KonditionenPage from '@/app/(public)/konditionen/page'
 import FuerHoefePage from '@/app/(public)/fuer-hoefe/page'
-import { SERVICEGEBUEHR_SATZ_TEXT, TARIFE } from '@/lib/konditionen'
+import { BAR_OHNE_GEBUEHR_SATZ, SERVICEGEBUEHR_SATZ_TEXT, TARIFE, servicegebuehrZahltKunde, vorBarStichtag } from '@/lib/konditionen'
 import { FUER_HOEFE_FRAGEN } from '@/lib/fuer-hoefe'
 
 const lies = (datei: string): string => readFileSync(join(process.cwd(), datei), 'utf8')
@@ -91,6 +91,15 @@ describe('Gerendert — dieselben Preise auf beiden Seiten', () => {
       expect(html).toContain(tarif.preis)
     }
     expect(html).toContain(SERVICEGEBUEHR_SATZ_TEXT)
+  })
+
+  it.each([
+    ['/konditionen', konditionen],
+    ['/fuer-hoefe', fuerHoefe],
+  ])('%s nennt den Grundsatz samt Bar-Ausnahme bis zum SEPA-Start (Register B1) aus konditionen.ts', (_seite, html) => {
+    // Gerendert mit der echten Uhr: vor dem Stichtag mit Ausnahme, danach ohne (tests/bargebuehr.test.ts).
+    expect(html).toContain(servicegebuehrZahltKunde(new Date()))
+    expect(html.includes(BAR_OHNE_GEBUEHR_SATZ)).toBe(vorBarStichtag(new Date()))
   })
 
   it.each([

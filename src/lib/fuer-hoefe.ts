@@ -7,7 +7,7 @@
  * Connect, „Nicht abgeholt" in servicegebuehr-Sprint, Pausieren über
  * Farm.isPaused) — keine Zusage darüber hinaus.
  */
-import { SERVICEGEBUEHR_SATZ_TEXT } from '@/lib/konditionen'
+import { SERVICEGEBUEHR_SATZ_TEXT, mitBarAusnahme } from '@/lib/konditionen'
 
 export type Vorteil = { titel: string; text: string; kurz: string }
 
@@ -96,3 +96,15 @@ export const FUER_HOEFE_SCHLUSS = {
   titel: 'Bereit für deinen Hofladen online?',
   text: 'Registrieren dauert zwei Minuten. Einrichten kannst du in Ruhe.',
 } as const
+
+/** Die Frage, deren Antwort die Bar-Ausnahme bekommt (Register B1). */
+const FRAGE_GELD = 'Wie kommt das Geld zu mir?'
+
+/**
+ * Die Fragen, wie /fuer-hoefe sie zeigt: vor dem Stichtag mit der
+ * Bar-Ausnahme in der Antwort zum Geld (Satz aus konditionen.ts), danach
+ * unverändert. `jetzt` beim Bauen bzw. Revalidieren der Seite.
+ */
+export function fuerHoefeFragen(jetzt: Date): readonly Frage[] {
+  return FUER_HOEFE_FRAGEN.map((f) => (f.frage === FRAGE_GELD ? { ...f, antwort: mitBarAusnahme(f.antwort, jetzt) } : f))
+}

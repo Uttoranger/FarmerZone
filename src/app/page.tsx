@@ -122,7 +122,7 @@ export default function HomePage() {
       {istBrennmaterialSaison(jetzt) && <BrennmaterialBand />}
       <SoFunktionierts rechnung={beispielRechnung(jetzt)} />
       <FuerHoefeBand />
-      <Fragen />
+      <Fragen jetzt={jetzt} />
       <StartseiteFuss jahr={jetzt.getFullYear()} />
     </KundeShellMitSitzung>
   )

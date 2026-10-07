@@ -243,6 +243,8 @@ describe('beispielRechnung', () => {
       mindestCents: 50,
       duZahlstCents: 2100,
       hofBekommtCents: 2000,
+      // Register B1: Das Beispiel ist die Online-Zahlung; bar kostet bis zum SEPA-Start nichts.
+      fussnote: 'Bei Online-Zahlung. Bei Barzahlung bis 31.\u00a0Jänner 2027 ohne Servicegebühr.',
     })
   })
 
@@ -413,7 +415,7 @@ describe('Abschnitte', () => {
   })
 
   it('Fragen: alle Antworten im HTML, auch zugeklappt — die erste offen', () => {
-    const text = html(createElement(Fragen))
+    const text = html(createElement(Fragen, { jetzt: JETZT }))
     for (const { frage, antwort } of STARTSEITE_FRAGEN) {
       expect(text).toContain(frage)
       expect(text).toContain(antwort.replace(/&/g, '&amp;'))
@@ -421,7 +423,7 @@ describe('Abschnitte', () => {
   })
 
   it('Fragen ohne Skript: <details name="fragen">, nur die erste offen, Fokus sichtbar', () => {
-    const text = html(createElement(Fragen))
+    const text = html(createElement(Fragen, { jetzt: JETZT }))
     const details = text.match(/<details\b[^>]*>/g) ?? []
     expect(details).toHaveLength(STARTSEITE_FRAGEN.length)
     for (const tag of details) expect(tag).toContain('name="fragen"')
@@ -462,7 +464,7 @@ describe('Themes: Farben nur über Tokens', () => {
     html(createElement(BrennmaterialBand)),
     html(createElement(SoFunktionierts, { rechnung: beispielRechnung(JETZT) })),
     html(createElement(FuerHoefeBand)),
-    html(createElement(Fragen)),
+    html(createElement(Fragen, { jetzt: JETZT })),
     html(createElement(StartseiteFuss, { jahr: 2026 })),
   ]
 

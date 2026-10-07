@@ -338,6 +338,8 @@ describe('Knopf „Ja, ich hole verbindlich ab" — bestaetigeBarBestellung', ()
 
     expect(sendOrderConfirmation).toHaveBeenCalledTimes(1)
     expect(sendOrderConfirmedToFarmer).toHaveBeenCalledTimes(1)
+    // Der Bestellzeitpunkt geht mit: Die Mail an den Hof entscheidet daran die Bar-Ausnahme (Register B1).
+    expect(sendOrderConfirmedToFarmer).toHaveBeenCalledWith(expect.objectContaining({ createdAt: BESTELLT }))
   })
 
   it('eine gescheiterte Mail geht nach Sentry und hält die andere nicht auf', async () => {

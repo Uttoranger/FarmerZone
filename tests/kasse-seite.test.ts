@@ -125,7 +125,7 @@ describe('Übersicht: Servicegebühr als eigene Zeile', () => {
   ]
 
   it('zeigt Warenpreis, Gebühr mit Satz und Gesamt aus kassenBetraege (Mockup: € 10,30 + € 0,52 = € 10,82)', () => {
-    const betraege = kassenBetraege(korb, GEBUEHR_5, JETZT)
+    const betraege = kassenBetraege(korb, GEBUEHR_5, JETZT, 'ONLINE')
     const html = renderToStaticMarkup(
       createElement(UebersichtKarte, { betraege, gebuehrText: gebuehrBezeichnung(GEBUEHR_5, JETZT) }, createElement('button', null, 'Jetzt bestellen'))
     )
@@ -140,7 +140,7 @@ describe('Übersicht: Servicegebühr als eigene Zeile', () => {
   it('ohne Gebühr keine Gebührenzeile', () => {
     const frei = { ...GEBUEHR_5, serviceFeeActiveFrom: null }
     const html = renderToStaticMarkup(
-      createElement(UebersichtKarte, { betraege: kassenBetraege(korb, frei, JETZT), gebuehrText: gebuehrBezeichnung(frei, JETZT) })
+      createElement(UebersichtKarte, { betraege: kassenBetraege(korb, frei, JETZT, 'ONLINE'), gebuehrText: gebuehrBezeichnung(frei, JETZT) })
     )
     expect(html).not.toContain('Servicegebühr')
     expect(html).toContain('€ 10,30')
@@ -207,8 +207,8 @@ describe('Nachbesserung 1: der Zahlungsschritt zeigt den Betrag des Servers', ()
 
   it('Knopf und Übersicht zeigen den Stripe-Betrag, auch wenn die lokale Rechnung inzwischen höher ist', () => {
     // Gegenprobe: Die lokale Rechnung ist wirklich gewandert (€ 10,30 → € 10,82).
-    expect(kassenBetraege(korb, GEBUEHR_AB_GLEICH, JETZT).gesamtCents).toBe(1030)
-    expect(kassenBetraege(korb, GEBUEHR_AB_GLEICH, SPAETER).gesamtCents).toBe(1082)
+    expect(kassenBetraege(korb, GEBUEHR_AB_GLEICH, JETZT, 'ONLINE').gesamtCents).toBe(1030)
+    expect(kassenBetraege(korb, GEBUEHR_AB_GLEICH, SPAETER, 'ONLINE').gesamtCents).toBe(1082)
 
     const html = zahlungsschritt({ amountCents: 1030, serviceFeeCents: 0 })
 

@@ -2,6 +2,7 @@ import * as React from 'react'
 import { Text, Link } from '@react-email/components'
 import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton, amberBox, textLink, MAIL_FARBE } from './_layout'
 import { formatEuro } from '@/lib/format'
+import { BAR_OHNE_GEBUEHR_SATZ } from '@/lib/konditionen'
 
 export interface OrderConfirmedProps {
   farmerName: string
@@ -17,6 +18,11 @@ export interface OrderConfirmedProps {
   serviceFee?: number
   /** Bar zu kassieren: Warenpreis + Servicegebühr. */
   barZuKassieren?: number
+  /**
+   * Bar vor dem SEPA-Start bestellt (Register B1): keine Gebühr, und eine
+   * Gebühr älterer Bestellungen zieht die Monatsabrechnung nicht ein.
+   */
+  barOhneGebuehr?: boolean
   dashboardUrl: string
 }
 
@@ -38,8 +44,14 @@ export function OrderConfirmedEmail(p: OrderConfirmedProps) {
         </Text>
         {mitGebuehr && (
           <Text style={{ ...mutedText, margin: '4px 0 0', color: MAIL_FARBE.orangeText }}>
-            davon Servicegebühr {formatEuro(p.serviceFee ?? 0)} — die schuldest du der
-            Monatsabrechnung; Warenpreis {formatEuro(p.total)} bleibt dir.
+            davon Servicegebühr {formatEuro(p.serviceFee ?? 0)}
+            {p.barOhneGebuehr ? '' : ' — die schuldest du der Monatsabrechnung'}; Warenpreis{' '}
+            {formatEuro(p.total)} bleibt dir.
+          </Text>
+        )}
+        {!mitGebuehr && p.barOhneGebuehr && (
+          <Text style={{ ...mutedText, margin: '4px 0 0', color: MAIL_FARBE.orangeText }}>
+            {BAR_OHNE_GEBUEHR_SATZ} Der ganze Betrag bleibt dir.
           </Text>
         )}
       </div>

@@ -347,7 +347,7 @@ function Betrag({ bestellung }: { bestellung: HofBestellDetail }): React.JSX.Ele
         <p className="font-heading text-[30px] leading-tight font-semibold tabular-nums">{euro(betrag.gesamtCents)}</p>
         <p className="text-[12.5px]">
           {zusammensetzung}
-          {betrag.gebuehrCents > 0 ? ' – die Gebühr holt die Monatsabrechnung.' : ''}
+          {betrag.gebuehrFuerAbrechnung ? ' – die Gebühr holt die Monatsabrechnung.' : ''}
         </p>
       </div>
     )

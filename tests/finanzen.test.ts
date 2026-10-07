@@ -176,11 +176,17 @@ describe('topfVonBestellung', () => {
     }
   })
 
-  it('legt eine abgeholte Vor-Ort-Bestellung in „geschuldet" — bar wie Karte', () => {
-    for (const paymentMethod of ['ONSITE_CASH', 'ONSITE_CARD']) {
+  it('legt eine abgeholte Vor-Ort-Bestellung in „geschuldet" — Karte immer, bar ab dem SEPA-Start (B1)', () => {
+    // Bar vor dem Stichtag zählt nirgends (tests/bargebuehr.test.ts); danach wie Karte.
+    const nachStichtag = new Date('2027-02-15T10:00:00.000Z')
+    for (const [paymentMethod, createdAt] of [
+      ['ONSITE_CASH', nachStichtag],
+      ['ONSITE_CARD', nachStichtag],
+      ['ONSITE_CARD', new Date('2026-09-15T10:00:00.000Z')],
+    ] as const) {
       expect(
         topfVonBestellung(
-          bestellung({ paymentMethod, paymentStatus: 'PENDING', status: 'PICKED_UP' })
+          bestellung({ paymentMethod, createdAt, paymentStatus: 'PENDING', status: 'PICKED_UP' })
         )
       ).toBe('geschuldet')
     }
@@ -194,10 +200,15 @@ describe('topfVonBestellung', () => {
     ).toBe('erwartet')
   })
 
-  it('legt eine noch nicht abgeholte Vor-Ort-Bestellung in „erwartet"', () => {
+  it('legt eine noch nicht abgeholte Vor-Ort-Bestellung in „erwartet" (bar ab dem SEPA-Start, B1)', () => {
     expect(
       topfVonBestellung(
-        bestellung({ paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', status: 'READY' })
+        bestellung({
+          paymentMethod: 'ONSITE_CASH',
+          createdAt: new Date('2027-02-15T10:00:00.000Z'),
+          paymentStatus: 'PENDING',
+          status: 'READY',
+        })
       )
     ).toBe('erwartet')
   })
@@ -235,11 +246,17 @@ describe('einnahmenImMonat', () => {
       bestellung({ serviceFeeCents: 100 }), // eingezogen
       bestellung({ serviceFeeCents: 200 }), // eingezogen
       bestellung({
-        paymentMethod: 'ONSITE_CASH',
+        paymentMethod: 'ONSITE_CARD',
         paymentStatus: 'PENDING',
         status: 'PICKED_UP',
         serviceFeeCents: 300,
       }), // geschuldet
+      bestellung({
+        paymentMethod: 'ONSITE_CASH',
+        paymentStatus: 'PENDING',
+        status: 'PICKED_UP',
+        serviceFeeCents: 350,
+      }), // nirgends: bar vor dem SEPA-Start, wird nicht eingezogen (B1)
       bestellung({ paymentStatus: 'PENDING', status: 'PENDING_CONFIRMATION', serviceFeeCents: 400 }), // erwartet
       bestellung({ status: 'CANCELLED', serviceFeeCents: 500 }), // nirgends
       bestellung({ serviceFeeCents: 600, serviceFeeRefundedAt: new Date('2026-09-20T08:00:00Z') }), // nirgends
