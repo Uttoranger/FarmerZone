@@ -35,6 +35,7 @@ import {
   RECHENBEISPIEL_WARENPREIS_CENTS,
   TON_TEXT,
   einstellungenBereiche,
+  zahlungHinweis,
   konditionenRechenbeispiel,
   konditionenZeile,
   type EinstellungenDaten,
@@ -177,6 +178,37 @@ describe('Routen in der HofShell', () => {
   })
 })
 
+// ─── Zahlungs-Seite: genau eine Hinweiskarte ────────────────────────────────
+
+describe('zahlungHinweis — eine Karte oben auf /settings/payments', () => {
+  const bereit = { stripeBereit: true, onlineAn: true }
+
+  it('ohne Stripe: „einrichten" — bei ?stripe=pending bzw. error stattdessen deren Karte, nie zwei', () => {
+    expect(zahlungHinweis({ rueckmeldung: undefined, stripeBereit: false, onlineAn: true })).toBe('einrichten')
+    expect(zahlungHinweis({ rueckmeldung: 'pending', stripeBereit: false, onlineAn: true })).toBe('fortsetzen')
+    expect(zahlungHinweis({ rueckmeldung: 'error', stripeBereit: false, onlineAn: true })).toBe('fehler')
+  })
+
+  it('Stripe fertig, Online aus: „einschalten"', () => {
+    expect(zahlungHinweis({ rueckmeldung: undefined, stripeBereit: true, onlineAn: false })).toBe('einschalten')
+  })
+
+  it('alles fertig: nichts, nach der Rückkehr von Stripe „geschafft"', () => {
+    expect(zahlungHinweis({ rueckmeldung: undefined, ...bereit })).toBeNull()
+    expect(zahlungHinweis({ rueckmeldung: 'success', ...bereit })).toBe('geschafft')
+    // „geschafft" nur, wenn es stimmt.
+    expect(zahlungHinweis({ rueckmeldung: 'success', stripeBereit: false, onlineAn: true })).toBe('einrichten')
+    expect(zahlungHinweis({ rueckmeldung: 'success', stripeBereit: true, onlineAn: false })).toBe('einschalten')
+  })
+
+  it('die Seite fragt die Regel und zeigt „Verbunden und aktiv" nur mit Online an', () => {
+    const seite = quelle('src/app/(hof)/settings/payments/page.tsx')
+    expect(seite).toContain('zahlungHinweis(')
+    expect(seite).toMatch(/onlineAn[\s\S]*Verbunden und aktiv/)
+    expect(quelle('src/app/(hof)/settings/payments/payments-actions.tsx')).toContain('schalteOnlineZahlungEin')
+  })
+})
+
 // ─── Übersicht ──────────────────────────────────────────────────────────────
 
 describe('einstellungenBereiche', () => {
@@ -229,18 +261,34 @@ describe('einstellungenBereiche', () => {
     expect(pausiert.zeile).toContain('pausiert')
   })
 
-  it('Zahlung: Stripe halb eingerichtet oder ohne Konto ist orange, bar geht immer', () => {
+  it('Zahlung: Stripe halb eingerichtet oder ohne Konto ist orange — einrichten ist Pflicht (Z1)', () => {
     const halb = bereich(einstellungenBereiche(daten({ stripeBereit: false }), VOR_STICHTAG), 'zahlung')
     expect(halb).toMatchObject({ ton: 'offen' })
     expect(halb.zeile).toContain('noch nicht fertig')
     const ohne = bereich(einstellungenBereiche(daten({ stripeBereit: false, stripeKontoDa: false }), VOR_STICHTAG), 'zahlung')
-    expect(ohne.zeile).toBe('Bar bei Abholung · Online-Zahlung noch nicht eingerichtet')
+    expect(ohne).toMatchObject({ ton: 'offen', zeile: 'Online-Zahlung noch nicht eingerichtet · bitte einrichten' })
   })
 
-  it('Zahlung: Hof kassiert bewusst nur bar (Online aus) — grau, nicht orange', () => {
-    const nurBar = bereich(einstellungenBereiche(daten({ stripeBereit: false, stripeKontoDa: false, onlineAn: false }), VOR_STICHTAG), 'zahlung')
-    expect(nurBar).toMatchObject({ ton: 'neutral', zeile: 'Bar bei Abholung · Online-Zahlung ist aus' })
-    expect(bereich(einstellungenBereiche(daten({ stripeBereit: false, onlineAn: false }), VOR_STICHTAG), 'zahlung').ton).toBe('neutral')
+  it('Zahlung: Bestandshof mit Online aus (früher „nur bar") ist orange und soll Stripe einrichten — kein „ist aus" (Z1)', () => {
+    const alt = bereich(einstellungenBereiche(daten({ stripeBereit: false, stripeKontoDa: false, onlineAn: false }), VOR_STICHTAG), 'zahlung')
+    expect(alt).toMatchObject({ ton: 'offen', zeile: 'Online-Zahlung noch nicht eingerichtet · bitte einrichten' })
+    expect(bereich(einstellungenBereiche(daten({ stripeBereit: false, onlineAn: false }), VOR_STICHTAG), 'zahlung').ton).toBe('offen')
+    // Stripe fertig, Online aber aus: nicht als „aktiv" ausgeben — der Checkout bietet online dann nicht an.
+    const fertigAberAus = bereich(einstellungenBereiche(daten({ stripeBereit: true, onlineAn: false }), VOR_STICHTAG), 'zahlung')
+    expect(fertigAberAus.ton).toBe('offen')
+    expect(fertigAberAus.zeile).not.toContain('aktiv')
+  })
+
+  it('Zahlung: Stripe fertig, Online aus — der Punkt nennt den Ausweg „einschalten" und führt zur Zahlungs-Seite', () => {
+    const b = bereich(einstellungenBereiche(daten({ stripeBereit: true, onlineAn: false }), VOR_STICHTAG), 'zahlung')
+    expect(b).toMatchObject({ ton: 'offen', href: '/settings/payments' })
+    expect(b.zeile).toContain('einschalten')
+  })
+
+  it('Zahlung: nirgends eine Wahl „nur bar" für den Hof', () => {
+    for (const ueber of [{ stripeBereit: false, stripeKontoDa: false, onlineAn: false }, { stripeBereit: false }, {}]) {
+      expect(bereich(einstellungenBereiche(daten(ueber), VOR_STICHTAG), 'zahlung').zeile).not.toMatch(/nur bar|ist aus/i)
+    }
   })
 
   it('Futtermittel: Nummer mit Betriebsart grün und Sprung zum Abschnitt; ohne Nummer nur zur Info', () => {

@@ -13,6 +13,7 @@ import { wienerZeitpunkt } from '@/lib/fristen'
 import { formatSlotTime } from '@/lib/pickup-days'
 import { hofZustand } from '@/lib/mein-hof'
 import { summeCent, type UmsatzBuchung } from '@/lib/umsatz'
+import { onlineZahlungPausiert } from '@/lib/stripe-konto'
 
 // ─── Tage ───────────────────────────────────────────────────────────────────
 
@@ -546,8 +547,9 @@ export type HeuteBlock =
 
 /**
  * Welche Blöcke wo stehen. Die Packliste beginnt immer die Hauptspalte
- * (Gate 5: „Packliste zuerst"); oben stehen nur der Stripe-Hinweis (bis er
- * erledigt ist, können Kunden nicht online zahlen) und die schmale
+ * (Gate 5: „Packliste zuerst"); oben stehen nur der Stripe-Hinweis —
+ * „pausiert" oder „einrichten" (Z1); bis er erledigt ist, können Kunden nicht
+ * online zahlen — und die schmale
  * Teilen-Zeile. Die Seitenspalte steht am Handy unter der Hauptspalte.
  */
 export function heuteAufbau({
@@ -567,6 +569,29 @@ export function heuteAufbau({
   if (ersteSchritte) seite.push('erste-schritte')
   seite.push('naechste-abholung', 'woche', 'hofseite')
   return { oben, haupt: ['packliste', 'braucht-dich'], seite }
+}
+
+// ─── Online-Zahlung einrichten (Register Z1) ────────────────────────────────
+
+/**
+ * Ein freigeschalteter Hof ohne fertiges Stripe-Konto sieht auf Heute deutlich
+ * „Online-Zahlung einrichten" (Z1). Er bleibt online — keine Abschaltung, keine
+ * Sperre, nur der Hinweis mit dem Weg in die Zahlungs-Einstellungen. Das gilt
+ * auch für einen Bestandshof mit `acceptsOnline` false: Er wird aufgefordert,
+ * an seinen Daten ändert sich nichts.
+ *
+ * Greift die Notbremse (onlineZahlungPausiert: Konto da, Stripe lässt es
+ * gerade nicht zu), steht stattdessen „Online-Zahlung ist pausiert" — nie
+ * beide. Wartende Höfe führt Einrichten, stillgelegte sind vom Netz.
+ */
+export function stripeEinrichtenHinweis(hof: {
+  approvedAt: Date | null
+  archivedAt: Date | null
+  stripeAccountReady: boolean
+  acceptsOnline: boolean
+  stripeAccountId: string | null
+}): boolean {
+  return hof.approvedAt !== null && hof.archivedAt === null && !hof.stripeAccountReady && !onlineZahlungPausiert(hof)
 }
 
 // ─── Wochenbalken ───────────────────────────────────────────────────────────

@@ -13,7 +13,8 @@ import {
 import { servicegebuehrEinstellungSchema } from '@/schemas/servicegebuehr'
 import { wienerMitternacht } from '@/lib/servicegebuehr'
 import { triageEingabeSchema } from '@/schemas/meldung'
-import { FREISCHALTUNG_EMAIL_OFFEN_TEXT, bestaetigungOffen } from '@/lib/email-bestaetigung'
+import { bestaetigungOffen } from '@/lib/email-bestaetigung'
+import { FREISCHALTUNG_GEAENDERT_TEXT, freischaltSperre } from '@/lib/admin-hoefe'
 
 function revalidateAll(slug: string) {
   revalidatePath('/admin')
@@ -33,16 +34,39 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
 
   const farm = await prisma.farm.findUnique({
     where: { id: farmId },
-    select: { name: true, slug: true, owner: { select: { email: true, emailVerified: true, createdAt: true } } },
+    select: {
+      name: true,
+      slug: true,
+      stripeAccountReady: true,
+      owner: { select: { email: true, emailVerified: true, createdAt: true } },
+    },
   })
   if (!farm) return { error: 'Hof nicht gefunden.' }
 
-  // S3 (Nr. 17b): „Hof online stellen" ist bis zur bestätigten E-Mail
-  // gesperrt — und online geht ein Hof nur über diesen Klick. Konten vor dem
-  // Stichtag bleiben unberührt. Frisch aus der Datenbank gelesen (oben).
-  if (bestaetigungOffen(farm.owner)) return { error: FREISCHALTUNG_EMAIL_OFFEN_TEXT }
+  // Die Sperren aus EINER Regel (freischaltSperre, src/lib/admin-hoefe.ts),
+  // alles frisch aus der Datenbank gelesen (oben):
+  // - S3 (Nr. 17b): „Hof online stellen" ist bis zur bestätigten E-Mail
+  //   gesperrt — und online geht ein Hof nur über diesen Klick. Konten vor dem
+  //   Stichtag bleiben unberührt.
+  // - Register Z1: Jeder Hof braucht ein fertiges Stripe-Konto — auch einer
+  //   mit acceptsOnline false aus der Zeit, als „nur bar" noch ging. Das ist
+  //   die serverseitige Schranke für „Hof online stellen".
+  // Bereits freigeschaltete Höfe berührt das nicht; es wirkt nur auf diesen Klick.
+  const sperre = freischaltSperre({
+    emailBestaetigungOffen: bestaetigungOffen(farm.owner),
+    stripeBereit: farm.stripeAccountReady === true,
+  })
+  if (sperre) return { error: sperre }
 
-  await prisma.farm.update({ where: { id: farmId }, data: { approvedAt: new Date() } })
+  // Bedingt schreiben, nicht blind: Die Sperre oben beruht auf einem Lesestand.
+  // Fällt Stripe dazwischen weg (account.updated) oder schaltet ein zweiter
+  // Klick schon frei, trifft das Schreiben nichts — dann keine Mail, sondern
+  // eine Meldung (ARCHITECTURE: der Statuswechsel ist die Sperre).
+  const { count } = await prisma.farm.updateMany({
+    where: { id: farmId, stripeAccountReady: true, approvedAt: null },
+    data: { approvedAt: new Date() },
+  })
+  if (count === 0) return { error: FREISCHALTUNG_GEAENDERT_TEXT }
   revalidateAll(farm.slug)
 
   // Die Zusage an den Hof — NACH dem erfolgreichen Update. Ein Mail-Fehler

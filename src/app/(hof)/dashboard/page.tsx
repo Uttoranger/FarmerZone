@@ -15,6 +15,7 @@ import {
   Kennzahlen,
   NaechsteAbholungKarte,
   Packliste,
+  StripeEinrichtenHinweis,
   StripeHinweis,
   TeilenKarte,
   WocheKarte,
@@ -71,7 +72,8 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
 
   const teilen = teilenKarte({ sichtbar: heute.hof.sichtbar, abholtag: heute.abholfensterHeute !== null })
   const aufbau = heuteAufbau({
-    stripeHinweis: heute.onlinePausiert !== null,
+    // „pausiert" (Notbremse) oder „einrichten" (Register Z1) — nie beide, siehe stripeEinrichtenHinweis.
+    stripeHinweis: heute.onlinePausiert !== null || heute.stripeEinrichten,
     teilen,
     ersteSchritte: ersteSchritteZeigen === 'karte',
   })
@@ -85,7 +87,11 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   const wirkungSatz = wirkung ? teilenWirkungSatz(wirkung) : null
 
   const bloecke: Record<HeuteBlock, ReactNode> = {
-    stripe: heute.onlinePausiert && <StripeHinweis barMoeglich={heute.onlinePausiert.barMoeglich} />,
+    stripe: heute.onlinePausiert ? (
+      <StripeHinweis barMoeglich={heute.onlinePausiert.barMoeglich} />
+    ) : (
+      heute.stripeEinrichten && <StripeEinrichtenHinweis />
+    ),
     'teilen-schmal': teilen && <TeilenKarte form="schmal" hofName={farm.name} hofSlug={farm.slug} satz={satz} adresse={adresse} fenster={fenster} wirkung={wirkungSatz} />,
     'teilen-gross': teilen && <TeilenKarte form="gross" hofName={farm.name} hofSlug={farm.slug} satz={satz} adresse={adresse} fenster={fenster} wirkung={wirkungSatz} />,
     packliste: (

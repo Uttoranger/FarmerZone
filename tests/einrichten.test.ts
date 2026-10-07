@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { einrichtenStand, vorname, type EinrichtenDaten } from '@/lib/einrichten'
+import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ } from '@/lib/konditionen'
 
 const OHNE_HOF: EinrichtenDaten = { personName: 'Max Mustermann', email: 'max@example.com', hof: null }
 
@@ -91,8 +92,23 @@ describe('einrichtenStand — mit Hof', () => {
     expect(s.text).not.toMatch(/melden uns|bevor/)
   })
 
-  it('Freischaltung wartet auf den Betreiber, bis approvedAt gesetzt ist', () => {
-    expect(schritt(mitHof(), 'freischaltung')).toMatchObject({ zustand: 'wartet', aktion: null })
+  it('Zahlung: nennt den Satz aus der Freigabe wörtlich (Register Z1, aus konditionen.ts)', () => {
+    expect(schritt(mitHof(), 'zahlung').text).toBe(ONLINE_ZAHLUNG_EINRICHTEN_SATZ)
+    // Am Handy steht textKurz — auch dort der volle Satz.
+    expect(schritt(mitHof(), 'zahlung').textKurz).toBe(ONLINE_ZAHLUNG_EINRICHTEN_SATZ)
+    expect(ONLINE_ZAHLUNG_EINRICHTEN_SATZ).toBe(
+      'Damit deine Kundinnen auch mit Karte, Apple Pay oder EPS zahlen können, richte bitte die Online-Zahlung ein. Dauert etwa 10 Minuten.'
+    )
+  })
+
+  it('„Hof online stellen" geht erst mit Stripe: ohne Stripe ist die Freischaltung gesperrt (Z1)', () => {
+    const s = schritt(mitHof(), 'freischaltung')
+    expect(s).toMatchObject({ zustand: 'gesperrt', aktion: { art: 'link', href: '/settings/payments', primaer: false } })
+    expect(s.text).toContain('Online-Zahlung')
+  })
+
+  it('Freischaltung wartet mit Stripe auf den Betreiber, bis approvedAt gesetzt ist', () => {
+    expect(schritt(mitHof({ stripeBereit: true }), 'freischaltung')).toMatchObject({ zustand: 'wartet', aktion: null })
     expect(schritt(mitHof({ freigeschaltet: true }), 'freischaltung').zustand).toBe('erledigt')
   })
 
@@ -134,9 +150,13 @@ describe('einrichtenStand — E-Mail noch nicht bestätigt (S3, Nr. 17b)', () =>
     expect(schritt(daten, 'produkte')).toMatchObject({ zustand: 'offen', aktion: { href: '/products?neu=1' } })
   })
 
-  it('Gegenprobe: bestätigt (oder alte Konten ohne Pflicht) wartet die Freischaltung wie bisher auf uns', () => {
-    expect(schritt({ ...mitHof(), emailOffen: false }, 'freischaltung').zustand).toBe('wartet')
-    expect(schritt(mitHof(), 'freischaltung').zustand).toBe('wartet')
+  it('Gegenprobe: bestätigt (oder alte Konten ohne Pflicht) und mit Stripe wartet die Freischaltung auf uns', () => {
+    expect(schritt({ ...mitHof({ stripeBereit: true }), emailOffen: false }, 'freischaltung').zustand).toBe('wartet')
+    expect(schritt(mitHof({ stripeBereit: true }), 'freischaltung').zustand).toBe('wartet')
+  })
+
+  it('ohne E-Mail UND ohne Stripe nennt die Freischaltung zuerst die E-Mail — wie freischaltSperre', () => {
+    expect(schritt({ ...mitHof(), emailOffen: true }, 'freischaltung').aktion).toMatchObject({ href: '/verify' })
   })
 
   it('ein freigeschalteter Hof bleibt erledigt', () => {
