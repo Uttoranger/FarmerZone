@@ -16,7 +16,6 @@ import { CustomerMagicLinkEmail } from '@/emails/customer-magic-link'
 import { AnmeldecodeEmail } from '@/emails/anmeldecode'
 import { PasswordResetEmail } from '@/emails/password-reset'
 import { EmailBestaetigungEmail } from '@/emails/email-bestaetigung'
-import { RegistrierungHinweisEmail } from '@/emails/registrierung-hinweis'
 import { NewFarmNotificationEmail } from '@/emails/new-farm-notification'
 import { FreischaltungEmail } from '@/emails/freischaltung'
 import { MeldungNotificationEmail } from '@/emails/meldung-notification'
@@ -243,6 +242,9 @@ export async function sendRegistrierungsHinweis(
   email: string,
   ziele: { weg: 'passwort' | 'code'; anmelden: string; passwortZuruecksetzen: string | null }
 ): Promise<{ id?: string; error?: string }> {
+  // Vorlage erst beim Versand laden: Seitenmodule, die email.ts einbinden,
+  // sollen sie nicht mitziehen (Nachtlauf Nr. 31, „schwere Module nur bei Bedarf").
+  const { RegistrierungHinweisEmail } = await import('@/emails/registrierung-hinweis')
   const html = await toHtml(React.createElement(RegistrierungHinweisEmail, ziele))
   return sendRaw(email, 'Jemand wollte sich mit deiner Adresse registrieren · FarmerZone', html)
 }

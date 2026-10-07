@@ -1,7 +1,6 @@
 import type Stripe from 'stripe'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { stripe } from '@/lib/stripe'
 import { alsCents } from '@/lib/order-totals'
 import { zuruecknahmeNachGescheiterterErstattung, zuruecknahmeNachGescheiterterVollerstattung } from '@/lib/storno'
 import {
@@ -199,6 +198,9 @@ async function nimmGescheiterteVollerstattungZurueck(
       : null
   if (!bestellung || !paymentIntentId) return fremd(paymentIntentId)
 
+  // Stripe erst hier laden: Die Datei hängt über die Bestell-Actions an Seiten,
+  // die das SDK sonst beim Start mitziehen (Nachtlauf Nr. 31).
+  const { stripe } = await import('@/lib/stripe')
   const liste = await stripe.refunds.list({ payment_intent: paymentIntentId, limit: SEITE }, STRIPE_OPTIONEN)
   // Mehr als eine Seite: kein vollständiges Bild — wie ladeStripeStand „unklar".
   if (liste.has_more) return { art: 'unklar', bestellung: bezug(bestellung), grund: 'stripe_mehr_als_eine_seite' }
