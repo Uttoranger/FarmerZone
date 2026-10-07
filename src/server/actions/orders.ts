@@ -21,13 +21,16 @@ import { alsCents } from '@/lib/order-totals'
 import { zahlungNachRueckweg } from '@/lib/hof-bestellungen'
 import { artikelFehltEingabeSchema, stornoEingabeSchema } from '@/schemas/hof-bestellungen'
 import { meldeFehlendenArtikel } from '@/server/artikel-fehlt'
+import { MELDE_VERMERK_TYP, meldeVermerk } from '@/server/erstattung-gescheitert'
 import {
   StripeStandUnklar,
   bucheVomHofZurueck,
   erstatteKundin,
+  erstattungZaehlt,
   hatErstattungen,
   ladeStripeStand,
   teilstornoSumme,
+  vollstornoMerkmal,
   type UnklarGrund,
 } from '@/server/teilerstattung'
 import { sendArtikelFehlt, sendErstattungOffen } from '@/lib/email'
@@ -647,12 +650,22 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
             reverse_transfer: true,
             // Wie im Checkout: eine application_fee gibt es nur bei Gebühr > 0.
             ...(plattformgebuehrCents(betraege) > 0 ? { refund_application_fee: true } : {}),
+            // Merkmale wie bei der Teilerstattung (Nr. 27): Scheitert die
+            // Erstattung später, erkennt der Webhook sie als unsere Buchung
+            // und öffnet die Zahlung wieder (src/server/erstattung-gescheitert.ts).
+            metadata: vollstornoMerkmal(order.id),
           },
           // Idempotenz: Erreicht ein zweiter Storno Stripe (Vermerk gescheitert
           // und Bestellung wieder geöffnet), liefert Stripe dieselbe Erstattung
           // statt einer zweiten.
           { idempotencyKey: `storno-${order.id}` }
         )
+        // Wie bei der Teilerstattung (erstatteKundin): Eine gescheiterte oder
+        // abgebrochene Erstattung hat kein Geld bewegt — nie REFUNDED
+        // vermerken und der Kundin keine Erstattung zusagen.
+        if (!erstattungZaehlt(refund.status)) {
+          throw new StripeStandUnklar('erstattung_gescheitert', { orderId: order.id, status: refund.status ?? 'unbekannt', refundId: refund.id })
+        }
         refundAmount = refund.amount / 100
       }
     } catch (err) {
@@ -674,6 +687,22 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
         },
       })
       erstattungOffen = true
+      // Hat Stripe die Erstattung sofort als gescheitert zurückgegeben, ist
+      // sie gebucht und gleich gemeldet (Sentry + Betreiber-Mail unten). Ein
+      // späteres refund.failed derselben Erstattung fände „schon erledigt"
+      // und meldete ein zweites Mal — der Vermerk hält es still
+      // (src/server/erstattung-gescheitert.ts). Scheitert nur der Vermerk,
+      // kommt die Meldung schlimmstenfalls doppelt.
+      if (err instanceof StripeStandUnklar && err.grund === 'erstattung_gescheitert' && typeof err.extra.refundId === 'string') {
+        try {
+          await prisma.webhookEvent.createMany({
+            data: [{ stripeEventId: meldeVermerk(err.extra.refundId), type: MELDE_VERMERK_TYP }],
+            skipDuplicates: true,
+          })
+        } catch (vermerkFehler) {
+          console.error('[cancelOrder] Meldevermerk nicht gesetzt:', vermerkFehler instanceof Error ? vermerkFehler.name : 'unbekannt')
+        }
+      }
     }
 
     // Der Vermerk getrennt von der Erstattung: Scheitert NUR er, ist das

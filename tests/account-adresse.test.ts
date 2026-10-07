@@ -46,7 +46,7 @@ vi.mock('@/app/account/profile/profile-client', () => ({ ProfileClient: () => nu
 
 import AccountProfilePage from '@/app/account/profile/page'
 import { updateSubscription, deleteCustomerAccount } from '@/server/actions/subscriptions'
-import { adresseBestaetigt, kundinnenKonto } from '@/lib/anmeldecode'
+import { adresseBestaetigt, fremdesPasswortBeiCodeAnmeldung, kundinnenKonto } from '@/lib/anmeldecode'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
@@ -299,5 +299,21 @@ describe('/account nur für Kundinnen-Konten (Nr. 17b, Nachbesserung Runde 1)', 
     expect(kundinnenKonto({ role: 'CUSTOMER', isAdmin: true })).toBe(false)
     expect(kundinnenKonto({ role: 'ADMIN' })).toBe(false)
     expect(kundinnenKonto(null)).toBe(false)
+  })
+})
+
+describe('fremdesPasswortBeiCodeAnmeldung — Name und Telefon nur aus FREMDEN Alt-Registrierungen leeren (Register B3, Nr. 27)', () => {
+  it('die Code-Anmeldung entfernt ein Passwort-Konto: das ist die fremde Alt-Registrierung', () => {
+    expect(fremdesPasswortBeiCodeAnmeldung({ pfad: '/sign-in/email-otp', providerId: 'credential' })).toBe(true)
+  })
+
+  it('nur der Pfad der Code-Anmeldung — nie ein anderes Löschen eines Passworts (Konto löschen, Bestätigung per Link)', () => {
+    expect(fremdesPasswortBeiCodeAnmeldung({ pfad: '/delete-user', providerId: 'credential' })).toBe(false)
+    expect(fremdesPasswortBeiCodeAnmeldung({ pfad: '/verify-email', providerId: 'credential' })).toBe(false)
+    expect(fremdesPasswortBeiCodeAnmeldung({ pfad: null, providerId: 'credential' })).toBe(false)
+  })
+
+  it('nur ein Passwort-Konto — kein anderer Anbieter', () => {
+    expect(fremdesPasswortBeiCodeAnmeldung({ pfad: '/sign-in/email-otp', providerId: 'google' })).toBe(false)
   })
 })

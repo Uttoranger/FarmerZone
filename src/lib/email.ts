@@ -232,6 +232,23 @@ export async function sendEmailBestaetigung(email: string, url: string): Promise
   return sendRaw(email, 'Bestätige deine E-Mail-Adresse · FarmerZone', html)
 }
 
+/**
+ * Hinweis an ein bestehendes Konto: Jemand wollte sich mit seiner Adresse
+ * registrieren (Register F6 „19b", Nachtlauf Nr. 27). Der Betreff nennt die
+ * Adresse nicht. Gibt wie sendRaw `{ error }` zurück statt zu werfen — der
+ * Aufrufer meldet es ohne Adresse an Sentry.
+ */
+export async function sendRegistrierungsHinweis(
+  email: string,
+  ziele: { weg: 'passwort' | 'code'; anmelden: string; passwortZuruecksetzen: string | null }
+): Promise<{ id?: string; error?: string }> {
+  // Vorlage erst beim Versand laden: Seitenmodule, die email.ts einbinden,
+  // sollen sie nicht mitziehen (Nachtlauf Nr. 31, „schwere Module nur bei Bedarf").
+  const { RegistrierungHinweisEmail } = await import('@/emails/registrierung-hinweis')
+  const html = await toHtml(React.createElement(RegistrierungHinweisEmail, ziele))
+  return sendRaw(email, 'Jemand wollte sich mit deiner Adresse registrieren · FarmerZone', html)
+}
+
 /** Passwort-Reset → Bauer */
 export async function sendPasswordResetEmail(email: string, url: string): Promise<void> {
   const html = await toHtml(React.createElement(PasswordResetEmail, { resetUrl: url }))

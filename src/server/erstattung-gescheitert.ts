@@ -1,8 +1,18 @@
 import type Stripe from 'stripe'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { zuruecknahmeNachGescheiterterErstattung } from '@/lib/storno'
-import { StripeStandUnklar, erstattungZaehlt, ladeStripeStand, ordneZu, type Anlass } from '@/server/teilerstattung'
+import { alsCents } from '@/lib/order-totals'
+import { zuruecknahmeNachGescheiterterErstattung, zuruecknahmeNachGescheiterterVollerstattung } from '@/lib/storno'
+import {
+  ANLASS_VOLLSTORNO,
+  SEITE,
+  STRIPE_OPTIONEN,
+  StripeStandUnklar,
+  erstattungZaehlt,
+  ladeStripeStand,
+  ordneZu,
+  type Anlass,
+} from '@/server/teilerstattung'
 
 /**
  * Eine Erstattung ist NACH dem Buchen gescheitert (Webhook `refund.failed` /
@@ -17,8 +27,11 @@ import { StripeStandUnklar, erstattungZaehlt, ladeStripeStand, ordneZu, type Anl
  * Geändert wird nur, was NACHWEISLICH zu einer unserer Buchungen gehört: Die
  * Erstattung trägt unsere Merkmale (`metadata` orderId/anlass/positionId, über
  * `ordneZu`), und diese Bestellung gehört zu genau der Zahlung der
- * Erstattung. Alles andere (Vollstorno ohne Merkmale, von Hand im Dashboard,
- * fremde Bestellung) ändert nichts und wird nur gemeldet.
+ * Erstattung. Seit Nr. 27 trägt auch die Vollerstattung des Stornos Merkmale
+ * (`anlass: 'vollstorno'`); sie hat einen eigenen Weg
+ * (`nimmGescheiterteVollerstattungZurueck`). Alles andere (Vollstorno von
+ * vorher ohne Merkmale, von Hand im Dashboard, fremde Bestellung) ändert
+ * nichts und wird nur gemeldet.
  *
  * Genau einmal je Erstattung — ohne eigene Spalte: Ziel ist Stripes Summe der
  * zählenden, zugeordneten Erstattungen (`ladeStripeStand`, die gescheiterte
@@ -45,7 +58,7 @@ export type GescheitertAusgang =
   | {
       art: 'zurueckgenommen'
       bestellung: Bestellbezug
-      anlass: Anlass
+      anlass: Anlass | typeof ANLASS_VOLLSTORNO
       vorherCents: number
       nachherCents: number
       /** War die Bestellung als erstattet vermerkt (REFUNDED) und ist jetzt wieder offen (PAID)? */
@@ -83,6 +96,7 @@ export async function nimmGescheiterteErstattungZurueck(refund: Stripe.Refund): 
   if (erstattungZaehlt(refund.status)) return { art: 'nicht_gescheitert' }
 
   const paymentIntentId = zahlungVon(refund)
+  if (refund.metadata?.anlass === ANLASS_VOLLSTORNO) return nimmGescheiterteVollerstattungZurueck(refund, paymentIntentId)
   const orderId = refund.metadata?.orderId
   const buchung = orderId ? ordneZu(orderId, refund.metadata, refund.amount) : null
   const bestellung =
@@ -90,13 +104,7 @@ export async function nimmGescheiterteErstattungZurueck(refund: Stripe.Refund): 
       ? await prisma.order.findFirst({ where: { id: orderId, stripePaymentIntentId: paymentIntentId }, select: BESTELLBEZUG })
       : null
 
-  if (!buchung || !bestellung || !paymentIntentId) {
-    // Zum Wiederfinden die Bestellung der ZAHLUNG nennen — nur lesen, nichts ändern.
-    const zurZahlung = paymentIntentId
-      ? await prisma.order.findUnique({ where: { stripePaymentIntentId: paymentIntentId }, select: BESTELLBEZUG })
-      : null
-    return { art: 'fremd', bestellung: zurZahlung ? bezug(zurZahlung) : null }
-  }
+  if (!buchung || !bestellung || !paymentIntentId) return fremd(paymentIntentId)
 
   let erstattetCentsStripe: number
   try {
@@ -149,6 +157,90 @@ export async function nimmGescheiterteErstattungZurueck(refund: Stripe.Refund): 
     vorherCents: bestellung.erstattetCents,
     nachherCents: entscheidung.erstattetCentsNeu,
     zahlungWiederOffen,
+  }
+}
+
+/** Nicht nachweislich unsere Buchung: zum Wiederfinden die Bestellung der ZAHLUNG nennen — nur lesen, nichts ändern. */
+async function fremd(paymentIntentId: string | null): Promise<GescheitertAusgang> {
+  const zurZahlung = paymentIntentId
+    ? await prisma.order.findUnique({ where: { stripePaymentIntentId: paymentIntentId }, select: BESTELLBEZUG })
+    : null
+  return { art: 'fremd', bestellung: zurZahlung ? bezug(zurZahlung) : null }
+}
+
+/**
+ * Die gescheiterte Erstattung ist eine VOLLERSTATTUNG des Stornos (Merkmal
+ * `anlass: 'vollstorno'`, Nr. 27). Sie steht in der Datenbank nur als
+ * `paymentStatus` REFUNDED; zurückgenommen wird deshalb der Zahlstand
+ * (REFUNDED → PAID, die Bestellung bleibt storniert), nie ein Betrag
+ * (`zuruecknahmeNachGescheiterterVollerstattung`).
+ *
+ * Wie beim Teil- und Rest-Storno nur, was nachweislich unsere Buchung ist:
+ * Merkmale UND die Bestellung gehört zu genau der Zahlung der Erstattung
+ * (beides in der WHERE-Klausel). Stripe wird gefragt, ob es außer der
+ * gescheiterten noch eine zählende Erstattung gibt (eine Seite, mit
+ * `STRIPE_OPTIONEN`) — dann bleibt alles, wie es ist, und es wird gemeldet.
+ * Genau einmal: Der Zahlstand wird bedingt auf REFUNDED umgestellt, der
+ * Meldevermerk in derselben Transaktion angelegt; jede weitere Zustellung
+ * findet PAID („schon erledigt") und den Vermerk.
+ */
+async function nimmGescheiterteVollerstattungZurueck(
+  refund: Stripe.Refund,
+  paymentIntentId: string | null
+): Promise<GescheitertAusgang> {
+  const orderId = refund.metadata?.orderId
+  const bestellung =
+    orderId && paymentIntentId
+      ? await prisma.order.findFirst({
+          where: { id: orderId, stripePaymentIntentId: paymentIntentId },
+          select: { ...BESTELLBEZUG, status: true, paymentStatus: true, totalAmount: true, serviceFeeCents: true },
+        })
+      : null
+  if (!bestellung || !paymentIntentId) return fremd(paymentIntentId)
+
+  // Stripe erst hier laden: Die Datei hängt über die Bestell-Actions an Seiten,
+  // die das SDK sonst beim Start mitziehen (Nachtlauf Nr. 31).
+  const { stripe } = await import('@/lib/stripe')
+  const liste = await stripe.refunds.list({ payment_intent: paymentIntentId, limit: SEITE }, STRIPE_OPTIONEN)
+  // Mehr als eine Seite: kein vollständiges Bild — wie ladeStripeStand „unklar".
+  if (liste.has_more) return { art: 'unklar', bestellung: bezug(bestellung), grund: 'stripe_mehr_als_eine_seite' }
+  // Die Erstattung des Ereignisses zählt nie mit, auch wenn die Liste sie
+  // noch als `pending` führt — das Ereignis ist verbindlich.
+  const andereZaehlendeErstattungen = liste.data.some((r) => r.id !== refund.id && erstattungZaehlt(r.status))
+
+  const entscheidung = zuruecknahmeNachGescheiterterVollerstattung({
+    status: bestellung.status,
+    paymentStatus: bestellung.paymentStatus,
+    erstattetCentsDatenbank: bestellung.erstattetCents,
+    bezahltDatenbankCents: alsCents(bestellung.totalAmount) + bestellung.serviceFeeCents,
+    gescheitertCents: refund.amount,
+    andereZaehlendeErstattungen,
+  })
+  if (entscheidung.art === 'schon_erledigt') return { art: 'schon_erledigt', bestellung: bezug(bestellung) }
+  if (entscheidung.art === 'unklar') return { art: 'unklar', bestellung: bezug(bestellung), grund: 'vollstorno_passt_nicht' }
+
+  await prisma.$transaction(async (tx) => {
+    // Bedingt auf genau den gelesenen Stand: storniert, erstattet, nichts
+    // teilerstattet. Eine gleichzeitige Zustellung war schneller → werfen,
+    // Stripe stellt erneut zu und findet „schon erledigt".
+    const { count } = await tx.order.updateMany({
+      where: { id: bestellung.id, status: 'CANCELLED', paymentStatus: 'REFUNDED', erstattetCents: 0 },
+      data: { paymentStatus: 'PAID' },
+    })
+    if (count !== 1) throw new Error('Vollerstattung gescheitert: Bestellung hat sich inzwischen geändert')
+    await tx.webhookEvent.createMany({
+      data: [{ stripeEventId: meldeVermerk(refund.id), type: MELDE_VERMERK_TYP }],
+      skipDuplicates: true,
+    })
+  })
+
+  return {
+    art: 'zurueckgenommen',
+    bestellung: bezug(bestellung),
+    anlass: ANLASS_VOLLSTORNO,
+    vorherCents: bestellung.erstattetCents,
+    nachherCents: bestellung.erstattetCents,
+    zahlungWiederOffen: true,
   }
 }
 

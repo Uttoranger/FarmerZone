@@ -7,7 +7,6 @@ import { sendFreischaltungEmail } from '@/lib/email'
 import {
   FARM_REJECT_APPROVED_MESSAGE,
   FARM_REJECT_HAS_DATA_MESSAGE,
-  FARM_REJECT_OWNER_HAS_ORDERS_MESSAGE,
   FARM_REJECT_OWNER_IS_ADMIN_MESSAGE,
 } from '@/lib/farm-approval'
 import { servicegebuehrEinstellungSchema } from '@/schemas/servicegebuehr'
@@ -112,7 +111,7 @@ export async function revokeFarmApprovalAction(farmId: string): Promise<{ error?
  * Gegen die Karteileichen, die Bot-Anmeldungen hinterlassen.
  *
  * Abgrenzung zu revokeFarmApprovalAction: Zurücknehmen macht unsichtbar und
- * löscht nichts. Diese Aktion ist endgültig — deshalb hängen vier Guards davor.
+ * löscht nichts. Diese Aktion ist endgültig — deshalb hängen drei Guards davor.
  *
  * Warum überhaupt Guards und nicht einfach `farm.delete`: Die Fremdschlüssel
  * geben das Löschen nicht her (belegt in prisma/migrations/0_init/migration.sql).
@@ -120,10 +119,11 @@ export async function revokeFarmApprovalAction(farmId: string): Promise<{ error?
  *                        lässt sich gar nicht löschen, die DB bricht ab.
  *   OrderItem.productId→ ON DELETE RESTRICT (:449)  dasselbe für die Produkte,
  *                        die per Cascade am Hof hängen.
- *   Order.customerId   → ON DELETE SET NULL (:443)  das Löschen des Users würde
- *                        die Kundenzuordnung fremder Bestellungen STILL kappen.
- * Die ersten beiden wären ein lauter Fehler, der dritte ein leiser Datenverlust.
- * Also wird vorher geprüft statt hinterher aufgeräumt.
+ *   Order.customerId   → ON DELETE SET NULL (:443)  das Löschen des Users kappt
+ *                        die Konto-Verknüpfung alter Bestellungen. Seit E8 liest
+ *                        sie niemand mehr — deshalb keine Sperre (Register B4).
+ * Die ersten beiden wären ein lauter Fehler. Also wird vorher geprüft statt
+ * hinterher aufgeräumt.
  *
  * Reihenfolge beim Löschen ist Pflicht: erst der Hof, dann der User —
  * Farm.ownerId steht ebenfalls auf RESTRICT (:431). Alles Übrige hängt an
@@ -167,15 +167,11 @@ export async function rejectFarmAction(farmId: string): Promise<{ error?: string
     if (positionen > 0) return { error: FARM_REJECT_HAS_DATA_MESSAGE }
   }
 
-  // 4. Keine Bestellungen am Inhaber-Konto — sonst kappt SET NULL still die
-  //    Kundenzuordnung von Bestellungen, die diesen Hof gar nichts angehen.
-  //    Seit E8 (Nr. 17a) hängt der Checkout keine Bestellung mehr an ein Konto;
-  //    verknüpft sind nur noch Bestellungen aus der Zeit davor. Die Sperre
-  //    bleibt bewusst: Sie fasst keine Altdaten an (keine Datenänderung ohne
-  //    Auftrag). Bewusst NICHT nach der Adresse zählen — dann sperrte jede
-  //    Gast-Bestellung unter der Adresse des Inhabers das Ablehnen.
-  const eigeneBestellungen = await prisma.order.count({ where: { customerId: farm.ownerId } })
-  if (eigeneBestellungen > 0) return { error: FARM_REJECT_OWNER_HAS_ORDERS_MESSAGE }
+  // Bestellungen am Inhaber-Konto sperren NICHT (mehr) (Register B4, Nr. 27):
+  // Seit E8 (Nr. 17a) hängt der Checkout keine Bestellung an ein Konto, und
+  // niemand liest `customerId` (Leser gehen nach `customerEmail`). Verknüpft
+  // sind nur Altbestellungen; SET NULL kappt beim Löschen diese tote
+  // Verknüpfung, die Bestellungen selbst bleiben unverändert stehen.
 
   // StockReservation hat als einzige Tabelle KEINEN Fremdschlüssel auf Product
   // (prisma/schema.prisma:387–397: productId ist ein blankes String-Feld).

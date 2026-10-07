@@ -102,6 +102,22 @@ function merkmal(orderId: string, anlass: Anlass, positionId: string | null, art
   return { orderId, anlass, art, ...(positionId ? { positionId } : {}) }
 }
 
+/** Anlass der Vollerstattung beim Storno (reverse_transfer, Nr. 27). */
+export const ANLASS_VOLLSTORNO = 'vollstorno'
+
+/**
+ * Die Merkmale der Vollerstattung — dasselbe Muster wie bei der
+ * Teilerstattung (`merkmal`): Bestellung, Anlass, Art. Damit erkennt der
+ * Webhook eine später gescheiterte Vollerstattung als nachweislich unsere
+ * Buchung (src/server/erstattung-gescheitert.ts). Bewusst KEIN `Anlass`:
+ * `ordneZu` ordnet sie nie einem Teil- oder Rest-Storno zu — taucht sie
+ * neben einem solchen auf, bleibt das Bild „unklar" und es wird nichts
+ * gebucht, wie bisher bei der Vollerstattung ohne Merkmale.
+ */
+export function vollstornoMerkmal(orderId: string): Stripe.Metadata {
+  return { orderId, anlass: ANLASS_VOLLSTORNO, art: 'kunde' }
+}
+
 /**
  * Eine Buchung dieser Bestellung zuordnen — oder null (= unklar). Teilstorno
  * braucht eine Position; das Format vor Nachbesserung 1 (`grund:
@@ -193,7 +209,7 @@ export async function erstatteKundin(
     { ...STRIPE_OPTIONEN, idempotencyKey: e.schluessel }
   )
   if (!erstattungZaehlt(erstattung.status)) {
-    throw new StripeStandUnklar('erstattung_gescheitert', { orderId: e.orderId, status: erstattung.status ?? 'unbekannt' })
+    throw new StripeStandUnklar('erstattung_gescheitert', { orderId: e.orderId, status: erstattung.status ?? 'unbekannt', refundId: erstattung.id })
   }
   stand.erstattungen.push({ anlass: e.anlass, positionId: e.positionId, betrag: erstattung.amount })
   return { erstattetCents: erstattung.amount, nachgetragen: false }
