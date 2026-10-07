@@ -92,7 +92,7 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Entscheidung:** Mein Hof hat die Reiter Hofseite | Beiträge. `/status` bleibt als Route und wird von dort verlinkt.
 - **Begründung:** Mein-Hof-Umbau „mach es so".
 - **Dateien:** `src/app/(hof)/farm-page/`, `src/components/mein-hof/` (#180).
-- **Stand:** Nr. 22e (07.10.2026): Der Reiter „Beiträge" kann alles, was `/status` konnte (Deaktivieren, Löschen, Als Vorlage, WhatsApp fortsetzen); `/status` bleibt als Route und leitet auf den Reiter um (freigabe.md §9 „22e"), `/status/new` und WhatsApp fortsetzen liegen in der HofShell (Bericht 22e).
+- **Stand:** Nr. 22e (07.10.2026): Der Reiter „Beiträge" bietet alle Handlungen von `/status` (Deaktivieren, Löschen, Als Vorlage, WhatsApp fortsetzen); `/status` bleibt als Route und leitet auf den Reiter um (freigabe.md §9 „22e" — Lesart „bleibt und leitet um" zur Bestätigung, Bericht 22e (a)), `/status/new` und WhatsApp fortsetzen liegen in der HofShell (Bericht 22e).
 
 ### E13 · „Verkauf eintragen" bleibt im Neu-Menü (02.10.2026)
 - **Entscheidung:** Die bestehende Funktion bleibt erhalten und steht im Neu-Menü. Das Formular wird nur ins neue Design gezogen.

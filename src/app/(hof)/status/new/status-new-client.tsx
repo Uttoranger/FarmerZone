@@ -365,7 +365,7 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
             {/* A2: orange CTA, A3: always clickable — validates on click */}
             <button
               onClick={handleTryNext}
-              className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors"
+              className={cn('w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors', FOKUS_RAHMEN)}
             >
               Weiter zu Empfängern
               <ArrowRight className="size-4" aria-hidden="true" />
@@ -440,7 +440,7 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
             {/* A2: orange CTA */}
             <button
               onClick={() => setStep(3)}
-              className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors"
+              className={cn('w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors', FOKUS_RAHMEN)}
             >
               Vorschau ansehen
               <ArrowRight className="size-4" aria-hidden="true" />
@@ -528,7 +528,7 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
             <button
               onClick={handlePublish}
               disabled={pending}
-              className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+              className={cn('w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2', FOKUS_RAHMEN)}
             >
               {pending ? 'Wird versendet…' : 'Versand starten'}
             </button>

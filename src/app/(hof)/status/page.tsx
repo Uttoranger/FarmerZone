@@ -3,8 +3,8 @@ import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
 
 /*
  * /status leitet in den Reiter „Beiträge" von Mein Hof um (Register E12,
- * Nachtlauf Nr. 22e). Der Reiter kann seit Nr. 22e alles, was diese Seite
- * konnte (Deaktivieren, Löschen, Als Vorlage, WhatsApp fortsetzen) — zwei
+ * Nachtlauf Nr. 22e). Der Reiter bietet seit Nr. 22e alle Handlungen dieser
+ * Seite (Deaktivieren, Löschen, Als Vorlage, WhatsApp fortsetzen) — zwei
  * Listen derselben Beiträge liefen auseinander.
  *
  * Warum die Route bleibt statt zu verschwinden: Lesezeichen, die installierte
