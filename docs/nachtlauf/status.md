@@ -55,6 +55,6 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 36 | BAES-Angaben | fertig (PR #214) | `nacht/2026-10-07/36-baes` | #214 | main | Textänderung zum Gegenlesen (§ 8 Abs. 7 FMV); keine Migration | 07.10.2026 |
 | 37 | Sentry ohne IP-Adressen | fertig (PR #215) | `nacht/2026-10-07/37-sentry-ip` | #215 | main | Sicherheitspfad, zwei Runden, Nachprüfung; Dashboard-Einstellung prüft der Mensch; keine Migration | 07.10.2026 |
 | 38 | Double-Opt-in (S11) | läuft | `nacht/2026-10-07/38-double-opt-in` | | main | | 07.10.2026 |
-| 39 | Direktverkauf senkt den Vorrat (D1) | läuft | `nacht/2026-10-07/39-direktverkauf-vorrat` | | main | | 07.10.2026 |
-| 40 | Rate-Limit über die Datenbank (R1) | offen | | | main | | |
+| 39 | Direktverkauf senkt den Vorrat (D1) | fertig (PR #216) | `nacht/2026-10-07/39-direktverkauf-vorrat` | #216 | main | Annahmen zur Freigabe (Grundeinheit, auf 0, Aufrunden); keine Migration | 07.10.2026 |
+| 40 | Rate-Limit über die Datenbank (R1) | läuft | `nacht/2026-10-07/40-rate-limit-db` | | main | | 07.10.2026 |
 | Sammel | Sammel-PR Lauf 7 | offen | `integration/lauf7` | | main | | |
