@@ -22,7 +22,8 @@ export const dynamic = 'force-dynamic'
  * gebaut nach docs/ai/DESIGN_SYSTEM.md, Abschnitt „Verkäufe". Die Shell kommt
  * aus dem Layout der Routengruppe (hof). Alles nur für den eigenen Hof
  * (farmId); an den Browser gehen nur Text und Zahlen (Zeilen in Cent, Tage
- * nach Wiener Zeit, Produkte nur mit Kennung, Name und Einheit).
+ * nach Wiener Zeit, Produkte nur mit Kennung, Name, Einheit, Gebindegröße und
+ * Vorrat — für den Schalter „Vorrat abziehen“, Nr. 39).
  */
 export default async function SalesPage(): Promise<React.JSX.Element> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -41,7 +42,7 @@ export default async function SalesPage(): Promise<React.JSX.Element> {
     ])
     daten = {
       overview,
-      produkte: produkte.map((p) => ({ id: p.id, name: p.name, unit: p.unit })),
+      produkte: produkte.map((p) => ({ id: p.id, name: p.name, unit: p.unit, unitSize: p.unitSize, stock: p.stock })),
       topProduktIds,
       stripeReady,
     }
