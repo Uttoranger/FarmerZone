@@ -195,6 +195,8 @@ describe('Mail-Link (GET /api/orders/confirm/[token]) — leitet nur weiter', ()
     await klick()
 
     expect(updateMany).not.toHaveBeenCalled()
+    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
+    await vi.dynamicImportSettled()
     expect(sendOrderConfirmation).not.toHaveBeenCalled()
     expect(nachlauf).toHaveLength(0)
   })
@@ -331,6 +333,8 @@ describe('Knopf „Ja, ich hole verbindlich ab" — bestaetigeBarBestellung', ()
   it('Mails erst nach der Antwort — an Kundin und Hof, je einmal', async () => {
     await weiterleitungVon(bestaetigeBarBestellung({}, formular()))
 
+    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
+    await vi.dynamicImportSettled()
     expect(sendOrderConfirmation).not.toHaveBeenCalled()
     expect(sendOrderConfirmedToFarmer).not.toHaveBeenCalled()
 

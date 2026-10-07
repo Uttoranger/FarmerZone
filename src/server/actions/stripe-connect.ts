@@ -4,7 +4,6 @@ import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { stripe } from '@/lib/stripe'
 import { stripeKontoBereit } from '@/lib/stripe-konto'
 import { APP_URL } from '@/lib/umgebung-server'
 
@@ -41,6 +40,9 @@ export async function createConnectAccount(): Promise<{ error?: string }> {
 
   const publicUrl = getPublicUrl()
 
+  // Stripe erst im Aufruf (Nr. 31): /settings/payments und /sales binden
+  // diese Actions ein und zögen das SDK sonst in jeden Kaltstart.
+  const { stripe } = await import('@/lib/stripe')
   const account = await stripe.accounts.create({
     type: 'express',
     country: 'AT',
@@ -76,6 +78,7 @@ export async function createOnboardingLink(): Promise<{ url?: string; error?: st
   // AccountLink return/refresh URLs are browser redirects — Stripe allows http://localhost in test mode
   const returnPath = `/api/stripe/return?account_id=${farm.stripeAccountId}`
 
+  const { stripe } = await import('@/lib/stripe')
   const link = await stripe.accountLinks.create({
     account: farm.stripeAccountId,
     refresh_url: `${APP_URL}${returnPath}`,
@@ -93,6 +96,7 @@ export async function checkConnectStatus(): Promise<{ ready: boolean; error?: st
     return { ready: false }
   }
 
+  const { stripe } = await import('@/lib/stripe')
   const account = await stripe.accounts.retrieve(farm.stripeAccountId)
   // Dieselbe Regel wie account.updated (src/lib/stripe-konto.ts).
   const ready = stripeKontoBereit(account)
@@ -118,6 +122,7 @@ export async function createStripeDashboardLinkAction(): Promise<{ url?: string;
     if (!farm.stripeAccountId || !farm.stripeAccountReady) {
       return { error: 'Stripe ist noch nicht eingerichtet' }
     }
+    const { stripe } = await import('@/lib/stripe')
     const link = await stripe.accounts.createLoginLink(farm.stripeAccountId)
     return { url: link.url }
   } catch (err) {

@@ -155,6 +155,8 @@ describe('markAsNotPickedUp — bar', () => {
     expect(daten[0]).toEqual({ status: 'NOT_PICKED_UP' })
     expect(daten[1]).toEqual({ serviceFeeRefundedAt: expect.any(Date) })
     expect(refundCreate).not.toHaveBeenCalled()
+    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
+    await vi.dynamicImportSettled()
     expect(sendOrderCancelled).not.toHaveBeenCalled()
   })
 
@@ -302,6 +304,9 @@ describe('cancelOrder — Gebühren-Vermerk bei Storno', () => {
     expect(stornoDaten().at(-1)).toEqual(
       expect.objectContaining({ status: 'CANCELLED', serviceFeeRefundedAt: expect.any(Date) })
     )
-    expect(sendOrderCancelled).toHaveBeenCalledWith(expect.objectContaining({ serviceFeeCents: 98 }), 20.98, undefined)
+    // Die Mail läuft nach der Antwort und lädt den Versand erst dann (Nr. 31) — also abwarten.
+    await vi.waitFor(() =>
+      expect(sendOrderCancelled).toHaveBeenCalledWith(expect.objectContaining({ serviceFeeCents: 98 }), 20.98, undefined)
+    )
   })
 })
