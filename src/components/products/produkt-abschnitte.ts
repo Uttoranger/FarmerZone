@@ -7,6 +7,7 @@ import type { FieldErrors } from 'react-hook-form'
 import type { z } from 'zod'
 import { PRODUKT_FELD_REIHENFOLGE, type ProductFormData } from '@/schemas/product'
 import { UNTERKATEGORIE_LABEL, type ProductSubcategoryValue } from '@/lib/taxonomie'
+import { SPEICHERN_NICHT_IM_SHOP } from '@/lib/produkt-sichtbarkeit'
 
 export const ABSCHNITTE = ['grunddaten', 'preis', 'details', 'kennzeichnung'] as const
 export type Abschnitt = (typeof ABSCHNITTE)[number]
@@ -161,7 +162,7 @@ export function speichernText(fehlend: number, bearbeiten: boolean, sichtbar?: b
   // Im neuen Design (Mockup mobil-h2-neues-produkt, Nr. 18) sagt der Knopf,
   // was danach passiert: sichtbar geht es sofort auf die Hofseite.
   if (sichtbar === undefined) return 'Anlegen'
-  return sichtbar ? 'Produkt veröffentlichen' : 'Als Entwurf speichern'
+  return sichtbar ? 'Produkt veröffentlichen' : SPEICHERN_NICHT_IM_SHOP
 }
 
 /** Der Titel des Produktdialogs — beim Anlegen nach der Wahl aus „Was legst du an?". */

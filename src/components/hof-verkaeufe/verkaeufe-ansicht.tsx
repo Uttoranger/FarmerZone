@@ -7,7 +7,7 @@ import { ChevronRight, ExternalLink, Pencil, Plus, ReceiptText, ShoppingCart, Tr
 import { createStripeDashboardLinkAction } from '@/server/actions/stripe-connect'
 import { deleteManualSale } from '@/server/actions/manual-sales'
 import type { SalesOverview } from '@/server/queries/manual-sales'
-import { kanalText, wiederholVorlagen, type VerkaufDaten, type VerkaufProdukt, type VerkaufsZeile } from '@/lib/hof-verkaeufe'
+import { JAHRESSUMME_TEXT, kanalText, wiederholVorlagen, type VerkaufDaten, type VerkaufProdukt, type VerkaufsZeile } from '@/lib/hof-verkaeufe'
 import { centsAlsEuro, formatEuro } from '@/lib/format'
 import { useUrlAuftrag } from '@/lib/use-url-auftrag'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -76,7 +76,9 @@ export function VerkaeufeAnsicht({ overview, produkte, topProduktIds, stripeRead
         <div className={cn(KARTE, 'p-4 md:p-5')}>
           <p className={cn('text-[13px]', LEISE)}>Diese Woche</p>
           <p className="mt-1 font-heading text-4xl font-semibold text-foreground tabular-nums md:text-[40px]">{formatEuro(overview.weekTotal)}</p>
-          <p className={cn('mt-1 text-[13px]', LEISE)}>Gesamt: {formatEuro(overview.ytdTotal)}</p>
+          <p className={cn('mt-1 text-[13px]', LEISE)}>
+            {`${JAHRESSUMME_TEXT}: ${formatEuro(overview.ytdTotal)}`}
+          </p>
         </div>
         <Kennzahl titel="Online bezahlt" betrag={overview.weekOnline} satz="Über FarmerZone bezahlte, abgeholte Bestellungen." />
         <Kennzahl titel="Bar kassiert" betrag={overview.weekBar} satz="Vor Ort kassierte Abholungen plus deine Direktverkäufe." />

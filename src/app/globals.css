@@ -128,7 +128,11 @@
      braucht. Hell = dasselbe Waldgrün wie --primary. */
   --brand-text: oklch(0.30 0.082 155);
 
-  --destructive: oklch(0.577 0.245 27.325);
+  /* #C91018 — Fehler-Rot. Register O1 (Nr. 28): mindestens 4,5:1 auf jedem
+     hellen Grund — der shadcn-Wert (#E7000B) erreichte auf dem Crème des
+     neuen Designs nur 4,22:1. Jetzt 5,20 (Grund neu) bis 5,88 (weiße Karte);
+     tests/fehler-farbe-kontrast.test.ts rechnet nach. */
+  --destructive: oklch(0.53 0.21 27.325);
 
   /* Warm-Grau Border */
   --border: oklch(0.90 0.012 85);
@@ -277,6 +281,7 @@
   /* Helles Salbeigrün: Waldgrün wäre auf dunklem Grund unlesbar. */
   --brand-text: oklch(0.82 0.045 148);
 
+  /* #FF6467 — hält auf allen dunklen Gründen 6,09:1 oder mehr (O1). */
   --destructive: oklch(0.704 0.191 22.216);
   /* Etwas kräftiger als im Tag-Modus, weil Karte und Grund im Dunkeln nur
      1,1:1 auseinanderliegen — der Rahmen trägt hier die ganze Abgrenzung. */

@@ -10,7 +10,7 @@ import { ladeFotoHoch, pruefeLesbarkeit, stufenText, type UploadStufe } from '@/
 import { useFotoQuellen, type FotoAuswahl } from '@/components/shared/foto-quellen'
 import { ordneLeseFehler, type LeseDiagnose, type UploadDiagnose } from '@/lib/upload-diagnose'
 import { bildFehlerArtVon, bildFehlerMeldung, karteText } from '@/lib/upload-fehler'
-import { IM_SHOP, NICHT_IM_SHOP } from '@/lib/produkt-sichtbarkeit'
+import { IM_SHOP, NICHT_IM_SHOP, NICHT_IM_SHOP_IM_SATZ } from '@/lib/produkt-sichtbarkeit'
 import { meldeUploadFehler } from '@/lib/upload-meldung'
 import { leseAusgangVon, naechsterSchritt } from '@/lib/foto-wege'
 import { MAX_ORIGINAL_BYTES } from '@/lib/upload-pfade'
@@ -283,7 +283,7 @@ function zusammenfassung(abschnitt: Abschnitt, w: ProductFormData): string {
     case 'preis': {
       const preis = Number.isFinite(w.price) ? w.price : 0
       const teile = [formatGrundpreis(preis, w.unit, w.unitSize), `${Number.isFinite(w.stock) ? w.stock : 0} auf Lager`]
-      if (!w.isAvailable) teile.push('ausgeblendet')
+      if (!w.isAvailable) teile.push(NICHT_IM_SHOP_IM_SATZ)
       return teile.join(' · ')
     }
     case 'details': {

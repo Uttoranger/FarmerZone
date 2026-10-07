@@ -54,7 +54,7 @@ const db = vi.hoisted(() => ({
 vi.mock('@/lib/prisma', () => ({ prisma: db }))
 
 import { HOF_NEU } from '@/lib/bauern-navigation'
-import { verkaufsZeilen, wiederholVorlagen, type FeedVerkauf, type VerkaufDaten } from '@/lib/hof-verkaeufe'
+import { JAHRESSUMME_TEXT, verkaufsZeilen, wiederholVorlagen, type FeedVerkauf, type VerkaufDaten } from '@/lib/hof-verkaeufe'
 import { mergeSalesFeed, type SalesFeedOrder } from '@/lib/sales-summary'
 import { manualSaleFormSchema } from '@/schemas/manual-sale'
 import { NOTIZ_MAX, PRODUKTNAME_MAX, VERKAUF_BETRAG_MAX, VERKAUF_MENGE_MAX, ZU_LANG } from '@/lib/eingabegrenzen'
@@ -385,6 +385,25 @@ describe('Ansicht /sales — vier Zustände, lange Namen, Tokens', () => {
     expect(html).toContain('Auszahlungen bei Stripe ansehen')
     expect(symboleVersteckt(html)).toBe(true)
     expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|green-|amber-|red-|app-ink/)
+  })
+
+  it('F6 (22b): unter der Wochenzahl „Dieses Jahr (für die Umsatzgrenze)" statt „Gesamt"', () => {
+    const html = renderToStaticMarkup(createElement(VerkaeufeAnsicht, props()))
+    expect(JAHRESSUMME_TEXT).toBe('Dieses Jahr (für die Umsatzgrenze)')
+    expect(html).toContain(`${JAHRESSUMME_TEXT}: ${formatEuro(1234.5)}`)
+    expect(html).not.toContain('Gesamt')
+  })
+
+  it('F6 (22b): „Verkauf eintragen" steht in allen Breiten als Knopf im Kopf, auch am Handy', () => {
+    const html = renderToStaticMarkup(createElement(VerkaeufeAnsicht, props()))
+    const kopf = html.slice(html.indexOf('<header'), html.indexOf('</header>'))
+    const knopf = kopf.match(/<button[^>]*>(?:(?!<\/button>)[\s\S])*Verkauf eintragen<\/button>/)
+    expect(knopf, 'Knopf im Kopf').not.toBeNull()
+    // Keine Klasse, die ihn unter einer Breite versteckt (wie „+ Neues Produkt" erst ab 768 px).
+    expect(knopf![0]).not.toMatch(/(?:^|[\s"])(?:hidden|sr-only|max-md:hidden|max-sm:hidden)(?=[\s"])/)
+    expect(knopf![0]).toContain('bg-primary')
+    // Gegenprobe: Die Suche fände ein verstecktes Element.
+    expect('<button class="hidden md:inline-flex">').toMatch(/(?:^|[\s"])(?:hidden|sr-only|max-md:hidden|max-sm:hidden)(?=[\s"])/)
   })
 
   it('ohne Stripe kein Auszahlungs-Link', () => {

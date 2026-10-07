@@ -6,11 +6,12 @@
  *
  * Der Zustand eines Produkts kommt weiter aus `produktZustand`
  * (produkt-sichtbarkeit.ts) — hier stehen nur die Wörter des Mockups dazu:
- * Sichtbar, Nur noch N, Ausverkauft, Entwurf. „Entwurf" ist ein Produkt, das
- * der Hof ausgeblendet hat (isAvailable = false); eine eigene Spalte dafür
- * gibt es nicht.
+ * Sichtbar, Nur noch N, Ausverkauft, Nicht im Shop. „Nicht im Shop" ist ein
+ * Produkt, das der Hof ausgeblendet hat (isAvailable = false); eine eigene
+ * Spalte dafür gibt es nicht. Das Wort gilt seit Nr. 28 (Register B2); der
+ * Filterwert in der Adresse bleibt `entwuerfe`, damit alte Links gelten.
  */
-import { produktZustand } from '@/lib/produkt-sichtbarkeit'
+import { NICHT_IM_SHOP, produktZustand } from '@/lib/produkt-sichtbarkeit'
 import { formatMenge, formatZahl, mitAnzahl } from '@/lib/format'
 import { istFuttermittel, type ProductCategoryValue } from '@/lib/taxonomie'
 import { abholungText, type NaechstesFenster } from '@/lib/heute'
@@ -25,7 +26,7 @@ export type ProduktStatusTon = 'offen' | 'fertig' | 'neutral'
 export type ProduktStatus = { text: string; ton: ProduktStatusTon }
 
 /**
- * Die Marke einer Zeile. Reihenfolge wie produktZustand: „Entwurf" sticht
+ * Die Marke einer Zeile. Reihenfolge wie produktZustand: „Nicht im Shop" sticht
  * „Ausverkauft" — ein ausgeblendetes Produkt ist für Kunden gar nicht da.
  * „N Größen warten auf Meldung" gehört zu Gate 6 (Futter-Sperre je Gebinde)
  * und kommt mit Nr. 20.
@@ -34,7 +35,7 @@ export function produktStatus(p: { isAvailable: boolean; stock: number }): Produ
   const zustand = produktZustand(p)
   switch (zustand.art) {
     case 'nicht-im-shop':
-      return { text: 'Entwurf', ton: 'neutral' }
+      return { text: NICHT_IM_SHOP, ton: 'neutral' }
     case 'ausverkauft':
       return { text: 'Ausverkauft', ton: 'neutral' }
     case 'knapp':
@@ -63,7 +64,8 @@ export const PRODUKTE_FILTER_LABEL: Record<ProdukteFilter, string> = {
   lebensmittel: 'Lebensmittel',
   futter: 'Futtermittel',
   brennmaterial: 'Brennmaterial',
-  entwuerfe: 'Entwürfe',
+  // Der Wert heißt weiter `entwuerfe` (Adresse, alte Links) — nur das Wort ist neu (B2).
+  entwuerfe: NICHT_IM_SHOP,
 }
 
 /**
@@ -136,7 +138,7 @@ export function istWiederDa(vorher: number, jetzt: number): boolean {
 /**
  * Darf der Moment kommen? Nur, wenn Kunden die Ware auch sehen: Hof sichtbar
  * (heuteHofSichtbar — freigegeben, nicht pausiert, nicht stillgelegt) und
- * Produkt sichtbar. Ein Teilen-Aufruf zu einem Entwurf oder einem pausierten
+ * Produkt sichtbar. Ein Teilen-Aufruf zu einem Produkt, das nicht im Shop steht, oder einem pausierten
  * Hof führte ins Leere.
  */
 export function wiederDaMomentMoeglich(m: { hofSichtbar: boolean; produktSichtbar: boolean; wiederDa: boolean }): boolean {

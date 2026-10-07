@@ -6,9 +6,10 @@
  * mobil-h2-gespeichert-teilen).
  *
  * Beweist:
- *  - Status einer Zeile: Sichtbar, Nur noch N, Ausverkauft, Entwurf — dieselbe
- *    Reihenfolge wie produktZustand („Entwurf" sticht „Ausverkauft").
- *  - Filter (Alle, Lebensmittel, Futtermittel, Brennmaterial, Entwürfe) und
+ *  - Status einer Zeile: Sichtbar, Nur noch N, Ausverkauft, Nicht im Shop —
+ *    dieselbe Reihenfolge wie produktZustand („Nicht im Shop" sticht
+ *    „Ausverkauft"); das Wort kommt aus EINER Quelle (NICHT_IM_SHOP, Register B2).
+ *  - Filter (Alle, Lebensmittel, Futtermittel, Brennmaterial, Nicht im Shop) und
  *    Suche: aus der Adresse über Zod, Ungültiges fällt still weg.
  *  - Kopfzeile „6 Produkte · 5 sichtbar".
  *  - Vorrat: Schema nur ganze Zahlen ≥ 0 bis VORRAT_MAX; ein Altbestand darüber
@@ -78,6 +79,7 @@ import {
   wiederDaOeffnen,
   wiederDaSchluessel,
 } from '@/lib/wieder-da-moment'
+import { NICHT_IM_SHOP, SPEICHERN_NICHT_IM_SHOP } from '@/lib/produkt-sichtbarkeit'
 import { produkteAnsichtAus } from '@/schemas/produkte-filter'
 import { vorratSetzenSchema } from '@/schemas/vorrat'
 import { VORRAT_MAX } from '@/lib/eingabegrenzen'
@@ -94,15 +96,38 @@ type P = { isAvailable: boolean; stock: number; category: ProductCategoryValue |
 const p = (teil: Partial<P> = {}): P => ({ isAvailable: true, stock: 20, category: 'EIER', name: 'Freilandeier', ...teil })
 
 describe('produktStatus — vier Zustände wie im Mockup', () => {
-  it('Sichtbar (grün), Nur noch N (orange), Ausverkauft und Entwurf (neutral)', () => {
+  it('Sichtbar (grün), Nur noch N (orange), Ausverkauft und Nicht im Shop (neutral)', () => {
     expect(produktStatus(p({ stock: 24 }))).toEqual({ text: 'Sichtbar', ton: 'fertig' })
     expect(produktStatus(p({ stock: 3 }))).toEqual({ text: 'Nur noch 3', ton: 'offen' })
     expect(produktStatus(p({ stock: 0 }))).toEqual({ text: 'Ausverkauft', ton: 'neutral' })
-    expect(produktStatus(p({ isAvailable: false, stock: 24 }))).toEqual({ text: 'Entwurf', ton: 'neutral' })
+    expect(produktStatus(p({ isAvailable: false, stock: 24 }))).toEqual({ text: 'Nicht im Shop', ton: 'neutral' })
   })
 
-  it('Entwurf sticht Ausverkauft — ausgeblendet ist für Kunden gar nicht da', () => {
-    expect(produktStatus(p({ isAvailable: false, stock: 0 })).text).toBe('Entwurf')
+  it('Nicht im Shop sticht Ausverkauft — ausgeblendet ist für Kunden gar nicht da', () => {
+    expect(produktStatus(p({ isAvailable: false, stock: 0 })).text).toBe('Nicht im Shop')
+  })
+
+  it('B2: Marke, Filter und Speichern-Knopf nehmen das Wort aus EINER Quelle', () => {
+    expect(produktStatus(p({ isAvailable: false })).text).toBe(NICHT_IM_SHOP)
+    expect(PRODUKTE_FILTER_LABEL.entwuerfe).toBe(NICHT_IM_SHOP)
+    expect(speichernText(0, false, false)).toBe(SPEICHERN_NICHT_IM_SHOP)
+  })
+
+  it('B2: kein „Entwurf" mehr in den Texten rund um Produkte', () => {
+    const dateien = [
+      'src/lib/produkte-hof.ts',
+      'src/lib/produkt-sichtbarkeit.ts',
+      'src/components/produkte/produkte-ansicht.tsx',
+      'src/components/produkte/vorrat-feld.tsx',
+      'src/components/produkte/wieder-da-moment.tsx',
+      'src/components/products/product-dialog.tsx',
+      'src/components/products/produkt-abschnitte.ts',
+      'src/components/products/im-shop-schalter.tsx',
+    ]
+    for (const datei of dateien) expect(quelle(datei), datei).not.toMatch(/Entw(?:u|ü)rf/)
+    // Gegenprobe: Die Suche schlägt bei beiden Formen an, nicht beim Filterwert der Adresse.
+    expect('Entwurf Entwürfe').toMatch(/Entw(?:u|ü)rf/)
+    expect('?filter=entwuerfe').not.toMatch(/Entw(?:u|ü)rf/)
   })
 })
 
@@ -129,7 +154,7 @@ describe('Filter und Suche', () => {
     expect(zaehleProdukteFilter([])).toEqual({ alle: 0, lebensmittel: 0, futter: 0, brennmaterial: 0, entwuerfe: 0 })
   })
 
-  it('zählt je Filter; Entwürfe sind die ausgeblendeten', () => {
+  it('zählt je Filter; „Nicht im Shop" sind die ausgeblendeten', () => {
     expect(zaehleProdukteFilter(liste)).toEqual({ alle: 5, lebensmittel: 3, futter: 1, brennmaterial: 1, entwuerfe: 1 })
     expect(passtZuProdukteFilter(p({ isAvailable: false }), 'entwuerfe')).toBe(true)
     expect(passtZuProdukteFilter(p(), 'entwuerfe')).toBe(false)
@@ -157,6 +182,8 @@ describe('Filter und Suche', () => {
     expect(produkteAnsichtAus(new URLSearchParams('filter=quatsch'))).toEqual({ filter: 'alle', suche: '' })
     expect(produkteAnsichtAus(new URLSearchParams(`suche=${'x'.repeat(200)}`)).suche).toBe('')
     expect(produkteAnsichtAus(new URLSearchParams(''))).toEqual({ filter: 'alle', suche: '' })
+    // B2 ändert nur das Wort: Alte Links mit dem Filterwert der Adresse gelten weiter.
+    expect(produkteAnsichtAus(new URLSearchParams('filter=entwuerfe'))).toEqual({ filter: 'entwuerfe', suche: '' })
   })
 
   it('die Adresse eines Filters behält die Suche, „Alle" ohne Parameter', () => {
@@ -379,7 +406,8 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
   it('gefüllt: Kopfzeile, vier Marken, Vorrat-Stepper, Schalter „Sichtbar", Hinweis unter der Tabelle', async () => {
     const html = await rendere(liste)
     expect(html).toContain('4 Produkte · 3 sichtbar')
-    for (const marke of ['Sichtbar', 'Nur noch 3', 'Ausverkauft', 'Entwurf']) expect(html).toContain(`>${marke}<`)
+    for (const marke of ['Sichtbar', 'Nur noch 3', 'Ausverkauft', 'Nicht im Shop']) expect(html).toContain(`>${marke}<`)
+    expect(html).not.toMatch(/Entw(?:u|ü)rf/)
     expect(html).toContain('aria-label="Vorrat Karotten"')
     expect(html).toContain('role="switch"')
     expect(html).toContain('aria-label="Freilandeier sichtbar"')
@@ -396,7 +424,7 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
     expect(html).toContain('line-clamp-2')
   })
 
-  it('Filter aus der Adresse: nur die Entwürfe', async () => {
+  it('Filter aus der Adresse (alter Wert entwuerfe): nur, was nicht im Shop steht', async () => {
     navigation.filter = 'entwuerfe'
     const html = await rendere(liste)
     navigation.filter = null
@@ -433,7 +461,7 @@ describe('Produktdialog im neuen Design', () => {
     expect(dialogTitel(false, null)).toBe('Neues Produkt')
     expect(dialogTitel(true, 'futter')).toBe('Produkt bearbeiten')
     expect(speichernText(0, false, true)).toBe('Produkt veröffentlichen')
-    expect(speichernText(0, false, false)).toBe('Als Entwurf speichern')
+    expect(speichernText(0, false, false)).toBe('Speichern (nicht im Shop)')
     expect(speichernText(2, false, true)).toBe('Noch 2 Angaben fehlen')
     expect(speichernText(0, true, true)).toBe('Speichern')
   })
