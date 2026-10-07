@@ -251,3 +251,59 @@ Nur Tatsachen korrigieren, keine neuen Rechtsformulierungen: Anmeldung per Code 
 
 ### Morgenbericht (`morgenbericht-<datum>-lauf6.md`)
 Je PR: Vorschau-Link, „enthält Migration: ja/nein", Basis, Merge-Reihenfolge (Merge-Commit, nicht Squash), „Für dich zu tun" (u. a. Heu-Produkte bestätigen, Höfe ohne Stripe ansprechen, Stripe-Events `refund.failed` und `charge.refund.updated`, EPS/Apple Pay/Google Pay, geänderte Stellen der Datenschutzerklärung prüfen lassen).
+
+## 11. Lauf 7 (uttoranger, im Chat erteilt)
+
+Entscheidungen im Register: S11, D1, R1, G3 (Sammel-PR).
+
+- **Haltepunkt:** der Sammel-PR (`integration/lauf7`).
+- **Reihenfolge (fest):** 34 (danach ggf. 34a, 34b … für Fehler aus dem Probelauf) → 35 → 36 → 37 → 38 → 39 → 40 → Sammel-PR.
+- **Vor jeder neuen Nummer** `origin/main` hineinholen.
+- **Migrationen:** nur bei 38 und 40, nur Expand, nach Regel 3. Entsteht anderswo eine: STOPP.
+- **Nachprüfung des Fix-Commits** nach Fixes im Geld- oder Sicherheitspfad (34a ff., 35, 37, 38, 40).
+- **In 34 niemals Produktion oder Live-Schlüssel.**
+- **Konflikte in Code:** diese Nummer stoppen, melden, mit der nächsten unabhängigen weitermachen.
+- **Checkliste je PR** (im PR-Text abhaken):
+  - [ ] Register und Freigabe decken den Inhalt ab
+  - [ ] `origin/main` vor dem Push hineingeholt
+  - [ ] `pnpm typecheck`, `pnpm lint` (kein neuer Befund), `pnpm test` grün
+  - [ ] `pnpm test:integration` grün, wenn Datenbank berührt
+  - [ ] Migration: ja/nein; wenn ja, nur Expand, SQL im PR-Text
+  - [ ] Geld nur als Int-Cent, Beträge nur serverseitig berechnet
+  - [ ] Keine personenbezogenen Daten oder Secrets in Code, Logs, Tests
+  - [ ] Neue Seiten: `loading.tsx`, beide Themes, 390 und 1440 px, Axe ohne Fehler, Touch-Ziele ≥ 44 px
+  - [ ] Texte aus einer Quelle, Deutsch, per Du
+  - [ ] `tester` und `pruefer` gelaufen, Befunde erledigt oder begründet
+  - [ ] Entwurf, wenn eine Vorbedingung offen ist
+
+### 34 Automatischer Probelauf (Gate 9a) als E2E-Tests in `tests/e2e/`
+- **Vorbedingung:** Die Vorschau-Umgebung nutzt die Entwicklungsdatenbank und Stripe im **Testmodus**. Ohne Werte auszugeben prüfen, dass der Stripe-Schlüssel der Vorschau mit `sk_test_` beginnt. Sonst: STOPP, Nummer 34 überspringen und melden. Niemals Live-Schlüssel, niemals Produktion.
+- Testhof im Stripe-Testmodus mit verbundenem Konto (per API im Testmodus anlegen oder vorhandenes nutzen), Seed-Daten aus `seed-daten.ts`.
+- Abläufe: (1) Online mit Testkarte, auch 3-D-Secure; (2) Wallet — falls im Browser nicht möglich, begründet auslassen; (3) EPS im Testmodus; (4) Bar ohne Servicegebühr (B1) mit Bestätigungsknopf; (5) Bar unbestätigt → nach Frist freigegeben (Zeit im Test vorstellen); (6) Futter mit Größe inkl. Hinweis „Angaben stammen vom Hof"; (7) Artikel fehlt bei Online-Bestellung → Teilerstattung; (8) Storno online → Vollerstattung mit Transfer-Rückbuchung; (9) abgeholt und „nicht abgeholt"; (10) Bestellungen finden per Code; (11) Produkt am Handy-Viewport anlegen und Teilen-Fenster öffnen; (12) QR-Plakat erzeugt eine gültige Hofseiten-Adresse mit `?k=qr`.
+- Je Ablauf gegen die Stripe-Test-API prüfen: `application_fee_amount`, Transfer-Betrag, Erstattung und Rückbuchung stimmen exakt mit den Beträgen in der Datenbank und der Anzeige überein.
+- Bericht `docs/nachtlauf/berichte/34.md`: Tabelle je Ablauf (bestanden/Fehler/ausgelassen mit Grund), Screenshots lokal unter `.nachtlauf/`.
+- Gefundene Fehler NICHT in 34 beheben: je Fehler eine eigene Nummer 34a, 34b … direkt nach 34, mit Test, der den Fehler zeigt.
+
+### 35 Altlasten aus Lauf 6 §6
+`bestellSummen` mit Int-Cent statt `Math.round(Zahl * 100)` · `percent` im Servicegebühr-Schema ohne `z.coerce` · `revertReady` verschickt die Mail nach der Antwort · `linkedProductIds` in Beiträgen gegen den eigenen Hof prüfen · Knöpfe unter 44 px in „Mein Auftritt" · `farm-page-view` zeigt Online-Zahlung nach `stripeAccountReady` und `acceptsOnline` (Z1), nicht nur nach `acceptsOnline`.
+
+### 36 BAES-Angaben
+`BAES_FUTTERMITTEL_URL` auf https://baes.gv.at/en/admission/feed/faq-feed, dazu Kontakt futtermittel@baes.gv.at und +43 5 0555 33216 im Kopfhinweis. **Ausnahme zu CLAUDE.md („keine echten E-Mails/Telefonnummern im Code"):** Das ist der öffentliche Kontakt einer Behörde für Kundinnen und Höfe, keine personenbezogene Angabe; vom Menschen in der Freigabe ausdrücklich verlangt. Die Werte stehen an einer Stelle (neben `BAES_FUTTERMITTEL_URL`). Wortlaut des Falls „abgepacktes Heimtierfutter" mit § 8 Abs. 7 Futtermittelverordnung 2010 abgleichen (Meldung an das BAES statt Registrierung) und im Bericht als Textänderung zum Gegenlesen markieren.
+
+### 37 Sentry ohne IP-Adressen
+`sendDefaultPii` aus, `beforeSend` entfernt `user.ip_address` und Request-Header mit IP; Test. Im Bericht vermerken, dass die Einstellung im Sentry-Dashboard zusätzlich zu prüfen ist.
+
+### 38 S11 Double-Opt-in
+Anmeldung zu Hof-Neuigkeiten und Benachrichtigungen erst nach Klick auf den Bestätigungslink (signiert, mit Ablauf); unbestätigte Anmeldungen bekommen keine werblichen Mails; Abmeldelink in jeder werblichen Mail. Bestehende Abonnenten unverändert, Anzahl im Bericht. Migration nur Expand, falls nötig.
+
+### 39 D1 Direktverkauf senkt den Vorrat
+Verkäufe, wie im Register D1.
+
+### 40 R1 Rate-Limit über die Datenbank
+Tabelle mit Schlüssel, Fenster und Zähler; Aufräumen alter Einträge im bestehenden Cron; die bestehende Bremse je Instanz bleibt als erste Stufe. Migration nur Expand.
+
+### Sammel-PR (Haltepunkt)
+Branch `integration/lauf7` von `main`, alle PRs dieses Laufs per `git merge --no-ff` in Merge-Reihenfolge; Doku-Konflikte: beide Seiten behalten; Code-Konflikte sauber zusammenführen und jede Auflösung im PR-Text begründen. Typecheck, Unit- und Integrationstests auf dem Gesamtstand grün. PRs mit offener Vorbedingung (Entwurf) NICHT aufnehmen.
+
+### Morgenbericht (`morgenbericht-<datum>-lauf7.md`)
+Ergebnis des Probelaufs zuerst (Tabelle der 12 Abläufe), dann je PR Vorschau-Link, Migration ja/nein, Basis; der Sammel-PR mit Liste der Konfliktauflösungen; „Für dich zu tun" (u. a. Sentry-Dashboard IP, Zahl der bestehenden Abonnenten, Probelauf vor Ort mit dem Pilothof).

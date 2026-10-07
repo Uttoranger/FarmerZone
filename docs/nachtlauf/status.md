@@ -31,22 +31,30 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 19c | Geldpfad „Artikel fehlt" nachziehen | fertig | `nacht/2026-10-06/19c-geldpfad` | #191 | main | Stripe-Abo `refund.failed`/`charge.refund.updated` setzen; gescheiterter Voll-Storno nur gemeldet | 06.10.2026 |
 | 19a | B1 – keine Bargebühr bis zum Stichtag | fertig | `nacht/2026-10-06/19a-bargebuehr` | #192 | 19c (#191) | Mockup-Abweichungen Kasse/Startseite freigeben | 06.10.2026 |
 | 19b | Sicherheits-Altlasten aus Lauf 4 | fertig | `nacht/2026-10-06/19b-sicherheit` | #193 | 19a (#192) | Foto-Upload nach Deploy prüfen; Registrierung: Aufzählung nicht ganz geschlossen | 06.10.2026 |
-| 20 | Futter und Brennmaterial | fertig (Entwurf) | `nacht/2026-10-06/20-futter-brennmaterial` | #198 | 22e (#197) | Entwurf bis E10-Texte gegengelesen; (a)–(d) entscheiden; Sperr-Umgehung per Kategoriewechsel behoben | 07.10.2026 |
-| 21 | Teilen | fertig (Entwurf) | `nacht/2026-10-06/21-teilen` | #199 | 20 (#198) | Entwurf bis sessionStorage (§ 165 TKG) und Farbwerte im Teilen-Bild freigegeben; Momente „gespeichert"/Abschaltung fehlen (kein Feld) | 07.10.2026 |
+| 20 | Futter und Brennmaterial | gemergt (#211) | `nacht/2026-10-06/20-futter-brennmaterial` | #198 | 22e (#197) | Entwurf bis E10-Texte gegengelesen; (a)–(d) entscheiden; Sperr-Umgehung per Kategoriewechsel behoben | 07.10.2026 |
+| 21 | Teilen | gemergt (#211) | `nacht/2026-10-06/21-teilen` | #199 | 20 (#198) | Entwurf bis sessionStorage (§ 165 TKG) und Farbwerte im Teilen-Bild freigegeben; Momente „gespeichert"/Abschaltung fehlen (kein Feld) | 07.10.2026 |
 | 22a | Kunden und Kundendetail | fertig | `nacht/2026-10-06/22a-kunden` | #194 | 19b (#193) | Marken-Farben freigeben; ILIKE-Altlast customers.ts erledigt | 06.10.2026 |
 | 22b | Verkäufe und „Verkauf eintragen" | fertig | `nacht/2026-10-06/22b-verkaeufe` | #195 | 22a (#194) | „Gesamt"-Wort und Vorrat bei Direktverkauf entscheiden | 06.10.2026 |
-| 22c | Auswertung und Region | fertig (Entwurf) | `nacht/2026-10-06/22c-auswertung-region` | #200 | 21 (#199) | Entwurf bis Slug `region` in Produktion geprüft; Vorbelegung „Betrieb" offen | 07.10.2026 |
+| 22c | Auswertung und Region | gemergt (#211) | `nacht/2026-10-06/22c-auswertung-region` | #200 | 21 (#199) | Entwurf bis Slug `region` in Produktion geprüft; Vorbelegung „Betrieb" offen | 07.10.2026 |
 | 22d | Einstellungen | fertig | `nacht/2026-10-06/22d-einstellungen` | #196 | 22b (#195) | Mockup-Abweichungen der Übersicht vor Merge freigeben | 07.10.2026 |
 | 22e | Beiträge, Hilfe, Meine Meldungen | fertig | `nacht/2026-10-06/22e-beitraege-hilfe` | #197 | 22d (#196) | E12-Lesart „bleibt und leitet um" bestätigen; Anzeigen der alten Beitragskarte (E-Mail-Zahl) entscheiden | 07.10.2026 |
 | 22f | Admin in der AdminShell | ersetzt | `nacht/2026-10-06/22f-admin` | #201 (geschlossen) | 22c (#200) | Code übernommen in Nr. 24 (#203); Lesart „Bar-Höfe freischaltbar" nach Z1 verworfen | 07.10.2026 |
-| 23 | Nachtrag Futter (#198) | fertig | `nacht/2026-10-06/20-futter-brennmaterial` | #198 | main | Entwurf aufgehoben; genaue BAES-Unterseite eintragen; Abgrenzung neue Bestätigung (Sichtbarkeit/Foto frei, MwSt nicht) bestätigen | 07.10.2026 |
-| 24 | Stripe-Pflicht und Admin auf main | fertig | `nacht/2026-10-07/24-stripe-pflicht` | #203 | main | ersetzt #201 (geschlossen); Sackgasse für Höfe mit acceptsOnline=false behoben; Höfe ohne Stripe nach Merge ansprechen | 07.10.2026 |
-| 25 | Teilen nach T1 (#199) | fertig | `nacht/2026-10-06/21-teilen` | #199 | 20 (#198) | Entwurf aufgehoben; kein Browser-Speicher, keine Bestell-Zuordnung | 07.10.2026 |
-| 26 | Auswertung und Region nach T1 (#200) | fertig | `nacht/2026-10-06/22c-auswertung-region` | #200 | 21 (#199) | Entwurf aufgehoben; Teilen-Karte nur Besuche; Slug `region` frei | 07.10.2026 |
-| 27 | Konto und Geld, klein | fertig | `nacht/2026-10-07/27-konto-geld` | #204 | main | Neuer Ablauf nach „Konto erstellen" (Postfach-Hinweis, Anmelden über /login); B3 nur bei fremdem Passwort | 07.10.2026 |
-| 28 | Oberfläche und Wortwahl | fertig | `nacht/2026-10-07/28-oberflaeche` | #205 | main | Fehler-Rot hell deutlich dunkler (O1, auch auf Tönung ≥ 4,5:1) | 07.10.2026 |
-| 29 | „Betrieb" bei Futter kaufen | fertig | `nacht/2026-10-07/29-futter-betrieb` | #206 | 26 (#200) | Vorbelegung nur über die Adresse; Server prüft weiter | 07.10.2026 |
-| 30 | Teilen-Momente und Abschalten | fertig | `nacht/2026-10-07/30-teilen-momente` | #207 | 25 (#199) | **Enthält Migration** (Expand: `Farm.teilenMomenteAus` mit Default false) | 07.10.2026 |
-| 31 | Tab-Wechsel beschleunigen | fertig | `nacht/2026-10-07/31-tab-wechsel` | #208 | main | /orders −12 % Server-JS, „[E-Mail] Init" weg; Admin-/Auswertungs-Ladeansichten kommen mit #203/#200; #204 dafür angepasst (433c546) | 07.10.2026 |
-| 32 | Altlasten Lauf 5 | fertig | `nacht/2026-10-07/32-altlasten` | #209 | 24 (#203) | gestapelt auf #203 (Servicegebühr-Dialog); Server nimmt Mindestgebühr nur noch als ganze Cent | 07.10.2026 |
+| 23 | Nachtrag Futter (#198) | gemergt (#211) | `nacht/2026-10-06/20-futter-brennmaterial` | #198 | main | Entwurf aufgehoben; genaue BAES-Unterseite eintragen; Abgrenzung neue Bestätigung (Sichtbarkeit/Foto frei, MwSt nicht) bestätigen | 07.10.2026 |
+| 24 | Stripe-Pflicht und Admin auf main | gemergt (#211) | `nacht/2026-10-07/24-stripe-pflicht` | #203 | main | ersetzt #201 (geschlossen); Sackgasse für Höfe mit acceptsOnline=false behoben; Höfe ohne Stripe nach Merge ansprechen | 07.10.2026 |
+| 25 | Teilen nach T1 (#199) | gemergt (#211) | `nacht/2026-10-06/21-teilen` | #199 | 20 (#198) | Entwurf aufgehoben; kein Browser-Speicher, keine Bestell-Zuordnung | 07.10.2026 |
+| 26 | Auswertung und Region nach T1 (#200) | gemergt (#211) | `nacht/2026-10-06/22c-auswertung-region` | #200 | 21 (#199) | Entwurf aufgehoben; Teilen-Karte nur Besuche; Slug `region` frei | 07.10.2026 |
+| 27 | Konto und Geld, klein | gemergt (#211) | `nacht/2026-10-07/27-konto-geld` | #204 | main | Neuer Ablauf nach „Konto erstellen" (Postfach-Hinweis, Anmelden über /login); B3 nur bei fremdem Passwort | 07.10.2026 |
+| 28 | Oberfläche und Wortwahl | gemergt (#211) | `nacht/2026-10-07/28-oberflaeche` | #205 | main | Fehler-Rot hell deutlich dunkler (O1, auch auf Tönung ≥ 4,5:1) | 07.10.2026 |
+| 29 | „Betrieb" bei Futter kaufen | gemergt (#211) | `nacht/2026-10-07/29-futter-betrieb` | #206 | 26 (#200) | Vorbelegung nur über die Adresse; Server prüft weiter | 07.10.2026 |
+| 30 | Teilen-Momente und Abschalten | gemergt (#211) | `nacht/2026-10-07/30-teilen-momente` | #207 | 25 (#199) | **Enthält Migration** (Expand: `Farm.teilenMomenteAus` mit Default false) | 07.10.2026 |
+| 31 | Tab-Wechsel beschleunigen | gemergt (#211) | `nacht/2026-10-07/31-tab-wechsel` | #208 | main | /orders −12 % Server-JS, „[E-Mail] Init" weg; Admin-/Auswertungs-Ladeansichten kommen mit #203/#200; #204 dafür angepasst (433c546) | 07.10.2026 |
+| 32 | Altlasten Lauf 5 | gemergt (#211) | `nacht/2026-10-07/32-altlasten` | #209 | 24 (#203) | gestapelt auf #203 (Servicegebühr-Dialog); Server nimmt Mindestgebühr nur noch als ganze Cent | 07.10.2026 |
 | 33 | Datenschutzerklärung | fertig (Entwurf) | `nacht/2026-10-07/33-datenschutz` | #210 | main | Haltepunkt Lauf 6; Entwurf bis rechtliche Prüfung der Tabelle in Bericht 33 | 07.10.2026 |
+| 34 | Automatischer Probelauf (Gate 9a) | offen | | | main | | |
+| 35 | Altlasten aus Lauf 6 | offen | | | main | | |
+| 36 | BAES-Angaben | offen | | | main | | |
+| 37 | Sentry ohne IP-Adressen | offen | | | main | | |
+| 38 | Double-Opt-in (S11) | offen | | | main | | |
+| 39 | Direktverkauf senkt den Vorrat (D1) | offen | | | main | | |
+| 40 | Rate-Limit über die Datenbank (R1) | offen | | | main | | |
+| Sammel | Sammel-PR Lauf 7 | offen | `integration/lauf7` | | main | | |
