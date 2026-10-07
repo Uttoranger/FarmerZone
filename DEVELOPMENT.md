@@ -4309,6 +4309,14 @@ Auftrag freigabe.md §9 „22e", Register E12. Keine Schema-Änderung, keine Mig
 - **Fachregel Meldungen in der Hof-Sicht:** `fuerHof` liefert statt Farbklassen (`statusFarbe`) den Ton `statusTon` (`STATUS_TON`: In Arbeit und erledigt grün, sonst neutral — nie orange, denn keine Meldung wartet auf den Hof) und `offen` (nicht in `STATUS_ABGESCHLOSSEN`). Beides ist abgeleitet; die Allowlist der Sichtbarkeitsregel bleibt eine Allowlist (`tests/meldung.test.ts`). „Offen" und „Beantwortet" in der Seitenspalte sind zwei Fragen, keine Aufteilung: Eine Meldung „In Arbeit" mit Antwort zählt in beiden. Die Admin-Marken (`STATUS_MARKE_FARBE`) bleiben.
 - **Bewusst nicht übernommen aus den Mockups:** „Rückruf anfordern" (Register O5, Ersatz „E-Mail schreiben" an `SUPPORT_EMAIL`), „Bei einer Antwort bekommst du zusätzlich eine E-Mail" (eine solche Mail gibt es nicht), die hervorgehobene Karte für eine neue Antwort (kein Gelesen-Stand gespeichert). Die Fehlernummer bleibt ein freiwilliges Feld; `?kennung=` wird auf `/fehler-melden` wie auf `/problem-melden` geprüft übernommen.
 
+## Datenschutzerklärung auf Sachstand (Nachtlauf Nr. 33, Oktober 2026)
+
+Auftrag freigabe.md §10 „33": nur Tatsachen korrigiert, keine neue Rechtsformulierung, keine Schema-Änderung. Jede geänderte Stelle steht wörtlich vorher/nachher mit Code-Beleg in `docs/nachtlauf/berichte/33.md` (zur rechtlichen Prüfung).
+
+- **Korrigiert:** Abschnitt 10 beschreibt die Anmeldung mit Code (E7) statt Magic Link, sagt, dass beim Bestellen kein Konto entsteht (E8, 17a), und nennt „Bestellungen finden" per Code mit einem Cookie für `BESTELLUNGEN_ANSICHT_SEKUNDEN` (die Minuten kommen aus der Konstante). Abschnitt 2 nennt die Stripe-Kennung des Zahlungsvorgangs statt einer „anonymisierten Bestätigungs-ID" und Cookies für Anmeldung und Bestellungen finden statt für den Warenkorb (der liegt im localStorage). Abschnitt 4 Sentry nennt Ladezeit-Messungen (10 % in Produktion), Formularinhalte als entfernt, kein Session Replay und die Farm-ID bei Höfen. Abschnitt 8 bestreitet keine Analyse-Werkzeuge mehr (Vercel Web Analytics ist eingebunden).
+- **Wache:** `tests/datenschutz-sachstand.test.ts` bindet jede dieser Aussagen an ihren Beleg im Code (gesperrte Magic-Link-Pfade, Checkout ohne Konto, `@vercel/analytics` im Layout, kein `replayIntegration`, `stripePaymentIntentId`). Wer den Code ändert, wird an die Erklärung erinnert.
+- **Offen (Bericht 33):** Teilen-Satz nach Merge von #199; Bestelldaten „7 Jahre" und Server-Logs „30 Tage" setzt der Code nicht um (Bestellungen werden nie gelöscht, Log-Aufbewahrung hängt am Vercel-Plan).
+
 ## Nützliche Befehle
 
 ```bash
