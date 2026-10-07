@@ -49,4 +49,4 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 30 | Teilen-Momente und Abschalten | fertig | `nacht/2026-10-07/30-teilen-momente` | #207 | 25 (#199) | **Enthält Migration** (Expand: `Farm.teilenMomenteAus` mit Default false) | 07.10.2026 |
 | 31 | Tab-Wechsel beschleunigen | fertig | `nacht/2026-10-07/31-tab-wechsel` | #208 | main | /orders −12 % Server-JS, „[E-Mail] Init" weg; Admin-/Auswertungs-Ladeansichten kommen mit #203/#200; #204 dafür angepasst (433c546) | 07.10.2026 |
 | 32 | Altlasten Lauf 5 | fertig | `nacht/2026-10-07/32-altlasten` | #209 | 24 (#203) | gestapelt auf #203 (Servicegebühr-Dialog); Server nimmt Mindestgebühr nur noch als ganze Cent | 07.10.2026 |
-| 33 | Datenschutzerklärung | läuft | `nacht/2026-10-07/33-datenschutz` | | main | | 07.10.2026 |
+| 33 | Datenschutzerklärung | fertig (Entwurf) | `nacht/2026-10-07/33-datenschutz` | #210 | main | Haltepunkt Lauf 6; Entwurf bis rechtliche Prüfung der Tabelle in Bericht 33 | 07.10.2026 |
