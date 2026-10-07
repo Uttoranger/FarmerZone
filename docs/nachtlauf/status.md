@@ -39,7 +39,7 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 22d | Einstellungen | fertig | `nacht/2026-10-06/22d-einstellungen` | #196 | 22b (#195) | Mockup-Abweichungen der Übersicht vor Merge freigeben | 07.10.2026 |
 | 22e | Beiträge, Hilfe, Meine Meldungen | fertig | `nacht/2026-10-06/22e-beitraege-hilfe` | #197 | 22d (#196) | E12-Lesart „bleibt und leitet um" bestätigen; Anzeigen der alten Beitragskarte (E-Mail-Zahl) entscheiden | 07.10.2026 |
 | 22f | Admin in der AdminShell | fertig (Entwurf) | `nacht/2026-10-06/22f-admin` | #201 | 22c (#200) | Haltepunkt Lauf 5; Entwurf bis „Freischalten ohne Stripe nur bei Online-Wunsch" bestätigt; Bar-Höfe-Blocker behoben | 07.10.2026 |
-| 23 | Nachtrag Futter (#198) | offen | | | | | |
+| 23 | Nachtrag Futter (#198) | läuft | `nacht/2026-10-06/20-futter-brennmaterial` | #198 | main | | 07.10.2026 |
 | 24 | Stripe-Pflicht und Admin auf main | offen | | | | | |
 | 25 | Teilen nach T1 (#199) | offen | | | | | |
 | 26 | Auswertung und Region nach T1 (#200) | offen | | | | | |
