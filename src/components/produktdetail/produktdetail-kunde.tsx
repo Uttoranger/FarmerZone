@@ -46,6 +46,8 @@ import { HofseiteSeitenspalte } from '@/components/hofseite/hofseite-seitenspalt
 import { GleichMitAbholen, Kennzeichnung } from '@/components/produktdetail/produktdetail-teile'
 import { RaummassErklaerung } from '@/components/shared/raummass-erklaerung'
 import { raummassErklaeren } from '@/lib/verkaufsgroessen'
+import { futterVerantwortung, futterVerantwortungImKorb } from '@/lib/futter-registrierung'
+import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
 
 /*
  * Die Produktseite /[farmSlug]/produkt/[id] (Nachtlauf Nr. 11, Gate 4).
@@ -168,6 +170,10 @@ export function ProduktdetailKunde({
   const mitnehmen = gleichMitAbholen(produkte, produkt, farm.isPaused)
   // Raummeter und Schüttraummeter erklärt die Seite beim ersten Vorkommen (DESIGN_SYSTEM, Nr. 20).
   const raummass = raummassErklaeren((familie.length > 0 ? familie : [produkt]).map((p) => p.unit))
+  // Bei jedem Futter der Verantwortungs-Hinweis (E10a), bei „nur an Betriebe" mit Zusatz.
+  // Über die ganze Familie: Die Abgabe kann je Größe abweichen, der Zusatz
+  // „nur an Betriebe" darf auf der Seite nicht fehlen, wenn eine Größe ihn braucht.
+  const verantwortung = futterVerantwortung(familie.length > 0 ? familie : [produkt])
 
   const marke =
     zustand.art === 'knapp' ? (
@@ -340,6 +346,8 @@ export function ProduktdetailKunde({
               </div>
             )}
 
+            <FutterVerantwortung saetze={verantwortung} />
+
             {/* Am Handy die EINE feste Leiste unten (Fokus-Seite), ab 768 px in der Karte. */}
             <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] md:static md:z-auto md:border-0 md:bg-transparent md:p-0">
               <div className="mx-auto flex max-w-[1200px] items-center gap-2.5 md:gap-3.5">
@@ -406,6 +414,7 @@ export function ProduktdetailKunde({
           gebuehrKorb={gebuehr?.korb ?? null}
           mitKorb={mitKorb}
           jetzt={jetzt}
+          produkte={produkte}
           className="hidden lg:col-start-2 lg:row-start-1 lg:flex"
         />
       </div>
@@ -420,6 +429,7 @@ export function ProduktdetailKunde({
           onUpdateQuantity={updateQuantity}
           onRemoveItem={removeItem}
           gebuehrKorb={gebuehr?.korb ?? null}
+          futterHinweis={futterVerantwortungImKorb(items, produkte)}
         />
       )}
     </>

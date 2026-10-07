@@ -5,7 +5,10 @@ import { CheckCircle2, ChevronRight, CircleDashed, ExternalLink, Info, Lock } fr
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import {
+  BAES_FUTTERMITTEL_URL,
+  BAES_LINK_TEXT,
   DEUTSCHLAND_HINWEIS,
+  ORIENTIERUNG_HINWEIS,
   HAUPT_FAELLE,
   REGISTRIERUNGS_FAELLE,
   fallStand,
@@ -25,7 +28,9 @@ import { cn } from '@/lib/utils'
  * Was der Hof mit seinem Stand anbieten kann; die zwei Fälle, die das
  * Formular entscheidet, offen, die übrigen fünf unter „Alle Futterarten".
  * Eingetragen wird im Hofprofil (Nummer und Status, Rückfrage F6) — die
- * Plattform prüft nichts (E9), hier wird nur angezeigt.
+ * Plattform prüft nichts (E9), hier wird nur angezeigt. Darüber steht seit
+ * Nr. 23 der Kopfhinweis zur Orientierung (ORIENTIERUNG_HINWEIS) mit dem Link
+ * zum BAES (E10a): Die Texte gehen ohne Gegenlesen live.
  */
 
 /** Wo Nummer und Status stehen — der Abschnitt im Hofprofil (Einstellungen, Nr. 22d). */
@@ -45,6 +50,27 @@ export function FutterRegistrierungen({ registrierung }: { registrierung: HofReg
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Kopfhinweis über allem, was folgt (E10a). */}
+      <div className="flex gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3">
+        <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] leading-snug text-foreground">{ORIENTIERUNG_HINWEIS}</p>
+          <a
+            href={BAES_FUTTERMITTEL_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              'inline-flex min-h-11 items-center gap-1.5 rounded-md text-[13px] font-semibold text-brand-text underline-offset-4 hover:underline',
+              FOKUS_RAHMEN
+            )}
+          >
+            {BAES_LINK_TEXT}
+            <ExternalLink className="size-3.5" strokeWidth={1.7} aria-hidden="true" />
+            <span className="sr-only"> (öffnet in einem neuen Tab)</span>
+          </a>
+        </div>
+      </div>
+
       {saetze.map((s) => (
         <Hinweiskarte key={s.text} ton={s.ton} symbol={s.ton === 'gruen' ? CheckCircle2 : Info}>
           {s.text}

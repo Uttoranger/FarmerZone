@@ -8,7 +8,6 @@ import {
 } from '@/lib/eingabegrenzen'
 import { emailSchema } from '@/schemas/email'
 import { NEUE_BESTELLUNG_ZAHLARTEN } from '@/lib/kasse'
-import { checkoutTeilenKanalSchema } from '@/schemas/teilen'
 
 /**
  * Die Reihenfolge der Felder auf der Seite — maßgeblich dafür, zu welchem
@@ -118,10 +117,9 @@ export const checkoutRequestSchema = z.object({
   // DB (pruefeBetriebsnachweis) — hier nur die Form der Eingabe.
   kaeuferArt: z.enum(KAEUFER_ART_VALUES).optional().default('PRIVAT'),
   betriebsnummer: z.string().trim().max(100).optional(),
-  // Über welchen geteilten Link die Kundin kam (Gate 7, S8): eines der sieben
-  // Kürzel aus dem sessionStorage der Hofseite. Fehlt es oder ist es ungültig,
-  // wird es zu undefined — die Bestellung scheitert daran NIE.
-  teilenKanal: checkoutTeilenKanalSchema,
+  // Kein `teilenKanal` mehr (Register T1, Nr. 25): Bestellungen bekommen
+  // keinen Teilen-Kanal. Ein alter Tab, der das Feld noch schickt, scheitert
+  // nicht — z.object verwirft unbekannte Felder still.
   items: z
     .array(
       z.object({

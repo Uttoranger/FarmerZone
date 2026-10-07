@@ -22,8 +22,6 @@ import { berechneServicegebuehr } from '@/lib/servicegebuehr'
 import { pruefeSitzungsWarenkorb } from '@/server/warenkorb'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
-import { teilenKanalAus } from '@/lib/teilen-kanal'
-import { zaehleBestellungNachDerAntwort } from '@/server/teilen-zaehlung'
 import { bestellPositionsName } from '@/lib/eingabegrenzen'
 import { fristVon } from '@/lib/fristen'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
@@ -652,9 +650,6 @@ export async function POST(request: NextRequest) {
         serviceFeeMinCentsApplied: servicegebuehr.prozentAngewendet === null ? null : farm.serviceFeeMinCents,
         kaeuferArt: data.kaeuferArt,
         betriebsnummer: betriebsnummerFuerBestellung(data.kaeuferArt, data.betriebsnummer),
-        // Nur der Kanal des geteilten Links, nie eine Kennung (Gate 7, S8).
-        // Ungültig oder fehlend → null; daran scheitert keine Bestellung.
-        teilenKanal: teilenKanalAus(data.teilenKanal),
         items: {
           create: positionen.map((i) => ({
             productId: i.productId,
@@ -766,8 +761,6 @@ export async function POST(request: NextRequest) {
       )
     }
     await gibHalteFrei()
-    // Teilen-Zählung als Nachlauf: Sie rollt nie etwas zurück (Gate 7).
-    zaehleBestellungNachDerAntwort(order.farmId, teilenKanalAus(data.teilenKanal), order.createdAt)
 
     return NextResponse.json({
       orderId: order.id,
@@ -861,8 +854,6 @@ export async function POST(request: NextRequest) {
       console.error('[/api/checkout] Bestätigungsmail fehlgeschlagen', orderNumber, e)
     }
   })
-
-  zaehleBestellungNachDerAntwort(order.farmId, teilenKanalAus(data.teilenKanal), order.createdAt)
 
   return NextResponse.json({
     orderId: order.id,

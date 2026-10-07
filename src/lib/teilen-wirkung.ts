@@ -2,45 +2,37 @@
  * Teilen-Wirkung (Gate 7 Aufgabe 4, Auswertungs-Karte „Über deine geteilten
  * Links" in Nr. 22c) — die reine Zusammenfassung der Zählerzeilen.
  *
- * Eingabe sind nur Summen je Kanal und Tag (`TeilenAufruf`); heraus kommen
- * Summen je Kanal und gesamt. Personen kommen darin nicht vor (S8).
+ * Eingabe sind nur Besuche je Kanal und Tag (`TeilenAufruf`); heraus kommen
+ * Summen je Kanal und gesamt. Personen kommen darin nicht vor (S8), und seit
+ * Nr. 25 auch keine Bestellungen (Register T1: keine Bestell-Zuordnung).
  */
 import type { TeilenKanal } from '@prisma/client'
 import { TEILEN_KANAL_NAME } from '@/lib/teilen-kanal'
 import { kalendertagInWien } from '@/lib/wiener-tag'
 import { tagVersetzt } from '@/lib/kalender'
 
-export type TeilenZeile = { kanal: TeilenKanal; besuche: number; bestellungen: number }
+export type TeilenZeile = { kanal: TeilenKanal; besuche: number }
 
 export type TeilenKanalSumme = TeilenZeile & { name: string }
 
 export type TeilenWirkung = {
   besuche: number
-  bestellungen: number
-  /** Kanäle mit mindestens einem Besuch oder einer Bestellung, die stärksten zuerst. */
+  /** Kanäle mit mindestens einem Besuch, die stärksten zuerst. */
   kanaele: TeilenKanalSumme[]
 }
 
-/** Summen je Kanal und gesamt — Reihenfolge: Besuche, dann Bestellungen, dann Name. */
+/** Summen je Kanal und gesamt — Reihenfolge: Besuche, dann Name. */
 export function fasseTeilenWirkungZusammen(zeilen: readonly TeilenZeile[]): TeilenWirkung {
   const jeKanal = new Map<TeilenKanal, TeilenZeile>()
   for (const z of zeilen) {
-    const bisher = jeKanal.get(z.kanal) ?? { kanal: z.kanal, besuche: 0, bestellungen: 0 }
-    jeKanal.set(z.kanal, {
-      kanal: z.kanal,
-      besuche: bisher.besuche + Math.max(0, z.besuche),
-      bestellungen: bisher.bestellungen + Math.max(0, z.bestellungen),
-    })
+    const bisher = jeKanal.get(z.kanal)?.besuche ?? 0
+    jeKanal.set(z.kanal, { kanal: z.kanal, besuche: bisher + Math.max(0, z.besuche) })
   }
   const kanaele = [...jeKanal.values()]
-    .filter((k) => k.besuche > 0 || k.bestellungen > 0)
+    .filter((k) => k.besuche > 0)
     .map((k) => ({ ...k, name: TEILEN_KANAL_NAME[k.kanal] }))
-    .toSorted((a, b) => b.besuche - a.besuche || b.bestellungen - a.bestellungen || a.name.localeCompare(b.name, 'de'))
-  return {
-    besuche: kanaele.reduce((s, k) => s + k.besuche, 0),
-    bestellungen: kanaele.reduce((s, k) => s + k.bestellungen, 0),
-    kanaele,
-  }
+    .toSorted((a, b) => b.besuche - a.besuche || a.name.localeCompare(b.name, 'de'))
+  return { besuche: kanaele.reduce((s, k) => s + k.besuche, 0), kanaele }
 }
 
 export type TeilenZeitraum = {
@@ -63,13 +55,12 @@ export function diesenMonat(jetzt: Date): TeilenZeitraum {
 }
 
 /**
- * „14 Besuche, 3 Bestellungen über deine Links" — der Satz der Teilen-Zeile
- * (Mockup web-h3-heute-mit-teilen-karte). Ohne Besuch nichts: Eine Null wäre
- * keine Nachricht, nur ein Vorwurf.
+ * „14 Besuche über deine Links" — der Satz der Teilen-Zeile (Mockup
+ * web-h3-heute-mit-teilen-karte; die Bestellungen daraus entfallen mit
+ * Register T1). Ohne Besuch nichts: Eine Null wäre keine Nachricht, nur ein
+ * Vorwurf.
  */
-export function teilenWirkungSatz(wirkung: Pick<TeilenWirkung, 'besuche' | 'bestellungen'>): string | null {
-  if (wirkung.besuche <= 0 && wirkung.bestellungen <= 0) return null
-  const besuche = `${wirkung.besuche} ${wirkung.besuche === 1 ? 'Besuch' : 'Besuche'}`
-  const bestellungen = `${wirkung.bestellungen} ${wirkung.bestellungen === 1 ? 'Bestellung' : 'Bestellungen'}`
-  return `${besuche}, ${bestellungen} über deine Links`
+export function teilenWirkungSatz(wirkung: Pick<TeilenWirkung, 'besuche'>): string | null {
+  if (wirkung.besuche <= 0) return null
+  return `${wirkung.besuche} ${wirkung.besuche === 1 ? 'Besuch' : 'Besuche'} über deine Links`
 }

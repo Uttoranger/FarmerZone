@@ -26,7 +26,6 @@ import {
   type HoefeFilter,
 } from '@/schemas/hoefe-filter'
 import {
-  BRENNMATERIAL_TITEL,
   hatProduktfilter,
   kategorieChips,
   siegelChips,
@@ -71,15 +70,9 @@ export const MENGEN_HINWEIS = `Kleinmengen heißt bis ${KLEINGEBINDE_BIS_KG} kg 
 /** Die Sortierung im Futter — derselbe Wortlaut in der Filterzeile und bei den aktiven Filtern. */
 export const KILOPREIS_LABEL = 'Günstigster Kilopreis'
 
-/**
- * Brennholz heißt auf /hoefe „Brennmaterial" — wie der Chip der Startseite
- * (src/lib/startseite.ts, E11). Die Kategorie selbst (BRENNHOLZ) und ihr
- * Label in der Taxonomie ändert erst Gate 6.
- */
-const BRENNMATERIAL_LABEL = BRENNMATERIAL_TITEL
-
+/** Seit Nr. 23 heißt BRENNHOLZ schon in der Taxonomie „Brennmaterial" (E11 Label) — keine Sonderregel mehr. */
 function kategorieLabel(k: ProductCategoryValue): string {
-  return k === 'BRENNHOLZ' ? BRENNMATERIAL_LABEL : KATEGORIE_LABEL[k]
+  return KATEGORIE_LABEL[k]
 }
 
 // ─── Chips ──────────────────────────────────────────────────────────────────
@@ -143,7 +136,7 @@ export function kategorieReihe(
     },
     {
       schluessel: 'BRENNHOLZ',
-      label: BRENNMATERIAL_LABEL,
+      label: KATEGORIE_LABEL.BRENNHOLZ,
       aktiv: imHofladen && filter.kategorien.includes('BRENNHOLZ'),
       ziel: hofladenKategorieZiel(filter, 'BRENNHOLZ'),
     },

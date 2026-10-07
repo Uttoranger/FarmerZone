@@ -34,7 +34,7 @@ import { prisma } from '@/lib/prisma'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { revalidatePath, updateTag } from 'next/cache'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
-import { SPERR_GRUND } from '@/lib/futter-registrierung'
+import { FUTTER_BESTAETIGUNG_FEHLT, SPERR_GRUND } from '@/lib/futter-registrierung'
 
 const getSession = vi.mocked(auth.api.getSession)
 const farmForUser = vi.mocked(getFarmForUser)
@@ -227,6 +227,28 @@ const BUCHE = {
     { bezeichnung: 'Raummeter', unit: 'RAUMMETER', price: 129, stock: 4 },
   ],
 }
+
+describe('legeFutterFamilieAn — Pflicht-Bestätigung (E10a, Nr. 23)', () => {
+  it('ohne Haken: abgelehnt mit dem Satz zum Haken, nichts angelegt', async () => {
+    const ergebnis = await legeFutterFamilieAn({ ...HEU, kennzeichnung: { ...HEU.kennzeichnung, bestaetigt: false } })
+
+    expect(ergebnis).toEqual({ error: FUTTER_BESTAETIGUNG_FEHLT })
+    expect(productCreate).not.toHaveBeenCalled()
+  })
+
+  it('ohne Haken UND mit weiterem Fehler: der allgemeine Satz (das Formular zeigt die Felder)', async () => {
+    const ergebnis = await legeFutterFamilieAn({ ...HEU, name: '', kennzeichnung: { ...HEU.kennzeichnung, bestaetigt: false } })
+
+    expect(ergebnis).toEqual({ error: 'Bitte prüfe deine Eingaben.' })
+    expect(productCreate).not.toHaveBeenCalled()
+  })
+
+  it('mit Haken: jede Größe trägt bestaetigtAm = jetzt', async () => {
+    await legeFutterFamilieAn(HEU)
+
+    expect(angelegt().every((p) => (p.futter?.create.bestaetigtAm as Date).getTime() === JETZT.getTime())).toBe(true)
+  })
+})
 
 describe('legeBrennmaterialFamilieAn', () => {
   it('Brennholz mit drei Größen: alle online, Kategorie Brennholz, Art als Unterkategorie', async () => {

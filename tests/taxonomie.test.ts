@@ -257,7 +257,9 @@ describe('formatKategorie', () => {
   it('ohne Unterkategorie nur die Kategorie', () => {
     expect(formatKategorie('FLEISCH')).toBe('Fleisch & Wurst')
     expect(formatKategorie('FLEISCH', null)).toBe('Fleisch & Wurst')
-    expect(formatKategorie('BRENNHOLZ', undefined)).toBe('Brennholz')
+    // E11 Label (Nr. 23): Der Enum-Wert bleibt BRENNHOLZ, angezeigt wird „Brennmaterial".
+    expect(formatKategorie('BRENNHOLZ', undefined)).toBe('Brennmaterial')
+    expect(formatKategorie('BRENNHOLZ', 'BRENNHOLZ_SCHEIT')).toBe('Brennmaterial · Brennholz (Scheite)')
   })
 
   it('kennt jede Kategorie', () => {

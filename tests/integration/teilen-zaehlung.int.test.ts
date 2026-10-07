@@ -2,15 +2,16 @@
  * Integrationstest — Teilen-Zählung (Gate 7, Nr. 21; S8) in der echten Datenbank.
  *
  * Die Aussage ist der ZUSTAND danach:
- *  - Eine Bestellung mit gültigem Kürzel trägt den Kanal (`Order.teilenKanal`)
- *    und zählt als Bestellung im Aggregat des Tages — als Nachlauf.
- *  - Ein ungültiges oder fehlendes Kürzel lässt die Bestellung NIE scheitern:
- *    Sie steht, der Kanal ist null, gezählt wird nichts.
+ *  - Seit Nr. 25 (Register T1) bekommt keine Bestellung einen Kanal: Auch ein
+ *    Checkout aus einem alten Tab, der noch ein Kürzel mitschickt, steht,
+ *    `Order.teilenKanal` bleibt null, und im Aggregat zählt nichts. Die
+ *    Spalten bleiben (Expand/Contract), werden aber nicht mehr beschrieben.
+ *  - Ein Besuch über den Link zählt genau einmal (Route POST /api/teilen/besuch).
  *  - Gleichzeitige Besuche zählen atomar: 25 parallele Aufrufe = 25 Besuche
  *    in EINER Zeile (eindeutiger Index Hof/Kanal/Tag).
  *  - Besuche zählen nur bei öffentlichen Höfen.
- *  - Die Abfrage für die Auswertung (22c) liefert nur Summen dieses Hofs im
- *    Zeitraum.
+ *  - Die Abfrage für die Auswertung (22c) liefert nur Besuche dieses Hofs im
+ *    Zeitraum — Bestellzahlen alter Zeilen kommen nicht mehr heraus.
  * Mail und Stripe sind gemockt; bar bei Abholung braucht Stripe nicht.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -20,7 +21,9 @@ vi.mock('@/lib/stripe', () => ({
   stripe: { paymentIntents: { create: vi.fn(), retrieve: vi.fn() } },
 }))
 
+import { NextRequest } from 'next/server'
 import { POST as checkout } from '@/app/api/checkout/route'
+import { POST as besuch } from '@/app/api/teilen/besuch/route'
 import { prisma } from '@/lib/prisma'
 import { teilenTag } from '@/lib/teilen-kanal'
 import { zaehleBesuchFuerSlug, zaehleTeilenBesuch } from '@/server/teilen-zaehlung'
@@ -48,40 +51,13 @@ async function bestelle(farm: { id: string; slug: string }, produktId: string, z
   )
 }
 
-/** Der Nachlauf läuft im Test ohne Request-Kontext sofort an, aber nicht synchron — kurz warten. */
-async function warteAuf<T>(lies: () => Promise<T>, fertig: (wert: T) => boolean): Promise<T> {
-  let wert = await lies()
-  for (let i = 0; i < 50 && !fertig(wert); i++) {
-    await new Promise((r) => setTimeout(r, 20))
-    wert = await lies()
-  }
-  return wert
-}
-
-describe('Checkout mit Teilen-Kanal', () => {
-  it('gültiges Kürzel: Bestellung trägt den Kanal und zählt im Aggregat des Tages', async () => {
-    const { farm } = await erstelleHof()
-    const produkt = await erstelleProdukt(farm.id, { stock: 5 })
-
-    const res = await bestelle(farm, produkt.id, { teilenKanal: 'wa' })
-
-    expect(res.status).toBe(200)
-    const bestellung = await prisma.order.findFirstOrThrow({ where: { farmId: farm.id } })
-    expect(bestellung.teilenKanal).toBe('WHATSAPP')
-    const zeile = await warteAuf(
-      () => prisma.teilenAufruf.findFirst({ where: { farmId: farm.id } }),
-      (z) => z !== null
-    )
-    expect(zeile).toMatchObject({ kanal: 'WHATSAPP', besuche: 0, bestellungen: 1 })
-    expect(zeile?.tag.toISOString()).toBe(teilenTag(bestellung.createdAt).toISOString())
-  })
-
+describe('Checkout ohne Teilen-Kanal (T1)', () => {
   it.each([
+    ['gültiges Kürzel aus einem alten Tab', { teilenKanal: 'wa' }],
     ['unbekanntes Kürzel', { teilenKanal: 'tiktok' }],
     ['falscher Typ', { teilenKanal: 42 }],
-    ['Großschreibung', { teilenKanal: 'WA' }],
     ['ohne Kürzel', {}],
-  ])('%s: Bestellung steht trotzdem, Kanal null, nichts gezählt', async (_fall, zusatz) => {
+  ])('%s: Bestellung steht, Kanal null, nichts gezählt', async (_fall, zusatz) => {
     const { farm } = await erstelleHof()
     const produkt = await erstelleProdukt(farm.id, { stock: 5 })
 
@@ -90,8 +66,33 @@ describe('Checkout mit Teilen-Kanal', () => {
     expect(res.status).toBe(200)
     const bestellung = await prisma.order.findFirstOrThrow({ where: { farmId: farm.id } })
     expect(bestellung.teilenKanal).toBeNull()
+    // Der Bestand ist gebucht wie bei jeder Bestellung — der Geldpfad ist unberührt.
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: produkt.id } })).stock).toBe(4)
+    // Früher zählte ein Nachlauf die Bestellung — kurz warten, damit ein
+    // verirrter Nachlauf auffiele.
     await new Promise((r) => setTimeout(r, 100))
     expect(await prisma.teilenAufruf.count({ where: { farmId: farm.id } })).toBe(0)
+  })
+})
+
+describe('Besuch über die Route', () => {
+  it('ein Aufruf über ?k=wa zählt genau einen Besuch, keine Bestellung', async () => {
+    const { farm } = await erstelleHof()
+    const anfrage = new NextRequest('http://localhost/api/teilen/besuch', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile Safari/604.1',
+      },
+      body: JSON.stringify({ farmSlug: farm.slug, kanal: 'wa' }),
+    })
+
+    expect((await besuch(anfrage)).status).toBe(200)
+
+    const zeilen = await prisma.teilenAufruf.findMany({ where: { farmId: farm.id } })
+    expect(zeilen).toHaveLength(1)
+    expect(zeilen[0]).toMatchObject({ kanal: 'WHATSAPP', besuche: 1, bestellungen: 0 })
+    expect(zeilen[0].tag.toISOString()).toBe(teilenTag(new Date()).toISOString())
   })
 })
 
@@ -123,7 +124,7 @@ describe('Besuche zählen', () => {
 })
 
 describe('getTeilenWirkung — die Abfrage für die Auswertung (22c)', () => {
-  it('summiert je Kanal nur diesen Hof und nur Tage im Zeitraum', async () => {
+  it('summiert Besuche je Kanal nur dieses Hofs und nur Tage im Zeitraum; alte Bestellzahlen bleiben draußen', async () => {
     const { farm } = await erstelleHof()
     const { farm: fremd } = await erstelleHof()
     const tag = (t: string) => new Date(`${t}T00:00:00.000Z`)
@@ -141,19 +142,19 @@ describe('getTeilenWirkung — die Abfrage für die Auswertung (22c)', () => {
 
     const wirkung = await getTeilenWirkung(farm.id, { von: '2026-10-01', bis: '2026-10-07' })
 
-    expect(wirkung.besuche).toBe(17)
-    expect(wirkung.bestellungen).toBe(3)
-    expect(wirkung.kanaele).toEqual([
-      { kanal: 'WHATSAPP', name: 'WhatsApp', besuche: 14, bestellungen: 3 },
-      { kanal: 'QR', name: 'Plakat (QR-Code)', besuche: 3, bestellungen: 0 },
-    ])
+    expect(wirkung).toEqual({
+      besuche: 17,
+      kanaele: [
+        { kanal: 'WHATSAPP', name: 'WhatsApp', besuche: 14 },
+        { kanal: 'QR', name: 'Plakat (QR-Code)', besuche: 3 },
+      ],
+    })
   })
 
   it('ohne Zeilen: alles null, keine Kanäle', async () => {
     const { farm } = await erstelleHof()
     expect(await getTeilenWirkung(farm.id, { von: '2026-10-01', bis: '2026-10-31' })).toEqual({
       besuche: 0,
-      bestellungen: 0,
       kanaele: [],
     })
   })

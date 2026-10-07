@@ -157,7 +157,7 @@ export function TeilenKarte({
   adresse: string
   /** Daten des Teilen-Fensters (Nr. 21); ohne sie das einfache Teilen. */
   fenster?: TeilenFensterDaten | null
-  /** „14 Besuche, 3 Bestellungen über deine Links" der letzten Woche (teilenWirkungSatz). */
+  /** „14 Besuche über deine Links" der letzten Woche (teilenWirkungSatz). */
   wirkung?: string | null
 }): React.JSX.Element {
   const knopf = (label: string, klasse: string) =>

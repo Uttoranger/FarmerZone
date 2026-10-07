@@ -22,6 +22,7 @@ import {
 import { mwstStandard } from '@/lib/mwst'
 import { nachkommastellen, parseDezimal } from '@/lib/format'
 import { PRODUKTNAME_MAX, ZU_LANG } from '@/lib/eingabegrenzen'
+import { FUTTER_BESTAETIGUNG_FEHLT } from '@/lib/futter-registrierung'
 
 // Kategorien, Unterkategorien und Siegel leben seit Sprint Taxonomie 1 in
 // src/lib/taxonomie.ts — der EINEN Quelle. Die drei Namen bleiben hier
@@ -201,7 +202,8 @@ export const FUTTER_FEHLER = {
   zusammensetzung: 'Bitte trag die Zusammensetzung ein — sie steht auf dem Sackanhänger oder Lieferschein.',
   analytischeBestandteile:
     'Bitte trag die analytischen Bestandteile ein — sie stehen auf dem Sackanhänger oder Lieferschein.',
-  bestaetigt: 'Bitte bestätige, dass die Angaben dem Sackanhänger bzw. Lieferschein entsprechen.',
+  // Wortlaut aus src/lib/futter-registrierung.ts — der einen Quelle der Futter-Texte (E10a).
+  bestaetigt: FUTTER_BESTAETIGUNG_FEHLT,
   unterkategorie: 'Bitte wähle die Sorte — zum Beispiel Wiesenheu oder Stroh.',
   fehlt: 'Bei Futtermitteln brauchen wir die Kennzeichnung vom Sackanhänger.',
   verboten: 'Eine Futter-Kennzeichnung gibt es nur bei Futtermitteln.',
@@ -234,9 +236,12 @@ const rohwertZahl = z.preprocess(
 
 /**
  * Die Futter-Kennzeichnung, wie der Hof sie eingibt. `bestaetigt` ist der
- * Haken „Die Angaben entsprechen dem Sackanhänger" — die Server Action macht
+ * Pflicht-Haken aus E10a (FUTTER_BESTAETIGUNG_TEXT) — die Server Action macht
  * daraus `bestaetigtAm = jetzt`. Ein Boolean statt `z.literal(true)`, damit das
  * Formular mit `false` starten kann; die Prüfung verlangt trotzdem true.
+ * So gilt es beim ANLEGEN (Futter-Formular, familienKennzeichnungSchema).
+ * Beim Bearbeiten entscheidet der Server mit dem gespeicherten Stand, ob der
+ * Haken nötig ist (futterKennzeichnungBearbeitenSchema, Nr. 23).
  *
  * futtermittelart ist hier nullable: Ob sie fehlt oder nicht zur Kategorie
  * passt, entscheidet productFormSchema — erst dort ist die Kategorie bekannt,
@@ -267,6 +272,14 @@ export const futterKennzeichnungSchema = z.object({
 
 export type FutterKennzeichnungFormData = z.infer<typeof futterKennzeichnungSchema>
 
+/**
+ * Beim Bearbeiten darf der Haken fehlen: Ob die Änderung eine neue
+ * Bestätigung verlangt, weiß nur der Server mit dem gespeicherten Stand
+ * (brauchtNeueBestaetigung, E10a). Ändert der Hof nur Preis oder Vorrat,
+ * bleibt die alte Bestätigung stehen; sonst lehnt updateProduct ohne Haken ab.
+ */
+export const futterKennzeichnungBearbeitenSchema = futterKennzeichnungSchema.extend({ bestaetigt: z.boolean() })
+
 /** Kategorie-Feld: null = „Keine Angabe" (heutiges Verhalten); ungültige Werte werden abgelehnt. */
 const kategorieFeld = z.preprocess(leerZuNull, z.enum(PRODUCT_CATEGORY_VALUES).nullable()).default(null)
 
@@ -288,7 +301,9 @@ const produktFelder = z.object({
     .refine((l) => new Set(l).size === l.length, 'Ein Siegel kann nur einmal gewählt werden.'),
   // Nur im Bereich Futtermittel — Pflicht dort, verboten sonst (superRefine).
   // null = keine Kennzeichnung (das Formular schreibt null, nie undefined).
-  futter: futterKennzeichnungSchema.nullable().optional(),
+  // Der Haken entscheidet hier nicht (futterKennzeichnungBearbeitenSchema) —
+  // neue Futtermittel entstehen ohnehin nur im Futter-Formular (createProduct lehnt ab).
+  futter: futterKennzeichnungBearbeitenSchema.nullable().optional(),
   // ≠ ALLE nur im Bereich Futtermittel (superRefine).
   abgabe: z.enum(ABGABE_VALUES).default('ALLE'),
   countsTowardLimit: z.boolean().default(true),

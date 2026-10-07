@@ -23,6 +23,14 @@ export type TeilenBildFormat = (typeof TEILEN_BILD_FORMATE)[number]
 /** Der Name des Suchparameters — eine Quelle für Link, Hofseite und Test. */
 export const TEILEN_PARAMETER = 'k'
 
+/**
+ * Was der Hof über die Zählung erfährt — EINE Quelle für jeden Satz dazu
+ * (Teilen-Fenster). Er muss stimmen (Register T1): gezählt werden nur
+ * Besuche, nichts landet im Browser der Kundin, Bestellungen bekommen keinen
+ * Kanal.
+ */
+export const TEILEN_ZAEHLUNG_HINWEIS = 'Wir zählen nur Besuche über deinen Link – ohne Cookies und ohne Speicher im Browser.'
+
 const ZU_ENUM: Record<TeilenKanalCode, TeilenKanal> = {
   wa: 'WHATSAPP',
   'wa-status': 'WHATSAPP_STATUS',
@@ -67,7 +75,7 @@ export function teilenLink(basis: string, slug: string, kanal: TeilenKanalCode):
 }
 
 /**
- * Der Tag, auf den ein Aufruf oder eine Bestellung zählt: der Wiener
+ * Der Tag, auf den ein Besuch zählt: der Wiener
  * Kalendertag (CODING_STANDARDS „Tage und Wochen"), als Mitternacht UTC —
  * so speichert Prisma ihn in der Spalte `@db.Date` genau als diesen Tag.
  */
