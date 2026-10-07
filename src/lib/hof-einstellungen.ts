@@ -86,7 +86,11 @@ export type EinstellungenDaten = {
   abholzeitenGesamt: number
   stripeKontoDa: boolean
   stripeBereit: boolean
-  /** Farm.acceptsOnline — aus heißt: der Hof kassiert bewusst nur bar. */
+  /**
+   * Farm.acceptsOnline. Eine Wahl „nur bar" gibt es nicht mehr (Register Z1);
+   * ein Bestandshof mit false wird nur aufgefordert, Stripe einzurichten — die
+   * Daten bleiben, wie sie sind.
+   */
   onlineAn: boolean
   betriebsnummer: string | null
   betriebsstatus: Betriebsstatus | null
@@ -143,16 +147,21 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
     {
       id: 'zahlung',
       titel: 'Zahlung',
-      // Orange nur, wenn Online an ist und Stripe nicht fertig — ein Hof, der
-      // bewusst nur bar kassiert, hat nichts zu tun.
-      zeile: d.stripeBereit
-        ? 'Online-Zahlung über Stripe aktiv · bar bei Abholung'
-        : !d.onlineAn
-          ? 'Bar bei Abholung · Online-Zahlung ist aus'
-          : d.stripeKontoDa
-            ? 'Stripe-Einrichtung noch nicht fertig · bar bei Abholung geht'
-            : 'Bar bei Abholung · Online-Zahlung noch nicht eingerichtet',
-      ton: d.stripeBereit ? 'fertig' : d.onlineAn ? 'offen' : 'neutral',
+      // Jeder Hof richtet Stripe ein (Register Z1): Ohne fertiges Konto ist
+      // der Punkt orange — auch bei einem Bestandshof mit Online aus, der nur
+      // aufgefordert wird. Barzahlung durch Kundinnen bleibt (B1), sie ist
+      // aber keine Wahl des Hofs statt Stripe.
+      zeile: !d.stripeBereit
+        ? d.stripeKontoDa
+          ? 'Stripe-Einrichtung noch nicht fertig · bitte abschließen'
+          : 'Online-Zahlung noch nicht eingerichtet · bitte einrichten'
+        : d.onlineAn
+          ? 'Online-Zahlung über Stripe aktiv · bar bei Abholung'
+          : // Stripe ist fertig, Online steht aus der Zeit vor Z1 noch auf aus:
+            // Der Checkout bietet online dann nicht an — nicht „aktiv" nennen.
+            // Ausweg: der Knopf „Online-Zahlung einschalten" auf der Zahlungs-Seite.
+            'Stripe eingerichtet · Online-Zahlung noch aus – jetzt einschalten',
+      ton: d.stripeBereit && d.onlineAn ? 'fertig' : 'offen',
       href: '/settings/payments',
     },
     {
@@ -189,6 +198,34 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
     },
   ]
 }
+
+// ─── Zahlungs-Seite ─────────────────────────────────────────────────────────
+
+/** Welche EINE Hinweiskarte oben auf /settings/payments steht. */
+export type ZahlungHinweisArt = 'geschafft' | 'fortsetzen' | 'fehler' | 'einrichten' | 'einschalten'
+
+/**
+ * Genau eine Karte, nie zwei orange übereinander (Nachbesserung Nr. 24):
+ * Die Rückmeldung von Stripe (`?stripe=`) geht vor, sonst sagt die Karte, was
+ * fehlt — Stripe einrichten (Z1) oder, bei fertigem Konto und Online aus
+ * (Bestandshof vor Z1), Online-Zahlung einschalten. „geschafft" nur, wenn
+ * es stimmt.
+ */
+export function zahlungHinweis(d: {
+  rueckmeldung: string | undefined
+  stripeBereit: boolean
+  onlineAn: boolean
+}): ZahlungHinweisArt | null {
+  if (d.rueckmeldung === 'error') return 'fehler'
+  if (!d.stripeBereit) return d.rueckmeldung === 'pending' ? 'fortsetzen' : 'einrichten'
+  if (!d.onlineAn) return 'einschalten'
+  return d.rueckmeldung === 'success' ? 'geschafft' : null
+}
+
+export const ONLINE_AUS_TITEL = 'Online-Zahlung ist noch aus'
+export const ONLINE_AUS_SATZ =
+  'Dein Stripe-Konto ist fertig, die Online-Zahlung ist für deinen Hof aber noch aus. ' +
+  'Schalte sie ein, damit deine Kundinnen online zahlen können.'
 
 /**
  * Die Zeile „Konditionen und Tarif": ohne gewählten Tarif (heute jeder Hof)

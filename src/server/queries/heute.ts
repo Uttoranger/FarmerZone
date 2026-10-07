@@ -23,6 +23,7 @@ import {
   ueberfaelligWhere,
   umsatzHeuteCent,
   wienerTag,
+  stripeEinrichtenHinweis,
   wochenBalken,
   wochenvergleich,
 } from '@/lib/heute'
@@ -64,6 +65,8 @@ export type Heute = {
    * Hinweis mit dem Weg zu Stripe; `barMoeglich` wählt den Satz.
    */
   onlinePausiert: { barMoeglich: boolean } | null
+  /** Freigeschaltet ohne fertiges Stripe (Register Z1, stripeEinrichtenHinweis): Hinweis „Online-Zahlung einrichten". */
+  stripeEinrichten: boolean
   /** Was Teilen-Karte und Freischaltungs-Moment brauchen — sichtbar = öffentlich UND nicht pausiert (heuteHofSichtbar). */
   hof: { sichtbar: boolean; approvedAt: Date | null }
   /** Bis zu drei Produkte im Shop mit Bestand, in der Reihenfolge des Hofs. */
@@ -236,6 +239,7 @@ export async function getHeute(farmId: string, jetzt: Date = new Date()): Promis
     ersteSchritte: ersteSchritte(ersteSchritteDaten(hof, { produkte, aktiveAbholzeiten: slots.length })),
     wartetAufFreigabe: hof?.approvedAt == null,
     onlinePausiert: hof && onlineZahlungPausiert(hof) ? { barMoeglich: hof.acceptsOnsite } : null,
+    stripeEinrichten: hof ? stripeEinrichtenHinweis(hof) : false,
     hof: { sichtbar: hof ? heuteHofSichtbar(hof) : false, approvedAt: hof?.approvedAt ?? null },
     angebot: angebot.map((p) => p.name),
     hofseite: fortschritt

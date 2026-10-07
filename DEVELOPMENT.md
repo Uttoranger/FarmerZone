@@ -3252,6 +3252,10 @@ Bestand-Look, kein `data-design="neu"`. Was gebaut ist, steht in
   offener Punkt im Fortschritt hätte Höfe ohne Stripe dauerhaft auf 10 von 11
   gehalten. Das Badge sagt trotzdem, was fehlt. Kein neuer Stripe-Weg — der
   Hof richtet Online-Zahlung weiter unter Einstellungen → Zahlungen ein.
+  **Ersetzt am 07.10.2026 durch Register Z1** (Stripe-Pflicht, Nachtlauf
+  Nr. 24, Eintrag „Stripe-Pflicht für Höfe" unten): Online-Zahlung ist kein
+  Plus mehr, sondern Pflicht. Die Zeile bleibt trotzdem fertig — gezählt wird
+  die Pflicht in Einrichten und Erste Schritte, nicht doppelt.
 - **Leiser Text in `--app-ink-soft`.** `--app-ink-faint` erreicht auf Creme
   2,4 : 1; die Axe-Prüfung des Sprints („ohne Fehler") ließ sich nur mit dem
   nächststärkeren Token erfüllen. Die Regel steht in CODING_STANDARDS §7 bei
@@ -4316,6 +4320,32 @@ Auftrag freigabe.md §9 „22e", Register E12. Keine Schema-Änderung, keine Mig
 - **`euroEingabeZuCent`** (`src/lib/format.ts`) für getippte Euro-Beträge. Gebaut für den Servicegebühr-Dialog aus #203 (`src/components/admin/servicegebuehr-dialog.tsx`), dort noch nicht eingesetzt — die alte Datei `src/app/admin/servicegebuehr-einstellung.tsx` löscht #203.
 - **Beitrags-Actions** (`status-posts.ts`): Zod an allen vier (`src/schemas/status-post.ts`, Grenzen in `eingabegrenzen.ts`; der Server lässt mehr zu als das Formular, weil ein alter Beitrag ungekürzt als Vorlage kommt), Besitz im Schreiben (`updateMany`/`deleteMany` mit `{ id, farmId }`, `count`), nach außen nur Sätze, Sentry mit festem Text, Schritt und Fehlerklasse. Deaktivieren und Löschen bauen auch die öffentliche Hofseite neu.
 - **„Mein Auftritt":** Bildunterschrift, Beschreibung eines Werts und „Logo hochladen" auf 44 px (Klassen); die kleinen Pfeil-, Löschen- und Ziehknöpfe (24–32 px, ohne Namen) bleiben Altlast.
+
+## Admin in der AdminShell (Nachtlauf Nr. 22f, Oktober 2026)
+
+Auftrag freigabe.md §9 „22f", Gate 8 (Zeile `/admin`, `/admin/meldungen(/[id])`, `/admin/finanzen`), Register E9, K1, F5. Mockups `admin-hoefe-und-freischaltung`, `admin-briefkasten`, `admin-meldung-entscheiden`, `admin-finanzen`, `admin-mobil-unterwegs-freischalten`. Keine Schema-Änderung, keine Migration.
+
+- **Shell:** `src/app/admin/layout.tsx` trägt die AdminShell aus Nr. 05 um alle Admin-Routen. Name und Zähler (wartende Höfe, Meldungen zu entscheiden) lädt `ladeAdminbereich` erst nach `verlangeAdminSeite` — ein Layout rendert parallel zur Seite und hätte sonst einem Unbefugten die Zähler gezeigt. Die Seiten prüfen weiter selbst; ein AST-Test wacht über jede künftige Admin-Seite.
+- **Fachregel Freischalten ohne Stripe (Lesart nach Nachbesserung Runde 1):** Freigabe §9 („Freischalten bleibt gesperrt ohne Stripe") und Gate 8 setzten eine Sperre voraus, die es im Code nicht gab. Zugleich darf ein Hof bewusst nur bar kassieren — Online-Zahlung ist ein Plus, kein Muss (`hof-einstellungen.ts`, `stripe-konto.ts`). Deshalb sperrt `freischaltSperre` (EINE Regel für Liste und `approveFarmAction`) nur Höfe, die online kassieren wollen und deren Stripe nicht fertig ist: `acceptsOnline !== false && stripeAccountReady !== true`, beides frisch aus der Datenbank, nach der E-Mail-Sperre (S3). Ein Bar-Hof ist ohne Stripe freischaltbar und heißt in der Liste „Nur bar" (neutral, eigener Filter), nicht „Zahlung fehlt". Bereits freigeschaltete Höfe berührt das nicht. Bitte bestätigen (Bericht 22f, (a)). **Verworfen am 07.10.2026 durch Register Z1** (Nr. 24): Stripe sperrt das Freischalten für jeden Hof, „Nur bar" gibt es nicht mehr.
+- **E9:** Die Betriebsnummer steht im Admin als Nummer da, wie der Hof sie angibt; kein Haken, kein „geprüft" (Test am Quelltext).
+- **Servicegebühr je Hof:** dieselbe `setServiceFeeAction`, jetzt im Dialog; Satz „Gilt nur für neue Bestellungen – bestehende behalten ihren Satz" mit dem Standard aus `konditionen.ts`.
+- **Briefkasten:** Filter Zu entscheiden · Offen · Abgeschlossen · Alle mit Zahl, Art als Umschalter, Wunschliste gebündelt daneben (der frühere Reiter „Wünsche" entfällt; `?reiter=wuensche` zeigt einfach den Briefkasten). Ein einzelner Status aus einem alten Link filtert weiter, nur ohne leuchtenden Chip. Der KI-Vorschlag bleibt ein Vorschlag mit zwei Knöpfen; Triage-Fehler stehen jetzt im Formular statt als Toast.
+- **Finanzen:** dieselben Zahlen aus `getFinanzen` (Cent), Break-even aus `kostendeckungSatz` (Schnitt der Gebühr je Bestellung gegen die eingetragenen Kosten, schon vorhanden) mit Fortschrittsbalken. Das Diagramm ist jetzt aus Token-Balken statt Recharts — `finanzen-diagramm.tsx` ist aus `FARBLITERAL_BESTAND` heraus. Grundgebühren-Kachel, „per SEPA am …" und „entfallene Gebühren" aus dem Mockup fehlen (keine Daten bzw. vor SEPA-Start nicht zutreffend, B1).
+- **Entfernt:** `src/app/admin/admin-farm-list.tsx`, `servicegebuehr-einstellung.tsx` (aufgegangen in `src/components/admin/`).
+
+## Stripe-Pflicht für Höfe (Nachtlauf Nr. 24, Oktober 2026)
+
+Auftrag freigabe.md §10 „24", Register Z1 (dazu B1). Der Branch übernimmt die Admin-Commits aus Nr. 22f (#201) per Cherry-pick auf `main`. Keine Schema-Änderung, keine Migration, keine Datenänderung, kein Eingriff in den Geldpfad.
+
+- **Fachregel (ersetzt „Online-Zahlung ist ein Plus, kein Muss"):** Jeder Hof richtet Stripe ein, bevor er freigeschaltet wird. Eine Wahl „nur bar" gibt es nicht mehr. Barzahlung durch Kundinnen bleibt möglich (B1) — das ist keine Wahl des Hofs statt Stripe. Die Lesart aus 22f Runde 1 (Sperre nur bei Online-Wunsch) ist verworfen.
+- **Freischalten:** `freischaltSperre` (`src/lib/admin-hoefe.ts`) kennt `acceptsOnline` nicht mehr: erst die E-Mail (S3), dann Stripe — für jeden Hof. `approveFarmAction` fragt dieselbe Regel und liest `acceptsOnline` gar nicht mehr. Das ist die serverseitige Schranke für „Hof online stellen"; einen anderen Weg in die Öffentlichkeit gibt es nicht.
+- **Admin:** „Nur bar" (Marke, Filter, „nicht nötig") ist weg. Freigeschaltete Höfe ohne Stripe tragen „Stripe fehlt" (orange, kein Rot) als Marke und Filter; der Filter fragt `stripeFehlt` und findet deshalb auch einen pausierten Hof ohne Stripe. Der alte Link `?filter=ohne-zahlung` zeigt dieselben Höfe, `?filter=nur-bar` fällt auf „Alle".
+- **Bestandshöfe:** Bereits freigeschaltete Höfe ohne Stripe bleiben online — keine Abschaltung, keine Sperre, keine Mail. Sie sehen auf Heute die orange Karte „Online-Zahlung einrichten" (`stripeEinrichtenHinweis`, `src/lib/heute.ts`) mit dem Weg nach `/settings/payments`, dazu Hinweiskarte und orangen Punkt in den Einstellungen. Ein Hof mit `acceptsOnline = false` aus der Zeit vor Z1 wird nur aufgefordert; die Spalte bleibt, wie sie ist.
+- **Notbremse unverändert:** `onlineZahlungPausiert` (`src/lib/stripe-konto.ts`) und `account.updated` im Webhook sind unberührt. Greift sie, steht auf Heute „Online-Zahlung ist pausiert" statt des Einrichten-Hinweises — nie beide.
+- **Kein Schreibweg für „nur bar":** Keine Server Action und keine API-Route schreibt `acceptsOnline` (es gab nie eine; `createFarm` verlässt sich auf den Default true). `tests/stripe-pflicht.test.ts` wacht am Quelltext, dass keine dazukommt, die es auf etwas anderes als true setzt.
+- **Texte aus einer Quelle:** `ONLINE_ZAHLUNG_EINRICHTEN_SATZ` (wörtlich aus der Freigabe) und `ONLINE_ZAHLUNG_START_SCHRITT`/`_KURZ` in `src/lib/konditionen.ts`. Einrichten, Erste Schritte, Heute und Zahlung zeigen den Satz; `/fuer-hoefe`, `/konditionen` (Aufnahme-Schritte) und Registrieren nennen „Online-Zahlung einrichten" als Schritt vor der Freischaltung. Die öffentlichen Texte nennen keine einzelnen Zahlungsarten — welche Stripe anbietet, schaltet der Betreiber im Stripe-Konto frei.
+- **Nachbesserung Runde 1 — keine Sackgasse für Bestandshöfe:** Ein Hof mit `acceptsOnline = false` kam vorher nie zur Online-Zahlung (kein Weg setzte das Feld, der Checkout fragt es). Jetzt setzen `createConnectAccount` und `createOnboardingLink` es im selben Zug auf true; wessen Stripe schon fertig ist, schaltet es auf `/settings/payments` mit `schalteOnlineZahlungEin` ein (nur true, nur der eigene Hof). Der Admin sieht solche Höfe als „Online-Zahlung aus" (neutral, eigener Filter). Freischalten schreibt bedingt (`updateMany` mit `stripeAccountReady: true, approvedAt: null`). Die Zahlungs-Seite zeigt oben nur noch eine Karte (`zahlungHinweis`).
+- **Einrichten:** Der Schritt „Prüfung und Freischaltung" ist ohne Stripe gesperrt (nach der E-Mail, dieselbe Reihenfolge wie `freischaltSperre`), mit Umriss-Link „Online-Zahlung einrichten". In Erste Schritte ist die Zahlung nicht mehr „optional", „Bar bei Abholung geht auch ohne" ist weg.
 
 ## Nützliche Befehle
 

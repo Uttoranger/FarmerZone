@@ -9,11 +9,14 @@ import {
   createConnectAccount,
   createOnboardingLink,
   checkConnectStatus,
+  schalteOnlineZahlungEin,
 } from '@/server/actions/stripe-connect'
 
 interface PaymentsActionsProps {
   hasAccount: boolean
   isReady: boolean
+  /** Farm.acceptsOnline — false nur bei Bestandshöfen vor Register Z1. */
+  onlineAn: boolean
 }
 
 /** Während eine Action läuft: Kreisel für das Auge, Satz für den Screenreader. */
@@ -32,7 +35,7 @@ function Warten(): React.JSX.Element {
  * Stripe (createOnboardingLink); „Status prüfen" fragt checkConnectStatus.
  * Genau ein orange Knopf (Hof-Aktion), Prüfen als Umriss.
  */
-export function PaymentsActions({ hasAccount, isReady }: PaymentsActionsProps): React.JSX.Element {
+export function PaymentsActions({ hasAccount, isReady, onlineAn }: PaymentsActionsProps): React.JSX.Element {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
@@ -75,6 +78,38 @@ export function PaymentsActions({ hasAccount, isReady }: PaymentsActionsProps): 
     } finally {
       setLoading(false)
     }
+  }
+
+  // Stripe fertig, Online aber aus (Bestandshof vor Z1): Einschalten ist hier
+  // die eine Hof-Aktion, „Status prüfen" bleibt als Umriss daneben.
+  async function handleEinschalten() {
+    setLoading(true)
+    try {
+      const res = await schalteOnlineZahlungEin({ einschalten: true })
+      if ('error' in res) {
+        toast.error(res.error)
+      } else {
+        toast.success('Online-Zahlung ist eingeschaltet.')
+        router.refresh()
+      }
+    } catch {
+      toast.error('Wir konnten die Online-Zahlung gerade nicht einschalten. Versuch es bitte noch einmal.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (isReady && !onlineAn) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={handleEinschalten} disabled={loading} className={KNOPF_ORANGE}>
+          {loading ? <Warten /> : 'Online-Zahlung einschalten'}
+        </button>
+        <button type="button" onClick={handleRefresh} disabled={loading} className={KNOPF_RAHMEN}>
+          Status prüfen
+        </button>
+      </div>
+    )
   }
 
   if (isReady) {

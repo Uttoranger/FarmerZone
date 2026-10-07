@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import * as Sentry from '@sentry/nextjs'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { verlangeAdminSeite } from '@/server/admin-wache'
-import { aktuellerFinanzMonat, getFinanzen } from '@/server/queries/finanzen'
+import { aktuellerFinanzMonat, getFinanzen, type FinanzenDaten } from '@/server/queries/finanzen'
 import { centsAlsEuro, istMonatsschluessel } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import {
@@ -13,108 +14,99 @@ import {
   STRIPE_HINWEIS,
   kostendeckungSatz,
 } from '@/lib/finanzen'
-import { Marke } from '@/components/ui/marke'
 import { cn } from '@/lib/utils'
-import { FinanzenDiagramm } from './finanzen-diagramm'
+import { ProgressBar } from '@/components/ui/progress-bar'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { KARTE, KICKER, LEISE } from '@/components/hof-bestellungen/stil'
+import { ADMIN_RAHMEN, AdminFehler, SEITEN_TITEL } from '@/components/admin/admin-teile'
+import { DiagrammLegende, FinanzenDiagramm } from './finanzen-diagramm'
 import { KostenListe } from './kosten-liste'
 
 export const metadata: Metadata = { title: 'Finanzen — Admin — FarmerZone' }
 // Die Seite zeigt Geld und wird selten aufgerufen — nie aus einem Cache.
 export const dynamic = 'force-dynamic'
 
-const CHIP_EINGEZOGEN = 'bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-200'
-const CHIP_OFFEN = 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200'
-
 /**
  * /admin/finanzen — beantwortet EINE Frage: Ab wann trägt sich die Plattform?
+ * (Mockup admin-finanzen, im neuen Design seit Nr. 22f.)
  *
  * Die Einnahmen kommen aus den Bestellungen (die Servicegebühr, in vier Töpfen
  * — src/lib/finanzen.ts), die Kosten trägt der Betreiber selbst ein. Ein
  * Überblick, keine Buchhaltung: keine Abrechnung mit den Höfen, kein
- * automatischer Abruf von Kosten, keine Fremdwährung.
- *
- * Gerechnet wird nichts hier. Diese Datei zeigt an, was die reine Funktion
- * entschieden hat (ARCHITECTURE §1).
+ * automatischer Abruf von Kosten, keine Fremdwährung. Alle Beträge in ganzen
+ * Cent; gerechnet wird nichts hier — die Seite zeigt an, was die reinen
+ * Funktionen entschieden haben (ARCHITECTURE §1). Nur lesend: Geschrieben
+ * werden hier allein die eigenen Kostenposten (KostenSheet, unverändert).
  */
 export default async function AdminFinanzenPage({
   searchParams,
 }: {
   searchParams: Promise<{ monat?: string }>
-}) {
+}): Promise<React.JSX.Element> {
   await verlangeAdminSeite()
 
   const { monat: gewuenscht } = await searchParams
   // Ungültiges still verwerfen und den laufenden Monat zeigen (ARCHITECTURE §4):
   // Eine Adresszeile ist Fremdtext, kein Grund für eine Fehlerseite.
-  const monat =
-    typeof gewuenscht === 'string' && istMonatsschluessel(gewuenscht)
-      ? gewuenscht
-      : aktuellerFinanzMonat()
+  const monat = typeof gewuenscht === 'string' && istMonatsschluessel(gewuenscht) ? gewuenscht : aktuellerFinanzMonat()
 
-  const daten = await getFinanzen(monat)
+  let daten: FinanzenDaten | null = null
+  try {
+    daten = await getFinanzen(monat)
+  } catch (err) {
+    Sentry.captureException(err, { tags: { bereich: 'admin', seite: 'finanzen' } })
+  }
+
+  if (!daten) {
+    return (
+      <div className={ADMIN_RAHMEN}>
+        <AdminFehler titel="Finanzen" satz="Wir konnten die Finanzen gerade nicht laden." nochmal="/admin/finanzen" />
+      </div>
+    )
+  }
+
   const { einnahmen, kosten } = daten
-  const einnahmenCents = einnahmen.gezaehltCents
-  const ergebnisCents = einnahmenCents - kosten.cents
-
+  const ergebnisCents = einnahmen.gezaehltCents - kosten.cents
   const geschafft = daten.brauchtBestellungen
-  const anteil =
-    geschafft === null || geschafft === 0
-      ? null
-      : Math.min(100, Math.round((einnahmen.bestellungen / geschafft) * 100))
 
   return (
-    <main className="min-h-screen bg-background px-4 py-8 md:px-6">
-      <div className="mx-auto max-w-4xl">
-        <Link href="/admin" className="text-sm text-primary hover:underline">
-          ← Admin
-        </Link>
-
-        <h1 className="mt-3 mb-4 text-xl font-semibold text-foreground">Finanzen</h1>
-
-        {/* Monatswahl. Links statt Knöpfe: Der Monat steht in der Adresse, also
-            ist er teilbar und der Zurück-Pfeil des Browsers tut das Richtige. */}
-        <nav
-          aria-label="Monat wählen"
-          className="mb-5 flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-1 py-1"
-        >
+    <div className={cn(ADMIN_RAHMEN, 'flex flex-col gap-5')}>
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <h1 className={SEITEN_TITEL}>Finanzen</h1>
+        {/* Links statt Knöpfe: Der Monat steht in der Adresse, also ist er
+            teilbar und der Zurück-Pfeil des Browsers tut das Richtige. */}
+        <nav aria-label="Monat wählen" className="flex items-center gap-1.5">
           <MonatsPfeil monat={daten.vorigerMonat} richtung="zurueck" />
-          <span className="text-sm font-semibold text-foreground">{daten.bezeichnung}</span>
+          <span className="min-w-[9.5rem] text-center text-[15px] font-semibold text-foreground" aria-current="page">
+            {daten.bezeichnung}
+          </span>
           <MonatsPfeil monat={daten.naechsterMonat} richtung="vor" />
         </nav>
+      </header>
 
-        {/* Drei Kacheln. Bei 375 px zwei Spalten und das Ergebnis über die
-            ganze Breite — drei Beträge nebeneinander brächen dort um. */}
-        <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <Kachel
-            titel="Einnahmen"
-            betragCents={einnahmenCents}
-            fussnote={
-              einnahmen.bestellungen === 1
-                ? '1 Bestellung'
-                : `${einnahmen.bestellungen} Bestellungen`
-            }
-          />
-          <Kachel
-            titel="Kosten"
-            betragCents={kosten.cents}
-            fussnote={kosten.anzahl === 1 ? '1 Posten' : `${kosten.anzahl} Posten`}
-          />
-          <Kachel
-            titel="Ergebnis"
-            betragCents={ergebnisCents}
-            fussnote={ergebnisCents < 0 ? 'noch nicht gedeckt' : 'gedeckt'}
-            negativ={ergebnisCents < 0}
-            className="col-span-2 sm:col-span-1"
-          />
-        </div>
+      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Kachel titel={EINNAHMEN_ONLINE_LABEL} betragCents={einnahmen.eingezogenCents} satz={`bereits einbehalten · ${STRIPE_HINWEIS}`} />
+        <Kachel titel={EINNAHMEN_VOR_ORT_LABEL} betragCents={einnahmen.geschuldetCents} satz="noch offen · schulden die Höfe" />
+        <Kachel titel="Kosten" betragCents={kosten.cents} satz={kosten.anzahl === 1 ? '1 Posten' : `${kosten.anzahl} Posten`} />
+        <Kachel
+          titel="Ergebnis"
+          betragCents={ergebnisCents}
+          vorzeichen
+          satz={ergebnisCents < 0 ? 'noch nicht gedeckt' : 'trägt sich'}
+          ton={ergebnisCents < 0 ? 'offen' : 'fertig'}
+        />
+      </dl>
 
-        {/* Die Antwort auf die Frage der Seite. Auf der Markenfläche, damit sie
-            nicht wie eine weitere Kachel aussieht: `primary` ist im hellen
-            Modus das dunkle Waldgrün und im dunklen die helle Entsprechung —
-            `primary-foreground` sitzt in beiden darauf (CODING_STANDARDS §7). */}
-        <section className="mb-5 rounded-2xl bg-primary px-4 py-4 text-primary-foreground">
-          <h2 className="text-sm font-semibold">Wann trägt sich die Plattform?</h2>
-          <p className="mt-1.5 text-sm leading-relaxed opacity-95">
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)]">
+        <section aria-labelledby="traegt-titel" className={cn(KARTE, 'flex flex-col gap-4 p-4 md:p-[18px]')}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="traegt-titel" className="font-heading text-[17px] font-semibold text-foreground">
+              Wann trägt sich die Plattform?
+            </h2>
+            <DiagrammLegende />
+          </div>
+          <FinanzenDiagramm punkte={daten.verlauf} />
+          <p className="text-[14px] leading-relaxed text-foreground">
             {kostendeckungSatz({
               schnittCents: daten.schnittCents,
               brauchtBestellungen: daten.brauchtBestellungen,
@@ -122,105 +114,66 @@ export default async function AdminFinanzenPage({
               bestellungen: einnahmen.bestellungen,
             })}
           </p>
+          {geschafft !== null && geschafft > 0 && (
+            <ProgressBar
+              beschriftung={`${einnahmen.bestellungen} von ${geschafft} Bestellungen`}
+              wert={Math.min(einnahmen.bestellungen, geschafft)}
+              max={geschafft}
+            />
+          )}
+        </section>
 
-          {anteil !== null && geschafft !== null && (
-            <div className="mt-3">
-              <div
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={geschafft}
-                aria-valuenow={einnahmen.bestellungen}
-                aria-label={`${einnahmen.bestellungen} von ${geschafft} Bestellungen`}
-                // Die Wanne steht bewusst leise (2:1 gegen die Fläche): Die
-                // Aussage trägt der gefüllte Balken, und darunter steht sie
-                // zusätzlich als Zahl — der Fortschritt hängt also nie allein
-                // an einem Farbunterschied.
-                className="h-2 w-full overflow-hidden rounded-full bg-primary-foreground/25"
-              >
-                <div
-                  className="h-full rounded-full bg-primary-foreground transition-[width]"
-                  style={{ width: `${anteil}%` }}
-                />
-              </div>
-              <p className="mt-1.5 text-xs opacity-90 tabular-nums">
-                {einnahmen.bestellungen} von {geschafft} Bestellungen
-              </p>
+        <KostenListe monat={daten.monat} bezeichnung={daten.bezeichnung} posten={daten.posten} summeCents={kosten.cents} />
+      </div>
+
+      <section aria-labelledby="einnahmen-titel" className={cn(KARTE, 'p-4 md:p-[18px]')}>
+        <h2 id="einnahmen-titel" className={KICKER}>
+          Einnahmen im Einzelnen
+        </h2>
+        <dl className="mt-2 text-[14px] [&>div]:flex [&>div]:items-baseline [&>div]:justify-between [&>div]:gap-3 [&>div]:border-t [&>div]:border-border [&>div]:py-2.5">
+          <div>
+            <dt className="text-foreground">{EINNAHMEN_ONLINE_LABEL}</dt>
+            <dd className="font-semibold text-foreground tabular-nums">{formatEuro(centsAlsEuro(einnahmen.eingezogenCents))}</dd>
+          </div>
+          <div>
+            <dt className="text-foreground">{EINNAHMEN_VOR_ORT_LABEL}</dt>
+            <dd className="font-semibold text-foreground tabular-nums">{formatEuro(centsAlsEuro(einnahmen.geschuldetCents))}</dd>
+          </div>
+          {/* „Provision" nur, wenn sie im Monat nicht 0 ist: Farm.platformFeePercent
+              steht im Pilot auf 0, und eine Nullzeile ist Rauschen. */}
+          {einnahmen.provisionCents !== 0 && (
+            <div>
+              <dt className="text-foreground">{EINNAHMEN_PROVISION_LABEL}</dt>
+              <dd className="font-semibold text-foreground tabular-nums">{formatEuro(centsAlsEuro(einnahmen.provisionCents))}</dd>
             </div>
           )}
-        </section>
+        </dl>
+        <p className={cn('mt-1 text-[13px]', LEISE)}>
+          erwartet: {formatEuro(centsAlsEuro(einnahmen.erwartetCents))} aus{' '}
+          {einnahmen.offeneBestellungen === 1 ? '1 offenen Bestellung' : `${einnahmen.offeneBestellungen} offenen Bestellungen`}
+        </p>
+      </section>
 
-        <FinanzenDiagramm punkte={daten.verlauf} />
-
-        {/* Einnahmen im Einzelnen */}
-        <section className="mb-5 rounded-xl border border-border bg-card">
-          <h2 className="border-b border-border px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Einnahmen
-          </h2>
-
-          <Zeile
-            titel={EINNAHMEN_ONLINE_LABEL}
-            chip="eingezogen"
-            chipFarbe={CHIP_EINGEZOGEN}
-            betragCents={einnahmen.eingezogenCents}
-            // Befund aus Phase 0 d): Die Zahlung entsteht auf dem
-            // Plattformkonto, Stripe zieht dort ab — gespeichert wird davon
-            // nichts. „Eingezogen" ist deshalb ein Brutto.
-            hinweis={STRIPE_HINWEIS}
-          />
-          <Zeile
-            titel={EINNAHMEN_VOR_ORT_LABEL}
-            chip="noch offen"
-            chipFarbe={CHIP_OFFEN}
-            betragCents={einnahmen.geschuldetCents}
-            hinweis="schulden die Höfe"
-          />
-          {/* „Provision" nur, wenn sie im Monat nicht 0 ist: Farm.platformFeePercent
-              steht im Pilot auf 0, und eine Nullzeile auf jeder Seite ist Rauschen. */}
-          {einnahmen.provisionCents !== 0 && (
-            <Zeile titel={EINNAHMEN_PROVISION_LABEL} betragCents={einnahmen.provisionCents} />
-          )}
-
-          <p className="px-4 py-2.5 text-xs text-muted-foreground">
-            erwartet: {formatEuro(centsAlsEuro(einnahmen.erwartetCents))} aus{' '}
-            {einnahmen.offeneBestellungen === 1
-              ? '1 offenen Bestellung'
-              : `${einnahmen.offeneBestellungen} offenen Bestellungen`}
-          </p>
-        </section>
-
-        <KostenListe monat={daten.monat} bezeichnung={daten.bezeichnung} posten={daten.posten} />
-
-        <p className="mt-6 text-xs leading-relaxed text-muted-foreground">{FINANZEN_FUSSZEILE}</p>
-      </div>
-    </main>
+      <p className={cn('text-[12.5px] leading-relaxed', LEISE)}>{FINANZEN_FUSSZEILE}</p>
+    </div>
   )
 }
 
 /** Ein Monatspfeil — oder ein stiller Platzhalter, wo es nichts mehr gibt. */
-function MonatsPfeil({
-  monat,
-  richtung,
-}: {
-  monat: string | null
-  richtung: 'zurueck' | 'vor'
-}) {
+function MonatsPfeil({ monat, richtung }: { monat: string | null; richtung: 'zurueck' | 'vor' }): React.JSX.Element {
   const Symbol = richtung === 'zurueck' ? ChevronLeft : ChevronRight
-  const beschriftung = richtung === 'zurueck' ? 'Vorheriger Monat' : 'Nächster Monat'
-
   if (monat === null) {
     // Kein ausgegrauter Knopf, der nichts tut: Die Fläche bleibt, damit der
     // Monatsname nicht springt, aber es gibt nichts zu treffen.
-    // `block`, weil ein inline-Span keine Größe annimmt.
     return <span aria-hidden="true" className="block size-11" />
   }
-
   return (
     <Link
       href={`/admin/finanzen?monat=${monat}`}
-      aria-label={beschriftung}
-      className="flex size-11 items-center justify-center rounded-lg text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      aria-label={richtung === 'zurueck' ? 'Vorheriger Monat' : 'Nächster Monat'}
+      className={cn('flex size-11 items-center justify-center rounded-full border border-border text-foreground hover:bg-muted', FOKUS_RAHMEN)}
     >
-      <Symbol className="size-5" aria-hidden="true" />
+      <Symbol className="size-4" strokeWidth={1.7} aria-hidden="true" />
     </Link>
   )
 }
@@ -228,61 +181,31 @@ function MonatsPfeil({
 function Kachel({
   titel,
   betragCents,
-  fussnote,
-  negativ = false,
-  className,
+  satz,
+  vorzeichen = false,
+  ton,
 }: {
   titel: string
   betragCents: number
-  fussnote: string
-  negativ?: boolean
-  className?: string
-}) {
+  satz: string
+  /** „+ € 35,10" — nur beim Ergebnis. */
+  vorzeichen?: boolean
+  /** Grün = trägt sich, Orange = noch nicht (kein Rot, Register O1). */
+  ton?: 'fertig' | 'offen'
+}): React.JSX.Element {
+  const betrag = formatEuro(centsAlsEuro(betragCents))
   return (
-    <div className={cn('rounded-xl border border-border bg-card px-3 py-3', className)}>
-      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        {titel}
-      </p>
-      <p
+    <div className={cn(KARTE, 'min-w-0 px-4 py-3.5')}>
+      <dt className={KICKER}>{titel}</dt>
+      <dd
         className={cn(
-          'mt-0.5 text-lg font-semibold tabular-nums',
-          // Bedeutungsfarbe: Ein negatives Ergebnis ist die eine Zahl, die man
-          // sofort sehen muss. Heller Wert plus dark:-Entsprechung (§7).
-          negativ ? 'text-red-600 dark:text-red-400' : 'text-foreground'
+          'mt-1 font-heading text-[24px] leading-tight font-semibold tabular-nums md:text-[26px]',
+          ton === 'fertig' ? 'text-status-fertig' : ton === 'offen' ? 'text-status-offen' : 'text-foreground'
         )}
       >
-        {formatEuro(centsAlsEuro(betragCents))}
-      </p>
-      <p className="mt-0.5 text-[11px] text-muted-foreground">{fussnote}</p>
-    </div>
-  )
-}
-
-function Zeile({
-  titel,
-  chip,
-  chipFarbe,
-  betragCents,
-  hinweis,
-}: {
-  titel: string
-  chip?: string
-  chipFarbe?: string
-  betragCents: number
-  hinweis?: string
-}) {
-  return (
-    <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3 last:border-b-0">
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-foreground">{titel}</span>
-          {chip && chipFarbe && <Marke farbe={chipFarbe}>{chip}</Marke>}
-        </div>
-        {hinweis && <p className="mt-0.5 text-xs text-muted-foreground">{hinweis}</p>}
-      </div>
-      <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
-        {formatEuro(centsAlsEuro(betragCents))}
-      </span>
+        {vorzeichen && betragCents > 0 ? `+ ${betrag}` : betrag}
+      </dd>
+      <dd className={cn('mt-0.5 text-[12.5px]', LEISE)}>{satz}</dd>
     </div>
   )
 }

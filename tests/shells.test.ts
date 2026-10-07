@@ -265,6 +265,8 @@ describe('kein Big Bang', () => {
     '(hof)/layout.tsx',
     // Nr. 17b: „E-Mail bestätigen" (neu, Fokus-Shell wie /register).
     '(auth)/verify/page.tsx',
+    // Nr. 22f: alle Routen unter /admin — ihr Layout trägt die AdminShell.
+    'admin/layout.tsx',
   ]
 
   it('nur die Vorschau unter /intern und die umgestellten Routen binden eine Shell ein', () => {
