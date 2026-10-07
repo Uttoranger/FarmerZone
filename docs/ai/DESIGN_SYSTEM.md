@@ -148,6 +148,7 @@ Umgesetzt in `src/components/shells/` (KundeShell, KundeFokusShell, HofShell, Ad
 
 - Alles, was navigiert, ist ein echter Link (`<a href>`): Hofkarten, Kategorie-Chips, Filter, Navigation, Produktkacheln. Filter stehen in der URL (siehe Konzept Bereiche §6.2), damit Teilen, Zurück und Mittelklick funktionieren.
 - Ein Knopf ist nur, was etwas auslöst (In den Korb, Speichern, Teilen).
+- E-Mail und Telefon stehen als Links (`mailto:`, `tel:`) mit 44 px Trefferfläche und Symbol (`Mail`/`Phone`, `aria-hidden`); sichtbar die Schreibweise der Quelle, der `tel:`-Link wird daraus ohne Leerzeichen gebaut, nie ein zweites Mal von Hand geschrieben (Vorbild `BAES_KONTAKT_TEL`, `src/lib/futter-registrierung.ts`).
 
 ### Entdecken (/hoefe)
 
