@@ -48,6 +48,25 @@ async function toHtml(element: React.ReactElement): Promise<string> {
   return render(element)
 }
 
+/**
+ * Für die Versandfunktionen, die ein Ergebnis liefern statt zu werfen
+ * (Anmeldecode, Code für „Bestellungen finden", E-Mail bestätigen): Laden und
+ * Rendern der Vorlage im selben Fehlerweg wie der Versand — seit die Vorlage
+ * dynamisch kommt (Nr. 31), könnte schon das Laden scheitern. Dann
+ * `{ error }` wie bei einem Resend-Fehler; auth.ts schreibt den Code lokal ins Log.
+ */
+async function htmlOderFehler(
+  baue: () => Promise<React.ReactElement>
+): Promise<{ ok: true; html: string } | { ok: false; error: string }> {
+  try {
+    return { ok: true, html: await toHtml(await baue()) }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`[E-Mail] Vorlage nicht erzeugt: ${msg}`)
+    return { ok: false, error: msg }
+  }
+}
+
 export async function sendRaw(to: string, subject: string, html: string): Promise<{ id?: string; error?: string }> {
   if (!apiKey) {
     console.log(`[E-Mail] KEIN API-KEY — würde senden: "${subject}" → ${logEmpfaenger(to)}`)
@@ -204,9 +223,12 @@ export async function sendMagicLinkEmail(email: string, url: string, firstName?:
  */
 export async function sendAnmeldeCodeEmail(email: string, code: string): Promise<{ id?: string; error?: string }> {
   const minuten = ANMELDECODE_GUELTIG_SEKUNDEN / 60
-  const { AnmeldecodeEmail } = await import('@/emails/anmeldecode')
-  const html = await toHtml(React.createElement(AnmeldecodeEmail, { code, minuten }))
-  return sendRaw(email, 'Dein Anmeldecode für FarmerZone', html)
+  const vorlage = await htmlOderFehler(async () => {
+    const { AnmeldecodeEmail } = await import('@/emails/anmeldecode')
+    return React.createElement(AnmeldecodeEmail, { code, minuten })
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, 'Dein Anmeldecode für FarmerZone', vorlage.html)
 }
 
 /**
@@ -216,9 +238,12 @@ export async function sendAnmeldeCodeEmail(email: string, code: string): Promise
  */
 export async function sendBestellCodeEmail(email: string, code: string): Promise<{ id?: string; error?: string }> {
   const minuten = ANMELDECODE_GUELTIG_SEKUNDEN / 60
-  const { AnmeldecodeEmail } = await import('@/emails/anmeldecode')
-  const html = await toHtml(React.createElement(AnmeldecodeEmail, { code, minuten, zweck: 'bestellungen' }))
-  return sendRaw(email, 'Dein Code für deine Bestellungen · FarmerZone', html)
+  const vorlage = await htmlOderFehler(async () => {
+    const { AnmeldecodeEmail } = await import('@/emails/anmeldecode')
+    return React.createElement(AnmeldecodeEmail, { code, minuten, zweck: 'bestellungen' })
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, 'Dein Code für deine Bestellungen · FarmerZone', vorlage.html)
 }
 
 /**
@@ -227,9 +252,12 @@ export async function sendBestellCodeEmail(email: string, code: string): Promise
  * keinen Link; gibt das Versandergebnis zurück (sendRaw wirft nie).
  */
 export async function sendEmailBestaetigung(email: string, url: string): Promise<{ id?: string; error?: string }> {
-  const { EmailBestaetigungEmail } = await import('@/emails/email-bestaetigung')
-  const html = await toHtml(React.createElement(EmailBestaetigungEmail, { url, stunden: BESTAETIGUNG_GUELTIG_SEKUNDEN / 3600 }))
-  return sendRaw(email, 'Bestätige deine E-Mail-Adresse · FarmerZone', html)
+  const vorlage = await htmlOderFehler(async () => {
+    const { EmailBestaetigungEmail } = await import('@/emails/email-bestaetigung')
+    return React.createElement(EmailBestaetigungEmail, { url, stunden: BESTAETIGUNG_GUELTIG_SEKUNDEN / 3600 })
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, 'Bestätige deine E-Mail-Adresse · FarmerZone', vorlage.html)
 }
 
 /** Passwort-Reset → Bauer */

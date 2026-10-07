@@ -101,9 +101,22 @@ export function erstattungZaehlt(status: string | null): boolean {
  * Das Stripe-SDK erst im Aufruf (Nachtlauf Nr. 31, ARCHITECTURE §4): Dieses
  * Modul hängt an den Bestell-Actions, die /orders einbindet — ein statischer
  * Import legte das SDK in jeden Kaltstart der Seite.
+ *
+ * Einmal je Instanz geladen und gemerkt. Wer die Funktionen hier innerhalb
+ * einer Transaktion mit Zeilensperre aufruft (meldeFehlendenArtikel), ruft
+ * `stripeVorladen()` VOR der Transaktion: Das Laden des Moduls soll die
+ * Sperre nicht verlängern — in der Transaktion wird dann nicht mehr
+ * importiert (tests/schwere-module.test.ts).
  */
+let geladenesSdk: Stripe | null = null
+
+export async function stripeVorladen(): Promise<Stripe> {
+  if (!geladenesSdk) geladenesSdk = (await import('@/lib/stripe')).stripe
+  return geladenesSdk
+}
+
 async function stripeSdk(): Promise<Stripe> {
-  return (await import('@/lib/stripe')).stripe
+  return geladenesSdk ?? stripeVorladen()
 }
 
 function merkmal(orderId: string, anlass: Anlass, positionId: string | null, art: 'kunde' | 'hof'): Stripe.MetadataParam {

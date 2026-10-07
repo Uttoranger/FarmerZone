@@ -144,3 +144,66 @@ describe('E-Mail und Stripe kommen erst im Aufruf', () => {
     expect(lies('src/lib/email.ts')).not.toContain('[E-Mail] Init')
   })
 })
+
+/**
+ * Kein dynamischer Import innerhalb einer Transaktion (Nachbesserung Nr. 31):
+ * Das erste Laden eines Moduls dauert — in einer Transaktion mit Zeilensperre
+ * (FOR UPDATE) hielte es die Sperre so lange fest. Wer in der Transaktion
+ * Stripe braucht, lädt es vorher (`stripeVorladen`, teilerstattung.ts).
+ */
+describe('Kein await import() innerhalb einer Transaktion', () => {
+  /** Der Text jeder `$transaction(…)`-Klammer einer Datei (Klammern gezählt). */
+  function transaktionen(text: string): string[] {
+    const bloecke: string[] = []
+    let ab = text.indexOf('$transaction(')
+    while (ab !== -1) {
+      let tiefe = 0
+      let i = ab + '$transaction'.length
+      for (; i < text.length; i++) {
+        if (text[i] === '(') tiefe++
+        else if (text[i] === ')' && --tiefe === 0) break
+      }
+      bloecke.push(text.slice(ab, i + 1))
+      ab = text.indexOf('$transaction(', i)
+    }
+    return bloecke
+  }
+
+  function quelldateien(ordner: string): string[] {
+    return fs.readdirSync(path.join(WURZEL, ordner), { withFileTypes: true }).flatMap((e) => {
+      const relativ = `${ordner}/${e.name}`
+      if (e.isDirectory()) return quelldateien(relativ)
+      return /\.tsx?$/.test(e.name) ? [relativ] : []
+    })
+  }
+
+  it('Gegenprobe: erkennt einen Import in der Klammer, nicht davor', () => {
+    expect(transaktionen("x; prisma.$transaction(async (tx) => { const { a } = await import('b'); f(a) })")[0]).toMatch(/import\(/)
+    expect(transaktionen("await import('b'); prisma.$transaction(async (tx) => { f() })")[0]).not.toMatch(/import\(/)
+  })
+
+  it('findet die Transaktion von „Artikel fehlt"', () => {
+    const text = fs.readFileSync(path.join(WURZEL, 'src/server/artikel-fehlt.ts'), 'utf8')
+    expect(transaktionen(text).some((b) => b.includes('FOR UPDATE'))).toBe(true)
+  })
+
+  it('keine Datei unter src importiert innerhalb einer $transaction', () => {
+    const treffer = quelldateien('src').flatMap((datei) =>
+      transaktionen(fs.readFileSync(path.join(WURZEL, datei), 'utf8'))
+        .filter((b) => /\bimport\(/.test(b))
+        .map(() => datei)
+    )
+    expect(treffer).toEqual([])
+  })
+
+  it('„Artikel fehlt" lädt Stripe vor der Sperre; teilerstattung importiert nur in stripeVorladen', () => {
+    const artikel = fs.readFileSync(path.join(WURZEL, 'src/server/artikel-fehlt.ts'), 'utf8')
+    const vorladen = artikel.indexOf('await stripeVorladen()')
+    expect(vorladen).toBeGreaterThan(-1)
+    expect(vorladen).toBeLessThan(artikel.indexOf('prisma.$transaction('))
+    const teil = fs.readFileSync(path.join(WURZEL, 'src/server/teilerstattung.ts'), 'utf8')
+    expect(teil.match(/import\('@\/lib\/stripe'\)/g)).toHaveLength(1)
+    const funktion = teil.slice(teil.indexOf('export async function stripeVorladen'), teil.indexOf('async function stripeSdk'))
+    expect(funktion).toContain("import('@/lib/stripe')")
+  })
+})
