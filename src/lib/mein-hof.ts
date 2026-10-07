@@ -1,5 +1,5 @@
 /**
- * Der Kopf von „Mein Hof" (components/farmer/mein-hof-kopf.tsx) — was er über
+ * Der Kopf von „Mein Hof" (components/mein-hof/seitenkopf.tsx) — was er über
  * den Hof sagt. Rein und ohne Datenbank prüfbar (tests/mein-hof.test.ts).
  */
 

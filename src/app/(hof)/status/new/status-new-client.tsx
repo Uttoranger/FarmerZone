@@ -13,24 +13,28 @@ import { publishStatusPost } from '@/server/actions/status-posts'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { formatEuro } from '@/lib/format'
 import { renderStatusBodyWithChip } from '@/lib/status-body'
+import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
 
 type Anlass = 'FRESH_PRODUCT' | 'NEW_SEASON' | 'PROMOTION' | 'ANNOUNCEMENT'
 
 const ANLASS_OPTIONS: { value: Anlass; label: string; icon: React.ReactNode }[] = [
-  { value: 'FRESH_PRODUCT', label: 'Frisches Produkt', icon: <Leaf className="size-5" /> },
-  { value: 'NEW_SEASON',    label: 'Neue Saison',      icon: <CalendarDays className="size-5" /> },
-  { value: 'PROMOTION',     label: 'Aktion',           icon: <Tag className="size-5" /> },
-  { value: 'ANNOUNCEMENT',  label: 'Mitteilung',       icon: <MessageCircle className="size-5" /> },
+  { value: 'FRESH_PRODUCT', label: 'Frisches Produkt', icon: <Leaf className="size-5" aria-hidden="true" /> },
+  { value: 'NEW_SEASON',    label: 'Neue Saison',      icon: <CalendarDays className="size-5" aria-hidden="true" /> },
+  { value: 'PROMOTION',     label: 'Aktion',           icon: <Tag className="size-5" aria-hidden="true" /> },
+  { value: 'ANNOUNCEMENT',  label: 'Mitteilung',       icon: <MessageCircle className="size-5" aria-hidden="true" /> },
 ]
 
-// Badge colors for preview (read-only, not used for active state)
+// Marke in der Vorschau (nur Anzeige). Seit Nr. 22e in der HofShell: Tokens
+// statt Tailwind-Palette — Schrift in der Zustandsfarbe des Themes, Fläche
+// getönt (wie StatusBadge), damit sie in beiden Themes 4,5:1 hält.
 const ANLASS_COLOR: Record<Anlass, string> = {
-  FRESH_PRODUCT: 'text-primary bg-primary/10',
-  NEW_SEASON:    'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40',
-  PROMOTION:     'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40',
-  ANNOUNCEMENT:  'text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40',
+  FRESH_PRODUCT: 'text-status-fertig bg-accent/15',
+  NEW_SEASON:    'text-status-fertig bg-accent/15',
+  PROMOTION:     'text-status-offen bg-primary/15',
+  ANNOUNCEMENT:  'text-foreground bg-muted',
 }
 
 interface Props {
@@ -62,23 +66,23 @@ function Stepper({ step }: { step: number }) {
                 className={cn(
                   'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all shrink-0',
                   isDone || isActive
-                    ? 'bg-primary border-primary text-primary-foreground'
+                    ? 'bg-accent border-accent text-accent-foreground'
                     : 'border-border bg-card text-muted-foreground',
                 )}
               >
-                {isDone ? <Check className="w-3.5 h-3.5" /> : num}
+                {isDone ? <Check className="w-3.5 h-3.5" aria-hidden="true" /> : num}
               </div>
               <span
                 className={cn(
                   'text-[11px] font-medium leading-none',
-                  isActive ? 'text-foreground' : isDone ? 'text-primary/70' : 'text-muted-foreground',
+                  isActive ? 'text-foreground' : isDone ? 'text-status-fertig' : 'text-muted-foreground',
                 )}
               >
                 {label}
               </span>
             </div>
             {!isLast && (
-              <div className={cn('flex-1 h-0.5 mt-3.5 mx-1', isDone ? 'bg-primary/50' : 'bg-border')} />
+              <div className={cn('flex-1 h-0.5 mt-3.5 mx-1', isDone ? 'bg-accent/50' : 'bg-border')} />
             )}
           </div>
         )
@@ -164,8 +168,9 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
         if (showOnFarmPage) parts.push('auf der Hof-Seite')
         if (sendEmail && !emailBlocked && (res.emailCount ?? 0) > 0)
           parts.push(`${res.emailCount} E-Mails versendet`)
-        toast.success(`Status veröffentlicht${parts.length ? ' — ' + parts.join(', ') : ''}`)
-        router.push('/status')
+        toast.success(`Beitrag veröffentlicht${parts.length ? ' — ' + parts.join(', ') : ''}`)
+        // Direkt in den Reiter — /status leitet seit Nr. 22e ohnehin dorthin um.
+        router.push(BEITRAEGE_HREF)
       }
     })
   }
@@ -174,14 +179,14 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="bg-card rounded-2xl shadow-[0_4px_16px_oklch(0.18_0.03_150_/_0.06)] p-6 md:p-8">
+      <div className="rounded-2xl border border-border bg-card p-5 md:p-8">
         <Stepper step={step} />
 
         {/* ── Step 1: Content ─────────────────────────────────────────── */}
         {step === 1 && (
           <div>
             <div className="mb-6">
-              <h1 className="font-heading text-xl font-semibold text-foreground">Neuer Status</h1>
+              <h1 className="font-heading text-xl font-semibold text-foreground">Neuer Beitrag</h1>
               <p className="text-sm text-muted-foreground mt-0.5">Inhalt erstellen</p>
             </div>
 
@@ -192,17 +197,20 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
                 {ANLASS_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
+                    type="button"
                     onClick={() => setAnlass(opt.value)}
+                    aria-pressed={anlass === opt.value}
                     className={cn(
-                      'relative flex items-center gap-2.5 p-3 rounded-xl border-2 text-sm font-medium transition-all text-left',
+                      'relative flex min-h-11 items-center gap-2.5 p-3 rounded-xl border-2 text-sm font-medium transition-all text-left',
+                      FOKUS_RAHMEN,
                       anlass === opt.value
-                        ? 'bg-app-chip-green border-primary text-primary'
+                        ? 'bg-accent/15 border-accent text-foreground'
                         : 'border-border text-muted-foreground hover:border-border/80 hover:bg-muted/40',
                     )}
                   >
                     {opt.icon}
                     <span className="flex-1">{opt.label}</span>
-                    {anlass === opt.value && <Check className="size-4 shrink-0" />}
+                    {anlass === opt.value && <Check className="size-4 shrink-0 text-status-fertig" aria-hidden="true" />}
                   </button>
                 ))}
               </div>
@@ -228,12 +236,12 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
                 className={cn(
                   'w-full h-11 px-3 rounded-xl border bg-card text-sm focus:outline-none focus:ring-2 transition-colors',
                   fieldErrors.title
-                    ? 'border-destructive focus:ring-destructive/30'
-                    : 'border-border focus:ring-primary/30',
+                    ? 'border-status-offen focus:ring-status-offen/30'
+                    : 'border-border focus:ring-ring/50',
                 )}
               />
               {fieldErrors.title && (
-                <p className="text-xs text-destructive mt-1">Bitte einen Titel eingeben.</p>
+                <p className="text-xs font-medium text-status-offen mt-1">Bitte einen Titel eingeben.</p>
               )}
             </div>
 
@@ -257,12 +265,12 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
                 className={cn(
                   'w-full px-3 py-2.5 rounded-xl border bg-card text-sm focus:outline-none focus:ring-2 resize-none transition-colors',
                   fieldErrors.body
-                    ? 'border-destructive focus:ring-destructive/30'
-                    : 'border-border focus:ring-primary/30',
+                    ? 'border-status-offen focus:ring-status-offen/30'
+                    : 'border-border focus:ring-ring/50',
                 )}
               />
               {fieldErrors.body && (
-                <p className="text-xs text-destructive mt-1">Bitte eine Nachricht eingeben.</p>
+                <p className="text-xs font-medium text-status-offen mt-1">Bitte eine Nachricht eingeben.</p>
               )}
               <p className="text-xs text-muted-foreground mt-1">
                 Tipp:{' '}
@@ -275,7 +283,7 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
             {photoUpload.fileInput}
             {/* object-contain auf Sand: volles Bild statt Zoom-Crop (nachlese-7) */}
             {photoUrl && (
-              <div className="relative w-full aspect-[3/2] max-h-48 mb-3 rounded-xl overflow-hidden border border-border bg-app-chip">
+              <div className="relative w-full aspect-[3/2] max-h-48 mb-3 rounded-xl overflow-hidden border border-border bg-muted">
                 <Image
                   src={photoUrl}
                   alt="Status-Foto"
@@ -287,10 +295,15 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
                   type="button"
                   onClick={() => setPhotoUrl(null)}
                   aria-label="Foto entfernen"
-                  className="absolute top-2 right-2 flex items-center justify-center size-7 rounded-full text-white transition-opacity hover:opacity-90"
-                  style={{ background: 'rgba(45,48,39,0.85)' }}
+                  className={cn(
+                    // Auf dem Foto theme-fest dunkel mit heller Schrift (DESIGN_SYSTEM „Bild-Overlays"); 44 px Trefferfläche.
+                    'absolute top-1 right-1 flex items-center justify-center size-11 rounded-full transition-opacity hover:opacity-90',
+                    FOKUS_RAHMEN,
+                  )}
                 >
-                  <X className="size-4" />
+                  <span className="flex size-7 items-center justify-center rounded-full bg-primary-foreground/85 text-accent-foreground">
+                    <X className="size-4" aria-hidden="true" />
+                  </span>
                 </button>
               </div>
             )}
@@ -301,11 +314,11 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
                 type="button"
                 onClick={photoUpload.openFilePicker}
                 disabled={photoUpload.isUploading}
-                className="flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs text-foreground hover:bg-muted/40 disabled:opacity-60"
+                className={cn('flex items-center gap-1.5 min-h-11 px-3 rounded-lg border border-border text-xs text-foreground hover:bg-muted/40 disabled:opacity-60', FOKUS_RAHMEN)}
               >
                 {photoUpload.isUploading
-                  ? <Loader2 className="size-3.5 animate-spin" />
-                  : <Camera className="size-3.5" />}
+                  ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                  : <Camera className="size-3.5" aria-hidden="true" />}
                 {photoUpload.isUploading
                   ? photoUpload.progress
                     ? stufenText(photoUpload.progress)
@@ -327,15 +340,18 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
                   {products.map((p) => (
                     <button
                       key={p.id}
+                      type="button"
+                      aria-pressed={linkedProductIds.includes(p.id)}
                       onClick={() =>
                         setLinkedProductIds((prev) =>
                           prev.includes(p.id) ? prev.filter((id) => id !== p.id) : [...prev, p.id],
                         )
                       }
                       className={cn(
-                        'text-xs px-3 py-1.5 rounded-full border transition-colors',
+                        'min-h-11 text-xs px-3 py-1.5 rounded-full border transition-colors',
+                        FOKUS_RAHMEN,
                         linkedProductIds.includes(p.id)
-                          ? 'bg-primary text-primary-foreground border-primary'
+                          ? 'bg-foreground text-background border-foreground'
                           : 'border-border text-muted-foreground hover:border-foreground/30',
                       )}
                     >
@@ -349,10 +365,10 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
             {/* A2: orange CTA, A3: always clickable — validates on click */}
             <button
               onClick={handleTryNext}
-              className="w-full h-12 rounded-xl bg-accent text-accent-foreground font-semibold flex items-center justify-center gap-2 hover:bg-accent-hover transition-colors"
+              className={cn('w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors', FOKUS_RAHMEN)}
             >
               Weiter zu Empfängern
-              <ArrowRight className="size-4" />
+              <ArrowRight className="size-4" aria-hidden="true" />
             </button>
           </div>
         )}
@@ -363,7 +379,7 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
             <div className="mb-6">
               <button
                 onClick={() => setStep(1)}
-                className="text-sm text-muted-foreground hover:text-foreground mb-3 block"
+                className={cn('mb-2 -ml-2 inline-flex min-h-11 items-center rounded-full px-2 text-sm text-muted-foreground hover:text-foreground', FOKUS_RAHMEN)}
               >
                 ← Zurück
               </button>
@@ -375,14 +391,14 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
 
             <div className="space-y-3 mb-5">
               <ChannelCard
-                icon={<Home className="size-5" />}
+                icon={<Home className="size-5" aria-hidden="true" />}
                 title="Auf meiner Hof-Seite anzeigen"
                 subtitle="Alle Besucher sehen es · für 7 Tage prominent"
                 checked={showOnFarmPage}
                 onChange={setShowOnFarmPage}
               />
               <ChannelCard
-                icon={<Mail className="size-5" />}
+                icon={<Mail className="size-5" aria-hidden="true" />}
                 title="Per E-Mail an Abonnenten"
                 subtitle={
                   emailBlocked
@@ -396,7 +412,7 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
                 disabled={emailCount === 0 || emailBlocked}
               />
               <ChannelCard
-                icon={<MessageSquare className="size-5" />}
+                icon={<MessageSquare className="size-5" aria-hidden="true" />}
                 title="Per WhatsApp an Abonnenten"
                 subtitle={
                   whatsAppCount > 0
@@ -408,7 +424,7 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
                 disabled={whatsAppCount === 0}
               />
               <ChannelCard
-                icon={<CircleDot className="size-5" />}
+                icon={<CircleDot className="size-5" aria-hidden="true" />}
                 title="Als WhatsApp-Status-Bild teilen"
                 subtitle="Wir erstellen ein Bild — du postest es 1× in deinen Status"
                 checked={sendWhatsAppStatus}
@@ -424,10 +440,10 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
             {/* A2: orange CTA */}
             <button
               onClick={() => setStep(3)}
-              className="w-full h-12 rounded-xl bg-accent text-accent-foreground font-semibold flex items-center justify-center gap-2 hover:bg-accent-hover transition-colors"
+              className={cn('w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors', FOKUS_RAHMEN)}
             >
               Vorschau ansehen
-              <ArrowRight className="size-4" />
+              <ArrowRight className="size-4" aria-hidden="true" />
             </button>
           </div>
         )}
@@ -438,7 +454,7 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
             <div className="mb-6">
               <button
                 onClick={() => setStep(2)}
-                className="text-sm text-muted-foreground hover:text-foreground mb-3 block"
+                className={cn('mb-2 -ml-2 inline-flex min-h-11 items-center rounded-full px-2 text-sm text-muted-foreground hover:text-foreground', FOKUS_RAHMEN)}
               >
                 ← Zurück
               </button>
@@ -484,25 +500,25 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
               <h3 className="text-sm font-semibold text-foreground mb-2">Empfänger</h3>
               {showOnFarmPage && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="size-4 text-green-600 dark:text-green-400 shrink-0" />
+                  <CheckCircle className="size-4 text-status-fertig shrink-0" aria-hidden="true" />
                   Auf Hof-Seite für 7 Tage anzeigen
                 </div>
               )}
               {sendEmail && !emailBlocked && emailCount > 0 && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="size-4 text-green-600 dark:text-green-400 shrink-0" />
+                  <CheckCircle className="size-4 text-status-fertig shrink-0" aria-hidden="true" />
                   {emailCount} E-Mails werden automatisch versendet
                 </div>
               )}
               {sendWhatsApp && whatsAppCount > 0 && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="size-4 text-green-600 dark:text-green-400 shrink-0" />
+                  <CheckCircle className="size-4 text-status-fertig shrink-0" aria-hidden="true" />
                   {whatsAppCount} WhatsApp-Nachrichten (je 1 Tap)
                 </div>
               )}
               {sendWhatsAppStatus && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="size-4 text-green-600 dark:text-green-400 shrink-0" />
+                  <CheckCircle className="size-4 text-status-fertig shrink-0" aria-hidden="true" />
                   WhatsApp-Status-Bild zum Download
                 </div>
               )}
@@ -512,7 +528,7 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
             <button
               onClick={handlePublish}
               disabled={pending}
-              className="w-full h-12 rounded-xl bg-accent text-accent-foreground font-semibold hover:bg-accent-hover transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+              className={cn('w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2', FOKUS_RAHMEN)}
             >
               {pending ? 'Wird versendet…' : 'Versand starten'}
             </button>
@@ -549,16 +565,18 @@ function ChannelCard({
       type="button"
       onClick={() => !disabled && onChange?.(!checked)}
       disabled={disabled}
+      aria-pressed={checked && !disabled}
       className={cn(
         'w-full flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all',
-        checked && !disabled ? 'border-primary bg-primary/5' : 'border-border hover:border-border/80',
+        FOKUS_RAHMEN,
+        checked && !disabled ? 'border-accent bg-accent/10' : 'border-border hover:border-border/80',
         disabled && 'opacity-50 cursor-not-allowed',
       )}
     >
       <div
         className={cn(
           'size-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5',
-          checked && !disabled ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+          checked && !disabled ? 'bg-accent text-accent-foreground' : 'bg-muted text-muted-foreground',
         )}
       >
         {icon}
@@ -570,10 +588,10 @@ function ChannelCard({
       <div
         className={cn(
           'size-5 rounded-md border-2 flex items-center justify-center shrink-0 mt-1 transition-colors',
-          checked && !disabled ? 'bg-primary border-primary' : 'border-border',
+          checked && !disabled ? 'bg-accent border-accent' : 'border-border',
         )}
       >
-        {checked && !disabled && <CheckCircle className="size-3.5 text-primary-foreground" />}
+        {checked && !disabled && <CheckCircle className="size-3.5 text-accent-foreground" aria-hidden="true" />}
       </div>
     </button>
   )

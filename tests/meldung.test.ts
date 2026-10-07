@@ -56,7 +56,7 @@ describe('Sichtbarkeitsregel fuerHof', () => {
   it('liefert genau text, art, createdAt, öffentlichen Status, Antwort — und nie ein Triage-Feld', () => {
     const sicht = fuerHof(VOLL)
     expect(Object.keys(sicht).sort()).toEqual(
-      ['antwortAnMelder', 'art', 'createdAt', 'id', 'kurznummer', 'status', 'statusFarbe', 'text'].sort()
+      ['antwortAnMelder', 'art', 'createdAt', 'id', 'kurznummer', 'offen', 'status', 'statusTon', 'text'].sort()
     )
     for (const verboten of ['clusterKey', 'triageNotiz', 'duplikatVonId', 'sprintName', 'triagedAt', 'seiteUrl', 'userAgent', 'viewport', 'customerEmail', 'screenshotUrl', 'diagKennung']) {
       expect(sicht).not.toHaveProperty(verboten)

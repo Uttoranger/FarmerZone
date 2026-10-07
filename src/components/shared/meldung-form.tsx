@@ -1,9 +1,7 @@
 'use client'
 
-import { useState, useSyncExternalStore, useTransition } from 'react'
 import Link from 'next/link'
 import { Bug, Lightbulb, HelpCircle, ImagePlus, X, Loader2 } from 'lucide-react'
-import { meldungAbsenden } from '@/server/actions/meldung'
 import {
   MELDUNG_ARTEN,
   MELDUNG_ART_SATZ,
@@ -12,76 +10,23 @@ import {
   MELDUNG_TEXT_MIN,
   type MeldungArt,
 } from '@/lib/meldung'
-import { useImageUpload, stufenText } from '@/components/shared/image-upload'
+import { stufenText } from '@/components/shared/image-upload'
+import { HONIGTOPF_STIL, useMeldungFormular } from '@/components/shared/use-meldung-formular'
 import { Button } from '@/components/ui/button'
 
 /**
- * Das Meldeformular des Fehlerbriefkastens — EINE Komponente, zwei Einstiege:
- * im Bauernbereich (/fehler-melden, mit Screenshot) und öffentlich
- * (/problem-melden, mit freiwilliger E-Mail für Rückfragen).
+ * Das Meldeformular des Fehlerbriefkastens im Bestandsdesign — öffentlich
+ * (/problem-melden, mit freiwilliger E-Mail für Rückfragen; ein eingeloggter
+ * Hof wird dort an der Sitzung erkannt und bekommt den Screenshot-Weg). Der
+ * Hofbereich (/fehler-melden) zeigt seit Nachtlauf Nr. 22e „Meldung abgeben"
+ * im neuen Design (components/hof-hilfe/meldung-abgeben.tsx); beide teilen
+ * die Logik aus useMeldungFormular.
  *
  * Was automatisch mitgeht, steht sichtbar unter dem Formular: Seite, Browser,
  * Bildschirmgröße, Zeit, bei eingeloggtem Hof der Hof. KEINE IP, keine Cookies.
  */
 
 const ART_ICON: Record<MeldungArt, typeof Bug> = { FEHLER: Bug, WUNSCH: Lightbulb, FRAGE: HelpCircle }
-
-// Honigtopf: aus dem Blickfeld, aus der Tab-Reihenfolge, aus dem Screenreader —
-// dasselbe Muster wie die Registrierung (register-form.tsx).
-const HONIGTOPF_STIL: React.CSSProperties = {
-  position: 'absolute',
-  left: '-10000px',
-  top: 'auto',
-  width: '1px',
-  height: '1px',
-  overflow: 'hidden',
-}
-
-type Kontext = { seiteUrl: string; userAgent: string; viewport: string }
-
-const KEIN_KONTEXT: Kontext = { seiteUrl: '', userAgent: '', viewport: '' }
-
-function kontextJetzt(): Kontext {
-  if (typeof window === 'undefined') return KEIN_KONTEXT
-  // Die Seite, von der die Meldung kommt: der Verweis, wenn er von uns stammt —
-  // sonst die Adresse des Formulars selbst.
-  let seiteUrl = window.location.href
-  try {
-    if (document.referrer && new URL(document.referrer).origin === window.location.origin) {
-      seiteUrl = document.referrer
-    }
-  } catch {
-    // Verweis nicht lesbar — die eigene Adresse genügt
-  }
-  return {
-    seiteUrl,
-    userAgent: navigator.userAgent,
-    viewport: `${window.innerWidth}x${window.innerHeight}`,
-  }
-}
-
-// Der Kontext ist Browserwissen (Adresse, User-Agent, Fenstergröße) und darf
-// erst NACH der Hydration erscheinen — der Server kennt ihn nicht, und ein
-// Wert schon beim ersten Client-Render ergäbe eine Hydration-Abweichung.
-// useSyncExternalStore liefert auf dem Server und während der Hydration den
-// leeren Stand, danach den echten; der Snapshot wird nur bei Änderung neu
-// gebaut (React verlangt ein stabiles Objekt).
-let letzterKontext: Kontext = KEIN_KONTEXT
-function kontextSnapshot(): Kontext {
-  const neu = kontextJetzt()
-  if (
-    neu.seiteUrl !== letzterKontext.seiteUrl ||
-    neu.userAgent !== letzterKontext.userAgent ||
-    neu.viewport !== letzterKontext.viewport
-  ) {
-    letzterKontext = neu
-  }
-  return letzterKontext
-}
-function kontextAbonnieren(melden: () => void): () => void {
-  window.addEventListener('resize', melden)
-  return () => window.removeEventListener('resize', melden)
-}
 
 export function MeldungForm({
   formToken,
@@ -101,42 +46,27 @@ export function MeldungForm({
    */
   kennungVorbelegt?: string
 }) {
-  const [art, setArt] = useState<MeldungArt>('FEHLER')
-  const [text, setText] = useState('')
-  const [kennung, setKennung] = useState(kennungVorbelegt)
-  const [email, setEmail] = useState('')
-  const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null)
-  const [website, setWebsite] = useState('')
-  const [fehler, setFehler] = useState('')
-  const [kurznummer, setKurznummer] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
-  const kontext = useSyncExternalStore(kontextAbonnieren, kontextSnapshot, () => KEIN_KONTEXT)
-
-  const upload = useImageUpload({
-    variant: 'meldung',
-    onUploaded: (url) => setScreenshotUrl(url),
-  })
-
-  function absenden(e: React.FormEvent) {
-    e.preventDefault()
-    setFehler('')
-    startTransition(async () => {
-      const result = await meldungAbsenden({
-        art,
-        text,
-        seiteUrl: kontext.seiteUrl,
-        userAgent: kontext.userAgent,
-        viewport: kontext.viewport,
-        diagKennung: kennung,
-        customerEmail: alsHof ? '' : email,
-        screenshotUrl: screenshotUrl ?? '',
-        website,
-        formToken,
-      })
-      if ('error' in result) setFehler(result.error)
-      else setKurznummer(result.kurznummer)
-    })
-  }
+  const {
+    art,
+    setArt,
+    text,
+    setText,
+    kennung,
+    setKennung,
+    email,
+    setEmail,
+    screenshotUrl,
+    setScreenshotUrl,
+    website,
+    setWebsite,
+    fehler,
+    kurznummer,
+    isPending,
+    kontext,
+    upload,
+    absenden,
+    nochEtwas,
+  } = useMeldungFormular({ formToken, alsHof, kennungVorbelegt })
 
   if (kurznummer) {
     return (
@@ -159,12 +89,7 @@ export function MeldungForm({
           )}
           <button
             type="button"
-            onClick={() => {
-              setKurznummer(null)
-              setText('')
-              setKennung('')
-              setScreenshotUrl(null)
-            }}
+            onClick={nochEtwas}
             className="inline-flex min-h-11 items-center rounded-lg border border-border px-4 text-sm font-medium text-foreground hover:bg-muted/40"
           >
             Noch etwas melden

@@ -119,7 +119,8 @@ export async function publishStatusPost(data: {
       }
     }
 
-    revalidatePath('/status')
+    // Die Beiträge stehen seit Nr. 22e im Reiter von Mein Hof (/status leitet dorthin um).
+    revalidatePath('/farm-page')
     // Revalidate public farm page (ISR bust)
     const farmSlug = await prisma.farm.findUnique({ where: { id: farm.id }, select: { slug: true } })
     if (farmSlug) revalidatePath(`/${farmSlug.slug}`)
@@ -146,7 +147,8 @@ export async function expireStatusPost(postId: string): Promise<{ error?: string
     const farm = await getAuthorizedFarm()
     await requireOwnership(farm.id, postId)
     await prisma.statusPost.update({ where: { id: postId }, data: { expiresAt: new Date() } })
-    revalidatePath('/status')
+    // Die Beiträge stehen seit Nr. 22e im Reiter von Mein Hof (/status leitet dorthin um).
+    revalidatePath('/farm-page')
     return {}
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Unbekannter Fehler' }
@@ -158,7 +160,8 @@ export async function deleteStatusPost(postId: string): Promise<{ error?: string
     const farm = await getAuthorizedFarm()
     await requireOwnership(farm.id, postId)
     await prisma.statusPost.delete({ where: { id: postId } })
-    revalidatePath('/status')
+    // Die Beiträge stehen seit Nr. 22e im Reiter von Mein Hof (/status leitet dorthin um).
+    revalidatePath('/farm-page')
     return {}
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Unbekannter Fehler' }

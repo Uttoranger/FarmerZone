@@ -413,7 +413,9 @@ describe('Die Fehlernummer auf dem Weg in den Briefkasten', () => {
     expect(seite).toContain('bereinigeKennung')
     expect(seite).toContain('KENNUNG_PARAMETER')
     expect(seite).toContain('kennungVorbelegt={kennung}')
-    expect(liesDatei('src/components/shared/meldung-form.tsx')).toMatch(/useState\(kennungVorbelegt\)/)
+    // Seit Nr. 22e steht die Logik im gemeinsamen Hook (Bestandsformular und „Meldung abgeben").
+    expect(liesDatei('src/components/shared/meldung-form.tsx')).toContain('useMeldungFormular({ formToken, alsHof, kennungVorbelegt })')
+    expect(liesDatei('src/components/shared/use-meldung-formular.ts')).toMatch(/useState\(kennungVorbelegt\)/)
   })
 
   it('hält die Knopfbeschriftungen an einer Stelle', () => {

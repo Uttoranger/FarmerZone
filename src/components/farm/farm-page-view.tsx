@@ -67,6 +67,7 @@ import { stripStatusVariables, renderStatusBodyWithChip } from '@/lib/status-bod
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
 import { produktLink } from '@/lib/produktdetail'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
+import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
 
 const ANLASS_META: Record<string, { label: string; icon: ReactNode }> = {
   FRESH_PRODUCT: { label: 'Frisches Produkt', icon: <Leaf className="size-3" strokeWidth={1.7} /> },
@@ -1224,7 +1225,7 @@ function HofseiteBesitzer({
                           {isEdit && (
                             <div className="ml-auto">
                               <Link
-                                href="/status"
+                                href={BEITRAEGE_HREF}
                                 className="flex items-center justify-center rounded-full border transition-colors hover:bg-muted"
                                 style={{ width: 32, height: 32, borderColor: 'var(--border)', color: 'var(--app-ink-soft)' }}
                                 aria-label="Status bearbeiten"
@@ -1271,7 +1272,7 @@ function HofseiteBesitzer({
                     </Link>
                     {/* Sekundär-Button statt übersehbarer Textzeile (nachlese-6) */}
                     <Link
-                      href="/status"
+                      href={BEITRAEGE_HREF}
                       className="w-full mt-2 flex items-center justify-center gap-2 rounded-[14px] py-3.5 text-sm font-semibold transition-colors hover:bg-card/70"
                       style={{ border: '1.5px solid var(--app-line-firm)', background: 'color-mix(in srgb, var(--card) 50%, transparent)', color: 'var(--app-ink-soft)' }}
                     >
@@ -1292,7 +1293,7 @@ function HofseiteBesitzer({
                 </Link>
                 {/* Sekundär-Button statt übersehbarer Textzeile (nachlese-6) */}
                 <Link
-                  href="/status"
+                  href={BEITRAEGE_HREF}
                   className="w-full flex items-center justify-center gap-2 rounded-[14px] py-3.5 text-sm font-semibold transition-colors hover:bg-card/70"
                   style={{ border: '1.5px solid var(--app-line-firm)', background: 'color-mix(in srgb, var(--card) 50%, transparent)', color: 'var(--app-ink-soft)' }}
                 >

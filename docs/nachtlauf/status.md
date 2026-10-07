@@ -36,6 +36,6 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 22a | Kunden und Kundendetail | fertig | `nacht/2026-10-06/22a-kunden` | #194 | 19b (#193) | Marken-Farben freigeben; ILIKE-Altlast customers.ts erledigt | 06.10.2026 |
 | 22b | Verkäufe und „Verkauf eintragen" | fertig | `nacht/2026-10-06/22b-verkaeufe` | #195 | 22a (#194) | „Gesamt"-Wort und Vorrat bei Direktverkauf entscheiden | 06.10.2026 |
 | 22c | Auswertung und Region | offen | | | | | |
-| 22d | Einstellungen | läuft | `nacht/2026-10-06/22d-einstellungen` | | 22b (#195) | | 06.10.2026 |
-| 22e | Beiträge, Hilfe, Meine Meldungen | offen | | | | | |
+| 22d | Einstellungen | fertig | `nacht/2026-10-06/22d-einstellungen` | #196 | 22b (#195) | Mockup-Abweichungen der Übersicht vor Merge freigeben | 07.10.2026 |
+| 22e | Beiträge, Hilfe, Meine Meldungen | läuft | `nacht/2026-10-06/22e-beitraege-hilfe` | | 22d (#196) | | 07.10.2026 |
 | 22f | Admin in der AdminShell | offen | | | | | |

@@ -5,9 +5,8 @@
  * Beweist:
  *  - /farm-page zeigt unter lg die alte Hofseite mit Stiften und ab lg den
  *    Editor — der Kopf steht nur einmal.
- *  - Der Kopf von Mein Hof hat zwei Fassungen: die Karte unter lg, die
- *    kompakte Zeile ab lg mit genau zwei Knöpfen (Teilen, Kundenansicht in
- *    neuem Tab).
+ *  - (Die zwei Fassungen des Kopfs prüft seit Nr. 22e tests/mein-hof-seite.test.ts
+ *    am gerenderten seitenkopf.tsx; der Bestandskopf fiel mit /status weg.)
  *  - „Hofseite ansehen" in der Seitenleiste entfällt ab lg.
  *  - Der Editor speichert nur über die vorhandenen Aktionen aus farm.ts und
  *    appearance.ts — keine neue Server-Aktion.
@@ -47,28 +46,6 @@ describe('/farm-page', () => {
   it('der Editor bekommt keinen ganzen Hof mit Date oder Decimal, nur seine Felder', () => {
     expect(seite).not.toMatch(/<HofseiteEditor[^>]*\shof=\{farm\}/)
     expect(seite).toContain('bannerFocusY: farm.bannerFocusY')
-  })
-})
-
-describe('Kopf von Mein Hof', () => {
-  const kopf = quelltext('src/components/farmer/mein-hof-kopf.tsx')
-
-  it('die Karte mit Streifen nur unter lg, die kompakte Zeile nur ab lg', () => {
-    expect(kopf).toMatch(/dark:ring-border lg:hidden/)
-    expect(kopf).toMatch(/dark:ring-border lg:flex/)
-  })
-
-  it('die kompakte Zeile: Teilen und Kundenansicht in neuem Tab, nur wenn öffentlich', () => {
-    const zeile = kopf.slice(kopf.indexOf('Ab lg: eine kompakte Zeile'), kopf.indexOf('<nav aria-label="Mein Hof"'))
-    expect(zeile).toContain('{hof.zustand.oeffentlich && (')
-    expect(zeile).toContain('label="Teilen"')
-    expect(zeile).toMatch(/target="_blank"[^>]*>\s*Kundenansicht/)
-    expect(zeile.match(/<Link /g)).toHaveLength(1)
-    expect(zeile.match(/<HofTeilenKnopf /g)).toHaveLength(1)
-  })
-
-  it('die Zahl am Reiter „Beiträge" nur ab lg — unter lg bleibt der Reiter, wie er war', () => {
-    expect(kopf).toMatch(/reiter\.id === 'beitraege' && beitraegeZahl != null && \(\s*<span className="hidden lg:inline"/)
   })
 })
 

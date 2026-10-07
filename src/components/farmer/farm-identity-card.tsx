@@ -18,7 +18,7 @@ import { hofInitialen } from '@/lib/hof-initialen'
  *
  * Was sie bewusst NICHT tut:
  *  - Sie zeigt nicht die öffentliche Hof-URL. Die trägt der Kopf von Mein Hof
- *    (mein-hof-kopf.tsx) mit Kopieren und Teilen; hier führt die
+ *    (components/mein-hof/seitenkopf.tsx) mit Kopieren und Teilen; hier führt die
  *    Schaltfläche in die Eigentümer-Vorschau /farm-page.
  *  - Sie ersetzt den Freigabe-Balken nicht. Der Punkt „Noch nicht
  *    freigegeben" ist eine Zustandsanzeige an der Identität, die Erklärung

@@ -92,17 +92,17 @@ describe('hofAdresse', () => {
   })
 })
 
-describe('im Kopf (mein-hof-kopf.tsx)', () => {
-  const kopf = readFileSync(join(process.cwd(), 'src/components/farmer/mein-hof-kopf.tsx'), 'utf8')
+describe('im Kopf (components/mein-hof/seitenkopf.tsx, seit Nr. 22e der einzige)', () => {
+  const kopf = readFileSync(join(process.cwd(), 'src/components/mein-hof/seitenkopf.tsx'), 'utf8')
 
   it('Link und Kopieren nur, wenn öffentlich; sonst die Adresse als reiner Text', () => {
-    expect(kopf).toMatch(/hof\.zustand\.oeffentlich \? \(\s*<>\s*<a\s+href=\{hof\.adresse\.url\}/)
-    expect(kopf).toContain('<AdresseKopierenKnopf url={hof.adresse.url} />')
-    expect(kopf).toMatch(/\) : \(\s*<span[^>]*>\{hof\.adresse\.anzeige\}<\/span>/)
+    expect(kopf).toMatch(/if \(!hof\.zustand\.oeffentlich\) \{\s*return <span[^>]*>\{hof\.adresse\.anzeige\}<\/span>/)
+    expect(kopf).toMatch(/<a\s+href=\{hof\.adresse\.url\}/)
+    expect(kopf).toContain('<AdresseKopierenKnopf url={hof.adresse.url}')
   })
 
   it('das Schild kommt aus dem Zustand und fehlt, wenn er keins hat', () => {
-    expect(kopf).toContain('{hof.zustand.schild && (')
+    expect(kopf).toContain('if (!hof.zustand.schild) return null')
     expect(kopf).toContain('{hof.zustand.schild.text}')
   })
 })

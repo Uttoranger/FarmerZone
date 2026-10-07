@@ -1,11 +1,12 @@
 /**
- * Der Reiter „Beiträge" in Mein Hof (E12, Nachtlauf Nr. 16): was die Übersicht
- * über die Beiträge des Hofs zeigt. Rein und ohne Datenbank prüfbar
- * (tests/mein-hof-seite.test.ts).
+ * Der Reiter „Beiträge" in Mein Hof (E12, Nachtlauf Nr. 16, seit Nr. 22e mit
+ * allem, was /status konnte): was die Liste über die Beiträge des Hofs zeigt
+ * und welche Handlungen je Beitrag angeboten werden. Rein und ohne Datenbank
+ * prüfbar (tests/mein-hof-seite.test.ts, tests/beitraege-hilfe.test.ts).
  *
- * Bearbeitet wird weiter auf den bestehenden Seiten unter /status
- * (Deaktivieren, Löschen, Als Vorlage, WhatsApp fortsetzen) — die Übersicht
- * baut keinen zweiten Beitrags-Editor, sie sagt nur, was es gibt.
+ * Geschrieben wird weiter im bestehenden Ablauf /status/new — der Reiter baut
+ * keinen zweiten Beitrags-Editor. Deaktivieren und Löschen laufen über die
+ * bestehenden Actions (src/server/actions/status-posts.ts).
  */
 import { vorWieLange } from '@/lib/hofseite-kunde'
 import { aufzaehlung } from '@/lib/hofseite-fortschritt'
@@ -20,10 +21,25 @@ export type BeitragQuelle = {
   publishedAt: string | null
   sentViaEmail: boolean
   sentViaWhatsApp: boolean
+  /** Wie viele der WhatsApp-Nachrichten schon verschickt sind (je ein Tipp, /status/[id]/send-whatsapp). */
+  whatsappSentCount: number
+  whatsappRecipientCount: number
 }
 
 /** Der Ton der Marke — dieselben Werte wie StatusBadge (components/ui/status-badge.tsx). */
 export type BeitragTon = 'offen' | 'fertig' | 'neutral'
+
+/**
+ * Was je Beitrag angeboten wird — dieselben Bedingungen wie früher auf /status:
+ * Deaktivieren nur, solange er aktiv ist; Als Vorlage nur für vergangene;
+ * WhatsApp fortsetzen nur, solange Nachrichten offen sind. Löschen geht immer.
+ */
+export type BeitragAktionen = {
+  deaktivieren: boolean
+  /** /status/new?from=<id> — der Ablauf übernimmt Inhalt und Foto, der alte Beitrag bleibt. */
+  vorlage: string | null
+  whatsapp: { href: string; text: string } | null
+}
 
 export type BeitragEintrag = {
   id: string
@@ -31,6 +47,7 @@ export type BeitragEintrag = {
   marke: { text: string; ton: BeitragTon }
   /** „vor 3 Stunden · Nur auf der Hofseite" bzw. „Noch nicht veröffentlicht". */
   zeile: string
+  aktionen: BeitragAktionen
 }
 
 export type BeitragGruppeId = 'aktiv' | 'entwuerfe' | 'vergangen'
@@ -64,6 +81,18 @@ function wege(b: BeitragQuelle): string {
   return zusaetzlich.length === 0 ? 'Nur auf der Hofseite' : aufzaehlung(['Hofseite', ...zusaetzlich])
 }
 
+function aktionen(b: BeitragQuelle, gruppe: BeitragGruppeId): BeitragAktionen {
+  const offen = b.whatsappRecipientCount - b.whatsappSentCount
+  return {
+    deaktivieren: gruppe === 'aktiv',
+    vorlage: gruppe === 'vergangen' ? `/status/new?from=${b.id}` : null,
+    whatsapp:
+      gruppe !== 'entwuerfe' && b.sentViaWhatsApp && offen > 0
+        ? { href: `/status/${b.id}/send-whatsapp`, text: `WhatsApp fortsetzen · ${b.whatsappSentCount} von ${b.whatsappRecipientCount}` }
+        : null,
+  }
+}
+
 /**
  * Die Beiträge in drei Gruppen (Aktiv · Entwürfe · Vergangen), leere fallen
  * weg; innerhalb einer Gruppe die Reihenfolge der Abfrage. „vor …" rechnet
@@ -80,6 +109,7 @@ export function beitraegeUebersicht(beitraege: readonly BeitragQuelle[], jetztIs
         titel: b.title,
         marke: MARKE[id],
         zeile: b.isDraft || !b.publishedAt ? 'Noch nicht veröffentlicht' : `${vorWieLange(b.publishedAt, jetztIso)} · ${wege(b)}`,
+        aktionen: aktionen(b, id),
       })),
   })).filter((g) => g.eintraege.length > 0)
   return { gruppen, anzahl: beitraege.length }

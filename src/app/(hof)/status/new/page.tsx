@@ -1,12 +1,25 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getStatusTemplate } from '@/server/queries/status-posts'
 import { prisma } from '@/lib/prisma'
+import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
+import { ZurueckLink } from '@/components/hofbereich/zurueck-link'
 import { StatusNewClient } from './status-new-client'
 
+export const metadata: Metadata = { title: 'Neuer Beitrag — FarmerZone' }
+
 export const dynamic = 'force-dynamic'
+
+/*
+ * „Neuer Beitrag" (Wizard Inhalt → Empfänger → Versand) in der HofShell
+ * (Nachtlauf Nr. 22e): dieselbe Action publishStatusPost und derselbe Ablauf
+ * wie bisher, nur in die Routengruppe (hof) gezogen und auf Tokens gestellt.
+ * Das neue Teilen-Fenster (Mockup web-h4-teilen-fenster-mit-bild) kommt mit
+ * Gate 7 (Nr. 21). Zurück führt in den Reiter „Beiträge" von Mein Hof.
+ */
 
 export default async function StatusNewPage({
   searchParams,
@@ -43,7 +56,8 @@ export default async function StatusNewPage({
   ])
 
   return (
-    <div className="px-4 py-6">
+    <div className="mx-auto max-w-2xl px-4 pt-5 pb-12 md:px-8 md:pt-7">
+      <ZurueckLink href={BEITRAEGE_HREF}>Beiträge</ZurueckLink>
       <StatusNewClient
         products={products.map((p) => ({ id: p.id, name: p.name, price: Number(p.price) }))}
         emailCount={emailCount}
