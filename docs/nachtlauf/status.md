@@ -53,8 +53,8 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 34 | Automatischer Probelauf (Gate 9a) | übersprungen | – | – | main | **Vorbedingung nicht erfüllt:** `STRIPE_SECRET_KEY` ist bei Vercel eine gemeinsame Variable für Vorschau und Produktion (Typ sensitive, Präfix nicht prüfbar) → Vorschau nutzt sehr wahrscheinlich den Live-Schlüssel; Vorschau aus dem Container nicht erreichbar. Keine Zahlung ausgeführt. | 07.10.2026 |
 | 35 | Altlasten aus Lauf 6 | fertig (PR #213) | `nacht/2026-10-07/35-altlasten` | #213 | main | Geldpfad, Nachprüfung ohne Befund; keine Migration | 07.10.2026 |
 | 36 | BAES-Angaben | fertig (PR #214) | `nacht/2026-10-07/36-baes` | #214 | main | Textänderung zum Gegenlesen (§ 8 Abs. 7 FMV); keine Migration | 07.10.2026 |
-| 37 | Sentry ohne IP-Adressen | läuft | `nacht/2026-10-07/37-sentry-ip` | | main | | 07.10.2026 |
-| 38 | Double-Opt-in (S11) | offen | | | main | | |
+| 37 | Sentry ohne IP-Adressen | fertig (PR #215) | `nacht/2026-10-07/37-sentry-ip` | #215 | main | Sicherheitspfad, zwei Runden, Nachprüfung; Dashboard-Einstellung prüft der Mensch; keine Migration | 07.10.2026 |
+| 38 | Double-Opt-in (S11) | läuft | `nacht/2026-10-07/38-double-opt-in` | | main | | 07.10.2026 |
 | 39 | Direktverkauf senkt den Vorrat (D1) | läuft | `nacht/2026-10-07/39-direktverkauf-vorrat` | | main | | 07.10.2026 |
 | 40 | Rate-Limit über die Datenbank (R1) | offen | | | main | | |
 | Sammel | Sammel-PR Lauf 7 | offen | `integration/lauf7` | | main | | |
