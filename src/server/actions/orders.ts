@@ -3,9 +3,8 @@
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { stripe } from '@/lib/stripe'
 import { revalidatePath } from 'next/cache'
-import { sendOrderReady, sendOrderCancelled, sendOrderNotReady, type OrderForEmail } from '@/lib/email'
+import type { OrderForEmail } from '@/lib/email'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import * as Sentry from '@sentry/nextjs'
 import type { OrderStatus } from '@prisma/client'
@@ -33,7 +32,6 @@ import {
   vollstornoMerkmal,
   type UnklarGrund,
 } from '@/server/teilerstattung'
-import { sendArtikelFehlt, sendErstattungOffen } from '@/lib/email'
 
 export type ActionResult = { error?: string }
 
@@ -168,6 +166,13 @@ const ORDER_EMAIL_SELECT = {
 const PACKBAR: OrderStatus[] = ['PAID', 'CONFIRMED', 'IN_PREPARATION']
 const LAUFEND: OrderStatus[] = ['PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY']
 
+/*
+ * E-Mail und Stripe kommen erst im Aufruf per `await import()` (Nachtlauf
+ * Nr. 31, ARCHITECTURE §4): Diese Actions binden die Bestellseiten ein, und
+ * ein statischer Import legte Resend, React Email, alle Vorlagen und das
+ * Stripe-SDK in jeden Kaltstart von /orders — auch ohne Mail und ohne Storno.
+ */
+
 /** Ein Mailfehler kippt keinen Statuswechsel — nur gemeldet, ohne Kundendaten. */
 function mailNachDerAntwort(art: string, orderId: string, senden: () => Promise<void>): void {
   nachDerAntwort(async () => {
@@ -198,7 +203,10 @@ export async function markAsReady(orderId: string): Promise<ActionResult> {
   })
   if (count === 0) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
 
-  mailNachDerAntwort('abholbereit', orderId, () => sendOrderReady(toEmailOrder(order, farm)))
+  mailNachDerAntwort('abholbereit', orderId, async () => {
+    const { sendOrderReady } = await import('@/lib/email')
+    await sendOrderReady(toEmailOrder(order, farm))
+  })
 
   revalidatePath('/orders')
   revalidatePath(`/orders/${orderId}`)
@@ -282,6 +290,7 @@ export async function revertReady(
   // Kunden-Info nur auf Wunsch (Haken im Dialog, Standard AN): neutrales
   // "Kurzes Update" — relativiert die bereits verschickte Abholbereit-Mail
   if (notifyCustomer) {
+    const { sendOrderNotReady } = await import('@/lib/email')
     await sendOrderNotReady(toEmailOrder(order, farm))
   }
 
@@ -633,6 +642,7 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
         // Läuft NACH der Transaktion, nicht in einer Sperre — deshalb ohne die
         // kurzen STRIPE_OPTIONEN (die SDK-Wiederholung ist hier erwünscht,
         // der Schlüssel verhindert eine zweite Erstattung).
+        const { stripe } = await import('@/lib/stripe')
         const refund = await stripe.refunds.create(
           {
             payment_intent: pi,
@@ -736,6 +746,7 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
       // geändert, zeigt die Mail den Stand, aus dem storniert wurde.
       const fuerMail =
         (await prisma.order.findFirst({ where: { id: orderId, farmId: farm.id }, select: ORDER_EMAIL_SELECT })) ?? order
+      const { sendOrderCancelled } = await import('@/lib/email')
       await sendOrderCancelled(toEmailOrder(fuerMail, farm), refundAmount, reason)
     })
   }
@@ -745,8 +756,8 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
   // Mailfehler rollt nichts zurück. Ohne Daten der Kundin.
   if (handbuchungOffen) {
     const hand = handbuchungOffen
-    mailNachDerAntwort('erstattung_offen', orderId, () =>
-      sendErstattungOffen({
+    mailNachDerAntwort('erstattung_offen', orderId, async () =>
+      (await import('@/lib/email')).sendErstattungOffen({
         was: 'Der Hof hat die Bestellung storniert, die Erstattung über Stripe hat aber nicht geklappt. Die Bestellung ist storniert, das Geld steht noch aus.',
         bestellId: orderId,
         bestellnummer: order.orderNumber,
@@ -845,8 +856,8 @@ export async function meldeArtikelFehlt(input: unknown): Promise<ArtikelFehltErg
   const fuerMail = await prisma.order.findFirst({ where: { id: orderId, farmId: farm.id }, select: ORDER_EMAIL_SELECT })
   const position = fuerMail?.items.find((i) => i.id === itemId)
   if (fuerMail && position) {
-    mailNachDerAntwort('artikel_fehlt', orderId, () =>
-      sendArtikelFehlt(toEmailOrder(fuerMail, farm), {
+    mailNachDerAntwort('artikel_fehlt', orderId, async () =>
+      (await import('@/lib/email')).sendArtikelFehlt(toEmailOrder(fuerMail, farm), {
         position: {
           productName: position.productName,
           quantity: position.quantity,
@@ -949,6 +960,7 @@ async function lasseServicegebuehrEntfallen(order: {
   // Online UND bezahlt: Teilerstattung in Höhe der Gebühr.
   if (order.paymentMethod === 'ONLINE' && order.paymentStatus === 'PAID' && order.stripePaymentIntentId) {
     try {
+      const { stripe } = await import('@/lib/stripe')
       await stripe.refunds.create(
         {
           payment_intent: order.stripePaymentIntentId,

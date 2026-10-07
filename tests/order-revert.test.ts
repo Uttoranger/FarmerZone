@@ -114,6 +114,8 @@ describe('revertReady', () => {
     expect(sendOrderNotReady).toHaveBeenCalledWith(
       expect.objectContaining({ customerEmail: 'kundin@test.local', orderNumber: 'TH-1907-TEST' })
     )
+    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
+    await vi.dynamicImportSettled()
     expect(sendOrderReady).not.toHaveBeenCalled()
     expect(sendOrderCancelled).not.toHaveBeenCalled()
   })
@@ -122,6 +124,8 @@ describe('revertReady', () => {
     orderFindFirst.mockResolvedValue({ ...EMAIL_ORDER, paymentStatus: 'PENDING' } as never)
     const result = await revertReady('order_1', false)
     expect(result).toEqual({})
+    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
+    await vi.dynamicImportSettled()
     expect(sendOrderNotReady).not.toHaveBeenCalled()
     expect(sendOrderReady).not.toHaveBeenCalled()
     expect(sendOrderCancelled).not.toHaveBeenCalled()
@@ -130,6 +134,8 @@ describe('revertReady', () => {
   it('abgelehnter Rückschritt verschickt auch mit Haken keine Mail', async () => {
     orderFindFirst.mockResolvedValue(null)
     await revertReady('order_confirmed', true)
+    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
+    await vi.dynamicImportSettled()
     expect(sendOrderNotReady).not.toHaveBeenCalled()
   })
 })
@@ -183,6 +189,8 @@ describe('revertPickedUp', () => {
   it('bleibt mailfrei — auch die neue Update-Mail wird NIE verschickt', async () => {
     orderFindFirst.mockResolvedValue({ id: 'order_1' } as never)
     await revertPickedUp('order_1')
+    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
+    await vi.dynamicImportSettled()
     expect(sendOrderReady).not.toHaveBeenCalled()
     expect(sendOrderCancelled).not.toHaveBeenCalled()
     expect(sendOrderNotReady).not.toHaveBeenCalled()

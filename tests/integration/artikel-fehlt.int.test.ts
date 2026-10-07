@@ -602,6 +602,8 @@ describe('Im Zweifel nicht buchen (Nachbesserung 2)', () => {
     expect(await stand(orderId)).toMatchObject({ warenCents: 1030, gebuehrCents: 52, erstattetCents: 0, fehlend: [] })
     expect(refundCreate).not.toHaveBeenCalled()
     expect(reversalCreate).not.toHaveBeenCalled()
+    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
+    await vi.dynamicImportSettled()
     expect(sendArtikelFehlt).not.toHaveBeenCalled()
   }
 
@@ -733,6 +735,8 @@ describe('Rest-Storno mit Stripes bezahltem Betrag (Nr. 19c)', () => {
     )
     await vi.waitFor(() => expect(sendErstattungOffen).toHaveBeenCalledTimes(1))
     expect(vi.mocked(sendErstattungOffen).mock.calls[0]![0]).toMatchObject({ bestellId: order.id })
+    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
+    await vi.dynamicImportSettled()
     expect(sendOrderCancelled).not.toHaveBeenCalled()
   })
 

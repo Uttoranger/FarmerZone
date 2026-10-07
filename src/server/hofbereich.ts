@@ -41,12 +41,18 @@ export async function ladeHofbereich(): Promise<Hofbereich> {
   const hof = await getFarmForUser(session.user.id)
   if (!hof) redirect('/onboarding')
 
-  const offeneBestellungen = await getOpenOrdersCount(hof.id)
-  const bannerState = await getFarmBannerState(session.user.id)
-  // Menüpunkt „Admin" nur für den Betreiber — frisch aus der DB, nicht aus der Sitzung.
-  const isAdmin = await isAdminUser(session.user.id)
-  // Die Zählabfrage nur für den Betreiber — kein Hof bezahlt dafür.
-  const zuEntscheiden = isAdmin ? await zaehleZuEntscheiden() : 0
+  // Unabhängig voneinander, also nebeneinander (Nachtlauf Nr. 31) — vorher
+  // vier Rundreisen zur Datenbank hintereinander vor jeder Hof-Seite.
+  const [offeneBestellungen, bannerState, { isAdmin, zuEntscheiden }] = await Promise.all([
+    getOpenOrdersCount(hof.id),
+    getFarmBannerState(session.user.id),
+    // Menüpunkt „Admin" nur für den Betreiber — frisch aus der DB, nicht aus der Sitzung.
+    isAdminUser(session.user.id).then(async (admin) => ({
+      isAdmin: admin,
+      // Die Zählabfrage nur für den Betreiber — kein Hof bezahlt dafür.
+      zuEntscheiden: admin ? await zaehleZuEntscheiden() : 0,
+    })),
+  ])
 
   // Reihenfolge wie bei der Server-Prüfung: stillgelegt sticht „wartet auf Freigabe".
   const balken: Hofbereich['balken'] =

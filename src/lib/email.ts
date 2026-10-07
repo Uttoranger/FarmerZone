@@ -1,28 +1,7 @@
 import 'server-only'
 import * as React from 'react'
-import { render } from '@react-email/render'
-import { Resend } from 'resend'
-import { OrderConfirmationEmail } from '@/emails/order-confirmation'
-import { OnsiteConfirmationEmail } from '@/emails/onsite-confirmation'
-import { NewOrderNotificationEmail } from '@/emails/new-order-notification'
-import { OrderConfirmedEmail } from '@/emails/order-confirmed'
-import { OrderReadyEmail } from '@/emails/pickup-reminder'
-import { OrderCancelledEmail } from '@/emails/order-cancelled'
-import { ArtikelFehltEmail } from '@/emails/artikel-fehlt'
-import { OrderNotReadyEmail } from '@/emails/order-not-ready'
-import { ZahlungZuSpaetEmail } from '@/emails/zahlung-zu-spaet'
-import { BestellungVerfallenEmail } from '@/emails/bestellung-verfallen'
-import { CustomerMagicLinkEmail } from '@/emails/customer-magic-link'
-import { AnmeldecodeEmail } from '@/emails/anmeldecode'
-import { PasswordResetEmail } from '@/emails/password-reset'
-import { EmailBestaetigungEmail } from '@/emails/email-bestaetigung'
-import { NewFarmNotificationEmail } from '@/emails/new-farm-notification'
-import { FreischaltungEmail } from '@/emails/freischaltung'
-import { MeldungNotificationEmail } from '@/emails/meldung-notification'
-import { BriefkastenZusammenfassungEmail } from '@/emails/briefkasten-zusammenfassung'
-import { ErstattungOffenEmail } from '@/emails/erstattung-offen'
+import type { Resend } from 'resend'
 import { SUPPORT_EMAIL } from '@/lib/support'
-import { StatusUpdateEmail } from '@/emails/status-update'
 import { generateReorderToken } from '@/lib/reorder-token'
 import { formatEuro, formatPosition } from '@/lib/format'
 import { barBestaetigungsPfad, bestellungPfad } from '@/lib/bestell-link'
@@ -37,11 +16,25 @@ import { ANMELDECODE_GUELTIG_SEKUNDEN } from '@/lib/anmeldecode'
 import { BESTAETIGUNG_GUELTIG_SEKUNDEN } from '@/lib/email-bestaetigung'
 
 const apiKey = process.env.RESEND_API_KEY
-const resend = apiKey ? new Resend(apiKey) : null
 const FROM = process.env.EMAIL_FROM ?? 'onboarding@resend.dev'
 
-// Einmal beim Serverstart loggen damit man im Terminal sieht ob der Key gelesen wurde
-console.log(`[E-Mail] Init — RESEND_API_KEY=${apiKey ? 'gesetzt' : 'FEHLT → nur Log-Modus'} FROM=${FROM}`)
+/*
+ * Schwere Module erst beim Versand (Nachtlauf Nr. 31, ARCHITECTURE §4): Das
+ * Resend-SDK, @react-email/render und jede Vorlage kommen per `await import()`
+ * in der Versandfunktion — so lädt ein Kaltstart, der keine Mail schickt,
+ * nichts davon. Vorher stand hier ein Log beim Laden des Moduls, das bei
+ * jedem Kaltstart im Hofbereich erschien; ob der Schlüssel fehlt, sagt jetzt
+ * sendRaw bei jedem Versand (Log-Modus unten).
+ */
+let resendInstanz: Resend | null = null
+
+async function resendClient(schluessel: string): Promise<Resend> {
+  if (!resendInstanz) {
+    const { Resend } = await import('resend')
+    resendInstanz = new Resend(schluessel)
+  }
+  return resendInstanz
+}
 
 // Empfängeradressen sind personenbezogene Daten und haben in den
 // Produktions-Logs (Vercel) nichts verloren — lokal bleiben sie sichtbar,
@@ -51,16 +44,38 @@ function logEmpfaenger(to: string): string {
 }
 
 async function toHtml(element: React.ReactElement): Promise<string> {
+  const { render } = await import('@react-email/render')
   return render(element)
 }
 
+/**
+ * Für die Versandfunktionen, die ein Ergebnis liefern statt zu werfen
+ * (Anmeldecode, Code für „Bestellungen finden", E-Mail bestätigen): Laden und
+ * Rendern der Vorlage im selben Fehlerweg wie der Versand — seit die Vorlage
+ * dynamisch kommt (Nr. 31), könnte schon das Laden scheitern. Dann
+ * `{ error }` wie bei einem Resend-Fehler; auth.ts schreibt den Code lokal ins Log.
+ */
+async function htmlOderFehler(
+  baue: () => Promise<React.ReactElement>
+): Promise<{ ok: true; html: string } | { ok: false; error: string }> {
+  try {
+    return { ok: true, html: await toHtml(await baue()) }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`[E-Mail] Vorlage nicht erzeugt: ${msg}`)
+    return { ok: false, error: msg }
+  }
+}
+
 export async function sendRaw(to: string, subject: string, html: string): Promise<{ id?: string; error?: string }> {
-  if (!resend) {
+  if (!apiKey) {
     console.log(`[E-Mail] KEIN API-KEY — würde senden: "${subject}" → ${logEmpfaenger(to)}`)
     return { error: 'RESEND_API_KEY nicht gesetzt' }
   }
   console.log(`[E-Mail] Sende: "${subject}" → ${logEmpfaenger(to)} (from: ${FROM})`)
   try {
+    // Im try: Scheitert schon das Laden des SDK, bleibt es beim { error } — sendRaw wirft nie.
+    const resend = await resendClient(apiKey)
     const result = await resend.emails.send({ from: FROM, to, subject, html })
     if (result.error) {
       console.error(`[E-Mail] Resend-Fehler: ${JSON.stringify(result.error)}`)
@@ -195,6 +210,7 @@ function betraege(order: OrderForEmail): { warenpreis: number; gebuehr: number; 
 
 /** Magic-Link → Kunde */
 export async function sendMagicLinkEmail(email: string, url: string, firstName?: string): Promise<void> {
+  const { CustomerMagicLinkEmail } = await import('@/emails/customer-magic-link')
   const html = await toHtml(React.createElement(CustomerMagicLinkEmail, { firstName, magicUrl: url }))
   await send(email, 'Dein Login-Link für FarmerZone', html)
 }
@@ -207,8 +223,12 @@ export async function sendMagicLinkEmail(email: string, url: string, firstName?:
  */
 export async function sendAnmeldeCodeEmail(email: string, code: string): Promise<{ id?: string; error?: string }> {
   const minuten = ANMELDECODE_GUELTIG_SEKUNDEN / 60
-  const html = await toHtml(React.createElement(AnmeldecodeEmail, { code, minuten }))
-  return sendRaw(email, 'Dein Anmeldecode für FarmerZone', html)
+  const vorlage = await htmlOderFehler(async () => {
+    const { AnmeldecodeEmail } = await import('@/emails/anmeldecode')
+    return React.createElement(AnmeldecodeEmail, { code, minuten })
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, 'Dein Anmeldecode für FarmerZone', vorlage.html)
 }
 
 /**
@@ -218,8 +238,12 @@ export async function sendAnmeldeCodeEmail(email: string, code: string): Promise
  */
 export async function sendBestellCodeEmail(email: string, code: string): Promise<{ id?: string; error?: string }> {
   const minuten = ANMELDECODE_GUELTIG_SEKUNDEN / 60
-  const html = await toHtml(React.createElement(AnmeldecodeEmail, { code, minuten, zweck: 'bestellungen' }))
-  return sendRaw(email, 'Dein Code für deine Bestellungen · FarmerZone', html)
+  const vorlage = await htmlOderFehler(async () => {
+    const { AnmeldecodeEmail } = await import('@/emails/anmeldecode')
+    return React.createElement(AnmeldecodeEmail, { code, minuten, zweck: 'bestellungen' })
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, 'Dein Code für deine Bestellungen · FarmerZone', vorlage.html)
 }
 
 /**
@@ -228,8 +252,12 @@ export async function sendBestellCodeEmail(email: string, code: string): Promise
  * keinen Link; gibt das Versandergebnis zurück (sendRaw wirft nie).
  */
 export async function sendEmailBestaetigung(email: string, url: string): Promise<{ id?: string; error?: string }> {
-  const html = await toHtml(React.createElement(EmailBestaetigungEmail, { url, stunden: BESTAETIGUNG_GUELTIG_SEKUNDEN / 3600 }))
-  return sendRaw(email, 'Bestätige deine E-Mail-Adresse · FarmerZone', html)
+  const vorlage = await htmlOderFehler(async () => {
+    const { EmailBestaetigungEmail } = await import('@/emails/email-bestaetigung')
+    return React.createElement(EmailBestaetigungEmail, { url, stunden: BESTAETIGUNG_GUELTIG_SEKUNDEN / 3600 })
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, 'Bestätige deine E-Mail-Adresse · FarmerZone', vorlage.html)
 }
 
 /**
@@ -251,6 +279,7 @@ export async function sendRegistrierungsHinweis(
 
 /** Passwort-Reset → Bauer */
 export async function sendPasswordResetEmail(email: string, url: string): Promise<void> {
+  const { PasswordResetEmail } = await import('@/emails/password-reset')
   const html = await toHtml(React.createElement(PasswordResetEmail, { resetUrl: url }))
   await send(email, 'Passwort zurücksetzen · FarmerZone', html)
 }
@@ -265,6 +294,7 @@ export async function sendNewFarmNotification(farm: {
   const registeredAt = new Date().toLocaleString('de-AT', {
     day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
   })
+  const { NewFarmNotificationEmail } = await import('@/emails/new-farm-notification')
   const html = await toHtml(
     React.createElement(NewFarmNotificationEmail, {
       farmName: farm.name,
@@ -290,6 +320,7 @@ export async function sendFreischaltungEmail(farm: {
   ownerEmail: string
 }): Promise<void> {
   const farmUrl = `${APP_URL}/${farm.slug}`
+  const { FreischaltungEmail } = await import('@/emails/freischaltung')
   const html = await toHtml(React.createElement(FreischaltungEmail, { farmName: farm.name, farmUrl }))
   await send(farm.ownerEmail, 'Dein Hof ist freigeschaltet', html)
 }
@@ -310,6 +341,7 @@ export async function sendMeldungNotification(m: {
   screenshotUrl: string | null
   createdAt: Date
 }): Promise<void> {
+  const { MeldungNotificationEmail } = await import('@/emails/meldung-notification')
   const html = await toHtml(
     React.createElement(MeldungNotificationEmail, {
       kurznummer: m.kurznummer,
@@ -338,6 +370,7 @@ export async function sendBriefkastenZusammenfassung(z: {
   neueste: Array<{ kurznummer: string; art: string; ersteZeile: string; hofName: string | null }>
   geloescht: number
 }): Promise<void> {
+  const { BriefkastenZusammenfassungEmail } = await import('@/emails/briefkasten-zusammenfassung')
   const html = await toHtml(
     React.createElement(BriefkastenZusammenfassungEmail, { ...z, adminUrl: `${APP_URL}/admin/meldungen` })
   )
@@ -369,6 +402,7 @@ export type ErstattungOffenMeldung = {
  * um die Erstattung und melden uns."
  */
 export async function sendErstattungOffen(m: ErstattungOffenMeldung): Promise<void> {
+  const { ErstattungOffenEmail } = await import('@/emails/erstattung-offen')
   const html = await toHtml(
     React.createElement(ErstattungOffenEmail, {
       was: m.was,
@@ -394,6 +428,7 @@ export async function sendOrderConfirmation(order: OrderForEmail): Promise<void>
   // nach dem Schließen des Tabs noch hat (kein Konto, keine Historie).
   const orderUrl = `${APP_URL}${bestellungPfad(order.farm.slug, order.id)}`
 
+  const { OrderConfirmationEmail } = await import('@/emails/order-confirmation')
   const html = await toHtml(React.createElement(OrderConfirmationEmail, {
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
@@ -440,6 +475,7 @@ export async function sendOnsiteConfirmation(
       })
     : null
 
+  const { OnsiteConfirmationEmail } = await import('@/emails/onsite-confirmation')
   const html = await toHtml(React.createElement(OnsiteConfirmationEmail, {
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
@@ -463,6 +499,7 @@ export async function sendOnsiteConfirmation(
 
 /** Online-Zahlung → Bauer */
 export async function sendOrderPaidToFarmer(order: OrderForEmail): Promise<void> {
+  const { NewOrderNotificationEmail } = await import('@/emails/new-order-notification')
   const html = await toHtml(React.createElement(NewOrderNotificationEmail, {
     farmerName: order.farm.ownerName,
     customerName: order.customerName,
@@ -492,6 +529,7 @@ export async function sendOrderConfirmedToFarmer(order: OrderForEmail): Promise<
   const paymentLabel =
     order.paymentMethod === 'ONSITE_CASH' ? 'Bar bei Abholung' : 'Karte bei Abholung'
 
+  const { OrderConfirmedEmail } = await import('@/emails/order-confirmed')
   const html = await toHtml(React.createElement(OrderConfirmedEmail, {
     farmerName: order.farm.ownerName,
     customerName: order.customerName,
@@ -523,6 +561,7 @@ export async function sendOrderReady(order: OrderForEmail): Promise<void> {
   const reorderUrl = `${APP_URL}/${order.farm.slug}?reorder=${reorderToken}`
   const orderUrl = `${APP_URL}${bestellungPfad(order.farm.slug, order.id)}`
 
+  const { OrderReadyEmail } = await import('@/emails/pickup-reminder')
   const html = await toHtml(React.createElement(OrderReadyEmail, {
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
@@ -546,6 +585,7 @@ export async function sendOrderReady(order: OrderForEmail): Promise<void> {
 /** Fertig-Rückschritt → Kunde (optional, Haken im Dialog): neutrales Update,
  *  die Abholbereit-Mail war schon draußen und wird hiermit relativiert */
 export async function sendOrderNotReady(order: OrderForEmail): Promise<void> {
+  const { OrderNotReadyEmail } = await import('@/emails/order-not-ready')
   const html = await toHtml(React.createElement(OrderNotReadyEmail, {
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
@@ -575,6 +615,7 @@ export async function sendStatusUpdateEmail(opts: {
   photoUrl?: string
   unsubscribeUrl: string
 }): Promise<void> {
+  const { StatusUpdateEmail } = await import('@/emails/status-update')
   const html = await toHtml(
     React.createElement(StatusUpdateEmail, {
       farmName: opts.farmName,
@@ -597,6 +638,7 @@ export async function sendOrderCancelled(
   /** Der Grund aus dem Storno-Dialog (Nr. 19) — Text des Hofs, React escaped ihn. */
   cancelReason?: string | null
 ): Promise<void> {
+  const { OrderCancelledEmail } = await import('@/emails/order-cancelled')
   const html = await toHtml(React.createElement(OrderCancelledEmail, {
     customerName: order.customerName,
     orderNumber: order.orderNumber,
@@ -628,6 +670,7 @@ export async function sendArtikelFehlt(
     erstattetCents: number | null
   }
 ): Promise<void> {
+  const { ArtikelFehltEmail } = await import('@/emails/artikel-fehlt')
   const html = await toHtml(React.createElement(ArtikelFehltEmail, {
     customerName: order.customerName,
     orderNumber: order.orderNumber,
@@ -653,6 +696,7 @@ export async function sendZahlungZuSpaet(
   },
   erstattetCents: number
 ): Promise<void> {
+  const { ZahlungZuSpaetEmail } = await import('@/emails/zahlung-zu-spaet')
   const html = await toHtml(React.createElement(ZahlungZuSpaetEmail, {
     customerName: order.customerName,
     orderNumber: order.orderNumber,
@@ -670,6 +714,7 @@ export async function sendBestellungVerfallen(
     farm: Pick<OrderForEmail['farm'], 'name'>
   }
 ): Promise<void> {
+  const { BestellungVerfallenEmail } = await import('@/emails/bestellung-verfallen')
   const html = await toHtml(React.createElement(BestellungVerfallenEmail, {
     customerName: order.customerName,
     orderNumber: order.orderNumber,

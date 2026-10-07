@@ -93,6 +93,8 @@ describe('ein Storno zwischen Lesen und Schreiben gewinnt', () => {
     const ergebnis = await markAsReady('order_1')
     expect(ergebnis.error).toContain('inzwischen geändert')
     expect(prisma.order.update).not.toHaveBeenCalled()
+    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
+    await vi.dynamicImportSettled()
     expect(sendOrderReady).not.toHaveBeenCalled()
   })
 

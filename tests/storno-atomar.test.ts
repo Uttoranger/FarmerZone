@@ -302,7 +302,10 @@ describe('cancelOrder — Erstattung erst nach der Sperre', () => {
       expect.objectContaining({ data: { paymentStatus: 'REFUNDED' } })
     )
     // Dritter Wert: der Grund aus dem Storno-Dialog (Nr. 19) — hier keiner.
-    expect(mailStorno).toHaveBeenCalledWith(expect.objectContaining({ orderNumber: 'TH-1' }), 20, undefined)
+    // Die Mail läuft nach der Antwort und lädt den Versand erst dann (Nr. 31) — also abwarten.
+    await vi.waitFor(() =>
+      expect(mailStorno).toHaveBeenCalledWith(expect.objectContaining({ orderNumber: 'TH-1' }), 20, undefined)
+    )
   })
 
   it('scheitert die Erstattung: Storno bleibt, Ware bleibt zurückgebucht, KEINE Mail, Meldung an Sentry', async () => {
@@ -322,6 +325,8 @@ describe('cancelOrder — Erstattung erst nach der Sperre', () => {
     // Die Storno-Vorlage liest „keine Erstattung" als Vor-Ort-Zahlung und
     // schriebe „Da du vor Ort bezahlst, entstehen dir keine Kosten" — an eine
     // Kundin, die online bezahlt hat und noch nichts zurückbekam.
+    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
+    await vi.dynamicImportSettled()
     expect(mailStorno).not.toHaveBeenCalled()
     // Offenes Geld darf nicht nur im Log stehen.
     expect(sentryMeldung).toHaveBeenCalledTimes(1)
@@ -348,7 +353,10 @@ describe('cancelOrder — Erstattung erst nach der Sperre', () => {
     // Das Geld IST zurück — „Rückerstattung fehlgeschlagen" wäre gelogen.
     expect(result).toEqual({ erstattetCents: 2000, vomHofCents: 2000 })
     // Dritter Wert: der Grund aus dem Storno-Dialog (Nr. 19) — hier keiner.
-    expect(mailStorno).toHaveBeenCalledWith(expect.objectContaining({ orderNumber: 'TH-1' }), 20, undefined)
+    // Die Mail läuft nach der Antwort und lädt den Versand erst dann (Nr. 31) — also abwarten.
+    await vi.waitFor(() =>
+      expect(mailStorno).toHaveBeenCalledWith(expect.objectContaining({ orderNumber: 'TH-1' }), 20, undefined)
+    )
     expect(sentryMeldung).toHaveBeenCalledTimes(1)
     const [, kontext] = sentryMeldung.mock.calls[0] as [unknown, { tags?: Record<string, unknown> }]
     expect(kontext.tags).toEqual(expect.objectContaining({ grund: 'vermerk_fehlgeschlagen' }))
@@ -364,7 +372,8 @@ describe('cancelOrder — Erstattung erst nach der Sperre', () => {
     ])
 
     expect(ergebnis).toEqual({ erstattetCents: 0, vomHofCents: 0 })
-    expect(mailStorno).toHaveBeenCalledTimes(1)
+    // Gestartet wird sie trotzdem — nach der Antwort, mit dem Versand erst dann geladen (Nr. 31).
+    await vi.waitFor(() => expect(mailStorno).toHaveBeenCalledTimes(1))
   })
 })
 

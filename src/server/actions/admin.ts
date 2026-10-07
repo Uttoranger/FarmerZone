@@ -3,7 +3,6 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { verlangeAdminAktion } from '@/server/admin-wache'
-import { sendFreischaltungEmail } from '@/lib/email'
 import {
   FARM_REJECT_APPROVED_MESSAGE,
   FARM_REJECT_HAS_DATA_MESSAGE,
@@ -72,6 +71,8 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
   // darf die Freischaltung nicht scheitern lassen: Der Hof ist ab hier
   // öffentlich, die Nachricht lässt sich notfalls von Hand nachholen.
   try {
+    // Erst hier geladen (Nr. 31): /admin bindet diese Actions ein.
+    const { sendFreischaltungEmail } = await import('@/lib/email')
     await sendFreischaltungEmail({
       name: farm.name,
       slug: farm.slug,

@@ -43,6 +43,15 @@ const TEILEN_ANGEBOT = 3
  * Alles für den Heute-Bildschirm (/dashboard) in einem Zug. Die Regeln stehen
  * rein in src/lib/heute.ts, der Umsatz kommt aus der gemeinsamen Regel
  * (src/lib/umsatz.ts, src/server/queries/umsatz.ts).
+ *
+ * `freigabe` ist die laufende Freigabe verwaister Bestellungen, die die Seite
+ * angestoßen hat (Frist gilt beim Lesen, ARCHITECTURE §5) — dieses Modul
+ * schreibt nicht selbst. Was sie ändern kann, wartet auf sie: offene
+ * Bestellungen (Packliste, nächster Abholtag, überfällig) und der Vorrat
+ * (ausverkauft, Angebot der Teilen-Karte). Was sie nie berührt — Umsatz (nur
+ * PICKED_UP), Hof und Abholzeiten, Produktzahl, Produkte ohne Kategorie, der
+ * letzte Beitrag —, läuft schon daneben (Nachtlauf Nr. 31). Die Freigabe
+ * selbst wirft nie (gibVerwaisteFreiOhneRisiko).
  */
 
 export type Heute = {
@@ -79,116 +88,117 @@ export type Heute = {
   hofseite: { prozent: number; satz: string; fertig: boolean }
 }
 
-export async function getHeute(farmId: string, jetzt: Date = new Date()): Promise<Heute> {
+export async function getHeute(
+  farmId: string,
+  jetzt: Date = new Date(),
+  freigabe: Promise<void> = Promise.resolve()
+): Promise<Heute> {
   const { heute } = abholtage(jetzt)
   // Dieselbe Regel wie Verkauf und Auswertung: src/lib/umsatz.ts.
   const wochenfenster = umsatzfenster('woche', jetzt)
 
-  const [
-    heutige,
-    naechste,
-    ueberfaelligAnzahl,
-    ueberfaelligJuengste,
-    ausverkauft,
-    ohneKategorie,
-    letzterStatus,
-    buchungen,
-    hof,
-    produkte,
-    angebot,
-  ] = await Promise.all([
-    prisma.order.findMany({
-      where: abholWhere(farmId, heute),
-      select: {
-        id: true,
-        customerName: true,
-        pickupTimeStart: true,
-        pickupTimeEnd: true,
-        paymentMethod: true,
-        status: true,
-        totalAmount: true,
-        serviceFeeCents: true,
-        // Fehlende Artikel (E14) werden nicht gepackt.
-        items: { where: { fehltSeit: null }, select: { productName: true, quantity: true } },
-      },
-    }),
-    prisma.order.findFirst({
-      where: naechsteAbholungWhere(farmId, jetzt),
-      orderBy: { pickupDate: 'asc' },
-      select: { pickupDate: true },
-    }),
-    prisma.order.count({ where: ueberfaelligWhere(farmId, jetzt) }),
-    prisma.order.findMany({
-      where: ueberfaelligWhere(farmId, jetzt),
-      select: { id: true, customerName: true, pickupDate: true },
-      orderBy: { pickupDate: 'desc' },
-      take: UEBERFAELLIG_EINZELN,
-    }),
-    // Dieselbe Regel wie produktZustand (produkt-sichtbarkeit.ts): im Shop, Bestand 0.
-    prisma.product.findMany({
-      where: { farmId, isAvailable: true, stock: { lte: 0 } },
-      select: { id: true, name: true },
-      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
-    }),
-    // Nur Produkte im Shop: Ein ausgeblendetes ohne Kategorie stört keine Kundin.
-    prisma.product.findMany({
-      where: { farmId, isAvailable: true, category: null },
-      select: { id: true, name: true },
-      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
-    }),
-    prisma.statusPost.findFirst({
-      where: { farmId, publishedAt: { not: null } },
-      orderBy: { publishedAt: 'desc' },
-      select: { publishedAt: true },
-    }),
-    // Die Buchungen von Montag der Vorwoche bis jetzt: daraus Woche, Vorwoche
-    // bis zum selben Zeitpunkt, die Tagesbalken und „Umsatz heute" — alles
-    // nach derselben Regel wie Verkauf und Auswertung (auswerten, summeCent).
-    umsatzBuchungen(farmId, { von: wochenfenster.vergleich.von, bis: wochenfenster.aktuell.bis }),
-    // Einstiegs-Checkliste, Hofseiten-Stand, Zustand und Abholzeiten in einem Zugriff.
-    prisma.farm.findUnique({
-      where: { id: farmId },
-      select: {
-        name: true,
-        description: true,
-        aboutText: true,
-        address: true,
-        postalCode: true,
-        city: true,
-        phone: true,
-        email: true,
-        latitude: true,
-        longitude: true,
-        logoUrl: true,
-        bannerType: true,
-        bannerUrl: true,
-        sectionsConfig: true,
-        stripeAccountReady: true,
-        stripeAccountId: true,
-        acceptsOnline: true,
-        acceptsOnsite: true,
-        approvedAt: true,
-        archivedAt: true,
-        isActive: true,
-        isPaused: true,
-        teilenMomenteAus: true,
-        farmPhotos: { select: { id: true } },
-        pickupSlots: {
-          where: { isActive: true },
-          orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
-          select: { dayOfWeek: true, startTime: true, endTime: true },
-        },
-      },
-    }),
-    prisma.product.count({ where: { farmId } }),
-    // Was die Teilen-Karte nennt: im Shop und vorrätig (wie produktZustand).
-    prisma.product.findMany({
-      where: { farmId, isAvailable: true, stock: { gt: 0 } },
-      select: { name: true },
-      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
-      take: TEILEN_ANGEBOT,
-    }),
-  ])
+  const [[heutige, naechste, ueberfaelligAnzahl, ueberfaelligJuengste, ausverkauft, angebot], [ohneKategorie, letzterStatus, buchungen, hof, produkte]] =
+    await Promise.all([
+      // Erst nach der Freigabe: offene Bestellungen und Vorrat.
+      freigabe.then(() =>
+        Promise.all([
+          prisma.order.findMany({
+            where: abholWhere(farmId, heute),
+            select: {
+              id: true,
+              customerName: true,
+              pickupTimeStart: true,
+              pickupTimeEnd: true,
+              paymentMethod: true,
+              status: true,
+              totalAmount: true,
+              serviceFeeCents: true,
+              // Fehlende Artikel (E14) werden nicht gepackt.
+              items: { where: { fehltSeit: null }, select: { productName: true, quantity: true } },
+            },
+          }),
+          prisma.order.findFirst({
+            where: naechsteAbholungWhere(farmId, jetzt),
+            orderBy: { pickupDate: 'asc' },
+            select: { pickupDate: true },
+          }),
+          prisma.order.count({ where: ueberfaelligWhere(farmId, jetzt) }),
+          prisma.order.findMany({
+            where: ueberfaelligWhere(farmId, jetzt),
+            select: { id: true, customerName: true, pickupDate: true },
+            orderBy: { pickupDate: 'desc' },
+            take: UEBERFAELLIG_EINZELN,
+          }),
+          // Dieselbe Regel wie produktZustand (produkt-sichtbarkeit.ts): im Shop, Bestand 0.
+          prisma.product.findMany({
+            where: { farmId, isAvailable: true, stock: { lte: 0 } },
+            select: { id: true, name: true },
+            orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+          }),
+          // Was die Teilen-Karte nennt: im Shop und vorrätig (wie produktZustand).
+          prisma.product.findMany({
+            where: { farmId, isAvailable: true, stock: { gt: 0 } },
+            select: { name: true },
+            orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+            take: TEILEN_ANGEBOT,
+          }),
+        ])
+      ),
+      // Daneben: was die Freigabe nie ändert.
+      Promise.all([
+        // Nur Produkte im Shop: Ein ausgeblendetes ohne Kategorie stört keine Kundin.
+        prisma.product.findMany({
+          where: { farmId, isAvailable: true, category: null },
+          select: { id: true, name: true },
+          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+        }),
+        prisma.statusPost.findFirst({
+          where: { farmId, publishedAt: { not: null } },
+          orderBy: { publishedAt: 'desc' },
+          select: { publishedAt: true },
+        }),
+        // Die Buchungen von Montag der Vorwoche bis jetzt: daraus Woche, Vorwoche
+        // bis zum selben Zeitpunkt, die Tagesbalken und „Umsatz heute" — alles
+        // nach derselben Regel wie Verkauf und Auswertung (auswerten, summeCent).
+        umsatzBuchungen(farmId, { von: wochenfenster.vergleich.von, bis: wochenfenster.aktuell.bis }),
+        // Einstiegs-Checkliste, Hofseiten-Stand, Zustand und Abholzeiten in einem Zugriff.
+        prisma.farm.findUnique({
+          where: { id: farmId },
+          select: {
+            name: true,
+            description: true,
+            aboutText: true,
+            address: true,
+            postalCode: true,
+            city: true,
+            phone: true,
+            email: true,
+            latitude: true,
+            longitude: true,
+            logoUrl: true,
+            bannerType: true,
+            bannerUrl: true,
+            sectionsConfig: true,
+            stripeAccountReady: true,
+            stripeAccountId: true,
+            acceptsOnline: true,
+            acceptsOnsite: true,
+            approvedAt: true,
+            archivedAt: true,
+            isActive: true,
+            isPaused: true,
+            teilenMomenteAus: true,
+            farmPhotos: { select: { id: true } },
+            pickupSlots: {
+              where: { isActive: true },
+              orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+              select: { dayOfWeek: true, startTime: true, endTime: true },
+            },
+          },
+        }),
+        prisma.product.count({ where: { farmId } }),
+      ]),
+    ])
 
   // Erst der Tag, dann seine Bestellungen — über dieselbe Bedingung wie
   // „Heute abholen", damit Zeile und Bestellliste dieselben Bestellungen zählen.

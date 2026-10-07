@@ -144,6 +144,10 @@ vi.mock('@vercel/blob')      // 3
 ```
 Alles, was Netz, DB oder Request-Kontext braucht.
 
+**Dynamische Importe greifen genauso** — `vi.mock('@/lib/email')` gilt auch für `await import('@/lib/email')` (ARCHITECTURE §4 „Schwere Module nur dynamisch"). Nur der Zeitpunkt verschiebt sich: Ein Nachlauf (`nachDerAntwort`) ruft die Versandfunktion erst, nachdem der Import aufgelöst ist — also nach dem Ende der Action. Deshalb:
+- „Mail ging raus": `await vi.waitFor(() => expect(sendX).toHaveBeenCalledWith(…))`.
+- „Keine Mail": vorher `await vi.dynamicImportSettled()` — sonst ist „nicht aufgerufen" nur zu früh geprüft und immer wahr.
+
 ### Niemals gemockt werden — die zu prüfende Aussage
 - **Nie** das Modul mocken, das gerade getestet wird.
 - **Nie** eine Fachregel aus `src/lib/` mocken, wenn ihr Ergebnis die Aussage des Tests ist.

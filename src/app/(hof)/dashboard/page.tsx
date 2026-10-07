@@ -54,17 +54,23 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   const farm = await getFarmForUser(session.user.id)
   if (!farm) redirect('/onboarding')
 
-  // Frist gilt beim Lesen: Verwaiste Bestellungen geben ihre Ware frei, bevor
-  // die Seite Bestand und Bestellungen zeigt (src/lib/fristen.ts). Fehler nur gemeldet.
-  await gibVerwaisteFreiOhneRisiko(farm.id)
-
   // Ein Zeitpunkt für die ganze Seite: Datum, Tag, Woche und Zeitfenster passen zusammen.
   const jetzt = new Date()
-  const heute = await getHeute(farm.id, jetzt)
+
+  // Frist gilt beim Lesen: Verwaiste Bestellungen geben ihre Ware frei, bevor
+  // die Seite Bestand und Bestellungen zeigt (src/lib/fristen.ts). Fehler nur
+  // gemeldet. Bewusst VOR der Antwort, nicht per after(): Packliste,
+  // „überfällig", „ausverkauft" und das Angebot der Teilen-Karte zeigten sonst
+  // eine verfallene Bestellung und ihre noch gebundene Ware. getHeute wartet
+  // nur mit diesen Abfragen auf die Freigabe, alle anderen laufen daneben
+  // (Nachtlauf Nr. 31); der Cookie ebenso.
+  const [heute, cookieJar] = await Promise.all([
+    getHeute(farm.id, jetzt, gibVerwaisteFreiOhneRisiko(farm.id, jetzt)),
+    cookies(),
+  ])
 
   // Der Cookie entscheidet auf dem Server, ob die Karte oder die Zeile
   // „Erste Schritte einblenden" kommt — so blitzt nichts auf und nichts rutscht nach.
-  const cookieJar = await cookies()
   const ersteSchritteZeigen = ersteSchritteAnzeige(
     heute.ersteSchritte,
     ersteSchritteAusgeblendet(cookieJar.get(ERSTE_SCHRITTE_AUS_COOKIE)?.value, farm.id)

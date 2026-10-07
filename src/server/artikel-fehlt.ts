@@ -18,6 +18,7 @@ import {
   bucheVomHofZurueck,
   erstatteKundin,
   ladeStripeStand,
+  stripeVorladen,
   type Buchung,
   type StripeStand,
 } from '@/server/teilerstattung'
@@ -105,6 +106,10 @@ export async function meldeFehlendenArtikel(eingabe: {
   jetzt: Date
 }): Promise<ArtikelFehltAusgang> {
   const { farmId, orderId, itemId, jetzt } = eingabe
+
+  // Das Stripe-SDK VOR der Zeilensperre laden (Nr. 31): Seit es dynamisch
+  // kommt, verlängerte sein erstes Laden sonst die FOR-UPDATE-Sperre unten.
+  await stripeVorladen()
 
   return prisma.$transaction(
     async (tx) => {
