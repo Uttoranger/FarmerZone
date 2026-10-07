@@ -27,6 +27,7 @@ import { updateProductImageAction, reorderProductsAction } from '@/server/action
 import { ReorderContext } from '@/components/shared/reorder-context'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { CartSheet } from './cart-sheet'
+import { futterVerantwortungImKorb } from '@/lib/futter-registrierung'
 import { produktPfad } from '@/lib/produktdetail'
 import { ProduktKarte } from '@/components/hofseite/produkt-karte'
 import { ProduktAbschnitte } from '@/components/hofseite/produkt-abschnitte'
@@ -864,6 +865,7 @@ export function ProductGrid({
           onUpdateQuantity={updateQuantity}
           onRemoveItem={removeItem}
           gebuehrKorb={gebuehrKorb}
+          futterHinweis={futterVerantwortungImKorb(items, products)}
         />
       )}
     </>

@@ -99,6 +99,13 @@ import type { NeuBereich } from '@/schemas/url-auftrag'
 import { FUTTER_ANLEGEN_HREF } from '@/lib/bauern-navigation'
 import { cn } from '@/lib/utils'
 import {
+  FUTTER_BESTAETIGUNG_AUSNAHME,
+  FUTTER_BESTAETIGUNG_NEU,
+  FUTTER_BESTAETIGUNG_TEXT,
+  brauchtNeueBestaetigung,
+  futterStandAusFormular,
+} from '@/lib/futter-registrierung'
+import {
   gewichtFrage,
   inhaltZeile,
   kundenVorschau,
@@ -240,8 +247,9 @@ function toFormDefaults(p: ProductData): Partial<ProductFormData> {
     category: p.category ?? null,
     subcategory: p.subcategory ?? null,
     labels: p.labels,
-    // Eine gespeicherte Kennzeichnung wurde schon einmal bestätigt — der Haken
-    // ist deshalb gesetzt. Beim Speichern wird das Datum ohnehin neu gestempelt.
+    // Der Haken startet beim Bearbeiten NIE gesetzt (E10a, Nr. 23): Er ist eine
+    // Erklärung des Hofs, kein gespeicherter Wert. Ob eine Änderung ihn
+    // verlangt, entscheidet brauchtNeueBestaetigung (verbindlich der Server).
     futter: p.futter
       ? {
           futtermittelart: p.futter.futtermittelart,
@@ -256,7 +264,7 @@ function toFormDefaults(p: ProductData): Partial<ProductFormData> {
           rohasche: p.futter.rohasche,
           zusatzstoffe: p.futter.zusatzstoffe ?? '',
           gebrauchshinweis: p.futter.gebrauchshinweis ?? '',
-          bestaetigt: true,
+          bestaetigt: false,
         }
       : null,
     abgabe: p.abgabe,
@@ -722,7 +730,37 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
     }, 250)
   }
 
+  /**
+   * Angaben eines Futtermittels geändert, aber nicht neu bestätigt (E10a):
+   * Abschnitt Kennzeichnung öffnen, Meldung am Haken, Fokus dorthin.
+   */
+  function bestaetigungVerlangen(text: string) {
+    form.setError('futter.bestaetigt', { type: 'manual', message: text })
+    abschnittOeffnen('kennzeichnung')
+    toast.error(text)
+    window.setTimeout(() => {
+      const el = formRef.current?.querySelector<HTMLElement>('[name="futter.bestaetigt"]')
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      // Der Haken steht ganz unten im Abschnitt: Wächst der Abschnitt beim
+      // Aufklappen noch, verfehlt das Scrollen ihn. focus() ohne preventScroll
+      // holt ihn danach sicher ins Bild.
+      window.setTimeout(() => el.focus(), 400)
+    }, 250)
+  }
+
   async function onSubmit(data: ProductFormData) {
+    // Vorab im Browser, damit kein Foto umsonst hochlädt — verbindlich prüft
+    // updateProduct mit dem gespeicherten Stand (Code BESTAETIGUNG).
+    if (
+      isEdit &&
+      data.futter &&
+      !data.futter.bestaetigt &&
+      brauchtNeueBestaetigung(futterStandAusFormular(toFormDefaults(product)), futterStandAusFormular(data))
+    ) {
+      bestaetigungVerlangen(FUTTER_BESTAETIGUNG_NEU)
+      return
+    }
     setIsSubmitting(true)
     try {
       let imageUrl = data.imageUrl ?? ''
@@ -779,6 +817,10 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
         ? await updateProduct(product.id, payload, bestandBasis ?? product.stock)
         : await createProduct(payload)
       if ('error' in ergebnis) {
+        if ('code' in ergebnis && ergebnis.code === 'BESTAETIGUNG') {
+          bestaetigungVerlangen(ergebnis.error)
+          return
+        }
         toast.error(ergebnis.error)
         if ('code' in ergebnis && ergebnis.code === 'GEAENDERT' && ergebnis.vorrat !== undefined) {
           // Das Feld zeigt jetzt den echten Stand; der Hof prüft und speichert erneut.
@@ -1811,13 +1853,16 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                                   type="checkbox"
                                   name={field.name}
                                   checked={field.value ?? false}
-                                  onChange={(e) => field.onChange(e.target.checked)}
+                                  onChange={(e) => {
+                                    field.onChange(e.target.checked)
+                                    // Die Meldung „bitte neu bestätigen" setzt das Absenden von Hand — der Haken nimmt sie zurück.
+                                    if (e.target.checked) form.clearErrors('futter.bestaetigt')
+                                  }}
                                   className="mt-0.5 w-4 h-4 rounded accent-primary"
                                 />
-                                <span className="text-sm text-foreground">
-                                  Die Angaben entsprechen dem Sackanhänger bzw. Lieferschein. Ich bin für die Richtigkeit verantwortlich.
-                                </span>
+                                <span className="text-sm text-foreground">{FUTTER_BESTAETIGUNG_TEXT}</span>
                               </label>
+                              {isEdit && <p className="text-xs text-muted-foreground">{FUTTER_BESTAETIGUNG_AUSNAHME}</p>}
                               <FormMessage />
                             </FormItem>
                           )}

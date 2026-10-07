@@ -22,7 +22,13 @@ import {
   type ProductSubcategoryValue,
   type TierartValue,
 } from '@/lib/taxonomie'
-import { gebindeSperre, speichernHinweis, type HofRegistrierung, type VerpackungValue } from '@/lib/futter-registrierung'
+import {
+  FUTTER_BESTAETIGUNG_TEXT,
+  gebindeSperre,
+  speichernHinweis,
+  type HofRegistrierung,
+  type VerpackungValue,
+} from '@/lib/futter-registrierung'
 import {
   FUTTER_GROESSEN_EINHEITEN,
   FUTTER_VORLAGEN,
@@ -530,9 +536,7 @@ export function FutterFormular({
               onChange={(e) => kennzeichnungSetzen({ bestaetigt: e.target.checked })}
               className="mt-0.5 size-4 shrink-0 accent-primary"
             />
-            <span className="text-sm text-foreground">
-              Die Angaben entsprechen dem Sackanhänger bzw. Lieferschein. Ich bin für die Richtigkeit verantwortlich.
-            </span>
+            <span className="text-sm text-foreground">{FUTTER_BESTAETIGUNG_TEXT}</span>
           </label>
           {fehler['kennzeichnung.bestaetigt'] && <FeldFehler>{fehler['kennzeichnung.bestaetigt']}</FeldFehler>}
         </div>

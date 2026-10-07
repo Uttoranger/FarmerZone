@@ -4321,6 +4321,18 @@ Auftrag freigabe.md §9 „20" und §4 (Nr. 20 Futter), Gate 6, Register E3, E9,
 - **Kundenseite:** Größenkacheln, Schild nach E9 und Brennmaterial-Angaben gab es seit Nr. 11; neu ist die Erklärbox rm/srm/fm auf der Produktseite. Gesperrte Größen sind Entwürfe und erscheinen nirgends (Hofseite, Entdecken, Gebinde-Facette).
 - **Bestellzeile:** `ORDER_UNIT_LABELS` kennt jetzt Ballen, Big Bag, rm und srm — vorher stand für diese Einheiten der Rohwert in der Zeile.
 
+
+## Nachtrag Futter: Pflicht-Bestätigung, Hinweise, Label Brennmaterial (Nachtlauf Nr. 23, Oktober 2026)
+
+Auftrag freigabe.md §10 „23" (#198), Register E10a, E11 (Label), E9. Keine Schema-Änderung — `FutterKennzeichnung.bestaetigtAm` gab es schon.
+
+- **Warum der Haken:** E10a lässt Futter ohne vorheriges Gegenlesen der Erklärtexte live gehen. Der Ausgleich ist eine Erklärung des Hofs mit dem Wortlaut aus dem Register, serverseitig erzwungen. Vorher hieß der Haken „Die Angaben entsprechen dem Sackanhänger …" und war im Bearbeiten-Dialog vorbelegt — damit bestätigte jedes Speichern still neu.
+- **Wann neu bestätigt werden muss:** bei jeder Änderung außer Preis, Vorrat, Sichtbarkeit und Foto. Abgrenzung konservativ: Diese vier sind keine Angabe zu Registrierung, Kennzeichnung oder Verpackung, und für jede gibt es einen eigenen Weg ohne Futter-Formular (Vorrat-Stepper, Schalter „Sichtbar", Foto im Hofseiten-Editor) — der Haken nur im Dialog schützte dort nichts. Alles andere zählt, auch Name, Beschreibung, Bio, Sorte, Abgabe, Einheit, MwSt und Saison: lieber einmal zu oft bestätigen. Felder, die künftig in `produktDaten` dazukommen, zählen von selbst mit (verglichen wird, was geschrieben würde).
+- **Wie verglichen wird:** `brauchtNeueBestaetigung` normalisiert (leer = null, Decimal = Zahl, Listen ohne Reihenfolge), damit derselbe Wert in anderer Schreibweise keine Bestätigung verlangt. Ohne Änderung bleibt der alte `bestaetigtAm` stehen; mit Haken wird er neu gesetzt. Altbestand ohne gespeicherte Kennzeichnung muss immer bestätigen.
+- **Kopfhinweis und BAES-Link:** „Zur Orientierung, keine Rechtsberatung …" über den sieben Fällen. Die Adresse ist vorerst die Startseite `https://www.baes.gv.at` — die genaue Unterseite für Futtermittelbetriebe ließ sich im Nachtlauf ohne Netz nicht bestimmen; sie steht nur in `BAES_FUTTERMITTEL_URL`.
+- **Kundenseite:** Verantwortungs-Hinweis bei jedem Futter auf der Produktseite (unter den Größenkacheln), im Warenkorb-Blatt und im Mini-Warenkorb; bei „nur an Betriebe" mit Zusatz. Reine Anzeige — Warenkorb-Prüfung, Checkout und Geldpfad sind unverändert.
+- **Label Brennmaterial (E11):** `KATEGORIE_LABEL.BRENNHOLZ` heißt jetzt „Brennmaterial"; Enum und Schema bleiben. Damit verschwinden die Sonderregeln in `hoefe-entdecken.ts` und `bereiche-anzeige.ts`; Startseiten-Chip und Produktliste-Filter nehmen das Label. Die Kennzeichnungszeile auf der Produktseite heißt jetzt „Brennmaterial · Brennholz (Scheite)".
+
 ## Nützliche Befehle
 
 ```bash

@@ -13,6 +13,7 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
 import { formatEuro, formatGrundpreis } from '@/lib/format'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
+import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
 import type { CartItem } from '@/lib/use-cart'
 
 type Props = {
@@ -25,6 +26,8 @@ type Props = {
   onRemoveItem: (productId: string) => void
   /** „zzgl. Servicegebühr" neben der Summe — null, wenn der Hof gerade gebührenfrei ist. */
   gebuehrKorb?: string | null
+  /** Verantwortungs-Hinweis, wenn Futter im Korb liegt (futterVerantwortungImKorb, E10a) — nur Anzeige. */
+  futterHinweis?: readonly string[]
 }
 
 /** Ein runder Mengen-Knopf: sichtbar 28 px, Trefferfläche 44 px. */
@@ -38,7 +41,7 @@ const MENGEN_KNOPF = cn(
  * noch in der Kundenansicht im neuen Design (KundeShell, data-design="neu"):
  * Kaufen ist Grün (accent), Text und Symbole aus den Tokens.
  */
-export function CartSheet({ open, onOpenChange, items, total, farmSlug, onUpdateQuantity, onRemoveItem, gebuehrKorb = null }: Props) {
+export function CartSheet({ open, onOpenChange, items, total, farmSlug, onUpdateQuantity, onRemoveItem, gebuehrKorb = null, futterHinweis = [] }: Props) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-md flex flex-col p-0">
@@ -138,6 +141,7 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, onUpdate
             <p className="text-xs text-muted-foreground -mt-1">
               {gebuehrKorb ? `${gebuehrKorb[0].toUpperCase()}${gebuehrKorb.slice(1)} · ` : ''}Reservierung gilt 15 Minuten.
             </p>
+            <FutterVerantwortung saetze={futterHinweis} />
             <Link
               href={`/${farmSlug}/checkout`}
               onClick={() => onOpenChange(false)}
