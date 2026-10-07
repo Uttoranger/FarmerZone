@@ -7,7 +7,7 @@
  * Die Wirkung (freischalten, zurücknehmen, ablehnen, Gebühr setzen) bleibt in
  * src/server/actions/admin.ts; die Seite entscheidet hier nur, was sie zeigt.
  */
-import { formatZahl } from '@/lib/format'
+import { euroEingabeZuCent, formatZahl } from '@/lib/format'
 import { wienKalendertag } from '@/lib/kalender'
 import { SERVICEGEBUEHR_STANDARD_PROZENT } from '@/lib/konditionen'
 import { FREISCHALTUNG_EMAIL_OFFEN_TEXT } from '@/lib/email-bestaetigung'
@@ -314,4 +314,18 @@ export function adminHofZeile(
       giltAbTag: hof.serviceFeeActiveFrom ? kalendertagInWien(hof.serviceFeeActiveFrom) : '',
     },
   }
+}
+
+/** Der Satz im Servicegebühr-Dialog, wenn die Mindestgebühr kein Betrag ist. */
+export const MINDESTGEBUEHR_UNGUELTIG = 'Gib die Mindestgebühr als Betrag in Euro ein, zum Beispiel 0,50.'
+
+/**
+ * Die getippte Mindestgebühr (Euro) → ganze Cent für setServiceFeeAction,
+ * `null` = kein gültiger Betrag (der Dialog zeigt MINDESTGEBUEHR_UNGUELTIG und
+ * schickt nichts). Leer bleibt 0 € wie bisher: So hat sich das Feld immer
+ * verhalten, und eine Mindestgebühr von 0 € ist erlaubt (Nr. 32, Runde 1).
+ */
+export function mindestgebuehrCent(eingabe: string): number | null {
+  if (eingabe.trim() === '') return 0
+  return euroEingabeZuCent(eingabe)
 }

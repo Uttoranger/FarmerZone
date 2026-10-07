@@ -275,7 +275,7 @@ describe('publishStatusPost (Beitragsfoto geht auch per Mail an Abonnentinnen)',
   const beitrag = (photoUrl: string) => ({
     title: 'Neue Eier',
     body: 'Frisch gelegt.',
-    anlass: 'FRESH_PRODUCT',
+    anlass: 'FRESH_PRODUCT' as const,
     photoUrl,
     showOnFarmPage: true,
     sendEmail: false,

@@ -4,7 +4,7 @@ import { z } from 'zod'
  * Die Admin-Eingabe für die Servicegebühr eines Hofes (Sprint servicegebuehr).
  *
  * Prozent 0–100 mit höchstens zwei Nachkommastellen (Schema: Decimal(5,2)),
- * Mindestgebühr in ganzen Cent, „gilt ab" als Kalendertag JJJJ-MM-TT oder
+ * Mindestgebühr in ganzen Cent (als Zahl, nie als Text), „gilt ab" als Kalendertag JJJJ-MM-TT oder
  * leer (= gebührenfrei). Die Umrechnung des Tages in einen Zeitpunkt
  * (Wiener Mitternacht) macht die Server-Action, nicht das Schema.
  */
@@ -14,7 +14,10 @@ export const servicegebuehrEinstellungSchema = z.object({
     .min(0, 'Prozentsatz darf nicht negativ sein')
     .max(100, 'Prozentsatz darf höchstens 100 sein')
     .refine((v) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-6, 'Höchstens zwei Nachkommastellen'),
-  minCents: z.coerce
+  // Ohne coerce (Nr. 32, Runde 1): Der Dialog schickt die ganze Cent-Zahl
+  // (mindestgebuehrCent). Text las z.coerce still als Cent — „1e2" als 100
+  // Cent, „" als 0 —, deshalb lehnt der Server ihn jetzt ab.
+  minCents: z
     .number({ message: 'Mindestgebühr muss eine Zahl sein' })
     .int('Mindestgebühr in ganzen Cent')
     .min(0, 'Mindestgebühr darf nicht negativ sein')

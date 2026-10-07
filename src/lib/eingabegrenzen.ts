@@ -33,6 +33,19 @@ export const BILD_URL_MAX = 2048
 export const VORRAT_MAX = 99_999
 
 /**
+ * Titel und Text eines Beitrags (Nr. 32). Das Formular kürzt schon beim
+ * Tippen auf 80 bzw. 500 Zeichen; der Server lässt bewusst mehr zu, weil ein
+ * älterer Beitrag als Vorlage (`?from=`) ungekürzt ins Formular kommt. Die
+ * Grenze hält nur Müll aus Datenbank, Hofseite und Mail.
+ */
+export const BEITRAG_TITEL_MAX = 200
+export const BEITRAG_TEXT_MAX = 5000
+/** Verknüpfte Produkte eines Beitrags — weit über jedem echten Sortiment. */
+export const BEITRAG_PRODUKTE_MAX = 500
+/** Wie oft „per WhatsApp verschickt" gezählt werden kann — fängt nur Unsinn ab. */
+export const BEITRAG_WHATSAPP_MAX = 100_000
+
+/**
  * Betrag und Menge eines eingetragenen Verkaufs (Nachtlauf Nr. 22b). Die
  * Spalten (Decimal(10,2) bzw. Decimal(10,3)) fassen mehr; darüber schlüge das
  * Speichern mit einem Datenbankfehler fehl statt mit einem Satz. Die Grenzen

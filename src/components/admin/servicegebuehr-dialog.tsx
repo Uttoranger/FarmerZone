@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { setServiceFeeAction } from '@/server/actions/admin'
 import { SERVICEGEBUEHR_ADMIN_ERKLAERUNG, centsAlsEuro } from '@/lib/servicegebuehr'
-import { SERVICEGEBUEHR_NUR_NEUE, type AdminHofZeile } from '@/lib/admin-hoefe'
+import { MINDESTGEBUEHR_UNGUELTIG, SERVICEGEBUEHR_NUR_NEUE, mindestgebuehrCent, type AdminHofZeile } from '@/lib/admin-hoefe'
 import { formatEuro } from '@/lib/format'
 import { BestellDialog, DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
 import { FELD, FELD_LABEL, TEXT_GRUEN } from '@/components/hof-bestellungen/stil'
@@ -36,13 +36,17 @@ function Formular({ hof, onClose }: { hof: AdminHofZeile | null; onClose: () => 
   function speichern() {
     if (!hof) return
     setFehler(null)
+    // Euro-Text → ganze Cent über die Ziffern, nie über Number (Nr. 32). Kein
+    // Betrag → Satz hier; Rohtext geht nie an den Server, der nur Cent nimmt.
+    const mindest = mindestgebuehrCent(mindestEuro)
+    if (mindest === null) {
+      setFehler(MINDESTGEBUEHR_UNGUELTIG)
+      return
+    }
     startTransition(async () => {
-      // Unverändert aus dem Bestand: Euro-Text → Cent; ungültiges geht als
-      // Text an den Server, der es mit einem Satz ablehnt.
-      const mindest = Math.round(Number(mindestEuro.replace(',', '.')) * 100)
       const ergebnis = await setServiceFeeAction(hof.id, {
         percent: prozent.replace(',', '.'),
-        minCents: Number.isFinite(mindest) ? mindest : mindestEuro,
+        minCents: mindest,
         activeFrom: giltAb,
       })
       if (ergebnis.error) {

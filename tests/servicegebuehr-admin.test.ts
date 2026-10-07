@@ -99,8 +99,8 @@ describe('setServiceFeeAction — Schreiben', () => {
     )
   })
 
-  it('nimmt Zahlen wie Text (Formularfelder) und rundet nichts still', async () => {
-    await setServiceFeeAction('farm_1', { percent: '10', minCents: '200', activeFrom: null })
+  it('nimmt den Prozentsatz als Text (Formularfeld) und rundet nichts still', async () => {
+    await setServiceFeeAction('farm_1', { percent: '10', minCents: 200, activeFrom: null })
     expect(farmUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: { serviceFeePercent: 10, serviceFeeMinCents: 200, serviceFeeActiveFrom: null },
@@ -130,6 +130,15 @@ describe('setServiceFeeAction — Validierung', () => {
     [{ ...GUELTIG, percent: 'abc' }, 'Prozentsatz muss eine Zahl sein'],
     [{ ...GUELTIG, minCents: 12.5 }, 'Mindestgebühr in ganzen Cent'],
     [{ ...GUELTIG, minCents: -1 }, 'Mindestgebühr darf nicht negativ sein'],
+    // Nr. 32, Runde 1: Die Mindestgebühr kommt nur als ganze Cent-Zahl. Text
+    // las z.coerce vorher still als Cent („1e2" → 100 Cent, „" → 0).
+    [{ ...GUELTIG, minCents: '200' }, 'Mindestgebühr muss eine Zahl sein'],
+    [{ ...GUELTIG, minCents: '1e2' }, 'Mindestgebühr muss eine Zahl sein'],
+    [{ ...GUELTIG, minCents: '' }, 'Mindestgebühr muss eine Zahl sein'],
+    [{ ...GUELTIG, minCents: '0,50' }, 'Mindestgebühr muss eine Zahl sein'],
+    [{ ...GUELTIG, minCents: true }, 'Mindestgebühr muss eine Zahl sein'],
+    [{ ...GUELTIG, minCents: null }, 'Mindestgebühr muss eine Zahl sein'],
+    [{ ...GUELTIG, minCents: Number.NaN }, 'Mindestgebühr muss eine Zahl sein'],
     [{ ...GUELTIG, activeFrom: '01.10.2026' }, 'Datum als JJJJ-MM-TT'],
     [{ ...GUELTIG, activeFrom: '2026-13-40' }, 'Ungültiges Datum.'],
   ])('lehnt %j ab: %s', async (eingabe, meldung) => {
