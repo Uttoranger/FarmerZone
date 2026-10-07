@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useId, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -8,6 +8,7 @@ import { Mail, MessageCircle, Trash2, BellOff, ExternalLink, LogOut } from 'luci
 import { authClient } from '@/lib/auth-client'
 import { cn } from '@/lib/utils'
 import { updateSubscription, deleteCustomerAccount } from '@/server/actions/subscriptions'
+import { ABO_TEXT } from '@/lib/abo-bestaetigung'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Button } from '@/components/ui/button'
@@ -32,6 +33,8 @@ interface SubscriptionRow {
   farmName: string
   farmSlug: string
   optInEmail: boolean
+  /** Anmeldung angefragt, Link noch gültig (Double-Opt-in, S11). */
+  emailWartet: boolean
   optInWhatsApp: boolean
   customerPhone: string | null
 }
@@ -59,20 +62,27 @@ export function ProfileClient({ user, subscriptions: initialSubs }: Props): Reac
   function toggleEmail(farmId: string) {
     const sub = subs.find((s) => s.farmId === farmId)
     if (!sub) return
-    const newOptIn = !sub.optInEmail
+    // Wartet die Anmeldung auf den Link, schaltet ein Tipp sie ab (wie „an").
+    const newOptIn = !(sub.optInEmail || sub.emailWartet)
+    const vorher = { optInEmail: sub.optInEmail, emailWartet: sub.emailWartet }
     setSubs((prev) =>
-      prev.map((s) => (s.farmId === farmId ? { ...s, optInEmail: newOptIn } : s)),
+      prev.map((s) => (s.farmId === farmId ? { ...s, optInEmail: newOptIn, emailWartet: false } : s)),
     )
     startTransition(async () => {
       const result = await updateSubscription(farmId, newOptIn, sub.optInWhatsApp)
       if (result.error) {
         toast.error(result.error)
-        setSubs((prev) =>
-          prev.map((s) => (s.farmId === farmId ? { ...s, optInEmail: !newOptIn } : s)),
-        )
-      } else {
-        toast.success(newOptIn ? 'E-Mail-Abo aktiviert' : 'E-Mail-Abo deaktiviert')
+        setSubs((prev) => prev.map((s) => (s.farmId === farmId ? { ...s, ...vorher } : s)))
+        return
       }
+      // E-Mail an heißt bei einer neuen Anmeldung: erst bestätigen (S11).
+      setSubs((prev) =>
+        prev.map((s) =>
+          s.farmId === farmId ? { ...s, optInEmail: result.email === 'an', emailWartet: result.email === 'wartet' } : s,
+        ),
+      )
+      if (result.email === 'wartet') toast.success(ABO_TEXT.profilWartet)
+      else toast.success(result.email === 'an' ? 'E-Mail-Abo aktiviert' : 'E-Mail-Abo deaktiviert')
     })
   }
 
@@ -84,7 +94,9 @@ export function ProfileClient({ user, subscriptions: initialSubs }: Props): Reac
       prev.map((s) => (s.farmId === farmId ? { ...s, optInWhatsApp: newOptIn } : s)),
     )
     startTransition(async () => {
-      const result = await updateSubscription(farmId, sub.optInEmail, newOptIn)
+      // E-Mail bleibt, wie sie ist: Eine wartende Anmeldung zählt als „an",
+      // sonst stellte der WhatsApp-Schalter sie still ab.
+      const result = await updateSubscription(farmId, sub.optInEmail || sub.emailWartet, newOptIn)
       if (result.error) {
         toast.error(result.error)
         setSubs((prev) =>
@@ -170,7 +182,8 @@ export function ProfileClient({ user, subscriptions: initialSubs }: Props): Reac
                     icon={Mail}
                     label="E-Mail-Neuigkeiten"
                     hof={sub.farmName}
-                    active={sub.optInEmail}
+                    active={sub.optInEmail || sub.emailWartet}
+                    hinweis={sub.emailWartet ? ABO_TEXT.schalterWartet : undefined}
                     onToggle={() => toggleEmail(sub.farmId)}
                   />
                   <ToggleRow
@@ -236,6 +249,7 @@ function ToggleRow({
   active,
   disabled,
   disabledNote,
+  hinweis,
   onToggle,
 }: {
   icon: typeof Mail
@@ -244,8 +258,11 @@ function ToggleRow({
   active: boolean
   disabled?: boolean
   disabledNote?: string
+  /** Kurzer Satz unter dem Namen, z. B. „Wartet auf deine Bestätigung" (S11). */
+  hinweis?: string
   onToggle: () => void
 }) {
+  const hinweisId = useId()
   return (
     <div className="flex min-h-11 items-center justify-between gap-3 py-1">
       <div className="flex min-w-0 items-center gap-2.5">
@@ -253,6 +270,11 @@ function ToggleRow({
         <div className="min-w-0">
           <span className={cn('text-[14px]', disabled ? 'text-muted-foreground' : 'text-foreground')}>{label}</span>
           {disabled && disabledNote && <p className="text-[12px] text-muted-foreground">{disabledNote}</p>}
+          {hinweis && (
+            <p id={hinweisId} className="text-[12px] text-status-offen">
+              {hinweis}
+            </p>
+          )}
         </div>
       </div>
       {/* Ein Schalter: Rolle „switch" sagt dem Screenreader Zustand und Zweck.
@@ -261,6 +283,7 @@ function ToggleRow({
         type="button"
         role="switch"
         aria-checked={active}
+        aria-describedby={hinweis ? hinweisId : undefined}
         aria-label={`${label} von ${hof}`}
         onClick={onToggle}
         disabled={disabled}

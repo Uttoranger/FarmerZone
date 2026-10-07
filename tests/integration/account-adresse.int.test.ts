@@ -98,7 +98,7 @@ describe('/account nach der Code-Anmeldung eines ruhenden Altkontos', () => {
     const { email, farmId } = await ruhendesKontoMitAbo()
     await meldeMitCodeAn(email)
 
-    expect(await aktionen.updateSubscription(farmId, false, false)).toEqual({})
+    expect(await aktionen.updateSubscription(farmId, false, false)).toEqual({ email: 'aus' })
     const abo = await prisma.customerFarmSubscription.findUniqueOrThrow({
       where: { customerEmail_farmId: { customerEmail: email, farmId } },
     })

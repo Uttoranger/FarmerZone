@@ -41,6 +41,8 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 // Die Darstellung hat eigene Wege (Browser-Prüfung); hier zählt, was die Seite ihr übergibt.
+// Die Bestätigungsmail (Double-Opt-in, Nr. 38) geht nach der Antwort — hier nicht.
+vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: vi.fn() }))
 vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({ KundeShellMitSitzung: () => null }))
 vi.mock('@/app/account/profile/profile-client', () => ({ ProfileClient: () => null }))
 
@@ -63,7 +65,13 @@ const ABO = {
   optInEmail: true,
   optInWhatsApp: false,
   customerPhone: null,
+  // Bestand vor dem Double-Opt-in (Nr. 38): nie angefragt.
+  emailOptInAngefragtAm: null,
+  emailOptInBestaetigtAm: null,
 }
+
+/** Ein neues Abo, wie upsert es zurückgibt: E-Mail noch aus, nie angefragt. */
+const NEUES_ABO = { id: 'abo_1', optInEmail: false, emailOptInAngefragtAm: null, emailOptInBestaetigtAm: null }
 
 /**
  * Sitzung und Datenbank getrennt: `inDb` ist der frische Stand des Kontos,
@@ -102,7 +110,8 @@ async function aboAnzeige(): Promise<unknown[]> {
 beforeEach(() => {
   vi.clearAllMocks()
   aboFindMany.mockResolvedValue([ABO] as never)
-  aboUpsert.mockResolvedValue({} as never)
+  aboUpsert.mockResolvedValue(NEUES_ABO as never)
+  vi.mocked(prisma.customerFarmSubscription.updateMany).mockResolvedValue({ count: 1 } as never)
   aboDeleteMany.mockResolvedValue({ count: 1 } as never)
   userDelete.mockResolvedValue({} as never)
 })
@@ -193,7 +202,7 @@ describe('Abos ändern und löschen — nur mit bestätigter Adresse', () => {
 
     const ergebnis = await updateSubscription('farm_1', false, false)
 
-    expect(ergebnis).toEqual({})
+    expect(ergebnis).toEqual({ email: 'aus' })
     expect(aboUpsert.mock.calls[0][0].where).toEqual({
       customerEmail_farmId: { customerEmail: 'erika.mustermann@example.org', farmId: 'farm_1' },
     })
@@ -202,7 +211,8 @@ describe('Abos ändern und löschen — nur mit bestätigter Adresse', () => {
   it('veraltete Sitzung (Cookie unbestätigt, Datenbank bestätigt): Ändern wirkt', async () => {
     sitzung(true, false)
 
-    expect(await updateSubscription('farm_1', true, false)).toEqual({})
+    // E-Mail an heißt seit Nr. 38: Bestätigungslink unterwegs.
+    expect(await updateSubscription('farm_1', true, false)).toEqual({ email: 'wartet' })
     expect(aboUpsert).toHaveBeenCalledOnce()
   })
 
@@ -219,7 +229,9 @@ describe('Abos ändern und löschen — nur mit bestätigter Adresse', () => {
     await updateSubscription('farm_1', true, true)
 
     expect(aboUpsert.mock.calls[0][0].create).toMatchObject({ customerPhone: null })
-    expect(aboUpsert.mock.calls[0][0].update).toEqual({ optInEmail: true, optInWhatsApp: true })
+    // E-Mail an schaltet nicht direkt an (Double-Opt-in, Nr. 38) — nur WhatsApp wird gesetzt.
+    expect(aboUpsert.mock.calls[0][0].create).toMatchObject({ optInEmail: false, optInWhatsApp: true })
+    expect(aboUpsert.mock.calls[0][0].update).toEqual({ optInWhatsApp: true })
   })
 
   it('unbestätigt: Konto löschen wird abgelehnt — weder Konto noch Abos verschwinden', async () => {

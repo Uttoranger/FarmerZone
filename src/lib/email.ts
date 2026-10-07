@@ -14,6 +14,7 @@ import type { MailZahlart } from '@/emails/order-confirmation'
 import { APP_URL } from '@/lib/umgebung-server'
 import { ANMELDECODE_GUELTIG_SEKUNDEN } from '@/lib/anmeldecode'
 import { BESTAETIGUNG_GUELTIG_SEKUNDEN } from '@/lib/email-bestaetigung'
+import { ABO_BESTAETIGUNG_GUELTIG_TAGE } from '@/lib/abo-bestaetigung'
 
 const apiKey = process.env.RESEND_API_KEY
 const FROM = process.env.EMAIL_FROM ?? 'onboarding@resend.dev'
@@ -258,6 +259,23 @@ export async function sendEmailBestaetigung(email: string, url: string): Promise
   })
   if (!vorlage.ok) return { error: vorlage.error }
   return sendRaw(email, 'Bestätige deine E-Mail-Adresse · FarmerZone', vorlage.html)
+}
+
+/**
+ * „Bitte bestätige deine Anmeldung" → wer sich für Neuigkeiten eines Hofes
+ * angemeldet hat (Double-Opt-in, S11, Nr. 38). Keine werbliche Mail, deshalb
+ * ohne Abmeldelink. Gibt das Versandergebnis zurück (sendRaw wirft nie).
+ */
+export async function sendAboBestaetigung(
+  email: string,
+  daten: { hofName: string; url: string }
+): Promise<{ id?: string; error?: string }> {
+  const vorlage = await htmlOderFehler(async () => {
+    const { AboBestaetigungEmail } = await import('@/emails/abo-bestaetigung')
+    return React.createElement(AboBestaetigungEmail, { ...daten, tage: ABO_BESTAETIGUNG_GUELTIG_TAGE })
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, 'Bitte bestätige deine Anmeldung · FarmerZone', vorlage.html)
 }
 
 /**

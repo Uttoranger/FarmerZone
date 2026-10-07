@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getStatusTemplate } from '@/server/queries/status-posts'
 import { prisma } from '@/lib/prisma'
+import { WERBEMAIL_EMPFAENGER } from '@/server/abo-anmeldung'
 import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
 import { ZurueckLink } from '@/components/hofbereich/zurueck-link'
 import { StatusNewClient } from './status-new-client'
@@ -44,7 +45,8 @@ export default async function StatusNewPage({
       select: { id: true, name: true, price: true },
       orderBy: { name: 'asc' },
     }),
-    prisma.customerFarmSubscription.count({ where: { farmId: farm.id, optInEmail: true } }),
+    // Dieselben Empfänger wie beim Versand: Bestand und bestätigte Anmeldungen (S11).
+    prisma.customerFarmSubscription.count({ where: { farmId: farm.id, ...WERBEMAIL_EMPFAENGER } }),
     prisma.customerFarmSubscription.count({ where: { farmId: farm.id, optInWhatsApp: true } }),
     prisma.statusPost.findFirst({
       where: {
