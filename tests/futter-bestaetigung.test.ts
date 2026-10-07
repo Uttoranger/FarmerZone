@@ -15,6 +15,8 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import {
   BAES_FUTTERMITTEL_URL,
+  BAES_KONTAKT,
+  BAES_KONTAKT_TEL,
   BETRIEB_VERANTWORTUNG,
   FUTTER_BESTAETIGUNG_TEXT,
   KUNDEN_VERANTWORTUNG,
@@ -279,11 +281,38 @@ describe('EINE Quelle für die Futter-Texte (E10a)', () => {
     ['Kundenhinweis', 'FarmerZone vermittelt nur'],
     ['Zusatz Betriebe', 'bestimmungsgemäßen Einsatz'],
     ['BAES-Adresse', 'baes.gv.at'],
-    ['BAES-E-Mail', 'futtermittel@'],
-    ['BAES-Telefon', '0555 33216'],
   ])('%s (%s) steht nur in der Quelle', (_name, stueck) => {
     // Gegenprobe steckt im Ergebnis: Die Quelle selbst muss gefunden werden.
     expect(fundstellen(stueck)).toEqual([QUELLE])
+  })
+
+  /** Wie oft das Stück in jeder Datei unter src/ steht (nur Dateien mit Treffern). */
+  function trefferJeDatei(stueck: string): Record<string, number> {
+    return Object.fromEntries(
+      dateien(WURZEL)
+        .map((d) => [relative(WURZEL, d).split('\\').join('/'), readFileSync(d, 'utf8').split(stueck).length - 1] as const)
+        .filter(([, n]) => n > 0)
+    )
+  }
+
+  // Die Suchstücke kommen aus BAES_KONTAKT selbst — kein Kontaktwert steht im Test.
+  const [lokalTeil] = BAES_KONTAKT.email.split('@')
+  const telefonEnde = BAES_KONTAKT.telefon.split(' ').slice(-2).join(' ')
+  const telefonZiffern = BAES_KONTAKT.telefon.replace(/\D/g, '')
+
+  it.each([
+    ['E-Mail ganz', BAES_KONTAKT.email],
+    ['E-Mail vor dem @', `${lokalTeil}@`],
+    ['Telefon ganz', BAES_KONTAKT.telefon],
+    ['Telefon, letzte Gruppen', telefonEnde],
+  ])('BAES-Kontakt (%s) steht genau einmal, nur in der Quelle', (_name, stueck) => {
+    expect(trefferJeDatei(stueck)).toEqual({ [QUELLE]: 1 })
+  })
+
+  it('die Nummer ohne Leerzeichen steht nirgends — der tel:-Link wird gebaut', () => {
+    // Gegenprobe: Die Zählung findet die Ziffernfolge, wo sie wirklich steht.
+    expect(BAES_KONTAKT_TEL.split(telefonZiffern).length - 1).toBe(1)
+    expect(trefferJeDatei(telefonZiffern)).toEqual({})
   })
 
   it.each([

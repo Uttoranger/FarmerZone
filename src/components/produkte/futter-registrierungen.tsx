@@ -9,6 +9,7 @@ import {
   BAES_KONTAKT,
   BAES_KONTAKT_MAILTO,
   BAES_KONTAKT_TEL,
+  BAES_KONTAKT_VORLESEN,
   BAES_LINK_TEXT,
   DEUTSCHLAND_HINWEIS,
   ORIENTIERUNG_HINWEIS,
@@ -75,12 +76,12 @@ export function FutterRegistrierungen({ registrierung }: { registrierung: HofReg
           <div className="flex flex-wrap gap-x-4">
             <a href={BAES_KONTAKT_MAILTO} className={cn(KOPF_LINK, 'min-w-0 break-all')}>
               <Mail className="size-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-              <span className="sr-only">E-Mail an das BAES: </span>
+              <span className="sr-only">{BAES_KONTAKT_VORLESEN.email}</span>
               {BAES_KONTAKT.email}
             </a>
             <a href={BAES_KONTAKT_TEL} className={cn(KOPF_LINK, 'whitespace-nowrap')}>
               <Phone className="size-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-              <span className="sr-only">BAES anrufen: </span>
+              <span className="sr-only">{BAES_KONTAKT_VORLESEN.telefon}</span>
               {BAES_KONTAKT.telefon}
             </a>
           </div>

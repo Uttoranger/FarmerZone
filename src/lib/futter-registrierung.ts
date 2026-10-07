@@ -141,10 +141,12 @@ export type RegistrierungsFall = {
  * Livegang von Landwirtschaftskammer bzw. BAES gegenlesen lassen
  * (Umsetzungsprompt Abschnitt 10).
  *
- * Abweichend vom Mockup (Nr. 36, freigabe.md §11): Abgepacktes Heimtierfutter
- * und fertige Packungen brauchen eine MELDUNG beim BAES, keine Registrierung —
- * § 8 Abs. 7 Futtermittelverordnung 2010. Darum sagen die Texte das
- * ausdrücklich; das Kürzel USP fällt weg, es ist ein Fachbegriff. Die
+ * Abweichend vom Mockup (Nr. 36): Lesart der Freigabe Lauf 7 (freigabe.md
+ * §11) zu § 8 Abs. 7 Futtermittelverordnung 2010 — abgepacktes Heimtierfutter
+ * und fertige Packungen brauchen eine Meldung beim BAES statt einer
+ * Registrierung. Gegenlesen offen (Bericht 36): Ob ein Hof, der eigene Ernte
+ * selbst abpackt, darunter fällt oder als Hersteller registriert sein muss,
+ * ist nicht geklärt. Das Kürzel USP fällt weg, es ist ein Fachbegriff; die
  * Paragrafen-Angabe steht nur hier, nicht im Nutzertext.
  */
 export const REGISTRIERUNGS_FAELLE = [
@@ -320,8 +322,8 @@ export const ORIENTIERUNG_HINWEIS =
  */
 export const BAES_FUTTERMITTEL_URL = 'https://baes.gv.at/en/admission/feed/faq-feed'
 
-/** Linktext zur BAES-Seite. */
-export const BAES_LINK_TEXT = 'Häufige Fragen des BAES zu Futtermitteln'
+/** Linktext zur BAES-Seite — die Seite aus der Freigabe ist die englische Fassung, das sagt der Text vorher. */
+export const BAES_LINK_TEXT = 'Häufige Fragen des BAES zu Futtermitteln (englisch)'
 
 /**
  * Kontakt des BAES für Futtermittel im Kopfhinweis (Nr. 36). Bewusste Ausnahme
@@ -338,10 +340,16 @@ export const BAES_KONTAKT = {
   telefon: '+43 5 0555 33216',
 } as const
 
+/** Was der Screenreader vor Adresse und Nummer ansagt — die Links zeigen sonst nur die Werte. */
+export const BAES_KONTAKT_VORLESEN = {
+  email: 'E-Mail an das BAES: ',
+  telefon: 'BAES anrufen: ',
+} as const
+
 /** Link zum Schreiben an das BAES. */
 export const BAES_KONTAKT_MAILTO = `mailto:${BAES_KONTAKT.email}`
 
-/** Link zum Anrufen — tel: verlangt die Nummer ohne Leerzeichen (+43 5 0555 33216 → +435055533216). */
+/** Link zum Anrufen — tel: verlangt die Nummer ohne Leerzeichen, darum aus `telefon` gebaut statt ein zweites Mal geschrieben. */
 export const BAES_KONTAKT_TEL = `tel:${BAES_KONTAKT.telefon.replace(/\s/g, '')}`
 
 /** Hinweis für Kundinnen bei jedem Futter (E10a, wörtlich). */

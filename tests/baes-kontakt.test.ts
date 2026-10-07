@@ -25,6 +25,8 @@ import {
   BAES_KONTAKT,
   BAES_KONTAKT_MAILTO,
   BAES_KONTAKT_TEL,
+  BAES_KONTAKT_VORLESEN,
+  BAES_LINK_TEXT,
   REGISTRIERUNGS_FAELLE,
   registrierungsSaetze,
   speichernHinweis,
@@ -42,14 +44,21 @@ describe('Die Werte aus der Freigabe (Nr. 36)', () => {
     expect(BAES_FUTTERMITTEL_URL).toBe('https://baes.gv.at/en/admission/feed/faq-feed')
   })
 
-  it('E-Mail und Telefon der Behörde stehen so, wie die Freigabe sie nennt', () => {
-    expect(BAES_KONTAKT.email).toBe('futtermittel@baes.gv.at')
-    expect(BAES_KONTAKT.telefon).toBe('+43 5 0555 33216')
+  // Die Kontaktwerte selbst stehen nur in der Quelle (ARCHITECTURE §5), hier
+  // nur ihre Form: Adresse beim BAES, österreichische Nummer.
+  it('E-Mail und Telefon sind ein Kontakt beim BAES in Österreich', () => {
+    expect(BAES_KONTAKT.email).toMatch(/^[a-z]+@baes\.gv\.at$/)
+    expect(BAES_KONTAKT.telefon).toMatch(/^\+43( \d+)+$/)
   })
 
   it('die Links wählen genau diese Adresse und Nummer — die Nummer ohne Leerzeichen', () => {
-    expect(BAES_KONTAKT_MAILTO).toBe('mailto:futtermittel@baes.gv.at')
-    expect(BAES_KONTAKT_TEL).toBe('tel:+435055533216')
+    expect(BAES_KONTAKT_MAILTO).toBe(`mailto:${BAES_KONTAKT.email}`)
+    expect(BAES_KONTAKT_TEL).toBe(`tel:${BAES_KONTAKT.telefon.replace(/ /g, '')}`)
+    expect(BAES_KONTAKT_TEL).toMatch(/^tel:\+43\d+$/)
+  })
+
+  it('der Linktext sagt, dass die Seite englisch ist', () => {
+    expect(BAES_LINK_TEXT).toContain('(englisch)')
   })
 })
 
@@ -64,8 +73,8 @@ describe('Kopfhinweis im Futter-Formular', () => {
     const html = kopf()
     expect(html).toContain(`href="${BAES_KONTAKT_MAILTO}"`)
     expect(html).toContain(`href="${BAES_KONTAKT_TEL}"`)
-    expect(html).toContain(`>${BAES_KONTAKT.email}<`)
-    expect(html).toContain(`>${BAES_KONTAKT.telefon}<`)
+    expect(html).toContain(`${BAES_KONTAKT_VORLESEN.email}</span>${BAES_KONTAKT.email}<`)
+    expect(html).toContain(`${BAES_KONTAKT_VORLESEN.telefon}</span>${BAES_KONTAKT.telefon}<`)
   })
 
   it('jeder Link im Kopfhinweis hat sichtbaren Fokus und 44 px Trefferfläche', () => {
@@ -79,21 +88,23 @@ describe('Kopfhinweis im Futter-Formular', () => {
 })
 
 describe('Die Komponente hat keine eigene Kopie der Werte', () => {
-  it('Adresse und Nummer kommen nur aus der Quelle', () => {
+  it('Adresse, Nummer und Vorlese-Texte kommen nur aus der Quelle', () => {
     const quelltext = readFileSync(join(__dirname, '..', 'src', 'components', 'produkte', 'futter-registrierungen.tsx'), 'utf8')
-    expect(quelltext).toContain('BAES_KONTAKT')
+    expect(quelltext).toContain('BAES_KONTAKT_VORLESEN')
     expect(quelltext).not.toContain('baes.gv.at')
-    expect(quelltext).not.toContain('0555')
+    expect(quelltext).not.toContain(BAES_KONTAKT.telefon.split(' ').at(-1))
+    expect(quelltext).not.toContain(BAES_KONTAKT_VORLESEN.email.trim())
+    expect(quelltext).not.toContain(BAES_KONTAKT_VORLESEN.telefon.trim())
   })
 })
 
 describe('Abgepacktes Heimtierfutter: Meldung, keine Registrierung (§ 8 Abs. 7 FMV 2010)', () => {
-  const heimtier = REGISTRIERUNGS_FAELLE.find((f) => f.id === 'heimtierfutter-abgepackt')!
+  const nachweis = (id: string): string | undefined => REGISTRIERUNGS_FAELLE.find((f) => f.id === id)?.nachweis
 
   it('der Fall nennt die Meldung beim BAES und sagt, dass keine Registrierung nötig ist', () => {
-    expect(heimtier.nachweis).toContain('Meldung beim BAES')
-    expect(heimtier.nachweis).toContain('Registrierung brauchst du dafür nicht')
-    expect(heimtier.nachweis).not.toContain('USP')
+    expect(nachweis('heimtierfutter-abgepackt')).toContain('Meldung beim BAES')
+    expect(nachweis('heimtierfutter-abgepackt')).toContain('Registrierung brauchst du dafür nicht')
+    expect(nachweis('heimtierfutter-abgepackt')).not.toContain('USP')
   })
 
   it('der orange Satz ohne Meldung spricht von Meldung statt Registrierung, ohne USP', () => {
@@ -105,7 +116,7 @@ describe('Abgepacktes Heimtierfutter: Meldung, keine Registrierung (§ 8 Abs. 7 
   })
 
   it('fertige Packungen anderer Hersteller: nur die Meldung beim BAES', () => {
-    expect(REGISTRIERUNGS_FAELLE.find((f) => f.id === 'fertige-packungen')!.nachweis).toBe('keine Registrierung – nur Meldung beim BAES')
+    expect(nachweis('fertige-packungen')).toBe('keine Registrierung – nur Meldung beim BAES')
   })
 
   it('wartet alles auf die Meldung, nennt der Speichern-Satz Nummer und Meldung statt „Registrierung"', () => {
