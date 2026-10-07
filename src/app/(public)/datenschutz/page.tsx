@@ -191,8 +191,7 @@ export default function DatenschutzPage() {
               Du kannst dich mit einem Code, den wir dir per E-Mail schicken, in dein Kunden-Konto
               einloggen, um deine Benachrichtigungs-Einstellungen zu verwalten. Dabei wird deine
               E-Mail-Adresse gespeichert sowie ein temporärer Sitzungs-Cookie gesetzt (gültig 7
-              Tage). Ein Kunden-Konto entsteht nur, wenn du dich so anmeldest. Beim Bestellen wird
-              kein Konto angelegt.
+              Tage). Beim Bestellen wird kein Konto angelegt.
             </p>
             <p>
               {`„Bestellungen finden“ läuft ebenfalls über einen Code per E-Mail. Dafür entsteht kein Konto; es wird nur für ${BESTELLUNGEN_COOKIE_MINUTEN} Minuten ein Cookie mit deiner bestätigten E-Mail-Adresse gesetzt.`}
