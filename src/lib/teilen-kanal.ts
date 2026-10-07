@@ -75,7 +75,7 @@ export function teilenLink(basis: string, slug: string, kanal: TeilenKanalCode):
 }
 
 /**
- * Der Tag, auf den ein Aufruf oder eine Bestellung zählt: der Wiener
+ * Der Tag, auf den ein Besuch zählt: der Wiener
  * Kalendertag (CODING_STANDARDS „Tage und Wochen"), als Mitternacht UTC —
  * so speichert Prisma ihn in der Spalte `@db.Date` genau als diesen Tag.
  */

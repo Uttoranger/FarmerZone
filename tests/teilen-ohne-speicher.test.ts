@@ -79,9 +79,18 @@ function findeBestellZuordnung(quelltext: string, pfad = 'schnipsel.tsx'): strin
   return funde
 }
 
-const TEILEN_DATEIEN = [...quelldateien(join(WURZEL, 'src'))]
-  .map((pfad) => relative(WURZEL, pfad))
-  .filter((pfad) => /teilen/i.test(pfad))
+// Dateien, die Teilen zeigen oder auslösen, ohne „teilen" im Pfad zu tragen
+// (Heute-Zeile, Hofseite mit dem Besuchs-Beacon, WhatsApp-Versand mit ?k=wa).
+const TEILEN_NACHBARN = [
+  'src/components/heute/heute-teile.tsx',
+  'src/app/(public)/[farmSlug]/page.tsx',
+  'src/app/(hof)/status/[id]/send-whatsapp/whatsapp-tap-client.tsx',
+]
+
+const TEILEN_DATEIEN = [
+  ...[...quelldateien(join(WURZEL, 'src'))].map((pfad) => relative(WURZEL, pfad)).filter((pfad) => /teilen/i.test(pfad)),
+  ...TEILEN_NACHBARN,
+]
 
 const CHECKOUT_DATEIEN = [
   'src/components/checkout/checkout-form.tsx',
