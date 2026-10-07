@@ -137,9 +137,15 @@ export type RegistrierungsFall = {
 }
 
 /**
- * Die sieben Fälle aus dem Mockup web-h2-neues-futter, wörtlich (E10). Vor dem
+ * Die sieben Fälle aus dem Mockup web-h2-neues-futter (E10). Vor dem
  * Livegang von Landwirtschaftskammer bzw. BAES gegenlesen lassen
  * (Umsetzungsprompt Abschnitt 10).
+ *
+ * Abweichend vom Mockup (Nr. 36, freigabe.md §11): Abgepacktes Heimtierfutter
+ * und fertige Packungen brauchen eine MELDUNG beim BAES, keine Registrierung —
+ * § 8 Abs. 7 Futtermittelverordnung 2010. Darum sagen die Texte das
+ * ausdrücklich; das Kürzel USP fällt weg, es ist ein Fachbegriff. Die
+ * Paragrafen-Angabe steht nur hier, nicht im Nutzertext.
  */
 export const REGISTRIERUNGS_FAELLE = [
   {
@@ -152,7 +158,7 @@ export const REGISTRIERUNGS_FAELLE = [
     id: 'heimtierfutter-abgepackt',
     titel: 'Eigene Ernte als Heimtierfutter abgepackt',
     beispiele: 'Sackerl und Säcke mit eigenem Etikett, z. B. Nagerheu 1 kg',
-    nachweis: 'aktive Meldung beim BAES (USP) als Hersteller von Heimtierfutter',
+    nachweis: 'Meldung beim BAES – eine Registrierung brauchst du dafür nicht',
   },
   {
     id: 'zukauf',
@@ -182,7 +188,7 @@ export const REGISTRIERUNGS_FAELLE = [
     id: 'fertige-packungen',
     titel: 'Fertige Packungen anderer Hersteller',
     beispiele: 'nur weiterverkaufen, nicht selbst abpacken',
-    nachweis: 'keine Registrierung – nur Meldung',
+    nachweis: 'keine Registrierung – nur Meldung beim BAES',
   },
 ] as const satisfies readonly RegistrierungsFall[]
 
@@ -240,7 +246,9 @@ export type RegistrierungsSatz = { ton: 'gruen' | 'orange'; text: string }
 
 /**
  * Die Sätze über den Fällen — was der Hof mit seinem Stand anbieten kann
- * (Mockups web-h2-neues-futter und mobil-h2-neues-futter-meldung-fehlt).
+ * (Mockups web-h2-neues-futter und mobil-h2-neues-futter-meldung-fehlt; der
+ * orange Satz seit Nr. 36 mit „keine Registrierung" statt „über das USP",
+ * siehe REGISTRIERUNGS_FAELLE).
  */
 export function registrierungsSaetze(hof: HofRegistrierung): RegistrierungsSatz[] {
   const saetze: RegistrierungsSatz[] = []
@@ -260,7 +268,7 @@ export function registrierungsSaetze(hof: HofRegistrierung): RegistrierungsSatz[
   } else {
     saetze.push({
       ton: 'orange',
-      text: 'Sackerl und Sack noch nicht möglich. Abgepacktes Heu mit eigenem Etikett gilt als Heimtierfutter – dafür brauchst du eine Meldung beim BAES über das USP.',
+      text: 'Sackerl und Sack noch nicht möglich. Abgepacktes Heu mit eigenem Etikett gilt als Heimtierfutter – dafür brauchst du eine Meldung beim BAES, keine Registrierung.',
     })
   }
   return saetze
@@ -273,7 +281,7 @@ export function registrierungsSaetze(hof: HofRegistrierung): RegistrierungsSatz[
  */
 export function speichernHinweis(sofort: number, wartend: number): string | null {
   if (wartend === 0) return null
-  if (sofort === 0) return 'Noch keine Größe kann online gehen. Sie bleiben nicht im Shop, bis deine Registrierung eingetragen ist.'
+  if (sofort === 0) return 'Noch keine Größe kann online gehen. Sie bleiben nicht im Shop, bis deine LFBIS-Nummer bzw. BAES-Meldung eingetragen ist.'
   const vorne = sofort === 1 ? '1 Größe ist sofort sichtbar.' : `${sofort} Größen sind sofort sichtbar.`
   const hinten = wartend === 1 ? '1 Größe folgt nach der Meldung.' : `${wartend} Größen folgen nach der Meldung.`
   return `${vorne} ${hinten}`
@@ -306,15 +314,35 @@ export const ORIENTIERUNG_HINWEIS =
   'Zur Orientierung, keine Rechtsberatung. Im Zweifel bei der Bezirkshauptmannschaft, beim BAES oder bei der Landwirtschaftskammer nachfragen.'
 
 /**
- * Die BAES-Seite für Futtermittelbetriebe — die einzige Stelle mit der
- * Adresse. Vorerst die Startseite des BAES: Die genaue Unterseite ließ sich im
- * Nachtlauf ohne Netz nicht sicher bestimmen (Bericht 20, Nachtrag Nr. 23);
- * der Mensch trägt sie hier ein.
+ * Die BAES-Seite zu Futtermitteln (häufige Fragen) — die einzige Stelle mit
+ * der Adresse. Vom Menschen in der Freigabe vorgegeben (Nr. 36, freigabe.md
+ * §11); bis dahin stand hier die Startseite des BAES (Nr. 23).
  */
-export const BAES_FUTTERMITTEL_URL = 'https://www.baes.gv.at'
+export const BAES_FUTTERMITTEL_URL = 'https://baes.gv.at/en/admission/feed/faq-feed'
 
 /** Linktext zur BAES-Seite. */
-export const BAES_LINK_TEXT = 'Website des BAES'
+export const BAES_LINK_TEXT = 'Häufige Fragen des BAES zu Futtermitteln'
+
+/**
+ * Kontakt des BAES für Futtermittel im Kopfhinweis (Nr. 36). Bewusste Ausnahme
+ * zur Regel „keine echten E-Mails und Telefonnummern im Code" (CLAUDE.md):
+ * Das ist der öffentliche Kontakt einer Behörde, keine Angabe über eine
+ * Person, und der Mensch hat ihn in der Freigabe ausdrücklich verlangt. Er
+ * steht NUR hier — tests/futter-bestaetigung.test.ts sucht nach Kopien.
+ */
+export const BAES_KONTAKT = {
+  /** Der Satz vor E-Mail und Telefon. */
+  satz: 'Du erreichst das BAES auch direkt:',
+  email: 'futtermittel@baes.gv.at',
+  /** So, wie die Behörde sie schreibt; der Link wählt sie ohne Leerzeichen. */
+  telefon: '+43 5 0555 33216',
+} as const
+
+/** Link zum Schreiben an das BAES. */
+export const BAES_KONTAKT_MAILTO = `mailto:${BAES_KONTAKT.email}`
+
+/** Link zum Anrufen — tel: verlangt die Nummer ohne Leerzeichen (+43 5 0555 33216 → +435055533216). */
+export const BAES_KONTAKT_TEL = `tel:${BAES_KONTAKT.telefon.replace(/\s/g, '')}`
 
 /** Hinweis für Kundinnen bei jedem Futter (E10a, wörtlich). */
 export const KUNDEN_VERANTWORTUNG =

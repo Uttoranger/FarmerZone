@@ -125,6 +125,7 @@ NextResponse.json({ ok: true, …daten })
 - Deutsch, geduzt, ohne Fachjargon, mit Ausweg.
 - ✅ "Deine Reservierung ist abgelaufen. Wir haben die Verfügbarkeit neu geprüft."
 - ❌ "Reservation expired", "Fehler 500", "Constraint violation".
+- Öffentliche Kontakte einer Behörde (E-Mail, Telefon) stehen nur im Code, wenn der Mensch sie ausdrücklich freigegeben hat — dann an **einer** Stelle neben der zugehörigen Adresse, mit Kommentar zur Ausnahme und einem Test, der nach Kopien in `src/` sucht (Vorbild `BAES_KONTAKT`, `tests/futter-bestaetigung.test.ts`). Daten von Personen fallen nie darunter.
 
 ### Konsistenz bei Teilfehlschlag
 - Mehrere Schreibvorgänge, die zusammengehören → `prisma.$transaction`.

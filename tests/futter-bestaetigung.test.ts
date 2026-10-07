@@ -47,10 +47,11 @@ describe('Wortlaute aus E10a', () => {
     expect(BETRIEB_VERANTWORTUNG).toBe('Als Betrieb bist du für den bestimmungsgemäßen Einsatz verantwortlich.')
   })
 
-  it('der BAES-Link ist eine offizielle Adresse unter baes.gv.at über https', () => {
+  it('der BAES-Link ist eine offizielle Adresse unter baes.gv.at über https (Nr. 36: die FAQ zu Futtermitteln)', () => {
     const url = new URL(BAES_FUTTERMITTEL_URL)
     expect(url.protocol).toBe('https:')
-    expect(url.hostname).toBe('www.baes.gv.at')
+    expect(url.hostname).toBe('baes.gv.at')
+    expect(url.pathname).toBe('/en/admission/feed/faq-feed')
   })
 })
 
@@ -278,6 +279,8 @@ describe('EINE Quelle für die Futter-Texte (E10a)', () => {
     ['Kundenhinweis', 'FarmerZone vermittelt nur'],
     ['Zusatz Betriebe', 'bestimmungsgemäßen Einsatz'],
     ['BAES-Adresse', 'baes.gv.at'],
+    ['BAES-E-Mail', 'futtermittel@'],
+    ['BAES-Telefon', '0555 33216'],
   ])('%s (%s) steht nur in der Quelle', (_name, stueck) => {
     // Gegenprobe steckt im Ergebnis: Die Quelle selbst muss gefunden werden.
     expect(fundstellen(stueck)).toEqual([QUELLE])
@@ -288,6 +291,8 @@ describe('EINE Quelle für die Futter-Texte (E10a)', () => {
     ['components/products/product-dialog.tsx', 'FUTTER_BESTAETIGUNG_TEXT'],
     ['components/produkte/futter-registrierungen.tsx', 'ORIENTIERUNG_HINWEIS'],
     ['components/produkte/futter-registrierungen.tsx', 'BAES_FUTTERMITTEL_URL'],
+    ['components/produkte/futter-registrierungen.tsx', 'BAES_KONTAKT_MAILTO'],
+    ['components/produkte/futter-registrierungen.tsx', 'BAES_KONTAKT_TEL'],
     ['components/produktdetail/produktdetail-kunde.tsx', 'futterVerantwortung('],
     ['components/produktdetail/produktdetail-kunde.tsx', 'futterVerantwortungImKorb('],
     ['components/farm/product-grid.tsx', 'futterVerantwortungImKorb('],

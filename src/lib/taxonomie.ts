@@ -532,7 +532,7 @@ export const BETRIEBSSTATUS: Record<BetriebsstatusValue, { name: string; hilfe: 
   },
   REGISTRIERT: {
     name: 'Registriert',
-    hilfe: 'Du handelst oder lagerst Futter — trag deine BAES- bzw. BVL-Registrierungsnummer ein.',
+    hilfe: 'Du bist beim BAES gemeldet oder registriert (etwa für abgepacktes Heimtierfutter, Handel oder Lager) — trag deine BAES- bzw. BVL-Nummer ein.',
   },
   ZUGELASSEN: {
     name: 'Zugelassen',
