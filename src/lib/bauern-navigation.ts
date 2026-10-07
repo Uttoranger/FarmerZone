@@ -272,20 +272,27 @@ export function ariaAktuell(pfad: string, punkt: NavPunkt): 'page' | 'true' | un
 //
 // Unterschiede zum Bestand, alle aus dem Mockup:
 //  - Handy: Produkte statt Mein Hof in der Leiste; Mein Hof steht in „Mehr".
-//  - „Verkauf und Kunden" bekommt „Region". Eine eigene Route /region gibt es
-//    erst mit Gate 8 — bis dahin führt der Punkt auf das heutige Umfeld.
+//  - „Verkauf und Kunden" bekommt „Region" — seit Nr. 22c (Gate 8) eine
+//    eigene Route /region mit den Reitern Preise vergleichen | Futter kaufen;
+//    das alte /analytics/umfeld leitet dorthin um.
 //  - „Beiträge" ist ein Reiter in Mein Hof (E12), kein eigener Punkt.
 //  - Das Neu-Menü fragt „Was legst du an?". Seit Nr. 18 bestimmt die Wahl
 //    Lebensmittel · Futtermittel · Brennmaterial das Formular (?bereich= am
 //    Anlegen-Auftrag, lib/url-auftrag.ts); darunter „Oder etwas anderes":
 //    Beitrag und Verkauf eintragen (E13).
 
+/**
+ * Die Adresse von „Region" (Nr. 22c) — EINE Quelle für den Punkt der Shell,
+ * die Reiter-Links und die Umleitung von /analytics/umfeld.
+ */
+export const REGION_HREF = '/region'
+
 /** Punkte der HofShell: die des Bestands plus „Region". */
 export type HofNavId = NavPunktId | 'region'
 
 export type HofNavPunkt = Omit<NavPunkt, 'id'> & { id: HofNavId }
 
-const REGION: HofNavPunkt = { id: 'region', label: 'Region', href: '/analytics/umfeld' }
+const REGION: HofNavPunkt = { id: 'region', label: 'Region', href: REGION_HREF }
 
 /** „Verkauf und Kunden" der HofShell — im Browser als Gruppe, am Handy in „Mehr". */
 const HOF_VERKAUF_UND_KUNDEN: readonly HofNavPunkt[] = [...VERKAUF_UND_KUNDEN, REGION]

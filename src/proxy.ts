@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessionCookie } from 'better-auth/cookies'
 
-// Alle Ordner unter src/app/(farmer) — tests/proxy-pfade.test.ts hält Liste
+// Alle Ordner unter src/app/(farmer) und src/app/(hof) — tests/proxy-pfade.test.ts hält Liste
 // und matcher vollständig. Die Seiten prüfen die Anmeldung zusätzlich selbst.
 const FARMER_PATHS = [
   '/dashboard',
@@ -15,6 +15,7 @@ const FARMER_PATHS = [
   '/status',
   '/fehler-melden',
   '/meldungen',
+  '/region',
 ]
 
 export async function proxy(request: NextRequest) {
@@ -47,5 +48,6 @@ export const config = {
     '/status/:path*',
     '/fehler-melden/:path*',
     '/meldungen/:path*',
+    '/region/:path*',
   ],
 }

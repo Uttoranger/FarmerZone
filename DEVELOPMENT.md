@@ -4334,6 +4334,17 @@ Auftrag freigabe.md §9 „21", Gate 7 (Aufgaben 1–4), Sicherheitsregeln S8 un
 - **Beiträge:** Der WhatsApp-Versand eines Beitrags (`/status/[id]/send-whatsapp`) hängt `?k=wa` an. Ein geteilter Aufruf aus dem Teilen-Fenster legt **keinen** Beitrag an (Bericht 21, „Nicht gelöst").
 - **Nicht gebaut:** Moment „gespeichert", Abschaltung der Momente (keine Spalte), Rückruf (O5).
 
+## Auswertung und Region in der HofShell (Nachtlauf Nr. 22c, Oktober 2026)
+
+Auftrag freigabe.md §9 „22c", Gate 8 (Zeilen `/analytics` und `/region`), Register K1, B1, E3, E9, E10. Mockups `web-h5-auswertung-abrechnung-teilen-wirkung`, `web-h5-region-preise`, `web-h5-region-futter-kaufen`. Keine Schema-Änderung, keine Migration, kein Schreibzugriff auf Geld, kein Stripe-Aufruf.
+
+- **Region als eigene Route:** `/region` liegt in `(hof)` mit den Reitern „Preise vergleichen" (das bisherige Umfeld, Logik und Sichtbarkeitsregel unverändert) und „Futter kaufen" (`?reiter=futter`). `/analytics/umfeld` leitet mit 307 um und nimmt Umkreis, Bereich und Karte mit (`umfeldUmleitung`, nur gültige Werte). Der Punkt „Region" der HofShell zeigt auf `REGION_HREF`. Die Bestandsleiste kennt `/region` nicht — sie zeichnet nur noch die Druckansichten unter `(farmer)`. `region` steht in `RESERVED_SLUGS`, `KEINE_HOFSEITE` und im Proxy. **Hinweis Produktion:** Hieße ein Hof dort schon `region`, wäre seine Seite jetzt verdeckt; geprüft ist das nur in der Test-Datenbank. *Nachtrag Nr. 26: In Produktion ist der Slug frei (geprüft 07.10.2026).*
+- **Fachregel „Futter kaufen":** Registriert heißt „Nummer eingetragen" (`hatRegistrierung('LFBIS', …)`, dieselbe Regel wie die Sperre je Gebinde; die Plattform prüft die Nummer nicht, E9). Fremde Höfe nur mit `OEFFENTLICH_SICHTBAR` und nicht pausiert, wie das Umfeld; Größen nur, wenn kaufbar (`istKaufbar`) und nicht gesperrt (`gebindeSperre` mit dem Stand des Hofs). Je Familie eine Karte (E3), Schild über `futterSchild` (Wortlaut der Produktseite, „Futtermittelbetrieb · LFBIS …"), Nummer aufgelöst wie auf der Hofseite (`betriebsnummerFuerAnzeige`). Gekauft wird über die Produktseite des anderen Hofs (Käuferart „Betrieb" bietet der Checkout schon). An die Seite gehen nur Name, Slug, Entfernung, nächste Abholung, Größen und Preise — keine Adresse, kein Kontakt, keine Koordinaten.
+- **Fachregel „Servicegebühren dieses Monats":** An Stelle der Monatsabrechnung (bis zum SEPA-Start gibt es keine Lastschrift, B1/K1). Summiert werden nur die an den Bestellungen gespeicherten Beträge (`serviceFeeCents`, ganze Cent), Monat = Bestelleingang in Wiener Zeit, gezählt nach `topfVonBestellung` — dieselbe Regel wie die Betreiber-Finanzen: online bezahlt und nicht erstattet (online), vor Ort abgeholt und der Abrechnung geschuldet (vor Ort; vor dem Stichtag bei Barzahlung nie). Storniert, erstattet, nicht abgeholt und noch Offenes zählen nicht. Warum diese Regel und nicht der Abholzeitpunkt wie beim Umsatz: Die Gebühr ist Abrechnungsgeld; Hof und Betreiber sollen für denselben Monat dieselbe Zahl sehen. Sätze nur aus `konditionen.ts` (`BAR_OHNE_GEBUEHR_SATZ` bzw. ab dem Stichtag `barGebuehrSepaSatz`).
+- **Kennzahlen:** Warenumsatz, Bestellungen (online · bar) und Ø Bestellung aus abgeholten Bestellungen nach der Umsatzregel (`umsatzBestellungWhere`), „Nicht abgeholt" nach Abholtag (ganze Wiener Tage des Fensters). Die Umsatzkarte bleibt die bisherige (Bestellungen plus eingetragene Verkäufe, Vergleich, Balken); Zeitraum Woche · Monat · Jahr bleibt in der Adresse, Standard weiter die Woche (Heute verlinkt die Woche).
+- **Teilen-Wirkung:** Karte „Über deine geteilten Links" aus `getTeilenWirkung` für dieselben Wiener Tage wie die Kennzahlen; Bestellungen zählen weiter so, wie Nr. 21 sie zählt (beim Anlegen, offene Entscheidung (b) aus Bericht 21). Der Euro-Betrag des Mockups fehlt, weil er eine zweite Zählweise aus den Bestellungen bräuchte. *Ersetzt durch Nr. 26: nur Besuche (T1).*
+- **Entfernt:** `auswertung-reiter.tsx` (Region ist eigener Punkt), `umsatz-auswertung.tsx` (aufgegangen in `src/components/auswertung/`). Die Grenze Be- & Verarbeitung bleibt mit denselben Schwellen, im neuen Design ohne Rot (O1).
+
 ## Nachtrag Futter: Pflicht-Bestätigung, Hinweise, Label Brennmaterial (Nachtlauf Nr. 23, Oktober 2026)
 
 Auftrag freigabe.md §10 „23" (#198), Register E10a, E11 (Label), E9. Keine Schema-Änderung — `FutterKennzeichnung.bestaetigtAm` gab es schon.
@@ -4356,6 +4367,14 @@ Auftrag freigabe.md §10 „25" (#199), Register T1 und F6 (Teilen (a), (c), (d)
 - **Text zur Zählung aus einer Quelle:** `TEILEN_ZAEHLUNG_HINWEIS` („Wir zählen nur Besuche über deinen Link – ohne Cookies und ohne Speicher im Browser."). Die Datenschutzerklärung ist nicht angefasst — sie kommt mit Nr. 33.
 - **Gelöscht:** `src/lib/teilen-herkunft.ts`, `checkoutTeilenKanalSchema`, `zaehleTeilenBestellung`, `zaehleBestellungNachDerAntwort`. Die Komponente heißt jetzt `TeilenBesuchMelden` (`src/components/hofseite/teilen-besuch.tsx`), die Regel `teilenBesuchAusAdresse` (`src/lib/teilen-besuch.ts`). Eine Wache (`tests/teilen-ohne-speicher.test.ts`) hält Teilen-Code und Checkout frei von Browser-Speicher und Bestell-Zuordnung.
 - **Contract später:** Die Spalten `Order.teilenKanal` und `TeilenAufruf.bestellungen` können in einem eigenen, freigegebenen Schritt entfernt werden; Code liest oder schreibt sie nicht mehr (nur Schema und Schema-Tests kennen sie).
+
+## Auswertung und Region nach T1 (Nachtlauf Nr. 26, Oktober 2026)
+
+Auftrag freigabe.md §10 „26" (#200), Register T1 und F6. Keine Schema-Änderung, keine Migration.
+
+- **Teilen-Karte nur mit Besuchen:** `teilenKarte` liest nur noch `besuche` („38 Besuche", je Kanal „24 Besuche"); ohne Besuch ist die Karte leer und zeigt ihren Ausweg. Weder Bestellzahl noch Euro-Betrag, weil seit T1 keine Bestellung einem Kanal zugeordnet wird. Der Satz unter der Karte kommt aus `TEILEN_ZAEHLUNG_HINWEIS` (vorher eigener Wortlaut „Gezählt über den Link selbst …").
+- **Servicegebühren dieses Monats:** unverändert. F6 verlangt die Zählregel von `/admin/finanzen`; `servicegebuehrenImMonat` zählt schon seit 22c nach `topfVonBestellung`. Neu belegt ein Test, dass online/vor Ort/Summe/Anzahl gleich `einnahmenImMonat` (eingezogen/geschuldet/gezählt) sind.
+- **Slug `region`:** in Produktion frei (geprüft 07.10.2026); die offene Vorbedingung aus 22c ist erledigt.
 
 ## Nützliche Befehle
 

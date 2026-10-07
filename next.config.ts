@@ -10,7 +10,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 const KEINE_HOFSEITE = [
   'account', 'admin', 'analytics', 'api', 'bestellungen', 'customers', 'dashboard', 'datenschutz',
   'farm-page', 'fehler-melden', 'forgot-password', 'fuer-hoefe', 'hoefe', 'impressum', 'intern', 'konditionen',
-  'login', 'meldungen', 'onboarding', 'orders', 'problem-melden', 'products', 'register',
+  'login', 'meldungen', 'onboarding', 'orders', 'problem-melden', 'products', 'region', 'register',
   'reset-password', 'sales', 'settings', 'status', 'teilen', 'verify',
 ];
 // Genau EIN Pfadstück aus Slug-Zeichen (src/lib/slug.ts), das keine Route ist.
