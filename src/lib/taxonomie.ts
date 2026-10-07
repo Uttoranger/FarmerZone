@@ -515,6 +515,13 @@ export const BETRIEBSSTATUS_VALUES = ['PRIMAERPRODUKTION', 'REGISTRIERT', 'ZUGEL
 export type BetriebsstatusValue = (typeof BETRIEBSSTATUS_VALUES)[number]
 
 /** Name und Hilfesatz je Status — welche Nummer in Farm.betriebsnummer steht (Konzept §3). */
+/**
+ * Die Kennung des Abschnitts „Betriebsnummer" im Hofprofil (/settings/profile)
+ * — Sprungziel der Zeile „Futtermittel-Registrierung" in der Übersicht der
+ * Einstellungen (src/lib/hof-einstellungen.ts, Nachtlauf Nr. 22d).
+ */
+export const BETRIEBSNUMMER_ANKER = 'betriebsnummer-abschnitt'
+
 export const BETRIEBSSTATUS: Record<BetriebsstatusValue, { name: string; hilfe: string }> = {
   PRIMAERPRODUKTION: {
     name: 'Primärproduktion',

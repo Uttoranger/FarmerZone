@@ -664,9 +664,9 @@ export function AppearanceClient({ initialData }: Props) {
         <Link
           href={`/${initialData.farmSlug}`}
           target="_blank"
-          className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+          className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-brand-text hover:underline"
         >
-          <ExternalLink className="size-3.5" />
+          <ExternalLink className="size-3.5" aria-hidden="true" />
           Vorschau
         </Link>
       </div>
@@ -695,9 +695,9 @@ export function AppearanceClient({ initialData }: Props) {
             type="button"
             onClick={switchToGradient}
             className={cn(
-              'flex-1 h-9 rounded-lg border-2 text-sm font-medium transition-all',
+              'flex-1 min-h-11 rounded-lg border-2 text-sm font-medium transition-all',
               bannerType === 'GRADIENT'
-                ? 'border-primary bg-primary/5 text-primary'
+                ? 'border-primary bg-primary/12 text-foreground'
                 : 'border-border text-muted-foreground hover:border-border/80',
             )}
           >
@@ -707,9 +707,9 @@ export function AppearanceClient({ initialData }: Props) {
             type="button"
             onClick={switchToPhoto}
             className={cn(
-              'flex-1 h-9 rounded-lg border-2 text-sm font-medium transition-all',
+              'flex-1 min-h-11 rounded-lg border-2 text-sm font-medium transition-all',
               bannerType === 'PHOTO'
-                ? 'border-primary bg-primary/5 text-primary'
+                ? 'border-primary bg-primary/12 text-foreground'
                 : 'border-border text-muted-foreground hover:border-border/80',
             )}
           >
@@ -829,7 +829,7 @@ export function AppearanceClient({ initialData }: Props) {
                 className={cn(
                   'flex items-center gap-2 p-2.5 rounded-xl border-2 text-sm transition-all text-left',
                   selected
-                    ? 'bg-app-chip-green border-primary text-primary'
+                    ? 'bg-app-chip-green border-primary text-foreground'
                     : 'border-border text-muted-foreground hover:border-border/80 hover:bg-muted/40',
                 )}
               >
@@ -980,15 +980,15 @@ export function AppearanceClient({ initialData }: Props) {
           disabled={saving}
           className="h-12 px-8 rounded-xl bg-accent text-accent-foreground font-semibold hover:bg-accent-hover transition-colors disabled:opacity-60 flex items-center gap-2"
         >
-          {saving && <Loader2 className="size-4 animate-spin" />}
+          {saving && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
           {saving ? 'Wird gespeichert…' : 'Speichern & veröffentlichen'}
         </button>
         <Link
           href={`/${initialData.farmSlug}`}
           target="_blank"
-          className="text-sm text-primary hover:underline underline-offset-2 flex items-center gap-1"
+          className="flex min-h-11 items-center gap-1 text-sm font-medium text-brand-text hover:underline underline-offset-2"
         >
-          <ExternalLink className="size-3.5" />
+          <ExternalLink className="size-3.5" aria-hidden="true" />
           Seite ansehen
         </Link>
       </div>

@@ -308,7 +308,7 @@ export const ZIEL_ABSCHNITT: Record<HofseiteZeileId, string> = {
  * für die Checkliste am Handy (components/mein-hof/checkliste-kompakt.tsx),
  * deren fehlende Punkte dorthin verlinken. Ab lg öffnen dieselben Punkte ihr
  * Formular direkt in der Zeile (hofseite-editor.tsx). Jedes Ziel ist eine
- * Seite unter src/app/(farmer)/settings (tests/mein-hof-seite.test.ts).
+ * Seite unter src/app/(hof)/settings (tests/mein-hof-seite.test.ts).
  */
 export const EINSTELLUNG_FUER_ZEILE: Record<HofseiteZeileId, string> = {
   titelbild: '/settings/appearance',

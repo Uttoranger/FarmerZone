@@ -1,19 +1,31 @@
-﻿import { redirect } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
-import Link from 'next/link'
 import type { Metadata } from 'next'
-import { ChevronLeft, Mail, Shield } from 'lucide-react'
+import { Mail, Shield, Trash2 } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { getFarmArchiveState } from '@/server/queries/farm'
 import { supportMailto } from '@/lib/support'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { EinstellungenKopf } from '@/components/hof-einstellungen/einstellungen-kopf'
+import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
 import { PasswordForm } from './password-form'
 import { ArchiveFarmCard } from './archive-farm-card'
 import { DarstellungKarte } from './darstellung-karte'
 
-export const metadata: Metadata = { title: 'Konto — FarmerZone' }
+export const metadata: Metadata = { title: 'Konto und Sicherheit — FarmerZone' }
 
-export default async function AccountPage() {
+/** Links im Fließtext: grüner Text (Hof-Links wie im Editor), nie oranger Text. */
+const TEXTLINK = 'font-medium text-brand-text underline underline-offset-2 break-words'
+
+/*
+ * Konto und Sicherheit in der HofShell (Nachtlauf Nr. 22d). Gleiches
+ * Verhalten: Passwort ändern über Better Auth (meldet andere Geräte ab),
+ * E-Mail ändern und Konto löschen nur über die vorausgefüllte Support-Mail,
+ * Hof stilllegen/reaktivieren über die bestehenden Actions mit Sperre bei
+ * offenen Bestellungen. Neu sind nur Kopf, Rahmen und Farben (Tokens).
+ */
+export default async function AccountPage(): Promise<React.JSX.Element> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) redirect('/login')
 
@@ -35,38 +47,24 @@ export default async function AccountPage() {
   })
 
   return (
-    <div className="p-4 md:p-6 max-w-2xl">
-      <Link
-        href="/settings"
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6"
-      >
-        <ChevronLeft className="size-4" />
-        Einstellungen
-      </Link>
+    <div className={UNTERSEITE_RAHMEN}>
+      <EinstellungenKopf titel="Konto und Sicherheit" satz="Anmeldung, Passwort, Darstellung und dein Hof." />
 
-      <h1 className="text-xl font-semibold text-foreground mb-1">Konto</h1>
-      <p className="text-sm text-muted-foreground mb-6">
-        Konto-Informationen, Sicherheit und Darstellung.
-      </p>
-
-      <div className="space-y-4">
+      <div data-app-palette="neu" className="space-y-4">
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
-              <Mail className="size-4 text-primary" />
+              <Mail className="size-4 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
               <CardTitle>E-Mail-Adresse</CardTitle>
             </div>
             <CardDescription>
-              Deine aktuelle Login-E-Mail: <strong>{session.user.email}</strong>
+              Deine aktuelle Login-E-Mail: <strong className="break-all text-foreground">{session.user.email}</strong>
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
               Um deine E-Mail-Adresse zu ändern,{' '}
-              <a
-                href={emailChangeMailto}
-                className="text-primary underline underline-offset-2 break-words"
-              >
+              <a href={emailChangeMailto} className={TEXTLINK}>
                 schreib dem FarmerZone-Support
               </a>
               . Die Nachricht ist bereits vorausgefüllt.
@@ -77,16 +75,16 @@ export default async function AccountPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
-              <Shield className="size-4 text-primary" />
+              <Shield className="size-4 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
               <CardTitle>Passwort</CardTitle>
             </div>
             <CardDescription>Passwort für dein FarmerZone-Konto</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <PasswordForm />
-            <p className="text-sm text-muted-foreground border-t border-border/50 pt-4">
-              Passwort vergessen? Melde dich ab und nutze die Funktion „Passwort vergessen" auf der
-              Login-Seite — dann bekommst du einen Link per E-Mail.
+            <p className="border-t border-border pt-4 text-sm text-muted-foreground">
+              Passwort vergessen? Melde dich ab und nutze &bdquo;Passwort vergessen&ldquo; auf der Anmeldeseite — dann bekommst du
+              einen Link per E-Mail.
             </p>
           </CardContent>
         </Card>
@@ -95,27 +93,21 @@ export default async function AccountPage() {
 
         {farm && <ArchiveFarmCard farmSlug={farm.slug} isArchived={farm.archivedAt !== null} />}
 
-        <div className="rounded-xl border border-red-100 bg-red-50 p-4 dark:border-red-900/60 dark:bg-red-950/40">
-          <p className="text-sm font-medium text-red-700 dark:text-red-300 mb-1">Konto löschen</p>
-          <p className="text-xs text-red-600 dark:text-red-400">
+        <Hinweiskarte ton="orange" symbol={Trash2} titel="Konto löschen">
+          <p>
             Wenn du dein Konto löschen möchtest,{' '}
-            <a
-              href={accountDeleteMailto}
-              className="font-medium underline underline-offset-2 break-words"
-            >
+            <a href={accountDeleteMailto} className="font-semibold underline underline-offset-2 break-words">
               schreib dem FarmerZone-Support
-            </a>
-            {' '}— die Nachricht ist bereits vorausgefüllt.
-            Die Löschung wird innerhalb weniger Werktage bearbeitet.
+            </a>{' '}
+            — die Nachricht ist bereits vorausgefüllt. Die Löschung wird innerhalb weniger Werktage bearbeitet.
             Beachte: Bestelldaten müssen aus steuerrechtlichen Gründen 7 Jahre aufbewahrt werden.
           </p>
-          <p className="text-xs text-red-600 dark:text-red-400 mt-2">
-            Du willst nur deinen Hofladen schließen, dein Konto aber behalten? Dann nutze oben
-            &bdquo;Hof stilllegen&ldquo; — dabei bleiben alle Daten erhalten.
+          <p className="mt-2">
+            Du willst nur deinen Hofladen schließen, dein Konto aber behalten? Dann nutze oben &bdquo;Hof
+            stilllegen&ldquo; — dabei bleiben alle Daten erhalten.
           </p>
-        </div>
+        </Hinweiskarte>
       </div>
     </div>
   )
 }
-

@@ -34,7 +34,7 @@ export function DarstellungKarte() {
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
-          <Sun className="size-4 text-primary" />
+          <Sun className="size-4 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
           <CardTitle>Darstellung</CardTitle>
         </div>
         <CardDescription>Hell, dunkel — oder so, wie dein Gerät es eingestellt hat.</CardDescription>
@@ -56,7 +56,7 @@ export function DarstellungKarte() {
                   onClick={() => setTheme(key)}
                   // min-h-11 = 44px: die kleinste Fläche, die ein Daumen auf
                   // dem Handy zuverlässig trifft.
-                  className={`flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 ${
+                  className={`flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-medium transition-colors outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-ring ${
                     aktiv
                       ? 'bg-card text-foreground ring-1 ring-border'
                       : 'text-muted-foreground hover:text-foreground'

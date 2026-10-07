@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { setPause } from '@/server/actions/farm'
+import { KNOPF_GRUEN, KNOPF_ORANGE_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { cn } from '@/lib/utils'
 
 /**
  * Pause — unter /settings/pause und im Hofseiten-Editor ab lg
@@ -54,48 +56,50 @@ export function PauseClient({
 
   return (
     <div className="space-y-4">
-      {/* Status card */}
-      <div className={`rounded-xl border p-4 ${isPaused ? 'border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40' : 'border-green-200 dark:border-green-900/60 bg-primary/8'}`}>
-        <div className="flex items-center justify-between gap-4">
+      {/* Status: Orange = pausiert (offen, braucht dich), Grün = nimmt an (Farbrollen). */}
+      <div className={cn('rounded-2xl border p-4', isPaused ? 'border-primary/45 bg-primary/12' : 'border-accent/45 bg-accent/12')}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div className="flex items-center gap-3">
             {isPaused ? (
-              <PauseCircle className="size-6 text-amber-600 dark:text-amber-400 shrink-0" />
+              <PauseCircle className="size-6 shrink-0 text-status-offen" strokeWidth={1.7} aria-hidden="true" />
             ) : (
-              <PlayCircle className="size-6 text-primary shrink-0" />
+              <PlayCircle className="size-6 shrink-0 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
             )}
             <div>
-              <p className={`font-semibold ${isPaused ? 'text-amber-800 dark:text-amber-200' : 'text-green-800 dark:text-green-200'}`}>
+              <p className="font-semibold text-foreground">
                 {isPaused ? 'Bestellungen sind pausiert' : 'Du nimmst Bestellungen an'}
               </p>
-              <p className="text-sm text-muted-foreground">
+              {/* Normale Textfarbe auf der Tönung — leise Schrift fiele am Tag unter 4,5:1 (wie Hinweiskarte). */}
+              <p className="text-sm text-foreground">
                 {isPaused
                   ? 'Deine Hofseite bleibt sichtbar, mit deiner Nachricht. Bestellen kann gerade niemand.'
                   : 'Kunden können Produkte sehen und bestellen.'}
               </p>
             </div>
           </div>
-          <Button
+          {/* Wieder annehmen ist die gute Aktion (Grün); pausieren nimmt etwas weg (Orange-Umriss). */}
+          <button
+            type="button"
             onClick={handleToggle}
             disabled={isPending}
-            className={`shrink-0 ${
-              isPaused
-                ? 'bg-primary text-primary-foreground hover:opacity-90'
-                : 'bg-amber-600 hover:bg-amber-700 text-white'
-            }`}
+            className={isPaused ? KNOPF_GRUEN : KNOPF_ORANGE_RAHMEN}
           >
             {isPending ? (
-              <Loader2 className="size-4 animate-spin" />
+              <>
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                <span className="sr-only">Einen Moment …</span>
+              </>
             ) : isPaused ? (
               'Bestellungen annehmen'
             ) : (
               'Bestellungen pausieren'
             )}
-          </Button>
+          </button>
         </div>
       </div>
 
       {/* Pause message */}
-      <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+      <div className="space-y-3 rounded-2xl border border-border bg-card p-4">
         <Label htmlFor="pauseMessage" className="font-medium text-foreground block">
           Nachricht für Kunden (optional)
         </Label>
@@ -113,9 +117,9 @@ export function PauseClient({
           onClick={handleSaveMessage}
           disabled={isPending}
           variant="outline"
-          className="w-full"
+          className="min-h-11 w-full"
         >
-          {isPending ? <Loader2 className="size-4 animate-spin" /> : 'Nachricht speichern'}
+          {isPending ? <Loader2 className="size-4 animate-spin" aria-label="Einen Moment …" /> : 'Nachricht speichern'}
         </Button>
       </div>
     </div>

@@ -32,7 +32,7 @@ import {
   type Land,
 } from '@/lib/laender'
 import type { KartenZiel } from '@/components/settings/standort-karte'
-import { BETRIEBSSTATUS, BETRIEBSSTATUS_VALUES, type BetriebsstatusValue } from '@/lib/taxonomie'
+import { BETRIEBSNUMMER_ANKER, BETRIEBSSTATUS, BETRIEBSSTATUS_VALUES, type BetriebsstatusValue } from '@/lib/taxonomie'
 import { profilBearbeitenSchema } from '@/schemas/hofprofil'
 import { EMAIL_MAX, HOFNAME_MAX, PERSONENNAME_MAX, TELEFON_MAX } from '@/lib/eingabegrenzen'
 import { FeldZaehler } from '@/components/shared/zeichen-zaehler'
@@ -201,10 +201,10 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
           id={id}
           {...register(id)}
           placeholder={placeholder}
-          className={errors[id] ? 'border-destructive' : ''}
+          className={errors[id] ? 'min-h-11 border-status-offen' : 'min-h-11'}
         />
         {max !== undefined && <FeldZaehler control={control} name={id} max={max} />}
-        {errors[id] && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{errors[id]?.message}</p>}
+        {errors[id] && <p className="mt-1 text-xs text-status-offen">{errors[id]?.message}</p>}
       </div>
     )
   }
@@ -222,9 +222,9 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
             {...register('description')}
             rows={4}
             placeholder="Beschreibe deinen Hof für Kunden..."
-            className={errors.description ? 'border-destructive' : ''}
+            className={errors.description ? 'border-status-offen' : ''}
           />
-          {errors.description && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{errors.description.message}</p>}
+          {errors.description && <p className="mt-1 text-xs text-status-offen">{errors.description.message}</p>}
         </div>
       </div>
 
@@ -250,7 +250,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
               landFeld.onChange(e)
               setLand(alsLand(e.target.value))
             }}
-            className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground"
+            className="min-h-11 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground"
           >
             {LAENDER.map((wert) => (
               <option key={wert} value={wert}>
@@ -286,9 +286,9 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
               id="postalCode"
               {...register('postalCode')}
               placeholder={land === 'DE' ? '84359' : '3400'}
-              className={errors.postalCode ? 'border-destructive' : ''}
+              className={errors.postalCode ? 'min-h-11 border-status-offen' : 'min-h-11'}
             />
-            {errors.postalCode && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{errors.postalCode.message}</p>}
+            {errors.postalCode && <p className="mt-1 text-xs text-status-offen">{errors.postalCode.message}</p>}
           </div>
           <div>
             <Label htmlFor="city" className="text-sm text-muted-foreground mb-1 block">Ort *</Label>
@@ -296,9 +296,9 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
               id="city"
               {...register('city')}
               placeholder={land === 'DE' ? 'Simbach am Inn' : 'Klosterneuburg'}
-              className={errors.city ? 'border-destructive' : ''}
+              className={errors.city ? 'min-h-11 border-status-offen' : 'min-h-11'}
             />
-            {errors.city && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{errors.city.message}</p>}
+            {errors.city && <p className="mt-1 text-xs text-status-offen">{errors.city.message}</p>}
           </div>
         </div>
         {/* Der EINZIGE Auslöser der Vorwärts-Suche — bewusst eine Schaltfläche,
@@ -334,7 +334,8 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
       {/* Betriebsnummer (Sprint Bereiche 1): gehört dem Hof, nicht einem
           Produkt. Die Futter-Kennzeichnung zeigt sie an, der Checkout belegt
           sie vor, wenn du selbst Futter „nur an Betriebe" kaufst. */}
-      <div className="bg-card rounded-xl border border-border p-4 space-y-4">
+      {/* Ziel der Zeile „Futtermittel-Registrierung" der Übersicht (/settings, Nr. 22d). */}
+      <div id={BETRIEBSNUMMER_ANKER} className="scroll-mt-6 bg-card rounded-xl border border-border p-4 space-y-4">
         <div>
           <h2 className="font-medium text-foreground">Betriebsnummer</h2>
           <p className="text-xs text-muted-foreground">

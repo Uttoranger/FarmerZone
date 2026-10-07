@@ -28,22 +28,26 @@ function SlotRow({ slot, onDelete, onToggle }: { slot: Slot; onDelete: () => voi
       {/* min. 44px Tippfläche (Mobil-Pflicht): der Schalter ist die
           Urlaubs-Funktion und muss mit dem Daumen sicher treffbar sein */}
       <button
+        type="button"
         onClick={onToggle}
         aria-pressed={slot.isActive}
-        className={`text-xs min-h-11 min-w-11 px-3 rounded-full font-medium transition-colors ${
+        className={`text-xs min-h-11 min-w-11 px-3 rounded-full border font-semibold transition-colors outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-ring ${
           slot.isActive
-            ? 'bg-green-100 dark:bg-green-950/50 text-primary hover:bg-green-200'
-            : 'bg-muted text-muted-foreground hover:bg-muted-foreground/30'
+            ? 'border-accent/50 bg-accent/18 text-status-fertig hover:bg-accent/25'
+            : 'border-border bg-muted text-foreground hover:bg-muted/70'
         }`}
       >
         {slot.isActive ? 'Aktiv' : 'Pausiert'}
       </button>
+      {/* 44 px und ein Name für Screenreader: welcher Tag, welche Zeit. */}
       <button
+        type="button"
         onClick={onDelete}
-        className="p-1.5 text-muted-foreground/60 hover:text-red-600 dark:hover:text-red-400 transition-colors rounded"
+        aria-label={`Abholzeit ${DAY_NAMES[slot.dayOfWeek]} ${slot.startTime}–${slot.endTime} löschen`}
+        className="inline-flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-status-offen outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-ring"
         title="Löschen"
       >
-        <Trash2 className="size-4" />
+        <Trash2 className="size-4" aria-hidden="true" />
       </button>
     </div>
   )
@@ -167,7 +171,7 @@ export function PickupSlotsClient({
       <div className="bg-card rounded-xl border border-border p-4">
         <h2 className="font-medium text-foreground mb-3">Aktuelle Abholzeiten</h2>
         {slots.length === 0 ? (
-          <p className="text-sm text-muted-foreground/60 py-4 text-center">Noch keine Abholzeiten angelegt.</p>
+          <p className="py-4 text-center text-sm text-muted-foreground">Noch keine Abholzeiten angelegt.</p>
         ) : (
           <div className="space-y-2">
             {slots.map((slot) => (
@@ -190,11 +194,12 @@ export function PickupSlotsClient({
         <h2 className="font-medium text-foreground">Abholzeit hinzufügen</h2>
 
         <div>
-          <Label className="text-sm text-muted-foreground mb-1 block">Wochentag</Label>
+          <Label htmlFor="dayOfWeek" className="text-sm text-muted-foreground mb-1 block">Wochentag</Label>
           <select
             value={form.dayOfWeek}
             onChange={(e) => setForm({ ...form, dayOfWeek: parseInt(e.target.value) })}
-            className="w-full h-10 border border-border rounded-md px-3 text-sm bg-card"
+            id="dayOfWeek"
+            className="min-h-11 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground"
           >
             {DAY_NAMES.map((name, i) => (
               <option key={i} value={i}>{name}</option>
@@ -208,6 +213,7 @@ export function PickupSlotsClient({
             <Input
               id="startTime"
               type="time"
+              className="min-h-11"
               value={form.startTime}
               onChange={(e) => setForm({ ...form, startTime: e.target.value })}
             />
@@ -217,6 +223,7 @@ export function PickupSlotsClient({
             <Input
               id="endTime"
               type="time"
+              className="min-h-11"
               value={form.endTime}
               onChange={(e) => setForm({ ...form, endTime: e.target.value })}
             />
@@ -230,6 +237,7 @@ export function PickupSlotsClient({
           <Input
             id="maxOrders"
             type="number"
+            className="min-h-11"
             min="1"
             value={form.maxOrders}
             onChange={(e) => setForm({ ...form, maxOrders: e.target.value })}
@@ -240,9 +248,9 @@ export function PickupSlotsClient({
         <Button
           onClick={handleAdd}
           disabled={isPending}
-          className="w-full bg-primary text-primary-foreground hover:opacity-90"
+          className="min-h-11 w-full bg-primary text-primary-foreground hover:opacity-90"
         >
-          {isPending ? <Loader2 className="size-4 animate-spin" /> : <><Plus className="size-4 mr-1" /> Abholzeit hinzufügen</>}
+          {isPending ? <Loader2 className="size-4 animate-spin" aria-label="Einen Moment …" /> : <><Plus className="size-4 mr-1" aria-hidden="true" /> Abholzeit hinzufügen</>}
         </Button>
       </div>
     </div>

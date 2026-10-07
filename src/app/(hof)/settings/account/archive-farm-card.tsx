@@ -14,6 +14,8 @@ import {
 } from '@/lib/farm-archive'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { KNOPF_ORANGE_RAHMEN } from '@/components/hof-bestellungen/stil'
 import {
   Dialog,
   DialogContent,
@@ -74,7 +76,7 @@ export function ArchiveFarmCard({ farmSlug, isArchived }: Props) {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Power className="size-4 text-primary" />
+            <Power className="size-4 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
             <CardTitle>Hof reaktivieren</CardTitle>
           </div>
           <CardDescription>Dein Hof ist derzeit stillgelegt.</CardDescription>
@@ -94,7 +96,7 @@ export function ArchiveFarmCard({ farmSlug, isArchived }: Props) {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <PowerOff className="size-4 text-primary" />
+            <PowerOff className="size-4 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
             <CardTitle>{FARM_ARCHIVE_TITLE}</CardTitle>
           </div>
           <CardDescription>Deinen Hofladen dauerhaft schließen.</CardDescription>
@@ -104,32 +106,34 @@ export function ArchiveFarmCard({ farmSlug, isArchived }: Props) {
 
           <p className="text-sm text-muted-foreground">
             Nur vorübergehend zusperren? Dann nutze lieber{' '}
-            <Link href="/settings/pause" className="text-primary underline underline-offset-2">
-              Pause / Urlaub
+            <Link href="/settings/pause" className="font-medium text-brand-text underline underline-offset-2">
+              Urlaubsmodus
             </Link>{' '}
             — dabei bleibt deine Hofseite mit einem Hinweis sichtbar.
           </p>
 
           {blockedBy !== null && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/60 dark:bg-amber-950/40">
-              <p className="text-sm text-amber-800 dark:text-amber-200">{farmArchiveBlockedMessage(blockedBy)}</p>
-              <Link
-                href="/orders"
-                className="mt-2 inline-block text-sm font-medium text-amber-900 dark:text-amber-100 underline underline-offset-2"
-              >
-                Zu den Bestellungen
-              </Link>
-            </div>
+            <Hinweiskarte
+              ton="orange"
+              aktion={
+                <Link href="/orders" className="inline-flex min-h-11 items-center text-sm font-semibold underline underline-offset-2">
+                  Zu den Bestellungen
+                </Link>
+              }
+            >
+              {farmArchiveBlockedMessage(blockedBy)}
+            </Hinweiskarte>
           )}
 
-          <Button
-            variant="destructive"
+          {/* Zerstörend: Orange-Umriss statt Rot (DESIGN_SYSTEM „Dialoge und Blätter"). */}
+          <button
+            type="button"
             onClick={() => setDialogOpen(true)}
             disabled={isBusy}
-            className="w-full sm:w-auto"
+            className={`${KNOPF_ORANGE_RAHMEN} w-full sm:w-auto`}
           >
             Hof stilllegen
-          </Button>
+          </button>
         </CardContent>
       </Card>
 
@@ -147,9 +151,9 @@ export function ArchiveFarmCard({ farmSlug, isArchived }: Props) {
             <Button variant="ghost" onClick={() => setDialogOpen(false)} disabled={isBusy}>
               Abbrechen
             </Button>
-            <Button variant="destructive" onClick={handleArchive} disabled={isBusy}>
+            <button type="button" onClick={handleArchive} disabled={isBusy} className={KNOPF_ORANGE_RAHMEN}>
               {isBusy ? 'Wird stillgelegt…' : 'Hof stilllegen'}
-            </Button>
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
