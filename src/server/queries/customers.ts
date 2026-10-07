@@ -1,6 +1,15 @@
 import { prisma } from '@/lib/prisma'
 import { env } from '@/lib/env'
 import { kundeIdAus } from '@/lib/kunden-id'
+import { alsCents } from '@/lib/order-totals'
+import { fasseKundinZusammen, kundenSchluessel, type KundenBestellung, type KundenZusammenfassung } from '@/lib/hof-kunden'
+
+/*
+ * Kunden des Hofs (/customers, /customers/[kundeId]). Jede Abfrage trägt die
+ * farmId des angemeldeten Hofs in der WHERE-Klausel — eine Kundin gibt es nur
+ * als „Bestellungen bei diesem Hof", nie hofübergreifend. Geld wandelt diese
+ * Servergrenze einmal in Cent (alsCents), gerechnet wird in src/lib/hof-kunden.ts.
+ */
 
 /** Die Kennung einer Kundin dieses Hofs für die Adresse /customers/<kundeId>. */
 export function kundeIdFuer(farmId: string, email: string): string {
@@ -8,56 +17,36 @@ export function kundeIdFuer(farmId: string, email: string): string {
 }
 
 /**
- * Die E-Mail der Kundin zu einer Kennung — nur unter den Kundinnen des
- * eigenen Hofs gesucht (Besitz steckt in der WHERE-Klausel). Eine Kennung
+ * Alle Schreibweisen der E-Mail zu einer Kennung — nur unter den Bestellungen
+ * des eigenen Hofs gesucht (Besitz steckt in der WHERE-Klausel). Eine Kennung
  * lässt sich nicht zurückrechnen, also rechnen wir alle Kennungen des Hofs
- * vorwärts; für einen Hof sind das einige hundert Adressen.
+ * vorwärts; für einen Hof sind das einige hundert Adressen. Leer = keine
+ * Kundin dieses Hofs (auch bei einer Kennung aus einem anderen Hof).
+ *
+ * Mehrere Schreibweisen („Erika@…", „erika@… ") sind dieselbe Kundin — so
+ * fasst auch die Liste zusammen. Das Detail fragt dann genau diese Werte ab
+ * (`in`), statt mit ILIKE zu vergleichen: dort wären „_" und „%" Platzhalter.
  */
-export async function findeKundenEmail(farmId: string, kundeId: string): Promise<string | null> {
+export async function findeKundenAdressen(farmId: string, kundeId: string): Promise<string[]> {
   const zeilen = await prisma.order.findMany({
     where: { farmId },
     select: { customerEmail: true },
     distinct: ['customerEmail'],
   })
-  const treffer = zeilen.find((z) => kundeIdFuer(farmId, z.customerEmail) === kundeId)
-  return treffer?.customerEmail ?? null
+  return zeilen.map((z) => z.customerEmail).filter((email) => kundeIdFuer(farmId, email) === kundeId)
 }
 
-export type CustomerStatus =
-  | 'Stammkunde'
-  | 'Diesen Monat aktiv'
-  | 'Lange nicht gesehen'
-  | 'Neu'
-  | null
-
-export interface CustomerSummary {
+export interface CustomerSummary extends KundenZusammenfassung {
   /** Für den Link auf die Kundenseite — nie die E-Mail in eine Adresse. */
   kundeId: string
-  customerEmail: string
-  customerName: string
-  customerPhone: string
-  orderCount: number
-  totalSpent: number
-  firstOrderDate: string
-  lastOrderDate: string
-  daysSinceLastOrder: number
-  lastOrderLabel: string
-  lastOrderShort: string
-  isSubscribed: boolean
-  topProducts: { name: string; count: number }[]
-  status: CustomerStatus
-  isStammkunde: boolean
-  isDiesenMonatAktiv: boolean
-  isLangeNichtGesehen: boolean
-  isNeu: boolean
 }
 
 export interface CustomerOrderSummary {
   id: string
   orderNumber: string
   createdAt: string
-  pickupDate: string
-  totalAmount: number
+  /** Warenpreis der Bestellung in Cent (nach „Artikel fehlt" der aktuelle Stand). */
+  betragCents: number
   status: string
   items: { productName: string; quantity: number }[]
 }
@@ -67,247 +56,112 @@ export interface CustomerDetail extends CustomerSummary {
   subscription: { optInEmail: boolean; optInWhatsApp: boolean } | null
 }
 
-function computeStatus(
-  orderCount: number,
-  daysSinceLastOrder: number,
-  firstOrderDaysAgo: number
-): CustomerStatus {
-  if (orderCount >= 3) return 'Stammkunde'
-  if (orderCount === 1 && firstOrderDaysAgo < 14) return 'Neu'
-  if (orderCount >= 2 && daysSinceLastOrder > 60) return 'Lange nicht gesehen'
-  if (daysSinceLastOrder <= 30) return 'Diesen Monat aktiv'
-  return null
+/** So viele Bestellungen lädt das Detail; gezeigt werden davon die ersten fünf. */
+const LETZTE_BESTELLUNGEN = 10
+
+const BESTELL_FELDER = {
+  customerEmail: true,
+  customerName: true,
+  customerPhone: true,
+  status: true,
+  totalAmount: true,
+  createdAt: true,
+  // Fehlende Artikel (E14) wurden nicht übergeben — sie zählen nicht als gekauft.
+  items: { where: { fehltSeit: null }, select: { productName: true, quantity: true } },
+} as const
+
+type BestellZeile = {
+  customerEmail: string
+  customerName: string
+  customerPhone: string
+  status: string
+  totalAmount: { toString(): string }
+  createdAt: Date
+  items: { productName: string; quantity: number }[]
 }
 
-export async function getCustomersForFarm(farmId: string): Promise<CustomerSummary[]> {
+function alsKundenBestellung(o: BestellZeile): KundenBestellung {
+  return {
+    customerEmail: o.customerEmail,
+    customerName: o.customerName,
+    customerPhone: o.customerPhone,
+    status: o.status,
+    betragCents: alsCents(o.totalAmount),
+    createdAt: o.createdAt,
+    items: o.items,
+  }
+}
+
+export async function getCustomersForFarm(farmId: string, jetzt: Date = new Date()): Promise<CustomerSummary[]> {
   const [orders, subscriptions] = await Promise.all([
-    prisma.order.findMany({
-      where: { farmId },
-      select: {
-        customerEmail: true,
-        customerName: true,
-        customerPhone: true,
-        status: true,
-        totalAmount: true,
-        createdAt: true,
-        // Fehlende Artikel (E14) wurden nicht übergeben.
-        items: { where: { fehltSeit: null }, select: { productName: true, quantity: true } },
-      },
-      orderBy: { createdAt: 'asc' },
-    }),
+    prisma.order.findMany({ where: { farmId }, select: BESTELL_FELDER, orderBy: { createdAt: 'asc' } }),
     prisma.customerFarmSubscription.findMany({
       where: { farmId },
       select: { customerEmail: true, optInEmail: true, optInWhatsApp: true },
     }),
   ])
 
-  const subscriptionMap = new Map(
-    subscriptions.map((s) => [s.customerEmail.toLowerCase(), s])
-  )
+  const abos = new Map(subscriptions.map((s) => [kundenSchluessel(s.customerEmail), s]))
 
-  const customerMap = new Map<string, typeof orders>()
+  const jeKundin = new Map<string, KundenBestellung[]>()
   for (const order of orders) {
-    const key = order.customerEmail.toLowerCase()
-    if (!customerMap.has(key)) customerMap.set(key, [])
-    customerMap.get(key)!.push(order)
+    const schluessel = kundenSchluessel(order.customerEmail)
+    const liste = jeKundin.get(schluessel) ?? []
+    liste.push(alsKundenBestellung(order))
+    jeKundin.set(schluessel, liste)
   }
 
-  const now = new Date()
-  const result: CustomerSummary[] = []
-
-  for (const [emailKey, customerOrders] of customerMap) {
-    const sorted = [...customerOrders].sort(
-      (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
-    )
-    const firstOrder = sorted[0]
-    const lastOrder = sorted[sorted.length - 1]
-
-    const totalSpent = customerOrders
-      .filter((o) => o.status !== 'CANCELLED' && o.status !== 'NOT_PICKED_UP')
-      .reduce((sum, o) => sum + Number(o.totalAmount), 0)
-
-    const productCounts = new Map<string, number>()
-    for (const order of customerOrders) {
-      if (order.status === 'CANCELLED') continue
-      for (const item of order.items) {
-        productCounts.set(
-          item.productName,
-          (productCounts.get(item.productName) ?? 0) + item.quantity
-        )
-      }
-    }
-    const topProducts = [...productCounts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([name, count]) => ({ name, count }))
-
-    const daysSinceLastOrder = Math.floor(
-      (now.getTime() - lastOrder.createdAt.getTime()) / (1000 * 60 * 60 * 24)
-    )
-    const firstOrderDaysAgo = Math.floor(
-      (now.getTime() - firstOrder.createdAt.getTime()) / (1000 * 60 * 60 * 24)
-    )
-
-    const lastOrderLabel =
-      daysSinceLastOrder === 0
-        ? 'heute bestellt'
-        : daysSinceLastOrder === 1
-        ? 'gestern bestellt'
-        : `zuletzt vor ${daysSinceLastOrder} Tagen`
-
-    const lastOrderShort =
-      daysSinceLastOrder === 0
-        ? 'heute'
-        : daysSinceLastOrder === 1
-        ? 'gestern'
-        : `vor ${daysSinceLastOrder} Tagen`
-
-    const sub = subscriptionMap.get(emailKey)
-    const isSubscribed = !!(sub?.optInEmail || sub?.optInWhatsApp)
-    const orderCount = customerOrders.length
-    const status = computeStatus(orderCount, daysSinceLastOrder, firstOrderDaysAgo)
-
-    result.push({
-      kundeId: kundeIdFuer(farmId, emailKey),
-      customerEmail: lastOrder.customerEmail,
-      customerName: lastOrder.customerName,
-      customerPhone: lastOrder.customerPhone,
-      orderCount,
-      totalSpent,
-      firstOrderDate: firstOrder.createdAt.toISOString(),
-      lastOrderDate: lastOrder.createdAt.toISOString(),
-      daysSinceLastOrder,
-      lastOrderLabel,
-      lastOrderShort,
-      isSubscribed,
-      topProducts,
-      status,
-      isStammkunde: orderCount >= 3,
-      isDiesenMonatAktiv: daysSinceLastOrder <= 30,
-      isLangeNichtGesehen: orderCount >= 2 && daysSinceLastOrder > 60,
-      isNeu: orderCount === 1 && firstOrderDaysAgo < 14,
-    })
-  }
-
+  const result: CustomerSummary[] = [...jeKundin].map(([schluessel, bestellungen]) => ({
+    kundeId: kundeIdFuer(farmId, schluessel),
+    ...fasseKundinZusammen(bestellungen, abos.get(schluessel) ?? null, jetzt),
+  }))
   result.sort((a, b) => b.orderCount - a.orderCount)
   return result
 }
 
+/**
+ * Eine Kundin des Hofs mit ihren letzten Bestellungen. `adressen` kommt aus
+ * findeKundenAdressen (alle Schreibweisen bei diesem Hof); null, wenn es
+ * unter diesen Adressen bei diesem Hof keine Bestellung gibt.
+ */
 export async function getCustomerDetail(
   farmId: string,
-  customerEmail: string
+  adressen: readonly string[],
+  jetzt: Date = new Date()
 ): Promise<CustomerDetail | null> {
-  const [orders, subscription] = await Promise.all([
+  if (adressen.length === 0) return null
+  const schluessel = kundenSchluessel(adressen[0])
+
+  const [orders, abos] = await Promise.all([
     prisma.order.findMany({
-      where: {
-        farmId,
-        customerEmail: { equals: customerEmail, mode: 'insensitive' },
-      },
-      select: {
-        id: true,
-        orderNumber: true,
-        customerEmail: true,
-        customerName: true,
-        customerPhone: true,
-        status: true,
-        totalAmount: true,
-        createdAt: true,
-        pickupDate: true,
-        // Fehlende Artikel (E14) wurden nicht übergeben.
-        items: { where: { fehltSeit: null }, select: { productName: true, quantity: true } },
-      },
+      where: { farmId, customerEmail: { in: [...adressen] } },
+      select: { ...BESTELL_FELDER, id: true, orderNumber: true },
       orderBy: { createdAt: 'desc' },
     }),
-    prisma.customerFarmSubscription.findFirst({
-      where: {
-        farmId,
-        customerEmail: { equals: customerEmail, mode: 'insensitive' },
-      },
-      select: { optInEmail: true, optInWhatsApp: true },
+    // Dieselbe Zuordnung wie die Liste (kundenSchluessel: klein, ohne Rand) —
+    // im Code statt per ILIKE, das weder Rand noch Platzhalter richtig kennt.
+    // Abos eines Hofs sind höchstens so viele wie seine Kundinnen.
+    prisma.customerFarmSubscription.findMany({
+      where: { farmId },
+      select: { customerEmail: true, optInEmail: true, optInWhatsApp: true },
     }),
   ])
 
   if (orders.length === 0) return null
-
-  const sorted = [...orders].sort(
-    (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
-  )
-  const firstOrder = sorted[0]
-  const lastOrder = sorted[sorted.length - 1]
-
-  const totalSpent = orders
-    .filter((o) => o.status !== 'CANCELLED' && o.status !== 'NOT_PICKED_UP')
-    .reduce((sum, o) => sum + Number(o.totalAmount), 0)
-
-  const productCounts = new Map<string, number>()
-  for (const order of orders) {
-    if (order.status === 'CANCELLED') continue
-    for (const item of order.items) {
-      productCounts.set(
-        item.productName,
-        (productCounts.get(item.productName) ?? 0) + item.quantity
-      )
-    }
-  }
-  const topProducts = [...productCounts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([name, count]) => ({ name, count }))
-
-  const now = new Date()
-  const daysSinceLastOrder = Math.floor(
-    (now.getTime() - lastOrder.createdAt.getTime()) / (1000 * 60 * 60 * 24)
-  )
-  const firstOrderDaysAgo = Math.floor(
-    (now.getTime() - firstOrder.createdAt.getTime()) / (1000 * 60 * 60 * 24)
-  )
-
-  const lastOrderLabel =
-    daysSinceLastOrder === 0
-      ? 'heute bestellt'
-      : daysSinceLastOrder === 1
-      ? 'gestern bestellt'
-      : `zuletzt vor ${daysSinceLastOrder} Tagen`
-
-  const lastOrderShort =
-    daysSinceLastOrder === 0
-      ? 'heute'
-      : daysSinceLastOrder === 1
-      ? 'gestern'
-      : `vor ${daysSinceLastOrder} Tagen`
-
-  const isSubscribed = !!(subscription?.optInEmail || subscription?.optInWhatsApp)
-  const orderCount = orders.length
-  const status = computeStatus(orderCount, daysSinceLastOrder, firstOrderDaysAgo)
+  const abo = abos.find((a) => kundenSchluessel(a.customerEmail) === schluessel)
+  const subscription = abo ? { optInEmail: abo.optInEmail, optInWhatsApp: abo.optInWhatsApp } : null
 
   return {
-    kundeId: kundeIdFuer(farmId, customerEmail),
-    customerEmail: lastOrder.customerEmail,
-    customerName: lastOrder.customerName,
-    customerPhone: lastOrder.customerPhone,
-    orderCount,
-    totalSpent,
-    firstOrderDate: firstOrder.createdAt.toISOString(),
-    lastOrderDate: lastOrder.createdAt.toISOString(),
-    daysSinceLastOrder,
-    lastOrderLabel,
-    lastOrderShort,
-    isSubscribed,
-    topProducts,
-    status,
-    isStammkunde: orderCount >= 3,
-    isDiesenMonatAktiv: daysSinceLastOrder <= 30,
-    isLangeNichtGesehen: orderCount >= 2 && daysSinceLastOrder > 60,
-    isNeu: orderCount === 1 && firstOrderDaysAgo < 14,
-    recentOrders: orders.slice(0, 10).map((o) => ({
+    kundeId: kundeIdFuer(farmId, schluessel),
+    ...fasseKundinZusammen(orders.map(alsKundenBestellung), subscription, jetzt),
+    recentOrders: orders.slice(0, LETZTE_BESTELLUNGEN).map((o) => ({
       id: o.id,
       orderNumber: o.orderNumber,
       createdAt: o.createdAt.toISOString(),
-      pickupDate: o.pickupDate.toISOString(),
-      totalAmount: Number(o.totalAmount),
+      betragCents: alsCents(o.totalAmount),
       status: o.status,
       items: o.items,
     })),
-    subscription: subscription ?? null,
+    subscription,
   }
 }
