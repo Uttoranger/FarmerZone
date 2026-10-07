@@ -7,12 +7,13 @@
  *  - Ein wartender Hof ohne Geschäftsdaten verschwindet samt Inhaber-Konto,
  *    und zwar in der von den Fremdschlüsseln erzwungenen Reihenfolge:
  *    erst der Hof, dann der User (Farm.ownerId steht auf ON DELETE RESTRICT).
- *  - Die vier Guards greifen einzeln: Freigabe, Betreiber-Konto, Bestellungen
- *    und Verkäufe am Hof, Bestellungen am Inhaber-Konto.
+ *  - Die drei Guards greifen einzeln: Freigabe, Betreiber-Konto, Bestellungen
+ *    und Verkäufe am Hof.
+ *  - Bestellungen am Inhaber-Konto (Altbestand vor E8) sperren nicht mehr
+ *    (Register B4, Nr. 27) — die Ablehnungssperre für den Altbestand ist weg.
  *
- * Die Guards sind kein Zierrat: ohne sie bräche das Löschen entweder an einem
- * RESTRICT-Fremdschlüssel ab oder kappte per SET NULL still die Kundenzuordnung
- * fremder Bestellungen (prisma/migrations/0_init/migration.sql:440, :449, :443).
+ * Die Guards sind kein Zierrat: ohne sie bräche das Löschen an einem
+ * RESTRICT-Fremdschlüssel ab (prisma/migrations/0_init/migration.sql:440, :449).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -39,7 +40,6 @@ import { prisma } from '@/lib/prisma'
 import {
   FARM_REJECT_APPROVED_MESSAGE,
   FARM_REJECT_HAS_DATA_MESSAGE,
-  FARM_REJECT_OWNER_HAS_ORDERS_MESSAGE,
   FARM_REJECT_OWNER_IS_ADMIN_MESSAGE,
 } from '@/lib/farm-approval'
 
@@ -174,31 +174,19 @@ describe('rejectFarmAction — Guards', () => {
     expect(transaction).not.toHaveBeenCalled()
   })
 
-  it('löscht kein Inhaber-Konto, an dem eigene Bestellungen hängen', async () => {
-    orderCount.mockResolvedValue(1 as never)
-
-    const result = await rejectFarmAction('farm_1')
-
-    expect(result.error).toBe(FARM_REJECT_OWNER_HAS_ORDERS_MESSAGE)
-    expect(orderCount).toHaveBeenCalledWith({ where: { customerId: 'user_bot' } })
-    expect(transaction).not.toHaveBeenCalled()
-  })
-
-  it('eine Gast-Bestellung unter der Adresse des Inhabers sperrt das Ablehnen nicht (E8)', async () => {
-    // Seit Nr. 17a hängt der Checkout keine Bestellung mehr an ein Konto. Die
-    // Sperre zählt weiter nur echte Verknüpfungen (customerId) — die gibt es
-    // nur noch aus der Zeit davor. Nach der Adresse zu zählen, sperrte jeden
-    // Hof, unter dessen Adresse irgendwer bestellt (Morgenbericht Lauf 3, Folge 2).
-    const bestellungen: Array<Record<string, unknown>> = [
-      { customerId: null, customerEmail: 'user_bot@example.org', farmId: 'anderer_hof' },
-    ]
-    orderCount.mockImplementation((async ({ where }: { where: Record<string, unknown> }) =>
-      bestellungen.filter((b) => Object.entries(where).every(([feld, wert]) => b[feld] === wert)).length) as never)
+  it('alte Bestellungen am Inhaber-Konto (vor E8) sperren das Ablehnen nicht mehr (B4)', async () => {
+    // Bis Nr. 27 sperrte eine Bestellung mit customerId = Inhaber das Löschen.
+    // Seit E8 hängt der Checkout keine Bestellung mehr an ein Konto, und
+    // niemand liest customerId (Leser gehen nach customerEmail). Die
+    // Fremdschlüssel-Regel SET NULL kappt nur noch diese tote Verknüpfung;
+    // die Bestellungen selbst bleiben stehen.
+    orderCount.mockResolvedValue(3 as never)
 
     const result = await rejectFarmAction('farm_1')
 
     expect(result.error).toBeUndefined()
     expect(transaction).toHaveBeenCalledOnce()
+    expect(orderCount).not.toHaveBeenCalled()
   })
 
   it('fragt bei einem Hof ohne Produkte gar nicht erst nach Bestellpositionen', async () => {

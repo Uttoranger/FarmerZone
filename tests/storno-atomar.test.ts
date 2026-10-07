@@ -292,7 +292,7 @@ describe('cancelOrder — Erstattung erst nach der Sperre', () => {
     // (Destination Charge, tests/storno-erstattung.test.ts). Ohne Gebühr gibt es
     // keine application_fee zu erstatten. Fester Schlüssel gegen Doppelerstattung.
     expect(refundCreate).toHaveBeenCalledWith(
-      { payment_intent: 'pi_1', reverse_transfer: true },
+      { payment_intent: 'pi_1', reverse_transfer: true, metadata: { orderId: 'order_1', anlass: 'vollstorno', art: 'kunde' } },
       { idempotencyKey: 'storno-order_1' }
     )
     expect(orderUpdateMany.mock.invocationCallOrder[0]).toBeLessThan(

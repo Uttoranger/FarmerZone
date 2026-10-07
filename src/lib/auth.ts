@@ -5,10 +5,18 @@ import { emailOTP, magicLink } from 'better-auth/plugins'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
 import { prisma } from '@/lib/prisma'
 import { APP_URL, UMGEBUNG } from '@/lib/umgebung-server'
-import { ANMELDECODE_PLUGIN_OPTIONEN, GESPERRTE_AUTH_PFADE, codeVersandErlaubt, rolleAusTreffern } from '@/lib/anmeldecode'
+import {
+  ANMELDECODE_PLUGIN_OPTIONEN,
+  CODE_ANMELDUNG_PFAD,
+  GESPERRTE_AUTH_PFADE,
+  codeVersandErlaubt,
+  kontaktdatenBeiCodeAnmeldungLeeren,
+  rolleAusTreffern,
+} from '@/lib/anmeldecode'
 import { genauesIlikeMuster } from '@/lib/ilike-muster'
 import { erzeugeAnforderungsSperre } from '@/lib/anmeldecode-sperre'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
+import { sendeRegistrierungsHinweis } from '@/server/registrierung-hinweis'
 import {
   BESTAETIGUNG_GESPERRTE_AUTH_PFADE,
   BESTAETIGUNG_GUELTIG_SEKUNDEN,
@@ -141,6 +149,20 @@ export const auth = betterAuth({
     resetPasswordTokenExpiresIn: 3600,
     // Nach erfolgreichem Reset fliegen alle alten Sessions
     revokeSessionsOnPasswordReset: true,
+    // Registrieren meldet nicht an (Register F6 „19b", Nachtlauf Nr. 27):
+    // Damit antwortet Better Auth auf eine VERGEBENE Adresse wie bei Erfolg —
+    // mit einem Scheinkonto ohne Datenbankzeile, nachdem es das Passwort
+    // trotzdem gehasht hat (gleiche Rechenzeit). Ohne das warf signUpEmail
+    // „schon vorhanden", und die Antwort verriet, wer ein Konto hat. Angemeldet
+    // wird erst nach der Bestätigung per Link (/verify → Anmelden).
+    autoSignIn: false,
+    // Das bestehende Konto erfährt davon per Mail — nach der Antwort, damit
+    // die Antwortzeit gleich bleibt; höchstens einmal je Fenster, Fehler ohne
+    // Adresse nach Sentry (src/server/registrierung-hinweis.ts). Erreichbar
+    // nur über registerFarmer: /sign-up/email ist über HTTP zu.
+    onExistingUserSignUp: async ({ user }) => {
+      nachDerAntwort(() => sendeRegistrierungsHinweis(user.id))
+    },
     sendResetPassword: async ({ user, url }) => {
       try {
         const { sendPasswordResetEmail } = await import('@/lib/email')
@@ -264,6 +286,32 @@ export const auth = betterAuth({
         return ctx.json({ success: true })
       }
     }),
+  },
+
+  // Name und Telefon aus fremden Alt-Registrierungen (Register B3, Nr. 27):
+  // Beim ersten Code eines unbestätigten Kundinnen-Kontos setzt das
+  // emailOTP-Plugin `emailVerified` — in genau diesem Schreibvorgang leeren
+  // wir Name und Telefon mit, die niemand bewiesen hat (Regel und Begründung:
+  // kontaktdatenBeiCodeAnmeldungLeeren). Der Hook bekommt keine Konto-ID,
+  // nur die Daten und die Anfrage; das Konto kommt frisch aus der Datenbank
+  // über die Adresse in der Form, die das Plugin liest. Die Bestätigung
+  // eines Hofs per Link und jede andere Änderung bleiben unberührt.
+  databaseHooks: {
+    user: {
+      update: {
+        before: async (daten, kontext) => {
+          if (kontext?.path !== CODE_ANMELDUNG_PFAD || daten.emailVerified !== true) return
+          const body = kontext.body as { email?: unknown } | undefined
+          if (typeof body?.email !== 'string') return
+          const konto = await prisma.user.findUnique({
+            where: { email: adresseWieDasPlugin(body.email) },
+            select: { role: true, isAdmin: true, emailVerified: true },
+          })
+          if (!kontaktdatenBeiCodeAnmeldungLeeren({ pfad: kontext.path, setztBestaetigung: true, konto })) return
+          return { data: { ...daten, name: '', phone: null } }
+        },
+      },
+    },
   },
 
   plugins: [

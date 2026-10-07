@@ -419,3 +419,144 @@ describe('Nachbesserung Runde 1', () => {
     expect(sendErstattungOffen).not.toHaveBeenCalled()
   })
 })
+
+describe('refund.failed — Vollerstattung mit Merkmalen gescheitert (Nr. 27)', () => {
+  /**
+   * Eine Online-Bestellung Eier € 4,50 + Brot € 5,80 (Gebühr € 0,52, bezahlt
+   * € 10,82), vom Hof storniert und voll erstattet (reverse_transfer): Die
+   * Datenbank vermerkt das nur über REFUNDED, `erstattetCents` bleibt 0.
+   */
+  async function vollStorniert(eingabe: { merkmale?: boolean } = {}) {
+    const { farm } = await erstelleHof()
+    const eier = await erstelleProdukt(farm.id, { stock: 5, price: 4.5, name: 'Eier' })
+    const paymentIntentId = intKennung('pi')
+    const order = await prisma.order.create({
+      data: {
+        orderNumber: intKennung('bestellung').toUpperCase(),
+        farmId: farm.id,
+        customerEmail: `${intKennung('kundin')}@example.com`,
+        customerName: 'Anna Muster',
+        customerPhone: '+43 660 0000000',
+        status: 'CANCELLED',
+        totalAmount: new Prisma.Decimal(1030).div(100),
+        pickupDate: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        pickupTimeStart: '15:00',
+        pickupTimeEnd: '18:00',
+        paymentMethod: 'ONLINE',
+        paymentStatus: 'REFUNDED',
+        stripePaymentIntentId: paymentIntentId,
+        serviceFeeCents: 52,
+        erstattetCents: 0,
+        items: { create: [{ productId: eier.id, productName: 'Eier', unitPrice: 10.3, quantity: 1, totalPrice: 10.3, vatRate: 10 }] },
+      },
+    })
+    const voll: Erstattung = {
+      id: intKennung('re-voll'),
+      amount: 1082,
+      status: 'succeeded',
+      metadata: eingabe.merkmale === false ? {} : { orderId: order.id, anlass: 'vollstorno', art: 'kunde' },
+    }
+    erstattungen.push(voll)
+    return { order, paymentIntentId, voll }
+  }
+
+  it('öffnet die Zahlung wieder (REFUNDED → PAID), die Bestellung bleibt storniert; Meldung an Sentry und den Betreiber ohne Daten der Kundin', async () => {
+    const { order, paymentIntentId, voll } = await vollStorniert()
+    scheitert(voll)
+
+    const antwort = await zustellen(ereignis('refund.failed', voll, paymentIntentId))
+
+    expect(antwort.status).toBe(200)
+    const danach = await prisma.order.findUniqueOrThrow({ where: { id: order.id } })
+    expect(danach.status).toBe('CANCELLED')
+    expect(danach.paymentStatus).toBe('PAID')
+    expect(danach.erstattetCents).toBe(0)
+    expect(meldungen('erstattung_gescheitert_zurueckgenommen')).toBe(1)
+    await vi.waitFor(() => expect(sendErstattungOffen).toHaveBeenCalledTimes(1))
+    const meldung = vi.mocked(sendErstattungOffen).mock.calls[0]![0]
+    expect(meldung).toMatchObject({ bestellId: order.id, betraege: [expect.objectContaining({ cents: 1082 })] })
+    expect(meldung.handanweisung).toContain('Vollerstattung')
+    const sentryText = JSON.stringify(vi.mocked(Sentry.captureMessage).mock.calls)
+    for (const text of [JSON.stringify(meldung), sentryText]) {
+      expect(text).not.toContain('Anna')
+      expect(text).not.toContain('@example.com')
+    }
+  })
+
+  it('beide Ereignisse und eine erneute Zustellung: genau einmal zurückgenommen, einmal gemeldet', async () => {
+    const { order, paymentIntentId, voll } = await vollStorniert()
+    scheitert(voll)
+    const ev = ereignis('refund.failed', voll, paymentIntentId)
+
+    const antworten = [await zustellen(ev), await zustellen(ev), await zustellen(ereignis('charge.refund.updated', voll, paymentIntentId))]
+
+    expect(antworten.map((a) => a.status)).toEqual([200, 200, 200])
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).paymentStatus).toBe('PAID')
+    await nachlaufFertig()
+    expect(Sentry.captureMessage).toHaveBeenCalledTimes(1)
+    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
+  })
+
+  it('beide Ereignisse gleichzeitig: nie doppelt, genau eine Meldung', async () => {
+    const { order, paymentIntentId, voll } = await vollStorniert()
+    scheitert(voll)
+
+    const antworten = await Promise.all([
+      zustellen(ereignis('refund.failed', voll, paymentIntentId)),
+      zustellen(ereignis('charge.refund.updated', voll, paymentIntentId)),
+    ])
+
+    for (const a of antworten) expect([200, 500]).toContain(a.status)
+    await zustellen(ereignis('refund.failed', voll, paymentIntentId))
+    await nachlaufFertig()
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).paymentStatus).toBe('PAID')
+    expect(Sentry.captureMessage).toHaveBeenCalledTimes(1)
+    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
+  })
+
+  it('Stripe kennt daneben eine weitere zählende Erstattung (von Hand nachgeholt): nichts geändert, als unklar gemeldet', async () => {
+    const { order, paymentIntentId, voll } = await vollStorniert()
+    erstattungen.push({ id: intKennung('re-hand'), amount: 1082, status: 'succeeded', metadata: {} })
+    scheitert(voll)
+
+    const antwort = await zustellen(ereignis('refund.failed', voll, paymentIntentId))
+
+    expect(antwort.status).toBe(200)
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).paymentStatus).toBe('REFUNDED')
+    expect(meldungen('erstattung_gescheitert_unklar')).toBe(1)
+  })
+
+  it('Betrag passt nicht zum bezahlten Betrag der Bestellung: nichts geändert, als unklar gemeldet', async () => {
+    const { order, paymentIntentId, voll } = await vollStorniert()
+    voll.amount = 900
+    scheitert(voll)
+
+    await zustellen(ereignis('refund.failed', voll, paymentIntentId))
+
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).paymentStatus).toBe('REFUNDED')
+    expect(meldungen('erstattung_gescheitert_unklar')).toBe(1)
+  })
+
+  it('Merkmale einer anderen Bestellung als der der Zahlung: nichts geändert, als fremd gemeldet', async () => {
+    const a = await vollStorniert()
+    const b = await vollStorniert()
+    scheitert(a.voll)
+
+    await zustellen(ereignis('refund.failed', a.voll, b.paymentIntentId))
+
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: a.order.id } })).paymentStatus).toBe('REFUNDED')
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: b.order.id } })).paymentStatus).toBe('REFUNDED')
+    expect(meldungen('erstattung_gescheitert_fremd')).toBe(1)
+  })
+
+  it('Gegenprobe: eine Vollerstattung OHNE Merkmale (vor Nr. 27) bleibt wie bisher nur gemeldet', async () => {
+    const { order, paymentIntentId, voll } = await vollStorniert({ merkmale: false })
+    scheitert(voll)
+
+    await zustellen(ereignis('refund.failed', voll, paymentIntentId))
+
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).paymentStatus).toBe('REFUNDED')
+    expect(meldungen('erstattung_gescheitert_fremd')).toBe(1)
+    expect(stripe.refunds.list).not.toHaveBeenCalled()
+  })
+})

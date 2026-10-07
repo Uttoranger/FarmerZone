@@ -132,6 +132,40 @@ export function kundinnenKonto(nutzer: { role?: string | null; isAdmin?: boolean
   return nutzer?.role === 'CUSTOMER' && nutzer.isAdmin !== true
 }
 
+/** Der Pfad der Code-Anmeldung in Better Auth (emailOTP). */
+export const CODE_ANMELDUNG_PFAD = '/sign-in/email-otp'
+
+/**
+ * Werden beim ersten Code Name und Telefon am Konto geleert (Register B3,
+ * Nr. 27)? Ein unbestätigtes Kundinnen-Konto trägt Angaben, die niemand
+ * bewiesen hat: aus einer fremden Registrierung mit Passwort (vor Nr. 17b
+ * möglich) oder aus dem alten Checkout (bis Nr. 17a), der Name und Telefon
+ * übernahm, die irgendwer zur Adresse tippte. Better Auth entfernt beim
+ * ersten Code nur Passwort und Sitzungen (revokeUnprovenAccountAccess).
+ * Welche Herkunft vorliegt, ist in diesem Moment nicht mehr zu erkennen
+ * (das Passwort ist schon gelöscht) — deshalb gilt die Regel für jedes
+ * unbestätigte Kundinnen-Konto.
+ *
+ * Nur der Übergang unbestätigt → bestätigt über die Code-Anmeldung, nur
+ * Kundinnen-Konten: Die Bestätigung eines Hofs per Link (`/verify-email`)
+ * und jede andere Änderung leeren nie etwas.
+ */
+export function kontaktdatenBeiCodeAnmeldungLeeren(e: {
+  pfad: string | null | undefined
+  /** Setzt die Änderung `emailVerified` auf true? */
+  setztBestaetigung: boolean
+  /** Das Konto frisch aus der Datenbank, VOR der Änderung. */
+  konto: { role?: string | null; isAdmin?: boolean | null; emailVerified?: boolean | null } | null
+}): boolean {
+  return (
+    e.pfad === CODE_ANMELDUNG_PFAD &&
+    e.setztBestaetigung &&
+    e.konto !== null &&
+    !adresseBestaetigt(e.konto) &&
+    kundinnenKonto(e.konto)
+  )
+}
+
 /**
  * Die Rolle hinter einer Adresse aus ALLEN Konten, die sie (ohne Rücksicht
  * auf Groß-/Kleinschreibung) trifft. Ein einziger Hof oder Admin darunter

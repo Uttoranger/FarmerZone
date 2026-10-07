@@ -25,9 +25,11 @@ import {
   StripeStandUnklar,
   bucheVomHofZurueck,
   erstatteKundin,
+  erstattungZaehlt,
   hatErstattungen,
   ladeStripeStand,
   teilstornoSumme,
+  vollstornoMerkmal,
   type UnklarGrund,
 } from '@/server/teilerstattung'
 import { sendArtikelFehlt, sendErstattungOffen } from '@/lib/email'
@@ -634,12 +636,22 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
             reverse_transfer: true,
             // Wie im Checkout: eine application_fee gibt es nur bei Gebühr > 0.
             ...(plattformgebuehrCents(betraege) > 0 ? { refund_application_fee: true } : {}),
+            // Merkmale wie bei der Teilerstattung (Nr. 27): Scheitert die
+            // Erstattung später, erkennt der Webhook sie als unsere Buchung
+            // und öffnet die Zahlung wieder (src/server/erstattung-gescheitert.ts).
+            metadata: vollstornoMerkmal(order.id),
           },
           // Idempotenz: Erreicht ein zweiter Storno Stripe (Vermerk gescheitert
           // und Bestellung wieder geöffnet), liefert Stripe dieselbe Erstattung
           // statt einer zweiten.
           { idempotencyKey: `storno-${order.id}` }
         )
+        // Wie bei der Teilerstattung (erstatteKundin): Eine gescheiterte oder
+        // abgebrochene Erstattung hat kein Geld bewegt — nie REFUNDED
+        // vermerken und der Kundin keine Erstattung zusagen.
+        if (!erstattungZaehlt(refund.status)) {
+          throw new StripeStandUnklar('erstattung_gescheitert', { orderId: order.id, status: refund.status ?? 'unbekannt' })
+        }
         refundAmount = refund.amount / 100
       }
     } catch (err) {

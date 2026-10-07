@@ -16,6 +16,7 @@ import { CustomerMagicLinkEmail } from '@/emails/customer-magic-link'
 import { AnmeldecodeEmail } from '@/emails/anmeldecode'
 import { PasswordResetEmail } from '@/emails/password-reset'
 import { EmailBestaetigungEmail } from '@/emails/email-bestaetigung'
+import { RegistrierungHinweisEmail } from '@/emails/registrierung-hinweis'
 import { NewFarmNotificationEmail } from '@/emails/new-farm-notification'
 import { FreischaltungEmail } from '@/emails/freischaltung'
 import { MeldungNotificationEmail } from '@/emails/meldung-notification'
@@ -230,6 +231,20 @@ export async function sendBestellCodeEmail(email: string, code: string): Promise
 export async function sendEmailBestaetigung(email: string, url: string): Promise<{ id?: string; error?: string }> {
   const html = await toHtml(React.createElement(EmailBestaetigungEmail, { url, stunden: BESTAETIGUNG_GUELTIG_SEKUNDEN / 3600 }))
   return sendRaw(email, 'Bestätige deine E-Mail-Adresse · FarmerZone', html)
+}
+
+/**
+ * Hinweis an ein bestehendes Konto: Jemand wollte sich mit seiner Adresse
+ * registrieren (Register F6 „19b", Nachtlauf Nr. 27). Der Betreff nennt die
+ * Adresse nicht. Gibt wie sendRaw `{ error }` zurück statt zu werfen — der
+ * Aufrufer meldet es ohne Adresse an Sentry.
+ */
+export async function sendRegistrierungsHinweis(
+  email: string,
+  ziele: { weg: 'passwort' | 'code'; anmelden: string; passwortZuruecksetzen: string | null }
+): Promise<{ id?: string; error?: string }> {
+  const html = await toHtml(React.createElement(RegistrierungHinweisEmail, ziele))
+  return sendRaw(email, 'Jemand wollte sich mit deiner Adresse registrieren · FarmerZone', html)
 }
 
 /** Passwort-Reset → Bauer */

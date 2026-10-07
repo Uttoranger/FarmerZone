@@ -1,13 +1,21 @@
 'use server'
 
 import { headers } from 'next/headers'
+import * as Sentry from '@sentry/nextjs'
+import { Prisma } from '@prisma/client'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { KONTO_VIELLEICHT_VORHANDEN, registrationSchema, vollerName } from '@/schemas/register'
+import { registrationSchema, vollerName } from '@/schemas/register'
 import { checkFormToken, FORM_EXPIRED_MESSAGE } from '@/lib/form-token'
 
-// Single server action for the full registration flow:
-// Zod validation → auth.api.signUpEmail (sets cookie via nextCookies()) → FARMER role
+// Ablauf: Zod → auth.api.signUpEmail (legt das Konto an, meldet NICHT an) →
+// Rolle FARMER → Bestätigungs-Mail. Angemeldet wird erst nach der Bestätigung.
+//
+// EINE Antwort für neue und vergebene Adressen (Register F6 „19b", Nr. 27):
+// Bei einer vergebenen Adresse liefert Better Auth (`autoSignIn: false`,
+// src/lib/auth.ts) ein Scheinkonto ohne Datenbankzeile und schickt dem
+// bestehenden Konto einen Hinweis — hier bleibt nur, an diesem Konto nichts
+// zu tun und trotzdem { ok: true } zu antworten.
 //
 // Die Registrierung ist OFFEN — kein Einladungscode mehr. Der Schutz sitzt
 // nicht mehr am Eingang, sondern an der Freigabe: Ein neu angelegter Hof
@@ -69,7 +77,7 @@ export async function registerFarmer(data: {
     return { error: validated.error.issues[0].message }
   }
 
-  // 2. Create user record (no cookie set here — client calls signIn.email afterwards)
+  // 2. Konto anlegen — ohne Sitzung (autoSignIn: false); das Formular meldet nicht an.
   // Mit den GEPRÜFTEN Werten: Das Schema schneidet die Ränder der E-Mail ab —
   // die rohe Eingabe mit Leerzeichen lehnte Better Auth als ungültig ab.
   let userId: string
@@ -82,10 +90,15 @@ export async function registerFarmer(data: {
     const message = err instanceof Error ? err.message : String(err)
     const lower = message.toLowerCase()
     if (lower.includes('already') || lower.includes('exist') || lower.includes('duplicate') || lower.includes('unique')) {
-      // Neutralere Wortwahl statt „bereits registriert" (Nr. 19b). Die
-      // Kontenaufzählung bleibt offen: Diese Antwort unterscheidet sich von
-      // der Erfolgsantwort (siehe KONTO_VIELLEICHT_VORHANDEN).
-      return { error: KONTO_VIELLEICHT_VORHANDEN }
+      // Darf mit `autoSignIn: false` nicht mehr vorkommen. Kommt es doch
+      // (Einstellung verloren, anderes Verhalten nach einem Update), bleibt
+      // die Antwort trotzdem dieselbe wie bei Erfolg — der Betreiber erfährt
+      // es über Sentry, ohne Adresse. Den Hinweis an das Konto gibt es dann nicht.
+      Sentry.captureMessage('Registrierung: vergebene Adresse als Fehler statt neutral beantwortet', {
+        level: 'warning',
+        tags: { aktion: 'registerFarmer', grund: 'vergeben_als_fehler' },
+      })
+      return { ok: true }
     }
     console.error('[registerFarmer] signUpEmail error:', err)
     return { error: 'Registrierung fehlgeschlagen. Bitte versuche es erneut.' }
@@ -95,8 +108,15 @@ export async function registerFarmer(data: {
   try {
     await prisma.user.update({ where: { id: userId }, data: { role: 'FARMER' } })
   } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      // Kein Konto mit dieser ID: das Scheinkonto einer vergebenen Adresse.
+      // Nichts weiter tun — vor allem keine Bestätigungs-Mail an das
+      // bestehende Konto (dessen Hinweis schickt Better Auth) — und dieselbe
+      // Antwort wie bei Erfolg geben.
+      return { ok: true }
+    }
     console.error('[registerFarmer] role update error:', err)
-    // Non-fatal: user is created and logged in; role can be fixed manually
+    // Non-fatal: user is created; role can be fixed manually
   }
 
   // 4. Bestätigungs-Mail (S3, Nr. 17b) — erst JETZT, mit Rolle FARMER: Der
