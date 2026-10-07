@@ -51,6 +51,7 @@ function roh(ueber: Partial<HofRohdaten> = {}): HofRohdaten {
     monat: { bestellungen: 4, gebuehrOnlineCents: 120, gebuehrBarCents: 0, gebuehrEntfallenCents: 0 },
     monatBezeichnung: 'Oktober 2026',
     stripeBereit: true,
+    onlineGewuenscht: true,
     isPaused: false,
     betriebsnummer: '1234567',
     sepaErteilt: false,
@@ -60,18 +61,24 @@ function roh(ueber: Partial<HofRohdaten> = {}): HofRohdaten {
 
 describe('freischaltSperre', () => {
   it('ohne bestätigte E-Mail: der Satz aus S3 — vor Stripe, wie der Server', () => {
-    expect(freischaltSperre({ emailBestaetigungOffen: true, stripeBereit: false })).toBe(FREISCHALTUNG_EMAIL_OFFEN_TEXT)
+    expect(freischaltSperre({ emailBestaetigungOffen: true, stripeBereit: false, onlineGewuenscht: true })).toBe(FREISCHALTUNG_EMAIL_OFFEN_TEXT)
   })
-  it('ohne fertiges Stripe-Konto: gesperrt mit Grund', () => {
-    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: false })).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
+  it('Online-Hof ohne fertiges Stripe-Konto: gesperrt mit Grund', () => {
+    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: false, onlineGewuenscht: true })).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
   })
-  it('mit E-Mail und Stripe: nichts im Weg', () => {
-    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: true })).toBeNull()
+  it('Online-Hof mit Stripe: nichts im Weg', () => {
+    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: true, onlineGewuenscht: true })).toBeNull()
+  })
+  it('Bar-Hof ohne Stripe: freischaltbar — Online-Zahlung ist ein Plus, kein Muss', () => {
+    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: false, onlineGewuenscht: false })).toBeNull()
+  })
+  it('Bar-Hof ohne bestätigte E-Mail bleibt gesperrt (S3)', () => {
+    expect(freischaltSperre({ emailBestaetigungOffen: true, stripeBereit: false, onlineGewuenscht: false })).toBe(FREISCHALTUNG_EMAIL_OFFEN_TEXT)
   })
 })
 
 describe('hofStatus', () => {
-  const basis = { approvedAt: JETZT, archivedAt: null, isPaused: false, stripeBereit: true }
+  const basis = { approvedAt: JETZT, archivedAt: null, isPaused: false, stripeBereit: true, onlineGewuenscht: true }
   it('stillgelegt sticht alles', () => {
     expect(hofStatus({ ...basis, archivedAt: JETZT, approvedAt: null, isPaused: true }).id).toBe('stillgelegt')
   })
@@ -85,6 +92,9 @@ describe('hofStatus', () => {
     expect(hofStatus({ ...basis, stripeBereit: false })).toEqual({ id: 'zahlung-fehlt', text: 'Zahlung fehlt', ton: 'offen' })
     expect(hofStatus(basis)).toEqual({ id: 'online', text: 'Online', ton: 'fertig' })
   })
+  it('ein Bar-Hof ohne Stripe ist „Nur bar" (neutral), nicht „Zahlung fehlt"', () => {
+    expect(hofStatus({ ...basis, stripeBereit: false, onlineGewuenscht: false })).toEqual({ id: 'nur-bar', text: 'Nur bar', ton: 'neutral' })
+  })
 })
 
 describe('Filter und Suche', () => {
@@ -93,6 +103,7 @@ describe('Filter und Suche', () => {
     zeile('Lindenhof', 'online'),
     zeile('Bergbauernhof', 'pausiert'),
     zeile('Waldhof', 'zahlung-fehlt'),
+    zeile('Barhof', 'nur-bar'),
     zeile('Neuhof', 'wartet'),
     zeile('Althof', 'stillgelegt'),
   ]
@@ -106,7 +117,7 @@ describe('Filter und Suche', () => {
     expect(filtereHoefe(hoefe, { filter: 'pausiert', suche: 'linden' })).toEqual([])
   })
   it('zählt je Filter ohne die wartenden', () => {
-    expect(zaehleHofFilter(hoefe)).toEqual({ alle: 4, online: 1, pausiert: 1, 'ohne-zahlung': 1, stillgelegt: 1 })
+    expect(zaehleHofFilter(hoefe)).toEqual({ alle: 5, online: 1, pausiert: 1, 'ohne-zahlung': 1, 'nur-bar': 1, stillgelegt: 1 })
   })
   it('die Adresse lässt Standardwerte weg', () => {
     expect(hoefeAdresse({ filter: 'alle', suche: '  ' })).toBe('/admin')
@@ -151,6 +162,12 @@ describe('adminHofZeile', () => {
   it('gibt nur Text, Zahlen und Wahrheitswerte an den Browser — kein Date', () => {
     const zeile = adminHofZeile(roh(), { gruendungsplatz: 1, maxPlaetze: 12 }, JETZT)
     expect(JSON.parse(JSON.stringify(zeile))).toEqual(zeile)
+  })
+
+  it('ein wartender Bar-Hof ohne Stripe: keine Sperre', () => {
+    const zeile = adminHofZeile(roh({ approvedAt: null, stripeBereit: false, onlineGewuenscht: false }), { gruendungsplatz: null, maxPlaetze: 12 }, JETZT)
+    expect(zeile.sperre).toBeNull()
+    expect(zeile.onlineGewuenscht).toBe(false)
   })
 
   it('ein wartender Hof ohne Stripe: Sperre mit Grund, kein Platz', () => {

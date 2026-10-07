@@ -56,6 +56,7 @@ function hof(ueber: Partial<HofRohdaten>, platz: number | null = null): AdminHof
     monat: { bestellungen: 0, gebuehrOnlineCents: 0, gebuehrBarCents: 0, gebuehrEntfallenCents: 0 },
     monatBezeichnung: 'Oktober 2026',
     stripeBereit: false,
+    onlineGewuenscht: true,
     isPaused: false,
     betriebsnummer: null,
     sepaErteilt: false,
@@ -86,6 +87,13 @@ describe('Höfe und Freischaltung', () => {
     const html = render([hof({ name: 'Sonnhof', stripeBereit: true })])
     expect(knopf(html, 'Freischalten')).not.toContain('disabled=""')
     expect(html).toContain('Stripe eingerichtet')
+  })
+
+  it('Bar-Hof ohne Stripe: Freischalten bedienbar, „Nur bar" statt Stripe-Hinweis', () => {
+    const html = render([hof({ name: 'Barhof', onlineGewuenscht: false })])
+    expect(knopf(html, 'Freischalten')).not.toContain('disabled=""')
+    expect(html).not.toContain(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
+    expect(html).toContain('Nur bar')
   })
 
   it('die Betriebsnummer steht als Nummer in der Tabelle — ohne Prüfvermerk (E9)', () => {

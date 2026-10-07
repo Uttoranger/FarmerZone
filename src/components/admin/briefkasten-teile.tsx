@@ -124,7 +124,7 @@ export function Wunschliste({ buendel }: { buendel: WunschBuendel[] }): React.JS
                   <li key={e.id}>
                     <Link
                       href={`/admin/meldungen/${e.id}`}
-                      className={cn('flex min-h-11 items-center rounded text-[12.5px] text-muted-foreground hover:text-foreground hover:underline md:min-h-8', FOKUS_RAHMEN_INNEN)}
+                      className={cn('flex min-h-11 items-center rounded text-[12.5px] text-muted-foreground hover:text-foreground hover:underline', FOKUS_RAHMEN_INNEN)}
                       title={e.text}
                     >
                       <span className="min-w-0 truncate">{e.text}</span>

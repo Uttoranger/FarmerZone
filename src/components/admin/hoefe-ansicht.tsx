@@ -107,7 +107,7 @@ export function HoefeAnsicht({
         </h2>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <FilterChipReihe beschriftung="Höfe filtern" className="min-w-0 lg:flex-1">
-            {HOF_FILTER_WERTE.filter((f) => f !== 'stillgelegt' || zahlen.stillgelegt > 0).map((f) => {
+            {HOF_FILTER_WERTE.filter((f) => (f !== 'stillgelegt' && f !== 'nur-bar') || zahlen[f] > 0).map((f) => {
               const adresse = hoefeAdresse({ filter: f, suche })
               return (
                 <FilterChip
@@ -205,7 +205,8 @@ function schreibeAdresse(adresse: string) {
 function WartenderHof({ hof, onAktion }: { hof: AdminHof; onAktion: (a: HofAktion) => void }): React.JSX.Element {
   // Was der Hof schon angelegt hat, dann Stripe und SEPA (Mockup: „4 Produkte · Stripe eingerichtet · SEPA erteilt").
   const teile = istOhneInhalt(hof.aktivitaet) ? [AKTIVITAET_LEER] : aktivitaetsTeile(hof.aktivitaet)
-  const angaben = [...teile, ...(hof.stripeBereit ? ['Stripe eingerichtet'] : []), ...(hof.sepaErteilt ? ['SEPA erteilt'] : [])]
+  const zahlung = hof.stripeBereit ? ['Stripe eingerichtet'] : hof.onlineGewuenscht ? [] : ['Nur bar']
+  const angaben = [...teile, ...zahlung, ...(hof.sepaErteilt ? ['SEPA erteilt'] : [])]
   return (
     <article
       aria-label={hof.name}
@@ -364,7 +365,7 @@ function Tabelle({ hoefe, onGebuehr, onAktion }: ZeilenProps): React.JSX.Element
               </td>
               <td className="px-3.5 py-2.5 tabular-nums">{hof.monat.bestellungen}</td>
               <td className="px-3.5 py-2.5">
-                <StripeZeichen bereit={hof.stripeBereit} />
+                <StripeZeichen bereit={hof.stripeBereit} online={hof.onlineGewuenscht} />
               </td>
               <td className="px-3.5 py-2.5 whitespace-nowrap tabular-nums">{hof.nummer ?? (
                   <>
@@ -412,7 +413,7 @@ function Karten({ hoefe, onGebuehr, onAktion }: ZeilenProps): React.JSX.Element 
             </div>
             <div>
               <dt className={LEISE}>Stripe</dt>
-              <dd className="text-foreground">{hof.stripeBereit ? 'eingerichtet' : 'fehlt'}</dd>
+              <dd className="text-foreground">{hof.stripeBereit ? 'eingerichtet' : hof.onlineGewuenscht ? 'fehlt' : 'nicht nötig (nur bar)'}</dd>
             </div>
             <div>
               <dt className={LEISE}>Betriebsnummer</dt>
@@ -434,17 +435,23 @@ function Karten({ hoefe, onGebuehr, onAktion }: ZeilenProps): React.JSX.Element 
   )
 }
 
-function StripeZeichen({ bereit }: { bereit: boolean }): React.JSX.Element {
-  return bereit ? (
-    <span className="inline-flex text-status-fertig">
-      <Check className="size-4" strokeWidth={1.7} aria-hidden="true" />
-      <span className="sr-only">eingerichtet</span>
-    </span>
-  ) : (
+function StripeZeichen({ bereit, online }: { bereit: boolean; online: boolean }): React.JSX.Element {
+  if (bereit) {
+    return (
+      <span className="inline-flex text-status-fertig">
+        <Check className="size-4" strokeWidth={1.7} aria-hidden="true" />
+        <span className="sr-only">eingerichtet</span>
+      </span>
+    )
+  }
+  // Ein Bar-Hof braucht kein Stripe — leise statt orange.
+  return online ? (
     <span className="text-status-offen">
       <span aria-hidden="true">–</span>
       <span className="sr-only">fehlt</span>
     </span>
+  ) : (
+    <span className="text-[12.5px] whitespace-nowrap text-muted-foreground">nur bar</span>
   )
 }
 

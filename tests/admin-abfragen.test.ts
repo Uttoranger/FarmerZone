@@ -46,6 +46,7 @@ function dbZeile(ueber: Record<string, unknown> = {}) {
     serviceFeeMinCents: 50,
     serviceFeeActiveFrom: null,
     stripeAccountReady: false,
+    acceptsOnline: true,
     isPaused: false,
     betriebsnummer: '  ',
     sepaMandatAm: null,
@@ -60,18 +61,18 @@ describe('getAdminFarms — Nr. 22f', () => {
     farmFindMany.mockResolvedValue([dbZeile()] as never)
     await getAdminFarms()
     const select = (farmFindMany.mock.calls[0][0] as { select: Record<string, unknown> }).select
-    expect(select).toMatchObject({ stripeAccountReady: true, isPaused: true, betriebsnummer: true, sepaMandatAm: true })
+    expect(select).toMatchObject({ stripeAccountReady: true, acceptsOnline: true, isPaused: true, betriebsnummer: true, sepaMandatAm: true })
     expect(select.stripeAccountId).toBeUndefined()
   })
 
   it('macht daraus Wahrheitswerte und eine angezeigte Nummer', async () => {
     farmFindMany.mockResolvedValue([
       dbZeile(),
-      dbZeile({ id: 'farm_2', stripeAccountReady: true, isPaused: true, betriebsnummer: ' 1234567 ', sepaMandatAm: new Date() }),
+      dbZeile({ id: 'farm_2', stripeAccountReady: true, acceptsOnline: false, isPaused: true, betriebsnummer: ' 1234567 ', sepaMandatAm: new Date() }),
     ] as never)
     const [a, b] = await getAdminFarms()
-    expect(a).toMatchObject({ stripeBereit: false, isPaused: false, betriebsnummer: null, sepaErteilt: false })
-    expect(b).toMatchObject({ stripeBereit: true, isPaused: true, betriebsnummer: '1234567', sepaErteilt: true })
+    expect(a).toMatchObject({ stripeBereit: false, onlineGewuenscht: true, isPaused: false, betriebsnummer: null, sepaErteilt: false })
+    expect(b).toMatchObject({ stripeBereit: true, onlineGewuenscht: false, isPaused: true, betriebsnummer: '1234567', sepaErteilt: true })
   })
 })
 
@@ -103,13 +104,24 @@ describe('zaehleMeldungenJeStatus', () => {
 describe('getMeldungNachbarn', () => {
   it('vorige ist die nächst jüngere, nächste die nächst ältere', async () => {
     const zeit = new Date('2026-10-05T10:00:00Z')
-    findFirst.mockImplementation(((arg: { where: { createdAt: { gt?: Date; lt?: Date } } }) =>
-      Promise.resolve(arg.where.createdAt.gt ? { id: 'juenger' } : { id: 'aelter' })) as never)
-    expect(await getMeldungNachbarn({ createdAt: zeit })).toEqual({ vorige: 'juenger', naechste: 'aelter' })
+    findFirst.mockImplementation(((arg: { orderBy: Array<{ createdAt: string }> }) =>
+      Promise.resolve(arg.orderBy[0].createdAt === 'asc' ? { id: 'juenger' } : { id: 'aelter' })) as never)
+    expect(await getMeldungNachbarn({ id: 'm5', createdAt: zeit })).toEqual({ vorige: 'juenger', naechste: 'aelter' })
+  })
+
+  it('gleicher Zeitpunkt: die Kennung entscheidet, nichts wird übersprungen', async () => {
+    const zeit = new Date('2026-10-05T10:00:00Z')
+    findFirst.mockResolvedValue(null as never)
+    await getMeldungNachbarn({ id: 'm5', createdAt: zeit })
+    const [juenger, aelter] = findFirst.mock.calls.map((c) => c[0] as { where: unknown; orderBy: unknown })
+    expect(juenger.where).toEqual({ OR: [{ createdAt: { gt: zeit } }, { createdAt: zeit, id: { gt: 'm5' } }] })
+    expect(juenger.orderBy).toEqual([{ createdAt: 'asc' }, { id: 'asc' }])
+    expect(aelter.where).toEqual({ OR: [{ createdAt: { lt: zeit } }, { createdAt: zeit, id: { lt: 'm5' } }] })
+    expect(aelter.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }])
   })
 
   it('am Rand: null statt eines Links ins Leere', async () => {
     findFirst.mockResolvedValue(null as never)
-    expect(await getMeldungNachbarn({ createdAt: new Date() })).toEqual({ vorige: null, naechste: null })
+    expect(await getMeldungNachbarn({ id: 'm1', createdAt: new Date() })).toEqual({ vorige: null, naechste: null })
   })
 })
