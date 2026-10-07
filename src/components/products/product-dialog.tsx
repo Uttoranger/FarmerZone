@@ -831,7 +831,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
         return
       }
       toast.success(isEdit ? 'Produkt gespeichert' : 'Produkt angelegt')
-      // Gespeichert, aber als Entwurf: Der Größe fehlt die Futtermittel-Registrierung (S7, Nr. 20).
+      // Gespeichert, aber nicht im Shop: Der Größe fehlt die Futtermittel-Registrierung (S7, Nr. 20).
       if (ergebnis.hinweis) toast.info(ergebnis.hinweis)
       // Schließen gibt auch die Kopie frei (Effekt auf `open`).
       onClose()
