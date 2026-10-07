@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { CircleCheck, Unlink } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { ABO_TEXT } from '@/lib/abo-bestaetigung'
+import { ABO_TEXT, aboFehlerSatz } from '@/lib/abo-bestaetigung'
 import { aboTokenSchema } from '@/schemas/abo'
 import { ladeAboBestaetigung } from '@/server/abo-anmeldung'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
@@ -10,7 +10,7 @@ import { KNOPF_GRUEN, KNOPF_RAHMEN } from '@/components/bestaetigung/bestaetigun
 import { AboBestaetigenKarte } from '@/components/abo-bestaetigung/bestaetigen-karte'
 
 export const metadata: Metadata = {
-  title: 'Anmeldung bestätigen — FarmerZone',
+  title: `${ABO_TEXT.seitenTitel} — FarmerZone`,
   // Der Link trägt einen gültigen Token (next.config.ts setzt dazu no-referrer).
   robots: { index: false, follow: false },
 }
@@ -27,7 +27,8 @@ const SATZ = 'mt-1 text-[14px] leading-normal break-words text-muted-foreground 
  * in der Fokus-Shell wie /verify. Der Aufruf (GET) liest nur; bestätigt wird
  * mit dem Knopf (Server Action, POST), weil Link-Scanner der Mailprogramme
  * Links ungefragt öffnen. Fälle: offen (Knopf), schon bestätigt, abgelaufen,
- * ungültig, Abo gelöscht — die letzten drei mit Ausweg.
+ * ungültig, überholt (ausgeschaltet, abgemeldet, neuerer Link), Abo gelöscht —
+ * alle außer den ersten beiden mit Ausweg. Texte aus ABO_TEXT.
  */
 export default async function NeuigkeitenBestaetigenPage({
   searchParams,
@@ -39,8 +40,9 @@ export default async function NeuigkeitenBestaetigenPage({
   const stand = token.success ? await ladeAboBestaetigung(token.data, new Date()) : ({ zustand: 'ungueltig' } as const)
 
   let inhalt: React.ReactNode
-  if (stand.zustand === 'offen' && token.success) {
-    inhalt = <AboBestaetigenKarte token={token.data} hofName={stand.hofName} hofSlug={stand.hofSlug} />
+  if (stand.zustand === 'offen') {
+    // „offen" gibt es nur mit gültigem Token — token.success ist hier immer wahr.
+    inhalt = <AboBestaetigenKarte token={token.success ? token.data : ''} hofName={stand.hofName} hofSlug={stand.hofSlug} />
   } else if (stand.zustand === 'bestaetigt') {
     inhalt = (
       <section aria-labelledby="abo-titel" className="flex flex-col gap-4">
@@ -48,11 +50,10 @@ export default async function NeuigkeitenBestaetigenPage({
           <CircleCheck className="mt-1 size-6 shrink-0 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
           <div className="min-w-0">
             <h2 id="abo-titel" className={TITEL}>
-              Du bist schon angemeldet
+              {ABO_TEXT.schonTitel}
             </h2>
             <p className={SATZ}>
-              Du bekommst Neuigkeiten von <strong className="font-semibold text-foreground">{stand.hofName}</strong> per E-Mail. Hier ist
-              nichts mehr zu tun.
+              {ABO_TEXT.schonSatz[0]} <strong className="font-semibold text-foreground">{stand.hofName}</strong> {ABO_TEXT.schonSatz[1]}
             </p>
           </div>
         </div>
@@ -62,19 +63,14 @@ export default async function NeuigkeitenBestaetigenPage({
       </section>
     )
   } else {
-    const satz =
-      stand.zustand === 'abgelaufen'
-        ? `${ABO_TEXT.abgelaufen} ${ABO_TEXT.ausweg}`
-        : stand.zustand === 'abo_weg'
-          ? ABO_TEXT.abo_weg
-          : `${ABO_TEXT.ungueltig} ${ABO_TEXT.ausweg}`
+    const satz = aboFehlerSatz(stand.zustand)
     inhalt = (
       <section aria-labelledby="abo-titel" className="flex flex-col gap-4">
         <div className="flex items-start gap-3">
           <Unlink className="mt-1 size-6 shrink-0 text-status-offen" strokeWidth={1.7} aria-hidden="true" />
           <div className="min-w-0">
             <h2 id="abo-titel" className={TITEL}>
-              {stand.zustand === 'abgelaufen' ? 'Der Link ist abgelaufen' : 'Das hat nicht geklappt'}
+              {stand.zustand === 'abgelaufen' ? ABO_TEXT.abgelaufenTitel : ABO_TEXT.fehlerTitel}
             </h2>
             <p className={SATZ}>{satz}</p>
           </div>
@@ -92,7 +88,7 @@ export default async function NeuigkeitenBestaetigenPage({
   }
 
   return (
-    <KundeFokusShell titel="Anmeldung bestätigen" zurueck={{ href: '/', label: 'Zur Startseite' }}>
+    <KundeFokusShell titel={ABO_TEXT.seitenTitel} zurueck={{ href: '/', label: 'Zur Startseite' }}>
       <div className="mx-auto w-full max-w-[520px] px-4 pt-6 pb-12 md:pt-10">
         <div className="rounded-2xl border border-border bg-card p-5 md:p-6">{inhalt}</div>
       </div>

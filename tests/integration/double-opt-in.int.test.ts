@@ -26,7 +26,16 @@ vi.mock('@/lib/email', () => ({
   sendOnsiteConfirmation: vi.fn(),
   sendStatusUpdateEmail: vi.fn(),
   sendAboBestaetigung: vi.fn(async () => ({ id: 'mail-1' })),
+  sendAnmeldeCodeEmail: vi.fn(async () => ({ id: 'mail-2' })),
 }))
+vi.mock('next/navigation', () => ({
+  redirect: vi.fn((ziel: string) => {
+    throw new Error(`REDIRECT ${ziel}`)
+  }),
+}))
+// /account: hier zählt, was die Seite übergibt, nicht die Darstellung.
+vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({ KundeShellMitSitzung: () => null }))
+vi.mock('@/app/account/profile/profile-client', () => ({ ProfileClient: () => null }))
 vi.mock('@/lib/stripe', () => ({
   stripe: { paymentIntents: { create: vi.fn(), retrieve: vi.fn() } },
 }))
@@ -38,7 +47,10 @@ import { prisma } from '@/lib/prisma'
 import { sendAboBestaetigung, sendStatusUpdateEmail } from '@/lib/email'
 import { POST as checkout } from '@/app/api/checkout/route'
 import { publishStatusPost } from '@/server/actions/status-posts'
-import { bestaetigeNeuigkeiten, unsubscribeWithToken } from '@/server/actions/subscriptions'
+import type { ReactElement } from 'react'
+import { auth } from '@/lib/auth'
+import { bestaetigeNeuigkeiten, unsubscribeWithToken, updateSubscription } from '@/server/actions/subscriptions'
+import AccountProfilePage from '@/app/account/profile/page'
 import { meldeEmailAboAn, EMAIL_ABO_STAND } from '@/server/abo-anmeldung'
 import { ABO_BESTAETIGUNG_GUELTIG_MS } from '@/lib/abo-bestaetigung'
 import { erzeugeAboBestaetigungsToken } from '@/lib/abo-bestaetigung-token'
@@ -58,6 +70,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   vi.mocked(headers).mockResolvedValue(new Headers() as never)
+  await prisma.verification.deleteMany({ where: { identifier: { contains: 'otp-int-' } } })
   await raeumeAuf()
 })
 
@@ -354,5 +367,122 @@ describe('Erneute Anmeldung', () => {
     expect(antworten.map((r) => r.status)).toEqual([200, 200])
     expect(Object.keys(koerper[0]!).sort()).toEqual(Object.keys(koerper[1]!).sort())
     expect(JSON.stringify(koerper)).not.toMatch(/optIn|subscri|neuigkeit/i)
+  })
+})
+
+/** Kundin mit Code anmelden (E7) — danach gelten die Actions unter /account für ihre Adresse. */
+async function meldeKundinMitCodeAn(email: string): Promise<void> {
+  await prisma.user.create({ data: { id: intKennung('konto'), email, name: 'Erika Mustermann', role: 'CUSTOMER', emailVerified: false } })
+  const otp = await auth.api.createVerificationOTP({ body: { email, type: 'sign-in' } })
+  const { headers: antwort } = await auth.api.signInEmailOTP({ body: { email, otp }, returnHeaders: true })
+  const cookie = antwort.getSetCookie().map((zeile) => zeile.split(';')[0]).join('; ')
+  vi.mocked(headers).mockResolvedValue(new Headers({ cookie }) as never)
+}
+
+type ProfilAbo = { farmId: string; optInEmail: boolean; emailWartet: boolean }
+
+async function profilAbos(): Promise<ProfilAbo[]> {
+  const seite = (await AccountProfilePage()) as ReactElement<{ children: ReactElement<{ subscriptions: ProfilAbo[] }> }>
+  return seite.props.children.props.subscriptions
+}
+
+describe('Ausschalten und Abmelden lösen die offene Anfrage auf (Nachbesserung Runde 1)', () => {
+  it('wartet → aus → neu laden → aus; der alte Link bestätigt nicht', async () => {
+    const hof = await hofMitAnmeldung()
+    const email = `${intKennung('kundin')}@example.com`
+    await bestelle(hof, email, true)
+    const alterLink = await tokenAusDerMail(email)
+    await meldeKundinMitCodeAn(email)
+    expect(await profilAbos()).toEqual([expect.objectContaining({ farmId: hof.farm.id, optInEmail: false, emailWartet: true })])
+
+    expect(await updateSubscription(hof.farm.id, false, false)).toEqual({ email: 'aus' })
+
+    expect(await profilAbos()).toEqual([expect.objectContaining({ optInEmail: false, emailWartet: false })])
+    expect(await bestaetigeNeuigkeiten({ token: alterLink })).toHaveProperty('error')
+    expect(await abo(hof.farm.id, email)).toMatchObject({ optInEmail: false, emailOptInAngefragtAm: null, emailOptInBestaetigtAm: null })
+    // Ohne Haken und nie angefragt: keine Werbung (nicht als Bestand).
+    expect(await beitragPerMail(hof)).toMatchObject({ emailCount: 0 })
+  })
+
+  it('danach wieder einschalten verlangt einen neuen Link; der neue bestätigt', async () => {
+    const hof = await hofMitAnmeldung()
+    const email = `${intKennung('kundin')}@example.com`
+    await bestelle(hof, email, true)
+    await tokenAusDerMail(email)
+    await meldeKundinMitCodeAn(email)
+    await updateSubscription(hof.farm.id, false, false)
+    vi.mocked(sendAboBestaetigung).mockClear()
+
+    expect(await updateSubscription(hof.farm.id, true, false)).toEqual({ email: 'wartet' })
+    const neuerLink = await tokenAusDerMail(email)
+
+    expect(await bestaetigeNeuigkeiten({ token: neuerLink })).toEqual({ ok: true, hofName: 'Hof Test' })
+  })
+
+  it('der WhatsApp-Schalter löst bei einer wartenden Anmeldung keine zweite Bestätigungsmail aus', async () => {
+    const hof = await hofMitAnmeldung()
+    const email = `${intKennung('kundin')}@example.com`
+    await bestelle(hof, email, true)
+    await tokenAusDerMail(email)
+    await meldeKundinMitCodeAn(email)
+    // Bremse ausgehebelt: Die Anfrage liegt 20 Minuten zurück, der Link gilt noch.
+    await prisma.customerFarmSubscription.updateMany({
+      where: { customerEmail: email },
+      data: { emailOptInAngefragtAm: new Date(Date.now() - 20 * 60 * 1000) },
+    })
+    vi.mocked(sendAboBestaetigung).mockClear()
+
+    expect(await updateSubscription(hof.farm.id, true, true)).toEqual({ email: 'wartet' })
+    await vi.dynamicImportSettled()
+
+    expect(vi.mocked(sendAboBestaetigung)).not.toHaveBeenCalled()
+  })
+
+  it('Abmeldelink bei offener Anfrage: aufgelöst, der alte Link bestätigt nicht', async () => {
+    const hof = await hofMitAnmeldung()
+    const email = `${intKennung('kundin')}@example.com`
+    await bestelle(hof, email, true)
+    const alterLink = await tokenAusDerMail(email)
+    const { generateUnsubscribeToken } = await import('@/lib/unsubscribe')
+
+    expect(await unsubscribeWithToken(generateUnsubscribeToken(email, hof.farm.id))).toEqual({})
+
+    expect(await bestaetigeNeuigkeiten({ token: alterLink })).toHaveProperty('error')
+    expect(await abo(hof.farm.id, email)).toMatchObject({ optInEmail: false, emailOptInAngefragtAm: null })
+  })
+
+  it('kein Replay: bestätigt → abgemeldet → der alte Link meldet nicht wieder an', async () => {
+    const hof = await hofMitAnmeldung()
+    const email = `${intKennung('kundin')}@example.com`
+    await bestelle(hof, email, true)
+    const link = await tokenAusDerMail(email)
+    await bestaetigeNeuigkeiten({ token: link })
+    const { generateUnsubscribeToken } = await import('@/lib/unsubscribe')
+    await unsubscribeWithToken(generateUnsubscribeToken(email, hof.farm.id))
+
+    const antwort = await bestaetigeNeuigkeiten({ token: link })
+
+    expect(antwort).toHaveProperty('error')
+    expect('error' in antwort && antwort.error).toContain('gilt nicht mehr')
+    expect((await abo(hof.farm.id, email)).optInEmail).toBe(false)
+    expect(await beitragPerMail(hof)).toMatchObject({ emailCount: 0 })
+  })
+
+  it('ein neuerer Link ersetzt den alten', async () => {
+    const hof = await hofMitAnmeldung()
+    const email = `${intKennung('kundin')}@example.com`
+    await bestelle(hof, email, true)
+    const alterLink = await tokenAusDerMail(email)
+    // Nach der Bremse erneut angemeldet.
+    await prisma.customerFarmSubscription.updateMany({
+      where: { customerEmail: email },
+      data: { emailOptInAngefragtAm: new Date(Date.now() - 20 * 60 * 1000) },
+    })
+    vi.mocked(sendAboBestaetigung).mockClear()
+    await bestelle(hof, email, true)
+    const neuerLink = await tokenAusDerMail(email)
+
+    expect(await bestaetigeNeuigkeiten({ token: alterLink })).toHaveProperty('error')
+    expect(await bestaetigeNeuigkeiten({ token: neuerLink })).toEqual({ ok: true, hofName: 'Hof Test' })
   })
 })

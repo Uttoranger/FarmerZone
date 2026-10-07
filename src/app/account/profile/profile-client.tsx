@@ -183,7 +183,7 @@ export function ProfileClient({ user, subscriptions: initialSubs }: Props): Reac
                     label="E-Mail-Neuigkeiten"
                     hof={sub.farmName}
                     active={sub.optInEmail || sub.emailWartet}
-                    hinweis={sub.emailWartet ? 'Wartet auf deine Bestätigung – schau in dein Postfach.' : undefined}
+                    hinweis={sub.emailWartet ? ABO_TEXT.schalterWartet : undefined}
                     onToggle={() => toggleEmail(sub.farmId)}
                   />
                   <ToggleRow

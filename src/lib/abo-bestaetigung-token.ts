@@ -14,8 +14,15 @@ import { ABO_BESTAETIGUNG_GUELTIG_MS } from '@/lib/abo-bestaetigung'
 // Dasselbe HMAC-Muster wie unsubscribe.ts und reorder-token.ts (Geheimnis aus
 // dem validierten env-Modul, Vergleich in konstanter Zeit) — mit Zweck im
 // Payload, damit kein anderer Token-Typ desselben Geheimnisses hier durchgeht,
-// und mit Ablauf (S11). Der Token trägt nur die Abo-ID, keine Adresse: Er
-// steht in einer URL, und die landet in Verläufen und Logs.
+// und mit Ablauf (S11). Der Token trägt nur die Abo-ID und den Zeitpunkt der
+// Anfrage, keine Adresse: Er steht in einer URL, und die landet in Verläufen
+// und Logs.
+//
+// AN DIE ANFRAGE GEBUNDEN (Nachbesserung Runde 1): Bestätigt wird nur, wenn
+// `emailOptInAngefragtAm` noch genau dieser Zeitpunkt ist und das Abo noch
+// unbestätigt (src/server/abo-anmeldung.ts). Ausschalten, Abmelden oder ein
+// neuerer Link lösen die Anfrage auf — ein alter Link meldet dann niemanden
+// wieder an. Der Ablauf folgt aus dem Anfragezeitpunkt plus Gültigkeit.
 
 const SECRET = env.BETTER_AUTH_SECRET
 const ZWECK = 'abo-optin'
@@ -24,13 +31,19 @@ function signiere(payload: string): string {
   return createHmac('sha256', SECRET).update(payload).digest('hex')
 }
 
-/** Token für den Link in der Bestätigungsmail; gilt `ABO_BESTAETIGUNG_GUELTIG_TAGE` ab `jetzt`. */
-export function erzeugeAboBestaetigungsToken(aboId: string, jetzt: Date): string {
-  const payload = `${ZWECK}:${aboId}:${jetzt.getTime() + ABO_BESTAETIGUNG_GUELTIG_MS}`
+/**
+ * Token für den Link in der Bestätigungsmail. `angefragtAm` ist genau der Wert,
+ * der in `emailOptInAngefragtAm` steht; der Link gilt
+ * `ABO_BESTAETIGUNG_GUELTIG_TAGE` ab da.
+ */
+export function erzeugeAboBestaetigungsToken(aboId: string, angefragtAm: Date): string {
+  const payload = `${ZWECK}:${aboId}:${angefragtAm.getTime()}`
   return `${Buffer.from(payload).toString('base64url')}.${signiere(payload)}`
 }
 
-export type AboTokenErgebnis = { ok: true; aboId: string } | { ok: false; grund: 'abgelaufen' | 'ungueltig' }
+export type AboTokenErgebnis =
+  | { ok: true; aboId: string; angefragtAm: Date }
+  | { ok: false; grund: 'abgelaufen' | 'ungueltig' }
 
 /**
  * Prüft Signatur, Zweck und Ablauf. „abgelaufen" nur bei gültiger Signatur —
@@ -44,11 +57,11 @@ export function pruefeAboBestaetigungsToken(token: string, jetzt: Date): AboToke
 
   const teile = payload.split(':')
   if (teile.length !== 3 || teile[0] !== ZWECK) return { ok: false, grund: 'ungueltig' }
-  const [, aboId, bisRoh] = teile
-  const bis = Number(bisRoh)
-  if (!aboId || !Number.isSafeInteger(bis)) return { ok: false, grund: 'ungueltig' }
-  if (jetzt.getTime() >= bis) return { ok: false, grund: 'abgelaufen' }
-  return { ok: true, aboId }
+  const [, aboId, angefragtRoh] = teile
+  const angefragt = Number(angefragtRoh)
+  if (!aboId || !Number.isSafeInteger(angefragt) || angefragt <= 0) return { ok: false, grund: 'ungueltig' }
+  if (jetzt.getTime() >= angefragt + ABO_BESTAETIGUNG_GUELTIG_MS) return { ok: false, grund: 'abgelaufen' }
+  return { ok: true, aboId, angefragtAm: new Date(angefragt) }
 }
 
 /** Der Pfad der Bestätigungsseite samt Token — nur der Server baut ihn. */

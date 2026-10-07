@@ -95,7 +95,8 @@ function schickeBestaetigungNachDerAntwort(aboId: string, angefragtAm: Date): vo
       // Ohne Versand (lokal ohne RESEND_API_KEY) steht der Link im Terminal —
       // nie in Produktion, auch nicht bei einem Resend-Fehler.
       if (!ergebnis.id && process.env.NODE_ENV !== 'production') {
-        console.log(`[DEV] Bestätigungslink Neuigkeiten für ${abo.customerEmail}: ${url}`)
+        // Ohne Adresse — die Abo-ID reicht, um den Link zuzuordnen.
+        console.log(`[DEV] Bestätigungslink Neuigkeiten (Abo ${aboId}): ${url}`)
       }
     } catch (err) {
       console.error('[Abo-Bestätigung] E-Mail-Fehler:', err instanceof Error ? err.name : 'unbekannt')
@@ -104,14 +105,35 @@ function schickeBestaetigungNachDerAntwort(aboId: string, angefragtAm: Date): vo
   })
 }
 
+/**
+ * Löst eine offene, unbestätigte Anfrage auf (Ausschalten auf /account,
+ * Abmeldelink): `emailOptInAngefragtAm` zurück auf null, `optInEmail` false.
+ * Danach ist das Abo „nie angefragt, ohne Haken" — keine Mail, und ein alter
+ * Link findet seine Anfrage nicht mehr (an den Zeitpunkt gebunden). Den
+ * Haken setzt danach nur wieder `bestaetigeEmailAbo`; eine neue Anmeldung
+ * geht über `meldeEmailAboAn` und verlangt einen neuen Link. Bestätigte Abos
+ * behalten ihre Zeitpunkte (Nachweis); ihr alter Link greift nicht mehr, weil
+ * die Bestätigung schon gesetzt ist.
+ */
+export async function loeseOffeneAnfrageAuf(wo: Prisma.CustomerFarmSubscriptionWhereInput): Promise<void> {
+  await prisma.customerFarmSubscription.updateMany({
+    where: { ...wo, emailOptInAngefragtAm: { not: null }, emailOptInBestaetigtAm: null },
+    data: { optInEmail: false, emailOptInAngefragtAm: null },
+  })
+}
+
 export type AboBestaetigungsStand =
   | { zustand: 'offen' | 'bestaetigt'; hofName: string; hofSlug: string }
-  | { zustand: 'ungueltig' | 'abgelaufen' | 'abo_weg' }
+  | { zustand: 'ungueltig' | 'abgelaufen' | 'ueberholt' | 'abo_weg' }
 
 /**
  * Für die Seite hinter dem Link (GET): liest nur, bestätigt nie — Link-Scanner
- * rufen ihn ungefragt auf (ARCHITECTURE §5). „bestaetigt" heißt: Das Abo
- * bekommt schon Mails, der Knopf ist überflüssig.
+ * rufen ihn ungefragt auf (ARCHITECTURE §5).
+ *  - `offen`: genau diese Anfrage wartet (Zeitpunkt aus dem Token, unbestätigt).
+ *  - `bestaetigt`: genau diese Anfrage ist bestätigt und das Abo bekommt Mails
+ *    (zweiter Klick, neu laden).
+ *  - `ueberholt`: Die Anfrage gibt es so nicht mehr — ausgeschaltet,
+ *    abgemeldet oder durch einen neueren Link ersetzt.
  */
 export async function ladeAboBestaetigung(token: string, jetzt: Date): Promise<AboBestaetigungsStand> {
   const geprueft = pruefeAboBestaetigungsToken(token, jetzt)
@@ -120,24 +142,25 @@ export async function ladeAboBestaetigung(token: string, jetzt: Date): Promise<A
     where: { id: geprueft.aboId },
     select: { ...EMAIL_ABO_STAND, farm: { select: { name: true, slug: true } } },
   })
-  if (!abo || abo.emailOptInAngefragtAm === null) return { zustand: 'abo_weg' }
-  return { zustand: werbemailErlaubt(abo) ? 'bestaetigt' : 'offen', hofName: abo.farm.name, hofSlug: abo.farm.slug }
+  if (!abo) return { zustand: 'abo_weg' }
+  if (abo.emailOptInAngefragtAm?.getTime() !== geprueft.angefragtAm.getTime()) return { zustand: 'ueberholt' }
+  const hof = { hofName: abo.farm.name, hofSlug: abo.farm.slug }
+  if (abo.emailOptInBestaetigtAm === null) return { zustand: 'offen', ...hof }
+  return werbemailErlaubt(abo) ? { zustand: 'bestaetigt', ...hof } : { zustand: 'ueberholt' }
 }
 
 /**
  * Der Knopf (POST): setzt `optInEmail` und den Zeitpunkt der Bestätigung —
- * bedingt, damit ein zweiter Klick den ersten Zeitpunkt (den Nachweis) nicht
- * überschreibt. Bestätigt werden nur Abos, für die ein Link angefragt wurde.
+ * bedingt auf genau die Anfrage aus dem Token (Zeitpunkt) und nur, solange
+ * sie unbestätigt ist. So überschreibt ein zweiter Klick den ersten
+ * Zeitpunkt (den Nachweis) nicht, und ein alter Link meldet nach Ausschalten
+ * oder Abmelden niemanden wieder an.
  */
 export async function bestaetigeEmailAbo(token: string, jetzt: Date): Promise<AboBestaetigungsStand> {
   const geprueft = pruefeAboBestaetigungsToken(token, jetzt)
   if (!geprueft.ok) return { zustand: geprueft.grund }
   await prisma.customerFarmSubscription.updateMany({
-    where: {
-      id: geprueft.aboId,
-      emailOptInAngefragtAm: { not: null },
-      OR: [{ optInEmail: false }, { emailOptInBestaetigtAm: null }],
-    },
+    where: { id: geprueft.aboId, emailOptInAngefragtAm: geprueft.angefragtAm, emailOptInBestaetigtAm: null },
     data: { optInEmail: true, emailOptInBestaetigtAm: jetzt },
   })
   return ladeAboBestaetigung(token, jetzt)

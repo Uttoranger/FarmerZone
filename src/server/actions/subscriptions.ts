@@ -6,8 +6,8 @@ import { prisma } from '@/lib/prisma'
 import { verifyUnsubscribeToken } from '@/lib/unsubscribe'
 import { bestaetigteAdresse } from '@/server/kunden-adresse'
 import { aboAenderungSchema, aboBestaetigenSchema } from '@/schemas/abo'
-import { ABO_TEXT } from '@/lib/abo-bestaetigung'
-import { EMAIL_ABO_STAND, bestaetigeEmailAbo, meldeEmailAboAn } from '@/server/abo-anmeldung'
+import { ABO_TEXT, aboFehlerSatz, wartetAufBestaetigung } from '@/lib/abo-bestaetigung'
+import { EMAIL_ABO_STAND, bestaetigeEmailAbo, loeseOffeneAnfrageAuf, meldeEmailAboAn } from '@/server/abo-anmeldung'
 
 // Abos hängen an der Adresse, nicht an einem Konto. Ändern oder löschen darf
 // sie nur, wer die Adresse mit Code bewiesen hat (E8, Nr. 17a) — frisch aus
@@ -61,9 +61,20 @@ export async function updateSubscription(
     update: { optInWhatsApp: geprueft.optInWhatsApp, ...(geprueft.optInEmail ? {} : { optInEmail: false }) },
     select: EMAIL_ABO_STAND,
   })
-  if (!geprueft.optInEmail) return { email: 'aus' }
+  if (!geprueft.optInEmail) {
+    // Eine offene Anfrage gleich mit auflösen — sonst stünde der Schalter
+    // nach dem Neuladen wieder auf „wartet", und der alte Link bestätigte
+    // weiter (Nachbesserung Runde 1).
+    await loeseOffeneAnfrageAuf({ id: abo.id })
+    return { email: 'aus' }
+  }
 
-  const schritt = await meldeEmailAboAn(abo, new Date())
+  const jetzt = new Date()
+  // Wartet die Anmeldung schon auf einen gültigen Link, ist „E-Mail an" nichts
+  // Neues — etwa wenn der WhatsApp-Schalter den E-Mail-Stand mitschickt. Kein
+  // zweiter Link; einen neuen gibt es über Aus und wieder An.
+  if (wartetAufBestaetigung(abo, jetzt)) return { email: 'wartet' }
+  const schritt = await meldeEmailAboAn(abo, jetzt)
   return { email: schritt === 'schon-aktiv' ? 'an' : 'wartet' }
 }
 
@@ -74,22 +85,18 @@ export async function updateSubscription(
  */
 export async function bestaetigeNeuigkeiten(input: unknown): Promise<{ ok: true; hofName: string } | { error: string }> {
   const eingabe = aboBestaetigenSchema.safeParse(input)
-  if (!eingabe.success) return { error: `${ABO_TEXT.ungueltig} ${ABO_TEXT.ausweg}` }
+  if (!eingabe.success) return { error: aboFehlerSatz('ungueltig') }
 
   const stand = await bestaetigeEmailAbo(eingabe.data.token, new Date())
   switch (stand.zustand) {
-    case 'offen':
-      // Nach dem Schreiben noch offen: nur möglich, wenn das Abo zwischendurch
-      // neu angefragt wurde — dann gilt der neuere Link.
-      return { error: ABO_TEXT.unerwartet }
     case 'bestaetigt':
       return { ok: true, hofName: stand.hofName }
-    case 'abgelaufen':
-      return { error: `${ABO_TEXT.abgelaufen} ${ABO_TEXT.ausweg}` }
-    case 'abo_weg':
-      return { error: ABO_TEXT.abo_weg }
-    case 'ungueltig':
-      return { error: `${ABO_TEXT.ungueltig} ${ABO_TEXT.ausweg}` }
+    case 'offen':
+      // Nach dem Schreiben noch offen: nur möglich, wenn das Abo zwischendurch
+      // geändert wurde — dann lieber noch einmal versuchen lassen.
+      return { error: ABO_TEXT.unerwartet }
+    default:
+      return { error: aboFehlerSatz(stand.zustand) }
   }
 }
 
@@ -97,8 +104,12 @@ export async function unsubscribeWithToken(token: string): Promise<ActionResult>
   const data = verifyUnsubscribeToken(token)
   if (!data) return { error: 'Ungültiger oder abgelaufener Link' }
 
+  const wo = { customerEmail: data.email.toLowerCase(), farmId: data.farmId }
+  // Eine offene Bestätigungsanfrage gilt mit der Abmeldung als erledigt — ein
+  // alter Link meldet danach niemanden wieder an (S11, Nachbesserung Runde 1).
+  await loeseOffeneAnfrageAuf(wo)
   await prisma.customerFarmSubscription.updateMany({
-    where: { customerEmail: data.email.toLowerCase(), farmId: data.farmId },
+    where: wo,
     data: { optInEmail: false, optInWhatsApp: false },
   })
 

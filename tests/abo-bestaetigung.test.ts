@@ -94,15 +94,15 @@ describe('wartetAufBestaetigung', () => {
 })
 
 describe('Bestätigungs-Token', () => {
-  it('gültig ausgestellt → liefert die Abo-ID', () => {
+  it('gültig ausgestellt → liefert Abo-ID und Zeitpunkt der Anfrage (Bindung an die Anfrage)', () => {
     const token = erzeugeAboBestaetigungsToken('abo123', JETZT)
-    expect(pruefeAboBestaetigungsToken(token, JETZT)).toEqual({ ok: true, aboId: 'abo123' })
+    expect(pruefeAboBestaetigungsToken(token, JETZT)).toEqual({ ok: true, aboId: 'abo123', angefragtAm: JETZT })
   })
 
   it('1 ms vor dem Ablauf gültig, genau am Ablauf abgelaufen', () => {
     const token = erzeugeAboBestaetigungsToken('abo123', JETZT)
     const ende = JETZT.getTime() + ABO_BESTAETIGUNG_GUELTIG_MS
-    expect(pruefeAboBestaetigungsToken(token, new Date(ende - 1))).toEqual({ ok: true, aboId: 'abo123' })
+    expect(pruefeAboBestaetigungsToken(token, new Date(ende - 1))).toEqual({ ok: true, aboId: 'abo123', angefragtAm: JETZT })
     expect(pruefeAboBestaetigungsToken(token, new Date(ende))).toEqual({ ok: false, grund: 'abgelaufen' })
   })
 
@@ -114,7 +114,7 @@ describe('Bestätigungs-Token', () => {
     expect(pruefeAboBestaetigungsToken(gefaelscht, JETZT)).toEqual({ ok: false, grund: 'ungueltig' })
   })
 
-  it('verlängerter Ablauf ohne neue Signatur → ungültig', () => {
+  it('verschobener Anfragezeitpunkt ohne neue Signatur → ungültig', () => {
     const token = erzeugeAboBestaetigungsToken('abo123', JETZT)
     const [b64, sig] = token.split('.')
     const payload = Buffer.from(b64!, 'base64url').toString().replace(/:\d+$/, ':99999999999999')
@@ -125,7 +125,7 @@ describe('Bestätigungs-Token', () => {
   })
 
   it('fremdes Geheimnis → ungültig', () => {
-    const payload = `abo-optin:abo123:${JETZT.getTime() + 1000}`
+    const payload = `abo-optin:abo123:${JETZT.getTime()}`
     const sig = createHmac('sha256', 'ein-anderes-geheimnis').update(payload).digest('hex')
     expect(pruefeAboBestaetigungsToken(`${Buffer.from(payload).toString('base64url')}.${sig}`, JETZT).ok).toBe(false)
   })

@@ -73,8 +73,29 @@ export function emailAnmeldungSchritt(abo: EmailAboStand | null, jetzt: Date): E
 export const ABO_TEXT = {
   ungueltig: 'Dieser Link ist nicht gültig. Vielleicht wurde er beim Kopieren abgeschnitten.',
   abgelaufen: `Dieser Link ist abgelaufen. Er gilt ${ABO_BESTAETIGUNG_GUELTIG_TAGE} Tage.`,
+  ueberholt: 'Dieser Link gilt nicht mehr. Vielleicht hast du die Anmeldung inzwischen ausgeschaltet oder einen neueren Link bekommen.',
   ausweg: 'Melde dich einfach noch einmal an – beim nächsten Einkauf oder unter „Mein Konto“. Dann schicken wir dir einen neuen Link.',
   abo_weg: 'Diese Anmeldung gibt es nicht mehr. Melde dich einfach noch einmal an, dann schicken wir dir einen neuen Link.',
   unerwartet: 'Das hat gerade nicht geklappt. Bitte versuch es noch einmal.',
   profilWartet: 'Wir haben dir einen Link geschickt. Bestätige die Anmeldung dort, dann bekommst du Neuigkeiten per E-Mail.',
+  schalterWartet: 'Wartet auf deine Bestätigung – schau in dein Postfach.',
+  // Die Seite hinter dem Link (/account/neuigkeiten-bestaetigen)
+  seitenTitel: 'Anmeldung bestätigen',
+  knopf: 'Anmeldung bestätigen',
+  offenTitel: 'Bestätige deine Anmeldung',
+  // Sätze mit Hofnamen als [davor, danach] — die Seite setzt den Namen fett dazwischen.
+  offenSatz: ['Du möchtest Neuigkeiten von', 'per E-Mail bekommen? Tippe auf den Knopf, dann ist es erledigt.'],
+  nichtAngemeldet: 'Du hast dich nicht angemeldet? Dann schließ diese Seite einfach – ohne Bestätigung schicken wir dir nichts.',
+  danke: 'Danke, du bist angemeldet',
+  dankeSatz: ['Ab jetzt bekommst du Neuigkeiten von', 'per E-Mail. Abmelden kannst du dich jederzeit über den Link in jeder Mail.'],
+  schonTitel: 'Du bist schon angemeldet',
+  schonSatz: ['Du bekommst Neuigkeiten von', 'per E-Mail. Hier ist nichts mehr zu tun.'],
+  abgelaufenTitel: 'Der Link ist abgelaufen',
+  fehlerTitel: 'Das hat nicht geklappt',
 } as const
+
+/** Der Satz für einen Link, der nicht (mehr) bestätigen kann — Seite und Knopf. */
+export function aboFehlerSatz(grund: 'ungueltig' | 'abgelaufen' | 'ueberholt' | 'abo_weg'): string {
+  if (grund === 'abo_weg') return ABO_TEXT.abo_weg
+  return `${ABO_TEXT[grund]} ${ABO_TEXT.ausweg}`
+}

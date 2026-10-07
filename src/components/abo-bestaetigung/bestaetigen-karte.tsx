@@ -8,6 +8,7 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { KNOPF_GRUEN } from '@/components/bestaetigung/bestaetigung-teile'
 import { bestaetigeNeuigkeiten } from '@/server/actions/subscriptions'
+import { ABO_TEXT } from '@/lib/abo-bestaetigung'
 
 /*
  * Der Link aus der Bestätigungsmail landet hier (/account/neuigkeiten-bestaetigen,
@@ -49,11 +50,10 @@ export function AboBestaetigenKarte({
           <CircleCheck className="mt-1 size-6 shrink-0 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
           <div className="min-w-0">
             <h2 id="abo-titel" ref={ueberschrift} tabIndex={-1} className={TITEL}>
-              Danke, du bist angemeldet
+              {ABO_TEXT.danke}
             </h2>
             <p className="mt-1 text-[14px] break-words text-muted-foreground [overflow-wrap:anywhere]">
-              Ab jetzt bekommst du Neuigkeiten von <strong className="font-semibold text-foreground">{hofName}</strong> per E-Mail.
-              Abmelden kannst du dich jederzeit über den Link in jeder Mail.
+              {ABO_TEXT.dankeSatz[0]} <strong className="font-semibold text-foreground">{hofName}</strong> {ABO_TEXT.dankeSatz[1]}
             </p>
           </div>
         </div>
@@ -70,16 +70,15 @@ export function AboBestaetigenKarte({
         <MailCheck className="mt-1 size-6 shrink-0 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
         <div className="min-w-0">
           <h2 id="abo-titel" ref={ueberschrift} tabIndex={-1} className={TITEL}>
-            Bestätige deine Anmeldung
+            {ABO_TEXT.offenTitel}
           </h2>
           <p className="mt-1 text-[14px] break-words text-muted-foreground [overflow-wrap:anywhere]">
-            Du möchtest Neuigkeiten von <strong className="font-semibold text-foreground">{hofName}</strong> per E-Mail
-            bekommen? Tippe auf den Knopf, dann ist es erledigt.
+            {ABO_TEXT.offenSatz[0]} <strong className="font-semibold text-foreground">{hofName}</strong> {ABO_TEXT.offenSatz[1]}
           </p>
         </div>
       </div>
       {typeof stand === 'object' && (
-        <Hinweiskarte ton="orange" titel="Das hat nicht geklappt">
+        <Hinweiskarte ton="orange" titel={ABO_TEXT.fehlerTitel}>
           <p role="alert">{stand.fehler}</p>
         </Hinweiskarte>
       )}
@@ -90,7 +89,7 @@ export function AboBestaetigenKarte({
             Einen Moment …
           </>
         ) : (
-          'Anmeldung bestätigen'
+          ABO_TEXT.knopf
         )}
       </button>
       {typeof stand === 'object' ? (
@@ -98,9 +97,7 @@ export function AboBestaetigenKarte({
           Anmeldungen unter „Mein Konto“ verwalten
         </Link>
       ) : (
-        <p className="text-[13px] leading-normal text-muted-foreground">
-          Du hast dich nicht angemeldet? Dann schließ diese Seite einfach – ohne Bestätigung schicken wir dir nichts.
-        </p>
+        <p className="text-[13px] leading-normal text-muted-foreground">{ABO_TEXT.nichtAngemeldet}</p>
       )}
     </section>
   )
