@@ -104,15 +104,18 @@ const IP_HEADER = new Set([
   'fly-client-ip',
   'x-vercel-forwarded-for',
   'x-vercel-proxied-for',
+  'x-original-forwarded-for',
+  'x-envoy-external-address',
 ])
 
-/** Ist dieser Header-Name ein IP-Träger? x-vercel-ip-* (Stadt, Breiten- und
- *  Längengrad, Postleitzahl) ist aus der IP abgeleitet und fällt mit. In
+/** Ist dieser Header-Name ein IP-Träger? x-vercel-ip-* und cf-ip* (Land,
+ *  Stadt, Breiten- und Längengrad, Postleitzahl) sind aus der IP abgeleitet
+ *  und fallen mit. In
  *  Span-Attributen schreibt das SDK Bindestriche als Unterstriche
  *  (http.request.header.x_forwarded_for) — beide Formen zählen. */
 function istIpHeader(name: string): boolean {
   const normal = name.toLowerCase().replace(/_/g, '-')
-  return IP_HEADER.has(normal) || normal.startsWith('x-vercel-ip-')
+  return IP_HEADER.has(normal) || normal.startsWith('x-vercel-ip-') || normal.startsWith('cf-ip')
 }
 
 /** Span-Attribute, die die Adresse der Gegenstelle tragen — in einem
@@ -208,33 +211,115 @@ function bereinigeSpanDaten(daten: Record<string, unknown>): void {
   }
 }
 
+/** Nur echte Objekte (kein Array, kein null) werden betreten — Ereignisse
+ *  können aus fremdem Code verquer gebaut ankommen. */
+function istObjekt(wert: unknown): wert is Record<string, unknown> {
+  return typeof wert === 'object' && wert !== null && !Array.isArray(wert)
+}
+
 /**
  * Der zentrale Filter — läuft auf Server, Edge und im Browser, für
  * FEHLER-Ereignisse (beforeSend) wie für TRANSAKTIONEN (beforeSendTransaction).
  * Entfernt, was der Kopfkommentar aufzählt; verwirft nie ein Ereignis —
  * ein gefiltertes Ereignis ist besser als keines.
+ *
+ * WIRFT NIE: Ein Fehler in beforeSend lässt das SDK das Ereignis verwerfen,
+ * und wir sähen den Fehler nie. Scheitert die Bereinigung trotzdem an einer
+ * unerwarteten Gestalt, geht ein Minimalereignis raus (siehe
+ * minimalEreignis) — nie das Rohereignis, das noch ungefiltert wäre.
  */
 export function bereinigeEreignis<E extends SentryEvent>(event: E): E {
-  if (event.message) event.message = bereinigeText(event.message)
+  try {
+    return bereinigeVollstaendig(event)
+  } catch {
+    return minimalEreignis(event)
+  }
+}
 
-  for (const ausnahme of event.exception?.values ?? []) {
-    if (ausnahme.value) ausnahme.value = bereinigeText(ausnahme.value)
+/** Notbehelf, wenn die Bereinigung scheitert: Nur Kennung, Zeit, Art, Stufe,
+ *  Umgebung und der bereinigte Fehlertext bleiben — kein request, user,
+ *  contexts, spans, breadcrumbs, extra, tags. Jedes Feld wird einzeln und
+ *  nur als einfacher Wert übernommen, damit auch hier nichts wirft. */
+function minimalEreignis<E extends SentryEvent>(event: E): E {
+  const minimal: Record<string, unknown> = {}
+  const roh = event as unknown as Record<string, unknown>
+  for (const feld of ['event_id', 'timestamp', 'start_timestamp', 'type', 'level', 'platform', 'environment', 'release', 'dist']) {
+    try {
+      const wert = roh[feld]
+      if (typeof wert === 'string' || typeof wert === 'number') minimal[feld] = wert
+    } catch {
+      // Getter, der wirft — Feld fällt weg.
+    }
+  }
+  try {
+    if (typeof roh.message === 'string') minimal.message = bereinigeText(roh.message)
+  } catch {
+    // Text nicht lesbar — fällt weg.
+  }
+  try {
+    const werte = istObjekt(roh.exception) ? roh.exception.values : undefined
+    const erste = Array.isArray(werte) && istObjekt(werte[0]) ? werte[0] : undefined
+    if (erste) {
+      minimal.exception = {
+        values: [
+          {
+            ...(typeof erste.type === 'string' ? { type: erste.type } : {}),
+            ...(typeof erste.value === 'string' ? { value: bereinigeText(erste.value) } : {}),
+          },
+        ],
+      }
+    }
+  } catch {
+    // Ausnahme nicht lesbar — fällt weg.
+  }
+  minimal.extra = { bereinigung: 'fehlgeschlagen' }
+  return minimal as unknown as E
+}
+
+function bereinigeVollstaendig<E extends SentryEvent>(event: E): E {
+  if (typeof event.message === 'string') event.message = bereinigeText(event.message)
+  else if (event.message !== undefined) delete event.message
+
+  if (event.exception !== undefined && !istObjekt(event.exception)) delete event.exception
+  if (event.exception?.values !== undefined && !Array.isArray(event.exception.values)) {
+    // Keine Liste — nicht zu sichten, also weg.
+    delete event.exception.values
+  }
+  const ausnahmen = event.exception?.values
+  if (Array.isArray(ausnahmen)) {
+    for (const ausnahme of ausnahmen) {
+      if (istObjekt(ausnahme) && typeof ausnahme.value === 'string') {
+        ausnahme.value = bereinigeText(ausnahme.value)
+      }
+    }
   }
 
+  if (event.request !== undefined && !istObjekt(event.request)) {
+    // Eine Anfrage, die kein Objekt ist, können wir nicht sichten — weg.
+    delete event.request
+  }
   if (event.request) {
     delete event.request.cookies
     // Der POST-Körper ist das PII-dichteste Feld (Checkout: Name, Telefon,
     // E-Mail, Adresse) — komplett weg, nie nur gefiltert.
     delete event.request.data
+    if (event.request.headers !== undefined && !istObjekt(event.request.headers)) {
+      // Header als Text oder Liste („x-forwarded-for: …") — nicht sichtbar
+      // zu filtern, also ganz weg.
+      delete event.request.headers
+    }
     if (event.request.headers) {
-      for (const name of Object.keys(event.request.headers)) {
+      const header = event.request.headers as Record<string, unknown>
+      for (const name of Object.keys(header)) {
         if (/^(authorization|cookie)$/i.test(name) || istIpHeader(name)) {
-          delete event.request.headers[name]
+          delete header[name]
         } else if (/^referer$/i.test(name)) {
           // Der Referer trägt die volle Vorgänger-URL (same-origin) — er wird
           // wie jede URL bereinigt, damit /customers/<e-mail> nicht über die
-          // Hintertür einwandert.
-          event.request.headers[name] = bereinigeUrl(event.request.headers[name])
+          // Hintertür einwandert. Kein Text → weg.
+          const wert = header[name]
+          if (typeof wert === 'string') header[name] = bereinigeUrl(wert)
+          else delete header[name]
         }
       }
     }
@@ -248,17 +333,19 @@ export function bereinigeEreignis<E extends SentryEvent>(event: E): E {
       // bereinigte URL trägt die unbedenklichen Parameter ohnehin.
       delete event.request.query_string
     }
-    if (event.request.url) event.request.url = bereinigeUrl(event.request.url)
+    if (typeof event.request.url === 'string') event.request.url = bereinigeUrl(event.request.url)
+    else if (event.request.url !== undefined) delete event.request.url
   }
 
   // onRequestError hängt den ROHEN Anfragepfad an — /customers/<e-mail> und
   // /api/orders/confirm/<token> stünden sonst wörtlich im Ereignis.
-  const nextjsKontext = event.contexts?.nextjs as Record<string, unknown> | undefined
+  const kontexte = istObjekt(event.contexts) ? event.contexts : undefined
+  const nextjsKontext = istObjekt(kontexte?.nextjs) ? kontexte.nextjs : undefined
   if (nextjsKontext && typeof nextjsKontext.request_path === 'string') {
     nextjsKontext.request_path = bereinigeUrl(nextjsKontext.request_path)
   }
 
-  if (event.user) {
+  if (event.user !== undefined && event.user !== null) {
     // Ausschließlich die Farm-ID überlebt — nie E-Mail, nie Name, nie IP,
     // auch nicht „{{auto}}" (das bäte Sentry, die Adresse selbst aus der
     // Verbindung zu nehmen). Bewusst kein `ip_address: null`: Im SDK (10.66)
@@ -266,21 +353,26 @@ export function bereinigeEreignis<E extends SentryEvent>(event: E): E {
     // sendDefaultPii ohnehin nicht gesetzt wird; dass der Ingest nichts
     // ableitet, regeln sendDefaultPii: false (Browser: infer_ip „never") und
     // die Projekteinstellung im Dashboard (Bericht Nr. 37).
-    event.user = event.user.id !== undefined ? { id: event.user.id } : {}
+    const id = istObjekt(event.user) ? event.user.id : undefined
+    event.user = typeof id === 'string' || typeof id === 'number' ? { id } : {}
   }
 
+  if (event.breadcrumbs !== undefined && !Array.isArray(event.breadcrumbs)) delete event.breadcrumbs
   for (const spur of event.breadcrumbs ?? []) {
-    if (spur.message) spur.message = bereinigeText(spur.message)
-    if (spur.data) {
+    if (!istObjekt(spur)) continue
+    if (typeof spur.message === 'string') spur.message = bereinigeText(spur.message)
+    if (spur.data !== undefined && !istObjekt(spur.data)) delete spur.data
+    const daten = spur.data as Record<string, unknown> | undefined
+    if (daten) {
       // Navigations-Brotkrumen tragen from/to, fetch-Brotkrumen url.
       for (const schluessel of ['url', 'from', 'to']) {
-        const wert = spur.data[schluessel]
-        if (typeof wert === 'string') spur.data[schluessel] = bereinigeUrl(wert)
+        const wert = daten[schluessel]
+        if (typeof wert === 'string') daten[schluessel] = bereinigeUrl(wert)
       }
       // Console-Brotkrumen tragen die rohen console.error-Argumente — Texte
       // werden bereinigt, alles Strukturierte fällt weg (könnte alles tragen).
-      if (Array.isArray(spur.data.arguments)) {
-        spur.data.arguments = spur.data.arguments.map((argument) => {
+      if (Array.isArray(daten.arguments)) {
+        daten.arguments = daten.arguments.map((argument: unknown) => {
           if (typeof argument === 'string') return bereinigeTextMitUrls(argument)
           if (typeof argument === 'number' || typeof argument === 'boolean' || argument === null) {
             return argument
@@ -295,14 +387,17 @@ export function bereinigeEreignis<E extends SentryEvent>(event: E): E {
   // url.query), Beschreibungen wie „GET https://…" und die Adresse der
   // Gegenstelle — gleiche Regeln. Der Wurzel-Span steht nicht in `spans`,
   // sondern in contexts.trace.data.
-  const spans = (event as { spans?: Array<{ description?: string; data?: Record<string, unknown> }> })
-    .spans
-  for (const span of spans ?? []) {
-    if (span.description) span.description = bereinigeTextMitUrls(span.description)
-    if (span.data) bereinigeSpanDaten(span.data)
+  const mitSpans = event as { spans?: unknown }
+  if (mitSpans.spans !== undefined && !Array.isArray(mitSpans.spans)) delete mitSpans.spans
+  for (const span of (mitSpans.spans as unknown[] | undefined) ?? []) {
+    if (!istObjekt(span)) continue
+    if (typeof span.description === 'string') span.description = bereinigeTextMitUrls(span.description)
+    if (span.data !== undefined && !istObjekt(span.data)) delete span.data
+    if (span.data) bereinigeSpanDaten(span.data as Record<string, unknown>)
   }
-  const wurzelDaten = event.contexts?.trace?.data
-  if (wurzelDaten) bereinigeSpanDaten(wurzelDaten as Record<string, unknown>)
+  const spur = istObjekt(kontexte?.trace) ? kontexte.trace : undefined
+  if (spur && spur.data !== undefined && !istObjekt(spur.data)) delete spur.data
+  if (spur?.data) bereinigeSpanDaten(spur.data as Record<string, unknown>)
 
   return event
 }
