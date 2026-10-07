@@ -22,8 +22,9 @@ import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
  * admin-hoefe-und-freischaltung (Browser), admin-mobil-unterwegs-freischalten.
  *
  * Die Shell schützt nichts: Jede Admin-Seite prüft selbst mit
- * verlangeAdminSeite (src/server/admin-wache.ts). Noch nutzt keine Route
- * diese Shell (kein Big Bang).
+ * verlangeAdminSeite (src/server/admin-wache.ts). Seit Nr. 22f trägt
+ * src/app/admin/layout.tsx sie um alle /admin-Routen; Name und Zähler lädt
+ * dort ladeAdminbereich (nach der Wache).
  */
 
 export type AdminShellProps = {

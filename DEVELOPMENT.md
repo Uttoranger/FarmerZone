@@ -4345,6 +4345,18 @@ Auftrag freigabe.md §9 „22c", Gate 8 (Zeilen `/analytics` und `/region`), Reg
 - **Teilen-Wirkung:** Karte „Über deine geteilten Links" aus `getTeilenWirkung` für dieselben Wiener Tage wie die Kennzahlen; Bestellungen zählen weiter so, wie Nr. 21 sie zählt (beim Anlegen, offene Entscheidung (b) aus Bericht 21). Der Euro-Betrag des Mockups fehlt, weil er eine zweite Zählweise aus den Bestellungen bräuchte.
 - **Entfernt:** `auswertung-reiter.tsx` (Region ist eigener Punkt), `umsatz-auswertung.tsx` (aufgegangen in `src/components/auswertung/`). Die Grenze Be- & Verarbeitung bleibt mit denselben Schwellen, im neuen Design ohne Rot (O1).
 
+## Admin in der AdminShell (Nachtlauf Nr. 22f, Oktober 2026)
+
+Auftrag freigabe.md §9 „22f", Gate 8 (Zeile `/admin`, `/admin/meldungen(/[id])`, `/admin/finanzen`), Register E9, K1, F5. Mockups `admin-hoefe-und-freischaltung`, `admin-briefkasten`, `admin-meldung-entscheiden`, `admin-finanzen`, `admin-mobil-unterwegs-freischalten`. Keine Schema-Änderung, keine Migration.
+
+- **Shell:** `src/app/admin/layout.tsx` trägt die AdminShell aus Nr. 05 um alle Admin-Routen. Name und Zähler (wartende Höfe, Meldungen zu entscheiden) lädt `ladeAdminbereich` erst nach `verlangeAdminSeite` — ein Layout rendert parallel zur Seite und hätte sonst einem Unbefugten die Zähler gezeigt. Die Seiten prüfen weiter selbst; ein AST-Test wacht über jede künftige Admin-Seite.
+- **Fachregel Freischalten ohne Stripe:** Freischalten verlangt jetzt ein fertiges Stripe-Konto (`stripeAccountReady`). Die Freigabe (§9 „Freischalten bleibt gesperrt ohne Stripe") und Gate 8 setzten die Sperre voraus, im Code gab es sie aber nicht — sie ist in `approveFarmAction` nach der E-Mail-Sperre (S3) ergänzt, frisch aus der Datenbank; bereits freigeschaltete Höfe berührt sie nicht. Bitte bestätigen (Bericht 22f, Annahme 1).
+- **E9:** Die Betriebsnummer steht im Admin als Nummer da, wie der Hof sie angibt; kein Haken, kein „geprüft" (Test am Quelltext).
+- **Servicegebühr je Hof:** dieselbe `setServiceFeeAction`, jetzt im Dialog; Satz „Gilt nur für neue Bestellungen – bestehende behalten ihren Satz" mit dem Standard aus `konditionen.ts`.
+- **Briefkasten:** Filter Zu entscheiden · Offen · Abgeschlossen · Alle mit Zahl, Art als Umschalter, Wunschliste gebündelt daneben (der frühere Reiter „Wünsche" entfällt; `?reiter=wuensche` zeigt einfach den Briefkasten). Ein einzelner Status aus einem alten Link filtert weiter, nur ohne leuchtenden Chip. Der KI-Vorschlag bleibt ein Vorschlag mit zwei Knöpfen; Triage-Fehler stehen jetzt im Formular statt als Toast.
+- **Finanzen:** dieselben Zahlen aus `getFinanzen` (Cent), Break-even aus `kostendeckungSatz` (Schnitt der Gebühr je Bestellung gegen die eingetragenen Kosten, schon vorhanden) mit Fortschrittsbalken. Das Diagramm ist jetzt aus Token-Balken statt Recharts — `finanzen-diagramm.tsx` ist aus `FARBLITERAL_BESTAND` heraus. Grundgebühren-Kachel, „per SEPA am …" und „entfallene Gebühren" aus dem Mockup fehlen (keine Daten bzw. vor SEPA-Start nicht zutreffend, B1).
+- **Entfernt:** `src/app/admin/admin-farm-list.tsx`, `servicegebuehr-einstellung.tsx` (aufgegangen in `src/components/admin/`).
+
 ## Nützliche Befehle
 
 ```bash
