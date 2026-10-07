@@ -56,7 +56,7 @@ export function WhatsAppTapClient({
   function buildWaUrl(sub: Subscriber): string {
     const phone = toWaPhone(sub.phone)
     const firstName = sub.name.split(' ')[0]
-    // Mit ?k=wa: Besuche und Bestellungen aus dieser Nachricht zählen für WhatsApp (Gate 7, ohne Kennung der Person).
+    // Mit ?k=wa: Besuche aus dieser Nachricht zählen für WhatsApp (Gate 7, T1; ohne Kennung der Person).
     const farmUrl = teilenLink(APP_URL, farmSlug, 'wa')
     const message = `Hallo ${firstName}!\n\n*${title}*\n\n${body}\n\nMehr auf: ${farmUrl}`
     return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`

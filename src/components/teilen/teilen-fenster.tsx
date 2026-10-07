@@ -21,7 +21,7 @@ import { Sheet, SheetBlatt, SheetDescription, SheetTitle } from '@/components/ui
 import { Segment } from '@/components/ui/segment'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { useMindestbreite } from '@/lib/use-mindestbreite'
-import { teilenBildPfad, teilenLink, type TeilenBildFormat } from '@/lib/teilen-kanal'
+import { TEILEN_ZAEHLUNG_HINWEIS, teilenBildPfad, teilenLink, type TeilenBildFormat } from '@/lib/teilen-kanal'
 import { TEILEN_BILD_PRODUKTE_MAX } from '@/lib/teilen-bild'
 import {
   FENSTER_KANAELE,
@@ -43,7 +43,8 @@ import { cn } from '@/lib/utils'
  * Das Bild ist das echte Teilen-Bild (/[farmSlug]/opengraph-image) — dieselbe
  * Grafik wie die Vorschau im Chat. Was ins Bild darf, entscheidet der Server
  * (nie ausverkauft, nie gesperrt); die Auswahl hier schickt nur Kennungen.
- * Jeder Kanal trägt sein Kürzel `?k=` für die Zählung, ohne Cookie (S8).
+ * Jeder Kanal trägt sein Kürzel `?k=` für die Zählung der Besuche, ohne Cookie
+ * und ohne Speicher im Browser (S8, Register T1).
  */
 
 const KNOPF_RAHMEN = cn(
@@ -336,8 +337,6 @@ export function TeilenFenster({
     </div>
   )
 
-  const hinweis = 'Der Link zählt, wie viele Besuche und Bestellungen dein Teilen bringt – ohne Cookies, nur über den Link selbst.'
-
   if (breit) {
     return (
       <Dialog open={offen} onOpenChange={onOffenChange}>
@@ -353,7 +352,7 @@ export function TeilenFenster({
               {imBild}
               {linkZeile}
               {kanaele(true)}
-              <p className="text-xs leading-normal text-muted-foreground">{hinweis}</p>
+              <p className="text-xs leading-normal text-muted-foreground">{TEILEN_ZAEHLUNG_HINWEIS}</p>
             </div>
           </div>
         </DialogContent>
@@ -376,7 +375,7 @@ export function TeilenFenster({
         <p className="text-center text-xs text-muted-foreground">Das Teilen-Menü deines Telefons – WhatsApp und Co. sind schon drin.</p>
         {linkZeile}
         {kanaele(false)}
-        <p className="text-xs leading-normal text-muted-foreground">{hinweis}</p>
+        <p className="text-xs leading-normal text-muted-foreground">{TEILEN_ZAEHLUNG_HINWEIS}</p>
       </SheetBlatt>
     </Sheet>
   )

@@ -14,7 +14,6 @@ import {
   type CheckoutFormData,
 } from '@/schemas/checkout'
 import { formatEuro } from '@/lib/format'
-import { leseTeilenHerkunft, teilenSpeicher } from '@/lib/teilen-herkunft'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import { ABHOLFENSTER_NICHT_VERFUEGBAR, CODE_ABHOLFENSTER_UNGUELTIG, CODE_ABHOLFENSTER_VOLL } from '@/lib/abholfenster'
 import { BETRIEBSNACHWEIS_FEHLER, CODE_BETRIEBSNACHWEIS_FEHLT } from '@/lib/betriebsnachweis'
@@ -360,9 +359,6 @@ export function CheckoutForm({
           // Vorbelegung als Betrieb darf nicht unbemerkt mitlaufen.
           kaeuferArt: betriebAbschnitt ? data.kaeuferArt : 'PRIVAT',
           betriebsnummer: betriebAbschnitt && data.kaeuferArt === 'BETRIEB' ? data.betriebsnummer : undefined,
-          // Über welchen geteilten Link sie kam (Gate 7, S8) — nur das Kürzel
-          // aus diesem Tab, kein Cookie, keine Kennung. Fehlt es, zählt nichts.
-          teilenKanal: leseTeilenHerkunft(teilenSpeicher(), farm.slug) ?? undefined,
           items: cart.map((i) => ({
             productId: i.productId,
             name: i.name,

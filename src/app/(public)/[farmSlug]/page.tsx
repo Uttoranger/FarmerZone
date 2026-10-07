@@ -13,7 +13,7 @@ import { nachbestellToken } from '@/schemas/nachbestellung'
 import { FarmPageView } from '@/components/farm/farm-page-view'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { StartseiteFuss } from '@/components/startseite/startseite-abschnitte'
-import { TeilenHerkunft } from '@/components/hofseite/teilen-herkunft'
+import { TeilenBesuchMelden } from '@/components/hofseite/teilen-besuch'
 
 export const dynamic = 'force-dynamic'
 
@@ -136,7 +136,7 @@ export default async function FarmPage({ params, searchParams }: Props) {
         jetzt={jetzt.toISOString()}
       />
       {/* Teilen-Zählung (Gate 7): nur auf der Seite für Kundinnen, nie in der Vorschau des Hofs. */}
-      {ansicht.art === 'kundin' && <TeilenHerkunft farmSlug={farm.slug} />}
+      {ansicht.art === 'kundin' && <TeilenBesuchMelden farmSlug={farm.slug} />}
       {/* Der Fuß der Startseite — ein Server-Teil, deshalb hier statt in der Client-Komponente. */}
       <StartseiteFuss jahr={jetzt.getFullYear()} />
     </KundeShellMitSitzung>

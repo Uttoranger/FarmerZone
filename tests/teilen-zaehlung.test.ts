@@ -3,17 +3,21 @@
  *
  * Beweist:
  *  - Nur die sieben Kürzel gelten (wa, wa-status, fb, ig, mail, qr, link);
- *    alles andere ergibt null und lässt nichts scheitern — auch nicht den
- *    Checkout-Body.
+ *    alles andere ergibt null und lässt nichts scheitern.
+ *  - Der Checkout kennt seit Nr. 25 (Register T1) kein Kürzel mehr: Ein
+ *    altes Feld `teilenKanal` aus einem offenen Tab wird verworfen, die
+ *    Anfrage bleibt gültig.
  *  - Der geteilte Link trägt genau `?k=` und sonst nichts.
  *  - Gezählt wird auf den Wiener Kalendertag, nicht den UTC-Tag.
  *  - Maschinen (Vorschau-Abrufer, Suchmaschinen, Skripte) und Vorabrufe zählen nicht.
- *  - Der Tab merkt sich das Kürzel ohne Cookie, zählt höchstens einmal je
- *    Hof und Kanal und wirft nie — auch nicht ohne oder mit kaputtem Speicher.
+ *  - Der Besuch kommt nur aus der aktuellen Adresse (T1, kein Browser-
+ *    Speicher): Danach ist `k` aus der Adresse, ein zweites Lesen findet
+ *    nichts mehr — der Besuch zählt genau einmal.
  *  - Die Route POST /api/teilen/besuch schreibt nur Hof, Kanal und Tag:
  *    keine IP, keinen Browser-Text, keine Person (Gegenprobe: mit IP und
  *    Browser im Kopf der Anfrage).
- *  - Die Zusammenfassung für die Auswertung (22c) summiert je Kanal.
+ *  - Die Zusammenfassung für die Auswertung (22c) summiert nur Besuche je
+ *    Kanal; Bestellungen kommen darin nicht mehr vor (T1).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
@@ -35,8 +39,8 @@ import {
   teilenLink,
   teilenTag,
 } from '@/lib/teilen-kanal'
-import { adresseOhneKanal, leseTeilenHerkunft, merkeTeilenBesuch } from '@/lib/teilen-herkunft'
-import { checkoutTeilenKanalSchema, teilenBesuchSchema } from '@/schemas/teilen'
+import { teilenBesuchAusAdresse } from '@/lib/teilen-besuch'
+import { teilenBesuchSchema } from '@/schemas/teilen'
 import { checkoutRequestSchema } from '@/schemas/checkout'
 import { diesenMonat, fasseTeilenWirkungZusammen, letzteTage, teilenWirkungSatz } from '@/lib/teilen-wirkung'
 import { POST as besuch } from '@/app/api/teilen/besuch/route'
@@ -102,12 +106,7 @@ describe('Maschinen und Vorabrufe zählen nicht', () => {
 })
 
 describe('Schemas', () => {
-  it('Checkout: ungültiges Kürzel wird undefined, die Anfrage bleibt gültig', () => {
-    expect(checkoutTeilenKanalSchema.parse('wa')).toBe('wa')
-    expect(checkoutTeilenKanalSchema.parse('tiktok')).toBeUndefined()
-    expect(checkoutTeilenKanalSchema.parse(42)).toBeUndefined()
-    expect(checkoutTeilenKanalSchema.parse(undefined)).toBeUndefined()
-
+  it('Checkout: kein Kürzel mehr (T1) — ein altes Feld wird verworfen, die Anfrage bleibt gültig', () => {
     const basis = {
       farmId: 'f1',
       farmSlug: 'hof-test',
@@ -121,10 +120,15 @@ describe('Schemas', () => {
       paymentMethod: 'ONSITE_CASH',
       items: [{ productId: 'p1', quantity: 1, unitPrice: 1 }],
     }
-    const ungueltig = checkoutRequestSchema.safeParse({ ...basis, teilenKanal: '<script>' })
-    expect(ungueltig.success).toBe(true)
-    expect(ungueltig.data?.teilenKanal).toBeUndefined()
-    expect(checkoutRequestSchema.parse({ ...basis, teilenKanal: 'qr' }).teilenKanal).toBe('qr')
+    // Ein Tab von vor dem Deploy schickt das Kürzel noch mit — es darf die
+    // Bestellung nicht scheitern lassen und kommt nicht beim Server an.
+    for (const teilenKanal of ['wa', '<script>', 42]) {
+      const gelesen = checkoutRequestSchema.safeParse({ ...basis, teilenKanal })
+      expect(gelesen.success).toBe(true)
+      expect(gelesen.data).not.toHaveProperty('teilenKanal')
+    }
+    // Gegenprobe: Das Schema behält sonst, was es kennt.
+    expect(checkoutRequestSchema.parse({ ...basis, teilenKanal: 'qr' })).toHaveProperty('farmSlug', 'hof-test')
   })
 
   it('Besuch: strikt — nur Slug und Kürzel, sonst 400', () => {
@@ -135,62 +139,31 @@ describe('Schemas', () => {
   })
 })
 
-function speicher(start: Record<string, string> = {}): Storage & { daten: Map<string, string> } {
-  const daten = new Map(Object.entries(start))
-  return {
-    daten,
-    length: 0,
-    clear: () => daten.clear(),
-    key: () => null,
-    getItem: (k: string) => daten.get(k) ?? null,
-    setItem: (k: string, v: string) => void daten.set(k, v),
-    removeItem: (k: string) => void daten.delete(k),
-  }
-}
-
-describe('Herkunft im Tab (sessionStorage, kein Cookie)', () => {
-  it('merkt das Kürzel und zählt einmal je Hof und Kanal', () => {
-    const s = speicher()
-    expect(merkeTeilenBesuch(s, 'hof-a', 'wa')).toEqual({ kanal: 'wa', zaehlen: true })
-    expect(merkeTeilenBesuch(s, 'hof-a', 'wa')).toEqual({ kanal: 'wa', zaehlen: false })
-    expect(leseTeilenHerkunft(s, 'hof-a')).toBe('wa')
-    // Anderer Kanal zählt eigens, der letzte Link gewinnt die Herkunft.
-    expect(merkeTeilenBesuch(s, 'hof-a', 'qr')).toEqual({ kanal: 'qr', zaehlen: true })
-    expect(leseTeilenHerkunft(s, 'hof-a')).toBe('qr')
-    // Anderer Hof hat seine eigene Herkunft.
-    expect(leseTeilenHerkunft(s, 'hof-b')).toBeNull()
+describe('Besuch aus der Adresse (ohne Browser-Speicher, T1)', () => {
+  it('liest das Kürzel und nimmt nur ?k aus der Adresse, der Rest bleibt', () => {
+    expect(teilenBesuchAusAdresse('https://x.at/hof-a?k=wa&bereich=futter#produkte')).toEqual({
+      kanal: 'wa',
+      ohne: '/hof-a?bereich=futter#produkte',
+    })
+    expect(teilenBesuchAusAdresse('https://x.at/hof-a?k=wa-status')).toEqual({ kanal: 'wa-status', ohne: '/hof-a' })
   })
 
-  it('ungültiges Kürzel ändert nichts und zählt nicht', () => {
-    const s = speicher()
-    merkeTeilenBesuch(s, 'hof-a', 'fb')
-    expect(merkeTeilenBesuch(s, 'hof-a', 'tiktok')).toEqual({ kanal: null, zaehlen: false })
-    expect(leseTeilenHerkunft(s, 'hof-a')).toBe('fb')
+  it('genau einmal: nach dem Entfernen von ?k findet ein zweites Lesen (Neuladen, zweiter Effekt) nichts mehr', () => {
+    const erst = teilenBesuchAusAdresse('https://x.at/hof-a?bereich=futter&k=qr')
+    expect(erst.kanal).toBe('qr')
+    expect(erst.ohne).toBe('/hof-a?bereich=futter')
+    const danach = teilenBesuchAusAdresse(new URL(erst.ohne ?? '', 'https://x.at').href)
+    expect(danach).toEqual({ kanal: null, ohne: null })
   })
 
-  it('ohne oder mit kaputtem Speicher: wirft nie, liest null, zählt trotzdem den Besuch', () => {
-    const wirft = {
-      getItem: () => {
-        throw new Error('gesperrt')
-      },
-      setItem: () => {
-        throw new Error('gesperrt')
-      },
-    }
-    expect(merkeTeilenBesuch(null, 'hof-a', 'mail')).toEqual({ kanal: 'mail', zaehlen: true })
-    expect(merkeTeilenBesuch(wirft, 'hof-a', 'mail')).toEqual({ kanal: 'mail', zaehlen: true })
-    expect(leseTeilenHerkunft(null, 'hof-a')).toBeNull()
-    expect(leseTeilenHerkunft(wirft, 'hof-a')).toBeNull()
+  it('ungültiges Kürzel zählt nicht, verlässt aber die Adresse', () => {
+    expect(teilenBesuchAusAdresse('https://x.at/hof-a?k=tiktok')).toEqual({ kanal: null, ohne: '/hof-a' })
+    expect(teilenBesuchAusAdresse('https://x.at/hof-a?k=%22%3E%3Cimg%3E')).toEqual({ kanal: null, ohne: '/hof-a' })
   })
 
-  it('ein manipulierter Speicherwert wird verworfen', () => {
-    expect(leseTeilenHerkunft(speicher({ 'farmerzone_teilen:hof-a': '"><img>' }), 'hof-a')).toBeNull()
-  })
-
-  it('nimmt nur ?k aus der Adresse, der Rest bleibt', () => {
-    expect(adresseOhneKanal('https://x.at/hof-a?k=wa&bereich=futter#produkte', 'k')).toBe('/hof-a?bereich=futter#produkte')
-    expect(adresseOhneKanal('https://x.at/hof-a?k=wa', 'k')).toBe('/hof-a')
-    expect(adresseOhneKanal('https://x.at/hof-a?bereich=futter', 'k')).toBeNull()
+  it('ohne ?k oder mit kaputter Adresse: nichts zu tun, wirft nie', () => {
+    expect(teilenBesuchAusAdresse('https://x.at/hof-a?bereich=futter')).toEqual({ kanal: null, ohne: null })
+    expect(teilenBesuchAusAdresse('keine adresse')).toEqual({ kanal: null, ohne: null })
   })
 })
 
@@ -256,28 +229,27 @@ describe('POST /api/teilen/besuch', () => {
   })
 })
 
-describe('Teilen-Wirkung (Abfrage für 22c, reine Zusammenfassung)', () => {
-  it('summiert je Kanal, die stärksten zuerst, Kanäle ohne Wirkung fallen weg', () => {
+describe('Teilen-Wirkung (Abfrage für 22c, reine Zusammenfassung, nur Besuche — T1)', () => {
+  it('summiert Besuche je Kanal, die stärksten zuerst, Kanäle ohne Besuch fallen weg', () => {
     const wirkung = fasseTeilenWirkungZusammen([
-      { kanal: 'QR', besuche: 2, bestellungen: 0 },
-      { kanal: 'WHATSAPP', besuche: 10, bestellungen: 2 },
-      { kanal: 'WHATSAPP', besuche: 4, bestellungen: 1 },
-      { kanal: 'FACEBOOK', besuche: 0, bestellungen: 0 },
+      { kanal: 'QR', besuche: 2 },
+      { kanal: 'WHATSAPP', besuche: 10 },
+      { kanal: 'WHATSAPP', besuche: 4 },
+      { kanal: 'FACEBOOK', besuche: 0 },
     ])
     expect(wirkung).toEqual({
       besuche: 16,
-      bestellungen: 3,
       kanaele: [
-        { kanal: 'WHATSAPP', name: 'WhatsApp', besuche: 14, bestellungen: 3 },
-        { kanal: 'QR', name: 'Plakat (QR-Code)', besuche: 2, bestellungen: 0 },
+        { kanal: 'WHATSAPP', name: 'WhatsApp', besuche: 14 },
+        { kanal: 'QR', name: 'Plakat (QR-Code)', besuche: 2 },
       ],
     })
   })
 
-  it('Satz der Teilen-Zeile: Einzahl und Mehrzahl, ohne Wirkung keiner', () => {
-    expect(teilenWirkungSatz({ besuche: 14, bestellungen: 3 })).toBe('14 Besuche, 3 Bestellungen über deine Links')
-    expect(teilenWirkungSatz({ besuche: 1, bestellungen: 1 })).toBe('1 Besuch, 1 Bestellung über deine Links')
-    expect(teilenWirkungSatz({ besuche: 0, bestellungen: 0 })).toBeNull()
+  it('Satz der Teilen-Zeile: nur Besuche, Einzahl und Mehrzahl, ohne Besuch keiner', () => {
+    expect(teilenWirkungSatz({ besuche: 14 })).toBe('14 Besuche über deine Links')
+    expect(teilenWirkungSatz({ besuche: 1 })).toBe('1 Besuch über deine Links')
+    expect(teilenWirkungSatz({ besuche: 0 })).toBeNull()
   })
 
   it('Zeiträume in Wiener Tagen', () => {

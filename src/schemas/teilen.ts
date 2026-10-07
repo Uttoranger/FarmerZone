@@ -3,18 +3,12 @@ import { TEILEN_BILD_FORMATE, TEILEN_KANAL_CODES } from '@/lib/teilen-kanal'
 import { hofSlugSchema } from '@/schemas/hof-adresse'
 
 /**
- * Teilen-Zählung (Gate 7, S8) — die Systemgrenzen: Kürzel aus der Adresse,
- * aus dem sessionStorage und aus dem Checkout-Body. Nur die sieben Kürzel
- * sind gültig; alles andere wird verworfen, nie korrigiert.
+ * Teilen-Zählung (Gate 7, S8) — die Systemgrenzen: Kürzel aus der Adresse
+ * und im Körper der Besuchsmeldung. Nur die sieben Kürzel sind gültig; alles
+ * andere wird verworfen, nie korrigiert. Der Checkout kennt seit Nr. 25
+ * (Register T1) kein Kürzel mehr.
  */
 export const teilenKanalCodeSchema = z.enum(TEILEN_KANAL_CODES)
-
-/**
- * Im Checkout-Body: Ein fehlender oder ungültiger Wert darf die Bestellung
- * NIE scheitern lassen (Geldpfad) — `catch` macht daraus undefined, die Route
- * speichert dann null.
- */
-export const checkoutTeilenKanalSchema = teilenKanalCodeSchema.optional().catch(undefined)
 
 /** Der Besuch über einen geteilten Link — POST /api/teilen/besuch. Strikt: ein unbekanntes Feld ist 400. */
 export const teilenBesuchSchema = z
