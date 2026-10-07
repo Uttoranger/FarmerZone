@@ -48,6 +48,8 @@ import { RaummassErklaerung } from '@/components/shared/raummass-erklaerung'
 import { raummassErklaeren } from '@/lib/verkaufsgroessen'
 import { futterVerantwortung, futterVerantwortungImKorb } from '@/lib/futter-registrierung'
 import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
+import { kassenAdresse } from '@/lib/kasse'
+import { mitKaeuferVorbelegung, type KaeuferVorbelegung } from '@/schemas/kaeufer-vorbelegung'
 
 /*
  * Die Produktseite /[farmSlug]/produkt/[id] (Nachtlauf Nr. 11, Gate 4).
@@ -76,6 +78,7 @@ export function ProduktdetailKunde({
   produktId,
   gewaehltId,
   ansicht,
+  kaeufer = null,
   jetzt,
 }: {
   farm: PublicFarm
@@ -84,6 +87,8 @@ export function ProduktdetailKunde({
   /** Die gewählte Größe (aus ?groesse=, geprüft) — sonst gleich produktId. */
   gewaehltId: string
   ansicht: Pick<SeitenAnsicht, 'art' | 'kaufen'>
+  /** `?kaeufer=betrieb` aus „Region › Futter kaufen" (Nr. 29, geprüft) — reist mit zur Kasse und in die Links dieses Hofs. */
+  kaeufer?: KaeuferVorbelegung | null
   /** Zeitpunkt der Anfrage (ISO) vom Server — Gebührensatz und Abholtage rechnen davon (Hydration). */
   jetzt: string
 }): React.JSX.Element | null {
@@ -113,7 +118,9 @@ export function ProduktdetailKunde({
   const kaufbar = zustand.art === 'kaufbar' || zustand.art === 'knapp'
   // Mit den Zahlarten des Hofs und der Bar-Ausnahme bis zum SEPA-Start (B1).
   const gebuehr = gebuehrHinweisFuerHof(farm, new Date(jetzt))
-  const link = (id: string) => produktLink(farm.slug, id, alsVorschau)
+  const link = (id: string) => mitKaeuferVorbelegung(produktLink(farm.slug, id, alsVorschau), kaeufer)
+  // Nur die Adresse trägt die Vorbelegung weiter (Nr. 29) — kein Speicher im Browser.
+  const kasse = kassenAdresse(farm.slug, kaeufer)
 
   function imKorb(id: string): number {
     if (!mitKorb) return 0
@@ -415,6 +422,7 @@ export function ProduktdetailKunde({
           mitKorb={mitKorb}
           jetzt={jetzt}
           produkte={produkte}
+          kasseHref={kasse}
           className="hidden lg:col-start-2 lg:row-start-1 lg:flex"
         />
       </div>
@@ -426,6 +434,7 @@ export function ProduktdetailKunde({
           items={items}
           total={total}
           farmSlug={farm.slug}
+          kasseHref={kasse}
           onUpdateQuantity={updateQuantity}
           onRemoveItem={removeItem}
           gebuehrKorb={gebuehr?.korb ?? null}

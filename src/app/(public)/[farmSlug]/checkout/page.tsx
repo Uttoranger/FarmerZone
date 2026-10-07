@@ -7,9 +7,12 @@ import { getBetriebsVorbelegung, getNurBetriebeProduktIds } from '@/server/queri
 import { CheckoutForm } from '@/components/checkout/checkout-form'
 import { ausgebuchteAbholfenster } from '@/server/abholfenster'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
+import { kassenVorbelegung } from '@/lib/kasse'
+import { KAEUFER_PARAMETER, leseKaeuferVorbelegung } from '@/schemas/kaeufer-vorbelegung'
 
 interface Props {
   params: Promise<{ farmSlug: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -18,8 +21,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return { title: farm ? `Bestellen — ${farm.name}` : 'Bestellen' }
 }
 
-export default async function CheckoutPage({ params }: Props) {
+export default async function CheckoutPage({ params, searchParams }: Props) {
   const { farmSlug } = await params
+  // `?kaeufer=betrieb` aus „Region › Futter kaufen" (Nr. 29): nur der Startwert
+  // des Hakens „Betrieb" — Ungültiges fällt im Schema still weg.
+  const suche = await searchParams
+  const kaeufer = leseKaeuferVorbelegung(suche[KAEUFER_PARAMETER])
   const farm = await getPublicFarm(farmSlug)
 
   if (!farm || farm.isPaused) notFound()
@@ -36,7 +43,7 @@ export default async function CheckoutPage({ params }: Props) {
 
   // Volle Abholfenster (maxOrders erreicht) zeigt das Formular ausgegraut —
   // dieselbe Zählung, mit der /api/checkout ablehnt (src/server/abholfenster.ts).
-  const [nurBetriebeIds, vorbelegung, ausgebucht] = await Promise.all([
+  const [nurBetriebeIds, ausHof, ausgebucht] = await Promise.all([
     getNurBetriebeProduktIds(farm.id),
     session?.user ? getBetriebsVorbelegung(session.user.id) : Promise.resolve(null),
     ausgebuchteAbholfenster(farm.id, new Date()),
@@ -49,7 +56,7 @@ export default async function CheckoutPage({ params }: Props) {
     <CheckoutForm
       farm={farm}
       nurBetriebeIds={nurBetriebeIds}
-      vorbelegung={vorbelegung}
+      vorbelegung={kassenVorbelegung(ausHof, kaeufer)}
       ausgebuchteAbholfenster={ausgebucht}
     />
   )

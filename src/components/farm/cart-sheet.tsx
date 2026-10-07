@@ -22,6 +22,8 @@ type Props = {
   items: CartItem[]
   total: number
   farmSlug: string
+  /** Adresse von „Zur Kasse" — die Produktseite gibt `?kaeufer=betrieb` mit (Nr. 29); sonst die Kasse des Hofs. */
+  kasseHref?: string
   onUpdateQuantity: (productId: string, qty: number) => void
   onRemoveItem: (productId: string) => void
   /** „zzgl. Servicegebühr" neben der Summe — null, wenn der Hof gerade gebührenfrei ist. */
@@ -41,7 +43,7 @@ const MENGEN_KNOPF = cn(
  * noch in der Kundenansicht im neuen Design (KundeShell, data-design="neu"):
  * Kaufen ist Grün (accent), Text und Symbole aus den Tokens.
  */
-export function CartSheet({ open, onOpenChange, items, total, farmSlug, onUpdateQuantity, onRemoveItem, gebuehrKorb = null, futterHinweis = [] }: Props) {
+export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHref, onUpdateQuantity, onRemoveItem, gebuehrKorb = null, futterHinweis = [] }: Props) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-md flex flex-col p-0">
@@ -143,7 +145,7 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, onUpdate
             </p>
             <FutterVerantwortung saetze={futterHinweis} />
             <Link
-              href={`/${farmSlug}/checkout`}
+              href={kasseHref ?? `/${farmSlug}/checkout`}
               onClick={() => onOpenChange(false)}
               className={cn(
                 'flex h-12 w-full items-center justify-center rounded-xl bg-accent text-base font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90',

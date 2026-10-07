@@ -156,7 +156,8 @@ describe('Karten im neuen Design', () => {
     const html = renderToStaticMarkup(createElement(FutterKaufenAnsicht, { ansicht, filter: { km: 25, art: null, menge: null } }))
     expect(html).toContain('Futtermittelbetrieb · LFBIS 1234567')
     expect(html).not.toMatch(/geprüft/i)
-    expect(html).toContain('href="/testhof/produkt/p"')
+    // Seit Nr. 29 mit `?kaeufer=betrieb`: Die Kasse belegt „Betrieb" vor.
+    expect(html).toContain('href="/testhof/produkt/p?kaeufer=betrieb"')
     expect(html).toContain('href="/region?reiter=futter&amp;km=25&amp;art=HEU_STROH"')
     expect(html).toContain('href="/products?neu=1&amp;bereich=futter"')
     expect(html).not.toMatch(/#[0-9a-f]{3,6}\b|rgb\(/i)

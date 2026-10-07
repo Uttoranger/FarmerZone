@@ -34,6 +34,7 @@ import {
   type ProductCategoryValue,
 } from '@/lib/taxonomie'
 import { UMFELD_KM, type UmfeldKm } from '@/lib/umfeld'
+import { mitKaeuferVorbelegung } from '@/schemas/kaeufer-vorbelegung'
 import { FUTTER_ART_VALUES, type FutterArt, type FutterKaufenFilter, type FutterMenge } from '@/schemas/region'
 
 // ─── Eingabe ────────────────────────────────────────────────────────────────
@@ -83,7 +84,7 @@ export type FutterGroesse = {
   /** „5 kg-Sack" — der Name ohne den Teil, den alle Größen teilen. */
   name: string
   preis: string
-  /** Die Produktseite dieser Größe; dort wird gekauft. */
+  /** Die Produktseite dieser Größe mit `?kaeufer=betrieb` (Nr. 29); dort wird gekauft. */
   href: string
 }
 
@@ -99,7 +100,7 @@ export type FutterAngebot = {
   /** „ab € 0,18 / kg" bei mehreren Größen, sonst „€ 0,17 / kg"; null ohne Kennzeichnung. */
   grundpreis: string | null
   groessen: FutterGroesse[]
-  /** „Bestellen" führt zur ersten Größe — die Produktseite bietet die übrigen zur Wahl. */
+  /** „Bestellen" führt zur ersten Größe — die Produktseite bietet die übrigen zur Wahl; mit `?kaeufer=betrieb`. */
   bestellenHref: string
 }
 
@@ -123,6 +124,15 @@ export const FUTTER_SELBST_VERKAUFEN =
   'Du verkaufst selbst Futter? Leg es unter Futtermittel an – mit Verkaufsgrößen vom Sackerl bis zum Rundballen. Dann finden es Höfe hier und Kleintierhalter im Entdecken.'
 
 const MENGE_LABEL: Record<FutterMenge, string> = { klein: 'Kleinmengen', gross: 'Ballen & mehr' }
+
+/**
+ * Der Weg zur Produktseite eines anderen Hofs. Wer hier kauft, ist ein Hof und
+ * kauft für seine Tiere: `?kaeufer=betrieb` belegt in der Kasse den Haken
+ * „Betrieb" vor (Nr. 29, Gate 8) — nur vor, prüfen tut /api/checkout.
+ */
+function kaufLink(slug: string, id: string): string {
+  return mitKaeuferVorbelegung(produktPfad(slug, id), 'betrieb')
+}
 
 /** Gilt der Hof als registrierter Futtermittelbetrieb? Eine eingetragene Nummer genügt (LFBIS, E9: ungeprüft). */
 export function istRegistrierterBetrieb(hof: Pick<FutterHof, 'betriebsnummer' | 'betriebsstatus'>): boolean {
@@ -190,9 +200,9 @@ function angebotAus(gruppe: readonly FutterProdukt[], hof: FutterHof, jetzt: Ort
     grundpreis: grundpreisText(sortiert),
     groessen: sortiert.map((p) => {
       const rest = p.name.trim().split(/\s+/).slice(anfang).join(' ')
-      return { id: p.id, name: sortiert.length > 1 ? rest || p.name : p.name, preis: formatEuro(p.price), href: produktPfad(hof.slug, p.id) }
+      return { id: p.id, name: sortiert.length > 1 ? rest || p.name : p.name, preis: formatEuro(p.price), href: kaufLink(hof.slug, p.id) }
     }),
-    bestellenHref: produktPfad(hof.slug, erstes.id),
+    bestellenHref: kaufLink(hof.slug, erstes.id),
   }
 }
 

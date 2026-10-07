@@ -59,6 +59,7 @@ export function HofseiteSeitenspalte({
   mitKorb,
   jetzt,
   produkte = [],
+  kasseHref,
   className,
 }: {
   hof: SeitenspalteHof
@@ -73,6 +74,8 @@ export function HofseiteSeitenspalte({
   jetzt: string
   /** Die Produkte des Hofs — nur für den Futter-Hinweis im Mini-Warenkorb (E10a). */
   produkte?: readonly (FutterAbgabe & { id: string })[]
+  /** Adresse von „Zur Kasse" — die Produktseite gibt `?kaeufer=betrieb` mit (Nr. 29); sonst die Kasse des Hofs. */
+  kasseHref?: string
   className?: string
 }): React.JSX.Element {
   const tage = useMemo(() => nextPickupDays(hof.pickupSlots, 3, new Date(jetzt)), [hof.pickupSlots, jetzt])
@@ -81,7 +84,7 @@ export function HofseiteSeitenspalte({
 
   return (
     <aside aria-label="Abholung, Zahlung und Anfahrt" className={cn('flex flex-col gap-[18px]', className)}>
-      {mitKorb && <MiniWarenkorb farmId={hof.id} slug={hof.slug} gebuehrKorb={gebuehrKorb} produkte={produkte} />}
+      {mitKorb && <MiniWarenkorb farmId={hof.id} slug={hof.slug} gebuehrKorb={gebuehrKorb} produkte={produkte} kasseHref={kasseHref} />}
 
       {/* Bei Pause keine Termine: Ankündigen, was man nicht buchen kann, wäre ein leeres Versprechen. */}
       {!hof.isPaused && tage.length > 0 && (
@@ -194,11 +197,13 @@ function MiniWarenkorb({
   slug,
   gebuehrKorb,
   produkte,
+  kasseHref,
 }: {
   farmId: string
   slug: string
   gebuehrKorb: string | null
   produkte: readonly (FutterAbgabe & { id: string })[]
+  kasseHref?: string
 }): ReactNode {
   const positionen = useWarenkorbVomHof(farmId)
   if (positionen.length === 0) return null
@@ -235,7 +240,7 @@ function MiniWarenkorb({
       </p>
       <FutterVerantwortung saetze={futterVerantwortungImKorb(positionen, produkte)} />
       <Link
-        href={`/${slug}/checkout`}
+        href={kasseHref ?? `/${slug}/checkout`}
         className={cn(
           'flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 text-[14.5px] font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90',
           FOKUS_RAHMEN
