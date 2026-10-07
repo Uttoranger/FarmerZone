@@ -38,10 +38,10 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 22c | Auswertung und Region | fertig (Entwurf) | `nacht/2026-10-06/22c-auswertung-region` | #200 | 21 (#199) | Entwurf bis Slug `region` in Produktion geprüft; Vorbelegung „Betrieb" offen | 07.10.2026 |
 | 22d | Einstellungen | fertig | `nacht/2026-10-06/22d-einstellungen` | #196 | 22b (#195) | Mockup-Abweichungen der Übersicht vor Merge freigeben | 07.10.2026 |
 | 22e | Beiträge, Hilfe, Meine Meldungen | fertig | `nacht/2026-10-06/22e-beitraege-hilfe` | #197 | 22d (#196) | E12-Lesart „bleibt und leitet um" bestätigen; Anzeigen der alten Beitragskarte (E-Mail-Zahl) entscheiden | 07.10.2026 |
-| 22f | Admin in der AdminShell | fertig (Entwurf) | `nacht/2026-10-06/22f-admin` | #201 | 22c (#200) | Haltepunkt Lauf 5; Entwurf bis „Freischalten ohne Stripe nur bei Online-Wunsch" bestätigt; Bar-Höfe-Blocker behoben | 07.10.2026 |
+| 22f | Admin in der AdminShell | ersetzt | `nacht/2026-10-06/22f-admin` | #201 (geschlossen) | 22c (#200) | Code übernommen in Nr. 24 (#203); Lesart „Bar-Höfe freischaltbar" nach Z1 verworfen | 07.10.2026 |
 | 23 | Nachtrag Futter (#198) | fertig | `nacht/2026-10-06/20-futter-brennmaterial` | #198 | main | Entwurf aufgehoben; genaue BAES-Unterseite eintragen; Abgrenzung neue Bestätigung (Sichtbarkeit/Foto frei, MwSt nicht) bestätigen | 07.10.2026 |
-| 24 | Stripe-Pflicht und Admin auf main | läuft | `nacht/2026-10-07/24-stripe-pflicht` | | main | | 07.10.2026 |
-| 25 | Teilen nach T1 (#199) | offen | | | | | |
+| 24 | Stripe-Pflicht und Admin auf main | fertig | `nacht/2026-10-07/24-stripe-pflicht` | #203 | main | ersetzt #201 (geschlossen); Sackgasse für Höfe mit acceptsOnline=false behoben; Höfe ohne Stripe nach Merge ansprechen | 07.10.2026 |
+| 25 | Teilen nach T1 (#199) | läuft | `nacht/2026-10-06/21-teilen` | #199 | 20 (#198) | | 07.10.2026 |
 | 26 | Auswertung und Region nach T1 (#200) | offen | | | | | |
 | 27 | Konto und Geld, klein | offen | | | | | |
 | 28 | Oberfläche und Wortwahl | offen | | | | | |
