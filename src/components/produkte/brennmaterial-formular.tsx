@@ -360,7 +360,7 @@ export function BrennmaterialFormular({ onClose }: { onClose: () => void }): Rea
               <li key={z.schluessel} className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3">
                 <div className="flex items-end gap-2">
                   <div className="min-w-0 flex-1">
-                    <Feld feld={`${pfad}.bezeichnung`} label="Größe" fehler={fehler[`${pfad}.bezeichnung`]}>
+                    <Feld feld={`${pfad}.bezeichnung`} labelZusatz={z.bezeichnung || 'neue Größe'} label="Größe" fehler={fehler[`${pfad}.bezeichnung`]}>
                       <input
                         id={feldId(`${pfad}.bezeichnung`)}
                         value={z.bezeichnung}
@@ -389,7 +389,7 @@ export function BrennmaterialFormular({ onClose }: { onClose: () => void }): Rea
                 )}
 
                 <div className="grid grid-cols-1 items-start gap-2.5 sm:grid-cols-[minmax(0,1fr)_auto]">
-                  <Feld feld={`${pfad}.price`} label={`Preis je ${einheitLabel(z.unit)}`} fehler={fehler[`${pfad}.price`]}>
+                  <Feld feld={`${pfad}.price`} labelZusatz={z.bezeichnung || 'neue Größe'} label={`Preis je ${einheitLabel(z.unit)}`} fehler={fehler[`${pfad}.price`]}>
                     <DezimalFeld id={feldId(`${pfad}.price`)} value={z.price} praefix="€" stellen={2} onChange={(w) => zeileAendern(z.schluessel, { price: w })} />
                   </Feld>
                   <div className="flex flex-col gap-1.5" data-feld={`${pfad}.stock`}>

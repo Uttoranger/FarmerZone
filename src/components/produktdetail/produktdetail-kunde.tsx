@@ -270,8 +270,9 @@ export function ProduktdetailKunde({
                 </p>
               )}
 
+              {/* Kacheln nach Platz statt fester Spalten: In der schmalen Textspalte ab 1024 px brach „Ofenfertig“ sonst mitten im Wort. */}
               {brennmaterial.length > 0 && (
-                <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <dl className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
                   {brennmaterial.map((z) => (
                     <div key={z.titel} className="rounded-xl border border-border bg-card px-3 py-2">
                       <dt className="text-[11.5px] text-muted-foreground">{z.titel}</dt>

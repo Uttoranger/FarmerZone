@@ -323,7 +323,7 @@ export function FutterFormular({
               <li key={z.schluessel} className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3">
                 <div className="flex items-end gap-2">
                   <div className="min-w-0 flex-1">
-                    <Feld feld={`${pfad}.bezeichnung`} label="Größe" fehler={fehler[`${pfad}.bezeichnung`]}>
+                    <Feld feld={`${pfad}.bezeichnung`} labelZusatz={z.bezeichnung || 'neue Größe'} label="Größe" fehler={fehler[`${pfad}.bezeichnung`]}>
                       <input
                         id={feldId(`${pfad}.bezeichnung`)}
                         value={z.bezeichnung}
@@ -361,13 +361,13 @@ export function FutterFormular({
 
                 <div className="grid grid-cols-2 items-start gap-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                   <Feld
-                    feld={`${pfad}.nettoMenge`}
+                    feld={`${pfad}.nettoMenge`} labelZusatz={z.bezeichnung || 'neue Größe'}
                     label={gewichtUngefaehr(z.unit) ? 'Gewicht (ca.)' : 'Gewicht'}
                     fehler={fehler[`${pfad}.nettoMenge`]}
                   >
                     <DezimalFeld id={feldId(`${pfad}.nettoMenge`)} value={z.nettoMenge} suffix="kg" onChange={(w) => zeileAendern(z.schluessel, { nettoMenge: w })} />
                   </Feld>
-                  <Feld feld={`${pfad}.price`} label="Preis" fehler={fehler[`${pfad}.price`]}>
+                  <Feld feld={`${pfad}.price`} labelZusatz={z.bezeichnung || 'neue Größe'} label="Preis" fehler={fehler[`${pfad}.price`]}>
                     <DezimalFeld id={feldId(`${pfad}.price`)} value={z.price} praefix="€" stellen={2} onChange={(w) => zeileAendern(z.schluessel, { price: w })} />
                   </Feld>
                   <div className="col-span-2 flex flex-col gap-1.5 sm:col-span-1" data-feld={`${pfad}.stock`}>

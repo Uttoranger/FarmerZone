@@ -124,7 +124,10 @@ export function Feld({
   fehler,
   children,
   labelKlasse,
+  labelZusatz,
 }: {
+  /** Für Screenreader hinter der Beschriftung — „Preis" steht je Größe einmal, das nennt welche. */
+  labelZusatz?: string
   /** Schlüssel wie im Schema („name", „groessen.0.price") — Sprungziel beim ersten Fehler. */
   feld: string
   label: string
@@ -138,6 +141,7 @@ export function Feld({
     <div className="flex min-w-0 flex-col gap-1.5" data-feld={feld}>
       <label htmlFor={id} className={cn('text-[13px] font-medium text-foreground', labelKlasse)}>
         {label}
+        {labelZusatz && <span className="sr-only"> {labelZusatz}</span>}
       </label>
       {children}
       {fehler ? <FeldFehler id={`${id}-fehler`}>{fehler}</FeldFehler> : hilfe ? <p className="text-xs text-muted-foreground">{hilfe}</p> : null}
