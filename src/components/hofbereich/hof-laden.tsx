@@ -82,6 +82,7 @@ export function BeitragNeuLaden(): React.JSX.Element {
           <div className="mb-4">
             <div className="mb-1.5 h-4 w-20 rounded bg-muted" />
             <div className="h-[122px] rounded-xl bg-muted" />
+            <div className="mt-1 h-3 w-3/4 rounded bg-muted" />
           </div>
           <div className="mb-5 h-11 w-36 rounded-lg bg-muted" />
           <div className="h-12 rounded-xl bg-muted" />

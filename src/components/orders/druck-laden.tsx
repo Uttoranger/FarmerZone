@@ -18,6 +18,7 @@ export function BestellDruckLaden(): React.JSX.Element {
       <div className="mb-5 border-b-2 border-border pb-4">
         <div className="h-6 w-48 rounded bg-border" />
         <div className="mt-2 h-4 w-56 rounded bg-app-trough" />
+        <div className="mt-1 h-4 w-32 rounded bg-app-trough" />
       </div>
       {[0, 1, 2].map((i) => (
         <div key={i} className="mb-5">

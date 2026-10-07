@@ -47,9 +47,10 @@ export function AdminLaden({ ansicht }: { ansicht: Ansicht }): React.JSX.Element
         <div className="mb-5 h-11 rounded-xl border border-border bg-card" />
         <div className="mb-5 h-11 rounded-xl border border-border bg-card" />
         <div className="mb-1 h-7 w-20 rounded bg-border" />
-        <div className="mb-5 h-4 w-64 rounded bg-muted" />
+        <div className="mb-1 h-4 w-64 max-w-full rounded bg-muted" />
+        <div className="mb-5 h-4 w-52 rounded bg-muted" />
         <div className="space-y-3">
-          {[0, 1, 2].map((i) => (
+          {[0, 1].map((i) => (
             <div key={i} className="rounded-xl border border-border bg-card p-4">
               <div className="flex items-start justify-between gap-2">
                 <div>
@@ -58,7 +59,16 @@ export function AdminLaden({ ansicht }: { ansicht: Ansicht }): React.JSX.Element
                 </div>
                 <div className="h-6 w-24 rounded-full bg-muted" />
               </div>
-              <div className="mt-3 h-3 w-3/4 rounded bg-muted" />
+              {/* Kennung, Inhaber, Bestätigung, Registrierung */}
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {[0, 1, 2, 3].map((j) => (
+                  <div key={j} className="h-3.5 w-3/4 rounded bg-muted" />
+                ))}
+              </div>
+              <div className="mt-4 h-3 w-56 rounded bg-muted" />
+              {/* Servicegebühr des Hofs */}
+              <div className="mt-3 h-[84px] rounded-xl bg-muted" />
+              <div className="mt-3 h-7 w-32 rounded-lg bg-muted" />
             </div>
           ))}
         </div>
@@ -78,11 +88,13 @@ export function AdminLaden({ ansicht }: { ansicht: Ansicht }): React.JSX.Element
             <div key={i} className="rounded-xl border border-border bg-card px-3 py-3">
               <div className="h-3 w-20 rounded bg-muted" />
               <div className="mt-2 h-6 w-24 rounded bg-border" />
+              <div className="mt-2 h-3 w-16 rounded bg-muted" />
             </div>
           ))}
         </div>
-        <div className="mb-5 h-28 rounded-2xl bg-muted" />
-        <div className="mb-5 h-48 rounded-xl border border-border bg-card" />
+        {/* „Wann trägt sich die Plattform?" und der Verlauf je Monat */}
+        <div className="mb-5 h-44 rounded-2xl bg-muted" />
+        <div className="mb-5 h-[280px] rounded-xl border border-border bg-card" />
         <Karte zeilen={3} />
       </Rahmen>
     )
@@ -102,6 +114,18 @@ export function AdminLaden({ ansicht }: { ansicht: Ansicht }): React.JSX.Element
             </div>
           ))}
         </div>
+        {/* Filter nach Status und Art — stehen im Reiter Meldungen immer da */}
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {[26, 16, 12, 17, 32, 18, 18, 22, 20, 12].map((breite, i) => (
+            <div key={i} className="h-9 rounded-full bg-muted" style={{ width: `${breite * 4}px` }} />
+          ))}
+        </div>
+        <div className="mb-5 flex flex-wrap gap-1.5">
+          {[20, 16, 18, 16].map((breite, i) => (
+            <div key={i} className="h-9 rounded-full bg-muted" style={{ width: `${breite * 4}px` }} />
+          ))}
+        </div>
+        <div className="mb-3 h-3 w-64 max-w-full rounded bg-muted" />
         <div className="space-y-3">
           {[0, 1, 2].map((i) => (
             <Karte key={i} />
@@ -120,13 +144,14 @@ export function AdminLaden({ ansicht }: { ansicht: Ansicht }): React.JSX.Element
         <div className="h-6 w-20 rounded-full bg-muted" />
       </div>
       <div className="mt-1 h-3 w-48 rounded bg-muted" />
+      {/* Meldung, Kontext, Triage-Formular */}
       <div className="mt-5">
-        <Karte zeilen={4} />
+        <Karte zeilen={1} />
       </div>
       <div className="mt-4">
-        <Karte />
+        <Karte zeilen={4} />
       </div>
-      <div className="mt-4 h-64 rounded-xl border border-border bg-card" />
+      <div className="mt-4 h-[500px] rounded-xl border border-border bg-card" />
     </Rahmen>
   )
 }

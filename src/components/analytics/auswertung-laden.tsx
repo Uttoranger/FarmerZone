@@ -62,14 +62,17 @@ export function AuswertungLaden({ reiter }: { reiter: 'umsatz' | 'umfeld' }): Re
         <>
           {/* Bereich und Umkreis */}
           <div className="mb-4 space-y-3">
-            <div className="h-[52px] rounded-xl bg-app-trough" />
+            <div className="h-[54px] rounded-xl bg-app-trough" />
             <div className="h-[54px] rounded-xl border border-border bg-card" />
           </div>
           {/* Liste | Karte */}
           <div className="mb-3 flex justify-end">
-            <div className="h-11 w-44 rounded-xl bg-app-trough" />
+            <div className="h-[52px] w-[172px] rounded-xl bg-app-trough" />
           </div>
-          <div className="mb-3 h-3 w-56 rounded bg-app-chip" />
+          <div className="mb-3 space-y-1.5">
+            <div className="h-3 w-full rounded bg-app-chip" />
+            <div className="h-3 w-40 rounded bg-app-chip" />
+          </div>
           <div className="space-y-2">
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className="rounded-xl border border-border bg-card px-4 py-3">
