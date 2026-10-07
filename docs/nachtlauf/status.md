@@ -56,5 +56,5 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 37 | Sentry ohne IP-Adressen | fertig (PR #215) | `nacht/2026-10-07/37-sentry-ip` | #215 | main | Sicherheitspfad, zwei Runden, Nachprüfung; Dashboard-Einstellung prüft der Mensch; keine Migration | 07.10.2026 |
 | 38 | Double-Opt-in (S11) | fertig (PR #217) | `nacht/2026-10-07/38-double-opt-in` | #217 | main | **Migration: ja (Expand)**; Sicherheitspfad, zwei Runden, zwei Nachprüfungen; ein „Sollte" offen (Rückgabetyp); Abonnentenzahl ermittelt der Mensch | 07.10.2026 |
 | 39 | Direktverkauf senkt den Vorrat (D1) | fertig (PR #216) | `nacht/2026-10-07/39-direktverkauf-vorrat` | #216 | main | Annahmen zur Freigabe (Grundeinheit, auf 0, Aufrunden); keine Migration | 07.10.2026 |
-| 40 | Rate-Limit über die Datenbank (R1) | läuft | `nacht/2026-10-07/40-rate-limit-db` | | main | | 07.10.2026 |
-| Sammel | Sammel-PR Lauf 7 | offen | `integration/lauf7` | | main | | |
+| 40 | Rate-Limit über die Datenbank (R1) | fertig (PR #218) | `nacht/2026-10-07/40-rate-limit-db` | #218 | main | **Migration: ja (Expand, neue Tabelle + RLS)**; nach #217 mergen; Datenschutzsatz offen | 07.10.2026 |
+| Sammel | Sammel-PR Lauf 7 | läuft | `integration/lauf7` | | main | | 07.10.2026 |
