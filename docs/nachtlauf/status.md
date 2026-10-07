@@ -41,8 +41,8 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 22f | Admin in der AdminShell | ersetzt | `nacht/2026-10-06/22f-admin` | #201 (geschlossen) | 22c (#200) | Code übernommen in Nr. 24 (#203); Lesart „Bar-Höfe freischaltbar" nach Z1 verworfen | 07.10.2026 |
 | 23 | Nachtrag Futter (#198) | fertig | `nacht/2026-10-06/20-futter-brennmaterial` | #198 | main | Entwurf aufgehoben; genaue BAES-Unterseite eintragen; Abgrenzung neue Bestätigung (Sichtbarkeit/Foto frei, MwSt nicht) bestätigen | 07.10.2026 |
 | 24 | Stripe-Pflicht und Admin auf main | fertig | `nacht/2026-10-07/24-stripe-pflicht` | #203 | main | ersetzt #201 (geschlossen); Sackgasse für Höfe mit acceptsOnline=false behoben; Höfe ohne Stripe nach Merge ansprechen | 07.10.2026 |
-| 25 | Teilen nach T1 (#199) | läuft | `nacht/2026-10-06/21-teilen` | #199 | 20 (#198) | | 07.10.2026 |
-| 26 | Auswertung und Region nach T1 (#200) | offen | | | | | |
+| 25 | Teilen nach T1 (#199) | fertig | `nacht/2026-10-06/21-teilen` | #199 | 20 (#198) | Entwurf aufgehoben; kein Browser-Speicher, keine Bestell-Zuordnung | 07.10.2026 |
+| 26 | Auswertung und Region nach T1 (#200) | läuft | `nacht/2026-10-06/22c-auswertung-region` | #200 | 21 (#199) | | 07.10.2026 |
 | 27 | Konto und Geld, klein | offen | | | | | |
 | 28 | Oberfläche und Wortwahl | offen | | | | | |
 | 29 | „Betrieb" bei Futter kaufen | offen | | | | | |
