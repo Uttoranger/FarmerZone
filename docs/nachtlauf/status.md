@@ -31,11 +31,11 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 19c | Geldpfad „Artikel fehlt" nachziehen | fertig | `nacht/2026-10-06/19c-geldpfad` | #191 | main | Stripe-Abo `refund.failed`/`charge.refund.updated` setzen; gescheiterter Voll-Storno nur gemeldet | 06.10.2026 |
 | 19a | B1 – keine Bargebühr bis zum Stichtag | fertig | `nacht/2026-10-06/19a-bargebuehr` | #192 | 19c (#191) | Mockup-Abweichungen Kasse/Startseite freigeben | 06.10.2026 |
 | 19b | Sicherheits-Altlasten aus Lauf 4 | fertig | `nacht/2026-10-06/19b-sicherheit` | #193 | 19a (#192) | Foto-Upload nach Deploy prüfen; Registrierung: Aufzählung nicht ganz geschlossen | 06.10.2026 |
-| 20 | Futter und Brennmaterial | offen | | | | | |
+| 20 | Futter und Brennmaterial | läuft | `nacht/2026-10-06/20-futter-brennmaterial` | | 22e (#197) | | 07.10.2026 |
 | 21 | Teilen | offen | | | | | |
 | 22a | Kunden und Kundendetail | fertig | `nacht/2026-10-06/22a-kunden` | #194 | 19b (#193) | Marken-Farben freigeben; ILIKE-Altlast customers.ts erledigt | 06.10.2026 |
 | 22b | Verkäufe und „Verkauf eintragen" | fertig | `nacht/2026-10-06/22b-verkaeufe` | #195 | 22a (#194) | „Gesamt"-Wort und Vorrat bei Direktverkauf entscheiden | 06.10.2026 |
 | 22c | Auswertung und Region | offen | | | | | |
 | 22d | Einstellungen | fertig | `nacht/2026-10-06/22d-einstellungen` | #196 | 22b (#195) | Mockup-Abweichungen der Übersicht vor Merge freigeben | 07.10.2026 |
-| 22e | Beiträge, Hilfe, Meine Meldungen | läuft | `nacht/2026-10-06/22e-beitraege-hilfe` | | 22d (#196) | | 07.10.2026 |
+| 22e | Beiträge, Hilfe, Meine Meldungen | fertig | `nacht/2026-10-06/22e-beitraege-hilfe` | #197 | 22d (#196) | E12-Lesart „bleibt und leitet um" bestätigen; Anzeigen der alten Beitragskarte (E-Mail-Zahl) entscheiden | 07.10.2026 |
 | 22f | Admin in der AdminShell | offen | | | | | |
