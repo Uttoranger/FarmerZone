@@ -64,6 +64,7 @@ import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
 import { EMAIL_BESTAETIGUNG_STICHTAG, FREISCHALTUNG_EMAIL_OFFEN_TEXT } from '@/lib/email-bestaetigung'
 import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
+import { FREISCHALTUNG_STRIPE_OFFEN_TEXT } from '@/lib/admin-hoefe'
 
 /**
  * Seit dem Checkout-Sprint prüft POST /api/checkout die Reservierungsfrist und
@@ -342,6 +343,7 @@ describe('Freigabe-Actions', () => {
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
+      stripeAccountReady: true,
       // Konto vor dem Stichtag, unbestätigt: bestehende Höfe bleiben unberührt (17b).
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: false },
     } as never)
@@ -361,6 +363,7 @@ describe('Freigabe-Actions', () => {
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
+      stripeAccountReady: true,
       // Konto vor dem Stichtag, unbestätigt: bestehende Höfe bleiben unberührt (17b).
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: false },
     } as never)
@@ -382,6 +385,7 @@ describe('Freigabe-Actions', () => {
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
+      stripeAccountReady: true,
       // Konto vor dem Stichtag, unbestätigt: bestehende Höfe bleiben unberührt (17b).
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: false },
     } as never)
@@ -413,11 +417,50 @@ describe('Freigabe-Actions', () => {
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
+      stripeAccountReady: true,
       owner: { email: 'bauer@testhof.at', createdAt: new Date(EMAIL_BESTAETIGUNG_STICHTAG.getTime() + 1), emailVerified: true },
     } as never)
 
     expect((await approveFarmAction('farm_1')).error).toBeUndefined()
     expect(farmUpdate).toHaveBeenCalledTimes(1)
+  })
+
+  it('schaltet einen Hof ohne fertiges Stripe-Konto NICHT frei (Gate 8, Nr. 22f) — keine Mail, nichts geschrieben', async () => {
+    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    farmFindUnique.mockResolvedValue({
+      name: 'Testhof',
+      slug: 'testhof',
+      stripeAccountReady: false,
+      owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
+    } as never)
+
+    const result = await approveFarmAction('farm_1')
+
+    expect(result.error).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
+    expect(farmUpdate).not.toHaveBeenCalled()
+    expect(freischaltMail).not.toHaveBeenCalled()
+  })
+
+  it('fragt Stripe frisch aus der Datenbank ab — die Abfrage wählt stripeAccountReady aus', async () => {
+    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    farmFindUnique.mockResolvedValue(null as never)
+
+    await approveFarmAction('farm_1')
+
+    const arg = farmFindUnique.mock.calls[0][0] as { select: Record<string, unknown> }
+    expect(arg.select.stripeAccountReady).toBe(true)
+  })
+
+  it('ohne bestätigte E-Mail UND ohne Stripe nennt die Sperre zuerst die E-Mail — wie die Liste', async () => {
+    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    farmFindUnique.mockResolvedValue({
+      name: 'Testhof',
+      slug: 'testhof',
+      stripeAccountReady: false,
+      owner: { email: 'bauer@testhof.at', createdAt: new Date(EMAIL_BESTAETIGUNG_STICHTAG.getTime() + 1), emailVerified: false },
+    } as never)
+
+    expect((await approveFarmAction('farm_1')).error).toBe(FREISCHALTUNG_EMAIL_OFFEN_TEXT)
   })
 
   it('nimmt mit isAdmin die Freigabe zurück (approvedAt = null) — und schweigt dabei', async () => {

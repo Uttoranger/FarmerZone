@@ -14,6 +14,7 @@ import { servicegebuehrEinstellungSchema } from '@/schemas/servicegebuehr'
 import { wienerMitternacht } from '@/lib/servicegebuehr'
 import { triageEingabeSchema } from '@/schemas/meldung'
 import { FREISCHALTUNG_EMAIL_OFFEN_TEXT, bestaetigungOffen } from '@/lib/email-bestaetigung'
+import { FREISCHALTUNG_STRIPE_OFFEN_TEXT } from '@/lib/admin-hoefe'
 
 function revalidateAll(slug: string) {
   revalidatePath('/admin')
@@ -33,7 +34,12 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
 
   const farm = await prisma.farm.findUnique({
     where: { id: farmId },
-    select: { name: true, slug: true, owner: { select: { email: true, emailVerified: true, createdAt: true } } },
+    select: {
+      name: true,
+      slug: true,
+      stripeAccountReady: true,
+      owner: { select: { email: true, emailVerified: true, createdAt: true } },
+    },
   })
   if (!farm) return { error: 'Hof nicht gefunden.' }
 
@@ -41,6 +47,11 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
   // gesperrt — und online geht ein Hof nur über diesen Klick. Konten vor dem
   // Stichtag bleiben unberührt. Frisch aus der Datenbank gelesen (oben).
   if (bestaetigungOffen(farm.owner)) return { error: FREISCHALTUNG_EMAIL_OFFEN_TEXT }
+
+  // Gate 8 (freigabe.md §9 „22f"): Freischalten erst mit fertigem
+  // Stripe-Konto — dieselbe Reihenfolge wie freischaltSperre in der Liste.
+  // Bereits freigeschaltete Höfe berührt das nicht; es wirkt nur auf diesen Klick.
+  if (farm.stripeAccountReady !== true) return { error: FREISCHALTUNG_STRIPE_OFFEN_TEXT }
 
   await prisma.farm.update({ where: { id: farmId }, data: { approvedAt: new Date() } })
   revalidateAll(farm.slug)

@@ -5,6 +5,7 @@ import { alsLand, type Land } from '@/lib/laender'
 import { monatsgrenzenWien } from '@/lib/servicegebuehr'
 import { BAR_SERVICEGEBUEHR_AB } from '@/lib/konditionen'
 import { bestaetigungOffen } from '@/lib/email-bestaetigung'
+import { nummerAnzeige } from '@/lib/admin-hoefe'
 
 /**
  * Die Monatsspalten je Hof (Sprint servicegebuehr, E-3) — das Fundament der
@@ -59,6 +60,14 @@ export type AdminFarmRow = {
   monat: AdminMonatsSpalten
   /** Der Bezugsmonat der Spalten, z. B. „September 2026". */
   monatBezeichnung: string
+  /** Stripe-Konto fertig (Farm.stripeAccountReady) — Bedingung fürs Freischalten (Nr. 22f). */
+  stripeBereit: boolean
+  /** Bestellungen pausiert (Urlaubsmodus) — nur für Status und Filter der Liste. */
+  isPaused: boolean
+  /** Betriebsnummer, wie der Hof sie angegeben hat (E9: nur Anzeige, nie geprüft). */
+  betriebsnummer: string | null
+  /** SEPA-Mandat erteilt (Farm.sepaMandatAm gesetzt) — nur Anzeige. */
+  sepaErteilt: boolean
 }
 
 /** Ist der angemeldete Nutzer Plattformbetreiber? Frisch aus der DB, nie aus der Session. */
@@ -152,6 +161,12 @@ export async function getAdminFarms(jetzt: Date = new Date()): Promise<AdminFarm
         serviceFeePercent: true,
         serviceFeeMinCents: true,
         serviceFeeActiveFrom: true,
+        // Nr. 22f: Status, Freischalt-Sperre und Anzeige der Liste. Die
+        // Stripe-Kennung selbst verlässt diese Funktion nicht.
+        stripeAccountReady: true,
+        isPaused: true,
+        betriebsnummer: true,
+        sepaMandatAm: true,
         owner: { select: { email: true, emailVerified: true, createdAt: true } },
         _count: { select: { products: true, farmPhotos: true, pickupSlots: true } },
       },
@@ -189,10 +204,22 @@ export async function getAdminFarms(jetzt: Date = new Date()): Promise<AdminFarm
     serviceFeeActiveFrom: f.serviceFeeActiveFrom,
     monat: spalten.get(f.id) ?? MONAT_LEER,
     monatBezeichnung: monat.bezeichnung,
+    stripeBereit: f.stripeAccountReady === true,
+    isPaused: f.isPaused === true,
+    betriebsnummer: nummerAnzeige(f.betriebsnummer ?? null),
+    sepaErteilt: f.sepaMandatAm != null,
   }))
 
   // Wartende zuerst — das ist die einzige Liste, in der der Betreiber
   // tatsächlich etwas tun muss. Innerhalb der Gruppen bleibt es bei
   // „jüngste zuerst" aus der Query.
   return [...rows.filter((r) => r.approvedAt === null), ...rows.filter((r) => r.approvedAt !== null)]
+}
+
+/**
+ * Höfe, die auf Freischaltung warten — die Zahl am Reiter „Höfe" der
+ * AdminShell. Dieselbe Regel wie die Liste: wartend heißt approvedAt null.
+ */
+export async function zaehleWartendeHoefe(): Promise<number> {
+  return prisma.farm.count({ where: { approvedAt: null } })
 }

@@ -56,6 +56,9 @@ export type AdminMeldungZeile = {
   diagKennung: string | null
   clusterKey: string | null
   sprintName: string | null
+  /** Für die Zeile „woher" (Nr. 22f) — gezeigt nur als Pfad bzw. Gerät in Worten. */
+  seiteUrl: string
+  userAgent: string
 }
 
 export type AdminMeldungFilter = { status: MeldungStatus[]; art: MeldungArt | null }
@@ -94,6 +97,8 @@ export async function getMeldungenFuerAdmin(filter: AdminMeldungFilter): Promise
       diagKennung: true,
       clusterKey: true,
       sprintName: true,
+      seiteUrl: true,
+      userAgent: true,
       farm: { select: { name: true } },
     },
   })
@@ -109,7 +114,38 @@ export async function getMeldungenFuerAdmin(filter: AdminMeldungFilter): Promise
     diagKennung: z.diagKennung,
     clusterKey: z.clusterKey,
     sprintName: z.sprintName,
+    seiteUrl: z.seiteUrl,
+    userAgent: z.userAgent,
   }))
+}
+
+/**
+ * Meldungen je Status — die Zahlen hinter den Filtern des Briefkastens
+ * (Nr. 22f). Eine gruppierte Abfrage über den Index auf status; mit Art-Filter
+ * zählt sie nur diese Art, damit Chip und Liste dasselbe sagen.
+ */
+export async function zaehleMeldungenJeStatus(art: MeldungArt | null): Promise<Partial<Record<MeldungStatus, number>>> {
+  const gruppen = await prisma.meldung.groupBy({
+    by: ['status'],
+    where: art ? { art } : {},
+    _count: { _all: true },
+  })
+  const zahlen: Partial<Record<MeldungStatus, number>> = {}
+  for (const g of gruppen) zahlen[g.status] = g._count._all
+  return zahlen
+}
+
+/**
+ * Die Nachbarn einer Meldung für „‹ Vorige" und „Nächste ›" (Nr. 22f): in der
+ * Reihenfolge des Briefkastens (neueste zuerst) ist die vorige die nächst
+ * jüngere, die nächste die nächst ältere. Nur Kennungen, nichts zum Anzeigen.
+ */
+export async function getMeldungNachbarn(meldung: { createdAt: Date }): Promise<{ vorige: string | null; naechste: string | null }> {
+  const [juenger, aelter] = await Promise.all([
+    prisma.meldung.findFirst({ where: { createdAt: { gt: meldung.createdAt } }, orderBy: { createdAt: 'asc' }, select: { id: true } }),
+    prisma.meldung.findFirst({ where: { createdAt: { lt: meldung.createdAt } }, orderBy: { createdAt: 'desc' }, select: { id: true } }),
+  ])
+  return { vorige: juenger?.id ?? null, naechste: aelter?.id ?? null }
 }
 
 /**
