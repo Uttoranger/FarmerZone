@@ -9,6 +9,7 @@ import { KARTE } from '@/components/hof-bestellungen/stil'
 import { EinstellungenKopf } from '@/components/hof-einstellungen/einstellungen-kopf'
 import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
 import { cn } from '@/lib/utils'
+import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
 import { PaymentsActions } from './payments-actions'
 
 export const metadata: Metadata = { title: 'Zahlung — FarmerZone' }
@@ -31,6 +32,11 @@ async function getFarmPaymentData() {
  * (stripe-connect.ts); die Seite ruft Stripe nicht selbst auf. Neu gezeichnet
  * mit Hinweiskarte und StatusBadge; ?stripe=error (Rückweg von Stripe) steht
  * jetzt inline da, statt still zu bleiben.
+ *
+ * Register Z1: Stripe ist Pflicht, eine Wahl „nur bar" gibt es nicht. Ohne
+ * fertiges Konto steht oben der Hinweis „Online-Zahlung einrichten" — auch
+ * für einen Bestandshof mit acceptsOnline false (nur der Hinweis, keine
+ * Datenänderung). Barzahlung durch Kundinnen bleibt (B1).
  */
 export default async function PaymentsPage({
   searchParams,
@@ -54,6 +60,11 @@ export default async function PaymentsPage({
         {stripeStatus === 'pending' && (
           <Hinweiskarte ton="orange" symbol={Clock}>
             Die Einrichtung bei Stripe ist noch nicht ganz fertig. Bitte setz sie fort.
+          </Hinweiskarte>
+        )}
+        {!farm.stripeAccountReady && stripeStatus !== 'success' && (
+          <Hinweiskarte ton="orange" symbol={CircleAlert} titel={ONLINE_ZAHLUNG_EINRICHTEN_TITEL}>
+            {ONLINE_ZAHLUNG_EINRICHTEN_SATZ}
           </Hinweiskarte>
         )}
         {stripeStatus === 'error' && (
@@ -86,7 +97,7 @@ export default async function PaymentsPage({
                 Bar bei Abholung
               </h2>
               <p className="mt-0.5 text-[13px] text-muted-foreground">
-                Kunden zahlen bei der Abholung bar — keine Einrichtung nötig.
+                Kunden können bei der Abholung auch bar zahlen — zusätzlich zur Online-Zahlung.
               </p>
             </div>
             <StatusBadge status="fertig">Immer aktiv</StatusBadge>
@@ -98,7 +109,8 @@ export default async function PaymentsPage({
 }
 
 function StripeStatus({ accountId, ready }: { accountId: string | null; ready: boolean }): React.JSX.Element {
-  if (!accountId) return <StatusBadge status="neutral">Noch nicht verbunden</StatusBadge>
+  // Orange statt grau: Ohne Stripe fehlt etwas, das jeder Hof braucht (Z1).
+  if (!accountId) return <StatusBadge status="offen">Noch nicht verbunden</StatusBadge>
   if (!ready) return <StatusBadge status="offen">Einrichtung nicht fertig</StatusBadge>
   return <StatusBadge status="fertig">Verbunden und aktiv</StatusBadge>
 }

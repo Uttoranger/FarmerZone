@@ -425,7 +425,7 @@ describe('Freigabe-Actions', () => {
     expect(farmUpdate).toHaveBeenCalledTimes(1)
   })
 
-  it('schaltet einen Online-Hof ohne fertiges Stripe-Konto NICHT frei (Gate 8, Nr. 22f) — keine Mail, nichts geschrieben', async () => {
+  it('schaltet einen Hof ohne fertiges Stripe-Konto NICHT frei (Register Z1) — keine Mail, nichts geschrieben', async () => {
     userFindUnique.mockResolvedValue({ isAdmin: true } as never)
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
@@ -442,7 +442,7 @@ describe('Freigabe-Actions', () => {
     expect(freischaltMail).not.toHaveBeenCalled()
   })
 
-  it('schaltet einen Bar-Hof (acceptsOnline false) ohne Stripe frei — Online-Zahlung ist kein Muss', async () => {
+  it('schaltet auch einen Bar-Hof (acceptsOnline false) ohne Stripe NICHT frei — die Wahl „nur bar" gibt es nicht mehr (Z1)', async () => {
     userFindUnique.mockResolvedValue({ isAdmin: true } as never)
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
@@ -452,11 +452,14 @@ describe('Freigabe-Actions', () => {
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
     } as never)
 
-    expect((await approveFarmAction('farm_1')).error).toBeUndefined()
-    expect(farmUpdate).toHaveBeenCalledTimes(1)
+    const result = await approveFarmAction('farm_1')
+
+    expect(result.error).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
+    expect(farmUpdate).not.toHaveBeenCalled()
+    expect(freischaltMail).not.toHaveBeenCalled()
   })
 
-  it('schaltet einen Online-Hof mit fertigem Stripe frei', async () => {
+  it('schaltet einen Hof mit fertigem Stripe frei', async () => {
     userFindUnique.mockResolvedValue({ isAdmin: true } as never)
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
@@ -469,7 +472,7 @@ describe('Freigabe-Actions', () => {
     expect((await approveFarmAction('farm_1')).error).toBeUndefined()
   })
 
-  it('fragt Stripe und Online-Wunsch frisch aus der Datenbank ab', async () => {
+  it('fragt Stripe frisch aus der Datenbank ab', async () => {
     userFindUnique.mockResolvedValue({ isAdmin: true } as never)
     farmFindUnique.mockResolvedValue(null as never)
 
@@ -477,7 +480,6 @@ describe('Freigabe-Actions', () => {
 
     const arg = farmFindUnique.mock.calls[0][0] as { select: Record<string, unknown> }
     expect(arg.select.stripeAccountReady).toBe(true)
-    expect(arg.select.acceptsOnline).toBe(true)
   })
 
   it('ohne bestätigte E-Mail UND ohne Stripe nennt die Sperre zuerst die E-Mail — wie die Liste', async () => {

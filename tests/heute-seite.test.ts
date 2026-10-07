@@ -39,6 +39,7 @@ import {
   heuteAufbau,
   heuteHofSichtbar,
   naechstesAbholfenster,
+  stripeEinrichtenHinweis,
   packliste,
   packlistenZahlen,
   teilenKarte,
@@ -65,10 +66,12 @@ import {
   Kennzahlen,
   NaechsteAbholungKarte,
   Packliste,
+  StripeEinrichtenHinweis,
   StripeHinweis,
   TeilenKarte,
   WocheKarte,
 } from '@/components/heute/heute-teile'
+import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 const html = (el: React.ReactElement) => renderToStaticMarkup(el)
@@ -248,6 +251,47 @@ describe('Stripe-Hinweis', () => {
     expect(h).toContain('href="/settings/payments"')
     expect(h).toContain('Bei Stripe ergänzen')
     expect(quelle('src/components/heute/heute-teile.tsx')).not.toContain('createOnboardingLink')
+  })
+})
+
+// ─── Online-Zahlung einrichten (Register Z1) ────────────────────────────────
+
+describe('Hinweis „Online-Zahlung einrichten" für freigeschaltete Höfe ohne Stripe (Z1)', () => {
+  const FREI = new Date('2026-09-01T09:00:00Z')
+  const basis = { approvedAt: FREI, archivedAt: null, stripeAccountReady: false, acceptsOnline: true, stripeAccountId: null }
+
+  it('freigeschaltet, ohne Konto: Hinweis — auch bei Online aus (früher „nur bar")', () => {
+    expect(stripeEinrichtenHinweis(basis)).toBe(true)
+    expect(stripeEinrichtenHinweis({ ...basis, acceptsOnline: false })).toBe(true)
+    // Konto da, aber Online aus: kein „pausiert", also der Einrichten-Hinweis.
+    expect(stripeEinrichtenHinweis({ ...basis, acceptsOnline: false, stripeAccountId: 'acct_test_platzhalter' })).toBe(true)
+  })
+
+  it('kein Hinweis mit Stripe, vor der Freischaltung oder stillgelegt', () => {
+    expect(stripeEinrichtenHinweis({ ...basis, stripeAccountReady: true })).toBe(false)
+    expect(stripeEinrichtenHinweis({ ...basis, approvedAt: null })).toBe(false)
+    expect(stripeEinrichtenHinweis({ ...basis, archivedAt: FREI })).toBe(false)
+  })
+
+  it('die Notbremse sticht: Konto da, Stripe lässt es nicht zu → „pausiert", nicht beide', () => {
+    const gesperrt = { ...basis, stripeAccountId: 'acct_test_platzhalter' }
+    expect(onlineZahlungPausiert(gesperrt)).toBe(true)
+    expect(stripeEinrichtenHinweis(gesperrt)).toBe(false)
+  })
+
+  it('rendert Titel, den Satz aus konditionen.ts und den Weg in die Zahlungs-Einstellungen — kein Stripe-Aufruf', () => {
+    const h = html(createElement(StripeEinrichtenHinweis))
+    expect(h).toContain(ONLINE_ZAHLUNG_EINRICHTEN_TITEL)
+    expect(h).toContain(ONLINE_ZAHLUNG_EINRICHTEN_SATZ)
+    expect(h).toContain('href="/settings/payments"')
+    expect(h).not.toMatch(/nur bar/i)
+  })
+
+  it('die Seite zeigt ihn oben, wo sonst „pausiert" steht — keine Abschaltung, nur ein Hinweis', () => {
+    expect(heuteAufbau({ stripeHinweis: true, teilen: null, ersteSchritte: false }).oben).toEqual(['stripe'])
+    const seite = quelle('src/app/(hof)/dashboard/page.tsx')
+    expect(seite).toContain('<StripeEinrichtenHinweis')
+    expect(seite).toContain('heute.stripeEinrichten')
   })
 })
 

@@ -9,7 +9,11 @@ import { HOFNAME_MAX } from '@/lib/eingabegrenzen'
  * zeigt die Liste, nie einen Fehler.
  */
 export const hoefeAnsichtSchema = z.object({
-  filter: z.enum(HOF_FILTER_WERTE).catch('alle'),
+  // Der alte Filter „Ohne Zahlung" heißt seit Register Z1 „Stripe fehlt" — ein
+  // gemerkter Link zeigt weiter dieselben Höfe. „nur-bar" gibt es nicht mehr.
+  filter: z
+    .preprocess((wert) => (wert === 'ohne-zahlung' ? 'stripe-fehlt' : wert), z.enum(HOF_FILTER_WERTE))
+    .catch('alle'),
   suche: z.string().trim().max(HOFNAME_MAX).catch(''),
 })
 

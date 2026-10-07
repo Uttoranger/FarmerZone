@@ -4,7 +4,9 @@
  *
  * Die Aussagen, die zählen:
  *  - Freischalten ist gesperrt ohne bestätigte E-Mail (S3) und ohne fertiges
- *    Stripe-Konto (Gate 8) — in derselben Reihenfolge wie approveFarmAction.
+ *    Stripe-Konto (Register Z1) — für jeden Hof, auch einen, der früher „nur
+ *    bar" gewählt hat; in derselben Reihenfolge wie approveFarmAction.
+ *  - Freigeschaltete Höfe ohne Stripe tragen „Stripe fehlt" (Liste, Filter).
  *  - Der Satz der Servicegebühr sagt „gilt nur für neue Bestellungen" und
  *    nimmt den Standard aus konditionen.ts.
  *  - Die Betriebsnummer wird nur angezeigt (E9) — nirgends steht „geprüft".
@@ -15,6 +17,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   FREISCHALTUNG_STRIPE_OFFEN_TEXT,
+  HOF_FILTER_LABEL,
   SERVICEGEBUEHR_NUR_NEUE,
   adminHofZeile,
   filtereHoefe,
@@ -24,6 +27,7 @@ import {
   nummerAnzeige,
   registriertText,
   satzKurz,
+  stripeFehlt,
   zaehleHofFilter,
   type HofRohdaten,
 } from '@/lib/admin-hoefe'
@@ -51,7 +55,6 @@ function roh(ueber: Partial<HofRohdaten> = {}): HofRohdaten {
     monat: { bestellungen: 4, gebuehrOnlineCents: 120, gebuehrBarCents: 0, gebuehrEntfallenCents: 0 },
     monatBezeichnung: 'Oktober 2026',
     stripeBereit: true,
-    onlineGewuenscht: true,
     isPaused: false,
     betriebsnummer: '1234567',
     sepaErteilt: false,
@@ -61,49 +64,67 @@ function roh(ueber: Partial<HofRohdaten> = {}): HofRohdaten {
 
 describe('freischaltSperre', () => {
   it('ohne bestätigte E-Mail: der Satz aus S3 — vor Stripe, wie der Server', () => {
-    expect(freischaltSperre({ emailBestaetigungOffen: true, stripeBereit: false, onlineGewuenscht: true })).toBe(FREISCHALTUNG_EMAIL_OFFEN_TEXT)
+    expect(freischaltSperre({ emailBestaetigungOffen: true, stripeBereit: false })).toBe(FREISCHALTUNG_EMAIL_OFFEN_TEXT)
   })
-  it('Online-Hof ohne fertiges Stripe-Konto: gesperrt mit Grund', () => {
-    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: false, onlineGewuenscht: true })).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
+  it('ohne fertiges Stripe-Konto: gesperrt mit Grund (Register Z1)', () => {
+    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: false })).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
   })
-  it('Online-Hof mit Stripe: nichts im Weg', () => {
-    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: true, onlineGewuenscht: true })).toBeNull()
+  it('mit Stripe und bestätigter E-Mail: nichts im Weg', () => {
+    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: true })).toBeNull()
   })
-  it('Bar-Hof ohne Stripe: freischaltbar — Online-Zahlung ist ein Plus, kein Muss', () => {
-    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: false, onlineGewuenscht: false })).toBeNull()
-  })
-  it('Bar-Hof ohne bestätigte E-Mail bleibt gesperrt (S3)', () => {
-    expect(freischaltSperre({ emailBestaetigungOffen: true, stripeBereit: false, onlineGewuenscht: false })).toBe(FREISCHALTUNG_EMAIL_OFFEN_TEXT)
+  it('ein Hof, der früher „nur bar" wählen konnte, ist ohne Stripe gesperrt — die Wahl zählt nicht mehr (Z1)', () => {
+    // Die Regel kennt acceptsOnline nicht: Auch ein Bestandshof mit
+    // acceptsOnline=false bekommt ohne Stripe keine Freischaltung.
+    const hof = { emailBestaetigungOffen: false, stripeBereit: false, acceptsOnline: false }
+    expect(freischaltSperre(hof)).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
   })
 })
 
 describe('hofStatus', () => {
-  const basis = { approvedAt: JETZT, archivedAt: null, isPaused: false, stripeBereit: true, onlineGewuenscht: true }
+  const basis = { approvedAt: JETZT, archivedAt: null, isPaused: false, stripeBereit: true }
   it('stillgelegt sticht alles', () => {
     expect(hofStatus({ ...basis, archivedAt: JETZT, approvedAt: null, isPaused: true }).id).toBe('stillgelegt')
   })
   it('ohne Freischaltung: wartet (orange)', () => {
     expect(hofStatus({ ...basis, approvedAt: null })).toEqual({ id: 'wartet', text: 'Wartet', ton: 'offen' })
   })
-  it('pausiert vor „Zahlung fehlt"', () => {
+  it('pausiert vor „Stripe fehlt"', () => {
     expect(hofStatus({ ...basis, isPaused: true, stripeBereit: false }).id).toBe('pausiert')
   })
-  it('ohne Stripe: Zahlung fehlt (orange), sonst online (grün)', () => {
-    expect(hofStatus({ ...basis, stripeBereit: false })).toEqual({ id: 'zahlung-fehlt', text: 'Zahlung fehlt', ton: 'offen' })
+  it('freigeschaltet ohne Stripe: „Stripe fehlt" (orange, kein Rot), sonst online (grün)', () => {
+    expect(hofStatus({ ...basis, stripeBereit: false })).toEqual({ id: 'stripe-fehlt', text: 'Stripe fehlt', ton: 'offen' })
     expect(hofStatus(basis)).toEqual({ id: 'online', text: 'Online', ton: 'fertig' })
   })
-  it('ein Bar-Hof ohne Stripe ist „Nur bar" (neutral), nicht „Zahlung fehlt"', () => {
-    expect(hofStatus({ ...basis, stripeBereit: false, onlineGewuenscht: false })).toEqual({ id: 'nur-bar', text: 'Nur bar', ton: 'neutral' })
+  it('es gibt kein „Nur bar" mehr', () => {
+    expect(JSON.stringify(HOF_FILTER_LABEL)).not.toMatch(/bar/i)
+    expect(hofStatus({ ...basis, stripeBereit: false }).text).not.toMatch(/bar/i)
+  })
+})
+
+describe('stripeFehlt', () => {
+  const basis = { approvedAt: JETZT, archivedAt: null, stripeBereit: false }
+  it('nur freigeschaltete, nicht stillgelegte Höfe ohne Stripe', () => {
+    expect(stripeFehlt(basis)).toBe(true)
+    expect(stripeFehlt({ ...basis, stripeBereit: true })).toBe(false)
+    // Wartende haben ihre eigene Sperre (freischaltSperre), Stillgelegte sind vom Netz.
+    expect(stripeFehlt({ ...basis, approvedAt: null })).toBe(false)
+    expect(stripeFehlt({ ...basis, archivedAt: JETZT })).toBe(false)
   })
 })
 
 describe('Filter und Suche', () => {
-  const zeile = (name: string, id: ReturnType<typeof hofStatus>['id']) => ({ name, slug: name.toLowerCase(), status: { id, text: '', ton: 'neutral' as const } })
+  const zeile = (name: string, id: ReturnType<typeof hofStatus>['id'], stripeFehlt = false) => ({
+    name,
+    slug: name.toLowerCase(),
+    status: { id, text: '', ton: 'neutral' as const },
+    stripeFehlt,
+  })
   const hoefe = [
     zeile('Lindenhof', 'online'),
     zeile('Bergbauernhof', 'pausiert'),
-    zeile('Waldhof', 'zahlung-fehlt'),
-    zeile('Barhof', 'nur-bar'),
+    zeile('Waldhof', 'stripe-fehlt', true),
+    // Pausiert und ohne Stripe: Der Filter „Stripe fehlt" findet ihn trotzdem.
+    zeile('Wiesenhof', 'pausiert', true),
     zeile('Neuhof', 'wartet'),
     zeile('Althof', 'stillgelegt'),
   ]
@@ -112,12 +133,12 @@ describe('Filter und Suche', () => {
     expect(filtereHoefe(hoefe, { filter: 'alle', suche: '' }).map((h) => h.name)).not.toContain('Neuhof')
   })
   it('filtert nach Status und sucht ohne Groß/klein in Name und Adresse', () => {
-    expect(filtereHoefe(hoefe, { filter: 'ohne-zahlung', suche: '' }).map((h) => h.name)).toEqual(['Waldhof'])
+    expect(filtereHoefe(hoefe, { filter: 'stripe-fehlt', suche: '' }).map((h) => h.name)).toEqual(['Waldhof', 'Wiesenhof'])
     expect(filtereHoefe(hoefe, { filter: 'alle', suche: '  LINDEN ' }).map((h) => h.name)).toEqual(['Lindenhof'])
     expect(filtereHoefe(hoefe, { filter: 'pausiert', suche: 'linden' })).toEqual([])
   })
   it('zählt je Filter ohne die wartenden', () => {
-    expect(zaehleHofFilter(hoefe)).toEqual({ alle: 5, online: 1, pausiert: 1, 'ohne-zahlung': 1, 'nur-bar': 1, stillgelegt: 1 })
+    expect(zaehleHofFilter(hoefe)).toEqual({ alle: 5, online: 1, pausiert: 2, 'stripe-fehlt': 2, stillgelegt: 1 })
   })
   it('die Adresse lässt Standardwerte weg', () => {
     expect(hoefeAdresse({ filter: 'alle', suche: '  ' })).toBe('/admin')
@@ -128,6 +149,11 @@ describe('Filter und Suche', () => {
     expect(p('filter=quatsch&suche=x')).toEqual({ filter: 'alle', suche: 'x' })
     expect(p(`suche=${'a'.repeat(81)}`)).toEqual({ filter: 'alle', suche: '' })
     expect(p('filter=stillgelegt')).toEqual({ filter: 'stillgelegt', suche: '' })
+  })
+  it('alte Links: „ohne-zahlung" zeigt „Stripe fehlt", „nur-bar" fällt auf alle', () => {
+    const p = (q: string) => hoefeAnsichtAus(new URLSearchParams(q))
+    expect(p('filter=ohne-zahlung')).toEqual({ filter: 'stripe-fehlt', suche: '' })
+    expect(p('filter=nur-bar')).toEqual({ filter: 'alle', suche: '' })
   })
 })
 
@@ -164,10 +190,11 @@ describe('adminHofZeile', () => {
     expect(JSON.parse(JSON.stringify(zeile))).toEqual(zeile)
   })
 
-  it('ein wartender Bar-Hof ohne Stripe: keine Sperre', () => {
-    const zeile = adminHofZeile(roh({ approvedAt: null, stripeBereit: false, onlineGewuenscht: false }), { gruendungsplatz: null, maxPlaetze: 12 }, JETZT)
+  it('ein freigeschalteter Hof ohne Stripe: Kennzeichen „Stripe fehlt", keine Sperre (bleibt online)', () => {
+    const zeile = adminHofZeile(roh({ stripeBereit: false }), { gruendungsplatz: null, maxPlaetze: 12 }, JETZT)
+    expect(zeile.stripeFehlt).toBe(true)
+    expect(zeile.status.text).toBe('Stripe fehlt')
     expect(zeile.sperre).toBeNull()
-    expect(zeile.onlineGewuenscht).toBe(false)
   })
 
   it('ein wartender Hof ohne Stripe: Sperre mit Grund, kein Platz', () => {

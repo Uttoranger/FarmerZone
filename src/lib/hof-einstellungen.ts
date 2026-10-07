@@ -86,7 +86,11 @@ export type EinstellungenDaten = {
   abholzeitenGesamt: number
   stripeKontoDa: boolean
   stripeBereit: boolean
-  /** Farm.acceptsOnline — aus heißt: der Hof kassiert bewusst nur bar. */
+  /**
+   * Farm.acceptsOnline. Eine Wahl „nur bar" gibt es nicht mehr (Register Z1);
+   * ein Bestandshof mit false wird nur aufgefordert, Stripe einzurichten — die
+   * Daten bleiben, wie sie sind.
+   */
   onlineAn: boolean
   betriebsnummer: string | null
   betriebsstatus: Betriebsstatus | null
@@ -143,16 +147,20 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
     {
       id: 'zahlung',
       titel: 'Zahlung',
-      // Orange nur, wenn Online an ist und Stripe nicht fertig — ein Hof, der
-      // bewusst nur bar kassiert, hat nichts zu tun.
-      zeile: d.stripeBereit
-        ? 'Online-Zahlung über Stripe aktiv · bar bei Abholung'
-        : !d.onlineAn
-          ? 'Bar bei Abholung · Online-Zahlung ist aus'
-          : d.stripeKontoDa
-            ? 'Stripe-Einrichtung noch nicht fertig · bar bei Abholung geht'
-            : 'Bar bei Abholung · Online-Zahlung noch nicht eingerichtet',
-      ton: d.stripeBereit ? 'fertig' : d.onlineAn ? 'offen' : 'neutral',
+      // Jeder Hof richtet Stripe ein (Register Z1): Ohne fertiges Konto ist
+      // der Punkt orange — auch bei einem Bestandshof mit Online aus, der nur
+      // aufgefordert wird. Barzahlung durch Kundinnen bleibt (B1), sie ist
+      // aber keine Wahl des Hofs statt Stripe.
+      zeile: !d.stripeBereit
+        ? d.stripeKontoDa
+          ? 'Stripe-Einrichtung noch nicht fertig · bitte abschließen'
+          : 'Online-Zahlung noch nicht eingerichtet · bitte einrichten'
+        : d.onlineAn
+          ? 'Online-Zahlung über Stripe aktiv · bar bei Abholung'
+          : // Stripe ist fertig, Online steht aus der Zeit vor Z1 noch auf aus:
+            // Der Checkout bietet online dann nicht an — nicht „aktiv" nennen.
+            'Stripe eingerichtet · Online-Zahlung ist noch nicht freigegeben',
+      ton: d.stripeBereit && d.onlineAn ? 'fertig' : 'offen',
       href: '/settings/payments',
     },
     {

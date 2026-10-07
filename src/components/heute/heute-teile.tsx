@@ -28,6 +28,7 @@ import {
   type WochenBalken,
 } from '@/lib/heute'
 import { onlinePausiertHinweis } from '@/lib/stripe-konto'
+import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -126,6 +127,30 @@ export function StripeHinweis({ barMoeglich }: { barMoeglich: boolean }): React.
       }
     >
       <p className="text-[12.5px]">{satz}</p>
+    </Hinweiskarte>
+  )
+}
+
+/**
+ * Online-Zahlung einrichten (Register Z1, stripeEinrichtenHinweis): für
+ * freigeschaltete Höfe ohne Stripe. Nur ein Hinweis — der Hof bleibt online.
+ * Derselbe Platz und dieselbe Form wie „pausiert", damit er nicht übersehen
+ * wird; der Weg führt in die Zahlungs-Einstellungen, die Seite ruft Stripe
+ * nicht selbst auf.
+ */
+export function StripeEinrichtenHinweis(): React.JSX.Element {
+  return (
+    <Hinweiskarte
+      ton="orange"
+      symbol={CreditCard}
+      titel={ONLINE_ZAHLUNG_EINRICHTEN_TITEL}
+      aktion={
+        <Link href="/settings/payments" className={KNOPF_ORANGE}>
+          Jetzt einrichten
+        </Link>
+      }
+    >
+      <p className="text-[12.5px]">{ONLINE_ZAHLUNG_EINRICHTEN_SATZ}</p>
     </Hinweiskarte>
   )
 }

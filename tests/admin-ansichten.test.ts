@@ -56,7 +56,6 @@ function hof(ueber: Partial<HofRohdaten>, platz: number | null = null): AdminHof
     monat: { bestellungen: 0, gebuehrOnlineCents: 0, gebuehrBarCents: 0, gebuehrEntfallenCents: 0 },
     monatBezeichnung: 'Oktober 2026',
     stripeBereit: false,
-    onlineGewuenscht: true,
     isPaused: false,
     betriebsnummer: null,
     sepaErteilt: false,
@@ -89,11 +88,17 @@ describe('Höfe und Freischaltung', () => {
     expect(html).toContain('Stripe eingerichtet')
   })
 
-  it('Bar-Hof ohne Stripe: Freischalten bedienbar, „Nur bar" statt Stripe-Hinweis', () => {
-    const html = render([hof({ name: 'Barhof', onlineGewuenscht: false })])
-    expect(knopf(html, 'Freischalten')).not.toContain('disabled=""')
-    expect(html).not.toContain(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
-    expect(html).toContain('Nur bar')
+  it('freigeschaltet ohne Stripe: „Stripe fehlt" in der Liste und als Filter — kein „Nur bar" (Z1)', () => {
+    const html = render([hof({ name: 'Waldhof', approvedAt: JETZT }, 1), hof({ id: 'farm_2', name: 'Sonnhof', approvedAt: JETZT, stripeBereit: true }, 2)])
+    // Marke in Tabelle und Karte, dazu der Filter-Chip mit Zahl.
+    expect(html.match(/>Stripe fehlt</g)?.length).toBeGreaterThanOrEqual(3)
+    expect(html).toContain('filter=stripe-fehlt')
+    expect(html).not.toMatch(/nur bar/i)
+  })
+
+  it('Gegenprobe: mit Stripe steht kein „Stripe fehlt" in der Liste', () => {
+    const html = render([hof({ name: 'Sonnhof', approvedAt: JETZT, stripeBereit: true }, 1)])
+    expect(html).not.toContain('>Stripe fehlt</span>')
   })
 
   it('die Betriebsnummer steht als Nummer in der Tabelle — ohne Prüfvermerk (E9)', () => {

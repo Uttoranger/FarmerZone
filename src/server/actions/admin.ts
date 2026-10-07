@@ -38,7 +38,6 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
       name: true,
       slug: true,
       stripeAccountReady: true,
-      acceptsOnline: true,
       owner: { select: { email: true, emailVerified: true, createdAt: true } },
     },
   })
@@ -49,13 +48,13 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
   // - S3 (Nr. 17b): „Hof online stellen" ist bis zur bestätigten E-Mail
   //   gesperrt — und online geht ein Hof nur über diesen Klick. Konten vor dem
   //   Stichtag bleiben unberührt.
-  // - Gate 8 (freigabe.md §9 „22f"): Wer online kassieren will, braucht ein
-  //   fertiges Stripe-Konto. Ein reiner Bar-Hof (acceptsOnline false) nicht.
+  // - Register Z1: Jeder Hof braucht ein fertiges Stripe-Konto — auch einer
+  //   mit acceptsOnline false aus der Zeit, als „nur bar" noch ging. Das ist
+  //   die serverseitige Schranke für „Hof online stellen".
   // Bereits freigeschaltete Höfe berührt das nicht; es wirkt nur auf diesen Klick.
   const sperre = freischaltSperre({
     emailBestaetigungOffen: bestaetigungOffen(farm.owner),
     stripeBereit: farm.stripeAccountReady === true,
-    onlineGewuenscht: farm.acceptsOnline !== false,
   })
   if (sperre) return { error: sperre }
 
