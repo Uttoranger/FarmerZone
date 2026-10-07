@@ -3,7 +3,7 @@
  * (tests/verkauf-eintragen.test.ts). Der Dialog fragt zuerst den Betrag,
  * dann den Weg; was verkauft wurde, ist freiwillig.
  */
-import { einheitLabel, formatEuro, formatMenge, formatZahl } from '@/lib/format'
+import { formatEuro, formatMenge } from '@/lib/format'
 import { OHNE_PRODUKT } from '@/lib/umsatz'
 import type { Verkaufskanal } from '@/schemas/verkaufskanal'
 
@@ -105,25 +105,31 @@ export const VORRAT_ABZIEHEN = 'Vorrat abziehen'
 /** Reicht der Vorrat nicht, ist der Verkauf trotzdem gebucht; der Vorrat steht dann auf 0, nie darunter. */
 export const VORRAT_ZU_KLEIN = 'Gebucht. Dein Vorrat war kleiner als die Menge – er steht jetzt auf 0.'
 
-const VORRAT_NICHT_GEAENDERT = 'Gebucht. Deinen Vorrat konnten wir gerade nicht ändern – bitte prüf ihn unter Produkte.'
+/** Die Menge steht in einer anderen Einheit als das Produkt (z. B. eine alte Vorlage) — umrechnen wäre geraten. */
+export const VORRAT_EINHEIT_PASST_NICHT = 'Gebucht. Vorrat nicht geändert – die Einheit passt nicht zum Produkt.'
+
+export const VORRAT_NICHT_GEAENDERT = 'Gebucht. Deinen Vorrat konnten wir gerade nicht ändern – bitte prüf ihn unter Produkte.'
 
 /**
- * Wie viele Gebinde ein Verkauf vom Vorrat abzieht. Der Vorrat zählt ganze
- * Gebinde (Register E3, `Product.stock` ist eine ganze Zahl), die Menge darf
- * gebrochen sein (2,5 kg): Aufgerundet, damit online nie mehr angeboten wird,
- * als noch da ist. Erst auf drei Stellen wie die Spalte `ManualSale.quantity`,
- * sonst machte ein Gleitkomma-Rest aus 2 eine 3. Ohne Menge speichert die
- * Action 1 (verkaufOhneAngaben) — dann geht auch 1 ab.
+ * NUR FÜR DIE ANZEIGE am Schalter: wie viele Gebinde der Verkauf voraussichtlich
+ * abzieht. Die Menge steht in der Grundeinheit des Produkts („2,5 kg"), der
+ * Vorrat zählt Gebinde (Register E3) — also Menge durch Gebindegröße,
+ * aufgerundet; ohne Menge 1 (so speichert die Action, verkaufOhneAngaben).
+ * Verbindlich rechnet die Action mit Decimal (`gebindeAusMenge` in
+ * src/server/actions/manual-sales.ts) aus der gespeicherten Menge.
  */
-export function gebindeZumAbziehen(menge: number | null | undefined): number {
-  if (menge == null || !Number.isFinite(menge) || menge <= 0) return 1
-  return Math.max(1, Math.ceil(Math.round(menge * 1000) / 1000))
+export function gebindeAnzeige(menge: number | null | undefined, unitSize: number | null): number {
+  const m = menge != null && Number.isFinite(menge) && menge > 0 ? menge : 1
+  const groesse = unitSize != null && unitSize > 0 ? unitSize : 1
+  // Auf drei Stellen gerundet, damit ein Gleitkomma-Rest (0,1 + 0,2) nicht aufrundet.
+  return Math.max(1, Math.ceil(Math.round((m / groesse) * 1000) / 1000))
 }
 
 /** Was die Buchung am Vorrat ausgerichtet hat — die Action meldet es, der Dialog zeigt den Satz. */
 export type VorratBuchung =
   | { art: 'abgezogen'; vorrat: number }
   | { art: 'auf-null' }
+  | { art: 'einheit-passt-nicht' }
   /** Der Vorrat änderte sich zwischen den Schritten mehrmals (Bestellung, Hof) — selten, nie ein Grund, den Verkauf zu verwerfen. */
   | { art: 'unveraendert' }
 
@@ -139,6 +145,8 @@ export function vorratHinweis(
       return { text: `Verkauf eingetragen. Vorrat jetzt: ${formatMenge(buchung.vorrat, produkt.unit, produkt.unitSize)}.`, knapp: false }
     case 'auf-null':
       return { text: VORRAT_ZU_KLEIN, knapp: true }
+    case 'einheit-passt-nicht':
+      return { text: VORRAT_EINHEIT_PASST_NICHT, knapp: true }
     case 'unveraendert':
       return { text: VORRAT_NICHT_GEAENDERT, knapp: true }
   }
@@ -148,22 +156,14 @@ export function vorratHinweis(
 export function vorratSchalterText(
   an: boolean,
   produkt: { stock: number; unit: string; unitSize: number | null },
-  menge: number | null | undefined
+  menge: number | null | undefined,
+  /** Einheit des Verkaufs; weicht sie von der des Produkts ab, zieht die Action nichts ab. */
+  einheit: string | null
 ): string {
   if (!an) return 'Aus – dein Vorrat bleibt, wie er ist.'
+  if (einheit !== null && einheit !== produkt.unit) return 'Die Einheit passt nicht zum Produkt – der Vorrat bleibt, wie er ist.'
   const bestand = `Im Vorrat: ${formatMenge(produkt.stock, produkt.unit, produkt.unitSize)}.`
-  const ab = gebindeZumAbziehen(menge)
+  const ab = gebindeAnzeige(menge, produkt.unitSize)
   if (produkt.stock < ab) return `${bestand} Das reicht nicht – danach steht er auf 0.`
   return `${bestand} Wir ziehen ${formatMenge(ab, produkt.unit, produkt.unitSize)} ab.`
-}
-
-/**
- * Die Einheit hinter dem Mengenfeld. Die Menge zählt Gebinde wie der Vorrat:
- * Bei einem Produkt mit Gebindegröße steht „× 0,5 kg" da, sonst nur „kg" —
- * sonst tippte der Hof 1 (kg) für zwei Halbkilo-Säcke, und vom Vorrat ginge
- * einer statt zwei ab.
- */
-export function mengenEinheit(unit: string, unitSize: number | null): string {
-  if (unitSize != null && unitSize !== 1) return `× ${formatZahl(unitSize)} ${einheitLabel(unit)}`
-  return einheitLabel(unit)
 }

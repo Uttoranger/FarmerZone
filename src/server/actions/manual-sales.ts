@@ -8,7 +8,6 @@ import { prisma } from '@/lib/prisma'
 import { manualSaleFormSchema, verkaufIdSchema } from '@/schemas/manual-sale'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import {
-  gebindeZumAbziehen,
   verkaufOhneAngaben,
   vorratHinweis,
   type VorratBuchung,
@@ -119,6 +118,21 @@ async function verkaufsDaten(
 }
 
 /**
+ * Wie viele Gebinde ein Verkauf abzieht. `ManualSale.quantity` steht in der
+ * Grundeinheit des Produkts („2,5 kg", so liest sie auch die Auswertung), der
+ * Vorrat zählt Gebinde (Register E3, ganze Zahl): Menge durch Gebindegröße,
+ * aufgerundet — lieber ein Gebinde zu wenig online anbieten als eines zu
+ * viel. Nur Decimal, kein Gleitkomma; ohne Gebindegröße (null oder 0) zählt
+ * jede Einheit als ein Gebinde. Die Anzeige am Schalter rechnet dasselbe nur
+ * zur Information nach (gebindeAnzeige).
+ */
+function gebindeAusMenge(menge: Prisma.Decimal, unitSize: Prisma.Decimal | null): number {
+  const groesse = unitSize && unitSize.gt(0) ? unitSize : new Prisma.Decimal(1)
+  const gebinde = menge.div(groesse).ceil()
+  return gebinde.lt(1) ? 1 : gebinde.toNumber()
+}
+
+/**
  * Zieht `menge` Gebinde vom Vorrat ab — nie unter 0 (Register D1,
  * CLAUDE.md: nie ein blindes decrement). Erst bedingt `stock >= menge`;
  * reicht das nicht, bedingt `stock < menge` auf 0: Der Verkauf ist echt
@@ -162,10 +176,16 @@ export async function createManualSale(data: unknown): Promise<VerkaufAntwort> {
   // Verkauf und Abzug in EINER Transaktion: Scheitert das Speichern, ist auch
   // nichts abgezogen — nie Ware weg ohne Verkauf. Abgezogen wird nach der
   // Menge, wie die Spalte sie gespeichert hat (drei Stellen).
-  const buchung = await prisma.$transaction(async (tx) => {
-    const verkauf = await tx.manualSale.create({ data: { farmId: farm.id, ...daten }, select: { quantity: true } })
+  // Wirft der Abzug (Datenbankfehler, Sperr-Timeout), rollt der ganze
+  // Verkauf zurück und der Hof sieht die Fehlermeldung — bewusst.
+  const buchung = await prisma.$transaction(async (tx): Promise<VorratBuchung | null> => {
+    const verkauf = await tx.manualSale.create({ data: { farmId: farm.id, ...daten }, select: { quantity: true, unit: true } })
     if (!abziehen) return null
-    return bucheVorrat(tx, abziehen.id, farm.id, gebindeZumAbziehen(verkauf.quantity.toNumber()))
+    // Die Menge steht in der Einheit des Verkaufs; nur in der Einheit des
+    // Produkts lässt sie sich in Gebinde umrechnen. Eine andere Einheit (alte
+    // Vorlage) umzurechnen wäre geraten — dann bleibt der Vorrat, wie er ist.
+    if (verkauf.unit !== abziehen.unit) return { art: 'einheit-passt-nicht' }
+    return bucheVorrat(tx, abziehen.id, farm.id, gebindeAusMenge(verkauf.quantity, abziehen.unitSize))
   })
 
   revalidate()

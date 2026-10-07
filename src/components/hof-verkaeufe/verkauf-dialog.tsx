@@ -16,6 +16,7 @@ import { FELD, FELD_LABEL, KNOPF_ORANGE, KNOPF_RAHMEN } from '@/components/hof-b
 import { createManualSale, updateManualSale } from '@/server/actions/manual-sales'
 import type { VerkaufDaten, VerkaufProdukt } from '@/lib/hof-verkaeufe'
 import { manualSaleFormSchema } from '@/schemas/manual-sale'
+import { UNIT_LABELS } from '@/schemas/product'
 import { verkaufskanalSchema, type Verkaufskanal } from '@/schemas/verkaufskanal'
 import { NOTIZ_MAX, PRODUKTNAME_MAX } from '@/lib/eingabegrenzen'
 import { wienKalendertag } from '@/lib/kalender'
@@ -27,7 +28,6 @@ import {
   datumKurz,
   istOhneProdukt,
   knopfText,
-  mengenEinheit,
   produktChips,
   vorratSchalterText,
 } from '@/lib/verkauf-eintragen'
@@ -145,7 +145,7 @@ export function VerkaufFormular({
   const fehler = form.formState.errors
   // Das gewählte Produkt aus dem Sortiment — nur dann gibt es einen Vorrat abzuziehen.
   const gewaehlt = werte.productId ? produkte.find((p) => p.id === werte.productId) : undefined
-  const einheit = werte.unit ? mengenEinheit(werte.unit, gewaehlt?.unitSize ?? null) : undefined
+  const einheit = werte.unit ? (UNIT_LABELS[werte.unit] ?? werte.unit) : undefined
   // D1 regelt nur das Eintragen: Beim Bearbeiten gibt es den Schalter nicht (und keine Gegenbuchung).
   const vorratSchalter = !bearbeiten && gewaehlt !== undefined
   const vorratTextId = useId()
@@ -394,7 +394,7 @@ export function VerkaufFormular({
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-semibold text-foreground">{VORRAT_ABZIEHEN}</span>
               <span id={vorratTextId} className="block text-[13px] leading-normal break-words text-muted-foreground">
-                {vorratSchalterText(werte.vorratAbziehen, gewaehlt, werte.quantity)}
+                {vorratSchalterText(werte.vorratAbziehen, gewaehlt, werte.quantity, werte.unit)}
               </span>
             </span>
             <span

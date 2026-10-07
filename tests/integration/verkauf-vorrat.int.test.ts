@@ -19,7 +19,8 @@ import { headers } from 'next/headers'
 import { createManualSale } from '@/server/actions/manual-sales'
 import { prisma } from '@/lib/prisma'
 import { wienKalendertag } from '@/lib/kalender'
-import { VORRAT_ZU_KLEIN } from '@/lib/verkauf-eintragen'
+import { Prisma } from '@prisma/client'
+import { VORRAT_EINHEIT_PASST_NICHT, VORRAT_ZU_KLEIN } from '@/lib/verkauf-eintragen'
 import { erstelleHofMitAnmeldung, erstelleProdukt, raeumeAuf, INT_PRAEFIX } from './setup/basis'
 
 afterEach(async () => {
@@ -54,6 +55,33 @@ describe('Verkauf eintragen zieht den Vorrat ab — echte Datenbank', () => {
     const produkt = await erstelleProdukt(farm.id, { stock: 7 })
     await createManualSale(verkauf(produkt.id, { quantity: 2.5 }))
     expect(await vorrat(produkt.id)).toBe(4)
+  })
+
+  it('Gebindegröße: die Menge in kg geht durch die Größe, gespeichert bleibt die Menge in kg', async () => {
+    const farm = await angemeldeterHof()
+    const { id } = await erstelleProdukt(farm.id, { stock: 10 })
+    await prisma.product.update({ where: { id }, data: { unit: 'KG', unitSize: new Prisma.Decimal('0.5') } })
+
+    const antwort = await createManualSale(verkauf(id, { quantity: 1.2, unit: 'KG' }))
+
+    // 1,2 kg aus Halbkilo-Säcken = 2,4 → 3 Säcke.
+    expect(antwort).toEqual({ ok: true, vorrat: { text: 'Verkauf eingetragen. Vorrat jetzt: 7 × 0,5 kg.', knapp: false } })
+    expect(await vorrat(id)).toBe(7)
+    const [gebucht] = await prisma.manualSale.findMany({ where: { farmId: farm.id } })
+    expect(gebucht.quantity.toString()).toBe('1.2')
+    expect(gebucht.unit).toBe('KG')
+  })
+
+  it('Einheit passt nicht zum Produkt: Verkauf gebucht, Vorrat unverändert, Hinweis', async () => {
+    const farm = await angemeldeterHof()
+    const produkt = await erstelleProdukt(farm.id, { stock: 7 }) // in Stück
+
+    expect(await createManualSale(verkauf(produkt.id, { quantity: 3, unit: 'KG' }))).toEqual({
+      ok: true,
+      vorrat: { text: VORRAT_EINHEIT_PASST_NICHT, knapp: true },
+    })
+    expect(await vorrat(produkt.id)).toBe(7)
+    expect(await prisma.manualSale.count({ where: { farmId: farm.id } })).toBe(1)
   })
 
   it('zu wenig Vorrat: Verkauf gebucht, Vorrat auf 0, nie darunter, Hinweis', async () => {
@@ -113,6 +141,7 @@ describe('Verkauf eintragen zieht den Vorrat ab — echte Datenbank', () => {
     // der Verkauf nachweislich darauf wartet (pg_locks, nicht gewährt).
     let gebucht: ReturnType<typeof createManualSale> | null = null
     let fertig = false
+    let gesehen = false
     await prisma.$transaction(
       async (tx) => {
         const { count } = await tx.product.updateMany({ where: { id: produkt.id, stock: { gte: 2 } }, data: { stock: { decrement: 2 } } })
@@ -120,14 +149,23 @@ describe('Verkauf eintragen zieht den Vorrat ab — echte Datenbank', () => {
         gebucht = createManualSale(verkauf(produkt.id, { quantity: 4 })).finally(() => {
           fertig = true
         })
+        // Nur Warten auf DIESE Transaktion zählt (Zeilensperre = Warten auf ihre transactionid) —
+        // nicht irgendeine fremde Sperre in der gemeinsamen Test-Datenbank.
+        const [{ meine }] = await tx.$queryRaw<{ meine: string }[]>`select txid_current()::text as meine`
         for (let i = 0; i < 100; i++) {
-          const [{ wartend }] = await prisma.$queryRaw<{ wartend: bigint }[]>`select count(*) as wartend from pg_locks where not granted`
-          if (Number(wartend) > 0) break
+          const [{ wartend }] = await prisma.$queryRaw<{ wartend: bigint }[]>`
+            select count(*) as wartend from pg_locks
+            where locktype = 'transactionid' and not granted and transactionid::text = ${meine}`
+          if (Number(wartend) > 0) {
+            gesehen = true
+            break
+          }
           await new Promise((r) => setTimeout(r, 50))
         }
       },
       { timeout: 15_000 }
     )
+    expect(gesehen).toBe(true)
     expect(fertig).toBe(false)
     if (!gebucht) throw new Error('Verkauf nicht gestartet')
 

@@ -491,13 +491,20 @@ describe('Formular „Verkauf eintragen" im neuen Design', () => {
     expect(formular({ verkauf: daten({ productId: 'p1', productName: LANG, unit: 'KG' }) })).not.toContain('Vorrat abziehen')
   })
 
-  it('D1 (Nr. 39): Gebindegröße steht hinter der Menge — die Menge zählt Gebinde wie der Vorrat', () => {
+  it('D1 (Nr. 39): die Menge bleibt in der Grundeinheit („kg"), der Satz nennt die Gebinde, die abgehen', () => {
     const html = formular({
       produkte: [{ id: 'p1', name: 'Mehl', unit: 'KG', unitSize: 0.5, stock: 8 }],
       vorlage: daten({ productId: 'p1', productName: 'Mehl', unit: 'KG', quantity: 2 }),
     })
-    expect(html).toContain('× 0,5 kg')
-    expect(html).toContain('Im Vorrat: 8 × 0,5 kg. Wir ziehen 2 × 0,5 kg ab.')
+    const mengenFeld = html.slice(html.indexOf('id="verkauf-menge"'), html.indexOf('verkauf-notiz'))
+    expect(mengenFeld).toContain('>kg<')
+    expect(mengenFeld).not.toContain('×')
+    expect(html).toContain('Im Vorrat: 8 × 0,5 kg. Wir ziehen 4 × 0,5 kg ab.')
+  })
+
+  it('D1 (Nr. 39): Vorlage in anderer Einheit — der Satz sagt, dass der Vorrat bleibt', () => {
+    const html = formular({ vorlage: daten({ productId: 'p1', productName: LANG, unit: 'G', quantity: 500 }) })
+    expect(html).toContain('Die Einheit passt nicht zum Produkt – der Vorrat bleibt, wie er ist.')
   })
 
   it('bearbeiten: Titel, Betrag im Knopf, Notiz aufgeklappt', () => {

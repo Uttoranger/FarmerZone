@@ -11,7 +11,9 @@
  *    danach auf 0 (bedingt `stock < Menge`), und die Antwort trägt den Hinweis.
  *  - Schalter aus, ohne Produkt, beim Ändern: keine Bestandsbuchung.
  *  - Ein fremdes Produkt: nichts gebucht, kein Verkauf.
- *  - Der Vorrat zählt ganze Gebinde: 2,5 zieht 3 ab, ohne Menge 1.
+ *  - Die Menge steht in der Grundeinheit des Produkts, der Vorrat zählt
+ *    Gebinde: Menge durch Gebindegröße, aufgerundet (Decimal), ohne Menge 1.
+ *  - Passt die Einheit des Verkaufs nicht zum Produkt: gebucht, nichts abgezogen.
  *  - Texte aus einer Quelle (src/lib/verkauf-eintragen.ts).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -38,9 +40,10 @@ import { createManualSale, updateManualSale } from '@/server/actions/manual-sale
 import { revalidatePath } from 'next/cache'
 import {
   VORRAT_ABZIEHEN,
+  VORRAT_EINHEIT_PASST_NICHT,
+  VORRAT_NICHT_GEAENDERT,
   VORRAT_ZU_KLEIN,
-  gebindeZumAbziehen,
-  mengenEinheit,
+  gebindeAnzeige,
   vorratHinweis,
   vorratSchalterText,
 } from '@/lib/verkauf-eintragen'
@@ -58,20 +61,25 @@ beforeEach(() => {
   vi.clearAllMocks()
   db.$transaction.mockImplementation(async (fn: (tx: typeof db) => unknown) => fn(db))
   db.product.findFirst.mockResolvedValue(PRODUKT)
-  db.manualSale.create.mockImplementation(async ({ data }: { data: { quantity: number } }) => ({ quantity: new Prisma.Decimal(data.quantity) }))
+  // Wie die Spalte: Menge als Decimal, Einheit wie gespeichert.
+  db.manualSale.create.mockImplementation(async ({ data }: { data: { quantity: number; unit: string | null } }) => ({
+    quantity: new Prisma.Decimal(data.quantity),
+    unit: data.unit,
+  }))
   db.product.updateMany.mockResolvedValue({ count: 1 })
 })
 
 describe('Regeln und Texte (rein)', () => {
-  it('der Vorrat zählt ganze Gebinde: gebrochene Mengen aufgerundet, ohne Menge 1', () => {
-    expect(gebindeZumAbziehen(3)).toBe(3)
-    expect(gebindeZumAbziehen(2.5)).toBe(3)
-    expect(gebindeZumAbziehen(0.001)).toBe(1)
-    // Drei Stellen wie die Spalte — Gleitkomma-Rest macht aus 2 nicht 3.
-    expect(gebindeZumAbziehen(2.0000000001)).toBe(2)
-    expect(gebindeZumAbziehen(0.1 + 0.2 + 2.7)).toBe(3)
-    expect(gebindeZumAbziehen(null)).toBe(1)
-    expect(gebindeZumAbziehen(undefined)).toBe(1)
+  it('Anzeige am Schalter: Menge durch Gebindegröße, aufgerundet, ohne Menge 1', () => {
+    expect(gebindeAnzeige(3, null)).toBe(3)
+    expect(gebindeAnzeige(2.5, null)).toBe(3)
+    expect(gebindeAnzeige(2, 0.5)).toBe(4)
+    expect(gebindeAnzeige(1.2, 0.5)).toBe(3)
+    expect(gebindeAnzeige(0.001, 1)).toBe(1)
+    // Gleitkomma-Rest macht aus 3 nicht 4.
+    expect(gebindeAnzeige(0.1 + 0.2 + 2.7, null)).toBe(3)
+    expect(gebindeAnzeige(null, 0.5)).toBe(2)
+    expect(gebindeAnzeige(undefined, null)).toBe(1)
   })
 
   it('Hinweis nach dem Speichern: neuer Vorrat, zu wenig, nicht geändert', () => {
@@ -82,25 +90,21 @@ describe('Regeln und Texte (rein)', () => {
     expect(vorratHinweis({ art: 'abgezogen', vorrat: 2 }, { unit: 'KG', unitSize: 0.5 }).text).toBe('Verkauf eingetragen. Vorrat jetzt: 2 × 0,5 kg.')
     expect(vorratHinweis({ art: 'auf-null' }, { unit: 'KG', unitSize: null })).toEqual({ text: VORRAT_ZU_KLEIN, knapp: true })
     expect(VORRAT_ZU_KLEIN).toBe('Gebucht. Dein Vorrat war kleiner als die Menge – er steht jetzt auf 0.')
-    const unveraendert = vorratHinweis({ art: 'unveraendert' }, { unit: 'KG', unitSize: null })
-    expect(unveraendert.knapp).toBe(true)
-    expect(unveraendert.text).toMatch(/^Gebucht\./)
+    expect(vorratHinweis({ art: 'unveraendert' }, { unit: 'KG', unitSize: null })).toEqual({ text: VORRAT_NICHT_GEAENDERT, knapp: true })
+    expect(vorratHinweis({ art: 'einheit-passt-nicht' }, { unit: 'KG', unitSize: null })).toEqual({ text: VORRAT_EINHEIT_PASST_NICHT, knapp: true })
+    expect(VORRAT_EINHEIT_PASST_NICHT).toBe('Gebucht. Vorrat nicht geändert – die Einheit passt nicht zum Produkt.')
   })
 
   it('der Satz unter dem Schalter sagt, was passiert', () => {
     expect(VORRAT_ABZIEHEN).toBe('Vorrat abziehen')
     const p = { stock: 12, unit: 'KG', unitSize: null }
-    expect(vorratSchalterText(true, p, 2.5)).toBe('Im Vorrat: 12 kg. Wir ziehen 3 kg ab.')
-    expect(vorratSchalterText(true, p, null)).toBe('Im Vorrat: 12 kg. Wir ziehen 1 kg ab.')
-    expect(vorratSchalterText(true, { ...p, stock: 2 }, 5)).toBe('Im Vorrat: 2 kg. Das reicht nicht – danach steht er auf 0.')
-    expect(vorratSchalterText(false, p, 2)).toBe('Aus – dein Vorrat bleibt, wie er ist.')
-  })
-
-  it('die Menge zählt Gebinde: bei einer Gebindegröße nennt das Feld sie', () => {
-    expect(mengenEinheit('KG', null)).toBe('kg')
-    expect(mengenEinheit('KG', 1)).toBe('kg')
-    expect(mengenEinheit('KG', 0.5)).toBe('× 0,5 kg')
-    expect(mengenEinheit('LITER', 2)).toBe('× 2 L')
+    expect(vorratSchalterText(true, p, 2.5, 'KG')).toBe('Im Vorrat: 12 kg. Wir ziehen 3 kg ab.')
+    expect(vorratSchalterText(true, p, null, 'KG')).toBe('Im Vorrat: 12 kg. Wir ziehen 1 kg ab.')
+    expect(vorratSchalterText(true, { ...p, stock: 2 }, 5, 'KG')).toBe('Im Vorrat: 2 kg. Das reicht nicht – danach steht er auf 0.')
+    expect(vorratSchalterText(false, p, 2, 'KG')).toBe('Aus – dein Vorrat bleibt, wie er ist.')
+    // Gebinde: 2 kg von Halbkilo-Säcken sind vier Säcke.
+    expect(vorratSchalterText(true, { stock: 8, unit: 'KG', unitSize: 0.5 }, 2, 'KG')).toBe('Im Vorrat: 8 × 0,5 kg. Wir ziehen 4 × 0,5 kg ab.')
+    expect(vorratSchalterText(true, p, 2, 'G')).toBe('Die Einheit passt nicht zum Produkt – der Vorrat bleibt, wie er ist.')
   })
 
   it('das Schema kennt den Schalter, freiwillig', () => {
@@ -153,10 +157,36 @@ describe('createManualSale mit „Vorrat abziehen"', () => {
   it('ändert sich der Vorrat zwischen den Schritten immer wieder: Verkauf gebucht, Vorrat unberührt, Hinweis — kein Absturz', async () => {
     db.product.updateMany.mockResolvedValue({ count: 0 })
     const antwort = await createManualSale(eingabe())
-    expect(antwort).toMatchObject({ ok: true, vorrat: { knapp: true } })
+    expect(antwort).toEqual({ ok: true, vorrat: { text: VORRAT_NICHT_GEAENDERT, knapp: true } })
     expect(db.manualSale.create).toHaveBeenCalledOnce()
-    // Begrenzt — keine Endlosschleife.
-    expect(db.product.updateMany.mock.calls.length).toBeLessThanOrEqual(6)
+    // Begrenzt: drei Anläufe zu je zwei bedingten Schritten — keine Endlosschleife.
+    expect(db.product.updateMany.mock.calls).toHaveLength(6)
+  })
+
+  it('Gebinde: Menge in der Grundeinheit durch Gebindegröße, aufgerundet, mit Decimal', async () => {
+    db.product.findFirst.mockResolvedValue({ ...PRODUKT, unit: 'KG', unitSize: new Prisma.Decimal('0.5') })
+    await createManualSale(eingabe({ quantity: 2 }))
+    expect(produktUpdates()[0].where.stock).toEqual({ gte: 4 })
+    vi.clearAllMocks()
+    db.product.findFirst.mockResolvedValue({ ...PRODUKT, unit: 'KG', unitSize: new Prisma.Decimal('0.5') })
+    db.product.updateMany.mockResolvedValue({ count: 1 })
+    await createManualSale(eingabe({ quantity: 1.2 }))
+    expect(produktUpdates()[0]).toEqual({ where: { id: 'p-1', farmId: 'hof-1', stock: { gte: 3 } }, data: { stock: { decrement: 3 } } })
+    // Gespeichert wird die Menge in kg, nicht in Säcken — die Auswertung liest sie so.
+    expect(db.manualSale.create.mock.calls[0][0].data.quantity).toBe(1.2)
+  })
+
+  it('Gebindegröße 0 zählt wie keine: jede Einheit ein Gebinde', async () => {
+    db.product.findFirst.mockResolvedValue({ ...PRODUKT, unitSize: new Prisma.Decimal(0) })
+    await createManualSale(eingabe({ quantity: 2 }))
+    expect(produktUpdates()[0].where.stock).toEqual({ gte: 2 })
+  })
+
+  it('Einheit passt nicht zum Produkt (alte Vorlage): Verkauf gebucht, nichts abgezogen, Hinweis', async () => {
+    const antwort = await createManualSale(eingabe({ unit: 'KG' })) // Produkt in Stück
+    expect(antwort).toEqual({ ok: true, vorrat: { text: VORRAT_EINHEIT_PASST_NICHT, knapp: true } })
+    expect(db.manualSale.create).toHaveBeenCalledOnce()
+    expect(db.product.updateMany).not.toHaveBeenCalled()
   })
 
   it('jedes decrement trägt die Bedingung stock >= Menge', async () => {
