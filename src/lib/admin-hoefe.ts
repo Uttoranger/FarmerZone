@@ -329,3 +329,18 @@ export function mindestgebuehrCent(eingabe: string): number | null {
   if (eingabe.trim() === '') return 0
   return euroEingabeZuCent(eingabe)
 }
+
+/**
+ * Der getippte Prozentsatz → Zahl für setServiceFeeAction (Nr. 35), `null` =
+ * keiner (der Dialog zeigt PROZENT_UNGUELTIG und schickt nichts). Über die
+ * Ziffern wie bei der Mindestgebühr — Komma oder Punkt, höchstens zwei
+ * Nachkommastellen, kein Exponent —, als ganze Hundertstel und erst am Ende
+ * geteilt: 490 / 100 ist genau die Zahl 4,9, die das Schema erwartet.
+ * Leer ist, anders als bei der Mindestgebühr, kein Satz: Vorher wurde daraus
+ * still 0 % — eine Gebühr soll nie aus einem versehentlich geleerten Feld fallen.
+ */
+export function prozentsatzEingabe(eingabe: string): number | null {
+  const hundertstel = euroEingabeZuCent(eingabe)
+  if (hundertstel === null || hundertstel > 10_000) return null
+  return hundertstel / 100
+}

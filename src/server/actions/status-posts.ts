@@ -11,6 +11,7 @@ import { APP_URL } from '@/lib/umgebung-server'
 import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
 import {
   BEITRAG_FELDER_MIT_SATZ,
+  BEITRAG_PRODUKT_FREMD,
   beitragIdSchema,
   beitragVeroeffentlichenSchema,
   whatsAppGezaehltSchema,
@@ -78,6 +79,18 @@ export async function publishStatusPost(
     // Das Foto geht auf die Hofseite und in die Mail an Abonnentinnen — nur
     // aus unserem Speicher und dem Ordner dieses Hofes (Nr. 19b).
     if (!(await bildUrlErlaubt(data.photoUrl, farm.id))) return { error: BILD_NICHT_UEBERNOMMEN }
+    // Verknüpfte Produkte nur vom eigenen Hof (Nr. 35): Die Hofseite zeigt sie
+    // zum Beitrag. Eine fremde oder unbekannte Kennung lehnt den Beitrag ab,
+    // statt sie still zu verwerfen — sonst ginge er ohne das Produkt hinaus,
+    // das der Hof gemeint hat, und das womöglich schon per Mail.
+    const produktIds = [...new Set(data.linkedProductIds ?? [])]
+    if (produktIds.length > 0) {
+      const eigene = await prisma.product.findMany({
+        where: { id: { in: produktIds }, farmId: farm.id },
+        select: { id: true },
+      })
+      if (eigene.length !== produktIds.length) return { error: BEITRAG_PRODUKT_FREMD }
+    }
     const now = new Date()
     const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
 
@@ -111,7 +124,7 @@ export async function publishStatusPost(
         body: data.body,
         anlass: data.anlass,
         photoUrl: data.photoUrl ?? null,
-        linkedProductIds: data.linkedProductIds ?? [],
+        linkedProductIds: produktIds,
         showOnFarmPage: data.showOnFarmPage,
         publishedAt: now,
         expiresAt,

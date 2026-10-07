@@ -17,6 +17,7 @@
 
 import type { PaymentMethod } from '@prisma/client'
 import { vorBarStichtag } from '@/lib/konditionen'
+import { alsCents } from '@/lib/order-totals'
 import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
 
 /*
@@ -191,12 +192,29 @@ export type BestellSummen = {
 }
 
 /**
+ * Der Warenpreis (Order.totalAmount, Decimal(10,2)) in ganzen Cent — über
+ * `alsCents`, denselben Weg wie /api/checkout (`decimalZuCents`, der
+ * Stripe-Betrag) und „Artikel fehlt" (Nr. 35, CODING_STANDARDS §2 Geld).
+ * Für jeden Betrag mit höchstens zwei Nachkommastellen gleich wie früher
+ * `Math.round(Zahl * 100)` (tests/bestellsummen-cent.test.ts).
+ *
+ * Unlesbares (leer, Text, NaN, unendlich) kommt aus der Datenbank nie; es
+ * bleibt wie bisher 0 Cent, damit eine Bestellanzeige nicht an einem Wert aus
+ * Testdaten oder JSON zerbricht. Decimal würde dort werfen.
+ */
+function warenpreisAlsCents(betrag: BestellungMitGebuehr['totalAmount']): number {
+  const text = typeof betrag === 'number' ? String(betrag) : betrag.toString().trim()
+  if (text === '' || !Number.isFinite(Number(text))) return 0
+  return alsCents(text)
+}
+
+/**
  * Die drei Zahlen jeder Bestellanzeige — ausschließlich aus dem SNAPSHOT der
  * Bestellung, nie aus der aktuellen Hofeinstellung. Deshalb bleibt eine
  * Bestellung unverändert, wenn der Betreiber die Gebühr später umstellt.
  */
 export function bestellSummen(bestellung: BestellungMitGebuehr): BestellSummen {
-  const warenpreisCents = Math.round(alsZahl(bestellung.totalAmount) * 100)
+  const warenpreisCents = warenpreisAlsCents(bestellung.totalAmount)
   const gebuehrCents = Math.max(0, Math.round(bestellung.serviceFeeCents))
   return { warenpreisCents, gebuehrCents, gesamtCents: warenpreisCents + gebuehrCents }
 }
