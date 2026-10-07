@@ -9,7 +9,10 @@
  *  - Betragsgleich für jeden gültigen Wert: `Order.totalAmount` ist
  *    Decimal(10,2); für jeden Betrag mit höchstens zwei Nachkommastellen — als
  *    Prisma-Decimal, als Text und als Zahl aus JSON — liefert die neue Rechnung
- *    genau den Cent-Betrag, den die alte lieferte und den Stripe bekommt.
+ *    genau den erwarteten Cent-Betrag (aus der ganzen Zahl der Schleife, nicht
+ *    gerechnet) und denselben wie `decimalZuCents`, den Stripe bekommt. Die
+ *    alte Rechnung lieferte für diese Werte dieselben Cent (Gegenlauf in Nr. 35,
+ *    Bericht 35.md); sie steht hier bewusst nicht mehr als Float-Rechnung im Test.
  *  - Grenzfälle: 0,005 € → 1 Cent (wie bisher). Drei Nachkommastellen kann die
  *    Spalte nicht speichern; kämen sie als Text oder Zahl, rundet jetzt Decimal
  *    kaufmännisch (1,005 → 101) statt Float (1,005 × 100 = 100,49999… → 100) —
@@ -25,12 +28,6 @@ import { Prisma } from '@prisma/client'
 import { barZuKassierenCents, bestellSummen } from '@/lib/servicegebuehr'
 import { alsCents, decimalZuCents } from '@/lib/order-totals'
 
-/** Die alte Rechnung, wörtlich — nur als Vergleich für die Betragsgleichheit. */
-function alteRechnung(totalAmount: number | string | { toString(): string }): number {
-  const n = typeof totalAmount === 'number' ? totalAmount : Number(totalAmount.toString())
-  return Math.round((Number.isFinite(n) ? n : 0) * 100)
-}
-
 /** Ein Cent-Betrag als Euro-Text mit zwei Stellen, ohne Float: 1234 → „12.34". */
 function euroText(cent: number): string {
   return `${Math.floor(cent / 100)}.${String(cent % 100).padStart(2, '0')}`
@@ -40,14 +37,13 @@ const warenpreis = (totalAmount: number | string | { toString(): string }) =>
   bestellSummen({ totalAmount, serviceFeeCents: 0 }).warenpreisCents
 
 describe('bestellSummen — betragsgleich für jeden gültigen Wert', () => {
-  it('0 bis 2.000 € auf den Cent genau: Decimal, Text und Zahl wie vorher und wie Stripe', () => {
+  it('0 bis 2.000 € auf den Cent genau: Decimal, Text und Zahl wie Stripe', () => {
     for (let cent = 0; cent <= 200_000; cent++) {
       const text = euroText(cent)
       const decimal = new Prisma.Decimal(text)
-      const zahl = Number(text)
-      const ergebnis = [warenpreis(decimal), warenpreis(text), warenpreis(zahl)]
+      // Die Zahl ist nur die EINGABEFORM (Betrag aus JSON), gerechnet wird mit ihr nicht.
+      const ergebnis = [warenpreis(decimal), warenpreis(text), warenpreis(Number(text))]
       if (ergebnis.some((e) => e !== cent)) throw new Error(`${text}: ${ergebnis.join(' / ')} statt ${cent}`)
-      if (alteRechnung(decimal) !== cent || alteRechnung(zahl) !== cent) throw new Error(`alt ${text}`)
       if (decimalZuCents(decimal) !== cent) throw new Error(`Stripe ${text}`)
     }
   })
@@ -59,7 +55,7 @@ describe('bestellSummen — betragsgleich für jeden gültigen Wert', () => {
       expect(warenpreis(new Prisma.Decimal(text))).toBe(cent)
       expect(warenpreis(text)).toBe(cent)
       expect(warenpreis(Number(text))).toBe(cent)
-      expect(alteRechnung(new Prisma.Decimal(text))).toBe(cent)
+      expect(decimalZuCents(new Prisma.Decimal(text))).toBe(cent)
     }
   })
 
@@ -84,14 +80,16 @@ describe('bestellSummen — betragsgleich für jeden gültigen Wert', () => {
 
 describe('bestellSummen — Grenzfälle', () => {
   it('0,005 € → 1 Cent (kaufmännisch, wie bisher)', () => {
+    // Fester Erwartungswert; die alte Rechnung lieferte ebenfalls 1.
     expect(warenpreis('0.005')).toBe(1)
-    expect(alteRechnung('0.005')).toBe(1)
+    expect(warenpreis('0.005')).toBe(decimalZuCents(new Prisma.Decimal('0.005')))
   })
 
   it('drei Nachkommastellen (nie aus der Datenbank): Decimal rundet kaufmännisch wie der Checkout', () => {
-    // Float: 1,005 × 100 = 100,49999999999999 → 100. Decimal: 100,5 → 101.
-    expect(alteRechnung('1.005')).toBe(100)
+    // Die alte Rechnung lieferte hier 100 (Float: 1,005 × 100 = 100,49999999999999),
+    // jetzt 101 wie decimalZuCents im Checkout (Decimal: 100,5 → kaufmännisch 101).
     expect(warenpreis('1.005')).toBe(101)
+    expect(warenpreis('1.005')).toBe(decimalZuCents(new Prisma.Decimal('1.005')))
     expect(warenpreis('1.255')).toBe(126)
     expect(warenpreis('1.005')).toBe(alsCents('1.005'))
   })

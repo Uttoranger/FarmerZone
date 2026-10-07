@@ -178,8 +178,9 @@ export function LogoUpload({
             className={cn('absolute -top-3 -right-3 size-11 rounded-full flex items-center justify-center', FOKUS_RAHMEN)}
             aria-label="Logo entfernen"
           >
-            {/* Sichtbar bleibt der kleine Kreis, die Trefferfläche ist der ganze Knopf. */}
-            <span className="size-5 rounded-full bg-black/60 text-white flex items-center justify-center">
+            {/* Sichtbar bleibt der kleine Kreis, die Trefferfläche ist der ganze Knopf.
+                Theme-fest dunkel auf dem Foto über Tokens (DESIGN_SYSTEM, Bild-Overlays). */}
+            <span className="size-5 rounded-full bg-primary-foreground/60 text-accent-foreground flex items-center justify-center">
               <X className="w-3 h-3" aria-hidden="true" />
             </span>
           </button>
@@ -259,7 +260,7 @@ function BannerPhotoUpload({
             aria-label="Titelbild entfernen"
           >
             {/* Sichtbar der 28-px-Kreis wie bisher, getroffen wird der 44-px-Knopf (Nr. 35). */}
-            <span className="size-7 rounded-full bg-black/60 text-white flex items-center justify-center group-hover:bg-black/80 transition-colors">
+            <span className="size-7 rounded-full bg-primary-foreground/60 text-accent-foreground flex items-center justify-center group-hover:bg-primary-foreground/80 transition-colors">
               <X className="w-3.5 h-3.5" aria-hidden="true" />
             </span>
           </button>

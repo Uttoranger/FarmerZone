@@ -19,6 +19,10 @@ export const PROZENT_UNGUELTIG =
 export const GILT_AB_UNGUELTIG =
   'Wähle den Tag, ab dem die Gebühr gilt, oder lass das Feld leer, dann bleibt der Hof gebührenfrei.'
 
+/** Kein lesbares Formular (kein Objekt, unbekannter Fehler) — ohne Feld, mit Ausweg. */
+export const EINSTELLUNG_UNGUELTIG =
+  'Wir konnten die Einstellung nicht lesen. Lade die Seite neu und versuch es noch einmal.'
+
 export const servicegebuehrEinstellungSchema = z.object({
   // Ohne coerce (Nr. 35, wie minCents seit Nr. 32): Der Dialog schickt die
   // Zahl (prozentsatzEingabe). Text las z.coerce still — „" als 0 %, „1e1"

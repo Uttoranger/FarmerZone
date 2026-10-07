@@ -23,7 +23,7 @@ vi.mock('@/lib/prisma', () => ({
 }))
 
 import { setServiceFeeAction } from '@/server/actions/admin'
-import { GILT_AB_UNGUELTIG, PROZENT_UNGUELTIG } from '@/schemas/servicegebuehr'
+import { EINSTELLUNG_UNGUELTIG, GILT_AB_UNGUELTIG, PROZENT_UNGUELTIG } from '@/schemas/servicegebuehr'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
@@ -162,10 +162,25 @@ describe('setServiceFeeAction — Validierung', () => {
     expect(farmUpdate).not.toHaveBeenCalled()
   })
 
-  it('die Sätze für Prozent und Datum sind deutsch, geduzt und enden mit einem Punkt', () => {
-    for (const satz of [PROZENT_UNGUELTIG, GILT_AB_UNGUELTIG]) {
+  // Nachbesserung Runde 1: Ohne Feld (Eingabe kein Objekt) kam Zods englischer
+  // Standardsatz durch. Nur die Mindestgebühr gibt ihre eigene Schema-Meldung weiter.
+  it.each([
+    ['null', null],
+    ['Text', 'percent=5'],
+    ['Zahl', 42],
+    ['Liste', [4.9, 50, '2026-10-01']],
+  ])('Eingabe kein Objekt (%s) → fester deutscher Satz, nichts geschrieben', async (_fall, eingabe) => {
+    const result = await setServiceFeeAction('farm_1', eingabe as never)
+    expect(result.error).toBe(EINSTELLUNG_UNGUELTIG)
+    expect(result.error).not.toMatch(/Invalid|expected|received/)
+    expect(farmUpdate).not.toHaveBeenCalled()
+  })
+
+  it('die Sätze für Prozent, Datum und Eingabe sind deutsch, geduzt und enden mit einem Punkt', () => {
+    expect(EINSTELLUNG_UNGUELTIG).toMatch(/Lade die Seite neu/)
+    for (const satz of [PROZENT_UNGUELTIG, GILT_AB_UNGUELTIG, EINSTELLUNG_UNGUELTIG]) {
       expect(satz).toMatch(/^[A-ZÄÖÜ].*\.$/)
-      expect(satz).toMatch(/\b(?:Gib|Wähle|du|dein)\b/)
+      expect(satz).toMatch(/\b(?:Gib|Wähle|du|dein|Lade|versuch)\b/)
       expect(satz).not.toMatch(/Invalid|expected|received/)
     }
   })

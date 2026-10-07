@@ -8,7 +8,7 @@ import {
   FARM_REJECT_HAS_DATA_MESSAGE,
   FARM_REJECT_OWNER_IS_ADMIN_MESSAGE,
 } from '@/lib/farm-approval'
-import { GILT_AB_UNGUELTIG, PROZENT_UNGUELTIG, servicegebuehrEinstellungSchema } from '@/schemas/servicegebuehr'
+import { EINSTELLUNG_UNGUELTIG, GILT_AB_UNGUELTIG, PROZENT_UNGUELTIG, servicegebuehrEinstellungSchema } from '@/schemas/servicegebuehr'
 import { wienerMitternacht } from '@/lib/servicegebuehr'
 import { triageEingabeSchema } from '@/schemas/meldung'
 import { bestaetigungOffen } from '@/lib/email-bestaetigung'
@@ -208,14 +208,16 @@ export async function setServiceFeeAction(
 
   const parsed = servicegebuehrEinstellungSchema.safeParse(eingabe)
   if (!parsed.success) {
-    // Für Prozent und Datum nur der feste Satz, nie die Zod-Meldung (Nr. 35):
-    // Bei falschem Typ stünde sonst Zods englischer Standardtext im Dialog.
-    // Die Mindestgebühr trägt eigene Sätze für jeden Fall (Nr. 32).
+    // Nach außen nur eigene Sätze, nie eine Zod-Meldung an sich (Nr. 35): Bei
+    // falschem Typ oder ohne Feld (Eingabe kein Objekt) stünde sonst Zods
+    // englischer Standardtext im Dialog. Nur die Mindestgebühr trägt im
+    // Schema für jeden Fall einen eigenen deutschen Satz (Nr. 32).
     const erste = parsed.error.issues[0]
     const feld = erste?.path[0]
     if (feld === 'percent') return { error: PROZENT_UNGUELTIG }
     if (feld === 'activeFrom') return { error: GILT_AB_UNGUELTIG }
-    return { error: erste?.message ?? 'Ungültige Eingabe.' }
+    if (feld === 'minCents' && erste) return { error: erste.message }
+    return { error: EINSTELLUNG_UNGUELTIG }
   }
 
   const giltAb = parsed.data.activeFrom === null ? null : wienerMitternacht(parsed.data.activeFrom)

@@ -141,6 +141,23 @@ describe('Mein Auftritt — jeder Knopf ≥ 44 px, Symbol-Knöpfe benannt', () =
   })
 })
 
+describe('Mein Auftritt — Kreise auf Fotos aus Tokens (DESIGN_SYSTEM, Bild-Overlays)', () => {
+  /** Der Quelltext eines Knopfs ab seinem aria-label bis </button>. */
+  const knopf = (label: string) => new RegExp(`aria-label="${label}"[\\s\\S]*?</button>`).exec(QUELLE)?.[0] ?? ''
+
+  it.each(['Logo entfernen', 'Titelbild entfernen'])('„%s": kein Tailwind-black/white, theme-feste Tokens', (label) => {
+    const block = knopf(label)
+    expect(block).not.toBe('')
+    expect(block).not.toMatch(/(?:bg|text)-(?:black|white)\b/)
+    expect(block).toMatch(/bg-primary-foreground\/60/)
+    expect(block).toMatch(/text-accent-foreground/)
+  })
+
+  it('Gegenprobe: die Suche erkennt den alten Kreis', () => {
+    expect('<span className="size-5 rounded-full bg-black/60 text-white">').toMatch(/(?:bg|text)-(?:black|white)\b/)
+  })
+})
+
 describe('Gegenprobe: die Prüfung erkennt die alten Formen', () => {
   const knopf = (inhalt: string) => `const x = <div>${inhalt}</div>`
 
