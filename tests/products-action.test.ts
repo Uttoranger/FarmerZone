@@ -98,7 +98,7 @@ beforeEach(() => {
   vi.setSystemTime(JETZT)
   getSession.mockResolvedValue({ user: { id: 'user_1' } } as never)
   farmForUser.mockResolvedValue({ id: 'farm_1', slug: 'testhof', name: 'Hof Test' } as never)
-  productCreate.mockResolvedValue({ id: 'p_neu' } as never)
+  productCreate.mockResolvedValue({ id: 'p_neu', isAvailable: true, stock: 12 } as never)
   tx.product.updateMany.mockResolvedValue({ count: 1 })
   tx.futterKennzeichnung.upsert.mockResolvedValue({})
   tx.futterKennzeichnung.deleteMany.mockResolvedValue({ count: 0 })
@@ -112,10 +112,20 @@ afterEach(() => {
 })
 
 describe('createProduct', () => {
+  // Nachbesserung Nr. 30: „ist online" nur, wenn Kunden die Ware sehen UND kaufen können.
+  it('Moment-Anlass: ohne Vorrat (ausverkauft) oder ausgeblendet ist das Neue nicht kaufbar', async () => {
+    productCreate.mockResolvedValueOnce({ id: 'p_leer', isAvailable: true, stock: 0 } as never)
+    expect(await createProduct(basis as never)).toEqual({ ok: true, angelegt: { id: 'p_leer', kaufbar: false } })
+    productCreate.mockResolvedValueOnce({ id: 'p_entwurf', isAvailable: false, stock: 5 } as never)
+    expect(await createProduct(basis as never)).toEqual({ ok: true, angelegt: { id: 'p_entwurf', kaufbar: false } })
+  })
+
   it('schreibt Unterkategorie und Siegel — und isOrganic nie mehr', async () => {
     const ergebnis = await createProduct(basis as never)
 
-    expect(ergebnis).toEqual({ ok: true })
+    // Nr. 30: Die Antwort nennt das neue Produkt und ob Kunden es kaufen können (Moment „gespeichert").
+    expect(ergebnis).toEqual({ ok: true, angelegt: { id: 'p_neu', kaufbar: true } })
+    expect(productCreate.mock.calls[0][0].select).toEqual({ id: true, isAvailable: true, stock: true })
     const data = productCreate.mock.calls[0][0].data as Record<string, unknown>
     expect(data.farmId).toBe('farm_1')
     expect(data.subcategory).toBe('RIND')

@@ -486,6 +486,12 @@ model Farm {
   tarif        Tarif?
   sepaMandatAm DateTime?
 
+  // Teilen-Momente abgeschaltet (Gate 7 Aufgabe 5, Nachtlauf Nr. 30): true =
+  // keiner der drei Momente (freigeschaltet, wieder da, gespeichert) fragt
+  // mehr. Default false — jeder bestehende Hof bleibt, wie er war (Expand).
+  // Geschrieben nur über setzeTeilenMomente (/settings/teilen).
+  teilenMomenteAus Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

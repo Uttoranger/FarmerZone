@@ -56,7 +56,17 @@ function revalidate(farmSlug: string) {
  * `hinweis` nach dem Speichern: gespeichert, aber als Entwurf, weil gesperrt.
  */
 export type ProduktErgebnis =
-  | { ok: true; hinweis?: string }
+  | {
+      ok: true
+      hinweis?: string
+      /**
+       * Nur beim Anlegen (createProduct): das neue Produkt und ob Kunden es
+       * sofort kaufen können (sichtbar UND Vorrat > 0) — Anlass des
+       * Teilen-Moments „gespeichert" (Nr. 30). Ohne Vorrat gilt es als
+       * ausverkauft, dann wäre „ist online" falsch.
+       */
+      angelegt?: { id: string; kaufbar: boolean }
+    }
   | { error: string; code?: 'GEAENDERT' | 'GESPERRT' | 'BESTAETIGUNG'; vorrat?: number }
 
 
@@ -114,16 +124,17 @@ export async function createProduct(data: ProductFormData): Promise<ProduktErgeb
   // Produktbild nur aus unserem Speicher und dem Ordner dieses Hofes (Nr. 19b).
   if (!(await bildUrlErlaubt(v.imageUrl, farm.id))) return { error: BILD_NICHT_UEBERNOMMEN }
 
-  await prisma.product.create({
+  const neu = await prisma.product.create({
     data: {
       farmId: farm.id,
       ...produktDaten(v),
       stock: v.stock,
     },
+    select: { id: true, isAvailable: true, stock: true },
   })
 
   revalidate(farm.slug)
-  return { ok: true }
+  return { ok: true, angelegt: { id: neu.id, kaufbar: neu.isAvailable && neu.stock > 0 } }
 }
 
 /** Der Satz, wenn eine Bestellung den Vorrat geändert hat, während der Hof ihn bearbeitet hat. */

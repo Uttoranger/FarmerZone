@@ -28,6 +28,14 @@ import { mwstStandard } from '@/lib/mwst'
 export type FamilieErgebnis =
   | {
       ok: true
+      /** Die Kennung der neuen Familie — Anlass des Teilen-Moments „gespeichert" (Nr. 30). */
+      familieId: string
+      /**
+       * Mindestens eine Größe ist für Kunden kaufbar: im Shop (nicht gesperrt)
+       * UND Vorrat > 0. Nur für den Moment „gespeichert" — `online` zählt
+       * weiter alle freigeschalteten Größen für den Toast.
+       */
+      kaufbar: boolean
       /** Wie viele Größen sofort im Shop stehen. */
       online: number
       /** Größen, die als Entwurf warten — mit dem Grund. */
@@ -109,6 +117,8 @@ export async function legeFutterFamilieAn(eingabe: unknown): Promise<FamilieErge
   revalidiereProdukte(farm.slug)
   return {
     ok: true,
+    familieId,
+    kaufbar: groessen.some((g) => g.sperre === null && g.stock > 0),
     online: groessen.filter((g) => g.sperre === null).length,
     wartend: groessen.flatMap((g) => (g.sperre ? [{ bezeichnung: g.bezeichnung, grund: g.sperre.grund }] : [])),
   }
@@ -164,5 +174,6 @@ export async function legeBrennmaterialFamilieAn(eingabe: unknown): Promise<Fami
   )
 
   revalidiereProdukte(farm.slug)
-  return { ok: true, online: v.groessen.length, wartend: [] }
+  // Keine Sperre bei Brennmaterial: kaufbar ist jede Größe mit Vorrat.
+  return { ok: true, familieId, kaufbar: v.groessen.some((g) => g.stock > 0), online: v.groessen.length, wartend: [] }
 }

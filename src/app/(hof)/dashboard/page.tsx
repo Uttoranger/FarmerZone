@@ -138,7 +138,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
         )}
       </div>
 
-      {freischaltMomentMoeglich({ approvedAt: heute.hof.approvedAt, sichtbar: heute.hof.sichtbar }, jetzt) && (
+      {freischaltMomentMoeglich(heute.hof, jetzt) && (
         <FreischaltMoment farmId={farm.id} hofName={farm.name} hofSlug={farm.slug} />
       )}
     </div>

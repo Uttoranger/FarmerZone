@@ -221,10 +221,10 @@ describe('„Wieder da" — Anlass und Regeln', () => {
   })
 
   it('nur bei sichtbarem Hof und sichtbarem Produkt', () => {
-    expect(wiederDaMomentMoeglich({ hofSichtbar: true, produktSichtbar: true, wiederDa: true })).toBe(true)
-    expect(wiederDaMomentMoeglich({ hofSichtbar: false, produktSichtbar: true, wiederDa: true })).toBe(false)
-    expect(wiederDaMomentMoeglich({ hofSichtbar: true, produktSichtbar: false, wiederDa: true })).toBe(false)
-    expect(wiederDaMomentMoeglich({ hofSichtbar: true, produktSichtbar: true, wiederDa: false })).toBe(false)
+    expect(wiederDaMomentMoeglich({ hofSichtbar: true, produktSichtbar: true, wiederDa: true, teilenMomenteAus: false })).toBe(true)
+    expect(wiederDaMomentMoeglich({ hofSichtbar: false, produktSichtbar: true, wiederDa: true, teilenMomenteAus: false })).toBe(false)
+    expect(wiederDaMomentMoeglich({ hofSichtbar: true, produktSichtbar: false, wiederDa: true, teilenMomenteAus: false })).toBe(false)
+    expect(wiederDaMomentMoeglich({ hofSichtbar: true, produktSichtbar: true, wiederDa: false, teilenMomenteAus: false })).toBe(false)
   })
 
   it('Texte mit Menge und nächster Abholung, ohne Abholung ohne Satzrest', () => {
@@ -385,7 +385,7 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
         products: produkte,
         hofBetriebsnummer: null,
         registrierung: { betriebsnummer: null, betriebsstatus: null },
-        hof: { name: 'Hof Test', slug: 'hof-test', sichtbar: true },
+        hof: { name: 'Hof Test', slug: 'hof-test', sichtbar: true, teilenMomenteAus: false },
         naechstesFenster: null,
       })
     )

@@ -14,6 +14,7 @@ import { produktZustand } from '@/lib/produkt-sichtbarkeit'
 import { formatMenge, formatZahl, mitAnzahl } from '@/lib/format'
 import { KATEGORIE_LABEL, istFuttermittel, type ProductCategoryValue } from '@/lib/taxonomie'
 import { abholungText, type NaechstesFenster } from '@/lib/heute'
+import { teilenMomenteAn } from '@/lib/teilen-momente'
 import { PRODUKTE_FILTER_WERTE, type ProdukteAnsicht, type ProdukteFilter } from '@/schemas/produkte-filter'
 import type { NeuBereich } from '@/schemas/url-auftrag'
 
@@ -136,11 +137,17 @@ export function istWiederDa(vorher: number, jetzt: number): boolean {
 /**
  * Darf der Moment kommen? Nur, wenn Kunden die Ware auch sehen: Hof sichtbar
  * (heuteHofSichtbar — freigegeben, nicht pausiert, nicht stillgelegt) und
- * Produkt sichtbar. Ein Teilen-Aufruf zu einem Entwurf oder einem pausierten
- * Hof führte ins Leere.
+ * Produkt sichtbar. Ein Teilen-Aufruf zu einem Produkt, das nicht im Shop steht, oder einem pausierten
+ * Hof führte ins Leere. Seit Nr. 30 auch nicht, wenn der Hof die
+ * Teilen-Momente abgeschaltet hat (Pflichtfeld, src/lib/teilen-momente.ts).
  */
-export function wiederDaMomentMoeglich(m: { hofSichtbar: boolean; produktSichtbar: boolean; wiederDa: boolean }): boolean {
-  return m.wiederDa && m.hofSichtbar && m.produktSichtbar
+export function wiederDaMomentMoeglich(m: {
+  hofSichtbar: boolean
+  produktSichtbar: boolean
+  wiederDa: boolean
+  teilenMomenteAus: boolean
+}): boolean {
+  return teilenMomenteAn(m) && m.wiederDa && m.hofSichtbar && m.produktSichtbar
 }
 
 export type WiederDaTexte = { titel: string; satz: string; teilenText: string }
@@ -159,6 +166,41 @@ export function wiederDaTexte(
     titel: `Wieder da: ${produkt.name}`,
     satz: `${formatMenge(produkt.vorrat, produkt.unit, produkt.unitSize)} im Vorrat. Sag deinen Kunden Bescheid?`,
     teilenText: wann ? `Wieder da bei uns: ${produkt.name}. ${wann}.` : `Wieder da bei uns: ${produkt.name}.`,
+  }
+}
+
+// ─── „Gespeichert" (Nr. 30) ─────────────────────────────────────────────────
+
+/**
+ * Der Anlass des Moments „gespeichert": ein neu angelegtes Produkt bzw. eine
+ * neue Familie mit Verkaufsgrößen (dann EIN Moment für alle Größen).
+ * `kaufbar` = mindestens eine Größe ist im Shop, nicht gesperrt und hat
+ * Vorrat (sagt der Server, Nachbesserung Nr. 30).
+ */
+export type ProduktAngelegt = { anlass: string; name: string; kaufbar: boolean }
+
+/**
+ * Darf der Moment „gespeichert" kommen? Wie bei „wieder da": Hof sichtbar,
+ * das Neue ist kaufbar (ein Produkt, das nicht im Shop steht, eine gesperrte Futter-Größe oder Ware
+ * ohne Vorrat — für Kunden „ausverkauft" — führte ins Leere) und die
+ * Teilen-Momente sind nicht abgeschaltet.
+ */
+export function gespeichertMomentMoeglich(m: { hofSichtbar: boolean; kaufbar: boolean; teilenMomenteAus: boolean }): boolean {
+  return teilenMomenteAn(m) && m.hofSichtbar && m.kaufbar
+}
+
+/**
+ * Was der Moment sagt (Mockup mobil-h2-gespeichert-teilen: „… ist online",
+ * Zitat „Neu bei uns: …"). Statt der Beschreibung aus dem Mockup („vom
+ * Sackerl bis zum Rundballen") nennt der Teilen-Text die nächste Abholung —
+ * wie „wieder da"; eine Beschreibung ist kein Pflichtfeld.
+ */
+export function gespeichertTexte(name: string, fenster: NaechstesFenster | null): WiederDaTexte {
+  const wann = abholungText(fenster)
+  return {
+    titel: `${name} ist online`,
+    satz: 'Kunden sehen es ab jetzt auf deiner Hofseite. Sag ihnen Bescheid?',
+    teilenText: wann ? `Neu bei uns: ${name}. ${wann}.` : `Neu bei uns: ${name}.`,
   }
 }
 

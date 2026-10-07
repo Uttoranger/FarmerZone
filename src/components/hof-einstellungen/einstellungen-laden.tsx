@@ -19,7 +19,8 @@ export function EinstellungenLaden(): React.JSX.Element {
       <div className="h-8 w-44 rounded-lg bg-border" />
       <div className="mt-2 h-4 w-64 rounded bg-muted" />
       <div className="mt-4 flex flex-col md:grid md:gap-3 lg:grid-cols-2">
-        {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+        {/* So viele Zeilen wie Bereiche (einstellungenBereiche, seit Nr. 30 neun). */}
+        {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
           <div
             key={i}
             className="flex h-[66px] items-center gap-3 border-t border-border md:h-[78px] md:rounded-2xl md:border md:bg-card md:px-[18px]"

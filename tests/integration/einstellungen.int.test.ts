@@ -37,7 +37,7 @@ describe('Einstellungen — nur der eigene Hof', () => {
     expect(daten!.betriebsnummer).toBe('LFBIS 0000000')
 
     const bereiche = einstellungenBereiche(daten!, new Date())
-    expect(bereiche).toHaveLength(8)
+    expect(bereiche).toHaveLength(9)
     expect(bereiche.find((b) => b.id === 'zahlung')?.ton).toBe('offen')
     expect(bereiche.find((b) => b.id === 'futtermittel')?.zeile).toBe('Primärproduktion · LFBIS 0000000')
   })
