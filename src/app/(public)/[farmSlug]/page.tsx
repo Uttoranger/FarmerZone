@@ -6,6 +6,8 @@ import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'
 import { verifyReorderToken } from '@/lib/reorder-token'
 import { prisma } from '@/lib/prisma'
 import { hofVorschaubild } from '@/lib/vorschaubild'
+import { teilenVorschauText } from '@/lib/teilen-bild'
+import { ladeTeilenVorschau } from '@/server/queries/teilen-bild'
 import type { Suchparameter } from '@/lib/ansichts-modus'
 import { nachbestellToken } from '@/schemas/nachbestellung'
 import { FarmPageView } from '@/components/farm/farm-page-view'
@@ -43,19 +45,34 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   if (!farm) return { title: 'Hof nicht gefunden', ...robots }
 
   const desc = (farm.aboutText ?? farm.description).slice(0, 155)
+  // Das Teilen-Bild (Gate 7) — ist es nicht ladbar, bleibt die Seite und
+  // nimmt das Bild der Startseite; der Fehler geht nur nach Sentry.
+  const vorschau = await ladeTeilenVorschauOhneRisiko(farm.slug)
 
   return {
     title: `${farm.name} — Frische Produkte direkt vom Hof`,
     description: desc,
     ...robots,
     openGraph: {
-      title: farm.name,
-      description: desc,
+      // Wie im Mockup mobil-k1-ueber-einen-geteilten-link: „Hof – frisch vom
+      // Hof in Ort" und „Eier, Erdäpfel · Abholung …" (teilenVorschauText).
+      ...teilenVorschauText(farm.name, desc, vorschau?.daten ?? null),
       type: 'website',
-      // Das Titelbild, ohne Titelbild das der Startseite — ein geteilter
-      // Hof-Link soll nie ohne Bild ankommen (src/lib/vorschaubild.ts).
-      images: [hofVorschaubild(farm)],
+      // Das Teilen-Bild, sonst das der Startseite — ein geteilter Hof-Link
+      // soll nie ohne Bild ankommen (src/lib/vorschaubild.ts).
+      images: [hofVorschaubild(farm, vorschau?.version ?? null)],
     },
+  }
+}
+
+/** Das Teilen-Bild für die Metadaten; scheitert es, fehlt nur das Bild (gemeldet), nie die Seite. */
+async function ladeTeilenVorschauOhneRisiko(slug: string): Promise<Awaited<ReturnType<typeof ladeTeilenVorschau>>> {
+  try {
+    return await ladeTeilenVorschau(slug, new Date())
+  } catch (err) {
+    unstable_rethrow(err)
+    Sentry.captureException(err, { tags: { bereich: 'hofseite-teilen-bild' } })
+    return null
   }
 }
 

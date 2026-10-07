@@ -16,6 +16,10 @@ export const TEILEN_KANAL_CODES = ['wa', 'wa-status', 'fb', 'ig', 'mail', 'qr', 
 
 export type TeilenKanalCode = (typeof TEILEN_KANAL_CODES)[number]
 
+/** Die zwei Formate des Teilen-Bilds: Beitrag 1:1 (auch Open Graph) und Status 9:16. */
+export const TEILEN_BILD_FORMATE = ['quadrat', 'story'] as const
+export type TeilenBildFormat = (typeof TEILEN_BILD_FORMATE)[number]
+
 /** Der Name des Suchparameters — eine Quelle für Link, Hofseite und Test. */
 export const TEILEN_PARAMETER = 'k'
 
@@ -89,4 +93,21 @@ export function istMaschine(userAgent: string | null): boolean {
 export function istVorabruf(headers: Pick<Headers, 'get'>): boolean {
   const zweck = `${headers.get('sec-purpose') ?? ''} ${headers.get('purpose') ?? ''} ${headers.get('x-purpose') ?? ''}`
   return /prefetch|prerender|preview/i.test(zweck)
+}
+
+/**
+ * Die Adresse des Teilen-Bilds eines Hofs (Route `/[farmSlug]/opengraph-image`).
+ * `auswahl` sind die im Teilen-Fenster gewählten Einträge, `version` die
+ * Prüfsumme des Inhalts (nur für den Zwischenspeicher).
+ */
+export function teilenBildPfad(
+  slug: string,
+  optionen: { format?: TeilenBildFormat; auswahl?: readonly string[] | null; version?: string } = {}
+): string {
+  const suche = new URLSearchParams()
+  if (optionen.format && optionen.format !== 'quadrat') suche.set('format', optionen.format)
+  if (optionen.auswahl) suche.set('p', optionen.auswahl.join(','))
+  if (optionen.version) suche.set('v', optionen.version)
+  const text = suche.toString()
+  return `/${encodeURIComponent(slug)}/opengraph-image${text ? `?${text}` : ''}`
 }

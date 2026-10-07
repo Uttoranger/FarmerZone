@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { TEILEN_KANAL_CODES } from '@/lib/teilen-kanal'
+import { TEILEN_BILD_FORMATE, TEILEN_KANAL_CODES } from '@/lib/teilen-kanal'
 import { hofSlugSchema } from '@/schemas/hof-adresse'
 
 /**
@@ -27,3 +27,28 @@ export const teilenBesuchSchema = z
   .strict()
 
 export type TeilenBesuch = z.infer<typeof teilenBesuchSchema>
+
+/**
+ * Die Adresse des Teilen-Bilds: `?format=quadrat|story` und `?p=<id>,<id>` —
+ * die im Teilen-Fenster gewählten Produkte. Was nicht passt, fällt still weg
+ * (Standard: quadrat, alle kaufbaren); ob ein Produkt ins Bild darf,
+ * entscheidet trotzdem `bildProdukte` (nie ausverkauft, nie gesperrt).
+ * `v` ist nur die Prüfsumme für den Zwischenspeicher und wird nicht gelesen.
+ */
+export const teilenBildSucheSchema = z.object({
+  format: z.enum(TEILEN_BILD_FORMATE).catch('quadrat'),
+  p: z
+    .string()
+    .max(400)
+    .transform((s) =>
+      s
+        .split(',')
+        .map((t) => t.trim())
+        .filter((t) => /^[A-Za-z0-9_-]{1,40}$/.test(t))
+        .slice(0, 12)
+    )
+    .optional()
+    .catch(undefined),
+})
+
+export type TeilenBildSuche = z.infer<typeof teilenBildSucheSchema>
