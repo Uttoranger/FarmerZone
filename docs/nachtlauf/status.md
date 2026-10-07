@@ -38,4 +38,4 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 22c | Auswertung und Region | fertig (Entwurf) | `nacht/2026-10-06/22c-auswertung-region` | #200 | 21 (#199) | Entwurf bis Slug `region` in Produktion geprüft; Vorbelegung „Betrieb" offen | 07.10.2026 |
 | 22d | Einstellungen | fertig | `nacht/2026-10-06/22d-einstellungen` | #196 | 22b (#195) | Mockup-Abweichungen der Übersicht vor Merge freigeben | 07.10.2026 |
 | 22e | Beiträge, Hilfe, Meine Meldungen | fertig | `nacht/2026-10-06/22e-beitraege-hilfe` | #197 | 22d (#196) | E12-Lesart „bleibt und leitet um" bestätigen; Anzeigen der alten Beitragskarte (E-Mail-Zahl) entscheiden | 07.10.2026 |
-| 22f | Admin in der AdminShell | läuft | `nacht/2026-10-06/22f-admin` | | 22c (#200) | | 07.10.2026 |
+| 22f | Admin in der AdminShell | fertig (Entwurf) | `nacht/2026-10-06/22f-admin` | #201 | 22c (#200) | Haltepunkt Lauf 5; Entwurf bis „Freischalten ohne Stripe nur bei Online-Wunsch" bestätigt; Bar-Höfe-Blocker behoben | 07.10.2026 |
