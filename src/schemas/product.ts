@@ -69,7 +69,7 @@ export const PRODUCT_UNIT_VALUES = [
   'STUECK', 'KG', 'G', 'LITER', 'ML', 'M3', 'PAKET', 'BALLEN', 'BIGBAG', 'RAUMMETER', 'SCHUETTRAUMMETER',
 ] as const
 
-/** Raummaße für Brennmaterial (E11) — nur im Bereich Sonstiges, nie bei Lebensmitteln oder Futter. */
+/** Raummaße für Brennmaterial (E11) — nur bei Brennholz angeboten. */
 export const RAUMMASS_EINHEITEN: readonly string[] = ['RAUMMETER', 'SCHUETTRAUMMETER']
 
 /**
@@ -79,18 +79,19 @@ export const RAUMMASS_EINHEITEN: readonly string[] = ['RAUMMETER', 'SCHUETTRAUMM
 const FUTTER_EINHEITEN: readonly string[] = ['KG', 'LITER', 'STUECK', 'PAKET', 'BALLEN', 'BIGBAG']
 
 /**
- * Die Einheiten, die das Formular für eine Kategorie anbietet: Ballen, Big
- * Bags und die Raummaße nur im Bereich Sonstiges (Brennholz) bzw. Ballen und
- * Big Bags auch bei Futtermitteln (Rückfrage F7), Futtermittel nur in
- * FUTTER_EINHEITEN. Reine Anzeige — das Schema nimmt jede Einheit an.
+ * Die Einheiten, die das Formular für eine Kategorie anbietet: Ballen und Big
+ * Bags bei Futtermitteln und im Bereich Sonstiges (Rückfrage F7), die Raummaße
+ * nur bei Brennholz (E11), Futtermittel nur in FUTTER_EINHEITEN. Reine Anzeige
+ * — das Schema nimmt jede Einheit an.
  */
 export function unitOptionsFuer(
   category: ProductCategoryValue | null | undefined
 ): readonly (typeof UNIT_OPTIONS)[number][] {
   if (istFuttermittel(category)) return UNIT_OPTIONS.filter((u) => FUTTER_EINHEITEN.includes(u.value))
+  const raummass = (u: (typeof UNIT_OPTIONS)[number]) => category === 'BRENNHOLZ' || !RAUMMASS_EINHEITEN.includes(u.value)
   return grossgebindeEinheitenAngeboten(category)
-    ? UNIT_OPTIONS
-    : UNIT_OPTIONS.filter((u) => !istGrossgebindeEinheit(u.value) && !RAUMMASS_EINHEITEN.includes(u.value))
+    ? UNIT_OPTIONS.filter(raummass)
+    : UNIT_OPTIONS.filter((u) => !istGrossgebindeEinheit(u.value) && raummass(u))
 }
 
 export const UNIT_LABELS: Record<string, string> = {

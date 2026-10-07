@@ -101,8 +101,8 @@ beforeEach(() => {
   tx.product.updateMany.mockResolvedValue({ count: 1 })
   tx.futterKennzeichnung.upsert.mockResolvedValue({})
   tx.futterKennzeichnung.deleteMany.mockResolvedValue({ count: 0 })
-  // Bestandsprodukt ohne Verpackung: keine Sperre (src/lib/futter-registrierung.ts).
-  productFindFirst.mockResolvedValue({ verpackung: null } as never)
+  // Futter-Altbestand ohne Verpackung: keine Sperre (src/lib/futter-registrierung.ts).
+  productFindFirst.mockResolvedValue({ category: 'HEU_STROH', verpackung: null } as never)
   farmFindUnique.mockResolvedValue({ betriebsnummer: null, betriebsstatus: null } as never)
 })
 
@@ -250,7 +250,7 @@ describe('updateProduct', () => {
 
 describe('updateProduct — Sperre je Gebinde (S7, Nr. 20)', () => {
   it('ein gesperrtes Sackerl wird gespeichert, aber als Entwurf — mit dem Grund', async () => {
-    productFindFirst.mockResolvedValue({ verpackung: 'ABGEPACKT_ETIKETT' } as never)
+    productFindFirst.mockResolvedValue({ category: 'HEU_STROH', verpackung: 'ABGEPACKT_ETIKETT' } as never)
     farmFindUnique.mockResolvedValue({ betriebsnummer: 'AT 1234567', betriebsstatus: 'PRIMAERPRODUKTION' } as never)
 
     const ergebnis = await updateProduct('p_sack', { ...heu, unit: 'STUECK', isAvailable: true } as never)
@@ -260,11 +260,11 @@ describe('updateProduct — Sperre je Gebinde (S7, Nr. 20)', () => {
     expect(aufruf.where).toEqual({ id: 'p_sack', farmId: 'farm_1' })
     expect(aufruf.data.isAvailable).toBe(false)
     // Die Verpackung kommt aus der Datenbank, nie aus dem Formular — der Hof steht in der WHERE-Klausel.
-    expect(productFindFirst).toHaveBeenCalledWith({ where: { id: 'p_sack', farmId: 'farm_1' }, select: { verpackung: true } })
+    expect(productFindFirst).toHaveBeenCalledWith({ where: { id: 'p_sack', farmId: 'farm_1' }, select: { category: true, verpackung: true } })
   })
 
   it('mit BAES-Meldung geht dasselbe Sackerl online', async () => {
-    productFindFirst.mockResolvedValue({ verpackung: 'ABGEPACKT_ETIKETT' } as never)
+    productFindFirst.mockResolvedValue({ category: 'HEU_STROH', verpackung: 'ABGEPACKT_ETIKETT' } as never)
     farmFindUnique.mockResolvedValue({ betriebsnummer: 'AT 1234567', betriebsstatus: 'REGISTRIERT' } as never)
 
     const ergebnis = await updateProduct('p_sack', { ...heu, unit: 'STUECK', isAvailable: true } as never)
@@ -283,10 +283,52 @@ describe('updateProduct — Sperre je Gebinde (S7, Nr. 20)', () => {
     expect(farmFindUnique).not.toHaveBeenCalled()
   })
 
-  it('kein Futter, oder ausgeblendet gespeichert: keine Abfrage zur Sperre', async () => {
+  it('kein Futter: keine Abfrage; ausgeblendetes Futter: die Kategorie wird gelesen, der Hof nicht', async () => {
     await updateProduct('p_1', basis as never)
-    await updateProduct('p_heu', { ...heu, isAvailable: false } as never)
-
     expect(productFindFirst).not.toHaveBeenCalled()
+
+    await updateProduct('p_heu', { ...heu, isAvailable: false } as never)
+    expect(productFindFirst).toHaveBeenCalledTimes(1)
+    expect(farmFindUnique).not.toHaveBeenCalled()
+  })
+})
+
+describe('updateProduct — Futter nur über das Futter-Formular (S7, Nachbesserung Nr. 20)', () => {
+  it('ein Nicht-Futter-Produkt lässt sich nicht auf eine Futter-Kategorie umstellen — nichts geschrieben', async () => {
+    productFindFirst.mockResolvedValue({ category: 'FLEISCH', verpackung: null } as never)
+
+    const ergebnis = await updateProduct('p_1', { ...heu, category: 'MISCHFUTTER', subcategory: null, futter: { ...heu.futter, futtermittelart: 'ALLEINFUTTERMITTEL' } } as never)
+
+    expect(ergebnis).toEqual({ error: FUTTER_NUR_UEBER_FORMULAR })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+    expect(tx.futterKennzeichnung.upsert).not.toHaveBeenCalled()
+  })
+
+  it('auch ausgeblendet nicht — sonst ginge es über den Schalter „Sichtbar" an der Sperre vorbei', async () => {
+    productFindFirst.mockResolvedValue({ category: null, verpackung: null } as never)
+
+    const ergebnis = await updateProduct('p_1', { ...heu, isAvailable: false } as never)
+
+    expect(ergebnis).toEqual({ error: FUTTER_NUR_UEBER_FORMULAR })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('ein Futtermittel bleibt als Futtermittel bearbeitbar (auch Altbestand ohne Verpackung)', async () => {
+    productFindFirst.mockResolvedValue({ category: 'HEU_STROH', verpackung: null } as never)
+
+    const ergebnis = await updateProduct('p_heu', { ...heu, isAvailable: true } as never)
+
+    expect(ergebnis).toEqual({ ok: true })
+    expect(tx.futterKennzeichnung.upsert).toHaveBeenCalledTimes(1)
+  })
+
+  it('der Besitz steht in der Abfrage; ein fremdes Produkt bekommt „nicht gefunden"', async () => {
+    productFindFirst.mockResolvedValue(null as never)
+
+    const ergebnis = await updateProduct('p_fremd', heu as never)
+
+    expect(ergebnis).toEqual({ error: 'Produkt nicht gefunden.' })
+    expect(productFindFirst).toHaveBeenCalledWith({ where: { id: 'p_fremd', farmId: 'farm_1' }, select: { category: true, verpackung: true } })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 })

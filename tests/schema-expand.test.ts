@@ -47,13 +47,15 @@ describe('Neue Einheiten: seit Gate 6 (Nr. 20) wählbar, nur für Brennmaterial'
     expect(block('enum', 'ProductUnit')).toEqual(expect.arrayContaining([...NEUE_EINHEITEN]))
   })
 
-  it('Zod nimmt sie an, das Formular bietet sie bei Brennholz an — nie bei Lebensmitteln oder Futter', () => {
+  it('Zod nimmt sie an, das Formular bietet sie nur bei Brennholz an — nie bei Lebensmitteln, Futter oder Sonstigem', () => {
     const angenommen: readonly string[] = PRODUCT_UNIT_VALUES
     const optionen = UNIT_OPTIONS.map((u): string => u.value)
     const brennholz = unitOptionsFuer('BRENNHOLZ').map((u): string => u.value)
     const eier = unitOptionsFuer('EIER').map((u): string => u.value)
     const heu = unitOptionsFuer('HEU_STROH').map((u): string => u.value)
+    const sonstiges = unitOptionsFuer('SONSTIGES').map((u): string => u.value)
     for (const einheit of NEUE_EINHEITEN) {
+      expect(sonstiges).not.toContain(einheit)
       expect(angenommen).toContain(einheit)
       expect(optionen).toContain(einheit)
       expect(brennholz).toContain(einheit)

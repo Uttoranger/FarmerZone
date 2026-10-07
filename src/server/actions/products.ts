@@ -16,7 +16,7 @@ import { dualUseHinweis, normiereProduktname, DUAL_USE_MIN_ZEICHEN } from '@/lib
 import { dualUseAnfrageSchema } from '@/schemas/product'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { istWiederDa } from '@/lib/produkte-hof'
-import { FUTTER_NUR_UEBER_FORMULAR, gebindeSperre, noetigeRegistrierung } from '@/lib/futter-registrierung'
+import { FUTTER_NUR_UEBER_FORMULAR, gebindeSperre, noetigeRegistrierung, type Gebinde } from '@/lib/futter-registrierung'
 import {
   futterDaten,
   ladeHofRegistrierung,
@@ -157,10 +157,25 @@ export async function updateProduct(
   if (!bildErlaubt) return { error: BILD_NICHT_UEBERNOMMEN }
   const futter = futterAus(v)
   const vorratSetzen = bestandVorher !== undefined && v.stock !== bestandVorher
-  // Sperre je Gebinde (S7): Soll ein Futtermittel in den Shop, entscheidet die
-  // Verpackung, die das Futter-Formular gesetzt hat, mit dem Stand des Hofs
-  // von JETZT. Gesperrt wird trotzdem gespeichert — nur als Entwurf.
-  const sperre = v.isAvailable && istFuttermittel(v.category) ? await sperreFuer(productId, farm.id, v.category) : null
+  // Futter (S7, Nachbesserung Nr. 20): Gespeichert wird als Futtermittel nur,
+  // was in der Datenbank schon eines ist. Ein Wechsel von Nicht-Futter auf
+  // Futter hätte keine Verpackung und käme an der Sperre je Gebinde vorbei —
+  // neue Futtermittel nur über das Futter-Formular. Auch ausgeblendet nicht,
+  // sonst schaltete „Sichtbar" es danach ohne Sperre ein. Gelesen wird mit dem
+  // Hof in der WHERE-Klausel; ein fremdes Produkt ist „nicht gefunden".
+  let sperre: string | null = null
+  if (istFuttermittel(v.category)) {
+    const bisher = await prisma.product.findFirst({
+      where: { id: productId, farmId: farm.id },
+      select: { category: true, verpackung: true },
+    })
+    if (!bisher) return { error: 'Produkt nicht gefunden.' }
+    if (!istFuttermittel(bisher.category)) return { error: FUTTER_NUR_UEBER_FORMULAR }
+    // Sperre je Gebinde: Soll das Futtermittel in den Shop, entscheidet die
+    // Verpackung aus der Datenbank mit dem Stand des Hofs von JETZT. Gesperrt
+    // wird trotzdem gespeichert — nur als Entwurf.
+    if (v.isAvailable) sperre = await sperreFuer(farm.id, { category: v.category, verpackung: bisher.verpackung })
+  }
   const daten = sperre ? { ...produktDaten(v), isAvailable: false } : produktDaten(v)
 
   const ergebnis = await prisma.$transaction(async (tx) => {
@@ -198,18 +213,12 @@ export async function updateProduct(
 }
 
 /**
- * Der Sperrgrund eines eigenen Produkts, wenn es mit dieser Kategorie in den
- * Shop soll — null, wenn es darf oder es nicht (mehr) gibt. Die Verpackung
- * kommt aus der Datenbank, nie aus dem Formular; der Hof steht in der WHERE-Klausel.
+ * Der Sperrgrund einer Größe, wenn sie in den Shop soll — null, wenn sie darf.
+ * Den Hof fragt nur, wer überhaupt eine Registrierung braucht. Ohne
+ * Verpackung ist es Altbestand (schon vor Nr. 20 Futter), den die Regel
+ * nicht sperrt (src/lib/futter-registrierung.ts).
  */
-async function sperreFuer(
-  productId: string,
-  farmId: string,
-  category: ProductFormData['category']
-): Promise<string | null> {
-  const produkt = await prisma.product.findFirst({ where: { id: productId, farmId }, select: { verpackung: true } })
-  if (!produkt) return null
-  const gebinde = { category, verpackung: produkt.verpackung }
+async function sperreFuer(farmId: string, gebinde: Gebinde): Promise<string | null> {
   if (noetigeRegistrierung(gebinde) === null) return null
   return gebindeSperre(gebinde, await ladeHofRegistrierung(farmId))?.grund ?? null
 }

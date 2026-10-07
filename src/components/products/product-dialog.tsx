@@ -1870,8 +1870,11 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
       onOpenChange={setKategorieSheetOffen}
       wert={{ category, subcategory: werte.subcategory }}
       startBereich={!isEdit && vorwahl === 'futter' ? 'FUTTERMITTEL' : undefined}
-      // Neue Futtermittel nur mit Verkaufsgrößen und Registrierung (Nr. 20, S7).
-      futterAnlegenHref={isEdit ? undefined : FUTTER_ANLEGEN_HREF}
+      // Futtermittel entstehen nur mit Verkaufsgrößen und Registrierung (Nr. 20,
+      // S7) — beim Anlegen und beim Bearbeiten eines Nicht-Futter-Produkts
+      // (updateProduct lehnt den Wechsel auf Futter ab). Ein Futtermittel
+      // bleibt in seinen Futter-Kategorien bearbeitbar.
+      futterAnlegenHref={isEdit && istFuttermittel(product.category) ? undefined : FUTTER_ANLEGEN_HREF}
       keineAngabeErlaubt={isEdit}
       onUebernehmen={({ category: neu, subcategory: sorte }) => kategorieUebernehmen(neu, sorte)}
     />
