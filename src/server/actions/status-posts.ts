@@ -6,6 +6,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { generateUnsubscribeToken } from '@/lib/unsubscribe'
+import { WERBEMAIL_EMPFAENGER } from '@/server/abo-anmeldung'
 import * as Sentry from '@sentry/nextjs'
 import { APP_URL } from '@/lib/umgebung-server'
 import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
@@ -89,8 +90,9 @@ export async function publishStatusPost(
         where: { farmId: farm.id, sentViaEmail: true, publishedAt: { gte: sevenDaysAgo } },
       })
       if (!recentSend) {
+        // Nur Bestand und bestätigte Anmeldungen (Double-Opt-in, S11, Nr. 38).
         emailSubscribers = await prisma.customerFarmSubscription.findMany({
-          where: { farmId: farm.id, optInEmail: true },
+          where: { farmId: farm.id, ...WERBEMAIL_EMPFAENGER },
           select: { customerEmail: true, customerPhone: true },
         })
       }

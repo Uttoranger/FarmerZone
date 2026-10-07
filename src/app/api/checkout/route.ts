@@ -22,6 +22,7 @@ import { berechneServicegebuehr } from '@/lib/servicegebuehr'
 import { pruefeSitzungsWarenkorb } from '@/server/warenkorb'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
+import { EMAIL_ABO_STAND, meldeEmailAboAn } from '@/server/abo-anmeldung'
 import { bestellPositionsName } from '@/lib/eingabegrenzen'
 import { fristVon } from '@/lib/fristen'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
@@ -703,32 +704,39 @@ export async function POST(request: NextRequest) {
   //     bestellen, statt an „Reservierung abgelaufen" zu scheitern.
   const gibHalteFrei = () => prisma.stockReservation.deleteMany({ where: { sessionId: data.sessionId } })
 
-  // 10b. Newsletter opt-in — only upsert if customer explicitly opted in
+  // 10b. Neuigkeiten vom Hof — nur, wenn die Kundin den Haken gesetzt hat.
+  //     E-Mail mit Double-Opt-in (Register S11, Nr. 38): Ein neues oder
+  //     abgemeldetes Abo bekommt erst einen Bestätigungslink (nach der
+  //     Antwort), `optInEmail` setzt erst der Knopf dahinter. Bestand und
+  //     bestätigte Abos bleiben unverändert. Ein gesetzter Haken wird nie
+  //     durch einen leeren überschrieben. Die Antwort an den Browser ist in
+  //     jedem Fall dieselbe — sie verrät nicht, ob die Adresse schon abonniert ist.
+  //     Scheitert das Abo, steht die Bestellung trotzdem: gemeldet, nicht zurückgerollt.
   if (data.optInEmail || data.optInWhatsApp) {
-    const email = data.customerEmail.toLowerCase()
-    const existing = await prisma.customerFarmSubscription.findUnique({
-      where: { customerEmail_farmId: { customerEmail: email, farmId: farm.id } },
-      select: { optInEmail: true, optInWhatsApp: true },
-    })
-    await prisma.customerFarmSubscription.upsert({
-      where: { customerEmail_farmId: { customerEmail: email, farmId: farm.id } },
-      create: {
-        customerEmail: email,
-        farmId: farm.id,
-        optInEmail: data.optInEmail ?? false,
-        optInWhatsApp: data.optInWhatsApp ?? false,
-        customerPhone: data.customerPhone || null,
-      },
-      update: {
-        // Only set to true — never overwrite an existing true with false from this checkout
-        ...(data.optInEmail ? { optInEmail: true } : {}),
-        ...(data.optInWhatsApp ? { optInWhatsApp: true } : {}),
-        customerPhone: data.customerPhone || null,
-        // Preserve existing opts if they were already true
-        ...(existing?.optInEmail ? { optInEmail: true } : {}),
-        ...(existing?.optInWhatsApp ? { optInWhatsApp: true } : {}),
-      },
-    })
+    try {
+      const email = data.customerEmail.toLowerCase()
+      const abo = await prisma.customerFarmSubscription.upsert({
+        where: { customerEmail_farmId: { customerEmail: email, farmId: farm.id } },
+        create: {
+          customerEmail: email,
+          farmId: farm.id,
+          optInEmail: false,
+          optInWhatsApp: data.optInWhatsApp ?? false,
+          customerPhone: data.customerPhone || null,
+        },
+        update: {
+          ...(data.optInWhatsApp ? { optInWhatsApp: true } : {}),
+          customerPhone: data.customerPhone || null,
+        },
+        select: EMAIL_ABO_STAND,
+      })
+      if (data.optInEmail) await meldeEmailAboAn(abo, new Date())
+    } catch (err) {
+      // Nur die Art des Fehlers — Prisma-Texte können die Adresse tragen.
+      const meldung = new Error('Abo im Checkout nicht gespeichert')
+      meldung.name = err instanceof Error ? err.name : 'Unbekannt'
+      Sentry.captureException(meldung, { tags: { aufgabe: 'checkout', grund: 'abo_nicht_gespeichert' }, extra: { orderId: order.id } })
+    }
   }
 
   // 11a. ONLINE — PaymentIntent anlegen (Ladungstyp: intentParameter oben).

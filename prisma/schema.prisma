@@ -853,6 +853,12 @@ model CustomerFarmSubscription {
   optInWhatsApp Boolean @default(false)
   customerPhone String?
 
+  // Double-Opt-in für E-Mail (Register S11, Nachtlauf Nr. 38). Beide null =
+  // Abo aus der Zeit davor (Bestand, bleibt unverändert). Angefragt ohne
+  // Bestätigung = keine werbliche Mail (src/lib/abo-bestaetigung.ts).
+  emailOptInAngefragtAm  DateTime?
+  emailOptInBestaetigtAm DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
