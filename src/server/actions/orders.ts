@@ -288,10 +288,15 @@ export async function revertReady(
   if (count === 0) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
 
   // Kunden-Info nur auf Wunsch (Haken im Dialog, Standard AN): neutrales
-  // "Kurzes Update" — relativiert die bereits verschickte Abholbereit-Mail
+  // "Kurzes Update" — relativiert die bereits verschickte Abholbereit-Mail.
+  // Erst nach der Antwort und mit try (Nr. 35): Vorher lief der Versand im
+  // Antwortpfad nach dem schon geschriebenen Status — ein Mailfehler warf aus
+  // der Action, obwohl die Bestellung längst zurückgesetzt war.
   if (notifyCustomer) {
-    const { sendOrderNotReady } = await import('@/lib/email')
-    await sendOrderNotReady(toEmailOrder(order, farm))
+    mailNachDerAntwort('nicht_abholbereit', orderId, async () => {
+      const { sendOrderNotReady } = await import('@/lib/email')
+      await sendOrderNotReady(toEmailOrder(order, farm))
+    })
   }
 
   revalidatePath('/orders')

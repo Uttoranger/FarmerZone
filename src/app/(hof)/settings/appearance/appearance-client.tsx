@@ -29,6 +29,7 @@ import {
 } from '@/server/actions/farm-photos'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { cn } from '@/lib/utils'
+import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import type { SectionConfig, FarmPhotoData } from '@/server/queries/appearance'
 
 // ── Design constants ──────────────────────────────────────────────────────────
@@ -80,6 +81,12 @@ const SECTION_LABELS: Record<string, string> = {
   gallery:  'Galerie',
   products: 'Produkte (immer sichtbar)',
 }
+
+/**
+ * Knöpfe nur mit Symbol (Pfeile, Löschen): 44 px Trefferfläche wie überall
+ * (DESIGN_SYSTEM, Nr. 35), das Symbol bleibt klein. Vorher 24 px.
+ */
+const SYMBOL_KNOPF = 'size-11 shrink-0 rounded-md flex items-center justify-center'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -145,13 +152,14 @@ export function LogoUpload({
   return (
     <div className="flex items-center gap-4">
       {fileInput}
-      {/* Round preview */}
-      <div
-        className="relative shrink-0 overflow-hidden bg-muted flex items-center justify-center"
-        style={{ width: 72, height: 72, borderRadius: '50%', border: '2px dashed var(--app-line-firm)' }}
-      >
-        {logoUrl ? (
-          <>
+      {/* Round preview — der Entfernen-Knopf liegt außerhalb des runden
+          Rahmens: overflow-hidden schnitte seine 44-px-Trefferfläche ab (Nr. 35). */}
+      <div className="relative shrink-0">
+        <div
+          className="relative overflow-hidden bg-muted flex items-center justify-center"
+          style={{ width: 72, height: 72, borderRadius: '50%', border: '2px dashed var(--app-line-firm)' }}
+        >
+          {logoUrl ? (
             <Image
               src={logoUrl}
               alt="Logo"
@@ -159,17 +167,22 @@ export function LogoUpload({
               sizes="72px"
               className="object-cover"
             />
-            <button
-              type="button"
-              onClick={handleRemove}
-              className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center"
-              aria-label="Logo entfernen"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </>
-        ) : (
-          <Camera className="w-6 h-6 text-muted-foreground/50" />
+          ) : (
+            <Camera className="w-6 h-6 text-muted-foreground/50" aria-hidden="true" />
+          )}
+        </div>
+        {logoUrl && (
+          <button
+            type="button"
+            onClick={handleRemove}
+            className={cn('absolute -top-3 -right-3 size-11 rounded-full flex items-center justify-center', FOKUS_RAHMEN)}
+            aria-label="Logo entfernen"
+          >
+            {/* Sichtbar bleibt der kleine Kreis, die Trefferfläche ist der ganze Knopf. */}
+            <span className="size-5 rounded-full bg-black/60 text-white flex items-center justify-center">
+              <X className="w-3 h-3" aria-hidden="true" />
+            </span>
+          </button>
         )}
       </div>
       <div>
@@ -179,7 +192,7 @@ export function LogoUpload({
           disabled={isUploading}
           className="inline-flex items-center gap-1.5 min-h-11 px-4 rounded-lg border border-border text-sm font-medium hover:bg-muted/40 transition-colors disabled:opacity-60"
         >
-          {isUploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+          {isUploading ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Upload className="size-3.5" aria-hidden="true" />}
           {/* Die Stufe statt eines stummen Spinners: Seit dem Zeitwächter-Umbau
               nennt jeder Hänger seinen Ort. */}
           {isUploading && progress
@@ -242,10 +255,13 @@ function BannerPhotoUpload({
           <button
             type="button"
             onClick={handleRemove}
-            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
+            className={cn('group absolute top-0.5 right-0.5 size-11 rounded-full flex items-center justify-center', FOKUS_RAHMEN_INNEN)}
             aria-label="Titelbild entfernen"
           >
-            <X className="w-3.5 h-3.5" />
+            {/* Sichtbar der 28-px-Kreis wie bisher, getroffen wird der 44-px-Knopf (Nr. 35). */}
+            <span className="size-7 rounded-full bg-black/60 text-white flex items-center justify-center group-hover:bg-black/80 transition-colors">
+              <X className="w-3.5 h-3.5" aria-hidden="true" />
+            </span>
           </button>
         </div>
       ) : (
@@ -257,14 +273,14 @@ function BannerPhotoUpload({
         >
           {isUploading ? (
             <>
-              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+              <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden="true" />
               <span className="text-xs text-muted-foreground">
                 {progress ? stufenText(progress) : 'Lädt…'}
               </span>
             </>
           ) : (
             <>
-              <Upload className="size-5 text-muted-foreground" />
+              <Upload className="size-5 text-muted-foreground" aria-hidden="true" />
               <span className="text-xs text-muted-foreground">Foto hochladen</span>
             </>
           )}
@@ -336,28 +352,35 @@ function GalleryPhotoItem({
           <span className="text-[10px] text-muted-foreground">Speichern…</span>
         )}
       </div>
-      <div className="flex flex-col gap-1 shrink-0">
+      {/* 44-px-Ziele (Nr. 35); die Pfeile übereinander, damit das Feld daneben Platz behält. */}
+      <div className="flex flex-col shrink-0">
         <button
+          type="button"
           onClick={() => onMove(photo.id, 'up')}
           disabled={index === 0}
-          className="w-6 h-6 rounded-md hover:bg-muted flex items-center justify-center disabled:opacity-30"
+          aria-label={`Foto ${index + 1} nach oben`}
+          className={cn(SYMBOL_KNOPF, FOKUS_RAHMEN, 'hover:bg-muted disabled:opacity-30')}
         >
-          <ChevronUp className="size-3.5" />
+          <ChevronUp className="size-3.5" aria-hidden="true" />
         </button>
         <button
+          type="button"
           onClick={() => onMove(photo.id, 'down')}
           disabled={index === total - 1}
-          className="w-6 h-6 rounded-md hover:bg-muted flex items-center justify-center disabled:opacity-30"
+          aria-label={`Foto ${index + 1} nach unten`}
+          className={cn(SYMBOL_KNOPF, FOKUS_RAHMEN, 'hover:bg-muted disabled:opacity-30')}
         >
-          <ChevronDown className="size-3.5" />
+          <ChevronDown className="size-3.5" aria-hidden="true" />
         </button>
       </div>
       <button
+        type="button"
         onClick={handleDelete}
         disabled={isDeleting}
-        className="w-6 h-6 rounded-md hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive shrink-0 disabled:opacity-40"
+        aria-label={`Foto ${index + 1} löschen`}
+        className={cn(SYMBOL_KNOPF, FOKUS_RAHMEN, 'hover:bg-destructive/10 text-muted-foreground hover:text-destructive disabled:opacity-40')}
       >
-        {isDeleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+        {isDeleting ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Trash2 className="size-3.5" aria-hidden="true" />}
       </button>
     </div>
   )
@@ -464,7 +487,7 @@ export function GallerySection({
           disabled={isUploading}
           className="w-full flex items-center justify-center gap-2 h-11 rounded-xl border-2 border-dashed border-border text-sm font-medium text-muted-foreground hover:bg-muted/30 hover:text-foreground transition-colors disabled:opacity-60"
         >
-          {isUploading ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+          {isUploading ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Plus className="size-4" aria-hidden="true" />}
           {/* Der Prozentsatz ist neu und für Mobilfunk gedacht: Seit der
               Umstellung geht das ORIGINAL über die Leitung (6–8 MB statt
               ~300 kB). Ohne bewegte Zahl sieht das nach Absturz aus. */}
@@ -513,10 +536,10 @@ function SortableSectionRow({ id, children }: { id: string; children: React.Reac
         {...attributes}
         {...listeners}
         aria-label="Bereich verschieben"
-        className="shrink-0 flex items-center justify-center size-8 rounded-lg text-muted-foreground hover:bg-muted cursor-grab active:cursor-grabbing"
+        className={cn('shrink-0 flex items-center justify-center size-11 rounded-lg text-muted-foreground hover:bg-muted cursor-grab active:cursor-grabbing', FOKUS_RAHMEN)}
         style={{ touchAction: 'none' }}
       >
-        <GripVertical className="size-4" />
+        <GripVertical className="size-4" aria-hidden="true" />
       </button>
       <div className="flex-1 min-w-0">{children}</div>
     </div>
@@ -739,7 +762,7 @@ export function AppearanceClient({ initialData }: Props) {
                   </div>
                   {bannerValue === preset.key && (
                     <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
-                      <Check className="w-2.5 h-2.5 text-primary-foreground" />
+                      <Check className="w-2.5 h-2.5 text-primary-foreground" aria-hidden="true" />
                     </div>
                   )}
                 </button>
@@ -827,7 +850,7 @@ export function AppearanceClient({ initialData }: Props) {
                 key={item.titel}
                 onClick={() => toggleCatalogValue(item)}
                 className={cn(
-                  'flex items-center gap-2 p-2.5 rounded-xl border-2 text-sm transition-all text-left',
+                  'flex items-center gap-2 min-h-11 p-2.5 rounded-xl border-2 text-sm transition-all text-left',
                   selected
                     ? 'bg-app-chip-green border-primary text-foreground'
                     : 'border-border text-muted-foreground hover:border-border/80 hover:bg-muted/40',
@@ -835,7 +858,7 @@ export function AppearanceClient({ initialData }: Props) {
               >
                 <Symbol className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
                 <span className="text-xs font-medium flex-1">{item.titel}</span>
-                {selected && <Check className="size-3.5 shrink-0" />}
+                {selected && <Check className="size-3.5 shrink-0" aria-hidden="true" />}
               </button>
             )
           })}
@@ -863,27 +886,33 @@ export function AppearanceClient({ initialData }: Props) {
                     className="w-full h-11 px-2 rounded-lg border border-border bg-card text-xs focus:outline-none focus:ring-1 focus:ring-primary/30"
                   />
                 </div>
-                <div className="flex flex-col gap-1 shrink-0">
+                <div className="flex flex-col shrink-0">
                   <button
+                    type="button"
                     onClick={() => moveValue(i, -1)}
                     disabled={i === 0}
-                    className="w-6 h-6 rounded-md hover:bg-muted flex items-center justify-center disabled:opacity-30"
+                    aria-label={`${v.title} nach oben`}
+                    className={cn(SYMBOL_KNOPF, FOKUS_RAHMEN, 'hover:bg-muted disabled:opacity-30')}
                   >
-                    <ChevronUp className="size-3.5" />
+                    <ChevronUp className="size-3.5" aria-hidden="true" />
                   </button>
                   <button
+                    type="button"
                     onClick={() => moveValue(i, 1)}
                     disabled={i === farmValues.length - 1}
-                    className="w-6 h-6 rounded-md hover:bg-muted flex items-center justify-center disabled:opacity-30"
+                    aria-label={`${v.title} nach unten`}
+                    className={cn(SYMBOL_KNOPF, FOKUS_RAHMEN, 'hover:bg-muted disabled:opacity-30')}
                   >
-                    <ChevronDown className="size-3.5" />
+                    <ChevronDown className="size-3.5" aria-hidden="true" />
                   </button>
                 </div>
                 <button
+                  type="button"
                   onClick={() => removeValue(i)}
-                  className="w-6 h-6 rounded-md hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive shrink-0"
+                  aria-label={`${v.title} entfernen`}
+                  className={cn(SYMBOL_KNOPF, FOKUS_RAHMEN, 'hover:bg-destructive/10 text-muted-foreground hover:text-destructive')}
                 >
-                  <Trash2 className="size-3.5" />
+                  <Trash2 className="size-3.5" aria-hidden="true" />
                 </button>
               </div>
             ))}
@@ -908,6 +937,7 @@ export function AppearanceClient({ initialData }: Props) {
             .sort((a, b) => a.order - b.order)
             .map((section, idx, sorted) => {
               const isProducts = section.key === 'products'
+              const bereichName = SECTION_LABELS[section.key] ?? section.key
               return (
                 <SortableSectionRow key={section.key} id={section.key}>
                   <div className="flex items-center gap-2">
@@ -916,7 +946,7 @@ export function AppearanceClient({ initialData }: Props) {
                     onClick={() => toggleSection(section.key)}
                     disabled={isProducts}
                     className={cn(
-                      'flex-1 flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all',
+                      'flex-1 flex items-center gap-3 min-h-11 p-3 rounded-xl border-2 text-left transition-all',
                       section.visible && !isProducts
                         ? 'border-primary bg-primary/5'
                         : isProducts
@@ -930,7 +960,7 @@ export function AppearanceClient({ initialData }: Props) {
                         section.visible ? 'bg-primary border-primary' : 'border-border',
                       )}
                     >
-                      {section.visible && <Check className="size-3 text-primary-foreground" />}
+                      {section.visible && <Check className="size-3 text-primary-foreground" aria-hidden="true" />}
                     </div>
                     <span
                       className={cn(
@@ -938,28 +968,29 @@ export function AppearanceClient({ initialData }: Props) {
                         isProducts ? 'text-muted-foreground' : 'text-foreground',
                       )}
                     >
-                      {SECTION_LABELS[section.key] ?? section.key}
+                      {bereichName}
                     </span>
                   </button>
-                  {/* Pfeil-Fallback (Barrierefreiheit / ohne Drag) */}
-                  <div className="flex flex-col gap-1 shrink-0">
+                  {/* Pfeil-Fallback (Barrierefreiheit / ohne Drag). Nebeneinander:
+                      übereinander verdoppelten zwei 44-px-Ziele jede Zeile (Nr. 35). */}
+                  <div className="flex shrink-0">
                     <button
                       type="button"
                       onClick={() => moveSectionByOffset(section.key, -1)}
                       disabled={idx === 0}
-                      aria-label="Bereich nach oben"
-                      className="w-6 h-6 rounded-md hover:bg-muted flex items-center justify-center disabled:opacity-30"
+                      aria-label={`${bereichName} nach oben`}
+                      className={cn(SYMBOL_KNOPF, FOKUS_RAHMEN, 'hover:bg-muted disabled:opacity-30')}
                     >
-                      <ChevronUp className="size-3.5" />
+                      <ChevronUp className="size-3.5" aria-hidden="true" />
                     </button>
                     <button
                       type="button"
                       onClick={() => moveSectionByOffset(section.key, 1)}
                       disabled={idx === sorted.length - 1}
-                      aria-label="Bereich nach unten"
-                      className="w-6 h-6 rounded-md hover:bg-muted flex items-center justify-center disabled:opacity-30"
+                      aria-label={`${bereichName} nach unten`}
+                      className={cn(SYMBOL_KNOPF, FOKUS_RAHMEN, 'hover:bg-muted disabled:opacity-30')}
                     >
-                      <ChevronDown className="size-3.5" />
+                      <ChevronDown className="size-3.5" aria-hidden="true" />
                     </button>
                   </div>
                   </div>

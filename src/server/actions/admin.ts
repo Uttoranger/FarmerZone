@@ -8,7 +8,7 @@ import {
   FARM_REJECT_HAS_DATA_MESSAGE,
   FARM_REJECT_OWNER_IS_ADMIN_MESSAGE,
 } from '@/lib/farm-approval'
-import { servicegebuehrEinstellungSchema } from '@/schemas/servicegebuehr'
+import { GILT_AB_UNGUELTIG, PROZENT_UNGUELTIG, servicegebuehrEinstellungSchema } from '@/schemas/servicegebuehr'
 import { wienerMitternacht } from '@/lib/servicegebuehr'
 import { triageEingabeSchema } from '@/schemas/meldung'
 import { bestaetigungOffen } from '@/lib/email-bestaetigung'
@@ -207,10 +207,19 @@ export async function setServiceFeeAction(
   if ('error' in guard) return { error: guard.error }
 
   const parsed = servicegebuehrEinstellungSchema.safeParse(eingabe)
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe.' }
+  if (!parsed.success) {
+    // Für Prozent und Datum nur der feste Satz, nie die Zod-Meldung (Nr. 35):
+    // Bei falschem Typ stünde sonst Zods englischer Standardtext im Dialog.
+    // Die Mindestgebühr trägt eigene Sätze für jeden Fall (Nr. 32).
+    const erste = parsed.error.issues[0]
+    const feld = erste?.path[0]
+    if (feld === 'percent') return { error: PROZENT_UNGUELTIG }
+    if (feld === 'activeFrom') return { error: GILT_AB_UNGUELTIG }
+    return { error: erste?.message ?? 'Ungültige Eingabe.' }
+  }
 
   const giltAb = parsed.data.activeFrom === null ? null : wienerMitternacht(parsed.data.activeFrom)
-  if (parsed.data.activeFrom !== null && giltAb === null) return { error: 'Ungültiges Datum.' }
+  if (parsed.data.activeFrom !== null && giltAb === null) return { error: GILT_AB_UNGUELTIG }
 
   const farm = await prisma.farm.findUnique({ where: { id: farmId }, select: { slug: true } })
   if (!farm) return { error: 'Hof nicht gefunden.' }
