@@ -10,6 +10,7 @@
  */
 import { vorWieLange } from '@/lib/hofseite-kunde'
 import { aufzaehlung } from '@/lib/hofseite-fortschritt'
+import { formatZahl } from '@/lib/format'
 
 /** Was die Übersicht von einem Beitrag braucht — eine Teilmenge von StatusPostSummary. */
 export type BeitragQuelle = {
@@ -21,6 +22,8 @@ export type BeitragQuelle = {
   publishedAt: string | null
   sentViaEmail: boolean
   sentViaWhatsApp: boolean
+  /** An wie viele Adressen die E-Mail beim Veröffentlichen ging (gespeichert, keine neue Abfrage). */
+  emailRecipientCount: number
   /** Wie viele der WhatsApp-Nachrichten schon verschickt sind (je ein Tipp, /status/[id]/send-whatsapp). */
   whatsappSentCount: number
   whatsappRecipientCount: number
@@ -75,9 +78,15 @@ const MARKE: Record<BeitragGruppeId, BeitragEintrag['marke']> = {
   vergangen: { text: 'Abgelaufen', ton: 'neutral' },
 }
 
-/** „Nur auf der Hofseite", „Hofseite und E-Mail", „Hofseite, E-Mail und WhatsApp". */
+/**
+ * „Nur auf der Hofseite", „Hofseite und 12 per E-Mail", „Hofseite, 12 per
+ * E-Mail und WhatsApp". Die Zahl der E-Mail-Empfänger stand auf der alten
+ * Beitragskarte von /status und kam mit Register F6 (22e) zurück in die Zeile;
+ * WhatsApp nennt seinen Stand im Knopf „WhatsApp fortsetzen · n von m".
+ */
 function wege(b: BeitragQuelle): string {
-  const zusaetzlich = [b.sentViaEmail && 'E-Mail', b.sentViaWhatsApp && 'WhatsApp'].filter((w): w is string => Boolean(w))
+  const email = b.sentViaEmail && `${formatZahl(b.emailRecipientCount)} per E-Mail`
+  const zusaetzlich = [email, b.sentViaWhatsApp && 'WhatsApp'].filter((w): w is string => Boolean(w))
   return zusaetzlich.length === 0 ? 'Nur auf der Hofseite' : aufzaehlung(['Hofseite', ...zusaetzlich])
 }
 

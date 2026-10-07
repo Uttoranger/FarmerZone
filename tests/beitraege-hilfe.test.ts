@@ -66,6 +66,7 @@ const basis: BeitragQuelle = {
   publishedAt: '2026-09-20T10:00:00.000Z',
   sentViaEmail: false,
   sentViaWhatsApp: false,
+  emailRecipientCount: 0,
   whatsappSentCount: 0,
   whatsappRecipientCount: 0,
 }
@@ -302,6 +303,11 @@ describe('Meine Meldungen (gerendert)', () => {
     expect(html).toContain('In Arbeit')
     expect(html).toContain('Antwort:')
     expect(html).toContain('Liegt am Bildformat')
+  })
+
+  it('F6 (22e): je Meldung „Tag · Nr. <Kurznummer>" bleibt', () => {
+    expect(zeilen[0].kurznummer).toMatch(/\S/)
+    expect(html).toContain(`Nr. <span class="font-mono">${zeilen[0].kurznummer}</span>`)
   })
 
   it('Fremdtext bleibt Text', () => {

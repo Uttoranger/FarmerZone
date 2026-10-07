@@ -62,8 +62,11 @@ describe('„Ablehnen" — Kontrast in beiden Themes', () => {
     expect(kontrast(farbe(DUNKEL, 'fz-text'), farbe(DUNKEL, 'fz-surface')), 'dunkel').toBeGreaterThanOrEqual(4.5)
   })
 
-  it('Gegenprobe: die Messung fängt den Zustand vor Nr. 19b (rote Schrift auf Crème) — unter 4,5:1', () => {
-    expect(kontrast(farbe(HELL, 'destructive'), farbe(HELL, 'background'))).toBeLessThan(4.5)
+  it('Gegenprobe: die Messung fängt den alten Zustand (rote Schrift auf Crème) — unter 4,5:1', () => {
+    // Der helle Wert von --destructive vor Register O1 (Nr. 28); seitdem hält
+    // das Token selbst 4,5:1 auch auf Crème (tests/fehler-farbe-kontrast.test.ts).
+    const vorO1 = oklchZuHex({ l: 0.577, c: 0.245, h: 27.325 })
+    expect(kontrast(vorO1, farbe(HELL, 'background'))).toBeLessThan(4.5)
   })
 
   it('Gegenprobe: die Suche findet den Knopf nur mit genau diesem Text', () => {

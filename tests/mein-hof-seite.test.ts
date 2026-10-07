@@ -36,6 +36,7 @@ vi.mock('next/image', () => ({
 import { MEIN_HOF_REITER_HOFBEREICH, meinHofReiterAus } from '@/lib/bauern-navigation'
 import { meinHofReiterSchema } from '@/schemas/mein-hof-reiter'
 import { beitraegeUebersicht, type BeitragQuelle } from '@/lib/mein-hof-beitraege'
+import { formatZahl } from '@/lib/format'
 import { EINSTELLUNG_FUER_ZEILE } from '@/lib/hofseite-fortschritt'
 import { hofseiteZeileIdSchema } from '@/schemas/hofseite-vorschau'
 import { MeinHofSeitenkopf } from '@/components/mein-hof/seitenkopf'
@@ -80,6 +81,7 @@ describe('Beiträge-Übersicht', () => {
     publishedAt: null,
     sentViaEmail: false,
     sentViaWhatsApp: false,
+    emailRecipientCount: 0,
     whatsappSentCount: 0,
     whatsappRecipientCount: 0,
   }
@@ -115,11 +117,22 @@ describe('Beiträge-Übersicht', () => {
   it('„vor …" vom übergebenen Zeitpunkt, und wohin der Beitrag ging', () => {
     const eintrag = (q: Partial<BeitragQuelle>) => beitraegeUebersicht([{ ...basis, ...q }], jetzt).gruppen[0].eintraege[0]
     expect(eintrag({ isActive: true, publishedAt: '2026-10-06T07:00:00.000Z' }).zeile).toBe('vor 3 Stunden · Nur auf der Hofseite')
-    expect(eintrag({ publishedAt: '2026-10-04T09:00:00.000Z', sentViaEmail: true }).zeile).toBe('vor 2 Tagen · Hofseite und E-Mail')
     expect(eintrag({ publishedAt: '2026-10-04T09:00:00.000Z', sentViaWhatsApp: true }).zeile).toBe('vor 2 Tagen · Hofseite und WhatsApp')
-    expect(eintrag({ publishedAt: '2026-10-04T09:00:00.000Z', sentViaEmail: true, sentViaWhatsApp: true }).zeile).toBe(
-      'vor 2 Tagen · Hofseite, E-Mail und WhatsApp'
+  })
+
+  it('F6 (22e): „N per E-Mail" steht wieder in der Zeile — die Zahl der Empfänger wie auf der alten Karte', () => {
+    const eintrag = (q: Partial<BeitragQuelle>) => beitraegeUebersicht([{ ...basis, ...q }], jetzt).gruppen[0].eintraege[0]
+    const vor2Tagen = '2026-10-04T09:00:00.000Z'
+    expect(eintrag({ publishedAt: vor2Tagen, sentViaEmail: true, emailRecipientCount: 12 }).zeile).toBe('vor 2 Tagen · Hofseite und 12 per E-Mail')
+    expect(eintrag({ publishedAt: vor2Tagen, sentViaEmail: true, sentViaWhatsApp: true, emailRecipientCount: 1 }).zeile).toBe(
+      'vor 2 Tagen · Hofseite, 1 per E-Mail und WhatsApp'
     )
+    // Tausender wie überall über formatZahl.
+    expect(eintrag({ publishedAt: vor2Tagen, sentViaEmail: true, emailRecipientCount: 1200 }).zeile).toBe(`vor 2 Tagen · Hofseite und ${formatZahl(1200)} per E-Mail`)
+    // Ohne E-Mail-Versand keine Zahl, auch wenn eine im Datensatz stünde.
+    expect(eintrag({ publishedAt: vor2Tagen, emailRecipientCount: 5 }).zeile).toBe('vor 2 Tagen · Nur auf der Hofseite')
+    // Entwürfe gingen an niemanden.
+    expect(eintrag({ isDraft: true, sentViaEmail: true, emailRecipientCount: 5 }).zeile).toBe('Noch nicht veröffentlicht')
     expect(eintrag({ isDraft: true }).zeile).toBe('Noch nicht veröffentlicht')
   })
 })
@@ -242,8 +255,9 @@ describe('Reiter „Beiträge"', () => {
               isActive: true,
               isDraft: false,
               publishedAt: jetzt,
-              sentViaEmail: false,
+              sentViaEmail: true,
               sentViaWhatsApp: false,
+              emailRecipientCount: 7,
               whatsappSentCount: 0,
               whatsappRecipientCount: 0,
             },
@@ -256,6 +270,8 @@ describe('Reiter „Beiträge"', () => {
     expect(html).toContain('href="/status/new"')
     expect(html).not.toContain('href="/status"')
     expect(html).toContain('Aktiv')
+    // F6 (22e): die Zahl der E-Mail-Empfänger steht in der Zeile.
+    expect(html).toContain('Hofseite und 7 per E-Mail')
   })
 
   it('leer: EmptyState mit Ausweg „Ersten Beitrag schreiben"', () => {

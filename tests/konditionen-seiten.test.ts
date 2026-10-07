@@ -28,7 +28,7 @@ vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
   KundeShellMitSitzung: ({ children }: { children: ReactNode }) => createElement('div', null, children),
 }))
 
-import KonditionenPage from '@/app/(public)/konditionen/page'
+import KonditionenPage, { revalidate as konditionenRevalidate } from '@/app/(public)/konditionen/page'
 import FuerHoefePage from '@/app/(public)/fuer-hoefe/page'
 import { BAR_OHNE_GEBUEHR_SATZ, SERVICEGEBUEHR_SATZ_TEXT, TARIFE, servicegebuehrZahltKunde, vorBarStichtag } from '@/lib/konditionen'
 import { FUER_HOEFE_FRAGEN } from '@/lib/fuer-hoefe'
@@ -50,6 +50,17 @@ const PREISSEITEN = [
  * Nicht: Tailwind-Klassen wie `to-70%` (vor der Zahl ein Bindestrich).
  */
 const ZAHL_LITERAL = /((?<![\w-])\d+(?:[.,]\d+)?\s*(?:€|%|Euro|Prozent))|(€\s*\d)/
+
+describe('Register F6 (19a): /konditionen wird stündlich neu gebaut', () => {
+  it('revalidate = 3600 als Segment-Konfiguration, ohne die Seite dynamisch zu machen', () => {
+    // Nach dem Stichtag (B1) verschwindet die Bar-Ausnahme so spätestens nach
+    // einer Stunde plus erstem Aufruf — vorher erst mit dem nächsten Deploy.
+    expect(konditionenRevalidate).toBe(3600)
+    const quelle = lies('src/app/(public)/konditionen/page.tsx')
+    expect(quelle).toMatch(/^export const revalidate = 3600$/m)
+    expect(quelle).not.toMatch(/export const dynamic|headers\(\)|cookies\(\)/)
+  })
+})
 
 describe('Quelltext — eine Quelle für Preise', () => {
   it('keine Preisseite schreibt einen Betrag oder Satz selbst', () => {
