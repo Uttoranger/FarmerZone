@@ -191,6 +191,99 @@ describe('Ladeansichten — jede öffentliche Route, die auf Daten wartet, zeigt
   })
 })
 
+/**
+ * Hofbereich, Bestandsbereich und Admin (Nachtlauf Nr. 31): JEDE Route hat
+ * ihre eigene Ladeansicht. Befund vom 06.10.2026: Nahezu jeder Tab-Wechsel im
+ * Hofbereich war ein Kaltstart — ohne loading.tsx gab es weder sofortige
+ * Rückmeldung noch Vorladen bis zur Grenze. Die Rückfälle der Gruppen fangen
+ * nur Routen, die neu dazukommen.
+ */
+const BEREICHE = ['src/app/(hof)', 'src/app/(farmer)', 'src/app/admin'] as const
+
+/** Alle Ordner unter `wurzel` mit einer page.tsx. */
+function routenOrdner(wurzel: string): string[] {
+  const ergebnis: string[] = []
+  const lauf = (ordner: string): void => {
+    const eintraege = fs.readdirSync(path.join(WURZEL, ordner), { withFileTypes: true })
+    if (eintraege.some((e) => e.isFile() && e.name === 'page.tsx')) ergebnis.push(ordner)
+    for (const e of eintraege) if (e.isDirectory()) lauf(`${ordner}/${e.name}`)
+  }
+  lauf(wurzel)
+  return ergebnis.sort()
+}
+
+/** Die Ladeansicht samt der Bauteile, die sie aus src/components bzw. relativ einbindet. */
+function ladeansichtMitTeilen(datei: string): string {
+  const text = liesDatei(datei)
+  const teile = [...text.matchAll(/from '(@\/components\/[^']+|\.{1,2}\/[^']+)'/g)].map(([, spez]) => {
+    const basis = spez.startsWith('@/')
+      ? path.join('src', spez.slice(2))
+      : path.join(path.dirname(datei), spez)
+    return ['.tsx', '.ts', '/loading.tsx'].map((e) => basis + e).find((k) => existiert(k))
+  })
+  return [text, ...teile.filter((t): t is string => t !== undefined).map(liesDatei)].join('\n')
+}
+
+describe('Ladeansichten — jede Route im Hofbereich, im Bestand und im Admin hat eine eigene', () => {
+  const routen = BEREICHE.flatMap(routenOrdner)
+
+  it('findet die Routen überhaupt (Gegenprobe)', () => {
+    expect(routen).toContain('src/app/(hof)/orders')
+    expect(routen).toContain('src/app/(hof)/status/new')
+    expect(routen).toContain('src/app/(farmer)/analytics/umfeld')
+    expect(routen).toContain('src/app/admin/meldungen/[id]')
+    expect(routen.length).toBeGreaterThanOrEqual(29)
+  })
+
+  for (const route of BEREICHE.flatMap(routenOrdner)) {
+    it(`${route} hat loading.tsx`, () => {
+      expect(existiert(`${route}/loading.tsx`), `${route}/loading.tsx fehlt`).toBe(true)
+    })
+  }
+
+  it('die Gruppen haben einen Rückfall für neue Routen', () => {
+    expect(existiert('src/app/(hof)/loading.tsx')).toBe(true)
+    expect(existiert('src/app/(farmer)/loading.tsx')).toBe(true)
+    expect(existiert('src/app/admin/loading.tsx')).toBe(true)
+  })
+
+  it('alle zeigen Platzhalter in Kartenform mit aria-busy, ohne Spinner, Farbliteral oder Emoji', () => {
+    const dateien = [...BEREICHE.flatMap(routenOrdner).map((r) => `${r}/loading.tsx`), 'src/app/(hof)/loading.tsx', 'src/app/(farmer)/loading.tsx']
+    for (const datei of dateien) {
+      const text = ladeansichtMitTeilen(datei)
+      expect(text, `${datei} ohne animate-pulse`).toContain('animate-pulse')
+      expect(text, `${datei} ohne aria-busy`).toContain('aria-busy')
+      expect(text, `${datei} mit Spinner`).not.toMatch(SPINNER)
+      expect(text, `${datei} mit Farbliteral`).not.toMatch(FARBLITERAL)
+      expect(PIKTOGRAMM.test(text), `${datei} mit Emoji`).toBe(false)
+    }
+  })
+
+  it('/status zeigt während der Umleitung die Form des Ziels (Mein Hof, Reiter Beiträge)', () => {
+    expect(liesDatei('src/app/(hof)/status/loading.tsx')).toMatch(/from '\.\.\/farm-page\/loading'/)
+  })
+
+  it('Admin: die Prüfung steht im Layout, VOR der Ladeansicht — sonst ginge 200 mit Skelett an Unbefugte', () => {
+    // Ein Layout liegt außerhalb der Suspense-Grenze seines Segments. Prüfte
+    // nur die Seite, streamte Next.js erst das Skelett und schickte 404 bzw.
+    // Umleitung im Datenstrom nach (Status 200).
+    const layout = liesDatei('src/app/admin/layout.tsx')
+    expect(layout).toMatch(/import \{ verlangeAdminSeite \} from '@\/server\/admin-wache'/)
+    const koerper = layout.slice(layout.indexOf('export default async function'))
+    expect(koerper.split('\n').slice(1).find((z) => z.trim() !== '')?.trim()).toBe('await verlangeAdminSeite()')
+    // Die Seiten prüfen trotzdem selbst weiter (eine Seite schützt die Ansicht).
+    for (const route of routenOrdner('src/app/admin')) {
+      expect(liesDatei(`${route}/page.tsx`), route).toContain('await verlangeAdminSeite()')
+    }
+  })
+
+  it('Hof und Bestand: Zugang prüft das Layout der Gruppe, vor jeder Ladeansicht', () => {
+    for (const gruppe of ['src/app/(hof)/layout.tsx', 'src/app/(farmer)/layout.tsx']) {
+      expect(liesDatei(gruppe), gruppe).toContain('await ladeHofbereich()')
+    }
+  })
+})
+
 describe('Startseite — bewusst OHNE src/app/loading.tsx', () => {
   it('hat kein src/app/loading.tsx', () => {
     // Eine Datei im Wurzelsegment wäre der Fallback für JEDE Route ohne
