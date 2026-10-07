@@ -80,6 +80,17 @@ describe('Regeln und Texte (rein)', () => {
     expect(gebindeAnzeige(0.1 + 0.2 + 2.7, null)).toBe(3)
     expect(gebindeAnzeige(null, 0.5)).toBe(2)
     expect(gebindeAnzeige(undefined, null)).toBe(1)
+    // Exakt aufgerundet wie der Server (Decimal), nicht erst auf drei Stellen gerundet.
+    expect(gebindeAnzeige(10, 3.333)).toBe(4)
+    expect(gebindeAnzeige(9.999, 3.333)).toBe(3)
+  })
+
+  it('Anzeige und Server rechnen gleich (Decimal als Maßstab)', () => {
+    const faelle: [number, number | null][] = [[10, 3.333], [9.999, 3.333], [1.2, 0.5], [2.5, null], [0.001, 0.25], [7, 0.333], [100, 0.125], [0.3, 0.1]]
+    for (const [menge, groesse] of faelle) {
+      const server = new Prisma.Decimal(menge).toDecimalPlaces(3).div(groesse ?? 1).ceil().toNumber()
+      expect(gebindeAnzeige(menge, groesse), `${menge} / ${groesse}`).toBe(Math.max(1, server))
+    }
   })
 
   it('Hinweis nach dem Speichern: neuer Vorrat, zu wenig, nicht geändert', () => {
@@ -92,7 +103,7 @@ describe('Regeln und Texte (rein)', () => {
     expect(VORRAT_ZU_KLEIN).toBe('Gebucht. Dein Vorrat war kleiner als die Menge – er steht jetzt auf 0.')
     expect(vorratHinweis({ art: 'unveraendert' }, { unit: 'KG', unitSize: null })).toEqual({ text: VORRAT_NICHT_GEAENDERT, knapp: true })
     expect(vorratHinweis({ art: 'einheit-passt-nicht' }, { unit: 'KG', unitSize: null })).toEqual({ text: VORRAT_EINHEIT_PASST_NICHT, knapp: true })
-    expect(VORRAT_EINHEIT_PASST_NICHT).toBe('Gebucht. Vorrat nicht geändert – die Einheit passt nicht zum Produkt.')
+    expect(VORRAT_EINHEIT_PASST_NICHT).toBe('Gebucht. Vorrat nicht geändert – die Einheit passt nicht zum Produkt. Bitte prüf ihn unter Produkte.')
   })
 
   it('der Satz unter dem Schalter sagt, was passiert', () => {

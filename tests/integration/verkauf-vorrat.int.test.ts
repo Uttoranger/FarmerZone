@@ -151,7 +151,7 @@ describe('Verkauf eintragen zieht den Vorrat ab — echte Datenbank', () => {
         })
         // Nur Warten auf DIESE Transaktion zählt (Zeilensperre = Warten auf ihre transactionid) —
         // nicht irgendeine fremde Sperre in der gemeinsamen Test-Datenbank.
-        const [{ meine }] = await tx.$queryRaw<{ meine: string }[]>`select txid_current()::text as meine`
+        const [{ meine }] = await tx.$queryRaw<{ meine: string }[]>`select pg_current_xact_id()::xid::text as meine`
         for (let i = 0; i < 100; i++) {
           const [{ wartend }] = await prisma.$queryRaw<{ wartend: bigint }[]>`
             select count(*) as wartend from pg_locks

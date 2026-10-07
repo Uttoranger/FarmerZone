@@ -106,7 +106,7 @@ export const VORRAT_ABZIEHEN = 'Vorrat abziehen'
 export const VORRAT_ZU_KLEIN = 'Gebucht. Dein Vorrat war kleiner als die Menge – er steht jetzt auf 0.'
 
 /** Die Menge steht in einer anderen Einheit als das Produkt (z. B. eine alte Vorlage) — umrechnen wäre geraten. */
-export const VORRAT_EINHEIT_PASST_NICHT = 'Gebucht. Vorrat nicht geändert – die Einheit passt nicht zum Produkt.'
+export const VORRAT_EINHEIT_PASST_NICHT = 'Gebucht. Vorrat nicht geändert – die Einheit passt nicht zum Produkt. Bitte prüf ihn unter Produkte.'
 
 export const VORRAT_NICHT_GEAENDERT = 'Gebucht. Deinen Vorrat konnten wir gerade nicht ändern – bitte prüf ihn unter Produkte.'
 
@@ -119,10 +119,13 @@ export const VORRAT_NICHT_GEAENDERT = 'Gebucht. Deinen Vorrat konnten wir gerade
  * src/server/actions/manual-sales.ts) aus der gespeicherten Menge.
  */
 export function gebindeAnzeige(menge: number | null | undefined, unitSize: number | null): number {
-  const m = menge != null && Number.isFinite(menge) && menge > 0 ? menge : 1
-  const groesse = unitSize != null && unitSize > 0 ? unitSize : 1
-  // Auf drei Stellen gerundet, damit ein Gleitkomma-Rest (0,1 + 0,2) nicht aufrundet.
-  return Math.max(1, Math.ceil(Math.round((m / groesse) * 1000) / 1000))
+  // In ganzen Tausendsteln (drei Stellen wie die Spalten) und ganzzahlig
+  // aufgerundet — so kommt dasselbe heraus wie beim Decimal-Teilen der Action
+  // (10 kg / 3,333 kg = 3,0003 → 4), ohne Gleitkomma-Rest (0,1 + 0,2).
+  const m = menge != null && Number.isFinite(menge) && menge > 0 ? Math.round(menge * 1000) : 1000
+  const g = unitSize != null && Number.isFinite(unitSize) && unitSize > 0 ? Math.round(unitSize * 1000) : 1000
+  if (m <= 0 || g <= 0) return 1
+  return Math.max(1, Math.floor((m + g - 1) / g))
 }
 
 /** Was die Buchung am Vorrat ausgerichtet hat — die Action meldet es, der Dialog zeigt den Satz. */
