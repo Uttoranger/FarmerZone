@@ -51,7 +51,7 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 32 | Altlasten Lauf 5 | gemergt (#211) | `nacht/2026-10-07/32-altlasten` | #209 | 24 (#203) | gestapelt auf #203 (Servicegebühr-Dialog); Server nimmt Mindestgebühr nur noch als ganze Cent | 07.10.2026 |
 | 33 | Datenschutzerklärung | fertig (Entwurf) | `nacht/2026-10-07/33-datenschutz` | #210 | main | Haltepunkt Lauf 6; Entwurf bis rechtliche Prüfung der Tabelle in Bericht 33 | 07.10.2026 |
 | 34 | Automatischer Probelauf (Gate 9a) | übersprungen | – | – | main | **Vorbedingung nicht erfüllt:** `STRIPE_SECRET_KEY` ist bei Vercel eine gemeinsame Variable für Vorschau und Produktion (Typ sensitive, Präfix nicht prüfbar) → Vorschau nutzt sehr wahrscheinlich den Live-Schlüssel; Vorschau aus dem Container nicht erreichbar. Keine Zahlung ausgeführt. | 07.10.2026 |
-| 35 | Altlasten aus Lauf 6 | läuft | `nacht/2026-10-07/35-altlasten` | | main | | 07.10.2026 |
+| 35 | Altlasten aus Lauf 6 | fertig (PR #213) | `nacht/2026-10-07/35-altlasten` | #213 | main | Geldpfad, Nachprüfung ohne Befund; keine Migration | 07.10.2026 |
 | 36 | BAES-Angaben | läuft | `nacht/2026-10-07/36-baes` | | main | | 07.10.2026 |
 | 37 | Sentry ohne IP-Adressen | offen | | | main | | |
 | 38 | Double-Opt-in (S11) | offen | | | main | | |
