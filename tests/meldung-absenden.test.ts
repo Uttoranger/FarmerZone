@@ -22,6 +22,9 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 vi.mock('@/lib/email', () => ({ sendMeldungNotification: vi.fn() }))
+// Zweite Stufe der Bremse (Register R1): hier nur, ob und wann sie gefragt
+// wird — die Zählung prüfen tests/bremse-datenbank*.test.ts.
+vi.mock('@/server/bremse-datenbank', () => ({ bremseUeberAlleInstanzen: vi.fn(async () => true) }))
 
 import { headers } from 'next/headers'
 import { meldungAbsenden } from '@/server/actions/meldung'
@@ -30,6 +33,8 @@ import { MELDUNGEN_PRO_STUNDE, MELDUNG_TEXT_MAX, ZU_VIELE_MELDUNGEN } from '@/li
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { sendMeldungNotification } from '@/lib/email'
+import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
+import { DB_BREMSEN } from '@/lib/bremse-datenbank'
 
 const getSession = vi.mocked(auth.api.getSession)
 const meldungCount = vi.mocked(prisma.meldung.count)
@@ -241,6 +246,50 @@ describe('meldungAbsenden — Stundenzähler', () => {
       vi.unstubAllEnvs()
       vi.mocked(headers).mockResolvedValue(new Headers() as never)
     }
+  })
+
+  it('zweistufig (R1): nach der Drossel dieser Instanz zählt die Datenbank je IP — gebremst, kein Datensatz', async () => {
+    alsKundin()
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.mocked(headers).mockResolvedValue(new Headers({ 'x-forwarded-for': '192.0.2.44' }) as never)
+    vi.mocked(bremseUeberAlleInstanzen).mockResolvedValueOnce(false)
+    try {
+      expect(await meldungAbsenden(meldung({ art: 'FRAGE' }))).toEqual({ error: ZU_VIELE_MELDUNGEN })
+      expect(bremseUeberAlleInstanzen).toHaveBeenCalledWith([{ bremse: DB_BREMSEN.meldungIp, merkmal: '192.0.2.44' }])
+      expect(meldungCreate).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllEnvs()
+      vi.mocked(headers).mockResolvedValue(new Headers() as never)
+    }
+  })
+
+  it('zweistufig (R1): hält schon diese Instanz an, wird die Datenbank nicht gefragt', async () => {
+    alsKundin()
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.mocked(headers).mockResolvedValue(new Headers({ 'x-forwarded-for': '192.0.2.45' }) as never)
+    try {
+      for (let i = 0; i < MELDUNGEN_PRO_STUNDE; i++) await meldungAbsenden(meldung({ art: 'FRAGE' }))
+      const bisher = vi.mocked(bremseUeberAlleInstanzen).mock.calls.length
+      expect(bisher).toBe(MELDUNGEN_PRO_STUNDE)
+      expect(await meldungAbsenden(meldung({ art: 'FRAGE' }))).toEqual({ error: ZU_VIELE_MELDUNGEN })
+      expect(vi.mocked(bremseUeberAlleInstanzen).mock.calls.length).toBe(bisher)
+    } finally {
+      vi.unstubAllEnvs()
+      vi.mocked(headers).mockResolvedValue(new Headers() as never)
+    }
+  })
+
+  it('zweistufig (R1): ein Hof und die Entwicklung fragen die Datenbank-Bremse nicht', async () => {
+    alsHof()
+    vi.stubEnv('NODE_ENV', 'production')
+    try {
+      await meldungAbsenden(meldung())
+    } finally {
+      vi.unstubAllEnvs()
+    }
+    alsKundin()
+    await meldungAbsenden(meldung({ art: 'FRAGE' }))
+    expect(bremseUeberAlleInstanzen).not.toHaveBeenCalled()
   })
 
   it('lässt eine andere IP unabhängig zu', async () => {

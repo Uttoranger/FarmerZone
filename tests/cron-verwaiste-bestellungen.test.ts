@@ -13,7 +13,9 @@ import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
 vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteBestellungenFrei: vi.fn() }))
-vi.mock('@/lib/prisma', () => ({ prisma: { stockReservation: { deleteMany: vi.fn() } } }))
+vi.mock('@/lib/prisma', () => ({
+  prisma: { stockReservation: { deleteMany: vi.fn() }, rateLimitZaehler: { deleteMany: vi.fn() } },
+}))
 vi.mock('@sentry/nextjs', () => ({ captureMessage: vi.fn(), captureException: vi.fn() }))
 
 import { GET as verwaiste } from '@/app/api/cron/verwaiste-bestellungen/route'
@@ -25,6 +27,7 @@ import * as Sentry from '@sentry/nextjs'
 
 const freigeben = vi.mocked(gibVerwaisteBestellungenFrei)
 const aufraeumen = vi.mocked(prisma.stockReservation.deleteMany)
+const bremsZaehlerWeg = vi.mocked(prisma.rateLimitZaehler.deleteMany)
 
 function anfrage(pfad: string, auth?: string) {
   return new NextRequest(`http://localhost${pfad}`, { headers: auth ? { authorization: auth } : {} })
@@ -35,6 +38,7 @@ beforeEach(() => {
   vi.stubEnv('CRON_SECRET', 'geheim-123')
   freigeben.mockResolvedValue({ storniert: 2, uebersprungen: 1, uebersprungenIds: ['order_x'], fehler: 0 })
   aufraeumen.mockResolvedValue({ count: 3 })
+  bremsZaehlerWeg.mockResolvedValue({ count: 7 })
 })
 
 afterEach(() => {
@@ -164,5 +168,42 @@ describe('/api/cron/cleanup-reservations', () => {
 
     expect(res.status).toBe(200)
     expect(await res.json()).toMatchObject({ deleted: 3 })
+  })
+
+  it('räumt auch die alten Zähler der Bremse weg (Register R1) — nur abgelaufene Fenster', async () => {
+    const res = await reservierungen(anfrage('/api/cron/cleanup-reservations', 'Bearer geheim-123'))
+
+    expect(await res.json()).toMatchObject({ deleted: 3, bremsZaehler: 7 })
+    expect(bremsZaehlerWeg).toHaveBeenCalledTimes(1)
+    const { where } = bremsZaehlerWeg.mock.calls[0][0] as { where: { ablauf: { lt: Date } } }
+    expect(where.ablauf.lt).toBeInstanceOf(Date)
+  })
+
+  it('ein Fehler beim Aufräumen der Zähler bricht den Cron nicht ab — gemeldet ohne Fehlertext', async () => {
+    bremsZaehlerWeg.mockRejectedValue(new Error('Verbindung weg'))
+    const res = await reservierungen(anfrage('/api/cron/cleanup-reservations', 'Bearer geheim-123'))
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ deleted: 3, bremsZaehler: null })
+    expect(aufraeumen).toHaveBeenCalledTimes(1)
+    const [gemeldet, kontext] = vi.mocked(Sentry.captureException).mock.calls[0] as [Error, unknown]
+    expect(gemeldet.message).not.toContain('Verbindung weg')
+    expect(kontext).toMatchObject({ tags: { aufgabe: 'cron-cleanup', grund: 'bremse-zaehler' } })
+  })
+
+  it('ohne Secret: auch die Zähler bleiben unberührt', async () => {
+    await reservierungen(anfrage('/api/cron/cleanup-reservations'))
+    expect(bremsZaehlerWeg).not.toHaveBeenCalled()
+  })
+
+  it('kein eigener Cron-Eintrag für die Bremse — sie hängt am bestehenden', () => {
+    const konfig = JSON.parse(readFileSync(path.join(process.cwd(), 'vercel.json'), 'utf8')) as {
+      crons: Array<{ path: string }>
+    }
+    expect(konfig.crons.map((c) => c.path).sort()).toEqual([
+      '/api/cron/briefkasten',
+      '/api/cron/cleanup-reservations',
+      '/api/cron/verwaiste-bestellungen',
+    ])
   })
 })

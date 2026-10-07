@@ -13,6 +13,7 @@ import {
 } from '@/lib/anmeldecode'
 import { genauesIlikeMuster } from '@/lib/ilike-muster'
 import { erzeugeAnforderungsSperre } from '@/lib/anmeldecode-sperre'
+import { anmeldecodeGebremst } from '@/server/bremse-datenbank'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { sendeRegistrierungsHinweis } from '@/server/registrierung-hinweis'
 import { leereKontaktdatenNachFremdemPasswort } from '@/server/kontaktdaten-fremd'
@@ -249,6 +250,11 @@ export const auth = betterAuth({
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
       if (ctx.path === '/sign-in/email-otp') {
+        // Zweite Stufe der IP-Bremse über alle Instanzen (Register R1); die
+        // erste (Better Auth, 3 je Minute) ist schon gelaufen. Nur Produktion.
+        if (await anmeldecodeGebremst('pruefen', ctx.headers, null)) {
+          throw new APIError('TOO_MANY_REQUESTS', { message: 'Zu viele Anfragen.' })
+        }
         const body = ctx.body as { email?: unknown } | undefined
         if (typeof body?.email !== 'string') return
         // Antwort wie bei falschem Code; der Code (falls einer liegt) bleibt
@@ -269,6 +275,11 @@ export const auth = betterAuth({
       // Wie alle Speicher-Grenzen nur in Produktion (src/lib/rate-limit.ts).
       // Vor der Rollenprüfung: Ein Hof wird genauso gebremst wie eine Kundin.
       if (process.env.NODE_ENV === 'production' && !codeAnforderungen.erlaubt(body.email)) {
+        throw new APIError('TOO_MANY_REQUESTS', { message: 'Zu viele Anfragen.' })
+      }
+      // Zweite Stufe über alle Instanzen (Register R1): je IP und je Adresse,
+      // dieselben Grenzen; erst wenn der Speicher durchlässt. Fail-open.
+      if (await anmeldecodeGebremst('anfordern', ctx.headers, body.email)) {
         throw new APIError('TOO_MANY_REQUESTS', { message: 'Zu viele Anfragen.' })
       }
       // Hof oder Admin: KEIN Code wird angelegt — der Hook antwortet selbst,

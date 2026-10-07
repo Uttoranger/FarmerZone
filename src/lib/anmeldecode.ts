@@ -25,7 +25,9 @@ export const ANMELDECODE_MAX_VERSUCHE = 5
 /**
  * Better Auth bremst Anfordern und Prüfen je IP und Pfad. 3 je Minute: Wer
  * sich einmal vertippt, kommt durch; eine Schleife nicht. Im Speicher der
- * Instanz — die harte Grenze sind die 5 Versuche je Code in der Datenbank.
+ * Instanz; dieselbe Grenze zählt danach die Datenbank über alle Instanzen
+ * (Register R1, src/lib/bremse-datenbank.ts). Die harte Grenze je Code sind
+ * die 5 Versuche in der Verification-Zeile.
  */
 export const ANMELDECODE_RATE_LIMIT = { window: 60, max: 3 } as const
 
@@ -34,7 +36,8 @@ export const CODE_ERNEUT_WARTEZEIT_SEKUNDEN = ANMELDECODE_RATE_LIMIT.window
 
 /**
  * Höchstens so viele Codes je Adresse — gegen ein Postfach, das von vielen
- * IPs aus mit Codes zugeschüttet wird. Je Instanz, wie alle Speicher-Grenzen.
+ * IPs aus mit Codes zugeschüttet wird. Erst je Instanz im Speicher, dann über
+ * alle Instanzen in der Datenbank (Register R1).
  */
 export const CODE_ANFORDERUNGEN_JE_ADRESSE = { max: 5, fensterMs: 15 * 60_000 } as const
 

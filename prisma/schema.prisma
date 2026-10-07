@@ -1042,3 +1042,25 @@ model Monatsabrechnung {
   // Eine Abrechnung je Hof und Monat; deckt auch Abfragen nach farmId.
   @@unique([farmId, monat])
 }
+
+// Die Bremse über alle Instanzen (Register R1, Nr. 40): je Schlüssel und
+// festem Zeitfenster ein Zähler. Die Bremse je Instanz im Speicher
+// (src/lib/rate-limit.ts) bleibt die erste Stufe; diese Tabelle zählt für
+// Anmeldecode, Registrierung, Problem melden, Bestellungen finden und
+// Checkout über alle warmen Serverless-Instanzen hinweg.
+//   schluessel    Zweck + gekürzter HMAC des Merkmals (src/lib/bremse-datenbank.ts)
+//                 — nie IP, Adresse oder Sitzung im Klartext
+//   fensterStart  Beginn des festen Fensters (Vielfaches der Fensterlänge)
+//   ablauf        Ende des Fensters; danach räumt der tägliche Cron
+//                 (api/cron/cleanup-reservations) die Zeile weg — gelesen
+//                 wird sie nach dem Ende ohnehin nie mehr
+// Gezählt wird atomar per INSERT … ON CONFLICT DO UPDATE (src/server/bremse-datenbank.ts).
+model RateLimitZaehler {
+  schluessel   String
+  fensterStart DateTime
+  zaehler      Int      @default(0)
+  ablauf       DateTime
+
+  @@id([schluessel, fensterStart])
+  @@index([ablauf])
+}

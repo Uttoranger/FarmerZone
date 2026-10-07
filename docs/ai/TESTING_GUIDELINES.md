@@ -56,7 +56,14 @@ bleibt Abschnitt 4 unverändert in Kraft.
 Zähler angefasst wird (`src/lib/rate-limit.ts`). In Tests ist der Limiter damit
 untätig — es gibt nichts zurückzusetzen. Wer die Grenze selbst prüfen will,
 nimmt `createRateLimiter()` und bekommt eine frische Instanz; das ist ein
-Unit-Test der reinen Funktion, kein Integrationstest.
+Unit-Test der reinen Funktion, kein Integrationstest. Dasselbe gilt für die
+zweite Stufe über die Datenbank (Register R1): Sie fragt nur in Produktion.
+Wer eine Action in Produktion prüft (`vi.stubEnv('NODE_ENV', 'production')`),
+mockt `@/server/bremse-datenbank` (`bremseUeberAlleInstanzen`) und prüft damit
+nur OB und WANN sie gefragt wird; die Zählung selbst — Nebenläufigkeit,
+Fensterwechsel, zwei Instanzen, Aufräumen — prüft
+`tests/integration/bremse-datenbank.int.test.ts` direkt an
+`bremseUeberAlleInstanzen`/`zaehleVersuche` mit einem eigenen Zweck `int-…`.
 
 ```bash
 pnpm test                                    # Unit, alles

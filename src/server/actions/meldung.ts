@@ -8,6 +8,8 @@ import { meldungEingabeSchema } from '@/schemas/meldung'
 import { MELDUNGEN_PRO_STUNDE, ZU_VIELE_MELDUNGEN, kurznummer } from '@/lib/meldung'
 import { istEigenesBild } from '@/server/bild-url'
 import { createRateLimiter, getClientIp } from '@/lib/rate-limit'
+import { DB_BREMSEN } from '@/lib/bremse-datenbank'
+import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
 
 /**
  * Eine Meldung in den Fehlerbriefkasten legen (Sprint fehlerbriefkasten, Teil B).
@@ -25,10 +27,12 @@ import { createRateLimiter, getClientIp } from '@/lib/rate-limit'
  *   sichtbare Ablehnung: das abgelaufene Formular (ein Mensch mit offenem Tab).
  *   Stundenzähler  höchstens fünf Meldungen je Stunde je Hof bzw. E-Mail —
  *                 aus der Datenbank gezählt, also über alle Instanzen hinweg.
- *                 Alle Meldungen OHNE Hof-Sitzung zählt zusätzlich der
- *                 bestehende In-Memory-Limiter je IP (nur Produktion, je
- *                 Instanz — die IP wird dafür nur flüchtig gelesen, nie
- *                 gespeichert), weil eine E-Mail frei erfunden werden kann.
+ *                 Alle Meldungen OHNE Hof-Sitzung zählt zusätzlich eine
+ *                 Bremse je IP (nur Produktion), weil eine E-Mail frei
+ *                 erfunden werden kann — zweistufig (Register R1): erst der
+ *                 Speicher dieser Instanz, dann dieselbe Grenze über alle
+ *                 Instanzen in der Datenbank (nur ein HMAC der IP, nie die
+ *                 IP selbst; src/server/bremse-datenbank.ts, fail-open).
  *
  * KONTEXT: farmId kommt aus der SITZUNG, nie aus dem Formular. Screenshots
  * gibt es nur für angemeldete Höfe — der bestehende Upload-Weg verlangt eine
@@ -129,6 +133,9 @@ export async function meldungAbsenden(data: MeldungFormularDaten): Promise<Meldu
     if (process.env.NODE_ENV === 'production') {
       const ip = getClientIp(await headers())
       if (!anonymDrossel.check(`meldung:${ip}`)) return { error: ZU_VIELE_MELDUNGEN }
+      if (!(await bremseUeberAlleInstanzen([{ bremse: DB_BREMSEN.meldungIp, merkmal: ip }]))) {
+        return { error: ZU_VIELE_MELDUNGEN }
+      }
     }
     if (eingabe.customerEmail) {
       const anzahl = await prisma.meldung.count({
