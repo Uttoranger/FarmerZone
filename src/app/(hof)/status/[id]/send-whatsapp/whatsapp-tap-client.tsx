@@ -5,6 +5,7 @@ import { Check, MessageSquare } from 'lucide-react'
 import { markWhatsAppSent } from '@/server/actions/status-posts'
 import { toWaPhone } from '@/lib/whatsapp'
 import { cn } from '@/lib/utils'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 
 interface Subscriber {
   email: string
@@ -62,7 +63,8 @@ export function WhatsAppTapClient({
   if (total === 0) {
     return (
       <div className="text-center py-16">
-        <p className="font-medium text-foreground mb-1">Keine WhatsApp-Abonnenten</p>
+        {/* h1 auch in den Randzuständen — sonst hätte die Seite keine Überschrift. */}
+        <h1 className="font-medium text-foreground mb-1">Keine WhatsApp-Abonnenten</h1>
         <p className="text-sm text-muted-foreground">Es gibt noch keine Kunden mit WhatsApp-Opt-in.</p>
       </div>
     )
@@ -71,12 +73,12 @@ export function WhatsAppTapClient({
   if (sentCount >= total) {
     return (
       <div className="text-center py-12">
-        <div className="size-16 rounded-full bg-green-100 dark:bg-green-950/50 flex items-center justify-center mx-auto mb-4">
-          <Check className="size-8 text-green-700 dark:text-green-300" />
+        <div className="size-16 rounded-full bg-accent/18 flex items-center justify-center mx-auto mb-4">
+          <Check className="size-8 text-status-fertig" aria-hidden="true" />
         </div>
-        <h2 className="font-heading text-xl font-semibold text-foreground mb-1">
+        <h1 className="font-heading text-xl font-semibold text-foreground mb-1">
           Alle {total} Nachrichten versendet!
-        </h2>
+        </h1>
         <p className="text-sm text-muted-foreground">
           Du hast alle WhatsApp-Abonnenten kontaktiert.
         </p>
@@ -108,7 +110,7 @@ export function WhatsAppTapClient({
         </div>
         <div className="h-2 bg-muted rounded-full overflow-hidden">
           <div
-            className="h-full bg-green-600 rounded-full transition-all duration-300"
+            className="h-full bg-accent rounded-full transition-all duration-300"
             style={{ width: `${(sentCount / total) * 100}%` }}
           />
         </div>
@@ -129,9 +131,9 @@ export function WhatsAppTapClient({
               {/* Avatar */}
               <div className={cn(
                 'size-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0',
-                isSent ? 'bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-300' : 'bg-muted text-muted-foreground'
+                isSent ? 'bg-accent/18 text-status-fertig' : 'bg-muted text-muted-foreground'
               )}>
-                {isSent ? <Check className="size-4" /> : sub.name.charAt(0).toUpperCase()}
+                {isSent ? <Check className="size-4" aria-hidden="true" /> : sub.name.charAt(0).toUpperCase()}
               </div>
 
               {/* Name + phone */}
@@ -144,17 +146,18 @@ export function WhatsAppTapClient({
 
               {/* Action */}
               {isSent ? (
-                <span className="text-xs text-green-700 dark:text-green-300 font-medium shrink-0">Gesendet</span>
+                <span className="text-xs text-status-fertig font-medium shrink-0">Gesendet</span>
               ) : (
                 <a
                   href={buildWaUrl(sub)}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => setTimeout(() => markSent(sub.email), 1000)}
-                  className="flex items-center gap-1.5 h-9 px-3 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors shrink-0"
+                  className={cn('flex items-center gap-1.5 min-h-11 px-4 rounded-full bg-accent text-accent-foreground text-sm font-semibold hover:bg-accent/90 transition-colors shrink-0', FOKUS_RAHMEN)}
                 >
-                  <MessageSquare className="size-3.5" />
+                  <MessageSquare className="size-3.5" aria-hidden="true" />
                   Tippen
+                  <span className="sr-only">: Nachricht an {sub.name} in WhatsApp öffnen</span>
                 </a>
               )}
             </div>

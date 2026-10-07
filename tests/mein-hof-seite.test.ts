@@ -13,8 +13,9 @@
  *  - /farm-page liegt in der Routengruppe (hof) mit der HofShell; das
  *    Bauern-Layout bleibt bei der Bestandsnavigation (kein Big Bang).
  *  - Die Vorschau ist die echte Hofseite (?vorschau=1) — kein Nachbau.
- *  - Der Reiter „Beiträge" baut keinen neuen Editor: Neu und Bearbeiten
- *    führen in die bestehenden Seiten unter /status.
+ *  - Der Reiter „Beiträge" baut keinen neuen Editor: „Neuer Beitrag" führt in
+ *    den bestehenden Ablauf /status/new; die Handlungen von /status stehen
+ *    seit Nr. 22e im Reiter selbst (tests/beitraege-hilfe.test.ts).
  *  - Kopf, Reiter und Beiträge rendern in beiden Themes mit Tokens (keine
  *    Farbliterale, kein black/white), Symbole aria-hidden.
  */
@@ -27,6 +28,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
 }))
+vi.mock('@/server/actions/status-posts', () => ({ expireStatusPost: vi.fn(), deleteStatusPost: vi.fn() }))
 vi.mock('next/image', () => ({
   default: (props: { src: string; alt: string }) => createElement('img', { src: props.src, alt: props.alt }),
 }))
@@ -78,6 +80,8 @@ describe('Beiträge-Übersicht', () => {
     publishedAt: null,
     sentViaEmail: false,
     sentViaWhatsApp: false,
+    whatsappSentCount: 0,
+    whatsappRecipientCount: 0,
   }
 
   it('ordnet Aktiv · Entwürfe · Vergangen, leere Gruppen fallen weg', () => {
@@ -227,18 +231,30 @@ describe('Kopf und Reiter (neues Design)', () => {
 describe('Reiter „Beiträge"', () => {
   const jetzt = '2026-10-06T10:00:00.000Z'
 
-  it('mit Beiträgen: Gruppen, „Neuer Beitrag" und die bestehende Seite /status verlinkt', () => {
+  it('mit Beiträgen: Gruppen und „Neuer Beitrag" — kein Umweg mehr über /status (Nr. 22e)', () => {
     const html = renderToStaticMarkup(
       createElement(BeitraegeReiter, {
         uebersicht: beitraegeUebersicht(
-          [{ id: 'b1', title: 'Erdbeeren sind da', isActive: true, isDraft: false, publishedAt: jetzt, sentViaEmail: false, sentViaWhatsApp: false }],
+          [
+            {
+              id: 'b1',
+              title: 'Erdbeeren sind da',
+              isActive: true,
+              isDraft: false,
+              publishedAt: jetzt,
+              sentViaEmail: false,
+              sentViaWhatsApp: false,
+              whatsappSentCount: 0,
+              whatsappRecipientCount: 0,
+            },
+          ],
           jetzt
         ),
       })
     )
     expect(html).toContain('Erdbeeren sind da')
     expect(html).toContain('href="/status/new"')
-    expect(html).toContain('href="/status"')
+    expect(html).not.toContain('href="/status"')
     expect(html).toContain('Aktiv')
   })
 
@@ -254,6 +270,7 @@ describe('Tokens statt Farbwerte', () => {
   const dateien = [
     'src/components/mein-hof/seitenkopf.tsx',
     'src/components/mein-hof/beitraege-reiter.tsx',
+    'src/components/mein-hof/beitrag-zeile.tsx',
     'src/components/mein-hof/checkliste-kompakt.tsx',
     'src/components/farmer/hofseite-editor.tsx',
     'src/components/farmer/hofseite-vorschau-rahmen.tsx',

@@ -64,7 +64,7 @@ describe('Hof-Sicht', () => {
     findMany.mockResolvedValue([ZEILE] as never)
     const [m] = await getMeldungenFuerHof('farm_1')
     expect(Object.keys(m).sort()).toEqual(
-      ['antwortAnMelder', 'art', 'createdAt', 'id', 'kurznummer', 'status', 'statusFarbe', 'text'].sort()
+      ['antwortAnMelder', 'art', 'createdAt', 'id', 'kurznummer', 'offen', 'status', 'statusTon', 'text'].sort()
     )
     expect(m.status).toBe('Kein Fehler — Antwort lesen')
     expect(m.kurznummer).toBe('cmfmeldu')

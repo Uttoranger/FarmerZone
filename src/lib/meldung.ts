@@ -110,6 +110,26 @@ export const STATUS_MARKE_FARBE: Record<MeldungStatus, string> = {
   DUPLIKAT: 'bg-[#F0EDE5] text-[#9AA08F]',
 }
 
+/** Der Ton einer Marke im neuen Design — dieselben Werte wie StatusBadge (components/ui/status-badge.tsx). */
+export type MeldungTon = 'offen' | 'fertig' | 'neutral'
+
+/**
+ * Der Ton des öffentlichen Status auf „Meine Meldungen" (Nachtlauf Nr. 22e,
+ * Mockup web-h6-meine-meldungen): Grün, wenn sich etwas tut oder getan ist
+ * (In Arbeit, Behoben/Umgesetzt/Beantwortet), sonst neutral. Nie Orange —
+ * Orange heißt im Hofbereich „wartet auf dich", und keine Meldung wartet auf
+ * den Hof. Die Admin-Marken (STATUS_MARKE_FARBE) bleiben, wie sie sind.
+ */
+export const STATUS_TON: Record<MeldungStatus, MeldungTon> = {
+  NEU: 'neutral',
+  GEPRUEFT: 'neutral',
+  VERMUTLICH_WUNSCH: 'neutral',
+  GEPLANT: 'fertig',
+  ERLEDIGT: 'fertig',
+  KEIN_FEHLER: 'neutral',
+  DUPLIKAT: 'neutral',
+}
+
 /** Öffentlicher Statustext — ein unbekannter Wert fällt auf „Eingegangen" zurück. */
 export function oeffentlicherStatus(status: string, art: string): string {
   if (status === 'ERLEDIGT' && istMeldungArt(art)) return ERLEDIGT_OEFFENTLICH[art]
@@ -216,7 +236,7 @@ export type MeldungVollstaendig = {
   diagKennung?: string | null
 }
 
-/** Genau das, was ein Hof unter „Hilfe und Rückmeldung" (/meldungen) sieht. */
+/** Genau das, was ein Hof unter „Meine Meldungen" (/meldungen) sieht. */
 export type MeldungFuerHof = {
   id: string
   kurznummer: string
@@ -225,8 +245,10 @@ export type MeldungFuerHof = {
   createdAt: Date
   /** Der übersetzte Status — nie der interne Wert. */
   status: string
-  /** Farbklassen für die Marke. */
-  statusFarbe: string
+  /** Der Ton der Marke (STATUS_TON) — abgeleitet, verrät den internen Wert nicht. */
+  statusTon: MeldungTon
+  /** Noch nicht abgeschlossen (Zähler „Offen") — abgeleitet aus STATUS_ABGESCHLOSSEN. */
+  offen: boolean
   antwortAnMelder: string | null
 }
 
@@ -244,7 +266,8 @@ export function fuerHof(m: MeldungVollstaendig): MeldungFuerHof {
     text: m.text,
     createdAt: m.createdAt,
     status: oeffentlicherStatus(m.status, m.art),
-    statusFarbe: STATUS_MARKE_FARBE[m.status] ?? STATUS_MARKE_FARBE.NEU,
+    statusTon: STATUS_TON[m.status] ?? STATUS_TON.NEU,
+    offen: !STATUS_ABGESCHLOSSEN.includes(m.status),
     antwortAnMelder: m.antwortAnMelder ?? null,
   }
 }

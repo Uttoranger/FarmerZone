@@ -20,9 +20,10 @@
  * Hofseite landen (NEU_BROWSER).
  *
  * „Mein Hof" bündelt Hofseite und Beiträge unter einem Kopf mit Reitern —
- * in der HofShell beide auf /farm-page (?reiter=beitraege, E12,
- * components/mein-hof/seitenkopf.tsx), im Bestand /status mit dem alten
- * Kopf (components/farmer/mein-hof-kopf.tsx). Der Punkt ist auf beiden aktiv.
+ * beide auf /farm-page (?reiter=beitraege, E12,
+ * components/mein-hof/seitenkopf.tsx). /status leitet seit Nr. 22e in den
+ * Reiter um; seine Unterseiten (/status/new, WhatsApp fortsetzen) bleiben,
+ * und der Punkt ist auch dort aktiv.
  */
 
 import { MEIN_HOF_REITER_PARAMETER, MEIN_HOF_REITER_VALUES, meinHofReiterSchema } from '@/schemas/mein-hof-reiter'
@@ -45,8 +46,8 @@ export type NavPunkt = {
   href: string
   /**
    * Weitere Pfade, auf denen der Punkt aktiv ist: „Mein Hof" startet mit
-   * /farm-page und umfasst auch /status; „Hilfe und Rückmeldung" führt nach
-   * /meldungen und leuchtet auch auf /fehler-melden.
+   * /farm-page und umfasst auch /status mit seinen Unterseiten; „Hilfe und
+   * Rückmeldung" führt nach /meldungen und leuchtet auch auf /fehler-melden.
    */
   auchAktivAuf?: readonly string[]
   /** Eine Zahl am Punkt: offene Bestellungen bzw. Meldungen, die auf den Betreiber warten. */
@@ -71,22 +72,19 @@ export type MeinHofReiterId = (typeof MEIN_HOF_REITER_VALUES)[number]
 export type MeinHofReiter = { id: MeinHofReiterId; label: string; href: string }
 
 /**
- * Die Reiter des Bestandskopfs (components/farmer/mein-hof-kopf.tsx), den
- * nur noch /status trägt: dort ist „Beiträge" die eigene Seite.
+ * Die Adresse des Reiters „Beiträge" — EINE Quelle für den Reiter, die
+ * Umleitung von /status und die Rückwege nach dem Schreiben (Nr. 22e).
  */
-export const MEIN_HOF_REITER: readonly MeinHofReiter[] = [
-  { id: 'hofseite', label: 'Hofseite', href: '/farm-page' },
-  { id: 'beitraege', label: 'Beiträge', href: '/status' },
-]
+export const BEITRAEGE_HREF = `/farm-page?${MEIN_HOF_REITER_PARAMETER}=beitraege`
 
 /**
  * Die Reiter von „Mein Hof" in der HofShell (E12, Nachtlauf Nr. 16): beide
- * auf /farm-page, der Reiter steht in der Adresse. /status bleibt als Route
- * bestehen und wird aus dem Reiter „Beiträge" verlinkt.
+ * auf /farm-page, der Reiter steht in der Adresse. Seit Nr. 22e kann der
+ * Reiter „Beiträge" alles, was /status konnte; /status leitet hierher um.
  */
 export const MEIN_HOF_REITER_HOFBEREICH: readonly MeinHofReiter[] = [
   { id: 'hofseite', label: 'Hofseite', href: '/farm-page' },
-  { id: 'beitraege', label: 'Beiträge', href: `/farm-page?${MEIN_HOF_REITER_PARAMETER}=beitraege` },
+  { id: 'beitraege', label: 'Beiträge', href: BEITRAEGE_HREF },
 ]
 
 /**
@@ -109,8 +107,9 @@ export const HAUPT: readonly NavPunkt[] = [
   {
     id: 'mein-hof',
     label: 'Mein Hof',
-    href: MEIN_HOF_REITER[0].href,
-    auchAktivAuf: MEIN_HOF_REITER.slice(1).map((r) => r.href),
+    href: MEIN_HOF_REITER_HOFBEREICH[0].href,
+    // /status selbst leitet um; gemeint sind seine Unterseiten (Neuer Beitrag, WhatsApp fortsetzen).
+    auchAktivAuf: ['/status'],
   },
 ]
 
@@ -160,9 +159,10 @@ export const VERKAUF_UND_KUNDEN_TITEL = 'Verkauf und Kunden'
 /**
  * Unten: Einstellungen, Hilfe, Admin — danach folgt „Abmelden" (eine Handlung,
  * kein Ziel). „Hilfe und Rückmeldung" ist EIN Punkt für Melden und Nachsehen:
- * Die Seite /meldungen zeigt den Stand und trägt den Knopf „Fehler melden";
- * zwei Einträge nebeneinander („Fehler melden", „Meine Meldungen") las sich
- * wie zwei verschiedene Dinge.
+ * Er führt nach /meldungen („Meine Meldungen" mit „+ Neue Meldung", seit
+ * Nr. 22e nach Mockup web-/mobil-h6-meine-meldungen) und leuchtet auch auf
+ * /fehler-melden; zwei Einträge nebeneinander („Fehler melden", „Meine
+ * Meldungen") las sich wie zwei verschiedene Dinge.
  */
 export const UNTEN: readonly NavPunkt[] = [
   { id: 'einstellungen', label: 'Einstellungen', href: '/settings' },
@@ -251,7 +251,7 @@ export function mehrAktiv(pfad: string): boolean {
 /**
  * aria-current für einen Punkt: 'page' nur, wenn der Link genau auf diese
  * Seite führt; 'true', wenn er nur für sie steht (Unterseite, oder „Mein Hof"
- * auf /status) — sonst hörte der Screenreader zwei Links mit
+ * auf /status/new) — sonst hörte der Screenreader zwei Links mit
  * verschiedenen Zielen als „aktuelle Seite".
  */
 export function ariaAktuell(pfad: string, punkt: NavPunkt): 'page' | 'true' | undefined {

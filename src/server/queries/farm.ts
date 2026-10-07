@@ -831,7 +831,7 @@ export async function getOeffentlicheHoefe(
   })
 }
 
-/** Was der Kopf von „Mein Hof" zeigt (components/farmer/mein-hof-kopf.tsx). */
+/** Was der Kopf von „Mein Hof" zeigt (components/mein-hof/seitenkopf.tsx). */
 export type MeinHofKopfDaten = {
   name: string
   slug: string

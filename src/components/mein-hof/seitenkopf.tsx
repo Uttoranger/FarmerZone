@@ -19,9 +19,8 @@ import { cn } from '@/lib/utils'
  * Reiter Hofseite | Beiträge als Links (?reiter=, E12).
  *
  * Unter lg mit dem Titelbild-Streifen wie bisher (der Mensch ist damit
- * zufrieden), ab lg als kompakte Zeile. Der Bestandskopf
- * (components/farmer/mein-hof-kopf.tsx) bleibt für /status, das noch im
- * Bestandslayout steht.
+ * zufrieden), ab lg als kompakte Zeile. Seit Nr. 22e der einzige Kopf von
+ * Mein Hof (der Bestandskopf fiel mit der Umleitung von /status weg).
  *
  * „Kundenansicht" öffnet die Vorschau der echten Hofseite (?vorschau=1) in
  * einem neuen Tab — sie geht auch vor der Freigabe, nur für den Besitzer

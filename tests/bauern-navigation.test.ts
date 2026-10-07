@@ -6,11 +6,12 @@
  *    Mein Hof · Mehr; Produkte liegt dort oben im Mehr-Blatt.
  *  - Browser: dieselbe Ordnung als Leiste, mit „Produkte" zwischen
  *    Bestellungen und Mein Hof; „Neu" dort mit genau zwei Einträgen.
- *  - „Mein Hof" ist auf Hofseite und Beiträge aktiv; die Reiter darunter
- *    kennen ihre Seite; Produkte trägt den Kopf nicht mehr.
+ *  - „Mein Hof" ist auf Hofseite, Beiträge und den /status-Unterseiten aktiv;
+ *    beide Reiter liegen auf /farm-page; Produkte trägt den Kopf nicht mehr.
  *  - Aktiv ist der längste passende Punkt; „Mehr" für alles, was im Blatt liegt.
  *  - „Hilfe und Rückmeldung" ist EIN Punkt nach /meldungen, aktiv auch auf
- *    /fehler-melden; die Seite trägt den Titel und den Knopf „Fehler melden".
+ *    /fehler-melden; „Meine Meldungen" trägt den Knopf „+ Neue Meldung",
+ *    „Meldung abgeben" die Überschrift „Hilfe und Rückmeldung" (Nr. 22e).
  *  - „Admin" nur für den Betreiber.
  *  - Jede Seite unter src/app/(farmer) ist über die Navigation erreichbar.
  */
@@ -20,8 +21,8 @@ import { join } from 'node:path'
 import {
   HANDY_LEISTE,
   HAUPT,
+  BEITRAEGE_HREF,
   MEIN_HOF_HINWEIS,
-  MEIN_HOF_REITER,
   MEIN_HOF_REITER_HOFBEREICH,
   NEU,
   NEU_BROWSER,
@@ -121,22 +122,20 @@ describe('Reihenfolge', () => {
 })
 
 describe('Mein Hof', () => {
-  it('Reiter: Hofseite (Standard) · Beiträge — Produkte ist keiner mehr', () => {
-    expect(MEIN_HOF_REITER.map((r) => [r.label, r.href])).toEqual([
+  it('Reiter: Hofseite (Standard) · Beiträge, beide auf /farm-page — Produkte ist keiner mehr', () => {
+    expect(MEIN_HOF_REITER_HOFBEREICH.map((r) => [r.label, r.href])).toEqual([
       ['Hofseite', '/farm-page'],
-      ['Beiträge', '/status'],
+      ['Beiträge', BEITRAEGE_HREF],
     ])
-    // Der Punkt „Mein Hof" führt zum ersten Reiter.
-    expect(HAUPT.find((p) => p.id === 'mein-hof')?.href).toBe(MEIN_HOF_REITER[0].href)
+    // Der Punkt „Mein Hof" führt zum ersten Reiter und gilt auch für /status und seine Unterseiten.
+    expect(HAUPT.find((p) => p.id === 'mein-hof')?.href).toBe(MEIN_HOF_REITER_HOFBEREICH[0].href)
+    expect(HAUPT.find((p) => p.id === 'mein-hof')?.auchAktivAuf).toEqual(['/status'])
     expect(MEIN_HOF_HINWEIS).toContain('Produkte')
   })
 
-  it('der Kopf sitzt über jeder Reiter-Seite, mit genau ihrem Reiter und parallel geladenen Daten', () => {
-    // Bestand: /status mit dem Bestandskopf (Reiter „Beiträge" ist dort die eigene Seite).
-    const status = quelle(hofSeite('/status'))
-    expect(status).toMatch(/<MeinHofKopf[^>]*aktiv="beitraege"/)
-    expect(status).toContain('getMeinHofKopf(session.user.id)')
-    // HofShell (Nr. 16): /farm-page trägt beide Reiter selbst, der Reiter steht in der Adresse.
+  it('der Kopf sitzt über beiden Reitern, mit genau ihrem Reiter und parallel geladenen Daten', () => {
+    // /status trägt seit Nr. 22e keinen Kopf mehr — es leitet in den Reiter um.
+    expect(quelle(hofSeite('/status'))).toContain('redirect(BEITRAEGE_HREF)')
     const meinHof = quelle(hofSeite('/farm-page'))
     for (const reiter of MEIN_HOF_REITER_HOFBEREICH) {
       expect(reiter.href.split('?')[0]).toBe('/farm-page')
@@ -145,21 +144,21 @@ describe('Mein Hof', () => {
     expect(meinHof).toContain('getMeinHofKopf(session.user.id)')
   })
 
-  it('Produkte trägt den Kopf nicht mehr, sondern eine eigene Überschrift', () => {
+  it('Produkte trägt den Kopf nicht, sondern eine eigene Überschrift', () => {
     // Seit Nr. 18 in der HofShell: Die Überschrift steht in der Ansicht der Seite.
     const seite = quelle('src/app/(hof)/products/page.tsx') + quelle('src/components/produkte/produkte-ansicht.tsx')
-    expect(seite).not.toContain('MeinHofKopf')
+    expect(seite).not.toContain('MeinHofSeitenkopf')
     expect(seite).toMatch(/<h1[^>]*>Produkte<\/h1>/)
   })
 
-  it('die Reiterleiste trägt den Hinweis und keine Produktzahl mehr', () => {
-    const kopf = quelle('src/components/farmer/mein-hof-kopf.tsx')
+  it('die Reiterleiste trägt den Hinweis und keine Produktzahl', () => {
+    const kopf = quelle('src/components/mein-hof/seitenkopf.tsx')
     const nav = kopf.slice(kopf.indexOf('<nav aria-label="Mein Hof"'), kopf.indexOf('</nav>'))
     expect(nav).toContain('{MEIN_HOF_HINWEIS}')
     expect(nav).not.toContain('produktZahl')
   })
 
-  it('Unterseiten der Reiter (z. B. „Neuer Status") bekommen ihn nicht', () => {
+  it('Unterseiten von /status (z. B. „Neuer Beitrag") bekommen den Kopf nicht', () => {
     const unterseiten: string[] = []
     const suche = (ordner: string) => {
       for (const name of readdirSync(ordner)) {
@@ -168,14 +167,10 @@ describe('Mein Hof', () => {
         else if (name === 'page.tsx') unterseiten.push(pfad)
       }
     }
-    for (const reiter of MEIN_HOF_REITER) {
-      const wurzel = join(process.cwd(), hofSeite(reiter.href).replace(/\/page\.tsx$/, ''))
-      for (const name of readdirSync(wurzel)) {
-        if (statSync(join(wurzel, name)).isDirectory()) suche(join(wurzel, name))
-      }
-    }
-    expect(unterseiten.length).toBeGreaterThan(0)
-    for (const pfad of unterseiten) expect(readFileSync(pfad, 'utf8'), pfad).not.toContain('MeinHofKopf')
+    suche(join(process.cwd(), 'src/app/(hof)/status'))
+    // Gegenprobe: Umleitung, Neuer Beitrag und WhatsApp fortsetzen wurden gefunden.
+    expect(unterseiten.length).toBe(3)
+    for (const pfad of unterseiten) expect(readFileSync(pfad, 'utf8'), pfad).not.toContain('MeinHofSeitenkopf')
   })
 })
 
@@ -190,10 +185,12 @@ describe('Hilfe und Rückmeldung', () => {
     expect(ariaAktuell('/fehler-melden', hilfe)).toBe('true')
   })
 
-  it('die Seite heißt so und trägt den Knopf „Fehler melden" nach /fehler-melden', () => {
-    const seite = quelle('src/app/(farmer)/meldungen/page.tsx')
-    expect(seite).toContain('title="Hilfe und Rückmeldung"')
-    expect(seite).toMatch(/href="\/fehler-melden"[\s\S]{0,400}Fehler melden/)
+  it('Meine Meldungen trägt „+ Neue Meldung", Meldung abgeben die Überschrift des Punkts', () => {
+    const meldungen = quelle(hofSeite('/meldungen')) + quelle('src/components/hof-hilfe/meine-meldungen.tsx')
+    expect(meldungen).toContain('Meine Meldungen')
+    expect(meldungen).toMatch(/href=\{NEUE_MELDUNG_HREF\}[\s\S]{0,400}Neue Meldung/)
+    const abgeben = quelle(hofSeite('/fehler-melden'))
+    expect(abgeben).toContain('Hilfe und Rückmeldung')
   })
 })
 

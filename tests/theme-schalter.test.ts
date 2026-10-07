@@ -119,7 +119,9 @@ describe('Lint-Regel gegen Farbliterale', () => {
     // Bis zur schließenden Klammer am Zeilenanfang — Pfade wie [id] tragen selbst eckige Klammern.
     const liste = konfiguration.slice(anfang, konfiguration.indexOf('\n]', anfang))
     const eintraege = [...liste.matchAll(/'([^']+)'/g)].map((m) => m[1]).filter((p) => !p.endsWith('/**'))
-    expect(eintraege.length).toBeGreaterThan(20)
+    // Gegenprobe, dass die Liste überhaupt gelesen wurde — keine Mindestgröße:
+    // Sie schrumpft mit jedem Umbau (Nr. 22e: status-new-client.tsx ist raus).
+    expect(eintraege.length).toBeGreaterThan(5)
     for (const pfad of eintraege) {
       // Glob-Zeichen im Pfad sind für ESLint maskiert (im Quelltext `\\[id\\]`), auf der Platte nicht.
       const echterPfad = pfad.replace(/\\+([[\]()])/g, '$1')

@@ -35,8 +35,9 @@ export const dynamic = 'force-dynamic'
  * Handy/Web mit „Vergrößern" (hofseite-editor.tsx). Die Vorschau ist immer
  * die echte Hofseite (?vorschau=1), nie ein Nachbau.
  *
- * Reiter „Beiträge" — die Übersicht; bearbeitet wird auf den bestehenden
- * Seiten unter /status (E12: /status bleibt als Route).
+ * Reiter „Beiträge" — seit Nr. 22e mit allem, was /status konnte
+ * (Deaktivieren, Löschen, Als Vorlage, WhatsApp fortsetzen); /status leitet
+ * hierher um, geschrieben wird weiter unter /status/new.
  */
 export default async function FarmPageOwnerRoute({
   searchParams,
