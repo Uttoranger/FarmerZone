@@ -314,7 +314,7 @@ export const ORIENTIERUNG_HINWEIS =
 export const BAES_FUTTERMITTEL_URL = 'https://www.baes.gv.at'
 
 /** Linktext zur BAES-Seite. */
-export const BAES_LINK_TEXT = 'BAES: Infos für Futtermittelbetriebe'
+export const BAES_LINK_TEXT = 'Website des BAES'
 
 /** Hinweis für Kundinnen bei jedem Futter (E10a, wörtlich). */
 export const KUNDEN_VERANTWORTUNG =

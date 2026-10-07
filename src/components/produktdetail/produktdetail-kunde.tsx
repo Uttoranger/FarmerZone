@@ -171,7 +171,9 @@ export function ProduktdetailKunde({
   // Raummeter und Schüttraummeter erklärt die Seite beim ersten Vorkommen (DESIGN_SYSTEM, Nr. 20).
   const raummass = raummassErklaeren((familie.length > 0 ? familie : [produkt]).map((p) => p.unit))
   // Bei jedem Futter der Verantwortungs-Hinweis (E10a), bei „nur an Betriebe" mit Zusatz.
-  const verantwortung = futterVerantwortung([produkt])
+  // Über die ganze Familie: Die Abgabe kann je Größe abweichen, der Zusatz
+  // „nur an Betriebe" darf auf der Seite nicht fehlen, wenn eine Größe ihn braucht.
+  const verantwortung = futterVerantwortung(familie.length > 0 ? familie : [produkt])
 
   const marke =
     zustand.art === 'knapp' ? (
