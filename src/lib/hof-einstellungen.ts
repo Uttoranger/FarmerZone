@@ -22,7 +22,10 @@ import type { WeeklySlot } from '@/lib/pickup-days'
 import { BETRIEBSNUMMER_ANKER, BETRIEBSSTATUS } from '@/lib/taxonomie'
 import {
   BAR_OHNE_GEBUEHR_SATZ,
+  ONLINE_GEBUEHR_ABGETRENNT_SATZ,
+  ONLINE_GEBUEHR_MIT_PROVISION_SATZ,
   PRO_MONAT,
+  barGebuehrSepaSatz,
   STARTPHASE_SATZ,
   TARIFE_AB,
   TARIFE_AB_SATZ,
@@ -83,6 +86,8 @@ export type EinstellungenDaten = {
   abholzeitenGesamt: number
   stripeKontoDa: boolean
   stripeBereit: boolean
+  /** Farm.acceptsOnline — aus heißt: der Hof kassiert bewusst nur bar. */
+  onlineAn: boolean
   betriebsnummer: string | null
   betriebsstatus: Betriebsstatus | null
   tarif: Tarif | null
@@ -138,12 +143,16 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
     {
       id: 'zahlung',
       titel: 'Zahlung',
+      // Orange nur, wenn Online an ist und Stripe nicht fertig — ein Hof, der
+      // bewusst nur bar kassiert, hat nichts zu tun.
       zeile: d.stripeBereit
         ? 'Online-Zahlung über Stripe aktiv · bar bei Abholung'
-        : d.stripeKontoDa
-          ? 'Stripe-Einrichtung noch nicht fertig · bar bei Abholung geht'
-          : 'Bar bei Abholung · Online-Zahlung noch nicht eingerichtet',
-      ton: d.stripeBereit ? 'fertig' : 'offen',
+        : !d.onlineAn
+          ? 'Bar bei Abholung · Online-Zahlung ist aus'
+          : d.stripeKontoDa
+            ? 'Stripe-Einrichtung noch nicht fertig · bar bei Abholung geht'
+            : 'Bar bei Abholung · Online-Zahlung noch nicht eingerichtet',
+      ton: d.stripeBereit ? 'fertig' : d.onlineAn ? 'offen' : 'neutral',
       href: '/settings/payments',
     },
     {
@@ -271,7 +280,12 @@ export function konditionenRechenbeispiel(hof: KonditionenHof, jetzt: Date): Rec
     online: {
       titel: 'Online bezahlt',
       zeilen: onlineZeilen,
-      satz: online > 0 ? 'Die Gebühr wird beim Bezahlen automatisch abgetrennt – dein Warenpreis bleibt unberührt.' : (grund ?? ''),
+      satz:
+        online > 0
+          ? provision > 0
+            ? ONLINE_GEBUEHR_MIT_PROVISION_SATZ
+            : ONLINE_GEBUEHR_ABGETRENNT_SATZ
+          : (grund ?? ''),
     },
     bar: {
       titel: 'Bar bei Abholung',
@@ -284,7 +298,7 @@ export function konditionenRechenbeispiel(hof: KonditionenHof, jetzt: Date): Rec
       satz: barOhneServicegebuehr('ONSITE_CASH', jetzt)
         ? BAR_OHNE_GEBUEHR_SATZ
         : bar > 0
-          ? 'Die Gebühr holt die Monatsabrechnung per SEPA-Lastschrift.'
+          ? (barGebuehrSepaSatz(jetzt) ?? '')
           : (grund ?? ''),
     },
   }

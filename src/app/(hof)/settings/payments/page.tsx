@@ -19,9 +19,6 @@ async function getFarmPaymentData() {
   return prisma.farm.findUnique({
     where: { ownerId: session.user.id },
     select: {
-      id: true,
-      acceptsOnline: true,
-      acceptsOnsite: true,
       stripeAccountId: true,
       stripeAccountReady: true,
     },

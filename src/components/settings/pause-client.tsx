@@ -119,7 +119,14 @@ export function PauseClient({
           variant="outline"
           className="min-h-11 w-full"
         >
-          {isPending ? <Loader2 className="size-4 animate-spin" aria-label="Einen Moment …" /> : 'Nachricht speichern'}
+          {isPending ? (
+            <>
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              <span className="sr-only">Einen Moment …</span>
+            </>
+          ) : (
+            'Nachricht speichern'
+          )}
         </Button>
       </div>
     </div>

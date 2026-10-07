@@ -42,8 +42,12 @@ import {
 } from '@/lib/hof-einstellungen'
 import { hofseiteFortschritt, type HofseiteStand } from '@/lib/hofseite-fortschritt'
 import {
+  BAR_GEBUEHR_SEPA_SATZ,
   BAR_OHNE_GEBUEHR_SATZ,
   KONDITIONEN_UEBERGANG,
+  ONLINE_GEBUEHR_ABGETRENNT_SATZ,
+  ONLINE_GEBUEHR_MIT_PROVISION_SATZ,
+  barGebuehrSepaSatz,
   MONATSABRECHNUNG_TEXT,
   TARIFE,
   TARIFE_AB,
@@ -106,6 +110,7 @@ function daten(teil: Partial<EinstellungenDaten> = {}, standTeil: Partial<Hofsei
     abholzeitenGesamt: s.abholzeiten.length,
     stripeKontoDa: true,
     stripeBereit: true,
+    onlineAn: true,
     betriebsnummer: 'AT 1234567',
     betriebsstatus: 'PRIMAERPRODUKTION',
     tarif: null,
@@ -230,6 +235,12 @@ describe('einstellungenBereiche', () => {
     expect(ohne.zeile).toBe('Bar bei Abholung · Online-Zahlung noch nicht eingerichtet')
   })
 
+  it('Zahlung: Hof kassiert bewusst nur bar (Online aus) — grau, nicht orange', () => {
+    const nurBar = bereich(einstellungenBereiche(daten({ stripeBereit: false, stripeKontoDa: false, onlineAn: false }), VOR_STICHTAG), 'zahlung')
+    expect(nurBar).toMatchObject({ ton: 'neutral', zeile: 'Bar bei Abholung · Online-Zahlung ist aus' })
+    expect(bereich(einstellungenBereiche(daten({ stripeBereit: false, onlineAn: false }), VOR_STICHTAG), 'zahlung').ton).toBe('neutral')
+  })
+
   it('Futtermittel: Nummer mit Betriebsart grün und Sprung zum Abschnitt; ohne Nummer nur zur Info', () => {
     const mit = bereich(einstellungenBereiche(daten(), VOR_STICHTAG), 'futtermittel')
     expect(mit).toMatchObject({ ton: 'fertig', zeile: 'Primärproduktion · AT 1234567', href: `/settings/profile#${BETRIEBSNUMMER_ANKER}` })
@@ -261,6 +272,7 @@ describe('konditionenRechenbeispiel', () => {
     expect(RECHENBEISPIEL_WARENPREIS_CENTS).toBe(2000)
     expect(r.satz).toBe(`Servicegebühr 5 %, mind. ${formatEuro(0.5)} – zahlt der Kunde`)
     expect(r.online.zeilen.map((z) => z.betrag)).toEqual([formatEuro(20), `+ ${formatEuro(1)}`, formatEuro(21), formatEuro(20)])
+    expect(r.online.satz).toBe(ONLINE_GEBUEHR_ABGETRENNT_SATZ)
   })
 
   it('bar vor dem SEPA-Start ohne Gebühr (B1), mit dem Satz aus konditionen.ts', () => {
@@ -272,7 +284,7 @@ describe('konditionenRechenbeispiel', () => {
   it('bar ab dem Stichtag mit Gebühr, die die Monatsabrechnung holt', () => {
     const r = konditionenRechenbeispiel(hof(), BAR_SERVICEGEBUEHR_AB)
     expect(r.bar.zeilen.map((z) => z.betrag)).toEqual([formatEuro(20), `+ ${formatEuro(1)}`, formatEuro(21), formatEuro(20)])
-    expect(r.bar.satz).toContain('Monatsabrechnung')
+    expect(r.bar.satz).toBe(BAR_GEBUEHR_SEPA_SATZ)
   })
 
   it('Hof ohne eingeschaltete Gebühr: kein Satz mit Prozent, ehrlicher Grund statt Versprechen', () => {
@@ -295,6 +307,24 @@ describe('konditionenRechenbeispiel', () => {
     const r = konditionenRechenbeispiel(hof({ platformFeePercent: '3' }), VOR_STICHTAG)
     expect(r.online.zeilen.find((z) => z.label === 'Provision')?.betrag).toBe(`− ${formatEuro(0.6)}`)
     expect(r.online.zeilen.at(-1)?.betrag).toBe(formatEuro(19.4))
+    // Mit Provision bleibt der Warenpreis nicht unberührt — der Satz sagt das.
+    expect(r.online.satz).toBe(ONLINE_GEBUEHR_MIT_PROVISION_SATZ)
+    expect(r.online.satz).not.toContain('unberührt')
+    expect(r.mitProvision).toBe(true)
+  })
+})
+
+describe('Sätze der Konditionen aus konditionen.ts', () => {
+  it('der SEPA-Satz zur Bargebühr hängt an B1: vor dem Stichtag keiner, ab dann der bisherige', () => {
+    expect(barGebuehrSepaSatz(new Date(BAR_SERVICEGEBUEHR_AB.getTime() - 1))).toBeNull()
+    expect(barGebuehrSepaSatz(BAR_SERVICEGEBUEHR_AB)).toBe(BAR_GEBUEHR_SEPA_SATZ)
+    // Vor dem Stichtag sagt das Rechenbeispiel nie „holt per SEPA".
+    expect(konditionenRechenbeispiel(hof(), VOR_STICHTAG).bar.satz).not.toContain('SEPA')
+  })
+
+  it('kein Satz steht als Literal in hof-einstellungen.ts', () => {
+    const text = quelle('src/lib/hof-einstellungen.ts')
+    for (const satz of ['automatisch abgetrennt', 'holt die Monatsabrechnung']) expect(text, satz).not.toContain(satz)
   })
 })
 

@@ -250,7 +250,16 @@ export function PickupSlotsClient({
           disabled={isPending}
           className="min-h-11 w-full bg-primary text-primary-foreground hover:opacity-90"
         >
-          {isPending ? <Loader2 className="size-4 animate-spin" aria-label="Einen Moment …" /> : <><Plus className="size-4 mr-1" aria-hidden="true" /> Abholzeit hinzufügen</>}
+          {isPending ? (
+            <>
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              <span className="sr-only">Einen Moment …</span>
+            </>
+          ) : (
+            <>
+              <Plus className="size-4 mr-1" aria-hidden="true" /> Abholzeit hinzufügen
+            </>
+          )}
         </Button>
       </div>
     </div>

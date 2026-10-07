@@ -18,7 +18,7 @@ afterEach(async () => {
 
 describe('Einstellungen — nur der eigene Hof', () => {
   it('Übersicht: eigener Hof, pausierte Abholzeit zählt nicht als Angebot, keine Stripe-Kennung', async () => {
-    const { farm, owner } = await erstelleHof({ stripeAccountId: `acct_int_${Date.now()}`, stripeAccountReady: false })
+    const { farm, owner } = await erstelleHof({ acceptsOnline: true, stripeAccountId: `acct_int_${Date.now()}`, stripeAccountReady: false })
     await erstelleHof({ name: 'Fremder Hof', isPaused: true })
     // Alle Abholzeiten bis auf eine pausieren.
     const [erste] = await prisma.pickupSlot.findMany({ where: { farmId: farm.id }, orderBy: { dayOfWeek: 'asc' } })
@@ -32,6 +32,7 @@ describe('Einstellungen — nur der eigene Hof', () => {
     expect(daten!.abholzeitenGesamt).toBe(7)
     expect(daten!.stripeKontoDa).toBe(true)
     expect(daten!.stripeBereit).toBe(false)
+    expect(daten!.onlineAn).toBe(true)
     expect(JSON.stringify(daten)).not.toContain('acct_int_')
     expect(daten!.betriebsnummer).toBe('LFBIS 0000000')
 
@@ -39,6 +40,17 @@ describe('Einstellungen — nur der eigene Hof', () => {
     expect(bereiche).toHaveLength(8)
     expect(bereiche.find((b) => b.id === 'zahlung')?.ton).toBe('offen')
     expect(bereiche.find((b) => b.id === 'futtermittel')?.zeile).toBe('Primärproduktion · LFBIS 0000000')
+  })
+
+  it('Zahlung: Online an und Stripe nicht fertig → orange; nur bar (Online aus, kein Konto) → grau', async () => {
+    const online = await erstelleHof({ acceptsOnline: true, stripeAccountReady: false })
+    const nurBar = await erstelleHof({ acceptsOnline: false })
+
+    const zahlung = async (ownerId: string) =>
+      einstellungenBereiche((await ladeEinstellungenUebersicht(ownerId))!, new Date()).find((b) => b.id === 'zahlung')
+
+    expect(await zahlung(online.owner.id)).toMatchObject({ ton: 'offen', zeile: 'Bar bei Abholung · Online-Zahlung noch nicht eingerichtet' })
+    expect(await zahlung(nurBar.owner.id)).toMatchObject({ ton: 'neutral', zeile: 'Bar bei Abholung · Online-Zahlung ist aus' })
   })
 
   it('ohne Hof: null', async () => {

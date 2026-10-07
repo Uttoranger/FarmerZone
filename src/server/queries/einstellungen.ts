@@ -16,7 +16,7 @@ export async function ladeEinstellungenUebersicht(ownerId: string): Promise<Eins
   const [hof, farm, einstellungen] = await Promise.all([
     prisma.farm.findUnique({
       where: { ownerId },
-      select: { stripeAccountId: true, tarif: true, archivedAt: true },
+      select: { stripeAccountId: true, acceptsOnline: true, tarif: true, archivedAt: true },
     }),
     getOwnerFarm(ownerId),
     getFarmSettings(ownerId),
@@ -37,6 +37,7 @@ export async function ladeEinstellungenUebersicht(ownerId: string): Promise<Eins
     abholzeitenGesamt: einstellungen.pickupSlots.length,
     stripeKontoDa: hof.stripeAccountId !== null,
     stripeBereit: farm.stripeAccountReady,
+    onlineAn: hof.acceptsOnline,
     betriebsnummer: einstellungen.betriebsnummer,
     betriebsstatus: einstellungen.betriebsstatus,
     tarif: hof.tarif,
