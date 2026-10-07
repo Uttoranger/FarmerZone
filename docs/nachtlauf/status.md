@@ -43,8 +43,8 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 24 | Stripe-Pflicht und Admin auf main | fertig | `nacht/2026-10-07/24-stripe-pflicht` | #203 | main | ersetzt #201 (geschlossen); Sackgasse für Höfe mit acceptsOnline=false behoben; Höfe ohne Stripe nach Merge ansprechen | 07.10.2026 |
 | 25 | Teilen nach T1 (#199) | fertig | `nacht/2026-10-06/21-teilen` | #199 | 20 (#198) | Entwurf aufgehoben; kein Browser-Speicher, keine Bestell-Zuordnung | 07.10.2026 |
 | 26 | Auswertung und Region nach T1 (#200) | fertig | `nacht/2026-10-06/22c-auswertung-region` | #200 | 21 (#199) | Entwurf aufgehoben; Teilen-Karte nur Besuche; Slug `region` frei | 07.10.2026 |
-| 27 | Konto und Geld, klein | läuft | `nacht/2026-10-07/27-konto-geld` | | main | | 07.10.2026 |
-| 28 | Oberfläche und Wortwahl | offen | | | | | |
+| 27 | Konto und Geld, klein | fertig | `nacht/2026-10-07/27-konto-geld` | #204 | main | Neuer Ablauf nach „Konto erstellen" (Postfach-Hinweis, Anmelden über /login); B3 nur bei fremdem Passwort | 07.10.2026 |
+| 28 | Oberfläche und Wortwahl | läuft | `nacht/2026-10-07/28-oberflaeche` | | main | | 07.10.2026 |
 | 29 | „Betrieb" bei Futter kaufen | offen | | | | | |
 | 30 | Teilen-Momente und Abschalten | offen | | | | | |
 | 31 | Tab-Wechsel beschleunigen | offen | | | | | |
