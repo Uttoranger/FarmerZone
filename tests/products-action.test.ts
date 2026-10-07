@@ -36,7 +36,8 @@ vi.mock('@/lib/prisma', () => {
 
 import { createProduct, updateProduct } from '@/server/actions/products'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
-import { FUTTER_NUR_UEBER_FORMULAR, SPERR_GRUND } from '@/lib/futter-registrierung'
+import { FUTTER_BESTAETIGUNG_NEU, FUTTER_NUR_UEBER_FORMULAR, SPERR_GRUND } from '@/lib/futter-registrierung'
+import { Prisma } from '@prisma/client'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getFarmForUser } from '@/server/queries/dashboard'
@@ -260,7 +261,8 @@ describe('updateProduct — Sperre je Gebinde (S7, Nr. 20)', () => {
     expect(aufruf.where).toEqual({ id: 'p_sack', farmId: 'farm_1' })
     expect(aufruf.data.isAvailable).toBe(false)
     // Die Verpackung kommt aus der Datenbank, nie aus dem Formular — der Hof steht in der WHERE-Klausel.
-    expect(productFindFirst).toHaveBeenCalledWith({ where: { id: 'p_sack', farmId: 'farm_1' }, select: { category: true, verpackung: true } })
+    // Seit Nr. 23 mit der Kennzeichnung: Der gespeicherte Stand entscheidet, ob neu bestätigt werden muss (E10a).
+    expect(productFindFirst).toHaveBeenCalledWith({ where: { id: 'p_sack', farmId: 'farm_1' }, include: { futter: true } })
   })
 
   it('mit BAES-Meldung geht dasselbe Sackerl online', async () => {
@@ -328,7 +330,99 @@ describe('updateProduct — Futter nur über das Futter-Formular (S7, Nachbesser
     const ergebnis = await updateProduct('p_fremd', heu as never)
 
     expect(ergebnis).toEqual({ error: 'Produkt nicht gefunden.' })
-    expect(productFindFirst).toHaveBeenCalledWith({ where: { id: 'p_fremd', farmId: 'farm_1' }, select: { category: true, verpackung: true } })
+    // Seit Nr. 23 mit der Kennzeichnung (Vergleich für die Pflicht-Bestätigung, E10a).
+    expect(productFindFirst).toHaveBeenCalledWith({ where: { id: 'p_fremd', farmId: 'farm_1' }, include: { futter: true } })
     expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+})
+
+describe('updateProduct — Pflicht-Bestätigung bei Futter (E10a, Nr. 23)', () => {
+  /**
+   * Der gespeicherte Stand, wie ihn die Datenbank liefert: genau das, was ein
+   * bestätigtes Speichern von `heu` schreibt — mit Decimal statt Zahl und dem
+   * alten Zeitpunkt der Bestätigung.
+   */
+  async function gespeichertesHeu(): Promise<Record<string, unknown>> {
+    await updateProduct('p_heu', heu as never)
+    const produkt = (tx.product.updateMany.mock.calls[0][0] as { data: Record<string, unknown> }).data
+    const kennzeichnung = (tx.futterKennzeichnung.upsert.mock.calls[0][0] as { create: Record<string, unknown> }).create
+    vi.clearAllMocks()
+    return {
+      id: 'p_heu',
+      farmId: 'farm_1',
+      verpackung: null,
+      stock: 4,
+      ...produkt,
+      price: new Prisma.Decimal(String(produkt.price)),
+      vatRate: new Prisma.Decimal(String(produkt.vatRate)),
+      futter: {
+        id: 'fk_1',
+        registrierungsnummer: null,
+        ...kennzeichnung,
+        nettoMenge: new Prisma.Decimal(String(kennzeichnung.nettoMenge)),
+        rohprotein: new Prisma.Decimal(String(kennzeichnung.rohprotein)),
+        bestaetigtAm: new Date('2026-09-01T08:00:00.000Z'),
+      },
+    }
+  }
+
+  const ohneHaken = { ...heu, futter: { ...heu.futter, bestaetigt: false } }
+
+  it('Kennzeichnung geändert ohne Haken: abgelehnt mit verständlichem Satz, nichts geschrieben', async () => {
+    productFindFirst.mockResolvedValue((await gespeichertesHeu()) as never)
+
+    const ergebnis = await updateProduct('p_heu', { ...ohneHaken, futter: { ...ohneHaken.futter, zusammensetzung: 'Heu vom zweiten Schnitt' } } as never)
+
+    expect(ergebnis).toEqual({ error: FUTTER_BESTAETIGUNG_NEU, code: 'BESTAETIGUNG' })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+    expect(tx.futterKennzeichnung.upsert).not.toHaveBeenCalled()
+  })
+
+  it('Produktangabe geändert (Abgabe, Name) ohne Haken: ebenfalls abgelehnt', async () => {
+    productFindFirst.mockResolvedValue((await gespeichertesHeu()) as never)
+
+    expect(await updateProduct('p_heu', { ...ohneHaken, abgabe: 'ALLE' } as never)).toMatchObject({ code: 'BESTAETIGUNG' })
+    expect(await updateProduct('p_heu', { ...ohneHaken, name: 'Heu vom Berg' } as never)).toMatchObject({ code: 'BESTAETIGUNG' })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('nur Preis und Vorrat geändert ohne Haken: gespeichert, die alte Bestätigung bleibt', async () => {
+    productFindFirst.mockResolvedValue((await gespeichertesHeu()) as never)
+
+    const ergebnis = await updateProduct('p_heu', { ...ohneHaken, price: 49.9, stock: 7 } as never, 4)
+
+    expect(ergebnis).toEqual({ ok: true })
+    const produkt = tx.product.updateMany.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(produkt.data.price).toBe(49.9)
+    expect(produkt.data.stock).toBe(7)
+    const aufruf = tx.futterKennzeichnung.upsert.mock.calls[0][0] as { update: Record<string, unknown> }
+    expect('bestaetigtAm' in aufruf.update).toBe(false)
+  })
+
+  it('geändert mit Haken: gespeichert, bestaetigtAm = jetzt', async () => {
+    productFindFirst.mockResolvedValue((await gespeichertesHeu()) as never)
+
+    const ergebnis = await updateProduct('p_heu', { ...heu, futter: { ...heu.futter, zusammensetzung: 'Heu vom zweiten Schnitt' } } as never)
+
+    expect(ergebnis).toEqual({ ok: true })
+    const aufruf = tx.futterKennzeichnung.upsert.mock.calls[0][0] as { update: Record<string, unknown> }
+    expect(aufruf.update.bestaetigtAm).toEqual(JETZT)
+    expect(aufruf.update.zusammensetzung).toBe('Heu vom zweiten Schnitt')
+  })
+
+  it('Altbestand ohne gespeicherte Kennzeichnung: ohne Haken abgelehnt', async () => {
+    productFindFirst.mockResolvedValue({ category: 'HEU_STROH', verpackung: null, futter: null } as never)
+
+    const ergebnis = await updateProduct('p_heu', ohneHaken as never)
+
+    expect(ergebnis).toEqual({ error: FUTTER_BESTAETIGUNG_NEU, code: 'BESTAETIGUNG' })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('ein Wechsel weg vom Futter braucht keinen Haken — die Kennzeichnung wird gelöscht', async () => {
+    const ergebnis = await updateProduct('p_heu', { ...heu, category: 'SONSTIGES', subcategory: null, futter: null, abgabe: 'ALLE' } as never)
+
+    expect(ergebnis).toEqual({ ok: true })
+    expect(tx.futterKennzeichnung.deleteMany).toHaveBeenCalledWith({ where: { productId: 'p_heu' } })
   })
 })

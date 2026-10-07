@@ -13,6 +13,10 @@
  *      Gegenprobe: Kauf als Betrieb mit Nummer geht (NUR_BETRIEBE).
  *   4. Abnahme „Brennholz mit drei Größen": drei Produkte, je Größe eigene
  *      Brennmaterial-Angaben.
+ *   5. Pflicht-Bestätigung beim Bearbeiten (E10a, Nr. 23) mit den echten
+ *      Spaltentypen (Decimal, Listen): nur Preis geändert → ohne Haken
+ *      gespeichert, bestaetigtAm bleibt; Kennzeichnung geändert → ohne Haken
+ *      abgelehnt und nichts geschrieben, mit Haken bestaetigtAm = jetzt.
  * Geprüft wird der Zustand danach (TESTING_GUIDELINES §1).
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
@@ -27,7 +31,7 @@ vi.mock('@/lib/stripe', () => ({
 
 import { headers } from 'next/headers'
 import { legeBrennmaterialFamilieAn, legeFutterFamilieAn } from '@/server/actions/produktfamilie'
-import { produktSichtbarkeitSetzen } from '@/server/actions/products'
+import { produktSichtbarkeitSetzen, updateProduct } from '@/server/actions/products'
 import { POST as checkout } from '@/app/api/checkout/route'
 import { prisma } from '@/lib/prisma'
 import { sendOnsiteConfirmation } from '@/lib/email'
@@ -202,5 +206,88 @@ describe('Brennmaterial mit Verkaufsgrößen — echte Datenbank', () => {
     expect(new Set(produkte.map((p) => p.brennmaterial?.id)).size).toBe(3)
     expect(produkte[0].brennmaterial).toMatchObject({ holzart: 'Buche', scheitlaengeCm: 33, restfeuchteMax: 20, ueberdacht: true })
     expect(produkte[0].brennmaterial?.gelagertSeit).toBeInstanceOf(Date)
+  })
+})
+
+describe('Pflicht-Bestätigung beim Bearbeiten (E10a, Nr. 23) — echte Datenbank', () => {
+  const ALT = new Date('2026-09-01T08:00:00.000Z')
+
+  /** Der Rundballen so, wie der Produktdialog ihn zum Bearbeiten vorbelegt (toFormDefaults), Haken leer. */
+  async function rundballenImDialog(farmId: string) {
+    await legeFutterFamilieAn(HEU)
+    const p = await prisma.product.findFirstOrThrow({ where: { farmId, name: { endsWith: 'Rundballen' } }, include: { futter: true } })
+    await prisma.futterKennzeichnung.update({ where: { productId: p.id }, data: { bestaetigtAm: ALT } })
+    const f = p.futter
+    if (!f) throw new Error('Kennzeichnung fehlt')
+    const formular = {
+      name: p.name,
+      description: p.description ?? '',
+      imageUrl: p.imageUrl ?? '',
+      category: p.category,
+      subcategory: p.subcategory,
+      labels: p.labels,
+      abgabe: p.abgabe,
+      countsTowardLimit: p.countsTowardLimit,
+      price: p.price.toNumber(),
+      vatRate: p.vatRate.toNumber(),
+      unit: p.unit,
+      unitSize: p.unitSize?.toNumber() ?? null,
+      stock: p.stock,
+      isAvailable: p.isAvailable,
+      allergens: p.allergens,
+      requiresCool: p.requiresCool,
+      requiresFreezer: p.requiresFreezer,
+      seasonStart: p.seasonStart,
+      seasonEnd: p.seasonEnd,
+      unavailableReason: p.unavailableReason ?? '',
+      futter: {
+        futtermittelart: f.futtermittelart,
+        zielTierarten: [...f.zielTierarten].reverse(),
+        zusammensetzung: f.zusammensetzung,
+        analytischeBestandteile: f.analytischeBestandteile,
+        nettoMenge: f.nettoMenge.toNumber(),
+        nettoEinheit: f.nettoEinheit,
+        rohprotein: f.rohprotein?.toNumber() ?? null,
+        rohfaser: f.rohfaser?.toNumber() ?? null,
+        rohfett: f.rohfett?.toNumber() ?? null,
+        rohasche: f.rohasche?.toNumber() ?? null,
+        zusatzstoffe: f.zusatzstoffe ?? '',
+        gebrauchshinweis: f.gebrauchshinweis ?? '',
+        bestaetigt: false,
+      },
+    }
+    return { id: p.id, stock: p.stock, formular }
+  }
+
+  async function kennzeichnung(productId: string) {
+    return prisma.futterKennzeichnung.findUniqueOrThrow({ where: { productId } })
+  }
+
+  it('nur der Preis geändert: ohne Haken gespeichert, die alte Bestätigung bleibt', async () => {
+    const farm = await lfbisHof()
+    const { id, stock, formular } = await rundballenImDialog(farm.id)
+
+    const ergebnis = await updateProduct(id, { ...formular, price: 49.9 } as never, stock)
+
+    expect(ergebnis).toEqual({ ok: true })
+    expect((await prisma.product.findUniqueOrThrow({ where: { id } })).price.toString()).toBe('49.9')
+    expect((await kennzeichnung(id)).bestaetigtAm).toEqual(ALT)
+  })
+
+  it('Kennzeichnung geändert ohne Haken: abgelehnt, nichts geschrieben; mit Haken: gespeichert, bestaetigtAm neu', async () => {
+    const farm = await lfbisHof()
+    const { id, stock, formular } = await rundballenImDialog(farm.id)
+    const geaendert = { ...formular, price: 49.9, futter: { ...formular.futter, zusammensetzung: 'Wiesenheu, zweiter Schnitt' } }
+
+    expect(await updateProduct(id, geaendert as never, stock)).toMatchObject({ code: 'BESTAETIGUNG' })
+    expect((await prisma.product.findUniqueOrThrow({ where: { id } })).price.toString()).toBe('45')
+    expect(await kennzeichnung(id)).toMatchObject({ zusammensetzung: 'Wiesenheu, erster Schnitt', bestaetigtAm: ALT })
+
+    const vorher = Date.now()
+    expect(await updateProduct(id, { ...geaendert, futter: { ...geaendert.futter, bestaetigt: true } } as never, stock)).toEqual({ ok: true })
+    const danach = await kennzeichnung(id)
+    expect(danach.zusammensetzung).toBe('Wiesenheu, zweiter Schnitt')
+    // Systemuhr in der Integrationsschicht: großzügig, nie auf die Millisekunde (TESTING_GUIDELINES §1).
+    expect(danach.bestaetigtAm.getTime()).toBeGreaterThanOrEqual(vorher - 60_000)
   })
 })

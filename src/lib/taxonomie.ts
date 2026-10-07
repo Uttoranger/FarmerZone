@@ -56,7 +56,9 @@ export const KATEGORIE_LABEL: Record<ProductCategoryValue, string> = {
   GETREIDE_KOERNER: 'Getreide & Körner',
   MISCHFUTTER: 'Mischfutter',
   ERGAENZUNGSFUTTER: 'Ergänzungsfutter',
-  BRENNHOLZ: 'Brennholz',
+  // Der Enum-Wert bleibt BRENNHOLZ (Schema); in der Oberfläche heißt die
+  // Kategorie Brennmaterial (E11 Label, Nr. 23) — Brennholz ist eine ihrer Arten.
+  BRENNHOLZ: 'Brennmaterial',
   SONSTIGES: 'Sonstiges',
 }
 

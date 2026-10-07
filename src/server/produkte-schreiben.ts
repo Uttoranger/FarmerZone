@@ -41,9 +41,10 @@ export type GepruefteKennzeichnung = FutterKennzeichnungFormData & {
 }
 
 /**
- * Die Kennzeichnungsspalten. Der Haken „entspricht dem Sackanhänger" wird
- * bei JEDEM Speichern neu gesetzt (bestaetigtAm = jetzt): Wer die Kennzeichnung
- * ändert, bestätigt sie neu — das Formular verlangt den Haken ohnehin.
+ * Die Kennzeichnungsspalten, mit bestaetigtAm = jetzt (Pflicht-Haken, E10a).
+ * Beim Anlegen immer; beim Bearbeiten nur, wenn der Hof neu bestätigt hat —
+ * sonst lässt updateProduct den alten Zeitpunkt stehen (nur Preis/Vorrat
+ * geändert, brauchtNeueBestaetigung).
  *
  * registrierungsnummer wird bewusst NICHT geschrieben (Rückfrage F6): Die
  * Nummer gehört dem Hof. Beim Update bleibt ein Altbestand so unangetastet —

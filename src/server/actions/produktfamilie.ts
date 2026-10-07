@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { futterDaten, ladeHofRegistrierung, revalidiereProdukte } from '@/server/produkte-schreiben'
 import { brennmaterialFamilieSchema, futterFamilieSchema } from '@/schemas/produktfamilie'
-import { gebindeSperre } from '@/lib/futter-registrierung'
+import { FUTTER_BESTAETIGUNG_FEHLT, gebindeSperre } from '@/lib/futter-registrierung'
 import { RESTFEUCHTE_JE_TROCKNUNG, gelagertSeitAus, groessenProduktname } from '@/lib/verkaufsgroessen'
 import { mwstStandard } from '@/lib/mwst'
 
@@ -47,13 +47,20 @@ async function angemeldeterHof(): Promise<{ id: string; slug: string } | { error
 
 /**
  * Ein Futtermittel mit seinen Verkaufsgrößen. Kennzeichnung für alle Größen
- * gleich, bestätigt mit diesem Speichern (bestaetigtAm = jetzt); die
+ * gleich, bestätigt mit diesem Speichern (bestaetigtAm = jetzt; ohne den
+ * Pflicht-Haken aus E10a lehnt schon das Schema ab); die
  * Nettomenge je Größe aus der Tabelle. Die Betriebsnummer steht am Hof, nicht
  * in der Kennzeichnung (Rückfrage F6).
  */
 export async function legeFutterFamilieAn(eingabe: unknown): Promise<FamilieErgebnis> {
   const geprueft = futterFamilieSchema.safeParse(eingabe)
-  if (!geprueft.success) return { error: EINGABE_FEHLER }
+  if (!geprueft.success) {
+    // Fehlt NUR der Pflicht-Haken (E10a), sagt die Antwort das — sonst wüsste
+    // der Hof nicht, was „prüfe deine Eingaben" meint. Alles andere zeigt das
+    // Formular am Feld.
+    const nurHaken = geprueft.error.issues.every((i) => i.path.join('.') === 'kennzeichnung.bestaetigt')
+    return { error: nurHaken ? FUTTER_BESTAETIGUNG_FEHLT : EINGABE_FEHLER }
+  }
   const v = geprueft.data
 
   const farm = await angemeldeterHof()

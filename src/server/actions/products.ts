@@ -16,7 +16,14 @@ import { dualUseHinweis, normiereProduktname, DUAL_USE_MIN_ZEICHEN } from '@/lib
 import { dualUseAnfrageSchema } from '@/schemas/product'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { istWiederDa } from '@/lib/produkte-hof'
-import { FUTTER_NUR_UEBER_FORMULAR, gebindeSperre, noetigeRegistrierung, type Gebinde } from '@/lib/futter-registrierung'
+import {
+  FUTTER_BESTAETIGUNG_NEU,
+  FUTTER_NUR_UEBER_FORMULAR,
+  brauchtNeueBestaetigung,
+  gebindeSperre,
+  noetigeRegistrierung,
+  type Gebinde,
+} from '@/lib/futter-registrierung'
 import {
   futterDaten,
   ladeHofRegistrierung,
@@ -44,11 +51,13 @@ function revalidate(farmSlug: string) {
  * GEAENDERT: Der Vorrat hat sich seit dem Öffnen geändert — `vorrat` ist der
  * aktuelle Stand. GESPERRT: Diese Größe darf ohne die nötige Futtermittel-
  * Registrierung nicht in den Shop (S7) — `error` nennt den Grund.
+ * BESTAETIGUNG: Angaben eines Futtermittels geändert, aber nicht neu bestätigt
+ * (E10a) — der Dialog öffnet den Haken.
  * `hinweis` nach dem Speichern: gespeichert, aber als Entwurf, weil gesperrt.
  */
 export type ProduktErgebnis =
   | { ok: true; hinweis?: string }
-  | { error: string; code?: 'GEAENDERT' | 'GESPERRT'; vorrat?: number }
+  | { error: string; code?: 'GEAENDERT' | 'GESPERRT' | 'BESTAETIGUNG'; vorrat?: number }
 
 
 /**
@@ -164,13 +173,35 @@ export async function updateProduct(
   // sonst schaltete „Sichtbar" es danach ohne Sperre ein. Gelesen wird mit dem
   // Hof in der WHERE-Klausel; ein fremdes Produkt ist „nicht gefunden".
   let sperre: string | null = null
+  const jetzt = new Date()
+  // Ob die Kennzeichnung mit diesem Speichern neu bestätigt wird (E10a).
+  // Nur dann gilt bestaetigtAm = jetzt; sonst bleibt der alte Zeitpunkt.
+  let neuBestaetigt = false
   if (istFuttermittel(v.category)) {
     const bisher = await prisma.product.findFirst({
       where: { id: productId, farmId: farm.id },
-      select: { category: true, verpackung: true },
+      include: { futter: true },
     })
     if (!bisher) return { error: 'Produkt nicht gefunden.' }
     if (!istFuttermittel(bisher.category)) return { error: FUTTER_NUR_UEBER_FORMULAR }
+    // Pflicht-Bestätigung (E10a, Nr. 23): Jede inhaltliche Änderung verlangt
+    // den Haken neu; nur Preis, Vorrat, Sichtbarkeit und Foto nicht
+    // (OHNE_NEUE_BESTAETIGUNG). Verglichen wird, was dieses Speichern schreiben
+    // würde, mit genau diesen Spalten aus der Datenbank — ein neues Feld in
+    // produktDaten zählt damit von selbst mit.
+    if (futter) {
+      const neuProdukt: Record<string, unknown> = produktDaten(v)
+      const neuKennzeichnung: Record<string, unknown> = futterDaten(futter, jetzt)
+      const noetig = brauchtNeueBestaetigung(
+        {
+          produkt: spaltenAus(bisher, Object.keys(neuProdukt)),
+          kennzeichnung: bisher.futter ? spaltenAus(bisher.futter, Object.keys(neuKennzeichnung)) : null,
+        },
+        { produkt: neuProdukt, kennzeichnung: neuKennzeichnung }
+      )
+      if (noetig && !futter.bestaetigt) return { error: FUTTER_BESTAETIGUNG_NEU, code: 'BESTAETIGUNG' }
+      neuBestaetigt = futter.bestaetigt
+    }
     // Sperre je Gebinde: Soll das Futtermittel in den Shop, entscheidet die
     // Verpackung aus der Datenbank mit dem Stand des Hofs von JETZT. Gesperrt
     // wird trotzdem gespeichert — nur als Entwurf.
@@ -192,11 +223,15 @@ export async function updateProduct(
     }
 
     if (futter) {
-      const daten = futterDaten(futter, new Date())
+      const daten = futterDaten(futter, jetzt)
+      // Nicht neu bestätigt (nur Preis/Vorrat geändert): Die Angaben sind
+      // dieselben, der alte Zeitpunkt der Bestätigung bleibt. Angelegt wird
+      // ohne gespeicherte Kennzeichnung nie ohne Haken (siehe oben).
+      const { bestaetigtAm, ...ohneZeitpunkt } = daten
       await tx.futterKennzeichnung.upsert({
         where: { productId },
         create: { productId, ...daten },
-        update: daten,
+        update: neuBestaetigt ? { ...ohneZeitpunkt, bestaetigtAm } : ohneZeitpunkt,
       })
     } else {
       // deleteMany statt delete: wirft nicht, wenn es nie eine Kennzeichnung gab.
@@ -210,6 +245,12 @@ export async function updateProduct(
 
   revalidate(farm.slug)
   return sperre ? { ok: true, hinweis: `Als Entwurf gespeichert. ${sperre}.` } : { ok: true }
+}
+
+/** Genau diese Spalten aus einer gelesenen Zeile — als Vergleichsstand für brauchtNeueBestaetigung. */
+function spaltenAus(zeile: object, spalten: readonly string[]): Record<string, unknown> {
+  const werte = zeile as Record<string, unknown>
+  return Object.fromEntries(spalten.map((s) => [s, werte[s]]))
 }
 
 /**

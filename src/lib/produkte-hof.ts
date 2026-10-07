@@ -12,7 +12,7 @@
  */
 import { produktZustand } from '@/lib/produkt-sichtbarkeit'
 import { formatMenge, formatZahl, mitAnzahl } from '@/lib/format'
-import { istFuttermittel, type ProductCategoryValue } from '@/lib/taxonomie'
+import { KATEGORIE_LABEL, istFuttermittel, type ProductCategoryValue } from '@/lib/taxonomie'
 import { abholungText, type NaechstesFenster } from '@/lib/heute'
 import { PRODUKTE_FILTER_WERTE, type ProdukteAnsicht, type ProdukteFilter } from '@/schemas/produkte-filter'
 import type { NeuBereich } from '@/schemas/url-auftrag'
@@ -62,7 +62,7 @@ export const PRODUKTE_FILTER_LABEL: Record<ProdukteFilter, string> = {
   alle: 'Alle',
   lebensmittel: 'Lebensmittel',
   futter: 'Futtermittel',
-  brennmaterial: 'Brennmaterial',
+  brennmaterial: KATEGORIE_LABEL.BRENNHOLZ,
   entwuerfe: 'Entwürfe',
 }
 
