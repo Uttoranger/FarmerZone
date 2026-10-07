@@ -45,8 +45,8 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 26 | Auswertung und Region nach T1 (#200) | fertig | `nacht/2026-10-06/22c-auswertung-region` | #200 | 21 (#199) | Entwurf aufgehoben; Teilen-Karte nur Besuche; Slug `region` frei | 07.10.2026 |
 | 27 | Konto und Geld, klein | fertig | `nacht/2026-10-07/27-konto-geld` | #204 | main | Neuer Ablauf nach „Konto erstellen" (Postfach-Hinweis, Anmelden über /login); B3 nur bei fremdem Passwort | 07.10.2026 |
 | 28 | Oberfläche und Wortwahl | fertig | `nacht/2026-10-07/28-oberflaeche` | #205 | main | Fehler-Rot hell deutlich dunkler (O1, auch auf Tönung ≥ 4,5:1) | 07.10.2026 |
-| 29 | „Betrieb" bei Futter kaufen | läuft | `nacht/2026-10-07/29-futter-betrieb` | | 26 (#200) | | 07.10.2026 |
-| 30 | Teilen-Momente und Abschalten | offen | | | | | |
+| 29 | „Betrieb" bei Futter kaufen | fertig | `nacht/2026-10-07/29-futter-betrieb` | #206 | 26 (#200) | Vorbelegung nur über die Adresse; Server prüft weiter | 07.10.2026 |
+| 30 | Teilen-Momente und Abschalten | läuft | `nacht/2026-10-07/30-teilen-momente` | | 25 (#199) | | 07.10.2026 |
 | 31 | Tab-Wechsel beschleunigen | offen | | | | | |
 | 32 | Altlasten Lauf 5 | offen | | | | | |
 | 33 | Datenschutzerklärung | offen | | | | | |
