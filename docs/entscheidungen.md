@@ -15,6 +15,8 @@ Präfixe:
 - **K** – Konditionen
 - **B** – Bezahlung und Gebühren
 - **S** – Sicherheitsanforderung aus Umsetzungsprompt Abschnitt 8
+- **Z** – Zahlungswege der Höfe
+- **T** – Teilen
 - **O** – offen
 
 ---
@@ -80,19 +82,31 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 
 ### E10 · Registrierungs-Fälle LFBIS / BAES (02.10.2026)
 - **Entscheidung:** Eigene Ernte, lose oder in Ballen, braucht nur LFBIS. Abgepacktes Heimtierfutter mit Etikett, Zukauf und Mischen brauchen eine aktive BAES-Meldung.
-- **Begründung:** Fachliche Klärung des Menschen. Die Texte lässt er vor dem Livegang gegenlesen (Umsetzungsprompt Abschnitt 10).
+- **Begründung:** Fachliche Klärung des Menschen. Die Texte lässt er vor dem Livegang gegenlesen (Umsetzungsprompt Abschnitt 10). — **Das Gegenlesen vor dem Livegang ist ersetzt durch E10a (07.10.2026).** Die Fälle selbst gelten weiter.
 - **Dateien:** `Product.verpackung` (#169); Sperre je Gebinde mit Nr. 20 (Gate 6).
+
+### E10a · Futter geht ohne vorheriges Gegenlesen live (07.10.2026)
+- **Entscheidung (uttoranger, Freigabe Lauf 6):** Futter geht live, ohne dass die Erklärtexte vorher gegengelesen sind. Ausgleich:
+  - Pflicht-Bestätigung des Hofs im Futter-Formular (Web und Handy), serverseitig erzwungen, Zeitpunkt in `FutterKennzeichnung.bestaetigtAm`; jede inhaltliche Änderung verlangt eine neue Bestätigung. Wortlaut: „Ich bestätige, dass meine Angaben zu Registrierung, Kennzeichnung und Verpackung richtig und vollständig sind. Für die Richtigkeit bin ich verantwortlich. Falsche Angaben können nach dem Futtermittelgesetz bestraft werden."
+  - Erklärtexte als Orientierung gekennzeichnet: „Zur Orientierung, keine Rechtsberatung. Im Zweifel bei der Bezirkshauptmannschaft, beim BAES oder bei der Landwirtschaftskammer nachfragen." mit Link zur BAES-Seite für Futtermittelbetriebe.
+  - Verantwortungs-Hinweis für Kunden bei jedem Futter: „Die Angaben zu Registrierung und Kennzeichnung stammen vom Hof. Der Hof ist für ihre Richtigkeit verantwortlich; FarmerZone vermittelt nur und prüft die Angaben nicht." Bei „nur an Betriebe" zusätzlich: „Als Betrieb bist du für den bestimmungsgemäßen Einsatz verantwortlich."
+  - Der Mensch legt die Texte parallel der Landwirtschaftskammer vor.
+- **Begründung:** Das Gegenlesen hätte den Livegang von Futter auf unbestimmte Zeit blockiert; die Verantwortung liegt ohnehin beim Hof (E9).
+- **Verhältnis zu anderen Einträgen:** ersetzt in E10 nur den Satz zum Gegenlesen; E9 (keine Prüfung durch die Plattform) bleibt.
+- **Dateien:** Futter-Formular, `src/lib/futter-registrierung.ts`, Produktdetail, Warenkorb; Umsetzung Nr. 23 (freigabe.md §10).
+- **Futter-Entscheidungen aus Bericht 20 (07.10.2026, uttoranger):** (a) Misch- und Ergänzungsfutter brauchen immer BAES; (b) Futtermittel entstehen nur über das Futter-Formular; (c) Altbestand ohne Verpackung wird nie gesperrt; (d) die Verpackung je Größe ist Selbstauskunft des Hofs.
 
 ### E11 · Brennmaterial mit Raummeter und Schüttraummeter (02.10.2026)
 - **Entscheidung:** Kategorie „Brennmaterial" mit den Arten Brennholz, Anzündholz und Hackschnitzel. Einheiten sind Raummeter und Schüttraummeter; M3 bleibt für Altdaten. Nur Abholung.
 - **Begründung:** Holz war als Kategorie gewünscht und wurde um Hackschnitzel erweitert. M3 ist für Holz mehrdeutig.
 - **Dateien:** `prisma/schema.prisma` (`ProductUnit`, `ProductSubcategory`, `BrennmaterialAngaben`, #169); Formular mit Nr. 20 (Gate 6).
+- **Label (07.10.2026, uttoranger):** Die Kategorie heißt in der Oberfläche „Brennmaterial" statt „Brennholz" (Nr. 23).
 
 ### E12 · Beiträge als Reiter in Mein Hof (02.10.2026)
 - **Entscheidung:** Mein Hof hat die Reiter Hofseite | Beiträge. `/status` bleibt als Route und wird von dort verlinkt.
 - **Begründung:** Mein-Hof-Umbau „mach es so".
 - **Dateien:** `src/app/(hof)/farm-page/`, `src/components/mein-hof/` (#180).
-- **Stand:** Nr. 22e (07.10.2026): Der Reiter „Beiträge" bietet alle Handlungen von `/status` (Deaktivieren, Löschen, Als Vorlage, WhatsApp fortsetzen); `/status` bleibt als Route und leitet auf den Reiter um (freigabe.md §9 „22e" — Lesart „bleibt und leitet um" zur Bestätigung, Bericht 22e (a)), `/status/new` und WhatsApp fortsetzen liegen in der HofShell (Bericht 22e).
+- **Stand:** Nr. 22e (07.10.2026): Der Reiter „Beiträge" bietet alle Handlungen von `/status` (Deaktivieren, Löschen, Als Vorlage, WhatsApp fortsetzen); `/status` bleibt als Route und leitet auf den Reiter um (freigabe.md §9 „22e"; Lesart „bleibt und leitet um" am 07.10.2026 von uttoranger bestätigt), `/status/new` und WhatsApp fortsetzen liegen in der HofShell (Bericht 22e).
 
 ### E13 · „Verkauf eintragen" bleibt im Neu-Menü (02.10.2026)
 - **Entscheidung:** Die bestehende Funktion bleibt erhalten und steht im Neu-Menü. Das Formular wird nur ins neue Design gezogen.
@@ -162,6 +176,34 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Begründung:** Der Spalten-Default `@default(4.9)` blieb in #167 stehen, weil dafür keine Migration freigegeben war. Bestehende Höfe behielten ihren gespeicherten Satz.
 - **Dateien:** keine Code-Änderung, nur Daten (Admin, Servicegebühr je Hof).
 
+### F6 · Entscheidungen zum Morgenbericht Lauf 5 (07.10.2026)
+- **Quelle:** uttoranger, Freigabe Lauf 6 (freigabe.md §10), zu Morgenbericht Lauf 5 §4.
+
+| Punkt | Entscheidung | Umsetzung |
+|---|---|---|
+| 19c Vollerstattung | bekommt dieselben Merkmale (`metadata`) wie die Teilerstattung | Nr. 27 |
+| 21 (b) Bestellung „über einen Link" | entfällt (T1) | Nr. 25 |
+| 22c Servicegebühren dieses Monats | Zählregel wie `/admin/finanzen` (`topfVonBestellung`) | Nr. 26 |
+| 22b Direktverkauf senkt Vorrat | Backlog | – |
+| 19b Registrierung | immer dieselbe Antwort, dazu eine Mail an das bestehende Konto | Nr. 27 |
+| Futter (a)–(d) | siehe E10a | Nr. 23 |
+| E11 Label | „Brennmaterial" statt „Brennholz" | Nr. 23 |
+| Teilen (a) | die Hofseite teilt das Teilen-Bild | bleibt (#199) |
+| Teilen (c) | Teilen über das Handy-Menü zählt als „link" | bleibt (#199) |
+| Teilen (d) | Teilen legt keinen Beitrag an | bleibt (#199) |
+| Teilen (g) | `@types/qrcode` freigegeben | bleibt (#199) |
+| 19a `/konditionen` | stündlich neu bauen | Nr. 28 |
+| 22a Kunden | eine Sortierwahl für alle Breiten; Markenfarben wie vorgeschlagen | bleibt (#194) |
+| 22b Verkäufe | „Dieses Jahr (für die Umsatzgrenze)" statt „Gesamt"; „Verkauf eintragen" auch am Handy oben | Nr. 28 |
+| 22d Rechenbeispiel | mit den Sätzen des eigenen Hofs | bleibt (#196) |
+| 22e Beiträge | `/status` bleibt und leitet um; Kurznummer in „Meine Meldungen"; „N per E-Mail" zurück in die Beitragszeile | Nr. 28 |
+| 22c Futter kaufen | Käuferart „Betrieb" vorbelegen | Nr. 29 |
+| 22c Teilen-Karte | Euro-Betrag weglassen (T1) | Nr. 26 |
+
+### F7 · Mockup-Abweichungen aus Lauf 5 (07.10.2026)
+- **Entscheidung (uttoranger, Freigabe Lauf 6):** Alle Mockup-Abweichungen aus den Berichten zu #192–#201 sind freigegeben.
+- **Dateien:** `docs/nachtlauf/berichte/19a.md` … `22f.md`.
+
 ---
 
 ## K – Konditionen
@@ -191,6 +233,48 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Dateien:** `src/lib/servicegebuehr.ts` (`berechneServicegebuehr` bekommt die Zahlungsart), `src/lib/konditionen.ts` (Konstante neben `TARIFE_AB`), Checkout-Server, Kasse/Warenkorb, Artikel fehlt, Admin-Finanzen, Mail „Vor-Ort-Bestellung bestätigt", `/konditionen`, `/fuer-hoefe`, Startseiten-Beispiel. Umsetzung 19a (freigabe.md §9).
 - **Stand:** umgesetzt in 19a (06.10.2026); maßgeblich ist der Bestellzeitpunkt, Annahmen im Bericht 19a.
 
+Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert (Freigabe Lauf 6, „ältere offene Punkte").
+
+### B2 · „Nicht im Shop" statt „Entwurf" (07.10.2026)
+- **Entscheidung (uttoranger):** Produkte, die nicht im Shop stehen, heißen in der Oberfläche „Nicht im Shop" statt „Entwurf".
+- **Dateien:** Produktliste, Marken, Formulare; Umsetzung Nr. 28.
+
+### B3 · Name und Telefon aus fremden Alt-Registrierungen (07.10.2026)
+- **Entscheidung (uttoranger):** Beim ersten Code-Login werden Name und Telefon geleert, die aus einer fremden Alt-Registrierung am Konto stehen (offener Punkt aus Bericht 17a, „Bitte entscheiden (c)").
+- **Dateien:** Code-Anmeldung; Umsetzung Nr. 27.
+
+### B4 · Ablehnungssperre für den Altbestand gestrichen (07.10.2026)
+- **Entscheidung (uttoranger):** Die Ablehnungssperre für den Altbestand (Bericht 17a) entfällt.
+- **Dateien:** Umsetzung Nr. 27.
+
+---
+
+## Z – Zahlungswege der Höfe
+
+### Z1 · Stripe-Pflicht für Höfe (07.10.2026)
+- **Entscheidung (uttoranger, Freigabe Lauf 6):**
+  - Jeder Hof muss Stripe einrichten, bevor er freigeschaltet wird bzw. online geht. Eine Wahl „nur bar" gibt es nicht mehr.
+  - Bereits freigeschaltete Höfe ohne Stripe bleiben online und werden aufgefordert, die Online-Zahlung einzurichten. Keine Abschaltung.
+  - Die technische Notbremse bleibt: Sperrt Stripe ein Konto nachträglich, verkauft der Hof vorübergehend nur bar („Online-Zahlung pausiert").
+  - Die Lesart aus 22f (#201, „Sperre nur bei Online-Wunsch, Bar-Höfe freischaltbar") ist verworfen.
+- **Begründung:** Kundinnen sollen bei jedem Hof mit Karte, Apple Pay oder EPS zahlen können.
+- **Verhältnis zu anderen Einträgen:** ersetzt die Fachregel „Online-Zahlung ist ein Plus, kein Muss" (DEVELOPMENT.md, `src/lib/hof-einstellungen.ts`); Barzahlung durch Kundinnen bleibt möglich (B1 unverändert).
+- **Dateien:** `src/lib/admin-hoefe.ts` (`freischaltSperre`), `src/server/actions/admin.ts`, Einstellungen „Zahlung", Einrichten, Heute, `/fuer-hoefe`, `/konditionen`, Registrieren (Texte aus `src/lib/konditionen.ts`); Umsetzung Nr. 24.
+
+---
+
+## T – Teilen
+
+### T1 · Teilen ohne Browser-Speicher (07.10.2026)
+- **Entscheidung (uttoranger, Freigabe Lauf 6):**
+  - Für den Teilen-Kanal wird nichts im Browser gespeichert: kein sessionStorage, kein localStorage, kein Cookie.
+  - Gezählt werden nur Besuche über `?k=`, serverseitig.
+  - Bestellungen werden keinem Kanal zugeordnet; `Order.teilenKanal` bleibt ungenutzt (Spalte bleibt, Expand/Contract).
+  - Farbwerte im Teilen-Bild sind eine Ausnahme vom Token-Gebot (Satori kennt keine CSS-Variablen), zentral in `TEILEN_BILD_FARBE`.
+- **Begründung:** Speicherzugriff auf dem Endgerät (§ 165 Abs. 3 TKG) ohne Einwilligung vermeiden; die Bestellzuordnung ist den Speicher nicht wert.
+- **Verhältnis zu anderen Einträgen:** erledigt Bericht 21 (b) und (e) sowie den Euro-Betrag der Teilen-Karte (22c).
+- **Dateien:** `src/lib/teilen-herkunft.ts` und Aufrufer, Checkout, Teilen-Fenster-Texte, `src/components/teilen/teilen-bild-grafik.tsx`; Umsetzung Nr. 25 und 26.
+
 ---
 
 ## S – Freigegebene Sicherheitsanforderungen
@@ -211,8 +295,17 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 
 | # | Thema | Stand |
 |---|---|---|
-| O1 | Fehler-Token | Fehlertext erreicht im hellen Theme 4,22:1 statt 4,5:1. Bis dahin zeigen die Seiten Fehler als orange Hinweiskarte bzw. orangen Text (`text-status-offen`). |
+| O1 | Fehler-Token | **Entschieden 07.10.2026 (uttoranger):** Die Fehler-Farbe bekommt einen Kontrast von mindestens 4,5:1 in beiden Themes (Nr. 28). Bisher: Fehlertext 4,22:1 im hellen Theme, deshalb orange Hinweiskarte bzw. `text-status-offen`. |
 | O2 | Bearbeiten am Handy (#180) | Unter der Checkliste in Mein Hof steht weiter der Editor mit Stiften; das Mockup zeigt nur „Vorschau ansehen". Entfällt er, braucht es einen eigenen Auftrag. |
-| O3 | S11 Double-Opt-in | Statusmeldungen und Newsletter haben nur ein einfaches Opt-in. Dazu gehört die Frage, ob „Nochmal bestellen" in der Abholbereit-Mail Werbung ist. |
-| O4 | AGB / Nutzungsbedingungen | Werden extern erstellt. Bis dahin gibt es beim Registrieren keinen Zustimmungs-Haken. |
-| O5 | Rückruf anfordern | Schema `RueckrufAnfrage` ist nicht freigegeben. Ersatz: „E-Mail schreiben". |
+| O3 | S11 Double-Opt-in | **Entschieden 07.10.2026 (uttoranger):** Double-Opt-in vor dem ersten Werbeversand — im Backlog, nicht in Lauf 6. Dazu gehört die Frage, ob „Nochmal bestellen" in der Abholbereit-Mail Werbung ist. |
+| O4 | AGB / Nutzungsbedingungen | Werden separat erstellt — **NICHT anfassen** (bestätigt 07.10.2026). Bis dahin gibt es beim Registrieren keinen Zustimmungs-Haken. |
+| O5 | Rückruf anfordern | **Entfällt (07.10.2026, uttoranger).** Schema `RueckrufAnfrage` wird nicht gebaut. Ersatz bleibt „E-Mail schreiben". |
+
+---
+
+## Backlog (entschieden, aber nicht im aktuellen Lauf)
+
+Stand 07.10.2026 (uttoranger, Freigabe Lauf 6):
+- 22b: Ein Direktverkauf mit Produkt senkt den Vorrat.
+- S11: Double-Opt-in vor dem ersten Werbeversand (O3).
+- Rate-Limit über einen gemeinsamen Speicher statt je Instanz — braucht einen neuen Dienst, die Entscheidung dafür ist offen.
