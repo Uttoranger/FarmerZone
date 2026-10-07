@@ -3,6 +3,7 @@ import type Stripe from 'stripe'
 import * as Sentry from '@sentry/nextjs'
 import type { Prisma } from '@prisma/client'
 import { enforceRateLimit } from '@/lib/rate-limit'
+import { bremseCheckout } from '@/server/bremse-datenbank'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
 import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
@@ -377,6 +378,12 @@ export async function POST(request: NextRequest) {
   // steht erst nach dem Parsen fest, deshalb hier und nicht ganz oben.
   const sitzungsLimit = enforceRateLimit('checkout', request, data.sessionId)
   if (sitzungsLimit) return sitzungsLimit
+
+  // Zweite Stufe über alle Instanzen (Register R1): erst nach der Bremse im
+  // Speicher, vor jedem Schreiben. Ist die Datenbank dafür nicht erreichbar,
+  // lässt sie durch — eine gültige Bestellung scheitert nie an der Bremse.
+  const ueberAlleInstanzen = await bremseCheckout(request, data.sessionId)
+  if (ueberAlleInstanzen) return ueberAlleInstanzen
 
   // 0a. FRIST GILT BEIM LESEN: Verwaiste Bestellungen dieses Hofs geben ihre
   //     Ware frei, bevor Bestand gelesen oder eine Wiederholung beantwortet
