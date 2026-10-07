@@ -175,8 +175,32 @@ describe('publishStatusPost — Zod', () => {
     expect(sp.create).not.toHaveBeenCalled()
   })
 
+  // Nachbesserung Runde 1: Felder ohne eigene Meldung gaben den englischen
+  // Zod-Text weiter („Invalid input: expected boolean …").
+  it.each([
+    ['Haken kein Wahrheitswert', { sendEmail: 'ja' }],
+    ['Produktliste kein Array', { linkedProductIds: 'p1' }],
+    ['Produkt-ID leer', { linkedProductIds: [''] }],
+    ['zu viele Produkte', { linkedProductIds: Array.from({ length: 501 }, (_, i) => `p${i}`) }],
+    ['Bild-Adresse keine Zeichenkette', { photoUrl: 42 }],
+    ['Bild-Adresse zu lang', { photoUrl: 'x'.repeat(2049) }],
+    ['Titel keine Zeichenkette', { title: 42 }],
+    ['Text keine Zeichenkette', { body: null }],
+  ])('%s → deutscher Satz, kein Zod-Text', async (_fall, mehr) => {
+    const antwort = await publishStatusPost(beitrag(mehr) as never)
+    expect(antwort.error).toBeTruthy()
+    expect(antwort.error).not.toMatch(/Invalid|expected|received|Too (big|small)/i)
+    expect(antwort.error).toMatch(/[äöüß]|Beitrag|Titel|Text/)
+  })
+
+  it('Gegenprobe: Titel, Text und Anlass behalten ihren eigenen Satz', async () => {
+    expect((await publishStatusPost(beitrag({ title: ' ' }) as never)).error).toBe('Gib deinem Beitrag einen Titel.')
+    expect((await publishStatusPost(beitrag({ body: '' }) as never)).error).toBe('Schreib ein paar Worte zu deinem Beitrag.')
+    expect((await publishStatusPost(beitrag({ anlass: 'X' }) as never)).error).toBe('Wähle einen Anlass für deinen Beitrag.')
+  })
+
   it('kein Objekt → Satz statt Absturz', async () => {
-    expect((await publishStatusPost(null as never)).error).toBeTruthy()
+    expect((await publishStatusPost(null as never)).error).toBe('Da stimmt etwas mit dem Beitrag nicht. Lade die Seite neu und versuch es noch einmal.')
   })
 })
 

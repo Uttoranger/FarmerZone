@@ -25,12 +25,12 @@ export const STATUS_POST_ANLASS_VALUES = ['FRESH_PRODUCT', 'NEW_SEASON', 'PROMOT
 
 export const beitragVeroeffentlichenSchema = z.object({
   title: z
-    .string()
+    .string({ message: 'Gib deinem Beitrag einen Titel.' })
     .trim()
     .min(1, 'Gib deinem Beitrag einen Titel.')
     .max(BEITRAG_TITEL_MAX, `Der Titel darf höchstens ${BEITRAG_TITEL_MAX} Zeichen haben — bitte kürzen.`),
   body: z
-    .string()
+    .string({ message: 'Schreib ein paar Worte zu deinem Beitrag.' })
     .trim()
     .min(1, 'Schreib ein paar Worte zu deinem Beitrag.')
     .max(BEITRAG_TEXT_MAX, `Der Text darf höchstens ${BEITRAG_TEXT_MAX} Zeichen haben — bitte kürzen.`),
@@ -41,6 +41,13 @@ export const beitragVeroeffentlichenSchema = z.object({
   sendEmail: z.boolean(),
   sendWhatsApp: z.boolean(),
 })
+
+/**
+ * Felder mit eigenem Satz für die Oberfläche. Alle anderen (Bild-Adresse,
+ * Produktliste, Haken) füllt das Formular selbst; trifft dort etwas nicht zu,
+ * hat jemand die Anfrage gebaut — dann ein allgemeiner Satz statt Zod-Text.
+ */
+export const BEITRAG_FELDER_MIT_SATZ: readonly string[] = ['title', 'body', 'anlass']
 
 export type BeitragVeroeffentlichenEingabe = z.input<typeof beitragVeroeffentlichenSchema>
 

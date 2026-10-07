@@ -10,6 +10,7 @@ import * as Sentry from '@sentry/nextjs'
 import { APP_URL } from '@/lib/umgebung-server'
 import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
 import {
+  BEITRAG_FELDER_MIT_SATZ,
   beitragIdSchema,
   beitragVeroeffentlichenSchema,
   whatsAppGezaehltSchema,
@@ -62,7 +63,13 @@ export async function publishStatusPost(
   eingabe: BeitragVeroeffentlichenEingabe
 ): Promise<{ postId?: string; emailCount?: number; whatsAppCount?: number; error?: string }> {
   const geprueft = beitragVeroeffentlichenSchema.safeParse(eingabe)
-  if (!geprueft.success) return { error: geprueft.error.issues[0]?.message ?? EINGABE_UNGUELTIG }
+  if (!geprueft.success) {
+    // Nur Titel, Text und Anlass tragen eigene deutsche Sätze; sonst stünde
+    // englischer Zod-Text im Hinweis (Nr. 32, Runde 1).
+    const erste = geprueft.error.issues[0]
+    const feld = erste?.path[0]
+    return { error: erste && typeof feld === 'string' && BEITRAG_FELDER_MIT_SATZ.includes(feld) ? erste.message : EINGABE_UNGUELTIG }
+  }
   const data = geprueft.data
 
   try {
