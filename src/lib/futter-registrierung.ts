@@ -273,7 +273,7 @@ export function registrierungsSaetze(hof: HofRegistrierung): RegistrierungsSatz[
  */
 export function speichernHinweis(sofort: number, wartend: number): string | null {
   if (wartend === 0) return null
-  if (sofort === 0) return 'Noch keine Größe kann online gehen. Sie warten als Entwurf, bis deine Registrierung eingetragen ist.'
+  if (sofort === 0) return 'Noch keine Größe kann online gehen. Sie bleiben nicht im Shop, bis deine Registrierung eingetragen ist.'
   const vorne = sofort === 1 ? '1 Größe ist sofort sichtbar.' : `${sofort} Größen sind sofort sichtbar.`
   const hinten = wartend === 1 ? '1 Größe folgt nach der Meldung.' : `${wartend} Größen folgen nach der Meldung.`
   return `${vorne} ${hinten}`

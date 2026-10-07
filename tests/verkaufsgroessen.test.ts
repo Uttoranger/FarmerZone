@@ -154,6 +154,6 @@ describe('Formular-Helfer', () => {
   it('gespeichertText sagt, was online ist und was wartet', () => {
     expect(gespeichertText('Heu', 4, 0)).toBe('Heu: 4 Größen online.')
     expect(gespeichertText('Heu', 2, 2)).toBe('Heu: 2 Größen online, 2 Größen warten auf deine Registrierung.')
-    expect(gespeichertText('Heu', 0, 1)).toBe('Heu: als Entwurf gespeichert – 1 Größe wartet auf deine Registrierung.')
+    expect(gespeichertText('Heu', 0, 1)).toBe('Heu: gespeichert, aber nicht im Shop – 1 Größe wartet auf deine Registrierung.')
   })
 })

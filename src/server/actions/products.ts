@@ -244,7 +244,7 @@ export async function updateProduct(
   if (typeof ergebnis === 'object') return { error: vorratGeaendertText(ergebnis.geaendert), code: 'GEAENDERT', vorrat: ergebnis.geaendert }
 
   revalidate(farm.slug)
-  return sperre ? { ok: true, hinweis: `Als Entwurf gespeichert. ${sperre}.` } : { ok: true }
+  return sperre ? { ok: true, hinweis: `Gespeichert, aber nicht im Shop. ${sperre}.` } : { ok: true }
 }
 
 /** Genau diese Spalten aus einer gelesenen Zeile — als Vergleichsstand für brauchtNeueBestaetigung. */

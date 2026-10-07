@@ -215,6 +215,6 @@ export function gespeichertText(name: string, online: number, wartend: number): 
   const groessen = (n: number) => (n === 1 ? '1 Größe' : `${n} Größen`)
   const warten = wartend === 1 ? '1 Größe wartet' : `${wartend} Größen warten`
   if (wartend === 0) return `${name.trim()}: ${groessen(online)} online.`
-  if (online === 0) return `${name.trim()}: als Entwurf gespeichert – ${warten} auf deine Registrierung.`
+  if (online === 0) return `${name.trim()}: gespeichert, aber nicht im Shop – ${warten} auf deine Registrierung.`
   return `${name.trim()}: ${groessen(online)} online, ${warten} auf deine Registrierung.`
 }

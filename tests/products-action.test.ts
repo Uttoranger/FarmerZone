@@ -256,7 +256,7 @@ describe('updateProduct — Sperre je Gebinde (S7, Nr. 20)', () => {
 
     const ergebnis = await updateProduct('p_sack', { ...heu, unit: 'STUECK', isAvailable: true } as never)
 
-    expect(ergebnis).toEqual({ ok: true, hinweis: `Als Entwurf gespeichert. ${SPERR_GRUND.heimtierfutter}.` })
+    expect(ergebnis).toEqual({ ok: true, hinweis: `Gespeichert, aber nicht im Shop. ${SPERR_GRUND.heimtierfutter}.` })
     const aufruf = tx.product.updateMany.mock.calls[0][0] as { where: unknown; data: Record<string, unknown> }
     expect(aufruf.where).toEqual({ id: 'p_sack', farmId: 'farm_1' })
     expect(aufruf.data.isAvailable).toBe(false)
