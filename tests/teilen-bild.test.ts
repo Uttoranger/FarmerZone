@@ -346,6 +346,71 @@ describe('GET /[farmSlug]/opengraph-image — Zwischenspeicher, Bremse, Fehler (
     expect(kontext).toEqual({ tags: { bereich: 'teilen-bild', farmId: 'farm-1', slug: 'hof-test' } })
   })
 
+  it('scheitert das Zeichnen erst beim Lesen des Bilds, kommt trotzdem 503 statt 200 mit kaputtem Body (Runde 2)', async () => {
+    // So verhält sich next/og wirklich: Der Konstruktor baut nur einen Stream,
+    // Satori/resvg laufen beim Lesen.
+    vi.mocked(ImageResponse).mockImplementationOnce(function () {
+      const kaputt = new ReadableStream({
+        start(controller) {
+          controller.error(new Error('Satori kaputt beim Zeichnen'))
+        },
+      })
+      return new Response(kaputt, { headers: { 'content-type': 'image/png' } })
+    })
+    const res = await aufruf(`?v=${aktuelleVersion()}`)
+    expect(res.status).toBe(503)
+    expect(res.headers.get('cache-control')).toBe('no-store')
+    expect(vi.mocked(Sentry.captureException)).toHaveBeenCalled()
+  })
+
+  describe('Auswahl p gegen die volle Auswahl des Teilen-Fensters (Runde 2)', () => {
+    const roh = (id: string, name: string, stock = 3) => ({
+      id,
+      name,
+      price: new Decimal('2.00'),
+      isAvailable: true,
+      stock,
+      familieId: null,
+      category: 'GEMUESE',
+      verpackung: null,
+    })
+    const VIELE = {
+      ...ROH,
+      products: [roh('a', 'Karotten'), roh('b', 'Erdäpfel'), roh('c', 'Zwiebeln'), roh('d', 'Kürbis'), roh('leer', 'Lauch', 0)],
+    }
+    const imBild = () => {
+      const element = vi.mocked(ImageResponse).mock.calls.at(-1)?.[0] as { props: { daten: { produkte: { id: string }[] } } }
+      return element.props.daten.produkte.map((e) => e.id)
+    }
+
+    beforeEach(() => {
+      findFirst.mockResolvedValue(VIELE as never)
+    })
+
+    it('das vierte Produkt lässt sich wählen und steht im Bild', async () => {
+      const res = await aufruf('?p=d')
+      expect(res.status).toBe(200)
+      expect(imBild()).toEqual(['d'])
+    })
+
+    it('ausverkauft gewählt: fällt weg, es gilt die Standardauswahl', async () => {
+      await aufruf('?p=leer')
+      expect(imBild()).not.toContain('leer')
+      expect(imBild()).toHaveLength(3)
+    })
+
+    it('fremde Kennung: fällt weg, es gilt die Standardauswahl', async () => {
+      await aufruf('?p=fremd-1')
+      expect(imBild()).not.toContain('fremd-1')
+      expect(imBild()).toHaveLength(3)
+    })
+
+    it('gemischt: nur die erlaubten Kennungen bleiben', async () => {
+      await aufruf('?p=leer,d,fremd-1')
+      expect(imBild()).toEqual(['d'])
+    })
+  })
+
   it('gebremst wie jede öffentliche Route (in Produktion)', async () => {
     vi.stubEnv('NODE_ENV', 'production')
     try {

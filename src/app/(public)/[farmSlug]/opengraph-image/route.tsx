@@ -63,16 +63,18 @@ export async function GET(
   }
   if (!quelle) return new Response('Nicht gefunden', { status: 404, headers: { 'Cache-Control': 'no-store' } })
 
-  // p nur mit erlaubten Werten: Kennungen, die als Eintrag ins Bild dürften.
-  // Bleibt keine übrig, gilt die Standardauswahl.
-  const erlaubt = new Set(bildProdukte(quelle.produkte, quelle.hof, null).map((e) => e.id))
-  const auswahl = suche.p?.filter((id) => erlaubt.has(id)) ?? []
+  // p nur mit erlaubten Werten: `bildProdukte` behält nur kaufbare Einträge
+  // dieses Hofs, deren Kennung gewählt ist — ausverkauft, gesperrt oder fremd
+  // fällt weg. Bewusst gegen die volle Auswahl des Teilen-Fensters geprüft,
+  // nicht gegen die ersten drei der Standardauswahl (sonst ginge das vierte
+  // Produkt verloren). Bleibt nichts übrig, gilt die Standardauswahl.
+  const auswahl = suche.p && bildProdukte(quelle.produkte, quelle.hof, suche.p).length > 0 ? suche.p : null
 
   const daten = teilenBildDaten({
     hof: quelle.hof,
     produkte: quelle.produkte,
     slots: quelle.slots,
-    auswahl: auswahl.length > 0 ? auswahl : null,
+    auswahl,
     adresse: hofAdresse(APP_URL, quelle.hof.slug).anzeige,
     jetzt: new Date(),
   })
@@ -83,9 +85,15 @@ export async function GET(
   const versioniert = request.nextUrl.searchParams.get('v') === teilenBildVersion(daten)
 
   try {
-    return new ImageResponse(<TeilenBildGrafik daten={daten} format={suche.format} qr={qr} />, {
-      ...TEILEN_BILD_MASSE[suche.format],
+    // Satori und resvg zeichnen erst beim Lesen des Bodys (der Konstruktor von
+    // ImageResponse baut nur einen Stream). Deshalb hier ganz lesen: Scheitert
+    // das Zeichnen, landet der Fehler in diesem catch — sonst ginge eine 200
+    // mit kaputtem Body und langem Cache-Header hinaus.
+    const bild = new ImageResponse(<TeilenBildGrafik daten={daten} format={suche.format} qr={qr} />, TEILEN_BILD_MASSE[suche.format])
+    const inhalt = await bild.arrayBuffer()
+    return new Response(inhalt, {
       headers: {
+        'Content-Type': 'image/png',
         'Cache-Control': versioniert
           ? 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400'
           : 'public, max-age=60, s-maxage=60',
