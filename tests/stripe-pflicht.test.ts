@@ -55,49 +55,91 @@ function alleDateien(ordner: string): string[] {
 
 /**
  * Ein Vorkommen von `acceptsOnline`, das kein Lesen ist: nicht hinter einem
- * Punkt (`farm.acceptsOnline`) und nicht `acceptsOnline: true` (Auswahl in
- * `select` oder das Setzen auf true). Trifft `acceptsOnline: false`,
+ * Punkt (`farm.acceptsOnline`), nicht `acceptsOnline: true` (Auswahl in
+ * `select` oder das Setzen auf true) und keine Typangabe
+ * (`acceptsOnline: boolean`). Trifft `acceptsOnline: false`,
  * `acceptsOnline: eingabe.x`, die Kurzform `{ acceptsOnline }` und Ähnliches.
  */
-const SCHREIBT_ACCEPTS_ONLINE = /(?<![.\w])acceptsOnline\b(?!\s*:\s*true\b)/
+const SCHREIBT_ACCEPTS_ONLINE = /(?<![.\w])acceptsOnline\b(?!\s*:\s*(?:true|boolean)\b)/
 
-/** Wege, auf denen ein Hof etwas schreiben kann: Server Actions und API-Routen. */
+/**
+ * Für src/lib (rein, ohne Datenbank): zusätzlich erlaubt ist das
+ * unveränderte Weiterreichen eines gelesenen Werts
+ * (`acceptsOnline: hof.acceptsOnline`), sonst dasselbe.
+ */
+const SETZT_ACCEPTS_ONLINE_IN_LIB = /(?<![.\w])acceptsOnline\b(?!\s*:\s*(?:true\b|boolean\b|[\w.]+\.acceptsOnline\b))/
+
+/** Wege, auf denen ein Hof etwas schreiben kann: alles unter src/server, API-Routen und jede Datei mit 'use server'. */
 function serverWege(): string[] {
   return alleDateien('src').filter((d) => {
-    if (d.startsWith(join('src', 'app', 'api'))) return true
+    if (d.startsWith(join('src', 'server') + '/') || d.startsWith(join('src', 'app', 'api'))) return true
     return /^\s*['"]use server['"]/m.test(lies(d))
   })
 }
 
+/** Formulare der Einstellungen: dort säße eine Wahl „nur bar". */
+const FORMULAR_ORDNER = ['src/components/hof-einstellungen', 'src/app/(hof)/settings']
+
 describe('Register Z1 — der Server lehnt acceptsOnline = false ab', () => {
-  it('keine Server Action und keine API-Route schreibt acceptsOnline anders als true', () => {
+  it('nichts unter src/server, keine Server Action und keine API-Route setzt acceptsOnline anders als true', () => {
     const wege = serverWege()
-    // Die Wache muss die Actions und den Checkout tatsächlich sehen.
+    // Die Wache muss Actions, Abfragen und den Checkout tatsächlich sehen.
     expect(wege).toContain(join('src', 'server', 'actions', 'farm.ts'))
+    expect(wege).toContain(join('src', 'server', 'actions', 'stripe-connect.ts'))
+    expect(wege).toContain(join('src', 'server', 'queries', 'farm.ts'))
     expect(wege).toContain(join('src', 'app', 'api', 'checkout', 'route.ts'))
     for (const datei of wege) {
       expect(ohneKommentare(lies(datei)), relative(WURZEL, datei)).not.toMatch(SCHREIBT_ACCEPTS_ONLINE)
     }
   })
 
-  it('Gegenprobe: die Suche erkennt jedes Schreiben und lässt das Lesen durch', () => {
-    for (const text of [
+  it('auch src/lib setzt acceptsOnline nirgends auf etwas anderes als true', () => {
+    const dateien = alleDateien('src/lib')
+    expect(dateien).toContain(join('src', 'lib', 'hofseite-fortschritt.ts'))
+    for (const datei of dateien) {
+      expect(ohneKommentare(lies(datei)), datei).not.toMatch(SETZT_ACCEPTS_ONLINE_IN_LIB)
+    }
+  })
+
+  it('Gegenprobe: die Suchen erkennen jedes Schreiben und lassen Lesen, Typen und Weiterreichen durch', () => {
+    const schreiben = [
       'data: { acceptsOnline: false }',
       'data: { acceptsOnline: v.data.online }',
       'data: { acceptsOnline, acceptsOnsite }',
       'acceptsOnline:false',
-    ]) {
+    ]
+    for (const text of schreiben) {
       expect(text).toMatch(SCHREIBT_ACCEPTS_ONLINE)
+      expect(text).toMatch(SETZT_ACCEPTS_ONLINE_IN_LIB)
     }
-    for (const text of ['select: { acceptsOnline: true }', 'if (!farm.acceptsOnline) return', 'hof.acceptsOnline && x']) {
+    for (const text of ['select: { acceptsOnline: true }', 'if (!farm.acceptsOnline) return', 'hof.acceptsOnline && x', 'acceptsOnline: boolean']) {
       expect(text).not.toMatch(SCHREIBT_ACCEPTS_ONLINE)
+      expect(text).not.toMatch(SETZT_ACCEPTS_ONLINE_IN_LIB)
+    }
+    // Weiterreichen ist nur in src/lib erlaubt, im Server nicht.
+    expect('acceptsOnline: hof.acceptsOnline').toMatch(SCHREIBT_ACCEPTS_ONLINE)
+    expect('acceptsOnline: hof.acceptsOnline').not.toMatch(SETZT_ACCEPTS_ONLINE_IN_LIB)
+  })
+
+  it('Schemas kennen kein Feld acceptsOnline, die Formulare der Einstellungen setzen es nie anders als true', () => {
+    for (const datei of alleDateien('src/schemas')) {
+      expect(ohneKommentare(lies(datei)), datei).not.toMatch(/acceptsOnline/)
+    }
+    const formulare = FORMULAR_ORDNER.flatMap((o) => alleDateien(o))
+    // Die Wache muss die Zahlungs-Seite und die Übersicht tatsächlich sehen.
+    expect(formulare).toContain(join('src', 'app', '(hof)', 'settings', 'payments', 'page.tsx'))
+    expect(formulare).toContain(join('src', 'app', '(hof)', 'settings', 'payments', 'payments-actions.tsx'))
+    expect(formulare).toContain(join('src', 'components', 'hof-einstellungen', 'einstellungen-uebersicht.tsx'))
+    for (const datei of formulare) {
+      const text = ohneKommentare(lies(datei))
+      expect(text, datei).not.toMatch(SCHREIBT_ACCEPTS_ONLINE)
+      expect(text, datei).not.toMatch(/name=["']acceptsOnline/)
     }
   })
 
-  it('Schemas und Formulare kennen kein Feld für die Wahl „nur bar"', () => {
-    for (const datei of [...alleDateien('src/schemas'), ...alleDateien('src/components/settings')]) {
-      expect(lies(datei), datei).not.toMatch(/acceptsOnline/)
-    }
+  it('Gegenprobe: die Formular-Wache schlägt bei einem Feld oder einer Wahl an', () => {
+    expect('<input type="checkbox" name="acceptsOnline" />').toMatch(/name=["']acceptsOnline/)
+    expect('speichere({ acceptsOnline: wert })').toMatch(SCHREIBT_ACCEPTS_ONLINE)
   })
 })
 

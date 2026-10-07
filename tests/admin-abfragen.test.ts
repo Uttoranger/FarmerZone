@@ -46,6 +46,7 @@ function dbZeile(ueber: Record<string, unknown> = {}) {
     serviceFeeMinCents: 50,
     serviceFeeActiveFrom: null,
     stripeAccountReady: false,
+    acceptsOnline: true,
     isPaused: false,
     betriebsnummer: '  ',
     sepaMandatAm: null,
@@ -60,18 +61,18 @@ describe('getAdminFarms — Nr. 22f', () => {
     farmFindMany.mockResolvedValue([dbZeile()] as never)
     await getAdminFarms()
     const select = (farmFindMany.mock.calls[0][0] as { select: Record<string, unknown> }).select
-    expect(select).toMatchObject({ stripeAccountReady: true, isPaused: true, betriebsnummer: true, sepaMandatAm: true })
+    expect(select).toMatchObject({ stripeAccountReady: true, acceptsOnline: true, isPaused: true, betriebsnummer: true, sepaMandatAm: true })
     expect(select.stripeAccountId).toBeUndefined()
   })
 
   it('macht daraus Wahrheitswerte und eine angezeigte Nummer', async () => {
     farmFindMany.mockResolvedValue([
       dbZeile(),
-      dbZeile({ id: 'farm_2', stripeAccountReady: true, isPaused: true, betriebsnummer: ' 1234567 ', sepaMandatAm: new Date() }),
+      dbZeile({ id: 'farm_2', stripeAccountReady: true, acceptsOnline: false, isPaused: true, betriebsnummer: ' 1234567 ', sepaMandatAm: new Date() }),
     ] as never)
     const [a, b] = await getAdminFarms()
-    expect(a).toMatchObject({ stripeBereit: false, isPaused: false, betriebsnummer: null, sepaErteilt: false })
-    expect(b).toMatchObject({ stripeBereit: true, isPaused: true, betriebsnummer: '1234567', sepaErteilt: true })
+    expect(a).toMatchObject({ stripeBereit: false, onlineAn: true, isPaused: false, betriebsnummer: null, sepaErteilt: false })
+    expect(b).toMatchObject({ stripeBereit: true, onlineAn: false, isPaused: true, betriebsnummer: '1234567', sepaErteilt: true })
   })
 })
 

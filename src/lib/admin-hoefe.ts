@@ -22,6 +22,14 @@ import { einstellungKurz, kalendertagInWien } from '@/lib/servicegebuehr'
 export const FREISCHALTUNG_STRIPE_OFFEN_TEXT = 'Stripe fehlt – Freischalten erst nach Stripe möglich.'
 
 /**
+ * Das bedingte Schreiben der Freischaltung traf nichts: Zwischen Lesen und
+ * Schreiben ist Stripe weggefallen, oder jemand hat den Hof schon
+ * freigeschaltet bzw. gelöscht.
+ */
+export const FREISCHALTUNG_GEAENDERT_TEXT =
+  'Der Hof hat sich gerade geändert (Stripe nicht mehr fertig oder schon freigeschaltet). Lade die Seite neu und versuch es noch einmal.'
+
+/**
  * Warum ein wartender Hof (noch) nicht freigeschaltet werden kann — null, wenn
  * nichts im Weg steht. EINE Regel für Liste und Action (approveFarmAction).
  *
@@ -48,7 +56,20 @@ export function stripeFehlt(hof: { approvedAt: Date | null; archivedAt: Date | n
   return hof.approvedAt !== null && hof.archivedAt === null && !hof.stripeBereit
 }
 
-export type HofStatusId = 'wartet' | 'stillgelegt' | 'pausiert' | 'stripe-fehlt' | 'online'
+/** Das Kennzeichen für Bestandshöfe mit Stripe, aber `acceptsOnline` false — neutral, kein Mangel des Kontos. */
+export const ONLINE_AUS_TEXT = 'Online-Zahlung aus'
+
+/**
+ * Freigeschaltet, Stripe fertig, aber Online steht aus der Zeit vor Z1 noch
+ * auf aus: Der Checkout bietet online dann nicht an. Der Hof schaltet es in
+ * den Zahlungs-Einstellungen selbst ein; der Betreiber findet ihn über den
+ * eigenen Filter.
+ */
+export function onlineAus(hof: { approvedAt: Date | null; archivedAt: Date | null; stripeBereit: boolean; onlineAn: boolean }): boolean {
+  return hof.approvedAt !== null && hof.archivedAt === null && hof.stripeBereit && !hof.onlineAn
+}
+
+export type HofStatusId = 'wartet' | 'stillgelegt' | 'pausiert' | 'stripe-fehlt' | 'online-aus' | 'online'
 
 /** Der Ton einer Marke — dieselben Werte wie StatusBadge (components/ui/status-badge.tsx). */
 export type HofTon = 'offen' | 'fertig' | 'neutral'
@@ -68,16 +89,18 @@ export function hofStatus(hof: {
   archivedAt: Date | null
   isPaused: boolean
   stripeBereit: boolean
+  onlineAn: boolean
 }): HofStatus {
   if (hof.archivedAt) return { id: 'stillgelegt', text: 'Stillgelegt', ton: 'neutral' }
   if (hof.approvedAt === null) return { id: 'wartet', text: 'Wartet', ton: 'offen' }
   if (hof.isPaused) return { id: 'pausiert', text: 'Pausiert', ton: 'neutral' }
   if (!hof.stripeBereit) return { id: 'stripe-fehlt', text: STRIPE_FEHLT_TEXT, ton: 'offen' }
+  if (!hof.onlineAn) return { id: 'online-aus', text: ONLINE_AUS_TEXT, ton: 'neutral' }
   return { id: 'online', text: 'Online', ton: 'fertig' }
 }
 
 /** Die Filter über der Hofliste (Mockup: Alle · Online · Pausiert · Ohne Zahlung → „Stripe fehlt"), dazu Stillgelegt. */
-export const HOF_FILTER_WERTE = ['alle', 'online', 'pausiert', 'stripe-fehlt', 'stillgelegt'] as const
+export const HOF_FILTER_WERTE = ['alle', 'online', 'pausiert', 'stripe-fehlt', 'online-aus', 'stillgelegt'] as const
 export type HofFilter = (typeof HOF_FILTER_WERTE)[number]
 
 export const HOF_FILTER_LABEL: Record<HofFilter, string> = {
@@ -85,21 +108,23 @@ export const HOF_FILTER_LABEL: Record<HofFilter, string> = {
   online: 'Online',
   pausiert: 'Pausiert',
   'stripe-fehlt': STRIPE_FEHLT_TEXT,
+  'online-aus': ONLINE_AUS_TEXT,
   stillgelegt: 'Stillgelegt',
 }
 
-const FILTER_STATUS: Record<Exclude<HofFilter, 'alle' | 'stripe-fehlt'>, HofStatusId> = {
+const FILTER_STATUS: Record<Exclude<HofFilter, 'alle' | 'stripe-fehlt' | 'online-aus'>, HofStatusId> = {
   online: 'online',
   pausiert: 'pausiert',
   stillgelegt: 'stillgelegt',
 }
 
-type FilterHof = { name: string; slug: string; status: HofStatus; stripeFehlt: boolean }
+type FilterHof = { name: string; slug: string; status: HofStatus; stripeFehlt: boolean; onlineAus: boolean }
 
 /** Passt ein Hof zu einem Filter? „Stripe fehlt" fragt das Kennzeichen, die übrigen den Status. */
 function passtZumFilter(hof: FilterHof, filter: HofFilter): boolean {
   if (filter === 'alle') return true
   if (filter === 'stripe-fehlt') return hof.stripeFehlt
+  if (filter === 'online-aus') return hof.onlineAus
   return hof.status.id === FILTER_STATUS[filter]
 }
 
@@ -124,7 +149,7 @@ export function filtereHoefe<T extends FilterHof>(hoefe: readonly T[], ansicht: 
 
 /** Die Zahl hinter jedem Filter-Chip — ohne Suche, wie in der Kundenliste. */
 export function zaehleHofFilter(hoefe: readonly FilterHof[]): Record<HofFilter, number> {
-  const zahlen: Record<HofFilter, number> = { alle: 0, online: 0, pausiert: 0, 'stripe-fehlt': 0, stillgelegt: 0 }
+  const zahlen: Record<HofFilter, number> = { alle: 0, online: 0, pausiert: 0, 'stripe-fehlt': 0, 'online-aus': 0, stillgelegt: 0 }
   for (const h of hoefe) {
     if (h.status.id === 'wartet') continue
     for (const f of HOF_FILTER_WERTE) {
@@ -205,6 +230,8 @@ export type HofRohdaten = {
   monat: { bestellungen: number; gebuehrOnlineCents: number; gebuehrBarCents: number; gebuehrEntfallenCents: number }
   monatBezeichnung: string
   stripeBereit: boolean
+  /** Farm.acceptsOnline — false nur bei Bestandshöfen aus der Zeit vor Register Z1. */
+  onlineAn: boolean
   isPaused: boolean
   betriebsnummer: string | null
   sepaErteilt: boolean
@@ -232,6 +259,9 @@ export type AdminHofZeile = {
   stripeBereit: boolean
   /** Freigeschaltet, aber ohne fertiges Stripe-Konto (stripeFehlt, Z1). */
   stripeFehlt: boolean
+  onlineAn: boolean
+  /** Freigeschaltet, Stripe fertig, Online aber aus (onlineAus). */
+  onlineAus: boolean
   sepaErteilt: boolean
   nummer: string | null
   istDeutsch: boolean
@@ -268,6 +298,8 @@ export function adminHofZeile(
     gruendungsplatz: hof.approvedAt && !hof.archivedAt ? platz : null,
     stripeBereit: hof.stripeBereit,
     stripeFehlt: stripeFehlt(hof),
+    onlineAn: hof.onlineAn,
+    onlineAus: onlineAus(hof),
     sepaErteilt: hof.sepaErteilt,
     nummer: nummerAnzeige(hof.betriebsnummer),
     istDeutsch: hof.land === 'DE',

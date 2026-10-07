@@ -27,6 +27,7 @@ import {
   nummerAnzeige,
   registriertText,
   satzKurz,
+  onlineAus,
   stripeFehlt,
   zaehleHofFilter,
   type HofRohdaten,
@@ -55,6 +56,7 @@ function roh(ueber: Partial<HofRohdaten> = {}): HofRohdaten {
     monat: { bestellungen: 4, gebuehrOnlineCents: 120, gebuehrBarCents: 0, gebuehrEntfallenCents: 0 },
     monatBezeichnung: 'Oktober 2026',
     stripeBereit: true,
+    onlineAn: true,
     isPaused: false,
     betriebsnummer: '1234567',
     sepaErteilt: false,
@@ -81,7 +83,7 @@ describe('freischaltSperre', () => {
 })
 
 describe('hofStatus', () => {
-  const basis = { approvedAt: JETZT, archivedAt: null, isPaused: false, stripeBereit: true }
+  const basis = { approvedAt: JETZT, archivedAt: null, isPaused: false, stripeBereit: true, onlineAn: true }
   it('stillgelegt sticht alles', () => {
     expect(hofStatus({ ...basis, archivedAt: JETZT, approvedAt: null, isPaused: true }).id).toBe('stillgelegt')
   })
@@ -94,6 +96,11 @@ describe('hofStatus', () => {
   it('freigeschaltet ohne Stripe: „Stripe fehlt" (orange, kein Rot), sonst online (grün)', () => {
     expect(hofStatus({ ...basis, stripeBereit: false })).toEqual({ id: 'stripe-fehlt', text: 'Stripe fehlt', ton: 'offen' })
     expect(hofStatus(basis)).toEqual({ id: 'online', text: 'Online', ton: 'fertig' })
+  })
+  it('Stripe fertig, Online aber aus (Bestandshof vor Z1): „Online-Zahlung aus" (neutral)', () => {
+    expect(hofStatus({ ...basis, onlineAn: false })).toEqual({ id: 'online-aus', text: 'Online-Zahlung aus', ton: 'neutral' })
+    // Ohne Stripe sticht „Stripe fehlt".
+    expect(hofStatus({ ...basis, onlineAn: false, stripeBereit: false }).id).toBe('stripe-fehlt')
   })
   it('es gibt kein „Nur bar" mehr', () => {
     expect(JSON.stringify(HOF_FILTER_LABEL)).not.toMatch(/bar/i)
@@ -112,12 +119,24 @@ describe('stripeFehlt', () => {
   })
 })
 
+describe('onlineAus', () => {
+  const basis = { approvedAt: JETZT, archivedAt: null, stripeBereit: true, onlineAn: false }
+  it('nur freigeschaltete, nicht stillgelegte Höfe mit Stripe, aber Online aus', () => {
+    expect(onlineAus(basis)).toBe(true)
+    expect(onlineAus({ ...basis, onlineAn: true })).toBe(false)
+    expect(onlineAus({ ...basis, stripeBereit: false })).toBe(false)
+    expect(onlineAus({ ...basis, approvedAt: null })).toBe(false)
+    expect(onlineAus({ ...basis, archivedAt: JETZT })).toBe(false)
+  })
+})
+
 describe('Filter und Suche', () => {
-  const zeile = (name: string, id: ReturnType<typeof hofStatus>['id'], stripeFehlt = false) => ({
+  const zeile = (name: string, id: ReturnType<typeof hofStatus>['id'], stripeFehlt = false, onlineAus = false) => ({
     name,
     slug: name.toLowerCase(),
     status: { id, text: '', ton: 'neutral' as const },
     stripeFehlt,
+    onlineAus,
   })
   const hoefe = [
     zeile('Lindenhof', 'online'),
@@ -125,6 +144,7 @@ describe('Filter und Suche', () => {
     zeile('Waldhof', 'stripe-fehlt', true),
     // Pausiert und ohne Stripe: Der Filter „Stripe fehlt" findet ihn trotzdem.
     zeile('Wiesenhof', 'pausiert', true),
+    zeile('Moorhof', 'online-aus', false, true),
     zeile('Neuhof', 'wartet'),
     zeile('Althof', 'stillgelegt'),
   ]
@@ -138,7 +158,10 @@ describe('Filter und Suche', () => {
     expect(filtereHoefe(hoefe, { filter: 'pausiert', suche: 'linden' })).toEqual([])
   })
   it('zählt je Filter ohne die wartenden', () => {
-    expect(zaehleHofFilter(hoefe)).toEqual({ alle: 5, online: 1, pausiert: 2, 'stripe-fehlt': 2, stillgelegt: 1 })
+    expect(zaehleHofFilter(hoefe)).toEqual({ alle: 6, online: 1, pausiert: 2, 'stripe-fehlt': 2, 'online-aus': 1, stillgelegt: 1 })
+  })
+  it('„Online-Zahlung aus" findet der Betreiber über einen eigenen Filter', () => {
+    expect(filtereHoefe(hoefe, { filter: 'online-aus', suche: '' }).map((h) => h.name)).toEqual(['Moorhof'])
   })
   it('die Adresse lässt Standardwerte weg', () => {
     expect(hoefeAdresse({ filter: 'alle', suche: '  ' })).toBe('/admin')
@@ -195,6 +218,12 @@ describe('adminHofZeile', () => {
     expect(zeile.stripeFehlt).toBe(true)
     expect(zeile.status.text).toBe('Stripe fehlt')
     expect(zeile.sperre).toBeNull()
+  })
+
+  it('ein freigeschalteter Hof mit Stripe, aber Online aus: Kennzeichen „Online-Zahlung aus", kein „Stripe fehlt"', () => {
+    const zeile = adminHofZeile(roh({ onlineAn: false }), { gruendungsplatz: null, maxPlaetze: 12 }, JETZT)
+    expect(zeile).toMatchObject({ onlineAus: true, stripeFehlt: false, onlineAn: false })
+    expect(zeile.status.text).toBe('Online-Zahlung aus')
   })
 
   it('ein wartender Hof ohne Stripe: Sperre mit Grund, kein Platz', () => {

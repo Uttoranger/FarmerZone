@@ -10,6 +10,7 @@ import { EinstellungenKopf } from '@/components/hof-einstellungen/einstellungen-
 import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
 import { cn } from '@/lib/utils'
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
+import { ONLINE_AUS_SATZ, ONLINE_AUS_TITEL, zahlungHinweis } from '@/lib/hof-einstellungen'
 import { PaymentsActions } from './payments-actions'
 
 export const metadata: Metadata = { title: 'Zahlung — FarmerZone' }
@@ -22,6 +23,7 @@ async function getFarmPaymentData() {
     select: {
       stripeAccountId: true,
       stripeAccountReady: true,
+      acceptsOnline: true,
     },
   })
 }
@@ -36,7 +38,9 @@ async function getFarmPaymentData() {
  * Register Z1: Stripe ist Pflicht, eine Wahl „nur bar" gibt es nicht. Ohne
  * fertiges Konto steht oben der Hinweis „Online-Zahlung einrichten" — auch
  * für einen Bestandshof mit acceptsOnline false (nur der Hinweis, keine
- * Datenänderung). Barzahlung durch Kundinnen bleibt (B1).
+ * Datenänderung). Barzahlung durch Kundinnen bleibt (B1). Ist Stripe fertig,
+ * Online aber aus, schaltet der Hof es hier selbst ein (schalteOnlineZahlungEin).
+ * Oben steht immer höchstens EINE Karte (zahlungHinweis).
  */
 export default async function PaymentsPage({
   searchParams,
@@ -46,30 +50,36 @@ export default async function PaymentsPage({
   const { stripe: stripeStatus } = await searchParams
   const farm = await getFarmPaymentData()
   if (!farm) return null
+  const hinweis = zahlungHinweis({ rueckmeldung: stripeStatus, stripeBereit: farm.stripeAccountReady, onlineAn: farm.acceptsOnline })
 
   return (
     <div className={UNTERSEITE_RAHMEN}>
       <EinstellungenKopf titel="Zahlung" satz="Verwalte, wie Kunden bezahlen können." />
 
       <div className="flex flex-col gap-4">
-        {stripeStatus === 'success' && (
+        {hinweis === 'geschafft' && (
           <Hinweiskarte ton="gruen" symbol={CircleCheck}>
             Dein Stripe-Konto ist eingerichtet. Online-Zahlung ist jetzt aktiv.
           </Hinweiskarte>
         )}
-        {stripeStatus === 'pending' && (
+        {hinweis === 'fortsetzen' && (
           <Hinweiskarte ton="orange" symbol={Clock}>
             Die Einrichtung bei Stripe ist noch nicht ganz fertig. Bitte setz sie fort.
           </Hinweiskarte>
         )}
-        {!farm.stripeAccountReady && stripeStatus !== 'success' && (
+        {hinweis === 'fehler' && (
+          <Hinweiskarte ton="orange" symbol={CircleAlert}>
+            Wir konnten den Stand bei Stripe gerade nicht prüfen. Versuch es bitte noch einmal.
+          </Hinweiskarte>
+        )}
+        {hinweis === 'einrichten' && (
           <Hinweiskarte ton="orange" symbol={CircleAlert} titel={ONLINE_ZAHLUNG_EINRICHTEN_TITEL}>
             {ONLINE_ZAHLUNG_EINRICHTEN_SATZ}
           </Hinweiskarte>
         )}
-        {stripeStatus === 'error' && (
-          <Hinweiskarte ton="orange" symbol={CircleAlert}>
-            Wir konnten den Stand bei Stripe gerade nicht prüfen. Versuch es bitte noch einmal.
+        {hinweis === 'einschalten' && (
+          <Hinweiskarte ton="orange" symbol={CircleAlert} titel={ONLINE_AUS_TITEL}>
+            {ONLINE_AUS_SATZ}
           </Hinweiskarte>
         )}
 
@@ -83,10 +93,10 @@ export default async function PaymentsPage({
                 Kunden zahlen online mit Karte und weiteren Zahlungsarten.
               </p>
             </div>
-            <StripeStatus accountId={farm.stripeAccountId} ready={farm.stripeAccountReady} />
+            <StripeStatus accountId={farm.stripeAccountId} ready={farm.stripeAccountReady} onlineAn={farm.acceptsOnline} />
           </div>
           <div className="mt-4">
-            <PaymentsActions hasAccount={!!farm.stripeAccountId} isReady={farm.stripeAccountReady} />
+            <PaymentsActions hasAccount={!!farm.stripeAccountId} isReady={farm.stripeAccountReady} onlineAn={farm.acceptsOnline} />
           </div>
         </section>
 
@@ -108,9 +118,11 @@ export default async function PaymentsPage({
   )
 }
 
-function StripeStatus({ accountId, ready }: { accountId: string | null; ready: boolean }): React.JSX.Element {
+function StripeStatus({ accountId, ready, onlineAn }: { accountId: string | null; ready: boolean; onlineAn: boolean }): React.JSX.Element {
   // Orange statt grau: Ohne Stripe fehlt etwas, das jeder Hof braucht (Z1).
   if (!accountId) return <StatusBadge status="offen">Noch nicht verbunden</StatusBadge>
   if (!ready) return <StatusBadge status="offen">Einrichtung nicht fertig</StatusBadge>
+  // Stripe fertig, Online aber aus (Bestandshof vor Z1): nicht „aktiv" nennen — der Checkout bietet online dann nicht an.
+  if (!onlineAn) return <StatusBadge status="offen">Online-Zahlung aus</StatusBadge>
   return <StatusBadge status="fertig">Verbunden und aktiv</StatusBadge>
 }

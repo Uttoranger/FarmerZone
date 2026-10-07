@@ -56,6 +56,7 @@ function hof(ueber: Partial<HofRohdaten>, platz: number | null = null): AdminHof
     monat: { bestellungen: 0, gebuehrOnlineCents: 0, gebuehrBarCents: 0, gebuehrEntfallenCents: 0 },
     monatBezeichnung: 'Oktober 2026',
     stripeBereit: false,
+    onlineAn: true,
     isPaused: false,
     betriebsnummer: null,
     sepaErteilt: false,
@@ -94,6 +95,17 @@ describe('Höfe und Freischaltung', () => {
     expect(html.match(/>Stripe fehlt</g)?.length).toBeGreaterThanOrEqual(3)
     expect(html).toContain('filter=stripe-fehlt')
     expect(html).not.toMatch(/nur bar/i)
+  })
+
+  it('Stripe fertig, Online aus: Marke und Filter „Online-Zahlung aus" — der Betreiber findet den Hof', () => {
+    const html = render([hof({ name: 'Moorhof', approvedAt: JETZT, stripeBereit: true, onlineAn: false }, 1)])
+    expect(html.match(/>Online-Zahlung aus</g)?.length).toBeGreaterThanOrEqual(3)
+    expect(html).toContain('filter=online-aus')
+  })
+
+  it('Gegenprobe: ohne solche Höfe kein Filter „Online-Zahlung aus"', () => {
+    const html = render([hof({ name: 'Sonnhof', approvedAt: JETZT, stripeBereit: true }, 1)])
+    expect(html).not.toContain('filter=online-aus')
   })
 
   it('Gegenprobe: mit Stripe steht kein „Stripe fehlt" in der Liste', () => {

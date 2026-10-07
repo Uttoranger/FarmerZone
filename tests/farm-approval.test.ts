@@ -34,7 +34,7 @@ vi.mock('@/server/abholfenster', async (original) => ({
 }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    farm: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
+    farm: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     product: { findUnique: vi.fn(), update: vi.fn(), createMany: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
     stockReservation: { aggregate: vi.fn(), deleteMany: vi.fn(), upsert: vi.fn(), findMany: vi.fn() },
     user: { findUnique: vi.fn(), update: vi.fn() },
@@ -64,7 +64,7 @@ import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
 import { EMAIL_BESTAETIGUNG_STICHTAG, FREISCHALTUNG_EMAIL_OFFEN_TEXT } from '@/lib/email-bestaetigung'
 import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
-import { FREISCHALTUNG_STRIPE_OFFEN_TEXT } from '@/lib/admin-hoefe'
+import { FREISCHALTUNG_GEAENDERT_TEXT, FREISCHALTUNG_STRIPE_OFFEN_TEXT } from '@/lib/admin-hoefe'
 
 /**
  * Seit dem Checkout-Sprint prüft POST /api/checkout die Reservierungsfrist und
@@ -98,6 +98,7 @@ const signUpEmail = vi.mocked(auth.api.signUpEmail)
 const farmFindUnique = vi.mocked(prisma.farm.findUnique)
 const farmCreate = vi.mocked(prisma.farm.create)
 const farmUpdate = vi.mocked(prisma.farm.update)
+const farmUpdateMany = vi.mocked(prisma.farm.updateMany)
 const productFindUnique = vi.mocked(prisma.product.findUnique)
 const productUpdate = vi.mocked(prisma.product.update)
 const reservationAggregate = vi.mocked(prisma.stockReservation.aggregate)
@@ -199,6 +200,7 @@ beforeEach(() => {
   userUpdate.mockResolvedValue({} as never)
   orderCreate.mockResolvedValue({ id: 'order_1' } as never)
   farmUpdate.mockResolvedValue({} as never)
+  farmUpdateMany.mockResolvedValue({ count: 1 } as never)
   farmCreate.mockResolvedValue({ id: 'farm_neu', slug: 'neuer-hof', name: 'Neuer Hof' } as never)
   getSession.mockResolvedValue({ user: { id: 'user_1', email: 'franz@test.local' } } as never)
 })
@@ -351,8 +353,8 @@ describe('Freigabe-Actions', () => {
     const result = await approveFarmAction('farm_1')
 
     expect(result.error).toBeUndefined()
-    expect(farmUpdate).toHaveBeenCalledTimes(1)
-    const arg = farmUpdate.mock.calls[0][0] as { data: { approvedAt: Date } }
+    expect(farmUpdateMany).toHaveBeenCalledTimes(1)
+    const arg = farmUpdateMany.mock.calls[0][0] as { data: { approvedAt: Date } }
     expect(arg.data.approvedAt).toBeInstanceOf(Date)
   })
 
@@ -394,7 +396,7 @@ describe('Freigabe-Actions', () => {
     const result = await approveFarmAction('farm_1')
 
     expect(result.error).toBeUndefined()
-    expect(farmUpdate).toHaveBeenCalledTimes(1)
+    expect(farmUpdateMany).toHaveBeenCalledTimes(1)
   })
 
   it('schaltet ein neues Konto ohne bestätigte E-Mail NICHT frei — „Hof online stellen" ist gesperrt (S3, 17b)', async () => {
@@ -408,7 +410,7 @@ describe('Freigabe-Actions', () => {
     const result = await approveFarmAction('farm_1')
 
     expect(result.error).toBe(FREISCHALTUNG_EMAIL_OFFEN_TEXT)
-    expect(farmUpdate).not.toHaveBeenCalled()
+    expect(farmUpdateMany).not.toHaveBeenCalled()
     expect(freischaltMail).not.toHaveBeenCalled()
   })
 
@@ -422,7 +424,7 @@ describe('Freigabe-Actions', () => {
     } as never)
 
     expect((await approveFarmAction('farm_1')).error).toBeUndefined()
-    expect(farmUpdate).toHaveBeenCalledTimes(1)
+    expect(farmUpdateMany).toHaveBeenCalledTimes(1)
   })
 
   it('schaltet einen Hof ohne fertiges Stripe-Konto NICHT frei (Register Z1) — keine Mail, nichts geschrieben', async () => {
@@ -438,7 +440,7 @@ describe('Freigabe-Actions', () => {
     const result = await approveFarmAction('farm_1')
 
     expect(result.error).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
-    expect(farmUpdate).not.toHaveBeenCalled()
+    expect(farmUpdateMany).not.toHaveBeenCalled()
     expect(freischaltMail).not.toHaveBeenCalled()
   })
 
@@ -455,7 +457,7 @@ describe('Freigabe-Actions', () => {
     const result = await approveFarmAction('farm_1')
 
     expect(result.error).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
-    expect(farmUpdate).not.toHaveBeenCalled()
+    expect(farmUpdateMany).not.toHaveBeenCalled()
     expect(freischaltMail).not.toHaveBeenCalled()
   })
 
@@ -480,6 +482,48 @@ describe('Freigabe-Actions', () => {
 
     const arg = farmFindUnique.mock.calls[0][0] as { select: Record<string, unknown> }
     expect(arg.select.stripeAccountReady).toBe(true)
+  })
+
+  it('schreibt die Freischaltung bedingt: nur mit fertigem Stripe und noch nicht freigeschaltet (dicht gegen Wettläufe)', async () => {
+    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    farmFindUnique.mockResolvedValue({
+      name: 'Testhof',
+      slug: 'testhof',
+      stripeAccountReady: true,
+      owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
+    } as never)
+
+    await approveFarmAction('farm_1')
+
+    const arg = farmUpdateMany.mock.calls[0][0] as { where: Record<string, unknown> }
+    expect(arg.where).toMatchObject({ id: 'farm_1', stripeAccountReady: true, approvedAt: null })
+    expect(farmUpdate).not.toHaveBeenCalled()
+  })
+
+  it('trifft das bedingte Schreiben nichts (Stripe inzwischen weg oder schon frei), kommt eine Meldung — keine Mail', async () => {
+    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    farmFindUnique.mockResolvedValue({
+      name: 'Testhof',
+      slug: 'testhof',
+      stripeAccountReady: true,
+      owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
+    } as never)
+    farmUpdateMany.mockResolvedValueOnce({ count: 0 } as never)
+
+    const result = await approveFarmAction('farm_1')
+
+    expect(result.error).toBe(FREISCHALTUNG_GEAENDERT_TEXT)
+    expect(freischaltMail).not.toHaveBeenCalled()
+  })
+
+  it('prüft den Admin zuerst — ohne Admin wird nichts gelesen und nichts geschrieben', async () => {
+    userFindUnique.mockResolvedValue({ isAdmin: false } as never)
+
+    const result = await approveFarmAction('farm_1')
+
+    expect(result.error).toBeTruthy()
+    expect(farmFindUnique).not.toHaveBeenCalled()
+    expect(farmUpdateMany).not.toHaveBeenCalled()
   })
 
   it('ohne bestätigte E-Mail UND ohne Stripe nennt die Sperre zuerst die E-Mail — wie die Liste', async () => {

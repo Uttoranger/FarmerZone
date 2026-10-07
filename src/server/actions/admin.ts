@@ -14,7 +14,7 @@ import { servicegebuehrEinstellungSchema } from '@/schemas/servicegebuehr'
 import { wienerMitternacht } from '@/lib/servicegebuehr'
 import { triageEingabeSchema } from '@/schemas/meldung'
 import { bestaetigungOffen } from '@/lib/email-bestaetigung'
-import { freischaltSperre } from '@/lib/admin-hoefe'
+import { FREISCHALTUNG_GEAENDERT_TEXT, freischaltSperre } from '@/lib/admin-hoefe'
 
 function revalidateAll(slug: string) {
   revalidatePath('/admin')
@@ -58,7 +58,15 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
   })
   if (sperre) return { error: sperre }
 
-  await prisma.farm.update({ where: { id: farmId }, data: { approvedAt: new Date() } })
+  // Bedingt schreiben, nicht blind: Die Sperre oben beruht auf einem Lesestand.
+  // Fällt Stripe dazwischen weg (account.updated) oder schaltet ein zweiter
+  // Klick schon frei, trifft das Schreiben nichts — dann keine Mail, sondern
+  // eine Meldung (ARCHITECTURE: der Statuswechsel ist die Sperre).
+  const { count } = await prisma.farm.updateMany({
+    where: { id: farmId, stripeAccountReady: true, approvedAt: null },
+    data: { approvedAt: new Date() },
+  })
+  if (count === 0) return { error: FREISCHALTUNG_GEAENDERT_TEXT }
   revalidateAll(farm.slug)
 
   // Die Zusage an den Hof — NACH dem erfolgreichen Update. Ein Mail-Fehler

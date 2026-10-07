@@ -159,7 +159,8 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
           ? 'Online-Zahlung über Stripe aktiv · bar bei Abholung'
           : // Stripe ist fertig, Online steht aus der Zeit vor Z1 noch auf aus:
             // Der Checkout bietet online dann nicht an — nicht „aktiv" nennen.
-            'Stripe eingerichtet · Online-Zahlung ist noch nicht freigegeben',
+            // Ausweg: der Knopf „Online-Zahlung einschalten" auf der Zahlungs-Seite.
+            'Stripe eingerichtet · Online-Zahlung noch aus – jetzt einschalten',
       ton: d.stripeBereit && d.onlineAn ? 'fertig' : 'offen',
       href: '/settings/payments',
     },
@@ -197,6 +198,34 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
     },
   ]
 }
+
+// ─── Zahlungs-Seite ─────────────────────────────────────────────────────────
+
+/** Welche EINE Hinweiskarte oben auf /settings/payments steht. */
+export type ZahlungHinweisArt = 'geschafft' | 'fortsetzen' | 'fehler' | 'einrichten' | 'einschalten'
+
+/**
+ * Genau eine Karte, nie zwei orange übereinander (Nachbesserung Nr. 24):
+ * Die Rückmeldung von Stripe (`?stripe=`) geht vor, sonst sagt die Karte, was
+ * fehlt — Stripe einrichten (Z1) oder, bei fertigem Konto und Online aus
+ * (Bestandshof vor Z1), Online-Zahlung einschalten. „geschafft" nur, wenn
+ * es stimmt.
+ */
+export function zahlungHinweis(d: {
+  rueckmeldung: string | undefined
+  stripeBereit: boolean
+  onlineAn: boolean
+}): ZahlungHinweisArt | null {
+  if (d.rueckmeldung === 'error') return 'fehler'
+  if (!d.stripeBereit) return d.rueckmeldung === 'pending' ? 'fortsetzen' : 'einrichten'
+  if (!d.onlineAn) return 'einschalten'
+  return d.rueckmeldung === 'success' ? 'geschafft' : null
+}
+
+export const ONLINE_AUS_TITEL = 'Online-Zahlung ist noch aus'
+export const ONLINE_AUS_SATZ =
+  'Dein Stripe-Konto ist fertig, die Online-Zahlung ist für deinen Hof aber noch aus. ' +
+  'Schalte sie ein, damit deine Kundinnen online zahlen können.'
 
 /**
  * Die Zeile „Konditionen und Tarif": ohne gewählten Tarif (heute jeder Hof)

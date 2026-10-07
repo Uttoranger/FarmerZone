@@ -8,6 +8,7 @@ import {
   HOF_FILTER_LABEL,
   HOF_FILTER_WERTE,
   NUMMER_HINWEIS,
+  ONLINE_AUS_TEXT,
   SERVICEGEBUEHR_NUR_NEUE,
   filtereHoefe,
   hoefeAdresse,
@@ -107,7 +108,7 @@ export function HoefeAnsicht({
         </h2>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <FilterChipReihe beschriftung="Höfe filtern" className="min-w-0 lg:flex-1">
-            {HOF_FILTER_WERTE.filter((f) => f !== 'stillgelegt' || zahlen[f] > 0).map((f) => {
+            {HOF_FILTER_WERTE.filter((f) => (f !== 'stillgelegt' && f !== 'online-aus') || zahlen[f] > 0).map((f) => {
               const adresse = hoefeAdresse({ filter: f, suche })
               return (
                 <FilterChip
@@ -206,7 +207,7 @@ function WartenderHof({ hof, onAktion }: { hof: AdminHof; onAktion: (a: HofAktio
   // Was der Hof schon angelegt hat, dann Stripe und SEPA (Mockup: „4 Produkte · Stripe eingerichtet · SEPA erteilt").
   const teile = istOhneInhalt(hof.aktivitaet) ? [AKTIVITAET_LEER] : aktivitaetsTeile(hof.aktivitaet)
   // Ohne Stripe steht der Grund darunter orange (hof.sperre, Register Z1).
-  const zahlung = hof.stripeBereit ? ['Stripe eingerichtet'] : []
+  const zahlung = hof.stripeBereit ? ['Stripe eingerichtet', ...(hof.onlineAn ? [] : [ONLINE_AUS_TEXT])] : []
   const angaben = [...teile, ...zahlung, ...(hof.sepaErteilt ? ['SEPA erteilt'] : [])]
   return (
     <article
