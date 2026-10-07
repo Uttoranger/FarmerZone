@@ -813,7 +813,7 @@ function HofseiteBesitzer({
               <div className="text-[13px] mt-px" style={{ color: isEdit ? 'var(--app-ink-faint)' : '#C9E3CF' }}>
                 {isEdit
                   ? 'Alles mit Stift-Symbol kannst du ändern – Kunden sehen es sofort.'
-                  : 'Bearbeiten-Knöpfe und ausgeblendete Produkte sind unsichtbar.'
+                  : `Bearbeiten-Knöpfe und Produkte, die ${NICHT_IM_SHOP_IM_SATZ} stehen, sind unsichtbar.`
                 }
               </div>
             </div>
