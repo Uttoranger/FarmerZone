@@ -115,8 +115,10 @@ function schickeBestaetigungNachDerAntwort(aboId: string, angefragtAm: Date): vo
  * behalten ihre Zeitpunkte (Nachweis); ihr alter Link greift nicht mehr, weil
  * die Bestätigung schon gesetzt ist.
  */
-export async function loeseOffeneAnfrageAuf(wo: Prisma.CustomerFarmSubscriptionWhereInput): Promise<void> {
-  await prisma.customerFarmSubscription.updateMany({
+export function loeseOffeneAnfrageAuf(wo: Prisma.CustomerFarmSubscriptionWhereInput) {
+  // Ohne await: Der Aufrufer stellt den Schritt in eine $transaction VOR das
+  // Ausschalten (Reihenfolge siehe updateSubscription).
+  return prisma.customerFarmSubscription.updateMany({
     where: { ...wo, emailOptInAngefragtAm: { not: null }, emailOptInBestaetigtAm: null },
     data: { optInEmail: false, emailOptInAngefragtAm: null },
   })

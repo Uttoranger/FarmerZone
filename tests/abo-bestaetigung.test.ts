@@ -76,6 +76,11 @@ describe('emailAnmeldungSchritt', () => {
   it('bestätigt, dann abgemeldet → neu bestätigen', () => {
     expect(emailAnmeldungSchritt({ ...BESTAETIGT, optInEmail: false }, JETZT)).toBe('bestaetigung-schicken')
   })
+
+  it('bestätigt, dann gleich wieder aus (Anfrage jünger als die Pause) → trotzdem neuer Link, nicht gebremst', () => {
+    const jung = { optInEmail: false, emailOptInAngefragtAm: vor(60_000), emailOptInBestaetigtAm: vor(30_000) }
+    expect(emailAnmeldungSchritt(jung, JETZT)).toBe('bestaetigung-schicken')
+  })
 })
 
 describe('wartetAufBestaetigung', () => {
@@ -85,6 +90,11 @@ describe('wartetAufBestaetigung', () => {
 
   it('Link abgelaufen → wartet nicht mehr (Schalter zeigt aus)', () => {
     expect(wartetAufBestaetigung({ ...ANGEFRAGT, emailOptInAngefragtAm: vor(ABO_BESTAETIGUNG_GUELTIG_MS) }, JETZT)).toBe(false)
+  })
+
+  it('bestätigt → aus, Anfrage jung → wartet nicht (Runde 2: die Kundin säße sonst fest)', () => {
+    const ausgeschaltet = { optInEmail: false, emailOptInAngefragtAm: vor(60 * 60 * 1000), emailOptInBestaetigtAm: vor(30 * 60 * 1000) }
+    expect(wartetAufBestaetigung(ausgeschaltet, JETZT)).toBe(false)
   })
 
   it('Bestand und bestätigt warten nie', () => {

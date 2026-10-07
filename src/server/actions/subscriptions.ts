@@ -49,8 +49,9 @@ export async function updateSubscription(
   // Auftrag verlangt den Klick auf den Link für jede neue Anmeldung.
   // Ausschalten wirkt sofort.
   const geprueft = eingabe.data
-  const abo = await prisma.customerFarmSubscription.upsert({
-    where: { customerEmail_farmId: { customerEmail, farmId: geprueft.farmId } },
+  const wo = { customerEmail_farmId: { customerEmail, farmId: geprueft.farmId } }
+  const speichern = prisma.customerFarmSubscription.upsert({
+    where: wo,
     create: {
       customerEmail,
       farmId: geprueft.farmId,
@@ -58,16 +59,25 @@ export async function updateSubscription(
       optInWhatsApp: geprueft.optInWhatsApp,
       customerPhone: null,
     },
+    // Aus setzt optInEmail immer false — auch bei einem bestätigten Abo.
     update: { optInWhatsApp: geprueft.optInWhatsApp, ...(geprueft.optInEmail ? {} : { optInEmail: false }) },
     select: EMAIL_ABO_STAND,
   })
   if (!geprueft.optInEmail) {
-    // Eine offene Anfrage gleich mit auflösen — sonst stünde der Schalter
-    // nach dem Neuladen wieder auf „wartet", und der alte Link bestätigte
-    // weiter (Nachbesserung Runde 1).
-    await loeseOffeneAnfrageAuf({ id: abo.id })
+    // ERST die offene Anfrage auflösen, DANN ausschalten, in einer
+    // Transaktion (Nachbesserung Runde 1/2): Sonst stünde der Schalter nach
+    // dem Neuladen wieder auf „wartet", der alte Link bestätigte weiter — und
+    // eine Bestätigung genau zwischen beiden Schritten ließe das Abo trotz
+    // „aus" bestätigt und an. In dieser Reihenfolge findet eine spätere
+    // Bestätigung ihre Anfrage nicht mehr, eine frühere schaltet das
+    // upsert wieder aus.
+    await prisma.$transaction([
+      loeseOffeneAnfrageAuf({ customerEmail, farmId: geprueft.farmId }),
+      speichern,
+    ])
     return { email: 'aus' }
   }
+  const abo = await speichern
 
   const jetzt = new Date()
   // Wartet die Anmeldung schon auf einen gültigen Link, ist „E-Mail an" nichts
@@ -107,11 +117,14 @@ export async function unsubscribeWithToken(token: string): Promise<ActionResult>
   const wo = { customerEmail: data.email.toLowerCase(), farmId: data.farmId }
   // Eine offene Bestätigungsanfrage gilt mit der Abmeldung als erledigt — ein
   // alter Link meldet danach niemanden wieder an (S11, Nachbesserung Runde 1).
-  await loeseOffeneAnfrageAuf(wo)
-  await prisma.customerFarmSubscription.updateMany({
-    where: wo,
-    data: { optInEmail: false, optInWhatsApp: false },
-  })
+  // Reihenfolge wie beim Ausschalten auf /account: erst auflösen, dann aus.
+  await prisma.$transaction([
+    loeseOffeneAnfrageAuf(wo),
+    prisma.customerFarmSubscription.updateMany({
+      where: wo,
+      data: { optInEmail: false, optInWhatsApp: false },
+    }),
+  ])
 
   return {}
 }

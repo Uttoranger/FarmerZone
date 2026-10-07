@@ -43,16 +43,23 @@ export function werbemailErlaubt(abo: EmailAboStand): boolean {
   return abo.optInEmail && (abo.emailOptInAngefragtAm === null || abo.emailOptInBestaetigtAm !== null)
 }
 
-/** Wartet dieses Abo auf die Bestätigung, und gilt der Link noch? (Anzeige auf /account.) */
+/**
+ * Wartet dieses Abo auf die Bestätigung, und gilt der Link noch? (Anzeige auf
+ * /account.) Nur eine OFFENE Anfrage wartet: Ein bestätigtes, dann
+ * ausgeschaltetes Abo behält seine Zeitpunkte als Nachweis, wartet aber auf
+ * nichts — sein alter Link greift nicht mehr (Nachbesserung Runde 2).
+ */
 export function wartetAufBestaetigung(abo: EmailAboStand, jetzt: Date): boolean {
-  if (werbemailErlaubt(abo) || abo.emailOptInAngefragtAm === null) return false
+  if (werbemailErlaubt(abo) || abo.emailOptInAngefragtAm === null || abo.emailOptInBestaetigtAm !== null) return false
   return jetzt.getTime() - abo.emailOptInAngefragtAm.getTime() < ABO_BESTAETIGUNG_GUELTIG_MS
 }
 
 /**
  * Was eine E-Mail-Anmeldung (Checkout-Haken, Schalter auf /account) auslöst:
  *  - `schon-aktiv`: Bestand oder bestätigt — nichts tun, keine Mail.
- *  - `gebremst`: Vor weniger als der Pause schon ein Link verschickt.
+ *  - `gebremst`: Für eine noch offene Anfrage ging vor weniger als der Pause
+ *    schon ein Link raus. Ein bestätigtes, dann abgemeldetes Abo ist nie
+ *    gebremst — es bekommt eine neue Anfrage, sonst säße die Kundin fest.
  *  - `bestaetigung-schicken`: Neuer Link. Auch nach einer Abmeldung: Wer
  *    sich abgemeldet hat, bestätigt neu — sonst meldete jeder, der die
  *    Adresse kennt, sie im Checkout wieder an.
@@ -64,7 +71,8 @@ export type EmailAnmeldeSchritt = 'schon-aktiv' | 'gebremst' | 'bestaetigung-sch
 export function emailAnmeldungSchritt(abo: EmailAboStand | null, jetzt: Date): EmailAnmeldeSchritt {
   if (abo && werbemailErlaubt(abo)) return 'schon-aktiv'
   const angefragt = abo?.emailOptInAngefragtAm
-  if (angefragt && jetzt.getTime() - angefragt.getTime() < ABO_BESTAETIGUNG_PAUSE_MS) return 'gebremst'
+  const offen = angefragt && abo.emailOptInBestaetigtAm === null
+  if (offen && jetzt.getTime() - angefragt.getTime() < ABO_BESTAETIGUNG_PAUSE_MS) return 'gebremst'
   return 'bestaetigung-schicken'
 }
 

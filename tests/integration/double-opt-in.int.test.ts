@@ -419,6 +419,30 @@ describe('Ausschalten und Abmelden lösen die offene Anfrage auf (Nachbesserung 
     expect(await bestaetigeNeuigkeiten({ token: neuerLink })).toEqual({ ok: true, hofName: 'Hof Test' })
   })
 
+  it('bestätigt → aus → an: neuer Link, erst nach der neuen Bestätigung wieder Mails (Runde 2)', async () => {
+    const hof = await hofMitAnmeldung()
+    const email = `${intKennung('kundin')}@example.com`
+    await bestelle(hof, email, true)
+    const ersterLink = await tokenAusDerMail(email)
+    await bestaetigeNeuigkeiten({ token: ersterLink })
+    await meldeKundinMitCodeAn(email)
+    expect(await updateSubscription(hof.farm.id, false, false)).toEqual({ email: 'aus' })
+    expect((await abo(hof.farm.id, email)).optInEmail).toBe(false)
+    expect(await profilAbos()).toEqual([expect.objectContaining({ optInEmail: false, emailWartet: false })])
+    vi.mocked(sendAboBestaetigung).mockClear()
+
+    // Sofort wieder an — keine Bremse, eine neue Anfrage.
+    expect(await updateSubscription(hof.farm.id, true, false)).toEqual({ email: 'wartet' })
+    const neuerLink = await tokenAusDerMail(email)
+    expect(neuerLink).not.toBe(ersterLink)
+    expect(await abo(hof.farm.id, email)).toMatchObject({ optInEmail: false, emailOptInBestaetigtAm: null })
+    expect(await profilAbos()).toEqual([expect.objectContaining({ optInEmail: false, emailWartet: true })])
+
+    expect(await bestaetigeNeuigkeiten({ token: neuerLink })).toEqual({ ok: true, hofName: 'Hof Test' })
+    expect(await beitragPerMail(hof)).toMatchObject({ emailCount: 1 })
+    expect(empfaengerDerBeitragsmails()).toEqual([email])
+  })
+
   it('der WhatsApp-Schalter löst bei einer wartenden Anmeldung keine zweite Bestätigungsmail aus', async () => {
     const hof = await hofMitAnmeldung()
     const email = `${intKennung('kundin')}@example.com`
