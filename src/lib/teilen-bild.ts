@@ -209,3 +209,11 @@ export function teilenVorschauText(
   const teile = [daten.produkte.map((p) => p.name).join(', '), daten.abholung ?? ''].filter((t) => t !== '')
   return { title: titel, description: teile.length > 0 ? teile.join(' · ') : beschreibung }
 }
+
+/** Wie man beim Hof bezahlt — die Zeile unten auf dem Plakat (Mockup: „Bar oder online bezahlen"). */
+export function plakatBezahlen(hof: { online: boolean; bar: boolean }): string | null {
+  if (hof.online && hof.bar) return 'Bar oder online bezahlen'
+  if (hof.online) return 'Online bezahlen'
+  if (hof.bar) return 'Bar bei der Abholung bezahlen'
+  return null
+}

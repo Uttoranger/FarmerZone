@@ -318,10 +318,11 @@ describe('Freischaltungs-Moment', () => {
     expect(() => merkeFreischaltGesehen(null, 'hof-1')).not.toThrow()
   })
 
-  it('der Moment teilt nur über teileHof — keine neuen Kanäle, kein Plakat vor Gate 7', () => {
+  it('der Moment teilt über teileHof und führt seit Nr. 21 zum QR-Plakat — keine eigenen Kanäle', () => {
     const moment = quelle('src/components/heute/freischalt-moment.tsx')
     expect(moment).toContain('HofTeilenKnopf')
-    expect(moment).not.toMatch(/wa\.me|whatsapp|plakat|qrcode/i)
+    expect(moment).toContain('href={PLAKAT_PFAD}')
+    expect(moment).not.toMatch(/wa\.me|qrcode|navigator\.share/i)
     expect(moment).toContain('Dein Hof ist online!')
     expect(moment).toContain('Später')
   })
