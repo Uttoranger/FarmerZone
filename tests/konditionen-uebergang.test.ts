@@ -179,11 +179,12 @@ describe('Die Seiten zeigen den Satz', () => {
   })
 
   it('Admin-Freischaltung — der Hinweis kommt aus konditionen.ts und steht im Freischalten-Dialog', () => {
-    const quelle = lies('src/app/admin/admin-farm-list.tsx')
+    // Seit Nr. 22f steht die Rückfrage in der AdminShell in einer eigenen Datei.
+    const quelle = lies('src/components/admin/hof-aktion-dialog.tsx')
     expect(quelle).toMatch(/import \{[^}]*KONDITIONEN_DERZEIT[^}]*\} from '@\/lib\/konditionen'/)
     // Zwischen dem Zweig „Freischalten" und dem Zweig „Zurücknehmen" des Dialogs.
     const hinweis = quelle.indexOf('{KONDITIONEN_DERZEIT}')
-    expect(hinweis).toBeGreaterThan(quelle.indexOf("dialog?.action === 'approve' ? ("))
+    expect(hinweis).toBeGreaterThan(quelle.indexOf("art === 'approve' ? ("))
     expect(hinweis).toBeLessThan(quelle.indexOf('Die Hofseite von'))
     // Verhalten unverändert: die Gründungsplatz-Zusage bleibt im Dialog.
     expect(quelle).toContain('{GRUENDUNGS_KONDITIONEN}')

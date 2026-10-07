@@ -44,6 +44,12 @@ import { useRueckwegKlick } from '@/components/shared/kunden-kopf'
 import { CartSheet } from '@/components/farm/cart-sheet'
 import { HofseiteSeitenspalte } from '@/components/hofseite/hofseite-seitenspalte'
 import { GleichMitAbholen, Kennzeichnung } from '@/components/produktdetail/produktdetail-teile'
+import { RaummassErklaerung } from '@/components/shared/raummass-erklaerung'
+import { raummassErklaeren } from '@/lib/verkaufsgroessen'
+import { futterVerantwortung, futterVerantwortungImKorb } from '@/lib/futter-registrierung'
+import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
+import { kassenAdresse } from '@/lib/kasse'
+import { mitKaeuferVorbelegung, type KaeuferVorbelegung } from '@/schemas/kaeufer-vorbelegung'
 
 /*
  * Die Produktseite /[farmSlug]/produkt/[id] (Nachtlauf Nr. 11, Gate 4).
@@ -72,6 +78,7 @@ export function ProduktdetailKunde({
   produktId,
   gewaehltId,
   ansicht,
+  kaeufer = null,
   jetzt,
 }: {
   farm: PublicFarm
@@ -80,6 +87,8 @@ export function ProduktdetailKunde({
   /** Die gewählte Größe (aus ?groesse=, geprüft) — sonst gleich produktId. */
   gewaehltId: string
   ansicht: Pick<SeitenAnsicht, 'art' | 'kaufen'>
+  /** `?kaeufer=betrieb` aus „Region › Futter kaufen" (Nr. 29, geprüft) — reist mit zur Kasse und in die Links dieses Hofs. */
+  kaeufer?: KaeuferVorbelegung | null
   /** Zeitpunkt der Anfrage (ISO) vom Server — Gebührensatz und Abholtage rechnen davon (Hydration). */
   jetzt: string
 }): React.JSX.Element | null {
@@ -109,7 +118,9 @@ export function ProduktdetailKunde({
   const kaufbar = zustand.art === 'kaufbar' || zustand.art === 'knapp'
   // Mit den Zahlarten des Hofs und der Bar-Ausnahme bis zum SEPA-Start (B1).
   const gebuehr = gebuehrHinweisFuerHof(farm, new Date(jetzt))
-  const link = (id: string) => produktLink(farm.slug, id, alsVorschau)
+  const link = (id: string) => mitKaeuferVorbelegung(produktLink(farm.slug, id, alsVorschau), kaeufer)
+  // Nur die Adresse trägt die Vorbelegung weiter (Nr. 29) — kein Speicher im Browser.
+  const kasse = kassenAdresse(farm.slug, kaeufer)
 
   function imKorb(id: string): number {
     if (!mitKorb) return 0
@@ -164,6 +175,12 @@ export function ProduktdetailKunde({
   const mitGrundpreis = kacheln.some((k) => k.grundpreis)
   const vorrat = vorratText(produkt, zustand)
   const mitnehmen = gleichMitAbholen(produkte, produkt, farm.isPaused)
+  // Raummeter und Schüttraummeter erklärt die Seite beim ersten Vorkommen (DESIGN_SYSTEM, Nr. 20).
+  const raummass = raummassErklaeren((familie.length > 0 ? familie : [produkt]).map((p) => p.unit))
+  // Bei jedem Futter der Verantwortungs-Hinweis (E10a), bei „nur an Betriebe" mit Zusatz.
+  // Über die ganze Familie: Die Abgabe kann je Größe abweichen, der Zusatz
+  // „nur an Betriebe" darf auf der Seite nicht fehlen, wenn eine Größe ihn braucht.
+  const verantwortung = futterVerantwortung(familie.length > 0 ? familie : [produkt])
 
   const marke =
     zustand.art === 'knapp' ? (
@@ -266,8 +283,9 @@ export function ProduktdetailKunde({
                 </p>
               )}
 
+              {/* Kacheln nach Platz statt fester Spalten: In der schmalen Textspalte ab 1024 px brach „Ofenfertig“ sonst mitten im Wort. */}
               {brennmaterial.length > 0 && (
-                <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <dl className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
                   {brennmaterial.map((z) => (
                     <div key={z.titel} className="rounded-xl border border-border bg-card px-3 py-2">
                       <dt className="text-[11.5px] text-muted-foreground">{z.titel}</dt>
@@ -321,6 +339,7 @@ export function ProduktdetailKunde({
                     />
                   ))}
                 </GroessenWahl>
+                {raummass && <RaummassErklaerung />}
               </>
             ) : (
               <div className="flex flex-col gap-0.5">
@@ -330,8 +349,11 @@ export function ProduktdetailKunde({
                 <p className="text-xl font-semibold text-foreground tabular-nums">{formatGrundpreis(produkt.price, produkt.unit, produkt.unitSize)}</p>
                 {zweite && <p className="text-[13px] text-muted-foreground tabular-nums">{zweite}</p>}
                 {vorrat && zustand.art === 'kaufbar' && <p className="text-[13px] text-muted-foreground">Vorrat: {vorrat}</p>}
+                {raummass && <RaummassErklaerung className="mt-2" />}
               </div>
             )}
+
+            <FutterVerantwortung saetze={verantwortung} />
 
             {/* Am Handy die EINE feste Leiste unten (Fokus-Seite), ab 768 px in der Karte. */}
             <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] md:static md:z-auto md:border-0 md:bg-transparent md:p-0">
@@ -399,6 +421,8 @@ export function ProduktdetailKunde({
           gebuehrKorb={gebuehr?.korb ?? null}
           mitKorb={mitKorb}
           jetzt={jetzt}
+          produkte={produkte}
+          kasseHref={kasse}
           className="hidden lg:col-start-2 lg:row-start-1 lg:flex"
         />
       </div>
@@ -410,9 +434,11 @@ export function ProduktdetailKunde({
           items={items}
           total={total}
           farmSlug={farm.slug}
+          kasseHref={kasse}
           onUpdateQuantity={updateQuantity}
           onRemoveItem={removeItem}
           gebuehrKorb={gebuehr?.korb ?? null}
+          futterHinweis={futterVerantwortungImKorb(items, produkte)}
         />
       )}
     </>

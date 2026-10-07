@@ -139,6 +139,8 @@ describe('online — Zahlungsfrist 30 Minuten', () => {
     expect(danach.cancelledAt).not.toBeNull()
     expect(await bestand(produkt.id)).toBe(BESTAND_NACH_CHECKOUT + MENGE)
     // Online gibt es keine Mail — die Kundin hat die Zahlung selbst nicht abgeschlossen.
+    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
+    await vi.dynamicImportSettled()
     expect(sendBestellungVerfallen).not.toHaveBeenCalled()
   })
 
@@ -262,6 +264,8 @@ describe('bar — Bestätigungsfrist 2 Stunden', () => {
     expect((await zustand(bestellung.id)).status).toBe('CANCELLED')
     expect(await bestand(produkt.id)).toBe(BESTAND_NACH_CHECKOUT + MENGE)
     await new Promise((r) => setTimeout(r, 50))
+    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
+    await vi.dynamicImportSettled()
     expect(sendBestellungVerfallen).not.toHaveBeenCalled()
   })
 
@@ -271,6 +275,8 @@ describe('bar — Bestätigungsfrist 2 Stunden', () => {
     await gibVerwaisteBestellungenFrei(new Date(), farm.id)
 
     expect((await zustand(bestellung.id)).status).toBe('PENDING_CONFIRMATION')
+    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
+    await vi.dynamicImportSettled()
     expect(sendBestellungVerfallen).not.toHaveBeenCalled()
   })
 })

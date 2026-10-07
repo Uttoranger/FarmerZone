@@ -37,20 +37,22 @@ describe('Einstellungen — nur der eigene Hof', () => {
     expect(daten!.betriebsnummer).toBe('LFBIS 0000000')
 
     const bereiche = einstellungenBereiche(daten!, new Date())
-    expect(bereiche).toHaveLength(8)
+    expect(bereiche).toHaveLength(9)
     expect(bereiche.find((b) => b.id === 'zahlung')?.ton).toBe('offen')
     expect(bereiche.find((b) => b.id === 'futtermittel')?.zeile).toBe('Primärproduktion · LFBIS 0000000')
   })
 
-  it('Zahlung: Online an und Stripe nicht fertig → orange; nur bar (Online aus, kein Konto) → grau', async () => {
+  it('Zahlung: ohne fertiges Stripe orange — auch ein Bestandshof mit Online aus (Register Z1, keine Datenänderung)', async () => {
     const online = await erstelleHof({ acceptsOnline: true, stripeAccountReady: false })
     const nurBar = await erstelleHof({ acceptsOnline: false })
 
     const zahlung = async (ownerId: string) =>
       einstellungenBereiche((await ladeEinstellungenUebersicht(ownerId))!, new Date()).find((b) => b.id === 'zahlung')
 
-    expect(await zahlung(online.owner.id)).toMatchObject({ ton: 'offen', zeile: 'Bar bei Abholung · Online-Zahlung noch nicht eingerichtet' })
-    expect(await zahlung(nurBar.owner.id)).toMatchObject({ ton: 'neutral', zeile: 'Bar bei Abholung · Online-Zahlung ist aus' })
+    expect(await zahlung(online.owner.id)).toMatchObject({ ton: 'offen', zeile: 'Online-Zahlung noch nicht eingerichtet · bitte einrichten' })
+    expect(await zahlung(nurBar.owner.id)).toMatchObject({ ton: 'offen', zeile: 'Online-Zahlung noch nicht eingerichtet · bitte einrichten' })
+    // Der Wert in der Datenbank bleibt, wie er war.
+    expect((await prisma.farm.findUnique({ where: { id: nurBar.farm.id }, select: { acceptsOnline: true } }))?.acceptsOnline).toBe(false)
   })
 
   it('ohne Hof: null', async () => {

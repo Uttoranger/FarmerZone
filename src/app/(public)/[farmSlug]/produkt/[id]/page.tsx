@@ -3,8 +3,9 @@ import type { Metadata } from 'next'
 import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'
 import type { Suchparameter } from '@/lib/ansichts-modus'
 import { gewaehlteGroesse, produktFamilie, produktMetadaten, sichtbaresProdukt } from '@/lib/produktdetail'
-import { hofVorschaubild } from '@/lib/vorschaubild'
+import { hofTitelbildVorschau } from '@/lib/vorschaubild'
 import { GROESSE_PARAMETER, leseGroesse } from '@/schemas/produktdetail'
+import { KAEUFER_PARAMETER, leseKaeuferVorbelegung } from '@/schemas/kaeufer-vorbelegung'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { ProduktdetailKunde } from '@/components/produktdetail/produktdetail-kunde'
 import { StartseiteFuss } from '@/components/startseite/startseite-abschnitte'
@@ -41,7 +42,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 
   // Nur öffentliche Daten: Name, Beschreibung, Preis, Hofname, Ort, Bild.
   const { titel, beschreibung } = produktMetadaten(produkt, farm)
-  const bild = produkt.imageUrl ? { url: produkt.imageUrl, alt: produkt.name } : hofVorschaubild(farm)
+  const bild = produkt.imageUrl ? { url: produkt.imageUrl, alt: produkt.name } : hofTitelbildVorschau(farm)
   return {
     title: titel,
     description: beschreibung,
@@ -59,6 +60,9 @@ export default async function ProduktSeite({ params, searchParams }: Props) {
   if (!einstieg) notFound()
 
   const gewaehlt = gewaehlteGroesse(produktFamilie(farm.products, einstieg), einstieg, leseGroesse(suche[GROESSE_PARAMETER]))
+  // Aus „Region › Futter kaufen" (Nr. 29): `?kaeufer=betrieb` reist nur über
+  // die Adresse weiter zur Kasse — Ungültiges fällt im Schema still weg.
+  const kaeufer = leseKaeuferVorbelegung(suche[KAEUFER_PARAMETER])
   // Einmal hier, auf dem Server: Gebührensatz und Abholtage rechnen in Server
   // und Browser vom selben Zeitpunkt (sonst Hydration-Abweichung).
   const jetzt = new Date()
@@ -70,6 +74,7 @@ export default async function ProduktSeite({ params, searchParams }: Props) {
         produktId={einstieg.id}
         gewaehltId={gewaehlt.id}
         ansicht={{ art: ansicht.art, kaufen: ansicht.kaufen }}
+        kaeufer={kaeufer}
         jetzt={jetzt.toISOString()}
       />
       <StartseiteFuss jahr={jetzt.getFullYear()} />

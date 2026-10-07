@@ -191,7 +191,7 @@ function gebindeMenge(p: Pick<DetailProdukt, 'unit' | 'unitSize' | 'futter'>): s
 }
 
 /** Die Wörter, mit denen alle Namen beginnen („Bergwiesen-Heu" vor „1 kg-Sackerl", „Rundballen"). */
-function gemeinsamerAnfang(namen: readonly string[]): number {
+export function gemeinsamerAnfang(namen: readonly string[]): number {
   // Ohne Vergleich kein gemeinsamer Anfang — und ohne Namen liefe die Schleife ewig (Math.min() = Infinity).
   if (namen.length < 2) return 0
   const woerter = namen.map((n) => n.trim().split(/\s+/))

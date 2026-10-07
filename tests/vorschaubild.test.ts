@@ -3,10 +3,12 @@
  *
  * Beweist:
  *  - Das Startseiten-Bild liegt in public/ und ist 1200 × 630.
- *  - Eine Hofseite zeigt ihr Titelbild — nur ein echtes Foto; ohne Titelbild
- *    (Verlauf, fehlende Adresse) das Startseiten-Bild.
+ *  - Eine Hofseite zeigt seit Nr. 21 ihr Teilen-Bild (Gate 7), ohne ladbares
+ *    Bild das der Startseite; die Produktseite ohne Foto das Titelbild des
+ *    Hofs (nur ein echtes Foto), sonst das Startseiten-Bild.
  *  - Es gibt keine Datei opengraph-image/twitter-image im app-Ordner: Sie
- *    überschriebe nach Nexts Dateikonvention die Titelbilder der Hofseiten.
+ *    gälte nach Nexts Dateikonvention für alle Seiten darunter (die Bild-Route
+ *    ist ein route.tsx in einem Ordner gleichen Namens).
  *  - metadataBase kommt aus der Adresse der Umgebung — nur, wenn sie gültig
  *    ist; eine Adresse ohne Schema legt keine Seite lahm.
  *  - Die Hofseite nutzt den Rückfall.
@@ -14,7 +16,7 @@
 import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { STARTSEITE_VORSCHAUBILD, hofVorschaubild, metadatenBasis } from '@/lib/vorschaubild'
+import { STARTSEITE_VORSCHAUBILD, hofTitelbildVorschau, hofVorschaubild, metadatenBasis } from '@/lib/vorschaubild'
 
 const wurzel = process.cwd()
 
@@ -41,22 +43,32 @@ describe('Startseite', () => {
 })
 
 describe('Hofseite', () => {
-  it('mit Titelbild: das Titelbild', () => {
-    expect(
-      hofVorschaubild({ name: 'Hof Test', bannerType: 'PHOTO', bannerUrl: 'https://bilder.example/titel.jpg' })
-    ).toEqual({ url: 'https://bilder.example/titel.jpg', alt: 'Hof Test' })
+  it('seit Nr. 21 das Teilen-Bild im Format 1:1, mit Prüfsumme in der Adresse (Gate 7)', () => {
+    expect(hofVorschaubild({ name: 'Hof Test', slug: 'hof-test' }, 'abc123')).toEqual({
+      url: '/hof-test/opengraph-image?v=abc123',
+      width: 1080,
+      height: 1080,
+      alt: 'Hof Test – frisch diese Woche',
+    })
   })
 
-  it('ohne Titelbild: das Bild der Startseite — auch bei einem Verlauf mit alter Foto-Adresse', () => {
-    expect(hofVorschaubild({ name: 'Hof Test', bannerType: 'PHOTO', bannerUrl: null })).toBe(STARTSEITE_VORSCHAUBILD)
+  it('ohne Teilen-Bild (nicht ladbar): das Bild der Startseite', () => {
+    expect(hofVorschaubild({ name: 'Hof Test', slug: 'hof-test' }, null)).toBe(STARTSEITE_VORSCHAUBILD)
+  })
+
+  it('Produktseite ohne Foto: Titelbild des Hofs, ohne Titelbild das der Startseite', () => {
     expect(
-      hofVorschaubild({ name: 'Hof Test', bannerType: 'GRADIENT', bannerUrl: 'https://bilder.example/alt.jpg' })
+      hofTitelbildVorschau({ name: 'Hof Test', bannerType: 'PHOTO', bannerUrl: 'https://bilder.example/titel.jpg' })
+    ).toEqual({ url: 'https://bilder.example/titel.jpg', alt: 'Hof Test' })
+    expect(hofTitelbildVorschau({ name: 'Hof Test', bannerType: 'PHOTO', bannerUrl: null })).toBe(STARTSEITE_VORSCHAUBILD)
+    expect(
+      hofTitelbildVorschau({ name: 'Hof Test', bannerType: 'GRADIENT', bannerUrl: 'https://bilder.example/alt.jpg' })
     ).toBe(STARTSEITE_VORSCHAUBILD)
   })
 
   it('die Hofseite setzt das Vorschaubild immer über hofVorschaubild', () => {
     const seite = readFileSync(join(wurzel, 'src/app/(public)/[farmSlug]/page.tsx'), 'utf8')
-    expect(seite).toContain('images: [hofVorschaubild(farm)]')
+    expect(seite).toContain('images: [hofVorschaubild(farm, vorschau?.version ?? null)]')
   })
 })
 

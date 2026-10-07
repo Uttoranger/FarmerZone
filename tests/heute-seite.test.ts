@@ -39,6 +39,7 @@ import {
   heuteAufbau,
   heuteHofSichtbar,
   naechstesAbholfenster,
+  stripeEinrichtenHinweis,
   packliste,
   packlistenZahlen,
   teilenKarte,
@@ -65,10 +66,12 @@ import {
   Kennzahlen,
   NaechsteAbholungKarte,
   Packliste,
+  StripeEinrichtenHinweis,
   StripeHinweis,
   TeilenKarte,
   WocheKarte,
 } from '@/components/heute/heute-teile'
+import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 const html = (el: React.ReactElement) => renderToStaticMarkup(el)
@@ -251,12 +254,53 @@ describe('Stripe-Hinweis', () => {
   })
 })
 
+// ─── Online-Zahlung einrichten (Register Z1) ────────────────────────────────
+
+describe('Hinweis „Online-Zahlung einrichten" für freigeschaltete Höfe ohne Stripe (Z1)', () => {
+  const FREI = new Date('2026-09-01T09:00:00Z')
+  const basis = { approvedAt: FREI, archivedAt: null, stripeAccountReady: false, acceptsOnline: true, stripeAccountId: null }
+
+  it('freigeschaltet, ohne Konto: Hinweis — auch bei Online aus (früher „nur bar")', () => {
+    expect(stripeEinrichtenHinweis(basis)).toBe(true)
+    expect(stripeEinrichtenHinweis({ ...basis, acceptsOnline: false })).toBe(true)
+    // Konto da, aber Online aus: kein „pausiert", also der Einrichten-Hinweis.
+    expect(stripeEinrichtenHinweis({ ...basis, acceptsOnline: false, stripeAccountId: 'acct_test_platzhalter' })).toBe(true)
+  })
+
+  it('kein Hinweis mit Stripe, vor der Freischaltung oder stillgelegt', () => {
+    expect(stripeEinrichtenHinweis({ ...basis, stripeAccountReady: true })).toBe(false)
+    expect(stripeEinrichtenHinweis({ ...basis, approvedAt: null })).toBe(false)
+    expect(stripeEinrichtenHinweis({ ...basis, archivedAt: FREI })).toBe(false)
+  })
+
+  it('die Notbremse sticht: Konto da, Stripe lässt es nicht zu → „pausiert", nicht beide', () => {
+    const gesperrt = { ...basis, stripeAccountId: 'acct_test_platzhalter' }
+    expect(onlineZahlungPausiert(gesperrt)).toBe(true)
+    expect(stripeEinrichtenHinweis(gesperrt)).toBe(false)
+  })
+
+  it('rendert Titel, den Satz aus konditionen.ts und den Weg in die Zahlungs-Einstellungen — kein Stripe-Aufruf', () => {
+    const h = html(createElement(StripeEinrichtenHinweis))
+    expect(h).toContain(ONLINE_ZAHLUNG_EINRICHTEN_TITEL)
+    expect(h).toContain(ONLINE_ZAHLUNG_EINRICHTEN_SATZ)
+    expect(h).toContain('href="/settings/payments"')
+    expect(h).not.toMatch(/nur bar/i)
+  })
+
+  it('die Seite zeigt ihn oben, wo sonst „pausiert" steht — keine Abschaltung, nur ein Hinweis', () => {
+    expect(heuteAufbau({ stripeHinweis: true, teilen: null, ersteSchritte: false }).oben).toEqual(['stripe'])
+    const seite = quelle('src/app/(hof)/dashboard/page.tsx')
+    expect(seite).toContain('<StripeEinrichtenHinweis')
+    expect(seite).toContain('heute.stripeEinrichten')
+  })
+})
+
 // ─── Freischaltungs-Moment ──────────────────────────────────────────────────
 
 describe('Freischaltungs-Moment', () => {
   const freigabe = new Date('2026-10-01T09:00:00Z')
   const tag = 24 * 60 * 60 * 1000
-  const oeffentlich = { approvedAt: freigabe, sichtbar: true }
+  const oeffentlich = { approvedAt: freigabe, sichtbar: true, teilenMomenteAus: false }
 
   it('nur im Zeitfenster nach der Freigabe', () => {
     expect(FREISCHALT_MOMENT_TAGE).toBe(14)
@@ -267,10 +311,10 @@ describe('Freischaltungs-Moment', () => {
   })
 
   it('nicht ohne Freigabe und nicht, solange der Hof nicht sichtbar ist (auch nicht pausiert)', () => {
-    expect(freischaltMomentMoeglich({ approvedAt: null, sichtbar: false }, freigabe)).toBe(false)
-    expect(freischaltMomentMoeglich({ approvedAt: freigabe, sichtbar: false }, freigabe)).toBe(false)
+    expect(freischaltMomentMoeglich({ approvedAt: null, sichtbar: false, teilenMomenteAus: false }, freigabe)).toBe(false)
+    expect(freischaltMomentMoeglich({ approvedAt: freigabe, sichtbar: false, teilenMomenteAus: false }, freigabe)).toBe(false)
     const pausiert = heuteHofSichtbar({ isActive: true, isPaused: true, approvedAt: freigabe, archivedAt: null })
-    expect(freischaltMomentMoeglich({ approvedAt: freigabe, sichtbar: pausiert }, freigabe)).toBe(false)
+    expect(freischaltMomentMoeglich({ approvedAt: freigabe, sichtbar: pausiert, teilenMomenteAus: false }, freigabe)).toBe(false)
   })
 
   type Speicher = Pick<Storage, 'getItem' | 'setItem'>
@@ -318,10 +362,11 @@ describe('Freischaltungs-Moment', () => {
     expect(() => merkeFreischaltGesehen(null, 'hof-1')).not.toThrow()
   })
 
-  it('der Moment teilt nur über teileHof — keine neuen Kanäle, kein Plakat vor Gate 7', () => {
+  it('der Moment teilt über teileHof und führt seit Nr. 21 zum QR-Plakat — keine eigenen Kanäle', () => {
     const moment = quelle('src/components/heute/freischalt-moment.tsx')
     expect(moment).toContain('HofTeilenKnopf')
-    expect(moment).not.toMatch(/wa\.me|whatsapp|plakat|qrcode/i)
+    expect(moment).toContain('href={PLAKAT_PFAD}')
+    expect(moment).not.toMatch(/wa\.me|qrcode|navigator\.share/i)
     expect(moment).toContain('Dein Hof ist online!')
     expect(moment).toContain('Später')
   })

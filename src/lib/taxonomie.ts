@@ -10,8 +10,8 @@
  * DIE REGELN:
  *   Jede Unterkategorie (L2) gehört zu GENAU EINER Kategorie (L1) — einzige
  *   Ausnahme sind die VORBEREITETEN_UNTERKATEGORIEN (Expand vor Gate 6), die
- *   noch zu keiner gehören und deshalb nirgends wählbar sind. Fisch,
- *   Brot, Getränke, Brennholz, Sonstiges, Mischfutter und Ergänzungsfutter
+ *   noch zu keiner gehören und deshalb nirgends wählbar sind (seit Gate 6
+ *   leer). Fisch, Brot, Getränke, Sonstiges, Mischfutter und Ergänzungsfutter
  *   haben bewusst keine L2.
  *   Der BEREICH (Lebensmittel, Futtermittel, Sonstiges) ist eine Funktion der
  *   Kategorie — bereichVon — und nie eine Spalte (Sprint Bereiche 1,
@@ -56,7 +56,9 @@ export const KATEGORIE_LABEL: Record<ProductCategoryValue, string> = {
   GETREIDE_KOERNER: 'Getreide & Körner',
   MISCHFUTTER: 'Mischfutter',
   ERGAENZUNGSFUTTER: 'Ergänzungsfutter',
-  BRENNHOLZ: 'Brennholz',
+  // Der Enum-Wert bleibt BRENNHOLZ (Schema); in der Oberfläche heißt die
+  // Kategorie Brennmaterial (E11 Label, Nr. 23) — Brennholz ist eine ihrer Arten.
+  BRENNHOLZ: 'Brennmaterial',
   SONSTIGES: 'Sonstiges',
 }
 
@@ -103,25 +105,24 @@ export const TAXONOMIE = {
   // Bei Misch- und Ergänzungsfutter ist die Tierart die Facette, keine L2.
   MISCHFUTTER: [],
   ERGAENZUNGSFUTTER: [],
-  BRENNHOLZ: [],
+  // Brennmaterial-Arten (E11) — seit Gate 6 (Nr. 20) zugeordnet; das
+  // Brennmaterial-Formular fragt die Art, die Angaben hängen an ihr.
+  BRENNHOLZ: ['BRENNHOLZ_SCHEIT', 'ANZUENDHOLZ', 'HACKSCHNITZEL'],
   SONSTIGES: [],
 } as const satisfies Record<ProductCategoryValue, readonly string[]>
 
 /**
  * Unterkategorien, die schon im Prisma-Enum stehen, aber noch zu KEINER
- * Kategorie gehören (Schema-Expand Redesign, Gate 3, E11 Brennmaterial).
- * Enum-Werte müssen vor dem Code in die Datenbank (Expand); wählbar werden sie
- * erst mit dem Brennmaterial-Formular (Gate 6), das sie nach TAXONOMIE.BRENNHOLZ
- * verschiebt und diese Liste leert.
+ * Kategorie gehören (Expand vor dem Code, ARCHITECTURE §5). Enum-Werte müssen
+ * vor dem Code in die Datenbank; wählbar werden sie erst mit dem Sprint, der
+ * sie anbietet — der verschiebt sie nach TAXONOMIE und leert diese Liste.
  *
- * Bis dahin gilt: gehoertZu sagt für jede Kategorie false — Zod lehnt sie
- * deshalb ab („passt nicht zu …"), kein Formular, kein Filter und keine
- * Hofseite bietet sie an, und hatUnterkategorien('BRENNHOLZ') bleibt false.
- * Bewusst NICHT schon in TAXONOMIE.BRENNHOLZ: Das hätte jedem Brennholz-Produkt
- * den Hinweis „Unterkategorie ergänzen" eingebracht und die Auswahl geöffnet —
- * eine Verhaltensänderung vor dem Formular, das die Angaben dazu erfasst.
+ * Solange ein Wert hier steht, sagt gehoertZu für jede Kategorie false — Zod
+ * lehnt ihn ab, kein Formular, kein Filter und keine Hofseite bietet ihn an.
+ * Leer seit Gate 6 (Nr. 20): Die Brennmaterial-Arten aus dem Expand von Gate 3
+ * stehen jetzt in TAXONOMIE.BRENNHOLZ.
  */
-export const VORBEREITETE_UNTERKATEGORIEN = ['BRENNHOLZ_SCHEIT', 'ANZUENDHOLZ', 'HACKSCHNITZEL'] as const
+export const VORBEREITETE_UNTERKATEGORIEN = [] as const
 
 /** Eine L2, die in TAXONOMIE steht und damit genau eine Kategorie hat. */
 export type ZugeordneteUnterkategorie = (typeof TAXONOMIE)[ProductCategoryValue][number]
@@ -137,7 +138,8 @@ export type VorbereiteteUnterkategorie = (typeof VORBEREITETE_UNTERKATEGORIEN)[n
 export type ProductSubcategoryValue = ZugeordneteUnterkategorie | VorbereiteteUnterkategorie
 
 /** Die L2 aus TAXONOMIE in Enum-Reihenfolge (Fleisch, Eier, Milch, Gemüse,
- *  Obst, Honig, Futtermittel-Altlast, Heu & Stroh, Getreide & Körner — so steht
+ *  Obst, Honig, Futtermittel-Altlast, Heu & Stroh, Getreide & Körner,
+ *  Brennmaterial — so steht
  *  es im Prisma-Enum, nicht in L1-Reihenfolge). Wer über L2 läuft und dabei
  *  eine Kategorie braucht, läuft hierüber, nie über PRODUCT_SUBCATEGORY_VALUES. */
 export const ZUGEORDNETE_UNTERKATEGORIEN = [
@@ -150,10 +152,11 @@ export const ZUGEORDNETE_UNTERKATEGORIEN = [
   ...TAXONOMIE.FUTTERMITTEL,
   ...TAXONOMIE.HEU_STROH,
   ...TAXONOMIE.GETREIDE_KOERNER,
+  ...TAXONOMIE.BRENNHOLZ,
 ] as const satisfies readonly ZugeordneteUnterkategorie[]
 
-/** Alle L2 des Prisma-Enums: die zugeordneten, dann die vorbereiteten
- *  Brennmaterial-Arten. Für Zod und den Abgleich mit dem Schema. */
+/** Alle L2 des Prisma-Enums: die zugeordneten, dann die vorbereiteten (seit
+ *  Gate 6 keine). Für Zod und den Abgleich mit dem Schema. */
 export const PRODUCT_SUBCATEGORY_VALUES = [
   ...ZUGEORDNETE_UNTERKATEGORIEN,
   ...VORBEREITETE_UNTERKATEGORIEN,
@@ -216,7 +219,7 @@ export const UNTERKATEGORIE_LABEL: Record<ProductSubcategoryValue, string> = {
   WEIZEN: 'Weizen',
   ROGGEN: 'Roggen',
   TRITICALE: 'Triticale',
-  // Brennmaterial — vorbereitet, noch nicht wählbar (VORBEREITETE_UNTERKATEGORIEN)
+  // Brennmaterial (seit Gate 6 wählbar, TAXONOMIE.BRENNHOLZ)
   BRENNHOLZ_SCHEIT: 'Brennholz (Scheite)',
   ANZUENDHOLZ: 'Anzündholz',
   HACKSCHNITZEL: 'Hackschnitzel',

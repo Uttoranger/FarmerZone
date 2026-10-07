@@ -177,7 +177,7 @@ export function LogoUpload({
           type="button"
           onClick={openFilePicker}
           disabled={isUploading}
-          className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg border border-border text-sm font-medium hover:bg-muted/40 transition-colors disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 min-h-11 px-4 rounded-lg border border-border text-sm font-medium hover:bg-muted/40 transition-colors disabled:opacity-60"
         >
           {isUploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
           {/* Die Stufe statt eines stummen Spinners: Seit dem Zeitwächter-Umbau
@@ -330,7 +330,7 @@ function GalleryPhotoItem({
           onChange={(e) => setCaption(e.target.value.slice(0, 100))}
           onBlur={handleCaptionBlur}
           placeholder="Bildunterschrift (optional)"
-          className="w-full h-8 px-2 rounded-lg border border-border bg-card text-xs focus:outline-none focus:ring-1 focus:ring-primary/30"
+          className="w-full h-11 px-2 rounded-lg border border-border bg-card text-xs focus:outline-none focus:ring-1 focus:ring-primary/30"
         />
         {isSavingCaption && (
           <span className="text-[10px] text-muted-foreground">Speichern…</span>
@@ -860,7 +860,7 @@ export function AppearanceClient({ initialData }: Props) {
                     value={v.subtitle}
                     onChange={(e) => updateSubtitle(i, e.target.value.slice(0, 100))}
                     placeholder="Kurze Beschreibung (optional)"
-                    className="w-full h-8 px-2 rounded-lg border border-border bg-card text-xs focus:outline-none focus:ring-1 focus:ring-primary/30"
+                    className="w-full h-11 px-2 rounded-lg border border-border bg-card text-xs focus:outline-none focus:ring-1 focus:ring-primary/30"
                   />
                 </div>
                 <div className="flex flex-col gap-1 shrink-0">

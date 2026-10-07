@@ -254,7 +254,8 @@ describe('Produktbild: updateProductImageAction, createProduct, updateProduct', 
     expect('error' in (await createProduct({ ...produkt, imageUrl: FREMDER_SERVER } as never))).toBe(true)
     expect(prisma.product.create).not.toHaveBeenCalled()
 
-    expect(await createProduct({ ...produkt, imageUrl: EIGEN } as never)).toEqual({ ok: true })
+    vi.mocked(prisma.product.create).mockResolvedValue({ id: 'prod_neu', isAvailable: true, stock: 3 } as never)
+    expect(await createProduct({ ...produkt, imageUrl: EIGEN } as never)).toEqual({ ok: true, angelegt: { id: 'prod_neu', kaufbar: true } })
     expect(prisma.product.create).toHaveBeenCalledTimes(1)
   })
 
@@ -274,7 +275,7 @@ describe('publishStatusPost (Beitragsfoto geht auch per Mail an Abonnentinnen)',
   const beitrag = (photoUrl: string) => ({
     title: 'Neue Eier',
     body: 'Frisch gelegt.',
-    anlass: 'FRESH_PRODUCT',
+    anlass: 'FRESH_PRODUCT' as const,
     photoUrl,
     showOnFarmPage: true,
     sendEmail: false,

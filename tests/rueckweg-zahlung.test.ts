@@ -34,7 +34,7 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
-import { revertOrderStatus } from '@/server/actions/orders'
+import { revertOrderStatus, revertPickedUp } from '@/server/actions/orders'
 import { zahlungNachRueckweg } from '@/lib/hof-bestellungen'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -155,5 +155,72 @@ describe('revertOrderStatus — Zahlstatus und Zahlzeitpunkt bleiben stimmig', (
     const satz = datenbankMit({ status: 'CANCELLED', paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', paidAt: null, pickedUpAt: null })
     expect((await revertOrderStatus('order_1', 'CONFIRMED')).error).toBeTruthy()
     expect(satz.status).toBe('CANCELLED')
+  })
+})
+
+/*
+ * Der Dialog „Abholung rückgängig" (revertPickedUp, Nr. 32, Morgenbericht
+ * Lauf 5 §5): Vorher ließ er Zahlstatus und Zahlzeitpunkt immer stehen — eine
+ * bar kassierte Bestellung stand danach „gepackt, bezahlt", obwohl das
+ * Kassieren mit dem Abholen zurückgenommen war. Jetzt dieselbe Regel wie das
+ * Rückgängig im Hinweis (zahlungNachRueckweg), bedingt auf Besitz,
+ * Ausgangsstatus und den gelesenen Zahlstand. Nur Statusfelder, kein Stripe.
+ */
+describe('revertPickedUp — Dialog „Abholung rückgängig" hält die Zahlung stimmig', () => {
+  it('bar „Abgeholt und kassiert" → wieder gepackt UND offen zu kassieren', async () => {
+    const satz = datenbankMit({ status: 'PICKED_UP', paymentMethod: 'ONSITE_CASH', paymentStatus: 'PAID', paidAt: KASSIERT, pickedUpAt: KASSIERT })
+
+    expect(await revertPickedUp('order_1')).toEqual({})
+
+    expect(satz).toMatchObject({ status: 'READY', paymentStatus: 'PENDING', paidAt: null, pickedUpAt: null })
+  })
+
+  it('online bezahlt → wieder gepackt, Zahlung und Zeitpunkt bleiben', async () => {
+    const satz = datenbankMit({ status: 'PICKED_UP', paymentMethod: 'ONLINE', paymentStatus: 'PAID', paidAt: ONLINE_BEZAHLT, pickedUpAt: KASSIERT })
+
+    expect(await revertPickedUp('order_1')).toEqual({})
+
+    expect(satz).toMatchObject({ status: 'READY', paymentStatus: 'PAID', paidAt: ONLINE_BEZAHLT, pickedUpAt: null })
+  })
+
+  it('bar, schon vor dem Abholen bezahlt (anderer Zeitpunkt) → Zahlung bleibt', async () => {
+    const satz = datenbankMit({ status: 'PICKED_UP', paymentMethod: 'ONSITE_CASH', paymentStatus: 'PAID', paidAt: ONLINE_BEZAHLT, pickedUpAt: KASSIERT })
+
+    expect(await revertPickedUp('order_1')).toEqual({})
+
+    expect(satz).toMatchObject({ status: 'READY', paymentStatus: 'PAID', paidAt: ONLINE_BEZAHLT })
+  })
+
+  it('schreibt bedingt: Besitz, Ausgangsstatus und gelesener Zahlstand in der WHERE-Klausel', async () => {
+    datenbankMit({ status: 'PICKED_UP', paymentMethod: 'ONSITE_CASH', paymentStatus: 'PAID', paidAt: KASSIERT, pickedUpAt: KASSIERT })
+
+    await revertPickedUp('order_1')
+
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: 'order_1', farmId: 'farm_1', status: 'PICKED_UP', paymentStatus: 'PAID', paidAt: KASSIERT },
+      data: { status: 'READY', pickedUpAt: null, paymentStatus: 'PENDING', paidAt: null },
+    })
+  })
+
+  it('ändert sich die Zahlung zwischen Lesen und Schreiben, wird nichts geschrieben', async () => {
+    const satz = datenbankMit({ status: 'PICKED_UP', paymentMethod: 'ONSITE_CASH', paymentStatus: 'PAID', paidAt: KASSIERT, pickedUpAt: KASSIERT })
+    const echtesLesen = findFirst.getMockImplementation()
+    findFirst.mockImplementationOnce((async (arg: never) => {
+      const gelesen = await echtesLesen!(arg)
+      satz.paymentStatus = 'REFUNDED'
+      return gelesen
+    }) as never)
+
+    const ergebnis = await revertPickedUp('order_1')
+
+    expect(ergebnis.error).toBeTruthy()
+    expect(satz).toMatchObject({ status: 'PICKED_UP', paymentStatus: 'REFUNDED', paidAt: KASSIERT })
+  })
+
+  it('Gegenprobe: eine stornierte Bestellung holt der Dialog nicht zurück', async () => {
+    const satz = datenbankMit({ status: 'CANCELLED', paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', paidAt: null, pickedUpAt: null })
+    expect((await revertPickedUp('order_1')).error).toBeTruthy()
+    expect(satz.status).toBe('CANCELLED')
+    expect(updateMany).not.toHaveBeenCalled()
   })
 })

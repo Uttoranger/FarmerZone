@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Check, Carrot, Wheat } from 'lucide-react'
 import {
   Sheet,
@@ -10,6 +11,7 @@ import {
   SheetFooter,
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import {
   ANZEIGE_BEREICHE,
   KATEGORIE_LABEL,
@@ -69,6 +71,7 @@ export function KategorieSheet({
   keineAngabeErlaubt,
   onUebernehmen,
   startBereich,
+  futterAnlegenHref,
 }: {
   open: boolean
   onOpenChange: (offen: boolean) => void
@@ -84,6 +87,12 @@ export function KategorieSheet({
    */
   keineAngabeErlaubt: boolean
   onUebernehmen: (wahl: Wahl) => void
+  /**
+   * Beim Anlegen (Nr. 20): Futtermittel entstehen nur im Futter-Formular mit
+   * Verkaufsgrößen (Sperre je Gebinde, S7). Gesetzt, zeigt die Futter-Kachel
+   * statt der Kategorien einen Link dorthin. Beim Bearbeiten leer.
+   */
+  futterAnlegenHref?: string
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -94,7 +103,14 @@ export function KategorieSheet({
         {/* Der Inhalt wird bei jedem Öffnen neu aufgebaut — so startet der
             Entwurf immer beim gespeicherten Wert, ohne Effekt zum Zurücksetzen. */}
         {open && (
-          <SheetInhalt wert={wert} keineAngabeErlaubt={keineAngabeErlaubt} onUebernehmen={onUebernehmen} startBereich={startBereich} />
+          <SheetInhalt
+            wert={wert}
+            keineAngabeErlaubt={keineAngabeErlaubt}
+            onUebernehmen={onUebernehmen}
+            startBereich={startBereich}
+            futterAnlegenHref={futterAnlegenHref}
+            onSchliessen={() => onOpenChange(false)}
+          />
         )}
       </SheetContent>
     </Sheet>
@@ -106,11 +122,15 @@ function SheetInhalt({
   keineAngabeErlaubt,
   onUebernehmen,
   startBereich,
+  futterAnlegenHref,
+  onSchliessen,
 }: {
   wert: Wahl
   keineAngabeErlaubt: boolean
   onUebernehmen: (wahl: Wahl) => void
   startBereich?: AnzeigeBereich
+  futterAnlegenHref?: string
+  onSchliessen: () => void
 }) {
   const start = bereinigt(wert)
   // Die Altlast FUTTERMITTEL öffnet die Futter-Kachel, auch wenn sie leer startet.
@@ -183,6 +203,23 @@ function SheetInhalt({
           </div>
         </Abschnitt>
 
+        {istFutterKachel && futterAnlegenHref ? (
+          <section className="space-y-3 rounded-xl border border-border bg-muted/40 p-4">
+            <p className="text-sm text-foreground">
+              Futtermittel legst du mit Verkaufsgrößen an – vom Sackerl bis zum Rundballen, mit deiner Registrierung.
+            </p>
+            <Link
+              href={futterAnlegenHref}
+              onClick={onSchliessen}
+              className={cn(
+                'inline-flex min-h-11 items-center rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground hover:opacity-90',
+                FOKUS_RAHMEN
+              )}
+            >
+              Neues Futtermittel anlegen
+            </Link>
+          </section>
+        ) : (
         <Abschnitt titel="Kategorie">
           <ul className="overflow-hidden rounded-xl border border-border" role="listbox" aria-label="Kategorie">
             {kategorien.map((l1) => (
@@ -203,8 +240,9 @@ function SheetInhalt({
             )}
           </ul>
         </Abschnitt>
+        )}
 
-        {sorten.length > 0 && (
+        {sorten.length > 0 && !(istFutterKachel && futterAnlegenHref) && (
           <Abschnitt titel="Unterkategorie">
             <div className="flex flex-wrap gap-2" role="group" aria-label="Unterkategorie">
               {sorten.map((l2) => {
@@ -230,7 +268,7 @@ function SheetInhalt({
           </Abschnitt>
         )}
 
-        {istFutterKachel && (
+        {istFutterKachel && !futterAnlegenHref && (
           <p className="text-xs text-muted-foreground">
             Ob es ein Einzel-, Allein- oder Ergänzungsfuttermittel ist, gibst du gleich in der Kennzeichnung an.
           </p>
@@ -241,7 +279,7 @@ function SheetInhalt({
         <Button
           type="button"
           className="min-h-12 w-full"
-          disabled={!kannUebernehmen}
+          disabled={!kannUebernehmen || (istFutterKachel && futterAnlegenHref !== undefined)}
           onClick={() => onUebernehmen(entwurf)}
         >
           <span className="truncate">Übernehmen · {zusammenfassung}</span>

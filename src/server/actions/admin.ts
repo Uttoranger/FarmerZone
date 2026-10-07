@@ -3,17 +3,16 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { verlangeAdminAktion } from '@/server/admin-wache'
-import { sendFreischaltungEmail } from '@/lib/email'
 import {
   FARM_REJECT_APPROVED_MESSAGE,
   FARM_REJECT_HAS_DATA_MESSAGE,
-  FARM_REJECT_OWNER_HAS_ORDERS_MESSAGE,
   FARM_REJECT_OWNER_IS_ADMIN_MESSAGE,
 } from '@/lib/farm-approval'
 import { servicegebuehrEinstellungSchema } from '@/schemas/servicegebuehr'
 import { wienerMitternacht } from '@/lib/servicegebuehr'
 import { triageEingabeSchema } from '@/schemas/meldung'
-import { FREISCHALTUNG_EMAIL_OFFEN_TEXT, bestaetigungOffen } from '@/lib/email-bestaetigung'
+import { bestaetigungOffen } from '@/lib/email-bestaetigung'
+import { FREISCHALTUNG_GEAENDERT_TEXT, freischaltSperre } from '@/lib/admin-hoefe'
 
 function revalidateAll(slug: string) {
   revalidatePath('/admin')
@@ -33,22 +32,47 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
 
   const farm = await prisma.farm.findUnique({
     where: { id: farmId },
-    select: { name: true, slug: true, owner: { select: { email: true, emailVerified: true, createdAt: true } } },
+    select: {
+      name: true,
+      slug: true,
+      stripeAccountReady: true,
+      owner: { select: { email: true, emailVerified: true, createdAt: true } },
+    },
   })
   if (!farm) return { error: 'Hof nicht gefunden.' }
 
-  // S3 (Nr. 17b): „Hof online stellen" ist bis zur bestätigten E-Mail
-  // gesperrt — und online geht ein Hof nur über diesen Klick. Konten vor dem
-  // Stichtag bleiben unberührt. Frisch aus der Datenbank gelesen (oben).
-  if (bestaetigungOffen(farm.owner)) return { error: FREISCHALTUNG_EMAIL_OFFEN_TEXT }
+  // Die Sperren aus EINER Regel (freischaltSperre, src/lib/admin-hoefe.ts),
+  // alles frisch aus der Datenbank gelesen (oben):
+  // - S3 (Nr. 17b): „Hof online stellen" ist bis zur bestätigten E-Mail
+  //   gesperrt — und online geht ein Hof nur über diesen Klick. Konten vor dem
+  //   Stichtag bleiben unberührt.
+  // - Register Z1: Jeder Hof braucht ein fertiges Stripe-Konto — auch einer
+  //   mit acceptsOnline false aus der Zeit, als „nur bar" noch ging. Das ist
+  //   die serverseitige Schranke für „Hof online stellen".
+  // Bereits freigeschaltete Höfe berührt das nicht; es wirkt nur auf diesen Klick.
+  const sperre = freischaltSperre({
+    emailBestaetigungOffen: bestaetigungOffen(farm.owner),
+    stripeBereit: farm.stripeAccountReady === true,
+  })
+  if (sperre) return { error: sperre }
 
-  await prisma.farm.update({ where: { id: farmId }, data: { approvedAt: new Date() } })
+  // Bedingt schreiben, nicht blind: Die Sperre oben beruht auf einem Lesestand.
+  // Fällt Stripe dazwischen weg (account.updated) oder schaltet ein zweiter
+  // Klick schon frei, trifft das Schreiben nichts — dann keine Mail, sondern
+  // eine Meldung (ARCHITECTURE: der Statuswechsel ist die Sperre).
+  const { count } = await prisma.farm.updateMany({
+    where: { id: farmId, stripeAccountReady: true, approvedAt: null },
+    data: { approvedAt: new Date() },
+  })
+  if (count === 0) return { error: FREISCHALTUNG_GEAENDERT_TEXT }
   revalidateAll(farm.slug)
 
   // Die Zusage an den Hof — NACH dem erfolgreichen Update. Ein Mail-Fehler
   // darf die Freischaltung nicht scheitern lassen: Der Hof ist ab hier
   // öffentlich, die Nachricht lässt sich notfalls von Hand nachholen.
   try {
+    // Erst hier geladen (Nr. 31): /admin bindet diese Actions ein.
+    const { sendFreischaltungEmail } = await import('@/lib/email')
     await sendFreischaltungEmail({
       name: farm.name,
       slug: farm.slug,
@@ -88,7 +112,7 @@ export async function revokeFarmApprovalAction(farmId: string): Promise<{ error?
  * Gegen die Karteileichen, die Bot-Anmeldungen hinterlassen.
  *
  * Abgrenzung zu revokeFarmApprovalAction: Zurücknehmen macht unsichtbar und
- * löscht nichts. Diese Aktion ist endgültig — deshalb hängen vier Guards davor.
+ * löscht nichts. Diese Aktion ist endgültig — deshalb hängen drei Guards davor.
  *
  * Warum überhaupt Guards und nicht einfach `farm.delete`: Die Fremdschlüssel
  * geben das Löschen nicht her (belegt in prisma/migrations/0_init/migration.sql).
@@ -96,10 +120,11 @@ export async function revokeFarmApprovalAction(farmId: string): Promise<{ error?
  *                        lässt sich gar nicht löschen, die DB bricht ab.
  *   OrderItem.productId→ ON DELETE RESTRICT (:449)  dasselbe für die Produkte,
  *                        die per Cascade am Hof hängen.
- *   Order.customerId   → ON DELETE SET NULL (:443)  das Löschen des Users würde
- *                        die Kundenzuordnung fremder Bestellungen STILL kappen.
- * Die ersten beiden wären ein lauter Fehler, der dritte ein leiser Datenverlust.
- * Also wird vorher geprüft statt hinterher aufgeräumt.
+ *   Order.customerId   → ON DELETE SET NULL (:443)  das Löschen des Users kappt
+ *                        die Konto-Verknüpfung alter Bestellungen. Seit E8 liest
+ *                        sie niemand mehr — deshalb keine Sperre (Register B4).
+ * Die ersten beiden wären ein lauter Fehler. Also wird vorher geprüft statt
+ * hinterher aufgeräumt.
  *
  * Reihenfolge beim Löschen ist Pflicht: erst der Hof, dann der User —
  * Farm.ownerId steht ebenfalls auf RESTRICT (:431). Alles Übrige hängt an
@@ -143,15 +168,11 @@ export async function rejectFarmAction(farmId: string): Promise<{ error?: string
     if (positionen > 0) return { error: FARM_REJECT_HAS_DATA_MESSAGE }
   }
 
-  // 4. Keine Bestellungen am Inhaber-Konto — sonst kappt SET NULL still die
-  //    Kundenzuordnung von Bestellungen, die diesen Hof gar nichts angehen.
-  //    Seit E8 (Nr. 17a) hängt der Checkout keine Bestellung mehr an ein Konto;
-  //    verknüpft sind nur noch Bestellungen aus der Zeit davor. Die Sperre
-  //    bleibt bewusst: Sie fasst keine Altdaten an (keine Datenänderung ohne
-  //    Auftrag). Bewusst NICHT nach der Adresse zählen — dann sperrte jede
-  //    Gast-Bestellung unter der Adresse des Inhabers das Ablehnen.
-  const eigeneBestellungen = await prisma.order.count({ where: { customerId: farm.ownerId } })
-  if (eigeneBestellungen > 0) return { error: FARM_REJECT_OWNER_HAS_ORDERS_MESSAGE }
+  // Bestellungen am Inhaber-Konto sperren NICHT (mehr) (Register B4, Nr. 27):
+  // Seit E8 (Nr. 17a) hängt der Checkout keine Bestellung an ein Konto, und
+  // niemand liest `customerId` (Leser gehen nach `customerEmail`). Verknüpft
+  // sind nur Altbestellungen; SET NULL kappt beim Löschen diese tote
+  // Verknüpfung, die Bestellungen selbst bleiben unverändert stehen.
 
   // StockReservation hat als einzige Tabelle KEINEN Fremdschlüssel auf Product
   // (prisma/schema.prisma:387–397: productId ist ein blankes String-Feld).

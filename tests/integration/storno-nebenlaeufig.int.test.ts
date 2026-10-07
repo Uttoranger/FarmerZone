@@ -156,6 +156,8 @@ describe('cancelOrder — Nebenläufigkeit in der echten Datenbank', () => {
     expect(await prisma.product.findUniqueOrThrow({ where: { id: produkt.id } })).toMatchObject({
       stock: 5,
     })
+    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
+    await vi.dynamicImportSettled()
     expect(sendOrderCancelled).not.toHaveBeenCalled()
   })
 })

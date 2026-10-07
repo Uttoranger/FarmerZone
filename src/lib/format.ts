@@ -123,6 +123,27 @@ export function parseDezimal(text: string): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+/**
+ * Ein getippter Euro-Betrag → ganze Cent, z. B. für die Mindestgebühr im
+ * Servicegebühr-Dialog: „1,50" · „1.5" · „0,5" · „,5" → 150 · 150 · 50 · 50.
+ *
+ * Gerechnet wird über die Ziffern, nie über `Math.round(Number(text) * 100)`
+ * (CODING_STANDARDS §2): „0,29" ergäbe als Zahl 28,999999999999996 Cent.
+ * Komma UND Punkt gelten als Trenner, höchstens zwei Nachkommastellen — eine
+ * dritte wird nicht still gerundet, sondern abgelehnt, ebenso Vorzeichen,
+ * Tausendertrenner, Exponent („1e2") und Leeres. `null` heißt: kein Betrag;
+ * die Oberfläche sagt dann einen Satz, statt etwas zu speichern.
+ */
+export function euroEingabeZuCent(eingabe: string): number | null {
+  const treffer = /^(\d*)(?:[.,](\d{0,2}))?$/.exec(eingabe.trim())
+  if (!treffer) return null
+  const [, euroText = '', centText] = treffer
+  // Mindestens eine Ziffer — „," oder „" allein sind kein Betrag.
+  if (euroText === '' && !centText) return null
+  const cent = Number(euroText || '0') * 100 + Number((centText ?? '').padEnd(2, '0'))
+  return Number.isSafeInteger(cent) ? cent : null
+}
+
 /** „1,00" · „5,99" · „0,125" — eine Zahl mit FESTER Stellenzahl, deutsch, ohne Einheit. */
 export function formatDezimal(n: number, stellen: number): string {
   return new Intl.NumberFormat('de-AT', {
@@ -210,7 +231,8 @@ export function plural(n: number, singular: string, mehrzahl: string): string {
  */
 
 /** Maßeinheiten, bei denen ein Grundpreis je Einheit etwas sagt — bei Stück und Paket nicht. */
-const MASS_EINHEITEN = new Set(['KG', 'G', 'LITER', 'ML', 'M3'])
+// Raummeter und Schüttraummeter (E11): Holz wird je Raummaß verglichen (€ / rm).
+const MASS_EINHEITEN = new Set(['KG', 'G', 'LITER', 'ML', 'M3', 'RAUMMETER', 'SCHUETTRAUMMETER'])
 
 export function istMassEinheit(unit: string): boolean {
   return MASS_EINHEITEN.has(unit)

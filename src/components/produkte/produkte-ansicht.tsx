@@ -4,7 +4,7 @@ import { useCallback, useOptimistic, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { Package, Plus, Search, Sparkles } from 'lucide-react'
+import { Lock, Package, Plus, Search, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -17,6 +17,8 @@ import { ProductDialog } from '@/components/products/product-dialog'
 import { produktHinweise } from '@/components/products/produkt-hinweise'
 import { VorratFeld } from '@/components/produkte/vorrat-feld'
 import { WasLegstDuAn } from '@/components/produkte/was-legst-du-an'
+import { FutterFormular } from '@/components/produkte/futter-formular'
+import { BrennmaterialFormular } from '@/components/produkte/brennmaterial-formular'
 import { WiederDaMoment } from '@/components/produkte/wieder-da-moment'
 import { deleteProduct, setzeKategorie } from '@/server/actions/products'
 import type { ProductData } from '@/server/queries/products'
@@ -30,10 +32,15 @@ import {
   sichtbareProdukteFilter,
   wiederDaMomentMoeglich,
   wiederDaTexte,
+  gespeichertMomentMoeglich,
+  gespeichertTexte,
   zaehleProdukteFilter,
+  type ProduktAngelegt,
   type WiederDaTexte,
 } from '@/lib/produkte-hof'
 import { browserSpeicher, leseWiederDaGezeigt, merkeWiederDaGezeigt, wiederDaOeffnen } from '@/lib/wieder-da-moment'
+import { gespeichertOeffnen, leseGespeichertGezeigt, merkeGespeichertGezeigt } from '@/lib/gespeichert-moment'
+import { GESPEICHERT_HINWEIS } from '@/lib/teilen-momente'
 import { produkteAnsichtAus } from '@/schemas/produkte-filter'
 import type { NeuBereich } from '@/schemas/url-auftrag'
 import { formatEuro, formatGebinde, formatKategorie } from '@/lib/format'
@@ -41,6 +48,7 @@ import { wienWochenMontag } from '@/lib/kalender'
 import { PRODUKTNAME_MAX } from '@/lib/eingabegrenzen'
 import type { KategorieVorschlag } from '@/lib/taxonomie'
 import type { NaechstesFenster } from '@/lib/heute'
+import type { HofRegistrierung } from '@/lib/futter-registrierung'
 import { useUrlAuftrag } from '@/lib/use-url-auftrag'
 import { cn } from '@/lib/utils'
 
@@ -48,7 +56,10 @@ type Props = {
   products: ProductData[]
   /** Betriebsnummer aus den Hof-Einstellungen — Anzeige in der Futter-Kennzeichnung. */
   hofBetriebsnummer: string | null
-  hof: { name: string; slug: string; sichtbar: boolean }
+  /** Nummer und Status des Hofs — „Deine Futtermittel-Registrierungen" im Futter-Formular (Nr. 20). */
+  registrierung: HofRegistrierung
+  /** teilenMomenteAus: Farm.teilenMomenteAus (Nr. 30) — dann fragt kein Moment. */
+  hof: { name: string; slug: string; sichtbar: boolean; teilenMomenteAus: boolean }
   naechstesFenster: NaechstesFenster | null
 }
 
@@ -66,7 +77,7 @@ type DialogZustand = { open: boolean; product: ProductData | null; vorwahl: NeuB
  * öffnen ?neu=1 (mit ?bereich= aus „Was legst du an?") und ?edit=<id>.
  * Bearbeiten öffnet der Name; Löschen steht im Bearbeiten-Dialog.
  */
-export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, hof, naechstesFenster }: Props): React.JSX.Element {
+export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, registrierung, hof, naechstesFenster }: Props): React.JSX.Element {
   const ansicht = produkteAnsichtAus(useSearchParams())
   // Die Suche tippt lokal (Leerzeichen am Ende bleiben stehen); die Adresse bekommt sie bereinigt mit.
   const [suche, setSuche] = useState(ansicht.suche)
@@ -74,7 +85,8 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, h
   const [waehlerOffen, setWaehlerOffen] = useState(false)
   const [loeschen, setLoeschen] = useState<ProductData | null>(null)
   const [loeschtGerade, setLoeschtGerade] = useState(false)
-  const [moment, setMoment] = useState<WiederDaTexte | null>(null)
+  // Ein Moment zur Zeit: „wieder da" (Vorrat 0 → mehr) oder „gespeichert" (neu angelegt, Nr. 30).
+  const [moment, setMoment] = useState<{ art: 'wieder-da' | 'gespeichert'; texte: WiederDaTexte } | null>(null)
 
   useUrlAuftrag((auftrag) => {
     setWaehlerOffen(false)
@@ -104,15 +116,37 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, h
   const momentPruefen = useCallback(
     (product: ProductData, vorrat: number) => {
       // product trägt schon die vorgezogene Sichtbarkeit (die Zeilen kommen aus `products`).
-      if (!wiederDaMomentMoeglich({ hofSichtbar: hof.sichtbar, produktSichtbar: product.isAvailable, wiederDa: true })) return
+      if (
+        !wiederDaMomentMoeglich({
+          hofSichtbar: hof.sichtbar,
+          produktSichtbar: product.isAvailable,
+          wiederDa: true,
+          teilenMomenteAus: hof.teilenMomenteAus,
+        })
+      )
+        return
       const speicher = browserSpeicher()
       // Im Handler, nicht beim Rendern: Die Woche des Klicks, in Wiener Zeit.
       const woche = wienWochenMontag(new Date())
       if (!wiederDaOeffnen(leseWiederDaGezeigt(speicher, product.id, woche))) return
       merkeWiederDaGezeigt(speicher, product.id, woche)
-      setMoment(wiederDaTexte({ name: product.name, vorrat, unit: product.unit, unitSize: product.unitSize }, naechstesFenster))
+      setMoment({
+        art: 'wieder-da',
+        texte: wiederDaTexte({ name: product.name, vorrat, unit: product.unit, unitSize: product.unitSize }, naechstesFenster),
+      })
     },
-    [hof.sichtbar, naechstesFenster]
+    [hof.sichtbar, hof.teilenMomenteAus, naechstesFenster]
+  )
+  // Moment „gespeichert" (Nr. 30): nach dem Anlegen, einmal je Produkt bzw. Familie und Gerät.
+  const angelegtPruefen = useCallback(
+    (angelegt: ProduktAngelegt) => {
+      if (!gespeichertMomentMoeglich({ hofSichtbar: hof.sichtbar, kaufbar: angelegt.kaufbar, teilenMomenteAus: hof.teilenMomenteAus })) return
+      const speicher = browserSpeicher()
+      if (!gespeichertOeffnen(leseGespeichertGezeigt(speicher, angelegt.anlass))) return
+      merkeGespeichertGezeigt(speicher, angelegt.anlass)
+      setMoment({ art: 'gespeichert', texte: gespeichertTexte(angelegt.name, naechstesFenster) })
+    },
+    [hof.sichtbar, hof.teilenMomenteAus, naechstesFenster]
   )
   const momentSchliessen = useCallback(() => setMoment(null), [])
 
@@ -131,6 +165,11 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, h
   }
 
   const oeffnen = (product: ProductData) => () => setDialog({ open: true, product, vorwahl: null })
+  const dialogSchliessen = () => setDialog({ open: false, product: null, vorwahl: null })
+  // Futter und Brennmaterial legt man mit Verkaufsgrößen an (Nr. 20, eigene
+  // Formulare); Bearbeiten einer einzelnen Größe bleibt im Produktdialog.
+  const familienFormular =
+    dialog.open && dialog.product === null && (dialog.vorwahl === 'futter' || dialog.vorwahl === 'brennmaterial') ? dialog.vorwahl : null
 
   const neuKnopf = (klassen?: string) => (
     <button
@@ -246,11 +285,17 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, h
 
       <WasLegstDuAn offen={waehlerOffen} onOffenChange={setWaehlerOffen} />
 
+      {familienFormular === 'futter' && (
+        <FutterFormular onClose={dialogSchliessen} registrierung={registrierung} onAngelegt={angelegtPruefen} />
+      )}
+      {familienFormular === 'brennmaterial' && <BrennmaterialFormular onClose={dialogSchliessen} onAngelegt={angelegtPruefen} />}
+
       <ProductDialog
-        open={dialog.open}
+        open={dialog.open && familienFormular === null}
         product={dialog.product}
         vorwahl={dialog.vorwahl}
-        onClose={() => setDialog({ open: false, product: null, vorwahl: null })}
+        onClose={dialogSchliessen}
+        onAngelegt={angelegtPruefen}
         onLoeschen={(product) => {
           setDialog({ open: false, product: null, vorwahl: null })
           setLoeschen(product)
@@ -282,7 +327,17 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, h
         </DialogContent>
       </Dialog>
 
-      {moment && <WiederDaMoment texte={moment} hof={hof} onSchliessen={momentSchliessen} />}
+      {moment?.art === 'wieder-da' && <WiederDaMoment texte={moment.texte} hof={hof} onSchliessen={momentSchliessen} />}
+      {moment?.art === 'gespeichert' && (
+        <WiederDaMoment
+          texte={moment.texte}
+          hof={hof}
+          onSchliessen={momentSchliessen}
+          teilenLabel="Jetzt teilen"
+          schliessenLabel="Später"
+          hinweis={GESPEICHERT_HINWEIS}
+        />
+      )}
     </div>
   )
 }
@@ -411,7 +466,7 @@ function NamenKnopf({ product, onOeffnen }: { product: ProductData; onOeffnen: (
 function Hinweise({ product, onOeffnen }: { product: ProductData; onOeffnen: () => void }): React.JSX.Element | null {
   const [uebernimmt, startTransition] = useTransition()
   const hinweise = produktHinweise(product)
-  if (hinweise.length === 0) return null
+  if (hinweise.length === 0 && !product.sperre) return null
 
   function uebernehmen(vorschlag: KategorieVorschlag) {
     startTransition(async () => {
@@ -428,6 +483,13 @@ function Hinweise({ product, onOeffnen }: { product: ProductData; onOeffnen: () 
   const chip = 'inline-flex min-h-9 items-center gap-1 rounded-full border border-dashed px-2.5 text-xs font-medium transition-colors disabled:opacity-50'
   return (
     <div className="mt-1.5 flex flex-wrap gap-1.5">
+      {/* Sperre je Gebinde (S7, Nr. 20): Warum diese Größe nicht in den Shop darf — ein Hinweis, kein Knopf. */}
+      {product.sperre && (
+        <span className={cn(chip, 'min-h-0 border-status-offen/60 py-0.5 text-status-offen')}>
+          <Lock className="size-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+          {product.sperre}
+        </span>
+      )}
       {hinweise.map((h) => {
         if (h.art === 'kategorie-uebernehmen') {
           return (

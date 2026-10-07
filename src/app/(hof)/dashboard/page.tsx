@@ -15,6 +15,7 @@ import {
   Kennzahlen,
   NaechsteAbholungKarte,
   Packliste,
+  StripeEinrichtenHinweis,
   StripeHinweis,
   TeilenKarte,
   WocheKarte,
@@ -25,6 +26,9 @@ import { datumLang, heuteAufbau, teilenKarte, teilenSatz, vergleichText, type He
 import { freischaltMomentMoeglich } from '@/lib/freischalt-moment'
 import { hofAdresse } from '@/lib/mein-hof'
 import { APP_URL } from '@/lib/umgebung-server'
+import { getTeilenFensterDaten } from '@/server/queries/teilen-bild'
+import { getTeilenWirkung } from '@/server/queries/teilen-wirkung'
+import { letzteTage, teilenWirkungSatz } from '@/lib/teilen-wirkung'
 
 export const metadata: Metadata = {
   title: 'Heute — FarmerZone',
@@ -50,17 +54,23 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   const farm = await getFarmForUser(session.user.id)
   if (!farm) redirect('/onboarding')
 
-  // Frist gilt beim Lesen: Verwaiste Bestellungen geben ihre Ware frei, bevor
-  // die Seite Bestand und Bestellungen zeigt (src/lib/fristen.ts). Fehler nur gemeldet.
-  await gibVerwaisteFreiOhneRisiko(farm.id)
-
   // Ein Zeitpunkt für die ganze Seite: Datum, Tag, Woche und Zeitfenster passen zusammen.
   const jetzt = new Date()
-  const heute = await getHeute(farm.id, jetzt)
+
+  // Frist gilt beim Lesen: Verwaiste Bestellungen geben ihre Ware frei, bevor
+  // die Seite Bestand und Bestellungen zeigt (src/lib/fristen.ts). Fehler nur
+  // gemeldet. Bewusst VOR der Antwort, nicht per after(): Packliste,
+  // „überfällig", „ausverkauft" und das Angebot der Teilen-Karte zeigten sonst
+  // eine verfallene Bestellung und ihre noch gebundene Ware. getHeute wartet
+  // nur mit diesen Abfragen auf die Freigabe, alle anderen laufen daneben
+  // (Nachtlauf Nr. 31); der Cookie ebenso.
+  const [heute, cookieJar] = await Promise.all([
+    getHeute(farm.id, jetzt, gibVerwaisteFreiOhneRisiko(farm.id, jetzt)),
+    cookies(),
+  ])
 
   // Der Cookie entscheidet auf dem Server, ob die Karte oder die Zeile
   // „Erste Schritte einblenden" kommt — so blitzt nichts auf und nichts rutscht nach.
-  const cookieJar = await cookies()
   const ersteSchritteZeigen = ersteSchritteAnzeige(
     heute.ersteSchritte,
     ersteSchritteAusgeblendet(cookieJar.get(ERSTE_SCHRITTE_AUS_COOKIE)?.value, farm.id)
@@ -68,17 +78,28 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
 
   const teilen = teilenKarte({ sichtbar: heute.hof.sichtbar, abholtag: heute.abholfensterHeute !== null })
   const aufbau = heuteAufbau({
-    stripeHinweis: heute.onlinePausiert !== null,
+    // „pausiert" (Notbremse) oder „einrichten" (Register Z1) — nie beide, siehe stripeEinrichtenHinweis.
+    stripeHinweis: heute.onlinePausiert !== null || heute.stripeEinrichten,
     teilen,
     ersteSchritte: ersteSchritteZeigen === 'karte',
   })
   const satz = teilenSatz(heute.angebot, heute.naechstesFenster?.fenster ?? null)
   const adresse = hofAdresse(APP_URL, farm.slug).anzeige
+  // Teilen-Fenster und „letzte Woche … über deine Links" (Nr. 21, Gate 7) —
+  // nur, wenn die Karte überhaupt steht.
+  const [fenster, wirkung] = teilen
+    ? await Promise.all([getTeilenFensterDaten(farm.id, jetzt), getTeilenWirkung(farm.id, letzteTage(jetzt, 7))])
+    : [null, null]
+  const wirkungSatz = wirkung ? teilenWirkungSatz(wirkung) : null
 
   const bloecke: Record<HeuteBlock, ReactNode> = {
-    stripe: heute.onlinePausiert && <StripeHinweis barMoeglich={heute.onlinePausiert.barMoeglich} />,
-    'teilen-schmal': teilen && <TeilenKarte form="schmal" hofName={farm.name} hofSlug={farm.slug} satz={satz} adresse={adresse} />,
-    'teilen-gross': teilen && <TeilenKarte form="gross" hofName={farm.name} hofSlug={farm.slug} satz={satz} adresse={adresse} />,
+    stripe: heute.onlinePausiert ? (
+      <StripeHinweis barMoeglich={heute.onlinePausiert.barMoeglich} />
+    ) : (
+      heute.stripeEinrichten && <StripeEinrichtenHinweis />
+    ),
+    'teilen-schmal': teilen && <TeilenKarte form="schmal" hofName={farm.name} hofSlug={farm.slug} satz={satz} adresse={adresse} fenster={fenster} wirkung={wirkungSatz} />,
+    'teilen-gross': teilen && <TeilenKarte form="gross" hofName={farm.name} hofSlug={farm.slug} satz={satz} adresse={adresse} fenster={fenster} wirkung={wirkungSatz} />,
     packliste: (
       <Packliste
         zeilen={heute.abholungen}
@@ -129,7 +150,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
         )}
       </div>
 
-      {freischaltMomentMoeglich({ approvedAt: heute.hof.approvedAt, sichtbar: heute.hof.sichtbar }, jetzt) && (
+      {freischaltMomentMoeglich(heute.hof, jetzt) && (
         <FreischaltMoment farmId={farm.id} hofName={farm.name} hofSlug={farm.slug} />
       )}
     </div>

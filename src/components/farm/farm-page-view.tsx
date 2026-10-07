@@ -66,6 +66,7 @@ import { stripStatusVariables, renderStatusBodyWithChip } from '@/lib/status-bod
 // Ersatz-Titelbild ohne Foto — gemeinsam mit dem Kopf von „Mein Hof".
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
 import { produktLink } from '@/lib/produktdetail'
+import { NICHT_IM_SHOP_IM_SATZ } from '@/lib/produkt-sichtbarkeit'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
 import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
 
@@ -769,7 +770,7 @@ function HofseiteBesitzer({
   const hiddenCount = farm.products.filter((p) => !p.isAvailable).length
   const productCountLabel = ownerMode
     ? isEdit
-      ? `${publicCount} sichtbar${hiddenCount > 0 ? ` · ${hiddenCount} ausgeblendet` : ''}`
+      ? `${publicCount} sichtbar${hiddenCount > 0 ? ` · ${hiddenCount} ${NICHT_IM_SHOP_IM_SATZ}` : ''}`
       : `${publicCount} Produkte`
     : publicCount > 0
       ? `${publicCount} Produkte`
@@ -812,7 +813,7 @@ function HofseiteBesitzer({
               <div className="text-[13px] mt-px" style={{ color: isEdit ? 'var(--app-ink-faint)' : '#C9E3CF' }}>
                 {isEdit
                   ? 'Alles mit Stift-Symbol kannst du ändern – Kunden sehen es sofort.'
-                  : 'Bearbeiten-Knöpfe und ausgeblendete Produkte sind unsichtbar.'
+                  : `Bearbeiten-Knöpfe und Produkte, die ${NICHT_IM_SHOP_IM_SATZ} stehen, sind unsichtbar.`
                 }
               </div>
             </div>

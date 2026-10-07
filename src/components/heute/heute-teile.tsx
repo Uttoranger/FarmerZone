@@ -17,6 +17,8 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { ProgressBar } from '@/components/ui/progress-bar'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { HofTeilenKnopf } from '@/components/farmer/hof-teilen-knopf'
+import { TeilenFensterKnopf } from '@/components/teilen/teilen-fenster'
+import type { TeilenFensterDaten } from '@/lib/teilen-fenster'
 import {
   PACK_MARKE,
   naechsteAbholungText,
@@ -28,6 +30,7 @@ import {
   type WochenBalken,
 } from '@/lib/heute'
 import { onlinePausiertHinweis } from '@/lib/stripe-konto'
+import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -130,12 +133,37 @@ export function StripeHinweis({ barMoeglich }: { barMoeglich: boolean }): React.
   )
 }
 
+/**
+ * Online-Zahlung einrichten (Register Z1, stripeEinrichtenHinweis): für
+ * freigeschaltete Höfe ohne Stripe. Nur ein Hinweis — der Hof bleibt online.
+ * Derselbe Platz und dieselbe Form wie „pausiert", damit er nicht übersehen
+ * wird; der Weg führt in die Zahlungs-Einstellungen, die Seite ruft Stripe
+ * nicht selbst auf.
+ */
+export function StripeEinrichtenHinweis(): React.JSX.Element {
+  return (
+    <Hinweiskarte
+      ton="orange"
+      symbol={CreditCard}
+      titel={ONLINE_ZAHLUNG_EINRICHTEN_TITEL}
+      aktion={
+        <Link href="/settings/payments" className={KNOPF_ORANGE}>
+          Jetzt einrichten
+        </Link>
+      }
+    >
+      <p className="text-[12.5px]">{ONLINE_ZAHLUNG_EINRICHTEN_SATZ}</p>
+    </Hinweiskarte>
+  )
+}
+
 // ─── Teilen-Karte ───────────────────────────────────────────────────────────
 
 /**
  * Schmal an Abholtagen (eine orange Zeile, die Packliste hat Vorrang), groß an
- * Tagen ohne Abholung. Geteilt wird nur die öffentliche Hofseite über
- * teileHof (HofTeilenKnopf) — ohne Zählung, ohne eigene Kanäle (Gate 7).
+ * Tagen ohne Abholung. Seit Nr. 21 (Gate 7) öffnet der Knopf das
+ * Teilen-Fenster mit Bild und Kanälen, wenn die Seite dessen Daten mitgibt;
+ * sonst bleibt es beim einfachen Teilen der Hofseite (teileHof).
  */
 export function TeilenKarte({
   form,
@@ -143,6 +171,8 @@ export function TeilenKarte({
   hofSlug,
   satz,
   adresse,
+  fenster = null,
+  wirkung = null,
 }: {
   form: Exclude<TeilenForm, null>
   hofName: string
@@ -150,7 +180,17 @@ export function TeilenKarte({
   satz: string
   /** „farmerzone.at/hof" (hofAdresse) — als Link auf die Hofseite. */
   adresse: string
+  /** Daten des Teilen-Fensters (Nr. 21); ohne sie das einfache Teilen. */
+  fenster?: TeilenFensterDaten | null
+  /** „14 Besuche über deine Links" der letzten Woche (teilenWirkungSatz). */
+  wirkung?: string | null
 }): React.JSX.Element {
+  const knopf = (label: string, klasse: string) =>
+    fenster ? (
+      <TeilenFensterKnopf daten={fenster} label={label} className={klasse} />
+    ) : (
+      <HofTeilenKnopf name={hofName} slug={hofSlug} label={label} className={klasse} />
+    )
   if (form === 'schmal') {
     // Eine Zeile auch am Handy (Mockup mobil-h3-heute-mit-teilen-karte): Knopf
     // rechts statt darunter, damit die Packliste nicht nach unten rutscht.
@@ -159,8 +199,9 @@ export function TeilenKarte({
         <Share2 className="hidden size-5 shrink-0 text-status-offen sm:block" strokeWidth={1.7} aria-hidden="true" />
         <p className="min-w-0 flex-1 line-clamp-2 break-words">
           <strong className="font-semibold">Diese Woche bei dir:</strong> {satz}
+          {wirkung && <span className="text-muted-foreground"> · letzte Woche {wirkung}</span>}
         </p>
-        <HofTeilenKnopf name={hofName} slug={hofSlug} label="Teilen" className={KNOPF_ORANGE} />
+        {knopf('Teilen', KNOPF_ORANGE)}
       </div>
     )
   }
@@ -174,6 +215,7 @@ export function TeilenKarte({
           Erzähl, was es diese Woche gibt
         </h2>
         <p className="mt-1 line-clamp-3 text-[13.5px] break-words">{satz}</p>
+        {wirkung && <p className="mt-1 text-[12.5px] text-muted-foreground">Letzte Woche {wirkung}.</p>}
         <a
           href={`/${hofSlug}`}
           target="_blank"
@@ -185,7 +227,7 @@ export function TeilenKarte({
           <span className="min-w-0 truncate">{adresse}</span>
         </a>
       </div>
-      <HofTeilenKnopf name={hofName} slug={hofSlug} label="Hof teilen" className={cn(KNOPF_ORANGE, 'w-full rounded-[14px]')} />
+      {knopf('Hof teilen', cn(KNOPF_ORANGE, 'w-full rounded-[14px]'))}
     </section>
   )
 }

@@ -11,6 +11,14 @@ import { CHANNEL_LABELS } from '@/schemas/manual-sale'
 import { wienKalendertag } from '@/lib/kalender'
 import { datumKurz } from '@/lib/verkauf-eintragen'
 
+/**
+ * Die Zeile unter der Wochenzahl (Register F6, 22b). Die Summe ist nicht der
+ * ganze Umsatz, sondern das Wiener Kalenderjahr ohne Urproduktion
+ * (`getYtdRevenue`, countsTowardLimit) — also das, was für die Umsatzgrenze
+ * zählt. „Gesamt" versprach mehr, als die Zahl ist.
+ */
+export const JAHRESSUMME_TEXT = 'Dieses Jahr (für die Umsatzgrenze)'
+
 /** Ein Direktverkauf, wie das Formular ihn zum Bearbeiten und Wiederholen braucht. */
 export type VerkaufDaten = {
   id: string

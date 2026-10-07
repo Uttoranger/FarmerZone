@@ -98,8 +98,11 @@ export async function erstelleHofMitAnmeldung(
   const email = `${kennung}@example.com`
   const passwort = 'test-passwort-1234'
 
-  const angemeldet = await auth.api.signUpEmail({
-    body: { email, password: passwort, name: 'Max Mustermann' },
+  // Registrieren meldet seit Nr. 27 nicht mehr an (`autoSignIn: false`,
+  // Register F6 „19b") — die Sitzung kommt aus der Anmeldung danach.
+  await auth.api.signUpEmail({ body: { email, password: passwort, name: 'Max Mustermann' } })
+  const angemeldet = await auth.api.signInEmail({
+    body: { email, password: passwort },
     asResponse: true,
   })
   const cookie = angemeldet.headers
@@ -202,6 +205,8 @@ export function checkoutAnfrage(eingabe: {
   paymentMethod?: 'ONSITE_CASH' | 'ONSITE_CARD' | 'ONLINE'
   /** Abholtag JJJJ-MM-TT, Standard: morgen in Wien. */
   pickupDate?: string
+  /** Weitere Felder des Bodys, roh — auch ungültige (Teilen-Kanal, Nr. 21). */
+  zusatz?: Record<string, unknown>
 }): NextRequest {
   // Morgen im Wiener Kalender — so prüft der Checkout das Abholfenster.
   const datum = eingabe.pickupDate ?? morgenInWien()
@@ -221,6 +226,7 @@ export function checkoutAnfrage(eingabe: {
     kaeuferArt: eingabe.kaeuferArt ?? 'PRIVAT',
     betriebsnummer: eingabe.betriebsnummer,
     items: eingabe.positionen,
+    ...eingabe.zusatz,
   }
 
   return new NextRequest('http://localhost:3000/api/checkout', {

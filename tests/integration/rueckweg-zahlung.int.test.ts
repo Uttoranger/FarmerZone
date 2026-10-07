@@ -22,7 +22,7 @@ vi.mock('@/lib/email', () => ({
 }))
 
 import { headers } from 'next/headers'
-import { markAsPickedUpAndPaid, markAsReady, revertOrderStatus } from '@/server/actions/orders'
+import { markAsPickedUp, markAsPickedUpAndPaid, markAsReady, revertOrderStatus, revertPickedUp } from '@/server/actions/orders'
 import { prisma } from '@/lib/prisma'
 import { erstelleHofMitAnmeldung, intKennung, raeumeAuf } from './setup/basis'
 
@@ -86,6 +86,34 @@ describe('revertOrderStatus — Zahlung in der echten Datenbank', () => {
 
     const danach = await prisma.order.findUniqueOrThrow({ where: { id: b.id } })
     expect(danach.status).toBe('PAID')
+    expect(danach.paymentStatus).toBe('PAID')
+    expect(danach.paidAt?.getTime()).toBe(bezahltAm.getTime())
+    expect(stimmig(danach)).toBe(true)
+  })
+})
+
+describe('revertPickedUp (Dialog „Abholung rückgängig", Nr. 32) — Zahlung in der echten Datenbank', () => {
+  it('bar: „Abgeholt und kassiert" → Abholung rückgängig ergibt wieder „gepackt, offen zu kassieren"', async () => {
+    const b = await bestellung({ status: 'READY', paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', paidAt: null })
+
+    expect(await markAsPickedUpAndPaid(b.id)).toEqual({})
+    expect(await revertPickedUp(b.id)).toEqual({})
+
+    const danach = await prisma.order.findUniqueOrThrow({ where: { id: b.id } })
+    expect(danach).toMatchObject({ status: 'READY', paymentStatus: 'PENDING', paidAt: null, pickedUpAt: null })
+    expect(stimmig(danach)).toBe(true)
+  })
+
+  it('online: „Abgeholt" → Abholung rückgängig lässt Zahlung und Zahlzeitpunkt stehen', async () => {
+    const bezahltAm = new Date(Date.now() - 60 * 60 * 1000)
+    const b = await bestellung({ status: 'READY', paymentMethod: 'ONLINE', paymentStatus: 'PAID', paidAt: bezahltAm })
+
+    expect(await markAsPickedUp(b.id)).toEqual({})
+    expect(await revertPickedUp(b.id)).toEqual({})
+
+    const danach = await prisma.order.findUniqueOrThrow({ where: { id: b.id } })
+    expect(danach.status).toBe('READY')
+    expect(danach.pickedUpAt).toBeNull()
     expect(danach.paymentStatus).toBe('PAID')
     expect(danach.paidAt?.getTime()).toBe(bezahltAm.getTime())
     expect(stimmig(danach)).toBe(true)

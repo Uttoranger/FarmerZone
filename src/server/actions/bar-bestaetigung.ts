@@ -4,7 +4,6 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
-import { sendOrderConfirmation, sendOrderConfirmedToFarmer } from '@/lib/email'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { barBestaetigungsPfad, bestaetigungsPfad } from '@/lib/bestell-link'
 import { barBestaetigungsAnsicht, GRUND_KUNDIN_STORNIERT } from '@/lib/bar-bestaetigung'
@@ -122,8 +121,10 @@ export async function bestaetigeBarBestellung(_vorher: BarAktionStand, formular:
   // Bestellungen). Nur die Bestell-ID geht nach Sentry.
   nachDerAntwort(async () => {
     for (const [mail, senden] of [
-      ['bestaetigung_kundin', () => sendOrderConfirmation(mailBestellung)],
-      ['bestaetigung_hof', () => sendOrderConfirmedToFarmer(mailBestellung)],
+      // Der Versand erst hier geladen (Nr. 31) — im try: Scheitert schon das
+      // Laden, ist es ein Mailfehler wie jeder andere.
+      ['bestaetigung_kundin', async () => (await import('@/lib/email')).sendOrderConfirmation(mailBestellung)],
+      ['bestaetigung_hof', async () => (await import('@/lib/email')).sendOrderConfirmedToFarmer(mailBestellung)],
     ] as const) {
       try {
         await senden()

@@ -272,20 +272,27 @@ export function ariaAktuell(pfad: string, punkt: NavPunkt): 'page' | 'true' | un
 //
 // Unterschiede zum Bestand, alle aus dem Mockup:
 //  - Handy: Produkte statt Mein Hof in der Leiste; Mein Hof steht in „Mehr".
-//  - „Verkauf und Kunden" bekommt „Region". Eine eigene Route /region gibt es
-//    erst mit Gate 8 — bis dahin führt der Punkt auf das heutige Umfeld.
+//  - „Verkauf und Kunden" bekommt „Region" — seit Nr. 22c (Gate 8) eine
+//    eigene Route /region mit den Reitern Preise vergleichen | Futter kaufen;
+//    das alte /analytics/umfeld leitet dorthin um.
 //  - „Beiträge" ist ein Reiter in Mein Hof (E12), kein eigener Punkt.
 //  - Das Neu-Menü fragt „Was legst du an?". Seit Nr. 18 bestimmt die Wahl
 //    Lebensmittel · Futtermittel · Brennmaterial das Formular (?bereich= am
 //    Anlegen-Auftrag, lib/url-auftrag.ts); darunter „Oder etwas anderes":
 //    Beitrag und Verkauf eintragen (E13).
 
+/**
+ * Die Adresse von „Region" (Nr. 22c) — EINE Quelle für den Punkt der Shell,
+ * die Reiter-Links und die Umleitung von /analytics/umfeld.
+ */
+export const REGION_HREF = '/region'
+
 /** Punkte der HofShell: die des Bestands plus „Region". */
 export type HofNavId = NavPunktId | 'region'
 
 export type HofNavPunkt = Omit<NavPunkt, 'id'> & { id: HofNavId }
 
-const REGION: HofNavPunkt = { id: 'region', label: 'Region', href: '/analytics/umfeld' }
+const REGION: HofNavPunkt = { id: 'region', label: 'Region', href: REGION_HREF }
 
 /** „Verkauf und Kunden" der HofShell — im Browser als Gruppe, am Handy in „Mehr". */
 const HOF_VERKAUF_UND_KUNDEN: readonly HofNavPunkt[] = [...VERKAUF_UND_KUNDEN, REGION]
@@ -307,16 +314,21 @@ export type HofNeuPunkt = {
 }
 
 /**
+ * „Neues Futtermittel" — das Formular mit Verkaufsgrößen (Nr. 20). Auch der
+ * Produktdialog verweist dorthin, wenn man in ihm ein Futtermittel anlegen will.
+ */
+export const FUTTER_ANLEGEN_HREF = '/products?neu=1&bereich=futter'
+
+/**
  * Das Neu-Menü (Browser: Aufklappmenü am Neu-Knopf und der Dialog hinter
  * „+ Neues Produkt", Handy: Blatt hinter dem Plus) — EINE Liste für alle drei.
- * Futtermittel und Brennmaterial führen bis Gate 6 (Nr. 20) in den
- * vorhandenen Produktdialog, der beide schon kann (Kennzeichnung, Brennholz):
- * Nichts geht verloren, und nichts verspricht Verkaufsgrößen, die es noch
- * nicht gibt.
+ * Seit Gate 6 (Nr. 20) öffnen Futtermittel und Brennmaterial die Formulare mit
+ * Verkaufsgrößen (src/components/produkte/futter-formular.tsx,
+ * brennmaterial-formular.tsx); Lebensmittel den Produktdialog.
  */
 export const HOF_NEU: readonly HofNeuPunkt[] = [
   { id: 'lebensmittel', label: 'Lebensmittel', satz: 'Eier, Gemüse, Fleisch, Brot, Honig …', href: '/products?neu=1&bereich=lebensmittel', gruppe: 'anlegen' },
-  { id: 'futtermittel', label: 'Futtermittel', satz: 'Heu, Stroh, Getreide, Silage', href: '/products?neu=1&bereich=futter', gruppe: 'anlegen' },
+  { id: 'futtermittel', label: 'Futtermittel', satz: 'Heu, Stroh, Getreide, Silage', href: FUTTER_ANLEGEN_HREF, gruppe: 'anlegen' },
   { id: 'brennmaterial', label: 'Brennmaterial', satz: 'Brennholz, Anzündholz, Hackschnitzel', href: '/products?neu=1&bereich=brennmaterial', gruppe: 'anlegen' },
   { id: 'status-posten', label: 'Neuer Beitrag', satz: 'Neuigkeit auf deiner Hofseite', href: '/status/new', gruppe: 'anderes' },
   { id: 'verkauf-eintragen', label: 'Verkauf eintragen', satz: 'Was du am Hof oder am Markt verkauft hast', href: '/sales?neu=1', gruppe: 'anderes' },

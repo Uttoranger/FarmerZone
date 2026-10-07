@@ -524,13 +524,13 @@ describe('leseUmfeldFilter — Umkreis, Bereich und Ansicht aus der URL', () => 
 
   it('der Link trägt Umkreis und Bereich immer, die Ansicht nur als Karte — und das Lesen ergibt sie zurück', () => {
     const link = umfeldLink({ km: 50, bereich: 'FUTTERMITTEL', ansicht: 'karte' })
-    expect(link).toBe('/analytics/umfeld?km=50&bereich=futter&ansicht=karte')
+    expect(link).toBe('/region?km=50&bereich=futter&ansicht=karte')
     const params = new URLSearchParams(link.split('?')[1])
     expect(
       leseUmfeldFilter({ km: params.get('km'), bereich: params.get('bereich'), ansicht: params.get('ansicht') })
     ).toEqual({ km: 50, bereich: 'FUTTERMITTEL', ansicht: 'karte' })
-    expect(umfeldLink({ km: 25, bereich: 'LEBENSMITTEL' })).toBe('/analytics/umfeld?km=25&bereich=hofladen')
-    expect(umfeldLink({ km: 25, bereich: 'LEBENSMITTEL', ansicht: 'liste' })).toBe('/analytics/umfeld?km=25&bereich=hofladen')
+    expect(umfeldLink({ km: 25, bereich: 'LEBENSMITTEL' })).toBe('/region?km=25&bereich=hofladen')
+    expect(umfeldLink({ km: 25, bereich: 'LEBENSMITTEL', ansicht: 'liste' })).toBe('/region?km=25&bereich=hofladen')
   })
 
   it('die Umkreis-Stufen sind die des Reglers auf /hoefe ohne „egal"', () => {

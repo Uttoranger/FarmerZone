@@ -1,5 +1,4 @@
 import type Stripe from 'stripe'
-import { stripe } from '@/lib/stripe'
 
 /**
  * Erstattungen mit FESTEN Beträgen bei einer Destination Charge
@@ -98,8 +97,46 @@ export function erstattungZaehlt(status: string | null): boolean {
   return status !== 'failed' && status !== 'canceled'
 }
 
+/*
+ * Das Stripe-SDK erst im Aufruf (Nachtlauf Nr. 31, ARCHITECTURE §4): Dieses
+ * Modul hängt an den Bestell-Actions, die /orders einbindet — ein statischer
+ * Import legte das SDK in jeden Kaltstart der Seite.
+ *
+ * Einmal je Instanz geladen und gemerkt. Wer die Funktionen hier innerhalb
+ * einer Transaktion mit Zeilensperre aufruft (meldeFehlendenArtikel), ruft
+ * `stripeVorladen()` VOR der Transaktion: Das Laden des Moduls soll die
+ * Sperre nicht verlängern — in der Transaktion wird dann nicht mehr
+ * importiert (tests/schwere-module.test.ts).
+ */
+let geladenesSdk: Stripe | null = null
+
+export async function stripeVorladen(): Promise<Stripe> {
+  if (!geladenesSdk) geladenesSdk = (await import('@/lib/stripe')).stripe
+  return geladenesSdk
+}
+
+async function stripeSdk(): Promise<Stripe> {
+  return geladenesSdk ?? stripeVorladen()
+}
+
 function merkmal(orderId: string, anlass: Anlass, positionId: string | null, art: 'kunde' | 'hof'): Stripe.MetadataParam {
   return { orderId, anlass, art, ...(positionId ? { positionId } : {}) }
+}
+
+/** Anlass der Vollerstattung beim Storno (reverse_transfer, Nr. 27). */
+export const ANLASS_VOLLSTORNO = 'vollstorno'
+
+/**
+ * Die Merkmale der Vollerstattung — dasselbe Muster wie bei der
+ * Teilerstattung (`merkmal`): Bestellung, Anlass, Art. Damit erkennt der
+ * Webhook eine später gescheiterte Vollerstattung als nachweislich unsere
+ * Buchung (src/server/erstattung-gescheitert.ts). Bewusst KEIN `Anlass`:
+ * `ordneZu` ordnet sie nie einem Teil- oder Rest-Storno zu — taucht sie
+ * neben einem solchen auf, bleibt das Bild „unklar" und es wird nichts
+ * gebucht, wie bisher bei der Vollerstattung ohne Merkmale.
+ */
+export function vollstornoMerkmal(orderId: string): Stripe.Metadata {
+  return { orderId, anlass: ANLASS_VOLLSTORNO, art: 'kunde' }
 }
 
 /**
@@ -133,6 +170,7 @@ export async function ladeStripeStand(
     gescheitert?: string
   } = {}
 ): Promise<StripeStand> {
+  const stripe = await stripeSdk()
   const intent = await stripe.paymentIntents.retrieve(paymentIntentId, { expand: ['latest_charge'] }, STRIPE_OPTIONEN)
   const zahlung = intent.latest_charge && typeof intent.latest_charge !== 'string' ? (intent.latest_charge as Stripe.Charge) : null
   const transfer = zahlung?.transfer ?? null
@@ -184,6 +222,7 @@ export async function erstatteKundin(
 ): Promise<{ erstattetCents: number; nachgetragen: boolean }> {
   const alt = vorhanden(stand.erstattungen, e.anlass, e.positionId)
   if (alt) return { erstattetCents: alt.betrag, nachgetragen: true }
+  const stripe = await stripeSdk()
   const erstattung = await stripe.refunds.create(
     {
       payment_intent: e.paymentIntentId,
@@ -193,7 +232,7 @@ export async function erstatteKundin(
     { ...STRIPE_OPTIONEN, idempotencyKey: e.schluessel }
   )
   if (!erstattungZaehlt(erstattung.status)) {
-    throw new StripeStandUnklar('erstattung_gescheitert', { orderId: e.orderId, status: erstattung.status ?? 'unbekannt' })
+    throw new StripeStandUnklar('erstattung_gescheitert', { orderId: e.orderId, status: erstattung.status ?? 'unbekannt', refundId: erstattung.id })
   }
   stand.erstattungen.push({ anlass: e.anlass, positionId: e.positionId, betrag: erstattung.amount })
   return { erstattetCents: erstattung.amount, nachgetragen: false }
@@ -217,6 +256,7 @@ export async function bucheVomHofZurueck(
 ): Promise<boolean> {
   if (r.betragCents <= 0 || vorhanden(stand.rueckbuchungen, r.anlass, r.positionId)) return false
   try {
+    const stripe = await stripeSdk()
     const rueck = await stripe.transfers.createReversal(
       stand.ueberweisung,
       { amount: r.betragCents, metadata: merkmal(r.orderId, r.anlass, r.positionId, 'hof') },
@@ -241,6 +281,7 @@ export function teilstornoSumme(liste: Buchung[]): number {
  * die nur stimmt, wenn noch nichts erstattet ist. `unklar` wie oben.
  */
 export async function hatErstattungen(paymentIntentId: string): Promise<boolean> {
+  const stripe = await stripeSdk()
   const liste = await stripe.refunds.list({ payment_intent: paymentIntentId, limit: SEITE }, STRIPE_OPTIONEN)
   if (liste.has_more) return true
   return liste.data.some((r) => erstattungZaehlt(r.status))

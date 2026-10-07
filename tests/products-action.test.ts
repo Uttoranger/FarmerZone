@@ -24,7 +24,9 @@ vi.mock('@/lib/prisma', () => {
   }
   return {
     prisma: {
-      product: { create: vi.fn() },
+      // findFirst/farm.findUnique seit Nr. 20: Sperre je Gebinde beim Bearbeiten (S7).
+      product: { create: vi.fn(), findFirst: vi.fn() },
+      farm: { findUnique: vi.fn() },
       // Interaktive Transaktion: der Callback bekommt den Mock-Client.
       $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
       __tx: tx,
@@ -34,6 +36,8 @@ vi.mock('@/lib/prisma', () => {
 
 import { createProduct, updateProduct } from '@/server/actions/products'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
+import { FUTTER_BESTAETIGUNG_NEU, FUTTER_NUR_UEBER_FORMULAR, SPERR_GRUND } from '@/lib/futter-registrierung'
+import { Prisma } from '@prisma/client'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getFarmForUser } from '@/server/queries/dashboard'
@@ -47,6 +51,8 @@ const tx = (prisma as unknown as { __tx: Tx }).__tx
 const getSession = vi.mocked(auth.api.getSession)
 const farmForUser = vi.mocked(getFarmForUser)
 const productCreate = vi.mocked(prisma.product.create)
+const productFindFirst = vi.mocked(prisma.product.findFirst)
+const farmFindUnique = vi.mocked(prisma.farm.findUnique)
 
 const JETZT = new Date('2026-09-21T10:00:00.000Z')
 
@@ -92,10 +98,13 @@ beforeEach(() => {
   vi.setSystemTime(JETZT)
   getSession.mockResolvedValue({ user: { id: 'user_1' } } as never)
   farmForUser.mockResolvedValue({ id: 'farm_1', slug: 'testhof', name: 'Hof Test' } as never)
-  productCreate.mockResolvedValue({ id: 'p_neu' } as never)
+  productCreate.mockResolvedValue({ id: 'p_neu', isAvailable: true, stock: 12 } as never)
   tx.product.updateMany.mockResolvedValue({ count: 1 })
   tx.futterKennzeichnung.upsert.mockResolvedValue({})
   tx.futterKennzeichnung.deleteMany.mockResolvedValue({ count: 0 })
+  // Futter-Altbestand ohne Verpackung: keine Sperre (src/lib/futter-registrierung.ts).
+  productFindFirst.mockResolvedValue({ category: 'HEU_STROH', verpackung: null } as never)
+  farmFindUnique.mockResolvedValue({ betriebsnummer: null, betriebsstatus: null } as never)
 })
 
 afterEach(() => {
@@ -103,10 +112,20 @@ afterEach(() => {
 })
 
 describe('createProduct', () => {
+  // Nachbesserung Nr. 30: „ist online" nur, wenn Kunden die Ware sehen UND kaufen können.
+  it('Moment-Anlass: ohne Vorrat (ausverkauft) oder ausgeblendet ist das Neue nicht kaufbar', async () => {
+    productCreate.mockResolvedValueOnce({ id: 'p_leer', isAvailable: true, stock: 0 } as never)
+    expect(await createProduct(basis as never)).toEqual({ ok: true, angelegt: { id: 'p_leer', kaufbar: false } })
+    productCreate.mockResolvedValueOnce({ id: 'p_entwurf', isAvailable: false, stock: 5 } as never)
+    expect(await createProduct(basis as never)).toEqual({ ok: true, angelegt: { id: 'p_entwurf', kaufbar: false } })
+  })
+
   it('schreibt Unterkategorie und Siegel — und isOrganic nie mehr', async () => {
     const ergebnis = await createProduct(basis as never)
 
-    expect(ergebnis).toEqual({ ok: true })
+    // Nr. 30: Die Antwort nennt das neue Produkt und ob Kunden es kaufen können (Moment „gespeichert").
+    expect(ergebnis).toEqual({ ok: true, angelegt: { id: 'p_neu', kaufbar: true } })
+    expect(productCreate.mock.calls[0][0].select).toEqual({ id: true, isAvailable: true, stock: true })
     const data = productCreate.mock.calls[0][0].data as Record<string, unknown>
     expect(data.farmId).toBe('farm_1')
     expect(data.subcategory).toBe('RIND')
@@ -117,37 +136,17 @@ describe('createProduct', () => {
     expect(revalidatePath).toHaveBeenCalledWith('/testhof')
   })
 
-  it('legt bei Futtermitteln die Kennzeichnung mit bestaetigtAm = jetzt an', async () => {
-    await createProduct(heu as never)
+  // Geändert in Nr. 20 (Gate 6, S7): Neue Futtermittel entstehen nur noch im
+  // Futter-Formular mit Verkaufsgrößen — dort wird je Größe die Verpackung
+  // gesetzt, an der die Sperre hängt. Wie die Kennzeichnung beim Anlegen
+  // geschrieben wird (bestaetigtAm = jetzt, keine Registrierungsnummer,
+  // Abgabe), prüft jetzt tests/produktfamilie-aktion.test.ts.
+  it('legt kein neues Futtermittel an und verweist auf das Futter-Formular', async () => {
+    const ergebnis = await createProduct(heu as never)
 
-    const data = productCreate.mock.calls[0][0].data as { futter?: { create: Record<string, unknown> } }
-    expect(data.futter?.create).toMatchObject({
-      futtermittelart: 'EINZELFUTTERMITTEL',
-      zielTierarten: ['PFERD', 'RIND'],
-      zusammensetzung: 'Heu vom ersten Schnitt',
-      nettoMenge: 300,
-      nettoEinheit: 'KG',
-      rohprotein: 9.5,
-      rohfaser: null,
-      zusatzstoffe: null,
-      gebrauchshinweis: null,
-      bestaetigtAm: JETZT,
-    })
-    expect('bestaetigt' in (data.futter?.create ?? {})).toBe(false)
-  })
-
-  it('schreibt die Registrierungsnummer nicht mehr — sie gehört dem Hof (F6)', async () => {
-    await createProduct(heu as never)
-
-    const data = productCreate.mock.calls[0][0].data as { futter?: { create: Record<string, unknown> } }
-    expect('registrierungsnummer' in (data.futter?.create ?? {})).toBe(false)
-  })
-
-  it('schreibt die Abgabe', async () => {
-    await createProduct(heu as never)
-
-    const data = productCreate.mock.calls[0][0].data as Record<string, unknown>
-    expect(data.abgabe).toBe('NUR_BETRIEBE')
+    expect(ergebnis).toEqual({ error: FUTTER_NUR_UEBER_FORMULAR })
+    expect(productCreate).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 
   it('gibt bei ungültiger Eingabe { error } zurück und schreibt nichts', async () => {
@@ -257,5 +256,183 @@ describe('updateProduct', () => {
 
     expect(ergebnis).toEqual({ error: 'Bitte prüfe deine Eingaben.' })
     expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+})
+
+describe('updateProduct — Sperre je Gebinde (S7, Nr. 20)', () => {
+  it('ein gesperrtes Sackerl wird gespeichert, aber als Entwurf — mit dem Grund', async () => {
+    productFindFirst.mockResolvedValue({ category: 'HEU_STROH', verpackung: 'ABGEPACKT_ETIKETT' } as never)
+    farmFindUnique.mockResolvedValue({ betriebsnummer: 'AT 1234567', betriebsstatus: 'PRIMAERPRODUKTION' } as never)
+
+    const ergebnis = await updateProduct('p_sack', { ...heu, unit: 'STUECK', isAvailable: true } as never)
+
+    expect(ergebnis).toEqual({ ok: true, hinweis: `Gespeichert, aber nicht im Shop. ${SPERR_GRUND.heimtierfutter}.` })
+    const aufruf = tx.product.updateMany.mock.calls[0][0] as { where: unknown; data: Record<string, unknown> }
+    expect(aufruf.where).toEqual({ id: 'p_sack', farmId: 'farm_1' })
+    expect(aufruf.data.isAvailable).toBe(false)
+    // Die Verpackung kommt aus der Datenbank, nie aus dem Formular — der Hof steht in der WHERE-Klausel.
+    // Seit Nr. 23 mit der Kennzeichnung: Der gespeicherte Stand entscheidet, ob neu bestätigt werden muss (E10a).
+    expect(productFindFirst).toHaveBeenCalledWith({ where: { id: 'p_sack', farmId: 'farm_1' }, include: { futter: true } })
+  })
+
+  it('mit BAES-Meldung geht dasselbe Sackerl online', async () => {
+    productFindFirst.mockResolvedValue({ category: 'HEU_STROH', verpackung: 'ABGEPACKT_ETIKETT' } as never)
+    farmFindUnique.mockResolvedValue({ betriebsnummer: 'AT 1234567', betriebsstatus: 'REGISTRIERT' } as never)
+
+    const ergebnis = await updateProduct('p_sack', { ...heu, unit: 'STUECK', isAvailable: true } as never)
+
+    expect(ergebnis).toEqual({ ok: true })
+    const aufruf = tx.product.updateMany.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(aufruf.data.isAvailable).toBe(true)
+  })
+
+  it('ein Bestandsfuttermittel ohne Verpackung bleibt, wie es war', async () => {
+    const ergebnis = await updateProduct('p_heu', { ...heu, isAvailable: true } as never)
+
+    expect(ergebnis).toEqual({ ok: true })
+    const aufruf = tx.product.updateMany.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(aufruf.data.isAvailable).toBe(true)
+    expect(farmFindUnique).not.toHaveBeenCalled()
+  })
+
+  it('kein Futter: keine Abfrage; ausgeblendetes Futter: die Kategorie wird gelesen, der Hof nicht', async () => {
+    await updateProduct('p_1', basis as never)
+    expect(productFindFirst).not.toHaveBeenCalled()
+
+    await updateProduct('p_heu', { ...heu, isAvailable: false } as never)
+    expect(productFindFirst).toHaveBeenCalledTimes(1)
+    expect(farmFindUnique).not.toHaveBeenCalled()
+  })
+})
+
+describe('updateProduct — Futter nur über das Futter-Formular (S7, Nachbesserung Nr. 20)', () => {
+  it('ein Nicht-Futter-Produkt lässt sich nicht auf eine Futter-Kategorie umstellen — nichts geschrieben', async () => {
+    productFindFirst.mockResolvedValue({ category: 'FLEISCH', verpackung: null } as never)
+
+    const ergebnis = await updateProduct('p_1', { ...heu, category: 'MISCHFUTTER', subcategory: null, futter: { ...heu.futter, futtermittelart: 'ALLEINFUTTERMITTEL' } } as never)
+
+    expect(ergebnis).toEqual({ error: FUTTER_NUR_UEBER_FORMULAR })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+    expect(tx.futterKennzeichnung.upsert).not.toHaveBeenCalled()
+  })
+
+  it('auch ausgeblendet nicht — sonst ginge es über den Schalter „Sichtbar" an der Sperre vorbei', async () => {
+    productFindFirst.mockResolvedValue({ category: null, verpackung: null } as never)
+
+    const ergebnis = await updateProduct('p_1', { ...heu, isAvailable: false } as never)
+
+    expect(ergebnis).toEqual({ error: FUTTER_NUR_UEBER_FORMULAR })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('ein Futtermittel bleibt als Futtermittel bearbeitbar (auch Altbestand ohne Verpackung)', async () => {
+    productFindFirst.mockResolvedValue({ category: 'HEU_STROH', verpackung: null } as never)
+
+    const ergebnis = await updateProduct('p_heu', { ...heu, isAvailable: true } as never)
+
+    expect(ergebnis).toEqual({ ok: true })
+    expect(tx.futterKennzeichnung.upsert).toHaveBeenCalledTimes(1)
+  })
+
+  it('der Besitz steht in der Abfrage; ein fremdes Produkt bekommt „nicht gefunden"', async () => {
+    productFindFirst.mockResolvedValue(null as never)
+
+    const ergebnis = await updateProduct('p_fremd', heu as never)
+
+    expect(ergebnis).toEqual({ error: 'Produkt nicht gefunden.' })
+    // Seit Nr. 23 mit der Kennzeichnung (Vergleich für die Pflicht-Bestätigung, E10a).
+    expect(productFindFirst).toHaveBeenCalledWith({ where: { id: 'p_fremd', farmId: 'farm_1' }, include: { futter: true } })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+})
+
+describe('updateProduct — Pflicht-Bestätigung bei Futter (E10a, Nr. 23)', () => {
+  /**
+   * Der gespeicherte Stand, wie ihn die Datenbank liefert: genau das, was ein
+   * bestätigtes Speichern von `heu` schreibt — mit Decimal statt Zahl und dem
+   * alten Zeitpunkt der Bestätigung.
+   */
+  async function gespeichertesHeu(): Promise<Record<string, unknown>> {
+    await updateProduct('p_heu', heu as never)
+    const produkt = (tx.product.updateMany.mock.calls[0][0] as { data: Record<string, unknown> }).data
+    const kennzeichnung = (tx.futterKennzeichnung.upsert.mock.calls[0][0] as { create: Record<string, unknown> }).create
+    vi.clearAllMocks()
+    return {
+      id: 'p_heu',
+      farmId: 'farm_1',
+      verpackung: null,
+      stock: 4,
+      ...produkt,
+      price: new Prisma.Decimal(String(produkt.price)),
+      vatRate: new Prisma.Decimal(String(produkt.vatRate)),
+      futter: {
+        id: 'fk_1',
+        registrierungsnummer: null,
+        ...kennzeichnung,
+        nettoMenge: new Prisma.Decimal(String(kennzeichnung.nettoMenge)),
+        rohprotein: new Prisma.Decimal(String(kennzeichnung.rohprotein)),
+        bestaetigtAm: new Date('2026-09-01T08:00:00.000Z'),
+      },
+    }
+  }
+
+  const ohneHaken = { ...heu, futter: { ...heu.futter, bestaetigt: false } }
+
+  it('Kennzeichnung geändert ohne Haken: abgelehnt mit verständlichem Satz, nichts geschrieben', async () => {
+    productFindFirst.mockResolvedValue((await gespeichertesHeu()) as never)
+
+    const ergebnis = await updateProduct('p_heu', { ...ohneHaken, futter: { ...ohneHaken.futter, zusammensetzung: 'Heu vom zweiten Schnitt' } } as never)
+
+    expect(ergebnis).toEqual({ error: FUTTER_BESTAETIGUNG_NEU, code: 'BESTAETIGUNG' })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+    expect(tx.futterKennzeichnung.upsert).not.toHaveBeenCalled()
+  })
+
+  it('Produktangabe geändert (Abgabe, Name) ohne Haken: ebenfalls abgelehnt', async () => {
+    productFindFirst.mockResolvedValue((await gespeichertesHeu()) as never)
+
+    expect(await updateProduct('p_heu', { ...ohneHaken, abgabe: 'ALLE' } as never)).toMatchObject({ code: 'BESTAETIGUNG' })
+    expect(await updateProduct('p_heu', { ...ohneHaken, name: 'Heu vom Berg' } as never)).toMatchObject({ code: 'BESTAETIGUNG' })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('nur Preis und Vorrat geändert ohne Haken: gespeichert, die alte Bestätigung bleibt', async () => {
+    productFindFirst.mockResolvedValue((await gespeichertesHeu()) as never)
+
+    const ergebnis = await updateProduct('p_heu', { ...ohneHaken, price: 49.9, stock: 7 } as never, 4)
+
+    expect(ergebnis).toEqual({ ok: true })
+    const produkt = tx.product.updateMany.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(produkt.data.price).toBe(49.9)
+    expect(produkt.data.stock).toBe(7)
+    const aufruf = tx.futterKennzeichnung.upsert.mock.calls[0][0] as { update: Record<string, unknown> }
+    expect('bestaetigtAm' in aufruf.update).toBe(false)
+  })
+
+  it('geändert mit Haken: gespeichert, bestaetigtAm = jetzt', async () => {
+    productFindFirst.mockResolvedValue((await gespeichertesHeu()) as never)
+
+    const ergebnis = await updateProduct('p_heu', { ...heu, futter: { ...heu.futter, zusammensetzung: 'Heu vom zweiten Schnitt' } } as never)
+
+    expect(ergebnis).toEqual({ ok: true })
+    const aufruf = tx.futterKennzeichnung.upsert.mock.calls[0][0] as { update: Record<string, unknown> }
+    expect(aufruf.update.bestaetigtAm).toEqual(JETZT)
+    expect(aufruf.update.zusammensetzung).toBe('Heu vom zweiten Schnitt')
+  })
+
+  it('Altbestand ohne gespeicherte Kennzeichnung: ohne Haken abgelehnt', async () => {
+    productFindFirst.mockResolvedValue({ category: 'HEU_STROH', verpackung: null, futter: null } as never)
+
+    const ergebnis = await updateProduct('p_heu', ohneHaken as never)
+
+    expect(ergebnis).toEqual({ error: FUTTER_BESTAETIGUNG_NEU, code: 'BESTAETIGUNG' })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('ein Wechsel weg vom Futter braucht keinen Haken — die Kennzeichnung wird gelöscht', async () => {
+    const ergebnis = await updateProduct('p_heu', { ...heu, category: 'SONSTIGES', subcategory: null, futter: null, abgabe: 'ALLE' } as never)
+
+    expect(ergebnis).toEqual({ ok: true })
+    expect(tx.futterKennzeichnung.deleteMany).toHaveBeenCalledWith({ where: { productId: 'p_heu' } })
   })
 })

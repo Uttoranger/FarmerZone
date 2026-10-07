@@ -1,7 +1,8 @@
 /**
  * Tests für den Ein-Schritt-Rückweg (bestellungen-undo):
  * revertReady (READY → PAID/CONFIRMED, Herleitung über paymentStatus) und
- * revertPickedUp (PICKED_UP → READY, pickedUpAt geleert, Geld unangetastet).
+ * revertPickedUp (PICKED_UP → READY, pickedUpAt geleert; die Zahlung nach
+ * zahlungNachRueckweg, seit Nr. 32 — Fälle in tests/rueckweg-zahlung.test.ts).
  * Beide Pfade verschicken KEINE Mail.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -113,6 +114,8 @@ describe('revertReady', () => {
     expect(sendOrderNotReady).toHaveBeenCalledWith(
       expect.objectContaining({ customerEmail: 'kundin@test.local', orderNumber: 'TH-1907-TEST' })
     )
+    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
+    await vi.dynamicImportSettled()
     expect(sendOrderReady).not.toHaveBeenCalled()
     expect(sendOrderCancelled).not.toHaveBeenCalled()
   })
@@ -121,6 +124,8 @@ describe('revertReady', () => {
     orderFindFirst.mockResolvedValue({ ...EMAIL_ORDER, paymentStatus: 'PENDING' } as never)
     const result = await revertReady('order_1', false)
     expect(result).toEqual({})
+    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
+    await vi.dynamicImportSettled()
     expect(sendOrderNotReady).not.toHaveBeenCalled()
     expect(sendOrderReady).not.toHaveBeenCalled()
     expect(sendOrderCancelled).not.toHaveBeenCalled()
@@ -129,6 +134,8 @@ describe('revertReady', () => {
   it('abgelehnter Rückschritt verschickt auch mit Haken keine Mail', async () => {
     orderFindFirst.mockResolvedValue(null)
     await revertReady('order_confirmed', true)
+    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
+    await vi.dynamicImportSettled()
     expect(sendOrderNotReady).not.toHaveBeenCalled()
   })
 })
@@ -160,17 +167,21 @@ describe('revertPickedUp', () => {
     expect(orderUpdate).not.toHaveBeenCalled()
   })
 
-  it('setzt READY und leert pickedUpAt — paymentStatus/paidAt bleiben unangetastet', async () => {
-    orderFindFirst.mockResolvedValue({ id: 'order_1' } as never)
+  it('setzt READY und leert pickedUpAt — online bezahlt bleibt die Zahlung unangetastet', async () => {
+    const bezahltAm = new Date('2026-07-20T08:00:00Z')
+    orderFindFirst.mockResolvedValue({
+      paymentMethod: 'ONLINE', paymentStatus: 'PAID', paidAt: bezahltAm, pickedUpAt: new Date('2026-07-21T10:00:00Z'),
+    } as never)
     const result = await revertPickedUp('order_1')
     expect(result).toEqual({})
     const updateArg = orderUpdateMany.mock.calls[0]?.[0] as {
       where: Record<string, unknown>
       data: Record<string, unknown>
     }
-    expect(updateArg.where).toEqual({ id: 'order_1', farmId: 'farm_1', status: 'PICKED_UP' })
+    // Bedingt auf Besitz, Ausgangsstatus und gelesenen Zahlstand
+    expect(updateArg.where).toEqual({ id: 'order_1', farmId: 'farm_1', status: 'PICKED_UP', paymentStatus: 'PAID', paidAt: bezahltAm })
     expect(updateArg.data).toEqual({ status: 'READY', pickedUpAt: null })
-    // Geld-Wahrheit: kein paymentStatus, kein paidAt im Update
+    // Geld-Wahrheit online: kein paymentStatus, kein paidAt im Update
     expect(updateArg.data).not.toHaveProperty('paymentStatus')
     expect(updateArg.data).not.toHaveProperty('paidAt')
   })
@@ -178,6 +189,8 @@ describe('revertPickedUp', () => {
   it('bleibt mailfrei — auch die neue Update-Mail wird NIE verschickt', async () => {
     orderFindFirst.mockResolvedValue({ id: 'order_1' } as never)
     await revertPickedUp('order_1')
+    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
+    await vi.dynamicImportSettled()
     expect(sendOrderReady).not.toHaveBeenCalled()
     expect(sendOrderCancelled).not.toHaveBeenCalled()
     expect(sendOrderNotReady).not.toHaveBeenCalled()

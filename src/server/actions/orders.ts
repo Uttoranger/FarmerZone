@@ -3,9 +3,8 @@
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { stripe } from '@/lib/stripe'
 import { revalidatePath } from 'next/cache'
-import { sendOrderReady, sendOrderCancelled, sendOrderNotReady, type OrderForEmail } from '@/lib/email'
+import type { OrderForEmail } from '@/lib/email'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import * as Sentry from '@sentry/nextjs'
 import type { OrderStatus } from '@prisma/client'
@@ -21,16 +20,18 @@ import { alsCents } from '@/lib/order-totals'
 import { zahlungNachRueckweg } from '@/lib/hof-bestellungen'
 import { artikelFehltEingabeSchema, stornoEingabeSchema } from '@/schemas/hof-bestellungen'
 import { meldeFehlendenArtikel } from '@/server/artikel-fehlt'
+import { MELDE_VERMERK_TYP, meldeVermerk } from '@/server/erstattung-gescheitert'
 import {
   StripeStandUnklar,
   bucheVomHofZurueck,
   erstatteKundin,
+  erstattungZaehlt,
   hatErstattungen,
   ladeStripeStand,
   teilstornoSumme,
+  vollstornoMerkmal,
   type UnklarGrund,
 } from '@/server/teilerstattung'
-import { sendArtikelFehlt, sendErstattungOffen } from '@/lib/email'
 
 export type ActionResult = { error?: string }
 
@@ -165,6 +166,13 @@ const ORDER_EMAIL_SELECT = {
 const PACKBAR: OrderStatus[] = ['PAID', 'CONFIRMED', 'IN_PREPARATION']
 const LAUFEND: OrderStatus[] = ['PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY']
 
+/*
+ * E-Mail und Stripe kommen erst im Aufruf per `await import()` (Nachtlauf
+ * Nr. 31, ARCHITECTURE §4): Diese Actions binden die Bestellseiten ein, und
+ * ein statischer Import legte Resend, React Email, alle Vorlagen und das
+ * Stripe-SDK in jeden Kaltstart von /orders — auch ohne Mail und ohne Storno.
+ */
+
 /** Ein Mailfehler kippt keinen Statuswechsel — nur gemeldet, ohne Kundendaten. */
 function mailNachDerAntwort(art: string, orderId: string, senden: () => Promise<void>): void {
   nachDerAntwort(async () => {
@@ -195,7 +203,10 @@ export async function markAsReady(orderId: string): Promise<ActionResult> {
   })
   if (count === 0) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
 
-  mailNachDerAntwort('abholbereit', orderId, () => sendOrderReady(toEmailOrder(order, farm)))
+  mailNachDerAntwort('abholbereit', orderId, async () => {
+    const { sendOrderReady } = await import('@/lib/email')
+    await sendOrderReady(toEmailOrder(order, farm))
+  })
 
   revalidatePath('/orders')
   revalidatePath(`/orders/${orderId}`)
@@ -279,6 +290,7 @@ export async function revertReady(
   // Kunden-Info nur auf Wunsch (Haken im Dialog, Standard AN): neutrales
   // "Kurzes Update" — relativiert die bereits verschickte Abholbereit-Mail
   if (notifyCustomer) {
+    const { sendOrderNotReady } = await import('@/lib/email')
     await sendOrderNotReady(toEmailOrder(order, farm))
   }
 
@@ -287,25 +299,38 @@ export async function revertReady(
   return {}
 }
 
-// Ein-Schritt-Rückweg: heilt einen Verdrücker bei "Abgeholt". Nur aus
-// PICKED_UP erlaubt, zurück auf READY, pickedUpAt wird geleert.
-// paymentStatus/paidAt bleiben UNANGETASTET: die Geld-Wahrheit (z. B. bar
-// kassiert bei "Abgeholt & bezahlt") wird von einem Undo nie verändert —
-// bewusste Grenze dieses Rückwegs.
+// Ein-Schritt-Rückweg (Dialog „Abholung rückgängig"): heilt einen Verdrücker
+// bei "Abgeholt". Nur aus PICKED_UP erlaubt, zurück auf READY, pickedUpAt wird
+// geleert. Die Zahlung behandelt er wie das Rückgängig im Hinweis
+// (revertOrderStatus, Nr. 19b): Vorher blieben paymentStatus/paidAt immer
+// stehen — eine bar kassierte Bestellung stand danach „gepackt, bezahlt",
+// obwohl das Kassieren zu genau dem zurückgenommenen Schritt gehörte (Nr. 32).
+// Was sich an der Zahlung ändert, entscheidet allein zahlungNachRueckweg —
+// online nie (das Geld liegt bei Stripe; hier kein Stripe-Aufruf, keine
+// Erstattung), bar nur das Kassieren genau dieses Schritts.
 export async function revertPickedUp(orderId: string): Promise<ActionResult> {
   const farm = await getAuthFarm()
   if (!farm) return { error: 'Nicht angemeldet' }
 
-  const exists = await prisma.order.findFirst({
+  const bestellung = await prisma.order.findFirst({
     where: { id: orderId, farmId: farm.id, status: 'PICKED_UP' },
-    select: { id: true },
+    select: { paymentMethod: true, paymentStatus: true, paidAt: true, pickedUpAt: true },
   })
-  if (!exists) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
+  if (!bestellung) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
+  const zahlung = zahlungNachRueckweg(bestellung, 'PICKED_UP')
 
-  // Bedingt geschrieben — Begründung wie bei revertReady.
+  // Bedingt auf Besitz, Ausgangsstatus und genau den gelesenen Zahlstand:
+  // Storniert, erstattet oder kassiert jemand zwischen Lesen und Schreiben,
+  // gilt die Entscheidung nicht mehr (Begründung wie bei revertReady).
   const { count } = await prisma.order.updateMany({
-    where: { id: orderId, farmId: farm.id, status: 'PICKED_UP' },
-    data: { status: 'READY', pickedUpAt: null },
+    where: {
+      id: orderId,
+      farmId: farm.id,
+      status: 'PICKED_UP',
+      paymentStatus: bestellung.paymentStatus,
+      paidAt: bestellung.paidAt,
+    },
+    data: { status: 'READY', pickedUpAt: null, ...(zahlung ?? {}) },
   })
   if (count === 0) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
 
@@ -617,6 +642,7 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
         // Läuft NACH der Transaktion, nicht in einer Sperre — deshalb ohne die
         // kurzen STRIPE_OPTIONEN (die SDK-Wiederholung ist hier erwünscht,
         // der Schlüssel verhindert eine zweite Erstattung).
+        const { stripe } = await import('@/lib/stripe')
         const refund = await stripe.refunds.create(
           {
             payment_intent: pi,
@@ -634,12 +660,22 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
             reverse_transfer: true,
             // Wie im Checkout: eine application_fee gibt es nur bei Gebühr > 0.
             ...(plattformgebuehrCents(betraege) > 0 ? { refund_application_fee: true } : {}),
+            // Merkmale wie bei der Teilerstattung (Nr. 27): Scheitert die
+            // Erstattung später, erkennt der Webhook sie als unsere Buchung
+            // und öffnet die Zahlung wieder (src/server/erstattung-gescheitert.ts).
+            metadata: vollstornoMerkmal(order.id),
           },
           // Idempotenz: Erreicht ein zweiter Storno Stripe (Vermerk gescheitert
           // und Bestellung wieder geöffnet), liefert Stripe dieselbe Erstattung
           // statt einer zweiten.
           { idempotencyKey: `storno-${order.id}` }
         )
+        // Wie bei der Teilerstattung (erstatteKundin): Eine gescheiterte oder
+        // abgebrochene Erstattung hat kein Geld bewegt — nie REFUNDED
+        // vermerken und der Kundin keine Erstattung zusagen.
+        if (!erstattungZaehlt(refund.status)) {
+          throw new StripeStandUnklar('erstattung_gescheitert', { orderId: order.id, status: refund.status ?? 'unbekannt', refundId: refund.id })
+        }
         refundAmount = refund.amount / 100
       }
     } catch (err) {
@@ -661,6 +697,22 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
         },
       })
       erstattungOffen = true
+      // Hat Stripe die Erstattung sofort als gescheitert zurückgegeben, ist
+      // sie gebucht und gleich gemeldet (Sentry + Betreiber-Mail unten). Ein
+      // späteres refund.failed derselben Erstattung fände „schon erledigt"
+      // und meldete ein zweites Mal — der Vermerk hält es still
+      // (src/server/erstattung-gescheitert.ts). Scheitert nur der Vermerk,
+      // kommt die Meldung schlimmstenfalls doppelt.
+      if (err instanceof StripeStandUnklar && err.grund === 'erstattung_gescheitert' && typeof err.extra.refundId === 'string') {
+        try {
+          await prisma.webhookEvent.createMany({
+            data: [{ stripeEventId: meldeVermerk(err.extra.refundId), type: MELDE_VERMERK_TYP }],
+            skipDuplicates: true,
+          })
+        } catch (vermerkFehler) {
+          console.error('[cancelOrder] Meldevermerk nicht gesetzt:', vermerkFehler instanceof Error ? vermerkFehler.name : 'unbekannt')
+        }
+      }
     }
 
     // Der Vermerk getrennt von der Erstattung: Scheitert NUR er, ist das
@@ -694,6 +746,7 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
       // geändert, zeigt die Mail den Stand, aus dem storniert wurde.
       const fuerMail =
         (await prisma.order.findFirst({ where: { id: orderId, farmId: farm.id }, select: ORDER_EMAIL_SELECT })) ?? order
+      const { sendOrderCancelled } = await import('@/lib/email')
       await sendOrderCancelled(toEmailOrder(fuerMail, farm), refundAmount, reason)
     })
   }
@@ -703,8 +756,8 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
   // Mailfehler rollt nichts zurück. Ohne Daten der Kundin.
   if (handbuchungOffen) {
     const hand = handbuchungOffen
-    mailNachDerAntwort('erstattung_offen', orderId, () =>
-      sendErstattungOffen({
+    mailNachDerAntwort('erstattung_offen', orderId, async () =>
+      (await import('@/lib/email')).sendErstattungOffen({
         was: 'Der Hof hat die Bestellung storniert, die Erstattung über Stripe hat aber nicht geklappt. Die Bestellung ist storniert, das Geld steht noch aus.',
         bestellId: orderId,
         bestellnummer: order.orderNumber,
@@ -803,8 +856,8 @@ export async function meldeArtikelFehlt(input: unknown): Promise<ArtikelFehltErg
   const fuerMail = await prisma.order.findFirst({ where: { id: orderId, farmId: farm.id }, select: ORDER_EMAIL_SELECT })
   const position = fuerMail?.items.find((i) => i.id === itemId)
   if (fuerMail && position) {
-    mailNachDerAntwort('artikel_fehlt', orderId, () =>
-      sendArtikelFehlt(toEmailOrder(fuerMail, farm), {
+    mailNachDerAntwort('artikel_fehlt', orderId, async () =>
+      (await import('@/lib/email')).sendArtikelFehlt(toEmailOrder(fuerMail, farm), {
         position: {
           productName: position.productName,
           quantity: position.quantity,
@@ -907,6 +960,7 @@ async function lasseServicegebuehrEntfallen(order: {
   // Online UND bezahlt: Teilerstattung in Höhe der Gebühr.
   if (order.paymentMethod === 'ONLINE' && order.paymentStatus === 'PAID' && order.stripePaymentIntentId) {
     try {
+      const { stripe } = await import('@/lib/stripe')
       await stripe.refunds.create(
         {
           payment_intent: order.stripePaymentIntentId,

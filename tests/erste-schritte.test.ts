@@ -26,6 +26,7 @@ import {
   ersteSchritteDaten,
   type ErsteSchritteDaten,
 } from '@/lib/erste-schritte'
+import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ } from '@/lib/konditionen'
 
 /** Ein Hof direkt nach der Registrierung: nichts eingerichtet. */
 const FRISCH: ErsteSchritteDaten = {
@@ -123,18 +124,20 @@ describe('einzelne Bedingungen', () => {
     expect(statusVon({ ...FRISCH, aktiveAbholzeiten: 1 }, 'abholzeiten')).toBe(true)
   })
 
-  it('Online-Zahlung hängt an der Stripe-Bereitschaft und ist als optional gekennzeichnet', () => {
+  it('Online-Zahlung hängt an der Stripe-Bereitschaft und ist Pflicht, nicht optional (Register Z1)', () => {
     const zahlung = ersteSchritte(FRISCH).schritte.find((s) => s.id === 'zahlung')
 
-    expect(zahlung?.optional).toBe(true)
+    expect(zahlung?.optional).toBe(false)
+    expect(zahlung?.nutzen).toBe(ONLINE_ZAHLUNG_EINRICHTEN_SATZ)
     expect(statusVon(FRISCH, 'zahlung')).toBe(false)
     expect(statusVon({ ...FRISCH, zahlungBereit: true }, 'zahlung')).toBe(true)
   })
 
-  it('kennzeichnet ausschließlich die Online-Zahlung als optional', () => {
-    const optionale = ersteSchritte(FRISCH).schritte.filter((s) => s.optional)
+  it('kein Schritt ist optional, keiner sagt „geht auch ohne"', () => {
+    const schritte = ersteSchritte(FRISCH).schritte
 
-    expect(optionale.map((s) => s.id)).toEqual(['zahlung'])
+    expect(schritte.filter((s) => s.optional)).toEqual([])
+    expect(schritte.map((s) => s.nutzen).join(' ')).not.toMatch(/auch ohne/)
   })
 })
 
@@ -160,7 +163,7 @@ describe('Zwischenstände', () => {
     ])
   })
 
-  it('hält die Karte, solange nur noch die optionale Zahlung offen ist', () => {
+  it('hält die Karte, solange nur noch die Zahlung offen ist', () => {
     const ergebnis = ersteSchritte({ ...FERTIG, zahlungBereit: false })
 
     expect(ergebnis.erledigt).toBe(4)

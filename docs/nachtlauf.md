@@ -73,10 +73,23 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 22d | Einstellungen (Übersicht, sechs Unterseiten, Konditionen) | Gate 8, `/settings` | K1 |
 | 22e | Beiträge als Reiter in Mein Hof, Hilfe und Meine Meldungen | Gate 8 | E12 |
 | 22f | Admin in der AdminShell | Gate 8, `/admin` | E9 (keine Nummernprüfung) |
+| 23 | Nachtrag Futter (#198): Pflicht-Bestätigung, Hinweise, „Brennmaterial" | `freigabe.md` §10 | E10a, E11 |
+| 24 | Stripe-Pflicht und Admin (#201) auf `main` | `freigabe.md` §10 | Z1 |
+| 25 | Teilen ohne Browser-Speicher (#199) | `freigabe.md` §10 | T1 |
+| 26 | Auswertung und Region nach T1 (#200) | `freigabe.md` §10 | T1, F6 |
+| 27 | Konto und Geld, klein | `freigabe.md` §10 | F6, B3, B4 |
+| 28 | Oberfläche und Wortwahl | `freigabe.md` §10 | F6, B2, O1 |
+| 29 | „Betrieb" bei Futter kaufen vorbelegen | `freigabe.md` §10 | F6 |
+| 30 | Teilen-Momente „gespeichert" und Abschalten | `freigabe.md` §10 | Migration nur Expand |
+| 31 | Tab-Wechsel im Hofbereich beschleunigen | `freigabe.md` §10 | – |
+| 32 | Altlasten aus Morgenbericht Lauf 5 §5 | `freigabe.md` §10 | – |
+| 33 | Datenschutzerklärung auf Sachstand | `freigabe.md` §10 | E8, T1 |
 
 **17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
 
 **Reihenfolge in Lauf 5** (weicht von der Tabellenreihenfolge ab, maßgeblich ist `freigabe.md` §9): 19c → 19a → 19b → 22a → 22b → 22d → 22e → 20 → 21 → 22c → 22f. 19c kommt vor 19a, weil beide dieselbe Geldlogik berühren; 22c nach 21, weil die Auswertung die Teilen-Wirkung braucht.
+
+**Reihenfolge in Lauf 6** (`freigabe.md` §10, Haltepunkt 33): 23 → 24 → 25 → 26 → 27 → 28 → 29 → 30 → 31 → 32 → 33. 23, 25, 26 bauen auf den offenen Branches von #198–#200 auf; 29 ist auf 26 gestapelt, 30 auf 25; die übrigen zweigen von `main` ab.
 
 **06b – Reservierte Slugs vollständig:** `RESERVED_SLUGS` in `src/lib/slug.ts` um alle Ordner aus `KEINE_HOFSEITE` (`next.config.ts`) ergänzen (u. a. `teilen`, `verify`, `konditionen`, `meldungen`, `fehler-melden`, `problem-melden`, `farm-page`, `forgot-password`, `reset-password`, `intern`), plus Test, der beide Listen gegeneinander prüft. Braucht keine Freigabe. In Produktion ist keiner dieser Slugs belegt (geprüft am 05.10.2026).
 

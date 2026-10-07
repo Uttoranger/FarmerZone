@@ -6,9 +6,10 @@
  * mobil-h2-gespeichert-teilen).
  *
  * Beweist:
- *  - Status einer Zeile: Sichtbar, Nur noch N, Ausverkauft, Entwurf — dieselbe
- *    Reihenfolge wie produktZustand („Entwurf" sticht „Ausverkauft").
- *  - Filter (Alle, Lebensmittel, Futtermittel, Brennmaterial, Entwürfe) und
+ *  - Status einer Zeile: Sichtbar, Nur noch N, Ausverkauft, Nicht im Shop —
+ *    dieselbe Reihenfolge wie produktZustand („Nicht im Shop" sticht
+ *    „Ausverkauft"); das Wort kommt aus EINER Quelle (NICHT_IM_SHOP, Register B2).
+ *  - Filter (Alle, Lebensmittel, Futtermittel, Brennmaterial, Nicht im Shop) und
  *    Suche: aus der Adresse über Zod, Ungültiges fällt still weg.
  *  - Kopfzeile „6 Produkte · 5 sichtbar".
  *  - Vorrat: Schema nur ganze Zahlen ≥ 0 bis VORRAT_MAX; ein Altbestand darüber
@@ -21,7 +22,7 @@
  *    Adresse an.
  *  - /products liegt in (hof), der Bestand (farmer) hat es nicht mehr.
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeAll } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createElement, type ReactNode } from 'react'
@@ -56,6 +57,11 @@ vi.mock('@/server/actions/products', () => ({
   updateProduct: vi.fn(),
   pruefeDualUse: vi.fn(),
 }))
+// Seit Nr. 20 hängen die Formulare mit Verkaufsgrößen an der Ansicht.
+vi.mock('@/server/actions/produktfamilie', () => ({
+  legeFutterFamilieAn: vi.fn(),
+  legeBrennmaterialFamilieAn: vi.fn(),
+}))
 
 import {
   PRODUKTE_FILTER_LABEL,
@@ -78,6 +84,7 @@ import {
   wiederDaOeffnen,
   wiederDaSchluessel,
 } from '@/lib/wieder-da-moment'
+import { NICHT_IM_SHOP, SPEICHERN_NICHT_IM_SHOP } from '@/lib/produkt-sichtbarkeit'
 import { produkteAnsichtAus } from '@/schemas/produkte-filter'
 import { vorratSetzenSchema } from '@/schemas/vorrat'
 import { VORRAT_MAX } from '@/lib/eingabegrenzen'
@@ -94,15 +101,42 @@ type P = { isAvailable: boolean; stock: number; category: ProductCategoryValue |
 const p = (teil: Partial<P> = {}): P => ({ isAvailable: true, stock: 20, category: 'EIER', name: 'Freilandeier', ...teil })
 
 describe('produktStatus — vier Zustände wie im Mockup', () => {
-  it('Sichtbar (grün), Nur noch N (orange), Ausverkauft und Entwurf (neutral)', () => {
+  it('Sichtbar (grün), Nur noch N (orange), Ausverkauft und Nicht im Shop (neutral)', () => {
     expect(produktStatus(p({ stock: 24 }))).toEqual({ text: 'Sichtbar', ton: 'fertig' })
     expect(produktStatus(p({ stock: 3 }))).toEqual({ text: 'Nur noch 3', ton: 'offen' })
     expect(produktStatus(p({ stock: 0 }))).toEqual({ text: 'Ausverkauft', ton: 'neutral' })
-    expect(produktStatus(p({ isAvailable: false, stock: 24 }))).toEqual({ text: 'Entwurf', ton: 'neutral' })
+    expect(produktStatus(p({ isAvailable: false, stock: 24 }))).toEqual({ text: 'Nicht im Shop', ton: 'neutral' })
   })
 
-  it('Entwurf sticht Ausverkauft — ausgeblendet ist für Kunden gar nicht da', () => {
-    expect(produktStatus(p({ isAvailable: false, stock: 0 })).text).toBe('Entwurf')
+  it('Nicht im Shop sticht Ausverkauft — ausgeblendet ist für Kunden gar nicht da', () => {
+    expect(produktStatus(p({ isAvailable: false, stock: 0 })).text).toBe('Nicht im Shop')
+  })
+
+  it('B2: Marke, Filter und Speichern-Knopf nehmen das Wort aus EINER Quelle', () => {
+    expect(produktStatus(p({ isAvailable: false })).text).toBe(NICHT_IM_SHOP)
+    expect(PRODUKTE_FILTER_LABEL.entwuerfe).toBe(NICHT_IM_SHOP)
+    expect(speichernText(0, false, false)).toBe(SPEICHERN_NICHT_IM_SHOP)
+  })
+
+  it('B2: kein „Entwurf" mehr in den Texten rund um Produkte', () => {
+    const dateien = [
+      'src/lib/produkte-hof.ts',
+      'src/lib/produkt-sichtbarkeit.ts',
+      'src/components/produkte/produkte-ansicht.tsx',
+      'src/components/produkte/vorrat-feld.tsx',
+      'src/components/produkte/wieder-da-moment.tsx',
+      'src/components/products/product-dialog.tsx',
+      'src/components/products/produkt-abschnitte.ts',
+      'src/components/products/im-shop-schalter.tsx',
+    ]
+    for (const datei of dateien) expect(quelle(datei), datei).not.toMatch(/Entw(?:u|ü)rf/)
+    // „Meine Hof-Seite" (Zähler und Satz über der Kundenansicht) nimmt dasselbe Wort aus der Quelle.
+    const editor = quelle('src/components/farm/farm-page-view.tsx')
+    expect(editor).not.toMatch(/ausgeblendete? Produkte|\d* ?ausgeblendet[`']/)
+    expect(editor.match(/\$\{NICHT_IM_SHOP_IM_SATZ\}/g)?.length).toBeGreaterThanOrEqual(2)
+    // Gegenprobe: Die Suche schlägt bei beiden Formen an, nicht beim Filterwert der Adresse.
+    expect('Entwurf Entwürfe').toMatch(/Entw(?:u|ü)rf/)
+    expect('?filter=entwuerfe').not.toMatch(/Entw(?:u|ü)rf/)
   })
 })
 
@@ -129,7 +163,7 @@ describe('Filter und Suche', () => {
     expect(zaehleProdukteFilter([])).toEqual({ alle: 0, lebensmittel: 0, futter: 0, brennmaterial: 0, entwuerfe: 0 })
   })
 
-  it('zählt je Filter; Entwürfe sind die ausgeblendeten', () => {
+  it('zählt je Filter; „Nicht im Shop" sind die ausgeblendeten', () => {
     expect(zaehleProdukteFilter(liste)).toEqual({ alle: 5, lebensmittel: 3, futter: 1, brennmaterial: 1, entwuerfe: 1 })
     expect(passtZuProdukteFilter(p({ isAvailable: false }), 'entwuerfe')).toBe(true)
     expect(passtZuProdukteFilter(p(), 'entwuerfe')).toBe(false)
@@ -157,6 +191,8 @@ describe('Filter und Suche', () => {
     expect(produkteAnsichtAus(new URLSearchParams('filter=quatsch'))).toEqual({ filter: 'alle', suche: '' })
     expect(produkteAnsichtAus(new URLSearchParams(`suche=${'x'.repeat(200)}`)).suche).toBe('')
     expect(produkteAnsichtAus(new URLSearchParams(''))).toEqual({ filter: 'alle', suche: '' })
+    // B2 ändert nur das Wort: Alte Links mit dem Filterwert der Adresse gelten weiter.
+    expect(produkteAnsichtAus(new URLSearchParams('filter=entwuerfe'))).toEqual({ filter: 'entwuerfe', suche: '' })
   })
 
   it('die Adresse eines Filters behält die Suche, „Alle" ohne Parameter', () => {
@@ -216,10 +252,10 @@ describe('„Wieder da" — Anlass und Regeln', () => {
   })
 
   it('nur bei sichtbarem Hof und sichtbarem Produkt', () => {
-    expect(wiederDaMomentMoeglich({ hofSichtbar: true, produktSichtbar: true, wiederDa: true })).toBe(true)
-    expect(wiederDaMomentMoeglich({ hofSichtbar: false, produktSichtbar: true, wiederDa: true })).toBe(false)
-    expect(wiederDaMomentMoeglich({ hofSichtbar: true, produktSichtbar: false, wiederDa: true })).toBe(false)
-    expect(wiederDaMomentMoeglich({ hofSichtbar: true, produktSichtbar: true, wiederDa: false })).toBe(false)
+    expect(wiederDaMomentMoeglich({ hofSichtbar: true, produktSichtbar: true, wiederDa: true, teilenMomenteAus: false })).toBe(true)
+    expect(wiederDaMomentMoeglich({ hofSichtbar: false, produktSichtbar: true, wiederDa: true, teilenMomenteAus: false })).toBe(false)
+    expect(wiederDaMomentMoeglich({ hofSichtbar: true, produktSichtbar: false, wiederDa: true, teilenMomenteAus: false })).toBe(false)
+    expect(wiederDaMomentMoeglich({ hofSichtbar: true, produktSichtbar: true, wiederDa: false, teilenMomenteAus: false })).toBe(false)
   })
 
   it('Texte mit Menge und nächster Abholung, ohne Abholung ohne Satzrest', () => {
@@ -323,6 +359,12 @@ describe('Route in der HofShell', () => {
 // ─── Darstellung (serverseitig gerendert, ohne DOM — TESTING_GUIDELINES §1) ──
 
 describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
+  // Schweres Modul (Ansicht samt Dialogen und Formularen) einmal kalt laden —
+  // nicht im ersten Test, dessen 5-s-Grenze es sonst reißt (TESTING_GUIDELINES §4).
+  beforeAll(async () => {
+    await import('@/components/produkte/produkte-ansicht')
+  }, 30_000)
+
   const lang = 'Bergwiesen-Heu vom ersten Schnitt aus dem oberen Mühlviertel, luftgetrocknet und lose gebündelt'
 
   function produkt(id: string, teil: Partial<ProductData>): ProductData {
@@ -352,6 +394,9 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
       seasonStart: null,
       seasonEnd: null,
       unavailableReason: null,
+      familieId: null,
+      verpackung: null,
+      sperre: null,
       ...teil,
     }
   }
@@ -370,7 +415,8 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
       createElement(ProdukteAnsicht, {
         products: produkte,
         hofBetriebsnummer: null,
-        hof: { name: 'Hof Test', slug: 'hof-test', sichtbar: true },
+        registrierung: { betriebsnummer: null, betriebsstatus: null },
+        hof: { name: 'Hof Test', slug: 'hof-test', sichtbar: true, teilenMomenteAus: false },
         naechstesFenster: null,
       })
     )
@@ -379,7 +425,8 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
   it('gefüllt: Kopfzeile, vier Marken, Vorrat-Stepper, Schalter „Sichtbar", Hinweis unter der Tabelle', async () => {
     const html = await rendere(liste)
     expect(html).toContain('4 Produkte · 3 sichtbar')
-    for (const marke of ['Sichtbar', 'Nur noch 3', 'Ausverkauft', 'Entwurf']) expect(html).toContain(`>${marke}<`)
+    for (const marke of ['Sichtbar', 'Nur noch 3', 'Ausverkauft', 'Nicht im Shop']) expect(html).toContain(`>${marke}<`)
+    expect(html).not.toMatch(/Entw(?:u|ü)rf/)
     expect(html).toContain('aria-label="Vorrat Karotten"')
     expect(html).toContain('role="switch"')
     expect(html).toContain('aria-label="Freilandeier sichtbar"')
@@ -396,7 +443,7 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
     expect(html).toContain('line-clamp-2')
   })
 
-  it('Filter aus der Adresse: nur die Entwürfe', async () => {
+  it('Filter aus der Adresse (alter Wert entwuerfe): nur, was nicht im Shop steht', async () => {
     navigation.filter = 'entwuerfe'
     const html = await rendere(liste)
     navigation.filter = null
@@ -424,6 +471,14 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
     // Gegenprobe: Die Suche schlägt bei einem Farbliteral an.
     expect('bg-white #fff').toMatch(/#[0-9a-fA-F]{3,8}\b|\b(?:bg|text|border)-(?:white|black)\b/)
   })
+
+  it('eine gesperrte Größe zeigt das Schloss mit dem Grund (S7, Nr. 20) — Gegenprobe ohne Sperre', async () => {
+    const grund = 'Wird erst sichtbar mit BAES-Meldung für Heimtierfutter'
+    const mit = await rendere([produkt('p5', { name: 'Heu 1 kg-Sackerl', category: 'HEU_STROH', isAvailable: false, sperre: grund })])
+    expect(mit).toContain(grund)
+    const ohne = await rendere([produkt('p5', { name: 'Heu 1 kg-Sackerl', category: 'HEU_STROH', isAvailable: false })])
+    expect(ohne).not.toContain(grund)
+  })
 })
 
 describe('Produktdialog im neuen Design', () => {
@@ -433,7 +488,7 @@ describe('Produktdialog im neuen Design', () => {
     expect(dialogTitel(false, null)).toBe('Neues Produkt')
     expect(dialogTitel(true, 'futter')).toBe('Produkt bearbeiten')
     expect(speichernText(0, false, true)).toBe('Produkt veröffentlichen')
-    expect(speichernText(0, false, false)).toBe('Als Entwurf speichern')
+    expect(speichernText(0, false, false)).toBe('Speichern (nicht im Shop)')
     expect(speichernText(2, false, true)).toBe('Noch 2 Angaben fehlen')
     expect(speichernText(0, true, true)).toBe('Speichern')
   })

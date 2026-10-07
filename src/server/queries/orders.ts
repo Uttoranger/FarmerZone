@@ -51,8 +51,10 @@ function serialize(order: RawOrder) {
     totalAmountCents: alsCents(totalAmount),
     platformFeeAmountCents: alsCents(platformFeeAmount),
     // Servicegebühr-Snapshot: Cent bleiben Int, der Prozentsatz ist ein Decimal
+    // (kein Geld) — über die Decimal-Methode wie in getHofBestellDetail, nie
+    // über Number(...) (Nr. 32).
     serviceFeePercentApplied:
-      order.serviceFeePercentApplied == null ? null : Number(order.serviceFeePercentApplied),
+      order.serviceFeePercentApplied == null ? null : order.serviceFeePercentApplied.toNumber(),
     // Was ein Storno an Geld bewegt (src/lib/storno.ts) — Decimal wird hier
     // an der Servergrenze zu ganzen Cent; der Storno-Dialog zeigt es,
     // cancelOrder rechnet dasselbe.
@@ -69,7 +71,7 @@ function serialize(order: RawOrder) {
       totalPriceCents: alsCents(totalPrice),
       // Decimal → number, sonst nicht über die RSC-Grenze serialisierbar
       product: i.product
-        ? { unit: i.product.unit, unitSize: i.product.unitSize == null ? null : Number(i.product.unitSize) }
+        ? { unit: i.product.unit, unitSize: i.product.unitSize == null ? null : i.product.unitSize.toNumber() }
         : null,
     })),
   }

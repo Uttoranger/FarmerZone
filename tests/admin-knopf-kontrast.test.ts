@@ -1,30 +1,31 @@
 /**
- * Der Knopf „Ablehnen & löschen" in der Admin-Hofliste erreicht ≥ 4,5:1 in
- * beiden Themes (Nr. 19b, Morgenbericht Lauf 4 §7: vorher 4,27:1).
+ * Der Knopf „Ablehnen" an einem wartenden Hof erreicht ≥ 4,5:1 in beiden
+ * Themes.
  *
- * Der Knopf ist ein Umriss-Knopf mit roter Schrift. Seine Fläche war im
- * Hellen `bg-background` (Crème) — darauf erreicht `--destructive` nur
- * 4,27:1. Jetzt liegt die Schrift in beiden Themes und auch beim Darüberfahren
- * auf `bg-card`. Geprüft wird beides am Quelltext: welche Tokens der Knopf
- * nimmt (Architektur-Regel mit Gegenprobe) und dass genau dieses Paar in
- * `globals.css` den Kontrast hält.
+ * Verlauf: Nr. 19b hob „Ablehnen & löschen" auf 4,5:1 (rote Schrift lag auf
+ * Crème bei 4,27:1 und wanderte auf die Kartenfläche). Seit Nr. 22f steht der
+ * Admin in der AdminShell (data-design="neu"): „Ablehnen" ist ein
+ * Umriss-Knopf (KNOPF_RAHMEN) mit normaler Textfarbe auf der Karte; die
+ * zerstörende Bestätigung („Endgültig löschen") steht erst im Dialog, als
+ * Orange-Umriss (DESIGN_SYSTEM „Dialoge und Blätter"). Geprüft wird am
+ * Quelltext, welche Klassen der Knopf nimmt (mit Gegenprobe), und an den
+ * Tokens in globals.css, dass genau dieses Paar den Kontrast hält.
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { kontrast, leseOklch, oklchZuHex } from '@/lib/farbraum'
+import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 
 const css = readFileSync(join(process.cwd(), 'src/app/globals.css'), 'utf8')
-const liste = readFileSync(join(process.cwd(), 'src/app/admin/admin-farm-list.tsx'), 'utf8')
+const ansicht = readFileSync(join(process.cwd(), 'src/components/admin/hoefe-ansicht.tsx'), 'utf8')
 
-/** Der CSS-Block zu einem Selektor — bis zur ersten schließenden Klammer am Zeilenanfang. */
 function block(selektor: string): string {
   const start = css.indexOf(`${selektor} {`)
   expect(start, `Block „${selektor}" fehlt`).toBeGreaterThan(-1)
   return css.slice(start, css.indexOf('\n}', start))
 }
 
-/** Der Hexwert einer shadcn-Variable (`--card`, `--destructive` …) in einem Block. */
 function farbe(selektor: string, variable: string): string {
   const treffer = block(selektor).match(new RegExp(`\\n\\s*--${variable}:\\s*([^;]+);`))
   expect(treffer, `${selektor} --${variable}`).not.toBeNull()
@@ -33,39 +34,42 @@ function farbe(selektor: string, variable: string): string {
   return oklchZuHex(oklch!)
 }
 
-/** Die Klassen des Knopfs, der genau diesen Text trägt. */
-function klassenDesKnopfs(text: string): string[] {
-  const ende = liste.indexOf(text)
+/** Die Klassen-Angabe des Knopfs, der genau diesen Text trägt (`className={…}` oder `className="…"`). */
+function klassenDesKnopfs(quelle: string, text: string): string {
+  const ende = quelle.indexOf(`>\n          ${text}\n`)
   expect(ende, `Knopf „${text}" fehlt`).toBeGreaterThan(-1)
-  const anfang = liste.lastIndexOf('<Button', ende)
-  const klassen = liste.slice(anfang, ende).match(/className="([^"]+)"/)
+  const anfang = quelle.lastIndexOf('<button', ende)
+  const klassen = quelle.slice(anfang, ende).match(/className=\{([^}]+)\}|className="([^"]+)"/)
   expect(klassen, `className am Knopf „${text}"`).not.toBeNull()
-  return klassen![1].split(/\s+/)
+  return (klassen![1] ?? klassen![2]).trim()
 }
 
 const HELL = ':root'
 const DUNKEL = '[data-theme="dark"]'
 
-describe('„Ablehnen & löschen" — Kontrast in beiden Themes', () => {
-  const klassen = klassenDesKnopfs('Ablehnen &amp; löschen')
-
-  it('rote Schrift auf der Kartenfläche — im Hellen, im Dunkeln und beim Darüberfahren', () => {
-    expect(klassen).toContain('text-destructive')
-    expect(klassen).toContain('bg-card')
-    expect(klassen).toContain('dark:bg-card')
-    expect(klassen).toContain('hover:bg-card')
-    expect(klassen).toContain('dark:hover:bg-card')
-    // Keine andere Fläche, keine Hexfarbe, kein Ad-hoc-Wert.
-    expect(klassen.filter((k) => /(^|:)bg-/.test(k) && !k.endsWith('bg-card'))).toEqual([])
-    expect(klassen.join(' ')).not.toMatch(/#[0-9a-f]{3,6}|\[/i)
+describe('„Ablehnen" — Kontrast in beiden Themes', () => {
+  it('der Knopf ist ein Umriss-Knopf in normaler Textfarbe, ohne eigene Fläche und ohne rote Schrift', () => {
+    expect(klassenDesKnopfs(ansicht, 'Ablehnen')).toBe('KNOPF_RAHMEN')
+    const klassen = KNOPF_RAHMEN.split(/\s+/)
+    expect(klassen).toContain('text-foreground')
+    expect(klassen).toContain('border-border')
+    expect(klassen.filter((k) => /^bg-/.test(k))).toEqual([])
+    expect(klassen.join(' ')).not.toMatch(/destructive|#[0-9a-f]{3,6}/i)
   })
 
-  it('--destructive auf --card hält ≥ 4,5:1 in beiden Themes', () => {
-    expect(kontrast(farbe(HELL, 'destructive'), farbe(HELL, 'card')), 'hell').toBeGreaterThanOrEqual(4.5)
-    expect(kontrast(farbe(DUNKEL, 'destructive'), farbe(DUNKEL, 'card')), 'dunkel').toBeGreaterThanOrEqual(4.5)
+  it('Textfarbe auf der Kartenfläche hält ≥ 4,5:1 in beiden Themes (Tokens des neuen Designs)', () => {
+    expect(kontrast(farbe(HELL, 'fz-text'), farbe(HELL, 'fz-surface')), 'hell').toBeGreaterThanOrEqual(4.5)
+    expect(kontrast(farbe(DUNKEL, 'fz-text'), farbe(DUNKEL, 'fz-surface')), 'dunkel').toBeGreaterThanOrEqual(4.5)
   })
 
   it('Gegenprobe: die Messung fängt den alten Zustand (rote Schrift auf Crème) — unter 4,5:1', () => {
-    expect(kontrast(farbe(HELL, 'destructive'), farbe(HELL, 'background'))).toBeLessThan(4.5)
+    // Der helle Wert von --destructive vor Register O1 (Nr. 28); seitdem hält
+    // das Token selbst 4,5:1 auch auf Crème (tests/fehler-farbe-kontrast.test.ts).
+    const vorO1 = oklchZuHex({ l: 0.577, c: 0.245, h: 27.325 })
+    expect(kontrast(vorO1, farbe(HELL, 'background'))).toBeLessThan(4.5)
+  })
+
+  it('Gegenprobe: die Suche findet den Knopf nur mit genau diesem Text', () => {
+    expect(() => klassenDesKnopfs(ansicht, 'Ablehnen & löschen')).toThrow()
   })
 })

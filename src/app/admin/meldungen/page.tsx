@@ -1,255 +1,145 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
+import * as Sentry from '@sentry/nextjs'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import {
   filterAusParametern,
   getMeldungenFuerAdmin,
   getWunschCluster,
-  type AdminMeldungFilter,
+  zaehleMeldungenJeStatus,
+  type AdminMeldungZeile,
+  type WunschCluster,
 } from '@/server/queries/meldung'
+import { MELDUNG_ARTEN, MELDUNG_ART_LABEL, STATUS_ZU_ENTSCHEIDEN, type MeldungStatus } from '@/lib/meldung'
+import { MELDUNG_ART_TON } from '@/lib/hof-hilfe'
 import {
-  MELDUNG_ARTEN,
-  MELDUNG_ART_LABEL,
-  MELDUNG_STATUS,
-  STATUS_INTERN,
-  STATUS_MARKE_FARBE,
-  STATUS_OFFEN,
-  STATUS_ZU_ENTSCHEIDEN,
-  prLink,
-} from '@/lib/meldung'
-import { Marke } from '@/components/ui/marke'
+  ADMIN_STATUS_TON,
+  STATUS_GRUPPEN,
+  adminStatusText,
+  aktiveStatusGruppe,
+  artUmschalten,
+  briefkastenAdresse,
+  herkunftZeile,
+  zaehleStatusGruppen,
+  type BriefkastenSuche,
+} from '@/lib/admin-briefkasten'
+import { wienKalendertag } from '@/lib/kalender'
+import { datumKurz } from '@/lib/verkauf-eintragen'
 import { cn } from '@/lib/utils'
+import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
+import { LEISE } from '@/components/hof-bestellungen/stil'
+import { ADMIN_RAHMEN, AdminFehler, SEITEN_TITEL } from '@/components/admin/admin-teile'
+import { MeldungListe, Wunschliste, type BriefkastenZeile, type WunschBuendel } from '@/components/admin/briefkasten-teile'
 
-export const metadata: Metadata = { title: 'Meldungen — Admin — FarmerZone' }
+export const metadata: Metadata = { title: 'Briefkasten — Admin — FarmerZone' }
 export const dynamic = 'force-dynamic'
 
-type Suche = { status?: string; art?: string; reiter?: string }
+/** Mehr zeigt die Liste nie auf einmal (getMeldungenFuerAdmin). */
+const LISTE_MAX = 200
 
-function datum(d: Date): string {
-  return d.toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit', year: '2-digit', timeZone: 'Europe/Vienna' })
-}
-
-/** Ein Link auf dieselbe Seite mit geändertem Filter — der Rest bleibt erhalten. */
-function filterHref(basis: Suche, aenderung: Partial<Suche>): string {
-  const params = new URLSearchParams()
-  const naechste = { ...basis, ...aenderung }
-  for (const [k, v] of Object.entries(naechste)) if (v) params.set(k, v)
-  const q = params.toString()
-  return q ? `/admin/meldungen?${q}` : '/admin/meldungen'
-}
-
-function Chip({ href, aktiv, children }: { href: string; aktiv: boolean; children: React.ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className={cn(
-        'inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-medium transition-colors',
-        aktiv
-          ? 'border-primary bg-primary text-primary-foreground'
-          : 'border-border bg-card text-muted-foreground hover:text-foreground'
-      )}
-    >
-      {children}
-    </Link>
-  )
-}
-
-/**
- * /admin/meldungen — die Triage-Liste des Betreibers (Sprint fehlerbriefkasten,
- * Teil D). Startansicht „Zu entscheiden": NEU + VERMUTLICH_WUNSCH — was auf
- * den Menschen wartet (Sprint Briefkasten-Rückkopplung). Der Reiter „Wünsche" zeigt die
- * gezählte Wunschliste nach clusterKey — Grundlage einer Entscheidung, nie ihr
- * Ersatz. Bei 375px sind die Zeilen Karten, keine Tabelle: nichts scrollt quer.
+/*
+ * /admin/meldungen — der Briefkasten in der AdminShell (Nachtlauf Nr. 22f,
+ * Mockup admin-briefkasten). Startansicht „Zu entscheiden": Neues und die
+ * Wunsch-Vorschläge der KI. Daneben die gebündelte Wunschliste — Grundlage
+ * einer Entscheidung, nie ihr Ersatz. Eingangskanal, kein Befehlskanal.
  */
-export default async function AdminMeldungenPage({ searchParams }: { searchParams: Promise<Suche> }) {
+export default async function AdminMeldungenPage({
+  searchParams,
+}: {
+  searchParams: Promise<BriefkastenSuche & { reiter?: string }>
+}): Promise<React.JSX.Element> {
   await verlangeAdminSeite()
 
-  const suche = await searchParams
-  const reiter = suche.reiter === 'wuensche' ? 'wuensche' : 'meldungen'
+  const roh = await searchParams
+  const suche: BriefkastenSuche = { status: roh.status, art: roh.art }
   const filter = filterAusParametern(suche, STATUS_ZU_ENTSCHEIDEN)
+  const jetzt = new Date()
+
+  let daten: { meldungen: AdminMeldungZeile[]; jeStatus: Partial<Record<MeldungStatus, number>>; cluster: WunschCluster[] } | null = null
+  try {
+    const [meldungen, jeStatus, cluster] = await Promise.all([
+      getMeldungenFuerAdmin(filter),
+      zaehleMeldungenJeStatus(filter.art),
+      getWunschCluster(),
+    ])
+    daten = { meldungen, jeStatus, cluster }
+  } catch (err) {
+    // Nur der Bereich — nie Meldungstext.
+    Sentry.captureException(err, { tags: { bereich: 'admin', seite: 'briefkasten' } })
+  }
+
+  if (!daten) {
+    return (
+      <div className={ADMIN_RAHMEN}>
+        <AdminFehler titel="Briefkasten" satz="Wir konnten den Briefkasten gerade nicht laden." nochmal="/admin/meldungen" />
+      </div>
+    )
+  }
+
+  const heute = wienKalendertag(jetzt)
+  const zeilen: BriefkastenZeile[] = daten.meldungen.map((m) => ({
+    id: m.id,
+    art: MELDUNG_ART_LABEL[m.art],
+    artTon: MELDUNG_ART_TON[m.art],
+    titel: m.ersteZeile || '—',
+    herkunft: `${herkunftZeile(m)} · Nr. ${m.kurznummer}`,
+    datum: datumKurz(wienKalendertag(m.createdAt), heute),
+    status: adminStatusText(m.status, m.sprintName),
+    statusTon: ADMIN_STATUS_TON[m.status],
+  }))
+  const buendel: WunschBuendel[] = daten.cluster.map((c) => ({
+    schluessel: c.clusterKey ?? '__ohne',
+    name: c.clusterKey ?? 'Ohne Bündel',
+    anzahl: c.anzahl,
+    beispiele: c.beispiele.map((b) => ({ id: b.id, text: `${b.kurznummer} · ${b.hofName ?? 'Kundin'} · ${b.ersteZeile || '—'}` })),
+    weitere: Math.max(0, c.anzahl - c.beispiele.length),
+  }))
+  const gruppe = aktiveStatusGruppe(suche.status, filter.status)
+  const gruppenZahl = zaehleStatusGruppen(daten.jeStatus)
+  const istVoreinstellung = gruppe === 'zu-entscheiden' && filter.art === null
 
   return (
-    <main className="min-h-screen bg-background px-4 py-8 md:px-6">
-      <div className="mx-auto max-w-4xl">
-        <Link href="/admin" className="text-sm text-primary hover:underline">
-          ← Admin
-        </Link>
-        <h1 className="mt-2 text-xl font-semibold text-foreground">Meldungen</h1>
-        <p className="mb-4 text-sm text-muted-foreground">
-          Eingangskanal, kein Befehlskanal — entscheiden tut der Betreiber.
-        </p>
+    <div className={cn(ADMIN_RAHMEN, 'flex flex-col gap-5')}>
+      <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
+        <h1 className={SEITEN_TITEL}>Briefkasten</h1>
+        <p className={cn('text-[13px]', LEISE)}>Wochen-Zusammenfassung montags per E-Mail, wenn etwas wartet</p>
+      </header>
 
-        {/* Reiter — schlichte Seitenlinks (kein ARIA-Tab-Widget: keine Pfeiltasten-Navigation nötig) */}
-        <nav className="mb-4 flex gap-2 border-b border-border" aria-label="Ansicht">
-          <Link
-            aria-current={reiter === 'meldungen' ? 'page' : undefined}
-            href={filterHref(suche, { reiter: undefined })}
-            className={cn(
-              'min-h-10 border-b-2 px-3 pb-2 pt-1 text-sm font-medium',
-              reiter === 'meldungen' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground'
-            )}
-          >
-            Meldungen
-          </Link>
-          <Link
-            aria-current={reiter === 'wuensche' ? 'page' : undefined}
-            href={filterHref(suche, { reiter: 'wuensche' })}
-            className={cn(
-              'min-h-10 border-b-2 px-3 pb-2 pt-1 text-sm font-medium',
-              reiter === 'wuensche' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground'
-            )}
-          >
-            Wünsche
-          </Link>
-        </nav>
-
-        {reiter === 'wuensche' ? <WunschReiter /> : <MeldungReiter suche={suche} filter={filter} />}
-      </div>
-    </main>
-  )
-}
-
-async function MeldungReiter({ suche, filter }: { suche: Suche; filter: AdminMeldungFilter }) {
-  const meldungen = await getMeldungenFuerAdmin(filter)
-  const istVoreinstellung = !suche.status
-  const gleicheMenge = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((s) => b.includes(s))
-  const statusChips: Array<{ wert: string | undefined; label: string; aktiv: boolean }> = [
-    { wert: undefined, label: 'Zu entscheiden', aktiv: istVoreinstellung },
-    { wert: STATUS_OFFEN.join(','), label: 'Offen', aktiv: !istVoreinstellung && gleicheMenge(filter.status, STATUS_OFFEN) },
-    ...MELDUNG_STATUS.map((s) => ({
-      wert: s,
-      label: STATUS_INTERN[s],
-      aktiv: !istVoreinstellung && filter.status.length === 1 && filter.status[0] === s,
-    })),
-    {
-      wert: MELDUNG_STATUS.join(','),
-      label: 'Alle',
-      aktiv: !istVoreinstellung && filter.status.length === MELDUNG_STATUS.length,
-    },
-  ]
-
-  return (
-    <>
-      <div className="mb-2 flex flex-wrap gap-1.5" aria-label="Status">
-        {statusChips.map((c) => (
-          <Chip key={c.label} href={filterHref(suche, { status: c.wert })} aktiv={c.aktiv}>
-            {c.label}
-          </Chip>
-        ))}
-      </div>
-      <div className="mb-5 flex flex-wrap gap-1.5" aria-label="Art">
-        <Chip href={filterHref(suche, { art: undefined })} aktiv={filter.art === null}>
-          Alle Arten
-        </Chip>
-        {MELDUNG_ARTEN.map((a) => (
-          <Chip key={a} href={filterHref(suche, { art: a })} aktiv={filter.art === a}>
-            {MELDUNG_ART_LABEL[a]}
-          </Chip>
-        ))}
+      <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-3">
+        <FilterChipReihe beschriftung="Nach Stand filtern">
+          {STATUS_GRUPPEN.map((g) => (
+            <FilterChip key={g.id} href={briefkastenAdresse(suche, { status: g.wert })} aktiv={gruppe === g.id}>
+              {g.label}
+              <span className="ml-1 tabular-nums">· {gruppenZahl[g.id]}</span>
+            </FilterChip>
+          ))}
+        </FilterChipReihe>
+        <span aria-hidden="true" className="hidden h-6 w-px bg-border md:block" />
+        <FilterChipReihe beschriftung="Nach Art filtern">
+          {MELDUNG_ARTEN.map((a) => (
+            <FilterChip key={a} href={briefkastenAdresse(suche, { art: artUmschalten(filter.art, a) })} aktiv={filter.art === a}>
+              {MELDUNG_ART_LABEL[a]}
+            </FilterChip>
+          ))}
+        </FilterChipReihe>
       </div>
 
-      <p className="mb-3 text-xs text-muted-foreground">
-        {meldungen.length === 0
-          ? 'Keine Meldungen mit diesem Filter.'
-          : meldungen.length === 1
-            ? '1 Meldung'
-            : `${meldungen.length} Meldungen${meldungen.length === 200 ? ' (die jüngsten 200)' : ''}`}
-        {' · Voreinstellung: '}
-        {STATUS_ZU_ENTSCHEIDEN.map((s) => STATUS_INTERN[s]).join(' + ')}
-      </p>
-
-      <ul className="space-y-2">
-        {meldungen.map((m) => {
-          const pr = prLink(m.sprintName)
-          return (
-            // Die ganze Karte ist klickbar (after:-Fläche des Links), der PR-Link liegt
-            // darüber — ein Link im Link wäre ungültiges HTML.
-            <li
-              key={m.id}
-              className="relative rounded-xl border border-border bg-card p-3 transition-colors hover:border-primary/40"
-            >
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                <Link
-                  href={`/admin/meldungen/${m.id}`}
-                  className="font-mono font-semibold text-foreground after:absolute after:inset-0 after:rounded-xl focus-visible:underline focus-visible:outline-none"
-                >
-                  {m.kurznummer}
-                </Link>
-                <span className="font-medium text-foreground">{MELDUNG_ART_LABEL[m.art]}</span>
-                <span>{datum(m.createdAt)}</span>
-                <span className="truncate">{m.hofName ?? (m.customerEmail ? 'Kundin' : 'Anonym')}</span>
-                <Marke farbe={STATUS_MARKE_FARBE[m.status]} className="ml-auto">
-                  {STATUS_INTERN[m.status]}
-                </Marke>
-              </div>
-              <p className="mt-1.5 truncate text-sm text-foreground">{m.ersteZeile || '—'}</p>
-              {(m.diagKennung || m.clusterKey || m.sprintName) && (
-                <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-                  {m.diagKennung && <span>Kennung {m.diagKennung}</span>}
-                  {m.clusterKey && <span>Cluster {m.clusterKey}</span>}
-                  {pr ? (
-                    <a
-                      href={pr}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="relative z-10 font-medium text-brand-text underline-offset-2 hover:underline"
-                    >
-                      {m.sprintName}
-                    </a>
-                  ) : (
-                    m.sprintName && <span>Sprint {m.sprintName}</span>
-                  )}
-                </div>
-              )}
-            </li>
-          )
-        })}
-      </ul>
-    </>
-  )
-}
-
-async function WunschReiter() {
-  const cluster = await getWunschCluster()
-  const gesamt = cluster.reduce((s, c) => s + c.anzahl, 0)
-
-  return (
-    <>
-      <p className="mb-3 text-xs text-muted-foreground">
-        {gesamt === 0
-          ? 'Noch keine Wünsche.'
-          : `${gesamt} ${gesamt === 1 ? 'Wunsch' : 'Wünsche'} in ${cluster.length} ${cluster.length === 1 ? 'Bündel' : 'Bündeln'} — Duplikate ausgenommen. Bündel entstehen über den Cluster-Schlüssel in der Triage.`}
-      </p>
-      <ul className="space-y-2">
-        {cluster.map((c) => (
-          <li key={c.clusterKey ?? '__ohne'} className="rounded-xl border border-border bg-card p-3">
-            <div className="flex items-center justify-between gap-2">
-              <span className="truncate text-sm font-semibold text-foreground">
-                {c.clusterKey ?? 'Ohne Cluster'}
-              </span>
-              <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
-                {c.anzahl}×
-              </span>
-            </div>
-            <ul className="mt-2 space-y-1">
-              {c.beispiele.map((b) => (
-                <li key={b.id} className="text-xs text-muted-foreground">
-                  <Link href={`/admin/meldungen/${b.id}`} className="hover:underline">
-                    <span className="font-mono text-foreground">{b.kurznummer}</span>
-                    {' · '}
-                    {b.hofName ?? 'Kundin'}
-                    {' · '}
-                    {b.ersteZeile || '—'}
-                  </Link>
-                </li>
-              ))}
-              {c.anzahl > c.beispiele.length && (
-                <li className="text-xs text-muted-foreground">… und {c.anzahl - c.beispiele.length} weitere</li>
-              )}
-            </ul>
-          </li>
-        ))}
-      </ul>
-    </>
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="flex min-w-0 flex-col gap-2">
+          <p className={cn('text-[13px]', LEISE)} aria-live="polite">
+            {zeilen.length === 1 ? '1 Meldung' : `${zeilen.length} Meldungen`}
+            {zeilen.length === LISTE_MAX && ' (die jüngsten 200)'}
+          </p>
+          <MeldungListe
+            zeilen={zeilen}
+            leer={
+              istVoreinstellung
+                ? { titel: 'Nichts zu entscheiden', satz: 'Neue Meldungen und Vorschläge der KI landen hier.', ausweg: { text: 'Offene Meldungen zeigen', href: briefkastenAdresse({}, { status: STATUS_GRUPPEN[1].wert }) } }
+                : { titel: 'Keine Meldung passt', satz: 'Mit diesem Filter gibt es keine Meldung.', ausweg: { text: 'Zu entscheiden zeigen', href: '/admin/meldungen' } }
+            }
+          />
+        </div>
+        <Wunschliste buendel={buendel} />
+      </div>
+    </div>
   )
 }

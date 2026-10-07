@@ -8,7 +8,6 @@ import { meldungEingabeSchema } from '@/schemas/meldung'
 import { MELDUNGEN_PRO_STUNDE, ZU_VIELE_MELDUNGEN, kurznummer } from '@/lib/meldung'
 import { istEigenesBild } from '@/server/bild-url'
 import { createRateLimiter, getClientIp } from '@/lib/rate-limit'
-import { sendMeldungNotification } from '@/lib/email'
 
 /**
  * Eine Meldung in den Fehlerbriefkasten legen (Sprint fehlerbriefkasten, Teil B).
@@ -161,6 +160,8 @@ export async function meldungAbsenden(data: MeldungFormularDaten): Promise<Meldu
   //    Meldung nicht scheitern lassen — sie ist gespeichert.
   if (eingabe.art === 'FEHLER') {
     try {
+      // Erst hier geladen (Nr. 31): Die Meldeseiten binden diese Action ein.
+      const { sendMeldungNotification } = await import('@/lib/email')
       await sendMeldungNotification({
         kurznummer: kurznummer(meldung.id),
         id: meldung.id,

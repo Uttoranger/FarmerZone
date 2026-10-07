@@ -189,3 +189,65 @@ Nach Gate 7 (`TeilenAufruf` aus #169, Paket `qrcode` erlaubt, siehe §3).
 
 ### 22f Admin
 In eine eigene AdminShell nach den admin-Mockups. Freischalten bleibt gesperrt ohne Stripe; keine Nummernprüfung (E9).
+
+## 10. Lauf 6 (07.10.2026, uttoranger)
+
+Freigabe im Chat erteilt (Mensch: uttoranger, 07.10.2026). Entscheidungen dazu im Register: E10a, E11 (Label), E12 (Stand), F6, F7, B2–B4, Z1, T1, O1, O3–O5, Backlog.
+
+- **Haltepunkt: 33.**
+- **Reihenfolge (fest):** 23 → 24 → 25 → 26 → 27 → 28 → 29 → 30 → 31 → 32 → 33.
+- **Migrationen:** nur bei Nr. 30, nur Expand (neue Spalten mit Default oder nullable), erzeugt nach Regel 3 in `docs/nachtlauf.md`, im Morgenbericht hervorheben. Entsteht bei einer anderen Nummer eine Migration: STOPP.
+- **Nach Fixes im Geld- oder Sicherheitspfad** (23, 24, 27, 32) eine kurze Nachprüfung des Fix-Commits.
+- **PRs mit offener Vorbedingung** bleiben Entwurf.
+- **Konflikte:** in Doku mechanisch lösen; in Code diese Nummer stoppen, melden und mit der nächsten unabhängigen weitermachen.
+- **NICHT anfassen:** O4 (AGB werden separat erstellt). Backlog (Register) gehört nicht in diesen Lauf.
+- Mockup-Abweichungen aus Lauf 5 (#192–#201) sind freigegeben (F7).
+
+### 23 #198 Nachtrag Futter (Branch `nacht/2026-10-06/20-futter-brennmaterial`)
+- Pflicht-Haken im Futter-Formular (Web, Handy) mit dem Wortlaut aus E10a. Serverseitig erzwingen, auch über Produktfamilie und Kategoriewechsel; Zeitpunkt in `FutterKennzeichnung.bestaetigtAm`; jede inhaltliche Änderung verlangt eine erneute Bestätigung.
+- Kopfhinweis über den sieben Fällen (Wortlaut E10a) mit Link zur BAES-Seite für Futtermittelbetriebe.
+- Kundenseite bei jedem Futter (Produktdetail, Größenkacheln, Warenkorb mit Futter): Verantwortungs-Hinweis aus E10a, bei „nur an Betriebe" der Zusatz. Texte aus einer Quelle.
+- E11-Label „Brennmaterial".
+- Danach Entwurf aufheben.
+
+### 24 Z1 Stripe-Pflicht und #201 auf `main` (neuer Branch von `main`)
+- Code aus `nacht/2026-10-06/22f-admin` übernehmen (cherry-pick oder merge, kein Force-Push). `freischaltSperre` sperrt immer ohne `stripeAccountReady`; Label „Nur bar" entfernen; Kennzeichen „Stripe fehlt" für freigeschaltete Höfe ohne Stripe. #201 schließen mit Verweis auf den neuen PR.
+- Einstellungen: Wahl „nur bar" entfernen; der Server lehnt `acceptsOnline = false` von Höfen ab; Notbremse unverändert.
+- Einrichten: „Hof online stellen" erst mit Stripe, Text „Damit deine Kundinnen auch mit Karte, Apple Pay oder EPS zahlen können, richte bitte die Online-Zahlung ein. Dauert etwa 10 Minuten." Heute: deutlicher Hinweis „Online-Zahlung einrichten" für freigeschaltete Höfe ohne Stripe. Keine Abschaltung.
+- Öffentliche Texte (`/fuer-hoefe`, `/konditionen`, Registrieren): Stripe-Einrichtung als Teil des Starts nennen, keine Bar-Option für Höfe andeuten. Texte aus `konditionen.ts`.
+
+### 25 #199 Teilen nach T1 (Branch `nacht/2026-10-06/21-teilen`, vorher den neuen Stand von 20 hineinholen)
+- Browser-Speicher entfernen (`teilen-herkunft.ts` und Aufrufer), Besuchszählung serverseitig über `?k=`, keine Bestell-Zuordnung, Texte „ohne Cookies" prüfen.
+- Danach Entwurf aufheben.
+
+### 26 #200 Auswertung und Region (Branch `nacht/2026-10-06/22c-auswertung-region`, vorher 21 hineinholen)
+- Euro-Betrag in der Teilen-Karte weg (T1), Zählregel wie Admin, Rest unverändert.
+- Slug `region` ist in Produktion frei (geprüft 07.10.2026).
+- Danach Entwurf aufheben.
+
+### 27 Konto und Geld, klein (Branch von `main`)
+19c Vollerstattung mit Merkmalen · 19b gleiche Antwort und Mail an das bestehende Konto · B3 · B4.
+
+### 28 Oberfläche und Wortwahl (Branch von `main`)
+B2 · 22a · 22b (Wortwahl, Knopf am Handy) · 22e (Kurznummer, „N per E-Mail") · O1 Fehler-Farbe · 19a `/konditionen` stündlich neu bauen.
+
+### 29 22c „Betrieb" bei Futter kaufen vorbelegen (gestapelt auf 26)
+
+### 30 Teilen-Momente „gespeichert" und Abschalten in den Einstellungen (gestapelt auf 25)
+Migration erlaubt: nur Expand (neue Spalten mit Default oder nullable), nach Regel 3, im Morgenbericht hervorheben.
+
+### 31 Tab-Wechsel im Hofbereich beschleunigen (Branch von `main`)
+Befund (Messung 06.10.2026): Server-Rechenzeit gering (Sentry p50 7–35 ms, `/dashboard` ~315 ms), aber jeder Produktionsaufruf zeigt das Modul-Log „[E-Mail] Init" → nahezu jeder Tab-Wechsel ist ein Kaltstart; ohne `loading.tsx` gibt es weder sofortige Rückmeldung noch Vorladen.
+- `loading.tsx` für jede Route in `(hof)`, als Rückfall für die Gruppe, sowie für `(farmer)`- und `/admin`-Routen ohne eigene; Skeletons nach DESIGN_SYSTEM.md in den Abmessungen der echten Seite.
+- E-Mail-, Stripe- und andere schwere Module nur dort und erst bei Bedarf laden (dynamischer Import in Versandfunktionen bzw. Actions); kein Seitenmodul zieht sie über Sammel-Importe mit. Modul-Log „[E-Mail] Init" entfernen.
+- `/dashboard`: unabhängige Abfragen mit `Promise.all`; Freigabe verwaister Bestellungen nicht blockierend vor dem Rendern, wenn fachlich zulässig (sonst begründen).
+- Im PR belegen: Bundle-Größe der Hof-Routen vorher/nachher aus `next build` und die Zahl der Module, die `/orders` beim Start lädt.
+
+### 32 Altlasten aus Morgenbericht Lauf 5 §5 (Branch von `main`)
+`revertPickedUp` korrigieren · `Number(...)` für Geld in `queries/orders.ts` und im Servicegebühr-Dialog durch Int-Cent ersetzen · `status-posts.ts`: Zod an allen Actions, Besitzprüfung im selben Schreibvorgang statt per vorgelagertem `findFirst` · 36-px-Felder in „Mein Auftritt" auf mindestens 44 px. Tests je Punkt.
+
+### 33 Datenschutzerklärung auf Sachstand bringen (Branch von `main`)
+Nur Tatsachen korrigieren, keine neuen Rechtsformulierungen: Anmeldung per Code statt Link; kein automatisches Kundenkonto (E8); Teilen zählt nur Besuche, ohne Speicher im Browser (T1); Stripe als Zahlungsdienst; Sentry; Aufbewahrung von Bestelldaten. Jede geänderte Stelle im Bericht auflisten, damit der Mensch sie rechtlich prüfen lassen kann.
+
+### Morgenbericht (`morgenbericht-<datum>-lauf6.md`)
+Je PR: Vorschau-Link, „enthält Migration: ja/nein", Basis, Merge-Reihenfolge (Merge-Commit, nicht Squash), „Für dich zu tun" (u. a. Heu-Produkte bestätigen, Höfe ohne Stripe ansprechen, Stripe-Events `refund.failed` und `charge.refund.updated`, EPS/Apple Pay/Google Pay, geänderte Stellen der Datenschutzerklärung prüfen lassen).

@@ -132,6 +132,26 @@ export function kundinnenKonto(nutzer: { role?: string | null; isAdmin?: boolean
   return nutzer?.role === 'CUSTOMER' && nutzer.isAdmin !== true
 }
 
+/** Der Pfad der Code-Anmeldung in Better Auth (emailOTP). */
+export const CODE_ANMELDUNG_PFAD = '/sign-in/email-otp'
+
+/**
+ * Entfernt die Code-Anmeldung gerade das Passwort einer FREMDEN
+ * Alt-Registrierung (Register B3, Nr. 27)? Better Auth löscht beim ersten
+ * Code eines unbestätigten Kontos dessen Passwort-Konto
+ * (revokeUnprovenAccountAccess, emailOTP-Plugin) — ein Passwort an einem
+ * Konto, dessen Postfach niemand bewiesen hat, stammt von jemandem, der die
+ * Adresse registriert hat, ohne sie zu besitzen. Genau dann werden Name und
+ * Telefon geleert, die er hinterlassen hat (src/server/kontaktdaten-fremd.ts,
+ * dort mit der Bedingung „unbestätigt, CUSTOMER, kein Betreiber" in der
+ * WHERE-Klausel). Ein ruhendes Konto aus dem alten Checkout hat kein
+ * Passwort und bleibt unberührt; die Bestätigung eines Hofs per Link und
+ * „Konto löschen" sind andere Pfade.
+ */
+export function fremdesPasswortBeiCodeAnmeldung(e: { pfad: string | null | undefined; providerId: string }): boolean {
+  return e.pfad === CODE_ANMELDUNG_PFAD && e.providerId === 'credential'
+}
+
 /**
  * Die Rolle hinter einer Adresse aus ALLEN Konten, die sie (ohne Rücksicht
  * auf Groß-/Kleinschreibung) trifft. Ein einziger Hof oder Admin darunter

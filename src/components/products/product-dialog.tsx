@@ -10,7 +10,7 @@ import { ladeFotoHoch, pruefeLesbarkeit, stufenText, type UploadStufe } from '@/
 import { useFotoQuellen, type FotoAuswahl } from '@/components/shared/foto-quellen'
 import { ordneLeseFehler, type LeseDiagnose, type UploadDiagnose } from '@/lib/upload-diagnose'
 import { bildFehlerArtVon, bildFehlerMeldung, karteText } from '@/lib/upload-fehler'
-import { IM_SHOP, NICHT_IM_SHOP } from '@/lib/produkt-sichtbarkeit'
+import { IM_SHOP, NICHT_IM_SHOP, NICHT_IM_SHOP_IM_SATZ } from '@/lib/produkt-sichtbarkeit'
 import { meldeUploadFehler } from '@/lib/upload-meldung'
 import { leseAusgangVon, naechsterSchritt } from '@/lib/foto-wege'
 import { MAX_ORIGINAL_BYTES } from '@/lib/upload-pfade'
@@ -49,6 +49,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { createProduct, updateProduct, pruefeDualUse } from '@/server/actions/products'
+import type { ProduktAngelegt } from '@/lib/produkte-hof'
 import type { ProductData } from '@/server/queries/products'
 import {
   productFormSchema,
@@ -96,7 +97,15 @@ import {
 } from '@/lib/format'
 import { KategorieSheet } from './kategorie-sheet'
 import type { NeuBereich } from '@/schemas/url-auftrag'
+import { FUTTER_ANLEGEN_HREF } from '@/lib/bauern-navigation'
 import { cn } from '@/lib/utils'
+import {
+  FUTTER_BESTAETIGUNG_AUSNAHME,
+  FUTTER_BESTAETIGUNG_NEU,
+  FUTTER_BESTAETIGUNG_TEXT,
+  brauchtNeueBestaetigung,
+  futterStandAusFormular,
+} from '@/lib/futter-registrierung'
 import {
   gewichtFrage,
   inhaltZeile,
@@ -168,6 +177,8 @@ type Props = {
   vorwahl?: NeuBereich | null
   /** Beim Bearbeiten: „Löschen" im Fuß — die Rückfrage stellt der Aufrufer. */
   onLoeschen?: (product: ProductData) => void
+  /** Nach dem Anlegen: Anlass des Teilen-Moments „gespeichert" (Nr. 30); ob er kommt, entscheidet der Aufrufer. */
+  onAngelegt?: (angelegt: ProduktAngelegt) => void
 }
 
 /** Eine leere Kennzeichnung — sobald eine Futter-Kategorie gewählt ist. */
@@ -239,8 +250,9 @@ function toFormDefaults(p: ProductData): Partial<ProductFormData> {
     category: p.category ?? null,
     subcategory: p.subcategory ?? null,
     labels: p.labels,
-    // Eine gespeicherte Kennzeichnung wurde schon einmal bestätigt — der Haken
-    // ist deshalb gesetzt. Beim Speichern wird das Datum ohnehin neu gestempelt.
+    // Der Haken startet beim Bearbeiten NIE gesetzt (E10a, Nr. 23): Er ist eine
+    // Erklärung des Hofs, kein gespeicherter Wert. Ob eine Änderung ihn
+    // verlangt, entscheidet brauchtNeueBestaetigung (verbindlich der Server).
     futter: p.futter
       ? {
           futtermittelart: p.futter.futtermittelart,
@@ -255,7 +267,7 @@ function toFormDefaults(p: ProductData): Partial<ProductFormData> {
           rohasche: p.futter.rohasche,
           zusatzstoffe: p.futter.zusatzstoffe ?? '',
           gebrauchshinweis: p.futter.gebrauchshinweis ?? '',
-          bestaetigt: true,
+          bestaetigt: false,
         }
       : null,
     abgabe: p.abgabe,
@@ -283,7 +295,7 @@ function zusammenfassung(abschnitt: Abschnitt, w: ProductFormData): string {
     case 'preis': {
       const preis = Number.isFinite(w.price) ? w.price : 0
       const teile = [formatGrundpreis(preis, w.unit, w.unitSize), `${Number.isFinite(w.stock) ? w.stock : 0} auf Lager`]
-      if (!w.isAvailable) teile.push('ausgeblendet')
+      if (!w.isAvailable) teile.push(NICHT_IM_SHOP_IM_SATZ)
       return teile.join(' · ')
     }
     case 'details': {
@@ -316,7 +328,7 @@ function chipKlasse(aktiv: boolean): string {
   )
 }
 
-export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwahl = null, onLoeschen }: Props) {
+export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwahl = null, onLoeschen, onAngelegt }: Props) {
   const isEdit = product !== null
   const [isSubmitting, setIsSubmitting] = useState(false)
   // Nur während des Foto-Uploads gesetzt — danach zeigt der Knopf wieder
@@ -721,7 +733,37 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
     }, 250)
   }
 
+  /**
+   * Angaben eines Futtermittels geändert, aber nicht neu bestätigt (E10a):
+   * Abschnitt Kennzeichnung öffnen, Meldung am Haken, Fokus dorthin.
+   */
+  function bestaetigungVerlangen(text: string) {
+    form.setError('futter.bestaetigt', { type: 'manual', message: text })
+    abschnittOeffnen('kennzeichnung')
+    toast.error(text)
+    window.setTimeout(() => {
+      const el = formRef.current?.querySelector<HTMLElement>('[name="futter.bestaetigt"]')
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      // Der Haken steht ganz unten im Abschnitt: Wächst der Abschnitt beim
+      // Aufklappen noch, verfehlt das Scrollen ihn. focus() ohne preventScroll
+      // holt ihn danach sicher ins Bild.
+      window.setTimeout(() => el.focus(), 400)
+    }, 250)
+  }
+
   async function onSubmit(data: ProductFormData) {
+    // Vorab im Browser, damit kein Foto umsonst hochlädt — verbindlich prüft
+    // updateProduct mit dem gespeicherten Stand (Code BESTAETIGUNG).
+    if (
+      isEdit &&
+      data.futter &&
+      !data.futter.bestaetigt &&
+      brauchtNeueBestaetigung(futterStandAusFormular(toFormDefaults(product)), futterStandAusFormular(data))
+    ) {
+      bestaetigungVerlangen(FUTTER_BESTAETIGUNG_NEU)
+      return
+    }
     setIsSubmitting(true)
     try {
       let imageUrl = data.imageUrl ?? ''
@@ -778,6 +820,10 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
         ? await updateProduct(product.id, payload, bestandBasis ?? product.stock)
         : await createProduct(payload)
       if ('error' in ergebnis) {
+        if ('code' in ergebnis && ergebnis.code === 'BESTAETIGUNG') {
+          bestaetigungVerlangen(ergebnis.error)
+          return
+        }
         toast.error(ergebnis.error)
         if ('code' in ergebnis && ergebnis.code === 'GEAENDERT' && ergebnis.vorrat !== undefined) {
           // Das Feld zeigt jetzt den echten Stand; der Hof prüft und speichert erneut.
@@ -788,8 +834,11 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
         return
       }
       toast.success(isEdit ? 'Produkt gespeichert' : 'Produkt angelegt')
+      // Gespeichert, aber nicht im Shop: Der Größe fehlt die Futtermittel-Registrierung (S7, Nr. 20).
+      if (ergebnis.hinweis) toast.info(ergebnis.hinweis)
       // Schließen gibt auch die Kopie frei (Effekt auf `open`).
       onClose()
+      if (ergebnis.angelegt) onAngelegt?.({ anlass: ergebnis.angelegt.id, name: payload.name, kaufbar: ergebnis.angelegt.kaufbar })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Wir konnten das Produkt nicht speichern. Bitte versuch es noch einmal.')
     } finally {
@@ -1808,13 +1857,16 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                                   type="checkbox"
                                   name={field.name}
                                   checked={field.value ?? false}
-                                  onChange={(e) => field.onChange(e.target.checked)}
+                                  onChange={(e) => {
+                                    field.onChange(e.target.checked)
+                                    // Die Meldung „bitte neu bestätigen" setzt das Absenden von Hand — der Haken nimmt sie zurück.
+                                    if (e.target.checked) form.clearErrors('futter.bestaetigt')
+                                  }}
                                   className="mt-0.5 w-4 h-4 rounded accent-primary"
                                 />
-                                <span className="text-sm text-foreground">
-                                  Die Angaben entsprechen dem Sackanhänger bzw. Lieferschein. Ich bin für die Richtigkeit verantwortlich.
-                                </span>
+                                <span className="text-sm text-foreground">{FUTTER_BESTAETIGUNG_TEXT}</span>
                               </label>
+                              {isEdit && <p className="text-xs text-muted-foreground">{FUTTER_BESTAETIGUNG_AUSNAHME}</p>}
                               <FormMessage />
                             </FormItem>
                           )}
@@ -1867,6 +1919,11 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
       onOpenChange={setKategorieSheetOffen}
       wert={{ category, subcategory: werte.subcategory }}
       startBereich={!isEdit && vorwahl === 'futter' ? 'FUTTERMITTEL' : undefined}
+      // Futtermittel entstehen nur mit Verkaufsgrößen und Registrierung (Nr. 20,
+      // S7) — beim Anlegen und beim Bearbeiten eines Nicht-Futter-Produkts
+      // (updateProduct lehnt den Wechsel auf Futter ab). Ein Futtermittel
+      // bleibt in seinen Futter-Kategorien bearbeitbar.
+      futterAnlegenHref={isEdit && istFuttermittel(product.category) ? undefined : FUTTER_ANLEGEN_HREF}
       keineAngabeErlaubt={isEdit}
       onUebernehmen={({ category: neu, subcategory: sorte }) => kategorieUebernehmen(neu, sorte)}
     />

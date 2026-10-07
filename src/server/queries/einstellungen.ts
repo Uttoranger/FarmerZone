@@ -16,7 +16,7 @@ export async function ladeEinstellungenUebersicht(ownerId: string): Promise<Eins
   const [hof, farm, einstellungen] = await Promise.all([
     prisma.farm.findUnique({
       where: { ownerId },
-      select: { stripeAccountId: true, acceptsOnline: true, tarif: true, archivedAt: true },
+      select: { stripeAccountId: true, acceptsOnline: true, tarif: true, archivedAt: true, teilenMomenteAus: true },
     }),
     getOwnerFarm(ownerId),
     getFarmSettings(ownerId),
@@ -43,6 +43,7 @@ export async function ladeEinstellungenUebersicht(ownerId: string): Promise<Eins
     tarif: hof.tarif,
     isPaused: einstellungen.isPaused,
     stillgelegt: hof.archivedAt !== null,
+    teilenMomenteAus: hof.teilenMomenteAus,
   }
 }
 
@@ -70,4 +71,12 @@ export async function ladeKonditionenHof(ownerId: string): Promise<KonditionenHo
     serviceFeeActiveFrom: hof.serviceFeeActiveFrom,
     platformFeePercent: hof.platformFeePercent.toString(),
   }
+}
+
+/**
+ * Der Schalter für /settings/teilen (Nr. 30) — nur der eigene Hof (ownerId).
+ * null heißt „kein Hof".
+ */
+export async function ladeTeilenMomente(ownerId: string): Promise<{ teilenMomenteAus: boolean } | null> {
+  return prisma.farm.findUnique({ where: { ownerId }, select: { teilenMomenteAus: true } })
 }

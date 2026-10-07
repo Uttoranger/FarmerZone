@@ -59,6 +59,7 @@ vi.mock('@/lib/prisma', () => {
       farm: { findUnique: vi.fn() },
       order,
       product,
+      webhookEvent: { createMany: vi.fn(async () => ({ count: 1 })) },
       $transaction: vi.fn(async (rueckruf: (tx: unknown) => Promise<unknown>) => rueckruf({ order, product })),
     },
   }
@@ -74,6 +75,13 @@ import * as Sentry from '@sentry/nextjs'
 
 const refundCreate = vi.mocked(stripe.refunds.create)
 const sentryMeldung = vi.mocked(Sentry.captureException)
+
+/**
+ * Die Merkmale der Vollerstattung (Nr. 27) — dasselbe Muster wie bei der
+ * Teilerstattung: Bestellung, Anlass, Art. Damit erkennt der Webhook eine
+ * später gescheiterte Vollerstattung als unsere Buchung.
+ */
+const VOLLSTORNO_MERKMALE = { orderId: 'order_1', anlass: 'vollstorno', art: 'kunde' }
 
 /** 24,00 € Warenpreis, 1,50 € Servicegebühr, keine Provision (Pilot). */
 const WARENPREIS_CENTS = 2400
@@ -166,7 +174,7 @@ describe('Vollstorno online — der Hof gibt genau seinen Warenpreis zurück', (
 
     expect(refundCreate).toHaveBeenCalledTimes(1)
     expect(refundCreate).toHaveBeenCalledWith(
-      { payment_intent: 'pi_1', reverse_transfer: true, refund_application_fee: true },
+      { payment_intent: 'pi_1', reverse_transfer: true, refund_application_fee: true, metadata: VOLLSTORNO_MERKMALE },
       { idempotencyKey: 'storno-order_1' }
     )
   })
@@ -178,7 +186,7 @@ describe('Vollstorno online — der Hof gibt genau seinen Warenpreis zurück', (
     await cancelOrder('order_1')
 
     expect(refundCreate).toHaveBeenCalledWith(
-      { payment_intent: 'pi_1', reverse_transfer: true },
+      { payment_intent: 'pi_1', reverse_transfer: true, metadata: VOLLSTORNO_MERKMALE },
       { idempotencyKey: 'storno-order_1' }
     )
   })
@@ -230,6 +238,63 @@ describe('Vollstorno online — der Hof gibt genau seinen Warenpreis zurück', (
       expect.anything(),
       expect.objectContaining({ tags: { aktion: 'cancelOrder', grund: 'erstattung_offen' } })
     )
+  })
+})
+
+describe('Vollstorno online — Stripe gibt die Erstattung sofort als gescheitert zurück (Nr. 27)', () => {
+  it('gilt nicht als erstattet: storniert, Zahlung offen, Sentry und Hinweis wie bei jedem Scheitern', async () => {
+    // Wie bei der Teilerstattung (erstatteKundin): Eine Erstattung mit Status
+    // failed/canceled hat kein Geld bewegt — auch nicht, wenn derselbe
+    // Schlüssel sie zurückgibt.
+    const satz = datenbankMit(bestellung())
+    refundCreate.mockResolvedValue({ id: 're_1', amount: 2550, status: 'failed' } as never)
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const ergebnis = await cancelOrder('order_1')
+
+    expect(ergebnis).toEqual({
+      error: 'Rückerstattung fehlgeschlagen. Wir kümmern uns um die Erstattung und melden uns.',
+      erstattungOffen: true,
+    })
+    expect(satz.status).toBe('CANCELLED')
+    expect(satz.paymentStatus).toBe('PAID')
+    expect(sentryMeldung).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ tags: { aktion: 'cancelOrder', grund: 'stripe_unklar_erstattung_gescheitert' } })
+    )
+  })
+
+  it('setzt den Meldevermerk der Erstattung — ein späteres refund.failed meldet sie nicht ein zweites Mal', async () => {
+    datenbankMit(bestellung())
+    refundCreate.mockResolvedValue({ id: 're_1', amount: 2550, status: 'failed' } as never)
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await cancelOrder('order_1')
+
+    expect(prisma.webhookEvent.createMany).toHaveBeenCalledWith({
+      data: [{ stripeEventId: 're_1#gescheitert-gemeldet', type: 'meldung.erstattung_gescheitert' }],
+      skipDuplicates: true,
+    })
+  })
+
+  it('Gegenprobe: ein anderer Fehler (Stripe nicht erreichbar) setzt keinen Vermerk — es gibt keine Erstattung', async () => {
+    datenbankMit(bestellung())
+    refundCreate.mockRejectedValue(new Error('Netzwerk weg'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await cancelOrder('order_1')
+
+    expect(prisma.webhookEvent.createMany).not.toHaveBeenCalled()
+  })
+
+  it('Gegenprobe: pending zählt als erstattet (das Geld ist unterwegs)', async () => {
+    const satz = datenbankMit(bestellung())
+    refundCreate.mockResolvedValue({ id: 're_1', amount: 2550, status: 'pending' } as never)
+
+    const ergebnis = await cancelOrder('order_1')
+
+    expect(ergebnis).toEqual({ erstattetCents: 2550, vomHofCents: 2400 })
+    expect(satz.paymentStatus).toBe('REFUNDED')
   })
 })
 
