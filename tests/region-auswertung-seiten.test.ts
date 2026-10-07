@@ -35,6 +35,7 @@ import { ServicegebuehrenKarte, TeilenWirkungKarte } from '@/components/auswertu
 import { baueFutterKaufen } from '@/lib/futter-kaufen'
 import { servicegebuehrenSaetze, teilenKarte } from '@/lib/auswertung'
 import { fasseTeilenWirkungZusammen } from '@/lib/teilen-wirkung'
+import { TEILEN_ZAEHLUNG_HINWEIS } from '@/lib/teilen-kanal'
 import { BAR_OHNE_GEBUEHR_SATZ, BAR_SERVICEGEBUEHR_AB } from '@/lib/konditionen'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
@@ -178,14 +179,18 @@ describe('Karten im neuen Design', () => {
   it('Teilen-Karte: Kanäle mit Balken, ohne Besuche ein Ausweg nach Heute', () => {
     const voll = renderToStaticMarkup(
       createElement(TeilenWirkungKarte, {
-        karte: teilenKarte(fasseTeilenWirkungZusammen([{ kanal: 'QR', besuche: 9, bestellungen: 2 }])),
+        karte: teilenKarte(fasseTeilenWirkungZusammen([{ kanal: 'QR', besuche: 9 }])),
         zeitraum: 'Oktober 2026',
       })
     )
     expect(voll).toContain('Über deine geteilten Links')
-    expect(voll).toContain('9 Besuche · 2 Bestellungen')
-    expect(voll).toContain('ohne Cookies')
+    expect(voll).toContain('9 Besuche')
+    // T1: nur Besuche — keine Bestellungen, kein Euro-Betrag; der Satz zur Zählung aus der einen Quelle.
+    expect(voll).not.toMatch(/Bestellung|€/)
+    expect(voll).toContain(TEILEN_ZAEHLUNG_HINWEIS)
     const leer = renderToStaticMarkup(createElement(TeilenWirkungKarte, { karte: { kopf: null, zeilen: [] }, zeitraum: 'Diese Woche' }))
     expect(leer).toContain('href="/dashboard"')
+    expect(leer).toContain(TEILEN_ZAEHLUNG_HINWEIS)
+    expect(leer).not.toMatch(/Bestellung|€/)
   })
 })

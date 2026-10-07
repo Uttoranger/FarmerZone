@@ -10,7 +10,8 @@
  *   - die „Servicegebühren dieses Monats" — nur lesend, aus den an den
  *     Bestellungen gespeicherten Beträgen, gezählt nach der Abrechnungsregel
  *     `topfVonBestellung` (src/lib/finanzen.ts, dieselbe wie /admin/finanzen),
- *   - die Zeilen der Karte „Über deine geteilten Links" (Teilen-Wirkung, Nr. 21).
+ *   - die Zeilen der Karte „Über deine geteilten Links" (Teilen-Wirkung, Nr. 21;
+ *     seit Nr. 26 nur Besuche, Register T1).
  *
  * Geld in ganzen Cent (CODING_STANDARDS §2), Tage und Monate in Wiener Zeit.
  */
@@ -158,24 +159,28 @@ export type TeilenKartenZeile = {
 }
 
 export type TeilenKarte = {
-  /** „38 Besuche · 6 Bestellungen" — null, wenn es nichts gab. */
+  /** „38 Besuche" — null, wenn es keinen Besuch gab. */
   kopf: string | null
   zeilen: TeilenKartenZeile[]
 }
 
-/** Die Karte „Über deine geteilten Links" aus der Zusammenfassung von `getTeilenWirkung`. */
+/**
+ * Die Karte „Über deine geteilten Links" aus der Zusammenfassung von
+ * `getTeilenWirkung`. Nur Besuche: Seit Register T1 wird keine Bestellung
+ * einem Kanal zugeordnet, deshalb steht hier weder eine Bestellzahl noch ein
+ * Euro-Betrag — die Karte verspricht nichts, was nicht gezählt wird.
+ */
 export function teilenKarte(wirkung: TeilenWirkung): TeilenKarte {
-  if (wirkung.besuche <= 0 && wirkung.bestellungen <= 0) return { kopf: null, zeilen: [] }
+  if (wirkung.besuche <= 0) return { kopf: null, zeilen: [] }
   const staerkster = Math.max(1, ...wirkung.kanaele.map((k) => k.besuche))
-  const zahlen = (besuche: number, bestellungen: number) =>
-    `${mitAnzahl(besuche, 'Besuch', 'Besuche')} · ${mitAnzahl(bestellungen, 'Bestellung', 'Bestellungen')}`
+  const besuche = (anzahl: number) => mitAnzahl(anzahl, 'Besuch', 'Besuche')
   return {
-    kopf: zahlen(wirkung.besuche, wirkung.bestellungen),
+    kopf: besuche(wirkung.besuche),
     zeilen: wirkung.kanaele.map((k) => ({
       kanal: k.kanal,
       name: k.name,
       anteilProzent: k.besuche > 0 ? Math.max(2, Math.round((k.besuche / staerkster) * 100)) : 0,
-      text: zahlen(k.besuche, k.bestellungen),
+      text: besuche(k.besuche),
     })),
   }
 }

@@ -8,6 +8,7 @@ import { centsAlsEuro, einheitLabel, formatEuro, formatZahl } from '@/lib/format
 import { zahlartZeile, type GrenzeStand, type Kennzahlen, type TeilenKarte as TeilenKarteDaten } from '@/lib/auswertung'
 import type { Balken, KanalAnteil, Periode, TopProdukt, Vergleichssatz } from '@/lib/umsatz'
 import { AUSWERTUNG_MAX_ZURUECK, auswertungHref } from '@/schemas/auswertung'
+import { TEILEN_ZAEHLUNG_HINWEIS } from '@/lib/teilen-kanal'
 import { cn } from '@/lib/utils'
 import type { ServicegebuehrenDiesesMonats } from '@/server/queries/auswertung'
 
@@ -111,7 +112,11 @@ export function KennzahlenReihe({ k, zeitraum }: { k: Kennzahlen; zeitraum: stri
 
 // ─── Über deine geteilten Links ─────────────────────────────────────────────
 
-/** Teilen-Wirkung (Nr. 21) im gewählten Zeitraum: Summe und je Kanal ein Balken nach Besuchen. */
+/**
+ * Teilen-Wirkung (Nr. 21) im gewählten Zeitraum: Summe und je Kanal ein Balken
+ * nach Besuchen. Nur Besuche, kein Euro-Betrag (Register T1); der Satz zur
+ * Zählung kommt aus `TEILEN_ZAEHLUNG_HINWEIS`, damit er überall gleich lautet.
+ */
 export function TeilenWirkungKarte({ karte, zeitraum }: { karte: TeilenKarteDaten; zeitraum: string }): React.JSX.Element {
   return (
     <section aria-labelledby="auswertung-teilen" className={cn(KARTE, 'flex flex-col gap-3 px-4 py-4 md:px-[18px]')}>
@@ -145,7 +150,7 @@ export function TeilenWirkungKarte({ karte, zeitraum }: { karte: TeilenKarteDate
           ))}
         </ul>
       )}
-      <p className={cn('text-xs leading-normal', LEISE)}>Gezählt über den Link selbst – ohne Cookies, ohne Daten über einzelne Personen.</p>
+      <p className={cn('text-xs leading-normal', LEISE)}>{TEILEN_ZAEHLUNG_HINWEIS}</p>
     </section>
   )
 }
