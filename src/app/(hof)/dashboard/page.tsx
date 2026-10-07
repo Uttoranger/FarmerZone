@@ -25,6 +25,9 @@ import { datumLang, heuteAufbau, teilenKarte, teilenSatz, vergleichText, type He
 import { freischaltMomentMoeglich } from '@/lib/freischalt-moment'
 import { hofAdresse } from '@/lib/mein-hof'
 import { APP_URL } from '@/lib/umgebung-server'
+import { getTeilenFensterDaten } from '@/server/queries/teilen-bild'
+import { getTeilenWirkung } from '@/server/queries/teilen-wirkung'
+import { letzteTage, teilenWirkungSatz } from '@/lib/teilen-wirkung'
 
 export const metadata: Metadata = {
   title: 'Heute — FarmerZone',
@@ -74,11 +77,17 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   })
   const satz = teilenSatz(heute.angebot, heute.naechstesFenster?.fenster ?? null)
   const adresse = hofAdresse(APP_URL, farm.slug).anzeige
+  // Teilen-Fenster und „letzte Woche … über deine Links" (Nr. 21, Gate 7) —
+  // nur, wenn die Karte überhaupt steht.
+  const [fenster, wirkung] = teilen
+    ? await Promise.all([getTeilenFensterDaten(farm.id, jetzt), getTeilenWirkung(farm.id, letzteTage(jetzt, 7))])
+    : [null, null]
+  const wirkungSatz = wirkung ? teilenWirkungSatz(wirkung) : null
 
   const bloecke: Record<HeuteBlock, ReactNode> = {
     stripe: heute.onlinePausiert && <StripeHinweis barMoeglich={heute.onlinePausiert.barMoeglich} />,
-    'teilen-schmal': teilen && <TeilenKarte form="schmal" hofName={farm.name} hofSlug={farm.slug} satz={satz} adresse={adresse} />,
-    'teilen-gross': teilen && <TeilenKarte form="gross" hofName={farm.name} hofSlug={farm.slug} satz={satz} adresse={adresse} />,
+    'teilen-schmal': teilen && <TeilenKarte form="schmal" hofName={farm.name} hofSlug={farm.slug} satz={satz} adresse={adresse} fenster={fenster} wirkung={wirkungSatz} />,
+    'teilen-gross': teilen && <TeilenKarte form="gross" hofName={farm.name} hofSlug={farm.slug} satz={satz} adresse={adresse} fenster={fenster} wirkung={wirkungSatz} />,
     packliste: (
       <Packliste
         zeilen={heute.abholungen}

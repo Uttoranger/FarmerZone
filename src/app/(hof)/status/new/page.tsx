@@ -17,8 +17,9 @@ export const dynamic = 'force-dynamic'
  * „Neuer Beitrag" (Wizard Inhalt → Empfänger → Versand) in der HofShell
  * (Nachtlauf Nr. 22e): dieselbe Action publishStatusPost und derselbe Ablauf
  * wie bisher, nur in die Routengruppe (hof) gezogen und auf Tokens gestellt.
- * Das neue Teilen-Fenster (Mockup web-h4-teilen-fenster-mit-bild) kommt mit
- * Gate 7 (Nr. 21). Zurück führt in den Reiter „Beiträge" von Mein Hof.
+ * Das Teilen-Fenster (Mockup web-h4-teilen-fenster-mit-bild) steht seit
+ * Nr. 21 auf Heute; dieser Ablauf bleibt der Weg für Beiträge mit Foto und
+ * Versand an Abonnentinnen. Zurück führt in den Reiter „Beiträge" von Mein Hof.
  */
 
 export default async function StatusNewPage({

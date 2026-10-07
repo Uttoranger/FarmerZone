@@ -117,6 +117,9 @@ export const checkoutRequestSchema = z.object({
   // DB (pruefeBetriebsnachweis) — hier nur die Form der Eingabe.
   kaeuferArt: z.enum(KAEUFER_ART_VALUES).optional().default('PRIVAT'),
   betriebsnummer: z.string().trim().max(100).optional(),
+  // Kein `teilenKanal` mehr (Register T1, Nr. 25): Bestellungen bekommen
+  // keinen Teilen-Kanal. Ein alter Tab, der das Feld noch schickt, scheitert
+  // nicht — z.object verwirft unbekannte Felder still.
   items: z
     .array(
       z.object({

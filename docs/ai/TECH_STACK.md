@@ -75,6 +75,8 @@ Stand: 2026-09. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 | Karte | `leaflet` | Google Maps, Mapbox |
 | Klassen-Merge | `cn()` aus `@/lib/utils` | Manuelle Template-Strings mit Klassen |
 | IDs / Tokens | `nanoid`, `crypto.randomUUID()` | `Math.random()`, Zeitstempel als ID |
+| QR-Code | `qrcode` (^1.5.4, Typen `@types/qrcode`) — nur die Matrix über `qrPfad` in `src/lib/qr-code.ts`, gezeichnet als eigener SVG-Pfad (Teilen-Bild, QR-Plakat; seit Nr. 21, Freigabe §3) | `QRCode.toDataURL`/`toString` im Code (fremde Grafik, zweite Gestalt), QR-Dienste im Netz |
+| Teilen-Bild | `next/og` (`ImageResponse`, Satori) — nur in Routen-Handlern, Farben als Werte mit Lint-Ausnahme je Zeile (Satori kennt keine CSS-Variablen) | Puppeteer/Canvas-Pakete, Bilddienste im Netz |
 | Server-State | React Query (nur wo vorhanden) | Neue globale Stores |
 
 ---

@@ -168,8 +168,8 @@ describe('Mein Hof', () => {
       }
     }
     suche(join(process.cwd(), 'src/app/(hof)/status'))
-    // Gegenprobe: Umleitung, Neuer Beitrag und WhatsApp fortsetzen wurden gefunden.
-    expect(unterseiten.length).toBe(3)
+    // Gegenprobe: Umleitung, Neuer Beitrag, WhatsApp fortsetzen und (seit Nr. 21) das QR-Plakat wurden gefunden.
+    expect(unterseiten.length).toBe(4)
     for (const pfad of unterseiten) expect(readFileSync(pfad, 'utf8'), pfad).not.toContain('MeinHofSeitenkopf')
   })
 })

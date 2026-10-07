@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'
 import type { Suchparameter } from '@/lib/ansichts-modus'
 import { gewaehlteGroesse, produktFamilie, produktMetadaten, sichtbaresProdukt } from '@/lib/produktdetail'
-import { hofVorschaubild } from '@/lib/vorschaubild'
+import { hofTitelbildVorschau } from '@/lib/vorschaubild'
 import { GROESSE_PARAMETER, leseGroesse } from '@/schemas/produktdetail'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { ProduktdetailKunde } from '@/components/produktdetail/produktdetail-kunde'
@@ -41,7 +41,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 
   // Nur öffentliche Daten: Name, Beschreibung, Preis, Hofname, Ort, Bild.
   const { titel, beschreibung } = produktMetadaten(produkt, farm)
-  const bild = produkt.imageUrl ? { url: produkt.imageUrl, alt: produkt.name } : hofVorschaubild(farm)
+  const bild = produkt.imageUrl ? { url: produkt.imageUrl, alt: produkt.name } : hofTitelbildVorschau(farm)
   return {
     title: titel,
     description: beschreibung,
