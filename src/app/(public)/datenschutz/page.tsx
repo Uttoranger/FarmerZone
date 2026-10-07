@@ -2,8 +2,13 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { KundenKopf } from '@/components/shared/kunden-kopf'
 import { DATENSCHUTZ_EMAIL } from '@/lib/support'
+import { BESTELLUNGEN_ANSICHT_SEKUNDEN } from '@/lib/bestellungen-finden'
 
 export const metadata: Metadata = { title: 'Datenschutz — FarmerZone' }
+
+// Aus derselben Konstante wie der Cookie selbst, damit die Erklärung nicht
+// von der Laufzeit abweicht (tests/datenschutz-sachstand.test.ts).
+const BESTELLUNGEN_COOKIE_MINUTEN = BESTELLUNGEN_ANSICHT_SEKUNDEN / 60
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -48,12 +53,12 @@ export default function DatenschutzPage() {
             <p className="mt-3"><strong className="text-foreground">Zahlungsdaten:</strong></p>
             <p>
               Kreditkarten- und Bankdaten werden ausschließlich von Stripe verarbeitet und gespeichert.
-              FarmerZone speichert keine vollständigen Zahlungsdaten — nur eine anonymisierte
-              Bestätigungs-ID.
+              FarmerZone speichert keine vollständigen Zahlungsdaten — nur die Kennung des
+              Zahlungsvorgangs bei Stripe.
             </p>
             <p className="mt-3"><strong className="text-foreground">Technisch notwendige Daten:</strong></p>
             <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>Session-Cookies (für Warenkorbfunktion, technisch notwendig)</li>
+              <li>Session-Cookies (für Anmeldung und „Bestellungen finden“, technisch notwendig)</li>
               <li>Server-Logs (IP-Adresse, Zeitstempel) für Betrieb und Sicherheit</li>
             </ul>
           </Section>
@@ -89,10 +94,13 @@ export default function DatenschutzPage() {
               </div>
               <div>
                 <p className="font-medium text-foreground">Sentry (Fehlerdiagnose)</p>
-                <p>Functional Software, Inc. (Sentry), USA — technische Fehlerberichte der Anwendung,
-                gespeichert auf Servern in der EU. Vor dem Versand werden personenbezogene Inhalte
-                (E-Mail-Adressen, Telefonnummern, Cookies, Zugangsdaten) automatisch entfernt;
-                übermittelt wird, was technisch schiefging, nicht wer betroffen war.</p>
+                <p>Functional Software, Inc. (Sentry), USA — technische Fehlerberichte der Anwendung
+                und Ladezeit-Messungen zu etwa jedem zehnten Seitenaufruf, gespeichert auf Servern
+                in der EU. Vor dem Versand werden personenbezogene Inhalte (E-Mail-Adressen,
+                Telefonnummern, Cookies, Zugangsdaten, Formularinhalte) automatisch entfernt; es
+                gibt keine Aufzeichnung deiner Bildschirmsitzung. Übermittelt wird, was technisch
+                schiefging; bei eingeloggten Höfen zusätzlich die interne Kennung des Hofes, nie
+                Name oder E-Mail-Adresse.</p>
               </div>
               <div>
                 <p className="font-medium text-foreground">Vercel Web Analytics (Reichweitenmessung)</p>
@@ -145,8 +153,9 @@ export default function DatenschutzPage() {
           <Section title="8. Cookies">
             <p>
               Wir verwenden ausschließlich technisch notwendige Cookies und localStorage-Einträge
-              (für Warenkorbfunktion und Session-Verwaltung). Es werden keine Tracking-Cookies,
-              Werbe-Cookies oder Analyse-Tools eingesetzt.
+              (für Warenkorbfunktion und Session-Verwaltung). Es werden keine Tracking-Cookies
+              oder Werbe-Cookies eingesetzt; die Reichweitenmessung mit Vercel Web Analytics
+              (siehe Abschnitt 4) kommt ohne Cookies aus.
             </p>
           </Section>
 
@@ -177,11 +186,16 @@ export default function DatenschutzPage() {
             </p>
           </Section>
 
-          <Section title="10. Kunden-Konto (Magic-Link-Login)">
+          <Section title="10. Kunden-Konto (Anmeldung mit Code)">
             <p>
-              Du kannst dich per einmaligem Login-Link (Magic Link) in dein Kunden-Konto einloggen,
-              um deine Benachrichtigungs-Einstellungen zu verwalten. Dabei wird deine E-Mail-Adresse
-              gespeichert sowie ein temporärer Sitzungs-Cookie gesetzt (gültig 7 Tage).
+              Du kannst dich mit einem Code, den wir dir per E-Mail schicken, in dein Kunden-Konto
+              einloggen, um deine Benachrichtigungs-Einstellungen zu verwalten. Dabei wird deine
+              E-Mail-Adresse gespeichert sowie ein temporärer Sitzungs-Cookie gesetzt (gültig 7
+              Tage). Ein Kunden-Konto entsteht nur, wenn du dich so anmeldest. Beim Bestellen wird
+              kein Konto angelegt.
+            </p>
+            <p>
+              {`„Bestellungen finden“ läuft ebenfalls über einen Code per E-Mail. Dafür entsteht kein Konto; es wird nur für ${BESTELLUNGEN_COOKIE_MINUTEN} Minuten ein Cookie mit deiner bestätigten E-Mail-Adresse gesetzt.`}
             </p>
             <p>
               Du kannst dein Konto und alle gespeicherten Einwilligungen jederzeit unter{' '}
@@ -247,7 +261,7 @@ export default function DatenschutzPage() {
           </Section>
 
           <p className="text-xs text-muted-foreground pt-4 border-t border-border">
-            Stand: September 2026
+            Stand: Oktober 2026
           </p>
         </div>
       </div>
