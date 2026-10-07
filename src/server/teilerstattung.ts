@@ -209,7 +209,7 @@ export async function erstatteKundin(
     { ...STRIPE_OPTIONEN, idempotencyKey: e.schluessel }
   )
   if (!erstattungZaehlt(erstattung.status)) {
-    throw new StripeStandUnklar('erstattung_gescheitert', { orderId: e.orderId, status: erstattung.status ?? 'unbekannt' })
+    throw new StripeStandUnklar('erstattung_gescheitert', { orderId: e.orderId, status: erstattung.status ?? 'unbekannt', refundId: erstattung.id })
   }
   stand.erstattungen.push({ anlass: e.anlass, positionId: e.positionId, betrag: erstattung.amount })
   return { erstattetCents: erstattung.amount, nachgetragen: false }

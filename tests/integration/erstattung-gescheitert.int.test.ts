@@ -560,3 +560,26 @@ describe('refund.failed — Vollerstattung mit Merkmalen gescheitert (Nr. 27)', 
     expect(stripe.refunds.list).not.toHaveBeenCalled()
   })
 })
+
+describe('Nachbesserung Runde 1 (Nr. 27) — sofort gescheiterter Storno schon gemeldet', () => {
+  it('der Storno hat den Vermerk gesetzt: ein späteres refund.failed ändert nichts und meldet nicht ein zweites Mal', async () => {
+    const { order, paymentIntentId, teil } = await nachBrotFehlt()
+    // Wie nach einem Storno, dessen Erstattung Stripe sofort als gescheitert
+    // zurückgab: nie als erstattet gebucht, Betreiber schon benachrichtigt.
+    const rest: Erstattung = { id: intKennung('re-rest'), amount: 500, status: 'failed', metadata: { orderId: order.id, anlass: 'reststorno', art: 'kunde' } }
+    erstattungen.push(rest)
+    await prisma.order.update({ where: { id: order.id }, data: { status: 'CANCELLED' } })
+    await prisma.webhookEvent.create({ data: { stripeEventId: `${rest.id}#gescheitert-gemeldet`, type: 'meldung.erstattung_gescheitert' } })
+    void teil
+
+    const antwort = await zustellen(ereignis('refund.failed', rest, paymentIntentId))
+
+    expect(antwort.status).toBe(200)
+    const danach = await prisma.order.findUniqueOrThrow({ where: { id: order.id } })
+    expect(danach.erstattetCents).toBe(582)
+    expect(danach.paymentStatus).toBe('PAID')
+    await nachlaufFertig()
+    expect(Sentry.captureMessage).not.toHaveBeenCalled()
+    expect(sendErstattungOffen).not.toHaveBeenCalled()
+  })
+})

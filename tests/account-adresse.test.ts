@@ -46,7 +46,7 @@ vi.mock('@/app/account/profile/profile-client', () => ({ ProfileClient: () => nu
 
 import AccountProfilePage from '@/app/account/profile/page'
 import { updateSubscription, deleteCustomerAccount } from '@/server/actions/subscriptions'
-import { adresseBestaetigt, kontaktdatenBeiCodeAnmeldungLeeren, kundinnenKonto } from '@/lib/anmeldecode'
+import { adresseBestaetigt, fremdesPasswortBeiCodeAnmeldung, kundinnenKonto } from '@/lib/anmeldecode'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
@@ -302,34 +302,18 @@ describe('/account nur für Kundinnen-Konten (Nr. 17b, Nachbesserung Runde 1)', 
   })
 })
 
-describe('kontaktdatenBeiCodeAnmeldungLeeren — Name und Telefon aus fremden Alt-Registrierungen (Register B3, Nr. 27)', () => {
-  const ERSTER_CODE = {
-    pfad: '/sign-in/email-otp',
-    setztBestaetigung: true,
-    konto: { role: 'CUSTOMER', isAdmin: false, emailVerified: false },
-  }
-
-  it('erster Code eines unbestätigten Kundinnen-Kontos: leeren', () => {
-    expect(kontaktdatenBeiCodeAnmeldungLeeren(ERSTER_CODE)).toBe(true)
+describe('fremdesPasswortBeiCodeAnmeldung — Name und Telefon nur aus FREMDEN Alt-Registrierungen leeren (Register B3, Nr. 27)', () => {
+  it('die Code-Anmeldung entfernt ein Passwort-Konto: das ist die fremde Alt-Registrierung', () => {
+    expect(fremdesPasswortBeiCodeAnmeldung({ pfad: '/sign-in/email-otp', providerId: 'credential' })).toBe(true)
   })
 
-  it('schon bestätigt (zweite Anmeldung, gleichzeitige Anmeldung war schneller): nichts leeren', () => {
-    expect(kontaktdatenBeiCodeAnmeldungLeeren({ ...ERSTER_CODE, konto: { ...ERSTER_CODE.konto, emailVerified: true } })).toBe(false)
+  it('nur der Pfad der Code-Anmeldung — nie ein anderes Löschen eines Passworts (Konto löschen, Bestätigung per Link)', () => {
+    expect(fremdesPasswortBeiCodeAnmeldung({ pfad: '/delete-user', providerId: 'credential' })).toBe(false)
+    expect(fremdesPasswortBeiCodeAnmeldung({ pfad: '/verify-email', providerId: 'credential' })).toBe(false)
+    expect(fremdesPasswortBeiCodeAnmeldung({ pfad: null, providerId: 'credential' })).toBe(false)
   })
 
-  it('nur die Code-Anmeldung — nie die Bestätigung per Link (Höfe) oder ein anderer Weg', () => {
-    expect(kontaktdatenBeiCodeAnmeldungLeeren({ ...ERSTER_CODE, pfad: '/verify-email' })).toBe(false)
-    expect(kontaktdatenBeiCodeAnmeldungLeeren({ ...ERSTER_CODE, pfad: '/update-user' })).toBe(false)
-    expect(kontaktdatenBeiCodeAnmeldungLeeren({ ...ERSTER_CODE, pfad: null })).toBe(false)
-  })
-
-  it('nur beim Übergang auf bestätigt — eine andere Änderung am Konto leert nichts', () => {
-    expect(kontaktdatenBeiCodeAnmeldungLeeren({ ...ERSTER_CODE, setztBestaetigung: false })).toBe(false)
-  })
-
-  it('nur Kundinnen-Konten: nie ein Hof, nie ein Betreiber, nie ein fehlendes Konto', () => {
-    expect(kontaktdatenBeiCodeAnmeldungLeeren({ ...ERSTER_CODE, konto: { ...ERSTER_CODE.konto, role: 'FARMER' } })).toBe(false)
-    expect(kontaktdatenBeiCodeAnmeldungLeeren({ ...ERSTER_CODE, konto: { ...ERSTER_CODE.konto, isAdmin: true } })).toBe(false)
-    expect(kontaktdatenBeiCodeAnmeldungLeeren({ ...ERSTER_CODE, konto: null })).toBe(false)
+  it('nur ein Passwort-Konto — kein anderer Anbieter', () => {
+    expect(fremdesPasswortBeiCodeAnmeldung({ pfad: '/sign-in/email-otp', providerId: 'google' })).toBe(false)
   })
 })

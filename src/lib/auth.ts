@@ -7,16 +7,15 @@ import { prisma } from '@/lib/prisma'
 import { APP_URL, UMGEBUNG } from '@/lib/umgebung-server'
 import {
   ANMELDECODE_PLUGIN_OPTIONEN,
-  CODE_ANMELDUNG_PFAD,
   GESPERRTE_AUTH_PFADE,
   codeVersandErlaubt,
-  kontaktdatenBeiCodeAnmeldungLeeren,
   rolleAusTreffern,
 } from '@/lib/anmeldecode'
 import { genauesIlikeMuster } from '@/lib/ilike-muster'
 import { erzeugeAnforderungsSperre } from '@/lib/anmeldecode-sperre'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { sendeRegistrierungsHinweis } from '@/server/registrierung-hinweis'
+import { leereKontaktdatenNachFremdemPasswort } from '@/server/kontaktdaten-fremd'
 import {
   BESTAETIGUNG_GESPERRTE_AUTH_PFADE,
   BESTAETIGUNG_GUELTIG_SEKUNDEN,
@@ -288,27 +287,21 @@ export const auth = betterAuth({
     }),
   },
 
-  // Name und Telefon aus fremden Alt-Registrierungen (Register B3, Nr. 27):
-  // Beim ersten Code eines unbestätigten Kundinnen-Kontos setzt das
-  // emailOTP-Plugin `emailVerified` — in genau diesem Schreibvorgang leeren
-  // wir Name und Telefon mit, die niemand bewiesen hat (Regel und Begründung:
-  // kontaktdatenBeiCodeAnmeldungLeeren). Der Hook bekommt keine Konto-ID,
-  // nur die Daten und die Anfrage; das Konto kommt frisch aus der Datenbank
-  // über die Adresse in der Form, die das Plugin liest. Die Bestätigung
-  // eines Hofs per Link und jede andere Änderung bleiben unberührt.
+  // Name und Telefon aus FREMDEN Alt-Registrierungen (Register B3, Nr. 27):
+  // Beim ersten Code eines unbestätigten Kontos löscht das emailOTP-Plugin
+  // dessen Passwort-Konto (revokeUnprovenAccountAccess → deleteAccount →
+  // dieser Hook, mit der Anfrage als Kontext), BEVOR es `emailVerified`
+  // setzt. Ein solches Passwort stammt von jemandem, der die Adresse ohne
+  // Postfach registriert hat — dann leeren wir auch Name und Telefon, die er
+  // hinterlassen hat (src/server/kontaktdaten-fremd.ts). Ruhende Konten aus
+  // dem alten Checkout haben kein Passwort und bleiben unberührt. Der Hook
+  // gibt nie false zurück und wirft nie: Das Löschen des Passworts und die
+  // Anmeldung laufen in jedem Fall weiter.
   databaseHooks: {
-    user: {
-      update: {
-        before: async (daten, kontext) => {
-          if (kontext?.path !== CODE_ANMELDUNG_PFAD || daten.emailVerified !== true) return
-          const body = kontext.body as { email?: unknown } | undefined
-          if (typeof body?.email !== 'string') return
-          const konto = await prisma.user.findUnique({
-            where: { email: adresseWieDasPlugin(body.email) },
-            select: { role: true, isAdmin: true, emailVerified: true },
-          })
-          if (!kontaktdatenBeiCodeAnmeldungLeeren({ pfad: kontext.path, setztBestaetigung: true, konto })) return
-          return { data: { ...daten, name: '', phone: null } }
+    account: {
+      delete: {
+        before: async (konto, kontext) => {
+          await leereKontaktdatenNachFremdemPasswort(konto, kontext?.path)
         },
       },
     },

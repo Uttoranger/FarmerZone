@@ -59,6 +59,7 @@ vi.mock('@/lib/prisma', () => {
       farm: { findUnique: vi.fn() },
       order,
       product,
+      webhookEvent: { createMany: vi.fn(async () => ({ count: 1 })) },
       $transaction: vi.fn(async (rueckruf: (tx: unknown) => Promise<unknown>) => rueckruf({ order, product })),
     },
   }
@@ -261,6 +262,29 @@ describe('Vollstorno online — Stripe gibt die Erstattung sofort als gescheiter
       expect.anything(),
       expect.objectContaining({ tags: { aktion: 'cancelOrder', grund: 'stripe_unklar_erstattung_gescheitert' } })
     )
+  })
+
+  it('setzt den Meldevermerk der Erstattung — ein späteres refund.failed meldet sie nicht ein zweites Mal', async () => {
+    datenbankMit(bestellung())
+    refundCreate.mockResolvedValue({ id: 're_1', amount: 2550, status: 'failed' } as never)
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await cancelOrder('order_1')
+
+    expect(prisma.webhookEvent.createMany).toHaveBeenCalledWith({
+      data: [{ stripeEventId: 're_1#gescheitert-gemeldet', type: 'meldung.erstattung_gescheitert' }],
+      skipDuplicates: true,
+    })
+  })
+
+  it('Gegenprobe: ein anderer Fehler (Stripe nicht erreichbar) setzt keinen Vermerk — es gibt keine Erstattung', async () => {
+    datenbankMit(bestellung())
+    refundCreate.mockRejectedValue(new Error('Netzwerk weg'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await cancelOrder('order_1')
+
+    expect(prisma.webhookEvent.createMany).not.toHaveBeenCalled()
   })
 
   it('Gegenprobe: pending zählt als erstattet (das Geld ist unterwegs)', async () => {

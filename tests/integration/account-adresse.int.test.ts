@@ -147,7 +147,8 @@ describe('Erster Code-Login leert Name und Telefon einer fremden Alt-Registrieru
   /**
    * Jemand hat die Adresse einer Gast-Kundin früher mit Passwort registriert
    * (vor Nr. 17b ging das) und Name und Telefon hinterlassen. Better Auth
-   * entfernt beim ersten Code der echten Kundin nur Passwort und Sitzungen.
+   * entfernt beim ersten Code der echten Kundin Passwort und Sitzungen — am
+   * Entfernen des Passworts erkennen wir die fremde Registrierung.
    */
   async function fremdeAltRegistrierung(): Promise<{ id: string; email: string }> {
     const email = `${intKennung('fremd')}@example.com`
@@ -169,15 +170,29 @@ describe('Erster Code-Login leert Name und Telefon einer fremden Alt-Registrieru
     expect(await prisma.account.count({ where: { userId: id, providerId: 'credential' } })).toBe(0)
   })
 
-  it('auch ein ruhendes Konto aus dem alten Checkout: nichts davon gilt als bewiesen', async () => {
+  it('ein ruhendes Konto aus dem alten Checkout (ohne Passwort) bleibt unverändert — es ist keine fremde Registrierung', async () => {
     const { id, email } = await ruhendesKontoMitAbo()
     await prisma.user.update({ where: { id }, data: { phone: '+43 660 0000000' } })
 
     await meldeMitCodeAn(email)
 
     const konto = await prisma.user.findUniqueOrThrow({ where: { id } })
-    expect(konto.name ?? '').toBe('')
-    expect(konto.phone).toBeNull()
+    expect(konto.emailVerified).toBe(true)
+    expect(konto.name).toBe('Erika Mustermann')
+    expect(konto.phone).toBe('+43 660 0000000')
+  })
+
+  it('Gegenprobe: ein Hof mit Passwort bekommt keinen Code — Name und Telefon bleiben', async () => {
+    const email = `${intKennung('hof')}@example.com`
+    await auth.api.signUpEmail({ body: { email, password: 'test-passwort-1', name: 'Max Mustermann' } })
+    const hof = await prisma.user.update({ where: { email }, data: { role: 'FARMER', phone: '+43 660 0000000' }, select: { id: true } })
+
+    await expect(meldeMitCodeAn(email)).rejects.toThrow()
+
+    const danach = await prisma.user.findUniqueOrThrow({ where: { id: hof.id } })
+    expect(danach.name).toBe('Max Mustermann')
+    expect(danach.phone).toBe('+43 660 0000000')
+    expect(await prisma.account.count({ where: { userId: hof.id, providerId: 'credential' } })).toBe(1)
   })
 
   it('Gegenprobe: ein schon bestätigtes Kundinnen-Konto behält beim nächsten Code Name und Telefon', async () => {

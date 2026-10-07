@@ -136,34 +136,20 @@ export function kundinnenKonto(nutzer: { role?: string | null; isAdmin?: boolean
 export const CODE_ANMELDUNG_PFAD = '/sign-in/email-otp'
 
 /**
- * Werden beim ersten Code Name und Telefon am Konto geleert (Register B3,
- * Nr. 27)? Ein unbestätigtes Kundinnen-Konto trägt Angaben, die niemand
- * bewiesen hat: aus einer fremden Registrierung mit Passwort (vor Nr. 17b
- * möglich) oder aus dem alten Checkout (bis Nr. 17a), der Name und Telefon
- * übernahm, die irgendwer zur Adresse tippte. Better Auth entfernt beim
- * ersten Code nur Passwort und Sitzungen (revokeUnprovenAccountAccess).
- * Welche Herkunft vorliegt, ist in diesem Moment nicht mehr zu erkennen
- * (das Passwort ist schon gelöscht) — deshalb gilt die Regel für jedes
- * unbestätigte Kundinnen-Konto.
- *
- * Nur der Übergang unbestätigt → bestätigt über die Code-Anmeldung, nur
- * Kundinnen-Konten: Die Bestätigung eines Hofs per Link (`/verify-email`)
- * und jede andere Änderung leeren nie etwas.
+ * Entfernt die Code-Anmeldung gerade das Passwort einer FREMDEN
+ * Alt-Registrierung (Register B3, Nr. 27)? Better Auth löscht beim ersten
+ * Code eines unbestätigten Kontos dessen Passwort-Konto
+ * (revokeUnprovenAccountAccess, emailOTP-Plugin) — ein Passwort an einem
+ * Konto, dessen Postfach niemand bewiesen hat, stammt von jemandem, der die
+ * Adresse registriert hat, ohne sie zu besitzen. Genau dann werden Name und
+ * Telefon geleert, die er hinterlassen hat (src/server/kontaktdaten-fremd.ts,
+ * dort mit der Bedingung „unbestätigt, CUSTOMER, kein Betreiber" in der
+ * WHERE-Klausel). Ein ruhendes Konto aus dem alten Checkout hat kein
+ * Passwort und bleibt unberührt; die Bestätigung eines Hofs per Link und
+ * „Konto löschen" sind andere Pfade.
  */
-export function kontaktdatenBeiCodeAnmeldungLeeren(e: {
-  pfad: string | null | undefined
-  /** Setzt die Änderung `emailVerified` auf true? */
-  setztBestaetigung: boolean
-  /** Das Konto frisch aus der Datenbank, VOR der Änderung. */
-  konto: { role?: string | null; isAdmin?: boolean | null; emailVerified?: boolean | null } | null
-}): boolean {
-  return (
-    e.pfad === CODE_ANMELDUNG_PFAD &&
-    e.setztBestaetigung &&
-    e.konto !== null &&
-    !adresseBestaetigt(e.konto) &&
-    kundinnenKonto(e.konto)
-  )
+export function fremdesPasswortBeiCodeAnmeldung(e: { pfad: string | null | undefined; providerId: string }): boolean {
+  return e.pfad === CODE_ANMELDUNG_PFAD && e.providerId === 'credential'
 }
 
 /**

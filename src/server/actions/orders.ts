@@ -21,6 +21,7 @@ import { alsCents } from '@/lib/order-totals'
 import { zahlungNachRueckweg } from '@/lib/hof-bestellungen'
 import { artikelFehltEingabeSchema, stornoEingabeSchema } from '@/schemas/hof-bestellungen'
 import { meldeFehlendenArtikel } from '@/server/artikel-fehlt'
+import { MELDE_VERMERK_TYP, meldeVermerk } from '@/server/erstattung-gescheitert'
 import {
   StripeStandUnklar,
   bucheVomHofZurueck,
@@ -650,7 +651,7 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
         // abgebrochene Erstattung hat kein Geld bewegt — nie REFUNDED
         // vermerken und der Kundin keine Erstattung zusagen.
         if (!erstattungZaehlt(refund.status)) {
-          throw new StripeStandUnklar('erstattung_gescheitert', { orderId: order.id, status: refund.status ?? 'unbekannt' })
+          throw new StripeStandUnklar('erstattung_gescheitert', { orderId: order.id, status: refund.status ?? 'unbekannt', refundId: refund.id })
         }
         refundAmount = refund.amount / 100
       }
@@ -673,6 +674,22 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
         },
       })
       erstattungOffen = true
+      // Hat Stripe die Erstattung sofort als gescheitert zurückgegeben, ist
+      // sie gebucht und gleich gemeldet (Sentry + Betreiber-Mail unten). Ein
+      // späteres refund.failed derselben Erstattung fände „schon erledigt"
+      // und meldete ein zweites Mal — der Vermerk hält es still
+      // (src/server/erstattung-gescheitert.ts). Scheitert nur der Vermerk,
+      // kommt die Meldung schlimmstenfalls doppelt.
+      if (err instanceof StripeStandUnklar && err.grund === 'erstattung_gescheitert' && typeof err.extra.refundId === 'string') {
+        try {
+          await prisma.webhookEvent.createMany({
+            data: [{ stripeEventId: meldeVermerk(err.extra.refundId), type: MELDE_VERMERK_TYP }],
+            skipDuplicates: true,
+          })
+        } catch (vermerkFehler) {
+          console.error('[cancelOrder] Meldevermerk nicht gesetzt:', vermerkFehler instanceof Error ? vermerkFehler.name : 'unbekannt')
+        }
+      }
     }
 
     // Der Vermerk getrennt von der Erstattung: Scheitert NUR er, ist das
