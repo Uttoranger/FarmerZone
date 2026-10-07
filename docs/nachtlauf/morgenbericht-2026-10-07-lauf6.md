@@ -63,7 +63,7 @@ Doku-Konflikte (`DEVELOPMENT.md`, `docs/ai/*.md`, `status.md`) kommen bei fast j
 | #203 und #207 | `src/app/(hof)/dashboard/page.tsx` | Block `stripe:` aus #203 (`onlinePausiert ? <StripeHinweis …/> : stripeEinrichten && <StripeEinrichtenHinweis />`); die zwei `TeilenKarte`-Zeilen aus #207 (mit `fenster` und `wirkung`) |
 | #203 und #207 | `src/server/queries/heute.ts` | beide Felder behalten: `stripeEinrichten` (aus #203) **und** `hof` mit `teilenMomenteAus` (aus #207), im Typ und im Rückgabewert |
 | #208 und #207 | `src/server/queries/heute.ts` | Fassung aus #208 (Abfragen nach Freigabe/daneben); im `farm.findUnique`-Select nach `isPaused: true` die Zeile `teilenMomenteAus: true,` ergänzen |
-| #205 und #198 | `src/lib/produkte-hof.ts` | `brennmaterial: KATEGORIE_LABEL.BRENNHOLZ,` (aus #198) und `entwuerfe: NICHT_IM_SHOP,` mit Kommentar (aus #205) |
+| #205 und #198 (bzw. #207) | `src/lib/produkte-hof.ts` | `brennmaterial: KATEGORIE_LABEL.BRENNHOLZ,` (aus #198) und `entwuerfe: NICHT_IM_SHOP,` mit Kommentar (aus #205); im Kommentar zu den Teilen-Momenten die Fassung aus #207 (Produkt, das nicht im Shop steht, plus der Satz „Seit Nr. 30 …“) |
 | #205 und #203 | `tests/admin-knopf-kontrast.test.ts` | Fassung aus #205 (Gegenprobe mit dem alten Rot) |
 
 Wenn du willst, löst der Dirigent diese Merges im nächsten Lauf. Er geht dann PR für PR vor und hält die Tests grün.
