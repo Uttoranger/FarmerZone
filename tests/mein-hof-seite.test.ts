@@ -125,12 +125,12 @@ describe('Checkliste: Ziele in den bestehenden Einstellungen', () => {
     for (const id of hofseiteZeileIdSchema.options) {
       const ziel = EINSTELLUNG_FUER_ZEILE[id]
       expect(ziel, id).toMatch(/^\/settings\/[a-z-]+$/)
-      expect(existsSync(join(process.cwd(), `src/app/(farmer)${ziel}/page.tsx`)), ziel).toBe(true)
+      expect(existsSync(join(process.cwd(), `src/app/(hof)${ziel}/page.tsx`)), ziel).toBe(true)
     }
   })
 
   it('Gegenprobe: ein erfundenes Ziel gibt es nicht', () => {
-    expect(existsSync(join(process.cwd(), 'src/app/(farmer)/settings/gibt-es-nicht/page.tsx'))).toBe(false)
+    expect(existsSync(join(process.cwd(), 'src/app/(hof)/settings/gibt-es-nicht/page.tsx'))).toBe(false)
   })
 })
 

@@ -40,6 +40,9 @@ const PREISSEITEN = [
   'src/app/(public)/konditionen/page.tsx',
   'src/app/(public)/fuer-hoefe/page.tsx',
   'src/components/fuer-hoefe/fuer-hoefe-abschnitte.tsx',
+  // Nr. 22d: „Deine Konditionen" in den Einstellungen — dieselbe Quelle.
+  'src/app/(hof)/settings/konditionen/page.tsx',
+  'src/components/hof-einstellungen/konditionen-ansicht.tsx',
 ]
 
 /**

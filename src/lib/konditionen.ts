@@ -197,6 +197,27 @@ export function servicegebuehrZahltKunde(jetzt: Date): string {
   )
 }
 
+/**
+ * Online: Was mit der Gebühr passiert — Satz unter dem Rechenbeispiel in den
+ * Einstellungen (/settings/konditionen). Mit Provision (Farm.platformFeePercent
+ * > 0) bleibt der Warenpreis NICHT unberührt, dann der zweite Satz.
+ */
+export const ONLINE_GEBUEHR_ABGETRENNT_SATZ =
+  'Die Gebühr wird beim Bezahlen automatisch abgetrennt – dein Warenpreis bleibt unberührt.'
+export const ONLINE_GEBUEHR_MIT_PROVISION_SATZ =
+  'Die Gebühr wird beim Bezahlen automatisch abgetrennt. Von deinem Warenpreis geht nur die Provision ab.'
+
+/** Bar ab dem SEPA-Start: wer die kassierte Gebühr einzieht (E6). */
+export const BAR_GEBUEHR_SEPA_SATZ = 'Die Gebühr holt die Monatsabrechnung per SEPA-Lastschrift.'
+
+/**
+ * Der SEPA-Satz zur Bargebühr — an B1 gebunden: Vor `BAR_SERVICEGEBUEHR_AB`
+ * kostet bar keine Gebühr, also holt auch keine Monatsabrechnung etwas (null).
+ */
+export function barGebuehrSepaSatz(jetzt: Date): string | null {
+  return vorBarStichtag(jetzt) ? null : BAR_GEBUEHR_SEPA_SATZ
+}
+
 /** Kurzfassung für Karten (Einrichten, Vorteile). */
 export const VOLLER_WARENPREIS = 'Die Servicegebühr zahlt der Kunde – du behältst den vollen Warenpreis.'
 

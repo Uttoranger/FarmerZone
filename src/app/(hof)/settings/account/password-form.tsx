@@ -118,7 +118,7 @@ export function PasswordForm() {
               key={check.id}
               className={[
                 'flex items-center gap-1.5 text-xs transition-colors duration-150',
-                check.passed ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground',
+                check.passed ? 'text-status-fertig' : 'text-muted-foreground',
               ].join(' ')}
             >
               {check.passed ? (
@@ -134,7 +134,7 @@ export function PasswordForm() {
         </ul>
 
         {pwHasError && (
-          <p role="alert" aria-live="polite" className="text-xs text-destructive mt-0.5">
+          <p role="alert" aria-live="polite" className="mt-0.5 text-xs text-status-offen">
             Bitte alle Passwort-Anforderungen erfüllen.
           </p>
         )}
@@ -159,7 +159,7 @@ export function PasswordForm() {
             id="account-confirm-error"
             role="alert"
             aria-live="polite"
-            className="text-xs text-destructive"
+            className="text-xs text-status-offen"
           >
             Passwörter stimmen nicht überein.
           </p>
@@ -170,7 +170,7 @@ export function PasswordForm() {
         <p
           role="alert"
           aria-live="polite"
-          className="text-sm text-destructive bg-destructive/8 border border-destructive/20 rounded-xl px-3 py-2.5 leading-relaxed"
+          className="rounded-xl border border-primary/45 bg-primary/12 px-3 py-2.5 text-sm leading-relaxed text-foreground"
         >
           {fehler}
         </p>
@@ -183,7 +183,7 @@ export function PasswordForm() {
       >
         {laedt ? (
           <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
             Speichere…
           </>
         ) : (
