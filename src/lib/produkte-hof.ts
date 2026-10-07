@@ -174,17 +174,19 @@ export function wiederDaTexte(
 /**
  * Der Anlass des Moments „gespeichert": ein neu angelegtes Produkt bzw. eine
  * neue Familie mit Verkaufsgrößen (dann EIN Moment für alle Größen).
- * `online` = mindestens eine Größe steht sofort im Shop.
+ * `kaufbar` = mindestens eine Größe ist im Shop, nicht gesperrt und hat
+ * Vorrat (sagt der Server, Nachbesserung Nr. 30).
  */
-export type ProduktAngelegt = { anlass: string; name: string; online: boolean }
+export type ProduktAngelegt = { anlass: string; name: string; kaufbar: boolean }
 
 /**
  * Darf der Moment „gespeichert" kommen? Wie bei „wieder da": Hof sichtbar,
- * das Neue steht im Shop (ein Entwurf oder eine gesperrte Futter-Größe führte
- * ins Leere) und die Teilen-Momente sind nicht abgeschaltet.
+ * das Neue ist kaufbar (ein Entwurf, eine gesperrte Futter-Größe oder Ware
+ * ohne Vorrat — für Kunden „ausverkauft" — führte ins Leere) und die
+ * Teilen-Momente sind nicht abgeschaltet.
  */
-export function gespeichertMomentMoeglich(m: { hofSichtbar: boolean; online: boolean; teilenMomenteAus: boolean }): boolean {
-  return teilenMomenteAn(m) && m.hofSichtbar && m.online
+export function gespeichertMomentMoeglich(m: { hofSichtbar: boolean; kaufbar: boolean; teilenMomenteAus: boolean }): boolean {
+  return teilenMomenteAn(m) && m.hofSichtbar && m.kaufbar
 }
 
 /**

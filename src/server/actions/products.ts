@@ -60,10 +60,12 @@ export type ProduktErgebnis =
       ok: true
       hinweis?: string
       /**
-       * Nur beim Anlegen (createProduct): das neue Produkt und ob es sofort im
-       * Shop steht — Anlass des Teilen-Moments „gespeichert" (Nr. 30).
+       * Nur beim Anlegen (createProduct): das neue Produkt und ob Kunden es
+       * sofort kaufen können (sichtbar UND Vorrat > 0) — Anlass des
+       * Teilen-Moments „gespeichert" (Nr. 30). Ohne Vorrat gilt es als
+       * ausverkauft, dann wäre „ist online" falsch.
        */
-      angelegt?: { id: string; online: boolean }
+      angelegt?: { id: string; kaufbar: boolean }
     }
   | { error: string; code?: 'GEAENDERT' | 'GESPERRT' | 'BESTAETIGUNG'; vorrat?: number }
 
@@ -128,11 +130,11 @@ export async function createProduct(data: ProductFormData): Promise<ProduktErgeb
       ...produktDaten(v),
       stock: v.stock,
     },
-    select: { id: true, isAvailable: true },
+    select: { id: true, isAvailable: true, stock: true },
   })
 
   revalidate(farm.slug)
-  return { ok: true, angelegt: { id: neu.id, online: neu.isAvailable } }
+  return { ok: true, angelegt: { id: neu.id, kaufbar: neu.isAvailable && neu.stock > 0 } }
 }
 
 /** Der Satz, wenn eine Bestellung den Vorrat geändert hat, während der Hof ihn bearbeitet hat. */

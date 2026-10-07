@@ -140,7 +140,7 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
   // Moment „gespeichert" (Nr. 30): nach dem Anlegen, einmal je Produkt bzw. Familie und Gerät.
   const angelegtPruefen = useCallback(
     (angelegt: ProduktAngelegt) => {
-      if (!gespeichertMomentMoeglich({ hofSichtbar: hof.sichtbar, online: angelegt.online, teilenMomenteAus: hof.teilenMomenteAus })) return
+      if (!gespeichertMomentMoeglich({ hofSichtbar: hof.sichtbar, kaufbar: angelegt.kaufbar, teilenMomenteAus: hof.teilenMomenteAus })) return
       const speicher = browserSpeicher()
       if (!gespeichertOeffnen(leseGespeichertGezeigt(speicher, angelegt.anlass))) return
       merkeGespeichertGezeigt(speicher, angelegt.anlass)

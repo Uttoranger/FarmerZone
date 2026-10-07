@@ -113,8 +113,24 @@ describe('Teilen ohne Browser-Speicher (T1)', () => {
         'src/app/api/teilen/besuch/route.ts',
         'src/server/teilen-zaehlung.ts',
         'src/schemas/teilen.ts',
+        // Nr. 30: Schalter der Teilen-Momente — Text, Action und Oberfläche ohne Speicher.
+        'src/lib/teilen-momente.ts',
+        'src/server/actions/teilen-momente.ts',
+        'src/components/hof-einstellungen/teilen-momente-schalter.tsx',
       ])
     )
+  })
+
+  it('die Merker der Teilen-Momente bleiben bewusst draußen', () => {
+    // „Schon gezeigt" je Gerät (localStorage) gehört zur Einmal-Regel der
+    // Momente auf dem Gerät des HOFS, nicht zum Teilen-Kanal der Kundinnen
+    // (T1 betrifft nur `?k=`). Diese Dateien tragen deshalb kein „teilen" im
+    // Pfad und stehen nicht in TEILEN_NACHBARN — sonst schlüge die Wache an
+    // einem erlaubten Speicher an. Der Schalter (Farm.teilenMomenteAus) liegt
+    // in der Datenbank, nicht im Browser.
+    for (const merker of ['src/lib/freischalt-moment.ts', 'src/lib/wieder-da-moment.ts', 'src/lib/gespeichert-moment.ts']) {
+      expect(TEILEN_DATEIEN).not.toContain(merker)
+    }
   })
 
   it.each(TEILEN_DATEIEN)('%s nutzt keinen Browser-Speicher und kein Cookie', (pfad) => {

@@ -838,7 +838,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
       if (ergebnis.hinweis) toast.info(ergebnis.hinweis)
       // Schließen gibt auch die Kopie frei (Effekt auf `open`).
       onClose()
-      if (ergebnis.angelegt) onAngelegt?.({ anlass: ergebnis.angelegt.id, name: payload.name, online: ergebnis.angelegt.online })
+      if (ergebnis.angelegt) onAngelegt?.({ anlass: ergebnis.angelegt.id, name: payload.name, kaufbar: ergebnis.angelegt.kaufbar })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Wir konnten das Produkt nicht speichern. Bitte versuch es noch einmal.')
     } finally {

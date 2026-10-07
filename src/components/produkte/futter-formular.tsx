@@ -242,7 +242,7 @@ export function FutterFormular({
       }
       toast.success(gespeichertText(name, ergebnis.online, ergebnis.wartend.length))
       onClose()
-      onAngelegt?.({ anlass: ergebnis.familieId, name: name.trim(), online: ergebnis.online > 0 })
+      onAngelegt?.({ anlass: ergebnis.familieId, name: name.trim(), kaufbar: ergebnis.kaufbar })
     } catch {
       toast.error('Wir konnten das Futter nicht speichern. Bitte versuch es noch einmal.')
     } finally {

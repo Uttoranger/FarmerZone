@@ -96,6 +96,7 @@ describe('legeFutterFamilieAn', () => {
     expect(ergebnis).toEqual({
       ok: true,
       familieId: expect.any(String),
+      kaufbar: true,
       online: 2,
       wartend: [
         { bezeichnung: '1 kg-Sackerl', grund: SPERR_GRUND.heimtierfutter },
@@ -117,8 +118,17 @@ describe('legeFutterFamilieAn', () => {
 
     const ergebnis = await legeFutterFamilieAn(HEU)
 
-    expect(ergebnis).toEqual({ ok: true, familieId: expect.any(String), online: 4, wartend: [] })
+    expect(ergebnis).toEqual({ ok: true, familieId: expect.any(String), kaufbar: true, online: 4, wartend: [] })
     expect(farmFindUnique).toHaveBeenCalledWith({ where: { id: 'farm_1' }, select: { betriebsnummer: true, betriebsstatus: true } })
+  })
+
+  // Nachbesserung Nr. 30: Vorrat nur in gesperrten Größen, die freien leer → nicht kaufbar.
+  it('Moment-Anlass: nur gesperrte Größen haben Vorrat → nicht kaufbar; der Toast-Zähler online bleibt 2', async () => {
+    const ergebnis = await legeFutterFamilieAn({
+      ...HEU,
+      groessen: HEU.groessen.map((g) => (g.verpackung === 'LOSE_BALLEN' ? { ...g, stock: 0 } : g)),
+    })
+    expect(ergebnis).toMatchObject({ ok: true, kaufbar: false, online: 2 })
   })
 
   it('je Größe ein Produkt derselben Familie, mit eigenem Preis, Vorrat, Verpackung und Kennzeichnung', async () => {
@@ -257,7 +267,7 @@ describe('legeBrennmaterialFamilieAn', () => {
   it('Brennholz mit drei Größen: alle online, Kategorie Brennholz, Art als Unterkategorie', async () => {
     const ergebnis = await legeBrennmaterialFamilieAn(BUCHE)
 
-    expect(ergebnis).toEqual({ ok: true, familieId: expect.any(String), online: 3, wartend: [] })
+    expect(ergebnis).toEqual({ ok: true, familieId: expect.any(String), kaufbar: true, online: 3, wartend: [] })
     const produkte = angelegt()
     expect(new Set(produkte.map((p) => p.familieId)).size).toBe(1)
     // Nr. 30: Die Antwort nennt genau die Familie, die angelegt wurde — Anlass des Moments „gespeichert".
@@ -312,6 +322,14 @@ describe('legeBrennmaterialFamilieAn', () => {
       restfeuchteMax: null,
       gelagertSeit: null,
     })
+  })
+
+  // Nachbesserung Nr. 30: Für den Moment zählt nur eine Größe, die Kunden kaufen können.
+  it('Moment-Anlass: alle Größen ohne Vorrat → nicht kaufbar; der Toast-Zähler online bleibt', async () => {
+    const ergebnis = await legeBrennmaterialFamilieAn({ ...BUCHE, groessen: BUCHE.groessen.map((g) => ({ ...g, stock: 0 })) })
+    expect(ergebnis).toMatchObject({ ok: true, kaufbar: false, online: 3 })
+    const eine = await legeBrennmaterialFamilieAn({ ...BUCHE, groessen: BUCHE.groessen.map((g, i) => ({ ...g, stock: i === 2 ? 1 : 0 })) })
+    expect(eine).toMatchObject({ ok: true, kaufbar: true })
   })
 
   it('ungültige Eingabe oder ohne Anmeldung: nichts geschrieben', async () => {

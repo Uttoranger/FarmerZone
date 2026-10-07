@@ -104,9 +104,10 @@ describe('Moment „gespeichert": einmal je Anlass und Gerät', () => {
   })
 
   it('nur, wenn das Neue im Shop steht und der Hof sichtbar ist', () => {
-    expect(gespeichertMomentMoeglich({ hofSichtbar: true, online: true, teilenMomenteAus: false })).toBe(true)
-    expect(gespeichertMomentMoeglich({ hofSichtbar: false, online: true, teilenMomenteAus: false })).toBe(false)
-    expect(gespeichertMomentMoeglich({ hofSichtbar: true, online: false, teilenMomenteAus: false })).toBe(false)
+    expect(gespeichertMomentMoeglich({ hofSichtbar: true, kaufbar: true, teilenMomenteAus: false })).toBe(true)
+    expect(gespeichertMomentMoeglich({ hofSichtbar: false, kaufbar: true, teilenMomenteAus: false })).toBe(false)
+    // Ohne Vorrat bzw. als Entwurf (kaufbar false, Nachbesserung Runde 1): kein „ist online".
+    expect(gespeichertMomentMoeglich({ hofSichtbar: true, kaufbar: false, teilenMomenteAus: false })).toBe(false)
   })
 
   it('der Moment wird nur nach dem ANLEGEN ausgelöst — Bearbeiten liefert keinen Anlass', () => {
@@ -117,7 +118,7 @@ describe('Moment „gespeichert": einmal je Anlass und Gerät', () => {
     const update = aktion.slice(aktion.indexOf('export async function updateProduct'), aktion.indexOf('export async function setzeKategorie'))
     expect(update).not.toContain('angelegt')
     expect(aktion.slice(aktion.indexOf('export async function createProduct'), aktion.indexOf('export async function updateProduct'))).toContain(
-      'angelegt: { id: neu.id, online: neu.isAvailable }'
+      'angelegt: { id: neu.id, kaufbar: neu.isAvailable && neu.stock > 0 }'
     )
   })
 })
@@ -141,7 +142,7 @@ describe('Abschaltung: kein Moment, wenn der Hof sie abgeschaltet hat', () => {
       'wieder da',
       (aus: boolean) => wiederDaMomentMoeglich({ hofSichtbar: true, produktSichtbar: true, wiederDa: true, teilenMomenteAus: aus }),
     ],
-    ['gespeichert', (aus: boolean) => gespeichertMomentMoeglich({ hofSichtbar: true, online: true, teilenMomenteAus: aus })],
+    ['gespeichert', (aus: boolean) => gespeichertMomentMoeglich({ hofSichtbar: true, kaufbar: true, teilenMomenteAus: aus })],
   ])('„%s": an → ja, aus → nein', (_name, moeglich) => {
     expect(moeglich(false)).toBe(true)
     expect(moeglich(true)).toBe(false)
