@@ -117,5 +117,9 @@ export function wiederholVorlagen(zeilen: VerkaufsZeile[], anzahl = 4): VerkaufD
   return zeilen.flatMap((z) => (z.art === 'verkauf' ? [z.verkauf] : [])).slice(0, anzahl)
 }
 
-/** Ein Produkt zur Schnellwahl „Was?" — nur, was das Formular braucht. */
-export type VerkaufProdukt = { id: string; name: string; unit: string }
+/**
+ * Ein Produkt zur Schnellwahl „Was?" — nur, was das Formular braucht. Vorrat
+ * und Gebindegröße seit Nr. 39 (D1): Der Schalter „Vorrat abziehen" sagt
+ * vorher, was abgeht, und das Mengenfeld nennt das Gebinde.
+ */
+export type VerkaufProdukt = { id: string; name: string; unit: string; unitSize: number | null; stock: number }

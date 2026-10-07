@@ -13,7 +13,8 @@
  *    über Number(Decimal).
  *  - Schema: Grenzen aus eingabegrenzen.ts, nur echte Kalendertage.
  *  - Actions: Anlegen, Ändern, Löschen nur am eigenen Hof (farmId in der
- *    WHERE-Klausel), kein Tag in der Zukunft, nie eine Bestandsbuchung,
+ *    WHERE-Klausel), kein Tag in der Zukunft, ohne Schalter „Vorrat abziehen"
+ *    keine Bestandsbuchung (mit Schalter: tests/verkauf-vorrat.test.ts),
  *    ohne Anmeldung ein Satz statt eines Absturzes.
  *  - Darstellung: vier Zustände, lange Namen mit title, Knöpfe mit Namen,
  *    Symbole aria-hidden, keine Farbwerte.
@@ -45,12 +46,17 @@ const sitzung = vi.hoisted(() => ({ wert: { user: { id: 'nutzer-1' } } as { user
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn(async () => sitzung.wert) } } }))
 vi.mock('@/server/queries/dashboard', () => ({ getFarmForUser: vi.fn(async () => ({ id: 'hof-1', slug: 'hof-eins' })) }))
 
-const db = vi.hoisted(() => ({
-  order: { findMany: vi.fn() },
-  orderItem: { findMany: vi.fn() },
-  manualSale: { findMany: vi.fn(), create: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn(), delete: vi.fn(), findFirst: vi.fn() },
-  product: { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
-}))
+const db = vi.hoisted(() => {
+  const d = {
+    order: { findMany: vi.fn() },
+    orderItem: { findMany: vi.fn() },
+    manualSale: { findMany: vi.fn(), create: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn(), delete: vi.fn(), findFirst: vi.fn() },
+    product: { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+    // Anlegen läuft seit Nr. 39 in einer Transaktion (Verkauf + Vorrat) — `tx` ist derselbe Mock.
+    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(d)),
+  }
+  return d
+})
 vi.mock('@/lib/prisma', () => ({ prisma: db }))
 
 import { HOF_NEU } from '@/lib/bauern-navigation'
@@ -254,7 +260,7 @@ describe('manualSaleFormSchema — Grenzen und Kalendertag', () => {
 
 // ─── Actions ────────────────────────────────────────────────────────────────
 
-describe('Verkauf anlegen, ändern, löschen — nur am eigenen Hof, ohne Bestandsbuchung', () => {
+describe('Verkauf anlegen, ändern, löschen — nur am eigenen Hof, ohne Schalter keine Bestandsbuchung', () => {
   const eingabe = { totalAmount: 24.555, channel: 'HOFLADEN', saleDate: '2026-10-06' }
 
   beforeEach(() => {
@@ -268,7 +274,7 @@ describe('Verkauf anlegen, ändern, löschen — nur am eigenen Hof, ohne Bestan
   })
   afterEach(() => {
     vi.useRealTimers()
-    // Keine Aktion bucht je Bestand — ein manueller Verkauf ist nur Umsatz.
+    // Ohne Schalter „Vorrat abziehen" bucht keine Aktion Bestand (D1, Nr. 39).
     expect(db.product.update).not.toHaveBeenCalled()
     expect(db.product.updateMany).not.toHaveBeenCalled()
   })
@@ -355,7 +361,7 @@ function uebersicht(teil: Partial<SalesOverview> = {}): SalesOverview {
 
 const props = (teil: Partial<SalesOverview> = {}, stripeReady = true) => ({
   overview: uebersicht(teil),
-  produkte: [{ id: 'p1', name: 'Eier', unit: 'STUECK' }],
+  produkte: [{ id: 'p1', name: 'Eier', unit: 'STUECK', unitSize: null, stock: 12 }],
   topProduktIds: ['p1'],
   stripeReady,
 })
@@ -435,7 +441,7 @@ describe('Formular „Verkauf eintragen" im neuen Design', () => {
       createElement(VerkaufFormular, {
         verkauf: null,
         vorlage: null,
-        produkte: [{ id: 'p1', name: LANG, unit: 'KG' }],
+        produkte: [{ id: 'p1', name: LANG, unit: 'KG', unitSize: null, stock: 12 }],
         topProduktIds: ['p1'],
         titel: (text: string) => createElement('h2', null, text),
         onFertig: () => {},
@@ -460,6 +466,38 @@ describe('Formular „Verkauf eintragen" im neuen Design', () => {
     expect(html).not.toContain('maxlength')
     expect(symboleVersteckt(html)).toBe(true)
     expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|green-|amber-|red-/)
+  })
+
+  it('D1 (Nr. 39): ohne Produkt kein Schalter „Vorrat abziehen"', () => {
+    expect(formular()).not.toContain('Vorrat abziehen')
+    expect(formular()).not.toContain('role="switch"')
+  })
+
+  it('D1 (Nr. 39): mit Produkt aus dem Sortiment der Schalter, Standard ein, mit Satz zum Vorrat', () => {
+    // Wiederholen = neuer Verkauf mit gewähltem Produkt.
+    const html = formular({ vorlage: daten({ productId: 'p1', productName: LANG, unit: 'KG', quantity: 2.5 }) })
+    const schalter = html.match(/<button[^>]*role="switch"[^>]*>/)?.[0] ?? ''
+    expect(schalter).toContain('aria-checked="true"')
+    expect(schalter).toContain('aria-label="Vorrat abziehen"')
+    expect(schalter).toMatch(/aria-describedby="[^"]+"/)
+    // 44 px Tippfläche und der Fokusrahmen des Design-Systems.
+    expect(schalter).toContain('min-h-11')
+    expect(schalter).toContain('outline-solid')
+    expect(html).toContain('Im Vorrat: 12 kg. Wir ziehen 3 kg ab.')
+    expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|green-|amber-|red-/)
+  })
+
+  it('D1 (Nr. 39): beim Bearbeiten kein Schalter — der Vorrat bleibt beim Ändern unberührt', () => {
+    expect(formular({ verkauf: daten({ productId: 'p1', productName: LANG, unit: 'KG' }) })).not.toContain('Vorrat abziehen')
+  })
+
+  it('D1 (Nr. 39): Gebindegröße steht hinter der Menge — die Menge zählt Gebinde wie der Vorrat', () => {
+    const html = formular({
+      produkte: [{ id: 'p1', name: 'Mehl', unit: 'KG', unitSize: 0.5, stock: 8 }],
+      vorlage: daten({ productId: 'p1', productName: 'Mehl', unit: 'KG', quantity: 2 }),
+    })
+    expect(html).toContain('× 0,5 kg')
+    expect(html).toContain('Im Vorrat: 8 × 0,5 kg. Wir ziehen 2 × 0,5 kg ab.')
   })
 
   it('bearbeiten: Titel, Betrag im Knopf, Notiz aufgeklappt', () => {
