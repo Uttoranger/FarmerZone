@@ -4321,6 +4321,19 @@ Auftrag freigabe.md §9 „20" und §4 (Nr. 20 Futter), Gate 6, Register E3, E9,
 - **Kundenseite:** Größenkacheln, Schild nach E9 und Brennmaterial-Angaben gab es seit Nr. 11; neu ist die Erklärbox rm/srm/fm auf der Produktseite. Gesperrte Größen sind Entwürfe und erscheinen nirgends (Hofseite, Entdecken, Gebinde-Facette).
 - **Bestellzeile:** `ORDER_UNIT_LABELS` kennt jetzt Ballen, Big Bag, rm und srm — vorher stand für diese Einheiten der Rohwert in der Zeile.
 
+## Teilen: Zählung, Teilen-Bild, Teilen-Fenster, QR-Plakat (Nachtlauf Nr. 21, Oktober 2026)
+
+Auftrag freigabe.md §9 „21", Gate 7 (Aufgaben 1–4), Sicherheitsregeln S8 und S9. Keine Schema-Änderung, keine Migration — `TeilenAufruf` und `Order.teilenKanal` stehen seit #169. Neues Paket `qrcode` (Freigabe §3), mit corepack und pnpm 10.33.0 installiert; der Lockfile behält seine Sicherheits-Overrides.
+
+- **Fachregel Teilen-Zählung (S8):** Ein geteilter Link trägt nur `?k=` mit einem von sieben Kürzeln (wa, wa-status, fb, ig, mail, qr, link). Gezählt wird nur als Summe je Hof, Kanal und **Wiener** Kalendertag. Ein Besuch zählt, wenn ein echter Browser die Hofseite mit gültigem Kürzel öffnet: Die Seite merkt das Kürzel im sessionStorage des Tabs, meldet den Besuch per Beacon (POST) und nimmt das Kürzel aus der Adresse — Vorschau-Abrufer der Messenger, Suchmaschinen, Vorabrufe und Headless-Browser zählen nicht, ein Neuladen auch nicht. Nur öffentliche Höfe zählen. Kein Cookie, keine IP, kein Gerät: Das Kürzel verlässt den Tab nur im Checkout.
+- **Fachregel Bestellung mit Kanal:** Der Checkout schickt das Kürzel aus dem Tab mit; `Order.teilenKanal` ist der Kanal oder null. Ein ungültiger oder fehlender Wert lässt die Bestellung nie scheitern (Zod `catch`). Die Bestellung zählt im Aggregat als Nachlauf nach der Antwort, beim Anlegen (online nach dem PaymentIntent, bar nach dem Token) — scheitert das Zählen, geht es nach Sentry, die Bestellung bleibt. **Bekannte Grenze:** Eine online angelegte, aber nie bezahlte Bestellung zählt mit; der Webhook wurde bewusst nicht angefasst.
+- **Abfrage für die Auswertung (22c):** `getTeilenWirkung(farmId, { von, bis })` (`src/server/queries/teilen-wirkung.ts`) liefert Summen je Kanal und gesamt; Zeiträume `letzteTage`, `diesenMonat` (`src/lib/teilen-wirkung.ts`). Die Karte „Über deine geteilten Links" baut 22c; Heute zeigt schon „letzte Woche … über deine Links".
+- **Teilen-Bild:** `/[farmSlug]/opengraph-image` als `route.tsx` in einem Ordner gleichen Namens — eine Datei `opengraph-image.tsx` gälte nach Nexts Konvention für alle Seiten unter dem Hof. Die Hofseite nimmt es als Vorschau (bisher: das Titelbild); die Produktseite ohne Foto bleibt beim Titelbild. Im Bild nur kaufbare Produkte (im Shop, Bestand, nicht gesperrt nach der Sperre je Gebinde aus Nr. 20), eine Familie als ein Eintrag mit „ab €", höchstens drei; pausiert keine Produkte und keine Abholung. Der Zwischenspeicher hängt an der Prüfsumme des Inhalts (`?v=`), so ist ein ausverkauftes Produkt nie in einem alten Bild.
+- **Teilen-Fenster:** öffnet sich auf Heute aus der Teilen-Karte. Kanäle ohne Web-Link (WhatsApp-Status, Instagram) gehen über das Teilen-Menü des Telefons mit Bild; ohne Menü wird das Bild gespeichert und der Text kopiert. Das Menü des Telefons kennt den gewählten Kanal nicht, deshalb zählt der Hauptknopf am Handy als „Link".
+- **QR-Plakat:** `/status/plakat`, A4, theme-fest wie Papier, Code auf die feste Hofseite mit `?k=qr` — ein gedrucktes Plakat bleibt gültig.
+- **Beiträge:** Der WhatsApp-Versand eines Beitrags (`/status/[id]/send-whatsapp`) hängt `?k=wa` an. Ein geteilter Aufruf aus dem Teilen-Fenster legt **keinen** Beitrag an (Bericht 21, „Nicht gelöst").
+- **Nicht gebaut:** Moment „gespeichert", Abschaltung der Momente (keine Spalte), Rückruf (O5).
+
 ## Nützliche Befehle
 
 ```bash
