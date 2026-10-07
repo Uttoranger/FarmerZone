@@ -287,25 +287,38 @@ export async function revertReady(
   return {}
 }
 
-// Ein-Schritt-Rückweg: heilt einen Verdrücker bei "Abgeholt". Nur aus
-// PICKED_UP erlaubt, zurück auf READY, pickedUpAt wird geleert.
-// paymentStatus/paidAt bleiben UNANGETASTET: die Geld-Wahrheit (z. B. bar
-// kassiert bei "Abgeholt & bezahlt") wird von einem Undo nie verändert —
-// bewusste Grenze dieses Rückwegs.
+// Ein-Schritt-Rückweg (Dialog „Abholung rückgängig"): heilt einen Verdrücker
+// bei "Abgeholt". Nur aus PICKED_UP erlaubt, zurück auf READY, pickedUpAt wird
+// geleert. Die Zahlung behandelt er wie das Rückgängig im Hinweis
+// (revertOrderStatus, Nr. 19b): Vorher blieben paymentStatus/paidAt immer
+// stehen — eine bar kassierte Bestellung stand danach „gepackt, bezahlt",
+// obwohl das Kassieren zu genau dem zurückgenommenen Schritt gehörte (Nr. 32).
+// Was sich an der Zahlung ändert, entscheidet allein zahlungNachRueckweg —
+// online nie (das Geld liegt bei Stripe; hier kein Stripe-Aufruf, keine
+// Erstattung), bar nur das Kassieren genau dieses Schritts.
 export async function revertPickedUp(orderId: string): Promise<ActionResult> {
   const farm = await getAuthFarm()
   if (!farm) return { error: 'Nicht angemeldet' }
 
-  const exists = await prisma.order.findFirst({
+  const bestellung = await prisma.order.findFirst({
     where: { id: orderId, farmId: farm.id, status: 'PICKED_UP' },
-    select: { id: true },
+    select: { paymentMethod: true, paymentStatus: true, paidAt: true, pickedUpAt: true },
   })
-  if (!exists) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
+  if (!bestellung) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
+  const zahlung = zahlungNachRueckweg(bestellung, 'PICKED_UP')
 
-  // Bedingt geschrieben — Begründung wie bei revertReady.
+  // Bedingt auf Besitz, Ausgangsstatus und genau den gelesenen Zahlstand:
+  // Storniert, erstattet oder kassiert jemand zwischen Lesen und Schreiben,
+  // gilt die Entscheidung nicht mehr (Begründung wie bei revertReady).
   const { count } = await prisma.order.updateMany({
-    where: { id: orderId, farmId: farm.id, status: 'PICKED_UP' },
-    data: { status: 'READY', pickedUpAt: null },
+    where: {
+      id: orderId,
+      farmId: farm.id,
+      status: 'PICKED_UP',
+      paymentStatus: bestellung.paymentStatus,
+      paidAt: bestellung.paidAt,
+    },
+    data: { status: 'READY', pickedUpAt: null, ...(zahlung ?? {}) },
   })
   if (count === 0) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
 

@@ -4309,6 +4309,14 @@ Auftrag freigabe.md §9 „22e", Register E12. Keine Schema-Änderung, keine Mig
 - **Fachregel Meldungen in der Hof-Sicht:** `fuerHof` liefert statt Farbklassen (`statusFarbe`) den Ton `statusTon` (`STATUS_TON`: In Arbeit und erledigt grün, sonst neutral — nie orange, denn keine Meldung wartet auf den Hof) und `offen` (nicht in `STATUS_ABGESCHLOSSEN`). Beides ist abgeleitet; die Allowlist der Sichtbarkeitsregel bleibt eine Allowlist (`tests/meldung.test.ts`). „Offen" und „Beantwortet" in der Seitenspalte sind zwei Fragen, keine Aufteilung: Eine Meldung „In Arbeit" mit Antwort zählt in beiden. Die Admin-Marken (`STATUS_MARKE_FARBE`) bleiben.
 - **Bewusst nicht übernommen aus den Mockups:** „Rückruf anfordern" (Register O5, Ersatz „E-Mail schreiben" an `SUPPORT_EMAIL`), „Bei einer Antwort bekommst du zusätzlich eine E-Mail" (eine solche Mail gibt es nicht), die hervorgehobene Karte für eine neue Antwort (kein Gelesen-Stand gespeichert). Die Fehlernummer bleibt ein freiwilliges Feld; `?kennung=` wird auf `/fehler-melden` wie auf `/problem-melden` geprüft übernommen.
 
+## Altlasten aus dem Morgenbericht Lauf 5 (Nachtlauf Nr. 32, Oktober 2026)
+
+- **„Abholung rückgängig" hält die Zahlung wie das Rückgängig im Hinweis.** `revertPickedUp` ließ `paymentStatus`/`paidAt` immer stehen (Grenze aus Nr. 19b): Eine bar kassierte Bestellung stand nach dem Dialog „gepackt, bezahlt", und der Hauptknopf „Abgeholt und € … kassiert" fehlte. Jetzt liest der Dialog den Zahlstand, fragt `zahlungNachRueckweg` und schreibt bedingt auf Besitz, Ausgangsstatus PICKED_UP und den gelesenen Zahlstand — online bleibt alles, bar geht nur das Kassieren mit zurück, das zu genau diesem Abholen gehörte (gleicher Zeitpunkt). Kein Stripe, keine Erstattung, nur Statusfelder. Die Sätze im Dialog sind unverändert.
+- **Kein `Number(...)` mehr in `src/server/queries/orders.ts`.** Geld war seit 19b schon Cent; Gebührensatz und Gebindegröße gehen jetzt über `toNumber()` wie in `getHofBestellDetail`.
+- **`euroEingabeZuCent`** (`src/lib/format.ts`) für getippte Euro-Beträge. Gebaut für den Servicegebühr-Dialog aus #203 (`src/components/admin/servicegebuehr-dialog.tsx`), dort noch nicht eingesetzt — die alte Datei `src/app/admin/servicegebuehr-einstellung.tsx` löscht #203.
+- **Beitrags-Actions** (`status-posts.ts`): Zod an allen vier (`src/schemas/status-post.ts`, Grenzen in `eingabegrenzen.ts`; der Server lässt mehr zu als das Formular, weil ein alter Beitrag ungekürzt als Vorlage kommt), Besitz im Schreiben (`updateMany`/`deleteMany` mit `{ id, farmId }`, `count`), nach außen nur Sätze, Sentry mit festem Text, Schritt und Fehlerklasse. Deaktivieren und Löschen bauen auch die öffentliche Hofseite neu.
+- **„Mein Auftritt":** Bildunterschrift, Beschreibung eines Werts und „Logo hochladen" auf 44 px (Klassen); die kleinen Pfeil-, Löschen- und Ziehknöpfe (24–32 px, ohne Namen) bleiben Altlast.
+
 ## Nützliche Befehle
 
 ```bash
