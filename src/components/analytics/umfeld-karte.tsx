@@ -6,6 +6,8 @@ import { X } from 'lucide-react'
 import HoefeKarte, { type KartenHof } from '@/components/hoefe/hoefe-karte'
 import { LEERE_LAGE, nachLeerTipp, nachPinTipp, type AuswahlLage } from '@/lib/hoefe-anzeige'
 import type { UmfeldKarte } from '@/lib/umfeld'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { cn } from '@/lib/utils'
 
 /** Ungefähre Höhe der Karte unter dem Pin (Name, Entfernung, Preis, Link). */
 const PIN_KARTE_HOEHE = 160
@@ -17,7 +19,7 @@ const PIN_KARTE_HOEHE = 160
  *
  * Sie wird von umfeld-anzeige.tsx per dynamic import geladen, erst wenn die
  * Ansicht „Karte" gewählt ist — mit ihr kommt Leaflet. Die Auswertung selbst
- * lädt kein Leaflet (tests/umfeld-karte.test.ts prüft das am Import-Graph).
+ * bzw. Region lädt kein Leaflet (tests/umfeld-karte.test.ts prüft das am Import-Graph).
  *
  * Welche Pins es gibt, hat baueUmfeldKarte (src/lib/umfeld.ts) entschieden:
  * genau die Höfe, die die Liste zählt. Hier wird nichts mehr gefiltert.
@@ -54,14 +56,14 @@ export default function UmfeldKarteAnsicht({ karte, eigenerName }: { karte: Umfe
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="truncate font-semibold text-foreground">{gewaehlt.name}</p>
+              <p className="truncate font-semibold text-foreground" title={gewaehlt.name}>{gewaehlt.name}</p>
               <p className="text-sm text-muted-foreground tabular-nums">{gewaehlt.entfernung}</p>
             </div>
             <button
               type="button"
               aria-label="Schließen"
               onClick={() => setLage((l) => nachLeerTipp(l))}
-              className="-mr-2 -mt-2 inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className={cn('-mr-2 -mt-2 inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground', FOKUS_RAHMEN)}
             >
               <X className="size-4" aria-hidden="true" />
             </button>
@@ -71,7 +73,7 @@ export default function UmfeldKarteAnsicht({ karte, eigenerName }: { karte: Umfe
           </p>
           <Link
             href={gewaehlt.link}
-            className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-brand-text underline-offset-4 hover:underline"
+            className={cn('mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-brand-text underline-offset-4 hover:underline', FOKUS_RAHMEN)}
           >
             Zur Hofseite
           </Link>

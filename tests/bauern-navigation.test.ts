@@ -278,15 +278,20 @@ describe('Vollständigkeit', () => {
   it('jede Seite unter src/app/(farmer) und src/app/(hof) hat ihren Punkt in der Navigation', () => {
     const ordner = HOF_GRUPPEN.flatMap((gruppe) => {
       const wurzel = join(process.cwd(), gruppe)
-      return readdirSync(wurzel).filter((n) => statSync(join(wurzel, n)).isDirectory())
+      return readdirSync(wurzel)
+        .filter((n) => statSync(join(wurzel, n)).isDirectory())
+        .map((name) => ({ gruppe, name }))
     })
     expect(ordner.length).toBeGreaterThan(5)
     // Gegenprobe: Die Suche erreicht beide Gruppen.
-    expect(ordner).toContain('farm-page')
-    expect(ordner).toContain('status')
-    for (const name of ordner) {
-      expect(aktiverPunkt(`/${name}`), name).not.toBeNull()
+    expect(ordner.map((o) => o.name)).toContain('farm-page')
+    expect(ordner.map((o) => o.name)).toContain('status')
+    for (const { gruppe, name } of ordner) {
       expect(hofAktiverPunkt(`/${name}`), name).not.toBeNull()
+      // Die Bestandsleiste (farmer-nav.tsx) zeichnet nur das Layout von
+      // (farmer). Routen, die es dort nie gab (seit Nr. 22c /region), braucht
+      // sie nicht zu kennen — alle früheren (farmer)-Routen kennt sie weiter.
+      if (gruppe.includes('(farmer)') || name !== 'region') expect(aktiverPunkt(`/${name}`), name).not.toBeNull()
     }
   })
 })
@@ -309,8 +314,8 @@ describe('HofShell: Seitenleiste', () => {
       ['Kunden', '/customers'],
       ['Verkäufe', '/sales'],
       ['Auswertung', '/analytics'],
-      // Region gibt es als eigene Route erst mit Gate 8; bis dahin ist es das Umfeld.
-      ['Region', '/analytics/umfeld'],
+      // Seit Nr. 22c (Gate 8) eine eigene Route; /analytics/umfeld leitet dorthin um.
+      ['Region', '/region'],
     ])
   })
 
@@ -392,14 +397,16 @@ describe('HofShell: aktive Punkte', () => {
     ['/products', 'produkte'],
     ['/status/new', 'mein-hof'],
     ['/analytics', 'auswertung'],
-    ['/analytics/umfeld', 'region'],
+    ['/region', 'region'],
+    // Die alte Adresse leitet nur noch um (Nr. 22c) — als Pfad gehört sie zur Auswertung.
+    ['/analytics/umfeld', 'auswertung'],
     ['/admin/finanzen', 'admin'],
   ])('%s → %s', (pfad, id) => {
     expect(hofAktiverPunkt(pfad)).toBe(id)
   })
 
   it('„Mehr" leuchtet für alles im Mehr-Blatt, nicht für die Leiste', () => {
-    for (const pfad of ['/farm-page', '/status', '/customers', '/analytics/umfeld', '/settings', '/meldungen']) {
+    for (const pfad of ['/farm-page', '/status', '/customers', '/region', '/settings', '/meldungen']) {
       expect(hofMehrAktiv(pfad), pfad).toBe(true)
     }
     for (const pfad of ['/dashboard', '/orders', '/products', '/onboarding']) {
@@ -411,8 +418,9 @@ describe('HofShell: aktive Punkte', () => {
     const nav = hofNavigation({ isAdmin: false })
     const region = nav.verkaufUndKunden.find((p) => p.id === 'region')
     const auswertung = nav.verkaufUndKunden.find((p) => p.id === 'auswertung')
-    expect(region && hofAriaAktuell('/analytics/umfeld', region)).toBe('page')
-    expect(auswertung && hofAriaAktuell('/analytics/umfeld', auswertung)).toBeUndefined()
+    expect(region && hofAriaAktuell('/region', region)).toBe('page')
+    expect(auswertung && hofAriaAktuell('/region', auswertung)).toBeUndefined()
+    expect(region && hofAriaAktuell('/analytics', region)).toBeUndefined()
     expect(auswertung && hofAriaAktuell('/analytics', auswertung)).toBe('page')
   })
 

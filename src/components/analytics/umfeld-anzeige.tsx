@@ -3,12 +3,14 @@
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { List, Map as MapIcon } from 'lucide-react'
+import { MapPin } from 'lucide-react'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Segment } from '@/components/ui/segment'
+import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { UmfeldKopf } from '@/components/analytics/umfeld-kopf'
 import { UmfeldListe } from '@/components/analytics/umfeld-liste'
 import type { AnzeigeBereich } from '@/lib/taxonomie'
 import type { UmfeldAnsicht, UmfeldKarte, UmfeldKm } from '@/lib/umfeld'
-import { cn } from '@/lib/utils'
 import { leseUmfeldAnsicht, umfeldLink, type UmfeldAnsichtWahl } from '@/schemas/umfeld-filter'
 
 // Erst beim Umschalten auf „Karte" geladen — mit ihr kommt Leaflet. Wer nur
@@ -18,8 +20,14 @@ const UmfeldKarteAnsicht = dynamic(() => import('@/components/analytics/umfeld-k
   loading: () => <div className="h-[60vh] min-h-[320px] animate-pulse rounded-2xl bg-muted" aria-hidden="true" />,
 })
 
+const ANSICHTEN = [
+  { wert: 'liste', label: 'Liste' },
+  { wert: 'karte', label: 'Karte' },
+] as const
+
 /**
- * Der Inhalt des Reiters „In der Nähe" (intern: Umfeld): Kopf (Bereich, Umkreis), Umschalter
+ * Der Inhalt des Reiters „Preise vergleichen" auf /region (bis Nr. 22c „In
+ * der Nähe" unter /analytics/umfeld; intern: Umfeld): Kopf (Bereich, Umkreis), Umschalter
  * „Liste | Karte" wie auf /hoefe, Hinweise und die gewählte Ansicht.
  *
  * Die Ansicht steht als ?ansicht= in der URL der Umfeld-Seite. Gewechselt wird
@@ -48,58 +56,48 @@ export function UmfeldAnzeige({
     window.history.replaceState(null, '', `${pfad}${link.slice(link.indexOf('?'))}`)
   }
 
-  const knopf = (wert: UmfeldAnsichtWahl, beschriftung: string, Icon: typeof List) => (
-    <button
-      type="button"
-      onClick={() => waehle(wert)}
-      aria-pressed={wahl === wert}
-      className={cn(
-        'inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        wahl === wert ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-      )}
-    >
-      <Icon className="size-4" aria-hidden="true" />
-      {beschriftung}
-    </button>
-  )
-
   return (
-    <>
+    <div className="flex flex-col gap-4">
       <UmfeldKopf bereich={bereich} km={km} ansicht={wahl} />
-      {/* Eigene Zeile wie auf /hoefe — neben dem Umschalter bliebe dem Satz
-          darunter bei 375 px kaum Platz. */}
-      <div className="mb-3 flex justify-end">
-        <div className="inline-flex rounded-xl bg-muted p-1" role="group" aria-label="Ansicht wählen">
-          {knopf('liste', 'Liste', List)}
-          {knopf('karte', 'Karte', MapIcon)}
+      {/* Liste | Karte ist Zustand der Seite (replaceState), kein Filter — deshalb
+          der Baustein Segment, nicht FilterChips. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <p className="text-[12.5px] leading-normal text-muted-foreground">
+            Luftlinie ab deinem Hof · nur Höfe, die gerade verkaufen · je Hof zählt sein günstigstes Angebot
+          </p>
+          {ansicht.hinweise.map((hinweis) => (
+            <p key={hinweis} className="text-[12.5px] leading-normal text-muted-foreground">
+              {hinweis}
+            </p>
+          ))}
         </div>
+        <Segment
+          beschriftung="Ansicht wählen"
+          optionen={ANSICHTEN}
+          wert={wahl}
+          onWertChange={(neu) => waehle(neu === 'karte' ? 'karte' : 'liste')}
+        />
       </div>
-      <p className="mb-3 text-xs text-muted-foreground">
-        Luftlinie ab deinem Hof. Nur Höfe, die gerade verkaufen — je Hof zählt sein günstigstes Angebot.
-      </p>
-      {ansicht.hinweise.map((hinweis) => (
-        <p key={hinweis} className="mb-3 text-xs text-muted-foreground">
-          {hinweis}
-        </p>
-      ))}
       {ansicht.leer && (
-        <div className="mb-4 rounded-xl border border-border bg-card p-5 dark:ring-1 dark:ring-border">
-          <p className="text-sm text-foreground">{ansicht.leer}</p>
-          {ansicht.weiterUmkreis && (
-            <Link
-              href={umfeldLink({ km: ansicht.weiterUmkreis, bereich, ansicht: wahl })}
-              className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-brand-text underline-offset-4 hover:underline"
-            >
-              Umkreis auf {ansicht.weiterUmkreis} km
-            </Link>
-          )}
-        </div>
+        <EmptyState
+          symbol={MapPin}
+          titel="Noch keine Höfe zum Vergleichen"
+          satz={ansicht.leer}
+          aktion={
+            ansicht.weiterUmkreis ? (
+              <Link href={umfeldLink({ km: ansicht.weiterUmkreis, bereich, ansicht: wahl })} className={KNOPF_RAHMEN}>
+                Umkreis auf {ansicht.weiterUmkreis} km
+              </Link>
+            ) : undefined
+          }
+        />
       )}
       {wahl === 'karte' ? (
         <UmfeldKarteAnsicht karte={karte} eigenerName={eigenerName} />
       ) : (
         !ansicht.leer && <UmfeldListe zeilen={ansicht.zeilen} />
       )}
-    </>
+    </div>
   )
 }
