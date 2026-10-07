@@ -96,6 +96,7 @@ import {
 } from '@/lib/format'
 import { KategorieSheet } from './kategorie-sheet'
 import type { NeuBereich } from '@/schemas/url-auftrag'
+import { FUTTER_ANLEGEN_HREF } from '@/lib/bauern-navigation'
 import { cn } from '@/lib/utils'
 import {
   gewichtFrage,
@@ -788,6 +789,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
         return
       }
       toast.success(isEdit ? 'Produkt gespeichert' : 'Produkt angelegt')
+      // Gespeichert, aber als Entwurf: Der Größe fehlt die Futtermittel-Registrierung (S7, Nr. 20).
+      if (ergebnis.hinweis) toast.info(ergebnis.hinweis)
       // Schließen gibt auch die Kopie frei (Effekt auf `open`).
       onClose()
     } catch (e) {
@@ -1867,6 +1870,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
       onOpenChange={setKategorieSheetOffen}
       wert={{ category, subcategory: werte.subcategory }}
       startBereich={!isEdit && vorwahl === 'futter' ? 'FUTTERMITTEL' : undefined}
+      // Neue Futtermittel nur mit Verkaufsgrößen und Registrierung (Nr. 20, S7).
+      futterAnlegenHref={isEdit ? undefined : FUTTER_ANLEGEN_HREF}
       keineAngabeErlaubt={isEdit}
       onUebernehmen={({ category: neu, subcategory: sorte }) => kategorieUebernehmen(neu, sorte)}
     />

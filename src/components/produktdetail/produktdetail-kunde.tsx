@@ -44,6 +44,8 @@ import { useRueckwegKlick } from '@/components/shared/kunden-kopf'
 import { CartSheet } from '@/components/farm/cart-sheet'
 import { HofseiteSeitenspalte } from '@/components/hofseite/hofseite-seitenspalte'
 import { GleichMitAbholen, Kennzeichnung } from '@/components/produktdetail/produktdetail-teile'
+import { RaummassErklaerung } from '@/components/shared/raummass-erklaerung'
+import { raummassErklaeren } from '@/lib/verkaufsgroessen'
 
 /*
  * Die Produktseite /[farmSlug]/produkt/[id] (Nachtlauf Nr. 11, Gate 4).
@@ -164,6 +166,8 @@ export function ProduktdetailKunde({
   const mitGrundpreis = kacheln.some((k) => k.grundpreis)
   const vorrat = vorratText(produkt, zustand)
   const mitnehmen = gleichMitAbholen(produkte, produkt, farm.isPaused)
+  // Raummeter und Schüttraummeter erklärt die Seite beim ersten Vorkommen (DESIGN_SYSTEM, Nr. 20).
+  const raummass = raummassErklaeren((familie.length > 0 ? familie : [produkt]).map((p) => p.unit))
 
   const marke =
     zustand.art === 'knapp' ? (
@@ -321,6 +325,7 @@ export function ProduktdetailKunde({
                     />
                   ))}
                 </GroessenWahl>
+                {raummass && <RaummassErklaerung />}
               </>
             ) : (
               <div className="flex flex-col gap-0.5">
@@ -330,6 +335,7 @@ export function ProduktdetailKunde({
                 <p className="text-xl font-semibold text-foreground tabular-nums">{formatGrundpreis(produkt.price, produkt.unit, produkt.unitSize)}</p>
                 {zweite && <p className="text-[13px] text-muted-foreground tabular-nums">{zweite}</p>}
                 {vorrat && zustand.art === 'kaufbar' && <p className="text-[13px] text-muted-foreground">Vorrat: {vorrat}</p>}
+                {raummass && <RaummassErklaerung className="mt-2" />}
               </div>
             )}
 

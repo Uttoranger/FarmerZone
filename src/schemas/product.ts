@@ -60,9 +60,17 @@ export const UNIT_OPTIONS = [
   { value: 'PAKET', label: 'Paket' },
   { value: 'BALLEN', label: 'Ballen' },
   { value: 'BIGBAG', label: 'Big Bag' },
+  // Brennmaterial (E11, seit Gate 6 wählbar): M3 ist für Holz mehrdeutig.
+  { value: 'RAUMMETER', label: 'Raummeter (rm)' },
+  { value: 'SCHUETTRAUMMETER', label: 'Schüttraummeter (srm)' },
 ] as const
 
-export const PRODUCT_UNIT_VALUES = ['STUECK', 'KG', 'G', 'LITER', 'ML', 'M3', 'PAKET', 'BALLEN', 'BIGBAG'] as const
+export const PRODUCT_UNIT_VALUES = [
+  'STUECK', 'KG', 'G', 'LITER', 'ML', 'M3', 'PAKET', 'BALLEN', 'BIGBAG', 'RAUMMETER', 'SCHUETTRAUMMETER',
+] as const
+
+/** Raummaße für Brennmaterial (E11) — nur im Bereich Sonstiges, nie bei Lebensmitteln oder Futter. */
+export const RAUMMASS_EINHEITEN: readonly string[] = ['RAUMMETER', 'SCHUETTRAUMMETER']
 
 /**
  * Futtermittel verkauft man nicht in g, ml oder m³ — und nur bei diesen sechs
@@ -71,8 +79,9 @@ export const PRODUCT_UNIT_VALUES = ['STUECK', 'KG', 'G', 'LITER', 'ML', 'M3', 'P
 const FUTTER_EINHEITEN: readonly string[] = ['KG', 'LITER', 'STUECK', 'PAKET', 'BALLEN', 'BIGBAG']
 
 /**
- * Die Einheiten, die das Formular für eine Kategorie anbietet: Ballen und Big
- * Bags nur bei Futtermitteln und Sonstiges (Rückfrage F7), Futtermittel nur in
+ * Die Einheiten, die das Formular für eine Kategorie anbietet: Ballen, Big
+ * Bags und die Raummaße nur im Bereich Sonstiges (Brennholz) bzw. Ballen und
+ * Big Bags auch bei Futtermitteln (Rückfrage F7), Futtermittel nur in
  * FUTTER_EINHEITEN. Reine Anzeige — das Schema nimmt jede Einheit an.
  */
 export function unitOptionsFuer(
@@ -81,7 +90,7 @@ export function unitOptionsFuer(
   if (istFuttermittel(category)) return UNIT_OPTIONS.filter((u) => FUTTER_EINHEITEN.includes(u.value))
   return grossgebindeEinheitenAngeboten(category)
     ? UNIT_OPTIONS
-    : UNIT_OPTIONS.filter((u) => !istGrossgebindeEinheit(u.value))
+    : UNIT_OPTIONS.filter((u) => !istGrossgebindeEinheit(u.value) && !RAUMMASS_EINHEITEN.includes(u.value))
 }
 
 export const UNIT_LABELS: Record<string, string> = {
@@ -94,6 +103,8 @@ export const UNIT_LABELS: Record<string, string> = {
   PAKET: 'Paket',
   BALLEN: 'Ballen',
   BIGBAG: 'Big Bag',
+  RAUMMETER: 'rm',
+  SCHUETTRAUMMETER: 'srm',
 }
 
 // Kurznamen für kompakte Saison-Anzeigen (Badge auf der Hof-Seite,
@@ -145,7 +156,7 @@ const optionalPositiveNumber = z.preprocess(
 )
 
 /** Preis je Gebinde: Pflicht, größer 0, auf den Cent (zwei Nachkommastellen). */
-const preisZahl = z.preprocess(
+export const preisZahl = z.preprocess(
   dezimal,
   z
     .number({ error: 'Bitte gib einen Preis ein, z. B. 5,99.' })
@@ -202,7 +213,7 @@ export const FUTTER_FEHLER = {
 } as const
 
 /** Nettomenge eines Gebindes: Pflicht, größer 0, höchstens drei Nachkommastellen (Decimal(10,3)). */
-const nettoMengeZahl = z.preprocess(
+export const nettoMengeZahl = z.preprocess(
   dezimal,
   z
     .number({ error: FUTTER_FEHLER.nettoMenge })

@@ -210,7 +210,8 @@ export function plural(n: number, singular: string, mehrzahl: string): string {
  */
 
 /** Maßeinheiten, bei denen ein Grundpreis je Einheit etwas sagt — bei Stück und Paket nicht. */
-const MASS_EINHEITEN = new Set(['KG', 'G', 'LITER', 'ML', 'M3'])
+// Raummeter und Schüttraummeter (E11): Holz wird je Raummaß verglichen (€ / rm).
+const MASS_EINHEITEN = new Set(['KG', 'G', 'LITER', 'ML', 'M3', 'RAUMMETER', 'SCHUETTRAUMMETER'])
 
 export function istMassEinheit(unit: string): boolean {
   return MASS_EINHEITEN.has(unit)

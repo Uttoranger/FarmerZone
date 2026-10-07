@@ -14,6 +14,12 @@ export const ORDER_UNIT_LABELS: Record<string, string> = {
   ML: 'ml',
   M3: 'm³',
   PAKET: 'Pak.',
+  // Seit Nr. 20: Futter und Brennmaterial mit Verkaufsgrößen — ohne Eintrag
+  // stünde der Rohwert („BALLEN") in der Bestellzeile.
+  BALLEN: 'Ballen',
+  BIGBAG: 'Big Bag',
+  RAUMMETER: 'rm',
+  SCHUETTRAUMMETER: 'srm',
 }
 
 export type OrderLineProduct = {

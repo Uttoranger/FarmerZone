@@ -16,6 +16,7 @@ import {
 } from '@/lib/geokodierung'
 import { LAND_GENITIV, alsLand, type Land } from '@/lib/laender'
 import { profileSchema, profilBearbeitenSchema } from '@/schemas/hofprofil'
+import { nimmGesperrteAusDemShop, revalidiereProdukte } from '@/server/produkte-schreiben'
 
 async function getAuthFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -88,6 +89,20 @@ export async function updateProfile(data: ProfileFormData): Promise<ProfileResul
         : {}),
     },
   })
+
+  // Futtermittel-Registrierung geändert: Größen, die jetzt gesperrt sind,
+  // gehen aus dem Shop (S7, Nr. 20). Nicht in einer Transaktion mit dem
+  // Profil — scheitert dieser Schritt, wirft er (Sentry), und der Warenkorb
+  // lässt gesperrte Größen trotzdem nicht durch den Checkout (src/server/warenkorb.ts).
+  const registrierungGeaendert =
+    (farm.betriebsnummer ?? '') !== (profil.betriebsnummer ?? '') || (farm.betriebsstatus ?? null) !== (profil.betriebsstatus ?? null)
+  if (registrierungGeaendert) {
+    const offline = await nimmGesperrteAusDemShop(farm.id, {
+      betriebsnummer: profil.betriebsnummer,
+      betriebsstatus: profil.betriebsstatus,
+    })
+    if (offline > 0) revalidiereProdukte(farm.slug)
+  }
 
   revalidatePath('/settings/profile')
   // Der Kartenpunkt zählt in die Erste-Schritte-Liste der Übersicht.

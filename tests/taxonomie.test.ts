@@ -117,36 +117,30 @@ describe('TAXONOMIE — jede L2 gehört zu genau einer L1', () => {
     }
   })
 
-  it('Fisch, Brot, Getränke, Brennholz, Sonstiges, Mischfutter und Ergänzungsfutter haben keine Unterkategorien', () => {
-    for (const l1 of ['FISCH', 'BROT', 'GETRAENKE', 'BRENNHOLZ', 'SONSTIGES', 'MISCHFUTTER', 'ERGAENZUNGSFUTTER'] as const) {
+  it('Fisch, Brot, Getränke, Sonstiges, Mischfutter und Ergänzungsfutter haben keine Unterkategorien', () => {
+    for (const l1 of ['FISCH', 'BROT', 'GETRAENKE', 'SONSTIGES', 'MISCHFUTTER', 'ERGAENZUNGSFUTTER'] as const) {
       expect(hatUnterkategorien(l1)).toBe(false)
       expect(unterkategorienVon(l1)).toEqual([])
     }
   })
 
-  it('die übrigen neun Kategorien haben Unterkategorien (inklusive Altlast FUTTERMITTEL)', () => {
-    for (const l1 of ['MILCH', 'EIER', 'FLEISCH', 'GEMUESE', 'OBST', 'HONIG', 'FUTTERMITTEL', 'HEU_STROH', 'GETREIDE_KOERNER'] as const) {
+  it('die übrigen zehn Kategorien haben Unterkategorien (inklusive Altlast FUTTERMITTEL und Brennholz seit Gate 6)', () => {
+    for (const l1 of ['MILCH', 'EIER', 'FLEISCH', 'GEMUESE', 'OBST', 'HONIG', 'FUTTERMITTEL', 'HEU_STROH', 'GETREIDE_KOERNER', 'BRENNHOLZ'] as const) {
       expect(hatUnterkategorien(l1)).toBe(true)
       expect(unterkategorienVon(l1).length).toBeGreaterThan(0)
     }
   })
 
-  it('vorbereitete Brennmaterial-Arten gehören noch zu keiner Kategorie und stehen nicht in TAXONOMIE (Expand vor Gate 6)', () => {
-    expect([...VORBEREITETE_UNTERKATEGORIEN]).toEqual(['BRENNHOLZ_SCHEIT', 'ANZUENDHOLZ', 'HACKSCHNITZEL'])
-    const zugeordnet: readonly string[] = Object.values(TAXONOMIE).flat()
-    for (const l2 of VORBEREITETE_UNTERKATEGORIEN) {
-      expect(zugeordnet, l2).not.toContain(l2)
-      expect(PRODUCT_CATEGORY_VALUES.filter((l1) => gehoertZu(l1, l2)), l2).toEqual([])
+  it('die Brennmaterial-Arten gehören seit Gate 6 (Nr. 20) zu Brennholz — vorbereitet ist nichts mehr', () => {
+    // Geändert in Nr. 20: Vorher standen die drei Arten als vorbereitete
+    // Werte ohne Kategorie da (Expand vor Gate 6). Das Brennmaterial-Formular
+    // fragt die Art, also stehen sie in TAXONOMIE.BRENNHOLZ und die Liste ist leer.
+    expect([...VORBEREITETE_UNTERKATEGORIEN]).toEqual([])
+    expect([...unterkategorienVon('BRENNHOLZ')]).toEqual(['BRENNHOLZ_SCHEIT', 'ANZUENDHOLZ', 'HACKSCHNITZEL'])
+    for (const l2 of ['BRENNHOLZ_SCHEIT', 'ANZUENDHOLZ', 'HACKSCHNITZEL'] as const) {
+      expect(PRODUCT_CATEGORY_VALUES.filter((l1) => gehoertZu(l1, l2)), l2).toEqual(['BRENNHOLZ'])
+      expect(kategorieVon(l2)).toBe('BRENNHOLZ')
     }
-  })
-
-  it('kategorieVon nimmt keine vorbereitete Unterkategorie an — das prüft der Compiler (pnpm typecheck)', () => {
-    // @ts-expect-error Eine vorbereitete L2 hat keine Kategorie; kategorieVon
-    // nimmt nur ZugeordneteUnterkategorie. Fällt dieser Fehler weg, prüft der
-    // Typ nicht mehr, und kategorieVorschlag könnte wieder zur Laufzeit werfen.
-    const aufruf = () => kategorieVon('BRENNHOLZ_SCHEIT')
-    // Zur Laufzeit bliebe es ein Fehler statt eines falschen Rückfalls.
-    expect(aufruf).toThrow('Unterkategorie ohne Kategorie')
   })
 
   it('hatUnterkategorien ohne Kategorie ist false', () => {
