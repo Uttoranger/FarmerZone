@@ -48,7 +48,7 @@ export const STARTSEITE_CHIPS: readonly SuchChip[] = [
   { label: 'Brot', filter: { kategorien: ['BROT'] } },
   { label: 'Honig', filter: { kategorien: ['HONIG'] } },
   { label: 'Futtermittel', filter: { bereich: 'FUTTERMITTEL' } },
-  { label: 'Brennmaterial', filter: { kategorien: ['BRENNHOLZ'] } },
+  { label: KATEGORIE_LABEL.BRENNHOLZ, filter: { kategorien: ['BRENNHOLZ'] } },
 ]
 
 /** Die Karte rechts im Kopf und „Alle Höfe auf der Karte" führen hierhin. */

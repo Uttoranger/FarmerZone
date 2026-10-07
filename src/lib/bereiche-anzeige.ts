@@ -478,11 +478,11 @@ export function angezeigterBereich(
 // ─── Hofseite: Kategorie-Abschnitte (E1) ────────────────────────────────────
 
 /**
- * Brennholz heißt in der Oberfläche „Brennmaterial" (E11, Startseite und
- * /hoefe). Die Kategorie selbst und ihr Taxonomie-Label ändert erst Gate 6 —
- * bis dahin steht das Wort hier, an EINER Stelle.
+ * Die Kategorie BRENNHOLZ heißt in der Oberfläche „Brennmaterial" (E11 Label,
+ * Nr. 23). Das Wort steht nur in der Taxonomie; der Name hier bleibt für die
+ * Abschnitte der Hofseite.
  */
-export const BRENNMATERIAL_TITEL = 'Brennmaterial'
+export const BRENNMATERIAL_TITEL = KATEGORIE_LABEL.BRENNHOLZ
 
 /** Der Abschnitt Futtermittel — Ziel von ?bereich=futter (Links von /hoefe und aus dem Umfeld). */
 export const FUTTER_ABSCHNITT_ANKER = 'kategorie-futtermittel'

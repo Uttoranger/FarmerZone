@@ -102,26 +102,22 @@ describe('kategorieVorschlag — kein Vorschlag', () => {
 // Kategorie. Trafen ihre Labels einen Produktnamen, warf kategorieVon — und
 // mit ihm die Produktliste (produktHinweise) und das Tippen im Produktdialog.
 // Erwartet ist genau das Ergebnis von vor dem Schema-Expand.
-describe('kategorieVorschlag — vorbereitete Unterkategorien lösen nie etwas aus', () => {
-  it('„Brennholz Buche" → Brennholz ohne Unterkategorie, wie vor dem Schema-Expand', () => {
-    expect(kategorieVorschlag('Brennholz Buche')).toEqual({ category: 'BRENNHOLZ', subcategory: null })
+// Geändert in Nr. 20: Bis Gate 6 waren die Brennmaterial-Arten vorbereitet
+// (ohne Kategorie) und durften nie etwas auslösen. Seit sie zu Brennholz
+// gehören, schlägt der Name sie vor — wie jede andere Sorte.
+describe('kategorieVorschlag — Brennmaterial-Arten seit Gate 6', () => {
+  it('„Brennholz Buche" und „Buche Scheite" → Brennholz (Scheite)', () => {
+    expect(kategorieVorschlag('Brennholz Buche')).toEqual({ category: 'BRENNHOLZ', subcategory: 'BRENNHOLZ_SCHEIT' })
+    expect(kategorieVorschlag('Buche Scheite')).toEqual({ category: 'BRENNHOLZ', subcategory: 'BRENNHOLZ_SCHEIT' })
   })
 
-  it('„Hackschnitzel", „Anzündholz", „Buche Scheite" werfen nicht und ergeben nichts', () => {
-    for (const name of ['Hackschnitzel', 'Anzündholz', 'Buche Scheite']) {
-      expect(() => kategorieVorschlag(name), name).not.toThrow()
-      expect(kategorieVorschlag(name), name).toBeNull()
-    }
+  it('„Hackschnitzel" und „Anzündholz" → ihre Art', () => {
+    expect(kategorieVorschlag('Hackschnitzel')).toEqual({ category: 'BRENNHOLZ', subcategory: 'HACKSCHNITZEL' })
+    expect(kategorieVorschlag('Anzündholz')).toEqual({ category: 'BRENNHOLZ', subcategory: 'ANZUENDHOLZ' })
   })
 
-  it('kein Label einer vorbereiteten Unterkategorie bringt kategorieVorschlag zum Werfen', () => {
-    expect(VORBEREITETE_UNTERKATEGORIEN.length).toBeGreaterThan(0)
-    for (const l2 of VORBEREITETE_UNTERKATEGORIEN) {
-      const label = UNTERKATEGORIE_LABEL[l2]
-      for (const name of [label, `${label} Buche`, `Buche ${label}`, `Bio ${label}`]) {
-        expect(() => kategorieVorschlag(name), name).not.toThrow()
-      }
-    }
+  it('es gibt keine vorbereiteten Unterkategorien mehr', () => {
+    expect(VORBEREITETE_UNTERKATEGORIEN).toEqual([])
   })
 
   it('kein Label irgendeiner Unterkategorie bringt kategorieVorschlag zum Werfen', () => {

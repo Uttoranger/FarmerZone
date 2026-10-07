@@ -307,16 +307,21 @@ export type HofNeuPunkt = {
 }
 
 /**
+ * „Neues Futtermittel" — das Formular mit Verkaufsgrößen (Nr. 20). Auch der
+ * Produktdialog verweist dorthin, wenn man in ihm ein Futtermittel anlegen will.
+ */
+export const FUTTER_ANLEGEN_HREF = '/products?neu=1&bereich=futter'
+
+/**
  * Das Neu-Menü (Browser: Aufklappmenü am Neu-Knopf und der Dialog hinter
  * „+ Neues Produkt", Handy: Blatt hinter dem Plus) — EINE Liste für alle drei.
- * Futtermittel und Brennmaterial führen bis Gate 6 (Nr. 20) in den
- * vorhandenen Produktdialog, der beide schon kann (Kennzeichnung, Brennholz):
- * Nichts geht verloren, und nichts verspricht Verkaufsgrößen, die es noch
- * nicht gibt.
+ * Seit Gate 6 (Nr. 20) öffnen Futtermittel und Brennmaterial die Formulare mit
+ * Verkaufsgrößen (src/components/produkte/futter-formular.tsx,
+ * brennmaterial-formular.tsx); Lebensmittel den Produktdialog.
  */
 export const HOF_NEU: readonly HofNeuPunkt[] = [
   { id: 'lebensmittel', label: 'Lebensmittel', satz: 'Eier, Gemüse, Fleisch, Brot, Honig …', href: '/products?neu=1&bereich=lebensmittel', gruppe: 'anlegen' },
-  { id: 'futtermittel', label: 'Futtermittel', satz: 'Heu, Stroh, Getreide, Silage', href: '/products?neu=1&bereich=futter', gruppe: 'anlegen' },
+  { id: 'futtermittel', label: 'Futtermittel', satz: 'Heu, Stroh, Getreide, Silage', href: FUTTER_ANLEGEN_HREF, gruppe: 'anlegen' },
   { id: 'brennmaterial', label: 'Brennmaterial', satz: 'Brennholz, Anzündholz, Hackschnitzel', href: '/products?neu=1&bereich=brennmaterial', gruppe: 'anlegen' },
   { id: 'status-posten', label: 'Neuer Beitrag', satz: 'Neuigkeit auf deiner Hofseite', href: '/status/new', gruppe: 'anderes' },
   { id: 'verkauf-eintragen', label: 'Verkauf eintragen', satz: 'Was du am Hof oder am Markt verkauft hast', href: '/sales?neu=1', gruppe: 'anderes' },

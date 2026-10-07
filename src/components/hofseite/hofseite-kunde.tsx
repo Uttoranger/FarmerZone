@@ -384,6 +384,7 @@ export function HofseiteKunde({
           gebuehrKorb={gebuehr?.korb ?? null}
           mitKorb={mitKorb}
           jetzt={jetzt}
+          produkte={produkte}
           // Am Handy nur in der Übersicht, dort vor dem Inhalt (Mockup mobil-k2-hofseite).
           className={cn('mb-[26px] lg:col-start-2 lg:row-start-1 lg:mb-0', offen !== 'uebersicht' && 'hidden lg:flex')}
         />

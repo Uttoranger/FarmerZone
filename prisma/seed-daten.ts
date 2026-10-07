@@ -1033,7 +1033,8 @@ const PILOTHOF: SeedHof = {
       bestand: 10,
       imShop: true,
       category: 'BRENNHOLZ',
-      subcategory: null,
+      // Seit Nr. 20 hat Brennholz Arten (E11) — die Testdaten tragen eine.
+      subcategory: 'BRENNHOLZ_SCHEIT',
       labels: [],
     },
     {

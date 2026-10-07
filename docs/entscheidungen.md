@@ -39,6 +39,7 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Entscheidung:** Jede Verkaufsgröße ist ein eigenes Produkt einer Familie (`Product.familieId`), vom Sackerl bis zum Rundballen.
 - **Begründung:** Das hält die Invarianten ein: ein Produkt = ein Gebinde, `stock` zählt Gebinde, Kennzeichnung je Gebinde.
 - **Dateien:** `prisma/schema.prisma` (Expand in #169); Formulare und Größenwahl folgen mit Nr. 20 (Gate 6).
+- **Stand:** Nr. 20 (07.10.2026): Formulare „Neues Futtermittel" und „Neues Brennmaterial" legen je Größe ein Produkt mit gemeinsamer `familieId` an (`src/server/actions/produktfamilie.ts`); bearbeitet wird je Größe. Bericht 20.
 
 ### E4 · Servicegebühr 5 %, immer aufrunden (02.10.2026)
 - **Entscheidung:** **5 %** und mindestens € 0,50, **immer aufgerundet** auf den nächsten Cent. Gerechnet wird nur in `berechneServicegebuehr`. Gespeicherte Beträge alter Bestellungen werden nie neu berechnet.
@@ -79,11 +80,13 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
   - Im Admin wird die Nummer nur angezeigt, einen Haken „geprüft" gibt es nicht.
 - **Begründung:** So steht es im Konzept Bereiche (`docs/konzepte/bereiche.md`). Die Plattform kann die Nummer nicht verlässlich prüfen.
 - **Dateien:** `src/lib/taxonomie.ts`, `src/lib/produktdetail.ts`, Admin-Freischaltung; das Feld `Farm.betriebsnummerGeprueftAm` entfällt. Die Umsetzung folgt mit Nr. 20 (Gate 6).
+- **Stand:** Nr. 20 (07.10.2026): Schild und Zusatz „laut Angabe des Hofs" waren seit Nr. 11 da; das Futter-Formular zeigt das Schild in der Vorschau, prüft nichts und bestätigt die Nummer nur über das Hofprofil. Admin unberührt (22f).
 
 ### E10 · Registrierungs-Fälle LFBIS / BAES (02.10.2026)
 - **Entscheidung:** Eigene Ernte, lose oder in Ballen, braucht nur LFBIS. Abgepacktes Heimtierfutter mit Etikett, Zukauf und Mischen brauchen eine aktive BAES-Meldung.
 - **Begründung:** Fachliche Klärung des Menschen. Die Texte lässt er vor dem Livegang gegenlesen (Umsetzungsprompt Abschnitt 10). — **Das Gegenlesen vor dem Livegang ist ersetzt durch E10a (07.10.2026).** Die Fälle selbst gelten weiter.
 - **Dateien:** `Product.verpackung` (#169); Sperre je Gebinde mit Nr. 20 (Gate 6).
+- **Stand:** Nr. 20 (07.10.2026): Sperre je Gebinde in `src/lib/futter-registrierung.ts`, serverseitig an allen Wegen in den Shop und vor dem Checkout (S7). Lesart: Mischfutter und Ergänzungsfutter brauchen als Mischung oder Zukauf immer die BAES-Meldung; Bestandsprodukte ohne Verpackung sperrt die Regel nicht. Texte vor dem Livegang gegenlesen lassen (Bericht 20).
 
 ### E10a · Futter geht ohne vorheriges Gegenlesen live (07.10.2026)
 - **Entscheidung (uttoranger, Freigabe Lauf 6):** Futter geht live, ohne dass die Erklärtexte vorher gegengelesen sind. Ausgleich:
@@ -101,6 +104,7 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Begründung:** Holz war als Kategorie gewünscht und wurde um Hackschnitzel erweitert. M3 ist für Holz mehrdeutig.
 - **Dateien:** `prisma/schema.prisma` (`ProductUnit`, `ProductSubcategory`, `BrennmaterialAngaben`, #169); Formular mit Nr. 20 (Gate 6).
 - **Label (07.10.2026, uttoranger):** Die Kategorie heißt in der Oberfläche „Brennmaterial" statt „Brennholz" (Nr. 23).
+- **Stand:** Nr. 20 (07.10.2026): Raummeter und Schüttraummeter wählbar (nur Brennmaterial), die drei Arten gehören zu Brennholz; Formular mit Holz-Angaben und Größen, Erklärbox rm/srm/fm auch auf der Produktseite. Bericht 20.
 
 ### E12 · Beiträge als Reiter in Mein Hof (02.10.2026)
 - **Entscheidung:** Mein Hof hat die Reiter Hofseite | Beiträge. `/status` bleibt als Route und wird von dort verlinkt.

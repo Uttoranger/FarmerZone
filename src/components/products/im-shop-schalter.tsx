@@ -69,7 +69,8 @@ export function ImShopSchalter({
         // Transition von selbst auf den Stand des Servers zurück. Der blieb
         // unverändert, weil nichts geschrieben wurde — genau das ist der
         // Rückweg. Ein eigenes Zurücksetzen wäre eine zweite Wahrheit.
-        toast.error('Das hat nicht geklappt. Bitte nochmal.')
+        // Gesperrte Größe (S7, Nr. 20): der Grund statt „nochmal" — nochmal hülfe nicht.
+        toast.error('code' in ergebnis && ergebnis.code === 'GESPERRT' ? ergebnis.error : 'Das hat nicht geklappt. Bitte nochmal.')
         return
       }
 

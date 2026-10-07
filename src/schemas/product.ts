@@ -22,6 +22,7 @@ import {
 import { mwstStandard } from '@/lib/mwst'
 import { nachkommastellen, parseDezimal } from '@/lib/format'
 import { PRODUKTNAME_MAX, ZU_LANG } from '@/lib/eingabegrenzen'
+import { FUTTER_BESTAETIGUNG_FEHLT } from '@/lib/futter-registrierung'
 
 // Kategorien, Unterkategorien und Siegel leben seit Sprint Taxonomie 1 in
 // src/lib/taxonomie.ts — der EINEN Quelle. Die drei Namen bleiben hier
@@ -60,9 +61,17 @@ export const UNIT_OPTIONS = [
   { value: 'PAKET', label: 'Paket' },
   { value: 'BALLEN', label: 'Ballen' },
   { value: 'BIGBAG', label: 'Big Bag' },
+  // Brennmaterial (E11, seit Gate 6 wählbar): M3 ist für Holz mehrdeutig.
+  { value: 'RAUMMETER', label: 'Raummeter (rm)' },
+  { value: 'SCHUETTRAUMMETER', label: 'Schüttraummeter (srm)' },
 ] as const
 
-export const PRODUCT_UNIT_VALUES = ['STUECK', 'KG', 'G', 'LITER', 'ML', 'M3', 'PAKET', 'BALLEN', 'BIGBAG'] as const
+export const PRODUCT_UNIT_VALUES = [
+  'STUECK', 'KG', 'G', 'LITER', 'ML', 'M3', 'PAKET', 'BALLEN', 'BIGBAG', 'RAUMMETER', 'SCHUETTRAUMMETER',
+] as const
+
+/** Raummaße für Brennmaterial (E11) — nur bei Brennholz angeboten. */
+export const RAUMMASS_EINHEITEN: readonly string[] = ['RAUMMETER', 'SCHUETTRAUMMETER']
 
 /**
  * Futtermittel verkauft man nicht in g, ml oder m³ — und nur bei diesen sechs
@@ -72,16 +81,18 @@ const FUTTER_EINHEITEN: readonly string[] = ['KG', 'LITER', 'STUECK', 'PAKET', '
 
 /**
  * Die Einheiten, die das Formular für eine Kategorie anbietet: Ballen und Big
- * Bags nur bei Futtermitteln und Sonstiges (Rückfrage F7), Futtermittel nur in
- * FUTTER_EINHEITEN. Reine Anzeige — das Schema nimmt jede Einheit an.
+ * Bags bei Futtermitteln und im Bereich Sonstiges (Rückfrage F7), die Raummaße
+ * nur bei Brennholz (E11), Futtermittel nur in FUTTER_EINHEITEN. Reine Anzeige
+ * — das Schema nimmt jede Einheit an.
  */
 export function unitOptionsFuer(
   category: ProductCategoryValue | null | undefined
 ): readonly (typeof UNIT_OPTIONS)[number][] {
   if (istFuttermittel(category)) return UNIT_OPTIONS.filter((u) => FUTTER_EINHEITEN.includes(u.value))
+  const raummass = (u: (typeof UNIT_OPTIONS)[number]) => category === 'BRENNHOLZ' || !RAUMMASS_EINHEITEN.includes(u.value)
   return grossgebindeEinheitenAngeboten(category)
-    ? UNIT_OPTIONS
-    : UNIT_OPTIONS.filter((u) => !istGrossgebindeEinheit(u.value))
+    ? UNIT_OPTIONS.filter(raummass)
+    : UNIT_OPTIONS.filter((u) => !istGrossgebindeEinheit(u.value) && raummass(u))
 }
 
 export const UNIT_LABELS: Record<string, string> = {
@@ -94,6 +105,8 @@ export const UNIT_LABELS: Record<string, string> = {
   PAKET: 'Paket',
   BALLEN: 'Ballen',
   BIGBAG: 'Big Bag',
+  RAUMMETER: 'rm',
+  SCHUETTRAUMMETER: 'srm',
 }
 
 // Kurznamen für kompakte Saison-Anzeigen (Badge auf der Hof-Seite,
@@ -145,7 +158,7 @@ const optionalPositiveNumber = z.preprocess(
 )
 
 /** Preis je Gebinde: Pflicht, größer 0, auf den Cent (zwei Nachkommastellen). */
-const preisZahl = z.preprocess(
+export const preisZahl = z.preprocess(
   dezimal,
   z
     .number({ error: 'Bitte gib einen Preis ein, z. B. 5,99.' })
@@ -189,7 +202,8 @@ export const FUTTER_FEHLER = {
   zusammensetzung: 'Bitte trag die Zusammensetzung ein — sie steht auf dem Sackanhänger oder Lieferschein.',
   analytischeBestandteile:
     'Bitte trag die analytischen Bestandteile ein — sie stehen auf dem Sackanhänger oder Lieferschein.',
-  bestaetigt: 'Bitte bestätige, dass die Angaben dem Sackanhänger bzw. Lieferschein entsprechen.',
+  // Wortlaut aus src/lib/futter-registrierung.ts — der einen Quelle der Futter-Texte (E10a).
+  bestaetigt: FUTTER_BESTAETIGUNG_FEHLT,
   unterkategorie: 'Bitte wähle die Sorte — zum Beispiel Wiesenheu oder Stroh.',
   fehlt: 'Bei Futtermitteln brauchen wir die Kennzeichnung vom Sackanhänger.',
   verboten: 'Eine Futter-Kennzeichnung gibt es nur bei Futtermitteln.',
@@ -202,7 +216,7 @@ export const FUTTER_FEHLER = {
 } as const
 
 /** Nettomenge eines Gebindes: Pflicht, größer 0, höchstens drei Nachkommastellen (Decimal(10,3)). */
-const nettoMengeZahl = z.preprocess(
+export const nettoMengeZahl = z.preprocess(
   dezimal,
   z
     .number({ error: FUTTER_FEHLER.nettoMenge })
@@ -222,9 +236,12 @@ const rohwertZahl = z.preprocess(
 
 /**
  * Die Futter-Kennzeichnung, wie der Hof sie eingibt. `bestaetigt` ist der
- * Haken „Die Angaben entsprechen dem Sackanhänger" — die Server Action macht
+ * Pflicht-Haken aus E10a (FUTTER_BESTAETIGUNG_TEXT) — die Server Action macht
  * daraus `bestaetigtAm = jetzt`. Ein Boolean statt `z.literal(true)`, damit das
  * Formular mit `false` starten kann; die Prüfung verlangt trotzdem true.
+ * So gilt es beim ANLEGEN (Futter-Formular, familienKennzeichnungSchema).
+ * Beim Bearbeiten entscheidet der Server mit dem gespeicherten Stand, ob der
+ * Haken nötig ist (futterKennzeichnungBearbeitenSchema, Nr. 23).
  *
  * futtermittelart ist hier nullable: Ob sie fehlt oder nicht zur Kategorie
  * passt, entscheidet productFormSchema — erst dort ist die Kategorie bekannt,
@@ -255,6 +272,14 @@ export const futterKennzeichnungSchema = z.object({
 
 export type FutterKennzeichnungFormData = z.infer<typeof futterKennzeichnungSchema>
 
+/**
+ * Beim Bearbeiten darf der Haken fehlen: Ob die Änderung eine neue
+ * Bestätigung verlangt, weiß nur der Server mit dem gespeicherten Stand
+ * (brauchtNeueBestaetigung, E10a). Ändert der Hof nur Preis oder Vorrat,
+ * bleibt die alte Bestätigung stehen; sonst lehnt updateProduct ohne Haken ab.
+ */
+export const futterKennzeichnungBearbeitenSchema = futterKennzeichnungSchema.extend({ bestaetigt: z.boolean() })
+
 /** Kategorie-Feld: null = „Keine Angabe" (heutiges Verhalten); ungültige Werte werden abgelehnt. */
 const kategorieFeld = z.preprocess(leerZuNull, z.enum(PRODUCT_CATEGORY_VALUES).nullable()).default(null)
 
@@ -276,7 +301,9 @@ const produktFelder = z.object({
     .refine((l) => new Set(l).size === l.length, 'Ein Siegel kann nur einmal gewählt werden.'),
   // Nur im Bereich Futtermittel — Pflicht dort, verboten sonst (superRefine).
   // null = keine Kennzeichnung (das Formular schreibt null, nie undefined).
-  futter: futterKennzeichnungSchema.nullable().optional(),
+  // Der Haken entscheidet hier nicht (futterKennzeichnungBearbeitenSchema) —
+  // neue Futtermittel entstehen ohnehin nur im Futter-Formular (createProduct lehnt ab).
+  futter: futterKennzeichnungBearbeitenSchema.nullable().optional(),
   // ≠ ALLE nur im Bereich Futtermittel (superRefine).
   abgabe: z.enum(ABGABE_VALUES).default('ALLE'),
   countsTowardLimit: z.boolean().default(true),

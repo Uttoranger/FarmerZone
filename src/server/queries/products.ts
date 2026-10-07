@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { categoryImagePath } from '@/lib/product-image'
 import { zuProduktDto } from '@/lib/produkt-dto'
 import { heuteHofSichtbar, naechstesAbholfenster, type NaechstesFenster } from '@/lib/heute'
+import { gebindeSperre, type HofRegistrierung } from '@/lib/futter-registrierung'
 import type {
   Abgabe,
   Futtermittelart,
@@ -11,6 +12,7 @@ import type {
   ProductLabel,
   ProductSubcategory,
   Tierart,
+  Verpackung,
 } from '@prisma/client'
 
 // Einheitliche Produkt-Reihenfolge (Sprint 17K): manuelle sortOrder,
@@ -77,6 +79,16 @@ export type ProductData = {
   seasonStart: number | null
   seasonEnd: number | null
   unavailableReason: string | null
+  /** Seit Nr. 20 (E3): Verkaufsgrößen einer Familie tragen dieselbe ID; null = Einzelprodukt. */
+  familieId: string | null
+  /** Seit Nr. 20 (E10): Verpackung des Gebindes, an der die Sperre hängt; null = keine Angabe. */
+  verpackung: Verpackung | null
+  /**
+   * Seit Nr. 20 (S7): Warum diese Größe ohne Registrierung nicht in den Shop
+   * darf („Wird erst sichtbar mit …"), sonst null. Nur getProdukteSeite kennt
+   * den Hof und füllt es; getProductsForFarm allein lässt es null.
+   */
+  sperre: string | null
 }
 
 export async function getProductsForFarm(farmId: string): Promise<ProductData[]> {
@@ -128,6 +140,9 @@ export async function getProductsForFarm(farmId: string): Promise<ProductData[]>
     seasonStart: p.seasonStart,
     seasonEnd: p.seasonEnd,
     unavailableReason: p.unavailableReason,
+    familieId: p.familieId,
+    verpackung: p.verpackung,
+    sperre: null,
   }))
 }
 
@@ -135,6 +150,8 @@ export type ProdukteSeite = {
   products: ProductData[]
   /** Betriebsnummer aus den Hof-Einstellungen — Anzeige in der Futter-Kennzeichnung (Rückfrage F6). */
   hofBetriebsnummer: string | null
+  /** Nummer und Status des Hofs — Block „Deine Futtermittel-Registrierungen" im Futter-Formular (Nr. 20). */
+  registrierung: HofRegistrierung
   /** heuteHofSichtbar: freigegeben, nicht pausiert, nicht stillgelegt — Bedingung für „wieder da". */
   hofSichtbar: boolean
   /** Das nächste Abholfenster für den Teilen-Text des Moments „wieder da". */
@@ -153,6 +170,7 @@ export async function getProdukteSeite(farmId: string, jetzt: Date): Promise<Pro
       where: { id: farmId },
       select: {
         betriebsnummer: true,
+        betriebsstatus: true,
         isActive: true,
         isPaused: true,
         approvedAt: true,
@@ -165,9 +183,15 @@ export async function getProdukteSeite(farmId: string, jetzt: Date): Promise<Pro
       },
     }),
   ])
+  const registrierung: HofRegistrierung = {
+    betriebsnummer: hof?.betriebsnummer ?? null,
+    betriebsstatus: hof?.betriebsstatus ?? null,
+  }
   return {
-    products,
+    // Die Sperre je Gebinde mit demselben Stand wie der Schalter „Sichtbar" (S7).
+    products: products.map((p) => ({ ...p, sperre: gebindeSperre(p, registrierung)?.grund ?? null })),
     hofBetriebsnummer: hof?.betriebsnummer ?? null,
+    registrierung,
     hofSichtbar: hof ? heuteHofSichtbar(hof) : false,
     naechstesFenster: naechstesAbholfenster(hof?.pickupSlots ?? [], jetzt),
   }

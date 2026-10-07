@@ -14,11 +14,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
-vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     farm: { findUnique: vi.fn(), update: vi.fn() },
+    // Seit Nr. 20: Ein Wechsel der Registrierung nimmt gesperrte Größen aus dem Shop.
+    product: { findMany: vi.fn(), updateMany: vi.fn() },
   },
 }))
 
@@ -29,6 +31,8 @@ import { prisma } from '@/lib/prisma'
 const getSession = vi.mocked(auth.api.getSession)
 const farmFindUnique = vi.mocked(prisma.farm.findUnique)
 const farmUpdate = vi.mocked(prisma.farm.update)
+const productFindMany = vi.mocked(prisma.product.findMany)
+const productUpdateMany = vi.mocked(prisma.product.updateMany)
 
 const gueltig = {
   name: 'Hof Müller',
@@ -52,6 +56,8 @@ beforeEach(() => {
   getSession.mockResolvedValue({ user: { id: 'user_1' } } as never)
   farmFindUnique.mockResolvedValue({ id: 'farm_1', slug: 'testhof' } as never)
   farmUpdate.mockResolvedValue({} as never)
+  productFindMany.mockResolvedValue([] as never)
+  productUpdateMany.mockResolvedValue({ count: 0 } as never)
 })
 
 describe('updateProfile — Stammdaten', () => {
@@ -260,5 +266,56 @@ describe('updateProfile — Betriebsnummer (Sprint Bereiche 1)', () => {
 
     expect(res.error).toBe('Eine Betriebsnummer hat mindestens 5 Zeichen.')
     expect(farmUpdate).not.toHaveBeenCalled()
+  })
+})
+
+describe('updateProfile — Futter-Sperre je Gebinde nach Statuswechsel (S7, Nr. 20)', () => {
+  const alterHof = { id: 'farm_1', slug: 'testhof', betriebsnummer: 'AT 1234567', betriebsstatus: 'REGISTRIERT' }
+
+  it('nimmt abgepacktes Heimtierfutter aus dem Shop, wenn die BAES-Meldung ausgetragen wird — Ballen bleiben', async () => {
+    farmFindUnique.mockResolvedValue(alterHof as never)
+    productFindMany.mockResolvedValue([
+      { id: 'p_sack', category: 'HEU_STROH', verpackung: 'ABGEPACKT_ETIKETT' },
+      { id: 'p_ballen', category: 'HEU_STROH', verpackung: 'LOSE_BALLEN' },
+    ] as never)
+    productUpdateMany.mockResolvedValue({ count: 1 } as never)
+
+    const res = await updateProfile({ ...gueltig, betriebsnummer: 'AT 1234567', betriebsstatus: 'PRIMAERPRODUKTION' })
+
+    expect(res.error).toBeUndefined()
+    const suche = productFindMany.mock.calls[0][0] as { where: Record<string, unknown> }
+    expect(suche.where).toMatchObject({ farmId: 'farm_1', isAvailable: true, verpackung: { not: null } })
+    expect(productUpdateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['p_sack'] }, farmId: 'farm_1', isAvailable: true },
+      data: { isAvailable: false },
+    })
+  })
+
+  it('ohne Nummer gehen auch Ballen offline', async () => {
+    farmFindUnique.mockResolvedValue(alterHof as never)
+    productFindMany.mockResolvedValue([{ id: 'p_ballen', category: 'HEU_STROH', verpackung: 'LOSE_BALLEN' }] as never)
+
+    await updateProfile({ ...gueltig, betriebsnummer: null, betriebsstatus: null })
+
+    const aufruf = productUpdateMany.mock.calls[0][0] as { where: { id: { in: string[] } } }
+    expect(aufruf.where.id.in).toEqual(['p_ballen'])
+  })
+
+  it('unveränderte Registrierung: keine Produktabfrage', async () => {
+    farmFindUnique.mockResolvedValue(alterHof as never)
+
+    await updateProfile({ ...gueltig, betriebsnummer: 'AT 1234567', betriebsstatus: 'REGISTRIERT' })
+
+    expect(productFindMany).not.toHaveBeenCalled()
+    expect(productUpdateMany).not.toHaveBeenCalled()
+  })
+
+  it('eine bessere Registrierung schaltet nichts von selbst ein', async () => {
+    farmFindUnique.mockResolvedValue({ ...alterHof, betriebsstatus: 'PRIMAERPRODUKTION' } as never)
+    productFindMany.mockResolvedValue([{ id: 'p_ballen', category: 'HEU_STROH', verpackung: 'LOSE_BALLEN' }] as never)
+
+    await updateProfile({ ...gueltig, betriebsnummer: 'AT 1234567', betriebsstatus: 'REGISTRIERT' })
+
+    expect(productUpdateMany).not.toHaveBeenCalled()
   })
 })

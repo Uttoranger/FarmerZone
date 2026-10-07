@@ -21,7 +21,7 @@
  *    Adresse an.
  *  - /products liegt in (hof), der Bestand (farmer) hat es nicht mehr.
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeAll } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createElement, type ReactNode } from 'react'
@@ -55,6 +55,11 @@ vi.mock('@/server/actions/products', () => ({
   createProduct: vi.fn(),
   updateProduct: vi.fn(),
   pruefeDualUse: vi.fn(),
+}))
+// Seit Nr. 20 hängen die Formulare mit Verkaufsgrößen an der Ansicht.
+vi.mock('@/server/actions/produktfamilie', () => ({
+  legeFutterFamilieAn: vi.fn(),
+  legeBrennmaterialFamilieAn: vi.fn(),
 }))
 
 import {
@@ -323,6 +328,12 @@ describe('Route in der HofShell', () => {
 // ─── Darstellung (serverseitig gerendert, ohne DOM — TESTING_GUIDELINES §1) ──
 
 describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
+  // Schweres Modul (Ansicht samt Dialogen und Formularen) einmal kalt laden —
+  // nicht im ersten Test, dessen 5-s-Grenze es sonst reißt (TESTING_GUIDELINES §4).
+  beforeAll(async () => {
+    await import('@/components/produkte/produkte-ansicht')
+  }, 30_000)
+
   const lang = 'Bergwiesen-Heu vom ersten Schnitt aus dem oberen Mühlviertel, luftgetrocknet und lose gebündelt'
 
   function produkt(id: string, teil: Partial<ProductData>): ProductData {
@@ -352,6 +363,9 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
       seasonStart: null,
       seasonEnd: null,
       unavailableReason: null,
+      familieId: null,
+      verpackung: null,
+      sperre: null,
       ...teil,
     }
   }
@@ -370,6 +384,7 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
       createElement(ProdukteAnsicht, {
         products: produkte,
         hofBetriebsnummer: null,
+        registrierung: { betriebsnummer: null, betriebsstatus: null },
         hof: { name: 'Hof Test', slug: 'hof-test', sichtbar: true },
         naechstesFenster: null,
       })
@@ -423,6 +438,14 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
     }
     // Gegenprobe: Die Suche schlägt bei einem Farbliteral an.
     expect('bg-white #fff').toMatch(/#[0-9a-fA-F]{3,8}\b|\b(?:bg|text|border)-(?:white|black)\b/)
+  })
+
+  it('eine gesperrte Größe zeigt das Schloss mit dem Grund (S7, Nr. 20) — Gegenprobe ohne Sperre', async () => {
+    const grund = 'Wird erst sichtbar mit BAES-Meldung für Heimtierfutter'
+    const mit = await rendere([produkt('p5', { name: 'Heu 1 kg-Sackerl', category: 'HEU_STROH', isAvailable: false, sperre: grund })])
+    expect(mit).toContain(grund)
+    const ohne = await rendere([produkt('p5', { name: 'Heu 1 kg-Sackerl', category: 'HEU_STROH', isAvailable: false })])
+    expect(ohne).not.toContain(grund)
   })
 })
 

@@ -1,7 +1,6 @@
 'use server'
 
 import { headers } from 'next/headers'
-import { revalidatePath, updateTag } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
@@ -9,7 +8,6 @@ import {
   productFormSchema,
   kategorieSetzenSchema,
   sichtbarkeitSchema,
-  type FutterKennzeichnungFormData,
   type ProductFormData,
 } from '@/schemas/product'
 import { bereinigeSiegel, istFuttermittel } from '@/lib/taxonomie'
@@ -17,8 +15,21 @@ import { mwstStandard } from '@/lib/mwst'
 import { dualUseHinweis, normiereProduktname, DUAL_USE_MIN_ZEICHEN } from '@/lib/dual-use'
 import { dualUseAnfrageSchema } from '@/schemas/product'
 import { getFarmForUser } from '@/server/queries/dashboard'
-import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 import { istWiederDa } from '@/lib/produkte-hof'
+import {
+  FUTTER_BESTAETIGUNG_NEU,
+  FUTTER_NUR_UEBER_FORMULAR,
+  brauchtNeueBestaetigung,
+  gebindeSperre,
+  noetigeRegistrierung,
+  type Gebinde,
+} from '@/lib/futter-registrierung'
+import {
+  futterDaten,
+  ladeHofRegistrierung,
+  revalidiereProdukte,
+  type GepruefteKennzeichnung,
+} from '@/server/produkte-schreiben'
 import { formatZahl } from '@/lib/format'
 import { bestandVorherSchema, vorratSetzenSchema } from '@/schemas/vorrat'
 import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
@@ -31,29 +42,23 @@ async function getAuthenticatedFarm() {
   return farm
 }
 
+/** Alles neu laden, was Produkte dieses Hofs zeigt (src/server/produkte-schreiben.ts). */
 function revalidate(farmSlug: string) {
-  revalidatePath('/products')
-  revalidatePath(`/${farmSlug}`)
-  revalidatePath('/farm-page')
-  // Heute nennt in der Teilen-Karte Produkte mit Bestand (getHeute) — nach
-  // Vorrat oder Sichtbarkeit sonst ein veralteter Satz.
-  revalidatePath('/dashboard')
-  // Die Hofübersicht hängt an einem eigenen Fünf-Minuten-Cache, den kein
-  // revalidatePath erreicht (src/app/(public)/hoefe/page.tsx). Ohne diese Zeile
-  // stand ein ausgeblendetes, umbenanntes oder ausverkauftes Produkt dort bis
-  // zu fünf Minuten weiter — bei einem Schalter, der sofort wirken soll, ist
-  // das keine Verzögerung, sondern ein falsches Versprechen.
-  //
-  // updateTag, NICHT revalidateTag: In Next 16 verlangt revalidateTag ein
-  // zweites Argument und warnt ohne es; updateTag gilt für Server Actions, gibt
-  // „lies deine eigene Schreibung" und braucht kein Profil. Es WIRFT außerhalb
-  // einer Server Action — dieser Helfer wird ausschließlich von den Aktionen
-  // dieser Datei gerufen, nie aus einer Route.
-  updateTag(HOEFE_CACHE_TAG)
+  revalidiereProdukte(farmSlug)
 }
 
-/** GEAENDERT: Der Vorrat hat sich seit dem Öffnen geändert — `vorrat` ist der aktuelle Stand. */
-export type ProduktErgebnis = { ok: true } | { error: string; code?: 'GEAENDERT'; vorrat?: number }
+/**
+ * GEAENDERT: Der Vorrat hat sich seit dem Öffnen geändert — `vorrat` ist der
+ * aktuelle Stand. GESPERRT: Diese Größe darf ohne die nötige Futtermittel-
+ * Registrierung nicht in den Shop (S7) — `error` nennt den Grund.
+ * BESTAETIGUNG: Angaben eines Futtermittels geändert, aber nicht neu bestätigt
+ * (E10a) — der Dialog öffnet den Haken.
+ * `hinweis` nach dem Speichern: gespeichert, aber als Entwurf, weil gesperrt.
+ */
+export type ProduktErgebnis =
+  | { ok: true; hinweis?: string }
+  | { error: string; code?: 'GEAENDERT' | 'GESPERRT' | 'BESTAETIGUNG'; vorrat?: number }
+
 
 /**
  * Die Produktspalten aus dem geprüften Formular — für create und update
@@ -86,38 +91,6 @@ function produktDaten(v: ProductFormData) {
   }
 }
 
-/** Eine Kennzeichnung, die das Schema durchgelassen hat — dort ist die Futtermittelart gesetzt. */
-type GepruefteKennzeichnung = FutterKennzeichnungFormData & {
-  futtermittelart: NonNullable<FutterKennzeichnungFormData['futtermittelart']>
-}
-
-/**
- * Die Kennzeichnungsspalten. Der Haken „entspricht dem Sackanhänger" wird
- * bei JEDEM Speichern neu gesetzt (bestaetigtAm = jetzt): Wer die Kennzeichnung
- * ändert, bestätigt sie neu — das Formular verlangt den Haken ohnehin.
- *
- * registrierungsnummer wird bewusst NICHT geschrieben (Rückfrage F6): Die
- * Nummer gehört dem Hof. Beim Update bleibt ein Altbestand so unangetastet —
- * er dient nur noch als Rückfall zum Lesen.
- */
-function futterDaten(f: GepruefteKennzeichnung, jetzt: Date) {
-  return {
-    futtermittelart: f.futtermittelart,
-    zielTierarten: f.zielTierarten,
-    zusammensetzung: f.zusammensetzung,
-    analytischeBestandteile: f.analytischeBestandteile,
-    nettoMenge: f.nettoMenge,
-    nettoEinheit: f.nettoEinheit,
-    rohprotein: f.rohprotein,
-    rohfaser: f.rohfaser,
-    rohfett: f.rohfett,
-    rohasche: f.rohasche,
-    zusatzstoffe: f.zusatzstoffe || null,
-    gebrauchshinweis: f.gebrauchshinweis || null,
-    bestaetigtAm: jetzt,
-  }
-}
-
 /**
  * Das Schema hat schon entschieden: futter gibt es genau dann, wenn der
  * Bereich Futtermittel ist, und dann mit einer passenden Futtermittelart.
@@ -135,16 +108,17 @@ export async function createProduct(data: ProductFormData): Promise<ProduktErgeb
   const geprueft = productAnlegenSchema.safeParse(data)
   if (!geprueft.success) return { error: 'Bitte prüfe deine Eingaben.' }
   const v = geprueft.data
+  // Neue Futtermittel nur über das Futter-Formular — nur dort entsteht die
+  // Verpackung je Größe, an der die Sperre je Gebinde hängt (S7).
+  if (istFuttermittel(v.category)) return { error: FUTTER_NUR_UEBER_FORMULAR }
   // Produktbild nur aus unserem Speicher und dem Ordner dieses Hofes (Nr. 19b).
   if (!(await bildUrlErlaubt(v.imageUrl, farm.id))) return { error: BILD_NICHT_UEBERNOMMEN }
-  const futter = futterAus(v)
 
   await prisma.product.create({
     data: {
       farmId: farm.id,
       ...produktDaten(v),
       stock: v.stock,
-      ...(futter ? { futter: { create: futterDaten(futter, new Date()) } } : {}),
     },
   })
 
@@ -192,11 +166,53 @@ export async function updateProduct(
   if (!bildErlaubt) return { error: BILD_NICHT_UEBERNOMMEN }
   const futter = futterAus(v)
   const vorratSetzen = bestandVorher !== undefined && v.stock !== bestandVorher
+  // Futter (S7, Nachbesserung Nr. 20): Gespeichert wird als Futtermittel nur,
+  // was in der Datenbank schon eines ist. Ein Wechsel von Nicht-Futter auf
+  // Futter hätte keine Verpackung und käme an der Sperre je Gebinde vorbei —
+  // neue Futtermittel nur über das Futter-Formular. Auch ausgeblendet nicht,
+  // sonst schaltete „Sichtbar" es danach ohne Sperre ein. Gelesen wird mit dem
+  // Hof in der WHERE-Klausel; ein fremdes Produkt ist „nicht gefunden".
+  let sperre: string | null = null
+  const jetzt = new Date()
+  // Ob die Kennzeichnung mit diesem Speichern neu bestätigt wird (E10a).
+  // Nur dann gilt bestaetigtAm = jetzt; sonst bleibt der alte Zeitpunkt.
+  let neuBestaetigt = false
+  if (istFuttermittel(v.category)) {
+    const bisher = await prisma.product.findFirst({
+      where: { id: productId, farmId: farm.id },
+      include: { futter: true },
+    })
+    if (!bisher) return { error: 'Produkt nicht gefunden.' }
+    if (!istFuttermittel(bisher.category)) return { error: FUTTER_NUR_UEBER_FORMULAR }
+    // Pflicht-Bestätigung (E10a, Nr. 23): Jede inhaltliche Änderung verlangt
+    // den Haken neu; nur Preis, Vorrat, Sichtbarkeit und Foto nicht
+    // (OHNE_NEUE_BESTAETIGUNG). Verglichen wird, was dieses Speichern schreiben
+    // würde, mit genau diesen Spalten aus der Datenbank — ein neues Feld in
+    // produktDaten zählt damit von selbst mit.
+    if (futter) {
+      const neuProdukt: Record<string, unknown> = produktDaten(v)
+      const neuKennzeichnung: Record<string, unknown> = futterDaten(futter, jetzt)
+      const noetig = brauchtNeueBestaetigung(
+        {
+          produkt: spaltenAus(bisher, Object.keys(neuProdukt)),
+          kennzeichnung: bisher.futter ? spaltenAus(bisher.futter, Object.keys(neuKennzeichnung)) : null,
+        },
+        { produkt: neuProdukt, kennzeichnung: neuKennzeichnung }
+      )
+      if (noetig && !futter.bestaetigt) return { error: FUTTER_BESTAETIGUNG_NEU, code: 'BESTAETIGUNG' }
+      neuBestaetigt = futter.bestaetigt
+    }
+    // Sperre je Gebinde: Soll das Futtermittel in den Shop, entscheidet die
+    // Verpackung aus der Datenbank mit dem Stand des Hofs von JETZT. Gesperrt
+    // wird trotzdem gespeichert — nur als Entwurf.
+    if (v.isAvailable) sperre = await sperreFuer(farm.id, { category: v.category, verpackung: bisher.verpackung })
+  }
+  const daten = sperre ? { ...produktDaten(v), isAvailable: false } : produktDaten(v)
 
   const ergebnis = await prisma.$transaction(async (tx) => {
     const { count } = await tx.product.updateMany({
       where: vorratSetzen ? { id: productId, farmId: farm.id, stock: bestandVorher } : { id: productId, farmId: farm.id },
-      data: vorratSetzen ? { ...produktDaten(v), stock: v.stock } : produktDaten(v),
+      data: vorratSetzen ? { ...daten, stock: v.stock } : daten,
     })
     if (count === 0) {
       if (!vorratSetzen) return 'nicht-gefunden' as const
@@ -207,11 +223,15 @@ export async function updateProduct(
     }
 
     if (futter) {
-      const daten = futterDaten(futter, new Date())
+      const daten = futterDaten(futter, jetzt)
+      // Nicht neu bestätigt (nur Preis/Vorrat geändert): Die Angaben sind
+      // dieselben, der alte Zeitpunkt der Bestätigung bleibt. Angelegt wird
+      // ohne gespeicherte Kennzeichnung nie ohne Haken (siehe oben).
+      const { bestaetigtAm, ...ohneZeitpunkt } = daten
       await tx.futterKennzeichnung.upsert({
         where: { productId },
         create: { productId, ...daten },
-        update: daten,
+        update: neuBestaetigt ? { ...ohneZeitpunkt, bestaetigtAm } : ohneZeitpunkt,
       })
     } else {
       // deleteMany statt delete: wirft nicht, wenn es nie eine Kennzeichnung gab.
@@ -224,7 +244,24 @@ export async function updateProduct(
   if (typeof ergebnis === 'object') return { error: vorratGeaendertText(ergebnis.geaendert), code: 'GEAENDERT', vorrat: ergebnis.geaendert }
 
   revalidate(farm.slug)
-  return { ok: true }
+  return sperre ? { ok: true, hinweis: `Gespeichert, aber nicht im Shop. ${sperre}.` } : { ok: true }
+}
+
+/** Genau diese Spalten aus einer gelesenen Zeile — als Vergleichsstand für brauchtNeueBestaetigung. */
+function spaltenAus(zeile: object, spalten: readonly string[]): Record<string, unknown> {
+  const werte = zeile as Record<string, unknown>
+  return Object.fromEntries(spalten.map((s) => [s, werte[s]]))
+}
+
+/**
+ * Der Sperrgrund einer Größe, wenn sie in den Shop soll — null, wenn sie darf.
+ * Den Hof fragt nur, wer überhaupt eine Registrierung braucht. Ohne
+ * Verpackung ist es Altbestand (schon vor Nr. 20 Futter), den die Regel
+ * nicht sperrt (src/lib/futter-registrierung.ts).
+ */
+async function sperreFuer(farmId: string, gebinde: Gebinde): Promise<string | null> {
+  if (noetigeRegistrierung(gebinde) === null) return null
+  return gebindeSperre(gebinde, await ladeHofRegistrierung(farmId))?.grund ?? null
 }
 
 /**
@@ -291,6 +328,21 @@ export async function produktSichtbarkeitSetzen(input: unknown): Promise<Produkt
   if (!session?.user) return { error: 'Bitte melde dich neu an.' }
   const farm = await getFarmForUser(session.user.id)
   if (!farm) return { error: 'Kein Hof gefunden.' }
+
+  // Einschalten prüft die Sperre je Gebinde (S7): Ein Futtermittel, dessen
+  // Verpackung eine Registrierung verlangt, die der Hof nicht eingetragen hat,
+  // bleibt Entwurf. Ausschalten geht immer.
+  if (imShop) {
+    const produkt = await prisma.product.findFirst({
+      where: { id: productId, farmId: farm.id },
+      select: { category: true, verpackung: true },
+    })
+    if (!produkt) return { error: 'Produkt nicht gefunden.' }
+    if (noetigeRegistrierung(produkt) !== null) {
+      const sperre = gebindeSperre(produkt, await ladeHofRegistrierung(farm.id))
+      if (sperre) return { error: `${sperre.grund}.`, code: 'GESPERRT' }
+    }
+  }
 
   const { count } = await prisma.product.updateMany({
     where: { id: productId, farmId: farm.id },

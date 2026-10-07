@@ -39,6 +39,7 @@ export default async function ProductsPage(): Promise<React.JSX.Element> {
       <ProdukteAnsicht
         products={seite.products}
         hofBetriebsnummer={seite.hofBetriebsnummer}
+        registrierung={seite.registrierung}
         hof={{ name: farm.name, slug: farm.slug, sichtbar: seite.hofSichtbar }}
         naechstesFenster={seite.naechstesFenster}
       />
