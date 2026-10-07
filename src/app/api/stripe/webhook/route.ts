@@ -6,8 +6,16 @@ import { stripe } from '@/lib/stripe'
 import { env } from '@/lib/env'
 import { prisma } from '@/lib/prisma'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
-import { sendOrderConfirmation, sendOrderPaidToFarmer, sendZahlungZuSpaet } from '@/lib/email'
+import { sendErstattungOffen, sendOrderConfirmation, sendOrderPaidToFarmer, sendZahlungZuSpaet } from '@/lib/email'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
+import {
+  MELDE_VERMERK_TYP,
+  meldeVermerk,
+  nimmGescheiterteErstattungZurueck,
+  type GescheitertAusgang,
+} from '@/server/erstattung-gescheitert'
+import { formatEuro } from '@/lib/format'
+import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { stripeKontoBereit } from '@/lib/stripe-konto'
 
 // Next.js App Router does not pre-parse the body — raw text needed for Stripe sig verification
@@ -71,6 +79,10 @@ export async function POST(request: NextRequest) {
     } else if (event.type === 'account.updated') {
       // Auch über den Plattform-Endpunkt möglich (abonniert); dieselbe Regel.
       await handleKontoAktualisiert(event.data.object as Stripe.Account)
+    } else if (event.type === 'refund.failed' || event.type === 'charge.refund.updated') {
+      // Beide Ereignisse können für DIESELBE Erstattung kommen — die
+      // Zurücknahme ist je Erstattung idempotent (src/server/erstattung-gescheitert.ts).
+      await handleErstattungGescheitert(event.data.object as Stripe.Refund, event.type)
     }
   } catch (err) {
     // 500 → Stripe retried das Event; es wurde noch nicht persistiert und gilt als unverarbeitet
@@ -270,6 +282,110 @@ async function erstatteSpaeteZahlung(
   nachDerAntwort(async () => {
     await mailOhneRisiko('zahlung_zu_spaet', order.id, () => sendZahlungZuSpaet(order, erstattetCents))
   })
+}
+
+/**
+ * Eine Erstattung ist nach dem Buchen gescheitert (Nr. 19c): zurücknehmen,
+ * was nachweislich unsere Buchung ist, und den Betreiber benachrichtigen
+ * (Sentry + Mail) — einmal je Erstattung, auch wenn beide Ereignisse kommen.
+ * Die Kundin bekommt keine Mail: Der Betreiber klärt die Erstattung erst.
+ */
+async function handleErstattungGescheitert(refund: Stripe.Refund, typ: 'refund.failed' | 'charge.refund.updated') {
+  const ausgang = await nimmGescheiterteErstattungZurueck(refund)
+  if (ausgang.art === 'nicht_gescheitert') return
+  // Genau eine Meldung je Erstattung, über einen Vermerk in der
+  // Idempotenz-Tabelle der Ereignisse. Die Zurücknahme gelingt nur einmal und
+  // legt den Vermerk in ihrer eigenen Transaktion an — sie meldet immer.
+  // Alles andere meldet nur, wer den Vermerk als Erster anlegt; „schon
+  // erledigt" nach einer Zurücknahme findet ihn also immer und bleibt still.
+  // Ohne Vermerk meldet sich „schon erledigt" einmal: Die Datenbank zählt die
+  // Erstattung nicht (mehr), das Geld steht trotzdem aus.
+  if (ausgang.art !== 'zurueckgenommen' && !(await ersteMeldung(refund.id))) return
+
+  const meldung = gescheitertMeldung(ausgang, refund)
+  const orderId = ausgang.bestellung?.id ?? null
+  // Nur Kennungen und Beträge — keine Daten der Kundin.
+  Sentry.captureMessage(meldung.titel, {
+    level: 'error',
+    tags: { webhook: typ, grund: meldung.grund },
+    extra: {
+      orderId,
+      refundId: refund.id,
+      betragCents: refund.amount,
+      failureReason: refund.failure_reason ?? null,
+      ...(ausgang.art === 'zurueckgenommen'
+        ? { anlass: ausgang.anlass, erstattetCentsVorher: ausgang.vorherCents, erstattetCentsNachher: ausgang.nachherCents, zahlungWiederOffen: ausgang.zahlungWiederOffen }
+        : {}),
+      ...(ausgang.art === 'unklar' ? { unklarGrund: ausgang.grund } : {}),
+      handerstattung: meldung.handanweisung,
+    },
+  })
+  nachDerAntwort(async () => {
+    await mailOhneRisiko('erstattung_offen', orderId ?? refund.id, () =>
+      sendErstattungOffen({
+        was: meldung.was,
+        bestellId: orderId,
+        bestellnummer: ausgang.bestellung?.orderNumber ?? null,
+        hofName: ausgang.bestellung?.hofName ?? null,
+        betraege: [{ label: 'Gescheiterte Erstattung', cents: refund.amount }],
+        handanweisung: meldung.handanweisung,
+        stripeKennung: refund.id,
+      })
+    )
+  })
+}
+
+/** Vermerkt, dass diese gescheiterte Erstattung gemeldet ist — false, wenn schon geschehen. */
+async function ersteMeldung(refundId: string): Promise<boolean> {
+  try {
+    await prisma.webhookEvent.create({
+      data: { stripeEventId: meldeVermerk(refundId), type: MELDE_VERMERK_TYP },
+    })
+    return true
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') return false
+    throw err
+  }
+}
+
+function gescheitertMeldung(
+  ausgang: Exclude<GescheitertAusgang, { art: 'nicht_gescheitert' }>,
+  refund: Stripe.Refund
+): { titel: string; grund: string; was: string; handanweisung: string } {
+  const betrag = formatEuro(centsAlsEuro(refund.amount))
+  if (ausgang.art === 'schon_erledigt') {
+    return {
+      titel: 'Erstattung gescheitert — in der Datenbank nicht (mehr) gezählt',
+      grund: 'erstattung_gescheitert_nicht_gezaehlt',
+      was: `Stripe meldet eine Erstattung über ${betrag} an die Kundin als gescheitert. Die App zählt sie nicht oder nicht mehr als erstattet – das Geld steht noch aus.`,
+      handanweisung:
+        'In Stripe prüfen, ob der Kundin der Betrag inzwischen auf anderem Weg erstattet wurde; sonst erneut erstatten – über Stripe ohne reverse_transfer und ohne refund_application_fee – und sie informieren.',
+    }
+  }
+  if (ausgang.art === 'zurueckgenommen') {
+    return {
+      titel: 'Erstattung gescheitert — in der Datenbank zurückgenommen',
+      grund: 'erstattung_gescheitert_zurueckgenommen',
+      was: `Stripe meldet eine Erstattung über ${betrag} an die Kundin als gescheitert. Wir haben sie in der App zurückgenommen – das Geld steht noch aus.`,
+      handanweisung:
+        'Der Kundin den Betrag erneut erstatten – über Stripe ohne reverse_transfer und ohne refund_application_fee (die Rückbuchung vom Hof ist davon nicht betroffen) – und sie informieren. Die App zählt ihn nicht mehr als erstattet.',
+    }
+  }
+  if (ausgang.art === 'unklar') {
+    return {
+      titel: 'Erstattung gescheitert — Stand unklar, nichts geändert',
+      grund: 'erstattung_gescheitert_unklar',
+      was: `Stripe meldet eine Erstattung über ${betrag} dieser Bestellung als gescheitert, aber Stripe und App passen nicht zusammen. In der App wurde nichts geändert.`,
+      handanweisung: 'In Stripe prüfen, was zu dieser Zahlung wirklich erstattet ist, der Kundin den offenen Betrag von Hand erstatten und den Stand der Bestellung klären.',
+    }
+  }
+  return {
+    titel: 'Erstattung gescheitert — keiner Buchung der App zuzuordnen',
+    grund: 'erstattung_gescheitert_fremd',
+    was: `Stripe meldet eine Erstattung über ${betrag} als gescheitert, die die App keiner ihrer Teil- oder Rest-Erstattungen zuordnen kann (z. B. Vollstorno oder von Hand). In der App wurde nichts geändert.`,
+    handanweisung:
+      'In Stripe prüfen und der Kundin den Betrag von Hand erstatten. Ein Vollstorno steht in der App weiter als erstattet.',
+  }
 }
 
 function verschickeBezahltMails(order: Prisma.OrderGetPayload<{ include: typeof BESTELLUNG_FUER_MAIL }>) {

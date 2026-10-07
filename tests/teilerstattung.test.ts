@@ -34,7 +34,7 @@ import {
   ordneZu,
 } from '@/server/teilerstattung'
 import { TRANSAKTION_MS, VERBINDUNG_WARTEN_MS } from '@/server/artikel-fehlt'
-import { restNachTeilerstattung } from '@/lib/storno'
+import { restNachTeilerstattung, zuruecknahmeNachGescheiterterErstattung } from '@/lib/storno'
 
 const ERSTATTUNG = { paymentIntentId: 'pi_1', orderId: 'order_1', anlass: 'reststorno' as const, positionId: null, betragCents: 500, schluessel: 'storno-order_1' }
 
@@ -155,25 +155,104 @@ describe('im Zweifel nicht buchen', () => {
 })
 
 describe('restNachTeilerstattung — aus dem, was Stripe gebucht hat', () => {
-  // Eier € 4,50 + Brot € 5,80, Gebühr € 0,52 → bezahlt € 10,82
+  // Eier € 4,50 + Brot € 5,80, Gebühr € 0,52 → bezahlt € 10,82. Nach „Brot
+  // fehlt" steht in der Datenbank Warenpreis 450 + Gebühr 50 + erstattet 582.
+  const NACH_BROT = { bezahltStripeCents: 1082, bezahltDatenbankCents: 450 + 50 + 582, warenOriginalCents: 1030 }
+
   it('nach „Brot fehlt" (582 erstattet, 580 zurückgebucht): Kundin 500, Hof 450', () => {
-    expect(restNachTeilerstattung({ bezahltCents: 1082, warenOriginalCents: 1030, provisionCents: 0, teilErstattetCents: 582, teilZurueckgebuchtCents: 580 })).toEqual({
+    expect(restNachTeilerstattung({ ...NACH_BROT, provisionCents: 0, teilErstattetCents: 582, teilZurueckgebuchtCents: 580 })).toEqual({
       erstattungCents: 500,
       vomHofCents: 450,
     })
   })
 
   it('Rückbuchung damals gescheitert: der Rest holt sie nach (Hof gibt insgesamt genau den Warenpreis)', () => {
-    expect(restNachTeilerstattung({ bezahltCents: 1082, warenOriginalCents: 1030, provisionCents: 0, teilErstattetCents: 582, teilZurueckgebuchtCents: 0 })).toEqual({
+    expect(restNachTeilerstattung({ ...NACH_BROT, provisionCents: 0, teilErstattetCents: 582, teilZurueckgebuchtCents: 0 })).toEqual({
       erstattungCents: 500,
       vomHofCents: 1030,
     })
   })
 
-  it('nie negativ', () => {
-    expect(restNachTeilerstattung({ bezahltCents: 500, warenOriginalCents: 100, provisionCents: 0, teilErstattetCents: 600, teilZurueckgebuchtCents: 200 })).toEqual({
-      erstattungCents: 0,
-      vomHofCents: 0,
+  it('mit Provision (€ 1,00): der Hof gibt insgesamt Warenpreis − Provision zurück, die Kundin bekommt alles, was sie zahlte', () => {
+    const rest = restNachTeilerstattung({ ...NACH_BROT, provisionCents: 100, teilErstattetCents: 582, teilZurueckgebuchtCents: 580 })
+
+    expect(rest).toEqual({ erstattungCents: 500, vomHofCents: 350 })
+    // Teilstorno + Rest = Vollstorno am Anfang: Kundin 1082, Hof 1030 − 100.
+    expect(582 + rest!.erstattungCents).toBe(1082)
+    expect(580 + rest!.vomHofCents).toBe(1030 - 100)
+  })
+
+  it('mit Provision, Rückbuchung damals gescheitert: der Hof gibt Warenpreis − Provision, nicht mehr', () => {
+    expect(restNachTeilerstattung({ ...NACH_BROT, provisionCents: 100, teilErstattetCents: 582, teilZurueckgebuchtCents: 0 })).toEqual({
+      erstattungCents: 500,
+      vomHofCents: 930,
     })
+  })
+
+  it('bezahlt laut Stripe weicht von der Datenbank ab: kein Rest (nichts buchen)', () => {
+    // Ein Nachtrag mit abweichendem Betrag oder eine zurückgenommene Erstattung:
+    // Die Kundin bekäme still zu wenig oder zu viel.
+    expect(restNachTeilerstattung({ ...NACH_BROT, bezahltDatenbankCents: 1080, provisionCents: 0, teilErstattetCents: 582, teilZurueckgebuchtCents: 580 })).toBeNull()
+    expect(restNachTeilerstattung({ ...NACH_BROT, bezahltStripeCents: 1100, provisionCents: 0, teilErstattetCents: 582, teilZurueckgebuchtCents: 580 })).toBeNull()
+  })
+
+  it('Stripe nennt keinen bezahlten Betrag: kein Rest', () => {
+    expect(restNachTeilerstattung({ ...NACH_BROT, bezahltStripeCents: null, provisionCents: 0, teilErstattetCents: 582, teilZurueckgebuchtCents: 580 })).toBeNull()
+  })
+
+  it('nie negativ', () => {
+    expect(
+      restNachTeilerstattung({ bezahltStripeCents: 500, bezahltDatenbankCents: 500, warenOriginalCents: 100, provisionCents: 0, teilErstattetCents: 600, teilZurueckgebuchtCents: 200 })
+    ).toEqual({ erstattungCents: 0, vomHofCents: 0 })
+  })
+})
+
+describe('ladeStripeStand — bezahlter Betrag', () => {
+  it('kommt aus der Zahlung (latest_charge.amount), nie aus der Datenbank', async () => {
+    vi.mocked(stripe.paymentIntents.retrieve).mockResolvedValue({ latest_charge: { transfer: 'tr_1', amount: 1082 } } as never)
+    expect((await ladeStripeStand('pi_1', 'order_1')).bezahltCents).toBe(1082)
+  })
+
+  it('Zahlung ohne Überweisung: unklar (nichts buchen, melden), kein einfacher Fehler', async () => {
+    vi.mocked(stripe.paymentIntents.retrieve).mockResolvedValue({ latest_charge: { transfer: null, amount: 1082 } } as never)
+    await expect(ladeStripeStand('pi_1', 'order_1')).rejects.toMatchObject({ grund: 'ohne_ueberweisung' })
+  })
+
+  it('die als gescheitert gemeldete Erstattung zählt nie mit, auch wenn die Liste sie noch als pending führt', async () => {
+    vi.mocked(stripe.refunds.list).mockResolvedValue({
+      has_more: false,
+      data: [
+        { id: 're_a', amount: 582, status: 'pending', metadata: { orderId: 'order_1', anlass: 'teilstorno', positionId: 'p1' } },
+        { id: 're_b', amount: 500, status: 'succeeded', metadata: { orderId: 'order_1', anlass: 'reststorno' } },
+      ],
+    } as never)
+    expect((await ladeStripeStand('pi_1', 'order_1', { gescheitert: 're_a' })).erstattungen).toEqual([{ anlass: 'reststorno', positionId: null, betrag: 500 }])
+    expect((await ladeStripeStand('pi_1', 'order_1')).erstattungen).toHaveLength(2)
+  })
+
+  it('ohne Betrag an der Zahlung: unbekannt (null), nicht 0', async () => {
+    expect((await ladeStripeStand('pi_1', 'order_1')).bezahltCents).toBeNull()
+  })
+})
+
+describe('zuruecknahmeNachGescheiterterErstattung — gescheiterte Erstattung genau einmal zurücknehmen', () => {
+  it('die Datenbank zählt die gescheiterte noch mit: auf Stripes Summe zurück', () => {
+    expect(zuruecknahmeNachGescheiterterErstattung({ erstattetCentsDatenbank: 1082, erstattetCentsStripe: 500, gescheitertCents: 582 })).toEqual({
+      art: 'zuruecknehmen',
+      erstattetCentsNeu: 500,
+    })
+  })
+
+  it('schon zurückgenommen (zweite Zustellung, zweites Ereignis derselben Erstattung): nichts mehr', () => {
+    expect(zuruecknahmeNachGescheiterterErstattung({ erstattetCentsDatenbank: 500, erstattetCentsStripe: 500, gescheitertCents: 582 })).toEqual({ art: 'schon_erledigt' })
+  })
+
+  it('passt weder das eine noch das andere: unklar, nichts ändern', () => {
+    expect(zuruecknahmeNachGescheiterterErstattung({ erstattetCentsDatenbank: 900, erstattetCentsStripe: 500, gescheitertCents: 582 })).toEqual({ art: 'unklar' })
+    expect(zuruecknahmeNachGescheiterterErstattung({ erstattetCentsDatenbank: 0, erstattetCentsStripe: 500, gescheitertCents: 582 })).toEqual({ art: 'unklar' })
+  })
+
+  it('ein Betrag von 0 oder weniger ist nie zurückzunehmen', () => {
+    expect(zuruecknahmeNachGescheiterterErstattung({ erstattetCentsDatenbank: 500, erstattetCentsStripe: 500, gescheitertCents: 0 })).toEqual({ art: 'unklar' })
   })
 })

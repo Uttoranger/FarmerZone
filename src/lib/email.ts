@@ -20,10 +20,11 @@ import { NewFarmNotificationEmail } from '@/emails/new-farm-notification'
 import { FreischaltungEmail } from '@/emails/freischaltung'
 import { MeldungNotificationEmail } from '@/emails/meldung-notification'
 import { BriefkastenZusammenfassungEmail } from '@/emails/briefkasten-zusammenfassung'
+import { ErstattungOffenEmail } from '@/emails/erstattung-offen'
 import { SUPPORT_EMAIL } from '@/lib/support'
 import { StatusUpdateEmail } from '@/emails/status-update'
 import { generateReorderToken } from '@/lib/reorder-token'
-import { formatPosition } from '@/lib/format'
+import { formatEuro, formatPosition } from '@/lib/format'
 import { barBestaetigungsPfad, bestellungPfad } from '@/lib/bestell-link'
 import type { OrderLineProduct } from '@/lib/order-line'
 import { bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
@@ -328,6 +329,41 @@ export async function sendBriefkastenZusammenfassung(z: {
     `Briefkasten: ${z.neu} neu, ${z.liegenGeblieben} liegen länger als 14 Tage`,
     html
   )
+}
+
+/** Was der Betreiber über offenes Geld erfährt — ohne Daten der Kundin. */
+export type ErstattungOffenMeldung = {
+  /** Was passiert ist — ein Satz. */
+  was: string
+  bestellId: string | null
+  bestellnummer: string | null
+  hofName: string | null
+  betraege: Array<{ label: string; cents: number }>
+  /** Was von Hand zu tun ist — dieselbe Anweisung wie an Sentry. */
+  handanweisung: string
+  /** Kennung der Erstattung bei Stripe (re_…), falls bekannt. */
+  stripeKennung: string | null
+}
+
+/**
+ * Erstattung offen → Betreiber (Nr. 19c): ein Storno, dessen Erstattung
+ * scheiterte, oder eine Erstattung, die Stripe später als gescheitert meldet.
+ * Erstatten kann nur das Plattformkonto; der Hof bekommt nur „Wir kümmern uns
+ * um die Erstattung und melden uns."
+ */
+export async function sendErstattungOffen(m: ErstattungOffenMeldung): Promise<void> {
+  const html = await toHtml(
+    React.createElement(ErstattungOffenEmail, {
+      was: m.was,
+      bestellnummer: m.bestellnummer,
+      bestellId: m.bestellId,
+      hofName: m.hofName,
+      betraege: m.betraege.map((b) => ({ label: b.label, wert: formatEuro(centsAlsEuro(b.cents)) })),
+      handanweisung: m.handanweisung,
+      stripeKennung: m.stripeKennung,
+    })
+  )
+  await send(SUPPORT_EMAIL, `Erstattung offen – Bestellung ${m.bestellnummer ?? m.stripeKennung ?? 'unbekannt'}`, html)
 }
 
 /**

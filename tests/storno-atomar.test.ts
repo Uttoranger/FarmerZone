@@ -30,6 +30,7 @@ vi.mock('@/lib/email', () => ({
   sendOrderReady: vi.fn(),
   sendOrderCancelled: vi.fn(),
   sendOrderNotReady: vi.fn(),
+  sendErstattungOffen: vi.fn(),
 }))
 vi.mock('@/lib/prisma', () => {
   const order = { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() }
@@ -60,7 +61,7 @@ import {
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
-import { sendOrderCancelled } from '@/lib/email'
+import { sendErstattungOffen, sendOrderCancelled } from '@/lib/email'
 import * as Sentry from '@sentry/nextjs'
 
 const getSession = vi.mocked(auth.api.getSession)
@@ -312,7 +313,7 @@ describe('cancelOrder — Erstattung erst nach der Sperre', () => {
     const result = await cancelOrder('order_1')
 
     expect(result.error).toBe(
-      'Rückerstattung fehlgeschlagen. Bitte manuell über das Stripe Dashboard erstatten.'
+      'Rückerstattung fehlgeschlagen. Wir kümmern uns um die Erstattung und melden uns.'
     )
     expect(satz.status).toBe('CANCELLED')
     expect(rueckbuchungen()).toBe(2)
@@ -328,6 +329,13 @@ describe('cancelOrder — Erstattung erst nach der Sperre', () => {
     expect(kontext.extra).toEqual(expect.objectContaining({ orderId: 'order_1' }))
     // Keine Kundendaten an Sentry (CLAUDE.md, Sicherheit).
     expect(JSON.stringify(kontext)).not.toContain('anna@example.com')
+    // Der Betreiber bekommt eine Meldung — der Hof hat keinen Zugang zum
+    // Plattformkonto (Nr. 19c). Ohne Daten der Kundin.
+    await vi.waitFor(() => expect(sendErstattungOffen).toHaveBeenCalledTimes(1))
+    const meldung = vi.mocked(sendErstattungOffen).mock.calls[0]![0]
+    expect(meldung).toMatchObject({ bestellId: 'order_1', bestellnummer: 'TH-1' })
+    expect(JSON.stringify(meldung)).not.toContain('anna@example.com')
+    expect(JSON.stringify(meldung)).not.toContain('Anna')
   })
 
   it('Geld erstattet, nur der REFUNDED-Vermerk scheitert: Erfolg an den Hof, Mail MIT Betrag, Sentry meldet den Vermerk', async () => {

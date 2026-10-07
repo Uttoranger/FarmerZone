@@ -67,11 +67,20 @@ export type Buchung = { anlass: Anlass; positionId: string | null; betrag: numbe
 /** Was Stripe zu dieser Bestellung schon gebucht hat. */
 export type StripeStand = {
   ueberweisung: string
+  /** Was die Kundin laut Stripe bezahlt hat (`latest_charge.amount`); null = Stripe nennt keinen Betrag. */
+  bezahltCents: number | null
   erstattungen: Buchung[]
   rueckbuchungen: Buchung[]
 }
 
-export type UnklarGrund = 'mehr_als_eine_seite' | 'ohne_zuordnung' | 'nachtrag_unklar' | 'zu_viele_nachtraege' | 'erstattung_gescheitert'
+export type UnklarGrund =
+  | 'mehr_als_eine_seite'
+  | 'ohne_zuordnung'
+  | 'nachtrag_unklar'
+  | 'zu_viele_nachtraege'
+  | 'erstattung_gescheitert'
+  | 'bezahlt_abweichend'
+  | 'ohne_ueberweisung'
 
 /** Das Bild bei Stripe ist nicht eindeutig — nichts buchen, von Hand prüfen. */
 export class StripeStandUnklar extends Error {
@@ -112,12 +121,29 @@ export function ordneZu(orderId: string, metadata: Stripe.Metadata | null | unde
  * irgendetwas gebucht wird. Wirft `StripeStandUnklar`, wenn eine Liste mehr
  * als eine Seite hat oder eine Buchung keiner Position zuzuordnen ist.
  */
-export async function ladeStripeStand(paymentIntentId: string, orderId: string): Promise<StripeStand> {
+export async function ladeStripeStand(
+  paymentIntentId: string,
+  orderId: string,
+  optionen: {
+    /**
+     * Diese Erstattung zählt nie mit, egal welchen Status die Liste zeigt —
+     * für den Webhook, dessen Ereignis sie verbindlich als gescheitert meldet,
+     * während `refunds.list` sie womöglich noch als `pending` führt.
+     */
+    gescheitert?: string
+  } = {}
+): Promise<StripeStand> {
   const intent = await stripe.paymentIntents.retrieve(paymentIntentId, { expand: ['latest_charge'] }, STRIPE_OPTIONEN)
-  const zahlung = intent.latest_charge
-  const transfer = zahlung && typeof zahlung !== 'string' ? (zahlung as Stripe.Charge).transfer : null
+  const zahlung = intent.latest_charge && typeof intent.latest_charge !== 'string' ? (intent.latest_charge as Stripe.Charge) : null
+  const transfer = zahlung?.transfer ?? null
   const ueberweisung = typeof transfer === 'string' ? transfer : transfer?.id
-  if (!ueberweisung) throw new Error('Zahlung ohne Überweisung an den Hof')
+  // Ohne Überweisung ist es keine Zahlung, wie der Checkout sie anlegt — nicht
+  // raten, nichts buchen, melden (statt eines Fehlers, den der Webhook mit 500
+  // beantwortete und Stripe drei Tage lang stumm erneut zustellte).
+  if (!ueberweisung) throw new StripeStandUnklar('ohne_ueberweisung', { orderId })
+  // Der bezahlte Betrag für den Rest-Storno — aus Stripe, nie aus der
+  // Datenbank (restNachTeilerstattung). Fehlt er, ist er unbekannt, nicht 0.
+  const bezahltCents = typeof zahlung?.amount === 'number' ? zahlung.amount : null
 
   const [erstattungen, rueckbuchungen] = await Promise.all([
     stripe.refunds.list({ payment_intent: paymentIntentId, limit: SEITE }, STRIPE_OPTIONEN),
@@ -125,10 +151,10 @@ export async function ladeStripeStand(paymentIntentId: string, orderId: string):
   ])
   if (erstattungen.has_more || rueckbuchungen.has_more) throw new StripeStandUnklar('mehr_als_eine_seite', { orderId })
 
-  const stand: StripeStand = { ueberweisung, erstattungen: [], rueckbuchungen: [] }
+  const stand: StripeStand = { ueberweisung, bezahltCents, erstattungen: [], rueckbuchungen: [] }
   for (const r of erstattungen.data) {
     // Gescheiterte oder abgebrochene Erstattungen haben kein Geld bewegt.
-    if (!erstattungZaehlt(r.status)) continue
+    if (!erstattungZaehlt(r.status) || (optionen.gescheitert !== undefined && r.id === optionen.gescheitert)) continue
     const buchung = ordneZu(orderId, r.metadata, r.amount)
     if (!buchung) throw new StripeStandUnklar('ohne_zuordnung', { orderId, art: 'erstattung', betragCents: r.amount })
     stand.erstattungen.push(buchung)

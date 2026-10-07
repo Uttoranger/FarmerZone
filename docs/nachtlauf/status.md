@@ -28,7 +28,7 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 17d | Konditionen-Übergang (K1) | fertig | `nacht/2026-10-06/17d-konditionen-uebergang` | #186 | 17c (#185) | Bar-Gebühren vor Stichtag entschieden (B1 → 19a); Satz zweimal auf /fuer-hoefe bestätigen | 06.10.2026 |
 | 18 | Produkte | fertig | `nacht/2026-10-06/18-produkte` | #187 | 17d (#186) | Bestandsfehler im Bearbeiten-Dialog mitbehoben; „Verkauf eintragen" mit /sales; Entwurf vs. „Nicht im Shop" | 06.10.2026 |
 | 19 | Bestellungen | fertig | `nacht/2026-10-06/19-bestellungen` | #188 | 18 (#187) | 4 Geldpfad-Punkte offen → 19c; `maxDuration` mit Vercel-Plan abgleichen | 06.10.2026 |
-| 19c | Geldpfad „Artikel fehlt" nachziehen | offen | | | | | |
+| 19c | Geldpfad „Artikel fehlt" nachziehen | läuft | `nacht/2026-10-06/19c-geldpfad` | | main | | 06.10.2026 |
 | 19a | B1 – keine Bargebühr bis zum Stichtag | offen | | | | | |
 | 19b | Sicherheits-Altlasten aus Lauf 4 | offen | | | | | |
 | 20 | Futter und Brennmaterial | offen | | | | | |
