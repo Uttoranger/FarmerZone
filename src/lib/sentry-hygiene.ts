@@ -22,7 +22,12 @@
  * - contexts.nextjs.request_path: von onRequestError roh angehängt.
  * - Blob-Speicher-URLs: tragen den Geräte-Dateinamen („Hof_Mueller.jpg" ist
  *   ein personenbezogenes Datum) im Pfad und als pathname-Parameter.
- * - Spans von Transaktionen: url.full/url.query der echten Navigation.
+ * - Spans von Transaktionen: url.full/url.query der echten Navigation,
+ *   auch im Wurzel-Span (contexts.trace.data).
+ * - IP-Adressen (Nr. 37): user.ip_address (auch „{{auto}}"), die Header, mit
+ *   denen Proxies die Adresse weiterreichen (X-Forwarded-For & Co., jede
+ *   Schreibweise), Vercels daraus abgeleitete Ortsangaben (x-vercel-ip-*),
+ *   request.env (REMOTE_ADDR) und die IP-Attribute der Spans.
  *
  * Namen lassen sich nicht per Muster erkennen — gegen sie wirkt die
  * strukturelle Sperre: kein sendDefaultPii, als Nutzerkennung ausschließlich
@@ -78,6 +83,57 @@ const ANMELDECODE_MUSTER = /\b(code|otp|anmeldecode)(\W{1,3})\d{6}\b/gi
  *  Über-Redaktion ist die sichere Richtung, der Transaktions-NAME bleibt
  *  parametrisiert und damit lesbar. */
 const KENNUNG_SEGMENT_MUSTER = /^[A-Za-z0-9_-]{24,}$/
+
+/** Header, in denen Proxies und CDNs die Adresse der Kundin weiterreichen —
+ *  klein geschrieben; verglichen wird case-insensitiv. Die Liste umfasst die
+ *  des SDK (ipHeaderNames in @sentry/core) und mehr: x-vercel-proxied-for
+ *  fängt das SDK selbst nicht ab. */
+const IP_HEADER = new Set([
+  'x-forwarded-for',
+  'x-forwarded',
+  'forwarded',
+  'forwarded-for',
+  'x-real-ip',
+  'x-client-ip',
+  'x-cluster-client-ip',
+  'cf-connecting-ip',
+  'cf-connecting-ipv6',
+  'cf-pseudo-ipv4',
+  'true-client-ip',
+  'fastly-client-ip',
+  'fly-client-ip',
+  'x-vercel-forwarded-for',
+  'x-vercel-proxied-for',
+])
+
+/** Ist dieser Header-Name ein IP-Träger? x-vercel-ip-* (Stadt, Breiten- und
+ *  Längengrad, Postleitzahl) ist aus der IP abgeleitet und fällt mit. In
+ *  Span-Attributen schreibt das SDK Bindestriche als Unterstriche
+ *  (http.request.header.x_forwarded_for) — beide Formen zählen. */
+function istIpHeader(name: string): boolean {
+  const normal = name.toLowerCase().replace(/_/g, '-')
+  return IP_HEADER.has(normal) || normal.startsWith('x-vercel-ip-')
+}
+
+/** Span-Attribute, die die Adresse der Gegenstelle tragen — in einem
+ *  Server-Span ist das die Kundin. server.address (unser eigener Host)
+ *  bleibt. */
+const IP_SPAN_ATTRIBUTE = new Set([
+  'user.ip_address',
+  'client.address',
+  'client.socket.address',
+  'http.client_ip',
+  'net.peer.ip',
+  'net.sock.peer.addr',
+  'network.peer.address',
+])
+
+const HEADER_ATTRIBUT_PRAEFIX = /^http\.(request|response)\.header\./i
+
+function istIpSpanAttribut(schluessel: string): boolean {
+  if (IP_SPAN_ATTRIBUTE.has(schluessel.toLowerCase())) return true
+  return HEADER_ATTRIBUT_PRAEFIX.test(schluessel) && istIpHeader(schluessel.replace(HEADER_ATTRIBUT_PRAEFIX, ''))
+}
 
 function bereinigeText(text: string): string {
   return text
@@ -138,6 +194,20 @@ function bereinigeTextMitUrls(text: string): string {
   return bereinigeText(text.replace(/https?:\/\/\S+/g, (url) => bereinigeUrl(url)))
 }
 
+/** Span-Attribute: IP-Träger fallen ganz weg, Query und URLs werden
+ *  bereinigt. */
+function bereinigeSpanDaten(daten: Record<string, unknown>): void {
+  for (const [schluessel, wert] of Object.entries(daten)) {
+    if (istIpSpanAttribut(schluessel)) {
+      delete daten[schluessel]
+      continue
+    }
+    if (typeof wert !== 'string') continue
+    if (/query/i.test(schluessel)) daten[schluessel] = bereinigeQuery(wert)
+    else if (/url|path|target/i.test(schluessel)) daten[schluessel] = bereinigeUrl(wert)
+  }
+}
+
 /**
  * Der zentrale Filter — läuft auf Server, Edge und im Browser, für
  * FEHLER-Ereignisse (beforeSend) wie für TRANSAKTIONEN (beforeSendTransaction).
@@ -158,7 +228,7 @@ export function bereinigeEreignis<E extends SentryEvent>(event: E): E {
     delete event.request.data
     if (event.request.headers) {
       for (const name of Object.keys(event.request.headers)) {
-        if (/^(authorization|cookie)$/i.test(name)) {
+        if (/^(authorization|cookie)$/i.test(name) || istIpHeader(name)) {
           delete event.request.headers[name]
         } else if (/^referer$/i.test(name)) {
           // Der Referer trägt die volle Vorgänger-URL (same-origin) — er wird
@@ -168,6 +238,9 @@ export function bereinigeEreignis<E extends SentryEvent>(event: E): E {
         }
       }
     }
+    // Server-Umgebung der Anfrage (REMOTE_ADDR, REMOTE_HOST …) — trägt die
+    // Adresse der Gegenstelle und sonst nichts, was wir zum Beheben brauchen.
+    delete event.request.env
     if (typeof event.request.query_string === 'string') {
       event.request.query_string = bereinigeQuery(event.request.query_string)
     } else if (event.request.query_string !== undefined) {
@@ -186,7 +259,13 @@ export function bereinigeEreignis<E extends SentryEvent>(event: E): E {
   }
 
   if (event.user) {
-    // Ausschließlich die Farm-ID überlebt — nie E-Mail, nie Name, nie IP.
+    // Ausschließlich die Farm-ID überlebt — nie E-Mail, nie Name, nie IP,
+    // auch nicht „{{auto}}" (das bäte Sentry, die Adresse selbst aus der
+    // Verbindung zu nehmen). Bewusst kein `ip_address: null`: Im SDK (10.66)
+    // wirkt null nur gegen das automatische „{{auto}}", das ohne
+    // sendDefaultPii ohnehin nicht gesetzt wird; dass der Ingest nichts
+    // ableitet, regeln sendDefaultPii: false (Browser: infer_ip „never") und
+    // die Projekteinstellung im Dashboard (Bericht Nr. 37).
     event.user = event.user.id !== undefined ? { id: event.user.id } : {}
   }
 
@@ -213,17 +292,17 @@ export function bereinigeEreignis<E extends SentryEvent>(event: E): E {
   }
 
   // Spans einer Transaktion tragen die ECHTEN Navigations-URLs (url.full,
-  // url.query) und Beschreibungen wie „GET https://…" — gleiche Regeln.
+  // url.query), Beschreibungen wie „GET https://…" und die Adresse der
+  // Gegenstelle — gleiche Regeln. Der Wurzel-Span steht nicht in `spans`,
+  // sondern in contexts.trace.data.
   const spans = (event as { spans?: Array<{ description?: string; data?: Record<string, unknown> }> })
     .spans
   for (const span of spans ?? []) {
     if (span.description) span.description = bereinigeTextMitUrls(span.description)
-    for (const [schluessel, wert] of Object.entries(span.data ?? {})) {
-      if (typeof wert !== 'string') continue
-      if (/query/i.test(schluessel)) span.data![schluessel] = bereinigeQuery(wert)
-      else if (/url|path|target/i.test(schluessel)) span.data![schluessel] = bereinigeUrl(wert)
-    }
+    if (span.data) bereinigeSpanDaten(span.data)
   }
+  const wurzelDaten = event.contexts?.trace?.data
+  if (wurzelDaten) bereinigeSpanDaten(wurzelDaten as Record<string, unknown>)
 
   return event
 }

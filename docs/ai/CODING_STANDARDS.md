@@ -120,6 +120,7 @@ NextResponse.json({ ok: true, …daten })
 - Fehlertexte aus SDKs und `fetch` gehen nur bereinigt nach Sentry (`bereinigeFehlerText`): Sie können Pfade, Dateinamen und Adressen tragen.
 - **Nie** `cause` mit dem Rohfehler setzen. Sentry schickt verkettete Fehler mit, am Kontext vorbei.
 - Kontexte flach halten (ein Kontext je Anlauf statt einer Liste) — Sentry kürzt ab der dritten Ebene.
+- **Sentry bekommt nie eine IP-Adresse.** Jedes `Sentry.init` setzt `sendDefaultPii: false` und `beforeSend` wie `beforeSendTransaction` auf `bereinigeEreignis` (`src/lib/sentry-hygiene.ts`); nie `dataCollection` setzen — schon ein leeres Objekt schaltet im SDK alle Vorgaben auf „sammeln“, auch die IP. Ein neuer IP-Träger (Proxy-Header, Span-Attribut) kommt in `IP_HEADER` bzw. `IP_SPAN_ATTRIBUTE`, nie als Sonderfall an der Aufrufstelle. Wache: `tests/beobachtbarkeit.test.ts` (prüft jede init-Stelle statisch).
 
 ### Nutzertexte
 - Deutsch, geduzt, ohne Fachjargon, mit Ausweg.

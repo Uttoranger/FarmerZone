@@ -23,6 +23,10 @@ export async function register() {
     environment: umgebung,
     // Leichtes Tracing nur in Produktion (jede zehnte Anfrage), sonst keins.
     tracesSampleRate: umgebung === 'production' ? 0.1 : 0,
+    // Keine IP (Nr. 37): Ohne sendDefaultPii hängt das SDK keine
+    // user.ip_address an und lässt die IP-Header weg; bereinigeEreignis
+    // räumt den Rest. Nie `dataCollection` setzen: das schaltet alle
+    // Vorgaben auf „an", auch die IP.
     sendDefaultPii: false,
     // BEIDE Haken, ein Filter: beforeSend läuft nur für Fehler; ohne
     // beforeSendTransaction gingen die getasteten Transaktionen samt roher
