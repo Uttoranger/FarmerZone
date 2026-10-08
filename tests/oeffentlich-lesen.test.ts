@@ -192,12 +192,13 @@ function verstoesse(text: string, pfad: string): string[] {
 }
 
 describe('Wache: Wiederholen nur auf öffentlichen Lesepfaden', () => {
+  // Liest und parst ganz src/ — unter Last länger als 5 s, deshalb ein eigenes Limit.
   it('in src/ wiederholt nur die öffentliche Hofliste — ohne Schreiben, außerhalb jeder Transaktion', () => {
     const alle = dateien(SRC).map((pfad) => ({ pfad: relative(SRC, pfad).split('\\').join('/'), text: readFileSync(pfad, 'utf8') }))
     expect(alle.flatMap(({ pfad, text }) => verstoesse(text, pfad))).toEqual([])
     // Gegenprobe: Die Suche findet den einen echten Aufruf.
     expect(alle.flatMap(({ pfad, text }) => aufrufe(text, pfad).map(() => pfad))).toEqual(ERLAUBT)
-  })
+  }, 30_000)
 
   it('die wiederholte Abfrage liest nur: getOeffentlicheHoefe ohne Schreiben und ohne Transaktion', () => {
     const koerper = rumpf(readFileSync(join(SRC, 'server/queries/farm.ts'), 'utf8'), 'getOeffentlicheHoefe')

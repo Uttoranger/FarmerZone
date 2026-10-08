@@ -31,6 +31,8 @@
  *  4. Die Vorbedingung in `meldeEmailAboAn` (`where: { optInEmail:
  *     abo.optInEmail, … }`): schreibt nur auf genau den gelesenen Stand —
  *     ein Vergleich mit dem Feld des gelesenen Abos, kein Empfängerfilter.
+ *     Erlaubt nur wörtlich `abo.optInEmail` und nicht unter einer
+ *     Verneinung.
  *
  * Grenzen (bewusst, mit Blick auf heutigen Code): Die Wache sieht
  * Objekt-Literale dort, wo sie stehen. Ein Wert aus einer Variablen
@@ -169,12 +171,16 @@ function verstoesse(quelltext: string, pfad: string, istAboAnmeldung: boolean): 
         const knopf = istAboAnmeldung && inFunktion(knoten, 'bestaetigeEmailAbo')
         if (!istFalse && !knopf) melde(knoten, GRUND_SCHREIBT)
       } else if (ort.art === 'filtern') {
-        // Die Vorbedingung des bedingten Schreibens: der Wert des gelesenen Abos.
+        // Die Vorbedingung des bedingten Schreibens: genau `abo.optInEmail`,
+        // der Wert des gelesenen Abos — nicht verneint, kein anderes Objekt.
         const vorbedingung =
           istAboAnmeldung &&
           inFunktion(knoten, 'meldeEmailAboAn') &&
+          !ort.verneint &&
           wert !== null &&
           ts.isPropertyAccessExpression(wert) &&
+          ts.isIdentifier(wert.expression) &&
+          wert.expression.text === 'abo' &&
           wert.name.text === 'optInEmail'
         if ((!istFalse || ort.verneint) && !ort.empfaengerFilter && !vorbedingung) melde(knoten, GRUND_FILTERT)
       } else if (ort.art === 'sonst' && wert !== null && konstante(wert) === true) {
@@ -195,13 +201,14 @@ function schnipsel(text: string, alsAboAnmeldung = false): Fund[] {
 const ABO_ANMELDUNG = readFileSync(join(WURZEL, ABO_ANMELDUNG_PFAD), 'utf8')
 
 describe('Den Haken setzt nur der Knopf, Empfänger nur über WERBEMAIL_EMPFAENGER', () => {
+  // Liest und parst ganz src/ — unter Last länger als 5 s, deshalb ein eigenes Limit.
   it('in ganz src/ schreibt kein Weg optInEmail außer false, und true steht nur in Lese-Auswahlen und den erlaubten Stellen', () => {
     const treffer = dateien(WURZEL).flatMap((pfad) => {
       const rel = relative(WURZEL, pfad).split('\\').join('/')
       return verstoesse(readFileSync(pfad, 'utf8'), rel, rel === ABO_ANMELDUNG_PFAD).map((f) => `${rel}:${f.zeile} ${f.grund} — ${f.text}`)
     })
     expect(treffer).toEqual([])
-  })
+  }, 30_000)
 
   it('ohne die Ausnahmen meldet die Wache in abo-anmeldung.ts genau die vier erlaubten Stellen', () => {
     // Die Ausnahmen schneiden also genau diese Stellen aus und nicht mehr.
@@ -358,6 +365,7 @@ describe('loeseOffeneAnfrageAuf — verzögert, deshalb ausdrücklich getippt un
     expect(funktion?.type?.getText(datei)).toBe('Prisma.PrismaPromise<Prisma.BatchPayload>')
   })
 
+  // Liest und parst ganz src/ — unter Last länger als 5 s, deshalb ein eigenes Limit.
   it('jeder Aufruf in src/ wird abgewartet, steht in $transaction([...]) oder wird zurückgegeben', () => {
     const treffer = dateien(WURZEL).flatMap((pfad) =>
       lockereAufrufe(readFileSync(pfad, 'utf8'), pfad).map((t) => `${relative(WURZEL, pfad)}: ${t}`)
@@ -365,7 +373,7 @@ describe('loeseOffeneAnfrageAuf — verzögert, deshalb ausdrücklich getippt un
     expect(treffer).toEqual([])
     // Gegenprobe: Die Suche findet die echten Aufrufe (heute in $transaction).
     expect(readFileSync(join(WURZEL, 'server/actions/subscriptions.ts'), 'utf8')).toContain('loeseOffeneAnfrageAuf(')
-  })
+  }, 30_000)
 
   it('Gegenprobe: ein liegen gelassener Aufruf schlägt an, die drei richtigen Formen nicht', () => {
     expect(lockereAufrufe('function f() { loeseOffeneAnfrageAuf(wo); return 1 }', 'a.ts')).toEqual(['loeseOffeneAnfrageAuf(wo)'])
@@ -392,6 +400,12 @@ describe('Gegenproben: was erlaubt bleibt', () => {
     const text = 'export async function meldeEmailAboAn(abo) { await updateMany({ where: { id: abo.id, optInEmail: abo.optInEmail }, data: { optInEmail: false } }) }'
     expect(schnipsel(text, true)).toEqual([])
     expect(schnipsel(text)).toHaveLength(1)
+    // Nur wörtlich `abo.optInEmail` und nicht verneint (Nachbesserung 2).
+    const mit = (where: string) => `export async function meldeEmailAboAn(abo, eingabe) { await updateMany({ where: ${where}, data: { optInEmail: false } }) }`
+    expect(schnipsel(mit('{ id: abo.id, optInEmail: eingabe.optInEmail }'), true)).toHaveLength(1)
+    expect(schnipsel(mit('{ id: abo.id, optInEmail: abo.vorher.optInEmail }'), true)).toHaveLength(1)
+    expect(schnipsel(mit('{ id: abo.id, NOT: { optInEmail: abo.optInEmail } }'), true)).toHaveLength(1)
+    expect(schnipsel(mit('{ id: abo.id, optInEmail: (abo.optInEmail as boolean) }'), true)).toEqual([])
   })
 
   it('Daten außerhalb der Datenbank (Formular, Antwort an den Browser) sind kein Schreib-Objekt', () => {

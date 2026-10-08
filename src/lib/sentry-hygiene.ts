@@ -72,11 +72,28 @@ export function ermittleUmgebung(
   return 'development'
 }
 
-/** E-Mail-Adressen in freiem Text. */
-const EMAIL_MUSTER = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g
+/*
+ * LAUFZEIT (Nr. 47): Alles hier läuft synchron in beforeSend, auf dem Server
+ * wie im Browser, und das SDK kürzt vorher nichts (`maxValueLength` ist nicht
+ * gesetzt). Jedes Muster muss deshalb in linearer Zeit laufen — auch bei
+ * 100 000 Zeichen ohne Treffer (tests/sentry-hygiene-felder.test.ts misst
+ * das). Ein Muster, das an jeder Stelle einer langen Zeichenfolge neu
+ * ansetzt und jedes Mal bis zu ihrem Ende liest, braucht dafür Sekunden.
+ */
 
-/** Dieselben Adressen URL-kodiert (%40 statt @) — so stehen sie im Pfad. */
-const EMAIL_KODIERT_MUSTER = /[A-Za-z0-9._%+-]+%40[A-Za-z0-9.-]+\.[A-Za-z]{2,}/gi
+/** Ein Zeichen des lokalen Teils einer E-Mail-Adresse (vor dem @). */
+const EMAIL_LOKAL = /[A-Za-z0-9._%+-]/
+
+/** Die Domain einer E-Mail-Adresse, ab dem Zeichen nach dem @ (klebend:
+ *  lastIndex setzt ersetzeEmails). */
+const EMAIL_DOMAIN = /[A-Za-z0-9.-]+\.[A-Za-z]{2,}/y
+
+/** Dieselben Adressen URL-kodiert (%40 statt @) — so stehen sie im Pfad.
+ *  Angesetzt wird nur am Anfang einer Zeichenfolge (Lookbehind), sonst wäre
+ *  das Muster quadratisch. Das Ergebnis bleibt gleich: %40 gehört selbst zu
+ *  den Zeichen des lokalen Teils, der Treffer ab dem Anfang nimmt schon das
+ *  letzte passende %40 der Folge — ein späterer Anfang fände nichts mehr. */
+const EMAIL_KODIERT_MUSTER = /(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+%40[A-Za-z0-9.-]+\.[A-Za-z]{2,}/gi
 
 /** Telefonnummern: +43 664 123 4567, 0664/1234567, (0664) 1234567 … — eine
  *  führende +/0/(0-Gruppe und danach mindestens sieben weitere Ziffern mit
@@ -160,9 +177,31 @@ function istIpSpanAttribut(schluessel: string): boolean {
   return HEADER_ATTRIBUT_PRAEFIX.test(schluessel) && istIpHeader(schluessel.replace(HEADER_ATTRIBUT_PRAEFIX, ''))
 }
 
+/**
+ * E-Mail-Adressen in freiem Text — dasselbe Ergebnis wie
+ * `text.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, …)`, aber
+ * linear: Jener Regex setzte in einer langen Folge ohne @ an jeder Stelle neu
+ * an (100 000 Zeichen: rund 7 Sekunden). Hier wird von jedem @ aus gesucht —
+ * nach links der lokale Teil, höchstens bis zum Ende des vorigen Treffers
+ * (dort setzte auch der Regex wieder an), nach rechts die Domain.
+ */
+function ersetzeEmails(text: string): string {
+  let ergebnis = ''
+  let ende = 0
+  for (let at = text.indexOf('@'); at !== -1; at = text.indexOf('@', Math.max(at + 1, ende))) {
+    let anfang = at
+    while (anfang > ende && EMAIL_LOKAL.test(text[anfang - 1])) anfang--
+    if (anfang === at) continue
+    EMAIL_DOMAIN.lastIndex = at + 1
+    if (!EMAIL_DOMAIN.test(text)) continue
+    ergebnis += `${text.slice(ende, anfang)}[e-mail entfernt]`
+    ende = EMAIL_DOMAIN.lastIndex
+  }
+  return ergebnis + text.slice(ende)
+}
+
 function bereinigeText(text: string): string {
-  return text
-    .replace(EMAIL_MUSTER, '[e-mail entfernt]')
+  return ersetzeEmails(text)
     .replace(EMAIL_KODIERT_MUSTER, '[e-mail entfernt]')
     .replace(TELEFON_MUSTER, '[telefon entfernt]')
     .replace(ANMELDECODE_MUSTER, '$1$2[code entfernt]')
@@ -313,7 +352,9 @@ function bereinigeFreitext(text: string): string {
  * `suchQuery` ist kein Parametername.
  */
 function bereinigeQueryText(text: string): string {
-  return /^\S*=\S*$/.test(text) ? bereinigeQuery(text, bereinigeFreitext) : bereinigeFreitext(text)
+  // Bis zum ersten „=" ohne Leerraum, danach ohne Leerraum — so setzt das
+  // Muster nur einmal an (`^\S*=\S*$` probierte jedes „=" durch: quadratisch).
+  return /^[^\s=]*=\S*$/.test(text) ? bereinigeQuery(text, bereinigeFreitext) : bereinigeFreitext(text)
 }
 
 /** Heikel ist ein Schlüssel nach Namen, als IP-Träger oder wenn er selbst

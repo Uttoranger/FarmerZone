@@ -20,10 +20,11 @@
  *     „Träger" im Rumpf (seit Nachbesserung 1): einen destrukturierten
  *     Parameter (`async ({ order }) => …`), eine vorher gebaute Liste oder
  *     Variable, deren Startwert ihn ohne `await` nennt (`const s = [tx.a(),
- *     tx.b()]; Promise.all(s)`, `const r = repo(tx)`), eine Liste, in die
- *     solche Aufrufe geschoben werden (`s.push(tx.a())`), und Träger von
- *     Trägern. Ein abgewartetes Ergebnis (`const x = await tx.a()`) ist kein
- *     Träger.
+ *     tx.b()]; Promise.all(s)`, `const r = repo(tx)`), auch destrukturiert
+ *     (`const { order } = tx`, `const [a, b] = [tx.a(), tx.b()]`, seit
+ *     Nachbesserung 2), eine Liste, in die solche Aufrufe geschoben werden
+ *     (`s.push(tx.a())`), und Träger von Trägern. Ein abgewartetes Ergebnis
+ *     (`const x = await tx.a()`) ist kein Träger.
  *     Grenzen: Ein Client, der erst nach der Deklaration zugewiesen wird
  *     (`let db; db = tx`) oder in einem Objektfeld reist (`{ db: tx }` an
  *     eine Hilfsfunktion, die ihn als `typeof prisma` nimmt), und Helfer in
@@ -126,8 +127,9 @@ function traeger(rumpf: ts.Node, namen: string[]): Set<string> {
   const gefunden = new Set(namen)
   const kandidaten: { name: string; wert: ts.Node }[] = []
   const sammle = (k: ts.Node): void => {
-    if (ts.isVariableDeclaration(k) && ts.isIdentifier(k.name) && k.initializer && !ts.isAwaitExpression(ohneHuelle(k.initializer))) {
-      kandidaten.push({ name: k.name.text, wert: k.initializer })
+    // Auch destrukturiert: jeder Name im Muster trägt, was der Startwert trägt.
+    if (ts.isVariableDeclaration(k) && k.initializer && !ts.isAwaitExpression(ohneHuelle(k.initializer))) {
+      for (const name of parameterNamen(k.name)) kandidaten.push({ name, wert: k.initializer })
     }
     if (
       ts.isCallExpression(k) &&
@@ -183,12 +185,13 @@ function promiseAllMitTransaktion(text: string, pfad = 'schnipsel.ts'): string[]
 }
 
 describe('Wache 1: kein Promise.all mit dem Transaktions-Client', () => {
+  // Liest und parst ganz src/ — unter Last länger als 5 s, deshalb ein eigenes Limit.
   it('in ganz src/ läuft auf einem Transaktions-Client nichts gleichzeitig', () => {
     const treffer = dateien(SRC, (n) => /\.(ts|tsx)$/.test(n)).flatMap((pfad) =>
       promiseAllMitTransaktion(readFileSync(pfad, 'utf8'), relative(SRC, pfad))
     )
     expect(treffer).toEqual([])
-  })
+  }, 30_000)
 
   it('Gegenprobe: Promise.all mit tx im $transaction-Rückruf schlägt an — auch über map, allSettled und anderen Namen', () => {
     expect(promiseAllMitTransaktion('prisma.$transaction(async (tx) => { await Promise.all([tx.order.count(), tx.product.count()]) })')).toHaveLength(1)
@@ -221,12 +224,18 @@ describe('Wache 1: kein Promise.all mit dem Transaktions-Client', () => {
     // Destrukturierter Parameter: jeder Teil ist ein Stück des Clients.
     expect(promiseAllMitTransaktion('prisma.$transaction(async ({ order, product }) => Promise.all([order.count(), product.count()]))')).toHaveLength(1)
     expect(promiseAllMitTransaktion('async function f({ order }: Prisma.TransactionClient) { await Promise.all([order.count(), x]) }')).toHaveLength(1)
+    // Destrukturiert im Rumpf (Nachbesserung 2).
+    expect(inTransaktion('const { order, product } = tx; await Promise.all([order.count(), product.count()])')).toHaveLength(1)
+    expect(inTransaktion('const [a, b] = [tx.a.count(), tx.b.count()]; await Promise.all([a, b])')).toHaveLength(1)
+    expect(inTransaktion('const { order: { count } } = tx; await Promise.allSettled([count(), x])')).toHaveLength(1)
   })
 
   it('Gegenprobe (Nachbesserung 1): abgewartete Ergebnisse sind keine Träger', () => {
     const inTransaktion = (rumpf: string) => promiseAllMitTransaktion(`prisma.$transaction(async (tx) => { ${rumpf} })`)
     expect(inTransaktion('const zeilen = await tx.a.findMany(); await Promise.all(zeilen.map((z) => schicke(z)))')).toEqual([])
     expect(inTransaktion('const zahl = (await tx.a.count()) as number; const s = [zahl]; await Promise.all(s.map(warte))')).toEqual([])
+    expect(inTransaktion('const { count } = await tx.a.updateMany({ where, data }); await Promise.all([schicke(count), x])')).toEqual([])
+    expect(inTransaktion('const [erste] = await tx.a.findMany(); await Promise.all([schicke(erste)])')).toEqual([])
   })
 })
 
@@ -275,10 +284,11 @@ function doppeltGeladen(text: string, pfad = 'page.tsx'): string[] {
 describe('Wache 2: Metadaten und Seite laden eine Server-Abfrage nur geteilt', () => {
   const seiten = dateien(APP, (n) => n === 'page.tsx' || n === 'page.ts')
 
+  // Liest und parst ganz src/ — unter Last länger als 5 s, deshalb ein eigenes Limit.
   it('keine Seite mit generateMetadata ruft dieselbe Server-Abfrage zweimal ungeteilt auf', () => {
     const treffer = seiten.flatMap((pfad) => doppeltGeladen(readFileSync(pfad, 'utf8'), pfad).map((n) => `${relative(SRC, pfad)}: ${n}`))
     expect(treffer).toEqual([])
-  })
+  }, 30_000)
 
   it('die Kasse lädt den Hof in Metadaten und Seite über getPublicFarmGeteilt', () => {
     const kasse = readFileSync(join(APP, '(public)/[farmSlug]/checkout/page.tsx'), 'utf8')

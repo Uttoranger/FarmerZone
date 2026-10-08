@@ -6,7 +6,9 @@
  *
  * Seit der Nachbesserung 1 auch: Texte unter Query-Schlüsseln (Werte, nicht
  * nur Parameternamen) und die Nachrichten (event.message, message der
- * Brotkrumen) mit derselben Freitext-Regel wie logentry.
+ * Brotkrumen) mit derselben Freitext-Regel wie logentry. Seit der
+ * Nachbesserung 2: Laufzeit linear bei langen Texten, und die linear
+ * gemachte E-Mail-Regel liefert dasselbe wie die alten Muster.
  *
  * Je Feld ein Test mit E-Mail-Adresse, Token und IP-Adresse darin; dazu
  * Gegenproben, dass Kennungen, Codes, Zahlen und die technischen Kontexte des
@@ -326,6 +328,75 @@ describe('Nachrichten — event.message und message der Brotkrumen (Nachbesserun
     expect(e.message).toBe('Seite geladen in 120 ms um 10:30:45, Node 22.22.2, Status 503')
     expect(e.breadcrumbs?.[0].message).toBe('Bestellung 481234 gespeichert (farm cmuri7ryv000nkl7dnkc5bx72)')
     expect(e.exception?.values?.[0].value).toBe(`connect ETIMEDOUT ${IP4}:6543`)
+  })
+})
+
+describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung 2)', () => {
+  // Alles läuft synchron in beforeSend, und das SDK kürzt vorher nichts. Die
+  // alten Muster brauchten für jeden dieser Texte Sekunden (quadratisch);
+  // jetzt sind es Millisekunden. Die Grenze lässt Luft für eine volle Maschine.
+  const GRENZE_MS = 500
+  const N = 50_000
+  const lang: [string, object][] = [
+    ['Query-Text unter suchQuery', { extra: { suchQuery: 'a='.repeat(N) + ' x' } }],
+    ['Query-Text unter http.query', { extra: { 'http.query': 'a='.repeat(N) + ' x' } }],
+    ['lange Folge in extra', { extra: { text: 'a'.repeat(2 * N) } }],
+    ['lange Folge als Nachricht', { message: 'a.'.repeat(N) }],
+    ['lange Folge im Fehlertext', { exception: { values: [{ value: 'a%'.repeat(N) }] } }],
+    ['viele @ im Fehlertext', { exception: { values: [{ value: 'a@'.repeat(N) }] } }],
+    ['lange Domain ohne Endung', { exception: { values: [{ value: 'a@' + 'b.'.repeat(N) + 'c' }] } }],
+    ['kodierte Adressen ohne Endung', { extra: { text: 'a%40'.repeat(N) } }],
+    ['langer Pfad', { request: { url: 'https://farmerzone.at/' + 'a-'.repeat(N) } }],
+    ['Brotkrume', { breadcrumbs: [{ message: 'a'.repeat(2 * N), data: { notiz: 'a-'.repeat(N), arguments: ['a'.repeat(2 * N)] } }] }],
+  ]
+
+  for (const [name, teil] of lang) {
+    it(`${name}: unter ${GRENZE_MS} ms`, () => {
+      const start = performance.now()
+      bereinigeEreignis(ereignis(teil))
+      expect(performance.now() - start).toBeLessThan(GRENZE_MS)
+    })
+  }
+})
+
+describe('E-Mail-Adressen — dasselbe Ergebnis wie die Muster vor der Nachbesserung 2', () => {
+  // Die Referenz: die beiden Regex, die bis hierher galten (quadratisch, aber
+  // das Ergebnis ist die Vorgabe). Über den Fehlertext geprüft — dort gilt
+  // nur bereinigeText; die Texte enthalten keine Ziffern außer in „%40", also
+  // weder Telefonnummer noch Anmeldecode.
+  const ALT_EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g
+  const ALT_KODIERT = /[A-Za-z0-9._%+-]+%40[A-Za-z0-9.-]+\.[A-Za-z]{2,}/gi
+  const referenz = (text: string) => text.replace(ALT_EMAIL, '[e-mail entfernt]').replace(ALT_KODIERT, '[e-mail entfernt]')
+  const neu = (text: string) => bereinigeEreignis(ereignis({ exception: { values: [{ value: text }] } })).exception?.values?.[0].value
+
+  it('an den Rändern: aneinandergeklebte, kodierte, halbe und doppelte Adressen', () => {
+    const faelle = [
+      'kundin@example.com', 'Mail an kundin@example.com, anna@example.org.', 'kundin@example.com-anna@example.org',
+      'a@b.cc_x@d.ee', 'a@b.cc+x@d.ee', 'a@b.cc.x@d.ee', 'a@b.cc%x@d.ee', 'x@y.zz@w.vv', 'a@b.cc@d.ee', '@a.bc', 'a@', 'a@b',
+      'a@b.c', 'a@.cc', 'a@b..cc', 'a@b-.cc', '.@a.bc', '-@-.--', 'A@B.CO', 'a.b@c-d.ef.gh', 'mailto:kundin@example.com',
+      '<kundin@example.com>', 'kundin%40example.com', 'a%40b%40c.de', 'kundin%40example.com,anna%40example.org',
+      '/customers/kunde%40beispiel.at', 'a@b.cc%40d.ee', 'a%40b.cc@d.ee', '%40a.bc', 'a%4', '@@a@@b.cc@@',
+    ]
+    for (const text of faelle) expect(neu(text), text).toBe(referenz(text))
+  })
+
+  it('auf 5000 zufällig zusammengesetzten Texten (fester Startwert)', () => {
+    // Aus Bruchstücken von Adressen: Gut die Hälfte der Texte trägt eine
+    // Adresse, über ein Drittel mehrere, einige hundert aneinandergeklebt.
+    const teile = ['a', 'Zz', 'kundin', '.', '-', '_', '+', '%', '%40', '%4', '@', ' ', 'de', 'com', ',', '(', 'b.c', 'xy.at', '@@', '..', 'x@y.de', 'a%40b.at', '@b.cc', 'kundin@']
+    let zustand = 47
+    const zufall = (bis: number) => {
+      zustand = (zustand * 48_271) % 2_147_483_647
+      return zustand % bis
+    }
+    let mitAdresse = 0
+    for (let i = 0; i < 5000; i++) {
+      const text = Array.from({ length: 1 + zufall(25) }, () => teile[zufall(teile.length)]).join('')
+      const erwartet = referenz(text)
+      if (erwartet !== text) mitAdresse++
+      expect(neu(text), text).toBe(erwartet)
+    }
+    expect(mitAdresse).toBeGreaterThan(2000)
   })
 })
 
