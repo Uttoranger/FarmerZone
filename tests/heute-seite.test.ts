@@ -8,12 +8,17 @@
  *  - Packliste: offen zuerst, dann „wartet auf Kunde", dann gepackt — je
  *    Gruppe nach Uhrzeit; Erledigtes fällt weg; Betrag in Cent mitgeführt.
  *  - Die Seite stellt die Packliste an den Anfang der Hauptspalte; oben
- *    stehen nur Stripe-Hinweis und die schmale Teilen-Zeile.
+ *    steht höchstens EIN Kasten — der Stripe-Hinweis hat Vorrang; steht dort
+ *    schon der Balken der Shell, rückt er in „Braucht dich". Die Teilen-Zeile
+ *    steht kompakt direkt unter der Packliste (freigabe.md §12 Nr. 45).
  *  - Stripe-Hinweis: nur bei acceptsOnline && !stripeAccountReady (mit
  *    Konto) — alle vier Kombinationen, dazu der Fall ohne Konto.
- *  - Teilen-Karte: schmal an Abholtagen, groß sonst, gar nicht, solange der
- *    Hof nicht öffentlich ist. Abholtag = aktives Abholfenster am Wiener
+ *  - Teilen-Zeile: immer kompakt, gar nicht, solange der Hof nicht
+ *    öffentlich ist oder pausiert. Abholtag = aktives Abholfenster am Wiener
  *    Wochentag.
+ *  - Kennzahlen sagen, was sie zählen: „Heute abholen" (dieselben
+ *    Bestellungen wie die Packliste) und „Heute eingenommen, mit Hofladen" —
+ *    „0" neben „€ 178" widerspricht sich nicht mehr.
  *  - Freischaltungs-Moment: nur im Zeitfenster nach approvedAt, nur
  *    öffentlich, nur wenn das Gerät ihn sicher noch nicht gezeigt hat —
  *    fehlender oder werfender Speicher zeigt ihn nie (höchstens einmal).
@@ -32,23 +37,27 @@ vi.mock('next/link', () => ({
 }))
 
 import {
+  HEUTE_ABHOLEN,
+  KENNZAHL_TEXT,
   PACK_MARKE,
   abholfensterHeute,
+  brauchtDich,
   fensterAnzahl,
   fensterText,
   heuteAufbau,
   heuteHofSichtbar,
   naechstesAbholfenster,
   stripeEinrichtenHinweis,
+  stripeHinweisOrt,
   packliste,
   packlistenZahlen,
-  teilenKarte,
   teilenSatz,
   umsatzHeuteCent,
   wochenBalken,
   type PacklistenBestellung,
   type PacklistenZeile,
 } from '@/lib/heute'
+import { hofBalkenArt } from '@/lib/mein-hof'
 import { onlinePausiertHinweis, onlineZahlungPausiert } from '@/lib/stripe-konto'
 import { umsatzBestellungWhere } from '@/lib/umsatz'
 import {
@@ -156,12 +165,11 @@ describe('Abholfenster — Wiener Wochentag', () => {
 
 // ─── Teilen-Karte ───────────────────────────────────────────────────────────
 
-describe('Teilen-Karte', () => {
-  it('schmal an Abholtagen, groß sonst — nur wenn Kunden den Hof sehen und bei ihm bestellen können', () => {
-    expect(teilenKarte({ sichtbar: true, abholtag: true })).toBe('schmal')
-    expect(teilenKarte({ sichtbar: true, abholtag: false })).toBe('gross')
-    expect(teilenKarte({ sichtbar: false, abholtag: true })).toBeNull()
-    expect(teilenKarte({ sichtbar: false, abholtag: false })).toBeNull()
+describe('Teilen-Zeile', () => {
+  it('kompakt unter der Packliste — nur wenn Kunden den Hof sehen und bei ihm bestellen können', () => {
+    expect(heuteAufbau({ stripe: null, teilen: true, ersteSchritte: false }).haupt).toEqual(['packliste', 'teilen', 'braucht-dich'])
+    const ohne = heuteAufbau({ stripe: null, teilen: false, ersteSchritte: false })
+    expect([...ohne.oben, ...ohne.haupt, ...ohne.seite]).not.toContain('teilen')
   })
 
   it('sichtbar heißt: freigegeben, aktiv, nicht stillgelegt und NICHT pausiert', () => {
@@ -193,28 +201,79 @@ describe('Teilen-Karte', () => {
 
 // ─── Aufbau ─────────────────────────────────────────────────────────────────
 
-describe('Aufbau der Seite — Packliste zuerst', () => {
-  it('die Hauptspalte beginnt immer mit der Packliste', () => {
-    for (const teilen of ['schmal', 'gross', null] as const) {
-      for (const stripeHinweis of [true, false]) {
+describe('Aufbau der Seite — Packliste zuerst, oben höchstens ein Kasten', () => {
+  const orte = ['oben', 'braucht-dich', null] as const
+
+  it('die Hauptspalte beginnt immer mit der Packliste, die Teilen-Zeile folgt direkt darunter', () => {
+    for (const stripe of orte) {
+      for (const teilen of [true, false]) {
         for (const ersteSchritte of [true, false]) {
-          expect(heuteAufbau({ stripeHinweis, teilen, ersteSchritte }).haupt[0]).toBe('packliste')
+          const { haupt } = heuteAufbau({ stripe, teilen, ersteSchritte })
+          expect(haupt[0]).toBe('packliste')
+          if (teilen) expect(haupt[1]).toBe('teilen')
         }
       }
     }
   })
 
-  it('oben nur Stripe-Hinweis und schmale Teilen-Zeile; die große Karte steht in der Seitenspalte', () => {
-    expect(heuteAufbau({ stripeHinweis: true, teilen: 'schmal', ersteSchritte: false }).oben).toEqual(['stripe', 'teilen-schmal'])
-    const gross = heuteAufbau({ stripeHinweis: false, teilen: 'gross', ersteSchritte: true })
-    expect(gross.oben).toEqual([])
-    expect(gross.seite[0]).toBe('teilen-gross')
-    expect(gross.seite).toContain('erste-schritte')
-    const ohne = heuteAufbau({ stripeHinweis: false, teilen: null, ersteSchritte: false })
-    expect([...ohne.oben, ...ohne.haupt, ...ohne.seite]).not.toContain('teilen-gross')
-    expect(ohne.seite).not.toContain('erste-schritte')
-    expect(ohne.haupt).toEqual(['packliste', 'braucht-dich'])
-    expect(ohne.seite).toEqual(['naechste-abholung', 'woche', 'hofseite'])
+  it('oben steht höchstens EIN Kasten, und nur der Stripe-Hinweis — nie die Teilen-Zeile', () => {
+    for (const stripe of orte) {
+      for (const teilen of [true, false]) {
+        for (const ersteSchritte of [true, false]) {
+          const { oben } = heuteAufbau({ stripe, teilen, ersteSchritte })
+          expect(oben.length).toBeLessThanOrEqual(1)
+          expect(oben).toEqual(stripe === 'oben' ? ['stripe'] : [])
+        }
+      }
+    }
+  })
+
+  it('jeder Block steht genau einmal; die Seitenspalte trägt Erste Schritte, nächste Abholung, Woche und Hofseite', () => {
+    const voll = heuteAufbau({ stripe: 'oben', teilen: true, ersteSchritte: true })
+    const alle = [...voll.oben, ...voll.haupt, ...voll.seite]
+    expect(new Set(alle).size).toBe(alle.length)
+    expect(voll.seite).toEqual(['erste-schritte', 'naechste-abholung', 'woche', 'hofseite'])
+    const ohne = heuteAufbau({ stripe: null, teilen: false, ersteSchritte: false })
+    expect(ohne).toEqual({ oben: [], haupt: ['packliste', 'braucht-dich'], seite: ['naechste-abholung', 'woche', 'hofseite'] })
+  })
+})
+
+describe('Stripe-Hinweis hat oben Vorrang — außer der Balken der Shell steht schon da', () => {
+  const FREI = new Date('2026-09-01T09:00:00Z')
+
+  it('ohne Hinweis kein Ort; mit Hinweis oben; über dem Balken der Shell als Zeile in „Braucht dich"', () => {
+    expect(stripeHinweisOrt({ hinweis: false, hofBalken: false })).toBeNull()
+    expect(stripeHinweisOrt({ hinweis: false, hofBalken: true })).toBeNull()
+    expect(stripeHinweisOrt({ hinweis: true, hofBalken: false })).toBe('oben')
+    expect(stripeHinweisOrt({ hinweis: true, hofBalken: true })).toBe('braucht-dich')
+  })
+
+  it('der Balken der Shell: stillgelegt sticht „wartet", freigeschaltet keiner — dieselbe Regel wie das Layout', () => {
+    expect(hofBalkenArt({ approvedAt: FREI, archivedAt: null })).toBeNull()
+    expect(hofBalkenArt({ approvedAt: null, archivedAt: null })).toBe('wartet')
+    expect(hofBalkenArt({ approvedAt: FREI, archivedAt: FREI })).toBe('stillgelegt')
+    expect(hofBalkenArt({ approvedAt: null, archivedAt: FREI })).toBe('stillgelegt')
+    expect(quelle('src/server/hofbereich.ts')).toContain('hofBalkenArt(bannerState)')
+    expect(quelle('src/server/queries/heute.ts')).toContain('hofBalkenArt(hof)')
+  })
+
+  it('ein Hof, der auf die Freischaltung wartet und Stripe angefangen hat: „pausiert" wird die erste Zeile von „Braucht dich"', () => {
+    const daten = { ueberfaellig: { anzahl: 0, juengste: [] }, ausverkauft: [{ id: 'p1', name: 'Eier' }], ohneKategorie: [], statusErinnerung: null }
+    const mit = brauchtDich({ ...daten, stripe: true })
+    expect(mit[0]).toEqual({ art: 'stripe', text: expect.stringContaining('Stripe'), href: '/settings/payments' })
+    expect(mit).toHaveLength(2)
+    expect(brauchtDich({ ...daten, stripe: false }).map((e) => e.art)).toEqual(['ausverkauft'])
+    // Und oben steht dann nichts von der Seite: höchstens EIN Kasten.
+    const ort = stripeHinweisOrt({ hinweis: true, hofBalken: hofBalkenArt({ approvedAt: null, archivedAt: null }) !== null })
+    expect(heuteAufbau({ stripe: ort, teilen: false, ersteSchritte: false }).oben).toEqual([])
+  })
+
+  it('die Abfrage entscheidet den Ort einmal und gibt ihn an Seite und „Braucht dich"', () => {
+    const abfrage = quelle('src/server/queries/heute.ts')
+    expect(abfrage).toContain('stripeHinweisOrt(')
+    expect(abfrage).toMatch(/stripe: stripeOrt === 'braucht-dich'/)
+    const seite = quelle('src/app/(hof)/dashboard/page.tsx')
+    expect(seite).toContain('stripe: heute.stripeOrt')
   })
 })
 
@@ -288,7 +347,7 @@ describe('Hinweis „Online-Zahlung einrichten" für freigeschaltete Höfe ohne 
   })
 
   it('die Seite zeigt ihn oben, wo sonst „pausiert" steht — keine Abschaltung, nur ein Hinweis', () => {
-    expect(heuteAufbau({ stripeHinweis: true, teilen: null, ersteSchritte: false }).oben).toEqual(['stripe'])
+    expect(heuteAufbau({ stripe: 'oben', teilen: true, ersteSchritte: false }).oben).toEqual(['stripe'])
     const seite = quelle('src/app/(hof)/dashboard/page.tsx')
     expect(seite).toContain('<StripeEinrichtenHinweis')
     expect(seite).toContain('heute.stripeEinrichten')
@@ -541,32 +600,47 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     expect(h).toContain('truncate')
   })
 
-  it('Kopf und Kennzahlen: Abholung heute als Marke, Umsatz über formatEuro, offen orange', () => {
+  it('Kopf und Kennzahlen: Abholung heute als Marke, Betrag über formatEuro, offen orange', () => {
     const kopf = html(createElement(HeuteKopf, { datum: 'Dienstag, 6. Oktober 2026', abholungHeute: '15–18 Uhr' }))
     expect(kopf).toContain('<h1')
     expect(kopf).toContain('Abholung heute, 15–18 Uhr')
     expect(html(createElement(HeuteKopf, { datum: 'Dienstag', abholungHeute: null }))).not.toContain('Abholung heute')
     const zahlen = html(createElement(Kennzahlen, { bestellungen: 8, zuPacken: 5, umsatzHeuteCent: 18640 }))
-    expect(zahlen).toContain('Bestellungen heute')
     expect(zahlen).toContain('Noch zu packen')
     expect(zahlen).toContain('€ 186,40')
     expect(zahlen).toContain('text-status-offen')
   })
 
-  it('Teilen-Karte: schmal als Zeile, groß als Karte mit Hof-Link — beide mit „Teilen"', () => {
+  it('Kennzahlen sagen, was sie zählen: „Heute abholen" und „Heute eingenommen, mit Hofladen" (freigabe.md §12 Nr. 45)', () => {
+    expect(HEUTE_ABHOLEN).toBe('Heute abholen')
+    expect(KENNZAHL_TEXT).toEqual({
+      abholen: 'Heute abholen',
+      packen: 'Noch zu packen',
+      eingenommen: 'Heute eingenommen',
+      eingenommenMit: 'mit Hofladen',
+    })
+    // Alle abgeholt, dazu der Hofladen: 0 offene Abholungen neben € 178 — kein Widerspruch mehr.
+    const zahlen = html(createElement(Kennzahlen, { bestellungen: 0, zuPacken: 0, umsatzHeuteCent: 17800 }))
+    expect(zahlen).toContain('Heute abholen')
+    expect(zahlen).toContain('Heute eingenommen')
+    expect(zahlen).toContain('mit Hofladen')
+    expect(zahlen).toContain('€ 178,00')
+    expect(zahlen).not.toContain('Bestellungen heute')
+    expect(zahlen).not.toContain('Umsatz heute')
+    // Der Betrag kürzt nie mehr ab: am Handy steht er über die ganze Breite.
+    expect(quelle('src/components/heute/heute-teile.tsx')).toMatch(/col-span-2 lg:col-span-1/)
+  })
+
+  it('Teilen-Zeile: kompakt mit Satz und „Teilen", ohne Besuche nur, wenn es keine gab', () => {
     const satz = 'Eier, Heu – Abholung Samstag, 9–12 Uhr'
-    const schmal = html(createElement(TeilenKarte, { form: 'schmal', hofName: 'Hof Test', hofSlug: 'hof-test', satz, adresse: 'farmerzone.at/hof-test' }))
-    expect(schmal).toContain('Diese Woche bei dir:')
-    expect(schmal).toContain(satz)
-    expect(schmal).toContain('Teilen')
-    expect(schmal).not.toContain('Besuche')
-    const gross = html(createElement(TeilenKarte, { form: 'gross', hofName: 'Hof Test', hofSlug: 'hof-test', satz, adresse: 'farmerzone.at/hof-test' }))
-    expect(gross).toContain('<h2')
-    expect(gross).toContain('href="/hof-test"')
-    expect(gross).toContain('farmerzone.at/hof-test')
-    expect(gross).not.toContain('Besuche')
-    // Der Adress-Link hat 44 px Trefferfläche und kürzt trotzdem mit Auslassung.
-    expect(gross).toMatch(/<a [^>]*class="[^"]*min-h-11[^"]*"[^>]*href="\/hof-test"|<a [^>]*href="\/hof-test"[^>]*class="[^"]*min-h-11/)
+    const zeile = html(createElement(TeilenKarte, { hofName: 'Hof Test', hofSlug: 'hof-test', satz }))
+    expect(zeile).toContain('Diese Woche bei dir:')
+    expect(zeile).toContain(satz)
+    expect(zeile).toContain('Teilen')
+    expect(zeile).not.toContain('Besuche')
+    expect(zeile).not.toContain('<h2')
+    const mitWirkung = html(createElement(TeilenKarte, { hofName: 'Hof Test', hofSlug: 'hof-test', satz, wirkung: '14 Besuche über deine Links' }))
+    expect(mitWirkung).toContain('letzte Woche 14 Besuche über deine Links')
   })
 
   it('Seitenspalte: nächste Abholung, Woche mit Balken und Vergleich, Hofseite mit Fortschritt', () => {
@@ -599,7 +673,7 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
   it('jedes Symbol ist aria-hidden', () => {
     const alle = [
       html(createElement(StripeHinweis, { barMoeglich: true })),
-      html(createElement(TeilenKarte, { form: 'gross', hofName: 'Hof Test', hofSlug: 'hof-test', satz: 'x', adresse: 'a' })),
+      html(createElement(TeilenKarte, { hofName: 'Hof Test', hofSlug: 'hof-test', satz: 'x' })),
       html(createElement(HeuteKopf, { datum: 'x', abholungHeute: '15–18 Uhr' })),
       html(createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })], zuPacken: 1, naechsteAbholung: null, leer: { abholfenster: null } })),
     ].join('')

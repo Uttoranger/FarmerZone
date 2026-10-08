@@ -47,6 +47,9 @@ const db = vi.hoisted(() => ({
 vi.mock('@/lib/prisma', () => ({ prisma: db }))
 
 import {
+  KUNDEN_FILTER_LABEL,
+  KUNDEN_SORTIERUNG_LABEL,
+  SORTIEREN_TEXT,
   fasseKundinZusammen,
   filtereKunden,
   initialen,
@@ -59,15 +62,18 @@ import {
   richtungText,
   kundeSeitText,
   passtZurKundenSuche,
+  sichtbareKundenFilter,
+  sortierungBeschreibung,
   sortiereKunden,
   weitereBestellungen,
   zaehleKundenFilter,
   zuletztText,
   type KundenBestellung,
 } from '@/lib/hof-kunden'
-import { kundenAnsichtAus } from '@/schemas/hof-kunden'
+import { KUNDEN_FILTER_WERTE, KUNDEN_SORTIERUNG_WERTE, kundenAnsichtAus } from '@/schemas/hof-kunden'
 import { findeKundenAdressen, getCustomerDetail, getCustomersForFarm, kundeIdFuer, type CustomerDetail, type CustomerSummary } from '@/server/queries/customers'
 import { KundenAnsicht } from '@/components/hof-kunden/kunden-ansicht'
+import { SortierFelder } from '@/components/hof-kunden/kunden-sortieren'
 import { KundenDetail } from '@/components/hof-kunden/kunden-detail'
 
 function quelle(pfad: string): string {
@@ -436,7 +442,7 @@ describe('Ansicht /customers — vier Zustände, lange Namen, Tokens', () => {
     expect(html).toContain('aria-current="page"')
     expect(html).toContain('placeholder="Name, Telefon oder E-Mail"')
     expect(html).toContain('Kundin suchen')
-    expect(html).toContain('Sortieren')
+    expect(html).toMatch(/<button[^>]*>[\s\S]*?Sortieren[\s\S]*?<\/button>/)
     expect(html).toContain('href="/customers/aaaaaaaaaaaaaaaa"')
     expect(html).toContain(`title="${LANG}"`)
     expect(html).toContain(`aria-label="${LANG} anrufen"`)
@@ -446,19 +452,56 @@ describe('Ansicht /customers — vier Zustände, lange Namen, Tokens', () => {
     expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgb\(|green-|amber-|purple-|blue-/)
   })
 
-  it('Sortierung: Auswahl ohne Richtung, Umschalter nennt die Richtung; ?richtung=auf kehrt die Liste um', () => {
+  it('Sortierung hinter EINEM Knopf „Sortieren" (freigabe.md §12 Nr. 45): keine Auswahlliste und kein Richtungsknopf mehr auf der Seite', () => {
+    const html = renderToStaticMarkup(createElement(KundenAnsicht, { kunden: LISTE }))
+    expect(SORTIEREN_TEXT).toBe('Sortieren')
+    expect(html).not.toContain('<select')
+    expect(html).not.toContain('Reihenfolge umkehren')
+    const knopf = html.match(/<button[^>]*aria-haspopup="dialog"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? ''
+    expect(knopf).toContain('Sortieren')
+    // Was gerade gilt, hört der Screenreader am Knopf.
+    expect(knopf).toContain(sortierungBeschreibung('bestellungen', 'ab'))
+    expect(sortierungBeschreibung('bestellungen', 'ab')).toBe('Anzahl Bestellungen – Meiste zuerst')
+    expect(sortierungBeschreibung('name', 'auf')).toBe('Name – A bis Z')
+  })
+
+  it('?richtung=auf und ?sortierung= wirken weiter auf die Liste', () => {
     const ab = renderToStaticMarkup(createElement(KundenAnsicht, { kunden: LISTE }))
-    expect(ab).toContain('Anzahl Bestellungen')
-    expect(ab).toContain('Meiste zuerst')
-    expect(ab).toContain('Reihenfolge umkehren')
-    expect(ab).toContain('lucide-arrow-down-wide-narrow')
     navigation.parameter = 'richtung=auf'
     const auf = renderToStaticMarkup(createElement(KundenAnsicht, { kunden: LISTE }))
-    expect(auf).toContain('Wenigste zuerst')
-    expect(auf).toContain('lucide-arrow-up-narrow-wide')
     const reihenfolge = (html: string) => [...html.matchAll(/<table[\s\S]*?<\/table>/g)][0][0].match(/href="\/customers\/([a-z])/g)
     expect(reihenfolge(ab)).toEqual(['href="/customers/a', 'href="/customers/c', 'href="/customers/b'])
     expect(reihenfolge(auf)).toEqual(['href="/customers/b', 'href="/customers/c', 'href="/customers/a'])
+    expect(auf).toContain(sortierungBeschreibung('bestellungen', 'auf'))
+  })
+
+  it('das Blatt hinter „Sortieren": fünf Sortierungen und zwei Richtungen als echte Radioknöpfe, die gewählten angehakt', () => {
+    const html = renderToStaticMarkup(
+      createElement(SortierFelder, { sortierung: 'umsatz', richtung: 'ab', onSortierung: () => {}, onRichtung: () => {} })
+    )
+    expect(html.match(/type="radio"[^>]*name="kunden-sortierung"|name="kunden-sortierung"[^>]*type="radio"/g)).toHaveLength(KUNDEN_SORTIERUNG_WERTE.length)
+    expect(html.match(/type="radio"[^>]*name="kunden-richtung"|name="kunden-richtung"[^>]*type="radio"/g)).toHaveLength(2)
+    for (const s of KUNDEN_SORTIERUNG_WERTE) expect(html).toContain(KUNDEN_SORTIERUNG_LABEL[s])
+    // Die Richtung heißt, was sie bei dieser Sortierung tut — die Standardrichtung zuerst.
+    expect(html.indexOf('Höchster zuerst')).toBeGreaterThan(-1)
+    expect(html.indexOf('Höchster zuerst')).toBeLessThan(html.indexOf('Niedrigster zuerst'))
+    expect(html.match(/checked=""/g)).toHaveLength(2)
+    expect(html).toContain('<fieldset')
+    expect(html).toContain('<legend')
+  })
+
+  it('höchstens zwei Filter sichtbar: Alle und Stammkunden — ein anderer gewählter Filter tritt an die Stelle von Stammkunden', () => {
+    expect(sichtbareKundenFilter('alle')).toEqual(['alle', 'stammkunden'])
+    expect(sichtbareKundenFilter('stammkunden')).toEqual(['alle', 'stammkunden'])
+    expect(sichtbareKundenFilter('lange')).toEqual(['alle', 'lange'])
+    for (const f of KUNDEN_FILTER_WERTE) {
+      expect(sichtbareKundenFilter(f).length).toBeLessThanOrEqual(2)
+      expect(sichtbareKundenFilter(f)).toContain(f)
+      navigation.parameter = f === 'alle' ? '' : `filter=${f}`
+      const html = renderToStaticMarkup(createElement(KundenAnsicht, { kunden: LISTE }))
+      expect(html.match(/data-slot="filter-chip"/g), f).toHaveLength(2)
+      expect(html).toContain(`>${KUNDEN_FILTER_LABEL[f]}<`)
+    }
   })
 
   it('ein Telefon aus Leerzeichen ist keins — kein Anrufen-Link', () => {

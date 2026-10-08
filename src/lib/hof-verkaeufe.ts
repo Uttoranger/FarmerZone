@@ -10,6 +10,8 @@ import { isOnlinePaidOrder } from '@/lib/sales-summary'
 import { CHANNEL_LABELS } from '@/schemas/manual-sale'
 import { wienKalendertag } from '@/lib/kalender'
 import { datumKurz } from '@/lib/verkauf-eintragen'
+import { formatEuro } from '@/lib/format'
+import { PROCESSING_REVENUE_LIMIT } from '@/lib/revenue-limit'
 
 /**
  * Die Zeile unter der Wochenzahl (Register F6, 22b). Die Summe ist nicht der
@@ -18,6 +20,16 @@ import { datumKurz } from '@/lib/verkauf-eintragen'
  * zählt. „Gesamt" versprach mehr, als die Zahl ist.
  */
 export const JAHRESSUMME_TEXT = 'Dieses Jahr (für die Umsatzgrenze)'
+
+/**
+ * Der Satz unter der Jahressumme: was die Umsatzgrenze ist (freigabe.md §12
+ * Nr. 45 — Fachwörter erklären; der Wortlaut darüber bleibt, wie F6 ihn
+ * festlegt). Die Grenze steht als Betrag da, aus derselben Quelle wie die
+ * Jahreskarte der Auswertung: „bis zu dieser Summe" las sich direkt unter der
+ * Jahressumme wie deren Betrag. Vereinfacht wie dort („keine Steuerberatung"):
+ * Gezählt wird ohne die als Urproduktion markierten Produkte.
+ */
+export const UMSATZGRENZE_ERKLAERUNG = `Umsatzgrenze heißt: Bis ${formatEuro(PROCESSING_REVENUE_LIMIT, 0)} im Jahr gilt der Verkauf von Verarbeitetem wie Brot, Most oder Wurst noch als Teil deiner Landwirtschaft – Rohes aus eigener Ernte zählt nicht mit.`
 
 /** Ein Direktverkauf, wie das Formular ihn zum Bearbeiten und Wiederholen braucht. */
 export type VerkaufDaten = {

@@ -22,10 +22,8 @@ import {
 } from '@/components/heute/heute-teile'
 import { FreischaltMoment } from '@/components/heute/freischalt-moment'
 import { ERSTE_SCHRITTE_AUS_COOKIE, ersteSchritteAnzeige, ersteSchritteAusgeblendet } from '@/lib/erste-schritte'
-import { datumLang, heuteAufbau, teilenKarte, teilenSatz, vergleichText, type HeuteBlock } from '@/lib/heute'
+import { datumLang, heuteAufbau, teilenSatz, vergleichText, type HeuteBlock } from '@/lib/heute'
 import { freischaltMomentMoeglich } from '@/lib/freischalt-moment'
-import { hofAdresse } from '@/lib/mein-hof'
-import { APP_URL } from '@/lib/umgebung-server'
 import { getTeilenFensterDaten } from '@/server/queries/teilen-bild'
 import { getTeilenWirkung } from '@/server/queries/teilen-wirkung'
 import { letzteTage, teilenWirkungSatz } from '@/lib/teilen-wirkung'
@@ -43,9 +41,11 @@ export const metadata: Metadata = {
  *
  * Packliste zuerst: Was wo steht, entscheidet heuteAufbau; Regeln und Zahlen
  * kommen aus src/lib/heute.ts und src/server/queries/heute.ts, hier wird nur
- * angeordnet. Ab 1280 px zwei Spalten (Hauptspalte links, Seitenspalte 360 px
- * rechts) — bei 1024 px neben der Seitenleiste wäre die Packliste zu schmal,
- * dort steht die Seitenspalte als Raster darunter.
+ * angeordnet. Oben höchstens EIN Kasten (Stripe), die Teilen-Zeile kompakt
+ * unter der Packliste (freigabe.md §12 Nr. 45). Ab 1280 px zwei Spalten
+ * (Hauptspalte links, Seitenspalte 360 px rechts) — bei 1024 px neben der
+ * Seitenleiste wäre die Packliste zu schmal, dort steht die Seitenspalte als
+ * Raster darunter.
  */
 export default async function HeutePage(): Promise<React.JSX.Element> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -76,17 +76,17 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
     ersteSchritteAusgeblendet(cookieJar.get(ERSTE_SCHRITTE_AUS_COOKIE)?.value, farm.id)
   )
 
-  const teilen = teilenKarte({ sichtbar: heute.hof.sichtbar, abholtag: heute.abholfensterHeute !== null })
+  // Teilen nur, solange Kunden den Hof sehen und bei ihm bestellen können (heuteHofSichtbar).
+  const teilen = heute.hof.sichtbar
   const aufbau = heuteAufbau({
-    // „pausiert" (Notbremse) oder „einrichten" (Register Z1) — nie beide, siehe stripeEinrichtenHinweis.
-    stripeHinweis: heute.onlinePausiert !== null || heute.stripeEinrichten,
+    // „pausiert" (Notbremse) oder „einrichten" (Register Z1) — nie beide; wo er steht, entscheidet getHeute.
+    stripe: heute.stripeOrt,
     teilen,
     ersteSchritte: ersteSchritteZeigen === 'karte',
   })
   const satz = teilenSatz(heute.angebot, heute.naechstesFenster?.fenster ?? null)
-  const adresse = hofAdresse(APP_URL, farm.slug).anzeige
   // Teilen-Fenster und „letzte Woche … über deine Links" (Nr. 21, Gate 7) —
-  // nur, wenn die Karte überhaupt steht.
+  // nur, wenn die Zeile überhaupt steht.
   const [fenster, wirkung] = teilen
     ? await Promise.all([getTeilenFensterDaten(farm.id, jetzt), getTeilenWirkung(farm.id, letzteTage(jetzt, 7))])
     : [null, null]
@@ -98,8 +98,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
     ) : (
       heute.stripeEinrichten && <StripeEinrichtenHinweis />
     ),
-    'teilen-schmal': teilen && <TeilenKarte form="schmal" hofName={farm.name} hofSlug={farm.slug} satz={satz} adresse={adresse} fenster={fenster} wirkung={wirkungSatz} />,
-    'teilen-gross': teilen && <TeilenKarte form="gross" hofName={farm.name} hofSlug={farm.slug} satz={satz} adresse={adresse} fenster={fenster} wirkung={wirkungSatz} />,
+    teilen: teilen && <TeilenKarte hofName={farm.name} hofSlug={farm.slug} satz={satz} fenster={fenster} wirkung={wirkungSatz} />,
     packliste: (
       <Packliste
         zeilen={heute.abholungen}

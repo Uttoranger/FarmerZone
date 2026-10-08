@@ -293,7 +293,7 @@ describe('einstellungenBereiche', () => {
 
   it('Futtermittel: Nummer mit Betriebsart grün und Sprung zum Abschnitt; ohne Nummer nur zur Info', () => {
     const mit = bereich(einstellungenBereiche(daten(), VOR_STICHTAG), 'futtermittel')
-    expect(mit).toMatchObject({ ton: 'fertig', zeile: 'Primärproduktion · AT 1234567', href: `/settings/profile#${BETRIEBSNUMMER_ANKER}` })
+    expect(mit).toMatchObject({ ton: 'fertig', zeile: 'Eigene Ernte (Primärproduktion) · AT 1234567', href: `/settings/profile#${BETRIEBSNUMMER_ANKER}` })
     expect(quelle('src/components/settings/profile-form.tsx')).toContain('BETRIEBSNUMMER_ANKER')
     const ohne = bereich(einstellungenBereiche(daten({ betriebsnummer: '  ' }), VOR_STICHTAG), 'futtermittel')
     expect(ohne.ton).toBe('neutral')

@@ -425,7 +425,7 @@ export const kategorieSetzenSchema = z
   .strict()
   .refine((d) => !istAltlastKategorie(d.category) && !istFuttermittel(d.category), {
     path: ['category'],
-    message: 'Futtermittel brauchen eine Kennzeichnung — bitte im Produkt selbst wählen.',
+    message: 'Futtermittel brauchen die Angaben vom Sackanhänger — bitte im Produkt selbst wählen.',
   })
   .refine((d) => d.subcategory === null || (!istAltlastUnterkategorie(d.subcategory) && gehoertZu(d.category, d.subcategory)), {
     path: ['subcategory'],

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ChevronRight, Inbox, PartyPopper, Printer } from 'lucide-react'
+import { CalendarCheck, ChevronRight, Inbox, PartyPopper, Printer } from 'lucide-react'
 import type { BestellungenSeite, HofBestellDetail, HofListenEintrag } from '@/server/queries/orders'
 import type { HofBestellFilter } from '@/schemas/hof-bestellungen'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -8,13 +8,15 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
+import { bestellListeHref } from '@/lib/hof-bestellungen'
+import { HEUTE_NIEMAND } from '@/lib/heute'
 import { cn } from '@/lib/utils'
 import { BestellDetail } from './bestell-detail'
 import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from './stil'
 
-/** `?filter=` nur, wenn es nicht der Standard ist — die Adresse bleibt kurz. */
+/** `?filter=` nur, wenn es nicht der Standard ist — die Adresse bleibt kurz (bestellListeHref). */
 export function filterSuche(filter: HofBestellFilter): string {
-  return filter === 'offen' ? '' : `?filter=${filter}`
+  return bestellListeHref(filter).slice('/orders'.length)
 }
 
 /**
@@ -62,7 +64,7 @@ export function BestellungenAnsicht({
         </div>
         <FilterChipReihe beschriftung="Bestellungen filtern">
           {seite.chips.map((chip) => (
-            <FilterChip key={chip.filter} href={`/orders${filterSuche(chip.filter)}`} aktiv={chip.filter === filter}>
+            <FilterChip key={chip.filter} href={bestellListeHref(chip.filter)} aktiv={chip.filter === filter}>
               {chip.text}
             </FilterChip>
           ))}
@@ -190,23 +192,21 @@ function LeereListe({ seite, filter }: { seite: BestellungenSeite; filter: HofBe
         titel="Alles erledigt"
         satz="Gerade wartet keine Bestellung auf dich."
         aktion={
-          <Link href="/orders?filter=erledigt" className={KNOPF_RAHMEN}>
+          <Link href={bestellListeHref('erledigt')} className={KNOPF_RAHMEN}>
             Erledigte ansehen
           </Link>
         }
       />
     )
   }
-  return (
-    <EmptyState
-      symbol={Inbox}
-      titel="Keine Bestellungen in dieser Ansicht"
-      satz="Wähle einen anderen Filter."
-      aktion={
-        <Link href="/orders?filter=alle" className={KNOPF_RAHMEN}>
-          Alle Bestellungen zeigen
-        </Link>
-      }
-    />
+  // „Heute abholen" oder „Erledigt" leer: Der Ausweg führt zu allem, was noch offen ist.
+  const ausweg = (
+    <Link href={bestellListeHref('offen')} className={KNOPF_RAHMEN}>
+      Noch offene ansehen
+    </Link>
   )
+  if (filter === 'heute') {
+    return <EmptyState symbol={CalendarCheck} titel={HEUTE_NIEMAND} satz="Alles, was noch abgeholt wird, steht unter „Noch offen“." aktion={ausweg} />
+  }
+  return <EmptyState symbol={Inbox} titel="Noch nichts erledigt" satz="Abgeholte, stornierte und nicht abgeholte Bestellungen stehen dann hier." aktion={ausweg} />
 }

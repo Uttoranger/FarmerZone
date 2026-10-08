@@ -9,7 +9,7 @@
  * Abholtags und fällt sicher in den Wiener Tag.
  */
 import { tagVersetzt, wienKalendertag } from '@/lib/kalender'
-import { abholChip, abholtagName, PACK_MARKE } from '@/lib/heute'
+import { ABHOLUNG_ERLEDIGT, HEUTE_ABHOLEN, abholChip, abholtagName, PACK_MARKE } from '@/lib/heute'
 import { formatSlotTime } from '@/lib/pickup-days'
 import { artikelFehltErlaubt } from '@/lib/artikel-fehlt'
 import type { HofBestellFilter } from '@/schemas/hof-bestellungen'
@@ -20,7 +20,8 @@ type StatusTon = 'offen' | 'fertig' | 'neutral'
 /** Noch nicht übergeben und nicht storniert — „offen" in Kopf und Filter. */
 export const OFFEN_STATUS: readonly string[] = ['PENDING_CONFIRMATION', 'PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY']
 const PACKEN_STATUS: readonly string[] = ['PAID', 'CONFIRMED', 'IN_PREPARATION']
-const ERLEDIGT_STATUS: readonly string[] = ['PICKED_UP', 'CANCELLED', 'NOT_PICKED_UP']
+/** Durch — dieselben Status, die Heute aus der Packliste nimmt (ABHOLUNG_ERLEDIGT). */
+const ERLEDIGT_STATUS: readonly string[] = ABHOLUNG_ERLEDIGT
 /** Aus diesen Status darf storniert werden — dieselbe Sperre wie cancelOrder. */
 const STORNIERBAR_NICHT: readonly string[] = ERLEDIGT_STATUS
 
@@ -32,21 +33,27 @@ export type ListenBestellung = {
   pickupTimeEnd: string
 }
 
-/** Was der Filter zeigt (`?filter=`, src/schemas/hof-bestellungen.ts). */
+/**
+ * Was der Filter zeigt (`?filter=`, src/schemas/hof-bestellungen.ts) — genau
+ * drei (freigabe.md §12 Nr. 45), zugeordnet über die vorhandenen Status, ohne
+ * neue Status-Logik:
+ * - „Noch offen": jeder Status, in dem noch etwas zu tun ist (OFFEN_STATUS) —
+ *   auch „wartet auf Kunde" und Überfälliges von früheren Tagen.
+ * - „Erledigt": abgeholt, storniert, nicht abgeholt. Beide zusammen sind alle
+ *   Bestellungen, jede steht in genau einem.
+ * - „Heute abholen": noch offen UND Abholtag heute in Wien — dieselben
+ *   Bestellungen wie die Packliste auf Heute (abholWhere).
+ * Gerechnet wird beim Lesen mit `jetzt`; verwaiste Bestellungen hat die Seite
+ * vorher freigegeben (gibVerwaisteFreiOhneRisiko: Frist gilt beim Lesen).
+ */
 export function passtZumFilter(b: Pick<ListenBestellung, 'status' | 'pickupDate'>, filter: HofBestellFilter, jetzt: Date): boolean {
   switch (filter) {
     case 'offen':
       return OFFEN_STATUS.includes(b.status)
     case 'heute':
-      return wienKalendertag(b.pickupDate) === wienKalendertag(jetzt)
-    case 'packen':
-      return PACKEN_STATUS.includes(b.status)
-    case 'gepackt':
-      return b.status === 'READY'
+      return OFFEN_STATUS.includes(b.status) && wienKalendertag(b.pickupDate) === wienKalendertag(jetzt)
     case 'erledigt':
       return ERLEDIGT_STATUS.includes(b.status)
-    case 'alle':
-      return true
   }
 }
 
@@ -57,13 +64,15 @@ export function filterChips(
 ): Array<{ filter: HofBestellFilter; text: string }> {
   const zahl = (f: HofBestellFilter) => bestellungen.filter((b) => passtZumFilter(b, f, jetzt)).length
   return [
-    { filter: 'offen', text: `Offen · ${zahl('offen')}` },
-    { filter: 'heute', text: `Heute · ${zahl('heute')}` },
-    { filter: 'packen', text: `Zum Packen · ${zahl('packen')}` },
-    { filter: 'gepackt', text: `Gepackt · ${zahl('gepackt')}` },
+    { filter: 'heute', text: `${HEUTE_ABHOLEN} · ${zahl('heute')}` },
+    { filter: 'offen', text: `Noch offen · ${zahl('offen')}` },
     { filter: 'erledigt', text: 'Erledigt' },
-    { filter: 'alle', text: 'Alle' },
   ]
+}
+
+/** Die Adresse der Liste mit diesem Filter — der Standard „Noch offen" ohne Parameter, die Adresse bleibt kurz. */
+export function bestellListeHref(filter: HofBestellFilter): string {
+  return filter === 'offen' ? '/orders' : `/orders?filter=${filter}`
 }
 
 /** „5 offen · 2 gepackt" unter der Überschrift. */
@@ -103,14 +112,14 @@ export type BestellGruppe<T> = {
 
 /**
  * Die Liste je Abholfenster (Tag + Zeit). Offenes von früh nach spät — was als
- * Nächstes abgeholt wird, steht oben; Erledigtes und „Alle" von neu nach alt.
+ * Nächstes abgeholt wird, steht oben; Erledigtes von neu nach alt.
  */
 export function gruppiereNachAbholfenster<T extends ListenBestellung>(
   bestellungen: readonly T[],
   filter: HofBestellFilter,
   jetzt: Date
 ): BestellGruppe<T>[] {
-  const absteigend = filter === 'erledigt' || filter === 'alle'
+  const absteigend = filter === 'erledigt'
   const sortiert = bestellungen
     .filter((b) => passtZumFilter(b, filter, jetzt))
     .toSorted((a, b) => {

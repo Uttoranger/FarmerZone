@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Bell, ChevronLeft, Mail, MessageCircle, Phone } from 'lucide-react'
 import type { CustomerDetail } from '@/server/queries/customers'
 import { initialen, kundeSeitText, kundenMarke, tageSeit, vorTagenText, weitereBestellungen } from '@/lib/hof-kunden'
-import { bestellMarke } from '@/lib/hof-bestellungen'
+import { bestellListeHref, bestellMarke } from '@/lib/hof-bestellungen'
 import { centsAlsEuro, formatEuro, formatZahl } from '@/lib/format'
 import { toWaPhone } from '@/lib/whatsapp'
 import { ListGruppe, ListRow } from '@/components/ui/list-row'
@@ -126,7 +126,8 @@ export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: D
             {rest > 0 && (
               <p className={cn('text-[13px]', LEISE)}>
                 {rest} weitere {rest === 1 ? 'Bestellung findest' : 'Bestellungen findest'} du unter{' '}
-                <Link href="/orders?filter=alle" className={cn('rounded font-medium text-foreground underline underline-offset-2', FOKUS_RAHMEN)}>
+                {/* Ältere Bestellungen sind fast immer durch: der Filter „Erledigt" (einen für alle gibt es seit Nr. 45 nicht mehr). */}
+                <Link href={bestellListeHref('erledigt')} className={cn('rounded font-medium text-foreground underline underline-offset-2', FOKUS_RAHMEN)}>
                   Bestellungen
                 </Link>
                 .

@@ -29,6 +29,7 @@ import { hofInitialen } from '@/lib/hof-initialen'
 import { vorschauLink } from '@/lib/hofseite-vorschau'
 import {
   HOF_NEU_ANDERES_TITEL,
+  HOF_NEU_KNOPF,
   HOF_NEU_TITEL,
   VERKAUF_UND_KUNDEN_TITEL,
   ABMELDEN_LABEL,
@@ -41,7 +42,7 @@ import {
 } from '@/lib/bauern-navigation'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
-import { BottomNav, BottomNavLink, BottomNavMitte, bottomNavEintragKlassen, mittelknopfKlassen } from '@/components/ui/bottom-nav'
+import { BottomNav, BottomNavLink, BottomNavMitte, bottomNavEintragKlassen, mittelknopfMitWortKlassen, mittelkreisKlassen } from '@/components/ui/bottom-nav'
 import { SidebarEintrag, SidebarGruppe } from '@/components/ui/sidebar-gruppe'
 import { ListGruppe, ListRow } from '@/components/ui/list-row'
 import { Zaehler } from '@/components/ui/zaehler'
@@ -295,7 +296,7 @@ export function HofShell({ hofName, hofSlug, personName, isAdmin, zahlen, onAbme
               )}
             >
               <Plus className="size-[17px] shrink-0" strokeWidth={2.2} aria-hidden="true" />
-              <span className="flex-1">Neu</span>
+              <span className="flex-1">{HOF_NEU_KNOPF}</span>
               <ChevronDown
                 className="size-3.5 shrink-0 opacity-75 transition-transform group-data-[popup-open]:rotate-180"
                 strokeWidth={2}
@@ -399,12 +400,16 @@ export function HofShell({ hofName, hofSlug, personName, isAdmin, zahlen, onAbme
             return (
               <BottomNavMitte key="neu">
                 <Sheet open={offen === 'neu'} onOpenChange={wechsle('neu')}>
-                  <SheetTrigger aria-label="Neu erstellen" className={mittelknopfKlassen('orange')}>
-                    <Plus
-                      className={cn('size-6 motion-safe:transition-transform motion-safe:duration-200', offen === 'neu' && 'rotate-45')}
-                      strokeWidth={2.2}
-                      aria-hidden="true"
-                    />
+                  {/* Wort unter dem Plus (freigabe.md §12 Nr. 45): Kreis und Wort sind EIN Knopf. */}
+                  <SheetTrigger aria-label="Neu erstellen" className={mittelknopfMitWortKlassen()}>
+                    <span className={mittelkreisKlassen('orange')}>
+                      <Plus
+                        className={cn('size-6 motion-safe:transition-transform motion-safe:duration-200', offen === 'neu' && 'rotate-45')}
+                        strokeWidth={2.2}
+                        aria-hidden="true"
+                      />
+                    </span>
+                    <span>{HOF_NEU_KNOPF}</span>
                   </SheetTrigger>
                   <SheetBlatt className={ueberDerLeiste}>
                     <SheetTitle className="font-heading text-xl font-semibold">{HOF_NEU_TITEL}</SheetTitle>

@@ -18,9 +18,10 @@ export function BestellungenLaden({ modus }: { modus: 'liste' | 'detail' }): Rea
           </div>
           <div className="ml-auto size-11 rounded-full bg-muted md:w-44" />
         </div>
+        {/* Die drei Filter (seit Nr. 45): Heute abholen · N, Noch offen · N, Erledigt — Breiten von der fertigen Seite. */}
         <div className="flex gap-2 overflow-hidden">
-          {[20, 22, 28, 24, 22, 14].map((breite, i) => (
-            <div key={i} className="h-9 shrink-0 rounded-full bg-muted" style={{ width: `${breite * 4}px` }} />
+          {[138, 119, 84].map((breite, i) => (
+            <div key={i} className="h-9 shrink-0 rounded-full bg-muted" style={{ width: `${breite}px` }} />
           ))}
         </div>
       </div>

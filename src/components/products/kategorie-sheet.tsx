@@ -270,7 +270,7 @@ function SheetInhalt({
 
         {istFutterKachel && !futterAnlegenHref && (
           <p className="text-xs text-muted-foreground">
-            Ob es ein Einzel-, Allein- oder Ergänzungsfuttermittel ist, gibst du gleich in der Kennzeichnung an.
+            Ob es ein Einzel-, Allein- oder Ergänzungsfuttermittel ist, gibst du gleich bei den Angaben vom Sackanhänger an.
           </p>
         )}
       </div>

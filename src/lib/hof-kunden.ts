@@ -193,6 +193,23 @@ export const KUNDEN_FILTER_LABEL: Record<KundenFilter, string> = {
   neu: 'Neu',
 }
 
+/**
+ * Höchstens zwei Filter stehen als Chips da (freigabe.md §12 Nr. 45): „Alle"
+ * und „Stammkunden". Die übrigen Filter erreicht nur ein Link — der Tipp
+ * „Diese Kunden ansehen" (?filter=lange) oder ein altes Lesezeichen; ist einer
+ * davon gewählt, steht er an der Stelle von „Stammkunden", damit man sieht,
+ * was gerade gilt. Neue und Lange-weg-Kundinnen tragen ihre Marke in der
+ * Zeile, und „Sortieren" bringt sie nach vorn (Kunde seit, Letzte Bestellung).
+ */
+export const KUNDEN_FILTER_SICHTBAR: readonly KundenFilter[] = ['alle', 'stammkunden']
+
+export function sichtbareKundenFilter(aktiv: KundenFilter): KundenFilter[] {
+  return KUNDEN_FILTER_SICHTBAR.includes(aktiv) ? [...KUNDEN_FILTER_SICHTBAR] : [KUNDEN_FILTER_SICHTBAR[0], aktiv]
+}
+
+/** Der Knopf, hinter dem die Sortierung steht (freigabe.md §12 Nr. 45) — und der Titel des Blatts. */
+export const SORTIEREN_TEXT = 'Sortieren'
+
 /** Wonach sortiert wird — ohne Richtung; die nennt der Umschalter (`richtungText`). */
 export const KUNDEN_SORTIERUNG_LABEL: Record<KundenSortierung, string> = {
   bestellungen: 'Anzahl Bestellungen',
@@ -217,6 +234,11 @@ export function richtungText(sortierung: KundenSortierung, richtung: KundenRicht
 
 export function andereRichtung(richtung: KundenRichtung): KundenRichtung {
   return richtung === 'auf' ? 'ab' : 'auf'
+}
+
+/** „Anzahl Bestellungen – Meiste zuerst": was gerade gilt, für den Screenreader am Knopf „Sortieren". */
+export function sortierungBeschreibung(sortierung: KundenSortierung, richtung: KundenRichtung): string {
+  return `${KUNDEN_SORTIERUNG_LABEL[sortierung]} – ${richtungText(sortierung, richtung)}`
 }
 
 type FilterKunde = Pick<KundenZusammenfassung, 'isStammkunde' | 'isDiesenMonatAktiv' | 'isLangeNichtGesehen' | 'isNeu'>

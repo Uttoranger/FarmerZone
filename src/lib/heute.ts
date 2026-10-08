@@ -206,7 +206,7 @@ export const BRAUCHT_DICH_EINZELN = 3
 export const UEBERFAELLIG_EINZELN = 5
 
 export type BrauchtDichEintrag = {
-  art: 'ueberfaellig' | 'ausverkauft' | 'ohne-kategorie' | 'status'
+  art: 'stripe' | 'ueberfaellig' | 'ausverkauft' | 'ohne-kategorie' | 'status'
   text: string
   href: string
   /** Überfällige Abholungen: jede Bestellung mit eigenem Link. */
@@ -224,7 +224,19 @@ export type BrauchtDichDaten = {
   ohneKategorie: { id: string; name: string }[]
   /** statusReminder (dashboard-hints.ts): null = nicht fällig. */
   statusErinnerung: number | 'never' | null
+  /**
+   * Der Stripe-Hinweis gehört hierher statt oben auf die Seite
+   * (stripeHinweisOrt === 'braucht-dich'): Oben steht schon der Balken der Shell.
+   */
+  stripe: boolean
 }
+
+/**
+ * Die Zeile, wenn der Stripe-Hinweis nicht oben stehen kann (stripeHinweisOrt).
+ * Ohne „bar"-Versprechen: Ein Hof, der auf die Freischaltung wartet, nimmt
+ * noch gar keine Bestellungen an.
+ */
+export const STRIPE_BRAUCHT_DICH_TEXT = 'Online-Zahlung noch nicht fertig — Stripe braucht noch Angaben von dir'
 
 const TAG_KURZ = new Intl.DateTimeFormat('de-AT', {
   timeZone: 'Europe/Vienna',
@@ -243,6 +255,10 @@ function mehrzahl(n: number, eins: string, viele: string): string {
  */
 export function brauchtDich(daten: BrauchtDichDaten): BrauchtDichEintrag[] {
   const eintraege: BrauchtDichEintrag[] = []
+
+  // Zuerst — oben auf der Seite hätte Stripe Vorrang: Ohne fertiges Stripe
+  // zahlt niemand online, und ein wartender Hof wird nicht freigeschaltet (Z1).
+  if (daten.stripe) eintraege.push({ art: 'stripe', text: STRIPE_BRAUCHT_DICH_TEXT, href: '/settings/payments' })
 
   const { anzahl, juengste } = daten.ueberfaellig
   if (anzahl > 0) {
@@ -389,10 +405,38 @@ export function packliste(bestellungen: readonly PacklistenBestellung[]): Packli
 
 export type PacklistenZahlen = { bestellungen: number; zuPacken: number }
 
-/** „Bestellungen heute" und „Noch zu packen" — gezählt an derselben Liste, die die Seite zeigt. */
+/** „Heute abholen" und „Noch zu packen" — gezählt an derselben Liste, die die Seite zeigt. */
 export function packlistenZahlen(zeilen: readonly PacklistenZeile[]): PacklistenZahlen {
   return { bestellungen: zeilen.length, zuPacken: zeilen.filter((z) => z.chip === 'vorbereiten').length }
 }
+
+// ─── Kennzahlen (freigabe.md §12 Nr. 45) ────────────────────────────────────
+
+/**
+ * „Heute abholen": Abholtag heute, weder abgeholt noch storniert noch „nicht
+ * abgeholt" — dieselben Bestellungen wie die Packliste und das Papier
+ * (abholWhere). EIN Wort für die Kennzahl auf Heute und den Filter in
+ * Bestellungen (hof-bestellungen.ts).
+ */
+export const HEUTE_ABHOLEN = 'Heute abholen'
+
+/**
+ * Die drei Kennzahlen auf Heute (Register F4). Vorher „Bestellungen heute"
+ * und „Umsatz heute": Waren alle Bestellungen abgeholt, stand „0" neben
+ * „€ 178" — die Zahl zählt nur offene Abholungen, der Betrag dagegen die
+ * heute abgeholten Bestellungen UND die Direktverkäufe (Hofladen, Markt …,
+ * umsatzHeuteCent). Jetzt sagt jede Kennzahl, was sie zählt; der Zusatz steht
+ * unter dem Betrag.
+ */
+export const KENNZAHL_TEXT = {
+  abholen: HEUTE_ABHOLEN,
+  packen: 'Noch zu packen',
+  eingenommen: 'Heute eingenommen',
+  eingenommenMit: 'mit Hofladen',
+} as const
+
+/** Der Leerzustand der Packliste — auch der des Filters „Heute abholen" in Bestellungen. */
+export const HEUTE_NIEMAND = 'Heute holt niemand etwas ab.'
 
 // ─── Abholfenster ───────────────────────────────────────────────────────────
 
@@ -484,9 +528,7 @@ export function umsatzHeuteCent(buchungen: UmsatzBuchung[], jetzt: Date): number
   return summeCent(buchungen, { von: abholtage(jetzt).heute.von, bis: jetzt })
 }
 
-// ─── Teilen-Karte ───────────────────────────────────────────────────────────
-
-export type TeilenForm = 'schmal' | 'gross' | null
+// ─── Teilen-Zeile ───────────────────────────────────────────────────────────
 
 /**
  * Sehen Kunden den Hof und können sie bei ihm bestellen? Nur im Zustand
@@ -501,17 +543,6 @@ export function heuteHofSichtbar(hof: {
   archivedAt: Date | null
 }): boolean {
   return hofZustand(hof).art === 'sichtbar'
-}
-
-/**
- * DESIGN_SYSTEM „Teilen": groß an Tagen ohne Abholung, schmale orange Zeile an
- * Abholtagen — die Packliste hat Vorrang. Nie, solange der Hof nicht sichtbar
- * ist (heuteHofSichtbar): ein Link ins Leere oder auf einen pausierten Hof
- * wäre irreführend.
- */
-export function teilenKarte({ sichtbar, abholtag }: { sichtbar: boolean; abholtag: boolean }): TeilenForm {
-  if (!sichtbar) return null
-  return abholtag ? 'schmal' : 'gross'
 }
 
 /**
@@ -536,39 +567,51 @@ export function teilenSatz(angebot: readonly string[], fenster: NaechstesFenster
 
 export type HeuteBlock =
   | 'stripe'
-  | 'teilen-schmal'
   | 'packliste'
+  | 'teilen'
   | 'braucht-dich'
-  | 'teilen-gross'
   | 'erste-schritte'
   | 'naechste-abholung'
   | 'woche'
   | 'hofseite'
 
+export type StripeHinweisOrt = 'oben' | 'braucht-dich' | null
+
 /**
- * Welche Blöcke wo stehen. Die Packliste beginnt immer die Hauptspalte
- * (Gate 5: „Packliste zuerst"); oben stehen nur der Stripe-Hinweis —
- * „pausiert" oder „einrichten" (Z1); bis er erledigt ist, können Kunden nicht
- * online zahlen — und die schmale
- * Teilen-Zeile. Die Seitenspalte steht am Handy unter der Hauptspalte.
+ * Wo der Stripe-Hinweis steht — „pausiert" (Notbremse) oder „einrichten"
+ * (Register Z1); bis er erledigt ist, können Kunden nicht online zahlen. Oben
+ * auf Heute steht höchstens EIN Kasten, und Stripe hat Vorrang (freigabe.md
+ * §12 Nr. 45). Zeigt die Shell dort schon ihren Balken (wartet auf
+ * Freischaltung, stillgelegt — hofBalkenArt), wird der Hinweis die erste
+ * Zeile von „Braucht dich": Den Balken des Layouts kann die Seite nicht
+ * verdrängen, und so geht der Hinweis nicht verloren.
+ */
+export function stripeHinweisOrt({ hinweis, hofBalken }: { hinweis: boolean; hofBalken: boolean }): StripeHinweisOrt {
+  if (!hinweis) return null
+  return hofBalken ? 'braucht-dich' : 'oben'
+}
+
+/**
+ * Welche Blöcke wo stehen (freigabe.md §12 Nr. 45). Oben höchstens EIN
+ * Kasten: der Stripe-Hinweis, wenn er oben steht. Die Hauptspalte beginnt
+ * immer mit der Packliste (Gate 5: „Packliste zuerst"), direkt darunter die
+ * kompakte Teilen-Zeile — nur bei sichtbarem Hof (heuteHofSichtbar) —, dann
+ * „Braucht dich". Die Seitenspalte steht am Handy unter der Hauptspalte.
  */
 export function heuteAufbau({
-  stripeHinweis,
+  stripe,
   teilen,
   ersteSchritte,
 }: {
-  stripeHinweis: boolean
-  teilen: TeilenForm
+  stripe: StripeHinweisOrt
+  teilen: boolean
   ersteSchritte: boolean
 }): { oben: HeuteBlock[]; haupt: HeuteBlock[]; seite: HeuteBlock[] } {
-  const oben: HeuteBlock[] = []
-  if (stripeHinweis) oben.push('stripe')
-  if (teilen === 'schmal') oben.push('teilen-schmal')
-  const seite: HeuteBlock[] = []
-  if (teilen === 'gross') seite.push('teilen-gross')
-  if (ersteSchritte) seite.push('erste-schritte')
+  const oben: HeuteBlock[] = stripe === 'oben' ? ['stripe'] : []
+  const haupt: HeuteBlock[] = teilen ? ['packliste', 'teilen', 'braucht-dich'] : ['packliste', 'braucht-dich']
+  const seite: HeuteBlock[] = ersteSchritte ? ['erste-schritte'] : []
   seite.push('naechste-abholung', 'woche', 'hofseite')
-  return { oben, haupt: ['packliste', 'braucht-dich'], seite }
+  return { oben, haupt, seite }
 }
 
 // ─── Online-Zahlung einrichten (Register Z1) ────────────────────────────────

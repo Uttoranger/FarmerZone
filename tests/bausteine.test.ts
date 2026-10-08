@@ -37,7 +37,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { GroessenWahl, Groessenkachel } from '@/components/ui/groessenkachel'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
-import { BottomNav, BottomNavLink, BottomNavMitte, mittelknopfKlassen } from '@/components/ui/bottom-nav'
+import { BottomNav, BottomNavLink, BottomNavMitte, mittelknopfKlassen, mittelknopfMitWortKlassen, mittelkreisKlassen } from '@/components/ui/bottom-nav'
 import { SidebarEintrag, SidebarGruppe } from '@/components/ui/sidebar-gruppe'
 import { Zaehler } from '@/components/ui/zaehler'
 
@@ -171,6 +171,24 @@ const FAELLE: Fall[] = [
       createElement(BottomNavLink, { href: '/orders', label: 'Bestellungen', symbol: Package, zahl: 3, zahlWofuer: 'offene Bestellungen' })
     ),
     merkmale: ['<nav aria-label="Hauptnavigation"', '<a href="/dashboard" aria-current="page"', 'aria-label="Neu anlegen"', 'bg-primary', '3 offene Bestellungen', 'safe-area-inset-bottom'],
+  },
+  {
+    name: 'BottomNav: Mittelknopf mit Wort (Hof „Neu")',
+    datei: 'bottom-nav',
+    element: el(BottomNav,
+      {},
+      el(
+        BottomNavMitte,
+        {},
+        createElement(
+          'button',
+          { type: 'button', 'aria-label': 'Neu erstellen', className: mittelknopfMitWortKlassen() },
+          createElement('span', { className: mittelkreisKlassen('orange') }, '+'),
+          createElement('span', null, 'Neu')
+        )
+      )
+    ),
+    merkmale: ['aria-label="Neu erstellen"', 'flex-col', 'size-[54px]', 'bg-primary', '>Neu<'],
   },
   {
     name: 'Sidebar-Gruppe mit Zähler',

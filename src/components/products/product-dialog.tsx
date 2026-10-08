@@ -103,6 +103,8 @@ import {
   FUTTER_BESTAETIGUNG_AUSNAHME,
   FUTTER_BESTAETIGUNG_NEU,
   FUTTER_BESTAETIGUNG_TEXT,
+  KENNZEICHNUNG_ERKLAERUNG,
+  KENNZEICHNUNG_FUNDORT,
   brauchtNeueBestaetigung,
   futterStandAusFormular,
 } from '@/lib/futter-registrierung'
@@ -1594,7 +1596,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                     <AccordionPanel>
                       <div className="space-y-4">
                         <p className="text-xs text-muted-foreground">
-                          Alle Angaben findest du auf dem Sackanhänger oder Lieferschein deines Futters.
+                          {KENNZEICHNUNG_ERKLAERUNG} {KENNZEICHNUNG_FUNDORT}
                         </p>
 
                         {/* Futtermittelart: nur die nach Tabelle 2.4 erlaubten Werte. Bei
@@ -1928,14 +1930,14 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
       onUebernehmen={({ category: neu, subcategory: sorte }) => kategorieUebernehmen(neu, sorte)}
     />
 
-    {/* Rückfrage: Kategoriewechsel weg von Futtermittel löscht die Kennzeichnung */}
+    {/* Rückfrage: Kategoriewechsel weg von Futtermittel löscht die Kennzeichnung (ohne das Fachwort, Nr. 45) */}
     <Dialog open={kategorieWechsel !== null} onOpenChange={(o) => !o && setKategorieWechsel(null)}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Kennzeichnung löschen?</DialogTitle>
+          <DialogTitle>Futter-Angaben löschen?</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Wenn das Produkt kein Futtermittel mehr ist, wird die Kennzeichnung beim Speichern
+          Wenn das Produkt kein Futtermittel mehr ist, werden seine Angaben vom Sackanhänger beim Speichern
           gelöscht. Die Angaben musst du dann neu eintippen, falls du sie wieder brauchst.
         </p>
         <DialogFooter>

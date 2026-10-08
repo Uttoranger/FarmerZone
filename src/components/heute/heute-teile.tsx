@@ -20,13 +20,14 @@ import { HofTeilenKnopf } from '@/components/farmer/hof-teilen-knopf'
 import { TeilenFensterKnopf } from '@/components/teilen/teilen-fenster'
 import type { TeilenFensterDaten } from '@/lib/teilen-fenster'
 import {
+  HEUTE_NIEMAND,
+  KENNZAHL_TEXT,
   PACK_MARKE,
   naechsteAbholungText,
   type BrauchtDichEintrag,
   type NaechsteAbholung,
   type NaechstesFenster,
   type PacklistenZeile,
-  type TeilenForm,
   type WochenBalken,
 } from '@/lib/heute'
 import { onlinePausiertHinweis } from '@/lib/stripe-konto'
@@ -78,18 +79,37 @@ export function HeuteKopf({ datum, abholungHeute }: { datum: string; abholungHeu
 
 // ─── Kennzahlen ─────────────────────────────────────────────────────────────
 
-function Kennzahl({ titel, wert, offen = false }: { titel: string; wert: string; offen?: boolean }) {
+function Kennzahl({
+  titel,
+  wert,
+  zusatz,
+  offen = false,
+  className,
+}: {
+  titel: string
+  wert: string
+  /** Leiser Satz unter dem Wert — was die Zahl mitzählt. */
+  zusatz?: string
+  offen?: boolean
+  className?: string
+}) {
   return (
-    <div className={cn(KARTE, 'min-w-0 px-3 py-3 md:px-[18px] md:py-4')}>
-      {/* Am Handy dürfen die Bezeichnungen zweizeilig werden („Bestellungen heute" bei 110 px). */}
-      <p className={cn('line-clamp-2 min-h-[2lh] text-xs leading-snug break-words md:min-h-0 md:text-[13px]', LEISE)}>{titel}</p>
+    <div className={cn(KARTE, 'min-w-0 px-3 py-3 md:px-[18px] md:py-4', className)}>
+      <p className={cn('line-clamp-2 text-xs leading-snug break-words md:text-[13px]', LEISE)}>{titel}</p>
       <p className={cn('mt-1 truncate font-heading text-[22px] font-semibold tabular-nums md:mt-1.5 md:text-[26px]', offen && 'text-status-offen')}>
         {wert}
       </p>
+      {zusatz && <p className={cn('mt-0.5 text-xs leading-snug md:text-[13px]', LEISE)}>{zusatz}</p>}
     </div>
   )
 }
 
+/**
+ * Die drei Kennzahlen (Register F4) mit Bezeichnungen, die sagen, was sie
+ * zählen (KENNZAHL_TEXT, freigabe.md §12 Nr. 45). Bis 1024 px zwei Spalten,
+ * der Betrag darunter über die ganze Breite — bei drei schmalen Spalten kürzte
+ * „€ 178,00" zu „€ 178,…".
+ */
 export function Kennzahlen({
   bestellungen,
   zuPacken,
@@ -100,10 +120,15 @@ export function Kennzahlen({
   umsatzHeuteCent: number
 }): React.JSX.Element {
   return (
-    <section aria-label="Heute in Zahlen" className="grid grid-cols-3 gap-2.5 md:gap-4">
-      <Kennzahl titel="Bestellungen heute" wert={String(bestellungen)} />
-      <Kennzahl titel="Noch zu packen" wert={String(zuPacken)} offen={zuPacken > 0} />
-      <Kennzahl titel="Umsatz heute" wert={formatEuro(centsAlsEuro(umsatzHeuteCent))} />
+    <section aria-label="Heute in Zahlen" className="grid grid-cols-2 gap-2.5 md:gap-4 lg:grid-cols-3">
+      <Kennzahl titel={KENNZAHL_TEXT.abholen} wert={String(bestellungen)} />
+      <Kennzahl titel={KENNZAHL_TEXT.packen} wert={String(zuPacken)} offen={zuPacken > 0} />
+      <Kennzahl
+        titel={KENNZAHL_TEXT.eingenommen}
+        wert={formatEuro(centsAlsEuro(umsatzHeuteCent))}
+        zusatz={KENNZAHL_TEXT.eingenommenMit}
+        className="col-span-2 lg:col-span-1"
+      />
     </section>
   )
 }
@@ -157,78 +182,45 @@ export function StripeEinrichtenHinweis(): React.JSX.Element {
   )
 }
 
-// ─── Teilen-Karte ───────────────────────────────────────────────────────────
+// ─── Teilen-Zeile ───────────────────────────────────────────────────────────
 
 /**
- * Schmal an Abholtagen (eine orange Zeile, die Packliste hat Vorrang), groß an
- * Tagen ohne Abholung. Seit Nr. 21 (Gate 7) öffnet der Knopf das
+ * Teilen als EINE kompakte Zeile direkt unter der Packliste (freigabe.md §12
+ * Nr. 45) — an jedem Tag; bis dahin stand sie an Abholtagen oben neben dem
+ * Stripe-Hinweis und an anderen Tagen als große Karte in der Seitenspalte.
+ * Knopf rechts statt darunter, auch am Handy (Mockup
+ * mobil-h3-heute-mit-teilen-karte). Seit Nr. 21 (Gate 7) öffnet der Knopf das
  * Teilen-Fenster mit Bild und Kanälen, wenn die Seite dessen Daten mitgibt;
  * sonst bleibt es beim einfachen Teilen der Hofseite (teileHof).
  */
 export function TeilenKarte({
-  form,
   hofName,
   hofSlug,
   satz,
-  adresse,
   fenster = null,
   wirkung = null,
 }: {
-  form: Exclude<TeilenForm, null>
   hofName: string
   hofSlug: string
   satz: string
-  /** „farmerzone.at/hof" (hofAdresse) — als Link auf die Hofseite. */
-  adresse: string
   /** Daten des Teilen-Fensters (Nr. 21); ohne sie das einfache Teilen. */
   fenster?: TeilenFensterDaten | null
   /** „14 Besuche über deine Links" der letzten Woche (teilenWirkungSatz). */
   wirkung?: string | null
 }): React.JSX.Element {
-  const knopf = (label: string, klasse: string) =>
-    fenster ? (
-      <TeilenFensterKnopf daten={fenster} label={label} className={klasse} />
-    ) : (
-      <HofTeilenKnopf name={hofName} slug={hofSlug} label={label} className={klasse} />
-    )
-  if (form === 'schmal') {
-    // Eine Zeile auch am Handy (Mockup mobil-h3-heute-mit-teilen-karte): Knopf
-    // rechts statt darunter, damit die Packliste nicht nach unten rutscht.
-    return (
-      <div className="flex items-center gap-3 rounded-2xl border border-primary/45 bg-primary/12 py-2.5 pr-2.5 pl-3.5 text-[13px] md:gap-3.5 md:px-4 md:py-3 md:text-[13.5px]">
-        <Share2 className="hidden size-5 shrink-0 text-status-offen sm:block" strokeWidth={1.7} aria-hidden="true" />
-        <p className="min-w-0 flex-1 line-clamp-2 break-words">
-          <strong className="font-semibold">Diese Woche bei dir:</strong> {satz}
-          {wirkung && <span className="text-muted-foreground"> · letzte Woche {wirkung}</span>}
-        </p>
-        {knopf('Teilen', KNOPF_ORANGE)}
-      </div>
-    )
-  }
   return (
-    <section aria-labelledby="heute-teilen" className="flex flex-col gap-3 rounded-2xl border border-primary/45 bg-primary/12 p-[18px]">
-      <span className="flex size-10 items-center justify-center rounded-full bg-primary/20">
-        <Share2 className="size-5 text-status-offen" strokeWidth={1.7} aria-hidden="true" />
-      </span>
-      <div className="min-w-0">
-        <h2 id="heute-teilen" className="font-heading text-lg font-semibold">
-          Erzähl, was es diese Woche gibt
-        </h2>
-        <p className="mt-1 line-clamp-3 text-[13.5px] break-words">{satz}</p>
-        {wirkung && <p className="mt-1 text-[12.5px] text-muted-foreground">Letzte Woche {wirkung}.</p>}
-        <a
-          href={`/${hofSlug}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          // min-h-11: 44 px Trefferfläche; der Text kürzt im inneren span (truncate braucht block).
-          className={cn('flex min-h-11 max-w-full items-center rounded-md text-[13px] font-medium text-status-fertig underline-offset-2 hover:underline', FOKUS_RAHMEN)}
-          title={adresse}
-        >
-          <span className="min-w-0 truncate">{adresse}</span>
-        </a>
-      </div>
-      {knopf('Hof teilen', cn(KNOPF_ORANGE, 'w-full rounded-[14px]'))}
-    </section>
+    <div className="flex items-center gap-3 rounded-2xl border border-primary/45 bg-primary/12 py-2.5 pr-2.5 pl-3.5 text-[13px] md:gap-3.5 md:px-4 md:py-3 md:text-[13.5px]">
+      <Share2 className="hidden size-5 shrink-0 text-status-offen sm:block" strokeWidth={1.7} aria-hidden="true" />
+      <p className="min-w-0 flex-1 line-clamp-2 break-words">
+        <strong className="font-semibold">Diese Woche bei dir:</strong> {satz}
+        {wirkung && <span className="text-muted-foreground"> · letzte Woche {wirkung}</span>}
+      </p>
+      {fenster ? (
+        <TeilenFensterKnopf daten={fenster} label="Teilen" className={KNOPF_ORANGE} />
+      ) : (
+        <HofTeilenKnopf name={hofName} slug={hofSlug} label="Teilen" className={KNOPF_ORANGE} />
+      )}
+    </div>
   )
 }
 
@@ -310,7 +302,7 @@ export function Packliste({
       {zeilen.length === 0 ? (
         <EmptyState
           symbol={PackageOpen}
-          titel="Heute holt niemand etwas ab."
+          titel={HEUTE_NIEMAND}
           satz={
             leer.abholfenster
               ? `Nächste Abholung: ${leer.abholfenster.name}, ${leer.abholfenster.zeit}.`
@@ -354,6 +346,7 @@ export function Packliste({
 // ─── Braucht dich ───────────────────────────────────────────────────────────
 
 const BRAUCHT_DICH_SYMBOL: Record<BrauchtDichEintrag['art'], LucideIcon> = {
+  stripe: CreditCard,
   ueberfaellig: Clock,
   ausverkauft: PackageX,
   'ohne-kategorie': Tags,

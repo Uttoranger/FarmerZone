@@ -3,25 +3,23 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { ArrowDownWideNarrow, ArrowUpNarrowWide, Bell, Phone, Search, Users } from 'lucide-react'
+import { Bell, Phone, Search, Users } from 'lucide-react'
 import type { CustomerSummary } from '@/server/queries/customers'
 import {
   KUNDEN_FILTER_LABEL,
-  KUNDEN_SORTIERUNG_LABEL,
   ZURUECKHOLEN_AB,
-  andereRichtung,
   filtereKunden,
   initialen,
   kundenAdresse,
   kundenKopfzeile,
   kundenMarke,
-  richtungText,
+  sichtbareKundenFilter,
   sortiereKunden,
   vorTagenText,
   zaehleKundenFilter,
   zuletztText,
 } from '@/lib/hof-kunden'
-import { KUNDEN_FILTER_WERTE, KUNDEN_SORTIERUNG_WERTE, kundenAnsichtAus, kundenAnsichtSchema, type KundenAnsicht as Ansicht } from '@/schemas/hof-kunden'
+import { kundenAnsichtAus, type KundenAnsicht as Ansicht } from '@/schemas/hof-kunden'
 import { centsAlsEuro, formatEuro, mitAnzahl } from '@/lib/format'
 import { EMAIL_MAX } from '@/lib/eingabegrenzen'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
@@ -31,6 +29,7 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { KARTE, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
 import { cn } from '@/lib/utils'
+import { KundenSortieren } from './kunden-sortieren'
 
 /*
  * Kunden des Hofs in der HofShell (Gate 8 „Code ohne Mockup", Nachtlauf
@@ -39,6 +38,8 @@ import { cn } from '@/lib/utils'
  * stehen in der Adresse (?filter=, ?suche=, ?sortierung=, ?richtung=) und werden im
  * Browser angewandt (replaceState, kein Server-Aufruf je Tipp). Was eine
  * Zeile sagt, entscheidet src/lib/hof-kunden.ts; hier wird nur angeordnet.
+ * Seit Nr. 45 (freigabe.md §12): höchstens zwei Filter-Chips, die Sortierung
+ * hinter dem Knopf „Sortieren" (kunden-sortieren.tsx).
  */
 
 const euro = (cents: number) => formatEuro(centsAlsEuro(cents))
@@ -80,7 +81,7 @@ export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.
         <>
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
             <FilterChipReihe beschriftung="Kunden filtern" className="min-w-0 xl:flex-1">
-              {KUNDEN_FILTER_WERTE.map((f) => {
+              {sichtbareKundenFilter(ansicht.filter).map((f) => {
                 const adresse = kundenAdresse({ ...aktuell, filter: f })
                 return (
                   <FilterChip
@@ -123,47 +124,13 @@ export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.
             <p className={cn('text-[13px]', LEISE)} aria-live="polite">
               {mitAnzahl(liste.length, 'Kunde', 'Kunden')}
             </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <label className="flex items-center gap-2 text-[13px]">
-                <span className={LEISE}>Sortieren nach</span>
-                <select
-                  value={ansicht.sortierung}
-                  onChange={(e) => {
-                    const sortierung = kundenAnsichtSchema.shape.sortierung.parse(e.target.value)
-                    // Neue Sortierung beginnt in ihrer Standardrichtung (Name A–Z, sonst das Größte zuerst).
-                    schreibeAdresse(kundenAdresse({ ...aktuell, sortierung, richtung: undefined }))
-                  }}
-                  className={cn(
-                    'h-11 rounded-full border border-border bg-card px-4 text-base font-medium text-foreground md:h-9 md:text-[13px]',
-                    FOKUS_RAHMEN
-                  )}
-                >
-                  {KUNDEN_SORTIERUNG_WERTE.map((s) => (
-                    <option key={s} value={s}>
-                      {KUNDEN_SORTIERUNG_LABEL[s]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {/* Ein Knopf, kein Link: Die Richtung ist Seitenzustand neben der Auswahl;
-                  die Adresse bekommt sie trotzdem mit (Neuladen, Teilen). */}
-              <button
-                type="button"
-                onClick={() => schreibeAdresse(kundenAdresse({ ...aktuell, richtung: andereRichtung(ansicht.richtung) }))}
-                className={cn(
-                  'inline-flex h-11 items-center gap-1.5 rounded-full border border-border bg-card px-4 text-base font-medium whitespace-nowrap text-foreground hover:bg-muted md:h-9 md:text-[13px]',
-                  FOKUS_RAHMEN
-                )}
-              >
-                {ansicht.richtung === 'auf' ? (
-                  <ArrowUpNarrowWide className="size-4" strokeWidth={1.7} aria-hidden="true" />
-                ) : (
-                  <ArrowDownWideNarrow className="size-4" strokeWidth={1.7} aria-hidden="true" />
-                )}
-                {richtungText(ansicht.sortierung, ansicht.richtung)}
-                <span className="sr-only"> – Reihenfolge umkehren</span>
-              </button>
-            </div>
+            {/* Ein Knopf, kein Link: Die Sortierung ist Seitenzustand; die Adresse
+                bekommt sie trotzdem mit (Neuladen, Teilen). */}
+            <KundenSortieren
+              sortierung={ansicht.sortierung}
+              richtung={ansicht.richtung}
+              onWaehle={(wahl) => schreibeAdresse(kundenAdresse({ ...aktuell, ...wahl }))}
+            />
           </div>
 
           {liste.length === 0 ? (

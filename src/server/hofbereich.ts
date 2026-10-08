@@ -6,6 +6,7 @@ import { getOpenOrdersCount } from '@/server/queries/orders'
 import { getFarmBannerState } from '@/server/queries/farm'
 import { isAdminUser } from '@/server/queries/admin'
 import { zaehleZuEntscheiden } from '@/server/queries/meldung'
+import { hofBalkenArt } from '@/lib/mein-hof'
 
 /**
  * Was jedes Layout des Hofbereichs braucht — für das Bestandslayout
@@ -54,11 +55,13 @@ export async function ladeHofbereich(): Promise<Hofbereich> {
     })),
   ])
 
-  // Reihenfolge wie bei der Server-Prüfung: stillgelegt sticht „wartet auf Freigabe".
+  // Reihenfolge wie bei der Server-Prüfung: stillgelegt sticht „wartet auf
+  // Freigabe" — dieselbe Regel, nach der Heute oben keinen zweiten Kasten zeigt.
+  const art = bannerState ? hofBalkenArt(bannerState) : null
   const balken: Hofbereich['balken'] =
-    bannerState?.archivedAt != null
+    art === 'stillgelegt'
       ? { art: 'stillgelegt' }
-      : bannerState != null && bannerState.approvedAt == null
+      : art === 'wartet' && bannerState
         ? { art: 'wartet', farmId: bannerState.id, farmName: bannerState.name, country: bannerState.country }
         : null
 
