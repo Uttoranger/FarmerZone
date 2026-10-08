@@ -58,12 +58,12 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 39 | Direktverkauf senkt den Vorrat (D1) | gemergt (#219) | `nacht/2026-10-07/39-direktverkauf-vorrat` | #216 | main | Annahmen zur Freigabe (Grundeinheit, auf 0, Aufrunden); keine Migration | 07.10.2026 |
 | 40 | Rate-Limit über die Datenbank (R1) | gemergt (#219) | `nacht/2026-10-07/40-rate-limit-db` | #218 | main | **Migration: ja (Expand, neue Tabelle + RLS)**; nach #217 mergen; Datenschutzsatz offen | 07.10.2026 |
 | Sammel 7 | Sammel-PR Lauf 7 | gemergt (#219) | `integration/lauf7` | #219 | main | #212–#218 zusammengeführt, keine Code-Konflikte; Gesamtstand grün (5456 Tests, Integration 328); Morgenbericht `morgenbericht-2026-10-07-lauf7.md` | 07.10.2026 |
-| 41 | Hof-Anmeldung am Handy und „Mein Hof" (N1) | offen | | | main | | |
-| 42 | Stripe-Testbetrieb und Modus-Wache (Z2) | offen | | | main | | |
+| 41 | Hof-Anmeldung am Handy und „Mein Hof" (N1) | läuft | `nacht/2026-10-08/41-hof-anmeldung` | | main | | 08.10.2026 |
+| 42 | Stripe-Testbetrieb und Modus-Wache (Z2) | läuft | `nacht/2026-10-08/42-stripe-wache` | | main | | 08.10.2026 |
 | 43 | Testumgebung test.farmerzone.at (Z3) | offen | | | 42 | | |
 | 44 | Rückweg im Hofbereich (N1) | offen | | | main | | |
 | 45 | Hofbereich kinderleicht | offen | | | main | | |
 | 46 | Kundensicht kinderleicht (N2) | offen | | | main | | |
-| 47 | Altlasten aus Lauf 7 und Laufzeit-Befunde | offen | | | main | | |
+| 47 | Altlasten aus Lauf 7 und Laufzeit-Befunde | läuft | `nacht/2026-10-08/47-altlasten` | | main | | 08.10.2026 |
 | 48 | Probelauf (Nachholung von 34) | offen | | | main | | |
 | Sammel 8 | Sammel-PR Lauf 8 | offen | `integration/lauf8` | | main | | |
