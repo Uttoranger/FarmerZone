@@ -10,20 +10,23 @@
  * Höfe" noch „Merken" noch „Neuigkeiten deiner Höfe", und die Handy-Leiste hat
  * drei Plätze statt fünf: Entdecken · [Warenkorb] · Bestellungen.
  *
- * „Meine Bestellungen" führt seit Nr. 14 in beiden Zuständen auf
- * /bestellungen: Dort findet die Kundin ihre Bestellungen mit E-Mail und Code
- * (E7/E8, nur für diese Sitzung, kein Konto). Der Punkt steht deshalb auch im
- * Web-Kopf — abgemeldet wie angemeldet —, denn das Ziel der Handy-Leiste muss
- * die Kopfzeile derselben Sitzung auch anbieten.
+ * „Meine Bestellungen" führt seit Nr. 14 in jeder Sitzung auf /bestellungen:
+ * Dort findet die Kundin ihre Bestellungen mit E-Mail und Code (E7/E8, nur
+ * für diese Sitzung, kein Konto). Der Punkt steht deshalb auch im Web-Kopf —
+ * in jeder Sitzung —, denn das Ziel der Handy-Leiste muss die Kopfzeile
+ * derselben Sitzung auch anbieten.
  *
- * Angemeldet heißt: über die bestehende freiwillige Kunden-Anmeldung
- * (/account/login). Dazu gehört „Mein Konto" (/account/profile) rechts im Kopf.
+ * Drei Sitzungen (kundenSitzung): ohne Sitzung steht rechts im Kopf
+ * „Anmelden", mit der freiwilligen Kunden-Anmeldung (/account/login) „Mein
+ * Konto" (/account/profile), mit einer Hof-Sitzung „Mein Hof" (/dashboard).
+ * Seit Nr. 41 (Register N1) führt „Anmelden" auf /login — die Seite zeigt
+ * beide Wege, die Hofkarte vorgewählt — und steht auch am Handy oben rechts.
  *
  * Bestehende Kundenseiten nutzen weiter KundenKopf (src/lib/kunden-kopf.ts);
- * diese Quelle gilt erst, wenn eine Route in die KundeShell umzieht.
+ * für seinen Knopf gilt kopfKnopf aus dieser Quelle.
  */
 
-export type KundenNavId = 'entdecken' | 'so-gehts' | 'fuer-hoefe' | 'bestellungen' | 'anmelden' | 'konto'
+export type KundenNavId = 'entdecken' | 'so-gehts' | 'fuer-hoefe' | 'bestellungen' | 'anmelden' | 'mein-hof' | 'konto'
 
 export type KundenNavPunkt = {
   id: KundenNavId
@@ -41,8 +44,22 @@ const SO_GEHTS: KundenNavPunkt = { id: 'so-gehts', label: 'So funktioniert’s',
 // Seit Nr. 15 eine eigene Seite (/fuer-hoefe) statt der Sprungmarke auf der Startseite.
 const FUER_HOEFE: KundenNavPunkt = { id: 'fuer-hoefe', label: 'Für Höfe', href: '/fuer-hoefe' }
 
-const ANMELDEN: KundenNavPunkt = { id: 'anmelden', label: 'Anmelden', href: '/account/login' }
+// Register N1: „Anmelden" führt auf die Hof-Anmeldung. Die Seite zeigt auch
+// den Weg der Kundinnen (Umschalter am Handy, zwei Karten im Browser) — vorher
+// führte die KundeShell auf /account/login, bestehende Höfe fanden ihre
+// Anmeldung am Handy nur ganz unten im Fuß der Startseite.
+const ANMELDEN: KundenNavPunkt = { id: 'anmelden', label: 'Anmelden', href: '/login' }
+// Mit Hof-Sitzung der Weg zurück in den eigenen Bereich (Heute).
+const MEIN_HOF: KundenNavPunkt = { id: 'mein-hof', label: 'Mein Hof', href: '/dashboard' }
 const KONTO: KundenNavPunkt = { id: 'konto', label: 'Mein Konto', href: '/account/profile' }
+
+/**
+ * „Schon dabei? Anmelden" — der Weg bestehender Höfe zur Anmeldung, wo sonst
+ * nur Registrieren angeboten wird (Band „Für Höfe" der Startseite,
+ * /fuer-hoefe oben und unten, /register). Wort und Ziel des Links sind die des
+ * Knopfs „Anmelden".
+ */
+export const SCHON_DABEI = { frage: 'Schon dabei?', link: ANMELDEN.label, href: ANMELDEN.href } as const
 
 /**
  * „Bestellungen finden" (Nr. 14) — dasselbe Ziel für alle: Die Seite zeigt
@@ -60,26 +77,55 @@ const HANDY_LEISTE: readonly KundenLeistenPlatz[] = [
   { art: 'punkt', punkt: BESTELLUNGEN },
 ]
 
+/**
+ * Wie eine öffentliche Seite die Sitzung sieht: ohne Sitzung (`gast`), mit
+ * der freiwilligen Kunden-Anmeldung (`kunde`) oder mit einer Hof-Sitzung
+ * (`hof`, Register N1).
+ */
+export type KundenSitzung = 'gast' | 'kunde' | 'hof'
+
 export type KundenNavigation = {
   /** Die Textlinks der Kopfzeile im Browser, links nach rechts. Suche und Warenkorb zeichnet die Shell. */
   web: readonly KundenNavPunkt[]
-  /** Der Knopf rechts in der Kopfzeile — nur abgemeldet. */
-  anmelden: KundenNavPunkt | null
-  /** Das Konto rechts in der Kopfzeile — nur angemeldet. */
+  /**
+   * Der Knopf rechts in der Kopfzeile, am Handy wie im Browser: „Anmelden"
+   * ohne Sitzung, „Mein Hof" mit Hof-Sitzung; mit Kundensitzung keiner.
+   */
+  knopf: KundenNavPunkt | null
+  /** Das Konto rechts in der Kopfzeile — nur mit Kundensitzung. */
   konto: KundenNavPunkt | null
   /** Die Unterleiste am Handy. */
   handy: readonly KundenLeistenPlatz[]
 }
 
-/** Die Navigation passend zur Sitzung — öffentliche Seiten kennen genau diese zwei Varianten. */
-export function kundenNavigation({ angemeldet }: { angemeldet: boolean }): KundenNavigation {
-  return angemeldet
-    ? { web: [ENTDECKEN, BESTELLUNGEN], anmelden: null, konto: KONTO, handy: HANDY_LEISTE }
-    : { web: [ENTDECKEN, SO_GEHTS, FUER_HOEFE, BESTELLUNGEN], anmelden: ANMELDEN, konto: null, handy: HANDY_LEISTE }
+/**
+ * Die Navigation passend zur Sitzung. Eine Hof-Sitzung sieht die Kundenseite
+ * wie ohne Sitzung — nur der Knopf führt in den eigenen Bereich statt zur
+ * Anmeldung (ein Hof bekäme sonst „Mein Konto" mit den Kunden-Abos).
+ */
+export function kundenNavigation({ sitzung }: { sitzung: KundenSitzung }): KundenNavigation {
+  switch (sitzung) {
+    case 'kunde':
+      return { web: [ENTDECKEN, BESTELLUNGEN], knopf: null, konto: KONTO, handy: HANDY_LEISTE }
+    case 'hof':
+      return { web: [ENTDECKEN, SO_GEHTS, FUER_HOEFE, BESTELLUNGEN], knopf: MEIN_HOF, konto: null, handy: HANDY_LEISTE }
+    case 'gast':
+      return { web: [ENTDECKEN, SO_GEHTS, FUER_HOEFE, BESTELLUNGEN], knopf: ANMELDEN, konto: null, handy: HANDY_LEISTE }
+  }
+}
+
+/**
+ * Der Knopf oben rechts in KundenKopf (Seiten, die noch nicht in der
+ * KundeShell stehen): mit Hof-Sitzung „Mein Hof", sonst „Anmelden". Eine
+ * Kundensitzung sieht dort wie bisher die Anmeldung — KundenKopf kennt kein
+ * „Mein Konto".
+ */
+export function kopfKnopf(sitzung: KundenSitzung): KundenNavPunkt {
+  return sitzung === 'hof' ? MEIN_HOF : ANMELDEN
 }
 
 // Jeder Punkt mit eigener Seite. Anker (#…) sind nie eine eigene Seite.
-const AKTIVIERBAR: readonly KundenNavPunkt[] = [ENTDECKEN, FUER_HOEFE, BESTELLUNGEN, ANMELDEN, KONTO]
+const AKTIVIERBAR: readonly KundenNavPunkt[] = [ENTDECKEN, FUER_HOEFE, BESTELLUNGEN, ANMELDEN, MEIN_HOF, KONTO]
 
 /** Der aktive Punkt zu einem Pfad — der längste passende; null auf Startseite, Hofseite und allem anderen. */
 export function kundenAktiverPunkt(pfad: string): KundenNavId | null {
@@ -103,11 +149,21 @@ export function kundenAriaAktuell(pfad: string, punkt: KundenNavPunkt): 'page' |
 }
 
 /**
- * Ob eine Sitzung für die KundeShell als „angemeldet" zählt: nur die
- * freiwillige Kunden-Anmeldung (Rolle CUSTOMER, /account/login). Ein Hof, der
- * im Bauern-Bereich angemeldet ist, bekäme sonst „Mein Konto" mit den
- * Kunden-Abos angeboten — für ihn bleibt die Kundenseite die abgemeldete.
+ * Die Sitzung zu einer Rolle (Zusatzfeld `role` der Sitzung, src/lib/auth.ts).
+ *
+ * - CUSTOMER → `kunde`: die freiwillige Kunden-Anmeldung. Auch ein Betreiber
+ *   ohne Hof trägt diese Rolle (das Admin-Recht ist `isAdmin`, getrennt von
+ *   der Rolle) und sieht wie bisher „Mein Konto".
+ * - FARMER → `hof`: Nur diese Rolle öffnet den Hofbereich (ladeHofbereich,
+ *   src/server/hofbereich.ts) — auch ein Betreiber mit eigenem Hof trägt sie.
+ *   Ob der Hof schon eingerichtet ist, braucht der Browser nicht: Ohne Hof
+ *   führt /dashboard zum Einrichten (/onboarding), also auch in den eigenen
+ *   Bereich. Ein eigener Lesepfad für die Frage „hat ein Hof?" entfällt.
+ * - alles andere → `gast`: Für keine andere Rolle gibt es auf der Kundenseite
+ *   einen eigenen Weg; „Mein Hof" führte dort auf /login zurück.
  */
-export function istKundensitzung(nutzer: { role?: string | null } | null | undefined): boolean {
-  return nutzer?.role === 'CUSTOMER'
+export function kundenSitzung(nutzer: { role?: string | null } | null | undefined): KundenSitzung {
+  if (nutzer?.role === 'CUSTOMER') return 'kunde'
+  if (nutzer?.role === 'FARMER') return 'hof'
+  return 'gast'
 }

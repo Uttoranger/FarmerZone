@@ -4524,6 +4524,29 @@ Auftrag freigabe.md §11 „40", Register R1. **Mit Migration** (`20261007200000
 - **Aufräumen:** `cleanup-reservations` (täglich 3:00 UTC) löscht nach den Reservierungen alle Zähler mit `ablauf < jetzt`, in eigenem `try` — ein Fehler dort lässt den Cron nicht scheitern. Die Antwort nennt `bremsZaehler` (Anzahl oder null).
 - **Bekannt, nicht geändert:** Im Checkout zählt die erste Stufe die IP je Anfrage zweimal (`enforceRateLimit` vor und nach dem Parsen, Altbestand) — je Instanz also effektiv 10 Bestellversuche je Minute und IP; die zweite Stufe zählt einmal (20). Die übrigen Routen mit `enforceRateLimit` (`/api/reserve`, `/api/warenkorb/pruefen`, Teilen) gehören nicht zu R1 und bleiben einstufig.
 
+## Hof-Anmeldung am Handy und „Mein Hof" (Nachtlauf Nr. 41, Oktober 2026)
+
+Auftrag freigabe.md §12 „41", Register N1. Keine Schema-Änderung, keine Migration, kein neues Paket.
+
+- **Anlass:** Befund vom 08.10.2026 (390 px): Bestehende Höfe fanden die Anmeldung nur ganz unten im Fuß der Startseite. Im Kopf der KundeShell war „Anmelden" unter 768 px ausgeblendet und führte auf die Kunden-Anmeldung. Ein angemeldeter Hof sah auf öffentlichen Seiten keinen Weg zurück in seinen Bereich.
+- **Fachregel Sitzung (`kundenSitzung`):** Öffentliche Seiten kennen drei Sitzungen: ohne Sitzung („Anmelden" → `/login`), Kundensitzung (Rolle CUSTOMER, „Mein Konto" wie bisher) und Hof-Sitzung (Rolle FARMER, „Mein Hof" → `/dashboard`). Warum die Rolle genügt: Den Hofbereich öffnet nur die Rolle FARMER (`ladeHofbereich`). Ein Betreiber mit eigenem Hof trägt sie also. Ein Betreiber ohne Hof trägt CUSTOMER (Seed) und sieht wie bisher „Mein Konto" — das Admin-Recht ist `isAdmin`, getrennt von der Rolle und nie in der Sitzung. Ob der Hof schon eingerichtet ist, braucht der Browser nicht: Ohne Hof führt `/dashboard` zum Einrichten. Deshalb gibt es keinen neuen Lesepfad und keinen Endpunkt. Die Enum-Rolle ADMIN (im Bestand ungenutzt) zählt wie ohne Sitzung: „Mein Hof" führte dort auf `/login`.
+- **„Anmelden" für alle auf `/login`:** Auch Kundinnen landen dort. Die Seite zeigt beide Wege (am Handy der Umschalter, im Browser die zweite Karte), die Hofkarte ist vorgewählt. Für Kundinnen ist das ein Tipp mehr als vorher (`/account/login`) — so beauftragt.
+- **KundenKopf** (Rechtsseiten, Bestellverfolgung, Bar-Bestätigung, 404) zeigt denselben Knopf (`kopfKnopf`), am Handy und im Browser; „Hofbetreiber-Login" gibt es nicht mehr. Mit Kundensitzung bleibt es dort bei „Anmelden", weil KundenKopf nie ein „Mein Konto" hatte.
+- **Hell/Dunkel am Handy:** In der KundeShell als letzte Zeile des Inhalts. Sie steht auf jeder Seite der Shell, auch dort, wo kein Fuß der Startseite steht (`/hoefe`, `/bestellungen`, `/account`, `/login`, Bestätigung). In KundenKopf steht der Schalter im Menü-Blatt, im Browser bleibt er im Kopf.
+- **Enge Köpfe:** „Anmelden" braucht am Handy rund 100 px.
+  - Gemessen braucht KundenKopf mit Zurück, Wort, Knopf und Menü 369 px, mit Warenkorb 417 px. Darunter tritt das Wort „FarmerZone" zurück, wie schon heute neben dem Hofnamen.
+  - In der KundeShell betrifft es nur Fokus-Seiten mit Warenkorb im Kopf unter 360 px.
+  - Ohne diese Regel liefen 404-, Rechts- und Produktseiten auf schmalen Handys seitlich über.
+- **„Schon dabei? Anmelden"** steht im Band „Für Höfe" der Startseite, auf `/fuer-hoefe` oben und unten und auf `/register` (unter „Konto erstellen"). Im Kopf von `/register` heißt die Frage jetzt ebenfalls „Schon dabei?" (vorher „Schon registriert?"), damit eine Seite nicht zwei Wortlaute für denselben Weg trägt.
+- **Startbildschirm-Karte** ganz unten auf Heute: Anleitung für iPhone und Android. Ob die Seite als installierte App läuft, weiß erst der Browser (`display-mode: standalone`, auf dem iPhone `navigator.standalone`). Deshalb rendert der Server nichts, und die Karte entscheidet nach dem Mounten — ohne Hydration-Abweichung. Warum kein „Ausblenden": Register T1 schließt Browser-Speicher aus, und wer die App installiert hat, sieht die Karte dort ohnehin nicht. Sie erscheint auch im Browser am Rechner; die Anleitung gilt dem Handy daneben.
+- **AdminShell:**
+  - „← Mein Hof" erscheint nur mit eigenem Hof (`kontoHatHof`: Rolle FARMER und Hof, in derselben Abfrage wie der Name). Vorher führte er den Seed-Betreiber ohne Hof über `/dashboard` auf `/login`.
+  - Die Initialen-Plakette steht auch am Handy. Mit Hof ist sie ein Link auf „Konto und Sicherheit". Ohne Hof bleibt sie ohne Link (Annahme, Bericht 41): Die Seite liegt im Hofbereich und schickte das Konto auf `/login`.
+  - Damit alles in eine Zeile passt (ab 375 px), stehen die drei Elemente rechts als Gruppe, und bis 1023 px steht der Kurzname „← Mein Hof".
+- **Bekannt, nicht geändert (Altbestand):**
+  - Touch-Ziele unter 44 px: Logo-Links in KundeShell, KundenKopf und AdminShell (151 × 32 px), die Textlinks „Höfe entdecken" und „Für Höfe" im Browser-Kopf von KundenKopf (20 px hoch), die Admin-Reiter (38 px).
+  - Die Seiten mit KundenKopf haben kein `<main>` (Axe `landmark-one-main`, `region`).
+
 ## Nützliche Befehle
 
 ```bash

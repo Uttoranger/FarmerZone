@@ -15,6 +15,7 @@ import { categoryImagePath } from '@/lib/product-image'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { SchonDabei } from '@/components/shared/schon-dabei'
 import { Wortmarke } from '@/components/shared/wortmarke'
 import { Kicker } from '@/components/startseite/kicker'
 
@@ -249,7 +250,8 @@ export function SoFunktionierts({ rechnung }: { rechnung: Beispielrechnung }): R
  * „Farbrollen"). Es trägt die Sprungmarke #fuer-hoefe für die Navigation.
  * „Mehr für Höfe" führt seit Nr. 15 auf die eigene Seite /fuer-hoefe. Preise
  * nennt das Band keine — die stehen nur dort und auf /konditionen
- * (src/lib/konditionen.ts).
+ * (src/lib/konditionen.ts). Darunter „Schon dabei? Anmelden" für Höfe, die
+ * schon registriert sind (Register N1, Nr. 41).
  */
 export function FuerHoefeBand(): React.JSX.Element {
   return (
@@ -266,19 +268,22 @@ export function FuerHoefeBand(): React.JSX.Element {
               Warenpreis.
             </p>
           </div>
-          <div className="flex flex-col gap-2.5 md:flex-row">
-            <Link href="/fuer-hoefe" className={cn(KNOPF_UMRISS, 'rounded-[14px] md:rounded-full')}>
-              Mehr für Höfe
-            </Link>
-            <Link
-              href="/register"
-              className={cn(
-                'inline-flex h-11 items-center justify-center rounded-[14px] border border-primary-foreground/30 bg-primary px-[18px] text-sm font-semibold text-primary-foreground transition-opacity duration-[250ms] hover:opacity-90 md:h-[46px] md:rounded-full',
-                FOKUS_RAHMEN
-              )}
-            >
-              Hof registrieren
-            </Link>
+          <div className="flex flex-col gap-1 md:items-end">
+            <div className="flex flex-col gap-2.5 md:flex-row">
+              <Link href="/fuer-hoefe" className={cn(KNOPF_UMRISS, 'rounded-[14px] md:rounded-full')}>
+                Mehr für Höfe
+              </Link>
+              <Link
+                href="/register"
+                className={cn(
+                  'inline-flex h-11 items-center justify-center rounded-[14px] border border-primary-foreground/30 bg-primary px-[18px] text-sm font-semibold text-primary-foreground transition-opacity duration-[250ms] hover:opacity-90 md:h-[46px] md:rounded-full',
+                  FOKUS_RAHMEN
+                )}
+              >
+                Hof registrieren
+              </Link>
+            </div>
+            <SchonDabei className="text-center md:text-right" />
           </div>
         </div>
       </div>
@@ -344,9 +349,8 @@ const FUSS_SPALTEN = [
     titel: 'Für Höfe',
     links: [
       { href: '/register', text: 'Hof registrieren' },
-      // Die Anmeldung der Höfe stand bisher in der Kopfleiste der Startseite
-      // („Hofbetreiber-Login"); die KundeShell führt zur Kunden-Anmeldung,
-      // also bleibt der Weg der Höfe hier.
+      // Seit Nr. 41 (Register N1) steht „Anmelden" (→ /login) auch oben im
+      // Kopf, am Handy wie im Browser; der Fuß behält den Weg der Höfe.
       { href: '/login', text: 'Anmelden für Höfe' },
       { href: '/konditionen', text: 'Konditionen' },
     ],

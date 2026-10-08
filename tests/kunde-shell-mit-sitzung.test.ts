@@ -1,14 +1,16 @@
 /**
  * KundeShellMitSitzung (src/components/shells/kunde-shell-mit-sitzung.tsx):
- * Die Hülle liest die Sitzung im Browser und reicht „angemeldet" an die
- * unveränderte KundeShell weiter — damit eine Seite wie die Startseite
- * statisch bleiben kann und nicht auf die Sitzung warten muss.
+ * Die Hülle liest die Sitzung im Browser und reicht sie an die KundeShell
+ * weiter — damit eine Seite wie die Startseite statisch bleiben kann und
+ * nicht auf die Sitzung warten muss.
  *
  * Beweist:
- *  - Ohne Sitzung, während die Sitzung noch lädt, und für einen angemeldeten
- *    Hof zeigt der Kopf „Anmelden" — dasselbe HTML, das der Server ausliefert.
- *  - Nur eine Kundensitzung (Rolle CUSTOMER) zeigt „Mein Konto".
- *  - Gegenprobe zu beidem in derselben Datei.
+ *  - Ohne Sitzung und während die Sitzung noch lädt zeigt der Kopf „Anmelden"
+ *    (→ /login) — dasselbe HTML, das der Server ausliefert.
+ *  - Eine Kundensitzung (Rolle CUSTOMER) zeigt „Mein Konto".
+ *  - Eine Hof-Sitzung (Rolle FARMER, auch ein Betreiber mit eigenem Hof) zeigt
+ *    „Mein Hof" (→ /dashboard) statt „Anmelden" (Nr. 41, Register N1).
+ *  - Gegenprobe zu allem in derselben Datei.
  */
 import { describe, it, expect, vi } from 'vitest'
 import { createElement, type ReactNode } from 'react'
@@ -32,10 +34,11 @@ function kopf(stand: Sitzung): string {
 }
 
 describe('KundeShellMitSitzung', () => {
-  it('ohne Sitzung: „Anmelden", kein „Mein Konto"', () => {
+  it('ohne Sitzung: „Anmelden" auf /login, kein „Mein Konto", kein „Mein Hof"', () => {
     const text = kopf({ data: null, isPending: false })
-    expect(text).toContain('>Anmelden<')
+    expect(text).toMatch(/<a [^>]*href="\/login"[^>]*>Anmelden<\/a>/)
     expect(text).not.toContain('Mein Konto')
+    expect(text).not.toContain('Mein Hof')
   })
 
   it('solange die Sitzung lädt: abgemeldet — wie das statische HTML vom Server', () => {
@@ -43,14 +46,22 @@ describe('KundeShellMitSitzung', () => {
     expect(text).toContain('>Anmelden<')
   })
 
-  it('Kundensitzung (Rolle CUSTOMER): „Mein Konto", kein „Anmelden"', () => {
+  it('Kundensitzung (Rolle CUSTOMER): „Mein Konto", kein „Anmelden", kein „Mein Hof"', () => {
     const text = kopf({ data: { user: { id: 'k1', role: 'CUSTOMER' } }, isPending: false })
     expect(text).toContain('aria-label="Mein Konto"')
     expect(text).not.toContain('>Anmelden<')
+    expect(text).not.toContain('Mein Hof')
   })
 
-  it('ein angemeldeter Hof sieht die Kundenseite abgemeldet', () => {
-    expect(kopf({ data: { user: { id: 'h1', role: 'FARMER' } }, isPending: false })).toContain('>Anmelden<')
+  it('Hof-Sitzung (Rolle FARMER): „Mein Hof" auf /dashboard statt „Anmelden" — ohne „Mein Konto" der Kunden', () => {
+    const text = kopf({ data: { user: { id: 'h1', role: 'FARMER' } }, isPending: false })
+    expect(text).toMatch(/<a [^>]*href="\/dashboard"[^>]*>Mein Hof<\/a>/)
+    expect(text).not.toContain('>Anmelden<')
+    expect(text).not.toContain('Mein Konto')
+  })
+
+  it('Sitzung ohne Rolle oder mit einer Rolle ohne eigene Kundenseite: wie abgemeldet', () => {
     expect(kopf({ data: { user: { id: 'h2' } }, isPending: false })).toContain('>Anmelden<')
+    expect(kopf({ data: { user: { id: 'a1', role: 'ADMIN' } }, isPending: false })).toContain('>Anmelden<')
   })
 })
