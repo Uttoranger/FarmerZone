@@ -23,7 +23,8 @@
  * beide Wege, die Hofkarte vorgewählt — und steht auch am Handy oben rechts.
  *
  * Bestehende Kundenseiten nutzen weiter KundenKopf (src/lib/kunden-kopf.ts);
- * für seinen Knopf gilt kopfKnopf aus dieser Quelle.
+ * für seinen Knopf gilt kopfKnopf aus dieser Quelle — dieselben drei
+ * Varianten wie in der KundeShell.
  */
 
 export type KundenNavId = 'entdecken' | 'so-gehts' | 'fuer-hoefe' | 'bestellungen' | 'anmelden' | 'mein-hof' | 'konto'
@@ -116,12 +117,21 @@ export function kundenNavigation({ sitzung }: { sitzung: KundenSitzung }): Kunde
 
 /**
  * Der Knopf oben rechts in KundenKopf (Seiten, die noch nicht in der
- * KundeShell stehen): mit Hof-Sitzung „Mein Hof", sonst „Anmelden". Eine
- * Kundensitzung sieht dort wie bisher die Anmeldung — KundenKopf kennt kein
- * „Mein Konto".
+ * KundeShell stehen) — dieselbe Wahl wie in der KundeShell, damit öffentliche
+ * Seiten nie eine vierte Variante zeigen: „Anmelden", mit Hof-Sitzung „Mein
+ * Hof", mit Kundensitzung „Mein Konto" (Entscheidung des Dirigenten in
+ * Nachbesserung 1 zu Nr. 41; eine angemeldete Kundin sah dort vorher
+ * „Anmelden", und /login leitet sie nicht weiter).
  */
 export function kopfKnopf(sitzung: KundenSitzung): KundenNavPunkt {
-  return sitzung === 'hof' ? MEIN_HOF : ANMELDEN
+  switch (sitzung) {
+    case 'hof':
+      return MEIN_HOF
+    case 'kunde':
+      return KONTO
+    case 'gast':
+      return ANMELDEN
+  }
 }
 
 // Jeder Punkt mit eigener Seite. Anker (#…) sind nie eine eigene Seite.

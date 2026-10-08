@@ -189,11 +189,12 @@ describe('kundenSitzung — wie eine öffentliche Seite die Sitzung sieht', () =
 })
 
 describe('kopfKnopf — der Knopf der Kopfzeile auf Seiten, die noch KundenKopf tragen', () => {
-  it('mit Hof-Sitzung „Mein Hof", sonst „Anmelden" — dieselben Punkte wie in der KundeShell', () => {
-    expect(kopfKnopf('hof')).toEqual(kundenNavigation({ sitzung: 'hof' }).knopf)
+  it('dieselben drei Varianten wie in der KundeShell: „Anmelden", „Mein Hof", „Mein Konto"', () => {
     expect(kopfKnopf('gast')).toEqual(kundenNavigation({ sitzung: 'gast' }).knopf)
-    // Kundensitzung wie bisher: KundenKopf kennt kein „Mein Konto", er zeigt die Anmeldung.
-    expect(kopfKnopf('kunde')).toEqual(kundenNavigation({ sitzung: 'gast' }).knopf)
+    expect(kopfKnopf('hof')).toEqual(kundenNavigation({ sitzung: 'hof' }).knopf)
+    // Nachbesserung 1: Eine angemeldete Kundin sieht auch hier „Mein Konto" — nie eine vierte Variante.
+    expect(kopfKnopf('kunde')).toEqual(kundenNavigation({ sitzung: 'kunde' }).konto)
+    expect(kopfKnopf('kunde')).toEqual({ id: 'konto', label: 'Mein Konto', href: '/account/profile' })
   })
 })
 

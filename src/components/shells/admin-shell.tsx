@@ -61,7 +61,10 @@ function KontoPlakette({ anzeige, hatHof }: { anzeige: string; hatHof: boolean }
       </span>
     )
   }
-  const beschriftung = `${ADMIN_KONTO.label} – angemeldet: ${anzeige}`
+  const initialen = hofInitialen(anzeige)
+  // Der Name beginnt mit dem, was man sieht (WCAG 2.5.3 „Label in Name"):
+  // Wer per Sprache „MM antippen" sagt, trifft den Link.
+  const beschriftung = `${initialen} – ${ADMIN_KONTO.label} (angemeldet: ${anzeige})`
   return (
     <Link
       href={ADMIN_KONTO.href}
@@ -70,7 +73,7 @@ function KontoPlakette({ anzeige, hatHof }: { anzeige: string; hatHof: boolean }
       className={cn('flex size-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-muted', FOKUS_RAHMEN)}
     >
       <span aria-hidden="true" className={kreis}>
-        {hofInitialen(anzeige)}
+        {initialen}
       </span>
     </Link>
   )

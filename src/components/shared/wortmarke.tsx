@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
  * kann das Wort auf schmalen Handys ausblenden, wo der Kopf sonst
  * überliefe; die Bildmarke bleibt (der Link darum trägt den Namen).
  */
-export function Wortmarke({ wortKlasse }: { wortKlasse?: string } = {}) {
+export function Wortmarke({ wortKlasse }: { wortKlasse?: string } = {}): React.JSX.Element {
   return (
     <span className="flex min-w-0 items-center gap-2">
       {/* Die Bildmarke behält ihre Farben in beiden Modi — ein Logo, das je

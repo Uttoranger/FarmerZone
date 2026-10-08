@@ -28,13 +28,17 @@ describe('menueFuer — die Wege des Menüs', () => {
     expect(texte.map(([text]) => text)).not.toContain('Anmelden')
   })
 
-  it('mit Kundensitzung wie bisher der Weg zur Anmeldung', () => {
-    expect(menueFuer('kunde')).toEqual(menueFuer('gast'))
+  it('mit Kundensitzung „Mein Konto" bei den Wegen der Kundinnen — kein „Anmelden"', () => {
+    const punkte = menueFuer('kunde').map((p) => [p.text, p.href, p.gruppe])
+    expect(punkte[3]).toEqual(['Mein Konto', '/account/profile', 'kunden'])
+    expect(punkte.map(([text]) => text)).not.toContain('Anmelden')
+    expect(punkte.map(([text]) => text)).toContain('Für Höfe')
   })
 
-  it.each(ALLE)('der Höfe-Weg ist derselbe Punkt wie der Knopf der Kopfzeile (Sitzung: %s)', (sitzung) => {
+  it.each(ALLE)('der Punkt der Sitzung ist derselbe wie der Knopf der Kopfzeile (Sitzung: %s)', (sitzung) => {
     const knopf = kopfKnopf(sitzung)
-    expect(menueFuer(sitzung).filter((p) => p.href === knopf.href)).toEqual([{ href: knopf.href, text: knopf.label, gruppe: 'hoefe' }])
+    const gruppe = sitzung === 'kunde' ? 'kunden' : 'hoefe'
+    expect(menueFuer(sitzung).filter((p) => p.href === knopf.href)).toEqual([{ href: knopf.href, text: knopf.label, gruppe }])
   })
 
   it('niemand heißt mehr „Hofbetreiber-Login"', () => {

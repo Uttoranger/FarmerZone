@@ -105,11 +105,27 @@ describe('KundenKopf — Seiten, die noch nicht in der KundeShell stehen', () =>
     expect(handy + browser).not.toContain('href="/login"')
   })
 
-  it('Kundensitzung: wie bisher der Weg zur Anmeldung (KundenKopf kennt kein „Mein Konto")', () => {
+  // Nachbesserung 1: dieselbe Variante wie in der KundeShell — „Mein Konto" als Konto-Symbol.
+  it('Kundensitzung: „Mein Konto" auf /account/profile am Handy und im Browser, 44 px, kein „Anmelden"', () => {
     const { handy, browser } = kopf(KUNDIN)
-    expect(handy).toContain('>Anmelden<')
-    expect(browser).toContain('>Anmelden<')
+    for (const teil of [handy, browser]) {
+      const tag = linkTag(teil, '/account/profile')
+      expect(tag).toContain('aria-label="Mein Konto"')
+      expect(tag).toMatch(/\bsize-11\b/)
+      expect(teil).toContain('lucide-user-round')
+    }
+    expect(handy + browser).not.toContain('>Anmelden<')
     expect(handy + browser).not.toContain('Mein Hof')
+  })
+
+  // Nachbesserung 1: Bei 390 px steht „FarmerZone" in jedem Kopf; zurück tritt es nur auf schmaleren Handys.
+  it('das Wort „FarmerZone" tritt nie bei 390 px oder breiter zurück', () => {
+    const schwellen = ['src/components/shared/kunden-kopf.tsx', 'src/components/shells/kunde-shell.tsx'].flatMap((datei) =>
+      [...ohneKommentare(quelle(datei)).matchAll(/max-\[(\d+)px\]:hidden/g)].map((t) => Number(t[1]))
+    )
+    // KundenKopf ohne und mit Warenkorb, KundeShell mit Warenkorb im Kopf.
+    expect(schwellen).toHaveLength(3)
+    for (const schwelle of schwellen) expect(schwelle).toBeLessThanOrEqual(390)
   })
 
   it('solange die Sitzung lädt: „Anmelden" — dasselbe HTML wie vom Server', () => {

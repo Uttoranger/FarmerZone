@@ -4,7 +4,7 @@ import { useEffect, useState, type MouseEvent, type RefObject } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Menu, Share2, ShoppingCart, X } from 'lucide-react'
+import { ArrowLeft, Menu, Share2, ShoppingCart, UserRound, X } from 'lucide-react'
 import { kopfForm, rueckweg, tippAufRueckweg, type KundenSeite } from '@/lib/kunden-kopf'
 import { menuePunkte, type AngezeigterMenuePunkt } from '@/lib/kunden-menue'
 import { kopfKnopf, type KundenNavPunkt, type KundenSitzung } from '@/lib/kunden-navigation'
@@ -84,25 +84,25 @@ export function KundenKopf({
 
   return (
     <>
-      {/* ── Handy ── Als <header>: Die Leiste trägt seit Nr. 41 auch „Anmelden"
-          bzw. „Mein Hof" — alles darin steht so in einem Landmark (Axe „region").
-          Es ist immer nur eine der beiden Kopfzeilen zu sehen. */}
+      {/* ── Handy ── Als <header>: Die Leiste trägt seit Nr. 41 auch „Anmelden",
+          „Mein Hof" bzw. „Mein Konto" — alles darin steht so in einem Landmark
+          (Axe „region"). Es ist immer nur eine der beiden Kopfzeilen zu sehen. */}
       <header className="sticky top-0 z-40 print:hidden md:hidden">
-        <div className="relative flex h-14 items-center justify-between gap-1 border-b border-border bg-card px-2">
+        <div className="relative flex h-14 items-center justify-between gap-0.5 border-b border-border bg-card px-2">
           <div className={`flex items-center ${form.zurueck ? '' : 'pl-2'}`}>
             {form.zurueck && <ZurueckKnopf seite={seite} />}
             <Link
               href="/"
               aria-label="FarmerZone — zur Startseite"
-              className={`flex h-11 min-w-11 items-center justify-center gap-2 rounded-lg px-1 ${FOKUS}`}
+              className={`flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg px-0.5 ${FOKUS}`}
             >
               <FIcon />
-              {/* Das Wort tritt zurück, wo der Platz für „Anmelden" bzw. „Mein Hof"
-                  nicht reicht (gemessen: Zurück, Wort, Knopf und Menü brauchen
-                  369 px, mit Warenkorb 417 px). */}
+              {/* Kompakt (16 px, enge Abstände), damit das Wort bei 390 px auch neben
+                  Warenkorb und „Anmelden" stehen bleibt. Erst darunter tritt es
+                  zurück — gemessen: WORT_PLATZ. */}
               {!nameInLeiste && (
                 <span
-                  className={`whitespace-nowrap font-heading text-lg font-bold text-brand-text ${korbInLeiste ? 'max-[419px]:hidden' : 'max-[369px]:hidden'}`}
+                  className={`whitespace-nowrap font-heading text-base font-bold text-brand-text ${korbInLeiste ? WORT_PLATZ.mitKorb : WORT_PLATZ.ohneKorb}`}
                 >
                   FarmerZone
                 </span>
@@ -120,7 +120,7 @@ export function KundenKopf({
               {hofName}
             </p>
           )}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center">
             {korbInLeiste && korb && <WarenkorbSymbol anzahl={korb.anzahl} href={korb.href} />}
             <KopfKnopf punkt={knopf} />
             <MenueBlatt tinte={tinte} sitzung={sitzung} />
@@ -173,15 +173,37 @@ const FOKUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:rin
 const TEXTLINK = 'rounded-md text-sm font-medium text-foreground/80 transition-colors hover:text-foreground'
 
 /**
- * „Anmelden" (→ /login) bzw. mit Hof-Sitzung „Mein Hof" (→ /dashboard) —
- * Wort und Ziel aus kopfKnopf, am Handy wie im Browser. 44 px hoch: auch am
- * Handy gut zu treffen.
+ * Ab welcher Breite das Wort „FarmerZone" in der Handy-Leiste steht — darunter
+ * liefe die Leiste seitlich über. Gemessen mit Zurück, kompaktem Wort (99 px),
+ * „Anmelden" und Menü: 336,5 px, mit Warenkorb 380,5 px; je rund 8 px Luft für
+ * abweichende Schriftbreiten. Bei 390 px steht das Wort also immer.
+ */
+const WORT_PLATZ = { ohneKorb: 'max-[345px]:hidden', mitKorb: 'max-[388px]:hidden' } as const
+
+/**
+ * Der Knopf oben rechts aus kopfKnopf, am Handy wie im Browser: „Anmelden"
+ * (→ /login) bzw. „Mein Hof" (→ /dashboard) als Umriss-Pille wie in der
+ * KundeShell, 44 px hoch; „Mein Konto" wie dort als Konto-Symbol (44 px).
  */
 function KopfKnopf({ punkt }: { punkt: KundenNavPunkt }) {
+  if (punkt.id === 'konto') {
+    return (
+      <Link
+        href={punkt.href}
+        aria-label={punkt.label}
+        title={punkt.label}
+        className={`inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-muted ${FOKUS}`}
+      >
+        <span className="flex size-8 items-center justify-center rounded-full bg-border text-foreground">
+          <UserRound className="size-4" strokeWidth={1.7} aria-hidden="true" />
+        </span>
+      </Link>
+    )
+  }
   return (
     <Link
       href={punkt.href}
-      className={`inline-flex h-11 shrink-0 items-center whitespace-nowrap rounded-lg border border-border px-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted ${FOKUS}`}
+      className={`inline-flex h-11 shrink-0 items-center whitespace-nowrap rounded-full border border-border px-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted md:px-4 ${FOKUS}`}
     >
       {punkt.label}
     </Link>

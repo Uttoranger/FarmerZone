@@ -8,6 +8,7 @@
  * entscheidet jede Admin-Seite selbst über verlangeAdminSeite
  * (src/server/admin-wache.ts) — die Navigation ist nie die Sperre.
  */
+import type { UserRole } from '@prisma/client'
 
 export type AdminReiterId = 'hoefe' | 'briefkasten' | 'finanzen'
 
@@ -39,7 +40,7 @@ export const ADMIN_KONTO = { label: 'Konto und Sicherheit', href: '/settings/acc
  * Betreiber ohne Hof (Rolle CUSTOMER) landete sonst auf /login, eine Rolle
  * FARMER ohne Hof erst beim Einrichten.
  */
-export function kontoHatHof(konto: { rolle: string | null | undefined; hofVorhanden: boolean }): boolean {
+export function kontoHatHof(konto: { rolle: UserRole | null | undefined; hofVorhanden: boolean }): boolean {
   return konto.rolle === 'FARMER' && konto.hofVorhanden
 }
 

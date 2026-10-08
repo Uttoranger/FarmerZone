@@ -283,7 +283,8 @@ describe('AdminShell', () => {
 
   it('mit Hof: die Initialen-Plakette ist ein Link auf „Konto und Sicherheit", auch am Handy sichtbar, 44 px', () => {
     const plakette = linkTag(admin(true), ADMIN_KONTO.href)
-    expect(plakette).toContain('aria-label="Konto und Sicherheit – angemeldet: Max Mustermann"')
+    // WCAG 2.5.3: Der zugängliche Name beginnt mit den sichtbaren Initialen.
+    expect(plakette).toContain('aria-label="MM – Konto und Sicherheit (angemeldet: Max Mustermann)"')
     expect(plakette).not.toMatch(/\bhidden\b/)
     expect(plakette).toMatch(/\bsize-11\b/)
     expect(admin(true)).toMatch(/<a [^>]*href="\/settings\/account"[^>]*>[\s\S]*?>MM<\/span>/)

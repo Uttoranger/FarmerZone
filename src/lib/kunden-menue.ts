@@ -28,12 +28,17 @@ const FUER_HOEFE: MenuePunkt = { href: '/fuer-hoefe', text: 'Für Höfe', gruppe
 const PROBLEM_MELDEN: MenuePunkt = { href: '/problem-melden', text: 'Problem melden', gruppe: 'hilfe' }
 
 /**
- * Die Punkte in Anzeigereihenfolge. Der Weg der Höfe ist derselbe Punkt wie
- * der Knopf oben rechts (kopfKnopf, Register N1): „Anmelden" (→ /login), mit
- * Hof-Sitzung „Mein Hof" (→ /dashboard) — vorher hieß er „Hofbetreiber-Login".
+ * Die Punkte in Anzeigereihenfolge. Der Punkt der Sitzung ist derselbe wie
+ * der Knopf oben rechts (kopfKnopf, Register N1): „Anmelden" (→ /login) bzw.
+ * mit Hof-Sitzung „Mein Hof" (→ /dashboard) bei den Wegen der Höfe — vorher
+ * hieß er „Hofbetreiber-Login". Mit Kundensitzung ist es „Mein Konto"; das
+ * gehört zu den Wegen der Kundinnen, nicht unter „Für Höfe".
  */
 export function menueFuer(sitzung: KundenSitzung): readonly MenuePunkt[] {
   const knopf = kopfKnopf(sitzung)
+  if (knopf.id === 'konto') {
+    return [...EINKAUFEN, { href: knopf.href, text: knopf.label, gruppe: 'kunden' }, FUER_HOEFE, PROBLEM_MELDEN]
+  }
   return [...EINKAUFEN, FUER_HOEFE, { href: knopf.href, text: knopf.label, gruppe: 'hoefe' }, PROBLEM_MELDEN]
 }
 
