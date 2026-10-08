@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Check, ChevronLeft, MessageCircle, Phone, Printer } from 'lucide-react'
+import { Check, MessageCircle, Phone, Printer } from 'lucide-react'
 import {
   markAsNotPickedUp,
   markAsPickedUp,
@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils'
 import { BestellDialog, DialogFehler } from './bestell-dialog'
 import { StornoDialog } from './storno-dialog'
 import { ArtikelFehltDialog } from './artikel-fehlt-dialog'
+import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { KARTE, KICKER, KNOPF_GRUEN, KNOPF_RAHMEN, LEISE, TEXT_GRUEN, TEXT_ORANGE } from './stil'
 
 const euro = (cents: number): string => formatEuro(centsAlsEuro(cents))
@@ -40,11 +41,11 @@ type Offen = 'storno' | 'fehlt' | 'nichtAbgeholt' | 'dochNicht' | 'abholungZurue
  */
 export function BestellDetail({
   bestellung,
-  zurueckHref,
+  zurueckSuche,
 }: {
   bestellung: HofBestellDetail
-  /** Handy: der Weg zurück in die Liste (mit dem gewählten Filter). */
-  zurueckHref: string
+  /** Der gewählte Filter der Liste (`?filter=…` oder leer) — der Rückweg führt mit ihm zurück. */
+  zurueckSuche: string
 }): React.JSX.Element {
   const [abgehakt, setAbgehakt] = useState<ReadonlySet<string>>(new Set())
   const [offen, setOffen] = useState<Offen>(null)
@@ -130,177 +131,183 @@ export function BestellDetail({
         : null
 
   return (
-    <article aria-labelledby={`bestellung-${bestellung.id}`} className="flex flex-col gap-3">
-      {/* Handy: Kopf mit Zurück, Bestellnummer und Anrufen (Mockup mobil-h3-bestelldetail). */}
-      <div className="flex items-center gap-1 lg:hidden">
-        <Link href={zurueckHref} aria-label="Zurück zu den Bestellungen" className={cn('inline-flex size-11 items-center justify-center rounded-full hover:bg-muted', FOKUS_RAHMEN)}>
-          <ChevronLeft className="size-6" strokeWidth={1.7} aria-hidden="true" />
-        </Link>
-        <h1 className="min-w-0 flex-1 truncate text-[17px] font-semibold">Bestellung {bestellung.nummer}</h1>
-        {kunde.telefon && (
-          <a href={`tel:${kunde.telefon}`} aria-label={`${kunde.name} anrufen`} className={cn('inline-flex size-11 items-center justify-center rounded-full hover:bg-muted', FOKUS_RAHMEN)}>
-            <Phone className="size-5" strokeWidth={1.7} aria-hidden="true" />
-          </a>
-        )}
-      </div>
-
-      <div className={cn(KARTE, 'flex flex-col gap-3.5 p-4 md:px-[18px]')}>
-        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-          <h2 id={`bestellung-${bestellung.id}`} className="line-clamp-2 min-w-0 font-heading text-[22px] leading-tight font-semibold break-words" title={kunde.name}>
-            {kunde.name}
-          </h2>
-          <StatusBadge status={bestellung.marke.ton}>{bestellung.marke.text}</StatusBadge>
-          <span className={cn('basis-full text-[13px] xl:ml-auto xl:basis-auto', LEISE)}>
-            {bestellung.nummer} · {bestellung.abholung}
-          </span>
-        </div>
-
-        <Betrag bestellung={bestellung} />
-
-        <section aria-labelledby={`packliste-${bestellung.id}`}>
-          <div className="flex items-baseline gap-2">
-            <h3 id={`packliste-${bestellung.id}`} className={KICKER}>
-              Packliste
-            </h3>
-            {zumPacken && vorhanden.length > 0 && (
-              <span className={cn('text-[12.5px]', LEISE)} aria-live="polite">
-                {erledigtZahl} von {vorhanden.length} erledigt
-              </span>
-            )}
+    <>
+      {/*
+        Unter 1024 px: Rückweg „Bestellungen" (Nr. 44 — am Handy feste Leiste, darüber
+        hinaus die Zeile „‹ …"), darunter Bestellnummer und Anrufen (Mockup
+        mobil-h3-bestelldetail). Ab 1024 px steht die Liste daneben, dort entfällt beides.
+      */}
+      <UnterseitenKopf
+        titel={`Bestellung ${bestellung.nummer}`}
+        suche={zurueckSuche}
+        listeDaneben
+        aktion={
+          kunde.telefon ? (
+            <a href={`tel:${kunde.telefon}`} aria-label={`${kunde.name} anrufen`} className={cn('inline-flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-muted', FOKUS_RAHMEN)}>
+              <Phone className="size-5" strokeWidth={1.7} aria-hidden="true" />
+            </a>
+          ) : undefined
+        }
+      />
+      <article aria-labelledby={`bestellung-${bestellung.id}`} className="flex flex-col gap-3">
+        <div className={cn(KARTE, 'flex flex-col gap-3.5 p-4 md:px-[18px]')}>
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <h2 id={`bestellung-${bestellung.id}`} className="line-clamp-2 min-w-0 font-heading text-[22px] leading-tight font-semibold break-words" title={kunde.name}>
+              {kunde.name}
+            </h2>
+            <StatusBadge status={bestellung.marke.ton}>{bestellung.marke.text}</StatusBadge>
+            <span className={cn('basis-full text-[13px] xl:ml-auto xl:basis-auto', LEISE)}>
+              {bestellung.nummer} · {bestellung.abholung}
+            </span>
           </div>
-          <ul className="mt-1.5">
-            {bestellung.positionen.map((p) => (
-              <li key={p.id} className="border-t border-border">
-                {zumPacken && !p.fehlt ? (
-                  <button
-                    type="button"
-                    aria-pressed={abgehakt.has(p.id)}
-                    onClick={() => hakeUm(p.id)}
-                    className={cn('flex min-h-12 w-full items-center gap-3 py-2 text-left', FOKUS_RAHMEN_INNEN)}
-                  >
-                    <Haken an={abgehakt.has(p.id)} />
-                    <span className={cn('min-w-0 flex-1 text-[14.5px] break-words', abgehakt.has(p.id) && 'text-muted-foreground line-through')}>{p.zeile}</span>
-                    <span className={cn('shrink-0 text-[13px] tabular-nums', LEISE)}>{euro(p.betragCents)}</span>
-                  </button>
-                ) : (
-                  <div className="flex min-h-12 items-center gap-3 py-2">
-                    <span className={cn('min-w-0 flex-1 text-[14.5px] break-words', p.fehlt && 'text-muted-foreground line-through')}>{p.zeile}</span>
-                    {p.fehlt && <StatusBadge status="offen">fehlt</StatusBadge>}
-                    <span className={cn('shrink-0 text-[13px] tabular-nums', LEISE, p.fehlt && 'line-through')}>{euro(p.betragCents)}</span>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
 
-        {zumPacken && (
-          <p className={cn('text-[12.5px]', LEISE)}>
-            Bestellnummer {bestellung.nummer} nur zum Abgleich – bitte zusätzlich den Namen prüfen.
-          </p>
-        )}
+          <Betrag bestellung={bestellung} />
 
-        {(hauptaktion || aktionen.artikelFehlt || aktionen.nichtAbgeholt || aktionen.stornieren) && (
-          <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center">
-            {hauptaktion && (
-              <button type="button" onClick={hauptaktion.onClick} disabled={laeuft} aria-busy={laeuft || undefined} className={cn(KNOPF_GRUEN, 'w-full rounded-[14px] sm:w-auto sm:rounded-full')}>
-                {hauptaktion.text}
-              </button>
-            )}
-            {aktionen.artikelFehlt && (
-              <button type="button" onClick={() => setOffen('fehlt')} disabled={laeuft} className={KNOPF_RAHMEN}>
-                Artikel fehlt
-              </button>
-            )}
-            <span className="hidden flex-1 sm:block" aria-hidden="true" />
-            <div className="flex flex-wrap justify-center gap-1 sm:justify-end">
-              {aktionen.nichtAbgeholt && (
-                <button type="button" onClick={() => setOffen('nichtAbgeholt')} disabled={laeuft} className={TEXT_GRUEN}>
-                  Nicht abgeholt
-                </button>
-              )}
-              {aktionen.stornieren && (
-                <button type="button" onClick={() => setOffen('storno')} disabled={laeuft} className={TEXT_ORANGE}>
-                  Stornieren
-                </button>
+          <section aria-labelledby={`packliste-${bestellung.id}`}>
+            <div className="flex items-baseline gap-2">
+              <h3 id={`packliste-${bestellung.id}`} className={KICKER}>
+                Packliste
+              </h3>
+              {zumPacken && vorhanden.length > 0 && (
+                <span className={cn('text-[12.5px]', LEISE)} aria-live="polite">
+                  {erledigtZahl} von {vorhanden.length} erledigt
+                </span>
               )}
             </div>
+            <ul className="mt-1.5">
+              {bestellung.positionen.map((p) => (
+                <li key={p.id} className="border-t border-border">
+                  {zumPacken && !p.fehlt ? (
+                    <button
+                      type="button"
+                      aria-pressed={abgehakt.has(p.id)}
+                      onClick={() => hakeUm(p.id)}
+                      className={cn('flex min-h-12 w-full items-center gap-3 py-2 text-left', FOKUS_RAHMEN_INNEN)}
+                    >
+                      <Haken an={abgehakt.has(p.id)} />
+                      <span className={cn('min-w-0 flex-1 text-[14.5px] break-words', abgehakt.has(p.id) && 'text-muted-foreground line-through')}>{p.zeile}</span>
+                      <span className={cn('shrink-0 text-[13px] tabular-nums', LEISE)}>{euro(p.betragCents)}</span>
+                    </button>
+                  ) : (
+                    <div className="flex min-h-12 items-center gap-3 py-2">
+                      <span className={cn('min-w-0 flex-1 text-[14.5px] break-words', p.fehlt && 'text-muted-foreground line-through')}>{p.zeile}</span>
+                      {p.fehlt && <StatusBadge status="offen">fehlt</StatusBadge>}
+                      <span className={cn('shrink-0 text-[13px] tabular-nums', LEISE, p.fehlt && 'line-through')}>{euro(p.betragCents)}</span>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          {zumPacken && (
+            <p className={cn('text-[12.5px]', LEISE)}>
+              Bestellnummer {bestellung.nummer} nur zum Abgleich – bitte zusätzlich den Namen prüfen.
+            </p>
+          )}
+
+          {(hauptaktion || aktionen.artikelFehlt || aktionen.nichtAbgeholt || aktionen.stornieren) && (
+            <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center">
+              {hauptaktion && (
+                <button type="button" onClick={hauptaktion.onClick} disabled={laeuft} aria-busy={laeuft || undefined} className={cn(KNOPF_GRUEN, 'w-full rounded-[14px] sm:w-auto sm:rounded-full')}>
+                  {hauptaktion.text}
+                </button>
+              )}
+              {aktionen.artikelFehlt && (
+                <button type="button" onClick={() => setOffen('fehlt')} disabled={laeuft} className={KNOPF_RAHMEN}>
+                  Artikel fehlt
+                </button>
+              )}
+              <span className="hidden flex-1 sm:block" aria-hidden="true" />
+              <div className="flex flex-wrap justify-center gap-1 sm:justify-end">
+                {aktionen.nichtAbgeholt && (
+                  <button type="button" onClick={() => setOffen('nichtAbgeholt')} disabled={laeuft} className={TEXT_GRUEN}>
+                    Nicht abgeholt
+                  </button>
+                )}
+                {aktionen.stornieren && (
+                  <button type="button" onClick={() => setOffen('storno')} disabled={laeuft} className={TEXT_ORANGE}>
+                    Stornieren
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+          {(aktionen.dochNichtGepackt || aktionen.abholungZurueck) && (
+            <button
+              type="button"
+              onClick={() => {
+                setKundinInformieren(true)
+                setOffen(aktionen.dochNichtGepackt ? 'dochNicht' : 'abholungZurueck')
+              }}
+              disabled={laeuft}
+              className={cn(KNOPF_RAHMEN, 'self-start text-muted-foreground')}
+            >
+              {aktionen.dochNichtGepackt ? 'Doch nicht gepackt' : 'Abholung rückgängig'}
+            </button>
+          )}
+          {aktionen.nichtAbgeholt && (
+            <p className={cn('text-[12.5px]', LEISE)}>„Nicht abgeholt“ kostet dich nichts – die Gebühr entfällt automatisch.</p>
+          )}
+          <div aria-live="polite">
+            <DialogFehler text={offen ? null : fehler} />
           </div>
-        )}
-        {(aktionen.dochNichtGepackt || aktionen.abholungZurueck) && (
-          <button
-            type="button"
-            onClick={() => {
-              setKundinInformieren(true)
-              setOffen(aktionen.dochNichtGepackt ? 'dochNicht' : 'abholungZurueck')
-            }}
-            disabled={laeuft}
-            className={cn(KNOPF_RAHMEN, 'self-start text-muted-foreground')}
-          >
-            {aktionen.dochNichtGepackt ? 'Doch nicht gepackt' : 'Abholung rückgängig'}
-          </button>
-        )}
-        {aktionen.nichtAbgeholt && (
-          <p className={cn('text-[12.5px]', LEISE)}>„Nicht abgeholt“ kostet dich nichts – die Gebühr entfällt automatisch.</p>
-        )}
-        <div aria-live="polite">
-          <DialogFehler text={offen ? null : fehler} />
         </div>
-      </div>
 
-      <Kundin bestellung={bestellung} />
+        <Kundin bestellung={bestellung} />
 
-      <StornoDialog bestellung={bestellung} offen={offen === 'storno'} onOffenChange={(o) => setOffen(o ? 'storno' : null)} />
-      <ArtikelFehltDialog
-        key={bestellung.positionen.map((p) => `${p.id}:${p.fehlt}`).join('|')}
-        bestellung={bestellung}
-        offen={offen === 'fehlt'}
-        onOffenChange={(o) => setOffen(o ? 'fehlt' : null)}
-        onStornoWaehlen={() => setOffen('storno')}
-      />
-      <BestellDialog
-        offen={offen === 'nichtAbgeholt'}
-        onOffenChange={(o) => setOffen(o ? 'nichtAbgeholt' : null)}
-        titel="Nicht abgeholt?"
-        unterzeile={`${kunde.name} · ${bestellung.nummer}`}
-        hauptaktion={{ text: 'Nicht abgeholt', onClick: nichtAbgeholt, ton: 'orange', laeuft }}
-      >
-        <div className="flex flex-col gap-2 text-[13.5px]">
-          <p>{kunde.vorname} hat die Bestellung nicht abgeholt. Sie bekommt keine E-Mail.</p>
-          <p>
-            {betrag.gebuehrCents > 0
-              ? bestellung.vorOrt
-                ? `Die Servicegebühr von ${euro(betrag.gebuehrCents)} entfällt und wird nicht abgerechnet. Am Warenpreis ändert sich nichts.`
-                : `Die Servicegebühr von ${euro(betrag.gebuehrCents)} bekommt ${kunde.vorname} zurück. Der Warenpreis bleibt bei dir.`
-              : 'Am Warenpreis ändert sich nichts.'}
-          </p>
-          <p className="rounded-xl border border-border bg-background px-3.5 py-2.5">Das lässt sich nicht rückgängig machen.</p>
-          <DialogFehler text={offen === 'nichtAbgeholt' ? fehler : null} />
-        </div>
-      </BestellDialog>
-      <BestellDialog
-        offen={offen === 'dochNicht'}
-        onOffenChange={(o) => setOffen(o ? 'dochNicht' : null)}
-        titel="Doch nicht gepackt?"
-        hauptaktion={{ text: 'Zurück zum Packen', onClick: () => rueckweg('dochNicht'), ton: 'gruen', laeuft }}
-      >
-        <p className="text-[13.5px]">{kunde.vorname} hat schon die E-Mail „bereit zur Abholung“ bekommen.</p>
-        <label className="flex min-h-11 cursor-pointer items-center gap-3 text-[14px]">
-          <input type="checkbox" checked={kundinInformieren} onChange={(e) => setKundinInformieren(e.target.checked)} className="size-5 accent-accent" />
-          {kunde.vorname} per E-Mail Bescheid geben
-        </label>
-        <DialogFehler text={offen === 'dochNicht' ? fehler : null} />
-      </BestellDialog>
-      <BestellDialog
-        offen={offen === 'abholungZurueck'}
-        onOffenChange={(o) => setOffen(o ? 'abholungZurueck' : null)}
-        titel="Abholung rückgängig?"
-        hauptaktion={{ text: 'Abholung rückgängig', onClick: () => rueckweg('abholungZurueck'), ton: 'gruen', laeuft }}
-      >
-        <p className="text-[13.5px]">Die Bestellung steht wieder auf „Gepackt“. Es geht keine E-Mail raus.</p>
-        <DialogFehler text={offen === 'abholungZurueck' ? fehler : null} />
-      </BestellDialog>
-    </article>
+        <StornoDialog bestellung={bestellung} offen={offen === 'storno'} onOffenChange={(o) => setOffen(o ? 'storno' : null)} />
+        <ArtikelFehltDialog
+          key={bestellung.positionen.map((p) => `${p.id}:${p.fehlt}`).join('|')}
+          bestellung={bestellung}
+          offen={offen === 'fehlt'}
+          onOffenChange={(o) => setOffen(o ? 'fehlt' : null)}
+          onStornoWaehlen={() => setOffen('storno')}
+        />
+        <BestellDialog
+          offen={offen === 'nichtAbgeholt'}
+          onOffenChange={(o) => setOffen(o ? 'nichtAbgeholt' : null)}
+          titel="Nicht abgeholt?"
+          unterzeile={`${kunde.name} · ${bestellung.nummer}`}
+          hauptaktion={{ text: 'Nicht abgeholt', onClick: nichtAbgeholt, ton: 'orange', laeuft }}
+        >
+          <div className="flex flex-col gap-2 text-[13.5px]">
+            <p>{kunde.vorname} hat die Bestellung nicht abgeholt. Sie bekommt keine E-Mail.</p>
+            <p>
+              {betrag.gebuehrCents > 0
+                ? bestellung.vorOrt
+                  ? `Die Servicegebühr von ${euro(betrag.gebuehrCents)} entfällt und wird nicht abgerechnet. Am Warenpreis ändert sich nichts.`
+                  : `Die Servicegebühr von ${euro(betrag.gebuehrCents)} bekommt ${kunde.vorname} zurück. Der Warenpreis bleibt bei dir.`
+                : 'Am Warenpreis ändert sich nichts.'}
+            </p>
+            <p className="rounded-xl border border-border bg-background px-3.5 py-2.5">Das lässt sich nicht rückgängig machen.</p>
+            <DialogFehler text={offen === 'nichtAbgeholt' ? fehler : null} />
+          </div>
+        </BestellDialog>
+        <BestellDialog
+          offen={offen === 'dochNicht'}
+          onOffenChange={(o) => setOffen(o ? 'dochNicht' : null)}
+          titel="Doch nicht gepackt?"
+          hauptaktion={{ text: 'Zurück zum Packen', onClick: () => rueckweg('dochNicht'), ton: 'gruen', laeuft }}
+        >
+          <p className="text-[13.5px]">{kunde.vorname} hat schon die E-Mail „bereit zur Abholung“ bekommen.</p>
+          <label className="flex min-h-11 cursor-pointer items-center gap-3 text-[14px]">
+            <input type="checkbox" checked={kundinInformieren} onChange={(e) => setKundinInformieren(e.target.checked)} className="size-5 accent-accent" />
+            {kunde.vorname} per E-Mail Bescheid geben
+          </label>
+          <DialogFehler text={offen === 'dochNicht' ? fehler : null} />
+        </BestellDialog>
+        <BestellDialog
+          offen={offen === 'abholungZurueck'}
+          onOffenChange={(o) => setOffen(o ? 'abholungZurueck' : null)}
+          titel="Abholung rückgängig?"
+          hauptaktion={{ text: 'Abholung rückgängig', onClick: () => rueckweg('abholungZurueck'), ton: 'gruen', laeuft }}
+        >
+          <p className="text-[13.5px]">Die Bestellung steht wieder auf „Gepackt“. Es geht keine E-Mail raus.</p>
+          <DialogFehler text={offen === 'abholungZurueck' ? fehler : null} />
+        </BestellDialog>
+      </article>
+    </>
   )
 }
 

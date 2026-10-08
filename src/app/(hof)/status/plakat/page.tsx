@@ -6,7 +6,7 @@ import { Printer } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getPlakatDaten } from '@/server/queries/teilen-bild'
-import { ZurueckLink } from '@/components/hofbereich/zurueck-link'
+import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { QrPlakat } from '@/components/teilen/qr-plakat'
 import { DruckenKnopf } from '@/components/teilen/drucken-knopf'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -46,8 +46,10 @@ export default async function PlakatPage(): Promise<React.JSX.Element> {
     <div className="mx-auto w-full max-w-4xl px-4 pt-5 pb-12 md:px-8 md:pt-8 print:m-0 print:max-w-none print:p-0">
       {/* A4 ohne Druckrand: Das Blatt bringt seinen eigenen Rand mit. */}
       <style>{'@page { size: A4; margin: 0; }'}</style>
+      {/* Direkt im Rahmen, nicht im Kasten um den Titel: Die Leiste am Handy
+          klebt nur, solange ihr Elternelement reicht. Gedruckt wird sie nie. */}
+      <UnterseitenKopf />
       <div className="print:hidden">
-        <ZurueckLink href="/dashboard">Heute</ZurueckLink>
         <div className="mb-5 flex flex-wrap items-end gap-3">
           <div className="min-w-0 flex-1">
             <h1 className="font-heading text-[26px] font-semibold md:text-[30px]">QR-Plakat</h1>

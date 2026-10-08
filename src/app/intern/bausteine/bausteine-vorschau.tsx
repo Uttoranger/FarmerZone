@@ -31,6 +31,7 @@ import { SidebarEintrag, SidebarGruppe } from '@/components/ui/sidebar-gruppe'
 import { Zaehler } from '@/components/ui/zaehler'
 import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { ThemeUmschalter } from '@/components/shared/theme-umschalter'
+import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { SHELL_VARIANTEN } from './shell/[variante]/varianten'
 
 /*
@@ -160,6 +161,20 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
               <ListRow titel={LANGER_NAME} untertitel="Gemüsekiste klein · Honig 500 g" ende={<span className="text-[13.5px] font-semibold">€ 21,90</span>} />
               <ListRow titel="Admin" symbol={SlidersHorizontal} href="/intern/bausteine#listrow" ende={<Zaehler anzahl={5} wofuer="Meldungen zu entscheiden" />} />
             </ListGruppe>
+          </Abschnitt>
+
+          <Abschnitt
+            id="unterseitenkopf"
+            titel="UnterseitenKopf"
+            satz="Kopf einer Unterseite im Hofbereich (Nr. 44): am Handy eine feste Leiste mit Pfeil und Elternseite – hier im Kasten scrollen –, im Browser die Zeile „‹ …“, darunter der Titel."
+          >
+            {/* Ein eigener Scroll-Kasten mit dem Rand der Hof-Rahmen (px-4 pt-5), damit die Leiste hier sichtbar klebt. */}
+            <div className="relative h-72 overflow-y-auto rounded-xl border border-border bg-background px-4 pt-5 md:px-8 md:pt-8">
+              <UnterseitenKopf pfad="/settings/profile" titel="Hof-Profil" satz="Informationen, die auf deiner öffentlichen Hof-Seite sichtbar sind." />
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="mb-3 h-24 rounded-2xl border border-border bg-card" />
+              ))}
+            </div>
           </Abschnitt>
 
           <Abschnitt id="status" titel="StatusBadge, Zähler und ProgressBar" satz="Zustände in Orange (offen), Grün (fertig) und neutral; Fortschritt als Balken.">

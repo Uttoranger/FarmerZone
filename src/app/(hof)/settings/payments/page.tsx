@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { KARTE } from '@/components/hof-bestellungen/stil'
-import { EinstellungenKopf } from '@/components/hof-einstellungen/einstellungen-kopf'
+import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
 import { cn } from '@/lib/utils'
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
@@ -54,7 +54,7 @@ export default async function PaymentsPage({
 
   return (
     <div className={UNTERSEITE_RAHMEN}>
-      <EinstellungenKopf titel="Zahlung" satz="Verwalte, wie Kunden bezahlen können." />
+      <UnterseitenKopf titel="Zahlung" satz="Verwalte, wie Kunden bezahlen können." />
 
       <div className="flex flex-col gap-4">
         {hinweis === 'geschafft' && (

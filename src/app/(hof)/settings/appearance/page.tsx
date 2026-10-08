@@ -4,7 +4,7 @@ import type { Metadata } from 'next'
 import { auth } from '@/lib/auth'
 import { getAppearanceData } from '@/server/queries/appearance'
 import { AppearanceClient } from './appearance-client'
-import { ZurueckZuEinstellungen } from '@/components/hof-einstellungen/einstellungen-kopf'
+import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
 
 export const metadata: Metadata = { title: 'Mein Auftritt — FarmerZone' }
@@ -15,7 +15,8 @@ export const dynamic = 'force-dynamic'
  * unverändert in der Logik — Uploads über die Upload-Route mit der Sperre bis
  * zur E-Mail-Bestätigung (17b), Galerie-URLs nur aus dem eigenen Speicher
  * (19b, addFarmPhotoAction). Der Kopf mit h1 steht im Formular selbst; hier
- * nur der Rückweg. data-app-palette: Teile zeichnen noch mit --app-*.
+ * nur der Rückweg (seit Nr. 44 der UnterseitenKopf, am Handy fest oben).
+ * data-app-palette: Teile zeichnen noch mit --app-*.
  */
 export default async function AppearancePage(): Promise<React.JSX.Element> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -26,9 +27,7 @@ export default async function AppearancePage(): Promise<React.JSX.Element> {
 
   return (
     <div className={UNTERSEITE_RAHMEN}>
-      <div className="mb-1">
-        <ZurueckZuEinstellungen />
-      </div>
+      <UnterseitenKopf />
       <div data-app-palette="neu">
         <AppearanceClient
           initialData={{
