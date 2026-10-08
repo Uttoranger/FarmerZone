@@ -9,20 +9,21 @@ import {
   COOKIE_HINWEIS_RAND_PX,
   UNTEN_FEST_ATTRIBUT,
   cookieHinweisUnten,
+  leistenMass,
   type LeistenMass,
 } from '@/lib/cookie-hinweis'
 
 const COOKIE_KEY = 'fz_cookie_ok'
 
-/** Die festen Leisten unten (Merkmal an der Leiste), wie sie gerade im Fenster liegen. */
+/**
+ * Die festen Leisten unten (Merkmal an der Leiste), wie sie gerade im Fenster
+ * liegen — samt allem, was aus ihnen herausragt (der erhobene Mittelknopf).
+ */
 function festeLeisten(): LeistenMass[] {
   return Array.from(document.querySelectorAll<HTMLElement>(`[${UNTEN_FEST_ATTRIBUT}]`))
     // Nur, was gerade wirklich fest steht: Die Kasse stellt ihre Leiste ab 768 px in den Fluss.
     .filter((el) => getComputedStyle(el).position === 'fixed')
-    .map((el) => {
-      const rahmen = el.getBoundingClientRect()
-      return { oben: rahmen.top, hoehe: rahmen.height }
-    })
+    .map((el) => leistenMass(el.getBoundingClientRect(), Array.from(el.querySelectorAll('*'), (teil) => teil.getBoundingClientRect())))
 }
 
 export function CookieBanner(): React.JSX.Element | null {

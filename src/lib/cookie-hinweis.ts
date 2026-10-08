@@ -23,6 +23,24 @@ export const UNTEN_FEST_ATTRIBUT = 'data-unten-fest'
 /** Lage einer Leiste im Fenster, wie getBoundingClientRect sie misst (px). */
 export type LeistenMass = { oben: number; hoehe: number }
 
+/** Was die Regel von einem gemessenen Rahmen (getBoundingClientRect) braucht. */
+export type Rahmen = { top: number; bottom: number; height: number }
+
+/**
+ * Das Maß einer festen Leiste samt allem, was aus ihr herausragt: Der
+ * erhobene Mittelknopf der Unterleiste steht 20 px über ihrer Oberkante
+ * (`mittelknopfKlassen`, im Hofbereich 16 px) — der Rahmen der Leiste selbst
+ * kennt ihn nicht, und ein Hinweis knapp über der Leiste läge auf dem Korb.
+ * Inhalt ohne Höhe (ausgeblendet) zählt nicht.
+ */
+export function leistenMass(leiste: Rahmen, inhalt: readonly Rahmen[]): LeistenMass {
+  let oben = leiste.top
+  for (const teil of inhalt) {
+    if (teil.height > 0 && Number.isFinite(teil.top) && teil.top < oben) oben = teil.top
+  }
+  return { oben, hoehe: leiste.bottom - oben }
+}
+
 /**
  * Abstand des Hinweises vom unteren Fensterrand in px: über der höchsten
  * sichtbaren Leiste plus Luft; ohne Leiste der gewohnte Rand. Eine Leiste

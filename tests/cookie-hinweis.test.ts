@@ -12,6 +12,7 @@ import {
   COOKIE_HINWEIS_RAND_PX,
   UNTEN_FEST_ATTRIBUT,
   cookieHinweisUnten,
+  leistenMass,
 } from '@/lib/cookie-hinweis'
 
 const FENSTER = 844
@@ -44,6 +45,31 @@ describe('cookieHinweisUnten — über der höchsten festen Leiste', () => {
 
   it('mehr als das ganze Fenster belegt keine Leiste', () => {
     expect(cookieHinweisUnten([{ oben: -200, hoehe: 1200 }], FENSTER)).toBe(FENSTER + COOKIE_HINWEIS_LUFT_PX)
+  })
+})
+
+describe('leistenMass — die Leiste samt dem, was aus ihr herausragt', () => {
+  // Unterleiste 68 px am unteren Rand; der Mittelknopf (54 px, -mt-5) ragt 20 px über sie hinaus.
+  const UNTERLEISTE = { top: FENSTER - 68, bottom: FENSTER, height: 68 }
+  const MITTELKNOPF = { top: FENSTER - 88, bottom: FENSTER - 34, height: 54 }
+
+  it('ohne Inhalt: der Rahmen der Leiste', () => {
+    expect(leistenMass(UNTERLEISTE, [])).toEqual({ oben: FENSTER - 68, hoehe: 68 })
+  })
+
+  it('der erhobene Mittelknopf zählt mit — der Hinweis steht auch über dem Korb', () => {
+    const eintrag = { top: FENSTER - 56, bottom: FENSTER - 12, height: 44 }
+    const mass = leistenMass(UNTERLEISTE, [eintrag, MITTELKNOPF])
+    expect(mass).toEqual({ oben: FENSTER - 88, hoehe: 88 })
+    expect(cookieHinweisUnten([mass], FENSTER)).toBe(88 + COOKIE_HINWEIS_LUFT_PX)
+    // Gegenprobe: Mit dem Rahmen der Leiste allein ragte der Hinweis 8 px in den Knopf.
+    expect(cookieHinweisUnten([leistenMass(UNTERLEISTE, [])], FENSTER)).toBe(68 + COOKIE_HINWEIS_LUFT_PX)
+  })
+
+  it('Inhalt ohne Höhe (ausgeblendet) und Unsinn verschieben nichts', () => {
+    const versteckt = { top: 0, bottom: 0, height: 0 }
+    const unsinn = { top: Number.NaN, bottom: 0, height: 10 }
+    expect(leistenMass(UNTERLEISTE, [versteckt, unsinn])).toEqual({ oben: FENSTER - 68, hoehe: 68 })
   })
 })
 
@@ -100,6 +126,8 @@ describe('Wache: jede feste Leiste am unteren Rand trägt das Merkmal', () => {
   it('der Hinweis selbst steht über den Leisten — gemessen, nicht mit festem bottom-4', () => {
     const banner = readFileSync(join(WURZEL, 'components/cookie-banner.tsx'), 'utf8')
     expect(banner).toContain('cookieHinweisUnten(festeLeisten(), window.innerHeight)')
+    // Gemessen wird die Leiste samt Inhalt — sonst läge der Hinweis auf dem erhobenen Mittelknopf.
+    expect(banner).toContain("leistenMass(el.getBoundingClientRect(), Array.from(el.querySelectorAll('*')")
     expect(banner).toContain('style={{ bottom: unten }}')
     expect(banner).not.toMatch(/\bbottom-4\b/)
     // Der Knopf „Verstanden" ist ein 44-px-Ziel.
