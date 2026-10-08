@@ -67,25 +67,83 @@ export function onlinePausiertHinweis(barMoeglich: boolean): { titel: string; sa
 // ─── Hof-Konto, das Stripe nicht kennt (Register Z2, Nachtlauf Nr. 42) ─────
 
 /**
+ * Über diese Parameter spricht ein Aufruf das Hof-Konto an: das Zielkonto
+ * eines PaymentIntents (Destination Charge) bzw. das Konto selbst.
+ */
+const HOFKONTO_PARAMETER: ReadonlySet<string> = new Set(['transfer_data[destination]', 'destination', 'account'])
+
+/**
  * Kennt Stripe das gespeicherte Konto eines Hofs nicht (mehr)? Typischer
  * Fall: ein Konto aus dem Testmodus, nachdem die Produktion auf den
- * Live-Schlüssel umgestellt ist — Stripe antwortet dann mit `resource_missing`
- * („No such account" bzw. beim Zielkonto eines PaymentIntents „No such
- * destination").
+ * Live-Schlüssel umgestellt ist — Stripe antwortet dann mit „No such
+ * account" bzw. beim Zielkonto eines PaymentIntents „No such destination".
  *
- * NUR an Stellen fragen, an denen das Hof-Konto die einzige Kennung im Aufruf
- * ist: Zielkonto des PaymentIntents im Checkout, Kontostatus, Einrichtungs-
- * und Login-Link, Rückkehr aus dem Onboarding. Bei einem Aufruf mit
- * PaymentIntent- oder Erstattungs-Kennung meinte derselbe Code etwas anderes.
+ * Streng (Nr. 42, Runde 1): `resource_missing` allein reicht nicht — derselbe
+ * Code meint sonst etwa einen unbekannten PaymentIntent. Es zählt nur, was
+ * sich aufs Hof-Konto bezieht: die Meldung „No such account/destination"
+ * oder `resource_missing` an einem Konto-Parameter (HOFKONTO_PARAMETER).
+ *
+ * Die Regel der Kasse (Zielkonto des PaymentIntents). Reine Konto-Aufrufe
+ * fragen `istUnzugaenglichesStripeKonto`, die zusätzlich den Zugriffsfehler
+ * kennt.
  *
  * Geprüft wird die Form, nicht die Klasse: So erkennt die Regel auch die
  * Fehler aus den Test-Mocks, und sie bleibt ohne Stripe-SDK.
  */
 export function istUnbekanntesStripeKonto(fehler: unknown): boolean {
   if (typeof fehler !== 'object' || fehler === null) return false
+  const { code, param, message } = fehler as { code?: unknown; param?: unknown; message?: unknown }
+  if (typeof message === 'string' && /\bNo such (account|destination)\b/i.test(message)) return true
+  return code === 'resource_missing' && typeof param === 'string' && HOFKONTO_PARAMETER.has(param)
+}
+
+/**
+ * Für reine Konto-Aufrufe mit der gespeicherten Kennung — Kontostatus
+ * (`accounts.retrieve`), Einrichtungslink (`accountLinks.create`), Login-Link
+ * (`accounts.createLoginLink`): Neben „unbekannt" zählt hier auch der
+ * Zugriffsfehler. Auf eine Kennung, die nicht zur Plattform gehört oder nicht
+ * (mehr) existiert, antwortet Stripe oft mit 403 `account_invalid` („does not
+ * have access to account … (or that account does not exist)"). Gespeicherte
+ * Kennungen stammen immer aus dem eigenen `accounts.create` — kein Zugriff
+ * heißt dann: neu einrichten (Nr. 42, Runde 1).
+ *
+ * GRENZE: Derselbe Fehler kommt auch, wenn der Plattform-Schlüssel zum
+ * falschen Stripe-Konto gehört. Dann gilt jeder Hof als unbekannt, und
+ * „neu einrichten" legte die Konten bei der falschen Plattform an — deshalb
+ * prüft der Mensch die Plattform des Schlüssels vor dem Umschalten
+ * (docs/betrieb/stripe-live.md).
+ *
+ * NICHT für die Kasse: Dort bleibt es bei `istUnbekanntesStripeKonto`.
+ */
+export function istUnzugaenglichesStripeKonto(fehler: unknown): boolean {
+  if (istUnbekanntesStripeKonto(fehler)) return true
+  if (typeof fehler !== 'object' || fehler === null) return false
   const { code, message } = fehler as { code?: unknown; message?: unknown }
-  if (code === 'resource_missing') return true
-  return typeof message === 'string' && /\bNo such (account|destination)\b/i.test(message)
+  if (code === 'account_invalid') return true
+  return typeof message === 'string' && /\bdoes not have access to account\b/i.test(message)
+}
+
+/** So lange bekommt ein Neuversuch beim Neu-Einrichten dasselbe Konto (15 Minuten). */
+export const NEU_EINRICHTEN_FENSTER_MS = 15 * 60 * 1000
+
+/**
+ * Idempotenz-Schlüssel für `accounts.create` beim Neu-Einrichten: Hof-ID,
+ * alte Kennung und das 15-Minuten-Fenster (UTC, gezählt seit 1970).
+ *
+ * Warum mit Fenster (Nr. 42, Runde 2): Stripe hält unter einem Schlüssel
+ * 24 Stunden lang JEDES Ergebnis, auch einen Fehler. Ohne Fenster sperrte ein
+ * gescheiterter erster Versuch — wahrscheinlich am Tag der Live-Umstellung —
+ * das Neu-Einrichten bis zu einen Tag. Mit Fenster bekommen Doppelklick und
+ * sofortiger Neuversuch weiter dasselbe Konto; nach spätestens 15 Minuten
+ * gilt ein neuer Schlüssel.
+ *
+ * Grenze: Fällt ein Doppelklick genau auf die Fenstergrenze, legt Stripe
+ * zwei Konten an. Gespeichert wird trotzdem nur eines (bedingt auf die alte
+ * Kennung), das andere steht mit Hof-ID im Server-Protokoll.
+ */
+export function neuEinrichtenSchluessel(farmId: string, altesKonto: string, jetzt: Date): string {
+  const fenster = Math.floor(jetzt.getTime() / NEU_EINRICHTEN_FENSTER_MS)
+  return `hofkonto-neu-${farmId}-${altesKonto}-${fenster}`
 }
 
 /**
@@ -101,9 +159,17 @@ export function hofKontoUnbekanntText(barMoeglich: boolean): string {
 
 /** Was der Hof sieht (Einstellungen → Zahlung): Titel und Satz der Hinweiskarte, Knopf. */
 export const NEU_EINRICHTEN_TITEL = 'Online-Zahlung neu einrichten'
-export const NEU_EINRICHTEN_SATZ =
-  'Stripe kennt dein bisheriges Konto nicht mehr. Richte die Online-Zahlung bitte neu ein – das dauert etwa 10 Minuten. ' +
-  'Bis dahin bieten wir deinen Kundinnen nur Barzahlung an.'
+/**
+ * Der Satz der Karte. Ohne Barzahlung (`acceptsOnsite` false) gibt es keinen
+ * Ausweg für die Kundinnen; dann verspricht er ihn nicht — wie
+ * `onlinePausiertHinweis` und `hofKontoUnbekanntText`.
+ */
+export function neuEinrichtenSatz(barMoeglich: boolean): string {
+  const anfang = 'Stripe kennt dein bisheriges Konto nicht mehr. Richte die Online-Zahlung bitte neu ein – das dauert etwa 10 Minuten. '
+  return barMoeglich
+    ? `${anfang}Bis dahin bieten wir deinen Kundinnen nur Barzahlung an.`
+    : `${anfang}Bis dahin können Kunden bei dir nicht bestellen.`
+}
 /** Die Marke an der Karte „Online-Zahlung (Stripe)". */
 export const NEU_EINRICHTEN_MARKE = 'Nicht mehr verbunden'
 /** Kurzfassung für Stellen außerhalb der Zahlungs-Einstellungen (Verkäufe, Aktionen). */

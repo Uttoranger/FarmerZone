@@ -14,6 +14,7 @@
  * bestimmeUmgebung (src/lib/umgebung.ts) — aus Etiketten, nie aus dem Schlüssel.
  */
 import { PRODUKTION_ADRESSE, type Umgebung, type UmgebungsArt } from '@/lib/umgebung'
+import { stripeStartGesperrt, type StripeModus } from '@/lib/stripe-modus'
 
 // ─── Marke im Admin-Kopf ─────────────────────────────────────────────────────
 
@@ -29,14 +30,15 @@ export type StripeMarke = {
 /**
  * „Stripe Live" bzw. „Stripe Test" für den Admin-Kopf — nur aus dem Modus.
  *
- * Grün allein für die Produktion mit Live-Schlüssel: Dort fließt echtes Geld,
- * wie es soll. Orange sonst — der Testbetrieb der Produktion (wie die orange
- * Karte aus Nr. 42), die Testumgebung, lokal und ein Live-Schlüssel außerhalb
- * der Produktion (dort startet Stripe gar nicht). Ohne erkennbaren Schlüssel
- * keine Marke: §12 nennt nur Live und Test.
+ * Grün allein dort, wo ein Live-Schlüssel den Stripe-Client auch starten darf
+ * — dieselbe Regel wie die Modus-Wache (`stripeStartGesperrt`, Nr. 42: nur
+ * das Produktions-Deployment bei Vercel). Dort fließt echtes Geld, wie es
+ * soll. Orange sonst: der Testbetrieb der Produktion (wie die orange Karte aus
+ * Nr. 42), die Testumgebung, lokal, und ein Live-Schlüssel, den die Wache
+ * sperrt. Ohne erkennbaren Schlüssel keine Marke: §12 nennt nur Live und Test.
  */
-export function stripeMarke(u: Pick<Umgebung, 'art' | 'stripe'>): StripeMarke | null {
-  if (u.stripe === 'live') return { text: STRIPE_MARKE_TEXT.live, ton: u.art === 'produktion' ? 'fertig' : 'offen' }
+export function stripeMarke(u: StripeModus): StripeMarke | null {
+  if (u.stripe === 'live') return { text: STRIPE_MARKE_TEXT.live, ton: stripeStartGesperrt(u) ? 'offen' : 'fertig' }
   if (u.stripe === 'test') return { text: STRIPE_MARKE_TEXT.test, ton: 'offen' }
   return null
 }

@@ -11,7 +11,7 @@ import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-
 import { cn } from '@/lib/utils'
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
 import { ONLINE_AUS_SATZ, ONLINE_AUS_TITEL, zahlungHinweis } from '@/lib/hof-einstellungen'
-import { NEU_EINRICHTEN_MARKE, NEU_EINRICHTEN_SATZ, NEU_EINRICHTEN_TITEL } from '@/lib/stripe-konto'
+import { NEU_EINRICHTEN_MARKE, NEU_EINRICHTEN_TITEL, neuEinrichtenSatz } from '@/lib/stripe-konto'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
 import { TESTBETRIEB } from '@/lib/umgebung-server'
 import { PaymentsActions } from './payments-actions'
@@ -27,6 +27,8 @@ async function getFarmPaymentData() {
       stripeAccountId: true,
       stripeAccountReady: true,
       acceptsOnline: true,
+      // Nur für den Satz „neu einrichten": Barzahlung versprechen, wo es sie gibt.
+      acceptsOnsite: true,
     },
   })
 }
@@ -99,7 +101,7 @@ export default async function PaymentsPage({
         )}
         {neuEinrichten && (
           <Hinweiskarte ton="orange" symbol={CircleAlert} titel={NEU_EINRICHTEN_TITEL}>
-            {NEU_EINRICHTEN_SATZ}
+            {neuEinrichtenSatz(farm.acceptsOnsite)}
           </Hinweiskarte>
         )}
 

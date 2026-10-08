@@ -3,16 +3,18 @@ import Stripe from 'stripe'
 import * as Sentry from '@sentry/nextjs'
 import { env } from '@/lib/env'
 import { UMGEBUNG } from '@/lib/umgebung-server'
-import { stripeGesperrtMeldung, stripeStartGesperrt } from '@/lib/stripe-modus'
+import type { UmgebungsArt } from '@/lib/umgebung'
+import { MODUS_SPERRE, stripeGesperrtMeldung, stripeStartGesperrt } from '@/lib/stripe-modus'
 
 /**
- * Die Modus-Wache hat gesperrt (Register Z2): Vorschau oder lokal mit
- * Live-Schlüssel. Die Meldung nennt Umgebung und Ausweg, nie den Schlüssel.
+ * Die Modus-Wache hat gesperrt (Register Z2): ein Live-Schlüssel außerhalb
+ * des Produktions-Deployments bei Vercel. Die Meldung nennt Umgebung und
+ * Ausweg, nie den Schlüssel.
  */
 export class StripeModusGesperrt extends Error {
   constructor(meldung: string) {
     super(meldung)
-    this.name = 'StripeModusGesperrt'
+    this.name = MODUS_SPERRE
   }
 }
 
@@ -21,13 +23,13 @@ let client: Stripe | null = null
 // noch einmal — sonst stünde dieselbe Meldung bei jedem Seitenaufruf in Sentry.
 let sperreGemeldet = false
 
-function meldeSperre(art: 'preview' | 'lokal', meldung: string): void {
+function meldeSperre(art: UmgebungsArt, meldung: string): void {
   if (sperreGemeldet) return
   sperreGemeldet = true
   console.error(`[Stripe] ${meldung}`)
   try {
     // Nur Umgebung und „live" — nie der Schlüssel oder ein Stück davon.
-    Sentry.captureMessage('Stripe-Client nicht gestartet: Live-Schlüssel außerhalb der Produktion', {
+    Sentry.captureMessage('Stripe-Client nicht gestartet: Live-Schlüssel außerhalb des Produktions-Deployments', {
       level: 'error',
       tags: { aufgabe: 'stripe-modus', umgebung: art, stripe: 'live' },
     })
@@ -42,9 +44,11 @@ function meldeSperre(art: 'preview' | 'lokal', meldung: string): void {
  * Onboarding importieren dieses Modul statisch. Würfe die Wache schon beim
  * Laden, fiele mit Stripe auch jede Bar-Bestellung aus.
  *
- * MODUS-WACHE (Register Z2, Nr. 42): In Vorschau und lokal (bestimmeUmgebung)
- * startet der Client mit Live-Schlüssel nicht. Der Modus kommt aus dem
- * Präfix (UMGEBUNG.stripe), gebaut wird der Client aus demselben Schlüssel.
+ * MODUS-WACHE (Register Z2, Nr. 42, fail-closed seit Runde 1): Mit
+ * Live-Schlüssel startet der Client nur im Produktions-Deployment bei Vercel
+ * (stripeStartGesperrt) — in Vorschau, lokal, Test, CI und Unbekanntem nicht.
+ * Der Modus kommt aus dem Präfix (UMGEBUNG.stripe), gebaut wird der Client
+ * aus demselben Schlüssel.
  *
  * apiVersion explizit statt `{} as any`. Der Wert kommt aus dem SDK selbst:
  * `Stripe.API_VERSION` ist als `typeof ApiVersion` typisiert und damit genau
@@ -54,11 +58,9 @@ function meldeSperre(art: 'preview' | 'lokal', meldung: string): void {
  */
 export function stripeClient(): Stripe {
   if (client) return client
-  const { art } = UMGEBUNG
-  // Gesperrt ist nie die Produktion — der zweite Vergleich sagt das dem Typ.
-  if (stripeStartGesperrt(UMGEBUNG) && art !== 'produktion') {
-    const meldung = stripeGesperrtMeldung(art)
-    meldeSperre(art, meldung)
+  if (stripeStartGesperrt(UMGEBUNG)) {
+    const meldung = stripeGesperrtMeldung(UMGEBUNG.art)
+    meldeSperre(UMGEBUNG.art, meldung)
     throw new StripeModusGesperrt(meldung)
   }
   client = new Stripe(env.STRIPE_SECRET_KEY, { apiVersion: Stripe.API_VERSION })

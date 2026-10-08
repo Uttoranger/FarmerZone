@@ -5,10 +5,11 @@ import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
 
 /**
  * Stripe kennt das gespeicherte Konto eines Hofs nicht (Register Z2,
- * Nachtlauf Nr. 42) — erkannt mit `istUnbekanntesStripeKonto`
- * (src/lib/stripe-konto.ts) an den Stellen, die das Hof-Konto benutzen:
- * Checkout, Kontostatus, Einrichtungs- und Login-Link, Rückkehr aus dem
- * Onboarding. Typisch nach der Live-Umstellung: Das Konto stammt aus dem
+ * Nachtlauf Nr. 42) — erkannt an den Stellen, die das Hof-Konto benutzen
+ * (src/lib/stripe-konto.ts): im Checkout mit `istUnbekanntesStripeKonto`,
+ * bei Kontostatus, Einrichtungs- und Login-Link und der Rückkehr aus dem
+ * Onboarding mit `istUnzugaenglichesStripeKonto` (dort zählt auch „kein
+ * Zugriff"). Typisch nach der Live-Umstellung: Das Konto stammt aus dem
  * Testmodus.
  *
  * 1. Der Hof gilt als NICHT BEREIT: `stripeAccountReady` auf false — bedingt

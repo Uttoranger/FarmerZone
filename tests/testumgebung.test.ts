@@ -4,8 +4,9 @@
  *
  * Beweist:
  *  - Marke im Admin: „Stripe Live" bzw. „Stripe Test" nur aus dem Modus,
- *    grün nur für Produktion mit Live-Schlüssel, ohne Schlüssel keine Marke,
- *    nie ein Stück des Schlüssels.
+ *    grün nur, wo die Modus-Wache einen Live-Schlüssel starten lässt
+ *    (Produktions-Deployment bei Vercel), ohne Schlüssel keine Marke, nie ein
+ *    Stück des Schlüssels.
  *  - „Zur echten Seite" steht nur im Banner der Vorschau.
  *  - Post außerhalb der Produktion nur an TEST_EMPFAENGER und @example.com;
  *    die Produktion ist nie gesperrt.
@@ -22,27 +23,32 @@ import {
 } from '@/lib/testumgebung'
 
 describe('stripeMarke — Marke im Admin-Kopf', () => {
-  it('Produktion mit Live-Schlüssel: „Stripe Live" in Grün', () => {
-    expect(stripeMarke({ art: 'produktion', stripe: 'live' })).toEqual({ text: 'Stripe Live', ton: 'fertig' })
+  // Das Produktions-Deployment bei Vercel: nur dort startet ein Live-Schlüssel (Modus-Wache, Nr. 42).
+  const VERCEL_PRODUKTION = { art: 'produktion', vercelProduktion: true } as const
+
+  it('Produktions-Deployment mit Live-Schlüssel: „Stripe Live" in Grün', () => {
+    expect(stripeMarke({ ...VERCEL_PRODUKTION, stripe: 'live' })).toEqual({ text: 'Stripe Live', ton: 'fertig' })
   })
 
   it('Produktion mit Test-Schlüssel (Testbetrieb): „Stripe Test" in Orange', () => {
-    expect(stripeMarke({ art: 'produktion', stripe: 'test' })).toEqual({ text: 'Stripe Test', ton: 'offen' })
+    expect(stripeMarke({ ...VERCEL_PRODUKTION, stripe: 'test' })).toEqual({ text: 'Stripe Test', ton: 'offen' })
   })
 
   it('Testumgebung und lokal: „Stripe Test" in Orange — dort fließt nie echtes Geld', () => {
-    expect(stripeMarke({ art: 'preview', stripe: 'test' })).toEqual({ text: 'Stripe Test', ton: 'offen' })
-    expect(stripeMarke({ art: 'lokal', stripe: 'test' })).toEqual({ text: 'Stripe Test', ton: 'offen' })
+    expect(stripeMarke({ art: 'preview', vercelProduktion: false, stripe: 'test' })).toEqual({ text: 'Stripe Test', ton: 'offen' })
+    expect(stripeMarke({ art: 'lokal', vercelProduktion: false, stripe: 'test' })).toEqual({ text: 'Stripe Test', ton: 'offen' })
   })
 
-  it('Live-Schlüssel außerhalb der Produktion: „Stripe Live", aber nie grün', () => {
-    expect(stripeMarke({ art: 'preview', stripe: 'live' })).toEqual({ text: 'Stripe Live', ton: 'offen' })
-    expect(stripeMarke({ art: 'lokal', stripe: 'live' })).toEqual({ text: 'Stripe Live', ton: 'offen' })
+  it('Live-Schlüssel, den die Modus-Wache sperrt: „Stripe Live", aber nie grün', () => {
+    expect(stripeMarke({ art: 'preview', vercelProduktion: false, stripe: 'live' })).toEqual({ text: 'Stripe Live', ton: 'offen' })
+    expect(stripeMarke({ art: 'lokal', vercelProduktion: false, stripe: 'live' })).toEqual({ text: 'Stripe Live', ton: 'offen' })
+    // Lokaler Produktions-Build, Test, CI: „produktion", aber ohne VERCEL_ENV=production — Stripe startet nicht.
+    expect(stripeMarke({ art: 'produktion', vercelProduktion: false, stripe: 'live' })).toEqual({ text: 'Stripe Live', ton: 'offen' })
   })
 
   it('ohne erkennbaren Schlüssel keine Marke — §12 kennt nur Live und Test', () => {
     for (const art of ['produktion', 'preview', 'lokal'] as const) {
-      expect(stripeMarke({ art, stripe: 'fehlt' }), art).toBeNull()
+      expect(stripeMarke({ art, vercelProduktion: art === 'produktion', stripe: 'fehlt' }), art).toBeNull()
     }
   })
 
@@ -50,12 +56,13 @@ describe('stripeMarke — Marke im Admin-Kopf', () => {
     expect(STRIPE_MARKE_TEXT).toEqual({ live: 'Stripe Live', test: 'Stripe Test' })
   })
 
-  it('kommt aus bestimmeUmgebung und trägt nie ein Stück des Schlüssels', () => {
-    const marke = stripeMarke(
-      bestimmeUmgebung({ NODE_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://farmerzone.example', STRIPE_SECRET_KEY: 'sk_live_sehr-geheim' })
-    )
-    expect(marke).toEqual({ text: 'Stripe Live', ton: 'fertig' })
-    expect(JSON.stringify(marke)).not.toMatch(/sk_|geheim/)
+  it('kommt aus bestimmeUmgebung und trägt nie ein Stück des Schlüssels — auch bei eingeschränkten Schlüsseln', () => {
+    const werte = { NODE_ENV: 'production', VERCEL_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://farmerzone.example' }
+    const live = stripeMarke(bestimmeUmgebung({ ...werte, STRIPE_SECRET_KEY: 'sk_live_sehr-geheim' }))
+    const eingeschraenkt = stripeMarke(bestimmeUmgebung({ ...werte, STRIPE_SECRET_KEY: 'rk_live_sehr-geheim' }))
+    expect(live).toEqual({ text: 'Stripe Live', ton: 'fertig' })
+    expect(eingeschraenkt).toEqual({ text: 'Stripe Live', ton: 'fertig' })
+    expect(JSON.stringify([live, eingeschraenkt])).not.toMatch(/sk_|rk_|geheim/)
   })
 })
 

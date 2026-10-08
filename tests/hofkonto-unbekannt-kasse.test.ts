@@ -13,6 +13,9 @@
  *    statt zwei Minuten „wird gerade angelegt".
  *  - Gegenprobe: Ein gewöhnlicher Stripe-Ausfall bleibt beim bisherigen Weg
  *    (eigener Satz, kein Vermerk, Sentry wie bisher).
+ *  - Gegenprobe (Runde 1): Die Kasse bleibt streng — `resource_missing` an
+ *    einem anderen Parameter (unbekannter PaymentIntent) und der
+ *    Zugriffsfehler `account_invalid` sind dort KEIN unbekanntes Hof-Konto.
  *
  * Den Zustand in der Datenbank danach prüft
  * tests/integration/hofkonto-unbekannt.int.test.ts.
@@ -201,6 +204,39 @@ describe('neue Online-Bestellung, Stripe kennt das Zielkonto nicht', () => {
 
   it('Gegenprobe: ein gewöhnlicher Stripe-Ausfall bleibt beim bisherigen Weg', async () => {
     anlegen.mockRejectedValue(new Error('Stripe nicht erreichbar'))
+
+    const res = await POST(anfrage())
+
+    expect(res.status).toBe(503)
+    expect(await res.json()).toEqual({ code: 'ZAHLUNG_NICHT_MOEGLICH', error: zahlungNichtMoeglichText(true) })
+    expect(vermerkeUnbekanntesHofKonto).not.toHaveBeenCalled()
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    [
+      'resource_missing an einem anderen Parameter (unbekannter PaymentIntent)',
+      () =>
+        new Stripe.errors.StripeInvalidRequestError({
+          type: 'invalid_request_error',
+          code: 'resource_missing',
+          param: 'intent',
+          message: "No such payment_intent: 'pi_erfunden'",
+          statusCode: 404,
+        }),
+    ],
+    [
+      'account_invalid (403) — in der Kasse kein Urteil über das Hof-Konto',
+      () =>
+        new Stripe.errors.StripeInvalidRequestError({
+          type: 'invalid_request_error',
+          code: 'account_invalid',
+          message: "The provided key does not have access to account 'acct_erfunden' (or that account does not exist).",
+          statusCode: 403,
+        }),
+    ],
+  ])('Gegenprobe (Runde 1): %s — kein Vermerk, bisheriger Weg', async (_fall, fehler) => {
+    anlegen.mockRejectedValue(fehler())
 
     const res = await POST(anfrage())
 
