@@ -70,13 +70,19 @@ export function ShellVorschau({ variante }: { variante: ShellVariante }): React.
   switch (variante) {
     case 'kunde':
       return (
-        <KundeShell angemeldet={false}>
+        <KundeShell sitzung="gast">
           <Beispielinhalt titel="Höfe in deiner Nähe" welt="kunde" />
         </KundeShell>
       )
     case 'kunde-angemeldet':
       return (
-        <KundeShell angemeldet>
+        <KundeShell sitzung="kunde">
+          <Beispielinhalt titel="Höfe in deiner Nähe" welt="kunde" />
+        </KundeShell>
+      )
+    case 'kunde-hof':
+      return (
+        <KundeShell sitzung="hof">
           <Beispielinhalt titel="Höfe in deiner Nähe" welt="kunde" />
         </KundeShell>
       )
@@ -114,7 +120,7 @@ export function ShellVorschau({ variante }: { variante: ShellVariante }): React.
       )
     case 'admin':
       return (
-        <AdminShell personName="Max Mustermann" zahlen={{ hoefe: 2, briefkasten: 3 }}>
+        <AdminShell personName="Max Mustermann" hatHof zahlen={{ hoefe: 2, briefkasten: 3 }}>
           <Beispielinhalt titel="Höfe" welt="admin" />
         </AdminShell>
       )

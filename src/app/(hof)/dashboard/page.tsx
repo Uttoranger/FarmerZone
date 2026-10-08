@@ -21,6 +21,7 @@ import {
   WocheKarte,
 } from '@/components/heute/heute-teile'
 import { FreischaltMoment } from '@/components/heute/freischalt-moment'
+import { StartbildschirmKarte } from '@/components/heute/startbildschirm-karte'
 import { ERSTE_SCHRITTE_AUS_COOKIE, ersteSchritteAnzeige, ersteSchritteAusgeblendet } from '@/lib/erste-schritte'
 import { datumLang, heuteAufbau, teilenKarte, teilenSatz, vergleichText, type HeuteBlock } from '@/lib/heute'
 import { freischaltMomentMoeglich } from '@/lib/freischalt-moment'
@@ -148,6 +149,10 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
             <ErsteSchritteSchalter richtung="ein" className="px-3" />
           </p>
         )}
+        {/* Ganz unten (Register N1): „Leg FarmerZone auf den Startbildschirm" —
+            nur im Browser, nicht in der installierten App; das entscheidet die
+            Karte selbst nach dem Mounten. */}
+        <StartbildschirmKarte />
       </div>
 
       {freischaltMomentMoeglich(heute.hof, jetzt) && (

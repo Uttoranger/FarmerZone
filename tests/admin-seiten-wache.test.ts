@@ -181,10 +181,34 @@ describe('ladeAdminbereich — Verhalten', () => {
     expect(meldungCount).not.toHaveBeenCalled()
   })
 
-  it('Admin: Name und Zähler — wartende Höfe und Meldungen zu entscheiden', async () => {
+  it('Admin ohne Hof: Name und Zähler — wartende Höfe und Meldungen zu entscheiden, kein Weg zum Hof', async () => {
     getSession.mockResolvedValue({ user: { id: 'u1' } } as never)
-    userFindUnique.mockResolvedValueOnce({ isAdmin: true } as never).mockResolvedValueOnce({ name: 'Max Mustermann' } as never)
-    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', zahlen: { hoefe: 2, briefkasten: 3 } })
+    userFindUnique
+      .mockResolvedValueOnce({ isAdmin: true } as never)
+      .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
+    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, zahlen: { hoefe: 2, briefkasten: 3 } })
     expect(farmCount).toHaveBeenCalledWith({ where: { approvedAt: null } })
+  })
+
+  // Nr. 41 (Register N1): „← Mein Hof" und die Konto-Plakette nur mit eigenem Hof —
+  // frisch aus der Datenbank, mit derselben Regel wie die Shell (kontoHatHof).
+  it('Admin mit eigenem Hof (Rolle FARMER): hatHof — gelesen werden nur Name, Rolle und die Hof-Kennung', async () => {
+    getSession.mockResolvedValue({ user: { id: 'u1' } } as never)
+    userFindUnique
+      .mockResolvedValueOnce({ isAdmin: true } as never)
+      .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'FARMER', farm: { id: 'f1' } } as never)
+    expect(await ladeAdminbereich()).toMatchObject({ personName: 'Max Mustermann', hatHof: true })
+    expect(userFindUnique).toHaveBeenLastCalledWith({
+      where: { id: 'u1' },
+      select: { name: true, role: true, farm: { select: { id: true } } },
+    })
+  })
+
+  it('Rolle FARMER ohne Hof: kein Weg zum Hof (der Hofbereich führte erst nach /onboarding)', async () => {
+    getSession.mockResolvedValue({ user: { id: 'u1' } } as never)
+    userFindUnique
+      .mockResolvedValueOnce({ isAdmin: true } as never)
+      .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'FARMER', farm: null } as never)
+    expect(await ladeAdminbereich()).toMatchObject({ hatHof: false })
   })
 })

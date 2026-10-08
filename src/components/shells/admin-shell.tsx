@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
-import { ADMIN_REITER, ADMIN_ZURUECK, adminAktiverReiter, type AdminReiter } from '@/lib/admin-navigation'
+import { ADMIN_KONTO, ADMIN_REITER, ADMIN_ZURUECK, adminAktiverReiter, type AdminReiter } from '@/lib/admin-navigation'
 import { hofInitialen } from '@/lib/hof-initialen'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -23,12 +23,18 @@ import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
  *
  * Die Shell schützt nichts: Jede Admin-Seite prüft selbst mit
  * verlangeAdminSeite (src/server/admin-wache.ts). Seit Nr. 22f trägt
- * src/app/admin/layout.tsx sie um alle /admin-Routen; Name und Zähler lädt
- * dort ladeAdminbereich (nach der Wache).
+ * src/app/admin/layout.tsx sie um alle /admin-Routen; Name, Zähler und ob
+ * das Konto einen Hof hat lädt dort ladeAdminbereich (nach der Wache).
+ *
+ * Seit Nr. 41 (Register N1): „← Mein Hof" nur mit eigenem Hof — ohne führte er
+ * über /dashboard auf /login. Die Initialen-Plakette ist dann ein Link auf
+ * „Konto und Sicherheit" und steht auch am Handy da.
  */
 
 export type AdminShellProps = {
   personName: string
+  /** Ob das Konto einen eigenen Hof hat (kontoHatHof) — nur dann gibt es Wege in den Hofbereich. */
+  hatHof: boolean
   /** Höfe, die auf Freischaltung warten; Meldungen, die zu entscheiden sind. */
   zahlen?: { hoefe?: number; briefkasten?: number }
   children: ReactNode
@@ -40,7 +46,40 @@ function zahlFuer(reiter: AdminReiter, zahlen: AdminShellProps['zahlen']): { anz
   return { wofuer: '' }
 }
 
-export function AdminShell({ personName, zahlen, children }: AdminShellProps): React.JSX.Element {
+/**
+ * Die Initialen der angemeldeten Person — mit eigenem Hof ein Link auf
+ * „Konto und Sicherheit" (44 px Fläche, der Kreis bleibt 32 px). Ohne Hof
+ * kein Link: Die Seite liegt im Hofbereich und schickte das Konto auf /login.
+ */
+function KontoPlakette({ anzeige, hatHof }: { anzeige: string; hatHof: boolean }): React.JSX.Element {
+  const kreis = 'flex size-8 shrink-0 items-center justify-center rounded-full bg-border text-[12px] font-semibold text-foreground'
+  if (!hatHof) {
+    return (
+      <span title={`Angemeldet: ${anzeige}`} className={kreis}>
+        <span aria-hidden="true">{hofInitialen(anzeige)}</span>
+        <span className="sr-only">Angemeldet: {anzeige}</span>
+      </span>
+    )
+  }
+  const initialen = hofInitialen(anzeige)
+  // Der Name beginnt mit dem, was man sieht (WCAG 2.5.3 „Label in Name"):
+  // Wer per Sprache „MM antippen" sagt, trifft den Link.
+  const beschriftung = `${initialen} – ${ADMIN_KONTO.label} (angemeldet: ${anzeige})`
+  return (
+    <Link
+      href={ADMIN_KONTO.href}
+      aria-label={beschriftung}
+      title={beschriftung}
+      className={cn('flex size-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-muted', FOKUS_RAHMEN)}
+    >
+      <span aria-hidden="true" className={kreis}>
+        {initialen}
+      </span>
+    </Link>
+  )
+}
+
+export function AdminShell({ personName, hatHof, zahlen, children }: AdminShellProps): React.JSX.Element {
   const pathname = usePathname()
   const aktiv = adminAktiverReiter(pathname)
   const anzeige = personName.trim() || 'Dein Konto'
@@ -87,27 +126,27 @@ export function AdminShell({ personName, zahlen, children }: AdminShellProps): R
             </ul>
           </nav>
 
-          <span className="flex-1" />
-
-          <Link
-            href={ADMIN_ZURUECK.href}
-            className={cn(
-              'inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-[14px] font-semibold text-brand-text hover:bg-muted',
-              FOKUS_RAHMEN
+          {/* Rechts als eine Gruppe: Am Handy passen Marke, „← Mein Hof", Hell/Dunkel
+              und Plakette ab 375 px in eine Zeile; ist es noch schmaler, rutscht die
+              Gruppe geschlossen unter die Marke statt einzeln umzubrechen. Bis
+              1023 px der Kurzname — neben den Reitern bräche „Zu meinem Hof" sonst um. */}
+          <div className="ml-auto flex items-center gap-0.5 md:gap-1.5 lg:gap-3">
+            {hatHof && (
+              <Link
+                href={ADMIN_ZURUECK.href}
+                className={cn(
+                  'inline-flex min-h-11 items-center gap-1 rounded-full px-1.5 text-[14px] font-semibold whitespace-nowrap text-brand-text hover:bg-muted md:gap-1.5 md:px-3',
+                  FOKUS_RAHMEN
+                )}
+              >
+                <ArrowLeft className="size-4" strokeWidth={1.7} aria-hidden="true" />
+                <span className="lg:hidden">{ADMIN_ZURUECK.kurz}</span>
+                <span className="hidden lg:inline">{ADMIN_ZURUECK.label}</span>
+              </Link>
             )}
-          >
-            <ArrowLeft className="size-4" strokeWidth={1.7} aria-hidden="true" />
-            <span className="md:hidden">{ADMIN_ZURUECK.kurz}</span>
-            <span className="hidden md:inline">{ADMIN_ZURUECK.label}</span>
-          </Link>
-          <ThemeUmschalter className={cn('rounded-full text-foreground hover:bg-muted', FOKUS_RAHMEN)} />
-          <span
-            title={`Angemeldet: ${anzeige}`}
-            className="hidden size-8 items-center justify-center rounded-full bg-border text-[12px] font-semibold text-foreground md:flex"
-          >
-            <span aria-hidden="true">{hofInitialen(anzeige)}</span>
-            <span className="sr-only">Angemeldet: {anzeige}</span>
-          </span>
+            <ThemeUmschalter className={cn('rounded-full text-foreground hover:bg-muted', FOKUS_RAHMEN)} />
+            <KontoPlakette anzeige={anzeige} hatHof={hatHof} />
+          </div>
         </div>
       </header>
 
