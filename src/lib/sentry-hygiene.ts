@@ -16,7 +16,9 @@
  * - URLs, auch im PFAD, nicht nur in der Query: /customers/<kundin@…> legt
  *   die Kunden-E-Mail (%40-kodiert) in den Pfad, /api/orders/confirm/<token>
  *   und /<hof>/bestaetigen/<token> (Bar-Bestätigung, H3) einen gültigen
- *   Einmal-Token — Query-Filter allein reicht nicht.
+ *   Einmal-Token — Query-Filter allein reicht nicht. In der Query fallen
+ *   heikle Parameter nach NAMEN, und seit Nr. 47 werden die Werte der übrigen
+ *   dekodiert bereinigt (?q=kundin@… stand sonst %40-kodiert da).
  * - request-Daten: Cookies, Authorization, Referer (trägt die volle
  *   Vorgänger-URL), der POST-Körper (data) komplett.
  * - contexts.nextjs.request_path: von onRequestError roh angehängt.
@@ -40,6 +42,11 @@
  *   IP-Adressen (IPv4 und IPv6). Im Fehlertext bleiben sie, weil dort die
  *   Adresse unseres eigenen Datenbank-Servers steht („connect ETIMEDOUT
  *   …:6543") und kein Weg die Adresse einer Kundin in einen Text schreibt.
+ *   Dieselbe Freitext-Regel gilt für die NACHRICHTEN: event.message und
+ *   message der Brotkrumen (Console-Brotkrumen tragen dort dieselben
+ *   Argumente wie in data.arguments). Ein Text unter einem Schlüssel mit
+ *   „query" ist nur dann ein Query-String, wenn er so aussieht; sonst
+ *   Freitext.
  * - Variablen in Stack-Frames (frame.vars, in Ausnahmen und Threads) fallen
  *   ganz weg: Sie können jedes Objekt tragen (Anfrage, Abo, Passwort), und
  *   zum Beheben reichen Datei, Funktion und Zeile.
@@ -161,15 +168,19 @@ function bereinigeText(text: string): string {
     .replace(ANMELDECODE_MUSTER, '$1$2[code entfernt]')
 }
 
-/** Entfernt heikle Parameter aus einem Query-String ('a=1&token=x' → 'a=1'). */
-function bereinigeQuery(query: string): string {
-  const parameter = new URLSearchParams(query)
-  const weg: string[] = []
-  parameter.forEach((_, name) => {
-    if (HEIKLE_PARAMETER.test(name)) weg.push(name)
+/**
+ * Entfernt heikle Parameter aus einem Query-String ('a=1&token=x' → 'a=1')
+ * und bereinigt Namen und Werte der übrigen DEKODIERT — sonst stünde
+ * „?q=kundin@…" als „q=kundin%40…" weiter da (Nr. 47). Die Regel ist dieselbe
+ * wie für den Pfad (E-Mail, Telefon, Code); strukturierte Felder geben die
+ * Freitext-Regel mit (bereinigeQueryText).
+ */
+function bereinigeQuery(query: string, regel: (text: string) => string = bereinigeText): string {
+  const sauber = new URLSearchParams()
+  new URLSearchParams(query).forEach((wert, name) => {
+    if (!HEIKLE_PARAMETER.test(name)) sauber.append(regel(name), regel(wert))
   })
-  for (const name of weg) parameter.delete(name)
-  return parameter.toString()
+  return sauber.toString()
 }
 
 /** Bereinigt den Pfad-Teil: E-Mails (roh und kodiert), Telefonnummern und
@@ -294,6 +305,17 @@ function bereinigeFreitext(text: string): string {
     .replace(LANGE_KENNUNG_MUSTER, '[kennung entfernt]')
 }
 
+/**
+ * Ein Text unter einem Schlüssel mit „query" (http.query, suchQuery …): Sieht
+ * er aus wie ein Query-String (kein Leerraum, mindestens ein „="), fallen
+ * heikle Parameter weg, und Namen und Werte gehen dekodiert durch die
+ * Freitext-Regel. Sonst ist er Freitext wie jeder andere — „kundin@…" unter
+ * `suchQuery` ist kein Parametername.
+ */
+function bereinigeQueryText(text: string): string {
+  return /^\S*=\S*$/.test(text) ? bereinigeQuery(text, bereinigeFreitext) : bereinigeFreitext(text)
+}
+
 /** Heikel ist ein Schlüssel nach Namen, als IP-Träger oder wenn er selbst
  *  eine Adresse oder Nummer enthält. */
 function istHeiklerSchluessel(name: string): boolean {
@@ -304,8 +326,8 @@ function istHeiklerSchluessel(name: string): boolean {
  *  Objekte und Listen werden betreten, alles andere (Funktion, Symbol) fällt weg. */
 function bereinigeWert(wert: unknown, schluessel: string | null, tiefe: number): unknown {
   if (typeof wert === 'string') {
-    // Ein Query-String trägt seine Geheimnisse als Parameter — gleiche Regel wie bei Spans.
-    if (schluessel !== null && /query/i.test(schluessel)) return bereinigeQuery(entferneIps(wert))
+    // Ein Query-String trägt seine Geheimnisse als Parameter — und in den Werten.
+    if (schluessel !== null && /query/i.test(schluessel)) return bereinigeQueryText(wert)
     return bereinigeFreitext(wert)
   }
   if (wert === null || typeof wert === 'number' || typeof wert === 'boolean') return wert
@@ -392,7 +414,7 @@ function minimalEreignis<E extends SentryEvent>(event: E): E {
   // sein, bevor sie ihn erreicht hat.
   try {
     const nachricht = roh.message
-    if (typeof nachricht === 'string') minimal.message = bereinigeText(nachricht)
+    if (typeof nachricht === 'string') minimal.message = bereinigeFreitext(nachricht)
   } catch {
     // Text nicht lesbar — fällt weg.
   }
@@ -420,7 +442,10 @@ function minimalEreignis<E extends SentryEvent>(event: E): E {
 }
 
 function bereinigeVollstaendig<E extends SentryEvent>(event: E): E {
-  if (typeof event.message === 'string') event.message = bereinigeText(event.message)
+  // Die Nachricht trägt dasselbe wie logentry (captureMessage, Konsole) —
+  // deshalb dieselbe Freitext-Regel. Nur der Fehlertext (exception.value)
+  // behält IP-Adressen, siehe Kopfkommentar.
+  if (typeof event.message === 'string') event.message = bereinigeFreitext(event.message)
   else if (event.message !== undefined) delete event.message
 
   if (event.exception !== undefined && !istObjekt(event.exception)) delete event.exception
@@ -541,7 +566,9 @@ function bereinigeVollstaendig<E extends SentryEvent>(event: E): E {
   if (event.breadcrumbs !== undefined && !Array.isArray(event.breadcrumbs)) delete event.breadcrumbs
   for (const spur of event.breadcrumbs ?? []) {
     if (!istObjekt(spur)) continue
-    if (typeof spur.message === 'string') spur.message = bereinigeText(spur.message)
+    // Console-Brotkrumen tragen die Argumente zweimal: als `arguments` und
+    // aneinandergehängt als `message` — beide mit derselben Regel (Nr. 47).
+    if (typeof spur.message === 'string') spur.message = bereinigeFreitext(spur.message)
     if (spur.data !== undefined && !istObjekt(spur.data)) delete spur.data
     const daten = spur.data as Record<string, unknown> | undefined
     if (daten) {

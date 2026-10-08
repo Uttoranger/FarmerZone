@@ -43,6 +43,18 @@ export function listUnsubscribeKoepfe(appUrl: string, token: string): { 'List-Un
   }
 }
 
+/**
+ * Grenze für `POST /api/abmelden` je IP und Minute (erste Stufe,
+ * `enforceRateLimit`). Bewusst weit über der Vorgabe von 20: Den POST
+ * schicken nicht Kundinnen, sondern die Server weniger großer Mailanbieter —
+ * nach einem Beitrag an viele Abonnentinnen kommen deren Abmeldungen über
+ * dieselben wenigen Adressen, und eine abgewiesene Abmeldung käme nie wieder.
+ * Ohne gültigen Token (HMAC über Adresse und Hof) erreicht ein Aufruf die
+ * Datenbank gar nicht; die Grenze hält nur eine Schleife mit einem echten
+ * Token davon ab, sie zu beschäftigen.
+ */
+export const EIN_KLICK_JE_MINUTE = 300
+
 /** Antwort des Endpunkts, wenn der Link nicht gilt (die Seite sagt dasselbe mit ihren Worten). */
 export const ABMELDE_LINK_UNGUELTIG =
   'Dieser Abmelde-Link gilt nicht. Öffne den Link aus der Mail noch einmal oder verwalte deine Abos unter „Mein Konto".'

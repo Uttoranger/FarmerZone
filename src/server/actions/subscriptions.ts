@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { bestaetigteAdresse } from '@/server/kunden-adresse'
 import { aboAenderungSchema, aboBestaetigenSchema } from '@/schemas/abo'
 import { abmeldeTokenSchema } from '@/schemas/abmelden'
+import { ABMELDE_LINK_UNGUELTIG } from '@/lib/abmelde-link'
 import { ABO_TEXT, aboFehlerSatz, wartetAufBestaetigung } from '@/lib/abo-bestaetigung'
 import { EMAIL_ABO_STAND, bestaetigeEmailAbo, loeseOffeneAnfrageAuf, meldeAboMitTokenAb, meldeEmailAboAn } from '@/server/abo-anmeldung'
 
@@ -113,12 +114,13 @@ export async function bestaetigeNeuigkeiten(input: unknown): Promise<{ ok: true;
 export async function unsubscribeWithToken(token: unknown): Promise<ActionResult> {
   // Das Argument kommt aus dem Browser — erst die Gestalt prüfen (Nr. 47).
   const eingabe = abmeldeTokenSchema.safeParse(token)
-  if (!eingabe.success) return { error: 'Ungültiger oder abgelaufener Link' }
+  // Derselbe Satz wie beim Ein-Klick-Endpunkt — der Token läuft nicht ab, und der Satz nennt den Ausweg.
+  if (!eingabe.success) return { error: ABMELDE_LINK_UNGUELTIG }
 
   // Derselbe Weg wie die Ein-Klick-Abmeldung des Mailprogramms (/api/abmelden):
   // offene Anfrage auflösen, dann E-Mail und WhatsApp aus (abo-anmeldung.ts).
   const { gueltig } = await meldeAboMitTokenAb(eingabe.data)
-  if (!gueltig) return { error: 'Ungültiger oder abgelaufener Link' }
+  if (!gueltig) return { error: ABMELDE_LINK_UNGUELTIG }
 
   return {}
 }

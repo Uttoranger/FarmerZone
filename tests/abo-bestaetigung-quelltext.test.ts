@@ -3,19 +3,44 @@
  * TypeScript-Parser seit Nr. 47):
  *  - Empfänger werblicher Mails kommen nur über `WERBEMAIL_EMPFAENGER`
  *    (src/server/abo-anmeldung.ts), nie über `optInEmail: true` als Filter.
- *  - Den Haken SCHREIBT nur der Knopf: In einem Schreib-Objekt (`data`,
- *    `create`, `update`) steht `optInEmail` überall sonst höchstens mit dem
- *    Literal `false` — auch kein Variablenwert (`optInEmail: eingabe.x`) und
- *    keine Kurzschreibweise (`{ optInEmail }`). Die eine Ausnahme ist `data`
- *    in `bestaetigeEmailAbo`. Setzte ihn ein anderer Weg, gälte ein
- *    zurückgesetztes Abo („nie angefragt") als Bestand und bekäme Werbung
- *    ohne Bestätigung.
- *  - Ein Literal `true` ist sonst nur in Lese-Auswahlen erlaubt (`select`,
- *    `include`, `orderBy`) und in den beiden Konstanten `WERBEMAIL_EMPFAENGER`
- *    und `EMAIL_ABO_STAND`.
- * Vorher prüfte die Wache Zeilen: Ein einzeiliges
- * `update({ data: { optInEmail: true }, select: … })` und ein nicht-literaler
- * Wert gingen durch. Mit Gegenproben genau dafür.
+ *  - Den Haken SCHREIBT nur der Knopf (`data` in `bestaetigeEmailAbo`).
+ *    Setzte ihn ein anderer Weg, gälte ein zurückgesetztes Abo („nie
+ *    angefragt") als Bestand und bekäme Werbung ohne Bestätigung.
+ *
+ * Wie die Wache liest: Für jedes `optInEmail` in einem Objekt entscheidet der
+ * INNERSTE umschließende Schlüssel, was der Wert bedeutet.
+ *  - Schreiben (`data`, `create`, `update`): nur das Literal `false`.
+ *  - Filtern (`where`, `having` und die Relations- und Logikfilter `some`,
+ *    `every`, `none`, `is`, `isNot`, `AND`, `OR`, `NOT`) — auch unter einer
+ *    Auswahl (`include: { abos: { where: … } }`, `_count`): nur das Literal
+ *    `false`, und auch das nicht unter einer Verneinung (`NOT`, `none`,
+ *    `isNot`), denn `NOT: { optInEmail: false }` filtert nach `true`.
+ *  - Lesen (`select`, `include`, `orderBy`): alles — `true` heißt „mitlesen".
+ *  - Sonst (Konstanten, Antworten, Formulare): kein konstantes `true` — eine
+ *    Konstante mit dem Haken kann später als `data` oder `where` dienen.
+ * Vor dem Vergleich fallen Klammern, `as`, `satisfies`, `<T>` und `!` weg;
+ * „konstant true" ist auch `!0` oder `!!1`. Jeder andere Wert — Variable,
+ * Bedingung, Objekt wie `{ equals: true }`, Kurzschreibweise — zählt in
+ * Schreib- und Filterobjekten als Verstoß.
+ *
+ * Die erlaubten Stellen, nur in abo-anmeldung.ts (Test „…genau die vier
+ * erlaubten Stellen"):
+ *  1. `data` in `bestaetigeEmailAbo` — der Knopf.
+ *  2. `WERBEMAIL_EMPFAENGER` — DER Empfängerfilter (gilt als Filter).
+ *  3. `EMAIL_ABO_STAND` — eine Auswahl für `select` (gilt als Lesen).
+ *  4. Die Vorbedingung in `meldeEmailAboAn` (`where: { optInEmail:
+ *     abo.optInEmail, … }`): schreibt nur auf genau den gelesenen Stand —
+ *     ein Vergleich mit dem Feld des gelesenen Abos, kein Empfängerfilter.
+ *
+ * Grenzen (bewusst, mit Blick auf heutigen Code): Die Wache sieht
+ * Objekt-Literale dort, wo sie stehen. Ein Wert aus einer Variablen
+ * (`const w = { optInEmail: x }; findMany({ where: w })`) fällt nur auf, wenn
+ * er konstant `true` ist; ein in JavaScript gefiltertes `optInEmail` (statt
+ * `werbemailErlaubt`) und rohes SQL sieht sie nicht — beides gibt es heute
+ * nicht. Vorher prüfte sie Zeilen: Ein einzeiliges `update({ data: {
+ * optInEmail: true }, select: … })`, ein nicht-literaler Wert, ein Filter
+ * unter einer Auswahl und `true as const` gingen durch. Mit Gegenproben genau
+ * dafür.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -35,12 +60,19 @@ function dateien(ordner: string): string[] {
 
 /** Schlüssel, deren Wert in die Datenbank geschrieben wird. */
 const SCHREIB_SCHLUESSEL = new Set(['data', 'create', 'update'])
+/** Schlüssel, deren Wert Zeilen auswählt — auch als Relations- und Logikfilter. */
+const FILTER_SCHLUESSEL = new Set(['where', 'having', 'some', 'every', 'none', 'is', 'isNot', 'AND', 'OR', 'NOT'])
+/** Filter, die ihren Inhalt verneinen: Darunter heißt `false` „true". */
+const VERNEINUNG = new Set(['NOT', 'none', 'isNot'])
 /** Schlüssel, unter denen ein `true` nur „mitlesen" heißt. */
 const LESE_AUSWAHL = new Set(['select', 'include', 'orderBy'])
-/** Die beiden erlaubten Konstanten in abo-anmeldung.ts (Filter und Auswahl). */
-const ERLAUBTE_KONSTANTEN = new Set(['WERBEMAIL_EMPFAENGER', 'EMAIL_ABO_STAND'])
 
 type Fund = { zeile: number; grund: string; text: string }
+type Ort = { art: 'schreiben' | 'filtern' | 'lesen' | 'sonst'; verneint: boolean; empfaengerFilter: boolean }
+
+const GRUND_SCHREIBT = 'schreibt optInEmail mit einem Wert außer false'
+const GRUND_FILTERT = 'filtert nach optInEmail mit einem Wert außer false (Empfänger nur über WERBEMAIL_EMPFAENGER)'
+const GRUND_TRUE = 'optInEmail: true außerhalb von Auswahl und Filter (kann später als data oder where dienen)'
 
 /** Der Name einer Objekt-Eigenschaft — auch als Text- oder berechneter Schlüssel. */
 function eigenschaftsName(name: ts.PropertyName): string | null {
@@ -52,35 +84,72 @@ function eigenschaftsName(name: ts.PropertyName): string | null {
   return null
 }
 
-/** Der innerste umschließende Objekt-Schlüssel, der Schreiben oder Lesen bedeutet. */
-function zusammenhang(knoten: ts.Node): 'schreiben' | 'lesen' | 'sonst' {
-  for (let k: ts.Node | undefined = knoten.parent; k; k = k.parent) {
-    if (ts.isPropertyAssignment(k)) {
-      const name = eigenschaftsName(k.name)
-      if (name && SCHREIB_SCHLUESSEL.has(name)) return 'schreiben'
-      if (name && LESE_AUSWAHL.has(name)) return 'lesen'
-    }
+/** Der Wert ohne Hüllen, die an ihm nichts ändern: `(x)`, `x as T`, `x satisfies T`, `<T>x`, `x!`. */
+function abgestreift(ausdruck: ts.Expression): ts.Expression {
+  let a = ausdruck
+  while (ts.isParenthesizedExpression(a) || ts.isAsExpression(a) || ts.isSatisfiesExpression(a) || ts.isTypeAssertionExpression(a) || ts.isNonNullExpression(a)) {
+    a = a.expression
   }
-  return 'sonst'
+  return a
 }
 
-/** Liegt der Knoten in der Funktion `name` bzw. in der Konstante `name`? */
-function liegtIn(knoten: ts.Node, pruefe: (k: ts.Node) => boolean): boolean {
-  for (let k: ts.Node | undefined = knoten.parent; k; k = k.parent) if (pruefe(k)) return true
-  return false
-}
+const UNBEKANNT = Symbol('unbekannt')
 
-function inFunktion(knoten: ts.Node, name: string): boolean {
-  return liegtIn(knoten, (k) => ts.isFunctionDeclaration(k) && k.name?.text === name)
-}
-
-function inErlaubterKonstante(knoten: ts.Node): boolean {
-  return liegtIn(knoten, (k) => ts.isVariableDeclaration(k) && ts.isIdentifier(k.name) && ERLAUBTE_KONSTANTEN.has(k.name.text))
+/** Der Wert, wenn er ohne Ausführen feststeht (`true`, `!0`, `!!1` …), sonst UNBEKANNT. */
+function konstante(ausdruck: ts.Expression): unknown {
+  const a = abgestreift(ausdruck)
+  if (a.kind === ts.SyntaxKind.TrueKeyword) return true
+  if (a.kind === ts.SyntaxKind.FalseKeyword) return false
+  if (ts.isNumericLiteral(a)) return Number(a.text)
+  if (ts.isStringLiteral(a) || ts.isNoSubstitutionTemplateLiteral(a)) return a.text
+  if (ts.isPrefixUnaryExpression(a) && a.operator === ts.SyntaxKind.ExclamationToken) {
+    const innen = konstante(a.operand)
+    return innen === UNBEKANNT ? UNBEKANNT : !innen
+  }
+  return UNBEKANNT
 }
 
 /**
- * Alle Verstöße einer Datei. `istAboAnmeldung` schaltet die beiden
- * Ausnahmen frei, die es nur in src/server/abo-anmeldung.ts gibt.
+ * Was ein `optInEmail` an dieser Stelle bedeutet: Der innerste Schlüssel aus
+ * Schreiben, Filtern oder Lesen entscheidet; eine Verneinung irgendwo
+ * darüber merkt sich die Wache. In abo-anmeldung.ts gelten die beiden
+ * Konstanten als das, wofür sie da sind: `WERBEMAIL_EMPFAENGER` als Filter
+ * (erlaubt), `EMAIL_ABO_STAND` als Auswahl.
+ */
+function zusammenhang(knoten: ts.Node, istAboAnmeldung: boolean): Ort {
+  let art: Ort['art'] | null = null
+  let verneint = false
+  let empfaengerFilter = false
+  for (let k: ts.Node | undefined = knoten.parent; k; k = k.parent) {
+    if (ts.isPropertyAssignment(k)) {
+      const name = eigenschaftsName(k.name)
+      if (name === null) continue
+      if (VERNEINUNG.has(name)) verneint = true
+      if (art !== null) continue
+      if (SCHREIB_SCHLUESSEL.has(name)) art = 'schreiben'
+      else if (FILTER_SCHLUESSEL.has(name)) art = 'filtern'
+      else if (LESE_AUSWAHL.has(name)) art = 'lesen'
+    } else if (art === null && istAboAnmeldung && ts.isVariableDeclaration(k) && ts.isIdentifier(k.name)) {
+      if (k.name.text === 'WERBEMAIL_EMPFAENGER') {
+        art = 'filtern'
+        empfaengerFilter = true
+      } else if (k.name.text === 'EMAIL_ABO_STAND') art = 'lesen'
+    }
+  }
+  return { art: art ?? 'sonst', verneint, empfaengerFilter }
+}
+
+/** Liegt der Knoten in der Funktion `name`? */
+function inFunktion(knoten: ts.Node, name: string): boolean {
+  for (let k: ts.Node | undefined = knoten.parent; k; k = k.parent) {
+    if (ts.isFunctionDeclaration(k) && k.name?.text === name) return true
+  }
+  return false
+}
+
+/**
+ * Alle Verstöße einer Datei. `istAboAnmeldung` schaltet die erlaubten
+ * Stellen frei, die es nur in src/server/abo-anmeldung.ts gibt.
  */
 function verstoesse(quelltext: string, pfad: string, istAboAnmeldung: boolean): Fund[] {
   const datei = ts.createSourceFile(pfad, quelltext, ts.ScriptTarget.Latest, true, pfad.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
@@ -92,14 +161,24 @@ function verstoesse(quelltext: string, pfad: string, istAboAnmeldung: boolean): 
     const kurz = ts.isShorthandPropertyAssignment(knoten) && knoten.name.text === 'optInEmail'
     const lang = ts.isPropertyAssignment(knoten) && eigenschaftsName(knoten.name) === 'optInEmail'
     if (kurz || lang) {
-      const wert = lang ? (knoten as ts.PropertyAssignment).initializer : null
+      // Kurzschreibweise `{ optInEmail }`: ein Variablenwert, also nie `false`.
+      const wert = lang ? abgestreift((knoten as ts.PropertyAssignment).initializer) : null
       const istFalse = wert?.kind === ts.SyntaxKind.FalseKeyword
-      const istTrue = wert?.kind === ts.SyntaxKind.TrueKeyword
-      const ort = zusammenhang(knoten)
-      const knopf = istAboAnmeldung && inFunktion(knoten, 'bestaetigeEmailAbo') && ort === 'schreiben'
-      if (ort === 'schreiben' && !istFalse && !knopf) melde(knoten, 'schreibt optInEmail mit einem Wert außer false')
-      else if (istTrue && ort !== 'lesen' && !knopf && !(istAboAnmeldung && inErlaubterKonstante(knoten))) {
-        melde(knoten, 'optInEmail: true außerhalb einer Lese-Auswahl (Filter nur über WERBEMAIL_EMPFAENGER)')
+      const ort = zusammenhang(knoten, istAboAnmeldung)
+      if (ort.art === 'schreiben') {
+        const knopf = istAboAnmeldung && inFunktion(knoten, 'bestaetigeEmailAbo')
+        if (!istFalse && !knopf) melde(knoten, GRUND_SCHREIBT)
+      } else if (ort.art === 'filtern') {
+        // Die Vorbedingung des bedingten Schreibens: der Wert des gelesenen Abos.
+        const vorbedingung =
+          istAboAnmeldung &&
+          inFunktion(knoten, 'meldeEmailAboAn') &&
+          wert !== null &&
+          ts.isPropertyAccessExpression(wert) &&
+          wert.name.text === 'optInEmail'
+        if ((!istFalse || ort.verneint) && !ort.empfaengerFilter && !vorbedingung) melde(knoten, GRUND_FILTERT)
+      } else if (ort.art === 'sonst' && wert !== null && konstante(wert) === true) {
+        melde(knoten, GRUND_TRUE)
       }
     }
     ts.forEachChild(knoten, besuche)
@@ -124,14 +203,27 @@ describe('Den Haken setzt nur der Knopf, Empfänger nur über WERBEMAIL_EMPFAENG
     expect(treffer).toEqual([])
   })
 
-  it('die Wache sieht die eine erlaubte Schreibstelle: bestaetigeEmailAbo setzt den Haken', () => {
-    // Ohne die Ausnahme meldet die Wache genau diese Stelle — sie schneidet also
-    // die richtige aus und nicht mehr.
-    const ohneAusnahme = verstoesse(ABO_ANMELDUNG, 'fremd.ts', false)
-    expect(ohneAusnahme.map((f) => f.text)).toContain('optInEmail: true')
-    const knopf = ohneAusnahme.filter((f) => f.grund.startsWith('schreibt'))
-    expect(knopf).toHaveLength(1)
-    expect(ABO_ANMELDUNG.split('\n')[knopf[0].zeile - 1]).toMatch(/data:\s*\{\s*optInEmail:\s*true/)
+  it('ohne die Ausnahmen meldet die Wache in abo-anmeldung.ts genau die vier erlaubten Stellen', () => {
+    // Die Ausnahmen schneiden also genau diese Stellen aus und nicht mehr.
+    const ohneAusnahmen = verstoesse(ABO_ANMELDUNG, 'fremd.ts', false)
+    const zeile = (f: Fund) => ABO_ANMELDUNG.split('\n')[f.zeile - 1]
+    const je = (grund: string) => ohneAusnahmen.filter((f) => f.grund === grund)
+    expect(ohneAusnahmen).toHaveLength(4)
+    // 1. Der Knopf schreibt den Haken.
+    expect(je(GRUND_SCHREIBT)).toHaveLength(1)
+    expect(zeile(je(GRUND_SCHREIBT)[0])).toMatch(/data:\s*\{\s*optInEmail:\s*true/)
+    // 4. Die Vorbedingung in meldeEmailAboAn vergleicht mit dem gelesenen Abo.
+    expect(je(GRUND_FILTERT).map((f) => f.text)).toEqual(['optInEmail: abo.optInEmail'])
+    // 2. und 3. Die beiden Konstanten — als fremde Datei bloß Objekte mit `true`.
+    const inKonstante = (name: string) => (f: Fund) => {
+      const zeilen = ABO_ANMELDUNG.split('\n')
+      const von = zeilen.findIndex((z) => z.startsWith(`export const ${name} =`)) + 1
+      const bis = zeilen.findIndex((z, i) => i >= von && z.startsWith('}')) + 1
+      return von > 0 && f.zeile > von && f.zeile < bis
+    }
+    expect(je(GRUND_TRUE)).toHaveLength(2)
+    expect(je(GRUND_TRUE).filter(inKonstante('WERBEMAIL_EMPFAENGER'))).toHaveLength(1)
+    expect(je(GRUND_TRUE).filter(inKonstante('EMAIL_ABO_STAND'))).toHaveLength(1)
   })
 
   it('der Versand der Beiträge und der Zähler auf „Neuer Beitrag" nehmen den Filter', () => {
@@ -171,6 +263,62 @@ describe('Gegenproben: was die alte Zeilen-Wache durchließ, schlägt jetzt an',
     expect(schnipsel('count({ where: { farmId, optInEmail:true } })')).toHaveLength(1)
     // Eine eigene Konstante mit dem Haken, die später als data oder where dient.
     expect(schnipsel('const daten = { optInEmail: true }')).toHaveLength(1)
+  })
+
+  it('ein Filter unter einer Auswahl: include mit where und _count mit where (Nachbesserung 1)', () => {
+    expect(schnipsel('findMany({ include: { subscriptions: { where: { optInEmail: true } } } })')).toEqual([
+      expect.objectContaining({ grund: GRUND_FILTERT }),
+    ])
+    expect(schnipsel('findMany({ select: { _count: { select: { subscriptions: { where: { optInEmail: true } } } } } })')).toEqual([
+      expect.objectContaining({ grund: GRUND_FILTERT }),
+    ])
+  })
+
+  it('Relations- und Logikfilter zählen als Filter', () => {
+    for (const filter of [
+      'where: { subscriptions: { some: { optInEmail: true } } }',
+      'where: { subscriptions: { every: { optInEmail: true } } }',
+      'where: { abo: { is: { optInEmail: true } } }',
+      'where: { AND: [{ farmId }, { optInEmail: true }] }',
+      'where: { OR: [{ optInEmail: true }] }',
+    ]) {
+      expect(schnipsel(`findMany({ ${filter} })`), filter).toEqual([expect.objectContaining({ grund: GRUND_FILTERT })])
+    }
+  })
+
+  it('unter einer Verneinung filtert auch false nach dem Haken', () => {
+    expect(schnipsel('findMany({ where: { NOT: { optInEmail: false } } })')).toHaveLength(1)
+    expect(schnipsel('findMany({ where: { AND: [{ NOT: [{ OR: [{ optInEmail: false }] }] }] } })')).toHaveLength(1)
+    expect(schnipsel('findMany({ where: { subscriptions: { none: { optInEmail: false } } } })')).toHaveLength(1)
+    expect(schnipsel('findMany({ where: { abo: { isNot: { optInEmail: false } } } })')).toHaveLength(1)
+  })
+
+  it('jeder Filterwert außer dem Literal false: Variable, Operator-Objekt, Kurzschreibweise', () => {
+    expect(schnipsel('count({ where: { farmId, optInEmail: eingabe.an } })')).toHaveLength(1)
+    expect(schnipsel('count({ where: { optInEmail: { equals: true } } })')).toHaveLength(1)
+    expect(schnipsel('count({ where: { optInEmail: { not: false } } })')).toHaveLength(1)
+    expect(schnipsel('count({ where: { farmId, optInEmail } })')).toHaveLength(1)
+    // Die Vorbedingung aus meldeEmailAboAn ist woanders ein gewöhnlicher Filter —
+    // auch in abo-anmeldung.ts selbst, außerhalb dieser Funktion.
+    expect(schnipsel('updateMany({ where: { id, optInEmail: abo.optInEmail }, data: { optInEmail: false } })')).toHaveLength(1)
+    expect(schnipsel('async function andere() { await updateMany({ where: { id, optInEmail: abo.optInEmail } }) }', true)).toHaveLength(1)
+  })
+
+  it('Klammern, as, satisfies, <T> und konstante Ausdrücke wie !0 tarnen true nicht', () => {
+    for (const wert of ['true as const', '(true)', '!0', '!!1', 'true satisfies boolean', '<boolean>true', '((true as boolean))']) {
+      expect(schnipsel(`count({ where: { optInEmail: ${wert} } })`), `where ${wert}`).toHaveLength(1)
+      expect(schnipsel(`update({ data: { optInEmail: ${wert} } })`), `data ${wert}`).toHaveLength(1)
+      expect(schnipsel(`const daten = { optInEmail: ${wert} }`), `Konstante ${wert}`).toHaveLength(1)
+    }
+  })
+
+  it('die Ausnahme für WERBEMAIL_EMPFAENGER gilt nicht für andere Konstanten in abo-anmeldung.ts', () => {
+    expect(schnipsel('export const ANDERE = { where: { optInEmail: true } }', true)).toHaveLength(1)
+    expect(schnipsel('export const ANDERE = { optInEmail: true }', true)).toHaveLength(1)
+    // Und ein Schreib-Objekt IN der Konstante bleibt ein Schreib-Objekt.
+    expect(schnipsel('export const WERBEMAIL_EMPFAENGER = { optInEmail: true, abos: { data: { optInEmail: true } } }', true)).toEqual([
+      expect.objectContaining({ grund: GRUND_SCHREIBT }),
+    ])
   })
 })
 
@@ -229,17 +377,28 @@ describe('loeseOffeneAnfrageAuf — verzögert, deshalb ausdrücklich getippt un
 })
 
 describe('Gegenproben: was erlaubt bleibt', () => {
-  it('false in Schreib-Objekten, Auswahl in select, Filter mit Variablenwert, Kommentare', () => {
+  it('false in Schreib-Objekten und Filtern, Auswahl in select, Kommentare', () => {
     expect(schnipsel('updateMany({ where: wo, data: { optInEmail: false, optInWhatsApp: false } })')).toEqual([])
     expect(schnipsel('update: { optInWhatsApp: x, ...(an ? {} : { optInEmail: false }) }')).toEqual([])
+    expect(schnipsel('update({ data: { optInEmail: (false as boolean) } })')).toEqual([])
+    expect(schnipsel('count({ where: { farmId, optInEmail: false } })')).toEqual([])
+    expect(schnipsel('findMany({ where: { NOT: { id }, optInEmail: false } })')).toEqual([])
     expect(schnipsel('findMany({ select: { customerEmail: true, optInEmail: true } })')).toEqual([])
-    expect(schnipsel('updateMany({ where: { id, optInEmail: abo.optInEmail }, data: { optInEmail: false } })')).toEqual([])
+    expect(schnipsel('findMany({ include: { subscriptions: { select: { optInEmail: true } } }, orderBy: { optInEmail: "desc" } })')).toEqual([])
     expect(schnipsel('// früher: data: { optInEmail: true }\nconst a = 1')).toEqual([])
+  })
+
+  it('die Vorbedingung des bedingten Schreibens in meldeEmailAboAn', () => {
+    const text = 'export async function meldeEmailAboAn(abo) { await updateMany({ where: { id: abo.id, optInEmail: abo.optInEmail }, data: { optInEmail: false } }) }'
+    expect(schnipsel(text, true)).toEqual([])
+    expect(schnipsel(text)).toHaveLength(1)
   })
 
   it('Daten außerhalb der Datenbank (Formular, Antwort an den Browser) sind kein Schreib-Objekt', () => {
     expect(schnipsel('JSON.stringify({ optInEmail: data.optInEmail ?? false })')).toEqual([])
     expect(schnipsel('return { optInEmail: werbemailErlaubt(s), emailWartet }')).toEqual([])
+    expect(schnipsel('schema.safeParse({ farmId, optInEmail, optInWhatsApp })')).toEqual([])
+    expect(schnipsel('const schema = z.object({ optInEmail: z.boolean().default(false) })')).toEqual([])
   })
 
   it('die beiden Konstanten gelten nur in abo-anmeldung.ts', () => {

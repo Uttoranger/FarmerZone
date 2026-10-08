@@ -193,6 +193,8 @@ describe('setServiceFeeAction — Validierung', () => {
     expect(await setServiceFeeAction('farm_1', { ...GUELTIG, minCents: MINDESTGEBUEHR_MAX_CENTS })).toEqual({})
     expect(farmUpdate).toHaveBeenCalledTimes(1)
     expect(MINDESTGEBUEHR_ZU_HOCH).toContain(formatEuro(centsAlsEuro(MINDESTGEBUEHR_MAX_CENTS)))
+    // Auch die Untergrenze im Anzeigeformat, nicht von Hand (Nachbesserung 1).
+    expect(MINDESTGEBUEHR_NEGATIV).toContain(formatEuro(0))
   })
 
   it('die Sätze zur Mindestgebühr sind geduzt, enden mit einem Punkt und nennen einen Ausweg', () => {

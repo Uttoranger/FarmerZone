@@ -38,7 +38,7 @@ export const MINDESTGEBUEHR_KEINE_ZAHL = 'Gib die Mindestgebühr als Betrag in E
 export const MINDESTGEBUEHR_GANZE_CENT =
   'Gib die Mindestgebühr mit höchstens zwei Nachkommastellen ein, zum Beispiel 0,50.'
 export const MINDESTGEBUEHR_NEGATIV =
-  'Die Mindestgebühr kann nicht unter € 0,00 liegen. Lass das Feld leer, wenn keine gelten soll.'
+  `Die Mindestgebühr kann nicht unter ${formatEuro(0)} liegen. Lass das Feld leer, wenn keine gelten soll.`
 export const MINDESTGEBUEHR_ZU_HOCH = `Die Mindestgebühr darf höchstens ${formatEuro(centsAlsEuro(MINDESTGEBUEHR_MAX_CENTS))} betragen. Gib einen kleineren Betrag ein.`
 
 export const servicegebuehrEinstellungSchema = z.object({

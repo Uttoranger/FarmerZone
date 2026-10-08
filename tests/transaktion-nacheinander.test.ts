@@ -16,11 +16,28 @@
  *     oder einem Parameter vom Typ `Prisma.TransactionClient` (auch über einen
  *     Typ-Alias derselben Datei). Prisma 7.8 reiht Aufrufe auf `tx` zwar
  *     selbst nacheinander ein; darauf baut der Code nicht, und lesbar
- *     nacheinander ist es ohnehin.
+ *     nacheinander ist es ohnehin. Die Wache folgt dem Client auch über
+ *     „Träger" im Rumpf (seit Nachbesserung 1): einen destrukturierten
+ *     Parameter (`async ({ order }) => …`), eine vorher gebaute Liste oder
+ *     Variable, deren Startwert ihn ohne `await` nennt (`const s = [tx.a(),
+ *     tx.b()]; Promise.all(s)`, `const r = repo(tx)`), eine Liste, in die
+ *     solche Aufrufe geschoben werden (`s.push(tx.a())`), und Träger von
+ *     Trägern. Ein abgewartetes Ergebnis (`const x = await tx.a()`) ist kein
+ *     Träger.
+ *     Grenzen: Ein Client, der erst nach der Deklaration zugewiesen wird
+ *     (`let db; db = tx`) oder in einem Objektfeld reist (`{ db: tx }` an
+ *     eine Hilfsfunktion, die ihn als `typeof prisma` nimmt), und Helfer in
+ *     anderen Dateien ohne den Typ `TransactionClient` werden nicht verfolgt.
+ *     Gleichnamige Variablen in anderen Gültigkeitsbereichen des Rumpfs
+ *     zählen mit — die sichere Richtung.
  *  2. Eine Seite mit `generateMetadata` ruft dieselbe Server-Abfrage
  *     (Import aus `@/server/…`) nie in Metadaten UND Seite direkt auf — nur
- *     über eine geteilte Fassung (Name endet auf `Geteilt`). Grenze: Ein
- *     lokaler Helfer, der die Abfrage umhüllt, wird nicht verfolgt.
+ *     über eine geteilte Fassung (Name endet auf `Geteilt`).
+ *     Grenzen: Die Wache sieht nur eine page-Datei mit `generateMetadata`
+ *     und Standard-Export als Funktionsdeklarationen. Layout und Seite (zwei
+ *     Dateien, die denselben Hof laden), `export const generateMetadata =
+ *     async …` und ein lokaler Helfer, der die Abfrage umhüllt, werden nicht
+ *     verfolgt — heute lädt kein Layout unter `[farmSlug]` den Hof.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -86,14 +103,63 @@ function nenntWert(knoten: ts.Node, name: string): boolean {
   return gefunden
 }
 
+/** Die Namen eines Parameters — auch jeder Teil eines destrukturierten (`{ order, product }`). */
+function parameterNamen(name: ts.BindingName): string[] {
+  if (ts.isIdentifier(name)) return [name.text]
+  return name.elements.flatMap((el) => (ts.isOmittedExpression(el) ? [] : parameterNamen(el.name)))
+}
+
+/** Ohne Klammern, `as` und `!` — `(await x)` bleibt ein abgewartetes Ergebnis. */
+function ohneHuelle(ausdruck: ts.Expression): ts.Expression {
+  let a = ausdruck
+  while (ts.isParenthesizedExpression(a) || ts.isAsExpression(a) || ts.isSatisfiesExpression(a) || ts.isNonNullExpression(a)) a = a.expression
+  return a
+}
+
+/**
+ * Alle Namen im Rumpf, die den Client oder schon gestartete Aufrufe auf ihm
+ * tragen: die Parameter-Namen, jede Variable, deren Startwert einen Träger
+ * ohne `await` nennt, und jede Liste, in die ein solcher Wert geschoben wird
+ * — wiederholt, bis nichts mehr dazukommt (Träger von Trägern).
+ */
+function traeger(rumpf: ts.Node, namen: string[]): Set<string> {
+  const gefunden = new Set(namen)
+  const kandidaten: { name: string; wert: ts.Node }[] = []
+  const sammle = (k: ts.Node): void => {
+    if (ts.isVariableDeclaration(k) && ts.isIdentifier(k.name) && k.initializer && !ts.isAwaitExpression(ohneHuelle(k.initializer))) {
+      kandidaten.push({ name: k.name.text, wert: k.initializer })
+    }
+    if (
+      ts.isCallExpression(k) &&
+      ts.isPropertyAccessExpression(k.expression) &&
+      ts.isIdentifier(k.expression.expression) &&
+      (k.expression.name.text === 'push' || k.expression.name.text === 'unshift')
+    ) {
+      for (const argument of k.arguments) kandidaten.push({ name: k.expression.expression.text, wert: argument })
+    }
+    ts.forEachChild(k, sammle)
+  }
+  sammle(rumpf)
+  for (let weiter = true; weiter; ) {
+    weiter = false
+    for (const { name, wert } of kandidaten) {
+      if (!gefunden.has(name) && [...gefunden].some((t) => nenntWert(wert, t))) {
+        gefunden.add(name)
+        weiter = true
+      }
+    }
+  }
+  return gefunden
+}
+
 function promiseAllMitTransaktion(text: string, pfad = 'schnipsel.ts'): string[] {
   const datei = lies(text, pfad)
   const aliasse = transaktionsAliasse(datei)
   const funde: string[] = []
   const besuche = (knoten: ts.Node): void => {
-    if (ts.isParameter(knoten) && ts.isIdentifier(knoten.name) && istTransaktionsParameter(knoten, datei, aliasse)) {
-      const name = knoten.name.text
+    if (ts.isParameter(knoten) && istTransaktionsParameter(knoten, datei, aliasse)) {
       const rumpf = (knoten.parent as ts.FunctionLikeDeclaration).body
+      const namen = rumpf ? traeger(rumpf, parameterNamen(knoten.name)) : new Set<string>()
       const suche = (k: ts.Node): void => {
         if (
           ts.isCallExpression(k) &&
@@ -101,7 +167,7 @@ function promiseAllMitTransaktion(text: string, pfad = 'schnipsel.ts'): string[]
           ts.isIdentifier(k.expression.expression) &&
           k.expression.expression.text === 'Promise' &&
           SAMMLER.has(k.expression.name.text) &&
-          k.arguments.some((a) => nenntWert(a, name))
+          k.arguments.some((a) => [...namen].some((name) => nenntWert(a, name)))
         ) {
           const zeile = datei.getLineAndCharacterOfPosition(k.getStart(datei)).line + 1
           funde.push(`${pfad}:${zeile} ${k.getText(datei).replace(/\s+/g, ' ').slice(0, 120)}`)
@@ -142,6 +208,25 @@ describe('Wache 1: kein Promise.all mit dem Transaktions-Client', () => {
     expect(promiseAllMitTransaktion('await Promise.all([prisma.a.count(), prisma.b.count()])')).toEqual([])
     // Ein gleichnamiges Feld eines anderen Objekts ist nicht der Client.
     expect(promiseAllMitTransaktion('prisma.$transaction(async (tx) => { await Promise.all([stripe.tx, warte()]) })')).toEqual([])
+  })
+
+  it('Gegenprobe (Nachbesserung 1): der Client über Träger — vorher gebaute Liste, push, Helfer, Destrukturierung', () => {
+    const inTransaktion = (rumpf: string) => promiseAllMitTransaktion(`prisma.$transaction(async (tx) => { ${rumpf} })`)
+    expect(inTransaktion('const s = [tx.a.count(), tx.b.count()]; await Promise.all(s)')).toHaveLength(1)
+    expect(inTransaktion('const s = ids.map((id) => tx.p.update({ where: { id }, data })); return Promise.allSettled(s)')).toHaveLength(1)
+    expect(inTransaktion('const s: Promise<number>[] = []; for (const id of ids) s.push(tx.p.count({ where: { id } })); await Promise.all(s)')).toHaveLength(1)
+    // Träger von Trägern und ein Helfer, der den Client bindet.
+    expect(inTransaktion('const s = [tx.a.count()]; const t = s.concat([x]); await Promise.race(t)')).toHaveLength(1)
+    expect(inTransaktion('const repo = baueRepo(tx); await Promise.all([repo.a(), repo.b()])')).toHaveLength(1)
+    // Destrukturierter Parameter: jeder Teil ist ein Stück des Clients.
+    expect(promiseAllMitTransaktion('prisma.$transaction(async ({ order, product }) => Promise.all([order.count(), product.count()]))')).toHaveLength(1)
+    expect(promiseAllMitTransaktion('async function f({ order }: Prisma.TransactionClient) { await Promise.all([order.count(), x]) }')).toHaveLength(1)
+  })
+
+  it('Gegenprobe (Nachbesserung 1): abgewartete Ergebnisse sind keine Träger', () => {
+    const inTransaktion = (rumpf: string) => promiseAllMitTransaktion(`prisma.$transaction(async (tx) => { ${rumpf} })`)
+    expect(inTransaktion('const zeilen = await tx.a.findMany(); await Promise.all(zeilen.map((z) => schicke(z)))')).toEqual([])
+    expect(inTransaktion('const zahl = (await tx.a.count()) as number; const s = [zahl]; await Promise.all(s.map(warte))')).toEqual([])
   })
 })
 

@@ -11,6 +11,10 @@
  *  - Ohne gültigen Token oder ohne den festen Inhalt: 400, nichts geschrieben.
  *  - GET ändert nie etwas (S2): weiter zur Seite mit dem Knopf.
  *  - Ein Datenbankfehler geht ohne Adresse und Token nach Sentry.
+ *  - Gebremst mit eigener Grenze (EIN_KLICK_JE_MINUTE je IP), nicht mit der
+ *    Vorgabe von 20 — die Aufrufe kommen von wenigen Mailanbieter-Servern.
+ *  - Der Knopf auf der Seite (`unsubscribeWithToken`) antwortet auf einen
+ *    ungültigen Link mit demselben Satz wie der Endpunkt.
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -25,12 +29,17 @@ vi.mock('@/lib/prisma', () => ({
   prisma: { $transaction: transaction, customerFarmSubscription: { updateMany } },
 }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
+// Nur für den Import der Server Actions (unsubscribeWithToken braucht keins von beiden).
+vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
+vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 
 import * as Sentry from '@sentry/nextjs'
 import { GET, POST } from '@/app/api/abmelden/route'
 import { generateUnsubscribeToken } from '@/lib/unsubscribe'
 import { APP_URL } from '@/lib/umgebung-server'
-import { ABMELDE_LINK_UNGUELTIG } from '@/lib/abmelde-link'
+import { ABMELDE_LINK_UNGUELTIG, EIN_KLICK_JE_MINUTE } from '@/lib/abmelde-link'
+import { CHECKOUT_RESERVE_MAX_PER_WINDOW } from '@/lib/rate-limit'
+import { unsubscribeWithToken } from '@/server/actions/subscriptions'
 
 const EMAIL = 'kundin@example.com'
 const HOF = 'farm-1'
@@ -129,8 +138,50 @@ describe('POST — die Ein-Klick-Abmeldung des Mailprogramms', () => {
     expect(JSON.stringify([gemeldet.message, kontext])).not.toMatch(new RegExp(`${EMAIL}|${TOKEN.slice(0, 20)}`))
   })
 
-  it('ist gebremst wie jede schreibende Route', () => {
-    expect(readFileSync(join(process.cwd(), 'src/app/api/abmelden/route.ts'), 'utf8')).toMatch(/enforceRateLimit\('abmelden', request\)/)
+  it('ist gebremst — mit eigener Grenze je IP statt der Vorgabe (Nachbesserung 1)', async () => {
+    expect(EIN_KLICK_JE_MINUTE).toBeGreaterThan(CHECKOUT_RESERVE_MAX_PER_WINDOW)
+    vi.stubEnv('NODE_ENV', 'production')
+    try {
+      const vonServer = (ip: string) => {
+        const anfrage = einKlick(TOKEN)
+        anfrage.headers.set('x-forwarded-for', ip)
+        return POST(anfrage)
+      }
+      // Ein Mailanbieter-Server schickt viele Abmeldungen hintereinander:
+      // Alle bis zur Grenze gehen durch, auch weit über 20.
+      const status: number[] = []
+      for (let i = 0; i < EIN_KLICK_JE_MINUTE; i++) status.push((await vonServer('198.51.100.20')).status)
+      expect(new Set(status)).toEqual(new Set([200]))
+      // Darüber: 429 — und ein anderer Server zählt für sich.
+      const darueber = await vonServer('198.51.100.20')
+      expect(darueber.status).toBe(429)
+      expect(darueber.headers.get('retry-after')).toBe('60')
+      expect((await vonServer('198.51.100.21')).status).toBe(200)
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('die Bremse steht vor allem anderen im POST, mit der eigenen Grenze', () => {
+    const quelle = readFileSync(join(process.cwd(), 'src/app/api/abmelden/route.ts'), 'utf8')
+    const post = quelle.slice(quelle.indexOf('export async function POST'))
+    expect(post).toMatch(/^[^]*?\{\s*const gebremst = enforceRateLimit\('abmelden', request, null, \{ max: EIN_KLICK_JE_MINUTE \}\)/)
+    expect(post.indexOf('enforceRateLimit(')).toBeLessThan(post.indexOf('safeParse('))
+  })
+})
+
+describe('Der Knopf auf der Seite — unsubscribeWithToken', () => {
+  it('ein ungültiger Link bekommt denselben Satz wie beim Endpunkt (mit Ausweg, ohne „abgelaufen"), nichts geschrieben', async () => {
+    for (const falsch of [42, '', 'x'.repeat(1001), `${TOKEN}x`, null]) {
+      expect(await unsubscribeWithToken(falsch), String(falsch).slice(0, 20)).toEqual({ error: ABMELDE_LINK_UNGUELTIG })
+    }
+    expect(ABMELDE_LINK_UNGUELTIG).not.toMatch(/abgelaufen/i)
+    expect(transaction).not.toHaveBeenCalled()
+  })
+
+  it('Gegenprobe: ein gültiger Link meldet ab', async () => {
+    expect(await unsubscribeWithToken(TOKEN)).toEqual({})
+    expect(transaction).toHaveBeenCalledTimes(1)
   })
 })
 

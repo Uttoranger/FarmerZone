@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import * as Sentry from '@sentry/nextjs'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { APP_URL } from '@/lib/umgebung-server'
-import { ABMELDEN_FEHLGESCHLAGEN, ABMELDE_LINK_UNGUELTIG, ABMELDE_SEITE, abmeldeSeitenPfad } from '@/lib/abmelde-link'
+import { ABMELDEN_FEHLGESCHLAGEN, ABMELDE_LINK_UNGUELTIG, ABMELDE_SEITE, EIN_KLICK_JE_MINUTE, abmeldeSeitenPfad } from '@/lib/abmelde-link'
 import { abmeldeTokenSchema, einKlickAbmeldungSchema } from '@/schemas/abmelden'
 import { meldeAboMitTokenAb } from '@/server/abo-anmeldung'
 
@@ -17,13 +17,15 @@ import { meldeAboMitTokenAb } from '@/server/abo-anmeldung'
  * - Berechtigt ist, wer den signierten Token hat (er steht nur in der Mail an
  *   genau diese Adresse); er gilt bewusst ohne Ablauf wie der Link im Text.
  * - Idempotent: Ein zweiter POST trifft nichts mehr und antwortet gleich.
+ * - Gebremst mit eigener, hoher Grenze je IP (EIN_KLICK_JE_MINUTE): Die
+ *   Aufrufe kommen gebündelt von wenigen Mailanbieter-Servern.
  * - Keine Auskunft: Dieselbe Antwort, ob es ein Abo gab oder nicht.
  * - GET ändert nie etwas (S2, ARCHITECTURE §5): Link-Scanner und Vorschauen
  *   rufen Adressen aus Mails ungefragt auf. Ein GET führt nur auf die Seite
  *   mit dem Knopf.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const gebremst = enforceRateLimit('abmelden', request)
+  const gebremst = enforceRateLimit('abmelden', request, null, { max: EIN_KLICK_JE_MINUTE })
   if (gebremst) return gebremst
 
   const token = abmeldeTokenSchema.safeParse(request.nextUrl.searchParams.get('token'))

@@ -4,6 +4,10 @@
  * 37") — `logentry`, `tags`, `extra`, die übrigen `contexts`, die Variablen in
  * Stack-Frames (`frame.vars`) und die Daten der Brotkrumen.
  *
+ * Seit der Nachbesserung 1 auch: Texte unter Query-Schlüsseln (Werte, nicht
+ * nur Parameternamen) und die Nachrichten (event.message, message der
+ * Brotkrumen) mit derselben Freitext-Regel wie logentry.
+ *
  * Je Feld ein Test mit E-Mail-Adresse, Token und IP-Adresse darin; dazu
  * Gegenproben, dass Kennungen, Codes, Zahlen und die technischen Kontexte des
  * SDK (Versionsnummern!) stehen bleiben. Erfundene Werte: example.com und
@@ -227,6 +231,101 @@ describe('Brotkrumen — data vollständig', () => {
       'http.query': 'seite=2',
     })
     expect(JSON.stringify(e)).not.toMatch(HEIKEL)
+  })
+})
+
+describe('Texte unter Query-Schlüsseln (Nachbesserung 1)', () => {
+  it('ein Text, der kein Query-String ist, geht durch die Freitext-Regel — nicht als Parametername durch', () => {
+    const e = bereinigeEreignis(ereignis({ extra: { suchQuery: MAIL, 'db.query': `SELECT 1 WHERE mail = '${MAIL}' -- ${IP4}` } }))
+    // Vorher: „kundin%40example.com=" (die Adresse als Parametername, kodiert).
+    expect(e.extra).toEqual({ suchQuery: '[e-mail entfernt]', 'db.query': "SELECT 1 WHERE mail = '[e-mail entfernt]' -- [ip entfernt]" })
+  })
+
+  it('ein Query-String: heikle Parameter fallen weg, Namen und Werte werden DEKODIERT bereinigt', () => {
+    const query = `q=${encodeURIComponent(MAIL)}&token=geheim-123&seite=2&von=${IP4}&id=${TOKEN}&ziel=${encodeURIComponent('/x?token=geheim-123')}`
+    const e = bereinigeEreignis(ereignis({ extra: { 'http.query': query }, breadcrumbs: [{ data: { 'http.query': query } }] }))
+    for (const ergebnis of [e.extra?.['http.query'], e.breadcrumbs?.[0].data?.['http.query']]) {
+      const parameter = new URLSearchParams(String(ergebnis))
+      expect([...parameter.keys()]).toEqual(['q', 'seite', 'von', 'id', 'ziel'])
+      expect(parameter.get('q')).toBe('[e-mail entfernt]')
+      expect(parameter.get('seite')).toBe('2')
+      expect(parameter.get('von')).toBe('[ip entfernt]')
+      expect(parameter.get('id')).toBe('[kennung entfernt]')
+      expect(parameter.get('ziel')).toBe('/x')
+      expect(String(ergebnis)).not.toMatch(/%40/)
+    }
+    expect(JSON.stringify(e)).not.toMatch(HEIKEL)
+  })
+
+  it('auch die Adresse der Anfrage: Werte im Query werden bereinigt, nicht nur Namen', () => {
+    const e = bereinigeEreignis(
+      ereignis({
+        request: { url: `https://farmerzone.at/suche?q=${encodeURIComponent(MAIL)}&seite=2`, query_string: `q=${MAIL}&seite=2` },
+      })
+    )
+    expect(new URLSearchParams(e.request?.url?.split('?')[1]).get('q')).toBe('[e-mail entfernt]')
+    expect(new URLSearchParams(e.request?.query_string as string).get('q')).toBe('[e-mail entfernt]')
+    expect(new URLSearchParams(e.request?.query_string as string).get('seite')).toBe('2')
+    expect(JSON.stringify(e)).not.toMatch(/kundin(@|%40)example/)
+  })
+})
+
+describe('Nachrichten — event.message und message der Brotkrumen (Nachbesserung 1)', () => {
+  const NACHRICHT = `Abruf https://farmerzone.at/upload?token=geheim-123 von ${IP4} für ${MAIL}, token=geheim-123, Kennung ${TOKEN}`
+  const SAUBER = 'Abruf https://farmerzone.at/upload von [ip entfernt] für [e-mail entfernt], token=[entfernt], Kennung [kennung entfernt]'
+
+  it('die Nachricht des Ereignisses mit derselben Regel wie logentry', () => {
+    expect(bereinigeEreignis(ereignis({ message: NACHRICHT })).message).toBe(SAUBER)
+  })
+
+  it('eine Console-Brotkrume trägt die Argumente als message UND als arguments — beide bereinigt', () => {
+    const e = bereinigeEreignis(
+      ereignis({
+        breadcrumbs: [
+          {
+            category: 'console',
+            level: 'error',
+            message: `Abo-Mail an ${MAIL} gescheitert: https://farmerzone.at/account/unsubscribe?token=geheim-123 von ${IP6} ${TOKEN}`,
+            data: {
+              logger: 'console',
+              arguments: [`Abo-Mail an ${MAIL} gescheitert:`, 'https://farmerzone.at/account/unsubscribe?token=geheim-123', `von ${IP6}`, TOKEN],
+            },
+          },
+        ],
+      })
+    )
+    expect(e.breadcrumbs?.[0].message).toBe(
+      'Abo-Mail an [e-mail entfernt] gescheitert: https://farmerzone.at/account/unsubscribe von [ip entfernt] [kennung entfernt]'
+    )
+    expect(e.breadcrumbs?.[0].data).toEqual({
+      logger: 'console',
+      arguments: ['Abo-Mail an [e-mail entfernt] gescheitert:', 'https://farmerzone.at/account/unsubscribe', 'von [ip entfernt]', '[kennung entfernt]'],
+    })
+    expect(JSON.stringify(e)).not.toMatch(HEIKEL)
+  })
+
+  it('auch das Minimalereignis bereinigt seine Nachricht mit dieser Regel', () => {
+    const roh: Record<string, unknown> = { event_id: 'e4', level: 'error', message: NACHRICHT }
+    Object.defineProperty(roh, 'tags', {
+      enumerable: true,
+      get() {
+        throw new Error('kaputt')
+      },
+    })
+    expect(bereinigeEreignis(ereignis(roh))).toEqual({ event_id: 'e4', level: 'error', message: SAUBER, extra: { bereinigung: 'fehlgeschlagen' } })
+  })
+
+  it('Gegenprobe: Der Fehlertext behält die Adresse des Datenbank-Servers (Nr. 37), Harmloses bleibt', () => {
+    const e = bereinigeEreignis(
+      ereignis({
+        message: 'Seite geladen in 120 ms um 10:30:45, Node 22.22.2, Status 503',
+        breadcrumbs: [{ category: 'console', message: 'Bestellung 481234 gespeichert (farm cmuri7ryv000nkl7dnkc5bx72)' }],
+        exception: { values: [{ type: 'Error', value: `connect ETIMEDOUT ${IP4}:6543` }] },
+      })
+    )
+    expect(e.message).toBe('Seite geladen in 120 ms um 10:30:45, Node 22.22.2, Status 503')
+    expect(e.breadcrumbs?.[0].message).toBe('Bestellung 481234 gespeichert (farm cmuri7ryv000nkl7dnkc5bx72)')
+    expect(e.exception?.values?.[0].value).toBe(`connect ETIMEDOUT ${IP4}:6543`)
   })
 })
 
