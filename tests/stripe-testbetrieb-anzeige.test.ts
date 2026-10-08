@@ -8,7 +8,8 @@
  *  - AdminShell: die orange Karte über jeder Admin-Seite, nur im Testbetrieb.
  *  - Einstellungen → Zahlung: der Satz in der Karte „Online-Zahlung
  *    (Stripe)", nur im Testbetrieb; mit `?stripe=neu` und gespeichertem,
- *    nicht bereitem Konto „Online-Zahlung neu einrichten" (Karte, Marke, Knopf).
+ *    nicht bereitem Konto „Online-Zahlung neu einrichten" (Karte, Marke, Knopf)
+ *    — Barzahlung verspricht die Karte nur, wenn der Hof sie anbietet (Runde 1).
  *  - Verdrahtung: TESTBETRIEB entsteht aus bestimmeUmgebung (Produktion mit
  *    sk_test_ ja; Live, Vorschau, lokal nein); die drei Server-Stellen reichen
  *    nur den Wahrheitswert weiter, keine Client-Komponente liest die Umgebung.
@@ -53,7 +54,7 @@ import { AdminShell, type AdminShellProps } from '@/components/shells/admin-shel
 import PaymentsPage from '@/app/(hof)/settings/payments/page'
 import { kassenZahlarten } from '@/lib/kasse'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
-import { NEU_EINRICHTEN_MARKE, NEU_EINRICHTEN_SATZ, NEU_EINRICHTEN_TITEL } from '@/lib/stripe-konto'
+import { NEU_EINRICHTEN_MARKE, NEU_EINRICHTEN_TITEL, neuEinrichtenSatz } from '@/lib/stripe-konto'
 
 const WURZEL = process.cwd()
 const quelle = (datei: string): string => readFileSync(join(WURZEL, datei), 'utf8')
@@ -77,6 +78,7 @@ beforeEach(() => {
     stripeAccountId: 'acct_erfunden',
     stripeAccountReady: true,
     acceptsOnline: true,
+    acceptsOnsite: true,
   } as never)
 })
 
@@ -170,18 +172,33 @@ describe('Einstellungen → Zahlung: „Online-Zahlung neu einrichten"', () => {
       stripeAccountId: 'acct_erfunden',
       stripeAccountReady: false,
       acceptsOnline: true,
+      acceptsOnsite: true,
     } as never)
   })
 
   it('mit ?stripe=neu: Karte, Marke und der orange Knopf zum Neu-Einrichten', async () => {
     const html = await zahlungsSeite('neu')
     expect(html).toContain(NEU_EINRICHTEN_TITEL)
-    expect(html).toContain(imHtml(NEU_EINRICHTEN_SATZ))
+    expect(html).toContain(imHtml(neuEinrichtenSatz(true)))
     expect(html).toContain(NEU_EINRICHTEN_MARKE)
     // Titel der Karte und Knopf — zweimal derselbe Wortlaut aus einer Quelle.
     expect(html.split(NEU_EINRICHTEN_TITEL)).toHaveLength(3)
     expect(html).not.toContain('Einrichtung fortsetzen')
     expect(html).not.toContain('Status prüfen')
+  })
+
+  it('ohne Barzahlung beim Hof verspricht die Karte sie nicht (Runde 1)', async () => {
+    vi.mocked(prisma.farm.findUnique).mockResolvedValue({
+      stripeAccountId: 'acct_erfunden',
+      stripeAccountReady: false,
+      acceptsOnline: true,
+      acceptsOnsite: false,
+    } as never)
+    const html = await zahlungsSeite('neu')
+    expect(html).toContain(imHtml(neuEinrichtenSatz(false)))
+    expect(html).not.toContain(imHtml(neuEinrichtenSatz(true)))
+    // Die Seite liest dafür acceptsOnsite mit.
+    expect(vi.mocked(prisma.farm.findUnique).mock.calls[0][0]).toMatchObject({ select: { acceptsOnsite: true } })
   })
 
   it('Gegenprobe: ohne den Parameter bleibt es beim Fortsetzen', async () => {
@@ -195,6 +212,7 @@ describe('Einstellungen → Zahlung: „Online-Zahlung neu einrichten"', () => {
       stripeAccountId: 'acct_erfunden',
       stripeAccountReady: true,
       acceptsOnline: true,
+      acceptsOnsite: true,
     } as never)
     const html = await zahlungsSeite('neu')
     expect(html).not.toContain(NEU_EINRICHTEN_TITEL)

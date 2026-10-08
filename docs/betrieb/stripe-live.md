@@ -12,8 +12,8 @@ Mit dem Live-Schlüssel verschwinden alle drei von selbst. Den Modus liest die A
 
 **Was die App schon absichert:**
 
-- **Modus-Wache:** Landet ein Live-Schlüssel versehentlich in der Vorschau oder lokal, startet Stripe dort nicht. Die Meldung beginnt mit „Stripe startet nicht …", Sentry bekommt sie einmal je Instanz, ohne Schlüssel.
-- **Unbekanntes Hof-Konto:** Ein gespeichertes Hof-Konto, das Stripe nicht kennt, macht den Hof „nicht bereit". Danach bietet die Kasse dort nur Bar an, und der Hof sieht „Online-Zahlung neu einrichten". Die Kennung wird nicht automatisch gelöscht.
+- **Modus-Wache:** Ein Live-Schlüssel (`sk_live_` oder `rk_live_`) startet Stripe **nur im Produktions-Deployment bei Vercel** (`VERCEL_ENV=production`). Überall sonst startet Stripe damit nicht: in der Vorschau, lokal (auch mit `next start`), in Tests und in der CI. Die Meldung beginnt mit „Stripe startet nicht …", Sentry bekommt sie einmal je Instanz, ohne Schlüssel. Der Webhook antwortet dann mit 503 „Modus-Wache", nicht mit „Signatur ungültig".
+- **Unbekanntes Hof-Konto:** Ein gespeichertes Hof-Konto, das Stripe nicht kennt oder für das der Plattform-Schlüssel keinen Zugriff hat, macht den Hof „nicht bereit". Danach bietet die Kasse dort nur Bar an, und der Hof sieht „Online-Zahlung neu einrichten". Die Kennung wird nicht automatisch gelöscht.
 
 ---
 
@@ -22,6 +22,11 @@ Mit dem Live-Schlüssel verschwinden alle drei von selbst. Den Modus liest die A
 - [ ] Die Testumgebung läuft und der Probelauf ist bestanden: `docs/betrieb/testumgebung.md` (Nr. 43), `docs/nachtlauf/probelauf-checkliste.md` (Nr. 48).
 - [ ] **Offene Online-Bestellungen aus der Testzeit abschließen**, solange der Test-Schlüssel noch gilt: bezahlte abholen lassen oder stornieren.
   > **Hinweis:** Nach der Umstellung lassen sich Testzahlungen von vor der Umstellung **nicht mehr über Stripe erstatten**. Ihre Zahlungsvorgänge liegen im Testmodus, und den sieht der Live-Schlüssel nicht. Ein späterer Storno meldet dem Hof „Rückerstattung fehlgeschlagen“. Erstatten lässt sich dann nur noch von Hand im Stripe-Dashboard (Testmodus) – es ist ohnehin kein echtes Geld.
+- [ ] **Probe „neu einrichten" im Testmodus** (in der Testumgebung, nie in der Produktion; Nr. 48 übernimmt den Schritt in die Probelauf-Checkliste):
+  1. In der Datenbank der Testumgebung bei einem Testhof `stripeAccountId` auf eine **erfundene** Kennung setzen (`acct_` und beliebige Zeichen) und `stripeAccountReady` auf true.
+  2. Als dieser Hof Einstellungen → Zahlung öffnen und **„Status prüfen"** tippen.
+  3. Erwartet: die Karte **„Online-Zahlung neu einrichten"**, die Marke „Nicht mehr verbunden" und der orange Knopf „Online-Zahlung neu einrichten". Stripe antwortet auf eine fremde Kennung mit „kein Zugriff" (403) oder „unbekannt" (404) – beides führt hierher.
+  4. Danach den Knopf tippen (legt ein neues Test-Konto an) oder die alte Kennung wieder eintragen.
 - [ ] Die Höfe vorab informieren: Nach der Umstellung öffnen sie einmal Einstellungen → Zahlung und richten die Online-Zahlung neu ein (etwa 10 Minuten). Siehe Schritt 9.
 - [ ] Eine ruhige Stunde wählen, ohne laufende Abholung.
 
@@ -95,6 +100,7 @@ Vercel erlaubt je Variable und Umgebung nur einen Wert. Deshalb kommt **zuerst S
   - [ ] Admin (`/admin`): Die orange Karte „Stripe läuft im Testmodus …“ ist weg.
   - [ ] Einstellungen → Zahlung: „Online-Zahlung läuft noch im Testbetrieb.“ ist weg.
   - [ ] Sentry: Keine neue Warnung „Stripe TEST in Produktion“ und keine „Kein STRIPE_CONNECT_WEBHOOK_SECRET“.
+  - [ ] Sentry: Keine Meldung „Stripe-Client nicht gestartet …“. Kommt sie doch, läuft der Live-Schlüssel außerhalb des Produktions-Deployments, etwa in einer Vorschau – dann Schritt 5 prüfen.
   - [ ] Eine Vorschau zeigt im Umgebungsbanner weiter „Stripe Test“.
   - [ ] Stripe → Webhooks: Endpunkt A und B zeigen beim ersten Ereignis eine Zustellung mit 200.
 - [ ] Im **Testmodus** von Stripe den alten Endpunkt `https://farmerzone.at/api/stripe/webhook` löschen. Die Produktion prüft jetzt gegen die Live-Secrets und würde jede Test-Zustellung mit 400 ablehnen. Der Endpunkt der Testumgebung (`test.farmerzone.at`, Nr. 43) bleibt.
@@ -106,7 +112,7 @@ Die gespeicherten Hof-Konten stammen aus dem Testmodus, der Live-Schlüssel kenn
 1. Sobald die App zum ersten Mal bei Stripe nach dem Konto fragt, vermerkt sie den Hof als „nicht bereit“. Das passiert bei „Status prüfen“, „Einrichtung fortsetzen“, „Auszahlungen bei Stripe ansehen“ oder beim ersten Online-Kauf. Die Kennung bleibt stehen.
 2. Die erste Kundin, die bis dahin online zahlen will, liest: „Online-Zahlung ist bei diesem Hof gerade nicht möglich. Bitte wähle Bar bei Abholung.“ Die Kasse stellt sofort auf Bar um, ihre Ware bleibt reserviert. Danach bietet die Kasse bei diesem Hof nur noch Bar an.
 3. Der Hof öffnet Einstellungen → Zahlung. Er tippt auf „Status prüfen“ bzw. „Einrichtung fortsetzen“ und sieht dann die Karte **„Online-Zahlung neu einrichten“**.
-4. Der Knopf „Online-Zahlung neu einrichten“ fragt Stripe zuerst, ob das alte Konto wirklich unbekannt ist. Nur dann legt er ein neues Live-Konto an und führt zu Stripe (etwa 10 Minuten). Danach steht dort „Verbunden und aktiv“.
+4. Der Knopf „Online-Zahlung neu einrichten“ fragt Stripe zuerst, ob das alte Konto wirklich unbekannt ist oder der Zugriff verweigert wird. Nur dann legt er ein neues Live-Konto an und führt zu Stripe (etwa 10 Minuten). Danach steht dort „Verbunden und aktiv“. Ein Doppelklick legt kein zweites Konto an. Alte und neue Kennung stehen mit der Hof-ID im Server-Protokoll (Vercel-Logs: „[Stripe] Hof-Konto neu eingerichtet …“), falls ein Konto später zuzuordnen ist.
 
 - [ ] Damit keine Kundin auf Schritt 2 trifft: Die Höfe gleich nach dem Deploy bitten, einmal „Status prüfen“ zu tippen und dann neu einzurichten.
 - [ ] Überblick im Admin: Die Höfe-Liste zeigt jeden noch nicht neu eingerichteten Hof (nach dem Vermerk) als **„Stripe fehlt“** (Filter „Stripe fehlt“).

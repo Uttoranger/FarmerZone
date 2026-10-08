@@ -18,6 +18,7 @@ import {
 import { formatEuro } from '@/lib/format'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { stripeKontoBereit } from '@/lib/stripe-konto'
+import { istModusSperre } from '@/lib/stripe-modus'
 
 // Next.js App Router does not pre-parse the body — raw text needed for Stripe sig verification
 export async function POST(request: NextRequest) {
@@ -40,11 +41,25 @@ export async function POST(request: NextRequest) {
   const secrets = [webhookSecret, env.STRIPE_CONNECT_WEBHOOK_SECRET].filter(
     (s): s is string => typeof s === 'string' && s.length > 0
   )
+
+  // Modus-Wache (Register Z2, Nr. 42): Sperrt sie den Stripe-Client, ist das
+  // keine ungültige Signatur — sonst sucht jemand den Fehler im Secret. Eine
+  // eigene Antwort; 503, damit Stripe das Ereignis später erneut zustellt.
+  // Die Meldung nennt Umgebung und Ausweg, nie den Schlüssel.
+  let webhooks: typeof stripe.webhooks
+  try {
+    webhooks = stripe.webhooks
+  } catch (err) {
+    if (!istModusSperre(err)) throw err
+    console.error(`[Webhook] ${err.message}`)
+    return NextResponse.json({ error: 'Stripe gesperrt: Modus-Wache (Live-Schlüssel außerhalb des Produktions-Deployments)' }, { status: 503 })
+  }
+
   let event: Stripe.Event | null = null
   let letzterFehler = 'Unknown error'
   for (const secret of secrets) {
     try {
-      event = stripe.webhooks.constructEvent(rawBody, sig, secret)
+      event = webhooks.constructEvent(rawBody, sig, secret)
       break
     } catch (err) {
       letzterFehler = err instanceof Error ? err.message : 'Unknown error'

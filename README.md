@@ -97,7 +97,7 @@ Alle Variablen aus `.env.example` im Vercel Dashboard unter **Settings → Envir
 Wichtig für Produktion:
 - `BETTER_AUTH_URL` = `https://deine-domain.at`
 - `NEXT_PUBLIC_APP_URL` = `https://deine-domain.at`
-- `STRIPE_SECRET_KEY` = Live-Key (`sk_live_...`) — **nur für Production**; Vorschau und lokal laufen nur mit Test-Schlüssel, mit `sk_live_` startet Stripe dort nicht (Modus-Wache, Register Z2)
+- `STRIPE_SECRET_KEY` = Live-Key (`sk_live_...`) — **nur für Production**; ein Live-Schlüssel (`sk_live_`/`rk_live_`) startet Stripe nur im Produktions-Deployment bei Vercel (`VERCEL_ENV=production`), in Vorschau, lokal (auch `next start`) und Tests nicht (Modus-Wache, Register Z2)
 - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` = Live-Key (`pk_live_...`), ebenfalls nur für Production
 - `EMAIL_FROM` = Adresse von verifizierter Resend-Domain
 

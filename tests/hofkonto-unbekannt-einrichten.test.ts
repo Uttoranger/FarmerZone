@@ -12,9 +12,17 @@
  *    Kennung) ersetzt die Kennung NUR, wenn Stripe das alte Konto in diesem
  *    Moment nachweislich nicht kennt, und nur bedingt auf die alte Kennung.
  *    Kennt Stripe das Konto, bleibt alles, wie es war.
+ *  - Runde 1: Bei diesen reinen Konto-Aufrufen zählt auch der Zugriffsfehler
+ *    (403 `account_invalid`) als „Konto unbekannt" — die gespeicherte Kennung
+ *    stammt immer aus dem eigenen accounts.create.
+ *  - Runde 1: Nach jedem Vermerk rendern Zahlung, Einstellungen, Heute,
+ *    Verkäufe und Hofseite neu — auch nach dem Login-Link (Verkäufe).
+ *  - Runde 1: Beim Ersetzen legt accounts.create mit Idempotenz-Schlüssel aus
+ *    Hof und alter Kennung an (Doppelklick, Neuversuch → kein zweites Konto),
+ *    und alte wie neue Kennung stehen mit der Hof-ID im Server-Protokoll.
  *  - Gegenproben: Andere Stripe-Fehler nehmen den bisherigen Weg.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Stripe from 'stripe'
 
 const sitzung = vi.hoisted(() => ({ wert: { user: { id: 'user_1' } } as { user: { id: string } } | null }))
@@ -67,6 +75,25 @@ const kontoUnbekannt = () =>
     statusCode: 404,
   })
 
+/** Stripes Antwort auf eine Kennung ohne Zugriff (Runde 1) — erfunden, ohne Schlüssel. */
+const keinZugriff = () =>
+  new Stripe.errors.StripeInvalidRequestError({
+    type: 'invalid_request_error',
+    code: 'account_invalid',
+    message: `The provided key does not have access to account '${ALT}' (or that account does not exist). Application access may have been revoked.`,
+    statusCode: 403,
+  })
+
+/** Beide Antworten heißen bei reinen Konto-Aufrufen: neu einrichten. */
+const UNBEKANNT = [
+  ['unbekannt (resource_missing)', kontoUnbekannt],
+  ['kein Zugriff (account_invalid, 403)', keinZugriff],
+] as const
+
+/** Nach dem Vermerk: alle Seiten, die den Zahlungsstand zeigen (wie schalteOnlineZahlungEin, dazu Verkäufe). */
+const NEU_GERENDERT = ['/settings/payments', '/settings', '/dashboard', '/sales', '/hof-test']
+const neuGerendert = () => vi.mocked(revalidatePath).mock.calls.map(([pfad]) => pfad)
+
 const farmFindUnique = vi.mocked(prisma.farm.findUnique)
 const farmUpdate = vi.mocked(prisma.farm.update)
 const farmUpdateMany = vi.mocked(prisma.farm.updateMany)
@@ -90,15 +117,15 @@ beforeEach(() => {
 })
 
 describe('„Status prüfen" (checkConnectStatus)', () => {
-  it('unbekanntes Konto: vermerkt den Hof und meldet kontoUnbekannt — ohne die Kennung anzufassen', async () => {
-    vi.mocked(stripe.accounts.retrieve).mockRejectedValue(kontoUnbekannt())
+  it.each(UNBEKANNT)('%s: vermerkt den Hof und meldet kontoUnbekannt — ohne die Kennung anzufassen', async (_fall, fehler) => {
+    vi.mocked(stripe.accounts.retrieve).mockRejectedValue(fehler())
 
     expect(await checkConnectStatus()).toEqual({ ready: false, kontoUnbekannt: true })
 
     expect(vermerk).toHaveBeenCalledWith('farm_1', ALT)
     expect(farmUpdate).not.toHaveBeenCalled()
     expect(schriebKennung()).toBe(false)
-    expect(revalidatePath).toHaveBeenCalledWith('/settings/payments')
+    expect(neuGerendert()).toEqual(NEU_GERENDERT)
   })
 
   it('Gegenprobe: ein anderer Stripe-Fehler wirft wie bisher, ohne Vermerk', async () => {
@@ -118,13 +145,14 @@ describe('„Status prüfen" (checkConnectStatus)', () => {
 })
 
 describe('„Einrichtung fortsetzen" (createOnboardingLink)', () => {
-  it('unbekanntes Konto: kein Link, Satz für den Hof, kontoUnbekannt — Hof vermerkt', async () => {
-    vi.mocked(stripe.accountLinks.create).mockRejectedValue(kontoUnbekannt())
+  it.each(UNBEKANNT)('%s: kein Link, Satz für den Hof, kontoUnbekannt — Hof vermerkt', async (_fall, fehler) => {
+    vi.mocked(stripe.accountLinks.create).mockRejectedValue(fehler())
 
     expect(await createOnboardingLink()).toEqual({ error: NEU_EINRICHTEN_KURZ, kontoUnbekannt: true })
 
     expect(vermerk).toHaveBeenCalledWith('farm_1', ALT)
     expect(schriebKennung()).toBe(false)
+    expect(neuGerendert()).toEqual(NEU_GERENDERT)
   })
 
   it('Gegenprobe: ein anderer Fehler wirft wie bisher', async () => {
@@ -136,8 +164,16 @@ describe('„Einrichtung fortsetzen" (createOnboardingLink)', () => {
 })
 
 describe('„Online-Zahlung neu einrichten" (createConnectAccount mit gespeicherter Kennung)', () => {
-  it('Stripe kennt das alte Konto nicht: neues Konto, Kennung bedingt auf die alte ersetzt, nicht bereit', async () => {
-    vi.mocked(stripe.accounts.retrieve).mockRejectedValue(kontoUnbekannt())
+  let protokoll: ReturnType<typeof vi.spyOn>
+  beforeEach(() => {
+    protokoll = vi.spyOn(console, 'info').mockImplementation(() => {})
+  })
+  afterEach(() => {
+    protokoll.mockRestore()
+  })
+
+  it.each(UNBEKANNT)('Stripe: %s — neues Konto, Kennung bedingt auf die alte ersetzt, nicht bereit', async (_fall, fehler) => {
+    vi.mocked(stripe.accounts.retrieve).mockRejectedValue(fehler())
 
     expect(await createConnectAccount()).toEqual({})
 
@@ -148,6 +184,36 @@ describe('„Online-Zahlung neu einrichten" (createConnectAccount mit gespeicher
       data: { stripeAccountId: NEU, stripeAccountReady: false, acceptsOnline: true },
     })
     expect(farmUpdate).not.toHaveBeenCalled()
+  })
+
+  it('legt mit Idempotenz-Schlüssel aus Hof und alter Kennung an — ein Doppelklick bekommt dasselbe Konto', async () => {
+    vi.mocked(stripe.accounts.retrieve).mockRejectedValue(kontoUnbekannt())
+
+    await createConnectAccount()
+    await createConnectAccount()
+
+    const optionen = vi.mocked(stripe.accounts.create).mock.calls.map(([, o]) => o)
+    expect(optionen).toEqual([
+      { idempotencyKey: `hofkonto-neu-farm_1-${ALT}` },
+      { idempotencyKey: `hofkonto-neu-farm_1-${ALT}` },
+    ])
+    // Der Schlüssel trägt nur Kennungen — keine Adresse, kein Name.
+    expect(JSON.stringify(optionen)).not.toContain('@')
+  })
+
+  it('schreibt alte und neue Kennung mit der Hof-ID ins Server-Protokoll — nichts Persönliches', async () => {
+    vi.mocked(stripe.accounts.retrieve).mockRejectedValue(kontoUnbekannt())
+
+    await createConnectAccount()
+
+    expect(protokoll).toHaveBeenCalledTimes(1)
+    const zeile = String(protokoll.mock.calls[0][0])
+    expect(zeile).toMatch(/^\[Stripe\] Hof-Konto neu eingerichtet/)
+    expect(zeile).toContain('farm_1')
+    expect(zeile).toContain(`alt ${ALT}`)
+    expect(zeile).toContain(`neu ${NEU}`)
+    expect(zeile).not.toContain(HOF.email)
+    expect(zeile).not.toContain(HOF.name)
   })
 
   it('Stripe kennt das Konto: nichts wird ersetzt, kein zweites Konto', async () => {
@@ -168,7 +234,7 @@ describe('„Online-Zahlung neu einrichten" (createConnectAccount mit gespeicher
     expect(schriebKennung()).toBe(false)
   })
 
-  it('hat sich die Kennung inzwischen geändert (zweiter Tab), bleibt die neue stehen', async () => {
+  it('hat sich die Kennung inzwischen geändert (zweiter Tab), bleibt die neue stehen — und das Protokoll sagt es', async () => {
     vi.mocked(stripe.accounts.retrieve).mockRejectedValue(kontoUnbekannt())
     farmUpdateMany.mockResolvedValue({ count: 0 } as never)
 
@@ -176,26 +242,38 @@ describe('„Online-Zahlung neu einrichten" (createConnectAccount mit gespeicher
 
     expect(antwort.error).toMatch(/Lade die Seite neu/)
     expect(farmUpdate).not.toHaveBeenCalled()
+    expect(protokoll).toHaveBeenCalledTimes(1)
+    const zeile = String(protokoll.mock.calls[0][0])
+    expect(zeile).toMatch(/^\[Stripe\] Hof-Konto nicht ersetzt/)
+    expect(zeile).toContain('farm_1')
+    expect(zeile).toContain(ALT)
+    expect(zeile).toContain(NEU)
   })
 
-  it('Gegenprobe: ohne gespeichertes Konto fragt der Weg Stripe nicht nach dem alten', async () => {
+  it('Gegenprobe: ohne gespeichertes Konto fragt der Weg Stripe nicht nach dem alten — Anlegen wie bisher', async () => {
     farmFindUnique.mockResolvedValue({ ...HOF, stripeAccountId: null, stripeAccountReady: false } as never)
 
     expect(await createConnectAccount()).toEqual({})
 
     expect(stripe.accounts.retrieve).not.toHaveBeenCalled()
     expect(farmUpdate).toHaveBeenCalledWith({ where: { id: 'farm_1' }, data: { stripeAccountId: NEU, acceptsOnline: true } })
+    // Der erste Weg bleibt unverändert: ohne Idempotenz-Schlüssel, ohne Protokollzeile.
+    expect(vi.mocked(stripe.accounts.create).mock.calls[0]).toHaveLength(1)
+    expect(protokoll).not.toHaveBeenCalled()
   })
 })
 
 describe('Auszahlungen bei Stripe (createStripeDashboardLinkAction)', () => {
-  it('unbekanntes Konto: Hof vermerkt, Satz mit dem Weg zum Neu-Einrichten', async () => {
-    vi.mocked(stripe.accounts.createLoginLink).mockRejectedValue(kontoUnbekannt())
+  it.each(UNBEKANNT)('%s: Hof vermerkt, Satz mit dem Weg zum Neu-Einrichten, Seiten neu gerendert', async (_fall, fehler) => {
+    vi.mocked(stripe.accounts.createLoginLink).mockRejectedValue(fehler())
     const fehlerAusgabe = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     expect(await createStripeDashboardLinkAction()).toEqual({ error: NEU_EINRICHTEN_KURZ })
 
     expect(vermerk).toHaveBeenCalledWith('farm_1', ALT)
+    // Runde 1: Der Vermerk setzt „nicht bereit" — ohne Neurendern zeigte /sales weiter den Knopf.
+    expect(neuGerendert()).toEqual(NEU_GERENDERT)
+    expect(fehlerAusgabe).not.toHaveBeenCalled()
     fehlerAusgabe.mockRestore()
   })
 
@@ -206,6 +284,7 @@ describe('Auszahlungen bei Stripe (createStripeDashboardLinkAction)', () => {
     expect(await createStripeDashboardLinkAction()).toEqual({ error: 'Stripe-Übersicht gerade nicht erreichbar' })
 
     expect(vermerk).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
     fehlerAusgabe.mockRestore()
   })
 })
@@ -213,8 +292,8 @@ describe('Auszahlungen bei Stripe (createStripeDashboardLinkAction)', () => {
 describe('Rückkehr aus dem Onboarding (/api/stripe/return)', () => {
   const zurueck = () => rueckkehr(new NextRequest(`http://localhost:3000/api/stripe/return?account_id=${ALT}`))
 
-  it('unbekanntes Konto: Hof vermerkt, weiter zu ?stripe=neu', async () => {
-    vi.mocked(stripe.accounts.retrieve).mockRejectedValue(kontoUnbekannt())
+  it.each(UNBEKANNT)('%s: Hof vermerkt, weiter zu ?stripe=neu', async (_fall, fehler) => {
+    vi.mocked(stripe.accounts.retrieve).mockRejectedValue(fehler())
 
     const antwort = await zurueck()
 

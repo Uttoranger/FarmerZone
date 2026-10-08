@@ -458,3 +458,66 @@ describe('Signatur- und Konfigurationsfehler', () => {
     expect(constructEvent).not.toHaveBeenCalled()
   })
 })
+
+describe('Modus-Wache (Register Z2, Nr. 42 Runde 1): gesperrter Client ist keine ungültige Signatur', () => {
+  /** Ersetzt `stripe.webhooks` für einen Fall durch einen Zugriff, der wirft — wie der Stellvertreter in src/lib/stripe.ts. */
+  async function mitGesperrtemClient(fehler: Error, pruefe: () => Promise<void>): Promise<void> {
+    const vorher = Object.getOwnPropertyDescriptor(stripe, 'webhooks')!
+    Object.defineProperty(stripe, 'webhooks', {
+      configurable: true,
+      get() {
+        throw fehler
+      },
+    })
+    try {
+      await pruefe()
+    } finally {
+      Object.defineProperty(stripe, 'webhooks', vorher)
+    }
+  }
+
+  it('antwortet 503 mit eigener Antwort und protokolliert die Meldung — ohne Schlüssel, ohne Verarbeitung', async () => {
+    // So heißt die Sperre der Wache (MODUS_SPERRE); die Meldung trägt nie den Schlüssel.
+    const sperre = Object.assign(
+      new Error('Stripe startet nicht: Die Vorschau läuft mit einem Live-Schlüssel. Ein Live-Schlüssel ist nur im Produktions-Deployment bei Vercel erlaubt.'),
+      { name: 'StripeModusGesperrt' }
+    )
+    const fehlerAusgabe = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await mitGesperrtemClient(sperre, async () => {
+      const res = await POST(makeRequest())
+
+      expect(res.status).toBe(503)
+      const antwort = JSON.stringify(await res.json())
+      expect(antwort).toContain('Modus-Wache')
+      expect(antwort).not.toMatch(/signature/i)
+    })
+
+    expect(constructEvent).not.toHaveBeenCalled()
+    expect(webhookEventFindUnique).not.toHaveBeenCalled()
+    expect(orderUpdateMany).not.toHaveBeenCalled()
+    const protokoll = JSON.stringify(fehlerAusgabe.mock.calls)
+    expect(protokoll).toContain('[Webhook] Stripe startet nicht')
+    expect(protokoll).not.toMatch(/Signature verification failed|whsec_|sk_live|sk_test|rk_live|rk_test/)
+    fehlerAusgabe.mockRestore()
+  })
+
+  it('Gegenprobe: ein anderer Fehler beim Zugriff wird nicht als Sperre ausgegeben', async () => {
+    await mitGesperrtemClient(new Error('etwas anderes'), async () => {
+      await expect(POST(makeRequest())).rejects.toThrow('etwas anderes')
+    })
+    expect(constructEvent).not.toHaveBeenCalled()
+  })
+
+  it('Gegenprobe: eine ungültige Signatur bleibt 400', async () => {
+    constructEvent.mockImplementation(() => {
+      throw new Error('No signatures found matching the expected signature')
+    })
+    const fehlerAusgabe = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const res = await POST(makeRequest())
+
+    expect(res.status).toBe(400)
+    fehlerAusgabe.mockRestore()
+  })
+})
