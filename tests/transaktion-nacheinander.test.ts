@@ -284,11 +284,10 @@ function doppeltGeladen(text: string, pfad = 'page.tsx'): string[] {
 describe('Wache 2: Metadaten und Seite laden eine Server-Abfrage nur geteilt', () => {
   const seiten = dateien(APP, (n) => n === 'page.tsx' || n === 'page.ts')
 
-  // Liest und parst ganz src/ — unter Last länger als 5 s, deshalb ein eigenes Limit.
   it('keine Seite mit generateMetadata ruft dieselbe Server-Abfrage zweimal ungeteilt auf', () => {
     const treffer = seiten.flatMap((pfad) => doppeltGeladen(readFileSync(pfad, 'utf8'), pfad).map((n) => `${relative(SRC, pfad)}: ${n}`))
     expect(treffer).toEqual([])
-  }, 30_000)
+  })
 
   it('die Kasse lädt den Hof in Metadaten und Seite über getPublicFarmGeteilt', () => {
     const kasse = readFileSync(join(APP, '(public)/[farmSlug]/checkout/page.tsx'), 'utf8')

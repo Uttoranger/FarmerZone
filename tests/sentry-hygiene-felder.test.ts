@@ -348,6 +348,9 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
     ['kodierte Adressen ohne Endung', { extra: { text: 'a%40'.repeat(N) } }],
     ['langer Pfad', { request: { url: 'https://farmerzone.at/' + 'a-'.repeat(N) } }],
     ['Brotkrume', { breadcrumbs: [{ message: 'a'.repeat(2 * N), data: { notiz: 'a-'.repeat(N), arguments: ['a'.repeat(2 * N)] } }] }],
+    ['lange Ziffernfolge', { message: '01 '.repeat(N) }],
+    ['token ohne Wert', { extra: { text: 'token' + ' '.repeat(2 * N) } }],
+    ['Bearer ohne Wert', { extra: { text: 'Bearer' + ' '.repeat(2 * N) } }],
   ]
 
   for (const [name, teil] of lang) {
