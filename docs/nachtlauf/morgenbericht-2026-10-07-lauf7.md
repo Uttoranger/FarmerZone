@@ -11,6 +11,8 @@ Erledigt sind:
 
 ## 1. Probelauf (Nr. 34) — nicht ausgeführt
 
+> **Korrektur 08.10.2026:** Die Annahme unten („sehr wahrscheinlich den Live-Schlüssel") war falsch. Das Banner der Vorschau zeigt „Stripe Test"; Vorschau und Produktion nutzen dieselbe Variable und laufen beide im Testmodus. Den Modus prüft man über das Umgebungsbanner, nie durch Entschlüsseln (`docs/nachtlauf.md` §2). Nachholung als Nr. 48 (`freigabe.md` §12).
+
 **Vorbedingung laut Freigabe:** Die Vorschau nutzt die Entwicklungsdatenbank und Stripe im **Testmodus**; der Stripe-Schlüssel der Vorschau beginnt mit `sk_test_`. Sonst: STOPP, Nummer überspringen, melden.
 
 **Befund (ohne Werte auszugeben):**
