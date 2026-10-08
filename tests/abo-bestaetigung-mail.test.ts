@@ -22,6 +22,9 @@ let email: typeof import('@/lib/email')
 
 beforeAll(async () => {
   vi.stubEnv('RESEND_API_KEY', 're_test_dummy')
+  // Inhalt der Mails wie im Produktions-Deployment: Nur dort ist die Post frei
+  // (Register Z3). Ohne VERCEL_ENV kämen die Testadressen unter example.org nicht an.
+  vi.stubEnv('VERCEL_ENV', 'production')
   email = await import('@/lib/email')
 }, 30_000)
 

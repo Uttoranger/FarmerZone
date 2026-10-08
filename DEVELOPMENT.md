@@ -4579,6 +4579,24 @@ Die Regeln stehen in `docs/ai/ARCHITECTURE.md` (§4 „Schwere Module nur dynami
 - **Warum der Webhook nach außen neutral antwortet (Runde 2):** Die Antwort auf die Sperre kommt vor der Signaturprüfung, also an jeden Aufrufer; „Modus-Wache“ verriete die Lage. Die 503 ändert nur die Diagnose — Stripe stellt bei jeder Antwort außer 2xx ohnehin erneut zu.
 - **Annahmen (Bericht 42):** Fail-closed ist eine Annahme zur Freigabe (Dirigent). Der Webhook `account.updated` bleibt unverändert (eine Zustellung kommt aus demselben Modus wie das Konto). Die Altskripte `scripts/check-stripe.ts` und `scripts/fix-pending-online-orders.ts` bauen ihren Client weiter selbst, ohne Wache. Die Kasse wählt im Testbetrieb weiter „Online bezahlen" vor; der Satz bittet um Bar. Testkarten-Bestellungen sind in der Bestellansicht des Hofs nicht gekennzeichnet (Altzustand, nicht beauftragt).
 
+## Testumgebung test.farmerzone.at (Nachtlauf Nr. 43, Oktober 2026)
+
+Auftrag freigabe.md §12 „43", Register Z3, gestapelt auf Nr. 42. Keine Schema-Änderung, keine Migration, kein Aufruf an Vercel, DNS oder Stripe. Z3: kein Umschalter in der Produktion; echte Abläufe testet man in einer eigenen Umgebung — Branch `staging` als Vercel-Vorschau unter `test.farmerzone.at`, Entwicklungsdatenbank, Stripe-Test. Die Regeln stehen in `docs/ai/ARCHITECTURE.md` §5 (eigene Adresse der Vorschau, Post-Sperre) und `docs/ai/DESIGN_SYSTEM.md` (Betriebsleiste, Absperrband), die Einrichtung in `docs/betrieb/testumgebung.md`.
+
+- **Warum die Vorschau jetzt `NEXT_PUBLIC_APP_URL` liest:** Bis Nr. 42 ignorierte sie die Variable („die gehört der Produktion"). Die Testumgebung braucht aber eine feste Adresse für Mails, Stripe-Rücksprünge und die Anmeldung. Die alte Sorge bleibt als Sperre: Versehentlich für alle Umgebungen mit `farmerzone.at` angelegt, schickten sonst alle Vorschauen ihre Links in die Produktion. Better Auth nimmt die Adresse über `baseURL` (sie geht vor `BETTER_AUTH_URL`); die Cookies tragen keine Domain und bleiben auf `test.farmerzone.at`.
+- **Warum die echte Adresse eine Konstante ist:** In der Testumgebung gibt es keine Variable mit ihr — dort ist `NEXT_PUBLIC_APP_URL` die Testadresse —, und die Domain ist öffentlich. Ältere Stellen mit der Domain als Text sind unverändert (nicht beauftragt).
+- **Warum eine eigene Zeile im Admin:** Die Kopfzeile ist am Handy und zwischen 768 und 1024 px schon voll (bei 768 px brach „Zu meinem Hof" schon vorher um; das ordnet Nr. 41).
+- **Warum der Banner-Link im DOM zuletzt steht:** Davor verdrängte er „Zum Inhalt springen" als ersten Link, und Axe meldete `region` am Sprunglink.
+- **Warum Post gesperrt wird:** Die Entwicklungsdatenbank kann Adressen tragen, die nie Post aus einem Probelauf bekommen sollen. Zuerst galt „außerhalb der Produktion". In Runde 1 entschied der Dirigent fail-closed wie bei der Modus-Wache (frei nur mit `VERCEL_ENV=production`), weil `bestimmeUmgebung` auch einen lokalen Produktions-Build, die CI und Skripte als „produktion" einordnet. Damit eine echte Produktion ohne Systemvariablen nicht still verstummt, meldet `sendRaw` diesen Fall einmal je Instanz an Sentry. Was das für Tests heißt, steht in `docs/ai/TESTING_GUIDELINES.md` §3 („Post-Sperre in Tests“).
+- **Warum keine Formprüfung im Schema:** Ein Tippfehler in einer Link- oder Test-Variable soll keinen Build der Produktion scheitern lassen; er meldet sich als Warnung oder lässt Adressen weg. Eine Liste im Schema ginge auch nicht, denn im Test-Modus ist `env` das rohe `process.env`.
+- **Runde 1, außerdem:**
+  - Die Vorschau-Warnung „Stripe LIVE — echte Zahlungen möglich." stimmte seit der Wache aus Nr. 42 nicht mehr. Sie sagt jetzt, dass Stripe dort nicht startet (`WARNUNG_LIVE_IN_VORSCHAU`).
+  - Die Farben des Absperrbands stehen nur noch an einer Stelle.
+  - Die echte Seite wird über den Host erkannt (Punkt am Ende, Großschreibung, Pfad).
+  - Fehlt `staging`, endet die Action mit einem Hinweis statt rot — sonst wäre bis zum Anlegen jeder Push auf `main` rot.
+  - „Stripe Test" hat eine Quelle (`STRIPE_LABEL`).
+- **Runde 2:** Die Nachprüfung fand eine Lücke in der Erkennung der echten Seite. Geprüft wurde der Rohwert, danach schnitten zwei Stellen je einen Punkt ab — `https://farmerzone.at..` wurde so zur echten Seite in FQDN-Form und galt als Adresse der Vorschau. Jetzt wird erst normalisiert und dann geprüft; ein Host, der danach noch auf „." endet oder ein leeres Label hat, ist ungültig. Die Nachprüfung 2 hat 57 Schreibweisen gegen den Code laufen lassen (Punkte, Port, Benutzerteil, Prozent- und Unicode-Punkte, Leerraum): kein Leck mehr.
+
 ## Nützliche Befehle
 
 ```bash

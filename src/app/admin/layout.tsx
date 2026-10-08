@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { ladeAdminbereich } from '@/server/adminbereich'
 import { AdminShell } from '@/components/shells/admin-shell'
-import { TESTBETRIEB } from '@/lib/umgebung-server'
+import { STRIPE_MARKE, TESTBETRIEB, TESTUMGEBUNG_URL } from '@/lib/umgebung-server'
 
 /*
  * Alle Routen unter /admin in der AdminShell (Nachtlauf Nr. 22f, Gate 8):
@@ -21,8 +21,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const { personName, hatHof, zahlen } = await ladeAdminbereich()
 
   // Testbetrieb (Register Z2): Produktion mit Test-Schlüssel — nur der Wahrheitswert geht an die Shell.
+  // Betriebsleiste (Register Z3): Marke als Text und Ton, Link nur mit Adresse.
   return (
-    <AdminShell personName={personName} hatHof={hatHof} zahlen={zahlen} testbetrieb={TESTBETRIEB}>
+    <AdminShell
+      personName={personName}
+      hatHof={hatHof}
+      zahlen={zahlen}
+      testbetrieb={TESTBETRIEB}
+      stripeMarke={STRIPE_MARKE}
+      testumgebungUrl={TESTUMGEBUNG_URL}
+    >
       {children}
     </AdminShell>
   )

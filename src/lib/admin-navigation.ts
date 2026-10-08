@@ -44,6 +44,13 @@ export function kontoHatHof(konto: { rolle: UserRole | null | undefined; hofVorh
   return konto.rolle === 'FARMER' && konto.hofVorhanden
 }
 
+/**
+ * „Zur Testumgebung" in der Betriebsleiste der AdminShell (Register Z3). Das
+ * Ziel ist keine feste Adresse: Es kommt aus NEXT_PUBLIC_TESTUMGEBUNG_URL
+ * (TESTUMGEBUNG_URL in src/lib/umgebung-server.ts) — ohne Variable kein Link.
+ */
+export const ADMIN_TESTUMGEBUNG = { label: 'Zur Testumgebung' } as const
+
 /** Der aktive Reiter — der längste passende, damit /admin/meldungen nicht auch „Höfe" ist. */
 export function adminAktiverReiter(pfad: string): AdminReiterId | null {
   let bester: AdminReiter | null = null
