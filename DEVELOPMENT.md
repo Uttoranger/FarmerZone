@@ -4554,6 +4554,7 @@ Auftrag freigabe.md §12 „43", Register Z3, gestapelt auf Nr. 42. Keine Schema
   - Die echte Seite wird über den Host erkannt (Punkt am Ende, Großschreibung, Pfad).
   - Fehlt `staging`, endet die Action mit einem Hinweis statt rot — sonst wäre bis zum Anlegen jeder Push auf `main` rot.
   - „Stripe Test" hat eine Quelle (`STRIPE_LABEL`).
+- **Runde 2:** Die Nachprüfung fand eine Lücke in der Erkennung der echten Seite. Geprüft wurde der Rohwert, danach schnitten zwei Stellen je einen Punkt ab — `https://farmerzone.at..` wurde so zur echten Seite in FQDN-Form und galt als Adresse der Vorschau. Jetzt wird erst normalisiert und dann geprüft; ein Host, der danach noch auf „." endet oder ein leeres Label hat, ist ungültig. Die Nachprüfung 2 hat 57 Schreibweisen gegen den Code laufen lassen (Punkte, Port, Benutzerteil, Prozent- und Unicode-Punkte, Leerraum): kein Leck mehr.
 
 ## Nützliche Befehle
 

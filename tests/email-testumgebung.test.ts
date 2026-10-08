@@ -1,5 +1,5 @@
 /**
- * Post-Sperre außerhalb der Produktion am ECHTEN sendRaw (src/lib/email.ts,
+ * Post-Sperre außerhalb des Produktions-Deployments bei Vercel am ECHTEN sendRaw (src/lib/email.ts,
  * Register Z3, Nachtlauf Nr. 43). Nur das Resend-SDK ist gemockt — kein Netz.
  *
  * Beweist:

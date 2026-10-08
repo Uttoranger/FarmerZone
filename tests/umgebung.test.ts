@@ -519,6 +519,9 @@ describe('bestimmeUmgebung — eigene Adresse der Vorschau (Register Z3)', () =>
       // Mehrere Punkte am Ende: Erst normalisieren, dann prüfen — sonst bliebe die echte Seite mit Punkt übrig (Runde 2).
       `https://${host}..`,
       `https://${host}...`,
+      // Kodierte und Unicode-Punkte normalisiert der URL-Parser zu „." (Nachprüfung 2).
+      `https://${host}%2E%2E`,
+      `https://${host}\u3002\u3002`,
       `HTTPS://${host.toUpperCase()}`,
       `https://${host}/pfad`,
       `http://${host}`,
@@ -577,6 +580,8 @@ describe('bestimmeUmgebung — Link zur Testumgebung (Register Z3)', () => {
       `https://${host}.`,
       `https://${host}..`,
       `https://${host}...`,
+      `https://${host}%2E%2E`,
+      `https://${host}\u3002\u3002`,
       `https://${host.toUpperCase()}/admin`,
       `https://www.${host}`,
     ]) {
