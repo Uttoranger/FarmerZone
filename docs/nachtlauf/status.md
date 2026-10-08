@@ -58,7 +58,7 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 39 | Direktverkauf senkt den Vorrat (D1) | gemergt (#219) | `nacht/2026-10-07/39-direktverkauf-vorrat` | #216 | main | Annahmen zur Freigabe (Grundeinheit, auf 0, Aufrunden); keine Migration | 07.10.2026 |
 | 40 | Rate-Limit über die Datenbank (R1) | gemergt (#219) | `nacht/2026-10-07/40-rate-limit-db` | #218 | main | **Migration: ja (Expand, neue Tabelle + RLS)**; nach #217 mergen; Datenschutzsatz offen | 07.10.2026 |
 | Sammel 7 | Sammel-PR Lauf 7 | gemergt (#219) | `integration/lauf7` | #219 | main | #212–#218 zusammengeführt, keine Code-Konflikte; Gesamtstand grün (5456 Tests, Integration 328); Morgenbericht `morgenbericht-2026-10-07-lauf7.md` | 07.10.2026 |
-| 41 | Hof-Anmeldung am Handy und „Mein Hof" (N1) | läuft (Nachbesserung 1) | `nacht/2026-10-08/41-hof-anmeldung` | | main | tester grün; pruefer: 3 „Sollte" | 08.10.2026 |
+| 41 | Hof-Anmeldung am Handy und „Mein Hof" (N1) | fertig (PR #221) | `nacht/2026-10-08/41-hof-anmeldung` | #221 | main | Admin ohne Hof: Plakette ohne Link (Freigabe); Mockup-Abweichungen mit Bild; keine Migration | 08.10.2026 |
 | 42 | Stripe-Testbetrieb und Modus-Wache (Z2) | läuft (Nachbesserung 1) | `nacht/2026-10-08/42-stripe-wache` | | main | tester grün; pruefer: 6 „Sollte" (u. a. Wache fail-closed) | 08.10.2026 |
 | 43 | Testumgebung test.farmerzone.at (Z3) | läuft | `nacht/2026-10-08/43-testumgebung` | | 42 | | 08.10.2026 |
 | 44 | Rückweg im Hofbereich (N1) | läuft | `nacht/2026-10-08/44-rueckweg` | | main | | 08.10.2026 |
