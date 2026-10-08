@@ -59,11 +59,11 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 40 | Rate-Limit über die Datenbank (R1) | gemergt (#219) | `nacht/2026-10-07/40-rate-limit-db` | #218 | main | **Migration: ja (Expand, neue Tabelle + RLS)**; nach #217 mergen; Datenschutzsatz offen | 07.10.2026 |
 | Sammel 7 | Sammel-PR Lauf 7 | gemergt (#219) | `integration/lauf7` | #219 | main | #212–#218 zusammengeführt, keine Code-Konflikte; Gesamtstand grün (5456 Tests, Integration 328); Morgenbericht `morgenbericht-2026-10-07-lauf7.md` | 07.10.2026 |
 | 41 | Hof-Anmeldung am Handy und „Mein Hof" (N1) | fertig (PR #221) | `nacht/2026-10-08/41-hof-anmeldung` | #221 | main | Admin ohne Hof: Plakette ohne Link (Freigabe); Mockup-Abweichungen mit Bild; keine Migration | 08.10.2026 |
-| 42 | Stripe-Testbetrieb und Modus-Wache (Z2) | läuft (Nachbesserung 1) | `nacht/2026-10-08/42-stripe-wache` | | main | tester grün; pruefer: 6 „Sollte" (u. a. Wache fail-closed) | 08.10.2026 |
+| 42 | Stripe-Testbetrieb und Modus-Wache (Z2) | läuft (Nachprüfung Runde 2) | `nacht/2026-10-08/42-stripe-wache` | | main | zwei Runden; Wache fail-closed (VERCEL_ENV=production) | 08.10.2026 |
 | 43 | Testumgebung test.farmerzone.at (Z3) | läuft | `nacht/2026-10-08/43-testumgebung` | | 42 | | 08.10.2026 |
-| 44 | Rückweg im Hofbereich (N1) | läuft | `nacht/2026-10-08/44-rueckweg` | | main | | 08.10.2026 |
+| 44 | Rückweg im Hofbereich (N1) | fertig (PR #222) | `nacht/2026-10-08/44-rueckweg` | #222 | main | Schalter mit sofortiger Wirkung bleiben auf der Seite (Freigabe); Doppelung /fehler-melden laut §12; keine Migration | 08.10.2026 |
 | 45 | Hofbereich kinderleicht | läuft | `nacht/2026-10-08/45-hofbereich` | | main | | 08.10.2026 |
 | 46 | Kundensicht kinderleicht (N2) | offen | | | main | | |
-| 47 | Altlasten aus Lauf 7 und Laufzeit-Befunde | läuft (Nachbesserung 1) | `nacht/2026-10-08/47-altlasten` | | main | tester grün; pruefer: 4 „Sollte" | 08.10.2026 |
+| 47 | Altlasten aus Lauf 7 und Laufzeit-Befunde | läuft (Nachprüfung Runde 2) | `nacht/2026-10-08/47-altlasten` | | main | zwei Runden | 08.10.2026 |
 | 48 | Probelauf (Nachholung von 34) | offen — Vorbedingung B nicht erfüllt (Vorschau und api.stripe.com aus der Sitzung gesperrt, CONNECT 403) → Checkliste | | | main | | 08.10.2026 |
 | Sammel 8 | Sammel-PR Lauf 8 | offen | `integration/lauf8` | | main | | |
