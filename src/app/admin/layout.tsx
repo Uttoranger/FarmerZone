@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { ladeAdminbereich } from '@/server/adminbereich'
 import { AdminShell } from '@/components/shells/admin-shell'
+import { TESTBETRIEB } from '@/lib/umgebung-server'
 
 /*
  * Alle Routen unter /admin in der AdminShell (Nachtlauf Nr. 22f, Gate 8):
@@ -19,8 +20,9 @@ export const metadata: Metadata = {
 export default async function AdminLayout({ children }: { children: React.ReactNode }): Promise<React.JSX.Element> {
   const { personName, hatHof, zahlen } = await ladeAdminbereich()
 
+  // Testbetrieb (Register Z2): Produktion mit Test-Schlüssel — nur der Wahrheitswert geht an die Shell.
   return (
-    <AdminShell personName={personName} hatHof={hatHof} zahlen={zahlen}>
+    <AdminShell personName={personName} hatHof={hatHof} zahlen={zahlen} testbetrieb={TESTBETRIEB}>
       {children}
     </AdminShell>
   )

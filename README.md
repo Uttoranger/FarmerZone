@@ -97,21 +97,24 @@ Alle Variablen aus `.env.example` im Vercel Dashboard unter **Settings → Envir
 Wichtig für Produktion:
 - `BETTER_AUTH_URL` = `https://deine-domain.at`
 - `NEXT_PUBLIC_APP_URL` = `https://deine-domain.at`
-- `STRIPE_SECRET_KEY` = Live-Key (`sk_live_...`)
-- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` = Live-Key (`pk_live_...`)
+- `STRIPE_SECRET_KEY` = Live-Key (`sk_live_...`) — **nur für Production**; ein Live-Schlüssel (`sk_live_`/`rk_live_`) startet Stripe nur bei `VERCEL_ENV=production` (Modus-Wache, Register Z2): nicht in Vorschau, Tests und lokal mit `next dev`. Lokal mit `next start` startet er, sobald `VERCEL_ENV=production` gesetzt ist (etwa nach `vercel env pull --environment=production`)
+- „Automatically expose System Environment Variables" eingeschaltet lassen: Ohne `VERCEL_ENV` zur Laufzeit sperrt die Modus-Wache Stripe mit Live-Schlüssel auch in der Produktion
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` = Live-Key (`pk_live_...`), ebenfalls nur für Production
 - `EMAIL_FROM` = Adresse von verifizierter Resend-Domain
+
+Die Umstellung von Test auf Live Schritt für Schritt: [`docs/betrieb/stripe-live.md`](docs/betrieb/stripe-live.md).
 
 ### 3. Stripe Webhook für Produktion
 
 Im [Stripe Dashboard](https://dashboard.stripe.com/webhooks) einen neuen Webhook anlegen:
 - **URL:** `https://deine-domain.at/api/stripe/webhook`
-- **Events:** `payment_intent.succeeded`, `payment_intent.payment_failed`, `payment_intent.canceled` — ohne `canceled` wird eine abgebrochene Zahlung nie storniert und ihre Ware bleibt reserviert.
+- **Events:** `payment_intent.succeeded`, `payment_intent.payment_failed`, `payment_intent.canceled`, `refund.failed`, `charge.refund.updated`, `account.updated` — ohne `canceled` wird eine abgebrochene Zahlung nie storniert und ihre Ware bleibt reserviert; ohne die beiden Erstattungs-Ereignisse bleibt eine später gescheiterte Erstattung unbemerkt.
 - Den Signing Secret als `STRIPE_WEBHOOK_SECRET` in Vercel eintragen.
 
 Dazu einen **zweiten** Endpunkt für die verbundenen Höfe („Events von verbundenen Konten“ / Connect):
 - **URL:** dieselbe, `https://deine-domain.at/api/stripe/webhook`
 - **Events:** `account.updated` — hält „Online-Zahlung bereit“ aktuell, wenn Stripe ein Hof-Konto sperrt oder wieder freigibt.
-- Dessen Signing Secret als `STRIPE_CONNECT_WEBHOOK_SECRET` in Vercel eintragen (Production und Preview). Die Route prüft gegen beide Secrets.
+- Dessen Signing Secret als `STRIPE_CONNECT_WEBHOOK_SECRET` in Vercel eintragen — das Live-Secret nur für Production, ein Test-Secret für Preview. Die Route prüft gegen beide Secrets.
 
 ### 4. Cron-Job einrichten
 

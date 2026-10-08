@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ExternalLink, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { KNOPF_ORANGE, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { NEU_EINRICHTEN_TITEL } from '@/lib/stripe-konto'
 import {
   createConnectAccount,
   createOnboardingLink,
@@ -17,7 +18,12 @@ interface PaymentsActionsProps {
   isReady: boolean
   /** Farm.acceptsOnline — false nur bei Bestandshöfen vor Register Z1. */
   onlineAn: boolean
+  /** Register Z2: Stripe kennt das gespeicherte Konto nicht (?stripe=neu, von der Seite entschieden). */
+  neuEinrichten?: boolean
 }
+
+/** Die Zahlungs-Seite mit „Online-Zahlung neu einrichten" (zahlungHinweis, Register Z2). */
+const NEU_EINRICHTEN_ADRESSE = '/settings/payments?stripe=neu'
 
 /** Während eine Action läuft: Kreisel für das Auge, Satz für den Screenreader. */
 function Warten(): React.JSX.Element {
@@ -34,15 +40,21 @@ function Warten(): React.JSX.Element {
  * Ablauf unverändert: ohne Konto erst createConnectAccount, dann der Link zu
  * Stripe (createOnboardingLink); „Status prüfen" fragt checkConnectStatus.
  * Genau ein orange Knopf (Hof-Aktion), Prüfen als Umriss.
+ *
+ * Register Z2 (Nr. 42): Melden Prüfen oder Fortsetzen, dass Stripe das Konto
+ * nicht kennt, geht es zur Seite mit „Online-Zahlung neu einrichten". Dort
+ * läuft derselbe Einrichten-Weg wie ohne Konto — createConnectAccount prüft
+ * selbst bei Stripe, ob das alte Konto wirklich unbekannt ist, bevor es die
+ * Kennung ersetzt.
  */
-export function PaymentsActions({ hasAccount, isReady, onlineAn }: PaymentsActionsProps): React.JSX.Element {
+export function PaymentsActions({ hasAccount, isReady, onlineAn, neuEinrichten = false }: PaymentsActionsProps): React.JSX.Element {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
   async function handleSetup() {
     setLoading(true)
     try {
-      if (!hasAccount) {
+      if (!hasAccount || neuEinrichten) {
         const res = await createConnectAccount()
         if (res.error) {
           toast.error(res.error)
@@ -51,12 +63,19 @@ export function PaymentsActions({ hasAccount, isReady, onlineAn }: PaymentsActio
         }
       }
       const link = await createOnboardingLink()
-      if (link.error) {
-        toast.error(link.error)
+      if (link.kontoUnbekannt) {
+        // Fortsetzen geht nicht, Stripe kennt das Konto nicht — die Seite
+        // zeigt jetzt den Weg zum Neu-Einrichten.
+        router.replace(NEU_EINRICHTEN_ADRESSE)
         setLoading(false)
         return
       }
-      window.location.href = link.url!
+      if (link.error || !link.url) {
+        toast.error(link.error ?? 'Wir konnten Stripe gerade nicht erreichen. Versuch es bitte noch einmal.')
+        setLoading(false)
+        return
+      }
+      window.location.href = link.url
     } catch {
       toast.error('Wir konnten Stripe gerade nicht erreichen. Versuch es bitte noch einmal.')
       setLoading(false)
@@ -67,6 +86,11 @@ export function PaymentsActions({ hasAccount, isReady, onlineAn }: PaymentsActio
     setLoading(true)
     try {
       const res = await checkConnectStatus()
+      if (res.kontoUnbekannt) {
+        // Stripe kennt das Konto nicht (Register Z2): zur Karte „neu einrichten".
+        router.replace(NEU_EINRICHTEN_ADRESSE)
+        return
+      }
       if (res.ready) {
         toast.success('Dein Stripe-Konto ist bestätigt.')
       } else {
@@ -128,11 +152,12 @@ export function PaymentsActions({ hasAccount, isReady, onlineAn }: PaymentsActio
         ) : (
           <>
             <ExternalLink className="size-4" strokeWidth={1.7} aria-hidden="true" />
-            {hasAccount ? 'Einrichtung fortsetzen' : 'Mit Stripe einrichten'}
+            {neuEinrichten ? NEU_EINRICHTEN_TITEL : hasAccount ? 'Einrichtung fortsetzen' : 'Mit Stripe einrichten'}
           </>
         )}
       </button>
-      {hasAccount && (
+      {/* Beim Neu-Einrichten gibt es nichts zu prüfen: Stripe kennt das alte Konto nicht. */}
+      {hasAccount && !neuEinrichten && (
         <button type="button" onClick={handleRefresh} disabled={loading} className={KNOPF_RAHMEN}>
           Status prüfen
         </button>

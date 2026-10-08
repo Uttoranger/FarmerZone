@@ -36,6 +36,7 @@ import {
   zahlungsGebuehrText,
 } from '@/lib/kasse'
 import { checkoutZahlungsBetragSchema } from '@/schemas/checkout'
+import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
 import { berechneServicegebuehr } from '@/lib/servicegebuehr'
 import { calcTotalAmount, decimalZuCents } from '@/lib/order-totals'
 
@@ -73,6 +74,46 @@ describe('E5: Zahlarten für neue Bestellungen', () => {
     expect(CODE_ZAHLART_NICHT_ANGEBOTEN).toBe('ZAHLART_NICHT_ANGEBOTEN')
     expect(ZAHLART_NICHT_ANGEBOTEN).toMatch(/Bar bei Abholung/)
     expect(ZAHLART_NICHT_ANGEBOTEN).toMatch(/Online bezahlen/)
+  })
+})
+
+describe('Testbetrieb an der Zahlart (Register Z2, Nr. 42)', () => {
+  it('im Testbetrieb trägt „Online bezahlen" den Satz — und nur diese Zahlart', () => {
+    const arten = kassenZahlarten(HOF_ALLES, false, { testbetrieb: true })
+    expect(arten.find((a) => a.wert === 'ONLINE')?.hinweis).toBe(TESTBETRIEB_TEXT.kasse)
+    expect(arten.find((a) => a.wert === 'ONSITE_CASH')?.hinweis).toBeUndefined()
+  })
+
+  it('Bar bleibt wählbar, Titel und Zusätze bleiben gleich', () => {
+    const ohne = kassenZahlarten(HOF_ALLES)
+    const mit = kassenZahlarten(HOF_ALLES, false, { testbetrieb: true })
+    expect(mit.map((a) => a.wert)).toEqual(['ONLINE', 'ONSITE_CASH'])
+    expect(mit.map(({ wert, titel, zusatz }) => ({ wert, titel, zusatz }))).toEqual(ohne)
+  })
+
+  it('ohne Testbetrieb (Live-Schlüssel, Vorschau, lokal) kein Satz', () => {
+    for (const arten of [kassenZahlarten(HOF_ALLES), kassenZahlarten(HOF_ALLES, false, { testbetrieb: false })]) {
+      expect(arten.some((a) => 'hinweis' in a)).toBe(false)
+    }
+  })
+
+  it('ohne Online-Zahlung beim Hof gibt es keinen Testbetrieb-Satz', () => {
+    const arten = kassenZahlarten({ ...HOF_ALLES, stripeAccountReady: false }, false, { testbetrieb: true })
+    expect(JSON.stringify(arten)).not.toContain(TESTBETRIEB_TEXT.kasse)
+  })
+})
+
+describe('onlineAus: Stripe kennt das Konto des Hofs nicht (Register Z2, Nr. 42)', () => {
+  it('die Kasse bietet nur noch bar an — wie ohne Konto', () => {
+    expect(kassenZahlarten(HOF_ALLES, false, { onlineAus: true }).map((a) => a.wert)).toEqual(['ONSITE_CASH'])
+    expect(kassenZahlarten(HOF_ALLES, false, { onlineAus: true })).toEqual(
+      kassenZahlarten({ ...HOF_ALLES, stripeAccountReady: false })
+    )
+  })
+
+  it('auch im Testbetrieb: ohne Online kein Testbetrieb-Satz', () => {
+    const arten = kassenZahlarten(HOF_ALLES, false, { onlineAus: true, testbetrieb: true })
+    expect(JSON.stringify(arten)).not.toContain(TESTBETRIEB_TEXT.kasse)
   })
 })
 

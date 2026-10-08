@@ -328,6 +328,10 @@ export function KontaktHinweis(): React.JSX.Element {
 /**
  * Die Zahlart-Wahl (E5: online und bar). Echte Radioknöpfe — Pfeiltasten
  * wechseln, der Screenreader sagt die Gruppe an; jede Zeile ist 50 px hoch.
+ *
+ * Ein `hinweis` (heute nur der Testbetrieb, Register Z2) steht als eigene
+ * Zeile unter Titel und Zusatz, orange, IM Label: Er gehört zur Zahlart und
+ * wird mit ihr vorgelesen — wer „Online bezahlen" wählt, hat ihn gehört.
  */
 export function ZahlartWahl({
   zahlarten,
@@ -352,6 +356,12 @@ export function ZahlartWahl({
             <span className="basis-full pl-8 text-[12.5px] text-muted-foreground sm:ml-auto sm:basis-auto sm:pl-0 sm:text-right">
               {z.zusatz}
             </span>
+            {z.hinweis && (
+              <span className="mt-1 flex basis-full items-start gap-1.5 pl-8 text-[12.5px] leading-snug font-medium text-status-offen">
+                <AlertCircle className="mt-px size-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+                <span>{z.hinweis}</span>
+              </span>
+            )}
           </label>
         ))}
       </div>

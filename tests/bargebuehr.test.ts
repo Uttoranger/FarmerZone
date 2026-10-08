@@ -195,7 +195,8 @@ describe('Kasse (Client-Vorschau) — derselbe Weg, mit der Zahlungsart', () => 
     const formular = lies('src/components/checkout/checkout-form.tsx')
     expect(formular).toMatch(/kassenBetraege\(cart, farm, jetzt, paymentMethod\)/)
     expect(formular).toMatch(/barHinweis\(farm, jetzt\)/)
-    expect(formular).toMatch(/kassenZahlarten\(farm, hinweisBar !== null\)/)
+    // Seit Nr. 42 (Register Z2) kommen Testbetrieb und onlineAus als drittes Argument dazu.
+    expect(formular).toMatch(/kassenZahlarten\(farm, hinweisBar !== null(, \{ testbetrieb, onlineAus \})?\)/)
     // Gegenprobe: die alte Form ohne Zahlungsart fiele auf.
     expect('kassenBetraege(cart, farm, jetzt)').not.toMatch(/kassenBetraege\(cart, farm, jetzt, paymentMethod\)/)
   })

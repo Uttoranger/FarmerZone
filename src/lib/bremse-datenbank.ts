@@ -34,6 +34,7 @@ export type DbBremse = {
 
 const MINUTE_MS = 60_000
 const STUNDE_MS = 60 * MINUTE_MS
+const TAG_MS = 24 * STUNDE_MS
 
 /** Gleich `AUTH_RATE_LIMIT_*` in auth.ts (10 je Minute) — die Registrierung lief bisher über dieselbe Zahl. */
 export const REGISTRIERUNG_JE_IP = { max: 10, fensterMs: MINUTE_MS } as const
@@ -44,7 +45,10 @@ const CHECKOUT_JE_MINUTE = { max: 20, fensterMs: MINUTE_MS } as const
 const anmeldecodeJeIp = { max: ANMELDECODE_RATE_LIMIT.max, fensterMs: ANMELDECODE_RATE_LIMIT.window * 1000 }
 const codesJeAdresse = { max: CODE_ANFORDERUNGEN_JE_ADRESSE.max, fensterMs: CODE_ANFORDERUNGEN_JE_ADRESSE.fensterMs }
 
-/** Die fünf Wege aus R1 mit ihren Grenzen. */
+/**
+ * Die fünf Wege aus R1 mit ihren Grenzen — und eine Drossel, die niemanden
+ * bremst, sondern nur Sentry leise hält (Nr. 42, siehe unten).
+ */
 export const DB_BREMSEN = {
   // Anmeldecode (Better Auth emailOTP, Hook in auth.ts)
   anmeldecodeAnfordernIp: { zweck: 'anmeldecode-anfordern-ip', ...anmeldecodeJeIp },
@@ -61,6 +65,11 @@ export const DB_BREMSEN = {
   // Checkout (/api/checkout)
   checkoutIp: { zweck: 'checkout-ip', ...CHECKOUT_JE_MINUTE },
   checkoutSitzung: { zweck: 'checkout-sitzung', ...CHECKOUT_JE_MINUTE },
+  // Keine Bremse für Menschen und ohne erste Stufe: „Stripe kennt das Konto
+  // eines Hofs nicht" (Register Z2, Nr. 42) geht höchstens einmal je Hof und
+  // Tag nach Sentry — über alle Instanzen, Merkmal ist die Hof-ID. Ein Tag ist
+  // hier ein festes 24-Stunden-Fenster (UTC), für eine Drossel genügt das.
+  stripeKontoUnbekannt: { zweck: 'stripe-konto-unbekannt', max: 1, fensterMs: TAG_MS },
 } as const satisfies Record<string, DbBremse>
 
 /**

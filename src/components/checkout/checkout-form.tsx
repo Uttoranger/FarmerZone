@@ -151,6 +151,7 @@ export function CheckoutForm({
   nurBetriebeIds,
   vorbelegung,
   ausgebuchteAbholfenster,
+  testbetrieb = false,
 }: {
   farm: PublicFarm
   /** Fenster mit erreichter Höchstzahl (abholSchluessel) — vom Server gezählt. */
@@ -159,6 +160,8 @@ export function CheckoutForm({
   nurBetriebeIds: string[]
   /** Ist der Besteller selbst ein Hof: Käuferart Betrieb und seine Nummer (Konzept 6.4). */
   vorbelegung: { kaeuferArt: 'BETRIEB'; betriebsnummer: string } | null
+  /** Register Z2: Die Produktion läuft mit Test-Schlüssel — nur der Wahrheitswert, nie der Schlüssel. */
+  testbetrieb?: boolean
 }) {
   const [cart, setCart] = useState<CartItem[]>([])
   // Verlangt der Server den Nachweis, obwohl der Browser nichts davon wusste
@@ -183,6 +186,10 @@ export function CheckoutForm({
   // geändert hat; an der Übersicht, was beim Abschicken schiefging.
   const [korbHinweis, setKorbHinweis] = useState<string | null>(null)
   const [fehler, setFehler] = useState<string | null>(null)
+  // Register Z2: Stripe kennt den Zahlungszugang des Hofs nicht (Antwort `onlineAus`).
+  // Bis zum Neuladen bietet die Kasse dann nur bar an; danach sagt es der
+  // Server selbst, denn der Hof ist als nicht bereit vermerkt.
+  const [onlineAus, setOnlineAus] = useState(false)
   // Die Uhr der Frist. Nur im Browser gelesen (Effekt) — die Kasse rendert auf
   // dem Server ohnehin nur das Skelett, der Korb liegt im localStorage.
   const [jetzt, setJetzt] = useState(() => new Date())
@@ -260,8 +267,9 @@ export function CheckoutForm({
   // B1: Solange bar keine Servicegebühr kostet, online aber schon, sagt die
   // Kasse das unter den Zahlarten — und verspricht nicht „gleicher Betrag".
   const hinweisBar = barHinweis(farm, jetzt)
-  // E5: nur online (mit fertigem Stripe-Zugang) und bar bei Abholung.
-  const zahlarten = kassenZahlarten(farm, hinweisBar !== null)
+  // E5: nur online (mit fertigem Stripe-Zugang) und bar bei Abholung; Z2:
+  // im Testbetrieb mit Satz an „Online bezahlen", nach `onlineAus` nur bar.
+  const zahlarten = kassenZahlarten(farm, hinweisBar !== null, { testbetrieb, onlineAus })
   const defaultPayment = zahlarten[0]?.wert ?? 'ONSITE_CASH'
 
   const form = useForm<CheckoutFormData>({
@@ -399,6 +407,13 @@ export function CheckoutForm({
         // (etwa mit Barzahlung) eine neue Bestellung wird statt der alten.
         if (err.code === CODE_ZAHLUNG_NICHT_MOEGLICH) {
           idempotencyKeyRef.current = crypto.randomUUID()
+          // Stripe kennt den Zahlungszugang des Hofs nicht (Register Z2): Online gibt
+          // es hier vorerst nicht. Bar ist gleich ausgewählt — die Halte der
+          // Sitzung stehen noch, die Kundin muss nichts neu reservieren.
+          if (err.onlineAus === true) {
+            setOnlineAus(true)
+            if (farm.acceptsOnsite) form.setValue('paymentMethod', 'ONSITE_CASH')
+          }
           setFehler(err.error ?? 'Online-Zahlung ist gerade nicht möglich.')
           return
         }

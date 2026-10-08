@@ -48,6 +48,13 @@ export type Umgebung = {
   trustedOrigins: readonly string[]
   datenbank: DatenbankArt
   stripe: StripeArt
+  /**
+   * Läuft die App als Produktions-Deployment bei Vercel (`VERCEL_ENV=production`)?
+   * Nur dort darf ein Live-Schlüssel den Stripe-Client starten (Modus-Wache,
+   * src/lib/stripe-modus.ts) — `art` allein reicht dafür nicht, denn auch ein
+   * lokaler Produktions-Build, Vitest und die CI zählen als „produktion".
+   */
+  vercelProduktion: boolean
   branch: string | null
   /** Deutsche Sätze, wenn Umgebung und Anschlüsse sich widersprechen. */
   warnungen: readonly string[]
@@ -179,12 +186,16 @@ export function istTestDatenbank(databaseUrl: string | undefined): boolean {
   return erkannteFernDatenbank(databaseUrl) === null
 }
 
-/** Nur das Präfix zählt — der Schlüssel selbst verlässt diese Funktion nicht. */
+/**
+ * Nur das Präfix zählt — der Schlüssel selbst verlässt diese Funktion nicht.
+ * Eingeschränkte Schlüssel (`rk_…`) zählen wie ihre vollen Geschwister: Auch
+ * ein `rk_live_` kann echtes Geld bewegen (Nr. 42, Runde 1).
+ */
 function stripeArt(schluessel: string | undefined): StripeArt {
   const s = bereinigt(schluessel)
   if (!s) return 'fehlt'
-  if (s.startsWith('sk_test_')) return 'test'
-  if (s.startsWith('sk_live_')) return 'live'
+  if (s.startsWith('sk_test_') || s.startsWith('rk_test_')) return 'test'
+  if (s.startsWith('sk_live_') || s.startsWith('rk_live_')) return 'live'
   return 'fehlt'
 }
 
@@ -227,6 +238,9 @@ export function bestimmeUmgebung(werte: UmgebungsWerte): Umgebung {
 
   const datenbank: DatenbankArt = istDevDatenbank(werte.DATABASE_URL) ? 'dev' : 'fremd'
   const stripe = stripeArt(werte.STRIPE_SECRET_KEY)
+  // Wörtlich, ohne Trimmen: Vercel setzt den Wert selbst, und fail-closed
+  // heißt hier, dass nur genau „production" zählt (Modus-Wache).
+  const vercelProduktion = werte.VERCEL_ENV === 'production'
   const branch = bereinigt(werte.VERCEL_GIT_COMMIT_REF) ?? null
 
   const warnungen: string[] = []
@@ -248,7 +262,7 @@ export function bestimmeUmgebung(werte: UmgebungsWerte): Umgebung {
     }
   }
 
-  return { art, appUrl, trustedOrigins, datenbank, stripe, branch, warnungen }
+  return { art, appUrl, trustedOrigins, datenbank, stripe, vercelProduktion, branch, warnungen }
 }
 
 const DATENBANK_LABEL: Record<DatenbankArt, { lang: string; kurz: string }> = {

@@ -416,6 +416,18 @@ describe('Ansicht /sales — vier Zustände, lange Namen, Tokens', () => {
     expect(renderToStaticMarkup(createElement(VerkaeufeAnsicht, props({}, false)))).not.toContain('Stripe')
   })
 
+  it('Nr. 42 (Runde 1): der Auszahlungs-Block bleibt eingehängt — seine Meldung überlebt das Neurendern nach „Konto unbekannt"', () => {
+    // Meldet der Login-Link „Konto unbekannt", setzt die Action den Hof auf
+    // nicht bereit und rendert /sales neu. Mit `stripeReady && <…/>` würde der
+    // Block samt Meldung ausgehängt; so bleibt er stehen und zeigt nur die
+    // Meldung (ohne Knopf). Zustand lässt sich ohne DOM nicht rendern —
+    // deshalb die Prüfung am Quelltext.
+    const quelltext = readFileSync(join(process.cwd(), 'src/components/hof-verkaeufe/verkaeufe-ansicht.tsx'), 'utf8')
+    expect(quelltext).toContain('<StripeAuszahlungen bereit={stripeReady} />')
+    expect(quelltext).not.toMatch(/stripeReady\s*&&\s*<StripeAuszahlungen/)
+    expect(quelltext).toMatch(/if \(!bereit && !fehler\) return null/)
+  })
+
   it('leer: EmptyState mit Ausweg, kein Wiederholen', () => {
     const html = renderToStaticMarkup(createElement(VerkaeufeAnsicht, props({ zeilen: [], weekTotal: 0, weekOnline: 0, weekBar: 0, ytdTotal: 0 })))
     expect(html).toContain('Noch keine Verkäufe')

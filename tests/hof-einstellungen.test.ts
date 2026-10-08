@@ -201,6 +201,15 @@ describe('zahlungHinweis — eine Karte oben auf /settings/payments', () => {
     expect(zahlungHinweis({ rueckmeldung: 'success', stripeBereit: true, onlineAn: false })).toBe('einschalten')
   })
 
+  it('Stripe kennt das Konto nicht (?stripe=neu, Register Z2): „neu-einrichten" — nur mit Konto und nicht bereit', () => {
+    expect(zahlungHinweis({ rueckmeldung: 'neu', stripeBereit: false, onlineAn: true, stripeKontoDa: true })).toBe('neu-einrichten')
+    // Ohne Konto ist es ein gewöhnliches Einrichten, mit fertigem Konto gibt es nichts neu einzurichten.
+    expect(zahlungHinweis({ rueckmeldung: 'neu', stripeBereit: false, onlineAn: true, stripeKontoDa: false })).toBe('einrichten')
+    expect(zahlungHinweis({ rueckmeldung: 'neu', stripeBereit: true, onlineAn: true, stripeKontoDa: true })).toBeNull()
+    // Ohne den Parameter bleibt alles beim Alten.
+    expect(zahlungHinweis({ rueckmeldung: undefined, stripeBereit: false, onlineAn: true, stripeKontoDa: true })).toBe('einrichten')
+  })
+
   it('die Seite fragt die Regel und zeigt „Verbunden und aktiv" nur mit Online an', () => {
     const seite = quelle('src/app/(hof)/settings/payments/page.tsx')
     expect(seite).toContain('zahlungHinweis(')

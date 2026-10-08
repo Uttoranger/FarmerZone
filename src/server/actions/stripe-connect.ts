@@ -1,10 +1,12 @@
 'use server'
 
 import { headers } from 'next/headers'
+import type Stripe from 'stripe'
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { stripeKontoBereit } from '@/lib/stripe-konto'
+import { NEU_EINRICHTEN_KURZ, istUnzugaenglichesStripeKonto, neuEinrichtenSchluessel, stripeKontoBereit } from '@/lib/stripe-konto'
+import { vermerkeUnbekanntesHofKonto } from '@/server/hofkonto-unbekannt'
 import { APP_URL } from '@/lib/umgebung-server'
 import { onlineZahlungEinschaltenSchema } from '@/schemas/online-zahlung'
 
@@ -32,19 +34,51 @@ function getPublicUrl(): string {
   return 'https://farmerzone.at'
 }
 
+/**
+ * Nach dem Vermerk „Stripe kennt das Konto nicht" (bereit → false): die
+ * Seiten neu rendern, die den Stand zeigen — wie bei schalteOnlineZahlungEin,
+ * dazu Verkäufe (Knopf „Auszahlungen bei Stripe ansehen"). Rendert auch die
+ * Seite neu, von der die Action kam.
+ */
+function zeigeZahlungsstandNeu(slug: string): void {
+  revalidatePath('/settings/payments')
+  revalidatePath('/settings')
+  revalidatePath('/dashboard')
+  revalidatePath('/sales')
+  revalidatePath(`/${slug}`)
+}
+
+/**
+ * Stripe-Konto anlegen — und „Online-Zahlung neu einrichten" (Register Z2,
+ * Nr. 42): Steht schon eine Kennung da, wird sie NUR ersetzt, wenn Stripe das
+ * alte Konto in diesem Moment nachweislich nicht kennt oder den Zugriff
+ * verweigert (etwa ein Test-Konto nach der Live-Umstellung). Das ist nie
+ * automatisch, sondern nur dieser Knopfdruck des Hofs; kennt Stripe das
+ * Konto, bleibt alles, wie es war. Ersetzt wird bedingt auf die alte
+ * Kennung — ein zweiter Tab, der schon neu eingerichtet hat, wird nicht
+ * überschrieben.
+ */
 export async function createConnectAccount(): Promise<{ error?: string }> {
   const farm = await getAuthenticatedFarm()
-
-  if (farm.stripeAccountId) {
-    return { error: 'Stripe-Konto bereits verbunden' }
-  }
-
-  const publicUrl = getPublicUrl()
 
   // Stripe erst im Aufruf (Nr. 31): /settings/payments und /sales binden
   // diese Actions ein und zögen das SDK sonst in jeden Kaltstart.
   const { stripe } = await import('@/lib/stripe')
-  const account = await stripe.accounts.create({
+
+  const altesKonto = farm.stripeAccountId
+  if (altesKonto) {
+    try {
+      await stripe.accounts.retrieve(altesKonto)
+      return { error: 'Stripe-Konto bereits verbunden' }
+    } catch (err) {
+      // Nur „Stripe kennt es nicht" bzw. „kein Zugriff" öffnet den Weg; jeder
+      // andere Fehler (Ausfall, Sperre) ersetzt nichts.
+      if (!istUnzugaenglichesStripeKonto(err)) throw err
+    }
+  }
+
+  const publicUrl = getPublicUrl()
+  const parameter: Stripe.AccountCreateParams = {
     type: 'express',
     country: 'AT',
     email: farm.email,
@@ -58,21 +92,46 @@ export async function createConnectAccount(): Promise<{ error?: string }> {
       mcc: '5499', // Lebensmittel-Einzelhandel (Specialty Food Stores)
       product_description: 'Regionale Hofprodukte: Milch, Eier, Fleisch, Gemüse',
     },
-  })
+  }
+  // Beim Ersetzen mit Idempotenz-Schlüssel aus Hof, alter Kennung und
+  // 15-Minuten-Fenster: Ein Doppelklick oder ein Neuversuch nach gescheitertem
+  // Speichern bekommt von Stripe dasselbe Konto zurück, statt ein zweites,
+  // verwaistes anzulegen — und ein gescheiterter Versuch sperrt höchstens bis
+  // zum nächsten Fenster (neuEinrichtenSchluessel). Der erste Weg bleibt wie bisher.
+  const account = altesKonto
+    ? await stripe.accounts.create(parameter, { idempotencyKey: neuEinrichtenSchluessel(farm.id, altesKonto, new Date()) })
+    : await stripe.accounts.create(parameter)
 
   // Wer Stripe einrichtet, will online kassieren (Register Z1): Ein
   // Bestandshof mit acceptsOnline false aus der Zeit vor Z1 bliebe sonst
   // trotz fertigem Konto ohne Online-Zahlung (der Checkout fragt das Feld).
-  await prisma.farm.update({
-    where: { id: farm.id },
-    data: { stripeAccountId: account.id, acceptsOnline: true },
-  })
+  if (altesKonto) {
+    const { count } = await prisma.farm.updateMany({
+      where: { id: farm.id, stripeAccountId: altesKonto },
+      data: { stripeAccountId: account.id, stripeAccountReady: false, acceptsOnline: true },
+    })
+    // Ins Server-Protokoll, beide Kennungen mit Hof-ID (weder Geheimnis noch
+    // Personendatum): Nur so lässt sich ein ersetztes Konto später noch einem
+    // Hof zuordnen — die Datenbank kennt danach nur die neue Kennung.
+    if (count === 0) {
+      console.info(
+        `[Stripe] Hof-Konto nicht ersetzt, die Kennung hatte sich inzwischen geändert: Hof ${farm.id}, alt ${altesKonto}, von Stripe ${account.id}`
+      )
+      return { error: 'Deine Online-Zahlung wurde gerade schon neu eingerichtet. Lade die Seite neu.' }
+    }
+    console.info(`[Stripe] Hof-Konto neu eingerichtet: Hof ${farm.id}, alt ${altesKonto}, neu ${account.id}`)
+  } else {
+    await prisma.farm.update({
+      where: { id: farm.id },
+      data: { stripeAccountId: account.id, acceptsOnline: true },
+    })
+  }
 
   revalidatePath('/settings/payments')
   return {}
 }
 
-export async function createOnboardingLink(): Promise<{ url?: string; error?: string }> {
+export async function createOnboardingLink(): Promise<{ url?: string; error?: string; kontoUnbekannt?: true }> {
   const farm = await getAuthenticatedFarm()
 
   if (!farm.stripeAccountId) {
@@ -83,12 +142,23 @@ export async function createOnboardingLink(): Promise<{ url?: string; error?: st
   const returnPath = `/api/stripe/return?account_id=${farm.stripeAccountId}`
 
   const { stripe } = await import('@/lib/stripe')
-  const link = await stripe.accountLinks.create({
-    account: farm.stripeAccountId,
-    refresh_url: `${APP_URL}${returnPath}`,
-    return_url: `${APP_URL}${returnPath}`,
-    type: 'account_onboarding',
-  })
+  let link: { url: string }
+  try {
+    link = await stripe.accountLinks.create({
+      account: farm.stripeAccountId,
+      refresh_url: `${APP_URL}${returnPath}`,
+      return_url: `${APP_URL}${returnPath}`,
+      type: 'account_onboarding',
+    })
+  } catch (err) {
+    // Stripe kennt das Konto nicht oder verweigert den Zugriff (Register Z2):
+    // Fortsetzen geht nicht, der Hof richtet neu ein — die Seite zeigt ihm
+    // den Weg (?stripe=neu).
+    if (!istUnzugaenglichesStripeKonto(err)) throw err
+    await vermerkeUnbekanntesHofKonto(farm.id, farm.stripeAccountId)
+    zeigeZahlungsstandNeu(farm.slug)
+    return { error: NEU_EINRICHTEN_KURZ, kontoUnbekannt: true }
+  }
 
   // Einrichtung fortsetzen heißt online kassieren wollen (Z1) — auch für ein
   // Konto, das vor Z1 angelegt wurde. Nur auf true, nur der eigene Hof.
@@ -97,7 +167,7 @@ export async function createOnboardingLink(): Promise<{ url?: string; error?: st
   return { url: link.url }
 }
 
-export async function checkConnectStatus(): Promise<{ ready: boolean; error?: string }> {
+export async function checkConnectStatus(): Promise<{ ready: boolean; error?: string; kontoUnbekannt?: true }> {
   const farm = await getAuthenticatedFarm()
 
   if (!farm.stripeAccountId) {
@@ -105,7 +175,18 @@ export async function checkConnectStatus(): Promise<{ ready: boolean; error?: st
   }
 
   const { stripe } = await import('@/lib/stripe')
-  const account = await stripe.accounts.retrieve(farm.stripeAccountId)
+  let account: Stripe.Account
+  try {
+    account = await stripe.accounts.retrieve(farm.stripeAccountId)
+  } catch (err) {
+    // Stripe kennt das Konto nicht oder verweigert den Zugriff (Register Z2):
+    // nicht bereit vermerken — bedingt, die Kennung bleibt — und den Weg zum
+    // Neu-Einrichten zeigen.
+    if (!istUnzugaenglichesStripeKonto(err)) throw err
+    await vermerkeUnbekanntesHofKonto(farm.id, farm.stripeAccountId)
+    zeigeZahlungsstandNeu(farm.slug)
+    return { ready: false, kontoUnbekannt: true }
+  }
   // Dieselbe Regel wie account.updated (src/lib/stripe-konto.ts).
   const ready = stripeKontoBereit(account)
 
@@ -157,15 +238,26 @@ export async function schalteOnlineZahlungEin(input: unknown): Promise<{ ok: tru
 // Für Express-Konten ist der dokumentierte Weg der Login-Link ins
 // Express-Dashboard (POST /v1/accounts/{id}/login_link, nur für Express).
 export async function createStripeDashboardLinkAction(): Promise<{ url?: string; error?: string }> {
+  let hof: { id: string; slug: string; konto: string } | null = null
   try {
     const farm = await getAuthenticatedFarm()
     if (!farm.stripeAccountId || !farm.stripeAccountReady) {
       return { error: 'Stripe ist noch nicht eingerichtet' }
     }
+    hof = { id: farm.id, slug: farm.slug, konto: farm.stripeAccountId }
     const { stripe } = await import('@/lib/stripe')
     const link = await stripe.accounts.createLoginLink(farm.stripeAccountId)
     return { url: link.url }
   } catch (err) {
+    // Stripe kennt das Konto nicht oder verweigert den Zugriff (Register
+    // Z2): vermerken und den Weg zum Neu-Einrichten nennen, statt „gerade
+    // nicht erreichbar". Die Verkäufe-Seite rendert danach neu; ihre Meldung
+    // überlebt das (StripeAuszahlungen bleibt eingehängt).
+    if (hof && istUnzugaenglichesStripeKonto(err)) {
+      await vermerkeUnbekanntesHofKonto(hof.id, hof.konto)
+      zeigeZahlungsstandNeu(hof.slug)
+      return { error: NEU_EINRICHTEN_KURZ }
+    }
     console.error('[Stripe] Login-Link fehlgeschlagen:', err)
     return { error: 'Stripe-Übersicht gerade nicht erreichbar' }
   }

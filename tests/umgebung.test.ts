@@ -271,10 +271,36 @@ describe('bestimmeUmgebung — Stripe', () => {
     expect(bestimmeUmgebung({ STRIPE_SECRET_KEY: 'sk_live_x' }).stripe).toBe('live')
   })
 
+  it('erkennt eingeschränkte Schlüssel wie ihre vollen Geschwister (Nr. 42, Runde 1)', () => {
+    // Auch ein eingeschränkter Live-Schlüssel kann echtes Geld bewegen — er zählt als live.
+    expect(bestimmeUmgebung({ STRIPE_SECRET_KEY: 'rk_live_x' }).stripe).toBe('live')
+    expect(bestimmeUmgebung({ STRIPE_SECRET_KEY: 'rk_test_x' }).stripe).toBe('test')
+  })
+
   it('meldet fehlt bei fehlendem, leerem oder unbekanntem Schlüssel', () => {
     expect(bestimmeUmgebung({}).stripe).toBe('fehlt')
     expect(bestimmeUmgebung({ STRIPE_SECRET_KEY: '  ' }).stripe).toBe('fehlt')
-    expect(bestimmeUmgebung({ STRIPE_SECRET_KEY: 'rk_live_x' }).stripe).toBe('fehlt')
+    // Ein öffentlicher Schlüssel in der falschen Variable ist kein Geheimschlüssel.
+    expect(bestimmeUmgebung({ STRIPE_SECRET_KEY: 'pk_live_x' }).stripe).toBe('fehlt')
+    expect(bestimmeUmgebung({ STRIPE_SECRET_KEY: 'whsec_x' }).stripe).toBe('fehlt')
+  })
+})
+
+describe('bestimmeUmgebung — Produktions-Deployment bei Vercel (Nr. 42, Runde 1)', () => {
+  it('nur VERCEL_ENV=production ist das Produktions-Deployment', () => {
+    expect(bestimmeUmgebung(PRODUKTION).vercelProduktion).toBe(true)
+    // Fail-closed: nur genau dieser Wert, kein Trimmen, keine Großschreibung.
+    expect(bestimmeUmgebung({ VERCEL_ENV: ' production ' }).vercelProduktion).toBe(false)
+    expect(bestimmeUmgebung({ VERCEL_ENV: 'Production' }).vercelProduktion).toBe(false)
+  })
+
+  it('Vorschau, lokal, lokaler Produktions-Build, Test/CI und Unbekanntes sind es nicht', () => {
+    expect(bestimmeUmgebung(PREVIEW).vercelProduktion).toBe(false)
+    expect(bestimmeUmgebung(LOKAL).vercelProduktion).toBe(false)
+    expect(bestimmeUmgebung({ NODE_ENV: 'production' }).vercelProduktion).toBe(false)
+    expect(bestimmeUmgebung({ NODE_ENV: 'test' }).vercelProduktion).toBe(false)
+    expect(bestimmeUmgebung({ VERCEL_ENV: 'development' }).vercelProduktion).toBe(false)
+    expect(bestimmeUmgebung({}).vercelProduktion).toBe(false)
   })
 })
 
