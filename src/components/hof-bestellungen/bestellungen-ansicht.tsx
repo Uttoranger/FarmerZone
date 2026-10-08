@@ -69,13 +69,14 @@ export function BestellungenAnsicht({
         </FilterChipReihe>
       </div>
 
-      <div className="mt-4 lg:mt-5 lg:flex lg:items-start lg:gap-5 xl:gap-6">
+      {/* In der Bestellung unter 1024 px kein Abstand oben: Dort beginnt die feste Leiste des Rückwegs am oberen Rand. */}
+      <div className={cn('lg:mt-5 lg:flex lg:items-start lg:gap-5 xl:gap-6', modus === 'liste' && 'mt-4')}>
         <div className={cn('lg:w-[320px] lg:shrink-0 xl:w-[420px] 2xl:w-[520px]', modus === 'detail' && 'hidden lg:block')}>
           <BestellListe seite={seite} filter={filter} gewaehlt={detail?.id ?? null} nurBreit={modus === 'liste'} suche={suche} />
         </div>
         <div className={cn('min-w-0 flex-1', modus === 'liste' && 'hidden lg:block')}>
           {detail ? (
-            <BestellDetail key={detail.id} bestellung={detail} zurueckHref={`/orders${suche}`} />
+            <BestellDetail key={detail.id} bestellung={detail} zurueckSuche={suche} />
           ) : (
             seite.gruppen.length > 0 && (
               <p className={cn(KARTE, 'px-5 py-8 text-center text-[13.5px]', LEISE)}>Wähle links eine Bestellung.</p>

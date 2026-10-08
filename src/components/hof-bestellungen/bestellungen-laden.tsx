@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import { UnterseitenKopfLaden } from '@/components/hofbereich/hof-laden'
 
 /*
  * Ladeansicht der Bestellungen (Nachtlauf Nr. 19) — dieselben Maße wie die
@@ -24,7 +25,7 @@ export function BestellungenLaden({ modus }: { modus: 'liste' | 'detail' }): Rea
           ))}
         </div>
       </div>
-      <div className="mt-4 lg:mt-5 lg:flex lg:items-start lg:gap-5 xl:gap-6">
+      <div className={cn('lg:mt-5 lg:flex lg:items-start lg:gap-5 xl:gap-6', modus === 'liste' && 'mt-4')}>
         <div className={cn('flex flex-col gap-2.5 lg:w-[320px] lg:shrink-0 xl:w-[420px] 2xl:w-[520px]', modus === 'detail' && 'hidden lg:flex')}>
           <div className="mb-0.5 h-3 w-48 rounded bg-border" />
           {[0, 1, 2, 3].map((i) => (
@@ -38,9 +39,10 @@ export function BestellungenLaden({ modus }: { modus: 'liste' | 'detail' }): Rea
           ))}
         </div>
         <div className={cn('min-w-0 flex-1', modus === 'liste' && 'hidden lg:block')}>
-          <div className="mb-3 flex h-11 items-center gap-2 lg:hidden">
-            <div className="size-11 rounded-full bg-muted" />
-            <div className="h-5 w-40 rounded bg-border" />
+          {/* Unter 1024 px der Unterseiten-Kopf mit „Bestellung …" (Nr. 44); Anrufen nur mit Telefon, deshalb ohne Platz. */}
+          <UnterseitenKopfLaden listeDaneben />
+          <div className="mb-5 md:mb-6 lg:hidden">
+            <div className="h-8 w-52 rounded-lg bg-border" />
           </div>
           <div className="flex flex-col gap-3.5 rounded-2xl border border-border bg-card p-4 md:px-[18px]">
             <div className="h-7 w-44 rounded-lg bg-border" />

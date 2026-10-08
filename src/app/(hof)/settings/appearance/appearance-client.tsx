@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import {
@@ -31,6 +31,8 @@ import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import type { SectionConfig, FarmPhotoData } from '@/server/queries/appearance'
+import { useNachSpeichern } from '@/components/hof-einstellungen/use-nach-speichern'
+import { EINSTELLUNG_MEIN_AUFTRITT } from '@/lib/bauern-navigation'
 
 // ── Design constants ──────────────────────────────────────────────────────────
 
@@ -109,17 +111,38 @@ interface Props {
   }
 }
 
+/**
+ * Meldet dem Formular, ob gerade ein Foto hochlädt (Nr. 44): Nach dem
+ * Speichern geht es zurück zur Übersicht, und ein Upload, dessen Feld dabei
+ * aushängt, ginge verloren (CODING_STANDARDS §8 „Ein Datei-Feld wird nie
+ * angefasst …"). Der Aufrufer reicht einen stabilen Setter herein. Hängt der
+ * Baustein selbst aus (Titelbild zurück auf Verlauf), meldet er „fertig" —
+ * sonst bliebe „Speichern" für immer gesperrt.
+ */
+function useHochladenMelden(laeuft: boolean, melden: ((laeuft: boolean) => void) | undefined): void {
+  useEffect(() => {
+    if (!melden) return
+    melden(laeuft)
+    return () => {
+      if (laeuft) melden(false)
+    }
+  }, [laeuft, melden])
+}
+
 // ── Logo upload sub-component ─────────────────────────────────────────────────
 // Auch im Hofseiten-Editor ab lg (components/farmer/hofseite-editor.tsx).
 
 export function LogoUpload({
   logoUrl,
   onUploaded,
+  onHochladen,
 }: {
   logoUrl: string | null
   onUploaded: (url: string | null) => void
+  /** Meldet, solange ein Foto hochlädt oder gespeichert wird (Mein Auftritt wartet damit, Nr. 44). */
+  onHochladen?: (laeuft: boolean) => void
 }): React.JSX.Element {
-  const [, startTransition] = useTransition()
+  const [speichert, startTransition] = useTransition()
 
   const { isUploading, progress, openFilePicker, fileInput } = useImageUpload({
     variant: 'logo',
@@ -136,6 +159,7 @@ export function LogoUpload({
       })
     },
   })
+  useHochladenMelden(isUploading || speichert, onHochladen)
 
   async function handleRemove() {
     startTransition(async () => {
@@ -213,11 +237,13 @@ export function LogoUpload({
 function BannerPhotoUpload({
   bannerUrl,
   onUploaded,
+  onHochladen,
 }: {
   bannerUrl: string | null
   onUploaded: (url: string | null) => void
+  onHochladen?: (laeuft: boolean) => void
 }) {
-  const [, startTransition] = useTransition()
+  const [speichert, startTransition] = useTransition()
 
   const { isUploading, progress, openFilePicker, fileInput } = useImageUpload({
     variant: 'banner',
@@ -234,6 +260,7 @@ function BannerPhotoUpload({
       })
     },
   })
+  useHochladenMelden(isUploading || speichert, onHochladen)
 
   async function handleRemove() {
     startTransition(async () => {
@@ -399,9 +426,12 @@ const GALLERY_LIMIT = 8
 export function GallerySection({
   initialPhotos,
   onGespeichert,
+  onHochladen,
 }: {
   initialPhotos: FarmPhotoData[]
   onGespeichert?: () => void
+  /** Meldet, solange Fotos hochladen (Mein Auftritt wartet damit, Nr. 44). */
+  onHochladen?: (laeuft: boolean) => void
 }): React.JSX.Element {
   const [photos, setPhotos] = useState<FarmPhotoData[]>(initialPhotos)
 
@@ -425,6 +455,8 @@ export function GallerySection({
       }
     },
   })
+  // onUploaded wird im Upload abgewartet — isUploading deckt das Speichern mit ab.
+  useHochladenMelden(isUploading, onHochladen)
 
   function handleDeleted(id: string) {
     setPhotos((prev) => prev.filter((p) => p.id !== id).map((p, i) => ({ ...p, sortOrder: i })))
@@ -558,6 +590,12 @@ export function AppearanceClient({ initialData }: Props) {
   const [sectionsConfig, setSectionsConfig] = useState<SectionConfig[]>(initialData.sectionsConfig)
   const [farmValues, setFarmValues] = useState<FarmValueInput[]>(initialData.farmValues)
   const [saving, setSaving] = useState(false)
+  // Solange ein Foto hochlädt, wartet „Speichern": Danach geht es zur Übersicht (Nr. 44), der Upload ginge verloren.
+  const [logoLaeuft, setLogoLaeuft] = useState(false)
+  const [titelbildLaeuft, setTitelbildLaeuft] = useState(false)
+  const [galerieLaeuft, setGalerieLaeuft] = useState(false)
+  const uploadLaeuft = logoLaeuft || titelbildLaeuft || galerieLaeuft
+  const nachSpeichern = useNachSpeichern()
 
   const currentPreset = BANNER_PRESETS.find((p) => p.key === bannerValue) ?? BANNER_PRESETS[0]
 
@@ -648,6 +686,7 @@ export function AppearanceClient({ initialData }: Props) {
   // ── Save ────────────────────────────────────────────────────────────────────
 
   async function handleSave() {
+    if (uploadLaeuft) return
     setSaving(true)
     const result = await saveAppearanceAction({
       tagline: tagline || null,
@@ -669,7 +708,7 @@ export function AppearanceClient({ initialData }: Props) {
     if (result.error) {
       toast.error(result.error)
     } else {
-      toast.success('Auftritt gespeichert!')
+      nachSpeichern('Auftritt gespeichert!')
     }
   }
 
@@ -680,7 +719,7 @@ export function AppearanceClient({ initialData }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-semibold text-foreground">Mein Auftritt</h1>
+          <h1 className="font-heading text-2xl font-semibold text-foreground">{EINSTELLUNG_MEIN_AUFTRITT.label}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Gestalte deine öffentliche Hof-Seite
           </p>
@@ -699,7 +738,7 @@ export function AppearanceClient({ initialData }: Props) {
       <section className="bg-card rounded-2xl shadow-[0_2px_8px_oklch(0.18_0.03_150_/_0.05)] p-6">
         <h2 className="font-semibold text-foreground mb-1">Logo</h2>
         <p className="text-xs text-muted-foreground mb-4">Rundes Hof-Logo — erscheint auf deiner Seite</p>
-        <LogoUpload logoUrl={logoUrl} onUploaded={setLogoUrl} />
+        <LogoUpload logoUrl={logoUrl} onUploaded={setLogoUrl} onHochladen={setLogoLaeuft} />
       </section>
 
       {/* ── Banner section ─────────────────────────────────────────────────── */}
@@ -774,6 +813,7 @@ export function AppearanceClient({ initialData }: Props) {
           <BannerPhotoUpload
             bannerUrl={bannerUrl}
             onUploaded={handleBannerPhotoUploaded}
+            onHochladen={setTitelbildLaeuft}
           />
         )}
       </section>
@@ -1003,17 +1043,17 @@ export function AppearanceClient({ initialData }: Props) {
       </section>
 
       {/* ── Gallery ─────────────────────────────────────────────────────────── */}
-      <GallerySection initialPhotos={initialData.farmPhotos} />
+      <GallerySection initialPhotos={initialData.farmPhotos} onHochladen={setGalerieLaeuft} />
 
       {/* ── Save button ─────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-4 pb-8">
         <button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || uploadLaeuft}
           className="h-12 px-8 rounded-xl bg-accent text-accent-foreground font-semibold hover:bg-accent-hover transition-colors disabled:opacity-60 flex items-center gap-2"
         >
           {saving && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-          {saving ? 'Wird gespeichert…' : 'Speichern & veröffentlichen'}
+          {saving ? 'Wird gespeichert…' : uploadLaeuft ? 'Foto lädt noch …' : 'Speichern & veröffentlichen'}
         </button>
         <Link
           href={`/${initialData.farmSlug}`}

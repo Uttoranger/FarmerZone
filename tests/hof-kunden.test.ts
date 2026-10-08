@@ -25,11 +25,11 @@ import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { Prisma } from '@prisma/client'
 
-const navigation = vi.hoisted(() => ({ parameter: '' }))
+const navigation = vi.hoisted(() => ({ parameter: '', pfad: '/customers' }))
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(navigation.parameter),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
-  usePathname: () => '/customers',
+  usePathname: () => navigation.pfad,
 }))
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode; [k: string]: unknown }) => {
@@ -422,6 +422,7 @@ const LANG = 'Maximiliane Theodora Friederike von und zu Hohenberg-Liechtenstein
 describe('Ansicht /customers — vier Zustände, lange Namen, Tokens', () => {
   beforeEach(() => {
     navigation.parameter = ''
+    navigation.pfad = '/customers'
   })
 
   it('gefüllt: Kopf, Filter mit Zahlen, Suche, Sortierung, Zeilen mit Link und Anrufen; langer Name im title', () => {
@@ -492,6 +493,11 @@ describe('Ansicht /customers — vier Zustände, lange Namen, Tokens', () => {
 })
 
 describe('Kundendetail', () => {
+  // Der Rückweg (UnterseitenKopf, Nr. 44) hängt am Pfad der Seite.
+  beforeEach(() => {
+    navigation.pfad = '/customers/k-1'
+  })
+
   function detail(teil: Partial<CustomerDetail> = {}): CustomerDetail {
     return {
       ...kunde({ kundeId: 'aaaaaaaaaaaaaaaa', customerName: LANG, customerPhone: '+43 660 7654321', orderCount: 14, umsatzCents: 12345, status: 'Stammkunde', isStammkunde: true, isSubscribed: true, topProducts: [{ name: 'Eier', count: 12 }] }),

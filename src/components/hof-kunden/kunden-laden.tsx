@@ -1,9 +1,10 @@
 import { cn } from '@/lib/utils'
+import { UnterseitenKopfLaden } from '@/components/hofbereich/hof-laden'
 
 /*
  * Ladeansicht der Kunden (Nachtlauf Nr. 22a) — dieselben Maße wie die fertige
  * Seite. Liste: Kopf (h1 + Zeile), Filter-Chips und Suche, Zahl und
- * Sortierung, ab 1024 px Tabelle, darunter Zeilen. Detail: Zurück, Kopfkarte
+ * Sortierung, ab 1024 px Tabelle, darunter Zeilen. Detail: Unterseiten-Kopf, Kopfkarte
  * mit Knöpfen, Kennzahlen und Bestellungen, ab 1280 px rechts Kontakt.
  * Nur, was sicher kommt (Tipp, Lieblingsprodukte und Neuigkeiten hängen von
  * den Daten ab). Farbstaffelung wie die anderen Hof-Routen im neuen Design:
@@ -71,44 +72,46 @@ function ListeLaden(): React.JSX.Element {
 
 function DetailLaden(): React.JSX.Element {
   return (
-    <div className="flex flex-col gap-4">
-      <div className="h-11 w-32 rounded-full bg-muted" />
-      <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 md:px-[18px]">
-        <div className="flex items-start gap-3.5">
-          <div className="size-14 rounded-full bg-muted" />
-          <div className="flex-1">
-            <div className="h-7 w-56 rounded-lg bg-border" />
-            <div className="mt-2 h-5 w-40 rounded bg-muted" />
+    <>
+      <UnterseitenKopfLaden mitTitel={false} />
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 md:px-[18px]">
+          <div className="flex items-start gap-3.5">
+            <div className="size-14 rounded-full bg-muted" />
+            <div className="flex-1">
+              <div className="h-7 w-56 rounded-lg bg-border" />
+              <div className="mt-2 h-5 w-40 rounded bg-muted" />
+            </div>
           </div>
-        </div>
-        <div className="flex gap-2">
-          {[28, 30, 26].map((breite, i) => (
-            <div key={i} className="h-11 rounded-full bg-muted" style={{ width: `${breite * 4}px` }} />
-          ))}
-        </div>
-      </div>
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
-        <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-3 gap-2">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="h-[72px] rounded-2xl border border-border bg-card" />
+          <div className="flex gap-2">
+            {[28, 30, 26].map((breite, i) => (
+              <div key={i} className="h-11 rounded-full bg-muted" style={{ width: `${breite * 4}px` }} />
             ))}
           </div>
-          <div className="h-3 w-36 rounded bg-border" />
-          <div className="overflow-hidden rounded-2xl border border-border bg-card">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="flex h-[62px] items-center gap-3 border-t border-border px-3.5 first:border-t-0">
-                <div className="flex-1">
-                  <div className="h-4 w-24 rounded bg-border" />
-                  <div className="mt-1.5 h-3 w-48 rounded bg-muted" />
+        </div>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
+          <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-3 gap-2">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-[72px] rounded-2xl border border-border bg-card" />
+              ))}
+            </div>
+            <div className="h-3 w-36 rounded bg-border" />
+            <div className="overflow-hidden rounded-2xl border border-border bg-card">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="flex h-[62px] items-center gap-3 border-t border-border px-3.5 first:border-t-0">
+                  <div className="flex-1">
+                    <div className="h-4 w-24 rounded bg-border" />
+                    <div className="mt-1.5 h-3 w-48 rounded bg-muted" />
+                  </div>
+                  <div className="h-4 w-14 rounded bg-muted" />
                 </div>
-                <div className="h-4 w-14 rounded bg-muted" />
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
+          <div className="h-[132px] rounded-2xl border border-border bg-card" />
         </div>
-        <div className="h-[132px] rounded-2xl border border-border bg-card" />
       </div>
-    </div>
+    </>
   )
 }
