@@ -21,6 +21,7 @@ Alle Farben kommen aus CSS-Custom-Properties auf `:root`, umgeschaltet über `da
 | --status-fertig | #9FD0AF | #2E6B45 |
 
 - Buttons behalten ihre Markenfarben in beiden Themes.
+- **Benannte Ausnahme: Absperrband.** Das Umgebungsbanner (`src/components/shared/umgebungs-banner.tsx`, nur in Vorschau und lokal) hat feste Farben, in beiden Themes gleich: Bernstein-400 mit Stein-900, bei Widerspruch Rot-700 mit Weiß. Sie stehen nur dort, in der Konstante `ABSPERRBAND`; Balken und Link „Zur echten Seite“ nehmen sie von dort, keine zweite Kopie (`tests/testumgebung-anzeige.test.ts`). Die Browserleiste der Testumgebung (`themeColor` im Root-Layout) trägt dieselben Werte als Hex, weil ein Meta-Tag keine Klassen kennt. Die Ausnahme gilt nur für dieses Banner, für keine andere Komponente.
 - Status-Textfarben sind pro Theme definiert; nie die Variante des anderen Themes verwenden — sonst fällt der Kontrast auf Creme unter 4,5:1.
 - Bild-Overlays (Titelbilder, Cover) bleiben immer dunkel hinterlegt und sind theme-unabhängig.
   Theme-fest heißt nicht Tailwind-`black`/`white`: Im neuen Design (`data-design="neu"`) sind `primary-foreground` (fast schwarz) und `accent-foreground` (Crème) in beiden Themes gleich — dunkler Schleier `from-primary-foreground/25`, helle Punkte auf Fotos `bg-accent-foreground/50`. Im Bestand haben beide andere Werte (`accent-foreground` ist dort dunkel) — das Muster gilt nur im neuen Design.

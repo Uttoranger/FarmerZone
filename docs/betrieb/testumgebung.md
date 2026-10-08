@@ -11,14 +11,14 @@ Danach kommt der Probelauf (`docs/nachtlauf/probelauf-checkliste.md`, Nr. 48) un
 - **Eigene Adresse:** In einer Vorschau gilt `NEXT_PUBLIC_APP_URL` als Adresse der App — aber nur als reine https-Adresse und nie als `farmerzone.at`. Links in Mails, die Rücksprünge von Stripe und die Anmeldung laufen dann über `test.farmerzone.at`. Andere Vorschauen bleiben bei ihrer Vercel-Adresse.
 - **Banner:** Oben steht „TESTUMGEBUNG · Dev-Datenbank · Stripe Test · staging", daneben der Link „Zur echten Seite".
 - **Admin der echten Seite:** Unter dem Kopf steht eine Leiste mit der Marke „Stripe Test" (nach der Live-Schaltung „Stripe Live") und dem Link „Zur Testumgebung".
-- **Post nur an dich:** Außerhalb der Produktion gehen Mails nur an Adressen aus `TEST_EMPFAENGER` und an `@example.com`. Alles andere wird nicht verschickt, nur gezählt: Im Log steht „[E-Mail] Nicht verschickt …" mit einer Zahl, ohne Adresse.
+- **Post nur an dich:** An jede Adresse geht Post nur im Produktions-Deployment bei Vercel. Überall sonst gehen Mails nur an Adressen aus `TEST_EMPFAENGER` und an `@example.com`: in der Testumgebung, in Vorschauen, lokal und in einem lokalen Produktions-Build. Alles andere wird nicht verschickt, nur gezählt: Im Log steht „[E-Mail] Nicht verschickt …" mit einer Zahl, ohne Adresse.
 - **Action „Staging nachziehen"** (`.github/workflows/staging-nachziehen.yml`): Nach jedem Push auf `main` setzt sie `staging` per Fast-Forward auf `main`, ohne Force. Vercel baut daraufhin die Testumgebung neu. Hat `staging` eigene Commits, wird die Action rot, statt sie zu überschreiben.
 
 ---
 
 ## 1. Branch staging anlegen
 
-- [ ] GitHub → Code → Branches → „New branch": Name **`staging`**, Quelle **`main`**. Die Action legt den Branch bewusst nicht selbst an; ohne ihn endet sie rot mit „Branch staging fehlt".
+- [ ] GitHub → Code → Branches → „New branch": Name **`staging`**, Quelle **`main`**. Die Action legt den Branch bewusst nicht selbst an. Bis es ihn gibt, endet sie nach jedem Push auf `main` grün mit dem Hinweis „Branch staging fehlt" und tut nichts.
 - [ ] Keine Regel (Branch-Schutz, Ruleset), die Pushes von GitHub Actions auf `staging` verbietet. Die Action schiebt mit dem eingebauten Token. Ein Schutz gegen Force-Push oder Löschen schadet nicht, die Action braucht beides nie.
 - [ ] Ihr Schreibrecht fordert die Action selbst an (`contents: write`, nur in ihrem Job). Die Grundeinstellung unter Settings → Actions → General → „Workflow permissions" darf auf „Lesen" bleiben.
 - [ ] Auf `staging` arbeitet niemand direkt. Alles kommt über `main`, sonst wird die Action rot (siehe „Wenn etwas hakt").
@@ -41,7 +41,7 @@ Vercel → Settings → Environment Variables → „Add". Umgebung **Preview**,
 | `BETTER_AUTH_URL` | `https://test.farmerzone.at` | Rückfall für Better Auth. Die App nimmt die Adresse schon aus `NEXT_PUBLIC_APP_URL`, mit gleichem Wert schadet sie nicht |
 | `STRIPE_WEBHOOK_SECRET` | Signing Secret des zweiten Test-Endpunkts (Schritt 5) | Sonst prüft die Testumgebung gegen das Secret der Produktion und lehnt jede Zustellung ab |
 | `RESEND_API_KEY` | optional, ein Resend-Schlüssel | Ohne ihn verschickt die Testumgebung gar nichts, die Mails stehen nur im Log |
-| `TEST_EMPFAENGER` | nur mit `RESEND_API_KEY`: deine Test-Adressen, durch Komma getrennt | Wer in der Testumgebung Post bekommt. `@example.com` gilt immer |
+| `TEST_EMPFAENGER` | nur mit `RESEND_API_KEY`: deine Test-Adressen, durch Komma getrennt | Wer in der Testumgebung Post bekommt. `@example.com` gilt immer. Betreiber-Mails (neuer Hof, Fehlermeldung, Erstattung offen, Briefkasten) gehen an die Support-Adresse (`SUPPORT_EMAIL` in `src/lib/support.ts`) und kommen nur an, wenn auch diese Adresse in der Liste steht |
 
 - **`NEXT_PUBLIC_APP_URL` nie für alle Vorschauen anlegen**, nur für `staging`. Die App weist in einer Vorschau nur `farmerzone.at` ab, nicht `test.farmerzone.at`: Für alle Vorschauen gesetzt, schickten sonst alle ihre Links in die Testumgebung.
 - **Alles andere erbt die Testumgebung von Preview** und bleibt unverändert: `DATABASE_URL` (Entwicklungsdatenbank) und die Stripe-Test-Schlüssel. Für `staging` nichts davon überschreiben, schon gar keinen Live-Schlüssel (außerhalb der Produktion startet Stripe damit gar nicht, Register Z2).
@@ -64,7 +64,9 @@ Vercel → Settings → Environment Variables → „Add". Umgebung **Preview**,
 - [ ] **Vercel-Sperre für Stripe öffnen:** Stripe kann sich nicht bei Vercel anmelden und bekäme sonst 401.
   - Vercel → Settings → Deployment Protection → „Protection Bypass for Automation": ein Geheimnis erzeugen.
   - Es an die Adresse des Endpunkts hängen: `https://test.farmerzone.at/api/stripe/webhook?x-vercel-protection-bypass=<Geheimnis>`.
-  - Das Geheimnis steht dann nur bei Vercel und in dieser Adresse bei Stripe.
+  - **Was das Geheimnis kann:** Es öffnet nicht nur die Testumgebung, sondern **alle** geschützten Deployments dieses Projekts, also jede Vorschau und jede Branch-Adresse. Wer es kennt, kommt ohne Vercel-Login hinein.
+  - **Wer es sieht:** Es steht bei Vercel und, lesbar, in der Endpunkt-Adresse im Stripe-Dashboard. Jede Person mit Zugang zu den Webhooks bei Stripe kann es lesen.
+  - **Erneuern:** Bei Vercel ein neues Geheimnis erzeugen und das alte widerrufen, dann die Adresse des Endpunkts bei Stripe anpassen. Das gilt auch, wenn jemand mit Stripe- oder Vercel-Zugang ausscheidet. Bis Stripe die neue Adresse hat, bekommt der Endpunkt 401 und Stripe stellt später erneut zu.
 - [ ] Das **Signing Secret** dieses Endpunkts (beginnt mit `whsec_`) als `STRIPE_WEBHOOK_SECRET` nur für den Branch `staging` eintragen (Schritt 3), dann `staging` neu deployen.
 - [ ] Gut zu wissen: Bis zur Live-Schaltung teilen Produktion und Testumgebung den Test-Schlüssel. Deshalb bekommen **beide** Endpunkte **alle** Test-Ereignisse. Jede Seite quittiert Ereignisse zu Bestellungen, die sie nicht kennt (Nr. 48 prüft das im Code).
 - [ ] **Apple-Pay-Domain:** Einstellungen → Zahlungsmethoden → Domains (Testmodus): **`test.farmerzone.at`** hinzufügen.
@@ -83,7 +85,7 @@ Vercel → Settings → Environment Variables → „Add". Umgebung **Preview**,
 
 ## Wenn etwas hakt
 
-- **Action rot „Branch staging fehlt":** Schritt 1.
+- **Hinweis „Branch staging fehlt" in der Action (grün):** Den Branch gibt es noch nicht, Schritt 1.
 - **Action rot „Kein Fast-Forward möglich":** Jemand hat direkt auf `staging` gearbeitet. Die Action hat nichts überschrieben. Zwei Wege:
   - Die Änderung per PR nach `main` bringen; beim nächsten Push zieht die Action nach.
   - Oder `staging` bewusst verwerfen: GitHub → Branches → `staging` löschen und neu aus `main` anlegen. Die Domain bleibt dem Branchnamen zugeordnet.

@@ -12,8 +12,9 @@ name: Staging nachziehen
 # - Nie überschreiben: Gepusht wird ohne Force. Hat staging Commits, die main
 #   nicht kennt (jemand hat direkt auf staging gearbeitet), endet der Job rot,
 #   statt sie wegzuwerfen — dann führt der Mensch von Hand zusammen.
-# - Den Branch staging legt der Job NICHT an. Fehlt er, endet der Job rot mit
-#   Hinweis; anlegen ist ein bewusster Schritt des Menschen (Betriebsdoku).
+# - Den Branch staging legt der Job NICHT an; anlegen ist ein bewusster Schritt
+#   des Menschen (Betriebsdoku, Schritt 1). Fehlt er, endet der Job mit einem
+#   Hinweis und grün — sonst wäre bis dahin jeder Push auf main rot.
 
 on:
   push:
@@ -43,8 +44,8 @@ jobs:
         run: |
           set -euo pipefail
           if ! git rev-parse --verify --quiet refs/remotes/origin/staging > /dev/null; then
-            echo "::error title=Branch staging fehlt::Den Branch staging gibt es noch nicht. Bitte einmal von Hand aus main anlegen (docs/betrieb/testumgebung.md, Schritt 1). Diese Action legt ihn bewusst nicht an."
-            exit 1
+            echo "::notice title=Branch staging fehlt::Den Branch staging gibt es noch nicht, es gibt nichts nachzuziehen. Anlegen: docs/betrieb/testumgebung.md, Schritt 1. Diese Action legt ihn bewusst nicht an."
+            exit 0
           fi
           if ! git merge-base --is-ancestor refs/remotes/origin/staging refs/remotes/origin/main; then
             echo "::error title=Kein Fast-Forward möglich::staging hat Commits, die main nicht hat. Nichts überschrieben — bitte staging von Hand zusammenführen (docs/betrieb/testumgebung.md)."

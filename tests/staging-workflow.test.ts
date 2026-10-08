@@ -8,6 +8,7 @@
  *  - Schreibrecht gibt es nur im Job; oben steht `permissions: {}`.
  *  - Kein Überschreiben: kein --force, kein +Refspec, kein Löschen; vor dem
  *    Push prüft `git merge-base --is-ancestor`, sonst endet der Job rot.
+ *    Fehlt staging, endet er mit einem Hinweis, ohne den Branch anzulegen.
  *  - Keine Secrets außer dem eingebauten Token, kein Ausdruck ${{ … }}.
  *
  * Gegenproben: Die Prüfung schlägt an jeder Stelle an, an der eine veränderte
@@ -73,9 +74,25 @@ describe('staging-nachziehen.yml', () => {
     expect(TEXT).toMatch(/fetch-depth: 0/)
   })
 
-  it('legt staging nicht selbst an — fehlt der Branch, endet der Job rot mit Hinweis', () => {
-    expect(TEXT).toMatch(/refs\/remotes\/origin\/staging/)
-    expect(TEXT).toMatch(/docs\/betrieb\/testumgebung\.md/)
+  // Nr. 43, Runde 1: Ohne staging wäre sonst jeder Push auf main rot, bis der
+  // Mensch den Branch anlegt — ein Hinweis genügt, angelegt wird nicht.
+  it('legt staging nicht selbst an — fehlt der Branch, endet der Job grün mit Hinweis', () => {
+    const start = TEXT.indexOf('if ! git rev-parse --verify --quiet refs/remotes/origin/staging')
+    expect(start).toBeGreaterThan(-1)
+    const zweig = TEXT.slice(start, TEXT.indexOf('\n          fi', start))
+    expect(zweig).toContain('::notice')
+    expect(zweig).toContain('exit 0')
+    expect(zweig).not.toContain('exit 1')
+    expect(zweig).not.toMatch(/git (push|branch|checkout)/)
+    expect(zweig).toMatch(/docs\/betrieb\/testumgebung\.md/)
+  })
+
+  it('Gegenprobe: geht kein Fast-Forward, bleibt der Job rot', () => {
+    const start = TEXT.indexOf('if ! git merge-base --is-ancestor')
+    expect(start).toBeGreaterThan(-1)
+    const zweig = TEXT.slice(start, TEXT.indexOf('\n          fi', start))
+    expect(zweig).toContain('::error')
+    expect(zweig).toContain('exit 1')
   })
 })
 

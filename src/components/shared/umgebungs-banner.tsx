@@ -17,15 +17,29 @@ import { bannerLink } from '@/lib/testumgebung'
  * damit er beim Laden nicht hinter ihr verschwindet; danach scrollt er weg,
  * und der Titel-Präfix „[TEST]" bleibt als Erkennungszeichen.
  *
- * Feste Farben, bewusst ohne Token und ohne dark:-Variante: Ein Warnstreifen
- * muss in beiden Modi gleich aussehen, wie ein Absperrband. Bernstein-400 auf
- * Stein-900 liegt bei rund 11:1, Rot-700 auf Weiß bei rund 6,4:1 — beides
- * über den geforderten 4,5:1.
+ * Feste Farben aus ABSPERRBAND (unten), bewusst ohne Token und ohne
+ * dark:-Variante — die benannte Ausnahme in docs/ai/DESIGN_SYSTEM.md.
  *
  * In der Vorschau (Testumgebung, Register Z3) liegt rechts im Balken „Zur
  * echten Seite" (UmgebungsBannerLink); der Balken hält ihm den Platz frei und
  * ist dann 44 px hoch (Touch-Ziel). Ohne Link bleibt er schmal wie bisher.
  */
+/**
+ * Das Absperrband: Ein Warnstreifen muss in beiden Modi gleich aussehen. Die
+ * einzige Stelle mit diesen Farben — Balken und Link nehmen sie von hier.
+ * Bernstein-400 auf Stein-900 liegt bei rund 11:1, Rot-700 auf Weiß bei rund
+ * 6,4:1, beides über den geforderten 4,5:1. Rot heißt: Widerspruch in der
+ * Umgebung, der Grund steht im Balken.
+ */
+const ABSPERRBAND = {
+  ruhig: { flaeche: 'bg-amber-400', schrift: 'text-stone-900' },
+  warnung: { flaeche: 'bg-red-700', schrift: 'text-white' },
+} as const
+
+function band(): (typeof ABSPERRBAND)[keyof typeof ABSPERRBAND] {
+  return UMGEBUNG.warnungen.length > 0 ? ABSPERRBAND.warnung : ABSPERRBAND.ruhig
+}
+
 export function UmgebungsBanner(): React.JSX.Element | null {
   meldeUmgebungsWarnungen()
   if (!ZEIGE_UMGEBUNGSBANNER) return null
@@ -33,14 +47,13 @@ export function UmgebungsBanner(): React.JSX.Element | null {
   const { lang, kurz } = bannerZeilen(UMGEBUNG)
   const warnung = UMGEBUNG.warnungen.length > 0
   const mitLink = bannerLink(UMGEBUNG) !== null
+  const { flaeche, schrift } = band()
 
   return (
     <div
       role="status"
       aria-label="Hinweis auf die Testumgebung"
-      className={`relative z-[60] print:hidden pt-[env(safe-area-inset-top)] ${
-        warnung ? 'bg-red-700 text-white' : 'bg-amber-400 text-stone-900'
-      }`}
+      className={`relative z-[60] print:hidden pt-[env(safe-area-inset-top)] ${flaeche} ${schrift}`}
     >
       <p
         className={`text-center text-xs font-bold tracking-wide ${
@@ -74,12 +87,11 @@ export function UmgebungsBannerLink(): React.JSX.Element | null {
   if (!ZEIGE_UMGEBUNGSBANNER) return null
   const link = bannerLink(UMGEBUNG)
   if (!link) return null
-  const warnung = UMGEBUNG.warnungen.length > 0
 
   return (
     <nav
       aria-label="Testumgebung"
-      className={`absolute top-[env(safe-area-inset-top)] right-4 z-[61] print:hidden ${warnung ? 'text-white' : 'text-stone-900'}`}
+      className={`absolute top-[env(safe-area-inset-top)] right-4 z-[61] print:hidden ${band().schrift}`}
     >
       <a
         href={link.href}

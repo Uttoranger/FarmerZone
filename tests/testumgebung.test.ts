@@ -8,17 +8,21 @@
  *    (Produktions-Deployment bei Vercel), ohne Schlüssel keine Marke, nie ein
  *    Stück des Schlüssels.
  *  - „Zur echten Seite" steht nur im Banner der Vorschau.
- *  - Post außerhalb der Produktion nur an TEST_EMPFAENGER und @example.com;
- *    die Produktion ist nie gesperrt.
+ *  - Post frei nur im Produktions-Deployment bei Vercel (fail-closed wie die
+ *    Modus-Wache); sonst nur an TEST_EMPFAENGER und @example.com — auch im
+ *    lokalen Produktions-Build. Gemeldet wird nur die Sperre „trotz Produktion".
  */
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { PRODUKTION_ADRESSE, bestimmeUmgebung, type UmgebungsArt } from '@/lib/umgebung'
+import { PRODUKTION_ADRESSE, bannerZeilen, bestimmeUmgebung } from '@/lib/umgebung'
 import {
   STRIPE_MARKE_TEXT,
   ZUR_ECHTEN_SEITE,
   bannerLink,
   darfMailEmpfangen,
   leseTestEmpfaenger,
+  sperrtTrotzProduktion,
   stripeMarke,
 } from '@/lib/testumgebung'
 
@@ -54,6 +58,25 @@ describe('stripeMarke — Marke im Admin-Kopf', () => {
 
   it('die Texte stehen wörtlich wie in freigabe.md §12', () => {
     expect(STRIPE_MARKE_TEXT).toEqual({ live: 'Stripe Live', test: 'Stripe Test' })
+  })
+
+  it('„Stripe Test" hat EINE Quelle: Marke im Admin und Banner sagen dasselbe', () => {
+    const banner = bannerZeilen(bestimmeUmgebung({ VERCEL_ENV: 'preview', STRIPE_SECRET_KEY: 'sk_test_x' }))
+    expect(banner.kurz).toContain(STRIPE_MARKE_TEXT.test)
+    // Im Quelltext unter src/ steht das Wort nur einmal als Zeichenkette (Kommentare zählen nicht).
+    const ohneKommentare = (text: string): string => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+    const dateien: string[] = []
+    const sammle = (ordner: string): void => {
+      for (const name of readdirSync(ordner)) {
+        const pfad = join(ordner, name)
+        if (statSync(pfad).isDirectory()) sammle(pfad)
+        else if (/\.tsx?$/.test(name)) dateien.push(pfad)
+      }
+    }
+    sammle(join(process.cwd(), 'src'))
+    const funde = dateien.filter((pfad) => /['"`]Stripe Test['"`]/.test(ohneKommentare(readFileSync(pfad, 'utf8'))))
+    // Gegenprobe: Die Suche findet die eine Quelle.
+    expect(funde.map((pfad) => relative(process.cwd(), pfad).split('\\').join('/'))).toEqual(['src/lib/umgebung.ts'])
   })
 
   it('kommt aus bestimmeUmgebung und trägt nie ein Stück des Schlüssels — auch bei eingeschränkten Schlüsseln', () => {
@@ -105,40 +128,55 @@ describe('leseTestEmpfaenger — die Liste aus TEST_EMPFAENGER', () => {
   })
 })
 
-describe('darfMailEmpfangen — Post außerhalb der Produktion', () => {
+describe('darfMailEmpfangen — Post nur im Produktions-Deployment frei (fail-closed)', () => {
   const LISTE = leseTestEmpfaenger('tester@example.org, zweite@example.net')
-  const NICHT_PRODUKTION: readonly UmgebungsArt[] = ['preview', 'lokal']
+  // Dieselbe Lage wie bei der Modus-Wache (Nr. 42): frei nur mit VERCEL_ENV=production.
+  const ECHTE_PRODUKTION = { art: 'produktion', vercelProduktion: true } as const
+  // Gebaut wie die Produktion, aber ohne VERCEL_ENV: lokaler Build, CI, Skripte — oder eine Produktion ohne Systemvariablen.
+  const PRODUKTION_OHNE_VERCEL = { art: 'produktion', vercelProduktion: false } as const
+  const NICHT_FREI = [
+    { art: 'preview', vercelProduktion: false },
+    { art: 'lokal', vercelProduktion: false },
+    PRODUKTION_OHNE_VERCEL,
+  ] as const
+  const name = (u: { art: string; vercelProduktion: boolean }): string => `${u.art}${u.vercelProduktion ? '+vercel' : ''}`
 
-  it('Produktion: jede Adresse — eine echte Bestellbestätigung hängt an keiner Liste', () => {
-    expect(darfMailEmpfangen('kundin@example.org', 'produktion', new Set())).toBe(true)
-    expect(darfMailEmpfangen('Kundin@Beispiel.example', 'produktion', LISTE)).toBe(true)
+  it('Produktions-Deployment bei Vercel: jede Adresse — eine echte Bestellbestätigung hängt an keiner Liste', () => {
+    expect(darfMailEmpfangen('kundin@example.org', ECHTE_PRODUKTION, new Set())).toBe(true)
+    expect(darfMailEmpfangen('Kundin@Beispiel.example', ECHTE_PRODUKTION, LISTE)).toBe(true)
+  })
+
+  it('wie die Produktion gebaut, aber ohne VERCEL_ENV=production: gesperrt wie außerhalb', () => {
+    expect(darfMailEmpfangen('kundin@example.org', PRODUKTION_OHNE_VERCEL, new Set())).toBe(false)
+    expect(darfMailEmpfangen('bauer-01@example.com', PRODUKTION_OHNE_VERCEL, new Set())).toBe(true)
+    expect(darfMailEmpfangen('tester@example.org', PRODUKTION_OHNE_VERCEL, LISTE)).toBe(true)
   })
 
   it('außerhalb: Adressen aus TEST_EMPFAENGER, ohne Rücksicht auf Groß-/Kleinschreibung und Ränder', () => {
-    for (const art of NICHT_PRODUKTION) {
-      expect(darfMailEmpfangen('tester@example.org', art, LISTE), art).toBe(true)
-      expect(darfMailEmpfangen('  ZWEITE@example.NET ', art, LISTE), art).toBe(true)
+    for (const u of NICHT_FREI) {
+      expect(darfMailEmpfangen('tester@example.org', u, LISTE), name(u)).toBe(true)
+      expect(darfMailEmpfangen('  ZWEITE@example.NET ', u, LISTE), name(u)).toBe(true)
     }
   })
 
   it('außerhalb: jede Adresse der Domain example.com, auch ohne Liste', () => {
-    for (const art of NICHT_PRODUKTION) {
-      expect(darfMailEmpfangen('bauer-01@example.com', art, new Set()), art).toBe(true)
-      expect(darfMailEmpfangen('Admin@EXAMPLE.com', art, new Set()), art).toBe(true)
+    for (const u of NICHT_FREI) {
+      expect(darfMailEmpfangen('bauer-01@example.com', u, new Set()), name(u)).toBe(true)
+      expect(darfMailEmpfangen('Admin@EXAMPLE.com', u, new Set()), name(u)).toBe(true)
     }
   })
 
   it('außerhalb: alles andere nicht', () => {
-    for (const art of NICHT_PRODUKTION) {
-      expect(darfMailEmpfangen('kundin@example.org', art, LISTE), art).toBe(false)
-      expect(darfMailEmpfangen('tester@example.org', art, new Set()), art).toBe(false)
+    for (const u of NICHT_FREI) {
+      expect(darfMailEmpfangen('kundin@example.org', u, LISTE), name(u)).toBe(false)
+      expect(darfMailEmpfangen('tester@example.org', u, new Set()), name(u)).toBe(false)
     }
   })
 
   it('außerhalb: nur genau example.com — keine Unterdomain, keine angehängte Domain', () => {
     // Die Unterdomain fängt auch ein naives endsWith('example.com') — ohne fremde .com-Domain im Test.
     for (const adresse of ['x@sub.example.com', 'x@example.com.example.org', 'x@example.comx']) {
-      expect(darfMailEmpfangen(adresse, 'preview', new Set()), adresse).toBe(false)
+      expect(darfMailEmpfangen(adresse, NICHT_FREI[0], new Set()), adresse).toBe(false)
     }
   })
 
@@ -151,7 +189,24 @@ describe('darfMailEmpfangen — Post außerhalb der Produktion', () => {
       '',
       '   ',
     ]) {
-      expect(darfMailEmpfangen(adresse, 'preview', LISTE), adresse).toBe(false)
+      expect(darfMailEmpfangen(adresse, NICHT_FREI[0], LISTE), adresse).toBe(false)
     }
+  })
+})
+
+describe('sperrtTrotzProduktion — wann die Sperre gemeldet wird (Sicherheitsnetz)', () => {
+  it('nur, wenn die App sich für die Produktion hält und VERCEL_ENV=production fehlt', () => {
+    expect(sperrtTrotzProduktion({ art: 'produktion', vercelProduktion: false })).toBe(true)
+  })
+
+  it('nie im Produktions-Deployment, in der Vorschau oder lokal — dort ist die Sperre gewollt bzw. aus', () => {
+    expect(sperrtTrotzProduktion({ art: 'produktion', vercelProduktion: true })).toBe(false)
+    expect(sperrtTrotzProduktion({ art: 'preview', vercelProduktion: false })).toBe(false)
+    expect(sperrtTrotzProduktion({ art: 'lokal', vercelProduktion: false })).toBe(false)
+  })
+
+  it('kommt aus bestimmeUmgebung: lokaler Produktions-Build ja, Produktion bei Vercel nein', () => {
+    expect(sperrtTrotzProduktion(bestimmeUmgebung({ NODE_ENV: 'production' }))).toBe(true)
+    expect(sperrtTrotzProduktion(bestimmeUmgebung({ NODE_ENV: 'production', VERCEL_ENV: 'production' }))).toBe(false)
   })
 })

@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
+import { stripeStartGesperrt } from '@/lib/stripe-modus'
 import {
   PRODUKTION_ADRESSE,
+  WARNUNG_LIVE_IN_VORSCHAU,
   bannerZeilen,
   bestimmeUmgebung,
   datenbankHost,
@@ -331,9 +333,19 @@ describe('bestimmeUmgebung — Warnungen', () => {
     expect(u.warnungen).toEqual(['Fremde Datenbank — das ist nicht die Dev-Datenbank.'])
   })
 
-  it('warnt in der Preview vor Stripe live', () => {
+  // Seit der Modus-Wache aus Nr. 42 startet ein Live-Schlüssel in der Vorschau
+  // nicht — „echte Zahlungen möglich" war nicht mehr wahr (Nr. 43, Runde 1).
+  it('warnt in der Preview vor einem Live-Schlüssel — und sagt, was die Wache tut', () => {
     const u = bestimmeUmgebung({ ...PREVIEW, STRIPE_SECRET_KEY: 'sk_live_x' })
-    expect(u.warnungen).toEqual(['Stripe LIVE — echte Zahlungen möglich.'])
+    expect(u.warnungen).toEqual([WARNUNG_LIVE_IN_VORSCHAU])
+    // Der Satz stimmt mit der Wache überein: Stripe startet dort nicht.
+    expect(stripeStartGesperrt(u)).toBe(true)
+    expect(WARNUNG_LIVE_IN_VORSCHAU).toMatch(/startet nicht/)
+    expect(WARNUNG_LIVE_IN_VORSCHAU).not.toMatch(/Zahlungen möglich/)
+  })
+
+  it('warnt genauso bei einem eingeschränkten Live-Schlüssel', () => {
+    expect(bestimmeUmgebung({ ...PREVIEW, STRIPE_SECRET_KEY: 'rk_live_x' }).warnungen).toEqual([WARNUNG_LIVE_IN_VORSCHAU])
   })
 
   it('warnt in der Preview, wenn Vercel keine Adresse liefert — dann fehlen die Systemvariablen', () => {
@@ -418,9 +430,11 @@ const STAGING: UmgebungsWerte = {
 }
 
 describe('httpsHerkunft — nur eine reine https-Adresse', () => {
-  it('gibt die Herkunft normalisiert zurück: klein, ohne Schrägstrich am Ende', () => {
+  it('gibt die Herkunft normalisiert zurück: klein, ohne Schrägstrich und ohne Punkt am Ende', () => {
     expect(httpsHerkunft('https://test.farmerzone.example')).toBe(TESTUMGEBUNG)
     expect(httpsHerkunft('  https://Test.FarmerZone.example/  ')).toBe(TESTUMGEBUNG)
+    // Der Punkt am Ende ist derselbe Host — der Browser schickt die Herkunft ohne ihn.
+    expect(httpsHerkunft('https://test.farmerzone.example.')).toBe(TESTUMGEBUNG)
     expect(httpsHerkunft('https://test.farmerzone.example:8443')).toBe('https://test.farmerzone.example:8443')
   })
 
@@ -492,8 +506,17 @@ describe('bestimmeUmgebung — eigene Adresse der Vorschau (Register Z3)', () =>
     }
   })
 
-  it('nimmt die echte Seite nie als Adresse einer Vorschau — auch nicht mit www', () => {
-    for (const wert of [PRODUKTION_ADRESSE, `${PRODUKTION_ADRESSE}/`, PRODUKTION_ADRESSE.replace('https://', 'https://www.')]) {
+  it('nimmt die echte Seite nie als Adresse einer Vorschau — mit www, Punkt am Ende, groß geschrieben oder mit Pfad', () => {
+    const host = new URL(PRODUKTION_ADRESSE).hostname
+    for (const wert of [
+      PRODUKTION_ADRESSE,
+      `${PRODUKTION_ADRESSE}/`,
+      `https://www.${host}`,
+      `https://${host}.`,
+      `HTTPS://${host.toUpperCase()}`,
+      `https://${host}/pfad`,
+      `http://${host}`,
+    ]) {
       const u = bestimmeUmgebung({ ...STAGING, NEXT_PUBLIC_APP_URL: wert })
       expect(u.appUrl, wert).toBe('https://farmer-zone-git-staging-team.vercel.app')
       expect(u.trustedOrigins.join(' '), wert).not.toContain('farmerzone.at')
@@ -541,10 +564,18 @@ describe('bestimmeUmgebung — Link zur Testumgebung (Register Z3)', () => {
     }
   })
 
-  it('führt nie unter dem Namen „Testumgebung" auf die echte Seite', () => {
-    const u = bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_TESTUMGEBUNG_URL: PRODUKTION_ADRESSE })
-    expect(u.testumgebungUrl).toBeNull()
-    expect(u.warnungen).toEqual(['NEXT_PUBLIC_TESTUMGEBUNG_URL zeigt auf die echte Seite — der Link zur Testumgebung fehlt.'])
+  it('führt nie unter dem Namen „Testumgebung" auf die echte Seite — auch nicht mit Punkt, Großschreibung oder Pfad', () => {
+    const host = new URL(PRODUKTION_ADRESSE).hostname
+    for (const wert of [PRODUKTION_ADRESSE, `https://${host}.`, `https://${host.toUpperCase()}/admin`, `https://www.${host}`]) {
+      const u = bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_TESTUMGEBUNG_URL: wert })
+      expect(u.testumgebungUrl, wert).toBeNull()
+      expect(u.warnungen, wert).toEqual(['NEXT_PUBLIC_TESTUMGEBUNG_URL zeigt auf die echte Seite — der Link zur Testumgebung fehlt.'])
+    }
+  })
+
+  it('Gegenprobe: eine Unterdomain der echten Seite ist nicht die echte Seite', () => {
+    const host = new URL(PRODUKTION_ADRESSE).hostname
+    expect(bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_TESTUMGEBUNG_URL: `https://test.${host}` }).testumgebungUrl).toBe(`https://test.${host}`)
   })
 
   it('verlinkt nicht auf sich selbst — in der Testumgebung gibt es den Link nicht', () => {

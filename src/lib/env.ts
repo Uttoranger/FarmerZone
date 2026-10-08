@@ -59,9 +59,9 @@ const serverEnvSchema = z.object({
   // ohne Formprüfung: Ein Tippfehler kostet den Link und meldet sich als
   // Warnung (Sentry bzw. Banner), aber nie den Start der Produktion.
   NEXT_PUBLIC_TESTUMGEBUNG_URL: optional(),
-  // OPTIONAL (Register Z3, Nr. 43): Wer außerhalb der Produktion Mails bekommt
-  // — durch Komma getrennte Adressen, dazu immer @example.com. Fehlt sie, gehen
-  // dort nur Mails an Testkonten. Als Text, nicht als Liste: Im Test-Modus
+  // OPTIONAL (Register Z3, Nr. 43): Wer außerhalb des Produktions-Deployments
+  // bei Vercel Mails bekommt — durch Komma getrennte Adressen, dazu immer
+  // @example.com. Fehlt sie, gehen dort nur Mails an Testkonten. Als Text, nicht als Liste: Im Test-Modus
   // unten ist env das rohe process.env, eine Liste wäre dort ein String. Die
   // Liste baut leseTestEmpfaenger (src/lib/testumgebung.ts).
   TEST_EMPFAENGER: optional(),

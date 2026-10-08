@@ -156,6 +156,23 @@ describe('Umgebungsbanner: „Zur echten Seite"', () => {
     expect(link).not.toContain('target=')
   })
 
+  // DESIGN_SYSTEM.md, Ausnahme „Absperrband": feste Farben an EINER Stelle, Balken und Link nehmen sie von dort.
+  it('die Farben des Absperrbands stehen genau einmal im Banner — Balken und Link teilen sie', () => {
+    const banner = ohneKommentare(quelle('src/components/shared/umgebungs-banner.tsx'))
+    for (const farbe of ['bg-amber-400', 'text-stone-900', 'bg-red-700', 'text-white']) {
+      expect(banner.split(farbe).length - 1, farbe).toBe(1)
+    }
+    expect(banner).toMatch(/ABSPERRBAND/)
+  })
+
+  it('Gegenprobe: der Link trägt die Schriftfarbe des Bands, der Balken Fläche und Schrift', () => {
+    const { balken, link } = banner(VORSCHAU)
+    expect(balken).toContain('bg-amber-400')
+    expect(balken).toContain('text-stone-900')
+    expect(link).toContain('text-stone-900')
+    expect(link).not.toContain('bg-amber-400')
+  })
+
   it('das Root-Layout setzt den Link hinter die Seite — „Zum Inhalt springen" bleibt der erste Link', () => {
     const layout = ohneKommentare(quelle('src/app/layout.tsx'))
     const balken = layout.indexOf('<UmgebungsBanner />')

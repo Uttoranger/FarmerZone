@@ -108,9 +108,23 @@ const PRODUKTION_HOST = 'farmerzone.at'
  */
 export const PRODUKTION_ADRESSE = `https://${PRODUKTION_HOST}`
 
-/** Zeigt eine (normalisierte) Herkunft auf die echte Seite — mit oder ohne www? */
-function istEchteSeite(herkunft: string): boolean {
-  return herkunft === PRODUKTION_ADRESSE || herkunft === `https://www.${PRODUKTION_HOST}`
+/** Der Host einer Adresse, wie ihn der Browser vergleicht: klein, ohne Punkt am Ende — oder null. */
+function hostVon(roh: string): string | null {
+  try {
+    return new URL(roh).hostname.toLowerCase().replace(/\.$/, '')
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Zeigt eine eingetragene Adresse auf die echte Seite — mit oder ohne www?
+ * Verglichen wird der Host, nicht der Text: „https://FarmerZone.at./pfad"
+ * ist ebenso die echte Seite wie „http://farmerzone.at" (Nr. 43, Runde 1).
+ */
+function zeigtAufEchteSeite(roh: string): boolean {
+  const host = hostVon(roh)
+  return host === PRODUKTION_HOST || host === `www.${PRODUKTION_HOST}`
 }
 
 /**
@@ -132,19 +146,25 @@ export function httpsHerkunft(wert: string | undefined): string | null {
   }
   if (url.protocol !== 'https:') return null
   if (url.username || url.password || url.search || url.hash || url.pathname !== '/') return null
+  // Der Punkt am Ende ist derselbe Host; der Browser schickt die Herkunft ohne ihn.
+  const host = url.hostname.replace(/\.$/, '')
   // WHATWG-URL lässt „*" im Host stehen — ein Platzhalter ist nie eine Herkunft.
-  if (!/^[a-z0-9.-]+$/.test(url.hostname)) return null
-  return url.origin
+  if (!/^[a-z0-9.-]+$/.test(host)) return null
+  return `https://${host}${url.port ? `:${url.port}` : ''}`
 }
 
 type AdressPruefung = { herkunft: string } | { problem: 'keine-https-adresse' | 'echte-seite' } | null
 
-/** Eine eingetragene Adresse prüfen: fehlt (null), taugt, oder warum nicht. */
+/**
+ * Eine eingetragene Adresse prüfen: fehlt (null), taugt, oder warum nicht.
+ * Die echte Seite zuerst — sie ist der schwerere Fehler, auch mit Pfad oder http.
+ */
 function pruefeAdresse(wert: string | undefined): AdressPruefung {
-  if (!bereinigt(wert)) return null
-  const herkunft = httpsHerkunft(wert)
+  const roh = bereinigt(wert)
+  if (!roh) return null
+  if (zeigtAufEchteSeite(roh)) return { problem: 'echte-seite' }
+  const herkunft = httpsHerkunft(roh)
   if (!herkunft) return { problem: 'keine-https-adresse' }
-  if (istEchteSeite(herkunft)) return { problem: 'echte-seite' }
   return { herkunft }
 }
 
@@ -273,6 +293,16 @@ function umgebungsArt(werte: UmgebungsWerte): UmgebungsArt {
   return 'produktion'
 }
 
+/**
+ * Die Warnung bei einem Live-Schlüssel in der Vorschau — aus einer Quelle,
+ * damit Banner und Test dasselbe sagen. Sie beschreibt, was die Modus-Wache
+ * tut (src/lib/stripe-modus.ts, Nr. 42): Außerhalb des Produktions-Deployments
+ * startet Stripe mit Live-Schlüssel nicht. Bis Nr. 43 stand hier „echte
+ * Zahlungen möglich" — seit der Wache nicht mehr wahr.
+ */
+export const WARNUNG_LIVE_IN_VORSCHAU =
+  'Live-Schlüssel in der Vorschau — Stripe startet nicht, Online-Zahlungen sind gesperrt. Bitte einen Test-Schlüssel eintragen.'
+
 export function bestimmeUmgebung(werte: UmgebungsWerte): Umgebung {
   const art = umgebungsArt(werte)
   // Nur in der Vorschau zählt die eigene Adresse aus NEXT_PUBLIC_APP_URL als
@@ -336,7 +366,7 @@ export function bestimmeUmgebung(werte: UmgebungsWerte): Umgebung {
       )
     }
     if (datenbank === 'fremd') warnungen.push('Fremde Datenbank — das ist nicht die Dev-Datenbank.')
-    if (stripe === 'live') warnungen.push('Stripe LIVE — echte Zahlungen möglich.')
+    if (stripe === 'live') warnungen.push(WARNUNG_LIVE_IN_VORSCHAU)
     if (!appUrl) {
       warnungen.push('Keine Vercel-Adresse bekannt — der Login kann so nicht funktionieren.')
     }
@@ -369,11 +399,16 @@ const DATENBANK_LABEL: Record<DatenbankArt, { lang: string; kurz: string }> = {
   fremd: { lang: 'Fremde Datenbank', kurz: 'fremde DB' },
 }
 
-const STRIPE_LABEL: Record<StripeArt, string> = {
+/**
+ * Wie der Stripe-Modus heißt — die eine Quelle auch für die Marke im Admin
+ * (STRIPE_MARKE_TEXT in src/lib/testumgebung.ts, Nr. 43). „LIVE" schreit das
+ * Banner bewusst: In einer Vorschau ist ein Live-Schlüssel ein Fehler.
+ */
+export const STRIPE_LABEL = {
   test: 'Stripe Test',
   live: 'Stripe LIVE',
   fehlt: 'Stripe fehlt',
-}
+} as const satisfies Record<StripeArt, string>
 
 /**
  * Die Zeilen des Umgebungsbanners — lang für breite, kurz für schmale Bildschirme.

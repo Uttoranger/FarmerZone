@@ -8,18 +8,23 @@
  * Entwicklungsdatenbank, Stripe im Testmodus. Damit niemand die beiden
  * verwechselt, sagt der Admin-Kopf, welcher Stripe-Modus gilt, und es gibt
  * Wege hin und zurück. Und damit ein Probelauf niemandem schreibt, der nichts
- * bestellt hat, geht außerhalb der Produktion Post nur an freigegebene Adressen.
+ * bestellt hat, geht Post nur im Produktions-Deployment an jede Adresse,
+ * sonst nur an freigegebene.
  *
  * Welche Umgebung gilt und welcher Stripe-Modus, entscheidet allein
  * bestimmeUmgebung (src/lib/umgebung.ts) — aus Etiketten, nie aus dem Schlüssel.
  */
-import { PRODUKTION_ADRESSE, type Umgebung, type UmgebungsArt } from '@/lib/umgebung'
+import { PRODUKTION_ADRESSE, STRIPE_LABEL, type Umgebung } from '@/lib/umgebung'
 import { stripeStartGesperrt, type StripeModus } from '@/lib/stripe-modus'
 
 // ─── Marke im Admin-Kopf ─────────────────────────────────────────────────────
 
-/** Wörtlich aus freigabe.md §12 (Nr. 43). */
-export const STRIPE_MARKE_TEXT = { live: 'Stripe Live', test: 'Stripe Test' } as const
+/**
+ * Wörtlich aus freigabe.md §12 (Nr. 43). „Stripe Test" kommt aus derselben
+ * Quelle wie im Umgebungsbanner; „Stripe Live" schreibt nur der Admin so — das
+ * Banner ruft dort „Stripe LIVE", weil es in einer Vorschau ein Fehler ist.
+ */
+export const STRIPE_MARKE_TEXT = { live: 'Stripe Live', test: STRIPE_LABEL.test } as const
 
 export type StripeMarke = {
   text: (typeof STRIPE_MARKE_TEXT)[keyof typeof STRIPE_MARKE_TEXT]
@@ -57,7 +62,7 @@ export function bannerLink(u: Pick<Umgebung, 'art'>): typeof ZUR_ECHTEN_SEITE | 
   return u.art === 'preview' ? ZUR_ECHTEN_SEITE : null
 }
 
-// ─── Post außerhalb der Produktion ───────────────────────────────────────────
+// ─── Post nur im Produktions-Deployment frei ─────────────────────────────────
 
 /** Die Domain der Seed- und Testkonten (prisma/seed-daten.ts, Tests). */
 const TEST_DOMAIN = 'example.com'
@@ -88,19 +93,35 @@ export function leseTestEmpfaenger(roh: string | undefined): ReadonlySet<string>
   )
 }
 
+/** Was die Post-Regel von der Umgebung braucht — wie die Modus-Wache aus Nr. 42. */
+export type PostUmgebung = Pick<Umgebung, 'art' | 'vercelProduktion'>
+
 /**
  * Darf an diese Adresse in dieser Umgebung eine Mail gehen?
  *
- * Die Produktion immer — eine echte Bestellbestätigung hängt an keiner Liste.
- * Außerhalb (Testumgebung, andere Vorschauen, lokal mit Resend-Schlüssel) nur
- * Adressen aus TEST_EMPFAENGER und der Domain example.com: Die
+ * Frei nur im Produktions-Deployment bei Vercel (`art` produktion UND
+ * `VERCEL_ENV=production`) — fail-closed wie die Modus-Wache (Nr. 42,
+ * Entscheidung des Dirigenten, Nr. 43 Runde 1): `bestimmeUmgebung` ordnet
+ * Unbekanntes als „produktion" ein, also auch einen lokalen Produktions-Build,
+ * die CI und Skripte. Dort und in Testumgebung, Vorschau und lokal gehen Mails
+ * nur an TEST_EMPFAENGER und die Domain example.com: Die
  * Entwicklungsdatenbank kann Adressen tragen, die nie Post aus einem Test
- * bekommen sollen. Ohne Liste gehen dort also nur Mails an Testkonten.
+ * bekommen sollen. Ohne Liste also nur an Testkonten.
  */
-export function darfMailEmpfangen(adresse: string, art: UmgebungsArt, testEmpfaenger: ReadonlySet<string>): boolean {
-  if (art === 'produktion') return true
+export function darfMailEmpfangen(adresse: string, u: PostUmgebung, testEmpfaenger: ReadonlySet<string>): boolean {
+  if (u.art === 'produktion' && u.vercelProduktion) return true
   const a = normalisiert(adresse)
   if (!SCHLICHTE_ADRESSE.test(a)) return false
   if (a.slice(a.lastIndexOf('@') + 1) === TEST_DOMAIN) return true
   return testEmpfaenger.has(a)
+}
+
+/**
+ * Sperrt die Post, obwohl die App sich für die Produktion hält? Das ist ein
+ * lokaler Produktions-Build, die CI — oder eine echte Produktion, der Vercel
+ * die Systemvariablen nicht gibt. Damit Letztere nicht still verstummt,
+ * meldet src/lib/email.ts diesen Fall (und nur ihn) einmal je Instanz an Sentry.
+ */
+export function sperrtTrotzProduktion(u: PostUmgebung): boolean {
+  return u.art === 'produktion' && !u.vercelProduktion
 }

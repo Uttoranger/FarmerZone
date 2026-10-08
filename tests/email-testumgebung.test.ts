@@ -6,7 +6,10 @@
  *  - In der Vorschau gehen Mails nur an TEST_EMPFAENGER und @example.com;
  *    alles andere verschickt sendRaw nicht, sondern zählt es — im Log steht
  *    keine Adresse.
- *  - Die Produktion verschickt an jede Adresse (Gegenprobe aus demselben Modul).
+ *  - Frei ist nur das Produktions-Deployment bei Vercel (VERCEL_ENV=production,
+ *    Gegenprobe aus demselben Modul). Gebaut wie die Produktion, aber ohne
+ *    VERCEL_ENV (lokaler Build, CI, Skripte), gilt die Sperre — und Sentry
+ *    erfährt es höchstens einmal je Instanz, ohne Adresse und Betreff.
  *  - Ohne RESEND_API_KEY bleibt der Log-Modus, wie er war.
  *
  * Die Umgebung entsteht wie im Betrieb aus VERCEL_ENV (umgebung-server.ts,
@@ -15,9 +18,10 @@
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 
-const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
+const { sendMock, captureMessage } = vi.hoisted(() => ({ sendMock: vi.fn(), captureMessage: vi.fn() }))
 
 vi.mock('server-only', () => ({}))
+vi.mock('@sentry/nextjs', () => ({ captureMessage, captureException: vi.fn() }))
 vi.mock('resend', () => ({
   Resend: class {
     emails = { send: sendMock }
@@ -31,6 +35,7 @@ const IMPORT_TIMEOUT = 30_000
 type EmailModul = typeof import('@/lib/email')
 let vorschau: EmailModul
 let produktion: EmailModul
+let produktionOhneVercel: EmailModul
 let vorschauOhneKey: EmailModul
 
 async function ladeMit(werte: Record<string, string>): Promise<EmailModul> {
@@ -45,9 +50,11 @@ beforeAll(async () => {
     RESEND_API_KEY: 're_test_dummy',
     TEST_EMPFAENGER: 'tester@example.org, Zweite@Example.net',
   })
-  produktion = await ladeMit({ VERCEL_ENV: '', RESEND_API_KEY: 're_test_dummy', TEST_EMPFAENGER: '' })
+  produktion = await ladeMit({ VERCEL_ENV: 'production', RESEND_API_KEY: 're_test_dummy', TEST_EMPFAENGER: '' })
+  // Wie ein lokaler Produktions-Build: NODE_ENV ist nicht development, VERCEL_ENV fehlt.
+  produktionOhneVercel = await ladeMit({ VERCEL_ENV: '', RESEND_API_KEY: 're_test_dummy', TEST_EMPFAENGER: '' })
   vorschauOhneKey = await ladeMit({ VERCEL_ENV: 'preview', RESEND_API_KEY: '', TEST_EMPFAENGER: '' })
-}, IMPORT_TIMEOUT * 3)
+}, IMPORT_TIMEOUT * 4)
 
 afterAll(() => {
   vi.unstubAllEnvs()
@@ -56,6 +63,7 @@ afterAll(() => {
 let log: MockInstance<typeof console.log>
 
 beforeEach(() => {
+  captureMessage.mockReset()
   sendMock.mockReset()
   sendMock.mockResolvedValue({ data: { id: 'email_1' }, error: null })
   log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
@@ -119,13 +127,49 @@ describe('Vorschau: Post nur an freigegebene Adressen', () => {
   })
 })
 
+describe('Wie die Produktion gebaut, aber ohne VERCEL_ENV=production (fail-closed)', () => {
+  it('verschickt nicht an eine fremde Adresse — wie außerhalb der Produktion', async () => {
+    const ergebnis = await produktionOhneVercel.sendRaw('kundin@example.org', 'Test', '<p>Hallo</p>')
+
+    expect(ergebnis).toEqual({ gesperrt: true })
+    expect(sendMock).not.toHaveBeenCalled()
+  })
+
+  it('verschickt weiter an Testkonten von example.com', async () => {
+    await produktionOhneVercel.sendRaw('bauer-01@example.com', 'Test', '<p>Hallo</p>')
+
+    expect(sendMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('meldet die Sperre höchstens einmal je Instanz an Sentry — fester Satz, ohne Adresse und Betreff', async () => {
+    // Eigene Instanz: Das „schon gemeldet" lebt auf Modulebene.
+    const frisch = await ladeMit({ VERCEL_ENV: '', RESEND_API_KEY: 're_test_dummy', TEST_EMPFAENGER: '' })
+    captureMessage.mockReset()
+
+    await frisch.sendRaw('kundin@example.org', 'Deine Bestellung 4711', '<p>Hallo</p>')
+    await frisch.sendRaw('andere-kundin@example.org', 'Deine Bestellung 4712', '<p>Hallo</p>')
+
+    expect(captureMessage).toHaveBeenCalledTimes(1)
+    const gemeldet = JSON.stringify(captureMessage.mock.calls)
+    expect(gemeldet).toMatch(/VERCEL_ENV/)
+    expect(gemeldet).not.toMatch(/kundin@|example\.org|Bestellung/)
+  }, IMPORT_TIMEOUT)
+})
+
 describe('Gegenproben', () => {
-  it('Produktion: verschickt an jede Adresse — die Sperre gilt nur außerhalb', async () => {
+  it('Produktions-Deployment bei Vercel: verschickt an jede Adresse, ohne Meldung', async () => {
     const ergebnis = await produktion.sendRaw('kundin@example.org', 'Test', '<p>Hallo</p>')
 
     expect(ergebnis).toEqual({ id: 'email_1' })
     expect(sendMock).toHaveBeenCalledWith(expect.objectContaining({ to: 'kundin@example.org' }))
     expect(geloggt()).not.toMatch(/Nicht verschickt/)
+    expect(captureMessage).not.toHaveBeenCalled()
+  })
+
+  it('Vorschau: die gewollte Sperre meldet nichts an Sentry', async () => {
+    await vorschau.sendRaw('kundin@example.org', 'Test', '<p>Hallo</p>')
+
+    expect(captureMessage).not.toHaveBeenCalled()
   })
 
   it('ohne RESEND_API_KEY bleibt der Log-Modus, wie er war — auch in der Vorschau', async () => {
