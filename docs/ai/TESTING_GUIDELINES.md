@@ -100,6 +100,13 @@ pnpm test:integration                        # Integration (braucht .env.test)
   schützt.
 - **Nicht in `pnpm test`, nicht im Stop-Hook.** Eigener CI-Job `integration` mit
   einem `postgres:17`-Dienst.
+- **Was an der Verbindung passiert, misst man an pg selbst** (seit Nr. 47):
+  Gleichzeitige Abfragen auf einer Verbindung zählt eine Hülle um
+  `pg.Client.prototype.query` (nur zählen, nie ändern; Vorbild
+  `tests/integration/kasse-lesepfad.int.test.ts`); einen Verbindungsabbruch des
+  Poolers stellt eine Hülle um `pg.Pool.prototype.query` her (Vorbild
+  `tests/integration/oeffentlich-lesen.int.test.ts`). Prisma und Adapter
+  bleiben echt; beide Hüllen kommen im `afterAll` wieder weg.
 
 ### Folge der Node-Umgebung
 - **Kein DOM, keine Interaktion.** Keine Testing-Library, kein Klicken, kein Snapshot von JSX.
@@ -197,6 +204,7 @@ in einen ungültigen Schlüssel statt in echtes Geld.
 - Keine gemeinsame veränderliche Variable zwischen Tests. `beforeEach` zum Zurücksetzen (`vi.clearAllMocks()`).
 - Reihenfolge-Unabhängigkeit: Jeder Test muss allein laufen.
 - **Schwere Module echt importieren** (z. B. `@/lib/email` mit React und allen Vorlagen): einmal je Datei in `beforeAll` mit eigenem Timeout (`30_000`), nie in jedem Test. Ein kalter Import im Test zählt gegen das 5-s-Limit und reißt es, sobald parallel gearbeitet wird. `vi.resetModules()` nur, wo ein Modul Umgebungswerte auf Modulebene liest oder dort veränderlichen Zustand hält (etwa einen gemerkten Abruf) — dann ebenfalls in `beforeAll`, eine Instanz je Variante (Vorbild: `tests/email-sendraw.test.ts`, `tests/upload-ursache.test.ts`). Das Testlimit nie global anheben.
+- **Modul-Zustand, den Tests gegeneinander verschieben würden** (gemerkte Meldungen, Bremsen): Die Funktion nimmt den Zustand als optionalen letzten Parameter, die Aufrufer lassen ihn weg; jeder Test gibt einen frischen mit (Vorbild `neueBremsMeldungen` in `tests/bremse-datenbank.test.ts`), die Zeit als Parameter. Die Verdrahtung mit dem Zustand des Moduls prüft EIN frisch geladenes Modul (`vi.resetModules()` in `beforeAll`, die Attrappen danach ebenfalls neu importieren).
 
 ### Immer mitprüfen
 - Grenzfälle: 0, leer, `null`, exakt an der Frist, ein Millisekunde davor und danach.

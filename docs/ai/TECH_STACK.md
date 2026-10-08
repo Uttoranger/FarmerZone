@@ -24,6 +24,8 @@ Stand: 2026-09. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 ### Versionsfallen — hier verrät sich veraltetes Trainingswissen
 
 **Prisma 7:** Client wird über `PrismaPg`-Adapter instanziiert (`src/lib/prisma.ts`), nicht über `datasources`. Immer `import { prisma } from '@/lib/prisma'`. Nie einen zweiten `new PrismaClient()` anlegen.
+- **Verhalten mit dem pg-Adapter (7.8, gemessen in Nr. 47):** Relationen lädt Prisma als eigene Teilabfragen und startet sie gleichzeitig. Außerhalb einer Transaktion bekommt jede ihre eigene Verbindung aus dem Pool; IN einer Transaktion teilen sie sich eine — pg warnt dann „Calling client.query() when the client is already executing a query" (ab pg@9 ein Fehler). Zwei `findUnique`, die sich nicht zu einer Abfrage zusammenlegen lassen (z. B. mit `approvedAt: { not: null }`), bündelt Prisma im selben Takt zu einem Batch in EINER Transaktion — deshalb lädt eine Seite dieselbe Abfrage für Metadaten und Inhalt nur über React `cache` (ARCHITECTURE §4). Aufrufe auf einem `tx` reiht Prisma 7.8 selbst nacheinander ein; der Code verlässt sich nicht darauf (CODING_STANDARDS §4).
+- **Fehler des Adapters:** Einen Postgres-Fehler ohne eigene Prisma-Art (z. B. SQLSTATE 08006 des Poolers) reicht Prisma als `DriverAdapterError` durch, die Ursache steht in `cause` (`kind: 'postgres'`, `originalCode`, `originalMessage`); hängt Prisma ihn an einen eigenen Fehler, unter `meta.driverAdapterError` (`src/lib/verbindungsfehler.ts`).
 
 **Zod 4:** Nicht die Zod-3-Signaturen verwenden.
 - Fehlertexte: `z.string({ error: '…' })`, **nicht** `{ required_error, invalid_type_error }`.

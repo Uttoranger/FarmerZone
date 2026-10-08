@@ -122,6 +122,7 @@ NextResponse.json({ ok: true, …daten })
 - Fehlertexte aus SDKs und `fetch` gehen nur bereinigt nach Sentry (`bereinigeFehlerText`): Sie können Pfade, Dateinamen und Adressen tragen.
 - **Nie** `cause` mit dem Rohfehler setzen. Sentry schickt verkettete Fehler mit, am Kontext vorbei.
 - Kontexte flach halten (ein Kontext je Anlauf statt einer Liste) — Sentry kürzt ab der dritten Ebene.
+- **In `tags`, `extra` und eigene Kontexte nur Kennungen, Codes, Zahlen und feste Wörter** — nie Adresse, Token, IP oder Fremdtext. `bereinigeEreignis` filtert dort seit Nr. 47 zusätzlich (heikle Schlüssel wie `email`, `token`, `ip`, `cookie` fallen weg; Texte gehen durch `bereinigeFreitext`, auch IP-Adressen und lange Kennungen ab 32 Zeichen), ebenso `logentry` und die Daten der Brotkrumen; `frame.vars` fallen ganz weg. Das ist das Netz, nicht der Plan. Ein neuer technischer Kontext des SDK (ohne Freitext) kommt in `UNBEDENKLICHE_KONTEXTE`, sonst wird er bereinigt.
 - **Sentry bekommt nie eine IP-Adresse.** Jedes `Sentry.init` setzt `sendDefaultPii: false` und `beforeSend` wie `beforeSendTransaction` auf `bereinigeEreignis` (`src/lib/sentry-hygiene.ts`); nie `dataCollection` setzen — schon ein leeres Objekt schaltet im SDK alle Vorgaben auf „sammeln“, auch die IP. Ein neuer IP-Träger (Proxy-Header, Span-Attribut) kommt in `IP_HEADER` bzw. `IP_SPAN_ATTRIBUTE`, nie als Sonderfall an der Aufrufstelle. `bereinigeEreignis` wirft nie: Ein Fehler in `beforeSend` verwirft das Ereignis. Was sich nicht sichten lässt, fällt weg, im Notfall bleibt ein Minimalereignis, nie das Rohereignis. Wache: `tests/beobachtbarkeit.test.ts` (prüft jeden init-Aufruf statisch, gleich unter welchem Namen).
 
 ### Nutzertexte
@@ -131,8 +132,10 @@ NextResponse.json({ ok: true, …daten })
 
 ### Konsistenz bei Teilfehlschlag
 - Mehrere Schreibvorgänge, die zusammengehören → `prisma.$transaction`.
+- **In einer interaktiven Transaktion läuft alles nacheinander** — nie `Promise.all`/`allSettled` mit dem Transaktions-Client (Rückruf-Parameter oder `Prisma.TransactionClient`). Eine Verbindung, eine Abfrage zur Zeit; ab pg@9 ist alles andere ein Fehler (`tests/transaktion-nacheinander.test.ts`, Nr. 47).
 - Geht das nicht (externer Dienst dazwischen): Kompensation schreiben, wie beim Bestandsabzug.
 - Nichts Langsames im Antwortpfad → `nachDerAntwort()`.
+- **Wiederholt wird nur ein öffentlicher Lesepfad**, nur bei einem Verbindungsabbruch (08006/`EAUTHTIMEOUT`) und genau einmal: `leseOeffentlichMitWiederholung` (`src/server/oeffentlich-lesen.ts`). Nie ein Schreibweg, nie in einer Transaktion — ein wiederholtes Schreiben könnte doppelt buchen. Eine neue Stelle braucht einen Eintrag in der Liste von `tests/oeffentlich-lesen.test.ts`.
 
 ---
 
