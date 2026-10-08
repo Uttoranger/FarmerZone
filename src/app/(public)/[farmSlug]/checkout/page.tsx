@@ -9,6 +9,7 @@ import { ausgebuchteAbholfenster } from '@/server/abholfenster'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { kassenVorbelegung } from '@/lib/kasse'
 import { KAEUFER_PARAMETER, leseKaeuferVorbelegung } from '@/schemas/kaeufer-vorbelegung'
+import { TESTBETRIEB } from '@/lib/umgebung-server'
 
 interface Props {
   params: Promise<{ farmSlug: string }>
@@ -52,12 +53,14 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
   // Die Fokus-Shell (Nachtlauf Nr. 12) rendert CheckoutForm selbst: Ihr
   // „Zurück" hängt am Zustand im Browser — hinaus zum Hof nur, solange keine
   // Bestellung steht (kassenZurueck, src/lib/kasse.ts).
+  // Testbetrieb (Register Z2): nur der Wahrheitswert geht in den Browser.
   return (
     <CheckoutForm
       farm={farm}
       nurBetriebeIds={nurBetriebeIds}
       vorbelegung={kassenVorbelegung(ausHof, kaeufer)}
       ausgebuchteAbholfenster={ausgebucht}
+      testbetrieb={TESTBETRIEB}
     />
   )
 }

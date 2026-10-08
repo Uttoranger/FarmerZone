@@ -215,7 +215,7 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
 // ─── Zahlungs-Seite ─────────────────────────────────────────────────────────
 
 /** Welche EINE Hinweiskarte oben auf /settings/payments steht. */
-export type ZahlungHinweisArt = 'geschafft' | 'fortsetzen' | 'fehler' | 'einrichten' | 'einschalten'
+export type ZahlungHinweisArt = 'geschafft' | 'fortsetzen' | 'fehler' | 'einrichten' | 'einschalten' | 'neu-einrichten'
 
 /**
  * Genau eine Karte, nie zwei orange übereinander (Nachbesserung Nr. 24):
@@ -223,14 +223,26 @@ export type ZahlungHinweisArt = 'geschafft' | 'fortsetzen' | 'fehler' | 'einrich
  * fehlt — Stripe einrichten (Z1) oder, bei fertigem Konto und Online aus
  * (Bestandshof vor Z1), Online-Zahlung einschalten. „geschafft" nur, wenn
  * es stimmt.
+ *
+ * `?stripe=neu` (Register Z2, Nr. 42): Stripe kennt das gespeicherte Konto
+ * nicht — gesetzt von „Status prüfen", „Einrichtung fortsetzen" und der
+ * Rückkehr aus dem Onboarding, nachdem der Hof als nicht bereit vermerkt ist.
+ * Die Karte heißt dann „Online-Zahlung neu einrichten" — nur mit Konto und
+ * nur, solange es nicht bereit ist. Der Parameter öffnet nichts: Ob wirklich
+ * neu angelegt wird, fragt `createConnectAccount` selbst bei Stripe nach.
  */
 export function zahlungHinweis(d: {
   rueckmeldung: string | undefined
   stripeBereit: boolean
   onlineAn: boolean
+  /** Ein Stripe-Konto ist gespeichert (Farm.stripeAccountId gesetzt). */
+  stripeKontoDa?: boolean
 }): ZahlungHinweisArt | null {
   if (d.rueckmeldung === 'error') return 'fehler'
-  if (!d.stripeBereit) return d.rueckmeldung === 'pending' ? 'fortsetzen' : 'einrichten'
+  if (!d.stripeBereit) {
+    if (d.rueckmeldung === 'neu' && d.stripeKontoDa) return 'neu-einrichten'
+    return d.rueckmeldung === 'pending' ? 'fortsetzen' : 'einrichten'
+  }
   if (!d.onlineAn) return 'einschalten'
   return d.rueckmeldung === 'success' ? 'geschafft' : null
 }

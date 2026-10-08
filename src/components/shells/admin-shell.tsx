@@ -3,16 +3,19 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, CircleAlert } from 'lucide-react'
 import { ADMIN_REITER, ADMIN_ZURUECK, adminAktiverReiter, type AdminReiter } from '@/lib/admin-navigation'
 import { hofInitialen } from '@/lib/hof-initialen'
+import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Zaehler } from '@/components/ui/zaehler'
 import { Wortmarke } from '@/components/shared/wortmarke'
 import { ThemeUmschalter } from '@/components/shared/theme-umschalter'
 import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
+import { ADMIN_RAHMEN } from '@/components/admin/admin-teile'
 
 /*
  * Die Shell des Betreiber-Bereichs im neuen Design (Gate 2): eigene
@@ -31,6 +34,12 @@ export type AdminShellProps = {
   personName: string
   /** Höfe, die auf Freischaltung warten; Meldungen, die zu entscheiden sind. */
   zahlen?: { hoefe?: number; briefkasten?: number }
+  /**
+   * Register Z2: Die Produktion läuft mit Test-Schlüssel (TESTBETRIEB aus
+   * umgebung-server.ts) — dann steht über jeder Admin-Seite die orange Karte.
+   * Nur der Wahrheitswert, nie der Schlüssel.
+   */
+  testbetrieb?: boolean
   children: ReactNode
 }
 
@@ -40,7 +49,7 @@ function zahlFuer(reiter: AdminReiter, zahlen: AdminShellProps['zahlen']): { anz
   return { wofuer: '' }
 }
 
-export function AdminShell({ personName, zahlen, children }: AdminShellProps): React.JSX.Element {
+export function AdminShell({ personName, zahlen, testbetrieb = false, children }: AdminShellProps): React.JSX.Element {
   const pathname = usePathname()
   const aktiv = adminAktiverReiter(pathname)
   const anzeige = personName.trim() || 'Dein Konto'
@@ -112,6 +121,15 @@ export function AdminShell({ personName, zahlen, children }: AdminShellProps): R
       </header>
 
       <main id={INHALT_ID} tabIndex={-1} className="px-4 py-5 outline-none md:px-8 md:py-7">
+        {/* Testbetrieb (Register Z2): über jeder Admin-Seite, in ihrer Breite.
+            Mit Live-Schlüssel ist TESTBETRIEB false — die Karte verschwindet von selbst. */}
+        {testbetrieb && (
+          <div className={cn(ADMIN_RAHMEN, 'mb-5')}>
+            <Hinweiskarte ton="orange" symbol={CircleAlert}>
+              {TESTBETRIEB_TEXT.admin}
+            </Hinweiskarte>
+          </div>
+        )}
         {children}
       </main>
     </div>

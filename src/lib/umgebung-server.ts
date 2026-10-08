@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs'
 import { env } from '@/lib/env'
 import { bestimmeUmgebung, type Umgebung } from '@/lib/umgebung'
+import { istTestbetrieb } from '@/lib/stripe-modus'
 
 /**
  * Die Umgebung, einmal je Prozess berechnet — der Serverzweig zu umgebung.ts.
@@ -38,6 +39,14 @@ export const APP_URL: string = UMGEBUNG.appUrl ?? 'http://localhost:3000'
 
 /** Ob das Banner überhaupt gezeigt wird: nur, wenn die Testumgebung eindeutig erkannt ist. */
 export const ZEIGE_UMGEBUNGSBANNER = UMGEBUNG.art !== 'produktion'
+
+/**
+ * Testbetrieb (Register Z2, Nr. 42): Die Produktion läuft mit Test-Schlüssel.
+ * Kasse, AdminShell und Zahlungs-Einstellungen lesen nur diesen Wahrheitswert
+ * — an Client-Komponenten geht er als Prop, nie der Modus oder der Schlüssel.
+ * Mit Live-Schlüssel ist er false, und die Hinweise verschwinden von selbst.
+ */
+export const TESTBETRIEB: boolean = istTestbetrieb(UMGEBUNG)
 
 // Einmal je Kaltstart — mehr wäre bei jedem Seitenaufruf dieselbe Meldung.
 // Serverlos heißt: je Instanz einmal; das ist gewollt, nicht zu viel.

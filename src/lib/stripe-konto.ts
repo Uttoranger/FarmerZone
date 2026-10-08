@@ -63,3 +63,49 @@ export function onlinePausiertHinweis(barMoeglich: boolean): { titel: string; sa
       : 'Stripe braucht noch Angaben von dir. Bis dahin können Kunden bei dir nicht bestellen.',
   }
 }
+
+// ─── Hof-Konto, das Stripe nicht kennt (Register Z2, Nachtlauf Nr. 42) ─────
+
+/**
+ * Kennt Stripe das gespeicherte Konto eines Hofs nicht (mehr)? Typischer
+ * Fall: ein Konto aus dem Testmodus, nachdem die Produktion auf den
+ * Live-Schlüssel umgestellt ist — Stripe antwortet dann mit `resource_missing`
+ * („No such account" bzw. beim Zielkonto eines PaymentIntents „No such
+ * destination").
+ *
+ * NUR an Stellen fragen, an denen das Hof-Konto die einzige Kennung im Aufruf
+ * ist: Zielkonto des PaymentIntents im Checkout, Kontostatus, Einrichtungs-
+ * und Login-Link, Rückkehr aus dem Onboarding. Bei einem Aufruf mit
+ * PaymentIntent- oder Erstattungs-Kennung meinte derselbe Code etwas anderes.
+ *
+ * Geprüft wird die Form, nicht die Klasse: So erkennt die Regel auch die
+ * Fehler aus den Test-Mocks, und sie bleibt ohne Stripe-SDK.
+ */
+export function istUnbekanntesStripeKonto(fehler: unknown): boolean {
+  if (typeof fehler !== 'object' || fehler === null) return false
+  const { code, message } = fehler as { code?: unknown; message?: unknown }
+  if (code === 'resource_missing') return true
+  return typeof message === 'string' && /\bNo such (account|destination)\b/i.test(message)
+}
+
+/**
+ * Antwort des Checkouts, wenn Stripe das Konto des Hofs nicht kennt. Kein
+ * „versuch es später": Online kommt bei diesem Hof erst zurück, wenn er
+ * Stripe neu einrichtet. Ohne Barzahlung verspricht der Satz sie nicht.
+ */
+export function hofKontoUnbekanntText(barMoeglich: boolean): string {
+  return barMoeglich
+    ? 'Online-Zahlung ist bei diesem Hof gerade nicht möglich. Bitte wähle Bar bei Abholung.'
+    : 'Online-Zahlung ist bei diesem Hof gerade nicht möglich. Frag am besten direkt beim Hof nach.'
+}
+
+/** Was der Hof sieht (Einstellungen → Zahlung): Titel und Satz der Hinweiskarte, Knopf. */
+export const NEU_EINRICHTEN_TITEL = 'Online-Zahlung neu einrichten'
+export const NEU_EINRICHTEN_SATZ =
+  'Stripe kennt dein bisheriges Konto nicht mehr. Richte die Online-Zahlung bitte neu ein – das dauert etwa 10 Minuten. ' +
+  'Bis dahin bieten wir deinen Kundinnen nur Barzahlung an.'
+/** Die Marke an der Karte „Online-Zahlung (Stripe)". */
+export const NEU_EINRICHTEN_MARKE = 'Nicht mehr verbunden'
+/** Kurzfassung für Stellen außerhalb der Zahlungs-Einstellungen (Verkäufe, Aktionen). */
+export const NEU_EINRICHTEN_KURZ =
+  'Stripe kennt dein bisheriges Konto nicht mehr. Richte die Online-Zahlung unter Einstellungen → Zahlung neu ein.'
