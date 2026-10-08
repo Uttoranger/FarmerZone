@@ -13,6 +13,7 @@ import { SERVICEGEBUEHR_STANDARD_PROZENT } from '@/lib/konditionen'
 import { FREISCHALTUNG_EMAIL_OFFEN_TEXT } from '@/lib/email-bestaetigung'
 import { datumKurz } from '@/lib/verkauf-eintragen'
 import { einstellungKurz, kalendertagInWien } from '@/lib/servicegebuehr'
+import { MINDESTGEBUEHR_KEINE_ZAHL } from '@/schemas/servicegebuehr'
 
 /**
  * Jeder Hof braucht vor dem Freischalten ein fertiges Stripe-Konto (Register
@@ -316,8 +317,9 @@ export function adminHofZeile(
   }
 }
 
-/** Der Satz im Servicegebühr-Dialog, wenn die Mindestgebühr kein Betrag ist. */
-export const MINDESTGEBUEHR_UNGUELTIG = 'Gib die Mindestgebühr als Betrag in Euro ein, zum Beispiel 0,50.'
+/** Der Satz im Servicegebühr-Dialog, wenn die Mindestgebühr kein Betrag ist —
+ *  derselbe, den der Server bei falschem Typ zurückgibt (Nr. 47, eine Quelle). */
+export const MINDESTGEBUEHR_UNGUELTIG = MINDESTGEBUEHR_KEINE_ZAHL
 
 /**
  * Die getippte Mindestgebühr (Euro) → ganze Cent für setServiceFeeAction,

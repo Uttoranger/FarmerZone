@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import type { Metadata } from 'next'
 import { auth } from '@/lib/auth'
-import { getPublicFarm } from '@/server/queries/farm'
+import { getPublicFarmGeteilt } from '@/server/queries/farm'
 import { getBetriebsVorbelegung, getNurBetriebeProduktIds } from '@/server/queries/products'
 import { CheckoutForm } from '@/components/checkout/checkout-form'
 import { ausgebuchteAbholfenster } from '@/server/abholfenster'
@@ -17,7 +17,9 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { farmSlug } = await params
-  const farm = await getPublicFarm(farmSlug)
+  // Dieselbe Abfrage wie die Seite, einmal je Anfrage (Nr. 47): Zwei getrennte
+  // Aufrufe liefen in einer Prisma-Transaktion gleichzeitig über eine Verbindung.
+  const farm = await getPublicFarmGeteilt(farmSlug)
   return { title: farm ? `Bestellen — ${farm.name}` : 'Bestellen' }
 }
 
@@ -27,7 +29,7 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
   // des Hakens „Betrieb" — Ungültiges fällt im Schema still weg.
   const suche = await searchParams
   const kaeufer = leseKaeuferVorbelegung(suche[KAEUFER_PARAMETER])
-  const farm = await getPublicFarm(farmSlug)
+  const farm = await getPublicFarmGeteilt(farmSlug)
 
   if (!farm || farm.isPaused) notFound()
 

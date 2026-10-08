@@ -238,8 +238,9 @@ describe('Neue Anmeldung im Checkout', () => {
     expect(await beitragPerMail(hof)).toMatchObject({ emailCount: 1 })
     const [mail] = vi.mocked(sendStatusUpdateEmail).mock.calls.map(([daten]) => daten)
     expect(mail!.to).toBe(email)
-    const abmeldeToken = new URL(mail!.unsubscribeUrl).searchParams.get('token')!
-    expect(new URL(mail!.unsubscribeUrl).pathname).toBe('/account/unsubscribe')
+    // Seit Nr. 47 bekommt der Versand den Token und baut daraus Link und
+    // Abmelde-Kopfzeilen (src/lib/abmelde-link.ts).
+    const abmeldeToken = mail!.abmeldeToken
     expect(verifyUnsubscribeToken(abmeldeToken)).toEqual({ email, farmId: hof.farm.id })
 
     expect(await unsubscribeWithToken(abmeldeToken)).toEqual({})

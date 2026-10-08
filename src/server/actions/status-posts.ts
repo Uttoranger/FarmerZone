@@ -8,7 +8,6 @@ import { getFarmForUser } from '@/server/queries/dashboard'
 import { generateUnsubscribeToken } from '@/lib/unsubscribe'
 import { WERBEMAIL_EMPFAENGER } from '@/server/abo-anmeldung'
 import * as Sentry from '@sentry/nextjs'
-import { APP_URL } from '@/lib/umgebung-server'
 import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
 import {
   BEITRAG_FELDER_MIT_SATZ,
@@ -158,7 +157,7 @@ export async function publishStatusPost(
         for (const sub of emailSubscribers) {
           const firstName = nameMap.get(sub.customerEmail.toLowerCase()) ?? ''
           const personalBody = data.body.replace(/\{Vorname\}/gi, firstName)
-          const unsubToken = generateUnsubscribeToken(sub.customerEmail, farm.id)
+          // Aus dem Token baut der Versand Abmeldelink und Abmelde-Kopfzeilen (Nr. 47).
           await sendStatusUpdateEmail({
             to: sub.customerEmail,
             farmName: farmFull.name,
@@ -167,7 +166,7 @@ export async function publishStatusPost(
             body: personalBody,
             anlass: data.anlass,
             photoUrl: data.photoUrl,
-            unsubscribeUrl: `${APP_URL}/account/unsubscribe?token=${unsubToken}`,
+            abmeldeToken: generateUnsubscribeToken(sub.customerEmail, farm.id),
           })
         }
       }

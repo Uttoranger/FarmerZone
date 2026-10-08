@@ -163,6 +163,15 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // Die Ein-Klick-Abmeldung (RFC 8058, Nr. 47) trägt denselben Token wie
+        // der Abmeldelink — kein Referrer, kein Suchindex.
+        source: '/api/abmelden',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        ],
+      },
+      {
         source: '/api/orders/confirm/:token',
         headers: [
           { key: 'Referrer-Policy', value: 'no-referrer' },
