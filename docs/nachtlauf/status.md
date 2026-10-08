@@ -61,7 +61,7 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 41 | Hof-Anmeldung am Handy und „Mein Hof" (N1) | läuft | `nacht/2026-10-08/41-hof-anmeldung` | | main | | 08.10.2026 |
 | 42 | Stripe-Testbetrieb und Modus-Wache (Z2) | läuft | `nacht/2026-10-08/42-stripe-wache` | | main | | 08.10.2026 |
 | 43 | Testumgebung test.farmerzone.at (Z3) | offen | | | 42 | | |
-| 44 | Rückweg im Hofbereich (N1) | offen | | | main | | |
+| 44 | Rückweg im Hofbereich (N1) | läuft | `nacht/2026-10-08/44-rueckweg` | | main | | 08.10.2026 |
 | 45 | Hofbereich kinderleicht | offen | | | main | | |
 | 46 | Kundensicht kinderleicht (N2) | offen | | | main | | |
 | 47 | Altlasten aus Lauf 7 und Laufzeit-Befunde | läuft | `nacht/2026-10-08/47-altlasten` | | main | | 08.10.2026 |
