@@ -439,3 +439,64 @@ export function leerzustand(eingabe: {
     ausweg: { art: 'link', label: 'Alle zurücksetzen', ziel: alleZuruecksetzen(filter) },
   }
 }
+
+// ─── Ein Suchfeld „Ort oder Produkt" (Nr. 46) ───────────────────────────────
+
+/**
+ * Das eine Suchfeld auf /hoefe (Nachtlauf Nr. 46, freigabe.md §12): Höfe und
+ * Produkte filtert es beim Tippen wie bisher (berechneHofAuswahl, im
+ * Browser); einen Ort — Postleitzahl oder Name — löst es erst auf Wunsch auf,
+ * serverseitig über `loeseOrtAuf` wie vorher das eigene Postleitzahl-Feld.
+ * Daneben „Standort nutzen"; der Standort bleibt im Browser.
+ */
+export const SUCHFELD_TEXT = {
+  platzhalter: 'Ort oder Produkt',
+  beschriftung: 'Ort, Postleitzahl oder Produkt suchen',
+  standort: 'Standort nutzen',
+  nichtsGespeichert: 'Nichts wird gespeichert.',
+  /** Standort abgelehnt oder nicht verfügbar — kein Fehler, nur der andere Weg. */
+  ohneStandort: 'Kein Problem — tipp einfach deinen Ort oder deine Postleitzahl ins Suchfeld.',
+  ohneTreffer: 'Diesen Ort kennen wir nicht — probier es mit der Postleitzahl.',
+  /** Der Dialog des Browsers liegt noch offen: kein Scheitern, nur Geduld — und ein zweiter Weg. */
+  dauert: 'Das dauert gerade — du kannst auch deinen Ort ins Suchfeld tippen.',
+  ortAendern: 'Ort ändern',
+  /** Der eigene Standort trägt keinen Namen — im Satz steht er so (Akkusativ bzw. Dativ). */
+  rundUmStandort: 'deinen Standort',
+  abStandort: 'deinem Standort',
+  keinerDavon: 'Keiner davon',
+  mehrereOrte: 'Welchen Ort meinst du?',
+} as const
+
+/**
+ * Der Schlüssel des Eintrags „Höfe rund um …" in der Vorschlagsliste neben
+ * den Produktnamen. Kein Produktname kann ihn tragen: Postgres speichert in
+ * Text kein Nullzeichen.
+ */
+export const ORT_VORSCHLAG = '\u0000ort'
+
+/** Ab zwei Zeichen kann der Text ein Ort sein — dieselbe Grenze wie `ortssucheSchema`. */
+export function ortVorschlagAnbieten(text: string): boolean {
+  return text.trim().length >= 2
+}
+
+/** „Höfe rund um „4910" zeigen" — der Eintrag, der den Text als Ort sucht. */
+export function ortVorschlagText(text: string): string {
+  return `Höfe rund um „${text.trim()}" zeigen`
+}
+
+/** Eine Postleitzahl vorn: „4910", „84359 Simbach" — das ist ein Ort, kein Produkt. */
+export function siehtNachOrtAus(text: string): boolean {
+  return /^\d{4,5}(?:\s|$)/.test(text.trim())
+}
+
+/**
+ * Enter ohne markierten Vorschlag: Sieht der Text nach einer Postleitzahl aus
+ * oder findet die Produktsuche nichts, sucht das Feld ihn als Ort. Sonst
+ * bleibt es bei der Produktsuche, die beim Tippen schon wirkt — „Eier" ist
+ * kein Ort. Wer bei einem Treffer trotzdem den Ort meint („Ried" neben dem
+ * Riedhof), nimmt den Eintrag „Höfe rund um …" aus der Liste.
+ */
+export function enterSuchtOrt(text: string, treffer: number): boolean {
+  if (!ortVorschlagAnbieten(text)) return false
+  return siehtNachOrtAus(text) || treffer === 0
+}

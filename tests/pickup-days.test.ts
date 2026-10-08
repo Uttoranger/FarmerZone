@@ -6,7 +6,7 @@
  * offen ist, Slot-Sortierung, keine Slots → leer, Maps-URL-Encoding.
  */
 import { describe, it, expect } from 'vitest'
-import { nextPickupDays, formatSlotTime, pickupWeekdaysLabel } from '@/lib/pickup-days'
+import { abholtagZeile, nextPickupDays, formatSlotTime, pickupWeekdaysLabel } from '@/lib/pickup-days'
 import { buildMapsUrl, buildShareData } from '@/lib/customer-links'
 
 // Montag, 20. Juli 2026, 10:00 (getDay() = 1)
@@ -16,9 +16,10 @@ const MI = { dayOfWeek: 3, startTime: '08:00', endTime: '18:00' }
 const SA = { dayOfWeek: 6, startTime: '09:00', endTime: '12:00' }
 
 describe('nextPickupDays', () => {
-  it('liefert die nächsten Termine mit Wochentag-Labels und Zeiten', () => {
+  it('liefert die nächsten Termine mit Wochentag und Datum („Sa, 25. Juli", Nr. 46) und Zeiten', () => {
     const days = nextPickupDays([MI, SA], 3, NOW)
-    expect(days.map((d) => d.label)).toEqual(['Mi, 22. Juli', 'Sa, 25. Juli', 'Mi, 29. Juli'])
+    expect(days.map((d) => d.label)).toEqual(['Mi, 22.\u00a0Juli', 'Sa, 25.\u00a0Juli', 'Mi, 29.\u00a0Juli'])
+    expect(days.map((d) => d.datum)).toEqual(days.map((d) => d.label))
     expect(days[0].times).toBe('8–18 Uhr')
     expect(days[1].times).toBe('9–12 Uhr')
   })
@@ -30,12 +31,20 @@ describe('nextPickupDays', () => {
       NOW
     )
     expect(days.map((d) => d.label)).toEqual(['Heute', 'Morgen'])
+    // Auch heute und morgen tragen ihr Datum (Nr. 46).
+    expect(days.map((d) => d.datum)).toEqual(['Mo, 20.\u00a0Juli', 'Di, 21.\u00a0Juli'])
+    expect(days.map(abholtagZeile)).toEqual(['Heute · Mo, 20.\u00a0Juli', 'Morgen · Di, 21.\u00a0Juli'])
+  })
+
+  it('ab übermorgen ist die Zeile nur das Datum — kein „Sa, 25. Juli · Sa, 25. Juli"', () => {
+    const [mittwoch] = nextPickupDays([MI], 1, NOW)
+    expect(abholtagZeile(mittwoch!)).toBe('Mi, 22.\u00a0Juli')
   })
 
   it('überspringt Heute, wenn alle Zeitfenster schon vorbei sind', () => {
     // Montag-Slot endet 09:00, jetzt ist 10:00 → nächster Montag in einer Woche
     const days = nextPickupDays([{ dayOfWeek: 1, startTime: '07:00', endTime: '09:00' }], 1, NOW)
-    expect(days[0].label).toBe('Mo, 27. Juli')
+    expect(days[0].label).toBe('Mo, 27.\u00a0Juli')
   })
 
   it('sortiert mehrere Fenster eines Tages nach Beginn', () => {

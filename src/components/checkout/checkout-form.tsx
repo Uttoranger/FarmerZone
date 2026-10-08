@@ -32,6 +32,7 @@ import { centsAlsEuro } from '@/lib/servicegebuehr'
 import {
   CODE_ZAHLART_NICHT_ANGEBOTEN,
   abholKacheln,
+  abholSatz,
   angezeigteBetraege,
   barHinweis,
   bestellschlussHeute,
@@ -66,7 +67,6 @@ import {
   KontaktHinweis,
   KorbKarte,
   ReservierungsHinweis,
-  TEXTLINK,
   UebersichtKarte,
   ZahlartWahl,
 } from './kasse-teile'
@@ -138,12 +138,6 @@ type Zahlung = {
   abholung: string
   name: string
   email: string
-}
-
-/** „Abholung heute, 15:00–18:00 Uhr" — klein geschrieben, wo es mitten im Satz steht. */
-function abholSatz(tag: string, zeit: string): string {
-  const imSatz = tag === 'Heute' || tag === 'Morgen' ? tag.toLowerCase() : tag
-  return `${imSatz}, ${zeit}`
 }
 
 export function CheckoutForm({
@@ -273,7 +267,6 @@ export function CheckoutForm({
       customerNote: '',
       pickupSlotKey: '',
       paymentMethod: defaultPayment,
-      onsiteConfirmed: false,
       kaeuferArt: vorbelegung?.kaeuferArt ?? 'PRIVAT',
       betriebsnummer: vorbelegung?.betriebsnummer ?? '',
       nurBetriebeImKorb: false,
@@ -290,7 +283,6 @@ export function CheckoutForm({
   }, [betriebAbschnitt, form])
   const kaeuferArt = form.watch('kaeuferArt')
   const paymentMethod = form.watch('paymentMethod')
-  const customerPhone = form.watch('customerPhone')
   const pickupSlotKey = form.watch('pickupSlotKey')
   const gewaehlt = kacheln.find((k) => k.key === pickupSlotKey)
 
@@ -353,8 +345,6 @@ export function CheckoutForm({
           pickupTimeStart,
           pickupTimeEnd,
           paymentMethod: data.paymentMethod,
-          optInEmail: data.optInEmail ?? false,
-          optInWhatsApp: data.optInWhatsApp ?? false,
           // Ohne sichtbaren Abschnitt ist jede Bestellung privat — eine
           // Vorbelegung als Betrieb darf nicht unbemerkt mitlaufen.
           kaeuferArt: betriebAbschnitt ? data.kaeuferArt : 'PRIVAT',
@@ -444,7 +434,7 @@ export function CheckoutForm({
           reserviertBis: typeof result.reserviertBis === 'string' ? result.reserviertBis : null,
           betrag: betrag.data,
           gebuehrText: zahlungsGebuehrText(farm, new Date(), betrag.data),
-          abholung: gewaehlt ? abholSatz(gewaehlt.tag, gewaehlt.zeit) : '',
+          abholung: gewaehlt ? abholSatz(gewaehlt) : '',
           name: data.customerName,
           email: data.customerEmail,
         })
@@ -531,7 +521,7 @@ export function CheckoutForm({
 
   const stand = reservierungsStand(reserviertBis, jetzt)
   const fussnote = [
-    gewaehlt ? `Abholung ${abholSatz(gewaehlt.tag, gewaehlt.zeit)}` : 'Wähl noch, wann du abholst',
+    gewaehlt ? `Abholung ${abholSatz(gewaehlt)}` : 'Wähl noch, wann du abholst',
     paymentMethod === 'ONLINE' ? 'Bezahlung sicher über Stripe' : 'Du zahlst bar beim Abholen',
   ].join(' · ')
 
@@ -771,73 +761,12 @@ export function CheckoutForm({
               <ZahlartWahl zahlarten={zahlarten} feld={form.register('paymentMethod')} fehler={fehlerAm.paymentMethod?.message} />
             )}
             {hinweisBar && zahlarten.some((z) => z.wert === 'ONSITE_CASH') && <p className={HINWEIS}>{hinweisBar}</p>}
-            {paymentMethod === 'ONSITE_CASH' && (
-              <div className="mt-1">
-                <label className="flex min-h-11 cursor-pointer items-start gap-3">
-                  <input
-                    type="checkbox"
-                    {...form.register('onsiteConfirmed')}
-                    aria-invalid={fehlerAm.onsiteConfirmed ? true : undefined}
-                    aria-describedby={fehlerAm.onsiteConfirmed ? 'onsiteConfirmed-fehler' : undefined}
-                    className={cn('mt-0.5 size-5 shrink-0 accent-accent', FOKUS_RAHMEN)}
-                  />
-                  <span className="text-[14px]">
-                    Ich hole meine Bestellung zum gewählten Termin ab und zahle vor Ort bar.
-                  </span>
-                </label>
-                {fehlerAm.onsiteConfirmed?.message && (
-                  <FeldFehler id="onsiteConfirmed-fehler">{fehlerAm.onsiteConfirmed.message}</FeldFehler>
-                )}
-              </div>
-            )}
             {paymentMethod === 'ONLINE' && (
               <p className={HINWEIS}>
                 Im nächsten Schritt bezahlst du sicher über Stripe. Apple Pay bzw. Google Pay erscheint nur, wenn dein Gerät es unterstützt.
               </p>
             )}
           </section>
-          {/* Freiwilliges nach der Zahlart: Das Mockup führt Korb → Abholung → Bezahlen. */}
-          <section aria-labelledby="kasse-neuigkeiten" className={cn(KARTE, 'flex flex-col gap-2.5')}>
-            <div>
-              <h2 id="kasse-neuigkeiten" className={KARTEN_TITEL}>
-                Neuigkeiten vom Hof
-              </h2>
-              <p className={cn(HINWEIS, 'mt-1')}>Freiwillig — nur wenn du möchtest.</p>
-            </div>
-            <label className="flex min-h-11 cursor-pointer items-start gap-3">
-              <input type="checkbox" {...form.register('optInEmail')} className={cn('mt-0.5 size-5 shrink-0 accent-accent', FOKUS_RAHMEN)} />
-              <span className="min-w-0 text-[14px] break-words">
-                Per E-Mail über frische Produkte und Aktionen von <strong>{farm.name}</strong> informiert werden
-                {/* Double-Opt-in (S11, Nr. 38): erst nach dem Link aus der Mail. */}
-                <span className={cn(HINWEIS, 'mt-0.5 block')}>Bei einer neuen Anmeldung schicken wir dir zuerst eine E-Mail zum Bestätigen.</span>
-              </span>
-            </label>
-            <label className={cn('flex min-h-11 items-start gap-3', customerPhone?.length >= 4 ? 'cursor-pointer' : 'cursor-not-allowed')}>
-              <input
-                type="checkbox"
-                {...form.register('optInWhatsApp')}
-                disabled={!customerPhone || customerPhone.length < 4}
-                aria-describedby={!customerPhone || customerPhone.length < 4 ? 'optInWhatsApp-hinweis' : undefined}
-                className={cn('mt-0.5 size-5 shrink-0 accent-accent', FOKUS_RAHMEN)}
-              />
-              <span className="text-[14px]">
-                Per WhatsApp informiert werden
-                {(!customerPhone || customerPhone.length < 4) && (
-                  <span id="optInWhatsApp-hinweis" className={cn(HINWEIS, 'mt-0.5 block')}>
-                    Dafür brauchen wir deine Telefonnummer.
-                  </span>
-                )}
-              </span>
-            </label>
-            <p className={HINWEIS}>
-              Abmelden kannst du dich jederzeit über den Link in jeder Nachricht. Mehr dazu in unserer{' '}
-              <Link href="/datenschutz" className={cn(TEXTLINK, 'min-h-0 px-0 text-[12.5px]')}>
-                Datenschutzerklärung
-              </Link>
-              .
-            </p>
-          </section>
-
         </fieldset>
       </KassenRaster>
     </form>

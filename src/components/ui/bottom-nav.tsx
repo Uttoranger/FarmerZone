@@ -38,6 +38,8 @@ export function BottomNav({
     <nav
       aria-label={beschriftung}
       data-slot="bottom-nav"
+      // Feste Leiste unten: Der Cookie-Hinweis steht darüber, nie darauf (src/lib/cookie-hinweis.ts).
+      data-unten-fest=""
       className={cn(
         'fixed inset-x-0 bottom-0 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] md:hidden print:hidden',
         ueberSchleier ? 'z-[60]' : 'z-50',

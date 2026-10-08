@@ -301,6 +301,8 @@ export function AktionsLeiste({ children }: { children: ReactNode }): React.JSX.
   return (
     <div
       data-feste-leiste
+      // Der Kaufknopf: Der Cookie-Hinweis steht darüber, nie darauf (src/lib/cookie-hinweis.ts).
+      data-unten-fest=""
       className="fixed inset-x-0 bottom-0 z-40 flex flex-col gap-2 border-t border-border bg-card px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] md:static md:z-auto md:border-0 md:bg-transparent md:p-0"
     >
       {children}
@@ -391,7 +393,9 @@ export function AbholWahl({
             )}
           >
             <input type="radio" value={k.key} {...feld} disabled={k.ausgebucht} className="sr-only" />
-            <span className="text-[13.5px] font-semibold break-words">{k.tag}</span>
+            {/* Jeder Termin mit Datum (Nr. 46): „Heute"/„Morgen" nur zusätzlich, nie statt des Datums. */}
+            {k.relativ && <span className="text-[12px] font-semibold text-status-fertig">{k.relativ}</span>}
+            <span className="text-[13.5px] font-semibold break-words">{k.datum}</span>
             <span className="mt-0.5 text-[12px] whitespace-nowrap text-muted-foreground">{k.zeit}</span>
             {/* Voll heißt: Der Hof nimmt für dieses Fenster nichts mehr an (maxOrders). */}
             {k.ausgebucht && <span className="text-[12px] font-semibold">ausgebucht</span>}

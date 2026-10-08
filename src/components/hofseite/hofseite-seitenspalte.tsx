@@ -5,7 +5,7 @@ import { useMemo } from 'react'
 import Link from 'next/link'
 import { Banknote, CalendarDays, CreditCard, MapPin, Phone, ShoppingBasket } from 'lucide-react'
 import type { PublicPickupSlot } from '@/server/queries/farm'
-import { abholzeitenJeWochentag, nextPickupDays } from '@/lib/pickup-days'
+import { abholtagZeile, abholzeitenJeWochentag, nextPickupDays } from '@/lib/pickup-days'
 import { buildMapsUrl } from '@/lib/customer-links'
 import { formatEuro, mitAnzahl } from '@/lib/format'
 import { warenkorbAnzahl } from '@/lib/warenkorb-speicher'
@@ -92,17 +92,15 @@ export function HofseiteSeitenspalte({
           <h2 id="naechste-abholung" className={KARTEN_TITEL}>
             Nächste Abholung
           </h2>
-          <ul className="flex gap-2">
+          {/* Klar als Text (Nr. 46, Register N2): Zeilen wie „Abholzeiten", keine
+              Kacheln, die wie wählbare Knöpfe aussehen, aber nichts tun. Gewählt
+              wird das Zeitfenster in der Kasse — dort mit demselben Datum. */}
+          <ul className="flex flex-col gap-2">
             {tage.map((tag, i) => (
-              <li
-                key={tag.date.toISOString()}
-                className={cn(
-                  'min-w-0 flex-1 rounded-xl px-1.5 py-3 text-center',
-                  i === 0 ? 'border-[1.5px] border-accent bg-accent/12' : 'border border-border'
-                )}
-              >
-                <span className="block text-[13px] leading-snug font-semibold break-words text-foreground">{tag.label}</span>
-                <span className="mt-0.5 block text-xs text-muted-foreground">{tag.times}</span>
+              <li key={tag.date.toISOString()} className={ZEILE}>
+                <CalendarDays className={SYMBOL} strokeWidth={1.7} aria-hidden="true" />
+                <span className={cn('min-w-0 flex-1 break-words', i === 0 && 'font-semibold')}>{abholtagZeile(tag)}</span>
+                <span className="shrink-0 text-muted-foreground tabular-nums">{tag.times}</span>
               </li>
             ))}
           </ul>

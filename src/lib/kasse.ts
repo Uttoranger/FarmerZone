@@ -8,9 +8,9 @@
  * für die Servicegebühr, dieselben Abholfenster, dieselbe Frist.
  */
 import { abholSchluessel, angeboteneAbholfenster, type AbholSlot } from '@/lib/abholfenster'
-import { formatEuro, formatZahl } from '@/lib/format'
+import { formatEuro, formatTagKurz, formatZahl } from '@/lib/format'
 import { uhrzeitInWien } from '@/lib/fristen'
-import { abholtagName } from '@/lib/heute'
+import { tagVersetzt } from '@/lib/kalender'
 import { korbBetraege, zahlungsarten } from '@/lib/hofseite-kunde'
 import { BAR_OHNE_GEBUEHR_HINWEIS } from '@/lib/konditionen'
 import { calcTotalAmount, decimalZuCents } from '@/lib/order-totals'
@@ -328,8 +328,13 @@ export function kassenZurueck(k: {
 export type AbholKachel = {
   /** „JJJJ-MM-TT|HH:MM|HH:MM" — der Wert, den /api/checkout prüft. */
   key: string
-  /** „Heute", „Morgen", „Mittwoch" oder „Mittwoch, 14. Oktober". */
-  tag: string
+  /**
+   * „Sa, 10. Okt" — jeder Termin mit Wochentag UND Datum (Nr. 46, Register
+   * N2): Ein Wochentag allein ließ offen, welcher Samstag gemeint ist.
+   */
+  datum: string
+  /** „Heute" bzw. „Morgen" zusätzlich zum Datum, sonst null. */
+  relativ: 'Heute' | 'Morgen' | null
   /** „15:00–18:00 Uhr". */
   zeit: string
   /** Beginn, HH:MM — zugleich Bestellschluss (src/lib/fristen.ts). */
@@ -345,17 +350,30 @@ export type AbholKachel = {
  */
 export function abholKacheln(slots: readonly AbholSlot[], jetzt: Date, ausgebucht: readonly string[]): AbholKachel[] {
   const heute = kalendertagInWien(jetzt)
+  const morgen = tagVersetzt(heute, 1)
   return angeboteneAbholfenster(slots, jetzt).map((f) => {
     const key = abholSchluessel(f)
     return {
       key,
-      tag: f.datum === heute ? 'Heute' : abholtagName(heute, f.datum),
+      datum: formatTagKurz(f.datum),
+      relativ: f.datum === heute ? 'Heute' : f.datum === morgen ? 'Morgen' : null,
       zeit: `${f.start}–${f.ende} Uhr`,
       start: f.start,
       heute: f.datum === heute,
       ausgebucht: ausgebucht.includes(key),
     }
   })
+}
+
+/**
+ * Der gewählte Termin als Satzteil — unter dem Kaufknopf und im
+ * Zahlungsschritt: „Sa, 10. Okt, 09:00–12:00 Uhr", heute bzw. morgen mit dem
+ * Wort dazu: „Do, 8. Okt (heute), 15:00–18:00 Uhr". Dieselbe Schreibweise wie
+ * die Kachel, damit die Kundin den Termin wiedererkennt.
+ */
+export function abholSatz(k: Pick<AbholKachel, 'datum' | 'relativ' | 'zeit'>): string {
+  const relativ = k.relativ ? ` (${k.relativ.toLowerCase()})` : ''
+  return `${k.datum}${relativ}, ${k.zeit}`
 }
 
 /**

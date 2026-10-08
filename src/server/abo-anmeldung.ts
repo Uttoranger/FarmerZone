@@ -31,9 +31,10 @@ export const EMAIL_ABO_STAND = {
 } as const
 
 /**
- * Eine E-Mail-Anmeldung für ein bestehendes Abo (Checkout-Haken, Schalter auf
- * /account). Neue und abgemeldete Abos bekommen einen Bestätigungslink,
- * bestätigte und Bestandsabos bleiben, wie sie sind.
+ * Eine E-Mail-Anmeldung für ein bestehendes Abo (Bestätigungsseite einer
+ * Bestellung seit Nr. 46, Schalter auf /account). Neue und abgemeldete Abos
+ * bekommen einen Bestätigungslink, bestätigte und Bestandsabos bleiben, wie
+ * sie sind.
  *
  * Bedingt geschrieben auf genau den Stand, aus dem entschieden wurde (wie
  * „Vorrat setzen", ARCHITECTURE §5): Zwei gleichzeitige Anmeldungen

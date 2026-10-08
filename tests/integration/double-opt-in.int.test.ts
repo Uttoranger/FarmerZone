@@ -6,15 +6,17 @@
  *  - Migration 20261007180000_double_opt_in: zwei nullable Spalten, ein
  *    Abo aus altem Code (rohes INSERT ohne die Spalten) gilt als Bestand und
  *    bekommt weiter Mails; ein zweiter Lauf ändert nichts.
- *  - Neue Anmeldung im Checkout: Bestätigungsmail, aber keine werbliche Mail
- *    bis zur Bestätigung; der Bestand daneben bekommt seine Mail.
+ *  - Neue Anmeldung auf der Bestätigungsseite (seit Nr. 46, Register N2;
+ *    vorher ein Haken im Checkout): Bestätigungsmail, aber keine werbliche
+ *    Mail bis zur Bestätigung; der Bestand daneben bekommt seine Mail.
  *  - Bestätigung per Knopf mit dem Token aus der Mail → Mails, mit gültigem
  *    Abmeldelink; Abmelden wirkt.
  *  - Die Seite hinter dem Link (GET) bestätigt nicht; abgelaufener und
  *    manipulierter Token werden abgelehnt, nichts geschrieben.
  *  - Erneute Anmeldung: unbestätigt kurz danach keine zweite Mail, gleichzeitig
- *    nur eine; bestätigt keine neue Bestätigung; die Antwort des Checkouts
- *    verrät nicht, ob die Adresse schon abonniert ist.
+ *    nur eine; bestätigt keine neue Bestätigung; weder der Checkout noch die
+ *    Anmeldung auf der Bestätigungsseite verraten, ob die Adresse schon
+ *    abonniert ist.
  * Mails, Stripe und der Cache sind gemockt; der Nachlauf läuft ohne Request
  * sofort (nach-der-antwort.ts), deshalb `vi.waitFor`.
  */
@@ -52,6 +54,7 @@ import { auth } from '@/lib/auth'
 import { bestaetigeNeuigkeiten, unsubscribeWithToken, updateSubscription } from '@/server/actions/subscriptions'
 import AccountProfilePage from '@/app/account/profile/page'
 import { meldeEmailAboAn, EMAIL_ABO_STAND } from '@/server/abo-anmeldung'
+import { meldeNeuigkeitenAn } from '@/server/actions/neuigkeiten'
 import { ABO_BESTAETIGUNG_GUELTIG_MS } from '@/lib/abo-bestaetigung'
 import { erzeugeAboBestaetigungsToken } from '@/lib/abo-bestaetigung-token'
 import { verifyUnsubscribeToken } from '@/lib/unsubscribe'
@@ -89,20 +92,34 @@ async function hofMitAnmeldung(): Promise<Hof> {
   return { farm, cookie }
 }
 
-/** Bestellt eine Einheit bar, mit oder ohne Haken „Neuigkeiten per E-Mail". */
-async function bestelle(hof: Hof, customerEmail: string, optInEmail: boolean): Promise<Response> {
+/**
+ * Bestellt eine Einheit bar und meldet sich — wenn gewünscht — danach auf der
+ * Bestätigungsseite für „Neuigkeiten per E-Mail" an (seit Nr. 46 dort statt
+ * als Haken im Checkout), mit dem signierten Pfad aus der Antwort.
+ */
+async function bestelle(hof: Hof, customerEmail: string, neuigkeiten: boolean): Promise<Response> {
   const produkt = await erstelleProdukt(hof.farm.id, { stock: 5 })
   const sitzung = intKennung('sitzung')
   await setzeHalt(produkt.id, sitzung, 1)
-  return checkout(
+  const antwort = await checkout(
     checkoutAnfrage({
       farm: hof.farm,
       sessionId: sitzung,
       customerEmail,
       positionen: [{ productId: produkt.id, name: 'Testprodukt', quantity: 1, unitPrice: 10 }],
-      zusatz: { optInEmail },
     })
   )
+  if (neuigkeiten) {
+    expect(await meldeNeuigkeitenAn(await zugangAus(antwort.clone()))).toEqual({ ok: true })
+  }
+  return antwort
+}
+
+/** Kennung und Signatur aus dem signierten Pfad der Bestätigungsseite in der Checkout-Antwort. */
+async function zugangAus(antwort: Response): Promise<{ orderId: string; sig: string }> {
+  const { bestaetigung } = (await antwort.json()) as { bestaetigung: string }
+  const url = new URL(bestaetigung, 'http://localhost')
+  return { orderId: url.pathname.split('/').at(-1) ?? '', sig: url.searchParams.get('sig') ?? '' }
 }
 
 /** Veröffentlicht einen Beitrag mit Versand per Mail — als angemeldeter Hof. */
@@ -201,7 +218,7 @@ describe('Migration 20261007180000_double_opt_in', () => {
   })
 })
 
-describe('Neue Anmeldung im Checkout', () => {
+describe('Neue Anmeldung auf der Bestätigungsseite', () => {
   it('Bestätigungsmail genau einmal — aber keine Beitragsmail bis zur Bestätigung; der Bestand bekommt seine', async () => {
     const hof = await hofMitAnmeldung()
     const neu = `${intKennung('neu')}@example.com`
@@ -361,12 +378,16 @@ describe('Erneute Anmeldung', () => {
     const bestand = `${intKennung('bestand')}@example.com`
     await bestandsAbo(hof.farm.id, bestand)
 
-    const antworten = [await bestelle(hof, neu, true), await bestelle(hof, bestand, true)]
+    const antworten = [await bestelle(hof, neu, false), await bestelle(hof, bestand, false)]
+    const zugaenge = await Promise.all(antworten.map((r) => zugangAus(r.clone())))
+    const anmeldungen = [await meldeNeuigkeitenAn(zugaenge[0]), await meldeNeuigkeitenAn(zugaenge[1])]
 
     const koerper = await Promise.all(antworten.map((r) => r.json() as Promise<Record<string, unknown>>))
     expect(antworten.map((r) => r.status)).toEqual([200, 200])
     expect(Object.keys(koerper[0]!).sort()).toEqual(Object.keys(koerper[1]!).sort())
     expect(JSON.stringify(koerper)).not.toMatch(/optIn|subscri|neuigkeit/i)
+    // Die Anmeldung auf der Bestätigungsseite antwortet für beide gleich.
+    expect(anmeldungen).toEqual([{ ok: true }, { ok: true }])
   })
 })
 

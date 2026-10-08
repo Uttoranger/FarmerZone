@@ -16,9 +16,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-const { shellProps, teilenProps } = vi.hoisted(() => ({
+const { shellProps, teilenProps, neuigkeitenProps } = vi.hoisted(() => ({
   shellProps: [] as Array<Record<string, unknown>>,
   teilenProps: [] as Array<Record<string, unknown>>,
+  neuigkeitenProps: [] as Array<Record<string, unknown>>,
 }))
 
 vi.mock('@/lib/prisma', () => ({ prisma: { order: { findUnique: vi.fn() } } }))
@@ -45,8 +46,16 @@ vi.mock('@/components/bestaetigung/hof-teilen-karte', () => ({
   },
 }))
 
+vi.mock('@/components/bestaetigung/neuigkeiten-karte', () => ({
+  NeuigkeitenKarte: (p: Record<string, unknown>) => {
+    neuigkeitenProps.push(p)
+    return createElement('section', { 'data-neuigkeiten': 'karte' }, 'Neuigkeiten vom Hof per E-Mail')
+  },
+}))
+
 import ConfirmPage, { metadata } from '@/app/(public)/[farmSlug]/confirm/[orderId]/page'
 import { bestellLinkGilt, bestellSignatur } from '@/lib/bestell-link'
+import { GRUND_NICHT_BESTAETIGT } from '@/lib/fristen'
 import { prisma } from '@/lib/prisma'
 
 const findUnique = vi.mocked(prisma.order.findUnique)
@@ -113,6 +122,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   shellProps.length = 0
   teilenProps.length = 0
+  neuigkeitenProps.length = 0
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(JETZT)
   findUnique.mockResolvedValue(bestellung() as never)
@@ -285,5 +295,30 @@ describe('„Hof teilen" teilt die öffentliche Hofseite', () => {
     // Gegenprobe zur Adresse, auf der die Kundin gerade steht.
     expect(JSON.stringify(geteilt)).not.toContain(GUELTIG)
     expect(JSON.stringify(geteilt)).not.toContain('confirm')
+  })
+})
+
+describe('Neuigkeiten per E-Mail auf der Bestätigungsseite (Register N2, Nr. 46)', () => {
+  it('bar offen: die Karte steht da — mit Kennung, gültiger Signatur, Hofname und der Adresse der Bestellung', async () => {
+    const html = await seite()
+    expect(html).toContain('data-neuigkeiten="karte"')
+    expect(neuigkeitenProps).toEqual([{ orderId: 'order-1', sig: GUELTIG, hofName: 'Hof Test', email: 'erika@example.org' }])
+    expect(bestellLinkGilt('order-1', String(neuigkeitenProps[0]?.sig))).toBe(true)
+  })
+
+  it('online bezahlt und bar bestätigt: ebenso', async () => {
+    findUnique.mockResolvedValue(bestellung({ paymentMethod: 'ONLINE', paymentStatus: 'PAID', status: 'PAID' }) as never)
+    expect(await seite()).toContain('data-neuigkeiten="karte"')
+    findUnique.mockResolvedValue(bestellung({ status: 'CONFIRMED' }) as never)
+    expect(await seite()).toContain('data-neuigkeiten="karte"')
+  })
+
+  it('storniert, verfallen und ohne Signatur: keine Karte', async () => {
+    findUnique.mockResolvedValue(bestellung({ status: 'CANCELLED', cancelReason: GRUND_NICHT_BESTAETIGT }) as never)
+    expect(await seite()).not.toContain('data-neuigkeiten')
+    findUnique.mockResolvedValue(bestellung({ status: 'CANCELLED', cancelReason: 'Vom Hof storniert' }) as never)
+    expect(await seite()).not.toContain('data-neuigkeiten')
+    expect(await seite({})).not.toContain('data-neuigkeiten')
+    expect(neuigkeitenProps).toEqual([])
   })
 })

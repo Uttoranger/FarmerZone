@@ -251,6 +251,33 @@ describe('bestaetigungsBloecke — was die Seite in welchem Zustand zeigt', () =
     }
   })
 
+  it('Neuigkeiten per E-Mail (N2, Nr. 46): online und bar, solange die Bestellung läuft', () => {
+    for (const [z, s] of [
+      ['bezahlt', 'PAID'],
+      ['bezahlt', 'READY'],
+      ['bestaetigt', 'CONFIRMED'],
+      ['bestaetigt', 'PICKED_UP'],
+      ['bestaetigung-offen', 'PENDING_CONFIRMATION'],
+      ['zahlung-wird-geprueft', 'PENDING_CONFIRMATION'],
+    ] as const) {
+      expect(bestaetigungsBloecke(z, s).neuigkeiten, `${z} ${s}`).toBe(true)
+    }
+  })
+
+  it('keine Neuigkeiten bei storniert, verfallen, gescheiterter Zahlung oder nicht abgeholt', () => {
+    for (const [z, s] of [
+      ['verfallen', 'CANCELLED'],
+      ['zahlung-fehlgeschlagen', 'PENDING_CONFIRMATION'],
+      ['bezahlt', 'CANCELLED'],
+      [null, 'CANCELLED'],
+      [null, 'NOT_PICKED_UP'],
+      // Online ohne Zahlung und ohne Hinweis von Stripe: kein Zustand, keine Anmeldung.
+      [null, 'PENDING_CONFIRMATION'],
+    ] as const) {
+      expect(bestaetigungsBloecke(z, s).neuigkeiten, `${z} ${s}`).toBe(false)
+    }
+  })
+
   it('genau eine Hauptaktion je Zustand', () => {
     expect(bestaetigungsBloecke('bezahlt', 'PAID').aktion).toBe('bestellung')
     expect(bestaetigungsBloecke('verfallen', 'CANCELLED').aktion).toBe('neu-bestellen')

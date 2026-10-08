@@ -1,5 +1,6 @@
 // "Nächste Abholung"-Tageskarten (Sprint 20, Referenz 17) aus den echten
 // PickupSlots (wöchentlich wiederkehrend, dayOfWeek = JS getDay(), 0 = Sonntag).
+import { formatTagKurz } from '@/lib/format'
 
 export type WeeklySlot = { dayOfWeek: number; startTime: string; endTime: string }
 
@@ -9,7 +10,14 @@ export type WeeklySlot = { dayOfWeek: number; startTime: string; endTime: string
  * die der Server genauso prüft.
  */
 export const ABHOL_VORLAUF_TAGE = 14
-export type PickupDay = { date: Date; label: string; times: string }
+export type PickupDay = {
+  date: Date
+  /** „Heute", „Morgen", sonst das Datum „Sa, 10. Okt". */
+  label: string
+  /** Immer das Datum „Sa, 10. Okt" (Nr. 46: jeder Termin mit Datum). */
+  datum: string
+  times: string
+}
 
 const WEEKDAY_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
 
@@ -20,13 +28,18 @@ export function formatSlotTime(t: string): string {
   return m === '00' ? hour : `${hour}:${m}`
 }
 
+/** Der Kalendertag (JJJJ-MM-TT) eines Datums in der Zeit, in der hier gerechnet wird. */
+function kalendertag(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
 function dayLabel(date: Date, now: Date): string {
   const tomorrow = new Date(now)
   tomorrow.setDate(tomorrow.getDate() + 1)
   if (date.toDateString() === now.toDateString()) return 'Heute'
   if (date.toDateString() === tomorrow.toDateString()) return 'Morgen'
-  const month = date.toLocaleDateString('de-AT', { month: 'long' })
-  return `${WEEKDAY_SHORT[date.getDay()]}, ${date.getDate()}. ${month}`
+  // Dieselbe Schreibweise wie die Kasse („Sa, 10. Okt", src/lib/format.ts).
+  return formatTagKurz(kalendertag(date))
 }
 
 // Nächste `count` Abholtage innerhalb von 14 Tagen. Heute zählt nur, solange
@@ -52,6 +65,7 @@ export function nextPickupDays(
     days.push({
       date,
       label: dayLabel(date, now),
+      datum: formatTagKurz(kalendertag(date)),
       times: `${sorted
         .map((s) => `${formatSlotTime(s.startTime)}–${formatSlotTime(s.endTime)}`)
         .join(' · ')} Uhr`,
@@ -59,6 +73,14 @@ export function nextPickupDays(
   }
 
   return days
+}
+
+/**
+ * Eine Zeile der Karte „Nächste Abholung" (Nr. 46: Termine als Text, keine
+ * Knopf-Optik ohne Funktion): „Heute · Do, 8. Okt", sonst das Datum.
+ */
+export function abholtagZeile(tag: Pick<PickupDay, 'label' | 'datum'>): string {
+  return tag.label === tag.datum ? tag.datum : `${tag.label} · ${tag.datum}`
 }
 
 // Kurzlabel für die Aktionsleiste: "Mi & Sa" (Wochentage der Slots, Mo–So sortiert)

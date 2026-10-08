@@ -27,6 +27,7 @@ import {
   mitAnzahl,
   plural,
   formatDatumLang,
+  formatTagKurz,
 } from '@/lib/format'
 import { abGrundpreis, baueAngebotsZeile, grundpreisAusKennzeichnung } from '@/lib/bereiche-anzeige'
 import { LEERER_HOEFE_FILTER } from '@/schemas/hoefe-filter'
@@ -423,5 +424,36 @@ describe('formatDatumLang — ein Tag in Wiener Zeit', () => {
 
   it('österreichisch: Jänner', () => {
     expect(formatDatumLang(new Date('2027-01-15T12:00:00.000Z'))).toBe('15.\u00a0Jänner 2027')
+  })
+})
+
+describe('formatTagKurz — ein Abholtermin mit Wochentag und Datum (Nr. 46)', () => {
+  it('schreibt „Sa, 10. Okt" mit geschütztem Leerzeichen vor dem Monat', () => {
+    expect(formatTagKurz('2026-10-10')).toBe('Sa, 10. Okt')
+    expect(formatTagKurz('2026-10-14')).toBe('Mi, 14. Okt')
+  })
+
+  it('jeder Wochentag und die Monatsgrenze stimmen', () => {
+    // 4. bis 10. Oktober 2026: Sonntag bis Samstag.
+    const woche = ['04', '05', '06', '07', '08', '09', '10'].map((t) => formatTagKurz(`2026-10-${t}`).slice(0, 2))
+    expect(woche).toEqual(['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'])
+    expect(formatTagKurz('2026-10-31')).toBe('Sa, 31. Okt')
+    expect(formatTagKurz('2026-11-01')).toBe('So, 1. Nov')
+  })
+
+  it('österreichisch: Jän, und kurze Monate bleiben ganz', () => {
+    expect(formatTagKurz('2027-01-02')).toBe('Sa, 2. Jän')
+    expect(formatTagKurz('2027-03-01')).toBe('Mo, 1. März')
+    expect(formatTagKurz('2027-06-07')).toBe('Mo, 7. Juni')
+  })
+
+  it('hängt an keiner Zeitzone: der Kalendertag entscheidet, auch im Schaltjahr', () => {
+    expect(formatTagKurz('2028-02-29')).toBe('Di, 29. Feb')
+  })
+
+  it('Unlesbares bleibt, wie es kam — kein „undefined" in der Kasse', () => {
+    expect(formatTagKurz('morgen')).toBe('morgen')
+    expect(formatTagKurz('2026-13-01')).toBe('2026-13-01')
+    expect(formatTagKurz('')).toBe('')
   })
 })

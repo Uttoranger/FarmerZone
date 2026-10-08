@@ -12,7 +12,13 @@ import {
   KILOPREIS_LABEL,
   MENGE_LABEL,
   MENGEN_HINWEIS,
+  ORT_VORSCHLAG,
+  SUCHFELD_TEXT,
   aktiveFilter,
+  enterSuchtOrt,
+  ortVorschlagAnbieten,
+  ortVorschlagText,
+  siehtNachOrtAus,
   alleZuruecksetzen,
   entdeckenKopf,
   ergebnisZahl,
@@ -32,6 +38,8 @@ import {
 } from '@/lib/hoefe-entdecken'
 import type { AngebotsProdukt } from '@/lib/bereiche-anzeige'
 import { LEERER_HOEFE_FILTER, leseHoefeFilter, type HoefeFilter } from '@/schemas/hoefe-filter'
+import { tasteInVorschlaegen } from '@/lib/hofuebersicht'
+import { ortssucheSchema } from '@/schemas/ortssuche'
 import { KLEINGEBINDE_BIS_KG, type ProductCategoryValue } from '@/lib/taxonomie'
 
 let laufnummer = 0
@@ -395,5 +403,53 @@ describe('leerzustand — immer mit Ausweg', () => {
     expect(leer.ausweg).toEqual({ art: 'link', label: 'Alle zurücksetzen', ziel: alleZuruecksetzen(filter) })
     expect(leer.titel.length).toBeGreaterThan(0)
     expect(leer.satz.length).toBeGreaterThan(0)
+  })
+})
+
+describe('Ein Suchfeld „Ort oder Produkt" (Nr. 46)', () => {
+  it('der Platzhalter sagt beides, die Beschriftung auch die Postleitzahl', () => {
+    expect(SUCHFELD_TEXT.platzhalter).toBe('Ort oder Produkt')
+    expect(SUCHFELD_TEXT.beschriftung).toMatch(/Ort.*Postleitzahl.*Produkt/)
+    expect(SUCHFELD_TEXT.standort).toBe('Standort nutzen')
+  })
+
+  it('der Eintrag „Höfe rund um …" erscheint ab zwei Zeichen — dieselbe Grenze wie die Ortssuche des Servers', () => {
+    expect(ortVorschlagAnbieten('')).toBe(false)
+    expect(ortVorschlagAnbieten(' R ')).toBe(false)
+    expect(ortVorschlagAnbieten('Ri')).toBe(true)
+    // Gegenprobe am Schema: was der Eintrag anbietet, nimmt loeseOrtAuf auch an.
+    expect(ortssucheSchema.safeParse(' R ').success).toBe(false)
+    expect(ortssucheSchema.safeParse('Ri').success).toBe(true)
+    expect(ortVorschlagText('  4910 ')).toBe('Höfe rund um „4910" zeigen')
+  })
+
+  it('eine Postleitzahl vorn ist ein Ort, ein Wort mit Ziffern nicht', () => {
+    expect(siehtNachOrtAus('4910')).toBe(true)
+    expect(siehtNachOrtAus(' 84359 Simbach ')).toBe(true)
+    expect(siehtNachOrtAus('Eier 10er')).toBe(false)
+    expect(siehtNachOrtAus('491')).toBe(false)
+    expect(siehtNachOrtAus('491000')).toBe(false)
+  })
+
+  it('Enter ohne Markierung: Ort bei Postleitzahl oder ohne Treffer, sonst bleibt es bei der Produktsuche', () => {
+    expect(enterSuchtOrt('4910', 3)).toBe(true)
+    expect(enterSuchtOrt('Ried', 0)).toBe(true)
+    expect(enterSuchtOrt('Eier', 4)).toBe(false)
+    expect(enterSuchtOrt('R', 0)).toBe(false)
+    expect(enterSuchtOrt('', 0)).toBe(false)
+  })
+
+  it('mit der Tastatur: Pfeil nach oben aus dem Feld landet auf „Höfe rund um …", Enter übernimmt ihn', () => {
+    const namen = ['Freilandeier', 'Eierlikör', ORT_VORSCHLAG]
+    const hoch = tasteInVorschlaegen('ArrowUp', { offen: false, markiert: null }, namen)
+    expect(hoch.lage).toEqual({ offen: true, markiert: ORT_VORSCHLAG })
+    const enter = tasteInVorschlaegen('Enter', hoch.lage, namen)
+    expect(enter.uebernehmen).toBe(ORT_VORSCHLAG)
+    // Gegenprobe: ein Produkt bleibt ein Produkt.
+    expect(tasteInVorschlaegen('Enter', { offen: true, markiert: 'Freilandeier' }, namen).uebernehmen).toBe('Freilandeier')
+  })
+
+  it('der Schlüssel des Ort-Eintrags kann kein Produktname sein (Nullzeichen)', () => {
+    expect(ORT_VORSCHLAG.charCodeAt(0)).toBe(0)
   })
 })

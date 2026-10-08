@@ -26,6 +26,7 @@ import {
   StatusSchritte,
 } from '@/components/bestaetigung/bestaetigung-teile'
 import { HofTeilenKarte } from '@/components/bestaetigung/hof-teilen-karte'
+import { NeuigkeitenKarte } from '@/components/bestaetigung/neuigkeiten-karte'
 import { fristVon, tagInWorten, uhrzeitInWien } from '@/lib/fristen'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 
@@ -216,6 +217,13 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
 
         {/* Nur Name und Slug: geteilt wird die öffentliche Hofseite, nie diese signierte Adresse. */}
         {bloecke.teilen && <HofTeilenKarte hofName={order.farm.name} hofSlug={order.farm.slug} />}
+
+        {/* Register N2 (Nr. 46): die Neuigkeiten-Anmeldung, vorher ein Haken in der Kasse.
+            Kennung und Signatur stehen ohnehin in der Adresse dieser Seite; welche
+            Adresse angemeldet wird, nimmt der Server aus der Bestellung. */}
+        {bloecke.neuigkeiten && (
+          <NeuigkeitenKarte orderId={order.id} sig={sig} hofName={order.farm.name} email={order.customerEmail} />
+        )}
 
         <Aktionen>
           {bloecke.aktion === 'bestellung' && (

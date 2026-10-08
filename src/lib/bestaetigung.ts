@@ -248,6 +248,13 @@ export type BestaetigungsBloecke = {
   fristHinweis: boolean
   /** „Erzähl's weiter" — nur, wenn die Bestellung wirklich steht. */
   teilen: boolean
+  /**
+   * „Neuigkeiten vom Hof per E-Mail" (Register N2, Nr. 46) — die Anmeldung,
+   * die vorher als Haken in der Kasse stand. Online wie bar, solange die
+   * Bestellung läuft; nicht bei storniert, verfallen, gescheiterter Zahlung
+   * oder nicht abgeholt.
+   */
+  neuigkeiten: boolean
   /** Die eine Hauptaktion (grün); „keine" heißt: die Aktion steckt in der Mail. */
   aktion: 'bestellung' | 'neu-bestellen' | 'erneut-versuchen' | 'keine'
 }
@@ -277,6 +284,9 @@ export function bestaetigungsBloecke(zustand: BestaetigungsZustand | null, statu
     kalender: steht && kalenderTerminGilt(status),
     fristHinweis: zustand === 'bestaetigung-offen',
     teilen: steht && status !== 'CANCELLED' && status !== 'NOT_PICKED_UP',
+    // Auch bei „bar offen" und „Zahlung wird geprüft": Die Kundin ist gerade
+    // hier, und die Anmeldung gilt ohnehin erst mit ihrem Klick in der Mail.
+    neuigkeiten: (laeuft || zustand === 'bestaetigung-offen') && status !== 'CANCELLED' && status !== 'NOT_PICKED_UP',
     aktion:
       zustand === 'verfallen'
         ? 'neu-bestellen'
