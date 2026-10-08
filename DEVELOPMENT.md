@@ -4523,6 +4523,7 @@ Auftrag freigabe.md §11 „40", Register R1. **Mit Migration** (`20261007200000
 - **Fail-open (Annahme):** Ist die Datenbank nicht erreichbar oder braucht die Zählung länger als 1,5 s, lässt die zweite Stufe durch und meldet es an Sentry (Fehlerart und Zweck, nie Schlüssel, IP oder Adresse). Begründung: Eine Bremse, die bei einem Datenbank-Schluckauf aussperrt oder eine Bestellung verhindert, schadet mehr als ein paar ungezählte Versuche; die erste Stufe wirkt weiter.
 - **Aufräumen:** `cleanup-reservations` (täglich 3:00 UTC) löscht nach den Reservierungen alle Zähler mit `ablauf < jetzt`, in eigenem `try` — ein Fehler dort lässt den Cron nicht scheitern. Die Antwort nennt `bremsZaehler` (Anzahl oder null).
 - **Bekannt, nicht geändert:** Im Checkout zählt die erste Stufe die IP je Anfrage zweimal (`enforceRateLimit` vor und nach dem Parsen, Altbestand) — je Instanz also effektiv 10 Bestellversuche je Minute und IP; die zweite Stufe zählt einmal (20). Die übrigen Routen mit `enforceRateLimit` (`/api/reserve`, `/api/warenkorb/pruefen`, Teilen) gehören nicht zu R1 und bleiben einstufig.
+
 ## Probelauf als Checkliste (Nachtlauf Nr. 48, Oktober 2026)
 
 Auftrag freigabe.md §12 „48" (Nachholung von Nr. 34). Kein Code, keine Migration. Vorbedingung B war nicht erfüllt: Die Netzwerkrichtlinie der Nacht-Sitzung sperrt die Vorschau-Adressen und api.stripe.com. Deshalb gilt der Pfad „Sonst": `docs/nachtlauf/probelauf-checkliste.md` führt den Menschen durch die zwölf Abläufe, mit Beträgen aus dem Code und den Stellen in Stripe-Dashboard und Admin. Bericht 48.
@@ -4535,7 +4536,7 @@ Auftrag freigabe.md §12 „48" (Nachholung von Nr. 34). Kein Code, keine Migrat
   - Folge: Jedes fremde Ereignis legt eine Zeile in `WebhookEvent` an, ohne Personendaten. Aufgeräumt wird die Tabelle nicht.
 - **Folge für die Testumgebung:** Bezahlt setzt erst der Webhook. Ohne eigenen Endpunkt bleibt eine Online-Bestellung dort auf „Zahlung wird geprüft". Der Endpunkt braucht zwei Dinge:
   - ein eigenes Signing Secret als `STRIPE_WEBHOOK_SECRET`, nur für den Branch;
-  - einen Weg durch die Vercel-Anmeldung, sonst bekommt Stripe 401. Vorschlag: „Protection Bypass for Automation" als Parameter an der Endpunkt-Adresse; in der Vercel-Doku noch zu bestätigen.
+  - einen Weg durch die Vercel-Anmeldung, sonst bekommt Stripe 401. Den Weg beschreibt `docs/betrieb/testumgebung.md`, Schritt 5 (Nr. 43): „Protection Bypass for Automation" als Parameter an der Endpunkt-Adresse. Dort steht auch, dass dieses Geheimnis alle geschützten Deployments des Projekts öffnet.
 - **Testbetrieb-Hinweise (Nr. 42)** erscheinen nur in der Produktion mit Test-Schlüssel (`istTestbetrieb`), nie in Vorschau oder Testumgebung. Dort sagt es das Banner.
 
 ## Nützliche Befehle
