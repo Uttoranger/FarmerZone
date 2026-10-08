@@ -62,7 +62,7 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 42 | Stripe-Testbetrieb und Modus-Wache (Z2) | läuft (Nachbesserung 1) | `nacht/2026-10-08/42-stripe-wache` | | main | tester grün; pruefer: 6 „Sollte" (u. a. Wache fail-closed) | 08.10.2026 |
 | 43 | Testumgebung test.farmerzone.at (Z3) | läuft | `nacht/2026-10-08/43-testumgebung` | | 42 | | 08.10.2026 |
 | 44 | Rückweg im Hofbereich (N1) | läuft | `nacht/2026-10-08/44-rueckweg` | | main | | 08.10.2026 |
-| 45 | Hofbereich kinderleicht | offen | | | main | | |
+| 45 | Hofbereich kinderleicht | läuft | `nacht/2026-10-08/45-hofbereich` | | main | | 08.10.2026 |
 | 46 | Kundensicht kinderleicht (N2) | offen | | | main | | |
 | 47 | Altlasten aus Lauf 7 und Laufzeit-Befunde | läuft (Nachbesserung 1) | `nacht/2026-10-08/47-altlasten` | | main | tester grün; pruefer: 4 „Sollte" | 08.10.2026 |
 | 48 | Probelauf (Nachholung von 34) | offen — Vorbedingung B nicht erfüllt (Vorschau und api.stripe.com aus der Sitzung gesperrt, CONNECT 403) → Checkliste | | | main | | 08.10.2026 |
