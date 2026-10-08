@@ -39,7 +39,7 @@ Mit dem Live-Schlüssel verschwinden alle drei von selbst. Den Modus liest die A
   select id, slug, "stripeAccountId" from "Farm" where "stripeAccountId" is not null;
   ```
   Nach dem Neu-Einrichten kennt die Datenbank nur noch die neue Kennung. Die alte steht dann nur im Laufzeit-Protokoll („[Stripe] Hof-Konto neu eingerichtet …“), und das bewahrt Vercel je nach Plan nur kurz auf.
-- [ ] Die Höfe vorab informieren: Nach der Umstellung öffnen sie einmal Einstellungen → Zahlung und richten die Online-Zahlung neu ein (etwa 10 Minuten). Siehe Schritt 9.
+- [ ] Die Höfe vorab informieren: Sobald du Bescheid gibst (erst nach der Probe mit EINEM Hof in Schritt 9), öffnen sie einmal Einstellungen → Zahlung und richten die Online-Zahlung neu ein (etwa 10 Minuten). Vorher nicht neu einrichten.
 - [ ] Eine ruhige Stunde wählen, ohne laufende Abholung.
 
 ## 1. Stripe-Konto live aktivieren
@@ -133,9 +133,10 @@ Die gespeicherten Hof-Konten stammen aus dem Testmodus, der Live-Schlüssel kenn
 5. Doppelklick und sofortiger Neuversuch bekommen von Stripe dasselbe Konto (Idempotenz-Schlüssel je 15-Minuten-Fenster). Grenzen:
    - Scheitert der erste Versuch bei Stripe, gibt der Knopf bis zu 15 Minuten dieselbe Antwort. Danach noch einmal tippen.
    - Fällt ein Doppelklick genau auf den Wechsel des Fensters, entsteht bei Stripe ein zweites, ungenutztes Konto. Gespeichert wird nur eines; das andere steht mit Hof-ID im Protokoll („[Stripe] Hof-Konto nicht ersetzt …“).
+   - Scheitert nach dem Anlegen bei Stripe das Speichern in der Datenbank (oder geht die Antwort von Stripe verloren) und fällt der Neuversuch in ein neues Fenster, entsteht ebenfalls ein zweites Konto. Das erste steht dann NICHT im Protokoll; es ist im Stripe-Dashboard (Connect → Verbundene Konten) über die Hof-Adresse zu finden. Geld geht dabei nicht verloren.
 
 - [ ] **Zuerst EIN Hof** (am besten ein eigener Testhof): Nach dem Neu-Einrichten muss sein Konto im Stripe-Dashboard (Live) unter Connect → Verbundene Konten des Kontos aus Schritt 2 stehen. Erst dann die anderen Höfe bitten.
-- [ ] Damit keine Kundin auf Schritt 2 trifft: Die Höfe gleich nach dem Deploy bitten, einmal „Status prüfen“ zu tippen und dann neu einzurichten.
+- [ ] Damit keine Kundin auf Schritt 2 trifft: Nach der Probe mit EINEM Hof (oben) die übrigen Höfe zügig bitten, einmal „Status prüfen“ zu tippen und dann neu einzurichten.
 - [ ] Überblick im Admin: Die Höfe-Liste zeigt jeden noch nicht neu eingerichteten Hof (nach dem Vermerk) als **„Stripe fehlt“** (Filter „Stripe fehlt“).
 - [ ] Sentry meldet „Stripe kennt das gespeicherte Konto eines Hofs nicht“ höchstens einmal je Hof und Tag, nur mit der Hof-ID.
 
