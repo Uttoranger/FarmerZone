@@ -7,7 +7,10 @@ import { ProfileForm } from '@/components/settings/profile-form'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
 
-export const metadata: Metadata = { title: 'Hof-Profil — FarmerZone' }
+/** Titel der Seite — für den Kopf und den Tab, eine Schreibweise. */
+const TITEL = 'Hof-Profil'
+
+export const metadata: Metadata = { title: `${TITEL} — FarmerZone` }
 
 /*
  * Hof-Profil in der HofShell (Nachtlauf Nr. 22d): gleiches Formular, gleiche
@@ -26,7 +29,7 @@ export default async function ProfileSettingsPage(): Promise<React.JSX.Element> 
 
   return (
     <div className={UNTERSEITE_RAHMEN}>
-      <UnterseitenKopf titel="Hof-Profil" satz="Informationen, die auf deiner öffentlichen Hof-Seite sichtbar sind." />
+      <UnterseitenKopf titel={TITEL} satz="Informationen, die auf deiner öffentlichen Hof-Seite sichtbar sind." />
       <div data-app-palette="neu">
         <ProfileForm farm={farm} />
       </div>

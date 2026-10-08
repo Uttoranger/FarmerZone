@@ -7,7 +7,10 @@ import { PickupSlotsClient } from '@/components/settings/pickup-slots-client'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
 
-export const metadata: Metadata = { title: 'Abholzeiten — FarmerZone' }
+/** Titel der Seite — für den Kopf und den Tab, eine Schreibweise. */
+const TITEL = 'Abholzeiten'
+
+export const metadata: Metadata = { title: `${TITEL} — FarmerZone` }
 
 /*
  * Abholzeiten in der HofShell (Nachtlauf Nr. 22d): dieselbe Liste und dieselben
@@ -26,7 +29,7 @@ export default async function PickupSlotsPage(): Promise<React.JSX.Element> {
   return (
     <div className={UNTERSEITE_RAHMEN}>
       <UnterseitenKopf
-        titel="Abholzeiten"
+        titel={TITEL}
         satz="Lege fest, wann Kunden ihre Bestellungen abholen können. Deine Abholzeiten gelten dauerhaft jede Woche. Kundinnen können Termine bis zu 14 Tage im Voraus wählen."
       />
       <div data-app-palette="neu">

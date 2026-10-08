@@ -122,6 +122,10 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
   const landFeld = register('country')
 
   function onSubmit(data: ProfileFormData) {
+    // Während der Ortssuche nicht speichern: Danach geht es zur Übersicht
+    // (Nr. 44), und der gesuchte Punkt käme in einer ausgehängten Seite an —
+    // gespeichert wären still die alten Koordinaten.
+    if (sucheLaeuft) return
     startTransition(async () => {
       const res = await updateProfile(data)
       if (res.error) {
@@ -309,11 +313,12 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
           </div>
         </div>
         {/* Der EINZIGE Auslöser der Vorwärts-Suche — bewusst eine Schaltfläche,
-            nichts Automatisches beim Tippen oder Speichern. */}
+            nichts Automatisches beim Tippen oder Speichern. Gesperrt, solange
+            gespeichert wird: Danach geht es zur Übersicht (Nr. 44). */}
         <button
           type="button"
           onClick={aufKarteSuchen}
-          disabled={sucheLaeuft}
+          disabled={sucheLaeuft || isPending}
           className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-medium text-foreground hover:bg-muted/40 transition-colors disabled:opacity-60"
         >
           {sucheLaeuft && <Loader2 className="size-4 animate-spin" />}
@@ -390,12 +395,13 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
         — dort lädst du Bilder direkt vom Gerät hoch.
       </p>
 
+      {/* Wartet, solange „Auf der Karte suchen" läuft — sonst ginge der neue Standort verloren (siehe onSubmit). */}
       <Button
         type="submit"
-        disabled={isPending}
+        disabled={isPending || sucheLaeuft}
         className="w-full h-12 bg-primary text-primary-foreground hover:opacity-90 font-semibold"
       >
-        {isPending ? <Loader2 className="size-4 animate-spin" /> : 'Profil speichern'}
+        {isPending ? <Loader2 className="size-4 animate-spin" /> : sucheLaeuft ? 'Suche läuft noch …' : 'Profil speichern'}
       </Button>
     </form>
   )

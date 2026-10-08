@@ -14,7 +14,9 @@
  *  - Speichern: auf Einstellungs-Unterseiten Toast „Gespeichert" und zurück
  *    zur Übersicht, nur nach Erfolg; Abholzeiten bleibt; derselbe Baustein im
  *    Hofseiten-Editor behält seine Meldung. Mein Auftritt verlässt die Seite
- *    nicht, solange ein Foto hochlädt.
+ *    nicht, solange ein Foto hochlädt; das Hof-Profil nicht, solange die
+ *    Ortssuche läuft (Nachbesserung Runde 1).
+ *  - Tab-Titel und Seitentitel der Unterseiten haben eine Schreibweise.
  *  - Hof-Profil: „Einstellungen → Mein Auftritt" ist ein Link.
  *  - Mehr-Blatt: „Angemeldet …" ist ein Link auf „Konto und Sicherheit".
  */
@@ -246,6 +248,16 @@ describe('Speichern auf den Einstellungs-Unterseiten (Quelltext)', () => {
     expect(rumpf(quelle('src/components/settings/pause-client.tsx'), 'handleToggle')).not.toContain('nachSpeichern(')
   })
 
+  it('Hof-Profil: Speichern wartet, solange „Auf der Karte suchen" läuft — der neue Standort ginge sonst verloren', () => {
+    const text = quelle('src/components/settings/profile-form.tsx')
+    expect(text).toMatch(/type="submit"\s*disabled=\{isPending \|\| sucheLaeuft\}/)
+    expect(rumpf(text, 'onSubmit')).toMatch(/if \(sucheLaeuft\) return[\s\S]*startTransition\(/)
+    // Umgekehrt beginnt keine Suche, während gespeichert wird (danach geht es zur Übersicht).
+    expect(text).toMatch(/onClick=\{aufKarteSuchen\}\s*disabled=\{sucheLaeuft \|\| isPending\}/)
+    // Gegenprobe: Die alte Sperre allein (nur isPending) fällt auf.
+    expect('type="submit"\n        disabled={isPending}').not.toMatch(/type="submit"\s*disabled=\{isPending \|\| sucheLaeuft\}/)
+  })
+
   it('Mein Auftritt: Speichern wartet, solange ein Foto hochlädt (der Upload ginge beim Verlassen verloren)', () => {
     const text = quelle('src/app/(hof)/settings/appearance/appearance-client.tsx')
     expect(text).toMatch(/disabled=\{saving \|\| uploadLaeuft\}/)
@@ -360,6 +372,27 @@ describe('Hof-Profil: „Einstellungen → Mein Auftritt" ist ein Link', () => {
     const klassen = link?.[1].split(' ') ?? []
     for (const k of ['text-brand-text', 'py-3', ...FOKUS_RAHMEN.split(' ')]) expect(klassen, k).toContain(k)
     expect(html).not.toContain('<span class="text-foreground">Einstellungen → Mein Auftritt</span>')
+  })
+
+  it('ohne laufende Suche ist „Profil speichern" frei', () => {
+    const html = renderToStaticMarkup(createElement(ProfileForm, { farm: HOF }))
+    const knopf = html.match(/<button[^>]*type="submit"[^>]*>([^<]*)<\/button>/)
+    expect(knopf?.[1]).toBe('Profil speichern')
+    expect(knopf?.[0]).not.toMatch(/\sdisabled=/)
+  })
+})
+
+describe('Tab-Titel und Seitentitel der Unterseiten', () => {
+  // Zahlung bleibt außen vor (Nr. 42 ändert dort parallel, nur der Kopf ist getauscht);
+  // Konditionen hat im Bestand zwei Wortlaute (Tab „Konditionen", h1 „Deine Konditionen").
+  it.each(['profile', 'pickup-slots', 'pause', 'account', 'appearance', 'teilen'])('/settings/%s: der Tab nimmt dieselbe Schreibweise wie der Kopf', (seite) => {
+    const text = quelle(`src/app/(hof)/settings/${seite}/page.tsx`)
+    const tab = text.match(/title: `\$\{([A-Za-z_.]+)\} — FarmerZone`/)
+    expect(tab, seite).not.toBeNull()
+    const quelleDesTitels = tab?.[1] ?? ''
+    // Die Mein-Auftritt-Seite trägt ihre h1 im Formular (aus derselben Konstante).
+    const kopf = seite === 'appearance' ? quelle('src/app/(hof)/settings/appearance/appearance-client.tsx') : text
+    expect(kopf, seite).toContain(`{${quelleDesTitels}}`)
   })
 })
 

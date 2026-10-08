@@ -5,9 +5,10 @@ import { auth } from '@/lib/auth'
 import { getAppearanceData } from '@/server/queries/appearance'
 import { AppearanceClient } from './appearance-client'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
+import { EINSTELLUNG_MEIN_AUFTRITT } from '@/lib/bauern-navigation'
 import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
 
-export const metadata: Metadata = { title: 'Mein Auftritt — FarmerZone' }
+export const metadata: Metadata = { title: `${EINSTELLUNG_MEIN_AUFTRITT.label} — FarmerZone` }
 export const dynamic = 'force-dynamic'
 
 /*

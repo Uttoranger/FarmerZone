@@ -8,7 +8,7 @@ import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
 import { TeilenMomenteSchalter } from '@/components/hof-einstellungen/teilen-momente-schalter'
 
-export const metadata: Metadata = { title: 'Teilen-Hinweise — FarmerZone' }
+export const metadata: Metadata = { title: `${TEILEN_MOMENTE_TITEL} — FarmerZone` }
 export const dynamic = 'force-dynamic'
 
 /*
