@@ -4524,6 +4524,22 @@ Auftrag freigabe.md §11 „40", Register R1. **Mit Migration** (`20261007200000
 - **Aufräumen:** `cleanup-reservations` (täglich 3:00 UTC) löscht nach den Reservierungen alle Zähler mit `ablauf < jetzt`, in eigenem `try` — ein Fehler dort lässt den Cron nicht scheitern. Die Antwort nennt `bremsZaehler` (Anzahl oder null).
 - **Bekannt, nicht geändert:** Im Checkout zählt die erste Stufe die IP je Anfrage zweimal (`enforceRateLimit` vor und nach dem Parsen, Altbestand) — je Instanz also effektiv 10 Bestellversuche je Minute und IP; die zweite Stufe zählt einmal (20). Die übrigen Routen mit `enforceRateLimit` (`/api/reserve`, `/api/warenkorb/pruefen`, Teilen) gehören nicht zu R1 und bleiben einstufig.
 
+## Befunde vor Lauf 8: Stripe-Modus und Hof-Anmeldung am Handy (08.10.2026)
+
+Vom Menschen am 08.10.2026 nur lesend geprüft; Grundlage für Register N1, Z2, Z3 und `freigabe.md` §12.
+
+- **Stripe-Modus:** `STRIPE_*` ist bei Vercel EINE Variable für Vorschau und Produktion. Das Umgebungsbanner der Vorschau zeigt „Stripe Test", die Produktion lädt `pk_test_` — beide laufen im Testmodus, es fließt noch kein echtes Geld.
+  - Lauf 7 hatte Nr. 34 übersprungen mit der Begründung, die Vorschau nutze „sehr wahrscheinlich" den Live-Schlüssel. Das war falsch: Der Schluss beruhte nur darauf, dass Vorschau und Produktion dieselbe (verschlüsselte) Variable teilen, nicht auf ihrem Wert.
+  - Den Modus zeigt das Umgebungsbanner (`bannerZeilen` in `src/lib/umgebung.ts`, aus dem Präfix des Schlüssels in `bestimmeUmgebung`); dafür muss niemand etwas entschlüsseln. Die Regel dazu steht in `docs/nachtlauf.md` §2.
+  - Die Live-Schaltung macht der Mensch ganz am Schluss (Z2); bis dahin sagen Kasse, Admin und Zahlungs-Einstellungen, dass Online-Zahlungen Testzahlungen sind (Nr. 42).
+- **Hof-Anmeldung am Handy (390 px):** Bestehende Höfe fanden die Anmeldung nur ganz unten im Fuß der Startseite („Anmelden für Höfe").
+  - Im Kopf der KundeShell standen nur Logo und Hell/Dunkel; „Anmelden" war unter 768 px ausgeblendet.
+  - `/fuer-hoefe` und das Band „Für Höfe" boten nur Registrieren.
+  - Ein angemeldeter Hof sah auf öffentlichen Seiten keinen Weg in seinen Bereich.
+  - Das Manifest startet auf `/dashboard`, die Sitzung hält 7 Tage. Wer FarmerZone auf den Startbildschirm legt, ist also mit einem Tipp in seinem Hof.
+  - Im Hofbereich war der Rückweg „‹ …" auf Unterseiten klein, nur oben und nach dem Scrollen weg.
+  - Folge: Register N1, Umsetzung Nr. 41 und 44.
+
 ## Nützliche Befehle
 
 ```bash

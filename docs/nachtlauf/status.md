@@ -50,11 +50,20 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 31 | Tab-Wechsel beschleunigen | gemergt (#211) | `nacht/2026-10-07/31-tab-wechsel` | #208 | main | /orders −12 % Server-JS, „[E-Mail] Init" weg; Admin-/Auswertungs-Ladeansichten kommen mit #203/#200; #204 dafür angepasst (433c546) | 07.10.2026 |
 | 32 | Altlasten Lauf 5 | gemergt (#211) | `nacht/2026-10-07/32-altlasten` | #209 | 24 (#203) | gestapelt auf #203 (Servicegebühr-Dialog); Server nimmt Mindestgebühr nur noch als ganze Cent | 07.10.2026 |
 | 33 | Datenschutzerklärung | fertig (Entwurf) | `nacht/2026-10-07/33-datenschutz` | #210 | main | Haltepunkt Lauf 6; Entwurf bis rechtliche Prüfung der Tabelle in Bericht 33 | 07.10.2026 |
-| 34 | Automatischer Probelauf (Gate 9a) | übersprungen | – | – | main | **Vorbedingung nicht erfüllt:** `STRIPE_SECRET_KEY` ist bei Vercel eine gemeinsame Variable für Vorschau und Produktion (Typ sensitive, Präfix nicht prüfbar) → Vorschau nutzt sehr wahrscheinlich den Live-Schlüssel; Vorschau aus dem Container nicht erreichbar. Keine Zahlung ausgeführt. | 07.10.2026 |
-| 35 | Altlasten aus Lauf 6 | fertig (PR #213) | `nacht/2026-10-07/35-altlasten` | #213 | main | Geldpfad, Nachprüfung ohne Befund; keine Migration | 07.10.2026 |
-| 36 | BAES-Angaben | fertig (PR #214) | `nacht/2026-10-07/36-baes` | #214 | main | Textänderung zum Gegenlesen (§ 8 Abs. 7 FMV); keine Migration | 07.10.2026 |
-| 37 | Sentry ohne IP-Adressen | fertig (PR #215) | `nacht/2026-10-07/37-sentry-ip` | #215 | main | Sicherheitspfad, zwei Runden, Nachprüfung; Dashboard-Einstellung prüft der Mensch; keine Migration | 07.10.2026 |
-| 38 | Double-Opt-in (S11) | fertig (PR #217) | `nacht/2026-10-07/38-double-opt-in` | #217 | main | **Migration: ja (Expand)**; Sicherheitspfad, zwei Runden, zwei Nachprüfungen; ein „Sollte" offen (Rückgabetyp); Abonnentenzahl ermittelt der Mensch | 07.10.2026 |
-| 39 | Direktverkauf senkt den Vorrat (D1) | fertig (PR #216) | `nacht/2026-10-07/39-direktverkauf-vorrat` | #216 | main | Annahmen zur Freigabe (Grundeinheit, auf 0, Aufrunden); keine Migration | 07.10.2026 |
-| 40 | Rate-Limit über die Datenbank (R1) | fertig (PR #218) | `nacht/2026-10-07/40-rate-limit-db` | #218 | main | **Migration: ja (Expand, neue Tabelle + RLS)**; nach #217 mergen; Datenschutzsatz offen | 07.10.2026 |
-| Sammel | Sammel-PR Lauf 7 | fertig (PR #219) | `integration/lauf7` | #219 | main | #212–#218 zusammengeführt, keine Code-Konflikte; Gesamtstand grün (5456 Tests, Integration 328); Morgenbericht `morgenbericht-2026-10-07-lauf7.md` | 07.10.2026 |
+| 34 | Automatischer Probelauf (Gate 9a) | übersprungen | – | – | main | **Vorbedingung nicht erfüllt:** `STRIPE_SECRET_KEY` ist bei Vercel eine gemeinsame Variable für Vorschau und Produktion (Typ sensitive, Präfix nicht prüfbar) → Vorschau nutzt sehr wahrscheinlich den Live-Schlüssel; Vorschau aus dem Container nicht erreichbar. Keine Zahlung ausgeführt. **Korrektur 08.10.2026:** Das Banner der Vorschau zeigt ‚Stripe Test'; die Annahme ‚sehr wahrscheinlich Live' war falsch. Die Produktion nutzt dieselbe Variable und läuft ebenfalls im Testmodus. (Nachholung als Nr. 48.) | 07.10.2026 |
+| 35 | Altlasten aus Lauf 6 | gemergt (#219) | `nacht/2026-10-07/35-altlasten` | #213 | main | Geldpfad, Nachprüfung ohne Befund; keine Migration | 07.10.2026 |
+| 36 | BAES-Angaben | gemergt (#219) | `nacht/2026-10-07/36-baes` | #214 | main | Textänderung zum Gegenlesen (§ 8 Abs. 7 FMV); keine Migration | 07.10.2026 |
+| 37 | Sentry ohne IP-Adressen | gemergt (#219) | `nacht/2026-10-07/37-sentry-ip` | #215 | main | Sicherheitspfad, zwei Runden, Nachprüfung; Dashboard-Einstellung prüft der Mensch; keine Migration | 07.10.2026 |
+| 38 | Double-Opt-in (S11) | gemergt (#219) | `nacht/2026-10-07/38-double-opt-in` | #217 | main | **Migration: ja (Expand)**; Sicherheitspfad, zwei Runden, zwei Nachprüfungen; ein „Sollte" offen (Rückgabetyp); Abonnentenzahl ermittelt der Mensch | 07.10.2026 |
+| 39 | Direktverkauf senkt den Vorrat (D1) | gemergt (#219) | `nacht/2026-10-07/39-direktverkauf-vorrat` | #216 | main | Annahmen zur Freigabe (Grundeinheit, auf 0, Aufrunden); keine Migration | 07.10.2026 |
+| 40 | Rate-Limit über die Datenbank (R1) | gemergt (#219) | `nacht/2026-10-07/40-rate-limit-db` | #218 | main | **Migration: ja (Expand, neue Tabelle + RLS)**; nach #217 mergen; Datenschutzsatz offen | 07.10.2026 |
+| Sammel 7 | Sammel-PR Lauf 7 | gemergt (#219) | `integration/lauf7` | #219 | main | #212–#218 zusammengeführt, keine Code-Konflikte; Gesamtstand grün (5456 Tests, Integration 328); Morgenbericht `morgenbericht-2026-10-07-lauf7.md` | 07.10.2026 |
+| 41 | Hof-Anmeldung am Handy und „Mein Hof" (N1) | offen | | | main | | |
+| 42 | Stripe-Testbetrieb und Modus-Wache (Z2) | offen | | | main | | |
+| 43 | Testumgebung test.farmerzone.at (Z3) | offen | | | 42 | | |
+| 44 | Rückweg im Hofbereich (N1) | offen | | | main | | |
+| 45 | Hofbereich kinderleicht | offen | | | main | | |
+| 46 | Kundensicht kinderleicht (N2) | offen | | | main | | |
+| 47 | Altlasten aus Lauf 7 und Laufzeit-Befunde | offen | | | main | | |
+| 48 | Probelauf (Nachholung von 34) | offen | | | main | | |
+| Sammel 8 | Sammel-PR Lauf 8 | offen | `integration/lauf8` | | main | | |

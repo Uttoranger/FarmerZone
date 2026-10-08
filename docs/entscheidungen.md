@@ -19,6 +19,7 @@ Präfixe:
 - **T** – Teilen
 - **D** – Direktverkauf
 - **R** – Rate-Limit
+- **N** – Nutzerführung (Navigation und Bedienung)
 - **O** – offen
 
 ---
@@ -273,6 +274,25 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Verhältnis zu anderen Einträgen:** ersetzt die Fachregel „Online-Zahlung ist ein Plus, kein Muss" (DEVELOPMENT.md, `src/lib/hof-einstellungen.ts`); Barzahlung durch Kundinnen bleibt möglich (B1 unverändert).
 - **Dateien:** `src/lib/admin-hoefe.ts` (`freischaltSperre`), `src/server/actions/admin.ts`, Einstellungen „Zahlung", Einrichten, Heute, `/fuer-hoefe`, `/konditionen`, Registrieren (Texte aus `src/lib/konditionen.ts`); Umsetzung Nr. 24.
 
+### Z2 · Stripe-Testbetrieb und Modus-Wache (08.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 8):**
+  - Solange die Produktion mit Test-Schlüssel läuft, sagen Kasse, Admin und Zahlungs-Einstellungen das deutlich.
+  - Vorschau und lokal laufen nie mit Live-Schlüssel (Client startet nicht).
+  - Den Modus prüft man nur über das Umgebungsbanner bzw. `bestimmeUmgebung`, nie durch Entschlüsseln.
+  - Die Live-Schaltung macht der Mensch als letzten Schritt nach `docs/betrieb/stripe-live.md`.
+- **Begründung:** Befund vom 08.10.2026 (nur lesend): `STRIPE_*` ist bei Vercel EINE Variable für Vorschau und Produktion. Das Umgebungsbanner der Vorschau zeigt „Stripe Test", die Produktion lädt `pk_test_` — beide laufen im Testmodus. Die Annahme aus Lauf 7 (Nr. 34, „sehr wahrscheinlich Live") war falsch.
+- **Verhältnis zu anderen Einträgen:** ergänzt Z1; kein Lauf schaltet auf Live um.
+- **Dateien:** Stripe-Server-Client, Kasse, AdminShell, Einstellungen „Zahlung", `docs/betrieb/stripe-live.md`; Umsetzung Nr. 42 (freigabe.md §12).
+
+### Z3 · Testumgebung statt Umschalter (08.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 8):**
+  - In der Produktion gibt es keinen Umschalter zwischen Test und Live.
+  - Echte Abläufe testet man in der Testumgebung `test.farmerzone.at` (Branch `staging`, Entwicklungsdatenbank, Stripe-Test).
+  - Testmodus je Hof bleibt eine Option für später.
+- **Begründung:** Testzahlungen gehören nicht neben echte Bestellungen; eine eigene Umgebung trennt Daten und Schlüssel.
+- **Verhältnis zu anderen Einträgen:** ergänzt Z2. „Testmodus je Hof" ist nicht beauftragt.
+- **Dateien:** `src/lib/umgebung.ts`, AdminShell, Umgebungsbanner, E-Mail-Versand außerhalb der Produktion, `.github/workflows/staging-nachziehen.yml`, `docs/betrieb/testumgebung.md`; Umsetzung Nr. 43 (freigabe.md §12).
+
 ---
 
 ## T – Teilen
@@ -333,6 +353,28 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 
 ---
 
+## N – Nutzerführung
+
+### N1 · Handy-Navigation (08.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 8):**
+  - Jeder Bildschirm hat genau eine Hauptaktion.
+  - Öffentliche Seiten zeigen oben immer „Anmelden" (→ `/login`), auch am Handy; mit Hof-Sitzung steht dort „Mein Hof" (→ `/dashboard`).
+  - Unterseiten im Hofbereich haben am Handy einen festen Kopf mit Rückweg zur Elternseite (eine Quelle).
+  - Einstellungs-Unterseiten führen nach dem Speichern zur Übersicht zurück.
+- **Begründung:** Befund vom 08.10.2026 (Handy, 390 px): Bestehende Höfe finden die Anmeldung nur ganz unten im Fuß der Startseite („Anmelden für Höfe"); im Kopf der KundeShell ist „Anmelden" unter 768 px ausgeblendet; ein angemeldeter Hof sieht auf öffentlichen Seiten keinen Weg in seinen Bereich. Im Hofbereich ist der Rückweg auf Unterseiten klein und nach dem Scrollen weg.
+- **Dateien:** KundeShell und KundenKopf, AdminShell, `src/lib/kunden-navigation.ts`, `src/lib/kunden-menue.ts`, `src/lib/admin-navigation.ts`, `src/lib/bauern-navigation.ts`, Hofbereich-Unterseiten; Umsetzung Nr. 41 und 44 (freigabe.md §12).
+
+### N2 · Kasse ohne Zusatz-Haken (08.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 8):**
+  - Der Pflicht-Haken „Ich hole ab und zahle bar" entfällt; der Kaufknopf „Zahlungspflichtig bestellen" bleibt (FAGG § 9 Abs. 3).
+  - Die Neuigkeiten-Anmeldung zieht auf die Bestätigungsseite; Double-Opt-in (S11) bleibt.
+  - Die Bar-Bestätigung per Mail (H3) bleibt unverändert.
+- **Begründung:** Weniger Schritte in der Kasse; der verbindliche Abschluss liegt im Kaufknopf.
+- **Verhältnis zu anderen Einträgen:** ändert die Kasse aus Gate 4 (Nr. 12: Zusage-Haken bei Bar); S11 und H3 bleiben unverändert.
+- **Dateien:** Kasse (Formular, Schema, `/api/checkout`), Bestätigungsseite; Umsetzung Nr. 46 (freigabe.md §12).
+
+---
+
 ## O – Offen (nicht entschieden, nicht bauen)
 
 | # | Thema | Stand |
@@ -348,3 +390,5 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 ## Backlog (entschieden, aber nicht im aktuellen Lauf)
 
 Stand Lauf 7 (uttoranger): Die Punkte aus Lauf 6 sind entschieden und eingeplant — Direktverkauf senkt den Vorrat (D1, Nr. 39), Double-Opt-in (S11, Nr. 38), Rate-Limit über die Datenbank statt eines neuen Dienstes (R1, Nr. 40). Derzeit ist nichts im Backlog.
+
+Stand Lauf 8 (uttoranger, 08.10.2026): N1, N2, Z2 und Z3 sind entschieden und in Nr. 41–48 eingeplant (freigabe.md §12). „Testmodus je Hof" (Z3) bleibt eine Option für später und ist nicht beauftragt. Die Stripe-Live-Schaltung macht der Mensch ganz am Schluss (Z2); kein Lauf schaltet um.
