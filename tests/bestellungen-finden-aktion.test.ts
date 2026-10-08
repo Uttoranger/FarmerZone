@@ -38,6 +38,10 @@ vi.mock('@/lib/nach-der-antwort', () => ({
 }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendBestellCodeEmail: vi.fn(async () => ({ id: 'mail-1' })) }))
+// Zweite Stufe der Bremse (Register R1, Nr. 40): hier nur, OB und WANN sie
+// gefragt wird — die Zählung selbst prüfen tests/bremse-datenbank.test.ts und
+// tests/integration/bremse-datenbank.int.test.ts.
+vi.mock('@/server/bremse-datenbank', () => ({ bremseUeberAlleInstanzen: vi.fn(async () => true) }))
 vi.mock('@/server/bestellungen-finden', () => ({
   legeBestellCodeAn: vi.fn(async () => '481234'),
   pruefeBestellCode: vi.fn(async () => ({ ok: true })),
@@ -46,6 +50,8 @@ vi.mock('@/server/bestellungen-finden', () => ({
 import * as Sentry from '@sentry/nextjs'
 import { sendBestellCodeEmail } from '@/lib/email'
 import { legeBestellCodeAn, pruefeBestellCode } from '@/server/bestellungen-finden'
+import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
+import { DB_BREMSEN } from '@/lib/bremse-datenbank'
 import { leseBestellZugang } from '@/lib/bestellungen-zugang'
 
 type Aktionen = typeof import('@/server/actions/bestellungen-finden')
@@ -138,6 +144,62 @@ describe('fordereBestellCodeAn', () => {
   it('außerhalb der Produktion bremst nichts (Entwicklung, Tests)', async () => {
     const { fordereBestellCodeAn } = await ladeAktionen()
     for (let i = 0; i < 8; i += 1) expect(await fordereBestellCodeAn({ email: 'kundin@example.com' })).toEqual({ ok: true })
+  })
+})
+
+describe('zweistufig: erst diese Instanz, dann die Datenbank (Register R1)', () => {
+  const ueberAlle = vi.mocked(bremseUeberAlleInstanzen)
+
+  it('Produktion: Anfordern fragt die Datenbank je IP und je Adresse — mit IP und normalisierter Adresse', async () => {
+    alsProduktion()
+    const { fordereBestellCodeAn } = await ladeAktionen()
+    expect(await fordereBestellCodeAn({ email: '  Kundin@Example.COM ' })).toEqual({ ok: true })
+    expect(ueberAlle.mock.calls).toEqual([
+      [[{ bremse: DB_BREMSEN.bestellungenAnfordernIp, merkmal: '203.0.113.7' }]],
+      [[{ bremse: DB_BREMSEN.bestellungenAdresse, merkmal: 'kundin@example.com' }]],
+    ])
+  })
+
+  it('Produktion: die Datenbank bremst, obwohl diese Instanz noch frei ist — kein Code', async () => {
+    alsProduktion()
+    ueberAlle.mockResolvedValueOnce(false)
+    const { fordereBestellCodeAn } = await ladeAktionen()
+    expect(await fordereBestellCodeAn({ email: 'kundin@example.com' })).toMatchObject({ code: 'ZU_VIELE' })
+    expect(legeBestellCodeAn).not.toHaveBeenCalled()
+  })
+
+  it('Produktion: die Datenbank bremst je Adresse — kein Code', async () => {
+    alsProduktion()
+    ueberAlle.mockResolvedValueOnce(true).mockResolvedValueOnce(false)
+    const { fordereBestellCodeAn } = await ladeAktionen()
+    expect(await fordereBestellCodeAn({ email: 'kundin@example.com' })).toMatchObject({ code: 'ZU_VIELE' })
+    expect(legeBestellCodeAn).not.toHaveBeenCalled()
+  })
+
+  it('Produktion: Prüfen fragt die Datenbank je IP; gebremst → kein Cookie, kein Prüfen', async () => {
+    alsProduktion()
+    ueberAlle.mockResolvedValueOnce(false)
+    const { zeigeBestellungen } = await ladeAktionen()
+    expect(await zeigeBestellungen({ email: 'kundin@example.com', code: '481234' })).toMatchObject({ code: 'ZU_VIELE' })
+    expect(ueberAlle).toHaveBeenCalledWith([{ bremse: DB_BREMSEN.bestellungenPruefenIp, merkmal: '203.0.113.7' }])
+    expect(pruefeBestellCode).not.toHaveBeenCalled()
+    expect(kontext.gesetzt).toHaveLength(0)
+  })
+
+  it('Reihenfolge: hält schon diese Instanz an, wird die Datenbank nicht gefragt', async () => {
+    alsProduktion()
+    const { fordereBestellCodeAn } = await ladeAktionen()
+    for (let i = 0; i < 3; i += 1) await fordereBestellCodeAn({ email: `k${i}@example.com` })
+    const bisher = ueberAlle.mock.calls.length
+    expect(await fordereBestellCodeAn({ email: 'k9@example.com' })).toMatchObject({ code: 'ZU_VIELE' })
+    expect(ueberAlle.mock.calls.length).toBe(bisher)
+  })
+
+  it('außerhalb der Produktion: keine Datenbank-Bremse', async () => {
+    const { fordereBestellCodeAn, zeigeBestellungen } = await ladeAktionen()
+    await fordereBestellCodeAn({ email: 'kundin@example.com' })
+    await zeigeBestellungen({ email: 'kundin@example.com', code: '481234' })
+    expect(ueberAlle).not.toHaveBeenCalled()
   })
 })
 

@@ -808,6 +808,8 @@ export function CheckoutForm({
               <input type="checkbox" {...form.register('optInEmail')} className={cn('mt-0.5 size-5 shrink-0 accent-accent', FOKUS_RAHMEN)} />
               <span className="min-w-0 text-[14px] break-words">
                 Per E-Mail über frische Produkte und Aktionen von <strong>{farm.name}</strong> informiert werden
+                {/* Double-Opt-in (S11, Nr. 38): erst nach dem Link aus der Mail. */}
+                <span className={cn(HINWEIS, 'mt-0.5 block')}>Bei einer neuen Anmeldung schicken wir dir zuerst eine E-Mail zum Bestätigen.</span>
               </span>
             </label>
             <label className={cn('flex min-h-11 items-start gap-3', customerPhone?.length >= 4 ? 'cursor-pointer' : 'cursor-not-allowed')}>

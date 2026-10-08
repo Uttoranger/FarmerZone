@@ -23,6 +23,9 @@ if (dsn) {
     environment: umgebung,
     // Leichtes Tracing nur in Produktion (jede zehnte Sitzung), sonst keins.
     tracesSampleRate: umgebung === 'production' ? 0.1 : 0,
+    // Keine IP (Nr. 37): Ohne sendDefaultPii meldet das SDK dem Ingest
+    // infer_ip „never" — Sentry leitet die Adresse nicht aus der Verbindung
+    // ab. Nie `dataCollection` setzen: das schaltet alle Vorgaben auf „an".
     sendDefaultPii: false,
     // BEIDE Haken, ein Filter: beforeSend läuft nur für Fehler; ohne
     // beforeSendTransaction gingen Pageload-Transaktionen samt roher URL

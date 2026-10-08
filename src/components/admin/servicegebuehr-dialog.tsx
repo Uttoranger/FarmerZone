@@ -4,7 +4,8 @@ import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { setServiceFeeAction } from '@/server/actions/admin'
 import { SERVICEGEBUEHR_ADMIN_ERKLAERUNG, centsAlsEuro } from '@/lib/servicegebuehr'
-import { MINDESTGEBUEHR_UNGUELTIG, SERVICEGEBUEHR_NUR_NEUE, mindestgebuehrCent, type AdminHofZeile } from '@/lib/admin-hoefe'
+import { MINDESTGEBUEHR_UNGUELTIG, SERVICEGEBUEHR_NUR_NEUE, mindestgebuehrCent, prozentsatzEingabe, type AdminHofZeile } from '@/lib/admin-hoefe'
+import { PROZENT_UNGUELTIG } from '@/schemas/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { BestellDialog, DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
 import { FELD, FELD_LABEL, TEXT_GRUEN } from '@/components/hof-bestellungen/stil'
@@ -27,8 +28,9 @@ export function ServicegebuehrDialog({ hof, onClose }: { hof: AdminHofZeile | nu
 function Formular({ hof, onClose }: { hof: AdminHofZeile | null; onClose: () => void }): React.JSX.Element {
   const [laeuft, startTransition] = useTransition()
   const [fehler, setFehler] = useState<string | null>(null)
-  // Formularzustand als Text — <input type="number"> liefert Text, und der
-  // Server prüft ohnehin (servicegebuehrEinstellungSchema).
+  // Formularzustand als Text — <input type="number"> liefert Text. An den
+  // Server gehen nur Zahlen (prozentsatzEingabe, mindestgebuehrCent); er
+  // prüft ohnehin (servicegebuehrEinstellungSchema).
   const [prozent, setProzent] = useState(hof?.gebuehr.prozent ?? '')
   const [mindestEuro, setMindestEuro] = useState(hof ? (hof.gebuehr.mindestCents / 100).toFixed(2) : '')
   const [giltAb, setGiltAb] = useState(hof?.gebuehr.giltAbTag ?? '')
@@ -36,6 +38,12 @@ function Formular({ hof, onClose }: { hof: AdminHofZeile | null; onClose: () => 
   function speichern() {
     if (!hof) return
     setFehler(null)
+    // Prozent-Text → Zahl über die Ziffern (Nr. 35); der Server nimmt nur Zahlen.
+    const prozentsatz = prozentsatzEingabe(prozent)
+    if (prozentsatz === null) {
+      setFehler(PROZENT_UNGUELTIG)
+      return
+    }
     // Euro-Text → ganze Cent über die Ziffern, nie über Number (Nr. 32). Kein
     // Betrag → Satz hier; Rohtext geht nie an den Server, der nur Cent nimmt.
     const mindest = mindestgebuehrCent(mindestEuro)
@@ -45,7 +53,7 @@ function Formular({ hof, onClose }: { hof: AdminHofZeile | null; onClose: () => 
     }
     startTransition(async () => {
       const ergebnis = await setServiceFeeAction(hof.id, {
-        percent: prozent.replace(',', '.'),
+        percent: prozentsatz,
         minCents: mindest,
         activeFrom: giltAb,
       })

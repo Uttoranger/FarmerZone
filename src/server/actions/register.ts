@@ -7,6 +7,12 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { registrationSchema, vollerName } from '@/schemas/register'
 import { checkFormToken, FORM_EXPIRED_MESSAGE } from '@/lib/form-token'
+import { createRateLimiter, getClientIp } from '@/lib/rate-limit'
+import { DB_BREMSEN, REGISTRIERUNG_JE_IP, REGISTRIERUNG_ZU_VIELE } from '@/lib/bremse-datenbank'
+import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
+
+// Erste Stufe: je Instanz im Speicher (SERVERLESS-KAVEAT in rate-limit.ts).
+const registrierungJeIp = createRateLimiter({ max: REGISTRIERUNG_JE_IP.max, windowMs: REGISTRIERUNG_JE_IP.fensterMs })
 
 // Ablauf: Zod → auth.api.signUpEmail (legt das Konto an, meldet NICHT an) →
 // Rolle FARMER → Bestätigungs-Mail. Angemeldet wird erst nach der Bestätigung.
@@ -21,7 +27,14 @@ import { checkFormToken, FORM_EXPIRED_MESSAGE } from '@/lib/form-token'
 // nicht mehr am Eingang, sondern an der Freigabe: Ein neu angelegter Hof
 // entsteht mit approvedAt = null und ist öffentlich unsichtbar, bis der
 // Betreiber ihn im Admin-Bereich freischaltet (src/lib/farm-approval.ts).
-// Das Rate-Limit (10/min/IP aus src/lib/auth.ts) gilt unverändert weiter.
+//
+// BREMSE JE IP (Register R1, Nr. 40), nur in Produktion, zweistufig: erst der
+// Speicher dieser Instanz, dann dieselbe Grenze über alle Instanzen in der
+// Datenbank (src/server/bremse-datenbank.ts, fail-open). 10 je Minute — die
+// Zahl des Better-Auth-Limits. Das greift hier NICHT: Better Auth bremst nur
+// Anfragen über seinen HTTP-Weg, `auth.api.signUpEmail` vom Server läuft an
+// ihm vorbei (better-auth/dist/api/index.mjs, onRequestRateLimit nur im
+// Router), und `/sign-up/email` ist über HTTP gesperrt.
 //
 // Davor sitzen seit dem Spam-Sprint zwei Schranken gegen naive Bots — beide
 // kosten echte Höfe nichts, weil sie an Dingen hängen, die ein Browser
@@ -75,6 +88,16 @@ export async function registerFarmer(data: {
   })
   if (!validated.success) {
     return { error: validated.error.issues[0].message }
+  }
+
+  // 1b. Bremse je IP (siehe Kopf) — vor dem teuren Teil (Passwort-Hash,
+  //     Konto anlegen, Mail).
+  if (process.env.NODE_ENV === 'production') {
+    const ip = getClientIp(await headers())
+    if (!registrierungJeIp.check(ip)) return { error: REGISTRIERUNG_ZU_VIELE }
+    if (!(await bremseUeberAlleInstanzen([{ bremse: DB_BREMSEN.registrierungIp, merkmal: ip }]))) {
+      return { error: REGISTRIERUNG_ZU_VIELE }
+    }
   }
 
   // 2. Konto anlegen — ohne Sitzung (autoSignIn: false); das Formular meldet nicht an.

@@ -9,6 +9,9 @@
  *  - Nach außen nur Sätze für Menschen, nie `err.message`; Sentry bekommt einen
  *    festen Text und die Fehlerklasse, nie Titel, Text oder Adressen.
  *  - Deaktivieren und Löschen räumen auch die öffentliche Hofseite neu auf.
+ *  - Verknüpfte Produkte nur vom eigenen Hof (Nr. 35): eine Abfrage mit
+ *    `{ id: { in }, farmId }`; eine fremde oder unbekannte Kennung lehnt den
+ *    ganzen Beitrag mit einem Satz ab, statt still etwas zu speichern.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -22,6 +25,7 @@ vi.mock('@/lib/email', () => ({ sendStatusUpdateEmail: vi.fn() }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     farm: { findUnique: vi.fn() },
+    product: { findMany: vi.fn() },
     order: { findMany: vi.fn() },
     customerFarmSubscription: { findMany: vi.fn() },
     statusPost: {
@@ -39,7 +43,7 @@ import { StatusPostAnlass } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import * as Sentry from '@sentry/nextjs'
 import { deleteStatusPost, expireStatusPost, markWhatsAppSent, publishStatusPost } from '@/server/actions/status-posts'
-import { STATUS_POST_ANLASS_VALUES } from '@/schemas/status-post'
+import { BEITRAG_PRODUKT_FREMD, STATUS_POST_ANLASS_VALUES } from '@/schemas/status-post'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getFarmForUser } from '@/server/queries/dashboard'
@@ -250,5 +254,50 @@ describe('Fehler nach außen: nie err.message, Sentry ohne Inhalte', () => {
     expect(sp.deleteMany).not.toHaveBeenCalled()
     expect(sp.create).not.toHaveBeenCalled()
     expect(Sentry.captureException).not.toHaveBeenCalled()
+  })
+})
+
+describe('publishStatusPost — verknüpfte Produkte nur vom eigenen Hof', () => {
+  const produkte = vi.mocked(prisma.product.findMany)
+
+  it('eigene Produkte: eine Abfrage mit id in … UND farmId, dann gespeichert', async () => {
+    produkte.mockResolvedValue([{ id: 'p1' }, { id: 'p2' }] as never)
+    const antwort = await publishStatusPost(beitrag({ linkedProductIds: ['p1', 'p2'] }) as never)
+    expect(antwort.error).toBeUndefined()
+    expect(produkte).toHaveBeenCalledTimes(1)
+    expect(produkte).toHaveBeenCalledWith({ where: { id: { in: ['p1', 'p2'] }, farmId: 'farm_1' }, select: { id: true } })
+    expect(sp.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ linkedProductIds: ['p1', 'p2'] }) }))
+  })
+
+  it('ein fremdes oder unbekanntes Produkt: Satz, nichts angelegt, kein Versand', async () => {
+    // Die Abfrage mit farmId findet nur p1 — p_fremd gehört einem anderen Hof oder gibt es nicht.
+    produkte.mockResolvedValue([{ id: 'p1' }] as never)
+    const antwort = await publishStatusPost(beitrag({ linkedProductIds: ['p1', 'p_fremd'], sendEmail: true }) as never)
+    expect(antwort.error).toBe(BEITRAG_PRODUKT_FREMD)
+    expect(antwort.postId).toBeUndefined()
+    expect(sp.create).not.toHaveBeenCalled()
+    expect(prisma.customerFarmSubscription.findMany).not.toHaveBeenCalled()
+  })
+
+  it('doppelte Kennung zählt einmal (sonst wäre ein eigenes Produkt zweimal „fremd")', async () => {
+    produkte.mockResolvedValue([{ id: 'p1' }] as never)
+    const antwort = await publishStatusPost(beitrag({ linkedProductIds: ['p1', 'p1'] }) as never)
+    expect(antwort.error).toBeUndefined()
+    expect(produkte).toHaveBeenCalledWith({ where: { id: { in: ['p1'] }, farmId: 'farm_1' }, select: { id: true } })
+    expect(sp.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ linkedProductIds: ['p1'] }) }))
+  })
+
+  it('ohne Produkte: keine Abfrage, leere Liste gespeichert', async () => {
+    await publishStatusPost(beitrag() as never)
+    await publishStatusPost(beitrag({ linkedProductIds: [] }) as never)
+    expect(produkte).not.toHaveBeenCalled()
+    expect(sp.create).toHaveBeenCalledTimes(2)
+    expect(sp.create).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ linkedProductIds: [] }) }))
+  })
+
+  it('der Satz ist deutsch, geduzt und nennt den Ausweg', () => {
+    expect(BEITRAG_PRODUKT_FREMD).toMatch(/Produkt/)
+    expect(BEITRAG_PRODUKT_FREMD).toMatch(/Lade die Seite neu/)
+    expect(BEITRAG_PRODUKT_FREMD).not.toMatch(/ID|farmId|Invalid/)
   })
 })

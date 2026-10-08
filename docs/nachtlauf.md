@@ -84,12 +84,23 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 31 | Tab-Wechsel im Hofbereich beschleunigen | `freigabe.md` §10 | – |
 | 32 | Altlasten aus Morgenbericht Lauf 5 §5 | `freigabe.md` §10 | – |
 | 33 | Datenschutzerklärung auf Sachstand | `freigabe.md` §10 | E8, T1 |
+| 34 | Automatischer Probelauf (Gate 9a) als E2E-Tests | `freigabe.md` §11 | Stripe-Testmodus (Vorbedingung) |
+| 34a … | Fehler aus dem Probelauf, je einer | `freigabe.md` §11 | – |
+| 35 | Altlasten aus Lauf 6 | `freigabe.md` §11 | Z1 |
+| 36 | BAES-Angaben | `freigabe.md` §11 | E10, E10a |
+| 37 | Sentry ohne IP-Adressen | `freigabe.md` §11 | – |
+| 38 | Double-Opt-in für werbliche Mails | `freigabe.md` §11 | S11, Migration nur Expand |
+| 39 | Direktverkauf senkt den Vorrat | `freigabe.md` §11 | D1 |
+| 40 | Rate-Limit über die Datenbank | `freigabe.md` §11 | R1, Migration nur Expand |
+| Sammel | Sammel-PR `integration/lauf7` | `freigabe.md` §11 | G3 |
 
 **17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
 
 **Reihenfolge in Lauf 5** (weicht von der Tabellenreihenfolge ab, maßgeblich ist `freigabe.md` §9): 19c → 19a → 19b → 22a → 22b → 22d → 22e → 20 → 21 → 22c → 22f. 19c kommt vor 19a, weil beide dieselbe Geldlogik berühren; 22c nach 21, weil die Auswertung die Teilen-Wirkung braucht.
 
 **Reihenfolge in Lauf 6** (`freigabe.md` §10, Haltepunkt 33): 23 → 24 → 25 → 26 → 27 → 28 → 29 → 30 → 31 → 32 → 33. 23, 25, 26 bauen auf den offenen Branches von #198–#200 auf; 29 ist auf 26 gestapelt, 30 auf 25; die übrigen zweigen von `main` ab.
+
+**Reihenfolge in Lauf 7** (`freigabe.md` §11, Haltepunkt Sammel-PR): 34 (danach ggf. 34a, 34b …) → 35 → 36 → 37 → 38 → 39 → 40 → Sammel-PR. Alle Nummern zweigen von `main` ab; vor jeder Nummer wird `origin/main` hineingeholt.
 
 **06b – Reservierte Slugs vollständig:** `RESERVED_SLUGS` in `src/lib/slug.ts` um alle Ordner aus `KEINE_HOFSEITE` (`next.config.ts`) ergänzen (u. a. `teilen`, `verify`, `konditionen`, `meldungen`, `fehler-melden`, `problem-melden`, `farm-page`, `forgot-password`, `reset-password`, `intern`), plus Test, der beide Listen gegeneinander prüft. Braucht keine Freigabe. In Produktion ist keiner dieser Slugs belegt (geprüft am 05.10.2026).
 
@@ -109,6 +120,7 @@ Der Lauf beginnt bei der ersten Nummer, die in `status.md` nicht als „fertig" 
 5. **Abschluss:** `pnpm typecheck && pnpm lint && pnpm test` grün; bei Datenbank-Änderungen zusätzlich `pnpm test:integration` gegen die lokale Test-Datenbank. Dann pushen und PR öffnen: Titel mit Nummer, Basis = Vorgänger-Branch, Beschreibung = Bericht + Liste der weggelassenen Teile + Hinweis „Gestapelt auf #<vorheriger PR>, nach dessen Merge zuerst mergen".
 6. **`status.md` aktualisieren:** Nummer, Status, PR-Link, Branch, Dauer, offene Punkte.
 7. Nächste Nummer.
+8. **Am Ende des Laufs: Sammel-PR** (Register G3). Branch `integration/lauf<n>` von `main`, alle fertigen PRs des Laufs per `git merge --no-ff` in Merge-Reihenfolge; Doku-Konflikte beide Seiten behalten, Code-Konflikte sauber zusammenführen und jede Auflösung im PR-Text begründen; Typecheck, Unit- und Integrationstests auf dem Gesamtstand grün. Entwürfe kommen nicht hinein.
 
 ---
 

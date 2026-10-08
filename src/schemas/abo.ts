@@ -13,3 +13,14 @@ export const aboAenderungSchema = z.object({
 })
 
 export type AboAenderung = z.infer<typeof aboAenderungSchema>
+
+/**
+ * Der Knopf „Anmeldung bestätigen" (Double-Opt-in, S11, Nr. 38). Hier nur
+ * die Form; Signatur, Zweck und Ablauf prüft `pruefeAboBestaetigungsToken`.
+ * Echte Token sind rund 120 Zeichen lang — die Grenze hält Unsinn fern.
+ */
+export const ABO_TOKEN_MAX = 512
+
+export const aboTokenSchema = z.string().trim().min(1).max(ABO_TOKEN_MAX)
+
+export const aboBestaetigenSchema = z.object({ token: aboTokenSchema })

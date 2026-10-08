@@ -267,6 +267,8 @@ describe('kein Big Bang', () => {
     '(auth)/verify/page.tsx',
     // Nr. 22f: alle Routen unter /admin — ihr Layout trägt die AdminShell.
     'admin/layout.tsx',
+    // Nr. 38: „Anmeldung bestätigen" (neu, Double-Opt-in, Fokus-Shell wie /verify).
+    'account/neuigkeiten-bestaetigen/page.tsx',
   ]
 
   it('nur die Vorschau unter /intern und die umgestellten Routen binden eine Shell ein', () => {

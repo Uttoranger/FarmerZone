@@ -6,11 +6,13 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { generateUnsubscribeToken } from '@/lib/unsubscribe'
+import { WERBEMAIL_EMPFAENGER } from '@/server/abo-anmeldung'
 import * as Sentry from '@sentry/nextjs'
 import { APP_URL } from '@/lib/umgebung-server'
 import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
 import {
   BEITRAG_FELDER_MIT_SATZ,
+  BEITRAG_PRODUKT_FREMD,
   beitragIdSchema,
   beitragVeroeffentlichenSchema,
   whatsAppGezaehltSchema,
@@ -78,6 +80,18 @@ export async function publishStatusPost(
     // Das Foto geht auf die Hofseite und in die Mail an Abonnentinnen — nur
     // aus unserem Speicher und dem Ordner dieses Hofes (Nr. 19b).
     if (!(await bildUrlErlaubt(data.photoUrl, farm.id))) return { error: BILD_NICHT_UEBERNOMMEN }
+    // Verknüpfte Produkte nur vom eigenen Hof (Nr. 35): Die Hofseite zeigt sie
+    // zum Beitrag. Eine fremde oder unbekannte Kennung lehnt den Beitrag ab,
+    // statt sie still zu verwerfen — sonst ginge er ohne das Produkt hinaus,
+    // das der Hof gemeint hat, und das womöglich schon per Mail.
+    const produktIds = [...new Set(data.linkedProductIds ?? [])]
+    if (produktIds.length > 0) {
+      const eigene = await prisma.product.findMany({
+        where: { id: { in: produktIds }, farmId: farm.id },
+        select: { id: true },
+      })
+      if (eigene.length !== produktIds.length) return { error: BEITRAG_PRODUKT_FREMD }
+    }
     const now = new Date()
     const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
 
@@ -89,8 +103,9 @@ export async function publishStatusPost(
         where: { farmId: farm.id, sentViaEmail: true, publishedAt: { gte: sevenDaysAgo } },
       })
       if (!recentSend) {
+        // Nur Bestand und bestätigte Anmeldungen (Double-Opt-in, S11, Nr. 38).
         emailSubscribers = await prisma.customerFarmSubscription.findMany({
-          where: { farmId: farm.id, optInEmail: true },
+          where: { farmId: farm.id, ...WERBEMAIL_EMPFAENGER },
           select: { customerEmail: true, customerPhone: true },
         })
       }
@@ -111,7 +126,7 @@ export async function publishStatusPost(
         body: data.body,
         anlass: data.anlass,
         photoUrl: data.photoUrl ?? null,
-        linkedProductIds: data.linkedProductIds ?? [],
+        linkedProductIds: produktIds,
         showOnFarmPage: data.showOnFarmPage,
         publishedAt: now,
         expiresAt,

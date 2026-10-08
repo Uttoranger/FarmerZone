@@ -49,6 +49,14 @@ export const beitragVeroeffentlichenSchema = z.object({
  */
 export const BEITRAG_FELDER_MIT_SATZ: readonly string[] = ['title', 'body', 'anlass']
 
+/**
+ * Ein verknüpftes Produkt gehört nicht zum Hof der Anmeldung oder gibt es
+ * nicht mehr (Nr. 35). Die Auswahl zeigt nur eigene Produkte — der Fall
+ * entsteht bei einer veralteten Seite oder einer gebauten Anfrage.
+ */
+export const BEITRAG_PRODUKT_FREMD =
+  'Ein ausgewähltes Produkt gibt es auf deinem Hof nicht mehr. Lade die Seite neu und wähl die Produkte noch einmal.'
+
 export type BeitragVeroeffentlichenEingabe = z.input<typeof beitragVeroeffentlichenSchema>
 
 /** „Per WhatsApp verschickt": wie viele Abonnentinnen bisher angetippt sind. */

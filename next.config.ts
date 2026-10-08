@@ -145,6 +145,24 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // „Anmeldung bestätigen" (Double-Opt-in, S11, Nr. 38): Der Link aus der
+        // Mail trägt einen gültigen Token (?token=) — gleiche Regel wie /verify.
+        source: '/account/neuigkeiten-bestaetigen',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        ],
+      },
+      {
+        // Der Abmeldelink (?token=) gilt ohne Ablauf — er geht ebenso nicht
+        // als Referrer mit und kommt in keinen Suchindex (Nr. 38).
+        source: '/account/unsubscribe',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        ],
+      },
+      {
         source: '/api/orders/confirm/:token',
         headers: [
           { key: 'Referrer-Policy', value: 'no-referrer' },

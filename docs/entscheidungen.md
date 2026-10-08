@@ -17,6 +17,8 @@ Präfixe:
 - **S** – Sicherheitsanforderung aus Umsetzungsprompt Abschnitt 8
 - **Z** – Zahlungswege der Höfe
 - **T** – Teilen
+- **D** – Direktverkauf
+- **R** – Rate-Limit
 - **O** – offen
 
 ---
@@ -147,6 +149,11 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Dateien:** `docs/nachtlauf.md` (Regel 3), `CLAUDE.md` (Befehle, Datenbank-Regeln), `docs/nachtlauf-start.txt`.
 
 ---
+
+### G3 · Sammel-PR am Ende eines Laufs (Lehre aus Lauf 6, 07.10.2026)
+- **Entscheidung (uttoranger, Freigabe Lauf 7):** Am Ende jedes Nachtlaufs baut der Dirigent einen Sammel-PR: Branch `integration/lauf<n>` von `main`, alle fertigen PRs des Laufs per `git merge --no-ff` in Merge-Reihenfolge, Doku-Konflikte beide Seiten behalten, Code-Konflikte sauber zusammenführen und jede Auflösung im PR-Text begründen. Typecheck, Unit- und Integrationstests auf dem Gesamtstand grün. PRs mit offener Vorbedingung (Entwurf) kommen nicht hinein.
+- **Begründung:** In Lauf 6 entstanden Code-Konflikte zwischen unabhängigen PRs, die erst beim Mergen sichtbar wurden; der Sammel-PR (#211) hat sie mit grünen Tests aufgelöst.
+- **Dateien:** `docs/nachtlauf.md` Abschnitt 4.
 
 ## F – Freigaben nach der Umsetzung
 
@@ -294,6 +301,36 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Stand:** umgesetzt in 17b.
 - **Stichtag (06.10.2026, uttoranger im Chat):** Konten ab dem Merge von #184, also ab **06.10.2026, 20:21 Uhr** Wiener Zeit, müssen bestätigen. Bewusst nicht Mitternacht: Ein am 06.10. um 18:07 Uhr angelegter und freigeschalteter Hof bleibt ausgenommen. Konstante `EMAIL_BESTAETIGUNG_STICHTAG` in `src/lib/email-bestaetigung.ts`.
 
+### S11 · Double-Opt-in für werbliche Mails (07.10.2026)
+- **Entscheidung (uttoranger, Freigabe Lauf 7):** Double-Opt-in für alle werblichen Mails (Beiträge per Mail, Benachrichtigungen).
+  - Neue Anmeldungen gelten erst nach Klick auf einen Bestätigungslink (signiert, mit Ablauf).
+  - Unbestätigte Anmeldungen bekommen keine werblichen Mails.
+  - Jede werbliche Mail trägt einen Abmeldelink.
+  - Bestehende Abonnenten bleiben vorerst unverändert; ihre Zahl steht im Morgenbericht, den Umgang mit ihnen entscheidet der Mensch.
+- **Begründung:** Bisher nur einfaches Opt-in (O3).
+- **Dateien:** Abo-Anmeldung, Mailversand der Beiträge und Benachrichtigungen; Umsetzung Nr. 38 (freigabe.md §11), Migration nur Expand, falls nötig.
+
+---
+
+## D – Direktverkauf
+
+### D1 · Direktverkauf senkt den Vorrat (07.10.2026)
+- **Entscheidung (uttoranger, Freigabe Lauf 7):** „Verkauf eintragen" mit einem Produkt aus dem Sortiment zieht den Vorrat ab.
+  - Bedingtes `updateMany`, nie unter 0.
+  - Reicht der Vorrat nicht: Hinweis, der Verkauf wird trotzdem gebucht, der Vorrat geht nicht ins Minus.
+  - Schalter „Vorrat abziehen" im Formular, Standard ein.
+- **Begründung:** Offener Punkt aus Bericht 22b (Backlog Lauf 6).
+- **Dateien:** Verkäufe (`/sales`, „Verkauf eintragen"); Umsetzung Nr. 39.
+
+---
+
+## R – Rate-Limit
+
+### R1 · Rate-Limit über die Datenbank (07.10.2026)
+- **Entscheidung (uttoranger, Freigabe Lauf 7):** Für Anmeldecode, Registrierung, Problem melden, Bestellungen finden und Checkout zählt eine Tabelle in der Datenbank (Schlüssel, Fenster, Zähler) die Versuche über alle Instanzen. Die bestehende Bremse je Instanz bleibt als erste Stufe. Alte Einträge räumt der bestehende Cron auf. Migration nur Expand.
+- **Begründung:** Die Bremse je Instanz greift auf Vercel nur teilweise (Backlog Lauf 6); ein eigener Dienst ist nicht nötig.
+- **Dateien:** `src/lib/rate-limit.ts`, Cron; Umsetzung Nr. 40.
+
 ---
 
 ## O – Offen (nicht entschieden, nicht bauen)
@@ -302,7 +339,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 |---|---|---|
 | O1 | Fehler-Token | **Entschieden 07.10.2026 (uttoranger):** Die Fehler-Farbe bekommt einen Kontrast von mindestens 4,5:1 in beiden Themes (Nr. 28). Bisher: Fehlertext 4,22:1 im hellen Theme, deshalb orange Hinweiskarte bzw. `text-status-offen`. |
 | O2 | Bearbeiten am Handy (#180) | Unter der Checkliste in Mein Hof steht weiter der Editor mit Stiften; das Mockup zeigt nur „Vorschau ansehen". Entfällt er, braucht es einen eigenen Auftrag. |
-| O3 | S11 Double-Opt-in | **Entschieden 07.10.2026 (uttoranger):** Double-Opt-in vor dem ersten Werbeversand — im Backlog, nicht in Lauf 6. Dazu gehört die Frage, ob „Nochmal bestellen" in der Abholbereit-Mail Werbung ist. |
+| O3 | S11 Double-Opt-in | **Entschieden, siehe S11** (Freigabe Lauf 7, Umsetzung Nr. 38). Offen bleibt die Frage, ob „Nochmal bestellen" in der Abholbereit-Mail Werbung ist. |
 | O4 | AGB / Nutzungsbedingungen | Werden separat erstellt — **NICHT anfassen** (bestätigt 07.10.2026). Bis dahin gibt es beim Registrieren keinen Zustimmungs-Haken. |
 | O5 | Rückruf anfordern | **Entfällt (07.10.2026, uttoranger).** Schema `RueckrufAnfrage` wird nicht gebaut. Ersatz bleibt „E-Mail schreiben". |
 
@@ -310,7 +347,4 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 
 ## Backlog (entschieden, aber nicht im aktuellen Lauf)
 
-Stand 07.10.2026 (uttoranger, Freigabe Lauf 6):
-- 22b: Ein Direktverkauf mit Produkt senkt den Vorrat.
-- S11: Double-Opt-in vor dem ersten Werbeversand (O3).
-- Rate-Limit über einen gemeinsamen Speicher statt je Instanz — braucht einen neuen Dienst, die Entscheidung dafür ist offen.
+Stand Lauf 7 (uttoranger): Die Punkte aus Lauf 6 sind entschieden und eingeplant — Direktverkauf senkt den Vorrat (D1, Nr. 39), Double-Opt-in (S11, Nr. 38), Rate-Limit über die Datenbank statt eines neuen Dienstes (R1, Nr. 40). Derzeit ist nichts im Backlog.
