@@ -44,15 +44,18 @@ export async function POST(request: NextRequest) {
 
   // Modus-Wache (Register Z2, Nr. 42): Sperrt sie den Stripe-Client, ist das
   // keine ungültige Signatur — sonst sucht jemand den Fehler im Secret. Eine
-  // eigene Antwort; 503, damit Stripe das Ereignis später erneut zustellt.
-  // Die Meldung nennt Umgebung und Ausweg, nie den Schlüssel.
+  // eigene Antwort (503) ändert die Diagnose, nicht das Wiederholen: Stripe
+  // stellt bei jeder Antwort außer 2xx erneut zu (live bis zu drei Tage).
+  // Nach außen ein neutraler Satz, denn diese Antwort kommt VOR der
+  // Signaturprüfung und ginge an jeden Aufrufer. Die Einzelheiten stehen nur
+  // im Protokoll — die Meldung nennt Umgebung und Ausweg, nie den Schlüssel.
   let webhooks: typeof stripe.webhooks
   try {
     webhooks = stripe.webhooks
   } catch (err) {
     if (!istModusSperre(err)) throw err
     console.error(`[Webhook] ${err.message}`)
-    return NextResponse.json({ error: 'Stripe gesperrt: Modus-Wache (Live-Schlüssel außerhalb des Produktions-Deployments)' }, { status: 503 })
+    return NextResponse.json({ error: 'Zahlungsdienst vorübergehend nicht verfügbar.' }, { status: 503 })
   }
 
   let event: Stripe.Event | null = null

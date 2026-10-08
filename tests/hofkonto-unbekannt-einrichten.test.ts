@@ -46,7 +46,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { vermerkeUnbekanntesHofKonto } from '@/server/hofkonto-unbekannt'
-import { NEU_EINRICHTEN_KURZ } from '@/lib/stripe-konto'
+import { NEU_EINRICHTEN_FENSTER_MS, NEU_EINRICHTEN_KURZ } from '@/lib/stripe-konto'
 import {
   checkConnectStatus,
   createConnectAccount,
@@ -186,19 +186,41 @@ describe('„Online-Zahlung neu einrichten" (createConnectAccount mit gespeicher
     expect(farmUpdate).not.toHaveBeenCalled()
   })
 
-  it('legt mit Idempotenz-Schlüssel aus Hof und alter Kennung an — ein Doppelklick bekommt dasselbe Konto', async () => {
-    vi.mocked(stripe.accounts.retrieve).mockRejectedValue(kontoUnbekannt())
+  describe('Idempotenz-Schlüssel aus Hof, alter Kennung und 15-Minuten-Fenster', () => {
+    const JETZT = new Date('2026-10-08T10:03:00.000Z')
+    const FENSTER = Math.floor(JETZT.getTime() / NEU_EINRICHTEN_FENSTER_MS)
+    const schluessel = () => vi.mocked(stripe.accounts.create).mock.calls.map(([, o]) => (o as { idempotencyKey?: string })?.idempotencyKey)
 
-    await createConnectAccount()
-    await createConnectAccount()
+    beforeEach(() => {
+      vi.useFakeTimers({ now: JETZT, toFake: ['Date'] })
+      vi.mocked(stripe.accounts.retrieve).mockRejectedValue(kontoUnbekannt())
+    })
+    afterEach(() => {
+      vi.useRealTimers()
+    })
 
-    const optionen = vi.mocked(stripe.accounts.create).mock.calls.map(([, o]) => o)
-    expect(optionen).toEqual([
-      { idempotencyKey: `hofkonto-neu-farm_1-${ALT}` },
-      { idempotencyKey: `hofkonto-neu-farm_1-${ALT}` },
-    ])
-    // Der Schlüssel trägt nur Kennungen — keine Adresse, kein Name.
-    expect(JSON.stringify(optionen)).not.toContain('@')
+    it('ein Doppelklick bekommt dasselbe Konto — derselbe Schlüssel', async () => {
+      await createConnectAccount()
+      vi.setSystemTime(new Date(JETZT.getTime() + 2_000))
+      await createConnectAccount()
+
+      expect(schluessel()).toEqual([`hofkonto-neu-farm_1-${ALT}-${FENSTER}`, `hofkonto-neu-farm_1-${ALT}-${FENSTER}`])
+      // Der Schlüssel trägt nur Kennungen — keine Adresse, kein Name.
+      expect(JSON.stringify(schluessel())).not.toContain('@')
+    })
+
+    it('Runde 2: ein gescheiterter Versuch sperrt höchstens bis zum nächsten Fenster, nicht 24 Stunden', async () => {
+      // Stripe hielte unter demselben Schlüssel auch den Fehler 24 Stunden lang fest.
+      vi.mocked(stripe.accounts.create).mockRejectedValueOnce(new Error('Stripe nicht erreichbar'))
+      await expect(createConnectAccount()).rejects.toThrow('Stripe nicht erreichbar')
+
+      vi.setSystemTime(new Date(JETZT.getTime() + NEU_EINRICHTEN_FENSTER_MS))
+      expect(await createConnectAccount()).toEqual({})
+
+      const [erster, zweiter] = schluessel()
+      expect(erster).toBe(`hofkonto-neu-farm_1-${ALT}-${FENSTER}`)
+      expect(zweiter).toBe(`hofkonto-neu-farm_1-${ALT}-${FENSTER + 1}`)
+    })
   })
 
   it('schreibt alte und neue Kennung mit der Hof-ID ins Server-Protokoll — nichts Persönliches', async () => {

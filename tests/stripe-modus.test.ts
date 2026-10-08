@@ -79,12 +79,30 @@ describe('stripeStartGesperrt — ein Live-Schlüssel nur im Produktions-Deploym
   })
 })
 
+describe('Grenzen der Wache — die Wache vertraut VERCEL_ENV (dokumentiert, Runde 2)', () => {
+  it('next start mit gezogenem VERCEL_ENV=production startet mit Live-Schlüssel — von der Vercel-Produktion nicht zu unterscheiden', () => {
+    // Etwa nach `vercel env pull --environment=production`. Steht in stripe-live.md und README.
+    expect(stripeStartGesperrt(bestimmeUmgebung({ NODE_ENV: 'production', VERCEL_ENV: 'production', STRIPE_SECRET_KEY: 'sk_live_erfunden' }))).toBe(false)
+  })
+
+  it('die echte Produktion ohne freigegebene Systemvariablen (VERCEL_ENV fehlt) ist gesperrt', () => {
+    // Deshalb der Haken vor Schritt 8 in stripe-live.md: „Automatically expose System Environment Variables".
+    const ohneSystemvariablen = { NODE_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://farmerzone.example', STRIPE_SECRET_KEY: 'sk_live_erfunden' }
+    expect(stripeStartGesperrt(bestimmeUmgebung(ohneSystemvariablen))).toBe(true)
+  })
+})
+
 describe('stripeGesperrtMeldung — klar, deutsch, ohne Schlüssel', () => {
   it('sagt je Umgebung, was los ist und was zu tun ist', () => {
     expect(stripeGesperrtMeldung('preview')).toMatch(/^Stripe startet nicht: .*Vorschau.*Live-Schlüssel.*Test-Schlüssel/)
     expect(stripeGesperrtMeldung('lokal')).toMatch(/^Stripe startet nicht: .*[Ll]okal.*Live-Schlüssel.*Test-Schlüssel/)
     // „produktion" ohne Vercel-Produktion: lokaler Produktions-Build, Test, CI.
     expect(stripeGesperrtMeldung('produktion')).toMatch(/^Stripe startet nicht: .*Live-Schlüssel.*VERCEL_ENV=production.*Test-Schlüssel/)
+  })
+
+  it('nennt für „produktion" beide Auswege — auch die Systemvariablen bei Vercel (Runde 2)', () => {
+    // Fehlt VERCEL_ENV in der echten Produktion, wäre „Test-Schlüssel eintragen" der falsche Rat.
+    expect(stripeGesperrtMeldung('produktion')).toContain('Automatically expose System Environment Variables')
   })
 
   it('trägt keinen Schlüssel und kein Präfix eines Schlüssels', () => {

@@ -5,7 +5,7 @@ import type Stripe from 'stripe'
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { NEU_EINRICHTEN_KURZ, istUnzugaenglichesStripeKonto, stripeKontoBereit } from '@/lib/stripe-konto'
+import { NEU_EINRICHTEN_KURZ, istUnzugaenglichesStripeKonto, neuEinrichtenSchluessel, stripeKontoBereit } from '@/lib/stripe-konto'
 import { vermerkeUnbekanntesHofKonto } from '@/server/hofkonto-unbekannt'
 import { APP_URL } from '@/lib/umgebung-server'
 import { onlineZahlungEinschaltenSchema } from '@/schemas/online-zahlung'
@@ -93,12 +93,13 @@ export async function createConnectAccount(): Promise<{ error?: string }> {
       product_description: 'Regionale Hofprodukte: Milch, Eier, Fleisch, Gemüse',
     },
   }
-  // Beim Ersetzen mit Idempotenz-Schlüssel aus Hof und alter Kennung: Ein
-  // Doppelklick oder ein Neuversuch nach gescheitertem Speichern bekommt von
-  // Stripe dasselbe Konto zurück, statt ein zweites, verwaistes anzulegen
-  // (Stripe hält den Schlüssel 24 Stunden). Der erste Weg bleibt wie bisher.
+  // Beim Ersetzen mit Idempotenz-Schlüssel aus Hof, alter Kennung und
+  // 15-Minuten-Fenster: Ein Doppelklick oder ein Neuversuch nach gescheitertem
+  // Speichern bekommt von Stripe dasselbe Konto zurück, statt ein zweites,
+  // verwaistes anzulegen — und ein gescheiterter Versuch sperrt höchstens bis
+  // zum nächsten Fenster (neuEinrichtenSchluessel). Der erste Weg bleibt wie bisher.
   const account = altesKonto
-    ? await stripe.accounts.create(parameter, { idempotencyKey: `hofkonto-neu-${farm.id}-${altesKonto}` })
+    ? await stripe.accounts.create(parameter, { idempotencyKey: neuEinrichtenSchluessel(farm.id, altesKonto, new Date()) })
     : await stripe.accounts.create(parameter)
 
   // Wer Stripe einrichtet, will online kassieren (Register Z1): Ein

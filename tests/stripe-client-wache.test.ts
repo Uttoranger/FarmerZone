@@ -320,7 +320,9 @@ describe('kein Weg an der Wache vorbei', () => {
     const fundstellen = QUELLEN.filter(({ text }) => rufStripeAuf(text)).map(({ pfad }) => pfad)
     expect(fundstellen).toEqual([WACHE])
 
-    const wache = ohneKommentare(QUELLEN.find(({ pfad }) => pfad === WACHE)!.text)
+    const quelleDerWache = QUELLEN.find(({ pfad }) => pfad === WACHE)
+    expect(quelleDerWache, 'src/lib/stripe.ts fehlt unter den Quellen').toBeDefined()
+    const wache = ohneKommentare(quelleDerWache?.text ?? '')
     expect(wache.match(/\bStripe\(/g)).toHaveLength(1)
     expect(wache.indexOf('stripeStartGesperrt(UMGEBUNG)')).toBeGreaterThan(-1)
     expect(wache.indexOf('stripeStartGesperrt(UMGEBUNG)')).toBeLessThan(wache.indexOf('new Stripe('))

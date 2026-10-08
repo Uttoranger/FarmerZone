@@ -12,7 +12,9 @@ import {
   hofKontoUnbekanntText,
   istUnbekanntesStripeKonto,
   istUnzugaenglichesStripeKonto,
+  NEU_EINRICHTEN_FENSTER_MS,
   neuEinrichtenSatz,
+  neuEinrichtenSchluessel,
   onlinePausiertHinweis,
   onlineZahlungPausiert,
   stripeKontoBereit,
@@ -169,6 +171,34 @@ describe('istUnzugaenglichesStripeKonto — reine Konto-Aufrufe (Runde 1)', () =
     expect(istUnzugaenglichesStripeKonto(new Error('Stripe startet nicht: Lokal ist ein Live-Schlüssel eingetragen.'))).toBe(false)
     expect(istUnzugaenglichesStripeKonto(null)).toBe(false)
     expect(istUnzugaenglichesStripeKonto('account_invalid')).toBe(false)
+  })
+})
+
+describe('neuEinrichtenSchluessel — Idempotenz im 15-Minuten-Fenster (Runde 2)', () => {
+  const ZEHN_UHR = new Date('2026-10-08T10:00:00.000Z')
+  const plus = (ms: number) => new Date(ZEHN_UHR.getTime() + ms)
+
+  it('Doppelklick und sofortiger Neuversuch im selben Fenster: derselbe Schlüssel', () => {
+    const erster = neuEinrichtenSchluessel('farm_1', 'acct_erfunden', ZEHN_UHR)
+    expect(neuEinrichtenSchluessel('farm_1', 'acct_erfunden', plus(1_000))).toBe(erster)
+    expect(neuEinrichtenSchluessel('farm_1', 'acct_erfunden', plus(NEU_EINRICHTEN_FENSTER_MS - 1))).toBe(erster)
+  })
+
+  it('spätestens nach 15 Minuten ein neuer Schlüssel — ein gespeicherter Fehler sperrt nicht 24 Stunden', () => {
+    expect(NEU_EINRICHTEN_FENSTER_MS).toBe(15 * 60 * 1000)
+    const erster = neuEinrichtenSchluessel('farm_1', 'acct_erfunden', ZEHN_UHR)
+    expect(neuEinrichtenSchluessel('farm_1', 'acct_erfunden', plus(NEU_EINRICHTEN_FENSTER_MS))).not.toBe(erster)
+  })
+
+  it('Grenze: an der Fenstergrenze wechselt der Schlüssel (dokumentiert)', () => {
+    expect(neuEinrichtenSchluessel('farm_1', 'acct_erfunden', plus(-1))).not.toBe(neuEinrichtenSchluessel('farm_1', 'acct_erfunden', ZEHN_UHR))
+  })
+
+  it('je Hof und alter Kennung ein eigener Schlüssel — nur Kennungen, nichts Persönliches', () => {
+    const schluessel = neuEinrichtenSchluessel('farm_1', 'acct_erfunden', ZEHN_UHR)
+    expect(schluessel).toMatch(/^hofkonto-neu-farm_1-acct_erfunden-\d+$/)
+    expect(neuEinrichtenSchluessel('farm_2', 'acct_erfunden', ZEHN_UHR)).not.toBe(schluessel)
+    expect(neuEinrichtenSchluessel('farm_1', 'acct_anders', ZEHN_UHR)).not.toBe(schluessel)
   })
 })
 

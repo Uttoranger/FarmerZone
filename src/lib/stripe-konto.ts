@@ -107,6 +107,12 @@ export function istUnbekanntesStripeKonto(fehler: unknown): boolean {
  * Kennungen stammen immer aus dem eigenen `accounts.create` — kein Zugriff
  * heißt dann: neu einrichten (Nr. 42, Runde 1).
  *
+ * GRENZE: Derselbe Fehler kommt auch, wenn der Plattform-Schlüssel zum
+ * falschen Stripe-Konto gehört. Dann gilt jeder Hof als unbekannt, und
+ * „neu einrichten" legte die Konten bei der falschen Plattform an — deshalb
+ * prüft der Mensch die Plattform des Schlüssels vor dem Umschalten
+ * (docs/betrieb/stripe-live.md).
+ *
  * NICHT für die Kasse: Dort bleibt es bei `istUnbekanntesStripeKonto`.
  */
 export function istUnzugaenglichesStripeKonto(fehler: unknown): boolean {
@@ -115,6 +121,29 @@ export function istUnzugaenglichesStripeKonto(fehler: unknown): boolean {
   const { code, message } = fehler as { code?: unknown; message?: unknown }
   if (code === 'account_invalid') return true
   return typeof message === 'string' && /\bdoes not have access to account\b/i.test(message)
+}
+
+/** So lange bekommt ein Neuversuch beim Neu-Einrichten dasselbe Konto (15 Minuten). */
+export const NEU_EINRICHTEN_FENSTER_MS = 15 * 60 * 1000
+
+/**
+ * Idempotenz-Schlüssel für `accounts.create` beim Neu-Einrichten: Hof-ID,
+ * alte Kennung und das 15-Minuten-Fenster (UTC, gezählt seit 1970).
+ *
+ * Warum mit Fenster (Nr. 42, Runde 2): Stripe hält unter einem Schlüssel
+ * 24 Stunden lang JEDES Ergebnis, auch einen Fehler. Ohne Fenster sperrte ein
+ * gescheiterter erster Versuch — wahrscheinlich am Tag der Live-Umstellung —
+ * das Neu-Einrichten bis zu einen Tag. Mit Fenster bekommen Doppelklick und
+ * sofortiger Neuversuch weiter dasselbe Konto; nach spätestens 15 Minuten
+ * gilt ein neuer Schlüssel.
+ *
+ * Grenze: Fällt ein Doppelklick genau auf die Fenstergrenze, legt Stripe
+ * zwei Konten an. Gespeichert wird trotzdem nur eines (bedingt auf die alte
+ * Kennung), das andere steht mit Hof-ID im Server-Protokoll.
+ */
+export function neuEinrichtenSchluessel(farmId: string, altesKonto: string, jetzt: Date): string {
+  const fenster = Math.floor(jetzt.getTime() / NEU_EINRICHTEN_FENSTER_MS)
+  return `hofkonto-neu-${farmId}-${altesKonto}-${fenster}`
 }
 
 /**

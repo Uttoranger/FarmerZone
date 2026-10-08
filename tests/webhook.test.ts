@@ -462,7 +462,9 @@ describe('Signatur- und Konfigurationsfehler', () => {
 describe('Modus-Wache (Register Z2, Nr. 42 Runde 1): gesperrter Client ist keine ungültige Signatur', () => {
   /** Ersetzt `stripe.webhooks` für einen Fall durch einen Zugriff, der wirft — wie der Stellvertreter in src/lib/stripe.ts. */
   async function mitGesperrtemClient(fehler: Error, pruefe: () => Promise<void>): Promise<void> {
-    const vorher = Object.getOwnPropertyDescriptor(stripe, 'webhooks')!
+    const vorher = Object.getOwnPropertyDescriptor(stripe, 'webhooks')
+    // Der Mock oben legt `webhooks` als eigene Eigenschaft an; fehlt sie, stimmt der Testaufbau nicht.
+    if (!vorher) throw new Error('Testaufbau: stripe.webhooks fehlt im Mock von @/lib/stripe')
     Object.defineProperty(stripe, 'webhooks', {
       configurable: true,
       get() {
@@ -476,7 +478,7 @@ describe('Modus-Wache (Register Z2, Nr. 42 Runde 1): gesperrter Client ist keine
     }
   }
 
-  it('antwortet 503 mit eigener Antwort und protokolliert die Meldung — ohne Schlüssel, ohne Verarbeitung', async () => {
+  it('antwortet 503 mit neutralem Satz und protokolliert die Meldung — ohne Schlüssel, ohne Verarbeitung', async () => {
     // So heißt die Sperre der Wache (MODUS_SPERRE); die Meldung trägt nie den Schlüssel.
     const sperre = Object.assign(
       new Error('Stripe startet nicht: Die Vorschau läuft mit einem Live-Schlüssel. Ein Live-Schlüssel ist nur im Produktions-Deployment bei Vercel erlaubt.'),
@@ -488,9 +490,10 @@ describe('Modus-Wache (Register Z2, Nr. 42 Runde 1): gesperrter Client ist keine
       const res = await POST(makeRequest())
 
       expect(res.status).toBe(503)
-      const antwort = JSON.stringify(await res.json())
-      expect(antwort).toContain('Modus-Wache')
-      expect(antwort).not.toMatch(/signature/i)
+      // Runde 2: Die Antwort kommt vor der Signaturprüfung — nach außen nichts über die Lage.
+      const antwort = await res.json()
+      expect(antwort).toEqual({ error: 'Zahlungsdienst vorübergehend nicht verfügbar.' })
+      expect(JSON.stringify(antwort)).not.toMatch(/signature|Modus|Live|Schlüssel|Vorschau|Stripe/i)
     })
 
     expect(constructEvent).not.toHaveBeenCalled()

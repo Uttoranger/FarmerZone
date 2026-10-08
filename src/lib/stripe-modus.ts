@@ -36,6 +36,13 @@ export type StripeModus = Pick<Umgebung, 'art' | 'stripe' | 'vercelProduktion'>
  * „produktion" einordnet (dort ist ein fehlendes Banner der kleinere Fehler) —
  * hier wäre ein durchgelassener Live-Schlüssel der größere.
  *
+ * Grenzen: Die Wache vertraut `VERCEL_ENV`. Steht es lokal auf `production`
+ * (etwa nach `vercel env pull --environment=production`), startet `next start`
+ * mit Live-Schlüssel; `next dev` bleibt gesperrt (Umgebung „lokal"). Umgekehrt
+ * sperrt sie auch die echte Produktion, wenn Vercel die Systemvariablen nicht
+ * freigibt („Automatically expose System Environment Variables") — dann fehlt
+ * `VERCEL_ENV` zur Laufzeit.
+ *
  * Test-Schlüssel sind überall erlaubt; ob die Produktion damit im
  * Testbetrieb läuft, sagt `istTestbetrieb`.
  */
@@ -48,8 +55,10 @@ export function stripeStartGesperrt(u: StripeModus): boolean {
  * Die Fehlermeldung der Wache — für Protokoll und Sentry, nicht für
  * Kundinnen (die sehen den Satz ihres Wegs, etwa „Online-Zahlung ist gerade
  * nicht möglich"). Bewusst ohne Schlüssel und ohne Präfix eines Schlüssels.
- * „produktion" heißt hier: gebaut wie die Produktion, aber nicht das
- * Produktions-Deployment bei Vercel (lokaler Produktions-Build, Test, CI).
+ * „produktion" heißt hier: gebaut wie die Produktion, aber ohne
+ * `VERCEL_ENV=production` — ein lokaler Produktions-Build, ein Test, die CI
+ * oder eine Produktion bei Vercel ohne freigegebene Systemvariablen. Die
+ * Meldung nennt deshalb beide Auswege.
  */
 export function stripeGesperrtMeldung(art: UmgebungsArt): string {
   switch (art) {
@@ -58,7 +67,7 @@ export function stripeGesperrtMeldung(art: UmgebungsArt): string {
     case 'lokal':
       return 'Stripe startet nicht: Lokal ist ein Live-Schlüssel eingetragen. Ein Live-Schlüssel ist nur im Produktions-Deployment bei Vercel erlaubt – bitte lokal einen Test-Schlüssel eintragen.'
     case 'produktion':
-      return 'Stripe startet nicht: Ein Live-Schlüssel ist eingetragen, aber hier läuft nicht das Produktions-Deployment bei Vercel (VERCEL_ENV=production fehlt) – etwa ein lokaler Produktions-Build, ein Test oder die CI. Bitte hier einen Test-Schlüssel eintragen.'
+      return 'Stripe startet nicht: Ein Live-Schlüssel ist eingetragen, aber hier läuft nicht das Produktions-Deployment bei Vercel (VERCEL_ENV=production fehlt). Lokal, in Tests und in der CI bitte einen Test-Schlüssel eintragen. Ist das die Produktion bei Vercel, fehlen die Systemvariablen: dort „Automatically expose System Environment Variables" einschalten.'
   }
 }
 
