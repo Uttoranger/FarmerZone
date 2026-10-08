@@ -63,7 +63,7 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 43 | Testumgebung test.farmerzone.at (Z3) | läuft | `nacht/2026-10-08/43-testumgebung` | | 42 | | 08.10.2026 |
 | 44 | Rückweg im Hofbereich (N1) | fertig (PR #222) | `nacht/2026-10-08/44-rueckweg` | #222 | main | Schalter mit sofortiger Wirkung bleiben auf der Seite (Freigabe); Doppelung /fehler-melden laut §12; keine Migration | 08.10.2026 |
 | 45 | Hofbereich kinderleicht | läuft | `nacht/2026-10-08/45-hofbereich` | | main | | 08.10.2026 |
-| 46 | Kundensicht kinderleicht (N2) | offen | | | main | | |
+| 46 | Kundensicht kinderleicht (N2) | läuft | `nacht/2026-10-08/46-kundensicht` | | main | | 08.10.2026 |
 | 47 | Altlasten aus Lauf 7 und Laufzeit-Befunde | läuft (Nachprüfung Runde 2) | `nacht/2026-10-08/47-altlasten` | | main | zwei Runden | 08.10.2026 |
 | 48 | Probelauf (Nachholung von 34) | offen — Vorbedingung B nicht erfüllt (Vorschau und api.stripe.com aus der Sitzung gesperrt, CONNECT 403) → Checkliste | | | main | | 08.10.2026 |
 | Sammel 8 | Sammel-PR Lauf 8 | offen | `integration/lauf8` | | main | | |
