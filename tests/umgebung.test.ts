@@ -433,8 +433,11 @@ describe('httpsHerkunft — nur eine reine https-Adresse', () => {
   it('gibt die Herkunft normalisiert zurück: klein, ohne Schrägstrich und ohne Punkt am Ende', () => {
     expect(httpsHerkunft('https://test.farmerzone.example')).toBe(TESTUMGEBUNG)
     expect(httpsHerkunft('  https://Test.FarmerZone.example/  ')).toBe(TESTUMGEBUNG)
-    // Der Punkt am Ende ist derselbe Host — der Browser schickt die Herkunft ohne ihn.
+    // Ein Punkt am Ende meint denselben Host — eine Schreibweise für Links.
     expect(httpsHerkunft('https://test.farmerzone.example.')).toBe(TESTUMGEBUNG)
+    // Bleibt nach dem Normalisieren ein Punkt am Ende, ist es keine Herkunft (Runde 2).
+    expect(httpsHerkunft('https://test.farmerzone.example..')).toBeNull()
+    expect(httpsHerkunft('https://test..farmerzone.example')).toBeNull()
     expect(httpsHerkunft('https://test.farmerzone.example:8443')).toBe('https://test.farmerzone.example:8443')
   })
 
@@ -513,6 +516,9 @@ describe('bestimmeUmgebung — eigene Adresse der Vorschau (Register Z3)', () =>
       `${PRODUKTION_ADRESSE}/`,
       `https://www.${host}`,
       `https://${host}.`,
+      // Mehrere Punkte am Ende: Erst normalisieren, dann prüfen — sonst bliebe die echte Seite mit Punkt übrig (Runde 2).
+      `https://${host}..`,
+      `https://${host}...`,
       `HTTPS://${host.toUpperCase()}`,
       `https://${host}/pfad`,
       `http://${host}`,
@@ -566,7 +572,14 @@ describe('bestimmeUmgebung — Link zur Testumgebung (Register Z3)', () => {
 
   it('führt nie unter dem Namen „Testumgebung" auf die echte Seite — auch nicht mit Punkt, Großschreibung oder Pfad', () => {
     const host = new URL(PRODUKTION_ADRESSE).hostname
-    for (const wert of [PRODUKTION_ADRESSE, `https://${host}.`, `https://${host.toUpperCase()}/admin`, `https://www.${host}`]) {
+    for (const wert of [
+      PRODUKTION_ADRESSE,
+      `https://${host}.`,
+      `https://${host}..`,
+      `https://${host}...`,
+      `https://${host.toUpperCase()}/admin`,
+      `https://www.${host}`,
+    ]) {
       const u = bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_TESTUMGEBUNG_URL: wert })
       expect(u.testumgebungUrl, wert).toBeNull()
       expect(u.warnungen, wert).toEqual(['NEXT_PUBLIC_TESTUMGEBUNG_URL zeigt auf die echte Seite — der Link zur Testumgebung fehlt.'])

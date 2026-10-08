@@ -3,28 +3,6 @@ import { UMGEBUNG, ZEIGE_UMGEBUNGSBANNER, meldeUmgebungsWarnungen } from '@/lib/
 import { bannerLink } from '@/lib/testumgebung'
 
 /**
- * Der Balken, der eine Testumgebung als solche kennzeichnet.
- *
- * Server-Komponente: Die Umgebung wird hier entschieden, an den Browser gehen
- * nur die fertigen Etiketten — nie ein Host, nie ein Schlüssel.
- *
- * In Produktion rendert sie NICHTS, auch nicht bei Widersprüchen (Kundinnen
- * dürfen kein Banner sehen); Widersprüche gehen dort als Warnung an Sentry.
- *
- * Im normalen Fluss, nicht klebend — ein klebender Balken müsste jede
- * klebende Leiste der App (Hofseite, Bauern-Sidebar) nach unten schieben.
- * Dafür ist er über der Seitenleiste des Bauern-Bereichs (z-40) gestapelt,
- * damit er beim Laden nicht hinter ihr verschwindet; danach scrollt er weg,
- * und der Titel-Präfix „[TEST]" bleibt als Erkennungszeichen.
- *
- * Feste Farben aus ABSPERRBAND (unten), bewusst ohne Token und ohne
- * dark:-Variante — die benannte Ausnahme in docs/ai/DESIGN_SYSTEM.md.
- *
- * In der Vorschau (Testumgebung, Register Z3) liegt rechts im Balken „Zur
- * echten Seite" (UmgebungsBannerLink); der Balken hält ihm den Platz frei und
- * ist dann 44 px hoch (Touch-Ziel). Ohne Link bleibt er schmal wie bisher.
- */
-/**
  * Das Absperrband: Ein Warnstreifen muss in beiden Modi gleich aussehen. Die
  * einzige Stelle mit diesen Farben — Balken und Link nehmen sie von hier.
  * Bernstein-400 auf Stein-900 liegt bei rund 11:1, Rot-700 auf Weiß bei rund
@@ -40,6 +18,28 @@ function band(): (typeof ABSPERRBAND)[keyof typeof ABSPERRBAND] {
   return UMGEBUNG.warnungen.length > 0 ? ABSPERRBAND.warnung : ABSPERRBAND.ruhig
 }
 
+/**
+ * Der Balken, der eine Testumgebung als solche kennzeichnet.
+ *
+ * Server-Komponente: Die Umgebung wird hier entschieden, an den Browser gehen
+ * nur die fertigen Etiketten — nie ein Host, nie ein Schlüssel.
+ *
+ * In Produktion rendert sie NICHTS, auch nicht bei Widersprüchen (Kundinnen
+ * dürfen kein Banner sehen); Widersprüche gehen dort als Warnung an Sentry.
+ *
+ * Im normalen Fluss, nicht klebend — ein klebender Balken müsste jede
+ * klebende Leiste der App (Hofseite, Bauern-Sidebar) nach unten schieben.
+ * Dafür ist er über der Seitenleiste des Bauern-Bereichs (z-40) gestapelt,
+ * damit er beim Laden nicht hinter ihr verschwindet; danach scrollt er weg,
+ * und der Titel-Präfix „[TEST]" bleibt als Erkennungszeichen.
+ *
+ * Feste Farben aus ABSPERRBAND (oben), bewusst ohne Token und ohne
+ * dark:-Variante — die benannte Ausnahme in docs/ai/DESIGN_SYSTEM.md.
+ *
+ * In der Vorschau (Testumgebung, Register Z3) liegt rechts im Balken „Zur
+ * echten Seite" (UmgebungsBannerLink); der Balken hält ihm den Platz frei und
+ * ist dann 44 px hoch (Touch-Ziel). Ohne Link bleibt er schmal wie bisher.
+ */
 export function UmgebungsBanner(): React.JSX.Element | null {
   meldeUmgebungsWarnungen()
   if (!ZEIGE_UMGEBUNGSBANNER) return null

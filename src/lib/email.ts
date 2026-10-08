@@ -100,9 +100,10 @@ async function htmlOderFehler(
 
 /**
  * Ergebnis eines Versands: `id` = verschickt, `error` = gescheitert,
- * `gesperrt` = außerhalb der Produktion bewusst nicht verschickt (Empfänger
- * nicht freigegeben, Register Z3). Gesperrt ist kein Fehler — die Aufrufer
- * melden ihn deshalb nicht an Sentry.
+ * `gesperrt` = außerhalb des Produktions-Deployments bei Vercel bewusst nicht
+ * verschickt (Empfänger nicht freigegeben, Register Z3). Gesperrt ist kein
+ * Fehler — die Aufrufer melden ihn deshalb nicht an Sentry; nur sendRaw selbst
+ * meldet die Sperre trotz Produktion, einmal je Instanz.
  */
 export type VersandErgebnis = { id?: string; error?: string; gesperrt?: true }
 

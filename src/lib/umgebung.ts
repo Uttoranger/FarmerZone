@@ -108,22 +108,8 @@ const PRODUKTION_HOST = 'farmerzone.at'
  */
 export const PRODUKTION_ADRESSE = `https://${PRODUKTION_HOST}`
 
-/** Der Host einer Adresse, wie ihn der Browser vergleicht: klein, ohne Punkt am Ende — oder null. */
-function hostVon(roh: string): string | null {
-  try {
-    return new URL(roh).hostname.toLowerCase().replace(/\.$/, '')
-  } catch {
-    return null
-  }
-}
-
-/**
- * Zeigt eine eingetragene Adresse auf die echte Seite — mit oder ohne www?
- * Verglichen wird der Host, nicht der Text: „https://FarmerZone.at./pfad"
- * ist ebenso die echte Seite wie „http://farmerzone.at" (Nr. 43, Runde 1).
- */
-function zeigtAufEchteSeite(roh: string): boolean {
-  const host = hostVon(roh)
+/** Ist dieser (fertig normalisierte) Host die echte Seite — mit oder ohne www? */
+function istEchterHost(host: string | null): boolean {
   return host === PRODUKTION_HOST || host === `www.${PRODUKTION_HOST}`
 }
 
@@ -146,10 +132,12 @@ export function httpsHerkunft(wert: string | undefined): string | null {
   }
   if (url.protocol !== 'https:') return null
   if (url.username || url.password || url.search || url.hash || url.pathname !== '/') return null
-  // Der Punkt am Ende ist derselbe Host; der Browser schickt die Herkunft ohne ihn.
-  const host = url.hostname.replace(/\.$/, '')
-  // WHATWG-URL lässt „*" im Host stehen — ein Platzhalter ist nie eine Herkunft.
-  if (!/^[a-z0-9.-]+$/.test(host)) return null
+  // Ein Punkt am Ende meint denselben Host — eine Schreibweise für Links.
+  const host = url.hostname.endsWith('.') ? url.hostname.slice(0, -1) : url.hostname
+  // Nur nichtleere Labels aus a–z, 0–9 und „-": Bleibt nach dem Normalisieren
+  // ein Punkt am Ende („farmerzone.at.."), ist es keine Herkunft (Nr. 43,
+  // Runde 2). Ebenso fällt „*" heraus — WHATWG-URL ließe den Platzhalter stehen.
+  if (!/^[a-z0-9-]+(\.[a-z0-9-]+)*$/.test(host)) return null
   return `https://${host}${url.port ? `:${url.port}` : ''}`
 }
 
@@ -157,15 +145,29 @@ type AdressPruefung = { herkunft: string } | { problem: 'keine-https-adresse' | 
 
 /**
  * Eine eingetragene Adresse prüfen: fehlt (null), taugt, oder warum nicht.
- * Die echte Seite zuerst — sie ist der schwerere Fehler, auch mit Pfad oder http.
+ *
+ * Erst normalisieren, dann prüfen (Nr. 43, Runde 2): Geprüft wird die Herkunft,
+ * die tatsächlich benutzt würde. Vorher lief die Prüfung auf dem Rohwert, und
+ * „https://farmerzone.at.." kam als „https://farmerzone.at." durch — die echte
+ * Seite mit Punkt am Ende.
  */
 function pruefeAdresse(wert: string | undefined): AdressPruefung {
   const roh = bereinigt(wert)
   if (!roh) return null
-  if (zeigtAufEchteSeite(roh)) return { problem: 'echte-seite' }
   const herkunft = httpsHerkunft(roh)
-  if (!herkunft) return { problem: 'keine-https-adresse' }
-  return { herkunft }
+  if (herkunft) return istEchterHost(new URL(herkunft).hostname) ? { problem: 'echte-seite' } : { herkunft }
+  // Abgelehnt ist der Wert ohnehin. Meint er die echte Seite (http, Pfad,
+  // Punkte am Ende, groß geschrieben), nennt die Warnung diesen schwereren Grund.
+  return istEchterHost(hostOhnePunkteAmEnde(roh)) ? { problem: 'echte-seite' } : { problem: 'keine-https-adresse' }
+}
+
+/** Nur für die Wahl der Warnung bei einem abgelehnten Wert: Host klein, ohne alle Punkte am Ende. */
+function hostOhnePunkteAmEnde(roh: string): string | null {
+  try {
+    return new URL(roh).hostname.toLowerCase().replace(/\.+$/, '')
+  } catch {
+    return null
+  }
 }
 
 type DatenbankZiel = { host: string; benutzer: string }
