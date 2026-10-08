@@ -11,13 +11,20 @@ import { alsCents, calcLineTotal, decimalZuCents } from '@/lib/order-totals'
 import { fristVon, zeitpunktFuerMail } from '@/lib/fristen'
 import { buildMapsUrl } from '@/lib/customer-links'
 import type { MailZahlart } from '@/emails/order-confirmation'
-import { APP_URL } from '@/lib/umgebung-server'
+import { APP_URL, UMGEBUNG } from '@/lib/umgebung-server'
 import { ANMELDECODE_GUELTIG_SEKUNDEN } from '@/lib/anmeldecode'
 import { BESTAETIGUNG_GUELTIG_SEKUNDEN } from '@/lib/email-bestaetigung'
 import { ABO_BESTAETIGUNG_GUELTIG_TAGE } from '@/lib/abo-bestaetigung'
+import { env } from '@/lib/env'
+import { darfMailEmpfangen, leseTestEmpfaenger } from '@/lib/testumgebung'
 
 const apiKey = process.env.RESEND_API_KEY
 const FROM = process.env.EMAIL_FROM ?? 'onboarding@resend.dev'
+
+// Post-Sperre außerhalb der Produktion (Register Z3, Nr. 43): die Liste einmal
+// je Instanz, der Zähler auch — gezählt wird nur, nie eine Adresse notiert.
+const TEST_EMPFAENGER = leseTestEmpfaenger(env.TEST_EMPFAENGER)
+let nichtVerschickt = 0
 
 /*
  * Schwere Module erst beim Versand (Nachtlauf Nr. 31, ARCHITECTURE §4): Das
@@ -68,10 +75,28 @@ async function htmlOderFehler(
   }
 }
 
-export async function sendRaw(to: string, subject: string, html: string): Promise<{ id?: string; error?: string }> {
+/**
+ * Ergebnis eines Versands: `id` = verschickt, `error` = gescheitert,
+ * `gesperrt` = außerhalb der Produktion bewusst nicht verschickt (Empfänger
+ * nicht freigegeben, Register Z3). Gesperrt ist kein Fehler — die Aufrufer
+ * melden ihn deshalb nicht an Sentry.
+ */
+export type VersandErgebnis = { id?: string; error?: string; gesperrt?: true }
+
+export async function sendRaw(to: string, subject: string, html: string): Promise<VersandErgebnis> {
   if (!apiKey) {
     console.log(`[E-Mail] KEIN API-KEY — würde senden: "${subject}" → ${logEmpfaenger(to)}`)
     return { error: 'RESEND_API_KEY nicht gesetzt' }
+  }
+  // Nach dem Log-Modus, damit lokal ohne Schlüssel alles bleibt, wie es war.
+  // Hier stehen weder Adresse noch Betreff im Log: Beide können eine Person
+  // nennen, und die Testumgebung schreibt in die Vercel-Logs.
+  if (!darfMailEmpfangen(to, UMGEBUNG.art, TEST_EMPFAENGER)) {
+    nichtVerschickt += 1
+    console.log(
+      `[E-Mail] Nicht verschickt: Empfänger steht nicht in TEST_EMPFAENGER (außerhalb der Produktion). Bisher ${nichtVerschickt} in dieser Instanz.`
+    )
+    return { gesperrt: true }
   }
   console.log(`[E-Mail] Sende: "${subject}" → ${logEmpfaenger(to)} (from: ${FROM})`)
   try {

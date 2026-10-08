@@ -103,6 +103,8 @@ Wichtig für Produktion:
 
 Die Umstellung von Test auf Live Schritt für Schritt: [`docs/betrieb/stripe-live.md`](docs/betrieb/stripe-live.md).
 
+Die Testumgebung (Branch `staging` unter einer eigenen Adresse, Entwicklungsdatenbank, Stripe-Test) mit ihren Branch-Variablen `NEXT_PUBLIC_APP_URL`, `BETTER_AUTH_URL`, `STRIPE_WEBHOOK_SECRET` und `TEST_EMPFAENGER` sowie `NEXT_PUBLIC_TESTUMGEBUNG_URL` für Production: [`docs/betrieb/testumgebung.md`](docs/betrieb/testumgebung.md).
+
 ### 3. Stripe Webhook für Produktion
 
 Im [Stripe Dashboard](https://dashboard.stripe.com/webhooks) einen neuen Webhook anlegen:

@@ -65,6 +65,7 @@ Vercel erlaubt je Variable und Umgebung nur einen Wert. Deshalb kommt **zuerst S
 
 - [ ] Bei jeder bestehenden Variable `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` und `STRIPE_WEBHOOK_SECRET` sowie bei `STRIPE_PUBLISHABLE_KEY` (falls vorhanden; der Code liest sie nicht) die Umgebung **Production abwählen**. Übrig bleibt Preview, bei Bedarf auch Development.
 - [ ] Danach gilt: Vorschau = Test-Schlüssel, Produktion = Live-Schlüssel.
+- [ ] Die Branch-Variable `STRIPE_WEBHOOK_SECRET` für `staging` (Testumgebung, `docs/betrieb/testumgebung.md` Schritt 3) bleibt, wie sie ist. Sie gehört zum Test-Endpunkt von `test.farmerzone.at`.
 
 **4. Neue Variablen nur für Production**
 
@@ -92,7 +93,7 @@ Vercel erlaubt je Variable und Umgebung nur einen Wert. Deshalb kommt **zuerst S
 - [ ] Vercel → Deployments → das aktuelle Production-Deployment **neu bauen** („Redeploy“, ohne Build-Cache). Ein Neustart allein genügt nicht: `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` wird beim Bauen in die Seiten geschrieben.
 - [ ] Danach prüfen, auf `farmerzone.at`:
   - [ ] Kasse (`/<hof>/checkout`): An „Online bezahlen“ steht kein „Testbetrieb: …“ mehr.
-  - [ ] Admin (`/admin`): Die orange Karte „Stripe läuft im Testmodus …“ ist weg.
+  - [ ] Admin (`/admin`): Die orange Karte „Stripe läuft im Testmodus …“ ist weg, unter dem Kopf steht „Stripe Live“ in Grün (Nr. 43).
   - [ ] Einstellungen → Zahlung: „Online-Zahlung läuft noch im Testbetrieb.“ ist weg.
   - [ ] Sentry: Keine neue Warnung „Stripe TEST in Produktion“ und keine „Kein STRIPE_CONNECT_WEBHOOK_SECRET“.
   - [ ] Eine Vorschau zeigt im Umgebungsbanner weiter „Stripe Test“.

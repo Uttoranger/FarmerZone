@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
+  PRODUKTION_ADRESSE,
   bannerZeilen,
   bestimmeUmgebung,
   datenbankHost,
   erkannteFernDatenbank,
+  httpsHerkunft,
   istDevDatenbank,
   istTestDatenbank,
   zeigtAufGehostetesProjekt,
@@ -104,9 +106,14 @@ describe('bestimmeUmgebung — Adresse und vertraute Herkünfte', () => {
     expect(u.trustedOrigins).toEqual(['https://farmer-zone-abc123-team.vercel.app'])
   })
 
-  it('ignoriert in der Preview eine gesetzte NEXT_PUBLIC_APP_URL — die gehört der Produktion', () => {
-    const u = bestimmeUmgebung({ ...PREVIEW, NEXT_PUBLIC_APP_URL: 'https://farmerzone.example' })
-    expect(u.trustedOrigins).not.toContain('https://farmerzone.example')
+  // Bis Nr. 42 ignorierte die Preview NEXT_PUBLIC_APP_URL ganz („die gehört der
+  // Produktion"). Seit Nr. 43 (Register Z3) trägt die Testumgebung dort ihre
+  // eigene Adresse — die Sorge von damals bleibt als Sperre: Die Adresse der
+  // echten Seite gilt in einer Vorschau nie.
+  it('ignoriert in der Preview eine NEXT_PUBLIC_APP_URL, die auf die echte Seite zeigt — die gehört der Produktion', () => {
+    const u = bestimmeUmgebung({ ...PREVIEW, NEXT_PUBLIC_APP_URL: PRODUKTION_ADRESSE })
+    expect(u.trustedOrigins).not.toContain(PRODUKTION_ADRESSE)
+    expect(u.appUrl).toBe('https://farmer-zone-git-fix-testumgebung-team.vercel.app')
   })
 
   it('nimmt lokal localhost:3000', () => {
@@ -370,5 +377,153 @@ describe('bestimmeUmgebung — keine Geheimnisse im Ergebnis', () => {
       expect(text).not.toContain('5432')
       expect(text).not.toContain('6543')
     }
+  })
+})
+
+// ─── Testumgebung test.farmerzone.at (Register Z3, Nr. 43) ───────────────────
+// Erfundene Adressen unter .example — nur PRODUKTION_ADRESSE ist die echte,
+// öffentliche Adresse, und sie kommt aus dem Modul, nicht aus dem Test.
+const TESTUMGEBUNG = 'https://test.farmerzone.example'
+const STAGING: UmgebungsWerte = {
+  ...PREVIEW,
+  VERCEL_GIT_COMMIT_REF: 'staging',
+  VERCEL_BRANCH_URL: 'farmer-zone-git-staging-team.vercel.app',
+  NEXT_PUBLIC_APP_URL: TESTUMGEBUNG,
+}
+
+describe('httpsHerkunft — nur eine reine https-Adresse', () => {
+  it('gibt die Herkunft normalisiert zurück: klein, ohne Schrägstrich am Ende', () => {
+    expect(httpsHerkunft('https://test.farmerzone.example')).toBe(TESTUMGEBUNG)
+    expect(httpsHerkunft('  https://Test.FarmerZone.example/  ')).toBe(TESTUMGEBUNG)
+    expect(httpsHerkunft('https://test.farmerzone.example:8443')).toBe('https://test.farmerzone.example:8443')
+  })
+
+  it('lehnt alles ab, was keine reine https-Herkunft ist', () => {
+    for (const wert of [
+      'http://test.farmerzone.example',
+      'test.farmerzone.example',
+      'https://test.farmerzone.example/pfad',
+      'https://test.farmerzone.example/?x=1',
+      'https://test.farmerzone.example/#anker',
+      'https://nutzer:passwort@test.farmerzone.example',
+      'https://*.vercel.app',
+      'javascript:alert(1)',
+      'keine adresse',
+    ]) {
+      expect(httpsHerkunft(wert), wert).toBeNull()
+    }
+  })
+
+  it('behandelt Fehlendes, Leeres und Weißes als fehlend', () => {
+    expect(httpsHerkunft(undefined)).toBeNull()
+    expect(httpsHerkunft('')).toBeNull()
+    expect(httpsHerkunft('   ')).toBeNull()
+  })
+})
+
+describe('bestimmeUmgebung — eigene Adresse der Vorschau (Register Z3)', () => {
+  it('Produktion unverändert: nur NEXT_PUBLIC_APP_URL, so wie sie steht — auch ohne https', () => {
+    expect(bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_TESTUMGEBUNG_URL: TESTUMGEBUNG }).trustedOrigins).toEqual([
+      'https://farmerzone.example',
+    ])
+    // Der lokale Produktions-Build (pnpm start) läuft mit http://localhost — wie bisher.
+    const lokalerBuild = bestimmeUmgebung({ NODE_ENV: 'production', NEXT_PUBLIC_APP_URL: 'http://localhost:3000' })
+    expect(lokalerBuild.appUrl).toBe('http://localhost:3000')
+    expect(lokalerBuild.trustedOrigins).toEqual(['http://localhost:3000'])
+  })
+
+  it('Vorschau ohne Variable unverändert: Branch-Adresse vorn, Deploy-Adresse dahinter, keine Warnung', () => {
+    const u = bestimmeUmgebung({ ...PREVIEW, NEXT_PUBLIC_APP_URL: undefined })
+    expect(u.appUrl).toBe('https://farmer-zone-git-fix-testumgebung-team.vercel.app')
+    expect(u.trustedOrigins).toEqual([
+      'https://farmer-zone-git-fix-testumgebung-team.vercel.app',
+      'https://farmer-zone-abc123-team.vercel.app',
+    ])
+    expect(u.warnungen).toEqual([])
+  })
+
+  it('Vorschau mit Variable: Sie wird appUrl und vertraute Herkunft, die Vercel-Adressen bleiben dahinter', () => {
+    const u = bestimmeUmgebung(STAGING)
+    expect(u.appUrl).toBe(TESTUMGEBUNG)
+    expect(u.trustedOrigins).toEqual([
+      TESTUMGEBUNG,
+      'https://farmer-zone-git-staging-team.vercel.app',
+      'https://farmer-zone-abc123-team.vercel.app',
+    ])
+    expect(u.warnungen).toEqual([])
+  })
+
+  it('normalisiert die Adresse der Vorschau wie jede Herkunft', () => {
+    expect(bestimmeUmgebung({ ...STAGING, NEXT_PUBLIC_APP_URL: 'https://Test.FarmerZone.example/' }).appUrl).toBe(TESTUMGEBUNG)
+  })
+
+  it('nimmt in der Vorschau nur https — sonst die Vercel-Adresse und eine Warnung im Banner', () => {
+    for (const wert of ['http://test.farmerzone.example', 'https://test.farmerzone.example/pfad', 'https://*.vercel.app']) {
+      const u = bestimmeUmgebung({ ...STAGING, NEXT_PUBLIC_APP_URL: wert })
+      expect(u.appUrl, wert).toBe('https://farmer-zone-git-staging-team.vercel.app')
+      expect(u.trustedOrigins.join(' '), wert).not.toContain('test.farmerzone')
+      expect(u.warnungen, wert).toEqual(['NEXT_PUBLIC_APP_URL ist keine reine https-Adresse — die Vorschau nimmt ihre Vercel-Adresse.'])
+    }
+  })
+
+  it('nimmt die echte Seite nie als Adresse einer Vorschau — auch nicht mit www', () => {
+    for (const wert of [PRODUKTION_ADRESSE, `${PRODUKTION_ADRESSE}/`, PRODUKTION_ADRESSE.replace('https://', 'https://www.')]) {
+      const u = bestimmeUmgebung({ ...STAGING, NEXT_PUBLIC_APP_URL: wert })
+      expect(u.appUrl, wert).toBe('https://farmer-zone-git-staging-team.vercel.app')
+      expect(u.trustedOrigins.join(' '), wert).not.toContain('farmerzone.at')
+      expect(u.warnungen, wert).toEqual(['NEXT_PUBLIC_APP_URL zeigt auf die echte Seite — die Vorschau nimmt ihre Vercel-Adresse.'])
+    }
+  })
+
+  it('führt eine Adresse, die schon die Branch-Adresse ist, nur einmal', () => {
+    const u = bestimmeUmgebung({ ...STAGING, NEXT_PUBLIC_APP_URL: 'https://farmer-zone-git-staging-team.vercel.app' })
+    expect(u.trustedOrigins).toEqual([
+      'https://farmer-zone-git-staging-team.vercel.app',
+      'https://farmer-zone-abc123-team.vercel.app',
+    ])
+  })
+
+  it('kommt mit der eigenen Adresse auch ohne Vercel-Adressen aus — dann ohne Warnung zum Login', () => {
+    const u = bestimmeUmgebung({ VERCEL_ENV: 'preview', NEXT_PUBLIC_APP_URL: TESTUMGEBUNG, DATABASE_URL: DEV_DB_POOLER, STRIPE_SECRET_KEY: 'sk_test_x' })
+    expect(u.appUrl).toBe(TESTUMGEBUNG)
+    expect(u.trustedOrigins).toEqual([TESTUMGEBUNG])
+    expect(u.warnungen).toEqual([])
+  })
+
+  it('lokal unverändert: localhost:3000, auch wenn NEXT_PUBLIC_APP_URL etwas anderes sagt', () => {
+    const u = bestimmeUmgebung({ ...LOKAL, NEXT_PUBLIC_APP_URL: TESTUMGEBUNG })
+    expect(u.trustedOrigins).toEqual(['http://localhost:3000'])
+  })
+})
+
+describe('bestimmeUmgebung — Link zur Testumgebung (Register Z3)', () => {
+  it('reicht NEXT_PUBLIC_TESTUMGEBUNG_URL normalisiert durch', () => {
+    expect(bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_TESTUMGEBUNG_URL: 'https://Test.FarmerZone.example/' }).testumgebungUrl).toBe(TESTUMGEBUNG)
+  })
+
+  it('ohne Variable kein Link und keine Warnung', () => {
+    const u = bestimmeUmgebung(PRODUKTION)
+    expect(u.testumgebungUrl).toBeNull()
+    expect(u.warnungen).toEqual([])
+  })
+
+  it('ohne reine https-Adresse kein Link, dafür eine Warnung (Produktion: an Sentry, Vorschau: im Banner)', () => {
+    for (const wert of ['http://test.farmerzone.example', 'test.farmerzone.example', 'https://test.farmerzone.example/admin']) {
+      const u = bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_TESTUMGEBUNG_URL: wert })
+      expect(u.testumgebungUrl, wert).toBeNull()
+      expect(u.warnungen, wert).toEqual(['NEXT_PUBLIC_TESTUMGEBUNG_URL ist keine reine https-Adresse — der Link zur Testumgebung fehlt.'])
+    }
+  })
+
+  it('führt nie unter dem Namen „Testumgebung" auf die echte Seite', () => {
+    const u = bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_TESTUMGEBUNG_URL: PRODUKTION_ADRESSE })
+    expect(u.testumgebungUrl).toBeNull()
+    expect(u.warnungen).toEqual(['NEXT_PUBLIC_TESTUMGEBUNG_URL zeigt auf die echte Seite — der Link zur Testumgebung fehlt.'])
+  })
+
+  it('verlinkt nicht auf sich selbst — in der Testumgebung gibt es den Link nicht', () => {
+    const u = bestimmeUmgebung({ ...STAGING, NEXT_PUBLIC_TESTUMGEBUNG_URL: TESTUMGEBUNG })
+    expect(u.testumgebungUrl).toBeNull()
+    expect(u.warnungen).toEqual([])
   })
 })

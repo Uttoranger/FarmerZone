@@ -157,6 +157,8 @@ Alles, was Netz, DB oder Request-Kontext braucht.
 
 **`@/lib/stripe` ist ein Stellvertreter (seit Nr. 42):** Der Client entsteht erst beim ersten Gebrauch (Modus-Wache, Register Z2). Wer Stripe-Wege prüft, mockt weiter `@/lib/stripe` mit `{ stripe: { … } }` — daran ändert sich nichts. Wer die Wache selbst prüft, mockt das Paket `stripe` (eine Attrappe, die ihre Konstruktor-Aufrufe zählt) und lädt `@/lib/stripe` je Fall frisch: `vi.resetModules()` plus `vi.doMock('@/lib/umgebung-server' …)`/`vi.doMock('@/lib/env' …)` mit den Werten des Falls, denn Client und „schon gemeldet“ leben auf Modulebene (Vorbild `tests/stripe-client-wache.test.ts`). Stripe-Fehler in Tests baut das SDK selbst, ohne Netz: `new Stripe.errors.StripeInvalidRequestError({ code: 'resource_missing', … })`.
 
+**Post-Sperre in Tests (seit Nr. 43):** Unter Vitest ist `NODE_ENV=test`, und `bestimmeUmgebung` zählt das als Produktion — die Sperre aus Register Z3 ist in allen bestehenden Mail-Tests also aus, an ihren Adressen ändert sich nichts. Wer die Sperre selbst prüft, lädt `@/lib/email` mit `VERCEL_ENV=preview` (und `TEST_EMPFAENGER`) frisch, eine Instanz je Variante in `beforeAll` — Umgebung, Liste und Zähler leben auf Modulebene (Vorbild `tests/email-testumgebung.test.ts`). Die Regel selbst prüft `tests/testumgebung.test.ts` ohne Mock.
+
 ### Niemals gemockt werden — die zu prüfende Aussage
 - **Nie** das Modul mocken, das gerade getestet wird.
 - **Nie** eine Fachregel aus `src/lib/` mocken, wenn ihr Ergebnis die Aussage des Tests ist.

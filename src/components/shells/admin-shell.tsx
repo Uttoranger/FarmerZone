@@ -3,10 +3,11 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ArrowLeft, CircleAlert } from 'lucide-react'
-import { ADMIN_REITER, ADMIN_ZURUECK, adminAktiverReiter, type AdminReiter } from '@/lib/admin-navigation'
+import { ArrowLeft, CircleAlert, FlaskConical } from 'lucide-react'
+import { ADMIN_REITER, ADMIN_TESTUMGEBUNG, ADMIN_ZURUECK, adminAktiverReiter, type AdminReiter } from '@/lib/admin-navigation'
 import { hofInitialen } from '@/lib/hof-initialen'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
+import type { StripeMarke } from '@/lib/testumgebung'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
@@ -28,6 +29,10 @@ import { ADMIN_RAHMEN } from '@/components/admin/admin-teile'
  * verlangeAdminSeite (src/server/admin-wache.ts). Seit Nr. 22f trägt
  * src/app/admin/layout.tsx sie um alle /admin-Routen; Name und Zähler lädt
  * dort ladeAdminbereich (nach der Wache).
+ *
+ * Seit Nr. 43 (Register Z3) die Betriebsleiste unter dem Kopf: Marke
+ * „Stripe Live"/„Stripe Test" und „Zur Testumgebung". Beides entscheidet der
+ * Server (umgebung-server.ts) und reicht nur Text, Ton und Adresse herein.
  */
 
 export type AdminShellProps = {
@@ -40,6 +45,13 @@ export type AdminShellProps = {
    * Nur der Wahrheitswert, nie der Schlüssel.
    */
   testbetrieb?: boolean
+  /**
+   * Register Z3: „Stripe Live" bzw. „Stripe Test" (STRIPE_MARKE aus
+   * umgebung-server.ts) — nur Text und Ton, nie der Schlüssel.
+   */
+  stripeMarke?: StripeMarke | null
+  /** Ziel von „Zur Testumgebung" (TESTUMGEBUNG_URL) — ohne Adresse kein Link. */
+  testumgebungUrl?: string | null
   children: ReactNode
 }
 
@@ -49,7 +61,14 @@ function zahlFuer(reiter: AdminReiter, zahlen: AdminShellProps['zahlen']): { anz
   return { wofuer: '' }
 }
 
-export function AdminShell({ personName, zahlen, testbetrieb = false, children }: AdminShellProps): React.JSX.Element {
+export function AdminShell({
+  personName,
+  zahlen,
+  testbetrieb = false,
+  stripeMarke = null,
+  testumgebungUrl = null,
+  children,
+}: AdminShellProps): React.JSX.Element {
   const pathname = usePathname()
   const aktiv = adminAktiverReiter(pathname)
   const anzeige = personName.trim() || 'Dein Konto'
@@ -118,6 +137,27 @@ export function AdminShell({ personName, zahlen, testbetrieb = false, children }
             <span className="sr-only">Angemeldet: {anzeige}</span>
           </span>
         </div>
+        {/* Betriebsleiste (Register Z3): welcher Stripe-Modus gilt und der Weg
+            in die Testumgebung. Eine eigene Zeile unter dem Kopf statt in ihm:
+            Die Kopfzeile ist am Handy und bis 1024 px schon voll, hier stehen
+            Marke und Link in jeder Breite gleich. */}
+        {(stripeMarke || testumgebungUrl) && (
+          <div className="flex min-h-11 items-center justify-between gap-3 border-t border-border px-4 md:px-8">
+            {stripeMarke ? <StatusBadge status={stripeMarke.ton}>{stripeMarke.text}</StatusBadge> : <span />}
+            {testumgebungUrl && (
+              <a
+                href={testumgebungUrl}
+                className={cn(
+                  '-mr-3 inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-[14px] font-semibold whitespace-nowrap text-brand-text hover:bg-muted',
+                  FOKUS_RAHMEN
+                )}
+              >
+                <FlaskConical className="size-4" strokeWidth={1.7} aria-hidden="true" />
+                {ADMIN_TESTUMGEBUNG.label}
+              </a>
+            )}
+          </div>
+        )}
       </header>
 
       <main id={INHALT_ID} tabIndex={-1} className="px-4 py-5 outline-none md:px-8 md:py-7">

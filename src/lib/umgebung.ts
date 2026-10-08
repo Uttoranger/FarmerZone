@@ -7,6 +7,11 @@
  * steht deshalb an EINER Stelle, was die Umgebung ist, welche Adressen ihr
  * gehören und ob Datenbank und Stripe zur Umgebung passen.
  *
+ * Testumgebung (Register Z3, Nr. 43): test.farmerzone.at ist eine Vorschau
+ * des Branches staging mit eigener Adresse in NEXT_PUBLIC_APP_URL. In der
+ * Vorschau gilt diese Adresse nur als reine https-Adresse und nie als die
+ * der echten Seite; Produktion und lokal bleiben, wie sie waren.
+ *
  * Rein: Die Werte kommen als Parameter, nie aus process.env — damit jede
  * Kombination ohne Vercel prüfbar ist. Der Serverzweig liegt in
  * umgebung-server.ts.
@@ -35,6 +40,8 @@ export type UmgebungsWerte = {
   VERCEL_BRANCH_URL?: string
   VERCEL_GIT_COMMIT_REF?: string
   NEXT_PUBLIC_APP_URL?: string
+  /** Adresse der Testumgebung für „Zur Testumgebung" im Admin (Register Z3) — gesetzt nur in Production. */
+  NEXT_PUBLIC_TESTUMGEBUNG_URL?: string
   DATABASE_URL?: string
   STRIPE_SECRET_KEY?: string
   STRIPE_CONNECT_WEBHOOK_SECRET?: string
@@ -46,6 +53,11 @@ export type Umgebung = {
   appUrl: string | null
   /** Herkünfte, denen Better Auth vertraut. Nie ein Platzhalter wie *.vercel.app. */
   trustedOrigins: readonly string[]
+  /**
+   * Ziel von „Zur Testumgebung" im Admin (Register Z3) — null ohne gültige
+   * Variable, bei der Adresse der echten Seite und in der Testumgebung selbst.
+   */
+  testumgebungUrl: string | null
   datenbank: DatenbankArt
   stripe: StripeArt
   branch: string | null
@@ -73,6 +85,60 @@ const LOKALE_ADRESSE = 'http://localhost:3000'
 function bereinigt(wert: string | undefined): string | undefined {
   const t = wert?.trim()
   return t ? t : undefined
+}
+
+/** Der Host der echten Seite. Kein Geheimnis: Er steht auf jedem Plakat, in
+ *  jeder Hofadresse (farmerzone.at/<hof>) und in der Support-Adresse. */
+const PRODUKTION_HOST = 'farmerzone.at'
+
+/**
+ * Die Adresse der echten Seite (Register Z3) — Ziel von „Zur echten Seite"
+ * im Banner der Testumgebung.
+ *
+ * Eine Konstante und keine Variable, weil die Testumgebung keine Variable mit
+ * dieser Adresse hat: Dort ist NEXT_PUBLIC_APP_URL die Testadresse, und eine
+ * eigene Variable müsste der Mensch in jeder Vorschau pflegen.
+ */
+export const PRODUKTION_ADRESSE = `https://${PRODUKTION_HOST}`
+
+/** Zeigt eine (normalisierte) Herkunft auf die echte Seite — mit oder ohne www? */
+function istEchteSeite(herkunft: string): boolean {
+  return herkunft === PRODUKTION_ADRESSE || herkunft === `https://www.${PRODUKTION_HOST}`
+}
+
+/**
+ * Eine reine https-Herkunft wie „https://test.farmerzone.at" — oder null.
+ *
+ * Nur Schema, Host und Port: kein Pfad, keine Abfrage, kein Anker, keine
+ * Zugangsdaten. Normalisiert über URL (Host klein, ohne Schrägstrich am Ende),
+ * weil Better Auth Herkünfte genau vergleicht. Nur für Werte, die ein Mensch
+ * einträgt — die Vercel-Systemvariablen bleiben, wie sie sind.
+ */
+export function httpsHerkunft(wert: string | undefined): string | null {
+  const roh = bereinigt(wert)
+  if (!roh) return null
+  let url: URL
+  try {
+    url = new URL(roh)
+  } catch {
+    return null
+  }
+  if (url.protocol !== 'https:') return null
+  if (url.username || url.password || url.search || url.hash || url.pathname !== '/') return null
+  // WHATWG-URL lässt „*" im Host stehen — ein Platzhalter ist nie eine Herkunft.
+  if (!/^[a-z0-9.-]+$/.test(url.hostname)) return null
+  return url.origin
+}
+
+type AdressPruefung = { herkunft: string } | { problem: 'keine-https-adresse' | 'echte-seite' } | null
+
+/** Eine eingetragene Adresse prüfen: fehlt (null), taugt, oder warum nicht. */
+function pruefeAdresse(wert: string | undefined): AdressPruefung {
+  if (!bereinigt(wert)) return null
+  const herkunft = httpsHerkunft(wert)
+  if (!herkunft) return { problem: 'keine-https-adresse' }
+  if (istEchteSeite(herkunft)) return { problem: 'echte-seite' }
+  return { herkunft }
 }
 
 type DatenbankZiel = { host: string; benutzer: string }
@@ -198,18 +264,29 @@ function umgebungsArt(werte: UmgebungsWerte): UmgebungsArt {
 
 export function bestimmeUmgebung(werte: UmgebungsWerte): Umgebung {
   const art = umgebungsArt(werte)
+  // Nur in der Vorschau zählt die eigene Adresse aus NEXT_PUBLIC_APP_URL als
+  // geprüfter Wert; Produktion und lokal lesen sie wie bisher (bzw. gar nicht).
+  const vorschauAdresse = art === 'preview' ? pruefeAdresse(werte.NEXT_PUBLIC_APP_URL) : null
 
   let trustedOrigins: string[]
   switch (art) {
     case 'preview': {
-      // Die Branch-Adresse zuerst: Sie bleibt über Deploys hinweg gleich und
+      // Die eigene Adresse der Testumgebung zuerst (Register Z3): Beim Branch
+      // staging steht dort https://test.farmerzone.at, und Links in Mails,
+      // Stripe-Rücksprünge und Better Auth sollen dorthin führen. Nur eine
+      // reine https-Adresse und nie die echte Seite — wäre die Variable für
+      // alle Vorschauen angelegt, schickte sonst jede Vorschau ihre Links in
+      // die Produktion (dann Warnung im Banner, siehe unten).
+      const eigene = vorschauAdresse && 'herkunft' in vorschauAdresse ? [vorschauAdresse.herkunft] : []
+      // Danach die Branch-Adresse: Sie bleibt über Deploys hinweg gleich und
       // taugt deshalb als appUrl in Links. Die Deploy-Adresse zusätzlich, weil
       // der Browser auch unter ihr aufruft.
       const branchUrl = bereinigt(werte.VERCEL_BRANCH_URL)
       const deployUrl = bereinigt(werte.VERCEL_URL)
-      trustedOrigins = [branchUrl, deployUrl]
+      const vercel = [branchUrl, deployUrl]
         .filter((h): h is string => Boolean(h))
         .map((h) => `https://${h}`)
+      trustedOrigins = [...new Set([...eigene, ...vercel])]
       break
     }
     case 'lokal':
@@ -229,8 +306,21 @@ export function bestimmeUmgebung(werte: UmgebungsWerte): Umgebung {
   const stripe = stripeArt(werte.STRIPE_SECRET_KEY)
   const branch = bereinigt(werte.VERCEL_GIT_COMMIT_REF) ?? null
 
+  // Der Link zur Testumgebung (Register Z3): nie auf die echte Seite und nie
+  // auf sich selbst — in der Testumgebung führt er nirgendwohin.
+  const testumgebung = pruefeAdresse(werte.NEXT_PUBLIC_TESTUMGEBUNG_URL)
+  const testumgebungUrl =
+    testumgebung && 'herkunft' in testumgebung && testumgebung.herkunft !== appUrl ? testumgebung.herkunft : null
+
   const warnungen: string[] = []
   if (art === 'preview') {
+    if (vorschauAdresse && 'problem' in vorschauAdresse) {
+      warnungen.push(
+        vorschauAdresse.problem === 'echte-seite'
+          ? 'NEXT_PUBLIC_APP_URL zeigt auf die echte Seite — die Vorschau nimmt ihre Vercel-Adresse.'
+          : 'NEXT_PUBLIC_APP_URL ist keine reine https-Adresse — die Vorschau nimmt ihre Vercel-Adresse.'
+      )
+    }
     if (datenbank === 'fremd') warnungen.push('Fremde Datenbank — das ist nicht die Dev-Datenbank.')
     if (stripe === 'live') warnungen.push('Stripe LIVE — echte Zahlungen möglich.')
     if (!appUrl) {
@@ -247,8 +337,17 @@ export function bestimmeUmgebung(werte: UmgebungsWerte): Umgebung {
       warnungen.push('Kein STRIPE_CONNECT_WEBHOOK_SECRET — gesperrte oder frisch freigegebene Hof-Konten bleiben unbemerkt.')
     }
   }
+  // In jeder Umgebung: Produktion meldet es an Sentry, Vorschau und lokal im Banner.
+  // Ein Tippfehler kostet nur den Link, nie den Start (src/lib/env.ts).
+  if (testumgebung && 'problem' in testumgebung) {
+    warnungen.push(
+      testumgebung.problem === 'echte-seite'
+        ? 'NEXT_PUBLIC_TESTUMGEBUNG_URL zeigt auf die echte Seite — der Link zur Testumgebung fehlt.'
+        : 'NEXT_PUBLIC_TESTUMGEBUNG_URL ist keine reine https-Adresse — der Link zur Testumgebung fehlt.'
+    )
+  }
 
-  return { art, appUrl, trustedOrigins, datenbank, stripe, branch, warnungen }
+  return { art, appUrl, trustedOrigins, testumgebungUrl, datenbank, stripe, branch, warnungen }
 }
 
 const DATENBANK_LABEL: Record<DatenbankArt, { lang: string; kurz: string }> = {
