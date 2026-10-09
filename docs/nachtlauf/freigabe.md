@@ -421,3 +421,12 @@ integration/lauf8 von main; Doku-PR und alle PRs per git merge --no-ff in der Re
 
 ### §4 Morgenbericht (`morgenbericht-<datum>-lauf8.md`)
 Ergebnis von 48 zuerst. Dann je PR: Vorschau-Link, Migration nein, Basis. Sammel-PR mit Konfliktauflösungen. Bilderstrecke „Handy vorher/nachher": Startseite ausgeloggt, Für Höfe, Hofseite, Kasse, Heute, Bestellungen, Kunden, Hof-Profil unten. „Für dich zu tun": Testumgebung einrichten (docs/betrieb/testumgebung.md), Probelauf nach Checkliste, und als letzter Schritt die Live-Schaltung (docs/betrieb/stripe-live.md).
+
+### Fortsetzung (uttoranger, 09.10.2026, im Chat)
+Stand laut status.md auf docs/lauf8 (70d5a80): 41, 42, 43, 44, 47 fertig (#221, #223, #226, #222, #224), 48 als Checkliste (#225, Runde 2 zu 46 offen). 45 in Nachbesserung Runde 1, 46 in tester/pruefer – beide noch NICHT gepusht.
+1. Sofort: den Arbeitsstand von 45 und 46 als WIP-Commit auf ihre Branches pushen (nacht/2026-10-08/45-hofbereich, nacht/2026-10-08/46-kundensicht), damit nichts verloren geht. Kein git stash.
+2. Dann nach freigabe.md §12 weiter: 45 Runde 1 abschließen (Blocker „Satz zur Umsatzgrenze passt nicht zum Code"), 46 Prüfung und ggf. Nachbesserung (Geldpfad: Nachprüfung), 48 Runde 2 (Teil zu 46).
+3. Sammel-PR integration/lauf8 nach §1. Erwartete Konflikte: DEVELOPMENT.md (beide Seiten behalten); src/app/admin/layout.tsx, src/components/shells/admin-shell.tsx und src/lib/admin-navigation.ts zwischen 41 und 42/43. Alle Änderungen erhalten: „Mein Hof" und Plakette aus 41, Testmodus-Karte aus 42, Stripe-Marke und Link zur Testumgebung aus 43. Jede Auflösung im PR-Text begründen; typecheck, lint, test, test:integration grün.
+4. Morgenbericht nach §4.
+
+Hat diese Sitzung den Arbeitsstand von 45/46 nicht mehr: beide neu von origin/main nach §12 umsetzen und das im Morgenbericht vermerken.
