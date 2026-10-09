@@ -37,6 +37,7 @@ import { calcPlatformFeeAmount, decimalZuCents, type DecimalEingabe } from '@/li
 import { centsAlsEuro, formatDatumLang, formatEuro, formatZahl } from '@/lib/format'
 import { Decimal } from '@prisma/client/runtime/index-browser'
 import { TEILEN_MOMENTE_PFAD, TEILEN_MOMENTE_TITEL, teilenMomenteZeile } from '@/lib/teilen-momente'
+import { EINSTELLUNG_KONTO, EINSTELLUNG_MEIN_AUFTRITT } from '@/lib/bauern-navigation'
 
 /** Weitergereicht: Das Sprungziel steht in taxonomie.ts, weil das Hofprofil (Client) es auch braucht. */
 export { BETRIEBSNUMMER_ANKER }
@@ -120,7 +121,7 @@ function esFehlt(teile: readonly string[]): string {
  */
 export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): EinstellungBereich[] {
   const profilFehlt = fehlendAuf(d.hofseiteZeilen, '/settings/profile')
-  const auftrittFehlt = fehlendAuf(d.hofseiteZeilen, '/settings/appearance')
+  const auftrittFehlt = fehlendAuf(d.hofseiteZeilen, EINSTELLUNG_MEIN_AUFTRITT.href)
   const nummer = d.betriebsnummer?.trim() ?? ''
 
   return [
@@ -133,10 +134,10 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
     },
     {
       id: 'auftritt',
-      titel: 'Mein Auftritt',
+      titel: EINSTELLUNG_MEIN_AUFTRITT.label,
       zeile: auftrittFehlt.length > 0 ? esFehlt(auftrittFehlt) : 'Titelbild, Logo, Über uns und Fotos sind da',
       ton: auftrittFehlt.length > 0 ? 'offen' : 'fertig',
-      href: '/settings/appearance',
+      href: EINSTELLUNG_MEIN_AUFTRITT.href,
     },
     {
       id: 'abholzeiten',
@@ -204,10 +205,10 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
     },
     {
       id: 'konto',
-      titel: 'Konto und Sicherheit',
+      titel: EINSTELLUNG_KONTO.label,
       zeile: d.stillgelegt ? 'Dein Hof ist stillgelegt' : 'E-Mail, Passwort, Darstellung, Hof stilllegen',
       ton: d.stillgelegt ? 'offen' : 'fertig',
-      href: '/settings/account',
+      href: EINSTELLUNG_KONTO.href,
     },
   ]
 }
@@ -215,7 +216,7 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
 // ─── Zahlungs-Seite ─────────────────────────────────────────────────────────
 
 /** Welche EINE Hinweiskarte oben auf /settings/payments steht. */
-export type ZahlungHinweisArt = 'geschafft' | 'fortsetzen' | 'fehler' | 'einrichten' | 'einschalten'
+export type ZahlungHinweisArt = 'geschafft' | 'fortsetzen' | 'fehler' | 'einrichten' | 'einschalten' | 'neu-einrichten'
 
 /**
  * Genau eine Karte, nie zwei orange übereinander (Nachbesserung Nr. 24):
@@ -223,14 +224,26 @@ export type ZahlungHinweisArt = 'geschafft' | 'fortsetzen' | 'fehler' | 'einrich
  * fehlt — Stripe einrichten (Z1) oder, bei fertigem Konto und Online aus
  * (Bestandshof vor Z1), Online-Zahlung einschalten. „geschafft" nur, wenn
  * es stimmt.
+ *
+ * `?stripe=neu` (Register Z2, Nr. 42): Stripe kennt das gespeicherte Konto
+ * nicht — gesetzt von „Status prüfen", „Einrichtung fortsetzen" und der
+ * Rückkehr aus dem Onboarding, nachdem der Hof als nicht bereit vermerkt ist.
+ * Die Karte heißt dann „Online-Zahlung neu einrichten" — nur mit Konto und
+ * nur, solange es nicht bereit ist. Der Parameter öffnet nichts: Ob wirklich
+ * neu angelegt wird, fragt `createConnectAccount` selbst bei Stripe nach.
  */
 export function zahlungHinweis(d: {
   rueckmeldung: string | undefined
   stripeBereit: boolean
   onlineAn: boolean
+  /** Ein Stripe-Konto ist gespeichert (Farm.stripeAccountId gesetzt). */
+  stripeKontoDa?: boolean
 }): ZahlungHinweisArt | null {
   if (d.rueckmeldung === 'error') return 'fehler'
-  if (!d.stripeBereit) return d.rueckmeldung === 'pending' ? 'fortsetzen' : 'einrichten'
+  if (!d.stripeBereit) {
+    if (d.rueckmeldung === 'neu' && d.stripeKontoDa) return 'neu-einrichten'
+    return d.rueckmeldung === 'pending' ? 'fortsetzen' : 'einrichten'
+  }
   if (!d.onlineAn) return 'einschalten'
   return d.rueckmeldung === 'success' ? 'geschafft' : null
 }

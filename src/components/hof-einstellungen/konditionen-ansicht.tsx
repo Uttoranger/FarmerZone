@@ -4,7 +4,7 @@ import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { KARTE, KICKER } from '@/components/hof-bestellungen/stil'
-import { EinstellungenKopf } from '@/components/hof-einstellungen/einstellungen-kopf'
+import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import {
   KONDITIONEN_STAND,
   KONDITIONEN_UEBERGANG,
@@ -31,7 +31,7 @@ export function KonditionenAnsicht({ hof, jetzt }: { hof: KonditionenHof; jetzt:
 
   return (
     <div>
-      <EinstellungenKopf titel="Deine Konditionen" satz={beispiel.mitProvision ? undefined : VOLLER_WARENPREIS} />
+      <UnterseitenKopf titel="Deine Konditionen" satz={beispiel.mitProvision ? undefined : VOLLER_WARENPREIS} />
 
       <div className="flex flex-col gap-5 md:gap-6">
         {/* Vor den Preisen, damit keiner als heute fällig gelesen wird (Register K1). */}

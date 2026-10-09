@@ -17,9 +17,10 @@ export default function HeuteLaden(): React.JSX.Element {
           <div className="h-8 w-28 rounded-lg bg-border md:h-9" />
           <div className="mt-2 h-4 w-52 rounded bg-muted" />
         </div>
+        {/* Wie Kennzahlen: drei Spalten; Höhen von der fertigen Seite abgenommen (360/390, 768, ab 1024 px). */}
         <div className="grid grid-cols-3 gap-2.5 md:gap-4">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-[76px] rounded-2xl border border-border bg-card p-3 md:h-[92px] md:p-4">
+            <div key={i} className="h-[106px] rounded-2xl border border-border bg-card p-3 md:h-[124px] md:p-4 lg:h-[117px]">
               <div className="h-3 w-3/4 rounded bg-muted" />
               <div className="mt-3 h-6 w-1/2 rounded bg-border" />
             </div>

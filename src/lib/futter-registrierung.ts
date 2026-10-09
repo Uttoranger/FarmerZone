@@ -146,8 +146,9 @@ export type RegistrierungsFall = {
  * und fertige Packungen brauchen eine Meldung beim BAES statt einer
  * Registrierung. Gegenlesen offen (Bericht 36): Ob ein Hof, der eigene Ernte
  * selbst abpackt, darunter fällt oder als Hersteller registriert sein muss,
- * ist nicht geklärt. Das Kürzel USP fällt weg, es ist ein Fachbegriff; die
- * Paragrafen-Angabe steht nur hier, nicht im Nutzertext.
+ * ist nicht geklärt. Die Paragrafen-Angabe steht nur hier, nicht im
+ * Nutzertext. Das Kürzel USP fiel mit Nr. 36 weg (Fachbegriff); seit Nr. 45
+ * steht es ausgeschrieben im orangen Satz (USP_AUSGESCHRIEBEN).
  */
 export const REGISTRIERUNGS_FAELLE = [
   {
@@ -247,10 +248,16 @@ export function fallZeile(id: RegistrierungsFallId, hof: HofRegistrierung): stri
 export type RegistrierungsSatz = { ton: 'gruen' | 'orange'; text: string }
 
 /**
+ * Das Portal, über das die Meldung beim BAES läuft — nie als nacktes Kürzel
+ * (freigabe.md §12 Nr. 45: „USP ausschreiben"; tests/fachwort-wache.test.ts).
+ */
+export const USP_AUSGESCHRIEBEN = 'Unternehmensserviceportal (USP)'
+
+/**
  * Die Sätze über den Fällen — was der Hof mit seinem Stand anbieten kann
  * (Mockups web-h2-neues-futter und mobil-h2-neues-futter-meldung-fehlt; der
- * orange Satz seit Nr. 36 mit „keine Registrierung" statt „über das USP",
- * siehe REGISTRIERUNGS_FAELLE).
+ * orange Satz seit Nr. 36 mit „keine Registrierung", seit Nr. 45 wieder mit
+ * dem Weg zur Meldung, das USP ausgeschrieben — siehe REGISTRIERUNGS_FAELLE).
  */
 export function registrierungsSaetze(hof: HofRegistrierung): RegistrierungsSatz[] {
   const saetze: RegistrierungsSatz[] = []
@@ -270,7 +277,7 @@ export function registrierungsSaetze(hof: HofRegistrierung): RegistrierungsSatz[
   } else {
     saetze.push({
       ton: 'orange',
-      text: 'Sackerl und Sack noch nicht möglich. Abgepacktes Heu mit eigenem Etikett gilt als Heimtierfutter – dafür brauchst du eine Meldung beim BAES, keine Registrierung.',
+      text: `Sackerl und Sack noch nicht möglich. Abgepacktes Heu mit eigenem Etikett gilt als Heimtierfutter – dafür brauchst du eine Meldung beim BAES über das ${USP_AUSGESCHRIEBEN}, keine Registrierung.`,
     })
   }
   return saetze
@@ -296,6 +303,21 @@ export function speichernHinweis(sofort: number, wartend: number): string | null
 // Produktdialog, Server Actions, Produktseite und Warenkorb. Die Wortlaute
 // stehen so im Register; tests/futter-bestaetigung.test.ts hält sie fest.
 
+/**
+ * Der EINE Name des Abschnitts mit den Futter-Angaben — im Futter-Formular,
+ * im Produktdialog (produkt-abschnitte.ts) und in jedem Verweis darauf
+ * (Nachbesserung Runde 1 zu Nr. 45: vorher hieß derselbe Abschnitt an
+ * manchen Stellen anders). Das Wort erklärt KENNZEICHNUNG_ERKLAERUNG am
+ * Anfang des Abschnitts; der Pflicht-Haken aus E10a nennt es wörtlich.
+ */
+export const KENNZEICHNUNG_TITEL = 'Kennzeichnung'
+
+/** So verweist ein Satz auf den Abschnitt: „im Abschnitt „Kennzeichnung“". */
+export const KENNZEICHNUNG_VERWEIS = `im Abschnitt „${KENNZEICHNUNG_TITEL}“`
+
+/** Titel der Rückfrage, wenn ein Futtermittel eine andere Kategorie bekommt (Produktdialog). */
+export const KENNZEICHNUNG_LOESCHEN_TITEL = `Angaben ${KENNZEICHNUNG_VERWEIS} löschen?`
+
 /** Der Pflicht-Haken im Futter-Formular und im Produktdialog (E10a, wörtlich). */
 export const FUTTER_BESTAETIGUNG_TEXT =
   'Ich bestätige, dass meine Angaben zu Registrierung, Kennzeichnung und Verpackung richtig und vollständig sind. Für die Richtigkeit bin ich verantwortlich. Falsche Angaben können nach dem Futtermittelgesetz bestraft werden.'
@@ -305,11 +327,27 @@ export const FUTTER_BESTAETIGUNG_FEHLT =
   'Bitte bestätige deine Angaben mit dem Haken – ohne Bestätigung können wir das Futter nicht speichern.'
 
 /** Antwort des Servers, wenn beim Bearbeiten Angaben geändert, aber nicht neu bestätigt wurden. */
-export const FUTTER_BESTAETIGUNG_NEU =
-  'Du hast Angaben zum Futter geändert. Bitte bestätige sie neu mit dem Haken unter der Kennzeichnung, dann speichern wir.'
+export const FUTTER_BESTAETIGUNG_NEU = `Du hast Angaben zum Futter geändert. Bitte bestätige sie neu mit dem Haken ${KENNZEICHNUNG_VERWEIS}, dann speichern wir.`
 
 /** Der Satz unter dem Haken beim Bearbeiten — wann er nicht nötig ist (OHNE_NEUE_BESTAETIGUNG). */
 export const FUTTER_BESTAETIGUNG_AUSNAHME = 'Änderst du nur Preis, Vorrat, Foto oder Sichtbarkeit, brauchst du den Haken nicht.'
+
+/**
+ * Der erste Satz des Abschnitts „Kennzeichnung" im Futter-Formular und im
+ * Produktdialog: was das Fachwort heißt (freigabe.md §12 Nr. 45). Der
+ * Pflicht-Haken aus E10a nennt „Kennzeichnung" wörtlich und steht im selben
+ * Abschnitt — der Satz erklärt ihn mit, ohne ihn umzuformulieren.
+ */
+export const KENNZEICHNUNG_ERKLAERUNG =
+  'Kennzeichnung heißt: die Angaben, die zu jedem Futter gehören – was es ist, woraus es besteht und für welche Tiere.'
+
+/**
+ * Wo der Hof die Angaben findet — in beiden Formularen gleich. Heu aus eigener
+ * Ernte (E10) hat keinen Sackanhänger und keinen Lieferschein; der Satz
+ * stimmt für beide Fälle (Runde 1).
+ */
+export const KENNZEICHNUNG_FUNDORT =
+  'Bei eigener Ernte trägst du sie selbst ein, bei zugekauftem Futter stehen sie auf dem Sackanhänger oder Lieferschein.'
 
 /** Kopfhinweis über den sieben Fällen (E10a, wörtlich). */
 export const ORIENTIERUNG_HINWEIS =

@@ -10,6 +10,7 @@ import {
   bestaetigungsKopf,
   bestaetigungsZustand,
   bestellSchritte,
+  neuigkeitenErlaubt,
 } from '@/lib/bestaetigung'
 import { zahlungsAnzeige } from '@/lib/bestellstatus'
 import { buildMapsUrl } from '@/lib/customer-links'
@@ -26,6 +27,7 @@ import {
   StatusSchritte,
 } from '@/components/bestaetigung/bestaetigung-teile'
 import { HofTeilenKarte } from '@/components/bestaetigung/hof-teilen-karte'
+import { NeuigkeitenKarte } from '@/components/bestaetigung/neuigkeiten-karte'
 import { fristVon, tagInWorten, uhrzeitInWien } from '@/lib/fristen'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 
@@ -153,6 +155,9 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
 
   // Einmal je Anfrage bestimmt — Server-Komponente, kein Hydration-Abgleich.
   const jetzt = new Date()
+  // Dieselbe Regel wie in der Action (Nr. 46, Runde 1): Die Karte steht nur,
+  // wo die Anmeldung auch angenommen wird — aus der Datenbank, mit der Frist.
+  const neuigkeiten = neuigkeitenErlaubt(order, jetzt)
   const kopf = bestaetigungsKopf(zustand, {
     status: order.status,
     paymentMethod: order.paymentMethod,
@@ -216,6 +221,13 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
 
         {/* Nur Name und Slug: geteilt wird die öffentliche Hofseite, nie diese signierte Adresse. */}
         {bloecke.teilen && <HofTeilenKarte hofName={order.farm.name} hofSlug={order.farm.slug} />}
+
+        {/* Register N2 (Nr. 46): die Neuigkeiten-Anmeldung, vorher ein Haken in der Kasse.
+            Kennung und Signatur stehen ohnehin in der Adresse dieser Seite; welche
+            Adresse angemeldet wird, nimmt der Server aus der Bestellung. */}
+        {neuigkeiten && (
+          <NeuigkeitenKarte orderId={order.id} sig={sig} hofName={order.farm.name} email={order.customerEmail} />
+        )}
 
         <Aktionen>
           {bloecke.aktion === 'bestellung' && (

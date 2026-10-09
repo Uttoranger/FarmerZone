@@ -22,7 +22,7 @@ import {
 import { mwstStandard } from '@/lib/mwst'
 import { nachkommastellen, parseDezimal } from '@/lib/format'
 import { PRODUKTNAME_MAX, ZU_LANG } from '@/lib/eingabegrenzen'
-import { FUTTER_BESTAETIGUNG_FEHLT } from '@/lib/futter-registrierung'
+import { FUTTER_BESTAETIGUNG_FEHLT, KENNZEICHNUNG_VERWEIS } from '@/lib/futter-registrierung'
 
 // Kategorien, Unterkategorien und Siegel leben seit Sprint Taxonomie 1 in
 // src/lib/taxonomie.ts — der EINEN Quelle. Die drei Namen bleiben hier
@@ -205,8 +205,9 @@ export const FUTTER_FEHLER = {
   // Wortlaut aus src/lib/futter-registrierung.ts — der einen Quelle der Futter-Texte (E10a).
   bestaetigt: FUTTER_BESTAETIGUNG_FEHLT,
   unterkategorie: 'Bitte wähle die Sorte — zum Beispiel Wiesenheu oder Stroh.',
-  fehlt: 'Bei Futtermitteln brauchen wir die Kennzeichnung vom Sackanhänger.',
-  verboten: 'Eine Futter-Kennzeichnung gibt es nur bei Futtermitteln.',
+  // Verweis auf den Abschnitt beim einen Namen — Heu aus eigener Ernte hat keinen Sackanhänger (Nr. 45, Runde 1).
+  fehlt: `Bei Futtermitteln brauchen wir die Angaben ${KENNZEICHNUNG_VERWEIS}.`,
+  verboten: `Angaben ${KENNZEICHNUNG_VERWEIS} gibt es nur bei Futtermitteln.`,
   altlast:
     'Diese Kategorie gibt es nicht mehr — bitte Heu & Stroh, Getreide & Körner, Mischfutter oder Ergänzungsfutter wählen.',
   nettoMenge: 'Bitte trag ein, wie viel ein Gebinde enthält — steht auf dem Sackanhänger.',
@@ -425,7 +426,7 @@ export const kategorieSetzenSchema = z
   .strict()
   .refine((d) => !istAltlastKategorie(d.category) && !istFuttermittel(d.category), {
     path: ['category'],
-    message: 'Futtermittel brauchen eine Kennzeichnung — bitte im Produkt selbst wählen.',
+    message: `Futtermittel brauchen die Angaben ${KENNZEICHNUNG_VERWEIS} — bitte im Produkt selbst wählen.`,
   })
   .refine((d) => d.subcategory === null || (!istAltlastUnterkategorie(d.subcategory) && gehoertZu(d.category, d.subcategory)), {
     path: ['subcategory'],

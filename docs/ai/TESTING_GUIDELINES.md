@@ -100,6 +100,13 @@ pnpm test:integration                        # Integration (braucht .env.test)
   schützt.
 - **Nicht in `pnpm test`, nicht im Stop-Hook.** Eigener CI-Job `integration` mit
   einem `postgres:17`-Dienst.
+- **Was an der Verbindung passiert, misst man an pg selbst** (seit Nr. 47):
+  Gleichzeitige Abfragen auf einer Verbindung zählt eine Hülle um
+  `pg.Client.prototype.query` (nur zählen, nie ändern; Vorbild
+  `tests/integration/kasse-lesepfad.int.test.ts`); einen Verbindungsabbruch des
+  Poolers stellt eine Hülle um `pg.Pool.prototype.query` her (Vorbild
+  `tests/integration/oeffentlich-lesen.int.test.ts`). Prisma und Adapter
+  bleiben echt; beide Hüllen kommen im `afterAll` wieder weg.
 
 ### Folge der Node-Umgebung
 - **Kein DOM, keine Interaktion.** Keine Testing-Library, kein Klicken, kein Snapshot von JSX.
@@ -155,6 +162,10 @@ Alles, was Netz, DB oder Request-Kontext braucht.
 - „Mail ging raus": `await vi.waitFor(() => expect(sendX).toHaveBeenCalledWith(…))`.
 - „Keine Mail": vorher `await vi.dynamicImportSettled()` — sonst ist „nicht aufgerufen" nur zu früh geprüft und immer wahr.
 
+**`@/lib/stripe` ist ein Stellvertreter (seit Nr. 42):** Der Client entsteht erst beim ersten Gebrauch (Modus-Wache, Register Z2). Wer Stripe-Wege prüft, mockt weiter `@/lib/stripe` mit `{ stripe: { … } }` — daran ändert sich nichts. Wer die Wache selbst prüft, mockt das Paket `stripe` (eine Attrappe, die ihre Konstruktor-Aufrufe zählt) und lädt `@/lib/stripe` je Fall frisch: `vi.resetModules()` plus `vi.doMock('@/lib/umgebung-server' …)`/`vi.doMock('@/lib/env' …)` mit den Werten des Falls, denn Client und „schon gemeldet“ leben auf Modulebene (Vorbild `tests/stripe-client-wache.test.ts`). Die Umgebung dafür entsteht aus `bestimmeUmgebung(werte)` — so wie im Betrieb, mit `vercelProduktion` —, nicht als handgebautes `{ art, stripe }`. Eine gesperrte Wache an einem gemockten Client spielt ein Getter auf der Eigenschaft nach, der einen Fehler mit dem Namen `MODUS_SPERRE` wirft (Vorbild `tests/webhook.test.ts`). Stripe-Fehler in Tests baut das SDK selbst, ohne Netz: `new Stripe.errors.StripeInvalidRequestError({ code: 'resource_missing', … })`.
+
+**Post-Sperre in Tests (seit Nr. 43):** Unter Vitest fehlt `VERCEL_ENV` — die Sperre aus Register Z3 gilt also (fail-closed): Das echte `sendRaw` verschickt nur an `@example.com` und `TEST_EMPFAENGER`. Ein Test, der den Inhalt einer Produktions-Mail an andere Adressen prüft (example.org, `SUPPORT_EMAIL`), lädt `@/lib/email` mit `vi.stubEnv('VERCEL_ENV', 'production')` vor dem Import (Vorbild `tests/mail-vorlagen.test.ts`). Wer die Sperre selbst prüft, lädt `@/lib/email` je Variante frisch (`VERCEL_ENV=preview`, `production` oder leer), eine Instanz je Variante in `beforeAll` — Umgebung, Liste, Zähler und „schon gemeldet“ leben auf Modulebene (Vorbild `tests/email-testumgebung.test.ts`). Die Regel selbst prüft `tests/testumgebung.test.ts` ohne Mock.
+
 ### Niemals gemockt werden — die zu prüfende Aussage
 - **Nie** das Modul mocken, das gerade getestet wird.
 - **Nie** eine Fachregel aus `src/lib/` mocken, wenn ihr Ergebnis die Aussage des Tests ist.
@@ -197,6 +208,9 @@ in einen ungültigen Schlüssel statt in echtes Geld.
 - Keine gemeinsame veränderliche Variable zwischen Tests. `beforeEach` zum Zurücksetzen (`vi.clearAllMocks()`).
 - Reihenfolge-Unabhängigkeit: Jeder Test muss allein laufen.
 - **Schwere Module echt importieren** (z. B. `@/lib/email` mit React und allen Vorlagen): einmal je Datei in `beforeAll` mit eigenem Timeout (`30_000`), nie in jedem Test. Ein kalter Import im Test zählt gegen das 5-s-Limit und reißt es, sobald parallel gearbeitet wird. `vi.resetModules()` nur, wo ein Modul Umgebungswerte auf Modulebene liest oder dort veränderlichen Zustand hält (etwa einen gemerkten Abruf) — dann ebenfalls in `beforeAll`, eine Instanz je Variante (Vorbild: `tests/email-sendraw.test.ts`, `tests/upload-ursache.test.ts`). Das Testlimit nie global anheben.
+- **Statische Wachen, die ganz `src/` lesen und parsen** (TypeScript-Parser über jede Datei): eigenes Limit `30_000` nur an genau diesem `it`, mit einem Satz, warum. Eine Wache, die nur wenige Dateien liest, bleibt beim Standard.
+- **Laufzeit-Tests gegen quadratische Muster** (Regex, Schleifen über Fremdtext) messen mit `performance.now()` gegen eine großzügige Grenze (Vorbild `tests/sentry-hygiene-felder.test.ts`: 500 ms für Millisekunden-Arbeit). Das ist die eine erlaubte Abhängigkeit von der Uhr: Gemessen wird die Dauer, nie ein Datum.
+- **Modul-Zustand, den Tests gegeneinander verschieben würden** (gemerkte Meldungen, Bremsen): Die Funktion nimmt den Zustand als optionalen letzten Parameter, die Aufrufer lassen ihn weg; jeder Test gibt einen frischen mit (Vorbild `neueBremsMeldungen` in `tests/bremse-datenbank.test.ts`), die Zeit als Parameter. Die Verdrahtung mit dem Zustand des Moduls prüft EIN frisch geladenes Modul (`vi.resetModules()` in `beforeAll`, die Attrappen danach ebenfalls neu importieren).
 
 ### Immer mitprüfen
 - Grenzfälle: 0, leer, `null`, exakt an der Frist, ein Millisekunde davor und danach.

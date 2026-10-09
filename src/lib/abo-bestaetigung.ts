@@ -55,14 +55,15 @@ export function wartetAufBestaetigung(abo: EmailAboStand, jetzt: Date): boolean 
 }
 
 /**
- * Was eine E-Mail-Anmeldung (Checkout-Haken, Schalter auf /account) auslöst:
+ * Was eine E-Mail-Anmeldung (Bestätigungsseite einer Bestellung, Schalter auf
+ * /account) auslöst:
  *  - `schon-aktiv`: Bestand oder bestätigt — nichts tun, keine Mail.
  *  - `gebremst`: Für eine noch offene Anfrage ging vor weniger als der Pause
  *    schon ein Link raus. Ein bestätigtes, dann abgemeldetes Abo ist nie
  *    gebremst — es bekommt eine neue Anfrage, sonst säße die Kundin fest.
  *  - `bestaetigung-schicken`: Neuer Link. Auch nach einer Abmeldung: Wer
  *    sich abgemeldet hat, bestätigt neu — sonst meldete jeder, der die
- *    Adresse kennt, sie im Checkout wieder an.
+ *    Adresse kennt, sie wieder an.
  * Die Antwort an den Browser ist in allen drei Fällen dieselbe (keine
  * Auskunft darüber, ob eine Adresse schon abonniert ist).
  */
@@ -101,6 +102,45 @@ export const ABO_TEXT = {
   abgelaufenTitel: 'Der Link ist abgelaufen',
   fehlerTitel: 'Das hat nicht geklappt',
 } as const
+
+/**
+ * Die Anmeldung auf der Bestätigungsseite einer Bestellung (Register N2,
+ * Nr. 46) — vorher der Haken „Neuigkeiten vom Hof" in der Kasse. Die Adresse
+ * kommt aus der Bestellung, nie aus dem Browser (meldeNeuigkeitenAn). Der Satz
+ * danach ist für jede Adresse derselbe: Er verrät nicht, ob sie schon
+ * angemeldet war (S11, keine Auskunft).
+ */
+export const NEUIGKEITEN_TEXT = {
+  titel: 'Neuigkeiten vom Hof per E-Mail',
+  // [davor, danach] — die Seite setzt den Hofnamen fett dazwischen.
+  satz: ['Möchtest du erfahren, wenn es bei', 'frische Produkte oder Aktionen gibt? Freiwillig – abmelden kannst du dich jederzeit.'],
+  knopf: 'Ja, Neuigkeiten per E-Mail',
+  laeuft: 'Einen Moment …',
+  // [davor, danach] — die Adresse aus der Bestellung dazwischen.
+  bestaetigen: ['Wir schicken dir zuerst eine E-Mail an', 'zum Bestätigen. Ohne Bestätigung bekommst du nichts.'],
+  danke: 'Danke! Falls du noch nicht angemeldet bist, kommt gleich eine E-Mail zum Bestätigen.',
+  datenschutz: 'Abmelden kannst du dich jederzeit über den Link in jeder Nachricht. Mehr dazu in unserer',
+  datenschutzLink: 'Datenschutzerklärung',
+  linkUngueltig: 'Das hat nicht geklappt. Öffne diese Seite bitte über den Link in deiner Bestätigungsmail.',
+  zuViele: 'Gerade kommen sehr viele Anfragen. Versuch es in einer Minute noch einmal.',
+  fehler: 'Das hat gerade nicht geklappt. Deine Bestellung ist davon nicht betroffen – versuch es einfach noch einmal.',
+} as const
+
+/**
+ * Bremse der Anmeldung auf der Bestätigungsseite je IP und Minute (nur in
+ * Produktion, wie jede öffentliche Action). Die zweite Bremse ist die des
+ * Abos selbst: höchstens ein Link je zehn Minuten (ABO_BESTAETIGUNG_PAUSE_MS).
+ */
+export const NEUIGKEITEN_PRO_MINUTE = 10
+
+/**
+ * Die dritte Bremse (Nachbesserung Runde 1): höchstens so viele Anfragen je
+ * Bestellung und Tag, über alle Instanzen (Datenbank-Bremse aus Nr. 40,
+ * `DB_BREMSEN.neuigkeitenBestellung`). Wer eine Bestellung mit fremder Adresse
+ * anlegt, hält deren signierten Link — ohne diese Grenze ginge an die Adresse
+ * alle zehn Minuten eine Bestätigungsmail, solange die Bestellung läuft.
+ */
+export const NEUIGKEITEN_JE_BESTELLUNG_UND_TAG = 3
 
 /** Der Satz für einen Link, der nicht (mehr) bestätigen kann — Seite und Knopf. */
 export function aboFehlerSatz(grund: 'ungueltig' | 'abgelaufen' | 'ueberholt' | 'abo_weg'): string {

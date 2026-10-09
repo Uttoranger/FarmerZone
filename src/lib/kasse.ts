@@ -8,11 +8,12 @@
  * für die Servicegebühr, dieselben Abholfenster, dieselbe Frist.
  */
 import { abholSchluessel, angeboteneAbholfenster, type AbholSlot } from '@/lib/abholfenster'
-import { formatEuro, formatZahl } from '@/lib/format'
+import { formatEuro, formatTagKurz, formatZahl } from '@/lib/format'
 import { uhrzeitInWien } from '@/lib/fristen'
-import { abholtagName } from '@/lib/heute'
+import { tagVersetzt } from '@/lib/kalender'
 import { korbBetraege, zahlungsarten } from '@/lib/hofseite-kunde'
 import { BAR_OHNE_GEBUEHR_HINWEIS } from '@/lib/konditionen'
+import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
 import { calcTotalAmount, decimalZuCents } from '@/lib/order-totals'
 import { RESERVIERUNG_TTL_MS } from '@/lib/reservierung'
 import {
@@ -51,7 +52,13 @@ export const CODE_ZAHLART_NICHT_ANGEBOTEN = 'ZAHLART_NICHT_ANGEBOTEN'
 export const ZAHLART_NICHT_ANGEBOTEN =
   'Karte bei Abholung gibt es nicht mehr. Bitte wähl „Online bezahlen" oder „Bar bei Abholung".'
 
-export type KassenZahlart = { wert: NeueZahlart; titel: string; zusatz: string }
+export type KassenZahlart = {
+  wert: NeueZahlart
+  titel: string
+  zusatz: string
+  /** Ein Satz, der an der Zahlart steht und gehört werden muss — heute nur der Testbetrieb (Z2). */
+  hinweis?: string
+}
 
 /**
  * Die Zahlarten, die die Kasse anbietet — aus derselben Regel wie die rechte
@@ -64,6 +71,11 @@ export type KassenZahlart = { wert: NeueZahlart; titel: string; zusatz: string }
  * „gleicher Betrag" sagt der Zusatz nur, wenn es stimmt: Kostet bar gerade
  * keine Gebühr, online aber schon (`barHinweis`, Register B1), fällt er weg —
  * den Unterschied nennt dann der Hinweis unter den Zahlarten.
+ *
+ * Register Z2 (Nr. 42): Im Testbetrieb steht an „Online bezahlen" der Satz
+ * `TESTBETRIEB_TEXT.kasse`. Meldet der Server, dass Stripe den Zahlungszugang
+ * des Hofs nicht kennt (`onlineAus`), bietet die Kasse online nicht mehr an —
+ * dieselbe Liste wie bei einem Hof ohne fertige Stripe-Anbindung.
  */
 export function kassenZahlarten(
   hof: {
@@ -71,11 +83,24 @@ export function kassenZahlarten(
     stripeAccountReady: boolean
     acceptsOnsite: boolean
   },
-  barGuenstiger = false
+  barGuenstiger = false,
+  optionen: {
+    /** Register Z2: Die Produktion läuft mit Test-Schlüssel (TESTBETRIEB, nie der Schlüssel). */
+    testbetrieb?: boolean
+    /** Register Z2: Stripe kennt den Zahlungszugang des Hofs nicht — online wie ohne Stripe-Anbindung. */
+    onlineAus?: boolean
+  } = {}
 ): KassenZahlart[] {
-  return zahlungsarten(hof).map((z) =>
+  const angebot = optionen.onlineAus ? { ...hof, stripeAccountReady: false } : hof
+  return zahlungsarten(angebot).map((z) =>
     z.art === 'online'
-      ? { wert: 'ONLINE', titel: 'Online bezahlen', zusatz: 'Karte und weitere Wege – du wählst im nächsten Schritt' }
+      ? {
+          wert: 'ONLINE',
+          titel: 'Online bezahlen',
+          zusatz: 'Karte und weitere Wege – du wählst im nächsten Schritt',
+          // Bar bleibt wählbar, die Beträge ändern sich nicht — nur der Satz kommt dazu.
+          ...(optionen.testbetrieb ? { hinweis: TESTBETRIEB_TEXT.kasse } : {}),
+        }
       : {
           wert: 'ONSITE_CASH',
           titel: 'Bar bei Abholung',
@@ -328,8 +353,13 @@ export function kassenZurueck(k: {
 export type AbholKachel = {
   /** „JJJJ-MM-TT|HH:MM|HH:MM" — der Wert, den /api/checkout prüft. */
   key: string
-  /** „Heute", „Morgen", „Mittwoch" oder „Mittwoch, 14. Oktober". */
-  tag: string
+  /**
+   * „Sa, 10. Okt" — jeder Termin mit Wochentag UND Datum (Nr. 46, Register
+   * N2): Ein Wochentag allein ließ offen, welcher Samstag gemeint ist.
+   */
+  datum: string
+  /** „Heute" bzw. „Morgen" zusätzlich zum Datum, sonst null. */
+  relativ: 'Heute' | 'Morgen' | null
   /** „15:00–18:00 Uhr". */
   zeit: string
   /** Beginn, HH:MM — zugleich Bestellschluss (src/lib/fristen.ts). */
@@ -345,17 +375,30 @@ export type AbholKachel = {
  */
 export function abholKacheln(slots: readonly AbholSlot[], jetzt: Date, ausgebucht: readonly string[]): AbholKachel[] {
   const heute = kalendertagInWien(jetzt)
+  const morgen = tagVersetzt(heute, 1)
   return angeboteneAbholfenster(slots, jetzt).map((f) => {
     const key = abholSchluessel(f)
     return {
       key,
-      tag: f.datum === heute ? 'Heute' : abholtagName(heute, f.datum),
+      datum: formatTagKurz(f.datum),
+      relativ: f.datum === heute ? 'Heute' : f.datum === morgen ? 'Morgen' : null,
       zeit: `${f.start}–${f.ende} Uhr`,
       start: f.start,
       heute: f.datum === heute,
       ausgebucht: ausgebucht.includes(key),
     }
   })
+}
+
+/**
+ * Der gewählte Termin als Satzteil — unter dem Kaufknopf und im
+ * Zahlungsschritt: „Sa, 10. Okt, 09:00–12:00 Uhr", heute bzw. morgen mit dem
+ * Wort dazu: „Do, 8. Okt (heute), 15:00–18:00 Uhr". Dieselbe Schreibweise wie
+ * die Kachel, damit die Kundin den Termin wiedererkennt.
+ */
+export function abholSatz(k: Pick<AbholKachel, 'datum' | 'relativ' | 'zeit'>): string {
+  const relativ = k.relativ ? ` (${k.relativ.toLowerCase()})` : ''
+  return `${k.datum}${relativ}, ${k.zeit}`
 }
 
 /**

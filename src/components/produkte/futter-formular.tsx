@@ -25,6 +25,9 @@ import {
 } from '@/lib/taxonomie'
 import {
   FUTTER_BESTAETIGUNG_TEXT,
+  KENNZEICHNUNG_ERKLAERUNG,
+  KENNZEICHNUNG_FUNDORT,
+  KENNZEICHNUNG_TITEL,
   gebindeSperre,
   speichernHinweis,
   type HofRegistrierung,
@@ -422,8 +425,8 @@ export function FutterFormular({
 
       <Abschnitt
         id="futter-kennzeichnung"
-        titel="Kennzeichnung"
-        satz="Alle Angaben findest du auf dem Sackanhänger oder Lieferschein deines Futters. Sie gelten für alle Größen; das Gewicht steht je Größe oben."
+        titel={KENNZEICHNUNG_TITEL}
+        satz={`${KENNZEICHNUNG_ERKLAERUNG} ${KENNZEICHNUNG_FUNDORT} Sie gelten für alle Größen; das Gewicht steht je Größe oben.`}
       >
         <div className="flex flex-col gap-2" data-feld="kennzeichnung.futtermittelart">
           <p id="futter-art" className="text-[13px] font-medium text-foreground">

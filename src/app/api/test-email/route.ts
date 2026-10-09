@@ -22,5 +22,8 @@ export async function GET(request: NextRequest) {
 
   const result = await sendRaw(to, `FarmerZone Test-E-Mail ${new Date().toISOString()}`, html)
 
-  return NextResponse.json({ ok: !result.error, to, error: result.error ?? null })
+  // Gesperrt (Register Z3): Lokal geht Post nur an TEST_EMPFAENGER und
+  // @example.com — dann ist nichts verschickt, und die Antwort sagt das.
+  const fehler = result.error ?? (result.gesperrt ? 'Nicht verschickt: Die Adresse steht nicht in TEST_EMPFAENGER.' : null)
+  return NextResponse.json({ ok: fehler === null, to, error: fehler })
 }

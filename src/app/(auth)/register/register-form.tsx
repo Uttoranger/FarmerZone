@@ -18,6 +18,7 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
 import { HofAdresseVorschau } from '@/components/shared/hof-adresse-vorschau'
+import { SchonDabei } from '@/components/shared/schon-dabei'
 import { FELD, FELD_LABEL, FeldFehler } from '@/components/checkout/kasse-teile'
 import { StartSchritte } from '@/components/fuer-hoefe/start-schritte'
 import { PostfachHinweis } from './postfach-hinweis'
@@ -269,6 +270,8 @@ export function RegisterForm({ formToken }: { formToken: string }): React.JSX.El
                 {isSubmitting && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
                 {isSubmitting ? 'Einen Moment …' : 'Konto erstellen'}
               </button>
+              {/* Register N1: Wer schon einen Hof hat, findet hier den Weg zur Anmeldung — auch am Handy, wo der Kopf nur „Anmelden" zeigt. */}
+              <SchonDabei className="-mt-1 text-center" />
             </form>
           </>
         )}

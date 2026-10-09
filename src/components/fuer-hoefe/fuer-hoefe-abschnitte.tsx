@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Kicker } from '@/components/startseite/kicker'
 import { Illustration } from '@/components/startseite/startseite-abschnitte'
+import { SchonDabei } from '@/components/shared/schon-dabei'
 import { HeuteBild } from '@/components/fuer-hoefe/heute-bild'
 import { StartSchritte } from '@/components/fuer-hoefe/start-schritte'
 
@@ -23,6 +24,9 @@ import { StartSchritte } from '@/components/fuer-hoefe/start-schritte'
  * Server-Komponenten ohne Skript; die Fragen klappt <details> selbst auf.
  * Hofwelt, also Orange für den Handlungsknopf (DESIGN_SYSTEM, „Farbrollen").
  * Texte aus src/lib/fuer-hoefe.ts, Preise nur aus src/lib/konditionen.ts.
+ * Unter den Knöpfen im Einstieg und im Abschluss steht „Schon dabei?
+ * Anmelden" (Register N1, Nr. 41) — wer schon registriert ist, landet hier
+ * sonst nur bei „Kostenlos starten".
  */
 
 const CONTAINER = 'mx-auto max-w-[1200px] px-4 md:px-6'
@@ -62,6 +66,7 @@ export function FuerHoefeEinstieg(): React.JSX.Element {
               Konditionen ansehen
             </Link>
           </div>
+          <SchonDabei className="-mt-2" />
           <p className="max-w-[34rem] text-[13px] leading-normal text-muted-foreground">{KONDITIONEN_UEBERGANG}</p>
         </div>
         <HeuteBild />
@@ -223,6 +228,7 @@ export function FuerHoefeSchluss(): React.JSX.Element {
           <Link href="/register" className={cn(KNOPF_ORANGE, 'mt-2')}>
             Kostenlos starten
           </Link>
+          <SchonDabei className="-mt-1" />
         </div>
       </div>
     </section>

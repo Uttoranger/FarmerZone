@@ -177,10 +177,10 @@ describe('Die sieben Fälle (Mockup web-h2-neues-futter)', () => {
 })
 
 describe('Sätze im Formular', () => {
-  it('LFBIS-Hof: Ballen grün, Sackerl orange mit dem BAES-Satz (Mockup, seit Nr. 36 Meldung statt Registrierung)', () => {
+  it('LFBIS-Hof: Ballen grün, Sackerl orange mit dem BAES-Satz (Mockup, seit Nr. 36 Meldung statt Registrierung, seit Nr. 45 mit dem Portal ausgeschrieben)', () => {
     const saetze = registrierungsSaetze(LFBIS)
     expect(saetze.map((s) => s.ton)).toEqual(['gruen', 'orange'])
-    expect(saetze[1].text).toContain('dafür brauchst du eine Meldung beim BAES, keine Registrierung')
+    expect(saetze[1].text).toContain('dafür brauchst du eine Meldung beim BAES über das Unternehmensserviceportal (USP), keine Registrierung')
   })
 
   it('gemeldeter Hof: beide grün; ohne Nummer: beide orange', () => {

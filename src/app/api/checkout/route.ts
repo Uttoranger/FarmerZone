@@ -23,7 +23,6 @@ import { berechneServicegebuehr } from '@/lib/servicegebuehr'
 import { pruefeSitzungsWarenkorb } from '@/server/warenkorb'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
-import { EMAIL_ABO_STAND, meldeEmailAboAn } from '@/server/abo-anmeldung'
 import { bestellPositionsName } from '@/lib/eingabegrenzen'
 import { fristVon } from '@/lib/fristen'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
@@ -31,7 +30,13 @@ import { bestaetigungsPfad } from '@/lib/bestell-link'
 import { AbholfensterVoll, imAbholfenster, pruefeAbholfenster } from '@/server/abholfenster'
 import { ABHOLFENSTER_NICHT_VERFUEGBAR, CODE_ABHOLFENSTER_VOLL } from '@/lib/abholfenster'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
-import { CODE_ZAHLUNG_NICHT_MOEGLICH, zahlungNichtMoeglichText } from '@/lib/stripe-konto'
+import {
+  CODE_ZAHLUNG_NICHT_MOEGLICH,
+  hofKontoUnbekanntText,
+  istUnbekanntesStripeKonto,
+  zahlungNichtMoeglichText,
+} from '@/lib/stripe-konto'
+import { vermerkeUnbekanntesHofKonto } from '@/server/hofkonto-unbekannt'
 import { CODE_ZAHLART_NICHT_ANGEBOTEN, ZAHLART_NICHT_ANGEBOTEN, zahlartFuerNeueBestellung } from '@/lib/kasse'
 import {
   pruefeBetriebsnachweis,
@@ -179,15 +184,23 @@ function intentParameter(
  * eingeschränkt): Bestellung stornieren und Ware zurückbuchen, statt eine
  * Bestellung ohne Zahlungsweg stehen zu lassen. Scheitert auch der Storno,
  * räumt die Frist auf (src/server/verwaiste-bestellungen.ts).
+ *
+ * `kontoUnbekannt` (Register Z2, Nr. 42): Stripe kennt das Konto des Hofs
+ * nicht. Dann sagt der Satz nicht „versuch es später" — Online kommt bei
+ * diesem Hof erst nach dem Neu-Einrichten zurück —, und `onlineAus` lässt die
+ * Kasse sofort auf bar umstellen. Die Halte der Sitzung bleiben in beiden
+ * Fällen stehen (sie fallen erst nach einer angelegten Zahlung, Schritt 10).
  */
-async function zahlungNichtMoeglich(orderId: string, barMoeglich: boolean): Promise<NextResponse> {
+async function zahlungNichtMoeglich(orderId: string, barMoeglich: boolean, kontoUnbekannt = false): Promise<NextResponse> {
   try {
     await storniereUnbezahlteBestellung(orderId, GRUND_ZAHLUNG_NICHT_GESTARTET)
   } catch (err) {
     Sentry.captureException(err, { tags: { aufgabe: 'checkout', grund: 'storno_nach_zahlungsfehler' }, extra: { orderId } })
   }
   return NextResponse.json(
-    { code: CODE_ZAHLUNG_NICHT_MOEGLICH, error: zahlungNichtMoeglichText(barMoeglich) },
+    kontoUnbekannt
+      ? { code: CODE_ZAHLUNG_NICHT_MOEGLICH, error: hofKontoUnbekanntText(barMoeglich), onlineAus: true }
+      : { code: CODE_ZAHLUNG_NICHT_MOEGLICH, error: zahlungNichtMoeglichText(barMoeglich) },
     { status: 503 }
   )
 }
@@ -285,6 +298,12 @@ async function antwortFuerBestehendeBestellung(
       try {
         intent = await stripe.paymentIntents.create(parameter, intentOptionen(bestehend.id))
       } catch (err) {
+        // Stripe kennt das Konto des Hofs nicht (Register Z2): Das wird auch
+        // in zwei Minuten nicht anders — sofort beenden, Hof vermerken.
+        if (istUnbekanntesStripeKonto(err)) {
+          await vermerkeUnbekanntesHofKonto(bestehend.farmId, hofKonto)
+          return zahlungNichtMoeglich(bestehend.id, bestehend.farm.acceptsOnsite, true)
+        }
         // Konflikt: Die erste Anfrage legt den Intent gerade an — erwartbar.
         // Alles andere soll jemand sehen: Ein dauerhafter Fehler (etwa
         // abweichende Parameter) endete sonst nach zwei Minuten im stillen Storno.
@@ -711,40 +730,12 @@ export async function POST(request: NextRequest) {
   //     bestellen, statt an „Reservierung abgelaufen" zu scheitern.
   const gibHalteFrei = () => prisma.stockReservation.deleteMany({ where: { sessionId: data.sessionId } })
 
-  // 10b. Neuigkeiten vom Hof — nur, wenn die Kundin den Haken gesetzt hat.
-  //     E-Mail mit Double-Opt-in (Register S11, Nr. 38): Ein neues oder
-  //     abgemeldetes Abo bekommt erst einen Bestätigungslink (nach der
-  //     Antwort), `optInEmail` setzt erst der Knopf dahinter. Bestand und
-  //     bestätigte Abos bleiben unverändert. Ein gesetzter Haken wird nie
-  //     durch einen leeren überschrieben. Die Antwort an den Browser ist in
-  //     jedem Fall dieselbe — sie verrät nicht, ob die Adresse schon abonniert ist.
-  //     Scheitert das Abo, steht die Bestellung trotzdem: gemeldet, nicht zurückgerollt.
-  if (data.optInEmail || data.optInWhatsApp) {
-    try {
-      const email = data.customerEmail.toLowerCase()
-      const abo = await prisma.customerFarmSubscription.upsert({
-        where: { customerEmail_farmId: { customerEmail: email, farmId: farm.id } },
-        create: {
-          customerEmail: email,
-          farmId: farm.id,
-          optInEmail: false,
-          optInWhatsApp: data.optInWhatsApp ?? false,
-          customerPhone: data.customerPhone || null,
-        },
-        update: {
-          ...(data.optInWhatsApp ? { optInWhatsApp: true } : {}),
-          customerPhone: data.customerPhone || null,
-        },
-        select: EMAIL_ABO_STAND,
-      })
-      if (data.optInEmail) await meldeEmailAboAn(abo, new Date())
-    } catch (err) {
-      // Nur die Art des Fehlers — Prisma-Texte können die Adresse tragen.
-      const meldung = new Error('Abo im Checkout nicht gespeichert')
-      meldung.name = err instanceof Error ? err.name : 'Unbekannt'
-      Sentry.captureException(meldung, { tags: { aufgabe: 'checkout', grund: 'abo_nicht_gespeichert' }, extra: { orderId: order.id } })
-    }
-  }
+  // 10b. KEIN ABO IM CHECKOUT (Register N2, Nr. 46). Die Neuigkeiten meldet
+  //     die Kundin auf der Bestätigungsseite an (meldeNeuigkeitenAn, mit
+  //     Double-Opt-in über meldeEmailAboAn) — getrennt von der Bestellung, so
+  //     dass ein Abo nie eine Bestellung berührt. Ein alter Tab, der noch
+  //     optInEmail/optInWhatsApp schickt, bekommt seine Bestellung wie jeder
+  //     andere: Das Schema verwirft die Felder still.
 
   // 11a. ONLINE — PaymentIntent anlegen (Ladungstyp: intentParameter oben).
   //      Mit festem Stripe-Schlüssel je Bestellung und NIE ungeschützt:
@@ -753,13 +744,22 @@ export async function POST(request: NextRequest) {
   if (data.paymentMethod === 'ONLINE') {
     let paymentIntent: Stripe.PaymentIntent
     // Das ! ist sicher: Schritt 2 lehnt ONLINE ohne stripeAccountId ab.
-    const parameter = intentParameter(order, farm.stripeAccountId!)
+    const hofKonto = farm.stripeAccountId!
+    const parameter = intentParameter(order, hofKonto)
     try {
       paymentIntent = await stripe.paymentIntents.create(parameter, intentOptionen(order.id))
     } catch (err) {
       // Doppelklick: Die zweite Anfrage legt mit demselben Schlüssel gerade
       // denselben Intent an. Kein Ausfall, kein Storno — sie bekommt ihn.
       if (istStripeKonflikt(err)) return inArbeit()
+      // Stripe kennt das Konto des Hofs nicht — etwa ein Test-Konto nach der
+      // Live-Umstellung (Register Z2): Der Hof gilt ab jetzt als nicht bereit
+      // (die Kennung bleibt), Sentry erfährt es höchstens einmal je Hof und
+      // Tag, und die Kundin bekommt den Weg zur Barzahlung.
+      if (istUnbekanntesStripeKonto(err)) {
+        await vermerkeUnbekanntesHofKonto(farm.id, hofKonto)
+        return zahlungNichtMoeglich(order.id, farm.acceptsOnsite, true)
+      }
       console.error('[/api/checkout] PaymentIntent nicht angelegt', order.id)
       Sentry.captureException(err, { tags: { aufgabe: 'checkout', grund: 'zahlung_nicht_gestartet' }, extra: { orderId: order.id } })
       return zahlungNichtMoeglich(order.id, farm.acceptsOnsite)

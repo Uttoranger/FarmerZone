@@ -6,8 +6,7 @@ import { getFarmForUser } from '@/server/queries/dashboard'
 import { getStatusTemplate } from '@/server/queries/status-posts'
 import { prisma } from '@/lib/prisma'
 import { WERBEMAIL_EMPFAENGER } from '@/server/abo-anmeldung'
-import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
-import { ZurueckLink } from '@/components/hofbereich/zurueck-link'
+import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { StatusNewClient } from './status-new-client'
 
 export const metadata: Metadata = { title: 'Neuer Beitrag — FarmerZone' }
@@ -20,7 +19,9 @@ export const dynamic = 'force-dynamic'
  * wie bisher, nur in die Routengruppe (hof) gezogen und auf Tokens gestellt.
  * Das Teilen-Fenster (Mockup web-h4-teilen-fenster-mit-bild) steht seit
  * Nr. 21 auf Heute; dieser Ablauf bleibt der Weg für Beiträge mit Foto und
- * Versand an Abonnentinnen. Zurück führt in den Reiter „Beiträge" von Mein Hof.
+ * Versand an Abonnentinnen. Zurück führt in den Reiter „Beiträge" von Mein Hof
+ * (UnterseitenKopf, seit Nr. 44 am Handy fest oben; die h1 trägt der
+ * Assistent je Schritt selbst).
  */
 
 export default async function StatusNewPage({
@@ -60,7 +61,7 @@ export default async function StatusNewPage({
 
   return (
     <div className="mx-auto max-w-2xl px-4 pt-5 pb-12 md:px-8 md:pt-7">
-      <ZurueckLink href={BEITRAEGE_HREF}>Beiträge</ZurueckLink>
+      <UnterseitenKopf />
       <StatusNewClient
         products={products.map((p) => ({ id: p.id, name: p.name, price: Number(p.price) }))}
         emailCount={emailCount}

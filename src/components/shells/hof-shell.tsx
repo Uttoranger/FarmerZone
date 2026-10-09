@@ -7,6 +7,7 @@ import {
   BarChart3,
   CalendarCheck,
   ChevronDown,
+  ChevronRight,
   Compass,
   Eye,
   Home,
@@ -28,7 +29,10 @@ import { fuehreAbmeldenAus } from '@/lib/abmelden'
 import { hofInitialen } from '@/lib/hof-initialen'
 import { vorschauLink } from '@/lib/hofseite-vorschau'
 import {
+  EINSTELLUNG_KONTO,
   HOF_NEU_ANDERES_TITEL,
+  HOF_NEU_KNOPF,
+  HOF_NEU_KNOPF_NAME,
   HOF_NEU_TITEL,
   VERKAUF_UND_KUNDEN_TITEL,
   ABMELDEN_LABEL,
@@ -41,7 +45,7 @@ import {
 } from '@/lib/bauern-navigation'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
-import { BottomNav, BottomNavLink, BottomNavMitte, bottomNavEintragKlassen, mittelknopfKlassen } from '@/components/ui/bottom-nav'
+import { BottomNav, BottomNavLink, BottomNavMitte, bottomNavEintragKlassen, mittelknopfMitWortKlassen, mittelkreisKlassen } from '@/components/ui/bottom-nav'
 import { SidebarEintrag, SidebarGruppe } from '@/components/ui/sidebar-gruppe'
 import { ListGruppe, ListRow } from '@/components/ui/list-row'
 import { Zaehler } from '@/components/ui/zaehler'
@@ -182,19 +186,46 @@ function Hofkarte({
   )
 }
 
-/** Wer angemeldet ist — das Menü unten gehört der Person, nicht dem Hof. */
-function Person({ name }: { name: string }) {
+/**
+ * Wer angemeldet ist — das Menü unten gehört der Person, nicht dem Hof. Im
+ * Mehr-Blatt ist die Zeile seit Nr. 44 ein Link auf „Konto und Sicherheit"
+ * (dort Passwort, Darstellung, Hof stilllegen); in der Seitenleiste steht
+ * „Einstellungen" gleich darunter, dort bleibt sie Anzeige.
+ */
+export function PersonZeile({
+  name,
+  konto,
+  onNavigate,
+}: {
+  name: string
+  /** Mit Ziel ein Link (Mehr-Blatt), sonst Anzeige (Seitenleiste). */
+  konto?: { label: string; href: string }
+  onNavigate?: () => void
+}): React.JSX.Element {
   const anzeige = name.trim() || 'Dein Konto'
-  return (
-    <div className="flex items-center gap-2.5 px-3 pt-1 pb-2">
+  const inhalt = (
+    <>
       <Plakette name={anzeige} />
-      <span className="min-w-0">
+      <span className="min-w-0 flex-1">
         <span className="block text-[10px] font-semibold tracking-[1.2px] text-muted-foreground uppercase">Angemeldet</span>
         <span className="block truncate text-[13.5px] font-semibold text-foreground" title={anzeige}>
           {anzeige}
         </span>
       </span>
-    </div>
+    </>
+  )
+  if (!konto) return <div className="flex items-center gap-2.5 px-3 pt-1 pb-2">{inhalt}</div>
+  return (
+    <Link
+      href={konto.href}
+      onClick={onNavigate}
+      className={cn('flex min-h-11 items-center gap-2.5 rounded-xl px-3 py-1.5 transition-colors duration-[250ms] hover:bg-muted', FOKUS_RAHMEN)}
+    >
+      {inhalt}
+      {/* Wohin der Link führt — sichtbar zeigt der Pfeil nur, dass es weitergeht. */}
+      <span className="sr-only">{`, ${konto.label}`}</span>
+      <ChevronRight className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
+    </Link>
   )
 }
 
@@ -295,7 +326,7 @@ export function HofShell({ hofName, hofSlug, personName, isAdmin, zahlen, onAbme
               )}
             >
               <Plus className="size-[17px] shrink-0" strokeWidth={2.2} aria-hidden="true" />
-              <span className="flex-1">Neu</span>
+              <span className="flex-1">{HOF_NEU_KNOPF}</span>
               <ChevronDown
                 className="size-3.5 shrink-0 opacity-75 transition-transform group-data-[popup-open]:rotate-180"
                 strokeWidth={2}
@@ -350,7 +381,7 @@ export function HofShell({ hofName, hofSlug, personName, isAdmin, zahlen, onAbme
             </SidebarGruppe>
 
             <div className="mt-auto flex flex-col gap-1 border-t border-border pt-3">
-              <Person name={personName} />
+              <PersonZeile name={personName} />
               <SidebarGruppe>
                 {nav.unten.map((punkt) => (
                   <SidebarEintrag
@@ -399,12 +430,16 @@ export function HofShell({ hofName, hofSlug, personName, isAdmin, zahlen, onAbme
             return (
               <BottomNavMitte key="neu">
                 <Sheet open={offen === 'neu'} onOpenChange={wechsle('neu')}>
-                  <SheetTrigger aria-label="Neu erstellen" className={mittelknopfKlassen('orange')}>
-                    <Plus
-                      className={cn('size-6 motion-safe:transition-transform motion-safe:duration-200', offen === 'neu' && 'rotate-45')}
-                      strokeWidth={2.2}
-                      aria-hidden="true"
-                    />
+                  {/* Wort unter dem Plus (freigabe.md §12 Nr. 45): Kreis und Wort sind EIN Knopf. */}
+                  <SheetTrigger aria-label={HOF_NEU_KNOPF_NAME} className={mittelknopfMitWortKlassen()}>
+                    <span className={mittelkreisKlassen('orange')}>
+                      <Plus
+                        className={cn('size-6 motion-safe:transition-transform motion-safe:duration-200', offen === 'neu' && 'rotate-45')}
+                        strokeWidth={2.2}
+                        aria-hidden="true"
+                      />
+                    </span>
+                    <span>{HOF_NEU_KNOPF}</span>
                   </SheetTrigger>
                   <SheetBlatt className={ueberDerLeiste}>
                     <SheetTitle className="font-heading text-xl font-semibold">{HOF_NEU_TITEL}</SheetTitle>
@@ -475,7 +510,7 @@ export function HofShell({ hofName, hofSlug, personName, isAdmin, zahlen, onAbme
                     />
                   ))}
                 </ListGruppe>
-                <Person name={personName} />
+                <PersonZeile name={personName} konto={EINSTELLUNG_KONTO} onNavigate={schliessen} />
                 <ListGruppe beschriftung="Konto und Hilfe">
                   {untenImMehr.map((punkt) => (
                     <ListRow

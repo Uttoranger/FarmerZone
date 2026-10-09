@@ -1,5 +1,6 @@
 import 'server-only'
 import * as React from 'react'
+import * as Sentry from '@sentry/nextjs'
 import type { Resend } from 'resend'
 import { SUPPORT_EMAIL } from '@/lib/support'
 import { generateReorderToken } from '@/lib/reorder-token'
@@ -11,13 +12,43 @@ import { alsCents, calcLineTotal, decimalZuCents } from '@/lib/order-totals'
 import { fristVon, zeitpunktFuerMail } from '@/lib/fristen'
 import { buildMapsUrl } from '@/lib/customer-links'
 import type { MailZahlart } from '@/emails/order-confirmation'
-import { APP_URL } from '@/lib/umgebung-server'
+import { APP_URL, UMGEBUNG } from '@/lib/umgebung-server'
 import { ANMELDECODE_GUELTIG_SEKUNDEN } from '@/lib/anmeldecode'
 import { BESTAETIGUNG_GUELTIG_SEKUNDEN } from '@/lib/email-bestaetigung'
 import { ABO_BESTAETIGUNG_GUELTIG_TAGE } from '@/lib/abo-bestaetigung'
+import { env } from '@/lib/env'
+import { darfMailEmpfangen, leseTestEmpfaenger, sperrtTrotzProduktion } from '@/lib/testumgebung'
+import { abmeldeSeitenPfad, listUnsubscribeKoepfe } from '@/lib/abmelde-link'
 
 const apiKey = process.env.RESEND_API_KEY
 const FROM = process.env.EMAIL_FROM ?? 'onboarding@resend.dev'
+
+// Post-Sperre (Register Z3, Nr. 43): frei nur im Produktions-Deployment bei
+// Vercel. Die Liste einmal je Instanz, der Zähler auch — gezählt wird nur, nie
+// eine Adresse notiert.
+const TEST_EMPFAENGER = leseTestEmpfaenger(env.TEST_EMPFAENGER)
+let nichtVerschickt = 0
+let sperreTrotzProduktionGemeldet = false
+
+/**
+ * Sicherheitsnetz (Nr. 43, Runde 1): Hält sich die App für die Produktion, fehlt
+ * aber VERCEL_ENV=production, sperrt die Post fail-closed. Ist das die echte
+ * Produktion (Vercel gibt die Systemvariablen nicht frei), verstummte sie sonst
+ * still — deshalb einmal je Instanz nach Sentry, fester Satz, ohne Adresse und
+ * ohne Betreff. Lokal, in der CI und in Tests ohne DSN ist der Aufruf ein No-op.
+ */
+function meldeSperreTrotzProduktion(): void {
+  if (sperreTrotzProduktionGemeldet || !sperrtTrotzProduktion(UMGEBUNG)) return
+  sperreTrotzProduktionGemeldet = true
+  try {
+    Sentry.captureMessage(
+      'Mail nicht verschickt: Die App läuft als Produktion, aber ohne VERCEL_ENV=production — die Post-Sperre (Register Z3) gilt. Systemvariablen bei Vercel freigeben.',
+      { level: 'error', tags: { bereich: 'post-sperre' } }
+    )
+  } catch {
+    // Telemetrie scheitert leise — die Sperre selbst gilt weiter.
+  }
+}
 
 /*
  * Schwere Module erst beim Versand (Nachtlauf Nr. 31, ARCHITECTURE §4): Das
@@ -68,16 +99,47 @@ async function htmlOderFehler(
   }
 }
 
-export async function sendRaw(to: string, subject: string, html: string): Promise<{ id?: string; error?: string }> {
+/**
+ * Ergebnis eines Versands: `id` = verschickt, `error` = gescheitert,
+ * `gesperrt` = außerhalb des Produktions-Deployments bei Vercel bewusst nicht
+ * verschickt (Empfänger nicht freigegeben, Register Z3). Gesperrt ist kein
+ * Fehler — die Aufrufer melden ihn deshalb nicht an Sentry; nur sendRaw selbst
+ * meldet die Sperre trotz Produktion, einmal je Instanz.
+ */
+export type VersandErgebnis = { id?: string; error?: string; gesperrt?: true }
+
+/**
+ * Zusätzliche Kopfzeilen einer Mail — heute nur die Abmelde-Kopfzeilen
+ * werblicher Mails (List-Unsubscribe, RFC 8058, Nr. 47).
+ */
+type MailOptionen = { headers?: Record<string, string> }
+
+export async function sendRaw(
+  to: string,
+  subject: string,
+  html: string,
+  optionen: MailOptionen = {}
+): Promise<VersandErgebnis> {
   if (!apiKey) {
     console.log(`[E-Mail] KEIN API-KEY — würde senden: "${subject}" → ${logEmpfaenger(to)}`)
     return { error: 'RESEND_API_KEY nicht gesetzt' }
+  }
+  // Nach dem Log-Modus, damit lokal ohne Schlüssel alles bleibt, wie es war.
+  // Hier stehen weder Adresse noch Betreff im Log: Beide können eine Person
+  // nennen, und die Testumgebung schreibt in die Vercel-Logs.
+  if (!darfMailEmpfangen(to, UMGEBUNG, TEST_EMPFAENGER)) {
+    nichtVerschickt += 1
+    console.log(
+      `[E-Mail] Nicht verschickt: Empfänger steht nicht in TEST_EMPFAENGER (außerhalb des Produktions-Deployments). Bisher ${nichtVerschickt} in dieser Instanz.`
+    )
+    meldeSperreTrotzProduktion()
+    return { gesperrt: true }
   }
   console.log(`[E-Mail] Sende: "${subject}" → ${logEmpfaenger(to)} (from: ${FROM})`)
   try {
     // Im try: Scheitert schon das Laden des SDK, bleibt es beim { error } — sendRaw wirft nie.
     const resend = await resendClient(apiKey)
-    const result = await resend.emails.send({ from: FROM, to, subject, html })
+    const result = await resend.emails.send({ from: FROM, to, subject, html, ...(optionen.headers ? { headers: optionen.headers } : {}) })
     if (result.error) {
       console.error(`[E-Mail] Resend-Fehler: ${JSON.stringify(result.error)}`)
       return { error: JSON.stringify(result.error) }
@@ -91,8 +153,8 @@ export async function sendRaw(to: string, subject: string, html: string): Promis
   }
 }
 
-async function send(to: string, subject: string, html: string): Promise<void> {
-  await sendRaw(to, subject, html)
+async function send(to: string, subject: string, html: string, optionen?: MailOptionen): Promise<void> {
+  await sendRaw(to, subject, html, optionen)
 }
 
 function formatPickupDate(date: Date): string {
@@ -222,7 +284,7 @@ export async function sendMagicLinkEmail(email: string, url: string, firstName?:
  * zeigt ihn jedem, der danebensteht. Gibt das Versandergebnis zurück — ohne
  * ID (kein Schlüssel, Resend-Fehler) schreibt auth.ts den Code lokal ins Log.
  */
-export async function sendAnmeldeCodeEmail(email: string, code: string): Promise<{ id?: string; error?: string }> {
+export async function sendAnmeldeCodeEmail(email: string, code: string): Promise<VersandErgebnis> {
   const minuten = ANMELDECODE_GUELTIG_SEKUNDEN / 60
   const vorlage = await htmlOderFehler(async () => {
     const { AnmeldecodeEmail } = await import('@/emails/anmeldecode')
@@ -237,7 +299,7 @@ export async function sendAnmeldeCodeEmail(email: string, code: string): Promise
  * Dieselbe Vorlage wie der Anmeldecode, eigener Text; Betreff und Vorschau
  * ohne Code (Begründung wie oben). Gibt das Versandergebnis zurück.
  */
-export async function sendBestellCodeEmail(email: string, code: string): Promise<{ id?: string; error?: string }> {
+export async function sendBestellCodeEmail(email: string, code: string): Promise<VersandErgebnis> {
   const minuten = ANMELDECODE_GUELTIG_SEKUNDEN / 60
   const vorlage = await htmlOderFehler(async () => {
     const { AnmeldecodeEmail } = await import('@/emails/anmeldecode')
@@ -252,7 +314,7 @@ export async function sendBestellCodeEmail(email: string, code: string): Promise
  * volle Adresse von /verify mit dem signierten Token. Der Betreff trägt
  * keinen Link; gibt das Versandergebnis zurück (sendRaw wirft nie).
  */
-export async function sendEmailBestaetigung(email: string, url: string): Promise<{ id?: string; error?: string }> {
+export async function sendEmailBestaetigung(email: string, url: string): Promise<VersandErgebnis> {
   const vorlage = await htmlOderFehler(async () => {
     const { EmailBestaetigungEmail } = await import('@/emails/email-bestaetigung')
     return React.createElement(EmailBestaetigungEmail, { url, stunden: BESTAETIGUNG_GUELTIG_SEKUNDEN / 3600 })
@@ -269,7 +331,7 @@ export async function sendEmailBestaetigung(email: string, url: string): Promise
 export async function sendAboBestaetigung(
   email: string,
   daten: { hofName: string; url: string }
-): Promise<{ id?: string; error?: string }> {
+): Promise<VersandErgebnis> {
   const vorlage = await htmlOderFehler(async () => {
     const { AboBestaetigungEmail } = await import('@/emails/abo-bestaetigung')
     return React.createElement(AboBestaetigungEmail, { ...daten, tage: ABO_BESTAETIGUNG_GUELTIG_TAGE })
@@ -287,7 +349,7 @@ export async function sendAboBestaetigung(
 export async function sendRegistrierungsHinweis(
   email: string,
   ziele: { weg: 'passwort' | 'code'; anmelden: string; passwortZuruecksetzen: string | null }
-): Promise<{ id?: string; error?: string }> {
+): Promise<VersandErgebnis> {
   // Vorlage erst beim Versand laden: Seitenmodule, die email.ts einbinden,
   // sollen sie nicht mitziehen (Nachtlauf Nr. 31, „schwere Module nur bei Bedarf").
   const { RegistrierungHinweisEmail } = await import('@/emails/registrierung-hinweis')
@@ -622,7 +684,13 @@ export async function sendOrderNotReady(order: OrderForEmail): Promise<void> {
   )
 }
 
-/** Status-Update → Abonnent */
+/**
+ * Status-Update → Abonnent — die werbliche Mail (S11). Aus dem signierten
+ * Abmelde-Token entstehen beide Wege hinaus: der Link im Text (Seite mit dem
+ * Knopf) und seit Nr. 47 die Kopfzeilen List-Unsubscribe und
+ * List-Unsubscribe-Post, mit denen das Mailprogramm selbst „Abmelden"
+ * anbietet (Ein-Klick, RFC 8058). Keine Transaktionsmail trägt sie.
+ */
 export async function sendStatusUpdateEmail(opts: {
   to: string
   farmName: string
@@ -631,7 +699,8 @@ export async function sendStatusUpdateEmail(opts: {
   body: string
   anlass: string
   photoUrl?: string
-  unsubscribeUrl: string
+  /** Signierter Abmelde-Token (generateUnsubscribeToken) — ohne Ablauf. */
+  abmeldeToken: string
 }): Promise<void> {
   const { StatusUpdateEmail } = await import('@/emails/status-update')
   const html = await toHtml(
@@ -642,11 +711,11 @@ export async function sendStatusUpdateEmail(opts: {
       body: opts.body,
       anlass: opts.anlass,
       photoUrl: opts.photoUrl,
-      unsubscribeUrl: opts.unsubscribeUrl,
+      unsubscribeUrl: `${APP_URL}${abmeldeSeitenPfad(opts.abmeldeToken)}`,
       appUrl: APP_URL,
     })
   )
-  await send(opts.to, `${opts.farmName}: ${opts.title}`, html)
+  await send(opts.to, `${opts.farmName}: ${opts.title}`, html, { headers: listUnsubscribeKoepfe(APP_URL, opts.abmeldeToken) })
 }
 
 /** Storno → Kunde */

@@ -98,6 +98,8 @@ export function WiederDaMoment({
       <section
         aria-labelledby={titelId}
         aria-live="polite"
+        // Schwebt unten rechts: Der Cookie-Hinweis steht darüber, nie darauf (src/lib/cookie-hinweis.ts).
+        data-unten-fest=""
         className="fixed right-9 bottom-[30px] z-50 flex w-[400px] flex-col gap-2.5 rounded-2xl border border-primary/55 bg-card p-4 shadow-2xl shadow-primary-foreground/40"
       >
         <div className="flex items-center gap-2.5">

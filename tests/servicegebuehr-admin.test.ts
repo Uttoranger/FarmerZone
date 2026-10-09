@@ -23,7 +23,18 @@ vi.mock('@/lib/prisma', () => ({
 }))
 
 import { setServiceFeeAction } from '@/server/actions/admin'
-import { EINSTELLUNG_UNGUELTIG, GILT_AB_UNGUELTIG, PROZENT_UNGUELTIG } from '@/schemas/servicegebuehr'
+import {
+  EINSTELLUNG_UNGUELTIG,
+  GILT_AB_UNGUELTIG,
+  MINDESTGEBUEHR_GANZE_CENT,
+  MINDESTGEBUEHR_KEINE_ZAHL,
+  MINDESTGEBUEHR_MAX_CENTS,
+  MINDESTGEBUEHR_NEGATIV,
+  MINDESTGEBUEHR_ZU_HOCH,
+  PROZENT_UNGUELTIG,
+} from '@/schemas/servicegebuehr'
+import { MINDESTGEBUEHR_UNGUELTIG } from '@/lib/admin-hoefe'
+import { centsAlsEuro, formatEuro } from '@/lib/format'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
@@ -140,17 +151,19 @@ describe('setServiceFeeAction — Validierung', () => {
     [{ ...GUELTIG, percent: true }, PROZENT_UNGUELTIG],
     [{ ...GUELTIG, percent: Number.NaN }, PROZENT_UNGUELTIG],
     [{ ...GUELTIG, percent: Number.POSITIVE_INFINITY }, PROZENT_UNGUELTIG],
-    [{ ...GUELTIG, minCents: 12.5 }, 'Mindestgebühr in ganzen Cent'],
-    [{ ...GUELTIG, minCents: -1 }, 'Mindestgebühr darf nicht negativ sein'],
+    // Nr. 47: jede Ablehnung der Mindestgebühr geduzt, mit Punkt und Ausweg.
+    [{ ...GUELTIG, minCents: 12.5 }, MINDESTGEBUEHR_GANZE_CENT],
+    [{ ...GUELTIG, minCents: -1 }, MINDESTGEBUEHR_NEGATIV],
+    [{ ...GUELTIG, minCents: MINDESTGEBUEHR_MAX_CENTS + 1 }, MINDESTGEBUEHR_ZU_HOCH],
     // Nr. 32, Runde 1: Die Mindestgebühr kommt nur als ganze Cent-Zahl. Text
     // las z.coerce vorher still als Cent („1e2" → 100 Cent, „" → 0).
-    [{ ...GUELTIG, minCents: '200' }, 'Mindestgebühr muss eine Zahl sein'],
-    [{ ...GUELTIG, minCents: '1e2' }, 'Mindestgebühr muss eine Zahl sein'],
-    [{ ...GUELTIG, minCents: '' }, 'Mindestgebühr muss eine Zahl sein'],
-    [{ ...GUELTIG, minCents: '0,50' }, 'Mindestgebühr muss eine Zahl sein'],
-    [{ ...GUELTIG, minCents: true }, 'Mindestgebühr muss eine Zahl sein'],
-    [{ ...GUELTIG, minCents: null }, 'Mindestgebühr muss eine Zahl sein'],
-    [{ ...GUELTIG, minCents: Number.NaN }, 'Mindestgebühr muss eine Zahl sein'],
+    [{ ...GUELTIG, minCents: '200' }, MINDESTGEBUEHR_KEINE_ZAHL],
+    [{ ...GUELTIG, minCents: '1e2' }, MINDESTGEBUEHR_KEINE_ZAHL],
+    [{ ...GUELTIG, minCents: '' }, MINDESTGEBUEHR_KEINE_ZAHL],
+    [{ ...GUELTIG, minCents: '0,50' }, MINDESTGEBUEHR_KEINE_ZAHL],
+    [{ ...GUELTIG, minCents: true }, MINDESTGEBUEHR_KEINE_ZAHL],
+    [{ ...GUELTIG, minCents: null }, MINDESTGEBUEHR_KEINE_ZAHL],
+    [{ ...GUELTIG, minCents: Number.NaN }, MINDESTGEBUEHR_KEINE_ZAHL],
     [{ ...GUELTIG, activeFrom: '01.10.2026' }, GILT_AB_UNGUELTIG],
     [{ ...GUELTIG, activeFrom: '2026-13-40' }, GILT_AB_UNGUELTIG],
     // Kein Text: Vorher stand hier Zods englische Standardmeldung.
@@ -174,6 +187,25 @@ describe('setServiceFeeAction — Validierung', () => {
     expect(result.error).toBe(EINSTELLUNG_UNGUELTIG)
     expect(result.error).not.toMatch(/Invalid|expected|received/)
     expect(farmUpdate).not.toHaveBeenCalled()
+  })
+
+  it('die höchste Mindestgebühr ist noch erlaubt, der Satz darüber nennt sie im Anzeigeformat', async () => {
+    expect(await setServiceFeeAction('farm_1', { ...GUELTIG, minCents: MINDESTGEBUEHR_MAX_CENTS })).toEqual({})
+    expect(farmUpdate).toHaveBeenCalledTimes(1)
+    expect(MINDESTGEBUEHR_ZU_HOCH).toContain(formatEuro(centsAlsEuro(MINDESTGEBUEHR_MAX_CENTS)))
+    // Auch die Untergrenze im Anzeigeformat, nicht von Hand (Nachbesserung 1).
+    expect(MINDESTGEBUEHR_NEGATIV).toContain(formatEuro(0))
+  })
+
+  it('die Sätze zur Mindestgebühr sind geduzt, enden mit einem Punkt und nennen einen Ausweg', () => {
+    for (const satz of [MINDESTGEBUEHR_KEINE_ZAHL, MINDESTGEBUEHR_GANZE_CENT, MINDESTGEBUEHR_NEGATIV, MINDESTGEBUEHR_ZU_HOCH]) {
+      expect(satz).toMatch(/^[A-ZÄÖÜ].*\.$/)
+      // Ausweg: eine Handlung, die die Admin-Person jetzt tun kann.
+      expect(satz).toMatch(/\b(?:Gib|Lass)\b/)
+      expect(satz).not.toMatch(/Invalid|expected|received|muss eine Zahl sein|zu hoch$/)
+    }
+    // Eine Quelle: Der Dialog sagt bei unlesbarem Text denselben Satz wie der Server.
+    expect(MINDESTGEBUEHR_UNGUELTIG).toBe(MINDESTGEBUEHR_KEINE_ZAHL)
   })
 
   it('die Sätze für Prozent, Datum und Eingabe sind deutsch, geduzt und enden mit einem Punkt', () => {

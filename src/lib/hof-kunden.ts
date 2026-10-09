@@ -193,6 +193,51 @@ export const KUNDEN_FILTER_LABEL: Record<KundenFilter, string> = {
   neu: 'Neu',
 }
 
+/**
+ * Höchstens zwei Filter stehen als Chips da (freigabe.md §12 Nr. 45): „Alle"
+ * und „Stammkunden". Alle fünf erreicht das Blatt hinter „Sortieren" im
+ * Abschnitt „Zeigen" (ZEIGEN_TEXT, Runde 1); ist dort ein anderer gewählt,
+ * steht er an der Stelle von „Stammkunden", damit man sieht, was gerade gilt.
+ */
+export const KUNDEN_FILTER_SICHTBAR: readonly KundenFilter[] = ['alle', 'stammkunden']
+
+export function sichtbareKundenFilter(aktiv: KundenFilter): KundenFilter[] {
+  return KUNDEN_FILTER_SICHTBAR.includes(aktiv) ? [...KUNDEN_FILTER_SICHTBAR] : [KUNDEN_FILTER_SICHTBAR[0], aktiv]
+}
+
+/** Der Knopf, hinter dem die Sortierung steht (freigabe.md §12 Nr. 45) — und der Titel des Blatts. */
+export const SORTIEREN_TEXT = 'Sortieren'
+
+/** Der Abschnitt im Blatt mit allen Filtern — keiner fällt weg, nur zwei stehen als Chips da (Runde 1). */
+export const ZEIGEN_TEXT = 'Zeigen'
+
+/** Was das Blatt hinter „Sortieren" wählt: wonach, in welcher Reihenfolge und wen die Liste zeigt. */
+export type KundenBlattWahl = Pick<KundenAnsicht, 'sortierung' | 'richtung' | 'filter'>
+
+/** Jedes Öffnen beginnt beim Stand der Liste — ein abgebrochener Entwurf bleibt nicht hängen. */
+export function blattStart(ansicht: Pick<KundenAnsicht, 'sortierung' | 'richtung' | 'filter'>): KundenBlattWahl {
+  return { sortierung: ansicht.sortierung, richtung: ansicht.richtung, filter: ansicht.filter }
+}
+
+/**
+ * Eine neue Sortierung beginnt in ihrer Standardrichtung (Name A bis Z, sonst
+ * das Größte zuerst); dieselbe noch einmal gewählt lässt die Richtung, wie sie ist.
+ */
+export function mitSortierung(wahl: KundenBlattWahl, sortierung: KundenSortierung): KundenBlattWahl {
+  if (sortierung === wahl.sortierung) return wahl
+  return { ...wahl, sortierung, richtung: STANDARD_RICHTUNG[sortierung] }
+}
+
+/**
+ * Was das Blatt beim Schließen in die Adresse schreibt: „Übernehmen" die ganze
+ * Wahl (Suche bleibt), „Abbrechen" — auch Escape und Danebentippen — nichts:
+ * Die Liste bleibt, wie sie war.
+ */
+export function blattAdresse(aktuell: KundenAnsicht, wahl: KundenBlattWahl, aktion: 'uebernehmen' | 'abbrechen'): string | null {
+  if (aktion === 'abbrechen') return null
+  return kundenAdresse({ ...aktuell, ...wahl })
+}
+
 /** Wonach sortiert wird — ohne Richtung; die nennt der Umschalter (`richtungText`). */
 export const KUNDEN_SORTIERUNG_LABEL: Record<KundenSortierung, string> = {
   bestellungen: 'Anzahl Bestellungen',
@@ -217,6 +262,17 @@ export function richtungText(sortierung: KundenSortierung, richtung: KundenRicht
 
 export function andereRichtung(richtung: KundenRichtung): KundenRichtung {
   return richtung === 'auf' ? 'ab' : 'auf'
+}
+
+/** Die zwei Richtungen im Blatt, die Standardrichtung der Sortierung zuerst. */
+export function richtungenFuer(sortierung: KundenSortierung): [KundenRichtung, KundenRichtung] {
+  const standard = STANDARD_RICHTUNG[sortierung]
+  return [standard, andereRichtung(standard)]
+}
+
+/** „Anzahl Bestellungen – Meiste zuerst": was gerade gilt, für den Screenreader am Knopf „Sortieren". */
+export function sortierungBeschreibung(sortierung: KundenSortierung, richtung: KundenRichtung): string {
+  return `${KUNDEN_SORTIERUNG_LABEL[sortierung]} – ${richtungText(sortierung, richtung)}`
 }
 
 type FilterKunde = Pick<KundenZusammenfassung, 'isStammkunde' | 'isDiesenMonatAktiv' | 'isLangeNichtGesehen' | 'isNeu'>

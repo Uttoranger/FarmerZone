@@ -4,11 +4,14 @@ import { useEffect, useState, type MouseEvent, type RefObject } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Menu, Share2, ShoppingCart, X } from 'lucide-react'
+import { ArrowLeft, Menu, Share2, ShoppingCart, UserRound, X } from 'lucide-react'
 import { kopfForm, rueckweg, tippAufRueckweg, type KundenSeite } from '@/lib/kunden-kopf'
 import { menuePunkte, type AngezeigterMenuePunkt } from '@/lib/kunden-menue'
+import { kopfKnopf, type KundenNavPunkt, type KundenSitzung } from '@/lib/kunden-navigation'
+import { useKundenSitzung } from '@/lib/use-kunden-sitzung'
 import { useWarenkorbKopf } from '@/lib/use-warenkorb-kopf'
 import { eigenerVorgaengerJetzt, merkeHinauf } from '@/components/shared/rueckweg-merker'
+import { ThemeUmschalterZeile } from '@/components/shared/theme-umschalter'
 import { Wortmarke } from '@/components/shared/wortmarke'
 import { Sheet, SheetClose, SheetContent, SheetTitle } from '@/components/ui/sheet'
 
@@ -30,15 +33,20 @@ export const SPRUNGZIEL_OHNE_KOPF = 'scroll-mt-14'
  * HANDY (unter md): eine klebende Leiste, 56 px, auf jeder Kundenseite von
  * Anfang an — auch auf der Hofseite, dort ÜBER dem Titelbild. Links Zurück
  * (wo es woanders hinführt als nach Hause) und das F-Icon mit „FarmerZone"
- * als Weg zur Startseite, rechts der Warenkorb und das Menü. Kundenseiten
- * haben keine Leiste unten; diese eine Leiste trägt alle Wege, die im
- * Browser die Kopfzeile trägt. Auf der Hofseite erscheint in der Mitte der
- * Hofname, sobald die Überschrift aus dem Blick ist — dann tritt das Wort
- * „FarmerZone" zurück und nur das F-Icon bleibt als Weg nach Hause.
+ * als Weg zur Startseite, rechts der Warenkorb, „Anmelden" bzw. mit
+ * Hof-Sitzung „Mein Hof" (Register N1, kopfKnopf) und das Menü. Hell/Dunkel
+ * steht im Menü-Blatt. Kundenseiten haben keine Leiste unten; diese eine
+ * Leiste trägt alle Wege, die im Browser die Kopfzeile trägt. Auf der
+ * Hofseite erscheint in der Mitte der Hofname, sobald die Überschrift aus dem
+ * Blick ist — dann tritt das Wort „FarmerZone" zurück und nur das F-Icon
+ * bleibt als Weg nach Hause.
  *
  * BROWSER (ab md): eine Kopfzeile, 64 px — FarmerZone, Höfe entdecken, Für
- * Höfe, Hofbetreiber-Login, Warenkorb. Wo sie selbst nicht zurückführt
- * (Hofseite, Bestellweg), steht darunter ein Rückweg-Link.
+ * Höfe, „Anmelden" bzw. „Mein Hof", Warenkorb. Wo sie selbst nicht
+ * zurückführt (Hofseite, Bestellweg), steht darunter ein Rückweg-Link.
+ *
+ * Die Sitzung liest der Browser (useKundenSitzung), nie der Server — auch die
+ * statischen Rechtsseiten bleiben statisch.
  *
  * Beide kleben (`sticky`) statt fest zu stehen: Das Umgebungsbanner der
  * Testumgebung liegt im Fluss darüber und läge sonst beim Laden über ihnen.
@@ -58,6 +66,9 @@ export function KundenKopf({
 }) {
   const form = kopfForm(seite)
   const korb = useWarenkorbKopf()
+  const korbInLeiste = form.warenkorb && korb !== null
+  const sitzung = useKundenSitzung()
+  const knopf = kopfKnopf(sitzung)
   const nameInLeiste = useUeberschriftWeggescrollt(hofNameUeberschrift) && hofName !== undefined
   const tinte = seite.art === 'hofseite' ? 'text-app-ink' : 'text-foreground'
 
@@ -73,19 +84,28 @@ export function KundenKopf({
 
   return (
     <>
-      {/* ── Handy ── */}
-      <div className="sticky top-0 z-40 print:hidden md:hidden">
-        <div className="relative flex h-14 items-center justify-between gap-1 border-b border-border bg-card px-2">
+      {/* ── Handy ── Als <header>: Die Leiste trägt seit Nr. 41 auch „Anmelden",
+          „Mein Hof" bzw. „Mein Konto" — alles darin steht so in einem Landmark
+          (Axe „region"). Es ist immer nur eine der beiden Kopfzeilen zu sehen. */}
+      <header className="sticky top-0 z-40 print:hidden md:hidden">
+        <div className="relative flex h-14 items-center justify-between gap-0.5 border-b border-border bg-card px-2">
           <div className={`flex items-center ${form.zurueck ? '' : 'pl-2'}`}>
             {form.zurueck && <ZurueckKnopf seite={seite} />}
             <Link
               href="/"
               aria-label="FarmerZone — zur Startseite"
-              className={`flex h-11 min-w-11 items-center justify-center gap-2 rounded-lg px-1 ${FOKUS}`}
+              className={`flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg px-0.5 ${FOKUS}`}
             >
               <FIcon />
+              {/* Kompakt (16 px, enge Abstände), damit das Wort bei 390 px auch neben
+                  Warenkorb und „Anmelden" stehen bleibt. Erst darunter tritt es
+                  zurück — gemessen: WORT_PLATZ. */}
               {!nameInLeiste && (
-                <span className="whitespace-nowrap font-heading text-lg font-bold text-brand-text">FarmerZone</span>
+                <span
+                  className={`whitespace-nowrap font-heading text-base font-bold text-brand-text ${korbInLeiste ? WORT_PLATZ.mitKorb : WORT_PLATZ.ohneKorb}`}
+                >
+                  FarmerZone
+                </span>
               )}
             </Link>
           </div>
@@ -101,11 +121,12 @@ export function KundenKopf({
             </p>
           )}
           <div className="flex items-center">
-            {form.warenkorb && korb && <WarenkorbSymbol anzahl={korb.anzahl} href={korb.href} />}
-            <MenueBlatt tinte={tinte} />
+            {korbInLeiste && korb && <WarenkorbSymbol anzahl={korb.anzahl} href={korb.href} />}
+            <KopfKnopf punkt={knopf} />
+            <MenueBlatt tinte={tinte} sitzung={sitzung} />
           </div>
         </div>
-      </div>
+      </header>
 
       {/* ── Browser ── */}
       <header className="sticky top-0 z-40 hidden h-16 border-b border-border bg-card print:hidden md:block">
@@ -123,12 +144,7 @@ export function KundenKopf({
             <Link href="/fuer-hoefe" className={`${TEXTLINK} ${FOKUS}`}>
               Für Höfe
             </Link>
-            <Link
-              href="/login"
-              className={`inline-flex h-9 items-center rounded-lg border border-border px-3.5 text-sm font-medium text-foreground transition-colors hover:bg-muted ${FOKUS}`}
-            >
-              Hofbetreiber-Login
-            </Link>
+            <KopfKnopf punkt={knopf} />
             {form.warenkorb && warenkorbPlatz}
           </div>
         </div>
@@ -155,6 +171,44 @@ export function TitelbildTeilen({ onTeilen }: { onTeilen: () => void }) {
 
 const FOKUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 const TEXTLINK = 'rounded-md text-sm font-medium text-foreground/80 transition-colors hover:text-foreground'
+
+/**
+ * Ab welcher Breite das Wort „FarmerZone" in der Handy-Leiste steht — darunter
+ * liefe die Leiste seitlich über. Gemessen mit Zurück, kompaktem Wort (99 px),
+ * „Anmelden" und Menü: 336,5 px, mit Warenkorb 380,5 px; je rund 8 px Luft für
+ * abweichende Schriftbreiten. Bei 390 px steht das Wort also immer.
+ */
+const WORT_PLATZ = { ohneKorb: 'max-[345px]:hidden', mitKorb: 'max-[388px]:hidden' } as const
+
+/**
+ * Der Knopf oben rechts aus kopfKnopf, am Handy wie im Browser: „Anmelden"
+ * (→ /login) bzw. „Mein Hof" (→ /dashboard) als Umriss-Pille wie in der
+ * KundeShell, 44 px hoch; „Mein Konto" wie dort als Konto-Symbol (44 px).
+ */
+function KopfKnopf({ punkt }: { punkt: KundenNavPunkt }) {
+  if (punkt.id === 'konto') {
+    return (
+      <Link
+        href={punkt.href}
+        aria-label={punkt.label}
+        title={punkt.label}
+        className={`inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-muted ${FOKUS}`}
+      >
+        <span className="flex size-8 items-center justify-center rounded-full bg-border text-foreground">
+          <UserRound className="size-4" strokeWidth={1.7} aria-hidden="true" />
+        </span>
+      </Link>
+    )
+  }
+  return (
+    <Link
+      href={punkt.href}
+      className={`inline-flex h-11 shrink-0 items-center whitespace-nowrap rounded-full border border-border px-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted md:px-4 ${FOKUS}`}
+    >
+      {punkt.label}
+    </Link>
+  )
+}
 
 /**
  * Liegt auf dem Foto, nicht auf der Seite: bleibt in beiden Modi eine weiße
@@ -184,14 +238,16 @@ function FIcon() {
  * Knopf schließen es; solange es offen ist, bleibt der Fokus darin und geht
  * danach zurück auf den Menü-Knopf (Base UI Dialog). Welche Seite gerade
  * offen ist, liest es erst beim Öffnen aus der Adresse — useSearchParams
- * verlangte auf den statischen Rechtsseiten eine Suspense-Grenze.
+ * verlangte auf den statischen Rechtsseiten eine Suspense-Grenze. Unten im
+ * Blatt steht Hell/Dunkel (Register N1: oben rechts gehört der Platz
+ * „Anmelden").
  */
-function MenueBlatt({ tinte }: { tinte: string }) {
+function MenueBlatt({ tinte, sitzung }: { tinte: string; sitzung: KundenSitzung }) {
   const [offen, setOffen] = useState(false)
   const [punkte, setPunkte] = useState<AngezeigterMenuePunkt[]>([])
 
   function beimWechsel(jetztOffen: boolean) {
-    if (jetztOffen) setPunkte(menuePunkte(window.location.pathname, window.location.search))
+    if (jetztOffen) setPunkte(menuePunkte(window.location.pathname, window.location.search, sitzung))
     setOffen(jetztOffen)
   }
 
@@ -232,6 +288,10 @@ function MenueBlatt({ tinte }: { tinte: string }) {
             </Link>
           ))}
         </nav>
+        {/* Als eigene Gruppe unter den Wegen, mit Trennstrich wie zwischen den Gruppen. */}
+        <div className="mx-2 border-t border-border py-2">
+          <ThemeUmschalterZeile className={`min-h-12 text-[15px] font-semibold text-foreground hover:bg-muted ${FOKUS}`} />
+        </div>
       </SheetContent>
     </Sheet>
   )

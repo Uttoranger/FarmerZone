@@ -76,4 +76,26 @@ describe('validateEnv', () => {
     expect(env.VERCEL_BRANCH_URL).toBeUndefined()
     expect(env.NEXT_PUBLIC_APP_URL).toBe('https://farmerzone.example')
   })
+
+  // Register Z3 (Nr. 43): Beide Variablen sind optional. Ihre Form prüfen
+  // umgebung.ts (nur https) und testumgebung.ts (Liste) — ein Tippfehler darf
+  // keinen Deploy der Produktion verhindern, nur den Link bzw. die Post.
+  it('Testumgebungs-Variablen sind optional — leer wird zu undefined, ein Wert bleibt erhalten', () => {
+    expect(validateEnv(complete).NEXT_PUBLIC_TESTUMGEBUNG_URL).toBeUndefined()
+    expect(validateEnv(complete).TEST_EMPFAENGER).toBeUndefined()
+    expect(validateEnv({ ...complete, TEST_EMPFAENGER: '  ' }).TEST_EMPFAENGER).toBeUndefined()
+    const env = validateEnv({
+      ...complete,
+      NEXT_PUBLIC_TESTUMGEBUNG_URL: 'https://test.farmerzone.example',
+      TEST_EMPFAENGER: 'tester@example.org, zweite@example.org',
+    })
+    expect(env.NEXT_PUBLIC_TESTUMGEBUNG_URL).toBe('https://test.farmerzone.example')
+    expect(env.TEST_EMPFAENGER).toBe('tester@example.org, zweite@example.org')
+  })
+
+  it('ein ungültiger Wert lässt den Start nicht scheitern', () => {
+    expect(() =>
+      validateEnv({ ...complete, NEXT_PUBLIC_TESTUMGEBUNG_URL: 'http://falsch', TEST_EMPFAENGER: 'kein-at ;' })
+    ).not.toThrow()
+  })
 })

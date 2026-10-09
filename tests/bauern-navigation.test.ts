@@ -14,6 +14,10 @@
  *    „Meldung abgeben" die Überschrift „Hilfe und Rückmeldung" (Nr. 22e).
  *  - „Admin" nur für den Betreiber.
  *  - Jede Seite unter src/app/(farmer) ist über die Navigation erreichbar.
+ *  - Rückweg (Nr. 44, Register N1): elternseite() kennt jede Unterseite mit
+ *    Name und Ziel aus Leiste und Mehr-Blatt; deren Seiten haben keinen.
+ *    zielNachSpeichern(): Einstellungs-Unterseiten zurück zur Übersicht,
+ *    Abholzeiten bleibt.
  */
 import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
@@ -39,6 +43,12 @@ import {
   hofNavigation,
   HOF_NEU_TITEL,
   mehrAktiv,
+  elternseite,
+  zielNachSpeichern,
+  einstellungsWeg,
+  EINSTELLUNG_KONTO,
+  EINSTELLUNG_MEIN_AUFTRITT,
+  GESPEICHERT_TEXT,
 } from '@/lib/bauern-navigation'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
@@ -426,5 +436,128 @@ describe('HofShell: aktive Punkte', () => {
 
   it('die Bestandsnavigation bleibt, wie sie ist: /analytics/umfeld gehört dort weiter zur Auswertung', () => {
     expect(aktiverPunkt('/analytics/umfeld')).toBe('auswertung')
+  })
+})
+
+// ─── Rückweg auf Unterseiten (Nachtlauf Nr. 44, Register N1) ────────────────
+
+describe('elternseite — wohin der Rückweg einer Unterseite führt', () => {
+  const nav = hofNavigation({ isAdmin: true })
+  const punkt = (id: string) => {
+    const p = [...nav.haupt, ...nav.verkaufUndKunden, ...nav.unten].find((x) => x.id === id)
+    if (!p) throw new Error(`kein Punkt ${id}`)
+    return { href: p.href, name: p.label }
+  }
+  // Sicher: Der Test „Reiter: Hofseite (Standard) · Beiträge" oben beweist, dass es den Reiter gibt.
+  const beitraege = MEIN_HOF_REITER_HOFBEREICH.find((r) => r.id === 'beitraege')!
+
+  it.each([
+    ['/settings/profile', 'einstellungen'],
+    ['/settings/pickup-slots', 'einstellungen'],
+    ['/settings/payments', 'einstellungen'],
+    ['/settings/pause', 'einstellungen'],
+    ['/settings/account', 'einstellungen'],
+    ['/settings/appearance', 'einstellungen'],
+    ['/settings/konditionen', 'einstellungen'],
+    ['/settings/teilen', 'einstellungen'],
+    ['/customers/k-1', 'kunden'],
+    ['/orders/bestellung-1', 'bestellungen'],
+    ['/fehler-melden', 'hilfe'],
+    ['/analytics/umfeld', 'auswertung'],
+    ['/status/plakat', 'heute'],
+  ])('%s → %s (Name und Ziel aus der Navigation)', (pfad, id) => {
+    expect(elternseite(pfad)).toEqual(punkt(id))
+  })
+
+  it('die Zuordnung mit den Namen, wie sie der Kopf zeigt', () => {
+    expect(elternseite('/settings/profile')).toEqual({ href: '/settings', name: 'Einstellungen' })
+    expect(elternseite('/customers/abc')).toEqual({ href: '/customers', name: 'Kunden' })
+    expect(elternseite('/orders/abc')).toEqual({ href: '/orders', name: 'Bestellungen' })
+    expect(elternseite('/fehler-melden')).toEqual({ href: '/meldungen', name: 'Hilfe und Rückmeldung' })
+    expect(elternseite('/analytics/umfeld')).toEqual({ href: '/analytics', name: 'Auswertung' })
+    expect(elternseite('/status/plakat')).toEqual({ href: '/dashboard', name: 'Heute' })
+  })
+
+  it('/status/new und WhatsApp fortsetzen → der Reiter „Beiträge" von Mein Hof (E12)', () => {
+    expect(elternseite('/status/new')).toEqual({ href: BEITRAEGE_HREF, name: 'Beiträge' })
+    expect(elternseite('/status/beitrag-1/send-whatsapp')).toEqual({ href: beitraege.href, name: beitraege.label })
+  })
+
+  it('Seiten der Leiste und des Mehr-Blatts haben keinen Rückweg', () => {
+    const ziele = [
+      ...nav.handyLeiste.flatMap((p) => (p.art === 'punkt' ? [p.punkt.href] : [])),
+      ...nav.mehr.map((p) => p.href),
+      ...nav.haupt.map((p) => p.href),
+      ...MEIN_HOF_REITER_HOFBEREICH.map((r) => r.href),
+    ]
+    // Gegenprobe: alle Ziele beider Teile sind dabei.
+    expect(ziele).toEqual(expect.arrayContaining(['/dashboard', '/orders', '/products', '/farm-page', '/customers', '/sales', '/analytics', '/region', '/settings', '/meldungen', '/admin', BEITRAEGE_HREF]))
+    for (const ziel of ziele) expect(elternseite(ziel), ziel).toBeNull()
+  })
+
+  it('Suche, Anker und Schrägstrich am Ende ändern nichts; tiefer als die Route trifft nichts', () => {
+    expect(elternseite('/orders/abc?filter=heute')).toEqual({ href: '/orders', name: 'Bestellungen' })
+    expect(elternseite('/settings/profile#betriebsnummer')).toEqual({ href: '/settings', name: 'Einstellungen' })
+    expect(elternseite('/fehler-melden/')).toEqual({ href: '/meldungen', name: 'Hilfe und Rückmeldung' })
+    // Druckansichten (ohne HofShell) und Pfade über ein Namenspräfix hinweg haben keinen.
+    expect(elternseite('/orders/today/print')).toBeNull()
+    expect(elternseite('/orders/abc/print')).toBeNull()
+    expect(elternseite('/settingsx/profile')).toBeNull()
+    expect(elternseite('/status')).toBeNull()
+    expect(elternseite('/onboarding')).toBeNull()
+    expect(elternseite(null)).toBeNull()
+    expect(elternseite('')).toBeNull()
+  })
+
+  it('jede Seite unter src/app/(hof) ist entweder ein Ziel der Navigation oder hat einen Rückweg', () => {
+    const seiten: string[] = []
+    const wurzel = join(process.cwd(), 'src/app/(hof)')
+    const suche = (ordner: string) => {
+      for (const name of readdirSync(ordner)) {
+        const p = join(ordner, name)
+        if (statSync(p).isDirectory()) suche(p)
+        else if (name === 'page.tsx') seiten.push(ordner.slice(wurzel.length).replace(/\\/g, '/').replace(/\[[^\]]+\]/g, 'x'))
+      }
+    }
+    suche(wurzel)
+    // Gegenprobe: die Suche erreicht Unterseiten in allen Tiefen.
+    expect(seiten).toEqual(expect.arrayContaining(['/settings/profile', '/customers/x', '/status/x/send-whatsapp', '/dashboard']))
+    const ziele = new Set([...nav.haupt, ...nav.verkaufUndKunden, ...nav.unten].map((p) => p.href.split('?')[0]))
+    for (const pfad of seiten) {
+      // /status leitet nur in den Reiter „Beiträge" um (E12) und zeigt nie einen Kopf.
+      if (pfad === '/status') continue
+      if (ziele.has(pfad)) expect(elternseite(pfad), pfad).toBeNull()
+      else expect(elternseite(pfad), pfad).not.toBeNull()
+    }
+  })
+})
+
+describe('zielNachSpeichern — Einstellungs-Unterseiten führen zur Übersicht zurück', () => {
+  it.each(['profile', 'appearance', 'pause', 'account', 'payments', 'teilen', 'konditionen'])('/settings/%s → /settings', (seite) => {
+    expect(zielNachSpeichern(`/settings/${seite}`)).toBe('/settings')
+  })
+
+  it('Ausnahme: Abholzeiten bleibt auf der Seite', () => {
+    expect(zielNachSpeichern('/settings/pickup-slots')).toBeNull()
+    expect(zielNachSpeichern('/settings/pickup-slots/')).toBeNull()
+  })
+
+  it('außerhalb der Einstellungs-Unterseiten bleibt jede Seite — auch derselbe Baustein im Hofseiten-Editor', () => {
+    for (const pfad of ['/settings', '/farm-page', '/orders/abc', '/status/new', '/customers/x', '/dashboard', null]) {
+      expect(zielNachSpeichern(pfad), String(pfad)).toBeNull()
+    }
+  })
+
+  it('der Toast heißt „Gespeichert"', () => {
+    expect(GESPEICHERT_TEXT).toBe('Gespeichert')
+  })
+})
+
+describe('Einstellungs-Unterseiten mit Namen außerhalb der Übersicht', () => {
+  it('Mein Auftritt und Konto und Sicherheit: Name und Ziel an einer Stelle, das Ziel ist eine echte Seite', () => {
+    expect(EINSTELLUNG_MEIN_AUFTRITT).toEqual({ label: 'Mein Auftritt', href: '/settings/appearance' })
+    expect(EINSTELLUNG_KONTO).toEqual({ label: 'Konto und Sicherheit', href: '/settings/account' })
+    for (const ziel of [EINSTELLUNG_MEIN_AUFTRITT, EINSTELLUNG_KONTO]) expect(hofSeite(ziel.href)).toContain('(hof)')
+    expect(einstellungsWeg(EINSTELLUNG_MEIN_AUFTRITT)).toBe('Einstellungen → Mein Auftritt')
   })
 })

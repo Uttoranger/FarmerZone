@@ -348,7 +348,7 @@ describe('Höfe in deiner Nähe — gefüllt, leer, laden, Fehler', () => {
 })
 
 describe('Sprungmarken für die Navigation der KundeShell', () => {
-  const web = kundenNavigation({ angemeldet: false }).web.map((p) => p.href)
+  const web = kundenNavigation({ sitzung: 'gast' }).web.map((p) => p.href)
 
   it('„So funktioniert’s" zeigt auf #so-funktionierts — und der Abschnitt trägt die Marke', () => {
     expect(web).toContain('/#so-funktionierts')

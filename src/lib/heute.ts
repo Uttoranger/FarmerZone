@@ -389,9 +389,105 @@ export function packliste(bestellungen: readonly PacklistenBestellung[]): Packli
 
 export type PacklistenZahlen = { bestellungen: number; zuPacken: number }
 
-/** „Bestellungen heute" und „Noch zu packen" — gezählt an derselben Liste, die die Seite zeigt. */
+/** „Heute abholen" und „Noch zu packen" — gezählt an derselben Liste, die die Seite zeigt. */
 export function packlistenZahlen(zeilen: readonly PacklistenZeile[]): PacklistenZahlen {
   return { bestellungen: zeilen.length, zuPacken: zeilen.filter((z) => z.chip === 'vorbereiten').length }
+}
+
+// ─── Kennzahlen (freigabe.md §12 Nr. 45) ────────────────────────────────────
+
+/**
+ * „Heute abholen": Abholtag heute, weder abgeholt noch storniert noch „nicht
+ * abgeholt" — dieselben Bestellungen wie die Packliste und das Papier
+ * (abholWhere). EIN Wort für die Kennzahl auf Heute und den Filter in
+ * Bestellungen (hof-bestellungen.ts).
+ */
+export const HEUTE_ABHOLEN = 'Heute abholen'
+
+/**
+ * Die drei Kennzahlen auf Heute (Register F4). Vorher „Bestellungen heute"
+ * und „Umsatz heute": Waren alle Bestellungen abgeholt, stand „0" neben
+ * „€ 178" — die Zahl zählt nur offene Abholungen, der Betrag dagegen die
+ * heute abgeholten Bestellungen UND die Direktverkäufe (Hofladen, Markt …,
+ * umsatzHeuteCent). Jetzt sagt jede Kennzahl, was sie zählt; der Zusatz steht
+ * unter dem Betrag.
+ */
+export const KENNZAHL_TEXT = {
+  abholen: HEUTE_ABHOLEN,
+  packen: 'Noch zu packen',
+  eingenommen: 'Heute eingenommen',
+  eingenommenMit: 'mit Hofladen',
+} as const
+
+/** Der Leerzustand der Packliste — auch der des Filters „Heute abholen" in Bestellungen. */
+export const HEUTE_NIEMAND = 'Heute holt niemand etwas ab.'
+
+/**
+ * Was der Hinweis „Online-Zahlung ist pausiert" braucht (Register F4) — oder
+ * null, wenn er nicht steht (onlineZahlungPausiert). „Nur bar bei Abholung"
+ * verspricht, dass Kunden bestellen können: Das gilt nur, solange sie den Hof
+ * sehen und bei ihm bestellen können (heuteHofSichtbar) und er bar annimmt.
+ * Ein wartender, stillgelegter oder pausierter Hof bekommt die zweite
+ * Fassung des Satzes, der Wortlaut bleibt (Nachbesserung Runde 2).
+ */
+export function onlinePausiertDaten(
+  hof: Parameters<typeof heuteHofSichtbar>[0] & Parameters<typeof onlineZahlungPausiert>[0] & { acceptsOnsite: boolean }
+): { barMoeglich: boolean } | null {
+  if (!onlineZahlungPausiert(hof)) return null
+  return { barMoeglich: heuteHofSichtbar(hof) && hof.acceptsOnsite }
+}
+
+/**
+ * Breite der Zeichen in Fraunces 600 (Einheit em), im Browser gemessen
+ * (Nr. 45, Runde 1) — Ziffern verschieden breit, weil die Schrift keine
+ * Tabellenziffern mitbringt. Unbekanntes zählt breit (EM_UNBEKANNT).
+ */
+const EM_ZEICHEN: Record<string, number> = {
+  '0': 0.675,
+  '1': 0.4685,
+  '2': 0.618,
+  '3': 0.565,
+  '4': 0.6285,
+  '5': 0.5875,
+  '6': 0.6185,
+  '7': 0.5275,
+  '8': 0.617,
+  '9': 0.6215,
+  '€': 0.7075,
+  ' ': 0.2175,
+  '\u00a0': 0.2175,
+  '\u202f': 0.1087,
+  ',': 0.2815,
+  '.': 0.27,
+}
+const EM_UNBEKANNT = 0.75
+/** Spielraum für die Ersatzschrift, solange Fraunces lädt, und fürs Runden. */
+const EM_SPIELRAUM = 1.04
+
+/**
+ * Wie breit ein Kennzahl-Wert in seiner eigenen Schriftgröße ist (em). Die
+ * Karte setzt daraus `font-size: max(12px, min(22px, 100cqw / em))`: Ein
+ * Betrag wird nie gekürzt, er wird in einer schmalen Karte kleiner (drei
+ * Spalten bei 360 px, freigabe.md §12 Nr. 45), aber nie kleiner als 12 px.
+ * Passt er dann noch immer nicht — Nur-Text-Zoom, Mindestschriftgröße,
+ * breitere Ersatzschrift, ein absurder Betrag —, bricht er um, statt über den
+ * Kartenrand zu laufen (Runde 2). Lieber etwas zu breit geschätzt als zu schmal.
+ */
+export function kennzahlBreiteEm(wert: string): number {
+  const summe = [...wert].reduce((em, zeichen) => em + (EM_ZEICHEN[zeichen] ?? EM_UNBEKANNT), 0)
+  return Math.ceil(summe * EM_SPIELRAUM * 1000) / 1000
+}
+
+/**
+ * Weiche Trennstellen (U+00AD) für Wörter, die in einer schmalen Kennzahl-Karte
+ * nicht in eine Zeile passen: „Heute einge-/nommen" statt „eingenomme/n" —
+ * bei 360 px ist „eingenommen" breiter als die Karte. Alle Silben, damit auch
+ * 320 px sauber trennen. Das Wort bleibt für Vorleser und Kopieren dasselbe.
+ */
+const TRENNSTELLEN: Record<string, string> = { eingenommen: 'ein\u00adge\u00adnom\u00admen' }
+
+export function mitTrennstellen(text: string): string {
+  return text.replace(/\p{L}+/gu, (wort) => TRENNSTELLEN[wort] ?? wort)
 }
 
 // ─── Abholfenster ───────────────────────────────────────────────────────────
@@ -484,9 +580,7 @@ export function umsatzHeuteCent(buchungen: UmsatzBuchung[], jetzt: Date): number
   return summeCent(buchungen, { von: abholtage(jetzt).heute.von, bis: jetzt })
 }
 
-// ─── Teilen-Karte ───────────────────────────────────────────────────────────
-
-export type TeilenForm = 'schmal' | 'gross' | null
+// ─── Teilen-Zeile ───────────────────────────────────────────────────────────
 
 /**
  * Sehen Kunden den Hof und können sie bei ihm bestellen? Nur im Zustand
@@ -501,17 +595,6 @@ export function heuteHofSichtbar(hof: {
   archivedAt: Date | null
 }): boolean {
   return hofZustand(hof).art === 'sichtbar'
-}
-
-/**
- * DESIGN_SYSTEM „Teilen": groß an Tagen ohne Abholung, schmale orange Zeile an
- * Abholtagen — die Packliste hat Vorrang. Nie, solange der Hof nicht sichtbar
- * ist (heuteHofSichtbar): ein Link ins Leere oder auf einen pausierten Hof
- * wäre irreführend.
- */
-export function teilenKarte({ sichtbar, abholtag }: { sichtbar: boolean; abholtag: boolean }): TeilenForm {
-  if (!sichtbar) return null
-  return abholtag ? 'schmal' : 'gross'
 }
 
 /**
@@ -536,21 +619,24 @@ export function teilenSatz(angebot: readonly string[], fenster: NaechstesFenster
 
 export type HeuteBlock =
   | 'stripe'
-  | 'teilen-schmal'
   | 'packliste'
+  | 'teilen'
   | 'braucht-dich'
-  | 'teilen-gross'
   | 'erste-schritte'
   | 'naechste-abholung'
   | 'woche'
   | 'hofseite'
 
 /**
- * Welche Blöcke wo stehen. Die Packliste beginnt immer die Hauptspalte
- * (Gate 5: „Packliste zuerst"); oben stehen nur der Stripe-Hinweis —
- * „pausiert" oder „einrichten" (Z1); bis er erledigt ist, können Kunden nicht
- * online zahlen — und die schmale
- * Teilen-Zeile. Die Seitenspalte steht am Handy unter der Hauptspalte.
+ * Welche Blöcke wo stehen (freigabe.md §12 Nr. 45). Oben höchstens EIN Kasten
+ * von Heute: der Stripe-Hinweis — „pausiert" (Notbremse) oder „einrichten"
+ * (Register Z1); bis er erledigt ist, können Kunden nicht online zahlen. Den
+ * Balken der Shell („wartet auf Freischaltung", „stillgelegt") zeigt das
+ * Layout auf jeder Seite; er zählt nicht mit (Entscheidung zur Prüfung,
+ * Runde 1). Die Hauptspalte beginnt immer mit der Packliste (Gate 5:
+ * „Packliste zuerst"), direkt darunter die kompakte Teilen-Zeile — nur bei
+ * sichtbarem Hof (heuteHofSichtbar) —, dann „Braucht dich". Die Seitenspalte
+ * steht am Handy unter der Hauptspalte.
  */
 export function heuteAufbau({
   stripeHinweis,
@@ -558,17 +644,14 @@ export function heuteAufbau({
   ersteSchritte,
 }: {
   stripeHinweis: boolean
-  teilen: TeilenForm
+  teilen: boolean
   ersteSchritte: boolean
 }): { oben: HeuteBlock[]; haupt: HeuteBlock[]; seite: HeuteBlock[] } {
-  const oben: HeuteBlock[] = []
-  if (stripeHinweis) oben.push('stripe')
-  if (teilen === 'schmal') oben.push('teilen-schmal')
-  const seite: HeuteBlock[] = []
-  if (teilen === 'gross') seite.push('teilen-gross')
-  if (ersteSchritte) seite.push('erste-schritte')
+  const oben: HeuteBlock[] = stripeHinweis ? ['stripe'] : []
+  const haupt: HeuteBlock[] = teilen ? ['packliste', 'teilen', 'braucht-dich'] : ['packliste', 'braucht-dich']
+  const seite: HeuteBlock[] = ersteSchritte ? ['erste-schritte'] : []
   seite.push('naechste-abholung', 'woche', 'hofseite')
-  return { oben, haupt: ['packliste', 'braucht-dich'], seite }
+  return { oben, haupt, seite }
 }
 
 // ─── Online-Zahlung einrichten (Register Z1) ────────────────────────────────

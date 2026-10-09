@@ -13,11 +13,12 @@
  *  - Gezählt wird mit EINEM parametrisierten INSERT … ON CONFLICT … RETURNING;
  *    über der Grenze = gebremst, alle Merkmale werden gezählt.
  *  - FAIL-OPEN: Datenbankfehler und Zeitlimit lassen durch und melden an
- *    Sentry — ohne Schlüssel, IP oder Adresse.
+ *    Sentry — ohne Schlüssel, IP oder Adresse, und seit Nr. 47 höchstens
+ *    einmal je Instanz und zehn Minuten (Zeit als Parameter, kein Systemtakt).
  *  - Anmeldecode und Checkout bremsen nur in Produktion; ohne Header zählt
  *    keine IP.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -29,11 +30,13 @@ vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi
 import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
 import {
+  BREMSE_MELDE_ABSTAND_MS,
   DB_BREMSEN,
   DB_BREMSE_ZEITLIMIT_MS,
   REGISTRIERUNG_JE_IP,
   ZU_VIELE_ANFRAGEN,
   adressMerkmal,
+  bremsMeldungFaellig,
   bremsSchluessel,
   fensterBeginn,
   fensterEnde,
@@ -47,6 +50,7 @@ import {
   anmeldecodeGebremst,
   bremseCheckout,
   bremseUeberAlleInstanzen,
+  neueBremsMeldungen,
   raeumeBremsZaehlerAuf,
   zaehleVersuche,
 } from '@/server/bremse-datenbank'
@@ -272,7 +276,8 @@ describe('bremseUeberAlleInstanzen', () => {
         { bremse: DB_BREMSEN.anmeldecodeAnfordernIp, merkmal: IP },
         { bremse: DB_BREMSEN.anmeldecodeAdresse, merkmal: ADRESSE },
       ],
-      JETZT
+      JETZT,
+      neueBremsMeldungen()
     )
     expect(erlaubt).toBe(true)
     expect(Sentry.captureException).toHaveBeenCalledTimes(1)
@@ -291,7 +296,7 @@ describe('bremseUeberAlleInstanzen', () => {
   it('FAIL-OPEN bei Zeitlimit: eine hängende Datenbank hält niemanden auf', async () => {
     vi.useFakeTimers()
     queryRaw.mockImplementation((() => new Promise(() => {})) as never)
-    const ergebnis = bremseUeberAlleInstanzen([{ bremse: DB_BREMSEN.checkoutIp, merkmal: IP }], JETZT)
+    const ergebnis = bremseUeberAlleInstanzen([{ bremse: DB_BREMSEN.checkoutIp, merkmal: IP }], JETZT, neueBremsMeldungen())
     await vi.advanceTimersByTimeAsync(DB_BREMSE_ZEITLIMIT_MS)
     expect(await ergebnis).toBe(true)
     expect(vi.mocked(Sentry.captureException).mock.calls[0]?.[1]).toMatchObject({ tags: { grund: 'zeitlimit' } })
@@ -301,6 +306,101 @@ describe('bremseUeberAlleInstanzen', () => {
     datenbankZaehlt()
     await bremseUeberAlleInstanzen([{ bremse: DB_BREMSEN.checkoutIp, merkmal: IP }], JETZT)
     expect(Sentry.captureException).not.toHaveBeenCalled()
+  })
+})
+
+describe('Sentry bei Ausfall: höchstens einmal je Instanz und zehn Minuten (Nr. 47)', () => {
+  const MINUTE = 60_000
+  const um = (minuten: number) => new Date(JETZT.getTime() + minuten * MINUTE)
+  const versuch = [{ bremse: DB_BREMSEN.checkoutIp, merkmal: IP }]
+
+  it('die Regel: die erste Meldung immer, danach erst wieder nach zehn Minuten', () => {
+    const t = JETZT.getTime()
+    expect(BREMSE_MELDE_ABSTAND_MS).toBe(10 * MINUTE)
+    expect(bremsMeldungFaellig(null, t)).toBe(true)
+    expect(bremsMeldungFaellig(t, t)).toBe(false)
+    expect(bremsMeldungFaellig(t, t + BREMSE_MELDE_ABSTAND_MS - 1)).toBe(false)
+    expect(bremsMeldungFaellig(t, t + BREMSE_MELDE_ABSTAND_MS)).toBe(true)
+    // Läuft die Uhr zurück, bleibt es ruhig, statt doppelt zu melden.
+    expect(bremsMeldungFaellig(t, t - MINUTE)).toBe(false)
+  })
+
+  it('bei Dauerausfall: eine Meldung, dann zehn Minuten Ruhe — durchgelassen wird jedes Mal', async () => {
+    queryRaw.mockRejectedValue(new Error('weg'))
+    const meldungen = neueBremsMeldungen()
+
+    for (const minute of [0, 1, 5, 9]) {
+      expect(await bremseUeberAlleInstanzen(versuch, um(minute), meldungen), `Minute ${minute}`).toBe(true)
+    }
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1)
+  })
+
+  it('nach zehn Minuten wieder eine Meldung, mit der Zahl der unterdrückten dazwischen', async () => {
+    queryRaw.mockRejectedValue(new Error('weg'))
+    const meldungen = neueBremsMeldungen()
+    for (const minute of [0, 2, 4, 6]) await bremseUeberAlleInstanzen(versuch, um(minute), meldungen)
+
+    await bremseUeberAlleInstanzen(versuch, um(10), meldungen)
+
+    expect(Sentry.captureException).toHaveBeenCalledTimes(2)
+    expect(vi.mocked(Sentry.captureException).mock.calls[1]?.[1]).toMatchObject({ extra: { unterdruecktSeitLetzterMeldung: 3 } })
+    expect(vi.mocked(Sentry.captureException).mock.calls[0]?.[1]).toMatchObject({ extra: { unterdruecktSeitLetzterMeldung: 0 } })
+  })
+
+  it('Zeitlimit und Datenbankfehler teilen sich die Bremse', async () => {
+    vi.useFakeTimers()
+    const meldungen = neueBremsMeldungen()
+    queryRaw.mockRejectedValueOnce(new Error('weg'))
+    await bremseUeberAlleInstanzen(versuch, um(0), meldungen)
+    queryRaw.mockImplementation((() => new Promise(() => {})) as never)
+    const haengt = bremseUeberAlleInstanzen(versuch, um(3), meldungen)
+    await vi.advanceTimersByTimeAsync(DB_BREMSE_ZEITLIMIT_MS)
+
+    expect(await haengt).toBe(true)
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1)
+  })
+
+  it('je Instanz: zwei Instanzen melden unabhängig voneinander', async () => {
+    queryRaw.mockRejectedValue(new Error('weg'))
+    await bremseUeberAlleInstanzen(versuch, um(0), neueBremsMeldungen())
+    await bremseUeberAlleInstanzen(versuch, um(1), neueBremsMeldungen())
+    expect(Sentry.captureException).toHaveBeenCalledTimes(2)
+  })
+
+  it('Gegenprobe: ein Erfolg dazwischen ändert an der Bremse nichts und meldet nichts', async () => {
+    const meldungen = neueBremsMeldungen()
+    queryRaw.mockRejectedValueOnce(new Error('weg'))
+    await bremseUeberAlleInstanzen(versuch, um(0), meldungen)
+    datenbankZaehlt()
+    await bremseUeberAlleInstanzen(versuch, um(1), meldungen)
+    queryRaw.mockRejectedValueOnce(new Error('weg'))
+    await bremseUeberAlleInstanzen(versuch, um(2), meldungen)
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Sentry-Bremse ohne eigenen Zustand: der Zustand des Moduls (frisch geladen)', () => {
+  // Ein frisches Modul samt frischer Attrappen — der Modul-Zustand der
+  // übrigen Tests in dieser Datei bleibt davon unberührt.
+  let modul: typeof import('@/server/bremse-datenbank')
+  let sentry: typeof import('@sentry/nextjs')
+  let roh: ReturnType<typeof vi.fn>
+
+  beforeAll(async () => {
+    vi.resetModules()
+    sentry = await import('@sentry/nextjs')
+    roh = vi.mocked((await import('@/lib/prisma')).prisma.$queryRaw) as unknown as ReturnType<typeof vi.fn>
+    modul = await import('@/server/bremse-datenbank')
+  }, 30_000)
+
+  it('die Aufrufer ohne Zustand teilen sich EINE Bremse je Instanz', async () => {
+    roh.mockRejectedValue(new Error('weg'))
+    const versuch = [{ bremse: DB_BREMSEN.checkoutIp, merkmal: IP }]
+    expect(await modul.bremseUeberAlleInstanzen(versuch, JETZT)).toBe(true)
+    expect(await modul.bremseUeberAlleInstanzen(versuch, new Date(JETZT.getTime() + 60_000))).toBe(true)
+    expect(vi.mocked(sentry.captureException)).toHaveBeenCalledTimes(1)
+    expect(await modul.bremseUeberAlleInstanzen(versuch, new Date(JETZT.getTime() + BREMSE_MELDE_ABSTAND_MS))).toBe(true)
+    expect(vi.mocked(sentry.captureException)).toHaveBeenCalledTimes(2)
   })
 })
 

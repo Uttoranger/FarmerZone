@@ -24,6 +24,7 @@ import {
   umsatzHeuteCent,
   wienerTag,
   stripeEinrichtenHinweis,
+  onlinePausiertDaten,
   wochenBalken,
   wochenvergleich,
 } from '@/lib/heute'
@@ -31,7 +32,6 @@ import { auswerten, umsatzfenster } from '@/lib/umsatz'
 import { umsatzBuchungen } from '@/server/queries/umsatz'
 import { statusReminder } from '@/lib/dashboard-hints'
 import { ersteSchritte, ersteSchritteDaten, type ErsteSchritteErgebnis } from '@/lib/erste-schritte'
-import { onlineZahlungPausiert } from '@/lib/stripe-konto'
 import { bestellSummen } from '@/lib/servicegebuehr'
 import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
 import { DEFAULT_SECTIONS, type SectionConfig } from '@/server/queries/appearance'
@@ -253,7 +253,8 @@ export async function getHeute(
     wochenBalken: wochenBalken(auswertung.balken, jetzt),
     ersteSchritte: ersteSchritte(ersteSchritteDaten(hof, { produkte, aktiveAbholzeiten: slots.length })),
     wartetAufFreigabe: hof?.approvedAt == null,
-    onlinePausiert: hof && onlineZahlungPausiert(hof) ? { barMoeglich: hof.acceptsOnsite } : null,
+    // „nur bar bei Abholung" nur bei sichtbarem Hof, der bar annimmt (onlinePausiertDaten, Nr. 45 Runde 2).
+    onlinePausiert: hof ? onlinePausiertDaten(hof) : null,
     stripeEinrichten: hof ? stripeEinrichtenHinweis(hof) : false,
     hof: {
       sichtbar: hof ? heuteHofSichtbar(hof) : false,

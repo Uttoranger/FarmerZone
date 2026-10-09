@@ -7,11 +7,14 @@
  *  - HofShell: Seitenleiste und Handy-Leiste zeigen die Einträge aus
  *    hofNavigation — dieselbe Quelle für Web und Handy; „Admin" nur für den
  *    Betreiber; Zahlen an Bestellungen und Admin.
- *  - KundeShell: abgemeldet mit „Anmelden", angemeldet mit Suche und „Mein
- *    Konto" — ohne „Meine Höfe" und „Merken" (E8); Handy-Leiste mit drei
- *    Plätzen; die Fokus-Variante hat keine Unterleiste.
- *  - AdminShell: Reiter Höfe · Briefkasten · Finanzen mit Zählern und der Weg
- *    zurück zum Hof, keine Hof-Seitenleiste.
+ *  - KundeShell: ohne Sitzung mit „Anmelden" (→ /login, auch am Handy),
+ *    mit Hof-Sitzung „Mein Hof" (→ /dashboard), mit Kundensitzung Suche und
+ *    „Mein Konto" — ohne „Meine Höfe" und „Merken" (E8); Hell/Dunkel am Handy
+ *    am Seitenfuß (Nr. 41, Register N1); Handy-Leiste mit drei Plätzen; die
+ *    Fokus-Variante hat keine Unterleiste.
+ *  - AdminShell: Reiter Höfe · Briefkasten · Finanzen mit Zählern; der Weg
+ *    zurück zum Hof und die Konto-Plakette als Link nur mit eigenem Hof
+ *    (Nr. 41); keine Hof-Seitenleiste.
  *  - Kein Big Bang: Außer der Vorschau unter /intern binden nur die Routen
  *    eine Shell ein, deren Gate sie umgestellt hat (Liste UMGESTELLT, mit
  *    Gegenprobe).
@@ -36,8 +39,8 @@ import { HofShell } from '@/components/shells/hof-shell'
 import { KundeFokusShell, KundeShell } from '@/components/shells/kunde-shell'
 import { AdminShell } from '@/components/shells/admin-shell'
 import { hofNavigation } from '@/lib/bauern-navigation'
-import { kundenNavigation } from '@/lib/kunden-navigation'
-import { ADMIN_REITER } from '@/lib/admin-navigation'
+import { kundenNavigation, type KundenSitzung } from '@/lib/kunden-navigation'
+import { ADMIN_KONTO, ADMIN_REITER, ADMIN_ZURUECK } from '@/lib/admin-navigation'
 
 const INHALT = createElement('p', null, 'Inhalt der Seite')
 
@@ -58,9 +61,16 @@ function hof(isAdmin: boolean, aktuell = '/dashboard'): string {
   )
 }
 
-function kunde(angemeldet: boolean, aktuell = '/hoefe'): string {
+function kunde(sitzung: KundenSitzung, aktuell = '/hoefe'): string {
   pfad.aktuell = aktuell
-  return renderToStaticMarkup(el(KundeShell, { angemeldet }))
+  return renderToStaticMarkup(el(KundeShell, { sitzung }))
+}
+
+/** Das öffnende Tag des ersten Links auf `href` im HTML. */
+function linkTag(html: string, href: string): string {
+  const tag = html.match(new RegExp(`<a [^>]*href="${href.replace(/[/?]/g, (z) => `\\${z}`)}"[^>]*>`))?.[0]
+  expect(tag, href).toBeDefined()
+  return tag ?? ''
 }
 
 /** Der Teil des HTML zwischen dem ersten Vorkommen von `start` und dem nächsten `ende` danach. */
@@ -73,12 +83,12 @@ function abschnitt(html: string, start: string, ende: string): string {
 describe('alle Shells', () => {
   const alle = {
     hof: () => hof(false),
-    kunde: () => kunde(false),
+    kunde: () => kunde('gast'),
     fokus: () =>
       renderToStaticMarkup(
         el(KundeFokusShell, { titel: 'Warenkorb', zurueck: { href: '/hof-beispiel', label: 'Zurück zum Hof' } })
       ),
-    admin: () => renderToStaticMarkup(el(AdminShell, { personName: 'Max Mustermann' })),
+    admin: () => renderToStaticMarkup(el(AdminShell, { personName: 'Max Mustermann', hatHof: true })),
   }
 
   it.each(Object.entries(alle))('%s: data-design="neu", Landmarken und Sprunglink', (_name, rendere) => {
@@ -143,26 +153,62 @@ describe('HofShell', () => {
 })
 
 describe('KundeShell', () => {
-  it('abgemeldet: Höfe entdecken · So funktioniert’s · Für Höfe · Anmelden', () => {
-    const html = kunde(false)
+  it('ohne Sitzung: Höfe entdecken · So funktioniert’s · Für Höfe · Anmelden', () => {
+    const html = kunde('gast')
     const kopf = abschnitt(html, '<header', '</header>')
-    for (const p of kundenNavigation({ angemeldet: false }).web) expect(kopf).toContain(`href="${p.href}"`)
+    for (const p of kundenNavigation({ sitzung: 'gast' }).web) expect(kopf).toContain(`href="${p.href}"`)
     expect(kopf).toContain('>Anmelden<')
+    expect(kopf).not.toContain('role="search"')
+    expect(kopf).not.toContain('Mein Konto')
+    expect(kopf).not.toContain('Mein Hof')
+  })
+
+  // Nr. 41 (Register N1): „Anmelden" führt auf die Hof-Anmeldung (/login zeigt beide Wege)
+  // und steht auch unter 768 px oben rechts — mit 44 px Fläche.
+  it('ohne Sitzung: „Anmelden" führt auf /login, ist in keiner Breite ausgeblendet und 44 px hoch', () => {
+    const kopf = abschnitt(kunde('gast'), '<header', '</header>')
+    const anmelden = linkTag(kopf, '/login')
+    expect(anmelden).not.toMatch(/\bhidden\b/)
+    expect(anmelden).toMatch(/\b(min-)?h-11\b/)
+    expect(kopf).not.toContain('href="/account/login"')
+    // Gegenprobe: Die Suche findet ein ausgeblendetes Merkmal — die Textlinks stehen erst ab 768 px.
+    expect(abschnitt(kopf, '<nav aria-label="Hauptnavigation"', '>')).toMatch(/\bhidden\b/)
+  })
+
+  it('Hof-Sitzung: „Mein Hof" auf /dashboard statt „Anmelden" — auch am Handy, ohne Suche und ohne „Mein Konto"', () => {
+    const kopf = abschnitt(kunde('hof'), '<header', '</header>')
+    const meinHof = linkTag(kopf, '/dashboard')
+    expect(meinHof).not.toMatch(/\bhidden\b/)
+    expect(meinHof).toMatch(/\b(min-)?h-11\b/)
+    expect(kopf).toMatch(/<a [^>]*href="\/dashboard"[^>]*>Mein Hof<\/a>/)
+    expect(kopf).not.toContain('>Anmelden<')
+    expect(kopf).not.toContain('href="/login"')
     expect(kopf).not.toContain('role="search"')
     expect(kopf).not.toContain('Mein Konto')
   })
 
-  it('angemeldet: Suche nach /hoefe?q=…, Mein Konto, kein Anmelden', () => {
-    const kopf = abschnitt(kunde(true), '<header', '</header>')
+  it('Kundensitzung: Suche nach /hoefe?q=…, Mein Konto, kein Anmelden, kein „Mein Hof"', () => {
+    const kopf = abschnitt(kunde('kunde'), '<header', '</header>')
     expect(kopf).toMatch(/<form role="search"[^>]*action="\/hoefe" method="get"/)
     expect(kopf).toContain('name="q"')
     expect(kopf).toContain('aria-label="Mein Konto"')
     expect(kopf).not.toContain('>Anmelden<')
+    expect(kopf).not.toContain('Mein Hof')
+  })
+
+  // Nr. 41: Am Handy braucht „Anmelden" den Platz oben rechts — Hell/Dunkel steht dort am Seitenfuß.
+  it.each(['gast', 'kunde', 'hof'] as const)('Hell/Dunkel am Handy am Seitenfuß, als letzter Teil des Inhalts (Sitzung: %s)', (sitzung) => {
+    const html = kunde(sitzung)
+    const inhalt = abschnitt(html, '<main', '</main>')
+    const fuss = inhalt.slice(inhalt.indexOf('Inhalt der Seite'))
+    expect(fuss).toContain('aria-label="Dunkelmodus einschalten"')
+    // Gegenprobe: Die Zeile fehlt im Kopf — dort steht vor der Hydration nur der Platzhalter des runden Schalters.
+    expect(abschnitt(html, '<header', '</header>')).not.toContain('aria-label="Dunkelmodus einschalten"')
   })
 
   // Nr. 14: „Bestellungen finden" (/bestellungen) ist das Ziel für alle — im Kopf und in der Leiste.
-  it.each([false, true])('„Meine Bestellungen" im Kopf und „Bestellungen" am Handy führen auf /bestellungen (angemeldet: %s)', (angemeldet) => {
-    const html = kunde(angemeldet)
+  it.each(['gast', 'kunde', 'hof'] as const)('„Meine Bestellungen" im Kopf und „Bestellungen" am Handy führen auf /bestellungen (Sitzung: %s)', (sitzung) => {
+    const html = kunde(sitzung)
     const kopf = abschnitt(html, '<header', '</header>')
     // Ab 1024 px der lange Name, darunter der kurze — sonst bräche der Kopf bei 768 px um.
     expect(kopf).toMatch(/<a [^>]*href="\/bestellungen"[^>]*>[\s\S]*?<span class="hidden lg:inline">Meine Bestellungen<\/span><\/a>/)
@@ -171,21 +217,21 @@ describe('KundeShell', () => {
     expect(leiste).toMatch(/<a [^>]*href="\/bestellungen"[^>]*>[\s\S]*?Bestellungen/)
   })
 
-  it('angemeldet: kein Weg zur Anmeldung; Gegenprobe: abgemeldet steht sie im Kopf', () => {
-    expect(kunde(true)).not.toContain('href="/account/login"')
-    expect(abschnitt(kunde(false), '<header', '</header>')).toContain('href="/account/login"')
+  it('Kundensitzung: kein Weg zur Anmeldung; Gegenprobe: ohne Sitzung steht sie im Kopf', () => {
+    expect(kunde('kunde')).not.toContain('href="/login"')
+    expect(abschnitt(kunde('gast'), '<header', '</header>')).toContain('href="/login"')
   })
 
-  it('E8: weder „Meine Höfe" noch „Merken" — in keinem Zustand', () => {
-    for (const html of [kunde(false), kunde(true)]) {
+  it('E8: weder „Meine Höfe" noch „Merken" — in keiner Sitzung', () => {
+    for (const html of [kunde('gast'), kunde('kunde'), kunde('hof')]) {
       expect(html).not.toContain('Meine Höfe')
       expect(html).not.toContain('Merken')
     }
   })
 
   it('Handy: Entdecken · Warenkorb · Bestellungen, der Warenkorb grün in der Mitte', () => {
-    for (const angemeldet of [false, true]) {
-      const leiste = abschnitt(kunde(angemeldet), 'data-slot="bottom-nav"', '</nav>')
+    for (const sitzung of ['gast', 'kunde', 'hof'] as const) {
+      const leiste = abschnitt(kunde(sitzung), 'data-slot="bottom-nav"', '</nav>')
       expect(leiste.match(/<a /g)).toHaveLength(3)
       expect(leiste.indexOf('Entdecken')).toBeLessThan(leiste.indexOf('Warenkorb'))
       expect(leiste.indexOf('Warenkorb')).toBeLessThan(leiste.indexOf('Bestellungen'))
@@ -209,19 +255,48 @@ describe('KundeShell', () => {
 })
 
 describe('AdminShell', () => {
-  it('Reiter Höfe · Briefkasten · Finanzen mit Zählern, „Zu meinem Hof", keine Hof-Seitenleiste', () => {
+  function admin(hatHof: boolean): string {
     pfad.aktuell = '/admin/meldungen/abc'
-    const html = renderToStaticMarkup(
-      el(AdminShell, { personName: 'Max Mustermann', zahlen: { hoefe: 2, briefkasten: 3 } })
-    )
+    return renderToStaticMarkup(el(AdminShell, { personName: 'Max Mustermann', hatHof, zahlen: { hoefe: 2, briefkasten: 3 } }))
+  }
+
+  it('Reiter Höfe · Briefkasten · Finanzen mit Zählern, „Zu meinem Hof", keine Hof-Seitenleiste', () => {
+    const html = admin(true)
     const reiter = abschnitt(html, '<nav aria-label="Admin-Bereiche"', '</nav>')
     expect([...reiter.matchAll(/<a href="([^"]+)"/g)].map((t) => t[1])).toEqual(ADMIN_REITER.map((r) => r.href))
     expect(reiter).toContain('2 Höfe warten auf Freischaltung')
     expect(reiter).toContain('3 Meldungen zu entscheiden')
     expect(reiter).toContain('<a href="/admin/meldungen" aria-current="true"')
     expect(html).toContain('Zu meinem Hof')
-    expect(html).toContain('href="/dashboard"')
+    expect(html).toContain(`href="${ADMIN_ZURUECK.href}"`)
     expect(html).not.toContain('<aside')
+  })
+
+  // Nr. 41 (Register N1): Ohne eigenen Hof führte „← Mein Hof" ins Leere (/dashboard → /login).
+  it('ohne eigenen Hof: kein „← Mein Hof"; Gegenprobe mit Hof', () => {
+    const ohne = admin(false)
+    expect(ohne).not.toContain(`href="${ADMIN_ZURUECK.href}"`)
+    expect(ohne).not.toContain(ADMIN_ZURUECK.label)
+    expect(ohne).not.toContain(`>${ADMIN_ZURUECK.kurz}<`)
+    expect(admin(true)).toContain(`>${ADMIN_ZURUECK.kurz}<`)
+  })
+
+  it('mit Hof: die Initialen-Plakette ist ein Link auf „Konto und Sicherheit", auch am Handy sichtbar, 44 px', () => {
+    const plakette = linkTag(admin(true), ADMIN_KONTO.href)
+    // WCAG 2.5.3: Der zugängliche Name beginnt mit den sichtbaren Initialen.
+    expect(plakette).toContain('aria-label="MM – Konto und Sicherheit (angemeldet: Max Mustermann)"')
+    expect(plakette).not.toMatch(/\bhidden\b/)
+    expect(plakette).toMatch(/\bsize-11\b/)
+    expect(admin(true)).toMatch(/<a [^>]*href="\/settings\/account"[^>]*>[\s\S]*?>MM<\/span>/)
+  })
+
+  it('ohne Hof: die Plakette steht auch am Handy da, ist aber kein Link ins Leere (/settings/account liegt im Hofbereich)', () => {
+    const ohne = admin(false)
+    expect(ohne).not.toContain(`href="${ADMIN_KONTO.href}"`)
+    const plakette = ohne.match(/<span title="Angemeldet: Max Mustermann"[^>]*>/)?.[0]
+    expect(plakette).toBeDefined()
+    expect(plakette).not.toMatch(/\bhidden\b/)
+    expect(ohne).toContain('Angemeldet: Max Mustermann')
   })
 })
 

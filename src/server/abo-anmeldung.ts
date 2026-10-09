@@ -5,6 +5,7 @@ import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { APP_URL } from '@/lib/umgebung-server'
 import { emailAnmeldungSchritt, werbemailErlaubt, type EmailAboStand, type EmailAnmeldeSchritt } from '@/lib/abo-bestaetigung'
 import { aboBestaetigungsPfad, erzeugeAboBestaetigungsToken, pruefeAboBestaetigungsToken } from '@/lib/abo-bestaetigung-token'
+import { verifyUnsubscribeToken } from '@/lib/unsubscribe'
 
 /*
  * Double-Opt-in für werbliche Mails (Register S11, Nachtlauf Nr. 38) — der
@@ -31,9 +32,10 @@ export const EMAIL_ABO_STAND = {
 } as const
 
 /**
- * Eine E-Mail-Anmeldung für ein bestehendes Abo (Checkout-Haken, Schalter auf
- * /account). Neue und abgemeldete Abos bekommen einen Bestätigungslink,
- * bestätigte und Bestandsabos bleiben, wie sie sind.
+ * Eine E-Mail-Anmeldung für ein bestehendes Abo (Bestätigungsseite einer
+ * Bestellung seit Nr. 46, Schalter auf /account). Neue und abgemeldete Abos
+ * bekommen einen Bestätigungslink, bestätigte und Bestandsabos bleiben, wie
+ * sie sind.
  *
  * Bedingt geschrieben auf genau den Stand, aus dem entschieden wurde (wie
  * „Vorrat setzen", ARCHITECTURE §5): Zwei gleichzeitige Anmeldungen
@@ -114,14 +116,48 @@ function schickeBestaetigungNachDerAntwort(aboId: string, angefragtAm: Date): vo
  * geht über `meldeEmailAboAn` und verlangt einen neuen Link. Bestätigte Abos
  * behalten ihre Zeitpunkte (Nachweis); ihr alter Link greift nicht mehr, weil
  * die Bestätigung schon gesetzt ist.
+ *
+ * ACHTUNG, verzögert: Das Ergebnis ist ein Prisma-Promise, das erst mit
+ * `await` (bzw. `.then`) oder als Schritt in `prisma.$transaction([...])`
+ * läuft. Wer es nur aufruft und liegen lässt, ändert nichts.
+ *
+ * @returns Den noch nicht ausgeführten Schritt; ausgeführt liefert er die
+ *   Zahl der aufgelösten Anfragen (`count`).
  */
-export function loeseOffeneAnfrageAuf(wo: Prisma.CustomerFarmSubscriptionWhereInput) {
+export function loeseOffeneAnfrageAuf(
+  wo: Prisma.CustomerFarmSubscriptionWhereInput
+): Prisma.PrismaPromise<Prisma.BatchPayload> {
   // Ohne await: Der Aufrufer stellt den Schritt in eine $transaction VOR das
   // Ausschalten (Reihenfolge siehe updateSubscription).
   return prisma.customerFarmSubscription.updateMany({
     where: { ...wo, emailOptInAngefragtAm: { not: null }, emailOptInBestaetigtAm: null },
     data: { optInEmail: false, emailOptInAngefragtAm: null },
   })
+}
+
+/**
+ * Abmelden mit dem signierten Link aus einer werblichen Mail — derselbe Weg
+ * für den Knopf auf der Seite (`unsubscribeWithToken`) und die Ein-Klick-
+ * Abmeldung des Mailprogramms (`/api/abmelden`, RFC 8058, Nr. 47).
+ *
+ * Erst die offene Anfrage auflösen, dann E-Mail und WhatsApp aus, in einer
+ * Transaktion (Reihenfolge wie beim Ausschalten auf /account): Ein alter
+ * Bestätigungslink meldet danach niemanden wieder an (S11, Nachbesserung
+ * Runde 1). Idempotent: Ein zweiter Aufruf trifft nichts mehr. Ob es ein Abo
+ * gab, sagt das Ergebnis nicht — nur, ob der Token gilt.
+ */
+export async function meldeAboMitTokenAb(token: string): Promise<{ gueltig: boolean }> {
+  const daten = verifyUnsubscribeToken(token)
+  if (!daten) return { gueltig: false }
+  const wo = { customerEmail: daten.email.toLowerCase(), farmId: daten.farmId }
+  await prisma.$transaction([
+    loeseOffeneAnfrageAuf(wo),
+    prisma.customerFarmSubscription.updateMany({
+      where: wo,
+      data: { optInEmail: false, optInWhatsApp: false },
+    }),
+  ])
+  return { gueltig: true }
 }
 
 export type AboBestaetigungsStand =

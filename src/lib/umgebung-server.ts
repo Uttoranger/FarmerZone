@@ -1,6 +1,8 @@
 import * as Sentry from '@sentry/nextjs'
 import { env } from '@/lib/env'
 import { bestimmeUmgebung, type Umgebung } from '@/lib/umgebung'
+import { istTestbetrieb } from '@/lib/stripe-modus'
+import { stripeMarke, type StripeMarke } from '@/lib/testumgebung'
 
 /**
  * Die Umgebung, einmal je Prozess berechnet — der Serverzweig zu umgebung.ts.
@@ -23,6 +25,7 @@ export const UMGEBUNG: Umgebung = bestimmeUmgebung({
   VERCEL_BRANCH_URL: env.VERCEL_BRANCH_URL,
   VERCEL_GIT_COMMIT_REF: env.VERCEL_GIT_COMMIT_REF,
   NEXT_PUBLIC_APP_URL: env.NEXT_PUBLIC_APP_URL,
+  NEXT_PUBLIC_TESTUMGEBUNG_URL: env.NEXT_PUBLIC_TESTUMGEBUNG_URL,
   DATABASE_URL: env.DATABASE_URL,
   STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY,
   STRIPE_CONNECT_WEBHOOK_SECRET: env.STRIPE_CONNECT_WEBHOOK_SECRET,
@@ -38,6 +41,23 @@ export const APP_URL: string = UMGEBUNG.appUrl ?? 'http://localhost:3000'
 
 /** Ob das Banner überhaupt gezeigt wird: nur, wenn die Testumgebung eindeutig erkannt ist. */
 export const ZEIGE_UMGEBUNGSBANNER = UMGEBUNG.art !== 'produktion'
+
+/**
+ * Testbetrieb (Register Z2, Nr. 42): Die Produktion läuft mit Test-Schlüssel.
+ * Kasse, AdminShell und Zahlungs-Einstellungen lesen nur diesen Wahrheitswert
+ * — an Client-Komponenten geht er als Prop, nie der Modus oder der Schlüssel.
+ * Mit Live-Schlüssel ist er false, und die Hinweise verschwinden von selbst.
+ */
+export const TESTBETRIEB: boolean = istTestbetrieb(UMGEBUNG)
+
+/**
+ * Admin-Kopf (Register Z3, Nr. 43): „Stripe Live" bzw. „Stripe Test" — an die
+ * AdminShell gehen nur Text und Ton, nie der Modus-Rohwert oder der Schlüssel.
+ */
+export const STRIPE_MARKE: StripeMarke | null = stripeMarke(UMGEBUNG)
+
+/** Ziel von „Zur Testumgebung" im Admin — null ohne gültige Variable, dann kein Link. */
+export const TESTUMGEBUNG_URL: string | null = UMGEBUNG.testumgebungUrl
 
 // Einmal je Kaltstart — mehr wäre bei jedem Seitenaufruf dieselbe Meldung.
 // Serverlos heißt: je Instanz einmal; das ist gewollt, nicht zu viel.
