@@ -39,6 +39,7 @@ vi.mock('@/server/abo-anmeldung', async (original) => {
 
 import { POST as checkout } from '@/app/api/checkout/route'
 import { prisma } from '@/lib/prisma'
+import { env } from '@/lib/env'
 import { sendAboBestaetigung } from '@/lib/email'
 import { bestellSignatur } from '@/lib/bestell-link'
 import { NEUIGKEITEN_JE_BESTELLUNG_UND_TAG, NEUIGKEITEN_TEXT } from '@/lib/abo-bestaetigung'
@@ -139,7 +140,7 @@ describe('Anmeldung auf der Bestätigungsseite', () => {
 describe('Nur für eine laufende Bestellung, höchstens drei Anfragen am Tag (Runde 1)', () => {
   /** Der Zähler dieser Bestellung — so, wie die Bremse ihn schlüsselt (Zweck im Klartext, Kennung nur im HMAC). */
   const zaehlerSchluessel = (orderId: string) =>
-    bremsSchluessel(process.env.BETTER_AUTH_SECRET!, DB_BREMSEN.neuigkeitenBestellung.zweck, orderId)
+    bremsSchluessel(env.BETTER_AUTH_SECRET, DB_BREMSEN.neuigkeitenBestellung.zweck, orderId)
 
   it('stornierte Bestellung: dieselbe Antwort, kein Abo, keine Mail, kein Zähler', async () => {
     const email = `${intKennung('kundin')}@example.com`

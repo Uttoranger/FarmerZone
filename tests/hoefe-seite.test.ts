@@ -384,8 +384,9 @@ describe('Ein Suchfeld „Ort oder Produkt" plus „Standort nutzen" (Nr. 46)', 
     expect(absenden).toMatch(/aktion === 'ort-eintrag-zeigen'\) setVorschlagsLage\(\{ offen: true, markiert: ORT_VORSCHLAG \}\)/)
     // Genau ein Weg zur Ortssuche beim Absenden — der für vier Ziffern.
     expect(absenden.match(/ortSuchen\(/g)).toHaveLength(1)
-    // Gegenprobe: der alte Weg (Enter ohne Treffer sucht selbst) fiele auf.
-    expect('if (enterSuchtOrt(suchtext, treffer)) ort.ortSuchen(suchtext)').not.toContain('enterImSuchfeld(suchtext, treffer)')
+    // Gegenprobe: Käme der alte Weg zurück (Enter ohne Treffer sucht selbst), zählte die Prüfung oben zwei Wege.
+    const mitAltemWeg = `${absenden}\nif (enterSuchtOrt(suchtext, treffer)) ort.ortSuchen(suchtext)`
+    expect(mitAltemWeg.match(/ortSuchen\(/g)).toHaveLength(2)
   })
 
   it('der Standort bleibt im Browser: Die Ortssuche schickt nur den getippten Text, der Standort geht in keine Anfrage', () => {

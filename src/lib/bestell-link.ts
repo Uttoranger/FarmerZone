@@ -21,7 +21,8 @@ import { env } from '@/lib/env'
 // Bestätigungsmail an die Adresse DER Bestellung auslösen, nie an eine andere;
 // angemeldet ist erst, wer in dieser Mail klickt (Double-Opt-in, S11). Dazu:
 // nur für eine laufende Bestellung (`neuigkeitenErlaubt`), höchstens drei
-// Anfragen je Bestellung und Tag (Datenbank-Bremse), ein Link je Abo und zehn
+// Anfragen je Bestellung und UTC-Tag (Datenbank-Bremse, an der Tagesgrenze bis
+// zu doppelt), ein Link je Abo und zehn
 // Minuten, immer dieselbe Antwort, und an der Bestellung ändert sich nichts
 // (docs/ai/ARCHITECTURE.md §5). Jeder weitere Schreibweg braucht ein eigenes
 // Token mit eigenem Zweck, nicht diese Signatur.
