@@ -12,7 +12,7 @@
  * Rein, ohne Datenbank (tests/bestaetigung.test.ts).
  */
 import type { OrderStatus, PaymentMethod, PaymentStatus } from '@prisma/client'
-import { GRUND_NICHT_BESTAETIGT, fristVon, tagInWorten, uhrzeitInWien, type FristBestellung } from '@/lib/fristen'
+import { GRUND_NICHT_BESTAETIGT, fristVon, istVerwaist, tagInWorten, uhrzeitInWien, type FristBestellung } from '@/lib/fristen'
 import { kalendertagInWien } from '@/lib/servicegebuehr'
 import { tagVersetzt } from '@/lib/kalender'
 import { bestellStatusAnzeige } from '@/lib/bestellstatus'
@@ -248,13 +248,6 @@ export type BestaetigungsBloecke = {
   fristHinweis: boolean
   /** „Erzähl's weiter" — nur, wenn die Bestellung wirklich steht. */
   teilen: boolean
-  /**
-   * „Neuigkeiten vom Hof per E-Mail" (Register N2, Nr. 46) — die Anmeldung,
-   * die vorher als Haken in der Kasse stand. Online wie bar, solange die
-   * Bestellung läuft; nicht bei storniert, verfallen, gescheiterter Zahlung
-   * oder nicht abgeholt.
-   */
-  neuigkeiten: boolean
   /** Die eine Hauptaktion (grün); „keine" heißt: die Aktion steckt in der Mail. */
   aktion: 'bestellung' | 'neu-bestellen' | 'erneut-versuchen' | 'keine'
 }
@@ -284,9 +277,6 @@ export function bestaetigungsBloecke(zustand: BestaetigungsZustand | null, statu
     kalender: steht && kalenderTerminGilt(status),
     fristHinweis: zustand === 'bestaetigung-offen',
     teilen: steht && status !== 'CANCELLED' && status !== 'NOT_PICKED_UP',
-    // Auch bei „bar offen" und „Zahlung wird geprüft": Die Kundin ist gerade
-    // hier, und die Anmeldung gilt ohnehin erst mit ihrem Klick in der Mail.
-    neuigkeiten: (laeuft || zustand === 'bestaetigung-offen') && status !== 'CANCELLED' && status !== 'NOT_PICKED_UP',
     aktion:
       zustand === 'verfallen'
         ? 'neu-bestellen'
@@ -296,6 +286,40 @@ export function bestaetigungsBloecke(zustand: BestaetigungsZustand | null, statu
             ? 'keine'
             : 'bestellung',
   }
+}
+
+/** Was `neuigkeitenErlaubt` von einer Bestellung liest — alles aus der Datenbank. */
+export type NeuigkeitenBestellung = FristBestellung & {
+  status: OrderStatus
+  paymentStatus: PaymentStatus
+  cancelReason: string | null
+}
+
+/**
+ * Darf zu dieser Bestellung die Anmeldung „Neuigkeiten vom Hof per E-Mail"
+ * stehen bzw. angenommen werden (Register N2, Nr. 46)? EINE Regel für die
+ * Karte der Bestätigungsseite und die Action `meldeNeuigkeitenAn`
+ * (Nachbesserung Runde 1) — die Karte verspricht nichts, was die Action
+ * ablehnt, und die Action nimmt nichts an, was die Karte nicht zeigt.
+ *
+ * Ja, solange die Bestellung läuft: online bezahlt, bar bestätigt (auch
+ * später im Ablauf und nach der Abholung) und bar offen bis zur Frist — dann
+ * ist die Kundin gerade auf der Seite, und angemeldet ist sie ohnehin erst
+ * mit ihrem Klick in der Mail.
+ *
+ * Nein bei storniert, verfallen, nicht abgeholt, gescheiterter oder nie
+ * abgeschlossener Zahlung. Der Zustand kommt allein aus der Datenbank: Stripes
+ * Hinweis in der Adresse („Zahlung wird geprüft") gibt kein Recht — die
+ * Action kennt ihn nicht, und ein Hinweis aus dem Browser darf nie eine Mail
+ * an eine fremde Adresse auslösen. Die Frist gilt beim Lesen (fristen.ts),
+ * nicht erst, wenn der Cron storniert hat; die Action schreibt nie an der
+ * Bestellung, gibt also auch nichts frei.
+ */
+export function neuigkeitenErlaubt(order: NeuigkeitenBestellung, jetzt: Date): boolean {
+  if (order.status === 'CANCELLED' || order.status === 'NOT_PICKED_UP') return false
+  const zustand = bestaetigungsZustand(order, undefined)
+  if (zustand === 'bezahlt' || zustand === 'bestaetigt') return true
+  return zustand === 'bestaetigung-offen' && !istVerwaist(order, jetzt)
 }
 
 /**

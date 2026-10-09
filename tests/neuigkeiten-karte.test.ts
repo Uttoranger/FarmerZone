@@ -50,6 +50,13 @@ describe('NeuigkeitenKarte', () => {
     expect(NEUIGKEITEN_TEXT.danke).not.toMatch(/schon angemeldet\.|bereits angemeldet\./)
   })
 
+  it('am Quelltext: der Fehlersatz steht in der Fehler-Farbe (text-destructive, O1), nicht orange (Runde 1)', () => {
+    const quelle = readFileSync(join(process.cwd(), 'src/components/bestaetigung/neuigkeiten-karte.tsx'), 'utf8')
+    const fehlerZeile = quelle.split('\n').find((z) => z.includes("stand.art === 'fehler' &&")) ?? ''
+    expect(fehlerZeile).toContain('text-destructive')
+    expect(fehlerZeile).not.toContain('text-status-offen')
+  })
+
   it('am Quelltext: zurück an den Server gehen nur Kennung und Signatur, nie die Adresse', () => {
     const quelle = readFileSync(join(process.cwd(), 'src/components/bestaetigung/neuigkeiten-karte.tsx'), 'utf8')
     expect(quelle).toContain('meldeNeuigkeitenAn({ orderId, sig })')

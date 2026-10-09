@@ -6,7 +6,7 @@ import { tasteInVorschlaegen, type Bezugspunkt, type ProduktVorschlag, type Vors
 import {
   ORT_VORSCHLAG,
   SUCHFELD_TEXT,
-  enterSuchtOrt,
+  enterImSuchfeld,
   ortVorschlagAnbieten,
   ortVorschlagText,
 } from '@/lib/hoefe-entdecken'
@@ -26,8 +26,10 @@ import { useOrtssuche } from '@/components/hoefe/use-ortssuche'
  *   berechneHofAuswahl); darunter erst ab dem ersten Zeichen die
  *   Vorschlagsliste aus dem VERFÜGBAREN Angebot (höchstens sechs) und als
  *   letzter Eintrag „Höfe rund um „…" zeigen" — der sucht den Text als Ort.
- * - Enter ohne Markierung sucht den Ort, wenn der Text nach einer
- *   Postleitzahl aussieht oder die Produktsuche nichts findet (enterSuchtOrt).
+ * - Enter ohne Markierung sucht den Ort nur bei vier Ziffern; findet die
+ *   Produktsuche nichts, markiert Enter den Eintrag „Höfe rund um …", und
+ *   erst ein zweites Enter (oder ein Tipp darauf) sucht ihn (enterImSuchfeld,
+ *   Nachbesserung Runde 1).
  * - Combobox-Muster (CODING_STANDARDS §8): Pfeiltasten, Enter, Escape; die
  *   Tastenlogik ist tasteInVorschlaegen (rein, getestet), hier wird nur
  *   ausgeführt. Die Liste steht im Fluss statt darüber, damit sie nie unter
@@ -52,7 +54,7 @@ export function HoefeSuche({
   vorschlaege: readonly ProduktVorschlag[]
   /** Die Ansage fürs Vorlesen („3 Treffer gefunden."); leer ohne Suche. */
   status: string
-  /** Wie viel die Suche gerade zeigt — bei 0 sucht Enter den Text als Ort. */
+  /** Wie viel die Suche gerade zeigt — bei 0 zeigt Enter den Eintrag „Höfe rund um …". */
   treffer: number
   bezugspunkt: Bezugspunkt | null
   onSuchtext: (wert: string) => void
@@ -98,8 +100,12 @@ export function HoefeSuche({
   /** Enter ohne markierten Vorschlag (die Taste hat tasteImSuchfeld dann nicht verbraucht). */
   function absenden(e: React.FormEvent) {
     e.preventDefault()
-    setVorschlagsLage({ offen: false, markiert: null })
-    if (enterSuchtOrt(suchtext, treffer)) ort.ortSuchen(suchtext)
+    const aktion = enterImSuchfeld(suchtext, treffer)
+    // Ohne Treffer: den Eintrag zeigen und markieren — ausgelöst wird er erst
+    // mit dem nächsten Enter oder Tipp, also ausdrücklich (Nominatim, Datenschutz).
+    if (aktion === 'ort-eintrag-zeigen') setVorschlagsLage({ offen: true, markiert: ORT_VORSCHLAG })
+    else setVorschlagsLage({ offen: false, markiert: null })
+    if (aktion === 'ort-suchen') ort.ortSuchen(suchtext)
   }
 
   const knopf = cn(

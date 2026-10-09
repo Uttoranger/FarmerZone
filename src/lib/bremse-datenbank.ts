@@ -1,4 +1,5 @@
 import { createHmac } from 'crypto'
+import { NEUIGKEITEN_JE_BESTELLUNG_UND_TAG } from '@/lib/abo-bestaetigung'
 import { ANMELDECODE_RATE_LIMIT, CODE_ANFORDERUNGEN_JE_ADRESSE } from '@/lib/anmeldecode'
 import { MELDUNGEN_PRO_STUNDE } from '@/lib/meldung'
 
@@ -34,6 +35,7 @@ export type DbBremse = {
 
 const MINUTE_MS = 60_000
 const STUNDE_MS = 60 * MINUTE_MS
+const TAG_MS = 24 * STUNDE_MS
 
 /** Gleich `AUTH_RATE_LIMIT_*` in auth.ts (10 je Minute) — die Registrierung lief bisher über dieselbe Zahl. */
 export const REGISTRIERUNG_JE_IP = { max: 10, fensterMs: MINUTE_MS } as const
@@ -44,7 +46,7 @@ const CHECKOUT_JE_MINUTE = { max: 20, fensterMs: MINUTE_MS } as const
 const anmeldecodeJeIp = { max: ANMELDECODE_RATE_LIMIT.max, fensterMs: ANMELDECODE_RATE_LIMIT.window * 1000 }
 const codesJeAdresse = { max: CODE_ANFORDERUNGEN_JE_ADRESSE.max, fensterMs: CODE_ANFORDERUNGEN_JE_ADRESSE.fensterMs }
 
-/** Die fünf Wege aus R1 mit ihren Grenzen. */
+/** Die fünf Wege aus R1 mit ihren Grenzen — dazu die Bremse je Bestellung (Nr. 46, Runde 1). */
 export const DB_BREMSEN = {
   // Anmeldecode (Better Auth emailOTP, Hook in auth.ts)
   anmeldecodeAnfordernIp: { zweck: 'anmeldecode-anfordern-ip', ...anmeldecodeJeIp },
@@ -61,6 +63,10 @@ export const DB_BREMSEN = {
   // Checkout (/api/checkout)
   checkoutIp: { zweck: 'checkout-ip', ...CHECKOUT_JE_MINUTE },
   checkoutSitzung: { zweck: 'checkout-sitzung', ...CHECKOUT_JE_MINUTE },
+  // Neuigkeiten auf der Bestätigungsseite (Nr. 46, Runde 1): je Bestellung und
+  // Tag. Ohne erste Stufe — die Grenze schützt das Postfach hinter der
+  // Bestellung, nicht den Server (src/lib/abo-bestaetigung.ts).
+  neuigkeitenBestellung: { zweck: 'neuigkeiten-bestellung', max: NEUIGKEITEN_JE_BESTELLUNG_UND_TAG, fensterMs: TAG_MS },
 } as const satisfies Record<string, DbBremse>
 
 /**

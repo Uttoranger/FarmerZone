@@ -313,6 +313,22 @@ describe('Neuigkeiten per E-Mail auf der Bestätigungsseite (Register N2, Nr. 46
     expect(await seite()).toContain('data-neuigkeiten="karte"')
   })
 
+  it('Zahlung wird geprüft (Stripe meldet „succeeded", die Datenbank noch nicht): keine Karte — die Action nähme sie nicht an', async () => {
+    findUnique.mockResolvedValue(bestellung({ paymentMethod: 'ONLINE', paymentStatus: 'PENDING' }) as never)
+    const html = await seite({ sig: GUELTIG, redirect_status: 'succeeded' })
+    expect(text(html)).toContain('Zahlung wird geprüft')
+    expect(html).not.toContain('data-neuigkeiten')
+    // Gegenprobe: Sobald der Webhook PAID geschrieben hat, steht sie da.
+    findUnique.mockResolvedValue(bestellung({ paymentMethod: 'ONLINE', paymentStatus: 'PAID', status: 'PAID' }) as never)
+    expect(await seite({ sig: GUELTIG, redirect_status: 'succeeded' })).toContain('data-neuigkeiten="karte"')
+  })
+
+  it('bar offen nach der Frist, die Freigabe ist noch nicht durch: keine Karte — die Frist gilt beim Lesen', async () => {
+    // Bestellt um 05:00 UTC: Die Frist (zwei Stunden) ist um 08:20 vorbei, der Status steht noch auf offen.
+    findUnique.mockResolvedValue(bestellung({ createdAt: new Date('2026-10-05T05:00:00Z') }) as never)
+    expect(await seite()).not.toContain('data-neuigkeiten')
+  })
+
   it('storniert, verfallen und ohne Signatur: keine Karte', async () => {
     findUnique.mockResolvedValue(bestellung({ status: 'CANCELLED', cancelReason: GRUND_NICHT_BESTAETIGT }) as never)
     expect(await seite()).not.toContain('data-neuigkeiten')

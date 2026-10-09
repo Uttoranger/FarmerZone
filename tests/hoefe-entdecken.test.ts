@@ -15,10 +15,10 @@ import {
   ORT_VORSCHLAG,
   SUCHFELD_TEXT,
   aktiveFilter,
-  enterSuchtOrt,
+  enterImSuchfeld,
   ortVorschlagAnbieten,
   ortVorschlagText,
-  siehtNachOrtAus,
+  istPostleitzahl,
   alleZuruecksetzen,
   entdeckenKopf,
   ergebnisZahl,
@@ -423,20 +423,27 @@ describe('Ein Suchfeld „Ort oder Produkt" (Nr. 46)', () => {
     expect(ortVorschlagText('  4910 ')).toBe('Höfe rund um „4910" zeigen')
   })
 
-  it('eine Postleitzahl vorn ist ein Ort, ein Wort mit Ziffern nicht', () => {
-    expect(siehtNachOrtAus('4910')).toBe(true)
-    expect(siehtNachOrtAus(' 84359 Simbach ')).toBe(true)
-    expect(siehtNachOrtAus('Eier 10er')).toBe(false)
-    expect(siehtNachOrtAus('491')).toBe(false)
-    expect(siehtNachOrtAus('491000')).toBe(false)
+  it('nur eine Eingabe aus vier Ziffern ist eine Postleitzahl (Runde 1)', () => {
+    expect(istPostleitzahl('4910')).toBe(true)
+    expect(istPostleitzahl(' 4910 ')).toBe(true)
+    for (const text of ['4910 Ried', '84359', '84359 Simbach', 'Eier 10er', '491', '491000', 'Ried', '']) {
+      expect(istPostleitzahl(text), text).toBe(false)
+    }
   })
 
-  it('Enter ohne Markierung: Ort bei Postleitzahl oder ohne Treffer, sonst bleibt es bei der Produktsuche', () => {
-    expect(enterSuchtOrt('4910', 3)).toBe(true)
-    expect(enterSuchtOrt('Ried', 0)).toBe(true)
-    expect(enterSuchtOrt('Eier', 4)).toBe(false)
-    expect(enterSuchtOrt('R', 0)).toBe(false)
-    expect(enterSuchtOrt('', 0)).toBe(false)
+  it('Enter ohne Markierung: vier Ziffern suchen den Ort, ohne Treffer zeigt Enter den Eintrag — ausgelöst wird er nur ausdrücklich', () => {
+    expect(enterImSuchfeld('4910', 3)).toBe('ort-suchen')
+    expect(enterImSuchfeld(' 4910 ', 0)).toBe('ort-suchen')
+    // Ohne Produkttreffer schickt Enter den Text NICHT an die Ortssuche (Nominatim): Er kann ein
+    // Produktwort sein. Die Datenschutzerklärung nennt dafür nur „Postleitzahl oder Ort".
+    expect(enterImSuchfeld('Ried', 0)).toBe('ort-eintrag-zeigen')
+    expect(enterImSuchfeld('Topinambur', 0)).toBe('ort-eintrag-zeigen')
+    expect(enterImSuchfeld('84359 Simbach', 0)).toBe('ort-eintrag-zeigen')
+    // Mit Treffern bleibt es bei der Produktsuche, die beim Tippen schon wirkt.
+    expect(enterImSuchfeld('Eier', 4)).toBe('nichts')
+    expect(enterImSuchfeld('84359', 2)).toBe('nichts')
+    expect(enterImSuchfeld('R', 0)).toBe('nichts')
+    expect(enterImSuchfeld('', 0)).toBe('nichts')
   })
 
   it('mit der Tastatur: Pfeil nach oben aus dem Feld landet auf „Höfe rund um …", Enter übernimmt ihn', () => {

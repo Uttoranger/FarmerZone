@@ -14,7 +14,7 @@ vi.mock('next/link', () => ({
 
 import { HofseiteSeitenspalte, type SeitenspalteHof } from '@/components/hofseite/hofseite-seitenspalte'
 
-// Mittwoch, 22. Juli 2026, 10 Uhr — gerechnet wird wie in nextPickupDays in der Zeit des Rechners.
+// Mittwoch, 22. Juli 2026, 10 Uhr in der Zeit des Rechners — in Wien derselbe Tag (nextPickupDays rechnet in Wiener Zeit).
 const JETZT = new Date(2026, 6, 22, 10, 0, 0).toISOString()
 
 const HOF: SeitenspalteHof = {

@@ -97,7 +97,7 @@ export function HofseiteSeitenspalte({
               wird das Zeitfenster in der Kasse — dort mit demselben Datum. */}
           <ul className="flex flex-col gap-2">
             {tage.map((tag, i) => (
-              <li key={tag.date.toISOString()} className={ZEILE}>
+              <li key={tag.kalendertag} className={ZEILE}>
                 <CalendarDays className={SYMBOL} strokeWidth={1.7} aria-hidden="true" />
                 <span className={cn('min-w-0 flex-1 break-words', i === 0 && 'font-semibold')}>{abholtagZeile(tag)}</span>
                 <span className="shrink-0 text-muted-foreground tabular-nums">{tag.times}</span>

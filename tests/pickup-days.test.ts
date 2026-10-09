@@ -64,6 +64,42 @@ describe('nextPickupDays', () => {
   })
 })
 
+describe('nextPickupDays rechnet im Wiener Kalender — wie die Kasse, nicht mit der Uhr des Geräts (Nr. 46, Runde 1)', () => {
+  const MO = { dayOfWeek: 1, startTime: '15:00', endTime: '18:00' }
+  const DI = { dayOfWeek: 2, startTime: '15:00', endTime: '18:00' }
+  const MI_SPAET = { dayOfWeek: 3, startTime: '15:00', endTime: '18:00' }
+
+  it('kurz nach Mitternacht in Wien (Sommerzeit, in UTC noch Montag) ist schon Dienstag', () => {
+    const jetzt = new Date('2026-07-20T22:30:00Z') // Di, 21. Juli, 00:30 in Wien
+    expect(nextPickupDays([DI], 1, jetzt)[0]).toMatchObject({ label: 'Heute', datum: 'Di, 21.\u00a0Juli' })
+    // Gegenprobe: Der Montag ist in Wien vorbei — sein Fenster kommt erst nächste Woche.
+    expect(nextPickupDays([MO], 1, jetzt)[0]).toMatchObject({ label: 'Mo, 27.\u00a0Juli' })
+  })
+
+  it('im Winter (eine Stunde Versatz): 23:30 UTC ist in Wien schon der nächste Tag', () => {
+    const jetzt = new Date('2026-01-12T23:30:00Z') // Di, 13. Jänner, 00:30 in Wien
+    expect(nextPickupDays([DI], 1, jetzt)[0]).toMatchObject({ label: 'Heute', datum: 'Di, 13.\u00a0Jän' })
+  })
+
+  it('Mitternacht UTC ist in Wien 2 Uhr desselben Tages — „Morgen" ist der Tag danach', () => {
+    const jetzt = new Date('2026-07-21T00:00:00Z') // Di, 21. Juli, 02:00 in Wien
+    expect(nextPickupDays([MI_SPAET], 1, jetzt)[0]).toMatchObject({ label: 'Morgen', datum: 'Mi, 22.\u00a0Juli' })
+  })
+
+  it('ob heute noch ein Fenster offen ist, entscheidet die Wiener Uhr', () => {
+    const montag = { dayOfWeek: 1, startTime: '15:00', endTime: '17:00' }
+    // 17:30 in Wien (15:30 UTC): vorbei — in UTC liefe es noch.
+    expect(nextPickupDays([montag], 1, new Date('2026-07-20T15:30:00Z'))[0]).toMatchObject({ label: 'Mo, 27.\u00a0Juli' })
+    // Gegenprobe: 16:30 in Wien läuft es noch.
+    expect(nextPickupDays([montag], 1, new Date('2026-07-20T14:30:00Z'))[0]).toMatchObject({ label: 'Heute' })
+  })
+
+  it('jeder Tag trägt seinen Wiener Kalendertag — derselbe Schlüssel wie in der Kasse', () => {
+    const tage = nextPickupDays([MO, DI], 2, new Date('2026-07-20T22:30:00Z'))
+    expect(tage.map((t) => t.kalendertag)).toEqual(['2026-07-21', '2026-07-27'])
+  })
+})
+
 describe('formatSlotTime', () => {
   it('kürzt volle Stunden und behält Minuten', () => {
     expect(formatSlotTime('08:00')).toBe('8')

@@ -10,6 +10,7 @@ import {
   bestaetigungsKopf,
   bestaetigungsZustand,
   bestellSchritte,
+  neuigkeitenErlaubt,
 } from '@/lib/bestaetigung'
 import { zahlungsAnzeige } from '@/lib/bestellstatus'
 import { buildMapsUrl } from '@/lib/customer-links'
@@ -154,6 +155,9 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
 
   // Einmal je Anfrage bestimmt — Server-Komponente, kein Hydration-Abgleich.
   const jetzt = new Date()
+  // Dieselbe Regel wie in der Action (Nr. 46, Runde 1): Die Karte steht nur,
+  // wo die Anmeldung auch angenommen wird — aus der Datenbank, mit der Frist.
+  const neuigkeiten = neuigkeitenErlaubt(order, jetzt)
   const kopf = bestaetigungsKopf(zustand, {
     status: order.status,
     paymentMethod: order.paymentMethod,
@@ -221,7 +225,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
         {/* Register N2 (Nr. 46): die Neuigkeiten-Anmeldung, vorher ein Haken in der Kasse.
             Kennung und Signatur stehen ohnehin in der Adresse dieser Seite; welche
             Adresse angemeldet wird, nimmt der Server aus der Bestellung. */}
-        {bloecke.neuigkeiten && (
+        {neuigkeiten && (
           <NeuigkeitenKarte orderId={order.id} sig={sig} hofName={order.farm.name} email={order.customerEmail} />
         )}
 

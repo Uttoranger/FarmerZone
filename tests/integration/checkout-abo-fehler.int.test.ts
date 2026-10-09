@@ -14,6 +14,10 @@
  *  - Scheitert das Abo dort (Speichern oder Anfrage), bleibt die Bestellung
  *    Zeile für Zeile, wie sie war; Sentry bekommt nur einen festen Text, Tags
  *    und die Bestell-ID — nie die Adresse.
+ *  - Nachbesserung Runde 1: Eine stornierte Bestellung meldet nichts an, und
+ *    je Bestellung zählt die Datenbank-Bremse (`RateLimitZaehler`, Nr. 40)
+ *    höchstens drei Anfragen am Tag — die vierte schickt keine Mail, die
+ *    Antwort bleibt dieselbe. In der Tabelle steht nur Zweck und HMAC.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
@@ -37,7 +41,8 @@ import { POST as checkout } from '@/app/api/checkout/route'
 import { prisma } from '@/lib/prisma'
 import { sendAboBestaetigung } from '@/lib/email'
 import { bestellSignatur } from '@/lib/bestell-link'
-import { NEUIGKEITEN_TEXT } from '@/lib/abo-bestaetigung'
+import { NEUIGKEITEN_JE_BESTELLUNG_UND_TAG, NEUIGKEITEN_TEXT } from '@/lib/abo-bestaetigung'
+import { DB_BREMSEN, bremsSchluessel } from '@/lib/bremse-datenbank'
 import { meldeEmailAboAn } from '@/server/abo-anmeldung'
 import { meldeNeuigkeitenAn } from '@/server/actions/neuigkeiten'
 import { checkoutAnfrage, erstelleHof, erstelleProdukt, intKennung, raeumeAuf, setzeHalt } from './setup/basis'
@@ -128,6 +133,53 @@ describe('Anmeldung auf der Bestätigungsseite', () => {
     expect(await prisma.customerFarmSubscription.count({ where: { farmId } })).toBe(0)
     await vi.dynamicImportSettled()
     expect(sendAboBestaetigung).not.toHaveBeenCalled()
+  })
+})
+
+describe('Nur für eine laufende Bestellung, höchstens drei Anfragen am Tag (Runde 1)', () => {
+  /** Der Zähler dieser Bestellung — so, wie die Bremse ihn schlüsselt (Zweck im Klartext, Kennung nur im HMAC). */
+  const zaehlerSchluessel = (orderId: string) =>
+    bremsSchluessel(process.env.BETTER_AUTH_SECRET!, DB_BREMSEN.neuigkeitenBestellung.zweck, orderId)
+
+  it('stornierte Bestellung: dieselbe Antwort, kein Abo, keine Mail, kein Zähler', async () => {
+    const email = `${intKennung('kundin')}@example.com`
+    const { farmId, orderId, sig } = await bestelle(email)
+    await prisma.order.update({ where: { id: orderId }, data: { status: 'CANCELLED', cancelReason: 'Vom Hof storniert' } })
+
+    expect(await meldeNeuigkeitenAn({ orderId, sig })).toEqual({ ok: true })
+
+    expect(await prisma.customerFarmSubscription.count({ where: { farmId } })).toBe(0)
+    expect(await prisma.rateLimitZaehler.count({ where: { schluessel: zaehlerSchluessel(orderId) } })).toBe(0)
+    await vi.dynamicImportSettled()
+    expect(sendAboBestaetigung).not.toHaveBeenCalled()
+  })
+
+  it(`je Bestellung ${NEUIGKEITEN_JE_BESTELLUNG_UND_TAG} Anfragen am Tag: die vierte schickt keine Mail, die Antwort bleibt dieselbe`, async () => {
+    const email = `${intKennung('kundin')}@example.com`
+    const { orderId, sig } = await bestelle(email)
+    const schluessel = zaehlerSchluessel(orderId)
+    try {
+      for (let anfrage = 1; anfrage <= NEUIGKEITEN_JE_BESTELLUNG_UND_TAG + 1; anfrage++) {
+        // Die Bremse des Abos (10 Minuten) ist hier nicht Thema: die letzte Anfrage zurückdatiert,
+        // wie in double-opt-in.int.test.ts. (Ein Tageswechsel in UTC mitten im Test ist praktisch ausgeschlossen.)
+        await prisma.customerFarmSubscription.updateMany({
+          where: { customerEmail: email },
+          data: { emailOptInAngefragtAm: new Date(Date.now() - 20 * 60 * 1000) },
+        })
+        expect(await meldeNeuigkeitenAn({ orderId, sig })).toEqual({ ok: true })
+        await vi.waitFor(() => expect(sendAboBestaetigung).toHaveBeenCalledTimes(Math.min(anfrage, NEUIGKEITEN_JE_BESTELLUNG_UND_TAG)))
+      }
+      await vi.dynamicImportSettled()
+      expect(sendAboBestaetigung).toHaveBeenCalledTimes(NEUIGKEITEN_JE_BESTELLUNG_UND_TAG)
+
+      const zeilen = await prisma.rateLimitZaehler.findMany({ where: { schluessel } })
+      expect(zeilen.map((z) => z.zaehler)).toEqual([NEUIGKEITEN_JE_BESTELLUNG_UND_TAG + 1])
+      // Weder Kennung noch Adresse im Klartext — nur Zweck und HMAC.
+      expect(JSON.stringify(zeilen)).not.toContain(orderId)
+      expect(JSON.stringify(zeilen)).not.toContain(email)
+    } finally {
+      await prisma.rateLimitZaehler.deleteMany({ where: { schluessel } })
+    }
   })
 })
 

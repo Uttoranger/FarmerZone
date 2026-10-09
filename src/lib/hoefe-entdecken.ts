@@ -484,19 +484,27 @@ export function ortVorschlagText(text: string): string {
   return `Höfe rund um „${text.trim()}" zeigen`
 }
 
-/** Eine Postleitzahl vorn: „4910", „84359 Simbach" — das ist ein Ort, kein Produkt. */
-export function siehtNachOrtAus(text: string): boolean {
-  return /^\d{4,5}(?:\s|$)/.test(text.trim())
+/** Genau vier Ziffern: eine österreichische Postleitzahl — die einzige Eingabe, die ohne Wahl als Ort gilt. */
+export function istPostleitzahl(text: string): boolean {
+  return /^\d{4}$/.test(text.trim())
 }
 
+/** Was Enter ohne markierten Vorschlag tut. */
+export type EnterImSuchfeld = 'ort-suchen' | 'ort-eintrag-zeigen' | 'nichts'
+
 /**
- * Enter ohne markierten Vorschlag: Sieht der Text nach einer Postleitzahl aus
- * oder findet die Produktsuche nichts, sucht das Feld ihn als Ort. Sonst
- * bleibt es bei der Produktsuche, die beim Tippen schon wirkt — „Eier" ist
- * kein Ort. Wer bei einem Treffer trotzdem den Ort meint („Ried" neben dem
- * Riedhof), nimmt den Eintrag „Höfe rund um …" aus der Liste.
+ * Enter ohne markierten Vorschlag (Nachbesserung Runde 1): An die Ortssuche
+ * (`loeseOrtAuf`, Nominatim) geht ein Text nur, wenn er aus vier Ziffern
+ * besteht oder wenn die Kundin den Eintrag „Höfe rund um …" ausdrücklich
+ * wählt. Findet die Produktsuche nichts, ZEIGT Enter diesen Eintrag (Liste
+ * offen, Eintrag markiert), statt ihn auszulösen — „Topinambur" ist ein
+ * Produktwort, und die Datenschutzerklärung nennt für die Ortssuche nur
+ * „Postleitzahl oder Ort". Sonst bleibt es bei der Produktsuche, die beim
+ * Tippen schon wirkt. Deutsche Postleitzahlen (fünf Ziffern) und „4910 Ried"
+ * gehen über den Eintrag.
  */
-export function enterSuchtOrt(text: string, treffer: number): boolean {
-  if (!ortVorschlagAnbieten(text)) return false
-  return siehtNachOrtAus(text) || treffer === 0
+export function enterImSuchfeld(text: string, treffer: number): EnterImSuchfeld {
+  if (!ortVorschlagAnbieten(text)) return 'nichts'
+  if (istPostleitzahl(text)) return 'ort-suchen'
+  return treffer === 0 ? 'ort-eintrag-zeigen' : 'nichts'
 }

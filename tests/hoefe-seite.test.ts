@@ -376,6 +376,18 @@ describe('Ein Suchfeld „Ort oder Produkt" plus „Standort nutzen" (Nr. 46)', 
     expect('import HoefeUmkreis from \'@/components/hoefe/hoefe-umkreis\'').toMatch(/HoefeUmkreis|hoefe-umkreis/)
   })
 
+  it('Enter löst die Ortssuche nur bei vier Ziffern aus — ohne Treffer markiert es den Eintrag „Höfe rund um …" (Runde 1)', () => {
+    const suche = quelle('src/components/hoefe/hoefe-suche.tsx').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+    const absenden = suche.slice(suche.indexOf('function absenden('), suche.indexOf('const knopf'))
+    expect(absenden).toContain('enterImSuchfeld(suchtext, treffer)')
+    expect(absenden).toMatch(/aktion === 'ort-suchen'\) ort\.ortSuchen\(suchtext\)/)
+    expect(absenden).toMatch(/aktion === 'ort-eintrag-zeigen'\) setVorschlagsLage\(\{ offen: true, markiert: ORT_VORSCHLAG \}\)/)
+    // Genau ein Weg zur Ortssuche beim Absenden — der für vier Ziffern.
+    expect(absenden.match(/ortSuchen\(/g)).toHaveLength(1)
+    // Gegenprobe: der alte Weg (Enter ohne Treffer sucht selbst) fiele auf.
+    expect('if (enterSuchtOrt(suchtext, treffer)) ort.ortSuchen(suchtext)').not.toContain('enterImSuchfeld(suchtext, treffer)')
+  })
+
   it('der Standort bleibt im Browser: Die Ortssuche schickt nur den getippten Text, der Standort geht in keine Anfrage', () => {
     // Ohne Kommentare: Die Datei erklärt selbst, warum es keinen localStorage gibt.
     const hook = quelle('src/components/hoefe/use-ortssuche.ts').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')

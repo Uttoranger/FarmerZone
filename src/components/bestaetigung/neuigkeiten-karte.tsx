@@ -69,7 +69,7 @@ export function NeuigkeitenKarte({
             <span>{NEUIGKEITEN_TEXT.danke}</span>
           </>
         )}
-        {stand.art === 'fehler' && <span className="text-status-offen">{stand.text}</span>}
+        {stand.art === 'fehler' && <span className="text-destructive">{stand.text}</span>}
       </p>
 
       {stand.art !== 'danke' && (

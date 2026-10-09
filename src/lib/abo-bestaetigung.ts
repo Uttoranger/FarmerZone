@@ -133,6 +133,15 @@ export const NEUIGKEITEN_TEXT = {
  */
 export const NEUIGKEITEN_PRO_MINUTE = 10
 
+/**
+ * Die dritte Bremse (Nachbesserung Runde 1): höchstens so viele Anfragen je
+ * Bestellung und Tag, über alle Instanzen (Datenbank-Bremse aus Nr. 40,
+ * `DB_BREMSEN.neuigkeitenBestellung`). Wer eine Bestellung mit fremder Adresse
+ * anlegt, hält deren signierten Link — ohne diese Grenze ginge an die Adresse
+ * alle zehn Minuten eine Bestätigungsmail, solange die Bestellung läuft.
+ */
+export const NEUIGKEITEN_JE_BESTELLUNG_UND_TAG = 3
+
 /** Der Satz für einen Link, der nicht (mehr) bestätigen kann — Seite und Knopf. */
 export function aboFehlerSatz(grund: 'ungueltig' | 'abgelaufen' | 'ueberholt' | 'abo_weg'): string {
   if (grund === 'abo_weg') return ABO_TEXT.abo_weg
