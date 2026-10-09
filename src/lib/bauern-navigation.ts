@@ -302,6 +302,12 @@ export const HOF_NEU_TITEL = 'Was legst du an?'
 /** Die zweite Gruppe des Neu-Menüs (Mockup web-h2-neu-was-legst-du-an). */
 export const HOF_NEU_ANDERES_TITEL = 'Oder etwas anderes'
 
+/** Das Wort am Neu-Knopf: in der Seitenleiste und unter dem Plus der Unterleiste (freigabe.md §12 Nr. 45). */
+export const HOF_NEU_KNOPF = 'Neu'
+
+/** Der Name des Plus-Knopfs für Vorleser — beginnt mit dem sichtbaren Wort (WCAG 2.5.3 „Label in Name"). */
+export const HOF_NEU_KNOPF_NAME = `${HOF_NEU_KNOPF} erstellen`
+
 export type HofNeuId = 'lebensmittel' | 'futtermittel' | 'brennmaterial' | 'status-posten' | 'verkauf-eintragen'
 
 /** Ein Eintrag im Neu-Menü der HofShell: oben die Bereiche (anlegen), darunter der Rest. */

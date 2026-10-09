@@ -26,13 +26,14 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { GroessenWahl, Groessenkachel } from '@/components/ui/groessenkachel'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
-import { BottomNav, BottomNavLink, BottomNavMitte, mittelknopfKlassen } from '@/components/ui/bottom-nav'
+import { BottomNav, BottomNavLink, BottomNavMitte, mittelknopfKlassen, mittelknopfMitWortKlassen, mittelkreisKlassen } from '@/components/ui/bottom-nav'
 import { SidebarEintrag, SidebarGruppe } from '@/components/ui/sidebar-gruppe'
 import { Zaehler } from '@/components/ui/zaehler'
 import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { ThemeUmschalter } from '@/components/shared/theme-umschalter'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { SHELL_VARIANTEN } from './shell/[variante]/varianten'
+import { HOF_NEU_KNOPF, HOF_NEU_KNOPF_NAME } from '@/lib/bauern-navigation'
 
 /*
  * Die Vorschau der Bausteine aus Gate 2. Jeder Baustein steht mit seinen
@@ -260,7 +261,7 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
             </div>
           </Abschnitt>
 
-          <Abschnitt id="bottomnav" titel="BottomNav mit Mittelknopf" satz="Die Unterleiste am Handy; hier ohne feste Position, damit sie in der Vorschau steht.">
+          <Abschnitt id="bottomnav" titel="BottomNav mit Mittelknopf" satz="Die Unterleiste am Handy; hier ohne feste Position, damit sie in der Vorschau steht. Im Hofbereich steht das Wort „Neu“ unter dem Plus — Kreis und Wort sind ein Knopf.">
             <div className="flex flex-col gap-9 pt-6">
               <BottomNav beschriftung="Beispiel: Unterleiste Kunde" className="relative z-0 rounded-2xl border md:block">
                 <BottomNavLink href="/intern/bausteine" label="Entdecken" symbol={Compass} aktuell="page" />
@@ -275,8 +276,11 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
                 <BottomNavLink href="/intern/bausteine" label="Heute" symbol={CalendarCheck} aktuell="page" />
                 <BottomNavLink href="/intern/bausteine#bottomnav" label="Bestellungen" symbol={ReceiptText} zahl={3} zahlWofuer="offene Bestellungen" />
                 <BottomNavMitte>
-                  <Link href="/intern/bausteine#bottomnav" aria-label="Neu erstellen" className={mittelknopfKlassen('orange')}>
-                    <Plus className="size-6" strokeWidth={2.2} aria-hidden="true" />
+                  <Link href="/intern/bausteine#bottomnav" aria-label={HOF_NEU_KNOPF_NAME} className={mittelknopfMitWortKlassen()}>
+                    <span className={mittelkreisKlassen('orange')}>
+                      <Plus className="size-6" strokeWidth={2.2} aria-hidden="true" />
+                    </span>
+                    <span>{HOF_NEU_KNOPF}</span>
                   </Link>
                 </BottomNavMitte>
                 <BottomNavLink href="/intern/bausteine#bottomnav" label="Produkte" symbol={Package} />

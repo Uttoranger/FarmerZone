@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Bell, Mail, MessageCircle, Phone } from 'lucide-react'
 import type { CustomerDetail } from '@/server/queries/customers'
 import { initialen, kundeSeitText, kundenMarke, tageSeit, vorTagenText, weitereBestellungen } from '@/lib/hof-kunden'
-import { bestellMarke } from '@/lib/hof-bestellungen'
+import { BESTELL_FILTER_TEXT, bestellListeHref, bestellMarke } from '@/lib/hof-bestellungen'
 import { centsAlsEuro, formatEuro, formatZahl } from '@/lib/format'
 import { toWaPhone } from '@/lib/whatsapp'
 import { ListGruppe, ListRow } from '@/components/ui/list-row'
@@ -120,12 +120,18 @@ export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: D
                 })}
               </ListGruppe>
               {rest > 0 && (
+                // „Noch offen" und „Erledigt" zeigen zusammen alle Bestellungen (einen Filter für alle gibt es
+                // seit Nr. 45 nicht mehr) — auch eine überfällige offene ist so auffindbar (Runde 1).
                 <p className={cn('text-[13px]', LEISE)}>
-                  {rest} weitere {rest === 1 ? 'Bestellung findest' : 'Bestellungen findest'} du unter{' '}
-                  <Link href="/orders?filter=alle" className={cn('rounded font-medium text-foreground underline underline-offset-2', FOKUS_RAHMEN)}>
-                    Bestellungen
+                  {rest} weitere {rest === 1 ? 'Bestellung findest' : 'Bestellungen findest'} du unter Bestellungen bei „
+                  <Link href={bestellListeHref('offen')} className={cn('rounded font-medium text-foreground underline underline-offset-2', FOKUS_RAHMEN)}>
+                    {BESTELL_FILTER_TEXT.offen}
                   </Link>
-                  .
+                  “ und „
+                  <Link href={bestellListeHref('erledigt')} className={cn('rounded font-medium text-foreground underline underline-offset-2', FOKUS_RAHMEN)}>
+                    {BESTELL_FILTER_TEXT.erledigt}
+                  </Link>
+                  “.
                 </p>
               )}
             </section>

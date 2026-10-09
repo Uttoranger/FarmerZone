@@ -5,8 +5,13 @@ import { STORNO_GRUND_MAX, ZU_LANG } from '@/lib/eingabegrenzen'
  * Bestellungen des Hofs (/orders, Nachtlauf Nr. 19): Filter in der Adresse und
  * die Eingaben der Aktionen. Die Adresse ist Fremddaten — ein unbekannter
  * Filter fällt still auf „offen", nie ein Fehler.
+ *
+ * Genau drei Filter, in der Reihenfolge der Chips (freigabe.md §12 Nr. 45):
+ * „Heute abholen", „Noch offen" (Standard), „Erledigt". Die Werte von vorher
+ * (packen, gepackt, alle) fallen damit still auf „Noch offen" — alte
+ * Lesezeichen zeigen die Liste, nie einen Fehler.
  */
-export const HOF_BESTELL_FILTER_WERTE = ['offen', 'heute', 'packen', 'gepackt', 'erledigt', 'alle'] as const
+export const HOF_BESTELL_FILTER_WERTE = ['heute', 'offen', 'erledigt'] as const
 
 export type HofBestellFilter = (typeof HOF_BESTELL_FILTER_WERTE)[number]
 

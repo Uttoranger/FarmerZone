@@ -524,10 +524,15 @@ export type BetriebsstatusValue = (typeof BETRIEBSSTATUS_VALUES)[number]
  */
 export const BETRIEBSNUMMER_ANKER = 'betriebsnummer-abschnitt'
 
-/** Name und Hilfesatz je Status — welche Nummer in Farm.betriebsnummer steht (Konzept §3). */
+/**
+ * Name und Hilfesatz je Status — welche Nummer in Farm.betriebsnummer steht
+ * (Konzept §3). „Primärproduktion" ist ein Fachwort: Das Alltagswort steht
+ * davor, das Amtswort in Klammern bleibt zum Wiedererkennen (freigabe.md §12
+ * Nr. 45, Wortlaut der Fälle aus E10: „Eigene Ernte").
+ */
 export const BETRIEBSSTATUS: Record<BetriebsstatusValue, { name: string; hilfe: string }> = {
   PRIMAERPRODUKTION: {
-    name: 'Primärproduktion',
+    name: 'Eigene Ernte (Primärproduktion)',
     hilfe: 'Du verkaufst nur selbst erzeugtes Futter — trag deine LFBIS-Nummer ein.',
   },
   REGISTRIERT: {

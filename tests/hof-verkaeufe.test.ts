@@ -60,7 +60,7 @@ const db = vi.hoisted(() => {
 vi.mock('@/lib/prisma', () => ({ prisma: db }))
 
 import { HOF_NEU } from '@/lib/bauern-navigation'
-import { JAHRESSUMME_TEXT, verkaufsZeilen, wiederholVorlagen, type FeedVerkauf, type VerkaufDaten } from '@/lib/hof-verkaeufe'
+import { JAHRESSUMME_TEXT, UMSATZGRENZE_ERKLAERUNG, verkaufsZeilen, wiederholVorlagen, type FeedVerkauf, type VerkaufDaten } from '@/lib/hof-verkaeufe'
 import { mergeSalesFeed, type SalesFeedOrder } from '@/lib/sales-summary'
 import { manualSaleFormSchema } from '@/schemas/manual-sale'
 import { NOTIZ_MAX, PRODUKTNAME_MAX, VERKAUF_BETRAG_MAX, VERKAUF_MENGE_MAX, ZU_LANG } from '@/lib/eingabegrenzen'
@@ -397,6 +397,8 @@ describe('Ansicht /sales — vier Zustände, lange Namen, Tokens', () => {
     const html = renderToStaticMarkup(createElement(VerkaeufeAnsicht, props()))
     expect(JAHRESSUMME_TEXT).toBe('Dieses Jahr (für die Umsatzgrenze)')
     expect(html).toContain(`${JAHRESSUMME_TEXT}: ${formatEuro(1234.5)}`)
+    // Nr. 45: Das Fachwort steht nicht ohne Erklärung da — der Satz direkt darunter.
+    expect(html).toContain(UMSATZGRENZE_ERKLAERUNG)
     expect(html).not.toContain('Gesamt')
   })
 

@@ -7,7 +7,8 @@
  * Die Werte stehen genau einmal, neben BAES_FUTTERMITTEL_URL — die
  * Komponente hat keine eigene Kopie. Der Fall „abgepacktes Heimtierfutter"
  * spricht von einer Meldung beim BAES, nie von einer Registrierung (§ 8 Abs. 7
- * Futtermittelverordnung 2010), und ohne das Kürzel USP.
+ * Futtermittelverordnung 2010). Das Kürzel USP steht nie nackt: Seit Nr. 45
+ * nennt der orange Satz das Portal ausgeschrieben (freigabe.md §12).
  */
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -107,12 +108,12 @@ describe('Abgepacktes Heimtierfutter: Meldung, keine Registrierung (§ 8 Abs. 7 
     expect(nachweis('heimtierfutter-abgepackt')).not.toContain('USP')
   })
 
-  it('der orange Satz ohne Meldung spricht von Meldung statt Registrierung, ohne USP', () => {
+  it('der orange Satz ohne Meldung spricht von Meldung statt Registrierung, das USP ausgeschrieben', () => {
     const satz = registrierungsSaetze({ betriebsnummer: null, betriebsstatus: null })[1]
     expect(satz.ton).toBe('orange')
-    expect(satz.text).toContain('Meldung beim BAES')
+    expect(satz.text).toContain('Meldung beim BAES über das Unternehmensserviceportal (USP)')
     expect(satz.text).toContain('keine Registrierung')
-    expect(satz.text).not.toContain('USP')
+    expect(satz.text.replace('Unternehmensserviceportal (USP)', '')).not.toContain('USP')
   })
 
   it('fertige Packungen anderer Hersteller: nur die Meldung beim BAES', () => {

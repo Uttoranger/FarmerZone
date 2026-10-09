@@ -10,6 +10,8 @@ import { isOnlinePaidOrder } from '@/lib/sales-summary'
 import { CHANNEL_LABELS } from '@/schemas/manual-sale'
 import { wienKalendertag } from '@/lib/kalender'
 import { datumKurz } from '@/lib/verkauf-eintragen'
+import { formatEuro } from '@/lib/format'
+import { PROCESSING_REVENUE_LIMIT } from '@/lib/revenue-limit'
 
 /**
  * Die Zeile unter der Wochenzahl (Register F6, 22b). Die Summe ist nicht der
@@ -18,6 +20,17 @@ import { datumKurz } from '@/lib/verkauf-eintragen'
  * zählt. „Gesamt" versprach mehr, als die Zahl ist.
  */
 export const JAHRESSUMME_TEXT = 'Dieses Jahr (für die Umsatzgrenze)'
+
+/**
+ * Der Satz unter der Jahressumme: was die Umsatzgrenze ist (freigabe.md §12
+ * Nr. 45 — Fachwörter erklären; der Wortlaut darüber bleibt, wie F6 ihn
+ * festlegt). Er sagt nur, was die Zahl zählt, passend zum Code: Jeder Verkauf
+ * zählt mit (Produkte standardmäßig `countsTowardLimit: true`, Posten ohne
+ * Produkt immer, `sumCountedRevenue`), heraus fällt nur, was der Hof im
+ * Produkt abhakt. Keine eigene Rechtsaussage — vereinfacht wie die Jahreskarte
+ * der Auswertung, mit derselben Grenze (`PROCESSING_REVENUE_LIMIT`).
+ */
+export const UMSATZGRENZE_ERKLAERUNG = `Umsatzgrenze heißt: die Grenze von ${formatEuro(PROCESSING_REVENUE_LIMIT, 0)} im Jahr für Be- und Verarbeitung – hier zählt jeder Verkauf mit, außer Produkten, die du im Produkt nicht mitzählen lässt (vereinfacht, keine Steuerberatung).`
 
 /** Ein Direktverkauf, wie das Formular ihn zum Bearbeiten und Wiederholen braucht. */
 export type VerkaufDaten = {

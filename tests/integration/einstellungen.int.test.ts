@@ -39,7 +39,7 @@ describe('Einstellungen — nur der eigene Hof', () => {
     const bereiche = einstellungenBereiche(daten!, new Date())
     expect(bereiche).toHaveLength(9)
     expect(bereiche.find((b) => b.id === 'zahlung')?.ton).toBe('offen')
-    expect(bereiche.find((b) => b.id === 'futtermittel')?.zeile).toBe('Primärproduktion · LFBIS 0000000')
+    expect(bereiche.find((b) => b.id === 'futtermittel')?.zeile).toBe('Eigene Ernte (Primärproduktion) · LFBIS 0000000')
   })
 
   it('Zahlung: ohne fertiges Stripe orange — auch ein Bestandshof mit Online aus (Register Z1, keine Datenänderung)', async () => {

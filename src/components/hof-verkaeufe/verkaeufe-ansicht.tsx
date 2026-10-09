@@ -7,7 +7,15 @@ import { ChevronRight, ExternalLink, Pencil, Plus, ReceiptText, ShoppingCart, Tr
 import { createStripeDashboardLinkAction } from '@/server/actions/stripe-connect'
 import { deleteManualSale } from '@/server/actions/manual-sales'
 import type { SalesOverview } from '@/server/queries/manual-sales'
-import { JAHRESSUMME_TEXT, kanalText, wiederholVorlagen, type VerkaufDaten, type VerkaufProdukt, type VerkaufsZeile } from '@/lib/hof-verkaeufe'
+import {
+  JAHRESSUMME_TEXT,
+  UMSATZGRENZE_ERKLAERUNG,
+  kanalText,
+  wiederholVorlagen,
+  type VerkaufDaten,
+  type VerkaufProdukt,
+  type VerkaufsZeile,
+} from '@/lib/hof-verkaeufe'
 import { centsAlsEuro, formatEuro } from '@/lib/format'
 import { useUrlAuftrag } from '@/lib/use-url-auftrag'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -79,6 +87,8 @@ export function VerkaeufeAnsicht({ overview, produkte, topProduktIds, stripeRead
           <p className={cn('mt-1 text-[13px]', LEISE)}>
             {`${JAHRESSUMME_TEXT}: ${formatEuro(overview.ytdTotal)}`}
           </p>
+          {/* Fachwort mit einem Satz erklärt (Nr. 45). */}
+          <p className={cn('mt-1 text-[12px] leading-snug', LEISE)}>{UMSATZGRENZE_ERKLAERUNG}</p>
         </div>
         <Kennzahl titel="Online bezahlt" betrag={overview.weekOnline} satz="Über FarmerZone bezahlte, abgeholte Bestellungen." />
         <Kennzahl titel="Bar kassiert" betrag={overview.weekBar} satz="Vor Ort kassierte Abholungen plus deine Direktverkäufe." />

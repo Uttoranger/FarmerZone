@@ -21,6 +21,8 @@ import { Zaehler } from '@/components/ui/zaehler'
  *    `mittelknopfKlassen(ton)` (ein Knopf kann so auch ein SheetTrigger sein).
  *  - `bottomNavEintragKlassen`: dieselbe Gestalt wie ein Link, für Knöpfe
  *    (z. B. „Mehr", das ein Blatt öffnet).
+ *  - `mittelknopfMitWortKlassen` + `mittelkreisKlassen`: der Mittelknopf mit
+ *    einem Wort unter dem Kreis (Hof: „Neu", freigabe.md §12 Nr. 45).
  */
 export function BottomNav({
   beschriftung = 'Hauptnavigation',
@@ -102,5 +104,28 @@ export function mittelknopfKlassen(ton: 'gruen' | 'orange'): string {
     'relative -mt-5 flex size-[54px] shrink-0 items-center justify-center rounded-full shadow-lg ring-4 ring-card transition-colors duration-[250ms]',
     ton === 'gruen' ? 'bg-accent text-accent-foreground hover:bg-accent-hover' : 'bg-primary text-primary-foreground hover:bg-primary/90',
     FOKUS_RAHMEN
+  )
+}
+
+/**
+ * Der Mittelknopf mit Wort (Hof: „Neu" unter dem Plus, freigabe.md §12
+ * Nr. 45): Die Fläche ist der ganze Knopf — Kreis UND Wort —, also größer als
+ * der Kreis allein, nie kleiner. Der Kreis bleibt 54 px und 20 px gehoben
+ * (`mittelkreisKlassen` als Span im Knopf), das Wort steht auf der Höhe der
+ * übrigen Beschriftungen der Leiste (Kreis 54 − 20 + 7 Abstand = 41 px, wie
+ * die Wörter der Einträge). Den Fokusrahmen trägt der Knopf, nicht der Kreis.
+ */
+export function mittelknopfMitWortKlassen(): string {
+  return cn(
+    'group relative -mt-5 flex shrink-0 flex-col items-center gap-[7px] rounded-2xl text-[10.5px] leading-none text-muted-foreground transition-colors duration-[250ms] hover:text-foreground',
+    FOKUS_RAHMEN
+  )
+}
+
+/** Der Kreis im Mittelknopf mit Wort — Gestalt wie `mittelknopfKlassen`, Hover über den ganzen Knopf. */
+export function mittelkreisKlassen(ton: 'gruen' | 'orange'): string {
+  return cn(
+    'flex size-[54px] shrink-0 items-center justify-center rounded-full shadow-lg ring-4 ring-card transition-colors duration-[250ms]',
+    ton === 'gruen' ? 'bg-accent text-accent-foreground group-hover:bg-accent-hover' : 'bg-primary text-primary-foreground group-hover:bg-primary/90'
   )
 }
