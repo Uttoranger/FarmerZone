@@ -50,6 +50,9 @@ import {
   KUNDEN_FILTER_LABEL,
   KUNDEN_SORTIERUNG_LABEL,
   SORTIEREN_TEXT,
+  ZEIGEN_TEXT,
+  blattAdresse,
+  blattStart,
   fasseKundinZusammen,
   filtereKunden,
   initialen,
@@ -61,6 +64,7 @@ import {
   andereRichtung,
   richtungText,
   kundeSeitText,
+  mitSortierung,
   passtZurKundenSuche,
   sichtbareKundenFilter,
   sortierungBeschreibung,
@@ -475,17 +479,31 @@ describe('Ansicht /customers — vier Zustände, lange Namen, Tokens', () => {
     expect(auf).toContain(sortierungBeschreibung('bestellungen', 'auf'))
   })
 
-  it('das Blatt hinter „Sortieren": fünf Sortierungen und zwei Richtungen als echte Radioknöpfe, die gewählten angehakt', () => {
-    const html = renderToStaticMarkup(
-      createElement(SortierFelder, { sortierung: 'umsatz', richtung: 'ab', onSortierung: () => {}, onRichtung: () => {} })
+  const ZAHLEN = { alle: 4, stammkunden: 1, aktiv: 2, lange: 0, neu: 3 }
+  const felder = (teil: Partial<Parameters<typeof SortierFelder>[0]> = {}) =>
+    renderToStaticMarkup(
+      createElement(SortierFelder, {
+        sortierung: 'umsatz',
+        richtung: 'ab',
+        filter: 'alle',
+        zahlen: ZAHLEN,
+        onSortierung: () => {},
+        onRichtung: () => {},
+        onFilter: () => {},
+        ...teil,
+      })
     )
+
+  it('das Blatt hinter „Sortieren": fünf Sortierungen und zwei Richtungen als echte Radioknöpfe, die gewählten angehakt', () => {
+    const html = felder()
     expect(html.match(/type="radio"[^>]*name="kunden-sortierung"|name="kunden-sortierung"[^>]*type="radio"/g)).toHaveLength(KUNDEN_SORTIERUNG_WERTE.length)
     expect(html.match(/type="radio"[^>]*name="kunden-richtung"|name="kunden-richtung"[^>]*type="radio"/g)).toHaveLength(2)
     for (const s of KUNDEN_SORTIERUNG_WERTE) expect(html).toContain(KUNDEN_SORTIERUNG_LABEL[s])
     // Die Richtung heißt, was sie bei dieser Sortierung tut — die Standardrichtung zuerst.
     expect(html.indexOf('Höchster zuerst')).toBeGreaterThan(-1)
     expect(html.indexOf('Höchster zuerst')).toBeLessThan(html.indexOf('Niedrigster zuerst'))
-    expect(html.match(/checked=""/g)).toHaveLength(2)
+    // Sortierung, Richtung und Filter: je eine Wahl angehakt.
+    expect(html.match(/checked=""/g)).toHaveLength(3)
     expect(html).toContain('<fieldset')
     expect(html).toContain('<legend')
   })
@@ -502,6 +520,35 @@ describe('Ansicht /customers — vier Zustände, lange Namen, Tokens', () => {
       expect(html.match(/data-slot="filter-chip"/g), f).toHaveLength(2)
       expect(html).toContain(`>${KUNDEN_FILTER_LABEL[f]}<`)
     }
+  })
+
+  it('alle fünf Filter bleiben erreichbar: im Blatt hinter „Sortieren" steht der Abschnitt „Zeigen" mit Zahl (Runde 1)', () => {
+    const html = felder({ filter: 'neu' })
+    expect(ZEIGEN_TEXT).toBe('Zeigen')
+    expect(html).toContain(`>${ZEIGEN_TEXT}</legend>`)
+    expect(html.match(/name="kunden-filter"/g)).toHaveLength(KUNDEN_FILTER_WERTE.length)
+    for (const f of KUNDEN_FILTER_WERTE) expect(html).toMatch(new RegExp(`${KUNDEN_FILTER_LABEL[f]}<span[^>]*>· ${ZAHLEN[f]}<`))
+    expect(html).toMatch(/value="neu"[^>]*checked=""|checked=""[^>]*value="neu"/)
+    // Die Liste selbst zeigt weiter höchstens zwei Chips (siehe oben).
+  })
+
+  it('Regeln des Blatts (rein): neue Sortierung in ihrer Standardrichtung, „Abbrechen" lässt die Liste, „Übernehmen" schreibt alles (Runde 1)', () => {
+    const wahl = { sortierung: 'umsatz', richtung: 'auf', filter: 'alle' } as const
+    // Name beginnt bei A bis Z, alles andere beim Größten.
+    expect(mitSortierung(wahl, 'name')).toEqual({ sortierung: 'name', richtung: 'auf', filter: 'alle' })
+    expect(mitSortierung(wahl, 'bestellungen')).toEqual({ sortierung: 'bestellungen', richtung: 'ab', filter: 'alle' })
+    // Dieselbe Sortierung noch einmal gewählt: die Richtung bleibt, wie sie ist.
+    expect(mitSortierung(wahl, 'umsatz')).toEqual(wahl)
+    const aktuell = { filter: 'alle', suche: 'hu', sortierung: 'bestellungen', richtung: 'ab' } as const
+    expect(blattStart(aktuell)).toEqual({ sortierung: 'bestellungen', richtung: 'ab', filter: 'alle' })
+    const entwurf = { sortierung: 'name', richtung: 'auf', filter: 'neu' } as const
+    expect(blattAdresse(aktuell, entwurf, 'abbrechen')).toBeNull()
+    expect(blattAdresse(aktuell, entwurf, 'uebernehmen')).toBe('/customers?filter=neu&suche=hu&sortierung=name')
+    // Die Komponente nutzt genau diese Regeln — keine zweite Fassung im Browser-Code.
+    const komponente = quelle('src/components/hof-kunden/kunden-sortieren.tsx')
+    expect(komponente).toContain('mitSortierung(')
+    expect(komponente).toContain('blattAdresse(')
+    expect(komponente).not.toContain('STANDARD_RICHTUNG[')
   })
 
   it('ein Telefon aus Leerzeichen ist keins — kein Anrufen-Link', () => {
@@ -567,6 +614,13 @@ describe('Kundendetail', () => {
     expect(html).toContain('9 weitere')
     expect(html).toContain('href="/customers"')
     expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgb\(|green-|amber-|purple-|blue-/)
+  })
+
+  it('„N weitere Bestellungen": beide Filter verlinkt, die zusammen alle Bestellungen zeigen — auch überfällige offene (Runde 1)', () => {
+    const html = renderToStaticMarkup(createElement(KundenDetail, { kunde: detail(), jetzt: JETZT }))
+    expect(html).toContain('9 weitere Bestellungen findest du unter Bestellungen bei')
+    expect(html).toMatch(/href="\/orders"[^>]*>Noch offen</)
+    expect(html).toMatch(/href="\/orders\?filter=erledigt"[^>]*>Erledigt</)
   })
 
   it('ohne Telefon: kein Anrufen und kein WhatsApp, E-Mail bleibt', () => {

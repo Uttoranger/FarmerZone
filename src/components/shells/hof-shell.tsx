@@ -30,6 +30,7 @@ import { vorschauLink } from '@/lib/hofseite-vorschau'
 import {
   HOF_NEU_ANDERES_TITEL,
   HOF_NEU_KNOPF,
+  HOF_NEU_KNOPF_NAME,
   HOF_NEU_TITEL,
   VERKAUF_UND_KUNDEN_TITEL,
   ABMELDEN_LABEL,
@@ -401,7 +402,7 @@ export function HofShell({ hofName, hofSlug, personName, isAdmin, zahlen, onAbme
               <BottomNavMitte key="neu">
                 <Sheet open={offen === 'neu'} onOpenChange={wechsle('neu')}>
                   {/* Wort unter dem Plus (freigabe.md §12 Nr. 45): Kreis und Wort sind EIN Knopf. */}
-                  <SheetTrigger aria-label="Neu erstellen" className={mittelknopfMitWortKlassen()}>
+                  <SheetTrigger aria-label={HOF_NEU_KNOPF_NAME} className={mittelknopfMitWortKlassen()}>
                     <span className={mittelkreisKlassen('orange')}>
                       <Plus
                         className={cn('size-6 motion-safe:transition-transform motion-safe:duration-200', offen === 'neu' && 'rotate-45')}

@@ -22,6 +22,8 @@ import type { TeilenFensterDaten } from '@/lib/teilen-fenster'
 import {
   HEUTE_NIEMAND,
   KENNZAHL_TEXT,
+  kennzahlBreiteEm,
+  mitTrennstellen,
   PACK_MARKE,
   naechsteAbholungText,
   type BrauchtDichEintrag,
@@ -84,19 +86,28 @@ function Kennzahl({
   wert,
   zusatz,
   offen = false,
-  className,
 }: {
   titel: string
   wert: string
   /** Leiser Satz unter dem Wert — was die Zahl mitzählt. */
   zusatz?: string
   offen?: boolean
-  className?: string
 }) {
   return (
-    <div className={cn(KARTE, 'min-w-0 px-3 py-3 md:px-[18px] md:py-4', className)}>
-      <p className={cn('line-clamp-2 text-xs leading-snug break-words md:text-[13px]', LEISE)}>{titel}</p>
-      <p className={cn('mt-1 truncate font-heading text-[22px] font-semibold tabular-nums md:mt-1.5 md:text-[26px]', offen && 'text-status-offen')}>
+    // Jede Karte ist ein Container: Die Zahl misst sich an ihrer Breite (cqw).
+    <div className={cn(KARTE, '@container min-w-0 px-3 py-3 md:px-[18px] md:py-4')}>
+      {/* Am Handy zwei Zeilen Platz, damit die Zahlen auf einer Höhe stehen; ein langes Wort trennt an seinen
+          weichen Trennstellen — gekürzt wird auch die Bezeichnung nie. */}
+      <p className={cn('min-h-[2lh] text-xs leading-snug break-words md:min-h-0 md:text-[13px]', LEISE)}>{mitTrennstellen(titel)}</p>
+      {/* Ein Betrag wird nie gekürzt: höchstens 22 bzw. 26 px, in einer schmalen Karte so groß, wie er hineinpasst (kennzahlBreiteEm). */}
+      <p
+        style={{ '--kz-em': kennzahlBreiteEm(wert) } as React.CSSProperties}
+        className={cn(
+          'mt-1 font-heading leading-7 font-semibold whitespace-nowrap tabular-nums md:mt-1.5 md:leading-8',
+          'text-[length:min(22px,calc(100cqw/var(--kz-em)))] md:text-[length:min(26px,calc(100cqw/var(--kz-em)))]',
+          offen && 'text-status-offen'
+        )}
+      >
         {wert}
       </p>
       {zusatz && <p className={cn('mt-0.5 text-xs leading-snug md:text-[13px]', LEISE)}>{zusatz}</p>}
@@ -106,9 +117,7 @@ function Kennzahl({
 
 /**
  * Die drei Kennzahlen (Register F4) mit Bezeichnungen, die sagen, was sie
- * zählen (KENNZAHL_TEXT, freigabe.md §12 Nr. 45). Bis 1024 px zwei Spalten,
- * der Betrag darunter über die ganze Breite — bei drei schmalen Spalten kürzte
- * „€ 178,00" zu „€ 178,…".
+ * zählen (KENNZAHL_TEXT, freigabe.md §12 Nr. 45) — drei Spalten auch am Handy.
  */
 export function Kennzahlen({
   bestellungen,
@@ -120,14 +129,13 @@ export function Kennzahlen({
   umsatzHeuteCent: number
 }): React.JSX.Element {
   return (
-    <section aria-label="Heute in Zahlen" className="grid grid-cols-2 gap-2.5 md:gap-4 lg:grid-cols-3">
+    <section aria-label="Heute in Zahlen" className="grid grid-cols-3 gap-2.5 md:gap-4">
       <Kennzahl titel={KENNZAHL_TEXT.abholen} wert={String(bestellungen)} />
       <Kennzahl titel={KENNZAHL_TEXT.packen} wert={String(zuPacken)} offen={zuPacken > 0} />
       <Kennzahl
         titel={KENNZAHL_TEXT.eingenommen}
         wert={formatEuro(centsAlsEuro(umsatzHeuteCent))}
         zusatz={KENNZAHL_TEXT.eingenommenMit}
-        className="col-span-2 lg:col-span-1"
       />
     </section>
   )
@@ -346,7 +354,6 @@ export function Packliste({
 // ─── Braucht dich ───────────────────────────────────────────────────────────
 
 const BRAUCHT_DICH_SYMBOL: Record<BrauchtDichEintrag['art'], LucideIcon> = {
-  stripe: CreditCard,
   ueberfaellig: Clock,
   ausverkauft: PackageX,
   'ohne-kategorie': Tags,

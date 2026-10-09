@@ -26,6 +26,7 @@ import {
   type ProductSubcategoryValue,
 } from '@/lib/taxonomie'
 import { cn } from '@/lib/utils'
+import { KENNZEICHNUNG_VERWEIS } from '@/lib/futter-registrierung'
 
 /**
  * Kategorie wählen (Sprint Bereiche 1, Konzept 6.1): zuerst der Bereich als
@@ -270,7 +271,7 @@ function SheetInhalt({
 
         {istFutterKachel && !futterAnlegenHref && (
           <p className="text-xs text-muted-foreground">
-            Ob es ein Einzel-, Allein- oder Ergänzungsfuttermittel ist, gibst du gleich bei den Angaben vom Sackanhänger an.
+            Ob es ein Einzel-, Allein- oder Ergänzungsfuttermittel ist, gibst du gleich {KENNZEICHNUNG_VERWEIS} an.
           </p>
         )}
       </div>

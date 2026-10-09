@@ -39,7 +39,8 @@ import { KundenSortieren } from './kunden-sortieren'
  * Browser angewandt (replaceState, kein Server-Aufruf je Tipp). Was eine
  * Zeile sagt, entscheidet src/lib/hof-kunden.ts; hier wird nur angeordnet.
  * Seit Nr. 45 (freigabe.md §12): höchstens zwei Filter-Chips, die Sortierung
- * hinter dem Knopf „Sortieren" (kunden-sortieren.tsx).
+ * hinter dem Knopf „Sortieren" (kunden-sortieren.tsx) — dort auch alle fünf
+ * Filter im Abschnitt „Zeigen".
  */
 
 const euro = (cents: number) => formatEuro(centsAlsEuro(cents))
@@ -124,13 +125,9 @@ export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.
             <p className={cn('text-[13px]', LEISE)} aria-live="polite">
               {mitAnzahl(liste.length, 'Kunde', 'Kunden')}
             </p>
-            {/* Ein Knopf, kein Link: Die Sortierung ist Seitenzustand; die Adresse
-                bekommt sie trotzdem mit (Neuladen, Teilen). */}
-            <KundenSortieren
-              sortierung={ansicht.sortierung}
-              richtung={ansicht.richtung}
-              onWaehle={(wahl) => schreibeAdresse(kundenAdresse({ ...aktuell, ...wahl }))}
-            />
+            {/* Ein Knopf, kein Link: Sortierung und Filter im Blatt sind Seitenzustand;
+                die Adresse bekommt sie trotzdem mit (Neuladen, Teilen). */}
+            <KundenSortieren ansicht={aktuell} zahlen={zahlen} onAdresse={schreibeAdresse} />
           </div>
 
           {liste.length === 0 ? (

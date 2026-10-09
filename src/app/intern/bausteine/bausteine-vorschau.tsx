@@ -32,6 +32,7 @@ import { Zaehler } from '@/components/ui/zaehler'
 import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { ThemeUmschalter } from '@/components/shared/theme-umschalter'
 import { SHELL_VARIANTEN } from './shell/[variante]/varianten'
+import { HOF_NEU_KNOPF, HOF_NEU_KNOPF_NAME } from '@/lib/bauern-navigation'
 
 /*
  * Die Vorschau der Bausteine aus Gate 2. Jeder Baustein steht mit seinen
@@ -260,11 +261,11 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
                 <BottomNavLink href="/intern/bausteine" label="Heute" symbol={CalendarCheck} aktuell="page" />
                 <BottomNavLink href="/intern/bausteine#bottomnav" label="Bestellungen" symbol={ReceiptText} zahl={3} zahlWofuer="offene Bestellungen" />
                 <BottomNavMitte>
-                  <Link href="/intern/bausteine#bottomnav" aria-label="Neu erstellen" className={mittelknopfMitWortKlassen()}>
+                  <Link href="/intern/bausteine#bottomnav" aria-label={HOF_NEU_KNOPF_NAME} className={mittelknopfMitWortKlassen()}>
                     <span className={mittelkreisKlassen('orange')}>
                       <Plus className="size-6" strokeWidth={2.2} aria-hidden="true" />
                     </span>
-                    <span>Neu</span>
+                    <span>{HOF_NEU_KNOPF}</span>
                   </Link>
                 </BottomNavMitte>
                 <BottomNavLink href="/intern/bausteine#bottomnav" label="Produkte" symbol={Package} />

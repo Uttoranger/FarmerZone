@@ -7,12 +7,15 @@
  *    öffnet dasselbe Blatt wie ein Tipp auf den Kreis.
  *  - Die Trefferfläche wird nicht kleiner: Der Kreis bleibt 54 px, das Wort
  *    kommt dazu; der Knopf behält seinen Namen „Neu erstellen" (das sichtbare
- *    Wort steht am Anfang des Namens).
+ *    Wort steht am Anfang des Namens) — abgeleitet aus HOF_NEU_KNOPF, nie
+ *    fest eingetippt (Runde 1).
  *  - Das Wort kommt aus der Navigations-Quelle (HOF_NEU_KNOPF), dieselbe wie
  *    der Neu-Knopf der Seitenleiste.
  *  - Gegenprobe: Die Kunden-Unterleiste (Warenkorb) bleibt ohne Wort.
  */
 import { describe, it, expect, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { createElement, type ComponentType, type ReactElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
@@ -27,7 +30,9 @@ vi.mock('@/lib/auth-client', () => ({ signOut: vi.fn() }))
 
 import { HofShell } from '@/components/shells/hof-shell'
 import { KundeShell } from '@/components/shells/kunde-shell'
-import { HOF_NEU_KNOPF } from '@/lib/bauern-navigation'
+import { HOF_NEU_KNOPF, HOF_NEU_KNOPF_NAME } from '@/lib/bauern-navigation'
+
+const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 
 function el<P extends { children?: ReactNode }>(typ: ComponentType<P>, props: Omit<P, 'children'>): ReactElement {
   return createElement(typ as unknown as ComponentType<Omit<P, 'children'>>, props, createElement('p', null, 'Inhalt'))
@@ -53,13 +58,22 @@ describe('Unterleiste Hof: „Neu" unter dem Plus', () => {
   })
 
   it('steht im Knopf des Plus, nach dem Symbol — Wort und Kreis öffnen dasselbe Blatt', () => {
-    expect(knopf).toContain('aria-label="Neu erstellen"')
+    expect(knopf).toContain(`aria-label="${HOF_NEU_KNOPF_NAME}"`)
+    expect(HOF_NEU_KNOPF_NAME).toBe('Neu erstellen')
     const symbol = knopf.indexOf('<svg')
     const wort = knopf.indexOf(`>${HOF_NEU_KNOPF}<`)
     expect(symbol).toBeGreaterThan(-1)
     expect(wort).toBeGreaterThan(symbol)
     // Sichtbarer Text steht am Anfang des Namens (WCAG „Label in Name").
-    expect('Neu erstellen'.startsWith(HOF_NEU_KNOPF)).toBe(true)
+    expect(HOF_NEU_KNOPF_NAME.startsWith(HOF_NEU_KNOPF)).toBe(true)
+  })
+
+  it('der Name kommt aus der Quelle — in Shell und Bausteine-Vorschau nicht fest eingetippt (Runde 1)', () => {
+    for (const datei of ['src/components/shells/hof-shell.tsx', 'src/app/intern/bausteine/bausteine-vorschau.tsx']) {
+      const text = quelle(datei)
+      expect(text, datei).toContain('aria-label={HOF_NEU_KNOPF_NAME}')
+      expect(text, datei).not.toContain('aria-label="Neu erstellen"')
+    }
   })
 
   it('die Trefferfläche wird nicht kleiner: der Kreis bleibt 54 px, das Wort kommt darunter dazu', () => {

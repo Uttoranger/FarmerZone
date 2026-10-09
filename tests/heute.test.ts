@@ -238,7 +238,6 @@ describe('brauchtDich', () => {
     ausverkauft: [],
     ohneKategorie: [],
     statusErinnerung: null,
-    stripe: false,
   }
 
   it('nichts zu tun → leer („Alles erledigt.")', () => {
@@ -318,17 +317,8 @@ describe('brauchtDich', () => {
       ausverkauft: [{ id: 'p1', name: 'Eier' }],
       ohneKategorie: [{ id: 'p2', name: 'Kürbis' }],
       statusErinnerung: 7,
-      stripe: false,
     })
     expect(eintraege.map((e) => e.art)).toEqual(['ueberfaellig', 'ausverkauft', 'ohne-kategorie', 'status'])
-  })
-
-  it('der Stripe-Hinweis, der oben keinen Platz hat (Balken der Shell), steht vor allem anderen', () => {
-    const eintraege = brauchtDich({ ...LEER, ausverkauft: [{ id: 'p1', name: 'Eier' }], stripe: true })
-    expect(eintraege.map((e) => e.art)).toEqual(['stripe', 'ausverkauft'])
-    expect(eintraege[0].href).toBe('/settings/payments')
-    // Kein „bar"-Versprechen: Ein wartender Hof nimmt noch gar keine Bestellungen an.
-    expect(eintraege[0].text).not.toMatch(/bar/i)
   })
 })
 

@@ -303,6 +303,18 @@ export function speichernHinweis(sofort: number, wartend: number): string | null
 // Produktdialog, Server Actions, Produktseite und Warenkorb. Die Wortlaute
 // stehen so im Register; tests/futter-bestaetigung.test.ts hält sie fest.
 
+/**
+ * Der EINE Name des Abschnitts mit den Futter-Angaben — im Futter-Formular,
+ * im Produktdialog (produkt-abschnitte.ts) und in jedem Verweis darauf
+ * (Nachbesserung Runde 1 zu Nr. 45: vorher hieß derselbe Abschnitt an
+ * manchen Stellen anders). Das Wort erklärt KENNZEICHNUNG_ERKLAERUNG am
+ * Anfang des Abschnitts; der Pflicht-Haken aus E10a nennt es wörtlich.
+ */
+export const KENNZEICHNUNG_TITEL = 'Kennzeichnung'
+
+/** So verweist ein Satz auf den Abschnitt: „im Abschnitt „Kennzeichnung“". */
+export const KENNZEICHNUNG_VERWEIS = `im Abschnitt „${KENNZEICHNUNG_TITEL}“`
+
 /** Der Pflicht-Haken im Futter-Formular und im Produktdialog (E10a, wörtlich). */
 export const FUTTER_BESTAETIGUNG_TEXT =
   'Ich bestätige, dass meine Angaben zu Registrierung, Kennzeichnung und Verpackung richtig und vollständig sind. Für die Richtigkeit bin ich verantwortlich. Falsche Angaben können nach dem Futtermittelgesetz bestraft werden.'
@@ -312,8 +324,7 @@ export const FUTTER_BESTAETIGUNG_FEHLT =
   'Bitte bestätige deine Angaben mit dem Haken – ohne Bestätigung können wir das Futter nicht speichern.'
 
 /** Antwort des Servers, wenn beim Bearbeiten Angaben geändert, aber nicht neu bestätigt wurden. */
-export const FUTTER_BESTAETIGUNG_NEU =
-  'Du hast Angaben zum Futter geändert. Bitte bestätige sie neu mit dem Haken unter der Kennzeichnung, dann speichern wir.'
+export const FUTTER_BESTAETIGUNG_NEU = `Du hast Angaben zum Futter geändert. Bitte bestätige sie neu mit dem Haken ${KENNZEICHNUNG_VERWEIS}, dann speichern wir.`
 
 /** Der Satz unter dem Haken beim Bearbeiten — wann er nicht nötig ist (OHNE_NEUE_BESTAETIGUNG). */
 export const FUTTER_BESTAETIGUNG_AUSNAHME = 'Änderst du nur Preis, Vorrat, Foto oder Sichtbarkeit, brauchst du den Haken nicht.'
@@ -327,8 +338,13 @@ export const FUTTER_BESTAETIGUNG_AUSNAHME = 'Änderst du nur Preis, Vorrat, Foto
 export const KENNZEICHNUNG_ERKLAERUNG =
   'Kennzeichnung heißt: die Angaben, die zu jedem Futter gehören – was es ist, woraus es besteht und für welche Tiere.'
 
-/** Wo der Hof die Angaben findet — in beiden Formularen gleich. */
-export const KENNZEICHNUNG_FUNDORT = 'Alle Angaben findest du auf dem Sackanhänger oder Lieferschein deines Futters.'
+/**
+ * Wo der Hof die Angaben findet — in beiden Formularen gleich. Heu aus eigener
+ * Ernte (E10) hat keinen Sackanhänger und keinen Lieferschein; der Satz
+ * stimmt für beide Fälle (Runde 1).
+ */
+export const KENNZEICHNUNG_FUNDORT =
+  'Bei eigener Ernte trägst du sie selbst ein, bei zugekauftem Futter stehen sie auf dem Sackanhänger oder Lieferschein.'
 
 /** Kopfhinweis über den sieben Fällen (E10a, wörtlich). */
 export const ORIENTIERUNG_HINWEIS =

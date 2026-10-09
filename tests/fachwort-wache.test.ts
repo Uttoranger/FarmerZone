@@ -10,10 +10,14 @@
  *  - „Umsatzgrenze" nur in der einen Quelle der Verkäufe-Texte
  *    (hof-verkaeufe.ts, Wortlaut aus Register F6); wer „Dieses Jahr (für die
  *    Umsatzgrenze)" zeigt, zeigt auch den Satz, der sie erklärt.
- *  - „Kennzeichnung" nur in Dateien mit Grund (Liste KENNZEICHNUNG_ERLAUBT): im
- *    Hofbereich nur der Abschnitt „Kennzeichnung" samt seinen Meldungen — und
- *    der Abschnitt trägt den erklärenden Satz (KENNZEICHNUNG_ERKLAERUNG); dazu
- *    die Pflichttexte aus E10a, die wörtlich bleiben (tests/futter-bestaetigung.test.ts).
+ *  - „Kennzeichnung" nur in Texten mit Grund (Liste KENNZEICHNUNG_ERLAUBT, je
+ *    Text, nicht je Datei — ein neuer Satz fällt auch in einer Datei auf, die
+ *    schon erlaubte Texte trägt): der EINE Name des Abschnitts
+ *    (KENNZEICHNUNG_TITEL, Verweise bauen ihn aus der Konstante), der
+ *    erklärende Satz (KENNZEICHNUNG_ERKLAERUNG) und die Pflichttexte aus E10a,
+ *    die wörtlich bleiben (tests/futter-bestaetigung.test.ts).
+ *  - Der Satz zur Umsatzgrenze stimmt mit dem Code: Jedes Produkt zählt, außer
+ *    der Hof lässt es nicht mitzählen; vereinfacht, ohne eigene Rechtsaussage.
  *  - Gegenprobe: Die Suche findet die Wörter in Zeichenketten, Vorlagen und
  *    JSX-Text, nicht in Kommentaren — und die Regeln schlagen an.
  */
@@ -21,10 +25,21 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import ts from 'typescript'
-import { KENNZEICHNUNG_ERKLAERUNG, USP_AUSGESCHRIEBEN } from '@/lib/futter-registrierung'
+import {
+  FUTTER_BESTAETIGUNG_NEU,
+  FUTTER_BESTAETIGUNG_TEXT,
+  KENNZEICHNUNG_ERKLAERUNG,
+  KENNZEICHNUNG_FUNDORT,
+  KENNZEICHNUNG_TITEL,
+  KENNZEICHNUNG_VERWEIS,
+  KUNDEN_VERANTWORTUNG,
+  USP_AUSGESCHRIEBEN,
+} from '@/lib/futter-registrierung'
 import { JAHRESSUMME_TEXT, UMSATZGRENZE_ERKLAERUNG } from '@/lib/hof-verkaeufe'
 import { formatEuro } from '@/lib/format'
-import { PROCESSING_REVENUE_LIMIT } from '@/lib/revenue-limit'
+import { PROCESSING_REVENUE_LIMIT, sumCountedRevenue } from '@/lib/revenue-limit'
+import { FUTTER_FEHLER } from '@/schemas/product'
+import { ABSCHNITT_TITEL } from '@/components/products/produkt-abschnitte'
 import { BETRIEBSSTATUS } from '@/lib/taxonomie'
 
 const WURZEL = process.cwd()
@@ -62,18 +77,33 @@ function findeFachwoerter(quelltext: string, datei = 'schnipsel.tsx'): Fund[] {
 }
 
 /**
- * Wo „Kennzeichnung" stehen darf — mit Grund. Eine neue Datei mit dem Wort
- * fällt hier auf: entweder ein Alltagswort nehmen („Angaben vom Sackanhänger")
- * oder den Satz KENNZEICHNUNG_ERKLAERUNG daneben zeigen und hier eintragen.
+ * Wo „Kennzeichnung" als Text stehen darf — je Text mit Grund, nicht je Datei
+ * (Nachbesserung Runde 1): Ein neuer, nicht erklärter Satz fällt auch in
+ * einer Datei auf, die schon erlaubte Texte trägt. Wer auf den Abschnitt
+ * verweist, baut seinen Namen aus KENNZEICHNUNG_TITEL — dann steht das Wort
+ * dort nicht als Text, und es gibt nur EINEN Namen.
  */
-const KENNZEICHNUNG_ERLAUBT: Record<string, string> = {
-  'src/lib/futter-registrierung.ts': 'Quelle des erklärenden Satzes; Pflichttexte aus E10a wörtlich; Verweis auf den Haken unter dem Abschnitt',
-  'src/components/produkte/futter-formular.tsx': 'Abschnitt „Kennzeichnung" im Futter-Formular, beginnt mit KENNZEICHNUNG_ERKLAERUNG',
-  'src/components/products/produkt-abschnitte.ts': 'Titel des Abschnitts im Produktdialog, der Abschnitt beginnt mit KENNZEICHNUNG_ERKLAERUNG',
-  'src/schemas/product.ts': 'Fehler am Abschnitt „Kennzeichnung" des Produktdialogs („… vom Sackanhänger")',
-  'src/components/produktdetail/produktdetail-teile.tsx': 'Produktseite für Kundinnen, kein Hofbereich (Nr. 45 betrifft den Hofbereich)',
-  'src/app/(public)/impressum/page.tsx': 'Rechtstext',
-  'src/lib/laender.ts': 'Klär-Erinnerung nur im Admin (DE_ADMIN_KLAERUNG), kein Hofbereich',
+type Erlaubt = { datei: string; text: string | RegExp; grund: string }
+const KENNZEICHNUNG_ERLAUBT: Erlaubt[] = [
+  { datei: 'src/lib/futter-registrierung.ts', text: KENNZEICHNUNG_TITEL, grund: 'der eine Name des Abschnitts' },
+  { datei: 'src/lib/futter-registrierung.ts', text: KENNZEICHNUNG_ERKLAERUNG, grund: 'der erklärende Satz am Anfang des Abschnitts' },
+  { datei: 'src/lib/futter-registrierung.ts', text: FUTTER_BESTAETIGUNG_TEXT, grund: 'Pflicht-Haken aus E10a, wörtlich' },
+  { datei: 'src/lib/futter-registrierung.ts', text: KUNDEN_VERANTWORTUNG, grund: 'Hinweis für Kundinnen aus E10a, wörtlich' },
+  { datei: 'src/components/produktdetail/produktdetail-teile.tsx', text: 'Kennzeichnung', grund: 'Produktseite für Kundinnen, kein Hofbereich' },
+  {
+    datei: 'src/app/(public)/impressum/page.tsx',
+    text: /^FarmerZone stellt ausschließlich die technische Plattform zur Verfügung\. Für die Beschreibung, Qualität, Kennzeichnung und Lieferung /,
+    grund: 'Rechtstext',
+  },
+  {
+    datei: 'src/lib/laender.ts',
+    text: 'Vor der Freischaltung klären: Stripe-Konto in DE, steuerliche Behandlung, Kennzeichnungspflichten.',
+    grund: 'Klär-Erinnerung nur im Admin, kein Hofbereich',
+  },
+]
+
+function passt(e: Erlaubt, fund: Fund): boolean {
+  return e.datei === fund.datei.split(sep).join('/') && (typeof e.text === 'string' ? e.text === fund.text : e.text.test(fund.text))
 }
 
 /** Die einzige Datei, in der „Umsatzgrenze" steht: der Wortlaut aus Register F6 und sein erklärender Satz. */
@@ -88,7 +118,7 @@ function beanstande(fund: Fund): string[] {
   if (/\bUSP\b/.test(fund.text.replaceAll(USP_AUSGESCHRIEBEN, ''))) maengel.push('USP nicht ausgeschrieben')
   if (fund.text.replaceAll(EIGENE_ERNTE, '').includes('Primärproduktion')) maengel.push('Primärproduktion ohne Alltagswort')
   if (fund.text.includes('Umsatzgrenze') && datei !== UMSATZGRENZE_QUELLE) maengel.push('Umsatzgrenze außerhalb der Quelle')
-  if (fund.text.includes('Kennzeichnung') && !(datei in KENNZEICHNUNG_ERLAUBT)) maengel.push('Kennzeichnung ohne Erklärung')
+  if (fund.text.includes('Kennzeichnung') && !KENNZEICHNUNG_ERLAUBT.some((e) => passt(e, { ...fund, datei }))) maengel.push('Kennzeichnung ohne Erklärung')
   return maengel
 }
 
@@ -120,7 +150,17 @@ describe('Fachwort-Wache', () => {
     expect(beanstande(fund('Für die Umsatzgrenze'))).toEqual(['Umsatzgrenze außerhalb der Quelle'])
     expect(beanstande(fund('Für die Umsatzgrenze', UMSATZGRENZE_QUELLE))).toEqual([])
     expect(beanstande(fund('Kennzeichnung'))).toEqual(['Kennzeichnung ohne Erklärung'])
-    expect(beanstande(fund('Kennzeichnung', 'src/components/produkte/futter-formular.tsx'))).toEqual([])
+    // Je Text, nicht je Datei: Ein neuer Satz fällt auch dort auf, wo schon erlaubte Texte stehen (Runde 1).
+    for (const datei of [
+      'src/lib/futter-registrierung.ts',
+      'src/schemas/product.ts',
+      'src/components/produkte/futter-formular.tsx',
+      'src/components/products/produkt-abschnitte.ts',
+    ]) {
+      expect(beanstande(fund('Neue Kennzeichnung ohne Satz', datei)), datei).toEqual(['Kennzeichnung ohne Erklärung'])
+    }
+    expect(beanstande(fund(FUTTER_BESTAETIGUNG_TEXT, 'src/lib/futter-registrierung.ts'))).toEqual([])
+    expect(beanstande(fund(FUTTER_BESTAETIGUNG_TEXT, 'src/components/produkte/futter-formular.tsx'))).toEqual(['Kennzeichnung ohne Erklärung'])
   })
 
   it('kein Fachwort ohne Erklärung in einem Text unter src/', () => {
@@ -128,9 +168,8 @@ describe('Fachwort-Wache', () => {
     expect(maengel).toEqual([])
   })
 
-  it('jede erlaubte Datei trägt das Wort noch — sonst gehört sie aus der Liste', () => {
-    const mitWort = new Set(ALLE_FUNDE.filter((f) => f.text.includes('Kennzeichnung')).map((f) => f.datei))
-    for (const datei of Object.keys(KENNZEICHNUNG_ERLAUBT)) expect(mitWort.has(datei), datei).toBe(true)
+  it('jeder erlaubte Text steht noch so da — sonst gehört er aus der Liste', () => {
+    for (const e of KENNZEICHNUNG_ERLAUBT) expect(ALLE_FUNDE.some((f) => passt(e, f)), `${e.datei}: ${e.grund}`).toBe(true)
   })
 
   it('USP steht ausgeschrieben; Primärproduktion heißt im Hofprofil „Eigene Ernte (Primärproduktion)"', () => {
@@ -140,15 +179,33 @@ describe('Fachwort-Wache', () => {
 
   it('„Umsatzgrenze": der Wortlaut aus F6 bleibt, daneben steht in einem Satz, was sie ist', () => {
     expect(JAHRESSUMME_TEXT).toBe('Dieses Jahr (für die Umsatzgrenze)')
-    // Ein Satz: beginnt mit dem Wort, endet mit dem Punkt, kein zweiter Satz
-    // (der Tausenderpunkt im Betrag steht zwischen Ziffern).
+    // Ein Satz: beginnt mit dem Wort, endet mit dem Punkt, kein zweiter Satz.
     expect(UMSATZGRENZE_ERKLAERUNG).toMatch(/^Umsatzgrenze heißt: .+\.$/)
     expect(UMSATZGRENZE_ERKLAERUNG).not.toMatch(/\.\s/)
-    // Die Grenze steht als Betrag da, aus derselben Quelle wie die Jahreskarte
-    // der Auswertung — „bis zu dieser Summe" las sich direkt unter der
-    // Jahressumme wie deren Betrag.
-    expect(UMSATZGRENZE_ERKLAERUNG).toContain(`Bis ${formatEuro(PROCESSING_REVENUE_LIMIT, 0)} im Jahr`)
+    // Die Grenze als Betrag, aus derselben Quelle wie die Jahreskarte der Auswertung.
+    expect(UMSATZGRENZE_ERKLAERUNG).toContain(formatEuro(PROCESSING_REVENUE_LIMIT, 0))
     expect(UMSATZGRENZE_ERKLAERUNG).not.toContain('dieser Summe')
+  })
+
+  it('der Satz zur Umsatzgrenze stimmt mit dem Code und ordnet nichts rechtlich ein (Runde 1)', () => {
+    // Code: Jedes Produkt zählt standardmäßig (countsTowardLimit: true); heraus
+    // fällt nur, was der Hof im Produkt abhakt; Posten ohne Produkt zählen immer.
+    expect(quelle('src/components/products/product-dialog.tsx')).toContain('countsTowardLimit: true,')
+    expect(
+      sumCountedRevenue([
+        { amount: 100, countsTowardLimit: true },
+        { amount: 40, countsTowardLimit: null },
+        { amount: 7, countsTowardLimit: false },
+      ])
+    ).toBe(140)
+    expect(UMSATZGRENZE_ERKLAERUNG).toContain('jeder Verkauf')
+    expect(UMSATZGRENZE_ERKLAERUNG).toContain('nicht mitzählen lässt')
+    // Vereinfacht wie die Jahreskarte der Auswertung, keine eigene Rechtsaussage.
+    expect(UMSATZGRENZE_ERKLAERUNG).toContain('vereinfacht, keine Steuerberatung')
+    expect(UMSATZGRENZE_ERKLAERUNG).not.toMatch(/Rohes|Teil deiner Landwirtschaft|\bgilt\b/)
+  })
+
+  it('wer die Jahressumme zeigt, zeigt auch den Satz', () => {
     const zeigen = [...quelldateien(join(WURZEL, 'src'))]
       .map((p) => relative(WURZEL, p).split(sep).join('/'))
       .filter((p) => p !== UMSATZGRENZE_QUELLE && /\bJAHRESSUMME_TEXT\b/.test(quelle(p)))
@@ -161,5 +218,34 @@ describe('Fachwort-Wache', () => {
     for (const datei of ['src/components/produkte/futter-formular.tsx', 'src/components/products/product-dialog.tsx']) {
       expect(quelle(datei), datei).toMatch(/\bKENNZEICHNUNG_ERKLAERUNG\b/)
     }
+  })
+
+  it('„Kennzeichnung": EIN Name aus einer Quelle — Abschnitt, Verweise und Meldungen bauen ihn aus KENNZEICHNUNG_TITEL (Runde 1)', () => {
+    expect(KENNZEICHNUNG_TITEL).toBe('Kennzeichnung')
+    expect(ABSCHNITT_TITEL.kennzeichnung).toBe(KENNZEICHNUNG_TITEL)
+    for (const datei of [
+      'src/components/produkte/futter-formular.tsx',
+      'src/components/products/produkt-abschnitte.ts',
+      'src/components/products/kategorie-sheet.tsx',
+      'src/components/products/product-dialog.tsx',
+      'src/schemas/product.ts',
+    ]) {
+      expect(quelle(datei), datei).toMatch(/\bKENNZEICHNUNG_(?:TITEL|VERWEIS)\b/)
+    }
+    expect(KENNZEICHNUNG_VERWEIS).toBe(`im Abschnitt „${KENNZEICHNUNG_TITEL}“`)
+    const verweis = `im Abschnitt „${KENNZEICHNUNG_TITEL}“`
+    expect(FUTTER_FEHLER.fehlt).toBe(`Bei Futtermitteln brauchen wir die Angaben ${verweis}.`)
+    expect(FUTTER_FEHLER.verboten).toBe(`Angaben ${verweis} gibt es nur bei Futtermitteln.`)
+    expect(FUTTER_BESTAETIGUNG_NEU).toBe(`Du hast Angaben zum Futter geändert. Bitte bestätige sie neu mit dem Haken ${verweis}, dann speichern wir.`)
+    // Kein zweiter Name für denselben Abschnitt (Runde 0 schrieb „Angaben vom Sackanhänger").
+    for (const pfad of quelldateien(join(WURZEL, 'src'))) {
+      expect(readFileSync(pfad, 'utf8'), relative(WURZEL, pfad)).not.toContain('Angaben vom Sackanhänger')
+    }
+  })
+
+  it('der Satz, wo die Angaben stehen, stimmt auch für Heu aus eigener Ernte — dort gibt es keinen Sackanhänger (E10)', () => {
+    expect(KENNZEICHNUNG_FUNDORT).toMatch(/^[^.]+\.$/)
+    expect(KENNZEICHNUNG_FUNDORT).toContain('eigener Ernte')
+    expect(KENNZEICHNUNG_FUNDORT).toContain('Sackanhänger oder Lieferschein')
   })
 })

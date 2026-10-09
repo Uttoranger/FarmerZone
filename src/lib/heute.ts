@@ -206,7 +206,7 @@ export const BRAUCHT_DICH_EINZELN = 3
 export const UEBERFAELLIG_EINZELN = 5
 
 export type BrauchtDichEintrag = {
-  art: 'stripe' | 'ueberfaellig' | 'ausverkauft' | 'ohne-kategorie' | 'status'
+  art: 'ueberfaellig' | 'ausverkauft' | 'ohne-kategorie' | 'status'
   text: string
   href: string
   /** Überfällige Abholungen: jede Bestellung mit eigenem Link. */
@@ -224,19 +224,7 @@ export type BrauchtDichDaten = {
   ohneKategorie: { id: string; name: string }[]
   /** statusReminder (dashboard-hints.ts): null = nicht fällig. */
   statusErinnerung: number | 'never' | null
-  /**
-   * Der Stripe-Hinweis gehört hierher statt oben auf die Seite
-   * (stripeHinweisOrt === 'braucht-dich'): Oben steht schon der Balken der Shell.
-   */
-  stripe: boolean
 }
-
-/**
- * Die Zeile, wenn der Stripe-Hinweis nicht oben stehen kann (stripeHinweisOrt).
- * Ohne „bar"-Versprechen: Ein Hof, der auf die Freischaltung wartet, nimmt
- * noch gar keine Bestellungen an.
- */
-export const STRIPE_BRAUCHT_DICH_TEXT = 'Online-Zahlung noch nicht fertig — Stripe braucht noch Angaben von dir'
 
 const TAG_KURZ = new Intl.DateTimeFormat('de-AT', {
   timeZone: 'Europe/Vienna',
@@ -255,10 +243,6 @@ function mehrzahl(n: number, eins: string, viele: string): string {
  */
 export function brauchtDich(daten: BrauchtDichDaten): BrauchtDichEintrag[] {
   const eintraege: BrauchtDichEintrag[] = []
-
-  // Zuerst — oben auf der Seite hätte Stripe Vorrang: Ohne fertiges Stripe
-  // zahlt niemand online, und ein wartender Hof wird nicht freigeschaltet (Z1).
-  if (daten.stripe) eintraege.push({ art: 'stripe', text: STRIPE_BRAUCHT_DICH_TEXT, href: '/settings/payments' })
 
   const { anzahl, juengste } = daten.ueberfaellig
   if (anzahl > 0) {
@@ -438,6 +422,56 @@ export const KENNZAHL_TEXT = {
 /** Der Leerzustand der Packliste — auch der des Filters „Heute abholen" in Bestellungen. */
 export const HEUTE_NIEMAND = 'Heute holt niemand etwas ab.'
 
+/**
+ * Breite der Zeichen in Fraunces 600 (Einheit em), im Browser gemessen
+ * (Nr. 45, Runde 1) — Ziffern verschieden breit, weil die Schrift keine
+ * Tabellenziffern mitbringt. Unbekanntes zählt breit (EM_UNBEKANNT).
+ */
+const EM_ZEICHEN: Record<string, number> = {
+  '0': 0.675,
+  '1': 0.4685,
+  '2': 0.618,
+  '3': 0.565,
+  '4': 0.6285,
+  '5': 0.5875,
+  '6': 0.6185,
+  '7': 0.5275,
+  '8': 0.617,
+  '9': 0.6215,
+  '€': 0.7075,
+  ' ': 0.2175,
+  '\u00a0': 0.2175,
+  '\u202f': 0.1087,
+  ',': 0.2815,
+  '.': 0.27,
+}
+const EM_UNBEKANNT = 0.75
+/** Spielraum für die Ersatzschrift, solange Fraunces lädt, und fürs Runden. */
+const EM_SPIELRAUM = 1.04
+
+/**
+ * Wie breit ein Kennzahl-Wert in seiner eigenen Schriftgröße ist (em). Die
+ * Karte setzt daraus `font-size: min(22px, 100cqw / em)`: Ein Betrag wird nie
+ * gekürzt, er wird in einer schmalen Karte kleiner (drei Spalten bei 360 px,
+ * freigabe.md §12 Nr. 45). Lieber etwas zu breit geschätzt als zu schmal.
+ */
+export function kennzahlBreiteEm(wert: string): number {
+  const summe = [...wert].reduce((em, zeichen) => em + (EM_ZEICHEN[zeichen] ?? EM_UNBEKANNT), 0)
+  return Math.ceil(summe * EM_SPIELRAUM * 1000) / 1000
+}
+
+/**
+ * Weiche Trennstellen (U+00AD) für Wörter, die in einer schmalen Kennzahl-Karte
+ * nicht in eine Zeile passen: „Heute einge-/nommen" statt „eingenomme/n" —
+ * bei 360 px ist „eingenommen" breiter als die Karte. Alle Silben, damit auch
+ * 320 px sauber trennen. Das Wort bleibt für Vorleser und Kopieren dasselbe.
+ */
+const TRENNSTELLEN: Record<string, string> = { eingenommen: 'ein\u00adge\u00adnom\u00admen' }
+
+export function mitTrennstellen(text: string): string {
+  return text.replace(/\p{L}+/gu, (wort) => TRENNSTELLEN[wort] ?? wort)
+}
+
 // ─── Abholfenster ───────────────────────────────────────────────────────────
 
 /** Ein wöchentliches Abholfenster, wie der Hof es eingetragen hat (dayOfWeek 0 = Sonntag). */
@@ -575,39 +609,27 @@ export type HeuteBlock =
   | 'woche'
   | 'hofseite'
 
-export type StripeHinweisOrt = 'oben' | 'braucht-dich' | null
-
 /**
- * Wo der Stripe-Hinweis steht — „pausiert" (Notbremse) oder „einrichten"
- * (Register Z1); bis er erledigt ist, können Kunden nicht online zahlen. Oben
- * auf Heute steht höchstens EIN Kasten, und Stripe hat Vorrang (freigabe.md
- * §12 Nr. 45). Zeigt die Shell dort schon ihren Balken (wartet auf
- * Freischaltung, stillgelegt — hofBalkenArt), wird der Hinweis die erste
- * Zeile von „Braucht dich": Den Balken des Layouts kann die Seite nicht
- * verdrängen, und so geht der Hinweis nicht verloren.
- */
-export function stripeHinweisOrt({ hinweis, hofBalken }: { hinweis: boolean; hofBalken: boolean }): StripeHinweisOrt {
-  if (!hinweis) return null
-  return hofBalken ? 'braucht-dich' : 'oben'
-}
-
-/**
- * Welche Blöcke wo stehen (freigabe.md §12 Nr. 45). Oben höchstens EIN
- * Kasten: der Stripe-Hinweis, wenn er oben steht. Die Hauptspalte beginnt
- * immer mit der Packliste (Gate 5: „Packliste zuerst"), direkt darunter die
- * kompakte Teilen-Zeile — nur bei sichtbarem Hof (heuteHofSichtbar) —, dann
- * „Braucht dich". Die Seitenspalte steht am Handy unter der Hauptspalte.
+ * Welche Blöcke wo stehen (freigabe.md §12 Nr. 45). Oben höchstens EIN Kasten
+ * von Heute: der Stripe-Hinweis — „pausiert" (Notbremse) oder „einrichten"
+ * (Register Z1); bis er erledigt ist, können Kunden nicht online zahlen. Den
+ * Balken der Shell („wartet auf Freischaltung", „stillgelegt") zeigt das
+ * Layout auf jeder Seite; er zählt nicht mit (Entscheidung zur Prüfung,
+ * Runde 1). Die Hauptspalte beginnt immer mit der Packliste (Gate 5:
+ * „Packliste zuerst"), direkt darunter die kompakte Teilen-Zeile — nur bei
+ * sichtbarem Hof (heuteHofSichtbar) —, dann „Braucht dich". Die Seitenspalte
+ * steht am Handy unter der Hauptspalte.
  */
 export function heuteAufbau({
-  stripe,
+  stripeHinweis,
   teilen,
   ersteSchritte,
 }: {
-  stripe: StripeHinweisOrt
+  stripeHinweis: boolean
   teilen: boolean
   ersteSchritte: boolean
 }): { oben: HeuteBlock[]; haupt: HeuteBlock[]; seite: HeuteBlock[] } {
-  const oben: HeuteBlock[] = stripe === 'oben' ? ['stripe'] : []
+  const oben: HeuteBlock[] = stripeHinweis ? ['stripe'] : []
   const haupt: HeuteBlock[] = teilen ? ['packliste', 'teilen', 'braucht-dich'] : ['packliste', 'braucht-dich']
   const seite: HeuteBlock[] = ersteSchritte ? ['erste-schritte'] : []
   seite.push('naechste-abholung', 'woche', 'hofseite')

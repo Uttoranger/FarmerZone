@@ -8,6 +8,7 @@ import type { z } from 'zod'
 import { PRODUKT_FELD_REIHENFOLGE, type ProductFormData } from '@/schemas/product'
 import { UNTERKATEGORIE_LABEL, type ProductSubcategoryValue } from '@/lib/taxonomie'
 import { SPEICHERN_NICHT_IM_SHOP } from '@/lib/produkt-sichtbarkeit'
+import { KENNZEICHNUNG_TITEL } from '@/lib/futter-registrierung'
 
 export const ABSCHNITTE = ['grunddaten', 'preis', 'details', 'kennzeichnung'] as const
 export type Abschnitt = (typeof ABSCHNITTE)[number]
@@ -16,7 +17,7 @@ export const ABSCHNITT_TITEL: Record<Abschnitt, string> = {
   grunddaten: 'Grunddaten',
   preis: 'Preis & Verfügbarkeit',
   details: 'Details',
-  kennzeichnung: 'Kennzeichnung',
+  kennzeichnung: KENNZEICHNUNG_TITEL,
 }
 
 type Feld = (typeof PRODUKT_FELD_REIHENFOLGE)[number]

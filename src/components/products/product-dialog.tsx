@@ -105,6 +105,8 @@ import {
   FUTTER_BESTAETIGUNG_TEXT,
   KENNZEICHNUNG_ERKLAERUNG,
   KENNZEICHNUNG_FUNDORT,
+  KENNZEICHNUNG_TITEL,
+  KENNZEICHNUNG_VERWEIS,
   brauchtNeueBestaetigung,
   futterStandAusFormular,
 } from '@/lib/futter-registrierung'
@@ -1930,15 +1932,15 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
       onUebernehmen={({ category: neu, subcategory: sorte }) => kategorieUebernehmen(neu, sorte)}
     />
 
-    {/* Rückfrage: Kategoriewechsel weg von Futtermittel löscht die Kennzeichnung (ohne das Fachwort, Nr. 45) */}
+    {/* Rückfrage: Kategoriewechsel weg von Futtermittel löscht den Abschnitt — beim einen Namen genannt (KENNZEICHNUNG_TITEL). */}
     <Dialog open={kategorieWechsel !== null} onOpenChange={(o) => !o && setKategorieWechsel(null)}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Futter-Angaben löschen?</DialogTitle>
+          <DialogTitle>{KENNZEICHNUNG_TITEL} löschen?</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Wenn das Produkt kein Futtermittel mehr ist, werden seine Angaben vom Sackanhänger beim Speichern
-          gelöscht. Die Angaben musst du dann neu eintippen, falls du sie wieder brauchst.
+          Wenn das Produkt kein Futtermittel mehr ist, löschen wir beim Speichern alles {KENNZEICHNUNG_VERWEIS}. Die
+          Angaben musst du dann neu eintippen, falls du sie wieder brauchst.
         </p>
         <DialogFooter>
           <Button variant="ghost" onClick={() => setKategorieWechsel(null)}>

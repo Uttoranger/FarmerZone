@@ -71,14 +71,16 @@ describe('P2 — Altlast-Unterkategorie', () => {
 
 describe('P3/P4 — Kennzeichnung nur und immer im Bereich Futtermittel', () => {
   it('fehlt sie bei Heu & Stroh, ist das ein Fehler', () => {
+    // Seit Nr. 45 (Runde 1) verweist der Satz auf den Abschnitt beim Namen —
+    // Heu aus eigener Ernte hat keinen Sackanhänger.
     expect(fehler({ ...heu, futter: null })['futter']).toBe(
-      'Bei Futtermitteln brauchen wir die Kennzeichnung vom Sackanhänger.'
+      'Bei Futtermitteln brauchen wir die Angaben im Abschnitt „Kennzeichnung“.'
     )
   })
 
   it('bei Eiern ist sie verboten — neuer Wortlaut ohne die alte Kategorie', () => {
     expect(fehler({ ...eier, futter: futterGueltig })['futter']).toBe(
-      'Eine Futter-Kennzeichnung gibt es nur bei Futtermitteln.'
+      'Angaben im Abschnitt „Kennzeichnung“ gibt es nur bei Futtermitteln.'
     )
   })
 })

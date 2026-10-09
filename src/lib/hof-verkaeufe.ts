@@ -24,12 +24,13 @@ export const JAHRESSUMME_TEXT = 'Dieses Jahr (für die Umsatzgrenze)'
 /**
  * Der Satz unter der Jahressumme: was die Umsatzgrenze ist (freigabe.md §12
  * Nr. 45 — Fachwörter erklären; der Wortlaut darüber bleibt, wie F6 ihn
- * festlegt). Die Grenze steht als Betrag da, aus derselben Quelle wie die
- * Jahreskarte der Auswertung: „bis zu dieser Summe" las sich direkt unter der
- * Jahressumme wie deren Betrag. Vereinfacht wie dort („keine Steuerberatung"):
- * Gezählt wird ohne die als Urproduktion markierten Produkte.
+ * festlegt). Er sagt nur, was die Zahl zählt, passend zum Code: Jeder Verkauf
+ * zählt mit (Produkte standardmäßig `countsTowardLimit: true`, Posten ohne
+ * Produkt immer, `sumCountedRevenue`), heraus fällt nur, was der Hof im
+ * Produkt abhakt. Keine eigene Rechtsaussage — vereinfacht wie die Jahreskarte
+ * der Auswertung, mit derselben Grenze (`PROCESSING_REVENUE_LIMIT`).
  */
-export const UMSATZGRENZE_ERKLAERUNG = `Umsatzgrenze heißt: Bis ${formatEuro(PROCESSING_REVENUE_LIMIT, 0)} im Jahr gilt der Verkauf von Verarbeitetem wie Brot, Most oder Wurst noch als Teil deiner Landwirtschaft – Rohes aus eigener Ernte zählt nicht mit.`
+export const UMSATZGRENZE_ERKLAERUNG = `Umsatzgrenze heißt: die Grenze von ${formatEuro(PROCESSING_REVENUE_LIMIT, 0)} im Jahr für Be- und Verarbeitung – hier zählt jeder Verkauf mit, außer Produkten, die du im Produkt nicht mitzählen lässt (vereinfacht, keine Steuerberatung).`
 
 /** Ein Direktverkauf, wie das Formular ihn zum Bearbeiten und Wiederholen braucht. */
 export type VerkaufDaten = {

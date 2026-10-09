@@ -79,8 +79,8 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   // Teilen nur, solange Kunden den Hof sehen und bei ihm bestellen können (heuteHofSichtbar).
   const teilen = heute.hof.sichtbar
   const aufbau = heuteAufbau({
-    // „pausiert" (Notbremse) oder „einrichten" (Register Z1) — nie beide; wo er steht, entscheidet getHeute.
-    stripe: heute.stripeOrt,
+    // „pausiert" (Notbremse) oder „einrichten" (Register Z1) — nie beide; der eine Kasten oben, auch über dem Balken der Shell.
+    stripeHinweis: heute.onlinePausiert !== null || heute.stripeEinrichten,
     teilen,
     ersteSchritte: ersteSchritteZeigen === 'karte',
   })

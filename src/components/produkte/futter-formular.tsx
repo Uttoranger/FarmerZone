@@ -27,6 +27,7 @@ import {
   FUTTER_BESTAETIGUNG_TEXT,
   KENNZEICHNUNG_ERKLAERUNG,
   KENNZEICHNUNG_FUNDORT,
+  KENNZEICHNUNG_TITEL,
   gebindeSperre,
   speichernHinweis,
   type HofRegistrierung,
@@ -424,7 +425,7 @@ export function FutterFormular({
 
       <Abschnitt
         id="futter-kennzeichnung"
-        titel="Kennzeichnung"
+        titel={KENNZEICHNUNG_TITEL}
         satz={`${KENNZEICHNUNG_ERKLAERUNG} ${KENNZEICHNUNG_FUNDORT} Sie gelten für alle Größen; das Gewicht steht je Größe oben.`}
       >
         <div className="flex flex-col gap-2" data-feld="kennzeichnung.futtermittelart">

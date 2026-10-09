@@ -7,7 +7,6 @@ import {
   type NaechstesFenster,
   type PacklistenZeile,
   type PacklistenZahlen,
-  type StripeHinweisOrt,
   type Wochenvergleich,
   type WochenBalken,
   abholfensterHeute,
@@ -25,11 +24,9 @@ import {
   umsatzHeuteCent,
   wienerTag,
   stripeEinrichtenHinweis,
-  stripeHinweisOrt,
   wochenBalken,
   wochenvergleich,
 } from '@/lib/heute'
-import { hofBalkenArt } from '@/lib/mein-hof'
 import { auswerten, umsatzfenster } from '@/lib/umsatz'
 import { umsatzBuchungen } from '@/server/queries/umsatz'
 import { statusReminder } from '@/lib/dashboard-hints'
@@ -79,12 +76,6 @@ export type Heute = {
   onlinePausiert: { barMoeglich: boolean } | null
   /** Freigeschaltet ohne fertiges Stripe (Register Z1, stripeEinrichtenHinweis): Hinweis „Online-Zahlung einrichten". */
   stripeEinrichten: boolean
-  /**
-   * Wo einer der beiden Stripe-Hinweise steht (stripeHinweisOrt): oben als
-   * einziger Kasten, als Zeile in „Braucht dich", wenn die Shell oben schon
-   * ihren Balken zeigt, oder gar nicht.
-   */
-  stripeOrt: StripeHinweisOrt
   /**
    * Was Teilen-Karte und Freischaltungs-Moment brauchen — sichtbar = öffentlich
    * UND nicht pausiert (heuteHofSichtbar); teilenMomenteAus = der Hof hat die
@@ -229,14 +220,6 @@ export async function getHeute(
   const fenster = naechstesAbholfenster(slots, jetzt)
   const fensterZahl = fensterAnzahl(fenster, wienKalendertag(jetzt), zeilen, naechsteAbholung)
   const auswertung = auswerten(buchungen, wochenfenster)
-  const onlinePausiert = hof !== null && onlineZahlungPausiert(hof)
-  const stripeEinrichten = hof !== null && stripeEinrichtenHinweis(hof)
-  // Oben höchstens EIN Kasten (freigabe.md §12 Nr. 45): Steht dort schon der
-  // Balken der Shell, rückt der Stripe-Hinweis in „Braucht dich".
-  const stripeOrt = stripeHinweisOrt({
-    hinweis: onlinePausiert || stripeEinrichten,
-    hofBalken: hof !== null && hofBalkenArt(hof) !== null,
-  })
   const sektionen = hof?.sectionsConfig
   const fortschritt = hof
     ? hofseiteFortschritt(
@@ -265,15 +248,13 @@ export async function getHeute(
       ausverkauft,
       ohneKategorie,
       statusErinnerung: statusReminder(letzterStatus?.publishedAt ?? null, jetzt),
-      stripe: stripeOrt === 'braucht-dich',
     }),
     woche: wochenvergleich(auswertung.summeCent, auswertung.vergleichCent),
     wochenBalken: wochenBalken(auswertung.balken, jetzt),
     ersteSchritte: ersteSchritte(ersteSchritteDaten(hof, { produkte, aktiveAbholzeiten: slots.length })),
     wartetAufFreigabe: hof?.approvedAt == null,
-    onlinePausiert: hof && onlinePausiert ? { barMoeglich: hof.acceptsOnsite } : null,
-    stripeEinrichten,
-    stripeOrt,
+    onlinePausiert: hof && onlineZahlungPausiert(hof) ? { barMoeglich: hof.acceptsOnsite } : null,
+    stripeEinrichten: hof ? stripeEinrichtenHinweis(hof) : false,
     hof: {
       sichtbar: hof ? heuteHofSichtbar(hof) : false,
       approvedAt: hof?.approvedAt ?? null,

@@ -57,6 +57,13 @@ export function passtZumFilter(b: Pick<ListenBestellung, 'status' | 'pickupDate'
   }
 }
 
+/** Die drei Filter beim Namen — EINE Quelle für die Chips und für Verweise (Kundendetail). */
+export const BESTELL_FILTER_TEXT: Record<HofBestellFilter, string> = {
+  heute: HEUTE_ABHOLEN,
+  offen: 'Noch offen',
+  erledigt: 'Erledigt',
+}
+
 /** Die Filter-Reihe: Beschriftung und Zahl (nur, wo sie bei der Arbeit hilft). */
 export function filterChips(
   bestellungen: readonly Pick<ListenBestellung, 'status' | 'pickupDate'>[],
@@ -64,9 +71,9 @@ export function filterChips(
 ): Array<{ filter: HofBestellFilter; text: string }> {
   const zahl = (f: HofBestellFilter) => bestellungen.filter((b) => passtZumFilter(b, f, jetzt)).length
   return [
-    { filter: 'heute', text: `${HEUTE_ABHOLEN} · ${zahl('heute')}` },
-    { filter: 'offen', text: `Noch offen · ${zahl('offen')}` },
-    { filter: 'erledigt', text: 'Erledigt' },
+    { filter: 'heute', text: `${BESTELL_FILTER_TEXT.heute} · ${zahl('heute')}` },
+    { filter: 'offen', text: `${BESTELL_FILTER_TEXT.offen} · ${zahl('offen')}` },
+    { filter: 'erledigt', text: BESTELL_FILTER_TEXT.erledigt },
   ]
 }
 

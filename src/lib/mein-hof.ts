@@ -84,21 +84,6 @@ export function hofZustand(hof: {
   return { art: 'sichtbar', schild: { text: 'Öffentlich', farbe: 'gruen' }, oeffentlich: true }
 }
 
-export type HofBalkenArt = 'stillgelegt' | 'wartet'
-
-/**
- * Welcher Balken über jeder Seite des Hofbereichs steht (HofBalken):
- * stillgelegt sticht „wartet auf Freischaltung" (Reihenfolge wie die
- * Server-Prüfung), sonst keiner. EINE Bedingung für das Layout
- * (ladeHofbereich) und für Heute, das oben höchstens einen Kasten zeigt
- * (stripeHinweisOrt in heute.ts, freigabe.md §12 Nr. 45).
- */
-export function hofBalkenArt(hof: { approvedAt: Date | null; archivedAt: Date | null }): HofBalkenArt | null {
-  if (hof.archivedAt != null) return 'stillgelegt'
-  if (hof.approvedAt == null) return 'wartet'
-  return null
-}
-
 /**
  * Die Adresse der Hofseite, wie der Kopf sie zeigt: Host und Slug, ohne
  * Protokoll („farmerzone.at/muellerhof"). Ein Bauer liest eine Adresse, kein
