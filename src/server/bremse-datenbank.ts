@@ -9,6 +9,7 @@ import {
   DB_BREMSE_ZEITLIMIT_MS,
   ZU_VIELE_ANFRAGEN,
   adressMerkmal,
+  bremsMeldungFaellig,
   bremsSchluessel,
   fensterBeginn,
   fensterEnde,
@@ -28,6 +29,10 @@ import {
  * Adresse. Die erste Stufe wirkt weiter. Eine Bremse, die bei einem
  * Datenbank-Schluckauf Kundinnen aussperrt oder eine Bestellung verhindert,
  * richtet mehr Schaden an als ein paar ungezählte Versuche.
+ *
+ * Gemeldet wird höchstens einmal je Instanz und zehn Minuten (Nr. 47,
+ * `BREMSE_MELDE_ABSTAND_MS`); die nächste Meldung nennt, wie viele Ausfälle
+ * dazwischen still blieben.
  */
 
 export type Versuch = { bremse: DbBremse; merkmal: string }
@@ -77,8 +82,29 @@ function mitFrist<T>(arbeit: Promise<T>, ms: number): Promise<T> {
   return Promise.race([arbeit, ablauf]).finally(() => clearTimeout(timer))
 }
 
+/**
+ * Wann diese Instanz zuletzt gemeldet hat und wie viele Ausfälle seither
+ * still blieben. Modul-Zustand: auf Vercel je warmer Instanz, ein Kaltstart
+ * beginnt neu — gewollt, „je Instanz" ist die Zusage.
+ */
+export type BremsMeldungen = { letzteMeldungMs: number | null; unterdrueckt: number }
+
+/** Ein frischer Stand — der Modul-Zustand unten, und für Tests ein eigener je „Instanz". */
+export function neueBremsMeldungen(): BremsMeldungen {
+  return { letzteMeldungMs: null, unterdrueckt: 0 }
+}
+
+const MELDUNGEN_DIESER_INSTANZ = neueBremsMeldungen()
+
 /** Fester Text, nur die Art des Fehlers und die Zwecke — nie Schlüssel oder Merkmal. */
-function meldeBremsFehler(err: unknown, versuche: readonly Versuch[]): void {
+function meldeBremsFehler(err: unknown, versuche: readonly Versuch[], jetzt: Date, meldungen: BremsMeldungen): void {
+  if (!bremsMeldungFaellig(meldungen.letzteMeldungMs, jetzt.getTime())) {
+    meldungen.unterdrueckt += 1
+    return
+  }
+  const unterdruecktSeitLetzterMeldung = meldungen.unterdrueckt
+  meldungen.letzteMeldungMs = jetzt.getTime()
+  meldungen.unterdrueckt = 0
   const meldung = new Error('Bremse über alle Instanzen nicht erreichbar')
   meldung.name = err instanceof Error ? err.name : 'Unbekannt'
   Sentry.captureException(meldung, {
@@ -88,6 +114,7 @@ function meldeBremsFehler(err: unknown, versuche: readonly Versuch[]): void {
       grund: err instanceof BremseZeitlimit ? 'zeitlimit' : 'datenbank',
       zweck: [...new Set(versuche.map((v) => v.bremse.zweck))].join(','),
     },
+    extra: { unterdruecktSeitLetzterMeldung },
   })
 }
 
@@ -98,15 +125,20 @@ function meldeBremsFehler(err: unknown, versuche: readonly Versuch[]): void {
  * Datenbankfehler oder Zeitlimit: true (fail-open, siehe Kopf).
  *
  * Gilt immer — ob nur in Produktion gebremst wird, entscheidet der Aufrufer
- * zusammen mit seiner ersten Stufe.
+ * zusammen mit seiner ersten Stufe. `meldungen` lassen die Aufrufer weg (der
+ * Stand dieser Instanz); Tests geben einen eigenen mit.
  */
-export async function bremseUeberAlleInstanzen(versuche: readonly Versuch[], jetzt: Date = new Date()): Promise<boolean> {
+export async function bremseUeberAlleInstanzen(
+  versuche: readonly Versuch[],
+  jetzt: Date = new Date(),
+  meldungen: BremsMeldungen = MELDUNGEN_DIESER_INSTANZ
+): Promise<boolean> {
   if (versuche.length === 0) return true
   try {
     const staende = await mitFrist(zaehleVersuche(versuche, jetzt), DB_BREMSE_ZEITLIMIT_MS)
     return staende.every((stand, i) => innerhalbDerGrenze(stand, versuche[i].bremse.max))
   } catch (err) {
-    meldeBremsFehler(err, versuche)
+    meldeBremsFehler(err, versuche, jetzt, meldungen)
     return true
   }
 }

@@ -85,6 +85,22 @@ export const DB_BREMSEN = {
  */
 export const DB_BREMSE_ZEITLIMIT_MS = 1500
 
+/**
+ * Höchstens eine Sentry-Meldung je Instanz in dieser Spanne, wenn die zweite
+ * Stufe ausfällt (Nr. 47). Fällt die Datenbank aus, scheitert JEDE Anfrage
+ * auf den fünf Wegen an der Bremse — ohne Abstand käme je Anmeldeversuch und
+ * je Bestellung eine Meldung, und die eigentliche Störung ginge darin unter.
+ */
+export const BREMSE_MELDE_ABSTAND_MS = 10 * MINUTE_MS
+
+/**
+ * Ist eine Meldung fällig? Die erste immer, danach erst wieder nach
+ * `BREMSE_MELDE_ABSTAND_MS`. Läuft die Uhr zurück, bleibt es ruhig.
+ */
+export function bremsMeldungFaellig(letzteMeldungMs: number | null, jetztMs: number): boolean {
+  return letzteMeldungMs === null || jetztMs - letzteMeldungMs >= BREMSE_MELDE_ABSTAND_MS
+}
+
 /** Derselbe Satz wie bei der ersten Stufe (`enforceRateLimit`). */
 export const ZU_VIELE_ANFRAGEN = 'Zu viele Anfragen — bitte warte einen Moment und versuche es erneut.'
 

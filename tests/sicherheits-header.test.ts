@@ -154,8 +154,8 @@ describe('Bestätigungsseite', () => {
     expect(headerFuer('/bestellungen', { vorschau: '1' })['X-Frame-Options']).toBe('DENY')
   })
 
-  it('„Anmeldung bestätigen" und der Abmeldelink genauso — die Adresse trägt den Token (Nr. 38)', () => {
-    for (const pfad of ['/account/neuigkeiten-bestaetigen', '/account/unsubscribe']) {
+  it('„Anmeldung bestätigen", der Abmeldelink und die Ein-Klick-Abmeldung genauso — die Adresse trägt den Token (Nr. 38, Nr. 47)', () => {
+    for (const pfad of ['/account/neuigkeiten-bestaetigen', '/account/unsubscribe', '/api/abmelden']) {
       const header = headerFuer(pfad, { token: 'abc.def' })
       expect(header['Referrer-Policy'], pfad).toBe('no-referrer')
       expect(header['X-Robots-Tag'], pfad).toBe('noindex, nofollow')

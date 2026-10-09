@@ -77,17 +77,24 @@ const limiters = new Map<string, ReturnType<typeof createRateLimiter>>()
 // Instanz. Für den Checkout folgt die zweite Stufe über alle Instanzen
 // (`bremseCheckout`, src/server/bremse-datenbank.ts); die übrigen Routen
 // bleiben bei dieser einen Stufe.
+//
+// EIGENE GRENZE (`max`, seit Nr. 47): nur, wo der Aufrufer kein Mensch ist und
+// die Vorgabe echte Aufrufe abwiese — die Ein-Klick-Abmeldung kommt von den
+// Servern weniger Mailanbieter (EIN_KLICK_JE_MINUTE, src/lib/abmelde-link.ts).
+// Jede Grenze hat ihren eigenen Zähler, sie teilt ihn nie mit der Vorgabe.
 export function enforceRateLimit(
   routeKey: string,
   request: NextRequest,
-  sessionId?: string | null
+  sessionId?: string | null,
+  { max = CHECKOUT_RESERVE_MAX_PER_WINDOW }: { max?: number } = {}
 ): NextResponse | null {
   if (process.env.NODE_ENV !== 'production') return null
 
-  let limiter = limiters.get(routeKey)
+  const zaehler = `${routeKey}:${max}`
+  let limiter = limiters.get(zaehler)
   if (!limiter) {
-    limiter = createRateLimiter()
-    limiters.set(routeKey, limiter)
+    limiter = createRateLimiter({ max })
+    limiters.set(zaehler, limiter)
   }
 
   const ip = getClientIp(request.headers)

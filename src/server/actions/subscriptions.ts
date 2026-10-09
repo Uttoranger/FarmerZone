@@ -3,11 +3,12 @@
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { verifyUnsubscribeToken } from '@/lib/unsubscribe'
 import { bestaetigteAdresse } from '@/server/kunden-adresse'
 import { aboAenderungSchema, aboBestaetigenSchema } from '@/schemas/abo'
+import { abmeldeTokenSchema } from '@/schemas/abmelden'
+import { ABMELDE_LINK_UNGUELTIG } from '@/lib/abmelde-link'
 import { ABO_TEXT, aboFehlerSatz, wartetAufBestaetigung } from '@/lib/abo-bestaetigung'
-import { EMAIL_ABO_STAND, bestaetigeEmailAbo, loeseOffeneAnfrageAuf, meldeEmailAboAn } from '@/server/abo-anmeldung'
+import { EMAIL_ABO_STAND, bestaetigeEmailAbo, loeseOffeneAnfrageAuf, meldeAboMitTokenAb, meldeEmailAboAn } from '@/server/abo-anmeldung'
 
 // Abos hängen an der Adresse, nicht an einem Konto. Ändern oder löschen darf
 // sie nur, wer die Adresse mit Code bewiesen hat (E8, Nr. 17a) — frisch aus
@@ -110,21 +111,16 @@ export async function bestaetigeNeuigkeiten(input: unknown): Promise<{ ok: true;
   }
 }
 
-export async function unsubscribeWithToken(token: string): Promise<ActionResult> {
-  const data = verifyUnsubscribeToken(token)
-  if (!data) return { error: 'Ungültiger oder abgelaufener Link' }
+export async function unsubscribeWithToken(token: unknown): Promise<ActionResult> {
+  // Das Argument kommt aus dem Browser — erst die Gestalt prüfen (Nr. 47).
+  const eingabe = abmeldeTokenSchema.safeParse(token)
+  // Derselbe Satz wie beim Ein-Klick-Endpunkt — der Token läuft nicht ab, und der Satz nennt den Ausweg.
+  if (!eingabe.success) return { error: ABMELDE_LINK_UNGUELTIG }
 
-  const wo = { customerEmail: data.email.toLowerCase(), farmId: data.farmId }
-  // Eine offene Bestätigungsanfrage gilt mit der Abmeldung als erledigt — ein
-  // alter Link meldet danach niemanden wieder an (S11, Nachbesserung Runde 1).
-  // Reihenfolge wie beim Ausschalten auf /account: erst auflösen, dann aus.
-  await prisma.$transaction([
-    loeseOffeneAnfrageAuf(wo),
-    prisma.customerFarmSubscription.updateMany({
-      where: wo,
-      data: { optInEmail: false, optInWhatsApp: false },
-    }),
-  ])
+  // Derselbe Weg wie die Ein-Klick-Abmeldung des Mailprogramms (/api/abmelden):
+  // offene Anfrage auflösen, dann E-Mail und WhatsApp aus (abo-anmeldung.ts).
+  const { gueltig } = await meldeAboMitTokenAb(eingabe.data)
+  if (!gueltig) return { error: ABMELDE_LINK_UNGUELTIG }
 
   return {}
 }

@@ -16,7 +16,9 @@
  * - URLs, auch im PFAD, nicht nur in der Query: /customers/<kundin@…> legt
  *   die Kunden-E-Mail (%40-kodiert) in den Pfad, /api/orders/confirm/<token>
  *   und /<hof>/bestaetigen/<token> (Bar-Bestätigung, H3) einen gültigen
- *   Einmal-Token — Query-Filter allein reicht nicht.
+ *   Einmal-Token — Query-Filter allein reicht nicht. In der Query fallen
+ *   heikle Parameter nach NAMEN, und seit Nr. 47 werden die Werte der übrigen
+ *   dekodiert bereinigt (?q=kundin@… stand sonst %40-kodiert da).
  * - request-Daten: Cookies, Authorization, Referer (trägt die volle
  *   Vorgänger-URL), der POST-Körper (data) komplett.
  * - contexts.nextjs.request_path: von onRequestError roh angehängt.
@@ -30,6 +32,24 @@
  *   x-envoy-external-address), die daraus abgeleiteten Ortsangaben von
  *   Vercel und Cloudflare (x-vercel-ip-*, cf-ip*), request.env
  *   (REMOTE_ADDR) und die IP-Attribute der Spans.
+ * - Die strukturierten Felder (Nr. 47, tests/sentry-hygiene-felder.test.ts):
+ *   logentry (Nachricht und Parameter), tags, extra, alle Kontexte außer
+ *   den technischen des SDK (UNBEDENKLICHE_KONTEXTE) und die Daten der
+ *   Brotkrumen. Dort kann jeder Aufrufer alles ablegen — deshalb fallen
+ *   heikle SCHLÜSSEL ganz weg (HEIKLER_SCHLUESSEL, IP-Header), und jeder
+ *   Text geht durch bereinigeFreitext: E-Mail, Telefon, Code, Adressen mit
+ *   Token, „token=…", lange Kennungen und — nur hier, nicht im Fehlertext —
+ *   IP-Adressen (IPv4 und IPv6). Im Fehlertext bleiben sie, weil dort die
+ *   Adresse unseres eigenen Datenbank-Servers steht („connect ETIMEDOUT
+ *   …:6543") und kein Weg die Adresse einer Kundin in einen Text schreibt.
+ *   Dieselbe Freitext-Regel gilt für die NACHRICHTEN: event.message und
+ *   message der Brotkrumen (Console-Brotkrumen tragen dort dieselben
+ *   Argumente wie in data.arguments). Ein Text unter einem Schlüssel mit
+ *   „query" ist nur dann ein Query-String, wenn er so aussieht; sonst
+ *   Freitext.
+ * - Variablen in Stack-Frames (frame.vars, in Ausnahmen und Threads) fallen
+ *   ganz weg: Sie können jedes Objekt tragen (Anfrage, Abo, Passwort), und
+ *   zum Beheben reichen Datei, Funktion und Zeile.
  *
  * Namen lassen sich nicht per Muster erkennen — gegen sie wirkt die
  * strukturelle Sperre: kein sendDefaultPii, als Nutzerkennung ausschließlich
@@ -52,11 +72,28 @@ export function ermittleUmgebung(
   return 'development'
 }
 
-/** E-Mail-Adressen in freiem Text. */
-const EMAIL_MUSTER = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g
+/*
+ * LAUFZEIT (Nr. 47): Alles hier läuft synchron in beforeSend, auf dem Server
+ * wie im Browser, und das SDK kürzt vorher nichts (`maxValueLength` ist nicht
+ * gesetzt). Jedes Muster muss deshalb in linearer Zeit laufen — auch bei
+ * 100 000 Zeichen ohne Treffer (tests/sentry-hygiene-felder.test.ts misst
+ * das). Ein Muster, das an jeder Stelle einer langen Zeichenfolge neu
+ * ansetzt und jedes Mal bis zu ihrem Ende liest, braucht dafür Sekunden.
+ */
 
-/** Dieselben Adressen URL-kodiert (%40 statt @) — so stehen sie im Pfad. */
-const EMAIL_KODIERT_MUSTER = /[A-Za-z0-9._%+-]+%40[A-Za-z0-9.-]+\.[A-Za-z]{2,}/gi
+/** Ein Zeichen des lokalen Teils einer E-Mail-Adresse (vor dem @). */
+const EMAIL_LOKAL = /[A-Za-z0-9._%+-]/
+
+/** Die Domain einer E-Mail-Adresse, ab dem Zeichen nach dem @ (klebend:
+ *  lastIndex setzt ersetzeEmails). */
+const EMAIL_DOMAIN = /[A-Za-z0-9.-]+\.[A-Za-z]{2,}/y
+
+/** Dieselben Adressen URL-kodiert (%40 statt @) — so stehen sie im Pfad.
+ *  Angesetzt wird nur am Anfang einer Zeichenfolge (Lookbehind), sonst wäre
+ *  das Muster quadratisch. Das Ergebnis bleibt gleich: %40 gehört selbst zu
+ *  den Zeichen des lokalen Teils, der Treffer ab dem Anfang nimmt schon das
+ *  letzte passende %40 der Folge — ein späterer Anfang fände nichts mehr. */
+const EMAIL_KODIERT_MUSTER = /(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+%40[A-Za-z0-9.-]+\.[A-Za-z]{2,}/gi
 
 /** Telefonnummern: +43 664 123 4567, 0664/1234567, (0664) 1234567 … — eine
  *  führende +/0/(0-Gruppe und danach mindestens sieben weitere Ziffern mit
@@ -140,23 +177,49 @@ function istIpSpanAttribut(schluessel: string): boolean {
   return HEADER_ATTRIBUT_PRAEFIX.test(schluessel) && istIpHeader(schluessel.replace(HEADER_ATTRIBUT_PRAEFIX, ''))
 }
 
+/**
+ * E-Mail-Adressen in freiem Text — dasselbe Ergebnis wie
+ * `text.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, …)`, aber
+ * linear: Jener Regex setzte in einer langen Folge ohne @ an jeder Stelle neu
+ * an (100 000 Zeichen: rund 7 Sekunden). Hier wird von jedem @ aus gesucht —
+ * nach links der lokale Teil, höchstens bis zum Ende des vorigen Treffers
+ * (dort setzte auch der Regex wieder an), nach rechts die Domain.
+ */
+function ersetzeEmails(text: string): string {
+  let ergebnis = ''
+  let ende = 0
+  for (let at = text.indexOf('@'); at !== -1; at = text.indexOf('@', Math.max(at + 1, ende))) {
+    let anfang = at
+    while (anfang > ende && EMAIL_LOKAL.test(text[anfang - 1])) anfang--
+    if (anfang === at) continue
+    EMAIL_DOMAIN.lastIndex = at + 1
+    if (!EMAIL_DOMAIN.test(text)) continue
+    ergebnis += `${text.slice(ende, anfang)}[e-mail entfernt]`
+    ende = EMAIL_DOMAIN.lastIndex
+  }
+  return ergebnis + text.slice(ende)
+}
+
 function bereinigeText(text: string): string {
-  return text
-    .replace(EMAIL_MUSTER, '[e-mail entfernt]')
+  return ersetzeEmails(text)
     .replace(EMAIL_KODIERT_MUSTER, '[e-mail entfernt]')
     .replace(TELEFON_MUSTER, '[telefon entfernt]')
     .replace(ANMELDECODE_MUSTER, '$1$2[code entfernt]')
 }
 
-/** Entfernt heikle Parameter aus einem Query-String ('a=1&token=x' → 'a=1'). */
-function bereinigeQuery(query: string): string {
-  const parameter = new URLSearchParams(query)
-  const weg: string[] = []
-  parameter.forEach((_, name) => {
-    if (HEIKLE_PARAMETER.test(name)) weg.push(name)
+/**
+ * Entfernt heikle Parameter aus einem Query-String ('a=1&token=x' → 'a=1')
+ * und bereinigt Namen und Werte der übrigen DEKODIERT — sonst stünde
+ * „?q=kundin@…" als „q=kundin%40…" weiter da (Nr. 47). Die Regel ist dieselbe
+ * wie für den Pfad (E-Mail, Telefon, Code); strukturierte Felder geben die
+ * Freitext-Regel mit (bereinigeQueryText).
+ */
+function bereinigeQuery(query: string, regel: (text: string) => string = bereinigeText): string {
+  const sauber = new URLSearchParams()
+  new URLSearchParams(query).forEach((wert, name) => {
+    if (!HEIKLE_PARAMETER.test(name)) sauber.append(regel(name), regel(wert))
   })
-  for (const name of weg) parameter.delete(name)
-  return parameter.toString()
+  return sauber.toString()
 }
 
 /** Bereinigt den Pfad-Teil: E-Mails (roh und kodiert), Telefonnummern und
@@ -219,6 +282,139 @@ function istObjekt(wert: unknown): wert is Record<string, unknown> {
   return typeof wert === 'object' && wert !== null && !Array.isArray(wert)
 }
 
+// ─── Strukturierte Felder (Nr. 47) ─────────────────────────────────────────
+
+const IP_ERSATZ = '[ip entfernt]'
+const OBJEKT_ERSATZ = '[objekt entfernt]'
+
+/** IPv4 — vier Zahlen von 0 bis 255. Versionen mit drei Stellen (22.22.2)
+ *  bleiben; eine vierstellige Version fiele mit, das ist die sichere Richtung. */
+const IPV4_MUSTER = /\b(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}\b/g
+
+/** IPv6 — Hex-Gruppen mit „::" oder acht volle Gruppen. Uhrzeiten
+ *  (10:30:45) haben weder das eine noch das andere; davor und danach steht
+ *  kein Wortzeichen und kein Doppelpunkt, so bleibt auch „Fehler::" stehen. */
+const IPV6_MUSTER =
+  /(?<![\w:])(?=[0-9a-f:]*::|(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4})(?=[0-9a-f:]*[0-9a-f])[0-9a-f]{0,4}(?::[0-9a-f]{0,4}){2,7}(?![\w:])/gi
+
+/** „token=…", „secret: …" — Zuweisungen in freiem Text, auch ohne Adresse
+ *  davor. `code` fehlt bewusst: „code=P2002" ist ein Prisma-Fehlercode. */
+const ZUWEISUNG_MUSTER = /\b(token|secret|passwor[dt]|otp|signatur|signature|sig|api[_-]?key|authorization)(\s*[=:]\s*)[^\s&,;"'<>]+/gi
+
+const BEARER_MUSTER = /\bBearer\s+[A-Za-z0-9._~+/=-]+/g
+
+/** Lange undurchsichtige Zeichenfolgen (Token, Signaturen, Hashes) ab 32
+ *  Zeichen. Datensatz-Kennungen (cuid, 25 Zeichen) und Stripe-Kennungen
+ *  bleiben lesbar — sie sind der Anker zum Beheben. */
+const LANGE_KENNUNG_MUSTER = /(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{32,}(?![A-Za-z0-9_-])/g
+
+/** Schlüssel, deren Wert nie nach Sentry geht — gleich, was drinsteht.
+ *  `mail` allein (Tag „welche Mail") und `code` (Fehlercode) gehören nicht dazu. */
+const HEIKLER_SCHLUESSEL =
+  /token|secret|passw|e-?mail|cookie|authorization|^auth$|session|telefon|phone|otp|anmeldecode|signatur|signature|^sig$|^s$|iban|kreditkarte|^ip$|ip_?addr|ip_?adresse|client_?ip|remote_?addr/i
+
+/** Kontexte, die das SDK selbst mit technischen Angaben füllt — Laufzeit,
+ *  Betriebssystem, Browser, Gerät, Prozess, Sprache und Zeitzone,
+ *  Rechenzentrum. Kein Freitext von Menschen, deshalb bleiben sie unberührt:
+ *  Die IP-Regel träfe sonst Versionen wie „120.0.0.0" (Chrome). `trace` hat
+ *  seine eigene Regel (Span-Daten); jeder andere Kontext — auch eigene wie
+ *  `upload` — wird bereinigt. */
+const UNBEDENKLICHE_KONTEXTE = new Set(['runtime', 'os', 'browser', 'device', 'app', 'culture', 'cloud_resource'])
+
+/** Bis zu dieser Tiefe wird ein Wert gesichtet; darunter fällt er weg, statt
+ *  ungeprüft mitzugehen (das SDK kappt ohnehin nach drei Ebenen). */
+const MAX_TIEFE = 8
+
+function entferneIps(text: string): string {
+  return text.replace(IPV4_MUSTER, IP_ERSATZ).replace(IPV6_MUSTER, IP_ERSATZ)
+}
+
+/**
+ * Ein Text aus einem strukturierten Feld. Ist er ganz eine Adresse (absolut
+ * oder ab „/"), gilt die URL-Regel (Pfad-Token, heikle Parameter, Blob-Pfad);
+ * sonst die Text-Regel samt eingebetteter Adressen. IP-Adressen fallen
+ * zuerst — sonst hielte die Telefon-Regel eine lange IPv4 für eine Nummer.
+ */
+function bereinigeFreitext(text: string): string {
+  const ohneIp = entferneIps(text)
+  if (/^(?:https?:\/\/|\/)\S*$/i.test(ohneIp)) return bereinigeUrl(ohneIp)
+  return bereinigeTextMitUrls(ohneIp)
+    .replace(BEARER_MUSTER, 'Bearer [entfernt]')
+    .replace(ZUWEISUNG_MUSTER, '$1$2[entfernt]')
+    .replace(LANGE_KENNUNG_MUSTER, '[kennung entfernt]')
+}
+
+/**
+ * Ein Text unter einem Schlüssel mit „query" (http.query, suchQuery …): Sieht
+ * er aus wie ein Query-String (kein Leerraum, mindestens ein „="), fallen
+ * heikle Parameter weg, und Namen und Werte gehen dekodiert durch die
+ * Freitext-Regel. Sonst ist er Freitext wie jeder andere — „kundin@…" unter
+ * `suchQuery` ist kein Parametername.
+ */
+function bereinigeQueryText(text: string): string {
+  // Bis zum ersten „=" ohne Leerraum, danach ohne Leerraum — so setzt das
+  // Muster nur einmal an (`^\S*=\S*$` probierte jedes „=" durch: quadratisch).
+  return /^[^\s=]*=\S*$/.test(text) ? bereinigeQuery(text, bereinigeFreitext) : bereinigeFreitext(text)
+}
+
+/** Heikel ist ein Schlüssel nach Namen, als IP-Träger oder wenn er selbst
+ *  eine Adresse oder Nummer enthält. */
+function istHeiklerSchluessel(name: string): boolean {
+  return HEIKLER_SCHLUESSEL.test(name) || istIpHeader(name) || istIpSpanAttribut(name) || bereinigeText(name) !== name
+}
+
+/** Ein beliebiger Wert: Texte bereinigt, Zahlen und Wahrheitswerte bleiben,
+ *  Objekte und Listen werden betreten, alles andere (Funktion, Symbol) fällt weg. */
+function bereinigeWert(wert: unknown, schluessel: string | null, tiefe: number): unknown {
+  if (typeof wert === 'string') {
+    // Ein Query-String trägt seine Geheimnisse als Parameter — und in den Werten.
+    if (schluessel !== null && /query/i.test(schluessel)) return bereinigeQueryText(wert)
+    return bereinigeFreitext(wert)
+  }
+  if (wert === null || typeof wert === 'number' || typeof wert === 'boolean') return wert
+  if (tiefe >= MAX_TIEFE) return OBJEKT_ERSATZ
+  if (Array.isArray(wert)) return wert.map((eintrag) => bereinigeWert(eintrag, schluessel, tiefe + 1))
+  if (istObjekt(wert)) return bereinigeEintraege(wert, tiefe + 1)
+  return undefined
+}
+
+/** Ein Objekt als NEUES Objekt: heikle Schlüssel fehlen, jeder Wert ist bereinigt. */
+function bereinigeEintraege(objekt: Record<string, unknown>, tiefe: number): Record<string, unknown> {
+  const sauber: Record<string, unknown> = {}
+  for (const [schluessel, wert] of Object.entries(objekt)) {
+    if (istHeiklerSchluessel(schluessel)) continue
+    const neu = bereinigeWert(wert, schluessel, tiefe)
+    if (neu !== undefined) sauber[schluessel] = neu
+  }
+  return sauber
+}
+
+/** Ein Argument einer Konsolen-Zeile: Texte bereinigt, Strukturiertes fällt weg (könnte alles tragen). */
+function konsolenArgument(argument: unknown): unknown {
+  if (typeof argument === 'string') return bereinigeFreitext(argument)
+  if (typeof argument === 'number' || typeof argument === 'boolean' || argument === null) return argument
+  return OBJEKT_ERSATZ
+}
+
+/** Entfernt `vars` aus allen Frames der Stacktraces einer Liste (Ausnahmen bzw. Threads). */
+function entferneFrameVariablen(werte: unknown): void {
+  if (!Array.isArray(werte)) return
+  for (const wert of werte) {
+    if (!istObjekt(wert) || wert.stacktrace === undefined) continue
+    if (!istObjekt(wert.stacktrace)) {
+      delete wert.stacktrace
+      continue
+    }
+    const frames = wert.stacktrace.frames
+    if (frames === undefined) continue
+    if (!Array.isArray(frames)) {
+      delete wert.stacktrace.frames
+      continue
+    }
+    for (const frame of frames) if (istObjekt(frame)) delete frame.vars
+  }
+}
+
 /**
  * Der zentrale Filter — läuft auf Server, Edge und im Browser, für
  * FEHLER-Ereignisse (beforeSend) wie für TRANSAKTIONEN (beforeSendTransaction).
@@ -259,7 +455,7 @@ function minimalEreignis<E extends SentryEvent>(event: E): E {
   // sein, bevor sie ihn erreicht hat.
   try {
     const nachricht = roh.message
-    if (typeof nachricht === 'string') minimal.message = bereinigeText(nachricht)
+    if (typeof nachricht === 'string') minimal.message = bereinigeFreitext(nachricht)
   } catch {
     // Text nicht lesbar — fällt weg.
   }
@@ -287,7 +483,10 @@ function minimalEreignis<E extends SentryEvent>(event: E): E {
 }
 
 function bereinigeVollstaendig<E extends SentryEvent>(event: E): E {
-  if (typeof event.message === 'string') event.message = bereinigeText(event.message)
+  // Die Nachricht trägt dasselbe wie logentry (captureMessage, Konsole) —
+  // deshalb dieselbe Freitext-Regel. Nur der Fehlertext (exception.value)
+  // behält IP-Adressen, siehe Kopfkommentar.
+  if (typeof event.message === 'string') event.message = bereinigeFreitext(event.message)
   else if (event.message !== undefined) delete event.message
 
   if (event.exception !== undefined && !istObjekt(event.exception)) delete event.exception
@@ -303,6 +502,33 @@ function bereinigeVollstaendig<E extends SentryEvent>(event: E): E {
       }
     }
   }
+  // Variablen der Stack-Frames: ganz weg, in Ausnahmen wie in Threads.
+  entferneFrameVariablen(ausnahmen)
+  const mitThreads = event as { threads?: unknown }
+  if (mitThreads.threads !== undefined && !istObjekt(mitThreads.threads)) delete mitThreads.threads
+  if (istObjekt(mitThreads.threads)) {
+    const threadWerte = mitThreads.threads.values
+    if (threadWerte !== undefined && !Array.isArray(threadWerte)) delete mitThreads.threads.values
+    entferneFrameVariablen(mitThreads.threads.values)
+  }
+
+  // logentry: eine Nachricht mit Parametern (Sentry.parameterize) — die
+  // Nachricht wie jeder Text, die Parameter wie Konsolen-Argumente.
+  if (event.logentry !== undefined && !istObjekt(event.logentry)) delete event.logentry
+  if (event.logentry) {
+    const eintrag = event.logentry as Record<string, unknown>
+    if (typeof eintrag.message === 'string') eintrag.message = bereinigeFreitext(eintrag.message)
+    else if (eintrag.message !== undefined) delete eintrag.message
+    if (Array.isArray(eintrag.params)) eintrag.params = eintrag.params.map(konsolenArgument)
+    else if (eintrag.params !== undefined) delete eintrag.params
+  }
+
+  // tags und extra: Jeder Aufrufer kann hier alles ablegen. Was kein Objekt
+  // ist, lässt sich nicht sichten und fällt weg.
+  if (event.tags !== undefined && !istObjekt(event.tags)) delete event.tags
+  if (event.tags) event.tags = bereinigeEintraege(event.tags, 0) as typeof event.tags
+  if (event.extra !== undefined && !istObjekt(event.extra)) delete event.extra
+  if (event.extra) event.extra = bereinigeEintraege(event.extra, 0)
 
   if (event.request !== undefined && !istObjekt(event.request)) {
     // Eine Anfrage, die kein Objekt ist, können wir nicht sichten — weg.
@@ -347,12 +573,23 @@ function bereinigeVollstaendig<E extends SentryEvent>(event: E): E {
     else if (event.request.url !== undefined) delete event.request.url
   }
 
-  // onRequestError hängt den ROHEN Anfragepfad an — /customers/<e-mail> und
-  // /api/orders/confirm/<token> stünden sonst wörtlich im Ereignis.
+  // Kontexte: Die technischen des SDK bleiben, `trace` hat unten seine eigene
+  // Regel, jeder andere wird bereinigt — auch `nextjs`: onRequestError hängt
+  // dort den ROHEN Anfragepfad an (/customers/<e-mail>,
+  // /api/orders/confirm/<token>), den die URL-Regel säubert.
+  if (event.contexts !== undefined && !istObjekt(event.contexts)) delete event.contexts
   const kontexte = istObjekt(event.contexts) ? event.contexts : undefined
-  const nextjsKontext = istObjekt(kontexte?.nextjs) ? kontexte.nextjs : undefined
-  if (nextjsKontext && typeof nextjsKontext.request_path === 'string') {
-    nextjsKontext.request_path = bereinigeUrl(nextjsKontext.request_path)
+  if (kontexte) {
+    for (const [name, wert] of Object.entries(kontexte)) {
+      if (UNBEDENKLICHE_KONTEXTE.has(name) || name === 'trace') continue
+      if (istHeiklerSchluessel(name)) {
+        delete kontexte[name]
+        continue
+      }
+      const neu = bereinigeWert(wert, name, 0)
+      if (neu === undefined) delete kontexte[name]
+      else kontexte[name] = neu as (typeof kontexte)[string]
+    }
   }
 
   if (event.user !== undefined && event.user !== null) {
@@ -370,26 +607,31 @@ function bereinigeVollstaendig<E extends SentryEvent>(event: E): E {
   if (event.breadcrumbs !== undefined && !Array.isArray(event.breadcrumbs)) delete event.breadcrumbs
   for (const spur of event.breadcrumbs ?? []) {
     if (!istObjekt(spur)) continue
-    if (typeof spur.message === 'string') spur.message = bereinigeText(spur.message)
+    // Console-Brotkrumen tragen die Argumente zweimal: als `arguments` und
+    // aneinandergehängt als `message` — beide mit derselben Regel (Nr. 47).
+    if (typeof spur.message === 'string') spur.message = bereinigeFreitext(spur.message)
     if (spur.data !== undefined && !istObjekt(spur.data)) delete spur.data
     const daten = spur.data as Record<string, unknown> | undefined
     if (daten) {
-      // Navigations-Brotkrumen tragen from/to, fetch-Brotkrumen url.
-      for (const schluessel of ['url', 'from', 'to']) {
-        const wert = daten[schluessel]
-        if (typeof wert === 'string') daten[schluessel] = bereinigeUrl(wert)
+      // Seit Nr. 47 JEDER Wert, nicht nur die bekannten: fetch- und
+      // XHR-Brotkrumen tragen außer url auch Körper und Kopfzeilen, eigene
+      // Brotkrumen beliebige Daten.
+      const sauber: Record<string, unknown> = {}
+      for (const [schluessel, wert] of Object.entries(daten)) {
+        if (schluessel === 'arguments' && Array.isArray(wert)) {
+          // Console-Brotkrumen tragen die rohen console.error-Argumente —
+          // Texte werden bereinigt, alles Strukturierte fällt weg.
+          sauber.arguments = wert.map(konsolenArgument)
+        } else if ((schluessel === 'url' || schluessel === 'from' || schluessel === 'to') && typeof wert === 'string') {
+          // Navigations-Brotkrumen tragen from/to, fetch-Brotkrumen url —
+          // auch relativ, deshalb immer die URL-Regel.
+          sauber[schluessel] = bereinigeUrl(entferneIps(wert))
+        } else if (!istHeiklerSchluessel(schluessel)) {
+          const neu = bereinigeWert(wert, schluessel, 1)
+          if (neu !== undefined) sauber[schluessel] = neu
+        }
       }
-      // Console-Brotkrumen tragen die rohen console.error-Argumente — Texte
-      // werden bereinigt, alles Strukturierte fällt weg (könnte alles tragen).
-      if (Array.isArray(daten.arguments)) {
-        daten.arguments = daten.arguments.map((argument: unknown) => {
-          if (typeof argument === 'string') return bereinigeTextMitUrls(argument)
-          if (typeof argument === 'number' || typeof argument === 'boolean' || argument === null) {
-            return argument
-          }
-          return '[objekt entfernt]'
-        })
-      }
+      spur.data = sauber
     }
   }
 
