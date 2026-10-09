@@ -99,12 +99,13 @@ function Kennzahl({
       {/* Am Handy zwei Zeilen Platz, damit die Zahlen auf einer Höhe stehen; ein langes Wort trennt an seinen
           weichen Trennstellen — gekürzt wird auch die Bezeichnung nie. */}
       <p className={cn('min-h-[2lh] text-xs leading-snug break-words md:min-h-0 md:text-[13px]', LEISE)}>{mitTrennstellen(titel)}</p>
-      {/* Ein Betrag wird nie gekürzt: höchstens 22 bzw. 26 px, in einer schmalen Karte so groß, wie er hineinpasst (kennzahlBreiteEm). */}
+      {/* Ein Betrag wird nie gekürzt: höchstens 22 bzw. 26 px, in einer schmalen Karte so groß, wie er hineinpasst
+          (kennzahlBreiteEm), nie unter 12 px — passt er dann nicht, bricht er um, statt über den Rand zu laufen. */}
       <p
         style={{ '--kz-em': kennzahlBreiteEm(wert) } as React.CSSProperties}
         className={cn(
-          'mt-1 font-heading leading-7 font-semibold whitespace-nowrap tabular-nums md:mt-1.5 md:leading-8',
-          'text-[length:min(22px,calc(100cqw/var(--kz-em)))] md:text-[length:min(26px,calc(100cqw/var(--kz-em)))]',
+          'mt-1 font-heading leading-7 font-semibold tabular-nums [overflow-wrap:anywhere] md:mt-1.5 md:leading-8',
+          'text-[length:max(12px,min(22px,calc(100cqw/var(--kz-em))))] md:text-[length:max(12px,min(26px,calc(100cqw/var(--kz-em))))]',
           offen && 'text-status-offen'
         )}
       >

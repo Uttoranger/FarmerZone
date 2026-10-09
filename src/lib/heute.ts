@@ -423,6 +423,21 @@ export const KENNZAHL_TEXT = {
 export const HEUTE_NIEMAND = 'Heute holt niemand etwas ab.'
 
 /**
+ * Was der Hinweis „Online-Zahlung ist pausiert" braucht (Register F4) — oder
+ * null, wenn er nicht steht (onlineZahlungPausiert). „Nur bar bei Abholung"
+ * verspricht, dass Kunden bestellen können: Das gilt nur, solange sie den Hof
+ * sehen und bei ihm bestellen können (heuteHofSichtbar) und er bar annimmt.
+ * Ein wartender, stillgelegter oder pausierter Hof bekommt die zweite
+ * Fassung des Satzes, der Wortlaut bleibt (Nachbesserung Runde 2).
+ */
+export function onlinePausiertDaten(
+  hof: Parameters<typeof heuteHofSichtbar>[0] & Parameters<typeof onlineZahlungPausiert>[0] & { acceptsOnsite: boolean }
+): { barMoeglich: boolean } | null {
+  if (!onlineZahlungPausiert(hof)) return null
+  return { barMoeglich: heuteHofSichtbar(hof) && hof.acceptsOnsite }
+}
+
+/**
  * Breite der Zeichen in Fraunces 600 (Einheit em), im Browser gemessen
  * (Nr. 45, Runde 1) — Ziffern verschieden breit, weil die Schrift keine
  * Tabellenziffern mitbringt. Unbekanntes zählt breit (EM_UNBEKANNT).
@@ -451,9 +466,12 @@ const EM_SPIELRAUM = 1.04
 
 /**
  * Wie breit ein Kennzahl-Wert in seiner eigenen Schriftgröße ist (em). Die
- * Karte setzt daraus `font-size: min(22px, 100cqw / em)`: Ein Betrag wird nie
- * gekürzt, er wird in einer schmalen Karte kleiner (drei Spalten bei 360 px,
- * freigabe.md §12 Nr. 45). Lieber etwas zu breit geschätzt als zu schmal.
+ * Karte setzt daraus `font-size: max(12px, min(22px, 100cqw / em))`: Ein
+ * Betrag wird nie gekürzt, er wird in einer schmalen Karte kleiner (drei
+ * Spalten bei 360 px, freigabe.md §12 Nr. 45), aber nie kleiner als 12 px.
+ * Passt er dann noch immer nicht — Nur-Text-Zoom, Mindestschriftgröße,
+ * breitere Ersatzschrift, ein absurder Betrag —, bricht er um, statt über den
+ * Kartenrand zu laufen (Runde 2). Lieber etwas zu breit geschätzt als zu schmal.
  */
 export function kennzahlBreiteEm(wert: string): number {
   const summe = [...wert].reduce((em, zeichen) => em + (EM_ZEICHEN[zeichen] ?? EM_UNBEKANNT), 0)

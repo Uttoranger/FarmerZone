@@ -315,6 +315,9 @@ export const KENNZEICHNUNG_TITEL = 'Kennzeichnung'
 /** So verweist ein Satz auf den Abschnitt: „im Abschnitt „Kennzeichnung“". */
 export const KENNZEICHNUNG_VERWEIS = `im Abschnitt „${KENNZEICHNUNG_TITEL}“`
 
+/** Titel der Rückfrage, wenn ein Futtermittel eine andere Kategorie bekommt (Produktdialog). */
+export const KENNZEICHNUNG_LOESCHEN_TITEL = `Angaben ${KENNZEICHNUNG_VERWEIS} löschen?`
+
 /** Der Pflicht-Haken im Futter-Formular und im Produktdialog (E10a, wörtlich). */
 export const FUTTER_BESTAETIGUNG_TEXT =
   'Ich bestätige, dass meine Angaben zu Registrierung, Kennzeichnung und Verpackung richtig und vollständig sind. Für die Richtigkeit bin ich verantwortlich. Falsche Angaben können nach dem Futtermittelgesetz bestraft werden.'

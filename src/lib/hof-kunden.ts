@@ -212,7 +212,7 @@ export const SORTIEREN_TEXT = 'Sortieren'
 export const ZEIGEN_TEXT = 'Zeigen'
 
 /** Was das Blatt hinter „Sortieren" wählt: wonach, in welcher Reihenfolge und wen die Liste zeigt. */
-export type KundenBlattWahl = { sortierung: KundenSortierung; richtung: KundenRichtung; filter: KundenFilter }
+export type KundenBlattWahl = Pick<KundenAnsicht, 'sortierung' | 'richtung' | 'filter'>
 
 /** Jedes Öffnen beginnt beim Stand der Liste — ein abgebrochener Entwurf bleibt nicht hängen. */
 export function blattStart(ansicht: Pick<KundenAnsicht, 'sortierung' | 'richtung' | 'filter'>): KundenBlattWahl {

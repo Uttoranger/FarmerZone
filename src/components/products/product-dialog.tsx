@@ -105,7 +105,7 @@ import {
   FUTTER_BESTAETIGUNG_TEXT,
   KENNZEICHNUNG_ERKLAERUNG,
   KENNZEICHNUNG_FUNDORT,
-  KENNZEICHNUNG_TITEL,
+  KENNZEICHNUNG_LOESCHEN_TITEL,
   KENNZEICHNUNG_VERWEIS,
   brauchtNeueBestaetigung,
   futterStandAusFormular,
@@ -1932,11 +1932,11 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
       onUebernehmen={({ category: neu, subcategory: sorte }) => kategorieUebernehmen(neu, sorte)}
     />
 
-    {/* Rückfrage: Kategoriewechsel weg von Futtermittel löscht den Abschnitt — beim einen Namen genannt (KENNZEICHNUNG_TITEL). */}
+    {/* Rückfrage: Kategoriewechsel weg von Futtermittel löscht den Abschnitt — Verweis über KENNZEICHNUNG_VERWEIS. */}
     <Dialog open={kategorieWechsel !== null} onOpenChange={(o) => !o && setKategorieWechsel(null)}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>{KENNZEICHNUNG_TITEL} löschen?</DialogTitle>
+          <DialogTitle>{KENNZEICHNUNG_LOESCHEN_TITEL}</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
           Wenn das Produkt kein Futtermittel mehr ist, löschen wir beim Speichern alles {KENNZEICHNUNG_VERWEIS}. Die

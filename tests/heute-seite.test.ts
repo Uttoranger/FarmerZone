@@ -51,6 +51,7 @@ import {
   kennzahlBreiteEm,
   mitTrennstellen,
   naechstesAbholfenster,
+  onlinePausiertDaten,
   stripeEinrichtenHinweis,
   packliste,
   packlistenZahlen,
@@ -253,6 +254,74 @@ describe('Stripe-Hinweis: der eine Kasten oben auf Heute — der Balken der Shel
     })
   })
 })
+
+// ─── Stripe-Hinweis ─────────────────────────────────────────────────────────
+
+describe('Stripe-Hinweis', () => {
+  const konto = 'acct_test_platzhalter'
+
+  it.each([
+    [true, false, true],
+    [true, true, false],
+    [false, false, false],
+    [false, true, false],
+  ])('acceptsOnline=%s, stripeAccountReady=%s → Hinweis %s', (acceptsOnline, stripeAccountReady, erwartet) => {
+    expect(onlineZahlungPausiert({ acceptsOnline, stripeAccountReady, stripeAccountId: konto })).toBe(erwartet)
+  })
+
+  it('ohne Stripe-Konto kein „pausiert" — dafür hat die Erste-Schritte-Karte ihren Schritt', () => {
+    expect(onlineZahlungPausiert({ acceptsOnline: true, stripeAccountReady: false, stripeAccountId: null })).toBe(false)
+  })
+
+  it('Wortlaut nach Mockup, Satz nach Barzahlung', () => {
+    expect(onlinePausiertHinweis(true)).toEqual({
+      titel: 'Online-Zahlung ist pausiert',
+      satz: 'Stripe braucht noch Angaben von dir. Bis dahin können Kunden nur bar bei Abholung bestellen.',
+    })
+    expect(onlinePausiertHinweis(false).satz).not.toContain('bar')
+  })
+
+  it('„nur bar bei Abholung" nur, solange Kunden den Hof sehen und er bar annimmt — wartend und stillgelegt bekommen die zweite Fassung (Runde 2)', () => {
+    const freigabe = new Date('2026-10-01T09:00:00Z')
+    const sichtbar = {
+      isActive: true,
+      isPaused: false,
+      approvedAt: freigabe,
+      archivedAt: null,
+      acceptsOnline: true,
+      acceptsOnsite: true,
+      stripeAccountReady: false,
+      stripeAccountId: konto,
+    }
+    expect(onlinePausiertDaten(sichtbar)).toEqual({ barMoeglich: true })
+    expect(onlinePausiertDaten({ ...sichtbar, approvedAt: null })).toEqual({ barMoeglich: false })
+    expect(onlinePausiertDaten({ ...sichtbar, archivedAt: freigabe })).toEqual({ barMoeglich: false })
+    expect(onlinePausiertDaten({ ...sichtbar, isPaused: true })).toEqual({ barMoeglich: false })
+    expect(onlinePausiertDaten({ ...sichtbar, acceptsOnsite: false })).toEqual({ barMoeglich: false })
+    // Nicht pausiert: kein Hinweis.
+    expect(onlinePausiertDaten({ ...sichtbar, stripeAccountReady: true })).toBeNull()
+    expect(onlinePausiertDaten({ ...sichtbar, stripeAccountId: null })).toBeNull()
+    // Die Abfrage nimmt genau diese Regel.
+    expect(quelle('src/server/queries/heute.ts')).toContain('onlinePausiertDaten(hof)')
+  })
+
+  it.each([true, false])(
+    'rendert beide Fassungen (barMoeglich=%s): Titel, Satz und genau EIN Link — in die Zahlungs-Einstellungen; Stripe ruft die Seite nicht auf',
+    (barMoeglich) => {
+      const h = html(createElement(StripeHinweis, { barMoeglich }))
+      const { titel, satz } = onlinePausiertHinweis(barMoeglich)
+      expect(h).toContain(titel)
+      expect(h).toContain(satz)
+      expect([...h.matchAll(/href="([^"]*)"/g)].map((m) => m[1])).toEqual(['/settings/payments'])
+      expect(h).toMatch(/<a [^>]*href="\/settings\/payments"[^>]*>Bei Stripe ergänzen<\/a>/)
+      // Kein Formular, keine Aktion, kein Knopf, der etwas auslöst — nur der Weg in die Einstellungen.
+      expect(h).not.toMatch(/<form|<button|formaction/i)
+      expect(quelle('src/components/heute/heute-teile.tsx')).not.toContain('createOnboardingLink')
+    }
+  )
+})
+
+// ─── Online-Zahlung einrichten (Register Z1) ────────────────────────────────
 
 describe('Hinweis „Online-Zahlung einrichten" für freigeschaltete Höfe ohne Stripe (Z1)', () => {
   const FREI = new Date('2026-09-01T09:00:00Z')
@@ -579,8 +648,19 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     // sonst so viel, wie ihre Länge (--kz-em) in die Karte (cqw) passt.
     expect(zahlen.match(/@container/g)).toHaveLength(3)
     expect(zahlen).toContain(`--kz-em:${kennzahlBreiteEm('€ 1\u00a0234,56')}`)
-    expect(zahlen).toContain('whitespace-nowrap')
     expect(zahlen).toMatch(/min\(22px,calc\(100cqw\/var\(--kz-em\)\)\)/)
+  })
+
+  it('Untergrenze 12 px und als Rückfall ein erlaubter Umbruch: nie über den Kartenrand, nie gekürzt (Runde 2)', () => {
+    const zahlen = html(createElement(Kennzahlen, { bestellungen: 1, zuPacken: 0, umsatzHeuteCent: 123456789 }))
+    expect(zahlen).toContain('€ 1\u00a0234\u00a0567,89')
+    // max(12px, …): auch bei Mindestschriftgröße oder Nur-Text-Zoom nicht winzig.
+    expect(zahlen).toMatch(/max\(12px,min\(22px,calc\(100cqw\/var\(--kz-em\)\)\)\)/)
+    expect(zahlen).toMatch(/max\(12px,min\(26px,calc\(100cqw\/var\(--kz-em\)\)\)\)/)
+    // Passt es dann nicht in eine Zeile, bricht der Betrag um, statt überzulaufen.
+    expect(zahlen).toContain('[overflow-wrap:anywhere]')
+    expect(zahlen).not.toContain('whitespace-nowrap')
+    expect(zahlen).not.toMatch(/truncate|text-ellipsis|overflow-hidden/)
   })
 
   it('kennzahlBreiteEm schätzt die Breite nie zu klein (im Browser gemessen, Fraunces 600) und kaum zu groß', () => {

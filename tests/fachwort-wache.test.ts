@@ -30,6 +30,7 @@ import {
   FUTTER_BESTAETIGUNG_TEXT,
   KENNZEICHNUNG_ERKLAERUNG,
   KENNZEICHNUNG_FUNDORT,
+  KENNZEICHNUNG_LOESCHEN_TITEL,
   KENNZEICHNUNG_TITEL,
   KENNZEICHNUNG_VERWEIS,
   KUNDEN_VERANTWORTUNG,
@@ -241,6 +242,22 @@ describe('Fachwort-Wache', () => {
     for (const pfad of quelldateien(join(WURZEL, 'src'))) {
       expect(readFileSync(pfad, 'utf8'), relative(WURZEL, pfad)).not.toContain('Angaben vom Sackanhänger')
     }
+  })
+
+  it('der Name steht nur, wo der Abschnitt steht — jeder Verweis kommt über KENNZEICHNUNG_VERWEIS, auch der Titel der Rückfrage (Runde 2)', () => {
+    // So sieht die Wache jeden Verweis: Er läuft über eine Konstante aus futter-registrierung.ts, nie über
+    // den nackten Namen in einem Satz einer Komponente.
+    const NAME_ALS_UEBERSCHRIFT = [
+      'src/lib/futter-registrierung.ts',
+      'src/components/products/produkt-abschnitte.ts',
+      'src/components/produkte/futter-formular.tsx',
+    ]
+    for (const pfad of quelldateien(join(WURZEL, 'src'))) {
+      const datei = relative(WURZEL, pfad).split(sep).join('/')
+      if (!NAME_ALS_UEBERSCHRIFT.includes(datei)) expect(quelle(datei), datei).not.toMatch(/\bKENNZEICHNUNG_TITEL\b/)
+    }
+    expect(KENNZEICHNUNG_LOESCHEN_TITEL).toBe(`Angaben ${KENNZEICHNUNG_VERWEIS} löschen?`)
+    expect(quelle('src/components/products/product-dialog.tsx')).toContain('{KENNZEICHNUNG_LOESCHEN_TITEL}')
   })
 
   it('der Satz, wo die Angaben stehen, stimmt auch für Heu aus eigener Ernte — dort gibt es keinen Sackanhänger (E10)', () => {

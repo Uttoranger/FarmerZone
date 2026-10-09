@@ -18,7 +18,7 @@
  *  - Darstellung: vier Zustände, lange Namen mit title, Telefon-Links mit
  *    Namen, keine Farbwerte.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, expectTypeOf, vi, beforeEach } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createElement, type ReactNode } from 'react'
@@ -73,8 +73,9 @@ import {
   zaehleKundenFilter,
   zuletztText,
   type KundenBestellung,
+  type KundenBlattWahl,
 } from '@/lib/hof-kunden'
-import { KUNDEN_FILTER_WERTE, KUNDEN_SORTIERUNG_WERTE, kundenAnsichtAus } from '@/schemas/hof-kunden'
+import { KUNDEN_FILTER_WERTE, KUNDEN_SORTIERUNG_WERTE, kundenAnsichtAus, type KundenAnsicht as AnsichtWerte } from '@/schemas/hof-kunden'
 import { findeKundenAdressen, getCustomerDetail, getCustomersForFarm, kundeIdFuer, type CustomerDetail, type CustomerSummary } from '@/server/queries/customers'
 import { KundenAnsicht } from '@/components/hof-kunden/kunden-ansicht'
 import { SortierFelder } from '@/components/hof-kunden/kunden-sortieren'
@@ -544,6 +545,9 @@ describe('Ansicht /customers — vier Zustände, lange Namen, Tokens', () => {
     const entwurf = { sortierung: 'name', richtung: 'auf', filter: 'neu' } as const
     expect(blattAdresse(aktuell, entwurf, 'abbrechen')).toBeNull()
     expect(blattAdresse(aktuell, entwurf, 'uebernehmen')).toBe('/customers?filter=neu&suche=hu&sortierung=name')
+    // Die Wahl ist ein Teil der Ansicht, abgeleitet statt von Hand nachgebaut (Runde 2).
+    expectTypeOf<KundenBlattWahl>().toEqualTypeOf<Pick<AnsichtWerte, 'sortierung' | 'richtung' | 'filter'>>()
+    expect(quelle('src/lib/hof-kunden.ts')).toContain("export type KundenBlattWahl = Pick<KundenAnsicht, 'sortierung' | 'richtung' | 'filter'>")
     // Die Komponente nutzt genau diese Regeln — keine zweite Fassung im Browser-Code.
     const komponente = quelle('src/components/hof-kunden/kunden-sortieren.tsx')
     expect(komponente).toContain('mitSortierung(')
