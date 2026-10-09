@@ -22,7 +22,7 @@ Inhalt:
 - 6 Rückweg (Nr. 44)
 - 7 Unbekanntes Hof-Konto (Nr. 42)
 - 8 Testbetrieb-Hinweise (Nr. 42)
-- 9 Kasse nach Nr. 46
+- 9 Kasse, Neuigkeiten und Kundensicht (Nr. 46)
 - 10 Abschluss und Aufräumen
 - 11 Ergebnis
 
@@ -154,7 +154,7 @@ Vor jedem Schritt, der bezahlt oder Geld zurückbucht, steht der Haken „Banner
 **1a – Karte, Bestellung A**
 
 1. Hofseite des Testhofs: 2 × Test-Eier und 1 × Test-Honig in den Korb, dann zur Kasse.
-2. Abholtermin wählen, dann E-Mail (deine), Name und Telefon (erfunden).
+2. Eine Abhol-Kachel wählen, etwa „Sa, 10. Okt" mit „09:00–12:00 Uhr". Dann E-Mail, Name und Telefon eintragen. Die E-Mail ist deine und steht in `TEST_EMPFAENGER`; Name und Telefon sind erfunden.
 3. „Online bezahlen" wählen, dann „Weiter zur Zahlung · € 18,17".
    - [ ] Banner zeigt „TEST · Dev-DB · Stripe Test".
 4. Im Zahlungsfeld: Karte `4242 4242 4242 4242`, Ablaufdatum in der Zukunft (z. B. 12/34), Prüfziffer beliebig (z. B. 123). Dann „Jetzt bezahlen · € 18,17".
@@ -162,7 +162,8 @@ Vor jedem Schritt, der bezahlt oder Geld zurückbucht, steht der Haken „Banner
 Erwartet:
 
 - [ ] Übersicht vor dem Bezahlen: „Warenpreis" € 17,30, „Servicegebühr · 5 %, mind. € 0,50" € 0,87, „Gesamt" € 18,17. Im Zahlungsschritt nennt die Kasse die Uhrzeit, bis zu der die Ware reserviert ist.
-- [ ] Bestätigungsseite: erst kurz „Zahlung wird geprüft", nach dem Neuladen „Danke, deine Bestellung ist da!". Der Schritt „Bezahlt" ist erreicht. Die Kundin bekommt eine Mail.
+- [ ] Unter dem Knopf steht „Abholung Sa, 10. Okt, 09:00–12:00 Uhr · Bezahlung sicher über Stripe", mit dem gewählten Termin. Die Kasse hat keinen Haken und keinen Abschnitt „Neuigkeiten vom Hof" (Abschnitt 9).
+- [ ] Bestätigungsseite: erst kurz „Zahlung wird geprüft", noch ohne die Karte „Neuigkeiten vom Hof per E-Mail". Nach dem Neuladen „Danke, deine Bestellung ist da!", jetzt mit der Karte. Der Schritt „Bezahlt" ist erreicht. Die Kundin bekommt eine Mail.
 - [ ] Hof → Bestellungen → A. A steht unter dem Filter „Noch offen", der gewählt ist, wenn die Seite aufgeht:
   - Der Betragskasten zeigt „Online bezahlt" und € 18,17.
   - Darunter steht „Warenpreis € 17,30 + Servicegebühr € 0,87 – die Gebühr ist online einbehalten."
@@ -246,17 +247,17 @@ Erwartet:
 
 Schritte:
 
-1. 2 × Test-Eier in den Korb, zur Kasse, „Bar bei Abholung" wählen.
+1. 2 × Test-Eier in den Korb, zur Kasse, eine Abhol-Kachel und „Bar bei Abholung" wählen.
    - [ ] Banner zeigt „TEST · Dev-DB · Stripe Test".
-2. Knopf „Zahlungspflichtig bestellen · € 9,80" tippen.
+2. Knopf „Zahlungspflichtig bestellen · € 9,80" tippen. Einen Haken gibt es dafür nicht mehr.
 3. Die Bestätigungsmail öffnen und den Link tippen. Auf der Seite „Ja, ich hole verbindlich ab" tippen.
 
 Erwartet:
 
 - [ ] Unter den Zahlarten steht „Bei Barzahlung bis 31. Jänner 2027 ohne Servicegebühr.", bei „Bar bei Abholung" der Zusatz „du bestätigst per E-Mail".
 - [ ] Die Übersicht hat keine Zeile Servicegebühr: „Warenpreis" € 9,80, „Gesamt" € 9,80.
-- [ ] Nach Nr. 46 gibt es bei Bar keinen Pflicht-Haken mehr. Vorher stand dort „Ich hole meine Bestellung zum gewählten Termin ab und zahle vor Ort bar." Siehe Abschnitt 9.
-- [ ] Bestätigungsseite: „Fast geschafft – bitte bestätige per E-Mail".
+- [ ] Die Kasse hat keinen Haken bei Bar und keinen Abschnitt „Neuigkeiten vom Hof" (Nr. 46). Unter dem Knopf steht „Abholung Sa, 10. Okt, 09:00–12:00 Uhr · Du zahlst bar beim Abholen", mit dem gewählten Termin.
+- [ ] Bestätigungsseite: „Fast geschafft – bitte bestätige per E-Mail". Darunter steht die Karte „Neuigkeiten vom Hof per E-Mail", weil eine offene Barbestellung bis zu ihrer Frist zählt. Getestet wird sie in Abschnitt 9.
 - [ ] Seite hinter dem Link: „Bestellung bei … bestätigen" mit „Bitte bestätige bis … – erst dann packt der Hof für dich." Die Positionen stehen da, **eine Zeile Servicegebühr nicht**, Summe € 9,80.
 - [ ] Hof → Bestellungen → E: „Bar zu kassieren € 9,80", darunter „Warenpreis € 9,80", ohne Satz zur Monatsabrechnung.
 - [ ] Stripe: nichts. Admin → Finanzen: S und V unverändert.
@@ -278,7 +279,7 @@ Erwartet:
 Schritte:
 
 1. Den Vorrat von Test-Honig notieren.
-2. 1 × Test-Honig in den Korb, zur Kasse, „Bar bei Abholung", das Abholfenster von heute wählen, das in etwa 20 Minuten beginnt.
+2. 1 × Test-Honig in den Korb, zur Kasse, „Bar bei Abholung". Dann die Kachel mit „Heute" wählen, deren Fenster in etwa 20 Minuten beginnt.
    - [ ] Banner zeigt „TEST · Dev-DB · Stripe Test".
 3. „Zahlungspflichtig bestellen · € 7,50" tippen. Die Mail **nicht** bestätigen.
 4. Warten, bis das Fenster begonnen hat. Dann die Hofseite oder Hof → Bestellungen öffnen.
@@ -581,19 +582,63 @@ Die drei Sätze erscheinen **nur in der Produktion**, solange sie mit Test-Schl�
 - [ ] bestanden
 - [ ] Fehler: ______
 
-## 9. Kasse nach Nr. 46
+## 9. Kasse, Neuigkeiten und Kundensicht (Nr. 46)
 
-Nr. 46 lief noch, als diese Liste entstand. Die Punkte folgen deshalb dem Auftrag (`freigabe.md` §12 „46"), nicht dem fertigen Stand. Ist Nr. 46 nicht im Sammel-PR, sieht die Kasse aus wie vorher: Pflicht-Haken bei Bar, Neuigkeiten in der Kasse. Dann lässt du diesen Abschnitt aus.
+Stand: Nr. 46 nach seiner Runde 1 (`nacht/2026-10-08/46-kundensicht`, ff52d03). Die Wörter stammen aus dem Code. Die Beträge ändert Nr. 46 nicht.
 
-- [ ] Bar: Es gibt keinen Pflicht-Haken mehr. Der Kaufknopf bleibt „Zahlungspflichtig bestellen · € …".
-- [ ] Jeder Abholtermin trägt ein Datum, z. B. „Sa, 10. Okt".
-- [ ] In der Kasse gibt es keinen Neuigkeiten-Haken mehr. Die Anmeldung steht auf der Bestätigungsseite, online wie bar.
-- [ ] Nach dem Haken kommt eine Mail. Ihr Link öffnet „Bestätige deine Anmeldung" mit dem Knopf „Anmeldung bestätigen". Danach steht dort „Danke, du bist angemeldet". Ohne diesen Klick gibt es keine Neuigkeiten (Double-Opt-in, S11).
-- [ ] Ein Fehler bei der Anmeldung ändert nichts an der Bestellung.
-- [ ] Am Handy bei 390 px verdeckt der Cookie-Hinweis weder die Unterleiste noch den Kaufknopf.
-- [ ] Alle Beträge sind wie in Abschnitt 3; Nr. 46 ändert keine Beträge.
-- [ ] `/hoefe`: ein Suchfeld „Ort oder Produkt" und „Standort nutzen". Bei 390 × 844 ist der erste Hof ohne Scrollen zu sehen.
-- [ ] Hofseite: Abholtermine lassen sich antippen und landen in der Kasse, oder sie stehen klar als Text da. Nichts sieht wie ein Knopf aus, ohne einer zu sein.
+**Kasse** (Profil Kundin, am Handy oder bei 390 px):
+
+- [ ] Abholung: Kacheln mit Datum und Zeit, etwa „Sa, 10. Okt" und „09:00–12:00 Uhr". Heute und morgen steht zusätzlich „Heute" bzw. „Morgen" darüber.
+- [ ] Bar: Es gibt keinen Haken. Bestellt wird allein mit „Zahlungspflichtig bestellen · € …".
+  - Darunter steht „Abholung Sa, 10. Okt, 09:00–12:00 Uhr · Du zahlst bar beim Abholen".
+  - Heute und morgen steht das Wort in Klammern dabei, etwa „Fr, 9. Okt (heute), …".
+- [ ] Online: „Weiter zur Zahlung · € …", darunter „Abholung … · Bezahlung sicher über Stripe".
+- [ ] In der Kasse gibt es keinen Abschnitt „Neuigkeiten vom Hof", weder für E-Mail noch für WhatsApp.
+- [ ] Die Beträge sind wie in Abschnitt 3.
+- [ ] Cookie-Hinweis:
+  - Am Handy ist er eine flache Zeile mit „Verstanden", über der Unterleiste bzw. über dem Kaufknopf. Nichts davon ist verdeckt.
+  - Nach „Verstanden" ist er weg.
+  - Er erscheint nur, bis du „Verstanden" tippst. Prüf ihn also vorher, oder in einem privaten Fenster, in dem du dich zuerst wieder bei Vercel anmeldest.
+
+**Neuigkeiten auf der Bestätigungsseite** (statt des Hakens in der Kasse)
+
+Die Bestätigungsseite einer Bestellung erreichst du über die Liste aus Ablauf 10, denn jede Zeile führt dorthin, oder über den Link in der Mail zur Bestellung. Direkt nach dem Bestellen bist du ohnehin dort.
+
+1. Die Bestätigungsseite einer laufenden oder abgeholten Bestellung öffnen, etwa von A (online bezahlt) oder E (bar bestätigt).
+   - [ ] Die Seite zeigt die Karte „Neuigkeiten vom Hof per E-Mail" mit „Möchtest du erfahren, wenn es bei \<Testhof\> frische Produkte oder Aktionen gibt? Freiwillig – abmelden kannst du dich jederzeit."
+   - [ ] Dazu der Knopf „Ja, Neuigkeiten per E-Mail" und darunter „Wir schicken dir zuerst eine E-Mail an \<Adresse der Bestellung\> zum Bestätigen. Ohne Bestätigung bekommst du nichts."
+2. Den Knopf **einmal** tippen.
+   - [ ] Statt des Knopfs steht „Danke! Falls du noch nicht angemeldet bist, kommt gleich eine E-Mail zum Bestätigen."
+3. Die Mail kommt an die Adresse aus der Bestellung, die deshalb in `TEST_EMPFAENGER` stehen muss (Abschnitt 2). Ihren Link öffnen.
+   - [ ] Die Seite „Bestätige deine Anmeldung" zeigt den Knopf „Anmeldung bestätigen".
+   - [ ] Erst danach steht „Danke, du bist angemeldet". Ohne diesen Klick gibt es keine Neuigkeiten (Double-Opt-in, S11).
+   - Ist die Adresse beim Testhof schon bestätigt angemeldet, kommt keine Mail. Auch das ist richtig, der Dank verrät es nicht.
+4. Die Bestellung ansehen.
+   - [ ] Sie ist unverändert, mit demselben Status und demselben Betrag.
+5. Gegenprobe ohne Karte:
+   - [ ] D (storniert, Ablauf 8) zeigt **keine** Karte „Neuigkeiten vom Hof per E-Mail".
+   - [ ] Ebenso keine Karte zeigen F (verfallen, Ablauf 5), B (nicht abgeholt, Ablauf 9c) und eine Online-Bestellung, solange „Zahlung wird geprüft" dasteht.
+
+Die Bremse nicht absichtlich auslösen: Tipp den Knopf je Bestellung nur einmal.
+- Ein zweites Tippen innerhalb von 10 Minuten bringt denselben Dank, aber keine zweite Mail.
+- Mehr als drei Anfragen je Bestellung und Tag nimmt die App nicht an; die Antwort bleibt trotzdem dieselbe.
+- Ein „Danke" ohne Mail nach mehreren Versuchen ist deshalb kein Fehler.
+
+**Hofseite** (Profil Kundin):
+
+- [ ] „Nächste Abholung" besteht aus Textzeilen mit Datum: „Heute · Fr, 9. Okt", „Morgen · Sa, 10. Okt" oder „So, 11. Okt", die Zeit rechts, etwa „9–12 Uhr".
+- [ ] Nichts davon ist antippbar oder sieht wie ein Knopf aus. Den Termin wählst du erst in der Kasse, dort mit demselben Datum.
+
+**`/hoefe`** (Profil Kundin, 390 × 844):
+
+- [ ] Es gibt ein Feld „Ort oder Produkt", darunter „Standort nutzen" und „Nichts wird gespeichert.".
+- [ ] Der erste Hof ist ohne Scrollen ganz zu sehen, auch bei offenem Cookie-Hinweis.
+- [ ] Tippst du ein Produkt, etwa „Ei", erscheinen Vorschläge. Am Ende steht der Eintrag „Höfe rund um „Ei" zeigen".
+- [ ] Eine Postleitzahl mit **genau vier Ziffern** und Enter sucht den Ort.
+  - Die Liste steht dann nach Entfernung.
+  - Oben steht „Wir zeigen Höfe rund um … – nichts wird gespeichert." mit „Ort ändern".
+- [ ] Ein Ortsname oder eine fünfstellige Postleitzahl sucht erst über den Eintrag „Höfe rund um „…" zeigen".
+- [ ] „Standort nutzen" und erlauben: Die Karte sagt „… rund um deinen Standort".
 
 **Ergebnis Abschnitt 9**
 
@@ -639,4 +684,4 @@ Diese Tabelle kommt in den Morgenbericht bzw. als Kommentar in den Sammel-PR.
 | Abschnitt 6 | Rückweg (Nr. 44) | | |
 | Abschnitt 7 | Unbekanntes Hof-Konto (Nr. 42) | | |
 | Abschnitt 8 | Testbetrieb-Hinweise (Nr. 42) | | |
-| Abschnitt 9 | Kasse nach Nr. 46 | | |
+| Abschnitt 9 | Kasse, Neuigkeiten und Kundensicht (Nr. 46) | | |
