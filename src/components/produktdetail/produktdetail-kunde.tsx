@@ -355,8 +355,9 @@ export function ProduktdetailKunde({
 
             <FutterVerantwortung saetze={verantwortung} />
 
-            {/* Am Handy die EINE feste Leiste unten (Fokus-Seite), ab 768 px in der Karte. */}
-            <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] md:static md:z-auto md:border-0 md:bg-transparent md:p-0">
+            {/* Am Handy die EINE feste Leiste unten (Fokus-Seite), ab 768 px in der Karte.
+                data-unten-fest: Der Cookie-Hinweis steht darüber (src/lib/cookie-hinweis.ts). */}
+            <div data-unten-fest="" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] md:static md:z-auto md:border-0 md:bg-transparent md:p-0">
               <div className="mx-auto flex max-w-[1200px] items-center gap-2.5 md:gap-3.5">
                 {kaufbar ? (
                   <>

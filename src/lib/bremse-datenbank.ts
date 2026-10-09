@@ -1,4 +1,5 @@
 import { createHmac } from 'crypto'
+import { NEUIGKEITEN_JE_BESTELLUNG_UND_TAG } from '@/lib/abo-bestaetigung'
 import { ANMELDECODE_RATE_LIMIT, CODE_ANFORDERUNGEN_JE_ADRESSE } from '@/lib/anmeldecode'
 import { MELDUNGEN_PRO_STUNDE } from '@/lib/meldung'
 
@@ -46,8 +47,9 @@ const anmeldecodeJeIp = { max: ANMELDECODE_RATE_LIMIT.max, fensterMs: ANMELDECOD
 const codesJeAdresse = { max: CODE_ANFORDERUNGEN_JE_ADRESSE.max, fensterMs: CODE_ANFORDERUNGEN_JE_ADRESSE.fensterMs }
 
 /**
- * Die fünf Wege aus R1 mit ihren Grenzen — und eine Drossel, die niemanden
- * bremst, sondern nur Sentry leise hält (Nr. 42, siehe unten).
+ * Die fünf Wege aus R1 mit ihren Grenzen — dazu die Bremse je Bestellung
+ * (Nr. 46, Runde 1) und eine Drossel, die niemanden bremst, sondern nur
+ * Sentry leise hält (Nr. 42, siehe unten).
  */
 export const DB_BREMSEN = {
   // Anmeldecode (Better Auth emailOTP, Hook in auth.ts)
@@ -70,6 +72,10 @@ export const DB_BREMSEN = {
   // Tag nach Sentry — über alle Instanzen, Merkmal ist die Hof-ID. Ein Tag ist
   // hier ein festes 24-Stunden-Fenster (UTC), für eine Drossel genügt das.
   stripeKontoUnbekannt: { zweck: 'stripe-konto-unbekannt', max: 1, fensterMs: TAG_MS },
+  // Neuigkeiten auf der Bestätigungsseite (Nr. 46, Runde 1): je Bestellung und
+  // Tag. Ohne erste Stufe — die Grenze schützt das Postfach hinter der
+  // Bestellung, nicht den Server (src/lib/abo-bestaetigung.ts).
+  neuigkeitenBestellung: { zweck: 'neuigkeiten-bestellung', max: NEUIGKEITEN_JE_BESTELLUNG_UND_TAG, fensterMs: TAG_MS },
 } as const satisfies Record<string, DbBremse>
 
 /**

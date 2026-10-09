@@ -20,6 +20,8 @@ import { auth } from '@/lib/auth'
 import { neueFrist } from '@/lib/reservierung'
 import { kalendertagInWien } from '@/lib/servicegebuehr'
 import { tagVersetzt } from '@/lib/kalender'
+import { DB_BREMSEN, bremsSchluessel } from '@/lib/bremse-datenbank'
+import { env } from '@/lib/env'
 import type { Abgabe, Farm, Prisma, Product, User } from '@prisma/client'
 
 export const INT_PRAEFIX = 'int-'
@@ -245,14 +247,23 @@ export function checkoutAnfrage(eingabe: {
  * kaskadierend am User.
  */
 export async function raeumeAuf(): Promise<void> {
-  await prisma.order.deleteMany({
-    where: {
-      OR: [
-        { farm: { slug: { startsWith: INT_PRAEFIX } } },
-        { customerEmail: { startsWith: INT_PRAEFIX } },
-      ],
-    },
-  })
+  const testBestellungen = {
+    OR: [{ farm: { slug: { startsWith: INT_PRAEFIX } } }, { customerEmail: { startsWith: INT_PRAEFIX } }],
+  } satisfies Prisma.OrderWhereInput
+  // Die Bremse je Bestellung (Neuigkeiten, Nr. 46 Runde 1) zählt mit der
+  // Bestell-ID im HMAC — ihre Zeilen tragen kein Präfix, deshalb über die
+  // Kennungen der Testbestellungen, bevor diese weg sind.
+  const kennungen = await prisma.order.findMany({ where: testBestellungen, select: { id: true } })
+  if (kennungen.length > 0) {
+    await prisma.rateLimitZaehler.deleteMany({
+      where: {
+        schluessel: {
+          in: kennungen.map(({ id }) => bremsSchluessel(env.BETTER_AUTH_SECRET, DB_BREMSEN.neuigkeitenBestellung.zweck, id)),
+        },
+      },
+    })
+  }
+  await prisma.order.deleteMany({ where: testBestellungen })
   await prisma.stockReservation.deleteMany({
     where: { sessionId: { startsWith: INT_PRAEFIX } },
   })

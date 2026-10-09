@@ -20,7 +20,7 @@
  */
 import { wienerZeitpunkt } from '@/lib/fristen'
 import { kalendertagInWien } from '@/lib/servicegebuehr'
-import { tagVersetzt } from '@/lib/kalender'
+import { tagVersetzt, wochentagVon } from '@/lib/kalender'
 import { ABHOL_VORLAUF_TAGE } from '@/lib/pickup-days'
 
 export const CODE_ABHOLFENSTER_UNGUELTIG = 'ABHOLFENSTER_UNGUELTIG'
@@ -50,12 +50,6 @@ export function abholSchluessel(wahl: Abholwahl): string {
   return `${wahl.datum}|${wahl.start}|${wahl.ende}`
 }
 
-/** Wochentag eines Kalendertags, 0 = Sonntag wie PickupSlot.dayOfWeek. */
-function wochentag(kalendertag: string): number {
-  const [j, m, t] = kalendertag.split('-').map(Number)
-  return new Date(Date.UTC(j, m - 1, t)).getUTCDay()
-}
-
 /** Alle wählbaren Fenster ab jetzt, nach Tag und Beginn sortiert. */
 export function angeboteneAbholfenster<S extends AbholSlot>(slots: readonly S[], jetzt: Date): AngebotenesFenster<S>[] {
   const aktiv = slots.filter((s) => s.isActive !== false)
@@ -63,7 +57,7 @@ export function angeboteneAbholfenster<S extends AbholSlot>(slots: readonly S[],
   const fenster: AngebotenesFenster<S>[] = []
   for (let versatz = 0; versatz < ABHOL_VORLAUF_TAGE; versatz++) {
     const datum = tagVersetzt(heute, versatz)
-    const tag = wochentag(datum)
+    const tag = wochentagVon(datum)
     for (const slot of aktiv) {
       if (slot.dayOfWeek !== tag) continue
       const schluss = wienerZeitpunkt(datum, slot.startTime)

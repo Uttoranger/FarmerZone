@@ -1,5 +1,9 @@
 // "Nächste Abholung"-Tageskarten (Sprint 20, Referenz 17) aus den echten
 // PickupSlots (wöchentlich wiederkehrend, dayOfWeek = JS getDay(), 0 = Sonntag).
+import { formatTagKurz } from '@/lib/format'
+import { uhrzeitInWien } from '@/lib/fristen'
+import { tagVersetzt, wochentagVon } from '@/lib/kalender'
+import { kalendertagInWien } from '@/lib/wiener-tag'
 
 export type WeeklySlot = { dayOfWeek: number; startTime: string; endTime: string }
 
@@ -9,7 +13,17 @@ export type WeeklySlot = { dayOfWeek: number; startTime: string; endTime: string
  * die der Server genauso prüft.
  */
 export const ABHOL_VORLAUF_TAGE = 14
-export type PickupDay = { date: Date; label: string; times: string }
+export type PickupDay = {
+  /** 12:00 UTC des Wiener Kalendertags — eindeutig je Tag (Schlüssel in Listen). */
+  date: Date
+  /** Der Wiener Kalendertag JJJJ-MM-TT — derselbe Schlüssel wie in der Kasse. */
+  kalendertag: string
+  /** „Heute", „Morgen", sonst das Datum „Sa, 10. Okt". */
+  label: string
+  /** Immer das Datum „Sa, 10. Okt" (Nr. 46: jeder Termin mit Datum). */
+  datum: string
+  times: string
+}
 
 const WEEKDAY_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
 
@@ -20,18 +34,15 @@ export function formatSlotTime(t: string): string {
   return m === '00' ? hour : `${hour}:${m}`
 }
 
-function dayLabel(date: Date, now: Date): string {
-  const tomorrow = new Date(now)
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  if (date.toDateString() === now.toDateString()) return 'Heute'
-  if (date.toDateString() === tomorrow.toDateString()) return 'Morgen'
-  const month = date.toLocaleDateString('de-AT', { month: 'long' })
-  return `${WEEKDAY_SHORT[date.getDay()]}, ${date.getDate()}. ${month}`
-}
-
 // Nächste `count` Abholtage innerhalb von 14 Tagen. Heute zählt nur, solange
 // mindestens ein Zeitfenster noch nicht vorbei ist. Slots pro Tag nach Beginn
 // sortiert, mehrere Fenster mit " · " verbunden.
+//
+// WIENER KALENDER UND UHR (Nr. 46, Runde 1), mit denselben Helfern wie die
+// Kasse (`angeboteneAbholfenster`, `abholKacheln`): Vorher galt die Uhr des
+// Geräts — der Server (UTC) und ein Browser in Wien zeigten zwischen 00:00 und
+// 01:00 bzw. 02:00 Wiener Zeit einen anderen Tag, und mit dem Datum in der
+// Zeile („Heute · Di, 21. Juli") fiel das auf.
 export function nextPickupDays(
   slots: WeeklySlot[],
   count = 3,
@@ -39,19 +50,24 @@ export function nextPickupDays(
 ): PickupDay[] {
   if (slots.length === 0) return []
 
-  const nowHm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  const heute = kalendertagInWien(now)
+  const jetztHm = uhrzeitInWien(now)
   const days: PickupDay[] = []
 
   for (let offset = 0; offset < ABHOL_VORLAUF_TAGE && days.length < count; offset++) {
-    const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset, 12, 0, 0)
-    let daySlots = slots.filter((s) => s.dayOfWeek === date.getDay())
-    if (offset === 0) daySlots = daySlots.filter((s) => s.endTime > nowHm)
+    const kalendertag = tagVersetzt(heute, offset)
+    let daySlots = slots.filter((s) => s.dayOfWeek === wochentagVon(kalendertag))
+    if (offset === 0) daySlots = daySlots.filter((s) => s.endTime > jetztHm)
     if (daySlots.length === 0) continue
 
     const sorted = daySlots.slice().sort((a, b) => a.startTime.localeCompare(b.startTime))
+    // Dieselbe Schreibweise wie die Kasse („Sa, 10. Okt", src/lib/format.ts).
+    const datum = formatTagKurz(kalendertag)
     days.push({
-      date,
-      label: dayLabel(date, now),
+      date: new Date(`${kalendertag}T12:00:00Z`),
+      kalendertag,
+      label: offset === 0 ? 'Heute' : offset === 1 ? 'Morgen' : datum,
+      datum,
       times: `${sorted
         .map((s) => `${formatSlotTime(s.startTime)}–${formatSlotTime(s.endTime)}`)
         .join(' · ')} Uhr`,
@@ -59,6 +75,14 @@ export function nextPickupDays(
   }
 
   return days
+}
+
+/**
+ * Eine Zeile der Karte „Nächste Abholung" (Nr. 46: Termine als Text, keine
+ * Knopf-Optik ohne Funktion): „Heute · Do, 8. Okt", sonst das Datum.
+ */
+export function abholtagZeile(tag: Pick<PickupDay, 'label' | 'datum'>): string {
+  return tag.label === tag.datum ? tag.datum : `${tag.label} · ${tag.datum}`
 }
 
 // Kurzlabel für die Aktionsleiste: "Mi & Sa" (Wochentage der Slots, Mo–So sortiert)

@@ -23,7 +23,6 @@ import { berechneServicegebuehr } from '@/lib/servicegebuehr'
 import { pruefeSitzungsWarenkorb } from '@/server/warenkorb'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
-import { EMAIL_ABO_STAND, meldeEmailAboAn } from '@/server/abo-anmeldung'
 import { bestellPositionsName } from '@/lib/eingabegrenzen'
 import { fristVon } from '@/lib/fristen'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
@@ -731,40 +730,12 @@ export async function POST(request: NextRequest) {
   //     bestellen, statt an „Reservierung abgelaufen" zu scheitern.
   const gibHalteFrei = () => prisma.stockReservation.deleteMany({ where: { sessionId: data.sessionId } })
 
-  // 10b. Neuigkeiten vom Hof — nur, wenn die Kundin den Haken gesetzt hat.
-  //     E-Mail mit Double-Opt-in (Register S11, Nr. 38): Ein neues oder
-  //     abgemeldetes Abo bekommt erst einen Bestätigungslink (nach der
-  //     Antwort), `optInEmail` setzt erst der Knopf dahinter. Bestand und
-  //     bestätigte Abos bleiben unverändert. Ein gesetzter Haken wird nie
-  //     durch einen leeren überschrieben. Die Antwort an den Browser ist in
-  //     jedem Fall dieselbe — sie verrät nicht, ob die Adresse schon abonniert ist.
-  //     Scheitert das Abo, steht die Bestellung trotzdem: gemeldet, nicht zurückgerollt.
-  if (data.optInEmail || data.optInWhatsApp) {
-    try {
-      const email = data.customerEmail.toLowerCase()
-      const abo = await prisma.customerFarmSubscription.upsert({
-        where: { customerEmail_farmId: { customerEmail: email, farmId: farm.id } },
-        create: {
-          customerEmail: email,
-          farmId: farm.id,
-          optInEmail: false,
-          optInWhatsApp: data.optInWhatsApp ?? false,
-          customerPhone: data.customerPhone || null,
-        },
-        update: {
-          ...(data.optInWhatsApp ? { optInWhatsApp: true } : {}),
-          customerPhone: data.customerPhone || null,
-        },
-        select: EMAIL_ABO_STAND,
-      })
-      if (data.optInEmail) await meldeEmailAboAn(abo, new Date())
-    } catch (err) {
-      // Nur die Art des Fehlers — Prisma-Texte können die Adresse tragen.
-      const meldung = new Error('Abo im Checkout nicht gespeichert')
-      meldung.name = err instanceof Error ? err.name : 'Unbekannt'
-      Sentry.captureException(meldung, { tags: { aufgabe: 'checkout', grund: 'abo_nicht_gespeichert' }, extra: { orderId: order.id } })
-    }
-  }
+  // 10b. KEIN ABO IM CHECKOUT (Register N2, Nr. 46). Die Neuigkeiten meldet
+  //     die Kundin auf der Bestätigungsseite an (meldeNeuigkeitenAn, mit
+  //     Double-Opt-in über meldeEmailAboAn) — getrennt von der Bestellung, so
+  //     dass ein Abo nie eine Bestellung berührt. Ein alter Tab, der noch
+  //     optInEmail/optInWhatsApp schickt, bekommt seine Bestellung wie jeder
+  //     andere: Das Schema verwirft die Felder still.
 
   // 11a. ONLINE — PaymentIntent anlegen (Ladungstyp: intentParameter oben).
   //      Mit festem Stripe-Schlüssel je Bestellung und NIE ungeschützt:

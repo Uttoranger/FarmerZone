@@ -21,6 +21,7 @@ import {
   CODE_ZAHLART_NICHT_ANGEBOTEN,
   ZAHLART_NICHT_ANGEBOTEN,
   abholKacheln,
+  abholSatz,
   bestellschlussHeute,
   gebuehrBezeichnung,
   kassenBetraege,
@@ -277,11 +278,31 @@ describe('abholKacheln — dieselben Fenster wie der Server (angeboteneAbholfens
     { id: 's3', dayOfWeek: 2, startTime: '09:00', endTime: '12:00', maxOrders: 3, isActive: true },
   ]
 
-  it('heute nur Fenster, deren Beginn noch kommt; „Heute", „Morgen", dann Wochentag', () => {
+  it('heute nur Fenster, deren Beginn noch kommt; jeder Termin mit Datum, heute und morgen mit dem Wort dazu', () => {
     const kacheln = abholKacheln(slots, JETZT, [])
-    expect(kacheln[0]).toEqual(expect.objectContaining({ key: '2026-10-05|15:00|18:00', tag: 'Heute', zeit: '15:00–18:00 Uhr', ausgebucht: false }))
-    expect(kacheln[1]).toEqual(expect.objectContaining({ key: '2026-10-06|09:00|12:00', tag: 'Morgen' }))
+    expect(kacheln[0]).toEqual(
+      expect.objectContaining({ key: '2026-10-05|15:00|18:00', datum: 'Mo, 5.\u00a0Okt', relativ: 'Heute', zeit: '15:00–18:00 Uhr', ausgebucht: false })
+    )
+    expect(kacheln[1]).toEqual(expect.objectContaining({ key: '2026-10-06|09:00|12:00', datum: 'Di, 6.\u00a0Okt', relativ: 'Morgen' }))
     expect(kacheln.some((k) => k.key.startsWith('2026-10-05|08:00'))).toBe(false)
+  })
+
+  it('ab übermorgen steht nur das Datum — nie ein Wochentag ohne Datum (Nr. 46)', () => {
+    const kacheln = abholKacheln(slots, JETZT, [])
+    const spaeter = kacheln.filter((k) => !k.key.startsWith('2026-10-05') && !k.key.startsWith('2026-10-06'))
+    expect(spaeter.length).toBeGreaterThan(0)
+    for (const k of spaeter) {
+      expect(k.relativ).toBeNull()
+      expect(k.datum).toMatch(/^(Mo|Di), \d{1,2}\.\u00a0(Okt|Nov)$/)
+    }
+    expect(spaeter[0]).toEqual(expect.objectContaining({ key: '2026-10-12|08:00|09:00', datum: 'Mo, 12.\u00a0Okt' }))
+  })
+
+  it('der Satz unter dem Kaufknopf nennt Datum und Zeit, heute und morgen mit dem Wort', () => {
+    const [heute, morgen] = abholKacheln(slots, JETZT, [])
+    expect(abholSatz(heute!)).toBe('Mo, 5.\u00a0Okt (heute), 15:00–18:00 Uhr')
+    expect(abholSatz(morgen!)).toBe('Di, 6.\u00a0Okt (morgen), 09:00–12:00 Uhr')
+    expect(abholSatz({ datum: 'Sa, 10.\u00a0Okt', relativ: null, zeit: '09:00–12:00 Uhr' })).toBe('Sa, 10.\u00a0Okt, 09:00–12:00 Uhr')
   })
 
   it('volle Fenster bleiben sichtbar, aber ausgebucht', () => {

@@ -287,7 +287,8 @@ export function KundeFokusShell({ titel, zurueck, rechts, aktion, children }: Ku
       </main>
 
       {aktion && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] md:static md:border-0 md:bg-transparent md:pt-6 md:pb-10 print:hidden">
+        // data-unten-fest: Der Cookie-Hinweis steht über der Leiste (src/lib/cookie-hinweis.ts).
+        <div data-unten-fest="" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] md:static md:border-0 md:bg-transparent md:pt-6 md:pb-10 print:hidden">
           <div className="mx-auto max-w-[1200px]">{aktion}</div>
         </div>
       )}

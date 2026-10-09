@@ -12,8 +12,20 @@ import { env } from '@/lib/env'
 // Abmeldelink in unsubscribe.ts): Der Link ist der einzige Weg der Kundin
 // zurück zu ihrer Bestellung — es gibt kein Konto und keine Historie. Wer
 // nach Wochen den Kaufbeleg oder die Abholadresse nachschlagen will, darf
-// nicht vor einer abgelaufenen Signatur stehen. Der Link gewährt nur LESEN
-// einer einzelnen Bestellung; ein abgefangener Link kann nichts auslösen.
+// nicht vor einer abgelaufenen Signatur stehen.
+//
+// WAS DER LINK DARF: Lesen einer einzelnen Bestellung — und seit Nr. 46 genau
+// EINEN Schreibweg: die Anmeldung „Neuigkeiten vom Hof per E-Mail" auf der
+// Bestätigungsseite (`meldeNeuigkeitenAn`). Ein abgefangener Link — oder der
+// eigene Link zu einer Bestellung mit fremder Adresse — kann damit nur eine
+// Bestätigungsmail an die Adresse DER Bestellung auslösen, nie an eine andere;
+// angemeldet ist erst, wer in dieser Mail klickt (Double-Opt-in, S11). Dazu:
+// nur für eine laufende Bestellung (`neuigkeitenErlaubt`), höchstens drei
+// Anfragen je Bestellung und UTC-Tag (Datenbank-Bremse, an der Tagesgrenze bis
+// zu doppelt), ein Link je Abo und zehn
+// Minuten, immer dieselbe Antwort, und an der Bestellung ändert sich nichts
+// (docs/ai/ARCHITECTURE.md §5). Jeder weitere Schreibweg braucht ein eigenes
+// Token mit eigenem Zweck, nicht diese Signatur.
 const SECRET = env.BETTER_AUTH_SECRET
 
 // Domänen-Präfix gegen Verwechslung: reorder-token und unsubscribe signieren

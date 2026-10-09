@@ -162,6 +162,20 @@ export async function anmeldecodeGebremst(
 }
 
 /**
+ * Neuigkeiten auf der Bestätigungsseite (Nr. 46, Runde 1): höchstens
+ * `NEUIGKEITEN_JE_BESTELLUNG_UND_TAG` Anfragen je Bestellung und Tag, über
+ * alle Instanzen. true = gebremst.
+ *
+ * Gilt überall, nicht nur in Produktion: Das Merkmal ist die Bestellung, keine
+ * IP — lokal und in Tests teilen sich nicht alle einen Schlüssel, und drei
+ * Anfragen je Bestellung stören dort niemanden. Fail-open wie jede zweite
+ * Stufe: Die Bremse des Abos (zehn Minuten) wirkt weiter.
+ */
+export async function neuigkeitenGebremst(orderId: string, jetzt: Date = new Date()): Promise<boolean> {
+  return !(await bremseUeberAlleInstanzen([{ bremse: DB_BREMSEN.neuigkeitenBestellung, merkmal: orderId }], jetzt))
+}
+
+/**
  * Für den täglichen Cron (api/cron/cleanup-reservations): Zeilen, deren
  * Fenster vorbei ist. Gelesen werden sie nie mehr — ein neues Fenster ist
  * eine neue Zeile.

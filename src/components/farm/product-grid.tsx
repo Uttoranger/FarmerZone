@@ -835,6 +835,8 @@ export function ProductGrid({
         <button
           type="button"
           onClick={() => setCartOpen(true)}
+          // Der Cookie-Hinweis steht über der Korb-Leiste, nie darauf (src/lib/cookie-hinweis.ts).
+          data-unten-fest=""
           className={cn(
             'fixed inset-x-4 bottom-[calc(68px+env(safe-area-inset-bottom,0px)+1.75rem)] z-40 flex min-h-12 items-center gap-2.5 rounded-2xl bg-accent px-4 py-3 text-accent-foreground shadow-lg transition-transform duration-[250ms] active:scale-[0.98] md:inset-x-auto md:right-6 md:bottom-6 md:rounded-full md:px-5 lg:hidden',
             FOKUS_RAHMEN

@@ -23,7 +23,6 @@ export const CHECKOUT_FELD_REIHENFOLGE = [
   'kaeuferArt',
   'betriebsnummer',
   'paymentMethod',
-  'onsiteConfirmed',
 ] as const
 
 /** JJJJ-MM-TT — der Wiener Kalendertag des Abholfensters. */
@@ -51,9 +50,12 @@ export const checkoutFormSchema = z
     // Server (unten) kennt ONSITE_CARD weiter — dort entscheidet die Route
     // NACH der Idempotenz, ob es eine neue Bestellung wäre.
     paymentMethod: z.enum(NEUE_BESTELLUNG_ZAHLARTEN, 'Bitte wähle, wie du bezahlen möchtest'),
-    onsiteConfirmed: z.boolean().optional(),
-    optInEmail: z.boolean().default(false),
-    optInWhatsApp: z.boolean().default(false),
+    // Kein Haken „Ich hole ab und zahle bar" mehr (Register N2, Nr. 46): Der
+    // verbindliche Abschluss ist der Knopf „Zahlungspflichtig bestellen".
+    // Keine Neuigkeiten-Haken mehr — die Anmeldung steht auf der
+    // Bestätigungsseite (meldeNeuigkeitenAn). Ein alter Stand, der die Felder
+    // noch kennt, scheitert nicht: z.object verwirft Unbekanntes still.
+
     // Abschnitt „Betrieb" (Sprint Bereiche 1). Nur sichtbar, wenn eine
     // Position mit abgabe = NUR_BETRIEBE im Korb liegt.
     kaeuferArt: z.enum(KAEUFER_ART_VALUES).default('PRIVAT'),
@@ -63,17 +65,7 @@ export const checkoutFormSchema = z
     // prüft mit seinen eigenen Daten erneut und liest diesen Wert NIE.
     nurBetriebeImKorb: z.boolean().default(false),
   })
-  // Die Abhol-Verpflichtung gehört in die Prüfung, nicht in die Absende-Funktion
-  // (Bug-Report Befund 5). Nur so erzeugt sie denselben sichtbaren Fehler wie
-  // die übrigen Pflichtfelder und nimmt am Sprung zum ersten Fehler teil.
   .superRefine((daten, ctx) => {
-    if (daten.paymentMethod === 'ONSITE_CASH' && !daten.onsiteConfirmed) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['onsiteConfirmed'],
-        message: 'Bitte bestätige die verbindliche Abholung',
-      })
-    }
     // Dieselbe Regel wie im Handler (src/lib/betriebsnachweis.ts).
     const nachweis = pruefeBetriebsnachweis(daten)
     if (!nachweis.ok) {
@@ -111,8 +103,11 @@ export const checkoutRequestSchema = z.object({
   // bestehende Bestellung zurück; eine NEUE lehnt die Route ab (E5,
   // zahlartFuerNeueBestellung in src/lib/kasse.ts).
   paymentMethod: z.enum(['ONLINE', 'ONSITE_CASH', 'ONSITE_CARD']),
-  optInEmail: z.boolean().optional().default(false),
-  optInWhatsApp: z.boolean().optional().default(false),
+  // Kein `onsiteConfirmed`, `optInEmail`, `optInWhatsApp` mehr (Register N2,
+  // Nr. 46): Der Checkout prüft keinen Haken und legt kein Abo an — die
+  // Neuigkeiten meldet die Kundin auf der Bestätigungsseite an. Ein alter
+  // Tab, der die Felder noch schickt, scheitert nicht: z.object verwirft
+  // unbekannte Felder still (tests/kasse-route.test.ts).
   // Ob die Käuferart reicht, prüft der Handler gegen Product.abgabe aus der
   // DB (pruefeBetriebsnachweis) — hier nur die Form der Eingabe.
   kaeuferArt: z.enum(KAEUFER_ART_VALUES).optional().default('PRIVAT'),
