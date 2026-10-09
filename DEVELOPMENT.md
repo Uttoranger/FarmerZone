@@ -4657,6 +4657,21 @@ Auftrag freigabe.md §12 „46", Register N2 (Geldpfad). Keine Schema-Änderung,
   - *Nominatim nur ausdrücklich.* Enter ohne Treffer schickte den Text an die Ortssuche, auch ein Produktwort; die Datenschutzerklärung nennt nur „Postleitzahl oder Ort". Jetzt nur bei genau vier Ziffern oder über den Eintrag „Höfe rund um …"; ohne Treffer markiert Enter den Eintrag (`enterImSuchfeld`). Deutsche Postleitzahlen gehen über den Eintrag.
   - *Fehlersatz der Karte* in der Fehler-Farbe `text-destructive` (O1) statt orange.
 
+## Probelauf als Checkliste (Nachtlauf Nr. 48, Oktober 2026)
+
+Auftrag freigabe.md §12 „48" (Nachholung von Nr. 34). Kein Code, keine Migration. Vorbedingung B war nicht erfüllt: Die Netzwerkrichtlinie der Nacht-Sitzung sperrt die Vorschau-Adressen und api.stripe.com. Deshalb gilt der Pfad „Sonst": `docs/nachtlauf/probelauf-checkliste.md` führt den Menschen durch die zwölf Abläufe, mit Beträgen aus dem Code und den Stellen in Stripe-Dashboard und Admin. Bericht 48.
+
+- **Ein Test-Schlüssel, alle Test-Endpunkte:** Vorschau und Produktion teilen bei Vercel die `STRIPE_*`-Variablen (Testmodus, Register Z2). Stripe stellt jedes Ereignis im Testmodus an jeden dort eingetragenen Endpunkt zu. Die Produktion bekommt also auch die Ereignisse aus Vorschau bzw. Testumgebung, und umgekehrt.
+- **Webhook bei unbekannter Bestellung (im Code geprüft):** Die Route quittiert mit 200 und speichert das Ereignis in `WebhookEvent`; Stripe stellt also nicht erneut zu. Sie ändert nichts und meldet nichts an Sentry.
+  - `payment_intent.*` ohne Bestellung: Bei `succeeded` steht nur eine Zeile im Protokoll („Order not found …"), `console.error` geht nicht an Sentry.
+  - `account.updated` ohne Hof: Die Route fragt Stripe gar nicht erst.
+  - Erstattungen: Nur eine gescheiterte Erstattung ohne passende Bestellung wird gemeldet, einmal je Erstattung (Sentry und Betreiber-Mail, Vermerk in `WebhookEvent`).
+  - Folge: Jedes fremde Ereignis legt eine Zeile in `WebhookEvent` an, ohne Personendaten. Aufgeräumt wird die Tabelle nicht.
+- **Folge für die Testumgebung:** Bezahlt setzt erst der Webhook. Ohne eigenen Endpunkt bleibt eine Online-Bestellung dort auf „Zahlung wird geprüft". Der Endpunkt braucht zwei Dinge:
+  - ein eigenes Signing Secret als `STRIPE_WEBHOOK_SECRET`, nur für den Branch;
+  - einen Weg durch die Vercel-Anmeldung, sonst bekommt Stripe 401. Den Weg beschreibt `docs/betrieb/testumgebung.md`, Schritt 5 (Nr. 43): „Protection Bypass for Automation" als Parameter an der Endpunkt-Adresse. Dort steht auch, dass dieses Geheimnis alle geschützten Deployments des Projekts öffnet.
+- **Testbetrieb-Hinweise (Nr. 42)** erscheinen nur in der Produktion mit Test-Schlüssel (`istTestbetrieb`), nie in Vorschau oder Testumgebung. Dort sagt es das Banner.
+
 ## Nützliche Befehle
 
 ```bash
