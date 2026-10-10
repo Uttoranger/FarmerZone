@@ -4,10 +4,13 @@ import type { Metadata } from 'next'
 import { auth } from '@/lib/auth'
 import { getFarmSettings } from '@/server/queries/farm'
 import { PauseClient } from '@/components/settings/pause-client'
-import { EinstellungenKopf } from '@/components/hof-einstellungen/einstellungen-kopf'
+import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
 
-export const metadata: Metadata = { title: 'Urlaubsmodus — FarmerZone' }
+/** Titel der Seite — für den Kopf und den Tab, eine Schreibweise. */
+const TITEL = 'Urlaubsmodus'
+
+export const metadata: Metadata = { title: `${TITEL} — FarmerZone` }
 
 /*
  * Urlaubsmodus (Pause, Farm.isPaused) in der HofShell (Nachtlauf Nr. 22d):
@@ -23,8 +26,8 @@ export default async function PausePage(): Promise<React.JSX.Element> {
 
   return (
     <div className={UNTERSEITE_RAHMEN}>
-      <EinstellungenKopf
-        titel="Urlaubsmodus"
+      <UnterseitenKopf
+        titel={TITEL}
         satz="Pausiere Bestellungen während Urlaub oder Betriebsferien. Bestehende Bestellungen bleiben erhalten."
       />
       <div data-app-palette="neu">

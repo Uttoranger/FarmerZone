@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { bestaetigteAdresse } from '@/server/kunden-adresse'
+import { wartetAufBestaetigung, werbemailErlaubt } from '@/lib/abo-bestaetigung'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { ProfileClient } from './profile-client'
 
@@ -26,6 +27,7 @@ export default async function AccountProfilePage() {
         orderBy: { createdAt: 'asc' },
       })
     : []
+  const jetzt = new Date()
 
   return (
     <KundeShellMitSitzung>
@@ -40,7 +42,10 @@ export default async function AccountProfilePage() {
           farmId: s.farmId,
           farmName: s.farm.name,
           farmSlug: s.farm.slug,
-          optInEmail: s.optInEmail,
+          // „An" nur, wenn das Abo Mails bekommt (Bestand oder bestätigt, S11);
+          // eine unbestätigte Anmeldung zeigt den Hinweis auf den Link.
+          optInEmail: werbemailErlaubt(s),
+          emailWartet: wartetAufBestaetigung(s, jetzt),
           optInWhatsApp: s.optInWhatsApp,
           customerPhone: s.customerPhone ?? null,
         }))}

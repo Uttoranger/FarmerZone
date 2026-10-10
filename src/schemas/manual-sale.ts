@@ -41,6 +41,11 @@ export const manualSaleFormSchema = z.object({
   channel: verkaufskanalSchema,
   saleDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, DATUM_FEHLT).refine(istKalendertag, DATUM_FEHLT),
   note: z.string().max(NOTIZ_MAX, ZU_LANG.notiz).optional().or(z.literal('')),
+  // Schalter „Vorrat abziehen" (Register D1). Abgezogen wird nur bei `true`:
+  // Das Formular schickt ihn immer mit (Standard ein); ein Aufruf ohne Feld —
+  // etwa eine im Deploy-Fenster noch offene alte Seite, die den Schalter nie
+  // gezeigt hat — bucht still keinen Vorrat ab. Beim Ändern gilt er nie.
+  vorratAbziehen: z.boolean().optional(),
 })
 
 export type ManualSaleFormData = z.infer<typeof manualSaleFormSchema>

@@ -128,7 +128,15 @@
      braucht. Hell = dasselbe Waldgrün wie --primary. */
   --brand-text: oklch(0.30 0.082 155);
 
-  --destructive: oklch(0.577 0.245 27.325);
+  /* #A01013 — Fehler-Rot (Register O1, Nr. 28). Steht als Schrift auf dem
+     Grund und auf eigener roter Tönung (Knopf und Badge bg-destructive/10,
+     Darüberfahren /20). Kontrast nachgerechnet in
+     tests/fehler-farbe-kontrast.test.ts, schlechtester Fall je Grund:
+     background 5,07 · card 5,59 · muted 4,64 · secondary 4,77 ·
+     --fz-bg 5,00 · --fz-surface 5,32 · muted/secondary neu 4,89
+     (jeweils mit /20; ungetönt 6,62 bis 8,15). Der shadcn-Wert #E7000B
+     erreichte ungetönt auf --fz-bg nur 4,22. */
+  --destructive: oklch(0.45 0.175 27.325);
 
   /* Warm-Grau Border */
   --border: oklch(0.90 0.012 85);
@@ -277,7 +285,12 @@
   /* Helles Salbeigrün: Waldgrün wäre auf dunklem Grund unlesbar. */
   --brand-text: oklch(0.82 0.045 148);
 
-  --destructive: oklch(0.704 0.191 22.216);
+  /* #FF7E7D — Fehler-Rot im Dunkeln (O1, Nr. 28), heller als der shadcn-Wert
+     #FF6467, der mit Tönung /20 auf muted nur 4,13 erreichte. Schlechtester
+     Fall je Grund (mit /20): background 6,08 · card 5,31 · muted 4,60 ·
+     secondary 4,60 · --fz-bg 5,71 · --fz-surface 5,11 · muted/secondary neu
+     4,65; ungetönt 6,48 bis 8,09 (tests/fehler-farbe-kontrast.test.ts). */
+  --destructive: oklch(0.75 0.165 22.216);
   /* Etwas kräftiger als im Tag-Modus, weil Karte und Grund im Dunkeln nur
      1,1:1 auseinanderliegen — der Rahmen trägt hier die ganze Abgrenzung. */
   --border: oklch(1 0 0 / 14%);

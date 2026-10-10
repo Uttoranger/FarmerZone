@@ -9,6 +9,7 @@
  * Leiste alle Wege tragen, die im Browser die Kopfzeile trägt.
  */
 import { hoefeLink } from '@/lib/bereiche-anzeige'
+import { kopfKnopf, type KundenSitzung } from '@/lib/kunden-navigation'
 
 export type MenuePunkt = {
   href: string
@@ -17,16 +18,29 @@ export type MenuePunkt = {
   gruppe: 'kunden' | 'hoefe' | 'hilfe'
 }
 
-/** Die Reihenfolge ist die Anzeige. */
-export const MENUE_PUNKTE: readonly MenuePunkt[] = [
+const EINKAUFEN: readonly MenuePunkt[] = [
   { href: '/', text: 'Startseite', gruppe: 'kunden' },
   { href: hoefeLink('LEBENSMITTEL'), text: 'Hofladen entdecken', gruppe: 'kunden' },
   { href: hoefeLink('FUTTERMITTEL'), text: 'Heu & Futter finden', gruppe: 'kunden' },
-  // Die Seite für Höfe (seit Nr. 15, vorher eine Sprungmarke auf die Startseite).
-  { href: '/fuer-hoefe', text: 'Für Höfe', gruppe: 'hoefe' },
-  { href: '/login', text: 'Hofbetreiber-Login', gruppe: 'hoefe' },
-  { href: '/problem-melden', text: 'Problem melden', gruppe: 'hilfe' },
 ]
+// Die Seite für Höfe (seit Nr. 15, vorher eine Sprungmarke auf die Startseite).
+const FUER_HOEFE: MenuePunkt = { href: '/fuer-hoefe', text: 'Für Höfe', gruppe: 'hoefe' }
+const PROBLEM_MELDEN: MenuePunkt = { href: '/problem-melden', text: 'Problem melden', gruppe: 'hilfe' }
+
+/**
+ * Die Punkte in Anzeigereihenfolge. Der Punkt der Sitzung ist derselbe wie
+ * der Knopf oben rechts (kopfKnopf, Register N1): „Anmelden" (→ /login) bzw.
+ * mit Hof-Sitzung „Mein Hof" (→ /dashboard) bei den Wegen der Höfe — vorher
+ * hieß er „Hofbetreiber-Login". Mit Kundensitzung ist es „Mein Konto"; das
+ * gehört zu den Wegen der Kundinnen, nicht unter „Für Höfe".
+ */
+export function menueFuer(sitzung: KundenSitzung): readonly MenuePunkt[] {
+  const knopf = kopfKnopf(sitzung)
+  if (knopf.id === 'konto') {
+    return [...EINKAUFEN, { href: knopf.href, text: knopf.label, gruppe: 'kunden' }, FUER_HOEFE, PROBLEM_MELDEN]
+  }
+  return [...EINKAUFEN, FUER_HOEFE, { href: knopf.href, text: knopf.label, gruppe: 'hoefe' }, PROBLEM_MELDEN]
+}
 
 export type AngezeigterMenuePunkt = MenuePunkt & { aktuell: boolean }
 
@@ -36,8 +50,8 @@ export type AngezeigterMenuePunkt = MenuePunkt & { aktuell: boolean }
  * „Heu & Futter finden" führen auf dieselbe Seite, aber nicht zum selben
  * Inhalt. „Für Höfe" ist seit Nr. 15 eine eigene Seite (/fuer-hoefe).
  */
-export function menuePunkte(pfad: string, suche: string): AngezeigterMenuePunkt[] {
+export function menuePunkte(pfad: string, suche: string, sitzung: KundenSitzung): AngezeigterMenuePunkt[] {
   const futter = new URLSearchParams(suche).get('bereich') === 'futter'
   const aktuellerLink = pfad === '/hoefe' && futter ? hoefeLink('FUTTERMITTEL') : pfad
-  return MENUE_PUNKTE.map((punkt) => ({ ...punkt, aktuell: punkt.href === aktuellerLink }))
+  return menueFuer(sitzung).map((punkt) => ({ ...punkt, aktuell: punkt.href === aktuellerLink }))
 }

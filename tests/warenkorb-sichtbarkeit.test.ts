@@ -37,7 +37,14 @@ const SITZUNG = 'sitzung-1'
  * Bestand und Halte stellen. Der eigene Halt gilt noch — sonst hätte jede
  * Position schon deshalb `abgelaufen`, und der Test bewiese nur das.
  */
-function stelleEin(produkt: { id: string; stock: number; isAvailable: boolean }) {
+function stelleEin(produkt: {
+  id: string
+  stock: number
+  isAvailable: boolean
+  category?: string | null
+  verpackung?: string | null
+  farm?: { betriebsnummer: string | null; betriebsstatus: string | null }
+}) {
   produktFindMany.mockResolvedValue([produkt] as never)
   halteFindMany.mockImplementation(((argumente: unknown) => {
     const sessionId = (argumente as { where?: { sessionId?: unknown } })?.where?.sessionId
@@ -112,5 +119,35 @@ describe('pruefeSitzungsWarenkorb — ausgeblendete Produkte', () => {
     // Checkout nennt dann diesen Grund zuerst.
     expect(pruefung.befund.etwasAbgelaufen).toBe(true)
     expect(CODE_RESERVIERUNG_ABGELAUFEN).toBe('RESERVIERUNG_ABGELAUFEN')
+  })
+})
+
+describe('pruefeSitzungsWarenkorb — Sperre je Gebinde vor dem Checkout (S7, Nr. 20)', () => {
+  const sackerl = { id: 'p_sack', stock: 20, isAvailable: true, category: 'HEU_STROH', verpackung: 'ABGEPACKT_ETIKETT' }
+
+  it('ein Sackerl, dessen Hof die BAES-Meldung ausgetragen hat, fällt aus dem Korb — auch wenn es noch sichtbar ist', async () => {
+    stelleEin({ ...sackerl, farm: { betriebsnummer: 'AT 1234567', betriebsstatus: 'PRIMAERPRODUKTION' } })
+
+    const pruefung = await pruefeSitzungsWarenkorb([{ productId: 'p_sack', quantity: 1 }], SITZUNG, JETZT)
+
+    expect(pruefung.befund.positionen[0]).toMatchObject({ zustand: 'weg', moeglich: 0 })
+    expect(pruefung.berichtigt).toEqual([])
+  })
+
+  it('Gegenprobe: mit BAES-Meldung geht dasselbe Sackerl durch', async () => {
+    stelleEin({ ...sackerl, farm: { betriebsnummer: 'AT 1234567', betriebsstatus: 'REGISTRIERT' } })
+
+    const pruefung = await pruefeSitzungsWarenkorb([{ productId: 'p_sack', quantity: 1 }], SITZUNG, JETZT)
+
+    expect(pruefung.befund.etwasGeaendert).toBe(false)
+  })
+
+  it('fragt Kategorie, Verpackung und die Registrierung des Hofs mit ab', async () => {
+    stelleEin({ ...sackerl, farm: { betriebsnummer: null, betriebsstatus: null } })
+
+    await pruefeSitzungsWarenkorb([{ productId: 'p_sack', quantity: 1 }], SITZUNG, JETZT)
+
+    const auswahl = (produktFindMany.mock.calls[0][0] as { select: Record<string, unknown> }).select
+    expect(auswahl).toMatchObject({ category: true, verpackung: true, farm: { select: { betriebsnummer: true, betriebsstatus: true } } })
   })
 })

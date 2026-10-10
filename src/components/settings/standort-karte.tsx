@@ -126,8 +126,11 @@ export default function StandortKarte({
       {hinweis && <p className="mb-2 text-xs text-muted-foreground">{hinweis}</p>}
 
       {/* Mindestens 260 px hoch laut Vorgabe — 280 gibt dem Daumen Spielraum,
-          ohne die Speichern-Schaltfläche unnötig weit nach unten zu drücken. */}
-      <div className="relative overflow-hidden rounded-xl" style={{ height: 280 }}>
+          ohne die Speichern-Schaltfläche unnötig weit nach unten zu drücken.
+          `isolate`: eine eigene Stapelebene — sonst lägen Leaflets Ebenen
+          (400, Bedienteile 1000) über dem festen Kopf des Hof-Profils (Nr. 44)
+          und über der Unterleiste. */}
+      <div className="relative isolate overflow-hidden rounded-xl" style={{ height: 280 }}>
         <div ref={kartenDiv} className="h-full w-full" />
         {/* Der feste Pin: exakt über der Kartenmitte, mit der Spitze im
             Zentrum — deshalb um die halbe Icon-Höhe angehoben. */}

@@ -39,7 +39,6 @@ import {
   type KartenHof,
   type TrefferHof,
 } from '@/components/hoefe/entdecken-teile'
-import HoefeUmkreis from '@/components/hoefe/hoefe-umkreis'
 import { HoefeSuche } from '@/components/hoefe/hoefe-suche'
 import { kategorieReihe, leerzustand } from '@/lib/hoefe-entdecken'
 import { grundpreisAusKennzeichnung, type AngebotsProdukt } from '@/lib/bereiche-anzeige'
@@ -316,9 +315,22 @@ describe('beide Themes: nur Tokens in den Teilen von Entdecken', () => {
   })
 })
 
+/** Das eine Suchfeld „Ort oder Produkt" (Nr. 46) ohne Text, ohne Bezugspunkt. */
+const SUCHE = {
+  suchtext: '',
+  vorschlaege: [],
+  status: '',
+  treffer: 0,
+  bezugspunkt: null,
+  onSuchtext: () => {},
+  onUebernehmen: () => {},
+  onBezugspunkt: () => {},
+  onAufheben: () => {},
+}
+
 describe('gültiges HTML und Grenzen der Felder', () => {
-  it('das PLZ-Formular steckt in keinem <span> (ein Formular ist ein Block)', () => {
-    const umkreis = html(createElement(HoefeUmkreis, { bezugspunkt: null, onBezugspunkt: () => {}, onAufheben: () => {} }))
+  it('das Suchformular steckt in keinem <span> (ein Formular ist ein Block)', () => {
+    const umkreis = html(createElement(HoefeSuche, SUCHE))
     const vorher = umkreis.slice(0, umkreis.indexOf('<form'))
     expect(umkreis).toContain('<form')
     const offeneSpans = (t: string) => (t.match(/<span\b/g) ?? []).length - (t.match(/<\/span>/g) ?? []).length
@@ -328,9 +340,60 @@ describe('gültiges HTML und Grenzen der Felder', () => {
   })
 
   it('das Suchfeld nimmt höchstens so viele Zeichen an, wie die Adresse trägt', () => {
-    const suche = html(createElement(HoefeSuche, { suchtext: '', vorschlaege: [], status: '', onSuchtext: () => {}, onUebernehmen: () => {} }))
+    const suche = html(createElement(HoefeSuche, SUCHE))
     expect(suche).toContain(`maxLength="${SUCHTEXT_MAX}"`)
     // Gegenprobe: ein längerer Suchtext fiele beim Lesen der Adresse weg.
     expect(SUCHTEXT_MAX).toBe(100)
+  })
+})
+
+describe('Ein Suchfeld „Ort oder Produkt" plus „Standort nutzen" (Nr. 46)', () => {
+  it('ohne Bezugspunkt: genau ein Eingabefeld, der Knopf „Standort nutzen" und „Nichts wird gespeichert."', () => {
+    const suche = html(createElement(HoefeSuche, SUCHE))
+    expect((suche.match(/<input\b/g) ?? []).length).toBe(1)
+    expect(suche).toContain('placeholder="Ort oder Produkt"')
+    expect(suche).toContain('role="combobox"')
+    expect(suche).toMatch(/<button type="button"[^>]*>.*Standort nutzen<\/button>/)
+    expect(suche).toContain('Nichts wird gespeichert.')
+    // Das eigene Postleitzahl-Feld und die große grüne Karte sind weg.
+    expect(suche).not.toContain('PLZ oder Ort')
+    expect(suche).not.toContain('data-slot="hinweiskarte"')
+  })
+
+  it('mit Bezugspunkt: „Wir zeigen Höfe rund um …" mit „Ort ändern" statt des Standort-Knopfs', () => {
+    const suche = html(createElement(HoefeSuche, { ...SUCHE, bezugspunkt: { lat: 48.2, lon: 13.5, name: '4910 Ried im Innkreis' } }))
+    expect(suche).toContain('data-slot="hinweiskarte"')
+    expect(suche).toContain('4910 Ried im Innkreis')
+    expect(suche).toContain('Ort ändern')
+    expect(suche).not.toContain('Standort nutzen')
+  })
+
+  it('die Seite verdrahtet das eine Feld mit Trefferzahl und Bezugspunkt — die alte Umkreis-Karte gibt es nicht mehr', () => {
+    const client = quelle('src/components/hoefe/hoefe-client.tsx')
+    expect(client).toMatch(/<HoefeSuche[\s\S]*?treffer=\{anzahl\}[\s\S]*?bezugspunkt=\{bezugspunkt\}[\s\S]*?\/>/)
+    expect(client).not.toMatch(/HoefeUmkreis|hoefe-umkreis/)
+    // Gegenprobe: das Muster erkennt den alten Einbau.
+    expect('import HoefeUmkreis from \'@/components/hoefe/hoefe-umkreis\'').toMatch(/HoefeUmkreis|hoefe-umkreis/)
+  })
+
+  it('Enter löst die Ortssuche nur bei vier Ziffern aus — ohne Treffer markiert es den Eintrag „Höfe rund um …" (Runde 1)', () => {
+    const suche = quelle('src/components/hoefe/hoefe-suche.tsx').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+    const absenden = suche.slice(suche.indexOf('function absenden('), suche.indexOf('const knopf'))
+    expect(absenden).toContain('enterImSuchfeld(suchtext, treffer)')
+    expect(absenden).toMatch(/aktion === 'ort-suchen'\) ort\.ortSuchen\(suchtext\)/)
+    expect(absenden).toMatch(/aktion === 'ort-eintrag-zeigen'\) setVorschlagsLage\(\{ offen: true, markiert: ORT_VORSCHLAG \}\)/)
+    // Genau ein Weg zur Ortssuche beim Absenden — der für vier Ziffern.
+    expect(absenden.match(/ortSuchen\(/g)).toHaveLength(1)
+    // Gegenprobe: Käme der alte Weg zurück (Enter ohne Treffer sucht selbst), zählte die Prüfung oben zwei Wege.
+    const mitAltemWeg = `${absenden}\nif (enterSuchtOrt(suchtext, treffer)) ort.ortSuchen(suchtext)`
+    expect(mitAltemWeg.match(/ortSuchen\(/g)).toHaveLength(2)
+  })
+
+  it('der Standort bleibt im Browser: Die Ortssuche schickt nur den getippten Text, der Standort geht in keine Anfrage', () => {
+    // Ohne Kommentare: Die Datei erklärt selbst, warum es keinen localStorage gibt.
+    const hook = quelle('src/components/hoefe/use-ortssuche.ts').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+    expect(hook).toContain('loeseOrtAuf(text)')
+    expect(hook).not.toMatch(/loeseOrtAuf\([^)]*coords/)
+    expect(hook).not.toMatch(/localStorage|sessionStorage|document\.cookie/)
   })
 })

@@ -391,7 +391,8 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     const text = lies('src/app/page.tsx')
     // Über die Hülle, die die Sitzung im Browser liest — die Seite bleibt statisch.
     expect(text).toMatch(/<KundeShellMitSitzung>/)
-    expect(lies('src/components/shells/kunde-shell-mit-sitzung.tsx')).toMatch(/<KundeShell angemeldet=/)
+    // Seit Nr. 41 reicht sie die Sitzung (gast · kunde · hof) weiter, nicht mehr nur „angemeldet".
+    expect(lies('src/components/shells/kunde-shell-mit-sitzung.tsx')).toMatch(/<KundeShell sitzung=\{sitzung\}/)
     expect(text).not.toMatch(/KundenKopf|LandingNav/)
   })
 

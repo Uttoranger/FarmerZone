@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Check } from 'lucide-react'
+import Link from 'next/link'
+import { Check, Printer } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Sheet, SheetBlatt, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -13,6 +14,7 @@ import {
   merkeFreischaltGesehen,
 } from '@/lib/freischalt-moment'
 import { useMindestbreite } from '@/lib/use-mindestbreite'
+import { PLAKAT_PFAD } from '@/lib/teilen-fenster'
 import { cn } from '@/lib/utils'
 
 /*
@@ -23,9 +25,10 @@ import { cn } from '@/lib/utils'
  * sobald der Moment aufgeht — höchstens einmal, auch wenn die Seite danach
  * ohne Schließen neu lädt. Ohne lesbaren Speicher kommt er gar nicht.
  *
- * Geteilt wird nur die Hofseite über teileHof (HofTeilenKnopf). Die zwei
- * weiteren Wege des Mockups (Nachricht an Stammkunden, Aushang) kommen erst
- * mit Gate 7 — bis dahin verspricht der Moment nichts, was es nicht gibt.
+ * Geteilt wird die Hofseite über teileHof (HofTeilenKnopf); seit Nr. 21
+ * (Gate 7) dazu „Plakat drucken" (QR-Plakat). „Stammkunden per WhatsApp"
+ * aus dem Mockup bleibt beim Beitrag mit WhatsApp-Versand (/status/new) —
+ * der Moment verspricht nichts, was es hier nicht gibt.
  * Web: Dialog; Handy: Blatt von unten (DESIGN_SYSTEM „Dialoge und Blätter").
  */
 export function FreischaltMoment({
@@ -73,6 +76,17 @@ export function FreischaltMoment({
           )}
         />
       </div>
+      {/* Seit Nr. 21 (Gate 7): der Aushang für alle, die am Hof vorbeikommen. */}
+      <Link
+        href={PLAKAT_PFAD}
+        className={cn(
+          'inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-[13.5px] font-semibold transition-colors duration-[250ms] hover:bg-muted md:w-auto',
+          FOKUS_RAHMEN
+        )}
+      >
+        <Printer className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+        Plakat drucken
+      </Link>
       <button
         type="button"
         onClick={() => setOffen(false)}

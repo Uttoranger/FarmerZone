@@ -46,8 +46,9 @@ export const FARM_PENDING_AFTER_SIGNUP =
 // Warum die Nachweispflicht: Die Fremdschlüssel geben das Löschen nicht
 // einfach her (prisma/migrations/0_init/migration.sql:440 und :449 stehen auf
 // ON DELETE RESTRICT, :443 auf SET NULL). Ohne Guard würde der Löschversuch
-// entweder mit einem Datenbankfehler abbrechen oder — schlimmer — stillschweigend
-// die Kundenzuordnung bestehender Bestellungen auf null setzen.
+// mit einem Datenbankfehler abbrechen. SET NULL kappt nur die Konto-Verknüpfung
+// alter Bestellungen (vor E8), die niemand mehr liest — dafür gibt es seit
+// Register B4 (Nr. 27) keine Sperre mehr.
 
 /** Freigeschaltete Höfe sind tabu: erst die Freigabe zurücknehmen, dann neu entscheiden. */
 export const FARM_REJECT_APPROVED_MESSAGE =
@@ -56,10 +57,6 @@ export const FARM_REJECT_APPROVED_MESSAGE =
 /** Bestell- und Verkaufsdaten unterliegen der Aufbewahrungspflicht — sie überleben jede Ablehnung. */
 export const FARM_REJECT_HAS_DATA_MESSAGE =
   'Dieser Hof hat bereits Bestellungen oder Verkäufe. Er wird nicht gelöscht — Geschäftsdaten unterliegen der Aufbewahrungspflicht.'
-
-/** Der Inhaber hat selbst als Kunde bestellt: sein Konto hängt an fremden Bestellungen. */
-export const FARM_REJECT_OWNER_HAS_ORDERS_MESSAGE =
-  'Der Inhaber dieses Hofes hat selbst schon bestellt. Sein Konto wird nicht gelöscht — die Bestellungen hängen daran.'
 
 /** Notbremse gegen den teuersten Fehlgriff: das eigene Betreiber-Konto. */
 export const FARM_REJECT_OWNER_IS_ADMIN_MESSAGE =

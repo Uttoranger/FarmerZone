@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { sendErstattungOffen, sendOrderConfirmation, sendOrderPaidToFarmer, sendZahlungZuSpaet } from '@/lib/email'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
+import { ANLASS_VOLLSTORNO } from '@/server/teilerstattung'
 import {
   MELDE_VERMERK_TYP,
   meldeVermerk,
@@ -17,6 +18,7 @@ import {
 import { formatEuro } from '@/lib/format'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { stripeKontoBereit } from '@/lib/stripe-konto'
+import { istModusSperre } from '@/lib/stripe-modus'
 
 // Next.js App Router does not pre-parse the body — raw text needed for Stripe sig verification
 export async function POST(request: NextRequest) {
@@ -39,11 +41,28 @@ export async function POST(request: NextRequest) {
   const secrets = [webhookSecret, env.STRIPE_CONNECT_WEBHOOK_SECRET].filter(
     (s): s is string => typeof s === 'string' && s.length > 0
   )
+
+  // Modus-Wache (Register Z2, Nr. 42): Sperrt sie den Stripe-Client, ist das
+  // keine ungültige Signatur — sonst sucht jemand den Fehler im Secret. Eine
+  // eigene Antwort (503) ändert die Diagnose, nicht das Wiederholen: Stripe
+  // stellt bei jeder Antwort außer 2xx erneut zu (live bis zu drei Tage).
+  // Nach außen ein neutraler Satz, denn diese Antwort kommt VOR der
+  // Signaturprüfung und ginge an jeden Aufrufer. Die Einzelheiten stehen nur
+  // im Protokoll — die Meldung nennt Umgebung und Ausweg, nie den Schlüssel.
+  let webhooks: typeof stripe.webhooks
+  try {
+    webhooks = stripe.webhooks
+  } catch (err) {
+    if (!istModusSperre(err)) throw err
+    console.error(`[Webhook] ${err.message}`)
+    return NextResponse.json({ error: 'Zahlungsdienst vorübergehend nicht verfügbar.' }, { status: 503 })
+  }
+
   let event: Stripe.Event | null = null
   let letzterFehler = 'Unknown error'
   for (const secret of secrets) {
     try {
-      event = stripe.webhooks.constructEvent(rawBody, sig, secret)
+      event = webhooks.constructEvent(rawBody, sig, secret)
       break
     } catch (err) {
       letzterFehler = err instanceof Error ? err.message : 'Unknown error'
@@ -362,6 +381,19 @@ function gescheitertMeldung(
         'In Stripe prüfen, ob der Kundin der Betrag inzwischen auf anderem Weg erstattet wurde; sonst erneut erstatten – über Stripe ohne reverse_transfer und ohne refund_application_fee – und sie informieren.',
     }
   }
+  if (ausgang.art === 'zurueckgenommen' && ausgang.anlass === ANLASS_VOLLSTORNO) {
+    // Die Vollerstattung lief mit reverse_transfer und refund_application_fee
+    // (Nr. 27: mit Merkmalen). Ob Stripe Rückbuchung und Gebührenerstattung
+    // nach dem Scheitern stehen lässt, sagt das Ereignis nicht — deshalb
+    // keine Anweisung, die das voraussetzt.
+    return {
+      titel: 'Vollerstattung gescheitert — Zahlung in der App wieder offen',
+      grund: 'erstattung_gescheitert_zurueckgenommen',
+      was: `Stripe meldet die Vollerstattung über ${betrag} nach einem Storno als gescheitert. Die Bestellung bleibt storniert, in der App ist die Zahlung wieder offen – das Geld steht noch aus.`,
+      handanweisung:
+        'Vollerstattung gescheitert: In Stripe prüfen, was von der Rückbuchung der Überweisung und der Erstattung der Plattformgebühr noch steht, dann der Kundin den vollen Betrag erneut erstatten (reverse_transfer und refund_application_fee nur, wenn Überweisung und Gebühr wieder beim Hof liegen) und sie informieren.',
+    }
+  }
   if (ausgang.art === 'zurueckgenommen') {
     return {
       titel: 'Erstattung gescheitert — in der Datenbank zurückgenommen',
@@ -382,9 +414,9 @@ function gescheitertMeldung(
   return {
     titel: 'Erstattung gescheitert — keiner Buchung der App zuzuordnen',
     grund: 'erstattung_gescheitert_fremd',
-    was: `Stripe meldet eine Erstattung über ${betrag} als gescheitert, die die App keiner ihrer Teil- oder Rest-Erstattungen zuordnen kann (z. B. Vollstorno oder von Hand). In der App wurde nichts geändert.`,
+    was: `Stripe meldet eine Erstattung über ${betrag} als gescheitert, die die App keiner ihrer Buchungen zuordnen kann (z. B. ein älterer Vollstorno ohne Merkmale oder eine Erstattung von Hand). In der App wurde nichts geändert.`,
     handanweisung:
-      'In Stripe prüfen und der Kundin den Betrag von Hand erstatten. Ein Vollstorno steht in der App weiter als erstattet.',
+      'In Stripe prüfen und der Kundin den Betrag von Hand erstatten. Ein älterer Vollstorno ohne Merkmale steht in der App weiter als erstattet.',
   }
 }
 

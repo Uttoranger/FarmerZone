@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
 import { hofAdresse, hofZustand, titelbildFoto, type HofZustand } from '@/lib/mein-hof'
 import { APP_URL } from '@/lib/umgebung-server'
@@ -352,6 +353,21 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
     products: farm.products.map((p) => alsOeffentlichesProdukt(p, { betriebsnummer })),
   }
 }
+
+/**
+ * `getPublicFarm` einmal je Anfrage (React `cache`) — für Seiten, deren
+ * Metadaten und Inhalt denselben Hof brauchen (die Kasse; die Hofseite teilt
+ * über `ladeHofseiteGeteilt`).
+ *
+ * Nicht nur gespart, sondern nötig (Nr. 47): Zwei getrennte Aufrufe im
+ * selben Takt bündelt Prisma 7 zu einem Batch — `approvedAt: { not: null }`
+ * verhindert, dass er sie zu einer Abfrage zusammenlegt — und führt ihn in
+ * EINER Transaktion aus. Darin laufen die Teilabfragen der Relationen (Werte,
+ * Fotos, Produkte samt Futter und Brennmaterial, Abholzeiten) gleichzeitig
+ * über dieselbe Verbindung: pg warnt „Calling client.query() when the client
+ * is already executing a query", ab pg@9 ist es ein Fehler.
+ */
+export const getPublicFarmGeteilt: typeof getPublicFarm = cache(getPublicFarm)
 
 export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> {
   const farm = await prisma.farm.findUnique({

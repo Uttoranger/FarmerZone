@@ -1,7 +1,7 @@
 /**
  * Die Konditionen für Höfe als Text — EINE Quelle für jede Seite, die Preise
  * nennt: /fuer-hoefe, /konditionen, Registrieren und Einrichten (Gate 5,
- * Nr. 15). Grundlage ist die Entscheidung E6 = Tarife (docs/nachtlauf/
+ * Nr. 15). Dazu die Sätze zur Stripe-Pflicht (Register Z1). Grundlage ist die Entscheidung E6 = Tarife (docs/nachtlauf/
  * freigabe.md): Hoftor 0 €, Hofladen 19 € im Monat, die Servicegebühr zahlt
  * der Kunde, abgerechnet wird einmal im Monat per SEPA.
  *
@@ -160,6 +160,38 @@ export const BAR_OHNE_GEBUEHR_HINWEIS = `Bei Barzahlung bis ${BAR_OHNE_GEBUEHR_B
 
 /** Derselbe Inhalt als Satz für Höfe — /konditionen, /fuer-hoefe und die Mail „Vor-Ort-Bestellung bestätigt". */
 export const BAR_OHNE_GEBUEHR_SATZ = `Bei Barzahlung fällt bis ${BAR_OHNE_GEBUEHR_BIS_TEXT} keine Servicegebühr an.`
+
+// ─── Online-Zahlung gehört zum Start (Register Z1) ───────────────────────────
+
+/**
+ * Jeder Hof richtet Stripe ein, bevor er online geht; eine Wahl „nur bar" gibt
+ * es nicht mehr (Z1). Barzahlung DURCH KUNDINNEN bleibt möglich (B1) — das ist
+ * keine Wahl des Hofs statt Stripe.
+ *
+ * Wörtlich aus der Freigabe (freigabe.md §10 „24"): Einrichten, Zahlung und
+ * Heute zeigen diesen Satz, keine Seite schreibt ihn ab
+ * (tests/stripe-pflicht.test.ts).
+ */
+export const ONLINE_ZAHLUNG_EINRICHTEN_SATZ =
+  'Damit deine Kundinnen auch mit Karte, Apple Pay oder EPS zahlen können, richte bitte die Online-Zahlung ein. ' +
+  'Dauert etwa 10 Minuten.'
+
+/** Der Titel des Schritts und des Hinweises — überall gleich. */
+export const ONLINE_ZAHLUNG_EINRICHTEN_TITEL = 'Online-Zahlung einrichten'
+
+/**
+ * Der Schritt „Online-Zahlung einrichten" für die öffentlichen Seiten
+ * (/fuer-hoefe, /konditionen, Registrieren): Er gehört zum Start und steht
+ * vor der Freischaltung. Ohne Zahlungsarten im Text — welche Stripe anbietet,
+ * schaltet der Betreiber im Stripe-Konto frei.
+ */
+export const ONLINE_ZAHLUNG_START_SCHRITT = {
+  titel: ONLINE_ZAHLUNG_EINRICHTEN_TITEL,
+  text: 'Über Stripe, dauert etwa 10 Minuten. Gehört zum Start – ohne sie schalten wir keinen Hof frei.',
+} as const
+
+/** Dasselbe kurz — neben dem Registrieren-Formular. */
+export const ONLINE_ZAHLUNG_START_KURZ = 'über Stripe, etwa 10 Minuten – gehört zum Start'
 
 // ─── Servicegebühr ──────────────────────────────────────────────────────────
 

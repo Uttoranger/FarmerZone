@@ -12,6 +12,8 @@
 // Reine Funktion ohne Datenbankbezug — dasselbe Muster wie dashboard-hints.ts,
 // das die Bedingungen der übrigen Hinweiskarten trägt.
 
+import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
+
 /** Alles, was die Liste zum Rechnen braucht — Zählwerte und Ja/Nein, sonst nichts. */
 export type ErsteSchritteDaten = {
   hatBeschreibung: boolean
@@ -36,7 +38,10 @@ export type ErsterSchritt = {
   nutzen: string
   href: string
   erledigt: boolean
-  /** Bar bei Abholung funktioniert ohne — das muss dranstehen. */
+  /**
+   * Ein Schritt, ohne den der Hof auskommt — derzeit keiner: Seit Register Z1
+   * ist auch die Online-Zahlung Pflicht. Das Feld bleibt für die Karte.
+   */
   optional: boolean
 }
 
@@ -67,7 +72,7 @@ export const ERSTE_SCHRITTE_WARTET =
  *
  * Die Reihenfolge ist die Arbeitsreihenfolge und liegt fest: erst wissen, wer
  * du bist (Profil, Auftritt), dann was du verkaufst (Produkt), dann wann man
- * es bekommt (Abholzeiten), zuletzt das Kür-Thema Bezahlung.
+ * es bekommt (Abholzeiten), zuletzt die Bezahlung (seit Z1 Pflicht).
  */
 export function ersteSchritte(daten: ErsteSchritteDaten): ErsteSchritteErgebnis {
   const schritte: ErsterSchritt[] = [
@@ -107,11 +112,12 @@ export function ersteSchritte(daten: ErsteSchritteDaten): ErsteSchritteErgebnis 
     },
     {
       id: 'zahlung',
-      titel: 'Online-Zahlung einrichten',
-      nutzen: 'Bar bei Abholung geht auch ohne.',
+      titel: ONLINE_ZAHLUNG_EINRICHTEN_TITEL,
+      // Stripe ist Pflicht (Register Z1), Satz aus konditionen.ts.
+      nutzen: ONLINE_ZAHLUNG_EINRICHTEN_SATZ,
       href: '/settings/payments',
       erledigt: daten.zahlungBereit,
-      optional: true,
+      optional: false,
     },
   ]
 

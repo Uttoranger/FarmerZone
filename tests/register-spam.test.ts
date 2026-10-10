@@ -25,9 +25,11 @@ vi.mock('@/lib/auth', () => ({
 vi.mock('@/lib/prisma', () => ({
   prisma: { user: { update: vi.fn() } },
 }))
+vi.mock('@sentry/nextjs', () => ({ captureMessage: vi.fn() }))
 
+import { Prisma } from '@prisma/client'
+import * as Sentry from '@sentry/nextjs'
 import { registerFarmer } from '@/server/actions/register'
-import { KONTO_VIELLEICHT_VORHANDEN } from '@/schemas/register'
 import {
   generateFormToken,
   checkFormToken,
@@ -250,22 +252,35 @@ describe('Bestätigungs-Mail erst nach der Rolle (Nr. 17b, Nachbesserung Runde 1
   })
 })
 
-// ── Neutralere Wortwahl bei vergebener Adresse (Nr. 19b) ────────────────────
-// Schließt die Kontenaufzählung NICHT (Erfolg antwortet anders) — geprüft
-// wird nur der Wortlaut mit beiden Auswegen.
+// ── Vergebene Adresse: dieselbe Antwort wie bei Erfolg (F6 „19b", Nr. 27) ──
+// Better Auth antwortet auf eine vergebene Adresse neutral (`autoSignIn:
+// false` in auth.ts) mit einem Scheinkonto, das es in der Datenbank nicht
+// gibt — und schickt dem bestehenden Konto einen Hinweis
+// (onExistingUserSignUp, tests/integration/registrierung-neutral.int.test.ts).
 
-describe('Vergebene Adresse — neutralere Wortwahl mit beiden Auswegen', () => {
-  it('nennt die Adresse nicht „bereits registriert", sondern zeigt beide Auswege', async () => {
+describe('Vergebene Adresse — dieselbe Antwort wie bei Erfolg', () => {
+  const KEIN_KONTO = new Prisma.PrismaClientKnownRequestError('Record to update not found.', { code: 'P2025', clientVersion: 'test' })
+
+  it('Scheinkonto von Better Auth: { ok: true }, keine Rolle, keine Bestätigungs-Mail an das fremde Konto', async () => {
+    signUpEmail.mockResolvedValue({ token: null, user: { id: 'schein_1' } } as never)
+    userUpdate.mockRejectedValue(KEIN_KONTO)
+
+    const result = await registerFarmer(echteAnmeldung())
+
+    expect(result).toEqual({ ok: true })
+    expect(result).toEqual(await registerFarmer(echteAnmeldung({ website: 'x' })))
+    expect(auth.api.sendVerificationEmail).not.toHaveBeenCalled()
+  })
+
+  it('wirft Better Auth doch „schon vorhanden" (Einstellung verloren): trotzdem { ok: true }, Meldung ohne Adresse', async () => {
     signUpEmail.mockRejectedValue(new Error('User already exists. Use another email.'))
 
     const result = await registerFarmer(echteAnmeldung())
 
-    expect(result).toEqual({ error: KONTO_VIELLEICHT_VORHANDEN })
-    expect(KONTO_VIELLEICHT_VORHANDEN).not.toMatch(/bereits registriert/i)
-    expect(KONTO_VIELLEICHT_VORHANDEN).toMatch(/Wenn es zu dieser Adresse schon ein Konto gibt/)
-    expect(KONTO_VIELLEICHT_VORHANDEN).toMatch(/melde dich an/)
-    expect(KONTO_VIELLEICHT_VORHANDEN).toMatch(/Passwort zurück/)
+    expect(result).toEqual({ ok: true })
     expect(userUpdate).not.toHaveBeenCalled()
+    expect(Sentry.captureMessage).toHaveBeenCalledTimes(1)
+    expect(JSON.stringify(vi.mocked(Sentry.captureMessage).mock.calls)).not.toContain('@')
   })
 
   it('Gegenprobe: ein anderer Fehler bekommt weiter den allgemeinen Satz', async () => {
@@ -274,5 +289,13 @@ describe('Vergebene Adresse — neutralere Wortwahl mit beiden Auswegen', () => 
     const result = await registerFarmer(echteAnmeldung())
 
     expect(result).toEqual({ error: 'Registrierung fehlgeschlagen. Bitte versuche es erneut.' })
+  })
+
+  it('Gegenprobe: ein anderer Fehler beim Setzen der Rolle bleibt wie bisher folgenlos für die Antwort, die Mail wird angestoßen', async () => {
+    userUpdate.mockRejectedValue(new Error('Verbindung weg'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    expect(await registerFarmer(echteAnmeldung())).toEqual({ ok: true })
+    expect(auth.api.sendVerificationEmail).toHaveBeenCalledTimes(1)
   })
 })

@@ -1,15 +1,30 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import * as Sentry from '@sentry/nextjs'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { verlangeAdminSeite } from '@/server/admin-wache'
-import { getMeldungDetail } from '@/server/queries/meldung'
-import { MELDUNG_ART_LABEL, STATUS_INTERN, STATUS_MARKE_FARBE, kiBegruendung, kurznummer, prLink } from '@/lib/meldung'
-import { Marke } from '@/components/ui/marke'
+import { getMeldungDetail, getMeldungNachbarn, type AdminMeldungDetail } from '@/server/queries/meldung'
+import { MELDUNG_ART_LABEL, kiBegruendung, kurznummer, prLink } from '@/lib/meldung'
+import { MELDUNG_ART_TON, geraetKurz } from '@/lib/hof-hilfe'
+import { ADMIN_STATUS_TON, BRIEFKASTEN_HREF, adminStatusText, bildschirmText } from '@/lib/admin-briefkasten'
+import { seitenPfad } from '@/lib/fremdtext'
+import { wienKalendertag } from '@/lib/kalender'
+import { datumKurz } from '@/lib/verkauf-eintragen'
+import { cn } from '@/lib/utils'
+import { StatusBadge } from '@/components/ui/status-badge'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
+import { ADMIN_RAHMEN, AdminFehler } from '@/components/admin/admin-teile'
 import { TriageForm, type TriageWerte } from './triage-form'
 import { KiVorschlag } from './ki-vorschlag'
 
 export const metadata: Metadata = { title: 'Meldung — Admin — FarmerZone' }
 export const dynamic = 'force-dynamic'
+
+function uhrzeit(d: Date): string {
+  return d.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Vienna' })
+}
 
 function zeitpunkt(d: Date): string {
   return d.toLocaleString('de-AT', {
@@ -22,16 +37,34 @@ function zeitpunkt(d: Date): string {
   })
 }
 
-/**
- * Detailansicht einer Meldung für den Betreiber: voller Text, Kontext,
- * Screenshot und die Triage-Felder. Die Kurznummer in der Adresse reicht —
- * getMeldungDetail löst ein Präfix auf.
+/*
+ * Meldung entscheiden (Nachtlauf Nr. 22f, Mockup admin-meldung-entscheiden):
+ * links die Meldung mit Bildschirmfoto und dem, was automatisch mitkam,
+ * rechts der Vorschlag der KI (nur ein Vorschlag — entschieden wird mit
+ * einem Knopf) und das Formular „Entscheiden". Die Kurznummer in der Adresse
+ * reicht — getMeldungDetail löst ein Präfix auf. Meldungstext und
+ * Browserangabe sind Fremdtext und stehen nur als Text da.
  */
-export default async function AdminMeldungDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AdminMeldungDetailPage({ params }: { params: Promise<{ id: string }> }): Promise<React.JSX.Element> {
   await verlangeAdminSeite()
 
   const { id } = await params
-  const m = await getMeldungDetail(id)
+  let daten: { m: AdminMeldungDetail | null; nachbarn: { vorige: string | null; naechste: string | null } } | null = null
+  try {
+    const m = await getMeldungDetail(id)
+    daten = { m, nachbarn: m ? await getMeldungNachbarn(m) : { vorige: null, naechste: null } }
+  } catch (err) {
+    Sentry.captureException(err, { tags: { bereich: 'admin', seite: 'meldung' } })
+  }
+
+  if (!daten) {
+    return (
+      <div className={ADMIN_RAHMEN}>
+        <AdminFehler titel="Meldung" satz="Wir konnten die Meldung gerade nicht laden." nochmal={`/admin/meldungen/${encodeURIComponent(id)}`} />
+      </div>
+    )
+  }
+  const { m, nachbarn } = daten
   if (!m) notFound()
 
   const gespeichert: TriageWerte = {
@@ -43,103 +76,132 @@ export default async function AdminMeldungDetailPage({ params }: { params: Promi
     antwortAnMelder: m.antwortAnMelder ?? '',
   }
   const pr = prLink(m.sprintName)
+  const jetzt = new Date()
+  const tag = datumKurz(wienKalendertag(m.createdAt), wienKalendertag(jetzt))
+  const begruendung = kiBegruendung(m.triageNotiz)
 
   return (
-    <main className="min-h-screen bg-background px-4 py-8 md:px-6">
-      <div className="mx-auto max-w-3xl">
-        <Link href="/admin/meldungen" className="text-sm text-primary hover:underline">
-          ← Meldungen
+    <div className={cn(ADMIN_RAHMEN, 'flex flex-col gap-4')}>
+      <nav aria-label="Meldungen blättern" className="flex flex-wrap items-center justify-between gap-2">
+        <Link
+          href={BRIEFKASTEN_HREF}
+          className={cn('inline-flex min-h-11 items-center gap-1 rounded-full pr-3 text-[14px] text-muted-foreground hover:text-foreground', FOKUS_RAHMEN)}
+        >
+          <ChevronLeft className="size-4" strokeWidth={1.7} aria-hidden="true" />
+          Briefkasten
         </Link>
-
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <h1 className="font-mono text-xl font-semibold text-foreground">{m.kurznummer}</h1>
-          <span className="text-sm font-medium text-foreground">{MELDUNG_ART_LABEL[m.art]}</span>
-          <Marke farbe={STATUS_MARKE_FARBE[m.status]}>{STATUS_INTERN[m.status]}</Marke>
+        <div className="flex gap-2">
+          {nachbarn.vorige && (
+            <Link href={`/admin/meldungen/${nachbarn.vorige}`} className={KNOPF_RAHMEN}>
+              <ChevronLeft className="size-4" strokeWidth={1.7} aria-hidden="true" />
+              Vorige
+            </Link>
+          )}
+          {nachbarn.naechste && (
+            <Link href={`/admin/meldungen/${nachbarn.naechste}`} className={KNOPF_RAHMEN}>
+              Nächste
+              <ChevronRight className="size-4" strokeWidth={1.7} aria-hidden="true" />
+            </Link>
+          )}
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {zeitpunkt(m.createdAt)}
-          {' · '}
-          {m.farm ? (
-            <>
-              Hof{' '}
-              <Link href={`/${m.farm.slug}`} className="text-primary hover:underline">
-                {m.farm.name}
-              </Link>
-            </>
-          ) : m.customerEmail ? (
-            <>Kundin · {m.customerEmail}</>
-          ) : (
-            'Anonym'
-          )}
-        </p>
+      </nav>
 
-        {m.status === 'VERMUTLICH_WUNSCH' && (
-          <KiVorschlag meldungId={m.id} gespeichert={gespeichert} begruendung={kiBegruendung(m.triageNotiz)} />
-        )}
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,460px)]">
+        <div className="flex min-w-0 flex-col gap-4">
+          <article aria-labelledby="meldung-titel" className={cn(KARTE, 'flex flex-col gap-3 p-4 md:p-[18px]')}>
+            <h1 id="meldung-titel" className="sr-only">
+              Meldung {m.kurznummer}
+            </h1>
+            <div className="flex flex-wrap items-center gap-2 text-[13px]">
+              <StatusBadge status={MELDUNG_ART_TON[m.art]}>{MELDUNG_ART_LABEL[m.art]}</StatusBadge>
+              <StatusBadge status={ADMIN_STATUS_TON[m.status]}>{adminStatusText(m.status, m.sprintName)}</StatusBadge>
+              <span className={LEISE}>
+                {tag}, {uhrzeit(m.createdAt)} ·{' '}
+                {m.farm ? (
+                  <a
+                    href={`/${m.farm.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn('rounded font-medium text-brand-text hover:underline', FOKUS_RAHMEN)}
+                  >
+                    {m.farm.name}
+                  </a>
+                ) : m.customerEmail ? (
+                  <span className="break-all">Kundin · {m.customerEmail}</span>
+                ) : (
+                  'Anonym'
+                )}
+                {' · '}Nr. <span className="font-mono">{m.kurznummer}</span>
+              </span>
+            </div>
+            <p className="text-[15.5px] leading-relaxed break-words whitespace-pre-wrap text-foreground">„{m.text}“</p>
+            {m.screenshotUrl && (
+              <a
+                href={m.screenshotUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn('block self-start rounded-xl', FOKUS_RAHMEN)}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- fremde Blob-Adresse, keine Optimierung nötig */}
+                <img src={m.screenshotUrl} alt="Bildschirmfoto zur Meldung" className="max-h-96 w-auto max-w-full rounded-xl border border-border" />
+              </a>
+            )}
+          </article>
 
-        {/* Text */}
-        <section className="mt-5 rounded-xl border border-border bg-card p-4">
-          <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Meldung</h2>
-          <p className="whitespace-pre-wrap break-words text-sm text-foreground">{m.text}</p>
-          {m.diagKennung && (
-            <p className="mt-3 text-xs text-muted-foreground">
-              Kennung: <span className="font-mono text-foreground">{m.diagKennung}</span>
-            </p>
-          )}
-        </section>
-
-        {/* Screenshot */}
-        {m.screenshotUrl && (
-          <section className="mt-4 rounded-xl border border-border bg-card p-4">
-            <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Screenshot</h2>
-            <a href={m.screenshotUrl} target="_blank" rel="noopener noreferrer">
-              {/* eslint-disable-next-line @next/next/no-img-element -- fremde Blob-Adresse, keine Optimierung nötig */}
-              <img src={m.screenshotUrl} alt="Screenshot zur Meldung" className="max-h-96 w-auto max-w-full rounded-lg border border-border" />
-            </a>
+          <section aria-labelledby="mitgeschickt-titel" className={cn(KARTE, 'p-4 md:p-[18px]')}>
+            <h2 id="mitgeschickt-titel" className={KICKER}>
+              Automatisch mitgeschickt
+            </h2>
+            <dl className="mt-2 grid grid-cols-[minmax(0,120px)_minmax(0,1fr)] text-[13.5px] md:grid-cols-[140px_minmax(0,1fr)] [&>dd]:border-t [&>dd]:border-border [&>dd]:py-2.5 [&>dt]:border-t [&>dt]:border-border [&>dt]:py-2.5">
+              <dt className={LEISE}>Seite</dt>
+              <dd className="break-all text-foreground">{m.seiteUrl ? seitenPfad(m.seiteUrl) : '–'}</dd>
+              <dt className={LEISE}>Gerät</dt>
+              <dd className="text-foreground" title={m.userAgent}>
+                {geraetKurz(m.userAgent)}
+              </dd>
+              <dt className={LEISE}>Bildschirm</dt>
+              <dd className="text-foreground">{bildschirmText(m.viewport)}</dd>
+              <dt className={LEISE}>Fehlernummer</dt>
+              <dd className="font-mono text-foreground">{m.diagKennung || '–'}</dd>
+              <dt className={LEISE}>Browser</dt>
+              <dd className="text-[12.5px] break-all text-muted-foreground">{m.userAgent || '–'}</dd>
+              {m.sprintName && (
+                <>
+                  <dt className={LEISE}>Sprint</dt>
+                  <dd className="text-foreground">
+                    {pr ? (
+                      <a href={pr} target="_blank" rel="noopener noreferrer" className={cn('rounded font-medium text-brand-text hover:underline', FOKUS_RAHMEN)}>
+                        {m.sprintName}
+                      </a>
+                    ) : (
+                      m.sprintName
+                    )}
+                  </dd>
+                </>
+              )}
+              {m.triagedAt && (
+                <>
+                  <dt className={LEISE}>Entschieden</dt>
+                  <dd className="text-foreground">{zeitpunkt(m.triagedAt)}</dd>
+                </>
+              )}
+              <dt className={LEISE}>Kennung</dt>
+              <dd className="font-mono text-[12.5px] break-all text-muted-foreground">{m.id}</dd>
+            </dl>
+            <p className={cn('mt-2 text-[12.5px]', LEISE)}>Keine IP-Adresse, keine Cookies.</p>
           </section>
-        )}
+        </div>
 
-        {/* Kontext */}
-        <section className="mt-4 rounded-xl border border-border bg-card p-4">
-          <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Kontext</h2>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-            <dt className="text-muted-foreground">Seite</dt>
-            <dd className="break-all text-foreground">{m.seiteUrl || '—'}</dd>
-            <dt className="text-muted-foreground">Viewport</dt>
-            <dd className="text-foreground">{m.viewport || '—'}</dd>
-            <dt className="text-muted-foreground">Browser</dt>
-            <dd className="break-all text-foreground">{m.userAgent || '—'}</dd>
-            <dt className="text-muted-foreground">ID</dt>
-            <dd className="break-all font-mono text-foreground">{m.id}</dd>
-            {m.sprintName && (
-              <>
-                <dt className="text-muted-foreground">Sprint</dt>
-                <dd className="text-foreground">
-                  {pr ? (
-                    <a href={pr} target="_blank" rel="noopener noreferrer" className="font-medium text-brand-text underline-offset-2 hover:underline">
-                      {m.sprintName}
-                    </a>
-                  ) : (
-                    m.sprintName
-                  )}
-                </dd>
-              </>
-            )}
-            {m.triagedAt && (
-              <>
-                <dt className="text-muted-foreground">Triage</dt>
-                <dd className="text-foreground">{zeitpunkt(m.triagedAt)}</dd>
-              </>
-            )}
-          </dl>
-        </section>
-
-        {/* Triage */}
-        <section className="mt-4 rounded-xl border border-border bg-card p-4">
-          <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Triage</h2>
-          <TriageForm meldungId={m.id} art={m.art} werte={gespeichert} hatHof={m.farm !== null} />
-        </section>
+        <div className="flex min-w-0 flex-col gap-4">
+          {m.status === 'VERMUTLICH_WUNSCH' && <KiVorschlag meldungId={m.id} gespeichert={gespeichert} begruendung={begruendung} />}
+          <section aria-labelledby="entscheiden-titel" className={cn(KARTE, 'p-4 md:p-[18px]')}>
+            <h2 id="entscheiden-titel" className="mb-3 font-heading text-[19px] font-semibold text-foreground">
+              Entscheiden
+            </h2>
+            <TriageForm meldungId={m.id} art={m.art} werte={gespeichert} hatHof={m.farm !== null} />
+          </section>
+        </div>
       </div>
-    </main>
+    </div>
   )
 }

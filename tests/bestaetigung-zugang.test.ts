@@ -263,3 +263,45 @@ describe('Kein Code baut den Pfad der Bestätigungsseite an bestell-link.ts vorb
     expect(treffer).toEqual([])
   })
 })
+
+describe('Die Signatur einer Bestellung öffnet genau einen Schreibweg (Nr. 46, Runde 1)', () => {
+  /** Alle .ts/.tsx unter src/, rekursiv. */
+  function quellen(ordner: string): string[] {
+    return readdirSync(ordner).flatMap((name) => {
+      const pfad = join(ordner, name)
+      if (statSync(pfad).isDirectory()) return quellen(pfad)
+      return /\.(ts|tsx)$/.test(name) ? [pfad] : []
+    })
+  }
+  /** Ohne Kommentare — eine Erwähnung im Kommentar ist kein Zugang. */
+  const ohneKommentare = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  const PRUEFT_SIGNATUR = /\bbestellLinkGilt\(/
+  const LESEWEGE = [
+    'src/app/(public)/[farmSlug]/bestellung/[orderId]/kalender/route.ts',
+    'src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx',
+    'src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx',
+  ]
+
+  it('lesen: Bestätigungsseite, Bestellseite, Kalender — schreiben: nur meldeNeuigkeitenAn (bestell-link.ts nennt ihn)', () => {
+    const treffer = quellen(join(process.cwd(), 'src'))
+      .filter((pfad) => !pfad.endsWith(join('lib', 'bestell-link.ts')))
+      .filter((pfad) => PRUEFT_SIGNATUR.test(ohneKommentare(readFileSync(pfad, 'utf8'))))
+      .map((pfad) => pfad.slice(process.cwd().length + 1))
+      .sort()
+    expect(treffer).toEqual([...LESEWEGE, 'src/server/actions/neuigkeiten.ts'].sort())
+  })
+
+  it('die Lesewege schreiben nicht: keine Server Action, keine Route außer GET', () => {
+    for (const pfad of LESEWEGE) {
+      const text = ohneKommentare(readFileSync(join(process.cwd(), pfad), 'utf8'))
+      expect(text, pfad).not.toMatch(/^\s*['"]use server['"]/m)
+      expect(text, pfad).not.toMatch(/export\s+(async\s+)?function\s+(POST|PUT|PATCH|DELETE)\b/)
+    }
+  })
+
+  it('Gegenprobe: ein Aufruf im Kommentar zählt nicht, einer im Code schon', () => {
+    expect(PRUEFT_SIGNATUR.test(ohneKommentare('// bestellLinkGilt(orderId, sig) prüft …'))).toBe(false)
+    expect(PRUEFT_SIGNATUR.test(ohneKommentare('if (!bestellLinkGilt(orderId, sig)) return'))).toBe(true)
+    expect('export async function POST(request: Request) {}').toMatch(/export\s+(async\s+)?function\s+(POST|PUT|PATCH|DELETE)\b/)
+  })
+})

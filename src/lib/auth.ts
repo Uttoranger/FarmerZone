@@ -5,10 +5,18 @@ import { emailOTP, magicLink } from 'better-auth/plugins'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
 import { prisma } from '@/lib/prisma'
 import { APP_URL, UMGEBUNG } from '@/lib/umgebung-server'
-import { ANMELDECODE_PLUGIN_OPTIONEN, GESPERRTE_AUTH_PFADE, codeVersandErlaubt, rolleAusTreffern } from '@/lib/anmeldecode'
+import {
+  ANMELDECODE_PLUGIN_OPTIONEN,
+  GESPERRTE_AUTH_PFADE,
+  codeVersandErlaubt,
+  rolleAusTreffern,
+} from '@/lib/anmeldecode'
 import { genauesIlikeMuster } from '@/lib/ilike-muster'
 import { erzeugeAnforderungsSperre } from '@/lib/anmeldecode-sperre'
+import { anmeldecodeGebremst } from '@/server/bremse-datenbank'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
+import { sendeRegistrierungsHinweis } from '@/server/registrierung-hinweis'
+import { leereKontaktdatenNachFremdemPasswort } from '@/server/kontaktdaten-fremd'
 import {
   BESTAETIGUNG_GESPERRTE_AUTH_PFADE,
   BESTAETIGUNG_GUELTIG_SEKUNDEN,
@@ -141,6 +149,20 @@ export const auth = betterAuth({
     resetPasswordTokenExpiresIn: 3600,
     // Nach erfolgreichem Reset fliegen alle alten Sessions
     revokeSessionsOnPasswordReset: true,
+    // Registrieren meldet nicht an (Register F6 „19b", Nachtlauf Nr. 27):
+    // Damit antwortet Better Auth auf eine VERGEBENE Adresse wie bei Erfolg —
+    // mit einem Scheinkonto ohne Datenbankzeile, nachdem es das Passwort
+    // trotzdem gehasht hat (gleiche Rechenzeit). Ohne das warf signUpEmail
+    // „schon vorhanden", und die Antwort verriet, wer ein Konto hat. Angemeldet
+    // wird erst nach der Bestätigung per Link (/verify → Anmelden).
+    autoSignIn: false,
+    // Das bestehende Konto erfährt davon per Mail — nach der Antwort, damit
+    // die Antwortzeit gleich bleibt; höchstens einmal je Fenster, Fehler ohne
+    // Adresse nach Sentry (src/server/registrierung-hinweis.ts). Erreichbar
+    // nur über registerFarmer: /sign-up/email ist über HTTP zu.
+    onExistingUserSignUp: async ({ user }) => {
+      nachDerAntwort(() => sendeRegistrierungsHinweis(user.id))
+    },
     sendResetPassword: async ({ user, url }) => {
       try {
         const { sendPasswordResetEmail } = await import('@/lib/email')
@@ -228,6 +250,11 @@ export const auth = betterAuth({
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
       if (ctx.path === '/sign-in/email-otp') {
+        // Zweite Stufe der IP-Bremse über alle Instanzen (Register R1); die
+        // erste (Better Auth, 3 je Minute) ist schon gelaufen. Nur Produktion.
+        if (await anmeldecodeGebremst('pruefen', ctx.headers, null)) {
+          throw new APIError('TOO_MANY_REQUESTS', { message: 'Zu viele Anfragen.' })
+        }
         const body = ctx.body as { email?: unknown } | undefined
         if (typeof body?.email !== 'string') return
         // Antwort wie bei falschem Code; der Code (falls einer liegt) bleibt
@@ -250,6 +277,11 @@ export const auth = betterAuth({
       if (process.env.NODE_ENV === 'production' && !codeAnforderungen.erlaubt(body.email)) {
         throw new APIError('TOO_MANY_REQUESTS', { message: 'Zu viele Anfragen.' })
       }
+      // Zweite Stufe über alle Instanzen (Register R1): je IP und je Adresse,
+      // dieselben Grenzen; erst wenn der Speicher durchlässt. Fail-open.
+      if (await anmeldecodeGebremst('anfordern', ctx.headers, body.email)) {
+        throw new APIError('TOO_MANY_REQUESTS', { message: 'Zu viele Anfragen.' })
+      }
       // Hof oder Admin: KEIN Code wird angelegt — der Hook antwortet selbst,
       // genau wie das Plugin bei einer Kundin ({ success: true }), und der
       // Endpunkt läuft gar nicht erst. Die Adresse geht so in die Abfrage,
@@ -264,6 +296,26 @@ export const auth = betterAuth({
         return ctx.json({ success: true })
       }
     }),
+  },
+
+  // Name und Telefon aus FREMDEN Alt-Registrierungen (Register B3, Nr. 27):
+  // Beim ersten Code eines unbestätigten Kontos löscht das emailOTP-Plugin
+  // dessen Passwort-Konto (revokeUnprovenAccountAccess → deleteAccount →
+  // dieser Hook, mit der Anfrage als Kontext), BEVOR es `emailVerified`
+  // setzt. Ein solches Passwort stammt von jemandem, der die Adresse ohne
+  // Postfach registriert hat — dann leeren wir auch Name und Telefon, die er
+  // hinterlassen hat (src/server/kontaktdaten-fremd.ts). Ruhende Konten aus
+  // dem alten Checkout haben kein Passwort und bleiben unberührt. Der Hook
+  // gibt nie false zurück und wirft nie: Das Löschen des Passworts und die
+  // Anmeldung laufen in jedem Fall weiter.
+  databaseHooks: {
+    account: {
+      delete: {
+        before: async (konto, kontext) => {
+          await leereKontaktdatenNachFremdemPasswort(konto, kontext?.path)
+        },
+      },
+    },
   },
 
   plugins: [

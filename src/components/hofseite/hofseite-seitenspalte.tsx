@@ -5,7 +5,7 @@ import { useMemo } from 'react'
 import Link from 'next/link'
 import { Banknote, CalendarDays, CreditCard, MapPin, Phone, ShoppingBasket } from 'lucide-react'
 import type { PublicPickupSlot } from '@/server/queries/farm'
-import { abholzeitenJeWochentag, nextPickupDays } from '@/lib/pickup-days'
+import { abholtagZeile, abholzeitenJeWochentag, nextPickupDays } from '@/lib/pickup-days'
 import { buildMapsUrl } from '@/lib/customer-links'
 import { formatEuro, mitAnzahl } from '@/lib/format'
 import { warenkorbAnzahl } from '@/lib/warenkorb-speicher'
@@ -14,6 +14,8 @@ import { korbBetraege, type Zahlungsart } from '@/lib/hofseite-kunde'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
+import { futterVerantwortungImKorb, type FutterAbgabe } from '@/lib/futter-registrierung'
 
 /*
  * Die rechte Spalte der Hofseite — EINE Komponente (Gate 4, Kernpunkt):
@@ -56,6 +58,8 @@ export function HofseiteSeitenspalte({
   gebuehrKorb,
   mitKorb,
   jetzt,
+  produkte = [],
+  kasseHref,
   className,
 }: {
   hof: SeitenspalteHof
@@ -68,6 +72,10 @@ export function HofseiteSeitenspalte({
   mitKorb: boolean
   /** Zeitpunkt der Anfrage (ISO) vom Server — die Abholtage rechnen davon, nicht von der Uhr beim Rendern. */
   jetzt: string
+  /** Die Produkte des Hofs — nur für den Futter-Hinweis im Mini-Warenkorb (E10a). */
+  produkte?: readonly (FutterAbgabe & { id: string })[]
+  /** Adresse von „Zur Kasse" — die Produktseite gibt `?kaeufer=betrieb` mit (Nr. 29); sonst die Kasse des Hofs. */
+  kasseHref?: string
   className?: string
 }): React.JSX.Element {
   const tage = useMemo(() => nextPickupDays(hof.pickupSlots, 3, new Date(jetzt)), [hof.pickupSlots, jetzt])
@@ -76,7 +84,7 @@ export function HofseiteSeitenspalte({
 
   return (
     <aside aria-label="Abholung, Zahlung und Anfahrt" className={cn('flex flex-col gap-[18px]', className)}>
-      {mitKorb && <MiniWarenkorb farmId={hof.id} slug={hof.slug} gebuehrKorb={gebuehrKorb} />}
+      {mitKorb && <MiniWarenkorb farmId={hof.id} slug={hof.slug} gebuehrKorb={gebuehrKorb} produkte={produkte} kasseHref={kasseHref} />}
 
       {/* Bei Pause keine Termine: Ankündigen, was man nicht buchen kann, wäre ein leeres Versprechen. */}
       {!hof.isPaused && tage.length > 0 && (
@@ -84,17 +92,15 @@ export function HofseiteSeitenspalte({
           <h2 id="naechste-abholung" className={KARTEN_TITEL}>
             Nächste Abholung
           </h2>
-          <ul className="flex gap-2">
+          {/* Klar als Text (Nr. 46, Register N2): Zeilen wie „Abholzeiten", keine
+              Kacheln, die wie wählbare Knöpfe aussehen, aber nichts tun. Gewählt
+              wird das Zeitfenster in der Kasse — dort mit demselben Datum. */}
+          <ul className="flex flex-col gap-2">
             {tage.map((tag, i) => (
-              <li
-                key={tag.date.toISOString()}
-                className={cn(
-                  'min-w-0 flex-1 rounded-xl px-1.5 py-3 text-center',
-                  i === 0 ? 'border-[1.5px] border-accent bg-accent/12' : 'border border-border'
-                )}
-              >
-                <span className="block text-[13px] leading-snug font-semibold break-words text-foreground">{tag.label}</span>
-                <span className="mt-0.5 block text-xs text-muted-foreground">{tag.times}</span>
+              <li key={tag.kalendertag} className={ZEILE}>
+                <CalendarDays className={SYMBOL} strokeWidth={1.7} aria-hidden="true" />
+                <span className={cn('min-w-0 flex-1 break-words', i === 0 && 'font-semibold')}>{abholtagZeile(tag)}</span>
+                <span className="shrink-0 text-muted-foreground tabular-nums">{tag.times}</span>
               </li>
             ))}
           </ul>
@@ -184,7 +190,19 @@ export function HofseiteSeitenspalte({
  * dem Speicher (useWarenkorbVomHof) — geschrieben wird nur über useCart im
  * Produktraster, das danach WARENKORB_EREIGNIS meldet.
  */
-function MiniWarenkorb({ farmId, slug, gebuehrKorb }: { farmId: string; slug: string; gebuehrKorb: string | null }): ReactNode {
+function MiniWarenkorb({
+  farmId,
+  slug,
+  gebuehrKorb,
+  produkte,
+  kasseHref,
+}: {
+  farmId: string
+  slug: string
+  gebuehrKorb: string | null
+  produkte: readonly (FutterAbgabe & { id: string })[]
+  kasseHref?: string
+}): ReactNode {
   const positionen = useWarenkorbVomHof(farmId)
   if (positionen.length === 0) return null
   const anzahl = warenkorbAnzahl(positionen)
@@ -218,8 +236,9 @@ function MiniWarenkorb({ farmId, slug, gebuehrKorb }: { farmId: string; slug: st
         <span className="tabular-nums">{formatEuro(centsAlsEuro(summeCents))}</span>
         {gebuehrKorb && <span className="text-[13px] font-normal text-muted-foreground">&nbsp;{gebuehrKorb}</span>}
       </p>
+      <FutterVerantwortung saetze={futterVerantwortungImKorb(positionen, produkte)} />
       <Link
-        href={`/${slug}/checkout`}
+        href={kasseHref ?? `/${slug}/checkout`}
         className={cn(
           'flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 text-[14.5px] font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90',
           FOKUS_RAHMEN

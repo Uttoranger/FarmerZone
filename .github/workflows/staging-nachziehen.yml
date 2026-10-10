@@ -1,0 +1,55 @@
+name: Staging nachziehen
+
+# Hält den Branch staging auf dem Stand von main (Register Z3, Nr. 43). Vercel
+# baut staging als Vorschau unter test.farmerzone.at — die Testumgebung zeigt
+# so immer, was gerade live ist. Einrichtung: docs/betrieb/testumgebung.md.
+#
+# SICHERHEIT
+# - Auslöser ist nur ein Push auf main. Kein PR-Ereignis, schon gar nicht die
+#   _target-Variante mit Base-Rechten.
+# - Schreibrecht hat nur dieser eine Job, und nur auf den Inhalt; oben ist alles
+#   aus. Keine Secrets außer dem eingebauten Token, kein Ausdruck in der Shell.
+# - Nie überschreiben: Gepusht wird ohne Force. Hat staging Commits, die main
+#   nicht kennt (jemand hat direkt auf staging gearbeitet), endet der Job rot,
+#   statt sie wegzuwerfen — dann führt der Mensch von Hand zusammen.
+# - Den Branch staging legt der Job NICHT an; anlegen ist ein bewusster Schritt
+#   des Menschen (Betriebsdoku, Schritt 1). Fehlt er, endet der Job mit einem
+#   Hinweis und grün — sonst wäre bis dahin jeder Push auf main rot.
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+# Zwei Pushes kurz hintereinander laufen nacheinander, nie gleichzeitig: Sonst
+# könnte ein älterer Lauf nach einem jüngeren schieben und fälschlich rot werden.
+concurrency:
+  group: staging-nachziehen
+  cancel-in-progress: false
+
+jobs:
+  nachziehen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Volle Geschichte aller Branches — für den Vorfahren-Vergleich unten.
+          fetch-depth: 0
+
+      - name: staging per Fast-Forward auf main setzen
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet refs/remotes/origin/staging > /dev/null; then
+            echo "::notice title=Branch staging fehlt::Den Branch staging gibt es noch nicht, es gibt nichts nachzuziehen. Anlegen: docs/betrieb/testumgebung.md, Schritt 1. Diese Action legt ihn bewusst nicht an."
+            exit 0
+          fi
+          if ! git merge-base --is-ancestor refs/remotes/origin/staging refs/remotes/origin/main; then
+            echo "::error title=Kein Fast-Forward möglich::staging hat Commits, die main nicht hat. Nichts überschrieben — bitte staging von Hand zusammenführen (docs/betrieb/testumgebung.md)."
+            exit 1
+          fi
+          # Ohne Force: Ein Push, der kein Fast-Forward ist, lehnt GitHub selbst ab.
+          git push origin refs/remotes/origin/main:refs/heads/staging

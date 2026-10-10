@@ -301,6 +301,8 @@ export function AktionsLeiste({ children }: { children: ReactNode }): React.JSX.
   return (
     <div
       data-feste-leiste
+      // Der Kaufknopf: Der Cookie-Hinweis steht darüber, nie darauf (src/lib/cookie-hinweis.ts).
+      data-unten-fest=""
       className="fixed inset-x-0 bottom-0 z-40 flex flex-col gap-2 border-t border-border bg-card px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] md:static md:z-auto md:border-0 md:bg-transparent md:p-0"
     >
       {children}
@@ -328,6 +330,10 @@ export function KontaktHinweis(): React.JSX.Element {
 /**
  * Die Zahlart-Wahl (E5: online und bar). Echte Radioknöpfe — Pfeiltasten
  * wechseln, der Screenreader sagt die Gruppe an; jede Zeile ist 50 px hoch.
+ *
+ * Ein `hinweis` (heute nur der Testbetrieb, Register Z2) steht als eigene
+ * Zeile unter Titel und Zusatz, orange, IM Label: Er gehört zur Zahlart und
+ * wird mit ihr vorgelesen — wer „Online bezahlen" wählt, hat ihn gehört.
  */
 export function ZahlartWahl({
   zahlarten,
@@ -352,6 +358,12 @@ export function ZahlartWahl({
             <span className="basis-full pl-8 text-[12.5px] text-muted-foreground sm:ml-auto sm:basis-auto sm:pl-0 sm:text-right">
               {z.zusatz}
             </span>
+            {z.hinweis && (
+              <span className="mt-1 flex basis-full items-start gap-1.5 pl-8 text-[12.5px] leading-snug font-medium text-status-offen">
+                <AlertCircle className="mt-px size-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+                <span>{z.hinweis}</span>
+              </span>
+            )}
           </label>
         ))}
       </div>
@@ -391,7 +403,9 @@ export function AbholWahl({
             )}
           >
             <input type="radio" value={k.key} {...feld} disabled={k.ausgebucht} className="sr-only" />
-            <span className="text-[13.5px] font-semibold break-words">{k.tag}</span>
+            {/* Jeder Termin mit Datum (Nr. 46): „Heute"/„Morgen" nur zusätzlich, nie statt des Datums. */}
+            {k.relativ && <span className="text-[12px] font-semibold text-status-fertig">{k.relativ}</span>}
+            <span className="text-[13.5px] font-semibold break-words">{k.datum}</span>
             <span className="mt-0.5 text-[12px] whitespace-nowrap text-muted-foreground">{k.zeit}</span>
             {/* Voll heißt: Der Hof nimmt für dieses Fenster nichts mehr an (maxOrders). */}
             {k.ausgebucht && <span className="text-[12px] font-semibold">ausgebucht</span>}

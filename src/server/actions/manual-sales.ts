@@ -7,22 +7,36 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { manualSaleFormSchema, verkaufIdSchema } from '@/schemas/manual-sale'
 import { getFarmForUser } from '@/server/queries/dashboard'
-import { verkaufOhneAngaben } from '@/lib/verkauf-eintragen'
+import {
+  verkaufOhneAngaben,
+  vorratHinweis,
+  type VorratBuchung,
+  type VorratHinweis,
+} from '@/lib/verkauf-eintragen'
 import { wienKalendertag } from '@/lib/kalender'
+import { revalidiereProdukte } from '@/server/produkte-schreiben'
 
 /*
- * Direktverkäufe (Verkauf eintragen, ändern, löschen). Ein Direktverkauf ist
- * nur Umsatz: Er bucht keinen Bestand ab und keinen zurück — auch nicht mit
- * verknüpftem Produkt. Ändern und Löschen brauchen deshalb keine Gegenbuchung.
+ * Direktverkäufe (Verkauf eintragen, ändern, löschen). Seit Register D1
+ * (Nachtlauf Nr. 39) zieht „Verkauf eintragen" mit einem Produkt aus dem
+ * Sortiment den Vorrat ab, wenn der Schalter „Vorrat abziehen" an ist —
+ * bedingt, nie unter 0, in derselben Transaktion wie der Verkauf. Ändern und
+ * Löschen buchen weiterhin nichts ab und nichts zurück: D1 regelt nur das
+ * Eintragen, und eine Gegenbuchung beim Löschen könnte Vorrat erfinden, den
+ * der Hof inzwischen selbst neu gezählt hat.
  */
 
-export type VerkaufAntwort = { ok: true } | { error: string }
+/** `vorrat` nur, wenn abgezogen wurde (oder werden sollte) — der Dialog zeigt den Satz nach dem Speichern. */
+export type VerkaufAntwort = { ok: true; vorrat?: VorratHinweis } | { error: string }
+
+/** Wie oft die Buchung neu ansetzt, wenn sich der Vorrat zwischen ihren zwei Schritten ändert. */
+const VORRAT_VERSUCHE = 3
 
 const NICHT_ANGEMELDET = 'Bitte melde dich neu an.'
 const NICHT_MEHR_DA = 'Diesen Verkauf gibt es nicht mehr. Lade die Seite neu.'
 
 /** Der Hof der Sitzung — oder null, dann antwortet die Action mit einem Satz statt abzustürzen. */
-async function eigenerHof(): Promise<{ id: string } | null> {
+async function eigenerHof(): Promise<{ id: string; slug: string } | null> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return null
   return getFarmForUser(session.user.id)
@@ -48,10 +62,19 @@ function revalidate() {
  * eigenen Hof gehören — sonst hinge ein Verkauf an einem fremden Produkt und
  * tauchte in dessen Grenzwert-Zählung auf.
  */
+type Verkaufsprodukt = { id: string; unit: string; unitSize: Prisma.Decimal | null }
+
 async function verkaufsDaten(
   farmId: string,
   data: unknown
-): Promise<{ error: string } | { daten: Omit<Prisma.ManualSaleUncheckedCreateInput, 'farmId'> }> {
+): Promise<
+  | { error: string }
+  | {
+      daten: Omit<Prisma.ManualSaleUncheckedCreateInput, 'farmId'>
+      /** Gesetzt, wenn ein eigenes Produkt gewählt und der Schalter „Vorrat abziehen" an ist. */
+      abziehen: Verkaufsprodukt | null
+    }
+> {
   const geprueft = manualSaleFormSchema.safeParse(data)
   if (!geprueft.success) return { error: geprueft.error.issues[0]?.message ?? 'Bitte prüf deine Eingaben.' }
   const v = geprueft.data
@@ -66,7 +89,7 @@ async function verkaufsDaten(
   const produkt = v.productId
     ? await prisma.product.findFirst({
         where: { id: v.productId, farmId },
-        select: { id: true, name: true, unit: true },
+        select: { id: true, name: true, unit: true, unitSize: true },
       })
     : null
   if (v.productId && !produkt) {
@@ -90,7 +113,57 @@ async function verkaufsDaten(
       saleDate: toDate(v.saleDate),
       note: v.note || null,
     },
+    abziehen: produkt && v.vorratAbziehen === true ? produkt : null,
   }
+}
+
+/**
+ * Wie viele Gebinde ein Verkauf abzieht. `ManualSale.quantity` steht in der
+ * Grundeinheit des Produkts („2,5 kg", so liest sie auch die Auswertung), der
+ * Vorrat zählt Gebinde (Register E3, ganze Zahl): Menge durch Gebindegröße,
+ * aufgerundet — lieber ein Gebinde zu wenig online anbieten als eines zu
+ * viel. Nur Decimal, kein Gleitkomma; ohne Gebindegröße (null oder 0) zählt
+ * jede Einheit als ein Gebinde. Die Anzeige am Schalter rechnet dasselbe nur
+ * zur Information nach (gebindeAnzeige).
+ */
+function gebindeAusMenge(menge: Prisma.Decimal, unitSize: Prisma.Decimal | null): number {
+  const groesse = unitSize && unitSize.gt(0) ? unitSize : new Prisma.Decimal(1)
+  const gebinde = menge.div(groesse).ceil()
+  return gebinde.lt(1) ? 1 : gebinde.toNumber()
+}
+
+/**
+ * Zieht `menge` Gebinde vom Vorrat ab — nie unter 0 (Register D1,
+ * CLAUDE.md: nie ein blindes decrement). Erst bedingt `stock >= menge`;
+ * reicht das nicht, bedingt `stock < menge` auf 0: Der Verkauf ist echt
+ * passiert, die Ware ist weg, der gezählte Vorrat war schlicht zu klein.
+ * Ändert sich der Vorrat zwischen den beiden Schritten (eine Bestellung, der
+ * Hof selbst), greift keine der Bedingungen — dann setzt die Buchung neu an,
+ * begrenzt. Hof in jeder WHERE-Klausel.
+ */
+async function bucheVorrat(
+  tx: Prisma.TransactionClient,
+  produktId: string,
+  farmId: string,
+  menge: number
+): Promise<VorratBuchung> {
+  for (let versuch = 0; versuch < VORRAT_VERSUCHE; versuch++) {
+    const abgezogen = await tx.product.updateMany({
+      where: { id: produktId, farmId, stock: { gte: menge } },
+      data: { stock: { decrement: menge } },
+    })
+    if (abgezogen.count === 1) {
+      // In derselben Transaktion: die eigene Schreibung, die Zeilensperre hält bis zum Commit.
+      const danach = await tx.product.findFirst({ where: { id: produktId, farmId }, select: { stock: true } })
+      return { art: 'abgezogen', vorrat: danach?.stock ?? 0 }
+    }
+    const geleert = await tx.product.updateMany({
+      where: { id: produktId, farmId, stock: { lt: menge } },
+      data: { stock: 0 },
+    })
+    if (geleert.count === 1) return { art: 'auf-null' }
+  }
+  return { art: 'unveraendert' }
 }
 
 export async function createManualSale(data: unknown): Promise<VerkaufAntwort> {
@@ -98,11 +171,28 @@ export async function createManualSale(data: unknown): Promise<VerkaufAntwort> {
   if (!farm) return { error: NICHT_ANGEMELDET }
   const ergebnis = await verkaufsDaten(farm.id, data)
   if ('error' in ergebnis) return { error: ergebnis.error }
+  const { daten, abziehen } = ergebnis
 
-  await prisma.manualSale.create({ data: { farmId: farm.id, ...ergebnis.daten } })
+  // Verkauf und Abzug in EINER Transaktion: Scheitert das Speichern, ist auch
+  // nichts abgezogen — nie Ware weg ohne Verkauf. Abgezogen wird nach der
+  // Menge, wie die Spalte sie gespeichert hat (drei Stellen).
+  // Wirft der Abzug (Datenbankfehler, Sperr-Timeout), rollt der ganze
+  // Verkauf zurück und der Hof sieht die Fehlermeldung — bewusst.
+  const buchung = await prisma.$transaction(async (tx): Promise<VorratBuchung | null> => {
+    const verkauf = await tx.manualSale.create({ data: { farmId: farm.id, ...daten }, select: { quantity: true, unit: true } })
+    if (!abziehen) return null
+    // Die Menge steht in der Einheit des Verkaufs; nur in der Einheit des
+    // Produkts lässt sie sich in Gebinde umrechnen. Eine andere Einheit (alte
+    // Vorlage) umzurechnen wäre geraten — dann bleibt der Vorrat, wie er ist.
+    if (verkauf.unit !== abziehen.unit) return { art: 'einheit-passt-nicht' }
+    return bucheVorrat(tx, abziehen.id, farm.id, gebindeAusMenge(verkauf.quantity, abziehen.unitSize))
+  })
 
   revalidate()
-  return { ok: true }
+  if (!buchung || !abziehen) return { ok: true }
+  // Vorrat geändert: Produkte, Hofseite und Hofübersicht zeigen sonst den alten Stand („ausverkauft" bei 0).
+  revalidiereProdukte(farm.slug)
+  return { ok: true, vorrat: vorratHinweis(buchung, abziehen) }
 }
 
 export async function updateManualSale(saleId: unknown, data: unknown): Promise<VerkaufAntwort> {
@@ -113,7 +203,9 @@ export async function updateManualSale(saleId: unknown, data: unknown): Promise<
   const ergebnis = await verkaufsDaten(farm.id, data)
   if ('error' in ergebnis) return { error: ergebnis.error }
 
-  // Besitz und Schreiben in einem: nur ein Verkauf des eigenen Hofs.
+  // Besitz und Schreiben in einem: nur ein Verkauf des eigenen Hofs. Der
+  // Vorrat bleibt beim Ändern unberührt (D1 regelt nur das Eintragen) —
+  // `abziehen` wird hier bewusst nicht ausgewertet.
   const { count } = await prisma.manualSale.updateMany({
     where: { id: id.data, farmId: farm.id },
     data: ergebnis.daten,

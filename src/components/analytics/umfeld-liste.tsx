@@ -6,6 +6,7 @@ import { ChevronDown } from 'lucide-react'
 import { mitAnzahl } from '@/lib/format'
 import { UMFELD_HOEFE_SICHTBAR, type UmfeldZeile } from '@/lib/umfeld'
 import { cn } from '@/lib/utils'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 
 /**
  * Die Zeilen des Umfelds. Alles, was hier steht, hat src/lib/umfeld.ts schon
@@ -28,17 +29,20 @@ export function UmfeldListe({ zeilen }: { zeilen: UmfeldZeile[] }) {
         const weitere = zeile.hoefe.length - sichtbar.length
         const deinsOhnePreis = zeile.eigenesProdukt && !zeile.preise.some((p) => p.deins)
         return (
-          <li key={zeile.schluessel} className="rounded-xl border border-border bg-card dark:ring-1 dark:ring-border">
+          <li
+            key={zeile.schluessel}
+            className={cn('rounded-[14px] border bg-card', istOffen ? 'border-accent' : 'border-border')}
+          >
             <button
               type="button"
               aria-expanded={istOffen}
               aria-controls={istOffen ? panelId : undefined}
               onClick={() => setOffen(istOffen ? null : zeile.schluessel)}
-              className="flex w-full items-start gap-3 rounded-xl px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className={cn('flex w-full items-start gap-3 rounded-[14px] px-4 py-3 text-left', FOKUS_RAHMEN)}
             >
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline justify-between gap-3">
-                  <span className="truncate font-semibold text-foreground">{zeile.titel}</span>
+                  <span className="truncate text-[14.5px] font-semibold text-foreground">{zeile.titel}</span>
                   <span className="shrink-0 text-sm text-muted-foreground tabular-nums">{zeile.anzahlText}</span>
                 </span>
                 {zeile.preise.map((preis) => (
@@ -51,7 +55,7 @@ export function UmfeldListe({ zeilen }: { zeilen: UmfeldZeile[] }) {
                       </span>
                     )}
                     {preis.deins && (
-                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-brand-text tabular-nums">
+                      <span className="rounded-full border border-accent/45 bg-accent/12 px-2 py-0.5 text-[11.5px] font-semibold text-status-fertig tabular-nums">
                         Deins: {preis.deins}
                       </span>
                     )}
@@ -59,7 +63,7 @@ export function UmfeldListe({ zeilen }: { zeilen: UmfeldZeile[] }) {
                 ))}
                 {zeile.hinweis && <span className="mt-1 block text-sm text-muted-foreground">{zeile.hinweis}</span>}
                 {deinsOhnePreis && (
-                  <span className="mt-1 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-brand-text">
+                  <span className="mt-1 inline-block rounded-full border border-accent/45 bg-accent/12 px-2 py-0.5 text-[11.5px] font-semibold text-status-fertig">
                     Deins
                   </span>
                 )}
@@ -79,9 +83,9 @@ export function UmfeldListe({ zeilen }: { zeilen: UmfeldZeile[] }) {
                         {/* 44 px hoch — ein Tap-Ziel, keine bloße Textzeile. */}
                         <Link
                           href={hof.link}
-                          className="flex min-h-11 min-w-0 items-center font-semibold text-brand-text underline-offset-4 hover:underline"
+                          className={cn('flex min-h-11 min-w-0 items-center font-semibold text-brand-text underline-offset-4 hover:underline', FOKUS_RAHMEN)}
                         >
-                          <span className="truncate">{hof.name}</span>
+                          <span className="truncate" title={hof.name}>{hof.name}</span>
                         </Link>
                         <span className="shrink-0 text-sm text-muted-foreground tabular-nums">{hof.entfernung}</span>
                       </div>
@@ -102,7 +106,7 @@ export function UmfeldListe({ zeilen }: { zeilen: UmfeldZeile[] }) {
                   <button
                     type="button"
                     onClick={() => setAlleHoefe(new Set([...alleHoefe, zeile.schluessel]))}
-                    className="mt-3 min-h-11 text-sm font-semibold text-brand-text underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className={cn('mt-3 min-h-11 text-sm font-semibold text-brand-text underline-offset-4 hover:underline', FOKUS_RAHMEN)}
                   >
                     {mitAnzahl(weitere, 'weiterer Hof', 'weitere Höfe')}
                   </button>

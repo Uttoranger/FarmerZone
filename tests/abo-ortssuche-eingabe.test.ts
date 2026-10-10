@@ -19,9 +19,11 @@ vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     user: { findUnique: vi.fn() },
-    customerFarmSubscription: { upsert: vi.fn() },
+    customerFarmSubscription: { upsert: vi.fn(), updateMany: vi.fn() },
   },
 }))
+// Die Bestätigungsmail (Double-Opt-in, Nr. 38) geht nach der Antwort — hier nicht.
+vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: vi.fn() }))
 vi.mock('@/lib/geokodierung', async (original) => ({
   ...(await original<typeof import('@/lib/geokodierung')>()),
   sucheOrtspunkt: vi.fn(),
@@ -44,7 +46,8 @@ beforeEach(() => {
   vi.mocked(prisma.user.findUnique).mockResolvedValue({
     email: 'anna@example.com', emailVerified: true, role: 'CUSTOMER', isAdmin: false,
   } as never)
-  upsert.mockResolvedValue({} as never)
+  upsert.mockResolvedValue({ id: 'abo_1', optInEmail: false, emailOptInAngefragtAm: null, emailOptInBestaetigtAm: null } as never)
+  vi.mocked(prisma.customerFarmSubscription.updateMany).mockResolvedValue({ count: 1 } as never)
   suche.mockResolvedValue([])
 })
 
@@ -76,7 +79,7 @@ describe('updateSubscription — ungültige Eingabe erreicht die Datenbank nie',
   })
 
   it('Gegenprobe: gültige Eingabe wird gespeichert', async () => {
-    expect(await updateSubscription('cmabc123', true, false)).toEqual({})
+    expect(await updateSubscription('cmabc123', true, false)).toEqual({ email: 'wartet' })
     expect(upsert).toHaveBeenCalledTimes(1)
   })
 })

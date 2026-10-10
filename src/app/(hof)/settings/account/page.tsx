@@ -7,13 +7,14 @@ import { getFarmArchiveState } from '@/server/queries/farm'
 import { supportMailto } from '@/lib/support'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
-import { EinstellungenKopf } from '@/components/hof-einstellungen/einstellungen-kopf'
+import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
+import { EINSTELLUNG_KONTO } from '@/lib/bauern-navigation'
 import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
 import { PasswordForm } from './password-form'
 import { ArchiveFarmCard } from './archive-farm-card'
 import { DarstellungKarte } from './darstellung-karte'
 
-export const metadata: Metadata = { title: 'Konto und Sicherheit — FarmerZone' }
+export const metadata: Metadata = { title: `${EINSTELLUNG_KONTO.label} — FarmerZone` }
 
 /** Links im Fließtext: grüner Text (Hof-Links wie im Editor), nie oranger Text. */
 const TEXTLINK = 'font-medium text-brand-text underline underline-offset-2 break-words'
@@ -48,7 +49,7 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
 
   return (
     <div className={UNTERSEITE_RAHMEN}>
-      <EinstellungenKopf titel="Konto und Sicherheit" satz="Anmeldung, Passwort, Darstellung und dein Hof." />
+      <UnterseitenKopf titel={EINSTELLUNG_KONTO.label} satz="Anmeldung, Passwort, Darstellung und dein Hof." />
 
       <div data-app-palette="neu" className="space-y-4">
         <Card>

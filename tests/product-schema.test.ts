@@ -17,7 +17,9 @@ import {
   PRODUCT_CATEGORY_VALUES,
   CATEGORY_OPTIONS,
   FUTTER_FEHLER,
+  futterKennzeichnungSchema,
 } from '@/schemas/product'
+import { FUTTER_BESTAETIGUNG_FEHLT } from '@/lib/futter-registrierung'
 import { mwstStandard } from '@/lib/mwst'
 import { istFuttermittel } from '@/lib/taxonomie'
 
@@ -200,9 +202,20 @@ describe('Futtermittel', () => {
     expect(fehler['futter.analytischeBestandteile']).toBe(FUTTER_FEHLER.analytischeBestandteile)
   })
 
-  it('ohne Bestätigung: Fehler am Haken', () => {
+  // Geändert in Nr. 23 (E10a): Beim Bearbeiten entscheidet der Server mit dem
+  // gespeicherten Stand, ob der Haken nötig ist (nur Preis/Vorrat geändert:
+  // nein). Das Schema lässt ihn deshalb offen; beim Anlegen verlangt ihn
+  // futterKennzeichnungSchema weiter (Futter-Formular, produktfamilie-schema).
+  it('Bearbeiten ohne Haken: das Schema lässt durch, die Aktion entscheidet', () => {
     const fehler = fehlerNachPfad({ ...heu, futter: { ...futterGueltig, bestaetigt: false } })
-    expect(fehler['futter.bestaetigt']).toBe(FUTTER_FEHLER.bestaetigt)
+    expect(fehler['futter.bestaetigt']).toBeUndefined()
+  })
+
+  it('Anlegen ohne Haken: Fehler am Haken mit dem Satz aus E10a', () => {
+    const r = futterKennzeichnungSchema.safeParse({ ...futterGueltig, bestaetigt: false })
+    expect(r.success).toBe(false)
+    expect(r.error?.issues.find((i) => i.path[0] === 'bestaetigt')?.message).toBe(FUTTER_FEHLER.bestaetigt)
+    expect(FUTTER_FEHLER.bestaetigt).toBe(FUTTER_BESTAETIGUNG_FEHLT)
   })
 
   it('eine Futter-Unterkategorie an einer anderen Kategorie passt nicht', () => {

@@ -7,6 +7,8 @@
  * Fließkommazahl nicht exakt darstellbar sind (19,99 · 0,29 · 1,10), und
  * keine Geldspalte wird mehr als Fließkommazahl ausgeliefert.
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Decimal } from '@prisma/client/runtime/index-browser'
 
@@ -65,5 +67,39 @@ describe('getOrderDetail — Geld als ganze Cent', () => {
   it('Gegenprobe: die Summen der Druckansicht stimmen weiter (bestellSummen)', async () => {
     const order = await getOrderDetail('farm_1', 'order_1')
     expect(order && bestellSummen(order)).toEqual({ warenpreisCents: 2109, gebuehrCents: 0, gesamtCents: 2109 })
+  })
+})
+
+/*
+ * Nr. 32 (Morgenbericht Lauf 5 §5): Auch die beiden letzten Decimal-Werte der
+ * Datei (Gebührensatz, Gebindegröße) gehen über Decimal-Methoden, nicht über
+ * `Number(...)` — kein Geld, aber dieselbe Regel an der Servergrenze
+ * (CODING_STANDARDS §2), damit kein Muster zum Abschreiben stehen bleibt.
+ */
+describe('src/server/queries/orders.ts — kein Number(...) auf Decimal', () => {
+  const QUELLE = readFileSync(join(process.cwd(), 'src/server/queries/orders.ts'), 'utf8')
+  const ohneKommentare = QUELLE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+
+  it('der Quelltext ruft Number(...) nicht auf', () => {
+    expect(ohneKommentare).not.toMatch(/\bNumber\(/)
+  })
+
+  it('Gegenprobe: die Suche schlägt an', () => {
+    expect('const x = Number(order.totalAmount)').toMatch(/\bNumber\(/)
+  })
+
+  it('Gebührensatz und Gebindegröße kommen weiter als Zahl an', async () => {
+    findFirst.mockResolvedValue({
+      ...bestellung(),
+      serviceFeePercentApplied: new Decimal('4.90'),
+      items: [
+        { id: 'i1', productId: 'p1', productName: 'Milch', quantity: 2, unitPrice: new Decimal('1.10'), totalPrice: new Decimal('2.20'), fehltSeit: null, product: { unit: 'LITER', unitSize: new Decimal('0.500') } },
+      ],
+    } as never)
+
+    const order = await getOrderDetail('farm_1', 'order_1')
+
+    expect(order?.serviceFeePercentApplied).toBe(4.9)
+    expect(order?.items[0]?.product).toEqual({ unit: 'LITER', unitSize: 0.5 })
   })
 })

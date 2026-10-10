@@ -10,7 +10,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 const KEINE_HOFSEITE = [
   'account', 'admin', 'analytics', 'api', 'bestellungen', 'customers', 'dashboard', 'datenschutz',
   'farm-page', 'fehler-melden', 'forgot-password', 'fuer-hoefe', 'hoefe', 'impressum', 'intern', 'konditionen',
-  'login', 'meldungen', 'onboarding', 'orders', 'problem-melden', 'products', 'register',
+  'login', 'meldungen', 'onboarding', 'orders', 'problem-melden', 'products', 'region', 'register',
   'reset-password', 'sales', 'settings', 'status', 'teilen', 'verify',
 ];
 // Genau EIN Pfadstück aus Slug-Zeichen (src/lib/slug.ts), das keine Route ist.
@@ -139,6 +139,33 @@ const nextConfig: NextConfig = {
         // gültigen Token (?token=). Beim Klick hinaus geht er nicht als
         // Referrer mit, und die Seite kommt in keinen Suchindex.
         source: '/verify',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        ],
+      },
+      {
+        // „Anmeldung bestätigen" (Double-Opt-in, S11, Nr. 38): Der Link aus der
+        // Mail trägt einen gültigen Token (?token=) — gleiche Regel wie /verify.
+        source: '/account/neuigkeiten-bestaetigen',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        ],
+      },
+      {
+        // Der Abmeldelink (?token=) gilt ohne Ablauf — er geht ebenso nicht
+        // als Referrer mit und kommt in keinen Suchindex (Nr. 38).
+        source: '/account/unsubscribe',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        ],
+      },
+      {
+        // Die Ein-Klick-Abmeldung (RFC 8058, Nr. 47) trägt denselben Token wie
+        // der Abmeldelink — kein Referrer, kein Suchindex.
+        source: '/api/abmelden',
         headers: [
           { key: 'Referrer-Policy', value: 'no-referrer' },
           { key: 'X-Robots-Tag', value: 'noindex, nofollow' },

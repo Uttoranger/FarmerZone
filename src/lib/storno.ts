@@ -179,3 +179,41 @@ export function zuruecknahmeNachGescheiterterErstattung(e: {
   }
   return { art: 'unklar' }
 }
+
+/**
+ * Eine VOLLERSTATTUNG (Storno mit reverse_transfer, Merkmal `anlass:
+ * 'vollstorno'`, Nr. 27) ist nach dem Buchen gescheitert: Wird die Zahlung
+ * wieder offen?
+ *
+ * Die Vollerstattung steht in der Datenbank nur als `paymentStatus` REFUNDED
+ * (`erstattetCents` bleibt 0 — Teil- und Rest-Storno zählen dort, der
+ * Vollstorno nicht). Zurückgenommen wird deshalb nicht über einen Betrag,
+ * sondern über den Zahlstand: REFUNDED → PAID (storniert + PAID = „Erstattung
+ * offen", wie nach einem gescheiterten Storno). Nur wenn das Bild genau zu
+ * einer Vollerstattung passt:
+ *   - Bestellung storniert, vorher nichts erstattet (sonst hätte der Storno
+ *     den Rest mit festen Beträgen geholt, nie die Vollerstattung),
+ *   - die gescheiterte Erstattung über genau den bezahlten Betrag
+ *     (Warenpreis + Gebühr der Bestellung),
+ *   - Stripe kennt keine weitere zählende Erstattung (etwa eine von Hand
+ *     nachgeholte — dann wäre „offen" falsch).
+ * REFUNDED → zurücknehmen; schon PAID → schon erledigt (zweites Ereignis,
+ * erneute Zustellung); alles andere → unklar, nichts ändern, melden.
+ */
+export function zuruecknahmeNachGescheiterterVollerstattung(e: {
+  status: string
+  paymentStatus: string
+  erstattetCentsDatenbank: number
+  /** Warenpreis + Servicegebühr der Bestellung, in Cent. */
+  bezahltDatenbankCents: number
+  gescheitertCents: number
+  /** Gibt es bei Stripe zu dieser Zahlung außer der gescheiterten noch eine zählende Erstattung? */
+  andereZaehlendeErstattungen: boolean
+}): { art: 'zuruecknehmen' } | { art: 'schon_erledigt' } | { art: 'unklar' } {
+  if (e.gescheitertCents <= 0) return { art: 'unklar' }
+  if (e.status !== 'CANCELLED' || e.erstattetCentsDatenbank !== 0) return { art: 'unklar' }
+  if (e.gescheitertCents !== e.bezahltDatenbankCents || e.andereZaehlendeErstattungen) return { art: 'unklar' }
+  if (e.paymentStatus === 'REFUNDED') return { art: 'zuruecknehmen' }
+  if (e.paymentStatus === 'PAID') return { art: 'schon_erledigt' }
+  return { art: 'unklar' }
+}

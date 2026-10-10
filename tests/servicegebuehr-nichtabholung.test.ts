@@ -155,6 +155,8 @@ describe('markAsNotPickedUp — bar', () => {
     expect(daten[0]).toEqual({ status: 'NOT_PICKED_UP' })
     expect(daten[1]).toEqual({ serviceFeeRefundedAt: expect.any(Date) })
     expect(refundCreate).not.toHaveBeenCalled()
+    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
+    await vi.dynamicImportSettled()
     expect(sendOrderCancelled).not.toHaveBeenCalled()
   })
 
@@ -296,12 +298,21 @@ describe('cancelOrder — Gebühren-Vermerk bei Storno', () => {
     // die Gebühr bekommt er als application_fee zurück (refund_application_fee) —
     // so erstattet die Plattform die Servicegebühr (tests/storno-erstattung.test.ts).
     expect(refundCreate).toHaveBeenCalledWith(
-      { payment_intent: 'pi_1', reverse_transfer: true, refund_application_fee: true },
+      {
+        payment_intent: 'pi_1',
+        reverse_transfer: true,
+        refund_application_fee: true,
+        // Merkmale der Vollerstattung (Nr. 27), wie bei der Teilerstattung.
+        metadata: { orderId: 'order_online', anlass: 'vollstorno', art: 'kunde' },
+      },
       { idempotencyKey: 'storno-order_online' }
     )
     expect(stornoDaten().at(-1)).toEqual(
       expect.objectContaining({ status: 'CANCELLED', serviceFeeRefundedAt: expect.any(Date) })
     )
-    expect(sendOrderCancelled).toHaveBeenCalledWith(expect.objectContaining({ serviceFeeCents: 98 }), 20.98, undefined)
+    // Die Mail läuft nach der Antwort und lädt den Versand erst dann (Nr. 31) — also abwarten.
+    await vi.waitFor(() =>
+      expect(sendOrderCancelled).toHaveBeenCalledWith(expect.objectContaining({ serviceFeeCents: 98 }), 20.98, undefined)
+    )
   })
 })

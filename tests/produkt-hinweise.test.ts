@@ -36,13 +36,14 @@ describe('produktHinweise', () => {
   })
   // Nachbesserung 1 zu Nr. 06: Ein Bestandsprodukt ohne Kategorie, dessen Name
   // das Label einer vorbereiteten Brennmaterial-Art trifft, riss die ganze
-  // Produktliste des Hofs ab (kategorieVon warf).
-  it('Brennholz-Namen ohne Kategorie werfen nicht und ergeben dasselbe wie vor dem Schema-Expand', () => {
+  // Produktliste des Hofs ab (kategorieVon warf). Seit Nr. 20 gehören die Arten
+  // zu Brennholz — der Name schlägt sie vor, geworfen wird weiterhin nichts.
+  it('Brennholz-Namen ohne Kategorie werfen nicht und schlagen die Art vor', () => {
     expect(produktHinweise({ ...produkt, name: 'Brennholz Buche' })).toEqual([
-      { art: 'kategorie-uebernehmen', vorschlag: { category: 'BRENNHOLZ', subcategory: null } },
+      { art: 'kategorie-uebernehmen', vorschlag: { category: 'BRENNHOLZ', subcategory: 'BRENNHOLZ_SCHEIT' } },
     ])
-    for (const name of ['Hackschnitzel', 'Anzündholz', 'Buche Scheite']) {
-      expect(produktHinweise({ ...produkt, name }), name).toEqual([{ art: 'kategorie-ergaenzen' }])
-    }
+    expect(produktHinweise({ ...produkt, name: 'Hackschnitzel' })).toEqual([
+      { art: 'kategorie-uebernehmen', vorschlag: { category: 'BRENNHOLZ', subcategory: 'HACKSCHNITZEL' } },
+    ])
   })
 })

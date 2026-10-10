@@ -7,7 +7,7 @@
  * Connect, „Nicht abgeholt" in servicegebuehr-Sprint, Pausieren über
  * Farm.isPaused) — keine Zusage darüber hinaus.
  */
-import { SERVICEGEBUEHR_SATZ_TEXT, mitBarAusnahme } from '@/lib/konditionen'
+import { ONLINE_ZAHLUNG_START_KURZ, ONLINE_ZAHLUNG_START_SCHRITT, SERVICEGEBUEHR_SATZ_TEXT, mitBarAusnahme } from '@/lib/konditionen'
 
 export type Vorteil = { titel: string; text: string; kurz: string }
 
@@ -41,8 +41,9 @@ export type StartSchritt = { titel: string; text: string }
 export const FUER_HOEFE_SCHRITTE: readonly StartSchritt[] = [
   { titel: 'Registrieren', text: 'Name, E-Mail, Passwort – zwei Minuten.' },
   { titel: 'Hof einrichten', text: 'Fotos, Abholzeiten, Produkte – in Ruhe, vor der Freischaltung.' },
-  // Ein SEPA-Mandat lässt sich heute nicht erteilen (Einrichten: „Jetzt ist nichts zu tun").
-  { titel: 'Zahlung einrichten', text: 'Online-Zahlung über Stripe. Für das SEPA-Mandat ist jetzt nichts zu tun.' },
+  // Stripe gehört zum Start (Register Z1), Satz aus konditionen.ts. Ein
+  // SEPA-Mandat lässt sich heute nicht erteilen (Einrichten: „Jetzt ist nichts zu tun").
+  { titel: ONLINE_ZAHLUNG_START_SCHRITT.titel, text: `${ONLINE_ZAHLUNG_START_SCHRITT.text} Für das SEPA-Mandat ist jetzt nichts zu tun.` },
   { titel: 'Freischaltung', text: 'Wir schauen kurz drüber, dann bist du online.' },
 ]
 
@@ -50,7 +51,7 @@ export const FUER_HOEFE_SCHRITTE: readonly StartSchritt[] = [
 export const REGISTRIEREN_SCHRITTE: readonly StartSchritt[] = [
   { titel: 'Konto erstellen', text: 'zwei Minuten, genau hier' },
   { titel: 'Hof einrichten', text: 'Fotos, Abholzeiten, Produkte – in Ruhe' },
-  { titel: 'Zahlung einrichten', text: 'Stripe für Online-Zahlung – für SEPA ist jetzt nichts zu tun' },
+  { titel: ONLINE_ZAHLUNG_START_SCHRITT.titel, text: `${ONLINE_ZAHLUNG_START_KURZ}; für SEPA ist jetzt nichts zu tun` },
   { titel: 'Freischaltung', text: 'wir schauen kurz drüber, dann bist du online' },
 ]
 

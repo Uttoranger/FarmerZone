@@ -15,16 +15,19 @@ import {
   Kennzahlen,
   NaechsteAbholungKarte,
   Packliste,
+  StripeEinrichtenHinweis,
   StripeHinweis,
   TeilenKarte,
   WocheKarte,
 } from '@/components/heute/heute-teile'
 import { FreischaltMoment } from '@/components/heute/freischalt-moment'
+import { StartbildschirmKarte } from '@/components/heute/startbildschirm-karte'
 import { ERSTE_SCHRITTE_AUS_COOKIE, ersteSchritteAnzeige, ersteSchritteAusgeblendet } from '@/lib/erste-schritte'
-import { datumLang, heuteAufbau, teilenKarte, teilenSatz, vergleichText, type HeuteBlock } from '@/lib/heute'
+import { datumLang, heuteAufbau, teilenSatz, vergleichText, type HeuteBlock } from '@/lib/heute'
 import { freischaltMomentMoeglich } from '@/lib/freischalt-moment'
-import { hofAdresse } from '@/lib/mein-hof'
-import { APP_URL } from '@/lib/umgebung-server'
+import { getTeilenFensterDaten } from '@/server/queries/teilen-bild'
+import { getTeilenWirkung } from '@/server/queries/teilen-wirkung'
+import { letzteTage, teilenWirkungSatz } from '@/lib/teilen-wirkung'
 
 export const metadata: Metadata = {
   title: 'Heute — FarmerZone',
@@ -39,9 +42,11 @@ export const metadata: Metadata = {
  *
  * Packliste zuerst: Was wo steht, entscheidet heuteAufbau; Regeln und Zahlen
  * kommen aus src/lib/heute.ts und src/server/queries/heute.ts, hier wird nur
- * angeordnet. Ab 1280 px zwei Spalten (Hauptspalte links, Seitenspalte 360 px
- * rechts) — bei 1024 px neben der Seitenleiste wäre die Packliste zu schmal,
- * dort steht die Seitenspalte als Raster darunter.
+ * angeordnet. Oben höchstens EIN Kasten (Stripe), die Teilen-Zeile kompakt
+ * unter der Packliste (freigabe.md §12 Nr. 45). Ab 1280 px zwei Spalten
+ * (Hauptspalte links, Seitenspalte 360 px rechts) — bei 1024 px neben der
+ * Seitenleiste wäre die Packliste zu schmal, dort steht die Seitenspalte als
+ * Raster darunter.
  */
 export default async function HeutePage(): Promise<React.JSX.Element> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -50,35 +55,51 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   const farm = await getFarmForUser(session.user.id)
   if (!farm) redirect('/onboarding')
 
-  // Frist gilt beim Lesen: Verwaiste Bestellungen geben ihre Ware frei, bevor
-  // die Seite Bestand und Bestellungen zeigt (src/lib/fristen.ts). Fehler nur gemeldet.
-  await gibVerwaisteFreiOhneRisiko(farm.id)
-
   // Ein Zeitpunkt für die ganze Seite: Datum, Tag, Woche und Zeitfenster passen zusammen.
   const jetzt = new Date()
-  const heute = await getHeute(farm.id, jetzt)
+
+  // Frist gilt beim Lesen: Verwaiste Bestellungen geben ihre Ware frei, bevor
+  // die Seite Bestand und Bestellungen zeigt (src/lib/fristen.ts). Fehler nur
+  // gemeldet. Bewusst VOR der Antwort, nicht per after(): Packliste,
+  // „überfällig", „ausverkauft" und das Angebot der Teilen-Karte zeigten sonst
+  // eine verfallene Bestellung und ihre noch gebundene Ware. getHeute wartet
+  // nur mit diesen Abfragen auf die Freigabe, alle anderen laufen daneben
+  // (Nachtlauf Nr. 31); der Cookie ebenso.
+  const [heute, cookieJar] = await Promise.all([
+    getHeute(farm.id, jetzt, gibVerwaisteFreiOhneRisiko(farm.id, jetzt)),
+    cookies(),
+  ])
 
   // Der Cookie entscheidet auf dem Server, ob die Karte oder die Zeile
   // „Erste Schritte einblenden" kommt — so blitzt nichts auf und nichts rutscht nach.
-  const cookieJar = await cookies()
   const ersteSchritteZeigen = ersteSchritteAnzeige(
     heute.ersteSchritte,
     ersteSchritteAusgeblendet(cookieJar.get(ERSTE_SCHRITTE_AUS_COOKIE)?.value, farm.id)
   )
 
-  const teilen = teilenKarte({ sichtbar: heute.hof.sichtbar, abholtag: heute.abholfensterHeute !== null })
+  // Teilen nur, solange Kunden den Hof sehen und bei ihm bestellen können (heuteHofSichtbar).
+  const teilen = heute.hof.sichtbar
   const aufbau = heuteAufbau({
-    stripeHinweis: heute.onlinePausiert !== null,
+    // „pausiert" (Notbremse) oder „einrichten" (Register Z1) — nie beide; der eine Kasten oben, auch über dem Balken der Shell.
+    stripeHinweis: heute.onlinePausiert !== null || heute.stripeEinrichten,
     teilen,
     ersteSchritte: ersteSchritteZeigen === 'karte',
   })
   const satz = teilenSatz(heute.angebot, heute.naechstesFenster?.fenster ?? null)
-  const adresse = hofAdresse(APP_URL, farm.slug).anzeige
+  // Teilen-Fenster und „letzte Woche … über deine Links" (Nr. 21, Gate 7) —
+  // nur, wenn die Zeile überhaupt steht.
+  const [fenster, wirkung] = teilen
+    ? await Promise.all([getTeilenFensterDaten(farm.id, jetzt), getTeilenWirkung(farm.id, letzteTage(jetzt, 7))])
+    : [null, null]
+  const wirkungSatz = wirkung ? teilenWirkungSatz(wirkung) : null
 
   const bloecke: Record<HeuteBlock, ReactNode> = {
-    stripe: heute.onlinePausiert && <StripeHinweis barMoeglich={heute.onlinePausiert.barMoeglich} />,
-    'teilen-schmal': teilen && <TeilenKarte form="schmal" hofName={farm.name} hofSlug={farm.slug} satz={satz} adresse={adresse} />,
-    'teilen-gross': teilen && <TeilenKarte form="gross" hofName={farm.name} hofSlug={farm.slug} satz={satz} adresse={adresse} />,
+    stripe: heute.onlinePausiert ? (
+      <StripeHinweis barMoeglich={heute.onlinePausiert.barMoeglich} />
+    ) : (
+      heute.stripeEinrichten && <StripeEinrichtenHinweis />
+    ),
+    teilen: teilen && <TeilenKarte hofName={farm.name} hofSlug={farm.slug} satz={satz} fenster={fenster} wirkung={wirkungSatz} />,
     packliste: (
       <Packliste
         zeilen={heute.abholungen}
@@ -127,9 +148,13 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
             <ErsteSchritteSchalter richtung="ein" className="px-3" />
           </p>
         )}
+        {/* Ganz unten (Register N1): „Leg FarmerZone auf den Startbildschirm" —
+            nur im Browser, nicht in der installierten App; das entscheidet die
+            Karte selbst nach dem Mounten. */}
+        <StartbildschirmKarte />
       </div>
 
-      {freischaltMomentMoeglich({ approvedAt: heute.hof.approvedAt, sichtbar: heute.hof.sichtbar }, jetzt) && (
+      {freischaltMomentMoeglich(heute.hof, jetzt) && (
         <FreischaltMoment farmId={farm.id} hofName={farm.name} hofSlug={farm.slug} />
       )}
     </div>

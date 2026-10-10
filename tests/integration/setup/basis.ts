@@ -20,6 +20,8 @@ import { auth } from '@/lib/auth'
 import { neueFrist } from '@/lib/reservierung'
 import { kalendertagInWien } from '@/lib/servicegebuehr'
 import { tagVersetzt } from '@/lib/kalender'
+import { DB_BREMSEN, bremsSchluessel } from '@/lib/bremse-datenbank'
+import { env } from '@/lib/env'
 import type { Abgabe, Farm, Prisma, Product, User } from '@prisma/client'
 
 export const INT_PRAEFIX = 'int-'
@@ -98,8 +100,11 @@ export async function erstelleHofMitAnmeldung(
   const email = `${kennung}@example.com`
   const passwort = 'test-passwort-1234'
 
-  const angemeldet = await auth.api.signUpEmail({
-    body: { email, password: passwort, name: 'Max Mustermann' },
+  // Registrieren meldet seit Nr. 27 nicht mehr an (`autoSignIn: false`,
+  // Register F6 „19b") — die Sitzung kommt aus der Anmeldung danach.
+  await auth.api.signUpEmail({ body: { email, password: passwort, name: 'Max Mustermann' } })
+  const angemeldet = await auth.api.signInEmail({
+    body: { email, password: passwort },
     asResponse: true,
   })
   const cookie = angemeldet.headers
@@ -202,6 +207,8 @@ export function checkoutAnfrage(eingabe: {
   paymentMethod?: 'ONSITE_CASH' | 'ONSITE_CARD' | 'ONLINE'
   /** Abholtag JJJJ-MM-TT, Standard: morgen in Wien. */
   pickupDate?: string
+  /** Weitere Felder des Bodys, roh — auch ungültige (Teilen-Kanal, Nr. 21). */
+  zusatz?: Record<string, unknown>
 }): NextRequest {
   // Morgen im Wiener Kalender — so prüft der Checkout das Abholfenster.
   const datum = eingabe.pickupDate ?? morgenInWien()
@@ -221,6 +228,7 @@ export function checkoutAnfrage(eingabe: {
     kaeuferArt: eingabe.kaeuferArt ?? 'PRIVAT',
     betriebsnummer: eingabe.betriebsnummer,
     items: eingabe.positionen,
+    ...eingabe.zusatz,
   }
 
   return new NextRequest('http://localhost:3000/api/checkout', {
@@ -239,14 +247,23 @@ export function checkoutAnfrage(eingabe: {
  * kaskadierend am User.
  */
 export async function raeumeAuf(): Promise<void> {
-  await prisma.order.deleteMany({
-    where: {
-      OR: [
-        { farm: { slug: { startsWith: INT_PRAEFIX } } },
-        { customerEmail: { startsWith: INT_PRAEFIX } },
-      ],
-    },
-  })
+  const testBestellungen = {
+    OR: [{ farm: { slug: { startsWith: INT_PRAEFIX } } }, { customerEmail: { startsWith: INT_PRAEFIX } }],
+  } satisfies Prisma.OrderWhereInput
+  // Die Bremse je Bestellung (Neuigkeiten, Nr. 46 Runde 1) zählt mit der
+  // Bestell-ID im HMAC — ihre Zeilen tragen kein Präfix, deshalb über die
+  // Kennungen der Testbestellungen, bevor diese weg sind.
+  const kennungen = await prisma.order.findMany({ where: testBestellungen, select: { id: true } })
+  if (kennungen.length > 0) {
+    await prisma.rateLimitZaehler.deleteMany({
+      where: {
+        schluessel: {
+          in: kennungen.map(({ id }) => bremsSchluessel(env.BETTER_AUTH_SECRET, DB_BREMSEN.neuigkeitenBestellung.zweck, id)),
+        },
+      },
+    })
+  }
+  await prisma.order.deleteMany({ where: testBestellungen })
   await prisma.stockReservation.deleteMany({
     where: { sessionId: { startsWith: INT_PRAEFIX } },
   })

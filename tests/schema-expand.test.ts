@@ -3,10 +3,11 @@
  * kennt, darf die App noch nicht anbieten.
  *
  * Beweist:
- *   1. Die neuen Einheiten RAUMMETER/SCHUETTRAUMMETER und die vorbereiteten
- *      Brennmaterial-Arten stehen im Prisma-Enum, aber kein Formular bietet sie
- *      an und Zod nimmt sie nicht an — keine Verhaltensänderung vor Gate 6.
- *   2. Ein Link mit einer vorbereiteten Sorte filtert auf /hoefe nichts.
+ *   1. Die neuen Einheiten RAUMMETER/SCHUETTRAUMMETER und die Brennmaterial-
+ *      Arten stehen im Prisma-Enum. Bis Gate 6 bot sie kein Formular an; seit
+ *      Nr. 20 (Gate 6) sind sie wählbar — die Einheiten nur für Brennmaterial,
+ *      die Arten nur unter Brennholz.
+ *   2. Ein Link mit einer Brennmaterial-Art filtert seit Gate 6 auf /hoefe.
  *   3. TeilenAufruf hält nur Zähler: keine Spalte für Personen-, Geräte- oder
  *      IP-Daten (Invariante aus docs/umsetzungsprompt.md §5, S8) — mit
  *      Gegenprobe, dass die Suche anschlägt.
@@ -41,55 +42,62 @@ function block(art: 'enum' | 'model', name: string, quelle: string = SCHEMA): st
 
 const NEUE_EINHEITEN = ['RAUMMETER', 'SCHUETTRAUMMETER'] as const
 
-describe('Neue Einheiten: in der Datenbank, noch nicht wählbar', () => {
+describe('Neue Einheiten: seit Gate 6 (Nr. 20) wählbar, nur für Brennmaterial', () => {
   it('stehen im Prisma-Enum ProductUnit', () => {
     expect(block('enum', 'ProductUnit')).toEqual(expect.arrayContaining([...NEUE_EINHEITEN]))
   })
 
-  it('stehen weder in den Formular-Optionen noch in den von Zod angenommenen Werten', () => {
+  it('Zod nimmt sie an, das Formular bietet sie nur bei Brennholz an — nie bei Lebensmitteln, Futter oder Sonstigem', () => {
     const angenommen: readonly string[] = PRODUCT_UNIT_VALUES
     const optionen = UNIT_OPTIONS.map((u): string => u.value)
     const brennholz = unitOptionsFuer('BRENNHOLZ').map((u): string => u.value)
+    const eier = unitOptionsFuer('EIER').map((u): string => u.value)
+    const heu = unitOptionsFuer('HEU_STROH').map((u): string => u.value)
+    const sonstiges = unitOptionsFuer('SONSTIGES').map((u): string => u.value)
     for (const einheit of NEUE_EINHEITEN) {
-      expect(angenommen).not.toContain(einheit)
-      expect(optionen).not.toContain(einheit)
-      expect(brennholz).not.toContain(einheit)
+      expect(sonstiges).not.toContain(einheit)
+      expect(angenommen).toContain(einheit)
+      expect(optionen).toContain(einheit)
+      expect(brennholz).toContain(einheit)
+      expect(eier).not.toContain(einheit)
+      expect(heu).not.toContain(einheit)
     }
   })
 
-  it('ein Brennholz-Produkt in Raummetern wird abgelehnt', () => {
+  it('ein Brennholz-Produkt in Raummetern ist gültig', () => {
     const r = productFormSchema.safeParse({ name: 'Buche', price: 129, unit: 'RAUMMETER', category: 'BRENNHOLZ' })
-    expect(r.success).toBe(false)
+    expect(r.success).toBe(true)
   })
 
-  it('Gegenprobe: dasselbe Produkt im Big Bag ist gültig', () => {
-    const r = productFormSchema.safeParse({ name: 'Buche', price: 129, unit: 'BIGBAG', category: 'BRENNHOLZ' })
-    expect(r.success).toBe(true)
+  it('Gegenprobe: eine unbekannte Einheit wird abgelehnt', () => {
+    const r = productFormSchema.safeParse({ name: 'Buche', price: 129, unit: 'FESTMETER', category: 'BRENNHOLZ' })
+    expect(r.success).toBe(false)
   })
 })
 
-describe('Vorbereitete Brennmaterial-Arten: in der Datenbank, noch nicht wählbar', () => {
-  it('stehen im Prisma-Enum ProductSubcategory', () => {
-    expect(block('enum', 'ProductSubcategory')).toEqual(expect.arrayContaining([...VORBEREITETE_UNTERKATEGORIEN]))
+describe('Brennmaterial-Arten: seit Gate 6 (Nr. 20) unter Brennholz', () => {
+  it('stehen im Prisma-Enum ProductSubcategory, vorbereitet ist nichts mehr', () => {
+    expect(block('enum', 'ProductSubcategory')).toEqual(expect.arrayContaining(['BRENNHOLZ_SCHEIT', 'ANZUENDHOLZ', 'HACKSCHNITZEL']))
+    expect(VORBEREITETE_UNTERKATEGORIEN).toEqual([])
   })
 
-  it('Brennholz hat weiterhin keine Unterkategorien — kein Hinweis, keine Auswahl', () => {
-    expect(hatUnterkategorien('BRENNHOLZ')).toBe(false)
-    expect(unterkategorienVon('BRENNHOLZ')).toEqual([])
+  it('Brennholz hat die drei Arten als Unterkategorien', () => {
+    expect(hatUnterkategorien('BRENNHOLZ')).toBe(true)
+    expect([...unterkategorienVon('BRENNHOLZ')]).toEqual(['BRENNHOLZ_SCHEIT', 'ANZUENDHOLZ', 'HACKSCHNITZEL'])
   })
 
-  it.each(VORBEREITETE_UNTERKATEGORIEN)('Zod lehnt Brennholz mit %s ab', (l2) => {
-    const r = productFormSchema.safeParse({
-      name: 'Buche', price: 99, unit: 'BIGBAG', category: 'BRENNHOLZ', subcategory: l2,
-    })
-    expect(r.success).toBe(false)
-    if (!r.success) expect(r.error.issues.map((i) => i.path.join('.'))).toContain('subcategory')
+  it.each(['BRENNHOLZ_SCHEIT', 'ANZUENDHOLZ', 'HACKSCHNITZEL'] as const)('Zod nimmt Brennholz mit %s an — und lehnt die Art bei Gemüse ab', (l2) => {
+    const brennholz = productFormSchema.safeParse({ name: 'Buche', price: 99, unit: 'BIGBAG', category: 'BRENNHOLZ', subcategory: l2 })
+    expect(brennholz.success).toBe(true)
+    const gemuese = productFormSchema.safeParse({ name: 'Buche', price: 99, unit: 'KG', category: 'GEMUESE', subcategory: l2 })
+    expect(gemuese.success).toBe(false)
+    if (!gemuese.success) expect(gemuese.error.issues.map((i) => i.path.join('.'))).toContain('subcategory')
   })
 
-  it('ein Link mit einer vorbereiteten Sorte filtert auf /hoefe nichts', () => {
+  it('ein Link mit einer Brennmaterial-Art filtert auf /hoefe', () => {
     const filter = leseHoefeFilter(new URLSearchParams('kat=BRENNHOLZ&sorte=HACKSCHNITZEL'))
     expect(filter.kategorien).toEqual(['BRENNHOLZ'])
-    expect(filter.sorten).toEqual([])
+    expect(filter.sorten).toEqual(['HACKSCHNITZEL'])
   })
 })
 

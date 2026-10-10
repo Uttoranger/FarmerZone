@@ -54,12 +54,17 @@ function statischErreichbar(einstiege: string[]): Set<string> {
 
 const relativ = (menge: Set<string>) => [...menge].map((d) => (d.startsWith('paket:') ? d : path.relative(WURZEL, d).split(path.sep).join('/')))
 
+// Seit Nr. 22c liegt das Umfeld als „Preise vergleichen" auf /region, die
+// Auswertung in der HofShell — beide Seiten samt Layout dürfen Leaflet nicht
+// statisch erreichen.
 const AUSWERTUNG = [
   'src/app/layout.tsx',
-  'src/app/(farmer)/layout.tsx',
-  'src/app/(farmer)/loading.tsx',
-  'src/app/(farmer)/analytics/page.tsx',
-  'src/app/(farmer)/analytics/umfeld/page.tsx',
+  'src/app/(hof)/layout.tsx',
+  'src/app/(hof)/analytics/page.tsx',
+  'src/app/(hof)/analytics/loading.tsx',
+  'src/app/(hof)/analytics/umfeld/page.tsx',
+  'src/app/(hof)/region/page.tsx',
+  'src/app/(hof)/region/loading.tsx',
 ]
 
 describe('Umfeld-Karte — erst beim Umschalten geladen', () => {

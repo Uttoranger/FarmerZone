@@ -38,7 +38,6 @@ import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Segment } from '@/components/ui/segment'
 import HoefeKarussell from '@/components/hoefe/hoefe-karussell'
-import HoefeUmkreis from '@/components/hoefe/hoefe-umkreis'
 import { HoefeSuche } from '@/components/hoefe/hoefe-suche'
 import { BlattGruppe, EntdeckenFilterblatt } from '@/components/hoefe/entdecken-filterblatt'
 import {
@@ -429,15 +428,16 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
         </div>
         <div className="lg:hidden">{filterblatt}</div>
       </div>
+      {/* EIN Feld „Ort oder Produkt" plus „Standort nutzen" (Nr. 46, freigabe.md §12) —
+          vorher Produktsuche und darunter eine Karte mit eigenem Postleitzahl-Feld. */}
       <HoefeSuche
         suchtext={filter.suchtext}
         vorschlaege={vorschlaege}
         status={statusText}
+        treffer={anzahl}
+        bezugspunkt={bezugspunkt}
         onSuchtext={(wert) => setzeFilter({ suchtext: wert })}
         onUebernehmen={suchMarkeHinzufuegen}
-      />
-      <HoefeUmkreis
-        bezugspunkt={bezugspunkt}
         onBezugspunkt={setBezugspunkt}
         onAufheben={() => {
           setBezugspunkt(null)

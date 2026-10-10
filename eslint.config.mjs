@@ -21,12 +21,10 @@ const FARBLITERAL_BESTAND = [
   'src/app/(auth)/forgot-password/page.tsx',
   'src/app/(auth)/reset-password/page.tsx',
   'src/app/(hof)/settings/appearance/appearance-client.tsx',
-  'src/app/admin/finanzen/finanzen-diagramm.tsx',
   // Eckige Klammern sind im Muster Zeichenklassen — für den Ordner [id] maskieren.
   'src/app/api/status-image/\\[id\\]/route.tsx',
   'src/app/layout.tsx',
   'src/app/manifest.ts',
-  'src/components/cookie-banner.tsx',
   'src/components/farm/farm-page-view.tsx',
   'src/components/farm/product-grid.tsx',
   'src/components/farmer/farm-identity-card.tsx',

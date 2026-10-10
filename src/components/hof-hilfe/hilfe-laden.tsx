@@ -7,6 +7,8 @@
  * Zweitzeilen und Flächen.
  */
 
+import { UnterseitenKopfLaden } from '@/components/hofbereich/hof-laden'
+
 /** Meldung abgeben: Formular (640 px) links, ab lg die Seitenspalte rechts. */
 export const MELDEN_RAHMEN = 'mx-auto w-full max-w-[1040px] px-4 pt-5 pb-12 md:px-8 md:pt-7'
 
@@ -16,9 +18,9 @@ export const MELDUNGEN_RAHMEN = 'mx-auto w-full max-w-[900px] px-4 pt-5 pb-12 md
 export function MeldungAbgebenLaden(): React.JSX.Element {
   return (
     <div className={MELDEN_RAHMEN}>
+      <UnterseitenKopfLaden mitTitel={false} zeileImBrowser={false} />
       <div className="animate-pulse lg:flex lg:items-start lg:gap-8" aria-busy="true">
         <div className="flex min-w-0 flex-col gap-3.5 lg:w-[640px] lg:shrink-0">
-          <div className="h-11 w-40 rounded-full bg-muted md:hidden" />
           <div className="h-8 w-64 rounded-lg bg-border" />
           <div className="h-4 w-full max-w-md rounded bg-muted" />
           <div className="mt-1 h-3 w-28 rounded bg-muted" />

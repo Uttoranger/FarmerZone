@@ -18,8 +18,17 @@
  */
 import { LOW_STOCK_THRESHOLD } from '@/lib/dashboard-hints'
 
-/** Die eine Beschriftung des Aus-Zustands — nie eine zweite Fassung daneben. */
+/** Die eine Beschriftung des Aus-Zustands — nie eine zweite Fassung daneben.
+ *  Seit Register B2 (Nr. 28) auch Marke, Filter und Speichern-Knopf der
+ *  Produktliste, die vorher ein Wort für „halb fertig" trugen: Ein solches
+ *  Produkt ist nicht unfertig, es steht nur gerade nicht im Shop. */
 export const NICHT_IM_SHOP = 'Nicht im Shop'
+
+/** Dasselbe Wort mitten im Satz („12 auf Lager · nicht im Shop"). */
+export const NICHT_IM_SHOP_IM_SATZ = 'nicht im Shop'
+
+/** Der Speichern-Knopf beim Anlegen, wenn der Schalter „Im Shop" aus ist (B2). */
+export const SPEICHERN_NICHT_IM_SHOP = `Speichern (${NICHT_IM_SHOP_IM_SATZ})`
 
 /** Die Beschriftung des Schalters. Sie WECHSELT NICHT: Der Zustand steckt in
  *  der Schalterstellung, nicht im Text. Ein Text, der mitwandert, liest sich

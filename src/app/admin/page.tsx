@@ -1,75 +1,64 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
+import * as Sentry from '@sentry/nextjs'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import { getAdminFarms } from '@/server/queries/admin'
-import { zaehleZuEntscheiden } from '@/server/queries/meldung'
-import {
-  gruendungsplaetze,
-  vergebeneGruendungsplaetze,
-  MAX_GRUENDUNGSHOEFE,
-} from '@/lib/gruendungshof'
-import { AdminFarmList } from './admin-farm-list'
+import { getMeldungenFuerAdmin } from '@/server/queries/meldung'
+import { gruendungsplaetze, vergebeneGruendungsplaetze, MAX_GRUENDUNGSHOEFE } from '@/lib/gruendungshof'
+import { adminHofZeile } from '@/lib/admin-hoefe'
+import { MELDUNG_ART_LABEL, STATUS_ZU_ENTSCHEIDEN } from '@/lib/meldung'
+import { MELDUNG_ART_TON } from '@/lib/hof-hilfe'
+import { HoefeAnsicht, type AdminHof, type NeueMeldung } from '@/components/admin/hoefe-ansicht'
+import { ADMIN_RAHMEN, AdminFehler } from '@/components/admin/admin-teile'
 
 export const metadata: Metadata = { title: 'Admin — FarmerZone' }
+export const dynamic = 'force-dynamic'
 
-export default async function AdminPage() {
+/** So viele Meldungen zeigt „Neu im Briefkasten" am Handy — der Rest steht im Briefkasten. */
+const NEU_IM_BRIEFKASTEN = 3
+
+/*
+ * /admin — Höfe und Freischaltung in der AdminShell (Nachtlauf Nr. 22f).
+ * Die Shell kommt aus src/app/admin/layout.tsx; die Seite prüft trotzdem
+ * selbst und zuerst (verlangeAdminSeite, frisch aus der Datenbank).
+ */
+export default async function AdminPage(): Promise<React.JSX.Element> {
   await verlangeAdminSeite()
 
-  const [farms, zuEntscheiden] = await Promise.all([getAdminFarms(), zaehleZuEntscheiden()])
-  const wartend = farms.filter((f) => f.approvedAt === null).length
-
-  // Plätze serverseitig berechnen und als schlichte Zahlen weiterreichen: die
-  // Liste ist eine Client-Komponente und soll nicht selbst mit Datumswerten
-  // rechnen müssen.
-  const plaetze = gruendungsplaetze(farms)
-  const vergebenePlaetze = vergebeneGruendungsplaetze(farms)
-  const farmsMitPlatz = farms.map((f) => ({ ...f, gruendungsplatz: plaetze.get(f.id) ?? null }))
+  const jetzt = new Date()
+  let daten: { hoefe: AdminHof[]; vergeben: number; neu: NeueMeldung[] } | null = null
+  try {
+    const [farms, zuEntscheiden] = await Promise.all([
+      getAdminFarms(jetzt),
+      getMeldungenFuerAdmin({ status: [...STATUS_ZU_ENTSCHEIDEN], art: null }),
+    ])
+    // Plätze serverseitig: die Ansicht ist eine Client-Komponente und rechnet
+    // nicht selbst mit Datumswerten.
+    const plaetze = gruendungsplaetze(farms)
+    daten = {
+      hoefe: farms.map((f) => ({
+        ...adminHofZeile(f, { gruendungsplatz: plaetze.get(f.id) ?? null, maxPlaetze: MAX_GRUENDUNGSHOEFE }, jetzt),
+        aktivitaet: f.aktivitaet,
+      })),
+      vergeben: vergebeneGruendungsplaetze(farms),
+      neu: zuEntscheiden.slice(0, NEU_IM_BRIEFKASTEN).map((m) => ({
+        id: m.id,
+        art: MELDUNG_ART_LABEL[m.art],
+        artTon: MELDUNG_ART_TON[m.art],
+        titel: m.ersteZeile || '—',
+      })),
+    }
+  } catch (err) {
+    // Nur der Bereich — keine Hofnamen, keine Adressen.
+    Sentry.captureException(err, { tags: { bereich: 'admin', seite: 'hoefe' } })
+  }
 
   return (
-    <main className="min-h-screen bg-background px-4 py-8 md:px-6">
-      <div className="mx-auto max-w-4xl">
-        {/* Fehlerbriefkasten: der Zähler ist bewusst ein Link, kein Alarm. Er zählt,
-            was auf dich wartet — Neues und die Wunsch-Vorschläge der KI. */}
-        <Link
-          href="/admin/meldungen"
-          className="mb-5 flex min-h-11 items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-2.5 text-sm transition-colors hover:border-primary/40"
-        >
-          <span className="font-medium text-foreground">
-            {zuEntscheiden === 0
-              ? 'Keine Meldung wartet auf dich'
-              : zuEntscheiden === 1
-                ? '1 Meldung zu entscheiden'
-                : `${zuEntscheiden} Meldungen zu entscheiden`}
-          </span>
-          <span className="text-xs text-primary">Briefkasten →</span>
-        </Link>
-
-        {/* Finanzen: kein Zähler davor. „Ab wann trägt sich die Plattform?"
-            ist eine Frage, die man stellt, wenn man sie stellen will — kein
-            Posten, der auf Erledigung wartet. */}
-        <Link
-          href="/admin/finanzen"
-          className="mb-5 flex min-h-11 items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-2.5 text-sm transition-colors hover:border-primary/40"
-        >
-          <span className="font-medium text-foreground">Einnahmen und Kosten der Plattform</span>
-          <span className="text-xs text-primary">Finanzen →</span>
-        </Link>
-
-        <h1 className="text-xl font-semibold text-foreground mb-1">Höfe</h1>
-        <p className="text-sm text-muted-foreground mb-1">
-          {wartend === 0
-            ? 'Kein Hof wartet auf Freischaltung.'
-            : wartend === 1
-              ? '1 Hof wartet auf Freischaltung.'
-              : `${wartend} Höfe warten auf Freischaltung.`}
-        </p>
-
-        <p className="text-sm text-muted-foreground mb-6">
-          Gründungsplätze vergeben: {vergebenePlaetze} von {MAX_GRUENDUNGSHOEFE}
-        </p>
-
-        <AdminFarmList farms={farmsMitPlatz} vergebenePlaetze={vergebenePlaetze} />
-      </div>
-    </main>
+    <div className={ADMIN_RAHMEN}>
+      {daten ? (
+        <HoefeAnsicht hoefe={daten.hoefe} vergebenePlaetze={daten.vergeben} maxPlaetze={MAX_GRUENDUNGSHOEFE} neueMeldungen={daten.neu} />
+      ) : (
+        <AdminFehler titel="Höfe" satz="Wir konnten die Höfe gerade nicht laden." nochmal="/admin" />
+      )}
+    </div>
   )
 }

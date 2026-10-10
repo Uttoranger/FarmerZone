@@ -4,7 +4,7 @@ import { ThemeProvider } from 'next-themes'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/sonner'
 import { CookieBanner } from '@/components/cookie-banner'
-import { UmgebungsBanner } from '@/components/shared/umgebungs-banner'
+import { UmgebungsBanner, UmgebungsBannerLink } from '@/components/shared/umgebungs-banner'
 import { RueckwegMerker } from '@/components/shared/rueckweg-merker'
 import { UMGEBUNG, ZEIGE_UMGEBUNGSBANNER } from '@/lib/umgebung-server'
 import { metadatenBasis } from '@/lib/vorschaubild'
@@ -118,6 +118,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
             Wiedererkennung — rendert nichts Sichtbares und setzt nichts
             auf dem Gerät (deshalb auch nicht Teil des Cookie-Banners). */}
         <Analytics />
+        {/* „Zur echten Seite" (Testumgebung, Register Z3): sichtbar im Balken
+            oben, im DOM bewusst zuletzt — „Zum Inhalt springen" der Shells
+            bleibt so der erste Link der Seite. */}
+        <UmgebungsBannerLink />
       </body>
     </html>
   )

@@ -5,6 +5,8 @@ import { cookies, headers } from 'next/headers'
 import { createRateLimiter, getClientIp } from '@/lib/rate-limit'
 import { ANMELDECODE_RATE_LIMIT } from '@/lib/anmeldecode'
 import { erzeugeAnforderungsSperre } from '@/lib/anmeldecode-sperre'
+import { DB_BREMSEN, adressMerkmal, type DbBremse } from '@/lib/bremse-datenbank'
+import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
 import {
   BESTELLUNGEN_ANSICHT_SEKUNDEN,
   BESTELLUNGEN_COOKIE,
@@ -24,17 +26,29 @@ import { legeBestellCodeAn, pruefeBestellCode } from '@/server/bestellungen-find
  *
  * Bremsen wie bei der Anmeldung (src/lib/anmeldecode.ts): je IP 3 in der
  * Minute (Anfordern und Prüfen getrennt), je Adresse 5 Codes in 15 Minuten.
- * Wie alle Speicher-Grenzen nur in Produktion und je Instanz; die Grenze über
- * alle Instanzen sind die 5 Versuche je Code in der Datenbank (S4).
+ * Nur in Produktion, zweistufig (Register R1): erst der Speicher dieser
+ * Instanz, dann dieselben Grenzen über alle Instanzen in der Datenbank
+ * (src/server/bremse-datenbank.ts, fail-open). Dazu die 5 Versuche je Code in
+ * der Datenbank (S4).
  */
 
 const anfordernJeIp = createRateLimiter({ max: ANMELDECODE_RATE_LIMIT.max, windowMs: ANMELDECODE_RATE_LIMIT.window * 1000 })
 const pruefenJeIp = createRateLimiter({ max: ANMELDECODE_RATE_LIMIT.max, windowMs: ANMELDECODE_RATE_LIMIT.window * 1000 })
 const anfordernJeAdresse = erzeugeAnforderungsSperre()
 
-async function bremst(limiter: ReturnType<typeof createRateLimiter>): Promise<boolean> {
+/** true = gebremst. Erste Stufe im Speicher; nur wenn sie durchlässt, die Datenbank. */
+async function bremst(limiter: ReturnType<typeof createRateLimiter>, ueberAlle: DbBremse): Promise<boolean> {
   if (process.env.NODE_ENV !== 'production') return false
-  return !limiter.check(getClientIp(await headers()))
+  const ip = getClientIp(await headers())
+  if (!limiter.check(ip)) return true
+  return !(await bremseUeberAlleInstanzen([{ bremse: ueberAlle, merkmal: ip }]))
+}
+
+/** Codes je Adresse, ebenfalls zweistufig. */
+async function adresseGebremst(email: string): Promise<boolean> {
+  if (process.env.NODE_ENV !== 'production') return false
+  if (!anfordernJeAdresse.erlaubt(email)) return true
+  return !(await bremseUeberAlleInstanzen([{ bremse: DB_BREMSEN.bestellungenAdresse, merkmal: adressMerkmal(email) }]))
 }
 
 type Antwort = { ok: true } | { error: string; code: 'EINGABE' | 'ZU_VIELE' }
@@ -67,10 +81,10 @@ export async function fordereBestellCodeAn(input: unknown): Promise<Antwort> {
   }
   const { email } = geprueft.data
 
-  if (await bremst(anfordernJeIp)) return { error: bestellCodeFehlerText('ZU_VIELE'), code: 'ZU_VIELE' }
-  if (process.env.NODE_ENV === 'production' && !anfordernJeAdresse.erlaubt(email)) {
+  if (await bremst(anfordernJeIp, DB_BREMSEN.bestellungenAnfordernIp)) {
     return { error: bestellCodeFehlerText('ZU_VIELE'), code: 'ZU_VIELE' }
   }
+  if (await adresseGebremst(email)) return { error: bestellCodeFehlerText('ZU_VIELE'), code: 'ZU_VIELE' }
 
   const code = await legeBestellCodeAn(email)
 
@@ -107,7 +121,7 @@ export async function zeigeBestellungen(input: unknown): Promise<PruefAntwort> {
   }
   const { email, code } = geprueft.data
 
-  if (await bremst(pruefenJeIp)) return { error: bestellCodeFehlerText('ZU_VIELE'), code: 'ZU_VIELE' }
+  if (await bremst(pruefenJeIp, DB_BREMSEN.bestellungenPruefenIp)) return { error: bestellCodeFehlerText('ZU_VIELE'), code: 'ZU_VIELE' }
 
   const jetzt = new Date()
   const ergebnis = await pruefeBestellCode(email, code, jetzt)

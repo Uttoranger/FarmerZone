@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { unstable_rethrow } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { ladeOeffentlicheHoefe } from '@/server/queries/oeffentliche-hoefe'
+import { schonGemeldet } from '@/server/oeffentlich-lesen'
 import type { HofUebersichtEintrag } from '@/server/queries/farm'
 import { ENTDECKEN_KOPF } from '@/lib/hoefe-entdecken'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
@@ -39,7 +40,8 @@ async function ladeHoefe(): Promise<HofUebersichtEintrag[] | 'fehler'> {
   } catch (err) {
     // Nexts eigene Steuersignale gehören nicht in die Fehleranzeige.
     unstable_rethrow(err)
-    Sentry.captureException(err, { tags: { bereich: 'hoefe-entdecken' } })
+    // Einen Verbindungsabbruch hat die Wiederholung schon gemeldet (Nr. 47).
+    if (!schonGemeldet(err)) Sentry.captureException(err, { tags: { bereich: 'hoefe-entdecken' } })
     return 'fehler'
   }
 }

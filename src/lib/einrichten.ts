@@ -15,8 +15,13 @@
  *    bräuchte einen neuen Geldweg (Stripe SetupIntent), den es nicht gibt —
  *    ein Schritt, der nie fertig werden kann, ließe „Noch 1 Schritt" ewig
  *    stehen.
+ *
+ * Stripe-Pflicht (Register Z1): „Hof online stellen" — die Freischaltung —
+ * geht erst mit fertigem Stripe-Konto. Hier steht es nur als Zustand; die
+ * Schranke selbst sitzt im Server (freischaltSperre in approveFarmAction).
  */
 import { aufzaehlung } from '@/lib/hofseite-fortschritt'
+import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
 
 export type EinrichtenDaten = {
   /** Name aus dem Konto (User.name). */
@@ -166,8 +171,10 @@ export function einrichtenStand(daten: EinrichtenDaten): EinrichtenStand {
           id: 'zahlung',
           titel: 'Online-Zahlung einrichten',
           titelKurz: 'Online-Zahlung (Stripe)',
-          text: 'Über Stripe, dauert ca. 10 Minuten. Du brauchst IBAN und Ausweis.',
-          textKurz: 'ca. 10 Min. · IBAN und Ausweis bereitlegen',
+          // Wörtlich aus der Freigabe (Z1), eine Quelle in konditionen.ts.
+          text: ONLINE_ZAHLUNG_EINRICHTEN_SATZ,
+          // Auch am Handy der volle Satz — er ist der Grund für die Pflicht.
+          textKurz: ONLINE_ZAHLUNG_EINRICHTEN_SATZ,
           zustand: 'offen',
           aktion: { art: 'link', href: '/settings/payments', label: 'Mit Stripe einrichten', primaer: true },
         }
@@ -204,15 +211,27 @@ export function einrichtenStand(daten: EinrichtenDaten): EinrichtenStand {
           zustand: 'gesperrt',
           aktion: { art: 'link', href: '/verify', label: 'E-Mail bestätigen', primaer: false },
         }
-      : {
-          id: 'freischaltung',
-          titel: 'Prüfung und Freischaltung',
-          titelKurz: 'Freischaltung',
-          text: 'Wir schauen kurz drüber und melden uns per E-Mail – dann ist dein Hof öffentlich.',
-          textKurz: 'wir melden uns per E-Mail',
-          zustand: hof ? 'wartet' : 'gesperrt',
-          aktion: null,
-        }
+      : hof && !hof.stripeBereit
+        ? {
+            // Z1: Online geht ein Hof erst mit Stripe — dieselbe Reihenfolge
+            // wie freischaltSperre (erst die E-Mail, dann Stripe).
+            id: 'freischaltung',
+            titel: 'Prüfung und Freischaltung',
+            titelKurz: 'Freischaltung',
+            text: 'Geht erst mit eingerichteter Online-Zahlung – danach schauen wir drüber und schalten deinen Hof frei.',
+            textKurz: 'erst nach der Online-Zahlung',
+            zustand: 'gesperrt',
+            aktion: { art: 'link', href: '/settings/payments', label: ONLINE_ZAHLUNG_EINRICHTEN_TITEL, primaer: false },
+          }
+        : {
+            id: 'freischaltung',
+            titel: 'Prüfung und Freischaltung',
+            titelKurz: 'Freischaltung',
+            text: 'Wir schauen kurz drüber und melden uns per E-Mail – dann ist dein Hof öffentlich.',
+            textKurz: 'wir melden uns per E-Mail',
+            zustand: hof ? 'wartet' : 'gesperrt',
+            aktion: null,
+          }
 
   const schritte = [konto, hofSchritt, produkte, zahlung, sepa, freischaltung].map((s, i) => ({ ...s, nummer: i + 1 }))
   const zaehlend = schritte.filter((s) => s.zustand !== 'hinweis')

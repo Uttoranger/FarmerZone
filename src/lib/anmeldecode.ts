@@ -25,7 +25,9 @@ export const ANMELDECODE_MAX_VERSUCHE = 5
 /**
  * Better Auth bremst Anfordern und Prüfen je IP und Pfad. 3 je Minute: Wer
  * sich einmal vertippt, kommt durch; eine Schleife nicht. Im Speicher der
- * Instanz — die harte Grenze sind die 5 Versuche je Code in der Datenbank.
+ * Instanz; dieselbe Grenze zählt danach die Datenbank über alle Instanzen
+ * (Register R1, src/lib/bremse-datenbank.ts). Die harte Grenze je Code sind
+ * die 5 Versuche in der Verification-Zeile.
  */
 export const ANMELDECODE_RATE_LIMIT = { window: 60, max: 3 } as const
 
@@ -34,7 +36,8 @@ export const CODE_ERNEUT_WARTEZEIT_SEKUNDEN = ANMELDECODE_RATE_LIMIT.window
 
 /**
  * Höchstens so viele Codes je Adresse — gegen ein Postfach, das von vielen
- * IPs aus mit Codes zugeschüttet wird. Je Instanz, wie alle Speicher-Grenzen.
+ * IPs aus mit Codes zugeschüttet wird. Erst je Instanz im Speicher, dann über
+ * alle Instanzen in der Datenbank (Register R1).
  */
 export const CODE_ANFORDERUNGEN_JE_ADRESSE = { max: 5, fensterMs: 15 * 60_000 } as const
 
@@ -130,6 +133,26 @@ export function adresseBestaetigt(nutzer: { emailVerified?: boolean | null } | n
 /** Ein Kundinnen-Konto: Rolle CUSTOMER und kein Betreiber-Recht. Nur solche Konten erreichen /account. */
 export function kundinnenKonto(nutzer: { role?: string | null; isAdmin?: boolean | null } | null | undefined): boolean {
   return nutzer?.role === 'CUSTOMER' && nutzer.isAdmin !== true
+}
+
+/** Der Pfad der Code-Anmeldung in Better Auth (emailOTP). */
+export const CODE_ANMELDUNG_PFAD = '/sign-in/email-otp'
+
+/**
+ * Entfernt die Code-Anmeldung gerade das Passwort einer FREMDEN
+ * Alt-Registrierung (Register B3, Nr. 27)? Better Auth löscht beim ersten
+ * Code eines unbestätigten Kontos dessen Passwort-Konto
+ * (revokeUnprovenAccountAccess, emailOTP-Plugin) — ein Passwort an einem
+ * Konto, dessen Postfach niemand bewiesen hat, stammt von jemandem, der die
+ * Adresse registriert hat, ohne sie zu besitzen. Genau dann werden Name und
+ * Telefon geleert, die er hinterlassen hat (src/server/kontaktdaten-fremd.ts,
+ * dort mit der Bedingung „unbestätigt, CUSTOMER, kein Betreiber" in der
+ * WHERE-Klausel). Ein ruhendes Konto aus dem alten Checkout hat kein
+ * Passwort und bleibt unberührt; die Bestätigung eines Hofs per Link und
+ * „Konto löschen" sind andere Pfade.
+ */
+export function fremdesPasswortBeiCodeAnmeldung(e: { pfad: string | null | undefined; providerId: string }): boolean {
+  return e.pfad === CODE_ANMELDUNG_PFAD && e.providerId === 'credential'
 }
 
 /**

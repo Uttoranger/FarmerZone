@@ -1,10 +1,12 @@
 import { z } from 'zod'
 import type { AnzeigeBereich } from '@/lib/taxonomie'
 import { UMFELD_KM, type UmfeldKm } from '@/lib/umfeld'
+import { REGION_HREF } from '@/lib/bauern-navigation'
 
 /**
- * Umkreis, Bereich und Ansicht des Reiters „In der Nähe" (intern: Umfeld) in der URL
- * (`/analytics/umfeld?km=25&bereich=futter&ansicht=karte`), damit Reload und
+ * Umkreis, Bereich und Ansicht des Reiters „Preise vergleichen" (intern:
+ * Umfeld) in der URL (`/region?km=25&bereich=futter&ansicht=karte`, seit
+ * Nr. 22c; vorher /analytics/umfeld, das dorthin umleitet), damit Reload und
  * Zurück funktionieren — auch von der Hofseite zurück in die Karte (Konzept
  * Umfeld §4).
  *
@@ -55,10 +57,28 @@ export function leseUmfeldFilter(params: { km?: Roh; bereich?: Roh; ansicht?: Ro
 /**
  * Der Link auf den Reiter mit genau diesem Umkreis, Bereich und dieser
  * Ansicht. Umkreis und Bereich immer ausgeschrieben, die Ansicht nur, wenn es
- * die Karte ist — die Liste ist die Voreinstellung.
+ * die Karte ist — die Liste ist die Voreinstellung. „Preise vergleichen" ist
+ * der erste Reiter von /region und braucht deshalb kein `reiter=`.
  */
 export function umfeldLink(filter: { km: UmfeldKm; bereich: AnzeigeBereich; ansicht?: UmfeldAnsichtWahl }): string {
   const bereich = filter.bereich === 'FUTTERMITTEL' ? 'futter' : 'hofladen'
   const ansicht = filter.ansicht === 'karte' ? '&ansicht=karte' : ''
-  return `/analytics/umfeld?km=${filter.km}&bereich=${bereich}${ansicht}`
+  return `${REGION_HREF}?km=${filter.km}&bereich=${bereich}${ansicht}`
+}
+
+/**
+ * Wohin /analytics/umfeld umleitet (Nr. 22c, Gate 8 „alte URL leitet um"):
+ * /region mit genau den Angaben, die das Schema annimmt — Umkreis, Bereich,
+ * Karte. Was nicht passt, fällt weg (wie beim Lesen), damit ein alter Link
+ * nie etwas Fremdes in die neue Adresse trägt; ohne gültige Angabe bleibt es
+ * beim nackten /region.
+ */
+export function umfeldUmleitung(params: { km?: Roh; bereich?: Roh; ansicht?: Roh }): string {
+  const teile: string[] = []
+  const km = kmSchema.safeParse(erster(params.km))
+  const bereich = bereichSchema.safeParse(erster(params.bereich))
+  if (km.success) teile.push(`km=${km.data}`)
+  if (bereich.success) teile.push(`bereich=${bereich.data}`)
+  if (leseUmfeldAnsicht(params.ansicht) === 'karte') teile.push('ansicht=karte')
+  return teile.length ? `${REGION_HREF}?${teile.join('&')}` : REGION_HREF
 }

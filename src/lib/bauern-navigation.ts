@@ -272,20 +272,27 @@ export function ariaAktuell(pfad: string, punkt: NavPunkt): 'page' | 'true' | un
 //
 // Unterschiede zum Bestand, alle aus dem Mockup:
 //  - Handy: Produkte statt Mein Hof in der Leiste; Mein Hof steht in „Mehr".
-//  - „Verkauf und Kunden" bekommt „Region". Eine eigene Route /region gibt es
-//    erst mit Gate 8 — bis dahin führt der Punkt auf das heutige Umfeld.
+//  - „Verkauf und Kunden" bekommt „Region" — seit Nr. 22c (Gate 8) eine
+//    eigene Route /region mit den Reitern Preise vergleichen | Futter kaufen;
+//    das alte /analytics/umfeld leitet dorthin um.
 //  - „Beiträge" ist ein Reiter in Mein Hof (E12), kein eigener Punkt.
 //  - Das Neu-Menü fragt „Was legst du an?". Seit Nr. 18 bestimmt die Wahl
 //    Lebensmittel · Futtermittel · Brennmaterial das Formular (?bereich= am
 //    Anlegen-Auftrag, lib/url-auftrag.ts); darunter „Oder etwas anderes":
 //    Beitrag und Verkauf eintragen (E13).
 
+/**
+ * Die Adresse von „Region" (Nr. 22c) — EINE Quelle für den Punkt der Shell,
+ * die Reiter-Links und die Umleitung von /analytics/umfeld.
+ */
+export const REGION_HREF = '/region'
+
 /** Punkte der HofShell: die des Bestands plus „Region". */
 export type HofNavId = NavPunktId | 'region'
 
 export type HofNavPunkt = Omit<NavPunkt, 'id'> & { id: HofNavId }
 
-const REGION: HofNavPunkt = { id: 'region', label: 'Region', href: '/analytics/umfeld' }
+const REGION: HofNavPunkt = { id: 'region', label: 'Region', href: REGION_HREF }
 
 /** „Verkauf und Kunden" der HofShell — im Browser als Gruppe, am Handy in „Mehr". */
 const HOF_VERKAUF_UND_KUNDEN: readonly HofNavPunkt[] = [...VERKAUF_UND_KUNDEN, REGION]
@@ -294,6 +301,12 @@ export const HOF_NEU_TITEL = 'Was legst du an?'
 
 /** Die zweite Gruppe des Neu-Menüs (Mockup web-h2-neu-was-legst-du-an). */
 export const HOF_NEU_ANDERES_TITEL = 'Oder etwas anderes'
+
+/** Das Wort am Neu-Knopf: in der Seitenleiste und unter dem Plus der Unterleiste (freigabe.md §12 Nr. 45). */
+export const HOF_NEU_KNOPF = 'Neu'
+
+/** Der Name des Plus-Knopfs für Vorleser — beginnt mit dem sichtbaren Wort (WCAG 2.5.3 „Label in Name"). */
+export const HOF_NEU_KNOPF_NAME = `${HOF_NEU_KNOPF} erstellen`
 
 export type HofNeuId = 'lebensmittel' | 'futtermittel' | 'brennmaterial' | 'status-posten' | 'verkauf-eintragen'
 
@@ -307,16 +320,21 @@ export type HofNeuPunkt = {
 }
 
 /**
+ * „Neues Futtermittel" — das Formular mit Verkaufsgrößen (Nr. 20). Auch der
+ * Produktdialog verweist dorthin, wenn man in ihm ein Futtermittel anlegen will.
+ */
+export const FUTTER_ANLEGEN_HREF = '/products?neu=1&bereich=futter'
+
+/**
  * Das Neu-Menü (Browser: Aufklappmenü am Neu-Knopf und der Dialog hinter
  * „+ Neues Produkt", Handy: Blatt hinter dem Plus) — EINE Liste für alle drei.
- * Futtermittel und Brennmaterial führen bis Gate 6 (Nr. 20) in den
- * vorhandenen Produktdialog, der beide schon kann (Kennzeichnung, Brennholz):
- * Nichts geht verloren, und nichts verspricht Verkaufsgrößen, die es noch
- * nicht gibt.
+ * Seit Gate 6 (Nr. 20) öffnen Futtermittel und Brennmaterial die Formulare mit
+ * Verkaufsgrößen (src/components/produkte/futter-formular.tsx,
+ * brennmaterial-formular.tsx); Lebensmittel den Produktdialog.
  */
 export const HOF_NEU: readonly HofNeuPunkt[] = [
   { id: 'lebensmittel', label: 'Lebensmittel', satz: 'Eier, Gemüse, Fleisch, Brot, Honig …', href: '/products?neu=1&bereich=lebensmittel', gruppe: 'anlegen' },
-  { id: 'futtermittel', label: 'Futtermittel', satz: 'Heu, Stroh, Getreide, Silage', href: '/products?neu=1&bereich=futter', gruppe: 'anlegen' },
+  { id: 'futtermittel', label: 'Futtermittel', satz: 'Heu, Stroh, Getreide, Silage', href: FUTTER_ANLEGEN_HREF, gruppe: 'anlegen' },
   { id: 'brennmaterial', label: 'Brennmaterial', satz: 'Brennholz, Anzündholz, Hackschnitzel', href: '/products?neu=1&bereich=brennmaterial', gruppe: 'anlegen' },
   { id: 'status-posten', label: 'Neuer Beitrag', satz: 'Neuigkeit auf deiner Hofseite', href: '/status/new', gruppe: 'anderes' },
   { id: 'verkauf-eintragen', label: 'Verkauf eintragen', satz: 'Was du am Hof oder am Markt verkauft hast', href: '/sales?neu=1', gruppe: 'anderes' },
@@ -379,4 +397,105 @@ export function hofMehrAktiv(pfad: string): boolean {
 export function hofAriaAktuell(pfad: string, punkt: HofNavPunkt): 'page' | 'true' | undefined {
   if (hofAktiverPunkt(pfad) !== punkt.id) return undefined
   return pfad === punkt.href.split('?')[0] ? 'page' : 'true'
+}
+
+// ─── Rückweg auf Unterseiten (Nachtlauf Nr. 44, Register N1) ────────────────
+//
+// Am Handy hat jede Unterseite des Hofbereichs einen festen Kopf mit dem Weg
+// zur Elternseite (components/hofbereich/unterseiten-kopf.tsx). Wohin er führt
+// und wie er heißt, steht nur hier — aus denselben Punkten wie Leiste und
+// Mehr-Blatt, damit es keine zweite Schreibweise gibt („‹ Alle Kunden",
+// „Zu den Beiträgen" und „Meine Meldungen" hießen vorher je Seite anders).
+
+/** Wohin der Rückweg einer Unterseite führt und wie die Elternseite heißt. */
+export type Elternseite = { href: string; name: string }
+
+/** Der sichtbare Name steht neben dem Pfeil; der Screenreader hört „Zurück zu …". */
+export const RUECKWEG_PRAEFIX = 'Zurück zu'
+
+function alsElternseite(punkt: { href: string; label: string }): Elternseite {
+  return { href: punkt.href, name: punkt.label }
+}
+
+function navPunkt(id: NavPunktId): NavPunkt {
+  const punkt = ALLE.find((p) => p.id === id)
+  if (!punkt) throw new Error(`Kein Punkt „${id}"`)
+  return punkt
+}
+
+function beitraegeReiter(): MeinHofReiter {
+  const reiter = MEIN_HOF_REITER_HOFBEREICH.find((r) => r.id === 'beitraege')
+  if (!reiter) throw new Error('Kein Reiter „Beiträge"')
+  return reiter
+}
+
+/**
+ * Die Unterseiten mit Rückweg (freigabe.md §12 Nr. 44). Ein Muster je Route,
+ * genau so tief wie die Route — /orders/today/print (Druckansicht ohne
+ * HofShell) trifft deshalb nichts. /analytics/umfeld leitet seit Nr. 22c auf
+ * /region um und zeigt den Kopf nie; die Zuordnung bleibt trotzdem, wie sie
+ * beauftragt ist.
+ */
+const UNTERSEITEN: readonly { muster: RegExp; eltern: () => Elternseite }[] = [
+  { muster: /^\/settings\/.+$/, eltern: () => alsElternseite(navPunkt('einstellungen')) },
+  { muster: /^\/customers\/[^/]+$/, eltern: () => alsElternseite(navPunkt('kunden')) },
+  { muster: /^\/orders\/[^/]+$/, eltern: () => alsElternseite(navPunkt('bestellungen')) },
+  { muster: /^\/status\/new$/, eltern: () => alsElternseite(beitraegeReiter()) },
+  { muster: /^\/status\/[^/]+\/send-whatsapp$/, eltern: () => alsElternseite(beitraegeReiter()) },
+  { muster: /^\/status\/plakat$/, eltern: () => alsElternseite(navPunkt('heute')) },
+  { muster: /^\/fehler-melden$/, eltern: () => alsElternseite(navPunkt('hilfe')) },
+  { muster: /^\/analytics\/umfeld$/, eltern: () => alsElternseite(navPunkt('auswertung')) },
+]
+
+/** Nur der Pfad: ohne Suche, Anker und abschließenden Schrägstrich. */
+function nurPfad(pfad: string): string {
+  const ohne = pfad.split(/[?#]/)[0]
+  return ohne.length > 1 ? ohne.replace(/\/+$/, '') : ohne
+}
+
+/**
+ * Die Elternseite zu einem Pfad — null für alles, was keine Unterseite ist:
+ * Seiten der Leiste und des Mehr-Blatts haben keinen Rückweg (dorthin führt
+ * die Navigation selbst), ebenso unbekannte Pfade.
+ */
+export function elternseite(pfad: string | null | undefined): Elternseite | null {
+  if (!pfad) return null
+  const reiner = nurPfad(pfad)
+  return UNTERSEITEN.find((u) => u.muster.test(reiner))?.eltern() ?? null
+}
+
+/** Der Toast nach erfolgreichem Speichern einer Einstellungs-Unterseite. */
+export const GESPEICHERT_TEXT = 'Gespeichert'
+
+/**
+ * Abholzeiten legt man meist mehrere nacheinander an und schaltet sie einzeln
+ * — die Seite bleibt nach dem Speichern offen (freigabe.md §12 Nr. 44).
+ */
+const BLEIBT_NACH_SPEICHERN: readonly string[] = ['/settings/pickup-slots']
+
+/**
+ * Wohin eine Seite nach erfolgreichem Speichern führt (Register N1:
+ * Einstellungs-Unterseiten zurück zur Übersicht). null = sie bleibt — auch
+ * jeder Pfad außerhalb von /settings, etwa derselbe Baustein im
+ * Hofseiten-Editor auf /farm-page.
+ */
+export function zielNachSpeichern(pfad: string | null | undefined): string | null {
+  if (!pfad) return null
+  const reiner = nurPfad(pfad)
+  if (BLEIBT_NACH_SPEICHERN.includes(reiner)) return null
+  const eltern = elternseite(reiner)
+  return eltern && eltern.href === navPunkt('einstellungen').href ? eltern.href : null
+}
+
+/**
+ * Einstellungs-Unterseiten, die auch außerhalb der Übersicht verlinkt werden
+ * — Name und Ziel hier, die Übersicht (lib/hof-einstellungen.ts) und die
+ * Seitentitel nehmen dieselben.
+ */
+export const EINSTELLUNG_MEIN_AUFTRITT = { label: 'Mein Auftritt', href: '/settings/appearance' } as const
+export const EINSTELLUNG_KONTO = { label: 'Konto und Sicherheit', href: '/settings/account' } as const
+
+/** „Einstellungen → Mein Auftritt" — der Weg in Worten, wie ihn das Hof-Profil nennt. */
+export function einstellungsWeg(unterseite: { label: string }): string {
+  return `${navPunkt('einstellungen').label} → ${unterseite.label}`
 }

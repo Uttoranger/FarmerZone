@@ -74,6 +74,12 @@ export function tagVersetzt(kalendertag: string, tage: number): string {
   return new Date(Date.UTC(j, m - 1, t + tage)).toISOString().slice(0, 10)
 }
 
+/** Der Wochentag eines Kalendertags JJJJ-MM-TT, 0 = Sonntag wie `PickupSlot.dayOfWeek` — ohne Zeitzone. */
+export function wochentagVon(kalendertag: string): number {
+  const [j, m, t] = kalendertag.split('-').map(Number)
+  return new Date(Date.UTC(j, m - 1, t)).getUTCDay()
+}
+
 /** Der Montag der Woche, in der `moment` in Wien liegt, als JJJJ-MM-TT. */
 export function wienWochenMontag(moment: Date): string {
   const tag = wienKalendertag(moment)

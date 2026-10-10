@@ -14,6 +14,8 @@
 // als Literal in eine Seite. Eine Zahl, die an zwei Orten steht, steht früher
 // oder später verschieden da — und bei Konditionen ist das kein Schönheitsfehler.
 
+import { ONLINE_ZAHLUNG_START_SCHRITT } from '@/lib/konditionen'
+
 export const MAX_GRUENDUNGSHOEFE = 12
 
 /** Ende der gebührenfreien Gründungsphase (einschließlich dieses Tages). */
@@ -75,8 +77,9 @@ export const GRUENDUNGS_ZAHLUNGSGEBUEHREN =
   'Barzahlung bei Abholung ist gebührenfrei. Die aktuellen Sätze siehst du beim ' +
   'Einrichten der Online-Zahlung, bevor du sie aktivierst.'
 
-/** Der Weg auf die Plattform, in drei Schritten — durchgängig automatisch,
- *  nur die Freischaltung selbst ist ein bewusster Handgriff des Betreibers. */
+/** Der Weg auf die Plattform, in vier Schritten — durchgängig automatisch,
+ *  nur die Freischaltung selbst ist ein bewusster Handgriff des Betreibers.
+ *  Die Online-Zahlung gehört zum Start (Register Z1), Satz aus konditionen.ts. */
 export const GRUENDUNGS_AUFNAHME_SCHRITTE = [
   {
     titel: 'Registrieren',
@@ -86,6 +89,7 @@ export const GRUENDUNGS_AUFNAHME_SCHRITTE = [
     titel: 'Hof einrichten',
     text: 'Produkte, Fotos, Abholzeiten. Alles geht schon vor der Freischaltung, in Ruhe.',
   },
+  ONLINE_ZAHLUNG_START_SCHRITT,
   {
     titel: 'Freischaltung',
     text: 'Der Betreiber prüft kurz — du bekommst automatisch eine E-Mail, sobald dein Hof öffentlich ist.',

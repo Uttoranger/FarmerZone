@@ -56,6 +56,9 @@ export type AdminMeldungZeile = {
   diagKennung: string | null
   clusterKey: string | null
   sprintName: string | null
+  /** Für die Zeile „woher" (Nr. 22f) — gezeigt nur als Pfad bzw. Gerät in Worten. */
+  seiteUrl: string
+  userAgent: string
 }
 
 export type AdminMeldungFilter = { status: MeldungStatus[]; art: MeldungArt | null }
@@ -94,6 +97,8 @@ export async function getMeldungenFuerAdmin(filter: AdminMeldungFilter): Promise
       diagKennung: true,
       clusterKey: true,
       sprintName: true,
+      seiteUrl: true,
+      userAgent: true,
       farm: { select: { name: true } },
     },
   })
@@ -109,7 +114,49 @@ export async function getMeldungenFuerAdmin(filter: AdminMeldungFilter): Promise
     diagKennung: z.diagKennung,
     clusterKey: z.clusterKey,
     sprintName: z.sprintName,
+    seiteUrl: z.seiteUrl,
+    userAgent: z.userAgent,
   }))
+}
+
+/**
+ * Meldungen je Status — die Zahlen hinter den Filtern des Briefkastens
+ * (Nr. 22f). Eine gruppierte Abfrage über den Index auf status; mit Art-Filter
+ * zählt sie nur diese Art, damit Chip und Liste dasselbe sagen.
+ */
+export async function zaehleMeldungenJeStatus(art: MeldungArt | null): Promise<Partial<Record<MeldungStatus, number>>> {
+  const gruppen = await prisma.meldung.groupBy({
+    by: ['status'],
+    where: art ? { art } : {},
+    _count: { _all: true },
+  })
+  const zahlen: Partial<Record<MeldungStatus, number>> = {}
+  for (const g of gruppen) zahlen[g.status] = g._count._all
+  return zahlen
+}
+
+/**
+ * Die Nachbarn einer Meldung für „‹ Vorige" und „Nächste ›" (Nr. 22f): über
+ * ALLE Meldungen, neueste zuerst — der Filter des Briefkastens gilt hier
+ * nicht (das Detail kennt ihn nicht). Die vorige ist die nächst jüngere, die
+ * nächste die nächst ältere; bei gleichem Zeitpunkt entscheidet die Kennung,
+ * damit keine übersprungen wird. Nur Kennungen, nichts zum Anzeigen.
+ */
+export async function getMeldungNachbarn(meldung: { id: string; createdAt: Date }): Promise<{ vorige: string | null; naechste: string | null }> {
+  const zeit = meldung.createdAt
+  const [juenger, aelter] = await Promise.all([
+    prisma.meldung.findFirst({
+      where: { OR: [{ createdAt: { gt: zeit } }, { createdAt: zeit, id: { gt: meldung.id } }] },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: { id: true },
+    }),
+    prisma.meldung.findFirst({
+      where: { OR: [{ createdAt: { lt: zeit } }, { createdAt: zeit, id: { lt: meldung.id } }] },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: { id: true },
+    }),
+  ])
+  return { vorige: juenger?.id ?? null, naechste: aelter?.id ?? null }
 }
 
 /**

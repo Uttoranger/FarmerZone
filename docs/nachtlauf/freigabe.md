@@ -189,3 +189,244 @@ Nach Gate 7 (`TeilenAufruf` aus #169, Paket `qrcode` erlaubt, siehe §3).
 
 ### 22f Admin
 In eine eigene AdminShell nach den admin-Mockups. Freischalten bleibt gesperrt ohne Stripe; keine Nummernprüfung (E9).
+
+## 10. Lauf 6 (07.10.2026, uttoranger)
+
+Freigabe im Chat erteilt (Mensch: uttoranger, 07.10.2026). Entscheidungen dazu im Register: E10a, E11 (Label), E12 (Stand), F6, F7, B2–B4, Z1, T1, O1, O3–O5, Backlog.
+
+- **Haltepunkt: 33.**
+- **Reihenfolge (fest):** 23 → 24 → 25 → 26 → 27 → 28 → 29 → 30 → 31 → 32 → 33.
+- **Migrationen:** nur bei Nr. 30, nur Expand (neue Spalten mit Default oder nullable), erzeugt nach Regel 3 in `docs/nachtlauf.md`, im Morgenbericht hervorheben. Entsteht bei einer anderen Nummer eine Migration: STOPP.
+- **Nach Fixes im Geld- oder Sicherheitspfad** (23, 24, 27, 32) eine kurze Nachprüfung des Fix-Commits.
+- **PRs mit offener Vorbedingung** bleiben Entwurf.
+- **Konflikte:** in Doku mechanisch lösen; in Code diese Nummer stoppen, melden und mit der nächsten unabhängigen weitermachen.
+- **NICHT anfassen:** O4 (AGB werden separat erstellt). Backlog (Register) gehört nicht in diesen Lauf.
+- Mockup-Abweichungen aus Lauf 5 (#192–#201) sind freigegeben (F7).
+
+### 23 #198 Nachtrag Futter (Branch `nacht/2026-10-06/20-futter-brennmaterial`)
+- Pflicht-Haken im Futter-Formular (Web, Handy) mit dem Wortlaut aus E10a. Serverseitig erzwingen, auch über Produktfamilie und Kategoriewechsel; Zeitpunkt in `FutterKennzeichnung.bestaetigtAm`; jede inhaltliche Änderung verlangt eine erneute Bestätigung.
+- Kopfhinweis über den sieben Fällen (Wortlaut E10a) mit Link zur BAES-Seite für Futtermittelbetriebe.
+- Kundenseite bei jedem Futter (Produktdetail, Größenkacheln, Warenkorb mit Futter): Verantwortungs-Hinweis aus E10a, bei „nur an Betriebe" der Zusatz. Texte aus einer Quelle.
+- E11-Label „Brennmaterial".
+- Danach Entwurf aufheben.
+
+### 24 Z1 Stripe-Pflicht und #201 auf `main` (neuer Branch von `main`)
+- Code aus `nacht/2026-10-06/22f-admin` übernehmen (cherry-pick oder merge, kein Force-Push). `freischaltSperre` sperrt immer ohne `stripeAccountReady`; Label „Nur bar" entfernen; Kennzeichen „Stripe fehlt" für freigeschaltete Höfe ohne Stripe. #201 schließen mit Verweis auf den neuen PR.
+- Einstellungen: Wahl „nur bar" entfernen; der Server lehnt `acceptsOnline = false` von Höfen ab; Notbremse unverändert.
+- Einrichten: „Hof online stellen" erst mit Stripe, Text „Damit deine Kundinnen auch mit Karte, Apple Pay oder EPS zahlen können, richte bitte die Online-Zahlung ein. Dauert etwa 10 Minuten." Heute: deutlicher Hinweis „Online-Zahlung einrichten" für freigeschaltete Höfe ohne Stripe. Keine Abschaltung.
+- Öffentliche Texte (`/fuer-hoefe`, `/konditionen`, Registrieren): Stripe-Einrichtung als Teil des Starts nennen, keine Bar-Option für Höfe andeuten. Texte aus `konditionen.ts`.
+
+### 25 #199 Teilen nach T1 (Branch `nacht/2026-10-06/21-teilen`, vorher den neuen Stand von 20 hineinholen)
+- Browser-Speicher entfernen (`teilen-herkunft.ts` und Aufrufer), Besuchszählung serverseitig über `?k=`, keine Bestell-Zuordnung, Texte „ohne Cookies" prüfen.
+- Danach Entwurf aufheben.
+
+### 26 #200 Auswertung und Region (Branch `nacht/2026-10-06/22c-auswertung-region`, vorher 21 hineinholen)
+- Euro-Betrag in der Teilen-Karte weg (T1), Zählregel wie Admin, Rest unverändert.
+- Slug `region` ist in Produktion frei (geprüft 07.10.2026).
+- Danach Entwurf aufheben.
+
+### 27 Konto und Geld, klein (Branch von `main`)
+19c Vollerstattung mit Merkmalen · 19b gleiche Antwort und Mail an das bestehende Konto · B3 · B4.
+
+### 28 Oberfläche und Wortwahl (Branch von `main`)
+B2 · 22a · 22b (Wortwahl, Knopf am Handy) · 22e (Kurznummer, „N per E-Mail") · O1 Fehler-Farbe · 19a `/konditionen` stündlich neu bauen.
+
+### 29 22c „Betrieb" bei Futter kaufen vorbelegen (gestapelt auf 26)
+
+### 30 Teilen-Momente „gespeichert" und Abschalten in den Einstellungen (gestapelt auf 25)
+Migration erlaubt: nur Expand (neue Spalten mit Default oder nullable), nach Regel 3, im Morgenbericht hervorheben.
+
+### 31 Tab-Wechsel im Hofbereich beschleunigen (Branch von `main`)
+Befund (Messung 06.10.2026): Server-Rechenzeit gering (Sentry p50 7–35 ms, `/dashboard` ~315 ms), aber jeder Produktionsaufruf zeigt das Modul-Log „[E-Mail] Init" → nahezu jeder Tab-Wechsel ist ein Kaltstart; ohne `loading.tsx` gibt es weder sofortige Rückmeldung noch Vorladen.
+- `loading.tsx` für jede Route in `(hof)`, als Rückfall für die Gruppe, sowie für `(farmer)`- und `/admin`-Routen ohne eigene; Skeletons nach DESIGN_SYSTEM.md in den Abmessungen der echten Seite.
+- E-Mail-, Stripe- und andere schwere Module nur dort und erst bei Bedarf laden (dynamischer Import in Versandfunktionen bzw. Actions); kein Seitenmodul zieht sie über Sammel-Importe mit. Modul-Log „[E-Mail] Init" entfernen.
+- `/dashboard`: unabhängige Abfragen mit `Promise.all`; Freigabe verwaister Bestellungen nicht blockierend vor dem Rendern, wenn fachlich zulässig (sonst begründen).
+- Im PR belegen: Bundle-Größe der Hof-Routen vorher/nachher aus `next build` und die Zahl der Module, die `/orders` beim Start lädt.
+
+### 32 Altlasten aus Morgenbericht Lauf 5 §5 (Branch von `main`)
+`revertPickedUp` korrigieren · `Number(...)` für Geld in `queries/orders.ts` und im Servicegebühr-Dialog durch Int-Cent ersetzen · `status-posts.ts`: Zod an allen Actions, Besitzprüfung im selben Schreibvorgang statt per vorgelagertem `findFirst` · 36-px-Felder in „Mein Auftritt" auf mindestens 44 px. Tests je Punkt.
+
+### 33 Datenschutzerklärung auf Sachstand bringen (Branch von `main`)
+Nur Tatsachen korrigieren, keine neuen Rechtsformulierungen: Anmeldung per Code statt Link; kein automatisches Kundenkonto (E8); Teilen zählt nur Besuche, ohne Speicher im Browser (T1); Stripe als Zahlungsdienst; Sentry; Aufbewahrung von Bestelldaten. Jede geänderte Stelle im Bericht auflisten, damit der Mensch sie rechtlich prüfen lassen kann.
+
+### Morgenbericht (`morgenbericht-<datum>-lauf6.md`)
+Je PR: Vorschau-Link, „enthält Migration: ja/nein", Basis, Merge-Reihenfolge (Merge-Commit, nicht Squash), „Für dich zu tun" (u. a. Heu-Produkte bestätigen, Höfe ohne Stripe ansprechen, Stripe-Events `refund.failed` und `charge.refund.updated`, EPS/Apple Pay/Google Pay, geänderte Stellen der Datenschutzerklärung prüfen lassen).
+
+## 11. Lauf 7 (uttoranger, im Chat erteilt)
+
+Entscheidungen im Register: S11, D1, R1, G3 (Sammel-PR).
+
+- **Haltepunkt:** der Sammel-PR (`integration/lauf7`).
+- **Reihenfolge (fest):** 34 (danach ggf. 34a, 34b … für Fehler aus dem Probelauf) → 35 → 36 → 37 → 38 → 39 → 40 → Sammel-PR.
+- **Vor jeder neuen Nummer** `origin/main` hineinholen.
+- **Migrationen:** nur bei 38 und 40, nur Expand, nach Regel 3. Entsteht anderswo eine: STOPP.
+- **Nachprüfung des Fix-Commits** nach Fixes im Geld- oder Sicherheitspfad (34a ff., 35, 37, 38, 40).
+- **In 34 niemals Produktion oder Live-Schlüssel.**
+- **Konflikte in Code:** diese Nummer stoppen, melden, mit der nächsten unabhängigen weitermachen.
+- **Checkliste je PR** (im PR-Text abhaken):
+  - [ ] Register und Freigabe decken den Inhalt ab
+  - [ ] `origin/main` vor dem Push hineingeholt
+  - [ ] `pnpm typecheck`, `pnpm lint` (kein neuer Befund), `pnpm test` grün
+  - [ ] `pnpm test:integration` grün, wenn Datenbank berührt
+  - [ ] Migration: ja/nein; wenn ja, nur Expand, SQL im PR-Text
+  - [ ] Geld nur als Int-Cent, Beträge nur serverseitig berechnet
+  - [ ] Keine personenbezogenen Daten oder Secrets in Code, Logs, Tests
+  - [ ] Neue Seiten: `loading.tsx`, beide Themes, 390 und 1440 px, Axe ohne Fehler, Touch-Ziele ≥ 44 px
+  - [ ] Texte aus einer Quelle, Deutsch, per Du
+  - [ ] `tester` und `pruefer` gelaufen, Befunde erledigt oder begründet
+  - [ ] Entwurf, wenn eine Vorbedingung offen ist
+
+### 34 Automatischer Probelauf (Gate 9a) als E2E-Tests in `tests/e2e/`
+- **Vorbedingung:** Die Vorschau-Umgebung nutzt die Entwicklungsdatenbank und Stripe im **Testmodus**. Ohne Werte auszugeben prüfen, dass der Stripe-Schlüssel der Vorschau mit `sk_test_` beginnt. Sonst: STOPP, Nummer 34 überspringen und melden. Niemals Live-Schlüssel, niemals Produktion.
+- Testhof im Stripe-Testmodus mit verbundenem Konto (per API im Testmodus anlegen oder vorhandenes nutzen), Seed-Daten aus `seed-daten.ts`.
+- Abläufe: (1) Online mit Testkarte, auch 3-D-Secure; (2) Wallet — falls im Browser nicht möglich, begründet auslassen; (3) EPS im Testmodus; (4) Bar ohne Servicegebühr (B1) mit Bestätigungsknopf; (5) Bar unbestätigt → nach Frist freigegeben (Zeit im Test vorstellen); (6) Futter mit Größe inkl. Hinweis „Angaben stammen vom Hof"; (7) Artikel fehlt bei Online-Bestellung → Teilerstattung; (8) Storno online → Vollerstattung mit Transfer-Rückbuchung; (9) abgeholt und „nicht abgeholt"; (10) Bestellungen finden per Code; (11) Produkt am Handy-Viewport anlegen und Teilen-Fenster öffnen; (12) QR-Plakat erzeugt eine gültige Hofseiten-Adresse mit `?k=qr`.
+- Je Ablauf gegen die Stripe-Test-API prüfen: `application_fee_amount`, Transfer-Betrag, Erstattung und Rückbuchung stimmen exakt mit den Beträgen in der Datenbank und der Anzeige überein.
+- Bericht `docs/nachtlauf/berichte/34.md`: Tabelle je Ablauf (bestanden/Fehler/ausgelassen mit Grund), Screenshots lokal unter `.nachtlauf/`.
+- Gefundene Fehler NICHT in 34 beheben: je Fehler eine eigene Nummer 34a, 34b … direkt nach 34, mit Test, der den Fehler zeigt.
+
+### 35 Altlasten aus Lauf 6 §6
+`bestellSummen` mit Int-Cent statt `Math.round(Zahl * 100)` · `percent` im Servicegebühr-Schema ohne `z.coerce` · `revertReady` verschickt die Mail nach der Antwort · `linkedProductIds` in Beiträgen gegen den eigenen Hof prüfen · Knöpfe unter 44 px in „Mein Auftritt" · `farm-page-view` zeigt Online-Zahlung nach `stripeAccountReady` und `acceptsOnline` (Z1), nicht nur nach `acceptsOnline`.
+
+### 36 BAES-Angaben
+`BAES_FUTTERMITTEL_URL` auf https://baes.gv.at/en/admission/feed/faq-feed, dazu Kontakt futtermittel@baes.gv.at und +43 5 0555 33216 im Kopfhinweis. **Ausnahme zu CLAUDE.md („keine echten E-Mails/Telefonnummern im Code"):** Das ist der öffentliche Kontakt einer Behörde für Kundinnen und Höfe, keine personenbezogene Angabe; vom Menschen in der Freigabe ausdrücklich verlangt. Die Werte stehen an einer Stelle (neben `BAES_FUTTERMITTEL_URL`). Wortlaut des Falls „abgepacktes Heimtierfutter" mit § 8 Abs. 7 Futtermittelverordnung 2010 abgleichen (Meldung an das BAES statt Registrierung) und im Bericht als Textänderung zum Gegenlesen markieren.
+
+### 37 Sentry ohne IP-Adressen
+`sendDefaultPii` aus, `beforeSend` entfernt `user.ip_address` und Request-Header mit IP; Test. Im Bericht vermerken, dass die Einstellung im Sentry-Dashboard zusätzlich zu prüfen ist.
+
+### 38 S11 Double-Opt-in
+Anmeldung zu Hof-Neuigkeiten und Benachrichtigungen erst nach Klick auf den Bestätigungslink (signiert, mit Ablauf); unbestätigte Anmeldungen bekommen keine werblichen Mails; Abmeldelink in jeder werblichen Mail. Bestehende Abonnenten unverändert, Anzahl im Bericht. Migration nur Expand, falls nötig.
+
+### 39 D1 Direktverkauf senkt den Vorrat
+Verkäufe, wie im Register D1.
+
+### 40 R1 Rate-Limit über die Datenbank
+Tabelle mit Schlüssel, Fenster und Zähler; Aufräumen alter Einträge im bestehenden Cron; die bestehende Bremse je Instanz bleibt als erste Stufe. Migration nur Expand.
+
+### Sammel-PR (Haltepunkt)
+Branch `integration/lauf7` von `main`, alle PRs dieses Laufs per `git merge --no-ff` in Merge-Reihenfolge; Doku-Konflikte: beide Seiten behalten; Code-Konflikte sauber zusammenführen und jede Auflösung im PR-Text begründen. Typecheck, Unit- und Integrationstests auf dem Gesamtstand grün. PRs mit offener Vorbedingung (Entwurf) NICHT aufnehmen.
+
+### Morgenbericht (`morgenbericht-<datum>-lauf7.md`)
+Ergebnis des Probelaufs zuerst (Tabelle der 12 Abläufe), dann je PR Vorschau-Link, Migration ja/nein, Basis; der Sammel-PR mit Liste der Konfliktauflösungen; „Für dich zu tun" (u. a. Sentry-Dashboard IP, Zahl der bestehenden Abonnenten, Probelauf vor Ort mit dem Pilothof).
+
+## 12. Lauf 8 (uttoranger, im Chat erteilt)
+
+Entscheidungen im Register: N1, N2, Z2, Z3. Wortlaut aus dem Startauftrag vom 08.10.2026: Ausgangslage, §1–§3 und §4.
+
+Stand: main = 9c7da65 (#219 Lauf 7 gemergt, Produktion READY, beide Migrationen eingespielt).
+
+### Ausgangslage (geprüft 08.10.2026, nur lesend)
+- STRIPE_* ist bei Vercel EINE Variable für Vorschau und Produktion. Das Umgebungsbanner der Vorschau zeigt „Stripe Test", die Produktion lädt pk_test_: Beide laufen im Testmodus. Die Live-Schaltung macht der Mensch ganz am Schluss; kein Lauf schaltet um.
+- Handy (390 px): Bestehende Höfe finden die Anmeldung nur ganz unten im Fuß der Startseite („Anmelden für Höfe"). Kopf der KundeShell: nur Logo und Hell/Dunkel, „Anmelden" ist unter 768 px ausgeblendet. /fuer-hoefe und das Band „Für Höfe" bieten nur Registrieren. Ein angemeldeter Hof sieht auf öffentlichen Seiten keinen Weg in seinen Bereich. Manifest startet auf /dashboard, Sitzung 7 Tage.
+- Hofbereich am Handy: Rückweg „‹ …" auf Unterseiten klein und nur oben, nach dem Scrollen weg; „Einstellungen → Mein Auftritt" im Hof-Profil ist kein Link.
+- Vercel-Laufzeit: (EAUTHTIMEOUT) beim Hintergrund-Neubau von /hoefe; DeprecationWarning „Calling client.query() when the client is already executing a query" auf /[farmSlug]/checkout seit 13.08.
+
+### §1 Warteschlange (fest)
+41 → 42 → 43 (gestapelt auf 42) → 44 → 45 → 46 → 47 → 48 → Sammel-PR (Haltepunkt).
+Jede Nummer: Branch nacht/2026-10-08/<nr>-<kurz> von origin/main (43 von Branch 42), ein PR.
+
+#### 41 Hof-Anmeldung am Handy und „Mein Hof" (N1)
+- KundeShell und KundenKopf: unter 768 px oben rechts „Anmelden" (Fläche ≥ 44 px, gut lesbar) → /login. Im Browser heißt der Knopf ebenfalls „Anmelden" (statt „Hofbetreiber-Login"; die KundeShell führte bisher auf /account/login) und führt auf /login. /login zeigt beide Wege wie bisher, „Ich habe einen Hof" vorausgewählt.
+- Hof-Sitzung (Rolle FARMER oder Admin mit eigenem Hof): statt „Anmelden" steht „Mein Hof" → /dashboard, am Handy und im Browser. Kundensitzung: „Mein Konto" wie bisher. Die Sitzung liest weiter der Browser (KundeShellMitSitzung); die Startseite bleibt statisch (kein headers()/cookies()).
+- Hell/Dunkel-Schalter am Handy aus dem Kopf ins Menü-Blatt (KundenKopf) bzw. in den Seitenfuß; im Browser bleibt er im Kopf.
+- /fuer-hoefe (oben und unten), Band „Für Höfe" der Startseite und /register: Link „Schon dabei? Anmelden" → /login.
+- Heute (/dashboard): ganz unten eine kleine Karte „Mit einem Tipp in deinem Hof: Leg FarmerZone auf den Startbildschirm", Anleitung für iPhone und Android in je zwei Sätzen. Nur im Browser, nicht in der installierten App (display-mode: standalone); ohne Speicher im Browser (T1). Manifest nicht ändern.
+- AdminShell: „← Mein Hof" nur, wenn das Konto einen Hof hat; die Initialen-Plakette wird ein Link auf /settings/account und ist auch am Handy sichtbar.
+- Texte und Ziele aus einer Quelle (kunden-navigation.ts, kunden-menue.ts, admin-navigation.ts); Tests anpassen.
+- Abnahme im Bericht (390 px, ausgeloggt): Startseite, /hoefe, Hofseite und /fuer-hoefe zeigen oben „Anmelden"; ein Tipp führt zur Hof-Anmeldung; mit Hof-Sitzung steht dort „Mein Hof".
+
+#### 42 Stripe-Testbetrieb und Modus-Wache (Z2; Geld/Sicherheit)
+- Stripe-Server-Client: Umgebung „preview" oder „lokal" (bestimmeUmgebung) und Schlüssel mit sk_live_ → Client startet nicht, klare Fehlermeldung, Sentry ohne Schlüssel. Test.
+- Nur wenn die Produktion mit Test-Schlüssel läuft (über bestimmeUmgebung):
+  - Kasse, an der Zahlart „Online bezahlen": „Testbetrieb: Echte Karten werden noch abgelehnt. Bitte wähle Bar bei Abholung." Bar bleibt wählbar, Beträge unverändert.
+  - AdminShell: Hinweiskarte (orange) „Stripe läuft im Testmodus – Online-Zahlungen sind Testzahlungen, es fließt kein echtes Geld."
+  - Einstellungen → Zahlung: „Online-Zahlung läuft noch im Testbetrieb."
+  - Mit Live-Schlüssel verschwinden alle drei von selbst. Texte aus einer Quelle.
+- Gespeichertes Hof-Konto, das Stripe nicht kennt (resource_missing / „No such account", z. B. Test-Konto nach der Live-Umstellung): gilt als nicht bereit, der Checkout bietet Online nicht an (wie ohne Konto, Z1), der Hof sieht „Online-Zahlung neu einrichten". stripeAccountId NICHT automatisch löschen. Sentry höchstens einmal je Hof und Tag, nur Hof-ID.
+- Neu: docs/betrieb/stripe-live.md – Schritte für den Menschen am Schluss: Stripe live aktivieren; Connect live; zwei Live-Webhooks (Plattform und Connect; Events laut src/app/api/stripe/webhook/route.ts, mindestens refund.failed, charge.refund.updated, payment_intent.canceled, account.updated); neue Variablen nur für Production (sk_live_, pk_live_, beide Webhook-Secrets, Connect-Client-ID – STRIPE_CONNECT_WEBHOOK_SECRET fehlt heute ganz); bestehende STRIPE_* auf Preview beschränken; EPS, Apple Pay, Google Pay live aktivieren; Apple-Pay-Domain farmerzone.at; neu deployen; Höfe richten Stripe neu ein; Vorschlag, wie Testbestellungen von vor der Umstellung aus Auswertungen herausgehalten werden (nur Vorschlag). Keine Werte.
+- Keine Migration, kein Aufruf an Stripe.
+
+#### 43 Testumgebung test.farmerzone.at (Z3) – gestapelt auf 42
+- src/lib/umgebung.ts: In der Umgebung „preview" zusätzlich NEXT_PUBLIC_APP_URL als vertrauenswürdige Herkunft und appUrl zulassen (nur https). Tests: Produktion unverändert, Vorschau ohne Variable unverändert, Vorschau mit Variable.
+- AdminShell (nur Admins): Marke „Stripe Live" bzw. „Stripe Test" aus bestimmeUmgebung (nie der Schlüssel) und Link „Zur Testumgebung" auf NEXT_PUBLIC_TESTUMGEBUNG_URL (ohne Variable kein Link). Im Umgebungsbanner der Testumgebung ein Link „Zur echten Seite".
+- E-Mails außerhalb der Produktion nur an Adressen aus TEST_EMPFAENGER (kommagetrennt) oder @example.com; alles andere wird nicht verschickt, nur gezählt (ohne Adresse). Test.
+- .github/workflows/staging-nachziehen.yml: bei push auf main den Branch staging per Fast-Forward auf main setzen. Trigger push, nie pull_request_target; permissions contents: write nur in diesem Job; kein Force-Push; geht der Fast-Forward nicht, wird der Job rot statt zu überschreiben.
+- Neu: docs/betrieb/testumgebung.md für den Menschen:
+  - Branch staging anlegen; Domain test.farmerzone.at bei Vercel dem Branch staging zuweisen; DNS-Eintrag.
+  - Branch-Variablen nur für staging: NEXT_PUBLIC_APP_URL und BETTER_AUTH_URL = https://test.farmerzone.at; optional RESEND_API_KEY mit TEST_EMPFAENGER. In Production: NEXT_PUBLIC_TESTUMGEBUNG_URL.
+  - Stripe-Testmodus: einen ZWEITEN Webhook-Endpunkt https://test.farmerzone.at/api/stripe/webhook anlegen (zusätzlich, nicht statt des bestehenden – die Produktion läuft bis zur Live-Schaltung selbst im Testmodus); dessen Secret als STRIPE_WEBHOOK_SECRET nur für Branch staging. Apple-Pay-Domain test.farmerzone.at im Testmodus.
+  - Abnahme: ohne Vercel-Login kein Zugriff (401); Banner zeigt „Stripe Test"; Vercel baut den Push der Action.
+- Keine Migration; kein Aufruf an Vercel, DNS oder Stripe.
+
+#### 44 Rückweg im Hofbereich (N1)
+- elternseite(pfad) in src/lib/bauern-navigation.ts, getestet: /settings/* → Einstellungen; /customers/[id] → Kunden; /orders/[id] → Bestellungen; /status/new und /status/[id]/send-whatsapp → Beiträge; /fehler-melden → Hilfe und Rückmeldung; /analytics/umfeld → Auswertung; /status/plakat → Heute. Seiten der Leiste und des Mehr-Blatts haben keinen Rückweg.
+- Baustein UnterseitenKopf (components/hofbereich/): am Handy fest oben (sticky, 56 px), Pfeil plus Name der Elternseite (15 px halbfett, ganze Fläche ≥ 44 px antippbar), darunter der Titel; im Browser die bisherige Zeile „‹ …". Ersetzt EinstellungenKopf, ZurueckZuEinstellungen und ZurueckLink auf allen genannten Seiten.
+- Einstellungs-Unterseiten: nach erfolgreichem Speichern Toast „Gespeichert" und zurück zu /settings. Ausnahme: Abholzeiten bleibt auf der Seite.
+- „Einstellungen → Mein Auftritt" im Hof-Profil wird ein Link.
+- Mehr-Blatt: Zeile „Angemeldet …" wird ein Link auf „Konto und Sicherheit".
+
+#### 45 Hofbereich kinderleicht
+- Heute: höchstens ein Hinweis-Kasten oben (Vorrang: Stripe einrichten); Teilen kompakt unter die Packliste. „Umsatz heute" eindeutig („Heute eingenommen, mit Hofladen") oder Direktverkäufe getrennt; „0 Bestellungen" neben „€ 178" darf nicht widersprüchlich wirken.
+- Bestellungen: genau drei Filter „Heute abholen", „Noch offen", „Erledigt".
+- Kunden: Sortierung hinter einem Knopf „Sortieren", höchstens zwei Filter sichtbar.
+- Unterleiste: Wort „Neu" unter dem Plus.
+- Fachwörter („Primärproduktion", „Umsatzgrenze", „Kennzeichnung", „USP") durch Alltagswörter ersetzen oder mit einem Satz erklären; USP ausschreiben („Unternehmensserviceportal (USP)"), auch im Mockup mobil-h2-neues-futter-meldung-fehlt. E10-Pflichttexte nicht umformulieren, nur erklären. Texte aus einer Quelle.
+- Brennholz: Anzahl der Produkte mit Einheit m³ je Hof (ohne Namen) im Bericht, mit Hinweis auf rm/srm. Daten ändert der Hof.
+
+#### 46 Kundensicht kinderleicht (N2; Geldpfad)
+- /hoefe: ein Suchfeld „Ort oder Produkt" plus „Standort nutzen"; erster Hof bei 390 × 844 ohne Scrollen sichtbar.
+- Hofseite: Abholtermine entweder antippbar (übernehmen den Termin in die Kasse) oder klar als Text, keine Knopf-Optik ohne Funktion.
+- Kasse: Pflicht-Haken bei Bar weg (Schema und Server prüfen ihn nicht mehr); Kaufknopf bleibt „Zahlungspflichtig bestellen"; jeder Termin mit Datum („Sa, 10. Okt"). Neuigkeiten-Haken von der Kasse auf die Bestätigungsseite (online und bar); E-Mail weiter mit Double-Opt-in über die bestehende Logik (meldeEmailAboAn), keine zweite. Ein Abo rollt nie eine Bestellung zurück. Der Testbetrieb-Satz aus 42 bleibt erhalten.
+- Cookie-Hinweis verdeckt weder Unterleiste noch Kaufknopf.
+- Beträge, Servicegebühr und B1 unverändert; alle Betrags-Tests bleiben grün.
+
+#### 47 Altlasten aus Lauf 7 und Laufzeit-Befunde (Sicherheitspfad)
+- loeseOffeneAnfrageAuf mit ausdrücklichem Rückgabetyp; Quelltext-Wache für optInEmail: true schärfen.
+- Werbliche Mails mit List-Unsubscribe und List-Unsubscribe-Post (Ein-Klick, signierter Link).
+- sentry-hygiene.ts: zusätzlich logentry, tags, extra, übrige contexts, frame.vars und Brotkrumen-Daten filtern; Test je Feld.
+- Bremse über die Datenbank: Sentry bei DB-Ausfall höchstens einmal je Instanz und 10 Minuten.
+- minCents-Meldungen der Servicegebühr geduzt und mit Ausweg.
+- DeprecationWarning auf /[farmSlug]/checkout: die Stelle finden, an der zwei Abfragen gleichzeitig über dieselbe Verbindung laufen (typisch Promise.all mit dem Transaktions-Client), nacheinander ausführen; Test, der Promise.all mit tx im Quelltext verbietet. In pg@9 wird daraus ein Fehler.
+- EAUTHTIMEOUT beim Neubau von /hoefe: öffentliche Lesepfade (getOeffentlicheHoefe) bei Verbindungsfehler 08006 genau einmal nach kurzer Pause wiederholen; nie in Schreibpfaden, nie in Transaktionen; Sentry nur, wenn auch die Wiederholung scheitert.
+
+#### 48 Probelauf (Nachholung von 34)
+- Vorbedingung A: Vorschau-Banner zeigt „Stripe Test" (am 08.10.2026 erfüllt; vor dem Start erneut lesen, nichts entschlüsseln). Vorbedingung B: Vorschau und api.stripe.com sind aus der Sitzung erreichbar.
+- A und B erfüllt: Abläufe 1–12 aus freigabe.md §11 Nr. 34, nur Testkarten, nur Dev-Datenbank; Fehler als 48a, 48b … direkt danach.
+- Sonst: keinen Code, sondern docs/nachtlauf/probelauf-checkliste.md – die 12 Abläufe Schritt für Schritt für den Menschen (an test.farmerzone.at, solange es die nicht gibt an der Branch-Adresse von integration/lauf8). Je Ablauf: Testkarte (4242 4242 4242 4242; 3-D-Secure 4000 0027 6000 3184; EPS im Testmodus), erwartete Beträge (Ware, Servicegebühr nach E4/B1, Hofanteil) und wo sie im Stripe-Dashboard (Testmodus) und im Admin stehen. Dazu die Abschnitte „Hof-Anmeldung am Handy" (Anmelden oben, Mein Hof, Startbildschirm) und „Rückweg" (Einstellungen → Hof-Profil → Speichern). Status „erledigt (Checkliste)".
+- Im Bericht: Vorschau und Produktion teilen den Test-Schlüssel, Test-Webhooks gehen an alle Test-Endpunkte. Im Code prüfen (kein Aufruf), dass der Webhook eine unbekannte Bestellung mit 200 und ohne Fehlerflut quittiert; sonst als 48a beheben.
+
+#### Sammel-PR (Haltepunkt)
+integration/lauf8 von main; Doku-PR und alle PRs per git merge --no-ff in der Reihenfolge von §1 (43 nach 42). Doku-Konflikte: beide Seiten behalten. Code-Konflikte (erwartbar in AdminShell, kunde-shell, umgebung.ts, Kasse) sauber zusammenführen, jede Auflösung im PR-Text begründen. typecheck, lint, test und test:integration auf dem Gesamtstand grün. Entwürfe nicht aufnehmen.
+
+### §2 Regeln
+- Vor jeder Nummer origin/main hineinholen.
+- Migrationen: keine. Entsteht eine: STOPP für diese Nummer, melden, nächste Nummer.
+- Nie Produktion, nie Live-Schlüssel, keine schreibenden Aufrufe an Stripe, Resend, Vercel oder DNS. Die Stripe-Live-Schaltung ist nicht Teil dieses Laufs.
+- Mockup-Abweichungen nur wie beschrieben, jede im Bericht mit Bild.
+- Nachprüfung des Fix-Commits bei 42, 43, 46 und 47.
+- Keine Personendaten in Berichten; Hof-Angaben nur als Anzahl.
+
+### §3 Checkliste je PR (im PR-Text abhaken)
+- [ ] Register und Freigabe decken den Inhalt ab
+- [ ] origin/main vor dem Push hineingeholt
+- [ ] pnpm typecheck, pnpm lint (kein neuer Befund), pnpm test grün
+- [ ] pnpm test:integration grün, wenn Datenbank berührt
+- [ ] Migration: nein
+- [ ] Geld nur als Int-Cent, Beträge nur serverseitig
+- [ ] Keine Personendaten oder Secrets in Code, Logs, Tests
+- [ ] Bilder 390 und 1440 px vorher/nachher, beide Themes, im Bericht
+- [ ] Axe ohne Fehler, Touch-Ziele ≥ 44 px, neue Seiten mit loading.tsx
+- [ ] Texte aus einer Quelle, Deutsch, per Du
+- [ ] tester und pruefer gelaufen, Befunde erledigt oder begründet
+- [ ] Entwurf, wenn eine Vorbedingung offen ist
+
+### §4 Morgenbericht (`morgenbericht-<datum>-lauf8.md`)
+Ergebnis von 48 zuerst. Dann je PR: Vorschau-Link, Migration nein, Basis. Sammel-PR mit Konfliktauflösungen. Bilderstrecke „Handy vorher/nachher": Startseite ausgeloggt, Für Höfe, Hofseite, Kasse, Heute, Bestellungen, Kunden, Hof-Profil unten. „Für dich zu tun": Testumgebung einrichten (docs/betrieb/testumgebung.md), Probelauf nach Checkliste, und als letzter Schritt die Live-Schaltung (docs/betrieb/stripe-live.md).
+
+### Fortsetzung (uttoranger, 09.10.2026, im Chat)
+Stand laut status.md auf docs/lauf8 (70d5a80): 41, 42, 43, 44, 47 fertig (#221, #223, #226, #222, #224), 48 als Checkliste (#225, Runde 2 zu 46 offen). 45 in Nachbesserung Runde 1, 46 in tester/pruefer – beide noch NICHT gepusht.
+1. Sofort: den Arbeitsstand von 45 und 46 als WIP-Commit auf ihre Branches pushen (nacht/2026-10-08/45-hofbereich, nacht/2026-10-08/46-kundensicht), damit nichts verloren geht. Kein git stash.
+2. Dann nach freigabe.md §12 weiter: 45 Runde 1 abschließen (Blocker „Satz zur Umsatzgrenze passt nicht zum Code"), 46 Prüfung und ggf. Nachbesserung (Geldpfad: Nachprüfung), 48 Runde 2 (Teil zu 46).
+3. Sammel-PR integration/lauf8 nach §1. Erwartete Konflikte: DEVELOPMENT.md (beide Seiten behalten); src/app/admin/layout.tsx, src/components/shells/admin-shell.tsx und src/lib/admin-navigation.ts zwischen 41 und 42/43. Alle Änderungen erhalten: „Mein Hof" und Plakette aus 41, Testmodus-Karte aus 42, Stripe-Marke und Link zur Testumgebung aus 43. Jede Auflösung im PR-Text begründen; typecheck, lint, test, test:integration grün.
+4. Morgenbericht nach §4.
+
+Hat diese Sitzung den Arbeitsstand von 45/46 nicht mehr: beide neu von origin/main nach §12 umsetzen und das im Morgenbericht vermerken.

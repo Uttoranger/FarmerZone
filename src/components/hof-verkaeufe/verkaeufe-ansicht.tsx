@@ -7,7 +7,15 @@ import { ChevronRight, ExternalLink, Pencil, Plus, ReceiptText, ShoppingCart, Tr
 import { createStripeDashboardLinkAction } from '@/server/actions/stripe-connect'
 import { deleteManualSale } from '@/server/actions/manual-sales'
 import type { SalesOverview } from '@/server/queries/manual-sales'
-import { kanalText, wiederholVorlagen, type VerkaufDaten, type VerkaufProdukt, type VerkaufsZeile } from '@/lib/hof-verkaeufe'
+import {
+  JAHRESSUMME_TEXT,
+  UMSATZGRENZE_ERKLAERUNG,
+  kanalText,
+  wiederholVorlagen,
+  type VerkaufDaten,
+  type VerkaufProdukt,
+  type VerkaufsZeile,
+} from '@/lib/hof-verkaeufe'
 import { centsAlsEuro, formatEuro } from '@/lib/format'
 import { useUrlAuftrag } from '@/lib/use-url-auftrag'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -76,13 +84,21 @@ export function VerkaeufeAnsicht({ overview, produkte, topProduktIds, stripeRead
         <div className={cn(KARTE, 'p-4 md:p-5')}>
           <p className={cn('text-[13px]', LEISE)}>Diese Woche</p>
           <p className="mt-1 font-heading text-4xl font-semibold text-foreground tabular-nums md:text-[40px]">{formatEuro(overview.weekTotal)}</p>
-          <p className={cn('mt-1 text-[13px]', LEISE)}>Gesamt: {formatEuro(overview.ytdTotal)}</p>
+          <p className={cn('mt-1 text-[13px]', LEISE)}>
+            {`${JAHRESSUMME_TEXT}: ${formatEuro(overview.ytdTotal)}`}
+          </p>
+          {/* Fachwort mit einem Satz erklärt (Nr. 45). */}
+          <p className={cn('mt-1 text-[12px] leading-snug', LEISE)}>{UMSATZGRENZE_ERKLAERUNG}</p>
         </div>
         <Kennzahl titel="Online bezahlt" betrag={overview.weekOnline} satz="Über FarmerZone bezahlte, abgeholte Bestellungen." />
         <Kennzahl titel="Bar kassiert" betrag={overview.weekBar} satz="Vor Ort kassierte Abholungen plus deine Direktverkäufe." />
       </section>
 
-      {stripeReady && <StripeAuszahlungen />}
+      {/* Immer eingehängt, auch ohne fertiges Stripe: Meldet der Login-Link
+          „Konto unbekannt", vermerkt die Action den Hof als nicht bereit und
+          rendert die Seite neu (Register Z2). Mit `stripeReady && …` ginge die
+          Meldung samt Komponente verloren. */}
+      <StripeAuszahlungen bereit={stripeReady} />
 
       {vorlagen.length > 0 && (
         <section aria-labelledby="verkaeufe-wiederholen" className="flex flex-col gap-2.5">
@@ -292,30 +308,37 @@ function datumTag(tag: string): string {
   return `${t}.${m}.${j}`
 }
 
-/** Dezenter Weg zur Auszahlungs-Übersicht im Stripe-Express-Dashboard (Link statt Zahl, Sprint 19). */
-function StripeAuszahlungen(): React.JSX.Element {
+/**
+ * Dezenter Weg zur Auszahlungs-Übersicht im Stripe-Express-Dashboard (Link
+ * statt Zahl, Sprint 19). Ohne fertiges Stripe kein Knopf — nur eine Meldung,
+ * die schon dasteht, bleibt sichtbar.
+ */
+function StripeAuszahlungen({ bereit }: { bereit: boolean }): React.JSX.Element | null {
   const [laeuft, starte] = useTransition()
   const [fehler, setFehler] = useState<string | null>(null)
 
+  if (!bereit && !fehler) return null
   return (
     <div>
-      <button
-        type="button"
-        disabled={laeuft}
-        aria-busy={laeuft || undefined}
-        onClick={() =>
-          starte(async () => {
-            setFehler(null)
-            const ergebnis = await createStripeDashboardLinkAction()
-            if (ergebnis.url) window.open(ergebnis.url, '_blank', 'noopener')
-            else setFehler(ergebnis.error ?? 'Die Stripe-Übersicht ist gerade nicht erreichbar. Versuch es gleich noch einmal.')
-          })
-        }
-        className={cn('inline-flex min-h-11 items-center gap-1.5 rounded-full text-[13.5px] font-semibold text-status-fertig hover:underline disabled:opacity-60', FOKUS_RAHMEN)}
-      >
-        <ExternalLink className="size-4" strokeWidth={1.7} aria-hidden="true" />
-        {laeuft ? 'Öffnet …' : 'Auszahlungen bei Stripe ansehen'}
-      </button>
+      {bereit && (
+        <button
+          type="button"
+          disabled={laeuft}
+          aria-busy={laeuft || undefined}
+          onClick={() =>
+            starte(async () => {
+              setFehler(null)
+              const ergebnis = await createStripeDashboardLinkAction()
+              if (ergebnis.url) window.open(ergebnis.url, '_blank', 'noopener')
+              else setFehler(ergebnis.error ?? 'Die Stripe-Übersicht ist gerade nicht erreichbar. Versuch es gleich noch einmal.')
+            })
+          }
+          className={cn('inline-flex min-h-11 items-center gap-1.5 rounded-full text-[13.5px] font-semibold text-status-fertig hover:underline disabled:opacity-60', FOKUS_RAHMEN)}
+        >
+          <ExternalLink className="size-4" strokeWidth={1.7} aria-hidden="true" />
+          {laeuft ? 'Öffnet …' : 'Auszahlungen bei Stripe ansehen'}
+        </button>
+      )}
       {fehler && (
         <p role="alert" className="text-[13px] font-medium text-status-offen">
           {fehler}

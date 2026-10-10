@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { istGebindeGesperrt } from '@/lib/futter-registrierung'
 import {
   pruefeWarenkorb,
   befundMeldung,
@@ -49,7 +50,17 @@ export async function pruefeSitzungsWarenkorb(
   const [produkte, fremdeHalte, eigeneHalte] = await Promise.all([
     prisma.product.findMany({
       where: { id: { in: ids } },
-      select: { id: true, stock: true, isAvailable: true },
+      // Kategorie, Verpackung und die Registrierung des Hofs für die Sperre je
+      // Gebinde (S7, Nr. 20) — gegen eine Größe, die nach dem Einlegen in den
+      // Korb gesperrt wurde (der Hof hat seinen Status geändert).
+      select: {
+        id: true,
+        stock: true,
+        isAvailable: true,
+        category: true,
+        verpackung: true,
+        farm: { select: { betriebsnummer: true, betriebsstatus: true } },
+      },
     }),
     prisma.stockReservation.findMany({
       where: { productId: { in: ids }, sessionId: { not: sessionId }, expiresAt: { gt: jetzt } },
@@ -71,7 +82,9 @@ export async function pruefeSitzungsWarenkorb(
   const lage: Bestandslage[] = produkte.map((p) => ({
     productId: p.id,
     verfuegbar: p.stock - (fremdSumme.get(p.id) ?? 0),
-    verkaeuflich: p.isAvailable,
+    // Gesperrt zählt wie ausgeblendet: Die Position fällt mit der bekannten
+    // Meldung aus dem Korb, bevor der Checkout Bestand bucht.
+    verkaeuflich: p.isAvailable && !istGebindeGesperrt(p, p.farm),
   }))
 
   const befund = pruefeWarenkorb(positionen, eigeneHalte, lage, jetzt)

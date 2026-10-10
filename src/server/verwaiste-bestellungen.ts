@@ -1,7 +1,5 @@
 import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
-import { stripe } from '@/lib/stripe'
-import { sendBestellungVerfallen } from '@/lib/email'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { GRUND_NICHT_BESTAETIGT, GRUND_ZAHLUNG_VERFALLEN, fristVon, istVerwaist } from '@/lib/fristen'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
@@ -125,6 +123,9 @@ export async function gibVerwaisteBestellungenFrei(jetzt: Date, farmId?: string)
         if (jetzt.getTime() - fristVon(bestellung).getTime() > MAIL_HOECHSTENS_MS) continue
         nachDerAntwort(async () => {
           try {
+            // Erst hier geladen (Nr. 31): Die Seiten, die freigeben, ziehen den
+            // E-Mail-Versand sonst bei jedem Kaltstart mit.
+            const { sendBestellungVerfallen } = await import('@/lib/email')
             await sendBestellungVerfallen(bestellung)
           } catch (err) {
             Sentry.captureException(err, {
@@ -160,6 +161,9 @@ async function brichZahlungAb(paymentIntentId: string | null): Promise<boolean> 
   // Es gibt nichts, womit die Kundin noch zahlen könnte.
   if (!paymentIntentId) return true
 
+  // Stripe erst, wenn wirklich gefragt wird (Nr. 31) — die meisten Aufrufe
+  // finden keine überfällige Online-Bestellung und brauchen das SDK nie.
+  const { stripe } = await import('@/lib/stripe')
   const intent = await stripe.paymentIntents.retrieve(paymentIntentId, {}, STRIPE_KURZ)
   if (intent.status === 'canceled') return true
   if (!ABBRECHBAR.has(intent.status)) return false

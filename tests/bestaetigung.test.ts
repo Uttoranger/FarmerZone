@@ -3,7 +3,15 @@
  * — nur aus dem Datenbankstand; Stripes redirect_status ist höchstens ein Hinweis.
  */
 import { describe, it, expect } from 'vitest'
-import { abholZeitText, bestaetigungsBloecke, bestaetigungsKopf, bestaetigungsZustand, bestellSchritte } from '@/lib/bestaetigung'
+import {
+  abholZeitText,
+  bestaetigungsBloecke,
+  bestaetigungsKopf,
+  bestaetigungsZustand,
+  bestellSchritte,
+  neuigkeitenErlaubt,
+  type NeuigkeitenBestellung,
+} from '@/lib/bestaetigung'
 import { GRUND_NICHT_BESTAETIGT, GRUND_ZAHLUNG_VERFALLEN, fristVon, uhrzeitInWien } from '@/lib/fristen'
 
 type Bestellung = Parameters<typeof bestaetigungsZustand>[0]
@@ -256,6 +264,68 @@ describe('bestaetigungsBloecke — was die Seite in welchem Zustand zeigt', () =
     expect(bestaetigungsBloecke('verfallen', 'CANCELLED').aktion).toBe('neu-bestellen')
     expect(bestaetigungsBloecke('zahlung-fehlgeschlagen', 'PENDING_CONFIRMATION').aktion).toBe('erneut-versuchen')
     expect(bestaetigungsBloecke('bestaetigung-offen', 'PENDING_CONFIRMATION').aktion).toBe('keine')
+  })
+})
+
+describe('neuigkeitenErlaubt — EINE Regel für die Karte und die Action (N2, Nr. 46, Runde 1)', () => {
+  // Bestellt um 10:00 Wiener Zeit, abgeholt wird morgen ab 15:00 — die Frist (bar) ist 12:00.
+  const JETZT = new Date('2026-10-05T08:20:00Z')
+  const bestellung = (abweichend: Partial<NeuigkeitenBestellung> = {}): NeuigkeitenBestellung => ({
+    paymentMethod: 'ONSITE_CASH',
+    paymentStatus: 'PENDING',
+    status: 'PENDING_CONFIRMATION',
+    cancelReason: null,
+    createdAt: new Date('2026-10-05T08:00:00Z'),
+    pickupDate: new Date('2026-10-06T12:00:00Z'),
+    pickupTimeStart: '15:00',
+    ...abweichend,
+  })
+
+  it('ja: online bezahlt, bar bestätigt — auch weiter im Ablauf und nach der Abholung', () => {
+    for (const fall of [
+      { paymentMethod: 'ONLINE', paymentStatus: 'PAID', status: 'PAID' },
+      { paymentMethod: 'ONLINE', paymentStatus: 'PAID', status: 'READY' },
+      { paymentMethod: 'ONLINE', paymentStatus: 'PAID', status: 'PICKED_UP' },
+      { status: 'CONFIRMED' },
+      { status: 'IN_PREPARATION' },
+      { status: 'PICKED_UP', paymentStatus: 'PAID' },
+    ] as const) {
+      expect(neuigkeitenErlaubt(bestellung(fall), JETZT), JSON.stringify(fall)).toBe(true)
+    }
+  })
+
+  it('bar offen: ja bis zur Frist, ab der Frist nein — sie gilt beim Lesen, nicht erst, wenn der Cron storniert hat', () => {
+    const offen = bestellung()
+    const frist = fristVon(offen)
+    expect(neuigkeitenErlaubt(offen, JETZT)).toBe(true)
+    expect(neuigkeitenErlaubt(offen, new Date(frist.getTime() - 1))).toBe(true)
+    expect(neuigkeitenErlaubt(offen, frist)).toBe(false)
+    expect(neuigkeitenErlaubt(offen, new Date(frist.getTime() + 24 * 60 * 60 * 1000))).toBe(false)
+  })
+
+  it('nein: storniert, verfallen, nicht abgeholt, nie bezahlt oder gescheitert — auch mit Stripes Hinweis „succeeded" nicht', () => {
+    for (const fall of [
+      { status: 'CANCELLED' },
+      { status: 'CANCELLED', cancelReason: GRUND_NICHT_BESTAETIGT },
+      { status: 'NOT_PICKED_UP' },
+      { paymentMethod: 'ONLINE', paymentStatus: 'PAID', status: 'CANCELLED' },
+      { paymentMethod: 'ONLINE', paymentStatus: 'REFUNDED', status: 'CANCELLED', cancelReason: GRUND_ZAHLUNG_VERFALLEN },
+      // Online offen: Was Stripe in der Adresse meldet („Zahlung wird geprüft"), gibt kein Recht — die Action kennt es nicht.
+      { paymentMethod: 'ONLINE', paymentStatus: 'PENDING', status: 'PENDING_CONFIRMATION' },
+      { paymentMethod: 'ONLINE', paymentStatus: 'FAILED', status: 'PENDING_CONFIRMATION' },
+    ] as const) {
+      expect(neuigkeitenErlaubt(bestellung(fall), JETZT), JSON.stringify(fall)).toBe(false)
+    }
+  })
+
+  it('Gegenprobe: dieselbe offene Online-Bestellung wird mit PAID erlaubt', () => {
+    const offen = bestellung({ paymentMethod: 'ONLINE', paymentStatus: 'PENDING' })
+    expect(neuigkeitenErlaubt(offen, JETZT)).toBe(false)
+    expect(neuigkeitenErlaubt({ ...offen, paymentStatus: 'PAID', status: 'PAID' }, JETZT)).toBe(true)
+  })
+
+  it('die Blöcke der Seite kennen die Anmeldung nicht mehr selbst — eine Quelle', () => {
+    expect(bestaetigungsBloecke('bezahlt', 'PAID')).not.toHaveProperty('neuigkeiten')
   })
 })
 

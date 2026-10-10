@@ -49,7 +49,7 @@ In der Oberfläche heißt die Ansicht ‚In der Nähe‘.
 ## 4. UI
 
 **Ort.** Reiter **„Umfeld"** in der Auswertung. Kein neuer Nav-Eintrag.
-*(Geändert vor dem Umfeld-Sprint:)* Die Auswertung bekommt zwei Reiter, „Umsatz" (das Bisherige, `/analytics`) und „Umfeld" (Unterseite `/analytics/umfeld`).
+*(Geändert vor dem Umfeld-Sprint:)* Die Auswertung bekommt zwei Reiter, „Umsatz" (das Bisherige, `/analytics`) und „Umfeld" (Unterseite `/analytics/umfeld`). *(Seit Nachtlauf Nr. 22c: Das Umfeld ist der Reiter „Preise vergleichen" der eigenen Route `/region`; `/analytics/umfeld` leitet dorthin um.)*
 
 **Kopf.**
 - Umschalter Bereich: Lebensmittel | Futtermittel (`bereichVon`).

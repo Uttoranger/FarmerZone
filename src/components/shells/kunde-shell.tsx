@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ChevronLeft, Compass, ReceiptText, Search, ShoppingBasket, UserRound, type LucideIcon } from 'lucide-react'
-import { kundenAriaAktuell, kundenNavigation, type KundenNavId } from '@/lib/kunden-navigation'
+import { kundenAriaAktuell, kundenNavigation, type KundenNavId, type KundenSitzung } from '@/lib/kunden-navigation'
 import { useWarenkorbKopf } from '@/lib/use-warenkorb-kopf'
 import { SUCHTEXT_PARAMETER } from '@/schemas/hoefe-filter'
 import { cn } from '@/lib/utils'
@@ -12,7 +12,7 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { BottomNav, BottomNavLink, BottomNavMitte, mittelknopfKlassen } from '@/components/ui/bottom-nav'
 import { Zaehler } from '@/components/ui/zaehler'
 import { Wortmarke } from '@/components/shared/wortmarke'
-import { ThemeUmschalter } from '@/components/shared/theme-umschalter'
+import { ThemeUmschalter, ThemeUmschalterZeile } from '@/components/shared/theme-umschalter'
 import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
 
 /*
@@ -28,6 +28,11 @@ import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
  * tragen diese Shells (tests/shells.test.ts, UMGESTELLT) — die Fokus-Shell
  * seit Nr. 12 die Kasse. Alle anderen Kundenseiten zeigen weiter KundenKopf
  * (components/shared/kunden-kopf.tsx).
+ *
+ * Seit Nr. 41 (Register N1) steht der Knopf rechts oben auch am Handy:
+ * „Anmelden" (→ /login) bzw. mit Hof-Sitzung „Mein Hof" (→ /dashboard). Dafür
+ * wandert Hell/Dunkel am Handy aus dem Kopf an den Seitenfuß; im Browser
+ * bleibt er im Kopf.
  */
 
 const SYMBOL: Partial<Record<KundenNavId, LucideIcon>> = {
@@ -54,9 +59,18 @@ function WarenkorbKopf({ anzahl, href }: { anzahl: number; href: string }) {
   )
 }
 
+/** Der Knopf rechts im Kopf: Pille mit 44 px Höhe — auch am Handy gut zu treffen und zu lesen. */
+const KOPF_KNOPF = cn(
+  'inline-flex h-11 shrink-0 items-center rounded-full border border-border px-4 text-[14px] font-semibold whitespace-nowrap text-foreground transition-colors duration-[250ms] hover:bg-muted',
+  FOKUS_RAHMEN
+)
+
 export type KundeShellProps = {
-  /** Ob eine Kundensitzung besteht (freiwillige Anmeldung unter /account). */
-  angemeldet: boolean
+  /**
+   * Wie die Seite die Sitzung sieht (kundenSitzung): ohne Sitzung „Anmelden",
+   * mit Kundensitzung Suche und „Mein Konto", mit Hof-Sitzung „Mein Hof".
+   */
+  sitzung: KundenSitzung
   /**
    * Fokus-Seite mit Kopf (Produktseite, Nr. 11): `false` lässt die
    * Unterleiste am Handy weg — die Seite bringt genau eine feste Leiste mit
@@ -68,10 +82,13 @@ export type KundeShellProps = {
   children: ReactNode
 }
 
-export function KundeShell({ angemeldet, unterleiste = true, children }: KundeShellProps): React.JSX.Element {
+export function KundeShell({ sitzung, unterleiste = true, children }: KundeShellProps): React.JSX.Element {
   const pathname = usePathname()
-  const nav = kundenNavigation({ angemeldet })
+  const nav = kundenNavigation({ sitzung })
   const korb = useWarenkorbKopf()
+  // Steht der Warenkorb auch am Handy im Kopf (Fokus-Seiten ohne Unterleiste),
+  // reicht der Platz neben „Anmelden" unter 360 px nicht für das Wort „FarmerZone".
+  const korbAmHandy = korb !== null && !unterleiste
 
   return (
     <div data-design="neu" className="min-h-dvh bg-background text-foreground">
@@ -79,11 +96,11 @@ export function KundeShell({ angemeldet, unterleiste = true, children }: KundeSh
       <header className="sticky top-0 z-40 border-b border-border bg-background print:hidden">
         <div className="mx-auto flex h-14 max-w-[1200px] items-center gap-3 px-4 md:h-16 md:gap-3 md:px-6 lg:gap-[22px]">
           <Link href="/" aria-label="FarmerZone – zur Startseite" className={cn('rounded-md', FOKUS_RAHMEN)}>
-            <Wortmarke />
+            <Wortmarke wortKlasse={korbAmHandy ? 'max-[359px]:hidden' : undefined} />
           </Link>
 
-          {/* Angemeldet sitzt die Suche im Kopf; am Handy oben in „Entdecken" (DESIGN_SYSTEM). */}
-          {angemeldet && (
+          {/* Mit Kundensitzung sitzt die Suche im Kopf; am Handy oben in „Entdecken" (DESIGN_SYSTEM). */}
+          {sitzung === 'kunde' && (
             <form role="search" action="/hoefe" method="get" className="hidden w-[340px] md:block">
               <label className="relative block">
                 <span className="sr-only">Hof oder Produkt suchen</span>
@@ -135,17 +152,11 @@ export function KundeShell({ angemeldet, unterleiste = true, children }: KundeSh
                 <WarenkorbKopf anzahl={korb.anzahl} href={korb.href} />
               </span>
             )}
-            <ThemeUmschalter className={cn('rounded-full text-foreground hover:bg-muted', FOKUS_RAHMEN)} />
-            {nav.anmelden && (
-              <Link
-                href={nav.anmelden.href}
-                aria-current={kundenAriaAktuell(pathname, nav.anmelden)}
-                className={cn(
-                  'hidden h-10 items-center rounded-full border border-border px-4 text-[14px] font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted md:inline-flex',
-                  FOKUS_RAHMEN
-                )}
-              >
-                {nav.anmelden.label}
+            {/* Am Handy steht Hell/Dunkel am Seitenfuß — oben rechts gehört der Platz dem Knopf. */}
+            <ThemeUmschalter className={cn('hidden rounded-full text-foreground hover:bg-muted md:inline-flex', FOKUS_RAHMEN)} />
+            {nav.knopf && (
+              <Link href={nav.knopf.href} aria-current={kundenAriaAktuell(pathname, nav.knopf)} className={KOPF_KNOPF}>
+                {nav.knopf.label}
               </Link>
             )}
             {nav.konto && (
@@ -167,6 +178,12 @@ export function KundeShell({ angemeldet, unterleiste = true, children }: KundeSh
 
       <main id={INHALT_ID} tabIndex={-1} className="pb-28 outline-none md:pb-0 print:pb-0">
         {children}
+        {/* Seitenfuß am Handy: Hell/Dunkel (im Browser im Kopf). Als letzter
+            Teil des Inhalts, auf jeder Seite der Shell — auch dort, wo kein
+            Fuß der Startseite steht. */}
+        <div className="border-t border-border px-2 py-1.5 md:hidden print:hidden">
+          <ThemeUmschalterZeile className={cn('w-auto text-muted-foreground hover:text-foreground', FOKUS_RAHMEN)} />
+        </div>
       </main>
 
       {unterleiste && (
@@ -270,7 +287,8 @@ export function KundeFokusShell({ titel, zurueck, rechts, aktion, children }: Ku
       </main>
 
       {aktion && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] md:static md:border-0 md:bg-transparent md:pt-6 md:pb-10 print:hidden">
+        // data-unten-fest: Der Cookie-Hinweis steht über der Leiste (src/lib/cookie-hinweis.ts).
+        <div data-unten-fest="" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] md:static md:border-0 md:bg-transparent md:pt-6 md:pb-10 print:hidden">
           <div className="mx-auto max-w-[1200px]">{aktion}</div>
         </div>
       )}

@@ -23,6 +23,11 @@ export const metadata: Metadata = {
     `Die Servicegebühr von ${SERVICEGEBUEHR_SATZ_TEXT} zahlt der Kunde.`,
 }
 
+// Statisch, aber stündlich neu gebaut (Register F6, 19a): Ob die Bar-Ausnahme
+// bis zum Stichtag (B1) dasteht, entscheidet sich je Bau. Ohne revalidate
+// stünde der Satz nach dem Stichtag bis zum nächsten Deploy da.
+export const revalidate = 3600
+
 const CTA_MAILTO = `mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent('Mein Hof auf FarmerZone')}`
 
 // Der Startseiten-CTA verspricht das Gründungshof-Angebot — bisher konnte man
@@ -38,7 +43,7 @@ const CTA_MAILTO = `mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent('Mein H
 // (tests/konditionen-seiten.test.ts). Bis Nr. 15 stand hier das
 // Gründungshof-Angebot; den Umbau der Seite ins neue Design macht Gate 8.
 export default function KonditionenPage() {
-  // Statisch: Beim Bauen entscheidet sich, ob die Bar-Ausnahme bis zum Stichtag (B1) dasteht.
+  // Je Bau bzw. stündlicher Revalidierung (oben): Danach entscheidet sich, ob die Bar-Ausnahme bis zum Stichtag (B1) dasteht.
   const jetzt = new Date()
   return (
     <div className="min-h-screen bg-background">

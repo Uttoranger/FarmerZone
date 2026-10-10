@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import { UnterseitenKopfLaden } from '@/components/hofbereich/hof-laden'
 
 /*
  * Rahmen und Ladeansichten der Einstellungen (Nachtlauf Nr. 22d) — dieselben
@@ -19,7 +20,8 @@ export function EinstellungenLaden(): React.JSX.Element {
       <div className="h-8 w-44 rounded-lg bg-border" />
       <div className="mt-2 h-4 w-64 rounded bg-muted" />
       <div className="mt-4 flex flex-col md:grid md:gap-3 lg:grid-cols-2">
-        {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+        {/* So viele Zeilen wie Bereiche (einstellungenBereiche, seit Nr. 30 neun). */}
+        {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
           <div
             key={i}
             className="flex h-[66px] items-center gap-3 border-t border-border md:h-[78px] md:rounded-2xl md:border md:bg-card md:px-[18px]"
@@ -39,10 +41,12 @@ export function EinstellungenLaden(): React.JSX.Element {
 export function EinstellungenUnterseiteLaden(): React.JSX.Element {
   return (
     <div className={cn(UNTERSEITE_RAHMEN, 'animate-pulse')} aria-busy="true">
-      <div className="h-11 w-32 rounded bg-muted" />
-      <div className="mt-2 h-8 w-48 rounded-lg bg-border" />
-      <div className="mt-2 h-4 w-72 max-w-full rounded bg-muted" />
-      <div className="mt-6 flex flex-col gap-4">
+      <UnterseitenKopfLaden />
+      <div className="mb-5 md:mb-6">
+        <div className="h-8 w-48 rounded-lg bg-border" />
+        <div className="mt-2 h-4 w-72 max-w-full rounded bg-muted" />
+      </div>
+      <div className="flex flex-col gap-4">
         <div className="h-40 rounded-2xl border border-border bg-card" />
         <div className="h-56 rounded-2xl border border-border bg-card" />
       </div>
@@ -53,10 +57,12 @@ export function EinstellungenUnterseiteLaden(): React.JSX.Element {
 export function KonditionenLaden(): React.JSX.Element {
   return (
     <div className={cn(EINSTELLUNGEN_RAHMEN, 'animate-pulse')} aria-busy="true">
-      <div className="h-11 w-32 rounded bg-muted" />
-      <div className="mt-2 h-8 w-56 rounded-lg bg-border" />
-      <div className="mt-2 h-4 w-80 max-w-full rounded bg-muted" />
-      <div className="mt-5 h-16 rounded-2xl border border-border bg-card" />
+      <UnterseitenKopfLaden />
+      <div className="mb-5 md:mb-6">
+        <div className="h-8 w-56 rounded-lg bg-border" />
+        <div className="mt-2 h-4 w-80 max-w-full rounded bg-muted" />
+      </div>
+      <div className="h-16 rounded-2xl border border-border bg-card" />
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <div className="h-52 rounded-2xl border border-border bg-card" />
         <div className="h-52 rounded-2xl border border-border bg-card" />

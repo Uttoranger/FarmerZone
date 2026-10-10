@@ -15,7 +15,8 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/server/queries/dashboard', () => ({ getFarmForUser: vi.fn() }))
 vi.mock('@/lib/prisma', () => ({
-  prisma: { product: { updateMany: vi.fn() } },
+  // findFirst/farm.findUnique seit Nr. 20: Einschalten prüft die Sperre je Gebinde (S7).
+  prisma: { product: { updateMany: vi.fn(), findFirst: vi.fn() }, farm: { findUnique: vi.fn() } },
 }))
 
 import { produktSichtbarkeitSetzen } from '@/server/actions/products'
@@ -28,12 +29,16 @@ import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 const getSession = vi.mocked(auth.api.getSession)
 const farmForUser = vi.mocked(getFarmForUser)
 const updateMany = vi.mocked(prisma.product.updateMany)
+const findFirst = vi.mocked(prisma.product.findFirst)
+const farmFindUnique = vi.mocked(prisma.farm.findUnique)
 
 beforeEach(() => {
   vi.clearAllMocks()
   getSession.mockResolvedValue({ user: { id: 'user_1' } } as never)
   farmForUser.mockResolvedValue({ id: 'farm_1', slug: 'testhof', name: 'Hof Test' } as never)
   updateMany.mockResolvedValue({ count: 1 } as never)
+  findFirst.mockResolvedValue({ category: 'EIER', verpackung: null } as never)
+  farmFindUnique.mockResolvedValue({ betriebsnummer: null, betriebsstatus: null } as never)
 })
 
 describe('produktSichtbarkeitSetzen', () => {
@@ -124,5 +129,47 @@ describe('produktSichtbarkeitSetzen', () => {
     expect(revalidatePath).toHaveBeenCalledWith('/testhof')
     expect(revalidatePath).toHaveBeenCalledWith('/farm-page')
     expect(updateTag).toHaveBeenCalledWith(HOEFE_CACHE_TAG)
+  })
+})
+
+describe('produktSichtbarkeitSetzen — Sperre je Gebinde (S7, Nr. 20)', () => {
+  it('ein Sackerl ohne BAES-Meldung bleibt Entwurf — mit dem Grund, nichts geschrieben', async () => {
+    findFirst.mockResolvedValue({ category: 'HEU_STROH', verpackung: 'ABGEPACKT_ETIKETT' } as never)
+    farmFindUnique.mockResolvedValue({ betriebsnummer: 'AT 1234567', betriebsstatus: 'PRIMAERPRODUKTION' } as never)
+
+    const ergebnis = await produktSichtbarkeitSetzen({ productId: 'p_sack', imShop: true })
+
+    expect(ergebnis).toEqual({ error: 'Wird erst sichtbar mit BAES-Meldung für Heimtierfutter.', code: 'GESPERRT' })
+    expect(updateMany).not.toHaveBeenCalled()
+    expect(findFirst).toHaveBeenCalledWith({ where: { id: 'p_sack', farmId: 'farm_1' }, select: { category: true, verpackung: true } })
+  })
+
+  it('Ballen mit LFBIS-Nummer gehen in den Shop', async () => {
+    findFirst.mockResolvedValue({ category: 'HEU_STROH', verpackung: 'LOSE_BALLEN' } as never)
+    farmFindUnique.mockResolvedValue({ betriebsnummer: 'AT 1234567', betriebsstatus: 'PRIMAERPRODUKTION' } as never)
+
+    expect(await produktSichtbarkeitSetzen({ productId: 'p_ballen', imShop: true })).toEqual({ ok: true })
+    expect(updateMany).toHaveBeenCalledTimes(1)
+  })
+
+  it('ein fremdes Produkt beim Einschalten: dieselbe Antwort wie sonst, nichts geschrieben', async () => {
+    findFirst.mockResolvedValue(null as never)
+
+    expect(await produktSichtbarkeitSetzen({ productId: 'p_fremd', imShop: true })).toEqual({ error: 'Produkt nicht gefunden.' })
+    expect(updateMany).not.toHaveBeenCalled()
+  })
+
+  it('Ausschalten geht immer, ohne die Sperre zu fragen', async () => {
+    await produktSichtbarkeitSetzen({ productId: 'p_sack', imShop: false })
+
+    expect(findFirst).not.toHaveBeenCalled()
+    expect(farmFindUnique).not.toHaveBeenCalled()
+  })
+
+  it('ein Produkt ohne Verpackung fragt den Hof nicht', async () => {
+    await produktSichtbarkeitSetzen({ productId: 'p_1', imShop: true })
+
+    expect(farmFindUnique).not.toHaveBeenCalled()
+    expect(updateMany).toHaveBeenCalledTimes(1)
   })
 })

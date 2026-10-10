@@ -50,7 +50,9 @@ export function BeitragZeile({ eintrag }: { eintrag: BeitragEintrag }): React.JS
           <p className="truncate text-[14.5px] font-semibold text-foreground" title={eintrag.titel}>
             {eintrag.titel}
           </p>
-          <p className="mt-0.5 truncate text-[12.5px] text-muted-foreground">{eintrag.zeile}</p>
+          {/* Zwei Zeilen statt abgeschnitten: Seit „N per E-Mail" darin steht (F6, 22e),
+              fiele am Handy sonst das Ende („und WhatsApp") weg. */}
+          <p className="mt-0.5 line-clamp-2 text-[12.5px] break-words text-muted-foreground">{eintrag.zeile}</p>
         </div>
         <StatusBadge status={eintrag.marke.ton} className="mt-0.5 shrink-0">
           {eintrag.marke.text}

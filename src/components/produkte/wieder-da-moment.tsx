@@ -11,7 +11,8 @@ import type { WiederDaTexte } from '@/lib/produkte-hof'
 
 /*
  * Moment „wieder da" (Mockups web-h2-ware-wieder-da-teilen,
- * mobil-h2-gespeichert-teilen; Nachtlauf Nr. 18). Ob er kommt, haben vorher
+ * mobil-h2-gespeichert-teilen; Nachtlauf Nr. 18) — seit Nr. 30 auch der
+ * Moment „gespeichert" (eigene Texte, „Jetzt teilen"/„Später" und Fußnote). Ob er kommt, haben vorher
  * entschieden: der Server (Vorrat 0 → mehr, bedingt gesetzt), die Ansicht
  * (Hof und Produkt sichtbar, wiederDaMomentMoeglich) und der Merker des Geräts
  * (je Produkt und Woche einmal, src/lib/wieder-da-moment.ts). Hier wird nur
@@ -26,10 +27,18 @@ export function WiederDaMoment({
   texte,
   hof,
   onSchliessen,
+  teilenLabel = 'Teilen',
+  schliessenLabel = 'Nicht jetzt',
+  hinweis,
 }: {
   texte: WiederDaTexte
   hof: { name: string; slug: string }
   onSchliessen: () => void
+  /** Seit Nr. 30 zeigt dieselbe Karte den Moment „gespeichert" mit den Wörtern seines Mockups. */
+  teilenLabel?: string
+  schliessenLabel?: string
+  /** Kleiner Satz unter den Knöpfen („Fragt nur einmal pro Produkt …"). */
+  hinweis?: string
 }): React.JSX.Element {
   const breit = useMindestbreite(768)
   const titelId = useId()
@@ -68,7 +77,7 @@ export function WiederDaMoment({
       )}
     >
       <Share2 className="size-4" strokeWidth={1.7} aria-hidden="true" />
-      Teilen
+      {teilenLabel}
     </button>
   )
   const nichtJetzt = (
@@ -77,9 +86,10 @@ export function WiederDaMoment({
       onClick={onSchliessen}
       className={cn('min-h-11 rounded-full px-[18px] text-sm font-semibold text-status-fertig hover:bg-muted', FOKUS_RAHMEN)}
     >
-      Nicht jetzt
+      {schliessenLabel}
     </button>
   )
+  const fussnote = hinweis ? <p className="text-center text-[11.5px] leading-normal text-muted-foreground">{hinweis}</p> : null
 
   if (breit) {
     return (
@@ -88,6 +98,8 @@ export function WiederDaMoment({
       <section
         aria-labelledby={titelId}
         aria-live="polite"
+        // Schwebt unten rechts: Der Cookie-Hinweis steht darüber, nie darauf (src/lib/cookie-hinweis.ts).
+        data-unten-fest=""
         className="fixed right-9 bottom-[30px] z-50 flex w-[400px] flex-col gap-2.5 rounded-2xl border border-primary/55 bg-card p-4 shadow-2xl shadow-primary-foreground/40"
       >
         <div className="flex items-center gap-2.5">
@@ -110,6 +122,7 @@ export function WiederDaMoment({
           {teilenKnopf}
           {nichtJetzt}
         </div>
+        {fussnote}
       </section>
     )
   }
@@ -127,6 +140,7 @@ export function WiederDaMoment({
           {teilenKnopf}
           {nichtJetzt}
         </div>
+        {fussnote}
       </SheetBlatt>
     </Sheet>
   )

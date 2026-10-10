@@ -40,13 +40,14 @@ vi.mock('next/link', () => ({
 }))
 
 import {
+  AbholWahl,
   KontaktHinweis,
   ReservierungsHinweis,
   UebersichtKarte,
   ZahlartWahl,
   ZahlungAbgelehnt,
 } from '@/components/checkout/kasse-teile'
-import { gebuehrBezeichnung, kassenBetraege, kassenZahlarten, reservierungsStand } from '@/lib/kasse'
+import { abholKacheln, gebuehrBezeichnung, kassenBetraege, kassenZahlarten, reservierungsStand } from '@/lib/kasse'
 import { StripeZahlung } from '@/components/checkout/stripe-payment'
 import { checkoutFormSchema, checkoutRequestSchema } from '@/schemas/checkout'
 import { paymentLabel } from '@/components/orders/order-status'
@@ -96,16 +97,50 @@ describe('E5: keine Karte bei Abholung für neue Bestellungen', () => {
     expect(checkoutFormSchema.safeParse({ ...basis, paymentMethod: 'ONLINE' }).success).toBe(true)
   })
 
-  it('bar verlangt weiter die Zusage, abzuholen und vor Ort zu zahlen', () => {
-    const r = checkoutFormSchema.safeParse({
+  it('bar braucht keinen Haken mehr — verbindlich ist der Knopf (Register N2, Nr. 46)', () => {
+    const bar = {
       customerName: 'Max Mustermann',
       customerEmail: 'max@example.org',
       customerPhone: '+43 660 0000000',
       pickupSlotKey: '2026-10-06|09:00|12:00',
       paymentMethod: 'ONSITE_CASH',
-      onsiteConfirmed: false,
-    })
-    expect(r.success).toBe(false)
+    }
+    expect(checkoutFormSchema.safeParse(bar).success).toBe(true)
+    // Ein alter Stand, der die Felder noch kennt, scheitert nicht — und sie kommen nicht durch.
+    const alt = checkoutFormSchema.safeParse({ ...bar, onsiteConfirmed: false, optInEmail: true, optInWhatsApp: true })
+    expect(alt.success).toBe(true)
+    expect(alt.data).not.toHaveProperty('onsiteConfirmed')
+    expect(alt.data).not.toHaveProperty('optInEmail')
+    expect(alt.data).not.toHaveProperty('optInWhatsApp')
+  })
+
+  it('die Anfrage an den Server verwirft Haken- und Abo-Felder still — ein alter Tab bestellt weiter', () => {
+    const anfrage = {
+      farmId: 'farm_1',
+      farmSlug: 'hof-test',
+      sessionId: 'sid_1',
+      customerName: 'Max Mustermann',
+      customerEmail: 'max@example.org',
+      customerPhone: '+43 660 0000000',
+      pickupDate: '2026-10-06',
+      pickupTimeStart: '09:00',
+      pickupTimeEnd: '12:00',
+      paymentMethod: 'ONSITE_CASH',
+      items: [{ productId: 'eier', quantity: 1, unitPrice: 4.5 }],
+    }
+    const r = checkoutRequestSchema.safeParse({ ...anfrage, onsiteConfirmed: true, optInEmail: true, optInWhatsApp: true })
+    expect(r.success).toBe(true)
+    expect(Object.keys(r.data ?? {})).not.toEqual(expect.arrayContaining(['onsiteConfirmed']))
+    expect(r.data).not.toHaveProperty('optInEmail')
+    expect(r.data).not.toHaveProperty('optInWhatsApp')
+  })
+
+  it('die Kasse zeigt keinen Pflicht-Haken und keine Neuigkeiten mehr; der Kaufknopf bleibt „Zahlungspflichtig bestellen"', () => {
+    const form = lies('src/components/checkout/checkout-form.tsx')
+    expect(form).not.toMatch(/onsiteConfirmed|optInEmail|optInWhatsApp|Neuigkeiten vom Hof|zahle vor Ort bar/)
+    expect(form).toContain('`Zahlungspflichtig bestellen · ${gesamt}`')
+    // Gegenprobe: die Suche erkennt den alten Haken.
+    expect("{...form.register('onsiteConfirmed')}").toMatch(/onsiteConfirmed|optInEmail|optInWhatsApp|Neuigkeiten vom Hof|zahle vor Ort bar/)
   })
 
   it('die Anfrage an den Server lässt den Wert in der Form zu — ob neu oder alt, entscheidet die Route nach der Idempotenz', () => {
@@ -309,5 +344,29 @@ describe('Beide Themes: nur Tokens', () => {
 
   it('die Kasse steht in der Fokus-Shell (data-design="neu")', () => {
     expect(lies('src/components/checkout/checkout-form.tsx')).toMatch(/<KundeFokusShell\b/)
+  })
+})
+
+describe('Abholung: jeder Termin mit Datum (Nr. 46)', () => {
+  // Montag, 5. Oktober 2026, 10 Uhr in Wien; Fenster Mo 15–18 und Sa 9–12.
+  const slots = [
+    { id: 's1', dayOfWeek: 1, startTime: '15:00', endTime: '18:00', maxOrders: null, isActive: true },
+    { id: 's2', dayOfWeek: 6, startTime: '09:00', endTime: '12:00', maxOrders: null, isActive: true },
+  ]
+  const FELD_TERMIN = { name: 'pickupSlotKey' as const, onChange: async () => {}, onBlur: async () => {}, ref: () => {} }
+
+  it('jede Kachel nennt Wochentag und Datum; heute steht zusätzlich „Heute"', () => {
+    const kacheln = abholKacheln(slots, JETZT, [])
+    const html = renderToStaticMarkup(createElement(AbholWahl, { kacheln, feld: FELD_TERMIN }))
+    expect(html).toContain('Heute')
+    expect(html).toContain('Mo, 5.\u00a0Okt')
+    expect(html).toContain('Sa, 10.\u00a0Okt')
+    expect(html).toContain('Sa, 17.\u00a0Okt')
+    // Jede Kachel trägt ihr Datum — so viele Daten wie Radioknöpfe.
+    const daten = html.match(/(Mo|Di|Mi|Do|Fr|Sa|So), \d{1,2}\.\u00a0[A-ZÄa-zä]+/g) ?? []
+    expect(daten.length).toBe(kacheln.length)
+    expect((html.match(/type="radio"/g) ?? []).length).toBe(kacheln.length)
+    // Ein Wochentag ohne Datum („Samstag") kommt nicht mehr vor.
+    expect(html).not.toMatch(/>(Montag|Samstag|Mittwoch)</)
   })
 })

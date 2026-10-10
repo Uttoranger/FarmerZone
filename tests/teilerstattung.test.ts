@@ -32,9 +32,10 @@ import {
   hatErstattungen,
   ladeStripeStand,
   ordneZu,
+  vollstornoMerkmal,
 } from '@/server/teilerstattung'
 import { TRANSAKTION_MS, VERBINDUNG_WARTEN_MS } from '@/server/artikel-fehlt'
-import { restNachTeilerstattung, zuruecknahmeNachGescheiterterErstattung } from '@/lib/storno'
+import { restNachTeilerstattung, zuruecknahmeNachGescheiterterErstattung, zuruecknahmeNachGescheiterterVollerstattung } from '@/lib/storno'
 
 const ERSTATTUNG = { paymentIntentId: 'pi_1', orderId: 'order_1', anlass: 'reststorno' as const, positionId: null, betragCents: 500, schluessel: 'storno-order_1' }
 
@@ -254,5 +255,57 @@ describe('zuruecknahmeNachGescheiterterErstattung — gescheiterte Erstattung ge
 
   it('ein Betrag von 0 oder weniger ist nie zurückzunehmen', () => {
     expect(zuruecknahmeNachGescheiterterErstattung({ erstattetCentsDatenbank: 500, erstattetCentsStripe: 500, gescheitertCents: 0 })).toEqual({ art: 'unklar' })
+  })
+})
+
+describe('Vollerstattung mit Merkmalen (Nr. 27)', () => {
+  it('trägt dasselbe Muster wie die Teilerstattung: Bestellung, Anlass vollstorno, Art kunde', () => {
+    expect(vollstornoMerkmal('order_1')).toEqual({ orderId: 'order_1', anlass: 'vollstorno', art: 'kunde' })
+  })
+
+  it('zählt nie als Teil- oder Rest-Storno — ladeStripeStand sieht sie weiter als nicht zuzuordnen (im Zweifel nichts buchen)', () => {
+    expect(ordneZu('order_1', vollstornoMerkmal('order_1'), 1082)).toBeNull()
+  })
+})
+
+describe('zuruecknahmeNachGescheiterterVollerstattung — gescheiterte Vollerstattung genau einmal zurücknehmen', () => {
+  const STORNIERT_ERSTATTET = {
+    status: 'CANCELLED',
+    paymentStatus: 'REFUNDED',
+    erstattetCentsDatenbank: 0,
+    bezahltDatenbankCents: 1082,
+    gescheitertCents: 1082,
+    andereZaehlendeErstattungen: false,
+  }
+
+  it('storniert und als erstattet vermerkt: Zahlung wieder offen', () => {
+    expect(zuruecknahmeNachGescheiterterVollerstattung(STORNIERT_ERSTATTET)).toEqual({ art: 'zuruecknehmen' })
+  })
+
+  it('schon wieder offen (zweite Zustellung, zweites Ereignis): nichts mehr', () => {
+    expect(zuruecknahmeNachGescheiterterVollerstattung({ ...STORNIERT_ERSTATTET, paymentStatus: 'PAID' })).toEqual({ art: 'schon_erledigt' })
+  })
+
+  it('Stripe kennt eine weitere zählende Erstattung (z. B. von Hand nachgeholt): unklar, nichts ändern', () => {
+    expect(zuruecknahmeNachGescheiterterVollerstattung({ ...STORNIERT_ERSTATTET, andereZaehlendeErstattungen: true })).toEqual({ art: 'unklar' })
+  })
+
+  it('Betrag passt nicht zum bezahlten Betrag der Bestellung: unklar', () => {
+    expect(zuruecknahmeNachGescheiterterVollerstattung({ ...STORNIERT_ERSTATTET, gescheitertCents: 1000 })).toEqual({ art: 'unklar' })
+  })
+
+  it('vorher schon teilweise erstattet (dann gäbe es keine Vollerstattung): unklar', () => {
+    expect(zuruecknahmeNachGescheiterterVollerstattung({ ...STORNIERT_ERSTATTET, erstattetCentsDatenbank: 582 })).toEqual({ art: 'unklar' })
+  })
+
+  it('Bestellung nicht storniert oder Zahlstand fremd: unklar', () => {
+    expect(zuruecknahmeNachGescheiterterVollerstattung({ ...STORNIERT_ERSTATTET, status: 'PAID' })).toEqual({ art: 'unklar' })
+    expect(zuruecknahmeNachGescheiterterVollerstattung({ ...STORNIERT_ERSTATTET, paymentStatus: 'PENDING' })).toEqual({ art: 'unklar' })
+  })
+
+  it('ein Betrag von 0 ist nie zurückzunehmen', () => {
+    expect(
+      zuruecknahmeNachGescheiterterVollerstattung({ ...STORNIERT_ERSTATTET, gescheitertCents: 0, bezahltDatenbankCents: 0 })
+    ).toEqual({ art: 'unklar' })
   })
 })

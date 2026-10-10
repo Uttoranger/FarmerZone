@@ -2,7 +2,8 @@
  * Ladeansicht von Entdecken (/hoefe, neues Design seit Nr. 09). Maße von
  * src/components/hoefe/hoefe-client.tsx und der KundeShell abgenommen:
  * Kopfzeile 56/64 px, Inhalt max. 1200 px, Überschrift und Unterzeile,
- * Suchfeld (48/44 px), Einstiegshinweis, dann die Hofkarten in der schmalen
+ * das eine Suchfeld „Ort oder Produkt" (48/44 px) mit „Standort nutzen"
+ * (seit Nr. 46 darunter bzw. ab 640 px daneben), dann die Hofkarten in der schmalen
  * Gestalt — so rendert der Server die Liste; der Splitscreen mit Karte
  * entsteht erst nach der Hydration (useIstBreit liefert serverseitig false).
  * Am Handy steht unten die Unterleiste der Shell.
@@ -31,11 +32,14 @@ export default function HoefeLaden() {
           <div className="mt-2 h-4 w-72 max-w-full rounded bg-app-chip" />
         </div>
 
-        {/* Suchfeld */}
-        <div className="h-12 w-full rounded-full border border-border bg-card md:h-11" />
-
-        {/* Einstiegshinweis (Postleitzahl oder Standort) */}
-        <div className="h-[118px] rounded-2xl border border-border bg-muted sm:h-[92px]" />
+        {/* Suchfeld „Ort oder Produkt" und „Standort nutzen" (Nr. 46) */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <div className="h-12 w-full rounded-full border border-border bg-card sm:flex-1 md:h-11" />
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-[164px] rounded-full bg-muted" />
+            <div className="h-3.5 w-36 rounded bg-app-chip" />
+          </div>
+        </div>
 
         {/* Karten-Vorschau (nur schmal) und Ergebniszahl */}
         <div className="h-[120px] rounded-2xl border border-border bg-muted lg:hidden" />

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { toast } from 'sonner'
 import { authClient } from '@/lib/auth-client'
 import { validatePassword } from '@/lib/password-rules'
 import { changePasswordSchema } from '@/schemas/change-password'
@@ -9,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { Check, Loader2 } from 'lucide-react'
+import { useNachSpeichern } from '@/components/hof-einstellungen/use-nach-speichern'
 
 export function PasswordForm() {
   const [currentPassword, setCurrentPassword] = useState('')
@@ -17,6 +17,8 @@ export function PasswordForm() {
   const [passwordTouched, setPasswordTouched] = useState(false)
   const [fehler, setFehler] = useState('')
   const [laedt, setLaedt] = useState(false)
+  // Nach dem Speichern zurück zur Übersicht (Register N1, Nr. 44).
+  const nachSpeichern = useNachSpeichern()
 
   const { valid: pwValid, checks } = validatePassword(password)
   const pwHasError = passwordTouched && !pwValid
@@ -65,8 +67,9 @@ export function PasswordForm() {
         return
       }
 
-      toast.success('Passwort geändert — andere Geräte wurden abgemeldet.')
       leerePasswortfelder()
+      // Dass die anderen Geräte abgemeldet sind, bleibt als Zusatz unter „Gespeichert" stehen.
+      nachSpeichern('Passwort geändert', 'Andere Geräte wurden abgemeldet.')
     } catch {
       setFehler('Verbindung fehlgeschlagen — bitte erneut versuchen.')
     } finally {

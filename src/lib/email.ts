@@ -1,28 +1,8 @@
 import 'server-only'
 import * as React from 'react'
-import { render } from '@react-email/render'
-import { Resend } from 'resend'
-import { OrderConfirmationEmail } from '@/emails/order-confirmation'
-import { OnsiteConfirmationEmail } from '@/emails/onsite-confirmation'
-import { NewOrderNotificationEmail } from '@/emails/new-order-notification'
-import { OrderConfirmedEmail } from '@/emails/order-confirmed'
-import { OrderReadyEmail } from '@/emails/pickup-reminder'
-import { OrderCancelledEmail } from '@/emails/order-cancelled'
-import { ArtikelFehltEmail } from '@/emails/artikel-fehlt'
-import { OrderNotReadyEmail } from '@/emails/order-not-ready'
-import { ZahlungZuSpaetEmail } from '@/emails/zahlung-zu-spaet'
-import { BestellungVerfallenEmail } from '@/emails/bestellung-verfallen'
-import { CustomerMagicLinkEmail } from '@/emails/customer-magic-link'
-import { AnmeldecodeEmail } from '@/emails/anmeldecode'
-import { PasswordResetEmail } from '@/emails/password-reset'
-import { EmailBestaetigungEmail } from '@/emails/email-bestaetigung'
-import { NewFarmNotificationEmail } from '@/emails/new-farm-notification'
-import { FreischaltungEmail } from '@/emails/freischaltung'
-import { MeldungNotificationEmail } from '@/emails/meldung-notification'
-import { BriefkastenZusammenfassungEmail } from '@/emails/briefkasten-zusammenfassung'
-import { ErstattungOffenEmail } from '@/emails/erstattung-offen'
+import * as Sentry from '@sentry/nextjs'
+import type { Resend } from 'resend'
 import { SUPPORT_EMAIL } from '@/lib/support'
-import { StatusUpdateEmail } from '@/emails/status-update'
 import { generateReorderToken } from '@/lib/reorder-token'
 import { formatEuro, formatPosition } from '@/lib/format'
 import { barBestaetigungsPfad, bestellungPfad } from '@/lib/bestell-link'
@@ -32,16 +12,61 @@ import { alsCents, calcLineTotal, decimalZuCents } from '@/lib/order-totals'
 import { fristVon, zeitpunktFuerMail } from '@/lib/fristen'
 import { buildMapsUrl } from '@/lib/customer-links'
 import type { MailZahlart } from '@/emails/order-confirmation'
-import { APP_URL } from '@/lib/umgebung-server'
+import { APP_URL, UMGEBUNG } from '@/lib/umgebung-server'
 import { ANMELDECODE_GUELTIG_SEKUNDEN } from '@/lib/anmeldecode'
 import { BESTAETIGUNG_GUELTIG_SEKUNDEN } from '@/lib/email-bestaetigung'
+import { ABO_BESTAETIGUNG_GUELTIG_TAGE } from '@/lib/abo-bestaetigung'
+import { env } from '@/lib/env'
+import { darfMailEmpfangen, leseTestEmpfaenger, sperrtTrotzProduktion } from '@/lib/testumgebung'
+import { abmeldeSeitenPfad, listUnsubscribeKoepfe } from '@/lib/abmelde-link'
 
 const apiKey = process.env.RESEND_API_KEY
-const resend = apiKey ? new Resend(apiKey) : null
 const FROM = process.env.EMAIL_FROM ?? 'onboarding@resend.dev'
 
-// Einmal beim Serverstart loggen damit man im Terminal sieht ob der Key gelesen wurde
-console.log(`[E-Mail] Init — RESEND_API_KEY=${apiKey ? 'gesetzt' : 'FEHLT → nur Log-Modus'} FROM=${FROM}`)
+// Post-Sperre (Register Z3, Nr. 43): frei nur im Produktions-Deployment bei
+// Vercel. Die Liste einmal je Instanz, der Zähler auch — gezählt wird nur, nie
+// eine Adresse notiert.
+const TEST_EMPFAENGER = leseTestEmpfaenger(env.TEST_EMPFAENGER)
+let nichtVerschickt = 0
+let sperreTrotzProduktionGemeldet = false
+
+/**
+ * Sicherheitsnetz (Nr. 43, Runde 1): Hält sich die App für die Produktion, fehlt
+ * aber VERCEL_ENV=production, sperrt die Post fail-closed. Ist das die echte
+ * Produktion (Vercel gibt die Systemvariablen nicht frei), verstummte sie sonst
+ * still — deshalb einmal je Instanz nach Sentry, fester Satz, ohne Adresse und
+ * ohne Betreff. Lokal, in der CI und in Tests ohne DSN ist der Aufruf ein No-op.
+ */
+function meldeSperreTrotzProduktion(): void {
+  if (sperreTrotzProduktionGemeldet || !sperrtTrotzProduktion(UMGEBUNG)) return
+  sperreTrotzProduktionGemeldet = true
+  try {
+    Sentry.captureMessage(
+      'Mail nicht verschickt: Die App läuft als Produktion, aber ohne VERCEL_ENV=production — die Post-Sperre (Register Z3) gilt. Systemvariablen bei Vercel freigeben.',
+      { level: 'error', tags: { bereich: 'post-sperre' } }
+    )
+  } catch {
+    // Telemetrie scheitert leise — die Sperre selbst gilt weiter.
+  }
+}
+
+/*
+ * Schwere Module erst beim Versand (Nachtlauf Nr. 31, ARCHITECTURE §4): Das
+ * Resend-SDK, @react-email/render und jede Vorlage kommen per `await import()`
+ * in der Versandfunktion — so lädt ein Kaltstart, der keine Mail schickt,
+ * nichts davon. Vorher stand hier ein Log beim Laden des Moduls, das bei
+ * jedem Kaltstart im Hofbereich erschien; ob der Schlüssel fehlt, sagt jetzt
+ * sendRaw bei jedem Versand (Log-Modus unten).
+ */
+let resendInstanz: Resend | null = null
+
+async function resendClient(schluessel: string): Promise<Resend> {
+  if (!resendInstanz) {
+    const { Resend } = await import('resend')
+    resendInstanz = new Resend(schluessel)
+  }
+  return resendInstanz
+}
 
 // Empfängeradressen sind personenbezogene Daten und haben in den
 // Produktions-Logs (Vercel) nichts verloren — lokal bleiben sie sichtbar,
@@ -51,17 +76,70 @@ function logEmpfaenger(to: string): string {
 }
 
 async function toHtml(element: React.ReactElement): Promise<string> {
+  const { render } = await import('@react-email/render')
   return render(element)
 }
 
-export async function sendRaw(to: string, subject: string, html: string): Promise<{ id?: string; error?: string }> {
-  if (!resend) {
+/**
+ * Für die Versandfunktionen, die ein Ergebnis liefern statt zu werfen
+ * (Anmeldecode, Code für „Bestellungen finden", E-Mail bestätigen): Laden und
+ * Rendern der Vorlage im selben Fehlerweg wie der Versand — seit die Vorlage
+ * dynamisch kommt (Nr. 31), könnte schon das Laden scheitern. Dann
+ * `{ error }` wie bei einem Resend-Fehler; auth.ts schreibt den Code lokal ins Log.
+ */
+async function htmlOderFehler(
+  baue: () => Promise<React.ReactElement>
+): Promise<{ ok: true; html: string } | { ok: false; error: string }> {
+  try {
+    return { ok: true, html: await toHtml(await baue()) }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`[E-Mail] Vorlage nicht erzeugt: ${msg}`)
+    return { ok: false, error: msg }
+  }
+}
+
+/**
+ * Ergebnis eines Versands: `id` = verschickt, `error` = gescheitert,
+ * `gesperrt` = außerhalb des Produktions-Deployments bei Vercel bewusst nicht
+ * verschickt (Empfänger nicht freigegeben, Register Z3). Gesperrt ist kein
+ * Fehler — die Aufrufer melden ihn deshalb nicht an Sentry; nur sendRaw selbst
+ * meldet die Sperre trotz Produktion, einmal je Instanz.
+ */
+export type VersandErgebnis = { id?: string; error?: string; gesperrt?: true }
+
+/**
+ * Zusätzliche Kopfzeilen einer Mail — heute nur die Abmelde-Kopfzeilen
+ * werblicher Mails (List-Unsubscribe, RFC 8058, Nr. 47).
+ */
+type MailOptionen = { headers?: Record<string, string> }
+
+export async function sendRaw(
+  to: string,
+  subject: string,
+  html: string,
+  optionen: MailOptionen = {}
+): Promise<VersandErgebnis> {
+  if (!apiKey) {
     console.log(`[E-Mail] KEIN API-KEY — würde senden: "${subject}" → ${logEmpfaenger(to)}`)
     return { error: 'RESEND_API_KEY nicht gesetzt' }
   }
+  // Nach dem Log-Modus, damit lokal ohne Schlüssel alles bleibt, wie es war.
+  // Hier stehen weder Adresse noch Betreff im Log: Beide können eine Person
+  // nennen, und die Testumgebung schreibt in die Vercel-Logs.
+  if (!darfMailEmpfangen(to, UMGEBUNG, TEST_EMPFAENGER)) {
+    nichtVerschickt += 1
+    console.log(
+      `[E-Mail] Nicht verschickt: Empfänger steht nicht in TEST_EMPFAENGER (außerhalb des Produktions-Deployments). Bisher ${nichtVerschickt} in dieser Instanz.`
+    )
+    meldeSperreTrotzProduktion()
+    return { gesperrt: true }
+  }
   console.log(`[E-Mail] Sende: "${subject}" → ${logEmpfaenger(to)} (from: ${FROM})`)
   try {
-    const result = await resend.emails.send({ from: FROM, to, subject, html })
+    // Im try: Scheitert schon das Laden des SDK, bleibt es beim { error } — sendRaw wirft nie.
+    const resend = await resendClient(apiKey)
+    const result = await resend.emails.send({ from: FROM, to, subject, html, ...(optionen.headers ? { headers: optionen.headers } : {}) })
     if (result.error) {
       console.error(`[E-Mail] Resend-Fehler: ${JSON.stringify(result.error)}`)
       return { error: JSON.stringify(result.error) }
@@ -75,8 +153,8 @@ export async function sendRaw(to: string, subject: string, html: string): Promis
   }
 }
 
-async function send(to: string, subject: string, html: string): Promise<void> {
-  await sendRaw(to, subject, html)
+async function send(to: string, subject: string, html: string, optionen?: MailOptionen): Promise<void> {
+  await sendRaw(to, subject, html, optionen)
 }
 
 function formatPickupDate(date: Date): string {
@@ -195,6 +273,7 @@ function betraege(order: OrderForEmail): { warenpreis: number; gebuehr: number; 
 
 /** Magic-Link → Kunde */
 export async function sendMagicLinkEmail(email: string, url: string, firstName?: string): Promise<void> {
+  const { CustomerMagicLinkEmail } = await import('@/emails/customer-magic-link')
   const html = await toHtml(React.createElement(CustomerMagicLinkEmail, { firstName, magicUrl: url }))
   await send(email, 'Dein Login-Link für FarmerZone', html)
 }
@@ -205,10 +284,14 @@ export async function sendMagicLinkEmail(email: string, url: string, firstName?:
  * zeigt ihn jedem, der danebensteht. Gibt das Versandergebnis zurück — ohne
  * ID (kein Schlüssel, Resend-Fehler) schreibt auth.ts den Code lokal ins Log.
  */
-export async function sendAnmeldeCodeEmail(email: string, code: string): Promise<{ id?: string; error?: string }> {
+export async function sendAnmeldeCodeEmail(email: string, code: string): Promise<VersandErgebnis> {
   const minuten = ANMELDECODE_GUELTIG_SEKUNDEN / 60
-  const html = await toHtml(React.createElement(AnmeldecodeEmail, { code, minuten }))
-  return sendRaw(email, 'Dein Anmeldecode für FarmerZone', html)
+  const vorlage = await htmlOderFehler(async () => {
+    const { AnmeldecodeEmail } = await import('@/emails/anmeldecode')
+    return React.createElement(AnmeldecodeEmail, { code, minuten })
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, 'Dein Anmeldecode für FarmerZone', vorlage.html)
 }
 
 /**
@@ -216,10 +299,14 @@ export async function sendAnmeldeCodeEmail(email: string, code: string): Promise
  * Dieselbe Vorlage wie der Anmeldecode, eigener Text; Betreff und Vorschau
  * ohne Code (Begründung wie oben). Gibt das Versandergebnis zurück.
  */
-export async function sendBestellCodeEmail(email: string, code: string): Promise<{ id?: string; error?: string }> {
+export async function sendBestellCodeEmail(email: string, code: string): Promise<VersandErgebnis> {
   const minuten = ANMELDECODE_GUELTIG_SEKUNDEN / 60
-  const html = await toHtml(React.createElement(AnmeldecodeEmail, { code, minuten, zweck: 'bestellungen' }))
-  return sendRaw(email, 'Dein Code für deine Bestellungen · FarmerZone', html)
+  const vorlage = await htmlOderFehler(async () => {
+    const { AnmeldecodeEmail } = await import('@/emails/anmeldecode')
+    return React.createElement(AnmeldecodeEmail, { code, minuten, zweck: 'bestellungen' })
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, 'Dein Code für deine Bestellungen · FarmerZone', vorlage.html)
 }
 
 /**
@@ -227,13 +314,52 @@ export async function sendBestellCodeEmail(email: string, code: string): Promise
  * volle Adresse von /verify mit dem signierten Token. Der Betreff trägt
  * keinen Link; gibt das Versandergebnis zurück (sendRaw wirft nie).
  */
-export async function sendEmailBestaetigung(email: string, url: string): Promise<{ id?: string; error?: string }> {
-  const html = await toHtml(React.createElement(EmailBestaetigungEmail, { url, stunden: BESTAETIGUNG_GUELTIG_SEKUNDEN / 3600 }))
-  return sendRaw(email, 'Bestätige deine E-Mail-Adresse · FarmerZone', html)
+export async function sendEmailBestaetigung(email: string, url: string): Promise<VersandErgebnis> {
+  const vorlage = await htmlOderFehler(async () => {
+    const { EmailBestaetigungEmail } = await import('@/emails/email-bestaetigung')
+    return React.createElement(EmailBestaetigungEmail, { url, stunden: BESTAETIGUNG_GUELTIG_SEKUNDEN / 3600 })
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, 'Bestätige deine E-Mail-Adresse · FarmerZone', vorlage.html)
+}
+
+/**
+ * „Bitte bestätige deine Anmeldung" → wer sich für Neuigkeiten eines Hofes
+ * angemeldet hat (Double-Opt-in, S11, Nr. 38). Keine werbliche Mail, deshalb
+ * ohne Abmeldelink. Gibt das Versandergebnis zurück (sendRaw wirft nie).
+ */
+export async function sendAboBestaetigung(
+  email: string,
+  daten: { hofName: string; url: string }
+): Promise<VersandErgebnis> {
+  const vorlage = await htmlOderFehler(async () => {
+    const { AboBestaetigungEmail } = await import('@/emails/abo-bestaetigung')
+    return React.createElement(AboBestaetigungEmail, { ...daten, tage: ABO_BESTAETIGUNG_GUELTIG_TAGE })
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, 'Bitte bestätige deine Anmeldung · FarmerZone', vorlage.html)
+}
+
+/**
+ * Hinweis an ein bestehendes Konto: Jemand wollte sich mit seiner Adresse
+ * registrieren (Register F6 „19b", Nachtlauf Nr. 27). Der Betreff nennt die
+ * Adresse nicht. Gibt wie sendRaw `{ error }` zurück statt zu werfen — der
+ * Aufrufer meldet es ohne Adresse an Sentry.
+ */
+export async function sendRegistrierungsHinweis(
+  email: string,
+  ziele: { weg: 'passwort' | 'code'; anmelden: string; passwortZuruecksetzen: string | null }
+): Promise<VersandErgebnis> {
+  // Vorlage erst beim Versand laden: Seitenmodule, die email.ts einbinden,
+  // sollen sie nicht mitziehen (Nachtlauf Nr. 31, „schwere Module nur bei Bedarf").
+  const { RegistrierungHinweisEmail } = await import('@/emails/registrierung-hinweis')
+  const html = await toHtml(React.createElement(RegistrierungHinweisEmail, ziele))
+  return sendRaw(email, 'Jemand wollte sich mit deiner Adresse registrieren · FarmerZone', html)
 }
 
 /** Passwort-Reset → Bauer */
 export async function sendPasswordResetEmail(email: string, url: string): Promise<void> {
+  const { PasswordResetEmail } = await import('@/emails/password-reset')
   const html = await toHtml(React.createElement(PasswordResetEmail, { resetUrl: url }))
   await send(email, 'Passwort zurücksetzen · FarmerZone', html)
 }
@@ -248,6 +374,7 @@ export async function sendNewFarmNotification(farm: {
   const registeredAt = new Date().toLocaleString('de-AT', {
     day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
   })
+  const { NewFarmNotificationEmail } = await import('@/emails/new-farm-notification')
   const html = await toHtml(
     React.createElement(NewFarmNotificationEmail, {
       farmName: farm.name,
@@ -273,6 +400,7 @@ export async function sendFreischaltungEmail(farm: {
   ownerEmail: string
 }): Promise<void> {
   const farmUrl = `${APP_URL}/${farm.slug}`
+  const { FreischaltungEmail } = await import('@/emails/freischaltung')
   const html = await toHtml(React.createElement(FreischaltungEmail, { farmName: farm.name, farmUrl }))
   await send(farm.ownerEmail, 'Dein Hof ist freigeschaltet', html)
 }
@@ -293,6 +421,7 @@ export async function sendMeldungNotification(m: {
   screenshotUrl: string | null
   createdAt: Date
 }): Promise<void> {
+  const { MeldungNotificationEmail } = await import('@/emails/meldung-notification')
   const html = await toHtml(
     React.createElement(MeldungNotificationEmail, {
       kurznummer: m.kurznummer,
@@ -321,6 +450,7 @@ export async function sendBriefkastenZusammenfassung(z: {
   neueste: Array<{ kurznummer: string; art: string; ersteZeile: string; hofName: string | null }>
   geloescht: number
 }): Promise<void> {
+  const { BriefkastenZusammenfassungEmail } = await import('@/emails/briefkasten-zusammenfassung')
   const html = await toHtml(
     React.createElement(BriefkastenZusammenfassungEmail, { ...z, adminUrl: `${APP_URL}/admin/meldungen` })
   )
@@ -352,6 +482,7 @@ export type ErstattungOffenMeldung = {
  * um die Erstattung und melden uns."
  */
 export async function sendErstattungOffen(m: ErstattungOffenMeldung): Promise<void> {
+  const { ErstattungOffenEmail } = await import('@/emails/erstattung-offen')
   const html = await toHtml(
     React.createElement(ErstattungOffenEmail, {
       was: m.was,
@@ -377,6 +508,7 @@ export async function sendOrderConfirmation(order: OrderForEmail): Promise<void>
   // nach dem Schließen des Tabs noch hat (kein Konto, keine Historie).
   const orderUrl = `${APP_URL}${bestellungPfad(order.farm.slug, order.id)}`
 
+  const { OrderConfirmationEmail } = await import('@/emails/order-confirmation')
   const html = await toHtml(React.createElement(OrderConfirmationEmail, {
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
@@ -423,6 +555,7 @@ export async function sendOnsiteConfirmation(
       })
     : null
 
+  const { OnsiteConfirmationEmail } = await import('@/emails/onsite-confirmation')
   const html = await toHtml(React.createElement(OnsiteConfirmationEmail, {
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
@@ -446,6 +579,7 @@ export async function sendOnsiteConfirmation(
 
 /** Online-Zahlung → Bauer */
 export async function sendOrderPaidToFarmer(order: OrderForEmail): Promise<void> {
+  const { NewOrderNotificationEmail } = await import('@/emails/new-order-notification')
   const html = await toHtml(React.createElement(NewOrderNotificationEmail, {
     farmerName: order.farm.ownerName,
     customerName: order.customerName,
@@ -475,6 +609,7 @@ export async function sendOrderConfirmedToFarmer(order: OrderForEmail): Promise<
   const paymentLabel =
     order.paymentMethod === 'ONSITE_CASH' ? 'Bar bei Abholung' : 'Karte bei Abholung'
 
+  const { OrderConfirmedEmail } = await import('@/emails/order-confirmed')
   const html = await toHtml(React.createElement(OrderConfirmedEmail, {
     farmerName: order.farm.ownerName,
     customerName: order.customerName,
@@ -506,6 +641,7 @@ export async function sendOrderReady(order: OrderForEmail): Promise<void> {
   const reorderUrl = `${APP_URL}/${order.farm.slug}?reorder=${reorderToken}`
   const orderUrl = `${APP_URL}${bestellungPfad(order.farm.slug, order.id)}`
 
+  const { OrderReadyEmail } = await import('@/emails/pickup-reminder')
   const html = await toHtml(React.createElement(OrderReadyEmail, {
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
@@ -529,6 +665,7 @@ export async function sendOrderReady(order: OrderForEmail): Promise<void> {
 /** Fertig-Rückschritt → Kunde (optional, Haken im Dialog): neutrales Update,
  *  die Abholbereit-Mail war schon draußen und wird hiermit relativiert */
 export async function sendOrderNotReady(order: OrderForEmail): Promise<void> {
+  const { OrderNotReadyEmail } = await import('@/emails/order-not-ready')
   const html = await toHtml(React.createElement(OrderNotReadyEmail, {
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
@@ -547,7 +684,13 @@ export async function sendOrderNotReady(order: OrderForEmail): Promise<void> {
   )
 }
 
-/** Status-Update → Abonnent */
+/**
+ * Status-Update → Abonnent — die werbliche Mail (S11). Aus dem signierten
+ * Abmelde-Token entstehen beide Wege hinaus: der Link im Text (Seite mit dem
+ * Knopf) und seit Nr. 47 die Kopfzeilen List-Unsubscribe und
+ * List-Unsubscribe-Post, mit denen das Mailprogramm selbst „Abmelden"
+ * anbietet (Ein-Klick, RFC 8058). Keine Transaktionsmail trägt sie.
+ */
 export async function sendStatusUpdateEmail(opts: {
   to: string
   farmName: string
@@ -556,8 +699,10 @@ export async function sendStatusUpdateEmail(opts: {
   body: string
   anlass: string
   photoUrl?: string
-  unsubscribeUrl: string
+  /** Signierter Abmelde-Token (generateUnsubscribeToken) — ohne Ablauf. */
+  abmeldeToken: string
 }): Promise<void> {
+  const { StatusUpdateEmail } = await import('@/emails/status-update')
   const html = await toHtml(
     React.createElement(StatusUpdateEmail, {
       farmName: opts.farmName,
@@ -566,11 +711,11 @@ export async function sendStatusUpdateEmail(opts: {
       body: opts.body,
       anlass: opts.anlass,
       photoUrl: opts.photoUrl,
-      unsubscribeUrl: opts.unsubscribeUrl,
+      unsubscribeUrl: `${APP_URL}${abmeldeSeitenPfad(opts.abmeldeToken)}`,
       appUrl: APP_URL,
     })
   )
-  await send(opts.to, `${opts.farmName}: ${opts.title}`, html)
+  await send(opts.to, `${opts.farmName}: ${opts.title}`, html, { headers: listUnsubscribeKoepfe(APP_URL, opts.abmeldeToken) })
 }
 
 /** Storno → Kunde */
@@ -580,6 +725,7 @@ export async function sendOrderCancelled(
   /** Der Grund aus dem Storno-Dialog (Nr. 19) — Text des Hofs, React escaped ihn. */
   cancelReason?: string | null
 ): Promise<void> {
+  const { OrderCancelledEmail } = await import('@/emails/order-cancelled')
   const html = await toHtml(React.createElement(OrderCancelledEmail, {
     customerName: order.customerName,
     orderNumber: order.orderNumber,
@@ -611,6 +757,7 @@ export async function sendArtikelFehlt(
     erstattetCents: number | null
   }
 ): Promise<void> {
+  const { ArtikelFehltEmail } = await import('@/emails/artikel-fehlt')
   const html = await toHtml(React.createElement(ArtikelFehltEmail, {
     customerName: order.customerName,
     orderNumber: order.orderNumber,
@@ -636,6 +783,7 @@ export async function sendZahlungZuSpaet(
   },
   erstattetCents: number
 ): Promise<void> {
+  const { ZahlungZuSpaetEmail } = await import('@/emails/zahlung-zu-spaet')
   const html = await toHtml(React.createElement(ZahlungZuSpaetEmail, {
     customerName: order.customerName,
     orderNumber: order.orderNumber,
@@ -653,6 +801,7 @@ export async function sendBestellungVerfallen(
     farm: Pick<OrderForEmail['farm'], 'name'>
   }
 ): Promise<void> {
+  const { BestellungVerfallenEmail } = await import('@/emails/bestellung-verfallen')
   const html = await toHtml(React.createElement(BestellungVerfallenEmail, {
     customerName: order.customerName,
     orderNumber: order.orderNumber,

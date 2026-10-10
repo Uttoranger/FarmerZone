@@ -240,6 +240,54 @@ describe('Chips', () => {
   })
 })
 
+describe('Gebinde-Facette mit Produktfamilien (Gate 6, Nr. 20)', () => {
+  // Eine Familie: je Größe ein Produkt mit eigener Nettomenge. Gesperrte
+  // Größen entstehen als Entwurf (isAvailable false) und sind nicht kaufbar.
+  const groesse = (name: string, nettoMenge: number, isAvailable: boolean) =>
+    baueAngebotsZeile({
+      name: `Bergwiesen-Heu ${name}`,
+      isAvailable,
+      stock: 10,
+      reservedStock: 0,
+      price: 5,
+      category: 'HEU_STROH',
+      subcategory: 'WIESENHEU',
+      labels: [],
+      futter: { zielTierarten: ['HEIMTIER', 'PFERD'], nettoMenge, nettoEinheit: 'KG' },
+    })
+  const angebot = (sackerlOnline: boolean) =>
+    [groesse('1 kg-Sackerl', 1, sackerlOnline), groesse('5 kg-Sack', 5, sackerlOnline), groesse('Kleinballen', 15, true), groesse('Rundballen', 250, true)].filter(
+      (z): z is AngebotsZeile => z !== null
+    )
+
+  it('mit allen vier Größen online steht der Hof unter Kleinmengen UND unter Ballen & mehr', () => {
+    const hoefe = [{ angebot: angebot(true) }]
+    expect(gebindeChips(hoefe, FUTTER).map((c) => [c.wert, c.anzahl])).toEqual([
+      ['KLEIN', 1],
+      ['GROSS', 1],
+    ])
+    expect(hofPasst(hoefe[0], { ...FUTTER, gebinde: 'KLEIN' })).toBe(true)
+    expect(hofPasst(hoefe[0], { ...FUTTER, gebinde: 'GROSS' })).toBe(true)
+  })
+
+  it('der 15-kg-Kleinballen zählt als Kleinmenge (bis 25 kg), der Rundballen als Ballen & mehr', () => {
+    const nurKleinballen = [{ angebot: [groesse('Kleinballen', 15, true)].filter((z): z is AngebotsZeile => z !== null) }]
+    expect(gebindeChips(nurKleinballen, FUTTER).map((c) => c.wert)).toEqual(['KLEIN'])
+  })
+
+  it('gesperrte Größen (Entwurf) zählen nicht — Sackerl und Sack ohne BAES-Meldung, nur der Rundballen kaufbar', () => {
+    const zeilen = [groesse('1 kg-Sackerl', 1, false), groesse('5 kg-Sack', 5, false), groesse('Rundballen', 250, true)].filter(
+      (z): z is AngebotsZeile => z !== null
+    )
+    expect(zeilen).toHaveLength(1)
+    const hoefe = [{ angebot: zeilen }]
+    expect(gebindeChips(hoefe, FUTTER).map((c) => c.wert)).toEqual(['GROSS'])
+    expect(hofPasst(hoefe[0], { ...FUTTER, gebinde: 'KLEIN' })).toBe(false)
+    // Gegenprobe: mit Meldung zählen die Kleinmengen wieder.
+    expect(gebindeChips([{ angebot: angebot(true) }], FUTTER).map((c) => c.wert)).toContain('KLEIN')
+  })
+})
+
 describe('Kilopreis', () => {
   const teuer = { name: 'teuer', angebot: [heu({ grundpreis: { wert: 0.3, einheit: 'KG', preis: 9, menge: 30 } })] }
   const billig = {

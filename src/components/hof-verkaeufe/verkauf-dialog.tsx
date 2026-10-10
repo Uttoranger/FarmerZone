@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useId, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 import { CalendarDays, Check, ChevronDown } from 'lucide-react'
@@ -22,7 +22,15 @@ import { NOTIZ_MAX, PRODUKTNAME_MAX } from '@/lib/eingabegrenzen'
 import { wienKalendertag } from '@/lib/kalender'
 import { useMindestbreite } from '@/lib/use-mindestbreite'
 import { STANDARD_KANAL, kanalSpeicher, kanalVorauswahl, merkeKanal } from '@/lib/verkaufskanal-speicher'
-import { HAUPTKANAELE, datumKurz, istOhneProdukt, knopfText, produktChips } from '@/lib/verkauf-eintragen'
+import {
+  HAUPTKANAELE,
+  VORRAT_ABZIEHEN,
+  datumKurz,
+  istOhneProdukt,
+  knopfText,
+  produktChips,
+  vorratSchalterText,
+} from '@/lib/verkauf-eintragen'
 import { cn } from '@/lib/utils'
 
 /*
@@ -50,6 +58,8 @@ type FormWerte = {
   unit: string | null
   saleDate: string
   note: string
+  /** Schalter „Vorrat abziehen" (Register D1) — Standard ein, gilt nur beim Eintragen mit Produkt. */
+  vorratAbziehen: boolean
 }
 
 function startWerte(verkauf: VerkaufDaten | null, vorlage: VerkaufDaten | null, heute: string): FormWerte {
@@ -65,6 +75,7 @@ function startWerte(verkauf: VerkaufDaten | null, vorlage: VerkaufDaten | null, 
       unit: null,
       saleDate: heute,
       note: '',
+      vorratAbziehen: true,
     }
   }
   const ohne = istOhneProdukt(quelle)
@@ -81,6 +92,7 @@ function startWerte(verkauf: VerkaufDaten | null, vorlage: VerkaufDaten | null, 
     // Wiederholen trägt heute ein, Bearbeiten behält den Tag.
     saleDate: verkauf ? verkauf.saleTag : heute,
     note: quelle.note ?? '',
+    vorratAbziehen: true,
   }
 }
 
@@ -131,7 +143,12 @@ export function VerkaufFormular({
   const chips = produktChips(topProduktIds, produkte, werte.productId)
   const knopf = knopfText(werte.totalAmount, bearbeiten)
   const fehler = form.formState.errors
+  // Das gewählte Produkt aus dem Sortiment — nur dann gibt es einen Vorrat abzuziehen.
+  const gewaehlt = werte.productId ? produkte.find((p) => p.id === werte.productId) : undefined
   const einheit = werte.unit ? (UNIT_LABELS[werte.unit] ?? werte.unit) : undefined
+  // D1 regelt nur das Eintragen: Beim Bearbeiten gibt es den Schalter nicht (und keine Gegenbuchung).
+  const vorratSchalter = !bearbeiten && gewaehlt !== undefined
+  const vorratTextId = useId()
   const datumText = datumKurz(werte.saleDate, heute)
 
   function waehleProdukt(produkt: VerkaufProdukt | null) {
@@ -153,6 +170,7 @@ export function VerkaufFormular({
       channel: w.channel,
       saleDate: w.saleDate,
       note: w.note,
+      vorratAbziehen: vorratSchalter && w.vorratAbziehen,
     })
     if (!geprueft.success) {
       for (const issue of geprueft.error.issues) {
@@ -176,7 +194,9 @@ export function VerkaufFormular({
         return
       }
       if (!bearbeiten) merkeKanal(kanalSpeicher(), geprueft.data.channel)
-      toast.success(bearbeiten ? 'Verkauf gespeichert' : 'Verkauf eingetragen')
+      // Der Satz zum Vorrat kommt vom Server (vorratHinweis) — reichte der Vorrat nicht, als Hinweis, der länger stehen bleibt.
+      if (antwort.vorrat?.knapp) toast.warning(antwort.vorrat.text, { duration: 10000 })
+      else toast.success(antwort.vorrat?.text ?? (bearbeiten ? 'Verkauf gespeichert' : 'Verkauf eingetragen'))
       onFertig()
     } catch {
       setServerFehler('Wir konnten den Verkauf nicht speichern. Bitte versuch es noch einmal.')
@@ -358,6 +378,38 @@ export function VerkaufFormular({
             </div>
           )}
         </fieldset>
+
+        {/* Vorrat abziehen (D1) — nur beim Eintragen mit einem Produkt aus dem Sortiment. Die ganze Zeile ist der
+            Schalter (44 px, role="switch") wie „Teilen-Hinweise zeigen"; fester Name, der Satz darunter beschreibt. */}
+        {vorratSchalter && (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={werte.vorratAbziehen}
+            aria-label={VORRAT_ABZIEHEN}
+            aria-describedby={vorratTextId}
+            onClick={() => form.setValue('vorratAbziehen', !werte.vorratAbziehen)}
+            className={cn('-my-1 flex min-h-11 w-full items-center gap-3 rounded-xl py-1 text-left', FOKUS_RAHMEN)}
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-foreground">{VORRAT_ABZIEHEN}</span>
+              <span id={vorratTextId} className="block text-[13px] leading-normal break-words text-muted-foreground">
+                {vorratSchalterText(werte.vorratAbziehen, gewaehlt, werte.quantity, werte.unit)}
+              </span>
+            </span>
+            <span
+              aria-hidden="true"
+              className={cn('relative block h-6 w-10 shrink-0 rounded-full transition-colors duration-[250ms]', werte.vorratAbziehen ? 'bg-accent' : 'bg-border')}
+            >
+              <span
+                className={cn(
+                  'absolute top-[3px] block size-[18px] rounded-full transition-transform duration-[250ms]',
+                  werte.vorratAbziehen ? 'translate-x-[19px] bg-accent-foreground' : 'translate-x-[3px] bg-muted-foreground'
+                )}
+              />
+            </span>
+          </button>
+        )}
 
         {/* Menge oder Notiz — zugeklappt */}
         <div>

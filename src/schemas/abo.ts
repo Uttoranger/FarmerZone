@@ -13,3 +13,28 @@ export const aboAenderungSchema = z.object({
 })
 
 export type AboAenderung = z.infer<typeof aboAenderungSchema>
+
+/**
+ * Der Knopf „Anmeldung bestätigen" (Double-Opt-in, S11, Nr. 38). Hier nur
+ * die Form; Signatur, Zweck und Ablauf prüft `pruefeAboBestaetigungsToken`.
+ * Echte Token sind rund 120 Zeichen lang — die Grenze hält Unsinn fern.
+ */
+export const ABO_TOKEN_MAX = 512
+
+export const aboTokenSchema = z.string().trim().min(1).max(ABO_TOKEN_MAX)
+
+export const aboBestaetigenSchema = z.object({ token: aboTokenSchema })
+
+/**
+ * Neuigkeiten auf der Bestätigungsseite anmelden (Register N2, Nr. 46). Der
+ * Browser schickt nur, was ohnehin in der Adresse der Seite steht: die
+ * Bestell-Kennung und die Signatur (`sig`, HMAC in Hex, bestell-link.ts) —
+ * nie eine E-Mail-Adresse. Ein zusätzliches Feld (etwa eine Adresse) fällt
+ * still weg. Ob die Signatur gilt, prüft `bestellLinkGilt` in der Action.
+ */
+export const neuigkeitenAnmeldenSchema = z.object({
+  orderId: z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/),
+  sig: z.string().regex(/^[0-9a-f]{64}$/),
+})
+
+export type NeuigkeitenAnmelden = z.infer<typeof neuigkeitenAnmeldenSchema>

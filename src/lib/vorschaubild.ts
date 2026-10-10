@@ -3,16 +3,20 @@
  * zeigen (Open Graph). Rein und ohne Datenbank prüfbar (tests/vorschaubild.test.ts).
  *
  * Die Startseite hat ein eigenes Bild (public/og/startseite.jpg, 1200 × 630 —
- * das Standardformat der großen Vorschau). Eine Hofseite zeigt ihr Titelbild;
- * ohne Titelbild dasselbe Bild wie die Startseite, damit ein geteilter
- * Hof-Link nie ohne Bild ankommt.
+ * das Standardformat der großen Vorschau). Eine Hofseite zeigt seit Nr. 21
+ * ihr Teilen-Bild (Gate 7: „Dasselbe Bild ist Open-Graph-Vorschau der
+ * Hofseite"): Hofname, was es diese Woche gibt, nächste Abholung — erzeugt
+ * von der Route `/[farmSlug]/opengraph-image` (src/lib/teilen-bild.ts).
  *
  * BEWUSST keine Datei `opengraph-image.*` im app-Ordner: Nach Nexts
- * Dateikonvention würde sie für alle Seiten darunter gelten und die
- * Titelbilder der Hofseiten überschreiben. Die Pfade sind relativ — aufgelöst
- * werden sie über `metadataBase` im Root-Layout (metadatenBasis unten).
+ * Dateikonvention würde sie für alle Seiten darunter gelten (Produktseite,
+ * Kasse, Bestätigung). Die Bild-Route liegt deshalb als `route.tsx` in einem
+ * Ordner gleichen Namens. Die Pfade sind relativ — aufgelöst werden sie über
+ * `metadataBase` im Root-Layout (metadatenBasis unten).
  */
 import { titelbildFoto } from '@/lib/mein-hof'
+import { teilenBildPfad } from '@/lib/teilen-kanal'
+import { TEILEN_BILD_MASSE } from '@/lib/teilen-bild'
 
 export type Vorschaubild = { url: string; width?: number; height?: number; alt: string }
 
@@ -40,8 +44,27 @@ export function metadatenBasis(appUrl: string | null): URL | undefined {
   }
 }
 
-/** Das Vorschaubild einer Hofseite: ihr Titelbild (nur ein echtes Foto), sonst das der Startseite. */
-export function hofVorschaubild(hof: { name: string; bannerType: string; bannerUrl: string | null }): Vorschaubild {
+/**
+ * Das Vorschaubild einer Hofseite: ihr Teilen-Bild im Format 1:1. `version`
+ * ist die Prüfsumme des Inhalts (`teilenBildVersion`) — sie macht die Adresse
+ * neu, sobald sich das Bild ändert; ohne sie (Bild nicht ladbar) das Bild der
+ * Startseite, damit ein geteilter Hof-Link nie ohne Bild ankommt.
+ */
+export function hofVorschaubild(hof: { name: string; slug: string }, version: string | null): Vorschaubild {
+  if (version === null) return STARTSEITE_VORSCHAUBILD
+  return {
+    url: teilenBildPfad(hof.slug, { version }),
+    ...TEILEN_BILD_MASSE.quadrat,
+    alt: `${hof.name} – frisch diese Woche`,
+  }
+}
+
+/**
+ * Das Titelbild eines Hofs als Vorschaubild (nur ein echtes Foto), sonst das
+ * der Startseite — für Seiten unter dem Hof, die kein eigenes Bild haben
+ * (Produktseite ohne Produktfoto). Bis Nr. 20 war das auch das Bild der Hofseite.
+ */
+export function hofTitelbildVorschau(hof: { name: string; bannerType: string; bannerUrl: string | null }): Vorschaubild {
   const titelbild = titelbildFoto(hof)
   return titelbild ? { url: titelbild, alt: hof.name } : STARTSEITE_VORSCHAUBILD
 }

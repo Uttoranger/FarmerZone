@@ -192,7 +192,7 @@ describe('Fokus-Seite: Kopf ja, Unterleiste nein', () => {
   })
 
   it('Gegenprobe: die KundeShell ohne Fokus hat eine Unterleiste', () => {
-    expect(renderToStaticMarkup(createElement(KundeShell, { angemeldet: false } as KundeShellProps, 'x'))).toContain('data-slot="bottom-nav"')
+    expect(renderToStaticMarkup(createElement(KundeShell, { sitzung: 'gast' } as KundeShellProps, 'x'))).toContain('data-slot="bottom-nav"')
   })
 
   it('der Rückweg führt zu allen Produkten des Hofs', async () => {

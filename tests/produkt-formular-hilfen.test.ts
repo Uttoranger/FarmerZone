@@ -97,8 +97,12 @@ describe('fehlendeAngaben und speichernText', () => {
         bestaetigt: false,
       },
     }
-    // Tierarten, analytische Bestandteile, Nettomenge, Bestätigung
-    expect(fehlendeAngaben(heu, productAnlegenSchema)).toBe(4)
+    // Tierarten, analytische Bestandteile, Nettomenge. Geändert in Nr. 23
+    // (E10a): Die Bestätigung zählt im Produktdialog nicht mehr mit — ob sie
+    // nötig ist, entscheidet beim Bearbeiten der gespeicherte Stand
+    // (brauchtNeueBestaetigung); neue Futtermittel entstehen nur im
+    // Futter-Formular, dessen Schema den Haken immer verlangt.
+    expect(fehlendeAngaben(heu, productAnlegenSchema)).toBe(3)
   })
 
   it('Button-Text: Einzahl, Mehrzahl, Anlegen, Speichern', () => {

@@ -15,6 +15,11 @@ Präfixe:
 - **K** – Konditionen
 - **B** – Bezahlung und Gebühren
 - **S** – Sicherheitsanforderung aus Umsetzungsprompt Abschnitt 8
+- **Z** – Zahlungswege der Höfe
+- **T** – Teilen
+- **D** – Direktverkauf
+- **R** – Rate-Limit
+- **N** – Nutzerführung (Navigation und Bedienung)
 - **O** – offen
 
 ---
@@ -37,6 +42,7 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Entscheidung:** Jede Verkaufsgröße ist ein eigenes Produkt einer Familie (`Product.familieId`), vom Sackerl bis zum Rundballen.
 - **Begründung:** Das hält die Invarianten ein: ein Produkt = ein Gebinde, `stock` zählt Gebinde, Kennzeichnung je Gebinde.
 - **Dateien:** `prisma/schema.prisma` (Expand in #169); Formulare und Größenwahl folgen mit Nr. 20 (Gate 6).
+- **Stand:** Nr. 20 (07.10.2026): Formulare „Neues Futtermittel" und „Neues Brennmaterial" legen je Größe ein Produkt mit gemeinsamer `familieId` an (`src/server/actions/produktfamilie.ts`); bearbeitet wird je Größe. Bericht 20.
 
 ### E4 · Servicegebühr 5 %, immer aufrunden (02.10.2026)
 - **Entscheidung:** **5 %** und mindestens € 0,50, **immer aufgerundet** auf den nächsten Cent. Gerechnet wird nur in `berechneServicegebuehr`. Gespeicherte Beträge alter Bestellungen werden nie neu berechnet.
@@ -77,22 +83,38 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
   - Im Admin wird die Nummer nur angezeigt, einen Haken „geprüft" gibt es nicht.
 - **Begründung:** So steht es im Konzept Bereiche (`docs/konzepte/bereiche.md`). Die Plattform kann die Nummer nicht verlässlich prüfen.
 - **Dateien:** `src/lib/taxonomie.ts`, `src/lib/produktdetail.ts`, Admin-Freischaltung; das Feld `Farm.betriebsnummerGeprueftAm` entfällt. Die Umsetzung folgt mit Nr. 20 (Gate 6).
+- **Stand:** Nr. 20 (07.10.2026): Schild und Zusatz „laut Angabe des Hofs" waren seit Nr. 11 da; das Futter-Formular zeigt das Schild in der Vorschau, prüft nichts und bestätigt die Nummer nur über das Hofprofil. Admin unberührt (22f).
+- **Stand:** Nr. 22f (07.10.2026): Der Admin zeigt die Betriebsnummer in Freischaltung und Hofliste nur an, wie der Hof sie angibt — kein Haken, kein „geprüft" (Bericht 22f).
 
 ### E10 · Registrierungs-Fälle LFBIS / BAES (02.10.2026)
 - **Entscheidung:** Eigene Ernte, lose oder in Ballen, braucht nur LFBIS. Abgepacktes Heimtierfutter mit Etikett, Zukauf und Mischen brauchen eine aktive BAES-Meldung.
-- **Begründung:** Fachliche Klärung des Menschen. Die Texte lässt er vor dem Livegang gegenlesen (Umsetzungsprompt Abschnitt 10).
+- **Begründung:** Fachliche Klärung des Menschen. Die Texte lässt er vor dem Livegang gegenlesen (Umsetzungsprompt Abschnitt 10). — **Das Gegenlesen vor dem Livegang ist ersetzt durch E10a (07.10.2026).** Die Fälle selbst gelten weiter.
 - **Dateien:** `Product.verpackung` (#169); Sperre je Gebinde mit Nr. 20 (Gate 6).
+- **Stand:** Nr. 20 (07.10.2026): Sperre je Gebinde in `src/lib/futter-registrierung.ts`, serverseitig an allen Wegen in den Shop und vor dem Checkout (S7). Lesart: Mischfutter und Ergänzungsfutter brauchen als Mischung oder Zukauf immer die BAES-Meldung; Bestandsprodukte ohne Verpackung sperrt die Regel nicht. Texte vor dem Livegang gegenlesen lassen (Bericht 20).
+
+### E10a · Futter geht ohne vorheriges Gegenlesen live (07.10.2026)
+- **Entscheidung (uttoranger, Freigabe Lauf 6):** Futter geht live, ohne dass die Erklärtexte vorher gegengelesen sind. Ausgleich:
+  - Pflicht-Bestätigung des Hofs im Futter-Formular (Web und Handy), serverseitig erzwungen, Zeitpunkt in `FutterKennzeichnung.bestaetigtAm`; jede inhaltliche Änderung verlangt eine neue Bestätigung. Wortlaut: „Ich bestätige, dass meine Angaben zu Registrierung, Kennzeichnung und Verpackung richtig und vollständig sind. Für die Richtigkeit bin ich verantwortlich. Falsche Angaben können nach dem Futtermittelgesetz bestraft werden."
+  - Erklärtexte als Orientierung gekennzeichnet: „Zur Orientierung, keine Rechtsberatung. Im Zweifel bei der Bezirkshauptmannschaft, beim BAES oder bei der Landwirtschaftskammer nachfragen." mit Link zur BAES-Seite für Futtermittelbetriebe.
+  - Verantwortungs-Hinweis für Kunden bei jedem Futter: „Die Angaben zu Registrierung und Kennzeichnung stammen vom Hof. Der Hof ist für ihre Richtigkeit verantwortlich; FarmerZone vermittelt nur und prüft die Angaben nicht." Bei „nur an Betriebe" zusätzlich: „Als Betrieb bist du für den bestimmungsgemäßen Einsatz verantwortlich."
+  - Der Mensch legt die Texte parallel der Landwirtschaftskammer vor.
+- **Begründung:** Das Gegenlesen hätte den Livegang von Futter auf unbestimmte Zeit blockiert; die Verantwortung liegt ohnehin beim Hof (E9).
+- **Verhältnis zu anderen Einträgen:** ersetzt in E10 nur den Satz zum Gegenlesen; E9 (keine Prüfung durch die Plattform) bleibt.
+- **Dateien:** Futter-Formular, `src/lib/futter-registrierung.ts`, Produktdetail, Warenkorb; Umsetzung Nr. 23 (freigabe.md §10).
+- **Futter-Entscheidungen aus Bericht 20 (07.10.2026, uttoranger):** (a) Misch- und Ergänzungsfutter brauchen immer BAES; (b) Futtermittel entstehen nur über das Futter-Formular; (c) Altbestand ohne Verpackung wird nie gesperrt; (d) die Verpackung je Größe ist Selbstauskunft des Hofs.
 
 ### E11 · Brennmaterial mit Raummeter und Schüttraummeter (02.10.2026)
 - **Entscheidung:** Kategorie „Brennmaterial" mit den Arten Brennholz, Anzündholz und Hackschnitzel. Einheiten sind Raummeter und Schüttraummeter; M3 bleibt für Altdaten. Nur Abholung.
 - **Begründung:** Holz war als Kategorie gewünscht und wurde um Hackschnitzel erweitert. M3 ist für Holz mehrdeutig.
 - **Dateien:** `prisma/schema.prisma` (`ProductUnit`, `ProductSubcategory`, `BrennmaterialAngaben`, #169); Formular mit Nr. 20 (Gate 6).
+- **Label (07.10.2026, uttoranger):** Die Kategorie heißt in der Oberfläche „Brennmaterial" statt „Brennholz" (Nr. 23).
+- **Stand:** Nr. 20 (07.10.2026): Raummeter und Schüttraummeter wählbar (nur Brennmaterial), die drei Arten gehören zu Brennholz; Formular mit Holz-Angaben und Größen, Erklärbox rm/srm/fm auch auf der Produktseite. Bericht 20.
 
 ### E12 · Beiträge als Reiter in Mein Hof (02.10.2026)
 - **Entscheidung:** Mein Hof hat die Reiter Hofseite | Beiträge. `/status` bleibt als Route und wird von dort verlinkt.
 - **Begründung:** Mein-Hof-Umbau „mach es so".
 - **Dateien:** `src/app/(hof)/farm-page/`, `src/components/mein-hof/` (#180).
-- **Stand:** Nr. 22e (07.10.2026): Der Reiter „Beiträge" bietet alle Handlungen von `/status` (Deaktivieren, Löschen, Als Vorlage, WhatsApp fortsetzen); `/status` bleibt als Route und leitet auf den Reiter um (freigabe.md §9 „22e" — Lesart „bleibt und leitet um" zur Bestätigung, Bericht 22e (a)), `/status/new` und WhatsApp fortsetzen liegen in der HofShell (Bericht 22e).
+- **Stand:** Nr. 22e (07.10.2026): Der Reiter „Beiträge" bietet alle Handlungen von `/status` (Deaktivieren, Löschen, Als Vorlage, WhatsApp fortsetzen); `/status` bleibt als Route und leitet auf den Reiter um (freigabe.md §9 „22e"; Lesart „bleibt und leitet um" am 07.10.2026 von uttoranger bestätigt), `/status/new` und WhatsApp fortsetzen liegen in der HofShell (Bericht 22e).
 
 ### E13 · „Verkauf eintragen" bleibt im Neu-Menü (02.10.2026)
 - **Entscheidung:** Die bestehende Funktion bleibt erhalten und steht im Neu-Menü. Das Formular wird nur ins neue Design gezogen.
@@ -129,6 +151,11 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 
 ---
 
+### G3 · Sammel-PR am Ende eines Laufs (Lehre aus Lauf 6, 07.10.2026)
+- **Entscheidung (uttoranger, Freigabe Lauf 7):** Am Ende jedes Nachtlaufs baut der Dirigent einen Sammel-PR: Branch `integration/lauf<n>` von `main`, alle fertigen PRs des Laufs per `git merge --no-ff` in Merge-Reihenfolge, Doku-Konflikte beide Seiten behalten, Code-Konflikte sauber zusammenführen und jede Auflösung im PR-Text begründen. Typecheck, Unit- und Integrationstests auf dem Gesamtstand grün. PRs mit offener Vorbedingung (Entwurf) kommen nicht hinein.
+- **Begründung:** In Lauf 6 entstanden Code-Konflikte zwischen unabhängigen PRs, die erst beim Mergen sichtbar wurden; der Sammel-PR (#211) hat sie mit grünen Tests aufgelöst.
+- **Dateien:** `docs/nachtlauf.md` Abschnitt 4.
+
 ## F – Freigaben nach der Umsetzung
 
 ### F1 · Mockup-Abweichungen Nr. 03, 05 und 07–17 (06.10.2026)
@@ -162,6 +189,34 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Begründung:** Der Spalten-Default `@default(4.9)` blieb in #167 stehen, weil dafür keine Migration freigegeben war. Bestehende Höfe behielten ihren gespeicherten Satz.
 - **Dateien:** keine Code-Änderung, nur Daten (Admin, Servicegebühr je Hof).
 
+### F6 · Entscheidungen zum Morgenbericht Lauf 5 (07.10.2026)
+- **Quelle:** uttoranger, Freigabe Lauf 6 (freigabe.md §10), zu Morgenbericht Lauf 5 §4.
+
+| Punkt | Entscheidung | Umsetzung |
+|---|---|---|
+| 19c Vollerstattung | bekommt dieselben Merkmale (`metadata`) wie die Teilerstattung | Nr. 27 |
+| 21 (b) Bestellung „über einen Link" | entfällt (T1) | Nr. 25 |
+| 22c Servicegebühren dieses Monats | Zählregel wie `/admin/finanzen` (`topfVonBestellung`) | Nr. 26 |
+| 22b Direktverkauf senkt Vorrat | Backlog | – |
+| 19b Registrierung | immer dieselbe Antwort, dazu eine Mail an das bestehende Konto | Nr. 27 |
+| Futter (a)–(d) | siehe E10a | Nr. 23 |
+| E11 Label | „Brennmaterial" statt „Brennholz" | Nr. 23 |
+| Teilen (a) | die Hofseite teilt das Teilen-Bild | bleibt (#199) |
+| Teilen (c) | Teilen über das Handy-Menü zählt als „link" | bleibt (#199) |
+| Teilen (d) | Teilen legt keinen Beitrag an | bleibt (#199) |
+| Teilen (g) | `@types/qrcode` freigegeben | bleibt (#199) |
+| 19a `/konditionen` | stündlich neu bauen | Nr. 28 |
+| 22a Kunden | eine Sortierwahl für alle Breiten; Markenfarben wie vorgeschlagen | bleibt (#194) |
+| 22b Verkäufe | „Dieses Jahr (für die Umsatzgrenze)" statt „Gesamt"; „Verkauf eintragen" auch am Handy oben | Nr. 28 |
+| 22d Rechenbeispiel | mit den Sätzen des eigenen Hofs | bleibt (#196) |
+| 22e Beiträge | `/status` bleibt und leitet um; Kurznummer in „Meine Meldungen"; „N per E-Mail" zurück in die Beitragszeile | Nr. 28 |
+| 22c Futter kaufen | Käuferart „Betrieb" vorbelegen | Nr. 29 |
+| 22c Teilen-Karte | Euro-Betrag weglassen (T1) | Nr. 26 |
+
+### F7 · Mockup-Abweichungen aus Lauf 5 (07.10.2026)
+- **Entscheidung (uttoranger, Freigabe Lauf 6):** Alle Mockup-Abweichungen aus den Berichten zu #192–#201 sind freigegeben.
+- **Dateien:** `docs/nachtlauf/berichte/19a.md` … `22f.md`.
+
 ---
 
 ## K – Konditionen
@@ -191,6 +246,67 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Dateien:** `src/lib/servicegebuehr.ts` (`berechneServicegebuehr` bekommt die Zahlungsart), `src/lib/konditionen.ts` (Konstante neben `TARIFE_AB`), Checkout-Server, Kasse/Warenkorb, Artikel fehlt, Admin-Finanzen, Mail „Vor-Ort-Bestellung bestätigt", `/konditionen`, `/fuer-hoefe`, Startseiten-Beispiel. Umsetzung 19a (freigabe.md §9).
 - **Stand:** umgesetzt in 19a (06.10.2026); maßgeblich ist der Bestellzeitpunkt, Annahmen im Bericht 19a.
 
+Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert (Freigabe Lauf 6, „ältere offene Punkte").
+
+### B2 · „Nicht im Shop" statt „Entwurf" (07.10.2026)
+- **Entscheidung (uttoranger):** Produkte, die nicht im Shop stehen, heißen in der Oberfläche „Nicht im Shop" statt „Entwurf".
+- **Dateien:** Produktliste, Marken, Formulare; Umsetzung Nr. 28.
+
+### B3 · Name und Telefon aus fremden Alt-Registrierungen (07.10.2026)
+- **Entscheidung (uttoranger):** Beim ersten Code-Login werden Name und Telefon geleert, die aus einer fremden Alt-Registrierung am Konto stehen (offener Punkt aus Bericht 17a, „Bitte entscheiden (c)").
+- **Dateien:** Code-Anmeldung; Umsetzung Nr. 27.
+
+### B4 · Ablehnungssperre für den Altbestand gestrichen (07.10.2026)
+- **Entscheidung (uttoranger):** Die Ablehnungssperre für den Altbestand (Bericht 17a) entfällt.
+- **Dateien:** Umsetzung Nr. 27.
+
+---
+
+## Z – Zahlungswege der Höfe
+
+### Z1 · Stripe-Pflicht für Höfe (07.10.2026)
+- **Entscheidung (uttoranger, Freigabe Lauf 6):**
+  - Jeder Hof muss Stripe einrichten, bevor er freigeschaltet wird bzw. online geht. Eine Wahl „nur bar" gibt es nicht mehr.
+  - Bereits freigeschaltete Höfe ohne Stripe bleiben online und werden aufgefordert, die Online-Zahlung einzurichten. Keine Abschaltung.
+  - Die technische Notbremse bleibt: Sperrt Stripe ein Konto nachträglich, verkauft der Hof vorübergehend nur bar („Online-Zahlung pausiert").
+  - Die Lesart aus 22f (#201, „Sperre nur bei Online-Wunsch, Bar-Höfe freischaltbar") ist verworfen.
+- **Begründung:** Kundinnen sollen bei jedem Hof mit Karte, Apple Pay oder EPS zahlen können.
+- **Verhältnis zu anderen Einträgen:** ersetzt die Fachregel „Online-Zahlung ist ein Plus, kein Muss" (DEVELOPMENT.md, `src/lib/hof-einstellungen.ts`); Barzahlung durch Kundinnen bleibt möglich (B1 unverändert).
+- **Dateien:** `src/lib/admin-hoefe.ts` (`freischaltSperre`), `src/server/actions/admin.ts`, Einstellungen „Zahlung", Einrichten, Heute, `/fuer-hoefe`, `/konditionen`, Registrieren (Texte aus `src/lib/konditionen.ts`); Umsetzung Nr. 24.
+
+### Z2 · Stripe-Testbetrieb und Modus-Wache (08.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 8):**
+  - Solange die Produktion mit Test-Schlüssel läuft, sagen Kasse, Admin und Zahlungs-Einstellungen das deutlich.
+  - Vorschau und lokal laufen nie mit Live-Schlüssel (Client startet nicht).
+  - Den Modus prüft man nur über das Umgebungsbanner bzw. `bestimmeUmgebung`, nie durch Entschlüsseln.
+  - Die Live-Schaltung macht der Mensch als letzten Schritt nach `docs/betrieb/stripe-live.md`.
+- **Begründung:** Befund vom 08.10.2026 (nur lesend): `STRIPE_*` ist bei Vercel EINE Variable für Vorschau und Produktion. Das Umgebungsbanner der Vorschau zeigt „Stripe Test", die Produktion lädt `pk_test_` — beide laufen im Testmodus. Die Annahme aus Lauf 7 (Nr. 34, „sehr wahrscheinlich Live") war falsch.
+- **Verhältnis zu anderen Einträgen:** ergänzt Z1; kein Lauf schaltet auf Live um.
+- **Dateien:** Stripe-Server-Client, Kasse, AdminShell, Einstellungen „Zahlung", `docs/betrieb/stripe-live.md`; Umsetzung Nr. 42 (freigabe.md §12).
+
+### Z3 · Testumgebung statt Umschalter (08.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 8):**
+  - In der Produktion gibt es keinen Umschalter zwischen Test und Live.
+  - Echte Abläufe testet man in der Testumgebung `test.farmerzone.at` (Branch `staging`, Entwicklungsdatenbank, Stripe-Test).
+  - Testmodus je Hof bleibt eine Option für später.
+- **Begründung:** Testzahlungen gehören nicht neben echte Bestellungen; eine eigene Umgebung trennt Daten und Schlüssel.
+- **Verhältnis zu anderen Einträgen:** ergänzt Z2. „Testmodus je Hof" ist nicht beauftragt.
+- **Dateien:** `src/lib/umgebung.ts`, AdminShell, Umgebungsbanner, E-Mail-Versand außerhalb der Produktion, `.github/workflows/staging-nachziehen.yml`, `docs/betrieb/testumgebung.md`; Umsetzung Nr. 43 (freigabe.md §12).
+
+---
+
+## T – Teilen
+
+### T1 · Teilen ohne Browser-Speicher (07.10.2026)
+- **Entscheidung (uttoranger, Freigabe Lauf 6):**
+  - Für den Teilen-Kanal wird nichts im Browser gespeichert: kein sessionStorage, kein localStorage, kein Cookie.
+  - Gezählt werden nur Besuche über `?k=`, serverseitig.
+  - Bestellungen werden keinem Kanal zugeordnet; `Order.teilenKanal` bleibt ungenutzt (Spalte bleibt, Expand/Contract).
+  - Farbwerte im Teilen-Bild sind eine Ausnahme vom Token-Gebot (Satori kennt keine CSS-Variablen), zentral in `TEILEN_BILD_FARBE`.
+- **Begründung:** Speicherzugriff auf dem Endgerät (§ 165 Abs. 3 TKG) ohne Einwilligung vermeiden; die Bestellzuordnung ist den Speicher nicht wert.
+- **Verhältnis zu anderen Einträgen:** erledigt Bericht 21 (b) und (e) sowie den Euro-Betrag der Teilen-Karte (22c).
+- **Dateien:** `src/lib/teilen-herkunft.ts` und Aufrufer, Checkout, Teilen-Fenster-Texte, `src/components/teilen/teilen-bild-grafik.tsx`; Umsetzung Nr. 25 und 26.
+
 ---
 
 ## S – Freigegebene Sicherheitsanforderungen
@@ -205,14 +321,74 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Stand:** umgesetzt in 17b.
 - **Stichtag (06.10.2026, uttoranger im Chat):** Konten ab dem Merge von #184, also ab **06.10.2026, 20:21 Uhr** Wiener Zeit, müssen bestätigen. Bewusst nicht Mitternacht: Ein am 06.10. um 18:07 Uhr angelegter und freigeschalteter Hof bleibt ausgenommen. Konstante `EMAIL_BESTAETIGUNG_STICHTAG` in `src/lib/email-bestaetigung.ts`.
 
+### S11 · Double-Opt-in für werbliche Mails (07.10.2026)
+- **Entscheidung (uttoranger, Freigabe Lauf 7):** Double-Opt-in für alle werblichen Mails (Beiträge per Mail, Benachrichtigungen).
+  - Neue Anmeldungen gelten erst nach Klick auf einen Bestätigungslink (signiert, mit Ablauf).
+  - Unbestätigte Anmeldungen bekommen keine werblichen Mails.
+  - Jede werbliche Mail trägt einen Abmeldelink.
+  - Bestehende Abonnenten bleiben vorerst unverändert; ihre Zahl steht im Morgenbericht, den Umgang mit ihnen entscheidet der Mensch.
+- **Begründung:** Bisher nur einfaches Opt-in (O3).
+- **Dateien:** Abo-Anmeldung, Mailversand der Beiträge und Benachrichtigungen; Umsetzung Nr. 38 (freigabe.md §11), Migration nur Expand, falls nötig.
+
+---
+
+## D – Direktverkauf
+
+### D1 · Direktverkauf senkt den Vorrat (07.10.2026)
+- **Entscheidung (uttoranger, Freigabe Lauf 7):** „Verkauf eintragen" mit einem Produkt aus dem Sortiment zieht den Vorrat ab.
+  - Bedingtes `updateMany`, nie unter 0.
+  - Reicht der Vorrat nicht: Hinweis, der Verkauf wird trotzdem gebucht, der Vorrat geht nicht ins Minus.
+  - Schalter „Vorrat abziehen" im Formular, Standard ein.
+- **Begründung:** Offener Punkt aus Bericht 22b (Backlog Lauf 6).
+- **Dateien:** Verkäufe (`/sales`, „Verkauf eintragen"); Umsetzung Nr. 39.
+
+---
+
+## R – Rate-Limit
+
+### R1 · Rate-Limit über die Datenbank (07.10.2026)
+- **Entscheidung (uttoranger, Freigabe Lauf 7):** Für Anmeldecode, Registrierung, Problem melden, Bestellungen finden und Checkout zählt eine Tabelle in der Datenbank (Schlüssel, Fenster, Zähler) die Versuche über alle Instanzen. Die bestehende Bremse je Instanz bleibt als erste Stufe. Alte Einträge räumt der bestehende Cron auf. Migration nur Expand.
+- **Begründung:** Die Bremse je Instanz greift auf Vercel nur teilweise (Backlog Lauf 6); ein eigener Dienst ist nicht nötig.
+- **Dateien:** `src/lib/rate-limit.ts`, Cron; Umsetzung Nr. 40.
+
+---
+
+## N – Nutzerführung
+
+### N1 · Handy-Navigation (08.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 8):**
+  - Jeder Bildschirm hat genau eine Hauptaktion.
+  - Öffentliche Seiten zeigen oben immer „Anmelden" (→ `/login`), auch am Handy; mit Hof-Sitzung steht dort „Mein Hof" (→ `/dashboard`).
+  - Unterseiten im Hofbereich haben am Handy einen festen Kopf mit Rückweg zur Elternseite (eine Quelle).
+  - Einstellungs-Unterseiten führen nach dem Speichern zur Übersicht zurück.
+- **Begründung:** Befund vom 08.10.2026 (Handy, 390 px): Bestehende Höfe finden die Anmeldung nur ganz unten im Fuß der Startseite („Anmelden für Höfe"); im Kopf der KundeShell ist „Anmelden" unter 768 px ausgeblendet; ein angemeldeter Hof sieht auf öffentlichen Seiten keinen Weg in seinen Bereich. Im Hofbereich ist der Rückweg auf Unterseiten klein und nach dem Scrollen weg.
+- **Dateien:** KundeShell und KundenKopf, AdminShell, `src/lib/kunden-navigation.ts`, `src/lib/kunden-menue.ts`, `src/lib/admin-navigation.ts`, `src/lib/bauern-navigation.ts`, Hofbereich-Unterseiten; Umsetzung Nr. 41 und 44 (freigabe.md §12).
+
+### N2 · Kasse ohne Zusatz-Haken (08.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 8):**
+  - Der Pflicht-Haken „Ich hole ab und zahle bar" entfällt; der Kaufknopf „Zahlungspflichtig bestellen" bleibt (FAGG § 9 Abs. 3).
+  - Die Neuigkeiten-Anmeldung zieht auf die Bestätigungsseite; Double-Opt-in (S11) bleibt.
+  - Die Bar-Bestätigung per Mail (H3) bleibt unverändert.
+- **Begründung:** Weniger Schritte in der Kasse; der verbindliche Abschluss liegt im Kaufknopf.
+- **Verhältnis zu anderen Einträgen:** ändert die Kasse aus Gate 4 (Nr. 12: Zusage-Haken bei Bar); S11 und H3 bleiben unverändert.
+- **Dateien:** Kasse (Formular, Schema, `/api/checkout`), Bestätigungsseite; Umsetzung Nr. 46 (freigabe.md §12).
+
 ---
 
 ## O – Offen (nicht entschieden, nicht bauen)
 
 | # | Thema | Stand |
 |---|---|---|
-| O1 | Fehler-Token | Fehlertext erreicht im hellen Theme 4,22:1 statt 4,5:1. Bis dahin zeigen die Seiten Fehler als orange Hinweiskarte bzw. orangen Text (`text-status-offen`). |
+| O1 | Fehler-Token | **Entschieden 07.10.2026 (uttoranger):** Die Fehler-Farbe bekommt einen Kontrast von mindestens 4,5:1 in beiden Themes (Nr. 28). Bisher: Fehlertext 4,22:1 im hellen Theme, deshalb orange Hinweiskarte bzw. `text-status-offen`. |
 | O2 | Bearbeiten am Handy (#180) | Unter der Checkliste in Mein Hof steht weiter der Editor mit Stiften; das Mockup zeigt nur „Vorschau ansehen". Entfällt er, braucht es einen eigenen Auftrag. |
-| O3 | S11 Double-Opt-in | Statusmeldungen und Newsletter haben nur ein einfaches Opt-in. Dazu gehört die Frage, ob „Nochmal bestellen" in der Abholbereit-Mail Werbung ist. |
-| O4 | AGB / Nutzungsbedingungen | Werden extern erstellt. Bis dahin gibt es beim Registrieren keinen Zustimmungs-Haken. |
-| O5 | Rückruf anfordern | Schema `RueckrufAnfrage` ist nicht freigegeben. Ersatz: „E-Mail schreiben". |
+| O3 | S11 Double-Opt-in | **Entschieden, siehe S11** (Freigabe Lauf 7, Umsetzung Nr. 38). Offen bleibt die Frage, ob „Nochmal bestellen" in der Abholbereit-Mail Werbung ist. |
+| O4 | AGB / Nutzungsbedingungen | Werden separat erstellt — **NICHT anfassen** (bestätigt 07.10.2026). Bis dahin gibt es beim Registrieren keinen Zustimmungs-Haken. |
+| O5 | Rückruf anfordern | **Entfällt (07.10.2026, uttoranger).** Schema `RueckrufAnfrage` wird nicht gebaut. Ersatz bleibt „E-Mail schreiben". |
+
+---
+
+## Backlog (entschieden, aber nicht im aktuellen Lauf)
+
+Stand Lauf 7 (uttoranger): Die Punkte aus Lauf 6 sind entschieden und eingeplant — Direktverkauf senkt den Vorrat (D1, Nr. 39), Double-Opt-in (S11, Nr. 38), Rate-Limit über die Datenbank statt eines neuen Dienstes (R1, Nr. 40). Derzeit ist nichts im Backlog.
+
+Stand Lauf 8 (uttoranger, 08.10.2026): N1, N2, Z2 und Z3 sind entschieden und in Nr. 41–48 eingeplant (freigabe.md §12). „Testmodus je Hof" (Z3) bleibt eine Option für später und ist nicht beauftragt. Die Stripe-Live-Schaltung macht der Mensch ganz am Schluss (Z2); kein Lauf schaltet um.

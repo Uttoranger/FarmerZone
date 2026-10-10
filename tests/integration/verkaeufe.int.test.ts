@@ -1,9 +1,10 @@
 /**
  * Verkäufe (Nachtlauf Nr. 22b) gegen ein ECHTES Postgres.
  *
- * Die Aussage: Ein Direktverkauf ist nur Umsatz. Anlegen, Ändern und Löschen
+ * Die Aussage: Ein Direktverkauf ist Umsatz. Anlegen, Ändern und Löschen
  * treffen nur Verkäufe des eigenen Hofs (Besitz in der WHERE-Klausel), der
- * Bestand eines verknüpften Produkts bleibt in jedem Fall unberührt, und die
+ * Bestand eines verknüpften Produkts bleibt ohne Schalter „Vorrat abziehen"
+ * unberührt (mit Schalter: verkauf-vorrat.int.test.ts, Register D1), und die
  * Übersicht zählt den Verkauf in der Woche (Bar) und im Feed — mit dem
  * Betrag, den die Spalte gespeichert hat. Geprüft wird der Zustand danach.
  */

@@ -4,9 +4,10 @@
  * eines sichtbaren Produkts von 0 auf mehr, fragt die Seite einmal, ob der Hof
  * es teilen will.
  *
- * „Höchstens einmal je Anlass" ohne Spalte in der Datenbank (eine
- * Schema-Änderung ist nicht beauftragt; „in den Einstellungen abschaltbar"
- * kommt mit Gate 7): Anlass = Produkt und Wiener Woche. Wer in derselben Woche
+ * „Höchstens einmal je Anlass" ohne Spalte in der Datenbank: Anlass = Produkt
+ * und Wiener Woche. Abschaltbar in den Einstellungen seit Nr. 30
+ * (Farm.teilenMomenteAus, geprüft in wiederDaMomentMoeglich) — der Schalter
+ * sagt nur „an/aus", kein „schon gezeigt"; die Einmal-Regel bleibt deshalb hier. Wer in derselben Woche
  * wieder auf 0 und zurück geht, wird nicht noch einmal gefragt; nächste Woche
  * wieder. Merker im localStorage, je Produkt ein Schlüssel mit der Woche
  * (Montag, JJJJ-MM-TT). Fehlt der Speicher oder wirft er, kommt der Moment

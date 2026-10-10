@@ -4,7 +4,7 @@
  * (tests/hof-einstellungen.test.ts).
  *
  * Die Übersicht (Mockups web-h1-einstellungen-uebersicht, mobil-h5-einstellungen)
- * zeigt acht Bereiche mit Status-Punkt. Es stehen nur Bereiche da, die es gibt:
+ * zeigt neun Bereiche mit Status-Punkt. Es stehen nur Bereiche da, die es gibt:
  * „Benachrichtigungen" aus dem Mockup hat keine Einstellung im Code und fehlt
  * deshalb; „Mein Auftritt" (eine bestehende Seite ohne Platz im Mockup) steht
  * dafür da. Was fehlt, zählt dieselbe Liste wie „Mein Hof" und „Einrichten"
@@ -36,6 +36,8 @@ import { barOhneServicegebuehr, berechneServicegebuehr, type ServicegebuehrEinst
 import { calcPlatformFeeAmount, decimalZuCents, type DecimalEingabe } from '@/lib/order-totals'
 import { centsAlsEuro, formatDatumLang, formatEuro, formatZahl } from '@/lib/format'
 import { Decimal } from '@prisma/client/runtime/index-browser'
+import { TEILEN_MOMENTE_PFAD, TEILEN_MOMENTE_TITEL, teilenMomenteZeile } from '@/lib/teilen-momente'
+import { EINSTELLUNG_KONTO, EINSTELLUNG_MEIN_AUFTRITT } from '@/lib/bauern-navigation'
 
 /** Weitergereicht: Das Sprungziel steht in taxonomie.ts, weil das Hofprofil (Client) es auch braucht. */
 export { BETRIEBSNUMMER_ANKER }
@@ -52,6 +54,7 @@ export type EinstellungBereichId =
   | 'zahlung'
   | 'futtermittel'
   | 'konditionen'
+  | 'teilen'
   | 'urlaubsmodus'
   | 'konto'
 
@@ -86,13 +89,19 @@ export type EinstellungenDaten = {
   abholzeitenGesamt: number
   stripeKontoDa: boolean
   stripeBereit: boolean
-  /** Farm.acceptsOnline — aus heißt: der Hof kassiert bewusst nur bar. */
+  /**
+   * Farm.acceptsOnline. Eine Wahl „nur bar" gibt es nicht mehr (Register Z1);
+   * ein Bestandshof mit false wird nur aufgefordert, Stripe einzurichten — die
+   * Daten bleiben, wie sie sind.
+   */
   onlineAn: boolean
   betriebsnummer: string | null
   betriebsstatus: Betriebsstatus | null
   tarif: Tarif | null
   isPaused: boolean
   stillgelegt: boolean
+  /** Farm.teilenMomenteAus (Nr. 30): true = die Teilen-Momente sind abgeschaltet. */
+  teilenMomenteAus: boolean
 }
 
 /** Die Titel der fehlenden Zeilen, deren Formular auf dieser Einstellungsseite liegt. */
@@ -105,12 +114,14 @@ function esFehlt(teile: readonly string[]): string {
 }
 
 /**
- * Die acht Bereiche der Übersicht, in der Reihenfolge des Mockups (Mein
- * Auftritt gleich nach den Hofdaten, wo er inhaltlich hingehört).
+ * Die neun Bereiche der Übersicht, in der Reihenfolge des Mockups (Mein
+ * Auftritt gleich nach den Hofdaten, wo er inhaltlich hingehört). Seit Nr. 30
+ * stehen die Teilen-Hinweise dort, wo das Mockup „Benachrichtigungen" zeigt —
+ * der einzige Schalter, der dort heute schon etwas bewirkt.
  */
 export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): EinstellungBereich[] {
   const profilFehlt = fehlendAuf(d.hofseiteZeilen, '/settings/profile')
-  const auftrittFehlt = fehlendAuf(d.hofseiteZeilen, '/settings/appearance')
+  const auftrittFehlt = fehlendAuf(d.hofseiteZeilen, EINSTELLUNG_MEIN_AUFTRITT.href)
   const nummer = d.betriebsnummer?.trim() ?? ''
 
   return [
@@ -123,10 +134,10 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
     },
     {
       id: 'auftritt',
-      titel: 'Mein Auftritt',
+      titel: EINSTELLUNG_MEIN_AUFTRITT.label,
       zeile: auftrittFehlt.length > 0 ? esFehlt(auftrittFehlt) : 'Titelbild, Logo, Über uns und Fotos sind da',
       ton: auftrittFehlt.length > 0 ? 'offen' : 'fertig',
-      href: '/settings/appearance',
+      href: EINSTELLUNG_MEIN_AUFTRITT.href,
     },
     {
       id: 'abholzeiten',
@@ -143,16 +154,21 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
     {
       id: 'zahlung',
       titel: 'Zahlung',
-      // Orange nur, wenn Online an ist und Stripe nicht fertig — ein Hof, der
-      // bewusst nur bar kassiert, hat nichts zu tun.
-      zeile: d.stripeBereit
-        ? 'Online-Zahlung über Stripe aktiv · bar bei Abholung'
-        : !d.onlineAn
-          ? 'Bar bei Abholung · Online-Zahlung ist aus'
-          : d.stripeKontoDa
-            ? 'Stripe-Einrichtung noch nicht fertig · bar bei Abholung geht'
-            : 'Bar bei Abholung · Online-Zahlung noch nicht eingerichtet',
-      ton: d.stripeBereit ? 'fertig' : d.onlineAn ? 'offen' : 'neutral',
+      // Jeder Hof richtet Stripe ein (Register Z1): Ohne fertiges Konto ist
+      // der Punkt orange — auch bei einem Bestandshof mit Online aus, der nur
+      // aufgefordert wird. Barzahlung durch Kundinnen bleibt (B1), sie ist
+      // aber keine Wahl des Hofs statt Stripe.
+      zeile: !d.stripeBereit
+        ? d.stripeKontoDa
+          ? 'Stripe-Einrichtung noch nicht fertig · bitte abschließen'
+          : 'Online-Zahlung noch nicht eingerichtet · bitte einrichten'
+        : d.onlineAn
+          ? 'Online-Zahlung über Stripe aktiv · bar bei Abholung'
+          : // Stripe ist fertig, Online steht aus der Zeit vor Z1 noch auf aus:
+            // Der Checkout bietet online dann nicht an — nicht „aktiv" nennen.
+            // Ausweg: der Knopf „Online-Zahlung einschalten" auf der Zahlungs-Seite.
+            'Stripe eingerichtet · Online-Zahlung noch aus – jetzt einschalten',
+      ton: d.stripeBereit && d.onlineAn ? 'fertig' : 'offen',
       href: '/settings/payments',
     },
     {
@@ -174,6 +190,13 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
       href: '/settings/konditionen',
     },
     {
+      id: 'teilen',
+      titel: TEILEN_MOMENTE_TITEL,
+      zeile: teilenMomenteZeile(d.teilenMomenteAus),
+      ton: 'neutral',
+      href: TEILEN_MOMENTE_PFAD,
+    },
+    {
       id: 'urlaubsmodus',
       titel: 'Urlaubsmodus',
       zeile: d.isPaused ? 'An · Kunden können gerade nicht bestellen' : 'Aus · du nimmst Bestellungen an',
@@ -182,13 +205,53 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
     },
     {
       id: 'konto',
-      titel: 'Konto und Sicherheit',
+      titel: EINSTELLUNG_KONTO.label,
       zeile: d.stillgelegt ? 'Dein Hof ist stillgelegt' : 'E-Mail, Passwort, Darstellung, Hof stilllegen',
       ton: d.stillgelegt ? 'offen' : 'fertig',
-      href: '/settings/account',
+      href: EINSTELLUNG_KONTO.href,
     },
   ]
 }
+
+// ─── Zahlungs-Seite ─────────────────────────────────────────────────────────
+
+/** Welche EINE Hinweiskarte oben auf /settings/payments steht. */
+export type ZahlungHinweisArt = 'geschafft' | 'fortsetzen' | 'fehler' | 'einrichten' | 'einschalten' | 'neu-einrichten'
+
+/**
+ * Genau eine Karte, nie zwei orange übereinander (Nachbesserung Nr. 24):
+ * Die Rückmeldung von Stripe (`?stripe=`) geht vor, sonst sagt die Karte, was
+ * fehlt — Stripe einrichten (Z1) oder, bei fertigem Konto und Online aus
+ * (Bestandshof vor Z1), Online-Zahlung einschalten. „geschafft" nur, wenn
+ * es stimmt.
+ *
+ * `?stripe=neu` (Register Z2, Nr. 42): Stripe kennt das gespeicherte Konto
+ * nicht — gesetzt von „Status prüfen", „Einrichtung fortsetzen" und der
+ * Rückkehr aus dem Onboarding, nachdem der Hof als nicht bereit vermerkt ist.
+ * Die Karte heißt dann „Online-Zahlung neu einrichten" — nur mit Konto und
+ * nur, solange es nicht bereit ist. Der Parameter öffnet nichts: Ob wirklich
+ * neu angelegt wird, fragt `createConnectAccount` selbst bei Stripe nach.
+ */
+export function zahlungHinweis(d: {
+  rueckmeldung: string | undefined
+  stripeBereit: boolean
+  onlineAn: boolean
+  /** Ein Stripe-Konto ist gespeichert (Farm.stripeAccountId gesetzt). */
+  stripeKontoDa?: boolean
+}): ZahlungHinweisArt | null {
+  if (d.rueckmeldung === 'error') return 'fehler'
+  if (!d.stripeBereit) {
+    if (d.rueckmeldung === 'neu' && d.stripeKontoDa) return 'neu-einrichten'
+    return d.rueckmeldung === 'pending' ? 'fortsetzen' : 'einrichten'
+  }
+  if (!d.onlineAn) return 'einschalten'
+  return d.rueckmeldung === 'success' ? 'geschafft' : null
+}
+
+export const ONLINE_AUS_TITEL = 'Online-Zahlung ist noch aus'
+export const ONLINE_AUS_SATZ =
+  'Dein Stripe-Konto ist fertig, die Online-Zahlung ist für deinen Hof aber noch aus. ' +
+  'Schalte sie ein, damit deine Kundinnen online zahlen können.'
 
 /**
  * Die Zeile „Konditionen und Tarif": ohne gewählten Tarif (heute jeder Hof)

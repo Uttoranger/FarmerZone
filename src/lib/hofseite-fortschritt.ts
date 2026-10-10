@@ -175,9 +175,11 @@ function zeilen(stand: HofseiteStand): HofseiteZeile[] {
         : 'Noch keine — erst dann können Kunden bestellen',
       stand.abholzeiten.length > 0
     ),
-    // Bar vor Ort geht immer (settings/payments) — online ist die Kür, nie ein
-    // Fehlen: Die Zeile zählt als fertig, trägt ohne Online-Zahlung aber das
+    // Die Zeile zählt als fertig, trägt ohne Online-Zahlung aber das
     // Warnschild „Online fehlt" statt des Häkchens (Mockup hof-mein-hof-v2-desktop).
+    // Stripe ist Pflicht (Register Z1) — gezählt wird die Pflicht aber nur
+    // einmal: in Einrichten und Erste Schritte, die dafür einen eigenen Schritt
+    // haben. Hier zählte sie sonst doppelt („Hofseite 10 von 11").
     zeile(
       'zahlung',
       'abholen-bezahlen',

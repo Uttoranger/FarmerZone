@@ -306,6 +306,8 @@ export function FarmerNav({
       {/* ===== HANDY: Leiste mit fünf Plätzen ===== */}
       <nav
         aria-label="Hauptnavigation"
+        // Feste Leiste unten: Der Cookie-Hinweis steht darüber (src/lib/cookie-hinweis.ts).
+        data-unten-fest=""
         className={cn(
           'fixed bottom-0 left-0 right-0 border-t border-border md:hidden print:hidden',
           offen ? 'z-[60]' : 'z-50'

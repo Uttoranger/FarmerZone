@@ -1,9 +1,13 @@
+import { cn } from '@/lib/utils'
+
 /**
  * Bildmarke und „FarmerZone" — für die Kopfzeile der Kundenseiten.
  *
- * Auch die KundeShell und der Fuß der Startseite zeigen sie.
+ * Auch die KundeShell und der Fuß der Startseite zeigen sie. `wortKlasse`
+ * kann das Wort auf schmalen Handys ausblenden, wo der Kopf sonst
+ * überliefe; die Bildmarke bleibt (der Link darum trägt den Namen).
  */
-export function Wortmarke() {
+export function Wortmarke({ wortKlasse }: { wortKlasse?: string } = {}): React.JSX.Element {
   return (
     <span className="flex min-w-0 items-center gap-2">
       {/* Die Bildmarke behält ihre Farben in beiden Modi — ein Logo, das je
@@ -17,7 +21,7 @@ export function Wortmarke() {
         />
         <path d="M40 64 L40 44" stroke="#7BAE85" strokeWidth="2.5" strokeLinecap="round" />
       </svg>
-      <span className="whitespace-nowrap font-heading text-lg font-bold text-brand-text">FarmerZone</span>
+      <span className={cn('whitespace-nowrap font-heading text-lg font-bold text-brand-text', wortKlasse)}>FarmerZone</span>
     </span>
   )
 }

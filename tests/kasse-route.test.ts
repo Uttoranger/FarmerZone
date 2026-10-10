@@ -318,3 +318,46 @@ describe('Nachbesserung 1: die Antwort nennt den Betrag, den Stripe abbucht', ()
     expect(body).not.toHaveProperty('amountCents')
   })
 })
+
+describe('Register N2 (Nr. 46): kein Pflicht-Haken, kein Abo im Checkout', () => {
+  const ALTE_FELDER = { onsiteConfirmed: false, optInEmail: true, optInWhatsApp: true }
+
+  it('bar ohne Haken: die Bestellung entsteht — verbindlich ist der Knopf, nicht ein Haken', async () => {
+    const res = await POST(anfrage({ paymentMethod: 'ONSITE_CASH' }))
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual(expect.objectContaining({ requiresConfirmation: true }))
+    expect(createData().paymentMethod).toBe('ONSITE_CASH')
+  })
+
+  it('ein alter Tab mit Haken-Feldern bekommt seine Bestellung — und es entsteht kein Abo', async () => {
+    const res = await POST(anfrage({ paymentMethod: 'ONSITE_CASH', ...ALTE_FELDER }))
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toEqual(expect.objectContaining({ requiresConfirmation: true }))
+    expect(orderCreate).toHaveBeenCalledOnce()
+    expect(prisma.customerFarmSubscription.upsert).not.toHaveBeenCalled()
+    expect(prisma.customerFarmSubscription.findUnique).not.toHaveBeenCalled()
+    // Die Antwort sagt nichts über Neuigkeiten — wie vorher keine Auskunft.
+    expect(JSON.stringify(body)).not.toMatch(/optIn|abo|neuigkeit|subscri/i)
+  })
+
+  it('online mit Haken-Feldern: Bestellung und Zahlungsvorgang, kein Abo, Betrag unverändert', async () => {
+    const res = await POST(anfrage({ paymentMethod: 'ONLINE', ...ALTE_FELDER }))
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual(expect.objectContaining({ clientSecret: 'pi_test_secret', amountCents: 500, serviceFeeCents: 50 }))
+    expect(prisma.customerFarmSubscription.upsert).not.toHaveBeenCalled()
+  })
+
+  it('am Quelltext: der Checkout fasst keine Abos an und ruft keine Abo-Anmeldung', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const route = readFileSync(join(process.cwd(), 'src/app/api/checkout/route.ts'), 'utf8')
+    const code = route.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')
+    expect(code).not.toMatch(/customerFarmSubscription|meldeEmailAboAn|abo-anmeldung|optIn/)
+    // Gegenprobe: das Muster schlägt am alten Stand an.
+    expect('if (data.optInEmail) await meldeEmailAboAn(abo, new Date())').toMatch(/customerFarmSubscription|meldeEmailAboAn|abo-anmeldung|optIn/)
+  })
+})

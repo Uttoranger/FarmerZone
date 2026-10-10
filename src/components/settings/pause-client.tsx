@@ -8,12 +8,18 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { setPause } from '@/server/actions/farm'
 import { KNOPF_GRUEN, KNOPF_ORANGE_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { useNachSpeichern } from '@/components/hof-einstellungen/use-nach-speichern'
 import { cn } from '@/lib/utils'
 
 /**
  * Pause — unter /settings/pause und im Hofseiten-Editor ab lg
  * (components/farmer/hofseite-editor.tsx), der über `onGespeichert` nach
  * jeder Änderung seine Vorschau neu lädt.
+ *
+ * „Nachricht speichern" führt auf /settings/pause zurück zur Übersicht
+ * (Register N1, Nr. 44). Der Umschalter bleibt auf der Seite: Er wirkt
+ * sofort, zeigt den neuen Zustand hier, und danach folgt oft noch die
+ * Nachricht für die Kunden.
  */
 export function PauseClient({
   initialPaused,
@@ -27,6 +33,7 @@ export function PauseClient({
   const [isPaused, setIsPaused] = useState(initialPaused)
   const [message, setMessage] = useState(initialMessage ?? '')
   const [isPending, startTransition] = useTransition()
+  const nachSpeichern = useNachSpeichern()
 
   function handleToggle() {
     const newPaused = !isPaused
@@ -48,7 +55,7 @@ export function PauseClient({
       if (res.error) {
         toast.error(res.error)
       } else {
-        toast.success('Nachricht gespeichert')
+        nachSpeichern('Nachricht gespeichert')
         onGespeichert?.()
       }
     })

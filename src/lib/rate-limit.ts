@@ -1,14 +1,19 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
+import { ZU_VIELE_ANFRAGEN } from '@/lib/bremse-datenbank'
 
 // ── Rate-Limiting (Härtung 2b) ────────────────────────────────────────────────
 //
 // SERVERLESS-KAVEAT: Dieser Limiter hält seine Zähler im Prozess-Speicher.
 // Auf Vercel gilt das Limit damit PRO INSTANZ, nicht global — parallel warme
 // Instanzen haben je eigene Fenster. Für einen Pilothof mit einem echten
-// Nutzer ist das bewusst ausreichend (Schutz gegen simple Schleifen/Bots);
-// ein globaler Store (Upstash/Redis) ist geparkt, Trigger: sichtbarer
-// Missbrauch.
+// Nutzer ist das bewusst ausreichend (Schutz gegen simple Schleifen/Bots).
+//
+// ZWEI STUFEN (Register R1, Nr. 40): Dieser Speicher ist die ERSTE Stufe.
+// Für Anmeldecode, Registrierung, Problem melden, Bestellungen finden und
+// Checkout zählt danach die Tabelle `RateLimitZaehler` über alle Instanzen
+// (src/lib/bremse-datenbank.ts, src/server/bremse-datenbank.ts) — gefragt
+// erst, wenn diese Stufe durchlässt.
 
 // Franz-tauglich: der eine echte Nutzer darf sich nie selbst aussperren.
 // 20 Checkout-/Reservierungs-Aufrufe pro Minute erreicht kein Mensch beim
@@ -69,19 +74,27 @@ const limiters = new Map<string, ReturnType<typeof createRateLimiter>>()
 // viele echte Kundinnen eine IP. Erst beide Grenzen zusammen sind brauchbar.
 //
 // SERVERLESS-KAVEAT wie oben: Die Zähler leben im Prozess, das Limit gilt je
-// Instanz. Für den Pilotbetrieb bewusst ausreichend; ein globaler Speicher
-// (Upstash/Redis) wäre die nächste Stufe und braucht neue Infrastruktur.
+// Instanz. Für den Checkout folgt die zweite Stufe über alle Instanzen
+// (`bremseCheckout`, src/server/bremse-datenbank.ts); die übrigen Routen
+// bleiben bei dieser einen Stufe.
+//
+// EIGENE GRENZE (`max`, seit Nr. 47): nur, wo der Aufrufer kein Mensch ist und
+// die Vorgabe echte Aufrufe abwiese — die Ein-Klick-Abmeldung kommt von den
+// Servern weniger Mailanbieter (EIN_KLICK_JE_MINUTE, src/lib/abmelde-link.ts).
+// Jede Grenze hat ihren eigenen Zähler, sie teilt ihn nie mit der Vorgabe.
 export function enforceRateLimit(
   routeKey: string,
   request: NextRequest,
-  sessionId?: string | null
+  sessionId?: string | null,
+  { max = CHECKOUT_RESERVE_MAX_PER_WINDOW }: { max?: number } = {}
 ): NextResponse | null {
   if (process.env.NODE_ENV !== 'production') return null
 
-  let limiter = limiters.get(routeKey)
+  const zaehler = `${routeKey}:${max}`
+  let limiter = limiters.get(zaehler)
   if (!limiter) {
-    limiter = createRateLimiter()
-    limiters.set(routeKey, limiter)
+    limiter = createRateLimiter({ max })
+    limiters.set(zaehler, limiter)
   }
 
   const ip = getClientIp(request.headers)
@@ -94,7 +107,7 @@ export function enforceRateLimit(
   if (ergebnisse.every(Boolean)) return null
 
   return NextResponse.json(
-    { error: 'Zu viele Anfragen — bitte warte einen Moment und versuche es erneut.' },
+    { error: ZU_VIELE_ANFRAGEN },
     { status: 429, headers: { 'Retry-After': String(Math.ceil(RATE_LIMIT_WINDOW_MS / 1000)) } }
   )
 }

@@ -36,7 +36,7 @@ vi.mock('@/components/shared/image-upload', () => ({
   stufenText: () => '',
 }))
 
-import { BEITRAEGE_HREF, HAUPT, hofAktiverPunkt } from '@/lib/bauern-navigation'
+import { BEITRAEGE_HREF, HAUPT, elternseite, hofAktiverPunkt } from '@/lib/bauern-navigation'
 import { beitraegeUebersicht, type BeitragQuelle } from '@/lib/mein-hof-beitraege'
 import { BeitraegeReiter } from '@/components/mein-hof/beitraege-reiter'
 import { fuerHof, STATUS_TON, type MeldungVollstaendig } from '@/lib/meldung'
@@ -66,6 +66,7 @@ const basis: BeitragQuelle = {
   publishedAt: '2026-09-20T10:00:00.000Z',
   sentViaEmail: false,
   sentViaWhatsApp: false,
+  emailRecipientCount: 0,
   whatsappSentCount: 0,
   whatsappRecipientCount: 0,
 }
@@ -153,8 +154,11 @@ describe('/status leitet in den Reiter um, Unterseiten unter (hof)', () => {
     const client = quelle('src/app/(hof)/status/new/status-new-client.tsx')
     expect(client).toContain('router.push(BEITRAEGE_HREF)')
     expect(client).not.toContain("router.push('/status')")
+    // Seit Nr. 44 kommt der Rückweg aus dem UnterseitenKopf — Ziel weiter der Reiter.
     const whatsapp = quelle('src/app/(hof)/status/[id]/send-whatsapp/page.tsx')
-    expect(whatsapp).toContain('href={BEITRAEGE_HREF}')
+    expect(whatsapp).toContain('<UnterseitenKopf')
+    expect(elternseite('/status/abc/send-whatsapp')?.href).toBe(BEITRAEGE_HREF)
+    expect(elternseite('/status/new')?.href).toBe(BEITRAEGE_HREF)
   })
 
   it('„Mein Hof" leuchtet auf dem Reiter und auf allen /status-Unterseiten', () => {
@@ -304,6 +308,11 @@ describe('Meine Meldungen (gerendert)', () => {
     expect(html).toContain('Liegt am Bildformat')
   })
 
+  it('F6 (22e): je Meldung „Tag · Nr. <Kurznummer>" bleibt', () => {
+    expect(zeilen[0].kurznummer).toMatch(/\S/)
+    expect(html).toContain(`Nr. <span class="font-mono">${zeilen[0].kurznummer}</span>`)
+  })
+
   it('Fremdtext bleibt Text', () => {
     expect(html).not.toContain('<script>')
     expect(html).toContain('&lt;script&gt;')
@@ -362,7 +371,7 @@ describe('Tokens statt Farbwerte (neue und umgezogene Dateien)', () => {
     'src/components/hof-hilfe/meldung-abgeben.tsx',
     'src/components/hof-hilfe/hilfe-seitenspalte.tsx',
     'src/components/hof-hilfe/hilfe-laden.tsx',
-    'src/components/hofbereich/zurueck-link.tsx',
+    'src/components/hofbereich/unterseiten-kopf.tsx',
     'src/app/(hof)/fehler-melden/page.tsx',
     'src/app/(hof)/meldungen/page.tsx',
     'src/app/(hof)/status/new/status-new-client.tsx',

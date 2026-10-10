@@ -62,10 +62,12 @@ import { useBildansicht } from '@/components/hofseite/bildansicht'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { ProductGrid } from './product-grid'
 import { HofseiteKunde } from '@/components/hofseite/hofseite-kunde'
+import { zahlungsarten } from '@/lib/hofseite-kunde'
 import { stripStatusVariables, renderStatusBodyWithChip } from '@/lib/status-body'
 // Ersatz-Titelbild ohne Foto — gemeinsam mit dem Kopf von „Mein Hof".
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
 import { produktLink } from '@/lib/produktdetail'
+import { NICHT_IM_SHOP_IM_SATZ } from '@/lib/produkt-sichtbarkeit'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
 import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
 
@@ -694,6 +696,13 @@ function HofseiteBesitzer({
   const pickupDays = useMemo(() => nextPickupDays(farm.pickupSlots, 3), [farm.pickupSlots])
   const pickupDaysShort = useMemo(() => pickupWeekdaysLabel(farm.pickupSlots), [farm.pickupSlots])
   const mapsUrl = buildMapsUrl(farm.address, farm.postalCode, farm.city)
+  // Wie Kundinnen zahlen können — dieselbe Regel wie Hofseite, Produktseite
+  // und Kasse (Register Z1, Nr. 35): online nur mit fertigem Stripe-Konto UND
+  // acceptsOnline. Vorher reichte acceptsOnline, und der Hof sah „Online
+  // (Karte)", obwohl online niemand zahlen konnte.
+  const arten = zahlungsarten(farm)
+  const zahltOnline = arten.some((z) => z.art === 'online')
+  const zahltBar = arten.some((z) => z.art === 'bar')
 
   // Reiterleiste und Beobachter lesen dieselbe Liste — siehe lib/hofseite-sektionen.ts
   const sektionen = useMemo(
@@ -769,7 +778,7 @@ function HofseiteBesitzer({
   const hiddenCount = farm.products.filter((p) => !p.isAvailable).length
   const productCountLabel = ownerMode
     ? isEdit
-      ? `${publicCount} sichtbar${hiddenCount > 0 ? ` · ${hiddenCount} ausgeblendet` : ''}`
+      ? `${publicCount} sichtbar${hiddenCount > 0 ? ` · ${hiddenCount} ${NICHT_IM_SHOP_IM_SATZ}` : ''}`
       : `${publicCount} Produkte`
     : publicCount > 0
       ? `${publicCount} Produkte`
@@ -812,7 +821,7 @@ function HofseiteBesitzer({
               <div className="text-[13px] mt-px" style={{ color: isEdit ? 'var(--app-ink-faint)' : '#C9E3CF' }}>
                 {isEdit
                   ? 'Alles mit Stift-Symbol kannst du ändern – Kunden sehen es sofort.'
-                  : 'Bearbeiten-Knöpfe und ausgeblendete Produkte sind unsichtbar.'
+                  : `Bearbeiten-Knöpfe und Produkte, die ${NICHT_IM_SHOP_IM_SATZ} stehen, sind unsichtbar.`
                 }
               </div>
             </div>
@@ -1011,13 +1020,13 @@ function HofseiteBesitzer({
                 Abholung <b style={{ color: 'var(--app-ink)' }}>{pickupDaysShort}</b>
               </span>
             )}
-            {(farm.acceptsOnline || farm.acceptsOnsite) && (
+            {arten.length > 0 && (
               <span className="text-sm hidden md:inline" style={{ color: 'var(--app-ink-soft)' }}>
                 Zahlung{' '}
                 <b style={{ color: 'var(--app-ink)' }}>
-                  {farm.acceptsOnline && farm.acceptsOnsite
+                  {zahltOnline && zahltBar
                     ? 'am Hof oder online'
-                    : farm.acceptsOnline
+                    : zahltOnline
                       ? 'online'
                       : 'am Hof'}
                 </b>
@@ -1153,24 +1162,21 @@ function HofseiteBesitzer({
               )}
             </div>
             <div className="flex flex-wrap gap-2.5 mt-3.5">
-              {farm.acceptsOnline && (
-                <span
-                  className="inline-flex items-center gap-1.5 text-[13px] font-semibold px-[13px] py-[7px] rounded-full"
-                  style={{ color: 'var(--app-chip-ink)', background: 'var(--app-chip)' }}
-                >
-                  <CreditCard className="size-3.5" strokeWidth={1.7} />
-                  Online (Karte)
-                </span>
-              )}
-              {farm.acceptsOnsite && (
-                <span
-                  className="inline-flex items-center gap-1.5 text-[13px] font-semibold px-[13px] py-[7px] rounded-full"
-                  style={{ color: 'var(--app-chip-ink)', background: 'var(--app-chip)' }}
-                >
-                  <Banknote className="size-3.5" strokeWidth={1.7} />
-                  Vor Ort (Bar & Karte)
-                </span>
-              )}
+              {/* Wortlaut aus zahlungsarten — wie Kundinnen ihn sehen; „Bar & Karte"
+                  stimmt seit E5 nicht mehr (keine Kartenzahlung am Hof). */}
+              {arten.map((z) => {
+                const Symbol = z.art === 'online' ? CreditCard : Banknote
+                return (
+                  <span
+                    key={z.art}
+                    className="inline-flex items-center gap-1.5 text-[13px] font-semibold px-[13px] py-[7px] rounded-full"
+                    style={{ color: 'var(--app-chip-ink)', background: 'var(--app-chip)' }}
+                  >
+                    <Symbol className="size-3.5" strokeWidth={1.7} aria-hidden="true" />
+                    {z.text}
+                  </span>
+                )
+              })}
             </div>
             <div className="flex items-center gap-2 mt-4 text-sm" style={{ color: 'var(--app-ink)' }}>
               <Phone className="size-[15px] shrink-0" strokeWidth={1.7} style={{ color: 'var(--app-ink-faint)' }} />

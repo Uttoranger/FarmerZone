@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState, useTransition } from 'react'
 import dynamic from 'next/dynamic'
+import Link from 'next/link'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -36,6 +37,10 @@ import { BETRIEBSNUMMER_ANKER, BETRIEBSSTATUS, BETRIEBSSTATUS_VALUES, type Betri
 import { profilBearbeitenSchema } from '@/schemas/hofprofil'
 import { EMAIL_MAX, HOFNAME_MAX, PERSONENNAME_MAX, TELEFON_MAX } from '@/lib/eingabegrenzen'
 import { FeldZaehler } from '@/components/shared/zeichen-zaehler'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { useNachSpeichern } from '@/components/hof-einstellungen/use-nach-speichern'
+import { EINSTELLUNG_MEIN_AUFTRITT, einstellungsWeg } from '@/lib/bauern-navigation'
+import { cn } from '@/lib/utils'
 
 // Nur clientseitig: Leaflet greift beim Import auf window zu.
 const StandortKarte = dynamic(() => import('@/components/settings/standort-karte'), { ssr: false })
@@ -50,6 +55,8 @@ const GRENZE: Partial<Record<keyof ProfileFormData, number>> = {
 
 export function ProfileForm({ farm }: { farm: FarmSettings }) {
   const [isPending, startTransition] = useTransition()
+  // Nach dem Speichern zurück zur Übersicht (Register N1, Nr. 44).
+  const nachSpeichern = useNachSpeichern()
   const [sucheLaeuft, setSucheLaeuft] = useState(false)
   // Die ruhige Zeile über der Karte: anfangs der Start-Hinweis (solange kein
   // Punkt gespeichert ist), danach das Vorwärts-Ergebnis oder die
@@ -115,12 +122,16 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
   const landFeld = register('country')
 
   function onSubmit(data: ProfileFormData) {
+    // Während der Ortssuche nicht speichern: Danach geht es zur Übersicht
+    // (Nr. 44), und der gesuchte Punkt käme in einer ausgehängten Seite an —
+    // gespeichert wären still die alten Koordinaten.
+    if (sucheLaeuft) return
     startTransition(async () => {
       const res = await updateProfile(data)
       if (res.error) {
         toast.error(res.error)
       } else {
-        toast.success('Profil gespeichert')
+        nachSpeichern('Profil gespeichert')
       }
     })
   }
@@ -302,11 +313,12 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
           </div>
         </div>
         {/* Der EINZIGE Auslöser der Vorwärts-Suche — bewusst eine Schaltfläche,
-            nichts Automatisches beim Tippen oder Speichern. */}
+            nichts Automatisches beim Tippen oder Speichern. Gesperrt, solange
+            gespeichert wird: Danach geht es zur Übersicht (Nr. 44). */}
         <button
           type="button"
           onClick={aufKarteSuchen}
-          disabled={sucheLaeuft}
+          disabled={sucheLaeuft || isPending}
           className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-medium text-foreground hover:bg-muted/40 transition-colors disabled:opacity-60"
         >
           {sucheLaeuft && <Loader2 className="size-4 animate-spin" />}
@@ -372,16 +384,24 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
 
       <p className="text-sm text-muted-foreground">
         Logo und Titelbild verwaltest du unter{' '}
-        <span className="text-foreground">Einstellungen → Mein Auftritt</span> —
-        dort lädst du Bilder direkt vom Gerät hoch.
+        {/* Ein Link im Satz (Nr. 44), grün wie jeder Link im Fließtext. Das
+            Polster macht ihn 44 px hoch, die Gegen-Ränder halten die Zeile ruhig. */}
+        <Link
+          href={EINSTELLUNG_MEIN_AUFTRITT.href}
+          className={cn('-my-3 inline-block rounded-md py-3 font-medium text-brand-text underline underline-offset-2', FOKUS_RAHMEN)}
+        >
+          {einstellungsWeg(EINSTELLUNG_MEIN_AUFTRITT)}
+        </Link>{' '}
+        — dort lädst du Bilder direkt vom Gerät hoch.
       </p>
 
+      {/* Wartet, solange „Auf der Karte suchen" läuft — sonst ginge der neue Standort verloren (siehe onSubmit). */}
       <Button
         type="submit"
-        disabled={isPending}
+        disabled={isPending || sucheLaeuft}
         className="w-full h-12 bg-primary text-primary-foreground hover:opacity-90 font-semibold"
       >
-        {isPending ? <Loader2 className="size-4 animate-spin" /> : 'Profil speichern'}
+        {isPending ? <Loader2 className="size-4 animate-spin" /> : sucheLaeuft ? 'Suche läuft noch …' : 'Profil speichern'}
       </Button>
     </form>
   )

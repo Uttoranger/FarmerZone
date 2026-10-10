@@ -1,6 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
+import { NextRequest } from 'next/server'
 import {
   createRateLimiter,
+  enforceRateLimit,
   getClientIp,
   CHECKOUT_RESERVE_MAX_PER_WINDOW,
   RATE_LIMIT_WINDOW_MS,
@@ -87,5 +89,31 @@ describe('getClientIp', () => {
   it('ignoriert einen leeren x-forwarded-for-Header', () => {
     const headers = new Headers({ 'x-forwarded-for': '', 'x-real-ip': '198.51.100.4' })
     expect(getClientIp(headers)).toBe('198.51.100.4')
+  })
+})
+
+describe('enforceRateLimit — Vorgabe und eigene Grenze (Nr. 47)', () => {
+  afterEach(() => vi.unstubAllEnvs())
+
+  const anfrage = (ip: string) => new NextRequest('http://localhost/api/x', { headers: { 'x-forwarded-for': ip } })
+  const durch = (route: string, ip: string, mal: number, grenze?: { max: number }) =>
+    Array.from({ length: mal }, () => enforceRateLimit(route, anfrage(ip), null, grenze)).filter((a) => a === null).length
+
+  it('ohne Grenze gilt die Vorgabe (20 je Minute und IP)', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    expect(durch('test-vorgabe', '198.51.100.30', CHECKOUT_RESERVE_MAX_PER_WINDOW + 5)).toBe(CHECKOUT_RESERVE_MAX_PER_WINDOW)
+  })
+
+  it('mit eigener Grenze gilt sie — mit eigenem Zähler, nie geteilt mit der Vorgabe derselben Route', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    expect(durch('test-eigen', '198.51.100.31', 60, { max: 50 })).toBe(50)
+    expect(enforceRateLimit('test-eigen', anfrage('198.51.100.31'), null, { max: 50 })?.status).toBe(429)
+    // Dieselbe Route mit der Vorgabe zählt für sich.
+    expect(durch('test-eigen', '198.51.100.31', 1)).toBe(1)
+  })
+
+  it('außerhalb der Produktion bremst nichts — auch nicht mit eigener Grenze', () => {
+    vi.stubEnv('NODE_ENV', 'test')
+    expect(durch('test-lokal', '198.51.100.32', 5, { max: 1 })).toBe(5)
   })
 })

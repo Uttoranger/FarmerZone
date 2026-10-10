@@ -7,9 +7,9 @@ import { getFarmForUser } from '@/server/queries/dashboard'
 import { getMeldungenFuerHof } from '@/server/queries/meldung'
 import { generateFormToken } from '@/lib/form-token'
 import { KENNUNG_PARAMETER, bereinigeKennung } from '@/lib/fehlerseite'
-import { MEINE_MELDUNGEN_HREF, meldungenStand } from '@/lib/hof-hilfe'
+import { meldungenStand } from '@/lib/hof-hilfe'
 import { supportMailto } from '@/lib/support'
-import { ZurueckLink } from '@/components/hofbereich/zurueck-link'
+import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { MeldungAbgeben } from '@/components/hof-hilfe/meldung-abgeben'
 import { HilfeSeitenspalte } from '@/components/hof-hilfe/hilfe-seitenspalte'
 import { MELDEN_RAHMEN } from '@/components/hof-hilfe/hilfe-laden'
@@ -57,12 +57,10 @@ export default async function FehlerMeldenPage({
 
   return (
     <div className={MELDEN_RAHMEN}>
+      {/* Am Handy die feste Leiste zurück (Nr. 44); ab 768 px führt „Abbrechen" dorthin, deshalb dort keine Zeile. */}
+      <UnterseitenKopf zeileImBrowser={false} />
       <div className="lg:flex lg:items-start lg:gap-8">
         <div className="flex min-w-0 flex-col gap-3.5 lg:w-[640px] lg:shrink-0">
-          {/* Am Handy der Weg zurück (Mockup mobil); ab 768 px führt „Abbrechen" dorthin. */}
-          <ZurueckLink href={MEINE_MELDUNGEN_HREF} className="mb-0 md:hidden">
-            Meine Meldungen
-          </ZurueckLink>
           <h1 className="font-heading text-2xl font-semibold text-foreground md:text-[26px]">Hilfe und Rückmeldung</h1>
           <p className="text-sm leading-normal text-muted-foreground">
             Etwas klemmt, du wünschst dir etwas oder hast eine Frage? Schreib uns – wir lesen alles.

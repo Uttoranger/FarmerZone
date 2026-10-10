@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { unstable_rethrow } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { ladeOeffentlicheHoefe } from '@/server/queries/oeffentliche-hoefe'
+import { schonGemeldet } from '@/server/oeffentlich-lesen'
 import { beispielRechnung, waehleStartseitenHoefe, type StartseitenHof } from '@/lib/startseite'
 import { istBrennmaterialSaison } from '@/lib/brennmaterial-saison'
 import { STARTSEITE_VORSCHAUBILD } from '@/lib/vorschaubild'
@@ -76,7 +77,8 @@ const ladeStartseitenHoefe = cache(async (): Promise<StartseitenHof[] | 'fehler'
     // Nexts eigene Steuersignale (Umleitung, dynamisches Rendern) gehören
     // nicht in die Fehleranzeige.
     unstable_rethrow(err)
-    Sentry.captureException(err, { tags: { bereich: 'startseite-hoefe' } })
+    // Einen Verbindungsabbruch hat die Wiederholung schon gemeldet (Nr. 47).
+    if (!schonGemeldet(err)) Sentry.captureException(err, { tags: { bereich: 'startseite-hoefe' } })
     return 'fehler'
   }
 })

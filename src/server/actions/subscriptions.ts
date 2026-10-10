@@ -3,9 +3,12 @@
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { verifyUnsubscribeToken } from '@/lib/unsubscribe'
 import { bestaetigteAdresse } from '@/server/kunden-adresse'
-import { aboAenderungSchema } from '@/schemas/abo'
+import { aboAenderungSchema, aboBestaetigenSchema } from '@/schemas/abo'
+import { abmeldeTokenSchema } from '@/schemas/abmelden'
+import { ABMELDE_LINK_UNGUELTIG } from '@/lib/abmelde-link'
+import { ABO_TEXT, aboFehlerSatz, wartetAufBestaetigung } from '@/lib/abo-bestaetigung'
+import { EMAIL_ABO_STAND, bestaetigeEmailAbo, loeseOffeneAnfrageAuf, meldeAboMitTokenAb, meldeEmailAboAn } from '@/server/abo-anmeldung'
 
 // Abos hängen an der Adresse, nicht an einem Konto. Ändern oder löschen darf
 // sie nur, wer die Adresse mit Code bewiesen hat (E8, Nr. 17a) — frisch aus
@@ -16,11 +19,19 @@ const KONTO_NUR_KUNDIN = 'Ein Hof-Konto lässt sich hier nicht löschen. Schreib
 
 export type ActionResult = { error?: string }
 
+/**
+ * Was der E-Mail-Schalter auf /account danach zeigt (Double-Opt-in, S11):
+ * `an` (Bestand oder bestätigt), `aus`, oder `wartet` — der Link ist
+ * unterwegs. Die Kundin ist hier mit Code angemeldet, ihr Abo-Stand ist
+ * keine fremde Auskunft.
+ */
+export type AboAenderungErgebnis = { error?: string; email?: 'an' | 'aus' | 'wartet' }
+
 export async function updateSubscription(
   farmId: string,
   optInEmail: boolean,
   optInWhatsApp: boolean,
-): Promise<ActionResult> {
+): Promise<AboAenderungErgebnis> {
   // Die Argumente kommen aus dem Browser — erst prüfen, dann lesen (Nr. 19b).
   const eingabe = aboAenderungSchema.safeParse({ farmId, optInEmail, optInWhatsApp })
   if (!eingabe.success) return { error: 'Das hat nicht geklappt. Bitte lade die Seite neu und versuch es noch einmal.' }
@@ -33,30 +44,83 @@ export async function updateSubscription(
   // Keine Telefonnummer aus dem Konto: Sie kann aus einer Registrierung mit
   // Passwort stammen, die die Adresse nie bewiesen hat — Better Auth behält
   // sie beim ersten Code. Die Nummer eines Abos kommt nur aus dem Checkout.
+  //
+  // E-Mail an schaltet NICHT direkt an (Double-Opt-in, S11, Nr. 38): Neue und
+  // abgemeldete Abos bekommen einen Bestätigungslink, auch hier — der
+  // Auftrag verlangt den Klick auf den Link für jede neue Anmeldung.
+  // Ausschalten wirkt sofort.
   const geprueft = eingabe.data
-  await prisma.customerFarmSubscription.upsert({
-    where: { customerEmail_farmId: { customerEmail, farmId: geprueft.farmId } },
+  const wo = { customerEmail_farmId: { customerEmail, farmId: geprueft.farmId } }
+  const speichern = prisma.customerFarmSubscription.upsert({
+    where: wo,
     create: {
       customerEmail,
       farmId: geprueft.farmId,
-      optInEmail: geprueft.optInEmail,
+      optInEmail: false,
       optInWhatsApp: geprueft.optInWhatsApp,
       customerPhone: null,
     },
-    update: { optInEmail: geprueft.optInEmail, optInWhatsApp: geprueft.optInWhatsApp },
+    // Aus setzt optInEmail immer false — auch bei einem bestätigten Abo.
+    update: { optInWhatsApp: geprueft.optInWhatsApp, ...(geprueft.optInEmail ? {} : { optInEmail: false }) },
+    select: EMAIL_ABO_STAND,
   })
+  if (!geprueft.optInEmail) {
+    // ERST die offene Anfrage auflösen, DANN ausschalten, in einer
+    // Transaktion (Nachbesserung Runde 1/2): Sonst stünde der Schalter nach
+    // dem Neuladen wieder auf „wartet", der alte Link bestätigte weiter — und
+    // eine Bestätigung genau zwischen beiden Schritten ließe das Abo trotz
+    // „aus" bestätigt und an. In dieser Reihenfolge findet eine spätere
+    // Bestätigung ihre Anfrage nicht mehr, eine frühere schaltet das
+    // upsert wieder aus.
+    await prisma.$transaction([
+      loeseOffeneAnfrageAuf({ customerEmail, farmId: geprueft.farmId }),
+      speichern,
+    ])
+    return { email: 'aus' }
+  }
+  const abo = await speichern
 
-  return {}
+  const jetzt = new Date()
+  // Wartet die Anmeldung schon auf einen gültigen Link, ist „E-Mail an" nichts
+  // Neues — etwa wenn der WhatsApp-Schalter den E-Mail-Stand mitschickt. Kein
+  // zweiter Link; einen neuen gibt es über Aus und wieder An.
+  if (wartetAufBestaetigung(abo, jetzt)) return { email: 'wartet' }
+  const schritt = await meldeEmailAboAn(abo, jetzt)
+  return { email: schritt === 'schon-aktiv' ? 'an' : 'wartet' }
 }
 
-export async function unsubscribeWithToken(token: string): Promise<ActionResult> {
-  const data = verifyUnsubscribeToken(token)
-  if (!data) return { error: 'Ungültiger oder abgelaufener Link' }
+/**
+ * Der Knopf hinter dem Link aus der Bestätigungsmail (POST, S11/S2). Ohne
+ * Anmeldung: Der signierte Token beweist das Postfach. Antwort nur mit
+ * festen Sätzen.
+ */
+export async function bestaetigeNeuigkeiten(input: unknown): Promise<{ ok: true; hofName: string } | { error: string }> {
+  const eingabe = aboBestaetigenSchema.safeParse(input)
+  if (!eingabe.success) return { error: aboFehlerSatz('ungueltig') }
 
-  await prisma.customerFarmSubscription.updateMany({
-    where: { customerEmail: data.email.toLowerCase(), farmId: data.farmId },
-    data: { optInEmail: false, optInWhatsApp: false },
-  })
+  const stand = await bestaetigeEmailAbo(eingabe.data.token, new Date())
+  switch (stand.zustand) {
+    case 'bestaetigt':
+      return { ok: true, hofName: stand.hofName }
+    case 'offen':
+      // Nach dem Schreiben noch offen: nur möglich, wenn das Abo zwischendurch
+      // geändert wurde — dann lieber noch einmal versuchen lassen.
+      return { error: ABO_TEXT.unerwartet }
+    default:
+      return { error: aboFehlerSatz(stand.zustand) }
+  }
+}
+
+export async function unsubscribeWithToken(token: unknown): Promise<ActionResult> {
+  // Das Argument kommt aus dem Browser — erst die Gestalt prüfen (Nr. 47).
+  const eingabe = abmeldeTokenSchema.safeParse(token)
+  // Derselbe Satz wie beim Ein-Klick-Endpunkt — der Token läuft nicht ab, und der Satz nennt den Ausweg.
+  if (!eingabe.success) return { error: ABMELDE_LINK_UNGUELTIG }
+
+  // Derselbe Weg wie die Ein-Klick-Abmeldung des Mailprogramms (/api/abmelden):
+  // offene Anfrage auflösen, dann E-Mail und WhatsApp aus (abo-anmeldung.ts).
+  const { gueltig } = await meldeAboMitTokenAb(eingabe.data)
+  if (!gueltig) return { error: ABMELDE_LINK_UNGUELTIG }
 
   return {}
 }
