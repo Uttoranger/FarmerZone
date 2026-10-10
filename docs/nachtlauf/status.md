@@ -67,13 +67,13 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 47 | Altlasten aus Lauf 7 und Laufzeit-Befunde | gemergt (#229) | `nacht/2026-10-08/47-altlasten` | #224 | main | Sicherheitspfad: zwei Runden, zwei Nachprüfungen, Nachzug des Dirigenten (Doku und Tests); E-Mail-Muster im Sentry-Filter mit erneuert (Freigabe); keine Migration | 08.10.2026 |
 | 48 | Probelauf (Nachholung von 34) | gemergt (#229) | `nacht/2026-10-08/48-probelauf` | #225 | main | Vorbedingung B nicht erfüllt (Vorschau und api.stripe.com gesperrt, CONNECT 403) → Checkliste nach Stand 41–47 (zwei Runden); Webhook: unbekannte Bestellung → 200, keine Fehlerflut, kein 48a | 09.10.2026 |
 | Sammel 8 | Sammel-PR Lauf 8 | gemergt (#229) | `integration/lauf8` | #229 | main | Doku-PR und 41–48 per --no-ff in §1-Reihenfolge; Konflikte in AdminShell, Kunden-Detail, Bremse, E-Mail und Doku aufgelöst, alle Änderungen erhalten; typecheck, lint 13/7, test 311/6110, Integration 40/350 grün; Morgenbericht `morgenbericht-2026-10-08-lauf8.md` | 09.10.2026 |
-| 49 | Mein Hof in der Leiste und Kundensicht (N3, N4) | läuft | `nacht/2026-10-10/49-mein-hof-leiste` | | main | | 10.10.2026 |
-| 50 | Mein Auftritt zieht in Mein Hof (N4) | offen | | | 49 | | |
+| 49 | Mein Hof in der Leiste und Kundensicht (N3, N4) | läuft (tester und pruefer) | `nacht/2026-10-10/49-mein-hof-leiste` | | main | Umsetzung fertig (8957a00) | 10.10.2026 |
+| 50 | Mein Auftritt zieht in Mein Hof (N4) | läuft | `nacht/2026-10-10/50-auftritt-in-mein-hof` | | 49 | gestapelt auf 49; Nachprüfung folgt | 10.10.2026 |
 | 51 | Hofseite: Schaufenster zuerst (N5), Käufer-Vorschau Lebensmittel | offen | | | main | | |
 | 52 | Karte (/hoefe, Standortkarte, Region) | läuft | `nacht/2026-10-10/52-karte` | | main | | 10.10.2026 |
 | 53 | Heute, Auswertung, Verkäufe | läuft | `nacht/2026-10-10/53-heute-auswertung` | | 55 | gestapelt auf 55 | 10.10.2026 |
 | 54 | Admin am Handy und alte Seiten ins neue Design | offen | | | main | | |
-| 55 | Testzahlungen aus Auswertungen (Z4) | läuft (tester und pruefer) | `nacht/2026-10-10/55-testzahlungen` | | main | Umsetzung fertig (40d35c2); Geld-Anzeige, Nachprüfung folgt | 10.10.2026 |
+| 55 | Testzahlungen aus Auswertungen (Z4) | läuft (Nachbesserung Runde 1) | `nacht/2026-10-10/55-testzahlungen` | | main | Umsetzung fertig (40d35c2); pruefer: kein Blocker, 6 Hinweise; Nachprüfung folgt | 10.10.2026 |
 | 56 | Altlasten Lauf 8 §6 und Kleinkram | offen | | | main | | |
 | 57 | Datenschutzerklärung, Nachtrag (Entwurf) | offen — Vorstufe erledigt: origin/main in den Branch der Nr. 33 geholt (dbb7223, #210 aktualisiert) | | | 33 (#210) | | 10.10.2026 |
 | Sammel 9 | Sammel-PR Lauf 9 | offen | `integration/lauf9` | | main | | |
