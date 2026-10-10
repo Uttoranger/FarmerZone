@@ -104,6 +104,16 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 48 | Probelauf (Nachholung von 34) | `freigabe.md` §12 | Stripe-Testmodus und Erreichbarkeit (Vorbedingungen A und B) |
 | 48a … | Fehler aus dem Probelauf, je einer | `freigabe.md` §12 | – |
 | Sammel 8 | Sammel-PR `integration/lauf8` | `freigabe.md` §12 | G3 |
+| 49 | Mein Hof in der Leiste und Kundensicht | `freigabe.md` §13 | N3, N4 (Teil 1) |
+| 50 | Mein Auftritt zieht in Mein Hof (gestapelt auf 49) | `freigabe.md` §13 | N4 (Teil 2) |
+| 51 | Hofseite: Schaufenster zuerst und Käufer-Vorschau Lebensmittel | `freigabe.md` §13 | N5 |
+| 52 | Karte (`/hoefe`, Standortkarte im Hof-Profil, Region) | `freigabe.md` §13 | O6 bleibt offen (nur Vorschlag im Bericht) |
+| 53 | Heute, Auswertung, Verkäufe (gestapelt auf 55) | `freigabe.md` §13 | F4, F6 |
+| 54 | Admin am Handy und alte Seiten ins neue Design | `freigabe.md` §13 | – |
+| 55 | Testzahlungen aus Auswertungen | `freigabe.md` §13 | Z4 |
+| 56 | Altlasten Lauf 8 §6 und Kleinkram | `freigabe.md` §13 | E10 (Pflichttexte nicht umformulieren) |
+| 57 | Datenschutzerklärung, Nachtrag (Entwurf, vom Branch der Nr. 33) | `freigabe.md` §13 | – |
+| Sammel 9 | Sammel-PR `integration/lauf9` (ohne 57) | `freigabe.md` §13 | G3 |
 
 **17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
 
@@ -114,6 +124,13 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 **Reihenfolge in Lauf 7** (`freigabe.md` §11, Haltepunkt Sammel-PR): 34 (danach ggf. 34a, 34b …) → 35 → 36 → 37 → 38 → 39 → 40 → Sammel-PR. Alle Nummern zweigen von `main` ab; vor jeder Nummer wird `origin/main` hineingeholt.
 
 **Reihenfolge in Lauf 8** (`freigabe.md` §12, Haltepunkt Sammel-PR): 41 → 42 → 43 (gestapelt auf 42) → 44 → 45 → 46 → 47 → 48 (danach ggf. 48a, 48b …) → Sammel-PR. Alle Nummern außer 43 zweigen von `main` ab; vor jeder Nummer wird `origin/main` hineingeholt. Keine Migrationen.
+
+**Reihenfolge in Lauf 9** (`freigabe.md` §13, Haltepunkt Sammel-PR): 49 → 52 → 50 (gestapelt auf 49) → 55 → 53 (gestapelt auf 55) → 51 → 54 → 56 → 57 (Entwurf) → Sammel-PR. Die Reihenfolge ist zugleich die Priorität: Reicht das Budget nicht, bleiben nicht begonnene Nummern für Lauf 10 und stehen so im Morgenbericht. Alle Nummern zweigen von `main` ab, mit drei Ausnahmen:
+- 50 zweigt vom Branch der Nr. 49 ab.
+- 53 zweigt vom Branch der Nr. 55 ab.
+- 57 zweigt vom Branch `nacht/2026-10-07/33-datenschutz` (#210) ab, nachdem dort `origin/main` hineingeholt und gepusht ist. Ihr PR ist ein Entwurf mit diesem Branch als Basis und kommt nicht in den Sammel-PR.
+
+Vor jeder Nummer wird `origin/main` hineingeholt. Keine Migrationen, keine neuen Pakete. Nachprüfung des Fix-Commits bei 50, 54, 55 und 56.
 
 **06b – Reservierte Slugs vollständig:** `RESERVED_SLUGS` in `src/lib/slug.ts` um alle Ordner aus `KEINE_HOFSEITE` (`next.config.ts`) ergänzen (u. a. `teilen`, `verify`, `konditionen`, `meldungen`, `fehler-melden`, `problem-melden`, `farm-page`, `forgot-password`, `reset-password`, `intern`), plus Test, der beide Listen gegeneinander prüft. Braucht keine Freigabe. In Produktion ist keiner dieser Slugs belegt (geprüft am 05.10.2026).
 

@@ -115,6 +115,7 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Begründung:** Mein-Hof-Umbau „mach es so".
 - **Dateien:** `src/app/(hof)/farm-page/`, `src/components/mein-hof/` (#180).
 - **Stand:** Nr. 22e (07.10.2026): Der Reiter „Beiträge" bietet alle Handlungen von `/status` (Deaktivieren, Löschen, Als Vorlage, WhatsApp fortsetzen); `/status` bleibt als Route und leitet auf den Reiter um (freigabe.md §9 „22e"; Lesart „bleibt und leitet um" am 07.10.2026 von uttoranger bestätigt), `/status/new` und WhatsApp fortsetzen liegen in der HofShell (Bericht 22e).
+- **Vermerk (10.10.2026):** ergänzt durch N3 (Mein Hof in der Handy-Leiste mit den Reitern Produkte · Hofseite · Beiträge unter md).
 
 ### E13 · „Verkauf eintragen" bleibt im Neu-Menü (02.10.2026)
 - **Entscheidung:** Die bestehende Funktion bleibt erhalten und steht im Neu-Menü. Das Formular wird nur ins neue Design gezogen.
@@ -183,6 +184,7 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
   - Heute zeigt drei Kennzahlen, ohne „Neue Kunden".
 - **Begründung:** Die wörtliche Gate-Bedingung hätte jedem neuen Hof ab dem ersten Tag „pausiert" gezeigt. Für „Neue Kunden" gibt es keine Regel, was „neu heute" heißt.
 - **Dateien:** `src/lib/stripe-konto.ts`, `src/server/queries/heute.ts`, `src/app/(hof)/dashboard/` (#181).
+- **Vermerk (10.10.2026, Freigabe Lauf 9):** „Online-Zahlung einrichten" nur noch im Kasten (Nr. 53); Kennzahlen 2 + 1 bis 1024 px.
 
 ### F5 · Servicegebühr 5 % für die aktiven Höfe gesetzt (06.10.2026)
 - **Entscheidung:** Der Mensch hat den Satz der aktiven Höfe im Admin auf 5 % gestellt (E4). Er gilt nur für neue Bestellungen.
@@ -293,6 +295,15 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Verhältnis zu anderen Einträgen:** ergänzt Z2. „Testmodus je Hof" ist nicht beauftragt.
 - **Dateien:** `src/lib/umgebung.ts`, AdminShell, Umgebungsbanner, E-Mail-Versand außerhalb der Produktion, `.github/workflows/staging-nachziehen.yml`, `docs/betrieb/testumgebung.md`; Umsetzung Nr. 43 (freigabe.md §12).
 
+### Z4 · Testzahlungen aus Auswertungen (10.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 9):**
+  - Online-Bestellungen, die vor dem Zeitpunkt in der Server-Variable `STRIPE_LIVE_AB` angelegt wurden, zählen nicht als Umsatz und nicht als Servicegebühr. Barbestellungen zählen immer.
+  - Ohne Variable bleibt alles wie heute.
+  - Abweichend von `docs/betrieb/stripe-live.md` §10 (Konstante) eine Variable: Zur Live-Schaltung ist dann keine Code-Änderung nötig. Den Wert setzt der Mensch.
+- **Begründung:** Befund vom 10.10.2026: Online-Bestellungen aus der Testzeit zählen als Umsatz bzw. Gebühr; dieselbe Zuordnung steht an mehreren Stellen (Auswertung und Verkäufe samt Jahressumme für die Umsatzgrenze, Admin-Finanzen, Admin-Hofliste, Heute, Kunden-Umsätze).
+- **Verhältnis zu anderen Einträgen:** ergänzt Z2 (Live-Schaltung durch den Menschen); Bestellungen, Beträge, Checkout, Webhook, Erstattung und Storno bleiben unverändert.
+- **Dateien:** eine Regel in `src/lib/` (Prüfung, Prisma-Where, Prisma.sql-Baustein), Auswertung, Verkäufe, Admin-Finanzen, Admin-Hofliste, Heute, Kunden; `docs/betrieb/stripe-live.md`; Umsetzung Nr. 55 (freigabe.md §13).
+
 ---
 
 ## T – Teilen
@@ -373,6 +384,34 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Verhältnis zu anderen Einträgen:** ändert die Kasse aus Gate 4 (Nr. 12: Zusage-Haken bei Bar); S11 und H3 bleiben unverändert.
 - **Dateien:** Kasse (Formular, Schema, `/api/checkout`), Bestätigungsseite; Umsetzung Nr. 46 (freigabe.md §12).
 
+### N3 · Mein Hof in der Handy-Leiste (10.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 9):**
+  - Unter md heißt die Leiste Heute · Bestellungen · Neu · Mein Hof · Mehr. Mein Hof hat dort die Reiter Produkte · Hofseite · Beiträge.
+  - Ein Tipp auf „Mein Hof" öffnet Produkte, damit der Vorrat ein Tipp bleibt.
+  - Die Route `/products` bleibt. Der Leistenpunkt „Mein Hof" ist aktiv auf `/products*`, `/farm-page*` und `/status*`.
+  - Ab md bleiben Seitenleiste und Reiter wie heute (Hofseite | Beiträge).
+- **Begründung:** Befund vom 10.10.2026 (Handy): Mein Hof liegt nur im Mehr-Blatt; Produkte belegen einen eigenen Leistenpunkt.
+- **Verhältnis zu anderen Einträgen:** ergänzt N1 und E12.
+- **Dateien:** `src/lib/bauern-navigation.ts`, `src/components/ui/bottom-nav.tsx`, Mein Hof (`src/app/(hof)/farm-page/`, `src/components/mein-hof/`), `/products`; Umsetzung Nr. 49 (freigabe.md §13).
+
+### N4 · Hofseite an EINEM Ort bearbeiten (10.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 9):**
+  - Alles, was Kundinnen auf der Hofseite sehen, wird in Mein Hof bearbeitet. Mein Auftritt zieht dorthin; `/settings/appearance` leitet auf `/farm-page` um.
+  - Unter lg steht der Umschalter „Bearbeiten · So sieht's die Kundin" ganz oben. „So sieht's die Kundin" ist die echte Hofseite in der App, kein neuer Tab.
+  - „Bearbeiten" ist eine Liste der Abschnitte mit Blatt von unten. Die alte FarmPageView mit Stiften entfällt dort.
+  - Nach dem Speichern auf den Reitern Hofseite und Beiträge erscheint „Gespeichert · Ansehen".
+- **Begründung:** Befund vom 10.10.2026: Hofseite wird an zwei Orten bearbeitet (Mein Hof, Mein Auftritt); am Handy steht der Umschalter erst unter der Checkliste, „Bearbeiten" zeigt die alte Ansicht mit Stiften (O2).
+- **Verhältnis zu anderen Einträgen:** entscheidet O2.
+- **Dateien:** Mein Hof (`farm-page-client.tsx`, `hofseite-editor.tsx`, `seitenkopf.tsx`), Mein Auftritt (`settings/appearance/`, `server/actions/appearance.ts`), `src/lib/hof-einstellungen.ts`; Umsetzung Nr. 49 und 50 (freigabe.md §13).
+
+### N5 · Hofseite unter lg, Reiter Übersicht (10.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 9):**
+  - Unter dem Kopf zuerst das Schaufenster: ein Fotostreifen und bis zu vier Produkte, dazu „Alle Produkte (n)".
+  - Danach unverändert: Nächste Abholung mit Abholzeiten, Zahlung & Kontakt, Über uns, Anfahrt; der Mini-Korb bleibt, wo er ist.
+  - Ab lg unverändert.
+- **Begründung:** Befund vom 10.10.2026: Fotos und Produkte stehen unter lg erst nach Abholung, Zahlung und Anfahrt.
+- **Dateien:** Hofseite (`hofseite-kunde.tsx`, `HofseiteFotos`, `hofseite/produkt-karte.tsx`); Umsetzung Nr. 51 (freigabe.md §13).
+
 ---
 
 ## O – Offen (nicht entschieden, nicht bauen)
@@ -380,10 +419,12 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 | # | Thema | Stand |
 |---|---|---|
 | O1 | Fehler-Token | **Entschieden 07.10.2026 (uttoranger):** Die Fehler-Farbe bekommt einen Kontrast von mindestens 4,5:1 in beiden Themes (Nr. 28). Bisher: Fehlertext 4,22:1 im hellen Theme, deshalb orange Hinweiskarte bzw. `text-status-offen`. |
-| O2 | Bearbeiten am Handy (#180) | Unter der Checkliste in Mein Hof steht weiter der Editor mit Stiften; das Mockup zeigt nur „Vorschau ansehen". Entfällt er, braucht es einen eigenen Auftrag. |
+| O2 | Bearbeiten am Handy (#180) | **Entschieden durch N4 (10.10.2026, Freigabe Lauf 9).** Bisher: Unter der Checkliste in Mein Hof steht weiter der Editor mit Stiften; das Mockup zeigt nur „Vorschau ansehen". Entfällt er, braucht es einen eigenen Auftrag. |
 | O3 | S11 Double-Opt-in | **Entschieden, siehe S11** (Freigabe Lauf 7, Umsetzung Nr. 38). Offen bleibt die Frage, ob „Nochmal bestellen" in der Abholbereit-Mail Werbung ist. |
 | O4 | AGB / Nutzungsbedingungen | Werden separat erstellt — **NICHT anfassen** (bestätigt 07.10.2026). Bis dahin gibt es beim Registrieren keinen Zustimmungs-Haken. |
 | O5 | Rückruf anfordern | **Entfällt (07.10.2026, uttoranger).** Schema `RueckrufAnfrage` wird nicht gebaut. Ersatz bleibt „E-Mail schreiben". |
+| O6 | Kachelquelle der Karten (10.10.2026) | OSM direkt, basemap.at oder ein Anbieter mit Schlüssel. Ein Wechsel ändert die Datenschutzerklärung. **Nicht bauen**; Nr. 52 legt nur einen Vorschlag in den Bericht. |
+| O7 | Gründungszusage (10.10.2026) | Der Freischalt-Dialog im Admin (`GRUENDUNGS_KONDITIONEN`, `src/lib/gruendungshof.ts`) verspricht „keine Plattformgebühr bis 31.12.2029, danach dauerhaft 3 %". Das passt nicht zu E6 und K1. Der Mensch entscheidet; der Text bleibt. |
 
 ---
 
@@ -392,3 +433,5 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 Stand Lauf 7 (uttoranger): Die Punkte aus Lauf 6 sind entschieden und eingeplant — Direktverkauf senkt den Vorrat (D1, Nr. 39), Double-Opt-in (S11, Nr. 38), Rate-Limit über die Datenbank statt eines neuen Dienstes (R1, Nr. 40). Derzeit ist nichts im Backlog.
 
 Stand Lauf 8 (uttoranger, 08.10.2026): N1, N2, Z2 und Z3 sind entschieden und in Nr. 41–48 eingeplant (freigabe.md §12). „Testmodus je Hof" (Z3) bleibt eine Option für später und ist nicht beauftragt. Die Stripe-Live-Schaltung macht der Mensch ganz am Schluss (Z2); kein Lauf schaltet um.
+
+Stand Lauf 9 (uttoranger, 10.10.2026): N3, N4, N5 und Z4 sind entschieden und in Nr. 49–57 eingeplant (freigabe.md §13). O6 (Kachelquelle) und O7 (Gründungszusage) sind offen und werden nicht gebaut. Die Live-Schaltung samt `STRIPE_LIVE_AB` macht der Mensch als letzten Schritt.
