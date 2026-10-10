@@ -71,9 +71,9 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 50 | Mein Auftritt zieht in Mein Hof (N4) | offen | | | 49 | | |
 | 51 | Hofseite: Schaufenster zuerst (N5), Käufer-Vorschau Lebensmittel | offen | | | main | | |
 | 52 | Karte (/hoefe, Standortkarte, Region) | läuft | `nacht/2026-10-10/52-karte` | | main | | 10.10.2026 |
-| 53 | Heute, Auswertung, Verkäufe | offen | | | 55 | | |
+| 53 | Heute, Auswertung, Verkäufe | läuft | `nacht/2026-10-10/53-heute-auswertung` | | 55 | gestapelt auf 55 | 10.10.2026 |
 | 54 | Admin am Handy und alte Seiten ins neue Design | offen | | | main | | |
-| 55 | Testzahlungen aus Auswertungen (Z4) | läuft | `nacht/2026-10-10/55-testzahlungen` | | main | | 10.10.2026 |
+| 55 | Testzahlungen aus Auswertungen (Z4) | läuft (tester und pruefer) | `nacht/2026-10-10/55-testzahlungen` | | main | Umsetzung fertig (40d35c2); Geld-Anzeige, Nachprüfung folgt | 10.10.2026 |
 | 56 | Altlasten Lauf 8 §6 und Kleinkram | offen | | | main | | |
-| 57 | Datenschutzerklärung, Nachtrag (Entwurf) | offen | | | 33 (#210) | | |
+| 57 | Datenschutzerklärung, Nachtrag (Entwurf) | offen — Vorstufe erledigt: origin/main in den Branch der Nr. 33 geholt (dbb7223, #210 aktualisiert) | | | 33 (#210) | | 10.10.2026 |
 | Sammel 9 | Sammel-PR Lauf 9 | offen | `integration/lauf9` | | main | | |
