@@ -46,8 +46,9 @@ import type { MeinHofKopfDaten } from '@/server/queries/farm'
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 
 describe('Reiter in der Adresse (E12)', () => {
-  it('Hofseite ohne Parameter, Beiträge mit ?reiter=beitraege — beide auf /farm-page', () => {
+  it('Hofseite ohne Parameter, Beiträge mit ?reiter=beitraege — beide auf /farm-page; davor Produkte auf /products (N3)', () => {
     expect(MEIN_HOF_REITER_HOFBEREICH.map((r) => [r.id, r.label, r.href])).toEqual([
+      ['produkte', 'Produkte', '/products'],
       ['hofseite', 'Hofseite', '/farm-page'],
       ['beitraege', 'Beiträge', '/farm-page?reiter=beitraege'],
     ])
@@ -188,8 +189,11 @@ describe('/farm-page in der HofShell', () => {
     const rahmen = quelle('src/components/farmer/hofseite-vorschau-rahmen.tsx')
     expect(rahmen).toMatch(/<iframe[\s\S]*?src=\{vorschauAdresse\(slug, anfang\)\}/)
     expect(rahmen).not.toMatch(/FarmPageView|HofseiteKunde/)
-    const kunde = quelle('src/components/farmer/farm-page-client.tsx')
-    expect(kunde).toMatch(/<iframe[\s\S]*?src=\{vorschauLink\(farm\.slug\)\}/)
+    // „So sieht’s die Kundin" (Nr. 49): dasselbe iframe für alle Reiter, Adresse über vorschauLink.
+    const kunde = quelle('src/components/mein-hof/mein-hof-ansicht.tsx')
+    expect(kunde).toMatch(/<iframe[\s\S]*?src=\{adresse\}/)
+    expect(kunde).toContain('kundenAnsichtAdresse(slug, reiter)')
+    expect(kunde).not.toMatch(/FarmPageView|HofseiteKunde/)
   })
 })
 

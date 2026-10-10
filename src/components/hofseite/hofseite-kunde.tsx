@@ -30,6 +30,7 @@ import {
   gebuehrHinweisFuerHof,
   hofseiteReiter,
   reiterAdresse,
+  ueberUnsText,
   verfuegbarText,
   vorWieLange,
   zahlungsarten,
@@ -228,7 +229,7 @@ export function HofseiteKunde({
   }
 
   const foto = titelbildFoto(farm)
-  const ueberUns = sichtbar('about') ? (farm.aboutText ?? farm.description).trim() : ''
+  const ueberUns = sichtbar('about') ? (ueberUnsText(farm) ?? '') : ''
   const werte = sichtbar('values') ? farm.farmValues.slice(0, 6) : []
   const verfuegbar = verfuegbarText(produkte, farm.isPaused)
   const kannBestellen = produkte.length > 0 && !farm.isPaused

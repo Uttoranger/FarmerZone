@@ -1,7 +1,6 @@
 import Image from 'next/image'
-import Link from 'next/link'
 import { ArrowUpRight } from 'lucide-react'
-import { MEIN_HOF_HINWEIS, MEIN_HOF_REITER_HOFBEREICH, type MeinHofReiterId } from '@/lib/bauern-navigation'
+import type { MeinHofReiterId } from '@/lib/bauern-navigation'
 import { hofInitialen } from '@/lib/hof-initialen'
 import { schildTon, titelbildVerlauf } from '@/lib/mein-hof'
 import { vorschauLink } from '@/lib/hofseite-vorschau'
@@ -10,6 +9,8 @@ import { AdresseKopierenKnopf } from '@/components/farmer/adresse-kopieren-knopf
 import { HofTeilenKnopf } from '@/components/farmer/hof-teilen-knopf'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { MeinHofReiterLeiste } from '@/components/mein-hof/reiter-leiste'
+import { KundenansichtKnopf } from '@/components/mein-hof/kundenansicht-knopf'
 import { cn } from '@/lib/utils'
 
 /*
@@ -22,10 +23,14 @@ import { cn } from '@/lib/utils'
  * zufrieden), ab lg als kompakte Zeile. Seit Nr. 22e der einzige Kopf von
  * Mein Hof (der Bestandskopf fiel mit der Umleitung von /status weg).
  *
- * „Kundenansicht" öffnet die Vorschau der echten Hofseite (?vorschau=1) in
- * einem neuen Tab — sie geht auch vor der Freigabe, nur für den Besitzer
- * (ansichtsModus). Teilen, Adress-Link und Kopieren nur, wenn die Hofseite
- * öffentlich ist (hofZustand) — sonst führte der Link Kundinnen ins Leere.
+ * „Kundenansicht" zeigt die Vorschau der echten Hofseite (?vorschau=1) — sie
+ * geht auch vor der Freigabe, nur für den Besitzer (ansichtsModus). Unter lg
+ * schaltet der Knopf seit Nr. 49 (Register N4) auf „So sieht’s die Kundin"
+ * (kundenansicht-knopf.tsx, Umschalter mein-hof-ansicht.tsx), ab lg öffnet er
+ * sie in einem neuen Tab. Teilen, Adress-Link und Kopieren nur, wenn die
+ * Hofseite öffentlich ist (hofZustand) — sonst führte der Link Kundinnen ins
+ * Leere. Die Reiter sind seit Nr. 49 ein eigener Baustein (reiter-leiste.tsx),
+ * den auch /products unter md trägt.
  */
 
 const KNOPF = cn(
@@ -75,16 +80,16 @@ function Knoepfe({ hof, breit }: { hof: MeinHofKopfDaten; breit: boolean }) {
   return (
     <div className={cn('flex gap-2', breit ? 'shrink-0' : 'mt-3 grid grid-cols-2')}>
       {hof.zustand.oeffentlich && <HofTeilenKnopf name={hof.name} slug={hof.slug} className={KNOPF} label="Teilen" />}
-      <a
-        href={vorschauLink(hof.slug)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={cn(KNOPF, !hof.zustand.oeffentlich && !breit && 'col-span-2')}
-      >
-        Kundenansicht
-        <ArrowUpRight className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-        <span className="sr-only"> (öffnet in neuem Tab)</span>
-      </a>
+      {breit ? (
+        <a href={vorschauLink(hof.slug)} target="_blank" rel="noopener noreferrer" className={KNOPF}>
+          Kundenansicht
+          <ArrowUpRight className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+          <span className="sr-only"> (öffnet in neuem Tab)</span>
+        </a>
+      ) : (
+        // Unter lg: schaltet auf „So sieht’s die Kundin" (Register N4), kein neuer Tab.
+        <KundenansichtKnopf slug={hof.slug} className={cn(KNOPF, !hof.zustand.oeffentlich && 'col-span-2')} />
+      )}
     </div>
   )
 }
@@ -101,7 +106,8 @@ export function MeinHofSeitenkopf({
   if (!hof) return null
 
   return (
-    <header className="mb-6 print:hidden">
+    // Unter lg folgt direkt der Umschalter (mein-hof-ansicht.tsx), ab lg der Inhalt.
+    <header className="mb-0 print:hidden lg:mb-6">
       {/* ===== Unter lg: Karte mit Titelbild-Streifen ===== */}
       <div className="overflow-hidden rounded-2xl border border-border bg-card lg:hidden">
         {/* Bildersatz, folgt dem Modus bewusst nicht; mittig ausgeschnitten —
@@ -152,30 +158,8 @@ export function MeinHofSeitenkopf({
         <Knoepfe hof={hof} breit />
       </div>
 
-      {/* Reiter links gruppiert (Mockup), rechts der Hinweis, wo Produkte liegen. */}
-      <nav aria-label="Mein Hof" className="mt-4 flex items-center gap-7 border-b border-border">
-        {MEIN_HOF_REITER_HOFBEREICH.map((reiter) => {
-          const istAktiv = reiter.id === aktiv
-          return (
-            <Link
-              key={reiter.id}
-              href={reiter.href}
-              scroll={false}
-              aria-current={istAktiv ? 'page' : undefined}
-              className={cn(
-                '-mb-px inline-flex min-h-12 items-center border-b-2 px-0.5 text-[15px] whitespace-nowrap transition-colors duration-[250ms]',
-                istAktiv ? 'border-foreground font-semibold text-foreground' : 'border-transparent font-medium text-muted-foreground hover:text-foreground',
-                FOKUS_RAHMEN,
-                'focus-visible:-outline-offset-2'
-              )}
-            >
-              {reiter.label}
-              {reiter.id === 'beitraege' && ` · ${beitraegeZahl}`}
-            </Link>
-          )
-        })}
-        <p className="ml-auto hidden text-[13px] text-muted-foreground md:block">{MEIN_HOF_HINWEIS}</p>
-      </nav>
+      {/* Reiter links gruppiert (Mockup), rechts ab md der Hinweis, wo Produkte liegen. */}
+      <MeinHofReiterLeiste aktiv={aktiv} beitraegeZahl={beitraegeZahl} className="mt-4" />
     </header>
   )
 }

@@ -37,6 +37,7 @@ import {
   VERKAUF_UND_KUNDEN_TITEL,
   ABMELDEN_LABEL,
   hofAriaAktuell,
+  hofHandyAriaAktuell,
   hofMehrAktiv,
   hofNavigation,
   type HofNavId,
@@ -69,6 +70,9 @@ import { NEU_SYMBOL } from '@/components/hofbereich/neu-symbol'
  * (hofNavigation) — Seitenleiste und Handy lesen dieselbe Quelle. Hier nur
  * Symbole und Zeichnung nach den Mockups system-komponente-seitenleiste-hof,
  * mobil-h3-heute-mit-teilen-karte und mobil-h5-mehr-auswertung-region-mein-hof.
+ * Am Handy seit Nr. 49 (Register N3) abweichend vom Mockup: „Mein Hof" steht
+ * in der Leiste (öffnet Produkte, aktiv nach hofHandyAriaAktuell), das
+ * Mehr-Blatt beginnt ohne Hofkarte mit „Verkauf und Kunden".
  *
  * Die Shell setzt data-design="neu" und damit die Tokens des Design-Systems
  * für das ganze Dokument. Noch nutzt sie keine Route (kein Big Bang): Der
@@ -133,47 +137,25 @@ function Plakette({ name, gross = false }: { name: string; gross?: boolean }) {
   )
 }
 
-/** Die Hofkarte am Kopf der Seitenleiste bzw. des Mehr-Blatts: der Hof tritt auf. */
-function Hofkarte({
-  hofName,
-  hofSlug,
-  meinHof,
-  onNavigate,
-}: {
-  hofName: string
-  hofSlug: string
-  /** Am Handy ist die Karte zugleich der Punkt „Mein Hof" aus „Mehr". */
-  meinHof?: { punkt: HofNavPunkt; aktuell: 'page' | 'true' | undefined }
-  onNavigate?: () => void
-}) {
-  const kopf = (
-    <>
-      <Plakette name={hofName} gross />
-      <span className="min-w-0">
-        <span className="block text-[10px] font-semibold tracking-[1.2px] text-muted-foreground uppercase">Mein Hof</span>
-        <span className="block truncate text-[15px] font-semibold text-foreground" title={hofName}>
-          {hofName}
-        </span>
-      </span>
-    </>
-  )
+/**
+ * Die Hofkarte am Kopf der Seitenleiste: der Hof tritt auf. Bis Nr. 49 stand
+ * sie auch oben im Mehr-Blatt als Punkt „Mein Hof" — seit Register N3 steht
+ * Mein Hof in der Handy-Leiste, die Karte nur noch in der Seitenleiste.
+ */
+function Hofkarte({ hofName, hofSlug }: { hofName: string; hofSlug: string }) {
   return (
     <div className="flex flex-col gap-2.5 rounded-[14px] border border-border bg-muted p-3">
-      {meinHof ? (
-        <Link
-          href={meinHof.punkt.href}
-          onClick={onNavigate}
-          aria-current={meinHof.aktuell}
-          className={cn('-m-1 flex items-center gap-2.5 rounded-xl p-1 hover:bg-card', FOKUS_RAHMEN)}
-        >
-          {kopf}
-        </Link>
-      ) : (
-        <div className="flex items-center gap-2.5">{kopf}</div>
-      )}
+      <div className="flex items-center gap-2.5">
+        <Plakette name={hofName} gross />
+        <span className="min-w-0">
+          <span className="block text-[10px] font-semibold tracking-[1.2px] text-muted-foreground uppercase">Mein Hof</span>
+          <span className="block truncate text-[15px] font-semibold text-foreground" title={hofName}>
+            {hofName}
+          </span>
+        </span>
+      </div>
       <Link
         href={vorschauLink(hofSlug)}
-        onClick={onNavigate}
         className={cn(
           'flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border text-[13.5px] font-medium text-foreground transition-colors duration-[250ms] hover:bg-card',
           FOKUS_RAHMEN
@@ -301,7 +283,6 @@ export function HofShell({ hofName, hofSlug, personName, isAdmin, zahlen, onAbme
   // Das Mehr-Blatt liegt über der Leiste; sie bleibt sichtbar und bedienbar.
   const ueberDerLeiste = 'bottom-[calc(68px+env(safe-area-inset-bottom))] max-h-[calc(100dvh-68px-env(safe-area-inset-bottom)-1rem)] pb-4'
 
-  const meinHofImMehr = nav.mehr.find((p) => p.id === 'mein-hof')
   const vukImMehr = nav.mehr.filter((p) => nav.verkaufUndKunden.some((v) => v.id === p.id))
   const untenImMehr = nav.mehr.filter((p) => nav.unten.some((u) => u.id === p.id))
 
@@ -418,7 +399,7 @@ export function HofShell({ hofName, hofSlug, personName, isAdmin, zahlen, onAbme
                 href={punkt.href}
                 label={punkt.label}
                 symbol={SYMBOL[punkt.id]}
-                aktuell={offen ? undefined : hofAriaAktuell(pathname, punkt)}
+                aktuell={offen ? undefined : hofHandyAriaAktuell(pathname, punkt)}
                 zahl={zahlFuer(punkt, zahlen)}
                 zahlWofuer={zahlWofuer(punkt)}
                 onNavigate={schliessen}
@@ -487,14 +468,6 @@ export function HofShell({ hofName, hofSlug, personName, isAdmin, zahlen, onAbme
                     Schließen
                   </SheetClose>
                 </div>
-                {meinHofImMehr && (
-                  <Hofkarte
-                    hofName={hofName}
-                    hofSlug={hofSlug}
-                    meinHof={{ punkt: meinHofImMehr, aktuell: hofAriaAktuell(pathname, meinHofImMehr) }}
-                    onNavigate={schliessen}
-                  />
-                )}
                 <p aria-hidden="true" className="px-0.5 pt-1 text-[11px] font-semibold tracking-[1.1px] text-muted-foreground uppercase">
                   {VERKAUF_UND_KUNDEN_TITEL}
                 </p>
@@ -505,7 +478,7 @@ export function HofShell({ hofName, hofSlug, personName, isAdmin, zahlen, onAbme
                       titel={punkt.label}
                       symbol={SYMBOL[punkt.id]}
                       href={punkt.href}
-                      aktuell={hofAriaAktuell(pathname, punkt)}
+                      aktuell={hofHandyAriaAktuell(pathname, punkt)}
                       onNavigate={schliessen}
                     />
                   ))}
@@ -518,7 +491,7 @@ export function HofShell({ hofName, hofSlug, personName, isAdmin, zahlen, onAbme
                       titel={punkt.label}
                       symbol={SYMBOL[punkt.id]}
                       href={punkt.href}
-                      aktuell={hofAriaAktuell(pathname, punkt)}
+                      aktuell={hofHandyAriaAktuell(pathname, punkt)}
                       ende={<Zaehler anzahl={zahlFuer(punkt, zahlen)} wofuer={zahlWofuer(punkt)} />}
                       onNavigate={schliessen}
                     />

@@ -124,7 +124,7 @@ describe('HofShell', () => {
     expect(leiste).toContain('Abmelden')
   })
 
-  it('Handy-Leiste: Heute · Bestellungen · Neu · Produkte · Mehr — aus derselben Quelle', () => {
+  it('Handy-Leiste (N3): Heute · Bestellungen · Neu · Mein Hof · Mehr — aus derselben Quelle, „Mein Hof" öffnet Produkte', () => {
     const leiste = abschnitt(hof(false), '<nav aria-label="Hauptnavigation" data-slot="bottom-nav"', '</nav>')
     const nav = hofNavigation({ isAdmin: false })
     const ziele = nav.handyLeiste.flatMap((p) => (p.art === 'punkt' ? [p.punkt.href] : []))
@@ -132,11 +132,36 @@ describe('HofShell', () => {
     expect(leiste).toContain('aria-label="Neu erstellen"')
     expect(leiste).toContain('>Mehr<')
     expect(leiste.indexOf('Neu erstellen')).toBeLessThan(leiste.indexOf('href="/products"'))
+    expect(leiste).toMatch(/<a href="\/products"[^>]*>[\s\S]*?Mein Hof<\/span><\/a>/)
+    expect(leiste).not.toContain('>Produkte<')
   })
 
   it('aktive Seite: aria-current an Seitenleiste und Leiste', () => {
     const html = hof(false, '/orders')
     expect(html.match(/<a href="\/orders" aria-current="page"/g)).toHaveLength(2)
+  })
+
+  it('Mein Hof (N3): auf /products ist „Produkte" der Seitenleiste und „Mein Hof" der Leiste die Seite', () => {
+    const html = hof(false, '/products')
+    const leiste = abschnitt(html, '<nav aria-label="Hauptnavigation" data-slot="bottom-nav"', '</nav>')
+    const seitenleiste = abschnitt(html, '<aside', '</aside>')
+    expect(leiste).toMatch(/<a href="\/products" aria-current="page"[^>]*>[\s\S]*?Mein Hof</)
+    expect(seitenleiste).toMatch(/<a href="\/products" aria-current="page"[^>]*>[\s\S]*?Produkte</)
+    expect(seitenleiste).not.toMatch(/<a href="\/farm-page" aria-current/)
+  })
+
+  it('Mein Hof (N3): auf /farm-page steht „Mein Hof" der Leiste für die Seite (true), die Seitenleiste zeigt Mein Hof als Seite', () => {
+    const html = hof(false, '/farm-page')
+    const leiste = abschnitt(html, '<nav aria-label="Hauptnavigation" data-slot="bottom-nav"', '</nav>')
+    expect(leiste).toMatch(/<a href="\/products" aria-current="true"/)
+    expect(abschnitt(html, '<aside', '</aside>')).toMatch(/<a href="\/farm-page" aria-current="page"/)
+    // „Mehr" leuchtet dort nicht mehr (vor Nr. 49 lag Mein Hof im Mehr-Blatt).
+    const mehrKnopf = leiste.slice(leiste.lastIndexOf('<button', leiste.indexOf('>Mehr<')), leiste.indexOf('>Mehr<'))
+    expect(mehrKnopf).toContain('<button')
+    expect(mehrKnopf).not.toContain('aria-current')
+    // Gegenprobe: im Mehr-Blatt liegende Seiten lassen „Mehr" leuchten.
+    const kunden = abschnitt(hof(false, '/customers'), '<nav aria-label="Hauptnavigation" data-slot="bottom-nav"', '</nav>')
+    expect(kunden.slice(kunden.lastIndexOf('<button', kunden.indexOf('>Mehr<')), kunden.indexOf('>Mehr<'))).toContain('aria-current="true"')
   })
 
   it('„Admin" und seine Zahl nur für den Betreiber; Bestellungen trägt die Zahl', () => {

@@ -78,11 +78,12 @@ describe('fertig oder fehlt', () => {
     for (const z of alleZeilen(VOLL)) expect(z.marke, z.id).toBeNull()
   })
 
-  it('ohne Logo und Über uns: 9 von 11, 82 %, der Satz nennt beide', () => {
-    const f = hofseiteFortschritt({ ...VOLL, logoUrl: null, aboutText: null })
-    expect([f.erledigt, f.gesamt, f.prozent]).toEqual([9, 11, 82])
-    expect(f.fehlend).toEqual(['Logo', 'Über uns'])
-    expect(f.satz).toBe('Es fehlen noch: Logo und Über uns.')
+  it('ohne Logo und ganz ohne Text für „Über uns": 8 von 11, 73 %, der Satz nennt alle drei', () => {
+    // Ohne eigenen Text zeigt die Hofseite die Kurzbeschreibung (Nr. 49) — erst ohne beide fehlt „Über uns".
+    const f = hofseiteFortschritt({ ...VOLL, logoUrl: null, aboutText: null, description: '' })
+    expect([f.erledigt, f.gesamt, f.prozent]).toEqual([8, 11, 73])
+    expect(f.fehlend).toEqual(['Logo', 'Name und Kurzbeschreibung', 'Über uns'])
+    expect(f.satz).toBe('Es fehlen noch: Logo, Name und Kurzbeschreibung und Über uns.')
     const logo = alleZeilen({ ...VOLL, logoUrl: null }).find((z) => z.id === 'logo')!
     expect(logo.fertig).toBe(false)
     expect(logo.marke).toEqual({ text: 'Fehlt', farbe: 'bernstein' })
@@ -113,7 +114,29 @@ describe('fertig oder fehlt', () => {
     expect(alleZeilen(VOLL).find((z) => z.id === 'ueber-uns')!.wert).toBe(
       'Seit drei Generationen bauen wir Gemüse an. Alles aus eigener Hand.'
     )
-    expect(alleZeilen({ ...VOLL, aboutText: ' \n ' }).find((z) => z.id === 'ueber-uns')!.wert).toBe('Noch kein Text')
+    expect(alleZeilen({ ...VOLL, aboutText: ' \n ', description: '' }).find((z) => z.id === 'ueber-uns')!.wert).toBe('Noch kein Text')
+  })
+
+  it('Über uns (Nr. 49): ohne eigenen Text zählt die Kurzbeschreibung — wie auf der Hofseite', () => {
+    for (const aboutText of [null, '', '  \n ']) {
+      const zeile = alleZeilen({ ...VOLL, aboutText }).find((z) => z.id === 'ueber-uns')!
+      expect(zeile.fertig, String(aboutText)).toBe(true)
+      expect(zeile.marke).toBeNull()
+      expect(zeile.wert).toBe('Gemüse und Eier aus Musterdorf')
+    }
+    // Ohne beides fehlt „Über uns" wie bisher.
+    const leer = alleZeilen({ ...VOLL, aboutText: null, description: '  ' }).find((z) => z.id === 'ueber-uns')!
+    expect(leer.fertig).toBe(false)
+    expect(leer.marke).toEqual({ text: 'Fehlt', farbe: 'bernstein' })
+  })
+
+  it('Folge für den Prozentwert (Heute, Einrichten, Einstellungen, Mein Hof): ein Punkt mehr, sobald es eine Kurzbeschreibung gibt', () => {
+    // Ein Hof wie die Seed-Höfe: Verlauf, kein Logo, keine Fotos, kein Über-uns-Text, aber eine Kurzbeschreibung.
+    const neu = { ...VOLL, bannerType: 'GRADIENT', logoUrl: null, fotos: 0, aboutText: null, acceptsOnline: false, stripeAccountReady: false }
+    // Vor Nr. 49 zählte „Über uns" nur den eigenen Text — derselbe Hof stand bei 7 von 11 (64 %).
+    expect(hofseiteFortschritt(neu)).toMatchObject({ erledigt: 8, gesamt: 11, prozent: 73 })
+    // Ohne Kurzbeschreibung fehlen „Name und Kurzbeschreibung" und „Über uns": 6 von 11.
+    expect(hofseiteFortschritt({ ...neu, description: '' })).toMatchObject({ erledigt: 6, prozent: 55 })
   })
 
   it('Fotos: Einzahl, Mehrzahl, keine', () => {

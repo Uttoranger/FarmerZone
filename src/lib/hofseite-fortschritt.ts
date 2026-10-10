@@ -10,6 +10,7 @@
 import type { SchildFarbe } from '@/lib/mein-hof'
 import { titelbildFoto } from '@/lib/mein-hof'
 import { formatSlotTime, type WeeklySlot } from '@/lib/pickup-days'
+import { ueberUnsText } from '@/lib/hofseite-kunde'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 
 export type HofseiteGruppeId = 'auftritt' | 'abholen-bezahlen' | 'sichtbarkeit'
@@ -110,7 +111,8 @@ function zeilen(stand: HofseiteStand): HofseiteZeile[] {
   const titelbild = titelbildFoto(stand) !== null
   const logo = (stand.logoUrl ?? '').trim().length > 0
   const beschreibung = einzeilig(stand.description)
-  const ueberUns = einzeilig(stand.aboutText ?? '')
+  // Dieselbe Regel wie die Hofseite (Nr. 49): ohne eigenen Text zählt die Kurzbeschreibung.
+  const ueberUns = einzeilig(ueberUnsText(stand) ?? '')
   const online = stand.acceptsOnline && stand.stripeAccountReady
   const kontakt = stand.phone.trim().length > 0 && stand.email.trim().length > 0
   const sichtbar = stand.sektionen

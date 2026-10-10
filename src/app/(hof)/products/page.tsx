@@ -4,8 +4,11 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getProdukteSeite } from '@/server/queries/products'
+import { zaehleBeitraege } from '@/server/queries/mein-hof-zahl'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { ProdukteAnsicht } from '@/components/produkte/produkte-ansicht'
+import { MeinHofAnsicht } from '@/components/mein-hof/mein-hof-ansicht'
+import { MeinHofReiterLeiste } from '@/components/mein-hof/reiter-leiste'
 
 export const metadata: Metadata = {
   title: 'Produkte — FarmerZone',
@@ -19,6 +22,11 @@ export const metadata: Metadata = {
  *
  * ?neu=1 (mit ?bereich=) und ?edit=<id> liest die Ansicht selbst
  * (src/lib/use-url-auftrag.ts), ebenso Filter und Suche (?filter=, ?suche=).
+ *
+ * Unter md gehört Produkte seit Nr. 49 zu „Mein Hof" (Register N3): oben die
+ * Reiter Produkte · Hofseite · Beiträge und der Umschalter „Bearbeiten · So
+ * sieht’s die Kundin" (dort der Reiter Produkte der Hofseite). Ab md bleibt
+ * die Seite, wie sie war — Produkte ist dort ein Punkt der Seitenleiste.
  */
 export default async function ProductsPage(): Promise<React.JSX.Element> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -32,17 +40,27 @@ export default async function ProductsPage(): Promise<React.JSX.Element> {
   // Vorrat auf einem Stand, den die nächste Abfrage schon ändert. Fehler nur gemeldet.
   await gibVerwaisteFreiOhneRisiko(farm.id)
 
-  const seite = await getProdukteSeite(farm.id, new Date())
+  const [seite, beitraegeZahl] = await Promise.all([getProdukteSeite(farm.id, new Date()), zaehleBeitraege(farm.id)])
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10">
-      <ProdukteAnsicht
-        products={seite.products}
-        hofBetriebsnummer={seite.hofBetriebsnummer}
-        registrierung={seite.registrierung}
-        hof={{ name: farm.name, slug: farm.slug, sichtbar: seite.hofSichtbar, teilenMomenteAus: seite.teilenMomenteAus }}
-        naechstesFenster={seite.naechstesFenster}
-      />
-    </div>
+    <MeinHofAnsicht
+      reiter="produkte"
+      slug={farm.slug}
+      kopf={
+        <div className="px-4 pt-5 md:hidden">
+          <MeinHofReiterLeiste aktiv="produkte" beitraegeZahl={beitraegeZahl} nurUnterMd />
+        </div>
+      }
+    >
+      <div className="mx-auto w-full max-w-6xl px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10">
+        <ProdukteAnsicht
+          products={seite.products}
+          hofBetriebsnummer={seite.hofBetriebsnummer}
+          registrierung={seite.registrierung}
+          hof={{ name: farm.name, slug: farm.slug, sichtbar: seite.hofSichtbar, teilenMomenteAus: seite.teilenMomenteAus }}
+          naechstesFenster={seite.naechstesFenster}
+        />
+      </div>
+    </MeinHofAnsicht>
   )
 }
