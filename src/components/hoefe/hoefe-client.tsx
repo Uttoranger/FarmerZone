@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -15,6 +15,7 @@ import {
 } from '@/lib/hofuebersicht'
 import {
   MENGEN_HINWEIS,
+  aktiveFilter,
   alleZuruecksetzen,
   entdeckenKopf,
   ergebnisZahl,
@@ -37,6 +38,8 @@ import type { HofUebersichtEintrag } from '@/server/queries/farm'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Segment } from '@/components/ui/segment'
+import { KUNDE_PLATZ_HOEHE } from '@/components/shells/kunde-shell-masse'
+import { KarteLaedt } from '@/components/karte/karte-laedt'
 import HoefeKarussell from '@/components/hoefe/hoefe-karussell'
 import { HoefeSuche } from '@/components/hoefe/hoefe-suche'
 import { BlattGruppe, EntdeckenFilterblatt } from '@/components/hoefe/entdecken-filterblatt'
@@ -51,8 +54,13 @@ import {
 
 // Nur clientseitig: Leaflet greift beim Import auf window zu. Die Karte wird
 // zudem erst EINGEHÄNGT, wenn sie sichtbar sein soll — wer am Handy nur die
-// Liste liest, lädt keine Kacheln.
-const HoefeKarte = dynamic(() => import('@/components/hoefe/hoefe-karte'), { ssr: false })
+// Liste liest, lädt keine Kacheln. Bis sie da ist, steht der Platzhalter in
+// ihrer Größe (Nr. 52): Er füllt den Rahmen, den die Seite der Karte gibt —
+// nichts fällt zusammen, nichts springt.
+const HoefeKarte = dynamic(() => import('@/components/hoefe/hoefe-karte'), {
+  ssr: false,
+  loading: () => <KarteLaedt />,
+})
 
 /** Ab lg (1024 px) zeigt die Seite den Splitscreen; darunter Liste oder Karte. */
 function useIstBreit(): boolean {
@@ -144,19 +152,32 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
   // Der Stand beim Öffnen des Filter-Blatts — „Abbrechen" stellt ihn wieder her.
   const blattStand = useRef<{ filter: HoefeFilter; umkreis: UmkreisStufe } | null>(null)
 
-  // Wie hoch das Karussell-Band am Handy WIRKLICH ist: Die Karte hält seine
-  // Pins darüber frei (fitBounds-Polster), gedeckelt auf die halbe Kartenhöhe.
+  // Wie hoch das Karussell-Band am Handy WIRKLICH ist: Solange ein Hof gewählt
+  // ist, landet sein Pin darüber, und die Übersicht hält Platz dafür frei
+  // (HoefeKarte deckelt das Polster selbst, Nr. 52).
   const [bandHoehe, setBandHoehe] = useState(176)
   const bandMessen = useCallback((el: HTMLDivElement | null) => {
     if (!el) return
     const beobachter = new ResizeObserver(([eintrag]) => {
-      const kartenHoehe = el.parentElement?.clientHeight ?? 0
-      const deckel = kartenHoehe > 0 ? Math.round(kartenHoehe / 2) : 260
-      setBandHoehe(Math.min(Math.round(eintrag.contentRect.height), deckel))
+      setBandHoehe(Math.round(eintrag.contentRect.height))
     })
     beobachter.observe(el)
     return () => beobachter.disconnect()
   }, [])
+
+  // Der Kartenmodus am Handy beginnt genau unter der klebenden Kopfzeile:
+  // Wer aus der gescrollten Liste kommt oder über einem Testumgebungs-Balken
+  // steht (nur Vorschau und lokal, er scrollt mit), sähe die Unterkante der
+  // Karte sonst hinter der Unterleiste. In der Produktion steht er schon dort.
+  const kartenmodus = useRef<HTMLDivElement>(null)
+  const imKartenmodus = !istBreit && ansicht === 'karte'
+  useEffect(() => {
+    const element = kartenmodus.current
+    if (!imKartenmodus || !element) return
+    const kopfHoehe = Number.parseFloat(getComputedStyle(element).getPropertyValue('--kunde-kopf')) || 0
+    const ziel = Math.max(0, element.getBoundingClientRect().top + window.scrollY - kopfHoehe)
+    if (Math.abs(window.scrollY - ziel) > 1) window.scrollTo({ top: ziel, behavior: 'instant' })
+  }, [imKartenmodus])
 
   // DIE Ableitung — Bereich/Facetten → Umkreis → Sortierung → Suche (rein,
   // getestet). Liste, Produkttreffer UND Karte lesen `gefiltert`.
@@ -363,8 +384,10 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
     </div>
   )
 
-  const filterblatt = (
+  /** Das Filter-Blatt; kompakt im Kartenmodus am Handy (ein runder Knopf, Zahl als Zähler). */
+  const filterblatt = (kompakt: boolean) => (
     <EntdeckenFilterblatt
+      kompakt={kompakt}
       anzahlFilter={zaehleFilter(filter, aktiverUmkreis)}
       anzeigenText={`${zahlText} anzeigen`}
       zuruecksetzen={zuruecksetzenLink}
@@ -416,6 +439,27 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
     </EntdeckenFilterblatt>
   )
 
+  /** EIN Feld „Ort oder Produkt" plus „Standort nutzen" (Nr. 46, freigabe.md §12) —
+   *  vorher Produktsuche und darunter eine Karte mit eigenem Postleitzahl-Feld.
+   *  Kompakt im Kartenmodus am Handy: nur das Feld (Nr. 52). */
+  const suchfeld = (kompakt: boolean) => (
+    <HoefeSuche
+      kompakt={kompakt}
+      suchtext={filter.suchtext}
+      vorschlaege={vorschlaege}
+      status={statusText}
+      treffer={anzahl}
+      bezugspunkt={bezugspunkt}
+      onSuchtext={(wert) => setzeFilter({ suchtext: wert })}
+      onUebernehmen={suchMarkeHinzufuegen}
+      onBezugspunkt={setBezugspunkt}
+      onAufheben={() => {
+        setBezugspunkt(null)
+        setUmkreis(null)
+      }}
+    />
+  )
+
   const kopfbereich = (
     <div className="mx-auto flex max-w-[1200px] flex-col gap-4 px-4 pt-5 md:px-6 md:pt-7">
       <div className="flex items-start gap-3">
@@ -426,24 +470,9 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
           </h1>
           <p className="mt-1 text-[14px] text-muted-foreground">{kopf.unterzeile}</p>
         </div>
-        <div className="lg:hidden">{filterblatt}</div>
+        <div className="lg:hidden">{filterblatt(false)}</div>
       </div>
-      {/* EIN Feld „Ort oder Produkt" plus „Standort nutzen" (Nr. 46, freigabe.md §12) —
-          vorher Produktsuche und darunter eine Karte mit eigenem Postleitzahl-Feld. */}
-      <HoefeSuche
-        suchtext={filter.suchtext}
-        vorschlaege={vorschlaege}
-        status={statusText}
-        treffer={anzahl}
-        bezugspunkt={bezugspunkt}
-        onSuchtext={(wert) => setzeFilter({ suchtext: wert })}
-        onUebernehmen={suchMarkeHinzufuegen}
-        onBezugspunkt={setBezugspunkt}
-        onAufheben={() => {
-          setBezugspunkt(null)
-          setUmkreis(null)
-        }}
-      />
+      {suchfeld(false)}
       {filterReihenBrowser}
       {futterHinweis}
       <AktiveFilterZeile filter={filter} onWahl={schreibeUrl} umkreis={aktiverUmkreis} onUmkreisAufheben={umkreisAufheben} />
@@ -464,11 +493,14 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
           <div className="sticky top-20 flex h-[calc(100dvh-6rem)] min-h-[420px] flex-col gap-2">
             {koordinatenHinweis}
             <div className="isolate min-h-0 flex-1 overflow-hidden rounded-l-2xl border-y border-l border-border">
+              {/* randlos: Den Rahmen trägt der Kasten (links, oben, unten) — rechts
+                  reicht die Karte ohne Rand bis an den Fensterrand. */}
               <HoefeKarte
                 hoefe={kartenHoefe}
                 lage={sichtbareLage}
                 fokus={fokus}
                 hoeheKlasse="h-full"
+                randlos
                 onAuswahl={pinGewaehlt}
                 onLeerTipp={() => setLage((l) => nachLeerTipp(l))}
               />
@@ -485,99 +517,125 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
   const zurListe = { ...filter, ansicht: 'liste' as const }
   const zurKarte = { ...filter, ansicht: 'karte' as const }
 
+  if (ansicht === 'karte') {
+    // KARTENMODUS AM HANDY (unter lg, Nr. 52; kein Mockup — Regeln in
+    // DESIGN_SYSTEM „Entdecken"): oben EINE Zeile Suche · Filter · Liste,
+    // darunter die Karte über die volle Breite bis genau zur Oberkante der
+    // Unterleiste (ab md bis zum Fensterrand). Die Höhe ist 100dvh ohne Kopf
+    // und Unterleiste (Maße aus der KundeShell); die Werkzeugzeile zieht die
+    // Karte als Flex-Zeile ab — Zeile und Karte zusammen füllen genau den Platz.
+    const hatAktiveFilter = aktiveFilter(filter, aktiverUmkreis).length > 0
+    return (
+      <>
+        <div ref={kartenmodus} className={cn('flex min-h-[280px] flex-col', KUNDE_PLATZ_HOEHE)}>
+          {/* Titel und Unterzeile weichen der Werkzeugzeile — der Titel bleibt für Vorleser. */}
+          <h1 className="sr-only">{kopf.titel}</h1>
+          {/* 44 px Bedienteile plus je 4 px Luft: Im Querformat (844 × 390) bleiben der Karte 70 %. */}
+          <div className="mx-auto flex w-full max-w-[1200px] shrink-0 items-start gap-2 px-4 py-1 md:px-6">
+            <div className="min-w-0 flex-1">{suchfeld(true)}</div>
+            {filterblatt(true)}
+            <Link
+              href={hoefeHref(zurListe)}
+              onNavigate={beimNavigieren(zurListe, schreibeUrl)}
+              prefetch={false}
+              className={cn(
+                'inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-3.5 text-[13.5px] font-semibold text-foreground hover:bg-muted',
+                FOKUS_RAHMEN
+              )}
+            >
+              <List className="size-4" strokeWidth={1.7} aria-hidden="true" />
+              {/* Unter 640 px nur „Liste" — Platz für das Suchfeld; vorgelesen wird immer „Liste zeigen". */}
+              <span>
+                Liste<span className="max-sm:sr-only"> zeigen</span>
+              </span>
+            </Link>
+          </div>
+          {/* Gesetzte Filter und Such-Marken bleiben sichtbar und entfernbar —
+              nur dann, sonst bleibt es bei der einen Zeile. */}
+          {hatAktiveFilter && (
+            <div className="mx-auto w-full max-w-[1200px] shrink-0 px-4 pb-2 md:px-6">
+              <AktiveFilterZeile filter={filter} onWahl={schreibeUrl} umkreis={aktiverUmkreis} onUmkreisAufheben={umkreisAufheben} />
+            </div>
+          )}
+          {/* `isolate`: Karussell, Hinweis und Leermeldung (z-[900]) bleiben in
+              dieser Stapelebene, sonst lägen sie beim Scrollen über der
+              Kopfzeile; `overflow-hidden` clippt das hinausgeglittene Karussell. */}
+          <div className="relative isolate min-h-0 flex-1 overflow-hidden">
+            <HoefeKarte
+              hoefe={kartenHoefe}
+              lage={sichtbareLage}
+              fokus={fokus}
+              sanft
+              attributionOben
+              randlos
+              hoeheKlasse="h-full"
+              polsterUnten={bandHoehe}
+              onAuswahl={pinGewaehlt}
+              onLeerTipp={() => setLage((l) => nachLeerTipp(l))}
+            />
+            {/* Über der Unterleiste und frei vom erhobenen Warenkorb-Knopf (--kunde-ueberstand). */}
+            {!auswahlMitPunkt && kartenHoefe.length > 0 && (
+              <p
+                className="pointer-events-none absolute inset-x-0 bottom-[calc(var(--kunde-ueberstand)+0.5rem)] z-[900] mx-auto w-fit rounded-full bg-card px-4 py-2 text-sm text-foreground shadow-md md:bottom-4"
+                aria-hidden="true"
+              >
+                Tippe einen Hof an
+              </p>
+            )}
+            <HoefeKarussell
+              hoefe={karussellHoefe}
+              ausgewaehlt={auswahlMitPunkt ? sichtbareLage.ausgewaehlt : null}
+              sichtbar={auswahlMitPunkt}
+              bereich={bereich}
+              gewaehlteKategorien={vorschauKategorien}
+              suchbegriffe={suchbegriffe}
+              onZentriert={hofAnfahren}
+              bandRef={bandMessen}
+            />
+            {/* Auch die Karte braucht die Leermeldung — eine leere Karte ohne
+                Wort wäre keine Rückmeldung. Sie liegt über der Karte, weil
+                darunter kein Platz mehr ist. */}
+            {anzahl === 0 && <div className="absolute inset-x-3 top-3 z-[900]">{ergebnisse(false)}</div>}
+          </div>
+        </div>
+        {koordinatenHinweis && <div className="mx-auto max-w-[1200px] px-4 pt-3 pb-4 md:px-6">{koordinatenHinweis}</div>}
+      </>
+    )
+  }
+
   return (
     <div>
       {kopfbereich}
       <div className="mx-auto mt-4 flex max-w-[1200px] flex-col gap-3 px-4 pb-10 md:px-6">
-        {ansicht === 'karte' ? (
-          <>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[13px] text-muted-foreground">{zahlText}</span>
-              <Link
-                href={hoefeHref(zurListe)}
-                onNavigate={beimNavigieren(zurListe, schreibeUrl)}
-                prefetch={false}
-                className={cn(
-                  'inline-flex h-11 items-center gap-1.5 rounded-full border border-border bg-card px-4 text-[13.5px] font-semibold text-foreground hover:bg-muted',
-                  FOKUS_RAHMEN
-                )}
-              >
-                <List className="size-4" strokeWidth={1.7} aria-hidden="true" />
-                Liste zeigen
-              </Link>
-            </div>
-            {/* Vollflächen-Karte mit Karussell am unteren Rand. `isolate`:
-                Karussell und Hinweis (z-[900]) bleiben in dieser Stapelebene,
-                sonst lägen sie beim Scrollen über der Kopfzeile;
-                `overflow-hidden` clippt das hinausgeglittene Karussell. */}
-            <div className="relative isolate overflow-hidden rounded-2xl border border-border">
-              <HoefeKarte
-                hoefe={kartenHoefe}
-                lage={sichtbareLage}
-                fokus={fokus}
-                sanft
-                attributionOben
-                hoeheKlasse="h-[60vh] min-h-[320px]"
-                polsterUnten={bandHoehe}
-                onAuswahl={pinGewaehlt}
-                onLeerTipp={() => setLage((l) => nachLeerTipp(l))}
-              />
-              {!auswahlMitPunkt && kartenHoefe.length > 0 && (
-                <p
-                  className="pointer-events-none absolute inset-x-0 bottom-4 z-[900] mx-auto w-fit rounded-full bg-card px-4 py-2 text-sm text-foreground shadow-md"
-                  aria-hidden="true"
-                >
-                  Tippe einen Hof an
-                </p>
-              )}
-              <HoefeKarussell
-                hoefe={karussellHoefe}
-                ausgewaehlt={auswahlMitPunkt ? sichtbareLage.ausgewaehlt : null}
-                sichtbar={auswahlMitPunkt}
-                bereich={bereich}
-                gewaehlteKategorien={vorschauKategorien}
-                suchbegriffe={suchbegriffe}
-                onZentriert={hofAnfahren}
-                bandRef={bandMessen}
-              />
-            </div>
-            {/* Auch die Karte braucht die Leermeldung — eine leere Karte ohne Wort wäre keine Rückmeldung. */}
-            {anzahl === 0 && ergebnisse(false)}
-            {koordinatenHinweis}
-          </>
-        ) : (
-          <>
-            {/* Die Karten-Vorschau (Mockup mobil-k1-entdecken): ein Bild, kein
-                Kartendienst — Leaflet lädt erst, wer sie öffnet. */}
-            <Link
-              href={hoefeHref(zurKarte)}
-              onNavigate={beimNavigieren(zurKarte, schreibeUrl)}
-              prefetch={false}
-              aria-label="Karte öffnen"
-              className={cn('relative block h-[120px] overflow-hidden rounded-2xl border border-border bg-accent', FOKUS_RAHMEN)}
-            >
-              {/* Der dunkle Schleier: primary-foreground ist im neuen Design in
-                  beiden Themes fast schwarz — theme-fest wie jedes Bild-Overlay
-                  (DESIGN_SYSTEM.md), aber ein Token statt Tailwind-Schwarz. */}
-              <span aria-hidden="true" className="absolute inset-0 bg-linear-150 from-primary-foreground/25 via-transparent via-55% to-primary/25" />
-              <span aria-hidden="true" className="absolute top-[58px] -left-6 h-1.5 w-[520px] rotate-[-8deg] rounded-full bg-accent-foreground/15" />
-              <span aria-hidden="true" className="absolute -top-6 left-[30%] h-[200px] w-1 rotate-[12deg] rounded-full bg-accent-foreground/12" />
-              {['left-[26%] top-[30%]', 'left-[58%] top-[52%]', 'left-[78%] top-[24%]'].map((lage) => (
-                <span
-                  key={lage}
-                  aria-hidden="true"
-                  className={cn('absolute size-3.5 rounded-full border-[2.5px] border-primary-foreground bg-primary', lage)}
-                />
-              ))}
-              <span className="absolute right-3 bottom-3 inline-flex h-9 items-center gap-1.5 rounded-full bg-card px-3.5 text-[13px] font-semibold text-foreground">
-                <MapIcon className="size-4" strokeWidth={1.7} aria-hidden="true" />
-                Karte öffnen
-              </span>
-            </Link>
-            <p className="text-[13px] text-muted-foreground">{zahlText}</p>
-            {ergebnisse(false)}
-          </>
-        )}
+        {/* Die Karten-Vorschau (Mockup mobil-k1-entdecken): ein Bild, kein
+            Kartendienst — Leaflet lädt erst, wer sie öffnet. */}
+        <Link
+          href={hoefeHref(zurKarte)}
+          onNavigate={beimNavigieren(zurKarte, schreibeUrl)}
+          prefetch={false}
+          aria-label="Karte öffnen"
+          className={cn('relative block h-[120px] overflow-hidden rounded-2xl border border-border bg-accent', FOKUS_RAHMEN)}
+        >
+          {/* Der dunkle Schleier: primary-foreground ist im neuen Design in
+              beiden Themes fast schwarz — theme-fest wie jedes Bild-Overlay
+              (DESIGN_SYSTEM.md), aber ein Token statt Tailwind-Schwarz. */}
+          <span aria-hidden="true" className="absolute inset-0 bg-linear-150 from-primary-foreground/25 via-transparent via-55% to-primary/25" />
+          <span aria-hidden="true" className="absolute top-[58px] -left-6 h-1.5 w-[520px] rotate-[-8deg] rounded-full bg-accent-foreground/15" />
+          <span aria-hidden="true" className="absolute -top-6 left-[30%] h-[200px] w-1 rotate-[12deg] rounded-full bg-accent-foreground/12" />
+          {['left-[26%] top-[30%]', 'left-[58%] top-[52%]', 'left-[78%] top-[24%]'].map((lage) => (
+            <span
+              key={lage}
+              aria-hidden="true"
+              className={cn('absolute size-3.5 rounded-full border-[2.5px] border-primary-foreground bg-primary', lage)}
+            />
+          ))}
+          <span className="absolute right-3 bottom-3 inline-flex h-9 items-center gap-1.5 rounded-full bg-card px-3.5 text-[13px] font-semibold text-foreground">
+            <MapIcon className="size-4" strokeWidth={1.7} aria-hidden="true" />
+            Karte öffnen
+          </span>
+        </Link>
+        <p className="text-[13px] text-muted-foreground">{zahlText}</p>
+        {ergebnisse(false)}
       </div>
     </div>
   )

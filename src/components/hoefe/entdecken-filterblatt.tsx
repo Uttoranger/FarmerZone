@@ -5,6 +5,7 @@ import { SlidersHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Sheet, SheetBlatt, SheetClose, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Zaehler } from '@/components/ui/zaehler'
 
 /**
  * Die Filter am Handy als Blatt (Mockup mobil-k1-filter): Umkreis, „Was
@@ -15,8 +16,14 @@ import { Sheet, SheetBlatt, SheetClose, SheetTitle, SheetTrigger } from '@/compo
  * sonst hieße Abbrechen dasselbe wie Anzeigen.
  *
  * Die Reihen kommen als Kinder herein; das Blatt selbst kennt keinen Filter.
+ *
+ * KOMPAKT (Kartenmodus am Handy, Nr. 52): ein runder 44-px-Knopf mit dem
+ * Filter-Symbol, das Wort „Filter" erst ab 640 px sichtbar (vorgelesen immer);
+ * die Zahl der gesetzten Filter als Zähler am Knopf — so passen Suche, Filter
+ * und Liste in eine Zeile.
  */
 export function EntdeckenFilterblatt({
+  kompakt = false,
   anzahlFilter,
   anzeigenText,
   zuruecksetzen,
@@ -24,6 +31,8 @@ export function EntdeckenFilterblatt({
   onAbbrechen,
   children,
 }: {
+  /** Runder Knopf mit Zähler statt „Filter · 2" (Kartenmodus am Handy). */
+  kompakt?: boolean
   /** Die Zahl am Knopf („Filter · 2"); 0 = keine. */
   anzahlFilter: number
   /** „3 Angebote anzeigen" — die Hauptaktion. */
@@ -46,21 +55,34 @@ export function EntdeckenFilterblatt({
         setOffen(neu)
       }}
     >
-      <SheetTrigger
-        className={cn(
-          'inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-4 text-[13.5px] font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted',
-          FOKUS_RAHMEN
-        )}
-      >
-        <SlidersHorizontal className="size-4" strokeWidth={1.7} aria-hidden="true" />
-        Filter
-        {anzahlFilter > 0 && (
-          <>
-            <span aria-hidden="true">· {anzahlFilter}</span>
-            <span className="sr-only">, {anzahlFilter} gesetzt</span>
-          </>
-        )}
-      </SheetTrigger>
+      {kompakt ? (
+        <SheetTrigger
+          className={cn(
+            'relative inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border border-border bg-card text-[13.5px] font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted sm:px-4',
+            FOKUS_RAHMEN
+          )}
+        >
+          <SlidersHorizontal className="size-4" strokeWidth={1.7} aria-hidden="true" />
+          <span className="max-sm:sr-only">Filter</span>
+          <Zaehler anzahl={anzahlFilter} wofuer="gesetzt" ton="gruen" className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[9.5px]" />
+        </SheetTrigger>
+      ) : (
+        <SheetTrigger
+          className={cn(
+            'inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-4 text-[13.5px] font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted',
+            FOKUS_RAHMEN
+          )}
+        >
+          <SlidersHorizontal className="size-4" strokeWidth={1.7} aria-hidden="true" />
+          Filter
+          {anzahlFilter > 0 && (
+            <>
+              <span aria-hidden="true">· {anzahlFilter}</span>
+              <span className="sr-only">, {anzahlFilter} gesetzt</span>
+            </>
+          )}
+        </SheetTrigger>
+      )}
       <SheetBlatt>
         <div className="flex items-center justify-between gap-2">
           <SheetTitle className="font-heading text-xl font-semibold">Filter</SheetTitle>

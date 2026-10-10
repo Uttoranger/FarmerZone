@@ -1,10 +1,14 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { MapPin } from 'lucide-react'
 import { erstelleKartenBremse, type KartenBremse, type StandortKandidat } from '@/lib/geokodierung'
+import { KARTEN_KACHELN, erstelleAusschnittMerker } from '@/lib/hoefe-anzeige'
+import { cn } from '@/lib/utils'
+import { useKartenGroesse } from '@/components/karte/use-karten-groesse'
+import { STANDORT_KARTE_RAHMEN } from '@/components/karte/karten-masse'
 
 /**
  * Die DAUERHAFT eingebettete Minikarte im Hofprofil — kein Dialog mehr.
@@ -26,8 +30,15 @@ import { erstelleKartenBremse, type KartenBremse, type StandortKandidat } from '
  * ÖFFENTLICHE Kundenkarte reicht das nicht — dann braucht es einen eigenen
  * Kachel-Anbieter mit Schlüssel.
  *
- * Wird nur clientseitig geladen (next/dynamic in profile-form): Leaflet
- * greift beim Import auf window zu.
+ * Wird nur clientseitig geladen (next/dynamic in profile-form, mit dem
+ * Platzhalter „Karte lädt …" in derselben Größe): Leaflet greift beim Import
+ * auf window zu. Die ruhige Zeile über der Karte steht deshalb im Formular,
+ * nicht hier — sonst schöbe sie die Karte nach dem Laden nach unten.
+ *
+ * GRÖSSENWECHSEL (Nr. 52): useKartenGroesse misst den Container; danach steht
+ * genau der Punkt von vorher unter dem festen Pin — der Pin bleibt die echte
+ * Kartenmitte. Das läuft still: Ein Drehen des Handys füllt weder das
+ * Formular noch die Adresse.
  */
 
 /** Ein programmatischer Sprung (Ergebnis der Vorwärts-Suche). `folge`
@@ -37,7 +48,6 @@ export type KartenZiel = { lat: number; lon: number; zoom: number; folge: number
 export default function StandortKarte({
   start,
   ziel,
-  hinweis,
   kandidaten,
   onMitteVerschoben,
   onAdresseAnfrage,
@@ -45,8 +55,6 @@ export default function StandortKarte({
   /** Ansicht beim Einhängen: gespeicherter Punkt (Zoom 17) oder Rückfall (Zoom 8). */
   start: { lat: number; lon: number; zoom: number }
   ziel: KartenZiel | null
-  /** Die ruhige Zeile über der Karte — null blendet sie aus. */
-  hinweis: string | null
   kandidaten: StandortKandidat[]
   /** Jede vom Bauern gewählte Kartenmitte (Schieben oder Kandidatenwahl) —
    *  wird im Formular zum ungespeicherten Koordinaten-Wert. */
@@ -57,9 +65,10 @@ export default function StandortKarte({
   const kartenDiv = useRef<HTMLDivElement>(null)
   const karte = useRef<L.Map | null>(null)
   const bremse = useRef<KartenBremse | null>(null)
-  // Eigene Sprünge (setView) feuern ebenfalls 'moveend' — sie dürfen weder
-  // als Nutzerbewegung zählen noch die Rückwärtssuche anstoßen.
-  const programmatisch = useRef(false)
+  // Eigene Sprünge (setView) und der Größenwechsel feuern ebenfalls
+  // 'moveend' — sie laufen in merker.still() und dürfen weder als
+  // Nutzerbewegung zählen noch die Rückwärtssuche anstoßen.
+  const [merker] = useState(erstelleAusschnittMerker)
   // Die Rückrufe wechseln mit jedem Render, die Karten-Handler hängen aber
   // nur einmal — Refs, damit nie ein veralteter Rückruf gefangen bleibt.
   const mitteRef = useRef(onMitteVerschoben)
@@ -73,17 +82,21 @@ export default function StandortKarte({
       center: [start.lat, start.lon],
       zoom: start.zoom,
       zoomControl: true,
+      // Den Größenwechsel misst useKartenGroesse (ResizeObserver) — nicht
+      // zusätzlich Leaflet beim window-resize.
+      trackResize: false,
     })
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution:
-        '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>-Mitwirkende',
+    // Ohne Leaflets Präfix; „© OpenStreetMap-Mitwirkende" mit Link bleibt.
+    map.attributionControl.setPrefix(false)
+    L.tileLayer(KARTEN_KACHELN.url, {
+      maxZoom: KARTEN_KACHELN.maxZoom,
+      attribution: KARTEN_KACHELN.attribution,
     }).addTo(map)
 
     const gebremst = erstelleKartenBremse((lat, lon) => anfrageRef.current(lat, lon))
     gebremst.setzeBezugspunkt(start.lat, start.lon)
     map.on('moveend', () => {
-      if (programmatisch.current) return
+      if (merker.istStill) return
       const mitte = map.getCenter()
       mitteRef.current(mitte.lat, mitte.lng)
       gebremst.mitteBewegt(mitte.lat, mitte.lng)
@@ -109,28 +122,30 @@ export default function StandortKarte({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zielFolge])
 
+  // Größenwechsel (Drehen, schmaleres Fenster): Leaflet misst neu, und genau
+  // der Punkt von vorher kommt wieder unter den festen Pin — ohne die
+  // Rundung, die invalidateSize allein bei ungeraden Breiten mitbrächte.
+  useKartenGroesse(kartenDiv, karte, merker, ({ mitte, zoom }) => {
+    karte.current?.setView(mitte, zoom, { animate: false })
+  })
+
   function springeZu(lat: number, lon: number, zoom: number) {
     const map = karte.current
     if (!map) return
     bremse.current?.setzeBezugspunkt(lat, lon)
     // animate: false → 'moveend' feuert synchron INNERHALB von setView; die
-    // Klammer um `programmatisch` ist damit wasserdicht, auch wenn die Karte
+    // Klammer merker.still() ist damit wasserdicht, auch wenn die Karte
     // schon auf dem Ziel steht und gar kein Ereignis kommt.
-    programmatisch.current = true
-    map.setView([lat, lon], zoom, { animate: false })
-    programmatisch.current = false
+    merker.still(() => map.setView([lat, lon], zoom, { animate: false }))
   }
 
   return (
     <div>
-      {hinweis && <p className="mb-2 text-xs text-muted-foreground">{hinweis}</p>}
-
-      {/* Mindestens 260 px hoch laut Vorgabe — 280 gibt dem Daumen Spielraum,
-          ohne die Speichern-Schaltfläche unnötig weit nach unten zu drücken.
+      {/* Größe aus STANDORT_KARTE_RAHMEN — dieselbe wie der Platzhalter.
           `isolate`: eine eigene Stapelebene — sonst lägen Leaflets Ebenen
           (400, Bedienteile 1000) über dem festen Kopf des Hof-Profils (Nr. 44)
           und über der Unterleiste. */}
-      <div className="relative isolate overflow-hidden rounded-xl" style={{ height: 280 }}>
+      <div className={cn('relative isolate overflow-hidden', STANDORT_KARTE_RAHMEN)}>
         <div ref={kartenDiv} className="h-full w-full" />
         {/* Der feste Pin: exakt über der Kartenmitte, mit der Spitze im
             Zentrum — deshalb um die halbe Icon-Höhe angehoben. */}

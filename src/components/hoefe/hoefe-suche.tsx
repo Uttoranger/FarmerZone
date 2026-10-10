@@ -38,8 +38,15 @@ import { useOrtssuche } from '@/components/hoefe/use-ortssuche'
  * Übernommene Produkt-Vorschläge werden Such-Marken („Aktive Filter"). Ein
  * gefundener Ort wird der Bezugspunkt; der Text verlässt dann das Feld, denn
  * er war kein Produkt. Ortssuche und Standort: useOrtssuche.
+ *
+ * KOMPAKT (Kartenmodus am Handy, Nr. 52): nur das Feld, 44 px hoch, damit
+ * Suche, Filter und Liste in EINE Zeile über der Karte passen. „Standort
+ * nutzen" samt „Nichts wird gespeichert." und die Karte „Wir zeigen Höfe rund
+ * um …" stehen dann nur in der Liste; die Ortssuche über den Eintrag „Höfe
+ * rund um …" bleibt, ebenso alle Ansagen für Vorleser.
  */
 export function HoefeSuche({
+  kompakt = false,
   suchtext,
   vorschlaege,
   status,
@@ -50,6 +57,8 @@ export function HoefeSuche({
   onBezugspunkt,
   onAufheben,
 }: {
+  /** Nur das Feld (Kartenmodus am Handy). */
+  kompakt?: boolean
   suchtext: string
   vorschlaege: readonly ProduktVorschlag[]
   /** Die Ansage fürs Vorlesen („3 Treffer gefunden."); leer ohne Suche. */
@@ -157,7 +166,8 @@ export function HoefeSuche({
               aria-busy={ort.laeuft}
               // 16 px: iOS zoomt bei kleinerer Schrift ins Feld.
               className={cn(
-                'h-12 w-full rounded-full border border-border bg-card pr-4 pl-11 text-base text-foreground placeholder:text-muted-foreground md:h-11 md:text-sm',
+                'w-full rounded-full border border-border bg-card pr-4 pl-11 text-base text-foreground placeholder:text-muted-foreground md:text-sm',
+                kompakt ? 'h-11 text-ellipsis' : 'h-12 md:h-11',
                 'outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-ring'
               )}
             />
@@ -219,7 +229,7 @@ export function HoefeSuche({
           </p>
         </form>
 
-        {!bezugspunkt && (
+        {!bezugspunkt && !kompakt && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {/* BEWUSST NICHT `disabled` während der Abfrage: Ein deaktivierter
                 Knopf verliert den Tastatur-Fokus an den Seitenanfang. Der
@@ -242,7 +252,7 @@ export function HoefeSuche({
         )}
       </div>
 
-      {bezugspunkt && (
+      {bezugspunkt && !kompakt && (
         <Hinweiskarte
           symbol={MapPin}
           aktion={

@@ -7,7 +7,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { createElement, type ReactNode } from 'react'
+import { createElement, type ComponentType, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 vi.mock('next/navigation', () => ({
@@ -40,6 +40,7 @@ import {
   type TrefferHof,
 } from '@/components/hoefe/entdecken-teile'
 import { HoefeSuche } from '@/components/hoefe/hoefe-suche'
+import { EntdeckenFilterblatt } from '@/components/hoefe/entdecken-filterblatt'
 import { kategorieReihe, leerzustand } from '@/lib/hoefe-entdecken'
 import { grundpreisAusKennzeichnung, type AngebotsProdukt } from '@/lib/bereiche-anzeige'
 import { LEERER_HOEFE_FILTER, SUCHTEXT_MAX, type HoefeFilter } from '@/schemas/hoefe-filter'
@@ -395,5 +396,57 @@ describe('Ein Suchfeld „Ort oder Produkt" plus „Standort nutzen" (Nr. 46)', 
     expect(hook).toContain('loeseOrtAuf(text)')
     expect(hook).not.toMatch(/loeseOrtAuf\([^)]*coords/)
     expect(hook).not.toMatch(/localStorage|sessionStorage|document\.cookie/)
+  })
+})
+
+describe('Kartenmodus am Handy: Suche · Filter · Liste in einer Zeile (Nr. 52)', () => {
+  it('die Suche kompakt: nur das Feld, ohne „Standort nutzen" — die Ansagen bleiben im Baum', () => {
+    const suche = html(createElement(HoefeSuche, { ...SUCHE, kompakt: true }))
+    expect((suche.match(/<input\b/g) ?? []).length).toBe(1)
+    expect(suche).toContain('role="combobox"')
+    expect(suche).not.toContain('Standort nutzen')
+    expect(suche).not.toContain('Nichts wird gespeichert.')
+    // Live-Regionen stehen dauerhaft im Baum, sonst verpasst der Screenreader die erste Änderung.
+    expect(suche).toContain('id="umkreis-meldung"')
+    expect(suche).toMatch(/<p role="status" class="sr-only">/)
+    // Gegenprobe: ohne kompakt steht der Knopf da.
+    expect(html(createElement(HoefeSuche, SUCHE))).toContain('Standort nutzen')
+  })
+
+  it('kompakt mit Bezugspunkt: keine Hinweiskarte, die Ansage „Entfernungen ab …" bleibt', () => {
+    const punkt = { lat: 48.2, lon: 13.5, name: '4910 Ried im Innkreis' }
+    const suche = html(createElement(HoefeSuche, { ...SUCHE, kompakt: true, bezugspunkt: punkt }))
+    expect(suche).not.toContain('data-slot="hinweiskarte"')
+    expect(suche).toContain('Entfernungen ab 4910 Ried im Innkreis')
+    // Gegenprobe: in der Liste steht die Karte mit „Ort ändern".
+    expect(html(createElement(HoefeSuche, { ...SUCHE, bezugspunkt: punkt }))).toContain('data-slot="hinweiskarte"')
+  })
+
+  it('der Filter kompakt: ein Knopf mit Namen „Filter" und der Zahl der gesetzten Filter', () => {
+    type BlattProps = Omit<Parameters<typeof EntdeckenFilterblatt>[0], 'children'>
+    // Die Reihen kommen als Kind herein — hier keine, es geht um den Knopf.
+    const blatt = (anzahlFilter: number) =>
+      html(
+        createElement(
+          EntdeckenFilterblatt as unknown as ComponentType<BlattProps>,
+          { kompakt: true, anzahlFilter, anzeigenText: '3 Höfe anzeigen', zuruecksetzen: null, onOeffnen: () => {}, onAbbrechen: () => {} },
+          null
+        )
+      )
+    const mitZwei = blatt(2)
+    expect(mitZwei).toMatch(/<button[^>]*>[\s\S]*Filter[\s\S]*<\/button>/)
+    expect(mitZwei).toContain('2 gesetzt')
+    expect(mitZwei).toContain('data-slot="zaehler"')
+    // Ohne gesetzten Filter keine Zahl.
+    expect(blatt(0)).not.toContain('data-slot="zaehler"')
+  })
+
+  it('der Titel bleibt für Vorleser, die Zeile zeigt Suche, Filter und Liste', () => {
+    const client = quelle('src/components/hoefe/hoefe-client.tsx')
+    expect(client).toMatch(/<h1 className="sr-only">\{kopf\.titel\}<\/h1>/)
+    expect(client).toMatch(/suchfeld\(true\)/)
+    expect(client).toMatch(/filterblatt\(true\)/)
+    // „Liste zeigen" — unter 640 px nur „Liste" sichtbar, vorgelesen immer ganz.
+    expect(client).toMatch(/Liste<span className="max-sm:sr-only"> zeigen<\/span>/)
   })
 })
