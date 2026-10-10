@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
+import { STRIPE_LIVE_AB } from '@/lib/umgebung-server'
 import {
   sumOnlinePaid,
   sumBarKassiert,
@@ -7,7 +8,7 @@ import {
   mergeSalesFeed,
   type SalesFeedOrder,
 } from '@/lib/sales-summary'
-import { verkaufsZeilen, type FeedVerkauf, type VerkaufsZeile } from '@/lib/hof-verkaeufe'
+import { verkaeufeZeigenAb, verkaufsZeilen, type FeedVerkauf, type VerkaufsZeile } from '@/lib/hof-verkaeufe'
 import { wienKalendertag } from '@/lib/kalender'
 import { getYtdRevenue } from './analytics'
 import { formatPosition } from '@/lib/format'
@@ -15,19 +16,24 @@ import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { umsatzBestellungWhere, umsatzfenster, umsatzVerkaufWhere } from '@/lib/umsatz'
 import { meistverkaufteProdukte } from '@/lib/verkauf-eintragen'
 import { centAusDecimal } from './umsatz'
+import { testzahlungenHinweisFuerHof } from './testzahlungen'
 
 // Verkäufe (/sales): Wochen-Summen (Online/Bar), Gesamt (YTD) und die vereinte
 // "Letzte Verkäufe"-Liste — Unterscheidung rein über stripePaymentIntentId,
 // KEIN Schema-Change. Zeitraum der Karten: laufende Woche nach der EINEN
 // Umsatzregel (src/lib/umsatz.ts) — dieselbe Zahl wie auf Heute. Seit
 // Nr. 22b gehen nur Text und Zahlen an den Browser (Zeilen aus
-// verkaufsZeilen, Beträge in Cent, Tage nach Wiener Zeit).
+// verkaufsZeilen, Beträge in Cent, Tage nach Wiener Zeit). Seit Nr. 55
+// zählen Testzahlungen (online vor dem Stichtag, Register Z4) in Woche und
+// Jahr nicht; die Liste „Letzte Verkäufe" zeigt die Bestellungen weiter.
 export type SalesOverview = {
   weekTotal: number
   weekOnline: number
   weekBar: number
   ytdTotal: number
   zeilen: VerkaufsZeile[]
+  /** „Testzahlungen vor dem … sind nicht mitgezählt." — nur, wenn der Stichtag Bestellungen der Seite betrifft. */
+  testzahlungenHinweis: string | null
 }
 
 const PICKED_ORDER_SELECT = {
@@ -67,12 +73,16 @@ function toFeedOrder(o: PickedOrderRow): SalesFeedOrder {
   }
 }
 
-export async function getSalesOverview(farmId: string, jetzt: Date = new Date()): Promise<SalesOverview> {
+export async function getSalesOverview(
+  farmId: string,
+  jetzt: Date = new Date(),
+  stripeLiveAb: Date | null = STRIPE_LIVE_AB
+): Promise<SalesOverview> {
   const woche = umsatzfenster('woche', jetzt).aktuell
 
-  const [weekOrders, weekSales, recentOrders, recentSales, ytdTotal] = await Promise.all([
+  const [weekOrders, weekSales, recentOrders, recentSales, ytdTotal, testzahlungenHinweis] = await Promise.all([
     prisma.order.findMany({
-      where: umsatzBestellungWhere(farmId, woche),
+      where: umsatzBestellungWhere(farmId, woche, stripeLiveAb),
       select: PICKED_ORDER_SELECT,
     }),
     prisma.manualSale.findMany({
@@ -86,7 +96,8 @@ export async function getSalesOverview(farmId: string, jetzt: Date = new Date())
       select: PICKED_ORDER_SELECT,
     }),
     letzteVerkaeufe(farmId, 10),
-    getYtdRevenue(farmId, jetzt),
+    getYtdRevenue(farmId, jetzt, stripeLiveAb),
+    testzahlungenHinweisFuerHof(farmId, verkaeufeZeigenAb(jetzt), stripeLiveAb),
   ])
 
   // Summen in Cent, erst zur Anzeige in Euro.
@@ -99,6 +110,7 @@ export async function getSalesOverview(farmId: string, jetzt: Date = new Date())
     weekBar: centsAlsEuro(sumBarKassiert(weekFeedOrders, weekFeedSales)),
     ytdTotal,
     zeilen: verkaufsZeilen(mergeSalesFeed(recentOrders.map(toFeedOrder), recentSales, 10), jetzt),
+    testzahlungenHinweis,
   }
 }
 
@@ -138,12 +150,16 @@ async function letzteVerkaeufe(farmId: string, limit: number): Promise<FeedVerka
  * abgeholte Bestellpositionen und manuelle Verkäufe mit Produkt, nach
  * derselben Umsatzregel wie überall.
  */
-export async function getMeistverkaufteProduktIds(farmId: string, jetzt: Date = new Date()): Promise<string[]> {
+export async function getMeistverkaufteProduktIds(
+  farmId: string,
+  jetzt: Date = new Date(),
+  stripeLiveAb: Date | null = STRIPE_LIVE_AB
+): Promise<string[]> {
   const fenster = { von: new Date(jetzt.getTime() - 90 * 24 * 60 * 60 * 1000), bis: jetzt }
   const [positionen, verkaeufe] = await Promise.all([
     prisma.orderItem.findMany({
       // Fehlende Artikel (E14) wurden nicht verkauft.
-      where: { order: umsatzBestellungWhere(farmId, fenster), fehltSeit: null },
+      where: { order: umsatzBestellungWhere(farmId, fenster, stripeLiveAb), fehltSeit: null },
       select: { productId: true, totalPrice: true },
     }),
     prisma.manualSale.findMany({

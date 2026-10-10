@@ -40,7 +40,7 @@ Mit dem Live-Schlüssel verschwinden alle drei von selbst. Den Modus liest die A
   ```
   Nach dem Neu-Einrichten kennt die Datenbank nur noch die neue Kennung. Die alte steht dann nur im Laufzeit-Protokoll („[Stripe] Hof-Konto neu eingerichtet …“), und das bewahrt Vercel je nach Plan nur kurz auf.
 - [ ] Die Höfe vorab informieren: Sobald du Bescheid gibst (erst nach der Probe mit EINEM Hof in Schritt 9), öffnen sie einmal Einstellungen → Zahlung und richten die Online-Zahlung neu ein (etwa 10 Minuten). Vorher nicht neu einrichten.
-- [ ] Eine ruhige Stunde wählen, ohne laufende Abholung.
+- [ ] Eine ruhige Stunde wählen, ohne laufende Abholung und möglichst ohne Online-Bestellungen: Wer während des Neu-Bauens in Schritt 8 online bestellt, zahlt noch im Testmodus, zählt aber schon als Umsatz (Bau-Fenster, siehe Schritt 4 `STRIPE_LIVE_AB`).
 
 ## 1. Stripe-Konto live aktivieren
 
@@ -97,6 +97,10 @@ Vercel erlaubt je Variable und Umgebung nur einen Wert. Deshalb kommt **zuerst S
   | `STRIPE_CONNECT_CLIENT_ID` | `ca_` | Connect → Einstellungen (steht in `.env.example`; der Code liest sie heute nicht, sie gehört trotzdem zum vollständigen Satz) |
 
 - [ ] Den Live-Schlüssel aus **demselben Stripe-Konto** kopieren, in dem Connect eingerichtet ist (Schritt 2). Ein Schlüssel eines anderen Kontos ließe jeden Hof als „unbekannt“ erscheinen, und „neu einrichten“ legte die Konten dort an.
+- [ ] **`STRIPE_LIVE_AB`** anlegen (Register Z4, Nr. 55), ebenfalls **nur für Production** (nicht für Preview; „Sensitive“ ist nicht nötig, so bleibt der Wert lesbar). Online-Bestellungen, die vor diesem Zeitpunkt angelegt wurden, sind Testzahlungen: Sie zählen in Auswertung, Verkäufe, Heute, Kunden und Admin nicht als Umsatz und nicht als Servicegebühr. Barbestellungen zählen immer.
+  - **Wert:** der Beginn des Redeploys aus Schritt 8, **mit Zeitzone**, etwa `2026-11-02T21:00:00+01:00` (Winterzeit `+01:00`, Sommerzeit `+02:00`). Am einfachsten trägst du ihn unmittelbar vor Schritt 8 ein – die Variable wirkt erst mit dem nächsten Deploy.
+  - Ohne Zeitzone oder mit einem Tippfehler gilt der Wert nicht: Die Testzahlungen zählen dann weiter mit, und Sentry meldet „Umgebung widersprüchlich: STRIPE_LIVE_AB …“ (höchstens einmal je Instanz). Der Deploy läuft trotzdem.
+  - **Bau-Fenster:** Online-Bestellungen zwischen dem Beginn des Redeploys und dem fertigen Deployment laufen noch über den Test-Schlüssel, liegen aber nach dem Stichtag – sie würden mitgezählt. Darum die ruhige Stunde (Schritt 0) und danach Admin → Finanzen prüfen (Schritt 8).
 
 ## 6. Zahlungsarten live aktivieren
 
@@ -120,6 +124,8 @@ Vercel erlaubt je Variable und Umgebung nur einen Wert. Deshalb kommt **zuerst S
     - `umgebung=produktion`: Der Produktion fehlt `VERCEL_ENV`. Den Schalter für die Systemvariablen prüfen (oben), nicht die Vorschau.
     - `umgebung=preview`: Der Live-Schlüssel steckt in einer Vorschau. Dann Schritt 5 prüfen.
   - [ ] Eine Vorschau zeigt im Umgebungsbanner weiter „Stripe Test“.
+  - [ ] Admin → Finanzen: Unter dem Titel steht leise „Testzahlungen vor dem … sind nicht mitgezählt.“ mit dem Zeitpunkt aus `STRIPE_LIVE_AB` (nur, wenn es in den gezeigten Monaten Testzahlungen gibt). Fehlt die Zeile trotz Testzahlungen, ist der Wert ungültig – Sentry nennt den Grund.
+  - [ ] Admin → Finanzen: Keine Online-Bestellung aus dem Bau-Fenster unter „Servicegebühr, online“. Gibt es doch eine, `STRIPE_LIVE_AB` auf den Zeitpunkt setzen, zu dem das neue Deployment fertig war (Vercel → Deployments, „Ready“), und noch einmal neu deployen – dann laufen alte und neue Version schon mit dem Live-Schlüssel.
   - [ ] Stripe → Webhooks: Endpunkt A und B zeigen beim ersten Ereignis eine Zustellung mit 200.
 - [ ] Im **Testmodus** von Stripe den alten Endpunkt `https://farmerzone.at/api/stripe/webhook` löschen. Die Produktion prüft jetzt gegen die Live-Secrets und würde jede Test-Zustellung mit 400 ablehnen. Der Endpunkt der Testumgebung (`test.farmerzone.at`, Nr. 43) bleibt.
 
@@ -141,13 +147,13 @@ Die gespeicherten Hof-Konten stammen aus dem Testmodus, der Live-Schlüssel kenn
 - [ ] Überblick im Admin: Die Höfe-Liste zeigt jeden noch nicht neu eingerichteten Hof (nach dem Vermerk) als **„Stripe fehlt“** (Filter „Stripe fehlt“).
 - [ ] Sentry meldet „Stripe kennt das gespeicherte Konto eines Hofs nicht“ höchstens einmal je Hof und Tag, nur mit der Hof-ID.
 
-## 10. Testbestellungen aus den Auswertungen heraushalten (nur Vorschlag, nicht gebaut)
+## 10. Testbestellungen aus den Auswertungen heraushalten – umgesetzt (Nr. 55, Variable statt Konstante)
 
-Online-Bestellungen von vor der Umstellung sind Testzahlungen. Sie stehen heute in der Auswertung des Hofs (Umsatz), in Heute (Umsatz) und in den Admin-Finanzen (Servicegebühr online). **Barbestellungen aus derselben Zeit sind echt:** Das Geld wurde bar übergeben, sie bleiben drin.
+Online-Bestellungen von vor der Umstellung sind Testzahlungen. **Barbestellungen aus derselben Zeit sind echt:** Das Geld wurde bar übergeben, sie zählen immer.
 
-- **Vorschlag A – Stichtag, ohne Migration:** Eine Konstante mit dem Zeitpunkt der Umstellung, etwa `STRIPE_LIVE_AB` neben `TARIFE_AB` in `src/lib/konditionen.ts`. Alle Geld-Auswertungen fragen eine Regel, zum Beispiel `istTestzahlung(order)` = Zahlart ONLINE und angelegt vor dem Stichtag. Diese Bestellungen zählen dann nicht als Umsatz und nicht als Gebühr. Klein und rückwirkend für den Bestand, muss aber in jeder Summe stecken (`umsatzBestellungWhere`, `topfVonBestellung` …).
-- **Vorschlag B – Merkmal an der Bestellung (Expand-Migration):** Eine neue Spalte, etwa `Order.stripeLivemode` (nullable). Der Checkout setzt sie aus `livemode` des PaymentIntents, eine Daten-Migration setzt sie für alle Online-Bestellungen vor dem Stichtag auf false. Die Auswertungen filtern darauf. Hält auch für die Testumgebung und spätere Fälle, braucht aber eine freigegebene Migration.
-- Empfehlung: A jetzt, B erst, wenn es mehr als eine Umstellung gibt. Beides braucht einen eigenen Auftrag.
+- **Umgesetzt (Register Z4):** Vorschlag A, aber mit der Server-Variable `STRIPE_LIVE_AB` statt einer Konstante – zur Live-Schaltung ist keine Code-Änderung nötig, den Wert setzt du in Schritt 4. Eine Regel aus einer Quelle (`src/lib/testzahlung.ts`): Zahlart online UND angelegt vor dem Stichtag. Sie gilt für die Auswertung, die Verkäufe samt Jahressumme für die Umsatzgrenze, Heute, die Umsätze der Kunden, die Admin-Finanzen und die Admin-Hofliste. Bestellungen, Beträge, Checkout, Webhook, Erstattung und Storno bleiben unverändert; die Liste „Letzte Verkäufe“ zeigt die Bestellungen weiter.
+- **Ohne Variable bleibt alles wie vorher.** Betrifft der Stichtag Bestellungen, steht in Auswertung, Verkäufe und Admin-Finanzen leise „Testzahlungen vor dem … sind nicht mitgezählt.“
+- **Vorschlag B – Merkmal an der Bestellung (Expand-Migration)** bleibt eine Option für später: eine Spalte wie `Order.stripeLivemode`, gesetzt aus `livemode` des PaymentIntents. Sie hielte auch für die Testumgebung und weitere Umstellungen, braucht aber eine freigegebene Migration und einen eigenen Auftrag.
 
 ## Zurück, falls nötig
 

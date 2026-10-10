@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { STRIPE_LIVE_AB } from '@/lib/umgebung-server'
 import { sumCountedRevenue, type CountablePosition } from '@/lib/revenue-limit'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import {
@@ -38,18 +39,24 @@ export type UmsatzAuswertung = {
   topProdukte: TopProdukt[]
 }
 
+/**
+ * `stripeLiveAb` in allen Abfragen dieser Datei: Stichtag der Live-Schaltung
+ * (Register Z4) — Testzahlungen davor zählen nicht als Umsatz. Standard ist
+ * die Variable des Servers (src/lib/umgebung-server.ts); Tests geben ihn mit.
+ */
 export async function getUmsatzAuswertung(
   farmId: string,
   periode: Periode,
   zurueck: number,
-  jetzt: Date = new Date()
+  jetzt: Date = new Date(),
+  stripeLiveAb: Date | null = STRIPE_LIVE_AB
 ): Promise<UmsatzAuswertung> {
   const pf = umsatzfenster(periode, jetzt, zurueck)
   // Ein Zug von der Vorperiode bis heute: Summe, fairer Vergleich und Balken
   // entstehen daraus im Speicher, mit derselben Regel wie die Abfrage.
   const [buchungen, top] = await Promise.all([
-    umsatzBuchungen(farmId, { von: pf.vergleichGanz.von, bis: pf.aktuell.bis }),
-    getTopProdukte(farmId, pf.aktuell),
+    umsatzBuchungen(farmId, { von: pf.vergleichGanz.von, bis: pf.aktuell.bis }, stripeLiveAb),
+    getTopProdukte(farmId, pf.aktuell, 3, stripeLiveAb),
   ])
   const auswertung = auswerten(buchungen, pf)
 
@@ -74,11 +81,16 @@ export async function getUmsatzAuswertung(
  * Verkauf wird in der Einheit des Produkts eingetragen. Verkäufe ohne
  * Produktangabe fehlen hier — sie sind kein Produkt.
  */
-export async function getTopProdukte(farmId: string, fenster: Umsatzfenster, anzahl = 3): Promise<TopProdukt[]> {
+export async function getTopProdukte(
+  farmId: string,
+  fenster: Umsatzfenster,
+  anzahl = 3,
+  stripeLiveAb: Date | null = STRIPE_LIVE_AB
+): Promise<TopProdukt[]> {
   const [positionen, verkaeufe] = await Promise.all([
     prisma.orderItem.findMany({
       // Fehlende Artikel (E14) wurden nicht verkauft — sie zählen nicht.
-      where: { order: umsatzBestellungWhere(farmId, fenster), fehltSeit: null },
+      where: { order: umsatzBestellungWhere(farmId, fenster, stripeLiveAb), fehltSeit: null },
       select: {
         productId: true,
         productName: true,
@@ -123,13 +135,18 @@ export async function getTopProdukte(farmId: string, fenster: Umsatzfenster, anz
 // Grenzwert-Summe (55k-Karte): Positionen, deren Produkt als Urproduktion
 // markiert ist (countsTowardLimit=false), zählen nicht; Positionen/Verkäufe
 // OHNE Produktbezug zählen weiter (konservativ). Das Jahr ist das Wiener
-// Kalenderjahr, gezählt nach der Umsatzregel (src/lib/umsatz.ts).
-export async function getYtdRevenue(farmId: string, jetzt: Date = new Date()): Promise<number> {
+// Kalenderjahr, gezählt nach der Umsatzregel (src/lib/umsatz.ts) — ohne
+// Testzahlungen (Register Z4).
+export async function getYtdRevenue(
+  farmId: string,
+  jetzt: Date = new Date(),
+  stripeLiveAb: Date | null = STRIPE_LIVE_AB
+): Promise<number> {
   const jahr = umsatzfenster('jahr', jetzt).aktuell
 
   const [orders, manualSales] = await Promise.all([
     prisma.order.findMany({
-      where: umsatzBestellungWhere(farmId, jahr),
+      where: umsatzBestellungWhere(farmId, jahr, stripeLiveAb),
       select: {
         items: {
           // Fehlende Artikel (E14) wurden nicht verkauft — sie zählen nicht.

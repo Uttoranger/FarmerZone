@@ -18,11 +18,18 @@ export function centAusDecimal(betrag: Prisma.Decimal | null): number {
   return betrag ? decimalZuCents(betrag) : 0
 }
 
-/** Alle Buchungen eines Fensters, einzeln — für Balken, Kanäle und den fairen Vergleich im Speicher. */
-export async function umsatzBuchungen(farmId: string, fenster: Umsatzfenster): Promise<UmsatzBuchung[]> {
+/**
+ * Alle Buchungen eines Fensters, einzeln — für Balken, Kanäle und den fairen
+ * Vergleich im Speicher. Ohne Testzahlungen vor `stripeLiveAb` (Register Z4).
+ */
+export async function umsatzBuchungen(
+  farmId: string,
+  fenster: Umsatzfenster,
+  stripeLiveAb: Date | null
+): Promise<UmsatzBuchung[]> {
   const [bestellungen, verkaeufe] = await Promise.all([
     prisma.order.findMany({
-      where: umsatzBestellungWhere(farmId, fenster),
+      where: umsatzBestellungWhere(farmId, fenster, stripeLiveAb),
       select: { pickedUpAt: true, totalAmount: true },
     }),
     prisma.manualSale.findMany({

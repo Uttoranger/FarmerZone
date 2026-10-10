@@ -29,6 +29,7 @@ export const UMGEBUNG: Umgebung = bestimmeUmgebung({
   DATABASE_URL: env.DATABASE_URL,
   STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY,
   STRIPE_CONNECT_WEBHOOK_SECRET: env.STRIPE_CONNECT_WEBHOOK_SECRET,
+  STRIPE_LIVE_AB: env.STRIPE_LIVE_AB,
 })
 
 /**
@@ -58,6 +59,15 @@ export const STRIPE_MARKE: StripeMarke | null = stripeMarke(UMGEBUNG)
 
 /** Ziel von „Zur Testumgebung" im Admin — null ohne gültige Variable, dann kein Link. */
 export const TESTUMGEBUNG_URL: string | null = UMGEBUNG.testumgebungUrl
+
+/**
+ * Stichtag der Live-Schaltung (Register Z4, Nr. 55) — die EINE Stelle, an der
+ * STRIPE_LIVE_AB gelesen wird. Null ohne gültige Variable: Dann zählen
+ * Testzahlungen mit wie vor Nr. 55. Die Abfragen in src/server/queries geben
+ * ihn als Parameter an die reinen Regeln (src/lib/testzahlung.ts); an den
+ * Browser geht er nie, nur der fertige Hinweis-Satz.
+ */
+export const STRIPE_LIVE_AB: Date | null = UMGEBUNG.stripeLiveAb
 
 // Einmal je Kaltstart — mehr wäre bei jedem Seitenaufruf dieselbe Meldung.
 // Serverlos heißt: je Instanz einmal; das ist gewollt, nicht zu viel.

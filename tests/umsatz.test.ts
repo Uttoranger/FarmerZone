@@ -19,6 +19,7 @@ import {
   einsichtSatz,
   summeCent,
   topProdukte,
+  umsatzBestellungWhere,
   umsatzfenster,
   umsatzVerkaufWhere,
   vergleichssatz,
@@ -149,6 +150,28 @@ describe('Zählregel an den Grenzen', () => {
     const bedingung = umsatzVerkaufWhere('hof', fenster).saleDate as { gte: Date; lt: Date }
     expect(iso(bedingung.gte)).toBe('2026-08-31T22:00:00.000Z')
     expect(iso(bedingung.lt)).toBe('2026-09-30T22:00:00.000Z')
+  })
+})
+
+describe('umsatzBestellungWhere — Testzahlungen (Register Z4, Nr. 55)', () => {
+  const fenster = umsatzfenster('monat', new Date('2026-11-15T08:00:00Z')).aktuell
+  const STICHTAG = new Date('2026-11-02T21:00:00+01:00')
+
+  it('ohne Stichtag ist die Bedingung Zeichen für Zeichen die von heute', () => {
+    expect(umsatzBestellungWhere('hof', fenster, null)).toStrictEqual({
+      farmId: 'hof',
+      status: 'PICKED_UP',
+      pickedUpAt: { gte: fenster.von, lte: fenster.bis },
+    })
+  })
+
+  it('mit Stichtag fehlen nur die Online-Bestellungen von davor — bar zählt immer', () => {
+    expect(umsatzBestellungWhere('hof', fenster, STICHTAG)).toStrictEqual({
+      farmId: 'hof',
+      status: 'PICKED_UP',
+      pickedUpAt: { gte: fenster.von, lte: fenster.bis },
+      NOT: { paymentMethod: 'ONLINE', createdAt: { lt: STICHTAG } },
+    })
   })
 })
 

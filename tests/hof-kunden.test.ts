@@ -95,6 +95,7 @@ function bestellung(teil: Partial<KundenBestellung> = {}): KundenBestellung {
     customerName: 'Erika Mustermann',
     customerPhone: '+43 660 0000000',
     status: 'PICKED_UP',
+    paymentMethod: 'ONSITE_CASH',
     betragCents: 1000,
     createdAt: vor(5),
     items: [],
@@ -134,7 +135,8 @@ describe('fasseKundinZusammen', () => {
         bestellung({ betragCents: 700, status: 'NOT_PICKED_UP', createdAt: vor(9) }),
       ],
       null,
-      JETZT
+      JETZT,
+      null
     )
     expect(k.umsatzCents).toBe(5997)
     expect(Number.isInteger(k.umsatzCents)).toBe(true)
@@ -148,7 +150,8 @@ describe('fasseKundinZusammen', () => {
         bestellung({ customerName: 'Alter Name', createdAt: vor(50) }),
       ],
       null,
-      JETZT
+      JETZT,
+      null
     )
     expect(k.customerName).toBe('Neuer Name')
     expect(k.customerPhone).toBe('+43 660 1111111')
@@ -165,7 +168,8 @@ describe('fasseKundinZusammen', () => {
         bestellung({ status: 'CANCELLED', items: [{ productName: 'Speck', quantity: 9 }] }),
       ],
       null,
-      JETZT
+      JETZT,
+      null
     )
     expect(k.topProducts).toEqual([
       { name: 'Eier', count: 5 },
@@ -174,10 +178,24 @@ describe('fasseKundinZusammen', () => {
     ])
   })
 
+  it('Testzahlungen (online vor dem Stichtag, Register Z4) zählen nicht zum Umsatz — bar davor schon, die Bestellzahl bleibt', () => {
+    const stichtag = vor(10)
+    const bestellungen = [
+      bestellung({ paymentMethod: 'ONLINE', betragCents: 2500, createdAt: vor(20) }), // Testzahlung
+      bestellung({ paymentMethod: 'ONSITE_CASH', betragCents: 1200, createdAt: vor(15) }), // bar, echt
+      bestellung({ paymentMethod: 'ONLINE', betragCents: 800, createdAt: vor(5) }), // nach dem Stichtag
+    ]
+    const k = fasseKundinZusammen(bestellungen, null, JETZT, stichtag)
+    expect(k.umsatzCents).toBe(2000)
+    expect(k.orderCount).toBe(3)
+    // Ohne Stichtag wie bisher: alles zählt.
+    expect(fasseKundinZusammen(bestellungen, null, JETZT, null).umsatzCents).toBe(4500)
+  })
+
   it('Neuigkeiten: an, sobald E-Mail oder WhatsApp eingewilligt ist', () => {
-    expect(fasseKundinZusammen([bestellung()], null, JETZT).isSubscribed).toBe(false)
-    expect(fasseKundinZusammen([bestellung()], { optInEmail: false, optInWhatsApp: false }, JETZT).isSubscribed).toBe(false)
-    expect(fasseKundinZusammen([bestellung()], { optInEmail: false, optInWhatsApp: true }, JETZT).isSubscribed).toBe(true)
+    expect(fasseKundinZusammen([bestellung()], null, JETZT, null).isSubscribed).toBe(false)
+    expect(fasseKundinZusammen([bestellung()], { optInEmail: false, optInWhatsApp: false }, JETZT, null).isSubscribed).toBe(false)
+    expect(fasseKundinZusammen([bestellung()], { optInEmail: false, optInWhatsApp: true }, JETZT, null).isSubscribed).toBe(true)
   })
 })
 
@@ -354,6 +372,7 @@ describe('Abfragen nur für den eigenen Hof', () => {
     customerName: 'Erika Mustermann',
     customerPhone: '',
     status: 'PICKED_UP',
+    paymentMethod: 'ONSITE_CASH',
     totalAmount: new Prisma.Decimal('19.99'),
     createdAt: vor(5),
     pickupDate: vor(4),
@@ -377,6 +396,27 @@ describe('Abfragen nur für den eigenen Hof', () => {
     expect(liste).toHaveLength(1)
     expect(liste[0].umsatzCents).toBe(2029)
     expect(liste[0].kundeId).toBe(kundeIdFuer('hof-a', 'erika@example.com'))
+  })
+
+  it('Liste und Detail laden die Zahlart mit und lassen Testzahlungen aus dem Umsatz (Register Z4)', async () => {
+    const stichtag = vor(6)
+    db.order.findMany.mockResolvedValue([
+      zeile({ paymentMethod: 'ONLINE', totalAmount: new Prisma.Decimal('30.00'), createdAt: vor(9) }), // Testzahlung
+      zeile({ paymentMethod: 'ONSITE_CASH', totalAmount: new Prisma.Decimal('12.50'), createdAt: vor(8) }),
+      zeile({ paymentMethod: 'ONLINE', totalAmount: new Prisma.Decimal('7.00'), createdAt: vor(2) }),
+    ])
+    db.customerFarmSubscription.findMany.mockResolvedValue([])
+
+    const liste = await getCustomersForFarm('hof-a', JETZT, stichtag)
+    expect(db.order.findMany.mock.calls[0][0].select.paymentMethod).toBe(true)
+    expect(liste[0].umsatzCents).toBe(1950)
+    expect(liste[0].orderCount).toBe(3)
+
+    const detail = await getCustomerDetail('hof-a', ['erika@example.com'], JETZT, stichtag)
+    expect(db.order.findMany.mock.calls[1][0].select.paymentMethod).toBe(true)
+    expect(detail?.umsatzCents).toBe(1950)
+    // Die Liste der letzten Bestellungen bleibt vollständig — nur der Umsatz zählt anders.
+    expect(detail?.recentOrders).toHaveLength(3)
   })
 
   it('Kennung: sucht nur unter den Bestellungen des eigenen Hofs, eine Kennung eines fremden Hofs findet nichts', async () => {

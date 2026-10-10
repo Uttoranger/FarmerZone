@@ -33,6 +33,7 @@ import {
   type Monatsschluessel,
   type Zahlungsart,
 } from '@/lib/servicegebuehr'
+import { istTestzahlung } from '@/lib/testzahlung'
 
 // ─── Kosten ──────────────────────────────────────────────────────────────────
 
@@ -187,6 +188,9 @@ export type EinnahmenTopf = 'eingezogen' | 'geschuldet' | 'erwartet' | 'keiner'
  *    Neue Barbestellungen tragen dort keine Gebühr, und die Gebühr älterer
  *    Barbestellungen wird nicht eingezogen — die Plattform erwartet aus
  *    ihnen nichts, sie zählen auch nicht als „Bestellung mit Einnahme".
+ *    Ebenso eine Testzahlung (`istTestzahlung`, Register Z4): online vor dem
+ *    Stichtag der Live-Schaltung — dort floss kein echtes Geld. Ohne
+ *    Stichtag (`stripeLiveAb` null) gibt es keine, alles wie vor Nr. 55.
  * 2. Online UND bezahlt → eingezogen. Nicht `status = 'PAID'`: Der
  *    Bestellstatus wandert weiter (CONFIRMED → READY → PICKED_UP), der
  *    Zahlungsstatus bleibt PAID.
@@ -206,11 +210,14 @@ export type EinnahmenTopf = 'eingezogen' | 'geschuldet' | 'erwartet' | 'keiner'
  * (src/server/queries/admin.ts, monatsSpaltenJeHof) — rohes SQL kann keine
  * TypeScript-Funktion rufen. Wer hier etwas ändert, ändert es dort mit, sonst
  * zeigen /admin und /admin/finanzen für denselben Monat verschiedene Zahlen.
+ * Die Testzahlungen nimmt dort derselbe Baustein heraus
+ * (`ohneTestzahlungenSql`, src/lib/testzahlung.ts).
  */
-export function topfVonBestellung(bestellung: BestellungFuerFinanzen): EinnahmenTopf {
+export function topfVonBestellung(bestellung: BestellungFuerFinanzen, stripeLiveAb: Date | null): EinnahmenTopf {
   if (bestellung.status === 'CANCELLED') return 'keiner'
   if (gebuehrEntfallen(bestellung)) return 'keiner'
   if (barOhneServicegebuehr(bestellung.paymentMethod, bestellung.createdAt)) return 'keiner'
+  if (istTestzahlung(bestellung, stripeLiveAb)) return 'keiner'
   if (bestellung.paymentMethod === 'ONLINE' && bestellung.paymentStatus === 'PAID') {
     return 'eingezogen'
   }
@@ -219,6 +226,16 @@ export function topfVonBestellung(bestellung: BestellungFuerFinanzen): Einnahmen
   }
   if (bestellung.status === 'NOT_PICKED_UP') return 'keiner'
   return 'erwartet'
+}
+
+/**
+ * Betrifft der Stichtag (Register Z4) diese Bestellungen — gibt es darunter
+ * eine Testzahlung, die ohne die Regel in einem Topf läge? Dann sagt die
+ * Finanzseite leise, dass Testzahlungen nicht mitgezählt sind. Ohne Stichtag
+ * nie; eine stornierte Testzahlung allein zählt nicht, die zählte ohnehin nicht.
+ */
+export function testzahlungenBetroffen(bestellungen: readonly BestellungFuerFinanzen[], stripeLiveAb: Date | null): boolean {
+  return bestellungen.some((b) => istTestzahlung(b, stripeLiveAb) && topfVonBestellung(b, null) !== 'keiner')
 }
 
 export type EinnahmenMonat = {
@@ -252,11 +269,13 @@ const EINNAHMEN_LEER: EinnahmenMonat = {
  *
  * Gezählt wird ausschließlich die Servicegebühr aus dem Snapshot; die
  * Provision läuft daneben mit, weil sie im Pilot 0 ist und die Seite sie nur
- * zeigt, wenn etwas drinsteht.
+ * zeigt, wenn etwas drinsteht. Testzahlungen (online vor `stripeLiveAb`,
+ * Register Z4) zählen nirgends.
  */
 export function einnahmenImMonat(
   bestellungen: readonly BestellungFuerFinanzen[],
-  monat: Monatsschluessel
+  monat: Monatsschluessel,
+  stripeLiveAb: Date | null
 ): EinnahmenMonat {
   const ergebnis: EinnahmenMonat = { ...EINNAHMEN_LEER }
 
@@ -264,7 +283,7 @@ export function einnahmenImMonat(
     if (monatsschluesselInWien(b.createdAt) !== monat) continue
     const gebuehr = Math.max(0, Math.round(b.serviceFeeCents))
 
-    switch (topfVonBestellung(b)) {
+    switch (topfVonBestellung(b, stripeLiveAb)) {
       case 'eingezogen':
         ergebnis.eingezogenCents += gebuehr
         ergebnis.bestellungen++

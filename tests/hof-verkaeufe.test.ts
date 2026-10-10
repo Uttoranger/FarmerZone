@@ -48,7 +48,7 @@ vi.mock('@/server/queries/dashboard', () => ({ getFarmForUser: vi.fn(async () =>
 
 const db = vi.hoisted(() => {
   const d = {
-    order: { findMany: vi.fn() },
+    order: { findMany: vi.fn(), findFirst: vi.fn() },
     orderItem: { findMany: vi.fn() },
     manualSale: { findMany: vi.fn(), create: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn(), delete: vi.fn(), findFirst: vi.fn() },
     product: { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
@@ -60,7 +60,15 @@ const db = vi.hoisted(() => {
 vi.mock('@/lib/prisma', () => ({ prisma: db }))
 
 import { HOF_NEU } from '@/lib/bauern-navigation'
-import { JAHRESSUMME_TEXT, UMSATZGRENZE_ERKLAERUNG, verkaufsZeilen, wiederholVorlagen, type FeedVerkauf, type VerkaufDaten } from '@/lib/hof-verkaeufe'
+import {
+  JAHRESSUMME_TEXT,
+  UMSATZGRENZE_ERKLAERUNG,
+  verkaeufeZeigenAb,
+  verkaufsZeilen,
+  wiederholVorlagen,
+  type FeedVerkauf,
+  type VerkaufDaten,
+} from '@/lib/hof-verkaeufe'
 import { mergeSalesFeed, type SalesFeedOrder } from '@/lib/sales-summary'
 import { manualSaleFormSchema } from '@/schemas/manual-sale'
 import { NOTIZ_MAX, PRODUKTNAME_MAX, VERKAUF_BETRAG_MAX, VERKAUF_MENGE_MAX, ZU_LANG } from '@/lib/eingabegrenzen'
@@ -225,9 +233,38 @@ describe('getSalesOverview — eigener Hof, Geld in Cent', () => {
     expect(uebersicht.zeilen.find((z) => z.art === 'bestellung')?.betragCent).toBe(1999)
   })
 
+  it('ohne Stichtag kein Hinweis und keine zusätzliche Abfrage — wie vor Nr. 55', async () => {
+    const uebersicht = await getSalesOverview('hof-1', JETZT, null)
+    expect(uebersicht.testzahlungenHinweis).toBeNull()
+    for (const [args] of db.order.findMany.mock.calls) expect(args.where).not.toHaveProperty('NOT')
+  })
+
+  it('mit Stichtag fehlen Testzahlungen in Woche und Jahr; der Hinweis fragt nur den eigenen Hof', async () => {
+    const stichtag = new Date('2026-10-05T21:00:00+02:00')
+    db.order.findFirst.mockResolvedValue({ id: 'o-test' })
+    const uebersicht = await getSalesOverview('hof-1', JETZT, stichtag)
+
+    const [woche, , jahr] = db.order.findMany.mock.calls.map(([args]) => args.where)
+    expect(woche.NOT).toEqual({ paymentMethod: 'ONLINE', createdAt: { lt: stichtag } })
+    expect(jahr.NOT).toEqual({ paymentMethod: 'ONLINE', createdAt: { lt: stichtag } })
+    const hinweis = db.order.findFirst.mock.calls[0][0].where
+    expect(hinweis).toMatchObject({ farmId: 'hof-1', paymentMethod: 'ONLINE', createdAt: { lt: stichtag }, status: { not: 'CANCELLED' } })
+    expect(uebersicht.testzahlungenHinweis).toBe('Testzahlungen vor dem 5.\u00a0Oktober 2026, 21:00 Uhr sind nicht mitgezählt.')
+  })
+
   it('kein Number(…) auf Geld in der Abfrage', () => {
     const q = quelle('src/server/queries/manual-sales.ts')
     expect(q).not.toMatch(/Number\([a-z]+\.totalAmount\)/)
+  })
+})
+
+describe('verkaeufeZeigenAb — ab hier betrifft eine Testzahlung die Seite (Register Z4)', () => {
+  it('sonst der Beginn des Wiener Jahres (Jahressumme für die Umsatzgrenze)', () => {
+    expect(verkaeufeZeigenAb(new Date('2026-10-10T09:00:00Z')).toISOString()).toBe('2025-12-31T23:00:00.000Z')
+  })
+
+  it('in der ersten Jännerwoche der Montag im Dezember, an dem die Woche beginnt', () => {
+    expect(verkaeufeZeigenAb(new Date('2027-01-02T09:00:00Z')).toISOString()).toBe('2026-12-27T23:00:00.000Z')
   })
 })
 
@@ -355,6 +392,7 @@ function uebersicht(teil: Partial<SalesOverview> = {}): SalesOverview {
       mergeSalesFeed([feedBestellung({ pickedUpAt: new Date('2026-10-06T09:00:00Z') })], [feedVerkauf({ productName: LANG }), feedVerkauf({ id: 'v2', productName: 'Honig', channel: 'WHATSAPP' }, new Date('2026-10-04T12:00:00Z'))], 10),
       JETZT
     ),
+    testzahlungenHinweis: null,
     ...teil,
   }
 }
@@ -412,6 +450,15 @@ describe('Ansicht /sales — vier Zustände, lange Namen, Tokens', () => {
     expect(knopf![0]).toContain('bg-primary')
     // Gegenprobe: Die Suche fände ein verstecktes Element.
     expect('<button class="hidden md:inline-flex">').toMatch(/(?:^|[\s"])(?:hidden|sr-only|max-md:hidden|max-sm:hidden)(?=[\s"])/)
+  })
+
+  it('Testzahlungen (Register Z4): die leise Zeile steht im Kopf, nur wenn der Server sie schickt', () => {
+    const satz = 'Testzahlungen vor dem 2.\u00a0November 2026, 21:00 Uhr sind nicht mitgezählt.'
+    const mit = renderToStaticMarkup(createElement(VerkaeufeAnsicht, props({ testzahlungenHinweis: satz })))
+    const kopf = mit.slice(mit.indexOf('<header'), mit.indexOf('</header>'))
+    expect(kopf).toContain(satz)
+    expect(kopf).toMatch(/<p class="[^"]*text-muted-foreground[^"]*">Testzahlungen vor dem/)
+    expect(renderToStaticMarkup(createElement(VerkaeufeAnsicht, props()))).not.toContain('Testzahlungen')
   })
 
   it('ohne Stripe kein Auszahlungs-Link', () => {

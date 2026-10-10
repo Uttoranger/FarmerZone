@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { STRIPE_LIVE_AB } from '@/lib/umgebung-server'
 import {
   abholtageDesFensters,
   kennzahlen,
@@ -17,12 +18,20 @@ import { centAusDecimal } from './umsatz'
  * Umsatz, Balken, Kanäle und Top-Produkte bleiben in ./analytics.ts.
  */
 
-/** Kennzahlen des gewählten Zeitraums: abgeholte Bestellungen (Umsatzregel) und nicht abgeholte (Abholtag). */
-export async function getKennzahlen(farmId: string, pf: Pick<Periodenfenster, 'aktuell'>): Promise<Kennzahlen> {
+/**
+ * Kennzahlen des gewählten Zeitraums: abgeholte Bestellungen (Umsatzregel,
+ * ohne Testzahlungen vor `stripeLiveAb`, Register Z4) und nicht abgeholte
+ * (Abholtag).
+ */
+export async function getKennzahlen(
+  farmId: string,
+  pf: Pick<Periodenfenster, 'aktuell'>,
+  stripeLiveAb: Date | null = STRIPE_LIVE_AB
+): Promise<Kennzahlen> {
   const tage = abholtageDesFensters(pf)
   const [abgeholt, nichtAbgeholt] = await Promise.all([
     prisma.order.findMany({
-      where: umsatzBestellungWhere(farmId, pf.aktuell),
+      where: umsatzBestellungWhere(farmId, pf.aktuell, stripeLiveAb),
       select: { paymentMethod: true, totalAmount: true },
     }),
     prisma.order.count({
@@ -44,9 +53,14 @@ export type ServicegebuehrenDiesesMonats = ServicegebuehrenMonat & {
  * Die Servicegebühren des laufenden Wiener Monats — nur gelesen, aus den an
  * den Bestellungen gespeicherten Beträgen. Monat = Bestelleingang, wie die
  * Betreiber-Finanzen (`einnahmenImMonat`); welche Bestellung zählt, sagt
- * `servicegebuehrenImMonat`. Keine Neuberechnung, kein Stripe-Aufruf.
+ * `servicegebuehrenImMonat` (Testzahlungen vor `stripeLiveAb` nie,
+ * Register Z4). Keine Neuberechnung, kein Stripe-Aufruf.
  */
-export async function getServicegebuehrenMonat(farmId: string, jetzt: Date): Promise<ServicegebuehrenDiesesMonats> {
+export async function getServicegebuehrenMonat(
+  farmId: string,
+  jetzt: Date,
+  stripeLiveAb: Date | null = STRIPE_LIVE_AB
+): Promise<ServicegebuehrenDiesesMonats> {
   const { von, bis, bezeichnung } = monatsgrenzenWien(jetzt)
   const bestellungen = await prisma.order.findMany({
     where: { farmId, createdAt: { gte: von, lt: bis } },
@@ -70,7 +84,8 @@ export async function getServicegebuehrenMonat(farmId: string, jetzt: Date): Pro
       serviceFeeRefundedAt: b.serviceFeeRefundedAt,
       provisionCents: centAusDecimal(b.platformFeeAmount),
     })),
-    monatsschluesselInWien(jetzt)
+    monatsschluesselInWien(jetzt),
+    stripeLiveAb
   )
   return { ...summe, bezeichnung }
 }

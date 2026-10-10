@@ -404,20 +404,20 @@ describe('Admin-Finanzen: Barbestellungen vor dem Stichtag tragen nichts bei', (
   }
 
   it('bar vor dem Stichtag: kein Topf — auch eine ältere Bestellung mit Gebühr wird nicht eingezogen', () => {
-    expect(topfVonBestellung(bestellung())).toBe('keiner')
-    expect(topfVonBestellung(bestellung({ serviceFeeCents: 100 }))).toBe('keiner')
-    expect(topfVonBestellung(bestellung({ status: 'READY', serviceFeeCents: 100 }))).toBe('keiner')
-    expect(topfVonBestellung(bestellung({ createdAt: KURZ_VORHER, serviceFeeCents: 100 }))).toBe('keiner')
+    expect(topfVonBestellung(bestellung(), null)).toBe('keiner')
+    expect(topfVonBestellung(bestellung({ serviceFeeCents: 100 }), null)).toBe('keiner')
+    expect(topfVonBestellung(bestellung({ status: 'READY', serviceFeeCents: 100 }), null)).toBe('keiner')
+    expect(topfVonBestellung(bestellung({ createdAt: KURZ_VORHER, serviceFeeCents: 100 }), null)).toBe('keiner')
   })
 
   it('bar ab dem Stichtag: geschuldet bzw. erwartet wie bisher', () => {
-    expect(topfVonBestellung(bestellung({ createdAt: GENAU, serviceFeeCents: 100 }))).toBe('geschuldet')
-    expect(topfVonBestellung(bestellung({ createdAt: DANACH, status: 'READY', serviceFeeCents: 100 }))).toBe('erwartet')
+    expect(topfVonBestellung(bestellung({ createdAt: GENAU, serviceFeeCents: 100 }), null)).toBe('geschuldet')
+    expect(topfVonBestellung(bestellung({ createdAt: DANACH, status: 'READY', serviceFeeCents: 100 }), null)).toBe('erwartet')
   })
 
   it('online vor dem Stichtag bleibt eingezogen', () => {
     expect(
-      topfVonBestellung(bestellung({ paymentMethod: 'ONLINE', paymentStatus: 'PAID', serviceFeeCents: 52 }))
+      topfVonBestellung(bestellung({ paymentMethod: 'ONLINE', paymentStatus: 'PAID', serviceFeeCents: 52 }), null)
     ).toBe('eingezogen')
   })
 
@@ -429,7 +429,8 @@ describe('Admin-Finanzen: Barbestellungen vor dem Stichtag tragen nichts bei', (
         bestellung({ serviceFeeCents: 100 }), // ältere Barbestellung mit Gebühr — nicht eingezogen
         bestellung({ status: 'CONFIRMED' }), // bar offen — nichts erwartet
       ],
-      '2027-01'
+      '2027-01',
+      null
     )
     expect(e).toEqual(
       expect.objectContaining({
@@ -449,7 +450,8 @@ describe('Admin-Finanzen: Barbestellungen vor dem Stichtag tragen nichts bei', (
         bestellung({ createdAt: DANACH, serviceFeeCents: 100 }),
         bestellung({ createdAt: DANACH, paymentMethod: 'ONLINE', paymentStatus: 'PAID', serviceFeeCents: 52 }),
       ],
-      '2027-02'
+      '2027-02',
+      null
     )
     expect(e).toEqual(expect.objectContaining({ eingezogenCents: 52, geschuldetCents: 100, bestellungen: 2 }))
   })

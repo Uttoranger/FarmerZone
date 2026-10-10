@@ -12,6 +12,7 @@ import { wienKalendertag } from '@/lib/kalender'
 import { datumKurz } from '@/lib/verkauf-eintragen'
 import { formatEuro } from '@/lib/format'
 import { PROCESSING_REVENUE_LIMIT } from '@/lib/revenue-limit'
+import { umsatzfenster } from '@/lib/umsatz'
 
 /**
  * Die Zeile unter der Wochenzahl (Register F6, 22b). Die Summe ist nicht der
@@ -31,6 +32,18 @@ export const JAHRESSUMME_TEXT = 'Dieses Jahr (für die Umsatzgrenze)'
  * der Auswertung, mit derselben Grenze (`PROCESSING_REVENUE_LIMIT`).
  */
 export const UMSATZGRENZE_ERKLAERUNG = `Umsatzgrenze heißt: die Grenze von ${formatEuro(PROCESSING_REVENUE_LIMIT, 0)} im Jahr für Be- und Verarbeitung – hier zählt jeder Verkauf mit, außer Produkten, die du im Produkt nicht mitzählen lässt (vereinfacht, keine Steuerberatung).`
+
+/**
+ * Ab wann die Seite Bestellungen zählt: Beginn der laufenden Woche oder des
+ * Wiener Jahres (Jahressumme für die Umsatzgrenze), was früher liegt — in der
+ * ersten Jännerwoche beginnt die Woche noch im Dezember. Ab hier betrifft eine
+ * Testzahlung die Seite, dann steht die Hinweiszeile da (Register Z4).
+ */
+export function verkaeufeZeigenAb(jetzt: Date): Date {
+  const woche = umsatzfenster('woche', jetzt).aktuell.von
+  const jahr = umsatzfenster('jahr', jetzt).aktuell.von
+  return new Date(Math.min(woche.getTime(), jahr.getTime()))
+}
 
 /** Ein Direktverkauf, wie das Formular ihn zum Bearbeiten und Wiederholen braucht. */
 export type VerkaufDaten = {

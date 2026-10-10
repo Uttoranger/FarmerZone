@@ -10,6 +10,7 @@ import {
   httpsHerkunft,
   istDevDatenbank,
   istTestDatenbank,
+  leseStripeLiveAb,
   zeigtAufGehostetesProjekt,
   type UmgebungsWerte,
 } from '@/lib/umgebung'
@@ -600,5 +601,97 @@ describe('bestimmeUmgebung — Link zur Testumgebung (Register Z3)', () => {
     const u = bestimmeUmgebung({ ...STAGING, NEXT_PUBLIC_TESTUMGEBUNG_URL: TESTUMGEBUNG })
     expect(u.testumgebungUrl).toBeNull()
     expect(u.warnungen).toEqual([])
+  })
+})
+
+// ─── Stichtag der Live-Schaltung STRIPE_LIVE_AB (Register Z4, Nr. 55) ────────
+// Nur ein ISO-Zeitpunkt MIT Zeitzone gilt. Alles andere wird ignoriert —
+// Testzahlungen zählen dann weiter mit wie vor Nr. 55 — und meldet sich wie
+// NEXT_PUBLIC_TESTUMGEBUNG_URL: Produktion an Sentry, Vorschau und lokal im Banner.
+const OHNE_ZEITZONE = 'STRIPE_LIVE_AB hat keine Zeitzone (etwa +01:00 am Ende) — die Variable gilt nicht, Testzahlungen zählen mit.'
+const UNGUELTIG = 'STRIPE_LIVE_AB ist kein gültiger Zeitpunkt (Form 2026-11-02T21:00:00+01:00) — die Variable gilt nicht, Testzahlungen zählen mit.'
+
+describe('leseStripeLiveAb — nur ein Zeitpunkt mit Zeitzone', () => {
+  it('liest Z und Versatz als denselben Zeitpunkt, mit und ohne Sekunden und Millisekunden', () => {
+    const erwartet = Date.UTC(2026, 10, 2, 20, 0, 0)
+    for (const wert of [
+      '2026-11-02T21:00:00+01:00',
+      '2026-11-02T20:00:00Z',
+      '2026-11-02T21:00+01:00',
+      '2026-11-02T15:00:00.000-05:00',
+      '  2026-11-02T21:00:00+01:00  ',
+    ]) {
+      expect(leseStripeLiveAb(wert), wert).toEqual({ ab: new Date(erwartet) })
+    }
+    expect(leseStripeLiveAb('2026-11-02T21:00:00.5+01:00')).toEqual({ ab: new Date(erwartet + 500) })
+  })
+
+  it('fehlt die Variable oder ist sie leer, gibt es keinen Stichtag und kein Problem', () => {
+    expect(leseStripeLiveAb(undefined)).toBeNull()
+    expect(leseStripeLiveAb('')).toBeNull()
+    expect(leseStripeLiveAb('   ')).toBeNull()
+  })
+
+  it('erkennt einen Zeitpunkt ohne Zeitzone — Vercel rechnet in UTC, Wien wäre ein bis zwei Stunden daneben', () => {
+    for (const wert of ['2026-11-02T21:00:00', '2026-11-02T21:00', '2026-11-02', '2026-11-02 21:00:00']) {
+      expect(leseStripeLiveAb(wert), wert).toEqual({ problem: 'ohne-zeitzone' })
+    }
+  })
+
+  it('lehnt Unlesbares und unmögliche Kalenderwerte ab, statt sie umzurechnen', () => {
+    for (const wert of [
+      'morgen',
+      '1730577600',
+      '02.11.2026 21:00',
+      '2026-13-01T00:00:00Z',
+      '2026-02-30T12:00:00+01:00',
+      '2026-11-31T12:00:00+01:00',
+      '2026-11-02T24:00:00+01:00',
+      '2026-11-02T21:60:00+01:00',
+      '2026-11-02T21:00:60+01:00',
+      '2026-11-02T21:00:00+15:00',
+      '2026-11-02T21:00:00+01:60',
+      '2026-11-02T21:00:00+0100',
+      '2026-11-02t21:00:00z',
+      '2026-11-02T21:00:00+01:00 Wien',
+    ]) {
+      expect(leseStripeLiveAb(wert), wert).toEqual({ problem: 'ungueltig' })
+    }
+  })
+
+  it('kennt den Schalttag', () => {
+    expect(leseStripeLiveAb('2028-02-29T12:00:00+01:00')).toEqual({ ab: new Date(Date.UTC(2028, 1, 29, 11)) })
+    expect(leseStripeLiveAb('2027-02-29T12:00:00+01:00')).toEqual({ problem: 'ungueltig' })
+  })
+})
+
+describe('bestimmeUmgebung — Stichtag STRIPE_LIVE_AB (Register Z4)', () => {
+  it('ohne Variable kein Stichtag und keine Warnung — alles wie vor Nr. 55', () => {
+    for (const werte of [PRODUKTION, PREVIEW, LOKAL]) {
+      const u = bestimmeUmgebung(werte)
+      expect(u.stripeLiveAb).toBeNull()
+      expect(u.warnungen).toEqual([])
+    }
+  })
+
+  it('reicht einen gültigen Zeitpunkt als Date durch, ohne Warnung', () => {
+    const u = bestimmeUmgebung({ ...PRODUKTION, STRIPE_LIVE_AB: '2026-11-02T21:00:00+01:00' })
+    expect(u.stripeLiveAb).toEqual(new Date('2026-11-02T20:00:00Z'))
+    expect(u.warnungen).toEqual([])
+  })
+
+  it('ignoriert einen Wert ohne Zeitzone und warnt — in Produktion wie in Vorschau und lokal', () => {
+    for (const werte of [PRODUKTION, PREVIEW, LOKAL]) {
+      const u = bestimmeUmgebung({ ...werte, STRIPE_LIVE_AB: '2026-11-02T21:00:00' })
+      expect(u.stripeLiveAb).toBeNull()
+      expect(u.warnungen).toEqual([OHNE_ZEITZONE])
+    }
+  })
+
+  it('ignoriert einen ungültigen Wert und warnt, ohne den Wert zu nennen', () => {
+    const u = bestimmeUmgebung({ ...PRODUKTION, STRIPE_LIVE_AB: '2026-02-30T12:00:00+01:00' })
+    expect(u.stripeLiveAb).toBeNull()
+    expect(u.warnungen).toEqual([UNGUELTIG])
+    expect(u.warnungen.join(' ')).not.toContain('2026-02-30')
   })
 })

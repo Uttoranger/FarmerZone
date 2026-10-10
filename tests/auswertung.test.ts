@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest'
 import {
   SERVICEGEBUEHREN_ERKLAERUNG,
   abholtageDesFensters,
+  auswertungZeigtAb,
   grenzeStand,
   kennzahlen,
   servicegebuehrenImMonat,
@@ -43,7 +44,8 @@ describe('Servicegebühren dieses Monats — gespeicherte Beträge, Abrechnungsr
   it('online bezahlt zählt mit dem gespeicherten Betrag, egal welcher Bestellstatus danach', () => {
     const summe = servicegebuehrenImMonat(
       [bestellung({ serviceFeeCents: 53 }), bestellung({ status: 'CONFIRMED', serviceFeeCents: 50 }), bestellung({ status: 'READY', serviceFeeCents: 61 })],
-      OKTOBER
+      OKTOBER,
+      null
     )
     expect(summe).toEqual({ monat: OKTOBER, onlineCents: 164, onlineAnzahl: 3, vorOrtCents: 0, vorOrtAnzahl: 0, summeCents: 164 })
   })
@@ -56,7 +58,8 @@ describe('Servicegebühren dieses Monats — gespeicherte Beträge, Abrechnungsr
         bestellung({ status: 'NOT_PICKED_UP', paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', serviceFeeCents: 90 }),
         bestellung({ status: 'PENDING_CONFIRMATION', paymentStatus: 'PENDING', serviceFeeCents: 99 }),
       ],
-      OKTOBER
+      OKTOBER,
+      null
     )
     expect(summe.summeCents).toBe(0)
     expect(summe.onlineAnzahl + summe.vorOrtAnzahl).toBe(0)
@@ -65,7 +68,8 @@ describe('Servicegebühren dieses Monats — gespeicherte Beträge, Abrechnungsr
   it('B1: bar vor dem Stichtag zählt nie — auch nicht eine ältere Barbestellung, die noch eine Gebühr trägt', () => {
     const summe = servicegebuehrenImMonat(
       [bestellung({ paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', serviceFeeCents: 75 })],
-      OKTOBER
+      OKTOBER,
+      null
     )
     expect(summe.vorOrtCents).toBe(0)
     expect(summe.vorOrtAnzahl).toBe(0)
@@ -78,7 +82,8 @@ describe('Servicegebühren dieses Monats — gespeicherte Beträge, Abrechnungsr
         bestellung({ createdAt: nachStichtag, paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', serviceFeeCents: 55 }),
         bestellung({ createdAt: nachStichtag, status: 'READY', paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', serviceFeeCents: 60 }),
       ],
-      monat
+      monat,
+      null
     )
     expect(summe).toMatchObject({ vorOrtCents: 55, vorOrtAnzahl: 1, onlineCents: 0, summeCents: 55 })
   })
@@ -88,13 +93,14 @@ describe('Servicegebühren dieses Monats — gespeicherte Beträge, Abrechnungsr
     const fruehOktober = new Date('2026-09-30T22:30:00Z') // 00:30 Wien am 1.10.
     const summe = servicegebuehrenImMonat(
       [bestellung({ createdAt: spaetSeptember, serviceFeeCents: 11 }), bestellung({ createdAt: fruehOktober, serviceFeeCents: 22 })],
-      OKTOBER
+      OKTOBER,
+      null
     )
     expect(summe.onlineCents).toBe(22)
   })
 
   it('rechnet ganzzahlig in Cent; negative oder krumme Werte verfälschen die Summe nicht', () => {
-    const summe = servicegebuehrenImMonat([bestellung({ serviceFeeCents: -5 }), bestellung({ serviceFeeCents: 50 })], OKTOBER)
+    const summe = servicegebuehrenImMonat([bestellung({ serviceFeeCents: -5 }), bestellung({ serviceFeeCents: 50 })], OKTOBER, null)
     expect(summe.onlineCents).toBe(50)
     expect(Number.isInteger(summe.summeCents)).toBe(true)
   })
@@ -112,8 +118,8 @@ describe('Servicegebühren — dieselbe Zahl wie /admin/finanzen (Register F6)',
       bestellung({ paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', serviceFeeCents: 75 }),
       bestellung({ createdAt: new Date('2026-09-30T21:30:00Z'), serviceFeeCents: 11 }),
     ]
-    const hof = servicegebuehrenImMonat(gemischt, OKTOBER)
-    const admin = einnahmenImMonat(gemischt, OKTOBER)
+    const hof = servicegebuehrenImMonat(gemischt, OKTOBER, null)
+    const admin = einnahmenImMonat(gemischt, OKTOBER, null)
     expect(hof.onlineCents).toBe(admin.eingezogenCents)
     expect(hof.vorOrtCents).toBe(admin.geschuldetCents)
     expect(hof.summeCents).toBe(admin.gezaehltCents)
@@ -125,13 +131,70 @@ describe('Servicegebühren — dieselbe Zahl wie /admin/finanzen (Register F6)',
       bestellung({ createdAt: nachStichtag, status: 'READY', paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', serviceFeeCents: 60 }),
       bestellung({ createdAt: nachStichtag, serviceFeeCents: 40 }),
     ]
-    const hofMaerz = servicegebuehrenImMonat(spaeter, '2027-03')
-    const adminMaerz = einnahmenImMonat(spaeter, '2027-03')
+    const hofMaerz = servicegebuehrenImMonat(spaeter, '2027-03', null)
+    const adminMaerz = einnahmenImMonat(spaeter, '2027-03', null)
     expect([hofMaerz.onlineCents, hofMaerz.vorOrtCents, hofMaerz.summeCents]).toEqual([
       adminMaerz.eingezogenCents,
       adminMaerz.geschuldetCents,
       adminMaerz.gezaehltCents,
     ])
+  })
+})
+
+describe('Servicegebühren — Testzahlungen zählen nicht (Register Z4, Nr. 55)', () => {
+  // Erfundener Stichtag mitten im Oktober: online davor ist eine Testzahlung.
+  const STICHTAG = new Date('2026-10-12T21:00:00+02:00')
+  const davor = new Date(STICHTAG.getTime() - 1)
+  const danach = new Date(STICHTAG.getTime() + 1)
+  const oktober = [
+    bestellung({ createdAt: davor, serviceFeeCents: 53 }), // Testzahlung
+    bestellung({ createdAt: danach, serviceFeeCents: 61 }), // echt
+    bestellung({ createdAt: davor, paymentMethod: 'ONSITE_CARD', paymentStatus: 'PENDING', serviceFeeCents: 75 }), // vor Ort, echt
+  ]
+
+  it('online vor dem Stichtag fehlt in „Online bezahlt", vor Ort zählt weiter', () => {
+    expect(servicegebuehrenImMonat(oktober, OKTOBER, STICHTAG)).toEqual({
+      monat: OKTOBER,
+      onlineCents: 61,
+      onlineAnzahl: 1,
+      vorOrtCents: 75,
+      vorOrtAnzahl: 1,
+      summeCents: 136,
+    })
+  })
+
+  it('Hof und Betreiber sehen auch mit Stichtag dieselbe Zahl', () => {
+    const hof = servicegebuehrenImMonat(oktober, OKTOBER, STICHTAG)
+    const admin = einnahmenImMonat(oktober, OKTOBER, STICHTAG)
+    expect([hof.onlineCents, hof.vorOrtCents, hof.summeCents, hof.onlineAnzahl + hof.vorOrtAnzahl]).toEqual([
+      admin.eingezogenCents,
+      admin.geschuldetCents,
+      admin.gezaehltCents,
+      admin.bestellungen,
+    ])
+  })
+
+  it('ohne Stichtag zählt die Online-Bestellung wie bisher', () => {
+    expect(servicegebuehrenImMonat(oktober, OKTOBER, null).onlineCents).toBe(114)
+  })
+})
+
+describe('auswertungZeigtAb — ab hier betrifft eine Testzahlung die Seite (Register Z4)', () => {
+  const jetzt = new Date('2026-11-18T09:00:00Z') // Mittwoch
+
+  it('Woche und Monat: der Jahresbeginn in Wien — die Grenzkarte zeigt das ganze Jahr', () => {
+    for (const periode of ['woche', 'monat'] as const) {
+      expect(auswertungZeigtAb(umsatzfenster(periode, jetzt), jetzt).toISOString()).toBe('2025-12-31T23:00:00.000Z')
+    }
+  })
+
+  it('Jahr: die Vorperiode, wenn sie früher beginnt — das Vorjahr der Balken', () => {
+    expect(auswertungZeigtAb(umsatzfenster('jahr', jetzt), jetzt).toISOString()).toBe('2024-12-31T23:00:00.000Z')
+  })
+
+  it('erste Jännerwoche: die Vorwoche liegt im Dezember davor', () => {
+    const jaenner = new Date('2027-01-05T09:00:00Z') // Dienstag
+    expect(auswertungZeigtAb(umsatzfenster('woche', jaenner), jaenner).toISOString()).toBe('2026-12-27T23:00:00.000Z')
   })
 })
 

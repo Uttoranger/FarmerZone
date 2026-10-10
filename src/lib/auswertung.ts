@@ -21,7 +21,7 @@ import { BAR_OHNE_GEBUEHR_SATZ, barGebuehrSepaSatz, vorBarStichtag } from '@/lib
 import { mitAnzahl } from '@/lib/format'
 import { wienKalendertag } from '@/lib/kalender'
 import { wienerTag, type Zeitraum } from '@/lib/heute'
-import type { Periode, Periodenfenster } from '@/lib/umsatz'
+import { umsatzfenster, type Periode, type Periodenfenster } from '@/lib/umsatz'
 import type { TeilenWirkung, TeilenZeitraum } from '@/lib/teilen-wirkung'
 
 // ─── Kennzahlen ─────────────────────────────────────────────────────────────
@@ -82,6 +82,17 @@ export function abholtageDesFensters(pf: Pick<Periodenfenster, 'aktuell'>): Zeit
   }
 }
 
+/**
+ * Ab wann die Auswertung Bestellungen zeigt: die Vorperiode der Balken oder
+ * der Beginn des Wiener Jahres (Grenzkarte), was früher liegt — die
+ * Servicegebühren dieses Monats liegen immer im Jahr. Ab hier betrifft eine
+ * Testzahlung die Seite, dann steht die Hinweiszeile da (Register Z4).
+ */
+export function auswertungZeigtAb(pf: Pick<Periodenfenster, 'vergleichGanz'>, jetzt: Date): Date {
+  const jahresbeginn = umsatzfenster('jahr', jetzt).aktuell.von
+  return new Date(Math.min(pf.vergleichGanz.von.getTime(), jahresbeginn.getTime()))
+}
+
 // ─── Servicegebühren dieses Monats ──────────────────────────────────────────
 
 export type ServicegebuehrenMonat = {
@@ -105,19 +116,21 @@ export type ServicegebuehrenMonat = {
  *   - vor Ort UND abgeholt, Gebühr nicht entfallen, nicht bar vor dem
  *     SEPA-Stichtag → „vor Ort" (geschuldet),
  *   - storniert, Gebühr erstattet/entfallen, nicht abgeholt, bar vor dem
- *     Stichtag und alles noch Offene → zählt nicht.
+ *     Stichtag, Testzahlungen (online vor `stripeLiveAb`, Register Z4) und
+ *     alles noch Offene → zählt nicht.
  * Offenes (bestellt, noch nicht bezahlt bzw. abgeholt) zählt bewusst nicht:
  * Die Zahl soll nur sagen, was tatsächlich angefallen ist.
  */
 export function servicegebuehrenImMonat(
   bestellungen: readonly BestellungFuerFinanzen[],
-  monat: Monatsschluessel
+  monat: Monatsschluessel,
+  stripeLiveAb: Date | null
 ): ServicegebuehrenMonat {
   const ergebnis: ServicegebuehrenMonat = { monat, onlineCents: 0, onlineAnzahl: 0, vorOrtCents: 0, vorOrtAnzahl: 0, summeCents: 0 }
   for (const b of bestellungen) {
     if (monatsschluesselInWien(b.createdAt) !== monat) continue
     const gebuehr = Math.max(0, Math.round(b.serviceFeeCents))
-    const topf = topfVonBestellung(b)
+    const topf = topfVonBestellung(b, stripeLiveAb)
     if (topf === 'eingezogen') {
       ergebnis.onlineCents += gebuehr
       ergebnis.onlineAnzahl++

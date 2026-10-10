@@ -4672,6 +4672,19 @@ Auftrag freigabe.md §12 „48" (Nachholung von Nr. 34). Kein Code, keine Migrat
   - einen Weg durch die Vercel-Anmeldung, sonst bekommt Stripe 401. Den Weg beschreibt `docs/betrieb/testumgebung.md`, Schritt 5 (Nr. 43): „Protection Bypass for Automation" als Parameter an der Endpunkt-Adresse. Dort steht auch, dass dieses Geheimnis alle geschützten Deployments des Projekts öffnet.
 - **Testbetrieb-Hinweise (Nr. 42)** erscheinen nur in der Produktion mit Test-Schlüssel (`istTestbetrieb`), nie in Vorschau oder Testumgebung. Dort sagt es das Banner.
 
+## Testzahlungen aus Auswertungen (Nachtlauf Nr. 55, Oktober 2026)
+
+Auftrag freigabe.md §13 „55", Register Z4. Keine Migration. Bericht 55.
+
+- **Fachregel:** Eine Online-Bestellung (`paymentMethod` ONLINE), die vor dem Stichtag `STRIPE_LIVE_AB` angelegt wurde, ist eine Testzahlung: Bis zur Live-Schaltung läuft Stripe im Testmodus (Z2), es floss kein echtes Geld. Sie zählt nicht als Umsatz und nicht als Servicegebühr. Bar (ONSITE_CASH) und „Karte bei Abholung" (ONSITE_CARD) kassiert der Hof selbst — echtes Geld, zählt immer. Genau am Stichtag zählt die Bestellung schon (`<`, nicht `<=`). Ohne Variable gibt es keine Testzahlung.
+- **Warum eine Variable statt der Konstante aus stripe-live.md §10:** Zur Live-Schaltung soll keine Code-Änderung nötig sein (Z4). Der Mensch setzt den Wert in Schritt 4, nur für Production.
+- **Warum nur mit Zeitzone:** Vercel rechnet in UTC. „2026-11-02T21:00" ohne Zone wäre in Wien 22:00 bzw. 23:00 — Online-Bestellungen dazwischen fielen auf die falsche Seite. Ungültig oder ohne Zone: ignoriert, Warnung wie bei `NEXT_PUBLIC_TESTUMGEBUNG_URL` (über `UMGEBUNG.warnungen`, Produktion einmal je Instanz an Sentry, sonst Banner); `Date.parse` ist dafür zu nachgiebig (30. Februar), `leseStripeLiveAb` rechnet die Teile selbst.
+- **Wo die Regel gilt:** Auswertung (Kennzahlen, Umsatzkarte, Top-Produkte, Jahresgrenze, Servicegebühren dieses Monats), Verkäufe (Woche, Jahressumme für die Umsatzgrenze, Schnellwahl der meistverkauften Produkte), Heute (Woche, „Heute eingenommen", Balken), Kunden (Umsatz), Admin-Finanzen (alle Töpfe), Admin-Hofliste (alle Monatsspalten, auch „Best./Monat" und „entfallen" — wie in den Finanzen, wo eine Testzahlung im Topf „keiner" liegt).
+- **Was bleibt:** Die Liste „Letzte Verkäufe" und die letzten Bestellungen einer Kundin zeigen Testzahlungen weiter — es sind Bestellungen, keine Summen. Bestellzahl, Status und Lieblingsprodukte einer Kundin zählen sie weiter (Z4 nennt nur Umsatz und Gebühr). Bestellungen, Beträge, Checkout, Webhook, Erstattung und Storno sind unberührt.
+- **Hinweiszeile:** Nur, wenn der Stichtag Bestellungen der Seite betrifft — eine nicht stornierte Testzahlung ab dem frühesten Zeitpunkt, den die Seite zeigt (Auswertung: Vorperiode der Balken oder Jahresbeginn; Verkäufe: Wochen- oder Jahresbeginn; Admin-Finanzen: die geladenen Monate, nur wenn die Testzahlung ohne die Regel in einem Topf läge). So verschwindet die Zeile von selbst, sobald die Testzeit aus allen gezeigten Zeiträumen gefallen ist. Mit Uhrzeit, weil der Stichtag ein Zeitpunkt ist.
+- **Bau-Fenster:** Wer zwischen Beginn des Redeploys (= Stichtag) und dem fertigen Deployment online bestellt, zahlt noch im Testmodus, zählt aber mit. Deshalb ruhige Stunde und danach Admin → Finanzen prüfen (stripe-live.md Schritt 0, 4, 8).
+- **`getDashboardStats` entfallen:** seit Heute (Nr. 17) ungenutzt, rechnete noch mit Wochen in Serverzeit (Altlast ARCHITECTURE §6, damit erledigt). Danach importiert `src/` nichts mehr aus `date-fns`; das Paket bleibt in package.json (kein Paket-Eingriff ohne Auftrag). `buildLowStockHint` und `countUniqueCustomers` (`dashboard-hints.ts`) nutzt nur noch ihr Test.
+
 ## Nützliche Befehle
 
 ```bash

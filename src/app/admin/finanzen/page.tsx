@@ -72,7 +72,13 @@ export default async function AdminFinanzenPage({
   return (
     <div className={cn(ADMIN_RAHMEN, 'flex flex-col gap-5')}>
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <h1 className={SEITEN_TITEL}>Finanzen</h1>
+        <div className="min-w-0">
+          <h1 className={SEITEN_TITEL}>Finanzen</h1>
+          {/* Leise, nur wenn der Stichtag Bestellungen der gezeigten Monate betrifft (Register Z4). */}
+          {daten.testzahlungenHinweis && (
+            <p className={cn('mt-1 text-[12.5px] leading-snug', LEISE)}>{daten.testzahlungenHinweis}</p>
+          )}
+        </div>
         {/* Links statt Knöpfe: Der Monat steht in der Adresse, also ist er
             teilbar und der Zurück-Pfeil des Browsers tut das Richtige. */}
         <nav aria-label="Monat wählen" className="flex items-center gap-1.5">
