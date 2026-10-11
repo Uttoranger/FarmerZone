@@ -18,7 +18,7 @@
  * (monatsschluesselInWien) — eine Bestellung am 30. September um 23:30 Uhr
  * Wien ist 21:30 UTC und gehört in den September.
  */
-import { formatEuro } from '@/lib/format'
+import { MONAT_KURZ, formatEuro } from '@/lib/format'
 import {
   barOhneServicegebuehr,
   centsAlsEuro,
@@ -391,12 +391,12 @@ export function monatKurz(monat: Monatsschluessel): string {
  * Säulenpaaren in 390 px passt „Sep. 26" nicht unter eine Säule. Eindeutig
  * bleibt er trotzdem — das Diagramm zeigt höchstens zwölf Monate, jeder Name
  * kommt darin höchstens einmal vor; das Jahr steht im Kopf der Seite.
+ * Fester Wortlaut (MONAT_KURZ aus format.ts) statt Intl „short": Je nach
+ * ICU-Stand stünde dort „Sep" oder „Sep.", „Jul" oder „Juli". Der Schlüssel
+ * ist schon der Kalendermonat — keine Zeitzone im Spiel.
  */
 export function monatOhneJahr(monat: Monatsschluessel): string {
-  return monatsgrenzenWienFuer(monat).von.toLocaleDateString('de-AT', {
-    month: 'short',
-    timeZone: 'Europe/Vienna',
-  })
+  return MONAT_KURZ[Number(monat.slice(5, 7)) - 1] ?? monat
 }
 
 export const EINNAHMEN_ONLINE_LABEL = 'Servicegebühr, online'

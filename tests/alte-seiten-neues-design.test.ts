@@ -294,6 +294,14 @@ describe('monatOhneJahr — die Achse der Finanzen am Handy', () => {
     // Jänner: Die Monatsgrenze liegt in UTC am 31.12. um 23:00 — der Name bleibt „Jän".
     expect(monatOhneJahr(monatsschluessel(2026, 1))).toMatch(/^Jän/)
   })
+
+  it('fester Wortlaut wie im übrigen Code — nicht Intl, dessen Kürzel je nach ICU-Stand schwanken', () => {
+    expect(jahr.map(monatOhneJahr)).toEqual(['Jän', 'Feb', 'März', 'Apr', 'Mai', 'Juni', 'Juli', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'])
+    const quelle = lies('src/lib/finanzen.ts')
+    const rumpf = quelle.slice(quelle.indexOf('export function monatOhneJahr'), quelle.indexOf('export function monatOhneJahr') + 200)
+    expect(rumpf).toContain('MONAT_KURZ[')
+    expect(rumpf).not.toContain('toLocaleDateString')
+  })
 })
 
 describe('bestellTon — die Marke der Bestellseite ist die Marke der Liste', () => {

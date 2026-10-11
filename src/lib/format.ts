@@ -100,7 +100,8 @@ export function formatDatumLang(zeitpunkt: Date): string {
 // Fester Wortlaut statt Intl \u201eshort": Je nach ICU-Stand schreibt Intl \u201eSa" oder
 // \u201eSa." und \u201eOkt" oder \u201eOkt." \u2014 ein Abholtermin soll \u00fcberall gleich aussehen.
 const WOCHENTAG_KURZ = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'] as const
-const MONAT_KURZ = ['J\u00e4n', 'Feb', 'M\u00e4rz', 'Apr', 'Mai', 'Juni', 'Juli', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'] as const
+/** Monatsnamen kurz, österreichisch: auch für die Achse der Finanzen am Handy (monatOhneJahr). */
+export const MONAT_KURZ = ['J\u00e4n', 'Feb', 'M\u00e4rz', 'Apr', 'Mai', 'Juni', 'Juli', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'] as const
 
 /**
  * \u201eSa, 10. Okt" \u2014 ein Abholtermin kurz, mit Wochentag UND Datum (Nr. 46): Ein
