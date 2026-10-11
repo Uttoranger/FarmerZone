@@ -33,7 +33,7 @@ import { useOrtssuche } from '@/components/hoefe/use-ortssuche'
  * - Combobox-Muster (CODING_STANDARDS §8): Pfeiltasten, Enter, Escape; die
  *   Tastenlogik ist tasteInVorschlaegen (rein, getestet), hier wird nur
  *   ausgeführt. Die Liste steht im Fluss statt darüber, damit sie nie unter
- *   der Karte (Leaflet) verschwindet.
+ *   der Karte (Leaflet) verschwindet — außer im Kartenmodus (unten).
  *
  * Übernommene Produkt-Vorschläge werden Such-Marken („Aktive Filter"). Ein
  * gefundener Ort wird der Bezugspunkt; der Text verlässt dann das Feld, denn
@@ -42,8 +42,13 @@ import { useOrtssuche } from '@/components/hoefe/use-ortssuche'
  * KOMPAKT (Kartenmodus am Handy, Nr. 52): nur das Feld, 44 px hoch, damit
  * Suche, Filter und Liste in EINE Zeile über der Karte passen. „Standort
  * nutzen" samt „Nichts wird gespeichert." und die Karte „Wir zeigen Höfe rund
- * um …" stehen dann nur in der Liste; die Ortssuche über den Eintrag „Höfe
- * rund um …" bleibt, ebenso alle Ansagen für Vorleser.
+ * um …" stehen dann nur in der Liste (den Bezugspunkt zeigt der Kartenmodus
+ * als Eintrag „Rund um …" unter „Aktive Filter"); die Ortssuche über den
+ * Eintrag „Höfe rund um …" bleibt, ebenso alle Ansagen für Vorleser. Die
+ * Vorschlagsliste legt sich dort ÜBER die Karte (Nachbesserung Runde 1): Im
+ * Fluss schrumpfte sie beim Tippen die Karte, im Querformat bis auf einen
+ * Streifen. Über der `isolate`-Ebene der Karte liegt sie mit z-[1000]; ihre
+ * Höhe endet über der Unterleiste (Maße der KundeShell), der Rest scrollt.
  */
 export function HoefeSuche({
   kompakt = false,
@@ -125,7 +130,7 @@ export function HoefeSuche({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
-        <form role="search" onSubmit={absenden} className="min-w-0 sm:flex-1">
+        <form role="search" onSubmit={absenden} className={cn('min-w-0 sm:flex-1', kompakt && 'relative')}>
           <div className="relative">
             {ort.laeuft ? (
               <Loader2 className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 animate-spin text-muted-foreground" aria-hidden="true" />
@@ -177,7 +182,13 @@ export function HoefeSuche({
               id={listeId}
               role="listbox"
               aria-label="Vorschläge"
-              className="mt-1.5 overflow-hidden rounded-2xl border border-border bg-popover py-1 shadow-sm dark:shadow-none"
+              className={cn(
+                'mt-1.5 rounded-2xl border border-border bg-popover py-1 shadow-sm dark:shadow-none',
+                kompakt
+                  ? // Ab der linken Kante des Felds, so breit wie nötig, höchstens bis zum rechten Seitenrand.
+                    'absolute top-full left-0 z-[1000] max-h-[calc(100dvh-var(--kunde-kopf)-var(--kunde-unterleiste)-4rem)] w-max max-w-[calc(100vw-2rem)] min-w-full overflow-y-auto md:max-w-[calc(100vw-3rem)]'
+                  : 'overflow-hidden'
+              )}
             >
               {vorschlagsNamen.map((name, i) => {
                 const vorschlag = vorschlaege[i]

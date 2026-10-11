@@ -386,18 +386,12 @@ describe('kein Big Bang', () => {
     }
     sammle(join(process.cwd(), 'src/components'))
     const erlaubt = new Set(Object.values(UMGESTELLT_UEBER_KOMPONENTE))
-    // Die Maße der KundeShell (kunde-shell-masse.ts, Nr. 52) sind Klassen und
-    // CSS-Variablen, keine Shell: Der Kartenmodus auf /hoefe liest sie, um genau
-    // zwischen Kopf und Unterleiste zu passen. Jeder andere Import zählt.
-    const SHELL_IMPORT = /@\/components\/shells\/(?!kunde-shell-masse['"])/
     const fremd = komponenten
       .map((d) => relative(process.cwd(), d).split('\\').join('/'))
       .filter((d) => !d.startsWith('src/components/shells/') && !erlaubt.has(d))
-      .filter((d) => SHELL_IMPORT.test(readFileSync(join(process.cwd(), d), 'utf8')))
-    // Gegenprobe: Die erlaubte Komponente findet die Suche, die Maße nicht, eine Shell schon.
-    expect([...erlaubt].every((d) => SHELL_IMPORT.test(readFileSync(join(process.cwd(), d), 'utf8')))).toBe(true)
-    expect(SHELL_IMPORT.test("import { KUNDE_PLATZ_HOEHE } from '@/components/shells/kunde-shell-masse'")).toBe(false)
-    expect(SHELL_IMPORT.test("import { KundeShell } from '@/components/shells/kunde-shell'")).toBe(true)
+      .filter((d) => /@\/components\/shells\//.test(readFileSync(join(process.cwd(), d), 'utf8')))
+    // Gegenprobe: Die erlaubte Komponente findet die Suche.
+    expect([...erlaubt].every((d) => /@\/components\/shells\//.test(readFileSync(join(process.cwd(), d), 'utf8')))).toBe(true)
     expect(fremd).toEqual([])
   })
 

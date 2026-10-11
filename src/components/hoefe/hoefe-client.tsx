@@ -38,7 +38,7 @@ import type { HofUebersichtEintrag } from '@/server/queries/farm'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Segment } from '@/components/ui/segment'
-import { KUNDE_PLATZ_HOEHE } from '@/components/shells/kunde-shell-masse'
+import { KUNDE_PLATZ_HOEHE } from '@/lib/kunde-shell-masse'
 import { KarteLaedt } from '@/components/karte/karte-laedt'
 import HoefeKarussell from '@/components/hoefe/hoefe-karussell'
 import { HoefeSuche } from '@/components/hoefe/hoefe-suche'
@@ -165,6 +165,21 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
     return () => beobachter.disconnect()
   }, [])
 
+  // Wie viel Platz der Hinweis „Tippe einen Hof an" unten braucht, samt
+  // Abstand zur Kante (unter 768 px über dem Warenkorb-Knopf): Ohne Auswahl
+  // hält die Übersicht ihn frei — sonst deckte er im Querformat Pins zu
+  // (Nachbesserung Runde 1). Gemessen am Kasten der Karte, auch nach dem Drehen.
+  // Startwert wie unter 768 px gemessen (36 + 28 px), damit die erste Übersicht schon passt.
+  const [hinweisPlatz, setHinweisPlatz] = useState(64)
+  const hinweisMessen = useCallback((el: HTMLParagraphElement | null) => {
+    const kasten = el?.offsetParent
+    if (!el || !(kasten instanceof HTMLElement)) return
+    const beobachter = new ResizeObserver(() => setHinweisPlatz(Math.round(kasten.clientHeight - el.offsetTop)))
+    beobachter.observe(el)
+    beobachter.observe(kasten)
+    return () => beobachter.disconnect()
+  }, [])
+
   // Der Kartenmodus am Handy beginnt genau unter der klebenden Kopfzeile:
   // Wer aus der gescrollten Liste kommt oder über einem Testumgebungs-Balken
   // steht (nur Vorschau und lokal, er scrollt mit), sähe die Unterkante der
@@ -270,6 +285,11 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
   // Zustand — sonst bliebe die Liste nach dem Zurücksetzen still eingeschränkt.
   const zuruecksetzenZiel = alleZuruecksetzen(filter)
   const umkreisAufheben = () => setUmkreis(null)
+  // „Ort ändern" bzw. der Eintrag „Rund um …" im Kartenmodus: Ohne Bezugspunkt wirkt auch kein Umkreis.
+  const ortAufheben = () => {
+    setBezugspunkt(null)
+    setUmkreis(null)
+  }
   const zuruecksetzenLink =
     zaehleFilter(filter, aktiverUmkreis) > 0 || filter.suchMarken.length > 0 || filter.suchtext.trim() !== '' ? (
       <Link
@@ -453,10 +473,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
       onSuchtext={(wert) => setzeFilter({ suchtext: wert })}
       onUebernehmen={suchMarkeHinzufuegen}
       onBezugspunkt={setBezugspunkt}
-      onAufheben={() => {
-        setBezugspunkt(null)
-        setUmkreis(null)
-      }}
+      onAufheben={ortAufheben}
     />
   )
 
@@ -493,14 +510,11 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
           <div className="sticky top-20 flex h-[calc(100dvh-6rem)] min-h-[420px] flex-col gap-2">
             {koordinatenHinweis}
             <div className="isolate min-h-0 flex-1 overflow-hidden rounded-l-2xl border-y border-l border-border">
-              {/* randlos: Den Rahmen trägt der Kasten (links, oben, unten) — rechts
-                  reicht die Karte ohne Rand bis an den Fensterrand. */}
               <HoefeKarte
                 hoefe={kartenHoefe}
                 lage={sichtbareLage}
                 fokus={fokus}
                 hoeheKlasse="h-full"
-                randlos
                 onAuswahl={pinGewaehlt}
                 onLeerTipp={() => setLage((l) => nachLeerTipp(l))}
               />
@@ -524,10 +538,14 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
     // Unterleiste (ab md bis zum Fensterrand). Die Höhe ist 100dvh ohne Kopf
     // und Unterleiste (Maße aus der KundeShell); die Werkzeugzeile zieht die
     // Karte als Flex-Zeile ab — Zeile und Karte zusammen füllen genau den Platz.
-    const hatAktiveFilter = aktiveFilter(filter, aktiverUmkreis).length > 0
+    // Ohne den getippten Suchtext: Er steht im Feld (suchtextImFeld unten) — die Zeile darf beim Tippen nicht erscheinen.
+    const hatAktiveFilter = aktiveFilter(filter, aktiverUmkreis, bezugspunkt).some((f) => f.schluessel !== 'suchtext')
     return (
       <>
-        <div ref={kartenmodus} className={cn('flex min-h-[280px] flex-col', KUNDE_PLATZ_HOEHE)}>
+        {/* Eine Mindesthöhe erst ab md: Darunter steht die Unterleiste fest am
+            Fensterrand — eine Mindesthöhe über dem Platz schöbe die Karte samt
+            Karussell im Querformat (740 × 360) hinter die Leiste. */}
+        <div ref={kartenmodus} className={cn('flex flex-col md:min-h-[280px]', KUNDE_PLATZ_HOEHE)}>
           {/* Titel und Unterzeile weichen der Werkzeugzeile — der Titel bleibt für Vorleser. */}
           <h1 className="sr-only">{kopf.titel}</h1>
           {/* 44 px Bedienteile plus je 4 px Luft: Im Querformat (844 × 390) bleiben der Karte 70 %. */}
@@ -550,11 +568,23 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
               </span>
             </Link>
           </div>
-          {/* Gesetzte Filter und Such-Marken bleiben sichtbar und entfernbar —
-              nur dann, sonst bleibt es bei der einen Zeile. */}
+          {/* Gesetzte Filter, Such-Marken und der Bezugspunkt („Rund um …",
+              statt der Karte „Wir zeigen Höfe rund um …" der Liste) bleiben
+              sichtbar und entfernbar — nur dann, sonst bleibt es bei der einen
+              Zeile. Der getippte Text nicht: Er steht im Feld, und die Karte
+              soll beim Tippen nicht schrumpfen. Die zweite Zeile kostet die
+              Karte Höhe (im Querformat 844 × 390 unter 70 %). */}
           {hatAktiveFilter && (
             <div className="mx-auto w-full max-w-[1200px] shrink-0 px-4 pb-2 md:px-6">
-              <AktiveFilterZeile filter={filter} onWahl={schreibeUrl} umkreis={aktiverUmkreis} onUmkreisAufheben={umkreisAufheben} />
+              <AktiveFilterZeile
+                filter={filter}
+                onWahl={schreibeUrl}
+                umkreis={aktiverUmkreis}
+                onUmkreisAufheben={umkreisAufheben}
+                ort={bezugspunkt}
+                onOrtAufheben={ortAufheben}
+                suchtextImFeld
+              />
             </div>
           )}
           {/* `isolate`: Karussell, Hinweis und Leermeldung (z-[900]) bleiben in
@@ -570,12 +600,14 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
               randlos
               hoeheKlasse="h-full"
               polsterUnten={bandHoehe}
+              polsterOhneAuswahl={hinweisPlatz}
               onAuswahl={pinGewaehlt}
               onLeerTipp={() => setLage((l) => nachLeerTipp(l))}
             />
             {/* Über der Unterleiste und frei vom erhobenen Warenkorb-Knopf (--kunde-ueberstand). */}
             {!auswahlMitPunkt && kartenHoefe.length > 0 && (
               <p
+                ref={hinweisMessen}
                 className="pointer-events-none absolute inset-x-0 bottom-[calc(var(--kunde-ueberstand)+0.5rem)] z-[900] mx-auto w-fit rounded-full bg-card px-4 py-2 text-sm text-foreground shadow-md md:bottom-4"
                 aria-hidden="true"
               >

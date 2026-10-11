@@ -2,14 +2,16 @@
  * Tests für die reine Anzeige-Logik der Karten
  * (src/lib/hoefe-anzeige.ts): die gemeinsame Auswahl-Grammatik, die drei
  * Pin-Zustände samt Stil-Stufen, die Karussell-Snap-Erkennung und seit
- * Nr. 52 die Gruppen-Pins (überlappende Pins), die Projektion der Webkarte
- * und der Merker „hat die Nutzerin den Ausschnitt bewegt?".
+ * Nr. 52 die Gruppen-Pins (Pins, deren Trefferflächen sich überdecken), die
+ * Projektion der Webkarte und der Merker „hat die Nutzerin den Ausschnitt
+ * bewegt?".
  */
 import { describe, it, expect } from 'vitest'
 import {
   KARTEN_KACHELN,
   KARTE_LAEDT,
   LEERE_LAGE,
+  TREFFERFLAECHE,
   ausWeltPixel,
   erstelleAusschnittMerker,
   gruppenBeschriftung,
@@ -21,6 +23,7 @@ import {
   nachZeiger,
   pinDarstellung,
   pinZustand,
+  trefferMasse,
   weltPixel,
   zentrierterIndex,
   zoomBisEinzeln,
@@ -191,24 +194,23 @@ function daneben(basis: PinPunkt, nummer: number, dx: number, dy: number, zoom: 
 
 const BASIS = pin(1, 48.25, 13.04)
 
-/** Wie viel Platz eine Marke auf der Karte einnimmt — die Maße der Darstellung. */
+/**
+ * Die Trefferfläche einer Marke, wie die Karte sie zeichnet: mindestens 44 px
+ * und rund wie das Bild — ein Kreis um den Pin (mit seiner größten Stufe),
+ * eine Pille um den Gruppen-Pin. Als waagrechte Strecke mit Radius darum.
+ */
 function flaeche(m: KartenMarke, zoom: number) {
   const p = weltPixel(m.lat, m.lon, zoom)
-  if (m.art === 'pin') {
-    // Ein Pin zählt mit seiner größten Stufe: Auch ausgewählt überdeckt er nichts.
-    const d = pinDarstellung('ausgewaehlt').groesse
-    return { x: p.x, y: p.y, breite: d, hoehe: d, rund: true }
-  }
-  const masse = gruppenPinMasse(m.mitglieder.length)
-  return { x: p.x, y: p.y, breite: masse.breite, hoehe: masse.hoehe, rund: false }
+  const d = pinDarstellung('ausgewaehlt').groesse
+  const bild = m.art === 'pin' ? { breite: d, hoehe: d } : gruppenPinMasse(m.mitglieder.length)
+  const masse = trefferMasse(bild.breite, bild.hoehe)
+  return { x: p.x, y: p.y, halbeStrecke: (masse.breite - masse.hoehe) / 2, radius: masse.hoehe / 2 }
 }
 
-/** Überdecken sich zwei Marken (oder berühren sie sich bis auf 1 px)? */
+/** Überdecken sich zwei Trefferflächen? Berühren ist erlaubt, ein Tipp trifft dort genau eine. */
 function ueberdecken(a: ReturnType<typeof flaeche>, b: ReturnType<typeof flaeche>): boolean {
-  const dx = Math.abs(a.x - b.x)
-  const dy = Math.abs(a.y - b.y)
-  if (a.rund && b.rund) return Math.hypot(dx, dy) < (a.breite + b.breite) / 2 + 1
-  return dx < (a.breite + b.breite) / 2 + 1 && dy < (a.hoehe + b.hoehe) / 2 + 1
+  const luecke = Math.max(0, Math.abs(a.x - b.x) - a.halbeStrecke - b.halbeStrecke)
+  return Math.hypot(luecke, a.y - b.y) < a.radius + b.radius - 1e-6
 }
 
 function paareDieSichUeberdecken(marken: KartenMarke[], zoom: number): string[] {
@@ -222,8 +224,31 @@ function paareDieSichUeberdecken(marken: KartenMarke[], zoom: number): string[] 
 const nummern = (marken: KartenMarke[]) =>
   marken.flatMap((m) => (m.art === 'pin' ? [m.pin.nummer] : m.mitglieder.map((p) => p.nummer))).sort((a, b) => a - b)
 
-describe('gruppierePins — Pins, die sich überdecken, werden ein Gruppen-Pin', () => {
+describe('trefferMasse — die Trefferfläche jeder Marke', () => {
+  it('mindestens 44 × 44 px um den Pin, auch um den größten (34 px)', () => {
+    expect(TREFFERFLAECHE).toBe(44)
+    const d = pinDarstellung('ausgewaehlt').groesse
+    expect(trefferMasse(d, d)).toEqual({ breite: 44, hoehe: 44 })
+  })
+
+  it('um den Gruppen-Pin so breit wie die Pille, aber 44 px hoch', () => {
+    const pille = gruppenPinMasse(3)
+    expect(trefferMasse(pille.breite, pille.hoehe)).toEqual({ breite: 58, hoehe: 44 })
+  })
+})
+
+describe('gruppierePins — Pins, deren Trefferflächen sich überdecken, werden ein Gruppen-Pin', () => {
   const ZOOM = 12
+
+  it('ein Hof allein ist ein Pin an seiner eigenen Stelle', () => {
+    expect(gruppierePins([BASIS], ZOOM)).toEqual([{ art: 'pin', pin: BASIS, lat: BASIS.lat, lon: BASIS.lon }])
+  })
+
+  it('ein Hof allein bleibt auch bei maximaler Zoomstufe genau an seiner Stelle — kein Auffächer-Versatz', () => {
+    const max = KARTEN_KACHELN.maxZoom
+    expect(gruppierePins([BASIS], max)).toEqual([{ art: 'pin', pin: BASIS, lat: BASIS.lat, lon: BASIS.lon }])
+    expect(gruppierePins([BASIS], max + 3)).toEqual([{ art: 'pin', pin: BASIS, lat: BASIS.lat, lon: BASIS.lon }])
+  })
 
   it('weit auseinander: jeder Hof bleibt ein eigener Pin an seiner Stelle, mit seiner Nummer', () => {
     const marken = gruppierePins([BASIS, daneben(BASIS, 2, 120, 0, ZOOM)], ZOOM)
@@ -249,21 +274,28 @@ describe('gruppierePins — Pins, die sich überdecken, werden ein Gruppen-Pin',
     expect(mitte.y).toBeCloseTo(a.y, 6)
   })
 
-  it('die Grenze: 36 px Mittenabstand berühren sich nicht mehr, 35 px schon (34 px Pin plus 2 px Luft)', () => {
-    expect(gruppierePins([BASIS, daneben(BASIS, 2, 36.5, 0, ZOOM)], ZOOM)).toHaveLength(2)
-    expect(gruppierePins([BASIS, daneben(BASIS, 2, 35, 0, ZOOM)], ZOOM)).toHaveLength(1)
+  it('die Grenze ist die Trefferfläche: ab 44 px Mittenabstand zwei Pins, darunter eine Gruppe', () => {
+    expect(gruppierePins([BASIS, daneben(BASIS, 2, 44.2, 0, ZOOM)], ZOOM)).toHaveLength(2)
+    expect(gruppierePins([BASIS, daneben(BASIS, 2, 43.8, 0, ZOOM)], ZOOM)).toHaveLength(1)
   })
 
-  it('schräg daneben zählt der echte Abstand der runden Pins, nicht ein Kasten darum', () => {
-    // 27 px waagrecht und senkrecht sind 38 px Luftlinie — zwei Scheiben berühren sich nicht.
-    expect(gruppierePins([BASIS, daneben(BASIS, 2, 27, 27, ZOOM)], ZOOM)).toHaveLength(2)
+  it('40 px: Die Bilder (34 px) berühren sich nicht, die Trefferflächen schon — eine Gruppe', () => {
+    // Vorher zwei Pins: Ein Tipp an den Rand des einen konnte den Nachbarn wählen.
+    expect(gruppierePins([BASIS, daneben(BASIS, 2, 40, 0, ZOOM)], ZOOM)).toHaveLength(1)
+  })
+
+  it('schräg daneben zählt der echte Abstand der runden Trefferflächen, nicht ein Kasten darum', () => {
+    // 32 px waagrecht und senkrecht sind 45 px Luftlinie — zwei Kreise von 44 px berühren sich nicht.
+    expect(gruppierePins([BASIS, daneben(BASIS, 2, 32, 32, ZOOM)], ZOOM)).toHaveLength(2)
+    // Gegenprobe: 31/31 sind 43,8 px — die Kreise überdecken sich.
+    expect(gruppierePins([BASIS, daneben(BASIS, 2, 31, 31, ZOOM)], ZOOM)).toHaveLength(1)
   })
 
   it('eine Gruppe ist breiter als ein Pin: Ein Nachbar, den sie überdeckt, kommt dazu', () => {
-    // 1 und 2 liegen übereinander; 3 steht 40 px rechts von ihrer Mitte —
-    // neben einem Pin wäre Platz, neben dem breiteren Gruppen-Pin nicht.
+    // 1 und 2 liegen übereinander; 3 steht 48 px rechts von ihrer Mitte —
+    // neben einem Pin wäre Platz, neben der breiteren Pille (58 px) nicht.
     const zwei = daneben(BASIS, 2, 0, 0, ZOOM)
-    const drei = daneben(BASIS, 3, 40, 0, ZOOM)
+    const drei = daneben(BASIS, 3, 48, 0, ZOOM)
     expect(gruppierePins([BASIS, drei], ZOOM)).toHaveLength(2)
     const marken = gruppierePins([BASIS, zwei, drei], ZOOM)
     expect(marken).toHaveLength(1)
@@ -307,7 +339,7 @@ describe('gruppierePins — Pins, die sich überdecken, werden ein Gruppen-Pin',
   })
 })
 
-describe('Seed-Daten: in keiner Zoomstufe überdecken sich Pins oder Gruppen', () => {
+describe('Seed-Daten: in keiner Zoomstufe überdecken sich die Trefferflächen von Pins oder Gruppen', () => {
   const PINS = SEED_HOEFE.filter((h) => h.breite != null && h.laenge != null).map((h, i) => ({
     slug: h.slug,
     nummer: i + 1,
@@ -332,15 +364,16 @@ describe('Seed-Daten: in keiner Zoomstufe überdecken sich Pins oder Gruppen', (
 
 describe('zoomZumAufloesen — ein Tipp auf den Gruppen-Pin zoomt hinein', () => {
   it('genau so weit, bis die Gruppe zerfällt', () => {
-    const zwei = daneben(BASIS, 2, 20, 0, 12)
-    // 20 px bei 12 sind 40 px bei 13: Dort berühren sich die Pins nicht mehr.
+    const zwei = daneben(BASIS, 2, 25, 0, 12)
+    // 25 px bei 12 sind 50 px bei 13: Dort überdecken sich die Trefferflächen (44 px) nicht mehr.
     expect(gruppierePins([BASIS, zwei], 12)).toHaveLength(1)
     expect(zoomZumAufloesen([BASIS, zwei], 12)).toBe(13)
   })
 
   it('weiter, wenn eine Stufe nicht reicht', () => {
+    // 5 px bei 12 sind 40 px bei 15 (noch eine Gruppe) und 80 px bei 16.
     const zwei = daneben(BASIS, 2, 5, 0, 12)
-    expect(zoomZumAufloesen([BASIS, zwei], 12)).toBe(15)
+    expect(zoomZumAufloesen([BASIS, zwei], 12)).toBe(16)
   })
 
   it('Höfe am selben Punkt: bis zur maximalen Zoomstufe, dort fächert die Karte sie auf', () => {
@@ -358,7 +391,7 @@ describe('zoomBisEinzeln — ein angefahrener Hof steht als eigener Pin da', () 
   })
 
   it('steckt er in einer Gruppe, die erste Stufe, auf der er allein steht', () => {
-    expect(zoomBisEinzeln([BASIS, zwei, fern], 'hof-1', 12)).toBe(15)
+    expect(zoomBisEinzeln([BASIS, zwei, fern], 'hof-1', 12)).toBe(16)
   })
 
   it('am selben Punkt wie ein anderer: die maximale Zoomstufe (dort aufgefächert)', () => {

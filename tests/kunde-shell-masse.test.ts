@@ -1,19 +1,20 @@
 /**
- * Die Maße der KundeShell aus EINER Quelle (Nachtlauf Nr. 52): Der
- * Kartenmodus auf /hoefe füllt genau den Platz zwischen Kopfzeile und
- * Unterleiste. Er rechnet mit den CSS-Variablen, die die Shell an ihren
- * Rahmen setzt (src/components/shells/kunde-shell-masse.ts) — nie mit
- * eigenen Zahlen.
+ * Die Maße der KundeShell für den Kartenmodus (Nachtlauf Nr. 52): Er füllt
+ * genau den Platz zwischen Kopfzeile und Unterleiste und rechnet dafür nur mit
+ * den CSS-Variablen, die die Shell an ihren Rahmen setzt
+ * (src/lib/kunde-shell-masse.ts) — nie mit eigenen Zahlen.
  *
- * Geprüft am Quelltext, weil sich Pixel nur im Browser messen lassen (die
- * Messung steht im Bericht 52): Die Zahlen der Variablen passen zu den
- * Klassen von Kopfzeile (kunde-shell.tsx) und Unterleiste (ui/bottom-nav.tsx),
- * und die Shell setzt beides. Mit Gegenprobe, dass die Suche anschlägt.
+ * Die Unterleiste (ui/bottom-nav.tsx, auch in der HofShell) trägt ihre Zahlen
+ * selbst; dieser Test ist die Wache, die beide gleich hält. Geprüft am
+ * Quelltext, weil sich Pixel nur im Browser messen lassen (die Messung steht
+ * im Bericht 52): Die Zahlen der Variablen passen zu den Klassen von
+ * Kopfzeile (kunde-shell.tsx) und Unterleiste, und die Shell setzt beides.
+ * Mit Gegenprobe, dass die Suche anschlägt.
  */
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { KUNDE_KOPF_ZEILE, KUNDE_PLATZ_HOEHE, KUNDE_SHELL_MASSE } from '@/components/shells/kunde-shell-masse'
+import { KUNDE_KOPF_ZEILE, KUNDE_PLATZ_HOEHE, KUNDE_SHELL_MASSE } from '@/lib/kunde-shell-masse'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 
@@ -75,6 +76,14 @@ describe('Maße der KundeShell', () => {
     expect(client).not.toMatch(/h-\[60vh\]/)
     // Karussell und Hinweis halten den Mittelknopf frei — über die Variable der Shell.
     expect(client + quelle('src/components/hoefe/hoefe-karussell.tsx')).toMatch(/var\(--kunde-ueberstand\)/)
+  })
+
+  it('unter md keine Mindesthöhe: Sie schöbe die Karte im Querformat hinter die Unterleiste (Runde 1)', () => {
+    const client = quelle('src/components/hoefe/hoefe-client.tsx')
+    expect(client).toContain("cn('flex flex-col md:min-h-[280px]', KUNDE_PLATZ_HOEHE)")
+    expect(client).not.toMatch(/(?<!md:)min-h-\[280px\]/)
+    // Gegenprobe: die alte Klasse fiele auf.
+    expect("cn('flex min-h-[280px] flex-col', KUNDE_PLATZ_HOEHE)").toMatch(/(?<!md:)min-h-\[280px\]/)
   })
 
   it('Gegenprobe: die Suche erkennt abweichende Zahlen', () => {

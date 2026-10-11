@@ -14,6 +14,7 @@ import {
   gruppierePins,
   pinDarstellung,
   pinZustand,
+  trefferMasse,
   zoomBisEinzeln,
   zoomZumAufloesen,
   type AuswahlLage,
@@ -45,11 +46,12 @@ import { useKartenGroesse } from '@/components/karte/use-karten-groesse'
  * ausschließlich Listeneintrag, Karussell-Karte und „Zum Hof". Höfe ohne
  * Koordinaten kommen hier gar nicht erst an.
  *
- * GRUPPEN-PINS (Nr. 52): Pins, die sich bei der aktuellen Zoomstufe
- * überdecken würden, zeichnet die Karte als EINEN Gruppen-Pin „3 Höfe"
- * (gruppierePins, rein und getestet; kein Paket). Ein Tipp darauf zoomt genau
- * so weit hinein, bis die Gruppe zerfällt; bei maximaler Zoomstufe stehen
- * Höfe am selben Punkt leicht aufgefächert. Die Nummern der Liste bleiben.
+ * GRUPPEN-PINS (Nr. 52): Pins, deren Trefferflächen (44 px, rund) sich bei
+ * der aktuellen Zoomstufe überdecken würden, zeichnet die Karte als EINEN
+ * Gruppen-Pin „3 Höfe" (gruppierePins, rein und getestet; kein Paket). Ein
+ * Tipp darauf zoomt genau so weit hinein, bis die Gruppe zerfällt; bei
+ * maximaler Zoomstufe stehen Höfe am selben Punkt leicht aufgefächert. Die
+ * Nummern der Liste bleiben.
  *
  * GRÖSSENWECHSEL (Nr. 52): useKartenGroesse misst den Container
  * (ResizeObserver); solange die Nutzerin weder verschoben noch gezoomt hat,
@@ -74,19 +76,24 @@ export type KartenHof = PinPunkt
 const OESTERREICH_MITTE: [number, number] = [47.7, 13.4]
 const OESTERREICH_ZOOM = 7
 
-/**
- * Die Trefferfläche jeder Marke: mindestens 44 × 44 px (DESIGN_SYSTEM,
- * „Qualität"), unsichtbar um die kleinere Scheibe bzw. Pille gelegt — so
- * bleibt das Bild, wie es ist, und der Finger trifft trotzdem.
- */
-const TREFFERFLAECHE = 44
+/** Die halbe Höhe des größten Pins (ausgewählt): So weit ragt ein Pin über seinen Punkt hinaus. */
+const PIN_HALB = pinDarstellung('ausgewaehlt').groesse / 2
 
-/** Der äußere Rahmen einer Marke: so groß wie die Trefferfläche, das Bild darin mittig. */
-function trefferRahmen(breite: number, hoehe: number, bild: string): Pick<L.DivIconOptions, 'html' | 'iconSize' | 'iconAnchor'> {
-  const b = Math.max(breite, TREFFERFLAECHE)
-  const h = Math.max(hoehe, TREFFERFLAECHE)
+/**
+ * Der äußere Rahmen einer Marke: so groß wie die Trefferfläche (trefferMasse,
+ * mindestens 44 px — dieselbe Zahl, mit der gruppierePins entscheidet), das
+ * Bild darin mittig. Rahmen und Marke selbst sind ganz rund (Kreis bzw.
+ * Pille): Der Browser nimmt Tipps nur innerhalb der Rundung an, also klickt
+ * die Fläche genau so, wie die Gruppierung sie rechnet — die Ecken eines
+ * Quadrats gehörten sonst zur Marke und reichten in den Nachbarn.
+ */
+const TREFFER_RUNDUNG = 'rounded-full'
+
+function trefferRahmen(breite: number, hoehe: number, bild: string): Pick<L.DivIconOptions, 'className' | 'html' | 'iconSize' | 'iconAnchor'> {
+  const { breite: b, hoehe: h } = trefferMasse(breite, hoehe)
   return {
-    html: `<div style="width:${b}px;height:${h}px;display:flex;align-items:center;justify-content:center;">${bild}</div>`,
+    className: TREFFER_RUNDUNG,
+    html: `<div style="width:${b}px;height:${h}px;border-radius:9999px;display:flex;align-items:center;justify-content:center;">${bild}</div>`,
     iconSize: [b, h],
     iconAnchor: [b / 2, h / 2],
   }
@@ -95,7 +102,6 @@ function trefferRahmen(breite: number, hoehe: number, bild: string): Pick<L.DivI
 function pinIcon(nummer: number, zustand: PinZustand): L.DivIcon {
   const stil = pinDarstellung(zustand)
   return L.divIcon({
-    className: '',
     ...trefferRahmen(
       stil.groesse,
       stil.groesse,
@@ -119,7 +125,6 @@ function gruppenIcon(anzahl: number, zustand: PinZustand): L.DivIcon {
   const { breite, hoehe } = gruppenPinMasse(anzahl)
   const name = gruppenBeschriftung(anzahl)
   return L.divIcon({
-    className: '',
     ...trefferRahmen(
       breite,
       hoehe,
@@ -167,6 +172,7 @@ export default function HoefeKarte({
   hoeheKlasse = 'h-[340px]',
   randlos = false,
   polsterUnten = 0,
+  polsterOhneAuswahl = 0,
   zentrum,
   onAuswahl,
   onLeerTipp,
@@ -183,8 +189,8 @@ export default function HoefeKarte({
    *  dann nach oben rechts, damit sie SICHTBAR bleibt (OSM-Pflicht). */
   attributionOben?: boolean
   hoeheKlasse?: string
-  /** Ohne eigenen Rahmen und ohne Rundung: Die Seite rahmt die Karte selbst
-   *  (Splitscreen) oder zeigt sie über die volle Breite (Kartenmodus am Handy). */
+  /** Ohne eigenen Rahmen und ohne Rundung: Der Kartenmodus am Handy zeigt die
+   *  Karte über die volle Breite bis zur Unterleiste. */
   randlos?: boolean
   /** Höhe des Bandes unten in Pixeln (Karussell am Handy, Karte unter dem
    *  Pin im Umfeld). Es liegt nur über der Karte, solange ein Hof gewählt
@@ -192,6 +198,10 @@ export default function HoefeKarte({
    *  Pin landet darüber statt dahinter (Nr. 52: Ohne Auswahl gehört die
    *  ganze Höhe den Pins, sonst bliebe im Querformat kaum Karte übrig). */
   polsterUnten?: number
+  /** Höhe unten, die OHNE Auswahl frei bleibt: der Hinweis „Tippe einen Hof
+   *  an" am Handy samt Abstand zur Kante. Die Übersicht hält sie frei, sonst
+   *  läge der Hinweis im Querformat über Pins (Nachbesserung Runde 1). */
+  polsterOhneAuswahl?: number
   /** Der eigene Hof als Mittelpunkt, samt Umkreis als Kreis (Umfeld). */
   zentrum?: KartenZentrum
   onAuswahl: (slug: string) => void
@@ -205,18 +215,25 @@ export default function HoefeKarte({
   const attribution = useRef<L.Control.Attribution | null>(null)
   // Hat die Nutzerin den Ausschnitt selbst bewegt? Eigene Bewegungen laufen in merker.still().
   const [merker] = useState(erstelleAusschnittMerker)
-  // Die Zoomstufe, für die die Pins gruppiert sind — nach jedem Zoomen neu.
-  const [zoomStufe, setZoomStufe] = useState<number | null>(null)
+  // Zählt Leaflets zoomend: Danach gruppieren die Pins neu, immer für
+  // map.getZoom() — nie für einen gemerkten Wert, der dem Zoom einen
+  // Bildaufbau hinterherliefe (Nachbesserung Runde 1). Ein Zähler statt der
+  // Stufe selbst: Endet ein Flug auf der Stufe, auf der er begann, wird
+  // trotzdem neu gruppiert — unterwegs kann der Effekt den Zwischen-Zoom des
+  // Bogens gelesen haben.
+  const [zoomEnden, setZoomEnden] = useState(0)
   // Rückrufe wechseln mit jedem Render, die Handler hängen aber an Karte und
   // Ebene — Refs (im Effekt nachgeführt), damit nichts Altes gefangen bleibt.
   const auswahlRef = useRef(onAuswahl)
   const leerTippRef = useRef(onLeerTipp)
   const polsterRef = useRef(polsterUnten)
+  const hinweisRef = useRef(polsterOhneAuswahl)
   const lageRef = useRef(lage)
   useEffect(() => {
     auswahlRef.current = onAuswahl
     leerTippRef.current = onLeerTipp
     polsterRef.current = polsterUnten
+    hinweisRef.current = polsterOhneAuswahl
     lageRef.current = lage
   })
 
@@ -262,7 +279,7 @@ export default function HoefeKarte({
     // Jede Bewegung, die nicht aus merker.still() kommt, ist eine der Nutzerin:
     // Ziehen, Zoomen, ein angefahrener Hof, ein aufgezoomter Gruppen-Pin.
     map.on('movestart zoomstart', () => merker.bewegungBeginnt())
-    map.on('zoomend', () => setZoomStufe(map.getZoom()))
+    map.on('zoomend', () => setZoomEnden((n) => n + 1))
     zentrumEbene.current = L.layerGroup().addTo(map)
     pinEbene.current = L.layerGroup().addTo(map)
     karte.current = map
@@ -363,8 +380,8 @@ export default function HoefeKarte({
   }, [zentrum?.lat, zentrum?.lon, zentrum?.radiusKm, zentrum?.titel])
 
   // Pins neu setzen, wenn Filter, Auswahl, Zeiger-Hervorhebung oder Zoomstufe
-  // wechseln. Die Signatur trägt Slug UND Nummer: Fällt per Filter ein
-  // koordinatenloser Hof VOR den Pins weg, ändern sich nur die Nummern —
+  // (zoomEnden) wechseln. Die Signatur trägt Slug UND Nummer: Fällt per Filter
+  // ein koordinatenloser Hof VOR den Pins weg, ändern sich nur die Nummern —
   // auch dann müssen die Pins neu gezeichnet werden, sonst zählt die Karte
   // anders als die Liste.
   const pinSignatur = hoefe.map((h) => `${h.slug}:${h.nummer}`).join(',')
@@ -373,7 +390,7 @@ export default function HoefeKarte({
     const ebene = pinEbene.current
     if (!map || !ebene) return
     ebene.clearLayers()
-    for (const marke of gruppierePins(hoefe, zoomStufe ?? map.getZoom())) {
+    for (const marke of gruppierePins(hoefe, map.getZoom())) {
       if (marke.art === 'pin') {
         L.marker([marke.lat, marke.lon], {
           icon: pinIcon(marke.pin.nummer, pinZustand(marke.pin.slug, lage)),
@@ -394,12 +411,13 @@ export default function HoefeKarte({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pinSignatur, lage.ausgewaehlt, lage.hervorgehoben, zoomStufe])
+  }, [pinSignatur, lage.ausgewaehlt, lage.hervorgehoben, zoomEnden])
 
   /**
    * Die Übersicht: mit Zentrum der ganze Umkreis, sonst alle Pins. Polster
    * oben bzw. unten um die Höhe der Attribution, damit kein Pin unter ihr
-   * liegt; unten zusätzlich das Band, solange ein Hof gewählt ist. Nie mehr
+   * liegt; unten zusätzlich das Band, solange ein Hof gewählt ist, sonst so
+   * viel, dass kein Pin unter dem Hinweis liegt (polsterOhneAuswahl). Nie mehr
    * Polster als Platz: Mindestens ein Drittel der Höhe bleibt für die Pins
    * (sonst rechnete Leaflet mit einer negativen Fläche). Läuft still — und
    * danach darf ein Größenwechsel die Übersicht wieder einpassen.
@@ -411,8 +429,12 @@ export default function HoefeKarte({
     const hoehe = map.getSize().y
     const zeile = attribution.current?.getContainer()?.offsetHeight ?? 0
     const oben = attributionOben ? zeile : 0
-    const band = lageRef.current.ausgewaehlt ? bandHoehe(map) : 0
-    const unten = Math.max(0, Math.min((attributionOben ? 0 : zeile) + band, hoehe - oben - 2 * rand - hoehe / 3))
+    // Mit Auswahl liegt das Band über der Karte, zusätzlich zum Rand. Ohne
+    // Auswahl nur der Hinweis: Ein Pin muss mit seiner halben Höhe darüber
+    // stehen, der Rand zählt dabei mit — sonst schrumpfte die Fläche der Pins
+    // doppelt, und im Querformat blieben nur Gruppen.
+    const zusatz = lageRef.current.ausgewaehlt ? bandHoehe(map) : Math.max(0, hinweisRef.current + PIN_HALB - rand)
+    const unten = Math.max(0, Math.min((attributionOben ? 0 : zeile) + zusatz, hoehe - oben - 2 * rand - hoehe / 3))
     merker.still(() => {
       if (zentrum) {
         map.fitBounds(L.latLng(zentrum.lat, zentrum.lon).toBounds(zentrum.radiusKm * 2000), {
@@ -435,6 +457,15 @@ export default function HoefeKarte({
     })
     merker.uebersichtGezeigt()
   }
+
+  // Der Platz des Hinweises steht erst nach dem ersten Bildaufbau fest (die
+  // Seite misst ihn): Ändert er sich, passt sich die Übersicht an — solange
+  // die Nutzerin nichts bewegt hat und kein Zentrum den Ausschnitt bestimmt.
+  useEffect(() => {
+    if (zentrum || merker.nutzerinHatBewegt) return
+    zeigeUebersicht()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [polsterOhneAuswahl])
 
   // Größenwechsel (Splitscreen, Drehen, eine Zeile darüber): Leaflet misst
   // neu; die Übersicht passt sich nur an, solange die Nutzerin nichts bewegt hat.

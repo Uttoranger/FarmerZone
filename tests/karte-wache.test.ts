@@ -78,6 +78,25 @@ describe('genau zwei Leaflet-Karten, beide am gemeinsamen Hook', () => {
     expect(karte).toMatch(/on\('movestart zoomstart'/)
   })
 
+  it('die Pins gruppieren für die Zoomstufe der Karte, nie für einen gemerkten Wert (Runde 1)', () => {
+    const karte = code('src/components/hoefe/hoefe-karte.tsx')
+    expect(karte).toMatch(/gruppierePins\(hoefe, map\.getZoom\(\)\)/)
+    // Jedes zoomend zählt — auch eines, das auf der Ausgangsstufe endet.
+    expect(karte).toMatch(/on\('zoomend', \(\) => setZoomEnden\(\(n\) => n \+ 1\)\)/)
+    // Gegenprobe: der alte Weg über die gemerkte Stufe fiele auf.
+    expect('gruppierePins(hoefe, zoomStufe ?? map.getZoom())').not.toMatch(/gruppierePins\(hoefe, map\.getZoom\(\)\)/)
+  })
+
+  it('die Trefferfläche hat EINE Zahl für Marke und Gruppierung, rund wie das Bild (Runde 1)', () => {
+    const karte = code('src/components/hoefe/hoefe-karte.tsx')
+    expect(karte).toMatch(/const \{ breite: b, hoehe: h \} = trefferMasse\(breite, hoehe\)/)
+    expect(karte).not.toMatch(/\b44\b/)
+    // Rund: der Rahmen der Marke (Leaflets Element) und die Fläche darin.
+    expect(karte).toMatch(/className: TREFFER_RUNDUNG/)
+    expect(karte).toMatch(/const TREFFER_RUNDUNG = 'rounded-full'/)
+    expect(karte).toContain('border-radius:9999px;display:flex')
+  })
+
   it('die Standortkarte hält beim Größenwechsel genau die Mitte von vorher (der feste Pin)', () => {
     const karte = code('src/components/settings/standort-karte.tsx')
     expect(karte).toMatch(/useKartenGroesse\(kartenDiv, karte, merker, \(\{ mitte, zoom \}\) =>/)

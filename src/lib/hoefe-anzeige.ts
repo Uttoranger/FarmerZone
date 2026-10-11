@@ -162,21 +162,41 @@ export type PinPunkt = { slug: string; nummer: number; lat: number; lon: number 
 
 /**
  * Was die Karte zeichnet: ein Pin mit der Nummer der Liste oder ein
- * Gruppen-Pin für Höfe, die sich bei der aktuellen Zoomstufe überdecken
- * würden. Ein aufgefächerter Pin (maximale Zoomstufe) steht leicht neben
+ * Gruppen-Pin für Höfe, deren Trefferflächen sich bei der aktuellen
+ * Zoomstufe überdecken würden. Ein aufgefächerter Pin (maximale Zoomstufe) steht leicht neben
  * seinem Punkt — `lat`/`lon` sind immer die Stelle, an der die Marke steht.
  */
 export type KartenMarke =
   | { art: 'pin'; pin: PinPunkt; lat: number; lon: number }
   | { art: 'gruppe'; schluessel: string; mitglieder: PinPunkt[]; lat: number; lon: number }
 
-/** So viel Luft halten zwei Marken mindestens, sonst gelten sie als überdeckt. */
-const MARKEN_LUFT = 2
+/**
+ * Die Trefferfläche jeder Marke: mindestens 44 px (DESIGN_SYSTEM,
+ * „Qualität"), unsichtbar um die kleinere Scheibe bzw. Pille gelegt — so
+ * bleibt das Bild, wie es ist, und der Finger trifft trotzdem. Sie ist rund
+ * wie das Bild: ein Kreis um den Pin, eine Pille um den Gruppen-Pin
+ * (border-radius an der Marke, der Browser nimmt Tipps nur innerhalb der
+ * Rundung an).
+ *
+ * DIESELBE Zahl entscheidet über Gruppen (Nachbesserung Runde 1): Überdecken
+ * sich zwei Trefferflächen, könnte ein Tipp an ihrem Rand den Nachbarn
+ * wählen — dann zeichnet die Karte EINE Marke. Vorher galt erst eine
+ * Überdeckung der Bilder (36 px), die Flächen überlappten bei 36–43 px.
+ */
+export const TREFFERFLAECHE = 44
+
+/** Die Trefferfläche zu einem Bild: mindestens 44 × 44 px, sonst so groß wie das Bild. */
+export function trefferMasse(breite: number, hoehe: number): { breite: number; hoehe: number } {
+  return { breite: Math.max(breite, TREFFERFLAECHE), hoehe: Math.max(hoehe, TREFFERFLAECHE) }
+}
+
 /**
  * Ein Pin zählt immer mit seiner größten Stufe (ausgewählt, 34 px): Sonst
- * gruppierte die Karte bei jeder Auswahl neu, und Pins sprängen.
+ * gruppierte die Karte bei jeder Auswahl neu, und Pins sprängen. Seine
+ * Trefferfläche ist ohnehin größer (44 px).
  */
 const PIN_DURCHMESSER = pinDarstellung('ausgewaehlt').groesse
+const PIN_FLAECHE = trefferMasse(PIN_DURCHMESSER, PIN_DURCHMESSER)
 
 /** Breite und Höhe des Gruppen-Pins (eine Pille mit „3 Höfe"). */
 export function gruppenPinMasse(anzahl: number): { breite: number; hoehe: number } {
@@ -195,38 +215,47 @@ export function gruppenZustand(mitglieder: readonly { slug: string }[], lage: Au
   return 'normal'
 }
 
-/** Radius, auf dem n Pins um ihre Mitte stehen, ohne sich zu berühren (Sehne = Pin + Luft). */
+/** Radius, auf dem n Pins um ihre Mitte stehen, ohne dass sich ihre Trefferflächen überdecken (Sehne = Trefferfläche). */
 function faecherRadius(anzahl: number): number {
   // Ein halber Pixel mehr, damit Rundung aus „berührt sich gerade nicht" kein „überdeckt" macht.
-  return (PIN_DURCHMESSER + MARKEN_LUFT) / (2 * Math.sin(Math.PI / anzahl)) + 0.5
+  return PIN_FLAECHE.breite / (2 * Math.sin(Math.PI / anzahl)) + 0.5
 }
 
-type Haufen = { mitglieder: PinPunkt[]; x: number; y: number }
-type Flaeche = { x: number; y: number; breite: number; hoehe: number; rund: boolean }
+/** Die Pixel aller Höfe eines Haufens als Summe — die Mitte ist Summe durch Anzahl. */
+type Haufen = { mitglieder: PinPunkt[]; summe: { x: number; y: number }; x: number; y: number }
+
+/**
+ * Eine Trefferfläche als „Stadion": eine waagrechte Strecke mit dem Radius
+ * drumherum. Ein Kreis (Pin) hat die Strecke 0, eine Pille die Breite minus
+ * die Höhe — genau die Form, die die Marke auf der Karte hat.
+ */
+type Flaeche = { x: number; y: number; halbeStrecke: number; radius: number }
+
+function stadion(x: number, y: number, masse: { breite: number; hoehe: number }): Flaeche {
+  const radius = masse.hoehe / 2
+  return { x, y, radius, halbeStrecke: Math.max(0, masse.breite / 2 - radius) }
+}
 
 function flaecheVon(haufen: Haufen, aufgefaechert: boolean): Flaeche {
   const n = haufen.mitglieder.length
-  if (n === 1) return { x: haufen.x, y: haufen.y, breite: PIN_DURCHMESSER, hoehe: PIN_DURCHMESSER, rund: true }
-  if (aufgefaechert) {
-    const kante = 2 * (faecherRadius(n) + PIN_DURCHMESSER / 2)
-    return { x: haufen.x, y: haufen.y, breite: kante, hoehe: kante, rund: false }
-  }
-  const masse = gruppenPinMasse(n)
-  return { x: haufen.x, y: haufen.y, ...masse, rund: false }
+  if (n === 1) return stadion(haufen.x, haufen.y, PIN_FLAECHE)
+  // Aufgefächert: der Kreis, in dem die Trefferflächen aller Höfe des Fächers liegen.
+  if (aufgefaechert) return { x: haufen.x, y: haufen.y, halbeStrecke: 0, radius: faecherRadius(n) + PIN_FLAECHE.hoehe / 2 }
+  const bild = gruppenPinMasse(n)
+  return stadion(haufen.x, haufen.y, trefferMasse(bild.breite, bild.hoehe))
 }
 
-/** Zwei runde Pins: echter Abstand; sonst die Rechtecke (Pille, Fächer). */
+/** Überdecken sich zwei Trefferflächen? Abstand der beiden Strecken gegen die Summe der Radien. */
 function ueberdecken(a: Flaeche, b: Flaeche): boolean {
-  const dx = Math.abs(a.x - b.x)
-  const dy = Math.abs(a.y - b.y)
-  if (a.rund && b.rund) return Math.hypot(dx, dy) < (a.breite + b.breite) / 2 + MARKEN_LUFT
-  return dx < (a.breite + b.breite) / 2 + MARKEN_LUFT && dy < (a.hoehe + b.hoehe) / 2 + MARKEN_LUFT
+  const luecke = Math.max(0, Math.abs(a.x - b.x) - a.halbeStrecke - b.halbeStrecke)
+  return Math.hypot(luecke, a.y - b.y) < a.radius + b.radius
 }
 
 /**
- * Pins, die sich bei dieser Zoomstufe überdecken, werden EIN Gruppen-Pin in
- * der Mitte seiner Höfe — so lange, bis sich keine zwei Marken mehr
- * überdecken (auch der breitere Gruppen-Pin nicht mit einem Nachbarn). Bei
+ * Pins, deren Trefferflächen sich bei dieser Zoomstufe überdecken, werden
+ * EIN Gruppen-Pin in der Mitte seiner Höfe — so lange, bis sich keine zwei
+ * Marken mehr überdecken (auch der breitere Gruppen-Pin nicht mit einem
+ * Nachbarn). Bei
  * maximaler Zoomstufe gibt es keine Gruppe mehr: Hineinzoomen ginge nicht
  * weiter, also stehen die Höfe leicht aufgefächert im Kreis um ihre Mitte.
  *
@@ -238,13 +267,11 @@ function ueberdecken(a: Flaeche, b: Flaeche): boolean {
 export function gruppierePins(pins: readonly PinPunkt[], zoom: number, maxZoom: number = KARTEN_KACHELN.maxZoom): KartenMarke[] {
   const z = Math.min(zoom, maxZoom)
   const aufgefaechert = zoom >= maxZoom
-  const punkt = new Map<string, { x: number; y: number }>()
   const haufen: Haufen[] = [...pins]
     .sort((a, b) => a.nummer - b.nummer)
     .map((pin) => {
       const p = weltPixel(pin.lat, pin.lon, z)
-      punkt.set(pin.slug, p)
-      return { mitglieder: [pin], x: p.x, y: p.y }
+      return { mitglieder: [pin], summe: p, x: p.x, y: p.y }
     })
 
   let zusammengelegt = true
@@ -252,16 +279,13 @@ export function gruppierePins(pins: readonly PinPunkt[], zoom: number, maxZoom: 
     zusammengelegt = false
     suche: for (let i = 0; i < haufen.length; i++) {
       for (let j = i + 1; j < haufen.length; j++) {
-        if (!ueberdecken(flaecheVon(haufen[i], aufgefaechert), flaecheVon(haufen[j], aufgefaechert))) continue
-        const mitglieder = [...haufen[i].mitglieder, ...haufen[j].mitglieder].sort((a, b) => a.nummer - b.nummer)
-        const summe = mitglieder.reduce(
-          (s, m) => {
-            const p = punkt.get(m.slug) as { x: number; y: number }
-            return { x: s.x + p.x, y: s.y + p.y }
-          },
-          { x: 0, y: 0 }
-        )
-        haufen[i] = { mitglieder, x: summe.x / mitglieder.length, y: summe.y / mitglieder.length }
+        const a = haufen[i]
+        const b = haufen[j]
+        if (!ueberdecken(flaecheVon(a, aufgefaechert), flaecheVon(b, aufgefaechert))) continue
+        // Die Mitte aus den Summen beider Haufen — jeder Hof zählt einmal, kein Nachschlagen.
+        const mitglieder = [...a.mitglieder, ...b.mitglieder].sort((p, q) => p.nummer - q.nummer)
+        const summe = { x: a.summe.x + b.summe.x, y: a.summe.y + b.summe.y }
+        haufen[i] = { mitglieder, summe, x: summe.x / mitglieder.length, y: summe.y / mitglieder.length }
         haufen.splice(j, 1)
         zusammengelegt = true
         break suche

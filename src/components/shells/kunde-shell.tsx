@@ -14,7 +14,7 @@ import { Zaehler } from '@/components/ui/zaehler'
 import { Wortmarke } from '@/components/shared/wortmarke'
 import { ThemeUmschalter, ThemeUmschalterZeile } from '@/components/shared/theme-umschalter'
 import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
-import { KUNDE_KOPF_ZEILE, KUNDE_SHELL_MASSE } from '@/components/shells/kunde-shell-masse'
+import { KUNDE_KOPF_ZEILE, KUNDE_SHELL_MASSE } from '@/lib/kunde-shell-masse'
 
 /*
  * Die Shell der Kundenseiten im neuen Design (Gate 2): Kopfzeile im Browser,
@@ -92,7 +92,7 @@ export function KundeShell({ sitzung, unterleiste = true, children }: KundeShell
   const korbAmHandy = korb !== null && !unterleiste
 
   return (
-    // Die Maße als CSS-Variablen (kunde-shell-masse.ts): Der Kartenmodus auf
+    // Die Maße als CSS-Variablen (src/lib/kunde-shell-masse.ts): Der Kartenmodus auf
     // /hoefe füllt damit genau den Platz zwischen Kopfzeile und Unterleiste.
     <div data-design="neu" className={cn('min-h-dvh bg-background text-foreground', KUNDE_SHELL_MASSE)}>
       <SprungLink />

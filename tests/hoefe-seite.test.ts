@@ -7,7 +7,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { createElement, type ComponentType, type ReactNode } from 'react'
+import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 vi.mock('next/navigation', () => ({
@@ -423,22 +423,114 @@ describe('Kartenmodus am Handy: Suche · Filter · Liste in einer Zeile (Nr. 52)
   })
 
   it('der Filter kompakt: ein Knopf mit Namen „Filter" und der Zahl der gesetzten Filter', () => {
-    type BlattProps = Omit<Parameters<typeof EntdeckenFilterblatt>[0], 'children'>
-    // Die Reihen kommen als Kind herein — hier keine, es geht um den Knopf.
-    const blatt = (anzahlFilter: number) =>
-      html(
-        createElement(
-          EntdeckenFilterblatt as unknown as ComponentType<BlattProps>,
-          { kompakt: true, anzahlFilter, anzeigenText: '3 Höfe anzeigen', zuruecksetzen: null, onOeffnen: () => {}, onAbbrechen: () => {} },
-          null
-        )
-      )
+    // Die Reihen kommen als Kind herein — hier keine (children: null), es geht um den Knopf.
+    const blatt = (anzahlFilter: number) => {
+      const eigenschaften: Parameters<typeof EntdeckenFilterblatt>[0] = {
+        kompakt: true,
+        anzahlFilter,
+        anzeigenText: '3 Höfe anzeigen',
+        zuruecksetzen: null,
+        onOeffnen: () => {},
+        onAbbrechen: () => {},
+        children: null,
+      }
+      return html(createElement(EntdeckenFilterblatt, eigenschaften))
+    }
     const mitZwei = blatt(2)
     expect(mitZwei).toMatch(/<button[^>]*>[\s\S]*Filter[\s\S]*<\/button>/)
     expect(mitZwei).toContain('2 gesetzt')
     expect(mitZwei).toContain('data-slot="zaehler"')
     // Ohne gesetzten Filter keine Zahl.
     expect(blatt(0)).not.toContain('data-slot="zaehler"')
+  })
+
+  it('kompakt legt sich die Vorschlagsliste über die Karte, statt sie beim Tippen zu schrumpfen (Runde 1)', () => {
+    const suche = quelle('src/components/hoefe/hoefe-suche.tsx')
+    const liste = suche.slice(suche.indexOf('role="listbox"'), suche.indexOf('{vorschlagsNamen.map('))
+    // Über der isolate-Ebene der Karte, unten bis über die Unterleiste, der Rest scrollt.
+    expect(liste).toMatch(/kompakt\s*\?[\s\S]*?'absolute top-full left-0 z-\[1000\] max-h-\[calc\(100dvh-var\(--kunde-kopf\)-var\(--kunde-unterleiste\)-4rem\)\][^']*overflow-y-auto[^']*'/)
+    expect(suche).toMatch(/<form role="search" onSubmit=\{absenden\} className=\{cn\('min-w-0 sm:flex-1', kompakt && 'relative'\)\}>/)
+    // Gegenprobe: in der Liste bleibt sie im Fluss.
+    expect(liste).toMatch(/: 'overflow-hidden'/)
+  })
+
+  it('der Bezugspunkt steht im Kartenmodus als Eintrag „Rund um …" — ein Knopf, wie der Umkreis', () => {
+    const ort = { lat: 48.2, lon: 13.5, name: '4910 Ried im Innkreis' }
+    const zeile = html(createElement(AktiveFilterZeile, { filter: LEERER_HOEFE_FILTER, ort }))
+    expect(zeile).toMatch(/<button type="button"[^>]*aria-label="Rund um 4910 Ried im Innkreis entfernen"/)
+    expect(zeile).toContain('Alle zurücksetzen')
+    // Gegenprobe: ohne Bezugspunkt keine Zeile.
+    expect(html(createElement(AktiveFilterZeile, { filter: LEERER_HOEFE_FILTER, ort: null }))).toBe('')
+  })
+
+  it('„Rund um …" und „Alle zurücksetzen" heben den Bezugspunkt auf', () => {
+    type Knoten = { props?: Record<string, unknown> & { children?: unknown } }
+    const finde = (knoten: unknown, passt: (k: Knoten) => boolean): Knoten | null => {
+      if (Array.isArray(knoten)) {
+        for (const kind of knoten) {
+          const treffer = finde(kind, passt)
+          if (treffer) return treffer
+        }
+        return null
+      }
+      if (!knoten || typeof knoten !== 'object') return null
+      const k = knoten as Knoten
+      if (passt(k)) return k
+      return finde(k.props?.children, passt)
+    }
+    let ortWeg = 0
+    let umkreisWeg = 0
+    const baum = AktiveFilterZeile({
+      filter: LEERER_HOEFE_FILTER,
+      umkreis: 25,
+      onWahl: () => {},
+      onUmkreisAufheben: () => (umkreisWeg += 1),
+      ort: { lat: 48.2, lon: 13.5 },
+      onOrtAufheben: () => (ortWeg += 1),
+    })
+    const eintrag = finde(baum, (k) => k.props?.['aria-label'] === 'Rund um deinen Standort entfernen')
+    ;(eintrag!.props!.onClick as () => void)()
+    expect([ortWeg, umkreisWeg]).toEqual([1, 0])
+    const alle = finde(baum, (k) => typeof k.props?.onNavigate === 'function' && JSON.stringify(k.props?.children ?? '').includes('Alle zurücksetzen'))
+    ;(alle!.props!.onNavigate as (e: { preventDefault: () => void }) => void)({ preventDefault() {} })
+    expect([ortWeg, umkreisWeg]).toEqual([2, 1])
+  })
+
+  it('im Kartenmodus kein Eintrag „Suche: …" für den getippten Text — er steht im Feld, die Karte schrumpft beim Tippen nicht', () => {
+    // Nur getippt: keine zweite Zeile.
+    expect(html(createElement(AktiveFilterZeile, { filter: { ...LEERER_HOEFE_FILTER, suchtext: 'Eier' }, suchtextImFeld: true }))).toBe('')
+    // Mit einem Filter daneben: der Filter ja, der Text nicht — und sein Entfernen behält den Text.
+    const zeile = html(createElement(AktiveFilterZeile, { filter: { ...LEERER_HOEFE_FILTER, siegel: ['BIO'], suchtext: 'Eier' }, suchtextImFeld: true }))
+    expect(zeile).toContain('aria-label="Bio entfernen"')
+    expect(zeile).toContain('href="/hoefe?q=Eier"')
+    expect(zeile).not.toContain('Suche: Eier')
+    // Gegenprobe: in der Liste steht der Eintrag.
+    expect(html(createElement(AktiveFilterZeile, { filter: { ...LEERER_HOEFE_FILTER, suchtext: 'Eier' } }))).toContain('aria-label="Suche: Eier entfernen"')
+    const client = quelle('src/components/hoefe/hoefe-client.tsx')
+    const kartenmodus = client.slice(client.indexOf("if (ansicht === 'karte') {"), client.lastIndexOf('return ('))
+    expect(kartenmodus).toMatch(/<AktiveFilterZeile[\s\S]*?suchtextImFeld[\s\S]*?\/>/)
+    expect(kartenmodus).toContain(".some((f) => f.schluessel !== 'suchtext')")
+  })
+
+  it('die Seite gibt den Bezugspunkt nur im Kartenmodus in „Aktive Filter" — die Liste zeigt ihn mit „Ort ändern"', () => {
+    const client = quelle('src/components/hoefe/hoefe-client.tsx')
+    const kopf = client.slice(client.indexOf('const kopfbereich = ('), client.indexOf('if (istBreit) {'))
+    const kartenmodus = client.slice(client.indexOf("if (ansicht === 'karte') {"), client.lastIndexOf('return ('))
+    expect(kartenmodus).toMatch(/<AktiveFilterZeile[\s\S]*?ort=\{bezugspunkt\}[\s\S]*?onOrtAufheben=\{ortAufheben\}[\s\S]*?\/>/)
+    expect(kartenmodus).toContain('aktiveFilter(filter, aktiverUmkreis, bezugspunkt).some(')
+    // Gegenprobe: der Kopf der Liste übergibt ihn nicht.
+    expect(kopf).toContain('<AktiveFilterZeile')
+    expect(kopf).not.toContain('ort={bezugspunkt}')
+  })
+
+  it('die Karte im Splitscreen behält ihren Rahmen; randlos nur im Kartenmodus am Handy (Runde 1)', () => {
+    const client = quelle('src/components/hoefe/hoefe-client.tsx')
+    const element = (teil: string) => teil.match(/<HoefeKarte[\s\S]*?\/>/)?.[0] ?? ''
+    const split = element(client.slice(client.indexOf('if (istBreit) {'), client.indexOf('const karussellHoefe')))
+    expect(split).toContain('hoeheKlasse="h-full"')
+    expect(split).not.toMatch(/\brandlos\b/)
+    // Gegenprobe: im Kartenmodus trägt die Karte die Eigenschaft — die Suche findet sie.
+    expect(element(client.slice(client.indexOf("if (ansicht === 'karte') {")))).toMatch(/\brandlos\b/)
   })
 
   it('der Titel bleibt für Vorleser, die Zeile zeigt Suche, Filter und Liste', () => {

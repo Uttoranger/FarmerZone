@@ -44,7 +44,7 @@ import {
   gehoertZu,
   type ProductCategoryValue,
 } from '@/lib/taxonomie'
-import { suchForm, type UmkreisStufe } from '@/lib/hofuebersicht'
+import { suchForm, type Bezugspunkt, type UmkreisStufe } from '@/lib/hofuebersicht'
 import { mitAnzahl } from '@/lib/format'
 
 // ─── Adresse ────────────────────────────────────────────────────────────────
@@ -226,19 +226,27 @@ export function sortierReihe(filter: HoefeFilter): EntdeckenChip[] {
 
 /** Ein gesetzter Filter: wie er heißt und welcher Filter ohne ihn gilt. */
 /**
- * `umkreis: true` markiert den Umkreis-Eintrag: Er lebt nur im Seitenzustand,
- * nie in der URL (#130) — sein `ohne` ist deshalb die unveränderte Adresse,
- * entfernt wird er über den Zustand, nicht über einen Link.
+ * `umkreis: true` markiert den Umkreis-Eintrag, `ort: true` den Bezugspunkt:
+ * Beide leben nur im Seitenzustand, nie in der URL (#130) — ihr `ohne` ist
+ * deshalb die unveränderte Adresse, entfernt werden sie über den Zustand,
+ * nicht über einen Link.
  */
-export type AktiverFilter = { schluessel: string; label: string; ohne: HoefeFilter; umkreis?: true }
+export type AktiverFilter = { schluessel: string; label: string; ohne: HoefeFilter; umkreis?: true; ort?: true }
+
+/** „Rund um 4910 Ried im Innkreis" bzw. „Rund um deinen Standort" — der Bezugspunkt als Eintrag. */
+export function ortFilterText(ort: Bezugspunkt): string {
+  return `Rund um ${ort.name ?? SUCHFELD_TEXT.rundUmStandort}`
+}
 
 /**
- * Jeder gesetzte Filter einzeln, in der Reihenfolge Suche → Umkreis →
- * Bereich → Kategorien → Sorten → Siegel → Tiere → Menge → Sortierung. Die
- * Ansicht (Liste/Karte) ist kein Filter und steht hier nie, der Umkreis
- * „Alle" (null) auch nicht.
+ * Jeder gesetzte Filter einzeln, in der Reihenfolge Suche → Bezugspunkt →
+ * Umkreis → Bereich → Kategorien → Sorten → Siegel → Tiere → Menge →
+ * Sortierung. Die Ansicht (Liste/Karte) ist kein Filter und steht hier nie,
+ * der Umkreis „Alle" (null) auch nicht. Den Bezugspunkt nennt nur, wer ihn
+ * übergibt — der Kartenmodus am Handy (Nr. 52), dem die Karte „Wir zeigen
+ * Höfe rund um …" fehlt; die Liste zeigt ihn dort samt „Ort ändern".
  */
-export function aktiveFilter(filter: HoefeFilter, umkreis: UmkreisStufe = null): AktiverFilter[] {
+export function aktiveFilter(filter: HoefeFilter, umkreis: UmkreisStufe = null, ort: Bezugspunkt | null = null): AktiverFilter[] {
   const liste: AktiverFilter[] = []
   for (const marke of filter.suchMarken) {
     liste.push({
@@ -249,6 +257,9 @@ export function aktiveFilter(filter: HoefeFilter, umkreis: UmkreisStufe = null):
   }
   if (filter.suchtext.trim() !== '') {
     liste.push({ schluessel: 'suchtext', label: `Suche: ${filter.suchtext.trim()}`, ohne: { ...filter, suchtext: '' } })
+  }
+  if (ort) {
+    liste.push({ schluessel: 'ort', label: ortFilterText(ort), ohne: filter, ort: true })
   }
   if (umkreis !== null) {
     liste.push({ schluessel: 'umkreis', label: `Umkreis: ${umkreis} km`, ohne: filter, umkreis: true })
