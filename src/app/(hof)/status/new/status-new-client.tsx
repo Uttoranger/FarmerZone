@@ -175,7 +175,11 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
           // „Gespeichert · Ansehen" (Nr. 49, Register N4): „Ansehen" führt in
           // den Reiter mit „So sieht’s die Kundin" — die Hofseite auf dem
           // Reiter Beiträge. Ab lg bleibt der bisherige Toast.
-          meldeGespeichertAnsehen({ beschreibung: meldung, onAnsehen: () => router.push(kundinAdresse('beitraege')) })
+          meldeGespeichertAnsehen({
+            abschnitt: 'beitraege',
+            beschreibung: meldung,
+            onAnsehen: () => router.push(kundinAdresse('beitraege')),
+          })
         } else {
           toast.success(meldung)
         }

@@ -2,7 +2,7 @@
 
 import { toast } from 'sonner'
 import { CircleCheck } from 'lucide-react'
-import { MEIN_HOF_ANSICHT_TEXT, UMSCHALTER_AB_PX } from '@/lib/mein-hof-ansicht'
+import { MEIN_HOF_ANSICHT_TEXT, UMSCHALTER_AB_PX, gespeichertHinweisId, type GespeichertAbschnitt } from '@/lib/mein-hof-ansicht'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
 
@@ -60,23 +60,35 @@ export function GespeichertAnsehenKarte({
  * Zeigt „Gespeichert · Ansehen" — nur unter lg, wo es den Umschalter gibt.
  * Ab lg steht die Vorschau neben der Liste (Hofseite) bzw. gibt es keine
  * Kundenansicht (Beiträge): Dort bleibt der bisherige Toast mit
- * `beschreibung` bzw. „Gespeichert". Nur im Handler aufrufen, nie beim Rendern.
+ * `beschreibung` bzw. „Gespeichert". Je `abschnitt` gibt es den Hinweis nur
+ * einmal (gespeichertHinweisId): Ein neues Speichern ersetzt den offenen.
+ * Nur im Handler aufrufen, nie beim Rendern.
  */
-export function meldeGespeichertAnsehen({ beschreibung, onAnsehen }: { beschreibung?: string; onAnsehen: () => void }): void {
+export function meldeGespeichertAnsehen({
+  beschreibung,
+  onAnsehen,
+  abschnitt = null,
+}: {
+  beschreibung?: string
+  onAnsehen: () => void
+  /** Wo gespeichert wurde — dieselbe Stelle ersetzt ihren Hinweis, statt einen zweiten zu stapeln. */
+  abschnitt?: GespeichertAbschnitt | null
+}): void {
+  const id = gespeichertHinweisId(abschnitt)
   if (window.matchMedia(`(min-width: ${UMSCHALTER_AB_PX.lg}px)`).matches) {
-    toast.success(beschreibung ?? MEIN_HOF_ANSICHT_TEXT.gespeichert)
+    toast.success(beschreibung ?? MEIN_HOF_ANSICHT_TEXT.gespeichert, { id })
     return
   }
   toast.custom(
-    (id) => (
+    (toastId) => (
       <GespeichertAnsehenKarte
         beschreibung={beschreibung}
         onAnsehen={() => {
-          toast.dismiss(id)
+          toast.dismiss(toastId)
           onAnsehen()
         }}
       />
     ),
-    { duration: DAUER_MS }
+    { id, duration: DAUER_MS }
   )
 }

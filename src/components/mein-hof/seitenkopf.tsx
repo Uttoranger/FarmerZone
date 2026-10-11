@@ -4,6 +4,7 @@ import type { MeinHofReiterId } from '@/lib/bauern-navigation'
 import { hofInitialen } from '@/lib/hof-initialen'
 import { schildTon, titelbildVerlauf } from '@/lib/mein-hof'
 import { vorschauLink } from '@/lib/hofseite-vorschau'
+import { MEIN_HOF_ANSICHT_TEXT } from '@/lib/mein-hof-ansicht'
 import type { MeinHofKopfDaten } from '@/server/queries/farm'
 import { AdresseKopierenKnopf } from '@/components/farmer/adresse-kopieren-knopf'
 import { HofTeilenKnopf } from '@/components/farmer/hof-teilen-knopf'
@@ -69,7 +70,7 @@ function Adresse({ hof }: { hof: MeinHofKopfDaten }) {
         className={cn('min-w-0 truncate rounded-sm text-[13px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline', FOKUS_RAHMEN)}
       >
         {hof.adresse.anzeige}
-        <span className="sr-only"> (öffnet in neuem Tab)</span>
+        <span className="sr-only">{MEIN_HOF_ANSICHT_TEXT.neuerTabHinweis}</span>
       </a>
       <AdresseKopierenKnopf url={hof.adresse.url} className={cn('text-muted-foreground hover:bg-muted hover:text-foreground', FOKUS_RAHMEN)} />
     </span>
@@ -82,9 +83,9 @@ function Knoepfe({ hof, breit }: { hof: MeinHofKopfDaten; breit: boolean }) {
       {hof.zustand.oeffentlich && <HofTeilenKnopf name={hof.name} slug={hof.slug} className={KNOPF} label="Teilen" />}
       {breit ? (
         <a href={vorschauLink(hof.slug)} target="_blank" rel="noopener noreferrer" className={KNOPF}>
-          Kundenansicht
+          {MEIN_HOF_ANSICHT_TEXT.kundenansicht}
           <ArrowUpRight className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-          <span className="sr-only"> (öffnet in neuem Tab)</span>
+          <span className="sr-only">{MEIN_HOF_ANSICHT_TEXT.neuerTabHinweis}</span>
         </a>
       ) : (
         // Unter lg: schaltet auf „So sieht’s die Kundin" (Register N4), kein neuer Tab.

@@ -23,7 +23,7 @@ export function KundenansichtKnopf({ slug, className }: { slug: string; classNam
       <a href={vorschauLink(slug)} target="_blank" rel="noopener noreferrer" className={className}>
         {MEIN_HOF_ANSICHT_TEXT.kundenansicht}
         <ArrowUpRight className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-        <span className="sr-only"> (öffnet in neuem Tab)</span>
+        <span className="sr-only">{MEIN_HOF_ANSICHT_TEXT.neuerTabHinweis}</span>
       </a>
     )
   }
