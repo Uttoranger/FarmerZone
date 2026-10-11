@@ -283,6 +283,11 @@ describe('Bestellseite — der Ausweg bei ungültigem Link führt zur Hofübersi
     erwarteAusweg(await seitenLinks('order-1', undefined, 'fremder-hof'))
   })
 
+  it('gültige Signatur, aber die Bestellung gibt es nicht', async () => {
+    findUnique.mockResolvedValue(null as never)
+    erwarteAusweg(await seitenLinks('order-1', bestellSignatur('order-1'), 'fremder-hof'))
+  })
+
   it('gültige Signatur, aber ein fremder Hof in der Adresse', async () => {
     findUnique.mockResolvedValue(bestellung() as never)
     erwarteAusweg(await seitenLinks('order-1', bestellSignatur('order-1'), 'fremder-hof'))
