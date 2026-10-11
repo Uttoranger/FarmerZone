@@ -14,6 +14,7 @@ import {
   formatiereAbholung,
   formatiereEntfernung,
   produktInitiale,
+  type Bezugspunkt,
   type NaechsteAbholung,
   type UmkreisStufe,
 } from '@/lib/hofuebersicht'
@@ -108,23 +109,44 @@ export function ChipReihe({
 
 /**
  * „Aktive Filter: [Suche: Eier ×] [Bio ×] Alle zurücksetzen" (Mockup
- * web-k1-suche-filter). Jeder Eintrag ist ein Link auf die Adresse ohne ihn.
+ * web-k1-suche-filter). Jeder Eintrag ist ein Link auf die Adresse ohne ihn;
+ * Umkreis und Bezugspunkt (nur Seitenzustand) sind Knöpfe.
  */
 export function AktiveFilterZeile({
   filter,
   onWahl,
   umkreis = null,
   onUmkreisAufheben,
+  ort = null,
+  onOrtAufheben,
+  suchtextImFeld = false,
 }: {
   filter: HoefeFilter
   onWahl?: FilterWahl
   /** Der Umkreis lebt nur im Seitenzustand (nie in der URL) — er kommt deshalb eigens herein. */
   umkreis?: UmkreisStufe
   onUmkreisAufheben?: () => void
+  /** Der Bezugspunkt als Eintrag — nur im Kartenmodus am Handy, dem die Karte
+   *  „Wir zeigen Höfe rund um …" samt „Ort ändern" fehlt (Nr. 52). */
+  ort?: Bezugspunkt | null
+  onOrtAufheben?: () => void
+  /** Der getippte Suchtext steht schon im Feld daneben (Kartenmodus am Handy):
+   *  kein eigener Eintrag „Suche: …" — sonst erschiene mit dem ersten Zeichen
+   *  eine zweite Zeile, und die Karte schrumpfte beim Tippen (Nr. 52, Runde 1).
+   *  Übernommene Such-Marken bleiben Einträge, sie stehen in keinem Feld. */
+  suchtextImFeld?: boolean
 }): React.JSX.Element | null {
-  const aktiv = aktiveFilter(filter, umkreis)
+  const aktiv = aktiveFilter(filter, umkreis, ort).filter((f) => !(suchtextImFeld && f.schluessel === 'suchtext'))
   if (aktiv.length === 0) return null
   const zurueck = alleZuruecksetzen(filter)
+  // „Alle zurücksetzen" nimmt alles, was die Zeile zeigt — mit dem Bezugspunkt, wenn er darin steht.
+  const zuruecksetzenDanach =
+    onUmkreisAufheben || (ort && onOrtAufheben)
+      ? () => {
+          onUmkreisAufheben?.()
+          if (ort) onOrtAufheben?.()
+        }
+      : undefined
   const eintrag = cn(
     "relative inline-flex h-9 max-w-full items-center gap-1.5 rounded-full border border-border bg-card px-3 text-[13px] text-foreground transition-colors duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] hover:bg-muted",
     FOKUS_RAHMEN
@@ -144,9 +166,15 @@ export function AktiveFilterZeile({
       <ul aria-labelledby="aktive-filter" className="flex min-w-0 flex-wrap gap-2">
         {aktiv.map((f) => (
           <li key={f.schluessel} className="min-w-0">
-            {f.umkreis ? (
-              // Ein Knopf, kein Link: Der Umkreis steht in keiner Adresse.
-              <button type="button" onClick={onUmkreisAufheben} aria-label={`${f.label} entfernen`} title={f.label} className={eintrag}>
+            {f.umkreis || f.ort ? (
+              // Ein Knopf, kein Link: Umkreis und Bezugspunkt stehen in keiner Adresse.
+              <button
+                type="button"
+                onClick={f.ort ? onOrtAufheben : onUmkreisAufheben}
+                aria-label={`${f.label} entfernen`}
+                title={f.label}
+                className={eintrag}
+              >
                 {inhalt(f.label)}
               </button>
             ) : (
@@ -166,7 +194,7 @@ export function AktiveFilterZeile({
       </ul>
       <Link
         href={hoefeHref(zurueck)}
-        onNavigate={beimNavigieren(zurueck, onWahl, onUmkreisAufheben)}
+        onNavigate={beimNavigieren(zurueck, onWahl, zuruecksetzenDanach)}
         prefetch={onWahl ? false : undefined}
         className={cn(
           'inline-flex min-h-11 items-center rounded-lg px-1 text-[13px] font-semibold text-status-fertig hover:underline',

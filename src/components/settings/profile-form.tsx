@@ -33,6 +33,8 @@ import {
   type Land,
 } from '@/lib/laender'
 import type { KartenZiel } from '@/components/settings/standort-karte'
+import { KarteLaedt } from '@/components/karte/karte-laedt'
+import { STANDORT_KARTE_RAHMEN } from '@/components/karte/karten-masse'
 import { BETRIEBSNUMMER_ANKER, BETRIEBSSTATUS, BETRIEBSSTATUS_VALUES, type BetriebsstatusValue } from '@/lib/taxonomie'
 import { profilBearbeitenSchema } from '@/schemas/hofprofil'
 import { EMAIL_MAX, HOFNAME_MAX, PERSONENNAME_MAX, TELEFON_MAX } from '@/lib/eingabegrenzen'
@@ -42,8 +44,12 @@ import { useNachSpeichern } from '@/components/hof-einstellungen/use-nach-speich
 import { EINSTELLUNG_MEIN_AUFTRITT, einstellungsWeg } from '@/lib/bauern-navigation'
 import { cn } from '@/lib/utils'
 
-// Nur clientseitig: Leaflet greift beim Import auf window zu.
-const StandortKarte = dynamic(() => import('@/components/settings/standort-karte'), { ssr: false })
+// Nur clientseitig: Leaflet greift beim Import auf window zu. Bis die Karte
+// da ist, steht der Platzhalter in ihrer Größe (Nr. 52) — nichts springt.
+const StandortKarte = dynamic(() => import('@/components/settings/standort-karte'), {
+  ssr: false,
+  loading: () => <KarteLaedt className={STANDORT_KARTE_RAHMEN} />,
+})
 
 /** Obergrenzen je Feld — dieselben, die updateProfile prüft (src/lib/eingabegrenzen.ts). */
 const GRENZE: Partial<Record<keyof ProfileFormData, number>> = {
@@ -326,15 +332,19 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
         </button>
 
         {/* Die Karte dauerhaft unter den Adressfeldern — beide Richtungen:
-            Die Suche fährt die Karte, das Schieben füllt die Adresse. */}
-        <StandortKarte
-          start={start}
-          ziel={ziel}
-          hinweis={hinweis}
-          kandidaten={kandidaten}
-          onMitteVerschoben={punktGewaehlt}
-          onAdresseAnfrage={adresseVomPunkt}
-        />
+            Die Suche fährt die Karte, das Schieben füllt die Adresse. Die
+            ruhige Zeile darüber steht hier statt in der Karte: Sie ist schon da,
+            während die Karte nachlädt, und schiebt danach nichts mehr. */}
+        <div>
+          {hinweis && <p className="mb-2 text-xs text-muted-foreground">{hinweis}</p>}
+          <StandortKarte
+            start={start}
+            ziel={ziel}
+            kandidaten={kandidaten}
+            onMitteVerschoben={punktGewaehlt}
+            onAdresseAnfrage={adresseVomPunkt}
+          />
+        </div>
       </div>
 
       <div className="bg-card rounded-xl border border-border p-4 space-y-4">

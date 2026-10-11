@@ -16,6 +16,7 @@ import {
   SUCHFELD_TEXT,
   aktiveFilter,
   enterImSuchfeld,
+  ortFilterText,
   ortVorschlagAnbieten,
   ortVorschlagText,
   istPostleitzahl,
@@ -304,6 +305,28 @@ describe('aktive Filter und „Alle zurücksetzen"', () => {
     // Gegenprobe: „Alle" (null) ist kein Filter, und kein anderer Eintrag trägt die Marke.
     expect(aktiveFilter(LEERER_HOEFE_FILTER, null)).toEqual([])
     expect(aktiveFilter(gesetzt).some((f) => f.umkreis)).toBe(false)
+  })
+
+  // Der Kartenmodus am Handy zeigt den Bezugspunkt nur hier — die Karte „Wir
+  // zeigen Höfe rund um …" samt „Ort ändern" steht dort nicht (Nr. 52, Runde 1).
+  it('ein übergebener Bezugspunkt ist ein eigener Eintrag „Rund um …", nach der Suche, vor dem Umkreis', () => {
+    const ort = { lat: 48.2, lon: 13.5, name: '4910 Ried im Innkreis' }
+    const liste = aktiveFilter(gesetzt, 25, ort)
+    expect(liste.map((f) => f.label).slice(0, 4)).toEqual(['Suche: Stroh', 'Suche: Heu', 'Rund um 4910 Ried im Innkreis', 'Umkreis: 25 km'])
+    const eintrag = liste.find((f) => f.ort)
+    expect(eintrag?.schluessel).toBe('ort')
+    // Er lebt nicht in der URL: Entfernen ändert keinen Filter der Adresse.
+    expect(eintrag?.ohne).toEqual(gesetzt)
+    expect(ortFilterText(ort)).toBe('Rund um 4910 Ried im Innkreis')
+    // Der eigene Standort trägt keinen Namen.
+    expect(ortFilterText({ lat: 48.2, lon: 13.5 })).toBe('Rund um deinen Standort')
+    // Die Zahl am Filter-Knopf bleibt, wie sie war — sie bekommt den Bezugspunkt nie.
+    expect(zaehleFilter(gesetzt, 25)).toBe(6)
+  })
+
+  it('Gegenprobe: ohne Bezugspunkt kein Eintrag „Rund um …"', () => {
+    expect(aktiveFilter(gesetzt, 25).some((f) => f.ort || f.label.startsWith('Rund um'))).toBe(false)
+    expect(aktiveFilter(LEERER_HOEFE_FILTER, null, null)).toEqual([])
   })
 })
 
