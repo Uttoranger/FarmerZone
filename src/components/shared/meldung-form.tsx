@@ -129,7 +129,7 @@ export function MeldungForm({
                 onClick={() => setArt(wert)}
                 aria-pressed={aktiv}
                 className={cn(
-                  'min-h-12 rounded-xl p-3 text-left text-[13.5px] font-semibold text-foreground transition-colors duration-[250ms] sm:text-center',
+                  'min-h-12 rounded-[12px] p-3 text-left text-[13.5px] font-semibold text-foreground transition-colors duration-[250ms] sm:text-center',
                   aktiv ? 'border-[1.5px] border-accent bg-accent/15' : 'border border-border bg-background hover:bg-muted',
                   FOKUS_RAHMEN
                 )}
@@ -169,7 +169,7 @@ export function MeldungForm({
               laufenden Upload aus — dasselbe Muster wie das Leeren des Feldes. */}
           {upload.fileInput}
           {screenshotUrl ? (
-            <div className="flex items-center gap-3 rounded-xl border border-border px-3.5 py-3">
+            <div className="flex items-center gap-3 rounded-[12px] border border-border px-3.5 py-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={screenshotUrl} alt="Bildschirmfoto zur Meldung" className="size-16 rounded-lg border border-border object-cover" />
               <span className="min-w-0 flex-1 text-[13.5px] text-foreground">Bildschirmfoto angehängt</span>
@@ -184,7 +184,7 @@ export function MeldungForm({
               onClick={upload.openFilePicker}
               disabled={upload.isUploading}
               className={cn(
-                'flex min-h-12 w-full items-center gap-3 rounded-xl border-[1.5px] border-dashed border-border px-3.5 py-3 text-left text-[13.5px] text-foreground transition-colors duration-[250ms] hover:bg-muted disabled:opacity-60',
+                'flex min-h-12 w-full items-center gap-3 rounded-[12px] border-[1.5px] border-dashed border-border px-3.5 py-3 text-left text-[13.5px] text-foreground transition-colors duration-[250ms] hover:bg-muted disabled:opacity-60',
                 FOKUS_RAHMEN
               )}
             >

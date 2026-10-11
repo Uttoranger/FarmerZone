@@ -17,9 +17,9 @@ export default function ProblemMeldenLaden() {
           <div className="h-4 w-64 max-w-full rounded bg-app-trough" />
           <div className="h-3 w-28 rounded bg-app-chip" />
           <div className="grid gap-2 sm:grid-cols-3">
-            <div className="h-12 rounded-xl bg-muted" />
-            <div className="h-12 rounded-xl bg-muted" />
-            <div className="h-12 rounded-xl bg-muted" />
+            <div className="h-12 rounded-[12px] bg-muted" />
+            <div className="h-12 rounded-[12px] bg-muted" />
+            <div className="h-12 rounded-[12px] bg-muted" />
           </div>
           <div className="h-3 w-32 rounded bg-app-chip" />
           <div className="h-24 rounded-[11px] bg-muted" />
