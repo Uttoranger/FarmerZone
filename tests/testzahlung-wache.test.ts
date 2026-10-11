@@ -10,26 +10,46 @@
  *     bzw. `process.env.STRIPE_LIVE_AB` nur in src/lib/umgebung-server.ts;
  *     `<werte>.STRIPE_LIVE_AB` nur in src/lib/umgebung.ts (dort wird der
  *     übergebene Rohwert rein geprüft).
- *  2. Den Stichtag (`STRIPE_LIVE_AB`) importiert nur die Servergrenze
- *     (src/server/**) — reine Regeln bekommen ihn als Parameter.
+ *  2. Den Stichtag holt nur die Servergrenze (src/server/**): der Import von
+ *     `STRIPE_LIVE_AB` und, seit Runde 1, `UMGEBUNG.stripeLiveAb` — reine
+ *     Regeln bekommen ihn als Parameter.
  *  3. Eine zweite Fassung der Regel außerhalb von testzahlung.ts: ein
  *     Größer/Kleiner-Vergleich, ein Prisma-Vergleich (`lt`, `lte`, `gt`,
  *     `gte`) oder eine Vorlage (rohes SQL, Text) mit dem Stichtag; der
  *     Stichtag unter anderem Namen (`const ab = STRIPE_LIVE_AB`); ein
  *     Prisma-Filter aus `paymentMethod: 'ONLINE'` und einem Bereich auf
  *     `createdAt`; rohes SQL mit `"paymentMethod" = 'ONLINE' AND "createdAt" <`.
- *  4. Die Regel mit `null` abgeschaltet: ein Aufruf der Regel oder einer
- *     Summe, die sie anwendet, mit dem Literal `null` als Stichtag. Einzige
- *     Ausnahme: `topfVonBestellung(b, null)` in `testzahlungenBetroffen`
- *     (lib/finanzen.ts) — dort ist genau „ohne die Regel" die Frage.
+ *  4. Die Regel abgeschaltet: ein Aufruf der Regel oder einer Summe, die sie
+ *     anwendet, mit dem Literal `null` als Stichtag; seit Runde 1 auch ein
+ *     eigenes `AND` im selben Objekt wie `...umsatzBestellungWhere(…)` oder
+ *     `...ohneTestzahlungenWhere(…)` — die Regel steckt dort im `AND`, ein
+ *     zweites ersetzte sie still (ein eigenes `NOT` daneben ist erlaubt).
  *  5. `getDashboardStats` ist entfallen (seit Heute ungenutzt, Nr. 55) und
  *     kommt nicht zurück.
  *
- * Grenzen (bewusst): Die Wache erkennt den Stichtag an seinen Namen
- * (`STRIPE_LIVE_AB`, `stripeLiveAb`). Ein unter anderem Namen weitergereichter
- * Wert, der nicht über `const x = …` umbenannt wurde (etwa als Parameter mit
- * fremdem Namen), fällt nur auf, wenn er an einer der Stellen aus 4 als `null`
- * ankommt. Gegenproben unten zeigen, dass jede Suche anschlägt.
+ * Zwei benannte Ausnahmen: `topfVonBestellung(b, null)` in
+ * `testzahlungenBetroffen` (lib/finanzen.ts) — dort ist genau „ohne die
+ * Regel" die Frage —, und `stichtagWeitInDerZukunft` (lib/umgebung.ts), die
+ * den Wert der Variable mit `jetzt` vergleicht: eine Plausibilitätsprüfung,
+ * keine Fassung der Regel.
+ *
+ * Grenzen (bewusst, Stand Runde 1):
+ *  - Den Stichtag erkennt die Wache an seinen Namen (`STRIPE_LIVE_AB`,
+ *    `stripeLiveAb`). Unter fremdem Namen weitergereicht — etwa als Parameter
+ *    `ab`, ohne `const x = …` —, sieht sie einen eigenen Vergleich nicht.
+ *  - `null` erkennt sie nur als Literal. Eine Variable, die `null` trägt
+ *    (`const keiner = null; f(x, keiner)`), geht durch.
+ *  - `UMGEBUNG.stripeLiveAb` meldet sie außerhalb von src/server; ein unter
+ *    anderem Namen eingebundenes `UMGEBUNG` nicht.
+ *  - Ein eigenes `AND` sieht sie nur im selben Objekt wie der Spread der
+ *    Bedingung, nicht über eine Zwischenvariable (`const w = umsatzBestellungWhere(…);
+ *    f({ ...w, AND: … })`).
+ *  - Eine NEUE Summe, die die Regel gar nicht benutzt (etwa ein `aggregate`
+ *    über `totalAmount` ohne `umsatzBestellungWhere`), findet sie
+ *    grundsätzlich nicht. Dafür stehen die Regel in CODING_STANDARDS §2
+ *    („Umsatz und Servicegebühr ohne Testzahlungen") und die
+ *    Integrationstests.
+ * Gegenproben unten zeigen, dass jede Suche anschlägt.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -62,6 +82,7 @@ const STICHTAG_ARGUMENT: Record<string, number> = {
   servicegebuehrenImMonat: 2,
   fasseKundinZusammen: 3,
   umsatzBestellungWhere: 2,
+  umsatzTestzahlungenWhere: 2,
   umsatzBuchungen: 2,
   monatsSpaltenJeHof: 2,
   testzahlungenHinweisFuerHof: 2,
@@ -78,6 +99,9 @@ const STICHTAG_ARGUMENT: Record<string, number> = {
   getCustomersForFarm: 2,
   getCustomerDetail: 3,
 }
+
+/** Bedingungen, die die Regel als `AND` mitbringen — ein eigenes `AND` im selben Objekt verdrängte sie. */
+const REGEL_IM_AND = new Set(['umsatzBestellungWhere', 'ohneTestzahlungenWhere'])
 
 type Fund = { datei: string; zeile: number; grund: string }
 
@@ -171,10 +195,21 @@ function pruefeQuelle(datei: string, text: string): Fund[] {
       const holt = benannt && ts.isNamedImports(benannt) && benannt.elements.some((e) => (e.propertyName ?? e.name).text === 'STRIPE_LIVE_AB')
       if (holt && !datei.startsWith('server/')) melde(knoten, 'importiert den Stichtag außerhalb der Servergrenze (src/server)')
     }
+    if (
+      ts.isPropertyAccessExpression(knoten) &&
+      knoten.name.text === 'stripeLiveAb' &&
+      ts.isIdentifier(knoten.expression) &&
+      knoten.expression.text === 'UMGEBUNG' &&
+      datei !== LESE_DATEI &&
+      !datei.startsWith('server/')
+    ) {
+      melde(knoten, 'liest den Stichtag über UMGEBUNG außerhalb der Servergrenze (src/server)')
+    }
 
     // 3. Zweite Fassung der Regel
     if (!regelDatei) {
-      if (ts.isBinaryExpression(knoten) && VERGLEICH.has(knoten.operatorToken.kind) && enthaeltStichtag(knoten)) {
+      const plausibilitaet = datei === PRUEF_DATEI && umschliessendeFunktion(knoten) === 'stichtagWeitInDerZukunft'
+      if (ts.isBinaryExpression(knoten) && VERGLEICH.has(knoten.operatorToken.kind) && enthaeltStichtag(knoten) && !plausibilitaet) {
         melde(knoten, 'vergleicht selbst mit dem Stichtag (Regel: src/lib/testzahlung.ts)')
       }
       if (ts.isPropertyAssignment(knoten) && PRISMA_BEREICH.has(eigenschaftsName(knoten.name) ?? '') && enthaeltStichtag(knoten.initializer)) {
@@ -216,6 +251,17 @@ function pruefeQuelle(datei: string, text: string): Fund[] {
         const erlaubt = datei === 'lib/finanzen.ts' && name === 'topfVonBestellung' && umschliessendeFunktion(knoten) === 'testzahlungenBetroffen'
         if (!erlaubt) melde(knoten, `${name} mit null als Stichtag — die Regel wäre abgeschaltet`)
       }
+    }
+    if (ts.isObjectLiteralExpression(knoten)) {
+      const traegtRegel = knoten.properties.some((p) => {
+        if (!ts.isSpreadAssignment(p)) return false
+        const a = abgestreift(p.expression)
+        return ts.isCallExpression(a) && REGEL_IM_AND.has(aufrufName(a) ?? '')
+      })
+      const eigenesAnd = knoten.properties.some(
+        (p) => (ts.isPropertyAssignment(p) || ts.isShorthandPropertyAssignment(p)) && eigenschaftsName(p.name) === 'AND'
+      )
+      if (traegtRegel && eigenesAnd) melde(knoten, 'eigenes AND neben der Regel ersetzte sie still — die Bedingung als Element der AND-Liste nehmen')
     }
 
     // 5. getDashboardStats bleibt weg
@@ -269,6 +315,15 @@ describe('Gegenproben — jede Suche schlägt an', () => {
     expect(gruende('app/(hof)/analytics/page.tsx', zeile)).toContain('importiert den Stichtag außerhalb der Servergrenze (src/server)')
     expect(gruende('components/x.tsx', "import { STRIPE_LIVE_AB as ab } from '@/lib/umgebung-server'")).toHaveLength(1)
     expect(gruende('server/queries/heute.ts', zeile)).toEqual([])
+    // Über UMGEBUNG am Import vorbei (Runde 1):
+    expect(gruende('components/x.tsx', 'f(UMGEBUNG.stripeLiveAb)')).toEqual([
+      'liest den Stichtag über UMGEBUNG außerhalb der Servergrenze (src/server)',
+    ])
+    expect(gruende('lib/hof-kunden.ts', 'const s = UMGEBUNG.stripeLiveAb')).toContain(
+      'liest den Stichtag über UMGEBUNG außerhalb der Servergrenze (src/server)'
+    )
+    expect(gruende('server/queries/x.ts', 'f(UMGEBUNG.stripeLiveAb)')).toEqual([])
+    expect(gruende('lib/umgebung-server.ts', 'export const STRIPE_LIVE_AB: Date | null = UMGEBUNG.stripeLiveAb')).toEqual([])
   })
 
   it('3. eine zweite Fassung der Regel', () => {
@@ -288,6 +343,13 @@ describe('Gegenproben — jede Suche schlägt an', () => {
     // Erlaubt: dieselben Formen in der Regel-Datei, Weiterreichen als Argument,
     // Abfrage „ist einer gesetzt", und die Kasse mit Zahlart und Zeitpunkt (fristVon).
     expect(gruende('lib/testzahlung.ts', 'const t = b.createdAt.getTime() < stripeLiveAb.getTime()')).toEqual([])
+    // Die Plausibilitätsprüfung des Werts ist erlaubt — derselbe Vergleich in einer anderen Funktion nicht.
+    expect(
+      gruende('lib/umgebung.ts', 'export function stichtagWeitInDerZukunft(stripeLiveAb, jetzt) { return stripeLiveAb.getTime() - jetzt.getTime() > 1 }')
+    ).toEqual([])
+    expect(gruende('lib/umgebung.ts', 'export function andere(stripeLiveAb, b) { return b.createdAt < stripeLiveAb }')).toContain(
+      'vergleicht selbst mit dem Stichtag (Regel: src/lib/testzahlung.ts)'
+    )
     expect(gruende('server/x.ts', 'umsatzBestellungWhere(farmId, fenster, stripeLiveAb)')).toEqual([])
     expect(gruende('server/x.ts', 'const q = Prisma.sql`WHERE ${von} < 1 AND ${ohneTestzahlungenSql(Prisma.sql, stripeLiveAb)}`')).toEqual([])
     expect(gruende('server/x.ts', 'if (stripeLiveAb === null) return null')).toEqual([])
@@ -305,6 +367,17 @@ describe('Gegenproben — jede Suche schlägt an', () => {
     expect(gruende('lib/finanzen.ts', 'export function testzahlungenBetroffen() { return topfVonBestellung(b, null) }')).toEqual([])
     expect(gruende('server/x.ts', 'getHeute(farm.id, jetzt, freigabe)')).toEqual([])
     expect(gruende('server/x.ts', 'fasseKundinZusammen(liste, abo ?? null, jetzt, stripeLiveAb)')).toEqual([])
+  })
+
+  it('4. die Regel von einem eigenen AND verdrängt (Runde 1)', () => {
+    const grund = 'eigenes AND neben der Regel ersetzte sie still — die Bedingung als Element der AND-Liste nehmen'
+    expect(gruende('server/x.ts', 'f({ ...umsatzBestellungWhere(farmId, fenster, stripeLiveAb), AND: [{ total: { gt: 0 } }] })')).toEqual([grund])
+    expect(gruende('server/x.ts', 'f({ AND: liste, ...ohneTestzahlungenWhere(stripeLiveAb) })')).toEqual([grund])
+    expect(gruende('server/x.ts', 'f({ ...umsatzBestellungWhere(farmId, fenster, stripeLiveAb), AND })')).toEqual([grund])
+    // Erlaubt: ein eigenes NOT daneben, die Regel als Element der AND-Liste, ein AND neben anderem Spread.
+    expect(gruende('server/x.ts', 'f({ ...umsatzBestellungWhere(farmId, fenster, stripeLiveAb), NOT: { id: x } })')).toEqual([])
+    expect(gruende('server/x.ts', 'f({ farmId, AND: [ohneTestzahlungenWhere(stripeLiveAb), { total: { gt: 0 } }] })')).toEqual([])
+    expect(gruende('lib/umsatz.ts', 'f({ ...abgeholtImFenster(farmId, fenster), AND: [testzahlungWhere(stripeLiveAb)] })')).toEqual([])
   })
 
   it('5. getDashboardStats', () => {

@@ -33,6 +33,19 @@ import { uhrzeitInWien } from '@/lib/fristen'
 /** Die Zahlart, die vor dem Stichtag eine Testzahlung ist — der Weg über Stripe. */
 export const TESTZAHLUNG_ZAHLART = 'ONLINE' satisfies Zahlungsart
 
+/**
+ * Was eine Seite an Summen zeigt — daran misst sich ihre Hinweiszeile: Sie
+ * steht genau dann, wenn eine dieser Zahlen eine Testzahlung auslässt.
+ *   umsatz          Fenster der Umsatzregel (abgeholte Bestellungen,
+ *                   `umsatzBestellungWhere`), je Summe eines;
+ *   gebuehrenMonat  Wiener Monat der „Servicegebühren dieses Monats"
+ *                   (Bestelleingang, `topfVonBestellung`), nur auf der Auswertung.
+ */
+export type GezeigteSummen = {
+  umsatz: readonly { von: Date; bis: Date }[]
+  gebuehrenMonat?: { von: Date; bis: Date }
+}
+
 /** Was die Prüfung von einer Bestellung braucht. */
 export type BestellungFuerTestzahlung = { paymentMethod: Zahlungsart; createdAt: Date }
 
@@ -53,9 +66,14 @@ export function testzahlungWhere(stripeLiveAb: Date): Prisma.OrderWhereInput {
  * Objekt: Die Bedingung bleibt Zeichen für Zeichen, wie sie vor Nr. 55 war.
  * `NOT` über beide Felder heißt „nicht (online UND vor dem Stichtag)" — beide
  * Spalten sind Pflicht, NULL kann die Verneinung nicht kippen.
+ *
+ * Als Element von `AND`, nicht als `NOT` oben: Ein `NOT`, das ein Aufrufer
+ * danach selbst setzt (`{ ...umsatzBestellungWhere(…), NOT: … }`), ersetzte
+ * sonst still die Regel. Wer selbst `AND` braucht, nimmt diese Bedingung als
+ * eines seiner Elemente.
  */
 export function ohneTestzahlungenWhere(stripeLiveAb: Date | null): Prisma.OrderWhereInput {
-  return stripeLiveAb === null ? {} : { NOT: testzahlungWhere(stripeLiveAb) }
+  return stripeLiveAb === null ? {} : { AND: [{ NOT: testzahlungWhere(stripeLiveAb) }] }
 }
 
 /**

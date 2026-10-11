@@ -20,6 +20,7 @@ import {
   summeCent,
   topProdukte,
   umsatzBestellungWhere,
+  umsatzTestzahlungenWhere,
   umsatzfenster,
   umsatzVerkaufWhere,
   vergleichssatz,
@@ -170,8 +171,23 @@ describe('umsatzBestellungWhere — Testzahlungen (Register Z4, Nr. 55)', () => 
       farmId: 'hof',
       status: 'PICKED_UP',
       pickedUpAt: { gte: fenster.von, lte: fenster.bis },
-      NOT: { paymentMethod: 'ONLINE', createdAt: { lt: STICHTAG } },
+      AND: [{ NOT: { paymentMethod: 'ONLINE', createdAt: { lt: STICHTAG } } }],
     })
+  })
+
+  it('die Bedingung der Hinweiszeile: dieselbe Umsatzregel, aber genau die Testzahlungen', () => {
+    expect(umsatzTestzahlungenWhere('hof', fenster, STICHTAG)).toStrictEqual({
+      farmId: 'hof',
+      status: 'PICKED_UP',
+      pickedUpAt: { gte: fenster.von, lte: fenster.bis },
+      AND: [{ paymentMethod: 'ONLINE', createdAt: { lt: STICHTAG } }],
+    })
+  })
+
+  it('ein eigenes NOT des Aufrufers bleibt neben der Regel erhalten (Nachbesserung Runde 1)', () => {
+    const bedingung = { ...umsatzBestellungWhere('hof', fenster, STICHTAG), NOT: { customerEmail: 'test@example.com' } }
+    expect(bedingung.NOT).toEqual({ customerEmail: 'test@example.com' })
+    expect(bedingung.AND).toEqual([{ NOT: { paymentMethod: 'ONLINE', createdAt: { lt: STICHTAG } } }])
   })
 })
 

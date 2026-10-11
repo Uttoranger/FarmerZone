@@ -56,6 +56,30 @@ describe('STRIPE_LIVE_AB — gelesen in umgebung-server.ts', () => {
     expect(nachricht).not.toContain('2026-11-02')
   }, 30_000)
 
+  it('ein Stichtag weit in der Zukunft gilt, meldet sich aber zur Laufzeit höchstens einmal je Instanz, ohne den Wert', async () => {
+    const modul = await ladeFrisch('2062-11-02T21:00:00+01:00')
+    expect(modul.STRIPE_LIVE_AB).toEqual(new Date('2062-11-02T20:00:00Z'))
+    const jetzt = new Date('2026-11-02T18:00:00Z')
+
+    modul.meldeUmgebungsWarnungen(jetzt)
+    modul.meldeUmgebungsWarnungen(jetzt)
+    modul.meldeUmgebungsWarnungen(new Date('2026-11-03T18:00:00Z'))
+
+    const zukunft = sentry.captureMessage.mock.calls.filter(([nachricht]) => String(nachricht).includes('in der Zukunft'))
+    expect(zukunft).toHaveLength(1)
+    expect(zukunft[0][1]).toBe('warning')
+    expect(zukunft[0][0]).toContain('STRIPE_LIVE_AB liegt mehr als 24 Stunden in der Zukunft')
+    expect(zukunft[0][0]).not.toContain('2062')
+  }, 30_000)
+
+  it('wenige Stunden voraus (Beginn des Redeploys) meldet sich nicht — erst, wenn es mehr als 24 Stunden sind', async () => {
+    const modul = await ladeFrisch('2026-11-02T21:00:00+01:00')
+    modul.meldeUmgebungsWarnungen(new Date('2026-11-01T20:00:01Z')) // 23:59:59 h davor
+    expect(sentry.captureMessage.mock.calls.flat().join(' ')).not.toContain('in der Zukunft')
+    modul.meldeUmgebungsWarnungen(new Date('2026-11-01T19:59:59Z')) // 24 h und 1 s davor
+    expect(sentry.captureMessage.mock.calls.flat().join(' ')).toContain('in der Zukunft')
+  }, 30_000)
+
   it('ein unlesbarer Wert gilt ebenso nicht', async () => {
     const modul = await ladeFrisch('nächsten Montag')
     expect(modul.STRIPE_LIVE_AB).toBeNull()

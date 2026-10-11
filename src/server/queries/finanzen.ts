@@ -81,8 +81,9 @@ export type FinanzenDaten = {
   /** Bestellungen bis zur Kostendeckung; null = noch keine Daten. */
   brauchtBestellungen: number | null
   /**
-   * „Testzahlungen vor dem … sind nicht mitgezählt." (Register Z4) — nur, wenn
-   * unter den Bestellungen der gezeigten Monate eine Testzahlung liegt.
+   * „Testzahlungen vor dem … sind nicht mitgezählt." (Register Z4) — genau
+   * dann, wenn eine Testzahlung der gezeigten Monate ohne die Regel in einem
+   * gezeigten Topf läge (`testzahlungenBetroffen`).
    */
   testzahlungenHinweis: string | null
 }

@@ -100,6 +100,7 @@ Vercel erlaubt je Variable und Umgebung nur einen Wert. Deshalb kommt **zuerst S
 - [ ] **`STRIPE_LIVE_AB`** anlegen (Register Z4, Nr. 55), ebenfalls **nur für Production** (nicht für Preview; „Sensitive“ ist nicht nötig, so bleibt der Wert lesbar). Online-Bestellungen, die vor diesem Zeitpunkt angelegt wurden, sind Testzahlungen: Sie zählen in Auswertung, Verkäufe, Heute, Kunden und Admin nicht als Umsatz und nicht als Servicegebühr. Barbestellungen zählen immer.
   - **Wert:** der Beginn des Redeploys aus Schritt 8, **mit Zeitzone**, etwa `2026-11-02T21:00:00+01:00` (Winterzeit `+01:00`, Sommerzeit `+02:00`). Am einfachsten trägst du ihn unmittelbar vor Schritt 8 ein – die Variable wirkt erst mit dem nächsten Deploy.
   - Ohne Zeitzone oder mit einem Tippfehler gilt der Wert nicht: Die Testzahlungen zählen dann weiter mit, und Sentry meldet „Umgebung widersprüchlich: STRIPE_LIVE_AB …“ (höchstens einmal je Instanz). Der Deploy läuft trotzdem.
+  - Liegt der Wert **mehr als 24 Stunden in der Zukunft** (etwa ein falsches Jahr), gilt er trotzdem – bis dahin zählen alle Online-Bestellungen als Testzahlungen. Sentry meldet dann „Umgebung widersprüchlich: STRIPE_LIVE_AB liegt mehr als 24 Stunden in der Zukunft …“ (höchstens einmal je Instanz, ohne den Wert). Dann den Wert berichtigen und neu deployen.
   - **Bau-Fenster:** Online-Bestellungen zwischen dem Beginn des Redeploys und dem fertigen Deployment laufen noch über den Test-Schlüssel, liegen aber nach dem Stichtag – sie würden mitgezählt. Darum die ruhige Stunde (Schritt 0) und danach Admin → Finanzen prüfen (Schritt 8).
 
 ## 6. Zahlungsarten live aktivieren
@@ -124,7 +125,7 @@ Vercel erlaubt je Variable und Umgebung nur einen Wert. Deshalb kommt **zuerst S
     - `umgebung=produktion`: Der Produktion fehlt `VERCEL_ENV`. Den Schalter für die Systemvariablen prüfen (oben), nicht die Vorschau.
     - `umgebung=preview`: Der Live-Schlüssel steckt in einer Vorschau. Dann Schritt 5 prüfen.
   - [ ] Eine Vorschau zeigt im Umgebungsbanner weiter „Stripe Test“.
-  - [ ] Admin → Finanzen: Unter dem Titel steht leise „Testzahlungen vor dem … sind nicht mitgezählt.“ mit dem Zeitpunkt aus `STRIPE_LIVE_AB` (nur, wenn es in den gezeigten Monaten Testzahlungen gibt). Fehlt die Zeile trotz Testzahlungen, ist der Wert ungültig – Sentry nennt den Grund.
+  - [ ] Admin → Finanzen: Unter dem Titel steht leise „Testzahlungen vor dem … sind nicht mitgezählt.“ mit dem Zeitpunkt aus `STRIPE_LIVE_AB` (nur, wenn in den gezeigten Monaten eine Testzahlung sonst mitgezählt hätte). Fehlt die Zeile trotz Testzahlungen, ist der Wert ungültig – Sentry nennt den Grund.
   - [ ] Admin → Finanzen: Keine Online-Bestellung aus dem Bau-Fenster unter „Servicegebühr, online“. Gibt es doch eine, `STRIPE_LIVE_AB` auf den Zeitpunkt setzen, zu dem das neue Deployment fertig war (Vercel → Deployments, „Ready“), und noch einmal neu deployen – dann laufen alte und neue Version schon mit dem Live-Schlüssel.
   - [ ] Stripe → Webhooks: Endpunkt A und B zeigen beim ersten Ereignis eine Zustellung mit 200.
 - [ ] Im **Testmodus** von Stripe den alten Endpunkt `https://farmerzone.at/api/stripe/webhook` löschen. Die Produktion prüft jetzt gegen die Live-Secrets und würde jede Test-Zustellung mit 400 ablehnen. Der Endpunkt der Testumgebung (`test.farmerzone.at`, Nr. 43) bleibt.
@@ -152,7 +153,7 @@ Die gespeicherten Hof-Konten stammen aus dem Testmodus, der Live-Schlüssel kenn
 Online-Bestellungen von vor der Umstellung sind Testzahlungen. **Barbestellungen aus derselben Zeit sind echt:** Das Geld wurde bar übergeben, sie zählen immer.
 
 - **Umgesetzt (Register Z4):** Vorschlag A, aber mit der Server-Variable `STRIPE_LIVE_AB` statt einer Konstante – zur Live-Schaltung ist keine Code-Änderung nötig, den Wert setzt du in Schritt 4. Eine Regel aus einer Quelle (`src/lib/testzahlung.ts`): Zahlart online UND angelegt vor dem Stichtag. Sie gilt für die Auswertung, die Verkäufe samt Jahressumme für die Umsatzgrenze, Heute, die Umsätze der Kunden, die Admin-Finanzen und die Admin-Hofliste. Bestellungen, Beträge, Checkout, Webhook, Erstattung und Storno bleiben unverändert; die Liste „Letzte Verkäufe“ zeigt die Bestellungen weiter.
-- **Ohne Variable bleibt alles wie vorher.** Betrifft der Stichtag Bestellungen, steht in Auswertung, Verkäufe und Admin-Finanzen leise „Testzahlungen vor dem … sind nicht mitgezählt.“
+- **Ohne Variable bleibt alles wie vorher.** Lässt eine gezeigte Zahl eine Testzahlung aus, steht in Auswertung, Verkäufe und Admin-Finanzen leise „Testzahlungen vor dem … sind nicht mitgezählt.“
 - **Vorschlag B – Merkmal an der Bestellung (Expand-Migration)** bleibt eine Option für später: eine Spalte wie `Order.stripeLivemode`, gesetzt aus `livemode` des PaymentIntents. Sie hielte auch für die Testumgebung und weitere Umstellungen, braucht aber eine freigegebene Migration und einen eigenen Auftrag.
 
 ## Zurück, falls nötig

@@ -11,6 +11,8 @@ import {
   istDevDatenbank,
   istTestDatenbank,
   leseStripeLiveAb,
+  STICHTAG_ZUKUNFT_GRENZE_MS,
+  stichtagWeitInDerZukunft,
   zeigtAufGehostetesProjekt,
   type UmgebungsWerte,
 } from '@/lib/umgebung'
@@ -659,9 +661,38 @@ describe('leseStripeLiveAb — nur ein Zeitpunkt mit Zeitzone', () => {
     }
   })
 
+  it('nimmt nur Zeitzonen der Erde: −12:00 bis +14:00', () => {
+    expect(leseStripeLiveAb('2026-11-02T09:00:00-12:00')).toEqual({ ab: new Date('2026-11-02T21:00:00Z') })
+    expect(leseStripeLiveAb('2026-11-03T11:00:00+14:00')).toEqual({ ab: new Date('2026-11-02T21:00:00Z') })
+    for (const wert of ['2026-11-02T09:00:00-12:01', '2026-11-02T09:00:00-13:00', '2026-11-02T09:00:00-14:00', '2026-11-03T11:00:00+14:01']) {
+      expect(leseStripeLiveAb(wert), wert).toEqual({ problem: 'ungueltig' })
+    }
+  })
+
   it('kennt den Schalttag', () => {
     expect(leseStripeLiveAb('2028-02-29T12:00:00+01:00')).toEqual({ ab: new Date(Date.UTC(2028, 1, 29, 11)) })
     expect(leseStripeLiveAb('2027-02-29T12:00:00+01:00')).toEqual({ problem: 'ungueltig' })
+  })
+})
+
+describe('stichtagWeitInDerZukunft — mehr als 24 Stunden voraus meldet sich (Nachbesserung Runde 1)', () => {
+  const jetzt = new Date('2026-11-02T18:00:00Z')
+
+  it('ein falsches Jahr liegt weit in der Zukunft', () => {
+    expect(stichtagWeitInDerZukunft(new Date('2062-11-02T20:00:00Z'), jetzt)).toBe(true)
+  })
+
+  it('genau 24 Stunden voraus noch nicht, eine Millisekunde mehr schon', () => {
+    expect(STICHTAG_ZUKUNFT_GRENZE_MS).toBe(24 * 60 * 60 * 1000)
+    expect(stichtagWeitInDerZukunft(new Date(jetzt.getTime() + STICHTAG_ZUKUNFT_GRENZE_MS), jetzt)).toBe(false)
+    expect(stichtagWeitInDerZukunft(new Date(jetzt.getTime() + STICHTAG_ZUKUNFT_GRENZE_MS + 1), jetzt)).toBe(true)
+  })
+
+  it('wenige Stunden voraus (Beginn des Redeploys), jetzt, vorbei oder kein Stichtag: kein Fehler', () => {
+    expect(stichtagWeitInDerZukunft(new Date(jetzt.getTime() + 3 * 60 * 60 * 1000), jetzt)).toBe(false)
+    expect(stichtagWeitInDerZukunft(jetzt, jetzt)).toBe(false)
+    expect(stichtagWeitInDerZukunft(new Date('2026-10-01T00:00:00Z'), jetzt)).toBe(false)
+    expect(stichtagWeitInDerZukunft(null, jetzt)).toBe(false)
   })
 })
 

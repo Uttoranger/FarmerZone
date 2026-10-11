@@ -228,14 +228,23 @@ export function topfVonBestellung(bestellung: BestellungFuerFinanzen, stripeLive
   return 'erwartet'
 }
 
+/** Die Töpfe, die die Finanzseite zeigt — alle außer „keiner". */
+const GEZEIGTE_TOEPFE: readonly EinnahmenTopf[] = ['eingezogen', 'geschuldet', 'erwartet']
+
 /**
- * Betrifft der Stichtag (Register Z4) diese Bestellungen — gibt es darunter
- * eine Testzahlung, die ohne die Regel in einem Topf läge? Dann sagt die
- * Finanzseite leise, dass Testzahlungen nicht mitgezählt sind. Ohne Stichtag
+ * Lässt eine gezeigte Zahl eine Testzahlung aus (Register Z4) — gibt es unter
+ * diesen Bestellungen eine, die ohne die Regel in einem der gezeigten Töpfe läge?
+ * Dann steht leise, dass Testzahlungen nicht mitgezählt sind. Ohne Stichtag
  * nie; eine stornierte Testzahlung allein zählt nicht, die zählte ohnehin nicht.
+ * `toepfe`: was die Seite zeigt — die Finanzseite alle drei, die
+ * „Servicegebühren dieses Monats" der Auswertung nur eingezogen und geschuldet.
  */
-export function testzahlungenBetroffen(bestellungen: readonly BestellungFuerFinanzen[], stripeLiveAb: Date | null): boolean {
-  return bestellungen.some((b) => istTestzahlung(b, stripeLiveAb) && topfVonBestellung(b, null) !== 'keiner')
+export function testzahlungenBetroffen(
+  bestellungen: readonly BestellungFuerFinanzen[],
+  stripeLiveAb: Date | null,
+  toepfe: readonly EinnahmenTopf[] = GEZEIGTE_TOEPFE
+): boolean {
+  return bestellungen.some((b) => istTestzahlung(b, stripeLiveAb) && toepfe.includes(topfVonBestellung(b, null)))
 }
 
 export type EinnahmenMonat = {

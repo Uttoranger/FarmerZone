@@ -60,8 +60,14 @@ describe('testzahlungWhere und ohneTestzahlungenWhere — dieselbe Regel für Pr
     expect(testzahlungWhere(AB)).toEqual({ paymentMethod: 'ONLINE', createdAt: { lt: AB } })
   })
 
-  it('verneint beide Felder zusammen, nicht jedes für sich', () => {
-    expect(ohneTestzahlungenWhere(AB)).toEqual({ NOT: { paymentMethod: 'ONLINE', createdAt: { lt: AB } } })
+  it('verneint beide Felder zusammen, nicht jedes für sich — als Element von AND', () => {
+    expect(ohneTestzahlungenWhere(AB)).toEqual({ AND: [{ NOT: { paymentMethod: 'ONLINE', createdAt: { lt: AB } } }] })
+  })
+
+  it('ein eigenes NOT des Aufrufers überschreibt die Regel nicht (Nachbesserung Runde 1)', () => {
+    const bedingung = { farmId: 'hof-1', ...ohneTestzahlungenWhere(AB), NOT: { customerEmail: 'test@example.com' } }
+    expect(bedingung.NOT).toEqual({ customerEmail: 'test@example.com' })
+    expect(bedingung.AND).toEqual([{ NOT: { paymentMethod: 'ONLINE', createdAt: { lt: AB } } }])
   })
 
   it('ohne Stichtag ein leeres Objekt: eingemischt bleibt die Bedingung, wie sie war', () => {

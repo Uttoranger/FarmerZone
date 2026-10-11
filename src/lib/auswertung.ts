@@ -16,7 +16,8 @@
  * Geld in ganzen Cent (CODING_STANDARDS §2), Tage und Monate in Wiener Zeit.
  */
 import { topfVonBestellung, type BestellungFuerFinanzen } from '@/lib/finanzen'
-import { istVorOrtZahlung, monatsschluesselInWien, type Monatsschluessel, type Zahlungsart } from '@/lib/servicegebuehr'
+import { istVorOrtZahlung, monatsgrenzenWien, monatsschluesselInWien, type Monatsschluessel, type Zahlungsart } from '@/lib/servicegebuehr'
+import type { GezeigteSummen } from '@/lib/testzahlung'
 import { BAR_OHNE_GEBUEHR_SATZ, barGebuehrSepaSatz, vorBarStichtag } from '@/lib/konditionen'
 import { mitAnzahl } from '@/lib/format'
 import { wienKalendertag } from '@/lib/kalender'
@@ -83,14 +84,19 @@ export function abholtageDesFensters(pf: Pick<Periodenfenster, 'aktuell'>): Zeit
 }
 
 /**
- * Ab wann die Auswertung Bestellungen zeigt: die Vorperiode der Balken oder
- * der Beginn des Wiener Jahres (Grenzkarte), was früher liegt — die
- * Servicegebühren dieses Monats liegen immer im Jahr. Ab hier betrifft eine
- * Testzahlung die Seite, dann steht die Hinweiszeile da (Register Z4).
+ * Welche Summen die Auswertung zeigt — daran misst sich die Hinweiszeile
+ * (Register Z4): die Umsatzfenster der Balken samt Vorperiode (Kennzahlen,
+ * Vergleich und Top-Produkte liegen darin) und des Wiener Jahres
+ * (Grenzkarte), dazu der Monat der Servicegebühren. Zwei Umsatzfenster, nicht
+ * eines von früh bis jetzt: Bei einem älteren Jahr läge dazwischen eine Lücke,
+ * die keine Zahl der Seite zeigt.
  */
-export function auswertungZeigtAb(pf: Pick<Periodenfenster, 'vergleichGanz'>, jetzt: Date): Date {
-  const jahresbeginn = umsatzfenster('jahr', jetzt).aktuell.von
-  return new Date(Math.min(pf.vergleichGanz.von.getTime(), jahresbeginn.getTime()))
+export function auswertungSummen(pf: Pick<Periodenfenster, 'vergleichGanz' | 'aktuell'>, jetzt: Date): GezeigteSummen {
+  const { von, bis } = monatsgrenzenWien(jetzt)
+  return {
+    umsatz: [{ von: pf.vergleichGanz.von, bis: pf.aktuell.bis }, umsatzfenster('jahr', jetzt).aktuell],
+    gebuehrenMonat: { von, bis },
+  }
 }
 
 // ─── Servicegebühren dieses Monats ──────────────────────────────────────────

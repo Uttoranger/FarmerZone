@@ -8,7 +8,7 @@ import {
   mergeSalesFeed,
   type SalesFeedOrder,
 } from '@/lib/sales-summary'
-import { verkaeufeZeigenAb, verkaufsZeilen, type FeedVerkauf, type VerkaufsZeile } from '@/lib/hof-verkaeufe'
+import { verkaeufeSummen, verkaufsZeilen, type FeedVerkauf, type VerkaufsZeile } from '@/lib/hof-verkaeufe'
 import { wienKalendertag } from '@/lib/kalender'
 import { getYtdRevenue } from './analytics'
 import { formatPosition } from '@/lib/format'
@@ -32,7 +32,7 @@ export type SalesOverview = {
   weekBar: number
   ytdTotal: number
   zeilen: VerkaufsZeile[]
-  /** „Testzahlungen vor dem … sind nicht mitgezählt." — nur, wenn der Stichtag Bestellungen der Seite betrifft. */
+  /** „Testzahlungen vor dem … sind nicht mitgezählt." — genau dann, wenn Wochen- oder Jahreszahl eine Testzahlung auslässt. */
   testzahlungenHinweis: string | null
 }
 
@@ -97,7 +97,7 @@ export async function getSalesOverview(
     }),
     letzteVerkaeufe(farmId, 10),
     getYtdRevenue(farmId, jetzt, stripeLiveAb),
-    testzahlungenHinweisFuerHof(farmId, verkaeufeZeigenAb(jetzt), stripeLiveAb),
+    testzahlungenHinweisFuerHof(farmId, verkaeufeSummen(jetzt), stripeLiveAb),
   ])
 
   // Summen in Cent, erst zur Anzeige in Euro.

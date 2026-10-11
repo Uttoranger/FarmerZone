@@ -543,6 +543,15 @@ describe('Testzahlungen — online vor dem Stichtag zählt nicht als Servicegeb�
     expect(testzahlungenBetroffen([], STICHTAG)).toBe(false)
   })
 
+  it('nur die gezeigten Töpfe zählen: ohne „erwartet" betrifft eine offene Testzahlung nichts', () => {
+    const offen = bestellung({ createdAt: DAVOR, paymentStatus: 'PENDING', status: 'PENDING_CONFIRMATION' })
+    const bezahlt = bestellung({ createdAt: DAVOR, status: 'CONFIRMED' })
+    expect(testzahlungenBetroffen([offen], STICHTAG, ['eingezogen', 'geschuldet'])).toBe(false)
+    expect(testzahlungenBetroffen([bezahlt], STICHTAG, ['eingezogen', 'geschuldet'])).toBe(true)
+    // Ohne Angabe alle Töpfe außer „keiner" — so zeigt es die Finanzseite.
+    expect(testzahlungenBetroffen([offen], STICHTAG)).toBe(true)
+  })
+
   it('ohne Stichtag ist das Ergebnis dasselbe wie heute — als gäbe es keine Testzahlung', () => {
     const maerz = [
       bestellung({ createdAt: DAVOR, serviceFeeCents: 100, provisionCents: 30 }),

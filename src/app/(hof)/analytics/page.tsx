@@ -9,7 +9,7 @@ import { getUmsatzAuswertung, getYtdRevenue } from '@/server/queries/analytics'
 import { getKennzahlen, getServicegebuehrenMonat } from '@/server/queries/auswertung'
 import { getTeilenWirkung } from '@/server/queries/teilen-wirkung'
 import { testzahlungenHinweisFuerHof } from '@/server/queries/testzahlungen'
-import { auswertungZeigtAb, grenzeStand, servicegebuehrenSaetze, teilenKarte, teilenZeitraumAus } from '@/lib/auswertung'
+import { auswertungSummen, grenzeStand, servicegebuehrenSaetze, teilenKarte, teilenZeitraumAus } from '@/lib/auswertung'
 import { umsatzfenster, type Periode, type Periodenfenster } from '@/lib/umsatz'
 import { PROCESSING_REVENUE_LIMIT, limitProgress } from '@/lib/revenue-limit'
 import { formatEuro } from '@/lib/format'
@@ -145,7 +145,7 @@ async function ladeAuswertung(farmId: string, periode: Periode, zurueck: number,
     getKennzahlen(farmId, pf),
     getTeilenWirkung(farmId, teilenZeitraumAus(pf)),
     getServicegebuehrenMonat(farmId, jetzt),
-    testzahlungenHinweisFuerHof(farmId, auswertungZeigtAb(pf, jetzt)),
+    testzahlungenHinweisFuerHof(farmId, auswertungSummen(pf, jetzt)),
   ])
   return { umsatz, ytdRevenue, kennzahlen, wirkung, gebuehren, grenze: limitProgress(ytdRevenue), testzahlungenHinweis }
 }
