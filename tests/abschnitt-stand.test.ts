@@ -194,7 +194,7 @@ describe('geaendertSeitLaden (Hof-Profil)', () => {
     expect(geaendertSeitLaden(ANFANG, { ...ANFANG, latitude: 48.25 })).toEqual({ ...GANZE_ADRESSE, latitude: 48.25 })
   })
 
-  it('Kartenpunkt nur gewackelt (Größenwechsel der Karte, unter einem Meter): unverändert — die Adresse bleibt beim frischen Stand', () => {
+  it('Kartenpunkt typisch gewackelt (Größenwechsel der Karte, unter der Toleranz): unverändert — die Adresse bleibt beim frischen Stand', () => {
     // Leaflet rechnet die Mitte nach invalidateSize aus gerundeten Pixeln neu (Nachprüfung Runde 2).
     const gewackelt = { ...ANFANG, latitude: 48.2 + 3e-6, longitude: 13.4 - 4e-6, phone: '+43 660 2222222' }
     expect(geaendertSeitLaden(ANFANG, gewackelt)).toEqual({ phone: '+43 660 2222222' })

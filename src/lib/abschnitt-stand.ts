@@ -217,11 +217,16 @@ const ADRESSE: readonly (keyof ProfileFormData)[] = ['address', 'postalCode', 'c
 
 /**
  * Ab dieser Abweichung (in Grad, rund ein Meter) gilt der Kartenpunkt als
- * bewegt. Leaflet rechnet die Mitte nach jedem Größenwechsel der Karte
- * (Handy drehen, Fenster schmaler) aus gerundeten Pixeln neu; das verschiebt
- * sie um einige Millionstel Grad, ohne dass jemand die Karte angefasst hat.
- * Ohne Toleranz nähme so ein Wackeln die ganze Adresse dieses Tabs mit
- * (ADRESSE) und schriebe zurück, was inzwischen in Mein Hof gespeichert wurde.
+ * bewegt. Leaflet rechnet die Mitte nach einem Größenwechsel der Karte
+ * (Handy drehen, Fenster schmaler) aus gerundeten Pixeln neu — um bis zu
+ * eine Pixelbreite, ohne dass jemand die Karte angefasst hat. Ohne Toleranz
+ * nähme so ein Wackeln die ganze Adresse dieses Tabs mit (ADRESSE) und
+ * schriebe zurück, was inzwischen in Mein Hof gespeichert wurde. Die
+ * Toleranz fängt das typische Wackeln ab, nicht das größte (bei Zoom 17 ist
+ * eine Pixelbreite etwas mehr als 1e-5 Grad Länge). Die Ursache — ein
+ * Größenwechsel meldet sich als Punktwahl — behebt Nr. 52 in der
+ * Standortkarte (use-karten-groesse: invalidateSize in merker.still(), die
+ * Mitte von vorher wird wiederhergestellt); erst beide zusammen sind dicht.
  */
 export const KARTENPUNKT_TOLERANZ_GRAD = 1e-5
 
