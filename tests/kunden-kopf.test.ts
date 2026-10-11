@@ -315,7 +315,8 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     // Bestätigungsseite (nie durch den Verlauf, davor steht das Mailprogramm).
     'src/app/(public)/[farmSlug]/bestaetigen/[token]/page.tsx': ['bestaetigung', 'bestellung-ungueltig'],
     'src/app/(public)/impressum/page.tsx': ['info'],
-    'src/app/(public)/datenschutz/page.tsx': ['info'],
+    // Die Datenschutzerklärung trägt seit Nr. 57 die KundeShell (siehe unten).
+    'src/app/(public)/datenschutz/page.tsx': [],
     'src/app/(public)/konditionen/page.tsx': ['info'],
     'src/app/(public)/problem-melden/page.tsx': ['info'],
     // Die Hofseite trägt seit Nr. 10 die KundeShell (siehe unten).
@@ -394,6 +395,13 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     // Seit Nr. 41 reicht sie die Sitzung (gast · kunde · hof) weiter, nicht mehr nur „angemeldet".
     expect(lies('src/components/shells/kunde-shell-mit-sitzung.tsx')).toMatch(/<KundeShell sitzung=\{sitzung\}/)
     expect(text).not.toMatch(/KundenKopf|LandingNav/)
+  })
+
+  it('die Datenschutzerklärung trägt die KundeShell des neuen Designs und keine zweite Kopfzeile (Nr. 57)', () => {
+    const text = lies('src/app/(public)/datenschutz/page.tsx')
+    // Über die Hülle, die die Sitzung im Browser liest — die Seite bleibt statisch.
+    expect(text).toMatch(/<KundeShellMitSitzung>/)
+    expect(text).not.toMatch(/KundenKopf|headers\(\)|auth\.api/)
   })
 
   it('Entdecken (/hoefe) trägt die KundeShell des neuen Designs und keine zweite Kopfzeile (Nr. 09)', () => {

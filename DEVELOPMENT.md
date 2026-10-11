@@ -4680,6 +4680,18 @@ Auftrag freigabe.md §12 „48" (Nachholung von Nr. 34). Kein Code, keine Migrat
   - einen Weg durch die Vercel-Anmeldung, sonst bekommt Stripe 401. Den Weg beschreibt `docs/betrieb/testumgebung.md`, Schritt 5 (Nr. 43): „Protection Bypass for Automation" als Parameter an der Endpunkt-Adresse. Dort steht auch, dass dieses Geheimnis alle geschützten Deployments des Projekts öffnet.
 - **Testbetrieb-Hinweise (Nr. 42)** erscheinen nur in der Produktion mit Test-Schlüssel (`istTestbetrieb`), nie in Vorschau oder Testumgebung. Dort sagt es das Banner.
 
+## Datenschutzerklärung, Nachtrag (Nachtlauf Nr. 57, Oktober 2026)
+
+Auftrag freigabe.md §13 „57", Entwurf auf dem Branch der Nr. 33 (nicht im Sammel-PR). Keine Migration, kein neues Paket. Jede neue Aussage steht mit ihrer Stelle im Code in `docs/nachtlauf/berichte/57.md`, die offenen Rechtsfragen ebenda.
+
+- **Nachgetragen:** Neuigkeiten (Anmeldung auf der Bestätigungsseite, nur per E-Mail, Double-Opt-in mit dem Knopf hinter dem Link, Ein-Klick-Abmeldung per List-Unsubscribe, die für E-Mail und WhatsApp dieses Hofs gilt, WhatsApp ohne neuen Einstieg, gespeicherte Felder), „Standort nutzen" statt „In meiner Nähe", die Zähler zum Schutz vor Missbrauch, Sentry ohne IP-Adressen und der Stand der Kartenkacheln (drei Stellen, Region neu genannt).
+- **Korrigiert:** Die Hofübersicht lädt die Karte ab 1024 px gleich mit der Seite (Splitscreen, `useIstBreit`), nur darunter erst nach „Karte öffnen". Der Satz der Nr. 33 („erst geladen, wenn du die Kartenansicht öffnest") stimmte nur am Handy.
+- **Warum WhatsApp „nicht mehr neu":** Seit Nr. 46 schreibt kein Weg mehr eine Telefonnummer ins Abo (die Kasse fragt nicht mehr, `meldeNeuigkeitenAn` und `/account` setzen keine bzw. `null`), und der WhatsApp-Schalter unter „Mein Konto" ist ohne Nummer gesperrt. Nur Abos von davor haben eine.
+- **Speicherdauer der Zähler (Fachregel):** Ein Zähler steht bis zum Ende seines Fensters plus bis zum nächsten Aufräumen (Cron `cleanup-reservations` täglich 3 Uhr UTC, gelöscht wird erst nach `ablauf`). Fenster unter einem Tag (IP, Adresse, Warenkorb-Kennung: 1 bis 60 Minuten) können zu jeder Uhrzeit enden, also bis zu 24 Stunden Warten: höchstens etwa 25 Stunden. Tagesfenster (je Bestellung, seit Nr. 46) enden um Mitternacht UTC: höchstens etwa 27 Stunden. Bericht 40 nannte „bis etwa 25 Stunden" — das war vor dem Tagesfenster. Die Zahlen rechnet `src/lib/datenschutz.ts` aus `DB_BREMSEN`; die Cron-Stunde steht dort als Konstante, weil vercel.json kein Modul ist, und die Wache gleicht beide ab.
+- **Satzvorschlag Bericht 40 berichtigt:** „verschlüsselt" passt nicht (ein HMAC lässt sich nicht entschlüsseln) — die Seite sagt „Prüfwert, den unser Server mit einem geheimen Schlüssel berechnet"; „nach spätestens einem Tag" passt nicht (siehe oben).
+- **Neues Design:** KundeShellMitSitzung wie /fuer-hoefe, die Seite bleibt statisch. Die Lesespalte hat die Maße der gemeinsamen Ladeansicht der Infoseiten (`(public)/loading.tsx`), die unverändert bleibt; Nr. 54 zieht Impressum und Konditionen parallel in dieselbe Shell.
+- **Wache:** `tests/datenschutz-sachstand.test.ts` bindet jede neue Aussage an den Code (24 Tests, vorher 7), mit Gegenprobe je Suche; gegen die alte Seite 15 rot.
+
 ## Nützliche Befehle
 
 ```bash
