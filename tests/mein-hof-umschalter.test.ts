@@ -240,7 +240,8 @@ describe('„Gespeichert · Ansehen"', () => {
 
   it('Hofseite (seit Nr. 50 die Liste „Bearbeiten"): jedes Blatt meldet „Gespeichert · Ansehen" mit seinem Abschnitt, statt selbst zu toasten', () => {
     const liste = quelle('src/components/mein-hof/abschnitte-liste.tsx')
-    expect(liste).toContain('meldeErfolg={ansicht ? () => meldeGespeichertAnsehen({ onAnsehen: () => ansehen(zeile.id) }) : undefined}')
+    // Je Abschnitt EIN Hinweis (Nr. 49 Runde 1): die Liste gibt den Abschnitt mit.
+    expect(liste).toContain('meldeErfolg={ansicht ? () => meldeGespeichertAnsehen({ abschnitt: zeile.id, onAnsehen: () => ansehen(zeile.id) }) : undefined}')
     // „Ansehen" schließt erst das Blatt und schaltet danach um — unter dem Blatt sähe niemand die Kundenansicht.
     expect(liste).toMatch(/nachDemSchliessen\.current = \(\) => ansicht\.zeigeKundin\(id\)\s*setzeOffen\(null\)/)
     expect(liste).toMatch(/onOpenChangeComplete=\{\(auf\) => \{[\s\S]*?danach\?\.\(\)/)

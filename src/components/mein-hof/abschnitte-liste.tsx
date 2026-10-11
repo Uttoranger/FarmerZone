@@ -170,7 +170,7 @@ export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt }: P
                 darstellung="blatt"
                 onGespeichert={() => gespeichert(zeile.id)}
                 onAbbrechen={() => setzeOffen(null)}
-                meldeErfolg={ansicht ? () => meldeGespeichertAnsehen({ onAnsehen: () => ansehen(zeile.id) }) : undefined}
+                meldeErfolg={ansicht ? () => meldeGespeichertAnsehen({ abschnitt: zeile.id, onAnsehen: () => ansehen(zeile.id) }) : undefined}
                 onHochladen={meldeHochladen}
               />
               {SOFORT_GESPEICHERT.has(zeile.id) && (
