@@ -24,12 +24,13 @@
  * Gerendert mit renderToStaticMarkup (TESTING_GUIDELINES §1), mit Gegenprobe
  * je Suche.
  */
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { join, relative } from 'node:path'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import type { ErrorEvent } from '@sentry/nextjs'
+import type { ErrorEvent, Event as SentryEvent } from '@sentry/nextjs'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
@@ -47,13 +48,132 @@ import { ABO_BESTAETIGUNG_GUELTIG_TAGE, ABO_TEXT, NEUIGKEITEN_TEXT } from '@/lib
 import { listUnsubscribeKoepfe } from '@/lib/abmelde-link'
 import { SUCHFELD_TEXT } from '@/lib/hoefe-entdecken'
 import { DB_BREMSEN, bremsSchluessel } from '@/lib/bremse-datenbank'
-import { ZAEHLER_AUFRAEUMEN_STUNDE_UTC, ZAEHLER_JE_MERKMAL, ZAEHLER_STUNDEN, zaehlerHoechstensStunden } from '@/lib/datenschutz'
+import {
+  HILFE_UND_RUECKMELDUNG,
+  MEIN_KONTO,
+  ZAEHLER_AUFRAEUMEN_SPIEL_MS,
+  ZAEHLER_AUFRAEUMEN_STUNDE_UTC,
+  ZAEHLER_JE_MERKMAL,
+  ZAEHLER_STUNDEN,
+  zaehlerHoechstensStunden,
+} from '@/lib/datenschutz'
+import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
 import { bereinigeEreignis } from '@/lib/sentry-hygiene'
 
 const lies = (datei: string): string => readFileSync(join(process.cwd(), datei), 'utf8')
 
-/** Quelltext ohne Kommentare — ein Wort im Kommentar ist keine Tatsache. `https://` bleibt stehen. */
-const ohneKommentare = (text: string): string => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+/** Vor diesen Zeichen beginnt ein „/" ein Regex-Literal, sonst ist es eine Division. */
+const REGEX_NACH_ZEICHEN = new Set(['', '(', ',', '=', ':', '[', '!', '&', '|', '?', '{', '}', ';', '+', '-', '*', '%', '<', '>', '~', '^'])
+const REGEX_NACH_WORT = /\b(?:return|typeof|case|do|else|in|of|new|delete|void|throw|yield|await)$/
+
+/**
+ * Quelltext ohne Kommentare — ein Wort im Kommentar ist keine Tatsache.
+ *
+ * Zeichen für Zeichen statt per Muster (Nachbesserung Runde 1): Zeichenketten
+ * ('…', "…", `…` samt ${…}) und Regex-Literale bleiben unangetastet. Das
+ * frühere Muster schnitt ab jedem „/*" in einem Text („image/*") bis zum
+ * nächsten „*\/" und warf den Code dazwischen weg. Ob ein „/" ein Regex
+ * beginnt, entscheidet wie bei einem Lexer das Zeichen bzw. Wort davor; ein
+ * „//" direkt nach „:" bleibt stehen (Adressen im JSX-Text). Zeichenketten
+ * enden spätestens am Zeilenende — ein Apostroph im JSX-Text kostet so
+ * höchstens eine Zeile.
+ */
+function ohneKommentare(quelle: string): string {
+  let i = 0
+  let aus = ''
+  let davor = ''
+  const kopiere = (bis: number) => {
+    aus += quelle.slice(i, bis)
+    i = bis
+  }
+  const zeichenkette = (anfuehrung: string) => {
+    let j = i + 1
+    while (j < quelle.length && quelle[j] !== anfuehrung && quelle[j] !== '\n') j += quelle[j] === '\\' ? 2 : 1
+    kopiere(Math.min(j + 1, quelle.length))
+    davor = anfuehrung
+  }
+  const regex = () => {
+    let j = i + 1
+    let klasse = false
+    while (j < quelle.length && quelle[j] !== '\n') {
+      const z = quelle[j]
+      if (z === '\\') {
+        j += 2
+        continue
+      }
+      if (z === '[') klasse = true
+      else if (z === ']') klasse = false
+      else if (z === '/' && !klasse) break
+      j++
+    }
+    j++
+    while (j < quelle.length && /[a-z]/i.test(quelle[j])) j++
+    kopiere(Math.min(j, quelle.length))
+    davor = 'a'
+  }
+  const vorlage = () => {
+    aus += '`'
+    i++
+    while (i < quelle.length && quelle[i] !== '`') {
+      if (quelle[i] === '\\') {
+        kopiere(i + 2)
+        continue
+      }
+      if (quelle[i] === '$' && quelle[i + 1] === '{') {
+        aus += '${'
+        i += 2
+        code(true)
+        aus += '}'
+        i++
+        continue
+      }
+      aus += quelle[i++]
+    }
+    aus += '`'
+    i++
+    davor = '`'
+  }
+  const code = (inVorlage: boolean) => {
+    let tiefe = 0
+    while (i < quelle.length) {
+      const z = quelle[i]
+      const n = quelle[i + 1]
+      if (z === '/' && n === '/' && quelle[i - 1] !== ':') {
+        while (i < quelle.length && quelle[i] !== '\n') i++
+        continue
+      }
+      if (z === '/' && n === '*') {
+        const ende = quelle.indexOf('*/', i + 2)
+        i = ende < 0 ? quelle.length : ende + 2
+        aus += ' '
+        continue
+      }
+      if (z === "'" || z === '"') {
+        zeichenkette(z)
+        continue
+      }
+      if (z === '`') {
+        vorlage()
+        continue
+      }
+      // Nur das Ende prüfen: ganz `aus` je „/" zu kopieren wäre bei JSX-Dateien voller „/>" quadratisch.
+      if (z === '/' && (REGEX_NACH_ZEICHEN.has(davor) || REGEX_NACH_WORT.test(aus.slice(-24).trimEnd()))) {
+        regex()
+        continue
+      }
+      if (inVorlage && z === '{') tiefe++
+      if (inVorlage && z === '}') {
+        if (tiefe === 0) return
+        tiefe--
+      }
+      aus += z
+      i++
+      if (z !== ' ' && z !== '\n' && z !== '\t' && z !== '\r') davor = z
+    }
+  }
+  code(false)
+  return aus
+}
 
 let quellenSpeicher: { datei: string; code: string }[] | null = null
 
@@ -73,11 +193,35 @@ function quellen(): { datei: string; code: string }[] {
   return quellenSpeicher
 }
 
+/**
+ * Eine Datei des installierten Sentry-SDK, gefunden über die Paketauflösung Glied für Glied
+ * (@sentry/nextjs → @sentry/react → …), nicht über den pnpm-Pfad mit seinen Prüfsummen. Ändert ein
+ * Update das Verhalten, schlägt die Wache an und erinnert an die Erklärung.
+ */
+function sentryDatei(kette: readonly string[], datei: string): string {
+  let von = join(process.cwd(), 'package.json')
+  let ordner = ''
+  for (const paket of kette) {
+    const fund = createRequire(von)
+      .resolve.paths(paket)
+      ?.map((suchort) => join(suchort, paket))
+      .find((kandidat) => existsSync(join(kandidat, 'package.json')))
+    if (!fund) throw new Error(`${paket} nicht gefunden`)
+    ordner = realpathSync(fund)
+    von = join(ordner, 'package.json')
+  }
+  return readFileSync(join(ordner, datei), 'utf8')
+}
+const SENTRY_BROWSER = ['@sentry/nextjs', '@sentry/react', '@sentry/browser'] as const
+const SENTRY_KERN = [...SENTRY_BROWSER, '@sentry/core'] as const
+
 /** Der sichtbare Text der Seite, ohne Tags, Leerraum zusammengezogen. */
 function seitenText(): string {
   return renderToStaticMarkup(createElement(DatenschutzPage))
     // React trennt benachbarte Textknoten mit <!-- --> — der Browser zeigt dort nichts, also kein Leerzeichen.
     .replace(/<!-- -->/g, '')
+    // Ein <span> (Name in „…") steht mitten im Satz — ohne Leerzeichen, sonst stünde eines vor dem Komma.
+    .replace(/<\/?span[^>]*>/g, '')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&quot;/g, '"')
     .replace(/&#x27;/g, "'")
@@ -199,6 +343,46 @@ describe('Datenschutzerklärung — Sentry', () => {
   })
 })
 
+describe('Datenschutzerklärung — Sentry-Sitzungen (Nachbesserung Runde 1)', () => {
+  it('nennt die Sitzungsmeldungen mit User-Agent und sagt, dass die Bitte um Verzicht auf die IP für sie nicht gilt', () => {
+    // Unser Browser-init nimmt keine eigene Integrationsliste — es gilt die des SDK.
+    const EIGENE_LISTE = /\bintegrations\s*:|defaultIntegrations\s*:/
+    expect(ohneKommentare(lies('src/instrumentation-client.ts'))).not.toMatch(EIGENE_LISTE)
+    expect('Sentry.init({ dsn, integrations: [] })').toMatch(EIGENE_LISTE)
+    // Im installierten SDK: Sitzungen sind Standard und tragen den User-Agent; ihr Umschlag nennt nur Name und
+    // Version des SDK. infer_ip steckt nur im Ereignis von Fehlern und Messungen (event.sdk.settings).
+    const sdk = sentryDatei(SENTRY_BROWSER, 'build/npm/esm/prod/sdk.js')
+    expect(sdk.slice(sdk.indexOf('function getDefaultIntegrations'))).toMatch(/browserSessionIntegration\(\)/)
+    expect(sentryDatei(SENTRY_KERN, 'build/esm/session.js')).toMatch(/user_agent: session\.userAgent/)
+    expect(sentryDatei(SENTRY_KERN, 'build/esm/utils/envelope.js')).toMatch(/const \{ name, version \} = metadataOrEvent\.sdk;\s*return \{ name, version \};/)
+    expect(sentryDatei(SENTRY_KERN, 'build/esm/envelope.js')).toMatch(/settings: event\.sdk\?\.settings \|\| newSdkInfo\.settings/)
+    const client = sentryDatei(SENTRY_BROWSER, 'build/npm/esm/prod/client.js')
+    expect(client).toMatch(/infer_ip: userInfo \? "auto" : "never"/)
+    // Eine IP käme in die Sitzung nur über userInfo (aus) oder über den Nutzer — und der trägt nur die Hof-ID.
+    expect(client).toMatch(/if \(userInfo\) \{\s*this\.on\("beforeSendSession", addAutoIpAddressToSession\)/)
+    expect(lies('src/components/farmer/sentry-nutzer.tsx')).toMatch(/Sentry\.setUser\(\{ id: farmId \}\)/)
+    // Fehlerberichte und Messungen tragen den User-Agent in den Kopfzeilen der Anfrage: HttpContext ist Standard
+    // und hängt sie in preprocessEvent an jedes Ereignis — der Client ruft das für Fehler und Transaktionen auf …
+    expect(sdk.slice(sdk.indexOf('function getDefaultIntegrations'))).toMatch(/httpContextIntegration\(\)/)
+    const httpKontext = sentryDatei(SENTRY_BROWSER, 'build/npm/esm/prod/integrations/httpcontext.js')
+    expect(httpKontext).toMatch(/preprocessEvent\(event\) \{[\s\S]*?const reqData = getHttpRequestData\(\);/)
+    expect(sentryDatei(SENTRY_BROWSER, 'build/npm/esm/prod/helpers.js')).toMatch(/"User-Agent": userAgent/)
+    // Auf der obersten Ebene der Methode (4 Leerzeichen), also ohne Bedingung — erst danach zählt event.type.
+    expect(sentryDatei(SENTRY_KERN, 'build/esm/client.js')).toMatch(
+      /_prepareEvent\(event, hint, currentScope, isolationScope\) \{[\s\S]{0,300}?\n {4}this\.emit\("preprocessEvent", event, hint\);\n {4}if \(!event\.type\)/,
+    )
+    // … und unser Filter (beforeSend und beforeSendTransaction) lässt ihn stehen.
+    expect(ohneKommentare(lies('src/instrumentation-client.ts'))).toMatch(/beforeSendTransaction: bereinigeEreignis/)
+    const messung: SentryEvent = { type: 'transaction', request: { headers: { 'User-Agent': 'Testbrowser/1.0' } } }
+    expect(bereinigeEreignis(messung).request?.headers).toEqual({ 'User-Agent': 'Testbrowser/1.0' })
+
+    const text = abschnitt(/Sentry \(Fehlerdiagnose\)/)
+    expect(text).toMatch(/aus deinem Browser bei jedem Seitenaufruf eine kurze Sitzungsmeldung/)
+    expect(text).toMatch(/Die Sitzungsmeldungen enthalten selbst keine IP-Adresse, tragen diese Bitte aber nicht mit\./)
+    expect(text).toMatch(/Fehlerberichte, Messungen und Sitzungsmeldungen enthalten die Kennung deines Browsers \(User-Agent\)/)
+  })
+})
+
 describe('Datenschutzerklärung — Zahlung', () => {
   it('nennt als gespeicherten Zahlungsbezug die Kennung des Zahlungsvorgangs, nicht eine „anonymisierte" ID', () => {
     // Gegenprobe Code: Die Bestellung speichert die PaymentIntent-Kennung von Stripe.
@@ -262,19 +446,23 @@ describe('Datenschutzerklärung — Neuigkeiten (S11, N2)', () => {
 
   it('WhatsApp ohne neuen Einstieg: kein Weg schreibt mehr eine Telefonnummer ins Abo, und der Schalter braucht eine', () => {
     const SCHREIBT_ABO = /customerFarmSubscription\.(create|createMany|upsert|update|updateMany)\(/
-    // Der Leerraum steht im Lookahead: `\s*` davor wiche sonst per Backtracking aus.
-    const NUMMER_NICHT_NULL = /customerPhone:(?!\s*null\b)/
+    // Der Leerraum steht im Lookahead: `\s*` davor wiche sonst per Backtracking aus. Erlaubt sind nur
+    // `null` (schreibt keine Nummer) und `true` (Lese-Auswahl); dazu fällt die Kurzschrift `{ customerPhone }`.
+    const NUMMER_GESETZT = /customerPhone:(?!\s*(?:null|true)\b)|[{,]\s*customerPhone\s*(?=[,}])/
     const schreiber = quellen().filter(({ code }) => SCHREIBT_ABO.test(code))
     // Gegenprobe: Die Suche findet die bekannten Schreibwege.
     expect(schreiber.map(({ datei }) => datei)).toEqual(
       expect.arrayContaining(['src/server/actions/neuigkeiten.ts', 'src/server/actions/subscriptions.ts', 'src/server/abo-anmeldung.ts'])
     )
     for (const { datei, code } of schreiber) {
-      expect(code, datei).not.toMatch(NUMMER_NICHT_NULL)
+      expect(code, datei).not.toMatch(NUMMER_GESETZT)
     }
-    // Gegenprobe: Eine Nummer aus der Eingabe schlüge an, `null` nicht.
-    expect('create: { customerPhone: daten.customerPhone }').toMatch(NUMMER_NICHT_NULL)
-    expect('create: { customerPhone: null }').not.toMatch(NUMMER_NICHT_NULL)
+    // Gegenprobe: Eine Nummer aus der Eingabe schlüge an, auch in Kurzschrift — `null` und eine Lese-Auswahl nicht.
+    expect('create: { customerPhone: daten.customerPhone }').toMatch(NUMMER_GESETZT)
+    expect('create: { customerEmail, customerPhone }').toMatch(NUMMER_GESETZT)
+    expect('create: { customerPhone, farmId }').toMatch(NUMMER_GESETZT)
+    expect('create: { customerPhone: null }').not.toMatch(NUMMER_GESETZT)
+    expect('select: { customerPhone: true }').not.toMatch(NUMMER_GESETZT)
     // Ohne Nummer ist der WhatsApp-Schalter unter „Mein Konto" gesperrt.
     expect(lies('src/app/account/profile/profile-client.tsx')).toMatch(/disabled=\{!sub\.customerPhone\}/)
 
@@ -367,17 +555,20 @@ describe('Datenschutzerklärung — Schutz vor Missbrauch (R1)', () => {
     expect([...genannt].sort()).toEqual([...alle].sort())
   })
 
-  it('rechnet die Höchstdauer aus Fenster und Wartezeit bis zum täglichen Aufräumen', () => {
+  it('rechnet die Höchstdauer aus Fenster, Wartezeit bis zum täglichen Aufräumen und dem Spiel beim Start', () => {
     const minute = 60_000
     const stunde = 60 * minute
-    // Fenster unter einem Tag: bis zu 24 Stunden Warten.
-    expect(zaehlerHoechstensStunden(minute)).toBe(25)
-    expect(zaehlerHoechstensStunden(15 * minute)).toBe(25)
-    expect(zaehlerHoechstensStunden(stunde)).toBe(25)
-    expect(zaehlerHoechstensStunden(23 * stunde)).toBe(47)
-    // Ganze Tage enden um Mitternacht UTC, das Aufräumen folgt um 3 Uhr.
-    expect(zaehlerHoechstensStunden(24 * stunde)).toBe(24 + ZAEHLER_AUFRAEUMEN_STUNDE_UTC)
-    expect(zaehlerHoechstensStunden(48 * stunde)).toBe(48 + ZAEHLER_AUFRAEUMEN_STUNDE_UTC)
+    const spiel = ZAEHLER_AUFRAEUMEN_SPIEL_MS / stunde
+    // Gegenprobe: Das Spiel ist eine ganze Stunde (Hobby-Tarif), sonst stimmten die Rundungen unten nicht.
+    expect(spiel).toBe(1)
+    // Fenster unter einem Tag: bis zum nächsten Tag warten, plus Spiel; angebrochene Stunden zählen ganz.
+    expect(zaehlerHoechstensStunden(minute)).toBe(1 + 24 + spiel)
+    expect(zaehlerHoechstensStunden(15 * minute)).toBe(1 + 24 + spiel)
+    expect(zaehlerHoechstensStunden(stunde)).toBe(1 + 24 + spiel)
+    expect(zaehlerHoechstensStunden(23 * stunde)).toBe(23 + 24 + spiel)
+    // Ganze Tage enden um Mitternacht UTC, das Aufräumen folgt ab der Cron-Stunde.
+    expect(zaehlerHoechstensStunden(24 * stunde)).toBe(24 + ZAEHLER_AUFRAEUMEN_STUNDE_UTC + spiel)
+    expect(zaehlerHoechstensStunden(48 * stunde)).toBe(48 + ZAEHLER_AUFRAEUMEN_STUNDE_UTC + spiel)
   })
 
   it('nennt die Höchstdauern aus Code und vercel.json — und der Cron räumt wirklich zu dieser Stunde auf', () => {
@@ -388,8 +579,16 @@ describe('Datenschutzerklärung — Schutz vor Missbrauch (R1)', () => {
     const server = lies('src/server/bremse-datenbank.ts')
     expect(server).toMatch(/ablauf: fensterEnde\(jetzt, bremse\.fensterMs\)/)
     expect(server).toMatch(/deleteMany\(\{ where: \{ ablauf: \{ lt: jetzt \} \} \}\)/)
-    // So lauten sie heute (Bericht 40: „bis etwa 25 Stunden"; je Bestellung seit Nr. 46 ein Tagesfenster).
-    expect(ZAEHLER_STUNDEN).toEqual({ person: 25, bestellung: 27 })
+    // Abgeleitet, nicht festgeschrieben: längstes Fenster der Personen-Zähler plus ein Tag plus Spiel bzw.
+    // Tagesfenster je Bestellung plus Cron-Stunde plus Spiel (heute 26 bzw. 28; Bericht 40 nannte 25).
+    const stunde = 60 * 60_000
+    const spiel = ZAEHLER_AUFRAEUMEN_SPIEL_MS / stunde
+    const personen = [...ZAEHLER_JE_MERKMAL.ip, ...ZAEHLER_JE_MERKMAL.adresse, ...ZAEHLER_JE_MERKMAL.warenkorb]
+    const laengstesFenster = Math.max(...personen.map((bremse) => bremse.fensterMs)) / stunde
+    expect(ZAEHLER_STUNDEN).toEqual({
+      person: Math.ceil(laengstesFenster + 24 + spiel),
+      bestellung: DB_BREMSEN.neuigkeitenBestellung.fensterMs / stunde + ZAEHLER_AUFRAEUMEN_STUNDE_UTC + spiel,
+    })
 
     const text = abschnitt(/2\. Welche Daten wir verarbeiten/)
     expect(text).toContain(`nach höchstens etwa ${ZAEHLER_STUNDEN.person} Stunden`)
@@ -429,35 +628,65 @@ describe('Datenschutzerklärung — Kartenkacheln (O6)', () => {
       'src/components/settings/standort-karte.tsx https://tile.openstreetmap.org/{z}/{x}/{y}.png',
     ])
     expect(lies('src/components/analytics/umfeld-karte.tsx')).toMatch(/import HoefeKarte, \{ type KartenHof \} from '@\/components\/hoefe\/hoefe-karte'/)
-    expect(lies('src/components/analytics/umfeld-anzeige.tsx')).toMatch(/wahl === 'karte' \? \(\s*<UmfeldKarteAnsicht/)
+    const umfeld = lies('src/components/analytics/umfeld-anzeige.tsx')
+    expect(umfeld).toMatch(/wahl === 'karte' \? \(\s*<UmfeldKarteAnsicht/)
+    // Auch dort steht die Ansicht in der Adresse (`?ansicht=karte`) — ein Link öffnet die Karte direkt.
+    expect(umfeld).toMatch(/leseUmfeldAnsicht\(useSearchParams\(\)\.get\('ansicht'\)\)/)
     expect(lies('src/lib/bauern-navigation.ts')).toMatch(/label: 'Region', href: REGION_HREF/)
 
     const text = abschnitt(/Standortsuche und Kartendarstellung/)
     expect(text).toMatch(/OpenStreetMap Foundation \(tile\.openstreetmap\.org\)/)
     expect(text).toMatch(/Minikarte im Hofprofil/)
-    expect(text).toMatch(/die Karte unter „Region“/)
+    expect(text).toMatch(/die Karte unter „Region“, sobald dort die Kartenansicht offen ist — auch über einen Link/)
+    // Gegenprobe Suche: Der Satz aus Runde 0 („sobald ein Hof dort „Karte“ wählt") hätte angeschlagen.
+    const NUR_NACH_WAHL = /sobald ein Hof dort „Karte“ wählt/
+    expect('die Karte unter „Region“, sobald ein Hof dort „Karte“ wählt').toMatch(NUR_NACH_WAHL)
+    expect(text).not.toMatch(NUR_NACH_WAHL)
   })
 
-  it('auf der Hofübersicht: ab 1024 px lädt die Karte mit der Seite, darunter erst nach „Karte öffnen"', () => {
+  it('sagt, was der Browser beim Laden der Kacheln mitschickt — IP, User-Agent und als Herkunft nur der Ursprung', () => {
+    // Der Ursprung statt der ganzen Adresse: strict-origin-when-cross-origin für alle Seiten, keine eigene
+    // Regel an den Kachel-Ebenen.
+    expect(lies('next.config.ts')).toMatch(/source: '\/\(\.\*\)',[\s\S]*?\{ key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' \}/)
+    for (const datei of ['src/components/hoefe/hoefe-karte.tsx', 'src/components/settings/standort-karte.tsx']) {
+      expect(ohneKommentare(lies(datei)), datei).not.toMatch(/referrerPolicy|crossOrigin/)
+    }
+    // Gegenprobe Suche: Eine eigene Regel an der Ebene schlüge an.
+    expect("L.tileLayer(url, { referrerPolicy: 'unsafe-url' })").toMatch(/referrerPolicy|crossOrigin/)
+
+    const text = abschnitt(/Standortsuche und Kartendarstellung/)
+    expect(text).toMatch(/die Kennung deines Browsers \(User-Agent\) sowie als Herkunft nur die Adresse unserer Website ohne Seitenpfad/)
+    // Der Satz aus Runde 0 ließ beides aus.
+    expect(text).not.toMatch(/ansiehst; weitere Angaben über dich schickt die Karte nicht mit/)
+  })
+
+  it('auf der Hofübersicht: ab 1024 px lädt die Karte mit der Seite, schmaler erst in der Kartenansicht — die auch ein Link öffnet', () => {
     const client = lies('src/components/hoefe/hoefe-client.tsx')
     expect(client.match(/matchMedia\('\(min-width: 1024px\)'\)/g)).toHaveLength(2)
     const breit = client.indexOf('if (istBreit) {')
     const schmalMitKarte = client.indexOf("ansicht === 'karte' ? (")
     const ersteKarte = client.indexOf('<HoefeKarte')
-    // Im Splitscreen steht die Karte sofort da, schmal nur im Kartenmodus.
+    // Im Splitscreen steht die Karte sofort da, schmal nur in der Kartenansicht.
     expect(breit).toBeGreaterThan(0)
     expect(ersteKarte).toBeGreaterThan(breit)
     expect(ersteKarte).toBeLessThan(schmalMitKarte)
     expect(client.match(/<HoefeKarte\b/g)).toHaveLength(2)
     expect(client).toMatch(/aria-label="Karte öffnen"/)
-    // Gegenprobe Suche: Der Satz der Nr. 33 stimmte nur unter 1024 px.
-    const alterSatz = 'Auf der öffentlichen Hofübersicht wird eine Karte erst geladen, wenn du dort die Kartenansicht öffnest'
-    expect(alterSatz).toMatch(/erst geladen, wenn du dort die Kartenansicht öffnest/)
+    // Die Kartenansicht steht in der Adresse, und die Startseite verlinkt sie direkt: Neuladen, Zurück,
+    // ein geteilter Link oder „Alle Höfe auf der Karte" laden die Kacheln auch am Handy ohne „Karte öffnen".
+    const filter = lies('src/schemas/hoefe-filter.ts')
+    expect(filter).toMatch(/ansicht: ansichtSchema\.parse\(params\.get\(P\.ansicht\)\)/)
+    expect(filter).toMatch(/if \(filter\.ansicht === 'karte'\) params\.set\(P\.ansicht, 'karte'\)/)
+    expect(lies('src/lib/startseite.ts')).toMatch(/export const KARTE_ADRESSE = hoefeAdresse\(\{ ansicht: 'karte' \}\)/)
+    expect(lies('src/components/startseite/hoefe-in-der-naehe.tsx')).toMatch(/href=\{KARTE_ADRESSE\}/)
+    // Gegenprobe Suche: Die falsche Fassung aus Runde 0 hätte angeschlagen.
+    const NUR_NACH_KNOPF = /erst, wenn du „Karte öffnen“ tippst/
+    expect('auf schmaleren Bildschirmen erst, wenn du „Karte öffnen“ tippst').toMatch(NUR_NACH_KNOPF)
 
     const text = abschnitt(/Standortsuche und Kartendarstellung/)
-    expect(text).not.toMatch(/erst geladen, wenn du dort die Kartenansicht öffnest/)
-    expect(text).toMatch(/ab 1024 Pixel Breite/)
-    expect(text).toMatch(/„Karte öffnen“/)
+    expect(text).not.toMatch(NUR_NACH_KNOPF)
+    expect(text).toMatch(/ab 1024 Pixel Breite steht die Karte neben der Liste und lädt gleich mit der Seite/)
+    expect(text).toMatch(/auf schmaleren Bildschirmen lädt sie erst in der Kartenansicht — nach „Karte öffnen“ oder über einen Link, der direkt dorthin führt/)
   })
 })
 
@@ -472,5 +701,55 @@ describe('Datenschutzerklärung — neues Design (Nr. 57)', () => {
     expect(seite).not.toMatch(/robots/)
     // Gegenprobe: Die Suche findet die Shell auf „Für Höfe".
     expect(lies('src/app/(public)/fuer-hoefe/page.tsx')).toMatch(/<KundeShellMitSitzung>/)
+  })
+})
+
+describe('Datenschutzerklärung — Namen und die Wache selbst (Nachbesserung Runde 1)', () => {
+  it('jeder Name in „…" steht so in der Oberfläche — aus seiner Konstante oder an die Stelle gebunden, die ihn zeigt', () => {
+    // Aus Konstanten: Die Seite liest sie, also stimmen sie von selbst — leer hieße, die Quelle fehlt.
+    const ausKonstanten = [NEUIGKEITEN_TEXT.knopf, ABO_TEXT.knopf, SUCHFELD_TEXT.standort, SUCHFELD_TEXT.ortAendern, PROBLEM_MELDEN, MEIN_KONTO, HILFE_UND_RUECKMELDUNG]
+    for (const name of ausKonstanten) expect(name.length, 'Name ohne Quelle').toBeGreaterThan(0)
+    // Feste Texte ohne Konstante: gebunden an die Stelle, an der die Oberfläche sie zeigt.
+    const gebunden: Record<string, [string, RegExp]> = {
+      Abmelden: ['src/emails/status-update.tsx', /href=\{unsubscribeUrl\}[^>]*>\s*Abmelden\s*</],
+      'Karte öffnen': ['src/components/hoefe/hoefe-client.tsx', /aria-label="Karte öffnen"/],
+      Region: ['src/lib/bauern-navigation.ts', /label: 'Region', href: REGION_HREF/],
+      'Bestellungen finden': ['src/components/bestellungen/bestellungen-ansicht.tsx', /aria-label="Bestellungen finden"/],
+    }
+    for (const [name, [datei, stelle]] of Object.entries(gebunden)) expect(lies(datei), name).toMatch(stelle)
+    // Verweise auf Abschnitte dieser Seite selbst.
+    const text = seitenText()
+    const verweise = ['Standortsuche und Kartendarstellung', 'Schutz vor Missbrauch']
+    for (const verweis of verweise) expect(text).toContain(verweis)
+
+    const erlaubt = new Set<string>([...ausKonstanten, ...Object.keys(gebunden), ...verweise])
+    const genannt = [...text.matchAll(/„([^“]+)“/g)].map((treffer) => treffer[1])
+    // Gegenprobe: Die Suche findet Namen beider Arten.
+    expect(genannt).toEqual(expect.arrayContaining([NEUIGKEITEN_TEXT.knopf, MEIN_KONTO, 'Abmelden', 'Region']))
+    for (const name of genannt) expect(erlaubt.has(name), `„${name}“ hat keine Quelle`).toBe(true)
+    // „Fehler melden" steht seit Nr. 22e nirgends mehr in der Oberfläche; der Punkt heißt „Hilfe und Rückmeldung".
+    expect(text).not.toMatch(/Fehler melden/)
+  })
+
+  it('der Kommentar-Entferner lässt Zeichenketten, Vorlagen und Regex-Literale stehen', () => {
+    const quelle = [
+      "const a = 'image/*'",
+      'const b = 1 /* weg-1 */ + 2',
+      "const c = '*/'",
+      'const d = "https://beispiel.invalid" // weg-2',
+      'const e = `x ${"//"} y ${{ k: 1 }.k}` // weg-3',
+      'const f = /\\/\\*/g.test(a)',
+      'const g = /a\\/\\//',
+      'function h() { return /\\/\\// }',
+      '<p>siehe https://beispiel.invalid</p>',
+    ].join('\n')
+    const ohne = ohneKommentare(quelle)
+    expect(ohne).not.toMatch(/weg-/)
+    for (const bleibt of ["const a = 'image/*'", 'const b = 1', '+ 2', "const c = '*/'", 'https://beispiel.invalid"', '${"//"}', 'const f = /\\/\\*/g', 'const g = /a\\/\\//', 'return /\\/\\// }', '<p>siehe https://beispiel.invalid</p>']) {
+      expect(ohne, bleibt).toContain(bleibt)
+    }
+    // Gegenprobe: Das Muster aus Runde 0 hätte von 'image/*' bis zum nächsten „*/" alles verschluckt.
+    const altesMuster = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '')
+    expect(altesMuster(quelle)).not.toContain('const b')
   })
 })

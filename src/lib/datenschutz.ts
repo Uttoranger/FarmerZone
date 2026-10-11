@@ -1,11 +1,14 @@
 import { DB_BREMSEN, type DbBremse } from '@/lib/bremse-datenbank'
+import { kundenNavigation } from '@/lib/kunden-navigation'
+import { UNTEN } from '@/lib/bauern-navigation'
 
 /*
- * Zahlen der Datenschutzerklärung, die aus dem Code folgen (Nachtlauf Nr. 57).
- * Die Seite (src/app/(public)/datenschutz/page.tsx) schreibt sie nicht selbst
- * hin, sondern nimmt sie von hier; tests/datenschutz-sachstand.test.ts gleicht
- * sie mit dem Code und mit vercel.json ab. Ändert sich ein Fenster oder der
- * Cron, schlägt der Test an und erinnert daran, die Erklärung nachzuziehen.
+ * Zahlen und Namen der Datenschutzerklärung, die aus dem Code folgen
+ * (Nachtlauf Nr. 57). Die Seite (src/app/(public)/datenschutz/page.tsx)
+ * schreibt sie nicht selbst hin, sondern nimmt sie von hier;
+ * tests/datenschutz-sachstand.test.ts gleicht sie mit dem Code und mit
+ * vercel.json ab. Ändert sich ein Fenster, der Cron oder ein Name, schlägt
+ * der Test an und erinnert daran, die Erklärung nachzuziehen.
  */
 
 const STUNDE_MS = 60 * 60 * 1000
@@ -19,21 +22,30 @@ const TAG_MS = 24 * STUNDE_MS
 export const ZAEHLER_AUFRAEUMEN_STUNDE_UTC = 3
 
 /**
+ * So viel später kann der Cron anlaufen: Im Hobby-Tarif (docs/ai/TECH_STACK.md
+ * §5) startet Vercel einen täglichen Cron irgendwann innerhalb der angegebenen
+ * Stunde, nicht pünktlich zur vollen Stunde. Das steht in Vercels Regeln, nicht
+ * im Code — deshalb als eigene Konstante und als offene Frage im Bericht 57
+ * (Tarif und Laufzeit prüfen).
+ */
+export const ZAEHLER_AUFRAEUMEN_SPIEL_MS = STUNDE_MS
+
+/**
  * Wie lange ein Zähler der Bremse höchstens in der Datenbank steht, auf ganze
  * Stunden aufgerundet: sein Fenster plus die Wartezeit bis zum ersten
  * Aufräumen nach dem Fensterende (gelöscht wird erst, wenn `ablauf` vorbei
- * ist, src/server/bremse-datenbank.ts).
+ * ist, src/server/bremse-datenbank.ts), plus das Spiel beim Start des Crons.
  *
  * Die Fenster beginnen bei Vielfachen ihrer Länge seit 1970 (`fensterBeginn`).
  * Ein Fenster unter einem Tag kann deshalb zu jeder Uhrzeit enden, kurz nach
- * dem Aufräumen — dann wartet die Zeile bis zu 24 Stunden. Ein Fenster aus
- * ganzen Tagen endet immer um Mitternacht UTC, das Aufräumen folgt um
+ * einem Aufräumen — dann wartet die Zeile bis zum nächsten Tag. Ein Fenster
+ * aus ganzen Tagen endet immer um Mitternacht UTC, das Aufräumen folgt ab
  * `ZAEHLER_AUFRAEUMEN_STUNDE_UTC`.
  */
 export function zaehlerHoechstensStunden(fensterMs: number): number {
   const ganzeTage = fensterMs % TAG_MS === 0
-  const wartenMs = ganzeTage ? ZAEHLER_AUFRAEUMEN_STUNDE_UTC * STUNDE_MS : TAG_MS
-  return Math.ceil((fensterMs + wartenMs) / STUNDE_MS)
+  const bisZumAufraeumenMs = ganzeTage ? ZAEHLER_AUFRAEUMEN_STUNDE_UTC * STUNDE_MS : TAG_MS
+  return Math.ceil((fensterMs + bisZumAufraeumenMs + ZAEHLER_AUFRAEUMEN_SPIEL_MS) / STUNDE_MS)
 }
 
 /**
@@ -56,8 +68,9 @@ export const ZAEHLER_JE_MERKMAL = {
   // anlegt (localStorage, src/lib/use-cart.ts) — im Code „Sitzung".
   warenkorb: [DB_BREMSEN.checkoutSitzung],
   bestellung: [DB_BREMSEN.neuigkeitenBestellung],
-  // Keine Person: die Kennung eines Hofs, nur damit eine Sentry-Meldung
-  // höchstens einmal am Tag kommt (Register Z2) — die Erklärung nennt sie nicht.
+  // Die Kennung eines Hofs (Tagesfenster, damit eine Sentry-Meldung höchstens
+  // einmal am Tag kommt, Register Z2). Die Erklärung nennt diesen Zähler heute
+  // nicht; ob sie es soll, ist eine offene Frage im Bericht 57.
   hof: [DB_BREMSEN.stripeKontoUnbekannt],
 } as const satisfies Record<string, readonly DbBremse[]>
 
@@ -72,3 +85,15 @@ export const ZAEHLER_STUNDEN = {
   /** Zähler je Bestellung (Anmeldung zu Neuigkeiten auf der Bestätigungsseite). */
   bestellung: hoechstensStunden(ZAEHLER_JE_MERKMAL.bestellung),
 } as const
+
+// ── Namen aus der Oberfläche ─────────────────────────────────────────────────
+//
+// Die Erklärung nennt Punkte so, wie die Navigation sie zeigt. Fehlt ein Punkt
+// einmal, bleibt der Name leer — dann schlägt die Wache an, statt dass die
+// Seite einen alten Namen weiterträgt.
+
+/** „Mein Konto" — der Punkt im Kopf einer Kundensitzung (src/lib/kunden-navigation.ts). */
+export const MEIN_KONTO = kundenNavigation({ sitzung: 'kunde' }).konto?.label ?? ''
+
+/** „Hilfe und Rückmeldung" — dort melden Höfe Fehler (Seitenleiste und Mehr-Blatt, src/lib/bauern-navigation.ts). */
+export const HILFE_UND_RUECKMELDUNG = UNTEN.find((punkt) => punkt.id === 'hilfe')?.label ?? ''

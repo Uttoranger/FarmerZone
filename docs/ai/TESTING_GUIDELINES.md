@@ -130,7 +130,7 @@ pnpm test:integration                        # Integration (braucht .env.test)
 | Jede Migration gegen das Deploy-Fenster | `migrationen-wache.test.ts` |
 | Jede Architektur-Regel, die sich am Quelltext prüfen lässt (wer was einbindet, wo ein Parameter gelesen wird) — mit Gegenprobe, dass die Suche anschlägt | `hofseite-einmal.test.ts`, `design-tokens.test.ts` |
 | Jeder Geldweg, bei dem die Datenbank die Antwort gibt, **zusätzlich** in der Integrationsschicht | `checkout-bestand.int.test.ts`, `storno-nebenlaeufig.int.test.ts` |
-| Jede Aussage der Datenschutzerklärung über das, was der Code tut — gerenderte Seite gegen die Stelle im Code, mit Gegenprobe; Zahlen kommen aus der Quelle, nie abgeschrieben | `datenschutz-sachstand.test.ts` |
+| Jede Aussage der Datenschutzerklärung über das, was der Code tut — gerenderte Seite gegen die Stelle im Code, mit Gegenprobe; Zahlen und Namen aus ihrer Konstante, sonst bindet die Wache den festen Text an die Stelle, die ihn zeigt; Fakten aus einer Bibliothek (Sentry-SDK) liest sie über die Paketauflösung nach, nicht über den pnpm-Pfad | `datenschutz-sachstand.test.ts` |
 
 Die **Migrationswache** ist ein normaler Unit-Test der Suite (reine Dateiarbeit,
 ohne Datenbank) — sie läuft bei `pnpm test` und damit im Stop-Hook. Sie schlägt

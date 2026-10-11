@@ -9,7 +9,8 @@ import { DATENSCHUTZ_EMAIL } from '@/lib/support'
 import { BESTELLUNGEN_ANSICHT_SEKUNDEN } from '@/lib/bestellungen-finden'
 import { ABO_BESTAETIGUNG_GUELTIG_TAGE, ABO_TEXT, NEUIGKEITEN_TEXT } from '@/lib/abo-bestaetigung'
 import { SUCHFELD_TEXT } from '@/lib/hoefe-entdecken'
-import { ZAEHLER_STUNDEN } from '@/lib/datenschutz'
+import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
+import { HILFE_UND_RUECKMELDUNG, MEIN_KONTO, ZAEHLER_STUNDEN } from '@/lib/datenschutz'
 
 export const metadata: Metadata = { title: 'Datenschutz — FarmerZone' }
 
@@ -119,7 +120,9 @@ export default function DatenschutzPage(): React.JSX.Element {
               <strong className="font-semibold">Technisch notwendige Daten:</strong>
             </p>
             <ul className={LISTE}>
-              <li>Session-Cookies (für Anmeldung und „Bestellungen finden“, technisch notwendig)</li>
+              <li>
+                Session-Cookies (für Anmeldung und <Name>Bestellungen finden</Name>, technisch notwendig)
+              </li>
               <li>Server-Logs (IP-Adresse, Zeitstempel) für Betrieb und Sicherheit</li>
             </ul>
             <p>
@@ -127,9 +130,10 @@ export default function DatenschutzPage(): React.JSX.Element {
             </p>
             <p>
               Damit niemand unsere Formulare mit massenhaften Anfragen lahmlegt, zählen wir, wie oft etwas versucht
-              wird: bei der Anmeldung mit Code und bei „Bestellungen finden“ je IP-Adresse und je E-Mail-Adresse, beim
+              wird: bei der Anmeldung mit Code und bei <Name>Bestellungen finden</Name> je IP-Adresse und je E-Mail-Adresse, beim
               Bestellen je IP-Adresse und je Warenkorb-Kennung deines Browsers, beim Registrieren eines Hofes und bei
-              „Problem melden“ ohne Hof-Anmeldung je IP-Adresse, bei der Anmeldung zu Neuigkeiten je Bestellung.
+              <Name>{PROBLEM_MELDEN}</Name> ohne Hof-Anmeldung je IP-Adresse, bei der Anmeldung zu Neuigkeiten je
+              Bestellung.
               Gespeichert wird dafür nur ein Prüfwert, den unser Server mit einem geheimen Schlüssel aus dieser Angabe
               berechnet, dazu Zählerstand und Zeitfenster — nie die Adresse oder Kennung selbst. Eine tägliche
               Aufräumarbeit löscht die Einträge, sobald ihr Zeitfenster vorbei ist: nach höchstens etwa{' '}
@@ -170,13 +174,18 @@ export default function DatenschutzPage(): React.JSX.Element {
               </Dienst>
               <Dienst name="Sentry (Fehlerdiagnose)">
                 <p>
-                  Functional Software, Inc. (Sentry), USA — technische Fehlerberichte der Anwendung und
-                  Ladezeit-Messungen zu etwa jedem zehnten Seitenaufruf, gespeichert auf Servern in der EU. Vor dem
-                  Versand werden personenbezogene Inhalte (IP-Adressen, E-Mail-Adressen, Telefonnummern, Cookies,
-                  Zugangsdaten, Formularinhalte) automatisch entfernt; Berichte aus deinem Browser bitten Sentry
-                  zudem ausdrücklich, deine IP-Adresse auch nicht aus der Verbindung zu übernehmen. Es gibt keine
-                  Aufzeichnung deiner Bildschirmsitzung. Übermittelt wird, was technisch schiefging; bei eingeloggten
-                  Höfen zusätzlich die interne Kennung des Hofes, nie Name oder E-Mail-Adresse.
+                  Functional Software, Inc. (Sentry), USA — technische Fehlerberichte der Anwendung,
+                  Ladezeit-Messungen zu etwa jedem zehnten Seitenaufruf und aus deinem Browser bei jedem Seitenaufruf
+                  eine kurze Sitzungsmeldung (ob die Seite ohne Fehler lief), gespeichert auf Servern in der EU. Vor
+                  dem Versand werden aus Fehlerberichten und Messungen personenbezogene Inhalte (IP-Adressen,
+                  E-Mail-Adressen, Telefonnummern, Cookies, Zugangsdaten, Formularinhalte) automatisch entfernt;
+                  Fehlerberichte und Messungen aus deinem Browser bitten Sentry zudem ausdrücklich, deine IP-Adresse
+                  auch nicht aus der Verbindung zu übernehmen. Die Sitzungsmeldungen enthalten selbst keine
+                  IP-Adresse, tragen diese Bitte aber nicht mit. Fehlerberichte, Messungen und Sitzungsmeldungen
+                  enthalten die Kennung deines Browsers (User-Agent). Es gibt keine Aufzeichnung deiner
+                  Bildschirmsitzung.
+                  Übermittelt wird, was technisch schiefging; bei eingeloggten Höfen zusätzlich die interne Kennung
+                  des Hofes, nie Name oder E-Mail-Adresse.
                 </p>
               </Dienst>
               <Dienst name="Vercel Web Analytics (Reichweitenmessung)">
@@ -268,19 +277,19 @@ export default function DatenschutzPage(): React.JSX.Element {
             </p>
             <ul className={LISTE}>
               <li>
-                Über den Link „Abmelden“ in jeder Neuigkeiten-Mail. Bietet dein E-Mail-Programm selbst „Abmelden“ an,
-                genügt dort ein Klick, ohne weitere Rückfrage. Abgemeldet wirst du damit für diesen Hof per E-Mail und
+                Über den Link <Name>Abmelden</Name> in jeder Neuigkeiten-Mail. Bietet dein E-Mail-Programm selbst{' '}
+                <Name>Abmelden</Name> an, genügt dort ein Klick, ohne weitere Rückfrage. Abgemeldet wirst du damit für diesen Hof per E-Mail und
                 per WhatsApp.
               </li>
               <li>
                 <Link href="/account/profile" className={LINK}>
-                  In deinem Kunden-Profil unter „Mein Konto“
+                  In deinem Kunden-Profil unter <Name>{MEIN_KONTO}</Name>
                 </Link>
               </li>
             </ul>
             <p>
               Neuigkeiten per WhatsApp lassen sich nicht mehr neu bestellen. Wer sie früher beim Bestellen mit seiner
-              Telefonnummer bestellt hat, kann sie unter „Mein Konto“ weiter ein- und ausschalten.
+              Telefonnummer bestellt hat, kann sie unter <Name>{MEIN_KONTO}</Name> weiter ein- und ausschalten.
             </p>
             <p>
               Rechtsgrundlage: Art. 6 Abs. 1 lit. a DSGVO (ausdrückliche Einwilligung). Gespeichert werden deine
@@ -302,12 +311,12 @@ export default function DatenschutzPage(): React.JSX.Element {
             </p>
             <div>
               <p>
-                Du kannst dein Konto und alle gespeicherten Einwilligungen jederzeit unter „Mein Konto“ → „Konto
-                löschen“ vollständig löschen. Bestelldaten werden aus steuerrechtlichen Gründen weiterhin aufbewahrt
-                (§ 132 BAO, 7 Jahre).
+                Du kannst dein Konto und alle gespeicherten Einwilligungen jederzeit unter <Name>{MEIN_KONTO}</Name>{' '}
+                vollständig löschen. Bestelldaten werden aus steuerrechtlichen Gründen weiterhin aufbewahrt (§ 132 BAO,
+                7 Jahre).
               </p>
               <Link href="/account/profile" className={LINK}>
-                Zu „Mein Konto“
+                Zu <Name>{MEIN_KONTO}</Name>
               </Link>
             </div>
           </Abschnitt>
@@ -322,17 +331,22 @@ export default function DatenschutzPage(): React.JSX.Element {
             </p>
             <p>
               Die Kartenkacheln, also die Bilder der Karte, lädt dein Browser direkt von der OpenStreetMap Foundation
-              (tile.openstreetmap.org). Dabei wird deine IP-Adresse dorthin übertragen, und an den geladenen Kacheln
-              ist zu erkennen, welchen Kartenausschnitt du ansiehst; weitere Angaben über dich schickt die Karte nicht
-              mit. Karten mit solchen Kacheln gibt es an drei Stellen:
+              (tile.openstreetmap.org). Dabei erhält sie deine IP-Adresse und, wie bei jedem Abruf, die Kennung deines
+              Browsers (User-Agent) sowie als Herkunft nur die Adresse unserer Website ohne Seitenpfad; an den
+              geladenen Kacheln ist zu erkennen, welchen Kartenausschnitt du ansiehst. Weitere Angaben über dich
+              schickt die Karte nicht mit. Karten mit solchen Kacheln gibt es an drei Stellen:
             </p>
             <ul className={LISTE}>
               <li>
                 auf der Hofübersicht: Im Browserfenster ab 1024 Pixel Breite steht die Karte neben der Liste und lädt
-                gleich mit der Seite, auf schmaleren Bildschirmen erst, wenn du „Karte öffnen“ tippst;
+                gleich mit der Seite; auf schmaleren Bildschirmen lädt sie erst in der Kartenansicht — nach{' '}
+                <Name>Karte öffnen</Name> oder über einen Link, der direkt dorthin führt;
               </li>
               <li>im Hofbereich die Minikarte im Hofprofil, mit der ein Hof seinen Standort setzt; sie lädt mit der Seite;</li>
-              <li>im Hofbereich die Karte unter „Region“, sobald ein Hof dort „Karte“ wählt.</li>
+              <li>
+                im Hofbereich die Karte unter <Name>Region</Name>, sobald dort die Kartenansicht offen ist — auch über
+                einen Link, der direkt dorthin führt.
+              </li>
             </ul>
           </Abschnitt>
 
@@ -360,7 +374,8 @@ export default function DatenschutzPage(): React.JSX.Element {
 
           <Abschnitt id="meldungen" titel="Fehler- und Wunschmeldungen">
             <p>
-              Über „Problem melden“ bzw. „Fehler melden“ kannst du uns Fehler, Wünsche und Fragen zur Plattform
+              Über <Name>{PROBLEM_MELDEN}</Name> bzw. <Name>{HILFE_UND_RUECKMELDUNG}</Name> kannst du uns Fehler,
+              Wünsche und Fragen zur Plattform
               schicken. Gespeichert werden dein Text, die Art der Meldung, die Adresse der Seite, von der du gemeldet
               hast, Browser-Kennung (User-Agent) und Bildschirmgröße sowie der Zeitpunkt — keine IP-Adresse, keine
               Cookies. Bei eingeloggten Höfen wird die Meldung dem Hof zugeordnet; Höfe können freiwillig ein
