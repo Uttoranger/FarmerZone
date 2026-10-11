@@ -20,7 +20,6 @@ const FARBLITERAL_BESTAND = [
   'src/emails/**',
   'src/app/(auth)/forgot-password/page.tsx',
   'src/app/(auth)/reset-password/page.tsx',
-  'src/app/(hof)/settings/appearance/appearance-client.tsx',
   // Eckige Klammern sind im Muster Zeichenklassen — für den Ordner [id] maskieren.
   'src/app/api/status-image/\\[id\\]/route.tsx',
   'src/app/layout.tsx',

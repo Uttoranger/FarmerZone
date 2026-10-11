@@ -392,7 +392,8 @@ export function HofseiteKunde({
 
         <div className="flex min-w-0 flex-col gap-[26px] lg:col-start-1 lg:row-start-1">
           {offen === 'uebersicht' && (ueberUns || werte.length > 0 || farm.foundedYear) ? (
-            <section aria-labelledby="ueber-uns" className={cn(KARTE, 'flex flex-col gap-2.5')}>
+            // data-abschnitt: Ziel der Markierung aus Mein Hof für Über uns, Gründungsjahr und Werte (ZIEL_ABSCHNITT, Nr. 50).
+            <section data-abschnitt="ueberuns" aria-labelledby="ueber-uns" className={cn(KARTE, 'flex flex-col gap-2.5')}>
               <h2 id="ueber-uns" className="font-heading text-xl font-semibold text-foreground">
                 Über uns
               </h2>

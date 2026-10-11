@@ -4,17 +4,17 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { getFarmSettings, getMeinHofKopf, getOwnerFarm } from '@/server/queries/farm'
 import { getAppearanceData } from '@/server/queries/appearance'
-import { getActiveStatusPost, getPastStatusCount, getStatusPostsForFarm } from '@/server/queries/status-posts'
+import { getStatusPostsForFarm } from '@/server/queries/status-posts'
 import { zaehleBeitraege } from '@/server/queries/mein-hof-zahl'
 import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
 import { beitraegeUebersicht } from '@/lib/mein-hof-beitraege'
 import { meinHofReiterAus } from '@/lib/bauern-navigation'
 import { MEIN_HOF_REITER_PARAMETER } from '@/schemas/mein-hof-reiter'
-import { FarmPageClient } from '@/components/farmer/farm-page-client'
 import { HofseiteEditor } from '@/components/farmer/hofseite-editor'
 import { MeinHofSeitenkopf } from '@/components/mein-hof/seitenkopf'
 import { BeitraegeReiter } from '@/components/mein-hof/beitraege-reiter'
-import { ChecklisteKompakt } from '@/components/mein-hof/checkliste-kompakt'
+import { AbschnitteListe } from '@/components/mein-hof/abschnitte-liste'
+import type { AbschnittHof } from '@/components/mein-hof/abschnitt-inhalt'
 import { MeinHofAnsicht } from '@/components/mein-hof/mein-hof-ansicht'
 
 export const metadata: Metadata = {
@@ -31,10 +31,12 @@ export const dynamic = 'force-dynamic'
  *
  * Reiter „Hofseite" — zwei Fassungen, per CSS gewechselt (der Server kennt
  * die Fensterbreite nicht, ein Wechsel im Browser flackerte beim Laden):
- * unter lg die Checkliste und die Hofseite mit Stiften (farm-page-client.tsx,
- * funktional unverändert); ab lg die Liste mit Fortschritt und die Vorschau
- * Handy/Web mit „Vergrößern" (hofseite-editor.tsx). Die Vorschau ist immer
- * die echte Hofseite (?vorschau=1), nie ein Nachbau.
+ * unter lg seit Nr. 50 (Register N4) die Liste „Bearbeiten" mit Blatt von
+ * unten (abschnitte-liste.tsx) — die alte Hofseite mit Stiften ist dort
+ * entfallen; ab lg die Liste mit Fortschritt und die Vorschau Handy/Web mit
+ * „Vergrößern" (hofseite-editor.tsx). Beide nehmen dieselben Bausteine
+ * (abschnitt-inhalt.tsx). Die Vorschau ist immer die echte Hofseite
+ * (?vorschau=1), nie ein Nachbau.
  *
  * Reiter „Beiträge" — seit Nr. 22e mit allem, was /status konnte
  * (Deaktivieren, Löschen, Als Vorlage, WhatsApp fortsetzen); /status leitet
@@ -80,9 +82,7 @@ export default async function FarmPageOwnerRoute({
     )
   }
 
-  const [activeStatus, pastStatusCount, kopf, beitraegeZahl, einstellungen, auftritt] = await Promise.all([
-    getActiveStatusPost(farm.id),
-    getPastStatusCount(farm.id),
+  const [kopf, beitraegeZahl, einstellungen, auftritt] = await Promise.all([
     getMeinHofKopf(session.user.id),
     zaehleBeitraege(farm.id),
     getFarmSettings(session.user.id),
@@ -91,6 +91,19 @@ export default async function FarmPageOwnerRoute({
   if (!einstellungen || !auftritt) redirect('/onboarding')
 
   const fortschritt = hofseiteFortschritt(hofseiteStand(farm, einstellungen))
+  // Nur, was die Bausteine brauchen — kein Date und kein Decimal über die Grenze (CODING_STANDARDS §2).
+  const hof: AbschnittHof = {
+    slug: farm.slug,
+    name: farm.name,
+    adresse: kopf?.adresse.anzeige ?? '',
+    logoUrl: farm.logoUrl,
+    bannerType: farm.bannerType,
+    bannerUrl: farm.bannerUrl,
+    bannerValue: farm.bannerValue,
+    bannerFocusY: farm.bannerFocusY,
+    isPaused: farm.isPaused,
+    pauseMessage: farm.pauseMessage,
+  }
 
   return (
     <>
@@ -103,38 +116,22 @@ export default async function FarmPageOwnerRoute({
           </div>
         }
       >
-        {/* Unter lg, „Bearbeiten": Checkliste, darunter die Hofseite mit
-            Stiften. Die Überschrift trägt dort die Hofseite selbst (der Hofname). */}
+        {/* Unter lg, „Bearbeiten": die Liste der Abschnitte, bearbeitet im
+            Blatt von unten. Sichtbar ist der Hofname im Kopf; die H1 hört nur
+            der Screenreader. */}
         <div className="lg:hidden">
-          <div className="mx-auto max-w-3xl px-4 pt-5 pb-5 md:px-8">
-            <ChecklisteKompakt fortschritt={fortschritt} />
+          <div className="mx-auto max-w-3xl px-4 pt-5 pb-12 md:px-8">
+            <h1 className="sr-only">Hofseite bearbeiten</h1>
+            <AbschnitteListe fortschritt={fortschritt} hof={hof} einstellungen={einstellungen} auftritt={auftritt} />
           </div>
-          <FarmPageClient farm={farm} activeStatus={activeStatus} pastStatusCount={pastStatusCount} />
         </div>
       </MeinHofAnsicht>
 
-      {/* Ab lg: Liste links, Vorschau rechts. Nur, was der Editor braucht —
-          kein Date und kein Decimal über die Grenze (CODING_STANDARDS §2). */}
+      {/* Ab lg: Liste links, Vorschau rechts. */}
       <div className="hidden px-8 pb-12 lg:block">
         {/* Sichtbar ist der Hofname im Kopf; die H1 hört nur der Screenreader. */}
         <h1 className="sr-only">Hofseite bearbeiten</h1>
-        <HofseiteEditor
-          fortschritt={fortschritt}
-          hof={{
-            slug: farm.slug,
-            name: farm.name,
-            adresse: kopf?.adresse.anzeige ?? '',
-            logoUrl: farm.logoUrl,
-            bannerType: farm.bannerType,
-            bannerUrl: farm.bannerUrl,
-            bannerValue: farm.bannerValue,
-            bannerFocusY: farm.bannerFocusY,
-            isPaused: farm.isPaused,
-            pauseMessage: farm.pauseMessage,
-          }}
-          einstellungen={einstellungen}
-          auftritt={auftritt}
-        />
+        <HofseiteEditor fortschritt={fortschritt} hof={hof} einstellungen={einstellungen} auftritt={auftritt} />
       </div>
     </>
   )

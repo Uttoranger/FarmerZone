@@ -16,6 +16,7 @@ import {
 } from '@/lib/geokodierung'
 import { LAND_GENITIV, alsLand, type Land } from '@/lib/laender'
 import { profileSchema, profilBearbeitenSchema } from '@/schemas/hofprofil'
+import { profilBasis } from '@/lib/abschnitt-stand'
 import { nimmGesperrteAusDemShop, revalidiereProdukte } from '@/server/produkte-schreiben'
 
 async function getAuthFarm() {
@@ -33,6 +34,19 @@ async function getAuthFarm() {
 // Laufzeit („ProfileFormData is not defined").
 export type ProfileFormData = z.infer<typeof profileSchema>
 export type ProfileResult = { error?: string }
+
+/**
+ * Der frische Stand des Profils — die Abschnitte von Mein Hof (Name,
+ * Adresse, Kontakt) lesen ihn direkt vor dem Speichern
+ * (components/mein-hof/abschnitt-speichern.ts, Nr. 50): updateProfile
+ * schreibt das ganze Profil, und der Stand aus den Props der Seite hielte
+ * nach einem anderen Abschnitt alte Werte. Nur lesen, nur der eigene Hof.
+ */
+export async function ladeProfilStand(): Promise<{ profil: ProfileFormData } | { error: string }> {
+  const farm = await getAuthFarm()
+  if (!farm) return { error: 'Nicht angemeldet' }
+  return { profil: profilBasis(farm) }
+}
 
 /** Der ruhige Hinweis bei einem Punkt außerhalb des gewählten Landes —
  *  Wortlaut wie bisher, nur das Land wechselt mit. */

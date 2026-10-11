@@ -52,7 +52,7 @@ function profilSchemaFuer(bestand?: ProfilBestand) {
     // im Checkout, Anzeige in der Futter-Kennzeichnung. Leer ist erlaubt.
     betriebsnummer: hofBetriebsnummerSchema,
     betriebsstatus: betriebsstatusSchema,
-    // Logo und Titelbild gehören zu „Mein Auftritt" (echter Datei-Upload) und
+    // Logo und Titelbild gehören zu Mein Hof (echter Datei-Upload, seit Nr. 50; vorher „Mein Auftritt") und
     // stehen bewusst NICHT mehr im Profil-Formular. Sie fehlen hier auch im
     // Schreibpfad: sonst würde jedes Profil-Speichern die dort hochgeladenen
     // Bilder auf null zurücksetzen. Die DB-Felder selbst bleiben unverändert.

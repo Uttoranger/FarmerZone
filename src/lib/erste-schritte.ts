@@ -13,6 +13,7 @@
 // das die Bedingungen der übrigen Hinweiskarten trägt.
 
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
+import { HOFSEITE_HREF } from '@/lib/mein-hof'
 
 /** Alles, was die Liste zum Rechnen braucht — Zählwerte und Ja/Nein, sonst nichts. */
 export type ErsteSchritteDaten = {
@@ -90,7 +91,8 @@ export function ersteSchritte(daten: ErsteSchritteDaten): ErsteSchritteErgebnis 
       id: 'auftritt',
       titel: 'Logo und Titelbild hochladen',
       nutzen: 'Macht aus der Vorlage deinen Hof.',
-      href: '/settings/appearance',
+      // Seit Nr. 50 in Mein Hof (Register N4); /settings/appearance leitet nur noch um.
+      href: HOFSEITE_HREF,
       erledigt: daten.hatLogo && daten.hatTitelbild,
       optional: false,
     },

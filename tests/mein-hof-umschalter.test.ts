@@ -170,13 +170,22 @@ describe('„Gespeichert · Ansehen"', () => {
     expect(ohne.match(/<p[ >]/g)).toHaveLength(1)
   })
 
-  it('Hofseite: Titelbild, Ausschnitt und Fotos melden ihren Abschnitt, statt selbst zu toasten', () => {
+  it('Hofseite (seit Nr. 50 die Liste „Bearbeiten"): jedes Blatt meldet „Gespeichert · Ansehen" mit seinem Abschnitt, statt selbst zu toasten', () => {
+    const liste = quelle('src/components/mein-hof/abschnitte-liste.tsx')
+    expect(liste).toContain('meldeErfolg={ansicht ? () => meldeGespeichertAnsehen({ onAnsehen: () => ansehen(zeile.id) }) : undefined}')
+    // „Ansehen" schließt erst das Blatt und schaltet danach um — unter dem Blatt sähe niemand die Kundenansicht.
+    expect(liste).toMatch(/nachDemSchliessen\.current = \(\) => ansicht\.zeigeKundin\(id\)\s*setzeOffen\(null\)/)
+    expect(liste).toMatch(/onOpenChangeComplete=\{\(auf\) => \{[\s\S]*?danach\?\.\(\)/)
+    // Jeder Baustein nimmt meldeErfolg statt seines Toasts: Bilder, Abholzeiten, Pause und die Formulare.
+    const inhalt = quelle('src/components/mein-hof/abschnitt-inhalt.tsx')
+    for (const baustein of ['TitelbildBaustein', 'LogoUpload', 'GallerySection', 'PickupSlotsClient', 'PauseClient']) {
+      expect(inhalt, baustein).toMatch(new RegExp(`<${baustein}[^>]*meldeErfolg=\\{meldeErfolg\\}`))
+    }
+    expect(inhalt).toContain('const formular = { onGespeichert, onAbbrechen, meldeErfolg }')
+    expect(quelle('src/components/mein-hof/abschnitt-formulare.tsx')).toMatch(/if \(meldeErfolg\) meldeErfolg\(\)\s*else toast\.success\(GESPEICHERT_TEXT\)/)
+    // Die Bestandsansicht mit Stiften meldet weiter über onGespeichert (ohne Aufrufer seit Nr. 50).
     const ansichtHof = quelle('src/components/farm/farm-page-view.tsx')
-    expect(ansichtHof).toContain("if (onGespeichert) onGespeichert('titelbild')")
     expect(ansichtHof).toContain("meldeErfolg={onGespeichert ? () => onGespeichert('titelbild') : undefined}")
-    expect(ansichtHof).toContain("onGespeichert={onGespeichert ? () => onGespeichert('fotos') : undefined}")
-    const client = quelle('src/components/farmer/farm-page-client.tsx')
-    expect(client).toContain('onGespeichert={ansicht ? (abschnitt) => ansicht.gespeichert(abschnitt) : undefined}')
   })
 
   it('Beiträge: nach dem Veröffentlichen auf der Hofseite — „Ansehen" führt in den Reiter mit der Kundenansicht', () => {

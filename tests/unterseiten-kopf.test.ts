@@ -182,7 +182,8 @@ describe('useNachSpeichern — Toast „Gespeichert" und zurück zur Übersicht'
     return fn
   }
 
-  it.each(['profile', 'appearance', 'pause', 'account'])('/settings/%s: Toast „Gespeichert", dann /settings', (seite) => {
+  // /settings/appearance leitet seit Nr. 50 nur noch um (Mein Hof) — dort wird nichts mehr gespeichert.
+  it.each(['profile', 'pause', 'account'])('/settings/%s: Toast „Gespeichert", dann /settings', (seite) => {
     nachSpeichernAuf(`/settings/${seite}`)('Profil gespeichert')
     expect(toast.success).toHaveBeenCalledWith(GESPEICHERT_TEXT, undefined)
     expect(navigation.push).toHaveBeenCalledWith('/settings')
@@ -218,7 +219,6 @@ function rumpf(text: string, name: string): string {
 describe('Speichern auf den Einstellungs-Unterseiten (Quelltext)', () => {
   const FORMULARE: [string, string, RegExp][] = [
     ['src/components/settings/profile-form.tsx', 'onSubmit', /if \(res\.error\)/],
-    ['src/app/(hof)/settings/appearance/appearance-client.tsx', 'handleSave', /if \(result\.error\)/],
     ['src/components/settings/pause-client.tsx', 'handleSaveMessage', /if \(res\.error\)/],
     ['src/app/(hof)/settings/account/password-form.tsx', 'handleSubmit', /if \(error\)/],
   ]
@@ -258,12 +258,17 @@ describe('Speichern auf den Einstellungs-Unterseiten (Quelltext)', () => {
     expect('type="submit"\n        disabled={isPending}').not.toMatch(/type="submit"\s*disabled=\{isPending \|\| sucheLaeuft\}/)
   })
 
-  it('Mein Auftritt: Speichern wartet, solange ein Foto hochlädt (der Upload ginge beim Verlassen verloren)', () => {
-    const text = quelle('src/app/(hof)/settings/appearance/appearance-client.tsx')
-    expect(text).toMatch(/disabled=\{saving \|\| uploadLaeuft\}/)
-    for (const baustein of ['LogoUpload', 'BannerPhotoUpload', 'GallerySection']) {
-      expect(text, baustein).toMatch(new RegExp(`<${baustein}[^>]*onHochladen=`))
+  it('Mein Hof (früher Mein Auftritt): Blatt und Zeile bleiben offen, solange ein Foto hochlädt (der Upload ginge beim Schließen verloren)', () => {
+    // Seit Nr. 50 speichert jedes Bild sofort; geschlossen würde nur das Datei-Feld aushängen (CODING_STANDARDS §8).
+    const inhalt = quelle('src/components/mein-hof/abschnitt-inhalt.tsx')
+    for (const baustein of ['TitelbildBaustein', 'LogoUpload', 'GallerySection']) {
+      expect(inhalt, baustein).toMatch(new RegExp(`<${baustein}[^>]*onHochladen=\\{onHochladen\\}`))
     }
+    const liste = quelle('src/components/mein-hof/abschnitte-liste.tsx')
+    expect(liste).toMatch(/if \(!auf && !hochladenJetzt\.current\) setzeOffen\(null\)/)
+    expect(liste).toMatch(/<SheetClose\s+disabled=\{hochladen\}/)
+    expect(liste).toContain("{hochladen ? 'Foto lädt noch …' : 'Schließen'}")
+    expect(quelle('src/components/farmer/hofseite-editor.tsx')).toMatch(/if \(hochladen\) return/)
   })
 })
 
@@ -309,7 +314,6 @@ describe('Die alten Bausteine sind ersetzt', () => {
     ['/settings/payments', 'src/app/(hof)/settings/payments/page.tsx'],
     ['/settings/pause', 'src/app/(hof)/settings/pause/page.tsx'],
     ['/settings/account', 'src/app/(hof)/settings/account/page.tsx'],
-    ['/settings/appearance', 'src/app/(hof)/settings/appearance/page.tsx'],
     ['/settings/teilen', 'src/app/(hof)/settings/teilen/page.tsx'],
     ['/settings/konditionen', 'src/components/hof-einstellungen/konditionen-ansicht.tsx'],
     ['/customers/[kundeId]', 'src/components/hof-kunden/kunden-detail.tsx'],
@@ -364,14 +368,14 @@ const HOF: FarmSettings = {
   pickupSlots: [],
 }
 
-describe('Hof-Profil: „Einstellungen → Mein Auftritt" ist ein Link', () => {
-  it('führt nach /settings/appearance, grün und 44 px hoch, mit sichtbarem Fokus', () => {
+describe('Hof-Profil: „Mein Hof → Hofseite" ist ein Link (seit Nr. 50, vorher „Einstellungen → Mein Auftritt")', () => {
+  it('führt nach Mein Hof, grün und 44 px hoch, mit sichtbarem Fokus', () => {
     const html = renderToStaticMarkup(createElement(ProfileForm, { farm: HOF }))
-    const link = html.match(/<a href="\/settings\/appearance" class="([^"]*)"[^>]*>([^<]*)<\/a>/)
-    expect(link?.[2]).toBe('Einstellungen → Mein Auftritt')
+    const link = html.match(/<a href="\/farm-page" class="([^"]*)"[^>]*>([^<]*)<\/a>/)
+    expect(link?.[2]).toBe('Mein Hof → Hofseite')
     const klassen = link?.[1].split(' ') ?? []
     for (const k of ['text-brand-text', 'py-3', ...FOKUS_RAHMEN.split(' ')]) expect(klassen, k).toContain(k)
-    expect(html).not.toContain('<span class="text-foreground">Einstellungen → Mein Auftritt</span>')
+    expect(html).not.toContain('/settings/appearance')
   })
 
   it('ohne laufende Suche ist „Profil speichern" frei', () => {
@@ -385,14 +389,13 @@ describe('Hof-Profil: „Einstellungen → Mein Auftritt" ist ein Link', () => {
 describe('Tab-Titel und Seitentitel der Unterseiten', () => {
   // Zahlung bleibt außen vor (Nr. 42 ändert dort parallel, nur der Kopf ist getauscht);
   // Konditionen hat im Bestand zwei Wortlaute (Tab „Konditionen", h1 „Deine Konditionen").
-  it.each(['profile', 'pickup-slots', 'pause', 'account', 'appearance', 'teilen'])('/settings/%s: der Tab nimmt dieselbe Schreibweise wie der Kopf', (seite) => {
+  // /settings/appearance leitet seit Nr. 50 nur noch um — ohne eigenen Tab-Titel und Kopf.
+  it.each(['profile', 'pickup-slots', 'pause', 'account', 'teilen'])('/settings/%s: der Tab nimmt dieselbe Schreibweise wie der Kopf', (seite) => {
     const text = quelle(`src/app/(hof)/settings/${seite}/page.tsx`)
     const tab = text.match(/title: `\$\{([A-Za-z_.]+)\} — FarmerZone`/)
     expect(tab, seite).not.toBeNull()
     const quelleDesTitels = tab?.[1] ?? ''
-    // Die Mein-Auftritt-Seite trägt ihre h1 im Formular (aus derselben Konstante).
-    const kopf = seite === 'appearance' ? quelle('src/app/(hof)/settings/appearance/appearance-client.tsx') : text
-    expect(kopf, seite).toContain(`{${quelleDesTitels}}`)
+    expect(text, seite).toContain(`{${quelleDesTitels}}`)
   })
 })
 

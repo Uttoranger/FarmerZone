@@ -12,9 +12,10 @@ import { useNachSpeichern } from '@/components/hof-einstellungen/use-nach-speich
 import { cn } from '@/lib/utils'
 
 /**
- * Pause — unter /settings/pause und im Hofseiten-Editor ab lg
- * (components/farmer/hofseite-editor.tsx), der über `onGespeichert` nach
- * jeder Änderung seine Vorschau neu lädt.
+ * Pause — unter /settings/pause und in Mein Hof (ab lg im Editor, unter lg
+ * seit Nr. 50 im Blatt), das über `onGespeichert` nach jeder Änderung
+ * Vorschau bzw. Seite neu lädt. `meldeErfolg` ersetzt dort den eigenen Toast
+ * durch „Gespeichert · Ansehen" (unter lg).
  *
  * „Nachricht speichern" führt auf /settings/pause zurück zur Übersicht
  * (Register N1, Nr. 44). Der Umschalter bleibt auf der Seite: Er wirkt
@@ -25,10 +26,12 @@ export function PauseClient({
   initialPaused,
   initialMessage,
   onGespeichert,
+  meldeErfolg,
 }: {
   initialPaused: boolean
   initialMessage: string | null
   onGespeichert?: () => void
+  meldeErfolg?: () => void
 }): React.JSX.Element {
   const [isPaused, setIsPaused] = useState(initialPaused)
   const [message, setMessage] = useState(initialMessage ?? '')
@@ -43,7 +46,8 @@ export function PauseClient({
         toast.error(res.error)
       } else {
         setIsPaused(newPaused)
-        toast.success(newPaused ? 'Bestellungen pausiert' : 'Du nimmst wieder Bestellungen an')
+        if (meldeErfolg) meldeErfolg()
+        else toast.success(newPaused ? 'Bestellungen pausiert' : 'Du nimmst wieder Bestellungen an')
         onGespeichert?.()
       }
     })
@@ -55,7 +59,8 @@ export function PauseClient({
       if (res.error) {
         toast.error(res.error)
       } else {
-        nachSpeichern('Nachricht gespeichert')
+        if (meldeErfolg) meldeErfolg()
+        else nachSpeichern('Nachricht gespeichert')
         onGespeichert?.()
       }
     })

@@ -5,8 +5,9 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import type { SectionConfig } from '@/server/queries/appearance'
+import { getAppearanceData, type SectionConfig } from '@/server/queries/appearance'
 import { appearanceSchema } from '@/schemas/auftritt'
+import { auftrittStandAus, type AuftrittStand } from '@/lib/abschnitt-stand'
 import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
 
 // Das Schema liegt in src/schemas/auftritt.ts — der Hofseiten-Editor prüft
@@ -14,6 +15,22 @@ import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
 // nicht als `export type { … }`: Ein Re-Export in einer 'use server'-Datei
 // registriert Next als Server-Aktion und bricht zur Laufzeit.
 export type AppearanceSaveInput = z.infer<typeof appearanceSchema>
+
+/**
+ * Der frische Stand des Auftritts — die Abschnitte von Mein Hof lesen ihn
+ * direkt vor dem Speichern (components/mein-hof/abschnitt-speichern.ts,
+ * Nr. 50): saveAppearanceAction schreibt bei jedem Aufruf alle Felder des
+ * Stands, und der Stand aus den Props der Seite hielte nach einem anderen
+ * Abschnitt alte Werte. Nur lesen, nur der eigene Hof, nur diese Felder.
+ */
+export async function ladeAuftrittStand(): Promise<{ stand: AuftrittStand } | { error: string }> {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) return { error: 'Nicht angemeldet' }
+
+  const daten = await getAppearanceData(session.user.id)
+  if (!daten) return { error: 'Hof nicht gefunden' }
+  return { stand: auftrittStandAus(daten) }
+}
 
 export async function saveAppearanceAction(
   data: AppearanceSaveInput,
@@ -80,7 +97,8 @@ export async function saveAppearanceAction(
   ])
 
   revalidatePath(`/${farm.slug}`)
-  revalidatePath('/settings/appearance')
+  // Seit Nr. 50 wird der Auftritt in Mein Hof bearbeitet; /settings/appearance leitet nur noch um.
+  revalidatePath('/farm-page')
 
   return {}
 }
@@ -96,7 +114,6 @@ export async function updateFarmLogoAction(logoUrl: string | null): Promise<{ er
   await prisma.farm.update({ where: { id: farm.id }, data: { logoUrl } })
 
   revalidatePath(`/${farm.slug}`)
-  revalidatePath('/settings/appearance')
   revalidatePath('/farm-page')
 
   return {}
@@ -116,7 +133,6 @@ export async function updateFarmBannerAction(
   await prisma.farm.update({ where: { id: farm.id }, data: { bannerType, bannerUrl } })
 
   revalidatePath(`/${farm.slug}`)
-  revalidatePath('/settings/appearance')
   revalidatePath('/farm-page')
 
   return {}

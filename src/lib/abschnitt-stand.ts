@@ -1,0 +1,121 @@
+/**
+ * Was ein Abschnitt von Mein Hof an die bestehenden Aktionen schickt
+ * (Nachtlauf Nr. 50, Register N4) — rein und ohne Datenbank prüfbar
+ * (tests/abschnitt-stand.test.ts).
+ *
+ * Beide Aktionen schreiben bei JEDEM Aufruf mehr als ein Feld:
+ * saveAppearanceAction (server/actions/appearance.ts) Leitspruch,
+ * Gründungsjahr, Über uns, Abschnitte und Werte (die Werte löscht sie und
+ * legt sie neu an), updateProfile (server/actions/farm.ts) das ganze Profil.
+ * Ein Abschnitt ändert deshalb nur sein eigenes Feld und schickt alles andere
+ * aus dem FRISCHEN Stand mit — gelesen vom Server direkt vor dem Speichern
+ * (components/mein-hof/abschnitt-speichern.ts), nie aus den Props der Seite:
+ * Die hielten nach einem anderen Abschnitt alte Werte, bis die Seite neu
+ * geladen ist, und schrieben sie zurück.
+ *
+ * Logo, Titelbild und Verlauf stehen nie darin: Sie haben eigene Aktionen,
+ * und saveAppearanceAction rührt fehlende Felder nicht an.
+ */
+import type { Betriebsstatus } from '@prisma/client'
+import { alsLand } from '@/lib/laender'
+import type { AppearanceSaveInput } from '@/schemas/auftritt'
+import type { ProfileFormData } from '@/schemas/hofprofil'
+
+/** Die Felder, die saveAppearanceAction bei jedem Aufruf schreibt — genau der Stand, aus dem jeder Abschnitt speichert. */
+export type AuftrittStand = {
+  tagline: string | null
+  foundedYear: number | null
+  aboutText: string | null
+  sectionsConfig: readonly { key: string; visible: boolean; order: number }[]
+  farmValues: readonly { icon: string; title: string; subtitle: string | null }[]
+}
+
+/** Was ein Abschnitt am Auftritt ändert. Ein fehlender Schlüssel heißt „nicht meins", null heißt „leeren". */
+export type AuftrittTeil = Partial<Pick<AppearanceSaveInput, 'tagline' | 'foundedYear' | 'aboutText' | 'sectionsConfig' | 'farmValues'>>
+
+/** Die Werte, wie die Aktion sie verlangt: sortOrder ist der Platz, ein leerer Untertitel wird null. */
+function werteFuerAktion(werte: AuftrittStand['farmValues']): AppearanceSaveInput['farmValues'] {
+  return werte.map((w, platz) => ({ icon: w.icon, title: w.title, subtitle: w.subtitle || null, sortOrder: platz }))
+}
+
+/** Der ganze Auftritt aus dem Stand — ohne Logo und Titelbild. */
+export function auftrittBasis(stand: AuftrittStand): AppearanceSaveInput {
+  return {
+    tagline: stand.tagline,
+    foundedYear: stand.foundedYear,
+    aboutText: stand.aboutText,
+    sectionsConfig: stand.sectionsConfig.map((s) => ({ key: s.key, visible: s.visible, order: s.order })),
+    farmValues: werteFuerAktion(stand.farmValues),
+  }
+}
+
+/** Der frische Stand mit dem Teil des Abschnitts — nur, was der Abschnitt wirklich setzt, ändert sich. */
+export function auftrittMitTeil(frisch: AuftrittStand, teil: AuftrittTeil): AppearanceSaveInput {
+  const neu = auftrittBasis(frisch)
+  if (teil.tagline !== undefined) neu.tagline = teil.tagline
+  if (teil.foundedYear !== undefined) neu.foundedYear = teil.foundedYear
+  if (teil.aboutText !== undefined) neu.aboutText = teil.aboutText
+  if (teil.sectionsConfig !== undefined) neu.sectionsConfig = teil.sectionsConfig.map((s) => ({ ...s }))
+  if (teil.farmValues !== undefined) neu.farmValues = werteFuerAktion(teil.farmValues.map((w) => ({ ...w, subtitle: w.subtitle ?? null })))
+  return neu
+}
+
+/** Aus dem gelesenen Auftritt (getAppearanceData) genau die Felder des Stands. */
+export function auftrittStandAus(daten: AuftrittStand): AuftrittStand {
+  return {
+    tagline: daten.tagline,
+    foundedYear: daten.foundedYear,
+    aboutText: daten.aboutText,
+    sectionsConfig: daten.sectionsConfig.map((s) => ({ key: s.key, visible: s.visible, order: s.order })),
+    farmValues: daten.farmValues.map((w) => ({ icon: w.icon, title: w.title, subtitle: w.subtitle })),
+  }
+}
+
+/** Was das Profil zum Speichern braucht — die Felder aus getFarmSettings. */
+export type ProfilQuelle = {
+  name: string
+  ownerName: string
+  description: string
+  address: string
+  postalCode: string
+  city: string
+  /** Die Spalte ist freier Text; gespeichert wird nur AT oder DE (alsLand). */
+  country: string
+  phone: string
+  email: string
+  latitude: number | null
+  longitude: number | null
+  betriebsnummer: string | null
+  betriebsstatus: Betriebsstatus | null
+}
+
+/** Was ein Abschnitt am Profil ändert (Name und Kurzbeschreibung, Adresse, Kontakt). */
+export type ProfilTeil = Partial<Pick<ProfileFormData, 'name' | 'description' | 'address' | 'postalCode' | 'city' | 'phone' | 'email'>>
+
+/** Das ganze Profil, wie updateProfile es verlangt — ohne Logo und Titelbild (die gehören nicht ins Profil). */
+export function profilBasis(e: ProfilQuelle): ProfileFormData {
+  return {
+    name: e.name,
+    ownerName: e.ownerName,
+    description: e.description,
+    address: e.address,
+    postalCode: e.postalCode,
+    city: e.city,
+    country: alsLand(e.country),
+    phone: e.phone,
+    email: e.email,
+    latitude: e.latitude,
+    longitude: e.longitude,
+    betriebsnummer: e.betriebsnummer,
+    betriebsstatus: e.betriebsstatus,
+  }
+}
+
+/** Der frische Stand mit dem Teil des Abschnitts. */
+export function profilMitTeil(frisch: ProfilQuelle, teil: ProfilTeil): ProfileFormData {
+  const neu = profilBasis(frisch)
+  for (const [feld, wert] of Object.entries(teil) as [keyof ProfilTeil, string | undefined][]) {
+    if (wert !== undefined) neu[feld] = wert
+  }
+  return neu
+}

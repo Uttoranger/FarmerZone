@@ -13,9 +13,11 @@
  *    läuft, und gibt nur das Einbetten frei (tests/sicherheits-header.test.ts).
  *  - ansichtsModus läuft nur auf dem Server: aufgerufen allein im Lader,
  *    eingebunden von keinem Client-Modul.
- *  - FarmPageView binden genau zwei Stellen ein: die Hofseite und
- *    farm-page-client.tsx (Besitzer am Handy). Eine dritte — benannt, als
- *    Namensraum, weitergereicht oder dynamisch — lässt den Test fehlschlagen.
+ *  - FarmPageView bindet seit Nr. 50 genau eine Stelle ein: die Hofseite.
+ *    farm-page-client.tsx (Besitzer am Handy mit Stiften) ist entfallen —
+ *    Mein Hof bearbeitet unter lg mit der Liste der Abschnitte (Register N4).
+ *    Eine zweite Stelle — benannt, als Namensraum, weitergereicht oder
+ *    dynamisch — lässt den Test fehlschlagen.
  *    Die Seite für Kundinnen im neuen Design (HofseiteKunde, Nr. 10) bindet
  *    nur FarmPageView ein; die Kundenansicht des Besitzers ist die echte Route
  *    im Rahmen (?vorschau=1 über vorschauLink), kein Nachbau.
@@ -31,7 +33,7 @@
  *    reservierte die Vorschau Bestand.
  */
 import { describe, it, expect, vi } from 'vitest'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { createElement, type ComponentProps, type ComponentType, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -58,7 +60,6 @@ vi.mock('@/components/farm/cart-sheet', () => ({ CartSheet: () => createElement(
 vi.mock('@/lib/auth-client', () => ({ useSession: () => ({ data: null }), signOut: vi.fn() }))
 
 import { FarmPageView } from '@/components/farm/farm-page-view'
-import { FarmPageClient } from '@/components/farmer/farm-page-client'
 import { MeinHofAnsicht } from '@/components/mein-hof/mein-hof-ansicht'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
@@ -220,7 +221,7 @@ describe('der Parameter „vorschau" wird nur in ansichtsModus() gelesen', () =>
 
 // ── Einbindung von FarmPageView ───────────────────────────────────────────
 
-describe('FarmPageView binden genau zwei Stellen ein', () => {
+describe('FarmPageView bindet genau eine Stelle ein', () => {
   const EINBINDEN = [
     /import\s*\{[^}]*\bFarmPageView\b[^}]*\}\s*from/, // benannt
     /import\s*\*\s*as\s+\w+\s+from\s+['"][^'"]*farm-page-view['"]/, // Namensraum
@@ -246,11 +247,12 @@ describe('FarmPageView binden genau zwei Stellen ein', () => {
     expect(bindetEin("export * from './andere-datei'")).toBe(false)
   })
 
-  it('die Hofseite und farm-page-client.tsx — eine dritte Stelle lässt den Test fehlschlagen', () => {
+  it('nur die Hofseite — seit Nr. 50 ist farm-page-client.tsx entfallen, eine zweite Stelle lässt den Test fehlschlagen', () => {
     const stellen = SRC.filter((pfad) => pfad !== 'src/components/farm/farm-page-view.tsx')
       .filter((pfad) => bindetEin(quelle(pfad)))
       .toSorted()
-    expect(stellen).toEqual(['src/app/(public)/[farmSlug]/page.tsx', 'src/components/farmer/farm-page-client.tsx'])
+    expect(stellen).toEqual(['src/app/(public)/[farmSlug]/page.tsx'])
+    expect(existsSync(join(WURZEL, 'src/components/farmer/farm-page-client.tsx'))).toBe(false)
   })
 
   it('die Seite für Kundinnen (HofseiteKunde) bindet nur FarmPageView ein', () => {
@@ -267,17 +269,16 @@ describe('FarmPageView binden genau zwei Stellen ein', () => {
     expect(ansicht).not.toMatch(/FarmPageView|HofseiteKunde/)
     // Die Adresse kommt aus vorschauLink — dieselbe Route wie für Kundinnen.
     expect(ohneKommentare(quelle('src/lib/mein-hof-ansicht.ts'))).toMatch(/kundenAnsichtAdresse[\s\S]*?vorschauLink\(slug\)/)
-    // FarmPageView rendert beim Besitzer nur noch den Bearbeitungsmodus, kein Rahmen daneben.
-    const besitzer = ohneKommentare(quelle('src/components/farmer/farm-page-client.tsx'))
-    expect(besitzer).toContain('mode="edit"')
-    expect(besitzer).not.toContain('<iframe')
+    // Mein Hof zeigt keine zweite Hofseite: unter lg die Liste der Abschnitte, ab lg der Editor (Nr. 50).
+    const meinHof = ohneKommentare(quelle('src/app/(hof)/farm-page/page.tsx'))
+    expect(meinHof).not.toMatch(/FarmPageView|FarmPageClient|HofseiteKunde/)
   })
 
-  it('die Hofseite rendert sie immer ohne ownerMode; farm-page-client steht nur auf der Besitzer-Route', () => {
+  it('die Hofseite rendert sie immer ohne ownerMode; keine Seite bindet mehr einen Bearbeitungsmodus ein', () => {
     const seite = ohneKommentare(quelle('src/app/(public)/[farmSlug]/page.tsx'))
     expect(seite.match(/ownerMode=\{[^}]*\}/g)).toEqual(['ownerMode={false}'])
     const besitzerSeiten = SRC.filter((pfad) => /<FarmPageClient\b/.test(ohneKommentare(quelle(pfad))))
-    expect(besitzerSeiten).toEqual(['src/app/(hof)/farm-page/page.tsx'])
+    expect(besitzerSeiten).toEqual([])
   })
 })
 
@@ -352,13 +353,13 @@ describe('Bearbeitungs-Elemente erscheinen nur mit ownerMode', () => {
     expect(gefunden(bearbeiten, IN_DER_ANSICHT)).toEqual(IN_DER_ANSICHT.map(({ was }) => was))
   })
 
-  it('Gegenprobe: Mein Hof trägt die Werkzeugleiste über der Hofseite mit Stiften', () => {
+  it('Gegenprobe: Mein Hof trägt die Werkzeugleiste über dem Inhalt (seit Nr. 50 die Liste der Abschnitte)', () => {
     type AnsichtProps = Omit<ComponentProps<typeof MeinHofAnsicht>, 'children'>
     const besitzer = renderToStaticMarkup(
       createElement(
         MeinHofAnsicht as unknown as ComponentType<AnsichtProps>,
         { reiter: 'hofseite', slug: HOF.slug, kopf: null },
-        createElement(FarmPageClient, { farm: HOF, activeStatus: STATUS, pastStatusCount: 2 })
+        createElement('p', null, 'Liste der Abschnitte')
       )
     )
     expect(gefunden(besitzer, [WERKZEUGLEISTE])).toEqual([WERKZEUGLEISTE.was])

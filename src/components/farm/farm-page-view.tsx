@@ -2,35 +2,27 @@
 
 /*
  * FarmPageView — DIE Hofseite. Es gibt sie genau einmal (ARCHITECTURE §4);
- * genau zwei Stellen binden sie ein, tests/hofseite-einmal.test.ts lässt eine
- * dritte fehlschlagen:
+ * genau eine Stelle bindet sie ein, tests/hofseite-einmal.test.ts lässt eine
+ * zweite fehlschlagen:
  *
- * 1. src/app/(public)/[farmSlug]/page.tsx — Kundinnen und die Vorschau des
- *    Hofs (?vorschau=1, dieselbe Route). Immer `ownerMode={false}`; gerendert
- *    wird die Hofseite im neuen Design (components/hofseite/hofseite-kunde.tsx,
- *    Nachtlauf Nr. 10) in der KundeShell der Seite. Was die Vorschau anders
- *    macht, kommt fertig entschieden als `ansicht` aus `ansichtsModus`
- *    (src/lib/ansichts-modus.ts): `kaufen` (wirkungslos in der Vorschau) und
- *    `art` (der Empfänger für die Markierung des Editors, VorschauImRahmen).
- *    Dazu `reorderItems` aus dem Nachbestell-Link — nur, wo Kaufen wirkt. Kein
- *    Stift, keine Werkzeugleiste, kein Bearbeitungs-Hinweis.
+ * src/app/(public)/[farmSlug]/page.tsx — Kundinnen und die Vorschau des
+ * Hofs (?vorschau=1, dieselbe Route). Immer `ownerMode={false}`; gerendert
+ * wird die Hofseite im neuen Design (components/hofseite/hofseite-kunde.tsx,
+ * Nachtlauf Nr. 10) in der KundeShell der Seite. Was die Vorschau anders
+ * macht, kommt fertig entschieden als `ansicht` aus `ansichtsModus`
+ * (src/lib/ansichts-modus.ts): `kaufen` (wirkungslos in der Vorschau) und
+ * `art` (der Empfänger für die Markierung des Editors, VorschauImRahmen).
+ * Dazu `reorderItems` aus dem Nachbestell-Link — nur, wo Kaufen wirkt. Kein
+ * Stift, keine Werkzeugleiste, kein Bearbeitungs-Hinweis.
  *
- * 2. src/components/farmer/farm-page-client.tsx — der Besitzer am Handy unter
- *    lg auf /farm-page, im Bearbeitungsmodus (`ownerMode`, `mode`,
- *    `pastStatusCount`, `onVorschau`, seit Nr. 49 `onGespeichert` für
- *    „Gespeichert · Ansehen"). Seit Nachtlauf Nr. 16 in der HofShell;
- *    die Bestandsfarben (--app-*) bekommen dort über data-app-palette die
- *    Werte des Design-Systems, der Aufbau ist unverändert. Nur hier gibt
- *    es Stifte, Titelbild- und Fotoknöpfe, den Bearbeitungs-Hinweis und den
- *    Pausen-Hinweis für den Hof; die Werkzeugleiste steht in
- *    farm-page-client.tsx selbst. Seine „Kundenansicht" zeigt seit Nr. 10 die
- *    echte Route im Rahmen (?vorschau=1) — kein zweiter Nachbau der Seite für
- *    Kundinnen.
- *
- * Die Besitzer-Ansicht (HofseiteBesitzer) entfällt, sobald auch die
- * Handyansicht auf Liste und Vorschau umzieht (wie ab lg,
- * components/farmer/hofseite-editor.tsx; Gate 5) — dann bleibt nur die erste
- * Stelle.
+ * Bis Nr. 49 band auch src/components/farmer/farm-page-client.tsx sie ein:
+ * der Besitzer am Handy unter lg auf /farm-page, im Bearbeitungsmodus mit
+ * Stiften (HofseiteBesitzer). Seit Nr. 50 (Register N4) bearbeitet Mein Hof
+ * unter lg mit der Liste der Abschnitte und Blatt von unten
+ * (components/mein-hof/abschnitte-liste.tsx); farm-page-client.tsx ist
+ * entfallen. Der Bearbeitungsmodus hier hat damit keinen Aufrufer mehr — ihn
+ * auszubauen ist ein eigener Auftrag (Bericht Nr. 50). Titelbild-Knopf und
+ * Ausschnitt (CoverEditButton, CoverFocusAdjust) nutzt Mein Hof weiter.
  */
 
 import type { ReactNode } from 'react'
@@ -70,7 +62,7 @@ import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
 import { produktLink } from '@/lib/produktdetail'
 import { NICHT_IM_SHOP_IM_SATZ } from '@/lib/produkt-sichtbarkeit'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
-import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
+import { BEITRAEGE_HREF, HOFSEITE_HREF } from '@/lib/bauern-navigation'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 
 const ANLASS_META: Record<string, { label: string; icon: ReactNode }> = {
@@ -488,20 +480,28 @@ export const TITELBILD_KNOPF_STIL = {
 
 /**
  * „Titelbild ersetzen" — auf der Hofseite im Bearbeitungsmodus und im
- * Editor ab lg (hofseite-editor.tsx), der über `onGespeichert` seine
- * Vorschau neu lädt. `meldeErfolg` ersetzt den eigenen Toast — in Mein Hof
- * unter lg durch „Gespeichert · Ansehen" (Nr. 49).
+ * Baustein „Titelbild" von Mein Hof (components/mein-hof/bild-bausteine.tsx:
+ * ab lg im Editor, unter lg seit Nr. 50 im Blatt), der über `onGespeichert`
+ * seine Vorschau neu lädt. `meldeErfolg` ersetzt den eigenen Toast — in Mein
+ * Hof unter lg durch „Gespeichert · Ansehen" (Nr. 49). `onHochladen` meldet,
+ * solange hochgeladen und gespeichert wird: Das Blatt bleibt dann offen,
+ * sonst hinge das Datei-Feld mitten im Upload aus (CODING_STANDARDS §8).
+ * `gross` macht den Knopf 44 px hoch (Touch-Ziel im Blatt, Nr. 50).
  */
 export function CoverEditButton({
   currentBannerUrl,
   onGespeichert,
   meldeErfolg,
+  onHochladen,
+  gross = false,
 }: {
   currentBannerUrl: string | null
   onGespeichert?: () => void
   meldeErfolg?: () => void
+  onHochladen?: (laeuft: boolean) => void
+  gross?: boolean
 }): React.JSX.Element {
-  const [, startTransition] = useTransition()
+  const [speichert, startTransition] = useTransition()
   const router = useRouter()
 
   const { isUploading, progress, openFilePicker, fileInput } = useImageUpload({
@@ -521,6 +521,14 @@ export function CoverEditButton({
       })
     },
   })
+  const laeuft = isUploading || speichert
+  useEffect(() => {
+    if (!onHochladen) return
+    onHochladen(laeuft)
+    return () => {
+      if (laeuft) onHochladen(false)
+    }
+  }, [laeuft, onHochladen])
 
   return (
     <>
@@ -529,7 +537,7 @@ export function CoverEditButton({
         type="button"
         onClick={openFilePicker}
         disabled={isUploading}
-        className="flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-60"
+        className={`flex items-center gap-1.5 ${gross ? 'min-h-11' : 'h-9'} px-3.5 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-60`}
         style={TITELBILD_KNOPF_STIL}
       >
         <Camera className="size-3.5" strokeWidth={1.7} />
@@ -540,7 +548,8 @@ export function CoverEditButton({
 }
 
 // ── Titelbild-Fokuspunkt: Anpass-Zustand (Drag mit Maus & Touch) ──────────────
-// Auch im Editor ab lg (hofseite-editor.tsx) über einem kleinen Abbild des Titelbilds.
+// Auch im Baustein „Titelbild" von Mein Hof (bild-bausteine.tsx) über einem
+// kleinen Abbild des Titelbilds; `gross` macht die Knöpfe 44 px hoch (Nr. 50).
 
 export function CoverFocusAdjust({
   focusY,
@@ -548,13 +557,16 @@ export function CoverFocusAdjust({
   onSave,
   onCancel,
   saving,
+  gross = false,
 }: {
   focusY: number
   onChange: (v: number) => void
   onSave: () => void
   onCancel: () => void
   saving: boolean
+  gross?: boolean
 }): React.JSX.Element {
+  const hoehe = gross ? 'min-h-11' : 'h-9'
   const drag = useRef<{ startY: number; startFocus: number; height: number } | null>(null)
 
   return (
@@ -596,7 +608,7 @@ export function CoverFocusAdjust({
           type="button"
           onClick={onCancel}
           disabled={saving}
-          className="flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-60"
+          className={`flex items-center gap-1.5 ${hoehe} px-3.5 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-60`}
           style={{ background: 'rgba(255,255,255,0.94)', color: '#5C6052', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}
         >
           Abbrechen
@@ -605,7 +617,7 @@ export function CoverFocusAdjust({
           type="button"
           onClick={onSave}
           disabled={saving}
-          className="flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+          className={`flex items-center gap-1.5 ${hoehe} px-3.5 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60`}
           style={{ background: 'rgba(45,48,39,0.85)', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}
         >
           <Check className="size-3.5" strokeWidth={1.7} />
@@ -672,10 +684,9 @@ export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = fal
 }
 
 /**
- * Der Besitzer am Handy unter lg auf /farm-page (farm-page-client.tsx):
- * Bearbeiten mit Stiften im Bestandsdesign. Seine Kundenansicht ist seit
- * Nr. 10 die echte Route im Rahmen (?vorschau=1), nicht mehr diese
- * Komponente; der Umbau von Mein Hof folgt mit Gate 5.
+ * Bearbeiten mit Stiften im Bestandsdesign — bis Nr. 49 der Besitzer am Handy
+ * unter lg auf /farm-page (farm-page-client.tsx). Seit Nr. 50 ohne Aufrufer
+ * (Mein Hof bearbeitet mit der Liste der Abschnitte, Register N4).
  */
 function HofseiteBesitzer({
   farm,
@@ -990,7 +1001,7 @@ function HofseiteBesitzer({
               ))}
               {isEdit && !adjustingFocus && (
                 <Link
-                  href="/settings/appearance"
+                  href={HOFSEITE_HREF}
                   className="pointer-events-auto flex items-center justify-center rounded-full transition-opacity hover:opacity-90"
                   style={{
                     width: 34, height: 34,

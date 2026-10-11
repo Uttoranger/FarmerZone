@@ -39,7 +39,7 @@ import { EMAIL_MAX, HOFNAME_MAX, PERSONENNAME_MAX, TELEFON_MAX } from '@/lib/ein
 import { FeldZaehler } from '@/components/shared/zeichen-zaehler'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { useNachSpeichern } from '@/components/hof-einstellungen/use-nach-speichern'
-import { EINSTELLUNG_MEIN_AUFTRITT, einstellungsWeg } from '@/lib/bauern-navigation'
+import { HOFSEITE_HREF, HOFSEITE_WEG } from '@/lib/bauern-navigation'
 import { cn } from '@/lib/utils'
 
 // Nur clientseitig: Leaflet greift beim Import auf window zu.
@@ -385,12 +385,13 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
       <p className="text-sm text-muted-foreground">
         Logo und Titelbild verwaltest du unter{' '}
         {/* Ein Link im Satz (Nr. 44), grün wie jeder Link im Fließtext. Das
-            Polster macht ihn 44 px hoch, die Gegen-Ränder halten die Zeile ruhig. */}
+            Polster macht ihn 44 px hoch, die Gegen-Ränder halten die Zeile ruhig.
+            Seit Nr. 50 in Mein Hof (Register N4), vorher „Mein Auftritt". */}
         <Link
-          href={EINSTELLUNG_MEIN_AUFTRITT.href}
+          href={HOFSEITE_HREF}
           className={cn('-my-3 inline-block rounded-md py-3 font-medium text-brand-text underline underline-offset-2', FOKUS_RAHMEN)}
         >
-          {einstellungsWeg(EINSTELLUNG_MEIN_AUFTRITT)}
+          {HOFSEITE_WEG}
         </Link>{' '}
         — dort lädst du Bilder direkt vom Gerät hoch.
       </p>
