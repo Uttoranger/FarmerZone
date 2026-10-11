@@ -17,7 +17,9 @@ import {
   gebindeGroesse,
   istMassEinheit,
 } from '@/lib/format'
-import { NETTO_EINHEIT_LABEL, type NettoEinheitValue } from '@/lib/taxonomie'
+import { KAEUFER_VORSCHAU, type KartenVorschau } from '@/lib/hofseite-kunde'
+import { NETTO_EINHEIT_LABEL, kategorieBildPfad, type NettoEinheitValue, type ProductCategoryValue } from '@/lib/taxonomie'
+import { preisZahl } from '@/schemas/product'
 
 /** „Preis je kg" ohne Gebinde, „Preis für das 2-kg-Paket" mit, „Preis für 6 Pakete" bei Stück/Paket. */
 export function preisFeldLabel(unit: string, unitSize?: number | null): string {
@@ -53,6 +55,41 @@ export function kundenVorschau(
     if (je) teile.push(je)
   }
   return `Kunden sehen: ${teile.join(' · ')}`
+}
+
+/**
+ * Der Preis aus dem Formular, wenn er die Prüfung beim Speichern bestünde
+ * (preisZahl, dasselbe Schema wie der Server) — sonst null. Den getippten
+ * Text zerlegt schon das Preisfeld (DezimalFeld → parseDezimal); hier kommt
+ * die Zahl an, oder NaN bzw. null, solange das Feld leer oder unlesbar ist.
+ * Nur Anzeige: Käufer-Vorschau und Zusammenfassung des Abschnitts „Preis"
+ * zeigen ohne gültigen Preis denselben ruhigen Satz (KAEUFER_VORSCHAU.preisFehlt)
+ * statt „€ 0,00" oder „NaN".
+ */
+export function gueltigerPreis(price: number | null): number | null {
+  const preis = preisZahl.safeParse(price)
+  return preis.success ? preis.data : null
+}
+
+/**
+ * Die Karte „So sehen Käufer dein Produkt" (Nr. 51) aus den Formularwerten —
+ * Foto, Name, Preis, Einheit. Die Produktkarte der Hofseite zeigt sie mit
+ * ihren eigenen Helfern (formatGrundpreis, zweitePreiszeile); hier wird nichts
+ * gerechnet. Ohne gültigen Preis (gueltigerPreis) zeigt die Karte den ruhigen
+ * Platzhalter; ohne Foto die Illustration der Kategorie wie die Hofseite.
+ */
+export function kaeuferVorschau(
+  werte: { name: string; price: number | null; unit: string; unitSize: number | null | undefined },
+  bild: { foto: string | null; kategorie: ProductCategoryValue | null }
+): KartenVorschau {
+  return {
+    name: werte.name.trim() || KAEUFER_VORSCHAU.name,
+    imageUrl: bild.foto,
+    categoryImageUrl: kategorieBildPfad(bild.kategorie),
+    price: gueltigerPreis(werte.price),
+    unit: werte.unit,
+    unitSize: werte.unitSize ?? null,
+  }
 }
 
 /**

@@ -75,8 +75,42 @@ export function reiterAdresse(pfad: string, suche: string, id: HofReiterId): str
 
 // ─── Übersicht: Produkte ────────────────────────────────────────────────────
 
-/** So viele Produkte zeigt die Übersicht, „Alle ansehen" führt zum Reiter Produkte (Mockup web-k2-hofseite). */
+/**
+ * So viele Produkte zeigt die Übersicht ab lg, „Alle ansehen" führt zum Reiter
+ * Produkte (Mockup web-k2-hofseite) — und ab md im Schaufenster, eine Reihe
+ * aus drei Kacheln.
+ */
 export const UEBERSICHT_PRODUKTE = 3
+
+/**
+ * Das Schaufenster unter lg (Register N5, Nr. 51): Unter dem Kopf stehen
+ * zuerst Fotostreifen und bis zu vier Produkte, dann „Alle Produkte (n)". Am
+ * Handy sind es vier Zeilen.
+ */
+export const SCHAUFENSTER_PRODUKTE = 4
+
+/**
+ * Steht die Karte an Stelle `index` nur am Handy? Ab md fasst eine Reihe drei
+ * Kacheln, ab lg gilt UEBERSICHT_PRODUKTE wie bisher. Entschieden wird über
+ * Klassen (md:hidden), nie durch Messen im Browser: Server und Browser zeigen
+ * dasselbe — kein Hydration-Unterschied, nach dem Laden springt nichts.
+ */
+export function stehtNurAmHandy(index: number): boolean {
+  return index >= UEBERSICHT_PRODUKTE
+}
+
+/** Gibt es ein Schaufenster? Nur in der Übersicht und nur mit Produkten — ohne bleibt die Übersicht, wie sie war. */
+export function zeigeSchaufenster(offen: HofReiterId, produktAnzahl: number): boolean {
+  return offen === 'uebersicht' && produktAnzahl > 0
+}
+
+/**
+ * „Alle Produkte (9)" unter dem Schaufenster. Die Zahl ist dieselbe wie im
+ * Reiter „Produkte · 9": alles, was der Reiter Produkte zeigt.
+ */
+export function alleProdukteText(anzahl: number): string {
+  return `Alle Produkte (${formatZahl(anzahl)})`
+}
 
 /**
  * Die Produkte der Übersicht: zuerst, was man gerade kaufen kann, jeweils in
@@ -114,6 +148,30 @@ export function ueberUnsText(hof: { aboutText: string | null; description: strin
   if (eigener) return eigener
   return hof.description.trim() || null
 }
+
+// ─── Käufer-Vorschau im Produktdialog (Nr. 51) ──────────────────────────────
+
+/**
+ * Was die Produktkarte in der Vorschau zeigt („So sehen Käufer dein
+ * Produkt"): Foto, Name, Preis, Einheit — ohne Link, ohne Korb. Entsteht aus
+ * den Formularwerten (kaeuferVorschau in components/products/produkt-preis.ts).
+ */
+export type KartenVorschau = {
+  name: string
+  imageUrl: string | null
+  categoryImageUrl: string | null
+  /** null: Das Preisfeld ist leer oder ungültig — die Karte zeigt dann KAEUFER_VORSCHAU.preisFehlt. */
+  price: number | null
+  unit: string
+  unitSize: number | null
+}
+
+/** Überschrift und ruhige Platzhalter der Käufer-Vorschau — leere Felder zeigen nie „NaN" oder „€ 0,00". */
+export const KAEUFER_VORSCHAU = {
+  titel: 'So sehen Käufer dein Produkt',
+  name: 'Dein Produkt',
+  preisFehlt: 'Preis fehlt noch',
+} as const
 
 // ─── Zahlung (E5) ───────────────────────────────────────────────────────────
 

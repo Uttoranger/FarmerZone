@@ -7,6 +7,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import {
   CalendarDays,
   Check,
+  ChevronRight,
   Leaf,
   MapPin,
   MessageCircle,
@@ -27,6 +28,7 @@ import { buildMapsUrl } from '@/lib/customer-links'
 import { hofInitialen } from '@/lib/hof-initialen'
 import {
   aktiverReiter,
+  alleProdukteText,
   gebuehrHinweisFuerHof,
   hofseiteReiter,
   reiterAdresse,
@@ -34,6 +36,7 @@ import {
   verfuegbarText,
   vorWieLange,
   zahlungsarten,
+  zeigeSchaufenster,
   type HofReiterId,
 } from '@/lib/hofseite-kunde'
 import { jsonLdSicher } from '@/lib/json-ld'
@@ -75,7 +78,9 @@ import { HofseiteFotos } from '@/components/hofseite/hofseite-fotos'
  * die rechte Spalte (EINE Komponente, hofseite-seitenspalte.tsx). Das
  * Produktraster bleibt in jedem Reiter an derselben Stelle eingehängt — Korb
  * und Nachbestell-Link überstehen so den Wechsel. Die Karten führen zur
- * Produktseite (Nr. 11).
+ * Produktseite (Nr. 11). Unter lg steht in der Übersicht zuerst das
+ * Schaufenster (Register N5, Nr. 51): Fotostreifen, bis zu vier Produkte,
+ * „Alle Produkte (n)"; danach rechte Spalte und Über uns.
  *
  * Was entschieden wird (Reiter, Abschnitte, Zustände, Zahlung, Gebühr), steht
  * in src/lib/hofseite-kunde.ts und bereiche-anzeige.ts.
@@ -97,6 +102,11 @@ const UMRISS_KNOPF = cn(
 )
 const TEXTLINK = cn(
   'inline-flex min-h-11 items-center rounded-md text-[13.5px] font-semibold text-brand-text underline-offset-4 hover:underline',
+  FOKUS_RAHMEN
+)
+/** „Alle Produkte (n)" unter dem Schaufenster — über die volle Breite, darum Radius 14 statt Pille (DESIGN_SYSTEM). */
+const ALLE_PRODUKTE_KNOPF = cn(
+  'flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[14px] border border-border px-4 text-[14px] font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted',
   FOKUS_RAHMEN
 )
 
@@ -136,8 +146,11 @@ export function HofseiteKunde({
   const beimZurueck = useRueckwegKlick(kundenSeite, 'zeile')
 
   const beitrag = sichtbar('status') ? activeStatus : null
-  const reiter = hofseiteReiter({ produktAnzahl: produkte.length, hatBeitrag: beitrag !== null })
+  // EINE Zahl für den Reiter „Produkte · n" und „Alle Produkte (n)": alles, was der Reiter Produkte zeigt.
+  const produktAnzahl = produkte.length
+  const reiter = hofseiteReiter({ produktAnzahl, hatBeitrag: beitrag !== null })
   const offen = aktiverReiter({ reiter: suche.get(REITER_PARAMETER), bereich: suche.get('bereich') }, reiter)
+  const schaufenster = zeigeSchaufenster(offen, produktAnzahl)
 
   // ?bereich=futter: einmal zum Futter-Abschnitt springen — nicht bei jedem
   // späteren Wechsel in den Reiter Produkte.
@@ -154,7 +167,7 @@ export function HofseiteKunde({
   // die Seite schon darunter gescrollt war.
   const reiterAnker = useRef<HTMLDivElement>(null)
 
-  function zeigeReiter(id: HofReiterId) {
+  function zeigeReiter(id: HofReiterId, { fokusAufReiter = false }: { fokusAufReiter?: boolean } = {}) {
     return (e: { preventDefault: () => void }) => {
       // Wie die Filter auf /hoefe: Die Adresse wird geschrieben, Next gleicht
       // useSearchParams ab — kein Server-Aufruf, kein Eintrag im Verlauf.
@@ -164,10 +177,16 @@ export function HofseiteKunde({
       e.preventDefault()
       window.history.replaceState(null, '', reiterAdresse(pfad, window.location.search, id))
       const anker = reiterAnker.current
-      if (!anker) return
-      const kopf = document.querySelector('header')?.getBoundingClientRect().height ?? 0
-      const ziel = anker.getBoundingClientRect().top + window.scrollY - kopf
-      if (window.scrollY > ziel) window.scrollTo({ top: ziel })
+      if (anker) {
+        const kopf = document.querySelector('header')?.getBoundingClientRect().height ?? 0
+        const ziel = anker.getBoundingClientRect().top + window.scrollY - kopf
+        if (window.scrollY > ziel) window.scrollTo({ top: ziel })
+      }
+      // Ein Link im Inhalt („Alle ansehen", „Alle Produkte (n)") verschwindet
+      // mit dem Wechsel — der Fokus fiele auf <body>. Er geht deshalb auf den
+      // neuen Reiter (Merkmal data-reiter der Reiterleiste), ohne Scrollen:
+      // Wohin die Seite gehört, hat der Anker oben entschieden.
+      if (fokusAufReiter) document.querySelector<HTMLElement>(`[data-reiter="${id}"]`)?.focus({ preventScroll: true })
     }
   }
 
@@ -233,6 +252,55 @@ export function HofseiteKunde({
   const werte = sichtbar('values') ? farm.farmValues.slice(0, 6) : []
   const verfuegbar = verfuegbarText(produkte, farm.isPaused)
   const kannBestellen = produkte.length > 0 && !farm.isPaused
+
+  const zeigeUeberUns = offen === 'uebersicht' && Boolean(ueberUns || werte.length > 0 || farm.foundedYear)
+  // Ab lg mit Schaufenster ein Raster aus zwei Zeilen: Über uns oben links,
+  // das Schaufenster darunter, die rechte Spalte über beide (siehe unten).
+  const zweiZeilen = schaufenster && zeigeUeberUns
+
+  const seitenspalte = (
+    <HofseiteSeitenspalte
+      hof={farm}
+      zahlungsarten={zahlungsarten(farm)}
+      gebuehrKurz={gebuehr?.kurz ?? null}
+      gebuehrKorb={gebuehr?.korb ?? null}
+      mitKorb={mitKorb}
+      jetzt={jetzt}
+      produkte={produkte}
+      // Am Handy nur in der Übersicht (Mockup mobil-k2-hofseite) — nach dem Schaufenster (Register N5), ohne Schaufenster vor dem Inhalt.
+      className={cn('lg:col-start-2 lg:row-start-1', zweiZeilen && 'lg:row-span-2', offen !== 'uebersicht' && 'hidden lg:flex')}
+    />
+  )
+
+  // EINE Karte Über uns — sie steht je nach Fall an genau einer Stelle (siehe unten), nie doppelt.
+  const ueberUnsKarte = zeigeUeberUns ? (
+    // data-abschnitt: Ziel der Markierung aus Mein Hof für Über uns, Gründungsjahr und Werte (ZIEL_ABSCHNITT, Nr. 50).
+    <section data-abschnitt="ueberuns" aria-labelledby="ueber-uns" className={cn(KARTE, 'flex flex-col gap-2.5', schaufenster && 'lg:col-start-1 lg:row-start-1')}>
+      <h2 id="ueber-uns" className="font-heading text-xl font-semibold text-foreground">
+        Über uns
+      </h2>
+      {ueberUns && (
+        <p className="text-[14.5px] leading-relaxed whitespace-pre-line break-words text-muted-foreground">{ueberUns}</p>
+      )}
+      {(werte.length > 0 || farm.foundedYear) && (
+        <ul className="mt-1 flex flex-wrap gap-2">
+          {farm.foundedYear && (
+            <li>
+              <StatusBadge status="neutral">Seit {farm.foundedYear}</StatusBadge>
+            </li>
+          )}
+          {werte.map((w) => (
+            <li key={w.id}>
+              <StatusBadge status="fertig" className="gap-1">
+                <Check className="size-3 shrink-0" strokeWidth={1.9} aria-hidden="true" />
+                {w.title}
+              </StatusBadge>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  ) : null
 
   return (
     <>
@@ -359,6 +427,7 @@ export function HofseiteKunde({
                 href={reiterAdresse(pfad, suche.toString(), r.id)}
                 onNavigate={zeigeReiter(r.id)}
                 prefetch={false}
+                data-reiter={r.id}
                 aria-current={offen === r.id ? 'page' : undefined}
                 className={cn(
                   'inline-flex min-h-12 items-center border-b-2 px-0.5 text-[15px] whitespace-nowrap transition-colors duration-[250ms]',
@@ -376,51 +445,31 @@ export function HofseiteKunde({
         </ul>
       </nav>
 
-      {/* ── Inhalt und rechte Spalte ── */}
-      <div className="mx-auto max-w-[1200px] px-4 pt-6 pb-12 md:px-6 md:pt-7 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <HofseiteSeitenspalte
-          hof={farm}
-          zahlungsarten={zahlungsarten(farm)}
-          gebuehrKurz={gebuehr?.kurz ?? null}
-          gebuehrKorb={gebuehr?.korb ?? null}
-          mitKorb={mitKorb}
-          jetzt={jetzt}
-          produkte={produkte}
-          // Am Handy nur in der Übersicht, dort vor dem Inhalt (Mockup mobil-k2-hofseite).
-          className={cn('mb-[26px] lg:col-start-2 lg:row-start-1 lg:mb-0', offen !== 'uebersicht' && 'hidden lg:flex')}
-        />
+      {/* ── Inhalt und rechte Spalte ──
+          Unter lg in der Übersicht zuerst das Schaufenster (Register N5):
+          Fotostreifen, bis zu vier Produkte, „Alle Produkte (n)"; danach die
+          rechte Spalte und Über uns. Der Quelltext hat unter lg genau diese
+          Reihenfolge — Tastatur und Screenreader folgen ihr, kein `order`.
+          Ab lg stellt das Raster die Teile an ihren alten Ort: Über uns oben
+          links (Zeile 1), das Schaufenster darunter (Zeile 2, mit dem Abstand
+          26 px wie bisher), die rechte Spalte über beide Zeilen. Ohne
+          Schaufenster (andere Reiter, keine Produkte) bleibt alles wie bisher:
+          die Spalte im Quelltext zuerst, Über uns oben in der Inhaltsspalte.
+          Über uns und die Spalte stehen dabei je an genau EINER Stelle. */}
+      <div
+        className={cn(
+          'mx-auto flex max-w-[1200px] flex-col gap-[26px] px-4 pt-6 pb-12 md:px-6 md:pt-7 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_360px]',
+          zweiZeilen && 'lg:grid-rows-[auto_1fr] lg:gap-y-[26px]'
+        )}
+      >
+        {!schaufenster && seitenspalte}
 
-        <div className="flex min-w-0 flex-col gap-[26px] lg:col-start-1 lg:row-start-1">
-          {offen === 'uebersicht' && (ueberUns || werte.length > 0 || farm.foundedYear) ? (
-            // data-abschnitt: Ziel der Markierung aus Mein Hof für Über uns, Gründungsjahr und Werte (ZIEL_ABSCHNITT, Nr. 50).
-            <section data-abschnitt="ueberuns" aria-labelledby="ueber-uns" className={cn(KARTE, 'flex flex-col gap-2.5')}>
-              <h2 id="ueber-uns" className="font-heading text-xl font-semibold text-foreground">
-                Über uns
-              </h2>
-              {ueberUns && (
-                <p className="text-[14.5px] leading-relaxed whitespace-pre-line break-words text-muted-foreground">{ueberUns}</p>
-              )}
-              {(werte.length > 0 || farm.foundedYear) && (
-                <ul className="mt-1 flex flex-wrap gap-2">
-                  {farm.foundedYear && (
-                    <li>
-                      <StatusBadge status="neutral">Seit {farm.foundedYear}</StatusBadge>
-                    </li>
-                  )}
-                  {werte.map((w) => (
-                    <li key={w.id}>
-                      <StatusBadge status="fertig" className="gap-1">
-                        <Check className="size-3 shrink-0" strokeWidth={1.9} aria-hidden="true" />
-                        {w.title}
-                      </StatusBadge>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
+        <div className={cn('flex min-w-0 flex-col gap-[26px] lg:col-start-1', zweiZeilen ? 'lg:row-start-2' : 'lg:row-start-1')}>
+          {!schaufenster && ueberUnsKarte}
+
+          {offen === 'uebersicht' && sichtbar('gallery') ? (
+            <HofseiteFotos fotos={farm.farmPhotos} streifenUnterLg={schaufenster} />
           ) : null}
-
-          {offen === 'uebersicht' && sichtbar('gallery') ? <HofseiteFotos fotos={farm.farmPhotos} /> : null}
 
           {offen === 'uebersicht' ? (
             <div className="-mb-3.5 flex flex-wrap items-baseline gap-x-2.5">
@@ -430,9 +479,10 @@ export function HofseiteKunde({
               {produkte.length > 0 && (
                 <Link
                   href={reiterAdresse(pfad, suche.toString(), 'produkte')}
-                  onNavigate={zeigeReiter('produkte')}
+                  onNavigate={zeigeReiter('produkte', { fokusAufReiter: true })}
                   prefetch={false}
-                  className={TEXTLINK}
+                  // Unter lg steht „Alle Produkte (n)" unter dem Schaufenster.
+                  className={cn(TEXTLINK, 'max-lg:hidden')}
                 >
                   Alle ansehen <span aria-hidden="true">&nbsp;→</span>
                 </Link>
@@ -458,9 +508,26 @@ export function HofseiteKunde({
               onGesprungen={() => setFutterSprung(false)}
               // Karten führen zur Produktseite (Nr. 11) — aus der Vorschau in deren Vorschau.
               produktLink={(id) => produktLink(farm.slug, id, ansicht.art === 'vorschau')}
+              platzUnten={!schaufenster}
             />
           </div>
+
+          {/* Derselbe Reiterwechsel wie die Reiterleiste (reiterAdresse, zeigeReiter). */}
+          {schaufenster && (
+            <Link
+              href={reiterAdresse(pfad, suche.toString(), 'produkte')}
+              onNavigate={zeigeReiter('produkte', { fokusAufReiter: true })}
+              prefetch={false}
+              className={cn(ALLE_PRODUKTE_KNOPF, '-mt-3.5 lg:hidden')}
+            >
+              {alleProdukteText(produktAnzahl)}
+              <ChevronRight className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+            </Link>
+          )}
         </div>
+
+        {schaufenster && seitenspalte}
+        {schaufenster && ueberUnsKarte}
       </div>
     </>
   )

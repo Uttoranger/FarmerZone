@@ -18,6 +18,14 @@
  *  - E5: „Bar bei Abholung", nie „Karte bei Abholung"; E4: der Hinweis nennt
  *    den Satz des Hofs, gebührenfrei steht keiner da.
  *  - Reiter „Beiträge" nur mit Beitrag.
+ *  - Schaufenster zuerst (Register N5, Nr. 51): In der Übersicht steht der
+ *    Quelltext in der Reihenfolge, die man unter lg sieht — Fotos, bis zu
+ *    vier Produkte, „Alle Produkte (n)", rechte Spalte, Über uns —, also
+ *    folgen Tastatur und Screenreader ihr; Über uns und die Spalte je genau
+ *    einmal. Ohne Produkte kein Schaufenster, die Übersicht wie bisher.
+ *    Nach „Alle ansehen" und „Alle Produkte (n)" geht der Fokus auf den Reiter.
+ *  - Die Produktkarte hat eine Vorschau-Variante ohne Link und ohne Korb
+ *    (Käufer-Vorschau im Produktdialog); die Kaufkarte bleibt, wie sie ist.
  * Je Aussage eine Gegenprobe, dass die Suche das Merkmal auch findet.
  */
 import { describe, it, expect, vi } from 'vitest'
@@ -51,7 +59,9 @@ vi.mock('@/server/actions/products', () => ({ updateProductImageAction: vi.fn(),
 
 import { FarmPageView } from '@/components/farm/farm-page-view'
 import { ProduktKarte } from '@/components/hofseite/produkt-karte'
+import { HofseiteFotos } from '@/components/hofseite/hofseite-fotos'
 import { kartenZustand } from '@/lib/bereiche-anzeige'
+import { KAEUFER_VORSCHAU, type KartenVorschau } from '@/lib/hofseite-kunde'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
@@ -396,5 +406,153 @@ describe('Produktkarten verlinken auf die Produktseite (Nr. 11)', () => {
     const src = dateien('src')
     expect(src).not.toContain('src/components/farm/produkt-detail.tsx')
     expect(src.filter((p) => /\bProduktDetail\b/.test(quelle(p)))).toEqual([])
+  })
+})
+
+// ─── Nr. 51: Schaufenster zuerst (Register N5) ──────────────────────────────
+
+describe('Schaufenster zuerst (Register N5, Nr. 51)', () => {
+  const FOTOS = [1, 2, 3].map((i) => ({ id: `foto_${i}`, url: `/landing/row-${i}.jpg`, caption: null, sortOrder: i }))
+
+  it('der Quelltext hat die Reihenfolge, die man unter lg sieht: Fotos, Produkte, „Alle Produkte (n)", rechte Spalte, Über uns', () => {
+    const html = seite({ farm: { ...HOF, farmPhotos: FOTOS } })
+    const stellen = [
+      html.indexOf('id="fotos"'),
+      html.indexOf('aria-label="Karotten in den Korb legen"'),
+      html.indexOf('>Alle Produkte (5)<'),
+      html.indexOf('<aside'),
+      html.indexOf('id="ueber-uns"'),
+    ]
+    expect(stellen.every((stelle) => stelle > -1), String(stellen)).toBe(true)
+    expect([...stellen].sort((a, b) => a - b)).toEqual(stellen)
+    // Über uns steht im Quelltext nach dem Schaufenster UND nach der Spalte — Screenreader lesen es zuletzt.
+    expect(html.indexOf('id="ueber-uns"')).toBeGreaterThan(html.indexOf('</aside>'))
+  })
+
+  it('Über uns und die rechte Spalte stehen je genau einmal da — keine doppelte Kennung, nichts doppelt fokussierbar', () => {
+    for (const farm of [{ ...HOF, farmPhotos: FOTOS }, { ...HOF, products: [], farmPhotos: FOTOS }]) {
+      const html = seite({ farm })
+      expect(html.match(/id="ueber-uns"/g)).toHaveLength(1)
+      expect(html.match(/<aside\b/g)).toHaveLength(1)
+      expect(html.match(/data-abschnitt="kontakt"/g)).toHaveLength(1)
+      expect(html.match(/id="fotos"/g)).toHaveLength(1)
+    }
+  })
+
+  it('bis zu vier Produkte: Kaufbares in der Reihenfolge des Hofs, Ausverkauftes rückt nicht nach', () => {
+    const html = seite()
+    for (const name of ['Buchenscheite', 'Bergwiesen-Heu', 'Freilandeier', 'Karotten']) {
+      expect(html, name).toContain(`aria-label="${name} in den Korb legen"`)
+    }
+    expect(html).not.toContain('Blütenhonig')
+    // Gegenprobe: Im Reiter Produkte steht auch der Honig.
+    expect(seite({ suche: 'reiter=produkte' })).toContain('Blütenhonig')
+  })
+
+  it('„Alle Produkte (n)" wechselt in den Reiter Produkte — n ist die Zahl des Reiters', () => {
+    const html = seite()
+    expect(html).toMatch(/<a[^>]*href="\/hof-test\?reiter=produkte"[^>]*>Alle Produkte \(5\)</)
+    expect(html).toContain('>Produkte · 5<')
+    // Nur in der Übersicht: Im Reiter Produkte steht schon alles.
+    expect(seite({ suche: 'reiter=produkte' })).not.toContain('Alle Produkte (')
+  })
+
+  it('Fotos: jede Kachel öffnet die Bildansicht, kein Bild liegt in einem Link (Meldung cmua8bof); ohne Fotos kein Streifen', () => {
+    expect(seite()).not.toContain('id="fotos"')
+    const html = seite({ farm: { ...HOF, farmPhotos: FOTOS } })
+    const bereich = html.slice(html.indexOf('id="fotos"'), html.indexOf('</section>', html.indexOf('id="fotos"')))
+    expect(bereich.match(/<button[^>]*aria-label="Foto \d von 3 vergrößern"/g)).toHaveLength(3)
+    expect(bereich).not.toMatch(/<a\b/)
+    // Auch die Fotos stehen vor der rechten Spalte.
+    expect(html.indexOf('id="fotos"')).toBeLessThan(html.indexOf('<aside'))
+  })
+
+  it('EINE Fotokomponente mit EINER Bildansicht — der Streifen ist eine Variante, keine zweite Liste daneben', () => {
+    for (const streifenUnterLg of [true, false]) {
+      const html = renderToStaticMarkup(createElement(HofseiteFotos, { fotos: FOTOS, streifenUnterLg }))
+      expect(html.match(/<ul\b/g), String(streifenUnterLg)).toHaveLength(1)
+      expect(html.match(/<button\b/g), String(streifenUnterLg)).toHaveLength(3)
+      expect(html).not.toMatch(/<a\b/)
+    }
+    expect(quelle('src/components/hofseite/hofseite-fotos.tsx').match(/useBildansicht\(/g)).toHaveLength(1)
+    expect(quelle('src/components/hofseite/hofseite-kunde.tsx').match(/<HofseiteFotos\b/g)).toHaveLength(1)
+  })
+
+  it('ohne Produkte kein Schaufenster: die Übersicht bleibt, wie sie war — rechte Spalte, Über uns, Fotos', () => {
+    const html = seite({ farm: { ...HOF, products: [], farmPhotos: FOTOS } })
+    expect(html).not.toContain('Alle Produkte (')
+    expect(html).toContain('Gerade keine Produkte')
+    expect(html.indexOf('<aside')).toBeLessThan(html.indexOf('id="ueber-uns"'))
+    expect(html.indexOf('id="ueber-uns"')).toBeLessThan(html.indexOf('id="fotos"'))
+  })
+
+  it('in den Reitern Produkte und Beiträge bleibt die Reihenfolge, wie sie war', () => {
+    for (const suche of ['reiter=produkte', 'reiter=beitraege']) {
+      const html = seite({ suche })
+      expect(html.indexOf('<aside'), suche).toBeLessThan(html.indexOf('id="produkte"'))
+    }
+  })
+
+  it('nach „Alle ansehen" und „Alle Produkte (n)" geht der Fokus auf den Reiter Produkte, ohne Scrollen — der Link verschwindet mit dem Wechsel', () => {
+    const text = quelle('src/components/hofseite/hofseite-kunde.tsx')
+    // Beide Links im Inhalt wechseln über dieselbe Funktion, mit Fokus auf den Reiter.
+    expect(text.match(/onNavigate=\{zeigeReiter\('produkte', \{ fokusAufReiter: true \}\)\}/g)).toHaveLength(2)
+    expect(text).toMatch(/document\.querySelector<HTMLElement>\(`\[data-reiter="\$\{id\}"\]`\)\?\.focus\(\{ preventScroll: true \}\)/)
+    // Die Reiterleiste und „Bestellen" im Kopf bleiben nach dem Wechsel stehen — ihr Fokus auch.
+    expect(text).toMatch(/onNavigate=\{zeigeReiter\(r\.id\)\}/)
+    expect(text.match(/onNavigate=\{zeigeReiter\('produkte'\)\}/g)).toHaveLength(1)
+    // Gegenprobe: Die Reiterleiste trägt das Merkmal, das der Fokus sucht — gerendert.
+    expect(seite()).toMatch(/<a[^>]*data-reiter="produkte"[^>]*>Produkte · 5</)
+  })
+})
+
+// ─── Nr. 51: Produktkarte als Vorschau ──────────────────────────────────────
+
+describe('ProduktKarte: Vorschau-Variante (muster) ohne Link und ohne Korb (Nr. 51)', () => {
+  const VORSCHAU: KartenVorschau = {
+    name: 'Bergkäse', imageUrl: null, categoryImageUrl: '/categories/milch.webp', price: 12.9, unit: 'KG', unitSize: 0.5,
+  }
+  const vorschau = (produkt: KartenVorschau) => renderToStaticMarkup(createElement(ProduktKarte, { variante: 'muster', produkt }))
+
+  it('zeigt Bild, Name und Preis mit denselben Helfern wie die Kaufkarte', () => {
+    const html = vorschau(VORSCHAU)
+    expect(html).toContain('Bergkäse')
+    expect(html).toContain('€ 12,90 für 0,5 kg')
+    expect(html).toContain('€ 25,80 / kg')
+    expect(html).toContain('src="/categories/milch.webp"')
+  })
+
+  it('kein Link, kein Korb-Knopf, keine Menge', () => {
+    const html = vorschau(VORSCHAU)
+    expect(html).not.toMatch(/<a\b/)
+    expect(html).not.toMatch(/<button\b/)
+    expect(html).not.toMatch(/in den Korb|Menge /)
+  })
+
+  it('ohne gültigen Preis ein ruhiger Platzhalter, nie „NaN" oder „€ 0,00"', () => {
+    const html = vorschau({ ...VORSCHAU, price: null })
+    expect(html).toContain(KAEUFER_VORSCHAU.preisFehlt)
+    expect(html).not.toMatch(/NaN|€ 0,00/)
+    // Gegenprobe: mit Preis kein Platzhalter.
+    expect(vorschau(VORSCHAU)).not.toContain(KAEUFER_VORSCHAU.preisFehlt)
+  })
+
+  it('ein Name mit 100 Zeichen steht in höchstens zwei Zeilen, der volle Name im title', () => {
+    const lang = 'Bergkäse '.repeat(12).slice(0, 100)
+    const html = vorschau({ ...VORSCHAU, name: lang })
+    expect(html).toMatch(new RegExp(`title="${lang}"`))
+    expect(html).toMatch(new RegExp(`<span[^>]*line-clamp-2[^>]*>${lang}</span>`))
+  })
+
+  it('Gegenprobe: die Kaufkarte hat weiter Link und Korb-Knopf', () => {
+    const p = HOF.products[4]!
+    const html = renderToStaticMarkup(
+      createElement(ProduktKarte, {
+        produkt: p, zustand: kartenZustand(p, false), imKorb: 0, wirdHinzugefuegt: false,
+        href: '/hof-test/produkt/p_karotten', onInDenKorb: () => {}, onMenge: () => {},
+      })
+    )
+    expect(html).toContain('href="/hof-test/produkt/p_karotten"')
+    expect(html).toContain('aria-label="Karotten in den Korb legen"')
   })
 })

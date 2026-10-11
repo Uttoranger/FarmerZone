@@ -5,6 +5,7 @@ import { Accordion as AccordionPrimitive } from "@base-ui/react/accordion"
 import { ChevronDownIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { FOKUS_RAHMEN } from "@/components/ui/fokus"
 
 function Accordion({ className, ...props }: AccordionPrimitive.Root.Props) {
   return (
@@ -37,7 +38,11 @@ function AccordionTrigger({
         data-slot="accordion-trigger"
         className={cn(
           // min-h-12: Touch-Ziel ≥ 44 px, auch wenn nur eine Zeile Text drinsteht.
-          "group/accordion flex min-h-12 flex-1 items-center justify-between gap-3 rounded-md py-3 text-left text-sm font-medium text-foreground outline-none transition-colors hover:text-brand-text focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+          "group/accordion flex min-h-12 flex-1 items-center justify-between gap-3 rounded-md py-3 text-left text-sm font-medium text-foreground transition-colors hover:text-brand-text disabled:pointer-events-none disabled:opacity-50",
+          // Sichtbarer Fokus wie alle Bausteine (DESIGN_SYSTEM, Nr. 51): Rahmen
+          // mit Abstand statt Ring direkt am Text — der Kopf hat kein seitliches
+          // Polster, der Ring lag sonst auf den ersten Buchstaben.
+          FOKUS_RAHMEN,
           className
         )}
         {...props}

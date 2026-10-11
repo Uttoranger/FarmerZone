@@ -1,12 +1,13 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import type { PublicProduct } from '@/server/queries/farm'
 import { formatGrundpreis } from '@/lib/format'
 import { knappText, type KartenZustand } from '@/lib/bereiche-anzeige'
-import { stepperObergrenze } from '@/lib/hofseite-kunde'
+import { KAEUFER_VORSCHAU, stepperObergrenze, type KartenVorschau } from '@/lib/hofseite-kunde'
 import { zweitePreiszeile } from '@/lib/produktdetail'
 import { produktInitiale } from '@/lib/hofuebersicht'
 import { SHOP_PAUSED_BUTTON_LABEL } from '@/lib/shop-pause'
@@ -21,16 +22,47 @@ function kurzbeschreibung(p: PublicProduct): string | null {
   return zeile ? zeile : null
 }
 
-function Preis({ produkt, className }: { produkt: PublicProduct; className?: string }) {
-  const zweite = zweitePreiszeile(produkt)
+/** Was der Preis braucht; null = kein gültiger Preis (nur in der Vorschau des Produktdialogs). */
+type PreisAngabe = Pick<PublicProduct, 'price' | 'unit' | 'unitSize' | 'futter'> | null
+
+function Preis({ preis, className }: { preis: PreisAngabe; className?: string }) {
+  if (!preis) {
+    // Ruhiger Platzhalter statt „€ 0,00" oder „NaN" (Nr. 51).
+    return <span className={cn('flex min-w-0 flex-col text-[15px] text-muted-foreground md:text-base', className)}>{KAEUFER_VORSCHAU.preisFehlt}</span>
+  }
+  const zweite = zweitePreiszeile(preis)
   return (
     <span className={cn('flex min-w-0 flex-col', className)}>
       <span className="text-[15px] font-semibold text-foreground md:text-base">
-        {formatGrundpreis(produkt.price, produkt.unit, produkt.unitSize)}
+        {formatGrundpreis(preis.price, preis.unit, preis.unitSize)}
       </span>
       {zweite && <span className="text-xs text-muted-foreground">{zweite}</span>}
     </span>
   )
+}
+
+type KaufKarte = {
+  variante?: 'kauf'
+  produkt: PublicProduct
+  zustand: KartenZustand
+  /** Menge dieses Produkts im Korb — 0, wenn keins drin liegt. */
+  imKorb: number
+  wirdHinzugefuegt: boolean
+  /** Die Produktseite (produktLink — in der Vorschau des Hofs bleibt sie in der Vorschau). */
+  href: string
+  onInDenKorb: (p: PublicProduct) => void
+  onMenge: (p: PublicProduct, menge: number) => void
+}
+
+type MusterKarte = {
+  /**
+   * Die Vorschau-Variante: „So sehen Käufer dein Produkt" im Produktdialog
+   * (Nr. 51) — dieselbe Karte, ohne Link und ohne Korb. Sie heißt „muster",
+   * weil „Vorschau" auf der Hofseite schon die Ansicht des Hofs meint
+   * (?vorschau=1, ansichtsModus).
+   */
+  variante: 'muster'
+  produkt: KartenVorschau
 }
 
 /**
@@ -48,28 +80,26 @@ function Preis({ produkt, className }: { produkt: PublicProduct; className?: str
  * pausiert) entscheidet kartenZustand, die Karte zeigt ihn nur: knapp als
  * orangene Marke „Nur noch …", ausverkauft ausgegraut — nie über opacity auf
  * Text (Kontrast). Ohne „Merken" (E8, S11).
+ *
+ * Die Vorschau-Variante (`variante="muster"`, seit Nr. 51) ist dieselbe Karte
+ * im Produktdialog: Foto, Name, Preis und Einheit aus dem Formular — ohne
+ * Link, ohne Korb, ohne Beschreibung und Zustand, die erst das gespeicherte
+ * Angebot hat.
  */
-export function ProduktKarte({
-  produkt,
-  zustand,
-  imKorb,
-  wirdHinzugefuegt,
-  href,
-  onInDenKorb,
-  onMenge,
-}: {
-  produkt: PublicProduct
-  zustand: KartenZustand
-  /** Menge dieses Produkts im Korb — 0, wenn keins drin liegt. */
-  imKorb: number
-  wirdHinzugefuegt: boolean
-  /** Die Produktseite (produktLink — in der Vorschau des Hofs bleibt sie in der Vorschau). */
-  href: string
-  onInDenKorb: (p: PublicProduct) => void
-  onMenge: (p: PublicProduct, menge: number) => void
-}): React.JSX.Element {
-  const bild = produkt.imageUrl ?? produkt.categoryImageUrl
-  const kurz = kurzbeschreibung(produkt)
+export function ProduktKarte(props: KaufKarte | MusterKarte): React.JSX.Element {
+  if (props.variante === 'muster') {
+    const { produkt } = props
+    return (
+      <KartenAufbau
+        name={produkt.name}
+        bild={produkt.imageUrl ?? produkt.categoryImageUrl}
+        istFoto={produkt.imageUrl !== null}
+        preis={produkt.price === null ? null : { price: produkt.price, unit: produkt.unit, unitSize: produkt.unitSize, futter: null }}
+      />
+    )
+  }
+
+  const { produkt, zustand, imKorb, wirdHinzugefuegt, href, onInDenKorb, onMenge } = props
   const kaufbar = zustand.art === 'kaufbar' || zustand.art === 'knapp'
   const ausverkauft = zustand.art === 'ausverkauft'
   const marke =
@@ -80,47 +110,19 @@ export function ProduktKarte({
     ) : null
 
   return (
-    <article className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 md:h-full md:flex-col md:items-stretch md:gap-0 md:overflow-hidden md:p-0">
-      <Link
-        href={href}
-        title={produkt.name}
-        className={cn(
-          'flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left md:flex-none md:flex-col md:items-stretch md:gap-0 md:rounded-none',
-          FOKUS_RAHMEN,
-          'md:focus-visible:-outline-offset-2'
-        )}
-      >
-        <span className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted md:h-[140px] md:w-full md:rounded-none">
-          {bild ? (
-            <Image
-              src={bild}
-              alt=""
-              fill
-              sizes="(min-width: 1280px) 260px, (min-width: 768px) 33vw, 64px"
-              className={cn(
-                produkt.imageUrl ? 'object-cover' : 'object-contain p-1 dark:brightness-[0.85] dark:saturate-[0.9]',
-                ausverkauft && 'grayscale'
-              )}
-            />
-          ) : (
-            <span aria-hidden="true" className="font-heading text-xl font-semibold text-brand-text">
-              {produktInitiale(produkt.name)}
-            </span>
-          )}
-          {marke && <span className="absolute top-2.5 left-2.5 hidden md:block">{marke}</span>}
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5 md:px-3.5 md:pt-3">
-          <span className="line-clamp-2 text-[15px] font-semibold break-words text-foreground">{produkt.name}</span>
-          {kurz && <span className="truncate text-[13px] text-muted-foreground">{kurz}</span>}
-          <Preis produkt={produkt} className="md:hidden" />
-          {/* Am Handy nur „knapp" als Marke — „Ausverkauft" steht schon rechts, wo sonst der Knopf ist. */}
-          {zustand.art === 'knapp' && <span className="mt-0.5 md:hidden">{marke}</span>}
-        </span>
-      </Link>
-
-      <div className="flex shrink-0 items-center gap-2 md:mt-auto md:px-3.5 md:pt-2 md:pb-3.5">
-        <Preis produkt={produkt} className="hidden flex-1 md:flex" />
-        {kaufbar && imKorb > 0 ? (
+    <KartenAufbau
+      name={produkt.name}
+      bild={produkt.imageUrl ?? produkt.categoryImageUrl}
+      istFoto={produkt.imageUrl !== null}
+      preis={produkt}
+      href={href}
+      kurz={kurzbeschreibung(produkt)}
+      ausgegraut={ausverkauft}
+      markeAufBild={marke}
+      // Am Handy nur „knapp" als Marke — „Ausverkauft" steht schon rechts, wo sonst der Knopf ist.
+      markeAmHandy={zustand.art === 'knapp' ? marke : null}
+      aktion={
+        kaufbar && imKorb > 0 ? (
           <Stepper
             beschriftung={`Menge ${produkt.name}`}
             wert={imKorb}
@@ -149,7 +151,87 @@ export function ProduktKarte({
                 ? zustand.grund
                 : 'Ausverkauft'}
           </span>
+        )
+      }
+    />
+  )
+}
+
+/**
+ * Der Aufbau der Karte — EINER für beide Varianten, damit die Vorschau im
+ * Produktdialog nie von der Hofseite abweicht. Mit `href` sind Bild und Name
+ * ein Link (Kaufkarte), ohne stehen sie als reine Anzeige da (Vorschau).
+ */
+function KartenAufbau({
+  name,
+  bild,
+  istFoto,
+  preis,
+  href,
+  kurz = null,
+  ausgegraut = false,
+  markeAufBild = null,
+  markeAmHandy = null,
+  aktion = null,
+}: {
+  name: string
+  bild: string | null
+  istFoto: boolean
+  preis: PreisAngabe
+  href?: string
+  kurz?: string | null
+  ausgegraut?: boolean
+  markeAufBild?: ReactNode
+  markeAmHandy?: ReactNode
+  aktion?: ReactNode
+}): React.JSX.Element {
+  const bildUndName = (
+    <>
+      <span className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted md:h-[140px] md:w-full md:rounded-none">
+        {bild ? (
+          <Image
+            src={bild}
+            alt=""
+            fill
+            sizes="(min-width: 1280px) 260px, (min-width: 768px) 33vw, 64px"
+            className={cn(
+              istFoto ? 'object-cover' : 'object-contain p-1 dark:brightness-[0.85] dark:saturate-[0.9]',
+              ausgegraut && 'grayscale'
+            )}
+          />
+        ) : (
+          <span aria-hidden="true" className="font-heading text-xl font-semibold text-brand-text">
+            {produktInitiale(name)}
+          </span>
         )}
+        {markeAufBild && <span className="absolute top-2.5 left-2.5 hidden md:block">{markeAufBild}</span>}
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5 md:px-3.5 md:pt-3">
+        <span className="line-clamp-2 text-[15px] font-semibold break-words text-foreground">{name}</span>
+        {kurz && <span className="truncate text-[13px] text-muted-foreground">{kurz}</span>}
+        <Preis preis={preis} className="md:hidden" />
+        {markeAmHandy && <span className="mt-0.5 md:hidden">{markeAmHandy}</span>}
+      </span>
+    </>
+  )
+  const anordnung =
+    'flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left md:flex-none md:flex-col md:items-stretch md:gap-0 md:rounded-none'
+
+  return (
+    <article className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 md:h-full md:flex-col md:items-stretch md:gap-0 md:overflow-hidden md:p-0">
+      {href ? (
+        <Link href={href} title={name} className={cn(anordnung, FOKUS_RAHMEN, 'md:focus-visible:-outline-offset-2')}>
+          {bildUndName}
+        </Link>
+      ) : (
+        <div title={name} className={anordnung}>
+          {bildUndName}
+        </div>
+      )}
+
+      <div className="flex shrink-0 items-center gap-2 md:mt-auto md:px-3.5 md:pt-2 md:pb-3.5">
+        <Preis preis={preis} className="hidden flex-1 md:flex" />
+        {aktion}
       </div>
     </article>
   )

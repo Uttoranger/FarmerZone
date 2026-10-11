@@ -3,11 +3,14 @@
  *
  * Beweist: category → /categories/{slug}.webp, null/fehlende Kategorie → null,
  * fehlende Asset-Datei → null (die WebP-Assets folgen als eigener Commit).
+ * Seit Nr. 51 kennt auch der Browser die Zuordnung (kategorieBildPfad in
+ * taxonomie.ts, Käufer-Vorschau im Produktdialog) — es bleibt EINE Zuordnung.
  */
 import fs from 'node:fs'
 import path from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { CATEGORY_SLUGS, categoryImagePath } from '@/lib/product-image'
+import { KATEGORIE_BILD_SLUG, PRODUCT_CATEGORY_VALUES, kategorieBildPfad } from '@/lib/taxonomie'
 
 describe('categoryImagePath', () => {
   it('mappt Kategorien auf /categories/{slug}.webp, wenn die Datei existiert', () => {
@@ -61,5 +64,26 @@ describe('categoryImagePath', () => {
       return false
     })
     expect(seen).toEqual(['categories/honig.webp'])
+  })
+})
+
+describe('kategorieBildPfad — dieselbe Zuordnung im Browser (Käufer-Vorschau, Nr. 51)', () => {
+  it('ergibt für jede Kategorie den Pfad, den der Server bei vorhandener Datei liefert', () => {
+    for (const kategorie of PRODUCT_CATEGORY_VALUES) {
+      expect(kategorieBildPfad(kategorie), kategorie).toBe(categoryImagePath(kategorie, () => true))
+    }
+  })
+
+  it('ohne Kategorie kein Bild', () => {
+    expect(kategorieBildPfad(null)).toBeNull()
+    expect(kategorieBildPfad(undefined)).toBeNull()
+  })
+
+  it('eine Zuordnung: product-image.ts nimmt sie aus taxonomie.ts, keine zweite Liste', () => {
+    expect(CATEGORY_SLUGS).toBe(KATEGORIE_BILD_SLUG)
+    const text = fs.readFileSync(path.join(process.cwd(), 'src/lib/product-image.ts'), 'utf8')
+    expect(text).not.toMatch(/MILCH:\s*'milch'/)
+    // Gegenprobe: In taxonomie.ts steht sie.
+    expect(fs.readFileSync(path.join(process.cwd(), 'src/lib/taxonomie.ts'), 'utf8')).toMatch(/MILCH:\s*'milch'/)
   })
 })
