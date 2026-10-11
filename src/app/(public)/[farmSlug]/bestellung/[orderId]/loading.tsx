@@ -38,6 +38,8 @@ export default function BestellungLaden() {
             <div className="h-6 w-24 rounded-full bg-muted" />
           </div>
           <div className="h-4 w-full max-w-md rounded bg-app-trough" />
+          {/* Der Satz an die Kundin bricht am Handy in eine zweite Zeile um. */}
+          <div className="h-4 w-2/3 rounded bg-app-trough md:hidden" />
         </div>
 
         {/* Abholung */}
