@@ -3,10 +3,11 @@
  * das Layout, gewartet wird nur auf den Inhalt. Gleiche Maße wie die
  * fertige Seite: Kopf (unter lg Karte mit Streifen, ab lg Zeile 80 px),
  * Reiter 48 px (unter md mit „Produkte", Nr. 49), unter lg der Umschalter
- * (56 px, volle Breite) und darunter die Checkliste, ab lg Liste links und
- * Vorschau rechts (320 px, ab xl 360 px). Nur, was sicher kommt — die
- * Balken (Freigabe, stillgelegt) stehen im Layout, die Zeilen der Checkliste
- * hängen von den Daten ab und fehlen hier.
+ * (56 px, volle Breite) und darunter die Liste „Bearbeiten" (Nr. 50: Stand
+ * und die dreizehn Zeilen — es sind immer alle da), ab lg Liste links
+ * (Gruppen mit sieben und vier Zeilen) und Vorschau rechts (320 px, ab xl
+ * 360 px). Nur, was sicher kommt — die Balken (Freigabe, stillgelegt) stehen
+ * im Layout.
  *
  * Farbstaffelung im neuen Design: bg-border für Überschriften, bg-muted für
  * Zweitzeilen und Flächen (die Bestandspalette --app-* gilt hier nicht).
@@ -53,12 +54,23 @@ export default function MeinHofLaden(): React.JSX.Element {
         <div className="h-10 w-[258px] rounded-full bg-muted" />
       </div>
 
-      {/* Unter lg: Checkliste */}
-      <div className="mx-auto max-w-3xl px-4 pt-5 pb-5 md:px-8 lg:hidden">
+      {/* Unter lg: Liste „Bearbeiten" — Stand, dann die Zeilen der Hofseite */}
+      <div className="mx-auto flex max-w-3xl flex-col gap-3 px-4 pt-5 pb-12 md:px-8 lg:hidden">
         <div className="rounded-2xl border border-border bg-card p-4">
           <div className="h-5 w-44 rounded bg-border" />
           <div className="mt-3 h-1.5 w-full rounded-full bg-muted" />
           <div className="mt-3 h-3.5 w-3/4 rounded bg-muted" />
+        </div>
+        <div className="flex flex-col gap-2.5">
+          {Array.from({ length: 13 }, (_, i) => (
+            <div key={i} className="flex min-h-[62px] items-center gap-2.5 rounded-xl border border-border bg-card py-2 pr-3 pl-3">
+              <div className="flex-1">
+                <div className="h-3.5 w-32 rounded bg-border" />
+                <div className="mt-2 h-3 w-48 rounded bg-muted" />
+              </div>
+              <div className="h-4 w-20 rounded bg-muted" />
+            </div>
+          ))}
         </div>
       </div>
 
@@ -70,7 +82,7 @@ export default function MeinHofLaden(): React.JSX.Element {
             <div className="mt-4 h-2 w-full rounded-full bg-muted" />
             <div className="mt-4 h-3.5 w-56 rounded bg-muted" />
           </div>
-          {[5, 4].map((zeilen, gruppe) => (
+          {[7, 4].map((zeilen, gruppe) => (
             <div key={gruppe}>
               <div className="h-3 w-28 rounded bg-muted" />
               <div className="mt-2 overflow-hidden rounded-2xl border border-border bg-card">

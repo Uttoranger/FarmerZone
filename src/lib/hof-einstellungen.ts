@@ -6,10 +6,12 @@
  * Die Übersicht (Mockups web-h1-einstellungen-uebersicht, mobil-h5-einstellungen)
  * zeigt neun Bereiche mit Status-Punkt. Es stehen nur Bereiche da, die es gibt:
  * „Benachrichtigungen" aus dem Mockup hat keine Einstellung im Code und fehlt
- * deshalb; „Mein Auftritt" (eine bestehende Seite ohne Platz im Mockup) steht
- * dafür da. Was fehlt, zählt dieselbe Liste wie „Mein Hof" und „Einrichten"
- * (hofseiteFortschritt, EINSTELLUNG_FUER_ZEILE) — eine Zahl, an keiner Stelle
- * anders gerechnet.
+ * deshalb; „Mein Auftritt" (ohne Platz im Mockup) steht dafür da — seit
+ * Nr. 50 als Link in Mein Hof, wo der Auftritt jetzt bearbeitet wird
+ * (Register N4). Was fehlt, zählt dieselbe Liste wie „Mein Hof" und
+ * „Einrichten" (hofseiteFortschritt, EINSTELLUNG_FUER_ZEILE) — eine Zahl, an
+ * keiner Stelle anders gerechnet; freiwillige Zeilen (Leitspruch, Werte)
+ * zählen nicht als fehlend.
  *
  * Die Konditionen nennen Tarife und Übergang nur aus konditionen.ts (K1) und
  * rechnen das Beispiel mit DER Gebührenregel (berechneServicegebuehr) und den
@@ -104,9 +106,9 @@ export type EinstellungenDaten = {
   teilenMomenteAus: boolean
 }
 
-/** Die Titel der fehlenden Zeilen, deren Formular auf dieser Einstellungsseite liegt. */
+/** Die Titel der fehlenden Zeilen, deren Formular an diesem Ziel liegt — Freiwilliges fehlt nie. */
 function fehlendAuf(zeilen: readonly HofseiteZeile[], ziel: string): string[] {
-  return zeilen.filter((z) => EINSTELLUNG_FUER_ZEILE[z.id] === ziel && !z.fertig).map((z) => z.titel)
+  return zeilen.filter((z) => EINSTELLUNG_FUER_ZEILE[z.id] === ziel && !z.fertig && !z.freiwillig).map((z) => z.titel)
 }
 
 function esFehlt(teile: readonly string[]): string {

@@ -1,56 +1,20 @@
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
-import type { Metadata } from 'next'
-import { auth } from '@/lib/auth'
-import { getAppearanceData } from '@/server/queries/appearance'
-import { AppearanceClient } from './appearance-client'
-import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { EINSTELLUNG_MEIN_AUFTRITT } from '@/lib/bauern-navigation'
-import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
-
-export const metadata: Metadata = { title: `${EINSTELLUNG_MEIN_AUFTRITT.label} — FarmerZone` }
-export const dynamic = 'force-dynamic'
 
 /*
- * Mein Auftritt in der HofShell (Nachtlauf Nr. 22d): das bestehende Formular
- * unverändert in der Logik — Uploads über die Upload-Route mit der Sperre bis
- * zur E-Mail-Bestätigung (17b), Galerie-URLs nur aus dem eigenen Speicher
- * (19b, addFarmPhotoAction). Der Kopf mit h1 steht im Formular selbst; hier
- * nur der Rückweg (seit Nr. 44 der UnterseitenKopf, am Handy fest oben).
- * data-app-palette: Teile zeichnen noch mit --app-*.
+ * /settings/appearance („Mein Auftritt") leitet seit Nachtlauf Nr. 50 in Mein
+ * Hof um, Reiter Hofseite (Register N4: Alles, was Kundinnen auf der Hofseite
+ * sehen, wird an EINEM Ort bearbeitet). Logo, Titelbild, Leitspruch,
+ * Gründungsjahr, Über uns, Werte, Abschnitte und Fotos stehen dort als
+ * Zeilen — unter lg mit Blatt von unten, ab lg im Editor.
+ *
+ * Warum die Route bleibt statt zu verschwinden: Lesezeichen, die installierte
+ * App und alte Links (Mails, Chats) zeigen auf /settings/appearance.
+ *
+ * Warum `redirect` (307) und nicht `permanentRedirect` (308): wie bei /status
+ * (Nr. 22e) — Browser merken sich eine dauerhafte Umleitung ohne Ablauf. Die
+ * Anmeldung prüft schon der Proxy (/settings/:path*).
  */
-export default async function AppearancePage(): Promise<React.JSX.Element> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
-
-  const data = await getAppearanceData(session.user.id)
-  if (!data) redirect('/login')
-
-  return (
-    <div className={UNTERSEITE_RAHMEN}>
-      <UnterseitenKopf />
-      <div data-app-palette="neu">
-        <AppearanceClient
-          initialData={{
-            farmId: data.farmId,
-            tagline: data.tagline ?? '',
-            foundedYear: data.foundedYear ? String(data.foundedYear) : '',
-            aboutText: data.aboutText ?? '',
-            logoUrl: data.logoUrl ?? null,
-            bannerType: data.bannerType,
-            bannerUrl: data.bannerUrl ?? null,
-            bannerValue: data.bannerValue ?? 'tannengruen',
-            sectionsConfig: data.sectionsConfig,
-            farmValues: data.farmValues.map((v) => ({
-              icon: v.icon,
-              title: v.title,
-              subtitle: v.subtitle ?? '',
-            })),
-            farmPhotos: data.farmPhotos,
-            farmSlug: data.slug,
-          }}
-        />
-      </div>
-    </div>
-  )
+export default function MeinAuftrittUmleitung(): never {
+  redirect(EINSTELLUNG_MEIN_AUFTRITT.href)
 }

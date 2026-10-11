@@ -5,12 +5,16 @@ import { z } from 'zod'
  * als Zod-Aufzählung, weil dieselben Kennungen über eine Systemgrenze gehen:
  * Der Editor schickt die geöffnete Zeile per postMessage an die Vorschau im
  * iframe, und die Hofseite liest sie als Fremddaten (CODING_STANDARDS §3).
+ * Seit Nr. 50 auch Leitspruch/Gründungsjahr (`tagline`) und Werte (`werte`)
+ * aus dem früheren „Mein Auftritt".
  */
 export const hofseiteZeileIdSchema = z.enum([
   'titelbild',
   'logo',
   'name',
+  'tagline',
   'ueber-uns',
+  'werte',
   'fotos',
   'adresse',
   'abholzeiten',

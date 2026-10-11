@@ -134,7 +134,6 @@ export default async function FarmPage({ params, searchParams }: Props) {
         farm={farm}
         activeStatus={activeStatus}
         reorderItems={reorderItems}
-        ownerMode={false}
         ansicht={ansicht}
         jetzt={jetzt.toISOString()}
       />

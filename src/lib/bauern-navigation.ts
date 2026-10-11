@@ -29,6 +29,7 @@
  */
 
 import { MEIN_HOF_REITER_PARAMETER, MEIN_HOF_REITER_VALUES, meinHofReiterSchema } from '@/schemas/mein-hof-reiter'
+import { HOFSEITE_HREF } from '@/lib/mein-hof'
 
 export type NavPunktId =
   | 'heute'
@@ -92,10 +93,18 @@ export type MeinHofReiter = {
 export const PRODUKTE_HREF = '/products'
 
 /**
+ * Die Adresse des Reiters „Hofseite" von Mein Hof (definiert in
+ * lib/mein-hof.ts) — für den Reiter, den Punkt „Mein Hof" und alles, was seit
+ * Nr. 50 dorthin zeigt: die Umleitung von /settings/appearance, die Zeile
+ * „Mein Auftritt" der Einstellungen und den Verweis im Hof-Profil (Register N4).
+ */
+export { HOFSEITE_HREF }
+
+/**
  * Die Adresse des Reiters „Beiträge" — EINE Quelle für den Reiter, die
  * Umleitung von /status und die Rückwege nach dem Schreiben (Nr. 22e).
  */
-export const BEITRAEGE_HREF = `/farm-page?${MEIN_HOF_REITER_PARAMETER}=beitraege`
+export const BEITRAEGE_HREF = `${HOFSEITE_HREF}?${MEIN_HOF_REITER_PARAMETER}=beitraege`
 
 /**
  * Die Reiter von „Mein Hof" in der HofShell (E12, Nachtlauf Nr. 16):
@@ -108,7 +117,7 @@ export const BEITRAEGE_HREF = `/farm-page?${MEIN_HOF_REITER_PARAMETER}=beitraege
  */
 export const MEIN_HOF_REITER_HOFBEREICH: readonly MeinHofReiter[] = [
   { id: 'produkte', label: 'Produkte', href: PRODUKTE_HREF, nurUnterMd: true },
-  { id: 'hofseite', label: 'Hofseite', href: '/farm-page' },
+  { id: 'hofseite', label: 'Hofseite', href: HOFSEITE_HREF },
   { id: 'beitraege', label: 'Beiträge', href: BEITRAEGE_HREF },
 ]
 
@@ -569,11 +578,16 @@ export function zielNachSpeichern(pfad: string | null | undefined): string | nul
  * Einstellungs-Unterseiten, die auch außerhalb der Übersicht verlinkt werden
  * — Name und Ziel hier, die Übersicht (lib/hof-einstellungen.ts) und die
  * Seitentitel nehmen dieselben.
+ *
+ * „Mein Auftritt" ist seit Nr. 50 keine eigene Seite mehr (Register N4): Die
+ * Zeile der Übersicht heißt weiter so und führt in Mein Hof, Reiter Hofseite;
+ * /settings/appearance leitet dorthin um (Lesezeichen bleiben gültig).
  */
-export const EINSTELLUNG_MEIN_AUFTRITT = { label: 'Mein Auftritt', href: '/settings/appearance' } as const
+export const EINSTELLUNG_MEIN_AUFTRITT = { label: 'Mein Auftritt', href: HOFSEITE_HREF } as const
 export const EINSTELLUNG_KONTO = { label: 'Konto und Sicherheit', href: '/settings/account' } as const
 
-/** „Einstellungen → Mein Auftritt" — der Weg in Worten, wie ihn das Hof-Profil nennt. */
-export function einstellungsWeg(unterseite: { label: string }): string {
-  return `${navPunkt('einstellungen').label} → ${unterseite.label}`
-}
+/**
+ * „Mein Hof → Hofseite" — der Weg in Worten, wie ihn das Hof-Profil für Logo
+ * und Titelbild nennt (seit Nr. 50; vorher „Einstellungen → Mein Auftritt").
+ */
+export const HOFSEITE_WEG = `${hauptPunkt('mein-hof').label} → ${meinHofReiter('hofseite').label}`

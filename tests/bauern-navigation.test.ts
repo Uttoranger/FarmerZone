@@ -55,10 +55,11 @@ import {
   mehrAktiv,
   elternseite,
   zielNachSpeichern,
-  einstellungsWeg,
   EINSTELLUNG_KONTO,
   EINSTELLUNG_MEIN_AUFTRITT,
   GESPEICHERT_TEXT,
+  HOFSEITE_HREF,
+  HOFSEITE_WEG,
 } from '@/lib/bauern-navigation'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
@@ -687,9 +688,20 @@ describe('zielNachSpeichern — Einstellungs-Unterseiten führen zur Übersicht 
 
 describe('Einstellungs-Unterseiten mit Namen außerhalb der Übersicht', () => {
   it('Mein Auftritt und Konto und Sicherheit: Name und Ziel an einer Stelle, das Ziel ist eine echte Seite', () => {
-    expect(EINSTELLUNG_MEIN_AUFTRITT).toEqual({ label: 'Mein Auftritt', href: '/settings/appearance' })
+    // Seit Nr. 50 (Register N4) führt „Mein Auftritt" in Mein Hof, Reiter Hofseite.
+    expect(EINSTELLUNG_MEIN_AUFTRITT).toEqual({ label: 'Mein Auftritt', href: '/farm-page' })
     expect(EINSTELLUNG_KONTO).toEqual({ label: 'Konto und Sicherheit', href: '/settings/account' })
     for (const ziel of [EINSTELLUNG_MEIN_AUFTRITT, EINSTELLUNG_KONTO]) expect(hofSeite(ziel.href)).toContain('(hof)')
-    expect(einstellungsWeg(EINSTELLUNG_MEIN_AUFTRITT)).toBe('Einstellungen → Mein Auftritt')
+  })
+
+  it('die Adresse der Hofseite gibt es einmal: Reiter, Punkt „Mein Hof" und Mein Auftritt nehmen sie', () => {
+    expect(HOFSEITE_HREF).toBe('/farm-page')
+    expect(MEIN_HOF_REITER_HOFBEREICH.find((r) => r.id === 'hofseite')?.href).toBe(HOFSEITE_HREF)
+    expect(EINSTELLUNG_MEIN_AUFTRITT.href).toBe(HOFSEITE_HREF)
+    expect(quelle('src/lib/bauern-navigation.ts').match(/'\/farm-page'/g) ?? []).toHaveLength(0)
+  })
+
+  it('der Weg in Worten für das Hof-Profil: „Mein Hof → Hofseite" aus den Namen von Punkt und Reiter', () => {
+    expect(HOFSEITE_WEG).toBe('Mein Hof → Hofseite')
   })
 })

@@ -238,13 +238,32 @@ describe('„Gespeichert · Ansehen"', () => {
     expect(ohne.match(/<p[ >]/g)).toHaveLength(1)
   })
 
-  it('Hofseite: Titelbild, Ausschnitt und Fotos melden ihren Abschnitt, statt selbst zu toasten', () => {
-    const ansichtHof = quelle('src/components/farm/farm-page-view.tsx')
-    expect(ansichtHof).toContain("if (onGespeichert) onGespeichert('titelbild')")
-    expect(ansichtHof).toContain("meldeErfolg={onGespeichert ? () => onGespeichert('titelbild') : undefined}")
-    expect(ansichtHof).toContain("onGespeichert={onGespeichert ? () => onGespeichert('fotos') : undefined}")
-    const client = quelle('src/components/farmer/farm-page-client.tsx')
-    expect(client).toContain('onGespeichert={ansicht ? (abschnitt) => ansicht.gespeichert(abschnitt) : undefined}')
+  it('Fotos: auch eine Serie, in der jedes Foto geklappt hat, meldet „Gespeichert · Ansehen" (Nr. 50 Runde 1)', () => {
+    // Die Galerie reicht meldeErfolg als Abschluss der Serie weiter — der Abschnitt „fotos" kommt von der Liste.
+    expect(quelle('src/components/mein-hof/bild-bausteine.tsx')).toMatch(/serieGespeichert: meldeErfolg,/)
+    // Der Upload ruft ihn nur, wenn nichts übersprungen wurde; sonst bleibt die Sammelmeldung mit dem Grund.
+    const upload = quelle('src/components/shared/image-upload.tsx')
+    expect(upload).toMatch(/else if \(skipped\.length > 0\) toast\.warning\(text\)\s*else if \(serieGespeichert\) serieGespeichert\(\)\s*else toast\.success\(text\)/)
+    // Gegenprobe: ohne meldeErfolg (ab lg) bleibt die Sammelmeldung — die Option ist freiwillig.
+    expect(upload).toMatch(/serieGespeichert\?: \(\) => void/)
+  })
+
+  it('Hofseite (seit Nr. 50 die Liste „Bearbeiten"): jedes Blatt meldet „Gespeichert · Ansehen" mit seinem Abschnitt, statt selbst zu toasten', () => {
+    const liste = quelle('src/components/mein-hof/abschnitte-liste.tsx')
+    // Je Abschnitt EIN Hinweis (Nr. 49 Runde 1): die Liste gibt den Abschnitt mit.
+    expect(liste).toContain('meldeErfolg={ansicht ? () => meldeGespeichertAnsehen({ abschnitt: zeile.id, onAnsehen: () => ansehen(zeile.id) }) : undefined}')
+    // „Ansehen" schließt erst das Blatt und schaltet danach um — unter dem Blatt sähe niemand die Kundenansicht.
+    expect(liste).toMatch(/nachDemSchliessen\.current = \(\) => ansicht\.zeigeKundin\(id\)\s*setzeOffen\(null\)/)
+    expect(liste).toMatch(/onOpenChangeComplete=\{\(auf\) => \{[\s\S]*?danach\?\.\(\)/)
+    // Jeder Baustein nimmt meldeErfolg statt seines Toasts: Bilder, Abholzeiten, Pause und die Formulare.
+    const inhalt = quelle('src/components/mein-hof/abschnitt-inhalt.tsx')
+    for (const baustein of ['TitelbildBaustein', 'LogoUpload', 'GallerySection', 'PickupSlotsClient', 'PauseClient']) {
+      expect(inhalt, baustein).toMatch(new RegExp(`<${baustein}[^>]*meldeErfolg=\\{meldeErfolg\\}`))
+    }
+    expect(inhalt).toContain('const formular = { onGespeichert, onAbbrechen, meldeErfolg }')
+    expect(quelle('src/components/mein-hof/abschnitt-formulare.tsx')).toMatch(/if \(meldeErfolg\) meldeErfolg\(\)\s*else toast\.success\(GESPEICHERT_TEXT\)/)
+    // Die Bestandsansicht mit Stiften ist seit Nr. 50 Runde 1 entfernt — FarmPageView meldet nichts mehr.
+    expect(quelle('src/components/farm/farm-page-view.tsx')).not.toMatch(/onGespeichert\('titelbild'\)/)
   })
 
   it('Beiträge: nach dem Veröffentlichen auf der Hofseite — „Ansehen" führt in den Reiter mit der Kundenansicht', () => {

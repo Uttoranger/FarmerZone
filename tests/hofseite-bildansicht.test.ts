@@ -75,9 +75,9 @@ describe('Bildansicht der Hofseite — am Quelltext', () => {
   })
 })
 
-describe('beide Galerien nutzen den einen Hook', () => {
-  it('Kundenansicht und Besitzer-Galerie binden useBildansicht ein und sperren nicht selbst', () => {
-    for (const pfad of ['src/components/hofseite/hofseite-fotos.tsx', 'src/components/farm/farm-page-view.tsx']) {
+describe('die Galerie nutzt den einen Hook', () => {
+  it('die Kundenansicht bindet useBildansicht ein und sperrt nicht selbst (die Besitzer-Galerie mit Stiften ist seit Nr. 50 Runde 1 entfernt)', () => {
+    for (const pfad of ['src/components/hofseite/hofseite-fotos.tsx']) {
       const text = quelltext(pfad)
       expect(text, pfad).toMatch(/useBildansicht\(/)
       expect(text, pfad).not.toContain('document.body.style.overflow')

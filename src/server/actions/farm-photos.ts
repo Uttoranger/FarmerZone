@@ -19,7 +19,6 @@ async function getSessionFarm(userId: string) {
 function revalidate(slug: string) {
   revalidatePath(`/${slug}`)
   revalidatePath('/farm-page')
-  revalidatePath('/settings/appearance')
 }
 
 export async function addFarmPhotoAction(input: unknown): Promise<{ photo?: { id: string; url: string; caption: string | null; sortOrder: number }; error?: string }> {
@@ -151,7 +150,7 @@ export async function reorderPhotosAction(ids: string[]): Promise<{ error?: stri
   return {}
 }
 
-// Pfeil-Fallback (Mein Auftritt): geht in reorderPhotosAction auf —
+// Pfeil-Fallback (Fotos in Mein Hof): geht in reorderPhotosAction auf —
 // berechnet die getauschte Gesamtreihenfolge und setzt sie komplett.
 export async function moveFarmPhotoAction(
   id: string,

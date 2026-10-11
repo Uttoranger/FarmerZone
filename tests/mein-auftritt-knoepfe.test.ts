@@ -1,11 +1,15 @@
 /**
- * „Mein Auftritt" (/settings/appearance, Nr. 35, Morgenbericht Lauf 6 §6):
- * Jeder Knopf ist ein Touch-Ziel von mindestens 44 px (DESIGN_SYSTEM). Nr. 32
- * hatte die Felder und „Logo hochladen" gehoben; übrig waren „Logo entfernen"
- * (20 px), „Titelbild entfernen" (28 px), der Griff „Bereich verschieben"
- * (32 px), die Pfeil- und Löschknöpfe bei Fotos, Werten und Bereichen (24 px)
- * und die Wert-Kacheln (40 px). Die sichtbaren Kreise dürfen kleiner bleiben —
- * dann liegt der Kreis als Span im 44-px-Knopf.
+ * Die Knöpfe der Abschnitte von Mein Hof — früher „Mein Auftritt"
+ * (/settings/appearance, Nr. 35, Morgenbericht Lauf 6 §6), seit Nr. 50 die
+ * Bausteine in Mein Hof (bild-bausteine.tsx, abschnitt-formulare.tsx) und die
+ * Liste „Bearbeiten" (abschnitte-liste.tsx): Jeder Knopf ist ein Touch-Ziel
+ * von mindestens 44 px (DESIGN_SYSTEM) — unter lg im Blatt von unten erst
+ * recht. Nr. 35 hatte „Logo entfernen" (20 px), die Pfeil- und Löschknöpfe bei
+ * Fotos und Werten (24 px) und die Wert-Kacheln (40 px) gehoben. Die
+ * sichtbaren Kreise dürfen kleiner bleiben — dann liegt der Kreis als Span im
+ * 44-px-Knopf. „Titelbild entfernen" ist seit Nr. 50 Runde 1 zurück, im
+ * Baustein „Titelbild"; den Griff „Bereich verschieben" gab es nur im
+ * früheren „Mein Auftritt" (die Hofseite liest nur `visible`, Bericht Nr. 50).
  *
  * Dazu: Knöpfe nur mit Symbol tragen ein `aria-label`, und ihre Symbole sind
  * `aria-hidden`.
@@ -18,8 +22,13 @@ import { join } from 'node:path'
 import ts from 'typescript'
 import { describe, it, expect } from 'vitest'
 
-const PFAD = 'src/app/(hof)/settings/appearance/appearance-client.tsx'
-const QUELLE = readFileSync(join(process.cwd(), PFAD), 'utf8')
+const PFADE = [
+  'src/components/mein-hof/bild-bausteine.tsx',
+  'src/components/mein-hof/abschnitt-formulare.tsx',
+  'src/components/mein-hof/abschnitte-liste.tsx',
+]
+const QUELLEN = PFADE.map((pfad) => readFileSync(join(process.cwd(), pfad), 'utf8'))
+const QUELLE = QUELLEN.join('\n')
 
 /** Größen-Klassen unter 44 px am Knopf selbst (Tailwind: 1 … 10, auch x.5). */
 const ZU_KLEIN = /(?:^|\s)(?:size|h|min-h|w|min-w)-(?:[1-9]|10)(?:\.5)?(?=\s|$)/
@@ -121,23 +130,22 @@ function pruefeKnoepfe(quelle: string): string[] {
   return befunde
 }
 
-describe('Mein Auftritt — jeder Knopf ≥ 44 px, Symbol-Knöpfe benannt', () => {
-  it('keine Befunde', () => {
-    expect(pruefeKnoepfe(QUELLE)).toEqual([])
+describe('Mein Hof (früher Mein Auftritt) — jeder Knopf ≥ 44 px, Symbol-Knöpfe benannt', () => {
+  it.each(PFADE.map((pfad, i) => [pfad, QUELLEN[i]] as const))('%s: keine Befunde', (_pfad, quelle) => {
+    expect(pruefeKnoepfe(quelle)).toEqual([])
   })
 
-  it('die Prüfung sieht alle Knöpfe der Seite', () => {
-    expect((QUELLE.match(/<button\b/g) ?? []).length).toBeGreaterThanOrEqual(20)
+  it('die Prüfung sieht alle Knöpfe der Bausteine', () => {
+    expect((QUELLE.match(/<button\b/g) ?? []).length).toBeGreaterThanOrEqual(12)
   })
 
   it('Knöpfe ohne Text nennen, wofür sie sind', () => {
-    for (const label of ['Logo entfernen', 'Titelbild entfernen', 'Bereich verschieben']) {
-      expect(QUELLE).toContain(`aria-label="${label}"`)
-    }
-    // Fotos, Werte und Bereiche nennen ihren Eintrag (Vorbild Direktverkauf, DESIGN_SYSTEM).
+    expect(QUELLE).toContain('aria-label="Logo entfernen"')
+    expect(QUELLE).toContain('aria-label="Titelbild entfernen"')
+    // Fotos und Werte nennen ihren Eintrag (Vorbild Direktverkauf, DESIGN_SYSTEM).
     expect(QUELLE).toMatch(/aria-label=\{`Foto \$\{index \+ 1\} nach oben`\}/)
-    expect(QUELLE).toMatch(/aria-label=\{`\$\{v\.title\} entfernen`\}/)
-    expect(QUELLE).toMatch(/aria-label=\{`\$\{bereichName\} nach unten`\}/)
+    expect(QUELLE).toMatch(/aria-label=\{`\$\{w\.title\} entfernen`\}/)
+    expect(QUELLE).toMatch(/aria-label=\{`\$\{w\.title\} nach unten`\}/)
   })
 })
 

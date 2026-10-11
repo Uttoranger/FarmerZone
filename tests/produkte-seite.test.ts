@@ -130,10 +130,8 @@ describe('produktStatus — vier Zustände wie im Mockup', () => {
       'src/components/products/im-shop-schalter.tsx',
     ]
     for (const datei of dateien) expect(quelle(datei), datei).not.toMatch(/Entw(?:u|ü)rf/)
-    // „Meine Hof-Seite" (Zähler und Satz über der Kundenansicht) nimmt dasselbe Wort aus der Quelle.
-    const editor = quelle('src/components/farm/farm-page-view.tsx')
-    expect(editor).not.toMatch(/ausgeblendete? Produkte|\d* ?ausgeblendet[`']/)
-    expect(editor.match(/\$\{NICHT_IM_SHOP_IM_SATZ\}/g)?.length).toBeGreaterThanOrEqual(2)
+    // „Meine Hof-Seite" (Zähler und Satz in der Ansicht mit Stiften) ist seit Nr. 50 Runde 1 entfernt.
+    expect(quelle('src/components/farm/farm-page-view.tsx')).not.toMatch(/ausgeblendete? Produkte|\d* ?ausgeblendet[`']/)
     // Gegenprobe: Die Suche schlägt bei beiden Formen an, nicht beim Filterwert der Adresse.
     expect('Entwurf Entwürfe').toMatch(/Entw(?:u|ü)rf/)
     expect('?filter=entwuerfe').not.toMatch(/Entw(?:u|ü)rf/)

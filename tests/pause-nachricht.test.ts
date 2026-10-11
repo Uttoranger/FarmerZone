@@ -6,10 +6,10 @@
  *   - setPause speichert die Nachricht unabhängig vom Pausenstatus: Sie lässt
  *     sich vorschreiben, solange der Shop läuft, und geht beim Beenden der
  *     Pause nicht verloren. Leerer Text wird null.
- *   - pausenBanner entscheidet, was der Banner zeigt: Kundinnen den Text (eigene
- *     Nachricht oder Rückfall), der Hof im Bearbeiten-Modus nur den Hinweis mit
- *     Weg zurück, der Hof in der Kundenansicht (Vorschau) den Hinweis UND genau
- *     den Text, den Kundinnen sehen.
+ *   - kundenPausenText entscheidet, was Kundinnen sehen: die Nachricht des
+ *     Hofs, sonst den Rückfall — Hofseite und Vorschau denselben Satz. (Der
+ *     Hinweis für den Hof im Bearbeitungsmodus der Hofseite, pausenBanner, ist
+ *     mit diesem Modus entfallen, Nr. 50 Runde 1.)
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -23,7 +23,7 @@ vi.mock('@/lib/prisma', () => ({
 }))
 
 import { setPause } from '@/server/actions/farm'
-import { pausenBanner, SHOP_PAUSED_FALLBACK } from '@/lib/shop-pause'
+import { kundenPausenText, SHOP_PAUSED_FALLBACK } from '@/lib/shop-pause'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
@@ -71,34 +71,13 @@ describe('setPause — die Nachricht bleibt', () => {
   })
 })
 
-describe('pausenBanner — was der Banner zeigt', () => {
-  it('Kundinnen sehen die Nachricht des Hofs', () => {
-    expect(pausenBanner({ ownerMode: false, vorschau: false, pauseMessage: 'Urlaub bis Montag' })).toEqual({
-      hofHinweis: false,
-      kundenText: 'Urlaub bis Montag',
-    })
+describe('kundenPausenText — was Kundinnen sehen', () => {
+  it('Kundinnen sehen die Nachricht des Hofs, ohne Ränder', () => {
+    expect(kundenPausenText('  Urlaub bis Montag ')).toBe('Urlaub bis Montag')
   })
 
   it('ohne Nachricht sehen Kundinnen den Rückfall-Text', () => {
-    expect(pausenBanner({ ownerMode: false, vorschau: false, pauseMessage: '  ' }).kundenText).toBe(
-      SHOP_PAUSED_FALLBACK
-    )
-  })
-
-  it('der Hof sieht im Bearbeiten-Modus nur den Hinweis mit Weg zurück', () => {
-    expect(pausenBanner({ ownerMode: true, vorschau: false, pauseMessage: 'Urlaub bis Montag' })).toEqual({
-      hofHinweis: true,
-      kundenText: null,
-    })
-  })
-
-  it('der Hof sieht in der Kundenansicht zusätzlich genau den Text der Kundinnen', () => {
-    expect(pausenBanner({ ownerMode: true, vorschau: true, pauseMessage: 'Urlaub bis Montag' })).toEqual({
-      hofHinweis: true,
-      kundenText: 'Urlaub bis Montag',
-    })
-    expect(pausenBanner({ ownerMode: true, vorschau: true, pauseMessage: null }).kundenText).toBe(
-      SHOP_PAUSED_FALLBACK
-    )
+    expect(kundenPausenText('  ')).toBe(SHOP_PAUSED_FALLBACK)
+    expect(kundenPausenText(null)).toBe(SHOP_PAUSED_FALLBACK)
   })
 })

@@ -47,8 +47,9 @@ type Props = {
   /** Shop pausiert: Kauf-Schaltflächen sind tot (Durchsetzung liegt am Server). */
   isPaused?: boolean
   /**
-   * Wechselt in die Kundenansicht. Kommt von farm-page-client.tsx, wo `mode`
-   * lebt — der Zustand floss bisher nur nach unten, für diesen Knopf braucht es
+   * Wechselt in die Kundenansicht — aus dem Bearbeitungsmodus der Hofseite
+   * (bis Nr. 49 aus farm-page-client.tsx, wo `mode` lebte; seit Nr. 50 ohne
+   * Aufrufer). Der Zustand floss nur nach unten, für diesen Knopf brauchte es
    * den Rückweg.
    */
   onVorschau?: () => void

@@ -13,11 +13,10 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
-import { getStatusTemplate, getPastStatusCount } from '@/server/queries/status-posts'
+import { getStatusTemplate } from '@/server/queries/status-posts'
 import { prisma } from '@/lib/prisma'
 
 const findFirst = vi.mocked(prisma.statusPost.findFirst)
-const count = vi.mocked(prisma.statusPost.count)
 
 const VORLAGE = {
   anlass: 'PROMOTION',
@@ -56,13 +55,3 @@ describe('getStatusTemplate', () => {
   })
 })
 
-describe('getPastStatusCount', () => {
-  it('zählt nur veröffentlichte UND abgelaufene Status der eigenen Farm', async () => {
-    count.mockResolvedValue(3 as never)
-    await expect(getPastStatusCount('farm_1')).resolves.toBe(3)
-    const arg = count.mock.calls[0]?.[0] as { where: Record<string, unknown> }
-    expect(arg.where.farmId).toBe('farm_1')
-    expect(arg.where.publishedAt).toEqual({ not: null })
-    expect(arg.where.expiresAt).toHaveProperty('lte')
-  })
-})

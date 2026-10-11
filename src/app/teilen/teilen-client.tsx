@@ -15,6 +15,7 @@ import { MAX_ORIGINAL_BYTES } from '@/lib/upload-pfade'
 import { leseGeteilteFotos, leereGeteilteFotos } from '@/lib/teilen-ablage'
 import { updateFarmBannerAction } from '@/server/actions/appearance'
 import { addFarmPhotoAction } from '@/server/actions/farm-photos'
+import { EINSTELLUNG_MEIN_AUFTRITT } from '@/lib/bauern-navigation'
 
 type Ziel = 'banner' | 'gallery'
 
@@ -275,10 +276,10 @@ export function TeilenClient({
                 Zur Hofseite
               </Link>
               <Link
-                href="/settings/appearance"
+                href={EINSTELLUNG_MEIN_AUFTRITT.href}
                 className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline underline-offset-4"
               >
-                Zu „Mein Auftritt“
+                Zu „{EINSTELLUNG_MEIN_AUFTRITT.label}“
               </Link>
             </div>
           </div>

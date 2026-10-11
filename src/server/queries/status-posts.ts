@@ -81,14 +81,6 @@ export async function getActiveStatusPost(farmId: string): Promise<ActiveStatusP
   }
 }
 
-// Anzahl vergangener Status (veröffentlicht + abgelaufen) — für den
-// "Frühere Status (N)"-Button auf der Hof-Seite (Owner-Sicht)
-export async function getPastStatusCount(farmId: string): Promise<number> {
-  return prisma.statusPost.count({
-    where: { farmId, publishedAt: { not: null }, expiresAt: { lte: new Date() } },
-  })
-}
-
 // Vorlage-Muster (nachlese-6): lädt einen Alt-Status als Vorbefüllung für den
 // Wizard. Ownership über den farmId-Scope — fremde oder ungültige IDs liefern
 // null, der Wizard startet dann einfach leer (kein Fehler, kein Crash).

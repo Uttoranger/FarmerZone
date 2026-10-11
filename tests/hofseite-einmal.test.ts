@@ -13,25 +13,27 @@
  *    läuft, und gibt nur das Einbetten frei (tests/sicherheits-header.test.ts).
  *  - ansichtsModus läuft nur auf dem Server: aufgerufen allein im Lader,
  *    eingebunden von keinem Client-Modul.
- *  - FarmPageView binden genau zwei Stellen ein: die Hofseite und
- *    farm-page-client.tsx (Besitzer am Handy). Eine dritte — benannt, als
- *    Namensraum, weitergereicht oder dynamisch — lässt den Test fehlschlagen.
+ *  - FarmPageView bindet seit Nr. 50 genau eine Stelle ein: die Hofseite.
+ *    farm-page-client.tsx (Besitzer am Handy mit Stiften) ist entfallen —
+ *    Mein Hof bearbeitet unter lg mit der Liste der Abschnitte (Register N4).
+ *    Eine zweite Stelle — benannt, als Namensraum, weitergereicht oder
+ *    dynamisch — lässt den Test fehlschlagen.
  *    Die Seite für Kundinnen im neuen Design (HofseiteKunde, Nr. 10) bindet
  *    nur FarmPageView ein; die Kundenansicht des Besitzers ist die echte Route
  *    im Rahmen (?vorschau=1 über vorschauLink), kein Nachbau.
  *  - Bearbeitungs-Elemente (Stifte, Werkzeugleiste, Bearbeitungs-Hinweis und
- *    die übrigen Knöpfe des Hofs) erscheinen nur mit ownerMode: Die Seite für
- *    Kundinnen und die Vorschau rendern ohne sie. Gerendert wird echt
- *    (react-dom/server in Node); je Quelle eine Gegenprobe, dass die Suche
- *    jedes Merkmal auch findet — FarmPageView im Bearbeitungsmodus für ihre
- *    Elemente, Mein Hof (MeinHofAnsicht, seit Nr. 49) für die Werkzeugleiste.
+ *    die übrigen Knöpfe des Hofs) gibt es auf der Hofseite nicht: Die Seite für
+ *    Kundinnen und die Vorschau rendern ohne sie, und FarmPageView hat seit
+ *    Nr. 50 Runde 1 keinen Bearbeitungsmodus mehr (kein `ownerMode`).
+ *    Gerendert wird echt (react-dom/server in Node); je Merkmal eine
+ *    Gegenprobe, dass die Suche es auch findet — die Werkzeugleiste an Mein
+ *    Hof (MeinHofAnsicht, seit Nr. 49), die übrigen an einem Stück HTML.
  *  - Kaufen wirkt bei Kundinnen und nirgends sonst: Der Korb (CartSheet) hängt
- *    nur in der Seite für Kundinnen — nicht in der Vorschau, nicht im
- *    Bearbeitungsmodus. Ginge `kaufen` auf dem Weg ins Produktraster verloren,
- *    reservierte die Vorschau Bestand.
+ *    nur in der Seite für Kundinnen — nicht in der Vorschau. Ginge `kaufen` auf
+ *    dem Weg ins Produktraster verloren, reservierte die Vorschau Bestand.
  */
 import { describe, it, expect, vi } from 'vitest'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { createElement, type ComponentProps, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -58,7 +60,6 @@ vi.mock('@/components/farm/cart-sheet', () => ({ CartSheet: () => createElement(
 vi.mock('@/lib/auth-client', () => ({ useSession: () => ({ data: null }), signOut: vi.fn() }))
 
 import { FarmPageView } from '@/components/farm/farm-page-view'
-import { FarmPageClient } from '@/components/farmer/farm-page-client'
 import { MeinHofAnsicht } from '@/components/mein-hof/mein-hof-ansicht'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
@@ -106,9 +107,8 @@ function funde(pfad: string, roh: string): Fund[] {
   }
   suche(new RegExp(String.raw`\[\s*${NAME}\s*\]`, 'g'), 'Index') // suche[VORSCHAU_PARAMETER]
   suche(new RegExp(String.raw`\.(?:get|getAll|has)\(\s*${NAME}`, 'g'), 'URLSearchParams')
-  // Jede Eigenschaft .vorschau — bis auf die eine, die nichts mit der Adresse
-  // zu tun hat: die Kundenansicht des Besitzers im Pausen-Banner.
-  suche(/\.vorschau\b/g, 'Eigenschaft', (stelle) => pfad === 'src/lib/shop-pause.ts' && text.slice(stelle - 7, stelle) === 'eingabe')
+  // Jede Eigenschaft .vorschau (die eine Ausnahme, der Pausen-Banner des Besitzers, ist seit Nr. 50 Runde 1 entfallen).
+  suche(/\.vorschau\b/g, 'Eigenschaft')
   suche(/\{[^{}]*\bvorschau\b[^{}]*\}\s*=(?!=)/g, 'Zerlegen') // const { vorschau } = await searchParams
   suche(/vorschau=/g, 'Adresse im Text') // location.search.includes('vorschau=1'), /[?&]vorschau=1/
   // Das Wort als Text: nur als Wert der Ansicht (art) und in der Definition der Konstante.
@@ -220,7 +220,7 @@ describe('der Parameter „vorschau" wird nur in ansichtsModus() gelesen', () =>
 
 // ── Einbindung von FarmPageView ───────────────────────────────────────────
 
-describe('FarmPageView binden genau zwei Stellen ein', () => {
+describe('FarmPageView bindet genau eine Stelle ein', () => {
   const EINBINDEN = [
     /import\s*\{[^}]*\bFarmPageView\b[^}]*\}\s*from/, // benannt
     /import\s*\*\s*as\s+\w+\s+from\s+['"][^'"]*farm-page-view['"]/, // Namensraum
@@ -246,11 +246,12 @@ describe('FarmPageView binden genau zwei Stellen ein', () => {
     expect(bindetEin("export * from './andere-datei'")).toBe(false)
   })
 
-  it('die Hofseite und farm-page-client.tsx — eine dritte Stelle lässt den Test fehlschlagen', () => {
+  it('nur die Hofseite — seit Nr. 50 ist farm-page-client.tsx entfallen, eine zweite Stelle lässt den Test fehlschlagen', () => {
     const stellen = SRC.filter((pfad) => pfad !== 'src/components/farm/farm-page-view.tsx')
       .filter((pfad) => bindetEin(quelle(pfad)))
       .toSorted()
-    expect(stellen).toEqual(['src/app/(public)/[farmSlug]/page.tsx', 'src/components/farmer/farm-page-client.tsx'])
+    expect(stellen).toEqual(['src/app/(public)/[farmSlug]/page.tsx'])
+    expect(existsSync(join(WURZEL, 'src/components/farmer/farm-page-client.tsx'))).toBe(false)
   })
 
   it('die Seite für Kundinnen (HofseiteKunde) bindet nur FarmPageView ein', () => {
@@ -267,21 +268,24 @@ describe('FarmPageView binden genau zwei Stellen ein', () => {
     expect(ansicht).not.toMatch(/FarmPageView|HofseiteKunde/)
     // Die Adresse kommt aus vorschauLink — dieselbe Route wie für Kundinnen.
     expect(ohneKommentare(quelle('src/lib/mein-hof-ansicht.ts'))).toMatch(/kundenAnsichtAdresse[\s\S]*?vorschauLink\(slug\)/)
-    // FarmPageView rendert beim Besitzer nur noch den Bearbeitungsmodus, kein Rahmen daneben.
-    const besitzer = ohneKommentare(quelle('src/components/farmer/farm-page-client.tsx'))
-    expect(besitzer).toContain('mode="edit"')
-    expect(besitzer).not.toContain('<iframe')
+    // Mein Hof zeigt keine zweite Hofseite: unter lg die Liste der Abschnitte, ab lg der Editor (Nr. 50).
+    const meinHof = ohneKommentare(quelle('src/app/(hof)/farm-page/page.tsx'))
+    expect(meinHof).not.toMatch(/FarmPageView|FarmPageClient|HofseiteKunde/)
   })
 
-  it('die Hofseite rendert sie immer ohne ownerMode; farm-page-client steht nur auf der Besitzer-Route', () => {
+  it('FarmPageView hat keinen Bearbeitungsmodus mehr (Nr. 50 Runde 1) — die Hofseite rendert sie ohne', () => {
     const seite = ohneKommentare(quelle('src/app/(public)/[farmSlug]/page.tsx'))
-    expect(seite.match(/ownerMode=\{[^}]*\}/g)).toEqual(['ownerMode={false}'])
+    expect(seite).not.toMatch(/ownerMode/)
+    const ansicht = ohneKommentare(quelle('src/components/farm/farm-page-view.tsx'))
+    expect(ansicht).not.toMatch(/ownerMode|HofseiteBesitzer|pastStatusCount|onVorschau/)
+    // Gegenprobe: Die Suche findet die alte Form.
+    expect('<FarmPageView farm={farm} ownerMode={false} />').toMatch(/ownerMode/)
     const besitzerSeiten = SRC.filter((pfad) => /<FarmPageClient\b/.test(ohneKommentare(quelle(pfad))))
-    expect(besitzerSeiten).toEqual(['src/app/(hof)/farm-page/page.tsx'])
+    expect(besitzerSeiten).toEqual([])
   })
 })
 
-// ── Bearbeitungs-Elemente nur mit ownerMode, Korb nur für Kundinnen ───────
+// ── Keine Bearbeitungs-Elemente auf der Hofseite, Korb nur für Kundinnen ───
 
 function produkt(id: string, name: string, sichtbar: boolean): PublicProduct {
   return {
@@ -316,7 +320,7 @@ const STATUS: ActiveStatusPost = {
 
 type Merkmal = { was: string; muster: RegExp }
 
-/** Woran man die Bearbeitungs-Elemente von FarmPageView im HTML erkennt. */
+/** Woran man die früheren Bearbeitungs-Elemente der Hofseite im HTML erkennt. */
 const IN_DER_ANSICHT: Merkmal[] = [
   { was: 'Stift', muster: /lucide-pencil/ },
   { was: 'Bearbeitungs-Hinweis', muster: /Du bearbeitest deine Hof-Seite|Stift-Symbol/ },
@@ -340,27 +344,32 @@ const VORSCHAU: Ansicht = { art: 'vorschau', kaufen: false }
 /** Genau so, wie die Hofseite FarmPageView rendert — in der KundeShell, mit der Ansicht aus ansichtsModus. */
 function hofseite(ansicht: Ansicht, farm: PublicFarm = HOF): string {
   return renderToStaticMarkup(
-    createElement(KundeShellMitSitzung, null, createElement(FarmPageView, { farm, activeStatus: STATUS, reorderItems: [], ownerMode: false, ansicht }))
+    createElement(KundeShellMitSitzung, null, createElement(FarmPageView, { farm, activeStatus: STATUS, reorderItems: [], ansicht }))
   )
 }
 
-describe('Bearbeitungs-Elemente erscheinen nur mit ownerMode', () => {
-  it('Gegenprobe: FarmPageView im Bearbeitungsmodus hat jedes ihrer Elemente', () => {
-    const bearbeiten = renderToStaticMarkup(
-      createElement(FarmPageView, { farm: HOF, activeStatus: STATUS, ownerMode: true, mode: 'edit', pastStatusCount: 2 })
-    )
-    expect(gefunden(bearbeiten, IN_DER_ANSICHT)).toEqual(IN_DER_ANSICHT.map(({ was }) => was))
+describe('Bearbeitungs-Elemente gibt es auf der Hofseite nicht', () => {
+  it('Gegenprobe: die Suche findet jedes Merkmal an einem Stück HTML, wie es die alte Ansicht mit Stiften zeigte', () => {
+    const alt = [
+      '<svg class="lucide lucide-pencil"></svg>',
+      '<p>Du bearbeitest deine Hof-Seite</p>',
+      '<button aria-label="Titelbild bearbeiten"></button>',
+      '<button>Titelbild ersetzen</button>',
+      '<button>Frühere Status (2)</button>',
+      '<p>Dein Shop ist pausiert</p>',
+    ].join('')
+    expect(gefunden(alt, IN_DER_ANSICHT)).toEqual(IN_DER_ANSICHT.map(({ was }) => was))
   })
 
-  it('Gegenprobe: Mein Hof trägt die Werkzeugleiste über der Hofseite mit Stiften', () => {
+  it('Gegenprobe: Mein Hof trägt die Werkzeugleiste über dem Inhalt (seit Nr. 50 die Liste der Abschnitte)', () => {
     // Die Kinder stehen in den Props, wie JSX sie übergibt.
-    const mitStiften: ComponentProps<typeof MeinHofAnsicht> = {
+    const mitListe: ComponentProps<typeof MeinHofAnsicht> = {
       reiter: 'hofseite',
       slug: HOF.slug,
       kopf: null,
-      children: createElement(FarmPageClient, { farm: HOF, activeStatus: STATUS, pastStatusCount: 2 }),
+      children: createElement('p', null, 'Liste der Abschnitte'),
     }
-    const besitzer = renderToStaticMarkup(createElement(MeinHofAnsicht, mitStiften))
+    const besitzer = renderToStaticMarkup(createElement(MeinHofAnsicht, mitListe))
     expect(gefunden(besitzer, [WERKZEUGLEISTE])).toEqual([WERKZEUGLEISTE.was])
     expect(besitzer).toContain('So sieht’s die Kundin')
   })
@@ -393,10 +402,4 @@ describe('Kaufen wirkt bei Kundinnen und nirgends sonst', () => {
     expect(hofseite(VORSCHAU, HOF_OFFEN)).not.toMatch(KORB)
   })
 
-  it('Bearbeitungsmodus des Besitzers: kein Korb', () => {
-    const bearbeiten = renderToStaticMarkup(
-      createElement(FarmPageView, { farm: HOF_OFFEN, activeStatus: STATUS, ownerMode: true, mode: 'edit' })
-    )
-    expect(bearbeiten).not.toMatch(KORB)
-  })
 })
