@@ -238,6 +238,16 @@ describe('„Gespeichert · Ansehen"', () => {
     expect(ohne.match(/<p[ >]/g)).toHaveLength(1)
   })
 
+  it('Fotos: auch eine Serie, in der jedes Foto geklappt hat, meldet „Gespeichert · Ansehen" (Nr. 50 Runde 1)', () => {
+    // Die Galerie reicht meldeErfolg als Abschluss der Serie weiter — der Abschnitt „fotos" kommt von der Liste.
+    expect(quelle('src/components/mein-hof/bild-bausteine.tsx')).toMatch(/serieGespeichert: meldeErfolg,/)
+    // Der Upload ruft ihn nur, wenn nichts übersprungen wurde; sonst bleibt die Sammelmeldung mit dem Grund.
+    const upload = quelle('src/components/shared/image-upload.tsx')
+    expect(upload).toMatch(/else if \(skipped\.length > 0\) toast\.warning\(text\)\s*else if \(serieGespeichert\) serieGespeichert\(\)\s*else toast\.success\(text\)/)
+    // Gegenprobe: ohne meldeErfolg (ab lg) bleibt die Sammelmeldung — die Option ist freiwillig.
+    expect(upload).toMatch(/serieGespeichert\?: \(\) => void/)
+  })
+
   it('Hofseite (seit Nr. 50 die Liste „Bearbeiten"): jedes Blatt meldet „Gespeichert · Ansehen" mit seinem Abschnitt, statt selbst zu toasten', () => {
     const liste = quelle('src/components/mein-hof/abschnitte-liste.tsx')
     // Je Abschnitt EIN Hinweis (Nr. 49 Runde 1): die Liste gibt den Abschnitt mit.

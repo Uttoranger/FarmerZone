@@ -590,6 +590,11 @@ interface UseImageUploadOptions {
    *  das Foto als übersprungen. `meta.batch` sagt, ob gerade eine Serie läuft
    *  (dann keine Einzelmeldung zeigen, es gibt eine Sammelmeldung). */
   onUploaded: (url: string, meta: { batch: boolean }) => void | Promise<void>
+  /** Eine Serie, in der jedes Foto geklappt hat, meldet sich hierüber statt
+   *  mit der Sammelmeldung — Mein Hof zeigt dann „Gespeichert · Ansehen"
+   *  wie nach einem einzelnen Foto (Nr. 50 Runde 1). Übersprungenes meldet
+   *  weiter die Sammelmeldung. */
+  serieGespeichert?: () => void
 }
 
 export function useImageUpload({
@@ -598,6 +603,7 @@ export function useImageUpload({
   multiple = false,
   maxFiles,
   onUploaded,
+  serieGespeichert,
 }: UseImageUploadOptions) {
   const [isUploading, setIsUploading] = useState(false)
   // `prozent` ist für Mobilfunk gedacht: Ein 8-MB-Original braucht dort
@@ -759,6 +765,7 @@ export function useImageUpload({
       const text = summarizeUploadBatch(uploaded, skipped)
       if (uploaded === 0) toast.error(text)
       else if (skipped.length > 0) toast.warning(text)
+      else if (serieGespeichert) serieGespeichert()
       else toast.success(text)
     }
     if (abschluss.karte) {

@@ -413,11 +413,13 @@ export function GallerySection({
       const neu = result.photo
       if (neu) {
         setPhotos((prev) => [...prev, neu])
-        // Eine Serie meldet ihr Sammelergebnis selbst (useImageUpload).
+        // Eine Serie meldet ihr Ergebnis am Ende selbst (useImageUpload, serieGespeichert).
         if (batch) onGespeichert?.()
         else erfolg('Foto hinzugefügt')
       }
     },
+    // Hat jedes Foto der Serie geklappt: „Gespeichert · Ansehen" wie nach einem einzelnen (unter lg).
+    serieGespeichert: meldeErfolg,
   })
   // onUploaded wird im Upload abgewartet — isUploading deckt das Speichern mit ab.
   useHochladenMelden(isUploading, onHochladen)
