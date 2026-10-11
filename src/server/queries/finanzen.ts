@@ -1,5 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { STRIPE_LIVE_AB } from '@/lib/umgebung-server'
+import { testzahlungenHinweis } from '@/lib/testzahlung'
 import {
   bestellungenBisKostendeckung,
   durchschnittsGebuehr,
@@ -8,6 +10,7 @@ import {
   kostenSummeImMonat,
   monatKurz,
   monateBis,
+  finanzseiteLaesstTestzahlungenAus,
   utcDatumAlsMonat,
   type BestellungFuerFinanzen,
   type EinnahmenMonat,
@@ -77,6 +80,13 @@ export type FinanzenDaten = {
   schnittCents: number
   /** Bestellungen bis zur Kostendeckung; null = noch keine Daten. */
   brauchtBestellungen: number | null
+  /**
+   * „Testzahlungen vor dem … sind nicht mitgezählt." (Register Z4) — genau
+   * dann, wenn eine gezeigte Zahl eine Testzahlung auslässt
+   * (`finanzseiteLaesstTestzahlungenAus`: Vormonate eingezogen und
+   * geschuldet, der gewählte Monat dazu „erwartet").
+   */
+  testzahlungenHinweis: string | null
 }
 
 /**
@@ -86,10 +96,15 @@ export type FinanzenDaten = {
  * erste Bestellung (für den Anfang des Diagramms) und die Bestellungen des
  * gezeigten Fensters. Die Bestellungen kommen nur mit den Feldern, die die
  * Regel liest — kein Kundenname, keine Adresse, keine E-Mail.
+ *
+ * `stripeLiveAb`: Stichtag der Live-Schaltung (Register Z4) — Testzahlungen
+ * davor zählen in keinem Topf. Standard ist die Variable des Servers; Tests
+ * geben ihn mit.
  */
 export async function getFinanzen(
   monat: Monatsschluessel,
-  jetzt: Date = new Date()
+  jetzt: Date = new Date(),
+  stripeLiveAb: Date | null = STRIPE_LIVE_AB
 ): Promise<FinanzenDaten> {
   const [postenZeilen, ersteBestellung] = await Promise.all([
     prisma.kostenposten.findMany({
@@ -153,7 +168,7 @@ export async function getFinanzen(
     provisionCents: centsAusDecimal(b.platformFeeAmount),
   }))
 
-  const einnahmenJeMonat = monate.map((m) => einnahmenImMonat(fuerRegel, m))
+  const einnahmenJeMonat = monate.map((m) => einnahmenImMonat(fuerRegel, m, stripeLiveAb))
   // `!` sicher: einnahmenJeMonat ist die Abbildung von `monate` und damit
   // genauso lang — der letzte Eintrag ist der gewählte Monat.
   const einnahmen = einnahmenJeMonat[einnahmenJeMonat.length - 1]!
@@ -186,6 +201,10 @@ export async function getFinanzen(
     verlauf,
     schnittCents,
     brauchtBestellungen: bestellungenBisKostendeckung(kosten.cents, schnittCents),
+    testzahlungenHinweis:
+      stripeLiveAb !== null && finanzseiteLaesstTestzahlungenAus(fuerRegel, monat, stripeLiveAb)
+        ? testzahlungenHinweis(stripeLiveAb)
+        : null,
   }
 }
 

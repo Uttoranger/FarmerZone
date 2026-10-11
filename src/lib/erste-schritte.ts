@@ -148,11 +148,7 @@ export type HofFuerErsteSchritte = {
   stripeAccountReady: boolean
 }
 
-/**
- * Stammdaten und Zählwerte → Checklisten-Daten, für Heute (queries/heute.ts).
- * getDashboardStats in queries/dashboard.ts hält noch eine eigene Kopie; sie
- * ist seit Heute ungenutzt und fällt mit ihr.
- */
+/** Stammdaten und Zählwerte → Checklisten-Daten, für Heute (queries/heute.ts). */
 export function ersteSchritteDaten(
   hof: HofFuerErsteSchritte | null,
   zaehler: { produkte: number; aktiveAbholzeiten: number }

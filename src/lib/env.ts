@@ -59,6 +59,14 @@ const serverEnvSchema = z.object({
   // ohne Formprüfung: Ein Tippfehler kostet den Link und meldet sich als
   // Warnung (Sentry bzw. Banner), aber nie den Start der Produktion.
   NEXT_PUBLIC_TESTUMGEBUNG_URL: optional(),
+  // OPTIONAL (Register Z4, Nr. 55): Stichtag der Live-Schaltung, nur in
+  // Production gesetzt — Online-Bestellungen davor sind Testzahlungen und
+  // zählen in den Auswertungen nicht mit. Ein ISO-Zeitpunkt MIT Zeitzone;
+  // geprüft wird in src/lib/umgebung.ts (leseStripeLiveAb), gelesen nur in
+  // src/lib/umgebung-server.ts. Bewusst hier ohne Formprüfung: Ein Tippfehler
+  // lässt die Testzahlungen mitzählen und meldet sich als Warnung, verhindert
+  // aber nie den Start der Produktion.
+  STRIPE_LIVE_AB: optional(),
   // OPTIONAL (Register Z3, Nr. 43): Wer außerhalb des Produktions-Deployments
   // bei Vercel Mails bekommt — durch Komma getrennte Adressen, dazu immer
   // @example.com. Fehlt sie, gehen dort nur Mails an Testkonten. Als Text, nicht als Liste: Im Test-Modus

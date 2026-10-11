@@ -11,6 +11,8 @@
  */
 import { STANDARD_RICHTUNG, type KundenFilter, type KundenAnsicht, type KundenRichtung, type KundenSortierung } from '@/schemas/hof-kunden'
 import { mitAnzahl } from '@/lib/format'
+import { istTestzahlung } from '@/lib/testzahlung'
+import type { Zahlungsart } from '@/lib/servicegebuehr'
 
 /** Die Töne der StatusBadge (src/components/ui/status-badge.tsx). */
 type StatusTon = 'offen' | 'fertig' | 'neutral'
@@ -23,6 +25,8 @@ export type KundenBestellung = {
   customerName: string
   customerPhone: string
   status: string
+  /** Für die Testzahlung (Register Z4): online vor dem Stichtag ist kein Umsatz. */
+  paymentMethod: Zahlungsart
   betragCents: number
   createdAt: Date
   items: { productName: string; quantity: number }[]
@@ -35,7 +39,7 @@ export type KundenZusammenfassung = {
   customerName: string
   customerPhone: string
   orderCount: number
-  /** Warenpreis aller Bestellungen ohne Storno und Nicht-Abholung, in Cent. */
+  /** Warenpreis aller Bestellungen ohne Storno, Nicht-Abholung und Testzahlung (Register Z4), in Cent. */
   umsatzCents: number
   firstOrderDate: string
   lastOrderDate: string
@@ -74,13 +78,24 @@ export function kundenStatus(anzahl: number, tageSeitLetzter: number, tageSeitEr
 /**
  * Aus den Bestellungen EINER Kundin ihre Zusammenfassung. Name und Telefon
  * stammen aus der letzten Bestellung (die aktuellste Angabe).
+ *
+ * Testzahlungen (online vor `stripeLiveAb`, Register Z4) sind kein Umsatz.
+ * Bestellzahl, Status und Lieblingsprodukte zählen sie weiter: Z4 nimmt sie
+ * nur aus Umsatz und Gebühr (freigabe.md §13, Nr. 55 „Kunden-Umsätze").
  */
-export function fasseKundinZusammen(bestellungen: readonly KundenBestellung[], abo: KundenAbo, jetzt: Date): KundenZusammenfassung {
+export function fasseKundinZusammen(
+  bestellungen: readonly KundenBestellung[],
+  abo: KundenAbo,
+  jetzt: Date,
+  stripeLiveAb: Date | null
+): KundenZusammenfassung {
   const sortiert = [...bestellungen].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
   const erste = sortiert[0]
   const letzte = sortiert[sortiert.length - 1]
 
-  const umsatzCents = sortiert.filter((b) => !OHNE_UMSATZ.includes(b.status)).reduce((summe, b) => summe + b.betragCents, 0)
+  const umsatzCents = sortiert
+    .filter((b) => !OHNE_UMSATZ.includes(b.status) && !istTestzahlung(b, stripeLiveAb))
+    .reduce((summe, b) => summe + b.betragCents, 0)
 
   const mengen = new Map<string, number>()
   for (const b of sortiert) {

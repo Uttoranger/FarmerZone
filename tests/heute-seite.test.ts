@@ -508,7 +508,7 @@ describe('umsatzHeuteCent — vom Wiener Mitternacht bis jetzt', () => {
 
   it('stornierte und nicht abgeholte Bestellungen sind keine Buchung: die Abfrage nimmt nur PICKED_UP', () => {
     // Die Regel der Datenbank-Bedingung ist dieselbe wie für Woche und Auswertung.
-    expect(umsatzBestellungWhere('hof', { von: jetzt, bis: jetzt }).status).toBe('PICKED_UP')
+    expect(umsatzBestellungWhere('hof', { von: jetzt, bis: jetzt }, null).status).toBe('PICKED_UP')
     expect(quelle('src/server/queries/heute.ts')).toContain('umsatzHeuteCent(buchungen, jetzt)')
   })
 })

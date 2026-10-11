@@ -45,6 +45,8 @@ export type UmgebungsWerte = {
   DATABASE_URL?: string
   STRIPE_SECRET_KEY?: string
   STRIPE_CONNECT_WEBHOOK_SECRET?: string
+  /** Stichtag der Live-Schaltung (Register Z4): Online-Bestellungen davor sind Testzahlungen — gesetzt nur in Production. */
+  STRIPE_LIVE_AB?: string
 }
 
 export type Umgebung = {
@@ -68,6 +70,12 @@ export type Umgebung = {
    */
   vercelProduktion: boolean
   branch: string | null
+  /**
+   * Stichtag der Live-Schaltung (Register Z4, Nr. 55) — null ohne gültige
+   * Variable. Online-Bestellungen davor sind Testzahlungen und zählen in den
+   * Auswertungen nicht mit (src/lib/testzahlung.ts).
+   */
+  stripeLiveAb: Date | null
   /** Deutsche Sätze, wenn Umgebung und Anschlüsse sich widersprechen. */
   warnungen: readonly string[]
 }
@@ -169,6 +177,78 @@ function hostOhnePunkteAmEnde(roh: string): string | null {
     return null
   }
 }
+
+type StichtagPruefung = { ab: Date } | { problem: 'ohne-zeitzone' | 'ungueltig' } | null
+
+// Ein ISO-Zeitpunkt MIT Zeitzone: Datum, „T", Uhrzeit (Sekunden und bis zu drei
+// Stellen Bruchteil freiwillig), dann „Z" oder ±hh:mm. Die Teile werden selbst
+// geprüft und gerechnet — Date.parse rechnet „30. Februar" still in den März um.
+const ZEITPUNKT_MIT_ZONE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?(Z|([+-])(\d{2}):(\d{2}))$/
+// Derselbe Zeitpunkt ohne Zeitzone (auch nur der Tag oder mit Leerzeichen) —
+// nur, um der Warnung den häufigsten Fehler beim Namen zu geben.
+const ZEITPUNKT_OHNE_ZONE = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?)?$/
+
+/**
+ * Der Stichtag der Live-Schaltung aus STRIPE_LIVE_AB (Register Z4, Nr. 55):
+ * fehlt (null), gilt, oder warum nicht.
+ *
+ * Nur ein ISO-Zeitpunkt MIT Zeitzone gilt, etwa „2026-11-02T21:00:00+01:00".
+ * Ohne Zone wäre der Zeitpunkt auf Vercel UTC, in Wien also ein bis zwei
+ * Stunden daneben — Online-Bestellungen dazwischen fielen auf die falsche
+ * Seite. Was nicht gilt, wird ignoriert (Testzahlungen zählen mit wie vor
+ * Nr. 55) und meldet sich als Warnung; den Start verhindert es nie.
+ */
+export function leseStripeLiveAb(wert: string | undefined): StichtagPruefung {
+  const roh = bereinigt(wert)
+  if (!roh) return null
+  const teile = ZEITPUNKT_MIT_ZONE.exec(roh)
+  if (!teile) return ZEITPUNKT_OHNE_ZONE.test(roh) ? { problem: 'ohne-zeitzone' } : { problem: 'ungueltig' }
+  const [, j, mo, t, h, mi, s = '0', bruch = '0', zone, vorzeichen, zoneH = '0', zoneMin = '0'] = teile
+  const [jahr, monat, tag, stunde, minute, sekunde] = [j, mo, t, h, mi, s].map(Number)
+  const tageImMonat = new Date(Date.UTC(jahr, monat, 0)).getUTCDate()
+  const versatzMin = Number(zoneH) * 60 + Number(zoneMin)
+  if (monat < 1 || monat > 12 || tag < 1 || tag > tageImMonat || stunde > 23 || minute > 59 || sekunde > 59) {
+    return { problem: 'ungueltig' }
+  }
+  // Zeitzonen der Erde liegen zwischen −12:00 und +14:00 — alles darüber ist ein Tippfehler.
+  const hoechstensMin = (vorzeichen === '-' ? 12 : 14) * 60
+  if (Number(zoneMin) > 59 || versatzMin > hoechstensMin) return { problem: 'ungueltig' }
+  const millis = Number(bruch.padEnd(3, '0'))
+  const ortszeit = Date.UTC(jahr, monat - 1, tag, stunde, minute, sekunde, millis)
+  const versatz = zone === 'Z' ? 0 : (vorzeichen === '-' ? -1 : 1) * versatzMin
+  return { ab: new Date(ortszeit - versatz * 60_000) }
+}
+
+/**
+ * Wie weit der Stichtag in der Zukunft liegen darf, bevor er sich meldet. Der
+ * Mensch trägt den Beginn des Redeploys ein (docs/betrieb/stripe-live.md,
+ * Schritt 4) — wenige Stunden voraus sind kein Fehler. Mehr als ein Tag riecht
+ * nach falschem Jahr oder Monat.
+ */
+export const STICHTAG_ZUKUNFT_GRENZE_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Liegt der Stichtag mehr als 24 Stunden nach `jetzt`? Dann nähme er still alle
+ * Online-Umsätze bis dahin heraus — Heute, Kunden und die Admin-Hofliste
+ * zeigen weniger, ohne Hinweiszeile. Der Stichtag gilt trotzdem; die Frage
+ * entscheidet nur, ob gewarnt wird (`meldeUmgebungsWarnungen`,
+ * src/lib/umgebung-server.ts). Gemessen zur Laufzeit, deshalb `jetzt` als
+ * Parameter.
+ */
+export function stichtagWeitInDerZukunft(stripeLiveAb: Date | null, jetzt: Date): boolean {
+  return stripeLiveAb !== null && stripeLiveAb.getTime() - jetzt.getTime() > STICHTAG_ZUKUNFT_GRENZE_MS
+}
+
+/** Die Warnung dazu — ohne den Wert, wie alle Warnungen hier. */
+export const STICHTAG_ZUKUNFT_WARNUNG =
+  'STRIPE_LIVE_AB liegt mehr als 24 Stunden in der Zukunft — bis dahin zählen alle Online-Bestellungen als Testzahlungen. Stimmen Jahr und Monat?'
+
+const STICHTAG_WARNUNG = {
+  'ohne-zeitzone':
+    'STRIPE_LIVE_AB hat keine Zeitzone (etwa +01:00 am Ende) — die Variable gilt nicht, Testzahlungen zählen mit.',
+  ungueltig:
+    'STRIPE_LIVE_AB ist kein gültiger Zeitpunkt (Form 2026-11-02T21:00:00+01:00) — die Variable gilt nicht, Testzahlungen zählen mit.',
+} as const
 
 type DatenbankZiel = { host: string; benutzer: string }
 
@@ -358,6 +438,10 @@ export function bestimmeUmgebung(werte: UmgebungsWerte): Umgebung {
   const testumgebungUrl =
     testumgebung && 'herkunft' in testumgebung && testumgebung.herkunft !== appUrl ? testumgebung.herkunft : null
 
+  // Der Stichtag der Live-Schaltung (Register Z4): nur mit Zeitzone, sonst keiner.
+  const stichtag = leseStripeLiveAb(werte.STRIPE_LIVE_AB)
+  const stripeLiveAb = stichtag && 'ab' in stichtag ? stichtag.ab : null
+
   const warnungen: string[] = []
   if (art === 'preview') {
     if (vorschauAdresse && 'problem' in vorschauAdresse) {
@@ -392,8 +476,11 @@ export function bestimmeUmgebung(werte: UmgebungsWerte): Umgebung {
         : 'NEXT_PUBLIC_TESTUMGEBUNG_URL ist keine reine https-Adresse — der Link zur Testumgebung fehlt.'
     )
   }
+  // Ebenso in jeder Umgebung: Ein ungültiger Stichtag zählt Testzahlungen mit
+  // wie vor Nr. 55, nie verhindert er den Start (src/lib/env.ts).
+  if (stichtag && 'problem' in stichtag) warnungen.push(STICHTAG_WARNUNG[stichtag.problem])
 
-  return { art, appUrl, trustedOrigins, testumgebungUrl, datenbank, stripe, vercelProduktion, branch, warnungen }
+  return { art, appUrl, trustedOrigins, testumgebungUrl, datenbank, stripe, vercelProduktion, branch, stripeLiveAb, warnungen }
 }
 
 const DATENBANK_LABEL: Record<DatenbankArt, { lang: string; kurz: string }> = {

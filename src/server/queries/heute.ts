@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { STRIPE_LIVE_AB } from '@/lib/umgebung-server'
 import { wienKalendertag } from '@/lib/kalender'
 import {
   UEBERFAELLIG_EINZELN,
@@ -91,7 +92,9 @@ export type Heute = {
 export async function getHeute(
   farmId: string,
   jetzt: Date = new Date(),
-  freigabe: Promise<void> = Promise.resolve()
+  freigabe: Promise<void> = Promise.resolve(),
+  // Stichtag der Live-Schaltung (Register Z4): Testzahlungen davor sind kein Umsatz.
+  stripeLiveAb: Date | null = STRIPE_LIVE_AB
 ): Promise<Heute> {
   const { heute } = abholtage(jetzt)
   // Dieselbe Regel wie Verkauf und Auswertung: src/lib/umsatz.ts.
@@ -160,7 +163,7 @@ export async function getHeute(
         // Die Buchungen von Montag der Vorwoche bis jetzt: daraus Woche, Vorwoche
         // bis zum selben Zeitpunkt, die Tagesbalken und „Umsatz heute" — alles
         // nach derselben Regel wie Verkauf und Auswertung (auswerten, summeCent).
-        umsatzBuchungen(farmId, { von: wochenfenster.vergleich.von, bis: wochenfenster.aktuell.bis }),
+        umsatzBuchungen(farmId, { von: wochenfenster.vergleich.von, bis: wochenfenster.aktuell.bis }, stripeLiveAb),
         // Einstiegs-Checkliste, Hofseiten-Stand, Zustand und Abholzeiten in einem Zugriff.
         prisma.farm.findUnique({
           where: { id: farmId },

@@ -70,6 +70,10 @@ export function VerkaeufeAnsicht({ overview, produkte, topProduktIds, stripeRead
         <div className="min-w-0">
           <h1 className="font-heading text-2xl font-semibold text-foreground md:text-[26px]">Verkäufe</h1>
           <p className="text-[13px] leading-normal text-muted-foreground">Was du diese Woche eingenommen hast</p>
+          {/* Leise, nur wenn der Stichtag Bestellungen dieser Seite betrifft (Register Z4). */}
+          {overview.testzahlungenHinweis && (
+            <p className={cn('mt-1 text-[12.5px] leading-snug', LEISE)}>{overview.testzahlungenHinweis}</p>
+          )}
         </div>
         <button type="button" onClick={neuerVerkauf} className={KNOPF_ORANGE}>
           <Plus className="size-4" strokeWidth={2} aria-hidden="true" />

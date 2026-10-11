@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/nextjs'
 import { env } from '@/lib/env'
-import { bestimmeUmgebung, type Umgebung } from '@/lib/umgebung'
+import { STICHTAG_ZUKUNFT_WARNUNG, bestimmeUmgebung, stichtagWeitInDerZukunft, type Umgebung } from '@/lib/umgebung'
 import { istTestbetrieb } from '@/lib/stripe-modus'
 import { stripeMarke, type StripeMarke } from '@/lib/testumgebung'
 
@@ -29,6 +29,7 @@ export const UMGEBUNG: Umgebung = bestimmeUmgebung({
   DATABASE_URL: env.DATABASE_URL,
   STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY,
   STRIPE_CONNECT_WEBHOOK_SECRET: env.STRIPE_CONNECT_WEBHOOK_SECRET,
+  STRIPE_LIVE_AB: env.STRIPE_LIVE_AB,
 })
 
 /**
@@ -59,22 +60,49 @@ export const STRIPE_MARKE: StripeMarke | null = stripeMarke(UMGEBUNG)
 /** Ziel von „Zur Testumgebung" im Admin — null ohne gültige Variable, dann kein Link. */
 export const TESTUMGEBUNG_URL: string | null = UMGEBUNG.testumgebungUrl
 
+/**
+ * Stichtag der Live-Schaltung (Register Z4, Nr. 55) — die EINE Stelle, an der
+ * STRIPE_LIVE_AB gelesen wird. Null ohne gültige Variable: Dann zählen
+ * Testzahlungen mit wie vor Nr. 55. Die Abfragen in src/server/queries geben
+ * ihn als Parameter an die reinen Regeln (src/lib/testzahlung.ts); an den
+ * Browser geht er nie, nur der fertige Hinweis-Satz.
+ */
+export const STRIPE_LIVE_AB: Date | null = UMGEBUNG.stripeLiveAb
+
 // Einmal je Kaltstart — mehr wäre bei jedem Seitenaufruf dieselbe Meldung.
 // Serverlos heißt: je Instanz einmal; das ist gewollt, nicht zu viel.
 let warnungenGemeldet = false
+let stichtagZukunftGemeldet = false
 
 /**
  * Widersprüche in Produktion (Dev-Datenbank, Stripe test) gehen nicht ins
  * Banner — Kundinnen sehen nie eines — sondern als Warnung an Sentry.
  * Ohne DSN ist Sentry nicht initialisiert und der Aufruf ein No-op; schlägt
  * er dennoch fehl, bleibt es folgenlos.
+ *
+ * Dazu, zur Laufzeit gemessen (`jetzt`), ein Stichtag mehr als 24 Stunden in
+ * der Zukunft (Register Z4, `stichtagWeitInDerZukunft`): Er gilt, nähme aber
+ * still alle Online-Umsätze heraus. In jeder Umgebung, weil ihn kein Banner
+ * zeigt; ebenso höchstens einmal je Instanz und ohne den Wert. Die Seiten
+ * rufen diese Funktion über das Umgebungsbanner bei jedem Aufbau.
  */
-export function meldeUmgebungsWarnungen(): void {
+export function meldeUmgebungsWarnungen(jetzt: Date = new Date()): void {
+  meldeStichtagInDerZukunft(jetzt)
   if (UMGEBUNG.art !== 'produktion' || UMGEBUNG.warnungen.length === 0) return
   if (warnungenGemeldet) return
   warnungenGemeldet = true
   try {
     Sentry.captureMessage(`Umgebung widersprüchlich: ${UMGEBUNG.warnungen.join(' ')}`, 'warning')
+  } catch {
+    // Telemetrie scheitert leise.
+  }
+}
+
+function meldeStichtagInDerZukunft(jetzt: Date): void {
+  if (stichtagZukunftGemeldet || !stichtagWeitInDerZukunft(STRIPE_LIVE_AB, jetzt)) return
+  stichtagZukunftGemeldet = true
+  try {
+    Sentry.captureMessage(`Umgebung widersprüchlich: ${STICHTAG_ZUKUNFT_WARNUNG}`, 'warning')
   } catch {
     // Telemetrie scheitert leise.
   }

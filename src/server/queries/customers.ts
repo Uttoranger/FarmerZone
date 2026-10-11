@@ -1,5 +1,7 @@
+import type { PaymentMethod } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { env } from '@/lib/env'
+import { STRIPE_LIVE_AB } from '@/lib/umgebung-server'
 import { kundeIdAus } from '@/lib/kunden-id'
 import { alsCents } from '@/lib/order-totals'
 import { fasseKundinZusammen, kundenSchluessel, type KundenBestellung, type KundenZusammenfassung } from '@/lib/hof-kunden'
@@ -64,6 +66,8 @@ const BESTELL_FELDER = {
   customerName: true,
   customerPhone: true,
   status: true,
+  // Für die Testzahlung (Register Z4): online vor dem Stichtag ist kein Umsatz.
+  paymentMethod: true,
   totalAmount: true,
   createdAt: true,
   // Fehlende Artikel (E14) wurden nicht übergeben — sie zählen nicht als gekauft.
@@ -75,6 +79,7 @@ type BestellZeile = {
   customerName: string
   customerPhone: string
   status: string
+  paymentMethod: PaymentMethod
   totalAmount: { toString(): string }
   createdAt: Date
   items: { productName: string; quantity: number }[]
@@ -86,13 +91,23 @@ function alsKundenBestellung(o: BestellZeile): KundenBestellung {
     customerName: o.customerName,
     customerPhone: o.customerPhone,
     status: o.status,
+    paymentMethod: o.paymentMethod,
     betragCents: alsCents(o.totalAmount),
     createdAt: o.createdAt,
     items: o.items,
   }
 }
 
-export async function getCustomersForFarm(farmId: string, jetzt: Date = new Date()): Promise<CustomerSummary[]> {
+/**
+ * `stripeLiveAb`: Stichtag der Live-Schaltung (Register Z4) — Testzahlungen
+ * zählen nicht zum Umsatz einer Kundin. Standard ist die Variable des
+ * Servers; Tests geben ihn mit.
+ */
+export async function getCustomersForFarm(
+  farmId: string,
+  jetzt: Date = new Date(),
+  stripeLiveAb: Date | null = STRIPE_LIVE_AB
+): Promise<CustomerSummary[]> {
   const [orders, subscriptions] = await Promise.all([
     prisma.order.findMany({ where: { farmId }, select: BESTELL_FELDER, orderBy: { createdAt: 'asc' } }),
     prisma.customerFarmSubscription.findMany({
@@ -113,7 +128,7 @@ export async function getCustomersForFarm(farmId: string, jetzt: Date = new Date
 
   const result: CustomerSummary[] = [...jeKundin].map(([schluessel, bestellungen]) => ({
     kundeId: kundeIdFuer(farmId, schluessel),
-    ...fasseKundinZusammen(bestellungen, abos.get(schluessel) ?? null, jetzt),
+    ...fasseKundinZusammen(bestellungen, abos.get(schluessel) ?? null, jetzt, stripeLiveAb),
   }))
   result.sort((a, b) => b.orderCount - a.orderCount)
   return result
@@ -127,7 +142,8 @@ export async function getCustomersForFarm(farmId: string, jetzt: Date = new Date
 export async function getCustomerDetail(
   farmId: string,
   adressen: readonly string[],
-  jetzt: Date = new Date()
+  jetzt: Date = new Date(),
+  stripeLiveAb: Date | null = STRIPE_LIVE_AB
 ): Promise<CustomerDetail | null> {
   if (adressen.length === 0) return null
   const schluessel = kundenSchluessel(adressen[0])
@@ -153,7 +169,7 @@ export async function getCustomerDetail(
 
   return {
     kundeId: kundeIdFuer(farmId, schluessel),
-    ...fasseKundinZusammen(orders.map(alsKundenBestellung), subscription, jetzt),
+    ...fasseKundinZusammen(orders.map(alsKundenBestellung), subscription, jetzt, stripeLiveAb),
     recentOrders: orders.slice(0, LETZTE_BESTELLUNGEN).map((o) => ({
       id: o.id,
       orderNumber: o.orderNumber,

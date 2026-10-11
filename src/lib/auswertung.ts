@@ -15,13 +15,14 @@
  *
  * Geld in ganzen Cent (CODING_STANDARDS §2), Tage und Monate in Wiener Zeit.
  */
-import { topfVonBestellung, type BestellungFuerFinanzen } from '@/lib/finanzen'
-import { istVorOrtZahlung, monatsschluesselInWien, type Monatsschluessel, type Zahlungsart } from '@/lib/servicegebuehr'
+import { GEZAEHLTE_TOEPFE, topfVonBestellung, type BestellungFuerFinanzen, type EinnahmenTopf } from '@/lib/finanzen'
+import { istVorOrtZahlung, monatsgrenzenWien, monatsschluesselInWien, type Monatsschluessel, type Zahlungsart } from '@/lib/servicegebuehr'
+import type { GezeigteSummen } from '@/lib/testzahlung'
 import { BAR_OHNE_GEBUEHR_SATZ, barGebuehrSepaSatz, vorBarStichtag } from '@/lib/konditionen'
 import { mitAnzahl } from '@/lib/format'
 import { wienKalendertag } from '@/lib/kalender'
 import { wienerTag, type Zeitraum } from '@/lib/heute'
-import type { Periode, Periodenfenster } from '@/lib/umsatz'
+import { umsatzfenster, type Periode, type Periodenfenster } from '@/lib/umsatz'
 import type { TeilenWirkung, TeilenZeitraum } from '@/lib/teilen-wirkung'
 
 // ─── Kennzahlen ─────────────────────────────────────────────────────────────
@@ -82,6 +83,22 @@ export function abholtageDesFensters(pf: Pick<Periodenfenster, 'aktuell'>): Zeit
   }
 }
 
+/**
+ * Welche Summen die Auswertung zeigt — daran misst sich die Hinweiszeile
+ * (Register Z4): die Umsatzfenster der Balken samt Vorperiode (Kennzahlen,
+ * Vergleich und Top-Produkte liegen darin) und des Wiener Jahres
+ * (Grenzkarte), dazu der Monat der Servicegebühren. Zwei Umsatzfenster, nicht
+ * eines von früh bis jetzt: Bei einem älteren Jahr läge dazwischen eine Lücke,
+ * die keine Zahl der Seite zeigt.
+ */
+export function auswertungSummen(pf: Pick<Periodenfenster, 'vergleichGanz' | 'aktuell'>, jetzt: Date): GezeigteSummen {
+  const { von, bis } = monatsgrenzenWien(jetzt)
+  return {
+    umsatz: [{ von: pf.vergleichGanz.von, bis: pf.aktuell.bis }, umsatzfenster('jahr', jetzt).aktuell],
+    gebuehrenMonat: { von, bis },
+  }
+}
+
 // ─── Servicegebühren dieses Monats ──────────────────────────────────────────
 
 export type ServicegebuehrenMonat = {
@@ -96,6 +113,14 @@ export type ServicegebuehrenMonat = {
 }
 
 /**
+ * Welche Töpfe die Karte zählt — die gezählten der Finanzseite, „erwartet"
+ * steht hier nicht. Dieselbe Konstante nimmt die Hinweiszeile
+ * (`testzahlungenHinweisFuerHof`, Register Z4), damit Karte und Zeile nie
+ * auseinanderlaufen.
+ */
+export const SERVICEGEBUEHREN_TOEPFE: readonly EinnahmenTopf[] = GEZAEHLTE_TOEPFE
+
+/**
  * Die Servicegebühren eines Monats aus den GESPEICHERTEN Beträgen
  * (`Order.serviceFeeCents`, nie neu berechnet, E4). Monat ist der
  * Bestelleingang in Wiener Zeit, gezählt wird nach `topfVonBestellung` —
@@ -105,19 +130,22 @@ export type ServicegebuehrenMonat = {
  *   - vor Ort UND abgeholt, Gebühr nicht entfallen, nicht bar vor dem
  *     SEPA-Stichtag → „vor Ort" (geschuldet),
  *   - storniert, Gebühr erstattet/entfallen, nicht abgeholt, bar vor dem
- *     Stichtag und alles noch Offene → zählt nicht.
+ *     Stichtag, Testzahlungen (online vor `stripeLiveAb`, Register Z4) und
+ *     alles noch Offene → zählt nicht.
  * Offenes (bestellt, noch nicht bezahlt bzw. abgeholt) zählt bewusst nicht:
  * Die Zahl soll nur sagen, was tatsächlich angefallen ist.
  */
 export function servicegebuehrenImMonat(
   bestellungen: readonly BestellungFuerFinanzen[],
-  monat: Monatsschluessel
+  monat: Monatsschluessel,
+  stripeLiveAb: Date | null
 ): ServicegebuehrenMonat {
   const ergebnis: ServicegebuehrenMonat = { monat, onlineCents: 0, onlineAnzahl: 0, vorOrtCents: 0, vorOrtAnzahl: 0, summeCents: 0 }
   for (const b of bestellungen) {
     if (monatsschluesselInWien(b.createdAt) !== monat) continue
+    const topf = topfVonBestellung(b, stripeLiveAb)
+    if (!SERVICEGEBUEHREN_TOEPFE.includes(topf)) continue
     const gebuehr = Math.max(0, Math.round(b.serviceFeeCents))
-    const topf = topfVonBestellung(b)
     if (topf === 'eingezogen') {
       ergebnis.onlineCents += gebuehr
       ergebnis.onlineAnzahl++
