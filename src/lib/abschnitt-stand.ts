@@ -187,16 +187,32 @@ export function profilMitTeil(frisch: ProfilQuelle, teil: ProfilTeil): ProfileFo
 }
 
 /**
+ * Die Felder, die zusammen EINE Adresse sind: Straße, PLZ, Ort, Land und der
+ * Kartenpunkt. Sie gehen nur gemeinsam — so wie das Adress-Blatt in Mein Hof
+ * Straße, PLZ und Ort immer zusammen schickt. Einzeln gemischt, ergäben zwei
+ * Tabs eine Adresse, die es nicht gibt: die Straße aus dem einen, den Ort
+ * aus dem anderen, den Punkt auf der Karte woanders.
+ */
+const ADRESSE: readonly (keyof ProfileFormData)[] = ['address', 'postalCode', 'city', 'country', 'latitude', 'longitude']
+
+/**
  * Was im Hof-Profil seit dem Laden der Seite geändert wurde — nur das geht
  * über den frischen Stand (speichereProfil). Ein älterer Tab des Hof-Profils
  * schickte sonst Name, Adresse oder Kontakt vom Laden mit und schriebe damit
  * zurück, was inzwischen in Mein Hof gespeichert wurde. Verglichen werden
- * einfache Werte (Text, Zahl, null).
+ * einfache Werte (Text, Zahl, null). Ist ein Teil der Adresse geändert, geht
+ * die ganze Adresse dieses Tabs (ADRESSE).
+ *
+ * Ein Wert, der auf den Stand vom Laden zurückgesetzt wurde, gilt als
+ * unverändert — dann gewinnt der frische Wert eines anderen Tabs.
  */
 export function geaendertSeitLaden(anfang: ProfileFormData, jetzt: ProfileFormData): ProfilTeil {
   const teil: ProfilTeil = {}
   for (const feld of Object.keys(jetzt) as (keyof ProfileFormData)[]) {
     if (!Object.is(jetzt[feld], anfang[feld])) setze(teil, feld, jetzt[feld])
+  }
+  if (ADRESSE.some((feld) => feld in teil)) {
+    for (const feld of ADRESSE) setze(teil, feld, jetzt[feld])
   }
   return teil
 }

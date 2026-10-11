@@ -16,6 +16,8 @@
  *  - Zwei Abschnitte nacheinander ohne Neuladen: Der zweite schreibt den
  *    ersten nicht zurück (frischer Stand vom Server). Gegenprobe: Mit dem
  *    Stand vom Öffnen der Seite ginge der erste verloren.
+ *  - Das Hof-Profil in einem älteren Tab schickt nur, was dort geändert wurde
+ *    — die Adresse aber nur als Ganzes: keine Mischadresse aus zwei Tabs.
  *  - Zwei Abschnitte zugleich: Sie laufen nacheinander, keiner geht verloren.
  *  - Logo, Titelbild und ein Galeriefoto ändern nur sich selbst — und ein
  *    Abschnitt danach lässt sie stehen.
@@ -245,6 +247,37 @@ describe('zwei Abschnitte nacheinander, ohne neu zu laden', () => {
       description: 'Gemüse, Eier und Brot aus Teststadt.',
       phone: '+43 660 2222222',
     })
+  })
+
+  it('Hof-Profil in einem älteren Tab ändert nur den Ort: keine Mischadresse mit der Adresse aus Mein Hof', async () => {
+    const { farm, ownerId } = await angemeldeterHof()
+    const beimOeffnen = profilBasis((await getFarmSettings(ownerId))!)
+
+    // Inzwischen speichert das Adress-Blatt in Mein Hof eine ganz neue Adresse.
+    expect((await speichereProfil({ address: 'Neue Gasse 2', postalCode: '8701', city: 'Neustadt' })).error).toBeUndefined()
+    // Im älteren Tab ändert jemand nur den Ort und speichert, wie profile-form.tsx es tut.
+    const formular = { ...beimOeffnen, city: 'Testau' }
+    expect((await speichereProfil(geaendertSeitLaden(beimOeffnen, formular))).error).toBeUndefined()
+
+    // Die Adresse dieses Tabs als Ganzes — nicht „Neue Gasse 2, 8701 Testau".
+    expect((await stand(farm.id)).hof).toMatchObject({
+      address: 'Teststraße 1',
+      postalCode: '8700',
+      city: 'Testau',
+      country: 'AT',
+      latitude: 48.2,
+      longitude: 13.4,
+    })
+  })
+
+  it('Gegenprobe: Feld für Feld gemischt ergäbe die Mischadresse', async () => {
+    const { farm } = await angemeldeterHof()
+
+    await speichereProfil({ address: 'Neue Gasse 2', postalCode: '8701', city: 'Neustadt' })
+    // So speicherte der ältere Tab, wenn nur der Ort als geändert mitginge.
+    await speichereProfil({ city: 'Testau' })
+
+    expect((await stand(farm.id)).hof).toMatchObject({ address: 'Neue Gasse 2', postalCode: '8701', city: 'Testau' })
   })
 
   it('zwei Abschnitte zugleich: sie laufen nacheinander, keiner geht verloren', async () => {

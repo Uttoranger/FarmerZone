@@ -17,6 +17,8 @@
  *    dem Satz des Schemas, nie mit einem englischen Satz von Zod.
  *  - geaendertSeitLaden (Hof-Profil, Nr. 50 Runde 1) nimmt nur, was seit dem
  *    Laden geändert wurde — Text, Zahl, null; unverändert fehlt der Schlüssel.
+ *    Die Adresse (Straße, PLZ, Ort, Land, Kartenpunkt) geht nur als Ganzes
+ *    (Runde 2): Ist ein Teil geändert, gehen alle.
  *  - Der Stand wird nicht verändert (der nächste Abschnitt rechnet weiter damit).
  */
 import { describe, it, expect } from 'vitest'
@@ -172,9 +174,41 @@ describe('profilBasis und profilMitTeil', () => {
 describe('geaendertSeitLaden (Hof-Profil)', () => {
   const ANFANG = profilBasis(PROFIL)
 
-  it('nur, was seit dem Laden geändert wurde — auch Zahl und null', () => {
-    const jetzt = { ...ANFANG, phone: '+43 660 2222222', latitude: 48.25, betriebsnummer: null }
-    expect(geaendertSeitLaden(ANFANG, jetzt)).toEqual({ phone: '+43 660 2222222', latitude: 48.25, betriebsnummer: null })
+  it('nur, was seit dem Laden geändert wurde — auch null', () => {
+    const jetzt = { ...ANFANG, phone: '+43 660 2222222', betriebsnummer: null }
+    expect(geaendertSeitLaden(ANFANG, jetzt)).toEqual({ phone: '+43 660 2222222', betriebsnummer: null })
+  })
+
+  const GANZE_ADRESSE = { address: 'Musterweg 1', postalCode: '4900', city: 'Musterdorf', country: 'AT', latitude: 48.2, longitude: 13.4 }
+
+  it('ein Teil der Adresse geändert: die ganze Adresse geht — Straße, PLZ, Ort, Land und Kartenpunkt', () => {
+    expect(geaendertSeitLaden(ANFANG, { ...ANFANG, city: 'Neustadt' })).toEqual({ ...GANZE_ADRESSE, city: 'Neustadt' })
+  })
+
+  it('nur der Kartenpunkt verschoben (eine Zahl): die Adresse geht mit', () => {
+    expect(geaendertSeitLaden(ANFANG, { ...ANFANG, latitude: 48.25 })).toEqual({ ...GANZE_ADRESSE, latitude: 48.25 })
+  })
+
+  it('Kontakt und Adresse zugleich: beides, die Adresse ganz', () => {
+    const jetzt = { ...ANFANG, phone: '+43 660 2222222', postalCode: '4901' }
+    expect(geaendertSeitLaden(ANFANG, jetzt)).toEqual({ ...GANZE_ADRESSE, postalCode: '4901', phone: '+43 660 2222222' })
+  })
+
+  it('keine Mischadresse: der frische Stand eines anderen Tabs mischt sich nicht in die Adresse', () => {
+    // Ein anderer Tab hat inzwischen eine ganz neue Adresse gespeichert; dieser Tab ändert nur den Ort.
+    const frisch = { ...PROFIL, address: 'Neue Gasse 2', postalCode: '8701', city: 'Neustadt', latitude: 47.1, longitude: 15.3 }
+    const teil = geaendertSeitLaden(ANFANG, { ...ANFANG, city: 'Musterau' })
+    expect(profilMitTeil(frisch, teil)).toMatchObject({ ...GANZE_ADRESSE, city: 'Musterau' })
+    // Gegenprobe: Feld für Feld gemischt stünde die Straße des anderen Tabs neben dem Ort dieses.
+    expect(profilMitTeil(frisch, { city: 'Musterau' })).toMatchObject({ address: 'Neue Gasse 2', postalCode: '8701', city: 'Musterau' })
+  })
+
+  it('auf den Stand vom Laden zurückgesetzt: gilt als unverändert — dann gewinnt der frische Wert des anderen Tabs', () => {
+    // Hier erst geändert, dann wieder auf „Musterdorf" gesetzt; ein anderer Tab hat inzwischen den Ort gespeichert.
+    const frisch = { ...PROFIL, city: 'Neustadt' }
+    const teil = geaendertSeitLaden(ANFANG, { ...ANFANG, city: 'Musterdorf' })
+    expect(teil).toEqual({})
+    expect(profilMitTeil(frisch, teil).city).toBe('Neustadt')
   })
 
   it('nichts geändert: leer — dann schreibt das Speichern den frischen Stand unverändert', () => {
