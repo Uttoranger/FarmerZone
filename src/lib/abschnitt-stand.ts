@@ -216,6 +216,23 @@ export function profilWieImSchema(schema: typeof profileSchema, werte: ProfileFo
 const ADRESSE: readonly (keyof ProfileFormData)[] = ['address', 'postalCode', 'city', 'country', 'latitude', 'longitude']
 
 /**
+ * Ab dieser Abweichung (in Grad, rund ein Meter) gilt der Kartenpunkt als
+ * bewegt. Leaflet rechnet die Mitte nach jedem Größenwechsel der Karte
+ * (Handy drehen, Fenster schmaler) aus gerundeten Pixeln neu; das verschiebt
+ * sie um einige Millionstel Grad, ohne dass jemand die Karte angefasst hat.
+ * Ohne Toleranz nähme so ein Wackeln die ganze Adresse dieses Tabs mit
+ * (ADRESSE) und schriebe zurück, was inzwischen in Mein Hof gespeichert wurde.
+ */
+export const KARTENPUNKT_TOLERANZ_GRAD = 1e-5
+
+function unveraendert(feld: keyof ProfileFormData, vorher: unknown, jetzt: unknown): boolean {
+  if ((feld === 'latitude' || feld === 'longitude') && typeof vorher === 'number' && typeof jetzt === 'number') {
+    return Math.abs(jetzt - vorher) < KARTENPUNKT_TOLERANZ_GRAD
+  }
+  return Object.is(jetzt, vorher)
+}
+
+/**
  * Was im Hof-Profil seit dem Laden der Seite geändert wurde — nur das geht
  * über den frischen Stand (speichereProfil). Ein älterer Tab des Hof-Profils
  * schickte sonst Name, Adresse oder Kontakt vom Laden mit und schriebe damit
@@ -224,12 +241,13 @@ const ADRESSE: readonly (keyof ProfileFormData)[] = ['address', 'postalCode', 'c
  * die ganze Adresse dieses Tabs (ADRESSE).
  *
  * Ein Wert, der auf den Stand vom Laden zurückgesetzt wurde, gilt als
- * unverändert — dann gewinnt der frische Wert eines anderen Tabs.
+ * unverändert — dann gewinnt der frische Wert eines anderen Tabs. Der
+ * Kartenpunkt gilt erst ab KARTENPUNKT_TOLERANZ_GRAD als bewegt.
  */
 export function geaendertSeitLaden(anfang: ProfileFormData, jetzt: ProfileFormData): ProfilTeil {
   const teil: ProfilTeil = {}
   for (const feld of Object.keys(jetzt) as (keyof ProfileFormData)[]) {
-    if (!Object.is(jetzt[feld], anfang[feld])) setze(teil, feld, jetzt[feld])
+    if (!unveraendert(feld, anfang[feld], jetzt[feld])) setze(teil, feld, jetzt[feld])
   }
   if (ADRESSE.some((feld) => feld in teil)) {
     for (const feld of ADRESSE) setze(teil, feld, jetzt[feld])

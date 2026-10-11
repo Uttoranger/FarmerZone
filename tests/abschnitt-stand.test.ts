@@ -34,6 +34,7 @@ import {
   auftrittMitTeil,
   auftrittStandAus,
   geaendertSeitLaden,
+  KARTENPUNKT_TOLERANZ_GRAD,
   profilBasis,
   profilMitTeil,
   profilWieImSchema,
@@ -191,6 +192,19 @@ describe('geaendertSeitLaden (Hof-Profil)', () => {
 
   it('nur der Kartenpunkt verschoben (eine Zahl): die Adresse geht mit', () => {
     expect(geaendertSeitLaden(ANFANG, { ...ANFANG, latitude: 48.25 })).toEqual({ ...GANZE_ADRESSE, latitude: 48.25 })
+  })
+
+  it('Kartenpunkt nur gewackelt (Größenwechsel der Karte, unter einem Meter): unverändert — die Adresse bleibt beim frischen Stand', () => {
+    // Leaflet rechnet die Mitte nach invalidateSize aus gerundeten Pixeln neu (Nachprüfung Runde 2).
+    const gewackelt = { ...ANFANG, latitude: 48.2 + 3e-6, longitude: 13.4 - 4e-6, phone: '+43 660 2222222' }
+    expect(geaendertSeitLaden(ANFANG, gewackelt)).toEqual({ phone: '+43 660 2222222' })
+    expect(KARTENPUNKT_TOLERANZ_GRAD).toBe(1e-5)
+  })
+
+  it('Gegenprobe: ab einem Meter gilt der Punkt als bewegt, und von null auf einen Punkt immer', () => {
+    expect(geaendertSeitLaden(ANFANG, { ...ANFANG, longitude: 13.4 + 2e-5 })).toEqual({ ...GANZE_ADRESSE, longitude: 13.4 + 2e-5 })
+    const ohnePunkt = { ...ANFANG, latitude: null, longitude: null }
+    expect(geaendertSeitLaden(ohnePunkt, ANFANG)).toEqual(GANZE_ADRESSE)
   })
 
   it('Kontakt und Adresse zugleich: beides, die Adresse ganz', () => {
