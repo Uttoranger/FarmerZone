@@ -93,10 +93,14 @@ const EMAIL_LOKAL = /[\p{L}\p{N}\p{M}._%+-]/u
  *  lastIndex setzt ersetzeEmails): Teile aus Buchstaben und Ziffern jeder
  *  Schrift (Nr. 56: eine Domain mit Umlaut fiel vorher gar nicht), „-" und
  *  kodierten Bytes eines Nicht-ASCII-Zeichens — so steht ein Umlaut in einer
- *  Adresse (%C3%BC); am Ende eine Endung aus mindestens zwei Buchstaben. Nur
- *  die Bytes %80–%FF: Ein kodiertes @, % oder „." (%40, %25, %2E) gehört nie
- *  zur Domain, sonst setzte das kodierte Muster darunter quadratisch an. */
-const EMAIL_DOMAIN = /(?:[\p{L}\p{N}\p{M}.-]|%[89A-Fa-f][0-9A-Fa-f])+\.(?:[\p{L}\p{M}]|%[89A-Fa-f][0-9A-Fa-f]){2,}/uy
+ *  Adresse (%C3%BC), nach einer zweiten Kodierung %25C3%25BC (Nr. 56, Runde 1:
+ *  sonst blieb eine doppelt kodierte Adresse mit Umlaut in der Domain ganz
+ *  stehen); am Ende eine Endung aus mindestens zwei Buchstaben. Nur die Bytes
+ *  %80–%FF, auch mehrfach kodiert: Ein kodiertes @ oder „." (%40, %2540,
+ *  %2E) und ein % ohne solches Byte gehören nie zur Domain, sonst setzte das
+ *  kodierte Muster darunter quadratisch an. */
+const EMAIL_DOMAIN =
+  /(?:[\p{L}\p{N}\p{M}.-]|%(?:25)*[89A-Fa-f][0-9A-Fa-f])+\.(?:[\p{L}\p{M}]|%(?:25)*[89A-Fa-f][0-9A-Fa-f]){2,}/uy
 
 /** Dieselben Adressen URL-kodiert (%40 statt @) — so stehen sie im Pfad —,
  *  seit Nr. 56 auch mehrfach kodiert (%2540: das % des %40 noch einmal
@@ -105,10 +109,11 @@ const EMAIL_DOMAIN = /(?:[\p{L}\p{N}\p{M}.-]|%[89A-Fa-f][0-9A-Fa-f])+\.(?:[\p{L}
  *  (Lookbehind), sonst wäre das Muster quadratisch. Das Ergebnis bleibt
  *  gleich: %40 und %2540 gehören selbst zu den Zeichen des lokalen Teils, der
  *  Treffer ab dem Anfang nimmt schon das letzte passende der Folge — ein
- *  späterer Anfang fände nichts mehr. Linear bleibt es, weil die Domain kein
- *  %2… und kein %4… enthalten kann: Jeder Versuch endet am nächsten Trenner. */
+ *  späterer Anfang fände nichts mehr. Linear bleibt es, weil ein Byte der
+ *  Domain (%(25)*[89A-F]…) nie ein Trenner %(25)*40 sein kann: Jeder Versuch
+ *  endet spätestens am nächsten Trenner. */
 const EMAIL_KODIERT_MUSTER =
-  /(?<![\p{L}\p{N}\p{M}._%+-])[\p{L}\p{N}\p{M}._%+-]+%(?:25)*40(?:[\p{L}\p{N}\p{M}.-]|%[89A-Fa-f][0-9A-Fa-f])+\.(?:[\p{L}\p{M}]|%[89A-Fa-f][0-9A-Fa-f]){2,}/giu
+  /(?<![\p{L}\p{N}\p{M}._%+-])[\p{L}\p{N}\p{M}._%+-]+%(?:25)*40(?:[\p{L}\p{N}\p{M}.-]|%(?:25)*[89A-Fa-f][0-9A-Fa-f])+\.(?:[\p{L}\p{M}]|%(?:25)*[89A-Fa-f][0-9A-Fa-f]){2,}/giu
 
 /** Telefonnummern: +43 664 123 4567, 0664/1234567, (0664) 1234567 … — eine
  *  führende +/0/(0-Gruppe und danach mindestens sieben weitere Ziffern mit

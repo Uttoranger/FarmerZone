@@ -367,6 +367,12 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
     ['viele relative Adressen im Fehlertext', { exception: { values: [{ value: ' /a?b=1'.repeat(N / 10) }] } }],
     ['lange Folge aus Schrägstrichen im Fehlertext', { exception: { values: [{ value: '/'.repeat(2 * N) }] } }],
     ['Schrägstriche nach Klammern im Fehlertext', { exception: { values: [{ value: '(/'.repeat(N) }] } }],
+    // Nr. 56, Runde 1: mehrfach kodierte Bytes in der Domain (%25C3, %2525C3).
+    ['doppelt kodierte Umlaute ohne Endung', { extra: { text: 'a%2540' + '%25C3%25A4.'.repeat(N) + '1' } }],
+    ['@ und doppelt kodierte Bytes ohne Punkt', { exception: { values: [{ value: 'a@' + '%25C3'.repeat(N) }] } }],
+    ['%25-Kette mit 40 und kodierten Bytes', { exception: { values: [{ value: '%' + '25'.repeat(N) + '40' + '%25C3'.repeat(N) }] } }],
+    ['halbe Bytes nach %2540', { extra: { text: ('x%2540' + '%258'.repeat(5)).repeat(N / 5) } }],
+    ['Domain aus langen %2525-Ketten', { exception: { values: [{ value: 'a%40b' + ('%' + '25'.repeat(20) + 'C').repeat(N / 20) }] } }],
   ]
 
   for (const [name, teil] of lang) {
@@ -382,15 +388,17 @@ describe('E-Mail-Adressen — dasselbe Ergebnis wie die schlichten Muster (Nachb
   // Die Referenz: die Regel als schlichte Regex (quadratisch, aber das
   // Ergebnis ist die Vorgabe). Bis Nr. 56 nur A–Z und %40; seit Nr. 56
   // Buchstaben und Ziffern jeder Schrift, in der Domain auch kodierte Bytes
-  // eines Nicht-ASCII-Zeichens (%80–%FF) und kodiert auch %2540, %252540 ….
+  // eines Nicht-ASCII-Zeichens (%80–%FF, seit Runde 1 auch mehrfach kodiert:
+  // %25C3, %2525C3 …) und kodiert auch %2540, %252540 ….
   // Über den Fehlertext geprüft: Dort gilt außer den E-Mail-Mustern nur die
   // Telefon- und Code-Regel und seit Nr. 56 die Adress-, Zuweisungs- und
   // Bearer-Regel. Die Texte tragen weder „http", „token" noch „Bearer", „/"
   // nur in einem Pfad ohne Token (dort gilt dieselbe E-Mail-Regel) und zu
   // wenige Ziffern am Stück für eine Telefonnummer oder einen Anmeldecode.
-  const REF_EMAIL = /[\p{L}\p{N}\p{M}._%+-]+@(?:[\p{L}\p{N}\p{M}.-]|%[89A-Fa-f][0-9A-Fa-f])+\.(?:[\p{L}\p{M}]|%[89A-Fa-f][0-9A-Fa-f]){2,}/gu
+  const REF_EMAIL =
+    /[\p{L}\p{N}\p{M}._%+-]+@(?:[\p{L}\p{N}\p{M}.-]|%(?:25)*[89A-Fa-f][0-9A-Fa-f])+\.(?:[\p{L}\p{M}]|%(?:25)*[89A-Fa-f][0-9A-Fa-f]){2,}/gu
   const REF_KODIERT =
-    /[\p{L}\p{N}\p{M}._%+-]+%(?:25)*40(?:[\p{L}\p{N}\p{M}.-]|%[89A-Fa-f][0-9A-Fa-f])+\.(?:[\p{L}\p{M}]|%[89A-Fa-f][0-9A-Fa-f]){2,}/giu
+    /[\p{L}\p{N}\p{M}._%+-]+%(?:25)*40(?:[\p{L}\p{N}\p{M}.-]|%(?:25)*[89A-Fa-f][0-9A-Fa-f])+\.(?:[\p{L}\p{M}]|%(?:25)*[89A-Fa-f][0-9A-Fa-f]){2,}/giu
   const referenz = (text: string) => text.replace(REF_EMAIL, '[e-mail entfernt]').replace(REF_KODIERT, '[e-mail entfernt]')
   const neu = (text: string) => bereinigeEreignis(ereignis({ exception: { values: [{ value: text }] } })).exception?.values?.[0].value
 
@@ -407,6 +415,11 @@ describe('E-Mail-Adressen — dasselbe Ergebnis wie die schlichten Muster (Nachb
       'j%C3%BCrgen%40b%C3%A4ckerei.example', 'a@b.%C3%A4%C3%B6', 'a@b.%C3', 'a@b%40c.de', 'a@b%2Ec.de', 'kundin%2540example.com',
       'kundin%252540example.com', 'a%25%2540b.cc', '%2540a.bc', 'a%2540', 'a%2540b%2540c.de', 'a%254b.cc', 'jü%2540bä.cc',
       '1@2.34', 'ä@ö.ü', 'ä@ö.üß-x@y.zz',
+      // Seit Runde 1: die Bytes in der Domain ebenfalls mehrfach kodiert (%25C3 …).
+      'j%25C3%25BCrgen%2540b%25C3%25A4ckerei.example', 'kundin%2540b%25C3%25A4ckerei.example',
+      '/customers/kundin%2540b%25C3%25A4ckerei.example', 'kundin%252540b%2525C3%2525A4ckerei.example', 'a@b%25C3%25A4.cc',
+      'a@b.%25C3%25A4%25C3%25B6', 'a%2540b.%2525C3', 'a%2540b%25C3', 'a%2540b%252540c.de', 'a%2540b%2525%25C3.de', 'a%40b%25.cc',
+      'a%40b%2525.cc', 'a%40b%2589.cc', 'a%40b%2540.cc', 'a%40b%252E.cc', 'a@b%25C.cc', 'a@b%2525252525A4.cc',
     ]
     for (const text of faelle) expect(neu(text), text).toBe(referenz(text))
   })
@@ -419,6 +432,8 @@ describe('E-Mail-Adressen — dasselbe Ergebnis wie die schlichten Muster (Nachb
     const teile = [
       'a', 'Zz', 'kundin', '.', '-', '_', '+', '%', '%40', '%4', '@', ' ', 'de', 'com', ',', '(', 'b.c', 'xy.at', '@@', '..',
       'x@y.de', 'a%40b.at', '@b.cc', 'kundin@', 'ü', 'ß', 'É', 'ü', '𝒜', '%C3%BC', '%2540', '%25', 'bäck.at', 'jü@',
+      // Seit Runde 1: mehrfach kodierte Bytes.
+      '%25C3', '%2525A4', 'b%25C3%25A4.cc',
     ]
     let zustand = 47
     const zufall = (bis: number) => {
@@ -596,5 +611,55 @@ describe('Nr. 56 — die offenen Fälle aus Lauf 8 §6 (Bericht 47)', () => {
     }
     const harmlos = { notiz: 'Größe 5 kg für Bäckerei Müller, Grüße aus Österreich', pfad: '/hoefe/gemüse' }
     expect(bereinigeEreignis(ereignis({ extra: structuredClone(harmlos) })).extra).toEqual(harmlos)
+  })
+})
+
+describe('Nr. 56, Nachbesserung Runde 1 — Befunde der Prüfung', () => {
+  const fehlertext = (wert: string) => bereinigeEreignis(ereignis({ exception: { values: [{ value: wert }] } })).exception?.values?.[0].value
+  const nachricht = (wert: string) => bereinigeEreignis(ereignis({ message: wert })).message
+
+  it('Umlaut-Domain doppelt und dreifach kodiert fällt — in Text, Adresse und Nachricht, im vollen und im Minimalereignis', () => {
+    // Vorher blieb die ganze Adresse stehen: In der Domain galten nur einfach
+    // kodierte Bytes (%C3), nicht %25C3 — so steht ein Umlaut, wenn eine
+    // Weiterleitung die schon kodierte Adresse noch einmal kodiert.
+    const DOPPELT = 'j%25C3%25BCrgen%2540b%25C3%25A4ckerei.example'
+    const DREIFACH = 'kundin%252540b%2525C3%2525A4ckerei.example'
+    for (const adresse of [DOPPELT, DREIFACH, 'kundin%2540b%25C3%25A4ckerei.example', 'kundin@b%25C3%25A4ckerei.example', 'kundin%2540beispiel.%25C3%25A4%25C3%25B6']) {
+      const e = bereinigeEreignis(
+        ereignis({
+          exception: { values: [{ type: 'Error', value: `Mail an ${adresse} gescheitert, Pfad /customers/${adresse}` }] },
+          message: `Abo für ${adresse} gescheitert`,
+          extra: { text: `an ${adresse}` },
+          request: { url: `https://farmerzone.at/customers/${adresse}` },
+          breadcrumbs: [{ data: { from: `/customers/${adresse}` } }],
+          contexts: { nextjs: { request_path: `/customers/${adresse}` } },
+        })
+      )
+      expect(e.exception?.values?.[0].value, adresse).toBe('Mail an [e-mail entfernt] gescheitert, Pfad /customers/[e-mail entfernt]')
+      expect(e.message, adresse).toBe('Abo für [e-mail entfernt] gescheitert')
+      expect(e.extra, adresse).toEqual({ text: 'an [e-mail entfernt]' })
+      expect(e.request?.url, adresse).toBe('https://farmerzone.at/customers/[e-mail entfernt]')
+      expect(e.breadcrumbs?.[0].data?.from, adresse).toBe('/customers/[e-mail entfernt]')
+      expect(e.contexts?.nextjs, adresse).toEqual({ request_path: '/customers/[e-mail entfernt]' })
+      expect(JSON.stringify(e), adresse).not.toMatch(/ckerei|kundin|rgen|beispiel/)
+    }
+
+    // Minimalereignis: Die Nachricht hat nur einen Getter, schon ihr
+    // Zurückschreiben wirft; Nachricht und Fehlertext bereinigt dann minimalEreignis.
+    const roh: Record<string, unknown> = { event_id: 'e6', level: 'error', exception: { values: [{ type: 'Error', value: `Mail an ${DOPPELT}` }] } }
+    Object.defineProperty(roh, 'message', { enumerable: true, get: () => `Abo für ${DREIFACH}` })
+    expect(bereinigeEreignis(ereignis(roh))).toEqual({
+      event_id: 'e6',
+      level: 'error',
+      message: 'Abo für [e-mail entfernt]',
+      exception: { values: [{ type: 'Error', value: 'Mail an [e-mail entfernt]' }] },
+      extra: { bereinigung: 'fehlgeschlagen' },
+    })
+
+    // Gegenprobe: ohne Domain samt Endung keine Adresse.
+    for (const text of ['Rabatt 50%2540 Stück', 'Code 25%2540, 30%25C3 Rabatt', 'Anteil 5%25 von 100%25C3']) {
+      expect(fehlertext(text), text).toBe(text)
+      expect(nachricht(text), text).toBe(text)
+    }
   })
 })
