@@ -239,6 +239,10 @@ describe('Speichern auf den Einstellungs-Unterseiten (Quelltext)', () => {
   it('Hof-Profil: speichert nur, was seit dem Laden geändert wurde, über den frischen Stand (speichereProfil)', () => {
     const profil = rumpf(quelle('src/components/settings/profile-form.tsx'), 'onSubmit')
     expect(profil).toContain('const res = await speichereProfil(geaendertSeitLaden(anfang, data))')
+    // Der Maßstab: der Stand beim Laden, Feld für Feld durch das Schema (tests/abschnitt-stand.test.ts).
+    expect(quelle('src/components/settings/profile-form.tsx')).toContain(
+      'const [anfang] = useState<ProfileFormData>(() => profilWieImSchema(schema, startwerte))'
+    )
     // Gegenprobe: das ganze Formular vom Laden ginge nicht mehr direkt an die Aktion.
     expect(quelle('src/components/settings/profile-form.tsx')).not.toMatch(/updateProfile\(/)
   })

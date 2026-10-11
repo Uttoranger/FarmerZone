@@ -21,7 +21,7 @@ import { alsLand } from '@/lib/laender'
 import { ZU_LANG } from '@/lib/eingabegrenzen'
 import { ZEILE_TITEL } from '@/lib/hofseite-fortschritt'
 import { GRUENDUNGSJAHR_FEHLER, WERTE_ZU_VIELE, type AppearanceSaveInput } from '@/schemas/auftritt'
-import type { ProfileFormData } from '@/schemas/hofprofil'
+import type { ProfileFormData, profileSchema } from '@/schemas/hofprofil'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 
 /**
@@ -184,6 +184,26 @@ export function profilMitTeil(frisch: ProfilQuelle, teil: ProfilTeil): ProfileFo
     if (wert !== undefined) setze(neu, feld, wert)
   }
   return neu
+}
+
+/**
+ * Der Stand beim Laden, Feld für Feld so, wie das Schema ihn ausgibt: Ränder
+ * weg, die E-Mail klein, eine leere Betriebsnummer null. Der Maßstab für
+ * geaendertSeitLaden — das Formular gibt beim Speichern die Ausgabe des
+ * Schemas weiter (zodResolver), ein unverändertes Feld muss also schon beim
+ * Laden genauso aussehen. Feld für Feld, nicht als Ganzes: Hält EIN Feld das
+ * Schema nicht ein (ein Altwert, etwa eine zu kurze Beschreibung), bleibt nur
+ * dieses, wie es geladen wurde. Sonst zählten mit ihm E-Mail und
+ * Betriebsnummer als geändert und schrieben den Stand eines anderen Tabs
+ * zurück.
+ */
+export function profilWieImSchema(schema: typeof profileSchema, werte: ProfileFormData): ProfileFormData {
+  const ergebnis: ProfileFormData = { ...werte }
+  for (const feld of Object.keys(werte) as (keyof ProfileFormData)[]) {
+    const geprueft = schema.shape[feld].safeParse(werte[feld])
+    if (geprueft.success) setze(ergebnis, feld, geprueft.data)
+  }
+  return ergebnis
 }
 
 /**

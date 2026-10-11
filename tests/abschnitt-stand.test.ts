@@ -19,11 +19,14 @@
  *    Laden geändert wurde — Text, Zahl, null; unverändert fehlt der Schlüssel.
  *    Die Adresse (Straße, PLZ, Ort, Land, Kartenpunkt) geht nur als Ganzes
  *    (Runde 2): Ist ein Teil geändert, gehen alle.
+ *  - profilWieImSchema (Runde 2): der Maßstab dafür, Feld für Feld durch das
+ *    Schema — scheitert ein Altwert, zählen E-Mail und Betriebsnummer
+ *    trotzdem nicht als geändert.
  *  - Der Stand wird nicht verändert (der nächste Abschnitt rechnet weiter damit).
  */
 import { describe, it, expect } from 'vitest'
 import { appearanceSchema } from '@/schemas/auftritt'
-import { profileSchema } from '@/schemas/hofprofil'
+import { profilBearbeitenSchema, profileSchema, type ProfileFormData } from '@/schemas/hofprofil'
 import {
   ABSCHNITT_SPEICHERN_TEXT,
   auftrittBasis,
@@ -33,6 +36,7 @@ import {
   geaendertSeitLaden,
   profilBasis,
   profilMitTeil,
+  profilWieImSchema,
   type AuftrittStand,
   type ProfilQuelle,
 } from '@/lib/abschnitt-stand'
@@ -222,6 +226,57 @@ describe('geaendertSeitLaden (Hof-Profil)', () => {
     expect(profilMitTeil(frisch, teil)).toEqual({ ...profilBasis(frisch), phone: '+43 660 2222222' })
     // Gegenprobe: das ganze Formular vom Laden schriebe den alten Namen zurück.
     expect(profilMitTeil(frisch, { ...ANFANG, phone: '+43 660 2222222' }).name).toBe('Hof Test')
+  })
+})
+
+describe('profilWieImSchema — der Stand beim Laden, Feld für Feld durch das Schema (Hof-Profil)', () => {
+  // So baut profile-form.tsx seine Startwerte und sein Schema — ohne profilBasis.
+  const GELADEN: ProfileFormData = {
+    name: 'Hof Test',
+    ownerName: 'Max Mustermann',
+    description: 'Gemüse und Eier aus Musterdorf',
+    address: 'Musterweg 1',
+    postalCode: '4900',
+    city: 'Musterdorf',
+    phone: '+43 660 0000000',
+    email: '  Hof@Example.com ',
+    country: 'AT',
+    latitude: 48.2,
+    longitude: 13.4,
+    betriebsnummer: '  ',
+    betriebsstatus: null,
+  }
+  const schemaFuer = (werte: ProfileFormData) => profilBearbeitenSchema({ name: werte.name, ownerName: werte.ownerName, phone: werte.phone })
+
+  it('alles gültig: dasselbe wie das ganze Schema — Ränder weg, E-Mail klein, leere Betriebsnummer null', () => {
+    const schema = schemaFuer(GELADEN)
+    expect(profilWieImSchema(schema, GELADEN)).toEqual(schema.parse(GELADEN))
+    expect(profilWieImSchema(schema, GELADEN)).toMatchObject({ email: 'hof@example.com', betriebsnummer: null })
+  })
+
+  it('ein Altwert scheitert am Schema: nur er bleibt, wie geladen — E-Mail und Betriebsnummer zählen nicht als geändert', () => {
+    const geladen = { ...GELADEN, description: 'Kurz' }
+    const schema = schemaFuer(geladen)
+    // Voraussetzung: Als Ganzes hält der Stand das Schema nicht ein.
+    expect(schema.safeParse(geladen).success).toBe(false)
+
+    const anfang = profilWieImSchema(schema, geladen)
+    expect(anfang).toEqual({ ...geladen, email: 'hof@example.com', betriebsnummer: null })
+
+    // Der Bauer verlängert nur die Beschreibung; zodResolver gibt die Ausgabe des Schemas weiter.
+    const gespeichert = schema.parse({ ...geladen, description: 'Gemüse und Eier vom Hof' })
+    expect(geaendertSeitLaden(anfang, gespeichert)).toEqual({ description: 'Gemüse und Eier vom Hof' })
+    // Gegenprobe: Mit dem ungeprüften Stand zählten E-Mail und Betriebsnummer als geändert.
+    expect(geaendertSeitLaden(geladen, gespeichert)).toEqual({
+      description: 'Gemüse und Eier vom Hof',
+      email: 'hof@example.com',
+      betriebsnummer: null,
+    })
+  })
+
+  it('eine Betriebsnummer mit Rändern wird getrimmt, nicht verworfen', () => {
+    const geladen = { ...GELADEN, betriebsnummer: ' LFBIS 0000000 ' }
+    expect(profilWieImSchema(schemaFuer(geladen), geladen).betriebsnummer).toBe('LFBIS 0000000')
   })
 })
 

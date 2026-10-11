@@ -17,7 +17,7 @@ import {
   type ProfileFormData,
 } from '@/server/actions/farm'
 import { speichereProfil } from '@/components/mein-hof/abschnitt-speichern'
-import { geaendertSeitLaden } from '@/lib/abschnitt-stand'
+import { geaendertSeitLaden, profilWieImSchema } from '@/lib/abschnitt-stand'
 import type { FarmSettings } from '@/server/queries/farm'
 import {
   HINWEIS_ADRESSE_UEBERNOMMEN,
@@ -107,13 +107,11 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
     betriebsnummer: farm.betriebsnummer,
     betriebsstatus: farm.betriebsstatus,
   }
-  // Einmal, so wie das Schema ihn ausgibt (Ränder, Kleinschreibung, leer →
-  // null) — sonst zählte ein unverändertes Feld als geändert. Hält ein
-  // Altwert das Schema nicht ein, gilt der Stand, wie er geladen wurde.
-  const [anfang] = useState<ProfileFormData>(() => {
-    const geprueft = schema.safeParse(startwerte)
-    return geprueft.success ? geprueft.data : startwerte
-  })
+  // Einmal, Feld für Feld so, wie das Schema ihn ausgibt (Ränder,
+  // Kleinschreibung, leer → null) — sonst zählte ein unverändertes Feld als
+  // geändert. Hält ein Altwert das Schema nicht ein, bleibt nur dieses Feld,
+  // wie es geladen wurde (profilWieImSchema).
+  const [anfang] = useState<ProfileFormData>(() => profilWieImSchema(schema, startwerte))
   const { register, handleSubmit, getValues, setValue, control, formState: { errors } } = useForm<ProfileFormData>({
     // Cast wie im Produktformular: Die Vorverarbeitung (leer → null) macht den
     // Eingabetyp des Schemas zu unknown; der Ausgabetyp ist ProfileFormData.
