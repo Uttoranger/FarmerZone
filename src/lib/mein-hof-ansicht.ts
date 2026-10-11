@@ -14,6 +14,7 @@ import { reiterAdresse } from '@/lib/hofseite-kunde'
 import { vorschauLink } from '@/lib/hofseite-vorschau'
 import { MEIN_HOF_ANSICHT_PARAMETER, meinHofAnsichtSchema, type MeinHofAnsichtId } from '@/schemas/mein-hof-ansicht'
 import type { HofReiterId } from '@/schemas/hofseite-reiter'
+import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 
 export type { MeinHofAnsichtId }
 
@@ -26,6 +27,12 @@ export const MEIN_HOF_ANSICHT_TEXT = {
   /** Der Knopf im Kopf von Mein Hof — unter lg schaltet er auf die Kundenansicht. */
   kundenansicht: 'Kundenansicht',
   neuerTab: 'In neuem Tab öffnen',
+  /**
+   * Für Screenreader an Links, deren Text den neuen Tab nicht nennt (`sr-only`):
+   * „Kundenansicht" ab lg, die Adresse im Kopf. Der Link „In neuem Tab öffnen"
+   * sagt es selbst und bekommt ihn nicht — sonst hörte man es doppelt.
+   */
+  neuerTabHinweis: ' (öffnet in neuem Tab)',
   /** Titel des Rahmens mit der echten Hofseite (für Screenreader). */
   rahmenTitel: 'So sehen Kunden deine Hofseite',
   gespeichert: GESPEICHERT_TEXT,
@@ -105,3 +112,16 @@ export function umschalterBis(reiter: MeinHofReiterAlleId): 'md' | 'lg' {
  * von Tailwind, für Abfragen im Browser (matchMedia), die keine Klasse kennen.
  */
 export const UMSCHALTER_AB_PX = { md: 768, lg: 1024 } as const
+
+/** Wo gespeichert wurde: ein Abschnitt der Hofseite (Markierung) oder ein Beitrag. */
+export type GespeichertAbschnitt = HofseiteZeileId | 'beitraege'
+
+/**
+ * Die Kennung von „Gespeichert · Ansehen" je Abschnitt: Speichert man denselben
+ * Abschnitt noch einmal (Fotos mehrmals umsortiert), ersetzt der neue Hinweis
+ * den offenen und fängt neu an, statt sich darüberzulegen. Ohne Abschnitt
+ * teilen sich alle Meldungen eine Kennung.
+ */
+export function gespeichertHinweisId(abschnitt: GespeichertAbschnitt | null): string {
+  return abschnitt ? `gespeichert-ansehen-${abschnitt}` : 'gespeichert-ansehen'
+}

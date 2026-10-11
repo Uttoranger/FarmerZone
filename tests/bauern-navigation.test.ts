@@ -430,22 +430,39 @@ describe('HofShell: Handy', () => {
     expect(hofNavigation({ isAdmin: false }).mehr.map((p) => p.id)).not.toContain('admin')
   })
 
-  it('Web und Handy erreichen dieselben Ziele — Produkte und Mein Hof der Seitenleiste über „Mein Hof" der Leiste (Reiter)', () => {
+  it('Web und Handy haben dieselben Ziele — keins nur am Handy, keins doppelt; die Hofseite ist am Handy der Reiter von „Mein Hof"', () => {
+    const hofseite = MEIN_HOF_REITER_HOFBEREICH.find((r) => r.id === 'hofseite')?.href
+    // Der Reiter „Hofseite" ist genau das Ziel von „Mein Hof" in der Seitenleiste.
+    expect(hofseite).toBe(HAUPT.find((p) => p.id === 'mein-hof')?.href)
     for (const isAdmin of [false, true]) {
       const nav = hofNavigation({ isAdmin })
       const web = [...nav.haupt, ...nav.verkaufUndKunden, ...nav.unten]
       const leiste = nav.handyLeiste.flatMap((p) => (p.art === 'punkt' ? [p.punkt] : []))
-      // Leiste und Mehr-Blatt zusammen: jeder Punkt höchstens einmal.
       const handy = [...leiste, ...nav.mehr]
+      const webZiele = web.map((p) => p.href)
+      const handyZiele = handy.map((p) => p.href)
+      // Kein Eintrag doppelt — weder als Punkt noch als Ziel, auf keiner Seite.
+      expect(new Set(webZiele).size, 'Seitenleiste').toBe(webZiele.length)
+      expect(new Set(handyZiele).size, 'Leiste und Mehr-Blatt').toBe(handyZiele.length)
       expect(new Set(handy.map((p) => p.id)).size).toBe(handy.length)
-      for (const punkt of web) {
-        const direkt = handy.some((h) => h.id === punkt.id && h.href === punkt.href)
-        const ueberReiter = MEIN_HOF_REITER_HOFBEREICH.some((r) => r.href === punkt.href)
-        expect(direkt || ueberReiter, punkt.id).toBe(true)
-      }
+      // Dieselbe Menge an Zielen. Einzige, benannte Ausnahme (N3): „Mein Hof" der
+      // Leiste öffnet Produkte, die Hofseite liegt dort im Reiter. Kein Ziel steht nur am Handy.
+      expect(new Set([...handyZiele, hofseite])).toEqual(new Set(webZiele))
+      expect(webZiele.filter((ziel) => !handyZiele.includes(ziel))).toEqual([hofseite])
+      expect(handyZiele.filter((ziel) => !webZiele.includes(ziel))).toEqual([])
       // Die Punkte des Mehr-Blatts sind dieselben Einträge wie in der Seitenleiste.
       for (const punkt of nav.mehr) expect(web).toContainEqual(punkt)
     }
+  })
+
+  it('Gegenprobe: ein Ziel nur am Handy oder ein doppelter Eintrag fiele auf', () => {
+    const nav = hofNavigation({ isAdmin: false })
+    const webZiele = [...nav.haupt, ...nav.verkaufUndKunden, ...nav.unten].map((p) => p.href)
+    const handyZiele = [...nav.handyLeiste.flatMap((p) => (p.art === 'punkt' ? [p.punkt] : [])), ...nav.mehr].map((p) => p.href)
+    const nurHandy = [...handyZiele, '/nur-am-handy']
+    expect(nurHandy.filter((ziel) => !webZiele.includes(ziel))).toEqual(['/nur-am-handy'])
+    const doppelt = [...handyZiele, handyZiele[0]]
+    expect(new Set(doppelt).size).not.toBe(doppelt.length)
   })
 })
 

@@ -19,6 +19,7 @@ import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 import { Segment } from '@/components/ui/segment'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { useVorschauMarkierung } from '@/components/farmer/use-vorschau-markierung'
+import { useSchmalerAls } from '@/lib/use-mindestbreite'
 import { meldeGespeichertAnsehen } from '@/components/mein-hof/gespeichert-ansehen'
 import { cn } from '@/lib/utils'
 
@@ -35,7 +36,11 @@ import { cn } from '@/lib/utils'
  * Adresse (?ansicht=kundin, geschrieben per replaceState wie die Filter) —
  * so führt „Ansehen" nach dem Veröffentlichen eines Beitrags von /status/new
  * direkt hierher. Ab der Grenze des Reiters (md bzw. lg) gibt es weder
- * Umschalter noch Rahmen; der Inhalt steht dort immer.
+ * Umschalter noch Rahmen; der Inhalt steht dort immer. Das iframe hängt nur
+ * dort ein, wo man den Umschalter sieht (useSchmalerAls: live über
+ * matchMedia, auf dem Server und beim Hydrieren „nein") — ein breiter
+ * Bildschirm mit ?ansicht=kundin (Drehen, größeres Fenster, geteilter Link)
+ * lädt die Hofseite nicht unsichtbar mit.
  *
  * Kopf und Inhalt hängen im Kontext: Der Knopf „Kundenansicht" im Kopf
  * (kundenansicht-knopf.tsx) und „Gespeichert · Ansehen" nach dem Speichern
@@ -77,6 +82,8 @@ export function MeinHofAnsicht({
 }): React.JSX.Element {
   const ansicht = meinHofAnsichtAus(useSearchParams().get(MEIN_HOF_ANSICHT_PARAMETER))
   const bis = umschalterBis(reiter)
+  // Ob man den Umschalter sieht — erst dann lädt der Rahmen die Hofseite.
+  const sichtbar = useSchmalerAls(UMSCHALTER_AB_PX[bis])
   const [markiert, setMarkiert] = useState<HofseiteZeileId | null>(null)
   // Zählt jeden Wunsch nach der Kundenansicht — auch einen zweiten bei schon offener —, damit der Sprung jedes Mal kommt.
   const [sprung, setSprung] = useState(0)
@@ -100,7 +107,7 @@ export function MeinHofAnsicht({
   const steuerung = useMemo<MeinHofAnsichtSteuerung>(
     () => ({
       zeigeKundin,
-      gespeichert: (abschnitt = null) => meldeGespeichertAnsehen({ onAnsehen: () => zeigeKundin(abschnitt) }),
+      gespeichert: (abschnitt = null) => meldeGespeichertAnsehen({ abschnitt, onAnsehen: () => zeigeKundin(abschnitt) }),
     }),
     [zeigeKundin]
   )
@@ -109,11 +116,10 @@ export function MeinHofAnsicht({
   // Rahmen füllt den Rest bis zur Unterleiste. Ab der Grenze nie — dort steht
   // der Inhalt, und die Seite bleibt, wo sie ist.
   useEffect(() => {
-    if (ansicht !== 'kundin') return
-    if (window.matchMedia(`(min-width: ${UMSCHALTER_AB_PX[bis]}px)`).matches) return
+    if (ansicht !== 'kundin' || !sichtbar) return
     const oben = anker.current?.getBoundingClientRect().top
     if (oben !== undefined) window.scrollTo({ top: oben + window.scrollY })
-  }, [ansicht, sprung, bis])
+  }, [ansicht, sprung, sichtbar])
 
   return (
     <Steuerung.Provider value={steuerung}>
@@ -142,7 +148,12 @@ export function MeinHofAnsicht({
         />
       </div>
       {ansicht === 'kundin' && (
-        <KundenRahmen adresse={kundenAnsichtAdresse(slug, reiter)} markiert={markiert} className={GRENZE[bis].nurDarunter} />
+        <KundenRahmen
+          adresse={kundenAnsichtAdresse(slug, reiter)}
+          markiert={markiert}
+          laden={sichtbar}
+          className={GRENZE[bis].nurDarunter}
+        />
       )}
       <div className={cn(ansicht === 'kundin' && GRENZE[bis].abDort)}>{children}</div>
     </Steuerung.Provider>
@@ -150,19 +161,28 @@ export function MeinHofAnsicht({
 }
 
 /**
+ * Höhe des Rahmens: der Bildschirm abzüglich Umschalter (56 px), der Zeile
+ * „In neuem Tab öffnen" (44 px) und unter md der Unterleiste der HofShell
+ * (68 px und ihr Rand, dazu der Home-Indicator). Eine Angabe für das iframe
+ * und die leere Fläche davor.
+ */
+const RAHMEN_FLAECHE = 'h-[calc(100dvh-169px-env(safe-area-inset-bottom))] w-full md:h-[calc(100dvh-100px)]'
+
+/**
  * Die echte Hofseite im Rahmen. Einbetten ist nur für diese Adresse und nur
  * für uns selbst erlaubt (next.config.ts, frame-ancestors 'self'); Kaufen
- * wirkt in der Vorschau nicht. Höhe: der Bildschirm abzüglich Umschalter
- * (56 px), der Zeile „In neuem Tab öffnen" (44 px) und unter md der
- * Unterleiste der HofShell (68 px und ihr Rand, dazu der Home-Indicator).
+ * wirkt in der Vorschau nicht. Das iframe hängt erst ein, wenn `laden` stimmt
+ * (der Umschalter ist zu sehen); bis dahin steht dieselbe Fläche leer da.
  */
-function KundenRahmen({
+export function KundenRahmen({
   adresse,
   markiert,
+  laden,
   className,
 }: {
   adresse: string
   markiert: HofseiteZeileId | null
+  laden: boolean
   className: string
 }): React.JSX.Element {
   const rahmen = useRef<HTMLIFrameElement>(null)
@@ -184,15 +204,18 @@ function KundenRahmen({
         >
           {MEIN_HOF_ANSICHT_TEXT.neuerTab}
           <ArrowUpRight className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
-          <span className="sr-only"> (öffnet in neuem Tab)</span>
         </a>
       </div>
-      <iframe
-        ref={rahmen}
-        src={adresse}
-        title={MEIN_HOF_ANSICHT_TEXT.rahmenTitel}
-        className="block h-[calc(100dvh-169px-env(safe-area-inset-bottom))] w-full border-0 bg-background md:h-[calc(100dvh-100px)]"
-      />
+      {laden ? (
+        <iframe
+          ref={rahmen}
+          src={adresse}
+          title={MEIN_HOF_ANSICHT_TEXT.rahmenTitel}
+          className={cn('block border-0 bg-background', RAHMEN_FLAECHE)}
+        />
+      ) : (
+        <div aria-hidden="true" data-rahmen-platz="" className={cn('bg-background', RAHMEN_FLAECHE)} />
+      )}
     </div>
   )
 }

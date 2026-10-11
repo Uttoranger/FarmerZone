@@ -351,12 +351,16 @@ describe('ueberUnsText — was Kundinnen unter „Über uns" lesen (Nr. 49)', ()
     expect(ueberUnsText({ aboutText: null, description: '  Kurz  ' })).toBe('Kurz')
   })
 
-  it('Hofseite und Checkliste nehmen dieselbe Funktion — keine eigene Fassung daneben', () => {
-    const kunde = readFileSync(join(process.cwd(), 'src/components/hofseite/hofseite-kunde.tsx'), 'utf8')
-    const fortschritt = readFileSync(join(process.cwd(), 'src/lib/hofseite-fortschritt.ts'), 'utf8')
-    for (const [name, text] of [['hofseite-kunde.tsx', kunde], ['hofseite-fortschritt.ts', fortschritt]]) {
-      expect(text, name).toContain('ueberUnsText(')
-      expect(text, name).not.toMatch(/aboutText\s*\?\?/)
+  it('Hofseite, ihre Metadaten und die Checkliste nehmen dieselbe Funktion — keine eigene Fassung daneben', () => {
+    // Die Metadaten (Suchmaschinen, Teilen-Vorschau) prüft tests/hofseite-metadaten.test.ts auch am Ergebnis.
+    for (const pfad of [
+      'src/components/hofseite/hofseite-kunde.tsx',
+      'src/app/(public)/[farmSlug]/page.tsx',
+      'src/lib/hofseite-fortschritt.ts',
+    ]) {
+      const text = readFileSync(join(process.cwd(), pfad), 'utf8')
+      expect(text, pfad).toContain('ueberUnsText(')
+      expect(text, pfad).not.toMatch(/aboutText\s*\?\?/)
     }
     // Gegenprobe: die Suche erkennt die alte Fassung.
     expect('(farm.aboutText ?? farm.description).trim()').toMatch(/aboutText\s*\?\?/)

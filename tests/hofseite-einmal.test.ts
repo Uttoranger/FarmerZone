@@ -33,7 +33,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import { createElement, type ComponentProps, type ComponentType, type ReactNode } from 'react'
+import { createElement, type ComponentProps, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 // Next und die Server-Aktionen gibt es im Test nicht: Router, Bild und Link
@@ -353,14 +353,14 @@ describe('Bearbeitungs-Elemente erscheinen nur mit ownerMode', () => {
   })
 
   it('Gegenprobe: Mein Hof trägt die Werkzeugleiste über der Hofseite mit Stiften', () => {
-    type AnsichtProps = Omit<ComponentProps<typeof MeinHofAnsicht>, 'children'>
-    const besitzer = renderToStaticMarkup(
-      createElement(
-        MeinHofAnsicht as unknown as ComponentType<AnsichtProps>,
-        { reiter: 'hofseite', slug: HOF.slug, kopf: null },
-        createElement(FarmPageClient, { farm: HOF, activeStatus: STATUS, pastStatusCount: 2 })
-      )
-    )
+    // Die Kinder stehen in den Props, wie JSX sie übergibt.
+    const mitStiften: ComponentProps<typeof MeinHofAnsicht> = {
+      reiter: 'hofseite',
+      slug: HOF.slug,
+      kopf: null,
+      children: createElement(FarmPageClient, { farm: HOF, activeStatus: STATUS, pastStatusCount: 2 }),
+    }
+    const besitzer = renderToStaticMarkup(createElement(MeinHofAnsicht, mitStiften))
     expect(gefunden(besitzer, [WERKZEUGLEISTE])).toEqual([WERKZEUGLEISTE.was])
     expect(besitzer).toContain('So sieht’s die Kundin')
   })
