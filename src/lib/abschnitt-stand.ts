@@ -21,6 +21,15 @@ import { alsLand } from '@/lib/laender'
 import type { AppearanceSaveInput } from '@/schemas/auftritt'
 import type { ProfileFormData } from '@/schemas/hofprofil'
 
+/**
+ * Die Sätze des Speicherwegs der Abschnitte (Blatt unter lg, Editor ab lg) —
+ * eine Quelle. Deutsch, per Du, mit Ausweg (CODING_STANDARDS §4).
+ */
+export const ABSCHNITT_SPEICHERN_TEXT = {
+  /** Ein Speichern wartet zu lange auf das vorige (Kette in components/mein-hof/abschnitt-speichern.ts). */
+  vorigesHaengt: 'Das vorige Speichern ist noch nicht fertig. Lade die Seite neu und versuch es dann noch einmal.',
+} as const
+
 /** Die Felder, die saveAppearanceAction bei jedem Aufruf schreibt — genau der Stand, aus dem jeder Abschnitt speichert. */
 export type AuftrittStand = {
   tagline: string | null
