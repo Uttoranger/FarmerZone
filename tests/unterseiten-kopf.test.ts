@@ -15,7 +15,8 @@
  *    zur Übersicht, nur nach Erfolg; Abholzeiten bleibt; derselbe Baustein im
  *    Hofseiten-Editor behält seine Meldung. Mein Auftritt verlässt die Seite
  *    nicht, solange ein Foto hochlädt; das Hof-Profil nicht, solange die
- *    Ortssuche läuft (Nachbesserung Runde 1).
+ *    Ortssuche läuft (Nachbesserung Runde 1). Ein Fehler des Hof-Profils
+ *    steht im Formular, auch eine gescheiterte Anfrage (Runde 2).
  *  - Tab-Titel und Seitentitel der Unterseiten haben eine Schreibweise.
  *  - Hof-Profil: „Einstellungen → Mein Auftritt" ist ein Link.
  *  - Mehr-Blatt: „Angemeldet …" ist ein Link auf „Konto und Sicherheit".
@@ -221,7 +222,7 @@ function rumpf(text: string, name: string): string {
 
 describe('Speichern auf den Einstellungs-Unterseiten (Quelltext)', () => {
   const FORMULARE: [string, string, RegExp][] = [
-    ['src/components/settings/profile-form.tsx', 'onSubmit', /if \(res\.error\)/],
+    ['src/components/settings/profile-form.tsx', 'onSubmit', /if \(satz\)/],
     ['src/components/settings/pause-client.tsx', 'handleSaveMessage', /if \(res\.error\)/],
     ['src/app/(hof)/settings/account/password-form.tsx', 'handleSubmit', /if \(error\)/],
   ]
@@ -238,7 +239,7 @@ describe('Speichern auf den Einstellungs-Unterseiten (Quelltext)', () => {
 
   it('Hof-Profil: speichert nur, was seit dem Laden geändert wurde, über den frischen Stand (speichereProfil)', () => {
     const profil = rumpf(quelle('src/components/settings/profile-form.tsx'), 'onSubmit')
-    expect(profil).toContain('const res = await speichereProfil(geaendertSeitLaden(anfang, data))')
+    expect(profil).toContain('const satz = await speichernOhneWurf(() => speichereProfil(geaendertSeitLaden(anfang, data)))')
     // Der Maßstab: der Stand beim Laden, Feld für Feld durch das Schema (tests/abschnitt-stand.test.ts).
     expect(quelle('src/components/settings/profile-form.tsx')).toContain(
       'const [anfang] = useState<ProfileFormData>(() => profilWieImSchema(schema, startwerte))'
@@ -249,9 +250,22 @@ describe('Speichern auf den Einstellungs-Unterseiten (Quelltext)', () => {
 
   it('der Fehlerweg kehrt vorher zurück bzw. steht im anderen Zweig — kein Sprung bei einem Fehler', () => {
     const profil = rumpf(quelle('src/components/settings/profile-form.tsx'), 'onSubmit')
-    expect(profil).toMatch(/if \(res\.error\) \{\s*toast\.error\(res\.error\)\s*\} else \{\s*nachSpeichern\(/)
+    expect(profil).toMatch(/if \(satz\) \{\s*setSpeicherFehler\(satz\)\s*return\s*\}\s*nachSpeichern\(/)
     const passwort = rumpf(quelle('src/app/(hof)/settings/account/password-form.tsx'), 'handleSubmit')
     expect(passwort).toMatch(/if \(error\) \{[\s\S]*?return\s*\}[\s\S]*nachSpeichern\(/)
+  })
+
+  it('Hof-Profil: ein Fehler steht im Formular über dem Knopf, die Eingabe bleibt — auch eine gescheiterte Anfrage', () => {
+    const text = quelle('src/components/settings/profile-form.tsx')
+    const profil = rumpf(text, 'onSubmit')
+    // Nie geworfen (die Fehlergrenze nähme die Eingabe mit), nie als Toast.
+    expect(profil).toContain('speichernOhneWurf(')
+    expect(profil).not.toContain('toast.error(')
+    // Ein neuer Versuch räumt den alten Satz weg.
+    expect(profil).toMatch(/if \(sucheLaeuft\) return\s*setSpeicherFehler\(null\)/)
+    expect(text).toMatch(/<DialogFehler text=\{speicherFehler\} \/>\s*\{\/\*[^*]*\*\/\}\s*<Button\s*type="submit"/)
+    // Ohne Fehler steht nichts da.
+    expect(renderToStaticMarkup(createElement(ProfileForm, { farm: HOF }))).not.toContain('role="alert"')
   })
 
   it('Abholzeiten bleibt auf der Seite — kein Sprung zur Übersicht', () => {

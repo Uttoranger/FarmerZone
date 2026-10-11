@@ -16,7 +16,8 @@ import {
   sucheHofStandort,
   type ProfileFormData,
 } from '@/server/actions/farm'
-import { speichereProfil } from '@/components/mein-hof/abschnitt-speichern'
+import { speichereProfil, speichernOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
+import { DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
 import { geaendertSeitLaden, profilWieImSchema } from '@/lib/abschnitt-stand'
 import type { FarmSettings } from '@/server/queries/farm'
 import {
@@ -59,6 +60,9 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
   // Nach dem Speichern zurück zur Übersicht (Register N1, Nr. 44).
   const nachSpeichern = useNachSpeichern()
   const [sucheLaeuft, setSucheLaeuft] = useState(false)
+  // Ein Fehler beim Speichern steht im Formular über dem Knopf, die Eingabe
+  // bleibt — wie in den Formularen von Mein Hof (DESIGN_SYSTEM).
+  const [speicherFehler, setSpeicherFehler] = useState<string | null>(null)
   // Die ruhige Zeile über der Karte: anfangs der Start-Hinweis (solange kein
   // Punkt gespeichert ist), danach das Vorwärts-Ergebnis oder die
   // Übernahme-Zeile der Rückwärtssuche.
@@ -135,16 +139,20 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
     // (Nr. 44), und der gesuchte Punkt käme in einer ausgehängten Seite an —
     // gespeichert wären still die alten Koordinaten.
     if (sucheLaeuft) return
+    setSpeicherFehler(null)
     startTransition(async () => {
       // Nur, was hier seit dem Laden geändert wurde, über den frischen Stand
       // vom Server — derselbe Weg wie die Abschnitte von Mein Hof. Ein älterer
       // Tab schriebe sonst Name, Adresse oder Kontakt aus Mein Hof zurück.
-      const res = await speichereProfil(geaendertSeitLaden(anfang, data))
-      if (res.error) {
-        toast.error(res.error)
-      } else {
-        nachSpeichern('Profil gespeichert')
+      // speichernOhneWurf: Eine gescheiterte Anfrage (Netz weg, Aktion nach
+      // einem Deploy unbekannt) ginge sonst an die Fehlergrenze, und die
+      // Eingabe wäre weg.
+      const satz = await speichernOhneWurf(() => speichereProfil(geaendertSeitLaden(anfang, data)))
+      if (satz) {
+        setSpeicherFehler(satz)
+        return
       }
+      nachSpeichern('Profil gespeichert')
     })
   }
 
@@ -407,6 +415,8 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
         </Link>{' '}
         — dort lädst du Bilder direkt vom Gerät hoch.
       </p>
+
+      <DialogFehler text={speicherFehler} />
 
       {/* Wartet, solange „Auf der Karte suchen" läuft — sonst ginge der neue Standort verloren (siehe onSubmit). */}
       <Button

@@ -90,9 +90,10 @@ function meldeGescheitertesSpeichern(fehler: unknown): void {
 }
 
 /**
- * Ein Speichern, das nie wirft — für die Formulare der Abschnitte: Der Satz
- * der Aktion bzw. bei einer gescheiterten Anfrage (Netz weg, Aktion nach
- * einem Deploy unbekannt) `ABSCHNITT_SPEICHERN_TEXT.gingNicht`, sonst null.
+ * Ein Speichern, das nie wirft — für die Formulare der Abschnitte und das
+ * Hof-Profil: Der Satz der Aktion bzw. bei einer gescheiterten Anfrage (Netz
+ * weg, Aktion nach einem Deploy unbekannt) `ABSCHNITT_SPEICHERN_TEXT.gingNicht`,
+ * sonst null.
  * Geworfen ginge es an die Fehlergrenze, und die Eingabe wäre weg. Sentry
  * bekommt die gescheiterte Anfrage trotzdem (meldeGescheitertesSpeichern).
  */
