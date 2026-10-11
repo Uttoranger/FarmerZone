@@ -9,7 +9,9 @@
  *    Gegenprobe, dass die Suche anschlägt.
  *  - Der alte Kopf (KundenKopf) steht nur noch auf /datenschutz (Nr. 57).
  *  - Die Seiten mit Token in der Adresse bleiben aus dem Suchindex
- *    (Metadaten); die Header prüft tests/sicherheits-header.test.ts.
+ *    (Metadaten); die Header prüft tests/sicherheits-header.test.ts. Der
+ *    Token von /reset-password steht im Formular nur an den erwarteten
+ *    Stellen (mit Gegenprobe).
  *  - Die Befunde der Axe-Prüfung bleiben behoben: die grüne Marke der
  *    Bestellseite steht auf einer Karte, der Auge-Knopf der Passwortseite
  *    hat 44 px.
@@ -135,13 +137,60 @@ describe('Seiten mit Token in der Adresse bleiben aus dem Suchindex (Metadaten)'
     expect(vergessenMeta.robots).toBeUndefined()
   })
 
-  it('der Token geht im Formular nur an Better Auth — nie in einen Link, nie ins Log', () => {
-    const formular = lies('src/app/(auth)/reset-password/neues-passwort-formular.tsx')
-    // Gelesen wird er aus der Adresse, gebraucht nur in resetPassword.
-    expect(formular).toMatch(/searchParams\.get\('token'\)/)
-    expect(formular).toMatch(/authClient\.resetPassword\(\{ newPassword: password, token \}\)/)
-    expect(anzahl(formular, /\btoken\b(?!:)/)).toBeGreaterThan(0)
-    expect(formular).not.toMatch(/console\.|Sentry|href=\{[^}]*token/)
+})
+
+describe('/reset-password — der Token steht nur an den erwarteten Stellen', () => {
+  const FORMULAR = 'src/app/(auth)/reset-password/neues-passwort-formular.tsx'
+
+  /** Die Codezeilen mit einem Treffer — ohne Kommentare, Leerraum vereinheitlicht. */
+  function zeilenMit(quelltext: string, muster: RegExp): string[] {
+    return quelltext
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/.*$/gm, '$1')
+      .split('\n')
+      .filter((zeile) => muster.test(zeile))
+      .map((zeile) => zeile.trim().replace(/\s+/g, ' '))
+  }
+
+  /** Gelesen aus der Adresse, geprüft, an Better Auth — sonst nirgends. */
+  const TOKEN_ZEILEN = [
+    "const token = searchParams.get('token')",
+    'const linkUngueltig = !token || !!errorParam',
+    'if (!canSubmit || !token) return',
+    'const { error } = await authClient.resetPassword({ newPassword: password, token })',
+  ]
+  /** Die Adresse selbst geht nirgends hin — sonst trüge sie den Token mit. */
+  const ADRESS_ZEILEN = [
+    'const searchParams = useSearchParams()',
+    "const token = searchParams.get('token')",
+    "const errorParam = searchParams.get('error')",
+  ]
+
+  it('im Formular genau diese Zeilen — kein Link, kein fetch, kein router.push, kein Log mit dem Token', () => {
+    const formular = lies(FORMULAR)
+    expect(zeilenMit(formular, /\btoken\b/)).toEqual(TOKEN_ZEILEN)
+    expect(zeilenMit(formular, /\bsearchParams\b/)).toEqual(ADRESS_ZEILEN)
+    expect(formular).not.toMatch(/window\.location|document\.URL|location\.href|console\.|Sentry/)
+  })
+
+  it('die Seite fasst ihn nicht an', () => {
+    expect(zeilenMit(lies('src/app/(auth)/reset-password/page.tsx'), /\btoken\b|searchParams/)).toEqual([])
+  })
+
+  it('Gegenprobe: jede weitere Verwendung fiele auf', () => {
+    const formular = lies(FORMULAR)
+    for (const zusatz of [
+      "router.push('/login?token=' + token)",
+      "void fetch('/api/x', { method: 'POST', body: token })",
+      "<Link href={'/x?t=' + token}>x</Link>",
+      'const t = token',
+    ]) {
+      expect(zeilenMit(`${formular}\n${zusatz}`, /\btoken\b/), zusatz).not.toEqual(TOKEN_ZEILEN)
+    }
+    const adressLink = "<Link href={'/x?' + searchParams.toString()}>x</Link>"
+    expect(zeilenMit(`${formular}\n${adressLink}`, /\bsearchParams\b/)).not.toEqual(ADRESS_ZEILEN)
+    // Kommentare zählen nicht: Der Kopfkommentar nennt „?token=", die Suche übergeht ihn.
+    expect(formular).toMatch(/\?token=/)
   })
 })
 
