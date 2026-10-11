@@ -248,10 +248,11 @@ describe('ausblenden über den Cookie', () => {
     expect(action).toContain('maxAge: ERSTE_SCHRITTE_AUS_DAUER_S')
     expect(action).toContain("revalidatePath('/dashboard')")
     // Seit Nr. 17 liegt Heute in (hof); ob die Karte kommt, reicht die Seite an heuteAufbau weiter.
+    // Seit Nr. 53 blendet derselbe Cookie die eine Liste „Zu tun" aus.
     const seite = readFileSync(join(process.cwd(), 'src/app/(hof)/dashboard/page.tsx'), 'utf8')
     expect(seite).toContain('cookieJar.get(ERSTE_SCHRITTE_AUS_COOKIE)?.value')
-    expect(seite).toContain("ersteSchritte: ersteSchritteZeigen === 'karte'")
-    expect(seite).toContain("ersteSchritteZeigen === 'zeile' && (")
+    expect(seite).toContain("zuTun: zuTunZeigen === 'karte'")
+    expect(seite).toContain("zuTunZeigen === 'zeile' && (")
     expect(seite).not.toContain('localStorage')
   })
 })

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import Link from 'next/link'
 import {
   ChevronRight,
@@ -14,7 +15,6 @@ import {
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { EmptyState } from '@/components/ui/empty-state'
-import { ProgressBar } from '@/components/ui/progress-bar'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { HofTeilenKnopf } from '@/components/farmer/hof-teilen-knopf'
 import { TeilenFensterKnopf } from '@/components/teilen/teilen-fenster'
@@ -34,6 +34,7 @@ import {
 } from '@/lib/heute'
 import { onlinePausiertHinweis } from '@/lib/stripe-konto'
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
+import { ERSTE_SCHRITTE_WARTET, type ZuTunAufgabe } from '@/lib/erste-schritte'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -86,19 +87,21 @@ function Kennzahl({
   wert,
   zusatz,
   offen = false,
+  className,
 }: {
   titel: string
   wert: string
   /** Leiser Satz unter dem Wert — was die Zahl mitzählt. */
   zusatz?: string
   offen?: boolean
+  className?: string
 }) {
   return (
     // Jede Karte ist ein Container: Die Zahl misst sich an ihrer Breite (cqw).
-    <div className={cn(KARTE, '@container min-w-0 px-3 py-3 md:px-[18px] md:py-4')}>
-      {/* Am Handy zwei Zeilen Platz, damit die Zahlen auf einer Höhe stehen; ein langes Wort trennt an seinen
-          weichen Trennstellen — gekürzt wird auch die Bezeichnung nie. */}
-      <p className={cn('min-h-[2lh] text-xs leading-snug break-words md:min-h-0 md:text-[13px]', LEISE)}>{mitTrennstellen(titel)}</p>
+    <div className={cn(KARTE, '@container min-w-0 px-3 py-3 md:px-[18px] md:py-4', className)}>
+      {/* In der halben Karte (2 + 1, Nr. 53) passt jede Bezeichnung in eine Zeile; ein langes Wort trennt
+          trotzdem an seinen weichen Trennstellen — gekürzt wird auch die Bezeichnung nie. */}
+      <p className={cn('text-xs leading-snug break-words md:text-[13px]', LEISE)}>{mitTrennstellen(titel)}</p>
       {/* Ein Betrag wird nie gekürzt: höchstens 22 bzw. 26 px, in einer schmalen Karte so groß, wie er hineinpasst
           (kennzahlBreiteEm), nie unter 12 px — passt er dann nicht, bricht er um, statt über den Rand zu laufen. */}
       <p
@@ -118,7 +121,10 @@ function Kennzahl({
 
 /**
  * Die drei Kennzahlen (Register F4) mit Bezeichnungen, die sagen, was sie
- * zählen (KENNZAHL_TEXT, freigabe.md §12 Nr. 45) — drei Spalten auch am Handy.
+ * zählen (KENNZAHL_TEXT, freigabe.md §12 Nr. 45). Bis 1024 px 2 + 1 (F4,
+ * Vermerk 10.10.2026): die beiden Zahlen nebeneinander, darunter der Betrag
+ * über die ganze Breite — so hat er am Handy Platz und muss nicht schrumpfen;
+ * die Anpassung der Schrift bleibt als Netz. Ab 1024 px drei nebeneinander.
  */
 export function Kennzahlen({
   bestellungen,
@@ -130,13 +136,14 @@ export function Kennzahlen({
   umsatzHeuteCent: number
 }): React.JSX.Element {
   return (
-    <section aria-label="Heute in Zahlen" className="grid grid-cols-3 gap-2.5 md:gap-4">
+    <section aria-label="Heute in Zahlen" className="grid grid-cols-2 gap-2.5 md:gap-4 lg:grid-cols-3">
       <Kennzahl titel={KENNZAHL_TEXT.abholen} wert={String(bestellungen)} />
       <Kennzahl titel={KENNZAHL_TEXT.packen} wert={String(zuPacken)} offen={zuPacken > 0} />
       <Kennzahl
         titel={KENNZAHL_TEXT.eingenommen}
         wert={formatEuro(centsAlsEuro(umsatzHeuteCent))}
         zusatz={KENNZAHL_TEXT.eingenommenMit}
+        className="col-span-2 lg:col-span-1"
       />
     </section>
   )
@@ -498,15 +505,56 @@ export function WocheKarte({
   )
 }
 
-/** „Deine Hofseite" — dieselbe Rechnung wie die Checkliste in Mein Hof (hofseiteFortschritt). */
-export function HofseiteKarte({ prozent, satz, fertig }: { prozent: number; satz: string; fertig: boolean }): React.JSX.Element {
+// ─── Zu tun ─────────────────────────────────────────────────────────────────
+
+/**
+ * „Zu tun" (freigabe.md §13 Nr. 53): EINE Liste statt „Erste Schritte" und
+ * „Deine Hofseite". Was darin steht und in welcher Reihenfolge, entscheidet
+ * zuTun (src/lib/erste-schritte.ts) — nur Offenes, jede Aufgabe einmal, ohne
+ * das, was der Stripe-Kasten oben schon sagt. Aufbau wie „Braucht dich":
+ * Zeilen sind Links in die Einstellungen, ihre Sätze brechen um statt
+ * gekürzt zu werden (ein Hofname hat bis zu 80 Zeichen). Der leere Kreis ist
+ * Schmuck; erledigt wird nichts auf Heute, deshalb kein Haken und kein Balken.
+ */
+export function ZuTunKarte({
+  aufgaben,
+  wartetAufFreigabe,
+  ausblenden,
+}: {
+  aufgaben: readonly ZuTunAufgabe[]
+  wartetAufFreigabe: boolean
+  /** Der Knopf „Ausblenden" (ErsteSchritteSchalter) — von der Seite gereicht, damit die Karte ohne Server-Aktion rendert. */
+  ausblenden: ReactNode
+}): React.JSX.Element {
   return (
-    <section aria-label="Deine Hofseite" className={cn(KARTE, 'flex flex-col gap-2.5 p-[18px]')}>
-      <ProgressBar beschriftung="Deine Hofseite" wert={prozent} />
-      <p className={cn('text-[12.5px]', LEISE)}>{satz}</p>
-      <Link href="/farm-page" className={cn(TEXTLINK, 'self-start')}>
-        {fertig ? 'Zu Mein Hof →' : 'Jetzt vervollständigen →'}
-      </Link>
+    <section aria-labelledby="heute-zu-tun" className={cn(KARTE, 'overflow-hidden')}>
+      <div className="flex min-h-[52px] items-center gap-2.5 border-b border-border py-1 pr-2 pl-4 md:pl-[18px]">
+        <h2 id="heute-zu-tun" className="text-[15px] font-semibold">
+          Zu tun
+        </h2>
+        <span className={cn('text-[12.5px] md:text-[13px]', LEISE)}>{aufgaben.length} offen</span>
+        <span className="ml-auto shrink-0">{ausblenden}</span>
+      </div>
+      {wartetAufFreigabe && (
+        <p className={cn('border-b border-border px-4 py-3 text-[12.5px] leading-relaxed md:px-[18px]', LEISE)}>{ERSTE_SCHRITTE_WARTET}</p>
+      )}
+      <ul>
+        {aufgaben.map((aufgabe) => (
+          <li key={aufgabe.id} className="border-t border-border first:border-t-0">
+            <Link
+              href={aufgabe.href}
+              className={cn('flex min-h-14 items-center gap-3 px-4 py-3 transition-colors hover:bg-muted md:px-[18px]', FOKUS_RAHMEN_INNEN)}
+            >
+              <span aria-hidden="true" className="size-5 shrink-0 rounded-full border-[1.5px] border-muted-foreground/60" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold break-words">{aufgabe.titel}</span>
+                <span className={cn('mt-0.5 block text-[12.5px] leading-snug break-words', LEISE)}>{aufgabe.satz}</span>
+              </span>
+              <ChevronRight className={cn('size-4 shrink-0', LEISE)} strokeWidth={1.7} aria-hidden="true" />
+            </Link>
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }

@@ -21,7 +21,7 @@ import { BAR_OHNE_GEBUEHR_SATZ, barGebuehrSepaSatz, vorBarStichtag } from '@/lib
 import { mitAnzahl } from '@/lib/format'
 import { wienKalendertag } from '@/lib/kalender'
 import { wienerTag, type Zeitraum } from '@/lib/heute'
-import { umsatzfenster, type Periode, type Periodenfenster } from '@/lib/umsatz'
+import { umsatzfenster, type Periodenfenster } from '@/lib/umsatz'
 import type { TeilenWirkung, TeilenZeitraum } from '@/lib/teilen-wirkung'
 
 // ─── Kennzahlen ─────────────────────────────────────────────────────────────
@@ -229,11 +229,4 @@ export function grenzeStand(prozent: number, grenzeText: string): GrenzeStand {
     }
   }
   return { ton: 'gruen', marke: 'Im grünen Bereich', hinweis: null }
-}
-
-/** Titel der Umsatzkarte je Zeitraum — die Balken sind Tage, Wochenabschnitte (1.–7. …) bzw. Monate. */
-export function umsatzKartenTitel(periode: Periode): string {
-  if (periode === 'woche') return 'Umsatz pro Tag'
-  if (periode === 'monat') return 'Umsatz pro Woche'
-  return 'Umsatz pro Monat'
 }

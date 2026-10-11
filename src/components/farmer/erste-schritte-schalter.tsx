@@ -4,13 +4,16 @@ import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { blendeErsteSchritteAus, blendeErsteSchritteEin } from '@/server/actions/erste-schritte'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
 
 /**
- * Die zwei Schalter der Erste-Schritte-Karte: „Ausblenden" in ihrem Kopf,
- * „Erste Schritte einblenden" als Zeile unten auf Heute. Beide setzen nur den
- * Cookie über die Action und laden die Seite neu; was danach zu sehen ist,
- * entscheidet der Server (ersteSchritteAnzeige in src/lib/erste-schritte.ts).
+ * Die zwei Schalter der Liste „Zu tun" (Nr. 53, vorher die Einstiegs-Checkliste):
+ * „Ausblenden" in ihrem Kopf, „Zu tun einblenden" als Zeile unten auf Heute.
+ * Beide setzen nur den Cookie über die Action und laden die Seite neu; was
+ * danach zu sehen ist, entscheidet der Server (ersteSchritteAnzeige in
+ * src/lib/erste-schritte.ts). Nur noch im neuen Design: Tokens und der
+ * sichtbare Fokus der neuen Bausteine.
  */
 export function ErsteSchritteSchalter({
   richtung,
@@ -39,14 +42,15 @@ export function ErsteSchritteSchalter({
       onClick={klick}
       disabled={laeuft}
       // Im Kopf der Karte heißt er nur „Ausblenden" — der Screenreader braucht den Bezug.
-      aria-label={richtung === 'aus' ? 'Erste Schritte ausblenden' : undefined}
+      aria-label={richtung === 'aus' ? 'Zu tun ausblenden' : undefined}
       className={cn(
-        // min-h-11 = 44 px Tippfläche; -my-2 hält die Zeile trotzdem schlank.
-        'inline-flex min-h-11 items-center rounded-md text-[13px] font-medium text-app-ink-soft underline-offset-2 transition-colors hover:text-app-ink hover:underline disabled:opacity-60 outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+        // min-h-11 = 44 px Tippfläche, px-3 hält auch „Ausblenden" breiter als 44 px.
+        'inline-flex min-h-11 items-center rounded-md px-3 text-[13px] font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:opacity-60',
+        FOKUS_RAHMEN,
         className
       )}
     >
-      {richtung === 'aus' ? 'Ausblenden' : 'Erste Schritte einblenden'}
+      {richtung === 'aus' ? 'Ausblenden' : 'Zu tun einblenden'}
     </button>
   )
 }
