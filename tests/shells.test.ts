@@ -344,6 +344,8 @@ describe('kein Big Bang', () => {
     'admin/layout.tsx',
     // Nr. 38: „Anmeldung bestätigen" (neu, Double-Opt-in, Fokus-Shell wie /verify).
     'account/neuigkeiten-bestaetigen/page.tsx',
+    // Nr. 57: die Datenschutzerklärung (KundeShell, statisch über KundeShellMitSitzung).
+    '(public)/datenschutz/page.tsx',
   ]
 
   it('nur die Vorschau unter /intern und die umgestellten Routen binden eine Shell ein', () => {

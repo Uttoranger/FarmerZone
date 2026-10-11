@@ -253,6 +253,13 @@ Umgesetzt in `src/components/shells/` (KundeShell, KundeFokusShell, HofShell, Ad
 - **/onboarding:** orange `Hinweiskarte` „Bestätige deine E-Mail" über dem Fortschritt, „Erneut senden" als Umriss (der eine orange Knopf bleibt „Mit Stripe einrichten"); der Schritt „Prüfung und Freischaltung" ist dann gesperrt mit Umriss-Link „E-Mail bestätigen".
 - **Mail:** `email-bestaetigung.tsx`, ein grüner Knopf „Zur Bestätigung" auf `/verify?token=…`, Gültigkeit aus `BESTAETIGUNG_GUELTIG_SEKUNDEN`.
 
+### Datenschutzerklärung (/datenschutz, seit Nr. 57)
+
+- **Kein Mockup** — gebaut nach diesen Regeln. `KundeShellMitSitzung` (statisch, mit Unterleiste). Eine Lesespalte `max-w-2xl px-4` wie die gemeinsame Ladeansicht der Infoseiten (`(public)/loading.tsx`), damit beim Wechsel nichts springt; Fließtext 15 px, `leading-relaxed`, in der Textfarbe.
+- h1 in Fraunces (28/34 px) mit leiser Zeile darunter; jeder Abschnitt eine `section` mit h2 in Fraunces (19/21 px), Linie oben und `scroll-mt-20` (die Kopfzeile klebt). Die Dienstleister in Abschnitt 4 als Karten (`--surface` mit Rand, Name als h3). „Stand" als letzte leise Zeile.
+- **Links stehen auf eigener Zeile**, 44 px hoch, unterstrichen in `text-status-fertig` mit `FOKUS_RAHMEN` — im Fließtext hätten sie nur die Zeilenhöhe als Trefferfläche. E-Mail mit `Mail`-Symbol, ein Link in einen neuen Tab mit `ExternalLink`-Symbol und „(öffnet in neuem Tab)" für Vorleser.
+- Zahlen und Namen aus der Oberfläche kommen aus ihrer Konstante, wo es eine gibt (`NEUIGKEITEN_TEXT`, `ABO_TEXT`, `SUCHFELD_TEXT`, `PROBLEM_MELDEN`, `src/lib/datenschutz.ts` mit Höchstdauern, „Mein Konto" und „Hilfe und Rückmeldung" aus den Navigationen). Wo es keine gibt („Abmelden" in der Mail, „Karte öffnen", „Region", „Bestellungen finden"), steht der Name fest im Text, und die Wache bindet ihn an die Stelle, die ihn zeigt; jeder Name in „…" auf der Seite muss eine der beiden Quellen haben (`tests/datenschutz-sachstand.test.ts`), ebenso jede Aussage über den Code. Ein Name steht in „…" und bricht nicht in sich um (`whitespace-nowrap`, sonst „E-" am Zeilenende).
+
 ### Mein Hof (/farm-page, seit Nr. 16)
 
 - **Erste Hof-Route in der HofShell.** Die Shell kommt aus dem Layout der Routengruppe `(hof)` (ARCHITECTURE §4); eine Hof-Route zieht um, indem ihr Ordner von `(farmer)` nach `(hof)` wandert. Balken „wartet auf Freigabe"/„stillgelegt" dort als orange Hinweiskarte (`HofBalken`).
