@@ -22,13 +22,13 @@ import {
 const HOFSEITE: KundenSeite = { art: 'hofseite', hofSlug: 'testhof', bereich: 'LEBENSMITTEL' }
 const FUTTER_HOFSEITE: KundenSeite = { art: 'hofseite', hofSlug: 'testhof', bereich: 'FUTTERMITTEL' }
 const CHECKOUT: KundenSeite = { art: 'checkout', hofSlug: 'testhof' }
-const BESTAETIGUNG: KundenSeite = { art: 'bestaetigung', hofSlug: 'testhof' }
-const BESTELLUNG: KundenSeite = { art: 'bestellung', hofSlug: 'testhof' }
 const HOFUEBERSICHT: KundenSeite = { art: 'hofuebersicht' }
 const INFO: KundenSeite = { art: 'info' }
-const BESTELLUNG_UNGUELTIG: KundenSeite = { art: 'bestellung-ungueltig' }
 const PRODUKT: KundenSeite = { art: 'produkt', hofSlug: 'testhof' }
-const ALLE = [HOFSEITE, FUTTER_HOFSEITE, CHECKOUT, BESTAETIGUNG, BESTELLUNG, BESTELLUNG_UNGUELTIG, HOFUEBERSICHT, INFO, PRODUKT]
+// Bestätigung, Bestellseite und Bar-Bestätigung tragen seit Nr. 13 bzw. 54 die
+// KundeShell bzw. die Fokus-Shell; ihre Wege hinaus prüfen die Tests der Seiten
+// (tests/bestellverfolgung-zugang.test.ts, tests/alte-seiten-neues-design.test.ts).
+const ALLE = [HOFSEITE, FUTTER_HOFSEITE, CHECKOUT, HOFUEBERSICHT, INFO, PRODUKT]
 
 describe('rueckweg — Hofseite', () => {
   it('vom eigenen Verlauf: einen Schritt zurück, dorthin, wo der Kunde herkam', () => {
@@ -57,17 +57,6 @@ describe('rueckweg — Bestellweg', () => {
     expect(rueckweg(CHECKOUT, false)).toEqual({ href: '/testhof', verlauf: false })
   })
 
-  it('Bestätigung und Bestellverfolgung gehen NIE über den Verlauf — davor stehen Stripe und die Bank', () => {
-    for (const seite of [BESTAETIGUNG, BESTELLUNG]) {
-      expect(rueckweg(seite, true), seite.art).toEqual({ href: '/testhof', verlauf: false })
-      expect(rueckweg(seite, false), seite.art).toEqual({ href: '/testhof', verlauf: false })
-    }
-  })
-
-  it('Bestellverfolgung mit ungültigem Link: nie über den Verlauf, zur Hofübersicht — der Hof ist nicht bestätigt', () => {
-    expect(rueckweg(BESTELLUNG_UNGUELTIG, true)).toEqual({ href: '/hoefe', verlauf: false })
-    expect(rueckweg(BESTELLUNG_UNGUELTIG, false)).toEqual({ href: '/hoefe', verlauf: false })
-  })
 })
 
 describe('rueckweg — Produktseite (Nr. 11)', () => {
@@ -109,25 +98,23 @@ describe('rueckweg — übrige Seiten', () => {
 
 describe('kopfForm — welche Seite welche Form bekommt', () => {
   it('Zurück in der Handy-Leiste überall, wo es woanders hinführt als das F-Icon', () => {
-    for (const seite of [HOFSEITE, FUTTER_HOFSEITE, CHECKOUT, BESTAETIGUNG, BESTELLUNG, BESTELLUNG_UNGUELTIG, INFO]) {
+    for (const seite of [HOFSEITE, FUTTER_HOFSEITE, CHECKOUT, INFO]) {
       expect(kopfForm(seite).zurueck, seite.art).toBe(true)
     }
     // Die Hofübersicht führt hinauf zur Startseite — das tut das F-Icon schon.
     expect(kopfForm(HOFUEBERSICHT).zurueck).toBe(false)
   })
-  it('Warenkorb-Symbol weder auf der Hofseite noch im Bestellweg — sonst ja', () => {
+  it('Warenkorb-Symbol weder auf der Hofseite noch im Checkout — sonst ja', () => {
     expect(kopfForm(HOFSEITE).warenkorb).toBe(false)
-    for (const seite of [CHECKOUT, BESTAETIGUNG, BESTELLUNG, BESTELLUNG_UNGUELTIG]) {
-      expect(kopfForm(seite).warenkorb, seite.art).toBe(false)
-    }
+    expect(kopfForm(CHECKOUT).warenkorb).toBe(false)
     for (const seite of [HOFUEBERSICHT, INFO]) expect(kopfForm(seite).warenkorb, seite.art).toBe(true)
   })
 
   it('im Browser eine Rückweg-Zeile nur dort, wo die Kopfzeile selbst nicht zurückführt', () => {
-    for (const seite of [HOFSEITE, CHECKOUT, BESTAETIGUNG, BESTELLUNG]) {
+    for (const seite of [HOFSEITE, CHECKOUT]) {
       expect(kopfForm(seite).rueckwegZeile, seite.art).toBe(true)
     }
-    for (const seite of [HOFUEBERSICHT, INFO, BESTELLUNG_UNGUELTIG]) expect(kopfForm(seite).rueckwegZeile, seite.art).toBe(false)
+    for (const seite of [HOFUEBERSICHT, INFO]) expect(kopfForm(seite).rueckwegZeile, seite.art).toBe(false)
   })
 })
 
@@ -204,8 +191,8 @@ describe('tippAufRueckweg — was ein Tipp tut', () => {
     expect(tippAufRueckweg(HOFSEITE, '/impressum', 'zeile')).toEqual({ aktion: 'hinauf', ziel: '/hoefe' })
   })
 
-  it('Bestätigung: immer hinauf zur Hofseite', () => {
-    expect(tippAufRueckweg(BESTAETIGUNG, '/testhof/checkout', 'knopf')).toEqual({ aktion: 'hinauf', ziel: '/testhof' })
+  it('Checkout ohne eigene Seite davor: hinauf zur Hofseite', () => {
+    expect(tippAufRueckweg(CHECKOUT, null, 'knopf')).toEqual({ aktion: 'hinauf', ziel: '/testhof' })
   })
 })
 
@@ -235,9 +222,8 @@ describe('Kein Hin und Her — die Folge von Tipps auf „Zurück"', () => {
     expect(tippe(HOFUEBERSICHT, aufHoefe).pfad).toBe('/')
   })
 
-  it('Bestätigung → Zurück → Hofseite → Zurück führt zur Hofübersicht, nicht zurück in die Bestätigung', () => {
-    const bestaetigung: Stand = { pfad: '/testhof/confirm/b1', vorgaenger: '/testhof/checkout' }
-    const aufHof = tippe(BESTAETIGUNG, bestaetigung)
+  it('Checkout aus einem geteilten Link → Zurück → Hofseite → Zurück führt zur Hofübersicht, nicht zurück in den Checkout', () => {
+    const aufHof = tippe(CHECKOUT, erstAufruf('/testhof/checkout'))
     expect(aufHof.pfad).toBe('/testhof')
     expect(tippe(HOFSEITE, aufHof).pfad).toBe('/hoefe')
   })
@@ -261,11 +247,9 @@ describe('zeileNimmtVerlauf — die Browser-Zeile unter der Kopfzeile', () => {
     expect(zeileNimmtVerlauf(HOFSEITE, null)).toBe(false)
   })
 
-  it('im Checkout zurück zur Hofseite, wenn sie davor stand; Bestätigung und Bestellung nie', () => {
+  it('im Checkout zurück zur Hofseite, wenn sie davor stand', () => {
     expect(zeileNimmtVerlauf(CHECKOUT, '/testhof')).toBe(true)
     expect(zeileNimmtVerlauf(CHECKOUT, '/hoefe')).toBe(false)
-    expect(zeileNimmtVerlauf(BESTAETIGUNG, '/testhof')).toBe(false)
-    expect(zeileNimmtVerlauf(BESTELLUNG, '/testhof')).toBe(false)
   })
 })
 
