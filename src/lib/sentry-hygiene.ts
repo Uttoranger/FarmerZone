@@ -374,8 +374,12 @@ const IPV6_MUSTER =
   /(?<![\w:])(?=[0-9a-f:]*::|(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4})(?=[0-9a-f:]*[0-9a-f])[0-9a-f]{0,4}(?::[0-9a-f]{0,4}){2,7}(?![\w:])/gi
 
 /** Ein Schlüssel vor „=" oder „:" — die ganze Folge aus Wortzeichen und „-"
- *  (ersetzeZuweisungen); ob er geheim ist, entscheidet istGeheimerSchluessel. */
-const ZUWEISUNG_KANDIDAT = /(?<![\w-])([\w-]+)(\s*[=:]\s*)/g
+ *  (ersetzeZuweisungen); ob er geheim ist, entscheidet istGeheimerSchluessel.
+ *  Anführungszeichen um Schlüssel und Wert gehören zum Trenner (Runde 1):
+ *  Prisma schreibt `token: "…"`, JSON `"access_token":"…"` — vorher beendete
+ *  das Zeichen den Wert, bevor er anfing. Backticks nicht: In ihnen nennt
+ *  Prisma Felder („Argument `token`: Invalid value …"). */
+const ZUWEISUNG_KANDIDAT = /(?<![\w-])([\w-]+)(["']?\s*[=:]\s*["']?)/g
 
 /** Wörter, die einen Schlüssel geheim machen. `code` fehlt bewusst:
  *  „code=P2002" ist ein Prisma-Fehlercode. */
@@ -489,7 +493,9 @@ const ADRESSE_IM_FEHLERTEXT =
  * „token=…" und „Bearer …". IP-Adressen bleiben (Adresse des
  * Datenbank-Servers, Nr. 37), ebenso lange Kennungen ohne Adresse:
  * Fehlertexte von Next.js und Prisma tragen technische Kennungen (etwa die
- * einer Server Action), die beim Beheben helfen.
+ * einer Server Action, Chunk-Namen beim Nachladen), die beim Beheben helfen.
+ * Ein Token mit Schlüssel fällt trotzdem, auch in Anführungszeichen
+ * (Prisma: token: "…", Runde 1); einer ganz ohne Schlüssel bleibt.
  */
 function bereinigeFehlertext(text: string): string {
   const mitAdressen = bereinigeText(text.replace(ADRESSE_IM_FEHLERTEXT, (adresse) => bereinigeUrl(adresse)))

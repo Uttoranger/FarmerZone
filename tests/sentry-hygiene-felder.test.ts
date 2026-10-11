@@ -386,6 +386,7 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
     ['langer Schlüssel mit Trennern', { exception: { values: [{ value: 'a_'.repeat(N) + '=x' }] } }],
     ['camelCase-Schlüssel ohne Wert', { exception: { values: [{ value: 'aToken'.repeat(N / 3) + ':' }] } }],
     ['token= ohne Wert', { extra: { text: 'token=' + ' '.repeat(2 * N) + '&' } }],
+    ['Schlüssel mit Anführungszeichen ohne Wert', { exception: { values: [{ value: 'token: "'.repeat(N / 4) }] } }],
   ]
 
   for (const [name, teil] of lang) {
@@ -775,6 +776,24 @@ describe('Nr. 56, Nachbesserung Runde 1 — Befunde der Prüfung', () => {
     for (const text of ['tokenizer=abc123', 'Tokens: 5', 'Apfelessig: 2 Liter', 'Signaturen: 3', 'otpCount5 bleibt', 'code=P2002', 'Rabattcode: SOMMER']) {
       expect(fehlertext(text), text).toBe(text)
       expect(nachricht(text), text).toBe(text)
+    }
+  })
+  it('ein Wert in Anführungszeichen fällt ebenso — Prisma-Meldung token: "…", JSON "access_token":"…"', () => {
+    // Vorher blieb er stehen: Das Anführungszeichen beendete den Wert, bevor
+    // er anfing. Im Fehlertext gilt die Regel für lange Kennungen bewusst
+    // nicht (Server-Action-Kennungen, Chunk-Namen) — hier fällt der Wert über
+    // seinen Schlüssel, gleich aus welchen Zeichen er besteht.
+    const HEX = '3fa85f6457174562b3fc2c963f66afa63fa85f6457174562b3fc2c963f66afa6'
+    expect(fehlertext(`Invalid prisma.session.findFirst() invocation: { where: { token: "${TOKEN}" } }`)).toBe(
+      'Invalid prisma.session.findFirst() invocation: { where: { token: "[entfernt]" } }'
+    )
+    expect(fehlertext(`Ungültiger Token: "${HEX}"`)).toBe('Ungültiger Token: "[entfernt]"')
+    expect(fehlertext('Antwort {"access_token":"abc123","expires_in":3600}')).toBe('Antwort {"access_token":"[entfernt]","expires_in":3600}')
+    expect(fehlertext("secret='abc123' und 'password': 'geheim'")).toBe("secret='[entfernt]' und 'password': '[entfernt]'")
+    expect(nachricht('token: "abc123"')).toBe('token: "[entfernt]"')
+    // Gegenproben: Prisma nennt Felder in Backticks, die Meldung bleibt lesbar; ein Platzhalter bleibt einfach.
+    for (const text of ['Argument `token`: Invalid value provided. Expected String, provided Int.', 'Fehler: "Bestellung fehlt"', 'token: "[entfernt]"']) {
+      expect(fehlertext(text), text).toBe(text)
     }
   })
 })
