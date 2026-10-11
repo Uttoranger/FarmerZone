@@ -16,6 +16,8 @@
  * Jede Suche hat ihre Gegenprobe.
  */
 import { describe, it, expect, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
@@ -144,11 +146,11 @@ function liste(stand: HofseiteStand = STAND): string {
   )
 }
 
-function inhalt(id: HofseiteZeileId, darstellung: 'zeile' | 'blatt', auftritt: AppearanceData = AUFTRITT): string {
+function inhalt(id: HofseiteZeileId, darstellung: 'zeile' | 'blatt', auftritt: AppearanceData = AUFTRITT, hof: AbschnittHof = HOF): string {
   return renderToStaticMarkup(
     createElement(AbschnittInhalt, {
       id,
-      hof: HOF,
+      hof,
       einstellungen: EINSTELLUNGEN,
       auftritt,
       darstellung,
@@ -275,5 +277,19 @@ describe('Bausteine im Blatt und im Editor', () => {
     expect(inhalt('logo', 'blatt')).toMatch(/class="inline-flex min-h-11[^"]*"[^>]*>.*Logo hochladen/)
     expect(inhalt('fotos', 'blatt')).toContain('Fotos hinzufügen')
     expect(inhalt('titelbild', 'blatt')).toContain('Titelbild ersetzen')
+  })
+
+  it('Titelbild mit Foto: „Titelbild entfernen" als 44-px-Knopf — über die vorhandene Aktion, keine neue Logik', () => {
+    const mitFoto: AbschnittHof = { ...HOF, bannerType: 'PHOTO', bannerUrl: '/titelbild.jpg' }
+    for (const darstellung of ['blatt', 'zeile'] as const) {
+      expect(inhalt('titelbild', darstellung, AUFTRITT, mitFoto), darstellung).toMatch(
+        /<button type="button" aria-label="Titelbild entfernen" class="[^"]*\bsize-11\b[^"]*"/
+      )
+    }
+    // Zurück auf den Verlauf, wie früher in „Mein Auftritt".
+    const quelle = readFileSync(join(process.cwd(), 'src/components/mein-hof/bild-bausteine.tsx'), 'utf8')
+    expect(quelle).toContain("updateFarmBannerAction('GRADIENT', null)")
+    // Gegenprobe: Ohne Foto gibt es nichts zu entfernen.
+    expect(inhalt('titelbild', 'blatt')).not.toContain('Titelbild entfernen')
   })
 })

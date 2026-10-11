@@ -7,9 +7,9 @@
  * recht. Nr. 35 hatte „Logo entfernen" (20 px), die Pfeil- und Löschknöpfe bei
  * Fotos und Werten (24 px) und die Wert-Kacheln (40 px) gehoben. Die
  * sichtbaren Kreise dürfen kleiner bleiben — dann liegt der Kreis als Span im
- * 44-px-Knopf. („Titelbild entfernen" und der Griff „Bereich verschieben" gab
- * es nur im früheren „Mein Auftritt"; sie sind mit ihm entfallen, Bericht
- * Nr. 50.)
+ * 44-px-Knopf. „Titelbild entfernen" ist seit Nr. 50 Runde 1 zurück, im
+ * Baustein „Titelbild"; den Griff „Bereich verschieben" gab es nur im
+ * früheren „Mein Auftritt" (die Hofseite liest nur `visible`, Bericht Nr. 50).
  *
  * Dazu: Knöpfe nur mit Symbol tragen ein `aria-label`, und ihre Symbole sind
  * `aria-hidden`.
@@ -141,6 +141,7 @@ describe('Mein Hof (früher Mein Auftritt) — jeder Knopf ≥ 44 px, Symbol-Kn�
 
   it('Knöpfe ohne Text nennen, wofür sie sind', () => {
     expect(QUELLE).toContain('aria-label="Logo entfernen"')
+    expect(QUELLE).toContain('aria-label="Titelbild entfernen"')
     // Fotos und Werte nennen ihren Eintrag (Vorbild Direktverkauf, DESIGN_SYSTEM).
     expect(QUELLE).toMatch(/aria-label=\{`Foto \$\{index \+ 1\} nach oben`\}/)
     expect(QUELLE).toMatch(/aria-label=\{`\$\{w\.title\} entfernen`\}/)
@@ -152,7 +153,7 @@ describe('Mein Auftritt — Kreise auf Fotos aus Tokens (DESIGN_SYSTEM, Bild-Ove
   /** Der Quelltext eines Knopfs ab seinem aria-label bis </button>. */
   const knopf = (label: string) => new RegExp(`aria-label="${label}"[\\s\\S]*?</button>`).exec(QUELLE)?.[0] ?? ''
 
-  it.each(['Logo entfernen'])('„%s": kein Tailwind-black/white, theme-feste Tokens', (label) => {
+  it.each(['Logo entfernen', 'Titelbild entfernen'])('„%s": kein Tailwind-black/white, theme-feste Tokens', (label) => {
     const block = knopf(label)
     expect(block).not.toBe('')
     expect(block).not.toMatch(/(?:bg|text)-(?:black|white)\b/)

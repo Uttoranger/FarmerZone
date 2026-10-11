@@ -272,4 +272,15 @@ describe('Logo, Titelbild und Galeriefoto (Abnahme Nr. 50: kein anderes Feld än
     await speichereAuftritt({ aboutText: 'Nach den Bildern.' })
     expect(await stand(farm.id)).toEqual({ ...nachBildern, hof: { ...nachBildern.hof, aboutText: 'Nach den Bildern.' } })
   })
+
+  it('„Titelbild entfernen": zurück auf den Verlauf des Hofs — sonst ändert sich nichts', async () => {
+    const { farm } = await angemeldeterHof()
+    const vorher = await stand(farm.id)
+
+    // Derselbe Aufruf wie im Baustein (bild-bausteine.tsx).
+    expect((await updateFarmBannerAction('GRADIENT', null)).error).toBeUndefined()
+
+    // Der Verlauf (bannerValue) bleibt, wie er war — die Hofseite zeigt ihn wieder.
+    expect(await stand(farm.id)).toEqual({ ...vorher, hof: { ...vorher.hof, bannerType: 'GRADIENT', bannerUrl: null } })
+  })
 })

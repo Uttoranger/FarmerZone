@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from 'react'
 import Image from 'next/image'
 import { Camera, ChevronDown, ChevronUp, Loader2, MoveVertical, Plus, Trash2, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { updateBannerFocusAction, updateFarmLogoAction } from '@/server/actions/appearance'
+import { updateBannerFocusAction, updateFarmBannerAction, updateFarmLogoAction } from '@/server/actions/appearance'
 import {
   addFarmPhotoAction,
   deleteFarmPhotoAction,
@@ -15,7 +15,7 @@ import type { FarmPhotoData } from '@/server/queries/appearance'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { CoverEditButton, CoverFocusAdjust, TITELBILD_KNOPF_STIL } from '@/components/farm/farm-page-view'
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
 
 /*
@@ -77,7 +77,12 @@ export type TitelbildHof = {
   bannerFocusY: number
 }
 
-/** Titelbild: Abbild mit den vorhandenen Knöpfen der Hofseite — Foto ersetzen, Ausschnitt ziehen. */
+/**
+ * Titelbild: Abbild mit den vorhandenen Knöpfen der Hofseite — Foto ersetzen,
+ * Ausschnitt ziehen, Foto entfernen (dann zeigt die Hofseite wieder den
+ * Verlauf des Hofs). Entfernen ist dieselbe Aktion wie früher in „Mein
+ * Auftritt" (updateFarmBannerAction mit GRADIENT), keine neue Logik.
+ */
 export function TitelbildBaustein({
   hof,
   onGespeichert,
@@ -86,8 +91,22 @@ export function TitelbildBaustein({
 }: BildBausteinProps & { hof: TitelbildHof }): React.JSX.Element {
   const [focusDraft, setFocusDraft] = useState<number | null>(null)
   const [pending, start] = useTransition()
+  const [entferntGerade, startEntfernen] = useTransition()
   const foto = titelbildFoto(hof)
   const focus = focusDraft ?? hof.bannerFocusY
+
+  function entfernen() {
+    startEntfernen(async () => {
+      const res = await updateFarmBannerAction('GRADIENT', null)
+      if (res.error) {
+        toast.error(res.error)
+        return
+      }
+      if (meldeErfolg) meldeErfolg()
+      else toast.success('Titelbild entfernt')
+      onGespeichert?.()
+    })
+  }
 
   function speichern() {
     const wert = focusDraft
@@ -124,26 +143,43 @@ export function TitelbildBaustein({
             gross
           />
         ) : (
-          <div className="absolute top-2 right-2 flex flex-wrap items-center justify-end gap-2">
+          <>
             {foto && (
               <button
                 type="button"
-                onClick={() => setFocusDraft(hof.bannerFocusY)}
-                className="flex min-h-11 items-center gap-1.5 rounded-lg px-3.5 text-sm font-semibold transition-opacity hover:opacity-90"
-                style={TITELBILD_KNOPF_STIL}
+                onClick={entfernen}
+                disabled={entferntGerade}
+                aria-label="Titelbild entfernen"
+                className={cn('group absolute top-0.5 left-0.5 flex size-11 items-center justify-center rounded-full disabled:opacity-60', FOKUS_RAHMEN_INNEN)}
               >
-                <MoveVertical className="size-3.5" strokeWidth={1.7} aria-hidden="true" />
-                Ausschnitt anpassen
+                {/* Sichtbar der 28-px-Kreis wie früher in „Mein Auftritt", getroffen wird der 44-px-Knopf (Nr. 35).
+                    Theme-fest dunkel auf dem Foto über Tokens (DESIGN_SYSTEM, Bild-Overlays). */}
+                <span className="flex size-7 items-center justify-center rounded-full bg-primary-foreground/60 text-accent-foreground transition-colors group-hover:bg-primary-foreground/80">
+                  <X className="size-3.5" aria-hidden="true" />
+                </span>
               </button>
             )}
-            <CoverEditButton
-              currentBannerUrl={hof.bannerUrl}
-              onGespeichert={onGespeichert}
-              meldeErfolg={meldeErfolg}
-              onHochladen={onHochladen}
-              gross
-            />
-          </div>
+            <div className="absolute top-2 right-2 flex flex-wrap items-center justify-end gap-2">
+              {foto && (
+                <button
+                  type="button"
+                  onClick={() => setFocusDraft(hof.bannerFocusY)}
+                  className="flex min-h-11 items-center gap-1.5 rounded-lg px-3.5 text-sm font-semibold transition-opacity hover:opacity-90"
+                  style={TITELBILD_KNOPF_STIL}
+                >
+                  <MoveVertical className="size-3.5" strokeWidth={1.7} aria-hidden="true" />
+                  Ausschnitt anpassen
+                </button>
+              )}
+              <CoverEditButton
+                currentBannerUrl={hof.bannerUrl}
+                onGespeichert={onGespeichert}
+                meldeErfolg={meldeErfolg}
+                onHochladen={onHochladen}
+                gross
+              />
+            </div>
+          </>
         )}
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
