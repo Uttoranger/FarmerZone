@@ -97,25 +97,25 @@ export function formatDatumLang(zeitpunkt: Date): string {
   return datumLangFormat.format(zeitpunkt).replace(/^(\d+\.) /, '$1\u00a0')
 }
 
-// Fester Wortlaut statt Intl \u201eshort": Je nach ICU-Stand schreibt Intl \u201eSa" oder
-// \u201eSa." und \u201eOkt" oder \u201eOkt." \u2014 ein Abholtermin soll \u00fcberall gleich aussehen.
+// Fester Wortlaut statt Intl „short": Je nach ICU-Stand schreibt Intl „Sa" oder
+// „Sa." und „Okt" oder „Okt." — ein Abholtermin soll überall gleich aussehen.
 const WOCHENTAG_KURZ = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'] as const
 /** Monatsnamen kurz, österreichisch: auch für die Achse der Finanzen am Handy (monatOhneJahr). */
 export const MONAT_KURZ = ['J\u00e4n', 'Feb', 'M\u00e4rz', 'Apr', 'Mai', 'Juni', 'Juli', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'] as const
 
 /**
- * \u201eSa, 10. Okt" \u2014 ein Abholtermin kurz, mit Wochentag UND Datum (Nr. 46): Ein
- * Wochentag allein (\u201eSamstag") l\u00e4sst offen, welcher Samstag gemeint ist.
- * Eingabe ist der Kalendertag (JJJJ-MM-TT), wie ihn die Abholfenster tragen \u2014
+ * „Sa, 10. Okt" — ein Abholtermin kurz, mit Wochentag UND Datum (Nr. 46): Ein
+ * Wochentag allein („Samstag") lässt offen, welcher Samstag gemeint ist.
+ * Eingabe ist der Kalendertag (JJJJ-MM-TT), wie ihn die Abholfenster tragen —
  * der Wiener Tag ist damit schon entschieden, hier wird nur geschrieben.
- * \u00d6sterreichisch \u201eJ\u00e4n". Nach \u201e10." ein gesch\u00fctztes Leerzeichen, damit der Monat
- * nicht allein in die n\u00e4chste Zeile rutscht. Unlesbares bleibt, wie es kam.
+ * Österreichisch „Jän". Nach „10." ein geschütztes Leerzeichen, damit der Monat
+ * nicht allein in die nächste Zeile rutscht. Unlesbares bleibt, wie es kam.
  */
 export function formatTagKurz(kalendertag: string): string {
   const teile = /^(\d{4})-(\d{2})-(\d{2})$/.exec(kalendertag)
   if (!teile) return kalendertag
   const [jahr, monat, tag] = [Number(teile[1]), Number(teile[2]), Number(teile[3])]
-  // Mittag in UTC: Der Wochentag eines Kalendertags h\u00e4ngt so an keiner Zeitzone.
+  // Mittag in UTC: Der Wochentag eines Kalendertags hängt so an keiner Zeitzone.
   const wochentag = WOCHENTAG_KURZ[new Date(Date.UTC(jahr, monat - 1, tag, 12)).getUTCDay()]
   const monatsName = MONAT_KURZ[monat - 1]
   if (!wochentag || !monatsName) return kalendertag
