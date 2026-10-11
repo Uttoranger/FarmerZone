@@ -391,6 +391,9 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
     ['viele Kennungen mit Ziffernfolgen', { exception: { values: [{ value: 'x0123456789a '.repeat(N / 6) }] } }],
     // Nr. 56, Runde 2.
     ['Prozent-Escapes vor Ziffern', { exception: { values: [{ value: '%200'.repeat(N / 2) }] } }],
+    ['mehrfach kodierte Abfragewerte', { request: { url: 'https://farmerzone.at/?' + 'a=%252F%253Fb%253D1&'.repeat(N / 20) } }],
+    ['ungültige Bytes im Abfragewert', { request: { url: 'https://farmerzone.at/?a=' + '%25C3'.repeat(N) } }],
+    ['%25-Kette im Abfragewert', { request: { url: 'https://farmerzone.at/?a=%' + '25'.repeat(N) + '41' } }],
   ]
 
   for (const [name, teil] of lang) {
@@ -856,5 +859,30 @@ describe('Nr. 56, Nachbesserung Runde 2 — Befunde der Nachprüfung', () => {
     for (const text of ['Zeit%202026-10-10%2020:02:00', 'Kennung%20clx0123456789abcdefghijklmn', 'Anfrage%20550e8400-e29b-41d4-a716-0123456789ab']) {
       expect(fehlertext(text), text).toBe(text)
     }
+  })
+  it('ein mehrfach kodierter Abfragewert verliert seinen Token — Adresse, Schema, Zuweisung; in Adresse, Fehlertext und Nachricht', () => {
+    // Runde 1 sah nur die einmal dekodierte Form: „%2Freset-password%3Ftoken…"
+    // beginnt nicht mit „/", „token%3D…" ist keine Zuweisung.
+    const faelle: [string, string][] = [
+      ['/login?next=%252Freset-password%253Ftoken%253Dabc123', '/login?next=%2Freset-password'],
+      ['/login?next=https%253A%252F%252Fx.example%252Freset%253Ftoken%253Dabc123', '/login?next=https%3A%2F%2Fx.example%2Freset'],
+      ['/login?next=/reset-password%253Ftoken%253Dabc123', '/login?next=%2Freset-password'],
+      ['/login?info=token%253Dabc123', '/login?info=token%3D%5Bentfernt%5D'],
+      // Dreifach kodiert, und fehlertolerant: Ein ungültiges Escape (%C3 allein) bleibt, der Rest wird dekodiert.
+      ['/login?next=%25252Freset%25253Ftoken%25253Dabc123', '/login?next=%2Freset'],
+      ['/login?next=%252Freset%253Ftoken%253Dabc%25C3', '/login?next=%2Freset'],
+      ['/login?info=token%253D%25C3abc123', '/login?info=token%3D%5Bentfernt%5D'],
+    ]
+    for (const [roh, sauber] of faelle) {
+      expect(adresse(roh), roh).toBe(`https://farmerzone.at${sauber}`)
+      expect(fehlertext(`Fehler bei ${roh} gemeldet`), roh).toBe(`Fehler bei ${sauber} gemeldet`)
+      expect(nachricht(roh), roh).toBe(sauber)
+    }
+    // Ebenso als Text unter einem Query-Schlüssel.
+    expect(bereinigeEreignis(ereignis({ extra: { 'http.query': 'next=%252Freset-password%253Ftoken%253Dabc123' } })).extra).toEqual({
+      'http.query': 'next=%2Freset-password',
+    })
+    // Gegenprobe: ein harmloser Wert bleibt.
+    expect(adresse('/hoefe?q=100%25&seite=2')).toBe('https://farmerzone.at/hoefe?q=100%25&seite=2')
   })
 })

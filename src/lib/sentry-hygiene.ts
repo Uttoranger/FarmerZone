@@ -266,7 +266,7 @@ function bereinigeQuery(query: string, freitext = false, tiefe = 0): string {
   const sauber = new URLSearchParams()
   new URLSearchParams(query).forEach((wert, name) => {
     if (HEIKLE_PARAMETER.test(name)) return
-    sauber.append(regel(name), freitext ? bereinigeFreitext(wert) : bereinigeAbfrageWert(wert, tiefe))
+    sauber.append(regel(name), freitext ? bereinigeFreitext(weiterDekodiert(wert)) : bereinigeAbfrageWert(wert, tiefe))
   })
   return sauber.toString()
 }
@@ -281,17 +281,53 @@ const MAX_ADRESS_TIEFE = 3
 
 const ADRESSE_ERSATZ = '[adresse entfernt]'
 
+/** Eine Folge von %XX-Escapes. */
+const ESCAPE_FOLGE = /(?:%[0-9A-Fa-f]{2})+/g
+
+/** Dekodiert jede Folge von Escapes für sich — decodeURIComponent würfe
+ *  sonst für den ganzen Text. Ist eine Folge kein gültiges UTF-8 („%3D%C3"),
+ *  werden nur ihre ASCII-Zeichen dekodiert (die Trenner „=", „/", „?"), die
+ *  übrigen Bytes bleiben, wie sie sind. */
+function dekodiereFehlertolerant(text: string): string {
+  return text.replace(ESCAPE_FOLGE, (folge) => {
+    try {
+      return decodeURIComponent(folge)
+    } catch {
+      return folge.replace(/%[0-7][0-9A-Fa-f]/g, (escape) => decodeURIComponent(escape))
+    }
+  })
+}
+
+/**
+ * Ein Abfragewert, so oft weiter dekodiert, wie er sich ändert — höchstens
+ * MAX_ADRESS_TIEFE-mal (Nr. 56, Runde 2). URLSearchParams dekodiert einmal;
+ * ein doppelt kodierter Wert (?next=%252Freset-password%253Ftoken%253D…, wie
+ * ihn eine Weiterleitung erzeugt, die einen kodierten Wert noch einmal kodiert)
+ * stand danach als „%2Freset-password%3Ftoken%3D…" da: keine Adresse, keine
+ * Zuweisung, und der Token blieb.
+ */
+function weiterDekodiert(wert: string): string {
+  let text = wert
+  for (let runde = 0; runde < MAX_ADRESS_TIEFE; runde++) {
+    const weiter = dekodiereFehlertolerant(text)
+    if (weiter === text) break
+    text = weiter
+  }
+  return text
+}
+
 /**
  * Ein Wert einer Abfrage in einer Adresse (Nr. 56, Runde 1). Ist er selbst
  * eine Adresse (?next=/reset-password?token=…, ?callbackUrl=https://…), gilt
  * für ihn die URL-Regel — vorher wurde er nur neu kodiert, und sein Token
  * blieb kodiert stehen (next=%2Freset-password%3Ftoken%3D…). Vorher fallen im
  * dekodierten Wert „token=…" und „Bearer …" (auch ohne Adresse:
- * ?next=reset?token=…). Strukturierte Felder brauchen das nicht: Ihre
- * Freitext-Regel nimmt Adressen und Zuweisungen selbst.
+ * ?next=reset?token=…). Beides prüft die ganz dekodierte Form (weiterDekodiert,
+ * Runde 2). Strukturierte Felder brauchen den Rest nicht: Ihre Freitext-Regel
+ * nimmt Adressen und Zuweisungen selbst.
  */
 function bereinigeAbfrageWert(wert: string, tiefe: number): string {
-  const ohneZuweisung = ersetzeZuweisungen(wert.replace(BEARER_MUSTER, 'Bearer [entfernt]'))
+  const ohneZuweisung = ersetzeZuweisungen(weiterDekodiert(wert).replace(BEARER_MUSTER, 'Bearer [entfernt]'))
   if (!ADRESS_WERT.test(ohneZuweisung)) return bereinigeText(ohneZuweisung)
   return tiefe < MAX_ADRESS_TIEFE ? bereinigeUrl(ohneZuweisung, tiefe + 1) : ADRESSE_ERSATZ
 }
