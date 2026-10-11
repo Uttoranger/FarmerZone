@@ -340,6 +340,21 @@ describe('Bestellseite — die angezeigten Beträge (Nr. 54: Bausteine der Best�
     expect(text.match(/€ \d+,\d{2}/g)).toEqual(['€ 12,34', '€ 3,21', '€ 0,49', '€ 16,04'])
   })
 
+  it('die Summe kommt aus dem gespeicherten Warenpreis, nie aus den Positionen', async () => {
+    // Im Datenmodell fallen beide nicht auseinander: „Artikel fehlt" setzt
+    // totalAmount auf den Warenpreis ohne die fehlende Position. Der Test
+    // trennt sie absichtlich, damit sichtbar bleibt, woher die Summe kommt —
+    // aus dem Snapshot der Bestellung (bestellSummen, CODING_STANDARDS §2),
+    // nicht aus einer Summe über die Zeilen.
+    findUnique.mockResolvedValue(bestellung({ ...BEISPIEL, totalAmount: '15.00' }) as never)
+    const text = await seite('order-1', bestellSignatur('order-1'))
+    expect(text).toContain('€ 12,34')
+    expect(text).toContain('€ 3,21')
+    // 1500 + 49 Cent — nicht 1555 + 49 aus den Zeilen.
+    expect(text).toContain('Online · Bezahlt€ 15,49')
+    expect(text).not.toContain('€ 16,04')
+  })
+
   it('eine fehlende Position steht da, kostet aber nichts — die Summe bleibt die der Bestellung', async () => {
     findUnique.mockResolvedValue(
       bestellung({
