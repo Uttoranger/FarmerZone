@@ -70,7 +70,7 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 49 | Mein Hof in der Leiste und Kundensicht (N3, N4) | läuft (Nachbesserung Runde 1) | `nacht/2026-10-10/49-mein-hof-leiste` | | main | Umsetzung fertig (8957a00); tester grün; pruefer: kein Blocker, 2 Sollte | 10.10.2026 |
 | 50 | Mein Auftritt zieht in Mein Hof (N4) | läuft | `nacht/2026-10-10/50-auftritt-in-mein-hof` | | 49 | gestapelt auf 49; Nachprüfung folgt | 10.10.2026 |
 | 51 | Hofseite: Schaufenster zuerst (N5), Käufer-Vorschau Lebensmittel | läuft | `nacht/2026-10-10/51-hofseite-schaufenster` | | main | | 10.10.2026 |
-| 52 | Karte (/hoefe, Standortkarte, Region) | läuft (tester und pruefer) | `nacht/2026-10-10/52-karte` | | main | Umsetzung fertig (8462f82, Bericht d64b53a) | 10.10.2026 |
+| 52 | Karte (/hoefe, Standortkarte, Region) | läuft (Nachbesserung Runde 1) | `nacht/2026-10-10/52-karte` | | main | Umsetzung fertig (8462f82, Bericht d64b53a); tester grün; pruefer: kein Blocker, 4 Sollte | 11.10.2026 |
 | 53 | Heute, Auswertung, Verkäufe | läuft | `nacht/2026-10-10/53-heute-auswertung` | | 55 | gestapelt auf 55 | 10.10.2026 |
 | 54 | Admin am Handy und alte Seiten ins neue Design | offen | | | main | | |
 | 55 | Testzahlungen aus Auswertungen (Z4) | läuft (Nachbesserung Runde 1) | `nacht/2026-10-10/55-testzahlungen` | | main | Umsetzung fertig (40d35c2); pruefer: kein Blocker, 6 Hinweise; Nachprüfung folgt | 10.10.2026 |
