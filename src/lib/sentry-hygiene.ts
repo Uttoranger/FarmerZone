@@ -392,6 +392,9 @@ const ZUWEISUNG_KANDIDAT = /(?<![\w-])([\w-]+)(["']?\s*[=:]\s*["']?)/g
  *  „code=P2002" ist ein Prisma-Fehlercode. */
 const GEHEIMES_WORT = new Set(['token', 'secret', 'passwort', 'password', 'otp', 'signatur', 'signature', 'sig', 'apikey', 'authorization'])
 
+/** Jedes Wort aus GEHEIMES_WORT enthält eines davon (api: apikey, api_key). */
+const GEHEIMES_WORT_IRGENDWO = /token|secret|passwor[dt]|otp|sig|api|authorization/i
+
 /** Ein Platzhalter dieser Datei („[entfernt]", „[code entfernt]" …), klebend. */
 const EIGENER_PLATZHALTER = /\[[a-z -]{0,12}entfernt\]/iy
 
@@ -404,6 +407,9 @@ const ZUWEISUNG_WERT = /[^\s&,;"'<>]*/y
  *  (tokenizer, Apfelessig), ist kein Teil — vorher galt nur der Anfang eines
  *  Worts, und „access_token=…" blieb stehen. */
 function istGeheimerSchluessel(schluessel: string): boolean {
+  // Vorfilter: Steckt keines der Wörter auch nur als Teil darin, ist der
+  // Schlüssel nie geheim — der häufige Fall, ohne Zerlegen.
+  if (!GEHEIMES_WORT_IRGENDWO.test(schluessel)) return false
   const teile = schluessel
     .replace(/([a-z0-9])(?=[A-Z])|([A-Z])(?=[A-Z][a-z])/g, '$1$2_')
     .toLowerCase()
