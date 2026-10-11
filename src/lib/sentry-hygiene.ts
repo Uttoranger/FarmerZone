@@ -125,10 +125,13 @@ const EMAIL_KODIERT_MUSTER =
  *  Buchstaben, „_" oder „-" klebt, nur, wenn sie rechts frei endet (Nr. 56,
  *  Runde 1): vorher wurde „2026-10-10 20:02:00" zu „2[telefon entfernt]:02:00",
  *  und eine Kennung mit „0" und acht Ziffern darin (cuid, UUID) zerbrach.
- *  „Rückruf-0664 1234567" und „Tel0664 …" fallen weiter. Linear: Angesetzt
- *  wird nur am Anfang einer Ziffernfolge, die Vorschau liest sie einmal. */
+ *  „Rückruf-0664 1234567" und „Tel0664 …" fallen weiter. Ein Prozent-Escape
+ *  links (%20, %22, %28 …) ist eine freie Grenze wie ein Leerzeichen (Runde 2:
+ *  „Ruf%2006641234567" — das Escape endet auf eine Ziffer, und die Nummer
+ *  blieb stehen). Linear: Angesetzt wird nur am Anfang einer Ziffernfolge,
+ *  die Vorschau liest sie einmal. */
 const TELEFON_MUSTER =
-  /(?<!\d)(?:(?<![A-Za-z_-])|(?=(?:\+|\(?0)\d(?:[\s/\-.()]{0,3}\d){7,}(?!\w)))(?:\+|\(?0)\d(?:[\s/\-.()]{0,3}\d){7,}/g
+  /(?:(?<=%[0-9A-Fa-f]{2})|(?<!\d)(?:(?<![A-Za-z_-])|(?=(?:\+|\(?0)\d(?:[\s/\-.()]{0,3}\d){7,}(?!\w))))(?:\+|\(?0)\d(?:[\s/\-.()]{0,3}\d){7,}/g
 
 /** Query-Parameter, deren NAME auf Geheimnisse oder Personenbezug deutet.
  *  `pathname` gehört dazu: Die Blob-SDK-Aufrufe tragen darin den Blob-Pfad

@@ -389,6 +389,8 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
     ['Schlüssel mit Anführungszeichen ohne Wert', { exception: { values: [{ value: 'token: "'.repeat(N / 4) }] } }],
     ['Ziffernfolge zwischen Buchstaben', { exception: { values: [{ value: 'x' + '0'.repeat(2 * N) + 'a' }] } }],
     ['viele Kennungen mit Ziffernfolgen', { exception: { values: [{ value: 'x0123456789a '.repeat(N / 6) }] } }],
+    // Nr. 56, Runde 2.
+    ['Prozent-Escapes vor Ziffern', { exception: { values: [{ value: '%200'.repeat(N / 2) }] } }],
   ]
 
   for (const [name, teil] of lang) {
@@ -824,6 +826,35 @@ describe('Nr. 56, Nachbesserung Runde 1 — Befunde der Prüfung', () => {
     for (const [roh, sauber] of nummern) {
       expect(fehlertext(roh), roh).toBe(sauber)
       expect(nachricht(roh), roh).toBe(sauber)
+    }
+  })
+})
+
+describe('Nr. 56, Nachbesserung Runde 2 — Befunde der Nachprüfung', () => {
+  const fehlertext = (wert: string) => bereinigeEreignis(ereignis({ exception: { values: [{ value: wert }] } })).exception?.values?.[0].value
+  const nachricht = (wert: string) => bereinigeEreignis(ereignis({ message: wert })).message
+  const adresse = (pfad: string) => bereinigeEreignis(ereignis({ request: { url: `https://farmerzone.at${pfad}` } })).request?.url
+  const extraText = (wert: string) => (bereinigeEreignis(ereignis({ extra: { text: wert } })).extra as { text?: string } | undefined)?.text
+
+  it('eine Nummer direkt nach einem Prozent-Escape fällt (%20, %22, %27, %28) — in Pfad, Fehlertext, Nachricht und extra', () => {
+    // Runde 1 zählte nur „keine Ziffer davor"; „%20" endet auf eine Ziffer,
+    // und die Nummer dahinter ging roh an Sentry.
+    const faelle: [string, string][] = [
+      ['/kontakt/Ruf%2006641234567', '/kontakt/Ruf%20[telefon entfernt]'],
+      ['name=Max%20Muster&tel=%2006641234567', 'name=Max%20Muster&tel=%20[telefon entfernt]'],
+      ['Ruf%220664 1234567%22', 'Ruf%22[telefon entfernt]%22'],
+      ['Ruf%270664/1234567%27', 'Ruf%27[telefon entfernt]%27'],
+      ['Ruf%28(0664) 1234567', 'Ruf%28[telefon entfernt]'],
+    ]
+    for (const [roh, sauber] of faelle) {
+      expect(fehlertext(roh), roh).toBe(sauber)
+      expect(nachricht(roh), roh).toBe(sauber)
+      expect(extraText(roh), roh).toBe(sauber)
+    }
+    expect(adresse('/kontakt/Ruf%2006641234567')).toBe('https://farmerzone.at/kontakt/Ruf%20[telefon entfernt]')
+    // Gegenproben: Zeitstempel, cuid und UUID bleiben, auch nach einem Escape.
+    for (const text of ['Zeit%202026-10-10%2020:02:00', 'Kennung%20clx0123456789abcdefghijklmn', 'Anfrage%20550e8400-e29b-41d4-a716-0123456789ab']) {
+      expect(fehlertext(text), text).toBe(text)
     }
   })
 })
