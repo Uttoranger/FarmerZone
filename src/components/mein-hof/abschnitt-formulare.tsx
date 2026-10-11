@@ -148,7 +148,7 @@ function Aktionen({ pending, fehler, onAbbrechen }: { pending: boolean; fehler: 
           type="button"
           onClick={onAbbrechen}
           disabled={pending}
-          className={cn('mx-auto min-h-11 rounded-full px-5 text-sm font-semibold text-status-fertig hover:bg-muted', FOKUS_RAHMEN)}
+          className={cn('mx-auto min-h-11 rounded-full px-5 text-sm font-semibold text-brand-text hover:bg-muted', FOKUS_RAHMEN)}
         >
           Abbrechen
         </button>
@@ -522,17 +522,21 @@ export function AbschnitteForm({ auftritt, ...rueckmeldung }: AuftrittFormularPr
         {sortiert.map((s) => {
           const fest = s.key === 'products'
           return (
-            <li key={s.key} className="flex items-center justify-between gap-3">
-              <Label htmlFor={`abschnitt-${s.key}`} className="min-h-11 flex-1 py-2 text-sm text-foreground">
-                {ABSCHNITT_LABEL[s.key] ?? s.key}
-                {fest && <span className="text-muted-foreground"> · immer sichtbar</span>}
+            <li key={s.key}>
+              {/* Der Schalter steht im Label: Die ganze Zeile schaltet, 44 px hoch, ohne tote Fläche
+                  daneben. Base UI verhindert dabei das doppelte Umschalten (Klick auf den Schalter). */}
+              <Label htmlFor={`abschnitt-${s.key}`} className="min-h-11 w-full justify-between gap-3 py-2 text-sm text-foreground">
+                <span>
+                  {ABSCHNITT_LABEL[s.key] ?? s.key}
+                  {fest && <span className="text-muted-foreground"> · immer sichtbar</span>}
+                </span>
+                <Switch
+                  id={`abschnitt-${s.key}`}
+                  checked={s.visible}
+                  disabled={fest}
+                  onCheckedChange={(sichtbar) => setSektionen((prev) => prev.map((x) => (x.key === s.key ? { ...x, visible: sichtbar } : x)))}
+                />
               </Label>
-              <Switch
-                id={`abschnitt-${s.key}`}
-                checked={s.visible}
-                disabled={fest}
-                onCheckedChange={(sichtbar) => setSektionen((prev) => prev.map((x) => (x.key === s.key ? { ...x, visible: sichtbar } : x)))}
-              />
             </li>
           )
         })}

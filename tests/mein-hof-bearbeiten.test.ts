@@ -225,7 +225,24 @@ describe('Bausteine im Blatt und im Editor', () => {
       const html = inhalt(id, 'blatt')
       expect(html, id).toMatch(/<button[^>]*type="submit"[^>]*class="[^"]*\bw-full\b[^"]*"[^>]*>Speichern<\/button>/)
       expect(html.indexOf('>Speichern<'), id).toBeLessThan(html.indexOf('>Abbrechen<'))
+      // Textknopf in der Farbe der Textknöpfe (wie „Schließen"), nicht im Status-Grün (Runde 1).
+      expect(html, id).toMatch(/<button type="button" class="[^"]*\btext-brand-text\b[^"]*">Abbrechen<\/button>/)
+      expect(html, id).not.toContain('text-status-fertig')
     }
+  })
+
+  it('Abschnitte der Hofseite: jeder Schalter steht in seinem Label — die ganze Zeile schaltet, 44 px hoch', () => {
+    const html = inhalt('abschnitte', 'blatt')
+    const zeilen = html.match(/<li>[\s\S]*?<\/li>/g) ?? []
+    expect(zeilen).toHaveLength(1)
+    for (const zeile of zeilen) {
+      const label = /^<li>(<label[^>]*>)/.exec(zeile)?.[1] ?? ''
+      expect(label).toContain('for="abschnitt-products"')
+      expect(label).toMatch(/class="[^"]*\bmin-h-11\b[^"]*\bw-full\b[^"]*"/)
+      expect(zeile).toMatch(/role="switch"[\s\S]*<\/label><\/li>$/)
+    }
+    // Gegenprobe: Der Schalter neben dem Label (die alte Form) fiele auf.
+    expect('<li><label for="x">Text</label><span role="switch"></span></li>').not.toMatch(/role="switch"[\s\S]*<\/label><\/li>$/)
   })
 
   it('Formulare im Editor: beide Knöpfe nebeneinander, keiner über die volle Breite', () => {
