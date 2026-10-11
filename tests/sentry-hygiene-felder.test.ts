@@ -396,6 +396,8 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
     ['%25-Kette im Abfragewert', { request: { url: 'https://farmerzone.at/?a=%' + '25'.repeat(N) + '41' } }],
     ['Schlüssel nach Prozent-Escapes', { exception: { values: [{ value: '%20a='.repeat(N / 5) }] } }],
     ['kodierte Anker verschachtelt', { request: { url: 'https://farmerzone.at/#' + 'a%3D%2F%23'.repeat(N / 10) } }],
+    ['viele relative Adressen als Nachricht', { message: ' /a?b=1'.repeat(N / 10) }],
+    ['Schrägstriche nach Doppelpunkt in extra', { extra: { text: ':/'.repeat(N) } }],
   ]
 
   for (const [name, teil] of lang) {
@@ -912,5 +914,28 @@ describe('Nr. 56, Nachbesserung Runde 2 — Befunde der Nachprüfung', () => {
     expect(fehlertext('100%token=abc123')).toBe('100%token=[entfernt]')
     expect(adresse('/hoefe#karte%20oben')).toBe('https://farmerzone.at/hoefe#karte%20oben')
     expect(fehlertext('Rabatt 50%20token')).toBe('Rabatt 50%20token')
+  })
+  it('Nachricht, Brotkrume und extra nehmen eingebettete relative Adressen wie der Fehlertext', () => {
+    // Vorher galt dort die URL-Regel nur für absolute Adressen und für einen
+    // Text, der ganz eine Adresse ist; eingebettet blieb der kodierte Token.
+    const faelle: [string, string][] = [
+      ['Fehler bei /login?next=%2Freset-password%3Ftoken%3Dabc123 gemeldet', 'Fehler bei /login?next=%2Freset-password gemeldet'],
+      ['Error: NEXT_REDIRECT;replace;/login?next=%2Freset-password%3Ftoken%3Dabc123;307;', 'Error: NEXT_REDIRECT;replace;/login?next=%2Freset-password'],
+      ['Abruf (/x?a=1#token=abc123) gescheitert', 'Abruf (/x?a=1) gescheitert'],
+      ['Bestätigung „/hof-test/bestaetigen/kurz-123“ abgelaufen', 'Bestätigung „/hof-test/bestaetigen/[kennung entfernt]“ abgelaufen'],
+    ]
+    for (const [roh, sauber] of faelle) {
+      const e = bereinigeEreignis(
+        ereignis({ message: roh, extra: { text: roh }, breadcrumbs: [{ category: 'console', message: roh }], exception: { values: [{ value: roh }] } })
+      )
+      expect(e.message, roh).toBe(sauber)
+      expect(e.extra, roh).toEqual({ text: sauber })
+      expect(e.breadcrumbs?.[0].message, roh).toBe(sauber)
+      expect(e.exception?.values?.[0].value, roh).toBe(sauber)
+    }
+    // Gegenproben wie im Fehlertext: „und/oder", Brüche, Pfade ohne Token; eine cuid ohne Adresse bleibt.
+    for (const text of ['und/oder, 3/4 und 1/2', 'Fehler beim Laden von /hoefe?seite=2&kat=EIER', 'Kennung clx0123456789abcdefghijklmn']) {
+      expect(nachricht(text), text).toBe(text)
+    }
   })
 })

@@ -521,13 +521,18 @@ function entferneIps(text: string): string {
 /**
  * Ein Text aus einem strukturierten Feld. Ist er ganz eine Adresse (absolut
  * oder ab „/"), gilt die URL-Regel (Pfad-Token, heikle Parameter, Blob-Pfad);
- * sonst die Text-Regel samt eingebetteter Adressen. IP-Adressen fallen
- * zuerst — sonst hielte die Telefon-Regel eine lange IPv4 für eine Nummer.
+ * sonst die Text-Regel samt eingebetteter Adressen — seit Nr. 56, Runde 2,
+ * relativ wie absolut nach derselben Regel wie im Fehlertext
+ * (ADRESSE_IM_FEHLERTEXT): Vorher blieb „Fehler bei /login?next=%2F…%3Ftoken%3D…"
+ * in Nachricht, Brotkrume und extra stehen, im Fehlertext fiel der Token.
+ * IP-Adressen fallen zuerst — sonst hielte die Telefon-Regel eine lange IPv4
+ * für eine Nummer.
  */
 function bereinigeFreitext(text: string): string {
   const ohneIp = entferneIps(text)
   if (/^(?:https?:\/\/|\/)\S*$/i.test(ohneIp)) return bereinigeUrl(ohneIp)
-  const ohneZuweisung = ersetzeZuweisungen(bereinigeTextMitUrls(ohneIp).replace(BEARER_MUSTER, 'Bearer [entfernt]'))
+  const mitAdressen = bereinigeText(ohneIp.replace(ADRESSE_IM_FEHLERTEXT, (adresse) => bereinigeUrl(adresse)))
+  const ohneZuweisung = ersetzeZuweisungen(mitAdressen.replace(BEARER_MUSTER, 'Bearer [entfernt]'))
   return ohneZuweisung.replace(LANGE_KENNUNG_MUSTER, '[kennung entfernt]')
 }
 
