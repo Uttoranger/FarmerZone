@@ -12,7 +12,9 @@
  * nicht, was in Fehlertexten und URLs schon drinsteht).
  *
  * Die heiklen Träger, jeder einzeln getestet (tests/beobachtbarkeit.test.ts):
- * - Fehlertexte und Brotkrumen: E-Mail-Adressen, Telefonnummern.
+ * - Fehlertexte und Brotkrumen: E-Mail-Adressen (seit Nr. 56 auch mit
+ *   Buchstaben jeder Schrift und mehrfach kodiert, %2540), Telefonnummern;
+ *   im Fehlertext seit Nr. 56 auch Adressen mit Token, relativ wie absolut.
  * - URLs, auch im PFAD, nicht nur in der Query: /customers/<kundin@…> legt
  *   die Kunden-E-Mail (%40-kodiert) in den Pfad, /api/orders/confirm/<token>
  *   und /<hof>/bestaetigen/<token> (Bar-Bestätigung, H3) einen gültigen
@@ -81,19 +83,32 @@ export function ermittleUmgebung(
  * ansetzt und jedes Mal bis zu ihrem Ende liest, braucht dafür Sekunden.
  */
 
-/** Ein Zeichen des lokalen Teils einer E-Mail-Adresse (vor dem @). */
-const EMAIL_LOKAL = /[A-Za-z0-9._%+-]/
+/** Ein Zeichen des lokalen Teils einer E-Mail-Adresse (vor dem @):
+ *  Buchstaben und Ziffern jeder Schrift, dazu . _ % + - (Nr. 56: vorher nur
+ *  A–Z, bei „jürgen@…" blieb „jü" stehen). \p{M} nimmt zerlegt geschriebene
+ *  Umlaute mit (u + Trema). */
+const EMAIL_LOKAL = /[\p{L}\p{N}\p{M}._%+-]/u
 
 /** Die Domain einer E-Mail-Adresse, ab dem Zeichen nach dem @ (klebend:
- *  lastIndex setzt ersetzeEmails). */
-const EMAIL_DOMAIN = /[A-Za-z0-9.-]+\.[A-Za-z]{2,}/y
+ *  lastIndex setzt ersetzeEmails): Teile aus Buchstaben und Ziffern jeder
+ *  Schrift (Nr. 56: eine Domain mit Umlaut fiel vorher gar nicht), „-" und
+ *  kodierten Bytes eines Nicht-ASCII-Zeichens — so steht ein Umlaut in einer
+ *  Adresse (%C3%BC); am Ende eine Endung aus mindestens zwei Buchstaben. Nur
+ *  die Bytes %80–%FF: Ein kodiertes @, % oder „." (%40, %25, %2E) gehört nie
+ *  zur Domain, sonst setzte das kodierte Muster darunter quadratisch an. */
+const EMAIL_DOMAIN = /(?:[\p{L}\p{N}\p{M}.-]|%[89A-Fa-f][0-9A-Fa-f])+\.(?:[\p{L}\p{M}]|%[89A-Fa-f][0-9A-Fa-f]){2,}/uy
 
-/** Dieselben Adressen URL-kodiert (%40 statt @) — so stehen sie im Pfad.
- *  Angesetzt wird nur am Anfang einer Zeichenfolge (Lookbehind), sonst wäre
- *  das Muster quadratisch. Das Ergebnis bleibt gleich: %40 gehört selbst zu
- *  den Zeichen des lokalen Teils, der Treffer ab dem Anfang nimmt schon das
- *  letzte passende %40 der Folge — ein späterer Anfang fände nichts mehr. */
-const EMAIL_KODIERT_MUSTER = /(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+%40[A-Za-z0-9.-]+\.[A-Za-z]{2,}/gi
+/** Dieselben Adressen URL-kodiert (%40 statt @) — so stehen sie im Pfad —,
+ *  seit Nr. 56 auch mehrfach kodiert (%2540: das % des %40 noch einmal
+ *  kodiert, etwa in einer Weiterleitung, die eine schon kodierte Adresse
+ *  weiterträgt). Angesetzt wird nur am Anfang einer Zeichenfolge
+ *  (Lookbehind), sonst wäre das Muster quadratisch. Das Ergebnis bleibt
+ *  gleich: %40 und %2540 gehören selbst zu den Zeichen des lokalen Teils, der
+ *  Treffer ab dem Anfang nimmt schon das letzte passende der Folge — ein
+ *  späterer Anfang fände nichts mehr. Linear bleibt es, weil die Domain kein
+ *  %2… und kein %4… enthalten kann: Jeder Versuch endet am nächsten Trenner. */
+const EMAIL_KODIERT_MUSTER =
+  /(?<![\p{L}\p{N}\p{M}._%+-])[\p{L}\p{N}\p{M}._%+-]+%(?:25)*40(?:[\p{L}\p{N}\p{M}.-]|%[89A-Fa-f][0-9A-Fa-f])+\.(?:[\p{L}\p{M}]|%[89A-Fa-f][0-9A-Fa-f]){2,}/giu
 
 /** Telefonnummern: +43 664 123 4567, 0664/1234567, (0664) 1234567 … — eine
  *  führende +/0/(0-Gruppe und danach mindestens sieben weitere Ziffern mit
@@ -177,20 +192,34 @@ function istIpSpanAttribut(schluessel: string): boolean {
   return HEADER_ATTRIBUT_PRAEFIX.test(schluessel) && istIpHeader(schluessel.replace(HEADER_ATTRIBUT_PRAEFIX, ''))
 }
 
+/** Wie viele Code-Einheiten das Zeichen vor `stelle` belegt: zwei bei einem
+ *  Zeichen außerhalb der Grundebene (Ersatzpaar), sonst eins. Nie über
+ *  `grenze` hinaus. */
+function breiteDavor(text: string, stelle: number, grenze: number): 1 | 2 {
+  const tief = text.charCodeAt(stelle - 1)
+  const hoch = text.charCodeAt(stelle - 2)
+  return stelle - 2 >= grenze && tief >= 0xdc00 && tief <= 0xdfff && hoch >= 0xd800 && hoch <= 0xdbff ? 2 : 1
+}
+
 /**
  * E-Mail-Adressen in freiem Text — dasselbe Ergebnis wie
- * `text.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, …)`, aber
- * linear: Jener Regex setzte in einer langen Folge ohne @ an jeder Stelle neu
- * an (100 000 Zeichen: rund 7 Sekunden). Hier wird von jedem @ aus gesucht —
+ * `text.replace(/[\p{L}\p{N}\p{M}._%+-]+@<EMAIL_DOMAIN>/gu, …)`, aber linear:
+ * Jener Regex setzte in einer langen Folge ohne @ an jeder Stelle neu an
+ * (100 000 Zeichen: rund 7 Sekunden). Hier wird von jedem @ aus gesucht —
  * nach links der lokale Teil, höchstens bis zum Ende des vorigen Treffers
- * (dort setzte auch der Regex wieder an), nach rechts die Domain.
+ * (dort setzte auch der Regex wieder an), nach rechts die Domain. Nach links
+ * zählt jedes Zeichen ganz, auch eines außerhalb der Grundebene (Nr. 56).
  */
 function ersetzeEmails(text: string): string {
   let ergebnis = ''
   let ende = 0
   for (let at = text.indexOf('@'); at !== -1; at = text.indexOf('@', Math.max(at + 1, ende))) {
     let anfang = at
-    while (anfang > ende && EMAIL_LOKAL.test(text[anfang - 1])) anfang--
+    while (anfang > ende) {
+      const breite = breiteDavor(text, anfang, ende)
+      if (!EMAIL_LOKAL.test(text.slice(anfang - breite, anfang))) break
+      anfang -= breite
+    }
     if (anfang === at) continue
     EMAIL_DOMAIN.lastIndex = at + 1
     if (!EMAIL_DOMAIN.test(text)) continue
@@ -298,8 +327,10 @@ const IPV6_MUSTER =
   /(?<![\w:])(?=[0-9a-f:]*::|(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4})(?=[0-9a-f:]*[0-9a-f])[0-9a-f]{0,4}(?::[0-9a-f]{0,4}){2,7}(?![\w:])/gi
 
 /** „token=…", „secret: …" — Zuweisungen in freiem Text, auch ohne Adresse
- *  davor. `code` fehlt bewusst: „code=P2002" ist ein Prisma-Fehlercode. */
-const ZUWEISUNG_MUSTER = /\b(token|secret|passwor[dt]|otp|signatur|signature|sig|api[_-]?key|authorization)(\s*[=:]\s*)[^\s&,;"'<>]+/gi
+ *  davor. `code` fehlt bewusst: „code=P2002" ist ein Prisma-Fehlercode. Ein
+ *  schon ersetzter Wert („otp: [code entfernt]") bleibt stehen — sonst würde
+ *  daraus „otp: [entfernt] entfernt]" (Nr. 56). */
+const ZUWEISUNG_MUSTER = /\b(token|secret|passwor[dt]|otp|signatur|signature|sig|api[_-]?key|authorization)(\s*[=:]\s*)(?!\[)[^\s&,;"'<>]+/gi
 
 const BEARER_MUSTER = /\bBearer\s+[A-Za-z0-9._~+/=-]+/g
 
@@ -342,6 +373,28 @@ function bereinigeFreitext(text: string): string {
     .replace(BEARER_MUSTER, 'Bearer [entfernt]')
     .replace(ZUWEISUNG_MUSTER, '$1$2[entfernt]')
     .replace(LANGE_KENNUNG_MUSTER, '[kennung entfernt]')
+}
+
+/** Adressen in einem Fehlertext (Nr. 56): absolut (https://…) oder relativ
+ *  ab „/". Eine relative nur am Anfang oder nach Leerraum, Klammer,
+ *  Anführungszeichen oder „=" — so werden „und/oder" und „3/4" keine
+ *  Adresse. Leerraum, Anführungszeichen und schließende Klammern beenden
+ *  sie. Linear: Jede Stelle wird höchstens einmal gelesen. */
+const ADRESSE_IM_FEHLERTEXT = /https?:\/\/[^\s"'`<>)\]]+|(?<![^\s"'`(<[=])\/[^\s"'`<>)\]]*/g
+
+/**
+ * Der Fehlertext (exception.value): E-Mail, Telefon und Code wie bisher, seit
+ * Nr. 56 auch Adressen mit Token — relativ wie absolut (Bericht 47: „Link
+ * /reset-password?token=…" blieb stehen) — mit der URL-Regel, dazu
+ * „token=…" und „Bearer …". IP-Adressen bleiben (Adresse des
+ * Datenbank-Servers, Nr. 37), ebenso lange Kennungen ohne Adresse:
+ * Fehlertexte von Next.js und Prisma tragen technische Kennungen (etwa die
+ * einer Server Action), die beim Beheben helfen.
+ */
+function bereinigeFehlertext(text: string): string {
+  return bereinigeText(text.replace(ADRESSE_IM_FEHLERTEXT, (adresse) => bereinigeUrl(adresse)))
+    .replace(BEARER_MUSTER, 'Bearer [entfernt]')
+    .replace(ZUWEISUNG_MUSTER, '$1$2[entfernt]')
 }
 
 /**
@@ -470,7 +523,7 @@ function minimalEreignis<E extends SentryEvent>(event: E): E {
         values: [
           {
             ...(typeof typ === 'string' ? { type: bereinigeText(typ) } : {}),
-            ...(typeof wert === 'string' ? { value: bereinigeText(wert) } : {}),
+            ...(typeof wert === 'string' ? { value: bereinigeFehlertext(wert) } : {}),
           },
         ],
       }
@@ -485,7 +538,7 @@ function minimalEreignis<E extends SentryEvent>(event: E): E {
 function bereinigeVollstaendig<E extends SentryEvent>(event: E): E {
   // Die Nachricht trägt dasselbe wie logentry (captureMessage, Konsole) —
   // deshalb dieselbe Freitext-Regel. Nur der Fehlertext (exception.value)
-  // behält IP-Adressen, siehe Kopfkommentar.
+  // behält IP-Adressen und lange Kennungen, siehe bereinigeFehlertext.
   if (typeof event.message === 'string') event.message = bereinigeFreitext(event.message)
   else if (event.message !== undefined) delete event.message
 
@@ -498,7 +551,7 @@ function bereinigeVollstaendig<E extends SentryEvent>(event: E): E {
   if (Array.isArray(ausnahmen)) {
     for (const ausnahme of ausnahmen) {
       if (istObjekt(ausnahme) && typeof ausnahme.value === 'string') {
-        ausnahme.value = bereinigeText(ausnahme.value)
+        ausnahme.value = bereinigeFehlertext(ausnahme.value)
       }
     }
   }

@@ -10,6 +10,11 @@
  * Nachbesserung 2: Laufzeit linear bei langen Texten, und die linear
  * gemachte E-Mail-Regel liefert dasselbe wie die alten Muster.
  *
+ * Seit Nr. 56 (Altlasten aus Lauf 8 §6, Bericht 47) je ein Test für die drei
+ * offenen Fälle: E-Mail mit Nicht-ASCII-Zeichen, doppelt kodierte Adressen
+ * (%2540) und ein Token in einer relativen Adresse im Fehlertext
+ * (exception.value) — dazu eine Gegenprobe und je Muster ein Laufzeit-Fall.
+ *
  * Je Feld ein Test mit E-Mail-Adresse, Token und IP-Adresse darin; dazu
  * Gegenproben, dass Kennungen, Codes, Zahlen und die technischen Kontexte des
  * SDK (Versionsnummern!) stehen bleiben. Erfundene Werte: example.com und
@@ -351,6 +356,15 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
     ['lange Ziffernfolge', { message: '01 '.repeat(N) }],
     ['token ohne Wert', { extra: { text: 'token' + ' '.repeat(2 * N) } }],
     ['Bearer ohne Wert', { extra: { text: 'Bearer' + ' '.repeat(2 * N) } }],
+    // Nr. 56: die erweiterten E-Mail-Muster und die Adressen im Fehlertext.
+    ['viele @ nach Umlauten', { exception: { values: [{ value: 'ä@'.repeat(N) }] } }],
+    ['Domain mit Umlauten ohne Endung', { exception: { values: [{ value: 'a@' + 'ä.'.repeat(N) + 'c' }] } }],
+    ['kodierte Umlaute ohne Endung', { extra: { text: 'a%40' + '%C3%A4.'.repeat(N) + '1' } }],
+    ['doppelt kodiert ohne Endung', { extra: { text: 'a%2540'.repeat(N) } }],
+    ['lange Folge aus %25', { exception: { values: [{ value: 'a%' + '25'.repeat(N) + '4' }] } }],
+    ['viele relative Adressen im Fehlertext', { exception: { values: [{ value: ' /a?b=1'.repeat(N) }] } }],
+    ['lange Folge aus Schrägstrichen im Fehlertext', { exception: { values: [{ value: '/'.repeat(2 * N) }] } }],
+    ['Schrägstriche nach Klammern im Fehlertext', { exception: { values: [{ value: '(/'.repeat(N) }] } }],
   ]
 
   for (const [name, teil] of lang) {
@@ -362,14 +376,20 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
   }
 })
 
-describe('E-Mail-Adressen — dasselbe Ergebnis wie die Muster vor der Nachbesserung 2', () => {
-  // Die Referenz: die beiden Regex, die bis hierher galten (quadratisch, aber
-  // das Ergebnis ist die Vorgabe). Über den Fehlertext geprüft — dort gilt
-  // nur bereinigeText; die Texte enthalten keine Ziffern außer in „%40", also
-  // weder Telefonnummer noch Anmeldecode.
-  const ALT_EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g
-  const ALT_KODIERT = /[A-Za-z0-9._%+-]+%40[A-Za-z0-9.-]+\.[A-Za-z]{2,}/gi
-  const referenz = (text: string) => text.replace(ALT_EMAIL, '[e-mail entfernt]').replace(ALT_KODIERT, '[e-mail entfernt]')
+describe('E-Mail-Adressen — dasselbe Ergebnis wie die schlichten Muster (Nachbesserung 2, seit Nr. 56 auch Nicht-ASCII und %2540)', () => {
+  // Die Referenz: die Regel als schlichte Regex (quadratisch, aber das
+  // Ergebnis ist die Vorgabe). Bis Nr. 56 nur A–Z und %40; seit Nr. 56
+  // Buchstaben und Ziffern jeder Schrift, in der Domain auch kodierte Bytes
+  // eines Nicht-ASCII-Zeichens (%80–%FF) und kodiert auch %2540, %252540 ….
+  // Über den Fehlertext geprüft: Dort gilt außer den E-Mail-Mustern nur die
+  // Telefon- und Code-Regel und seit Nr. 56 die Adress-, Zuweisungs- und
+  // Bearer-Regel. Die Texte tragen weder „http", „token" noch „Bearer", „/"
+  // nur in einem Pfad ohne Token (dort gilt dieselbe E-Mail-Regel) und zu
+  // wenige Ziffern am Stück für eine Telefonnummer oder einen Anmeldecode.
+  const REF_EMAIL = /[\p{L}\p{N}\p{M}._%+-]+@(?:[\p{L}\p{N}\p{M}.-]|%[89A-Fa-f][0-9A-Fa-f])+\.(?:[\p{L}\p{M}]|%[89A-Fa-f][0-9A-Fa-f]){2,}/gu
+  const REF_KODIERT =
+    /[\p{L}\p{N}\p{M}._%+-]+%(?:25)*40(?:[\p{L}\p{N}\p{M}.-]|%[89A-Fa-f][0-9A-Fa-f])+\.(?:[\p{L}\p{M}]|%[89A-Fa-f][0-9A-Fa-f]){2,}/giu
+  const referenz = (text: string) => text.replace(REF_EMAIL, '[e-mail entfernt]').replace(REF_KODIERT, '[e-mail entfernt]')
   const neu = (text: string) => bereinigeEreignis(ereignis({ exception: { values: [{ value: text }] } })).exception?.values?.[0].value
 
   it('an den Rändern: aneinandergeklebte, kodierte, halbe und doppelte Adressen', () => {
@@ -379,6 +399,12 @@ describe('E-Mail-Adressen — dasselbe Ergebnis wie die Muster vor der Nachbesse
       'a@b.c', 'a@.cc', 'a@b..cc', 'a@b-.cc', '.@a.bc', '-@-.--', 'A@B.CO', 'a.b@c-d.ef.gh', 'mailto:kundin@example.com',
       '<kundin@example.com>', 'kundin%40example.com', 'a%40b%40c.de', 'kundin%40example.com,anna%40example.org',
       '/customers/kunde%40beispiel.at', 'a@b.cc%40d.ee', 'a%40b.cc@d.ee', '%40a.bc', 'a%4', '@@a@@b.cc@@',
+      // Seit Nr. 56: Nicht-ASCII (auch zerlegt geschrieben und außerhalb der Grundebene) und mehrfach kodiert.
+      'jürgen.müller@example.com', 'kundin@bäckerei.example', 'Größe@straße.example', 'é@é.éé', 'jürgen@example.com',
+      'a@b.c̈c', '𝒜𝒷@example.com', 'x𝒜@y.zz', 'a𝒜b@c𝒜d.e𝒜', '\uDC00a@b.cc', 'a\uD835@b.cc', 'kundin@m%C3%BCller.example',
+      'j%C3%BCrgen%40b%C3%A4ckerei.example', 'a@b.%C3%A4%C3%B6', 'a@b.%C3', 'a@b%40c.de', 'a@b%2Ec.de', 'kundin%2540example.com',
+      'kundin%252540example.com', 'a%25%2540b.cc', '%2540a.bc', 'a%2540', 'a%2540b%2540c.de', 'a%254b.cc', 'jü%2540bä.cc',
+      '1@2.34', 'ä@ö.ü', 'ä@ö.üß-x@y.zz',
     ]
     for (const text of faelle) expect(neu(text), text).toBe(referenz(text))
   })
@@ -386,7 +412,12 @@ describe('E-Mail-Adressen — dasselbe Ergebnis wie die Muster vor der Nachbesse
   it('auf 5000 zufällig zusammengesetzten Texten (fester Startwert)', () => {
     // Aus Bruchstücken von Adressen: Gut die Hälfte der Texte trägt eine
     // Adresse, über ein Drittel mehrere, einige hundert aneinandergeklebt.
-    const teile = ['a', 'Zz', 'kundin', '.', '-', '_', '+', '%', '%40', '%4', '@', ' ', 'de', 'com', ',', '(', 'b.c', 'xy.at', '@@', '..', 'x@y.de', 'a%40b.at', '@b.cc', 'kundin@']
+    // Seit Nr. 56 auch Umlaute, zerlegte Zeichen, ein Buchstabe außerhalb der
+    // Grundebene und Kodierungen (%C3%BC, %2540, %25).
+    const teile = [
+      'a', 'Zz', 'kundin', '.', '-', '_', '+', '%', '%40', '%4', '@', ' ', 'de', 'com', ',', '(', 'b.c', 'xy.at', '@@', '..',
+      'x@y.de', 'a%40b.at', '@b.cc', 'kundin@', 'ü', 'ß', 'É', 'ü', '𝒜', '%C3%BC', '%2540', '%25', 'bäck.at', 'jü@',
+    ]
     let zustand = 47
     const zufall = (bis: number) => {
       zustand = (zustand * 48_271) % 2_147_483_647
@@ -454,5 +485,101 @@ describe('Gegenproben', () => {
     })
     const e = bereinigeEreignis(ereignis(roh))
     expect(e).toEqual({ event_id: 'e3', level: 'error', message: 'an [e-mail entfernt]', extra: { bereinigung: 'fehlgeschlagen' } })
+  })
+})
+
+describe('Nr. 56 — die offenen Fälle aus Lauf 8 §6 (Bericht 47)', () => {
+  const fehlertext = (wert: string) => bereinigeEreignis(ereignis({ exception: { values: [{ value: wert }] } })).exception?.values?.[0].value
+
+  it('E-Mail mit Nicht-ASCII-Zeichen fällt ganz — Umlaut im Namen oder in der Domain, roh und kodiert', () => {
+    // Vorher blieb bei einem Umlaut vor dem @ der Teil davor stehen („jü"), und
+    // eine Domain mit Umlaut fiel gar nicht.
+    expect(fehlertext('Nutzer jürgen.müller@example.com nicht gefunden')).toBe('Nutzer [e-mail entfernt] nicht gefunden')
+    expect(fehlertext('Mail an kundin@bäckerei.example gescheitert')).toBe('Mail an [e-mail entfernt] gescheitert')
+    expect(fehlertext('Größe@straße.example, José@example.com')).toBe('[e-mail entfernt], [e-mail entfernt]')
+    // Zerlegt geschrieben (u + Trema) — so liefern manche Tastaturen den Umlaut.
+    expect(fehlertext('an jürgen@example.com')).toBe('an [e-mail entfernt]')
+
+    // In Adressen steht der Umlaut kodiert — mit kodiertem wie mit rohem @.
+    const e = bereinigeEreignis(
+      ereignis({
+        request: { url: 'https://farmerzone.at/customers/j%C3%BCrgen%40b%C3%A4ckerei.example' },
+        breadcrumbs: [{ data: { from: '/customers/kundin@m%C3%BCller.example', to: '/orders' } }],
+        message: 'Abo für jürgen@bäckerei.example gescheitert',
+        extra: { kundin: 'Jürgen <jürgen@bäckerei.example>' },
+      })
+    )
+    expect(e.request?.url).toBe('https://farmerzone.at/customers/[e-mail entfernt]')
+    expect(e.breadcrumbs?.[0].data?.from).toBe('/customers/[e-mail entfernt]')
+    expect(e.message).toBe('Abo für [e-mail entfernt] gescheitert')
+    expect(e.extra).toEqual({ kundin: 'Jürgen <[e-mail entfernt]>' })
+    expect(JSON.stringify(e)).not.toMatch(/rgen@|b%C3%A4ckerei|m%C3%BCller|bäckerei/)
+  })
+
+  it('doppelt kodierte Adressen (%2540) fallen — im Pfad, im Next-Kontext, in Texten und im Fehlertext', () => {
+    // %2540: das % des %40 noch einmal kodiert, etwa in einer Weiterleitung,
+    // die eine schon kodierte Adresse weiterträgt. Dreifach kodiert ebenso.
+    const e = bereinigeEreignis(
+      ereignis({
+        request: { url: 'https://farmerzone.at/customers/kundin%2540example.com?ziel=%2Fcustomers%2Fanna%252540example.org' },
+        contexts: { nextjs: { request_path: '/customers/kundin%2540example.com' } },
+        extra: { weiter: 'Weiter zu kundin%252540example.com' },
+        exception: { values: [{ value: 'Weiterleitung zu /customers/kundin%2540example.com gescheitert' }] },
+      })
+    )
+    const [pfad, query] = (e.request?.url ?? '').split('?')
+    expect(pfad).toBe('https://farmerzone.at/customers/[e-mail entfernt]')
+    expect(new URLSearchParams(query).get('ziel')).toBe('/customers/[e-mail entfernt]')
+    expect(e.contexts?.nextjs).toEqual({ request_path: '/customers/[e-mail entfernt]' })
+    expect(e.extra).toEqual({ weiter: 'Weiter zu [e-mail entfernt]' })
+    expect(e.exception?.values?.[0].value).toBe('Weiterleitung zu /customers/[e-mail entfernt] gescheitert')
+    expect(JSON.stringify(e)).not.toMatch(/kundin|anna/)
+  })
+
+  it('ein Token in einer relativen Adresse im Fehlertext fällt — als Parameter und als Pfadteil; die IP bleibt', () => {
+    // Vorher blieb „Link /reset-password?token=…" im Fehlertext stehen (Bericht 47).
+    expect(fehlertext('Link /reset-password?token=abc123 an kundin@example.com')).toBe('Link /reset-password an [e-mail entfernt]')
+    expect(fehlertext('Bestätigung /hof-test/bestaetigen/kurz-123 abgelaufen')).toBe('Bestätigung /hof-test/bestaetigen/[kennung entfernt] abgelaufen')
+    expect(fehlertext(`Abruf von "/api/orders/confirm/${TOKEN}?s=sig-123" gescheitert`)).toBe(
+      'Abruf von "/api/orders/confirm/[kennung entfernt]" gescheitert'
+    )
+    expect(fehlertext('Weiterleitung (/account/unsubscribe?token=geheim-123&seite=2) verweigert')).toBe(
+      'Weiterleitung (/account/unsubscribe?seite=2) verweigert'
+    )
+    // Dieselbe Regel für absolute Adressen, „token=…" und „Bearer …" — wie im Freitext.
+    expect(fehlertext('GET https://farmerzone.at/account/neuigkeiten-bestaetigen?token=geheim-123 failed')).toBe(
+      'GET https://farmerzone.at/account/neuigkeiten-bestaetigen failed'
+    )
+    expect(fehlertext('Abmeldung mit token=geheim-123 und Bearer geheim-123 abgelehnt')).toBe('Abmeldung mit token=[entfernt] und Bearer [entfernt] abgelehnt')
+    // Ein schon ersetzter Code bleibt lesbar, auch im Freitext (vorher „otp: [entfernt] entfernt]").
+    expect(fehlertext('otp: 905173 abgelehnt')).toBe('otp: [code entfernt] abgelehnt')
+    expect(bereinigeEreignis(ereignis({ message: 'otp: 905173 abgelehnt' })).message).toBe('otp: [code entfernt] abgelehnt')
+    // Die Adresse des Datenbank-Servers bleibt im Fehlertext (Nr. 37).
+    expect(fehlertext(`connect ETIMEDOUT ${IP4}:6543`)).toBe(`connect ETIMEDOUT ${IP4}:6543`)
+
+    // Auch das Minimalereignis bereinigt seinen Fehlertext mit dieser Regel:
+    // Die Nachricht hat nur einen Getter, schon ihr Zurückschreiben — der
+    // erste Schritt — wirft, der Fehlertext ist dann noch roh.
+    const roh: Record<string, unknown> = { event_id: 'e5', level: 'error', exception: { values: [{ type: 'Error', value: 'Link /reset-password?token=abc123' }] } }
+    Object.defineProperty(roh, 'message', { enumerable: true, get: () => 'kaputt' })
+    expect(bereinigeEreignis(ereignis(roh)).exception?.values?.[0].value).toBe('Link /reset-password')
+  })
+
+  it('Gegenprobe: Harmloses mit Umlauten, Schrägstrichen und Kennungen bleibt', () => {
+    for (const text of [
+      'Größe 5 kg für Bäckerei Müller, 50 % Rabatt, 3 / 4 und/oder 1/2',
+      'Fehler beim Laden von /hoefe?seite=2&kat=EIER',
+      'Route /[farmSlug]/hoefe nutzt searchParams',
+      "ENOENT: no such file or directory, open '/var/task/.next/server/app/page.js'",
+      'Paket next@16.2.6 und @sentry/nextjs, Grüße @Hof-Team, jürgen@localhost',
+      // Lange Kennungen ohne Adresse bleiben im Fehlertext — etwa die einer Server Action.
+      'Failed to find Server Action "7fa3c9b1d2e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8". This request might be from an older or newer deployment.',
+      'Rabatt 50%2540 Stück, Code 25%40',
+      `connect ETIMEDOUT ${IP4}:6543`,
+    ]) {
+      expect(fehlertext(text), text).toBe(text)
+    }
+    const harmlos = { notiz: 'Größe 5 kg für Bäckerei Müller, Grüße aus Österreich', pfad: '/hoefe/gemüse' }
+    expect(bereinigeEreignis(ereignis({ extra: structuredClone(harmlos) })).extra).toEqual(harmlos)
   })
 })

@@ -584,16 +584,18 @@ describe('bereinigeEreignis — keine IP-Adressen (Nr. 37)', () => {
     let e: ErrorEvent | undefined
     expect(() => (e = bereinigeEreignis(ereignis(roh)))).not.toThrow()
 
+    // Seit Nr. 56 fällt auch der Token der relativen Adresse im Fehlertext
+    // (vorher hielt dieser Test ihn als bekannte Lücke fest, Bericht 47).
     expect(e).toEqual({
       event_id: 'e2',
       level: 'error',
       message: 'Mail an [e-mail entfernt], Rückruf [telefon entfernt], code: [code entfernt]',
       exception: {
-        values: [{ type: 'Error bei [e-mail entfernt]', value: 'Link /reset-password?token=abc an [e-mail entfernt]' }],
+        values: [{ type: 'Error bei [e-mail entfernt]', value: 'Link /reset-password an [e-mail entfernt]' }],
       },
       extra: { bereinigung: 'fehlgeschlagen' },
     })
-    expect(JSON.stringify(e)).not.toMatch(/hof@beispiel\.at|203\.0\.113\.7|123456/)
+    expect(JSON.stringify(e)).not.toMatch(/hof@beispiel\.at|203\.0\.113\.7|123456|token=abc/)
   })
 })
 
