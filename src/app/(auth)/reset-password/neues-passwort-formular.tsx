@@ -4,13 +4,13 @@ import { useId, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Check, CircleAlert, Loader2 } from 'lucide-react'
+import { Check, CircleAlert, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { validatePassword } from '@/lib/password-rules'
 import { resetPasswordSchema } from '@/schemas/reset-password'
 import { cn } from '@/lib/utils'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
-import { PasswordInput } from '@/components/ui/password-input'
 import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { FEHLER_TEXT, FELD, FELD_LABEL, KNOPF_ORANGE } from '@/components/anmelden/stil'
 
@@ -24,6 +24,38 @@ import { FEHLER_TEXT, FELD, FELD_LABEL, KNOPF_ORANGE } from '@/components/anmeld
  * next.config.ts, Metadaten der Seite). Neu ist nur die Gestalt: die Formen
  * der Hof-Anmeldung, Haken grün, der Hauptknopf orange (Hof-Aktion).
  */
+
+/**
+ * Passwortfeld mit Auge-Knopf von 44 px wie in der Registrierung
+ * (register-form.tsx): Der Knopf des gemeinsamen PasswordInput ist nur 16 px
+ * groß und unter Touch-Zielen ≥ 44 px (DESIGN_SYSTEM). Das gemeinsame Feld
+ * bleibt für die übrigen Formulare, wie es ist.
+ */
+function PasswortFeld(props: Omit<React.ComponentProps<'input'>, 'type' | 'className'>): React.JSX.Element {
+  const [sichtbar, setSichtbar] = useState(false)
+  return (
+    <div className="relative">
+      <input {...props} type={sichtbar ? 'text' : 'password'} className={cn(FELD, 'pr-12')} />
+      <button
+        type="button"
+        onClick={() => setSichtbar((s) => !s)}
+        aria-label={sichtbar ? 'Passwort verbergen' : 'Passwort anzeigen'}
+        aria-pressed={sichtbar}
+        className={cn(
+          'absolute top-px right-px flex size-11 items-center justify-center rounded-[10px] text-muted-foreground hover:text-foreground',
+          FOKUS_RAHMEN
+        )}
+      >
+        {sichtbar ? (
+          <EyeOff className="size-[18px]" strokeWidth={1.7} aria-hidden="true" />
+        ) : (
+          <Eye className="size-[18px]" strokeWidth={1.7} aria-hidden="true" />
+        )}
+      </button>
+    </div>
+  )
+}
+
 export function NeuesPasswortFormular(): React.JSX.Element {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -102,7 +134,7 @@ export function NeuesPasswortFormular(): React.JSX.Element {
         <label htmlFor={passwortId} className={FELD_LABEL}>
           Neues Passwort
         </label>
-        <PasswordInput
+        <PasswortFeld
           id={passwortId}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -111,7 +143,6 @@ export function NeuesPasswortFormular(): React.JSX.Element {
           required
           aria-invalid={pwHasError || undefined}
           aria-describedby={listeId}
-          className={cn(FELD, 'pr-10')}
           onBlur={() => setPasswordTouched(true)}
         />
 
@@ -147,7 +178,7 @@ export function NeuesPasswortFormular(): React.JSX.Element {
         <label htmlFor={wiederholungId} className={FELD_LABEL}>
           Passwort wiederholen
         </label>
-        <PasswordInput
+        <PasswortFeld
           id={wiederholungId}
           value={passwordConfirm}
           onChange={(e) => setPasswordConfirm(e.target.value)}
@@ -155,7 +186,6 @@ export function NeuesPasswortFormular(): React.JSX.Element {
           required
           aria-invalid={confirmHasError || undefined}
           aria-describedby={confirmHasError ? wiederholungFehlerId : undefined}
-          className={cn(FELD, 'pr-10')}
         />
         {confirmHasError && (
           <p id={wiederholungFehlerId} role="alert" aria-live="polite" className={FEHLER_TEXT}>

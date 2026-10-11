@@ -159,7 +159,10 @@ export default async function BestellungPage({ params, searchParams }: Props) {
       {/* Zurück führt hier NIE durch den Verlauf — die Seite kommt aus einer
           Mail. Die Wege hinaus sind echte Links: zum Hof und über die Shell. */}
       <div className={SPALTE}>
-        <div className="flex flex-col gap-2">
+        {/* Kopf als Karte wie in „Meine Bestellungen" und im Bestelldetail des
+            Hofs: Die grüne StatusBadge erreicht auf dem hellen Seitengrund
+            nur 4,37 : 1 (Axe), auf der Karte mindestens 4,5 : 1. */}
+        <div className={cn(KARTE, 'flex flex-col gap-2')}>
           <p className="text-[13.5px] text-muted-foreground">
             Deine Bestellung bei{' '}
             <Link

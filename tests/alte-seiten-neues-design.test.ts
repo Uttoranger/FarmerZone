@@ -10,6 +10,9 @@
  *  - Der alte Kopf (KundenKopf) steht nur noch auf /datenschutz (Nr. 57).
  *  - Die Seiten mit Token in der Adresse bleiben aus dem Suchindex
  *    (Metadaten); die Header prüft tests/sicherheits-header.test.ts.
+ *  - Die Befunde der Axe-Prüfung bleiben behoben: die grüne Marke der
+ *    Bestellseite steht auf einer Karte, der Auge-Knopf der Passwortseite
+ *    hat 44 px.
  *  - Die neuen reinen Helfer: mitgeschicktSatz (Problem melden),
  *    monatOhneJahr (Achse der Finanzen am Handy), bestellTon (Marke der
  *    Bestellseite = Marke in „Meine Bestellungen").
@@ -139,6 +142,29 @@ describe('Seiten mit Token in der Adresse bleiben aus dem Suchindex (Metadaten)'
     expect(formular).toMatch(/authClient\.resetPassword\(\{ newPassword: password, token \}\)/)
     expect(anzahl(formular, /\btoken\b(?!:)/)).toBeGreaterThan(0)
     expect(formular).not.toMatch(/console\.|Sentry|href=\{[^}]*token/)
+  })
+})
+
+describe('Kontrast und Touch-Ziele (Befunde der Axe-Prüfung)', () => {
+  it('die grüne Marke der Bestellseite steht auf der Kopf-Karte, nicht auf dem hellen Seitengrund', () => {
+    const text = lies('src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx')
+    const karte = text.indexOf("<div className={cn(KARTE, 'flex flex-col gap-2')}>")
+    const marke = text.indexOf('<StatusBadge')
+    const abholung = text.indexOf('abholung-titel')
+    expect(karte).toBeGreaterThan(-1)
+    // Die Marke steht im Kopf — nach dem Öffnen der Karte, vor der Karte „Abholung".
+    expect(marke).toBeGreaterThan(karte)
+    expect(marke).toBeLessThan(abholung)
+  })
+
+  it('der Auge-Knopf der Passwortseite ist 44 px groß, benannt und meldet seinen Zustand', () => {
+    const text = lies('src/app/(auth)/reset-password/neues-passwort-formular.tsx')
+    // Nicht das gemeinsame PasswordInput (Knopf 16 px).
+    expect(text).not.toMatch(/from '@\/components\/ui\/password-input'/)
+    expect(text).toMatch(/flex size-11 items-center justify-center/)
+    expect(text).toMatch(/aria-pressed=\{sichtbar\}/)
+    expect(text).toMatch(/aria-label=\{sichtbar \? 'Passwort verbergen' : 'Passwort anzeigen'\}/)
+    expect(anzahl(text, /<PasswortFeld\b/)).toBe(2)
   })
 })
 
