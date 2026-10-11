@@ -469,6 +469,19 @@ function entferneFrameVariablen(werte: unknown): void {
 }
 
 /**
+ * Ein Ereignis ohne die Daten der Anfrage (Adresse samt Abfrage, Kopfzeilen
+ * mit Referer) und ohne Brotkrumen — als Event-Prozessor für Meldungen, die
+ * nur sagen, DASS etwas geschah, auf einer Seite, deren Adresse Suchtext
+ * trägt (/hoefe?q=…, Nr. 56). Die URL-Regel ließe Suchwörter stehen: Sie
+ * kennt nur E-Mail, Telefon, Code und heikle Parameternamen.
+ */
+export function ohneAnfrage<E extends SentryEvent>(event: E): E {
+  delete event.request
+  delete event.breadcrumbs
+  return event
+}
+
+/**
  * Der zentrale Filter — läuft auf Server, Edge und im Browser, für
  * FEHLER-Ereignisse (beforeSend) wie für TRANSAKTIONEN (beforeSendTransaction).
  * Entfernt, was der Kopfkommentar aufzählt; verwirft nie ein Ereignis —

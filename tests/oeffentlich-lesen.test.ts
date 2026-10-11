@@ -14,6 +14,10 @@
  *    Personendaten; der Fehler geht weiter an den Aufrufer, der ihn nicht
  *    ein zweites Mal meldet.
  *  - Wache: nur öffentliche Lesepfade, nie Schreiben, nie in Transaktionen.
+ *  - Seit Nr. 56: Liefert die Seite ihre Fehleranzeige aus, meldet sie das —
+ *    Warnung mit Tag sichtbar=ja, höchstens einmal je Instanz und zehn
+ *    Minuten, ohne Anfrage-Daten (die Adresse trägt den Suchtext). Die
+ *    Verdrahtung in der Seite prüft tests/hoefe-fehleranzeige.test.ts.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -23,8 +27,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
 
 import * as Sentry from '@sentry/nextjs'
-import { WIEDERHOLUNG_PAUSE_MS, istVerbindungsabbruch } from '@/lib/verbindungsfehler'
-import { leseOeffentlichMitWiederholung, schonGemeldet } from '@/server/oeffentlich-lesen'
+import {
+  FEHLERANZEIGE_MELDE_ABSTAND_MS,
+  WIEDERHOLUNG_PAUSE_MS,
+  fehleranzeigeMeldungFaellig,
+  istVerbindungsabbruch,
+} from '@/lib/verbindungsfehler'
+import {
+  FEHLERANZEIGE_MELDUNG,
+  leseOeffentlichMitWiederholung,
+  meldeFehleranzeige,
+  neueFehleranzeigeMeldungen,
+  schonGemeldet,
+} from '@/server/oeffentlich-lesen'
 
 /** So kommt der Fehler des Poolers beim Aufrufer an (gemessen mit Prisma 7.8 und adapter-pg). */
 function poolerAbbruch(): Error {
@@ -135,6 +150,117 @@ describe('leseOeffentlichMitWiederholung', () => {
     await expect(leseOeffentlichMitWiederholung('oeffentliche-hoefe', lesen, { warte })).rejects.toBe(anderer)
     expect(lesen).toHaveBeenCalledTimes(2)
     expect(Sentry.captureException).not.toHaveBeenCalled()
+  })
+})
+
+// ─── Die Fehleranzeige wird ausgeliefert (Nr. 56) ───────────────────────────
+
+describe('fehleranzeigeMeldungFaellig — höchstens einmal je zehn Minuten', () => {
+  const T = Date.UTC(2026, 9, 11, 8, 0, 0)
+
+  it('die erste Meldung immer, danach erst nach zehn Minuten — eine Millisekunde davor nicht', () => {
+    expect(FEHLERANZEIGE_MELDE_ABSTAND_MS).toBe(10 * 60_000)
+    expect(fehleranzeigeMeldungFaellig(null, T)).toBe(true)
+    expect(fehleranzeigeMeldungFaellig(T, T)).toBe(false)
+    expect(fehleranzeigeMeldungFaellig(T, T + FEHLERANZEIGE_MELDE_ABSTAND_MS - 1)).toBe(false)
+    expect(fehleranzeigeMeldungFaellig(T, T + FEHLERANZEIGE_MELDE_ABSTAND_MS)).toBe(true)
+  })
+
+  it('läuft die Uhr zurück, bleibt es ruhig', () => {
+    expect(fehleranzeigeMeldungFaellig(T, T - 1)).toBe(false)
+  })
+})
+
+type Prozessor = (ereignis: Record<string, unknown>) => unknown
+
+/** Ein Sentry-Scope zum Mitschreiben: Was setzt die Meldung, welche Prozessoren hängt sie an? */
+function mitschreibenderScope() {
+  const scope = {
+    stufe: undefined as string | undefined,
+    tags: {} as Record<string, unknown>,
+    extra: {} as Record<string, unknown>,
+    prozessoren: [] as Prozessor[],
+    setLevel(stufe: string) {
+      scope.stufe = stufe
+      return scope
+    },
+    setTags(tags: Record<string, unknown>) {
+      Object.assign(scope.tags, tags)
+      return scope
+    },
+    setExtra(name: string, wert: unknown) {
+      scope.extra[name] = wert
+      return scope
+    },
+    addEventProcessor(prozessor: Prozessor) {
+      scope.prozessoren.push(prozessor)
+      return scope
+    },
+  }
+  return scope
+}
+
+/** Wendet den Kontext der n-ten Meldung auf einen mitschreibenden Scope an. */
+function kontextDerMeldung(n: number): ReturnType<typeof mitschreibenderScope> {
+  const scope = mitschreibenderScope()
+  const kontext = vi.mocked(Sentry.captureMessage).mock.calls[n][1] as unknown as (s: typeof scope) => unknown
+  kontext(scope)
+  return scope
+}
+
+describe('meldeFehleranzeige — die Seite liefert ihre Fehleranzeige aus (Nr. 56)', () => {
+  const T = new Date('2026-10-11T08:00:00.000Z')
+  const spaeter = (ms: number) => new Date(T.getTime() + ms)
+
+  it('eine Warnung mit Tag sichtbar=ja und festem Satz — ohne Anfrage und Brotkrumen, dort stünde der Suchtext', () => {
+    expect(meldeFehleranzeige('hoefe-entdecken', T, neueFehleranzeigeMeldungen())).toBe(true)
+
+    expect(Sentry.captureMessage).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(Sentry.captureMessage).mock.calls[0][0]).toBe(FEHLERANZEIGE_MELDUNG)
+    const scope = kontextDerMeldung(0)
+    expect(scope.stufe).toBe('warning')
+    expect(scope.tags).toEqual({ bereich: 'hoefe-entdecken', sichtbar: 'ja' })
+    expect(scope.extra).toEqual({ unterdruecktSeitLetzterMeldung: 0 })
+
+    // Was die Anfrage dem Ereignis mitgäbe — Adresse mit Suchtext, Referer, Brotkrumen — fällt weg.
+    const ereignis: Record<string, unknown> = {
+      message: FEHLERANZEIGE_MELDUNG,
+      request: {
+        url: 'https://farmerzone.at/hoefe?q=Musterhof+Bio',
+        query_string: 'q=Musterhof+Bio',
+        headers: { referer: 'https://farmerzone.at/hoefe?q=Musterhof' },
+      },
+      breadcrumbs: [{ category: 'navigation', data: { from: '/hoefe?q=Musterhof' } }],
+      tags: { bereich: 'hoefe-entdecken', sichtbar: 'ja' },
+    }
+    const ergebnis = scope.prozessoren.reduce<unknown>((e, p) => p(e as Record<string, unknown>), ereignis)
+    expect(ergebnis).toEqual({ message: FEHLERANZEIGE_MELDUNG, tags: { bereich: 'hoefe-entdecken', sichtbar: 'ja' } })
+    expect(JSON.stringify(ergebnis)).not.toMatch(/Musterhof|\?q=/)
+  })
+
+  it('höchstens einmal je Instanz und zehn Minuten; die nächste Meldung nennt die stillen dazwischen', () => {
+    const instanz = neueFehleranzeigeMeldungen()
+    expect(meldeFehleranzeige('hoefe-entdecken', T, instanz)).toBe(true)
+    expect(meldeFehleranzeige('hoefe-entdecken', spaeter(60_000), instanz)).toBe(false)
+    expect(meldeFehleranzeige('hoefe-entdecken', spaeter(FEHLERANZEIGE_MELDE_ABSTAND_MS - 1), instanz)).toBe(false)
+    expect(Sentry.captureMessage).toHaveBeenCalledTimes(1)
+
+    expect(meldeFehleranzeige('hoefe-entdecken', spaeter(FEHLERANZEIGE_MELDE_ABSTAND_MS), instanz)).toBe(true)
+    expect(Sentry.captureMessage).toHaveBeenCalledTimes(2)
+    expect(kontextDerMeldung(1).extra).toEqual({ unterdruecktSeitLetzterMeldung: 2 })
+  })
+
+  it('zwei Instanzen melden je für sich', () => {
+    expect(meldeFehleranzeige('hoefe-entdecken', T, neueFehleranzeigeMeldungen())).toBe(true)
+    expect(meldeFehleranzeige('hoefe-entdecken', T, neueFehleranzeigeMeldungen())).toBe(true)
+    expect(Sentry.captureMessage).toHaveBeenCalledTimes(2)
+  })
+
+  it('scheitert Sentry, wirft die Meldung nicht — die Fehleranzeige steht trotzdem', () => {
+    vi.mocked(Sentry.captureMessage).mockImplementationOnce(() => {
+      throw new Error('Sentry nicht erreichbar')
+    })
+    expect(() => meldeFehleranzeige('hoefe-entdecken', T, neueFehleranzeigeMeldungen())).not.toThrow()
   })
 })
 

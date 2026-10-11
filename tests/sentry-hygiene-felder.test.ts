@@ -24,7 +24,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import type { ErrorEvent } from '@sentry/nextjs'
-import { bereinigeEreignis } from '@/lib/sentry-hygiene'
+import { bereinigeEreignis, ohneAnfrage } from '@/lib/sentry-hygiene'
 
 function ereignis(teil: object): ErrorEvent {
   return teil as ErrorEvent
@@ -565,6 +565,19 @@ describe('Nr. 56 — die offenen Fälle aus Lauf 8 §6 (Bericht 47)', () => {
     const roh: Record<string, unknown> = { event_id: 'e5', level: 'error', exception: { values: [{ type: 'Error', value: 'Link /reset-password?token=abc123' }] } }
     Object.defineProperty(roh, 'message', { enumerable: true, get: () => 'kaputt' })
     expect(bereinigeEreignis(ereignis(roh)).exception?.values?.[0].value).toBe('Link /reset-password')
+  })
+
+  it('ohneAnfrage: ein Ereignis ohne Anfrage und Brotkrumen, der Rest bleibt (Fehleranzeige auf /hoefe)', () => {
+    const e = ohneAnfrage(
+      ereignis({
+        message: 'Öffentliche Hofliste: Fehleranzeige ausgeliefert',
+        level: 'warning',
+        tags: { sichtbar: 'ja' },
+        request: { url: 'https://farmerzone.at/hoefe?q=Musterhof', query_string: 'q=Musterhof', headers: { referer: 'https://farmerzone.at/hoefe?q=Bio' } },
+        breadcrumbs: [{ category: 'navigation', data: { to: '/hoefe?q=Musterhof' } }],
+      })
+    )
+    expect(e).toEqual({ message: 'Öffentliche Hofliste: Fehleranzeige ausgeliefert', level: 'warning', tags: { sichtbar: 'ja' } })
   })
 
   it('Gegenprobe: Harmloses mit Umlauten, Schrägstrichen und Kennungen bleibt', () => {
