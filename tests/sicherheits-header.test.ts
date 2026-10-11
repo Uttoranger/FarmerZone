@@ -10,6 +10,9 @@
  *  - Die Ausschlussliste der Nicht-Hofseiten deckt jeden Routenordner unter
  *    src/app ab — ein neuer Ordner fällt hier auf.
  *  - Die Regel für /hoefe (Standort) bleibt.
+ *  - Seiten mit Token in der Adresse schicken keinen Referrer und stehen in
+ *    keinem Suchindex — seit Nr. 54 auch /reset-password, wie /verify; die mit
+ *    Nr. 54 umgezogenen Seiten behalten ihre Header.
  *
  * Gematcht wird mit Nexts eigenem Pfadvergleich (path-to-regexp), nicht mit
  * einer Nachbildung — so gilt auch die Lookahead-Schreibweise der Quelle.
@@ -167,5 +170,49 @@ describe('Bestätigungsseite', () => {
   it('die übrigen Seiten behalten ihre Referrer-Regel — Gegenprobe', () => {
     expect(headerFuer('/hof-test')['Referrer-Policy']).toBe('strict-origin-when-cross-origin')
     expect(headerFuer('/hof-test/bestellung/order-1')['X-Robots-Tag']).toBeUndefined()
+  })
+})
+
+describe('Passwort zurücksetzen (Nr. 54)', () => {
+  it('/reset-password schickt keinen Referrer und steht in keinem Suchindex — die Adresse trägt den Token, wie /verify', () => {
+    const header = headerFuer('/reset-password', { token: 'abc' })
+    expect(header['Referrer-Policy']).toBe('no-referrer')
+    expect(header['X-Robots-Tag']).toBe('noindex, nofollow')
+    // Dieselbe Regel wie /verify, Wort für Wort.
+    const verify = headerFuer('/verify', { token: 'abc' })
+    expect(header['Referrer-Policy']).toBe(verify['Referrer-Policy'])
+    expect(header['X-Robots-Tag']).toBe(verify['X-Robots-Tag'])
+    // Die übrigen Header bleiben, auch die Sperre gegen Einbetten.
+    expect(header['X-Frame-Options']).toBe('DENY')
+    expect(header['X-Content-Type-Options']).toBe('nosniff')
+  })
+
+  it('„Passwort vergessen" trägt keinen Token und behält die allgemeine Regel — Gegenprobe', () => {
+    expect(headerFuer('/forgot-password')['Referrer-Policy']).toBe('strict-origin-when-cross-origin')
+    expect(headerFuer('/forgot-password')['X-Robots-Tag']).toBeUndefined()
+  })
+})
+
+describe('Die Seiten, die mit Nr. 54 in eine Shell umgezogen sind, behalten ihre Header', () => {
+  it('Bar-Bestätigung: Token im Pfad — kein Referrer, kein Suchindex', () => {
+    const header = headerFuer('/hof-test/bestaetigen/V1StGXR8_Z5jdHi6BmyT9pqLnv2wYc4k')
+    expect(header['Referrer-Policy']).toBe('no-referrer')
+    expect(header['X-Robots-Tag']).toBe('noindex, nofollow')
+  })
+
+  it('Bestellseite: unverändert die allgemeine Regel — fremde Ziele bekommen nur die Herkunft; noindex steht in den Metadaten', () => {
+    // Unverändert seit vor Nr. 54 (freigabe.md §13: Referrer-Policy bleibt). Die
+    // Signatur (?s=) verlässt die Seite so nie Richtung eines fremden Ziels;
+    // Sentry entfernt `s` aus Adressen und dem Referer (sentry-hygiene.ts).
+    const header = headerFuer('/hof-test/bestellung/order-1', { s: 'f'.repeat(64) })
+    expect(header['Referrer-Policy']).toBe('strict-origin-when-cross-origin')
+    expect(header['X-Frame-Options']).toBe('DENY')
+  })
+
+  it('Impressum, Konditionen, Problem melden: allgemeine Regel, keine Einbettung', () => {
+    for (const pfad of ['/impressum', '/konditionen', '/problem-melden']) {
+      expect(headerFuer(pfad)['Referrer-Policy'], pfad).toBe('strict-origin-when-cross-origin')
+      expect(headerFuer(pfad, { vorschau: '1' })['X-Frame-Options'], pfad).toBe('DENY')
+    }
   })
 })

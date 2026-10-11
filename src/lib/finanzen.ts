@@ -386,6 +386,19 @@ export function monatKurz(monat: Monatsschluessel): string {
   })
 }
 
+/**
+ * Die Achse am Handy (seit Nr. 54): nur der Monat, „Sep". Bei bis zu zwölf
+ * Säulenpaaren in 390 px passt „Sep. 26" nicht unter eine Säule. Eindeutig
+ * bleibt er trotzdem — das Diagramm zeigt höchstens zwölf Monate, jeder Name
+ * kommt darin höchstens einmal vor; das Jahr steht im Kopf der Seite.
+ */
+export function monatOhneJahr(monat: Monatsschluessel): string {
+  return monatsgrenzenWienFuer(monat).von.toLocaleDateString('de-AT', {
+    month: 'short',
+    timeZone: 'Europe/Vienna',
+  })
+}
+
 export const EINNAHMEN_ONLINE_LABEL = 'Servicegebühr, online'
 export const EINNAHMEN_VOR_ORT_LABEL = 'Servicegebühr, vor Ort bezahlt'
 export const EINNAHMEN_PROVISION_LABEL = 'Provision'

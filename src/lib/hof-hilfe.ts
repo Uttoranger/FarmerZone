@@ -29,6 +29,18 @@ export const MELDUNG_TEXT_LABEL: Record<MeldungArt, string> = {
   FRAGE: 'Was möchtest du wissen?',
 }
 
+/**
+ * Der eine Satz „Mitgeschickt: …" unter dem öffentlichen Meldeformular
+ * (/problem-melden, seit Nr. 54; Mockup fehler-500-problem-melden-kunde):
+ * was automatisch mitgeht, ohne Technik — die Fehlernummer nur, wenn eine da
+ * ist, „dein Hof" nur für einen angemeldeten Hof. Was wirklich mitgeht,
+ * entscheidet useMeldungFormular; der Satz verspricht nichts darüber hinaus.
+ */
+export function mitgeschicktSatz(kennung: string, alsHof: boolean): string {
+  const teile = [kennung.trim() === '' ? null : `Fehlernummer ${kennung.trim()}`, alsHof ? 'Seite, Gerät und dein Hof' : 'Seite und Gerät']
+  return `Mitgeschickt: ${teile.filter((t) => t !== null).join(', ')}. Keine IP-Adresse, keine Cookies.`
+}
+
 export type MeldungZeile = {
   id: string
   kurznummer: string

@@ -344,6 +344,18 @@ describe('kein Big Bang', () => {
     'admin/layout.tsx',
     // Nr. 38: „Anmeldung bestätigen" (neu, Double-Opt-in, Fokus-Shell wie /verify).
     'account/neuigkeiten-bestaetigen/page.tsx',
+    // Nr. 54: die alten Seiten ins neue Design — Bestellseite, Impressum,
+    // Konditionen, Problem melden und die beiden 404 in der KundeShell; die
+    // Bar-Bestätigung und die Passwort-Seiten in der Fokus-Shell.
+    '(public)/[farmSlug]/bestellung/[orderId]/page.tsx',
+    '(public)/impressum/page.tsx',
+    '(public)/konditionen/page.tsx',
+    '(public)/problem-melden/page.tsx',
+    'not-found.tsx',
+    '(public)/[farmSlug]/not-found.tsx',
+    '(public)/[farmSlug]/bestaetigen/[token]/page.tsx',
+    '(auth)/forgot-password/page.tsx',
+    '(auth)/reset-password/page.tsx',
   ]
 
   it('nur die Vorschau unter /intern und die umgestellten Routen binden eine Shell ein', () => {

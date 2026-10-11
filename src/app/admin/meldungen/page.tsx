@@ -123,7 +123,10 @@ export default async function AdminMeldungenPage({
         </FilterChipReihe>
       </div>
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+      {/* grid-cols-1 = eine Spalte minmax(0, 1fr): Ohne sie wüchse die Spalte
+          unter lg mit der längsten gekürzten Zeile (Liste, Wunschliste) — bei
+          390 px wischte die Seite seitlich (Nr. 54). */}
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-2">
           <p className={cn('text-[13px]', LEISE)} aria-live="polite">
             {zeilen.length === 1 ? '1 Meldung' : `${zeilen.length} Meldungen`}

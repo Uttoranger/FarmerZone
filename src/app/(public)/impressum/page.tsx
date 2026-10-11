@@ -1,36 +1,52 @@
 import type { Metadata } from 'next'
 import { TriangleAlert } from 'lucide-react'
-import { KundenKopf } from '@/components/shared/kunden-kopf'
 import { KONTAKT_EMAIL } from '@/lib/support'
+import { cn } from '@/lib/utils'
+import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import {
+  INFOSEITE_ABSCHNITT,
+  INFOSEITE_LINK,
+  INFOSEITE_SPALTE,
+  INFOSEITE_STAND,
+  INFOSEITE_TEXT,
+  INFOSEITE_TITEL,
+} from '@/components/shared/infoseite-stil'
+import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 
 export const metadata: Metadata = { title: 'Impressum — FarmerZone' }
 
+/**
+ * Impressum in der KundeShell (seit Nr. 54, kein Mockup — Formen aus
+ * infoseite-stil.ts wie /konditionen). Statisch: Die Sitzung für den Kopf
+ * liest der Browser (KundeShellMitSitzung), die Seite liest keine Anfrage
+ * (tests/hof-anmeldung.test.ts).
+ */
 export default function ImpressumPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <KundenKopf seite={{ art: 'info' }} />
-      <div className="max-w-2xl mx-auto px-4 py-10">
-        <h1 className="text-2xl font-semibold text-foreground mb-8">Impressum</h1>
+    <KundeShellMitSitzung>
+      <div className={INFOSEITE_SPALTE}>
+        <h1 className={cn(INFOSEITE_TITEL, 'mb-8')}>Impressum</h1>
 
-        <div className="space-y-8 text-sm text-muted-foreground leading-relaxed">
+        <div className={INFOSEITE_TEXT}>
 
           <section>
-            <h2 className="font-semibold text-foreground text-base mb-3">Angaben gemäß § 5 ECG (Österreich)</h2>
-            <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-lg px-4 py-3 text-amber-800 dark:text-amber-200 text-xs mb-4">
-              <TriangleAlert className="mt-px size-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-              <span>Pilotbetrieb — FarmerZone wird derzeit mit ausgewählten Höfen erprobt. Kein kommerzieller Betrieb.</span>
-            </div>
-            <p className="mb-1"><strong>Betreiber der Plattform:</strong></p>
+            <h2 className={INFOSEITE_ABSCHNITT}>Angaben gemäß § 5 ECG (Österreich)</h2>
+            {/* Orange Hinweiskarte statt der alten Bernstein-Fläche: Im neuen
+                Design gibt es für „Achtung" nur die Hinweiskarte (DESIGN_SYSTEM). */}
+            <Hinweiskarte ton="orange" symbol={TriangleAlert} className="mb-4">
+              Pilotbetrieb — FarmerZone wird derzeit mit ausgewählten Höfen erprobt. Kein kommerzieller Betrieb.
+            </Hinweiskarte>
+            <p className="mb-1 text-foreground"><strong className="font-semibold">Betreiber der Plattform:</strong></p>
             <address className="not-italic text-muted-foreground space-y-0.5">
               <p>Johannes Briewasser</p>
               <p>Freybergstraße 15 Top 11</p>
               <p>5270 Mauerkirchen, Österreich</p>
-              <p className="mt-2">E-Mail: <a href={`mailto:${KONTAKT_EMAIL}`} className="text-primary hover:underline break-words">{KONTAKT_EMAIL}</a></p>
+              <p className="mt-2">E-Mail: <a href={`mailto:${KONTAKT_EMAIL}`} className={INFOSEITE_LINK}>{KONTAKT_EMAIL}</a></p>
             </address>
           </section>
 
           <section>
-            <h2 className="font-semibold text-foreground text-base mb-3">Unternehmensgegenstand</h2>
+            <h2 className={INFOSEITE_ABSCHNITT}>Unternehmensgegenstand</h2>
             <p>
               FarmerZone ist eine digitale Vermittlungsplattform im Pilotbetrieb, die Verbrauchern die
               Möglichkeit bietet, Produkte direkt bei regionalen Landwirtschaftsbetrieben (Höfen) zu
@@ -39,7 +55,7 @@ export default function ImpressumPage() {
           </section>
 
           <section>
-            <h2 className="font-semibold text-foreground text-base mb-3">Haftungsausschluss — Produkte und Inhalte der Höfe</h2>
+            <h2 className={INFOSEITE_ABSCHNITT}>Haftungsausschluss — Produkte und Inhalte der Höfe</h2>
             <p>
               FarmerZone stellt ausschließlich die technische Plattform zur Verfügung.
               Für die Beschreibung, Qualität, Kennzeichnung und Lieferung der angebotenen Produkte
@@ -50,7 +66,7 @@ export default function ImpressumPage() {
           </section>
 
           <section>
-            <h2 className="font-semibold text-foreground text-base mb-3">Urheberrecht</h2>
+            <h2 className={INFOSEITE_ABSCHNITT}>Urheberrecht</h2>
             <p>
               Die auf dieser Plattform veröffentlichten Inhalte (Texte, Bilder, Grafiken) unterliegen
               dem österreichischen Urheberrecht. Eine Vervielfältigung oder Verwendung bedarf der
@@ -62,11 +78,11 @@ export default function ImpressumPage() {
               wurde zum 20.07.2025 eingestellt — ein Hinweis auf eine
               abgeschaltete Stelle wäre irreführend. */}
 
-          <p className="text-xs text-muted-foreground pt-4 border-t border-border">
+          <p className={INFOSEITE_STAND}>
             Stand: August 2026
           </p>
         </div>
       </div>
-    </div>
+    </KundeShellMitSitzung>
   )
 }

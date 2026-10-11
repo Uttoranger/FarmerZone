@@ -309,15 +309,15 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     'src/app/(public)/[farmSlug]/checkout/page.tsx': [],
     // Die Bestätigungsseite trägt seit Nr. 13 die KundeShell ohne Unterleiste (siehe unten).
     'src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx': [],
-    // Ungültiger Link: nicht einmal der Hof ist bestätigt → zur Hofübersicht.
-    'src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx': ['bestellung-ungueltig', 'bestellung'],
-    // Bar-Bestätigung (H3): Token unbekannt → zur Hofübersicht; sonst wie die
-    // Bestätigungsseite (nie durch den Verlauf, davor steht das Mailprogramm).
-    'src/app/(public)/[farmSlug]/bestaetigen/[token]/page.tsx': ['bestaetigung', 'bestellung-ungueltig'],
-    'src/app/(public)/impressum/page.tsx': ['info'],
+    // Seit Nr. 54 in der KundeShell (Bestellseite, Impressum, Konditionen,
+    // Problem melden) bzw. der Fokus-Shell (Bar-Bestätigung) — siehe unten.
+    'src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx': [],
+    'src/app/(public)/[farmSlug]/bestaetigen/[token]/page.tsx': [],
+    'src/app/(public)/impressum/page.tsx': [],
+    // Der Datenschutz zieht erst mit Nr. 57 um — bis dahin der letzte KundenKopf.
     'src/app/(public)/datenschutz/page.tsx': ['info'],
-    'src/app/(public)/konditionen/page.tsx': ['info'],
-    'src/app/(public)/problem-melden/page.tsx': ['info'],
+    'src/app/(public)/konditionen/page.tsx': [],
+    'src/app/(public)/problem-melden/page.tsx': [],
     // Die Hofseite trägt seit Nr. 10 die KundeShell (siehe unten).
     'src/app/(public)/[farmSlug]/page.tsx': [],
     // Die Produktseite trägt seit Nr. 11 die KundeShell ohne Unterleiste.
@@ -401,7 +401,7 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     // Über die Hülle, die die Sitzung im Browser liest — keine Sitzungsabfrage je Aufruf.
     expect(text).toMatch(/<KundeShellMitSitzung>/)
     expect(text).not.toMatch(/KundenKopf|headers\(\)|auth\.api/)
-    // Gegenprobe: Die Suche findet KundenKopf, wo er noch steht.
-    expect(lies('src/app/(public)/impressum/page.tsx')).toMatch(/KundenKopf/)
+    // Gegenprobe: Die Suche findet KundenKopf, wo er noch steht (Datenschutz, bis Nr. 57).
+    expect(lies('src/app/(public)/datenschutz/page.tsx')).toMatch(/KundenKopf/)
   })
 })

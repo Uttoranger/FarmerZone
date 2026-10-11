@@ -1,14 +1,12 @@
-import Link from 'next/link'
 import type { Metadata } from 'next'
-import { Search } from 'lucide-react'
-import { KundenKopf } from '@/components/shared/kunden-kopf'
 import {
   HOEFE_ENTDECKEN,
   NICHT_GEFUNDEN_TEXT,
   NICHT_GEFUNDEN_TITEL,
   ZUR_STARTSEITE,
 } from '@/lib/fehlerseite'
-import { SUCHTEXT_MAX, SUCHTEXT_PARAMETER } from '@/schemas/hoefe-filter'
+import { NichtGefundenAnsicht } from '@/components/shared/nicht-gefunden-ansicht'
+import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 
 export const metadata: Metadata = {
   title: 'Seite nicht gefunden — FarmerZone',
@@ -21,68 +19,21 @@ export const metadata: Metadata = {
  * damit der Bereich sich nicht verrät). Deshalb steht hier nichts, was einen
  * Bereich preisgibt, und auch kein Hof-Login: Das ist eine Kundenseite.
  *
- * Das Suchfeld ist ein gewöhnliches GET-Formular auf /hoefe und braucht kein
- * JavaScript. Den Text liest dort `leseHoefeFilter` als Parameter — eine
- * Systemgrenze, die seit Bereiche 2 geprüft ist und Müll verwirft, statt eine
- * Fehlerseite zu zeigen.
+ * Seit Nr. 54 in der KundeShell (Mockups fehler-404-seite-nicht-gefunden und
+ * fehler-404-mobil). Die Sitzung für den Kopf liest der Browser
+ * (KundeShellMitSitzung) — die 404 fragt den Server nichts. Am Handy steht
+ * die Unterleiste der Shell darunter: Die 404 ist keine Fokus-Seite.
  */
 export default function NotFound() {
   return (
-    <div className="min-h-screen bg-background">
-      <KundenKopf seite={{ art: 'info' }} />
-
-      <main className="mx-auto max-w-xl px-4 py-14 sm:py-20">
-        <h1 className="font-heading text-2xl font-semibold text-balance text-foreground sm:text-3xl">
-          {NICHT_GEFUNDEN_TITEL}
-        </h1>
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
-          {NICHT_GEFUNDEN_TEXT}
-        </p>
-
-        <form action="/hoefe" method="get" role="search" className="mt-8">
-          <label htmlFor="nicht-gefunden-suche" className="mb-1.5 block text-sm font-medium text-foreground">
-            Hof oder Produkt suchen
-          </label>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="relative flex-1">
-              <Search
-                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-                aria-hidden="true"
-              />
-              <input
-                id="nicht-gefunden-suche"
-                type="search"
-                name={SUCHTEXT_PARAMETER}
-                maxLength={SUCHTEXT_MAX}
-                placeholder="z. B. Eier, Heu, Wiesenhof"
-                className="min-h-11 w-full rounded-xl border border-border bg-card pr-3 pl-9 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              />
-            </div>
-            <button
-              type="submit"
-              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/40"
-            >
-              Suchen
-            </button>
-          </div>
-        </form>
-
-        {/* Genau ein primärer Weg (DESIGN_SYSTEM, „Qualität"); der zweite ist outline. */}
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <Link
-            href="/"
-            className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-          >
-            {ZUR_STARTSEITE}
-          </Link>
-          <Link
-            href="/hoefe"
-            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/40"
-          >
-            {HOEFE_ENTDECKEN}
-          </Link>
-        </div>
-      </main>
-    </div>
+    <KundeShellMitSitzung>
+      <NichtGefundenAnsicht
+        titel={NICHT_GEFUNDEN_TITEL}
+        text={NICHT_GEFUNDEN_TEXT}
+        haupt={{ href: '/', text: ZUR_STARTSEITE }}
+        neben={{ href: '/hoefe', text: HOEFE_ENTDECKEN }}
+        suchfeldId="nicht-gefunden-suche"
+      />
+    </KundeShellMitSitzung>
   )
 }
