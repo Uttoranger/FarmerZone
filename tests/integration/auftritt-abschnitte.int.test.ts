@@ -34,7 +34,8 @@ import { saveAppearanceAction, updateFarmBannerAction, updateFarmLogoAction } fr
 import { updateProfile } from '@/server/actions/farm'
 import { addFarmPhotoAction } from '@/server/actions/farm-photos'
 import { getAppearanceData } from '@/server/queries/appearance'
-import { getFarmSettings } from '@/server/queries/farm'
+import { getFarmSettings, getPublicFarm } from '@/server/queries/farm'
+import { DEFAULT_SECTIONS } from '@/server/queries/appearance'
 import { auftrittBasis, auftrittStandAus, geaendertSeitLaden, profilBasis } from '@/lib/abschnitt-stand'
 import { erstelleHofMitAnmeldung, raeumeAuf } from './setup/basis'
 
@@ -300,6 +301,24 @@ describe('Logo, Titelbild und Galeriefoto (Abnahme Nr. 50: kein anderes Feld än
 
     // Der Verlauf (bannerValue) bleibt, wie er war — die Hofseite zeigt ihn wieder.
     expect(await stand(farm.id)).toEqual({ ...vorher, hof: { ...vorher.hof, bannerType: 'GRADIENT', bannerUrl: null } })
+  })
+})
+
+describe('Abschnitte NULL — wie bei jedem Seed-Hof und jedem neuen Hof', () => {
+  it('das erste Speichern schreibt die Standard-Abschnitte; die Hofseite zeigt vorher und nachher dieselben', async () => {
+    // Ohne sectionsConfig angelegt: die Spalte ist NULL.
+    const { farm } = await angemeldeterHof({ sectionsConfig: undefined })
+    const spalte = async () => (await prisma.farm.findUniqueOrThrow({ where: { id: farm.id }, select: { sectionsConfig: true } })).sectionsConfig
+    expect(await spalte()).toBeNull()
+    const vorher = (await getPublicFarm(farm.slug))?.sectionsConfig
+
+    expect((await speichereAuftritt({ tagline: 'Gemüse vom Hügel' })).error).toBeUndefined()
+
+    // Gespeichert stehen jetzt die Standard-Abschnitte (getAppearanceData liest NULL als Standard) ...
+    expect(await spalte()).toEqual(DEFAULT_SECTIONS)
+    // ... und für Kundinnen ändert sich nichts: dieselben wirksamen Abschnitte wie vorher.
+    expect(vorher).toEqual(DEFAULT_SECTIONS)
+    expect((await getPublicFarm(farm.slug))?.sectionsConfig).toEqual(vorher)
   })
 })
 
