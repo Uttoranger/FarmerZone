@@ -74,6 +74,6 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 53 | Heute, Auswertung, Verkäufe | fertig, PR offen | `nacht/2026-10-10/53-heute-auswertung` | #233 | 55 | gestapelt auf 55 (#232); tester grün; pruefer ohne Blocker; Runde 1 (c0080bc); 55 Endstand hineingeholt (9ed8afb) | 11.10.2026 |
 | 54 | Admin am Handy und alte Seiten ins neue Design | fertig, PR offen | `nacht/2026-10-10/54-admin-handy` | #237 | main | Runde 1 und 2 mit Nachprüfung; Nacharbeit 39e2bfa | 11.10.2026 |
 | 55 | Testzahlungen aus Auswertungen (Z4) | fertig, PR offen | `nacht/2026-10-10/55-testzahlungen` | #232 | main | Runde 1 und 2 mit Nachprüfung; Nacharbeit 5ca0874 | 11.10.2026 |
-| 56 | Altlasten Lauf 8 §6 und Kleinkram | läuft (Nachprüfung Runde 1) | `nacht/2026-10-10/56-altlasten` | | main | tester grün; pruefer: 1 Blocker; Runde 1 (3955918 … f4b7fc7) | 11.10.2026 |
+| 56 | Altlasten Lauf 8 §6 und Kleinkram | läuft (Nachbesserung Runde 2) | `nacht/2026-10-10/56-altlasten` | | main | Runde 1 (3955918 … f4b7fc7); Nachprüfung: kein Blocker, 2 Sollte | 11.10.2026 |
 | 57 | Datenschutzerklärung, Nachtrag (Entwurf) | Entwurf offen | `nacht/2026-10-10/57-datenschutz-nachtrag` | #236 (Entwurf) | 33 (#210) | tester ohne Befund; pruefer: 1 Blocker, in Runde 1 (94b142a) behoben; nicht im Sammel-PR | 11.10.2026 |
 | Sammel 9 | Sammel-PR Lauf 9 | offen | `integration/lauf9` | | main | | |
