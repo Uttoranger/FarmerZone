@@ -7,7 +7,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getAppearanceData, type SectionConfig } from '@/server/queries/appearance'
 import { appearanceSchema } from '@/schemas/auftritt'
-import { auftrittStandAus, type AuftrittStand } from '@/lib/abschnitt-stand'
+import { ABSCHNITT_SPEICHERN_TEXT, auftrittStandAus, type AuftrittStand } from '@/lib/abschnitt-stand'
 import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
 
 // Das Schema liegt in src/schemas/auftritt.ts — der Hofseiten-Editor prüft
@@ -25,10 +25,10 @@ export type AppearanceSaveInput = z.infer<typeof appearanceSchema>
  */
 export async function ladeAuftrittStand(): Promise<{ stand: AuftrittStand } | { error: string }> {
   const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) return { error: 'Nicht angemeldet' }
+  if (!session?.user) return { error: ABSCHNITT_SPEICHERN_TEXT.nichtAngemeldet }
 
   const daten = await getAppearanceData(session.user.id)
-  if (!daten) return { error: 'Hof nicht gefunden' }
+  if (!daten) return { error: ABSCHNITT_SPEICHERN_TEXT.hofFehlt }
   return { stand: auftrittStandAus(daten) }
 }
 

@@ -34,7 +34,7 @@ import { ABSCHNITT_LABEL } from '@/lib/hofseite-fortschritt'
 import { GESPEICHERT_TEXT } from '@/lib/bauern-navigation'
 import type { FarmSettings } from '@/server/queries/farm'
 import type { AppearanceData, SectionConfig } from '@/server/queries/appearance'
-import { speichereAuftritt, speichereProfil } from '@/components/mein-hof/abschnitt-speichern'
+import { speichereAuftritt, speichereProfil, speichernOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
 import { DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
 import { FeldZaehler, ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
 import { Button } from '@/components/ui/button'
@@ -86,7 +86,9 @@ export type AbschnittFormularProps = {
 
 /**
  * Speichern mit Rückmeldung: Fehler stehen im Formular (DESIGN_SYSTEM,
- * Zustände: inline, kein Modal), Erfolg meldet der Toast bzw. `meldeErfolg`.
+ * Zustände: inline, kein Modal) — auch eine gescheiterte Anfrage, die sonst
+ * an die Fehlergrenze ginge (speichernOhneWurf); die Eingabe bleibt stehen.
+ * Erfolg meldet der Toast bzw. `meldeErfolg`.
  */
 function useSpeichern({ onGespeichert, meldeErfolg }: Pick<AbschnittFormularProps, 'onGespeichert' | 'meldeErfolg'>) {
   const [pending, start] = useTransition()
@@ -94,9 +96,9 @@ function useSpeichern({ onGespeichert, meldeErfolg }: Pick<AbschnittFormularProp
   const ausfuehren = (speichern: () => Promise<{ error?: string }>) => {
     setFehler(null)
     start(async () => {
-      const antwort = await speichern()
-      if (antwort.error) {
-        setFehler(antwort.error)
+      const satz = await speichernOhneWurf(speichern)
+      if (satz) {
+        setFehler(satz)
         return
       }
       if (meldeErfolg) meldeErfolg()

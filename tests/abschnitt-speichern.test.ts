@@ -13,7 +13,11 @@
  *    Höchstwartezeit kommt der Satz mit Ausweg, ohne dass gelesen oder
  *    geschrieben wurde; die Kette wartet weiter auf das hängende. Kommt es
  *    doch zurück, läuft das nächste wieder normal.
+ *  - Die Formulare zeigen jeden Fehler als Satz, auch eine gescheiterte
+ *    Anfrage (speichernOhneWurf) — statt der Fehlerseite, die Eingabe bleibt.
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ABSCHNITT_SPEICHERN_TEXT, type AuftrittStand } from '@/lib/abschnitt-stand'
 
@@ -150,5 +154,28 @@ describe('ein hängendes Speichern', () => {
 
   it('der Satz sagt, was zu tun ist — per Du, mit Ausweg', () => {
     expect(ABSCHNITT_SPEICHERN_TEXT.vorigesHaengt).toMatch(/Lade die Seite neu/)
+  })
+})
+
+describe('Fehler im Formular statt Fehlerseite (speichernOhneWurf)', () => {
+  it('eine gescheiterte Anfrage wird zum Satz mit Ausweg', async () => {
+    const { speichernOhneWurf } = await speicherweg()
+    await expect(speichernOhneWurf(() => Promise.reject(new TypeError('Failed to fetch')))).resolves.toBe(ABSCHNITT_SPEICHERN_TEXT.gingNicht)
+    expect(ABSCHNITT_SPEICHERN_TEXT.gingNicht).toBe('Wir konnten das gerade nicht speichern. Versuch es noch einmal.')
+  })
+
+  it('der Satz der Aktion bleibt, wie er ist; ohne Fehler null', async () => {
+    const { speichernOhneWurf } = await speicherweg()
+    await expect(speichernOhneWurf(async () => ({ error: 'Der Leitspruch darf höchstens 60 Zeichen haben — bitte kürzen.' }))).resolves.toBe(
+      'Der Leitspruch darf höchstens 60 Zeichen haben — bitte kürzen.'
+    )
+    await expect(speichernOhneWurf(async () => ({}))).resolves.toBeNull()
+  })
+
+  it('die Formulare der Abschnitte speichern nur darüber', () => {
+    const formulare = readFileSync(join(process.cwd(), 'src/components/mein-hof/abschnitt-formulare.tsx'), 'utf8')
+    expect(formulare).toMatch(/const satz = await speichernOhneWurf\(speichern\)\s*if \(satz\) \{\s*setFehler\(satz\)/)
+    // Gegenprobe: der alte Weg (ein Wurf ginge an die Fehlergrenze) steht nicht mehr da.
+    expect(formulare).not.toMatch(/const antwort = await speichern\(\)/)
   })
 })

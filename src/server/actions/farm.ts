@@ -16,7 +16,7 @@ import {
 } from '@/lib/geokodierung'
 import { LAND_GENITIV, alsLand, type Land } from '@/lib/laender'
 import { profileSchema, profilBearbeitenSchema } from '@/schemas/hofprofil'
-import { profilBasis } from '@/lib/abschnitt-stand'
+import { ABSCHNITT_SPEICHERN_TEXT, profilBasis } from '@/lib/abschnitt-stand'
 import { nimmGesperrteAusDemShop, revalidiereProdukte } from '@/server/produkte-schreiben'
 
 async function getAuthFarm() {
@@ -43,8 +43,11 @@ export type ProfileResult = { error?: string }
  * nach einem anderen Abschnitt alte Werte. Nur lesen, nur der eigene Hof.
  */
 export async function ladeProfilStand(): Promise<{ profil: ProfileFormData } | { error: string }> {
-  const farm = await getAuthFarm()
-  if (!farm) return { error: 'Nicht angemeldet' }
+  // Getrennt geprüft: Ohne Sitzung hilft Anmelden, ohne Hof hilft es nicht.
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) return { error: ABSCHNITT_SPEICHERN_TEXT.nichtAngemeldet }
+  const farm = await prisma.farm.findUnique({ where: { ownerId: session.user.id } })
+  if (!farm) return { error: ABSCHNITT_SPEICHERN_TEXT.hofFehlt }
   return { profil: profilBasis(farm) }
 }
 

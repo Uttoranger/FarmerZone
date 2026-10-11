@@ -54,6 +54,22 @@ function nacheinander(arbeit: () => Promise<{ error?: string }>): Promise<{ erro
   return lauf
 }
 
+/**
+ * Ein Speichern, das nie wirft — für die Formulare der Abschnitte: Der Satz
+ * der Aktion bzw. bei einer gescheiterten Anfrage (Netz weg, Aktion nach
+ * einem Deploy unbekannt) `ABSCHNITT_SPEICHERN_TEXT.gingNicht`, sonst null.
+ * Geworfen ginge es an die Fehlergrenze, und die Eingabe wäre weg. Ein Fehler
+ * auf dem Server ist dort schon bei Sentry; hier geht es nur um den Satz.
+ */
+export async function speichernOhneWurf(speichern: () => Promise<{ error?: string }>): Promise<string | null> {
+  try {
+    const antwort = await speichern()
+    return antwort.error ?? null
+  } catch {
+    return ABSCHNITT_SPEICHERN_TEXT.gingNicht
+  }
+}
+
 /** Speichert einen Teil des Auftritts (Leitspruch und Gründungsjahr, Über uns, Werte, Abschnitte). */
 export function speichereAuftritt(teil: AuftrittTeil): Promise<{ error?: string }> {
   return nacheinander(async () => {

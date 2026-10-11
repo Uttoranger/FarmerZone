@@ -28,6 +28,12 @@ import type { ProfileFormData } from '@/schemas/hofprofil'
 export const ABSCHNITT_SPEICHERN_TEXT = {
   /** Ein Speichern wartet zu lange auf das vorige (Kette in components/mein-hof/abschnitt-speichern.ts). */
   vorigesHaengt: 'Das vorige Speichern ist noch nicht fertig. Lade die Seite neu und versuch es dann noch einmal.',
+  /** Die Anfrage selbst scheiterte (Netz weg, Aktion nach einem Deploy unbekannt) — die Eingabe bleibt stehen. */
+  gingNicht: 'Wir konnten das gerade nicht speichern. Versuch es noch einmal.',
+  /** Die Sitzung ist abgelaufen (Lesen des frischen Stands, server/actions/appearance.ts und farm.ts). */
+  nichtAngemeldet: 'Du bist nicht mehr angemeldet. Melde dich neu an und versuch es dann noch einmal.',
+  /** Angemeldet, aber kein Hof zu diesem Konto — etwa in einem Tab mit einer älteren Anmeldung. */
+  hofFehlt: 'Wir finden deinen Hof gerade nicht. Lade die Seite neu und versuch es dann noch einmal.',
 } as const
 
 /** Die Felder, die saveAppearanceAction bei jedem Aufruf schreibt — genau der Stand, aus dem jeder Abschnitt speichert. */
