@@ -63,6 +63,44 @@ export const KATEGORIE_LABEL: Record<ProductCategoryValue, string> = {
 }
 
 /**
+ * Die Illustration jeder Kategorie: public/categories/<slug>.webp — das Bild
+ * der Produktkarte, solange ein Produkt kein eigenes Foto hat.
+ *
+ * Die Zuordnung ist VOLLSTÄNDIG (Record über alle Kategorien — TypeScript
+ * erzwingt jeden Wert), und zu jedem Dateinamen liegt eine Illustration in
+ * public/categories/ (tests/product-image.test.ts prüft das). Sie steht hier,
+ * rein, damit auch der Browser sie kennt (Käufer-Vorschau im Produktdialog,
+ * Nr. 51); ob die Datei wirklich liegt, prüft nur der Server
+ * (categoryImagePath in product-image.ts, liest das Dateisystem).
+ */
+export const KATEGORIE_BILD_SLUG: Record<ProductCategoryValue, string> = {
+  MILCH: 'milch',
+  EIER: 'eier',
+  FLEISCH: 'fleisch',
+  FISCH: 'fisch',
+  GEMUESE: 'gemuese',
+  OBST: 'obst',
+  BROT: 'brot',
+  HONIG: 'honig',
+  GETRAENKE: 'getraenke',
+  // Die Altlast aus Taxonomie 1 bekommt keine eigene Illustration: Sie steht
+  // nur noch an Bestandsdaten und teilt sich die neutrale Kachel mit Sonstiges.
+  FUTTERMITTEL: 'sonstiges',
+  // Die vier Futter-Kategorien aus Bereiche 1 — mit eigener Illustration.
+  HEU_STROH: 'heu-stroh',
+  GETREIDE_KOERNER: 'getreide-koerner',
+  MISCHFUTTER: 'mischfutter',
+  ERGAENZUNGSFUTTER: 'ergaenzungsfutter',
+  BRENNHOLZ: 'brennholz',
+  SONSTIGES: 'sonstiges',
+}
+
+/** Der Pfad der Illustration einer Kategorie („/categories/milch.webp") — ohne Kategorie keiner. */
+export function kategorieBildPfad(l1: ProductCategoryValue | null | undefined): string | null {
+  return l1 ? `/categories/${KATEGORIE_BILD_SLUG[l1]}.webp` : null
+}
+
+/**
  * Kategorien aus Taxonomie 1, die seit Bereiche 1 nicht mehr gewählt werden
  * dürfen. Postgres entfernt Enum-Werte nicht sauber — sie bleiben im Enum,
  * Zod lehnt sie ab, der Cleanup-Sprint entfernt sie (Konzept 2.3).

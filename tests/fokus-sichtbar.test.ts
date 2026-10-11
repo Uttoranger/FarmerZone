@@ -11,11 +11,16 @@
  *    setzt auch die Rahmenart.
  *  - Der gemeinsame Fokusrahmen (fokus.ts) trägt sie.
  *  - Gegenprobe: Die Prüfung erkennt die fehlerhafte Kette des Bestands.
+ *  - Der Kopf eines Akkordeon-Abschnitts (Produktdialog) zeigt den Fokus mit
+ *    dem gemeinsamen Rahmen, nicht mit einem eigenen Ring (Nr. 51).
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
+import { Accordion, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 
 /** Klassenketten (in '…', "…" oder `…`), die einen Fokusrahmen setzen, aber keine Rahmenart. */
 function rahmenOhneArt(text: string): string[] {
@@ -64,5 +69,26 @@ describe('Fokusrahmen mit Rahmenart', () => {
     const bestand = readFileSync(join(process.cwd(), 'src/components/farmer/farmer-nav.tsx'), 'utf8')
     expect(rahmenOhneArt(bestand).length).toBeGreaterThan(0)
     expect(rahmenOhneArt("'outline-none focus-visible:outline-2 focus-visible:outline-ring'")).toHaveLength(1)
+  })
+})
+
+describe('Akkordeon im Produktdialog (Nr. 51): Fokus nach DESIGN_SYSTEM', () => {
+  /** Die Klassen des ersten Knopfs im gerenderten HTML. */
+  const knopfKlassen = (html: string): string[] => (html.match(/<button[^>]*\bclass="([^"]*)"/)?.[1] ?? '').split(/\s+/)
+
+  it('der Kopf eines Abschnitts trägt den gemeinsamen Fokusrahmen (FOKUS_RAHMEN), keinen eigenen Ring', () => {
+    const html = renderToStaticMarkup(
+      createElement(Accordion, null, createElement(AccordionItem, { value: 'grunddaten' }, createElement(AccordionTrigger, null, 'Grunddaten')))
+    )
+    const klassen = knopfKlassen(html)
+    expect(html).toContain('Grunddaten')
+    for (const klasse of FOKUS_RAHMEN.split(' ')) expect(klassen, klasse).toContain(klasse)
+    expect(klassen.filter((k) => k.startsWith('focus-visible:ring'))).toEqual([])
+  })
+
+  it('Gegenprobe: der Ring des Bestands fiele auf', () => {
+    const bestand = knopfKlassen('<button class="outline-none focus-visible:ring-2 focus-visible:ring-ring">x</button>')
+    expect(bestand.filter((k) => k.startsWith('focus-visible:ring'))).toHaveLength(2)
+    expect(bestand).not.toContain('focus-visible:outline-solid')
   })
 })

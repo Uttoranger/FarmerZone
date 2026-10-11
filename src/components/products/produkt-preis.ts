@@ -17,7 +17,9 @@ import {
   gebindeGroesse,
   istMassEinheit,
 } from '@/lib/format'
-import { NETTO_EINHEIT_LABEL, type NettoEinheitValue } from '@/lib/taxonomie'
+import { KAEUFER_VORSCHAU, type KartenVorschau } from '@/lib/hofseite-kunde'
+import { NETTO_EINHEIT_LABEL, kategorieBildPfad, type NettoEinheitValue, type ProductCategoryValue } from '@/lib/taxonomie'
+import { preisZahl } from '@/schemas/product'
 
 /** „Preis je kg" ohne Gebinde, „Preis für das 2-kg-Paket" mit, „Preis für 6 Pakete" bei Stück/Paket. */
 export function preisFeldLabel(unit: string, unitSize?: number | null): string {
@@ -53,6 +55,33 @@ export function kundenVorschau(
     if (je) teile.push(je)
   }
   return `Kunden sehen: ${teile.join(' · ')}`
+}
+
+/**
+ * Die Karte „So sehen Käufer dein Produkt" (Nr. 51) aus den Formularwerten —
+ * Foto, Name, Preis, Einheit. Die Produktkarte der Hofseite zeigt sie mit
+ * ihren eigenen Helfern (formatGrundpreis, zweitePreiszeile); hier wird nichts
+ * gerechnet.
+ *
+ * Der Preis steht nur da, wenn er die Prüfung beim Speichern bestünde
+ * (preisZahl, dasselbe Schema wie der Server, Text zerlegt über parseDezimal) —
+ * sonst null, und die Karte zeigt einen ruhigen Platzhalter statt „€ 0,00"
+ * oder „NaN". Ohne Foto nimmt sie die Illustration der Kategorie wie die
+ * Hofseite.
+ */
+export function kaeuferVorschau(
+  werte: { name: string; price: number | null; unit: string; unitSize: number | null | undefined },
+  bild: { foto: string | null; kategorie: ProductCategoryValue | null }
+): KartenVorschau {
+  const preis = preisZahl.safeParse(werte.price)
+  return {
+    name: werte.name.trim() || KAEUFER_VORSCHAU.name,
+    imageUrl: bild.foto,
+    categoryImageUrl: kategorieBildPfad(bild.kategorie),
+    price: preis.success ? preis.data : null,
+    unit: werte.unit,
+    unitSize: werte.unitSize ?? null,
+  }
 }
 
 /**

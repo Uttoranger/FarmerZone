@@ -96,6 +96,8 @@ import {
   formatBestand,
 } from '@/lib/format'
 import { KategorieSheet } from './kategorie-sheet'
+import { LebensmittelVorschau } from './lebensmittel-vorschau'
+import { produktBereich } from '@/lib/produkte-hof'
 import type { NeuBereich } from '@/schemas/url-auftrag'
 import { FUTTER_ANLEGEN_HREF } from '@/lib/bauern-navigation'
 import { cn } from '@/lib/utils'
@@ -1880,6 +1882,22 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                   </AccordionItem>
                 )}
               </Accordion>
+
+              {/* „So sehen Käufer dein Produkt" (Nr. 51): nur für Lebensmittel —
+                  Futter und Brennmaterial haben ihre eigene Vorschau im eigenen
+                  Formular. Der Bereich kommt aus derselben Regel wie die Filter
+                  auf /products (produktBereich). Live aus dem Formular; gerechnet
+                  wird nichts, die Karte formatiert selbst. */}
+              {produktBereich(category) === 'lebensmittel' && (
+                <LebensmittelVorschau
+                  name={werte.name}
+                  price={werte.price}
+                  unit={werte.unit}
+                  unitSize={werte.unitSize}
+                  foto={previewUrl}
+                  kategorie={category}
+                />
+              )}
             </div>
 
             {/* Fuß: fest am unteren Rand als eigene Flex-Zone — kein sticky, keine
