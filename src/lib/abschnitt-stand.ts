@@ -39,6 +39,8 @@ export const ABSCHNITT_SPEICHERN_TEXT = {
   hofFehlt: 'Wir finden deinen Hof gerade nicht. Lade die Seite neu und versuch es dann noch einmal.',
   /** Ein Wert des Auftritts passt nicht ins Schema, und kein Abschnitt lässt sich zuordnen. */
   ungueltig: 'Wir konnten das nicht speichern. Lade die Seite neu und versuch es dann noch einmal.',
+  /** Der Grund hinter dem Namen des Abschnitts, der sperrt, wenn das Schema dafür keinen eigenen Satz hat (auftrittFehlerText). */
+  unspeicherbar: 'Dort steht etwas, das wir so nicht speichern können — bitte prüf es.',
 } as const
 
 /** Welcher Abschnitt ein Feld des Auftritts bearbeitet. */
@@ -71,7 +73,7 @@ export function auftrittFehlerText(issues: readonly { path: readonly PropertyKey
   const feld = erstes?.path[0]
   const zeile = typeof feld === 'string' ? ZEILE_DES_FELDS[feld] : undefined
   if (!erstes || !zeile) return ABSCHNITT_SPEICHERN_TEXT.ungueltig
-  const grund = EIGENE_SAETZE.has(erstes.message) ? erstes.message : 'Dort steht etwas, das wir so nicht speichern können — bitte prüf es.'
+  const grund = EIGENE_SAETZE.has(erstes.message) ? erstes.message : ABSCHNITT_SPEICHERN_TEXT.unspeicherbar
   return `„${ZEILE_TITEL[zeile]}“: ${grund} Erst danach lässt sich speichern.`
 }
 

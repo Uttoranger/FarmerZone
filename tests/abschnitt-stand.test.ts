@@ -211,7 +211,8 @@ describe('auftrittFehlerText — welcher Abschnitt sperrt', () => {
   it('ein Satz von Zod (englisch) kommt nie hinaus — dafür ein fester Satz, der Abschnitt bleibt genannt', () => {
     const eingabe = auftrittBasis({ ...STAND, farmValues: [{ icon: 'bio', title: 'x'.repeat(51), subtitle: null }] })
     const text = fehler(eingabe)
-    expect(text).toMatch(/^„Werte“: Dort steht etwas, das wir so nicht speichern können/)
+    expect(text).toBe(`„Werte“: ${ABSCHNITT_SPEICHERN_TEXT.unspeicherbar} Erst danach lässt sich speichern.`)
+    expect(ABSCHNITT_SPEICHERN_TEXT.unspeicherbar).toBe('Dort steht etwas, das wir so nicht speichern können — bitte prüf es.')
     expect(text).not.toMatch(/[Tt]oo big|expected|characters/)
   })
 
