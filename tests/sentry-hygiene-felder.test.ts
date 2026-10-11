@@ -373,6 +373,11 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
     ['%25-Kette mit 40 und kodierten Bytes', { exception: { values: [{ value: '%' + '25'.repeat(N) + '40' + '%25C3'.repeat(N) }] } }],
     ['halbe Bytes nach %2540', { extra: { text: ('x%2540' + '%258'.repeat(5)).repeat(N / 5) } }],
     ['Domain aus langen %2525-Ketten', { exception: { values: [{ value: 'a%40b' + ('%' + '25'.repeat(20) + 'C').repeat(N / 20) }] } }],
+    // Nr. 56, Runde 1: Adressen in Abfragewerten und Anker — verschachtelt nur
+    // bis MAX_ADRESS_TIEFE; jede Adresse als Wert wird einzeln zerlegt (5 000).
+    ['verschachtelte Adressen in Abfragewerten', { exception: { values: [{ value: '/?a='.repeat(N) }] } }],
+    ['verschachtelte Anker als Nachricht', { message: '/#a='.repeat(N) }],
+    ['viele Adressen als Abfragewerte', { request: { url: 'https://farmerzone.at/?' + 'a=/b&'.repeat(N / 10) } }],
   ]
 
   for (const [name, teil] of lang) {
@@ -661,5 +666,56 @@ describe('Nr. 56, Nachbesserung Runde 1 — Befunde der Prüfung', () => {
       expect(fehlertext(text), text).toBe(text)
       expect(nachricht(text), text).toBe(text)
     }
+  })
+  it('eine Adresse in einem Abfragewert oder im Anker verliert ihren Token — roh, kodiert und absolut, auch als ganze Nachricht', () => {
+    // Vorher kodierte die URL-Regel den Wert nur neu, und der Token blieb
+    // kodiert stehen (next=%2Freset-password%3Ftoken%3Dabc123); im Anker blieb
+    // er, wenn die ganze Nachricht die Adresse war.
+    const faelle: [string, string][] = [
+      ['/login?next=/reset-password?token=abc123', '/login?next=%2Freset-password'],
+      ['/login?next=%2Freset-password%3Ftoken%3Dabc123', '/login?next=%2Freset-password'],
+      ['/login?next=/reset-password?token=abc123&seite=2', '/login?next=%2Freset-password&seite=2'],
+      ['/login?callbackUrl=https://farmerzone.at/reset-password?token=abc123', '/login?callbackUrl=https%3A%2F%2Ffarmerzone.at%2Freset-password'],
+      ['/login?next=/api/orders/confirm/abc123', '/login?next=%2Fapi%2Forders%2Fconfirm%2F%5Bkennung+entfernt%5D'],
+      ['/login?next=/x/token=abc123', '/login?next=%2Fx%2Ftoken%3D%5Bentfernt%5D'],
+      ['/x?info=Bearer%20abc123', '/x?info=Bearer+%5Bentfernt%5D'],
+      ['/x?a=1#token=abc123', '/x?a=1'],
+      ['/x#a=1&token=abc123', '/x#a=1'],
+      ['/reset-password#token=abc123', '/reset-password'],
+      ['/x#next=/reset-password?token=abc123', '/x#next=%2Freset-password'],
+      // Gegenproben: ein Anker ohne „=", ein Wert ohne Adresse, eine harmlose Adresse im Wert.
+      ['/hoefe#karte', '/hoefe#karte'],
+      ['/hoefe?seite=2&kat=EIER', '/hoefe?seite=2&kat=EIER'],
+      ['/login?callbackUrl=%2Fhof%2Fbestellungen', '/login?callbackUrl=%2Fhof%2Fbestellungen'],
+    ]
+    for (const [roh, sauber] of faelle) {
+      expect(fehlertext(`Fehler bei ${roh} gemeldet`), roh).toBe(`Fehler bei ${sauber} gemeldet`)
+      expect(nachricht(roh), roh).toBe(sauber)
+      const e = bereinigeEreignis(
+        ereignis({
+          request: { url: `https://farmerzone.at${roh}`, headers: { Referer: `https://farmerzone.at${roh}` } },
+          breadcrumbs: [{ category: 'navigation', data: { from: roh } }],
+        })
+      )
+      expect(e.request?.url, roh).toBe(`https://farmerzone.at${sauber}`)
+      expect(e.request?.headers?.Referer, roh).toBe(`https://farmerzone.at${sauber}`)
+      expect(e.breadcrumbs?.[0].data?.from, roh).toBe(sauber)
+    }
+    // Abfrage für sich: request.query_string, Span-Daten und Texte unter Query-Schlüsseln.
+    const e = bereinigeEreignis(
+      ereignis({
+        request: { query_string: 'next=%2Freset-password%3Ftoken%3Dabc123' },
+        extra: { 'http.query': 'next=/reset-password?token=abc123&seite=2' },
+        contexts: { trace: { data: { 'url.query': 'next=%2Freset-password%3Ftoken%3Dabc123' } } },
+      })
+    )
+    expect(e.request?.query_string).toBe('next=%2Freset-password')
+    expect(e.extra).toEqual({ 'http.query': 'next=%2Freset-password&seite=2' })
+    expect(e.contexts?.trace?.data).toEqual({ 'url.query': 'next=%2Freset-password' })
+    // Verschachtelt nur bis zu einer Tiefe — noch tiefer fällt der Wert ganz.
+    expect(fehlertext('/a?x=/b?y=/c?z=/d?w=/e?token=abc123')).not.toMatch(/abc123/)
+    let tief = fehlertext('/a?x=/b?y=/c?z=/d?w=/e') ?? ''
+    for (let i = 0; i < 4; i++) tief = decodeURIComponent(tief.replace(/\+/g, ' '))
+    expect(tief).toBe('/a?x=/b?y=/c?z=/d?w=[adresse entfernt]')
   })
 })

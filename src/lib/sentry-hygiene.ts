@@ -20,7 +20,9 @@
  *   und /<hof>/bestaetigen/<token> (Bar-Bestätigung, H3) einen gültigen
  *   Einmal-Token — Query-Filter allein reicht nicht. In der Query fallen
  *   heikle Parameter nach NAMEN, und seit Nr. 47 werden die Werte der übrigen
- *   dekodiert bereinigt (?q=kundin@… stand sonst %40-kodiert da).
+ *   dekodiert bereinigt (?q=kundin@… stand sonst %40-kodiert da); seit
+ *   Nr. 56 (Runde 1) gilt für eine Adresse in einem Wert (?next=/…?token=…)
+ *   wieder die URL-Regel, und ein Anker mit „=" fällt wie eine Query.
  * - request-Daten: Cookies, Authorization, Referer (trägt die volle
  *   Vorgänger-URL), der POST-Körper (data) komplett.
  * - contexts.nextjs.request_path: von onRequestError roh angehängt.
@@ -245,15 +247,43 @@ function bereinigeText(text: string): string {
  * Entfernt heikle Parameter aus einem Query-String ('a=1&token=x' → 'a=1')
  * und bereinigt Namen und Werte der übrigen DEKODIERT — sonst stünde
  * „?q=kundin@…" als „q=kundin%40…" weiter da (Nr. 47). Die Regel ist dieselbe
- * wie für den Pfad (E-Mail, Telefon, Code); strukturierte Felder geben die
- * Freitext-Regel mit (bereinigeQueryText).
+ * wie für den Pfad (E-Mail, Telefon, Code), für Werte dazu die aus
+ * bereinigeAbfrageWert; strukturierte Felder nehmen die Freitext-Regel
+ * (`freitext`, bereinigeQueryText).
  */
-function bereinigeQuery(query: string, regel: (text: string) => string = bereinigeText): string {
+function bereinigeQuery(query: string, freitext = false, tiefe = 0): string {
+  const regel = freitext ? bereinigeFreitext : bereinigeText
   const sauber = new URLSearchParams()
   new URLSearchParams(query).forEach((wert, name) => {
-    if (!HEIKLE_PARAMETER.test(name)) sauber.append(regel(name), regel(wert))
+    if (HEIKLE_PARAMETER.test(name)) return
+    sauber.append(regel(name), freitext ? bereinigeFreitext(wert) : bereinigeAbfrageWert(wert, tiefe))
   })
   return sauber.toString()
+}
+
+/** Ein Abfragewert, der selbst eine Adresse ist: ab „/" oder mit Schema. */
+const ADRESS_WERT = /^(?:https?:\/\/|\/)/i
+
+/** Bis zu dieser Tiefe werden Adressen in Abfragewerten bereinigt
+ *  (?next=/…?next=/…); eine noch tiefere fällt ganz. Jede Ebene liest den Rest
+ *  noch einmal — ohne Grenze wäre die Laufzeit quadratisch. */
+const MAX_ADRESS_TIEFE = 3
+
+const ADRESSE_ERSATZ = '[adresse entfernt]'
+
+/**
+ * Ein Wert einer Abfrage in einer Adresse (Nr. 56, Runde 1). Ist er selbst
+ * eine Adresse (?next=/reset-password?token=…, ?callbackUrl=https://…), gilt
+ * für ihn die URL-Regel — vorher wurde er nur neu kodiert, und sein Token
+ * blieb kodiert stehen (next=%2Freset-password%3Ftoken%3D…). Vorher fallen im
+ * dekodierten Wert „token=…" und „Bearer …" (auch ohne Adresse:
+ * ?next=reset?token=…). Strukturierte Felder brauchen das nicht: Ihre
+ * Freitext-Regel nimmt Adressen und Zuweisungen selbst.
+ */
+function bereinigeAbfrageWert(wert: string, tiefe: number): string {
+  const ohneZuweisung = wert.replace(BEARER_MUSTER, 'Bearer [entfernt]').replace(ZUWEISUNG_MUSTER, '$1$2[entfernt]')
+  if (!ADRESS_WERT.test(ohneZuweisung)) return bereinigeText(ohneZuweisung)
+  return tiefe < MAX_ADRESS_TIEFE ? bereinigeUrl(ohneZuweisung, tiefe + 1) : ADRESSE_ERSATZ
 }
 
 /** Bereinigt den Pfad-Teil: E-Mails (roh und kodiert), Telefonnummern und
@@ -275,19 +305,30 @@ function bereinigePfad(pfad: string): string {
     .join('/')
 }
 
-/** Bereinigt eine volle URL: Pfad UND Query. Alles ab dem ERSTEN ? zählt als
- *  Query — auch ein weiteres ? darin (URLSearchParams nimmt es als Wertteil). */
-function bereinigeUrl(url: string): string {
+/** Bereinigt eine volle URL: Pfad, Query und Anker. Alles ab dem ERSTEN #
+ *  ist der Anker (wie im Browser), davor alles ab dem ERSTEN ? die Query —
+ *  auch ein weiteres ? darin (URLSearchParams nimmt es als Wertteil).
+ *  `tiefe` zählt Adressen in Abfragewerten (bereinigeAbfrageWert). */
+function bereinigeUrl(url: string, tiefe = 0): string {
   // Blob-Speicher-URLs tragen den Geräte-Dateinamen im Pfad — dort ist
   // nichts Diagnostisches zu holen, der ganze Rest fällt weg.
   if (/^https?:\/\/[^/?]*\bblob\.vercel-storage\.com/i.test(url)) {
     return `${url.split('/').slice(0, 3).join('/')}/[pfad entfernt]`
   }
-  const trenner = url.indexOf('?')
-  if (trenner === -1) return bereinigePfad(url)
-  const pfad = bereinigePfad(url.slice(0, trenner))
-  const sauber = bereinigeQuery(url.slice(trenner + 1))
-  return sauber ? `${pfad}?${sauber}` : pfad
+  const raute = url.indexOf('#')
+  const ohneAnker = raute === -1 ? url : url.slice(0, raute)
+  const anker = raute === -1 ? '' : bereinigeAnker(url.slice(raute + 1), tiefe)
+  const trenner = ohneAnker.indexOf('?')
+  const pfad = bereinigePfad(trenner === -1 ? ohneAnker : ohneAnker.slice(0, trenner))
+  const query = trenner === -1 ? '' : bereinigeQuery(ohneAnker.slice(trenner + 1), false, tiefe)
+  return `${pfad}${query ? `?${query}` : ''}${anker ? `#${anker}` : ''}`
+}
+
+/** Der Anker einer Adresse (Nr. 56, Runde 1): Mit „=" trägt er Parameter wie
+ *  eine Query (#token=…, so legen manche Anmeldewege den Token ab) und fällt
+ *  wie sie; sonst gilt die Regel des Pfads (#abschnitt bleibt). */
+function bereinigeAnker(anker: string, tiefe: number): string {
+  return anker.includes('=') ? bereinigeQuery(anker, false, tiefe) : bereinigePfad(anker)
 }
 
 /** Bereinigt URLs, die IN einem Text stecken (Span-Beschreibungen wie
@@ -412,7 +453,7 @@ function bereinigeFehlertext(text: string): string {
 function bereinigeQueryText(text: string): string {
   // Bis zum ersten „=" ohne Leerraum, danach ohne Leerraum — so setzt das
   // Muster nur einmal an (`^\S*=\S*$` probierte jedes „=" durch: quadratisch).
-  return /^[^\s=]*=\S*$/.test(text) ? bereinigeQuery(text, bereinigeFreitext) : bereinigeFreitext(text)
+  return /^[^\s=]*=\S*$/.test(text) ? bereinigeQuery(text, true) : bereinigeFreitext(text)
 }
 
 /** Heikel ist ein Schlüssel nach Namen, als IP-Träger oder wenn er selbst
