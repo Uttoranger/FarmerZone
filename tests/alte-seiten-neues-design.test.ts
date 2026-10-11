@@ -163,6 +163,20 @@ describe('/reset-password — der Token steht nur an den erwarteten Stellen', ()
     return [...treffer].sort((a, b) => a - b).map((zeile) => zeilen[zeile].trim().replace(/\s+/g, ' '))
   }
 
+  /** Wie oft eine Funktion dieses Namens aufgerufen wird — ebenfalls im Syntaxbaum. */
+  function aufrufe(quelltext: string, name: string): number {
+    const datei = ts.createSourceFile('formular.tsx', quelltext, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    let anzahl = 0
+    const besuche = (knoten: ts.Node): void => {
+      if (ts.isCallExpression(knoten) && ts.isIdentifier(knoten.expression) && knoten.expression.text === name) anzahl++
+      ts.forEachChild(knoten, besuche)
+    }
+    besuche(datei)
+    return anzahl
+  }
+
+  const PASSWORT_FORMULARE = [FORMULAR, 'src/app/(auth)/forgot-password/passwort-vergessen-formular.tsx']
+
   /** Gelesen aus der Adresse, geprüft, an Better Auth — sonst nirgends. */
   const TOKEN_ZEILEN = [
     "const token = searchParams.get('token')",
@@ -188,6 +202,34 @@ describe('/reset-password — der Token steht nur an den erwarteten Stellen', ()
     const seite = lies('src/app/(auth)/reset-password/page.tsx')
     expect(zeilenMit(seite, 'token')).toEqual([])
     expect(zeilenMit(seite, 'searchParams')).toEqual([])
+  })
+
+  it('die Adresse wird genau einmal gelesen, ohne Umbenennung; `location` steht in keinem Passwort-Formular', () => {
+    const formular = lies(FORMULAR)
+    expect(aufrufe(formular, 'useSearchParams')).toBe(1)
+    expect(zeilenMit(formular, 'useSearchParams')).toEqual([
+      "import { useRouter, useSearchParams } from 'next/navigation'",
+      'const searchParams = useSearchParams()',
+    ])
+    for (const datei of PASSWORT_FORMULARE) {
+      expect(zeilenMit(lies(datei), 'location'), datei).toEqual([])
+    }
+    // „Passwort vergessen" braucht die Adresse gar nicht.
+    expect(aufrufe(lies(PASSWORT_FORMULARE[1]), 'useSearchParams')).toBe(0)
+  })
+
+  it('Gegenprobe: ein zweites Lesen der Adresse oder `location` fiele auf', () => {
+    const formular = lies(FORMULAR)
+    expect(aufrufe(`${formular}\nconst adresse = useSearchParams()`, 'useSearchParams')).toBe(2)
+    const umbenannt = formular.replace('useRouter, useSearchParams }', 'useRouter, useSearchParams as adresse }')
+    expect(zeilenMit(umbenannt, 'useSearchParams')).not.toContain("import { useRouter, useSearchParams } from 'next/navigation'")
+    for (const zusatz of [
+      "void fetch('/api/x?' + location.search)",
+      "void fetch('//host' + document.location.search)",
+      "window.location.href = '/x'",
+    ]) {
+      expect(zeilenMit(`${formular}\n${zusatz}`, 'location'), zusatz).not.toEqual([])
+    }
   })
 
   it('Gegenprobe: jede weitere Verwendung fiele auf — auch an einen fremden Host ohne Protokoll', () => {
