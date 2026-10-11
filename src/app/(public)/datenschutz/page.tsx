@@ -62,6 +62,11 @@ function Dienst({ name, children }: { name: string; children: ReactNode }): Reac
   )
 }
 
+/** Ein Name aus der Oberfläche in Anführungszeichen — bricht nicht mitten im Namen um („E-“ / „Mail“). */
+function Name({ children }: { children: string }): React.JSX.Element {
+  return <span className="whitespace-nowrap">„{children}“</span>
+}
+
 function DatenschutzMail(): React.JSX.Element {
   return (
     // E-Mail-Adressen haben keine Leerzeichen — am Handy darf sie überall umbrechen.
@@ -249,12 +254,12 @@ export default function DatenschutzPage(): React.JSX.Element {
           <Abschnitt id="neuigkeiten" titel="9. Newsletter und Neuigkeiten von Höfen">
             <p>
               Nach einer Bestellung kannst du auf der Bestätigungsseite Neuigkeiten des Hofes über frische Produkte und
-              Aktionen per E-Mail bestellen, mit dem Knopf „{NEUIGKEITEN_TEXT.knopf}“. Angemeldet wird die
+              Aktionen per E-Mail bestellen, mit dem Knopf <Name>{NEUIGKEITEN_TEXT.knopf}</Name>. Angemeldet wird die
               E-Mail-Adresse, die du bei der Bestellung angegeben hast. Beim Bestellen selbst fragen wir nicht danach.
             </p>
             <p>
               Bei einer neuen Anmeldung schicken wir dir zuerst eine E-Mail mit einem Link. Erst wenn du ihn öffnest
-              und dort auf „{ABO_TEXT.knopf}“ tippst, bist du angemeldet; vorher bekommst du keine Neuigkeiten. Der
+              und dort auf <Name>{ABO_TEXT.knopf}</Name> tippst, bist du angemeldet; vorher bekommst du keine Neuigkeiten. Der
               Link gilt {ABO_BESTAETIGUNG_GUELTIG_TAGE} Tage.
             </p>
             <p>
@@ -333,12 +338,12 @@ export default function DatenschutzPage(): React.JSX.Element {
 
           <Abschnitt id="umkreissuche" titel="Umkreissuche auf der Hofübersicht">
             <p>
-              Tippst du auf der Hofübersicht auf „{SUCHFELD_TEXT.standort}“, fragt die Seite deinen Browser nach deinem
+              Tippst du auf der Hofübersicht auf <Name>{SUCHFELD_TEXT.standort}</Name>, fragt die Seite deinen Browser nach deinem
               Standort — ob er ihn herausgibt, entscheidest du in seiner Abfrage. Gibst du ihn frei, bleibt er in
               deinem Browser: Er wird nicht an uns und an niemanden sonst übertragen, steht nicht in der Adresse der
               Seite und wird nicht gespeichert, weder auf deinem Gerät noch bei uns. Die Entfernungen zu den Höfen
               rechnet dein Gerät selbst aus den Hofkoordinaten, die mit der Seite ohnehin geladen wurden. Tippst du
-              „{SUCHFELD_TEXT.ortAendern}“ oder schließt du die Seite, ist er fort. Nach dem Standort fragen darf nur
+              <Name>{SUCHFELD_TEXT.ortAendern}</Name> oder schließt du die Seite, ist er fort. Nach dem Standort fragen darf nur
               die Hofübersicht; alle anderen Seiten sperren die Abfrage.
             </p>
             <p>

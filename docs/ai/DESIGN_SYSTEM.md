@@ -258,7 +258,7 @@ Umgesetzt in `src/components/shells/` (KundeShell, KundeFokusShell, HofShell, Ad
 - **Kein Mockup** — gebaut nach diesen Regeln. `KundeShellMitSitzung` (statisch, mit Unterleiste). Eine Lesespalte `max-w-2xl px-4` wie die gemeinsame Ladeansicht der Infoseiten (`(public)/loading.tsx`), damit beim Wechsel nichts springt; Fließtext 15 px, `leading-relaxed`, in der Textfarbe.
 - h1 in Fraunces (28/34 px) mit leiser Zeile darunter; jeder Abschnitt eine `section` mit h2 in Fraunces (19/21 px), Linie oben und `scroll-mt-20` (die Kopfzeile klebt). Die Dienstleister in Abschnitt 4 als Karten (`--surface` mit Rand, Name als h3). „Stand" als letzte leise Zeile.
 - **Links stehen auf eigener Zeile**, 44 px hoch, unterstrichen in `text-status-fertig` mit `FOKUS_RAHMEN` — im Fließtext hätten sie nur die Zeilenhöhe als Trefferfläche. E-Mail mit `Mail`-Symbol, ein Link in einen neuen Tab mit `ExternalLink`-Symbol und „(öffnet in neuem Tab)" für Vorleser.
-- Zahlen und Knopfnamen kommen aus ihren Quellen (`NEUIGKEITEN_TEXT`, `ABO_TEXT`, `SUCHFELD_TEXT`, `src/lib/datenschutz.ts` …), nie abgeschrieben; jede Aussage über den Code hat ihre Wache in `tests/datenschutz-sachstand.test.ts`.
+- Zahlen und Knopfnamen kommen aus ihren Quellen (`NEUIGKEITEN_TEXT`, `ABO_TEXT`, `SUCHFELD_TEXT`, `src/lib/datenschutz.ts` …), nie abgeschrieben; jede Aussage über den Code hat ihre Wache in `tests/datenschutz-sachstand.test.ts`. Ein Name aus der Oberfläche steht in „…" und bricht nicht in sich um (`whitespace-nowrap`, sonst „E-" am Zeilenende).
 
 ### Mein Hof (/farm-page, seit Nr. 16)
 
