@@ -125,7 +125,7 @@ pnpm test:integration                        # Integration (braucht .env.test)
 | Jede Zod-Schema-Datei | `register-schema.test.ts` |
 | Jeder Geldweg | `checkout-totals.test.ts`, `servicegebuehr-checkout.test.ts` |
 | Jede Berechtigungsentscheidung | `farm-approval.test.ts`, `bestellverfolgung-zugang.test.ts` |
-| Jeder Token-/Signaturweg | `geheimnis.test.ts` |
+| Jeder Token-/Signaturweg — ein „Token nur hier"-Test zählt die Stellen im Syntaxbaum von TypeScript (kein Regex-Kommentarfilter: der hielt `//host` für einen Kommentar), mit einer Gegenprobe je Leckweg, auch für Wege ohne den Namen des Tokens (`document.URL`) | `geheimnis.test.ts`, `alte-seiten-neues-design.test.ts` |
 | Jeder behobene Bug | ein Test, der ihn vorher gefangen hätte |
 | Jede Migration gegen das Deploy-Fenster | `migrationen-wache.test.ts` |
 | Jede Architektur-Regel, die sich am Quelltext prüfen lässt (wer was einbindet, wo ein Parameter gelesen wird) — mit Gegenprobe, dass die Suche anschlägt | `hofseite-einmal.test.ts`, `design-tokens.test.ts` |

