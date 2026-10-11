@@ -23,6 +23,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import type { OrderStatus } from '@prisma/client'
 import { describe, expect, it, vi } from 'vitest'
+import ts from 'typescript'
 
 // Die Seiten binden Client-Formulare ein; für die Metadaten zählt nur der Export.
 vi.mock('@/lib/auth-client', () => ({ authClient: {}, signIn: {}, signOut: vi.fn(), useSession: () => ({ data: null }) }))
@@ -142,14 +143,24 @@ describe('Seiten mit Token in der Adresse bleiben aus dem Suchindex (Metadaten)'
 describe('/reset-password — der Token steht nur an den erwarteten Stellen', () => {
   const FORMULAR = 'src/app/(auth)/reset-password/neues-passwort-formular.tsx'
 
-  /** Die Codezeilen mit einem Treffer — ohne Kommentare, Leerraum vereinheitlicht. */
-  function zeilenMit(quelltext: string, muster: RegExp): string[] {
-    return quelltext
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/(^|[^:])\/\/.*$/gm, '$1')
-      .split('\n')
-      .filter((zeile) => muster.test(zeile))
-      .map((zeile) => zeile.trim().replace(/\s+/g, ' '))
+  /**
+   * Die Zeilen, in denen ein Bezeichner im Code steht — über den Syntaxbaum
+   * von TypeScript: Kommentare zählen nicht, Strings und Template-Literale
+   * bleiben Code. (Der frühere Filter mit regulären Ausdrücken hielt „//host"
+   * in einer Adresse für den Anfang eines Kommentars.) Leerraum vereinheitlicht.
+   */
+  function zeilenMit(quelltext: string, name: string): string[] {
+    const datei = ts.createSourceFile('formular.tsx', quelltext, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const zeilen = quelltext.split('\n')
+    const treffer = new Set<number>()
+    const besuche = (knoten: ts.Node): void => {
+      if (ts.isIdentifier(knoten) && knoten.text === name) {
+        treffer.add(datei.getLineAndCharacterOfPosition(knoten.getStart(datei)).line)
+      }
+      ts.forEachChild(knoten, besuche)
+    }
+    besuche(datei)
+    return [...treffer].sort((a, b) => a - b).map((zeile) => zeilen[zeile].trim().replace(/\s+/g, ' '))
   }
 
   /** Gelesen aus der Adresse, geprüft, an Better Auth — sonst nirgends. */
@@ -168,29 +179,36 @@ describe('/reset-password — der Token steht nur an den erwarteten Stellen', ()
 
   it('im Formular genau diese Zeilen — kein Link, kein fetch, kein router.push, kein Log mit dem Token', () => {
     const formular = lies(FORMULAR)
-    expect(zeilenMit(formular, /\btoken\b/)).toEqual(TOKEN_ZEILEN)
-    expect(zeilenMit(formular, /\bsearchParams\b/)).toEqual(ADRESS_ZEILEN)
-    expect(formular).not.toMatch(/window\.location|document\.URL|location\.href|console\.|Sentry/)
+    expect(zeilenMit(formular, 'token')).toEqual(TOKEN_ZEILEN)
+    expect(zeilenMit(formular, 'searchParams')).toEqual(ADRESS_ZEILEN)
+    expect(formular).not.toMatch(/console\.|Sentry/)
   })
 
   it('die Seite fasst ihn nicht an', () => {
-    expect(zeilenMit(lies('src/app/(auth)/reset-password/page.tsx'), /\btoken\b|searchParams/)).toEqual([])
+    const seite = lies('src/app/(auth)/reset-password/page.tsx')
+    expect(zeilenMit(seite, 'token')).toEqual([])
+    expect(zeilenMit(seite, 'searchParams')).toEqual([])
   })
 
-  it('Gegenprobe: jede weitere Verwendung fiele auf', () => {
+  it('Gegenprobe: jede weitere Verwendung fiele auf — auch an einen fremden Host ohne Protokoll', () => {
     const formular = lies(FORMULAR)
     for (const zusatz of [
       "router.push('/login?token=' + token)",
       "void fetch('/api/x', { method: 'POST', body: token })",
       "<Link href={'/x?t=' + token}>x</Link>",
       'const t = token',
+      // Protokoll-relative Adressen: „//" ist hier kein Kommentar.
+      "router.push('//host/?t=' + token)",
+      'void fetch(`//host?t=$' + '{token}`)',
+      "<Link href={'//host?t=' + token}>x</Link>",
     ]) {
-      expect(zeilenMit(`${formular}\n${zusatz}`, /\btoken\b/), zusatz).not.toEqual(TOKEN_ZEILEN)
+      expect(zeilenMit(`${formular}\n${zusatz}`, 'token'), zusatz).not.toEqual(TOKEN_ZEILEN)
     }
-    const adressLink = "<Link href={'/x?' + searchParams.toString()}>x</Link>"
-    expect(zeilenMit(`${formular}\n${adressLink}`, /\bsearchParams\b/)).not.toEqual(ADRESS_ZEILEN)
+    const adressLink = "<Link href={'//host?' + searchParams.toString()}>x</Link>"
+    expect(zeilenMit(`${formular}\n${adressLink}`, 'searchParams')).not.toEqual(ADRESS_ZEILEN)
     // Kommentare zählen nicht: Der Kopfkommentar nennt „?token=", die Suche übergeht ihn.
     expect(formular).toMatch(/\?token=/)
+    expect(zeilenMit('// token im Kommentar\n/* token */\nconst x = 1', 'token')).toEqual([])
   })
 })
 
