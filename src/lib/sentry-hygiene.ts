@@ -120,8 +120,15 @@ const EMAIL_KODIERT_MUSTER =
 /** Telefonnummern: +43 664 123 4567, 0664/1234567, (0664) 1234567 … — eine
  *  führende +/0/(0-Gruppe und danach mindestens sieben weitere Ziffern mit
  *  üblichen Trennzeichen (höchstens drei am Stück). Bewusst konservativ:
- *  Datumsangaben (01.09.2026), Uhrzeiten und Postleitzahlen bleiben stehen. */
-const TELEFON_MUSTER = /(?:\+|\(?0)\d(?:[\s/\-.()]{0,3}\d){7,}/g
+ *  Datumsangaben (01.09.2026), Uhrzeiten und Postleitzahlen bleiben stehen.
+ *  Nie mitten in einer Zahl, und eine Ziffernfolge, die links an einem
+ *  Buchstaben, „_" oder „-" klebt, nur, wenn sie rechts frei endet (Nr. 56,
+ *  Runde 1): vorher wurde „2026-10-10 20:02:00" zu „2[telefon entfernt]:02:00",
+ *  und eine Kennung mit „0" und acht Ziffern darin (cuid, UUID) zerbrach.
+ *  „Rückruf-0664 1234567" und „Tel0664 …" fallen weiter. Linear: Angesetzt
+ *  wird nur am Anfang einer Ziffernfolge, die Vorschau liest sie einmal. */
+const TELEFON_MUSTER =
+  /(?<!\d)(?:(?<![A-Za-z_-])|(?=(?:\+|\(?0)\d(?:[\s/\-.()]{0,3}\d){7,}(?!\w)))(?:\+|\(?0)\d(?:[\s/\-.()]{0,3}\d){7,}/g
 
 /** Query-Parameter, deren NAME auf Geheimnisse oder Personenbezug deutet.
  *  `pathname` gehört dazu: Die Blob-SDK-Aufrufe tragen darin den Blob-Pfad

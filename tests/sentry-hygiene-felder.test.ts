@@ -387,6 +387,8 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
     ['camelCase-Schlüssel ohne Wert', { exception: { values: [{ value: 'aToken'.repeat(N / 3) + ':' }] } }],
     ['token= ohne Wert', { extra: { text: 'token=' + ' '.repeat(2 * N) + '&' } }],
     ['Schlüssel mit Anführungszeichen ohne Wert', { exception: { values: [{ value: 'token: "'.repeat(N / 4) }] } }],
+    ['Ziffernfolge zwischen Buchstaben', { exception: { values: [{ value: 'x' + '0'.repeat(2 * N) + 'a' }] } }],
+    ['viele Kennungen mit Ziffernfolgen', { exception: { values: [{ value: 'x0123456789a '.repeat(N / 6) }] } }],
   ]
 
   for (const [name, teil] of lang) {
@@ -794,6 +796,34 @@ describe('Nr. 56, Nachbesserung Runde 1 — Befunde der Prüfung', () => {
     // Gegenproben: Prisma nennt Felder in Backticks, die Meldung bleibt lesbar; ein Platzhalter bleibt einfach.
     for (const text of ['Argument `token`: Invalid value provided. Expected String, provided Int.', 'Fehler: "Bestellung fehlt"', 'token: "[entfernt]"']) {
       expect(fehlertext(text), text).toBe(text)
+    }
+  })
+  it('die Telefon-Regel setzt nicht mitten in Zahlen und Kennungen an — Zeitstempel und cuid bleiben, echte Nummern fallen', () => {
+    // Vorher hatte sie links keine Grenze: „2026-10-10 20:02:00" wurde zu
+    // „2[telefon entfernt]:02:00", eine cuid mit „0" und acht Ziffern zerbrach.
+    for (const text of ['Zeit 2026-10-10 20:02:00', 'Kennung clx0123456789abcdefghijklmn']) {
+      expect(fehlertext(text), text).toBe(text)
+      expect(nachricht(text), text).toBe(text)
+    }
+    // Eine UUID bleibt im Fehlertext ganz (in der Nachricht fällt sie als lange Kennung, wie bisher).
+    expect(fehlertext('Anfrage 550e8400-e29b-41d4-a716-0123456789ab')).toBe('Anfrage 550e8400-e29b-41d4-a716-0123456789ab')
+    // In einer Adresse fällt die cuid als langes Pfadsegment (URL-Regel), nicht zerbrochen als Nummer.
+    expect(fehlertext('Fehler /api/farms/clx0123456789abcdefghijklmn/products')).toBe('Fehler /api/farms/[kennung entfernt]/products')
+    const nummern: [string, string][] = [
+      ['Rückruf +43 664 123 4567', 'Rückruf [telefon entfernt]'],
+      ['Tel.:0664/1234567', 'Tel.:[telefon entfernt]'],
+      ['unter (0664) 1234567 erreichbar', 'unter [telefon entfernt] erreichbar'],
+      ['Nummer:+436641234567', 'Nummer:[telefon entfernt]'],
+      ['Abruf /customers/06641234567', 'Abruf /customers/[telefon entfernt]'],
+      // Auch direkt an einem Wort — nur eine Ziffernfolge, die auf BEIDEN Seiten an Buchstaben klebt, ist eine Kennung.
+      ['Rückruf-0664 1234567', 'Rückruf-[telefon entfernt]'],
+      ['Tel0664 1234567', 'Tel[telefon entfernt]'],
+      ['tel_06641234567', 'tel_[telefon entfernt]'],
+      ['Tel+43 664 1234567', 'Tel[telefon entfernt]'],
+    ]
+    for (const [roh, sauber] of nummern) {
+      expect(fehlertext(roh), roh).toBe(sauber)
+      expect(nachricht(roh), roh).toBe(sauber)
     }
   })
 })
