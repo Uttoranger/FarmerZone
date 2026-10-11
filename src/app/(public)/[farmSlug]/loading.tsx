@@ -10,7 +10,8 @@ import { cn } from '@/lib/utils'
  * Reiterleiste 48 px, Inhalt max. 1200 px; ab 1024 px rechts die Spalte
  * (340/360 px). Gezeigt wird die Übersicht — der häufigste Einstieg —, unter
  * lg in der Reihenfolge des Schaufensters (Register N5, Nr. 51): Produkte,
- * „Alle Produkte (n)", rechte Spalte, Über uns; ab lg wie bisher.
+ * „Alle Produkte (n)", rechte Spalte, Über uns; ab lg wie bisher. „Nächste
+ * Abholung" als Textzeilen wie die Seite seit Nr. 46.
  *
  * Die Seite steht in der KundeShell und damit im Geltungsbereich
  * data-design="neu" — diese Ansicht kommt vor der Shell und setzt den Marker
@@ -59,18 +60,15 @@ export default function HofseiteLaden() {
         </div>
       </div>
 
-      {/* Wie die Seite: unter lg löst `contents` die Inhaltsspalte auf, `order`
-          setzt Produkte vor die rechte Spalte und Über uns dahinter. */}
-      <div className="mx-auto flex max-w-[1200px] flex-col gap-[26px] px-4 pt-6 pb-28 md:px-6 md:pt-7 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_360px]">
-        {/* Inhalt der Übersicht: Über uns, Produkte */}
-        <div className="flex flex-col gap-[26px] max-lg:contents lg:col-start-1 lg:row-start-1">
-          <div className="rounded-2xl border border-border bg-card p-[22px]">
-            <div className="h-5 w-28 rounded bg-border" />
-            <div className="mt-3 h-4 w-full rounded bg-app-chip" />
-            <div className="mt-2 h-4 w-5/6 rounded bg-app-chip" />
-          </div>
-          <div className="h-5 w-32 rounded bg-border max-lg:-order-2" />
-          <div className="grid gap-3 max-lg:-order-2 md:grid-cols-3 md:gap-4 lg:grid-cols-2 xl:grid-cols-3">
+      {/* Wie die Seite (hofseite-kunde.tsx): Unter lg steht im Quelltext, was
+          man sieht — Produkte, „Alle Produkte", rechte Spalte, Über uns. Ab lg
+          ein Raster aus zwei Zeilen: Über uns oben links, die Produkte darunter
+          (Abstand 26 px), die Spalte rechts über beide. */}
+      <div className="mx-auto flex max-w-[1200px] flex-col gap-[26px] px-4 pt-6 pb-28 md:px-6 md:pt-7 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-[auto_1fr] lg:gap-10 lg:gap-y-[26px] xl:grid-cols-[minmax(0,1fr)_360px]">
+        {/* Schaufenster: Produkte und „Alle Produkte" — ohne Fotostreifen, ob es Fotos gibt, entscheiden die Daten. */}
+        <div className="flex flex-col gap-[26px] lg:col-start-1 lg:row-start-2">
+          <div className="h-5 w-32 rounded bg-border" />
+          <div className="grid gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-2 xl:grid-cols-3">
             {/* Am Handy vier Zeilen, ab md drei Kacheln (stehtNurAmHandy). */}
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className={cn('flex items-center gap-3 rounded-2xl border border-border bg-card p-3 md:flex-col md:items-stretch md:gap-0 md:p-0', stehtNurAmHandy(i) && 'md:hidden')}>
@@ -84,18 +82,26 @@ export default function HofseiteLaden() {
             ))}
           </div>
           {/* „Alle Produkte (n)" — nur unter lg. */}
-          <div className="-mt-3.5 h-11 rounded-[14px] border border-border max-lg:-order-2 lg:hidden" />
+          <div className="-mt-3.5 h-11 rounded-[14px] border border-border lg:hidden" />
         </div>
 
-        {/* Rechte Spalte (unter lg nach den Produkten): Nächste Abholung, Zahlung & Kontakt */}
-        <div className="flex flex-col gap-[18px] max-lg:-order-1 lg:col-start-2 lg:row-start-1">
+        {/* Rechte Spalte (unter lg nach den Produkten): Nächste Abholung als
+            Textzeilen wie auf der Seite (seit Nr. 46), Zahlung & Kontakt. */}
+        <div className="flex flex-col gap-[18px] lg:col-start-2 lg:row-span-2 lg:row-start-1">
+          {/* Zeilenhöhen der Karte abgenommen (Titel 22 px, Zeilen 20 px, Satz 16 px): 173 px wie die echte. */}
           <div className="rounded-2xl border border-border bg-card p-[18px]">
-            <div className="h-4 w-36 rounded bg-app-trough" />
-            <div className="mt-3 flex gap-2">
-              <div className="h-[62px] flex-1 rounded-xl bg-muted" />
-              <div className="h-[62px] flex-1 rounded-xl bg-muted" />
-              <div className="h-[62px] flex-1 rounded-xl bg-muted" />
+            <div className="mt-[3px] h-4 w-36 rounded bg-app-trough" />
+            <div className="mt-[13px] flex flex-col gap-2">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="flex h-5 items-center gap-2.5">
+                  <div className="size-4 shrink-0 rounded bg-app-chip" />
+                  <div className={cn('h-3.5 rounded bg-app-chip', i === 0 ? 'w-28' : 'w-24')} />
+                  <div className="ml-auto h-3.5 w-16 shrink-0 rounded bg-app-chip" />
+                </div>
+              ))}
             </div>
+            <div className="mt-3 h-3 w-48 rounded bg-app-chip" />
+            <div className="h-0.5" />
           </div>
           <div className="rounded-2xl border border-border bg-card p-[18px]">
             <div className="h-4 w-40 rounded bg-app-trough" />
@@ -103,6 +109,13 @@ export default function HofseiteLaden() {
             <div className="mt-2.5 h-4 w-36 rounded bg-app-chip" />
             <div className="mt-2.5 h-4 w-32 rounded bg-app-chip" />
           </div>
+        </div>
+
+        {/* Über uns: unter lg zuletzt, ab lg oben links. */}
+        <div className="rounded-2xl border border-border bg-card p-[22px] lg:col-start-1 lg:row-start-1">
+          <div className="h-5 w-28 rounded bg-border" />
+          <div className="mt-3 h-4 w-full rounded bg-app-chip" />
+          <div className="mt-2 h-4 w-5/6 rounded bg-app-chip" />
         </div>
       </div>
     </div>

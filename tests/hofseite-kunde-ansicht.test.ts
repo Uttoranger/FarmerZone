@@ -18,10 +18,12 @@
  *  - E5: „Bar bei Abholung", nie „Karte bei Abholung"; E4: der Hinweis nennt
  *    den Satz des Hofs, gebührenfrei steht keiner da.
  *  - Reiter „Beiträge" nur mit Beitrag.
- *  - Schaufenster zuerst (Register N5, Nr. 51): In der Übersicht stehen
- *    Fotos und bis zu vier Produkte samt „Alle Produkte (n)" im Quelltext vor
- *    der rechten Spalte — Tastatur und Screenreader folgen der neuen
- *    Reihenfolge; ohne Produkte kein Schaufenster, die Übersicht wie bisher.
+ *  - Schaufenster zuerst (Register N5, Nr. 51): In der Übersicht steht der
+ *    Quelltext in der Reihenfolge, die man unter lg sieht — Fotos, bis zu
+ *    vier Produkte, „Alle Produkte (n)", rechte Spalte, Über uns —, also
+ *    folgen Tastatur und Screenreader ihr; Über uns und die Spalte je genau
+ *    einmal. Ohne Produkte kein Schaufenster, die Übersicht wie bisher.
+ *    Nach „Alle ansehen" und „Alle Produkte (n)" geht der Fokus auf den Reiter.
  *  - Die Produktkarte hat eine Vorschau-Variante ohne Link und ohne Korb
  *    (Käufer-Vorschau im Produktdialog); die Kaufkarte bleibt, wie sie ist.
  * Je Aussage eine Gegenprobe, dass die Suche das Merkmal auch findet.
@@ -425,11 +427,29 @@ describe('Produktkarten verlinken auf die Produktseite (Nr. 11)', () => {
 describe('Schaufenster zuerst (Register N5, Nr. 51)', () => {
   const FOTOS = [1, 2, 3].map((i) => ({ id: `foto_${i}`, url: `/landing/row-${i}.jpg`, caption: null, sortOrder: i }))
 
-  it('in der Übersicht stehen die Produkte im Quelltext vor der rechten Spalte — Tastatur und Screenreader folgen dem Schaufenster', () => {
-    const html = seite()
-    const karte = html.indexOf('aria-label="Karotten in den Korb legen"')
-    expect(karte).toBeGreaterThan(-1)
-    expect(karte).toBeLessThan(html.indexOf('<aside'))
+  it('der Quelltext hat die Reihenfolge, die man unter lg sieht: Fotos, Produkte, „Alle Produkte (n)", rechte Spalte, Über uns', () => {
+    const html = seite({ farm: { ...HOF, farmPhotos: FOTOS } })
+    const stellen = [
+      html.indexOf('id="fotos"'),
+      html.indexOf('aria-label="Karotten in den Korb legen"'),
+      html.indexOf('>Alle Produkte (5)<'),
+      html.indexOf('<aside'),
+      html.indexOf('id="ueber-uns"'),
+    ]
+    expect(stellen.every((stelle) => stelle > -1), String(stellen)).toBe(true)
+    expect([...stellen].sort((a, b) => a - b)).toEqual(stellen)
+    // Über uns steht im Quelltext nach dem Schaufenster UND nach der Spalte — Screenreader lesen es zuletzt.
+    expect(html.indexOf('id="ueber-uns"')).toBeGreaterThan(html.indexOf('</aside>'))
+  })
+
+  it('Über uns und die rechte Spalte stehen je genau einmal da — keine doppelte Kennung, nichts doppelt fokussierbar', () => {
+    for (const farm of [{ ...HOF, farmPhotos: FOTOS }, { ...HOF, products: [], farmPhotos: FOTOS }]) {
+      const html = seite({ farm })
+      expect(html.match(/id="ueber-uns"/g)).toHaveLength(1)
+      expect(html.match(/<aside\b/g)).toHaveLength(1)
+      expect(html.match(/data-abschnitt="kontakt"/g)).toHaveLength(1)
+      expect(html.match(/id="fotos"/g)).toHaveLength(1)
+    }
   })
 
   it('bis zu vier Produkte: Kaufbares in der Reihenfolge des Hofs, Ausverkauftes rückt nicht nach', () => {
@@ -471,12 +491,12 @@ describe('Schaufenster zuerst (Register N5, Nr. 51)', () => {
     expect(quelle('src/components/hofseite/hofseite-kunde.tsx').match(/<HofseiteFotos\b/g)).toHaveLength(1)
   })
 
-  it('ohne Produkte kein Schaufenster: die Übersicht bleibt, wie sie war — rechte Spalte zuerst, Fotos danach', () => {
+  it('ohne Produkte kein Schaufenster: die Übersicht bleibt, wie sie war — rechte Spalte, Über uns, Fotos', () => {
     const html = seite({ farm: { ...HOF, products: [], farmPhotos: FOTOS } })
     expect(html).not.toContain('Alle Produkte (')
     expect(html).toContain('Gerade keine Produkte')
     expect(html.indexOf('<aside')).toBeLessThan(html.indexOf('id="ueber-uns"'))
-    expect(html.indexOf('<aside')).toBeLessThan(html.indexOf('id="fotos"'))
+    expect(html.indexOf('id="ueber-uns"')).toBeLessThan(html.indexOf('id="fotos"'))
   })
 
   it('in den Reitern Produkte und Beiträge bleibt die Reihenfolge, wie sie war', () => {
@@ -484,6 +504,18 @@ describe('Schaufenster zuerst (Register N5, Nr. 51)', () => {
       const html = seite({ suche })
       expect(html.indexOf('<aside'), suche).toBeLessThan(html.indexOf('id="produkte"'))
     }
+  })
+
+  it('nach „Alle ansehen" und „Alle Produkte (n)" geht der Fokus auf den Reiter Produkte, ohne Scrollen — der Link verschwindet mit dem Wechsel', () => {
+    const text = quelle('src/components/hofseite/hofseite-kunde.tsx')
+    // Beide Links im Inhalt wechseln über dieselbe Funktion, mit Fokus auf den Reiter.
+    expect(text.match(/onNavigate=\{zeigeReiter\('produkte', \{ fokusAufReiter: true \}\)\}/g)).toHaveLength(2)
+    expect(text).toMatch(/document\.querySelector<HTMLElement>\(`\[data-reiter="\$\{id\}"\]`\)\?\.focus\(\{ preventScroll: true \}\)/)
+    // Die Reiterleiste und „Bestellen" im Kopf bleiben nach dem Wechsel stehen — ihr Fokus auch.
+    expect(text).toMatch(/onNavigate=\{zeigeReiter\(r\.id\)\}/)
+    expect(text.match(/onNavigate=\{zeigeReiter\('produkte'\)\}/g)).toHaveLength(1)
+    // Gegenprobe: Die Reiterleiste trägt das Merkmal, das der Fokus sucht — gerendert.
+    expect(seite()).toMatch(/<a[^>]*data-reiter="produkte"[^>]*>Produkte · 5</)
   })
 })
 

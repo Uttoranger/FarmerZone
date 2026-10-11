@@ -10,6 +10,8 @@
  *  - Leere oder ungültige Felder zeigen ruhige Platzhalter, nie „NaN".
  *  - Der Produktdialog zeigt sie nur für Lebensmittel; Futter (E9-Schild) und
  *    Brennmaterial behalten ihre eigene Vorschau unverändert.
+ *  - Die Zusammenfassung des Abschnitts „Preis" nimmt ohne gültigen Preis
+ *    denselben Satz wie die Vorschau (Runde 1).
  * Je Aussage eine Gegenprobe, dass die Suche das Merkmal auch findet.
  */
 import { describe, it, expect, vi } from 'vitest'
@@ -92,6 +94,15 @@ describe('nur im Produktdialog für Lebensmittel — Futter und Brennmaterial bl
     for (const feld of ['name={werte.name}', 'price={werte.price}', 'unit={werte.unit}', 'unitSize={werte.unitSize}', 'foto={previewUrl}', 'kategorie={category}']) {
       expect(aufruf, feld).toContain(feld)
     }
+  })
+
+  it('die Zusammenfassung des zugeklappten Abschnitts „Preis" sagt ohne gültigen Preis dasselbe wie die Vorschau, nie „€ 0,00"', () => {
+    const fall = dialog.slice(dialog.indexOf("case 'preis': {"), dialog.indexOf("case 'details': {"))
+    expect(fall).toContain('gueltigerPreis(w.price)')
+    expect(fall).toContain('KAEUFER_VORSCHAU.preisFehlt')
+    // Gegenprobe: der alte Rückfall auf 0 ist weg.
+    expect(fall).not.toMatch(/Number\.isFinite\(w\.price\) \? w\.price : 0/)
+    expect(fall.length).toBeGreaterThan(0)
   })
 
   it('Futter und Brennmaterial: eigene Vorschau unverändert, keine Produktkarte', () => {

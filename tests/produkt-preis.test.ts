@@ -13,6 +13,7 @@ import {
   preisFeldLabel,
   kundenVorschau,
   kaeuferVorschau,
+  gueltigerPreis,
   paketpreisFraglich,
   paketpreisAntworten,
   PAKETPREIS_FRAGE,
@@ -144,5 +145,21 @@ describe('kaeuferVorschau — die Karte „So sehen Käufer dein Produkt" aus de
     expect(ohneFoto.categoryImageUrl).toBe('/categories/honig.webp')
     expect(ohneFoto.unitSize).toBeNull()
     expect(kaeuferVorschau({ name: 'Honig', price: 9, unit: 'G', unitSize: null }, OHNE_BILD).categoryImageUrl).toBeNull()
+  })
+})
+
+describe('gueltigerPreis — derselbe Maßstab wie beim Speichern (Nr. 51, Runde 1)', () => {
+  it('gibt den Preis nur zurück, wenn er preisZahl besteht', () => {
+    expect(gueltigerPreis(4.5)).toBe(4.5)
+    expect(gueltigerPreis(0.01)).toBe(0.01)
+    for (const price of [Number.NaN, 0, -2, 4.505, Number.POSITIVE_INFINITY, null]) {
+      expect(gueltigerPreis(price), String(price)).toBeNull()
+    }
+  })
+
+  it('die Käufer-Vorschau nimmt genau diesen Preis', () => {
+    for (const price of [Number.NaN, 0, 4.505, 4.5, 12.9]) {
+      expect(kaeuferVorschau({ name: 'x', price, unit: 'STUECK', unitSize: null }, { foto: null, kategorie: null }).price).toBe(gueltigerPreis(price))
+    }
   })
 })
