@@ -200,8 +200,8 @@ export type ZuTun = {
 /**
  * Was Bestellungen erst möglich macht, aus den Ersten Schritten und in dieser
  * Reihenfolge an den Anfang: ohne Produkt nichts zu bestellen, ohne
- * Abholzeiten kein Termin, ohne Online-Zahlung keine Karte, kein Apple Pay
- * (Register Z1). Hofprofil und Auftritt stehen hier mit Absicht nicht: Die
+ * Abholzeiten kein Termin, ohne Online-Zahlung kein Bezahlen mit Karte oder
+ * Apple Pay (Register Z1). Hofprofil und Auftritt stehen hier mit Absicht nicht: Die
  * Liste der Hofseite zählt ihre Teile einzeln — Kurzbeschreibung und Standort,
  * Titelbild und Logo — mit genau derselben Bedingung (tests/zu-tun.test.ts),
  * so verschwindet jeder Teil, sobald er erledigt ist.
@@ -224,8 +224,9 @@ const NICHT_AUS_DER_HOFSEITE: ReadonlySet<HofseiteZeileId> = new Set<HofseiteZei
  *
  * `stripeImKasten`: Der Kasten oben auf Heute spricht schon über Stripe
  * („Online-Zahlung einrichten" bzw. „pausiert") — dann steht die Online-
- * Zahlung nicht noch einmal in der Liste. Ohne Kasten (der Hof wartet auf
- * die Freischaltung) bleibt sie drin: Vor der Freischaltung braucht er sie.
+ * Zahlung nicht noch einmal in der Liste. Ohne Kasten (etwa, solange der Hof
+ * auf die Freischaltung wartet) bleibt sie drin: Vor der Freischaltung
+ * braucht er sie.
  *
  * Reihenfolge: erst, was Bestellungen möglich macht (ZUERST), dann die
  * Hofseite in ihrer eigenen Reihenfolge — so, wie Kundinnen sie von oben
