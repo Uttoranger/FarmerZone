@@ -57,8 +57,8 @@ const WERTE_VORHER = [
   { icon: 'handarbeit', title: 'Handarbeit', subtitle: 'Alles von Hand', sortOrder: 2 },
 ]
 
-/** Ein angemeldeter Hof, bei dem JEDES Feld einen eigenen, erkennbaren Wert hat. */
-async function angemeldeterHof() {
+/** Ein angemeldeter Hof, bei dem JEDES Feld einen eigenen, erkennbaren Wert hat (abweichend: einzelne Felder anders). */
+async function angemeldeterHof(abweichend: Partial<Prisma.FarmUncheckedCreateInput> = {}) {
   const { farm, ownerId, cookie } = await erstelleHofMitAnmeldung({
     tagline: 'Frisch vom Feld',
     foundedYear: 1950,
@@ -76,6 +76,7 @@ async function angemeldeterHof() {
     betriebsnummer: 'LFBIS 0000000',
     betriebsstatus: 'PRIMAERPRODUKTION',
     pauseMessage: 'Im Urlaub bis Montag.',
+    ...abweichend,
   })
   await prisma.farmValue.createMany({ data: WERTE_VORHER.map((w, i) => ({ ...w, id: `int-wert-${farm.id}-${i}`, farmId: farm.id })) })
   await prisma.farmPhoto.create({
@@ -299,5 +300,18 @@ describe('Logo, Titelbild und Galeriefoto (Abnahme Nr. 50: kein anderes Feld än
 
     // Der Verlauf (bannerValue) bleibt, wie er war — die Hofseite zeigt ihn wieder.
     expect(await stand(farm.id)).toEqual({ ...vorher, hof: { ...vorher.hof, bannerType: 'GRADIENT', bannerUrl: null } })
+  })
+})
+
+describe('ein zu langer Altwert sperrt — die Meldung nennt den Abschnitt', () => {
+  it('„Über uns" mit 1001 Zeichen: Der Leitspruch wird nicht gespeichert, die Meldung nennt „Über uns", nichts ändert sich', async () => {
+    // Ein Altwert über der Grenze, wie er nur aus der Zeit vor dem Schema stammen kann.
+    const { farm } = await angemeldeterHof({ aboutText: 'x'.repeat(1001) })
+    const vorher = await stand(farm.id)
+
+    const antwort = await speichereAuftritt({ tagline: 'Gemüse vom Hügel' })
+
+    expect(antwort.error).toBe('„Über uns“: Der Text darf höchstens 1000 Zeichen haben — bitte kürzen. Erst danach lässt sich speichern.')
+    expect(await stand(farm.id)).toEqual(vorher)
   })
 })

@@ -97,6 +97,26 @@ export const ABSCHNITT_LABEL: Record<string, string> = {
   products: 'Produkte',
 }
 
+/**
+ * Der Name jeder Zeile — eine Quelle für Liste, Editor, Blatt und für die
+ * Meldung, wenn ein gespeicherter Wert das Speichern sperrt (abschnitt-stand.ts).
+ */
+export const ZEILE_TITEL: Record<HofseiteZeileId, string> = {
+  titelbild: 'Titelbild',
+  logo: 'Logo',
+  name: 'Name und Kurzbeschreibung',
+  tagline: 'Leitspruch und Gründungsjahr',
+  'ueber-uns': 'Über uns',
+  werte: 'Werte',
+  fotos: 'Fotos',
+  adresse: 'Adresse und Standort',
+  abholzeiten: 'Abholzeiten',
+  zahlung: 'Zahlungsarten',
+  kontakt: 'Kontakt',
+  bestellungen: 'Bestellungen',
+  abschnitte: 'Abschnitte der Hofseite',
+}
+
 const FEHLT = { text: 'Fehlt', farbe: 'bernstein' } as const
 /** Freiwilliges fehlt leise: grau statt bernstein — es ist kein offener Punkt. */
 const FEHLT_FREIWILLIG = { text: 'Fehlt', farbe: 'grau' } as const
@@ -147,13 +167,12 @@ function zeilen(stand: HofseiteStand): HofseiteZeile[] {
   const zeile = (
     id: HofseiteZeileId,
     gruppe: HofseiteGruppeId,
-    titel: string,
     wert: string,
     fertig: boolean,
     marke: HofseiteZeile['marke'] = fertig ? null : FEHLT
-  ): HofseiteZeile => ({ id, gruppe, titel, wert, fertig, marke, freiwillig: false })
-  const freiwillig = (id: HofseiteZeileId, titel: string, wert: string, fertig: boolean): HofseiteZeile => ({
-    ...zeile(id, 'auftritt', titel, wert, fertig, fertig ? null : FEHLT_FREIWILLIG),
+  ): HofseiteZeile => ({ id, gruppe, titel: ZEILE_TITEL[id], wert, fertig, marke, freiwillig: false })
+  const freiwillig = (id: HofseiteZeileId, wert: string, fertig: boolean): HofseiteZeile => ({
+    ...zeile(id, 'auftritt', wert, fertig, fertig ? null : FEHLT_FREIWILLIG),
     freiwillig: true,
   })
 
@@ -161,43 +180,37 @@ function zeilen(stand: HofseiteStand): HofseiteZeile[] {
     zeile(
       'titelbild',
       'auftritt',
-      'Titelbild',
       titelbild ? 'Foto gesetzt · Ausschnitt anpassbar' : 'Farbverlauf — ein eigenes Foto wirkt persönlicher',
       titelbild
     ),
     zeile(
       'logo',
       'auftritt',
-      'Logo',
       logo ? 'Logo gesetzt' : 'Fehlt — macht deinen Hof auf einen Blick erkennbar',
       logo
     ),
     zeile(
       'name',
       'auftritt',
-      'Name und Kurzbeschreibung',
       beschreibung ? `${stand.name} · ${beschreibung}` : `${stand.name} — Kurzbeschreibung fehlt`,
       beschreibung.length > 0
     ),
-    freiwillig('tagline', 'Leitspruch und Gründungsjahr', leitspruchWert(leitspruch, stand.foundedYear), leitspruch.length > 0),
-    zeile('ueber-uns', 'auftritt', 'Über uns', ueberUns || 'Noch kein Text', ueberUns.length > 0),
+    freiwillig('tagline', leitspruchWert(leitspruch, stand.foundedYear), leitspruch.length > 0),
+    zeile('ueber-uns', 'auftritt', ueberUns || 'Noch kein Text', ueberUns.length > 0),
     freiwillig(
       'werte',
-      'Werte',
       stand.werte.length > 0 ? stand.werte.join(' · ') : 'Freiwillig — bis zu 4, etwa Regional oder Saisonal',
       stand.werte.length > 0
     ),
     zeile(
       'fotos',
       'auftritt',
-      'Fotos',
       stand.fotos === 0 ? 'Noch keine Fotos' : stand.fotos === 1 ? '1 Foto' : `${stand.fotos} Fotos`,
       stand.fotos > 0
     ),
     zeile(
       'adresse',
       'abholen-bezahlen',
-      'Adresse und Standort',
       `${stand.address}, ${stand.postalCode} ${stand.city} · ${
         stand.hatKoordinaten ? 'auf der Karte gesetzt' : 'Standort auf der Karte fehlt'
       }`,
@@ -206,7 +219,6 @@ function zeilen(stand: HofseiteStand): HofseiteZeile[] {
     zeile(
       'abholzeiten',
       'abholen-bezahlen',
-      'Abholzeiten',
       stand.abholzeiten.length > 0
         ? abholzeitenKurz(stand.abholzeiten)
         : 'Noch keine — erst dann können Kunden bestellen',
@@ -220,7 +232,6 @@ function zeilen(stand: HofseiteStand): HofseiteZeile[] {
     zeile(
       'zahlung',
       'abholen-bezahlen',
-      'Zahlungsarten',
       online ? 'Online mit Karte · vor Ort bar und mit Karte' : 'Vor Ort bar und mit Karte · Online-Zahlung noch nicht eingerichtet',
       true,
       online ? null : { text: 'Online fehlt', farbe: 'bernstein' }
@@ -228,7 +239,6 @@ function zeilen(stand: HofseiteStand): HofseiteZeile[] {
     zeile(
       'kontakt',
       'abholen-bezahlen',
-      'Kontakt',
       kontakt ? `${stand.phone} · ${stand.email}` : 'Telefon oder E-Mail fehlt',
       kontakt
     ),
@@ -236,12 +246,11 @@ function zeilen(stand: HofseiteStand): HofseiteZeile[] {
     zeile(
       'bestellungen',
       'sichtbarkeit',
-      'Bestellungen',
       stand.isPaused ? 'Pausiert — Kunden können gerade nicht bestellen' : 'Nimmt Bestellungen an — pausieren möglich',
       true,
       stand.isPaused ? { text: 'Pausiert', farbe: 'bernstein' } : null
     ),
-    zeile('abschnitte', 'sichtbarkeit', 'Abschnitte der Hofseite', sichtbar.join(' · '), true),
+    zeile('abschnitte', 'sichtbarkeit', sichtbar.join(' · '), true),
   ]
 }
 

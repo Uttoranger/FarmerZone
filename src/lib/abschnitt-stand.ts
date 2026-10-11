@@ -18,8 +18,11 @@
  */
 import type { Betriebsstatus } from '@prisma/client'
 import { alsLand } from '@/lib/laender'
-import type { AppearanceSaveInput } from '@/schemas/auftritt'
+import { ZU_LANG } from '@/lib/eingabegrenzen'
+import { ZEILE_TITEL } from '@/lib/hofseite-fortschritt'
+import { GRUENDUNGSJAHR_FEHLER, WERTE_ZU_VIELE, type AppearanceSaveInput } from '@/schemas/auftritt'
 import type { ProfileFormData } from '@/schemas/hofprofil'
+import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 
 /**
  * Die Sätze des Speicherwegs der Abschnitte (Blatt unter lg, Editor ab lg) —
@@ -34,7 +37,43 @@ export const ABSCHNITT_SPEICHERN_TEXT = {
   nichtAngemeldet: 'Du bist nicht mehr angemeldet. Melde dich neu an und versuch es dann noch einmal.',
   /** Angemeldet, aber kein Hof zu diesem Konto — etwa in einem Tab mit einer älteren Anmeldung. */
   hofFehlt: 'Wir finden deinen Hof gerade nicht. Lade die Seite neu und versuch es dann noch einmal.',
+  /** Ein Wert des Auftritts passt nicht ins Schema, und kein Abschnitt lässt sich zuordnen. */
+  ungueltig: 'Wir konnten das nicht speichern. Lade die Seite neu und versuch es dann noch einmal.',
 } as const
+
+/** Welcher Abschnitt ein Feld des Auftritts bearbeitet. */
+const ZEILE_DES_FELDS: Partial<Record<string, HofseiteZeileId>> = {
+  tagline: 'tagline',
+  foundedYear: 'tagline',
+  aboutText: 'ueber-uns',
+  farmValues: 'werte',
+  sectionsConfig: 'abschnitte',
+  bannerType: 'titelbild',
+  bannerValue: 'titelbild',
+  bannerUrl: 'titelbild',
+  logoUrl: 'logo',
+}
+
+/** Die eigenen Sätze des Schemas (src/schemas/auftritt.ts) — jeder andere Satz stammt von Zod und ist englisch. */
+const EIGENE_SAETZE: ReadonlySet<string> = new Set([ZU_LANG.leitspruch, ZU_LANG.ueberUns, ZU_LANG.wertUntertitel, GRUENDUNGSJAHR_FEHLER, WERTE_ZU_VIELE])
+
+/**
+ * Die Meldung, wenn der Auftritt nicht ins Schema passt (saveAppearanceAction).
+ * Jedes Speichern schickt alle Felder des Auftritts mit (auftrittMitTeil) —
+ * ein zu langer Altwert sperrt also auch das Speichern eines anderen
+ * Abschnitts. Die Meldung nennt darum den Abschnitt, der sperrt, damit der
+ * Hof weiß, was er ändern muss: „„Über uns“: Der Text darf höchstens 1000
+ * Zeichen haben — bitte kürzen. Erst danach lässt sich speichern." Ein Satz
+ * von Zod (englisch) kommt nie hinaus (CODING_STANDARDS §4).
+ */
+export function auftrittFehlerText(issues: readonly { path: readonly PropertyKey[]; message: string }[]): string {
+  const erstes = issues[0]
+  const feld = erstes?.path[0]
+  const zeile = typeof feld === 'string' ? ZEILE_DES_FELDS[feld] : undefined
+  if (!erstes || !zeile) return ABSCHNITT_SPEICHERN_TEXT.ungueltig
+  const grund = EIGENE_SAETZE.has(erstes.message) ? erstes.message : 'Dort steht etwas, das wir so nicht speichern können — bitte prüf es.'
+  return `„${ZEILE_TITEL[zeile]}“: ${grund} Erst danach lässt sich speichern.`
+}
 
 /** Die Felder, die saveAppearanceAction bei jedem Aufruf schreibt — genau der Stand, aus dem jeder Abschnitt speichert. */
 export type AuftrittStand = {

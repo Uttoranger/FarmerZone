@@ -13,6 +13,8 @@
  *  - auftrittMitTeil ändert nur, was der Abschnitt setzt: undefined heißt
  *    „nicht meins", null heißt „leeren".
  *  - profilBasis und profilMitTeil tun dasselbe für das Profil.
+ *  - auftrittFehlerText nennt den Abschnitt, der das Speichern sperrt — mit
+ *    dem Satz des Schemas, nie mit einem englischen Satz von Zod.
  *  - geaendertSeitLaden (Hof-Profil, Nr. 50 Runde 1) nimmt nur, was seit dem
  *    Laden geändert wurde — Text, Zahl, null; unverändert fehlt der Schlüssel.
  *  - Der Stand wird nicht verändert (der nächste Abschnitt rechnet weiter damit).
@@ -21,7 +23,9 @@ import { describe, it, expect } from 'vitest'
 import { appearanceSchema } from '@/schemas/auftritt'
 import { profileSchema } from '@/schemas/hofprofil'
 import {
+  ABSCHNITT_SPEICHERN_TEXT,
   auftrittBasis,
+  auftrittFehlerText,
   auftrittMitTeil,
   auftrittStandAus,
   geaendertSeitLaden,
@@ -184,5 +188,35 @@ describe('geaendertSeitLaden (Hof-Profil)', () => {
     expect(profilMitTeil(frisch, teil)).toEqual({ ...profilBasis(frisch), phone: '+43 660 2222222' })
     // Gegenprobe: das ganze Formular vom Laden schriebe den alten Namen zurück.
     expect(profilMitTeil(frisch, { ...ANFANG, phone: '+43 660 2222222' }).name).toBe('Hof Test')
+  })
+})
+
+describe('auftrittFehlerText — welcher Abschnitt sperrt', () => {
+  const fehler = (eingabe: unknown) => {
+    const ergebnis = appearanceSchema.safeParse(eingabe)
+    if (ergebnis.success) throw new Error('Das Schema hätte ablehnen sollen')
+    return auftrittFehlerText(ergebnis.error.issues)
+  }
+
+  it('ein zu langer Altwert in „Über uns" sperrt auch das Speichern des Leitspruchs — die Meldung nennt „Über uns"', () => {
+    const eingabe = auftrittMitTeil({ ...STAND, aboutText: 'x'.repeat(1001) }, { tagline: 'Neuer Leitspruch' })
+    expect(fehler(eingabe)).toBe('„Über uns“: Der Text darf höchstens 1000 Zeichen haben — bitte kürzen. Erst danach lässt sich speichern.')
+  })
+
+  it('ein zu langer Untertitel eines Werts: „Werte"', () => {
+    const eingabe = auftrittBasis({ ...STAND, farmValues: [{ icon: 'bio', title: 'Bio-zertifiziert', subtitle: 'x'.repeat(101) }] })
+    expect(fehler(eingabe)).toMatch(/^„Werte“: Die Beschreibung darf höchstens 100 Zeichen haben — bitte kürzen\./)
+  })
+
+  it('ein Satz von Zod (englisch) kommt nie hinaus — dafür ein fester Satz, der Abschnitt bleibt genannt', () => {
+    const eingabe = auftrittBasis({ ...STAND, farmValues: [{ icon: 'bio', title: 'x'.repeat(51), subtitle: null }] })
+    const text = fehler(eingabe)
+    expect(text).toMatch(/^„Werte“: Dort steht etwas, das wir so nicht speichern können/)
+    expect(text).not.toMatch(/[Tt]oo big|expected|characters/)
+  })
+
+  it('ohne zuordenbaren Abschnitt: der allgemeine Satz mit Ausweg', () => {
+    expect(auftrittFehlerText([{ path: ['unbekannt'], message: 'Too big' }])).toBe(ABSCHNITT_SPEICHERN_TEXT.ungueltig)
+    expect(auftrittFehlerText([])).toBe(ABSCHNITT_SPEICHERN_TEXT.ungueltig)
   })
 })

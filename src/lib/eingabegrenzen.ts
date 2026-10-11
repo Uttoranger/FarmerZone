@@ -23,6 +23,8 @@ export const BILDUNTERSCHRIFT_MAX = 200
 export const LEITSPRUCH_MAX = 60
 /** Der Satz unter einem Wert der Hofseite (FarmValue.subtitle). */
 export const WERT_UNTERTITEL_MAX = 100
+/** Der Text „Über uns" (Farm.aboutText) — dieselbe Grenze wie seit „Mein Auftritt". */
+export const UEBER_UNS_MAX = 1000
 /**
  * Länge einer gespeicherten Bild-Adresse. Unsere Blob-Adressen sind weit
  * kürzer; die Grenze hält nur Müll aus der Datenbank (Nr. 19b, Runde 1).
@@ -80,6 +82,7 @@ export const ZU_LANG = {
   stornoGrund: `Der Grund darf höchstens ${STORNO_GRUND_MAX} Zeichen haben — bitte kürzen.`,
   leitspruch: `Der Leitspruch darf höchstens ${LEITSPRUCH_MAX} Zeichen haben — bitte kürzen.`,
   wertUntertitel: `Die Beschreibung darf höchstens ${WERT_UNTERTITEL_MAX} Zeichen haben — bitte kürzen.`,
+  ueberUns: `Der Text darf höchstens ${UEBER_UNS_MAX} Zeichen haben — bitte kürzen.`,
 } as const
 
 /**

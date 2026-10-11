@@ -7,7 +7,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getAppearanceData, type SectionConfig } from '@/server/queries/appearance'
 import { appearanceSchema } from '@/schemas/auftritt'
-import { ABSCHNITT_SPEICHERN_TEXT, auftrittStandAus, type AuftrittStand } from '@/lib/abschnitt-stand'
+import { ABSCHNITT_SPEICHERN_TEXT, auftrittFehlerText, auftrittStandAus, type AuftrittStand } from '@/lib/abschnitt-stand'
 import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
 
 // Das Schema liegt in src/schemas/auftritt.ts — der Hofseiten-Editor prüft
@@ -42,7 +42,8 @@ export async function saveAppearanceAction(
   if (!farm) return { error: 'Hof nicht gefunden' }
 
   const parsed = appearanceSchema.safeParse(data)
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Ungültige Daten' }
+  // Die Meldung nennt den Abschnitt, der sperrt — auch einen anderen als den gerade gespeicherten.
+  if (!parsed.success) return { error: auftrittFehlerText(parsed.error.issues) }
 
   const {
     tagline,

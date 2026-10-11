@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { LEITSPRUCH_MAX, WERT_UNTERTITEL_MAX, ZU_LANG } from '@/lib/eingabegrenzen'
+import { LEITSPRUCH_MAX, UEBER_UNS_MAX, WERT_UNTERTITEL_MAX, ZU_LANG } from '@/lib/eingabegrenzen'
 
 /**
  * Der Auftritt der Hofseite, wie saveAppearanceAction
@@ -14,6 +14,7 @@ export const WERTE_MAX = 4
 export const GRUENDUNGSJAHR_MIN = 1800
 export const GRUENDUNGSJAHR_MAX = 2050
 export const GRUENDUNGSJAHR_FEHLER = `Bitte ein Jahr zwischen ${GRUENDUNGSJAHR_MIN} und ${GRUENDUNGSJAHR_MAX} eintragen — oder das Feld leer lassen.`
+export const WERTE_ZU_VIELE = `Höchstens ${WERTE_MAX} Werte.`
 
 const farmValueSchema = z.object({
   icon: z.string().max(10),
@@ -37,13 +38,13 @@ export const appearanceSchema = z.object({
     .max(GRUENDUNGSJAHR_MAX, GRUENDUNGSJAHR_FEHLER)
     .nullable()
     .optional(),
-  aboutText: z.string().max(1000, 'Höchstens 1000 Zeichen').nullable().optional(),
+  aboutText: z.string().max(UEBER_UNS_MAX, ZU_LANG.ueberUns).nullable().optional(),
   bannerType: z.enum(['GRADIENT', 'PHOTO']).optional(),
   bannerValue: z.string().nullable().optional(),
   bannerUrl: z.string().url().nullable().optional(),
   logoUrl: z.string().url().nullable().optional(),
   sectionsConfig: z.array(sectionConfigSchema).default([]),
-  farmValues: z.array(farmValueSchema).max(WERTE_MAX, `Höchstens ${WERTE_MAX} Werte.`),
+  farmValues: z.array(farmValueSchema).max(WERTE_MAX, WERTE_ZU_VIELE),
 })
 
 export type AppearanceSaveInput = z.infer<typeof appearanceSchema>
