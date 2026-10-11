@@ -99,6 +99,43 @@ async function seite(orderId: string, s: string | undefined, farmSlug = 'hof-pro
   return elementText(element)
 }
 
+/**
+ * Alle Links eines Server-Elementbaums mit Ziel und sichtbarem Text — wie
+ * elementText: Funktions-Komponenten ohne Hooks werden aufgerufen (dann
+ * zählt der Link, den sie rendern); wo das nicht geht (next/link), zählt die
+ * `href`-Prop des Elements selbst.
+ */
+async function elementLinks(el: unknown): Promise<Array<{ href: string; text: string }>> {
+  if (el == null || typeof el !== 'object') return []
+  if (Array.isArray(el)) {
+    const alle: Array<{ href: string; text: string }> = []
+    for (const kind of el) alle.push(...(await elementLinks(kind)))
+    return alle
+  }
+  const element = el as { type?: unknown; props?: { children?: unknown; href?: unknown } }
+  if (!element.props) return []
+  if (typeof element.type === 'function') {
+    try {
+      return await elementLinks(await (element.type as (p: unknown) => unknown)(element.props))
+    } catch {
+      // Komponente braucht React-Kontext (Hooks) — dann zählt ihre href-Prop.
+    }
+  }
+  const eigener =
+    typeof element.props.href === 'string'
+      ? [{ href: element.props.href, text: (await elementText(element.props.children)).trim() }]
+      : []
+  return [...eigener, ...(await elementLinks(element.props.children))]
+}
+
+async function seitenLinks(orderId: string, s: string | undefined, farmSlug = 'hof-probe') {
+  const element = await BestellungPage({
+    params: Promise.resolve({ farmSlug, orderId }),
+    searchParams: Promise.resolve({ s }),
+  })
+  return elementLinks(element)
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
 })
@@ -220,6 +257,46 @@ describe('Bestellseite — die Signatur wird an der Seite selbst durchgesetzt', 
     const html = await seite('order-1', bestellSignatur('order-1'))
     expect(html).toContain('Dieser Link ist nicht gültig')
     expect(html).not.toContain('HM-2611')
+  })
+})
+
+describe('Bestellseite — der Ausweg bei ungültigem Link führt zur Hofübersicht', () => {
+  /**
+   * Ohne gültigen Link ist nicht einmal der Hof bestätigt: Der Ausweg führt
+   * nach /hoefe, nie nach /{farmSlug} aus der ungeprüften Adresse — und nie
+   * zum echten Hof der Bestellung (das verriete, wem sie gehört). Bis Nr. 54
+   * hielt das die Art `bestellung-ungueltig` in src/lib/kunden-kopf.ts fest.
+   */
+  function erwarteAusweg(links: Array<{ href: string; text: string }>) {
+    expect(links).toContainEqual({ href: '/hoefe', text: 'Zur Hofübersicht' })
+    for (const link of links) {
+      expect(link.href, link.text).not.toMatch(/fremder-hof|hof-probe/)
+    }
+  }
+
+  it('falsche Signatur', async () => {
+    erwarteAusweg(await seitenLinks('order-1', 'f'.repeat(64), 'fremder-hof'))
+  })
+
+  it('ohne Signatur', async () => {
+    erwarteAusweg(await seitenLinks('order-1', undefined, 'fremder-hof'))
+  })
+
+  it('gültige Signatur, aber ein fremder Hof in der Adresse', async () => {
+    findUnique.mockResolvedValue(bestellung() as never)
+    erwarteAusweg(await seitenLinks('order-1', bestellSignatur('order-1'), 'fremder-hof'))
+  })
+
+  it('stillgelegter Hof', async () => {
+    findUnique.mockResolvedValue(bestellung({ farm: { ...bestellung().farm, archivedAt: new Date('2026-01-01') } }) as never)
+    erwarteAusweg(await seitenLinks('order-1', bestellSignatur('order-1')))
+  })
+
+  it('Gegenprobe: mit gültigem Link führt „Zum Hof" zum Hof der Bestellung — die Suche findet Links', async () => {
+    findUnique.mockResolvedValue(bestellung() as never)
+    const links = await seitenLinks('order-1', bestellSignatur('order-1'))
+    expect(links).toContainEqual({ href: '/hof-probe', text: 'Zum Hof' })
+    expect(links).not.toContainEqual({ href: '/hoefe', text: 'Zur Hofübersicht' })
   })
 })
 
