@@ -72,7 +72,7 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 51 | Hofseite: Schaufenster zuerst (N5), Käufer-Vorschau Lebensmittel | fertig, PR offen | `nacht/2026-10-10/51-hofseite-schaufenster` | #235 | main | tester grün; pruefer ohne Blocker; Runde 1 (31b4a28) | 11.10.2026 |
 | 52 | Karte (/hoefe, Standortkarte, Region) | fertig, PR offen | `nacht/2026-10-10/52-karte` | #234 | main | tester grün; pruefer ohne Blocker; Runde 1 (fc5aaae, a0bdf38) | 11.10.2026 |
 | 53 | Heute, Auswertung, Verkäufe | fertig, PR offen | `nacht/2026-10-10/53-heute-auswertung` | #233 | 55 | gestapelt auf 55 (#232); tester grün; pruefer ohne Blocker; Runde 1 (c0080bc); 55 Endstand hineingeholt (9ed8afb) | 11.10.2026 |
-| 54 | Admin am Handy und alte Seiten ins neue Design | läuft | `nacht/2026-10-10/54-admin-handy` | | main | Nachprüfung folgt | 11.10.2026 |
+| 54 | Admin am Handy und alte Seiten ins neue Design | läuft (tester und pruefer) | `nacht/2026-10-10/54-admin-handy` | | main | Umsetzung fertig (f7badaa WIP, 9631630, b98c13a, ff89795); Nachprüfung folgt | 11.10.2026 |
 | 55 | Testzahlungen aus Auswertungen (Z4) | fertig, PR offen | `nacht/2026-10-10/55-testzahlungen` | #232 | main | Runde 1 und 2 mit Nachprüfung; Nacharbeit 5ca0874 | 11.10.2026 |
 | 56 | Altlasten Lauf 8 §6 und Kleinkram | läuft | `nacht/2026-10-10/56-altlasten` | | main | Nachprüfung folgt | 11.10.2026 |
 | 57 | Datenschutzerklärung, Nachtrag (Entwurf) | läuft (Nachbesserung Runde 1) | `nacht/2026-10-10/57-datenschutz-nachtrag` | | 33 (#210) | Umsetzung fertig (9184c93, b587a1c); pruefer: 1 Blocker (Karten-Satz), 4 Sollte | 11.10.2026 |
