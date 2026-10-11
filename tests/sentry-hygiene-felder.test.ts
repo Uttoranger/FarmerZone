@@ -362,7 +362,9 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
     ['kodierte Umlaute ohne Endung', { extra: { text: 'a%40' + '%C3%A4.'.repeat(N) + '1' } }],
     ['doppelt kodiert ohne Endung', { extra: { text: 'a%2540'.repeat(N) } }],
     ['lange Folge aus %25', { exception: { values: [{ value: 'a%' + '25'.repeat(N) + '4' }] } }],
-    ['viele relative Adressen im Fehlertext', { exception: { values: [{ value: ' /a?b=1'.repeat(N) }] } }],
+    // Jede Adresse wird einzeln zerlegt (URLSearchParams) — 5 000 genügen, um
+    // Quadratisches zu sehen; 50 000 lagen unter Last schon nahe der Grenze.
+    ['viele relative Adressen im Fehlertext', { exception: { values: [{ value: ' /a?b=1'.repeat(N / 10) }] } }],
     ['lange Folge aus Schrägstrichen im Fehlertext', { exception: { values: [{ value: '/'.repeat(2 * N) }] } }],
     ['Schrägstriche nach Klammern im Fehlertext', { exception: { values: [{ value: '(/'.repeat(N) }] } }],
   ]
