@@ -2,10 +2,8 @@ import { prisma } from '@/lib/prisma'
 import { STRIPE_LIVE_AB } from '@/lib/umgebung-server'
 import { testzahlungWhere, testzahlungenHinweis, type GezeigteSummen } from '@/lib/testzahlung'
 import { umsatzTestzahlungenWhere } from '@/lib/umsatz'
-import { testzahlungenBetroffen, type EinnahmenTopf } from '@/lib/finanzen'
-
-/** Was „Servicegebühren dieses Monats" zeigt — „erwartet" steht dort nicht (servicegebuehrenImMonat). */
-const AUSWERTUNG_TOEPFE: readonly EinnahmenTopf[] = ['eingezogen', 'geschuldet']
+import { testzahlungenBetroffen } from '@/lib/finanzen'
+import { SERVICEGEBUEHREN_TOEPFE } from '@/lib/auswertung'
 
 /**
  * Die leise Zeile „Testzahlungen vor dem … sind nicht mitgezählt." auf den
@@ -14,9 +12,9 @@ const AUSWERTUNG_TOEPFE: readonly EinnahmenTopf[] = ['eingezogen', 'geschuldet']
  *  - eine Umsatzsumme: dieselbe Form wie die Summe (`umsatzTestzahlungenWhere`
  *    je Fenster) — eine offene oder stornierte Testzahlung zählt dort nie;
  *  - die Servicegebühren des Monats (nur Auswertung): eine Testzahlung des
- *    Monats, die `topfVonBestellung` ohne die Regel als eingezogen oder
- *    geschuldet zählte (`testzahlungenBetroffen`), etwa bezahlt und noch
- *    nicht abgeholt.
+ *    Monats, die `topfVonBestellung` ohne die Regel in einem Topf der Karte
+ *    zählte (`testzahlungenBetroffen` mit `SERVICEGEBUEHREN_TOEPFE`, derselben
+ *    Liste wie `servicegebuehrenImMonat`), etwa bezahlt und noch nicht abgeholt.
  * So verschwindet die Zeile von selbst, sobald die Testzeit aus allen
  * gezeigten Zeiträumen gefallen ist.
  */
@@ -43,6 +41,6 @@ export async function testzahlungenHinweisFuerHof(
       : Promise.resolve([]),
   ])
   // Die Provision entscheidet keinen Topf; die Regel braucht nur das Feld.
-  const gebuehrBetroffen = testzahlungenBetroffen(imMonat.map((b) => ({ ...b, provisionCents: 0 })), stripeLiveAb, AUSWERTUNG_TOEPFE)
+  const gebuehrBetroffen = testzahlungenBetroffen(imMonat.map((b) => ({ ...b, provisionCents: 0 })), stripeLiveAb, SERVICEGEBUEHREN_TOEPFE)
   return abgeholt !== null || gebuehrBetroffen ? testzahlungenHinweis(stripeLiveAb) : null
 }

@@ -22,6 +22,9 @@ import {
   kostenImMonat,
   kostenSummeImMonat,
   monateBis,
+  GEZAEHLTE_TOEPFE,
+  TOEPFE_IM_GEWAEHLTEN_MONAT,
+  finanzseiteLaesstTestzahlungenAus,
   testzahlungenBetroffen,
   topfVonBestellung,
   type BestellungFuerFinanzen,
@@ -531,25 +534,64 @@ describe('Testzahlungen — online vor dem Stichtag zählt nicht als Servicegeb�
   })
 
   it('betrifft der Stichtag die Bestellungen? Nur, wenn eine Testzahlung sonst gezählt hätte', () => {
-    expect(testzahlungenBetroffen([bestellung({ createdAt: DAVOR })], STICHTAG)).toBe(true)
-    expect(testzahlungenBetroffen([bestellung({ createdAt: DAVOR, paymentStatus: 'PENDING', status: 'READY' })], STICHTAG)).toBe(true)
+    const alle = TOEPFE_IM_GEWAEHLTEN_MONAT
+    expect(testzahlungenBetroffen([bestellung({ createdAt: DAVOR })], STICHTAG, alle)).toBe(true)
+    expect(testzahlungenBetroffen([bestellung({ createdAt: DAVOR, paymentStatus: 'PENDING', status: 'READY' })], STICHTAG, alle)).toBe(true)
     // Storniert zählte sie ohnehin nicht; danach ist es keine Testzahlung; bar ist echt.
-    expect(testzahlungenBetroffen([bestellung({ createdAt: DAVOR, status: 'CANCELLED' })], STICHTAG)).toBe(false)
-    expect(testzahlungenBetroffen([bestellung({ createdAt: DANACH })], STICHTAG)).toBe(false)
+    expect(testzahlungenBetroffen([bestellung({ createdAt: DAVOR, status: 'CANCELLED' })], STICHTAG, alle)).toBe(false)
+    expect(testzahlungenBetroffen([bestellung({ createdAt: DANACH })], STICHTAG, alle)).toBe(false)
     expect(
-      testzahlungenBetroffen([bestellung({ createdAt: DAVOR, paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', status: 'PICKED_UP' })], STICHTAG)
+      testzahlungenBetroffen(
+        [bestellung({ createdAt: DAVOR, paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', status: 'PICKED_UP' })],
+        STICHTAG,
+        alle
+      )
     ).toBe(false)
-    expect(testzahlungenBetroffen([bestellung({ createdAt: DAVOR })], null)).toBe(false)
-    expect(testzahlungenBetroffen([], STICHTAG)).toBe(false)
+    expect(testzahlungenBetroffen([bestellung({ createdAt: DAVOR })], null, alle)).toBe(false)
+    expect(testzahlungenBetroffen([], STICHTAG, alle)).toBe(false)
   })
 
   it('nur die gezeigten Töpfe zählen: ohne „erwartet" betrifft eine offene Testzahlung nichts', () => {
     const offen = bestellung({ createdAt: DAVOR, paymentStatus: 'PENDING', status: 'PENDING_CONFIRMATION' })
     const bezahlt = bestellung({ createdAt: DAVOR, status: 'CONFIRMED' })
-    expect(testzahlungenBetroffen([offen], STICHTAG, ['eingezogen', 'geschuldet'])).toBe(false)
-    expect(testzahlungenBetroffen([bezahlt], STICHTAG, ['eingezogen', 'geschuldet'])).toBe(true)
-    // Ohne Angabe alle Töpfe außer „keiner" — so zeigt es die Finanzseite.
-    expect(testzahlungenBetroffen([offen], STICHTAG)).toBe(true)
+    expect(testzahlungenBetroffen([offen], STICHTAG, GEZAEHLTE_TOEPFE)).toBe(false)
+    expect(testzahlungenBetroffen([bezahlt], STICHTAG, GEZAEHLTE_TOEPFE)).toBe(true)
+    expect(testzahlungenBetroffen([offen], STICHTAG, TOEPFE_IM_GEWAEHLTEN_MONAT)).toBe(true)
+  })
+
+  it('die Töpfe aus einer Quelle (Runde 2): gezaehltCents und bestellungen zählen genau GEZAEHLTE_TOEPFE, der gewählte Monat zeigt dazu „erwartet"', () => {
+    expect([...GEZAEHLTE_TOEPFE]).toEqual(['eingezogen', 'geschuldet'])
+    expect([...TOEPFE_IM_GEWAEHLTEN_MONAT]).toEqual([...GEZAEHLTE_TOEPFE, 'erwartet'])
+    const maerz = [
+      bestellung({ createdAt: DANACH, serviceFeeCents: 200, provisionCents: 10 }), // eingezogen
+      bestellung({ createdAt: DANACH, paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', status: 'PICKED_UP', serviceFeeCents: 70 }), // geschuldet
+      bestellung({ createdAt: DANACH, paymentStatus: 'PENDING', status: 'READY', serviceFeeCents: 40 }), // erwartet
+      bestellung({ createdAt: DANACH, status: 'CANCELLED', serviceFeeCents: 90 }), // keiner
+    ]
+    const gezaehlt = maerz.filter((b) => GEZAEHLTE_TOEPFE.includes(topfVonBestellung(b, null)))
+    const monat = einnahmenImMonat(maerz, '2027-03', null)
+    expect(monat.gezaehltCents).toBe(gezaehlt.reduce((s, b) => s + b.serviceFeeCents, 0))
+    expect(monat.bestellungen).toBe(gezaehlt.length)
+    expect(monat).toMatchObject({ gezaehltCents: 270, bestellungen: 2, provisionCents: 10, erwartetCents: 40, offeneBestellungen: 1 })
+  })
+
+  it('Finanzseite (Runde 2): Vormonate zählen nur eingezogen und geschuldet, der gewählte Monat dazu „erwartet"', () => {
+    const februar = new Date('2027-02-10T10:00:00+01:00')
+    const offenImFebruar = bestellung({ createdAt: februar, paymentStatus: 'PENDING', status: 'PENDING_CONFIRMATION' })
+    const offenImMaerz = bestellung({ createdAt: DAVOR, paymentStatus: 'PENDING', status: 'PENDING_CONFIRMATION' })
+    const bezahltImFebruar = bestellung({ createdAt: februar, status: 'CONFIRMED' })
+
+    // Offen im Vormonat: Verlauf und Schnitt zählen nur Gezähltes — keine Zeile.
+    expect(finanzseiteLaesstTestzahlungenAus([offenImFebruar], '2027-03', STICHTAG)).toBe(false)
+    // Offen im gewählten Monat: „erwartet" steht auf der Seite — Zeile.
+    expect(finanzseiteLaesstTestzahlungenAus([offenImFebruar, offenImMaerz], '2027-03', STICHTAG)).toBe(true)
+    // Bezahlt im Vormonat: fehlt im Verlauf und im Schnitt — Zeile.
+    expect(finanzseiteLaesstTestzahlungenAus([bezahltImFebruar], '2027-03', STICHTAG)).toBe(true)
+    // Wird der Februar gewählt, zeigt er „erwartet" selbst.
+    expect(finanzseiteLaesstTestzahlungenAus([offenImFebruar], '2027-02', STICHTAG)).toBe(true)
+    // Ohne Stichtag nie; storniert zählte ohnehin nicht.
+    expect(finanzseiteLaesstTestzahlungenAus([bezahltImFebruar, offenImMaerz], '2027-03', null)).toBe(false)
+    expect(finanzseiteLaesstTestzahlungenAus([bestellung({ createdAt: DAVOR, status: 'CANCELLED' })], '2027-03', STICHTAG)).toBe(false)
   })
 
   it('ohne Stichtag ist das Ergebnis dasselbe wie heute — als gäbe es keine Testzahlung', () => {

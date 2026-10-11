@@ -21,9 +21,10 @@
  *     `createdAt`; rohes SQL mit `"paymentMethod" = 'ONLINE' AND "createdAt" <`.
  *  4. Die Regel abgeschaltet: ein Aufruf der Regel oder einer Summe, die sie
  *     anwendet, mit dem Literal `null` als Stichtag; seit Runde 1 auch ein
- *     eigenes `AND` im selben Objekt wie `...umsatzBestellungWhere(…)` oder
- *     `...ohneTestzahlungenWhere(…)` — die Regel steckt dort im `AND`, ein
- *     zweites ersetzte sie still (ein eigenes `NOT` daneben ist erlaubt).
+ *     eigenes `AND` im selben Objekt wie `...umsatzBestellungWhere(…)`,
+ *     `...ohneTestzahlungenWhere(…)` oder (Runde 2) `...umsatzTestzahlungenWhere(…)`
+ *     — die Regel steckt dort im `AND`, ein zweites ersetzte sie still (ein
+ *     eigenes `NOT` daneben ist erlaubt).
  *  5. `getDashboardStats` ist entfallen (seit Heute ungenutzt, Nr. 55) und
  *     kommt nicht zurück.
  *
@@ -77,6 +78,7 @@ const STICHTAG_ARGUMENT: Record<string, number> = {
   ohneTestzahlungenWhere: 0,
   ohneTestzahlungenSql: 1,
   testzahlungenBetroffen: 1,
+  finanzseiteLaesstTestzahlungenAus: 2,
   topfVonBestellung: 1,
   einnahmenImMonat: 2,
   servicegebuehrenImMonat: 2,
@@ -101,7 +103,7 @@ const STICHTAG_ARGUMENT: Record<string, number> = {
 }
 
 /** Bedingungen, die die Regel als `AND` mitbringen — ein eigenes `AND` im selben Objekt verdrängte sie. */
-const REGEL_IM_AND = new Set(['umsatzBestellungWhere', 'ohneTestzahlungenWhere'])
+const REGEL_IM_AND = new Set(['umsatzBestellungWhere', 'ohneTestzahlungenWhere', 'umsatzTestzahlungenWhere'])
 
 type Fund = { datei: string; zeile: number; grund: string }
 
@@ -362,6 +364,7 @@ describe('Gegenproben — jede Suche schlägt an', () => {
       'umsatzBestellungWhere mit null als Stichtag — die Regel wäre abgeschaltet'
     )
     expect(gruende('app/admin/page.tsx', 'getAdminFarms(jetzt, null)')).toHaveLength(1)
+    expect(gruende('server/queries/finanzen.ts', 'finanzseiteLaesstTestzahlungenAus(fuerRegel, monat, null)')).toHaveLength(1)
     expect(gruende('lib/finanzen.ts', 'export function andere() { return topfVonBestellung(b, null) }')).toHaveLength(1)
     // Die eine Ausnahme und gewöhnliche Aufrufe:
     expect(gruende('lib/finanzen.ts', 'export function testzahlungenBetroffen() { return topfVonBestellung(b, null) }')).toEqual([])
@@ -374,6 +377,8 @@ describe('Gegenproben — jede Suche schlägt an', () => {
     expect(gruende('server/x.ts', 'f({ ...umsatzBestellungWhere(farmId, fenster, stripeLiveAb), AND: [{ total: { gt: 0 } }] })')).toEqual([grund])
     expect(gruende('server/x.ts', 'f({ AND: liste, ...ohneTestzahlungenWhere(stripeLiveAb) })')).toEqual([grund])
     expect(gruende('server/x.ts', 'f({ ...umsatzBestellungWhere(farmId, fenster, stripeLiveAb), AND })')).toEqual([grund])
+    // Runde 2: Die Bedingung der Hinweiszeile trägt ihre Regel ebenso im AND.
+    expect(gruende('server/x.ts', 'f({ ...umsatzTestzahlungenWhere(farmId, fenster, stripeLiveAb), AND: [{ id: x }] })')).toEqual([grund])
     // Erlaubt: ein eigenes NOT daneben, die Regel als Element der AND-Liste, ein AND neben anderem Spread.
     expect(gruende('server/x.ts', 'f({ ...umsatzBestellungWhere(farmId, fenster, stripeLiveAb), NOT: { id: x } })')).toEqual([])
     expect(gruende('server/x.ts', 'f({ farmId, AND: [ohneTestzahlungenWhere(stripeLiveAb), { total: { gt: 0 } }] })')).toEqual([])

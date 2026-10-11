@@ -15,7 +15,7 @@
  *
  * Geld in ganzen Cent (CODING_STANDARDS §2), Tage und Monate in Wiener Zeit.
  */
-import { topfVonBestellung, type BestellungFuerFinanzen } from '@/lib/finanzen'
+import { GEZAEHLTE_TOEPFE, topfVonBestellung, type BestellungFuerFinanzen, type EinnahmenTopf } from '@/lib/finanzen'
 import { istVorOrtZahlung, monatsgrenzenWien, monatsschluesselInWien, type Monatsschluessel, type Zahlungsart } from '@/lib/servicegebuehr'
 import type { GezeigteSummen } from '@/lib/testzahlung'
 import { BAR_OHNE_GEBUEHR_SATZ, barGebuehrSepaSatz, vorBarStichtag } from '@/lib/konditionen'
@@ -113,6 +113,14 @@ export type ServicegebuehrenMonat = {
 }
 
 /**
+ * Welche Töpfe die Karte zählt — die gezählten der Finanzseite, „erwartet"
+ * steht hier nicht. Dieselbe Konstante nimmt die Hinweiszeile
+ * (`testzahlungenHinweisFuerHof`, Register Z4), damit Karte und Zeile nie
+ * auseinanderlaufen.
+ */
+export const SERVICEGEBUEHREN_TOEPFE: readonly EinnahmenTopf[] = GEZAEHLTE_TOEPFE
+
+/**
  * Die Servicegebühren eines Monats aus den GESPEICHERTEN Beträgen
  * (`Order.serviceFeeCents`, nie neu berechnet, E4). Monat ist der
  * Bestelleingang in Wiener Zeit, gezählt wird nach `topfVonBestellung` —
@@ -135,8 +143,9 @@ export function servicegebuehrenImMonat(
   const ergebnis: ServicegebuehrenMonat = { monat, onlineCents: 0, onlineAnzahl: 0, vorOrtCents: 0, vorOrtAnzahl: 0, summeCents: 0 }
   for (const b of bestellungen) {
     if (monatsschluesselInWien(b.createdAt) !== monat) continue
-    const gebuehr = Math.max(0, Math.round(b.serviceFeeCents))
     const topf = topfVonBestellung(b, stripeLiveAb)
+    if (!SERVICEGEBUEHREN_TOEPFE.includes(topf)) continue
+    const gebuehr = Math.max(0, Math.round(b.serviceFeeCents))
     if (topf === 'eingezogen') {
       ergebnis.onlineCents += gebuehr
       ergebnis.onlineAnzahl++

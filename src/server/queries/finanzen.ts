@@ -10,7 +10,7 @@ import {
   kostenSummeImMonat,
   monatKurz,
   monateBis,
-  testzahlungenBetroffen,
+  finanzseiteLaesstTestzahlungenAus,
   utcDatumAlsMonat,
   type BestellungFuerFinanzen,
   type EinnahmenMonat,
@@ -82,8 +82,9 @@ export type FinanzenDaten = {
   brauchtBestellungen: number | null
   /**
    * „Testzahlungen vor dem … sind nicht mitgezählt." (Register Z4) — genau
-   * dann, wenn eine Testzahlung der gezeigten Monate ohne die Regel in einem
-   * gezeigten Topf läge (`testzahlungenBetroffen`).
+   * dann, wenn eine gezeigte Zahl eine Testzahlung auslässt
+   * (`finanzseiteLaesstTestzahlungenAus`: Vormonate eingezogen und
+   * geschuldet, der gewählte Monat dazu „erwartet").
    */
   testzahlungenHinweis: string | null
 }
@@ -201,7 +202,9 @@ export async function getFinanzen(
     schnittCents,
     brauchtBestellungen: bestellungenBisKostendeckung(kosten.cents, schnittCents),
     testzahlungenHinweis:
-      stripeLiveAb !== null && testzahlungenBetroffen(fuerRegel, stripeLiveAb) ? testzahlungenHinweis(stripeLiveAb) : null,
+      stripeLiveAb !== null && finanzseiteLaesstTestzahlungenAus(fuerRegel, monat, stripeLiveAb)
+        ? testzahlungenHinweis(stripeLiveAb)
+        : null,
   }
 }
 

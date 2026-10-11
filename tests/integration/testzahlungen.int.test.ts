@@ -11,12 +11,18 @@
  *    Stichtag. Bar und Karte beim Hof zählen immer.
  *  - Umsatz von Auswertung, Verkäufe (Woche und Jahr für die Umsatzgrenze),
  *    Heute und Kunden ohne Testzahlungen; ohne Stichtag wie vor Nr. 55.
- *  - Die Hinweiszeile kommt nur, wenn der Stichtag Bestellungen betrifft.
+ *  - Die Hinweiszeile kommt genau dann, wenn eine gezeigte Zahl eine
+ *    Testzahlung auslässt — auf den Seiten des Hofs wie auf Admin-Finanzen.
  *
- * Alle Bestellungen liegen im März 2027: Der Seed bestellt dort nicht, und der
- * SEPA-Start (B1, 1. Februar 2027) ist vorbei — Barbestellungen tragen ihre
- * Gebühr, „bar zählt immer" ist damit auch in den Finanzen sichtbar. `jetzt`
- * und der Stichtag sind Parameter; die Abfragen hängen an keiner Uhr.
+ * Alle Bestellungen liegen im März 2083 bzw. in den Monaten bis März 2084:
+ * Der Seed legt seine Bestellungen relativ zur echten Uhr an
+ * (prisma/seed-lauf.ts), und /admin und /admin/finanzen zählen alle Höfe —
+ * ein Fenster in der Nähe von heute liefe in ein paar Monaten in die
+ * Seed-Bestellungen. 2083/2084 haben denselben Kalender wie 2027/2028
+ * (Wochentage, Schaltjahr, Tag der Zeitumstellung). Der SEPA-Start (B1,
+ * 1. Februar 2027) ist vorbei — Barbestellungen tragen ihre Gebühr, „bar
+ * zählt immer" ist damit auch in den Finanzen sichtbar. `jetzt` und der
+ * Stichtag sind Parameter; die Abfragen hängen an keiner Uhr.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
 
@@ -39,9 +45,9 @@ afterEach(async () => {
   await raeumeAuf()
 })
 
-// Erfundener Stichtag: Dienstag, 16. März 2027, 12:00 Uhr in Wien (MEZ).
-const STICHTAG = new Date('2027-03-16T12:00:00+01:00')
-const JETZT = new Date('2027-03-18T10:00:00+01:00') // Donnerstag derselben Woche
+// Erfundener Stichtag: Dienstag, 16. März 2083, 12:00 Uhr in Wien (MEZ).
+const STICHTAG = new Date('2083-03-16T12:00:00+01:00')
+const JETZT = new Date('2083-03-18T10:00:00+01:00') // Donnerstag derselben Woche
 
 type Bestellung = {
   paymentMethod: PaymentMethod
@@ -91,7 +97,7 @@ async function bestelle(farmId: string, b: Bestellung) {
 describe('Eine Regel, drei Formen — in Postgres dieselbe Auswahl', () => {
   it('Prüfung, Prisma-Bedingung und SQL-Baustein wählen genau dieselben Bestellungen, auch an der Grenze', async () => {
     const { farm } = await erstelleHof()
-    const zeitpunkte = [new Date(STICHTAG.getTime() - 1), STICHTAG, new Date(STICHTAG.getTime() + 1), new Date('2027-03-01T08:00:00Z')]
+    const zeitpunkte = [new Date(STICHTAG.getTime() - 1), STICHTAG, new Date(STICHTAG.getTime() + 1), new Date('2083-03-01T08:00:00Z')]
     const angelegt = []
     for (const paymentMethod of ['ONLINE', 'ONSITE_CASH', 'ONSITE_CARD'] as const) {
       for (const createdAt of zeitpunkte) angelegt.push(await bestelle(farm.id, { paymentMethod, createdAt }))
@@ -124,8 +130,8 @@ describe('Eine Regel, drei Formen — in Postgres dieselbe Auswahl', () => {
 describe('/admin und /admin/finanzen zählen gleich — mit und ohne Stichtag', () => {
   it('Testzahlungen fehlen in Hofliste und Finanzen gleichermaßen, bar und Karte zählen immer', async () => {
     const { farm } = await erstelleHof()
-    const davor = new Date('2027-03-05T10:00:00+01:00')
-    const danach = new Date('2027-03-17T10:00:00+01:00')
+    const davor = new Date('2083-03-05T10:00:00+01:00')
+    const danach = new Date('2083-03-17T10:00:00+01:00')
     await bestelle(farm.id, { paymentMethod: 'ONLINE', createdAt: davor, gebuehrCents: 52 }) // Testzahlung
     await bestelle(farm.id, { paymentMethod: 'ONLINE', createdAt: davor, status: 'PENDING_CONFIRMATION', paymentStatus: 'PENDING', gebuehrCents: 33 }) // Testzahlung, offen
     await bestelle(farm.id, { paymentMethod: 'ONLINE', createdAt: davor, status: 'CANCELLED', paymentStatus: 'REFUNDED', gebuehrCents: 50, gebuehrEntfallen: true }) // Testzahlung, entfallen
@@ -141,16 +147,16 @@ describe('/admin und /admin/finanzen zählen gleich — mit und ohne Stichtag', 
     // Dieselben Summen über ALLE Höfe des Monats — wie die Finanzseite sie zählt.
     for (const stichtag of [STICHTAG, null]) {
       const hoefe = await getAdminFarms(JETZT, stichtag)
-      const finanzen = await getFinanzen('2027-03', JETZT, stichtag)
+      const finanzen = await getFinanzen('2083-03', JETZT, stichtag)
       const summe = (feld: 'gebuehrOnlineCents' | 'gebuehrBarCents') => hoefe.reduce((s, h) => s + h.monat[feld], 0)
       expect(summe('gebuehrOnlineCents'), String(stichtag)).toBe(finanzen.einnahmen.eingezogenCents)
       expect(summe('gebuehrBarCents'), String(stichtag)).toBe(finanzen.einnahmen.geschuldetCents)
     }
 
-    const finanzenMit = await getFinanzen('2027-03', JETZT, STICHTAG)
+    const finanzenMit = await getFinanzen('2083-03', JETZT, STICHTAG)
     expect(finanzenMit.einnahmen).toMatchObject({ eingezogenCents: 61, geschuldetCents: 110, erwartetCents: 0, bestellungen: 3 })
     expect(finanzenMit.testzahlungenHinweis).toBe(testzahlungenHinweis(STICHTAG))
-    const finanzenOhne = await getFinanzen('2027-03', JETZT, null)
+    const finanzenOhne = await getFinanzen('2083-03', JETZT, null)
     expect(finanzenOhne.einnahmen).toMatchObject({ eingezogenCents: 113, geschuldetCents: 110, erwartetCents: 33, bestellungen: 4 })
     expect(finanzenOhne.testzahlungenHinweis).toBeNull()
   })
@@ -164,24 +170,24 @@ describe('Umsatz ohne Testzahlungen — Auswertung, Verkäufe, Heute, Kunden', (
     // Alle drei in der Woche von JETZT abgeholt, von derselben Kundin.
     await bestelle(farm.id, {
       paymentMethod: 'ONLINE',
-      createdAt: new Date('2027-03-15T09:00:00+01:00'),
-      pickedUpAt: new Date('2027-03-16T10:00:00+01:00'),
+      createdAt: new Date('2083-03-15T09:00:00+01:00'),
+      pickedUpAt: new Date('2083-03-16T10:00:00+01:00'),
       warenpreis: 20,
       produktId: produkt.id,
       kundin,
     }) // Testzahlung
     await bestelle(farm.id, {
       paymentMethod: 'ONLINE',
-      createdAt: new Date('2027-03-16T15:00:00+01:00'),
-      pickedUpAt: new Date('2027-03-17T10:00:00+01:00'),
+      createdAt: new Date('2083-03-16T15:00:00+01:00'),
+      pickedUpAt: new Date('2083-03-17T10:00:00+01:00'),
       warenpreis: 25,
       produktId: produkt.id,
       kundin,
     }) // echt
     await bestelle(farm.id, {
       paymentMethod: 'ONSITE_CASH',
-      createdAt: new Date('2027-03-15T09:30:00+01:00'),
-      pickedUpAt: new Date('2027-03-16T11:00:00+01:00'),
+      createdAt: new Date('2083-03-15T09:30:00+01:00'),
+      pickedUpAt: new Date('2083-03-16T11:00:00+01:00'),
       warenpreis: 7.5,
       produktId: produkt.id,
       kundin,
@@ -221,9 +227,9 @@ describe('Umsatz ohne Testzahlungen — Auswertung, Verkäufe, Heute, Kunden', (
 describe('Hinweiszeile — genau dann, wenn eine gezeigte Zahl eine Testzahlung auslässt', () => {
   const WOCHE = umsatzfenster('woche', JETZT).aktuell
   const JAHR = umsatzfenster('jahr', JETZT).aktuell
-  // Wiener Monat März 2027 (die Sommerzeit beginnt am 28. März).
-  const MAERZ = { von: new Date('2027-03-01T00:00:00+01:00'), bis: new Date('2027-04-01T00:00:00+02:00') }
-  const ANGELEGT = new Date('2027-03-10T09:00:00+01:00')
+  // Wiener Monat März 2083 (die Sommerzeit beginnt am 28. März).
+  const MAERZ = { von: new Date('2083-03-01T00:00:00+01:00'), bis: new Date('2083-04-01T00:00:00+02:00') }
+  const ANGELEGT = new Date('2083-03-10T09:00:00+01:00')
   const HINWEIS = testzahlungenHinweis(STICHTAG)
 
   it('offene Testzahlung: keine Zeile — abgeholte: Zeile; ohne Stichtag nie', async () => {
@@ -231,7 +237,7 @@ describe('Hinweiszeile — genau dann, wenn eine gezeigte Zahl eine Testzahlung 
     await bestelle(farm.id, { paymentMethod: 'ONLINE', createdAt: ANGELEGT, status: 'PENDING_CONFIRMATION', paymentStatus: 'PENDING', gebuehrCents: 52 })
     expect(await testzahlungenHinweisFuerHof(farm.id, { umsatz: [WOCHE, JAHR], gebuehrenMonat: MAERZ }, STICHTAG)).toBeNull()
 
-    await bestelle(farm.id, { paymentMethod: 'ONLINE', createdAt: ANGELEGT, pickedUpAt: new Date('2027-03-11T10:00:00+01:00') })
+    await bestelle(farm.id, { paymentMethod: 'ONLINE', createdAt: ANGELEGT, pickedUpAt: new Date('2083-03-11T10:00:00+01:00') })
     expect(await testzahlungenHinweisFuerHof(farm.id, { umsatz: [WOCHE, JAHR] }, STICHTAG)).toBe(HINWEIS)
     expect(await testzahlungenHinweisFuerHof(farm.id, { umsatz: [WOCHE, JAHR] }, null)).toBeNull()
   })
@@ -243,16 +249,68 @@ describe('Hinweiszeile — genau dann, wenn eine gezeigte Zahl eine Testzahlung 
     expect(await testzahlungenHinweisFuerHof(farm.id, { umsatz: [WOCHE, JAHR], gebuehrenMonat: MAERZ }, STICHTAG)).toBe(HINWEIS)
   })
 
-  it('abgeholt nur zwischen den gezeigten Fenstern, storniert oder bar: keine Zeile', async () => {
+  it('abgeholt nur zwischen den gezeigten Fenstern: keine Zeile', async () => {
     const { farm } = await erstelleHof()
-    await bestelle(farm.id, { paymentMethod: 'ONLINE', createdAt: ANGELEGT, pickedUpAt: new Date('2027-03-11T10:00:00+01:00') })
-    await bestelle(farm.id, { paymentMethod: 'ONLINE', createdAt: ANGELEGT, status: 'CANCELLED', paymentStatus: 'REFUNDED', gebuehrCents: 50, gebuehrEntfallen: true })
-    await bestelle(farm.id, { paymentMethod: 'ONSITE_CASH', createdAt: ANGELEGT, gebuehrCents: 70 })
+    await bestelle(farm.id, { paymentMethod: 'ONLINE', createdAt: ANGELEGT, pickedUpAt: new Date('2083-03-11T10:00:00+01:00') })
 
-    const davor = { von: new Date('2027-01-01T00:00:00+01:00'), bis: new Date('2027-03-11T09:59:59+01:00') }
-    const danach = { von: new Date('2027-03-11T10:00:01+01:00'), bis: JETZT }
+    const davor = { von: new Date('2083-01-01T00:00:00+01:00'), bis: new Date('2083-03-11T09:59:59+01:00') }
+    const danach = { von: new Date('2083-03-11T10:00:01+01:00'), bis: JETZT }
     expect(await testzahlungenHinweisFuerHof(farm.id, { umsatz: [davor, danach] }, STICHTAG)).toBeNull()
     // Gegenprobe: dasselbe Fenster über den Abholzeitpunkt hinweg findet sie.
     expect(await testzahlungenHinweisFuerHof(farm.id, { umsatz: [{ von: davor.von, bis: danach.bis }] }, STICHTAG)).toBe(HINWEIS)
+  })
+
+  it('storniert nach Abholung oder bar: keine Zeile — weder über den Umsatz noch über den Monat der Servicegebühren (Runde 2)', async () => {
+    const { farm } = await erstelleHof()
+    // Abgeholt im Jahr, danach storniert; die Erstattung gescheitert, die Zahlung
+    // bleibt PAID — so endet nach der Live-Schaltung jeder Storno einer
+    // Testzahlung (docs/betrieb/stripe-live.md, Hinweis zur Erstattung). Nur der
+    // Status hält sie aus beiden Abfragen heraus.
+    await bestelle(farm.id, {
+      paymentMethod: 'ONLINE',
+      createdAt: ANGELEGT,
+      status: 'CANCELLED',
+      paymentStatus: 'PAID',
+      pickedUpAt: new Date('2083-03-11T10:00:00+01:00'),
+      gebuehrCents: 50,
+    })
+    await bestelle(farm.id, { paymentMethod: 'ONSITE_CASH', createdAt: ANGELEGT, gebuehrCents: 70 })
+
+    expect(await testzahlungenHinweisFuerHof(farm.id, { umsatz: [WOCHE, JAHR], gebuehrenMonat: MAERZ }, STICHTAG)).toBeNull()
+  })
+})
+
+describe('Admin-Finanzen: Hinweiszeile genau dann, wenn eine gezeigte Zahl eine Testzahlung auslässt (Runde 2)', () => {
+  // Ein Fenster ohne Seed-Bestellungen: gewählt März 2084, gezeigt April 2083
+  // bis März 2084. Die Finanzseite zählt alle Höfe.
+  const STICHTAG_2084 = new Date('2084-03-16T12:00:00+01:00')
+  const JETZT_2084 = new Date('2084-03-18T10:00:00+01:00')
+  const IM_FEBRUAR = new Date('2084-02-10T10:00:00+01:00')
+  const IM_MAERZ = new Date('2084-03-10T10:00:00+01:00')
+  const HINWEIS_2084 = testzahlungenHinweis(STICHTAG_2084)
+  const OFFEN = { status: 'PENDING_CONFIRMATION', paymentStatus: 'PENDING', gebuehrCents: 33 } as const
+
+  it('offene Testzahlung im Vormonat: keine Zeile — im gewählten Monat: Zeile', async () => {
+    const { farm } = await erstelleHof()
+    await bestelle(farm.id, { paymentMethod: 'ONLINE', createdAt: IM_FEBRUAR, ...OFFEN })
+    expect((await getFinanzen('2084-03', JETZT_2084, STICHTAG_2084)).testzahlungenHinweis).toBeNull()
+    // Wird der Februar gewählt, steht dort „erwartet" — dann fehlt sie in einer gezeigten Zahl.
+    expect((await getFinanzen('2084-02', JETZT_2084, STICHTAG_2084)).testzahlungenHinweis).toBe(HINWEIS_2084)
+
+    await bestelle(farm.id, { paymentMethod: 'ONLINE', createdAt: IM_MAERZ, ...OFFEN })
+    expect((await getFinanzen('2084-03', JETZT_2084, STICHTAG_2084)).testzahlungenHinweis).toBe(HINWEIS_2084)
+  })
+
+  it('bezahlte Testzahlung im Vormonat: Zeile — sie fehlt im Verlauf', async () => {
+    const { farm } = await erstelleHof()
+    await bestelle(farm.id, { paymentMethod: 'ONLINE', createdAt: IM_FEBRUAR, status: 'CONFIRMED', paymentStatus: 'PAID', gebuehrCents: 52 })
+
+    const mit = await getFinanzen('2084-03', JETZT_2084, STICHTAG_2084)
+    expect(mit.testzahlungenHinweis).toBe(HINWEIS_2084)
+    expect(mit.verlauf.find((p) => p.monat === '2084-02')?.einnahmenCents).toBe(0)
+    // Gegenprobe ohne Stichtag: Der Februar zählt sie, eine Zeile gibt es nicht.
+    const ohne = await getFinanzen('2084-03', JETZT_2084, null)
+    expect(ohne.verlauf.find((p) => p.monat === '2084-02')?.einnahmenCents).toBe(52)
+    expect(ohne.testzahlungenHinweis).toBeNull()
   })
 })
