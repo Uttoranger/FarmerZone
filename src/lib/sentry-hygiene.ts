@@ -128,10 +128,13 @@ const EMAIL_KODIERT_MUSTER =
  *  „Rückruf-0664 1234567" und „Tel0664 …" fallen weiter. Ein Prozent-Escape
  *  links (%20, %22, %28 …) ist eine freie Grenze wie ein Leerzeichen (Runde 2:
  *  „Ruf%2006641234567" — das Escape endet auf eine Ziffer, und die Nummer
- *  blieb stehen). Linear: Angesetzt wird nur am Anfang einer Ziffernfolge,
- *  die Vorschau liest sie einmal. */
+ *  blieb stehen), auch mehrfach kodiert (%2520, Nacharbeit nach Runde 2).
+ *  Linear: Die Vorschau ganz vorn lässt jede Stelle sofort fallen, an der
+ *  keine Nummer beginnt — erst dann liest der Rückblick eine %25-Kette, und
+ *  die gehört zu höchstens zwei Anfängen. Angesetzt wird nur am Anfang einer
+ *  Ziffernfolge, die Vorschau liest sie einmal. */
 const TELEFON_MUSTER =
-  /(?:(?<=%[0-9A-Fa-f]{2})|(?<!\d)(?:(?<![A-Za-z_-])|(?=(?:\+|\(?0)\d(?:[\s/\-.()]{0,3}\d){7,}(?!\w))))(?:\+|\(?0)\d(?:[\s/\-.()]{0,3}\d){7,}/g
+  /(?=(?:\+|\(?0)\d)(?:(?<=%(?:25)*[0-9A-Fa-f]{2})|(?<!\d)(?:(?<![A-Za-z_-])|(?=(?:\+|\(?0)\d(?:[\s/\-.()]{0,3}\d){7,}(?!\w))))(?:\+|\(?0)\d(?:[\s/\-.()]{0,3}\d){7,}/g
 
 /** Query-Parameter, deren NAME auf Geheimnisse oder Personenbezug deutet.
  *  `pathname` gehört dazu: Die Blob-SDK-Aufrufe tragen darin den Blob-Pfad
@@ -266,7 +269,7 @@ function bereinigeQuery(query: string, freitext = false, tiefe = 0): string {
   const sauber = new URLSearchParams()
   new URLSearchParams(query).forEach((wert, name) => {
     if (HEIKLE_PARAMETER.test(name)) return
-    sauber.append(regel(name), freitext ? bereinigeFreitext(weiterDekodiert(wert)) : bereinigeAbfrageWert(wert, tiefe))
+    sauber.append(regel(name), freitext ? bereinigeFreitext(dekodiertFuerRegel(wert)) : bereinigeAbfrageWert(wert, tiefe))
   })
   return sauber.toString()
 }
@@ -284,19 +287,29 @@ const ADRESSE_ERSATZ = '[adresse entfernt]'
 /** Eine Folge von %XX-Escapes. */
 const ESCAPE_FOLGE = /(?:%[0-9A-Fa-f]{2})+/g
 
-/** Dekodiert jede Folge von Escapes für sich — decodeURIComponent würfe
- *  sonst für den ganzen Text. Ist eine Folge kein gültiges UTF-8 („%3D%C3"),
- *  werden nur ihre ASCII-Zeichen dekodiert (die Trenner „=", „/", „?"), die
- *  übrigen Bytes bleiben, wie sie sind. */
-function dekodiereFehlertolerant(text: string): string {
-  return text.replace(ESCAPE_FOLGE, (folge) => {
-    try {
-      return decodeURIComponent(folge)
-    } catch {
-      return folge.replace(/%[0-7][0-9A-Fa-f]/g, (escape) => decodeURIComponent(escape))
-    }
-  })
+/** Eine Folge von Escapes dekodiert; ist sie kein gültiges UTF-8 („%3D%C3"),
+ *  nur ihre ASCII-Zeichen (die Trenner „=", „/", „?"), die übrigen Bytes
+ *  bleiben, wie sie sind. */
+function dekodiereFolge(folge: string): string {
+  try {
+    return decodeURIComponent(folge)
+  } catch {
+    return folge.replace(/%[0-7][0-9A-Fa-f]/g, (escape) => decodeURIComponent(escape))
+  }
 }
+
+/** Dekodiert jede Folge von Escapes für sich — decodeURIComponent würfe
+ *  sonst für den ganzen Text. `plusKodiert`: %2B bleibt stehen (Nacharbeit
+ *  nach Runde 2) — für einen Wert, der selbst eine Adresse ist: Deren Abfrage
+ *  liest URLSearchParams, und dort hieße ein rohes „+" Leerzeichen; aus
+ *  „tel=%2B43…" wurde so „tel= 43…", keine Nummer mehr. %2B ist ein ganzes
+ *  ASCII-Escape, ein Schnitt dort trennt nie ein Zeichen aus mehreren Bytes. */
+function dekodiereFehlertolerant(text: string, plusKodiert = false): string {
+  return text.replace(ESCAPE_FOLGE, (folge) => (plusKodiert ? folge.split(/%2B/i).map(dekodiereFolge).join('%2B') : dekodiereFolge(folge)))
+}
+
+/** Ersatz für einen Abfragewert, der tiefer kodiert ist, als geprüft wird. */
+const WERT_ERSATZ = '[entfernt]'
 
 /**
  * Ein Abfragewert, so oft weiter dekodiert, wie er sich ändert — höchstens
@@ -304,16 +317,26 @@ function dekodiereFehlertolerant(text: string): string {
  * ein doppelt kodierter Wert (?next=%252Freset-password%253Ftoken%253D…, wie
  * ihn eine Weiterleitung erzeugt, die einen kodierten Wert noch einmal kodiert)
  * stand danach als „%2Freset-password%3Ftoken%3D…" da: keine Adresse, keine
- * Zuweisung, und der Token blieb.
+ * Zuweisung, und der Token blieb. Ändert er sich nach der letzten Runde noch,
+ * fällt er ganz (Nacharbeit nach Runde 2: fünffach kodiert blieb der Token
+ * kodiert stehen) — was nicht ganz gelesen ist, geht nicht mit.
  */
-function weiterDekodiert(wert: string): string {
+function weiterDekodiert(wert: string, plusKodiert = false): string {
   let text = wert
   for (let runde = 0; runde < MAX_ADRESS_TIEFE; runde++) {
-    const weiter = dekodiereFehlertolerant(text)
-    if (weiter === text) break
+    const weiter = dekodiereFehlertolerant(text, plusKodiert)
+    if (weiter === text) return text
     text = weiter
   }
-  return text
+  return dekodiereFehlertolerant(text, plusKodiert) === text ? text : WERT_ERSATZ
+}
+
+/** Ein Abfragewert, weiter dekodiert für die Prüfung. Ist er dann eine
+ *  Adresse, bleibt ein „+", das erst dabei entsteht, als %2B stehen
+ *  (dekodiereFehlertolerant) — die URL-Regel liest seine Abfrage. */
+function dekodiertFuerRegel(wert: string): string {
+  const ganz = weiterDekodiert(wert)
+  return ADRESS_WERT.test(ganz) ? weiterDekodiert(wert, true) : ganz
 }
 
 /**
@@ -323,11 +346,11 @@ function weiterDekodiert(wert: string): string {
  * blieb kodiert stehen (next=%2Freset-password%3Ftoken%3D…). Vorher fallen im
  * dekodierten Wert „token=…" und „Bearer …" (auch ohne Adresse:
  * ?next=reset?token=…). Beides prüft die ganz dekodierte Form (weiterDekodiert,
- * Runde 2). Strukturierte Felder brauchen den Rest nicht: Ihre Freitext-Regel
+ * Runde 2; als Adresse mit %2B statt „+", dekodiertFuerRegel). Strukturierte Felder brauchen den Rest nicht: Ihre Freitext-Regel
  * nimmt Adressen und Zuweisungen selbst.
  */
 function bereinigeAbfrageWert(wert: string, tiefe: number): string {
-  const ohneZuweisung = ersetzeZuweisungen(weiterDekodiert(wert).replace(BEARER_MUSTER, 'Bearer [entfernt]'))
+  const ohneZuweisung = ersetzeZuweisungen(dekodiertFuerRegel(wert).replace(BEARER_MUSTER, 'Bearer [entfernt]'))
   if (!ADRESS_WERT.test(ohneZuweisung)) return bereinigeText(ohneZuweisung)
   return tiefe < MAX_ADRESS_TIEFE ? bereinigeUrl(ohneZuweisung, tiefe + 1) : ADRESSE_ERSATZ
 }
@@ -376,9 +399,10 @@ function bereinigeUrl(url: string, tiefe = 0): string {
  *  eine Query (#token=…, so legen manche Anmeldewege den Token ab) und fällt
  *  wie sie; sonst gilt die Regel des Pfads (#abschnitt bleibt). Ein kodiertes
  *  „=" (%3D) zählt wie ein rohes (Runde 2: #token%3D… galt als Pfad und
- *  blieb) — dann wird der Anker vorher dekodiert. */
+ *  blieb) — dann wird der Anker vorher dekodiert, %2B bleibt dabei stehen
+ *  (dekodiereFehlertolerant): Er wird als Query gelesen. */
 function bereinigeAnker(anker: string, tiefe: number): string {
-  const mitTrennern = anker.includes('=') ? anker : dekodiereFehlertolerant(anker)
+  const mitTrennern = anker.includes('=') ? anker : dekodiereFehlertolerant(anker, true)
   return mitTrennern.includes('=') ? bereinigeQuery(mitTrennern, false, tiefe) : bereinigePfad(anker)
 }
 
@@ -533,7 +557,7 @@ function entferneIps(text: string): string {
 function bereinigeFreitext(text: string): string {
   const ohneIp = entferneIps(text)
   if (/^(?:https?:\/\/|\/)\S*$/i.test(ohneIp)) return bereinigeUrl(ohneIp)
-  const mitAdressen = bereinigeText(ohneIp.replace(ADRESSE_IM_FEHLERTEXT, (adresse) => bereinigeUrl(adresse)))
+  const mitAdressen = bereinigeText(ohneIp.replace(ADRESSE_IM_FREITEXT, (adresse) => bereinigeUrl(adresse)))
   const ohneZuweisung = ersetzeZuweisungen(mitAdressen.replace(BEARER_MUSTER, 'Bearer [entfernt]'))
   return ohneZuweisung.replace(LANGE_KENNUNG_MUSTER, '[kennung entfernt]')
 }
@@ -549,6 +573,16 @@ function bereinigeFreitext(text: string): string {
  *  einmal gelesen. */
 const ADRESSE_IM_FEHLERTEXT =
   /https?:\/\/[^\s"'`<>)\]«»„“”‚‘’]+|(?<![\p{L}\p{N}\p{M}_/.~%-])\/[^\s"'`<>)\]«»„“”‚‘’]*/giu
+
+/** Adressen in Nachricht, Brotkrume und extra (bereinigeFreitext): relativ
+ *  wie im Fehlertext, absolut aber bis zum Leerraum wie bereinigeTextMitUrls
+ *  (Nacharbeit nach Runde 2) — „]", „)" und Anführungszeichen stehen in
+ *  Adressen (?f[a]=1, ?utm=(herbst)); endete die Adresse dort, sah die
+ *  URL-Regel „&reorder=…" oder „&s=…" dahinter nicht mehr. Im Fehlertext
+ *  bleibt die engere Grenze: Dort stehen Adressen oft in Klammern oder JSON,
+ *  und der Text danach hilft beim Beheben. */
+const ADRESSE_IM_FREITEXT =
+  /https?:\/\/\S+|(?<![\p{L}\p{N}\p{M}_/.~%-])\/[^\s"'`<>)\]«»„“”‚‘’]*/giu
 
 /**
  * Der Fehlertext (exception.value): E-Mail, Telefon und Code wie bisher, seit
