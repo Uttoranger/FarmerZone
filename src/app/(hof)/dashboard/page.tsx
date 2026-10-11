@@ -82,7 +82,8 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   const teilen = heute.hof.sichtbar
   const aufbau = heuteAufbau({
     // „pausiert" (Notbremse) oder „einrichten" (Register Z1) — nie beide; der eine Kasten oben, auch über dem Balken der Shell.
-    stripeHinweis: heute.onlinePausiert !== null || heute.stripeEinrichten,
+    // Dieselbe Antwort nimmt die Online-Zahlung aus „Zu tun" (getHeute rechnet sie einmal).
+    stripeHinweis: heute.stripeImKasten,
     teilen,
     zuTun: zuTunZeigen === 'karte',
   })

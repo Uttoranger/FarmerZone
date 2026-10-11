@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { blendeErsteSchritteAus, blendeErsteSchritteEin } from '@/server/actions/erste-schritte'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { ZU_TUN_TEXT } from '@/lib/erste-schritte'
 import { cn } from '@/lib/utils'
 
 /**
@@ -42,7 +43,7 @@ export function ErsteSchritteSchalter({
       onClick={klick}
       disabled={laeuft}
       // Im Kopf der Karte heißt er nur „Ausblenden" — der Screenreader braucht den Bezug.
-      aria-label={richtung === 'aus' ? 'Zu tun ausblenden' : undefined}
+      aria-label={richtung === 'aus' ? ZU_TUN_TEXT.ausblendenName : undefined}
       className={cn(
         // min-h-11 = 44 px Tippfläche, px-3 hält auch „Ausblenden" breiter als 44 px.
         'inline-flex min-h-11 items-center rounded-md px-3 text-[13px] font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:opacity-60',
@@ -50,7 +51,7 @@ export function ErsteSchritteSchalter({
         className
       )}
     >
-      {richtung === 'aus' ? 'Ausblenden' : 'Zu tun einblenden'}
+      {richtung === 'aus' ? ZU_TUN_TEXT.ausblenden : ZU_TUN_TEXT.einblenden}
     </button>
   )
 }

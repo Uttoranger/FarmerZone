@@ -19,7 +19,7 @@
  *    Wochentag.
  *  - Kennzahlen sagen, was sie zählen: „Heute abholen" (dieselben
  *    Bestellungen wie die Packliste) und „Heute eingenommen, mit Hofladen" —
- *    „0" neben „€ 178" widerspricht sich nicht mehr. Bis 1024 px 2 + 1
+ *    „0" neben „€ 178" widerspricht sich nicht mehr. Unter 1024 px 2 + 1
  *    (Register F4, Vermerk 10.10.2026: der Betrag allein in der zweiten
  *    Zeile), ab 1024 px drei nebeneinander; ein Betrag wird nie gekürzt —
  *    seine Schrift passt sich der Karte an (kennzahlBreiteEm).
@@ -88,7 +88,7 @@ import {
   ZuTunKarte,
 } from '@/components/heute/heute-teile'
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
-import { ERSTE_SCHRITTE_WARTET, ersteSchritte, ersteSchritteDaten, zuTun, type ZuTunAufgabe } from '@/lib/erste-schritte'
+import { ERSTE_SCHRITTE_WARTET, ZU_TUN_TEXT, ersteSchritte, ersteSchritteDaten, zuTun, type ZuTunAufgabe } from '@/lib/erste-schritte'
 import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
@@ -266,7 +266,9 @@ describe('Stripe-Hinweis: der eine Kasten oben auf Heute — der Balken der Shel
     // Der Balken „wartet"/„stillgelegt" kommt aus dem Layout und steht auf jeder
     // Seite; Heute fragt ihn nicht ab und verschiebt deshalb nichts.
     expect(quelle('src/server/queries/heute.ts')).not.toMatch(/hofBalkenArt|stripeHinweisOrt|stripeOrt/)
-    expect(quelle('src/app/(hof)/dashboard/page.tsx')).toContain('stripeHinweis: heute.onlinePausiert !== null || heute.stripeEinrichten')
+    // Seit Nr. 53 rechnet getHeute die Bedingung einmal (stripeImKasten); die Seite reicht sie nur weiter.
+    expect(quelle('src/server/queries/heute.ts')).toContain('const stripeImKasten = onlinePausiert !== null || stripeEinrichten')
+    expect(quelle('src/app/(hof)/dashboard/page.tsx')).toContain('stripeHinweis: heute.stripeImKasten')
     expect(quelle('src/lib/heute.ts')).not.toMatch(/STRIPE_BRAUCHT_DICH_TEXT|art: 'stripe'|'braucht-dich' \| null/)
     expect(quelle('src/server/hofbereich.ts')).not.toContain('hofBalkenArt')
     // Wortlaut F4 bleibt.
@@ -660,7 +662,7 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     expect(zahlen).not.toContain('Umsatz heute')
   })
 
-  it('2 + 1 bis 1024 px, ab 1024 px drei nebeneinander — der Betrag steht allein in der zweiten Zeile (Register F4, Vermerk 10.10.2026)', () => {
+  it('unter 1024 px 2 + 1, ab 1024 px drei nebeneinander — der Betrag steht allein in der zweiten Zeile (Register F4, Vermerk 10.10.2026)', () => {
     const zahlen = html(createElement(Kennzahlen, { bestellungen: 12, zuPacken: 12, umsatzHeuteCent: 123456 }))
     expect(zahlen).toMatch(/<section[^>]*class="[^"]*\bgrid-cols-2\b[^"]*\blg:grid-cols-3\b/)
     expect(zahlen).not.toMatch(/(?<!lg:)grid-cols-3/)
@@ -875,21 +877,46 @@ describe('„Zu tun" — EINE Karte statt Erste Schritte und „Deine Hofseite" 
     expect(anzahl(ohneKasten)).toBe(1)
   })
 
-  it('der Kasten-Zustand kommt aus derselben Bedingung wie der Kasten oben — eine Quelle, keine zweite Regel', () => {
+  it('der Kasten-Zustand ist EINMAL berechnet: getHeute stellt damit den Kasten und nimmt die Online-Zahlung aus der Liste', () => {
     const abfrage = quelle('src/server/queries/heute.ts')
-    expect(abfrage).toContain('stripeImKasten: onlinePausiert !== null || stripeEinrichten')
-    expect(quelle('src/app/(hof)/dashboard/page.tsx')).toContain('stripeHinweis: heute.onlinePausiert !== null || heute.stripeEinrichten')
+    expect(abfrage.match(/onlinePausiert !== null \|\| stripeEinrichten/g)).toHaveLength(1)
+    expect(abfrage).toContain('const stripeImKasten = onlinePausiert !== null || stripeEinrichten')
+    expect(abfrage).toContain('fortschritt, { stripeImKasten })')
+    expect(abfrage).toMatch(/^\s+stripeImKasten,$/m)
+    const seite = quelle('src/app/(hof)/dashboard/page.tsx')
+    expect(seite).toContain('stripeHinweis: heute.stripeImKasten')
+    expect(seite).not.toMatch(/onlinePausiert !== null \|\|/)
   })
 
   it('weggeklickt: unten die Zeile „Zu tun einblenden"; der Schalter nimmt Tokens und den sichtbaren Fokus', () => {
+    expect(ZU_TUN_TEXT).toEqual({ titel: 'Zu tun', ausblenden: 'Ausblenden', ausblendenName: 'Zu tun ausblenden', einblenden: 'Zu tun einblenden' })
     const schalter = quelle('src/components/farmer/erste-schritte-schalter.tsx')
-    expect(schalter).toContain('Zu tun einblenden')
-    expect(schalter).toContain('Zu tun ausblenden')
+    expect(schalter).toContain('ZU_TUN_TEXT.einblenden')
+    expect(schalter).toContain('ZU_TUN_TEXT.ausblendenName')
+    expect(schalter).toContain('ZU_TUN_TEXT.ausblenden ')
     expect(schalter).toContain('FOKUS_RAHMEN')
     expect(schalter).not.toMatch(/Erste Schritte|app-ink/)
     const seite = quelle('src/app/(hof)/dashboard/page.tsx')
     expect(seite).toContain("zuTunZeigen === 'zeile' && (")
     expect(seite).not.toContain('data-app-palette')
+  })
+})
+
+describe('„Zu tun" als Wort aus EINER Quelle (ZU_TUN_TEXT)', () => {
+  const OHNE_KOMMENTARE = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  const SELBST_GESCHRIEBEN = /['"`>]\s*Zu tun\b/
+
+  it.each(['src/components/heute/heute-teile.tsx', 'src/components/farmer/erste-schritte-schalter.tsx', 'src/app/(hof)/dashboard/page.tsx'])(
+    '%s schreibt „Zu tun" nicht selbst',
+    (datei) => {
+      expect(OHNE_KOMMENTARE(quelle(datei))).not.toMatch(SELBST_GESCHRIEBEN)
+    }
+  )
+
+  it('Gegenprobe: die Suche erkennt selbst geschriebene Wörter, die Konstante nicht', () => {
+    for (const text of ["<h2>Zu tun</h2>", "'Zu tun einblenden'", '"Zu tun ausblenden"', '`Zu tun`']) expect(text).toMatch(SELBST_GESCHRIEBEN)
+    expect('{ZU_TUN_TEXT.titel}').not.toMatch(SELBST_GESCHRIEBEN)
+    expect(quelle('src/lib/erste-schritte.ts')).toMatch(SELBST_GESCHRIEBEN)
   })
 })
 

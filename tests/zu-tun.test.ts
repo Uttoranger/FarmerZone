@@ -121,7 +121,7 @@ describe('Reihenfolge und Inhalt', () => {
     const { schritte, fortschritt, liste } = bauen(FRISCH, { produkte: 0 })
     const zeilen = fortschritt.gruppen.flatMap((g) => g.zeilen)
     for (const aufgabe of liste.aufgaben) {
-      const schritt = schritte.schritte.find((s) => s.id === aufgabe.id)
+      const schritt = schritte.find((s) => s.id === aufgabe.id)
       if (schritt && ['produkt', 'abholzeiten', 'zahlung'].includes(aufgabe.id)) {
         expect(aufgabe, aufgabe.id).toEqual({ id: aufgabe.id, titel: schritt.titel, satz: schritt.nutzen, href: schritt.href })
         continue
@@ -230,7 +230,7 @@ describe('jede Aufgabe einmal — für jeden Hof', () => {
       const offen = new Set(ids(liste))
       expect(offen.size, 'doppelt').toBe(liste.aufgaben.length)
 
-      const schritt = (id: string) => schritte.schritte.find((s) => s.id === id)
+      const schritt = (id: string) => schritte.find((s) => s.id === id)
       const zeile = (id: string) => fortschritt.gruppen.flatMap((g) => g.zeilen).find((z) => z.id === id)
 
       // Ein Schritt der Ersten Schritte ist offen ⇔ eine seiner Aufgaben steht da.

@@ -4,8 +4,10 @@
  * fehlt. Rein und ohne Datenbank prüfbar (tests/hofseite-fortschritt.test.ts).
  *
  * EINE Liste für Fortschritt, Zeilentexte und die Markierung in der Vorschau —
- * die Erste-Schritte-Karte (erste-schritte.ts) zählt gröber und nur für neue
+ * die Ersten Schritte (erste-schritte.ts) zählen gröber und nur für neue
  * Höfe; hier zählt jeder Teil der Hofseite, den der Hof selbst füllen kann.
+ * Auf Heute stehen die offenen Zeilen mit den Ersten Schritten in der einen
+ * Liste „Zu tun" (zuTun, seit Nr. 53).
  */
 import type { SchildFarbe } from '@/lib/mein-hof'
 import { titelbildFoto } from '@/lib/mein-hof'
@@ -308,7 +310,8 @@ export const ZIEL_ABSCHNITT: Record<HofseiteZeileId, string> = {
 /**
  * Wo ein Punkt der Liste in den bestehenden Einstellungen bearbeitet wird —
  * für die Checkliste am Handy (components/mein-hof/checkliste-kompakt.tsx),
- * deren fehlende Punkte dorthin verlinken. Ab lg öffnen dieselben Punkte ihr
+ * deren fehlende Punkte dorthin verlinken, und für „Zu tun" auf Heute (zuTun
+ * in erste-schritte.ts, seit Nr. 53). Ab lg öffnen dieselben Punkte ihr
  * Formular direkt in der Zeile (hofseite-editor.tsx). Jedes Ziel ist eine
  * Seite unter src/app/(hof)/settings (tests/mein-hof-seite.test.ts).
  */

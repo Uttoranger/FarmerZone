@@ -82,6 +82,12 @@ export type Heute = {
   /** Freigeschaltet ohne fertiges Stripe (Register Z1, stripeEinrichtenHinweis): Hinweis „Online-Zahlung einrichten". */
   stripeEinrichten: boolean
   /**
+   * Steht oben der Stripe-Kasten („pausiert" oder „einrichten", nie beide)?
+   * EINMAL hier berechnet: Dieselbe Antwort stellt den Kasten (heuteAufbau)
+   * und nimmt die Online-Zahlung aus „Zu tun" (zuTun).
+   */
+  stripeImKasten: boolean
+  /**
    * Was Teilen-Karte und Freischaltungs-Moment brauchen — sichtbar = öffentlich
    * UND nicht pausiert (heuteHofSichtbar); teilenMomenteAus = der Hof hat die
    * Teilen-Momente abgeschaltet (Nr. 30, freischaltMomentMoeglich).
@@ -238,10 +244,12 @@ export async function getHeute(
         )
       )
     : null
-  // „pausiert" (Notbremse) oder „einrichten" (Register Z1) — nie beide; dieselbe
-  // Bedingung entscheidet den Kasten oben auf der Seite (heuteAufbau).
+  // „pausiert" (Notbremse) oder „einrichten" (Register Z1) — nie beide; der eine
+  // Kasten oben auf der Seite (heuteAufbau) und der Grund, die Online-Zahlung
+  // nicht noch einmal in „Zu tun" zu nennen.
   const onlinePausiert = hof ? onlinePausiertDaten(hof) : null
   const stripeEinrichten = hof ? stripeEinrichtenHinweis(hof) : false
+  const stripeImKasten = onlinePausiert !== null || stripeEinrichten
 
   return {
     abholungen: zeilen,
@@ -262,14 +270,13 @@ export async function getHeute(
     wochenBalken: wochenBalken(auswertung.balken, jetzt),
     // Was der Kasten oben zeigt, steht nicht noch einmal in der Liste (F4, Vermerk 10.10.2026).
     zuTun: fortschritt
-      ? zuTun(ersteSchritte(ersteSchritteDaten(hof, { produkte, aktiveAbholzeiten: slots.length })), fortschritt, {
-          stripeImKasten: onlinePausiert !== null || stripeEinrichten,
-        })
+      ? zuTun(ersteSchritte(ersteSchritteDaten(hof, { produkte, aktiveAbholzeiten: slots.length })), fortschritt, { stripeImKasten })
       : { aufgaben: [], anzeigen: false },
     wartetAufFreigabe: hof?.approvedAt == null,
     // „nur bar bei Abholung" nur bei sichtbarem Hof, der bar annimmt (onlinePausiertDaten, Nr. 45 Runde 2).
     onlinePausiert,
     stripeEinrichten,
+    stripeImKasten,
     hof: {
       sichtbar: hof ? heuteHofSichtbar(hof) : false,
       approvedAt: hof?.approvedAt ?? null,

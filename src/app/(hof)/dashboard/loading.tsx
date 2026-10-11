@@ -1,7 +1,7 @@
 /*
  * Ladeansicht von „Heute" (Nachtlauf Nr. 17). Die HofShell steht durch das
  * Layout, gewartet wird nur auf den Inhalt. Gleiche Maße wie die fertige
- * Seite: Kopf (h1 + Datum), drei Kennzahlen (bis 1024 px 2 + 1, Nr. 53),
+ * Seite: Kopf (h1 + Datum), drei Kennzahlen (unter 1024 px 2 + 1, Nr. 53),
  * darunter die Packliste mit Kopfzeile und drei Zeilen; ab 1280 px rechts die
  * Seitenspalte (360 px), darunter als Raster. Nur, was sicher kommt —
  * Stripe-Hinweis, Teilen-Karte und „Zu tun" hängen von den Daten ab und
@@ -22,7 +22,7 @@ export default function HeuteLaden(): React.JSX.Element {
           <div className="h-8 w-28 rounded-lg bg-border md:h-9" />
           <div className="mt-2 h-4 w-52 rounded bg-muted" />
         </div>
-        {/* Wie Kennzahlen: bis 1024 px 2 + 1, ab 1024 px drei nebeneinander. */}
+        {/* Wie Kennzahlen: unter 1024 px 2 + 1, ab 1024 px drei nebeneinander. */}
         <div className="grid grid-cols-2 gap-2.5 md:gap-4 lg:grid-cols-3">
           {KENNZAHL_FORM.map((form, i) => (
             <div key={i} className={`rounded-2xl border border-border bg-card p-3 md:p-4 lg:h-[117px] ${form}`}>

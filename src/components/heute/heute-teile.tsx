@@ -34,7 +34,7 @@ import {
 } from '@/lib/heute'
 import { onlinePausiertHinweis } from '@/lib/stripe-konto'
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
-import { ERSTE_SCHRITTE_WARTET, type ZuTunAufgabe } from '@/lib/erste-schritte'
+import { ERSTE_SCHRITTE_WARTET, ZU_TUN_TEXT, type ZuTunAufgabe } from '@/lib/erste-schritte'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -121,10 +121,11 @@ function Kennzahl({
 
 /**
  * Die drei Kennzahlen (Register F4) mit Bezeichnungen, die sagen, was sie
- * zählen (KENNZAHL_TEXT, freigabe.md §12 Nr. 45). Bis 1024 px 2 + 1 (F4,
- * Vermerk 10.10.2026): die beiden Zahlen nebeneinander, darunter der Betrag
- * über die ganze Breite — so hat er am Handy Platz und muss nicht schrumpfen;
- * die Anpassung der Schrift bleibt als Netz. Ab 1024 px drei nebeneinander.
+ * zählen (KENNZAHL_TEXT, freigabe.md §12 Nr. 45). Unter 1024 px 2 + 1 (F4,
+ * Vermerk 10.10.2026: „bis 1024 px"): die beiden Zahlen nebeneinander,
+ * darunter der Betrag über die ganze Breite — so hat er am Handy Platz und
+ * muss nicht schrumpfen; die Anpassung der Schrift bleibt als Netz. Ab 1024 px
+ * (lg) drei nebeneinander.
  */
 export function Kennzahlen({
   bestellungen,
@@ -530,7 +531,7 @@ export function ZuTunKarte({
     <section aria-labelledby="heute-zu-tun" className={cn(KARTE, 'overflow-hidden')}>
       <div className="flex min-h-[52px] items-center gap-2.5 border-b border-border py-1 pr-2 pl-4 md:pl-[18px]">
         <h2 id="heute-zu-tun" className="text-[15px] font-semibold">
-          Zu tun
+          {ZU_TUN_TEXT.titel}
         </h2>
         <span className={cn('text-[12.5px] md:text-[13px]', LEISE)}>{aufgaben.length} offen</span>
         <span className="ml-auto shrink-0">{ausblenden}</span>
