@@ -16,7 +16,6 @@ import {
   servicegebuehrenSaetze,
   teilenKarte,
   teilenZeitraumAus,
-  umsatzKartenTitel,
   zahlartZeile,
 } from '@/lib/auswertung'
 import { GEZAEHLTE_TOEPFE, einnahmenImMonat, topfVonBestellung, type BestellungFuerFinanzen } from '@/lib/finanzen'
@@ -328,9 +327,8 @@ describe('Grenze und Titel', () => {
     expect(grenzeStand(95, '€ 55.000').hinweis).toContain('€ 55.000')
   })
 
-  it('Titel der Umsatzkarte je Zeitraum', () => {
-    expect(umsatzKartenTitel('woche')).toBe('Umsatz pro Tag')
-    expect(umsatzKartenTitel('monat')).toBe('Umsatz pro Woche')
-    expect(umsatzKartenTitel('jahr')).toBe('Umsatz pro Monat')
+  it('die Umsatzkarte trägt in jedem Zeitraum denselben Titel „Mit Hofladen" — umsatzKartenTitel gibt es nicht mehr (Nr. 53)', async () => {
+    const modul: Record<string, unknown> = await import('@/lib/auswertung')
+    expect(modul.umsatzKartenTitel).toBeUndefined()
   })
 })

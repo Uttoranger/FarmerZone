@@ -6,12 +6,14 @@
  * ohne Datenbank prüfbar (tests/hofseite-fortschritt.test.ts).
  *
  * EINE Liste für Fortschritt, Zeilentexte und die Markierung in der Vorschau —
- * die Erste-Schritte-Karte (erste-schritte.ts) zählt gröber und nur für neue
+ * die Ersten Schritte (erste-schritte.ts) zählen gröber und nur für neue
  * Höfe; hier zählt jeder Teil der Hofseite, den der Hof selbst füllen kann.
  * Leitspruch/Gründungsjahr und Werte (Nr. 50, aus dem früheren „Mein
  * Auftritt") stehen als freiwillige Zeilen dabei: Sie zeigen ihren Stand,
  * zählen aber weder zum Fortschritt noch in den Satz — „11 von 11" bleibt
  * für Heute, Einrichten, Einstellungen und Mein Hof dieselbe Zahl.
+ * Auf Heute stehen die offenen Zeilen mit den Ersten Schritten in der einen
+ * Liste „Zu tun" (zuTun, seit Nr. 53) — die freiwilligen nicht.
  */
 import type { SchildFarbe } from '@/lib/mein-hof'
 import { HOFSEITE_HREF, titelbildFoto } from '@/lib/mein-hof'
@@ -369,11 +371,12 @@ export const ZIEL_ABSCHNITT: Record<HofseiteZeileId, string> = {
 /**
  * Wo ein Punkt der Liste außerhalb von Mein Hof bearbeitet wird — die
  * Übersicht der Einstellungen (lib/hof-einstellungen.ts) ordnet damit die
- * fehlenden Punkte ihren Zeilen zu („Hofdaten", „Mein Auftritt"). Was früher
- * „Mein Auftritt" war (/settings/appearance), liegt seit Nr. 50 in Mein Hof
- * selbst (Register N4); in Mein Hof öffnet jede Zeile ihr Formular direkt —
- * ab lg in der Zeile, darunter im Blatt. Jedes Ziel ist eine Seite unter
- * src/app/(hof) (tests/mein-hof-seite.test.ts).
+ * fehlenden Punkte ihren Zeilen zu („Hofdaten", „Mein Auftritt"), und „Zu
+ * tun" auf Heute (zuTun in erste-schritte.ts, seit Nr. 53) verlinkt dorthin.
+ * Was früher „Mein Auftritt" war (/settings/appearance), liegt seit Nr. 50 in
+ * Mein Hof selbst (Register N4); in Mein Hof öffnet jede Zeile ihr Formular
+ * direkt — ab lg in der Zeile, darunter im Blatt. Jedes Ziel ist eine Seite
+ * unter src/app/(hof) (tests/mein-hof-seite.test.ts).
  */
 export const EINSTELLUNG_FUER_ZEILE: Record<HofseiteZeileId, string> = {
   titelbild: HOFSEITE_HREF,

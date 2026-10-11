@@ -9,7 +9,10 @@
  *  - die Umleitung trägt Umkreis, Bereich und Karte mit, sonst nichts,
  *  - Routen liegen unter (hof), (farmer)/analytics gibt es nicht mehr,
  *  - die Karten rendern nur mit Tokens, ohne Lastschrift vor dem Stichtag,
- *    ohne Zahl oder Datum im Quelltext der Servicegebühren.
+ *    ohne Zahl oder Datum im Quelltext der Servicegebühren,
+ *  - seit Nr. 53 heißen die beiden Umsatzzahlen „Über FarmerZone"
+ *    (Bestellungen) und „Mit Hofladen" (mit Direktverkäufen), aus EINER
+ *    Quelle (UMSATZ_TEXT) — nie „Gesamt" (Register F6).
  */
 import { describe, it, expect, vi } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
@@ -31,9 +34,11 @@ import { umfeldLink, umfeldUmleitung } from '@/schemas/umfeld-filter'
 import UmfeldUmleitung from '@/app/(hof)/analytics/umfeld/page'
 import { RegionKopf } from '@/components/region/region-kopf'
 import { FutterKaufenAnsicht } from '@/components/region/futter-kaufen-ansicht'
-import { ServicegebuehrenKarte, TeilenWirkungKarte } from '@/components/auswertung/auswertung-teile'
+import { KennzahlenReihe, ServicegebuehrenKarte, TeilenWirkungKarte, UmsatzKarte } from '@/components/auswertung/auswertung-teile'
 import { baueFutterKaufen } from '@/lib/futter-kaufen'
-import { servicegebuehrenSaetze, teilenKarte } from '@/lib/auswertung'
+import { kennzahlen, servicegebuehrenSaetze, teilenKarte } from '@/lib/auswertung'
+import { UMSATZ_TEXT } from '@/lib/umsatz'
+import { KENNZAHL_TEXT } from '@/lib/heute'
 import { fasseTeilenWirkungZusammen } from '@/lib/teilen-wirkung'
 import { TEILEN_ZAEHLUNG_HINWEIS } from '@/lib/teilen-kanal'
 import { BAR_OHNE_GEBUEHR_SATZ, BAR_SERVICEGEBUEHR_AB } from '@/lib/konditionen'
@@ -175,6 +180,51 @@ describe('Karten im neuen Design', () => {
     expect(html).toContain('€ 1,53')
     expect(html).toContain(BAR_OHNE_GEBUEHR_SATZ)
     expect(html).not.toMatch(/Lastschrift|SEPA|Grundgebühr|Vor Ort bezahlt/)
+  })
+
+  it('Kennzahl „Über FarmerZone" zählt die abgeholten Bestellungen — kein „Warenumsatz" mehr (Nr. 53)', () => {
+    const html = renderToStaticMarkup(createElement(KennzahlenReihe, { k: kennzahlen([], 0), zeitraum: 'Diese Woche' }))
+    expect(html).toMatch(new RegExp(`<dt[^>]*>${UMSATZ_TEXT.ueberFarmerzone}</dt>`))
+    expect(html).toContain('Diese Woche · abgeholte Bestellungen')
+    expect(html).not.toMatch(/Warenumsatz|Gesamt/)
+  })
+
+  it('Umsatzkarte „Mit Hofladen" zählt Bestellungen und Direktverkäufe — in jedem Zeitraum, kein „Umsatz pro Tag" (Nr. 53)', () => {
+    const html = renderToStaticMarkup(
+      createElement(UmsatzKarte, {
+        zeitraum: 'Diese Woche',
+        summeCent: 20600,
+        vergleich: { richtung: 'mehr', text: '▲ 472 % mehr als letzte Woche' },
+        laufend: true,
+        balken: [{ label: 'Fr', cent: 2800, vergleichCent: 0 }],
+        vergleichLabel: 'Woche davor',
+      })
+    )
+    expect(html).toMatch(new RegExp(`<h2[^>]*>${UMSATZ_TEXT.mitHofladen}</h2>`))
+    expect(html).toContain('€ 206,00')
+    expect(html).toContain('Abgeholte Bestellungen und eingetragene Verkäufe')
+    expect(html).not.toMatch(/Umsatz pro (Tag|Woche|Monat)|Warenumsatz|Gesamt/)
+  })
+
+  it('Texte aus EINER Quelle: Auswertung und Heute nehmen UMSATZ_TEXT, keine Seite schreibt die Wörter selbst', () => {
+    expect(UMSATZ_TEXT).toEqual({ ueberFarmerzone: 'Über FarmerZone', mitHofladen: 'Mit Hofladen', mitHofladenKlein: 'mit Hofladen' })
+    // „Heute eingenommen · mit Hofladen" ist dasselbe Wort wie die Umsatzkarte der Auswertung.
+    expect(KENNZAHL_TEXT.eingenommenMit).toBe(UMSATZ_TEXT.mitHofladenKlein)
+    const teile = quelle('src/components/auswertung/auswertung-teile.tsx')
+    expect(teile).toContain('UMSATZ_TEXT.ueberFarmerzone')
+    expect(teile).toContain('UMSATZ_TEXT.mitHofladen')
+    for (const datei of ['src/components/auswertung/auswertung-teile.tsx', 'src/app/(hof)/analytics/page.tsx', 'src/components/heute/heute-teile.tsx', 'src/lib/heute.ts', 'src/lib/auswertung.ts']) {
+      const text = quelle(datei).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+      expect(text, datei).not.toMatch(/['"`]Über FarmerZone|['"`>]\s*Mit Hofladen|['"`]mit Hofladen|Warenumsatz|Umsatz pro (Tag|Woche|Monat)|umsatzKartenTitel/)
+    }
+  })
+
+  it('Gegenprobe: die Suche nach selbst geschriebenen Wörtern schlägt an', () => {
+    const suche = /['"`]Über FarmerZone|['"`>]\s*Mit Hofladen|['"`]mit Hofladen|Warenumsatz|Umsatz pro (Tag|Woche|Monat)|umsatzKartenTitel/
+    for (const text of ["titel=\"Warenumsatz\"", "'Umsatz pro Tag'", "<h2>Mit Hofladen</h2>", "eingenommenMit: 'mit Hofladen'", "titel=\"Über FarmerZone\""]) {
+      expect(text).toMatch(suche)
+    }
+    expect('UMSATZ_TEXT.mitHofladen').not.toMatch(suche)
   })
 
   it('Teilen-Karte: Kanäle mit Balken, ohne Besuche ein Ausweg nach Heute', () => {

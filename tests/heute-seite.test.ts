@@ -19,9 +19,13 @@
  *    Wochentag.
  *  - Kennzahlen sagen, was sie zählen: „Heute abholen" (dieselben
  *    Bestellungen wie die Packliste) und „Heute eingenommen, mit Hofladen" —
- *    „0" neben „€ 178" widerspricht sich nicht mehr. Drei Spalten auch am
- *    Handy; ein Betrag wird nie gekürzt — seine Schrift passt sich der Karte
- *    an (kennzahlBreiteEm), das Wort trennt an der weichen Trennstelle.
+ *    „0" neben „€ 178" widerspricht sich nicht mehr. Unter 1024 px 2 + 1
+ *    (Register F4, Vermerk 10.10.2026: der Betrag allein in der zweiten
+ *    Zeile), ab 1024 px drei nebeneinander; ein Betrag wird nie gekürzt —
+ *    seine Schrift passt sich der Karte an (kennzahlBreiteEm).
+ *  - „Zu tun" (Nr. 53): EINE Karte statt Erste Schritte und „Deine
+ *    Hofseite"; neben dem Stripe-Kasten steht „Online-Zahlung einrichten"
+ *    nicht noch einmal.
  *  - Freischaltungs-Moment: nur im Zeitfenster nach approvedAt, nur
  *    öffentlich, nur wenn das Gerät ihn sicher noch nicht gezeigt hat —
  *    fehlender oder werfender Speicher zeigt ihn nie (höchstens einmal).
@@ -74,7 +78,6 @@ import {
 import {
   BrauchtDichKarte,
   HeuteKopf,
-  HofseiteKarte,
   Kennzahlen,
   NaechsteAbholungKarte,
   Packliste,
@@ -82,8 +85,11 @@ import {
   StripeHinweis,
   TeilenKarte,
   WocheKarte,
+  ZuTunKarte,
 } from '@/components/heute/heute-teile'
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
+import { ERSTE_SCHRITTE_WARTET, ZU_TUN_TEXT, ersteSchritte, ersteSchritteDaten, zuTun, type ZuTunAufgabe } from '@/lib/erste-schritte'
+import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 const html = (el: React.ReactElement) => renderToStaticMarkup(el)
@@ -170,8 +176,8 @@ describe('Abholfenster — Wiener Wochentag', () => {
 
 describe('Teilen-Zeile', () => {
   it('kompakt unter der Packliste — nur wenn Kunden den Hof sehen und bei ihm bestellen können', () => {
-    expect(heuteAufbau({ stripeHinweis: false, teilen: true, ersteSchritte: false }).haupt).toEqual(['packliste', 'teilen', 'braucht-dich'])
-    const ohne = heuteAufbau({ stripeHinweis: false, teilen: false, ersteSchritte: false })
+    expect(heuteAufbau({ stripeHinweis: false, teilen: true, zuTun: false }).haupt).toEqual(['packliste', 'teilen', 'braucht-dich'])
+    const ohne = heuteAufbau({ stripeHinweis: false, teilen: false, zuTun: false })
     expect([...ohne.oben, ...ohne.haupt, ...ohne.seite]).not.toContain('teilen')
   })
 
@@ -208,8 +214,8 @@ describe('Aufbau der Seite — Packliste zuerst, oben höchstens ein Kasten', ()
   it('die Hauptspalte beginnt immer mit der Packliste, die Teilen-Zeile folgt direkt darunter', () => {
     for (const stripeHinweis of [true, false]) {
       for (const teilen of [true, false]) {
-        for (const ersteSchritte of [true, false]) {
-          const { haupt } = heuteAufbau({ stripeHinweis, teilen, ersteSchritte })
+        for (const zuTun of [true, false]) {
+          const { haupt } = heuteAufbau({ stripeHinweis, teilen, zuTun })
           expect(haupt[0]).toBe('packliste')
           if (teilen) expect(haupt[1]).toBe('teilen')
         }
@@ -220,8 +226,8 @@ describe('Aufbau der Seite — Packliste zuerst, oben höchstens ein Kasten', ()
   it('oben steht höchstens EIN Kasten, und nur der Stripe-Hinweis — nie die Teilen-Zeile', () => {
     for (const stripeHinweis of [true, false]) {
       for (const teilen of [true, false]) {
-        for (const ersteSchritte of [true, false]) {
-          const { oben } = heuteAufbau({ stripeHinweis, teilen, ersteSchritte })
+        for (const zuTun of [true, false]) {
+          const { oben } = heuteAufbau({ stripeHinweis, teilen, zuTun })
           expect(oben.length).toBeLessThanOrEqual(1)
           expect(oben).toEqual(stripeHinweis ? ['stripe'] : [])
         }
@@ -229,13 +235,29 @@ describe('Aufbau der Seite — Packliste zuerst, oben höchstens ein Kasten', ()
     }
   })
 
-  it('jeder Block steht genau einmal; die Seitenspalte trägt Erste Schritte, nächste Abholung, Woche und Hofseite', () => {
-    const voll = heuteAufbau({ stripeHinweis: true, teilen: true, ersteSchritte: true })
+  it('jeder Block steht genau einmal; die Seitenspalte trägt Zu tun, nächste Abholung und Woche (Nr. 53)', () => {
+    const voll = heuteAufbau({ stripeHinweis: true, teilen: true, zuTun: true })
     const alle = [...voll.oben, ...voll.haupt, ...voll.seite]
     expect(new Set(alle).size).toBe(alle.length)
-    expect(voll.seite).toEqual(['erste-schritte', 'naechste-abholung', 'woche', 'hofseite'])
-    const ohne = heuteAufbau({ stripeHinweis: false, teilen: false, ersteSchritte: false })
-    expect(ohne).toEqual({ oben: [], haupt: ['packliste', 'braucht-dich'], seite: ['naechste-abholung', 'woche', 'hofseite'] })
+    expect(voll.seite).toEqual(['zu-tun', 'naechste-abholung', 'woche'])
+    const ohne = heuteAufbau({ stripeHinweis: false, teilen: false, zuTun: false })
+    expect(ohne).toEqual({ oben: [], haupt: ['packliste', 'braucht-dich'], seite: ['naechste-abholung', 'woche'] })
+  })
+
+  it('Erste Schritte und „Deine Hofseite" gibt es nicht mehr als eigene Blöcke — nur noch die eine Liste', () => {
+    for (const stripeHinweis of [true, false]) {
+      for (const zuTun of [true, false]) {
+        const { oben, haupt, seite } = heuteAufbau({ stripeHinweis, teilen: true, zuTun })
+        const alle: string[] = [...oben, ...haupt, ...seite]
+        expect(alle).not.toContain('erste-schritte')
+        expect(alle).not.toContain('hofseite')
+        expect(alle.includes('zu-tun')).toBe(zuTun)
+      }
+    }
+    const seite = quelle('src/app/(hof)/dashboard/page.tsx')
+    expect(seite).toContain('<ZuTunKarte')
+    expect(seite).not.toMatch(/ErsteSchritteKarte|HofseiteKarte/)
+    expect(existsSync(join(process.cwd(), 'src/components/farmer/erste-schritte-karte.tsx'))).toBe(false)
   })
 })
 
@@ -244,7 +266,9 @@ describe('Stripe-Hinweis: der eine Kasten oben auf Heute — der Balken der Shel
     // Der Balken „wartet"/„stillgelegt" kommt aus dem Layout und steht auf jeder
     // Seite; Heute fragt ihn nicht ab und verschiebt deshalb nichts.
     expect(quelle('src/server/queries/heute.ts')).not.toMatch(/hofBalkenArt|stripeHinweisOrt|stripeOrt/)
-    expect(quelle('src/app/(hof)/dashboard/page.tsx')).toContain('stripeHinweis: heute.onlinePausiert !== null || heute.stripeEinrichten')
+    // Seit Nr. 53 rechnet getHeute die Bedingung einmal (stripeImKasten); die Seite reicht sie nur weiter.
+    expect(quelle('src/server/queries/heute.ts')).toContain('const stripeImKasten = onlinePausiert !== null || stripeEinrichten')
+    expect(quelle('src/app/(hof)/dashboard/page.tsx')).toContain('stripeHinweis: heute.stripeImKasten')
     expect(quelle('src/lib/heute.ts')).not.toMatch(/STRIPE_BRAUCHT_DICH_TEXT|art: 'stripe'|'braucht-dich' \| null/)
     expect(quelle('src/server/hofbereich.ts')).not.toContain('hofBalkenArt')
     // Wortlaut F4 bleibt.
@@ -269,7 +293,7 @@ describe('Stripe-Hinweis', () => {
     expect(onlineZahlungPausiert({ acceptsOnline, stripeAccountReady, stripeAccountId: konto })).toBe(erwartet)
   })
 
-  it('ohne Stripe-Konto kein „pausiert" — dafür hat die Erste-Schritte-Karte ihren Schritt', () => {
+  it('ohne Stripe-Konto kein „pausiert" — dafür steht „Online-Zahlung einrichten" im Kasten bzw. in „Zu tun"', () => {
     expect(onlineZahlungPausiert({ acceptsOnline: true, stripeAccountReady: false, stripeAccountId: null })).toBe(false)
   })
 
@@ -355,7 +379,7 @@ describe('Hinweis „Online-Zahlung einrichten" für freigeschaltete Höfe ohne 
   })
 
   it('die Seite zeigt ihn oben, wo sonst „pausiert" steht — keine Abschaltung, nur ein Hinweis', () => {
-    expect(heuteAufbau({ stripeHinweis: true, teilen: true, ersteSchritte: false }).oben).toEqual(['stripe'])
+    expect(heuteAufbau({ stripeHinweis: true, teilen: true, zuTun: false }).oben).toEqual(['stripe'])
     const seite = quelle('src/app/(hof)/dashboard/page.tsx')
     expect(seite).toContain('<StripeEinrichtenHinweis')
     expect(seite).toContain('heute.stripeEinrichten')
@@ -638,10 +662,21 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     expect(zahlen).not.toContain('Umsatz heute')
   })
 
-  it('drei Spalten auch am Handy, und ein Betrag wird nie gekürzt: die Schrift misst sich an Karte und Betrag (Runde 1)', () => {
+  it('unter 1024 px 2 + 1, ab 1024 px drei nebeneinander — der Betrag steht allein in der zweiten Zeile (Register F4, Vermerk 10.10.2026)', () => {
     const zahlen = html(createElement(Kennzahlen, { bestellungen: 12, zuPacken: 12, umsatzHeuteCent: 123456 }))
-    expect(zahlen).toMatch(/<section[^>]*class="[^"]*\bgrid-cols-3\b/)
-    expect(zahlen).not.toMatch(/col-span-2|grid-cols-2/)
+    expect(zahlen).toMatch(/<section[^>]*class="[^"]*\bgrid-cols-2\b[^"]*\blg:grid-cols-3\b/)
+    expect(zahlen).not.toMatch(/(?<!lg:)grid-cols-3/)
+    // Genau eine Karte geht unter 1024 px über beide Spalten: die letzte, „Heute eingenommen".
+    const karten = [...zahlen.matchAll(/<div class="([^"]*@container[^"]*)"/g)].map((m) => m[1])
+    expect(karten).toHaveLength(3)
+    expect(karten.map((k) => /(?<![\w:-])col-span-2\b/.test(k))).toEqual([false, false, true])
+    expect(karten[2]).toContain('lg:col-span-1')
+    expect(zahlen.indexOf('Heute abholen')).toBeLessThan(zahlen.indexOf('Noch zu packen'))
+    expect(zahlen.indexOf('Noch zu packen')).toBeLessThan(zahlen.indexOf('Heute ein'))
+  })
+
+  it('ein Betrag wird nie gekürzt: die Schrift misst sich an Karte und Betrag (Runde 1)', () => {
+    const zahlen = html(createElement(Kennzahlen, { bestellungen: 12, zuPacken: 12, umsatzHeuteCent: 123456 }))
     expect(zahlen).not.toContain('truncate')
     expect(zahlen).toContain('€ 1\u00a0234,56')
     // Jede Karte ist ein Container; die Zahl nimmt höchstens 22/26 px und
@@ -681,27 +716,28 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     expect(kennzahlBreiteEm('W')).toBeGreaterThanOrEqual(0.7)
   })
 
-  it('bei 360 und 390 px passt € 1 234,56 in die Karte (Schrift ≥ 14 px); Zahlen bleiben bei 22 px', () => {
-    // Innere Breite einer Karte bei drei Spalten: (Breite − 2 × 16 Rand − 2 × 10 Lücke) / 3 − 2 × 12 Innenabstand − 2 Rahmen.
-    const innen = (breite: number) => (breite - 32 - 20) / 3 - 24 - 2
-    for (const breite of [360, 390]) {
-      const schrift = Math.min(22, innen(breite) / kennzahlBreiteEm('€ 1\u00a0234,56'))
-      expect(schrift, String(breite)).toBeGreaterThanOrEqual(14)
-      expect(schrift * 4.91, String(breite)).toBeLessThanOrEqual(innen(breite))
-      expect(Math.min(22, innen(breite) / kennzahlBreiteEm('12'))).toBe(22)
-      expect(Math.min(22, innen(breite) / kennzahlBreiteEm('128'))).toBe(22)
+  it('bei 320, 360, 375 und 390 px: Zahlen und Betrag in voller Größe (22 px), auch € 12 345,67 — die Anpassung bleibt nur das Netz', () => {
+    // Zwei Spalten: (Breite − 2 × 16 Rand − 10 Lücke) / 2; der Betrag über beide: Breite − 2 × 16.
+    // Innen je 2 × 12 Innenabstand und 2 × 1 Rahmen weniger.
+    const halb = (breite: number) => (breite - 32 - 10) / 2 - 24 - 2
+    const ganz = (breite: number) => breite - 32 - 24 - 2
+    for (const breite of [320, 360, 375, 390]) {
+      expect(Math.min(22, halb(breite) / kennzahlBreiteEm('128')), String(breite)).toBe(22)
+      for (const betrag of ['€ 1\u00a0234,56', '€ 12\u00a0345,67']) {
+        expect(Math.min(22, ganz(breite) / kennzahlBreiteEm(betrag)), `${breite} ${betrag}`).toBe(22)
+      }
     }
   })
 
-  it('„Heute eingenommen" trennt in schmalen Karten an den Silben („Heute einge-nommen"), nie in der Zahl', () => {
+  it('„Heute eingenommen" behält die weichen Trennstellen; Bezeichnungen werden nie gekürzt', () => {
     expect(mitTrennstellen('Heute eingenommen')).toBe('Heute ein\u00ADge\u00ADnom\u00ADmen')
     expect(mitTrennstellen('Heute abholen')).toBe('Heute abholen')
     expect(mitTrennstellen('Noch zu packen')).toBe('Noch zu packen')
     const zahlen = html(createElement(Kennzahlen, { bestellungen: 0, zuPacken: 0, umsatzHeuteCent: 0 }))
     expect(zahlen).toContain('Heute ein\u00ADge\u00ADnom\u00ADmen')
-    // Zwei Zeilen Platz für jede Bezeichnung, damit die Zahlen auf einer Höhe stehen — gekürzt wird nichts.
-    expect(zahlen).toContain('min-h-[2lh]')
-    expect(zahlen).not.toContain('line-clamp')
+    // In der halben Karte passt jede Bezeichnung in eine Zeile — keine reservierte zweite Zeile mehr.
+    expect(zahlen).not.toContain('min-h-[2lh]')
+    expect(zahlen).not.toMatch(/line-clamp|truncate/)
   })
 
   it('Teilen-Zeile: kompakt mit Satz und „Teilen", ohne Besuche nur, wenn es keine gab', () => {
@@ -716,7 +752,7 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     expect(mitWirkung).toContain('letzte Woche 14 Besuche über deine Links')
   })
 
-  it('Seitenspalte: nächste Abholung, Woche mit Balken und Vergleich, Hofseite mit Fortschritt', () => {
+  it('Seitenspalte: nächste Abholung, Woche mit Balken und Vergleich', () => {
     const abholung = html(createElement(NaechsteAbholungKarte, { fenster: { tag: '2026-10-06', name: 'Heute', zeit: '15–18 Uhr' }, anzahl: 8 }))
     expect(abholung).toMatch(/Heute, <span[^>]*>15–18 Uhr<\/span>/)
     expect(abholung).toContain('8 Bestellungen')
@@ -731,10 +767,6 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     // Die Balken sind Bild; die Werte hört der Screenreader als Liste.
     expect(woche).toContain('sr-only')
 
-    const hofseite = html(createElement(HofseiteKarte, { prozent: 64, satz: 'Es fehlen noch: Logo und Über uns.', fertig: false }))
-    expect(hofseite).toContain('Deine Hofseite')
-    expect(hofseite).toContain('64 %')
-    expect(hofseite).toContain('href="/farm-page"')
   })
 
   it('Braucht dich: leer „Alles erledigt.", sonst Zeilen mit Ziel', () => {
@@ -749,6 +781,7 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
       html(createElement(TeilenKarte, { hofName: 'Hof Test', hofSlug: 'hof-test', satz: 'x' })),
       html(createElement(HeuteKopf, { datum: 'x', abholungHeute: '15–18 Uhr' })),
       html(createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })], zuPacken: 1, naechsteAbholung: null, leer: { abholfenster: null } })),
+      html(createElement(ZuTunKarte, { aufgaben: ZU_TUN_BEISPIEL, wartetAufFreigabe: false, ausblenden: null })),
     ].join('')
     const symbole = alle.match(/<svg[^>]*>/g) ?? []
     expect(symbole.length).toBeGreaterThan(0)
@@ -756,10 +789,142 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
   })
 })
 
+// ─── Zu tun (Nr. 53) ────────────────────────────────────────────────────────
+
+const ZU_TUN_BEISPIEL: ZuTunAufgabe[] = [
+  { id: 'titelbild', titel: 'Titelbild', satz: 'Farbverlauf — ein eigenes Foto wirkt persönlicher', href: '/settings/appearance' },
+  { id: 'fotos', titel: 'Fotos', satz: 'Noch keine Fotos', href: '/settings/appearance' },
+]
+
+/** Ein freigeschalteter Hof ohne Stripe, Logo, Titelbild, Über uns und Fotos — wie der neue Seed-Hof der Abnahme. */
+const NEUER_HOF = {
+  name: 'Hof Test',
+  description: 'Eier und Heu aus Musterdorf',
+  aboutText: null,
+  logoUrl: null,
+  bannerType: 'GRADIENT',
+  bannerUrl: null,
+  farmPhotos: [],
+  address: 'Musterweg 1',
+  postalCode: '4900',
+  city: 'Musterdorf',
+  latitude: 48.2,
+  longitude: 13.5,
+  pickupSlots: [{ dayOfWeek: 1, startTime: '15:00', endTime: '18:00' }],
+  acceptsOnline: true,
+  stripeAccountReady: false,
+  phone: '+43 660 0000000',
+  email: 'hof@example.com',
+  isPaused: false,
+  sectionsConfig: [{ key: 'about', visible: true, order: 1 }],
+}
+
+function zuTunFuer(stripeImKasten: boolean) {
+  const schritte = ersteSchritte(ersteSchritteDaten(NEUER_HOF, { produkte: 3, aktiveAbholzeiten: 1 }))
+  return zuTun(schritte, hofseiteFortschritt(hofseiteStand(NEUER_HOF, NEUER_HOF)), { stripeImKasten })
+}
+
+describe('„Zu tun" — EINE Karte statt Erste Schritte und „Deine Hofseite" (Nr. 53)', () => {
+  it('Titel, Anzahl offener Aufgaben, jede Aufgabe ein Link mit ihrem Satz; der Schalter zum Ausblenden steht im Kopf', () => {
+    const h = html(
+      createElement(ZuTunKarte, {
+        aufgaben: ZU_TUN_BEISPIEL,
+        wartetAufFreigabe: false,
+        ausblenden: createElement('button', { type: 'button' }, 'Ausblenden'),
+      })
+    )
+    expect(h).toMatch(/<h2[^>]*>Zu tun<\/h2>/)
+    expect(h).toContain('2 offen')
+    expect([...h.matchAll(/<a [^>]*href="([^"]*)"/g)].map((m) => m[1])).toEqual(['/settings/appearance', '/settings/appearance'])
+    expect(h).toContain('Farbverlauf — ein eigenes Foto wirkt persönlicher')
+    expect(h).toContain('Noch keine Fotos')
+    expect(h).toContain('Ausblenden')
+    expect(h).not.toContain(ERSTE_SCHRITTE_WARTET)
+  })
+
+  it('erledigt ist nichts in der Karte: kein Haken, kein „erledigt", kein Fortschrittsbalken', () => {
+    const h = html(createElement(ZuTunKarte, { aufgaben: ZU_TUN_BEISPIEL, wartetAufFreigabe: false, ausblenden: null }))
+    expect(h).not.toMatch(/erledigt|lucide-check|role="progressbar"|%/)
+  })
+
+  it('wartet auf Freischaltung: dazu der Satz, warum es sich lohnt, die Liste jetzt abzuarbeiten', () => {
+    const h = html(createElement(ZuTunKarte, { aufgaben: ZU_TUN_BEISPIEL, wartetAufFreigabe: true, ausblenden: null }))
+    expect(h).toContain(ERSTE_SCHRITTE_WARTET)
+  })
+
+  it('lange Werte (Hofname bis 80 Zeichen, Adresse) brechen um — gekürzt wird nichts', () => {
+    const lang = 'H'.repeat(80)
+    const h = html(
+      createElement(ZuTunKarte, {
+        aufgaben: [{ id: 'name', titel: 'Name und Kurzbeschreibung', satz: `${lang} — Kurzbeschreibung fehlt`, href: '/settings/profile' }],
+        wartetAufFreigabe: false,
+        ausblenden: null,
+      })
+    )
+    expect(h).toContain(`${lang} — Kurzbeschreibung fehlt`)
+    expect(h).toContain('break-words')
+    expect(h).not.toMatch(/truncate|line-clamp/)
+  })
+
+  it('„Online-Zahlung einrichten" höchstens einmal: freigeschaltet ohne Stripe steht es im Kasten und nicht in der Liste', () => {
+    const kasten = html(createElement(StripeEinrichtenHinweis))
+    const karte = html(createElement(ZuTunKarte, { aufgaben: zuTunFuer(true).aufgaben, wartetAufFreigabe: false, ausblenden: null }))
+    const anzahl = (text: string) => text.split(ONLINE_ZAHLUNG_EINRICHTEN_TITEL).length - 1
+    expect(anzahl(kasten) + anzahl(karte)).toBe(1)
+    expect(anzahl(karte)).toBe(0)
+    // Ohne Kasten (wartet auf Freischaltung) einmal — in der Liste.
+    const ohneKasten = html(createElement(ZuTunKarte, { aufgaben: zuTunFuer(false).aufgaben, wartetAufFreigabe: true, ausblenden: null }))
+    expect(anzahl(ohneKasten)).toBe(1)
+  })
+
+  it('der Kasten-Zustand ist EINMAL berechnet: getHeute stellt damit den Kasten und nimmt die Online-Zahlung aus der Liste', () => {
+    const abfrage = quelle('src/server/queries/heute.ts')
+    expect(abfrage.match(/onlinePausiert !== null \|\| stripeEinrichten/g)).toHaveLength(1)
+    expect(abfrage).toContain('const stripeImKasten = onlinePausiert !== null || stripeEinrichten')
+    expect(abfrage).toContain('fortschritt, { stripeImKasten })')
+    expect(abfrage).toMatch(/^\s+stripeImKasten,$/m)
+    const seite = quelle('src/app/(hof)/dashboard/page.tsx')
+    expect(seite).toContain('stripeHinweis: heute.stripeImKasten')
+    expect(seite).not.toMatch(/onlinePausiert !== null \|\|/)
+  })
+
+  it('weggeklickt: unten die Zeile „Zu tun einblenden"; der Schalter nimmt Tokens und den sichtbaren Fokus', () => {
+    expect(ZU_TUN_TEXT).toEqual({ titel: 'Zu tun', ausblenden: 'Ausblenden', ausblendenName: 'Zu tun ausblenden', einblenden: 'Zu tun einblenden' })
+    const schalter = quelle('src/components/farmer/erste-schritte-schalter.tsx')
+    expect(schalter).toContain('ZU_TUN_TEXT.einblenden')
+    expect(schalter).toContain('ZU_TUN_TEXT.ausblendenName')
+    expect(schalter).toContain('ZU_TUN_TEXT.ausblenden ')
+    expect(schalter).toContain('FOKUS_RAHMEN')
+    expect(schalter).not.toMatch(/Erste Schritte|app-ink/)
+    const seite = quelle('src/app/(hof)/dashboard/page.tsx')
+    expect(seite).toContain("zuTunZeigen === 'zeile' && (")
+    expect(seite).not.toContain('data-app-palette')
+  })
+})
+
+describe('„Zu tun" als Wort aus EINER Quelle (ZU_TUN_TEXT)', () => {
+  const OHNE_KOMMENTARE = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  const SELBST_GESCHRIEBEN = /['"`>]\s*Zu tun\b/
+
+  it.each(['src/components/heute/heute-teile.tsx', 'src/components/farmer/erste-schritte-schalter.tsx', 'src/app/(hof)/dashboard/page.tsx'])(
+    '%s schreibt „Zu tun" nicht selbst',
+    (datei) => {
+      expect(OHNE_KOMMENTARE(quelle(datei))).not.toMatch(SELBST_GESCHRIEBEN)
+    }
+  )
+
+  it('Gegenprobe: die Suche erkennt selbst geschriebene Wörter, die Konstante nicht', () => {
+    for (const text of ["<h2>Zu tun</h2>", "'Zu tun einblenden'", '"Zu tun ausblenden"', '`Zu tun`']) expect(text).toMatch(SELBST_GESCHRIEBEN)
+    expect('{ZU_TUN_TEXT.titel}').not.toMatch(SELBST_GESCHRIEBEN)
+    expect(quelle('src/lib/erste-schritte.ts')).toMatch(SELBST_GESCHRIEBEN)
+  })
+})
+
 describe('Tokens statt Farbwerte (beide Themes)', () => {
   const dateien = [
     'src/components/heute/heute-teile.tsx',
     'src/components/heute/freischalt-moment.tsx',
+    'src/components/farmer/erste-schritte-schalter.tsx',
     'src/app/(hof)/dashboard/page.tsx',
     'src/app/(hof)/dashboard/loading.tsx',
   ]

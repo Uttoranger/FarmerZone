@@ -460,3 +460,21 @@ export function topProdukte(posten: ProduktPosten[], anzahl = 3): TopProdukt[] {
     .sort((a, b) => b.cent - a.cent || a.name.localeCompare(b.name, 'de'))
     .slice(0, anzahl)
 }
+
+// ─── Beschriftung ───────────────────────────────────────────────────────────
+
+/**
+ * Wie die Seiten sagen, was eine Umsatzzahl zählt (freigabe.md §13 Nr. 53) —
+ * EINE Quelle, damit dasselbe Wort auf Heute und in der Auswertung dasselbe
+ * heißt. „Über FarmerZone" zählt nur abgeholte Bestellungen, „Mit Hofladen"
+ * dazu die eingetragenen Direktverkäufe (Hofladen, Markt, …) — so stehen
+ * „€ 0" und „€ 206" nebeneinander, ohne sich zu widersprechen. Nie „Gesamt":
+ * Die Summe ist nicht der ganze Umsatz des Hofs (Register F6). Nur Wörter,
+ * an der Rechnung oben ändert sich nichts.
+ */
+export const UMSATZ_TEXT = {
+  ueberFarmerzone: 'Über FarmerZone',
+  mitHofladen: 'Mit Hofladen',
+  /** Unter einem Betrag, klein: „€ 178 · mit Hofladen" (Kennzahl auf Heute). */
+  mitHofladenKlein: 'mit Hofladen',
+} as const

@@ -4,6 +4,8 @@
 // Oberfläche. Diese Liste ist der rote Faden: Was muss ich tun, damit mein
 // Hofladen läuft? Bewusst als Karte auf der Übersicht statt als klickende
 // Tour — eine Tour nervt beim zweiten Mal, eine Liste misst echten Zustand.
+// Seit Nr. 53 steht sie mit der Liste der Hofseite (hofseite-fortschritt.ts)
+// als EINE Liste „Zu tun" auf Heute (zuTun, unten).
 //
 // NICHTS wird gespeichert. Der Fortschritt ergibt sich jedes Mal neu aus den
 // vorhandenen Daten; es gibt kein „abgehakt"-Feld, das mit der Wirklichkeit
@@ -14,6 +16,8 @@
 
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
 import { HOFSEITE_HREF } from '@/lib/mein-hof'
+import { EINSTELLUNG_FUER_ZEILE, type HofseiteFortschritt } from '@/lib/hofseite-fortschritt'
+import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 
 /** Alles, was die Liste zum Rechnen braucht — Zählwerte und Ja/Nein, sonst nichts. */
 export type ErsteSchritteDaten = {
@@ -39,21 +43,6 @@ export type ErsterSchritt = {
   nutzen: string
   href: string
   erledigt: boolean
-  /**
-   * Ein Schritt, ohne den der Hof auskommt — derzeit keiner: Seit Register Z1
-   * ist auch die Online-Zahlung Pflicht. Das Feld bleibt für die Karte.
-   */
-  optional: boolean
-}
-
-export type ErsteSchritteErgebnis = {
-  schritte: ErsterSchritt[]
-  erledigt: number
-  gesamt: number
-  /** Anteil erledigt (0–100), gerundet — für den Balken. */
-  prozent: number
-  /** false = die Karte gehört gar nicht erst auf die Seite. */
-  anzeigen: boolean
 }
 
 /**
@@ -69,14 +58,17 @@ export const ERSTE_SCHRITTE_WARTET =
   'Arbeite die Liste am besten jetzt schon ab — dann steht dein Hof fertig da, sobald die Freischaltungs-Mail kommt.'
 
 /**
- * Berechnet Punkte und Fortschritt.
+ * Die fünf Schritte, jeder mit seinem Stand.
  *
  * Die Reihenfolge ist die Arbeitsreihenfolge und liegt fest: erst wissen, wer
  * du bist (Profil, Auftritt), dann was du verkaufst (Produkt), dann wann man
- * es bekommt (Abholzeiten), zuletzt die Bezahlung (seit Z1 Pflicht).
+ * es bekommt (Abholzeiten), zuletzt die Bezahlung. Keiner ist optional: Seit
+ * Register Z1 ist auch die Online-Zahlung Pflicht. Zähler, Anteil und „Karte
+ * zeigen" gibt es hier nicht mehr — die eigene Karte ist mit Nr. 53 in „Zu
+ * tun" aufgegangen; was dort steht und ob die Karte kommt, entscheidet zuTun.
  */
-export function ersteSchritte(daten: ErsteSchritteDaten): ErsteSchritteErgebnis {
-  const schritte: ErsterSchritt[] = [
+export function ersteSchritte(daten: ErsteSchritteDaten): ErsterSchritt[] {
+  return [
     {
       id: 'profil',
       titel: 'Hofprofil ausfüllen',
@@ -85,7 +77,6 @@ export function ersteSchritte(daten: ErsteSchritteDaten): ErsteSchritteErgebnis 
       // Beschreibung UND gesetzter Kartenpunkt — die Adresse allein reicht
       // nicht mehr, seit Kundinnen den Hof später auf einer Karte finden sollen.
       erledigt: daten.hatBeschreibung && daten.hatKoordinaten,
-      optional: false,
     },
     {
       id: 'auftritt',
@@ -94,7 +85,6 @@ export function ersteSchritte(daten: ErsteSchritteDaten): ErsteSchritteErgebnis 
       // Seit Nr. 50 in Mein Hof (Register N4); /settings/appearance leitet nur noch um.
       href: HOFSEITE_HREF,
       erledigt: daten.hatLogo && daten.hatTitelbild,
-      optional: false,
     },
     {
       id: 'produkt',
@@ -102,7 +92,6 @@ export function ersteSchritte(daten: ErsteSchritteDaten): ErsteSchritteErgebnis 
       nutzen: 'Ohne Produkt gibt es nichts zu bestellen.',
       href: '/products',
       erledigt: daten.produkte > 0,
-      optional: false,
     },
     {
       id: 'abholzeiten',
@@ -110,7 +99,6 @@ export function ersteSchritte(daten: ErsteSchritteDaten): ErsteSchritteErgebnis 
       nutzen: 'Erst dann können Kunden bestellen.',
       href: '/settings/pickup-slots',
       erledigt: daten.aktiveAbholzeiten > 0,
-      optional: false,
     },
     {
       id: 'zahlung',
@@ -119,22 +107,8 @@ export function ersteSchritte(daten: ErsteSchritteDaten): ErsteSchritteErgebnis 
       nutzen: ONLINE_ZAHLUNG_EINRICHTEN_SATZ,
       href: '/settings/payments',
       erledigt: daten.zahlungBereit,
-      optional: false,
     },
   ]
-
-  const erledigt = schritte.filter((s) => s.erledigt).length
-  const gesamt = schritte.length
-
-  return {
-    schritte,
-    erledigt,
-    gesamt,
-    prozent: Math.round((erledigt / gesamt) * 100),
-    // Ein einziger offener Punkt genügt, damit die Karte bleibt; ist alles
-    // erledigt, verschwindet sie restlos — kein „Alles erledigt"-Rest.
-    anzeigen: erledigt < gesamt,
-  }
 }
 
 /** Die Hof-Stammdaten, aus denen die Checkliste liest — so, wie die Abfrage sie liefert. */
@@ -173,6 +147,96 @@ export function ersteSchritteDaten(
   }
 }
 
+// ─── Zu tun (Nr. 53) ────────────────────────────────────────────────────────
+
+const ZU_TUN = 'Zu tun'
+
+/** Die Wörter der Liste „Zu tun" — EINE Quelle für Karte, Knöpfe und Vorleser, wie KENNZAHL_TEXT. */
+export const ZU_TUN_TEXT = {
+  titel: ZU_TUN,
+  ausblenden: 'Ausblenden',
+  /** Im Kopf der Karte heißt der Knopf nur „Ausblenden" — der Vorleser braucht den Bezug. */
+  ausblendenName: `${ZU_TUN} ausblenden`,
+  einblenden: `${ZU_TUN} einblenden`,
+} as const
+
+/**
+ * Eine Aufgabe der Liste „Zu tun" auf Heute: Titel, ein Satz und das Ziel —
+ * wörtlich aus einer der beiden Quellen (Erste Schritte oder die Liste der
+ * Hofseite), nie eine dritte Fassung desselben Satzes.
+ */
+export type ZuTunAufgabe = {
+  id: ErsterSchritt['id'] | HofseiteZeileId
+  titel: string
+  satz: string
+  href: string
+}
+
+export type ZuTun = {
+  /** Nur Offenes — Erledigtes verschwindet. */
+  aufgaben: ZuTunAufgabe[]
+  /** false = die Karte gehört gar nicht erst auf die Seite: alles erledigt. */
+  anzeigen: boolean
+}
+
+/**
+ * Was Bestellungen erst möglich macht, aus den Ersten Schritten und in dieser
+ * Reihenfolge an den Anfang: ohne Produkt nichts zu bestellen, ohne
+ * Abholzeiten kein Termin, ohne Online-Zahlung kein Bezahlen mit Karte oder
+ * Apple Pay (Register Z1). Hofprofil und Auftritt stehen hier mit Absicht nicht: Die
+ * Liste der Hofseite zählt ihre Teile einzeln — Kurzbeschreibung und Standort,
+ * Titelbild und Logo — mit genau derselben Bedingung (tests/zu-tun.test.ts),
+ * so verschwindet jeder Teil, sobald er erledigt ist.
+ */
+const ZUERST: readonly ErsterSchritt['id'][] = ['produkt', 'abholzeiten', 'zahlung']
+
+/**
+ * Zeilen der Hofseite, die nicht aus der Hofseite in die Liste kommen:
+ * „Abholzeiten" steht schon vorn (derselbe Schritt), „Zahlungsarten" kommt
+ * nur über den Schritt „Online-Zahlung einrichten" — den der Kasten oben
+ * ersetzen kann. Bestellungen und Abschnitte zählen dort ohnehin als fertig
+ * (ein Zustand, kein Fehlen).
+ */
+const NICHT_AUS_DER_HOFSEITE: ReadonlySet<HofseiteZeileId> = new Set<HofseiteZeileId>(['abholzeiten', 'zahlung'])
+
+/**
+ * Die EINE Liste „Zu tun" auf Heute (freigabe.md §13 Nr. 53, Register F4 mit
+ * dem Vermerk vom 10.10.2026): Erste Schritte und die Liste der Hofseite,
+ * jede Aufgabe einmal, Erledigtes verschwindet. Die freiwilligen Zeilen der
+ * Hofseite (Nr. 50) stehen nicht darin.
+ *
+ * `stripeImKasten`: Der Kasten oben auf Heute spricht schon über Stripe
+ * („Online-Zahlung einrichten" bzw. „pausiert") — dann steht die Online-
+ * Zahlung nicht noch einmal in der Liste. Ohne Kasten bleibt sie drin. Das
+ * sind zwei Fälle, beide ohne Stripe-Konto (bzw. ohne pausiertes): Der Hof
+ * wartet auf die Freischaltung — vor ihr braucht er Stripe (Register Z1) —
+ * oder er ist stillgelegt (`archivedAt`); `stripeEinrichtenHinweis` zeigt den
+ * Kasten in beiden nicht. Dass die Online-Zahlung dann in der Liste steht,
+ * obwohl der F4-Vermerk „nur noch im Kasten" sagt, steht im Bericht 53 zur
+ * Freigabe.
+ *
+ * Reihenfolge: erst, was Bestellungen möglich macht (ZUERST), dann die
+ * Hofseite in ihrer eigenen Reihenfolge — so, wie Kundinnen sie von oben
+ * nach unten sehen.
+ */
+export function zuTun(
+  schritte: readonly ErsterSchritt[],
+  hofseite: HofseiteFortschritt,
+  { stripeImKasten }: { stripeImKasten: boolean }
+): ZuTun {
+  const vorn: ZuTunAufgabe[] = ZUERST.flatMap((id) => schritte.filter((s) => s.id === id))
+    .filter((s) => !s.erledigt && !(s.id === 'zahlung' && stripeImKasten))
+    .map((s) => ({ id: s.id, titel: s.titel, satz: s.nutzen, href: s.href }))
+  const hinten: ZuTunAufgabe[] = hofseite.gruppen
+    .flatMap((g) => g.zeilen)
+    // Freiwillige Zeilen (Leitspruch, Werte; seit Nr. 50) zählen im
+    // Fortschritt nicht mit — dann sind sie auch keine Aufgabe.
+    .filter((z) => !z.fertig && !z.freiwillig && !NICHT_AUS_DER_HOFSEITE.has(z.id))
+    .map((z) => ({ id: z.id, titel: z.titel, satz: z.wert, href: EINSTELLUNG_FUER_ZEILE[z.id] }))
+  const aufgaben = [...vorn, ...hinten]
+  return { aufgaben, anzeigen: aufgaben.length > 0 }
+}
+
 // ─── Ausblenden ─────────────────────────────────────────────────────────────
 
 /**
@@ -181,7 +245,9 @@ export function ersteSchritteDaten(
  * Seite und lässt die Karte gleich weg — kein Aufblitzen, kein Nachrutschen
  * des Inhalts. Der Wert ist die Hof-ID, damit ein anderer Hof im selben
  * Browser die Karte weiter sieht. Keine Spalte in der Datenbank: Die Karte
- * misst echten Zustand, das Wegklicken ist eine Gerätevorliebe.
+ * misst echten Zustand, das Wegklicken ist eine Gerätevorliebe. Seit Nr. 53
+ * blendet derselbe Cookie die Liste „Zu tun" aus; der Name bleibt, damit
+ * eine schon getroffene Wahl gilt.
  */
 export const ERSTE_SCHRITTE_AUS_COOKIE = 'fz-erste-schritte-aus'
 
@@ -199,10 +265,10 @@ export function ersteSchritteAusgeblendet(cookieWert: string | undefined, farmId
 export type ErsteSchritteAnzeige = 'karte' | 'zeile' | 'nichts'
 
 /**
- * Was Heute für die Erste-Schritte-Karte zeigt: die Karte, solange etwas
- * offen ist und der Hof sie nicht weggeklickt hat; sonst unten die schmale
- * Zeile „Erste Schritte einblenden"; ist alles erledigt, gar nichts — auch
- * die Zeile nicht, sie würde eine leere Karte zurückholen.
+ * Was Heute für „Zu tun" zeigt: die Karte, solange etwas offen ist und der
+ * Hof sie nicht weggeklickt hat; sonst unten die schmale Zeile „Zu tun
+ * einblenden"; ist alles erledigt, gar nichts — auch die Zeile nicht, sie
+ * würde eine leere Karte zurückholen.
  */
 export function ersteSchritteAnzeige(ergebnis: { anzeigen: boolean }, ausgeblendet: boolean): ErsteSchritteAnzeige {
   if (!ergebnis.anzeigen) return 'nichts'

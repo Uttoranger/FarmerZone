@@ -9,14 +9,7 @@ import { getUmsatzAuswertung, getYtdRevenue } from '@/server/queries/analytics'
 import { getKennzahlen, getServicegebuehrenMonat } from '@/server/queries/auswertung'
 import { getTeilenWirkung } from '@/server/queries/teilen-wirkung'
 import { testzahlungenHinweisFuerHof } from '@/server/queries/testzahlungen'
-import {
-  auswertungSummen,
-  grenzeStand,
-  servicegebuehrenSaetze,
-  teilenKarte,
-  teilenZeitraumAus,
-  umsatzKartenTitel,
-} from '@/lib/auswertung'
+import { auswertungSummen, grenzeStand, servicegebuehrenSaetze, teilenKarte, teilenZeitraumAus } from '@/lib/auswertung'
 import { umsatzfenster, type Periode, type Periodenfenster } from '@/lib/umsatz'
 import { PROCESSING_REVENUE_LIMIT, limitProgress } from '@/lib/revenue-limit'
 import { formatEuro } from '@/lib/format'
@@ -102,7 +95,6 @@ export default async function AnalyticsPage({
       <TeilenWirkungKarte karte={teilenKarte(daten.wirkung)} zeitraum={daten.umsatz.zeitraum} />
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
         <UmsatzKarte
-          titel={umsatzKartenTitel(periode)}
           zeitraum={daten.umsatz.zeitraum}
           summeCent={daten.umsatz.summeCent}
           vergleich={daten.umsatz.vergleich}

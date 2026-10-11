@@ -6,12 +6,10 @@ import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getHeute } from '@/server/queries/heute'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
-import { ErsteSchritteKarte } from '@/components/farmer/erste-schritte-karte'
 import { ErsteSchritteSchalter } from '@/components/farmer/erste-schritte-schalter'
 import {
   BrauchtDichKarte,
   HeuteKopf,
-  HofseiteKarte,
   Kennzahlen,
   NaechsteAbholungKarte,
   Packliste,
@@ -19,6 +17,7 @@ import {
   StripeHinweis,
   TeilenKarte,
   WocheKarte,
+  ZuTunKarte,
 } from '@/components/heute/heute-teile'
 import { FreischaltMoment } from '@/components/heute/freischalt-moment'
 import { StartbildschirmKarte } from '@/components/heute/startbildschirm-karte'
@@ -28,6 +27,7 @@ import { freischaltMomentMoeglich } from '@/lib/freischalt-moment'
 import { getTeilenFensterDaten } from '@/server/queries/teilen-bild'
 import { getTeilenWirkung } from '@/server/queries/teilen-wirkung'
 import { letzteTage, teilenWirkungSatz } from '@/lib/teilen-wirkung'
+import { cn } from '@/lib/utils'
 
 export const metadata: Metadata = {
   title: 'Heute — FarmerZone',
@@ -43,10 +43,11 @@ export const metadata: Metadata = {
  * Packliste zuerst: Was wo steht, entscheidet heuteAufbau; Regeln und Zahlen
  * kommen aus src/lib/heute.ts und src/server/queries/heute.ts, hier wird nur
  * angeordnet. Oben höchstens EIN Kasten (Stripe), die Teilen-Zeile kompakt
- * unter der Packliste (freigabe.md §12 Nr. 45). Ab 1280 px zwei Spalten
+ * unter der Packliste (freigabe.md §12 Nr. 45). „Zu tun" ist EINE Liste statt
+ * Erster Schritte und „Deine Hofseite" (Nr. 53). Ab 1280 px zwei Spalten
  * (Hauptspalte links, Seitenspalte 360 px rechts) — bei 1024 px neben der
  * Seitenleiste wäre die Packliste zu schmal, dort steht die Seitenspalte als
- * Raster darunter.
+ * Raster darunter; „Zu tun" geht dort über beide Spalten.
  */
 export default async function HeutePage(): Promise<React.JSX.Element> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -71,9 +72,9 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   ])
 
   // Der Cookie entscheidet auf dem Server, ob die Karte oder die Zeile
-  // „Erste Schritte einblenden" kommt — so blitzt nichts auf und nichts rutscht nach.
-  const ersteSchritteZeigen = ersteSchritteAnzeige(
-    heute.ersteSchritte,
+  // „Zu tun einblenden" kommt — so blitzt nichts auf und nichts rutscht nach.
+  const zuTunZeigen = ersteSchritteAnzeige(
+    heute.zuTun,
     ersteSchritteAusgeblendet(cookieJar.get(ERSTE_SCHRITTE_AUS_COOKIE)?.value, farm.id)
   )
 
@@ -81,9 +82,10 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   const teilen = heute.hof.sichtbar
   const aufbau = heuteAufbau({
     // „pausiert" (Notbremse) oder „einrichten" (Register Z1) — nie beide; der eine Kasten oben, auch über dem Balken der Shell.
-    stripeHinweis: heute.onlinePausiert !== null || heute.stripeEinrichten,
+    // Dieselbe Antwort nimmt die Online-Zahlung aus „Zu tun" (getHeute rechnet sie einmal).
+    stripeHinweis: heute.stripeImKasten,
     teilen,
-    ersteSchritte: ersteSchritteZeigen === 'karte',
+    zuTun: zuTunZeigen === 'karte',
   })
   const satz = teilenSatz(heute.angebot, heute.naechstesFenster?.fenster ?? null)
   // Teilen-Fenster und „letzte Woche … über deine Links" (Nr. 21, Gate 7) —
@@ -109,11 +111,12 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
       />
     ),
     'braucht-dich': <BrauchtDichKarte eintraege={heute.brauchtDich} />,
-    // Bestandskarte mit der Palette --app-*: im Geltungsbereich bekommt sie die Werte des Design-Systems.
-    'erste-schritte': (
-      <div data-app-palette="neu" className="[&>*]:mb-0">
-        <ErsteSchritteKarte ergebnis={heute.ersteSchritte} wartetAufFreigabe={heute.wartetAufFreigabe} />
-      </div>
+    'zu-tun': (
+      <ZuTunKarte
+        aufgaben={heute.zuTun.aufgaben}
+        wartetAufFreigabe={heute.wartetAufFreigabe}
+        ausblenden={<ErsteSchritteSchalter richtung="aus" />}
+      />
     ),
     'naechste-abholung': (
       <NaechsteAbholungKarte fenster={heute.naechstesFenster?.fenster ?? null} anzahl={heute.naechstesFenster?.anzahl ?? 0} />
@@ -125,9 +128,14 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
         balken={heute.wochenBalken}
       />
     ),
-    hofseite: <HofseiteKarte prozent={heute.hofseite.prozent} satz={heute.hofseite.satz} fertig={heute.hofseite.fertig} />,
   }
-  const zeige = (ids: HeuteBlock[]) => ids.map((id) => <div key={id} className="min-w-0">{bloecke[id]}</div>)
+  // „Zu tun" geht im Raster der Seitenspalte (768–1279 px) über beide Spalten — sonst bliebe neben der Woche ein Loch.
+  const zeige = (ids: HeuteBlock[]) =>
+    ids.map((id) => (
+      <div key={id} className={cn('min-w-0', id === 'zu-tun' && 'md:col-span-2 xl:col-span-1')}>
+        {bloecke[id]}
+      </div>
+    ))
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10">
@@ -143,9 +151,9 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
           <div className="flex min-w-0 flex-1 flex-col gap-4 md:gap-5">{zeige(aufbau.haupt)}</div>
           <div className="grid gap-4 md:grid-cols-2 md:gap-5 xl:w-[360px] xl:shrink-0 xl:grid-cols-1">{zeige(aufbau.seite)}</div>
         </div>
-        {ersteSchritteZeigen === 'zeile' && (
-          <p className="text-center" data-app-palette="neu">
-            <ErsteSchritteSchalter richtung="ein" className="px-3" />
+        {zuTunZeigen === 'zeile' && (
+          <p className="text-center">
+            <ErsteSchritteSchalter richtung="ein" />
           </p>
         )}
         {/* Ganz unten (Register N1): „Leg FarmerZone auf den Startbildschirm" —
