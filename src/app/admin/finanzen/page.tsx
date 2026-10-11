@@ -103,7 +103,10 @@ export default async function AdminFinanzenPage({
         />
       </dl>
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)]">
+      {/* grid-cols-1 = eine Spalte minmax(0, 1fr): Ohne sie wüchse die eine Spalte
+          unter lg mit dem längsten nicht umbrechenden Text (Kostenposten mit
+          Notiz) — bei 390 px wischte die Seite seitlich (Nr. 54). */}
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)]">
         <section aria-labelledby="traegt-titel" className={cn(KARTE, 'flex flex-col gap-4 p-4 md:p-[18px]')}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 id="traegt-titel" className="font-heading text-[17px] font-semibold text-foreground">

@@ -145,6 +145,16 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // „Neues Passwort wählen" (Nr. 54): Better Auth leitet den Link aus der
+        // Mail mit einem gültigen Token (?token=) hierher — gleiche Regel wie
+        // /verify: kein Referrer beim Klick hinaus, kein Suchindex.
+        source: '/reset-password',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        ],
+      },
+      {
         // „Anmeldung bestätigen" (Double-Opt-in, S11, Nr. 38): Der Link aus der
         // Mail trägt einen gültigen Token (?token=) — gleiche Regel wie /verify.
         source: '/account/neuigkeiten-bestaetigen',

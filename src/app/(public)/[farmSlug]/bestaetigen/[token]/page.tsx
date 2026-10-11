@@ -11,7 +11,9 @@ import { fristVon, tagInWorten, uhrzeitInWien } from '@/lib/fristen'
 import { zahlungsAnzeige } from '@/lib/bestellstatus'
 import { SERVICEGEBUEHR_BEZEICHNUNG, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
 import { barBestaetigungsTokenSchema } from '@/schemas/bar-bestaetigung'
-import { KundenKopf } from '@/components/shared/kunden-kopf'
+import { cn } from '@/lib/utils'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { BarBestaetigenKnoepfe } from '@/components/checkout/bar-bestaetigen-knoepfe'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 
@@ -31,7 +33,10 @@ export const metadata: Metadata = {
 /**
  * Bar-Bestätigung per Knopf (H3) — Mockups
  * web-k3-bar-bestellung-bestaetigen-link-aus-mail.html und
- * mobil-k3-bar-bestaetigen.html. Fokus-Seite: keine Navigation unten.
+ * mobil-k3-bar-bestaetigen.html. Fokus-Seite: keine Navigation unten; seit
+ * Nr. 54 trägt sie die KundeFokusShell (Kopf „Bestätigen" wie im Mockup
+ * mobil; dazu der Zurück-Pfeil, den die Shell immer hat). Die Shell setzt
+ * die h1, die Überschriften der Seite sind darum h2.
  *
  * Der Aufruf ändert NICHTS: Link-Scanner und Vorschauen der Mailprogramme
  * rufen die Adresse ungefragt auf. Bestätigt wird erst mit dem Knopf
@@ -94,9 +99,9 @@ export default async function BarBestaetigenSeite({ params }: Props) {
           ) : (
             <XCircle className="size-12 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
           )}
-          <h1 className="font-heading text-[22px] font-semibold text-foreground md:text-[28px]">
+          <h2 className="font-heading text-[22px] font-semibold text-foreground md:text-[28px]">
             {ansicht === 'verfallen' ? 'Bestellung verfallen' : 'Bestellung storniert'}
-          </h1>
+          </h2>
           <p className="text-[15px] leading-normal text-muted-foreground">
             {ansicht === 'verfallen'
               ? 'Die Bestellung wurde nicht rechtzeitig bestätigt. Wir haben die Ware wieder freigegeben – dir entstehen keine Kosten.'
@@ -120,9 +125,9 @@ export default async function BarBestaetigenSeite({ params }: Props) {
   return (
     <Rahmen hofSlug={order.farm.slug} hofName={order.farm.name}>
       <div className="flex flex-col items-center gap-2.5 text-center">
-        <h1 className="font-heading text-[22px] font-semibold break-words text-foreground md:text-[28px]">
+        <h2 className="font-heading text-[22px] font-semibold break-words text-foreground md:text-[28px]">
           Bestellung bei {order.farm.name} bestätigen
-        </h1>
+        </h2>
         <p className="text-[15px] leading-normal text-muted-foreground">
           Bitte bestätige bis {tagInWorten(bis, jetzt)}, {uhrzeitInWien(bis)} Uhr – erst dann packt der Hof für dich.
         </p>
@@ -175,16 +180,22 @@ function Zeile({ titel, children }: { titel: string; children: ReactNode }) {
   )
 }
 
-/** Kopf und Spalte der Seite. `data-design="neu"`: Die Seite ist nach den neuen Mockups gebaut. */
+/** Der Kopf der Seite heißt wie im Mockup mobil — die Shell setzt ihn als h1. */
+const TITEL = 'Bestätigen'
+
+/** Die Spalte der Seite (560 px wie im Mockup). */
+const SPALTE = 'mx-auto flex w-full max-w-[560px] flex-col gap-3 px-4 pt-3.5 pb-8 md:gap-[18px] md:pt-[60px]'
+
+/**
+ * Kopf und Spalte der Seite: die Fokus-Shell (`data-design="neu"`). Zurück
+ * führt NIE durch den Verlauf — davor steht das Mailprogramm —, sondern als
+ * Link zum Hof.
+ */
 function Rahmen({ hofSlug, hofName, children }: { hofSlug: string; hofName: string; children: ReactNode }) {
   return (
-    <div data-design="neu" className="min-h-screen bg-background">
-      {/* Zurück führt NIE durch den Verlauf — davor steht das Mailprogramm (kunden-kopf.ts). */}
-      <KundenKopf seite={{ art: 'bestaetigung', hofSlug }} hofName={hofName} />
-      <main className="mx-auto flex w-full max-w-[560px] flex-col gap-3 px-4 pt-3.5 pb-8 md:gap-[18px] md:pt-[60px]">
-        {children}
-      </main>
-    </div>
+    <KundeFokusShell titel={TITEL} zurueck={{ href: `/${hofSlug}`, label: `Zurück zu ${hofName}` }}>
+      <div className={SPALTE}>{children}</div>
+    </KundeFokusShell>
   )
 }
 
@@ -195,21 +206,23 @@ function Rahmen({ hofSlug, hofName, children }: { hofSlug: string; hofName: stri
  */
 function LinkUngueltig() {
   return (
-    <div data-design="neu" className="min-h-screen bg-background">
-      <KundenKopf seite={{ art: 'bestellung-ungueltig' }} />
-      <main className="mx-auto flex w-full max-w-[560px] flex-col items-center gap-2.5 px-4 pt-10 text-center md:pt-[60px]">
+    <KundeFokusShell titel={TITEL} zurueck={{ href: '/hoefe', label: 'Zurück zu den Höfen' }}>
+      <div className="mx-auto flex w-full max-w-[560px] flex-col items-center gap-2.5 px-4 pt-10 pb-8 text-center md:pt-[60px]">
         <LinkIcon className="size-12 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
-        <h1 className="font-heading text-[22px] font-semibold text-foreground md:text-[28px]">Dieser Link gilt nicht mehr</h1>
+        <h2 className="font-heading text-[22px] font-semibold text-foreground md:text-[28px]">Dieser Link gilt nicht mehr</h2>
         <p className="text-[15px] leading-normal text-muted-foreground">
           Hast du schon bestätigt? Dann findest du deine Bestellung in der Bestätigungsmail. Sonst bestell einfach neu.
         </p>
         <Link
           href="/hoefe"
-          className="mt-2 inline-flex h-11 items-center justify-center rounded-full border border-border px-[18px] text-sm font-medium text-foreground hover:bg-muted"
+          className={cn(
+            'mt-2 inline-flex h-11 items-center justify-center rounded-full border border-border px-[18px] text-sm font-medium text-foreground hover:bg-muted',
+            FOKUS_RAHMEN
+          )}
         >
           Höfe entdecken
         </Link>
-      </main>
-    </div>
+      </div>
+    </KundeFokusShell>
   )
 }

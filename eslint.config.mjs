@@ -18,8 +18,6 @@ const KEINE_FARBLITERALE =
   'Keine Farbwerte im Quelltext — Utilities der Tokens aus docs/ai/DESIGN_SYSTEM.md (bg-background, text-foreground, text-status-offen …).'
 const FARBLITERAL_BESTAND = [
   'src/emails/**',
-  'src/app/(auth)/forgot-password/page.tsx',
-  'src/app/(auth)/reset-password/page.tsx',
   // Eckige Klammern sind im Muster Zeichenklassen — für den Ordner [id] maskieren.
   'src/app/api/status-image/\\[id\\]/route.tsx',
   'src/app/layout.tsx',

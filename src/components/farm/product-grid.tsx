@@ -90,8 +90,7 @@ type Props = {
 
 // Produktpreise kommen aus src/lib/format.ts (formatGrundpreis + Grundpreis-
 // Zeile), damit Hofübersicht, Warenkorb und Bauern-Bereich dieselbe Schreib-
-// weise zeigen. Nur die Warenkorb-Summe nutzt noch formatEuro aus
-// preis-format.ts (Altlast, Symbol hinten).
+// weise zeigen. Die Warenkorb-Summe nimmt formatEuro aus derselben Datei.
 
 function SeasonBadge({ start, end }: { start: number; end: number }) {
   const s = MONTH_SHORT[start - 1]

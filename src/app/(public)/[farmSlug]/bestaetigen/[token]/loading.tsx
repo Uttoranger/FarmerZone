@@ -1,6 +1,7 @@
 /**
  * Ladeansicht der Bar-Bestätigung. Maße aus
- * src/app/(public)/[farmSlug]/bestaetigen/[token]/page.tsx: Spalte max. 560 px,
+ * src/app/(public)/[farmSlug]/bestaetigen/[token]/page.tsx: Kopf der
+ * Fokus-Shell (52 px, ab md 64 px, seit Nr. 54), Spalte max. 560 px,
  * Überschrift mit Frist, die Karte mit Positionen und Summe, darunter der
  * große Knopf und der Textknopf. Wer aus der Mail kommt, sieht sofort, dass
  * die Bestellung gleich erscheint — nicht eine leere Seite.
@@ -13,7 +14,7 @@ export default function BarBestaetigenLaden() {
       aria-busy="true"
       aria-label="Bestellung wird geladen"
     >
-      <div className="h-14 border-b border-border bg-card md:h-16" />
+      <div className="h-[52px] border-b border-border bg-background md:h-16" />
 
       <main className="mx-auto flex w-full max-w-[560px] flex-col gap-3 px-4 pt-3.5 pb-8 md:gap-[18px] md:pt-[60px]">
         {/* Überschrift und Frist */}

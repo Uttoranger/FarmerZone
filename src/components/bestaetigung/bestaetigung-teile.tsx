@@ -12,7 +12,9 @@ import type { BestaetigungsKopf, BestellSchritt } from '@/lib/bestaetigung'
  * Bausteine der Bestätigungsseite /{hof}/confirm/{id} (Nr. 13). Mockups:
  * web-k3-bestaetigung-online-mit-erzaehl-s-weiter, web-k3-bar-wartet-auf-
  * bestaetigung, mobil-k3-bestaetigung. Sie zeigen nur an — was in welchem
- * Zustand erscheint, entscheidet src/lib/bestaetigung.ts.
+ * Zustand erscheint, entscheidet src/lib/bestaetigung.ts. Seit Nr. 54 baut
+ * auch die Bestellseite /{hof}/bestellung/{id} aus ihnen (Karte, Positionen,
+ * Knöpfe): dieselbe Bestellung sieht an beiden Stellen gleich aus.
  */
 
 export const KARTE = 'rounded-2xl border border-border bg-card px-4 py-4 md:px-[18px]'

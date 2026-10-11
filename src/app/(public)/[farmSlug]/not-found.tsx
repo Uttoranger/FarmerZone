@@ -1,14 +1,12 @@
-import Link from 'next/link'
 import type { Metadata } from 'next'
-import { Search } from 'lucide-react'
-import { KundenKopf } from '@/components/shared/kunden-kopf'
 import {
   HOEFE_ENTDECKEN,
   HOF_NICHT_GEFUNDEN_TEXT,
   HOF_NICHT_GEFUNDEN_TITEL,
   ZUR_STARTSEITE,
 } from '@/lib/fehlerseite'
-import { SUCHTEXT_MAX, SUCHTEXT_PARAMETER } from '@/schemas/hoefe-filter'
+import { NichtGefundenAnsicht } from '@/components/shared/nicht-gefunden-ansicht'
+import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 
 export const metadata: Metadata = {
   title: 'Hof nicht gefunden — FarmerZone',
@@ -30,63 +28,20 @@ export const metadata: Metadata = {
  * Deshalb behauptet der Text keinen Grund („vielleicht … oder …"): Warum ein
  * Hof nicht mehr da ist, ist seine Sache. Der primäre Weg ist hier nicht die
  * Startseite, sondern die Hofübersicht — wer einen Hof sucht, sucht einen Hof.
+ *
+ * Seit Nr. 54 in der KundeShell, dieselbe Ansicht wie die 404 des Hauses
+ * (Mockups fehler-404-*), nur mit den Hof-Texten und der Hofübersicht zuerst.
  */
 export default function HofNichtGefunden() {
   return (
-    <div className="min-h-screen bg-background">
-      <KundenKopf seite={{ art: 'info' }} />
-
-      <main className="mx-auto max-w-xl px-4 py-14 sm:py-20">
-        <h1 className="font-heading text-2xl font-semibold text-balance text-foreground sm:text-3xl">
-          {HOF_NICHT_GEFUNDEN_TITEL}
-        </h1>
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
-          {HOF_NICHT_GEFUNDEN_TEXT}
-        </p>
-
-        <form action="/hoefe" method="get" role="search" className="mt-8">
-          <label htmlFor="hof-nicht-gefunden-suche" className="mb-1.5 block text-sm font-medium text-foreground">
-            Hof oder Produkt suchen
-          </label>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="relative flex-1">
-              <Search
-                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-                aria-hidden="true"
-              />
-              <input
-                id="hof-nicht-gefunden-suche"
-                type="search"
-                name={SUCHTEXT_PARAMETER}
-                maxLength={SUCHTEXT_MAX}
-                placeholder="z. B. Eier, Heu, Wiesenhof"
-                className="min-h-11 w-full rounded-xl border border-border bg-card pr-3 pl-9 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              />
-            </div>
-            <button
-              type="submit"
-              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/40"
-            >
-              Suchen
-            </button>
-          </div>
-        </form>
-
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <Link
-            href="/hoefe"
-            className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-          >
-            {HOEFE_ENTDECKEN}
-          </Link>
-          <Link
-            href="/"
-            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/40"
-          >
-            {ZUR_STARTSEITE}
-          </Link>
-        </div>
-      </main>
-    </div>
+    <KundeShellMitSitzung>
+      <NichtGefundenAnsicht
+        titel={HOF_NICHT_GEFUNDEN_TITEL}
+        text={HOF_NICHT_GEFUNDEN_TEXT}
+        haupt={{ href: '/hoefe', text: HOEFE_ENTDECKEN }}
+        neben={{ href: '/', text: ZUR_STARTSEITE }}
+        suchfeldId="hof-nicht-gefunden-suche"
+      />
+    </KundeShellMitSitzung>
   )
 }

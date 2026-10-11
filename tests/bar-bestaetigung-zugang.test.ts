@@ -146,6 +146,37 @@ async function seite(token = TOKEN, farmSlug = 'hof-test'): Promise<string> {
   return elementText(await BestaetigenSeite({ params: Promise.resolve({ farmSlug, token }) }))
 }
 
+/**
+ * Alle Links eines Server-Elementbaums mit Ziel und Namen (Muster aus
+ * tests/bestellverfolgung-zugang.test.ts): Funktions-Komponenten ohne Hooks
+ * werden aufgerufen — die Fokus-Shell rendert so ihren Zurück-Link —, sonst
+ * zählt die `href`-Prop. Ein Link nur mit Symbol heißt nach `aria-label`.
+ */
+async function elementLinks(el: unknown): Promise<Array<{ href: string; text: string }>> {
+  if (el == null || typeof el !== 'object') return []
+  if (Array.isArray(el)) {
+    const alle: Array<{ href: string; text: string }> = []
+    for (const kind of el) alle.push(...(await elementLinks(kind)))
+    return alle
+  }
+  const element = el as { type?: unknown; props?: { children?: unknown; href?: unknown; 'aria-label'?: unknown } }
+  if (!element.props) return []
+  if (typeof element.type === 'function') {
+    try {
+      return await elementLinks(await (element.type as (p: unknown) => unknown)(element.props))
+    } catch {
+      // Komponente braucht React-Kontext (Hooks) — dann zählt ihre href-Prop.
+    }
+  }
+  const name = (await elementText(element.props.children)).trim() || String(element.props['aria-label'] ?? '')
+  const eigener = typeof element.props.href === 'string' ? [{ href: element.props.href, text: name }] : []
+  return [...eigener, ...(await elementLinks(element.props.children))]
+}
+
+async function seitenLinks(token = TOKEN, farmSlug = 'hof-test') {
+  return elementLinks(await BestaetigenSeite({ params: Promise.resolve({ farmSlug, token }) }))
+}
+
 function formular(token: unknown = TOKEN): FormData {
   const daten = new FormData()
   if (typeof token === 'string') daten.set('token', token)
@@ -305,6 +336,53 @@ describe('Seite /{hof}/bestaetigen/{token}', () => {
   it('steht in keinem Suchindex und gibt keinen Referrer weiter', () => {
     expect(metadata.robots).toEqual({ index: false, follow: false })
     expect(metadata.referrer).toBe('no-referrer')
+  })
+})
+
+describe('Seite /{hof}/bestaetigen/{token} — ohne gültigen Token führt der Weg zu den Höfen', () => {
+  /**
+   * Ohne gültigen Token ist nicht einmal der Hof bestätigt: Der Kopf
+   * („Zurück zu den Höfen") und der Knopf führen nach /hoefe — nie nach
+   * /{farmSlug} aus der ungeprüften Adresse und nie zum Hof der Bestellung
+   * (das verriete, wem der Token gehört). Bis Nr. 54 hielt das die Art
+   * `bestellung-ungueltig` in src/lib/kunden-kopf.ts fest; jetzt rendert der
+   * Test die echte Seite.
+   */
+  function erwarteAusweg(links: Array<{ href: string; text: string }>) {
+    expect(links).toContainEqual({ href: '/hoefe', text: 'Zurück zu den Höfen' })
+    expect(links).toContainEqual({ href: '/hoefe', text: 'Höfe entdecken' })
+    for (const link of links) {
+      expect(link.href, link.text).not.toMatch(/fremder-hof|hof-test/)
+    }
+  }
+
+  it('Token in falscher Form', async () => {
+    erwarteAusweg(await seitenLinks('a b', 'fremder-hof'))
+  })
+
+  it('unbekannter Token', async () => {
+    findUnique.mockResolvedValue(null as never)
+    erwarteAusweg(await seitenLinks(TOKEN, 'fremder-hof'))
+  })
+
+  it('fremder Hof in der Adresse', async () => {
+    erwarteAusweg(await seitenLinks(TOKEN, 'fremder-hof'))
+  })
+
+  it('stillgelegter Hof', async () => {
+    findUnique.mockResolvedValue(bestellung({ farm: { ...bestellung().farm, archivedAt: new Date('2026-01-01') } }) as never)
+    erwarteAusweg(await seitenLinks())
+  })
+
+  it('eine Online-Bestellung mit Token (Ansicht „ungueltig")', async () => {
+    findUnique.mockResolvedValue(bestellung({ paymentMethod: 'ONLINE' }) as never)
+    erwarteAusweg(await seitenLinks())
+  })
+
+  it('Gegenprobe: offen führt der Kopf zum Hof der Bestellung — die Suche findet auch den Zurück-Link der Shell', async () => {
+    const links = await seitenLinks()
+    expect(links).toContainEqual({ href: '/hof-test', text: 'Zurück zu Hof Test' })
+    expect(links).not.toContainEqual({ href: '/hoefe', text: 'Zurück zu den Höfen' })
   })
 })
 

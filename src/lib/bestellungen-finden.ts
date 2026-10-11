@@ -173,6 +173,15 @@ const TON: Record<OrderStatus, BestellTon> = {
   NOT_PICKED_UP: 'neutral',
 }
 
+/**
+ * Der Ton der Status-Marke einer Bestellung — für die Liste hier und für die
+ * Bestellseite (/{hof}/bestellung/{id}, seit Nr. 54 im neuen Design), damit
+ * dieselbe Bestellung an beiden Stellen dieselbe Farbe trägt.
+ */
+export function bestellTon(status: OrderStatus): BestellTon {
+  return TON[status] ?? 'neutral'
+}
+
 // Fester Wortlaut statt Intl „short": je nach ICU-Stand stünde „Sept." oder „Sep.".
 const MONAT_KURZ = ['Jän.', 'Feb.', 'März', 'Apr.', 'Mai', 'Juni', 'Juli', 'Aug.', 'Sep.', 'Okt.', 'Nov.', 'Dez.'] as const
 
@@ -211,7 +220,7 @@ export function bestellEintrag(b: ListenBestellung, jetzt: Date, laufend: boolea
     hofName: b.hofName,
     bestellnummer: b.bestellnummer,
     marke: bestellStatusAnzeige(b.status, '', b.paymentMethod).marke,
-    ton: TON[b.status] ?? 'neutral',
+    ton: bestellTon(b.status),
     wann: laufend ? abholZeitText(b, jetzt) : kurzesDatum(b.pickupDate, jetzt),
     betrag: formatEuro(centsAlsEuro(b.gesamtCents)),
     zahlung: `${zahlung.art} · ${zahlung.zustand}`,

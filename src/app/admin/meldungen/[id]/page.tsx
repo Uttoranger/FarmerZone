@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import { getMeldungDetail, getMeldungNachbarn, type AdminMeldungDetail } from '@/server/queries/meldung'
 import { MELDUNG_ART_LABEL, kiBegruendung, kurznummer, prLink } from '@/lib/meldung'
-import { MELDUNG_ART_TON, geraetKurz } from '@/lib/hof-hilfe'
+import { MELDUNG_ART_TON, OHNE_IP_UND_COOKIES, geraetKurz } from '@/lib/hof-hilfe'
 import { ADMIN_STATUS_TON, BRIEFKASTEN_HREF, adminStatusText, bildschirmText } from '@/lib/admin-briefkasten'
 import { seitenPfad } from '@/lib/fremdtext'
 import { wienKalendertag } from '@/lib/kalender'
@@ -188,7 +188,7 @@ export default async function AdminMeldungDetailPage({ params }: { params: Promi
               <dt className={LEISE}>Kennung</dt>
               <dd className="font-mono text-[12.5px] break-all text-muted-foreground">{m.id}</dd>
             </dl>
-            <p className={cn('mt-2 text-[12.5px]', LEISE)}>Keine IP-Adresse, keine Cookies.</p>
+            <p className={cn('mt-2 text-[12.5px]', LEISE)}>{OHNE_IP_UND_COOKIES}</p>
           </section>
         </div>
 

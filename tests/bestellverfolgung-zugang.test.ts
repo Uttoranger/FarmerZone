@@ -21,6 +21,7 @@ import { NextRequest } from 'next/server'
 import { GET } from '@/app/(public)/[farmSlug]/bestellung/[orderId]/kalender/route'
 import BestellungPage from '@/app/(public)/[farmSlug]/bestellung/[orderId]/page'
 import { bestellSignatur } from '@/lib/bestell-link'
+import { SERVICEGEBUEHR_BEZEICHNUNG, bestellSummen } from '@/lib/servicegebuehr'
 import { prisma } from '@/lib/prisma'
 
 const findUnique = vi.mocked(prisma.order.findUnique)
@@ -97,6 +98,43 @@ async function seite(orderId: string, s: string | undefined, farmSlug = 'hof-pro
     searchParams: Promise.resolve({ s }),
   })
   return elementText(element)
+}
+
+/**
+ * Alle Links eines Server-Elementbaums mit Ziel und sichtbarem Text — wie
+ * elementText: Funktions-Komponenten ohne Hooks werden aufgerufen (dann
+ * zählt der Link, den sie rendern); wo das nicht geht (next/link), zählt die
+ * `href`-Prop des Elements selbst.
+ */
+async function elementLinks(el: unknown): Promise<Array<{ href: string; text: string }>> {
+  if (el == null || typeof el !== 'object') return []
+  if (Array.isArray(el)) {
+    const alle: Array<{ href: string; text: string }> = []
+    for (const kind of el) alle.push(...(await elementLinks(kind)))
+    return alle
+  }
+  const element = el as { type?: unknown; props?: { children?: unknown; href?: unknown } }
+  if (!element.props) return []
+  if (typeof element.type === 'function') {
+    try {
+      return await elementLinks(await (element.type as (p: unknown) => unknown)(element.props))
+    } catch {
+      // Komponente braucht React-Kontext (Hooks) — dann zählt ihre href-Prop.
+    }
+  }
+  const eigener =
+    typeof element.props.href === 'string'
+      ? [{ href: element.props.href, text: (await elementText(element.props.children)).trim() }]
+      : []
+  return [...eigener, ...(await elementLinks(element.props.children))]
+}
+
+async function seitenLinks(orderId: string, s: string | undefined, farmSlug = 'hof-probe') {
+  const element = await BestellungPage({
+    params: Promise.resolve({ farmSlug, orderId }),
+    searchParams: Promise.resolve({ s }),
+  })
+  return elementLinks(element)
 }
 
 beforeEach(() => {
@@ -220,6 +258,117 @@ describe('Bestellseite — die Signatur wird an der Seite selbst durchgesetzt', 
     const html = await seite('order-1', bestellSignatur('order-1'))
     expect(html).toContain('Dieser Link ist nicht gültig')
     expect(html).not.toContain('HM-2611')
+  })
+})
+
+describe('Bestellseite — der Ausweg bei ungültigem Link führt zur Hofübersicht', () => {
+  /**
+   * Ohne gültigen Link ist nicht einmal der Hof bestätigt: Der Ausweg führt
+   * nach /hoefe, nie nach /{farmSlug} aus der ungeprüften Adresse — und nie
+   * zum echten Hof der Bestellung (das verriete, wem sie gehört). Bis Nr. 54
+   * hielt das die Art `bestellung-ungueltig` in src/lib/kunden-kopf.ts fest.
+   */
+  function erwarteAusweg(links: Array<{ href: string; text: string }>) {
+    expect(links).toContainEqual({ href: '/hoefe', text: 'Zur Hofübersicht' })
+    for (const link of links) {
+      expect(link.href, link.text).not.toMatch(/fremder-hof|hof-probe/)
+    }
+  }
+
+  it('falsche Signatur', async () => {
+    erwarteAusweg(await seitenLinks('order-1', 'f'.repeat(64), 'fremder-hof'))
+  })
+
+  it('ohne Signatur', async () => {
+    erwarteAusweg(await seitenLinks('order-1', undefined, 'fremder-hof'))
+  })
+
+  it('gültige Signatur, aber die Bestellung gibt es nicht', async () => {
+    findUnique.mockResolvedValue(null as never)
+    erwarteAusweg(await seitenLinks('order-1', bestellSignatur('order-1'), 'fremder-hof'))
+  })
+
+  it('gültige Signatur, aber ein fremder Hof in der Adresse', async () => {
+    findUnique.mockResolvedValue(bestellung() as never)
+    erwarteAusweg(await seitenLinks('order-1', bestellSignatur('order-1'), 'fremder-hof'))
+  })
+
+  it('stillgelegter Hof', async () => {
+    findUnique.mockResolvedValue(bestellung({ farm: { ...bestellung().farm, archivedAt: new Date('2026-01-01') } }) as never)
+    erwarteAusweg(await seitenLinks('order-1', bestellSignatur('order-1')))
+  })
+
+  it('Gegenprobe: mit gültigem Link führt „Zum Hof" zum Hof der Bestellung — die Suche findet Links', async () => {
+    findUnique.mockResolvedValue(bestellung() as never)
+    const links = await seitenLinks('order-1', bestellSignatur('order-1'))
+    expect(links).toContainEqual({ href: '/hof-probe', text: 'Zum Hof' })
+    expect(links).not.toContainEqual({ href: '/hoefe', text: 'Zur Hofübersicht' })
+  })
+})
+
+describe('Bestellseite — die angezeigten Beträge (Nr. 54: Bausteine der Bestätigung)', () => {
+  /**
+   * Die Seite zeigt seit Nr. 54 die Positionen wie /confirm: Zeilen aus dem
+   * Snapshot, die Servicegebühr als eigene Zeile und als Summe den Betrag aus
+   * bestellSummen (Warenpreis + Gebühr, in Cent). Das Beispiel ist von Hand
+   * gerechnet: 12,34 + 3,21 = 15,55 € Ware, 0,49 € Gebühr, 16,04 € gesamt.
+   */
+  const BEISPIEL = {
+    totalAmount: '15.55',
+    serviceFeeCents: 49,
+    serviceFeeRefundedAt: null,
+    items: [
+      { productName: 'Bergkäse', quantity: 1, unitPrice: '12.34', totalPrice: '12.34', fehltSeit: null, product: { unit: 'KG', unitSize: null } },
+      { productName: 'Heumilch', quantity: 3, unitPrice: '1.07', totalPrice: '3.21', fehltSeit: null, product: { unit: 'LITER', unitSize: null } },
+    ],
+  }
+
+  it('die Summe kommt aus bestellSummen — in Cent', () => {
+    expect(bestellSummen(BEISPIEL)).toEqual({ warenpreisCents: 1555, gebuehrCents: 49, gesamtCents: 1604 })
+  })
+
+  it('Positionen, Servicegebühr und Summe stehen so auf der Seite', async () => {
+    findUnique.mockResolvedValue(bestellung(BEISPIEL) as never)
+    const text = await seite('order-1', bestellSignatur('order-1'))
+    expect(text).toContain('€ 12,34')
+    expect(text).toContain('€ 3,21')
+    // Betrag direkt hinter seiner Bezeichnung: die Gebühr und die Summe mit Zahlart und Stand.
+    expect(text).toContain(`${SERVICEGEBUEHR_BEZEICHNUNG}€ 0,49`)
+    expect(text).toContain('Online · Bezahlt€ 16,04')
+    // Keine zweite, abweichende Summe (früher „Zwischensumme" und „Gesamt").
+    expect(text).not.toContain('Zwischensumme')
+    expect(text.match(/€ \d+,\d{2}/g)).toEqual(['€ 12,34', '€ 3,21', '€ 0,49', '€ 16,04'])
+  })
+
+  it('die Summe kommt aus dem gespeicherten Warenpreis, nie aus den Positionen', async () => {
+    // Im Datenmodell fallen beide nicht auseinander: „Artikel fehlt" setzt
+    // totalAmount auf den Warenpreis ohne die fehlende Position. Der Test
+    // trennt sie absichtlich, damit sichtbar bleibt, woher die Summe kommt —
+    // aus dem Snapshot der Bestellung (bestellSummen, CODING_STANDARDS §2),
+    // nicht aus einer Summe über die Zeilen.
+    findUnique.mockResolvedValue(bestellung({ ...BEISPIEL, totalAmount: '15.00' }) as never)
+    const text = await seite('order-1', bestellSignatur('order-1'))
+    expect(text).toContain('€ 12,34')
+    expect(text).toContain('€ 3,21')
+    // 1500 + 49 Cent — nicht 1555 + 49 aus den Zeilen.
+    expect(text).toContain('Online · Bezahlt€ 15,49')
+    expect(text).not.toContain('€ 16,04')
+  })
+
+  it('eine fehlende Position steht da, kostet aber nichts — die Summe bleibt die der Bestellung', async () => {
+    findUnique.mockResolvedValue(
+      bestellung({
+        ...BEISPIEL,
+        // Der Hof hat die Heumilch als fehlend gemeldet; totalAmount ist schon ohne sie gespeichert.
+        totalAmount: '12.34',
+        items: [BEISPIEL.items[0], { ...BEISPIEL.items[1], fehltSeit: new Date('2026-09-03T08:00:00Z') }],
+      }) as never
+    )
+    const text = await seite('order-1', bestellSignatur('order-1'))
+    expect(text).toContain('fehlt leider')
+    expect(text).toContain('nicht berechnet')
+    expect(text).not.toContain('€ 3,21')
+    expect(text).toContain('Online · Bezahlt€ 12,83')
   })
 })
 
