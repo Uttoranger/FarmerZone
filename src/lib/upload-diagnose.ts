@@ -125,7 +125,12 @@ const NETZFEHLER_TEXTE = new Set([
   'terminated', // Node (undici)
 ])
 
-function istNetzfehler(fehler: unknown): boolean {
+/**
+ * Ein abgerissener Request — nach den Wortlauten oben. Auch die Formulare von
+ * Mein Hof fragen das (abschnitt-speichern.ts): Ein Funkloch beim Speichern
+ * ist dort nur eine Brotkrume für Sentry, kein Befund.
+ */
+export function istNetzfehler(fehler: unknown): boolean {
   return fehler instanceof Error && fehler.name === 'TypeError' && NETZFEHLER_TEXTE.has(fehler.message)
 }
 
@@ -317,7 +322,7 @@ export function befundVon(fehler: unknown, verborgen: readonly string[] = []): A
 }
 
 /** Ein Fehlername, wie Browser ihn setzen — alles andere könnte etwas tragen. */
-const BEZEICHNER = /^[A-Za-z][A-Za-z0-9_]{0,59}$/
+export const BEZEICHNER = /^[A-Za-z][A-Za-z0-9_]{0,59}$/
 
 /**
  * Klasse und bereinigte Nachricht eines Lesefehlers. Anders als befundVon

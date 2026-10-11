@@ -1,6 +1,8 @@
+import * as Sentry from '@sentry/nextjs'
 import { ladeAuftrittStand, saveAppearanceAction } from '@/server/actions/appearance'
 import { ladeProfilStand, updateProfile } from '@/server/actions/farm'
 import { ABSCHNITT_SPEICHERN_TEXT, auftrittMitTeil, profilMitTeil, type AuftrittTeil, type ProfilTeil } from '@/lib/abschnitt-stand'
+import { BEZEICHNER, befundVon, istNetzfehler } from '@/lib/upload-diagnose'
 
 /*
  * Der EINE Speicherweg der Abschnitte von Mein Hof (Nachtlauf Nr. 50,
@@ -55,17 +57,51 @@ function nacheinander(arbeit: () => Promise<{ error?: string }>): Promise<{ erro
 }
 
 /**
+ * Meldet eine gescheiterte Anfrage an Sentry. Früher tat das die Fehlergrenze
+ * (app/error.tsx); seit die Formulare nicht mehr dorthin werfen, sähe Sentry
+ * sonst weder die nach einem Deploy unbekannte Aktion
+ * (UnrecognizedActionError) noch einen Fehler im eigenen Code.
+ *
+ * Nur die Art, nie die Eingabe: fester Text, die Klasse als Name, die
+ * Nachricht bereinigt (bereinigeFehlerText nimmt Adressen, Pfade,
+ * E-Mail-Adressen und Kennungen heraus — auch die Kennung der Aktion). Die
+ * Klasse geht ungefiltert mit (bereinigeEreignis sichtet den Typ nicht),
+ * darum nur, wenn sie wie ein Name aussieht. Formularwerte stehen weder im
+ * Fehler noch hier.
+ *
+ * Ein Netzabbruch (Funkloch) ist kein Befund, nur eine Brotkrume: Sie reist
+ * mit, falls danach etwas Echtes gemeldet wird. Wirft nie — der Bauer bekommt
+ * seinen Satz auch, wenn Sentry selbst scheitert.
+ */
+function meldeGescheitertesSpeichern(fehler: unknown): void {
+  try {
+    const { klasse, meldung } = befundVon(fehler)
+    const name = BEZEICHNER.test(klasse) ? klasse : 'Unbekannt'
+    if (istNetzfehler(fehler)) {
+      Sentry.addBreadcrumb({ category: 'mein-hof', level: 'warning', message: 'Speichern: Verbindung abgebrochen', data: { klasse: name } })
+      return
+    }
+    const ereignis = new Error('Mein Hof: Speichern gescheitert')
+    ereignis.name = name
+    Sentry.captureException(ereignis, { level: 'error', tags: { bereich: 'mein-hof-speichern', klasse: name }, extra: { fehlertext: meldung } })
+  } catch {
+    // Absichtlich leer: Telemetrie scheitert leise, der Satz für den Bauern kommt trotzdem.
+  }
+}
+
+/**
  * Ein Speichern, das nie wirft — für die Formulare der Abschnitte: Der Satz
  * der Aktion bzw. bei einer gescheiterten Anfrage (Netz weg, Aktion nach
  * einem Deploy unbekannt) `ABSCHNITT_SPEICHERN_TEXT.gingNicht`, sonst null.
- * Geworfen ginge es an die Fehlergrenze, und die Eingabe wäre weg. Ein Fehler
- * auf dem Server ist dort schon bei Sentry; hier geht es nur um den Satz.
+ * Geworfen ginge es an die Fehlergrenze, und die Eingabe wäre weg. Sentry
+ * bekommt die gescheiterte Anfrage trotzdem (meldeGescheitertesSpeichern).
  */
 export async function speichernOhneWurf(speichern: () => Promise<{ error?: string }>): Promise<string | null> {
   try {
     const antwort = await speichern()
     return antwort.error ?? null
-  } catch {
+  } catch (fehler) {
+    meldeGescheitertesSpeichern(fehler)
     return ABSCHNITT_SPEICHERN_TEXT.gingNicht
   }
 }

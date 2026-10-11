@@ -15,6 +15,9 @@
  *    doch zurück, läuft das nächste wieder normal.
  *  - Die Formulare zeigen jeden Fehler als Satz, auch eine gescheiterte
  *    Anfrage (speichernOhneWurf) — statt der Fehlerseite, die Eingabe bleibt.
+ *  - Sentry sieht die gescheiterte Anfrage trotzdem (Runde 2): Klasse und
+ *    bereinigte Nachricht, nie Formularwerte; ein Netzabbruch nur als
+ *    Brotkrume; scheitert Sentry selbst, kommt der Satz trotzdem.
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -35,6 +38,8 @@ vi.mock('@/server/actions/farm', () => ({
   ladeProfilStand: aktion.ladeProfilStand,
   updateProfile: aktion.updateProfile,
 }))
+const sentry = vi.hoisted(() => ({ captureException: vi.fn(), addBreadcrumb: vi.fn() }))
+vi.mock('@sentry/nextjs', () => sentry)
 
 const STAND: AuftrittStand = { tagline: 'Alt', foundedYear: null, aboutText: 'Über uns von früher', sectionsConfig: [], farmValues: [] }
 const PROFIL = {
@@ -177,5 +182,93 @@ describe('Fehler im Formular statt Fehlerseite (speichernOhneWurf)', () => {
     expect(formulare).toMatch(/const satz = await speichernOhneWurf\(speichern\)\s*if \(satz\) \{\s*setFehler\(satz\)/)
     // Gegenprobe: der alte Weg (ein Wurf ginge an die Fehlergrenze) steht nicht mehr da.
     expect(formulare).not.toMatch(/const antwort = await speichern\(\)/)
+  })
+})
+
+describe('Sentry sieht die gescheiterte Anfrage (speichernOhneWurf)', () => {
+  /** So wirft Next.js, wenn die Aktion nach einem Deploy unbekannt ist (server-action-reducer). */
+  function aktionUnbekannt(): Error {
+    const fehler = new Error(
+      'Server Action "7f2c9d1e4b3a59687c0d1e2f3a4b5c6d7e8f9a0b1c" was not found on the server. \nRead more: https://nextjs.org/docs/messages/failed-to-find-server-action'
+    )
+    fehler.name = 'UnrecognizedActionError'
+    return fehler
+  }
+
+  it('meldet Klasse und bereinigte Nachricht — ohne Kennung der Aktion, ohne Adresse', async () => {
+    const { speichernOhneWurf } = await speicherweg()
+    await expect(speichernOhneWurf(() => Promise.reject(aktionUnbekannt()))).resolves.toBe(ABSCHNITT_SPEICHERN_TEXT.gingNicht)
+
+    expect(sentry.captureException).toHaveBeenCalledTimes(1)
+    const [ereignis, kontext] = sentry.captureException.mock.calls[0]
+    expect(ereignis).toBeInstanceOf(Error)
+    expect(ereignis.name).toBe('UnrecognizedActionError')
+    expect(ereignis.message).toBe('Mein Hof: Speichern gescheitert')
+    expect(kontext).toEqual({
+      level: 'error',
+      tags: { bereich: 'mein-hof-speichern', klasse: 'UnrecognizedActionError' },
+      extra: { fehlertext: expect.stringContaining('was not found on the server') },
+    })
+    expect(kontext.extra.fehlertext).not.toContain('7f2c9d1e4b3a59687c0d1e2f3a4b5c6d7e8f9a0b1c')
+    expect(kontext.extra.fehlertext).not.toContain('https://')
+    expect(sentry.addBreadcrumb).not.toHaveBeenCalled()
+  })
+
+  it('nie Formularwerte — auch nicht, wenn der Fehler aus dem Speichern mit ihnen kommt', async () => {
+    const { speichernOhneWurf } = await speicherweg()
+    const formular = { email: 'hof-27@example.com', phone: '+43 660 0000000', address: 'Musterweg 1' }
+    // Ein Programmierfehler ist auch ein TypeError — aber kein Netzabbruch: Er wird gemeldet.
+    const geworfen = speichernOhneWurf(async () => {
+      throw new TypeError(`Cannot read properties of undefined (reading 'trim') bei ${formular.email}`)
+    })
+    await expect(geworfen).resolves.toBe(ABSCHNITT_SPEICHERN_TEXT.gingNicht)
+
+    expect(sentry.captureException).toHaveBeenCalledTimes(1)
+    const gesendet = JSON.stringify(sentry.captureException.mock.calls[0], (_schluessel, wert) =>
+      wert instanceof Error ? { name: wert.name, message: wert.message } : wert
+    )
+    expect(gesendet).toContain('TypeError')
+    expect(gesendet).toContain('[e-mail]')
+    for (const wert of Object.values(formular)) expect(gesendet).not.toContain(wert)
+  })
+
+  it('ein Netzabbruch ist nur eine Brotkrume, kein Befund', async () => {
+    const { speichernOhneWurf } = await speicherweg()
+    await expect(speichernOhneWurf(() => Promise.reject(new TypeError('Failed to fetch')))).resolves.toBe(ABSCHNITT_SPEICHERN_TEXT.gingNicht)
+
+    expect(sentry.captureException).not.toHaveBeenCalled()
+    expect(sentry.addBreadcrumb).toHaveBeenCalledTimes(1)
+    expect(sentry.addBreadcrumb).toHaveBeenCalledWith({
+      category: 'mein-hof',
+      level: 'warning',
+      message: 'Speichern: Verbindung abgebrochen',
+      data: { klasse: 'TypeError' },
+    })
+  })
+
+  it('scheitert Sentry selbst, kommt der Satz trotzdem', async () => {
+    const { speichernOhneWurf } = await speicherweg()
+    sentry.captureException.mockImplementationOnce(() => {
+      throw new Error('Sentry kaputt')
+    })
+    await expect(speichernOhneWurf(() => Promise.reject(aktionUnbekannt()))).resolves.toBe(ABSCHNITT_SPEICHERN_TEXT.gingNicht)
+  })
+
+  it('ein Satz der Aktion ist kein Fehler — Sentry bleibt still', async () => {
+    const { speichernOhneWurf } = await speicherweg()
+    await speichernOhneWurf(async () => ({ error: ABSCHNITT_SPEICHERN_TEXT.nichtAngemeldet }))
+    await speichernOhneWurf(async () => ({}))
+    expect(sentry.captureException).not.toHaveBeenCalled()
+    expect(sentry.addBreadcrumb).not.toHaveBeenCalled()
+  })
+
+  it('eine Klasse, die nicht wie ein Name aussieht, geht nicht mit', async () => {
+    const { speichernOhneWurf } = await speicherweg()
+    const fehler = new Error('kaputt')
+    fehler.name = 'hof-27@example.com'
+    await speichernOhneWurf(() => Promise.reject(fehler))
+    const [ereignis, kontext] = sentry.captureException.mock.calls[0]
+    expect(ereignis.name).toBe('Unbekannt')
+    expect(kontext.tags.klasse).toBe('Unbekannt')
   })
 })
