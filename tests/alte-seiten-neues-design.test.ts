@@ -168,6 +168,29 @@ describe('Kontrast und Touch-Ziele (Befunde der Axe-Prüfung)', () => {
   })
 })
 
+describe('Ladeansicht der Bestellseite — dieselben Karten wie die Seite', () => {
+  const SEITE = 'src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx'
+  const LADEN = 'src/app/(public)/[farmSlug]/bestellung/[orderId]/loading.tsx'
+  /** Der Kopf der Seite ist seit dem Axe-Befund eine Karte (b98c13a). */
+  const KOPF_KARTE = "className={cn(KARTE, 'flex flex-col gap-2')}"
+
+  it('der Kopf steht im Skeleton als dieselbe Karte wie auf der Seite — beim Umschalten springt nichts', () => {
+    const seite = lies(SEITE)
+    const laden = lies(LADEN)
+    expect(seite).toContain(KOPF_KARTE)
+    // Die erste Karte der Ladeansicht ist der Kopf, vor „Abholung".
+    expect(laden.indexOf(KOPF_KARTE)).toBeGreaterThan(-1)
+    expect(laden.indexOf(KOPF_KARTE)).toBeLessThan(laden.indexOf('{/* Abholung */}'))
+  })
+
+  it('alle drei Karten nehmen die Klasse der Seite, nicht eine Abschrift', () => {
+    const laden = lies(LADEN)
+    expect(laden).toMatch(/import \{ KARTE \} from '@\/components\/bestaetigung\/bestaetigung-teile'/)
+    expect(anzahl(laden, /cn\(KARTE, /)).toBe(3)
+    expect(laden).not.toMatch(/rounded-2xl border border-border bg-card/)
+  })
+})
+
 describe('mitgeschicktSatz — was unter „Problem melden" automatisch mitgeht', () => {
   it('mit Fehlernummer, wie im Mockup', () => {
     expect(mitgeschicktSatz('7F3A-21C9', false)).toBe(

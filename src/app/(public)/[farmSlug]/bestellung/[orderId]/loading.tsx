@@ -2,9 +2,11 @@
  * Ladeansicht der Bestellseite („Wo ist meine Bestellung?"). Maße aus
  * src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx: Kopf der
  * KundeShell (56 px, ab md 64 px), Spalte max. 640 px (px-4 pt-8, ab md
- * pt-10), darin Kopf mit Bestellnummer, Abholkarte und Positionen. Die
- * Seite steht im Geltungsbereich data-design="neu"; diese Ansicht kommt vor
- * der Shell und setzt den Marker selbst (wie „Meine Bestellungen").
+ * pt-10), darin drei Karten wie die Seite: Kopf mit Bestellnummer,
+ * Abholung und Positionen — dieselbe Klasse `KARTE`, damit beim Umschalten
+ * nichts springt. Die Seite steht im Geltungsbereich data-design="neu";
+ * diese Ansicht kommt vor der Shell und setzt den Marker selbst (wie „Meine
+ * Bestellungen").
  *
  * Diese Seite erreicht man über einen signierten Link aus der E-Mail, oft am
  * Handy und oft unterwegs — also genau dort, wo das Warten am längsten
@@ -14,6 +16,9 @@
  * ungültige Signatur antwortet ohne Abfrage, also sofort, und zeigt dieses
  * Skeleton kaum.
  */
+import { cn } from '@/lib/utils'
+import { KARTE } from '@/components/bestaetigung/bestaetigung-teile'
+
 export default function BestellungLaden() {
   return (
     <div
@@ -25,8 +30,8 @@ export default function BestellungLaden() {
       <div className="h-14 border-b border-border bg-background md:h-16" />
 
       <main className="mx-auto flex w-full max-w-[640px] flex-col gap-4 px-4 pt-8 pb-12 md:pt-10">
-        {/* Kopf: Hof, Bestellnummer mit Marke, Satz */}
-        <div className="flex flex-col gap-2">
+        {/* Kopf als Karte wie auf der Seite: Hof, Bestellnummer mit Marke, Satz */}
+        <div className={cn(KARTE, 'flex flex-col gap-2')}>
           <div className="h-4 w-48 rounded bg-app-chip" />
           <div className="flex items-center justify-between gap-2">
             <div className="h-8 w-40 rounded-lg bg-border" />
@@ -36,7 +41,7 @@ export default function BestellungLaden() {
         </div>
 
         {/* Abholung */}
-        <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card px-4 py-4 md:px-[18px]">
+        <div className={cn(KARTE, 'flex flex-col gap-2')}>
           <div className="h-3 w-20 rounded bg-app-chip" />
           <div className="h-6 w-56 max-w-full rounded bg-app-trough" />
           <div className="h-4 w-32 rounded bg-app-chip" />
@@ -45,7 +50,7 @@ export default function BestellungLaden() {
         </div>
 
         {/* Positionen */}
-        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card px-4 py-4 md:px-[18px]">
+        <div className={cn(KARTE, 'flex flex-col gap-3')}>
           <div className="flex justify-between">
             <div className="h-4 w-36 rounded bg-app-chip" />
             <div className="h-4 w-14 rounded bg-app-chip" />
