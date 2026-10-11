@@ -668,6 +668,15 @@ describe('bestimmeUmgebung — Produktion nimmt NEXT_PUBLIC_APP_URL als bereinig
     expect(u.warnungen.join(' ')).not.toMatch(/farmerzone|geheim/)
   })
 
+  it('auch ein Wert mit „*" bleibt roh — Better Auth liest ihn als Muster; gewollt (nie leer), er meldet sich als Warnung (Runde 1)', () => {
+    // Hält fest, was der Kommentar zu trustedOrigins sagt: Erzeugt wird nie
+    // ein Platzhalter, aber ein eingetragener steht roh da.
+    const wert = 'https://*.farmerzone.example'
+    const u = bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_APP_URL: wert })
+    expect(u.trustedOrigins).toEqual([wert])
+    expect(u.warnungen).toEqual([WARNUNG_APP_URL_UNGUELTIG])
+  })
+
   it('fehlt der Wert, bleibt es ohne Ersatz — mit Warnung', () => {
     const u = bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_APP_URL: '  ' })
     expect(u.trustedOrigins).toEqual([])

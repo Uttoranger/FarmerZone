@@ -52,7 +52,13 @@ export type Umgebung = {
   art: UmgebungsArt
   /** Die Adresse, unter der die App erreichbar ist — null, wenn unbekannt. */
   appUrl: string | null
-  /** Herkünfte, denen Better Auth vertraut. Nie ein Platzhalter wie *.vercel.app. */
+  /**
+   * Herkünfte, denen Better Auth vertraut. Erzeugt wird nie ein Platzhalter
+   * wie *.vercel.app. In der Produktion steht ein ungültiger Wert von
+   * NEXT_PUBLIC_APP_URL aber roh hier (nie leer, siehe produktionsAdresse) —
+   * trägt er „*" oder „?", liest Better Auth ihn als Muster. Er meldet sich
+   * als Warnung (WARNUNG_APP_URL_UNGUELTIG).
+   */
   trustedOrigins: readonly string[]
   /**
    * Ziel von „Zur Testumgebung" im Admin (Register Z3) — null ohne gültige
@@ -383,7 +389,8 @@ export function bestimmeUmgebung(werte: UmgebungsWerte): Umgebung {
       break
     case 'produktion': {
       // Nur die eingetragene Adresse, seit Nr. 56 als bereinigte Herkunft
-      // (ein ungültiger Wert roh, siehe produktionsAdresse). Fehlt sie, gibt
+      // (ein ungültiger Wert roh, siehe produktionsAdresse — mit „*" oder „?"
+      // darin ist er für Better Auth ein Muster). Fehlt sie, gibt
       // es KEINEN Ersatz — eine geratene Herkunft wäre ein Sicherheitsloch,
       // kein Komfort. Eine Vercel-Adresse kommt auch hier nie dazu.
       trustedOrigins = produktion ? ['herkunft' in produktion ? produktion.herkunft : produktion.roh] : []
