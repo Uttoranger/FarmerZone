@@ -73,7 +73,7 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 52 | Karte (/hoefe, Standortkarte, Region) | läuft (Nachbesserung Runde 1) | `nacht/2026-10-10/52-karte` | | main | Umsetzung fertig (8462f82, Bericht d64b53a); tester grün; pruefer: kein Blocker, 4 Sollte | 11.10.2026 |
 | 53 | Heute, Auswertung, Verkäufe | läuft (Nachbesserung Runde 1) | `nacht/2026-10-10/53-heute-auswertung` | | 55 | gestapelt auf 55; Umsetzung fertig (644aa44), 55 Runde 1 hineingeholt (32cdd88); tester grün; pruefer: kein Blocker, 3 Sollte | 11.10.2026 |
 | 54 | Admin am Handy und alte Seiten ins neue Design | läuft | `nacht/2026-10-10/54-admin-handy` | | main | Nachprüfung folgt | 11.10.2026 |
-| 55 | Testzahlungen aus Auswertungen (Z4) | läuft (Nachprüfung Runde 2) | `nacht/2026-10-10/55-testzahlungen` | | main | Runde 1 (6414c51, 4ee2785), Runde 2 (4dd6cf9) | 11.10.2026 |
+| 55 | Testzahlungen aus Auswertungen (Z4) | fertig, PR offen | `nacht/2026-10-10/55-testzahlungen` | #232 | main | Runde 1 und 2 mit Nachprüfung; Nacharbeit 5ca0874 | 11.10.2026 |
 | 56 | Altlasten Lauf 8 §6 und Kleinkram | läuft | `nacht/2026-10-10/56-altlasten` | | main | Nachprüfung folgt | 11.10.2026 |
 | 57 | Datenschutzerklärung, Nachtrag (Entwurf) | offen — Vorstufe erledigt: origin/main in den Branch der Nr. 33 geholt (dbb7223, #210 aktualisiert) | | | 33 (#210) | | 10.10.2026 |
 | Sammel 9 | Sammel-PR Lauf 9 | offen | `integration/lauf9` | | main | | |
