@@ -75,5 +75,5 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 54 | Admin am Handy und alte Seiten ins neue Design | läuft | `nacht/2026-10-10/54-admin-handy` | | main | Nachprüfung folgt | 11.10.2026 |
 | 55 | Testzahlungen aus Auswertungen (Z4) | fertig, PR offen | `nacht/2026-10-10/55-testzahlungen` | #232 | main | Runde 1 und 2 mit Nachprüfung; Nacharbeit 5ca0874 | 11.10.2026 |
 | 56 | Altlasten Lauf 8 §6 und Kleinkram | läuft | `nacht/2026-10-10/56-altlasten` | | main | Nachprüfung folgt | 11.10.2026 |
-| 57 | Datenschutzerklärung, Nachtrag (Entwurf) | läuft (tester und pruefer) | `nacht/2026-10-10/57-datenschutz-nachtrag` | | 33 (#210) | Umsetzung fertig (9184c93, b587a1c) | 11.10.2026 |
+| 57 | Datenschutzerklärung, Nachtrag (Entwurf) | läuft (Nachbesserung Runde 1) | `nacht/2026-10-10/57-datenschutz-nachtrag` | | 33 (#210) | Umsetzung fertig (9184c93, b587a1c); pruefer: 1 Blocker (Karten-Satz), 4 Sollte | 11.10.2026 |
 | Sammel 9 | Sammel-PR Lauf 9 | offen | `integration/lauf9` | | main | | |
