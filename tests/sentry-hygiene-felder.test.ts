@@ -379,6 +379,9 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
     ['verschachtelte Anker als Nachricht', { message: '/#a='.repeat(N) }],
     ['viele Adressen als Abfragewerte', { request: { url: 'https://farmerzone.at/?' + 'a=/b&'.repeat(N / 10) } }],
     ['halbe Platzhalter nach token=', { exception: { values: [{ value: 'token=[code entfernt '.repeat(N / 4) }] } }],
+    ['Schrägstriche nach Doppelpunkt im Fehlertext', { exception: { values: [{ value: ':/'.repeat(N) }] } }],
+    ['Schrägstriche nach Umlauten im Fehlertext', { exception: { values: [{ value: 'ä/'.repeat(N) }] } }],
+    ['viele Adressen nach Anführungszeichen im Fehlertext', { exception: { values: [{ value: '«/'.repeat(N / 10) }] } }],
   ]
 
   for (const [name, teil] of lang) {
@@ -729,5 +732,29 @@ describe('Nr. 56, Nachbesserung Runde 1 — Befunde der Prüfung', () => {
     expect(nachricht('Passwort: kundin@example.com, token=[entfernt]')).toBe('Passwort: [e-mail entfernt], token=[entfernt]')
     // … hängt etwas daran, fällt der ganze Wert.
     expect(fehlertext('otp: 905173-abc abgelehnt')).toBe('otp: [entfernt] abgelehnt')
+  })
+  it('Adressen im Fehlertext auch nach Doppelpunkt, Komma, Semikolon, Klammer und typografischen Anführungszeichen — und mit HTTPS in Großbuchstaben', () => {
+    // Vorher galt eine relative Adresse nur am Anfang oder nach Leerraum,
+    // Klammer, Anführungszeichen und „=", eine absolute nur klein geschrieben.
+    const faelle: [string, string][] = [
+      ['Fehler bei:/api/orders/confirm/abc123', 'Fehler bei:/api/orders/confirm/[kennung entfernt]'],
+      ['Fehler,/api/orders/confirm/abc123', 'Fehler,/api/orders/confirm/[kennung entfernt]'],
+      ['Fehler;/hof-test/bestaetigen/abc123', 'Fehler;/hof-test/bestaetigen/[kennung entfernt]'],
+      ['Daten {/api/orders/confirm/abc123 }', 'Daten {/api/orders/confirm/[kennung entfernt] }'],
+      ['url „/account/unsubscribe?token=geheim-123“', 'url „/account/unsubscribe“'],
+      ['url «/account/unsubscribe?token=geheim-123»', 'url «/account/unsubscribe»'],
+      ['url:/account/unsubscribe?token=geheim-123&seite=2', 'url:/account/unsubscribe?seite=2'],
+      ['GET HTTPS://FARMERZONE.AT/api/orders/confirm/abc123 failed', 'GET HTTPS://FARMERZONE.AT/api/orders/confirm/[kennung entfernt] failed'],
+      ['GET Https://farmerzone.at/reset-password?token=abc123', 'GET Https://farmerzone.at/reset-password'],
+    ]
+    for (const [roh, sauber] of faelle) expect(fehlertext(roh), roh).toBe(sauber)
+    // In Nachrichten gilt die Adress-Regel für absolute Adressen im Text — jetzt auch groß geschrieben.
+    expect(nachricht('GET HTTPS://FARMERZONE.AT/api/orders/confirm/abc123 failed')).toBe(
+      'GET HTTPS://FARMERZONE.AT/api/orders/confirm/[kennung entfernt] failed'
+    )
+    // Gegenproben: Ein Schrägstrich nach Buchstabe oder Ziffer (jeder Schrift) beginnt keine Adresse.
+    for (const text of ['und/oder, 3/4 und 1/2', 'Maß/abcdefghijklmnopqrstuvwxyz', 'localhost:3000/api/orders/confirm/x', 'v1.2/beta', 'Gewicht 50%/Jahr']) {
+      expect(fehlertext(text), text).toBe(text)
+    }
   })
 })

@@ -332,9 +332,10 @@ function bereinigeAnker(anker: string, tiefe: number): string {
 }
 
 /** Bereinigt URLs, die IN einem Text stecken (Span-Beschreibungen wie
- *  „GET https://…?token=…"), danach den Text selbst. */
+ *  „GET https://…?token=…", seit Nr. 56 Runde 1 auch groß geschrieben),
+ *  danach den Text selbst. */
 function bereinigeTextMitUrls(text: string): string {
-  return bereinigeText(text.replace(/https?:\/\/\S+/g, (url) => bereinigeUrl(url)))
+  return bereinigeText(text.replace(/https?:\/\/\S+/gi, (url) => bereinigeUrl(url)))
 }
 
 /** Span-Attribute: IP-Träger fallen ganz weg, Query und URLs werden
@@ -424,12 +425,17 @@ function bereinigeFreitext(text: string): string {
     .replace(LANGE_KENNUNG_MUSTER, '[kennung entfernt]')
 }
 
-/** Adressen in einem Fehlertext (Nr. 56): absolut (https://…) oder relativ
- *  ab „/". Eine relative nur am Anfang oder nach Leerraum, Klammer,
- *  Anführungszeichen oder „=" — so werden „und/oder" und „3/4" keine
- *  Adresse. Leerraum, Anführungszeichen und schließende Klammern beenden
- *  sie. Linear: Jede Stelle wird höchstens einmal gelesen. */
-const ADRESSE_IM_FEHLERTEXT = /https?:\/\/[^\s"'`<>)\]]+|(?<![^\s"'`(<[=])\/[^\s"'`<>)\]]*/g
+/** Adressen in einem Fehlertext (Nr. 56): absolut (https://…, auch groß
+ *  geschrieben) oder relativ ab „/". Eine relative beginnt nie direkt nach
+ *  einem Buchstaben oder einer Ziffer jeder Schrift, nach „_", „/", „.", „~",
+ *  „%" oder „-" — so werden „und/oder", „3/4" und „localhost:3000/…" keine
+ *  Adresse; nach Doppelpunkt, Komma, Klammer oder Anführungszeichen schon
+ *  (Runde 1: vorher nur am Anfang, nach Leerraum, ( [ < " ' ` und „="; „bei:/api/…"
+ *  blieb stehen). Leerraum, Anführungszeichen (auch typografische) und
+ *  schließende Klammern beenden sie. Linear: Jede Stelle wird höchstens
+ *  einmal gelesen. */
+const ADRESSE_IM_FEHLERTEXT =
+  /https?:\/\/[^\s"'`<>)\]«»„“”‚‘’]+|(?<![\p{L}\p{N}\p{M}_/.~%-])\/[^\s"'`<>)\]«»„“”‚‘’]*/giu
 
 /**
  * Der Fehlertext (exception.value): E-Mail, Telefon und Code wie bisher, seit
