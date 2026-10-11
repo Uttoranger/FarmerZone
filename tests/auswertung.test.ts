@@ -7,6 +7,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   SERVICEGEBUEHREN_ERKLAERUNG,
+  SERVICEGEBUEHREN_TOEPFE,
   abholtageDesFensters,
   auswertungSummen,
   grenzeStand,
@@ -18,7 +19,8 @@ import {
   umsatzKartenTitel,
   zahlartZeile,
 } from '@/lib/auswertung'
-import { einnahmenImMonat, type BestellungFuerFinanzen } from '@/lib/finanzen'
+import { GEZAEHLTE_TOEPFE, einnahmenImMonat, topfVonBestellung, type BestellungFuerFinanzen } from '@/lib/finanzen'
+import { monatsschluesselInWien } from '@/lib/servicegebuehr'
 import { BAR_GEBUEHR_SEPA_SATZ, BAR_OHNE_GEBUEHR_SATZ, BAR_SERVICEGEBUEHR_AB } from '@/lib/konditionen'
 import { umsatzfenster } from '@/lib/umsatz'
 import { fasseTeilenWirkungZusammen } from '@/lib/teilen-wirkung'
@@ -138,6 +140,32 @@ describe('Servicegebühren — dieselbe Zahl wie /admin/finanzen (Register F6)',
       adminMaerz.geschuldetCents,
       adminMaerz.gezaehltCents,
     ])
+  })
+})
+
+describe('Servicegebühren — welche Töpfe die Karte zählt, steht an einer Stelle (Nachbesserung Runde 2)', () => {
+  it('SERVICEGEBUEHREN_TOEPFE sind die gezählten Töpfe der Finanzseite — dieselbe Konstante', () => {
+    expect(SERVICEGEBUEHREN_TOEPFE).toBe(GEZAEHLTE_TOEPFE)
+    expect([...SERVICEGEBUEHREN_TOEPFE]).toEqual(['eingezogen', 'geschuldet'])
+  })
+
+  it('die Karte zählt genau die Bestellungen des Monats, deren Topf darin liegt', () => {
+    const gemischt = [
+      bestellung({ serviceFeeCents: 53 }),
+      bestellung({ status: 'READY', serviceFeeCents: 61 }),
+      bestellung({ status: 'CANCELLED', serviceFeeCents: 70 }),
+      bestellung({ status: 'PENDING_CONFIRMATION', paymentStatus: 'PENDING', serviceFeeCents: 99 }),
+      bestellung({ createdAt: nachStichtag, paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', serviceFeeCents: 55 }),
+      bestellung({ createdAt: nachStichtag, status: 'READY', paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', serviceFeeCents: 60 }),
+    ]
+    for (const monat of [OKTOBER, '2027-03'] as const) {
+      const gezaehlt = gemischt.filter(
+        (b) => monatsschluesselInWien(b.createdAt) === monat && SERVICEGEBUEHREN_TOEPFE.includes(topfVonBestellung(b, null))
+      )
+      const karte = servicegebuehrenImMonat(gemischt, monat, null)
+      expect(karte.onlineAnzahl + karte.vorOrtAnzahl, monat).toBe(gezaehlt.length)
+      expect(karte.summeCents, monat).toBe(gezaehlt.reduce((s, b) => s + b.serviceFeeCents, 0))
+    }
   })
 })
 

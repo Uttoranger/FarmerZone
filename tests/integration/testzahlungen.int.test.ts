@@ -11,7 +11,8 @@
  *    Stichtag. Bar und Karte beim Hof zählen immer.
  *  - Umsatz von Auswertung, Verkäufe (Woche und Jahr für die Umsatzgrenze),
  *    Heute und Kunden ohne Testzahlungen; ohne Stichtag wie vor Nr. 55.
- *  - Die Hinweiszeile kommt nur, wenn der Stichtag Bestellungen betrifft.
+ *  - Die Hinweiszeile kommt genau dann, wenn eine gezeigte Zahl eine
+ *    Testzahlung auslässt — auf den Seiten des Hofs wie auf Admin-Finanzen.
  *
  * Alle Bestellungen liegen im März 2027: Der Seed bestellt dort nicht, und der
  * SEPA-Start (B1, 1. Februar 2027) ist vorbei — Barbestellungen tragen ihre
@@ -243,16 +244,68 @@ describe('Hinweiszeile — genau dann, wenn eine gezeigte Zahl eine Testzahlung 
     expect(await testzahlungenHinweisFuerHof(farm.id, { umsatz: [WOCHE, JAHR], gebuehrenMonat: MAERZ }, STICHTAG)).toBe(HINWEIS)
   })
 
-  it('abgeholt nur zwischen den gezeigten Fenstern, storniert oder bar: keine Zeile', async () => {
+  it('abgeholt nur zwischen den gezeigten Fenstern: keine Zeile', async () => {
     const { farm } = await erstelleHof()
     await bestelle(farm.id, { paymentMethod: 'ONLINE', createdAt: ANGELEGT, pickedUpAt: new Date('2027-03-11T10:00:00+01:00') })
-    await bestelle(farm.id, { paymentMethod: 'ONLINE', createdAt: ANGELEGT, status: 'CANCELLED', paymentStatus: 'REFUNDED', gebuehrCents: 50, gebuehrEntfallen: true })
-    await bestelle(farm.id, { paymentMethod: 'ONSITE_CASH', createdAt: ANGELEGT, gebuehrCents: 70 })
 
     const davor = { von: new Date('2027-01-01T00:00:00+01:00'), bis: new Date('2027-03-11T09:59:59+01:00') }
     const danach = { von: new Date('2027-03-11T10:00:01+01:00'), bis: JETZT }
     expect(await testzahlungenHinweisFuerHof(farm.id, { umsatz: [davor, danach] }, STICHTAG)).toBeNull()
     // Gegenprobe: dasselbe Fenster über den Abholzeitpunkt hinweg findet sie.
     expect(await testzahlungenHinweisFuerHof(farm.id, { umsatz: [{ von: davor.von, bis: danach.bis }] }, STICHTAG)).toBe(HINWEIS)
+  })
+
+  it('storniert nach Abholung oder bar: keine Zeile — weder über den Umsatz noch über den Monat der Servicegebühren (Runde 2)', async () => {
+    const { farm } = await erstelleHof()
+    // Abgeholt im Jahr, danach storniert; die Erstattung gescheitert, die Zahlung
+    // bleibt PAID — so endet nach der Live-Schaltung jeder Storno einer
+    // Testzahlung (docs/betrieb/stripe-live.md, Hinweis zur Erstattung). Nur der
+    // Status hält sie aus beiden Abfragen heraus.
+    await bestelle(farm.id, {
+      paymentMethod: 'ONLINE',
+      createdAt: ANGELEGT,
+      status: 'CANCELLED',
+      paymentStatus: 'PAID',
+      pickedUpAt: new Date('2027-03-11T10:00:00+01:00'),
+      gebuehrCents: 50,
+    })
+    await bestelle(farm.id, { paymentMethod: 'ONSITE_CASH', createdAt: ANGELEGT, gebuehrCents: 70 })
+
+    expect(await testzahlungenHinweisFuerHof(farm.id, { umsatz: [WOCHE, JAHR], gebuehrenMonat: MAERZ }, STICHTAG)).toBeNull()
+  })
+})
+
+describe('Admin-Finanzen: Hinweiszeile genau dann, wenn eine gezeigte Zahl eine Testzahlung auslässt (Runde 2)', () => {
+  // Ein Fenster ohne Seed-Bestellungen: gewählt März 2028, gezeigt April 2027
+  // bis März 2028. Die Finanzseite zählt alle Höfe.
+  const STICHTAG_2028 = new Date('2028-03-16T12:00:00+01:00')
+  const JETZT_2028 = new Date('2028-03-18T10:00:00+01:00')
+  const IM_FEBRUAR = new Date('2028-02-10T10:00:00+01:00')
+  const IM_MAERZ = new Date('2028-03-10T10:00:00+01:00')
+  const HINWEIS_2028 = testzahlungenHinweis(STICHTAG_2028)
+  const OFFEN = { status: 'PENDING_CONFIRMATION', paymentStatus: 'PENDING', gebuehrCents: 33 } as const
+
+  it('offene Testzahlung im Vormonat: keine Zeile — im gewählten Monat: Zeile', async () => {
+    const { farm } = await erstelleHof()
+    await bestelle(farm.id, { paymentMethod: 'ONLINE', createdAt: IM_FEBRUAR, ...OFFEN })
+    expect((await getFinanzen('2028-03', JETZT_2028, STICHTAG_2028)).testzahlungenHinweis).toBeNull()
+    // Wird der Februar gewählt, steht dort „erwartet" — dann fehlt sie in einer gezeigten Zahl.
+    expect((await getFinanzen('2028-02', JETZT_2028, STICHTAG_2028)).testzahlungenHinweis).toBe(HINWEIS_2028)
+
+    await bestelle(farm.id, { paymentMethod: 'ONLINE', createdAt: IM_MAERZ, ...OFFEN })
+    expect((await getFinanzen('2028-03', JETZT_2028, STICHTAG_2028)).testzahlungenHinweis).toBe(HINWEIS_2028)
+  })
+
+  it('bezahlte Testzahlung im Vormonat: Zeile — sie fehlt im Verlauf', async () => {
+    const { farm } = await erstelleHof()
+    await bestelle(farm.id, { paymentMethod: 'ONLINE', createdAt: IM_FEBRUAR, status: 'CONFIRMED', paymentStatus: 'PAID', gebuehrCents: 52 })
+
+    const mit = await getFinanzen('2028-03', JETZT_2028, STICHTAG_2028)
+    expect(mit.testzahlungenHinweis).toBe(HINWEIS_2028)
+    expect(mit.verlauf.find((p) => p.monat === '2028-02')?.einnahmenCents).toBe(0)
+    // Gegenprobe ohne Stichtag: Der Februar zählt sie, eine Zeile gibt es nicht.
+    const ohne = await getFinanzen('2028-03', JETZT_2028, null)
+    expect(ohne.verlauf.find((p) => p.monat === '2028-02')?.einnahmenCents).toBe(52)
+    expect(ohne.testzahlungenHinweis).toBeNull()
   })
 })

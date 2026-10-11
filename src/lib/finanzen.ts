@@ -228,23 +228,54 @@ export function topfVonBestellung(bestellung: BestellungFuerFinanzen, stripeLive
   return 'erwartet'
 }
 
-/** Die Töpfe, die die Finanzseite zeigt — alle außer „keiner". */
-const GEZEIGTE_TOEPFE: readonly EinnahmenTopf[] = ['eingezogen', 'geschuldet', 'erwartet']
+/**
+ * Was ein Monat der Plattform gebracht hat: `gezaehltCents`, `bestellungen`
+ * und die Provision in `einnahmenImMonat` — auf der Finanzseite Verlauf,
+ * Schnitt und Kacheln, in der Auswertung die „Servicegebühren dieses Monats"
+ * (`SERVICEGEBUEHREN_TOEPFE`). Daran misst sich auch die Hinweiszeile
+ * (Register Z4): dieselbe Liste, keine zweite.
+ */
+export const GEZAEHLTE_TOEPFE: readonly EinnahmenTopf[] = ['eingezogen', 'geschuldet']
+
+/** Was die Finanzseite für den gewählten Monat zeigt: dazu „erwartet" (nur dort, nicht im Verlauf). */
+export const TOEPFE_IM_GEWAEHLTEN_MONAT: readonly EinnahmenTopf[] = [...GEZAEHLTE_TOEPFE, 'erwartet']
 
 /**
  * Lässt eine gezeigte Zahl eine Testzahlung aus (Register Z4) — gibt es unter
  * diesen Bestellungen eine, die ohne die Regel in einem der gezeigten Töpfe läge?
  * Dann steht leise, dass Testzahlungen nicht mitgezählt sind. Ohne Stichtag
  * nie; eine stornierte Testzahlung allein zählt nicht, die zählte ohnehin nicht.
- * `toepfe`: was die Seite zeigt — die Finanzseite alle drei, die
- * „Servicegebühren dieses Monats" der Auswertung nur eingezogen und geschuldet.
+ * `toepfe`: was die Seite für diese Bestellungen zeigt — ohne Vorgabe, damit
+ * jeder Aufrufer sie aus derselben Liste nimmt wie die Anzeige
+ * (`GEZAEHLTE_TOEPFE`, `TOEPFE_IM_GEWAEHLTEN_MONAT`, `SERVICEGEBUEHREN_TOEPFE`).
  */
 export function testzahlungenBetroffen(
   bestellungen: readonly BestellungFuerFinanzen[],
   stripeLiveAb: Date | null,
-  toepfe: readonly EinnahmenTopf[] = GEZEIGTE_TOEPFE
+  toepfe: readonly EinnahmenTopf[]
 ): boolean {
   return bestellungen.some((b) => istTestzahlung(b, stripeLiveAb) && toepfe.includes(topfVonBestellung(b, null)))
+}
+
+/**
+ * Die Hinweiszeile der Finanzseite (Register Z4, Nachbesserung Runde 2):
+ * Die Vormonate zeigen nur, was sie gebracht haben (Verlauf und Schnitt aus
+ * `gezaehltCents`), der gewählte Monat dazu „erwartet". Eine offene
+ * Testzahlung in einem älteren Monat fehlt deshalb in keiner gezeigten Zahl
+ * und bringt keine Zeile; eine bezahlte fehlt im Verlauf und bringt sie.
+ * `bestellungen`: die der gezeigten Monate, wie `getFinanzen` sie lädt.
+ */
+export function finanzseiteLaesstTestzahlungenAus(
+  bestellungen: readonly BestellungFuerFinanzen[],
+  gewaehlterMonat: Monatsschluessel,
+  stripeLiveAb: Date | null
+): boolean {
+  const imGewaehlten = bestellungen.filter((b) => monatsschluesselInWien(b.createdAt) === gewaehlterMonat)
+  const davor = bestellungen.filter((b) => monatsschluesselInWien(b.createdAt) !== gewaehlterMonat)
+  return (
+    testzahlungenBetroffen(imGewaehlten, stripeLiveAb, TOEPFE_IM_GEWAEHLTEN_MONAT) ||
+    testzahlungenBetroffen(davor, stripeLiveAb, GEZAEHLTE_TOEPFE)
+  )
 }
 
 export type EinnahmenMonat = {
@@ -291,17 +322,14 @@ export function einnahmenImMonat(
   for (const b of bestellungen) {
     if (monatsschluesselInWien(b.createdAt) !== monat) continue
     const gebuehr = Math.max(0, Math.round(b.serviceFeeCents))
+    const topf = topfVonBestellung(b, stripeLiveAb)
 
-    switch (topfVonBestellung(b, stripeLiveAb)) {
+    switch (topf) {
       case 'eingezogen':
         ergebnis.eingezogenCents += gebuehr
-        ergebnis.bestellungen++
-        ergebnis.provisionCents += Math.max(0, Math.round(b.provisionCents))
         break
       case 'geschuldet':
         ergebnis.geschuldetCents += gebuehr
-        ergebnis.bestellungen++
-        ergebnis.provisionCents += Math.max(0, Math.round(b.provisionCents))
         break
       case 'erwartet':
         ergebnis.erwartetCents += gebuehr
@@ -310,9 +338,14 @@ export function einnahmenImMonat(
       case 'keiner':
         break
     }
+    // Was der Monat gebracht hat — aus derselben Liste, an der die Hinweiszeile misst.
+    if (GEZAEHLTE_TOEPFE.includes(topf)) {
+      ergebnis.gezaehltCents += gebuehr
+      ergebnis.bestellungen++
+      ergebnis.provisionCents += Math.max(0, Math.round(b.provisionCents))
+    }
   }
 
-  ergebnis.gezaehltCents = ergebnis.eingezogenCents + ergebnis.geschuldetCents
   return ergebnis
 }
 
