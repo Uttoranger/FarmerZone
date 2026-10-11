@@ -398,6 +398,8 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
     ['kodierte Anker verschachtelt', { request: { url: 'https://farmerzone.at/#' + 'a%3D%2F%23'.repeat(N / 10) } }],
     ['viele relative Adressen als Nachricht', { message: ' /a?b=1'.repeat(N / 10) }],
     ['Schrägstriche nach Doppelpunkt in extra', { extra: { text: ':/'.repeat(N) } }],
+    ['viele Zuweisungen im Pfad', { request: { url: 'https://farmerzone.at/' + 'a=b/'.repeat(N / 2) } }],
+    ['token= im Pfad', { request: { url: 'https://farmerzone.at/' + 'token=a/'.repeat(N / 4) } }],
   ]
 
   for (const [name, teil] of lang) {
@@ -937,5 +939,22 @@ describe('Nr. 56, Nachbesserung Runde 2 — Befunde der Nachprüfung', () => {
     for (const text of ['und/oder, 3/4 und 1/2', 'Fehler beim Laden von /hoefe?seite=2&kat=EIER', 'Kennung clx0123456789abcdefghijklmn']) {
       expect(nachricht(text), text).toBe(text)
     }
+  })
+  it('eine Zuweisung im Pfad einer Adresse fällt auch dort — request.url, ganze Nachricht, Brotkrume', () => {
+    // Vorher prüfte die URL-Regel den Pfad nicht auf „token=…": „/x%23token=…"
+    // (kodiertes #) oder „/x;token=…" blieben in der Adresse und in einem
+    // Text, der ganz die Adresse ist.
+    for (const [roh, sauber] of [
+      ['/x%23token=abc123', '/x%23token=[entfernt]'],
+      ['/x;token=abc123/weiter', '/x;token=[entfernt]'],
+      ['/konto/access_token:abc123', '/konto/access_token:[entfernt]'],
+    ]) {
+      expect(adresse(roh), roh).toBe(`https://farmerzone.at${sauber}`)
+      expect(nachricht(roh), roh).toBe(sauber)
+      expect(bereinigeEreignis(ereignis({ breadcrumbs: [{ category: 'navigation', data: { to: roh } }] })).breadcrumbs?.[0].data?.to, roh).toBe(sauber)
+    }
+    // Gegenproben: Schema, Host und Port sind keine Zuweisung; ein harmloser Schlüssel im Pfad bleibt.
+    expect(adresse('/hoefe/sorte=apfel')).toBe('https://farmerzone.at/hoefe/sorte=apfel')
+    expect(bereinigeEreignis(ereignis({ request: { url: 'http://localhost:3000/hoefe' } })).request?.url).toBe('http://localhost:3000/hoefe')
   })
 })

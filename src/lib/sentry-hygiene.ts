@@ -332,10 +332,12 @@ function bereinigeAbfrageWert(wert: string, tiefe: number): string {
   return tiefe < MAX_ADRESS_TIEFE ? bereinigeUrl(ohneZuweisung, tiefe + 1) : ADRESSE_ERSATZ
 }
 
-/** Bereinigt den Pfad-Teil: E-Mails (roh und kodiert), Telefonnummern und
- *  undurchsichtige Kennungs-Segmente. */
+/** Bereinigt den Pfad-Teil: E-Mails (roh und kodiert), Telefonnummern,
+ *  Zuweisungen wie „;token=…" oder „%23token=…" (Nr. 56, Runde 2: vorher
+ *  prüfte die URL-Regel den Pfad nicht darauf) und undurchsichtige
+ *  Kennungs-Segmente. */
 function bereinigePfad(pfad: string): string {
-  const segmente = bereinigeText(pfad).split('/')
+  const segmente = ersetzeZuweisungen(bereinigeText(pfad)).split('/')
   return segmente
     .map((segment, i) => {
       if (KENNUNG_SEGMENT_MUSTER.test(segment)) return '[kennung entfernt]'
