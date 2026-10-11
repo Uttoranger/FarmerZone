@@ -372,9 +372,12 @@ function bereinigeUrl(url: string, tiefe = 0): string {
 
 /** Der Anker einer Adresse (Nr. 56, Runde 1): Mit „=" trägt er Parameter wie
  *  eine Query (#token=…, so legen manche Anmeldewege den Token ab) und fällt
- *  wie sie; sonst gilt die Regel des Pfads (#abschnitt bleibt). */
+ *  wie sie; sonst gilt die Regel des Pfads (#abschnitt bleibt). Ein kodiertes
+ *  „=" (%3D) zählt wie ein rohes (Runde 2: #token%3D… galt als Pfad und
+ *  blieb) — dann wird der Anker vorher dekodiert. */
 function bereinigeAnker(anker: string, tiefe: number): string {
-  return anker.includes('=') ? bereinigeQuery(anker, false, tiefe) : bereinigePfad(anker)
+  const mitTrennern = anker.includes('=') ? anker : dekodiereFehlertolerant(anker)
+  return mitTrennern.includes('=') ? bereinigeQuery(mitTrennern, false, tiefe) : bereinigePfad(anker)
 }
 
 /** Bereinigt URLs, die IN einem Text stecken (Span-Beschreibungen wie
@@ -424,8 +427,10 @@ const IPV6_MUSTER =
  *  Anführungszeichen um Schlüssel und Wert gehören zum Trenner (Runde 1):
  *  Prisma schreibt `token: "…"`, JSON `"access_token":"…"` — vorher beendete
  *  das Zeichen den Wert, bevor er anfing. Backticks nicht: In ihnen nennt
- *  Prisma Felder („Argument `token`: Invalid value …"). */
-const ZUWEISUNG_KANDIDAT = /(?<![\w-])([\w-]+)(["']?\s*[=:]\s*["']?)/g
+ *  Prisma Felder („Argument `token`: Invalid value …"). Ein Prozent-Escape
+ *  davor ist eine Grenze wie ein Leerzeichen (Runde 2: in „Fehler%20token=…"
+ *  hieß der Schlüssel sonst „20token"); mitten in einem Escape beginnt keiner. */
+const ZUWEISUNG_KANDIDAT = /(?:(?<=%[0-9A-Fa-f]{2})|(?<![\w-])(?:(?<!%)|(?![0-9A-Fa-f]{2})))([\w-]+)(["']?\s*[=:]\s*["']?)/g
 
 /** Wörter, die einen Schlüssel geheim machen. `code` fehlt bewusst:
  *  „code=P2002" ist ein Prisma-Fehlercode. */

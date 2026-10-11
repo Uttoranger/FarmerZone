@@ -394,6 +394,8 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
     ['mehrfach kodierte Abfragewerte', { request: { url: 'https://farmerzone.at/?' + 'a=%252F%253Fb%253D1&'.repeat(N / 20) } }],
     ['ungültige Bytes im Abfragewert', { request: { url: 'https://farmerzone.at/?a=' + '%25C3'.repeat(N) } }],
     ['%25-Kette im Abfragewert', { request: { url: 'https://farmerzone.at/?a=%' + '25'.repeat(N) + '41' } }],
+    ['Schlüssel nach Prozent-Escapes', { exception: { values: [{ value: '%20a='.repeat(N / 5) }] } }],
+    ['kodierte Anker verschachtelt', { request: { url: 'https://farmerzone.at/#' + 'a%3D%2F%23'.repeat(N / 10) } }],
   ]
 
   for (const [name, teil] of lang) {
@@ -884,5 +886,31 @@ describe('Nr. 56, Nachbesserung Runde 2 — Befunde der Nachprüfung', () => {
     })
     // Gegenprobe: ein harmloser Wert bleibt.
     expect(adresse('/hoefe?q=100%25&seite=2')).toBe('https://farmerzone.at/hoefe?q=100%25&seite=2')
+  })
+  it('kodierte Trenner: Ein Escape vor dem Schlüssel ist eine Grenze, ein kodiertes „=" im Anker zählt wie ein rohes', () => {
+    // Vorher wurde der Schlüssel zu „20token" bzw. „23token", und „#token%3D…"
+    // galt ohne rohes „=" als Pfad.
+    for (const [roh, sauber] of [
+      ['Fehler%20token=abc123', 'Fehler%20token=[entfernt]'],
+      ['Abruf /x%23token=abc123 gescheitert', 'Abruf /x%23token=[entfernt] gescheitert'],
+      ['Wert%2Faccess_token:abc123', 'Wert%2Faccess_token:[entfernt]'],
+    ]) {
+      expect(fehlertext(roh), roh).toBe(sauber)
+      expect(nachricht(roh), roh).toBe(sauber)
+      expect(extraText(roh), roh).toBe(sauber)
+    }
+    for (const [roh, sauber] of [
+      ['/x#token%3Dabc123', '/x'],
+      ['/x#a%3D1%26token%3Dabc123', '/x#a=1'],
+      ['/x#next%3D%2Fapi%2Forders%2Fconfirm%2Fabc123', '/x#next=%2Fapi%2Forders%2Fconfirm%2F%5Bkennung+entfernt%5D'],
+    ]) {
+      expect(adresse(roh), roh).toBe(`https://farmerzone.at${sauber}`)
+      expect(fehlertext(`Fehler bei ${roh} gemeldet`), roh).toBe(`Fehler bei ${sauber} gemeldet`)
+      expect(nachricht(roh), roh).toBe(sauber)
+    }
+    // Gegenproben: ein Prozentzeichen ohne Escape vor dem Schlüssel; ein Anker ohne „=", auch dekodiert.
+    expect(fehlertext('100%token=abc123')).toBe('100%token=[entfernt]')
+    expect(adresse('/hoefe#karte%20oben')).toBe('https://farmerzone.at/hoefe#karte%20oben')
+    expect(fehlertext('Rabatt 50%20token')).toBe('Rabatt 50%20token')
   })
 })
