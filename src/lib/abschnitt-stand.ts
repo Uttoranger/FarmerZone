@@ -104,8 +104,17 @@ export type ProfilQuelle = {
   betriebsstatus: Betriebsstatus | null
 }
 
-/** Was ein Abschnitt am Profil ändert (Name und Kurzbeschreibung, Adresse, Kontakt). */
-export type ProfilTeil = Partial<Pick<ProfileFormData, 'name' | 'description' | 'address' | 'postalCode' | 'city' | 'phone' | 'email'>>
+/**
+ * Was am Profil geändert wird: ein Abschnitt von Mein Hof (Name und
+ * Kurzbeschreibung, Adresse, Kontakt) oder das Hof-Profil mit allem, was dort
+ * seit dem Laden geändert wurde (geaendertSeitLaden). Ein fehlender Schlüssel
+ * heißt „nicht meins".
+ */
+export type ProfilTeil = Partial<ProfileFormData>
+
+function setze<K extends keyof ProfileFormData>(ziel: Partial<ProfileFormData>, feld: K, wert: ProfileFormData[K]): void {
+  ziel[feld] = wert
+}
 
 /** Das ganze Profil, wie updateProfile es verlangt — ohne Logo und Titelbild (die gehören nicht ins Profil). */
 export function profilBasis(e: ProfilQuelle): ProfileFormData {
@@ -129,8 +138,24 @@ export function profilBasis(e: ProfilQuelle): ProfileFormData {
 /** Der frische Stand mit dem Teil des Abschnitts. */
 export function profilMitTeil(frisch: ProfilQuelle, teil: ProfilTeil): ProfileFormData {
   const neu = profilBasis(frisch)
-  for (const [feld, wert] of Object.entries(teil) as [keyof ProfilTeil, string | undefined][]) {
-    if (wert !== undefined) neu[feld] = wert
+  for (const feld of Object.keys(teil) as (keyof ProfileFormData)[]) {
+    const wert = teil[feld]
+    if (wert !== undefined) setze(neu, feld, wert)
   }
   return neu
+}
+
+/**
+ * Was im Hof-Profil seit dem Laden der Seite geändert wurde — nur das geht
+ * über den frischen Stand (speichereProfil). Ein älterer Tab des Hof-Profils
+ * schickte sonst Name, Adresse oder Kontakt vom Laden mit und schriebe damit
+ * zurück, was inzwischen in Mein Hof gespeichert wurde. Verglichen werden
+ * einfache Werte (Text, Zahl, null).
+ */
+export function geaendertSeitLaden(anfang: ProfileFormData, jetzt: ProfileFormData): ProfilTeil {
+  const teil: ProfilTeil = {}
+  for (const feld of Object.keys(jetzt) as (keyof ProfileFormData)[]) {
+    if (!Object.is(jetzt[feld], anfang[feld])) setze(teil, feld, jetzt[feld])
+  }
+  return teil
 }

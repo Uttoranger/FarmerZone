@@ -14,9 +14,10 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   holeAdresseZumPunkt,
   sucheHofStandort,
-  updateProfile,
   type ProfileFormData,
 } from '@/server/actions/farm'
+import { speichereProfil } from '@/components/mein-hof/abschnitt-speichern'
+import { geaendertSeitLaden } from '@/lib/abschnitt-stand'
 import type { FarmSettings } from '@/server/queries/farm'
 import {
   HINWEIS_ADRESSE_UEBERNOMMEN,
@@ -89,25 +90,35 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
     () => profilBearbeitenSchema({ name: farm.name, ownerName: farm.ownerName, phone: farm.phone }),
     [farm.name, farm.ownerName, farm.phone]
   )
+  // Der Stand beim Laden: Startwerte des Formulars und Maßstab dafür, was
+  // dieses Formular ändert (geaendertSeitLaden, siehe onSubmit).
+  const startwerte: ProfileFormData = {
+    name: farm.name,
+    ownerName: farm.ownerName,
+    description: farm.description,
+    address: farm.address,
+    postalCode: farm.postalCode,
+    city: farm.city,
+    phone: farm.phone,
+    email: farm.email,
+    country: startLand,
+    latitude: farm.latitude,
+    longitude: farm.longitude,
+    betriebsnummer: farm.betriebsnummer,
+    betriebsstatus: farm.betriebsstatus,
+  }
+  // Einmal, so wie das Schema ihn ausgibt (Ränder, Kleinschreibung, leer →
+  // null) — sonst zählte ein unverändertes Feld als geändert. Hält ein
+  // Altwert das Schema nicht ein, gilt der Stand, wie er geladen wurde.
+  const [anfang] = useState<ProfileFormData>(() => {
+    const geprueft = schema.safeParse(startwerte)
+    return geprueft.success ? geprueft.data : startwerte
+  })
   const { register, handleSubmit, getValues, setValue, control, formState: { errors } } = useForm<ProfileFormData>({
     // Cast wie im Produktformular: Die Vorverarbeitung (leer → null) macht den
     // Eingabetyp des Schemas zu unknown; der Ausgabetyp ist ProfileFormData.
     resolver: zodResolver(schema) as Resolver<ProfileFormData>,
-    defaultValues: {
-      name: farm.name,
-      ownerName: farm.ownerName,
-      description: farm.description,
-      address: farm.address,
-      postalCode: farm.postalCode,
-      city: farm.city,
-      phone: farm.phone,
-      email: farm.email,
-      country: startLand,
-      latitude: farm.latitude,
-      longitude: farm.longitude,
-      betriebsnummer: farm.betriebsnummer,
-      betriebsstatus: farm.betriebsstatus,
-    },
+    defaultValues: startwerte,
   })
   // Der Hilfesatz folgt dem gewählten Status — welche Nummer gehört hierher?
   const [status, setStatus] = useState<BetriebsstatusValue | null>(farm.betriebsstatus)
@@ -127,7 +138,10 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
     // gespeichert wären still die alten Koordinaten.
     if (sucheLaeuft) return
     startTransition(async () => {
-      const res = await updateProfile(data)
+      // Nur, was hier seit dem Laden geändert wurde, über den frischen Stand
+      // vom Server — derselbe Weg wie die Abschnitte von Mein Hof. Ein älterer
+      // Tab schriebe sonst Name, Adresse oder Kontakt aus Mein Hof zurück.
+      const res = await speichereProfil(geaendertSeitLaden(anfang, data))
       if (res.error) {
         toast.error(res.error)
       } else {

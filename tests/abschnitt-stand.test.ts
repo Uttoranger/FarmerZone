@@ -13,6 +13,8 @@
  *  - auftrittMitTeil ändert nur, was der Abschnitt setzt: undefined heißt
  *    „nicht meins", null heißt „leeren".
  *  - profilBasis und profilMitTeil tun dasselbe für das Profil.
+ *  - geaendertSeitLaden (Hof-Profil, Nr. 50 Runde 1) nimmt nur, was seit dem
+ *    Laden geändert wurde — Text, Zahl, null; unverändert fehlt der Schlüssel.
  *  - Der Stand wird nicht verändert (der nächste Abschnitt rechnet weiter damit).
  */
 import { describe, it, expect } from 'vitest'
@@ -22,6 +24,7 @@ import {
   auftrittBasis,
   auftrittMitTeil,
   auftrittStandAus,
+  geaendertSeitLaden,
   profilBasis,
   profilMitTeil,
   type AuftrittStand,
@@ -159,5 +162,27 @@ describe('profilBasis und profilMitTeil', () => {
   it('ändert nur das eigene Feld', () => {
     expect(profilMitTeil(PROFIL, { phone: '+43 660 1111111' })).toEqual({ ...profilBasis(PROFIL), phone: '+43 660 1111111' })
     expect(profilMitTeil(PROFIL, { name: undefined }).name).toBe('Hof Test')
+  })
+})
+
+describe('geaendertSeitLaden (Hof-Profil)', () => {
+  const ANFANG = profilBasis(PROFIL)
+
+  it('nur, was seit dem Laden geändert wurde — auch Zahl und null', () => {
+    const jetzt = { ...ANFANG, phone: '+43 660 2222222', latitude: 48.25, betriebsnummer: null }
+    expect(geaendertSeitLaden(ANFANG, jetzt)).toEqual({ phone: '+43 660 2222222', latitude: 48.25, betriebsnummer: null })
+  })
+
+  it('nichts geändert: leer — dann schreibt das Speichern den frischen Stand unverändert', () => {
+    expect(geaendertSeitLaden(ANFANG, { ...ANFANG })).toEqual({})
+  })
+
+  it('zusammen mit profilMitTeil: der frische Stand plus genau diese Änderung', () => {
+    // Inzwischen hat Mein Hof den Namen geändert; der ältere Tab ändert nur das Telefon.
+    const frisch = { ...PROFIL, name: 'Hof Neuname' }
+    const teil = geaendertSeitLaden(ANFANG, { ...ANFANG, phone: '+43 660 2222222' })
+    expect(profilMitTeil(frisch, teil)).toEqual({ ...profilBasis(frisch), phone: '+43 660 2222222' })
+    // Gegenprobe: das ganze Formular vom Laden schriebe den alten Namen zurück.
+    expect(profilMitTeil(frisch, { ...ANFANG, phone: '+43 660 2222222' }).name).toBe('Hof Test')
   })
 })

@@ -35,7 +35,7 @@ import { updateProfile } from '@/server/actions/farm'
 import { addFarmPhotoAction } from '@/server/actions/farm-photos'
 import { getAppearanceData } from '@/server/queries/appearance'
 import { getFarmSettings } from '@/server/queries/farm'
-import { auftrittBasis, auftrittStandAus, profilBasis } from '@/lib/abschnitt-stand'
+import { auftrittBasis, auftrittStandAus, geaendertSeitLaden, profilBasis } from '@/lib/abschnitt-stand'
 import { erstelleHofMitAnmeldung, raeumeAuf } from './setup/basis'
 
 afterEach(async () => {
@@ -226,6 +226,23 @@ describe('zwei Abschnitte nacheinander, ohne neu zu laden', () => {
     await updateProfile({ ...profilBasis(beimOeffnen), phone: '+43 660 1111111' })
 
     expect((await stand(farm.id)).hof.name).toBe('Hof Test')
+  })
+
+  it('Hof-Profil in einem älteren Tab: nur, was dort geändert wurde — Name und Kurzbeschreibung aus Mein Hof bleiben', async () => {
+    const { farm, ownerId } = await angemeldeterHof()
+    // So lädt das Hof-Profil seine Startwerte (profile-form.tsx) — dann bleibt der Tab offen.
+    const beimOeffnen = profilBasis((await getFarmSettings(ownerId))!)
+
+    await speichereProfil({ name: 'Hof Neuname', description: 'Gemüse, Eier und Brot aus Teststadt.' })
+    // Im älteren Tab ändert jemand nur die Telefonnummer und speichert, wie profile-form.tsx es tut.
+    const formular = { ...beimOeffnen, phone: '+43 660 2222222' }
+    expect((await speichereProfil(geaendertSeitLaden(beimOeffnen, formular))).error).toBeUndefined()
+
+    expect((await stand(farm.id)).hof).toMatchObject({
+      name: 'Hof Neuname',
+      description: 'Gemüse, Eier und Brot aus Teststadt.',
+      phone: '+43 660 2222222',
+    })
   })
 
   it('zwei Abschnitte zugleich: sie laufen nacheinander, keiner geht verloren', async () => {

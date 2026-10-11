@@ -45,9 +45,12 @@ const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn(
 vi.mock('sonner', () => ({ toast }))
 vi.mock('@/server/actions/farm', () => ({
   updateProfile: vi.fn(),
+  ladeProfilStand: vi.fn(),
   sucheHofStandort: vi.fn(),
   holeAdresseZumPunkt: vi.fn(),
 }))
+// Das Hof-Profil speichert seit Nr. 50 Runde 1 über den Speicherweg der Abschnitte (abschnitt-speichern.ts).
+vi.mock('@/server/actions/appearance', () => ({ ladeAuftrittStand: vi.fn(), saveAppearanceAction: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ signOut: vi.fn() }))
 
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
@@ -231,6 +234,13 @@ describe('Speichern auf den Einstellungs-Unterseiten (Quelltext)', () => {
     const aufruf = teil.indexOf('nachSpeichern(')
     expect(pruefung, `${funktion}: Fehlerprüfung`).toBeGreaterThanOrEqual(0)
     expect(aufruf, `${funktion}: nachSpeichern`).toBeGreaterThan(pruefung)
+  })
+
+  it('Hof-Profil: speichert nur, was seit dem Laden geändert wurde, über den frischen Stand (speichereProfil)', () => {
+    const profil = rumpf(quelle('src/components/settings/profile-form.tsx'), 'onSubmit')
+    expect(profil).toContain('const res = await speichereProfil(geaendertSeitLaden(anfang, data))')
+    // Gegenprobe: das ganze Formular vom Laden ginge nicht mehr direkt an die Aktion.
+    expect(quelle('src/components/settings/profile-form.tsx')).not.toMatch(/updateProfile\(/)
   })
 
   it('der Fehlerweg kehrt vorher zurück bzw. steht im anderen Zweig — kein Sprung bei einem Fehler', () => {
