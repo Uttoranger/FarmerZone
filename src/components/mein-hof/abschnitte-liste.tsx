@@ -63,6 +63,9 @@ export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt }: P
   const offenJetzt = useRef<HofseiteZeileId | null>(null)
   const hochladenJetzt = useRef(false)
   const nachDemSchliessen = useRef<(() => void) | null>(null)
+  // Beim Öffnen steht der Fokus auf dem Titel: Der Screenreader liest, wo man ist, am Handy geht keine
+  // Tastatur auf, und keine Kachel sieht schon gewählt aus. Weiter geht es mit Tab bzw. Wischen.
+  const titel = useRef<HTMLHeadingElement>(null)
 
   function setzeOffen(id: HofseiteZeileId | null) {
     offenJetzt.current = id
@@ -153,10 +156,12 @@ export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt }: P
           danach?.()
         }}
       >
-        <SheetBlatt>
+        <SheetBlatt initialFocus={titel}>
           {zeile && (
             <>
-              <SheetTitle className="font-heading text-xl leading-tight font-semibold break-words">{zeile.titel}</SheetTitle>
+              <SheetTitle ref={titel} tabIndex={-1} className="font-heading text-xl leading-tight font-semibold break-words outline-none">
+                {zeile.titel}
+              </SheetTitle>
               <AbschnittInhalt
                 id={zeile.id}
                 hof={hof}
