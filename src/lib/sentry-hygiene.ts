@@ -281,7 +281,7 @@ const ADRESSE_ERSATZ = '[adresse entfernt]'
  * Freitext-Regel nimmt Adressen und Zuweisungen selbst.
  */
 function bereinigeAbfrageWert(wert: string, tiefe: number): string {
-  const ohneZuweisung = wert.replace(BEARER_MUSTER, 'Bearer [entfernt]').replace(ZUWEISUNG_MUSTER, '$1$2[entfernt]')
+  const ohneZuweisung = ersetzeZuweisungen(wert.replace(BEARER_MUSTER, 'Bearer [entfernt]'))
   if (!ADRESS_WERT.test(ohneZuweisung)) return bereinigeText(ohneZuweisung)
   return tiefe < MAX_ADRESS_TIEFE ? bereinigeUrl(ohneZuweisung, tiefe + 1) : ADRESSE_ERSATZ
 }
@@ -373,14 +373,61 @@ const IPV4_MUSTER = /\b(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?:\.(?:25[0-5]|2[0-4]
 const IPV6_MUSTER =
   /(?<![\w:])(?=[0-9a-f:]*::|(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4})(?=[0-9a-f:]*[0-9a-f])[0-9a-f]{0,4}(?::[0-9a-f]{0,4}){2,7}(?![\w:])/gi
 
-/** „token=…", „secret: …" — Zuweisungen in freiem Text, auch ohne Adresse
- *  davor. `code` fehlt bewusst: „code=P2002" ist ein Prisma-Fehlercode. Ist
- *  der ganze Wert schon ein Platzhalter dieser Datei („otp: [code entfernt]"),
- *  bleibt er stehen — sonst würde daraus „otp: [entfernt] entfernt]" (Nr. 56).
- *  Nur ein eigener Platzhalter, nicht jeder Wert mit „[" (Runde 1: sonst blieb
- *  „token=[abc123]" stehen); hängt etwas daran, fällt der ganze Wert. */
-const ZUWEISUNG_MUSTER =
-  /\b(token|secret|passwor[dt]|otp|signatur|signature|sig|api[_-]?key|authorization)(\s*[=:]\s*)(?!\[[a-z -]{0,12}entfernt\](?![^\s&,;"'<>]))(?:\[[a-z -]{0,12}entfernt\])?[^\s&,;"'<>]+/gi
+/** Ein Schlüssel vor „=" oder „:" — die ganze Folge aus Wortzeichen und „-"
+ *  (ersetzeZuweisungen); ob er geheim ist, entscheidet istGeheimerSchluessel. */
+const ZUWEISUNG_KANDIDAT = /(?<![\w-])([\w-]+)(\s*[=:]\s*)/g
+
+/** Wörter, die einen Schlüssel geheim machen. `code` fehlt bewusst:
+ *  „code=P2002" ist ein Prisma-Fehlercode. */
+const GEHEIMES_WORT = new Set(['token', 'secret', 'passwort', 'password', 'otp', 'signatur', 'signature', 'sig', 'apikey', 'authorization'])
+
+/** Ein Platzhalter dieser Datei („[entfernt]", „[code entfernt]" …), klebend. */
+const EIGENER_PLATZHALTER = /\[[a-z -]{0,12}entfernt\]/iy
+
+/** Ein Wert bis zum nächsten Trenner, klebend. */
+const ZUWEISUNG_WERT = /[^\s&,;"'<>]*/y
+
+/** Ist ein Teil des Schlüssels ein geheimes Wort? Teile trennen „_", „-" und
+ *  der Wechsel zu einem Großbuchstaben (Runde 1: access_token, reset-token,
+ *  resetToken, XMLToken, x-api-key). Ein Wort, das nur so anfängt oder endet
+ *  (tokenizer, Apfelessig), ist kein Teil — vorher galt nur der Anfang eines
+ *  Worts, und „access_token=…" blieb stehen. */
+function istGeheimerSchluessel(schluessel: string): boolean {
+  const teile = schluessel
+    .replace(/([a-z0-9])(?=[A-Z])|([A-Z])(?=[A-Z][a-z])/g, '$1$2_')
+    .toLowerCase()
+    .split(/[_-]+/)
+  return teile.some((teil, i) => GEHEIMES_WORT.has(teil) || (teil === 'api' && teile[i + 1] === 'key'))
+}
+
+/**
+ * „token=…", „secret: …" — Zuweisungen in freiem Text, auch ohne Adresse
+ * davor: Der Wert bis zum nächsten Trenner fällt. Linear: Jeder Schlüssel
+ * wird einmal gefunden und eingeteilt, jeder Wert einmal gelesen; Schlüssel in
+ * einem schon ersetzten Wert zählen nicht mehr. Ist der ganze Wert schon ein
+ * Platzhalter dieser Datei („otp: [code entfernt]"), bleibt er stehen — sonst
+ * würde daraus „otp: [entfernt] entfernt]" (Nr. 56). Nur ein eigener
+ * Platzhalter, nicht jeder Wert mit „[" (Runde 1: sonst blieb
+ * „token=[abc123]" stehen); hängt etwas daran, fällt der ganze Wert.
+ */
+function ersetzeZuweisungen(text: string): string {
+  let ergebnis = ''
+  let ende = 0
+  for (const treffer of text.matchAll(ZUWEISUNG_KANDIDAT)) {
+    if (treffer.index < ende || !istGeheimerSchluessel(treffer[1])) continue
+    const wertAnfang = treffer.index + treffer[0].length
+    EIGENER_PLATZHALTER.lastIndex = wertAnfang
+    const nachPlatzhalter = EIGENER_PLATZHALTER.test(text) ? EIGENER_PLATZHALTER.lastIndex : wertAnfang
+    ZUWEISUNG_WERT.lastIndex = nachPlatzhalter
+    ZUWEISUNG_WERT.test(text)
+    const wertEnde = ZUWEISUNG_WERT.lastIndex
+    // Kein Wert, oder er ist genau ein eigener Platzhalter: stehen lassen.
+    if (wertEnde === wertAnfang || (nachPlatzhalter > wertAnfang && wertEnde === nachPlatzhalter)) continue
+    ergebnis += `${text.slice(ende, wertAnfang)}[entfernt]`
+    ende = wertEnde
+  }
+  return ergebnis + text.slice(ende)
+}
 
 const BEARER_MUSTER = /\bBearer\s+[A-Za-z0-9._~+/=-]+/g
 
@@ -419,10 +466,8 @@ function entferneIps(text: string): string {
 function bereinigeFreitext(text: string): string {
   const ohneIp = entferneIps(text)
   if (/^(?:https?:\/\/|\/)\S*$/i.test(ohneIp)) return bereinigeUrl(ohneIp)
-  return bereinigeTextMitUrls(ohneIp)
-    .replace(BEARER_MUSTER, 'Bearer [entfernt]')
-    .replace(ZUWEISUNG_MUSTER, '$1$2[entfernt]')
-    .replace(LANGE_KENNUNG_MUSTER, '[kennung entfernt]')
+  const ohneZuweisung = ersetzeZuweisungen(bereinigeTextMitUrls(ohneIp).replace(BEARER_MUSTER, 'Bearer [entfernt]'))
+  return ohneZuweisung.replace(LANGE_KENNUNG_MUSTER, '[kennung entfernt]')
 }
 
 /** Adressen in einem Fehlertext (Nr. 56): absolut (https://…, auch groß
@@ -447,9 +492,8 @@ const ADRESSE_IM_FEHLERTEXT =
  * einer Server Action), die beim Beheben helfen.
  */
 function bereinigeFehlertext(text: string): string {
-  return bereinigeText(text.replace(ADRESSE_IM_FEHLERTEXT, (adresse) => bereinigeUrl(adresse)))
-    .replace(BEARER_MUSTER, 'Bearer [entfernt]')
-    .replace(ZUWEISUNG_MUSTER, '$1$2[entfernt]')
+  const mitAdressen = bereinigeText(text.replace(ADRESSE_IM_FEHLERTEXT, (adresse) => bereinigeUrl(adresse)))
+  return ersetzeZuweisungen(mitAdressen.replace(BEARER_MUSTER, 'Bearer [entfernt]'))
 }
 
 /**

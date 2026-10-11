@@ -382,6 +382,10 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
     ['Schrägstriche nach Doppelpunkt im Fehlertext', { exception: { values: [{ value: ':/'.repeat(N) }] } }],
     ['Schrägstriche nach Umlauten im Fehlertext', { exception: { values: [{ value: 'ä/'.repeat(N) }] } }],
     ['viele Adressen nach Anführungszeichen im Fehlertext', { exception: { values: [{ value: '«/'.repeat(N / 10) }] } }],
+    ['viele harmlose Schlüssel', { message: 'a=b '.repeat(N / 2) }],
+    ['langer Schlüssel mit Trennern', { exception: { values: [{ value: 'a_'.repeat(N) + '=x' }] } }],
+    ['camelCase-Schlüssel ohne Wert', { exception: { values: [{ value: 'aToken'.repeat(N / 3) + ':' }] } }],
+    ['token= ohne Wert', { extra: { text: 'token=' + ' '.repeat(2 * N) + '&' } }],
   ]
 
   for (const [name, teil] of lang) {
@@ -755,6 +759,22 @@ describe('Nr. 56, Nachbesserung Runde 1 — Befunde der Prüfung', () => {
     // Gegenproben: Ein Schrägstrich nach Buchstabe oder Ziffer (jeder Schrift) beginnt keine Adresse.
     for (const text of ['und/oder, 3/4 und 1/2', 'Maß/abcdefghijklmnopqrstuvwxyz', 'localhost:3000/api/orders/confirm/x', 'v1.2/beta', 'Gewicht 50%/Jahr']) {
       expect(fehlertext(text), text).toBe(text)
+    }
+  })
+  it('die Zuweisungs-Regel erkennt Schlüssel mit Vorsilbe — access_token, resetToken, reset_token, x-api-key —, aber kein Wort, das nur so anfängt oder endet', () => {
+    // Vorher verlangte sie eine Wortgrenze vor dem Schlüsselwort; „_" und ein
+    // Großbuchstabe mitten im Schlüssel sind keine.
+    const roh = 'Abmeldung access_token=abc123 resetToken=abc123 reset_token=abc123 X-Api-Key: abc123 APIKey=abc123 client_secret=abc123'
+    const sauber =
+      'Abmeldung access_token=[entfernt] resetToken=[entfernt] reset_token=[entfernt] X-Api-Key: [entfernt] APIKey=[entfernt] client_secret=[entfernt]'
+    expect(fehlertext(roh)).toBe(sauber)
+    expect(nachricht(roh)).toBe(sauber)
+    expect(bereinigeEreignis(ereignis({ extra: { text: roh } })).extra).toEqual({ text: sauber })
+    expect(fehlertext('Abruf /x?info=access_token%3Dabc123 gescheitert')).toBe('Abruf /x?info=access_token%3D%5Bentfernt%5D gescheitert')
+    // Gegenproben: Wörter, die mit einem Schlüsselwort anfangen oder enden, und Fehlercodes.
+    for (const text of ['tokenizer=abc123', 'Tokens: 5', 'Apfelessig: 2 Liter', 'Signaturen: 3', 'otpCount5 bleibt', 'code=P2002', 'Rabattcode: SOMMER']) {
+      expect(fehlertext(text), text).toBe(text)
+      expect(nachricht(text), text).toBe(text)
     }
   })
 })
