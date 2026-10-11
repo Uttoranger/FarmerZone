@@ -4697,6 +4697,12 @@ Auftrag freigabe.md §13 „56" (Sicherheitspfad, Nachprüfung). Keine Schema-Ä
   - Telefon-Regel: Die vorgeschlagene einfache Grenze `(?<![\w-])` hätte „Rückruf-0664 1234567" und „Tel0664 …" freigegeben. Deshalb: nie mitten in einer Zahl (Zeitstempel), und eine links an ein Wort geklebte Ziffernfolge nur, wenn sie rechts frei endet (cuid, UUID bleiben).
   - Lange Kennungen bleiben im Fehlertext: Reines Hex zu verschonen und den Rest zu ersetzen, hätte unsere eigenen Hex-Signaturen (Formular, Abmelden, Bestell-Link …) trotzdem durchgelassen und Chunk-Namen und UUIDs gekostet. Ein Token ohne Schlüssel bleibt dort Restrisiko.
   - Nicht geändert (Vorgabe): die Fehlerklasse `exception.values[].type` — im vollen Ereignis ungefiltert, im Minimalereignis nur durch die Text-Regel.
+- **Nachbesserung Runde 2 (Befunde der Nachprüfung, je Punkt erst ein roter Test):**
+  - Rückschritt aus Runde 1: „keine Ziffer davor" ließ eine Nummer direkt nach einem Escape stehen, das auf eine Ziffer endet (`Ruf%2006641234567`). Ein Prozent-Escape links ist jetzt eine freie Grenze.
+  - Gegenstück zu Blocker 1: Adress- und Zuweisungs-Regel sahen nur die einmal dekodierte Form eines Abfragewerts (`?next=%252Freset-password%253Ftoken%253D…`). Jetzt wird der Wert vorher weiter dekodiert, solange er sich ändert (höchstens `MAX_ADRESS_TIEFE`-mal) — fehlertolerant, weil `decodeURIComponent` sonst für den ganzen Wert würfe; eine Folge ohne gültiges UTF-8 behält ihre übrigen Bytes, nur ASCII (die Trenner) wird dekodiert.
+  - Kodierte Trenner: Ein Escape vor dem Schlüssel ist eine Grenze (vorher „20token"), ein Anker mit `%3D` wird dekodiert und wie eine Query bereinigt, und die Zuweisungs-Regel läuft auch über den Pfad (vorher fiel „/x%23token=…" nur eingebettet im Text).
+  - Nachricht, Brotkrume und extra nehmen eingebettete relative Adressen wie der Fehlertext. Keine neue Art von Über-Schwärzung: Ein Text, der ganz eine relative Adresse ist, lief schon durch die URL-Regel; eine cuid als Segment einer eingebetteten relativen Adresse fällt jetzt ebenso.
+  - Telefon-Regel: Datum mit Uhrzeit (`01.09.2026 08:00`), lange Dezimalzahlen und eine UUID mit reiner Ziffern-Endgruppe gelten weiter als Nummer (Bestand). Sie zu verschonen, bräuchte eine weitere Grenze („keine Ziffer mit Punkt davor"), die eine direkt dahinter geklebte Nummer freigäbe — deshalb nur die Regel in `docs/ai/CODING_STANDARDS.md` eingegrenzt.
 
 ## Nützliche Befehle
 
