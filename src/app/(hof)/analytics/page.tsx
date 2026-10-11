@@ -10,7 +10,7 @@ import { getKennzahlen, getServicegebuehrenMonat } from '@/server/queries/auswer
 import { getTeilenWirkung } from '@/server/queries/teilen-wirkung'
 import { testzahlungenHinweisFuerHof } from '@/server/queries/testzahlungen'
 import {
-  auswertungZeigtAb,
+  auswertungSummen,
   grenzeStand,
   servicegebuehrenSaetze,
   teilenKarte,
@@ -153,7 +153,7 @@ async function ladeAuswertung(farmId: string, periode: Periode, zurueck: number,
     getKennzahlen(farmId, pf),
     getTeilenWirkung(farmId, teilenZeitraumAus(pf)),
     getServicegebuehrenMonat(farmId, jetzt),
-    testzahlungenHinweisFuerHof(farmId, auswertungZeigtAb(pf, jetzt)),
+    testzahlungenHinweisFuerHof(farmId, auswertungSummen(pf, jetzt)),
   ])
   return { umsatz, ytdRevenue, kennzahlen, wirkung, gebuehren, grenze: limitProgress(ytdRevenue), testzahlungenHinweis }
 }

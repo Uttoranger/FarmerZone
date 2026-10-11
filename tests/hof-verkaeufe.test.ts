@@ -63,7 +63,7 @@ import { HOF_NEU } from '@/lib/bauern-navigation'
 import {
   JAHRESSUMME_TEXT,
   UMSATZGRENZE_ERKLAERUNG,
-  verkaeufeZeigenAb,
+  verkaeufeSummen,
   verkaufsZeilen,
   wiederholVorlagen,
   type FeedVerkauf,
@@ -73,6 +73,7 @@ import { mergeSalesFeed, type SalesFeedOrder } from '@/lib/sales-summary'
 import { manualSaleFormSchema } from '@/schemas/manual-sale'
 import { NOTIZ_MAX, PRODUKTNAME_MAX, VERKAUF_BETRAG_MAX, VERKAUF_MENGE_MAX, ZU_LANG } from '@/lib/eingabegrenzen'
 import { formatEuro } from '@/lib/format'
+import { umsatzfenster } from '@/lib/umsatz'
 import { getSalesOverview, type SalesOverview } from '@/server/queries/manual-sales'
 import { createManualSale, deleteManualSale, updateManualSale } from '@/server/actions/manual-sales'
 import { VerkaeufeAnsicht } from '@/components/hof-verkaeufe/verkaeufe-ansicht'
@@ -236,7 +237,7 @@ describe('getSalesOverview — eigener Hof, Geld in Cent', () => {
   it('ohne Stichtag kein Hinweis und keine zusätzliche Abfrage — wie vor Nr. 55', async () => {
     const uebersicht = await getSalesOverview('hof-1', JETZT, null)
     expect(uebersicht.testzahlungenHinweis).toBeNull()
-    for (const [args] of db.order.findMany.mock.calls) expect(args.where).not.toHaveProperty('NOT')
+    for (const [args] of db.order.findMany.mock.calls) expect(args.where).not.toHaveProperty('AND')
   })
 
   it('mit Stichtag fehlen Testzahlungen in Woche und Jahr; der Hinweis fragt nur den eigenen Hof', async () => {
@@ -245,10 +246,14 @@ describe('getSalesOverview — eigener Hof, Geld in Cent', () => {
     const uebersicht = await getSalesOverview('hof-1', JETZT, stichtag)
 
     const [woche, , jahr] = db.order.findMany.mock.calls.map(([args]) => args.where)
-    expect(woche.NOT).toEqual({ paymentMethod: 'ONLINE', createdAt: { lt: stichtag } })
-    expect(jahr.NOT).toEqual({ paymentMethod: 'ONLINE', createdAt: { lt: stichtag } })
+    expect(woche.AND).toEqual([{ NOT: { paymentMethod: 'ONLINE', createdAt: { lt: stichtag } } }])
+    expect(jahr.AND).toEqual([{ NOT: { paymentMethod: 'ONLINE', createdAt: { lt: stichtag } } }])
+    // Dieselbe Form wie die Summen: abgeholt im Fenster der Woche bzw. des Jahres, und eine Testzahlung.
     const hinweis = db.order.findFirst.mock.calls[0][0].where
-    expect(hinweis).toMatchObject({ farmId: 'hof-1', paymentMethod: 'ONLINE', createdAt: { lt: stichtag }, status: { not: 'CANCELLED' } })
+    expect(hinweis.OR).toHaveLength(2)
+    for (const fenster of hinweis.OR) {
+      expect(fenster).toMatchObject({ farmId: 'hof-1', status: 'PICKED_UP', AND: [{ paymentMethod: 'ONLINE', createdAt: { lt: stichtag } }] })
+    }
     expect(uebersicht.testzahlungenHinweis).toBe('Testzahlungen vor dem 5.\u00a0Oktober 2026, 21:00 Uhr sind nicht mitgezählt.')
   })
 
@@ -258,13 +263,10 @@ describe('getSalesOverview — eigener Hof, Geld in Cent', () => {
   })
 })
 
-describe('verkaeufeZeigenAb — ab hier betrifft eine Testzahlung die Seite (Register Z4)', () => {
-  it('sonst der Beginn des Wiener Jahres (Jahressumme für die Umsatzgrenze)', () => {
-    expect(verkaeufeZeigenAb(new Date('2026-10-10T09:00:00Z')).toISOString()).toBe('2025-12-31T23:00:00.000Z')
-  })
-
-  it('in der ersten Jännerwoche der Montag im Dezember, an dem die Woche beginnt', () => {
-    expect(verkaeufeZeigenAb(new Date('2027-01-02T09:00:00Z')).toISOString()).toBe('2026-12-27T23:00:00.000Z')
+describe('verkaeufeSummen — daran misst sich die Hinweiszeile (Register Z4, Nachbesserung Runde 1)', () => {
+  it('die laufende Woche und das Wiener Jahr (Jahressumme für die Umsatzgrenze), keine Servicegebühren', () => {
+    const jetzt = new Date('2027-01-02T09:00:00Z') // erste Jännerwoche: Woche beginnt im Dezember
+    expect(verkaeufeSummen(jetzt)).toEqual({ umsatz: [umsatzfenster('woche', jetzt).aktuell, umsatzfenster('jahr', jetzt).aktuell] })
   })
 })
 

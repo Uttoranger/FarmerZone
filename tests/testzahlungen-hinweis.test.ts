@@ -129,11 +129,12 @@ describe('Auswertung — Hinweiszeile im Kopf', () => {
     expect(await auswertung()).not.toContain('Testzahlungen')
   })
 
-  it('fragt ab dem frühesten gezeigten Zeitpunkt, mit der farmId der Sitzung', async () => {
+  it('fragt mit den Summen der Seite (zwei Umsatzfenster, Monat der Servicegebühren) und der farmId der Sitzung', async () => {
     await auswertung()
-    const [farmId, seit] = vi.mocked(testzahlungenHinweisFuerHof).mock.calls.at(-1) ?? []
+    const [farmId, summen] = vi.mocked(testzahlungenHinweisFuerHof).mock.calls.at(-1) ?? []
     expect(farmId).toBe('hof-1')
-    expect(seit).toBeInstanceOf(Date)
+    expect(summen?.umsatz).toHaveLength(2)
+    expect(summen?.gebuehrenMonat?.von).toBeInstanceOf(Date)
   })
 })
 

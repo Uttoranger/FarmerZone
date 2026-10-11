@@ -210,13 +210,38 @@ export function leseStripeLiveAb(wert: string | undefined): StichtagPruefung {
   if (monat < 1 || monat > 12 || tag < 1 || tag > tageImMonat || stunde > 23 || minute > 59 || sekunde > 59) {
     return { problem: 'ungueltig' }
   }
-  // Zeitzonen der Erde liegen zwischen -12:00 und +14:00.
-  if (Number(zoneMin) > 59 || versatzMin > 14 * 60) return { problem: 'ungueltig' }
+  // Zeitzonen der Erde liegen zwischen −12:00 und +14:00 — alles darüber ist ein Tippfehler.
+  const hoechstensMin = (vorzeichen === '-' ? 12 : 14) * 60
+  if (Number(zoneMin) > 59 || versatzMin > hoechstensMin) return { problem: 'ungueltig' }
   const millis = Number(bruch.padEnd(3, '0'))
   const ortszeit = Date.UTC(jahr, monat - 1, tag, stunde, minute, sekunde, millis)
   const versatz = zone === 'Z' ? 0 : (vorzeichen === '-' ? -1 : 1) * versatzMin
   return { ab: new Date(ortszeit - versatz * 60_000) }
 }
+
+/**
+ * Wie weit der Stichtag in der Zukunft liegen darf, bevor er sich meldet. Der
+ * Mensch trägt den Beginn des Redeploys ein (docs/betrieb/stripe-live.md,
+ * Schritt 4) — wenige Stunden voraus sind kein Fehler. Mehr als ein Tag riecht
+ * nach falschem Jahr oder Monat.
+ */
+export const STICHTAG_ZUKUNFT_GRENZE_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Liegt der Stichtag mehr als 24 Stunden nach `jetzt`? Dann nähme er still alle
+ * Online-Umsätze bis dahin heraus — Heute, Kunden und die Admin-Hofliste
+ * zeigen weniger, ohne Hinweiszeile. Der Stichtag gilt trotzdem; die Frage
+ * entscheidet nur, ob gewarnt wird (`meldeUmgebungsWarnungen`,
+ * src/lib/umgebung-server.ts). Gemessen zur Laufzeit, deshalb `jetzt` als
+ * Parameter.
+ */
+export function stichtagWeitInDerZukunft(stripeLiveAb: Date | null, jetzt: Date): boolean {
+  return stripeLiveAb !== null && stripeLiveAb.getTime() - jetzt.getTime() > STICHTAG_ZUKUNFT_GRENZE_MS
+}
+
+/** Die Warnung dazu — ohne den Wert, wie alle Warnungen hier. */
+export const STICHTAG_ZUKUNFT_WARNUNG =
+  'STRIPE_LIVE_AB liegt mehr als 24 Stunden in der Zukunft — bis dahin zählen alle Online-Bestellungen als Testzahlungen. Stimmen Jahr und Monat?'
 
 const STICHTAG_WARNUNG = {
   'ohne-zeitzone':

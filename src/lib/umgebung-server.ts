@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/nextjs'
 import { env } from '@/lib/env'
-import { bestimmeUmgebung, type Umgebung } from '@/lib/umgebung'
+import { STICHTAG_ZUKUNFT_WARNUNG, bestimmeUmgebung, stichtagWeitInDerZukunft, type Umgebung } from '@/lib/umgebung'
 import { istTestbetrieb } from '@/lib/stripe-modus'
 import { stripeMarke, type StripeMarke } from '@/lib/testumgebung'
 
@@ -72,19 +72,37 @@ export const STRIPE_LIVE_AB: Date | null = UMGEBUNG.stripeLiveAb
 // Einmal je Kaltstart — mehr wäre bei jedem Seitenaufruf dieselbe Meldung.
 // Serverlos heißt: je Instanz einmal; das ist gewollt, nicht zu viel.
 let warnungenGemeldet = false
+let stichtagZukunftGemeldet = false
 
 /**
  * Widersprüche in Produktion (Dev-Datenbank, Stripe test) gehen nicht ins
  * Banner — Kundinnen sehen nie eines — sondern als Warnung an Sentry.
  * Ohne DSN ist Sentry nicht initialisiert und der Aufruf ein No-op; schlägt
  * er dennoch fehl, bleibt es folgenlos.
+ *
+ * Dazu, zur Laufzeit gemessen (`jetzt`), ein Stichtag mehr als 24 Stunden in
+ * der Zukunft (Register Z4, `stichtagWeitInDerZukunft`): Er gilt, nähme aber
+ * still alle Online-Umsätze heraus. In jeder Umgebung, weil ihn kein Banner
+ * zeigt; ebenso höchstens einmal je Instanz und ohne den Wert. Die Seiten
+ * rufen diese Funktion über das Umgebungsbanner bei jedem Aufbau.
  */
-export function meldeUmgebungsWarnungen(): void {
+export function meldeUmgebungsWarnungen(jetzt: Date = new Date()): void {
+  meldeStichtagInDerZukunft(jetzt)
   if (UMGEBUNG.art !== 'produktion' || UMGEBUNG.warnungen.length === 0) return
   if (warnungenGemeldet) return
   warnungenGemeldet = true
   try {
     Sentry.captureMessage(`Umgebung widersprüchlich: ${UMGEBUNG.warnungen.join(' ')}`, 'warning')
+  } catch {
+    // Telemetrie scheitert leise.
+  }
+}
+
+function meldeStichtagInDerZukunft(jetzt: Date): void {
+  if (stichtagZukunftGemeldet || !stichtagWeitInDerZukunft(STRIPE_LIVE_AB, jetzt)) return
+  stichtagZukunftGemeldet = true
+  try {
+    Sentry.captureMessage(`Umgebung widersprüchlich: ${STICHTAG_ZUKUNFT_WARNUNG}`, 'warning')
   } catch {
     // Telemetrie scheitert leise.
   }

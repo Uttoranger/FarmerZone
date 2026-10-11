@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest'
 import {
   SERVICEGEBUEHREN_ERKLAERUNG,
   abholtageDesFensters,
-  auswertungZeigtAb,
+  auswertungSummen,
   grenzeStand,
   kennzahlen,
   servicegebuehrenImMonat,
@@ -179,22 +179,26 @@ describe('Servicegebühren — Testzahlungen zählen nicht (Register Z4, Nr. 55)
   })
 })
 
-describe('auswertungZeigtAb — ab hier betrifft eine Testzahlung die Seite (Register Z4)', () => {
+describe('auswertungSummen — daran misst sich die Hinweiszeile (Register Z4, Nachbesserung Runde 1)', () => {
   const jetzt = new Date('2026-11-18T09:00:00Z') // Mittwoch
 
-  it('Woche und Monat: der Jahresbeginn in Wien — die Grenzkarte zeigt das ganze Jahr', () => {
-    for (const periode of ['woche', 'monat'] as const) {
-      expect(auswertungZeigtAb(umsatzfenster(periode, jetzt), jetzt).toISOString()).toBe('2025-12-31T23:00:00.000Z')
-    }
+  it('Umsatz: Balken samt Vorperiode und das Wiener Jahr der Grenzkarte; dazu der Monat der Servicegebühren', () => {
+    const pf = umsatzfenster('woche', jetzt)
+    const summen = auswertungSummen(pf, jetzt)
+    expect(summen.umsatz).toEqual([
+      { von: pf.vergleichGanz.von, bis: pf.aktuell.bis },
+      umsatzfenster('jahr', jetzt).aktuell,
+    ])
+    expect(summen.gebuehrenMonat?.von.toISOString()).toBe('2026-10-31T23:00:00.000Z')
+    expect(summen.gebuehrenMonat?.bis.toISOString()).toBe('2026-11-30T23:00:00.000Z')
   })
 
-  it('Jahr: die Vorperiode, wenn sie früher beginnt — das Vorjahr der Balken', () => {
-    expect(auswertungZeigtAb(umsatzfenster('jahr', jetzt), jetzt).toISOString()).toBe('2024-12-31T23:00:00.000Z')
-  })
-
-  it('erste Jännerwoche: die Vorwoche liegt im Dezember davor', () => {
-    const jaenner = new Date('2027-01-05T09:00:00Z') // Dienstag
-    expect(auswertungZeigtAb(umsatzfenster('woche', jaenner), jaenner).toISOString()).toBe('2026-12-27T23:00:00.000Z')
+  it('ein älteres Jahr: Balkenfenster und laufendes Jahr bleiben zwei Fenster — die Lücke dazwischen zählt nicht', () => {
+    const pf = umsatzfenster('jahr', jetzt, 3) // 2023 mit Vorjahr 2022
+    const [balken, jahr] = auswertungSummen(pf, jetzt).umsatz
+    expect(balken.von.toISOString()).toBe('2021-12-31T23:00:00.000Z')
+    expect(balken.bis.toISOString()).toBe('2023-12-31T22:59:59.999Z')
+    expect(jahr.von.toISOString()).toBe('2025-12-31T23:00:00.000Z')
   })
 })
 

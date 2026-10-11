@@ -23,7 +23,7 @@ import { tagVersetzt, wienKalendertag, wienWochenMontag } from '@/lib/kalender'
 import { wienerMitternacht, centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { CHANNEL_LABELS } from '@/schemas/manual-sale'
-import { ohneTestzahlungenWhere } from '@/lib/testzahlung'
+import { ohneTestzahlungenWhere, testzahlungWhere } from '@/lib/testzahlung'
 
 export type Periode = 'woche' | 'monat' | 'jahr'
 
@@ -165,6 +165,11 @@ export function zaehltVerkauf(saleDate: Date, fenster: Umsatzfenster): boolean {
   return tag >= wienKalendertag(fenster.von) && tag <= wienKalendertag(fenster.bis)
 }
 
+/** Abgeholt im Fenster — der gemeinsame Teil der beiden Bedingungen darunter. */
+function abgeholtImFenster(farmId: string, fenster: Umsatzfenster): Prisma.OrderWhereInput {
+  return { farmId, status: 'PICKED_UP', pickedUpAt: { gte: fenster.von, lte: fenster.bis } }
+}
+
 /**
  * Dieselbe Regel als Bedingung für die Datenbank — ohne Testzahlungen
  * (Register Z4). Der Stichtag ist Pflicht, damit jede Summe ihn bedenkt;
@@ -175,7 +180,18 @@ export function umsatzBestellungWhere(
   fenster: Umsatzfenster,
   stripeLiveAb: Date | null
 ): Prisma.OrderWhereInput {
-  return { farmId, status: 'PICKED_UP', pickedUpAt: { gte: fenster.von, lte: fenster.bis }, ...ohneTestzahlungenWhere(stripeLiveAb) }
+  return { ...abgeholtImFenster(farmId, fenster), ...ohneTestzahlungenWhere(stripeLiveAb) }
+}
+
+/**
+ * Genau die Testzahlungen, die die Umsatzregel ohne Stichtag gezählt hätte —
+ * die Bedingung der Hinweiszeile auf Auswertung und Verkäufen (Register Z4).
+ * Dieselbe Form wie die Summe, damit Zeile und Zahl übereinstimmen: Eine
+ * offene oder stornierte Testzahlung zählt in keiner Umsatzsumme, sie bringt
+ * deshalb auch keine Zeile.
+ */
+export function umsatzTestzahlungenWhere(farmId: string, fenster: Umsatzfenster, stripeLiveAb: Date): Prisma.OrderWhereInput {
+  return { ...abgeholtImFenster(farmId, fenster), AND: [testzahlungWhere(stripeLiveAb)] }
 }
 
 export function umsatzVerkaufWhere(farmId: string, fenster: Umsatzfenster): Prisma.ManualSaleWhereInput {
