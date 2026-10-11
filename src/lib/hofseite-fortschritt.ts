@@ -397,11 +397,13 @@ export const EINSTELLUNG_FUER_ZEILE: Record<HofseiteZeileId, string> = {
 /**
  * Die Zeilen in der Reihenfolge, in der ihre Abschnitte auf der Hofseite am
  * Handy stehen (hofseite-kunde.tsx, von oben nach unten): Titelbild mit Name,
- * Leitspruch und Adresse, der Hinweis bei Pause, die Reiter, dann die
- * Seitenspalte (Abholung, Zahlung und Kontakt) vor dem Inhalt (Über uns mit
- * Gründungsjahr und Werten, Fotos). So liest sich die Liste „Bearbeiten"
- * unter lg wie die Seite, die die Kundin sieht (Nr. 50). Ab lg bleiben die
- * Gruppen des Editors.
+ * Leitspruch und Adresse, der Hinweis bei Pause, die Reiter, das Schaufenster
+ * mit dem Fotostreifen (Register N5, Nr. 51), dann die Seitenspalte
+ * (Abholung, Zahlung und Kontakt) und Über uns mit Gründungsjahr und Werten.
+ * So liest sich die Liste „Bearbeiten" unter lg wie die Seite, die die Kundin
+ * sieht (Nr. 50). Maßstab ist die Übersicht mit Produkten: Ohne Produkte gibt
+ * es kein Schaufenster, die Fotos stehen dann als Raster nach Über uns. Ab lg
+ * bleiben die Gruppen des Editors.
  */
 export const HOFSEITE_REIHENFOLGE: readonly HofseiteZeileId[] = [
   'titelbild',
@@ -411,12 +413,12 @@ export const HOFSEITE_REIHENFOLGE: readonly HofseiteZeileId[] = [
   'adresse',
   'bestellungen',
   'abschnitte',
+  'fotos',
   'abholzeiten',
   'zahlung',
   'kontakt',
   'ueber-uns',
   'werte',
-  'fotos',
 ]
 
 /** Die Zeilen des Fortschritts in der Reihenfolge der Hofseite (HOFSEITE_REIHENFOLGE). */

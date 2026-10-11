@@ -4798,6 +4798,7 @@ Auftrag freigabe.md §13 „51", Register N5. Keine Schema-Änderung, keine Migr
 - **Nachbesserung Runde 1 (Prüfung, Hinweise des Dirigenten):**
   - Die Zusammenfassung des zugeklappten Abschnitts „Preis" im Produktdialog zeigte bei leerem Feld „€ 0,00"; sie nimmt jetzt denselben Maßstab und Satz wie die Vorschau (`gueltigerPreis`, „Preis fehlt noch"). Nur Anzeige.
   - Die Ladeansicht hat die Bauweise der Seite (unter lg Quelltext = Sicht, ab lg dasselbe Raster) und zeigt „Nächste Abholung" als Textzeilen in der Höhe der echten Karte (172 zu 173 px). Einen Platzhalter für den Fotostreifen hat sie bewusst nicht: Die Regel „Ladeansicht" in DESIGN_SYSTEM.md nennt genau den Fotostreifen als bedingten Teil, der wegbleibt — bei einem Hof ohne Fotos spränge der Inhalt sonst um rund 146 px nach oben. Bei Höfen mit Fotos rückt er beim Übergang um diesen Betrag nach unten; zur Entscheidung im Bericht 51.
+- **Zusammenspiel mit Nr. 50 (Sammel-PR Lauf 9):** Die Liste „Bearbeiten" in Mein Hof folgt der Hofseite am Handy (`HOFSEITE_REIHENFOLGE`). Mit dem Schaufenster steht „Fotos" darin jetzt hinter den Reitern statt am Ende; Maßstab ist die Übersicht mit Produkten. Ohne Produkte stehen die Fotos auf der Seite nach Über uns — beide Fälle zugleich kann eine Liste nicht abbilden.
 
 ## Nützliche Befehle
 

@@ -102,10 +102,11 @@ describe('Ziel in den Einstellungen (Nr. 50: Mein Auftritt zieht in Mein Hof)', 
 })
 
 describe('Reihenfolge der Hofseite (Liste „Bearbeiten" unter lg, Nr. 50)', () => {
-  // Die Abschnitte der Hofseite am Handy von oben nach unten: Titelbild mit
-  // Name und Adresse, Pausen-Hinweis, Reiter, dann die Seitenspalte (Abholung,
-  // Zahlung & Kontakt) vor dem Inhalt (Über uns, Fotos) — hofseite-kunde.tsx.
-  const AUF_DER_SEITE = ['titelbild', 'bestellungen', 'abschnitte', 'abholung', 'kontakt', 'ueberuns', 'fotos']
+  // Die Abschnitte der Hofseite am Handy von oben nach unten (Übersicht mit
+  // Produkten): Titelbild mit Name und Adresse, Pausen-Hinweis, Reiter, das
+  // Schaufenster mit dem Fotostreifen (N5, Nr. 51), dann die Seitenspalte
+  // (Abholung, Zahlung & Kontakt) und Über uns — hofseite-kunde.tsx.
+  const AUF_DER_SEITE = ['titelbild', 'bestellungen', 'abschnitte', 'fotos', 'abholung', 'kontakt', 'ueberuns']
 
   it('jede Zeile genau einmal', () => {
     expect(HOFSEITE_REIHENFOLGE.toSorted()).toEqual(hofseiteZeileIdSchema.options.toSorted())
@@ -123,12 +124,12 @@ describe('Reihenfolge der Hofseite (Liste „Bearbeiten" unter lg, Nr. 50)', () 
       'adresse',
       'bestellungen',
       'abschnitte',
+      'fotos',
       'abholzeiten',
       'zahlung',
       'kontakt',
       'ueber-uns',
       'werte',
-      'fotos',
     ])
   })
 
