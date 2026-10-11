@@ -22,15 +22,15 @@
  *    nur FarmPageView ein; die Kundenansicht des Besitzers ist die echte Route
  *    im Rahmen (?vorschau=1 über vorschauLink), kein Nachbau.
  *  - Bearbeitungs-Elemente (Stifte, Werkzeugleiste, Bearbeitungs-Hinweis und
- *    die übrigen Knöpfe des Hofs) erscheinen nur mit ownerMode: Die Seite für
- *    Kundinnen und die Vorschau rendern ohne sie. Gerendert wird echt
- *    (react-dom/server in Node); je Quelle eine Gegenprobe, dass die Suche
- *    jedes Merkmal auch findet — FarmPageView im Bearbeitungsmodus für ihre
- *    Elemente, Mein Hof (MeinHofAnsicht, seit Nr. 49) für die Werkzeugleiste.
+ *    die übrigen Knöpfe des Hofs) gibt es auf der Hofseite nicht: Die Seite für
+ *    Kundinnen und die Vorschau rendern ohne sie, und FarmPageView hat seit
+ *    Nr. 50 Runde 1 keinen Bearbeitungsmodus mehr (kein `ownerMode`).
+ *    Gerendert wird echt (react-dom/server in Node); je Merkmal eine
+ *    Gegenprobe, dass die Suche es auch findet — die Werkzeugleiste an Mein
+ *    Hof (MeinHofAnsicht, seit Nr. 49), die übrigen an einem Stück HTML.
  *  - Kaufen wirkt bei Kundinnen und nirgends sonst: Der Korb (CartSheet) hängt
- *    nur in der Seite für Kundinnen — nicht in der Vorschau, nicht im
- *    Bearbeitungsmodus. Ginge `kaufen` auf dem Weg ins Produktraster verloren,
- *    reservierte die Vorschau Bestand.
+ *    nur in der Seite für Kundinnen — nicht in der Vorschau. Ginge `kaufen` auf
+ *    dem Weg ins Produktraster verloren, reservierte die Vorschau Bestand.
  */
 import { describe, it, expect, vi } from 'vitest'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
@@ -107,9 +107,8 @@ function funde(pfad: string, roh: string): Fund[] {
   }
   suche(new RegExp(String.raw`\[\s*${NAME}\s*\]`, 'g'), 'Index') // suche[VORSCHAU_PARAMETER]
   suche(new RegExp(String.raw`\.(?:get|getAll|has)\(\s*${NAME}`, 'g'), 'URLSearchParams')
-  // Jede Eigenschaft .vorschau — bis auf die eine, die nichts mit der Adresse
-  // zu tun hat: die Kundenansicht des Besitzers im Pausen-Banner.
-  suche(/\.vorschau\b/g, 'Eigenschaft', (stelle) => pfad === 'src/lib/shop-pause.ts' && text.slice(stelle - 7, stelle) === 'eingabe')
+  // Jede Eigenschaft .vorschau (die eine Ausnahme, der Pausen-Banner des Besitzers, ist seit Nr. 50 Runde 1 entfallen).
+  suche(/\.vorschau\b/g, 'Eigenschaft')
   suche(/\{[^{}]*\bvorschau\b[^{}]*\}\s*=(?!=)/g, 'Zerlegen') // const { vorschau } = await searchParams
   suche(/vorschau=/g, 'Adresse im Text') // location.search.includes('vorschau=1'), /[?&]vorschau=1/
   // Das Wort als Text: nur als Wert der Ansicht (art) und in der Definition der Konstante.
@@ -274,15 +273,19 @@ describe('FarmPageView bindet genau eine Stelle ein', () => {
     expect(meinHof).not.toMatch(/FarmPageView|FarmPageClient|HofseiteKunde/)
   })
 
-  it('die Hofseite rendert sie immer ohne ownerMode; keine Seite bindet mehr einen Bearbeitungsmodus ein', () => {
+  it('FarmPageView hat keinen Bearbeitungsmodus mehr (Nr. 50 Runde 1) — die Hofseite rendert sie ohne', () => {
     const seite = ohneKommentare(quelle('src/app/(public)/[farmSlug]/page.tsx'))
-    expect(seite.match(/ownerMode=\{[^}]*\}/g)).toEqual(['ownerMode={false}'])
+    expect(seite).not.toMatch(/ownerMode/)
+    const ansicht = ohneKommentare(quelle('src/components/farm/farm-page-view.tsx'))
+    expect(ansicht).not.toMatch(/ownerMode|HofseiteBesitzer|pastStatusCount|onVorschau/)
+    // Gegenprobe: Die Suche findet die alte Form.
+    expect('<FarmPageView farm={farm} ownerMode={false} />').toMatch(/ownerMode/)
     const besitzerSeiten = SRC.filter((pfad) => /<FarmPageClient\b/.test(ohneKommentare(quelle(pfad))))
     expect(besitzerSeiten).toEqual([])
   })
 })
 
-// ── Bearbeitungs-Elemente nur mit ownerMode, Korb nur für Kundinnen ───────
+// ── Keine Bearbeitungs-Elemente auf der Hofseite, Korb nur für Kundinnen ───
 
 function produkt(id: string, name: string, sichtbar: boolean): PublicProduct {
   return {
@@ -317,7 +320,7 @@ const STATUS: ActiveStatusPost = {
 
 type Merkmal = { was: string; muster: RegExp }
 
-/** Woran man die Bearbeitungs-Elemente von FarmPageView im HTML erkennt. */
+/** Woran man die früheren Bearbeitungs-Elemente der Hofseite im HTML erkennt. */
 const IN_DER_ANSICHT: Merkmal[] = [
   { was: 'Stift', muster: /lucide-pencil/ },
   { was: 'Bearbeitungs-Hinweis', muster: /Du bearbeitest deine Hof-Seite|Stift-Symbol/ },
@@ -341,16 +344,21 @@ const VORSCHAU: Ansicht = { art: 'vorschau', kaufen: false }
 /** Genau so, wie die Hofseite FarmPageView rendert — in der KundeShell, mit der Ansicht aus ansichtsModus. */
 function hofseite(ansicht: Ansicht, farm: PublicFarm = HOF): string {
   return renderToStaticMarkup(
-    createElement(KundeShellMitSitzung, null, createElement(FarmPageView, { farm, activeStatus: STATUS, reorderItems: [], ownerMode: false, ansicht }))
+    createElement(KundeShellMitSitzung, null, createElement(FarmPageView, { farm, activeStatus: STATUS, reorderItems: [], ansicht }))
   )
 }
 
-describe('Bearbeitungs-Elemente erscheinen nur mit ownerMode', () => {
-  it('Gegenprobe: FarmPageView im Bearbeitungsmodus hat jedes ihrer Elemente', () => {
-    const bearbeiten = renderToStaticMarkup(
-      createElement(FarmPageView, { farm: HOF, activeStatus: STATUS, ownerMode: true, mode: 'edit', pastStatusCount: 2 })
-    )
-    expect(gefunden(bearbeiten, IN_DER_ANSICHT)).toEqual(IN_DER_ANSICHT.map(({ was }) => was))
+describe('Bearbeitungs-Elemente gibt es auf der Hofseite nicht', () => {
+  it('Gegenprobe: die Suche findet jedes Merkmal an einem Stück HTML, wie es die alte Ansicht mit Stiften zeigte', () => {
+    const alt = [
+      '<svg class="lucide lucide-pencil"></svg>',
+      '<p>Du bearbeitest deine Hof-Seite</p>',
+      '<button aria-label="Titelbild bearbeiten"></button>',
+      '<button>Titelbild ersetzen</button>',
+      '<button>Frühere Status (2)</button>',
+      '<p>Dein Shop ist pausiert</p>',
+    ].join('')
+    expect(gefunden(alt, IN_DER_ANSICHT)).toEqual(IN_DER_ANSICHT.map(({ was }) => was))
   })
 
   it('Gegenprobe: Mein Hof trägt die Werkzeugleiste über dem Inhalt (seit Nr. 50 die Liste der Abschnitte)', () => {
@@ -394,10 +402,4 @@ describe('Kaufen wirkt bei Kundinnen und nirgends sonst', () => {
     expect(hofseite(VORSCHAU, HOF_OFFEN)).not.toMatch(KORB)
   })
 
-  it('Bearbeitungsmodus des Besitzers: kein Korb', () => {
-    const bearbeiten = renderToStaticMarkup(
-      createElement(FarmPageView, { farm: HOF_OFFEN, activeStatus: STATUS, ownerMode: true, mode: 'edit' })
-    )
-    expect(bearbeiten).not.toMatch(KORB)
-  })
 })

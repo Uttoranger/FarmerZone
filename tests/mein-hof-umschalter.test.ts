@@ -262,9 +262,8 @@ describe('„Gespeichert · Ansehen"', () => {
     }
     expect(inhalt).toContain('const formular = { onGespeichert, onAbbrechen, meldeErfolg }')
     expect(quelle('src/components/mein-hof/abschnitt-formulare.tsx')).toMatch(/if \(meldeErfolg\) meldeErfolg\(\)\s*else toast\.success\(GESPEICHERT_TEXT\)/)
-    // Die Bestandsansicht mit Stiften meldet weiter über onGespeichert (ohne Aufrufer seit Nr. 50).
-    const ansichtHof = quelle('src/components/farm/farm-page-view.tsx')
-    expect(ansichtHof).toContain("meldeErfolg={onGespeichert ? () => onGespeichert('titelbild') : undefined}")
+    // Die Bestandsansicht mit Stiften ist seit Nr. 50 Runde 1 entfernt — FarmPageView meldet nichts mehr.
+    expect(quelle('src/components/farm/farm-page-view.tsx')).not.toMatch(/onGespeichert\('titelbild'\)/)
   })
 
   it('Beiträge: nach dem Veröffentlichen auf der Hofseite — „Ansehen" führt in den Reiter mit der Kundenansicht', () => {

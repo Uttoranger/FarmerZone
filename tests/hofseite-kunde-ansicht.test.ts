@@ -113,7 +113,7 @@ const JETZT = '2026-10-02T08:00:00.000Z'
 function seite({ suche = '', farm = HOF, status = STATUS as ActiveStatusPost | null, ansicht = KUNDIN, jetzt = JETZT } = {}): string {
   adresse.suche = suche
   return renderToStaticMarkup(
-    createElement(KundeShellMitSitzung, null, createElement(FarmPageView, { farm, activeStatus: status, reorderItems: [], ownerMode: false, ansicht, jetzt }))
+    createElement(KundeShellMitSitzung, null, createElement(FarmPageView, { farm, activeStatus: status, reorderItems: [], ansicht, jetzt }))
   )
 }
 
@@ -390,19 +390,6 @@ describe('Produktkarten verlinken auf die Produktseite (Nr. 11)', () => {
   it('in der Vorschau des Hofs bleibt der Link in der Vorschau', () => {
     const html = seite({ suche: 'reiter=produkte', ansicht: { art: 'vorschau', kaufen: false } })
     expect(html).toContain('href="/hof-test/produkt/p_karotten?vorschau=1"')
-  })
-
-  it('in der Besitzer-Vorschau (Hofbereich, mode preview) bleibt der Link in der Vorschau — vor der Freigabe gäbe es sonst 404', () => {
-    adresse.suche = ''
-    const html = renderToStaticMarkup(
-      createElement(FarmPageView, { farm: HOF, activeStatus: null, reorderItems: [], ownerMode: true, mode: 'preview' })
-    )
-    expect(html).toContain('href="/hof-test/produkt/p_karotten?vorschau=1"')
-    expect(html).not.toContain('href="/hof-test/produkt/p_karotten"')
-    // Gegenprobe: die Kundenansicht verlinkt die öffentliche Produktseite, ohne Vorschau.
-    const kundin = seite({ suche: 'reiter=produkte' })
-    expect(kundin).toContain('href="/hof-test/produkt/p_karotten"')
-    expect(kundin).not.toContain('p_karotten?vorschau=1')
   })
 
   it('das alte Produktblatt gibt es nicht mehr — eine Darstellung der Produktdetails', () => {
