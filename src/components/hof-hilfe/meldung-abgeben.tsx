@@ -4,7 +4,14 @@ import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Camera, Loader2, X } from 'lucide-react'
 import { MELDUNG_ARTEN, MELDUNG_ART_SATZ, MELDUNG_KENNUNG_MAX, MELDUNG_TEXT_MAX, MELDUNG_TEXT_MIN } from '@/lib/meldung'
-import { MEINE_MELDUNGEN_HREF, MELDUNG_TEXT_LABEL, geraetKurz, seiteKurz } from '@/lib/hof-hilfe'
+import {
+  MEINE_MELDUNGEN_HREF,
+  MELDUNG_TEXT_LABEL,
+  OHNE_IP_UND_COOKIES,
+  geraetKurz,
+  mitgeschicktSatz,
+  seiteKurz,
+} from '@/lib/hof-hilfe'
 import { stufenText } from '@/components/shared/image-upload'
 import { HONIGTOPF_STIL, useMeldungFormular } from '@/components/shared/use-meldung-formular'
 import { DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
@@ -205,10 +212,9 @@ export function MeldungAbgeben({
         </p>
       </div>
 
-      {/* Was mitgeht — am Handy ein Satz (Mockup mobil), ab 768 px die Karte. */}
-      <p className="text-xs leading-normal text-muted-foreground md:hidden">
-        Seite, Gerät und dein Hof gehen automatisch mit. Keine IP-Adresse, keine Cookies.
-      </p>
+      {/* Was mitgeht — am Handy ein Satz (Mockup mobil), ab 768 px die Karte.
+          Der Satz kommt aus mitgeschicktSatz, wie auf /problem-melden. */}
+      <p className="text-xs leading-normal text-muted-foreground md:hidden">{mitgeschicktSatz(kennung, true)}</p>
       <div className={cn(KARTE, 'hidden flex-col gap-3 bg-card px-[18px] py-4 md:flex')}>
         <p className={KICKER}>Das schicken wir automatisch mit</p>
         <dl className="text-[13px]">
@@ -217,7 +223,7 @@ export function MeldungAbgeben({
           <MitZeile name="Hof" wert={hofName} />
           {kennungAnzeige !== '' && <MitZeile name="Fehlernummer" wert={kennungAnzeige} />}
         </dl>
-        <p className="text-xs leading-normal text-muted-foreground">Keine IP-Adresse, keine Cookies.</p>
+        <p className="text-xs leading-normal text-muted-foreground">{OHNE_IP_UND_COOKIES}</p>
       </div>
 
       <DialogFehler text={fehler || null} />

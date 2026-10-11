@@ -33,7 +33,7 @@ import { metadata as vergessenMeta } from '@/app/(auth)/forgot-password/page'
 import { metadata as bestellungMeta } from '@/app/(public)/[farmSlug]/bestellung/[orderId]/page'
 import { metadata as barMeta } from '@/app/(public)/[farmSlug]/bestaetigen/[token]/page'
 import { metadata as problemMeta } from '@/app/(public)/problem-melden/page'
-import { MELDUNG_TEXT_BEISPIEL, mitgeschicktSatz } from '@/lib/hof-hilfe'
+import { MELDUNG_TEXT_BEISPIEL, OHNE_IP_UND_COOKIES, mitgeschicktSatz } from '@/lib/hof-hilfe'
 import { monatKurz, monatOhneJahr } from '@/lib/finanzen'
 import { bestellEintrag, bestellTon, type BestellTon } from '@/lib/bestellungen-finden'
 import { monatsschluessel } from '@/lib/servicegebuehr'
@@ -263,6 +263,21 @@ describe('mitgeschicktSatz — was unter „Problem melden" automatisch mitgeht'
   it('ohne Fehlernummer — leer oder nur Leerzeichen — fehlt sie', () => {
     expect(mitgeschicktSatz('', false)).toBe('Mitgeschickt: Seite und Gerät. Keine IP-Adresse, keine Cookies.')
     expect(mitgeschicktSatz('   ', false)).toBe('Mitgeschickt: Seite und Gerät. Keine IP-Adresse, keine Cookies.')
+  })
+
+  it('eine Quelle: beide Meldeformulare und der Briefkasten schreiben den Satz nicht selbst', () => {
+    for (const datei of [
+      'src/components/shared/meldung-form.tsx',
+      'src/components/hof-hilfe/meldung-abgeben.tsx',
+      'src/app/admin/meldungen/[id]/page.tsx',
+    ]) {
+      expect(lies(datei), datei).not.toMatch(/Keine IP-Adresse|automatisch mit\./)
+    }
+    expect(lies('src/components/shared/meldung-form.tsx')).toMatch(/mitgeschicktSatz\(kennung, alsHof\)/)
+    // „Meldung abgeben" ist immer ein Hof — am Handy derselbe Satz, mit Fehlernummer, sobald eine dasteht.
+    expect(lies('src/components/hof-hilfe/meldung-abgeben.tsx')).toMatch(/\{mitgeschicktSatz\(kennung, true\)\}/)
+    expect(mitgeschicktSatz('', true)).toBe(`Mitgeschickt: Seite, Gerät und dein Hof. ${OHNE_IP_UND_COOKIES}`)
+    expect(OHNE_IP_UND_COOKIES).toBe('Keine IP-Adresse, keine Cookies.')
   })
 
   it('ein angemeldeter Hof: dazu „dein Hof"; die Nummer ohne Ränder', () => {

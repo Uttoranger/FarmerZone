@@ -39,16 +39,20 @@ export const MELDUNG_TEXT_BEISPIEL: Partial<Record<MeldungArt, string>> = {
   FEHLER: 'Beim Bezahlen kam diese Seite …',
 }
 
+/** Was nie mitgeht — derselbe Satz unter beiden Meldeformularen und in der Meldung im Briefkasten. */
+export const OHNE_IP_UND_COOKIES = 'Keine IP-Adresse, keine Cookies.'
+
 /**
- * Der eine Satz „Mitgeschickt: …" unter dem öffentlichen Meldeformular
- * (/problem-melden, seit Nr. 54; Mockup fehler-500-problem-melden-kunde):
- * was automatisch mitgeht, ohne Technik — die Fehlernummer nur, wenn eine da
- * ist, „dein Hof" nur für einen angemeldeten Hof. Was wirklich mitgeht,
- * entscheidet useMeldungFormular; der Satz verspricht nichts darüber hinaus.
+ * Der eine Satz „Mitgeschickt: …" unter den Meldeformularen: auf
+ * /problem-melden (seit Nr. 54; Mockup fehler-500-problem-melden-kunde) und
+ * am Handy in „Meldung abgeben" (seit Runde 1 von Nr. 54) — was automatisch
+ * mitgeht, ohne Technik; die Fehlernummer nur, wenn eine da ist, „dein Hof"
+ * nur für einen angemeldeten Hof. Was wirklich mitgeht, entscheidet
+ * useMeldungFormular; der Satz verspricht nichts darüber hinaus.
  */
 export function mitgeschicktSatz(kennung: string, alsHof: boolean): string {
   const teile = [kennung.trim() === '' ? null : `Fehlernummer ${kennung.trim()}`, alsHof ? 'Seite, Gerät und dein Hof' : 'Seite und Gerät']
-  return `Mitgeschickt: ${teile.filter((t) => t !== null).join(', ')}. Keine IP-Adresse, keine Cookies.`
+  return `Mitgeschickt: ${teile.filter((t) => t !== null).join(', ')}. ${OHNE_IP_UND_COOKIES}`
 }
 
 export type MeldungZeile = {
