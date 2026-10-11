@@ -104,6 +104,7 @@ import {
   FUTTER_BESTAETIGUNG_NEU,
   FUTTER_BESTAETIGUNG_TEXT,
   KENNZEICHNUNG_ERKLAERUNG,
+  KENNZEICHNUNG_FELDHINWEIS,
   KENNZEICHNUNG_FUNDORT,
   KENNZEICHNUNG_LOESCHEN_TITEL,
   KENNZEICHNUNG_VERWEIS,
@@ -1161,7 +1162,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                                   />
                                 </div>
                                 <FormDescription className="text-xs">
-                                  Durchschnittsgewicht, wie auf dem Sackanhänger oder Lieferschein.
+                                  {KENNZEICHNUNG_FELDHINWEIS.gewicht}
                                 </FormDescription>
                                 <FormMessage />
                               </FormItem>
@@ -1638,7 +1639,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                                   <FormDescription className="text-xs">
                                     {field.value
                                       ? FUTTERMITTELART_ERKLAERUNG[field.value]
-                                      : 'Steht auf dem Sackanhänger, meist direkt über der Zusammensetzung.'}
+                                      : KENNZEICHNUNG_FELDHINWEIS.futtermittelart}
                                   </FormDescription>
                                 </>
                               )}
@@ -1682,7 +1683,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                                 })}
                               </div>
                               <FormDescription className="text-xs">
-                                Steht als „Alleinfuttermittel für …" oder „Ergänzungsfuttermittel für …" auf dem Anhänger.
+                                {KENNZEICHNUNG_FELDHINWEIS.tierarten}
                               </FormDescription>
                               <FormMessage />
                             </FormItem>
@@ -1704,7 +1705,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                                 />
                               </FormControl>
                               <FormDescription className="text-xs">
-                                Steht auf dem Sackanhänger. Bei Mischfutter die Einzelfuttermittel in absteigender Reihenfolge.
+                                {KENNZEICHNUNG_FELDHINWEIS.zusammensetzung}
                               </FormDescription>
                               <FormMessage />
                             </FormItem>
@@ -1726,7 +1727,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                                 />
                               </FormControl>
                               <FormDescription className="text-xs">
-                                Steht auf dem Sackanhänger unter „Analytische Bestandteile" (Rohprotein, Rohfaser, Rohfett, Rohasche …).
+                                {KENNZEICHNUNG_FELDHINWEIS.analytischeBestandteile}
                               </FormDescription>
                               <FormMessage />
                             </FormItem>

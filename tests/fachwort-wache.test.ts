@@ -29,6 +29,7 @@ import {
   FUTTER_BESTAETIGUNG_NEU,
   FUTTER_BESTAETIGUNG_TEXT,
   KENNZEICHNUNG_ERKLAERUNG,
+  KENNZEICHNUNG_FELDHINWEIS,
   KENNZEICHNUNG_FUNDORT,
   KENNZEICHNUNG_LOESCHEN_TITEL,
   KENNZEICHNUNG_TITEL,
@@ -41,7 +42,7 @@ import { formatEuro } from '@/lib/format'
 import { PROCESSING_REVENUE_LIMIT, sumCountedRevenue } from '@/lib/revenue-limit'
 import { FUTTER_FEHLER } from '@/schemas/product'
 import { ABSCHNITT_TITEL } from '@/components/products/produkt-abschnitte'
-import { BETRIEBSSTATUS } from '@/lib/taxonomie'
+import { BETRIEBSSTATUS, futtermittelartenFuer } from '@/lib/taxonomie'
 
 const WURZEL = process.cwd()
 
@@ -264,5 +265,25 @@ describe('Fachwort-Wache', () => {
     expect(KENNZEICHNUNG_FUNDORT).toMatch(/^[^.]+\.$/)
     expect(KENNZEICHNUNG_FUNDORT).toContain('eigener Ernte')
     expect(KENNZEICHNUNG_FUNDORT).toContain('Sackanhänger oder Lieferschein')
+  })
+
+  it('die Feldhinweise mit Sackanhänger sagen auch, was bei eigener Ernte gilt — aus einer Quelle für beide Formulare (Nr. 56)', () => {
+    const { futtermittelart, ...mitEigenerErnte } = KENNZEICHNUNG_FELDHINWEIS
+    for (const [feld, satz] of Object.entries(mitEigenerErnte)) {
+      expect(satz, feld).toMatch(/anhänger/i)
+      expect(satz, feld).toContain('bei eigener Ernte')
+    }
+    // Die Futtermittelart fragt das Formular nur, wo mehr als eine Art passt — nie bei eigener Ernte.
+    expect(futtermittelart).not.toContain('eigener Ernte')
+    expect(futtermittelartenFuer('ERGAENZUNGSFUTTER').length).toBeGreaterThan(1)
+    for (const kategorie of ['HEU_STROH', 'GETREIDE_KOERNER', 'MISCHFUTTER'] as const) {
+      expect(futtermittelartenFuer(kategorie), kategorie).toHaveLength(1)
+    }
+    // Beide Formulare nehmen die Sätze von dort — keine eigene Schreibweise daneben.
+    for (const datei of ['src/components/produkte/futter-formular.tsx', 'src/components/products/product-dialog.tsx']) {
+      const text = quelle(datei)
+      expect(text, datei).toMatch(/\bKENNZEICHNUNG_FELDHINWEIS\b/)
+      expect(text, datei).not.toMatch(/Steht (?:auf dem Sackanhänger|als „)|wie auf dem Sackanhänger oder Lieferschein/)
+    }
   })
 })
