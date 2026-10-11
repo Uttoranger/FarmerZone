@@ -35,7 +35,7 @@ import { metadata as barMeta } from '@/app/(public)/[farmSlug]/bestaetigen/[toke
 import { metadata as problemMeta } from '@/app/(public)/problem-melden/page'
 import { MELDUNG_TEXT_BEISPIEL, mitgeschicktSatz } from '@/lib/hof-hilfe'
 import { monatKurz, monatOhneJahr } from '@/lib/finanzen'
-import { bestellEintrag, bestellTon } from '@/lib/bestellungen-finden'
+import { bestellEintrag, bestellTon, type BestellTon } from '@/lib/bestellungen-finden'
 import { monatsschluessel } from '@/lib/servicegebuehr'
 
 const WURZEL = process.cwd()
@@ -297,24 +297,27 @@ describe('monatOhneJahr — die Achse der Finanzen am Handy', () => {
 })
 
 describe('bestellTon — die Marke der Bestellseite ist die Marke der Liste', () => {
-  const STATUS: OrderStatus[] = [
-    'PENDING_CONFIRMATION',
-    'PAID',
-    'CONFIRMED',
-    'IN_PREPARATION',
-    'READY',
-    'PICKED_UP',
-    'CANCELLED',
-    'NOT_PICKED_UP',
-  ]
+  /**
+   * Feste Erwartung je Status — nicht bestellTon selbst: Die Liste ruft
+   * bestellTon auf, ein Vergleich damit bewiese nichts.
+   */
+  const ERWARTET: Record<OrderStatus, BestellTon> = {
+    PENDING_CONFIRMATION: 'offen',
+    PAID: 'fertig',
+    CONFIRMED: 'fertig',
+    IN_PREPARATION: 'fertig',
+    READY: 'fertig',
+    PICKED_UP: 'neutral',
+    CANCELLED: 'neutral',
+    NOT_PICKED_UP: 'neutral',
+  }
+  const STATUS = Object.keys(ERWARTET) as OrderStatus[]
 
   it('orange, solange die Kundin etwas tun muss; grün, solange es läuft; sonst neutral', () => {
-    expect(bestellTon('PENDING_CONFIRMATION')).toBe('offen')
-    for (const s of ['PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY'] as const) expect(bestellTon(s), s).toBe('fertig')
-    for (const s of ['PICKED_UP', 'CANCELLED', 'NOT_PICKED_UP'] as const) expect(bestellTon(s), s).toBe('neutral')
+    for (const status of STATUS) expect(bestellTon(status), status).toBe(ERWARTET[status])
   })
 
-  it('„Meine Bestellungen" nimmt denselben Ton', () => {
+  it('„Meine Bestellungen" zeigt je Status dieselbe feste Farbe', () => {
     const jetzt = new Date('2026-10-10T08:00:00Z')
     for (const status of STATUS) {
       const eintrag = bestellEintrag(
@@ -336,7 +339,13 @@ describe('bestellTon — die Marke der Bestellseite ist die Marke der Liste', ()
         jetzt,
         true
       )
-      expect(eintrag.ton, status).toBe(bestellTon(status))
+      expect(eintrag.ton, status).toBe(ERWARTET[status])
     }
+  })
+
+  it('die Bestellseite nimmt den Ton aus bestellTon', () => {
+    expect(lies('src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx')).toMatch(
+      /<StatusBadge status=\{bestellTon\(order\.status\)\}>/
+    )
   })
 })
