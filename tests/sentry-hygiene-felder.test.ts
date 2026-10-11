@@ -378,6 +378,7 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
     ['verschachtelte Adressen in Abfragewerten', { exception: { values: [{ value: '/?a='.repeat(N) }] } }],
     ['verschachtelte Anker als Nachricht', { message: '/#a='.repeat(N) }],
     ['viele Adressen als Abfragewerte', { request: { url: 'https://farmerzone.at/?' + 'a=/b&'.repeat(N / 10) } }],
+    ['halbe Platzhalter nach token=', { exception: { values: [{ value: 'token=[code entfernt '.repeat(N / 4) }] } }],
   ]
 
   for (const [name, teil] of lang) {
@@ -717,5 +718,16 @@ describe('Nr. 56, Nachbesserung Runde 1 — Befunde der Prüfung', () => {
     let tief = fehlertext('/a?x=/b?y=/c?z=/d?w=/e') ?? ''
     for (let i = 0; i < 4; i++) tief = decodeURIComponent(tief.replace(/\+/g, ' '))
     expect(tief).toBe('/a?x=/b?y=/c?z=/d?w=[adresse entfernt]')
+  })
+  it('die Zuweisungs-Regel verschont nur eigene Platzhalter — ein Wert in eckigen Klammern fällt', () => {
+    // Vorher verschonte sie jeden Wert, der mit „[" beginnt.
+    expect(fehlertext('token=[abc123] password=[geheim]')).toBe('token=[entfernt] password=[entfernt]')
+    expect(nachricht('token=[abc123] password=[geheim]')).toBe('token=[entfernt] password=[entfernt]')
+    expect(bereinigeEreignis(ereignis({ extra: { text: 'secret: [abc123]' } })).extra).toEqual({ text: 'secret: [entfernt]' })
+    // Ein eigener Platzhalter als ganzer Wert bleibt einfach stehen …
+    expect(fehlertext('otp: 905173 abgelehnt')).toBe('otp: [code entfernt] abgelehnt')
+    expect(nachricht('Passwort: kundin@example.com, token=[entfernt]')).toBe('Passwort: [e-mail entfernt], token=[entfernt]')
+    // … hängt etwas daran, fällt der ganze Wert.
+    expect(fehlertext('otp: 905173-abc abgelehnt')).toBe('otp: [entfernt] abgelehnt')
   })
 })

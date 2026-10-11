@@ -373,10 +373,13 @@ const IPV6_MUSTER =
   /(?<![\w:])(?=[0-9a-f:]*::|(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4})(?=[0-9a-f:]*[0-9a-f])[0-9a-f]{0,4}(?::[0-9a-f]{0,4}){2,7}(?![\w:])/gi
 
 /** „token=…", „secret: …" — Zuweisungen in freiem Text, auch ohne Adresse
- *  davor. `code` fehlt bewusst: „code=P2002" ist ein Prisma-Fehlercode. Ein
- *  schon ersetzter Wert („otp: [code entfernt]") bleibt stehen — sonst würde
- *  daraus „otp: [entfernt] entfernt]" (Nr. 56). */
-const ZUWEISUNG_MUSTER = /\b(token|secret|passwor[dt]|otp|signatur|signature|sig|api[_-]?key|authorization)(\s*[=:]\s*)(?!\[)[^\s&,;"'<>]+/gi
+ *  davor. `code` fehlt bewusst: „code=P2002" ist ein Prisma-Fehlercode. Ist
+ *  der ganze Wert schon ein Platzhalter dieser Datei („otp: [code entfernt]"),
+ *  bleibt er stehen — sonst würde daraus „otp: [entfernt] entfernt]" (Nr. 56).
+ *  Nur ein eigener Platzhalter, nicht jeder Wert mit „[" (Runde 1: sonst blieb
+ *  „token=[abc123]" stehen); hängt etwas daran, fällt der ganze Wert. */
+const ZUWEISUNG_MUSTER =
+  /\b(token|secret|passwor[dt]|otp|signatur|signature|sig|api[_-]?key|authorization)(\s*[=:]\s*)(?!\[[a-z -]{0,12}entfernt\](?![^\s&,;"'<>]))(?:\[[a-z -]{0,12}entfernt\])?[^\s&,;"'<>]+/gi
 
 const BEARER_MUSTER = /\bBearer\s+[A-Za-z0-9._~+/=-]+/g
 
