@@ -99,6 +99,22 @@ export function verfuegbarText(produkte: readonly { isAvailable: boolean; stock:
   return n > 0 ? `${formatZahl(n)} verfügbar` : null
 }
 
+// ─── Über uns ───────────────────────────────────────────────────────────────
+
+/**
+ * Was Kundinnen unter „Über uns" lesen — EINE Regel für die Hofseite
+ * (components/hofseite/hofseite-kunde.tsx) und die Checkliste von Mein Hof
+ * (hofseite-fortschritt.ts, seit Nr. 49): der eigene Text ohne Ränder; ist er
+ * leer oder nur Leerraum, die Kurzbeschreibung; ist auch die leer, null.
+ * Vorher prüfte die Checkliste nur den eigenen Text und meldete „Fehlt",
+ * obwohl Kundinnen die Kurzbeschreibung lasen.
+ */
+export function ueberUnsText(hof: { aboutText: string | null; description: string }): string | null {
+  const eigener = (hof.aboutText ?? '').trim()
+  if (eigener) return eigener
+  return hof.description.trim() || null
+}
+
 // ─── Zahlung (E5) ───────────────────────────────────────────────────────────
 
 export type Zahlungsart = { art: 'online' | 'bar'; text: string }

@@ -23,7 +23,9 @@
  * beide auf /farm-page (?reiter=beitraege, E12,
  * components/mein-hof/seitenkopf.tsx). /status leitet seit Nr. 22e in den
  * Reiter um; seine Unterseiten (/status/new, WhatsApp fortsetzen) bleiben,
- * und der Punkt ist auch dort aktiv.
+ * und der Punkt ist auch dort aktiv. In der HofShell kommt am Handy seit
+ * Nr. 49 (Register N3) „Produkte" als erster Reiter dazu, und „Mein Hof" in
+ * der Leiste öffnet ihn (unten, „Neue HofShell").
  */
 
 import { MEIN_HOF_REITER_PARAMETER, MEIN_HOF_REITER_VALUES, meinHofReiterSchema } from '@/schemas/mein-hof-reiter'
@@ -66,10 +68,28 @@ export type NeuPunkt = {
   href: string
 }
 
-/** Die Reiter unter dem Kopf von „Mein Hof" — Hofseite ist der Standard. */
+/** Die Reiter auf /farm-page (der Reiter steht in der Adresse) — Hofseite ist der Standard. */
 export type MeinHofReiterId = (typeof MEIN_HOF_REITER_VALUES)[number]
 
-export type MeinHofReiter = { id: MeinHofReiterId; label: string; href: string }
+/**
+ * Alle Reiter von „Mein Hof": dazu „Produkte" — eine eigene Route
+ * (/products), als Reiter nur am Handy (Register N3, Nr. 49).
+ */
+export type MeinHofReiterAlleId = MeinHofReiterId | 'produkte'
+
+export type MeinHofReiter = {
+  id: MeinHofReiterAlleId
+  label: string
+  href: string
+  /**
+   * Nur unter md (768 px): Ab md steht „Produkte" als eigener Punkt in der
+   * Seitenleiste, und dort steht statt des Reiters der Hinweis MEIN_HOF_HINWEIS.
+   */
+  nurUnterMd?: boolean
+}
+
+/** Die Adresse von „Produkte" — EINE Quelle für den Punkt der Seitenleiste, den Reiter und „Mein Hof" der Handy-Leiste. */
+export const PRODUKTE_HREF = '/products'
 
 /**
  * Die Adresse des Reiters „Beiträge" — EINE Quelle für den Reiter, die
@@ -78,14 +98,25 @@ export type MeinHofReiter = { id: MeinHofReiterId; label: string; href: string }
 export const BEITRAEGE_HREF = `/farm-page?${MEIN_HOF_REITER_PARAMETER}=beitraege`
 
 /**
- * Die Reiter von „Mein Hof" in der HofShell (E12, Nachtlauf Nr. 16): beide
- * auf /farm-page, der Reiter steht in der Adresse. Seit Nr. 22e kann der
- * Reiter „Beiträge" alles, was /status konnte; /status leitet hierher um.
+ * Die Reiter von „Mein Hof" in der HofShell (E12, Nachtlauf Nr. 16):
+ * Hofseite und Beiträge auf /farm-page, der Reiter steht in der Adresse. Seit
+ * Nr. 22e kann der Reiter „Beiträge" alles, was /status konnte; /status
+ * leitet hierher um. Seit Nr. 49 (Register N3) steht davor „Produkte" — unter
+ * md der erste Reiter, denn dort öffnet „Mein Hof" in der Leiste Produkte.
+ * EINE Liste für alle Breiten; die Reiterleiste blendet „Produkte" ab md aus
+ * (components/mein-hof/reiter-leiste.tsx).
  */
 export const MEIN_HOF_REITER_HOFBEREICH: readonly MeinHofReiter[] = [
+  { id: 'produkte', label: 'Produkte', href: PRODUKTE_HREF, nurUnterMd: true },
   { id: 'hofseite', label: 'Hofseite', href: '/farm-page' },
   { id: 'beitraege', label: 'Beiträge', href: BEITRAEGE_HREF },
 ]
+
+function meinHofReiter(id: MeinHofReiterAlleId): MeinHofReiter {
+  const reiter = MEIN_HOF_REITER_HOFBEREICH.find((r) => r.id === id)
+  if (!reiter) throw new Error(`Kein Reiter „${id}"`)
+  return reiter
+}
 
 /**
  * Der Reiter aus dem Suchparameter der Seite. Next liefert einen doppelten
@@ -96,18 +127,23 @@ export function meinHofReiterAus(wert: string | string[] | undefined): MeinHofRe
   return meinHofReiterSchema.parse(Array.isArray(wert) ? wert[0] : wert)
 }
 
-/** Der Hinweis rechts neben den Reitern im Browser — Produkte hat seinen eigenen Platz in der Leiste. */
-export const MEIN_HOF_HINWEIS = 'Produkte verwaltest du links unter „Produkte".'
+/**
+ * Der Hinweis rechts neben den Reitern ab md — genau dort, wo der Reiter
+ * „Produkte" fehlt (`nurUnterMd`): Ab md hat Produkte seinen Punkt in der
+ * Seitenleiste. Wortlaut wie im Mockup web-h1-mein-hof-vorschau-handy, der
+ * Name kommt aus dem Reiter (seit Nr. 49, Register N3).
+ */
+export const MEIN_HOF_HINWEIS = `${meinHofReiter('produkte').label} verwaltest du links unter „${meinHofReiter('produkte').label}“.`
 
 /** Die Hauptpunkte — im Browser alle vier in der Leiste, am Handy drei davon direkt. */
 export const HAUPT: readonly NavPunkt[] = [
   { id: 'heute', label: 'Heute', href: '/dashboard' },
   { id: 'bestellungen', label: 'Bestellungen', href: '/orders', zahl: 'bestellungen' },
-  { id: 'produkte', label: 'Produkte', href: '/products' },
+  { id: 'produkte', label: 'Produkte', href: PRODUKTE_HREF },
   {
     id: 'mein-hof',
     label: 'Mein Hof',
-    href: MEIN_HOF_REITER_HOFBEREICH[0].href,
+    href: meinHofReiter('hofseite').href,
     // /status selbst leitet um; gemeint sind seine Unterseiten (Neuer Beitrag, WhatsApp fortsetzen).
     auchAktivAuf: ['/status'],
   },
@@ -270,8 +306,13 @@ export function ariaAktuell(pfad: string, punkt: NavPunkt): 'page' | 'true' | un
 // „Region"), damit nichts auf einmal umspringt (kein Big Bang). Zieht die
 // letzte Seite um, fällt der Bestandsteil weg.
 //
-// Unterschiede zum Bestand, alle aus dem Mockup:
-//  - Handy: Produkte statt Mein Hof in der Leiste; Mein Hof steht in „Mehr".
+// Unterschiede zum Bestand:
+//  - Handy (seit Nr. 49, Register N3; vorher nach Mockup Produkte in der
+//    Leiste und Mein Hof in „Mehr"): „Mein Hof" in der Leiste öffnet
+//    Produkte — der Vorrat bleibt ein Tipp — und steht für alle drei Reiter
+//    (Produkte · Hofseite · Beiträge). Ein eigener Punkt mit eigener
+//    Aktiv-Regel nur für die Leiste; die Seitenleiste bleibt, wie sie war.
+//    Weder Mein Hof noch Produkte stehen im Mehr-Blatt.
 //  - „Verkauf und Kunden" bekommt „Region" — seit Nr. 22c (Gate 8) eine
 //    eigene Route /region mit den Reitern Preise vergleichen | Futter kaufen;
 //    das alte /analytics/umfeld leitet dorthin um.
@@ -342,20 +383,44 @@ export const HOF_NEU: readonly HofNeuPunkt[] = [
 
 export type HofLeistenPlatz = { art: 'punkt'; punkt: HofNavPunkt } | { art: 'neu' } | { art: 'mehr' }
 
+/**
+ * „Mein Hof" in der Handy-Leiste (Register N3, Nr. 49): Der Tipp öffnet
+ * Produkte, und der Punkt gilt überall, wo „Produkte" oder „Mein Hof" der
+ * Seitenleiste gelten (/products, /farm-page, /status mit Unterseiten).
+ * Dasselbe Ziel wie „Produkte" der Seitenleiste — darum entscheidet die
+ * Leiste mit eigener Regel (hofHandyAktiverPunkt): In einer gemeinsamen
+ * Liste gewönne bei gleich langem Treffer der erste Eintrag.
+ */
+const MEIN_HOF_LEISTE: HofNavPunkt = {
+  id: 'mein-hof',
+  label: hauptPunkt('mein-hof').label,
+  href: PRODUKTE_HREF,
+  auchAktivAuf: [hauptPunkt('mein-hof').href, ...(hauptPunkt('mein-hof').auchAktivAuf ?? [])],
+}
+
 const HOF_HANDY_LEISTE: readonly HofLeistenPlatz[] = [
   { art: 'punkt', punkt: hauptPunkt('heute') },
   { art: 'punkt', punkt: hauptPunkt('bestellungen') },
   { art: 'neu' },
-  { art: 'punkt', punkt: hauptPunkt('produkte') },
+  { art: 'punkt', punkt: MEIN_HOF_LEISTE },
   { art: 'mehr' },
 ]
 
 const HOF_ALLE: readonly HofNavPunkt[] = [...HAUPT, ...HOF_VERKAUF_UND_KUNDEN, ...UNTEN]
 
-/** Was in „Mehr" steht: alle Ziele der Seitenleiste ohne Platz in der Handy-Leiste, in Leistenreihenfolge. */
-const HOF_MEHR: readonly HofNavPunkt[] = HOF_ALLE.filter(
-  (p) => !HOF_HANDY_LEISTE.some((platz) => platz.art === 'punkt' && platz.punkt.id === p.id)
-)
+const HOF_LEISTEN_PUNKTE: readonly HofNavPunkt[] = HOF_HANDY_LEISTE.flatMap((platz) => (platz.art === 'punkt' ? [platz.punkt] : []))
+
+/** Ob ein Punkt der Leiste das Ziel schon abdeckt — „Mein Hof" deckt Produkte und Mein Hof der Seitenleiste. */
+function leisteDeckt(punkt: HofNavPunkt): boolean {
+  const ziel = punkt.href.split('?')[0]
+  return HOF_LEISTEN_PUNKTE.some((l) => [l.href, ...(l.auchAktivAuf ?? [])].some((z) => treffer(ziel, z) >= 0))
+}
+
+/** Was in „Mehr" steht: alle Ziele der Seitenleiste, die kein Punkt der Handy-Leiste abdeckt, in Leistenreihenfolge. */
+const HOF_MEHR: readonly HofNavPunkt[] = HOF_ALLE.filter((p) => !leisteDeckt(p))
+
+/** Alle Ziele am Handy: Leiste und Mehr-Blatt — jeder Punkt genau einmal. */
+const HOF_HANDY_ZIELE: readonly HofNavPunkt[] = [...HOF_LEISTEN_PUNKTE, ...HOF_MEHR]
 
 export type HofNavigation = {
   /** Seitenleiste oben: Heute · Bestellungen · Produkte · Mein Hof. */
@@ -387,15 +452,30 @@ export function hofAktiverPunkt(pfad: string): HofNavId | null {
   return aktivIn(HOF_ALLE, pfad)
 }
 
+/**
+ * Der aktive Punkt am Handy (Leiste und Mehr-Blatt) — eigene Regel, weil
+ * „Mein Hof" in der Leiste dasselbe Ziel hat wie „Produkte" der Seitenleiste
+ * (Register N3). Die Seitenleiste fragt weiter `hofAktiverPunkt`.
+ */
+export function hofHandyAktiverPunkt(pfad: string): HofNavId | null {
+  return aktivIn(HOF_HANDY_ZIELE, pfad)
+}
+
 /** „Mehr" gilt als aktiv für jeden Pfad, dessen Ziel im Mehr-Blatt der HofShell liegt. */
 export function hofMehrAktiv(pfad: string): boolean {
-  const id = hofAktiverPunkt(pfad)
+  const id = hofHandyAktiverPunkt(pfad)
   return id !== null && HOF_MEHR.some((p) => p.id === id)
 }
 
 /** aria-current für einen Punkt der HofShell — Regel wie `ariaAktuell`. */
 export function hofAriaAktuell(pfad: string, punkt: HofNavPunkt): 'page' | 'true' | undefined {
   if (hofAktiverPunkt(pfad) !== punkt.id) return undefined
+  return pfad === punkt.href.split('?')[0] ? 'page' : 'true'
+}
+
+/** aria-current am Handy (Leiste und Mehr-Blatt) — dieselbe Form wie `hofAriaAktuell`, mit der Regel der Leiste. */
+export function hofHandyAriaAktuell(pfad: string, punkt: HofNavPunkt): 'page' | 'true' | undefined {
+  if (hofHandyAktiverPunkt(pfad) !== punkt.id) return undefined
   return pfad === punkt.href.split('?')[0] ? 'page' : 'true'
 }
 
@@ -424,9 +504,7 @@ function navPunkt(id: NavPunktId): NavPunkt {
 }
 
 function beitraegeReiter(): MeinHofReiter {
-  const reiter = MEIN_HOF_REITER_HOFBEREICH.find((r) => r.id === 'beitraege')
-  if (!reiter) throw new Error('Kein Reiter „Beiträge"')
-  return reiter
+  return meinHofReiter('beitraege')
 }
 
 /**

@@ -24,7 +24,7 @@
  *    Kundinnen und die Vorschau rendern ohne sie. Gerendert wird echt
  *    (react-dom/server in Node); je Quelle eine Gegenprobe, dass die Suche
  *    jedes Merkmal auch findet — FarmPageView im Bearbeitungsmodus für ihre
- *    Elemente, farm-page-client für die Werkzeugleiste.
+ *    Elemente, Mein Hof (MeinHofAnsicht, seit Nr. 49) für die Werkzeugleiste.
  *  - Kaufen wirkt bei Kundinnen und nirgends sonst: Der Korb (CartSheet) hängt
  *    nur in der Seite für Kundinnen — nicht in der Vorschau, nicht im
  *    Bearbeitungsmodus. Ginge `kaufen` auf dem Weg ins Produktraster verloren,
@@ -33,7 +33,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import { createElement, type ReactNode } from 'react'
+import { createElement, type ComponentProps, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 // Next und die Server-Aktionen gibt es im Test nicht: Router, Bild und Link
@@ -59,6 +59,7 @@ vi.mock('@/lib/auth-client', () => ({ useSession: () => ({ data: null }), signOu
 
 import { FarmPageView } from '@/components/farm/farm-page-view'
 import { FarmPageClient } from '@/components/farmer/farm-page-client'
+import { MeinHofAnsicht } from '@/components/mein-hof/mein-hof-ansicht'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
@@ -259,10 +260,17 @@ describe('FarmPageView binden genau zwei Stellen ein', () => {
   })
 
   it('die Kundenansicht des Besitzers ist die echte Route im Rahmen, kein Nachbau', () => {
+    // Seit Nr. 49 (Register N4) steht sie im Umschalter von Mein Hof, für jeden Reiter.
+    const ansicht = ohneKommentare(quelle('src/components/mein-hof/mein-hof-ansicht.tsx'))
+    expect(ansicht).toMatch(/<iframe[\s\S]*?src=\{adresse\}/)
+    expect(ansicht).toContain('adresse={kundenAnsichtAdresse(slug, reiter)}')
+    expect(ansicht).not.toMatch(/FarmPageView|HofseiteKunde/)
+    // Die Adresse kommt aus vorschauLink — dieselbe Route wie für Kundinnen.
+    expect(ohneKommentare(quelle('src/lib/mein-hof-ansicht.ts'))).toMatch(/kundenAnsichtAdresse[\s\S]*?vorschauLink\(slug\)/)
+    // FarmPageView rendert beim Besitzer nur noch den Bearbeitungsmodus, kein Rahmen daneben.
     const besitzer = ohneKommentare(quelle('src/components/farmer/farm-page-client.tsx'))
-    expect(besitzer).toMatch(/<iframe[\s\S]*?src=\{vorschauLink\(farm\.slug\)\}/)
-    // FarmPageView rendert dort nur noch den Bearbeitungsmodus.
-    expect(besitzer).toMatch(/mode === 'preview' \? \(\s*\/?\/?[\s\S]*?<iframe/)
+    expect(besitzer).toContain('mode="edit"')
+    expect(besitzer).not.toContain('<iframe')
   })
 
   it('die Hofseite rendert sie immer ohne ownerMode; farm-page-client steht nur auf der Besitzer-Route', () => {
@@ -317,8 +325,8 @@ const IN_DER_ANSICHT: Merkmal[] = [
   { was: 'Status-Pflege', muster: /Neuer Status|Frühere Status/ },
   { was: 'Pausen-Hinweis für den Hof', muster: /Dein Shop ist pausiert/ },
 ]
-/** Die Werkzeugleiste steht in farm-page-client.tsx selbst. */
-const WERKZEUGLEISTE: Merkmal = { was: 'Werkzeugleiste', muster: />Bearbeiten<|>Kundenansicht<|>Kopieren</ }
+/** Die Werkzeugleiste (Umschalter „Bearbeiten · So sieht’s die Kundin") steht seit Nr. 49 im Baustein MeinHofAnsicht. */
+const WERKZEUGLEISTE: Merkmal = { was: 'Werkzeugleiste', muster: />Bearbeiten<|>So sieht’s die Kundin<|>Kundenansicht<|>Kopieren</ }
 const KORB = /data-merkmal="korb"/
 
 function gefunden(html: string, merkmale: Merkmal[]): string[] {
@@ -344,9 +352,17 @@ describe('Bearbeitungs-Elemente erscheinen nur mit ownerMode', () => {
     expect(gefunden(bearbeiten, IN_DER_ANSICHT)).toEqual(IN_DER_ANSICHT.map(({ was }) => was))
   })
 
-  it('Gegenprobe: farm-page-client trägt die Werkzeugleiste', () => {
-    const besitzer = renderToStaticMarkup(createElement(FarmPageClient, { farm: HOF, activeStatus: STATUS, pastStatusCount: 2 }))
+  it('Gegenprobe: Mein Hof trägt die Werkzeugleiste über der Hofseite mit Stiften', () => {
+    // Die Kinder stehen in den Props, wie JSX sie übergibt.
+    const mitStiften: ComponentProps<typeof MeinHofAnsicht> = {
+      reiter: 'hofseite',
+      slug: HOF.slug,
+      kopf: null,
+      children: createElement(FarmPageClient, { farm: HOF, activeStatus: STATUS, pastStatusCount: 2 }),
+    }
+    const besitzer = renderToStaticMarkup(createElement(MeinHofAnsicht, mitStiften))
     expect(gefunden(besitzer, [WERKZEUGLEISTE])).toEqual([WERKZEUGLEISTE.was])
+    expect(besitzer).toContain('So sieht’s die Kundin')
   })
 
   it('die Seite für Kundinnen rendert ohne sie', () => {

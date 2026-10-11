@@ -15,6 +15,7 @@ import { HofseiteEditor } from '@/components/farmer/hofseite-editor'
 import { MeinHofSeitenkopf } from '@/components/mein-hof/seitenkopf'
 import { BeitraegeReiter } from '@/components/mein-hof/beitraege-reiter'
 import { ChecklisteKompakt } from '@/components/mein-hof/checkliste-kompakt'
+import { MeinHofAnsicht } from '@/components/mein-hof/mein-hof-ansicht'
 
 export const metadata: Metadata = {
   title: 'Mein Hof — FarmerZone',
@@ -38,6 +39,11 @@ export const dynamic = 'force-dynamic'
  * Reiter „Beiträge" — seit Nr. 22e mit allem, was /status konnte
  * (Deaktivieren, Löschen, Als Vorlage, WhatsApp fortsetzen); /status leitet
  * hierher um, geschrieben wird weiter unter /status/new.
+ *
+ * Seit Nr. 49 (Register N3/N4) steht unter lg auf beiden Reitern ganz oben
+ * unter dem Kopf der Umschalter „Bearbeiten · So sieht’s die Kundin"
+ * (MeinHofAnsicht, ?ansicht=kundin); „Bearbeiten" ist der Inhalt darunter.
+ * Unter md trägt der Kopf zusätzlich den Reiter „Produkte".
  */
 export default async function FarmPageOwnerRoute({
   searchParams,
@@ -57,11 +63,20 @@ export default async function FarmPageOwnerRoute({
     // Der Zeitpunkt für „vor …" einmal hier auf dem Server (CODING_STANDARDS §2).
     const uebersicht = beitraegeUebersicht(beitraege, new Date().toISOString())
     return (
-      <div className="mx-auto max-w-3xl px-4 pt-5 pb-12 md:px-8 md:pt-7 lg:max-w-none">
-        <MeinHofSeitenkopf hof={kopf} aktiv="beitraege" beitraegeZahl={uebersicht.anzahl} />
-        <h1 className="sr-only">Beiträge</h1>
-        <BeitraegeReiter uebersicht={uebersicht} />
-      </div>
+      <MeinHofAnsicht
+        reiter="beitraege"
+        slug={farm.slug}
+        kopf={
+          <div className="mx-auto max-w-3xl px-4 pt-5 md:px-8 md:pt-7 lg:max-w-none">
+            <MeinHofSeitenkopf hof={kopf} aktiv="beitraege" beitraegeZahl={uebersicht.anzahl} />
+          </div>
+        }
+      >
+        <div className="mx-auto max-w-3xl px-4 pt-5 pb-12 md:px-8 lg:max-w-none lg:pt-0">
+          <h1 className="sr-only">Beiträge</h1>
+          <BeitraegeReiter uebersicht={uebersicht} />
+        </div>
+      </MeinHofAnsicht>
     )
   }
 
@@ -79,18 +94,24 @@ export default async function FarmPageOwnerRoute({
 
   return (
     <>
-      <div className="mx-auto max-w-3xl px-4 pt-5 md:px-8 md:pt-7 lg:max-w-none">
-        <MeinHofSeitenkopf hof={kopf} aktiv="hofseite" beitraegeZahl={beitraegeZahl} />
-      </div>
-
-      {/* Unter lg: Checkliste, darunter die Hofseite mit Stiften. Die
-          Überschrift trägt dort die Hofseite selbst (der Hofname). */}
-      <div className="lg:hidden">
-        <div className="mx-auto max-w-3xl px-4 pb-5 md:px-8">
-          <ChecklisteKompakt fortschritt={fortschritt} />
+      <MeinHofAnsicht
+        reiter="hofseite"
+        slug={farm.slug}
+        kopf={
+          <div className="mx-auto max-w-3xl px-4 pt-5 md:px-8 md:pt-7 lg:max-w-none">
+            <MeinHofSeitenkopf hof={kopf} aktiv="hofseite" beitraegeZahl={beitraegeZahl} />
+          </div>
+        }
+      >
+        {/* Unter lg, „Bearbeiten": Checkliste, darunter die Hofseite mit
+            Stiften. Die Überschrift trägt dort die Hofseite selbst (der Hofname). */}
+        <div className="lg:hidden">
+          <div className="mx-auto max-w-3xl px-4 pt-5 pb-5 md:px-8">
+            <ChecklisteKompakt fortschritt={fortschritt} />
+          </div>
+          <FarmPageClient farm={farm} activeStatus={activeStatus} pastStatusCount={pastStatusCount} />
         </div>
-        <FarmPageClient farm={farm} activeStatus={activeStatus} pastStatusCount={pastStatusCount} />
-      </div>
+      </MeinHofAnsicht>
 
       {/* Ab lg: Liste links, Vorschau rechts. Nur, was der Editor braucht —
           kein Date und kein Decimal über die Grenze (CODING_STANDARDS §2). */}

@@ -126,18 +126,27 @@ describe('Vorschau-Rahmen', () => {
     expect(rahmen).toContain('ausloeser.current = document.activeElement instanceof HTMLElement ? document.activeElement : null')
   })
 
+  // Die Markierung geht seit Nr. 49 über EINEN Hook — für diesen Rahmen und „So sieht’s die Kundin" unter lg.
+  const markierung = quelltext('src/components/farmer/use-vorschau-markierung.ts')
+  const kundin = quelltext('src/components/mein-hof/mein-hof-ansicht.tsx')
+
   it('der erste Stand im src, jeder weitere per location.replace; die Markierung nur an den eigenen Ursprung', () => {
     // Sonst legte jedes Speichern einen Eintrag im Browserverlauf an.
     expect(rahmen).toMatch(/src=\{vorschauAdresse\(slug, anfang\)\}/)
     expect(rahmen).toContain('location.replace(vorschauAdresse(slug, stand))')
-    expect(rahmen.match(/postMessage\([^)]*window\.location\.origin\)/g)).toHaveLength(1)
-    expect(rahmen).not.toMatch(/postMessage\([^)]*'\*'/)
+    expect(markierung.match(/postMessage\([^)]*window\.location\.origin\)/g)).toHaveLength(1)
+    for (const text of [rahmen, markierung, kundin]) expect(text).not.toMatch(/postMessage\([^)]*'\*'/)
+    // Beide Rahmen nehmen den Hook, keiner schickt selbst.
+    for (const text of [rahmen, kundin]) {
+      expect(text).toContain('useVorschauMarkierung(rahmen, markiert)')
+      expect(text).not.toContain('postMessage(')
+    }
   })
 
   it('schickt die Markierung nach dem Laden noch einmal — auf die Bereit-Meldung der eigenen Seite, nicht auf onLoad', () => {
-    expect(rahmen).not.toContain('onLoad=')
-    expect(rahmen).toContain('leseBereit(ereignis, window.location.origin)')
-    expect(rahmen).toContain('ereignis.source !== rahmen.current?.contentWindow')
+    for (const text of [rahmen, kundin]) expect(text).not.toContain('onLoad=')
+    expect(markierung).toContain('leseBereit(ereignis, window.location.origin)')
+    expect(markierung).toContain('ereignis.source !== rahmen.current?.contentWindow')
     const empfaenger = quelltext('src/components/farm/vorschau-im-rahmen.tsx')
     expect(empfaenger).toMatch(/window\.parent\.postMessage\(\{ typ: BEREIT_TYP \}, window\.location\.origin\)/)
     // Das eigene Fenster scrollen, nicht scrollIntoView — das zöge die Editor-Seite mit.

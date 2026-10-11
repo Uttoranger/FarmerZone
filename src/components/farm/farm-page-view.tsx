@@ -17,7 +17,8 @@
  *
  * 2. src/components/farmer/farm-page-client.tsx — der Besitzer am Handy unter
  *    lg auf /farm-page, im Bearbeitungsmodus (`ownerMode`, `mode`,
- *    `pastStatusCount`, `onVorschau`). Seit Nachtlauf Nr. 16 in der HofShell;
+ *    `pastStatusCount`, `onVorschau`, seit Nr. 49 `onGespeichert` für
+ *    „Gespeichert · Ansehen"). Seit Nachtlauf Nr. 16 in der HofShell;
  *    die Bestandsfarben (--app-*) bekommen dort über data-app-palette die
  *    Werte des Design-Systems, der Aufbau ist unverändert. Nur hier gibt
  *    es Stifte, Titelbild- und Fotoknöpfe, den Bearbeitungs-Hinweis und den
@@ -70,6 +71,7 @@ import { produktLink } from '@/lib/produktdetail'
 import { NICHT_IM_SHOP_IM_SATZ } from '@/lib/produkt-sichtbarkeit'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
 import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
+import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 
 const ANLASS_META: Record<string, { label: string; icon: ReactNode }> = {
   FRESH_PRODUCT: { label: 'Frisches Produkt', icon: <Leaf className="size-3" strokeWidth={1.7} /> },
@@ -184,7 +186,16 @@ function SortableGalleryTile({
   )
 }
 
-function GallerySection({ farm, isEdit }: { farm: PublicFarm; isEdit: boolean }) {
+function GallerySection({
+  farm,
+  isEdit,
+  onGespeichert,
+}: {
+  farm: PublicFarm
+  isEdit: boolean
+  /** Statt des eigenen Toasts: „Gespeichert · Ansehen" in Mein Hof (Nr. 49). */
+  onGespeichert?: () => void
+}) {
   const [, startTransition] = useTransition()
   const router = useRouter()
 
@@ -222,6 +233,8 @@ function GallerySection({ farm, isEdit }: { farm: PublicFarm; isEdit: boolean })
       if (result.error) {
         toast.error(result.error)
         setPhotoOrder(null) // Revert auf Server-Stand
+      } else {
+        onGespeichert?.()
       }
     })
   }
@@ -236,7 +249,8 @@ function GallerySection({ farm, isEdit }: { farm: PublicFarm; isEdit: boolean })
         if (result.error) {
           toast.error(result.error)
         } else {
-          toast.success('Foto hinzugefügt')
+          if (onGespeichert) onGespeichert()
+          else toast.success('Foto hinzugefügt')
           router.refresh()
         }
       })
@@ -475,14 +489,17 @@ export const TITELBILD_KNOPF_STIL = {
 /**
  * „Titelbild ersetzen" — auf der Hofseite im Bearbeitungsmodus und im
  * Editor ab lg (hofseite-editor.tsx), der über `onGespeichert` seine
- * Vorschau neu lädt.
+ * Vorschau neu lädt. `meldeErfolg` ersetzt den eigenen Toast — in Mein Hof
+ * unter lg durch „Gespeichert · Ansehen" (Nr. 49).
  */
 export function CoverEditButton({
   currentBannerUrl,
   onGespeichert,
+  meldeErfolg,
 }: {
   currentBannerUrl: string | null
   onGespeichert?: () => void
+  meldeErfolg?: () => void
 }): React.JSX.Element {
   const [, startTransition] = useTransition()
   const router = useRouter()
@@ -496,7 +513,8 @@ export function CoverEditButton({
         if (result.error) {
           toast.error(result.error)
         } else {
-          toast.success('Titelbild aktualisiert')
+          if (meldeErfolg) meldeErfolg()
+          else toast.success('Titelbild aktualisiert')
           router.refresh()
           onGespeichert?.()
         }
@@ -613,6 +631,12 @@ type Props = {
   /** Wechselt in die Kundenansicht — nur im Bauern-Bereich gesetzt, wo `mode` lebt. */
   onVorschau?: () => void
   /**
+   * Nach einem Speichern im Bearbeitungsmodus (Titelbild, Ausschnitt, Fotos):
+   * welcher Abschnitt sich geändert hat — Mein Hof zeigt dann „Gespeichert ·
+   * Ansehen" statt des eigenen Toasts (Nr. 49, Register N4).
+   */
+  onGespeichert?: (abschnitt: HofseiteZeileId) => void
+  /**
    * Wer die öffentliche Seite sieht, entschieden von `ansichtsModus`
    * (src/lib/ansichts-modus.ts): In der Vorschau ist Kaufen wirkungslos, und
    * der Editor im Bauern-Bereich darf Abschnitte markieren (vorschau-im-rahmen.tsx).
@@ -628,14 +652,23 @@ type Props = {
 
 const FUER_KUNDINNEN: Pick<SeitenAnsicht, 'art' | 'kaufen'> = { art: 'kundin', kaufen: true }
 
-export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = false, mode = 'edit', pastStatusCount = 0, onVorschau, ansicht = FUER_KUNDINNEN, jetzt }: Props) {
+export function FarmPageView({ farm, activeStatus, reorderItems, ownerMode = false, mode = 'edit', pastStatusCount = 0, onVorschau, onGespeichert, ansicht = FUER_KUNDINNEN, jetzt }: Props) {
   // Kundinnen und die Vorschau des Hofs: die Hofseite im neuen Design (Nr. 10).
   if (!ownerMode) {
     // Ohne Zeitpunkt vom Server (kein Aufrufer heute) die eigene Uhr — dann
     // kann „vor N Stunden" zwischen Server und Browser abweichen.
     return <HofseiteKunde farm={farm} activeStatus={activeStatus} reorderItems={reorderItems} ansicht={ansicht} jetzt={jetzt ?? new Date().toISOString()} />
   }
-  return <HofseiteBesitzer farm={farm} activeStatus={activeStatus} mode={mode} pastStatusCount={pastStatusCount} onVorschau={onVorschau} />
+  return (
+    <HofseiteBesitzer
+      farm={farm}
+      activeStatus={activeStatus}
+      mode={mode}
+      pastStatusCount={pastStatusCount}
+      onVorschau={onVorschau}
+      onGespeichert={onGespeichert}
+    />
+  )
 }
 
 /**
@@ -650,12 +683,14 @@ function HofseiteBesitzer({
   mode,
   pastStatusCount,
   onVorschau,
+  onGespeichert,
 }: {
   farm: PublicFarm
   activeStatus: ActiveStatusPost | null
   mode: 'edit' | 'preview'
   pastStatusCount: number
   onVorschau?: () => void
+  onGespeichert?: (abschnitt: HofseiteZeileId) => void
 }) {
   // Die Verzweigungen unten stammen aus der Zeit, als Kundinnen und Besitzer
   // dieselbe Ansicht teilten; hier ist es immer der Besitzer (Gate 5 baut um).
@@ -679,7 +714,8 @@ function HofseiteBesitzer({
       if (result.error) {
         toast.error(result.error)
       } else {
-        toast.success('Bildausschnitt gespeichert')
+        if (onGespeichert) onGespeichert('titelbild')
+        else toast.success('Bildausschnitt gespeichert')
         focusRouter.refresh()
       }
       setFocusDraft(null)
@@ -897,7 +933,10 @@ function HofseiteBesitzer({
                 Anpassen
               </button>
             )}
-            <CoverEditButton currentBannerUrl={farm.bannerUrl} />
+            <CoverEditButton
+              currentBannerUrl={farm.bannerUrl}
+              meldeErfolg={onGespeichert ? () => onGespeichert('titelbild') : undefined}
+            />
           </div>
         )}
         {/* Hof-Siegel — Abstand von oben jetzt anteilig statt fester 38px.
@@ -1318,7 +1357,7 @@ function HofseiteBesitzer({
             Effekt in GallerySection richtig, nicht ein Neuaufbau. */}
         {showGallery && (
           <div id="fotos" data-abschnitt="fotos" className={`mt-[26px] ${SPRUNGZIEL_OHNE_KOPF}`}>
-            <GallerySection farm={farm} isEdit={isEdit} />
+            <GallerySection farm={farm} isEdit={isEdit} onGespeichert={onGespeichert ? () => onGespeichert('fotos') : undefined} />
           </div>
         )}
 
