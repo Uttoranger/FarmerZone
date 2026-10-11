@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Camera, Loader2, X } from 'lucide-react'
 import { MELDUNG_ARTEN, MELDUNG_ART_SATZ, MELDUNG_KENNUNG_MAX, MELDUNG_TEXT_MAX, MELDUNG_TEXT_MIN } from '@/lib/meldung'
-import { MEINE_MELDUNGEN_HREF, MELDUNG_TEXT_LABEL, mitgeschicktSatz } from '@/lib/hof-hilfe'
+import { MEINE_MELDUNGEN_HREF, MELDUNG_TEXT_BEISPIEL, MELDUNG_TEXT_LABEL, mitgeschicktSatz } from '@/lib/hof-hilfe'
 import { stufenText } from '@/components/shared/image-upload'
 import { HONIGTOPF_STIL, useMeldungFormular } from '@/components/shared/use-meldung-formular'
 import { FELD, FELD_LABEL, KICKER, KNOPF_GRUEN, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
@@ -152,6 +152,7 @@ export function MeldungForm({
           rows={4}
           maxLength={MELDUNG_TEXT_MAX}
           minLength={MELDUNG_TEXT_MIN}
+          placeholder={MELDUNG_TEXT_BEISPIEL[art]}
           required
           aria-describedby="meldung-text-zaehler"
           className={cn(FELD, 'min-h-[96px] resize-y leading-normal')}

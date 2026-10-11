@@ -30,6 +30,16 @@ export const MELDUNG_TEXT_LABEL: Record<MeldungArt, string> = {
 }
 
 /**
+ * Das Beispiel im Textfeld von /problem-melden (Mockup
+ * fehler-500-problem-melden-kunde) — nur bei „Fehler", dem Zustand, den das
+ * Mockup zeigt. Bei Wunsch und Frage genügt die Frage über dem Feld; ein
+ * Beispiel über eine kaputte Seite passte dort nicht.
+ */
+export const MELDUNG_TEXT_BEISPIEL: Partial<Record<MeldungArt, string>> = {
+  FEHLER: 'Beim Bezahlen kam diese Seite …',
+}
+
+/**
  * Der eine Satz „Mitgeschickt: …" unter dem öffentlichen Meldeformular
  * (/problem-melden, seit Nr. 54; Mockup fehler-500-problem-melden-kunde):
  * was automatisch mitgeht, ohne Technik — die Fehlernummer nur, wenn eine da

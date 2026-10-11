@@ -31,7 +31,7 @@ import { metadata as vergessenMeta } from '@/app/(auth)/forgot-password/page'
 import { metadata as bestellungMeta } from '@/app/(public)/[farmSlug]/bestellung/[orderId]/page'
 import { metadata as barMeta } from '@/app/(public)/[farmSlug]/bestaetigen/[token]/page'
 import { metadata as problemMeta } from '@/app/(public)/problem-melden/page'
-import { mitgeschicktSatz } from '@/lib/hof-hilfe'
+import { MELDUNG_TEXT_BEISPIEL, mitgeschicktSatz } from '@/lib/hof-hilfe'
 import { monatKurz, monatOhneJahr } from '@/lib/finanzen'
 import { bestellEintrag, bestellTon } from '@/lib/bestellungen-finden'
 import { monatsschluessel } from '@/lib/servicegebuehr'
@@ -188,6 +188,19 @@ describe('Ladeansicht der Bestellseite — dieselben Karten wie die Seite', () =
     expect(laden).toMatch(/import \{ KARTE \} from '@\/components\/bestaetigung\/bestaetigung-teile'/)
     expect(anzahl(laden, /cn\(KARTE, /)).toBe(3)
     expect(laden).not.toMatch(/rounded-2xl border border-border bg-card/)
+  })
+})
+
+describe('Problem melden — das Beispiel im Textfeld kommt aus dem Mockup', () => {
+  it('bei „Fehler" der Wortlaut des Mockups, bei Wunsch und Frage keins', () => {
+    expect(MELDUNG_TEXT_BEISPIEL.FEHLER).toBe('Beim Bezahlen kam diese Seite …')
+    expect(lies('docs/mockups/fehler-500-problem-melden-kunde.html')).toContain(MELDUNG_TEXT_BEISPIEL.FEHLER)
+    expect(MELDUNG_TEXT_BEISPIEL.WUNSCH).toBeUndefined()
+    expect(MELDUNG_TEXT_BEISPIEL.FRAGE).toBeUndefined()
+  })
+
+  it('das Textfeld nimmt das Beispiel der gewählten Art', () => {
+    expect(lies('src/components/shared/meldung-form.tsx')).toMatch(/placeholder=\{MELDUNG_TEXT_BEISPIEL\[art\]\}/)
   })
 })
 
