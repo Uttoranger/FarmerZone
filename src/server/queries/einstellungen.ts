@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
 import type { EinstellungenDaten, KonditionenHof } from '@/lib/hof-einstellungen'
+import type { TarifId } from '@/lib/konditionen'
 import { getFarmSettings, getOwnerFarm } from './farm'
 
 /**
@@ -47,10 +48,15 @@ export async function ladeEinstellungenUebersicht(ownerId: string): Promise<Eins
   }
 }
 
+/** Was „im Shop" heißt (produkt-sichtbarkeit.ts: Schalter „Im Shop") — Tarif-Zeile und Vergleich zählen gleich. */
+const IM_SHOP_WHERE = { isAvailable: true } as const
+
 /**
  * Die gespeicherten Sätze des eigenen Hofs für /settings/konditionen — als
  * Text (Decimal → string), damit die reine Rechnung (konditionenRechenbeispiel)
- * ohne Prisma-Objekte auskommt und nichts über `Number()` läuft.
+ * ohne Prisma-Objekte auskommt und nichts über `Number()` läuft. Dazu für den
+ * Vergleich mit Hoftor (Nr. 61) die Produkte im Shop und die aktiven
+ * Abholzeiten — gezählt in derselben Abfrage.
  */
 export async function ladeKonditionenHof(ownerId: string): Promise<KonditionenHof | null> {
   const hof = await prisma.farm.findUnique({
@@ -61,6 +67,7 @@ export async function ladeKonditionenHof(ownerId: string): Promise<KonditionenHo
       serviceFeeMinCents: true,
       serviceFeeActiveFrom: true,
       platformFeePercent: true,
+      _count: { select: { products: { where: IM_SHOP_WHERE }, pickupSlots: { where: { isActive: true } } } },
     },
   })
   if (!hof) return null
@@ -70,7 +77,27 @@ export async function ladeKonditionenHof(ownerId: string): Promise<KonditionenHo
     serviceFeeMinCents: hof.serviceFeeMinCents,
     serviceFeeActiveFrom: hof.serviceFeeActiveFrom,
     platformFeePercent: hof.platformFeePercent.toString(),
+    // Gründungshöfe erkennt erst Nr. 62 (Farm.gruendungBis und Platzvergabe).
+    gruendungBis: null,
+    produkteImShop: hof._count.products,
+    abholzeitenJeWoche: hof._count.pickupSlots,
   }
+}
+
+/** Was die Tarif-Zeile der HofShell über den Hof braucht (Nr. 61). */
+export type TarifStand = { tarif: TarifId | null; produkteImShop: number }
+
+/**
+ * Tarif und Produkte im Shop für die Tarif-Zeile — EINE Abfrage, weil jede
+ * Seite des Hofbereichs sie lädt (über `ladeTarifZeile`). Ein Hof, den es
+ * zwischen Sitzung und Abfrage nicht mehr gibt, zählt wie einer ohne Tarif.
+ */
+export async function ladeTarifStand(farmId: string): Promise<TarifStand> {
+  const hof = await prisma.farm.findUnique({
+    where: { id: farmId },
+    select: { tarif: true, _count: { select: { products: { where: IM_SHOP_WHERE } } } },
+  })
+  return { tarif: hof?.tarif ?? null, produkteImShop: hof?._count.products ?? 0 }
 }
 
 /**

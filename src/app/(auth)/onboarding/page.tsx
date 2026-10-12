@@ -8,6 +8,7 @@ import { ladeBestaetigungsStand, restWartezeitBestaetigung } from '@/server/emai
 import { getOpenOrdersCount } from '@/server/queries/orders'
 import { isAdminUser } from '@/server/queries/admin'
 import { zaehleZuEntscheiden } from '@/server/queries/meldung'
+import { ladeTarifZeile } from '@/server/hofbereich'
 import { HofShell } from '@/components/shells/hof-shell'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { EinrichtenSeite } from '@/components/einrichten/einrichten-seite'
@@ -72,8 +73,12 @@ export default async function OnboardingPage(): Promise<React.JSX.Element> {
     )
   }
 
-  // Zahlen und Admin-Recht wie im Bauern-Layout — frisch aus der Datenbank.
-  const [offeneBestellungen, isAdmin] = await Promise.all([getOpenOrdersCount(hof.id), isAdminUser(session.user.id)])
+  // Zahlen, Admin-Recht und Tarif-Zeile wie im Bauern-Layout — frisch aus der Datenbank.
+  const [offeneBestellungen, isAdmin, tarifZeile] = await Promise.all([
+    getOpenOrdersCount(hof.id),
+    isAdminUser(session.user.id),
+    ladeTarifZeile(hof.id, new Date()),
+  ])
   const zuEntscheiden = isAdmin ? await zaehleZuEntscheiden() : 0
   return (
     <HofShell
@@ -82,6 +87,7 @@ export default async function OnboardingPage(): Promise<React.JSX.Element> {
       personName={person.name}
       isAdmin={isAdmin}
       zahlen={{ bestellungen: offeneBestellungen, admin: zuEntscheiden }}
+      tarifZeile={tarifZeile}
     >
       {inhalt}
     </HofShell>

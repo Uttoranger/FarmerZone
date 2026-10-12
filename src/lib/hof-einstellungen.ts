@@ -16,7 +16,9 @@
  * Die Konditionen nennen Tarife und Übergang nur aus konditionen.ts (K1) und
  * rechnen das Beispiel mit DER Gebührenregel (berechneServicegebuehr) und den
  * gespeicherten Sätzen DIESES Hofs — die Seite verspricht nichts, was nicht
- * schon gilt (keine neuen Vertragszusagen).
+ * schon gilt (keine neuen Vertragszusagen). Seit Nr. 61 (Fassung 2) baut
+ * `baueKonditionenSeite` Stand, Tarif-Karten und Vergleich aus dem
+ * Tarif-Zustand (`bestimmeTarifZustand`) — dieselbe Regel wie die Tarif-Zeile.
  */
 import type { Betriebsstatus, Tarif } from '@prisma/client'
 import { aufzaehlung, abholzeitenKurz, EINSTELLUNG_FUER_ZEILE, type HofseiteZeile } from '@/lib/hofseite-fortschritt'
@@ -24,22 +26,36 @@ import type { WeeklySlot } from '@/lib/pickup-days'
 import { BETRIEBSNUMMER_ANKER, BETRIEBSSTATUS } from '@/lib/taxonomie'
 import {
   BAR_OHNE_GEBUEHR_SATZ,
+  DEIN_STAND_STARTPHASE,
+  HOFTOR_ABHOLZEITEN_JE_WOCHE,
+  HOFTOR_PRODUKTE,
+  IM_MONAT,
+  OHNE_WAHL_SATZ,
   ONLINE_GEBUEHR_ABGETRENNT_SATZ,
   ONLINE_GEBUEHR_MIT_PROVISION_SATZ,
+  PREIS_BEDINGUNGEN,
   PRO_MONAT,
+  START_TARIF,
+  TARIFE,
+  TARIF_MARKE,
+  TARIF_WAHL_SATZ,
+  VERGLEICH_TEXT,
   barGebuehrSepaSatz,
+  bestimmeTarifZustand,
   STARTPHASE_SATZ,
   TARIFE_AB,
   TARIFE_AB_SATZ,
   TARIFE_AB_TEXT,
   tarifText,
+  type DeinStand,
+  type TarifZustand,
 } from '@/lib/konditionen'
 import { barOhneServicegebuehr, berechneServicegebuehr, type ServicegebuehrEinstellung } from '@/lib/servicegebuehr'
 import { calcPlatformFeeAmount, decimalZuCents, type DecimalEingabe } from '@/lib/order-totals'
 import { centsAlsEuro, formatDatumLang, formatEuro, formatZahl } from '@/lib/format'
 import { Decimal } from '@prisma/client/runtime/index-browser'
 import { TEILEN_MOMENTE_PFAD, TEILEN_MOMENTE_TITEL, teilenMomenteZeile } from '@/lib/teilen-momente'
-import { EINSTELLUNG_KONTO, EINSTELLUNG_MEIN_AUFTRITT } from '@/lib/bauern-navigation'
+import { EINSTELLUNG_KONDITIONEN, EINSTELLUNG_KONTO, EINSTELLUNG_MEIN_AUFTRITT } from '@/lib/bauern-navigation'
 
 /** Weitergereicht: Das Sprungziel steht in taxonomie.ts, weil das Hofprofil (Client) es auch braucht. */
 export { BETRIEBSNUMMER_ANKER }
@@ -186,10 +202,10 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
     },
     {
       id: 'konditionen',
-      titel: 'Konditionen und Tarif',
+      titel: EINSTELLUNG_KONDITIONEN.label,
       zeile: konditionenZeile(d.tarif, jetzt),
       ton: 'neutral',
-      href: '/settings/konditionen',
+      href: EINSTELLUNG_KONDITIONEN.href,
     },
     {
       id: 'teilen',
@@ -276,6 +292,12 @@ export type KonditionenHof = ServicegebuehrEinstellung & {
   /** Farm.platformFeePercent — im Pilot 0; geht online vom Warenpreis ab. */
   platformFeePercent: DecimalEingabe
   tarif: Tarif | null
+  /** Ende der Gründungszusage (K2) — liefert ab Nr. 62 die Platzvergabe, bis dahin null. */
+  gruendungBis: Date | null
+  /** Produkte, die gerade im Shop stehen (`isAvailable`) — „Heute" im Vergleich mit Hoftor. */
+  produkteImShop: number
+  /** Aktive Abholzeiten je Woche — „Heute" im Vergleich mit Hoftor. */
+  abholzeitenJeWoche: number
 }
 
 export type RechenZeile = { label: string; betrag: string; summe?: boolean }
@@ -366,5 +388,83 @@ export function konditionenRechenbeispiel(hof: KonditionenHof, jetzt: Date): Rec
           ? (barGebuehrSepaSatz(jetzt) ?? '')
           : (grund ?? ''),
     },
+  }
+}
+
+// ─── Konditionen, Fassung 2: Stand, Tarif-Karten, Vergleich (Nr. 61) ────────
+
+/** Eine Tarif-Karte, wie „Deine Konditionen" sie zeigt — nur Text und Wahrheitswerte. */
+export type TarifKarteAnzeige = {
+  id: Tarif
+  name: string
+  fuerWen: string
+  leistungen: readonly string[]
+  /** „kostenlos" neben dem Namen — nur ohne Grundgebühr; nie „€ 0". */
+  kostenlos: boolean
+  marke: { text: string; ton: 'fertig' | 'neutral' } | null
+  /** Unter den Leistungen beim Tarif, der ohne Wahl gilt. */
+  satz: string | null
+  /** Der Preis mit Bedingungen — erst NACH den Leistungen (E6-Ergänzung). */
+  preis: { betrag: string; bedingungen: string; wahl: string | null } | null
+}
+
+export type VergleichZeile = { label: string; heute: number; hoftor: number }
+
+export type KonditionenSeite = {
+  zustand: TarifZustand
+  /** „Dein Stand" — Wortlaut gibt es bisher nur vor dem Stichtag (`'startphase'`); sonst zeigt die Seite den Übergang K1 allein. */
+  stand: DeinStand | null
+  karten: TarifKarteAnzeige[]
+  /** Nur vor dem Stichtag (`'startphase'`): was sich für diesen Hof ab dann ändert. */
+  vergleich: VergleichZeile[] | null
+}
+
+/**
+ * Stand, Tarif-Karten und Vergleich für „Deine Konditionen" (Mockups
+ * web-/mobil-h1-einstellungen-konditionen-v2). Marken nach E6-Ergänzung:
+ * „Dein Tarif" nur nach Wahl; „Gilt automatisch" für Hoftor nur ohne Wahl und
+ * nicht für einen Gründungshof (für ihn gilt bis zu seinem Tag Hofladen ohne
+ * Grundgebühr, K2). Der Vergleich nennt die Zahlen dieses Hofs neben den
+ * Grenzen von Hoftor — nur vor dem Stichtag, solange die Änderung bevorsteht.
+ */
+export function baueKonditionenSeite(hof: KonditionenHof, jetzt: Date): KonditionenSeite {
+  const zustand = bestimmeTarifZustand(hof, jetzt)
+  const ohneWahl = hof.tarif === null && zustand !== 'gruendungshof'
+
+  const karten = TARIFE.map((t): TarifKarteAnzeige => {
+    const gewaehlt = hof.tarif === t.id
+    const automatisch = ohneWahl && t.id === START_TARIF.id
+    const kostetGrundgebuehr = t.grundgebuehrCents > 0
+    return {
+      id: t.id,
+      name: t.name,
+      fuerWen: t.fuerWen,
+      leistungen: t.leistungen,
+      kostenlos: !kostetGrundgebuehr,
+      marke: gewaehlt
+        ? { text: TARIF_MARKE.gewaehlt, ton: 'fertig' }
+        : automatisch
+          ? { text: TARIF_MARKE.automatisch, ton: 'fertig' }
+          : kostetGrundgebuehr
+            ? { text: TARIF_MARKE.mehr, ton: 'neutral' }
+            : null,
+      satz: automatisch ? OHNE_WAHL_SATZ : null,
+      preis: kostetGrundgebuehr
+        ? { betrag: `${t.preis} ${IM_MONAT}`, bedingungen: PREIS_BEDINGUNGEN, wahl: gewaehlt ? null : TARIF_WAHL_SATZ }
+        : null,
+    }
+  })
+
+  return {
+    zustand,
+    stand: zustand === 'startphase' ? DEIN_STAND_STARTPHASE : null,
+    karten,
+    vergleich:
+      zustand === 'startphase'
+        ? [
+            { label: VERGLEICH_TEXT.produkte, heute: hof.produkteImShop, hoftor: HOFTOR_PRODUKTE },
+            { label: VERGLEICH_TEXT.abholzeiten, heute: hof.abholzeitenJeWoche, hoftor: HOFTOR_ABHOLZEITEN_JE_WOCHE },
+          ]
+        : null,
   }
 }

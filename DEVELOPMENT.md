@@ -4866,6 +4866,16 @@ Auftrag freigabe.md §13 „56" (Sicherheitspfad, Nachprüfung). Keine Schema-Ä
   - Rückschritt aus Runde 2: In Nachricht, Brotkrume und extra endete eine absolute Adresse an „]", „)" und Anführungszeichen, und „&reorder=…" oder „&s=…" dahinter blieb. Dort reichen absolute Adressen wieder bis zum Leerraum wie auf main (`ADRESSE_IM_FREITEXT`); seit 48a3820 liest eine relative Adresse eine eingebettete absolute mit (`/api/og?url=https://…`). 5dce1f4 ließ sie davor enden; dann landeten bei einer absoluten ohne „?" die übrigen Parameter der äußeren Abfrage in deren Pfad, und „&s=…" blieb. Im Fehlertext bleibt die engere Grenze aus Runde 1: Dort stehen Adressen oft in Klammern oder JSON, und der Text dahinter hilft beim Beheben; auf main gab es dort gar keine URL-Regel.
   - Ein Abfragewert, der sich nach der letzten Dekodier-Runde noch ändert, fällt ganz; fünffach kodiert blieb der Token vorher kodiert stehen.
 
+## Tarif-Zeile und „Deine Konditionen" Fassung 2 (Nachtlauf Nr. 61, Oktober 2026)
+
+Auftrag freigabe.md §14 „61" (Register E6-Ergänzung, K1, K2, O8). Keine Migration, kein neues Paket.
+
+- **Fachregel Tarif-Zustand (`bestimmeTarifZustand`, konditionen.ts):** vier Zustände. Gründungshof, solange der Wiener Kalendertag von heute nicht nach `gruendungBis` liegt — mit Vorrang vor der Startphase, weil ein Gründungshof seine eigene Zusage sehen soll; sonst Startphase vor `TARIFE_AB`; danach Hoftor ohne Wahl oder bei gewähltem Hoftor, Hofladen nur nach aktiver Wahl. Verglichen wird über `kalendertagInWien`, weil eine DATE-Spalte als UTC-Mitternacht kommt und um 0:30 Uhr in Wien in UTC noch gestern ist. Bis Nr. 62 liefert jeder Aufrufer `gruendungBis: null`; Nr. 62 setzt nur den Wert ein (`ladeTarifZeile`, `ladeKonditionenHof`).
+- **Warum ein Feld `fuerWen` neben `zusatz`:** Der Zusatz von Hofladen trägt „monatlich kündbar"; auf „Deine Konditionen" steht das unter dem Preis und stünde sonst zweimal in der Karte. Die öffentlichen Seiten behalten den vollen Zusatz.
+- **Was bewusst gleich blieb:** die Leistungen der Tarife (eine Fassung für alle Seiten; das Mockup schreibt „3 Produkte gleichzeitig im Shop" und „Urlaubsmodus: pausieren für € 0"), `VOLLER_WARENPREIS` ohne „immer", der Kopf mit Rückweg statt Brotkrumen, `MONATSABRECHNUNG_TEXT` mit „rechnen wir … ab" (auch /konditionen nutzt ihn).
+- **„Wählen kannst du ab Jänner 2027"** ist aus `TARIFE_AB` abgeleitet (Monat des letzten Tags der Startphase), damit kein zweites Datum im Code steht.
+- **Offen:** „Dein Stand" für Gründungshöfe (Nr. 62) und für die Zeit nach dem Stichtag samt Tarif-Wahl (Gate 8, O8); `KonditionenLaden` zeigt noch die Form von Fassung 1.
+
 ## Nützliche Befehle
 
 ```bash

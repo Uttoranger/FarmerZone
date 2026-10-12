@@ -17,11 +17,11 @@ import { SentryNutzer } from '@/components/farmer/sentry-nutzer'
  * zieht um, indem ihr Ordner von (farmer) nach (hof) wandert. Ist der letzte
  * umgezogen, fällt (farmer) samt farmer-nav.tsx weg.
  *
- * Zugang, Zahlen und Balken aus demselben Lader wie das Bestandslayout
- * (src/server/hofbereich.ts); die Shell lädt nichts selbst.
+ * Zugang, Zahlen, Balken und seit Nr. 61 die Tarif-Zeile aus demselben Lader
+ * wie das Bestandslayout (src/server/hofbereich.ts); die Shell lädt nichts selbst.
  */
 export default async function HofLayout({ children }: { children: React.ReactNode }): Promise<React.JSX.Element> {
-  const { hof, personName, offeneBestellungen, balken, isAdmin, zuEntscheiden } = await ladeHofbereich()
+  const { hof, personName, offeneBestellungen, balken, isAdmin, zuEntscheiden, tarifZeile } = await ladeHofbereich()
 
   return (
     <HofShell
@@ -30,6 +30,7 @@ export default async function HofLayout({ children }: { children: React.ReactNod
       personName={personName}
       isAdmin={isAdmin}
       zahlen={{ bestellungen: offeneBestellungen, admin: zuEntscheiden }}
+      tarifZeile={tarifZeile}
     >
       {/* Teilen-Service-Worker und Sentry-Kennung (nur die Farm-ID) wie im
           Bestandslayout — jeder Bauer kommt über eines der beiden. */}
