@@ -2,9 +2,10 @@
  * Die Lese-Aktion des frischen Stands (Nr. 50 Runde 1): ladeProfilStand
  * (server/actions/farm.ts) — Sitzung und Datenbank nachgebildet. Die
  * Schwester ladeAuftrittStand ist mit Nr. 65 entfallen: Die Abschnitte des
- * Auftritts schicken nur ihren Teil und lesen vorher nichts.
+ * Auftritts schicken nur ihren Teil und lesen vorher nichts — darum sagt
+ * seit Nr. 65 Runde 1 saveAppearanceAction selbst dieselben Sätze.
  *
- * Beweist: Ohne Sitzung sagt sie, dass man sich neu anmelden soll; mit
+ * Beweist: Ohne Sitzung sagen beide, dass man sich neu anmelden soll; mit
  * Sitzung, aber ohne Hof, dass wir den Hof nicht finden — zwei Sätze per Du,
  * mit Ausweg, aus einer Quelle (ABSCHNITT_SPEICHERN_TEXT). Vorher hieß es
  * knapp „Nicht angemeldet", auch dann, wenn nur der Hof fehlte.
@@ -21,6 +22,7 @@ vi.mock('@/lib/auth', () => ({ auth: { api: { getSession } } }))
 vi.mock('@/lib/prisma', () => ({ prisma: { farm: { findUnique: farmFinden } } }))
 
 import { ladeProfilStand } from '@/server/actions/farm'
+import { saveAppearanceAction } from '@/server/actions/appearance'
 import { ABSCHNITT_SPEICHERN_TEXT } from '@/lib/abschnitt-stand'
 
 const SITZUNG = { user: { id: 'user-1' } }
@@ -52,6 +54,20 @@ describe('ladeProfilStand', () => {
     getSession.mockResolvedValue(SITZUNG)
     farmFinden.mockResolvedValue(HOF)
     await expect(ladeProfilStand()).resolves.toEqual({ profil: HOF })
+  })
+})
+
+describe('saveAppearanceAction (Leitspruch, Über uns, Werte, Abschnitte)', () => {
+  it('ohne Sitzung: neu anmelden — ohne Abfrage', async () => {
+    getSession.mockResolvedValue(null)
+    await expect(saveAppearanceAction({ tagline: 'Gemüse vom Hügel' })).resolves.toEqual({ error: ABSCHNITT_SPEICHERN_TEXT.nichtAngemeldet })
+    expect(farmFinden).not.toHaveBeenCalled()
+  })
+
+  it('angemeldet, aber ohne Hof: nicht „Hof nicht gefunden", sondern der Satz mit Ausweg', async () => {
+    getSession.mockResolvedValue(SITZUNG)
+    farmFinden.mockResolvedValue(null)
+    await expect(saveAppearanceAction({ tagline: 'Gemüse vom Hügel' })).resolves.toEqual({ error: ABSCHNITT_SPEICHERN_TEXT.hofFehlt })
   })
 })
 

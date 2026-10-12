@@ -206,6 +206,16 @@ describe('fasseKundinZusammen', () => {
     expect(k.daysSinceLastOrder).toBe(5)
   })
 
+  it('die Zahl aller Bestellungen nimmt Testzahlungen mit — so viele stehen in der Liste der Kundin (Kundendetail „N weitere …")', () => {
+    const bestellungen = [
+      bestellung({ paymentMethod: 'ONLINE', createdAt: vor(20) }), // Testzahlung
+      bestellung({ paymentMethod: 'ONSITE_CASH', createdAt: vor(15) }),
+      bestellung({ paymentMethod: 'ONLINE', createdAt: vor(5) }), // nach dem Stichtag
+    ]
+    expect(fasseKundinZusammen(bestellungen, null, JETZT, vor(10))).toMatchObject({ orderCount: 2, alleBestellungen: 3 })
+    expect(fasseKundinZusammen(bestellungen, null, JETZT, null)).toMatchObject({ orderCount: 3, alleBestellungen: 3 })
+  })
+
   it('der Status zählt ab der ersten gezählten Bestellung: nach einer Testzahlung ist die erste echte Kundin „Neu"', () => {
     const k = fasseKundinZusammen(
       [bestellung({ paymentMethod: 'ONLINE', createdAt: vor(30) }), bestellung({ paymentMethod: 'ONSITE_CASH', createdAt: vor(3) })],
@@ -285,6 +295,8 @@ function kunde(teil: Partial<CustomerSummary> & { kundeId: string }): CustomerSu
     customerName: 'Erika Mustermann',
     customerPhone: '',
     orderCount: 1,
+    // Ohne Testzahlungen sind es dieselben — wer orderCount setzt, bekommt sie mit.
+    alleBestellungen: teil.orderCount ?? 1,
     umsatzCents: 1000,
     firstOrderDate: vor(100).toISOString(),
     lastOrderDate: vor(5).toISOString(),
@@ -442,6 +454,7 @@ describe('Abfragen nur für den eigenen Hof', () => {
     expect(detail?.orderCount).toBe(2)
     // Die Liste der letzten Bestellungen bleibt vollständig — nur Umsatz und Bestellzahl zählen anders.
     expect(detail?.recentOrders).toHaveLength(3)
+    expect(detail?.alleBestellungen).toBe(3)
   })
 
   it('Kennung: sucht nur unter den Bestellungen des eigenen Hofs, eine Kennung eines fremden Hofs findet nichts', async () => {
@@ -696,6 +709,14 @@ describe('Kundendetail', () => {
     expect(html).toContain('9 weitere Bestellungen findest du unter Bestellungen bei')
     expect(html).toMatch(/href="\/orders"[^>]*>Noch offen</)
     expect(html).toMatch(/href="\/orders\?filter=erledigt"[^>]*>Erledigt</)
+  })
+
+  it('mit Testzahlungen: „N weitere" zählt alle Bestellungen der Liste, die Kennzahl nur die gezählten (Register Z4)', () => {
+    // 7 Bestellungen, davon 3 Testzahlungen: 4 gezählt, 5 Zeilen, 2 nicht gezeigt.
+    const kunde = detail({ orderCount: 4, alleBestellungen: 7, recentOrders: detail().recentOrders.slice(0, 7) })
+    const html = renderToStaticMarkup(createElement(KundenDetail, { kunde, jetzt: JETZT }))
+    expect(html).toContain('2 weitere Bestellungen findest du unter Bestellungen bei')
+    expect(html).toMatch(/<dt[^>]*>Bestellungen<\/dt><dd[^>]*>4<\/dd>/)
   })
 
   it('ohne Telefon: kein Anrufen und kein WhatsApp, E-Mail bleibt', () => {

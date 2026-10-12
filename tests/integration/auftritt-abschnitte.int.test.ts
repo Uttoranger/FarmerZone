@@ -16,6 +16,8 @@
  *  - saveAppearanceAction mit `{ tagline, farmValues: [] }` lässt Gründungsjahr,
  *    Über uns, Abschnitte, Bilder und Fotos stehen; ohne Werte bleiben die
  *    Werte samt Kennung (Nr. 65).
+ *  - Auch nur Werte schreiben die Hofzeile (updatedAt steigt), sonst nichts an
+ *    ihr — warum (Sperre der Zeile, zwei Tabs), steht in appearance.ts.
  *  - Zwei Speicherketten zugleich (zwei Tabs) setzen einander nicht zurück.
  *  - Zwei Abschnitte nacheinander ohne Neuladen: Der zweite schreibt den
  *    ersten nicht zurück. Gegenprobe: Mit dem Stand vom Öffnen der Seite ginge
@@ -127,7 +129,7 @@ async function stand(farmId: string) {
       pauseMessage: true,
     },
   })
-  // Die Werte legt die Aktion bei jedem Speichern neu an — ihre Kennung zählt nicht, Inhalt und Reihenfolge schon.
+  // Kommen die Werte mit, legt die Aktion sie neu an — ihre Kennung zählt nicht, Inhalt und Reihenfolge schon.
   const werte = await prisma.farmValue.findMany({
     where: { farmId },
     orderBy: { sortOrder: 'asc' },
@@ -208,6 +210,20 @@ describe('saveAppearanceAction schreibt nur, was mitkommt (Nr. 65, Register N4)'
 
     expect(await kennungen()).toEqual(vorher)
     expect(vorher).toHaveLength(WERTE_VORHER.length)
+  })
+
+  it('nur Werte schreiben die Hofzeile mit (updatedAt steigt) — sonst ändert sich an ihr nichts', async () => {
+    const { farm } = await angemeldeterHof()
+    // Einen Tag zurück: So hängt die Aussage an keiner Millisekunde.
+    const gestern = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    await prisma.farm.update({ where: { id: farm.id }, data: { updatedAt: gestern } })
+    const vorher = await stand(farm.id)
+
+    expect(await saveAppearanceAction({ farmValues: NEUE_WERTE })).toEqual({})
+
+    const { updatedAt } = await prisma.farm.findUniqueOrThrow({ where: { id: farm.id }, select: { updatedAt: true } })
+    expect(updatedAt.getTime()).toBeGreaterThan(gestern.getTime())
+    expect(await stand(farm.id)).toEqual({ ...vorher, werte: NEUE_WERTE })
   })
 
   it('zwei Speicherketten zugleich (zwei Tabs): keine setzt die andere zurück', async () => {

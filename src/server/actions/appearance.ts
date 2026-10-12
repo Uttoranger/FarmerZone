@@ -7,7 +7,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import type { SectionConfig } from '@/server/queries/appearance'
 import { appearanceSchema } from '@/schemas/auftritt'
-import { auftrittFehlerText } from '@/lib/abschnitt-stand'
+import { ABSCHNITT_SPEICHERN_TEXT, auftrittFehlerText } from '@/lib/abschnitt-stand'
 import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
 
 // Das Schema liegt in src/schemas/auftritt.ts — der Hofseiten-Editor prüft
@@ -29,10 +29,10 @@ export async function saveAppearanceAction(
   data: AppearanceSaveInput,
 ): Promise<{ error?: string }> {
   const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) return { error: 'Nicht angemeldet' }
+  if (!session?.user) return { error: ABSCHNITT_SPEICHERN_TEXT.nichtAngemeldet }
 
   const farm = await prisma.farm.findUnique({ where: { ownerId: session.user.id } })
-  if (!farm) return { error: 'Hof nicht gefunden' }
+  if (!farm) return { error: ABSCHNITT_SPEICHERN_TEXT.hofFehlt }
 
   const parsed = appearanceSchema.safeParse(data)
   // Die Meldung nennt den Abschnitt, dessen Feld nicht passt.
@@ -64,6 +64,11 @@ export async function saveAppearanceAction(
     prisma.farm.update({
       where: { id: farm.id },
       data: {
+        // Immer, auch wenn nur die Werte mitkommen: Ohne Feld setzt Prisma kein
+        // UPDATE ab, und erst das UPDATE sperrt die Hofzeile bis zum Ende der
+        // Transaktion. So speichern zwei Tabs ihre Werte nacheinander — sonst
+        // löschten beide zugleich, legten beide an, und die Liste stünde doppelt da.
+        updatedAt: new Date(),
         ...(tagline !== undefined && { tagline }),
         ...(foundedYear !== undefined && { foundedYear }),
         ...(aboutText !== undefined && { aboutText }),

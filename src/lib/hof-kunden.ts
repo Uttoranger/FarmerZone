@@ -40,6 +40,8 @@ export type KundenZusammenfassung = {
   customerPhone: string
   /** Bestellungen ohne Testzahlungen (Register Z4, Ergänzung Lauf 10) — gezählt wie Auswertung und Admin-Hofliste. */
   orderCount: number
+  /** Alle Bestellungen, auch Testzahlungen — so viele zeigt die Liste im Kundendetail; daran zählt „N weitere …". */
+  alleBestellungen: number
   /** Warenpreis aller Bestellungen ohne Storno, Nicht-Abholung und Testzahlung (Register Z4), in Cent. */
   umsatzCents: number
   firstOrderDate: string
@@ -108,7 +110,8 @@ function bestimmeStatusMerkmale(gezaehlt: readonly KundenBestellung[], jetzt: Da
  * zählen seit Lauf 10 auch nicht zur Bestellzahl (Z4, Ergänzung: Auswertung,
  * Admin-Hofliste und Kundenansicht zählen gleich) — und damit nicht im Status,
  * der an ihr hängt. Lieblingsprodukte, erste und letzte Bestellung beschreiben
- * die Liste der Bestellungen, die alle zeigt, und nehmen sie weiter mit.
+ * die Liste der Bestellungen, die alle zeigt, und nehmen sie weiter mit —
+ * ebenso `alleBestellungen`, sonst fehlte unter der Liste „N weitere …".
  */
 export function fasseKundinZusammen(
   bestellungen: readonly KundenBestellung[],
@@ -138,6 +141,7 @@ export function fasseKundinZusammen(
     customerName: letzte.customerName,
     customerPhone: letzte.customerPhone,
     orderCount: gezaehlt.length,
+    alleBestellungen: sortiert.length,
     umsatzCents,
     firstOrderDate: erste.createdAt.toISOString(),
     lastOrderDate: letzte.createdAt.toISOString(),
