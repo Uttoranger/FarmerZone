@@ -4,7 +4,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { getFarmSettings, getMeinHofKopf, getOwnerFarm } from '@/server/queries/farm'
 import { getAppearanceData } from '@/server/queries/appearance'
-import { getStatusPostsForFarm } from '@/server/queries/status-posts'
+import { getStatusPostsForFarm, zaehleWhatsAppAbonnentinnen } from '@/server/queries/status-posts'
 import { zaehleBeitraege } from '@/server/queries/mein-hof-zahl'
 import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
 import { beitraegeUebersicht } from '@/lib/mein-hof-beitraege'
@@ -61,9 +61,14 @@ export default async function FarmPageOwnerRoute({
   const reiter = meinHofReiterAus((await searchParams)[MEIN_HOF_REITER_PARAMETER])
 
   if (reiter === 'beitraege') {
-    const [kopf, beitraege] = await Promise.all([getMeinHofKopf(session.user.id), getStatusPostsForFarm(farm.id)])
-    // Der Zeitpunkt für „vor …" einmal hier auf dem Server (CODING_STANDARDS §2).
-    const uebersicht = beitraegeUebersicht(beitraege, new Date().toISOString())
+    const [kopf, beitraege, whatsappAbonnentinnen] = await Promise.all([
+      getMeinHofKopf(session.user.id),
+      getStatusPostsForFarm(farm.id),
+      zaehleWhatsAppAbonnentinnen(farm.id),
+    ])
+    // Der Zeitpunkt für „vor …" einmal hier auf dem Server (CODING_STANDARDS §2),
+    // ebenso die heutigen WhatsApp-Abonnentinnen für „WhatsApp · n von m" (W1).
+    const uebersicht = beitraegeUebersicht(beitraege, new Date().toISOString(), whatsappAbonnentinnen)
     return (
       <MeinHofAnsicht
         reiter="beitraege"

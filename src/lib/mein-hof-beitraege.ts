@@ -11,6 +11,7 @@
 import { vorWieLange } from '@/lib/hofseite-kunde'
 import { aufzaehlung } from '@/lib/hofseite-fortschritt'
 import { formatZahl } from '@/lib/format'
+import { WHATSAPP_VERSAND_TEXT } from '@/lib/whatsapp-versand'
 
 /** Was die Übersicht von einem Beitrag braucht — eine Teilmenge von StatusPostSummary. */
 export type BeitragQuelle = {
@@ -24,9 +25,8 @@ export type BeitragQuelle = {
   sentViaWhatsApp: boolean
   /** An wie viele Adressen die E-Mail beim Veröffentlichen ging (gespeichert, keine neue Abfrage). */
   emailRecipientCount: number
-  /** Wie viele der WhatsApp-Nachrichten schon verschickt sind (je ein Tipp, /status/[id]/send-whatsapp). */
-  whatsappSentCount: number
-  whatsappRecipientCount: number
+  /** Wer die Nachricht in WhatsApp geöffnet bekam (Abonnements-IDs, Register W1, /status/[id]/send-whatsapp). */
+  whatsappGetippt: readonly string[]
 }
 
 /** Der Ton der Marke — dieselben Werte wie StatusBadge (components/ui/status-badge.tsx). */
@@ -35,7 +35,7 @@ export type BeitragTon = 'offen' | 'fertig' | 'neutral'
 /**
  * Was je Beitrag angeboten wird — dieselben Bedingungen wie früher auf /status:
  * Deaktivieren nur, solange er aktiv ist; Als Vorlage nur für vergangene;
- * WhatsApp fortsetzen nur, solange Nachrichten offen sind. Löschen geht immer.
+ * WhatsApp nur, solange heutige Abonnentinnen offen sind. Löschen geht immer.
  */
 export type BeitragAktionen = {
   deaktivieren: boolean
@@ -82,7 +82,7 @@ const MARKE: Record<BeitragGruppeId, BeitragEintrag['marke']> = {
  * „Nur auf der Hofseite", „Hofseite und 12 per E-Mail", „Hofseite, 12 per
  * E-Mail und WhatsApp". Die Zahl der E-Mail-Empfänger stand auf der alten
  * Beitragskarte von /status und kam mit Register F6 (22e) zurück in die Zeile;
- * WhatsApp nennt seinen Stand im Knopf „WhatsApp fortsetzen · n von m".
+ * WhatsApp nennt seinen Stand im Knopf „WhatsApp · n von m".
  */
 function wege(b: BeitragQuelle): string {
   const email = b.sentViaEmail && `${formatZahl(b.emailRecipientCount)} per E-Mail`
@@ -90,14 +90,20 @@ function wege(b: BeitragQuelle): string {
   return zusaetzlich.length === 0 ? 'Nur auf der Hofseite' : aufzaehlung(['Hofseite', ...zusaetzlich])
 }
 
-function aktionen(b: BeitragQuelle, gruppe: BeitragGruppeId): BeitragAktionen {
-  const offen = b.whatsappRecipientCount - b.whatsappSentCount
+/**
+ * Register W1: n ist, wer geöffnet bekam, m die Zahl der HEUTIGEN
+ * WhatsApp-Abonnentinnen des Hofs (nicht die beim Veröffentlichen
+ * eingefrorene). Aktive und vergangene Beiträge zeigen den Knopf, solange
+ * m > n; ohne Abonnentinnen keiner.
+ */
+function aktionen(b: BeitragQuelle, gruppe: BeitragGruppeId, whatsappAbonnentinnen: number): BeitragAktionen {
+  const getippt = b.whatsappGetippt.length
   return {
     deaktivieren: gruppe === 'aktiv',
     vorlage: gruppe === 'vergangen' ? `/status/new?from=${b.id}` : null,
     whatsapp:
-      gruppe !== 'entwuerfe' && b.sentViaWhatsApp && offen > 0
-        ? { href: `/status/${b.id}/send-whatsapp`, text: `WhatsApp fortsetzen · ${b.whatsappSentCount} von ${b.whatsappRecipientCount}` }
+      gruppe !== 'entwuerfe' && whatsappAbonnentinnen > getippt
+        ? { href: `/status/${b.id}/send-whatsapp`, text: WHATSAPP_VERSAND_TEXT.knopf(getippt, whatsappAbonnentinnen) }
         : null,
   }
 }
@@ -105,9 +111,14 @@ function aktionen(b: BeitragQuelle, gruppe: BeitragGruppeId): BeitragAktionen {
 /**
  * Die Beiträge in drei Gruppen (Aktiv · Entwürfe · Vergangen), leere fallen
  * weg; innerhalb einer Gruppe die Reihenfolge der Abfrage. „vor …" rechnet
- * vom übergebenen Zeitpunkt — die Seite bestimmt ihn einmal auf dem Server.
+ * vom übergebenen Zeitpunkt — die Seite bestimmt ihn einmal auf dem Server,
+ * ebenso die Zahl der heutigen WhatsApp-Abonnentinnen (Register W1).
  */
-export function beitraegeUebersicht(beitraege: readonly BeitragQuelle[], jetztIso: string): BeitraegeUebersicht {
+export function beitraegeUebersicht(
+  beitraege: readonly BeitragQuelle[],
+  jetztIso: string,
+  whatsappAbonnentinnen: number
+): BeitraegeUebersicht {
   const gruppen = GRUPPEN.map(({ id, titel }) => ({
     id,
     titel,
@@ -118,7 +129,7 @@ export function beitraegeUebersicht(beitraege: readonly BeitragQuelle[], jetztIs
         titel: b.title,
         marke: MARKE[id],
         zeile: b.isDraft || !b.publishedAt ? 'Noch nicht veröffentlicht' : `${vorWieLange(b.publishedAt, jetztIso)} · ${wege(b)}`,
-        aktionen: aktionen(b, id),
+        aktionen: aktionen(b, id, whatsappAbonnentinnen),
       })),
   })).filter((g) => g.eintraege.length > 0)
   return { gruppen, anzahl: beitraege.length }

@@ -4961,6 +4961,18 @@ Auftrag freigabe.md §15 „73“ (Register N7, in der Freigabe „D3“). Keine
 - **Der Hinweis, wo Produkte liegen,** steht am Ende der Liste als leiser Link auf `/products`. Der Auftrag nannte `seitenkopf.tsx` als seinen Ort im Kopf; er stand aber in der Reiterleiste (`reiter-leiste.tsx`) und ist dort seit Runde 1 entfallen (die drei Tests dazu sind umgekehrt, nicht gelöscht). Folge: Auf dem Reiter Beiträge (ab md) und auf Hofseite zwischen md und lg (dort steht die Liste „Bearbeiten“) gibt es ihn nicht mehr; er bleibt nur im Editor ab lg — so beschreibt es die Freigabe, Entscheidung für den Morgenbericht.
 - **Offen:** Der Kopf (Karte und Reiter) bleibt am breiten Bildschirm volle Breite und steht links und rechts über den Editor hinaus. Den alten Ort des Hinweises nennen noch der Satz über `MEIN_HOF_HINWEIS` in `bauern-navigation.ts` (Z. 140–144), der Kopf von `tests/mein-hof-umschalter.test.ts` und `docs/entwicklung/hofseite-editor-browser.md` — außerhalb der Grenzen von Runde 1.
 
+## WhatsApp an Abonnentinnen: ehrlich, je Person, fortsetzbar (Nachtlauf Nr. 66, Oktober 2026)
+
+Auftrag freigabe.md §15 „66" (Register W1). Eine Migration (freigegeben), kein neues Paket.
+
+- **Befund:** Die Tipp-Liste markierte eine Person eine Sekunde nach dem Tipp als „Gesendet" (`setTimeout`), ohne zu wissen, ob WhatsApp überhaupt aufging; gespeichert wurde nur eine Zahl aus dem Browser (`markWhatsAppSent`), beim Fortsetzen galten wieder alle als offen, und die Zahl konnte über die Empfängerzahl wachsen.
+- **Migration `20261012200000_whatsapp_getippt`:** nur `StatusPost.whatsappGetippt TEXT[]`, nullable, Default `ARRAY[]::TEXT[]` (steht seit Postgres 11 nur im Katalog), kein Backfill — erzeugt mit `prisma migrate diff`, von Hand um `lock_timeout` und `IF NOT EXISTS` ergänzt. Bestandsbeiträge lesen [].
+- **Warum eine Anweisung:** Zwei Tabs (Handy und Rechner) tippen gleichzeitig. Lesen-dann-Schreiben verlor in der Gegenprobe drei von sechs Tipps; `array_remove`/`array_append` auf der gesperrten Zeile verliert keinen.
+- **Warum „verlassen und zurück":** Nur die Rückkehr in den Browser zeigt, dass WhatsApp vorn war. Ein Fokus ohne vorheriges Verlassen (etwa ein Tipp, der nichts öffnete) zählt nicht.
+- **Zähler:** `whatsappSentCount` wird gleich der Listenlänge mitgeschrieben (Bestand, alter Code im Deploy-Fenster); `whatsappRecipientCount` bleibt eingefroren und wird nicht mehr gelesen — Contract mit eigener Freigabe.
+- **Knopf ohne Häkchen-Bedingung (Runde 1):** „WhatsApp · n von m" steht bei aktiven und vergangenen Beiträgen, solange m > n — gleich, ob beim Veröffentlichen das WhatsApp-Häkchen gesetzt war oder schon Abonnentinnen da waren (Stand von heute, W1). `sentViaWhatsApp` bestimmt nur noch die Zeile „wohin". Das Mockup zeigt einen vergangenen Beitrag ohne Knopf; es gilt der Wortlaut der Freigabe.
+- **Offen:** n im Knopf zählt auch Kennungen von inzwischen Abgemeldeten (die Liste selbst nicht).
+
 ## Nützliche Befehle
 
 ```bash
