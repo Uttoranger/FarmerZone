@@ -1246,10 +1246,13 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
     expect(nachricht('Link /x?tel=0664987 6543 weg')).toBe('Link /x?tel=[telefon entfernt] weg')
     expect(fehlertext('Link /x?tel=0664 1234567 weg')).toBe('Link /x?tel=[telefon entfernt] weg')
     expect(nachricht('Link /x?s=0664 1234567 weg')).toBe('Link /x [telefon entfernt] weg')
-    // Endet die bereinigte Adresse nur zufällig auf dieselben Ziffern, zählt das nicht.
-    for (const ergebnis of [nachricht('Link /x?a=106&s=06 64 9876543 weg'), fehlertext('Link /x?a=106&s=06 64 9876543 weg')]) {
-      expect(ergebnis).not.toMatch(/9876543/)
-    }
+    // Endet die bereinigte Adresse nur zufällig auf dieselben Ziffern, zählt das nicht …
+    expect(nachricht('Link /x?a=106&s=06 64 9876543 weg')).toBe('Link /x?a=106 [telefon entfernt] weg')
+    expect(fehlertext('Link /x?a=106&s=06 64 9876543 weg')).toBe('Link /x?a=106 [telefon entfernt] weg')
+    // … ein neu kodiertes Zeichen davor aber schon: Die Telefon-Regel setzt hinter `%3A` an.
+    expect(nachricht('Link /x?q=Tel:0664987 6543 weg')).toBe('Link /x?q=Tel%3A[telefon entfernt] weg')
+    expect(nachricht('Link /out?link=tel:0664 1234567 weg')).toBe('Link /out?link=tel%3A[telefon entfernt] weg')
+    expect(fehlertext('Link /out?link=tel:+43 664 1234567 weg')).toBe('Link /out?link=tel%3A[telefon entfernt] weg')
     // Hinter einem Schlüsselwort ohne „=" am Ende einer Adresse fällt der Code vorab.
     expect(nachricht('Login https://farmerzone.at/konto&a=1&otp 123456 abgelaufen')).toBe(
       'Login https://farmerzone.at/konto&a=1&otp [code entfernt] abgelaufen'

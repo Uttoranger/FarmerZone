@@ -617,6 +617,9 @@ const ZIFFERN_REST = /(?:[\s/\-.()]{1,3}\d)(?:[\s/\-.()]{0,3}\d)*/y
 /** Ein „/" nach Leerraum oder Klammer: Dort beginnt in Ziffern eine Adresse. */
 const ADRESSE_IN_ZIFFERN = /(?<=[\s()])\//g
 
+/** TELEFON_MUSTER, klebend: Setzt die Telefon-Regel an dieser Stelle an? */
+const TELEFON_KLEBEND = new RegExp(TELEFON_MUSTER.source, 'y')
+
 /** Wo eine Adresse beginnen kann: wie in ADRESSE_IM_FREITEXT und ADRESSE_IM_FEHLERTEXT. */
 const ADRESS_ANFANG = /https?:\/\/|(?<![\p{L}\p{N}\p{M}_/.~%-])\//iu
 
@@ -746,10 +749,16 @@ function ersetzeVorab(text: string, adressen: RegExp): string {
     const nummer = nummerVor(ende)
     if (nummer === undefined || nummer.index < adresse.index) continue
     const nummerEnde = nummer.index + nummer[0].length
-    // Bleibt ihr Anfang samt dem Zeichen davor in der bereinigten Adresse stehen
-    // (`?tel=0664`), nimmt die Telefon-Regel danach die ganze Nummer. Das Zeichen
-    // davor zählt mit: `?a=106&s=06 64 …` endet bereinigt zufällig auch auf „06".
-    if (nummerEnde <= ende || bereinigeUrl(adresse[0]).endsWith(text.slice(nummer.index - 1, ende))) continue
+    // Bleibt ihr Anfang am Ende der bereinigten Adresse stehen und setzt die
+    // Telefon-Regel dort an (`?tel=0664`, auch hinter einem neu kodierten
+    // `tel%3A`), nimmt sie danach die ganze Nummer. Nur die Zeichen zu
+    // vergleichen genügt nicht: `?a=106&s=06 64 …` endet bereinigt zufällig
+    // auch auf „06", aber mitten in einer Zahl setzt die Regel nicht an.
+    if (nummerEnde <= ende) continue
+    const bereinigt = bereinigeUrl(adresse[0])
+    const anfangDerNummer = text.slice(nummer.index, ende)
+    TELEFON_KLEBEND.lastIndex = bereinigt.length - anfangDerNummer.length
+    if (bereinigt.endsWith(anfangDerNummer) && TELEFON_KLEBEND.test(bereinigt + text.slice(ende, nummerEnde))) continue
     // Das Zeichen, an dem die Adresse endet, bleibt — so bleibt auch ihre Grenze.
     let rest = ende + 1
     while (rest < nummerEnde && /\s/.test(text[rest])) rest++
