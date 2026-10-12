@@ -94,7 +94,7 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 
 | Datei | Bildschirm | Route im Code | Arbeit | Größe |
 |---|---|---|---|---|
-| `web-h4-teilen-fenster-mit-bild.html` | H4 · Teilen-Fenster mit Bild | `/status/new bzw. Dialog` | neu | 1440×960 |
+| `web-h4-teilen-fenster-mit-bild.html` | H4 · Teilen-Fenster mit Bild | `/status/new bzw. Dialog` | neu · Beitrag-Modus: siehe -beitrag-teilen (Nr. 67) | 1440×960 |
 | `web-h4-qr-plakat-zum-drucken.html` | H4 · QR-Plakat zum Drucken | `/status/plakat (neu, Druck)` | neu | 794×1123 |
 
 ## WEB · Hof – H5 Auswerten und Markt
@@ -190,7 +190,7 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 
 | Datei | Bildschirm | Route im Code | Arbeit | Größe |
 |---|---|---|---|---|
-| `mobil-h4-teilen-ueber-das-telefon.html` | H4 · Teilen über das Telefon | `/status/[id]/send-whatsapp → Web Share` | Umbau | 390×844 |
+| `mobil-h4-teilen-ueber-das-telefon.html` | H4 · Teilen über das Telefon | `/status/[id]/send-whatsapp → Web Share` | Umbau · Beitrag-Modus: siehe -beitrag-teilen (Nr. 67) | 390×844 |
 
 ## MOBIL · Hof – H5 Mehr
 
@@ -256,3 +256,14 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 | `mobil-h2-neues-produkt-grenze-hoftor.html` | H2 · Neues Produkt: Grenze im Hoftor (ab 1.2.2027) | `/products (Formular)` | Zustand (Gate 8, O8) | 390×844 |
 | `web-h1-einstellungen-konditionen-v2.html` | H1 · Einstellungen › Konditionen, Fassung 2 | `/settings/konditionen` | Umbau (Nr. 61), ersetzt web-h1-einstellungen-konditionen | 1440×1210 |
 | `mobil-h1-einstellungen-konditionen-v2.html` | H1 · Einstellungen › Konditionen, Fassung 2 | `/settings/konditionen` | Umbau (Nr. 61) | 390×1800 |
+
+## Lauf 11 (Canvas Version 75, 12.10.2026)
+
+| Datei | Bildschirm | Route im Code | Arbeit | Größe |
+|---|---|---|---|---|
+| `web-h4-beitrag-teilen.html` | H4 · Beitrag teilen – ein Fenster für Hof und Beitrag | `/status/new (nach dem Veröffentlichen), Mein Hof › Beiträge` | Umbau (Nr. 67) | 1180×820 |
+| `mobil-h4-beitrag-teilen.html` | H4 · Beitrag teilen – Blatt nach dem Veröffentlichen | `/status/new (Blatt), Mein Hof › Beiträge` | Umbau (Nr. 67) | 390×1300 |
+| `mobil-h4-beitraege-teilen-je-beitrag.html` | H4 · Mein Hof › Beiträge: Teilen je Beitrag, WhatsApp-Stand ehrlich | `/mein-hof (Reiter Beiträge)` | Umbau (Nr. 66, 67) | 390×844 |
+| `mobil-k2-hofseite-beitraege-alle-aktiven.html` | K2 · Hofseite › Beiträge: alle aktiven, neuester zuerst | `/[farmSlug]?reiter=beitraege` | Umbau (Nr. 68) | 390×844 |
+| `system-teilen-bild-varianten.html` | Komponente – Teilen-Bild 1:1: A Marktkarte (gilt), B Foto-Held (mit Foto), C Hoftafel (verworfen) | `/[farmSlug]/opengraph-image` | Umbau (Nr. 69) | 1720×720 |
+| `system-teilen-bild-story-und-beitrag.html` | Komponente – Teilen-Bild Status 9:16 (QR nur hier) und Beitrag-Modus | `/[farmSlug]/opengraph-image?format=story, Beitrag-Bild (Nr. 67)` | Umbau (Nr. 69) | 1720×860 |
