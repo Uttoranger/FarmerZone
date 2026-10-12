@@ -82,8 +82,10 @@ export function gueltigerPreis(price: number | null): number | null {
  * Foto, Name, Preis, Einheit. Die Produktkarte der Hofseite zeigt sie mit
  * ihren eigenen Helfern (formatGrundpreis, zweitePreiszeile); hier wird nichts
  * gerechnet. Ohne gültigen Preis (gueltigerPreis) zeigt die Karte den ruhigen
- * Platzhalter; ohne Foto die Illustration wie auf der Hofseite (Unterkategorie
- * → Kategorie → „Sonstiges", Register I1).
+ * Platzhalter; ohne Foto die Illustration wie auf der Hofseite: die der
+ * Unterkategorie, wenn der Aufrufer sie mitgibt (LebensmittelVorschau tut es,
+ * sonst zeigte die Karte ein anderes Bild als die Hofseite), sonst die der
+ * Kategorie, zuletzt „Sonstiges" (Register I1).
  */
 export function kaeuferVorschau(
   werte: { name: string; price: number | null; unit: string; unitSize: number | null | undefined },

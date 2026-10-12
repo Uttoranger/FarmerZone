@@ -1,7 +1,7 @@
 'use client'
 
 import { KAEUFER_VORSCHAU } from '@/lib/hofseite-kunde'
-import type { ProductCategoryValue } from '@/lib/taxonomie'
+import type { ProductCategoryValue, ProductSubcategoryValue } from '@/lib/taxonomie'
 import { ProduktKarte } from '@/components/hofseite/produkt-karte'
 import { kaeuferVorschau } from './produkt-preis'
 
@@ -23,6 +23,7 @@ export function LebensmittelVorschau({
   unitSize,
   foto,
   kategorie,
+  unterkategorie,
 }: {
   name: string
   /** Der Wert des Preisfelds — NaN, solange es leer oder unlesbar ist. */
@@ -32,8 +33,10 @@ export function LebensmittelVorschau({
   /** Das gewählte Foto (Vorschau-Adresse) oder das gespeicherte; null ohne Foto. */
   foto: string | null
   kategorie: ProductCategoryValue | null
+  /** Die gewählte Unterkategorie: Mit ihr zeigt die Karte ohne Foto dieselbe Illustration wie die Hofseite. */
+  unterkategorie: ProductSubcategoryValue | null
 }): React.JSX.Element {
-  const karte = kaeuferVorschau({ name, price, unit, unitSize }, { foto, kategorie })
+  const karte = kaeuferVorschau({ name, price, unit, unitSize }, { foto, kategorie, unterkategorie })
   return (
     <section aria-labelledby="lebensmittel-vorschau" className="mt-4 flex flex-col gap-2.5 rounded-2xl border border-border bg-muted/40 p-4">
       <h3 id="lebensmittel-vorschau" className="text-[11px] font-semibold tracking-[1px] text-muted-foreground uppercase">
