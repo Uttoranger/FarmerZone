@@ -40,8 +40,9 @@ import { cn } from '@/lib/utils'
  * Karten und Vergleich aus baueKonditionenSeite (Tarif-Zustand wie die
  * Tarif-Zeile), das Rechenbeispiel aus den gespeicherten Sätzen dieses Hofs —
  * hier steht keine Zahl (tests/konditionen-seiten.test.ts). „Dein Stand" gibt
- * es bisher nur vor dem Stichtag; sonst steht der Übergang wie in Fassung 1
- * als grüne Hinweiskarte (Gründungshof: Nr. 62, nach dem Stichtag: Gate 8).
+ * es vor dem Stichtag und für einen Gründungshof bis zu seinem Tag (K2); sonst
+ * steht der Übergang wie in Fassung 1 als grüne Hinweiskarte (nach dem
+ * Stichtag: Gate 8).
  */
 export function KonditionenAnsicht({ hof, jetzt }: { hof: KonditionenHof; jetzt: Date }): React.JSX.Element {
   const beispiel = konditionenRechenbeispiel(hof, jetzt)
@@ -136,7 +137,7 @@ function HakenZeile({ children }: { children: React.ReactNode }): React.JSX.Elem
   )
 }
 
-/** „Dein Stand": wo der Hof steht, drei Sätze, darunter der Übergang K1 wörtlich. */
+/** „Dein Stand": wo der Hof steht, seine Sätze (beim Gründungshof die Zusage), darunter der Übergang K1 wörtlich. */
 function DeinStandKarte({ stand }: { stand: DeinStand }): React.JSX.Element {
   return (
     <Hinweiskarte ton="gruen" className="rounded-[18px] p-4 md:px-[22px] md:py-[18px]">

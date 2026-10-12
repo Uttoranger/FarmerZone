@@ -451,9 +451,9 @@ export type DeinStand = { titel: string; saetze: readonly (readonly TextTeil[])[
 export const DEIN_STAND_TITEL = 'Dein Stand'
 
 /**
- * „Dein Stand" in der Startphase (K1, E6-Ergänzung). Für Gründungshöfe (K2)
- * kommt der Wortlaut mit Nr. 62, für die Zeit nach dem Stichtag mit Gate 8 —
- * bis dahin steht dort der Übergang K1 allein.
+ * „Dein Stand" in der Startphase (K1, E6-Ergänzung). Für Gründungshöfe gilt
+ * `baueGruendungsZusage` (K2), für die Zeit nach dem Stichtag kommt der
+ * Wortlaut mit Gate 8 — bis dahin steht dort der Übergang K1 allein.
  */
 export const DEIN_STAND_STARTPHASE: DeinStand = {
   titel: `Startphase – für dich ist alles ${KOSTENLOS}.`,
@@ -462,6 +462,34 @@ export const DEIN_STAND_STARTPHASE: DeinStand = {
     [{ text: `Ab ${TARIFE_AB_TEXT} läuft dein Hof ` }, { text: `${KOSTENLOS} im Tarif ${HOFTOR_NAME}`, betont: true }, { text: ' weiter.' }],
     [{ text: `${HOFLADEN_NAME} gibt es nur, wenn du ihn selbst wählst. Erst dann wird etwas abgebucht.` }],
   ],
+}
+
+/**
+ * Die Zusage eines Gründungshofs (Register K2): Hofladen ohne Grundgebühr bis
+ * zu seinem Tag, danach die normale Regel (E6-Ergänzung) — nie ein Preis, nie
+ * die alte Provision für „danach". Der Wortlaut steht NUR hier: „Dein Stand"
+ * nimmt ihn, und Nr. 62 lässt `gruendungsKonditionenText` (gruendungshof.ts,
+ * Freischalt-Dialog im Admin) hierauf verweisen. Datum wie in der Tarif-Zeile.
+ */
+export function baueGruendungsZusage(bis: Date): string {
+  return (
+    `${HOFLADEN_NAME} ${TARIF_ZEILE.gruendungshof.zeile} ${formatDatumLang(bis)}. ` +
+    `Danach gelten die normalen Tarife – ohne Wahl ${HOFTOR_NAME}, ${KOSTENLOS}.`
+  )
+}
+
+/**
+ * „Dein Stand" eines Hofs aus derselben Regel wie die Tarif-Zeile: ein
+ * Gründungshof mit seiner Zusage (Vorrang, K2), sonst vor dem Stichtag die
+ * Startphase (K1). Danach null, bis Gate 8 den Wortlaut bringt — dann zeigt
+ * „Deine Konditionen" den Übergang K1 allein.
+ */
+export function baueDeinStand(hof: TarifHof, jetzt: Date): DeinStand | null {
+  const stand = ermittleStand(hof, jetzt)
+  if (stand.zustand === 'gruendungshof') {
+    return { titel: TARIF_ZEILE.gruendungshof.titel, saetze: [[{ text: baueGruendungsZusage(stand.bis) }]] }
+  }
+  return stand.zustand === 'startphase' ? DEIN_STAND_STARTPHASE : null
 }
 
 /** Über den Tarif-Karten. */

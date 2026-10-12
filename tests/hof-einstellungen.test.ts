@@ -71,7 +71,6 @@ import {
   TARIF_WAHL_SATZ,
   TARIFE,
   TARIFE_AB,
-  TARIFE_AB_TEXT,
   VERGLEICH_TEXT,
   BAR_SERVICEGEBUEHR_AB,
   tarifText,
@@ -95,6 +94,12 @@ function quelle(pfad: string): string {
 const VOR_STICHTAG = new Date('2026-10-06T10:00:00Z')
 const NACH_STICHTAG = new Date(TARIFE_AB.getTime() + 24 * 3600 * 1000)
 const LANG = 'Biohof am Sonnenhang mit Hofladen, Bauernbrot aus dem Holzofen und Eiern vom Freiland'
+/** Eine DATE-Spalte kommt aus Prisma als UTC-Mitternacht des Tages (wie in tests/tarif-zeile.test.ts). */
+const BIS_SILVESTER_2027 = new Date('2027-12-31T00:00:00.000Z')
+/** Die Zusage eines Gründungshofs (K2), wörtlich wie in der Freigabe für Nr. 62. */
+const ZUSAGE_2027 = 'Hofladen ohne Grundgebühr bis 31. Dezember 2027. Danach gelten die normalen Tarife – ohne Wahl Hoftor, kostenlos.'
+/** Das geschützte Leerzeichen nach dem Tag ist Satz, nicht Wortlaut. */
+const normal = (text: string): string => text.replace(/ /g, ' ')
 
 function stand(teil: Partial<HofseiteStand> = {}): HofseiteStand {
   return {
@@ -140,6 +145,7 @@ function daten(teil: Partial<EinstellungenDaten> = {}, standTeil: Partial<Hofsei
     betriebsnummer: 'AT 1234567',
     betriebsstatus: 'PRIMAERPRODUKTION',
     tarif: null,
+    gruendungBis: null,
     isPaused: false,
     stillgelegt: false,
     teilenMomenteAus: false,
@@ -369,12 +375,22 @@ describe('einstellungenBereiche', () => {
     expect(bereich(einstellungenBereiche(daten({ stillgelegt: true }), VOR_STICHTAG), 'konto')).toMatchObject({ ton: 'offen' })
   })
 
-  it('Konditionen: ohne Tarif der Übergang (K1), mit Tarif vor dem Stichtag „ab …", nie als heute fällig', () => {
-    expect(konditionenZeile(null, VOR_STICHTAG)).toContain('In der Startphase kostenlos.')
-    expect(konditionenZeile(null, VOR_STICHTAG)).toContain(TARIFE_AB_TEXT)
-    const laden = TARIFE.find((t) => t.id === 'HOFLADEN')!
-    expect(konditionenZeile('HOFLADEN', VOR_STICHTAG)).toBe(`${laden.name} · ${laden.preis} / Monat ab ${TARIFE_AB_TEXT}`)
-    expect(konditionenZeile('HOFLADEN', NACH_STICHTAG)).toBe(`${laden.name} · ${laden.preis} / Monat`)
+  it('Konditionen: der Stand aus derselben Regel wie die Tarif-Zeile, nie ein Preis — Hofladen nur mit Namen (E6-Ergänzung)', () => {
+    const ohne = { tarif: null, gruendungBis: null }
+    expect(normal(konditionenZeile(ohne, VOR_STICHTAG))).toBe('Startphase: kostenlos · bis 31. Jänner 2027')
+    // Vor dem Stichtag gilt die Startphase auch nach einer Wahl — wie in der Tarif-Zeile.
+    expect(konditionenZeile({ ...ohne, tarif: 'HOFLADEN' }, VOR_STICHTAG)).toBe(konditionenZeile(ohne, VOR_STICHTAG))
+    expect(normal(konditionenZeile({ ...ohne, gruendungBis: BIS_SILVESTER_2027 }, NACH_STICHTAG))).toBe(
+      'Gründungshof · ohne Grundgebühr bis 31. Dezember 2027'
+    )
+    expect(konditionenZeile(ohne, NACH_STICHTAG)).toBe('Hoftor · kostenlos')
+    expect(konditionenZeile({ ...ohne, tarif: 'HOFLADEN' }, NACH_STICHTAG)).toBe('Hofladen')
+  })
+
+  it('die Zeile nimmt den Gründungshof aus den Daten der Übersicht (gruendungBis, ab Nr. 62 gesetzt) — grauer Punkt, keine Warnfarbe', () => {
+    const b = bereich(einstellungenBereiche(daten({ gruendungBis: BIS_SILVESTER_2027 }), VOR_STICHTAG), 'konditionen')
+    expect(normal(b.zeile)).toBe('Gründungshof · ohne Grundgebühr bis 31. Dezember 2027')
+    expect(b.ton).toBe('neutral')
   })
 })
 
@@ -530,6 +546,21 @@ describe('baueKonditionenSeite — Stand, Karten, Vergleich (Nr. 61)', () => {
     expect(seite.karten[0].satz).toBeNull()
   })
 
+  it('ein Gründungshof sieht in „Dein Stand" seine Zusage mit Datum statt der Startphase (K2) — ohne Preis', () => {
+    const seite = baueKonditionenSeite(hof({ gruendungBis: BIS_SILVESTER_2027 }), VOR_STICHTAG)
+    expect(seite.stand?.titel).toBe('Gründungshof')
+    expect((seite.stand?.saetze ?? []).map((satz) => normal(satz.map((t) => t.text).join('')))).toEqual([ZUSAGE_2027])
+    // Gegenprobe: ohne Datum bleibt der Stand der Startphase.
+    expect(baueKonditionenSeite(hof(), VOR_STICHTAG).stand).toBe(DEIN_STAND_STARTPHASE)
+  })
+
+  it('Tagesgrenze in Wien: am Tag des Datums noch Gründungshof, ab Mitternacht in Wien wieder die Startphase', () => {
+    // Winter: Wien ist UTC+1 — der 1. Jänner beginnt um 23:00 UTC des Vortags.
+    const gruender = hof({ gruendungBis: new Date('2026-12-31T00:00:00.000Z') })
+    expect(baueKonditionenSeite(gruender, new Date('2026-12-31T22:59:59.999Z')).stand?.titel).toBe('Gründungshof')
+    expect(baueKonditionenSeite(gruender, new Date('2026-12-31T23:00:00.000Z')).stand).toBe(DEIN_STAND_STARTPHASE)
+  })
+
   it('Stand und Vergleich nur vor dem Stichtag — der Vergleich mit den Zahlen des Hofs neben den Grenzen von Hoftor', () => {
     const vorher = baueKonditionenSeite(hof({ produkteImShop: 9, abholzeitenJeWoche: 3 }), VOR_STICHTAG)
     expect(vorher.stand).toBe(DEIN_STAND_STARTPHASE)
@@ -596,6 +627,17 @@ describe('Konditionen gerendert', () => {
     expect(nachher).not.toContain(VERGLEICH_TEXT.titel)
     expect(nachher).toContain(KONDITIONEN_UEBERGANG)
     expect(nachher).toContain('data-slot="hinweiskarte"')
+  })
+
+  it('Gründungshof: „Dein Stand" zeigt die Zusage mit Datum, darunter den Übergang K1 — vor den Tarifen, ohne Preis', () => {
+    const gruender = html(createElement(KonditionenAnsicht, { hof: hof({ gruendungBis: BIS_SILVESTER_2027 }), jetzt: VOR_STICHTAG }))
+    expect(gruender).toContain('Dein Stand')
+    expect(gruender).toMatch(/<h2[^>]*>Gründungshof<\/h2>/)
+    const stand = text(gruender.slice(gruender.indexOf('Dein Stand'), gruender.indexOf('id="tarife-titel"')))
+    expect(stand).not.toContain(DEIN_STAND_STARTPHASE.titel)
+    expect(stand.indexOf(ZUSAGE_2027)).toBeGreaterThan(-1)
+    expect(stand.indexOf(ZUSAGE_2027)).toBeLessThan(stand.indexOf(text(KONDITIONEN_UEBERGANG)))
+    expect(stand).not.toMatch(/€|%/)
   })
 
   it('kein „Dein Tarif", solange der Hof keinen gewählt hat; mit Tarif steht er da', () => {

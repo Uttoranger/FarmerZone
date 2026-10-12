@@ -42,6 +42,8 @@ export async function ladeEinstellungenUebersicht(ownerId: string): Promise<Eins
     betriebsnummer: einstellungen.betriebsnummer,
     betriebsstatus: einstellungen.betriebsstatus,
     tarif: hof.tarif,
+    // Gründungshöfe erkennt erst Nr. 62 (Farm.gruendungBis und Platzvergabe).
+    gruendungBis: null,
     isPaused: einstellungen.isPaused,
     stillgelegt: hof.archivedAt !== null,
     teilenMomenteAus: hof.teilenMomenteAus,

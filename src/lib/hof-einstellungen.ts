@@ -18,7 +18,8 @@
  * gespeicherten Sätzen DIESES Hofs — die Seite verspricht nichts, was nicht
  * schon gilt (keine neuen Vertragszusagen). Seit Nr. 61 (Fassung 2) baut
  * `baueKonditionenSeite` Stand, Tarif-Karten und Vergleich aus dem
- * Tarif-Zustand (`bestimmeTarifZustand`) — dieselbe Regel wie die Tarif-Zeile.
+ * Tarif-Zustand (`bestimmeTarifZustand`) — dieselbe Regel wie die Tarif-Zeile;
+ * die Zeile der Übersicht (`konditionenZeile`) ebenso, ohne Preis.
  */
 import type { Betriebsstatus, Tarif } from '@prisma/client'
 import { aufzaehlung, abholzeitenKurz, EINSTELLUNG_FUER_ZEILE, type HofseiteZeile } from '@/lib/hofseite-fortschritt'
@@ -26,7 +27,6 @@ import type { WeeklySlot } from '@/lib/pickup-days'
 import { BETRIEBSNUMMER_ANKER, BETRIEBSSTATUS } from '@/lib/taxonomie'
 import {
   BAR_OHNE_GEBUEHR_SATZ,
-  DEIN_STAND_STARTPHASE,
   HOFTOR_ABHOLZEITEN_JE_WOCHE,
   HOFTOR_PRODUKTE,
   IM_MONAT,
@@ -34,20 +34,18 @@ import {
   ONLINE_GEBUEHR_ABGETRENNT_SATZ,
   ONLINE_GEBUEHR_MIT_PROVISION_SATZ,
   PREIS_BEDINGUNGEN,
-  PRO_MONAT,
   START_TARIF,
   TARIFE,
   TARIF_MARKE,
   TARIF_WAHL_SATZ,
   VERGLEICH_TEXT,
   barGebuehrSepaSatz,
+  baueDeinStand,
+  baueTarifZeile,
   bestimmeTarifZustand,
-  STARTPHASE_SATZ,
-  TARIFE_AB,
-  TARIFE_AB_SATZ,
-  TARIFE_AB_TEXT,
   tarifText,
   type DeinStand,
+  type TarifHof,
   type TarifZustand,
 } from '@/lib/konditionen'
 import { barOhneServicegebuehr, berechneServicegebuehr, type ServicegebuehrEinstellung } from '@/lib/servicegebuehr'
@@ -116,6 +114,8 @@ export type EinstellungenDaten = {
   betriebsnummer: string | null
   betriebsstatus: Betriebsstatus | null
   tarif: Tarif | null
+  /** Ende der Gründungszusage (K2) — liefert ab Nr. 62 die Platzvergabe, bis dahin null. */
+  gruendungBis: Date | null
   isPaused: boolean
   stillgelegt: boolean
   /** Farm.teilenMomenteAus (Nr. 30): true = die Teilen-Momente sind abgeschaltet. */
@@ -203,7 +203,7 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
     {
       id: 'konditionen',
       titel: EINSTELLUNG_KONDITIONEN.label,
-      zeile: konditionenZeile(d.tarif, jetzt),
+      zeile: konditionenZeile(d, jetzt),
       ton: 'neutral',
       href: EINSTELLUNG_KONDITIONEN.href,
     },
@@ -272,15 +272,18 @@ export const ONLINE_AUS_SATZ =
   'Schalte sie ein, damit deine Kundinnen online zahlen können.'
 
 /**
- * Die Zeile „Konditionen und Tarif": ohne gewählten Tarif (heute jeder Hof)
- * der Übergang aus K1; mit Tarif dessen Name und Preis — vor dem Stichtag mit
- * „ab …", damit kein Tarif als heute fällig dasteht.
+ * Die Zeile „Konditionen und Tarif": der Stand aus derselben Regel und mit
+ * denselben Texten wie die Tarif-Zeile der HofShell (`baueTarifZeile`) — ohne
+ * Preis, bei Hofladen nur der Name: Der Preis steht allein auf „Deine
+ * Konditionen", nach dem Nutzen und mit Bedingungen (E6-Ergänzung).
  */
-export function konditionenZeile(tarif: Tarif | null, jetzt: Date): string {
-  if (!tarif) return `${STARTPHASE_SATZ} ${TARIFE_AB_SATZ}`
-  const t = tarifText(tarif)
-  const ab = jetzt.getTime() < TARIFE_AB.getTime() ? ` ab ${TARIFE_AB_TEXT}` : ''
-  return `${t.name} · ${t.preis} ${PRO_MONAT}${ab}`
+export function konditionenZeile(hof: TarifHof, jetzt: Date): string {
+  // Die Zahl der Produkte braucht nur der Balken der Tarif-Zeile; die Übersicht
+  // zeigt ihn nicht und lädt sie deshalb nicht.
+  const zeile = baueTarifZeile({ tarif: hof.tarif, gruendungBis: hof.gruendungBis, produkteImShop: 0 }, jetzt)
+  if (zeile === null) return tarifText('HOFLADEN').name
+  // Bei Hoftor nur der Titel: „Produkte im Shop" ohne die Zahl sagte nichts.
+  return zeile.zustand === 'hoftor' ? zeile.titel : `${zeile.titel} · ${zeile.zeile}`
 }
 
 // ─── Konditionen: Rechenbeispiel ────────────────────────────────────────────
@@ -412,7 +415,7 @@ export type VergleichZeile = { label: string; heute: number; hoftor: number }
 
 export type KonditionenSeite = {
   zustand: TarifZustand
-  /** „Dein Stand" — Wortlaut gibt es bisher nur vor dem Stichtag (`'startphase'`); sonst zeigt die Seite den Übergang K1 allein. */
+  /** „Dein Stand" (`baueDeinStand`): `'startphase'` und `'gruendungshof'`; nach dem Stichtag null — dann zeigt die Seite den Übergang K1 allein. */
   stand: DeinStand | null
   karten: TarifKarteAnzeige[]
   /** Nur vor dem Stichtag (`'startphase'`): was sich für diesen Hof ab dann ändert. */
@@ -424,8 +427,10 @@ export type KonditionenSeite = {
  * web-/mobil-h1-einstellungen-konditionen-v2). Marken nach E6-Ergänzung:
  * „Dein Tarif" nur nach Wahl; „Gilt automatisch" für Hoftor nur ohne Wahl und
  * nicht für einen Gründungshof (für ihn gilt bis zu seinem Tag Hofladen ohne
- * Grundgebühr, K2). Der Vergleich nennt die Zahlen dieses Hofs neben den
- * Grenzen von Hoftor — nur vor dem Stichtag, solange die Änderung bevorsteht.
+ * Grundgebühr, K2). „Dein Stand" kommt aus konditionen.ts (`baueDeinStand`,
+ * beim Gründungshof mit seinem Datum). Der Vergleich nennt die Zahlen dieses
+ * Hofs neben den Grenzen von Hoftor — nur vor dem Stichtag, solange die
+ * Änderung bevorsteht.
  */
 export function baueKonditionenSeite(hof: KonditionenHof, jetzt: Date): KonditionenSeite {
   const zustand = bestimmeTarifZustand(hof, jetzt)
@@ -457,7 +462,7 @@ export function baueKonditionenSeite(hof: KonditionenHof, jetzt: Date): Konditio
 
   return {
     zustand,
-    stand: zustand === 'startphase' ? DEIN_STAND_STARTPHASE : null,
+    stand: baueDeinStand(hof, jetzt),
     karten,
     vergleich:
       zustand === 'startphase'
