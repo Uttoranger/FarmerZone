@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useSyncExternalStore } from 'react'
+import { useState, useEffect, useRef, useSyncExternalStore } from 'react'
 import { nanoid } from 'nanoid'
 import type { WarenkorbPosition } from '@/schemas/warenkorb-speicher'
 import {
@@ -27,6 +27,8 @@ export type Warenkorb = {
 }
 
 const KEIN_KORB: CartItem[] = []
+
+type KorbStand = { farmId: string; farmSlug: string; items: CartItem[] }
 
 // Korb und Sitzung liegen im localStorage, den es erst im Browser gibt. Server
 // und Hydration lesen „kein Speicher" (undefined) und rendern den leeren Korb,
@@ -64,7 +66,7 @@ export function useCart(farmId: string, farmSlug: string): Warenkorb {
   // neu geladen (Zustand bei neuen Props anpassen), nicht in einem Effekt.
   // Danach ist dieser Zustand die Anzeige, der Speicher nur die Ablage:
   // Scheitert das Schreiben (privates Fenster), stimmt die Anzeige trotzdem.
-  const [korb, setKorb] = useState<{ farmId: string; farmSlug: string; items: CartItem[] } | null>(null)
+  const [korb, setKorb] = useState<KorbStand | null>(null)
   if (isHydrated && (korb?.farmId !== farmId || korb.farmSlug !== farmSlug)) {
     // Beschädigter oder fremder Korb ergibt einen leeren — kein Fehler, den
     // die Kundin sehen müsste (leseWarenkorb prüft mit Zod).
@@ -84,16 +86,34 @@ export function useCart(farmId: string, farmSlug: string): Warenkorb {
     }
   }, [farmId, farmSlug])
 
-  function persist(next: CartItem[]) {
-    setKorb({ farmId, farmSlug, items: next })
-    schreibeWarenkorb({ farmId, farmSlug, items: next })
+  // Jede Änderung setzt auf der vorigen auf, nie auf `items`: Das gehört zu dem
+  // Render, aus dem die Funktion stammt. Der Nachbestell-Link ruft addItem in
+  // einer Schleife aus EINEM Render — mit `items` setzte jeder Aufruf auf
+  // denselben leeren Korb auf, nur das letzte Produkt blieb, und die übrigen
+  // lagen 15 Minuten reserviert, ohne im Korb zu sein (Nr. 71). Ein Updater
+  // im Zustand reicht nicht: Er darf nichts schreiben, der Speicher braucht
+  // denselben Stand aber sofort (und das Signal an die Kopfzeile käme sonst
+  // mitten im Rendern).
+  const zuletzt = useRef<KorbStand | null>(null)
+
+  /** Der Korb nach der letzten Änderung — auch wenn seitdem noch nicht neu gerendert wurde. */
+  function aktuelleItems(): CartItem[] {
+    const stand = zuletzt.current
+    return stand?.farmId === farmId && stand.farmSlug === farmSlug ? stand.items : items
+  }
+
+  function persist(aendern: (vorher: CartItem[]) => CartItem[]) {
+    const stand = { farmId, farmSlug, items: aendern(aktuelleItems()) }
+    zuletzt.current = stand
+    setKorb(stand)
+    schreibeWarenkorb(stand)
   }
 
   async function addItem(
     product: Omit<CartItem, 'quantity'>,
     qty = 1
   ): Promise<{ ok: boolean; error?: string }> {
-    const existingQty = items.find((i) => i.productId === product.productId)?.quantity ?? 0
+    const existingQty = aktuelleItems().find((i) => i.productId === product.productId)?.quantity ?? 0
     const totalQty = existingQty + qty
 
     const res = await fetch('/api/reserve', {
@@ -107,18 +127,20 @@ export function useCart(farmId: string, farmSlug: string): Warenkorb {
       return { ok: false, error: err.error ?? 'Produkt nicht mehr verfügbar' }
     }
 
-    if (existingQty > 0) {
-      persist(items.map((i) => (i.productId === product.productId ? { ...i, quantity: totalQty } : i)))
-    } else {
-      persist([...items, { ...product, quantity: qty }])
-    }
+    // /api/reserve setzt die Menge auf totalQty, es zählt nicht dazu — genau
+    // die trägt der Korb, auch wenn die Position inzwischen schon drinsteht.
+    persist((vorher) =>
+      vorher.some((i) => i.productId === product.productId)
+        ? vorher.map((i) => (i.productId === product.productId ? { ...i, quantity: totalQty } : i))
+        : [...vorher, { ...product, quantity: totalQty }]
+    )
 
     return { ok: true }
   }
 
   async function updateQuantity(productId: string, qty: number): Promise<{ ok: boolean; error?: string }> {
     if (qty <= 0) {
-      persist(items.filter((i) => i.productId !== productId))
+      persist((vorher) => vorher.filter((i) => i.productId !== productId))
       return { ok: true }
     }
 
@@ -129,7 +151,7 @@ export function useCart(farmId: string, farmSlug: string): Warenkorb {
     })
 
     if (res.ok) {
-      persist(items.map((i) => (i.productId === productId ? { ...i, quantity: qty } : i)))
+      persist((vorher) => vorher.map((i) => (i.productId === productId ? { ...i, quantity: qty } : i)))
       return { ok: true }
     }
     // Bei Ablehnung bleibt die alte Menge; den Grund gibt es zurück, damit die
@@ -139,12 +161,14 @@ export function useCart(farmId: string, farmSlug: string): Warenkorb {
   }
 
   function removeItem(productId: string) {
-    persist(items.filter((i) => i.productId !== productId))
+    persist((vorher) => vorher.filter((i) => i.productId !== productId))
     // Reservation expires naturally after 15 min
   }
 
   function clearCart() {
-    setKorb({ farmId, farmSlug, items: [] })
+    const leer: KorbStand = { farmId, farmSlug, items: [] }
+    zuletzt.current = leer
+    setKorb(leer)
     leereWarenkorb()
   }
 
