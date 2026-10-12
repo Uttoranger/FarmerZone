@@ -89,7 +89,9 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 70 | Nacharbeit Lauf 10: Produktseite ohne Kontaktdaten, Port in der Host-Prüfung (E8, S16) | fertig, PR offen | `nacht/2026-10-12/70-produktseite-port` | #252 | main | tester grün; pruefer ohne Blocker; 3 Sollte unter Nacharbeit (zwei Doku-Sätze, Namen im Test) | 12.10.2026 |
 | 71 | Nachbestell-Link: alle Produkte in den Korb | fertig, PR offen | `nacht/2026-10-12/71-nachbestell-korb` | #253 | main | tester grün; pruefer ohne Blocker; 2 Sollte unter Nacharbeit (Name, Testfall updateQuantity/removeItem) | 12.10.2026 |
 | 73 | Mein Hof am breiten Bildschirm (N7) | läuft | `nacht/2026-10-12/73-mein-hof-breit` | – | main | – | 12.10.2026 |
-| 68 | Hofseite: alle aktiven Beiträge (F8) | läuft | `nacht/2026-10-12/68-hofseite-beitraege` | – | 66 | gestapelt auf 66 | 12.10.2026 |
+| 68 | Hofseite: alle aktiven Beiträge (F8) | fertig, PR offen | `nacht/2026-10-12/68-hofseite-beitraege` | #256 | 66 | gestapelt auf #255; pruefer ohne Blocker; Grenze um farm-page-view.tsx erweitert | 12.10.2026 |
 | 67 | Beitrag teilen = ein Fenster (T5) | läuft | `nacht/2026-10-12/67-beitrag-teilen` | – | 69 (+ 66) | von 69, 66 per Merge-Commit hereingeholt | 12.10.2026 |
-| 66 | WhatsApp an Abonnentinnen: ehrlich, je Person, fortsetzbar (W1, Migration) | läuft | `nacht/2026-10-12/66-whatsapp-geoeffnet` | – | main | – | 12.10.2026 |
-| 69 | Teilen-Bild neu: Marktkarte, Foto-Held, QR nur in der Story (T6) | läuft | `nacht/2026-10-12/69-teilen-bild` | – | main | – | 12.10.2026 |
+| 72 | Titelbild im Hochformat (N6) | läuft | `nacht/2026-10-12/72-titelbild-hochformat` | – | 68 | gestapelt auf 68 | 12.10.2026 |
+| 74 | Illustrationen verdrahten (I1) | läuft | `nacht/2026-10-12/74-illustrationen` | – | 69 | gestapelt auf 69 | 12.10.2026 |
+| 66 | WhatsApp an Abonnentinnen: ehrlich, je Person, fortsetzbar (W1, Migration) | fertig, PR offen | `nacht/2026-10-12/66-whatsapp-geoeffnet` | #255 | main | Migration wie freigegeben; Runde 1 (Knopf ohne Häkchen-Bedingung); zwei volle Prüfdurchgänge; Sollte unter Nacharbeit (Fehlerpfad im Client) | 12.10.2026 |
+| 69 | Teilen-Bild neu: Marktkarte, Foto-Held, QR nur in der Story (T6) | fertig, PR offen | `nacht/2026-10-12/69-teilen-bild` | #254 | main | zwei volle Prüfdurchgänge ohne Blocker; Bundle per lokalem Build belegt; Cache-Befund in 67, drei Sollte in 74; Bildgröße mit Foto (WhatsApp) prüfen | 12.10.2026 |
