@@ -596,8 +596,14 @@ function bereinigeFreitext(text: string): string {
   return ohneZuweisung.replace(LANGE_KENNUNG_MUSTER, '[kennung entfernt]')
 }
 
-/** „Bearer" vor einem Token (ersetzeVorab). */
-const BEARER_VORAB = /\bBearer\s+(?=[A-Za-z0-9._~+/=-])/g
+/** „Bearer" vor einem Token (ersetzeVorab), auch direkt hinter Ziffern wie
+ *  die Schlüssel (istGeheimerSchluessel): `…4567Bearer …` sahen die Regeln danach
+ *  erst, wenn die Nummer gefallen war — vorab fiel sie aber womöglich schon mit
+ *  einem anderen Wert. */
+const BEARER_VORAB = /(?:\b|(?<=\d))Bearer\s+(?=[A-Za-z0-9._~+/=-])/g
+
+/** ANMELDECODE_MUSTER für ersetzeVorab, ebenso auch direkt hinter Ziffern. */
+const ANMELDECODE_VORAB = /(?:\b|(?<=\d))(code|otp|anmeldecode)(\W{1,3})\d{6}\b/gi
 
 /** Ein Bearer-Token wie in BEARER_MUSTER, klebend. */
 const BEARER_TOKEN = /[A-Za-z0-9._~+/=-]+/y
@@ -645,14 +651,15 @@ function wortEnde(text: string, stelle: number): number {
  * dessen Wert stehen (`token: abc,password: geheim`). Beginnt im Wert eine
  * Adresse, fällt das Wort mit (endeMitAdresse). Eine Telefonnummer reicht über
  * Leerraum: Beginnt sie im Wert, fällt sie bis zu ihrem Ende mit; beginnt sie
- * in einer Adresse und geht dahinter weiter (`…&s=0664 1234567`), fällt ihr
- * Rest hinter der Adresse — fiele in der Adresse ihr Anfang (heikler
- * Parameter), sähe die Telefon-Regel im Rest keine Nummer mehr. Alle Regeln
+ * in einer Adresse und geht dahinter weiter (`…?s=0664 1234567`), fällt ihr
+ * Rest hinter der Adresse, wenn ihr Anfang dort mit einem heiklen Parameter
+ * fällt — sonst sähe die Telefon-Regel im Rest keine Nummer mehr. Alle Regeln
  * lesen den unveränderten Text, ihre Bereiche werden danach zusammengelegt —
  * so nimmt auch ein Wort, das fällt, keinem Schlüssel darin seinen Wert
  * hinter dem Leerraum. Linear: Nummern und Adressen werden je einmal gesucht,
- * jede Regel setzt je Treffer einmal an, und jedes Wort liest sie höchstens
- * einmal.
+ * jede Regel setzt je Treffer einmal an, jedes Wort liest sie höchstens
+ * einmal, und eine Adresse, über deren Ende eine Nummer reicht, wird einmal
+ * mehr bereinigt.
  */
 function ersetzeVorab(text: string, adressen: RegExp): string {
   const nummern = [...text.matchAll(TELEFON_MUSTER)]
@@ -672,30 +679,46 @@ function ersetzeVorab(text: string, adressen: RegExp): string {
    *  ganz eine Nummer, nimmt ihn deren Regel, mit ihrem Platzhalter. Endet ein
    *  Geheimnis (`ziffernRest`) auf eine Ziffer, fallen die Ziffern dahinter mit:
    *  Ob eine Nummer dort beginnt, sieht die Telefon-Regel oft erst, wenn vorher
-   *  eine E-Mail-Adresse gefallen ist (`kundin@example.com0664 1234567`). */
-  const wert = (anfang: number, ende: number, ersatz: string, ziffernRest = true) => {
+   *  eine E-Mail-Adresse gefallen ist (`kundin@example.com0664 1234567`). Der
+   *  Bereich wächst, bis nichts mehr dazukommt — in dem, was er dazunimmt, kann
+   *  wieder eine Nummer oder Adresse beginnen. Jede Runde liest nur das neue Stück. */
+  const wert = (anfang: number, ende: number, ersatz: string, ziffernRest = true, nummerAb = anfang) => {
     const bis = endeMitAdresse(text, anfang, ende)
-    const nummer = nummerVor(bis)
-    const nummerEnde = nummer === undefined || nummer.index < anfang ? bis : nummer.index + nummer[0].length
-    if (nummer?.index === anfang && nummerEnde >= bis) return
-    let ganz = Math.max(bis, nummerEnde)
-    if (ziffernRest && /\d/.test(text[ganz - 1])) {
-      ZIFFERN_REST.lastIndex = ganz
-      if (ZIFFERN_REST.test(text)) ganz = ZIFFERN_REST.lastIndex
+    const erste = nummerVor(bis)
+    if (erste !== undefined && erste.index >= nummerAb && erste.index <= anfang && erste.index + erste[0].length >= bis) return
+    let ganz = bis
+    for (;;) {
+      let neu = ganz
+      const nummer = nummerVor(neu)
+      if (nummer !== undefined && nummer.index >= nummerAb) neu = Math.max(neu, nummer.index + nummer[0].length)
+      if (ziffernRest && /\d/.test(text[neu - 1])) {
+        ZIFFERN_REST.lastIndex = neu
+        if (ZIFFERN_REST.test(text)) neu = ZIFFERN_REST.lastIndex
+      }
+      // Beginnt im neuen Stück eine Adresse (` /664/1?s=…`), fällt ihr Wort mit.
+      const von = Math.max(bis, ganz - 1)
+      const adresse = text.slice(von, neu).search(/(?<=[\s()])\//)
+      if (adresse !== -1) neu = Math.max(neu, wortEnde(text, von + adresse))
+      // Klebt am Ende ein „/" — davor steht dann eine Ziffer, nach der keine Adresse
+      // beginnt —, begänne hinter dem Platzhalter eine, die vorher keine war
+      // (`…6543/x?s=0664 …`): Das Wort fällt mit.
+      if (text[neu] === '/') neu = wortEnde(text, neu)
+      if (neu === ganz) break
+      ganz = neu
     }
-    // Beginnt in den Ziffern dahinter eine Adresse (` /664/1?s=…`), fällt ihr Wort mit.
-    const adresse = text.slice(bis, ganz).search(/(?<=[\s()])\//)
-    bereiche.push({ anfang, ende: adresse === -1 ? ganz : wortEnde(text, bis + adresse), ersatz })
+    bereiche.push({ anfang, ende: ganz, ersatz })
   }
-  // Die Codes zuerst: Bei „otp: 123456" greifen Code und Zuweisung gleich
-  // weit, und der Code-Platzhalter bleibt (die Sortierung unten ist stabil).
-  for (const treffer of text.matchAll(ANMELDECODE_MUSTER)) {
+  // Die Codes zuerst: Bei „otp: 123456" greifen Code und Zuweisung; reichen
+  // beide gleich weit, bleibt der Code-Platzhalter (die Sortierung unten ist stabil).
+  for (const treffer of text.matchAll(ANMELDECODE_VORAB)) {
     const trenner = treffer[2]
     if (!/\s/.test(trenner)) continue
     const anfang = treffer.index + treffer[1].length + trenner.length
     // Mit „/" davor beginnt eine Adresse (`code /123456?s=…`): Das Wort fällt mit,
-    // sonst schnitte der Platzhalter sie hinter dem Code entzwei.
-    wert(anfang, trenner.includes('/') ? wortEnde(text, anfang) : treffer.index + treffer[0].length, '[code entfernt]', false)
+    // sonst schnitte der Platzhalter sie hinter dem Code entzwei. Beginnt schon
+    // im Trenner eine Nummer (`code: +436641 987654`), nimmt sie deren Regel.
+    const ende = trenner.includes('/') ? wortEnde(text, anfang) : treffer.index + treffer[0].length
+    wert(anfang, ende, '[code entfernt]', false, treffer.index + treffer[1].length)
   }
   for (const treffer of text.matchAll(BEARER_VORAB)) {
     const anfang = treffer.index + treffer[0].length
@@ -717,10 +740,14 @@ function ersetzeVorab(text: string, adressen: RegExp): string {
     const ende = adresse.index + adresse[0].length
     const nummer = nummerVor(ende)
     if (nummer === undefined || nummer.index < adresse.index) continue
+    const nummerEnde = nummer.index + nummer[0].length
+    // Bleibt ihr Anfang in der bereinigten Adresse stehen (`?tel=0664`), nimmt
+    // die Telefon-Regel danach die ganze Nummer.
+    if (nummerEnde <= ende || bereinigeUrl(adresse[0]).endsWith(text.slice(nummer.index, ende))) continue
     // Das Zeichen, an dem die Adresse endet, bleibt — so bleibt auch ihre Grenze.
     let rest = ende + 1
-    while (rest < nummer.index + nummer[0].length && /\s/.test(text[rest])) rest++
-    if (rest < nummer.index + nummer[0].length) bereiche.push({ anfang: rest, ende: nummer.index + nummer[0].length, ersatz: '[telefon entfernt]' })
+    while (rest < nummerEnde && /\s/.test(text[rest])) rest++
+    if (rest < nummerEnde) bereiche.push({ anfang: rest, ende: nummerEnde, ersatz: '[telefon entfernt]' })
   }
   // Ein Bereich, der vor dem Ende des vorigen beginnt, liegt in ihm: In einem
   // Wort beginnen zwei Werte nur am selben Ort (otp: 123456) — dann zuerst der
@@ -757,8 +784,8 @@ const ADRESSE_IM_FEHLERTEXT =
  *  relativen Adresse eine absolute (/api/og?url=https://…), liest die
  *  relative sie mit, bis zum Leerraum: Endete sie davor, landeten die
  *  übrigen Parameter der äußeren Abfrage im Pfad der absoluten, und „&s=…"
- *  blieb. Ein Schlüsselwort, das sie so mitliest und dessen Wert hinter
- *  Leerraum steht, hat ersetzeVorab vorher genommen. Die Vorschau prüft je
+ *  blieb. Liest sie so ein Schlüsselwort mit, dessen Wert hinter Leerraum
+ *  steht, hat ersetzeVorab diesen Wert vorher genommen. Die Vorschau prüft je
  *  Zeichen acht Zeichen, das bleibt linear.
  *  Im Fehlertext bleibt die engere Grenze: Dort stehen Adressen oft in
  *  Klammern oder JSON, und der Text danach hilft beim Beheben. */

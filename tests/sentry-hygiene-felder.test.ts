@@ -425,6 +425,8 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
     ['Bearer vor einer langen E-Mail-Adresse', { message: 'Bearer kundin@' + 'a'.repeat(2 * N) }],
     ['viele Codes nach Schrägstrich', { message: 'code /123456?s=1 '.repeat(N / 10) }],
     ['viele Werte mit Adresse in den Ziffern dahinter', { extra: { text: 'token: a1 (/1?s=2 '.repeat(N / 10) } }],
+    ['Kette aus Nummern und Adressen hinter einem Wert', { message: 'token: x1' + ' 0664 1234567/x?s=0'.repeat(N / 10) }],
+    ['viele Werte mit kurzer Kette', { exception: { values: [{ value: 'token: x1 0664 1234567/x '.repeat(N / 15) }] } }],
   ]
 
   for (const [name, teil] of lang) {
@@ -1189,10 +1191,15 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
       ['Fehler token: x(0664) 1234567 weg', 'Fehler token: [entfernt] weg'],
       // Ein Code nimmt die Zahl dahinter nicht mit.
       ['Fehler code: 123456 3 Versuche', 'Fehler code: [code entfernt] 3 Versuche'],
+      // Beginnt schon im Trenner eine Nummer, nimmt sie deren Regel.
+      ['Fehler code: +436641 987654 weg', 'Fehler code: [telefon entfernt] weg'],
+      ['Fehler code (066412 98765 weg', 'Fehler code [telefon entfernt] weg'],
       // Hängt am Bearer-Token ein „@", fällt die E-Mail-Adresse mit.
       ['Fehler Bearer kundin@example.com weg', 'Fehler Bearer [entfernt] weg'],
-      // Ein Schlüssel direkt hinter der Nummer behält seinen Wert nicht.
+      // Ein Schlüssel oder Schlüsselwort direkt hinter der Nummer behält seinen Wert nicht.
       ['Fehler token: x+43 664 9876543token: geheimG weg', 'Fehler token: [entfernt] [entfernt] weg'],
+      ['Fehler password: x0664/9876543Bearer geheimB2 weg', 'Fehler password: [entfernt] [entfernt] weg'],
+      ['Fehler password: x0664/9876543code: 482913 weg', 'Fehler password: [entfernt] [code entfernt] weg'],
       ['Fehler oauth2token=geheimH weg', 'Fehler oauth2token=[entfernt] weg'],
     ]
     for (const [roh, sauber] of faelle) {
@@ -1204,6 +1211,24 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
     for (const ergebnis of [nachricht('Fehler code 111222/x,+43 664 9876543 weg'), fehlertext('Fehler code 111222/x,+43 664 9876543 weg')]) {
       expect(ergebnis).not.toMatch(/111222|664|9876543/)
     }
+    // Eine Nummer mit „ / " hinter einem Wert, der auf eine Ziffer endet (Nachprüfung von c8fb2fb):
+    // Das „/" darin beginnt keine Adresse, der Bereich reicht bis zum Ende der Nummer.
+    for (const roh of [
+      'Anmeldung otp: 482913 0664 / 9876543 abgelehnt',
+      'Fehler token: abc1 0664 / 987 65 43 weg',
+      'Fehler Bearer abc123 0664 / 9876543 weg',
+      'Login otp: 482913 - 0664 / 9876543',
+      'Fehler token: x0664 / 9876543 weg',
+      'Fehler token: a1 (/0664)1 987654 weg',
+      // Was der Bereich dazunimmt, liest er wieder: eine Nummer im neuen Stück, ein „/" dahinter.
+      'Fehler token: x1 9876543/x?a=1&s=0664 98 76 543 weg',
+      'Fehler password: 4829130664 9876543/x?a=1&s=0664 98 76 543 weg',
+      'Fehler code: Bearer 482913 /0abcx0664 / 98 76 5431',
+    ]) {
+      for (const ergebnis of [nachricht(roh), extraText(roh), brotkrume(roh), fehlertext(roh)]) {
+        expect(ergebnis ?? '', roh).not.toMatch(/9876543|987 65 43|987654|98 76 543|482913/)
+      }
+    }
     // Gegenproben: Eine Adresse hinter dem Wert bleibt lesbar; eine Nummer, die nur den
     // Anfang des Werts deckt, nimmt ihn nicht mit; ein Code am Schlüssel in einer Adresse
     // fällt mit dieser (sein Platzhalter mit Leerzeichen schnitte sie sonst entzwei).
@@ -1212,6 +1237,12 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
     expect(fehlertext('Fehler token: 06641234567geheimT weg')).toBe('Fehler token: [entfernt] weg')
     expect(nachricht('Abruf /x?code=123456&s=abc123sig weg')).toBe('Abruf /x weg')
     expect(nachricht('Abruf https://farmerzone.at/x?code=123456&s=abc123sig weg')).toBe('Abruf https://farmerzone.at/x weg')
+    // Bleibt der Anfang einer Nummer in der Adresse stehen, fällt die Nummer danach ganz;
+    // fällt er mit einem heiklen Parameter, fällt vorab ihr Rest dahinter.
+    expect(nachricht('Link /x?tel=0664 1234567 weg')).toBe('Link /x?tel=[telefon entfernt] weg')
+    expect(nachricht('Link /x?tel=0664987 6543 weg')).toBe('Link /x?tel=[telefon entfernt] weg')
+    expect(fehlertext('Link /x?tel=0664 1234567 weg')).toBe('Link /x?tel=[telefon entfernt] weg')
+    expect(nachricht('Link /x?s=0664 1234567 weg')).toBe('Link /x [telefon entfernt] weg')
     // Hinter einem Schlüsselwort ohne „=" am Ende einer Adresse fällt der Code vorab.
     expect(nachricht('Login https://farmerzone.at/konto&a=1&otp 123456 abgelaufen')).toBe(
       'Login https://farmerzone.at/konto&a=1&otp [code entfernt] abgelaufen'
@@ -1233,9 +1264,10 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
       'Fehler /x?a=1,token: 06641234567geheimT weg',
       'Fehler /x?a=1,token: geheimQ1 /664/12345?s=abc123sig weg',
       // Eine Nummer, die in einer Adresse beginnt und dahinter weitergeht, fällt ganz,
-      // auch wenn in der Adresse ihr Anfang mit einem heiklen Paar fällt.
+      // auch wenn in der Adresse ihr Anfang mit einem heiklen Parameter fällt.
       'Link https://farmerzone.at/x&s=0664 1234567 weg',
       'Link https://farmerzone.at/x?s=x-0664 1234567 weg',
+      'Abruf /api/og?url=https://farmerzone.at/x&s=0664 1234567 weg',
       'Fehler code /482913 nach sig: code /123456 weg',
     ]
     for (const roh of faelle) {
