@@ -34,7 +34,6 @@ vi.mock('next/image', () => ({
 }))
 vi.mock('@/server/actions/appearance', () => ({
   saveAppearanceAction: vi.fn(),
-  ladeAuftrittStand: vi.fn(),
   updateFarmLogoAction: vi.fn(),
   updateFarmBannerAction: vi.fn(),
   updateBannerFocusAction: vi.fn(),

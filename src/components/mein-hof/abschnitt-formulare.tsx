@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useTransition, type FormEvent, type ReactNode } from 'react'
 import Link from 'next/link'
-import { useForm, type FieldError } from 'react-hook-form'
+import { useForm, useWatch, type FieldError } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { z } from 'zod'
 import { toast } from 'sonner'
@@ -32,6 +32,7 @@ import { EMAIL_MAX, HOFNAME_MAX, LEITSPRUCH_MAX, TELEFON_MAX, WERT_UNTERTITEL_MA
 import { WERTE_KATALOG, istGewaehlt, katalogEintrag, type WertKatalogEintrag, type WertSchluessel } from '@/lib/hof-werte'
 import { ABSCHNITT_LABEL } from '@/lib/hofseite-fortschritt'
 import { GESPEICHERT_TEXT } from '@/lib/bauern-navigation'
+import { KARTENPUNKT_PRUEFEN, bereiteAdresseVor, brauchtKartenpruefung } from '@/lib/abschnitt-stand'
 import type { FarmSettings } from '@/server/queries/farm'
 import type { AppearanceData, SectionConfig } from '@/server/queries/appearance'
 import { speichereAuftritt, speichereProfil, speichernOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
@@ -55,8 +56,9 @@ import { cn } from '@/lib/utils'
  * herausgelöst.
  *
  * Gespeichert wird nur über speichereAuftritt bzw. speichereProfil
- * (abschnitt-speichern.ts): frischer Stand vom Server, dann nur das eigene
- * Feld, über die bestehenden Aktionen — keine zweite Speicherlogik. Die
+ * (abschnitt-speichern.ts): beim Auftritt nur der eigene Teil, beim Profil
+ * der frische Stand vom Server mit dem eigenen Feld, über die bestehenden
+ * Aktionen — keine zweite Speicherlogik. Die
  * Regeln je Feld kommen aus den Schemas der Aktionen (src/schemas/hofprofil.ts,
  * src/schemas/auftritt.ts), keine Abschrift.
  */
@@ -215,13 +217,17 @@ const adresseSchema = profileSchema.pick({ address: true, postalCode: true, city
 
 export function AdresseForm({ einstellungen, ...rueckmeldung }: ProfilFormularProps): React.JSX.Element {
   const { pending, fehler, ausfuehren } = useSpeichern(rueckmeldung)
-  const { register, handleSubmit, formState } = useForm<z.infer<typeof adresseSchema>>({
+  const { register, handleSubmit, control, formState } = useForm<z.infer<typeof adresseSchema>>({
     resolver: zodResolver(adresseSchema),
     defaultValues: { address: einstellungen.address, postalCode: einstellungen.postalCode, city: einstellungen.city },
   })
+  const strasse = useWatch({ control, name: 'address' })
   const hatPunkt = einstellungen.latitude != null && einstellungen.longitude != null
+  // Der Kartenpunkt zieht bei neuer Straße nicht mit — dann der Hinweis (Register N4, Ergänzung Lauf 10).
+  const kartePruefen = brauchtKartenpruefung(einstellungen, strasse)
   return (
-    <form onSubmit={handleSubmit((daten) => ausfuehren(() => speichereProfil(daten)))} className="space-y-3">
+    // Die Adresse als Ganzes: Land und Kartenpunkt vom Laden gehen mit, sonst mischte der frische Stand die eines anderen Tabs hinein.
+    <form onSubmit={handleSubmit((daten) => ausfuehren(() => speichereProfil(bereiteAdresseVor(einstellungen, daten))))} className="space-y-3">
       <Feld id="hofseite-strasse" label="Straße und Hausnummer" fehler={formState.errors.address}>
         <Input id="hofseite-strasse" className="h-11" autoComplete="street-address" {...register('address')} />
       </Feld>
@@ -233,11 +239,14 @@ export function AdresseForm({ einstellungen, ...rueckmeldung }: ProfilFormularPr
           <Input id="hofseite-ort" className="h-11" autoComplete="address-level2" {...register('city')} />
         </Feld>
       </div>
-      {/* Der Kartenpunkt braucht die Karte — die gibt es im Hofprofil. */}
-      <Link href="/settings/profile" className={TEXTLINK}>
-        {hatPunkt ? 'Standort auf der Karte ändern' : 'Standort auf der Karte setzen'}
-        <ArrowRight className="size-4" strokeWidth={1.7} aria-hidden="true" />
-      </Link>
+      {/* Der Kartenpunkt braucht die Karte — die gibt es im Hofprofil. Die Region sagt den Wechsel zum Hinweis an. */}
+      <div aria-live="polite">
+        <Link href={KARTENPUNKT_PRUEFEN.href} className={TEXTLINK}>
+          {kartePruefen && <MapPin className="size-4 text-status-offen" strokeWidth={1.7} aria-hidden="true" />}
+          {kartePruefen ? KARTENPUNKT_PRUEFEN.text : hatPunkt ? 'Standort auf der Karte ändern' : 'Standort auf der Karte setzen'}
+          <ArrowRight className="size-4" strokeWidth={1.7} aria-hidden="true" />
+        </Link>
+      </div>
       <Aktionen pending={pending} fehler={fehler} onAbbrechen={rueckmeldung.onAbbrechen} />
     </form>
   )

@@ -98,6 +98,7 @@ pnpm test:integration                        # Integration (braucht .env.test)
   steht der Zustand, der in **allen** Verschränkungen gelten muss (Bestand,
   Anzahl Bestellungen, Anzahl Mails). Das ist auch die Zusicherung, die das Geld
   schützt.
+- **Zwei Fenster mit eigenem Modul-Zustand** (etwa die Speicherkette von Mein Hof) entstehen als zweites Exemplar des Moduls: `await import('@/…/modul?zweiter-tab')` — die Abfrage im Pfad trennt nur dieses Modul, Prisma und Aktionen bleiben dieselben (Vorbild `tests/integration/auftritt-abschnitte.int.test.ts`, Nr. 65).
 - **Nicht in `pnpm test`, nicht im Stop-Hook.** Eigener CI-Job `integration` mit
   einem `postgres:17`-Dienst.
 - **Was an der Verbindung passiert, misst man an pg selbst** (seit Nr. 47):
@@ -111,6 +112,7 @@ pnpm test:integration                        # Integration (braucht .env.test)
 ### Folge der Node-Umgebung
 - **Kein DOM, keine Interaktion.** Keine Testing-Library, kein Klicken, kein Snapshot von JSX.
 - **Serverseitig rendern geht** — mit `renderToStaticMarkup` aus `react-dom/server` (schon Abhängigkeit, kein neues Paket). Nur für Architektur-Aussagen der Art „dieses Element erscheint in diesem Modus nie": `next/navigation`, `next/image`, `next/link` und die Server-Aktionen per `vi.mock` ersetzen, die echte Komponente rendern, im HTML nach Merkmalen suchen — und immer eine Gegenprobe rendern, in der jedes Merkmal vorkommen muss, und zwar aus der Komponente, die das Merkmal trägt — sonst beweist ein leerer Fund nichts. Merkmale sind Texte, `aria-label`, die Kennung eines Symbols (`lucide-pencil`) oder eine per `vi.mock` ersetzte Teilkomponente — keine Layout-Klassen, kein Vergleich ganzer HTML-Abschnitte: Das wäre ein Schnappschuss, und „Reine Darstellung" bleibt ungetestet (§2). Vorbild: `tests/hofseite-einmal.test.ts`. Effekte laufen dabei nicht; Verhalten bleibt Sache der reinen Funktionen.
+- **Ein Formular absenden geht auch ohne DOM** (seit Nr. 65, Vorbild `tests/hof-profil-absenden.test.ts`): das echte Formular einmal mit `renderToStaticMarkup` rendern; `useForm` per `vi.mock('react-hook-form', importOriginal)` nur umhüllen, um das Formular und den Absende-Griff festzuhalten, den die Komponente selbst baut (`handleSubmit(onSubmit)`); `useTransition` per `vi.mock('react', importOriginal)` so ersetzen, dass der Rückruf läuft (auf dem Server wirft `startTransition`) und der Test auf ihn wartet. Dann Felder mit `setValue` setzen und absenden — Schema (zodResolver), `onSubmit` und Maßstab bleiben echt, nachgebildet ist nur die Grenze zur Aktion; geprüft wird, was dort ankommt. Zustand, der nach dem Rendern gesetzt wird, verpufft (React auf dem Server) — eine Anzeige danach bleibt ungeprüft. Gegenprobe: die Komponente kurz auf den alten Weg stellen, der Test muss rot werden.
 - **Kein E2E vorhanden.** Kein Playwright, kein Cypress.
 - Wer Verhalten testen will, muss die Entscheidung **aus der Komponente herausziehen** — genau der Grund für die Schichtung in `ARCHITECTURE.md`.
 - Testing-Library oder Playwright **nicht eigenmächtig einführen**. Vorschlagen und fragen.

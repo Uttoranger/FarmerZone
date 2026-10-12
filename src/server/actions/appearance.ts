@@ -5,9 +5,9 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { getAppearanceData, type SectionConfig } from '@/server/queries/appearance'
+import type { SectionConfig } from '@/server/queries/appearance'
 import { appearanceSchema } from '@/schemas/auftritt'
-import { ABSCHNITT_SPEICHERN_TEXT, auftrittFehlerText, auftrittStandAus, type AuftrittStand } from '@/lib/abschnitt-stand'
+import { auftrittFehlerText } from '@/lib/abschnitt-stand'
 import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
 
 // Das Schema liegt in src/schemas/auftritt.ts — der Hofseiten-Editor prüft
@@ -17,21 +17,14 @@ import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
 export type AppearanceSaveInput = z.infer<typeof appearanceSchema>
 
 /**
- * Der frische Stand des Auftritts — die Abschnitte von Mein Hof lesen ihn
- * direkt vor dem Speichern (components/mein-hof/abschnitt-speichern.ts,
- * Nr. 50): saveAppearanceAction schreibt bei jedem Aufruf alle Felder des
- * Stands, und der Stand aus den Props der Seite hielte nach einem anderen
- * Abschnitt alte Werte. Nur lesen, nur der eigene Hof, nur diese Felder.
+ * Schreibt nur die Felder, die mitkommen (Register N4, Ergänzung Lauf 10):
+ * Ein fehlendes Feld bleibt, wie es ist; die Werte werden nur gelöscht und neu
+ * angelegt, wenn sie mitkommen (auch als leere Liste: „alle entfernt"). So
+ * setzt ein Abschnitt von Mein Hof keinen anderen zurück — auch nicht den
+ * eines zweiten Tabs, der zwischen Lesen und Schreiben gespeichert hat. Die
+ * Abschnitte schicken nur ihren Teil (speichereAuftritt in
+ * components/mein-hof/abschnitt-speichern.ts).
  */
-export async function ladeAuftrittStand(): Promise<{ stand: AuftrittStand } | { error: string }> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) return { error: ABSCHNITT_SPEICHERN_TEXT.nichtAngemeldet }
-
-  const daten = await getAppearanceData(session.user.id)
-  if (!daten) return { error: ABSCHNITT_SPEICHERN_TEXT.hofFehlt }
-  return { stand: auftrittStandAus(daten) }
-}
-
 export async function saveAppearanceAction(
   data: AppearanceSaveInput,
 ): Promise<{ error?: string }> {
@@ -42,7 +35,7 @@ export async function saveAppearanceAction(
   if (!farm) return { error: 'Hof nicht gefunden' }
 
   const parsed = appearanceSchema.safeParse(data)
-  // Die Meldung nennt den Abschnitt, der sperrt — auch einen anderen als den gerade gespeicherten.
+  // Die Meldung nennt den Abschnitt, dessen Feld nicht passt.
   if (!parsed.success) return { error: auftrittFehlerText(parsed.error.issues) }
 
   const {
@@ -57,9 +50,9 @@ export async function saveAppearanceAction(
     farmValues,
   } = parsed.data
 
-  // Der Editor schickt Logo und Titelbild bei jedem Speichern mit: Ein schon
-  // gespeichertes (auch älteres) Bild bleibt erlaubt, ein neues nur aus
-  // unserem Speicher und dem Ordner dieses Hofes (Nr. 19b).
+  // Kommen Logo oder Titelbild mit: Ein schon gespeichertes (auch älteres)
+  // Bild bleibt erlaubt, ein neues nur aus unserem Speicher und dem Ordner
+  // dieses Hofes (Nr. 19b).
   if (
     !(await bildUrlErlaubt(bannerUrl, farm.id, async () => farm.bannerUrl)) ||
     !(await bildUrlErlaubt(logoUrl, farm.id, async () => farm.logoUrl))
@@ -71,18 +64,18 @@ export async function saveAppearanceAction(
     prisma.farm.update({
       where: { id: farm.id },
       data: {
-        tagline: tagline ?? null,
-        foundedYear: foundedYear ?? null,
-        aboutText: aboutText ?? null,
+        ...(tagline !== undefined && { tagline }),
+        ...(foundedYear !== undefined && { foundedYear }),
+        ...(aboutText !== undefined && { aboutText }),
         ...(bannerType !== undefined && { bannerType }),
-        ...(bannerValue !== undefined && { bannerValue: bannerValue ?? null }),
-        ...(bannerUrl !== undefined && { bannerUrl: bannerUrl ?? null }),
-        ...(logoUrl !== undefined && { logoUrl: logoUrl ?? null }),
-        sectionsConfig: sectionsConfig as unknown as SectionConfig[],
+        ...(bannerValue !== undefined && { bannerValue }),
+        ...(bannerUrl !== undefined && { bannerUrl }),
+        ...(logoUrl !== undefined && { logoUrl }),
+        ...(sectionsConfig !== undefined && { sectionsConfig: sectionsConfig as unknown as SectionConfig[] }),
       },
     }),
-    prisma.farmValue.deleteMany({ where: { farmId: farm.id } }),
-    ...(farmValues.length > 0
+    ...(farmValues === undefined ? [] : [prisma.farmValue.deleteMany({ where: { farmId: farm.id } })]),
+    ...(farmValues !== undefined && farmValues.length > 0
       ? [
           prisma.farmValue.createMany({
             data: farmValues.map((v) => ({

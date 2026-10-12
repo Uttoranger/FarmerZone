@@ -2,22 +2,29 @@
  * Mein Hof: jeder Abschnitt speichert nur sein Feld (Nachtlauf Nr. 50,
  * Register N4) — gegen ein ECHTES Postgres.
  *
- * Die Ausgangslage: saveAppearanceAction schreibt bei JEDEM Aufruf Leitspruch,
- * Gründungsjahr, Über uns, Abschnitte und Werte (die Werte löscht sie und
- * legt sie neu an); updateProfile schreibt das ganze Profil. Ein Abschnitt,
- * der nur sein Feld schickte, löschte den Rest — einer, der den Stand vom
- * Öffnen der Seite mitschickte, schriebe nach einem anderen Abschnitt alte
- * Werte zurück.
+ * Die Ausgangslage: saveAppearanceAction schreibt seit Nr. 65 nur, was
+ * mitkommt (Register N4, Ergänzung; die Werte löscht sie und legt sie neu
+ * an, wenn sie mitkommen); updateProfile schreibt das ganze Profil. Ein
+ * Abschnitt des Auftritts schickt nur seinen Teil, einer des Profils den
+ * Rest aus dem frischen Stand — einer, der den Stand vom Öffnen der Seite
+ * mitschickte, schriebe nach einem anderen Abschnitt alte Werte zurück.
  *
  * Beweist (Zustand in der Datenbank danach):
  *  - Jeder Abschnitt (Leitspruch/Gründungsjahr, Über uns, Werte, Abschnitte,
  *    Name, Adresse, Kontakt) ändert nur sein Feld; alle anderen bleiben, die
  *    Werte samt Reihenfolge und Untertitel.
+ *  - saveAppearanceAction mit `{ tagline, farmValues: [] }` lässt Gründungsjahr,
+ *    Über uns, Abschnitte, Bilder und Fotos stehen; ohne Werte bleiben die
+ *    Werte samt Kennung (Nr. 65).
+ *  - Zwei Speicherketten zugleich (zwei Tabs) setzen einander nicht zurück.
  *  - Zwei Abschnitte nacheinander ohne Neuladen: Der zweite schreibt den
- *    ersten nicht zurück (frischer Stand vom Server). Gegenprobe: Mit dem
- *    Stand vom Öffnen der Seite ginge der erste verloren.
+ *    ersten nicht zurück. Gegenprobe: Mit dem Stand vom Öffnen der Seite ginge
+ *    der erste verloren.
  *  - Das Hof-Profil in einem älteren Tab schickt nur, was dort geändert wurde
- *    — die Adresse aber nur als Ganzes: keine Mischadresse aus zwei Tabs.
+ *    (Maßstab wie im Formular: profilWieImSchema, auch mit Altwerten) — die
+ *    Adresse aber nur als Ganzes: keine Mischadresse aus zwei Tabs.
+ *  - Das Adress-Formular in Mein Hof schickt Land und Kartenpunkt vom Laden
+ *    mit: Hat ein anderer Tab beides umgestellt, bleibt die Adresse stimmig.
  *  - Zwei Abschnitte zugleich: Sie laufen nacheinander, keiner geht verloren.
  *  - Logo, Titelbild und ein Galeriefoto ändern nur sich selbst — und ein
  *    Abschnitt danach lässt sie stehen.
@@ -35,10 +42,10 @@ import { speichereAuftritt, speichereProfil } from '@/components/mein-hof/abschn
 import { saveAppearanceAction, updateFarmBannerAction, updateFarmLogoAction } from '@/server/actions/appearance'
 import { updateProfile } from '@/server/actions/farm'
 import { addFarmPhotoAction } from '@/server/actions/farm-photos'
-import { getAppearanceData } from '@/server/queries/appearance'
 import { getFarmSettings, getPublicFarm } from '@/server/queries/farm'
 import { DEFAULT_SECTIONS } from '@/server/queries/appearance'
-import { auftrittBasis, auftrittStandAus, geaendertSeitLaden, profilBasis } from '@/lib/abschnitt-stand'
+import { bereiteAdresseVor, geaendertSeitLaden, profilBasis, profilWieImSchema } from '@/lib/abschnitt-stand'
+import { profilBearbeitenSchema } from '@/schemas/hofprofil'
 import { erstelleHofMitAnmeldung, raeumeAuf } from './setup/basis'
 
 afterEach(async () => {
@@ -136,6 +143,9 @@ async function stand(farmId: string) {
 
 type Stand = Awaited<ReturnType<typeof stand>>
 
+/** Derselbe Speicherweg als eigenes Exemplar (die Abfrage im Pfad trennt die Module) — so wie in einem zweiten Fenster. */
+const ZWEITER_TAB = '@/components/mein-hof/abschnitt-speichern?zweiter-tab'
+
 const NEUE_WERTE = [
   { icon: 'bio', title: 'Bio-zertifiziert', subtitle: 'Seit 2010', sortOrder: 0 },
   { icon: 'saisonal', title: 'Saisonal', subtitle: null, sortOrder: 1 },
@@ -179,6 +189,50 @@ const FAELLE: [string, () => Promise<{ error?: string }>, (vorher: Stand) => Sta
   ],
 ]
 
+describe('saveAppearanceAction schreibt nur, was mitkommt (Nr. 65, Register N4)', () => {
+  it('`{ tagline, farmValues: [] }`: Leitspruch neu, Werte leer — Gründungsjahr, Über uns, Abschnitte, Bilder und Fotos bleiben', async () => {
+    const { farm } = await angemeldeterHof()
+    const vorher = await stand(farm.id)
+
+    expect(await saveAppearanceAction({ tagline: 'Gemüse vom Hügel', farmValues: [] })).toEqual({})
+
+    expect(await stand(farm.id)).toEqual({ ...vorher, hof: { ...vorher.hof, tagline: 'Gemüse vom Hügel' }, werte: [] })
+  })
+
+  it('ohne Werte in der Anfrage bleiben die Werte samt Kennung — nichts wird gelöscht und neu angelegt', async () => {
+    const { farm } = await angemeldeterHof()
+    const kennungen = () => prisma.farmValue.findMany({ where: { farmId: farm.id }, orderBy: { sortOrder: 'asc' }, select: { id: true } })
+    const vorher = await kennungen()
+
+    expect(await saveAppearanceAction({ aboutText: 'Nur Über uns.' })).toEqual({})
+
+    expect(await kennungen()).toEqual(vorher)
+    expect(vorher).toHaveLength(WERTE_VORHER.length)
+  })
+
+  it('zwei Speicherketten zugleich (zwei Tabs): keine setzt die andere zurück', async () => {
+    const { farm } = await angemeldeterHof()
+    const vorher = await stand(farm.id)
+    // Ein zweites Fenster hat seine eigene Kette — ein eigenes Exemplar des Moduls, dieselben Aktionen.
+    const zweiterTab = (await import(/* @vite-ignore */ ZWEITER_TAB)) as typeof import('@/components/mein-hof/abschnitt-speichern')
+    expect(zweiterTab.speichereAuftritt).not.toBe(speichereAuftritt)
+
+    const antworten = await Promise.all([
+      speichereAuftritt({ aboutText: 'Aus Tab A.' }),
+      zweiterTab.speichereAuftritt({ tagline: 'Aus Tab B' }),
+      speichereAuftritt({ sectionsConfig: NEUE_ABSCHNITTE }),
+      zweiterTab.speichereAuftritt({ farmValues: NEUE_WERTE }),
+    ])
+
+    expect(antworten.map((a) => a.error)).toEqual([undefined, undefined, undefined, undefined])
+    expect(await stand(farm.id)).toEqual({
+      ...vorher,
+      hof: { ...vorher.hof, aboutText: 'Aus Tab A.', tagline: 'Aus Tab B', sectionsConfig: NEUE_ABSCHNITTE },
+      werte: NEUE_WERTE,
+    })
+  })
+})
+
 describe('jeder Abschnitt ändert nur sein Feld', () => {
   it.each(FAELLE)('%s: alle anderen Felder bleiben, auch die Werte samt Reihenfolge', async (_name, speichern, erwartet) => {
     const { farm } = await angemeldeterHof()
@@ -203,12 +257,17 @@ describe('zwei Abschnitte nacheinander, ohne neu zu laden', () => {
   })
 
   it('Gegenprobe: mit dem Stand vom Öffnen der Seite ginge „Über uns" verloren', async () => {
-    const { farm, ownerId } = await angemeldeterHof()
-    const beimOeffnen = auftrittStandAus((await getAppearanceData(ownerId))!)
+    const { farm } = await angemeldeterHof()
 
     await speichereAuftritt({ aboutText: 'Erst Über uns.' })
-    // So speicherte ein Abschnitt, der den Stand aus den Props der Seite mitschickt.
-    await saveAppearanceAction({ ...auftrittBasis(beimOeffnen), farmValues: NEUE_WERTE })
+    // So speicherte ein Abschnitt, der den ganzen Stand aus den Props der Seite mitschickt.
+    await saveAppearanceAction({
+      tagline: 'Frisch vom Feld',
+      foundedYear: 1950,
+      aboutText: 'Seit drei Generationen bauen wir Gemüse an.',
+      sectionsConfig: ABSCHNITTE_VORHER,
+      farmValues: NEUE_WERTE,
+    })
 
     expect((await stand(farm.id)).hof.aboutText).toBe('Seit drei Generationen bauen wir Gemüse an.')
   })
@@ -232,21 +291,32 @@ describe('zwei Abschnitte nacheinander, ohne neu zu laden', () => {
     expect((await stand(farm.id)).hof.name).toBe('Hof Test')
   })
 
-  it('Hof-Profil in einem älteren Tab: nur, was dort geändert wurde — Name und Kurzbeschreibung aus Mein Hof bleiben', async () => {
-    const { farm, ownerId } = await angemeldeterHof()
-    // So lädt das Hof-Profil seine Startwerte (profile-form.tsx) — dann bleibt der Tab offen.
-    const beimOeffnen = profilBasis((await getFarmSettings(ownerId))!)
+  it('Hof-Profil in einem älteren Tab mit Altwerten: nur, was dort geändert wurde — Name und E-Mail aus Mein Hof bleiben', async () => {
+    // Altwerte aus der Zeit vor dem Schema: Beschreibung zu kurz, E-Mail mit Großbuchstaben.
+    const { farm, ownerId } = await angemeldeterHof({ description: 'Kurz', email: 'int-Hof-Alt@Example.com' })
+    // So baut das Hof-Profil Schema und Maßstab (profile-form.tsx) — dann bleibt der Tab offen.
+    const geladen = (await getFarmSettings(ownerId))!
+    const schema = profilBearbeitenSchema({ name: geladen.name, ownerName: geladen.ownerName, phone: geladen.phone })
+    const startwerte = profilBasis(geladen)
+    const anfang = profilWieImSchema(schema, startwerte)
 
-    await speichereProfil({ name: 'Hof Neuname', description: 'Gemüse, Eier und Brot aus Teststadt.' })
-    // Im älteren Tab ändert jemand nur die Telefonnummer und speichert, wie profile-form.tsx es tut.
-    const formular = { ...beimOeffnen, phone: '+43 660 2222222' }
-    expect((await speichereProfil(geaendertSeitLaden(beimOeffnen, formular))).error).toBeUndefined()
+    // Inzwischen speichert Mein Hof Name und Kurzbeschreibung (die zu kurze sperrt jedes Profil-Speichern,
+    // updateProfile prüft das ganze Profil), danach eine neue E-Mail (Abschnitt Kontakt).
+    expect((await speichereProfil({ name: 'Hof Neuname', description: 'Gemüse, Eier und Brot aus Teststadt.' })).error).toBeUndefined()
+    expect((await speichereProfil({ phone: geladen.phone, email: 'int-kontakt-neu@example.com' })).error).toBeUndefined()
+    // Im älteren Tab verlängert jemand die Beschreibung (sonst ließe das Formular nicht speichern), ändert das
+    // Telefon und speichert, wie profile-form.tsx es tut: zodResolver gibt die Ausgabe des Schemas weiter.
+    const formular = schema.parse({ ...startwerte, description: 'Gemüse und Eier vom Hof', phone: '+43 660 2222222' })
+    expect((await speichereProfil(geaendertSeitLaden(anfang, formular))).error).toBeUndefined()
 
     expect((await stand(farm.id)).hof).toMatchObject({
       name: 'Hof Neuname',
-      description: 'Gemüse, Eier und Brot aus Teststadt.',
+      email: 'int-kontakt-neu@example.com',
+      description: 'Gemüse und Eier vom Hof',
       phone: '+43 660 2222222',
     })
+    // Gegenprobe: Mit dem ungeprüften Stand als Maßstab zählte die klein geschriebene E-Mail als geändert.
+    expect(geaendertSeitLaden(startwerte, formular)).toMatchObject({ email: 'int-hof-alt@example.com' })
   })
 
   it('Hof-Profil in einem älteren Tab ändert nur den Ort: keine Mischadresse mit der Adresse aus Mein Hof', async () => {
@@ -278,6 +348,37 @@ describe('zwei Abschnitte nacheinander, ohne neu zu laden', () => {
     await speichereProfil({ city: 'Testau' })
 
     expect((await stand(farm.id)).hof).toMatchObject({ address: 'Neue Gasse 2', postalCode: '8701', city: 'Testau' })
+  })
+
+  it('Adress-Formular in Mein Hof nach einem anderen Tab, der Land und Punkt umstellt: die Adresse bleibt als Ganzes stimmig', async () => {
+    const { farm, ownerId } = await angemeldeterHof()
+    // Mein Hof ist geladen (AT, Punkt in Österreich) — dann bleibt der Tab offen.
+    const beimLaden = (await getFarmSettings(ownerId))!
+
+    // Ein anderer Tab (Hof-Profil) stellt Land und Kartenpunkt um.
+    const anderesLand = { country: 'DE' as const, latitude: 48.137, longitude: 11.575 }
+    expect((await speichereProfil({ address: 'Teststraße 1', postalCode: '8700', city: 'Teststadt', ...anderesLand })).error).toBeUndefined()
+    // Mein Hof speichert eine neue Straße, wie das Adress-Formular es tut.
+    expect((await speichereProfil(bereiteAdresseVor(beimLaden, { address: 'Neue Gasse 2', postalCode: '8700', city: 'Teststadt' }))).error).toBeUndefined()
+
+    // Die Adresse dieses Formulars als Ganzes — nicht die neue Straße mit Land und Punkt des anderen Tabs.
+    expect((await stand(farm.id)).hof).toMatchObject({
+      address: 'Neue Gasse 2',
+      postalCode: '8700',
+      city: 'Teststadt',
+      country: 'AT',
+      latitude: 48.2,
+      longitude: 13.4,
+    })
+  })
+
+  it('Gegenprobe: nur Straße, PLZ und Ort (bis Nr. 65) ergäben die Mischadresse', async () => {
+    const { farm } = await angemeldeterHof()
+
+    await speichereProfil({ address: 'Teststraße 1', postalCode: '8700', city: 'Teststadt', country: 'DE', latitude: 48.137, longitude: 11.575 })
+    await speichereProfil({ address: 'Neue Gasse 2', postalCode: '8700', city: 'Teststadt' })
+
+    expect((await stand(farm.id)).hof).toMatchObject({ address: 'Neue Gasse 2', country: 'DE', latitude: 48.137, longitude: 11.575 })
   })
 
   it('zwei Abschnitte zugleich: sie laufen nacheinander, keiner geht verloren', async () => {
@@ -338,7 +439,7 @@ describe('Logo, Titelbild und Galeriefoto (Abnahme Nr. 50: kein anderes Feld än
 })
 
 describe('Abschnitte NULL — wie bei jedem Seed-Hof und jedem neuen Hof', () => {
-  it('das erste Speichern schreibt die Standard-Abschnitte; die Hofseite zeigt vorher und nachher dieselben', async () => {
+  it('ein anderer Abschnitt lässt die Spalte NULL (seit Nr. 65); die Hofseite zeigt vorher und nachher dieselben', async () => {
     // Ohne sectionsConfig angelegt: die Spalte ist NULL.
     const { farm } = await angemeldeterHof({ sectionsConfig: undefined })
     const spalte = async () => (await prisma.farm.findUniqueOrThrow({ where: { id: farm.id }, select: { sectionsConfig: true } })).sectionsConfig
@@ -347,21 +448,30 @@ describe('Abschnitte NULL — wie bei jedem Seed-Hof und jedem neuen Hof', () =>
 
     expect((await speichereAuftritt({ tagline: 'Gemüse vom Hügel' })).error).toBeUndefined()
 
-    // Gespeichert stehen jetzt die Standard-Abschnitte (getAppearanceData liest NULL als Standard) ...
-    expect(await spalte()).toEqual(DEFAULT_SECTIONS)
-    // ... und für Kundinnen ändert sich nichts: dieselben wirksamen Abschnitte wie vorher.
+    // Die Abschnitte kamen nicht mit, also bleibt die Spalte, wie sie war ...
+    expect(await spalte()).toBeNull()
+    // ... und für Kundinnen ändert sich nichts: die Standard-Abschnitte wie vorher.
     expect(vorher).toEqual(DEFAULT_SECTIONS)
     expect((await getPublicFarm(farm.slug))?.sectionsConfig).toEqual(vorher)
   })
 })
 
-describe('ein zu langer Altwert sperrt — die Meldung nennt den Abschnitt', () => {
-  it('„Über uns" mit 1001 Zeichen: Der Leitspruch wird nicht gespeichert, die Meldung nennt „Über uns", nichts ändert sich', async () => {
+describe('ein zu langer Altwert — sperrt nur noch seinen eigenen Abschnitt (seit Nr. 65)', () => {
+  it('„Über uns" mit 1001 Zeichen: Der Leitspruch wird gespeichert, „Über uns" bleibt unverändert stehen', async () => {
     // Ein Altwert über der Grenze, wie er nur aus der Zeit vor dem Schema stammen kann.
     const { farm } = await angemeldeterHof({ aboutText: 'x'.repeat(1001) })
     const vorher = await stand(farm.id)
 
-    const antwort = await speichereAuftritt({ tagline: 'Gemüse vom Hügel' })
+    expect((await speichereAuftritt({ tagline: 'Gemüse vom Hügel' })).error).toBeUndefined()
+
+    expect(await stand(farm.id)).toEqual({ ...vorher, hof: { ...vorher.hof, tagline: 'Gemüse vom Hügel' } })
+  })
+
+  it('„Über uns" selbst zu lang: nichts wird gespeichert, die Meldung nennt „Über uns"', async () => {
+    const { farm } = await angemeldeterHof()
+    const vorher = await stand(farm.id)
+
+    const antwort = await speichereAuftritt({ aboutText: 'x'.repeat(1001) })
 
     expect(antwort.error).toBe('„Über uns“: Der Text darf höchstens 1000 Zeichen haben — bitte kürzen. Erst danach lässt sich speichern.')
     expect(await stand(farm.id)).toEqual(vorher)

@@ -3,23 +3,21 @@
  * (Nachtlauf Nr. 50, Register N4) — rein und ohne Datenbank prüfbar
  * (tests/abschnitt-stand.test.ts).
  *
- * Beide Aktionen schreiben bei JEDEM Aufruf mehr als ein Feld:
- * saveAppearanceAction (server/actions/appearance.ts) Leitspruch,
- * Gründungsjahr, Über uns, Abschnitte und Werte (die Werte löscht sie und
- * legt sie neu an), updateProfile (server/actions/farm.ts) das ganze Profil.
- * Ein Abschnitt ändert deshalb nur sein eigenes Feld und schickt alles andere
- * aus dem FRISCHEN Stand mit — gelesen vom Server direkt vor dem Speichern
- * (components/mein-hof/abschnitt-speichern.ts), nie aus den Props der Seite:
- * Die hielten nach einem anderen Abschnitt alte Werte, bis die Seite neu
- * geladen ist, und schrieben sie zurück.
+ * saveAppearanceAction (server/actions/appearance.ts) schreibt seit Nr. 65
+ * nur, was mitkommt: Ein Abschnitt des Auftritts schickt nur seinen Teil
+ * (bereiteAuftrittVor). updateProfile (server/actions/farm.ts) schreibt
+ * weiter das ganze Profil: Ein Abschnitt des Profils ändert nur sein eigenes
+ * Feld und schickt alles andere aus dem FRISCHEN Stand mit — gelesen vom
+ * Server direkt vor dem Speichern (components/mein-hof/abschnitt-speichern.ts),
+ * nie aus den Props der Seite: Die hielten nach einem anderen Abschnitt alte
+ * Werte, bis die Seite neu geladen ist, und schrieben sie zurück.
  *
- * Logo, Titelbild und Verlauf stehen nie darin: Sie haben eigene Aktionen,
- * und saveAppearanceAction rührt fehlende Felder nicht an.
+ * Logo, Titelbild und Verlauf stehen nie darin: Sie haben eigene Aktionen.
  */
 import type { Betriebsstatus } from '@prisma/client'
 import { alsLand } from '@/lib/laender'
 import { ZU_LANG } from '@/lib/eingabegrenzen'
-import { ZEILE_TITEL } from '@/lib/hofseite-fortschritt'
+import { EINSTELLUNG_FUER_ZEILE, ZEILE_TITEL } from '@/lib/hofseite-fortschritt'
 import { GRUENDUNGSJAHR_FEHLER, WERTE_ZU_VIELE, type AppearanceSaveInput } from '@/schemas/auftritt'
 import type { ProfileFormData, profileSchema } from '@/schemas/hofprofil'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
@@ -33,7 +31,7 @@ export const ABSCHNITT_SPEICHERN_TEXT = {
   vorigesHaengt: 'Das vorige Speichern ist noch nicht fertig. Lade die Seite neu und versuch es dann noch einmal.',
   /** Die Anfrage selbst scheiterte (Netz weg, Aktion nach einem Deploy unbekannt) — die Eingabe bleibt stehen. */
   gingNicht: 'Wir konnten das gerade nicht speichern. Versuch es noch einmal.',
-  /** Die Sitzung ist abgelaufen (Lesen des frischen Stands, server/actions/appearance.ts und farm.ts). */
+  /** Die Sitzung ist abgelaufen (Lesen des frischen Stands des Profils, server/actions/farm.ts). */
   nichtAngemeldet: 'Du bist nicht mehr angemeldet. Melde dich neu an und versuch es dann noch einmal.',
   /** Angemeldet, aber kein Hof zu diesem Konto — etwa in einem Tab mit einer älteren Anmeldung. */
   hofFehlt: 'Wir finden deinen Hof gerade nicht. Lade die Seite neu und versuch es dann noch einmal.',
@@ -61,12 +59,12 @@ const EIGENE_SAETZE: ReadonlySet<string> = new Set([ZU_LANG.leitspruch, ZU_LANG.
 
 /**
  * Die Meldung, wenn der Auftritt nicht ins Schema passt (saveAppearanceAction).
- * Jedes Speichern schickt alle Felder des Auftritts mit (auftrittMitTeil) —
- * ein zu langer Altwert sperrt also auch das Speichern eines anderen
- * Abschnitts. Die Meldung nennt darum den Abschnitt, der sperrt, damit der
- * Hof weiß, was er ändern muss: „„Über uns“: Der Text darf höchstens 1000
- * Zeichen haben — bitte kürzen. Erst danach lässt sich speichern." Ein Satz
- * von Zod (englisch) kommt nie hinaus (CODING_STANDARDS §4).
+ * Sie nennt den Abschnitt, dessen Feld nicht passt, damit der Hof weiß, was
+ * er ändern muss: „„Über uns“: Der Text darf höchstens 1000 Zeichen haben —
+ * bitte kürzen. Erst danach lässt sich speichern." Seit Nr. 65 schickt jeder
+ * Abschnitt nur seinen Teil; ein zu langer Altwert sperrt also nur noch den
+ * eigenen Abschnitt. Ein Satz von Zod (englisch) kommt nie hinaus
+ * (CODING_STANDARDS §4).
  */
 export function auftrittFehlerText(issues: readonly { path: readonly PropertyKey[]; message: string }[]): string {
   const erstes = issues[0]
@@ -77,54 +75,29 @@ export function auftrittFehlerText(issues: readonly { path: readonly PropertyKey
   return `„${ZEILE_TITEL[zeile]}“: ${grund} Erst danach lässt sich speichern.`
 }
 
-/** Die Felder, die saveAppearanceAction bei jedem Aufruf schreibt — genau der Stand, aus dem jeder Abschnitt speichert. */
-export type AuftrittStand = {
-  tagline: string | null
-  foundedYear: number | null
-  aboutText: string | null
-  sectionsConfig: readonly { key: string; visible: boolean; order: number }[]
-  farmValues: readonly { icon: string; title: string; subtitle: string | null }[]
-}
-
 /** Was ein Abschnitt am Auftritt ändert. Ein fehlender Schlüssel heißt „nicht meins", null heißt „leeren". */
 export type AuftrittTeil = Partial<Pick<AppearanceSaveInput, 'tagline' | 'foundedYear' | 'aboutText' | 'sectionsConfig' | 'farmValues'>>
 
+/**
+ * Der Teil eines Abschnitts, wie saveAppearanceAction ihn verlangt — nur die
+ * Schlüssel, die der Abschnitt setzt (Register N4, Ergänzung Lauf 10): Die
+ * Aktion schreibt nur, was mitkommt. Ein Schlüssel mit undefined fehlt auch
+ * in der Anfrage. Werte bekommen sortOrder nach ihrem Platz, ein leerer
+ * Untertitel wird null.
+ */
+export function bereiteAuftrittVor(teil: AuftrittTeil): AppearanceSaveInput {
+  const anfrage: AppearanceSaveInput = {}
+  if (teil.tagline !== undefined) anfrage.tagline = teil.tagline
+  if (teil.foundedYear !== undefined) anfrage.foundedYear = teil.foundedYear
+  if (teil.aboutText !== undefined) anfrage.aboutText = teil.aboutText
+  if (teil.sectionsConfig !== undefined) anfrage.sectionsConfig = teil.sectionsConfig.map((s) => ({ key: s.key, visible: s.visible, order: s.order }))
+  if (teil.farmValues !== undefined) anfrage.farmValues = werteFuerAktion(teil.farmValues.map((w) => ({ ...w, subtitle: w.subtitle ?? null })))
+  return anfrage
+}
+
 /** Die Werte, wie die Aktion sie verlangt: sortOrder ist der Platz, ein leerer Untertitel wird null. */
-function werteFuerAktion(werte: AuftrittStand['farmValues']): AppearanceSaveInput['farmValues'] {
+function werteFuerAktion(werte: readonly { icon: string; title: string; subtitle: string | null }[]): NonNullable<AppearanceSaveInput['farmValues']> {
   return werte.map((w, platz) => ({ icon: w.icon, title: w.title, subtitle: w.subtitle || null, sortOrder: platz }))
-}
-
-/** Der ganze Auftritt aus dem Stand — ohne Logo und Titelbild. */
-export function auftrittBasis(stand: AuftrittStand): AppearanceSaveInput {
-  return {
-    tagline: stand.tagline,
-    foundedYear: stand.foundedYear,
-    aboutText: stand.aboutText,
-    sectionsConfig: stand.sectionsConfig.map((s) => ({ key: s.key, visible: s.visible, order: s.order })),
-    farmValues: werteFuerAktion(stand.farmValues),
-  }
-}
-
-/** Der frische Stand mit dem Teil des Abschnitts — nur, was der Abschnitt wirklich setzt, ändert sich. */
-export function auftrittMitTeil(frisch: AuftrittStand, teil: AuftrittTeil): AppearanceSaveInput {
-  const neu = auftrittBasis(frisch)
-  if (teil.tagline !== undefined) neu.tagline = teil.tagline
-  if (teil.foundedYear !== undefined) neu.foundedYear = teil.foundedYear
-  if (teil.aboutText !== undefined) neu.aboutText = teil.aboutText
-  if (teil.sectionsConfig !== undefined) neu.sectionsConfig = teil.sectionsConfig.map((s) => ({ ...s }))
-  if (teil.farmValues !== undefined) neu.farmValues = werteFuerAktion(teil.farmValues.map((w) => ({ ...w, subtitle: w.subtitle ?? null })))
-  return neu
-}
-
-/** Aus dem gelesenen Auftritt (getAppearanceData) genau die Felder des Stands. */
-export function auftrittStandAus(daten: AuftrittStand): AuftrittStand {
-  return {
-    tagline: daten.tagline,
-    foundedYear: daten.foundedYear,
-    aboutText: daten.aboutText,
-    sectionsConfig: daten.sectionsConfig.map((s) => ({ key: s.key, visible: s.visible, order: s.order })),
-    farmValues: daten.farmValues.map((w) => ({ icon: w.icon, title: w.title, subtitle: w.subtitle })),
-  }
 }
 
 /** Was das Profil zum Speichern braucht — die Felder aus getFarmSettings. */
@@ -204,6 +177,48 @@ export function profilWieImSchema(schema: typeof profileSchema, werte: ProfileFo
     if (geprueft.success) setze(ergebnis, feld, geprueft.data)
   }
   return ergebnis
+}
+
+/** Was das Adress-Formular in Mein Hof zeigt und schickt — Straße, PLZ, Ort. */
+export type AdressEingabe = Pick<ProfileFormData, 'address' | 'postalCode' | 'city'>
+
+/**
+ * Die Adresse, wie das Adress-Formular in Mein Hof sie schickt: Straße, PLZ
+ * und Ort aus dem Formular, Land und Kartenpunkt vom Laden der Seite — EINE
+ * Adresse als Ganzes (Register N4, Ergänzung Lauf 10). Nur Straße, PLZ und
+ * Ort mischten sonst Land und Punkt eines anderen Tabs aus dem frischen Stand
+ * hinein (profilMitTeil). Ohne Punkt geht null mit; updateProfile lässt einen
+ * gespeicherten Punkt dann stehen.
+ */
+export function bereiteAdresseVor(geladen: Pick<ProfilQuelle, 'country' | 'latitude' | 'longitude'>, eingabe: AdressEingabe): ProfilTeil {
+  return {
+    address: eingabe.address,
+    postalCode: eingabe.postalCode,
+    city: eingabe.city,
+    country: alsLand(geladen.country),
+    latitude: geladen.latitude,
+    longitude: geladen.longitude,
+  }
+}
+
+/**
+ * Der Hinweis im Adress-Formular von Mein Hof, sobald die Straße geändert ist:
+ * Der Kartenpunkt zieht nicht mit (die Karte gibt es nur im Hof-Profil). Text
+ * und Ziel aus einer Quelle; das Ziel ist der Ort, an dem die Adresse außerhalb
+ * von Mein Hof bearbeitet wird.
+ */
+export const KARTENPUNKT_PRUEFEN = { text: 'Standort auf der Karte prüfen', href: EINSTELLUNG_FUER_ZEILE.adresse } as const
+
+/**
+ * Steht der Hinweis KARTENPUNKT_PRUEFEN? Nur mit gesetztem Punkt (sonst heißt
+ * der Link „setzen") und einer anderen, nicht leeren Straße — Ränder zählen
+ * nicht (das Schema nimmt sie ohnehin nicht mit). Ein leeres Feld meldet
+ * beim Speichern selbst „Pflichtfeld".
+ */
+export function brauchtKartenpruefung(geladen: Pick<ProfilQuelle, 'address' | 'latitude' | 'longitude'>, strasse: string): boolean {
+  if (geladen.latitude === null || geladen.longitude === null) return false
+  const neu = strasse.trim()
+  return neu !== '' && neu !== geladen.address.trim()
 }
 
 /**
