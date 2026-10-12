@@ -15,6 +15,8 @@ import type { FarmPhotoData } from '@/server/queries/appearance'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { CoverEditButton, CoverFocusAdjust, TITELBILD_KNOPF_STIL } from '@/components/farm/farm-page-view'
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
+import { titelbildHinweis } from '@/lib/titelbild'
+import { useBildmasse } from '@/components/hofseite/titelbild'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
 
@@ -94,6 +96,9 @@ export function TitelbildBaustein({
   const [entferntGerade, startEntfernen] = useTransition()
   const foto = titelbildFoto(hof)
   const focus = focusDraft ?? hof.bannerFocusY
+  // Die Maße liest der Browser aus der Vorschau, sobald sie geladen ist (Register N6, Nr. 72) — der Satz darunter gilt nur für Hochformat.
+  const { masse, beimLaden } = useBildmasse(foto)
+  const hochformatHinweis = titelbildHinweis(masse)
 
   function entfernen() {
     startEntfernen(async () => {
@@ -128,7 +133,7 @@ export function TitelbildBaustein({
     <div>
       <div className="relative aspect-[5/2] overflow-hidden rounded-xl bg-muted">
         {foto ? (
-          <Image src={foto} alt="" fill sizes="640px" className="object-cover" style={{ objectPosition: `50% ${focus}%` }} />
+          <Image src={foto} alt="" fill sizes="640px" className="object-cover" style={{ objectPosition: `50% ${focus}%` }} onLoad={beimLaden} />
         ) : (
           // Der Verlauf ist ein Wert des Hofs (Titelbild-Einstellung), kein Farbliteral im Code.
           <div className="absolute inset-0" style={{ background: titelbildVerlauf(hof.bannerValue) }} />
@@ -182,6 +187,7 @@ export function TitelbildBaustein({
           </>
         )}
       </div>
+      {hochformatHinweis && <p className="mt-2 text-xs text-muted-foreground">{hochformatHinweis}</p>}
       <p className="mt-2 text-xs text-muted-foreground">
         Querformat wirkt am besten. Der Ausschnitt gilt für das hohe Titelbild auf der Hofseite.
       </p>

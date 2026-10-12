@@ -4957,6 +4957,16 @@ Auftrag freigabe.md §15 „68“ (in der Freigabe „F7“, im Register F8). Ke
 - **Reihenfolge:** `publishedAt` absteigend, bei gleicher Zeit die Kennung. Sonst könnte ein Beitrag zwischen zwei Aufrufen über die Grenze von fünf springen.
 - **Vorschau:** „So sieht’s die Kundin“ in Mein Hof ist ein iframe derselben Route (`?vorschau=1`) und bekommt die Liste von selbst; `hofseite-vorschau.ts` lädt keine Beiträge und blieb unverändert.
 
+## Titelbild im Hochformat (Nachtlauf Nr. 72, Oktober 2026)
+
+Auftrag freigabe.md §15 „72“ (in der Freigabe „B2“, im Register N6). Keine Migration, kein neues Paket.
+
+- **Anlass und Entscheidung:** Ein Handyfoto im Hochformat (3000 × 4000) wurde auf die Breite der Hofseite gezogen und auf 300 px Höhe beschnitten — am Computer blieb ein schmaler, unscharfer Streifen (Screenshot der Projektleitung, 12.10.2026). Jetzt steht ein Titelbild, das höher als breit ist, ab 768 px ganz da, vor einer unscharfen, abgedunkelten Kopie desselben Fotos; am Handy bleibt der Beschnitt mit Fokuspunkt. Querformat und Verlauf ohne Foto sehen aus wie vorher.
+- **Maße nur im Browser:** Hochgeladen wird über `api/upload/verarbeiten` (sharp), die Maße werden nicht gespeichert — eine Migration dafür gab es nicht. Der Browser liest sie, sobald das Bild geladen ist (`onLoad`, `naturalWidth`/`naturalHeight`). Bis dahin gilt der Beschnitt: Querformat springt nie, ein Hochformat wechselt einmal nach dem Laden (am Handy unsichtbar). Vormerkung Lauf 12: Maße beim Hochladen speichern (Expand-Migration, eigene Freigabe) — dann entfällt der Wechsel.
+- **Zwei Bilder, eine Datei:** Kopie und ganzes Foto haben dasselbe `sizes`, also dieselbe Adresse; in einer frischen Browsersitzung bei 390 px kam nur eine Anfrage, auch wenn die Kopie dort verborgen ist (`hidden md:block`).
+- **Mein Hof:** Unter der Vorschau steht bei Hochformat ein ruhiger Satz (kein Blocker). Er erscheint, solange das Foto ein Hochformat ist — nicht nur direkt nach dem Hochladen: Die Maße kommen aus der Vorschau, einen Zustand „gerade hochgeladen“ gibt es dort nicht, und der Hinweis erklärt auch später, warum die Hofseite am Computer so aussieht.
+- **Herausgelöst:** Das Titelbild steht nicht mehr in `hofseite-kunde.tsx`, sondern in `components/hofseite/titelbild.tsx`; die Regel dazu (Hochformat ja/nein, Satz, Maße lesen) in `src/lib/titelbild.ts`.
+
 ## Nützliche Befehle
 
 ```bash

@@ -58,6 +58,7 @@ import { ProductGrid, useBereichWunsch } from '@/components/farm/product-grid'
 import { VorschauImRahmen } from '@/components/farm/vorschau-im-rahmen'
 import { HofseiteSeitenspalte } from '@/components/hofseite/hofseite-seitenspalte'
 import { HofseiteFotos } from '@/components/hofseite/hofseite-fotos'
+import { Titelbild } from '@/components/hofseite/titelbild'
 
 /*
  * Die Hofseite für Kundinnen im neuen Design (Nachtlauf Nr. 10, Gate 4).
@@ -313,26 +314,8 @@ export function HofseiteKunde({
 
       {/* ── Titelbild, Name, Aktionen ── */}
       <div className="relative">
-        <div data-abschnitt="titelbild" className="relative h-[220px] w-full overflow-hidden bg-muted md:h-[300px]">
-          {foto ? (
-            <Image
-              src={foto}
-              alt=""
-              fill
-              sizes="100vw"
-              priority
-              className="object-cover"
-              style={{ objectPosition: `50% ${farm.bannerFocusY}%` }}
-            />
-          ) : (
-            // Der Verlauf ist ein Wert des Hofs (Titelbild-Einstellung), kein Farbliteral im Code.
-            <div className="absolute inset-0" style={{ background: titelbildVerlauf(farm.bannerValue) }} />
-          )}
-          {/* Am Handy steht der Name auf dem Bild: dunkler Schleier, theme-fest (DESIGN_SYSTEM, Bild-Overlays). */}
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-linear-to-t from-primary-foreground/75 via-primary-foreground/10 to-transparent md:hidden"
-          />
+        {/* Hochformat ab md ganz statt beschnitten (Register N6, Nr. 72): entscheidet titelbild.tsx. */}
+        <Titelbild foto={foto} verlauf={titelbildVerlauf(farm.bannerValue)} fokusY={farm.bannerFocusY}>
           <button
             type="button"
             onClick={() => void teileHof(farm)}
@@ -344,7 +327,7 @@ export function HofseiteKunde({
           >
             <Share2 className="size-5" strokeWidth={1.7} aria-hidden="true" />
           </button>
-        </div>
+        </Titelbild>
 
         <div className="relative mx-auto max-w-[1200px] px-4 md:flex md:items-end md:gap-6 md:px-6">
           {/* Am Handy über dem unteren Rand des Titelbilds, ab 768 px darunter neben dem Hofzeichen. */}
