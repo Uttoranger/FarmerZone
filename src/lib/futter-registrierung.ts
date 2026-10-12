@@ -349,6 +349,26 @@ export const KENNZEICHNUNG_ERKLAERUNG =
 export const KENNZEICHNUNG_FUNDORT =
   'Bei eigener Ernte trägst du sie selbst ein, bei zugekauftem Futter stehen sie auf dem Sackanhänger oder Lieferschein.'
 
+/**
+ * Die Feldhinweise der Kennzeichnung: wo der Hof die Angabe findet — im
+ * Futter-Formular und im Produktdialog dieselben (Nr. 56). Zugekauftes Futter
+ * hat einen Sackanhänger; Heu, Stroh und Getreide aus eigener Ernte (E10: lose
+ * oder in Ballen) haben keinen, dort trägt der Hof die Angabe selbst ein — wie
+ * KENNZEICHNUNG_FUNDORT es für den ganzen Abschnitt sagt. Die Futtermittelart
+ * fragt das Formular nur, wo mehr als eine Art passt (Ergänzungsfutter), also
+ * nie bei eigener Ernte; ihr Satz bleibt deshalb, wie er war.
+ */
+export const KENNZEICHNUNG_FELDHINWEIS = {
+  futtermittelart: 'Steht auf dem Sackanhänger, meist direkt über der Zusammensetzung.',
+  tierarten:
+    'Steht als „Alleinfuttermittel für …“ oder „Ergänzungsfuttermittel für …“ auf dem Anhänger, bei eigener Ernte wählst du selbst.',
+  zusammensetzung:
+    'Steht auf dem Sackanhänger, bei eigener Ernte trägst du sie selbst ein. Bei Mischfutter die Einzelfuttermittel in absteigender Reihenfolge.',
+  analytischeBestandteile:
+    'Steht auf dem Sackanhänger unter „Analytische Bestandteile“ (Rohprotein, Rohfaser, Rohfett, Rohasche …), bei eigener Ernte trägst du sie selbst ein.',
+  gewicht: 'Durchschnittsgewicht, wie auf dem Sackanhänger oder Lieferschein, bei eigener Ernte trägst du es selbst ein.',
+} as const
+
 /** Kopfhinweis über den sieben Fällen (E10a, wörtlich). */
 export const ORIENTIERUNG_HINWEIS =
   'Zur Orientierung, keine Rechtsberatung. Im Zweifel bei der Bezirkshauptmannschaft, beim BAES oder bei der Landwirtschaftskammer nachfragen.'

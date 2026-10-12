@@ -15,8 +15,27 @@
  * stellen deshalb `Date` (nur `Date`, Zeitgeber und Datenbank laufen echt) auf
  * Tage vor bzw. nach dem Stichtag — so laufen sie auch nach Februar 2027 und
  * entfallen nie still. Die Finanz-Fälle setzen `createdAt` selbst.
+ *
+ * Die Bestätigungsmail verschickt der Nachlauf (nachDerAntwort), und der liest
+ * vorher noch die Produkte aus der Datenbank. Unter Last war er beim Prüfen
+ * manchmal noch nicht fertig (Bericht 45, Lauf 8 §6). Der Test sammelt ihn
+ * deshalb und arbeitet ihn selbst ab (Nr. 56): Vorher ist sicher keine Mail
+ * verschickt (sie liegt nicht im Antwortpfad), danach sicher — ohne feste
+ * Pause und ohne Zeitgrenze.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+
+const nachlauf = vi.hoisted(() => ({ aufgaben: [] as Array<() => Promise<void>> }))
+vi.mock('@/lib/nach-der-antwort', () => ({
+  nachDerAntwort: (aufgabe: () => Promise<void>) => {
+    nachlauf.aufgaben.push(aufgabe)
+  },
+}))
+
+/** Startet, was der Checkout nach der Antwort erledigen will, und wartet, bis alles fertig ist. */
+async function arbeiteNachlaufAb(): Promise<void> {
+  for (let aufgabe = nachlauf.aufgaben.shift(); aufgabe; aufgabe = nachlauf.aufgaben.shift()) await aufgabe()
+}
 
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendOnsiteConfirmation: vi.fn(), sendBestellungVerfallen: vi.fn() }))
@@ -37,6 +56,8 @@ const anlegen = vi.mocked(stripe.paymentIntents.create)
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Ein nie gestarteter Nachlauf eines anderen Falls läuft auch später nicht.
+  nachlauf.aufgaben.length = 0
 })
 
 afterEach(async () => {
@@ -94,6 +115,10 @@ describe('Checkout vor dem Stichtag — echte Datenbank', () => {
     expect(bestellt.serviceFeePercentApplied).toBeNull()
     expect(bestellt.serviceFeeMinCentsApplied).toBeNull()
     expect(anlegen).not.toHaveBeenCalled()
+    // Die Mail liegt nicht im Antwortpfad — erst der Nachlauf verschickt sie.
+    expect(sendOnsiteConfirmation).not.toHaveBeenCalled()
+    await arbeiteNachlaufAb()
+    expect(sendOnsiteConfirmation).toHaveBeenCalledOnce()
     expect(sendOnsiteConfirmation).toHaveBeenCalledWith(expect.objectContaining({ serviceFeeCents: 0 }), expect.any(String))
   })
 

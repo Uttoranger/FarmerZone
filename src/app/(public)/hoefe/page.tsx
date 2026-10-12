@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { unstable_rethrow } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { ladeOeffentlicheHoefe } from '@/server/queries/oeffentliche-hoefe'
-import { schonGemeldet } from '@/server/oeffentlich-lesen'
+import { meldeFehleranzeige, schonGemeldet } from '@/server/oeffentlich-lesen'
 import type { HofUebersichtEintrag } from '@/server/queries/farm'
 import { ENTDECKEN_KOPF } from '@/lib/hoefe-entdecken'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
@@ -69,6 +69,9 @@ function OhneListe({ children }: { children: React.ReactNode }) {
  */
 export default async function HoefePage() {
   const hoefe = await ladeHoefe()
+  // Erst hier steht fest, dass die Kundin die Fehleranzeige bekommt — ein
+  // Abbruch beim Neubau im Hintergrund kommt nie hierher (Nr. 56).
+  if (hoefe === 'fehler') meldeFehleranzeige('hoefe-entdecken')
 
   return (
     <KundeShellMitSitzung>

@@ -59,7 +59,7 @@ import { useNachSpeichern } from '@/components/hof-einstellungen/use-nach-speich
 import { ProfileForm } from '@/components/settings/profile-form'
 import { PersonZeile } from '@/components/shells/hof-shell'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { EINSTELLUNG_KONTO, GESPEICHERT_TEXT, RUECKWEG_PRAEFIX } from '@/lib/bauern-navigation'
+import { EINSTELLUNG_KONTO, GESPEICHERT_TEXT, RUECKWEG_PRAEFIX, elternseite } from '@/lib/bauern-navigation'
 import type { FarmSettings } from '@/server/queries/farm'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
@@ -155,6 +155,20 @@ describe('UnterseitenKopf im Browser und Titel', () => {
     expect(detail).toMatch(/md:flex[^"]*lg:hidden|lg:hidden[^"]*md:flex/)
     // Gegenprobe: ohne listeDaneben bleiben beide.
     expect(kopf('/orders/bestellung-1', { titel: 'Bestellung FZ-1' })).not.toContain('lg:hidden')
+  })
+
+  it('/fehler-melden: am Handy steht der Name nur einmal — die Leiste trägt ihn, die h1 gleichen Wortlauts nur für den Screenreader (Nr. 56)', () => {
+    // Bericht 44: „← Hilfe und Rückmeldung" in der Leiste und darunter die h1 „Hilfe und Rückmeldung".
+    const seite = quelle('src/app/(hof)/fehler-melden/page.tsx')
+    const h1 = seite.match(/<h1 className="([^"]+)">([^<]+)<\/h1>/)
+    expect(h1?.[2].trim()).toBe(elternseite('/fehler-melden')?.name)
+    const klassen = h1?.[1].split(/\s+/) ?? []
+    expect(klassen).toContain('sr-only')
+    expect(klassen).toContain('md:not-sr-only')
+    // Die Ladeansicht hält den Titel-Platzhalter ebenso erst ab 768 px bereit — sonst spränge die Seite.
+    expect(quelle('src/components/hof-hilfe/hilfe-laden.tsx')).toContain('hidden h-8 w-64 rounded-lg bg-border md:block')
+    // Gegenprobe: Wo Titel und Elternseite verschieden heißen, bleibt die h1 des Kopfs sichtbar.
+    expect(kopf('/settings/profile', { titel: 'Hof-Profil' })).toMatch(/<h1 class="(?![^"]*sr-only)[^"]*">Hof-Profil<\/h1>/)
   })
 
   it('zeileImBrowser={false}: nur die Leiste am Handy', () => {

@@ -24,6 +24,20 @@ export const ANMELDE_ZEITABLAUF = 'EAUTHTIMEOUT'
 /** So lange wartet die eine Wiederholung — kurz, eine Seite wartet darauf. */
 export const WIEDERHOLUNG_PAUSE_MS = 300
 
+/**
+ * Zeigt die öffentliche Hofliste ihre Fehleranzeige, meldet die Seite das an
+ * Sentry (Nr. 56): Beim Abbruch JAVASCRIPT-NEXTJS-9 war nicht zu erkennen, ob
+ * eine Kundin die Fehleranzeige sah oder nur der Neubau im Hintergrund
+ * scheiterte. Höchstens einmal je Instanz und so viele Millisekunden — bei
+ * einem Ausfall käme sonst je Aufruf eine Meldung.
+ */
+export const FEHLERANZEIGE_MELDE_ABSTAND_MS = 10 * 60_000
+
+/** Ist eine Meldung fällig? Die erste immer, danach erst nach dem Abstand. Läuft die Uhr zurück, bleibt es ruhig. */
+export function fehleranzeigeMeldungFaellig(letzteMeldungMs: number | null, jetztMs: number): boolean {
+  return letzteMeldungMs === null || jetztMs - letzteMeldungMs >= FEHLERANZEIGE_MELDE_ABSTAND_MS
+}
+
 function alsObjekt(wert: unknown): Record<string, unknown> | null {
   return typeof wert === 'object' && wert !== null ? (wert as Record<string, unknown>) : null
 }
