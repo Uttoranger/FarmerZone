@@ -167,7 +167,7 @@ export default function DatenschutzPage() {
                 <Link href="/account/profile" className="text-primary hover:underline">
                   Kunden-Profil
                 </Link>{' '}
-                unter „Mein Konto"
+                unter „Mein Konto&ldquo;
               </li>
             </ul>
             <p>

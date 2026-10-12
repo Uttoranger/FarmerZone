@@ -6,6 +6,7 @@ import { getFarmForUser } from '@/server/queries/dashboard'
 import { getStatusTemplate } from '@/server/queries/status-posts'
 import { prisma } from '@/lib/prisma'
 import { WERBEMAIL_EMPFAENGER } from '@/server/abo-anmeldung'
+import { berechneMailabstandBeginn } from '@/lib/beitrag-mailabstand'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { StatusNewClient } from './status-new-client'
 
@@ -40,6 +41,10 @@ export default async function StatusNewPage({
   const { from } = await searchParams
   const template = await getStatusTemplate(farm.id, from)
 
+  // Ein Zeitpunkt für Abfrage und Anzeige (CODING_STANDARDS §2): Der Assistent
+  // rechnet „vor n Tagen" mit demselben jetzt, nie mit der Uhr des Browsers.
+  const jetzt = new Date()
+
   const [products, emailCount, whatsAppCount, recentEmail] = await Promise.all([
     prisma.product.findMany({
       where: { farmId: farm.id, isAvailable: true },
@@ -53,7 +58,7 @@ export default async function StatusNewPage({
       where: {
         farmId: farm.id,
         sentViaEmail: true,
-        publishedAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+        publishedAt: { gte: berechneMailabstandBeginn(jetzt) },
       },
       select: { publishedAt: true },
     }),
@@ -67,6 +72,7 @@ export default async function StatusNewPage({
         emailCount={emailCount}
         whatsAppCount={whatsAppCount}
         recentEmailSentAt={recentEmail?.publishedAt?.toISOString() ?? null}
+        jetzt={jetzt.toISOString()}
         farmSlug={farm.id}
         prefill={template}
       />

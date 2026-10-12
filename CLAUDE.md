@@ -32,7 +32,7 @@ Solo-Entwickler, ein Pilothof. **Produktivsystem mit echten Bestellungen und ech
   Nicht Teil von `pnpm test`, nicht Teil des Stop-Hooks; in der CI ein eigener Job.
 
 **Vor jedem Commit verpflichtend:** `pnpm typecheck && pnpm lint && pnpm test`.
-Kein Commit mit rotem Typecheck oder roten Tests. Keine Ausnahme, auch nicht "nur ein Formatfehler".
+Kein Commit mit rotem Typecheck, rotem Lint (Fehler; Warnungen dürfen bleiben) oder roten Tests. Keine Ausnahme, auch nicht "nur ein Formatfehler".
 
 ---
 
@@ -155,7 +155,7 @@ Eine Regel hier widerlegt? **Nicht heimlich abweichen** — melden.
 - **Gefährliche Befehle werden blockiert** (`prisma db push`, Force-Push,
   `.env` committen, Push auf `main`, Push aller Branches mit `--all`/`--mirror`,
   `npm install`).
-- **Ein Zug endet nicht bei rotem Typecheck oder roten Tests.**
+- **Ein Zug endet nicht bei rotem Typecheck, rotem Lint oder roten Tests.**
 
 Das ist Absicht. Nicht umgehen, sondern beheben. Konfiguration: `.claude/settings.json`.
 
