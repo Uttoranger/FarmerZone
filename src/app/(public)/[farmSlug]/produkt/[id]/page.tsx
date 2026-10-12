@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'
 import type { Suchparameter } from '@/lib/ansichts-modus'
 import { gewaehlteGroesse, produktFamilie, produktMetadaten, sichtbaresProdukt } from '@/lib/produktdetail'
+import { entferneKontaktdaten } from '@/lib/hofseite-kunde'
 import { hofTitelbildVorschau } from '@/lib/vorschaubild'
 import { GROESSE_PARAMETER, leseGroesse } from '@/schemas/produktdetail'
 import { KAEUFER_PARAMETER, leseKaeuferVorbelegung } from '@/schemas/kaeufer-vorbelegung'
@@ -70,7 +71,9 @@ export default async function ProduktSeite({ params, searchParams }: Props) {
   return (
     <KundeShellMitSitzung unterleiste={false}>
       <ProduktdetailKunde
-        farm={farm}
+        // Telefon und E-Mail erst nach dem Kauf (Nr. 60, hier seit Nr. 70): Sie bleiben auf
+        // dem Server und stehen so nicht in den Seitendaten der Client-Komponente.
+        farm={entferneKontaktdaten(farm)}
         produktId={einstieg.id}
         gewaehltId={gewaehlt.id}
         ansicht={{ art: ansicht.art, kaufen: ansicht.kaufen }}

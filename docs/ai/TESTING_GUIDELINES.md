@@ -127,6 +127,7 @@ pnpm test:integration                        # Integration (braucht .env.test)
 | Jede Zod-Schema-Datei | `register-schema.test.ts` |
 | Jeder Geldweg | `checkout-totals.test.ts`, `servicegebuehr-checkout.test.ts` |
 | Jede Berechtigungsentscheidung | `farm-approval.test.ts`, `bestellverfolgung-zugang.test.ts` |
+| Jede öffentliche Seite, die einen Hof an eine Client-Komponente reicht: ein Test auf deren Props — was die Seite nicht zeigen darf (Telefon, E-Mail), steht weder als Schlüssel noch als Wert darin, auch nicht verschachtelt; mit Gegenprobe, dass die Suche am vollen Hof anschlägt und der Rest ankommt (seit Nr. 70, Regelvorschlag aus Bericht 60) | `telefon-nach-kauf.test.ts` (Hofseite), `produktdetail-seite.test.ts` (Produktseite) |
 | Jeder Token-/Signaturweg — ein „Token nur hier"-Test zählt die Stellen im Syntaxbaum von TypeScript (kein Regex-Kommentarfilter: der hielt `//host` für einen Kommentar), mit einer Gegenprobe je Leckweg, auch für Wege ohne den Namen des Tokens (`document.URL`) | `geheimnis.test.ts`, `alte-seiten-neues-design.test.ts` |
 | Jeder behobene Bug | ein Test, der ihn vorher gefangen hätte |
 | Jede Migration gegen das Deploy-Fenster | `migrationen-wache.test.ts` |

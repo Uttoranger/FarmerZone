@@ -129,6 +129,18 @@ function istEchterHost(host: string | null): boolean {
   return host === PRODUKTION_HOST || host === `www.${PRODUKTION_HOST}`
 }
 
+/**
+ * Ist diese (fertig normalisierte) Herkunft die echte Seite — mit oder ohne
+ * www, aber ohne Port? Better Auth vergleicht Herkünfte genau: Der Browser auf
+ * der echten Seite sendet `https://farmerzone.at`, eine Herkunft mit Port träfe
+ * er nie, und die Anmeldung bräche still (Register S16, Nr. 70). Der
+ * Standard-Port 443 fällt schon im URL-Parser weg.
+ */
+function istEchteHerkunft(herkunft: string): boolean {
+  const url = new URL(herkunft)
+  return url.port === '' && istEchterHost(url.hostname)
+}
+
 /** Ein Text als Adresse — oder null, wenn der URL-Parser ihn nicht nimmt. */
 function alsUrl(roh: string): URL | null {
   try {
@@ -182,7 +194,8 @@ const MUSTER_ZEICHEN = /[*?]/
  *   Anker, Zugangsdaten und der Schrägstrich am Ende fallen weg (Better Auth
  *   vergleicht Herkünfte genau, Links in Mails hängen ihren Pfad an, und
  *   Zugangsdaten gehören in keinen Link); ein fremder Host gilt auch, meldet
- *   sich aber (bestimmeUmgebung, Register S16);
+ *   sich aber (bestimmeUmgebung, Register S16) — fremd ist auch die echte
+ *   Seite mit Port;
  * - ein Wert mit „*" oder „?" ist ungültig, auch wenn sich eine Herkunft lesen
  *   ließe (Register S16, Nr. 64): Wer ein Muster einträgt, meint keine Adresse —
  *   bereinigt zu „https://farmerzone.at" sähe der Fehler aus wie keiner;
@@ -529,7 +542,7 @@ export function bestimmeUmgebung(werte: UmgebungsWerte): Umgebung {
   if (art === 'produktion') {
     if (!produktion) warnungen.push(WARNUNG_APP_URL_FEHLT)
     else if ('roh' in produktion) warnungen.push(MUSTER_ZEICHEN.test(produktion.roh) ? WARNUNG_APP_URL_MUSTER : WARNUNG_APP_URL_UNGUELTIG)
-    else if (!istEchterHost(new URL(produktion.herkunft).hostname)) warnungen.push(WARNUNG_APP_URL_FREMDER_HOST)
+    else if (!istEchteHerkunft(produktion.herkunft)) warnungen.push(WARNUNG_APP_URL_FREMDER_HOST)
     if (datenbank === 'dev') warnungen.push('Produktion läuft gegen die Dev-Datenbank.')
     if (stripe === 'test') warnungen.push('Stripe TEST in Produktion — keine echten Zahlungen möglich.')
     // Ohne Connect-Endpunkt kommt account.updated nie an: Sperrt Stripe ein

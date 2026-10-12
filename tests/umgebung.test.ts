@@ -893,6 +893,25 @@ describe('S16 — NEXT_PUBLIC_APP_URL in der Produktion: kein Muster, fremder Ho
     }
   })
 
+  it('ein Port macht auch die echte Seite zum fremden Host — angenommen, aber gemeldet; ohne Port und mit Standard-Port nicht (Nr. 70)', () => {
+    // Better Auth vergleicht Herkünfte genau: Der Browser auf der echten Seite
+    // sendet https://farmerzone.at ohne Port, eine Herkunft mit Port träfe er nie.
+    for (const [wert, herkunft] of [
+      ['https://farmerzone.at:8443', 'https://farmerzone.at:8443'],
+      ['https://www.farmerzone.at:8443/start', 'https://www.farmerzone.at:8443'],
+    ] as const) {
+      expect(produktionsAdresse(wert), wert).toEqual({ herkunft })
+      const u = bestimmeUmgebung({ ...PROD_ECHT, NEXT_PUBLIC_APP_URL: wert })
+      expect(u.trustedOrigins, wert).toEqual([herkunft])
+      expect(u.warnungen, wert).toEqual([WARNUNG_APP_URL_FREMDER_HOST])
+      expect(u.warnungen.join(' '), wert).not.toMatch(/8443/)
+    }
+    // Gegenprobe: Der Standard-Port fällt schon im URL-Parser weg — die Warnung kommt nur mit einem Port.
+    for (const wert of ['https://farmerzone.at', 'https://farmerzone.at:443']) {
+      expect(bestimmeUmgebung({ ...PROD_ECHT, NEXT_PUBLIC_APP_URL: wert }).warnungen, wert).toEqual([])
+    }
+  })
+
   it('ein IPv6-Host bleibt roh und meldet sich als ungültig', () => {
     const wert = 'https://[2001:db8::1]/'
     expect(produktionsAdresse(wert)).toEqual({ roh: wert })
