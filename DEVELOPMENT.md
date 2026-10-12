@@ -4973,6 +4973,16 @@ Auftrag freigabe.md §15 „66" (Register W1). Eine Migration (freigegeben), kei
 - **Knopf ohne Häkchen-Bedingung (Runde 1):** „WhatsApp · n von m" steht bei aktiven und vergangenen Beiträgen, solange m > n — gleich, ob beim Veröffentlichen das WhatsApp-Häkchen gesetzt war oder schon Abonnentinnen da waren (Stand von heute, W1). `sentViaWhatsApp` bestimmt nur noch die Zeile „wohin". Das Mockup zeigt einen vergangenen Beitrag ohne Knopf; es gilt der Wortlaut der Freigabe.
 - **Offen:** n im Knopf zählt auch Kennungen von inzwischen Abgemeldeten (die Liste selbst nicht).
 
+## Hofseite: alle aktiven Beiträge (Nachtlauf Nr. 68, Oktober 2026)
+
+Auftrag freigabe.md §15 „68“ (in der Freigabe „F7“, im Register F8). Keine Migration, kein neues Paket.
+
+- **Entscheidung:** Die Hofseite zeigt alle aktiven Beiträge, den neuesten zuerst mit „Aktuell“, höchstens fünf; der Reiter heißt „Beiträge · n“. Vorher zeigte sie nur den neuesten (das ursprüngliche Konzept „ein Status je Hof“).
+- **Kein Gewinn an Daten:** Beiträge sind öffentlich, die Karte zeigt dieselben Felder wie vorher. Die Abfrage liest jetzt nur diese Felder (`select`) statt der ganzen Zeile samt Versandzählern. JSON-LD und Metadaten bleiben, wie sie waren.
+- **Die Zahl im Reiter:** n zählt die gezeigten Karten (höchstens 5), so wie „Produkte · n“ die gezeigten Produkte zählt. Einen Hinweis auf weitere Beiträge gibt es nicht — das Mockup zeigt keinen; ältere Beiträge stehen im Hofbereich (Mein Hof, Reiter Beiträge).
+- **Reihenfolge:** `publishedAt` absteigend, bei gleicher Zeit die Kennung. Sonst könnte ein Beitrag zwischen zwei Aufrufen über die Grenze von fünf springen.
+- **Vorschau:** „So sieht’s die Kundin“ in Mein Hof ist ein iframe derselben Route (`?vorschau=1`) und bekommt die Liste von selbst; `hofseite-vorschau.ts` lädt keine Beiträge und blieb unverändert.
+
 ## Nützliche Befehle
 
 ```bash

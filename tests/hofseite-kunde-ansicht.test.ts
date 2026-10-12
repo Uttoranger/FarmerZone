@@ -17,7 +17,8 @@
  *  - Zustände knapp und ausverkauft aus dem Bestand; kein „Merken".
  *  - E5: „Bar bei Abholung", nie „Karte bei Abholung"; E4: der Hinweis nennt
  *    den Satz des Hofs, gebührenfrei steht keiner da.
- *  - Reiter „Beiträge" nur mit Beitrag.
+ *  - Reiter „Beiträge · n" nur mit Beitrag; er zeigt alle aktiven Beiträge, der neueste
+ *    zuerst mit „Aktuell", die weiteren nur mit „vor …" (Register F8).
  *  - Schaufenster zuerst (Register N5, Nr. 51): In der Übersicht steht der
  *    Quelltext in der Reihenfolge, die man unter lg sieht — Fotos, bis zu
  *    vier Produkte, „Alle Produkte (n)", rechte Spalte, Über uns —, also
@@ -120,10 +121,10 @@ const KUNDIN: Ansicht = { art: 'kundin', kaufen: true }
 /** Der Zeitpunkt, den page.tsx einmal auf dem Server bestimmt (Nachbesserung 1: kein Date.now() beim Rendern). */
 const JETZT = '2026-10-02T08:00:00.000Z'
 
-function seite({ suche = '', farm = HOF, status = STATUS as ActiveStatusPost | null, ansicht = KUNDIN, jetzt = JETZT } = {}): string {
+function seite({ suche = '', farm = HOF, beitraege = [STATUS], ansicht = KUNDIN, jetzt = JETZT }: { suche?: string; farm?: PublicFarm; beitraege?: ActiveStatusPost[]; ansicht?: Ansicht; jetzt?: string } = {}): string {
   adresse.suche = suche
   return renderToStaticMarkup(
-    createElement(KundeShellMitSitzung, null, createElement(FarmPageView, { farm, activeStatus: status, reorderItems: [], ansicht, jetzt }))
+    createElement(KundeShellMitSitzung, null, createElement(FarmPageView, { farm, beitraege, reorderItems: [], ansicht, jetzt }))
   )
 }
 
@@ -235,9 +236,60 @@ describe('Zahlung und Gebühr', () => {
 
 describe('Reiter „Beiträge"', () => {
   it('nur mit Beitrag; dort steht er', () => {
-    expect(seite()).toContain('>Beiträge<')
+    expect(seite()).toContain('>Beiträge · 1<')
     expect(seite({ suche: 'reiter=beitraege' })).toContain('Neue Ernte')
-    expect(seite({ status: null })).not.toContain('>Beiträge<')
+    expect(seite({ beitraege: [] })).not.toMatch(/>Beiträge/)
+  })
+})
+
+describe('Reiter „Beiträge" — alle aktiven Beiträge (Register F8)', () => {
+  const beitrag = (id: string, title: string, anlass: ActiveStatusPost['anlass'], publishedAt: string): ActiveStatusPost => ({
+    ...STATUS, id, title, anlass, publishedAt,
+  })
+  // JETZT ist der 2. Oktober, 8 Uhr: vor 2 Stunden, vor 3 Tagen, vor 12 Tagen.
+  const NEU = beitrag('status_neu', 'Frische Wels-Filets ab Freitag', 'FRESH_PRODUCT', '2026-10-02T06:00:00.000Z')
+  const MITTE = beitrag('status_mitte', 'Zehn Ballen Heu zum Preis von neun', 'PROMOTION', '2026-09-29T08:00:00.000Z')
+  const ALT = beitrag('status_alt', 'Neue Saison im Hofladen', 'NEW_SEASON', '2026-09-20T08:00:00.000Z')
+  const LISTE = [NEU, MITTE, ALT]
+  const offen = (beitraege: ActiveStatusPost[], farm: PublicFarm = HOF) => seite({ suche: 'reiter=beitraege', beitraege, farm })
+
+  it('der Reiter nennt, wie viele Beiträge die Seite zeigt', () => {
+    expect(seite({ beitraege: LISTE })).toContain('>Beiträge · 3<')
+    expect(seite({ beitraege: [NEU] })).toContain('>Beiträge · 1<')
+  })
+
+  it('alle stehen da, in der Reihenfolge der Liste — der neueste zuerst', () => {
+    const html = offen(LISTE)
+    expect(reihenfolge(html, [ALT.title, MITTE.title, NEU.title])).toEqual([NEU.title, MITTE.title, ALT.title])
+    // Jede Karte trägt ihren eigenen Anlass, nicht den der ersten.
+    expect(html).toContain('Frisches Produkt')
+    expect(html).toContain('Neue Saison</span>')
+  })
+
+  it('„Aktuell" steht genau einmal, am neuesten; die weiteren tragen nur „vor …"', () => {
+    const html = offen(LISTE)
+    expect(html.match(/Aktuell ·/g)).toHaveLength(1)
+    // Die Zeit steht über dem Titel ihrer Karte, Karte für Karte.
+    const folge = ['Aktuell · vor 2 Stunden', NEU.title, 'vor 3 Tagen', MITTE.title, 'vor 12 Tagen', ALT.title]
+    expect(reihenfolge(html, [...folge].reverse())).toEqual(folge)
+  })
+
+  it('ein einzelner Beitrag ist der neueste: „Aktuell" steht da, wie vorher', () => {
+    expect(offen([MITTE])).toContain('Aktuell · vor 3 Tagen')
+  })
+
+  it('jede Karte benennt sich mit ihrer eigenen Überschrift — keine Kennung kommt zweimal vor', () => {
+    const html = offen(LISTE)
+    const kennungen = [...html.matchAll(/aria-labelledby="(beitrag-titel-[^"]+)"/g)].map((treffer) => treffer[1])
+    expect(kennungen).toHaveLength(3)
+    expect(new Set(kennungen).size).toBe(3)
+    for (const kennung of kennungen) expect(html).toContain(`id="${kennung}"`)
+  })
+
+  it('hat der Hof den Abschnitt Status ausgeblendet, gibt es weder Reiter noch Beiträge', () => {
+    const ohneStatus: PublicFarm = { ...HOF, sectionsConfig: [{ key: 'status', visible: false, order: 1 }] }
+    expect(seite({ beitraege: LISTE, farm: ohneStatus })).not.toMatch(/>Beiträge/)
+    expect(offen(LISTE, ohneStatus)).not.toContain(NEU.title)
   })
 })
 

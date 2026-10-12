@@ -204,7 +204,8 @@ type ReorderItem = { productId: string; productName: string; quantity: number }
 type Props = {
   /** Der Hof ohne Telefon und E-Mail (Nr. 60) — page.tsx entfernt beide auf dem Server. */
   farm: HofseiteHof
-  activeStatus: ActiveStatusPost | null
+  /** Die aktiven Beiträge, der neueste zuerst (Register F8). */
+  beitraege: ActiveStatusPost[]
   reorderItems?: ReorderItem[]
   /**
    * Wer die öffentliche Seite sieht, entschieden von `ansichtsModus`
@@ -222,8 +223,8 @@ type Props = {
 
 const FUER_KUNDINNEN: Pick<SeitenAnsicht, 'art' | 'kaufen'> = { art: 'kundin', kaufen: true }
 
-export function FarmPageView({ farm, activeStatus, reorderItems, ansicht = FUER_KUNDINNEN, jetzt }: Props) {
+export function FarmPageView({ farm, beitraege, reorderItems, ansicht = FUER_KUNDINNEN, jetzt }: Props) {
   // Ohne Zeitpunkt vom Server (kein Aufrufer heute) die eigene Uhr — dann
   // kann „vor N Stunden" zwischen Server und Browser abweichen.
-  return <HofseiteKunde farm={farm} activeStatus={activeStatus} reorderItems={reorderItems} ansicht={ansicht} jetzt={jetzt ?? new Date().toISOString()} />
+  return <HofseiteKunde farm={farm} beitraege={beitraege} reorderItems={reorderItems} ansicht={ansicht} jetzt={jetzt ?? new Date().toISOString()} />
 }

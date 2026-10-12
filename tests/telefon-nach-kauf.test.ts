@@ -25,7 +25,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 vi.mock('@/lib/prisma', () => ({ prisma: {} }))
 vi.mock('@/server/hofseite-vorschau', () => ({ ladeHofseiteGeteilt: vi.fn() }))
 vi.mock('@/server/queries/teilen-bild', () => ({ ladeTeilenVorschau: vi.fn(async () => null) }))
-vi.mock('@/server/queries/status-posts', () => ({ getActiveStatusPost: vi.fn(async () => null) }))
+vi.mock('@/server/queries/status-posts', () => ({ getActiveStatusPosts: vi.fn(async () => []) }))
 vi.mock('@/server/actions/appearance', () => ({ updateFarmBannerAction: vi.fn(), updateBannerFocusAction: vi.fn() }))
 vi.mock('@/server/actions/farm-photos', () => ({ addFarmPhotoAction: vi.fn(), reorderPhotosAction: vi.fn() }))
 vi.mock('@/server/actions/products', () => ({ updateProductImageAction: vi.fn(), reorderProductsAction: vi.fn() }))
@@ -129,7 +129,7 @@ async function seitenProps(art: 'kundin' | 'vorschau'): Promise<Record<string, u
 function hofseite(farm: PublicFarm = HOF): string {
   // Absichtlich der Hof MIT Telefon und E-Mail: Auch wenn sie einmal
   // durchrutschten, zeigt die Komponente sie nicht.
-  return renderToStaticMarkup(createElement(HofseiteKunde, { farm, activeStatus: null, reorderItems: [], ansicht: KUNDIN, jetzt: JETZT }))
+  return renderToStaticMarkup(createElement(HofseiteKunde, { farm, beitraege: [], reorderItems: [], ansicht: KUNDIN, jetzt: JETZT }))
 }
 
 describe('Hofseite: Telefon und E-Mail gehen nicht an die Client-Komponente', () => {

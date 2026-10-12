@@ -38,6 +38,7 @@ import {
   UEBERSICHT_PRODUKTE,
   aktiverReiter,
   alleProdukteText,
+  beitragZeitText,
   gebuehrHinweis,
   hofseiteReiter,
   korbBetraege,
@@ -101,16 +102,17 @@ describe('kategorieAbschnitte — E1: eine Seite mit Abschnitten statt Umschalte
 })
 
 describe('Reiter — Übersicht · Produkte · Beiträge', () => {
-  it('Beiträge nur, wenn der Hof gerade einen zeigt; Produkte mit Anzahl', () => {
-    expect(hofseiteReiter({ produktAnzahl: 10, hatBeitrag: false })).toEqual([
+  it('Beiträge nur ab einem Beitrag, mit der Zahl wie die Produkte (Register F8)', () => {
+    expect(hofseiteReiter({ produktAnzahl: 10, beitragAnzahl: 0 })).toEqual([
       { id: 'uebersicht', label: 'Übersicht' },
       { id: 'produkte', label: 'Produkte · 10' },
     ])
-    expect(hofseiteReiter({ produktAnzahl: 0, hatBeitrag: true }).map((r) => r.label)).toEqual(['Übersicht', 'Produkte', 'Beiträge'])
+    expect(hofseiteReiter({ produktAnzahl: 0, beitragAnzahl: 3 }).map((r) => r.label)).toEqual(['Übersicht', 'Produkte', 'Beiträge · 3'])
+    expect(hofseiteReiter({ produktAnzahl: 5, beitragAnzahl: 1 }).at(-1)).toEqual({ id: 'beitraege', label: 'Beiträge · 1' })
   })
 
-  const MIT_BEITRAG = hofseiteReiter({ produktAnzahl: 3, hatBeitrag: true })
-  const OHNE_BEITRAG = hofseiteReiter({ produktAnzahl: 3, hatBeitrag: false })
+  const MIT_BEITRAG = hofseiteReiter({ produktAnzahl: 3, beitragAnzahl: 2 })
+  const OHNE_BEITRAG = hofseiteReiter({ produktAnzahl: 3, beitragAnzahl: 0 })
 
   it('ohne Angabe die Übersicht; ein gültiger Reiter aus der Adresse gilt', () => {
     expect(aktiverReiter({ reiter: null, bereich: null }, MIT_BEITRAG)).toBe('uebersicht')
@@ -170,7 +172,7 @@ describe('Schaufenster unter lg (Register N5, Nr. 51)', () => {
 
   it('„Alle Produkte (n)" nennt dieselbe Zahl wie der Reiter Produkte', () => {
     expect(alleProdukteText(12)).toBe('Alle Produkte (12)')
-    expect(hofseiteReiter({ produktAnzahl: 12, hatBeitrag: false })[1]?.label).toBe('Produkte · 12')
+    expect(hofseiteReiter({ produktAnzahl: 12, beitragAnzahl: 0 })[1]?.label).toBe('Produkte · 12')
   })
 
   it('ein Schaufenster nur in der Übersicht und nur mit Produkten', () => {
@@ -349,6 +351,20 @@ describe('mengeAbgelehntText — was die Kundin liest, wenn der Hof keine Menge 
   it('Fachwörter oder nichts: ein verständlicher Satz statt Stille', () => {
     expect(mengeAbgelehntText('Ungültige Parameter')).toBe('Wir konnten die Menge nicht ändern. Versuch es gleich noch einmal.')
     expect(mengeAbgelehntText(undefined)).toBe('Wir konnten die Menge nicht ändern. Versuch es gleich noch einmal.')
+  })
+})
+
+describe('beitragZeitText — „Aktuell“ nur am neuesten Beitrag (Register F8)', () => {
+  const jetzt = '2026-10-02T08:00:00.000Z'
+
+  it('der neueste trägt „Aktuell · vor …“, die weiteren nur „vor …“', () => {
+    expect(beitragZeitText(true, '2026-10-02T06:00:00.000Z', jetzt)).toBe('Aktuell · vor 2 Stunden')
+    expect(beitragZeitText(false, '2026-09-29T08:00:00.000Z', jetzt)).toBe('vor 3 Tagen')
+  })
+
+  it('gerade erst veröffentlicht: „Aktuell · heute“ — gerechnet vom übergebenen Zeitpunkt', () => {
+    expect(beitragZeitText(true, '2026-10-02T07:45:00.000Z', jetzt)).toBe('Aktuell · heute')
+    expect(beitragZeitText(false, '2026-10-02T07:45:00.000Z', jetzt)).toBe('heute')
   })
 })
 

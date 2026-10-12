@@ -62,27 +62,37 @@ export async function getStatusPostsForFarm(farmId: string): Promise<StatusPostS
   }))
 }
 
-export async function getActiveStatusPost(farmId: string): Promise<ActiveStatusPost | null> {
+/**
+ * Die Beiträge, die die Hofseite zeigt (Register F8): veröffentlicht, nicht
+ * abgelaufen und mit „Auf der Hofseite zeigen“ — der neueste zuerst, höchstens
+ * `anzahl`. Die Frist gilt hier beim Lesen, kein Cron räumt sie weg.
+ */
+export async function getActiveStatusPosts(farmId: string, anzahl: number): Promise<ActiveStatusPost[]> {
   const now = new Date()
-  const post = await prisma.statusPost.findFirst({
+  const posts = await prisma.statusPost.findMany({
     where: {
       farmId,
       publishedAt: { lte: now },
       showOnFarmPage: true,
       OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
     },
-    orderBy: { publishedAt: 'desc' },
+    // Bei gleicher Veröffentlichungszeit entscheidet die Kennung: Die Reihenfolge
+    // ist nie Zufall, und kein Beitrag springt zwischen zwei Aufrufen über die Grenze.
+    orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
+    take: anzahl,
+    // Nur, was die Karte zeigt: Der Beitrag ist öffentlich, sein Versand (Empfänger, Zähler) nicht.
+    select: { id: true, title: true, body: true, anlass: true, photoUrl: true, linkedProductIds: true, publishedAt: true },
   })
-  if (!post) return null
-  return {
+  return posts.map((post) => ({
     id: post.id,
     title: post.title,
     body: post.body,
     anlass: post.anlass,
     photoUrl: post.photoUrl,
     linkedProductIds: post.linkedProductIds,
+    // Sicher: `publishedAt: { lte: now }` schließt Entwürfe (null) aus.
     publishedAt: post.publishedAt!.toISOString(),
-  }
+  }))
 }
 
 // Vorlage-Muster (nachlese-6): lädt einen Alt-Status als Vorbefüllung für den
