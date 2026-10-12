@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   AlignLeft,
@@ -24,13 +25,20 @@ import type { FarmSettings } from '@/server/queries/farm'
 import type { AppearanceData } from '@/server/queries/appearance'
 import { type HofseiteFortschritt, type HofseiteZeile } from '@/lib/hofseite-fortschritt'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
-import { VORSCHAU_BEARBEITUNG_BREITE, VORSCHAU_WEB_MINDESTBREITE, type VorschauGeraet } from '@/lib/hofseite-vorschau'
+import {
+  EDITOR_ABSTAND,
+  EDITOR_LISTE_HANDY_MAX,
+  VORSCHAU_WEB_MINDESTBREITE,
+  editorSpalten,
+  type VorschauGeraet,
+} from '@/lib/hofseite-vorschau'
+import { MEIN_HOF_HINWEIS, PRODUKTE_HREF } from '@/lib/bauern-navigation'
 import { useMindestbreite } from '@/lib/use-mindestbreite'
 import { AbschnittInhalt, SOFORT_GESPEICHERT, type AbschnittHof } from '@/components/mein-hof/abschnitt-inhalt'
 import { StatusBadge } from '@/components/ui/status-badge'
-import { FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
+import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { schildTon } from '@/lib/mein-hof'
-import { HofseiteVorschauRahmen } from '@/components/farmer/hofseite-vorschau-rahmen'
+import { HofseiteVorschauRahmen, useElementGroesse } from '@/components/farmer/hofseite-vorschau-rahmen'
 import { cn } from '@/lib/utils'
 
 /*
@@ -44,6 +52,12 @@ import { cn } from '@/lib/utils'
  * dazu Leitspruch/Gründungsjahr und Werte aus dem früheren „Mein Auftritt".
  * Gespeichert wird ausschließlich über die vorhandenen Server-Aktionen, jeder
  * Abschnitt mit frischem Stand vom Server (components/mein-hof/abschnitt-speichern.ts).
+ *
+ * Die Breiten der beiden Spalten kommen aus EINER Regel (editorSpalten in
+ * src/lib/hofseite-vorschau.ts, Register N7): Der Editor ist auf 2 000 px
+ * begrenzt und zentriert, die Vorschau nie breiter als die Seite (1 440 px),
+ * die Liste 400 bis 560 px neben Web bzw. höchstens 720 px neben Handy. Hier
+ * wird gemessen und gesetzt, nicht gerechnet.
  */
 
 type Props = {
@@ -136,6 +150,10 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt }: Pr
   const [geraet, setGeraet] = useState<VorschauGeraet>('handy')
   const breit = useMindestbreite(VORSCHAU_WEB_MINDESTBREITE)
   const webInline = geraet === 'web' && breit
+  // Die Breite, die dem Editor bleibt — höchstens EDITOR_BREITE_MAX, denn der
+  // äußere Rahmen unten begrenzt sie; 0, solange nichts gemessen ist.
+  const { ref: flaeche, breite: gemessen } = useElementGroesse()
+  const spalten = gemessen > 0 ? editorSpalten(gemessen, webInline ? 'web' : 'handy', breit) : null
 
   // Formulare schließen sich nach dem Speichern: Der Refresh liefert neue
   // Startwerte, und ein offenes Formular hielte die alten fest. Was sofort
@@ -155,8 +173,21 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt }: Pr
     // data-app-palette: Die eingebundenen Formulare der Einstellungen (Abholzeiten,
     // Pause) zeichnen noch mit --app-*; hier nehmen sie die Werte des
     // Design-Systems an (globals.css).
-    <div data-app-palette="neu" className="flex items-start gap-6 xl:gap-8">
-      <div className="min-w-0 flex-1 space-y-6">
+    // Das Paar steht zentriert (justify-center); was über die Breite hinausgeht,
+    // bleibt links und rechts leer (mx-auto, max-w).
+    <div
+      ref={flaeche}
+      data-app-palette="neu"
+      className="mx-auto flex w-full max-w-[2000px] items-start justify-center"
+      style={{ gap: EDITOR_ABSTAND }}
+    >
+      {/* Die Liste: Breite aus editorSpalten. Bis zur ersten Messung (Server, erster
+          Frame) füllt sie den Rest neben der Vorschau, höchstens so breit wie neben
+          Handy — dieselbe Regel in CSS, damit beim Hydrieren nichts springt. */}
+      <div
+        className={cn('min-w-0 space-y-6 transition-[width] duration-200 motion-reduce:transition-none', !spalten && 'flex-1')}
+        style={spalten ? { width: spalten.liste } : { maxWidth: EDITOR_LISTE_HANDY_MAX }}
+      >
         {/* Fortschritt */}
         <div className="rounded-2xl border border-border bg-card p-5">
           <div className="flex items-baseline justify-between gap-3">
@@ -195,14 +226,28 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt }: Pr
             </ul>
           </section>
         ))}
+
+        {/* Wo Produkte liegen — leise, am Ende der Liste (Register N7). */}
+        <p className="px-1">
+          <Link
+            href={PRODUKTE_HREF}
+            className={cn(
+              'inline-flex min-h-11 items-center rounded-sm text-[13px] text-muted-foreground underline underline-offset-2 transition-colors hover:text-foreground',
+              FOKUS_RAHMEN
+            )}
+          >
+            {MEIN_HOF_HINWEIS}
+          </Link>
+        </p>
       </div>
 
-      {/* Die Vorschau-Spalte: 320 px (ab xl 360 px) fürs Handy; im Web-Modus
-          wächst sie auf alles außer ~400 px für die Bearbeitung, mit einer
-          kurzen Breiten-Transition — die Liste links rückt zusammen. */}
+      {/* Die Vorschau-Spalte: Breite aus editorSpalten — neben der Liste fürs
+          Handy 320 px (ab xl 360 px), im Web-Modus alles außer der Liste, nie
+          mehr als die Seite breit ist; mit einer kurzen Breiten-Transition, die
+          Liste rückt mit. Bis zur ersten Messung die Klassen für Handy. */}
       <div
-        className={cn('w-[320px] shrink-0 transition-[width] duration-200 motion-reduce:transition-none', !webInline && 'xl:w-[360px]')}
-        style={webInline ? { width: `calc(100% - ${VORSCHAU_BEARBEITUNG_BREITE}px - 2rem)` } : undefined}
+        className={cn('shrink-0 transition-[width] duration-200 motion-reduce:transition-none', !spalten && 'w-[320px] xl:w-[360px]')}
+        style={spalten ? { width: spalten.vorschau } : undefined}
       >
         <HofseiteVorschauRahmen
           slug={hof.slug}

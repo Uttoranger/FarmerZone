@@ -4951,6 +4951,16 @@ Fehler aus Bericht 63 (Nacharbeit), behoben nach `/fix`. Kein neues Paket, keine
 - **Fix (`use-cart.ts`):** Der Hook merkt sich den Stand der letzten Änderung (`useRef`); `persist` bekommt die Änderung als Updater (`vorher => …`) und schreibt Zustand und Speicher mit demselben Stand, `addItem` liest die vorhandene Menge von dort. Kein Updater im React-Zustand: Der darf nichts schreiben, und `schreibeWarenkorb` meldet jede Änderung per Ereignis an die Kopfzeile — mitten im Rendern hieße das ein Update einer fremden Komponente. Reservierung je Position, Reihenfolge, Fehlerbild und „ein anderer Hof ersetzt den Korb" bleiben; der Effekt im Produktraster ist unverändert.
 - **Test:** `tests/use-cart.test.ts` mit einem Hook-Prüfstand ohne DOM (TESTING_GUIDELINES §1), der auch den echten Nachbestell-Effekt laufen lässt.
 
+## Mein Hof am breiten Bildschirm (Nachtlauf Nr. 73, Oktober 2026)
+
+Auftrag freigabe.md §15 „73“ (Register N7, in der Freigabe „D3“). Keine Migration, kein neues Paket, keine neue Datei unter `src/`.
+
+- **Befund:** Der Reiter Hofseite (ab lg) hatte keine Höchstbreite. Ab etwa 2 200 px Fensterbreite blieb rechts der Web-Vorschau Leere (sie war nie breiter als 1 440 px, die Liste fest 400 px), am Handy wurde die Liste über 2 000 px breit. Die Regeln mit ihren Zahlen stehen in DESIGN_SYSTEM „Mein Hof“.
+- **Eine Rechnung statt drei:** Vorher standen die Breiten verteilt — Klassen (320/360 px, Abstand), eine `calc()` im Editor und die 400 px in `hofseite-vorschau.ts`. Jetzt rechnet `editorSpalten(gesamtbreite, modus, breit)` allein; der Editor misst seine Breite und setzt sie. Im Web-Modus sieht bis 2 200 px Fensterbreite alles aus wie vorher, im Handy-Modus bis 1 440 px; erst darüber greifen die Grenzen (im Browser nachgemessen bei 1 024 bis 2 560 px, nichts läuft über).
+- **Warum ein Gerüst bis zur ersten Messung:** Der Server kennt die Breite nicht. Ohne Gerüst sprängen Liste und Vorschau beim Hydrieren (Handy-Spalte 320 → 360 px ab xl). Das Gerüst ist die Handy-Regel in CSS; seine Zahlen koppelt ein Test an die Konstanten. Der Abstand ist jetzt überall 32 px (unter xl vorher 24 px) — eine Zahl statt zwei.
+- **Der Hinweis, wo Produkte liegen,** steht am Ende der Liste als leiser Link auf `/products`. Der Auftrag nannte `seitenkopf.tsx` als seinen Ort im Kopf; er stand aber in der Reiterleiste (`reiter-leiste.tsx`) und ist dort seit Runde 1 entfallen (die drei Tests dazu sind umgekehrt, nicht gelöscht). Folge: Auf dem Reiter Beiträge (ab md) und auf Hofseite zwischen md und lg (dort steht die Liste „Bearbeiten“) gibt es ihn nicht mehr; er bleibt nur im Editor ab lg — so beschreibt es die Freigabe, Entscheidung für den Morgenbericht.
+- **Offen:** Der Kopf (Karte und Reiter) bleibt am breiten Bildschirm volle Breite und steht links und rechts über den Editor hinaus. Den alten Ort des Hinweises nennen noch der Satz über `MEIN_HOF_HINWEIS` in `bauern-navigation.ts` (Z. 140–144), der Kopf von `tests/mein-hof-umschalter.test.ts` und `docs/entwicklung/hofseite-editor-browser.md` — außerhalb der Grenzen von Runde 1.
+
 ## Nützliche Befehle
 
 ```bash

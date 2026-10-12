@@ -3,7 +3,9 @@
  * Korb-Regel, Nachrichten zwischen Editor und Rahmen, Maße. WER die Vorschau
  * bekommt und was dann anders ist, entscheidet nicht diese Datei, sondern
  * `ansichtsModus` (src/lib/ansichts-modus.ts) — nur dort wird der Parameter
- * gelesen. Rein und ohne Datenbank prüfbar (tests/hofseite-vorschau.test.ts).
+ * gelesen. Dazu die Spaltenbreiten des Editors am breiten Bildschirm
+ * (`editorSpalten`, Register N7). Rein und ohne Datenbank prüfbar
+ * (tests/hofseite-vorschau.test.ts).
  */
 import { bereitSchema, markierungSchema, type HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 
@@ -79,8 +81,58 @@ export const VORSCHAU_HANDY_HOEHE = 844
 /** Ab dieser Fensterbreite passt die Web-Vorschau neben die Bearbeitung (useMindestbreite); darunter öffnet „Web" das Overlay. */
 export const VORSCHAU_WEB_MINDESTBREITE = 1280
 
-/** So schmal darf die Bearbeitung neben der Web-Vorschau werden — die Vorschau nimmt den Rest der Breite. */
+/** So schmal darf die Bearbeitung neben der Web-Vorschau werden — die Vorschau nimmt den Rest der Breite, bis die Seite ganz hineinpasst (`editorSpalten`). */
 export const VORSCHAU_BEARBEITUNG_BREITE = 400
+
+/**
+ * Der Editor — Liste und Vorschau zusammen — ist nie breiter als das. Auf
+ * größeren Bildschirmen steht er zentriert, der Rest bleibt links und rechts
+ * leer (Register N7): Sonst bliebe rechts der Web-Vorschau Leere bzw. würde die
+ * Liste neben der Handy-Vorschau so breit, dass keine Zeile mehr lesbar ist.
+ */
+export const EDITOR_BREITE_MAX = 2000
+
+/** Der Zwischenraum zwischen Liste und Vorschau. */
+export const EDITOR_ABSTAND = 32
+
+/** Neben der Web-Vorschau ist die Liste höchstens so breit (mindestens `VORSCHAU_BEARBEITUNG_BREITE`). */
+export const EDITOR_LISTE_WEB_MAX = 560
+
+/** Neben der Handy-Vorschau ist die Liste höchstens so breit — breitere Zeilen lesen sich nicht mehr. */
+export const EDITOR_LISTE_HANDY_MAX = 720
+
+/** Die Spalte der Handy-Vorschau: 320 px, ab `VORSCHAU_WEB_MINDESTBREITE` (Tailwind xl) 360 px. */
+export const EDITOR_HANDY_SPALTE = 320
+export const EDITOR_HANDY_SPALTE_BREIT = 360
+
+/** Die Breiten der beiden Spalten des Editors in CSS-Pixeln. */
+export type EditorSpalten = { liste: number; vorschau: number }
+
+/**
+ * Wie breit Liste und Vorschau sind, wenn dem Editor `gesamtbreite` zur
+ * Verfügung steht — EINE Regel für beide Geräte (Register N7):
+ *
+ * - Mehr als `EDITOR_BREITE_MAX` nutzt der Editor nie.
+ * - Web: Die Vorschau bekommt, was neben der schmalsten Liste frei bleibt, nie
+ *   mehr als die Seite breit ist (1440 px, `VORSCHAU_SEITENBREITE`); die Liste
+ *   bekommt den Rest, mindestens 400 und höchstens 560 px. Beides zusammen füllt
+ *   die Gesamtbreite, solange sie reicht.
+ * - Handy: Die Vorschau hat ihre feste Spalte; die Liste bekommt den Rest,
+ *   höchstens 720 px. Das Paar steht zentriert, der Rest bleibt links und rechts.
+ *
+ * `breit` sagt, ob das Fenster mindestens `VORSCHAU_WEB_MINDESTBREITE` breit ist
+ * — das weiß nur der Browser, die Spalte der Handy-Vorschau wächst dort auf 360 px.
+ */
+export function editorSpalten(gesamtbreite: number, modus: VorschauGeraet, breit = false): EditorSpalten {
+  const gesamt = Math.min(gesamtbreite, EDITOR_BREITE_MAX)
+  if (modus === 'web') {
+    const vorschau = Math.min(VORSCHAU_SEITENBREITE.web, Math.max(0, gesamt - EDITOR_ABSTAND - VORSCHAU_BEARBEITUNG_BREITE))
+    const liste = Math.min(EDITOR_LISTE_WEB_MAX, Math.max(VORSCHAU_BEARBEITUNG_BREITE, gesamt - EDITOR_ABSTAND - vorschau))
+    return { liste, vorschau }
+  }
+  const vorschau = breit ? EDITOR_HANDY_SPALTE_BREIT : EDITOR_HANDY_SPALTE
+  return { liste: Math.min(EDITOR_LISTE_HANDY_MAX, Math.max(0, gesamt - EDITOR_ABSTAND - vorschau)), vorschau }
+}
 
 /**
  * Der Maßstab, mit dem die Seite in einen Rahmen passt — berechnet aus der

@@ -143,6 +143,11 @@ function erlaubt(fund: Fund, text: string): boolean {
     const imImport = /^import\s*\{[^}]*\}\s*from\s*'@\/lib\/hofseite-vorschau'\s*$/.test(zeileVon(code, fund.stelle))
     return imImport || imRumpf(code, 'export async function ansichtsModus(', fund.stelle)
   }
+  // Die eine Ausnahme: die Breite der Vorschau-Spalte heißt `vorschau` (Ergebnis von editorSpalten, Nr. 73) —
+  // eine Eigenschaft eines Ergebnisses, kein Parameter der Adresse. Nur im Editor und nur als `spalten.vorschau`.
+  if (fund.pfad === 'src/components/farmer/hofseite-editor.tsx' && fund.art === 'Eigenschaft') {
+    return code.slice(Math.max(0, fund.stelle - 'spalten'.length), fund.stelle) === 'spalten'
+  }
   return false
 }
 
@@ -178,6 +183,12 @@ describe('der Parameter „vorschau" wird nur in ansichtsModus() gelesen', () =>
       'const href = vorschauLink(slug)',
     ]
     for (const zeile of harmlos) expect(verboten('src/irgendwo.tsx', zeile), zeile).toEqual([])
+
+    // Die Spalten des Editors: `spalten.vorschau` nur im Editor erlaubt — jede andere Eigenschaft und jede andere Datei fällt auf.
+    const editor = 'src/components/farmer/hofseite-editor.tsx'
+    expect(verboten(editor, 'const b = spalten.vorschau')).toEqual([])
+    expect(verboten(editor, 'const b = suche.vorschau')).toHaveLength(1)
+    expect(verboten('src/irgendwo.tsx', 'const b = spalten.vorschau')).toHaveLength(1)
 
     // Auch in den beiden erlaubten Dateien zählt nur der eine Ort: Lesen außerhalb
     // von vorschauLink bzw. ansichtsModus fällt auf, ein Import weiter unten ändert daran nichts.
