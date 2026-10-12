@@ -4866,6 +4866,16 @@ Auftrag freigabe.md §13 „56" (Sicherheitspfad, Nachprüfung). Keine Schema-Ä
   - Rückschritt aus Runde 2: In Nachricht, Brotkrume und extra endete eine absolute Adresse an „]", „)" und Anführungszeichen, und „&reorder=…" oder „&s=…" dahinter blieb. Dort reichen absolute Adressen wieder bis zum Leerraum wie auf main (`ADRESSE_IM_FREITEXT`); seit 48a3820 liest eine relative Adresse eine eingebettete absolute mit (`/api/og?url=https://…`). 5dce1f4 ließ sie davor enden; dann landeten bei einer absoluten ohne „?" die übrigen Parameter der äußeren Abfrage in deren Pfad, und „&s=…" blieb. Im Fehlertext bleibt die engere Grenze aus Runde 1: Dort stehen Adressen oft in Klammern oder JSON, und der Text dahinter hilft beim Beheben; auf main gab es dort gar keine URL-Regel.
   - Ein Abfragewert, der sich nach der letzten Dekodier-Runde noch ändert, fällt ganz; fünffach kodiert blieb der Token vorher kodiert stehen.
 
+## Bausteinverzeichnis und Regelvorschläge (Nachtlauf Nr. 58, Oktober 2026)
+
+Auftrag freigabe.md §14 „58" (Register G4). Keine Schema-Änderung, keine Migration, kein neues Paket, kein Aufruf an externe Dienste.
+
+- **Warum:** Neue Dateien und Funktionen entstanden doppelt, weil niemand sah, dass es sie schon gab. `pnpm bausteine` (`scripts/bausteine.ts`) erzeugt `docs/ai/BAUSTEINE.md` aus `src/components`, `src/lib` und `src/server`: eine Zeile je Datei mit Pfad, Exporten, Zweck und Status. Gelesen wird nur der Syntaxbaum des vorhandenen `typescript`-Pakets (kein Typprüfer, schnell), die Ausgabe ist sortiert und ohne Datum — zwei Läufe ergeben dieselbe Datei.
+- **Zweck:** der erste Satz des ersten Kommentars, der die Datei beschreibt (am Dateikopf, vor einem Export oder durch eine Leerzeile abgesetzt) — nicht der Kommentar einer Hilfsfunktion, die nur in der Datei vorkommt. „z. B." und Zahlen vor dem Punkt beenden den Satz nicht. Ohne Kommentar steht „kein Zweck vermerkt".
+- **Status:** „genutzt" heißt: irgendeine andere Datei außerhalb von `tests/` bindet sie ein (`import`, `import()`, `export … from`; `@/` ist `src/`). Zählen: `src/`, `scripts/`, `prisma/` und die Dateien im Wurzelordner — eine Datei, die nur das Deploy-Skript braucht (`meldung-verweise.ts`), ist nicht tot. Grenze: Eine Datei, die nur ein unbenutzter Baustein einbindet, gilt als genutzt. „Altbestand → Ersatz" setzt das Tag `@altbestand <Ersatz>` im Kopfkommentar und geht vor „genutzt".
+- **Gegen Konflikte:** Die Datei trägt keine Zahlen und kein Datum, damit parallele Branches nicht in einer gemeinsamen Zeile kollidieren. Bei einem Merge-Konflikt wird neu erzeugt, nicht gemischt. `tests/bausteine-verzeichnis.test.ts` hält die Datei aktuell (Meldung „Bausteinverzeichnis veraltet – pnpm bausteine ausführen"); der Erzeuger selbst ist an einem Beispielordner geprüft (`tests/bausteine-generator.test.ts`, `tests/fixtures/bausteine-beispiel`).
+- **Regelvorschläge:** Der Bericht jeder Nummer endet mit Punkt 6 (Ursache, Gegenmaßnahme, Ort; eine Prüfung geht vor einer Textregel). Eingetragen wird erst nach Freigabe, mit Herkunft und Datum. Jeder fünfte Lauf beginnt mit einer Regel-Inventur (`docs/nachtlauf.md` §4); die erste steht in Bericht 58, nur als Vorschläge.
+
 ## Nützliche Befehle
 
 ```bash

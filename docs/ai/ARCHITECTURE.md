@@ -45,6 +45,8 @@ Vorbild: `src/lib/reservierung.ts` entscheidet (rein, 174 Tests ohne DB), `src/s
 | `tests/` | Alle Tests, flach | — |
 
 ### `src/lib/` ist voll — Regel beim Hinzufügen
+Zuerst `docs/ai/BAUSTEINE.md` (erzeugt mit `pnpm bausteine`) nach dem Stichwort durchsuchen: Gibt es die Datei, den Baustein oder die Funktion schon, wird sie benutzt oder erweitert, nicht neu geschrieben.
+
 94 Dateien (Stand 2026-09-29), gemischter Zweck. Bevor eine neue entsteht:
 1. Passt es in eine bestehende Datei? Dann dorthin.
 2. Ist es eine **Fachregel**? → eigene Datei, rein, ohne Import von `prisma`/`auth`/`stripe`.
