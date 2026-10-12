@@ -83,6 +83,7 @@ Stand: 2026-09. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 | Teilen-Bild | `next/og` (`ImageResponse`, Satori) — nur in Routen-Handlern, Farben als Werte mit Lint-Ausnahme je Zeile (Satori kennt keine CSS-Variablen), Schriften als TTF (oben); Bilder vorher über `sharp` in JPEG, weil Satori nur PNG, JPEG, GIF und SVG zeichnet (kein WebP) | Puppeteer/Canvas-Pakete, Bilddienste im Netz |
 | Server-State | React Query (nur wo vorhanden) | Neue globale Stores |
 | Bausteinverzeichnis | `pnpm bausteine` (`scripts/bausteine.ts`, `tsx` + die Compiler-API des vorhandenen `typescript`, nur Syntaxbaum) erzeugt `docs/ai/BAUSTEINE.md` | Von Hand gepflegte Liste, zweites Parser-Paket (ts-morph, acorn), Zeitstempel in der Datei |
+| Illustrationen prüfen | `pnpm illustrationen` (`scripts/illustrationen.ts`, `tsx` + das vorhandene `sharp`) prüft `public/categories/`: WebP, 1024 × 1024, höchstens 80 KB, einfarbiger Rand; eigener CI-Schritt neben dem Lint, nicht Teil von `build` (Register I1) | Prüfung von Hand, ein weiteres Bildpaket |
 
 ---
 

@@ -1903,6 +1903,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                   unitSize={werte.unitSize}
                   foto={previewUrl}
                   kategorie={category}
+                  unterkategorie={werte.subcategory}
                 />
               )}
             </div>

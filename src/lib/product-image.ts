@@ -1,16 +1,17 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { ProductCategory } from '@prisma/client'
-import { KATEGORIE_BILD_SLUG, kategorieBildPfad } from '@/lib/taxonomie'
+import type { ProductCategory, ProductSubcategory } from '@prisma/client'
+import { KATEGORIE_BILD_SLUG, illustrationPfad } from '@/lib/taxonomie'
 
-// Kategorie-Fallback-Bilder: /public/categories/{slug}.webp
+// Illustrationen: /public/categories/{slug}.webp (Kategorie) und
+// /public/categories/{slug}/{datei}.webp (Unterkategorie, Register I1).
 // Nur serverseitig verwenden (fs) — Client-Komponenten bekommen die fertige URL
-// oder nehmen kategorieBildPfad (taxonomie.ts) ohne Prüfung des Dateisystems.
+// oder nehmen illustrationPfad (taxonomie.ts) ohne Prüfung des Dateisystems.
 //
 // Die Zuordnung selbst steht seit Nr. 51 in taxonomie.ts (KATEGORIE_BILD_SLUG),
 // damit auch der Browser sie kennt; hier bleibt sie unter dem bisherigen Namen
 // erreichbar — EINE Liste. Der Rückfall unten bleibt: Fehlt eine Datei, rendert
-// die Kachel ohne Bild — kein gebrochenes <img>, kein Fehler im Log.
+// die Kachel mit der nächsten Stufe — kein gebrochenes <img>, kein Fehler im Log.
 // ACHTUNG Existenz-Cache (unten): Eine einmal als fehlend erkannte Datei
 // bleibt für die Lebensdauer des Prozesses „fehlend". Auf Vercel ist das
 // egal (jede Ablage ist ein Deployment = neuer Prozess); ein laufender
@@ -30,13 +31,20 @@ function assetExists(publicRelPath: string): boolean {
   return cached
 }
 
-// null bei fehlender Kategorie ODER fehlender Asset-Datei (Assets folgen als eigener Commit)
+/**
+ * Die Illustration eines Produkts ohne Foto (Register I1): Unterkategorie →
+ * Kategorie → „Sonstiges", jede Stufe nur, wenn ihre Datei liegt. Ohne
+ * Unterkategorie (Startseite, „Für Höfe") beginnt es bei der Kategorie.
+ * null nur, wenn nicht einmal „Sonstiges" liegt (Assets noch nicht abgelegt).
+ */
 export function categoryImagePath(
   category: ProductCategory | null | undefined,
+  subcategory?: ProductSubcategory | null,
   exists: (publicRelPath: string) => boolean = assetExists
 ): string | null {
-  const pfad = kategorieBildPfad(category)
-  if (!pfad) return null
+  // Ein Set lässt doppelte Stufen weg (ohne eigene Illustration ist die erste
+  // schon die Kategorie) und behält die Reihenfolge.
+  const stufen = new Set([illustrationPfad(category, subcategory), illustrationPfad(category), illustrationPfad(null)])
   // Die Existenz fragt den Pfad relativ zu public/ ab: „categories/milch.webp".
-  return exists(pfad.slice(1)) ? pfad : null
+  return [...stufen].find((pfad) => exists(pfad.slice(1))) ?? null
 }

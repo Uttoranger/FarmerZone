@@ -254,7 +254,7 @@ function alsOeffentlichesProdukt(
 ): PublicProduct {
   return {
     ...zuProduktDto(p),
-    categoryImageUrl: categoryImagePath(p.category),
+    categoryImageUrl: categoryImagePath(p.category, p.subcategory),
     isOrganic: p.labels.includes('BIO'),
     futter: futter
       ? {

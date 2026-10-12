@@ -22,8 +22,9 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import * as Sentry from '@sentry/nextjs'
-import { kategorieBildPfad, type ProductCategoryValue } from '@/lib/taxonomie'
+import { SONSTIGES_BILD_PFAD, illustrationPfad, type ProductCategoryValue } from '@/lib/taxonomie'
 import { bildFormat } from '@/lib/foto-wege'
+import { BEZEICHNER, befundVon } from '@/lib/upload-diagnose'
 import { mitZeitlimit } from '@/lib/upload-zeitwaechter'
 
 /** So lange darf das Laden aller Fotos eines Bilds dauern (Abruf und Umwandeln). */
@@ -37,9 +38,6 @@ const FOTO_MAX_PIXEL = 25_000_000
 
 /** Kante, in der ein rundes Produktbild geladen wird — im Bild steht es höchstens rund 130 px groß. */
 const RUND_KANTE = 192
-
-/** Die neutrale Illustration, wenn ein Produkt keine Kategorie hat. */
-export const SONSTIGES_PFAD = '/categories/sonstiges.webp'
 
 /** Der Ordner der Schriftdateien, relativ zum Projekt (process.cwd()). */
 export const SCHRIFT_ORDNER = 'src/assets/fonts'
@@ -55,12 +53,15 @@ export type BildQuelle =
   | { art: 'foto'; url: string; /** Die Illustration, falls das Foto nicht lädt. */ ersatz: string }
   | { art: 'illustration'; pfad: string }
 
-/** Die Illustration einer Kategorie, ohne Kategorie „Sonstiges". */
-export function illustrationPfad(kategorie: ProductCategoryValue | null): string {
-  return kategorieBildPfad(kategorie) ?? SONSTIGES_PFAD
-}
-
-/** Die Quelle einer Produktzeile: eigenes Foto → Illustration der Kategorie → „Sonstiges". */
+/**
+ * Die Quelle einer Produktzeile: eigenes Foto → Illustration der Kategorie →
+ * „Sonstiges" (dieselbe Kette wie überall, `illustrationPfad`).
+ *
+ * Bekannte Einschränkung: Das Teilen-Bild zeigt die Illustration der KATEGORIE,
+ * nicht die der Unterkategorie — die Route liest keine Unterkategorie. Die
+ * Dateien der Unterkategorien liegen im Paket der Route (next.config.ts trägt
+ * public/categories/**), ein Aufrufer könnte sie also übergeben.
+ */
 export function produktBildQuelle(
   produkt: { imageUrl: string | null; category: ProductCategoryValue | null },
   istEigen: (url: string) => boolean
@@ -157,7 +158,11 @@ async function holeFoto(url: string, w: BildWerkzeuge): Promise<Uint8Array | nul
   try {
     // Keine Umleitung: Sonst holte der Server ein Bild von einem fremden Host.
     const antwort = await w.holen(url, { signal: AbortSignal.timeout(FOTO_FRIST_MS), redirect: 'error', cache: 'no-store' })
-    if (!antwort.ok || !antwort.body) return null
+    if (!antwort.ok || !antwort.body) {
+      // Auch eine Fehlerseite hat einen Strom; ungelesen und nicht abgebrochen hielte er die Verbindung offen.
+      await antwort.body?.cancel()
+      return null
+    }
     if (Number(antwort.headers.get('content-length') ?? 0) > FOTO_MAX_BYTES) {
       await antwort.body.cancel()
       return null
@@ -172,6 +177,19 @@ async function holeFoto(url: string, w: BildWerkzeuge): Promise<Uint8Array | nul
   }
 }
 
+/**
+ * Meldet eine nicht ladbare Illustration: fester Text, die Klasse als Name, die
+ * Nachricht bereinigt (CODING_STANDARDS §4). Der Rohfehler trägt den absoluten
+ * Pfad der Datei auf dem Server und geht deshalb nie hinaus, auch nicht als
+ * `cause`.
+ */
+function meldeNichtLadbareIllustration(fehler: unknown): void {
+  const { klasse, meldung } = befundVon(fehler)
+  const ereignis = new Error('Teilen-Bild: Illustration nicht ladbar')
+  ereignis.name = BEZEICHNER.test(klasse) ? klasse : 'Unbekannt'
+  Sentry.captureException(ereignis, { tags: { bereich: 'teilen-bild', teil: 'illustration' }, extra: { fehlertext: meldung } })
+}
+
 function ladeIllustration(publicPfad: string, w: BildWerkzeuge): Promise<string | null> {
   let geladen = w.illustrationen.get(publicPfad)
   if (!geladen) {
@@ -182,8 +200,8 @@ function ladeIllustration(publicPfad: string, w: BildWerkzeuge): Promise<string 
         // Eine fehlende Illustration ist ein Fehler des Deployments (Datei
         // nicht eingetragen) — einmal je Datei und Prozess melden, dann
         // „Sonstiges", zuletzt ein leerer Kreis.
-        Sentry.captureException(fehler, { tags: { bereich: 'teilen-bild', teil: 'illustration' } })
-        return publicPfad === SONSTIGES_PFAD ? null : ladeIllustration(SONSTIGES_PFAD, w)
+        meldeNichtLadbareIllustration(fehler)
+        return publicPfad === SONSTIGES_BILD_PFAD ? null : ladeIllustration(SONSTIGES_BILD_PFAD, w)
       })
     w.illustrationen.set(publicPfad, geladen)
   }
