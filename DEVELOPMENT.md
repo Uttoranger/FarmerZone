@@ -4944,7 +4944,8 @@ Auftrag freigabe.md §15 „66" (Register W1). Eine Migration (freigegeben), kei
 - **Warum eine Anweisung:** Zwei Tabs (Handy und Rechner) tippen gleichzeitig. Lesen-dann-Schreiben verlor in der Gegenprobe drei von sechs Tipps; `array_remove`/`array_append` auf der gesperrten Zeile verliert keinen.
 - **Warum „verlassen und zurück":** Nur die Rückkehr in den Browser zeigt, dass WhatsApp vorn war. Ein Fokus ohne vorheriges Verlassen (etwa ein Tipp, der nichts öffnete) zählt nicht.
 - **Zähler:** `whatsappSentCount` wird gleich der Listenlänge mitgeschrieben (Bestand, alter Code im Deploy-Fenster); `whatsappRecipientCount` bleibt eingefroren und wird nicht mehr gelesen — Contract mit eigener Freigabe.
-- **Offen:** `publishStatusPost` setzt `sentViaWhatsApp` weiter nur, wenn beim Veröffentlichen schon Abonnentinnen da waren (Nr. 67); n im Knopf zählt auch Kennungen von inzwischen Abgemeldeten (die Liste selbst nicht).
+- **Knopf ohne Häkchen-Bedingung (Runde 1):** „WhatsApp · n von m" steht bei aktiven und vergangenen Beiträgen, solange m > n — gleich, ob beim Veröffentlichen das WhatsApp-Häkchen gesetzt war oder schon Abonnentinnen da waren (Stand von heute, W1). `sentViaWhatsApp` bestimmt nur noch die Zeile „wohin". Das Mockup zeigt einen vergangenen Beitrag ohne Knopf; es gilt der Wortlaut der Freigabe.
+- **Offen:** n im Knopf zählt auch Kennungen von inzwischen Abgemeldeten (die Liste selbst nicht).
 
 ## Nützliche Befehle
 
