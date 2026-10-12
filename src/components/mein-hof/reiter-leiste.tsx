@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { MEIN_HOF_HINWEIS, MEIN_HOF_REITER_HOFBEREICH, type MeinHofReiterAlleId } from '@/lib/bauern-navigation'
+import { MEIN_HOF_REITER_HOFBEREICH, type MeinHofReiterAlleId } from '@/lib/bauern-navigation'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
 
@@ -8,8 +8,9 @@ import { cn } from '@/lib/utils'
  * Hof (Hofseite, Beiträge; components/mein-hof/seitenkopf.tsx) und, unter md,
  * für /products (Nachtlauf Nr. 49, Register N3): Produkte · Hofseite ·
  * Beiträge. Die Liste kommt aus MEIN_HOF_REITER_HOFBEREICH; „Produkte" gibt es
- * nur unter md (`nurUnterMd`), ab md steht an seiner Stelle rechts der
- * Hinweis, wo Produkte liegt (Seitenleiste).
+ * nur unter md (`nurUnterMd`), ab md ist es ein eigener Punkt der Seitenleiste.
+ * Den Hinweis, wo Produkte liegen, trägt seit Nr. 73 (Register N7) der Editor
+ * am Ende seiner Liste (components/farmer/hofseite-editor.tsx), nicht die Leiste.
  *
  * Reiter links gruppiert wie im Mockup; „Beiträge · N" mit der Zahl aller
  * eigenen Beiträge (zaehleBeitraege), keine Produktzahl.
@@ -49,7 +50,6 @@ export function MeinHofReiterLeiste({
           </Link>
         )
       })}
-      {!nurUnterMd && <p className="ml-auto hidden text-[13px] text-muted-foreground md:block">{MEIN_HOF_HINWEIS}</p>}
     </nav>
   )
 }

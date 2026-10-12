@@ -190,10 +190,11 @@ describe('Mein Hof', () => {
     expect(seite).toMatch(/<h1[^>]*>Produkte<\/h1>/)
   })
 
-  it('die Reiterleiste ist EIN Baustein mit dem Hinweis und ohne Produktzahl; der Kopf nimmt ihn', () => {
+  it('die Reiterleiste ist EIN Baustein ohne den Hinweis und ohne Produktzahl; der Kopf nimmt ihn', () => {
     const leiste = quelle('src/components/mein-hof/reiter-leiste.tsx')
     const nav = leiste.slice(leiste.indexOf('<nav'), leiste.indexOf('</nav>'))
-    expect(nav).toContain('{MEIN_HOF_HINWEIS}')
+    // Seit Nr. 73 (Register N7) steht der Hinweis am Ende der Liste im Editor, nicht mehr in der Leiste.
+    expect(nav).not.toContain('MEIN_HOF_HINWEIS')
     expect(nav).toContain('MEIN_HOF_REITER_HOFBEREICH.map(')
     expect(nav).not.toContain('produktZahl')
     const kopf = quelle('src/components/mein-hof/seitenkopf.tsx')

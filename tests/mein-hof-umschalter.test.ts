@@ -78,16 +78,16 @@ describe('Reiterleiste', () => {
     expect(leiste('beitraege')).toMatch(/<a href="\/farm-page\?reiter=beitraege"[^>]*aria-current="page"/)
   })
 
-  it('der Hinweis steht im Kopf von Mein Hof, auf /products (nur unter md) nicht', () => {
-    expect(leiste('hofseite')).toContain(MEIN_HOF_HINWEIS)
+  it('der Hinweis steht nicht mehr in der Leiste — weder im Kopf von Mein Hof noch auf /products (er steht seit Nr. 73 am Ende der Liste im Editor)', () => {
+    expect(leiste('hofseite')).not.toContain(MEIN_HOF_HINWEIS)
     expect(leiste('produkte', true)).not.toContain(MEIN_HOF_HINWEIS)
   })
 
-  it('am Quelltext: ein Reiter mit nurUnterMd ist ab md ausgeblendet, der Hinweis erst ab md sichtbar', () => {
+  it('am Quelltext: ein Reiter mit nurUnterMd ist ab md ausgeblendet, die Leiste trägt den Hinweis nicht mehr', () => {
     const text = quelle('src/components/mein-hof/reiter-leiste.tsx')
     expect(text).toContain("reiter.nurUnterMd && 'md:hidden'")
     expect(text).toContain("nurUnterMd && 'md:hidden'")
-    expect(text).toMatch(/<p className="[^"]*hidden[^"]*md:block[^"]*">\{MEIN_HOF_HINWEIS\}/)
+    expect(text).not.toContain('MEIN_HOF_HINWEIS')
   })
 })
 

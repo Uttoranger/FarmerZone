@@ -159,7 +159,7 @@ export function MeinHofSeitenkopf({
         <Knoepfe hof={hof} breit />
       </div>
 
-      {/* Reiter links gruppiert (Mockup), rechts ab md der Hinweis, wo Produkte liegen. */}
+      {/* Reiter links gruppiert (Mockup). */}
       <MeinHofReiterLeiste aktiv={aktiv} beitraegeZahl={beitraegeZahl} className="mt-4" />
     </header>
   )
