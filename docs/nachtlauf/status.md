@@ -80,5 +80,8 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 63 | Lint auf null und Lint im Stop-Hook | fertig, PR offen | `nacht/2026-10-12/63-lint-null` | #242 | main | tester grün; pruefer ohne Blocker; Sollte unter Nacharbeit (Hook-Ausgabe, Namen); Lint 0 Fehler / 7 Warnungen | 12.10.2026 |
 | 58 | Bausteinverzeichnis und Regelvorschläge (G4) | fertig, PR offen | `nacht/2026-10-12/58-bausteine` | #243 | main | tester grün; pruefer ohne Blocker; 8 Sollte unter Nacharbeit; Regel-Inventur 18 Vorschläge | 12.10.2026 |
 | 64 | Nacharbeit Lauf 9: Sentry-Filter und Herkunft (S16) | läuft | `nacht/2026-10-12/64-sentry-herkunft` | – | main | – | 12.10.2026 |
-| 65 | Nacharbeit Lauf 9: Mein Hof speichern und Testzahlungen (N4, Z4) | läuft | `nacht/2026-10-12/65-mein-hof-testzahlungen` | – | main | – | 12.10.2026 |
-| 61 | Tarif-Zeile und „Deine Konditionen" Fassung 2 | läuft | `nacht/2026-10-12/61-tarif-zeile` | – | 63 | von Branch 63 (#242) | 12.10.2026 |
+| 65 | Nacharbeit Lauf 9: Mein Hof speichern und Testzahlungen (N4, Z4) | fertig, PR offen | `nacht/2026-10-12/65-mein-hof-testzahlungen` | #244 | main | Runde 1 (Blocker Kunden-Detail; Zeilensperre; Du-Meldungen); zwei volle Prüfdurchgänge ohne Blocker; Entscheidungen offen (siehe PR) | 12.10.2026 |
+| 61 | Tarif-Zeile und „Deine Konditionen" Fassung 2 | fertig, PR offen | `nacht/2026-10-12/61-tarif-zeile` | #245 | 63 | gestapelt auf #242; Runde 1 (Gründungshof-Stand für 62, Übersichtszeile ohne Preis); Nachprüfung ohne Befund | 12.10.2026 |
+| 60 | Telefonnummer erst nach dem Kauf | fertig, PR offen | `nacht/2026-10-12/60-telefon-nach-kauf` | #246 | 63 | gestapelt auf #242; zwei volle Prüfdurchgänge ohne Blocker; Bericht-Ergänzung (5d16df0); E-Mail-Pflicht und Produktseite offen (siehe PR) | 12.10.2026 |
+| 59 | Startseite: Karte der Region | läuft | `nacht/2026-10-12/59-startseite-karte` | – | 63 | von Branch 63 (#242); OSM hier nicht erreichbar, nur Natural Earth | 12.10.2026 |
+| 62 | Gründungs-Enddatum je Hof (K2, Migration) | läuft | `nacht/2026-10-12/62-gruendung-bis` | – | 61 | gestapelt auf 61 (#245) | 12.10.2026 |
