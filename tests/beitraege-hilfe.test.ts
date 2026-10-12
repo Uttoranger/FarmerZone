@@ -103,10 +103,20 @@ describe('Beiträge: Aktionen je Eintrag (E12, was /status konnte)', () => {
     expect(eintrag({ sentViaWhatsApp: true, whatsappGetippt: ['a', 'b'] }, 3).aktionen.whatsapp?.text).toBe('WhatsApp · 2 von 3')
   })
 
-  it('W1: kein Knopf, wenn alle geöffnet sind, ohne Abonnentinnen oder nie per WhatsApp', () => {
+  it('W1: das Häkchen beim Veröffentlichen zählt nicht — ohne Häkchen und m > n trotzdem der Knopf', () => {
+    expect(eintrag({ sentViaWhatsApp: false, whatsappGetippt: [] }, 5).aktionen.whatsapp).toEqual({
+      href: '/status/b1/send-whatsapp',
+      text: 'WhatsApp · 0 von 5',
+    })
+    // Vergangener Beitrag ohne Häkchen (basis): der Weg zurück in die Tipp-Liste bleibt.
+    expect(eintrag({ whatsappGetippt: ['a'] }, 2).aktionen.whatsapp?.text).toBe('WhatsApp · 1 von 2')
+  })
+
+  it('W1: kein Knopf, wenn alle geöffnet sind oder der Hof keine Abonnentinnen hat (m = 0)', () => {
     expect(eintrag({ sentViaWhatsApp: true, whatsappGetippt: ['a', 'b'] }, 2).aktionen.whatsapp).toBeNull()
     expect(eintrag({ sentViaWhatsApp: true, whatsappGetippt: [] }, 0).aktionen.whatsapp).toBeNull()
-    expect(eintrag({ sentViaWhatsApp: false, whatsappGetippt: [] }, 5).aktionen.whatsapp).toBeNull()
+    expect(eintrag({ sentViaWhatsApp: false, whatsappGetippt: [] }, 0).aktionen.whatsapp).toBeNull()
+    expect(eintrag({ isActive: true, publishedAt: jetzt, whatsappGetippt: [] }, 0).aktionen.whatsapp).toBeNull()
   })
 })
 
