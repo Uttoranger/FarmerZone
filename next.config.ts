@@ -51,6 +51,18 @@ const nextConfig: NextConfig = {
       './node_modules/.pnpm/@img+sharp-libvips-linux-x64@*/node_modules/@img/sharp-libvips-linux-x64/**/*',
       './node_modules/.pnpm/@img+sharp-linux-x64@*/node_modules/@img/sharp-linux-x64/**/*',
     ],
+    // Teilen-Bild (Nr. 69): Die Route liest Schriften und Kategorie-
+    // Illustrationen vom Dateisystem (process.cwd()) — der Tracer sieht
+    // diese Lesezugriffe nicht. sharp wandelt Fotos und Illustrationen in
+    // JPEG, weil Satori kein WebP zeichnet: dieselben Binärpakete wie oben.
+    // Der Schlüssel ist ein Glob auf den Routenpfad ohne Gruppe „(public)";
+    // die eckigen Klammern sind maskiert, sonst wären sie eine Zeichenklasse.
+    '/\\[farmSlug\\]/opengraph-image': [
+      './src/assets/fonts/**/*.ttf',
+      './public/categories/*.webp',
+      './node_modules/.pnpm/@img+sharp-libvips-linux-x64@*/node_modules/@img/sharp-libvips-linux-x64/**/*',
+      './node_modules/.pnpm/@img+sharp-linux-x64@*/node_modules/@img/sharp-linux-x64/**/*',
+    ],
   },
 
   images: {
