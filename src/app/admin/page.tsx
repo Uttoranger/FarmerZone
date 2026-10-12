@@ -38,6 +38,8 @@ export default async function AdminPage(): Promise<React.JSX.Element> {
       hoefe: farms.map((f) => ({
         ...adminHofZeile(f, { gruendungsplatz: plaetze.get(f.id) ?? null, maxPlaetze: MAX_GRUENDUNGSHOEFE }, jetzt),
         aktivitaet: f.aktivitaet,
+        // Das wirksame Gründungs-Ende, fertig aus getAdminFarms (Nr. 62).
+        gruendung: f.gruendung,
       })),
       vergeben: vergebeneGruendungsplaetze(farms),
       neu: zuEntscheiden.slice(0, NEU_IM_BRIEFKASTEN).map((m) => ({

@@ -492,6 +492,14 @@ model Farm {
   // Geschrieben nur über setzeTeilenMomente (/settings/teilen).
   teilenMomenteAus Boolean @default(false)
 
+  // Gründungs-Enddatum je Hof (Register K2, Nachtlauf Nr. 62): der letzte
+  // Wiener Kalendertag, bis zu dem ein Gründungshof als Hofladen ohne
+  // Grundgebühr läuft. null = Standard (GRUENDUNG_BIS_STANDARD_TAG in
+  // src/lib/gruendungshof.ts) — bewusst ohne Default und ohne Backfill
+  // (Expand): Wirksam ist der Wert nur mit Gründungsplatz (bestimmeGruendungBis).
+  // Geschrieben nur über setzeGruendungBisAction (Admin).
+  gruendungBis DateTime? @db.Date
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

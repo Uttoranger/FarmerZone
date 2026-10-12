@@ -186,8 +186,8 @@ describe('Die Seiten zeigen den Satz', () => {
     const hinweis = quelle.indexOf('{KONDITIONEN_DERZEIT}')
     expect(hinweis).toBeGreaterThan(quelle.indexOf("art === 'approve' ? ("))
     expect(hinweis).toBeLessThan(quelle.indexOf('Die Hofseite von'))
-    // Verhalten unverändert: die Gründungsplatz-Zusage bleibt im Dialog.
-    expect(quelle).toContain('{GRUENDUNGS_KONDITIONEN}')
+    // Die Gründungsplatz-Zusage bleibt im Dialog — seit Nr. 62 die Zusage K2 mit dem Standard-Ende.
+    expect(quelle).toContain('{gruendungsKonditionenText(GRUENDUNG_BIS_STANDARD)}')
   })
 
   it('„So startest du" und „So geht es weiter" verlangen kein SEPA-Mandat für heute', () => {

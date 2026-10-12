@@ -8,6 +8,8 @@
  * der Backfill aus #47 hat allen Bestandshöfen denselben Freigabezeitpunkt
  * eingetragen.
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import {
   gruendungsplaetze,
@@ -17,11 +19,18 @@ import {
   bekaemePlatzBeiFreigabe,
   gruendungshofLabel,
   MAX_GRUENDUNGSHOEFE,
-  GRUENDUNGS_PROVISION_PROZENT,
-  GRUENDUNGSPHASE_ENDE,
-  GRUENDUNGS_KONDITIONEN,
+  GRUENDUNG_BIS_STANDARD,
+  GRUENDUNG_BIS_STANDARD_TAG,
+  baueGruendungAnzeige,
+  bestimmeGruendungBis,
+  bildeGruendungBis,
+  gruendungsKonditionenText,
+  verkuerztGruendung,
+  verkuerztGruendungTag,
   type HofFuerPlatz,
 } from '@/lib/gruendungshof'
+import { baueGruendungsZusage, bestimmeTarifZustand } from '@/lib/konditionen'
+import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
 
 const T = (tag: number) => new Date(Date.UTC(2026, 0, tag, 12, 0, 0))
 
@@ -44,17 +53,6 @@ function reihe(n: number): HofFuerPlatz[] {
 describe('Konditionen', () => {
   it('hält die Betreiber-Vorgabe fest', () => {
     expect(MAX_GRUENDUNGSHOEFE).toBe(12)
-    expect(GRUENDUNGS_PROVISION_PROZENT).toBe(3)
-    expect(GRUENDUNGSPHASE_ENDE.getUTCFullYear()).toBe(2029)
-    expect(GRUENDUNGSPHASE_ENDE.getUTCMonth()).toBe(11) // Dezember
-    expect(GRUENDUNGSPHASE_ENDE.getUTCDate()).toBe(31)
-  })
-
-  it('nennt im Konditions-Text die Stripe-Gebühren ausdrücklich als unabhängig', () => {
-    expect(GRUENDUNGS_KONDITIONEN).toBe(
-      'Keine Plattformgebühr bis 31.12.2029, danach dauerhaft 3 %. ' +
-        'Zahlungsgebühren von Stripe fallen unabhängig davon an.'
-    )
   })
 
   it('beschriftet Plätze wie vorgegeben', () => {
@@ -170,5 +168,144 @@ describe('bekaemePlatzBeiFreigabe — für den Bestätigungsdialog', () => {
     hoefe[4] = { ...hoefe[4], archivedAt: T(20) }
 
     expect(bekaemePlatzBeiFreigabe(hoefe)).toBe(true)
+  })
+})
+
+// ─── Gründungs-Enddatum je Hof (Register K2, Nr. 62) ─────────────────────────
+
+/** Wiener Ortszeit → Zeitpunkt, z. B. wien('2027-12-31', 23, 59). */
+function wien(tag: string, stunde = 0, minute = 0): Date {
+  const mitternacht = wienerMitternacht(tag)
+  if (!mitternacht) throw new Error(`Ungültiger Tag im Test: ${tag}`)
+  return new Date(mitternacht.getTime() + (stunde * 60 + minute) * 60_000)
+}
+
+/** Wie ein Hof aus der Datenbank kommt: Platz-Felder und die DATE-Spalte. */
+function mitBis(h: HofFuerPlatz, gruendungBis: Date | null = null): HofFuerPlatz & { gruendungBis: Date | null } {
+  return { ...h, gruendungBis }
+}
+
+describe('Standard-Enddatum der Gründungshöfe (K2)', () => {
+  it('Wer den Standard ändert, schreibt vorher bestehende Zusagen je Hof fest (Migration mit Freigabe).', () => {
+    // Stolperdraht: Jeder Hof mit null folgt dem Standard. Ändert sich der Tag
+    // hier, ändert sich die Zusage aller dieser Höfe still mit (Register K2).
+    expect(GRUENDUNG_BIS_STANDARD_TAG).toBe('2027-12-31')
+    const quelle = readFileSync(join(process.cwd(), 'src', 'lib', 'gruendungshof.ts'), 'utf8')
+    const kopf = quelle.slice(0, quelle.indexOf('import '))
+    expect(kopf).toContain('Wer den Standard ändert, schreibt vorher bestehende Zusagen je Hof fest (Migration mit Freigabe).')
+  })
+
+  it('der Standard ist als Datum derselbe Wiener Kalendertag — nicht um einen Tag verschoben', () => {
+    expect(kalendertagInWien(GRUENDUNG_BIS_STANDARD)).toBe(GRUENDUNG_BIS_STANDARD_TAG)
+    expect(GRUENDUNG_BIS_STANDARD.toISOString()).toBe('2027-12-31T00:00:00.000Z')
+  })
+
+  it('bildeGruendungBis: ein Kalendertag wird zur Mitternacht UTC, wie die DATE-Spalte ihn liefert', () => {
+    expect(bildeGruendungBis('2028-06-30').toISOString()).toBe('2028-06-30T00:00:00.000Z')
+    expect(kalendertagInWien(bildeGruendungBis('2028-06-30'))).toBe('2028-06-30')
+  })
+})
+
+describe('gruendungsKonditionenText — die Zusage K2 aus einer Quelle', () => {
+  it('nennt das Datum lang und die normale Regel danach, ohne Provision und ohne „dauerhaft"', () => {
+    const text = gruendungsKonditionenText(GRUENDUNG_BIS_STANDARD)
+    expect(text).toBe(
+      'Hofladen ohne Grundgebühr bis 31. Dezember 2027. Danach gelten die normalen Tarife – ohne Wahl Hoftor, kostenlos.'
+    )
+    expect(text).not.toMatch(/%|dauerhaft/)
+  })
+
+  it('verweist auf baueGruendungsZusage in konditionen.ts — kein zweiter Wortlaut', () => {
+    const datum = bildeGruendungBis('2028-03-15')
+    expect(gruendungsKonditionenText(datum)).toBe(baueGruendungsZusage(datum))
+  })
+})
+
+describe('bestimmeGruendungBis — das wirksame Enddatum', () => {
+  it('Gründungshof ohne eigenes Datum (null): der Standard', () => {
+    const hoefe = reihe(3)
+    expect(bestimmeGruendungBis(mitBis(hoefe[1]), hoefe)).toEqual(GRUENDUNG_BIS_STANDARD)
+  })
+
+  it('Gründungshof mit eigenem Datum: genau dieses, auch früher als der Standard', () => {
+    const hoefe = reihe(3)
+    expect(bestimmeGruendungBis(mitBis(hoefe[0], bildeGruendungBis('2028-06-30')), hoefe)).toEqual(bildeGruendungBis('2028-06-30'))
+    expect(bestimmeGruendungBis(mitBis(hoefe[0], bildeGruendungBis('2027-03-31')), hoefe)).toEqual(bildeGruendungBis('2027-03-31'))
+  })
+
+  it('Platz 12 hat ein Datum, Platz 13 keins — auch mit eigenem Datum nicht', () => {
+    const hoefe = reihe(13)
+    expect(bestimmeGruendungBis(mitBis(hoefe[11]), hoefe)).toEqual(GRUENDUNG_BIS_STANDARD)
+    expect(bestimmeGruendungBis(mitBis(hoefe[12], bildeGruendungBis('2028-06-30')), hoefe)).toBeNull()
+  })
+
+  it('wartende und stillgelegte Höfe haben keins', () => {
+    const hoefe = [...reihe(2), hof('wartet', { approvedAt: null }), hof('still', { archivedAt: T(5) })]
+    expect(bestimmeGruendungBis(mitBis(hoefe[2], bildeGruendungBis('2028-06-30')), hoefe)).toBeNull()
+    expect(bestimmeGruendungBis(mitBis(hoefe[3]), hoefe)).toBeNull()
+  })
+
+  it('Tagesgrenze Wien: Der Standard gilt bis einschließlich 31.12.2027, 23:59 Uhr, nicht bis UTC-Mitternacht', () => {
+    const hoefe = reihe(1)
+    const bis = bestimmeGruendungBis(mitBis(hoefe[0]), hoefe)
+    expect(bestimmeTarifZustand({ tarif: null, gruendungBis: bis }, wien('2027-12-31', 23, 59))).toBe('gruendungshof')
+    expect(bestimmeTarifZustand({ tarif: null, gruendungBis: bis }, wien('2028-01-01'))).toBe('hoftor')
+  })
+
+  it('Tagesgrenze Wien bei eigenem Datum aus der DATE-Spalte (Sommerzeit)', () => {
+    const hoefe = reihe(1)
+    const bis = bestimmeGruendungBis(mitBis(hoefe[0], bildeGruendungBis('2028-06-30')), hoefe)
+    // 30.6. 23:30 in Wien ist in UTC noch derselbe Tag, 1.7. 0:30 in Wien in UTC noch der 30.6.
+    expect(bestimmeTarifZustand({ tarif: 'HOFLADEN', gruendungBis: bis }, wien('2028-06-30', 23, 30))).toBe('gruendungshof')
+    expect(bestimmeTarifZustand({ tarif: 'HOFLADEN', gruendungBis: bis }, wien('2028-07-01', 0, 30))).toBe('hofladen')
+  })
+})
+
+describe('verkuerztGruendung — früher als bisher braucht die Zustimmung des Hofs (K1)', () => {
+  it('ein früherer Wiener Tag verkürzt, derselbe oder ein späterer nicht', () => {
+    const bisher = bildeGruendungBis('2028-06-30')
+    expect(verkuerztGruendung(bisher, bildeGruendungBis('2028-06-29'))).toBe(true)
+    expect(verkuerztGruendung(bisher, bildeGruendungBis('2028-06-30'))).toBe(false)
+    expect(verkuerztGruendung(bisher, bildeGruendungBis('2028-07-01'))).toBe(false)
+  })
+
+  it('vergleicht Kalendertage, nicht Zeitpunkte: Wiener Mitternacht und UTC-Mitternacht desselben Tags sind gleich', () => {
+    expect(verkuerztGruendung(bildeGruendungBis('2027-12-31'), wien('2027-12-31'))).toBe(false)
+  })
+
+  it('dieselbe Regel auf Kalendertagen (Dialog); unlesbarer Text verkürzt nichts', () => {
+    expect(verkuerztGruendungTag('2028-06-30', '2028-06-29')).toBe(true)
+    expect(verkuerztGruendungTag('2028-06-30', '2028-06-30')).toBe(false)
+    expect(verkuerztGruendungTag('2028-06-30', 'morgen')).toBe(false)
+  })
+
+  it('ohne bisheriges oder neues Datum (kein Gründungsplatz) verkürzt nichts', () => {
+    expect(verkuerztGruendung(null, bildeGruendungBis('2027-01-01'))).toBe(false)
+    expect(verkuerztGruendung(bildeGruendungBis('2028-06-30'), null)).toBe(false)
+  })
+})
+
+describe('baueGruendungAnzeige — die Admin-Liste zeigt das wirksame Datum', () => {
+  it('ohne eigenes Datum: Standard, lang geschrieben, Tag für die Vorbelegung', () => {
+    const hoefe = reihe(2)
+    expect(baueGruendungAnzeige(mitBis(hoefe[0]), hoefe)).toEqual({
+      bisTag: '2027-12-31',
+      bisText: '31. Dezember 2027',
+      abweichend: false,
+    })
+  })
+
+  it('mit eigenem Datum: dieses, als abweichend markiert', () => {
+    const hoefe = reihe(2)
+    expect(baueGruendungAnzeige(mitBis(hoefe[1], bildeGruendungBis('2028-06-30')), hoefe)).toEqual({
+      bisTag: '2028-06-30',
+      bisText: '30. Juni 2028',
+      abweichend: true,
+    })
+  })
+
+  it('ohne Gründungsplatz: nichts', () => {
+    const hoefe = reihe(13)
+    expect(baueGruendungAnzeige(mitBis(hoefe[12], bildeGruendungBis('2028-06-30')), hoefe)).toBeNull()
   })
 })

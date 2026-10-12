@@ -8,6 +8,7 @@ import { ohneTestzahlungenSql } from '@/lib/testzahlung'
 import { STRIPE_LIVE_AB } from '@/lib/umgebung-server'
 import { bestaetigungOffen } from '@/lib/email-bestaetigung'
 import { nummerAnzeige } from '@/lib/admin-hoefe'
+import { baueGruendungAnzeige, bestimmeGruendungBis, type GruendungAnzeige } from '@/lib/gruendungshof'
 
 /**
  * Die Monatsspalten je Hof (Sprint servicegebuehr, E-3) — das Fundament der
@@ -74,6 +75,10 @@ export type AdminFarmRow = {
   betriebsnummer: string | null
   /** SEPA-Mandat erteilt (Farm.sepaMandatAm gesetzt) — nur Anzeige. */
   sepaErteilt: boolean
+  /** Farm.gruendungBis, die Spalte selbst (null = Standard, Register K2). */
+  gruendungBis: Date | null
+  /** Das wirksame Gründungs-Ende als Text (Nr. 62); null ohne Gründungsplatz. */
+  gruendung: GruendungAnzeige | null
 }
 
 /** Ist der angemeldete Nutzer Plattformbetreiber? Frisch aus der DB, nie aus der Session. */
@@ -183,6 +188,7 @@ export async function getAdminFarms(
         isPaused: true,
         betriebsnummer: true,
         sepaMandatAm: true,
+        gruendungBis: true,
         owner: { select: { email: true, emailVerified: true, createdAt: true } },
         _count: { select: { products: true, farmPhotos: true, pickupSlots: true } },
       },
@@ -225,12 +231,53 @@ export async function getAdminFarms(
     isPaused: f.isPaused === true,
     betriebsnummer: nummerAnzeige(f.betriebsnummer ?? null),
     sepaErteilt: f.sepaMandatAm != null,
+    gruendungBis: f.gruendungBis,
+    // Aus derselben Liste wie die Plätze (gruendungsplaetze filtert selbst) —
+    // keine zweite Abfrage.
+    gruendung: baueGruendungAnzeige(f, farms),
   }))
 
   // Wartende zuerst — das ist die einzige Liste, in der der Betreiber
   // tatsächlich etwas tun muss. Innerhalb der Gruppen bleibt es bei
   // „jüngste zuerst" aus der Query.
   return [...rows.filter((r) => r.approvedAt === null), ...rows.filter((r) => r.approvedAt !== null)]
+}
+
+const HOF_FUER_GRUENDUNG = {
+  id: true,
+  ownerId: true,
+  approvedAt: true,
+  createdAt: true,
+  archivedAt: true,
+  gruendungBis: true,
+} satisfies Prisma.FarmSelect
+
+/** Ein Hof der Platzvergabe samt seinem Gründungs-Ende (HofFuerPlatz plus Inhaber und Spalte). */
+export type HofFuerGruendung = Prisma.FarmGetPayload<{ select: typeof HOF_FUER_GRUENDUNG }>
+
+/**
+ * Die schmale Liste der Platzvergabe (Register K2, Nr. 62): alle
+ * freigeschalteten, nicht stillgelegten Höfe — nur sie belegen Plätze
+ * (gruendungsplaetze) — mit genau den Feldern, die Platz und Enddatum
+ * brauchen. Keine Namen, keine E-Mail: Sie läuft vor jeder Seite des
+ * Hofbereichs (Tarif-Zeile), deshalb nicht über getAdminFarms.
+ */
+export async function ladeHoefeFuerGruendung(): Promise<HofFuerGruendung[]> {
+  return prisma.farm.findMany({ where: { approvedAt: { not: null }, archivedAt: null }, select: HOF_FUER_GRUENDUNG })
+}
+
+/**
+ * Das wirksame Gründungs-Enddatum eines Hofs (Register K2, Nr. 62) — der EINE
+ * Lader für Tarif-Zeile, „Deine Konditionen" und die Übersicht der
+ * Einstellungen. Eine Abfrage: Der eigene Hof steckt mit seiner Spalte in der
+ * Liste der Platzvergabe; fehlt er dort (wartet, stillgelegt), hat er keinen
+ * Platz und damit kein Datum. Nach Kennung oder Inhaber, weil die Einstellungen
+ * den Hof über den Inhaber laden.
+ */
+export async function ladeGruendungBis(hof: { id: string } | { ownerId: string }): Promise<Date | null> {
+  const hoefe = await ladeHoefeFuerGruendung()
+  const eigener = hoefe.find((h) => ('id' in hof ? h.id === hof.id : h.ownerId === hof.ownerId))
+  return eigener ? bestimmeGruendungBis(eigener, hoefe) : null
 }
 
 /**

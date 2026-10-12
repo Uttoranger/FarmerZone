@@ -1,81 +1,63 @@
-// Gründungshöfe: Die ersten freigeschalteten Höfe der Plattform bekommen
-// dauerhaft bessere Konditionen.
+// Gründungshöfe: Die ersten freigeschalteten Höfe der Plattform laufen bis zu
+// einem Enddatum als Hofladen ohne Grundgebühr (Register K2), danach gilt die
+// normale Regel (E6-Ergänzung) — nie eine eigene Provision für „danach".
 //
 // Der Platz wird BERECHNET, nicht gespeichert — kein Schema-Feld. Damit kann
 // er nicht mit der Wirklichkeit auseinanderlaufen, und ein zurückgenommener
 // oder stillgelegter Hof gibt seinen Platz automatisch wieder frei.
+// Gespeichert ist seit Nr. 62 nur das Enddatum je Hof (Farm.gruendungBis,
+// DATE); null heißt Standard. Wirksam ist es nur mit Platz (bestimmeGruendungBis).
 //
-// GELTUNGSBEREICH: Diese Datei speist den Admin-Bereich und die öffentliche
-// Konditionen-Seite (src/app/(public)/konditionen/page.tsx). Ein kundenseitiges
-// Abzeichen folgt in einem eigenen Sprint; die Gebührenberechnung bleibt
-// unberührt (platformFeePercent steht weiterhin auf 0).
+// Wer den Standard ändert, schreibt vorher bestehende Zusagen je Hof fest (Migration mit Freigabe).
+//
+// GELTUNGSBEREICH: Diese Datei speist den Admin-Bereich, die öffentliche
+// Konditionen-Seite (Aufnahme-Schritte) und über den Lader ladeGruendungBis
+// (src/server/queries/admin.ts) Tarif-Zeile und „Deine Konditionen" des Hofs.
+// Die Gebührenberechnung bleibt unberührt (platformFeePercent steht auf 0).
 //
 // REGEL FÜR ANZEIGEN: Zahlen und Datum kommen aus den Konstanten unten, nie
 // als Literal in eine Seite. Eine Zahl, die an zwei Orten steht, steht früher
 // oder später verschieden da — und bei Konditionen ist das kein Schönheitsfehler.
 
-import { ONLINE_ZAHLUNG_START_SCHRITT } from '@/lib/konditionen'
+import { baueGruendungsZusage, ONLINE_ZAHLUNG_START_SCHRITT } from '@/lib/konditionen'
+import { formatDatumLang } from '@/lib/format'
+import { kalendertagInWien } from '@/lib/wiener-tag'
 
 export const MAX_GRUENDUNGSHOEFE = 12
 
-/** Ende der gebührenfreien Gründungsphase (einschließlich dieses Tages). */
-export const GRUENDUNGSPHASE_ENDE = new Date('2029-12-31T23:59:59.999Z')
+/**
+ * Bis einschließlich dieses Wiener Kalendertags läuft ein Gründungshof ohne
+ * eigenes Datum (Register K2: Standard 31.12.2027). Wie `TARIFE_AB_TAG` das
+ * EINZIGE Exemplar dieses Datums im Code; alles andere leitet sich ab.
+ */
+export const GRUENDUNG_BIS_STANDARD_TAG = '2027-12-31'
 
 /**
- * Das Ende als Datum zum Anzeigen, z. B. „31.12.2029".
- *
- * `timeZone: 'UTC'` ist keine Förmlichkeit: Der Zeitpunkt steht auf
- * 23:59:59.999 UTC, und ohne feste Zone würde ein Server östlich davon den
- * 1.1.2030 ausgeben — ein um einen Tag verschobenes Vertragsdatum.
+ * Ein Kalendertag (JJJJ-MM-TT) → der Wert, den die DATE-Spalte
+ * `Farm.gruendungBis` speichert und liefert: Mitternacht UTC (wie `teilenTag`).
+ * Gelesen wird er nur über den Wiener Kalendertag (`kalendertagInWien`), nie
+ * als Zeitpunkt — um 0:30 Uhr in Wien ist es in UTC noch gestern.
  */
-export const GRUENDUNGSPHASE_ENDE_TEXT = GRUENDUNGSPHASE_ENDE.toLocaleDateString('de-AT', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  timeZone: 'UTC',
-})
+export function bildeGruendungBis(kalendertag: string): Date {
+  return new Date(`${kalendertag}T00:00:00.000Z`)
+}
 
-/** Provision nach Ablauf der Gründungsphase, dauerhaft. */
-export const GRUENDUNGS_PROVISION_PROZENT = 3
+/** Der Standard in derselben Form wie die Spalte. */
+export const GRUENDUNG_BIS_STANDARD: Date = bildeGruendungBis(GRUENDUNG_BIS_STANDARD_TAG)
+
+/** „31. Dezember 2027" — wie die Tarif-Zeile und „Dein Stand" das Datum schreiben. */
+export const GRUENDUNG_BIS_STANDARD_TEXT = formatDatumLang(GRUENDUNG_BIS_STANDARD)
 
 /**
- * Die Konditionen in einem Satz — eine Quelle für alle Anzeigen.
- * Wortlaut unverändert, aber aus den Konstanten gebaut statt abgeschrieben.
+ * Die Zusage eines Gründungshofs in einem Satz, z. B. im Freischalt-Dialog mit
+ * dem Standard. Der Wortlaut steht NUR in konditionen.ts
+ * (`baueGruendungsZusage`, Register K2); „Dein Stand" nimmt ihn von dort.
  */
-export const GRUENDUNGS_KONDITIONEN =
-  `Keine Plattformgebühr bis ${GRUENDUNGSPHASE_ENDE_TEXT}, ` +
-  `danach dauerhaft ${GRUENDUNGS_PROVISION_PROZENT} %. ` +
-  'Zahlungsgebühren von Stripe fallen unabhängig davon an.'
+export function gruendungsKonditionenText(datum: Date): string {
+  return baueGruendungsZusage(datum)
+}
 
 // === TEXTBAUSTEINE DER KONDITIONEN-SEITE ===
-
-/** Das Angebot in einem Satz. */
-export const GRUENDUNGS_ANGEBOT =
-  `Die ersten ${MAX_GRUENDUNGSHOEFE} freigeschalteten Höfe zahlen bis ` +
-  `${GRUENDUNGSPHASE_ENDE_TEXT} keine Plattformgebühr. Danach gilt dauerhaft ein ` +
-  `Satz von ${GRUENDUNGS_PROVISION_PROZENT} % pro Online-Bestellung — dauerhaft heißt: ` +
-  'auch in zehn Jahren noch.'
-
-/**
- * Die wichtigste Klarstellung der Seite. Die Zwölf begrenzt die KONDITIONEN,
- * nicht den Zugang — sonst liest sich das Angebot wie eine geschlossene Tür.
- */
-export const GRUENDUNGS_KEINE_ZUGANGSGRENZE =
-  `Die ${MAX_GRUENDUNGSHOEFE} sind eine Konditions-, keine Zugangsgrenze: ` +
-  'Mitmachen kann jeder Hof, auch nach dem zwölften Platz. Für später ' +
-  'dazukommende Höfe gilt nach dem Pilotzeitraum der reguläre Satz. Wie hoch ' +
-  'der ausfällt, geben wir rechtzeitig und vorab bekannt — niemand erfährt ' +
-  'eine Änderung erst auf der Abrechnung.'
-
-/**
- * Zahlungsgebühren. BEWUSST OHNE Stripe-Prozentsätze: die ändern sich, und
- * eine Zahl in einem Rechtstext, die niemand nachpflegt, ist schlimmer als
- * keine Zahl. Die aktuellen Sätze zeigt Stripe beim Einrichten selbst an.
- */
-export const GRUENDUNGS_ZAHLUNGSGEBUEHREN =
-  'Unabhängig davon fallen die Gebühren des Zahlungsdienstleisters (Stripe) an; ' +
-  'Barzahlung bei Abholung ist gebührenfrei. Die aktuellen Sätze siehst du beim ' +
-  'Einrichten der Online-Zahlung, bevor du sie aktivierst.'
 
 /** Der Weg auf die Plattform, in vier Schritten — durchgängig automatisch,
  *  nur die Freischaltung selbst ist ein bewusster Handgriff des Betreibers.
@@ -169,4 +151,70 @@ export function vergebeneGruendungsplaetze(hoefe: HofFuerPlatz[]): number {
  */
 export function bekaemePlatzBeiFreigabe(hoefe: HofFuerPlatz[]): boolean {
   return vergebeneGruendungsplaetze(hoefe) < MAX_GRUENDUNGSHOEFE
+}
+
+// === GRÜNDUNGS-ENDDATUM JE HOF (Register K2, Nr. 62) ===
+
+/** Ein Hof, wie das Enddatum ihn braucht: Kennung und die Spalte (null = Standard). */
+export type HofMitGruendungBis = { id: string; gruendungBis: Date | null }
+
+/**
+ * Das wirksame Gründungs-Enddatum eines Hofs: mit Gründungsplatz (Platz ≤ 12)
+ * sein eigenes Datum oder der Standard, ohne Platz null — dann gilt die
+ * normale Regel. `hoefe` ist die Liste der Platzvergabe; steht der Hof nicht
+ * darin, hat er keinen Platz.
+ */
+export function bestimmeGruendungBis(hof: HofMitGruendungBis, hoefe: HofFuerPlatz[]): Date | null {
+  return istGruendungshof(hof.id, hoefe) ? (hof.gruendungBis ?? GRUENDUNG_BIS_STANDARD) : null
+}
+
+/**
+ * Verkürzt `neu` die Zusage gegenüber `bisher`? Ein früherer Tag geht nur mit
+ * Zustimmung des Hofs (Register K1: zugesagte Konditionen bleiben). Verglichen
+ * wird der Wiener Kalendertag, nie der Zeitpunkt.
+ */
+export function verkuerztGruendung(bisher: Date | null, neu: Date | null): boolean {
+  return bisher !== null && neu !== null && verkuerztGruendungTag(kalendertagInWien(bisher), kalendertagInWien(neu))
+}
+
+/**
+ * Dieselbe Regel auf Kalendertagen — für den Dialog, der Tage aus dem Feld
+ * hat. JJJJ-MM-TT vergleicht sich als Text wie als Datum; ein unlesbarer Text
+ * (Browser ohne Datumsfeld) verkürzt nichts, den lehnt der Server ab.
+ */
+export function verkuerztGruendungTag(bisherTag: string, neuTag: string): boolean {
+  return neuTag < bisherTag
+}
+
+/** Was die Admin-Liste je Gründungshof zeigt — fertig als Text, die Liste ist eine Client-Komponente. */
+export type GruendungAnzeige = {
+  /** Das wirksame Datum als Wiener Kalendertag JJJJ-MM-TT (Vorbelegung im Dialog). */
+  bisTag: string
+  /** Lang geschrieben wie in „Dein Stand", z. B. „31. Dezember 2027". */
+  bisText: string
+  /** true = eigenes Datum am Hof, false = Standard. */
+  abweichend: boolean
+}
+
+/** Spalte der Admin-Liste, Zeile der Karte und Titel des Dialogs. */
+export const GRUENDUNG_BIS_TITEL = 'Gründungshof bis'
+
+/** Die Marke neben dem Datum in der Admin-Liste. */
+export const GRUENDUNG_BIS_MARKE = { standard: 'Standard', abweichend: 'abweichend' } as const
+
+/** Die Texte des Dialogs „Gründungshof bis" im Admin. */
+export const GRUENDUNG_BIS_DIALOG = {
+  feld: 'Letzter Tag als Gründungshof',
+  leer: `Leer = Standard (${GRUENDUNG_BIS_STANDARD_TEXT})`,
+  zuruecksetzen: 'Auf Standard zurücksetzen',
+  zustimmung: 'Nur mit Zustimmung des Hofs (K1)',
+  frueher: (bisherText: string): string => `Das neue Ende liegt vor dem bisherigen (${bisherText}).`,
+  zugestimmt: 'Der Hof hat dem früheren Ende zugestimmt.',
+} as const
+
+/** Die Anzeige des wirksamen Datums; null ohne Gründungsplatz. */
+export function baueGruendungAnzeige(hof: HofMitGruendungBis, hoefe: HofFuerPlatz[]): GruendungAnzeige | null {
+  const bis = bestimmeGruendungBis(hof, hoefe)
+  if (bis === null) return null
+  return { bisTag: kalendertagInWien(bis), bisText: formatDatumLang(bis), abweichend: hof.gruendungBis !== null }
 }

@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { approveFarmAction, revokeFarmApprovalAction, rejectFarmAction } from '@/server/actions/admin'
-import { gruendungshofLabel, GRUENDUNGS_KONDITIONEN, MAX_GRUENDUNGSHOEFE } from '@/lib/gruendungshof'
+import { GRUENDUNG_BIS_STANDARD, gruendungshofLabel, gruendungsKonditionenText, MAX_GRUENDUNGSHOEFE } from '@/lib/gruendungshof'
 import { KONDITIONEN_DERZEIT } from '@/lib/konditionen'
 import type { AdminHofZeile } from '@/lib/admin-hoefe'
 import { BestellDialog, DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
@@ -98,7 +98,8 @@ export function HofAktionDialog({
             </p>
             {plaetzeFrei ? (
               <Hinweiskarte ton="gruen">
-                Dieser Hof belegt {gruendungshofLabel(vergebenePlaetze + 1)}. {GRUENDUNGS_KONDITIONEN}
+                {/* Ein neuer Hof startet mit dem Standard-Ende (K2); ändern lässt es sich danach in der Liste. */}
+                Dieser Hof belegt {gruendungshofLabel(vergebenePlaetze + 1)}. {gruendungsKonditionenText(GRUENDUNG_BIS_STANDARD)}
               </Hinweiskarte>
             ) : (
               <Hinweiskarte ton="orange">
