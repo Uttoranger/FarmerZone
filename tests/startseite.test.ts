@@ -26,7 +26,8 @@
  *  - Karte der Region (Nr. 59): Zähler und Pins aus den Höfen der Liste mit
  *    Koordinaten im Ausschnitt, der hervorgehobene Hof, EIN Link auf die
  *    Kartenansicht mit der Zahl im Namen, SVG ohne Bild und ohne Abruf, Farben
- *    nur über Tokens; Liste und Karte aus EINER Abfrage.
+ *    nur über Tokens; Liste und Karte aus EINER Abfrage; am Handy ein eigener
+ *    Abschnitt unter dem Kopf (Überschrift, Karte, Knopf) mit dem Fokusring.
  *
  * Gegenproben: Jede gesuchte Abwesenheit wird an einer Stelle gesucht, an der
  * dasselbe Merkmal nachweislich vorkommt.
@@ -54,6 +55,8 @@ import {
   BRENNMATERIAL_ADRESSE,
   FUTTER_ZIELGRUPPEN,
   KARTE_ADRESSE,
+  KARTE_KNOPF,
+  KARTE_UEBERSCHRIFT,
   STARTSEITE_CHIPS,
   STARTSEITE_FRAGEN,
   beispielRechnung,
@@ -381,6 +384,35 @@ describe('Kopf — Video, Standbild und Suche', () => {
     const daten = waehleKartenHoefe([hof({ slug: 'erster', ...IM_AUSSCHNITT[0] })])
     const mitDaten = html(createElement(StartseiteKopf, { karte: (form) => createElement(RegionsKarte, { form, karte: daten }) }))
     expect(mitDaten.split('1 Hof in der Region').length - 1).toBe(2)
+  })
+
+  /** Teilt das HTML am Ende des Kopfs (der Kopf enthält keinen weiteren Abschnitt). */
+  const teileAmKopfEnde = (seite: string) => {
+    const ende = seite.indexOf('</section>') + '</section>'.length
+    return { kopfTeil: seite.slice(0, ende), danach: seite.slice(ende) }
+  }
+
+  it('am Handy endet der Kopf vor der Karte: darunter ein Abschnitt mit Überschrift, Karte, Knopf wie im Mockup (Nr. 59)', () => {
+    // Die Karte je Form als Merkmal: So zeigt das HTML, wohin der Kopf welche Karte stellt.
+    const { kopfTeil, danach } = teileAmKopfEnde(html(createElement(StartseiteKopf, { karte: (form) => createElement('i', { 'data-karte': form }) })))
+
+    expect(kopfTeil).toContain('data-karte="web"')
+    expect(kopfTeil).not.toContain('data-karte="handy"')
+    expect(danach).toMatch(/^<section aria-labelledby="region-titel"[^>]*>/)
+    expect(danach).toContain(`<h2 id="region-titel"`)
+    const reihe = [`>${KARTE_UEBERSCHRIFT}</h2>`, 'data-karte="handy"', `${KARTE_KNOPF}</a>`].map((t) => danach.indexOf(t))
+    expect(reihe.every((stelle) => stelle > 0), String(reihe)).toBe(true)
+    expect([...reihe].sort((a, b) => a - b)).toEqual(reihe)
+  })
+
+  it('der Abschnitt liegt auf dem Seitengrund: keine weiße Schrift, der Fokus als Ring statt weiß (Nr. 59)', () => {
+    const { kopfTeil, danach } = teileAmKopfEnde(html(createElement(StartseiteKopf, {})))
+
+    expect(danach).not.toMatch(/text-white|outline-white/)
+    expect(danach).toContain('focus-visible:outline-ring')
+    // Gegenprobe: Auf dem Foto stehen beide.
+    expect(kopfTeil).toContain('text-white')
+    expect(kopfTeil).toContain('focus-visible:outline-white')
   })
 })
 

@@ -7,6 +7,7 @@ import {
   KARTE_ADRESSE,
   KARTE_KNOPF,
   KARTE_OEFFNEN,
+  KARTE_UEBERSCHRIFT,
   hoefeAdresse,
   benenneKartenLink,
   formatiereRegionsZaehler,
@@ -31,7 +32,8 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
  * Der Kopf der Startseite (Mockups web-k0-startseite, mobil-k0-startseite;
  * die Karte seit Nr. 59 nach web-/mobil-k0-startseite-karte-region):
  * Kornfeld-Video als Hintergrund, links Satz und Suche, rechts die Karte der
- * Region — am Handy steht sie unter der Suche.
+ * Region. Am Handy endet der Kopf vor der Karte; sie folgt in einem eigenen
+ * Abschnitt mit Überschrift auf dem Seitengrund, mit dem Knopf darunter.
  *
  * Alles über dem Foto bleibt in beiden Themes gleich (DESIGN_SYSTEM: „Bild-
  * Overlays bleiben immer dunkel hinterlegt und sind theme-unabhängig") —
@@ -54,137 +56,151 @@ const zeichneKarteOhneDaten = (form: KartenForm): ReactNode => <RegionsKarte for
  */
 export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (form: KartenForm) => ReactNode }): React.JSX.Element {
   return (
-    // bg-black: der Grund unter Foto und Schleier, solange das Bild lädt (und
-    // für die Kontrastprüfung) — die weiße Schrift steht nie auf dem hellen Seitengrund.
-    <section aria-labelledby="startseite-titel" className="relative isolate overflow-hidden bg-black">
-      {/* Drei Schichten wie bisher: (1) das Standbild — immer da, es ist die
-          Darstellung bei „Bewegung reduzieren" und der LCP-Kandidat (priority);
-          (2) darüber das Video, rein per CSS eingeblendet; (3) der Schleier. */}
-      <Image src="/landing/hero-poster.jpg" alt="" fill priority sizes="100vw" className="-z-10 object-cover" />
+    <>
+      {/* bg-black: der Grund unter Foto und Schleier, solange das Bild lädt (und
+          für die Kontrastprüfung) — die weiße Schrift steht nie auf dem hellen Seitengrund. */}
+      <section aria-labelledby="startseite-titel" className="relative isolate overflow-hidden bg-black">
+        {/* Drei Schichten wie bisher: (1) das Standbild — immer da, es ist die
+            Darstellung bei „Bewegung reduzieren" und der LCP-Kandidat (priority);
+            (2) darüber das Video, rein per CSS eingeblendet; (3) der Schleier. */}
+        <Image src="/landing/hero-poster.jpg" alt="" fill priority sizes="100vw" className="-z-10 object-cover" />
 
-      {/* Stumm, in Schleife, ohne Bedienelemente — reiner Hintergrund
-          (aria-hidden). Zweimal dieselbe Bedingung: Die Klasse blendet das
-          Element nur bei erlaubter Bewegung ein, die media-Bedingung an der
-          Quelle entscheidet, ob das Video überhaupt geladen wird.
-          preload="none" hält das Laden NICHT auf: autoPlay geht vor, das
-          Video lädt sofort an. Es bleibt nur für Browser stehen, die die
-          automatische Wiedergabe sperren (etwa im Datensparmodus) — dort lädt
-          dann gar nichts. Kein poster: Das Standbild darunter (next/image,
-          verkleinert) zeigt sich durch, solange das Video noch kein Bild hat;
-          ein poster lud dasselbe Foto ein zweites Mal im Original. */}
-      <video
-        className="absolute inset-0 -z-10 hidden h-full w-full object-cover motion-safe:block"
-        autoPlay
-        muted
-        loop
-        playsInline
-        preload="none"
-        aria-hidden="true"
-      >
-        <source media="(prefers-reduced-motion: no-preference)" src="/landing/hero-loop.mp4" type="video/mp4" />
-      </video>
+        {/* Stumm, in Schleife, ohne Bedienelemente — reiner Hintergrund
+            (aria-hidden). Zweimal dieselbe Bedingung: Die Klasse blendet das
+            Element nur bei erlaubter Bewegung ein, die media-Bedingung an der
+            Quelle entscheidet, ob das Video überhaupt geladen wird.
+            preload="none" hält das Laden NICHT auf: autoPlay geht vor, das
+            Video lädt sofort an. Es bleibt nur für Browser stehen, die die
+            automatische Wiedergabe sperren (etwa im Datensparmodus) — dort lädt
+            dann gar nichts. Kein poster: Das Standbild darunter (next/image,
+            verkleinert) zeigt sich durch, solange das Video noch kein Bild hat;
+            ein poster lud dasselbe Foto ein zweites Mal im Original. */}
+        <video
+          className="absolute inset-0 -z-10 hidden h-full w-full object-cover motion-safe:block"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="none"
+          aria-hidden="true"
+        >
+          <source media="(prefers-reduced-motion: no-preference)" src="/landing/hero-loop.mp4" type="video/mp4" />
+        </video>
 
-      <div aria-hidden="true" className="absolute inset-0 -z-10 bg-linear-to-tr from-black/65 via-black/30 via-45% to-black/5" />
-      <div aria-hidden="true" className="absolute inset-x-0 bottom-0 -z-10 h-12 bg-linear-to-b from-transparent to-background md:h-20" />
+        <div aria-hidden="true" className="absolute inset-0 -z-10 bg-linear-to-tr from-black/65 via-black/30 via-45% to-black/5" />
+        <div aria-hidden="true" className="absolute inset-x-0 bottom-0 -z-10 h-12 bg-linear-to-b from-transparent to-background md:h-20" />
 
-      <div className="mx-auto flex max-w-[1200px] items-center gap-[60px] px-4 pt-8 pb-14 md:px-6 md:pt-[84px] md:pb-24">
-        <div className="flex min-w-0 flex-1 flex-col gap-[18px] md:gap-5">
-          <p className="text-[12.5px] font-bold tracking-[1.6px] text-white/85 uppercase">Direkt vom Hof in deiner Nähe</p>
-          <h1
-            id="startseite-titel"
-            className="font-heading text-[36px] leading-[1.06] font-semibold text-balance text-white md:text-[58px] md:leading-[1.04]"
-          >
-            Frisch vom Hof. <br className="hidden md:inline" />
-            Online bestellen, <br className="hidden md:inline" />
-            am Hof abholen.
-          </h1>
-          <p className="max-w-[600px] text-[15px] leading-normal text-white/85 md:text-[17px]">
-            <span className="md:hidden">Eier, Gemüse, Brot – und Heu für die Hasen. Von Höfen aus deiner Gegend.</span>
-            <span className="hidden md:inline">
-              Eier, Gemüse, Fleisch, Brot – und sogar Heu für die Hasen. Von Bäuerinnen und Bauern aus deiner Gegend,
-              ohne Umweg über den Supermarkt.
-            </span>
-          </p>
+        <div className="mx-auto flex max-w-[1200px] items-center gap-[60px] px-4 pt-8 pb-14 md:px-6 md:pt-[84px] md:pb-24">
+          <div className="flex min-w-0 flex-1 flex-col gap-[18px] md:gap-5">
+            <p className="text-[12.5px] font-bold tracking-[1.6px] text-white/85 uppercase">Direkt vom Hof in deiner Nähe</p>
+            <h1
+              id="startseite-titel"
+              className="font-heading text-[36px] leading-[1.06] font-semibold text-balance text-white md:text-[58px] md:leading-[1.04]"
+            >
+              Frisch vom Hof. <br className="hidden md:inline" />
+              Online bestellen, <br className="hidden md:inline" />
+              am Hof abholen.
+            </h1>
+            <p className="max-w-[600px] text-[15px] leading-normal text-white/85 md:text-[17px]">
+              <span className="md:hidden">Eier, Gemüse, Brot – und Heu für die Hasen. Von Höfen aus deiner Gegend.</span>
+              <span className="hidden md:inline">
+                Eier, Gemüse, Fleisch, Brot – und sogar Heu für die Hasen. Von Bäuerinnen und Bauern aus deiner Gegend,
+                ohne Umweg über den Supermarkt.
+              </span>
+            </p>
 
-          {/* Die Suche schickt, was /hoefe heute versteht: den Suchtext `q`
-              (Hof oder Produkt) — derselbe Weg wie die Suche der 404 und der
-              KundeShell. Einen Ort nimmt /hoefe bewusst nicht aus der Adresse
-              (ARCHITECTURE §4, „Nie Standort in die URL"); die Umkreissuche
-              mit Postleitzahl oder Standort liegt dort, der Link darunter
-              führt hin. */}
-          <form
-            role="search"
-            action="/hoefe"
-            method="get"
-            className="flex flex-col gap-3 md:w-full md:max-w-[560px] md:flex-row md:items-center md:gap-2.5 md:rounded-full md:border md:border-border md:bg-card md:py-2 md:pr-2 md:pl-[18px]"
-          >
-            <label className="flex h-[50px] min-w-0 items-center gap-2.5 rounded-full border border-border bg-card px-4 md:h-auto md:flex-1 md:border-0 md:bg-transparent md:px-0">
-              <Search className="size-[18px] shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-              <span className="sr-only">Hof oder Produkt suchen</span>
-              <input
-                type="search"
-                name={SUCHTEXT_PARAMETER}
-                maxLength={SUCHTEXT_MAX}
-                placeholder="Hof oder Produkt, z. B. Eier oder Heu"
+            {/* Die Suche schickt, was /hoefe heute versteht: den Suchtext `q`
+                (Hof oder Produkt) — derselbe Weg wie die Suche der 404 und der
+                KundeShell. Einen Ort nimmt /hoefe bewusst nicht aus der Adresse
+                (ARCHITECTURE §4, „Nie Standort in die URL"); die Umkreissuche
+                mit Postleitzahl oder Standort liegt dort, der Link darunter
+                führt hin. */}
+            <form
+              role="search"
+              action="/hoefe"
+              method="get"
+              className="flex flex-col gap-3 md:w-full md:max-w-[560px] md:flex-row md:items-center md:gap-2.5 md:rounded-full md:border md:border-border md:bg-card md:py-2 md:pr-2 md:pl-[18px]"
+            >
+              <label className="flex h-[50px] min-w-0 items-center gap-2.5 rounded-full border border-border bg-card px-4 md:h-auto md:flex-1 md:border-0 md:bg-transparent md:px-0">
+                <Search className="size-[18px] shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
+                <span className="sr-only">Hof oder Produkt suchen</span>
+                <input
+                  type="search"
+                  name={SUCHTEXT_PARAMETER}
+                  maxLength={SUCHTEXT_MAX}
+                  placeholder="Hof oder Produkt, z. B. Eier oder Heu"
+                  className={cn(
+                    'h-11 min-w-0 flex-1 rounded-md bg-transparent text-[15.5px] text-foreground placeholder:text-muted-foreground',
+                    FOKUS_RAHMEN
+                  )}
+                />
+              </label>
+              <button
+                type="submit"
                 className={cn(
-                  'h-11 min-w-0 flex-1 rounded-md bg-transparent text-[15.5px] text-foreground placeholder:text-muted-foreground',
-                  FOKUS_RAHMEN
+                  'h-[50px] shrink-0 rounded-[14px] bg-accent px-[18px] text-sm font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90 md:h-[46px] md:rounded-full',
+                  FOKUS_AUF_FOTO
                 )}
-              />
-            </label>
-            <button
-              type="submit"
+              >
+                Höfe finden
+              </button>
+            </form>
+
+            <Link
+              href={hoefeAdresse()}
               className={cn(
-                'h-[50px] shrink-0 rounded-[14px] bg-accent px-[18px] text-sm font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90 md:h-[46px] md:rounded-full',
+                'inline-flex min-h-11 w-fit items-center gap-1.5 rounded-md text-[13.5px] font-semibold text-white underline-offset-4 hover:underline',
                 FOKUS_AUF_FOTO
               )}
             >
-              Höfe finden
-            </button>
-          </form>
+              <LocateFixed className="size-4" strokeWidth={1.7} aria-hidden="true" />
+              In deiner Nähe suchen – mit Postleitzahl oder Standort
+            </Link>
 
-          <Link
-            href={hoefeAdresse()}
-            className={cn(
-              'inline-flex min-h-11 w-fit items-center gap-1.5 rounded-md text-[13.5px] font-semibold text-white underline-offset-4 hover:underline',
-              FOKUS_AUF_FOTO
-            )}
-          >
-            <LocateFixed className="size-4" strokeWidth={1.7} aria-hidden="true" />
-            In deiner Nähe suchen – mit Postleitzahl oder Standort
-          </Link>
+            <ul className="flex flex-col gap-[7px] md:mt-1.5 md:flex-row md:flex-wrap md:gap-[22px]">
+              {VERSPRECHEN.map((text) => (
+                <li key={text} className="flex items-center gap-[7px] text-[13.5px] text-white/85">
+                  <Check className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+                  {text}
+                </li>
+              ))}
+            </ul>
+          </div>
 
-          {/* Am Handy (unter 1024 px) die Karte unter der Suche, darunter der
-              Knopf (Mockup mobil-k0-startseite-karte-region). Breiter als
-              440 px wird sie nicht: Am Tablett füllte sie sonst den Schirm. */}
-          <div className="flex w-full max-w-[440px] flex-col gap-[22px] lg:hidden">
+          {/* Die Karte rechts (ab 1024 px), so breit wie bisher. */}
+          <div className="hidden w-[420px] shrink-0 lg:block xl:w-[520px]">{karte('web')}</div>
+        </div>
+      </section>
+
+      {/* Am Handy (unter 1024 px) endet der Kopf vor der Karte: Sie steht in
+          einem eigenen Abschnitt auf dem Seitengrund, mit Überschrift und dem
+          Knopf darunter (Mockup mobil-k0-startseite-karte-region, Abstände von
+          dort). Hier gelten die Tokens des Seitengrunds und der normale
+          Fokusring — Weiß wie auf dem Foto verschwände im hellen Modus. Breiter
+          als 440 px wird die Karte nicht: Am Tablett füllte sie sonst den Schirm.
+          Nach unten der Abstand der übrigen Abschnitte; das Mockup zeigt darunter
+          nichts mehr. */}
+      <section aria-labelledby="region-titel" className="pt-[18px] pb-[52px] md:pb-[72px] lg:hidden">
+        <div className="mx-auto max-w-[1200px] px-4 md:px-6">
+          <div className="flex max-w-[440px] flex-col gap-2.5">
+            <h2 id="region-titel" className="font-heading text-xl font-semibold text-foreground">
+              {KARTE_UEBERSCHRIFT}
+            </h2>
             {karte('handy')}
             <Link
               href={KARTE_ADRESSE}
               className={cn(
-                'flex h-12 items-center justify-center gap-2 rounded-[14px] bg-accent px-4 text-[15px] font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90',
-                FOKUS_AUF_FOTO
+                'mt-[22px] flex h-12 items-center justify-center gap-2 rounded-[14px] bg-accent px-4 text-[15px] font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90',
+                FOKUS_RAHMEN
               )}
             >
               <MapIcon className="size-[17px] shrink-0" strokeWidth={1.7} aria-hidden="true" />
               {KARTE_KNOPF}
             </Link>
           </div>
-
-          <ul className="flex flex-col gap-[7px] md:mt-1.5 md:flex-row md:flex-wrap md:gap-[22px]">
-            {VERSPRECHEN.map((text) => (
-              <li key={text} className="flex items-center gap-[7px] text-[13.5px] text-white/85">
-                <Check className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-                {text}
-              </li>
-            ))}
-          </ul>
         </div>
-
-        {/* Die Karte rechts (ab 1024 px), so breit wie bisher. */}
-        <div className="hidden w-[420px] shrink-0 lg:block xl:w-[520px]">{karte('web')}</div>
-      </div>
-    </section>
+      </section>
+    </>
   )
 }
 
@@ -236,11 +252,14 @@ function Marke({ marke }: { marke: GezeichneteMarke }) {
  * Land da, ohne Zähler und Hofkarte; den Fehler zeigen die Hofkarten darunter.
  *
  * Die Karte folgt dem Modus bewusst NICHT: Sie ist Papier wie die Kacheln der
- * Hofübersicht (CODING_STANDARDS §7, „Was dem Modus NICHT folgt") und liegt in
- * beiden Themes auf dem dunklen Foto. Deshalb nur Tokens, die im neuen Design
- * in beiden Themes gleich sind: accent-foreground (Crème) für Papier und
- * Flächen, primary-foreground (fast schwarz) für Schrift und Linien, accent
- * (Grün) für Höfe und Wasser — ein Blau kennt das Design-System nicht.
+ * Hofübersicht (CODING_STANDARDS §7, „Was dem Modus NICHT folgt") und bleibt
+ * hell wie im dunklen Mockup — im Browser auf dem Foto, am Handy auf dem
+ * Seitengrund. Deshalb nur Tokens, die im neuen Design in beiden Themes gleich
+ * sind: accent-foreground (Crème) für Papier und Flächen, primary-foreground
+ * (fast schwarz) für Schrift und Linien, accent (Grün) für Höfe und Wasser —
+ * ein Blau kennt das Design-System nicht. Auch der Hover der Pille geht über
+ * die Deckkraft: accent-hover ist je Theme verschieden. Nur der Fokus folgt
+ * dem Grund: weiß auf dem Foto, am Handy der Fokusring.
  */
 export function RegionsKarte({ form, karte }: { form: KartenForm; karte: StartseitenKarte | null }): React.JSX.Element {
   const mass = REGIONSKARTE_MASSE[form]
@@ -258,7 +277,7 @@ export function RegionsKarte({ form, karte }: { form: KartenForm; karte: Startse
       className={cn(
         'group relative block overflow-hidden bg-accent-foreground shadow-2xl',
         form === 'web' ? 'rounded-[26px]' : 'rounded-[22px]',
-        FOKUS_AUF_FOTO
+        form === 'web' ? FOKUS_AUF_FOTO : FOKUS_RAHMEN
       )}
       style={{ aspectRatio: `${mass.breite} / ${mass.hoehe}` }}
     >
@@ -360,7 +379,7 @@ export function RegionsKarte({ form, karte }: { form: KartenForm; karte: Startse
       )}
 
       {form === 'web' && (
-        <span className="absolute right-3.5 bottom-3.5 flex h-[38px] items-center gap-1.5 rounded-full bg-accent px-[15px] text-[13.5px] font-semibold text-accent-foreground transition-colors duration-[250ms] group-hover:bg-accent-hover">
+        <span className="absolute right-3.5 bottom-3.5 flex h-[38px] items-center gap-1.5 rounded-full bg-accent px-[15px] text-[13.5px] font-semibold text-accent-foreground transition-opacity duration-[250ms] group-hover:opacity-90">
           <MapIcon className="size-[15px] shrink-0" strokeWidth={1.7} aria-hidden="true" />
           {KARTE_OEFFNEN}
         </span>

@@ -59,6 +59,9 @@ export const KARTE_ADRESSE = hoefeAdresse({ ansicht: 'karte' })
 /** Der Knopf unter der Karte am Handy (Mockup mobil-k0-startseite-karte-region). */
 export const KARTE_KNOPF = 'Alle Höfe auf der Karte'
 
+/** Die Überschrift des Abschnitts mit der Karte am Handy (dasselbe Mockup); im Browser steht die Karte ohne sie im Kopf. */
+export const KARTE_UEBERSCHRIFT = 'Höfe in deiner Region'
+
 /** Die Pille unten rechts auf der Karte im Browser (Mockup web-k0-startseite-karte-region). */
 export const KARTE_OEFFNEN = 'Karte öffnen'
 
