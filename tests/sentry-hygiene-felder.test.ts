@@ -404,7 +404,12 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
     ['lange Folge aus 25 als Nachricht', { message: '25'.repeat(N) }],
     ['%25-Ketten vor Nummern', { exception: { values: [{ value: ('%' + '25'.repeat(500) + '200664 1234567 ').repeat(N / 500) }] } }],
     ['viele kodierte Plus in einer Adresse als Abfragewert', { request: { url: 'https://farmerzone.at/?next=%2Fx%3Fa%3D' + '%252B'.repeat(N) } }],
-    ['lange absolute Adresse mit Klammern als Nachricht', { message: 'https://farmerzone.at/x?' + 'f[a]=(1)&'.repeat(N / 10) }],
+    // Mit Leerraum davor, sonst gilt die ganze Nachricht als eine Adresse und das Muster läuft nicht.
+    ['lange absolute Adresse mit Klammern als Nachricht', { message: 'Link https://farmerzone.at/x?' + 'f[a]=(1)&'.repeat(N / 10) }],
+    ['relative Adressen vor absoluten als Nachricht', { message: ' /a?u=https://x.example/b?f[a]=1'.repeat(N / 20) }],
+    ['lange Folge aus Schrägstrichen und http als Nachricht', { message: 'x /' + 'http/'.repeat(N / 3) }],
+    ['viele Plus-Nummern-Anfänge in einer Abfrage', { request: { url: 'https://farmerzone.at/?' + 'a=+0&'.repeat(N / 5) } }],
+    ['viele @ in einer Abfrage', { request: { url: 'https://farmerzone.at/?q=' + 'a@'.repeat(N) } }],
   ]
 
   for (const [name, teil] of lang) {
@@ -974,28 +979,52 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
     (bereinigeEreignis(ereignis({ type: 'transaction', spans: [{ data: { 'url.full': url } }] })) as unknown as { spans: Array<{ data: Record<string, unknown> }> })
       .spans[0].data['url.full']
 
-  it('ein „+", das erst das Dekodieren erzeugt, bleibt in einer Adresse ein Plus — die Nummer und der Teil vor dem @ fallen', () => {
+  it('ein „+" zählt in beiden Lesarten — roh als Plus, zerlegt als Leerzeichen; in Pfad, Anker, Abfrage und Bearer einer Adresse im Wert', () => {
     // Runde 2 dekodierte %2B zu einem rohen „+"; die Abfrage der inneren
     // Adresse las es als Leerzeichen, und „+43…" galt nicht mehr als Nummer.
-    const roh = '/login?next=%2Fx%3Ftel%3D%252B436641234567'
-    const sauber = '/login?next=%2Fx%3Ftel%3D%255Btelefon%2Bentfernt%255D'
-    expect(adresse(roh)).toBe(`https://farmerzone.at${sauber}`)
-    expect(spanAdresse(`https://farmerzone.at${roh}`)).toBe(`https://farmerzone.at${sauber}`)
-    expect(fehlertext(`Fehler bei ${roh} gemeldet`)).toBe(`Fehler bei ${sauber} gemeldet`)
-    expect(nachricht(roh)).toBe(sauber)
-    expect(bereinigeEreignis(ereignis({ extra: { 'http.query': 'next=%2Fx%3Ftel%3D%252B436641234567' } })).extra).toEqual({
-      'http.query': 'next=%2Fx%3Ftel%3D%255Btelefon%2Bentfernt%255D',
+    // Die erste Nacharbeit hielt %2B stehen — dann sah die Telefon-Regel im
+    // Pfad und im Anker keine Nummer mehr. Jetzt liest die Abfrage beide Lesarten.
+    const faelle: [string, string][] = [
+      ['/login?next=%2Fx%3Ftel%3D%252B436641234567', '/login?next=%2Fx%3Ftel%3D%255Btelefon%2Bentfernt%255D'],
+      ['/login?next=%2Fx%3Ftel%3D%2B436641234567', '/login?next=%2Fx%3Ftel%3D%255Btelefon%2Bentfernt%255D'],
+      ['/login?next=%2Fkunden%2F%252B436641234567', '/login?next=%2Fkunden%2F%5Btelefon+entfernt%5D'],
+      ['/login?next=%2Fx%23%252B436641234567', '/login?next=%2Fx%23%5Btelefon+entfernt%5D'],
+      ['/login?next=https%3A%2F%2Ffarmerzone.at%2Fkunden%2F%252B436641234567', '/login?next=https%3A%2F%2Ffarmerzone.at%2Fkunden%2F%5Btelefon+entfernt%5D'],
+      ['/login?next=%2Fx%3Fh%3DBearer%2520abc%252Bdef123', '/login?next=%2Fx%3Fh%3DBearer%2B%255Bentfernt%255D'],
+      // Auch in der Abfrage der Adresse selbst: als Plus wie als Leerzeichen.
+      ['/x?tel=+436641234567', '/x?tel=%5Btelefon+entfernt%5D'],
+      ['/x?tel=0664+1234567', '/x?tel=%5Btelefon+entfernt%5D'],
+    ]
+    for (const [roh, sauber] of faelle) {
+      expect(adresse(roh), roh).toBe(`https://farmerzone.at${sauber}`)
+      expect(spanAdresse(`https://farmerzone.at${roh}`), roh).toBe(`https://farmerzone.at${sauber}`)
+      expect(nachricht(roh), roh).toBe(sauber)
+      expect(bereinigeEreignis(ereignis({ breadcrumbs: [{ category: 'navigation', data: { to: roh } }] })).breadcrumbs?.[0].data?.to, roh).toBe(sauber)
+    }
+    expect(fehlertext('Fehler bei /login?next=%2Fx%3Ftel%3D%2B436641234567 gemeldet')).toBe(
+      'Fehler bei /login?next=%2Fx%3Ftel%3D%255Btelefon%2Bentfernt%255D gemeldet'
+    )
+    expect(bereinigeEreignis(ereignis({ extra: { 'http.query': 'next=%2Fx%3Fq%3Da%2520b%26tel%3D%252B436641234567' } })).extra).toEqual({
+      'http.query': 'next=%2Fx%3Fq%3Da+b%26tel%3D%5Btelefon+entfernt%5D',
     })
-    // Der lokale Teil einer Adresse mit „+" fällt ganz — als Abfragewert und im Anker.
-    for (const pfad of ['/login?next=%2Fx%3Fq%3Dkundin%252Bshop%2540example.com', '/x#q%3Dkundin%2Bshop%40example.com']) {
+    // Eine Adresse mit „+" fällt ganz — als Abfragewert, einfach und doppelt kodiert, roh und im Anker.
+    for (const pfad of [
+      '/login?next=%2Fx%3Fq%3Dkundin%252Bshop%2540example.com',
+      '/login?next=%2Fx%3Fq%3Dkundin%2Bshop%40example.com',
+      '/x?mail=kundin+shop@example.com',
+      '/x#q%3Dkundin%2Bshop%40example.com',
+    ]) {
       const ergebnis = adresse(pfad) ?? ''
       expect(ergebnis, pfad).not.toMatch(/kundin|shop/)
       expect(ergebnis, pfad).toMatch(/e-mail/)
       expect(nachricht(pfad) ?? '', pfad).not.toMatch(/kundin|shop/)
     }
-    // Gegenproben: Ein Leerzeichen bleibt ein Leerzeichen, ein Wert ohne Adresse wird ganz dekodiert.
+    // Gegenproben: Ein Leerzeichen bleibt ein Leerzeichen, ein Wert ohne Adresse wird ganz dekodiert,
+    // eine kodierte Adresse nimmt den Pfad davor nicht mit.
     expect(adresse('/login?next=%2Fsuche%3Fq%3Dmax%2Bmuster')).toBe('https://farmerzone.at/login?next=%2Fsuche%3Fq%3Dmax%2Bmuster')
+    expect(adresse('/hoefe?q=frische+eier&seite=2')).toBe('https://farmerzone.at/hoefe?q=frische+eier&seite=2')
     expect(adresse('/login?info=%252B436641234567')).toBe('https://farmerzone.at/login?info=%5Btelefon+entfernt%5D')
+    expect(adresse('/x?ziel=%2Fkunden%2Fanna%2540example.org')).toBe('https://farmerzone.at/x?ziel=%2Fkunden%2F%5Be-mail+entfernt%5D')
   })
 
   it('ein doppelt kodiertes Escape links ist eine Grenze wie ein einfaches — in Pfad, Fehlertext, Nachricht und extra', () => {
@@ -1025,6 +1054,10 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
       ['Link https://farmerzone.at/x?f[a]=1&reorder=abc123', 'Link https://farmerzone.at/x?f%5Ba%5D=1'],
       ['Link https://farmerzone.at/x?utm=(herbst)&s=abc123sig', 'Link https://farmerzone.at/x?utm=%28herbst%29'],
       [`Link https://farmerzone.at/x?q='a'&token=abc123`, 'Link https://farmerzone.at/x?q=%27a%27'],
+      // In einer relativen Adresse: Sie endet vor der absoluten, die bis zum Leerraum gelesen wird.
+      ['Abruf /api/og?url=https://farmerzone.at/x?f[a]=1&s=abc123sig gescheitert', 'Abruf /api/og?url=https://farmerzone.at/x?f%5Ba%5D=1 gescheitert'],
+      ['Abruf /proxy/https://farmerzone.at/x?f[a]=1&reorder=abc123 weg', 'Abruf /proxy/https://farmerzone.at/x?f%5Ba%5D=1 weg'],
+      [`Wert =/https://farmerzone.at/x?q='a'&s=abc123sig weg`, 'Wert =/https://farmerzone.at/x?q=%27a%27 weg'],
     ]
     for (const [roh, sauber] of faelle) {
       expect(nachricht(roh), roh).toBe(sauber)
