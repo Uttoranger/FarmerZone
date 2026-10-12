@@ -123,6 +123,16 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 64 | Nacharbeit Lauf 9: Sentry-Filter und Herkunft | `freigabe.md` §14 | S16 |
 | 65 | Nacharbeit Lauf 9: Mein Hof speichern und Testzahlungen | `freigabe.md` §14 | N4, Z4 |
 | Sammel 10 | Sammel-PR `integration/lauf10` | `freigabe.md` §14 | G3, G4 |
+| 66 | WhatsApp an Abonnentinnen: ehrlich, je Person, fortsetzbar (Migration) | `freigabe.md` §15 | W1 |
+| 67 | Beitrag teilen = ein Fenster (von 69 mit 66) | `freigabe.md` §15 | T5, W1, Teilen (d) |
+| 68 | Hofseite: alle aktiven Beiträge (gestapelt auf 66) | `freigabe.md` §15 | F8 |
+| 69 | Teilen-Bild neu: Marktkarte, Foto-Held, QR nur in der Story | `freigabe.md` §15 | T6 |
+| 70 | Nacharbeit Lauf 10: Produktseite ohne Kontaktdaten, Port in der Host-Prüfung | `freigabe.md` §15 | E8, S16 |
+| 71 | Nachbestell-Link: alle Produkte in den Korb | `freigabe.md` §15 | – |
+| 72 | Titelbild im Hochformat (gestapelt auf 68) | `freigabe.md` §15 | N6 |
+| 73 | Mein Hof am breiten Bildschirm | `freigabe.md` §15 | N7 |
+| 74 | Illustrationen verdrahten (gestapelt auf 69) | `freigabe.md` §15 | I1 |
+| Sammel 11 | Sammel-PR `integration/lauf11` | `freigabe.md` §15 | G3, G4 |
 
 **17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
 
@@ -147,6 +157,14 @@ Vor jeder Nummer wird `origin/main` hineingeholt. Keine Migrationen, keine neuen
 - 62 zweigt vom Branch der Nr. 61 ab.
 
 Höchstens drei Umsetzer gleichzeitig. Nie zwei Nummern an derselben Code-Datei (Dateigrenzen in `freigabe.md` §14).
+
+**Reihenfolge in Lauf 11** (`freigabe.md` §15, Haltepunkt Sammel-PR): 70 ∥ 66 ∥ 69 → 71, 73 sobald Plätze frei sind → 67 ∥ 68 → 72 ∥ 74 → Sammel-PR. Die Branches:
+- 70, 66, 69, 71 und 73 zweigen von `origin/main` ab.
+- 68 zweigt vom Branch der Nr. 66 ab, 72 vom Branch der Nr. 68, 74 vom Branch der Nr. 69.
+- 67 zweigt vom Branch der Nr. 69 ab und holt den Branch der Nr. 66 als ersten Commit per `git merge --no-ff` herein (Konflikte erwartet: keine – die Dateigrenzen sind getrennt).
+- Ist 66 nach zwei Runden nicht fertig, zweigt 68 von `origin/main` ab (die Abfrage bleibt dann getrennt), und 67 entsteht ohne die Abonnentinnen-Karte als Entwurf.
+
+Höchstens drei Umsetzer gleichzeitig. Nie zwei Nummern an derselben Code-Datei (Dateigrenzen in `freigabe.md` §15).
 
 **06b – Reservierte Slugs vollständig:** `RESERVED_SLUGS` in `src/lib/slug.ts` um alle Ordner aus `KEINE_HOFSEITE` (`next.config.ts`) ergänzen (u. a. `teilen`, `verify`, `konditionen`, `meldungen`, `fehler-melden`, `problem-melden`, `farm-page`, `forgot-password`, `reset-password`, `intern`), plus Test, der beide Listen gegeneinander prüft. Braucht keine Freigabe. In Produktion ist keiner dieser Slugs belegt (geprüft am 05.10.2026).
 

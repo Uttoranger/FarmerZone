@@ -17,9 +17,11 @@ Präfixe:
 - **S** – Sicherheitsanforderung aus Umsetzungsprompt Abschnitt 8
 - **Z** – Zahlungswege der Höfe
 - **T** – Teilen
+- **W** – WhatsApp-Versand
 - **D** – Direktverkauf
 - **R** – Rate-Limit
 - **N** – Nutzerführung (Navigation und Bedienung)
+- **I** – Illustrationen
 - **O** – offen
 
 ---
@@ -224,6 +226,12 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Entscheidung (uttoranger, Freigabe Lauf 6):** Alle Mockup-Abweichungen aus den Berichten zu #192–#201 sind freigegeben.
 - **Dateien:** `docs/nachtlauf/berichte/19a.md` … `22f.md`.
 
+### F8 · Hofseite: alle aktiven Beiträge (12.10.2026)
+- **Kennung:** In der Freigabe Lauf 11 „F7"; F7 ist im Register vergeben (Mockup-Abweichungen aus Lauf 5), darum F8 (Zuordnung durch den Dirigenten nach dem Muster des Registers).
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 11):** Hofseite zeigt alle aktiven Beiträge, neuester zuerst mit „Aktuell", höchstens fünf; der Reiter heißt „Beiträge · n". Vorher: nur der neueste (ursprüngliches Konzept „ein Status je Hof").
+- **Verhältnis zu anderen Einträgen:** ergänzt F2.
+- **Umsetzung:** Nr. 68 (freigabe.md §15).
+
 ---
 
 ## K – Konditionen
@@ -330,6 +338,26 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Verhältnis zu anderen Einträgen:** erledigt Bericht 21 (b) und (e) sowie den Euro-Betrag der Teilen-Karte (22c).
 - **Dateien:** `src/lib/teilen-herkunft.ts` und Aufrufer, Checkout, Teilen-Fenster-Texte, `src/components/teilen/teilen-bild-grafik.tsx`; Umsetzung Nr. 25 und 26.
 
+### T5 · Beitrag teilen = ein Fenster (12.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 11):** Das Teilen-Fenster von „Heute" bekommt einen Beitrag-Modus (Bild aus dem Beitrag, Text und Link vorbelegt). Es öffnet sich nach dem Veröffentlichen und über „Teilen" je aktivem Beitrag. Die WhatsApp-Abonnentinnen sind darin die erste Karte und führen zur Tipp-Liste (W1); E-Mail an Abonnentinnen bleibt ein Häkchen beim Veröffentlichen; die Häkchen „Per WhatsApp" und „Als WhatsApp-Status-Bild" entfallen. Teilen (d) bleibt: Teilen legt keinen Beitrag an.
+- **Verhältnis zu anderen Einträgen:** Teilen (d) aus F6 bleibt; ergänzt W1.
+- **Umsetzung:** Nr. 67 (freigabe.md §15).
+
+### T6 · Teilen-Bild (12.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 11):** Variante A „Marktkarte" (Creme, grüne Kante, Serif-Titel, Produktzeilen mit Foto oder Kategorie-Illustration, Abhol-Streifen, Link-Pille) ist das Bild; liegt ein Foto vor (Beitragsfoto, sonst erstes Produktfoto), gilt Variante B „Foto-Held". Der QR-Code steht nur im Format Status 9:16 (Storys haben keinen klickbaren Link); im 1:1 steht kein QR. Bildquelle je Produktzeile: eigenes Foto → Illustration der Kategorie → „Sonstiges". Schriften im Bild: Fraunces und Instrument Sans wie in der App.
+- **Verhältnis zu anderen Einträgen:** ergänzt T1 – Farbwerte im Teilen-Bild bleiben die Ausnahme vom Token-Gebot in `TEILEN_BILD_FARBE`.
+- **Umsetzung:** Nr. 69 (freigabe.md §15).
+
+---
+
+## W – WhatsApp-Versand
+
+### W1 · WhatsApp an Abonnenten, ehrlich und je Person (12.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 11):** Die App kann nicht wissen, ob in WhatsApp gesendet wurde (kein Rückkanal von wa.me; die Business-API kommt für den Pilot nicht in Frage). Deshalb heißt der Zustand „geöffnet", nie „gesendet"; markiert wird beim Zurückkommen in den Browser, nicht per Zeitschaltung; jede Person lässt sich zurücksetzen; gespeichert wird, WER angetippt wurde (Abonnements-IDs), die Zahl folgt daraus; Empfängerinnen werden nicht beim Veröffentlichen eingefroren, sondern beim Öffnen der Liste gelesen.
+- **Verhältnis zu anderen Einträgen:** ergänzt E12 (WhatsApp fortsetzen im Reiter Beiträge) und T5.
+- **Migration (freigegeben, Wortlaut):** „Nr. 66 darf eine Expand-Migration anlegen: neue Spalte StatusPost.whatsappGetippt vom Typ TEXT[] (Abonnements-IDs, keine E-Mails, keine Nummern), nullable, mit leerem Default wie linkedProductIds, ohne Backfill und ohne andere Schema-Änderung. Erzeugt mit prisma migrate diff; Produktion bekommt sie nur über vercel-build beim Merge." Die bestehenden Spalten whatsappSentCount und whatsappRecipientCount bleiben (Contract später, eigene Freigabe).
+- **Umsetzung:** Nr. 66 (freigabe.md §15).
+
 ---
 
 ## S – Freigegebene Sicherheitsanforderungen
@@ -429,6 +457,27 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Begründung:** Befund vom 10.10.2026: Fotos und Produkte stehen unter lg erst nach Abholung, Zahlung und Anfahrt.
 - **Dateien:** Hofseite (`hofseite-kunde.tsx`, `HofseiteFotos`, `hofseite/produkt-karte.tsx`); Umsetzung Nr. 51 (freigabe.md §13).
 
+### N6 · Titelbild im Hochformat (12.10.2026)
+- **Kennung:** In der Freigabe Lauf 11 „B2"; B2 ist vergeben und B steht für Bezahlung; Hofseite wie N4/N5, darum N6 (Zuordnung durch den Dirigenten nach dem Muster des Registers).
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 11):** Ein Titelbild, das höher als breit ist, wird am Desktop nicht beschnitten, sondern ganz gezeigt (object-contain, mittig) vor einer unscharfen, abgedunkelten Kopie desselben Bilds, die die Fläche füllt; am Handy bleibt der Beschnitt mit Fokuspunkt. Beim Hochladen sagt die App, dass Querformat am Computer größer wirkt – kein Zwang.
+- **Verhältnis zu anderen Einträgen:** ergänzt N5.
+- **Umsetzung:** Nr. 72 (freigabe.md §15).
+
+### N7 · Mein Hof am breiten Bildschirm (12.10.2026)
+- **Kennung:** In der Freigabe Lauf 11 „D3"; D steht für Direktverkauf; Mein Hof wie N4, darum N7 (Zuordnung durch den Dirigenten nach dem Muster des Registers).
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 11):** Der Editor ist auf 2 000 px Breite begrenzt und zentriert; die Vorschau ist nie breiter als 1 440 px, die Liste 400–560 px (Web) bzw. höchstens 720 px (Handy).
+- **Verhältnis zu anderen Einträgen:** ergänzt N4.
+- **Umsetzung:** Nr. 73 (freigabe.md §15).
+
+---
+
+## I – Illustrationen
+
+### I1 · Illustrationen (12.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 11):** Kategorie- und Unterkategorie-Illustrationen liegen als WebP in public/categories/ (Quelle: Bögen bei der Projektleitung, Schneideskript dort); Rückfall je Produkt: Foto → Unterkategorie → Kategorie → Sonstiges; Unterkategorien ohne eigenes Bild (Eier-Haltungsformen, Futter-Altlast) stehen in einer Ausnahmeliste; die Schwarzweiß-Fassung ist für Druck und dunkles Theme vorgesehen (Bau später).
+- **Verhältnis zu anderen Einträgen:** Bau der Schwarzweiß-Fassung später, siehe Backlog.
+- **Umsetzung:** Nr. 74 (freigabe.md §15).
+
 ---
 
 ## O – Offen (nicht entschieden, nicht bauen)
@@ -455,3 +504,5 @@ Stand Lauf 8 (uttoranger, 08.10.2026): N1, N2, Z2 und Z3 sind entschieden und in
 Stand Lauf 9 (uttoranger, 10.10.2026): N3, N4, N5 und Z4 sind entschieden und in Nr. 49–57 eingeplant (freigabe.md §13). O6 (Kachelquelle) und O7 (Gründungszusage) sind offen und werden nicht gebaut. Die Live-Schaltung samt `STRIPE_LIVE_AB` macht der Mensch als letzten Schritt.
 
 Stand Lauf 10 (uttoranger, 12.10.2026): G4, K2, S16 und die Ergänzungen zu E6 („ohne Wahl Hoftor"), Z4 („Bestellzahl ohne Testbestellungen") und N4 („die Server-Action schreibt nur mitgeschickte Felder") sind entschieden und in Nr. 58–65 eingeplant (freigabe.md §14). O8 (Produkte über der Grenze ab 1.2.2027) ist entschieden, der Bau folgt in Gate 8 / Lauf 11; O6 (Kachelquelle) bleibt offen und wird nicht gebaut. Lint gehört zur Abschlussprüfung (Nr. 63): 0 Fehler vor jedem Commit, der Stop-Hook prüft es ab Lauf 11. Die Mockup-Abweichungen aus den Berichten 49–54 und ebee305 (Reihenfolge der Liste „Bearbeiten") sind freigegeben (freigabe.md §13, Nachtrag). Vorgemerkt für Lauf 11: ein dauerhaftes Admin-Protokoll (S12) als Tabelle (braucht eine Migration). Die Live-Schaltung samt `STRIPE_LIVE_AB` macht der Mensch als letzten Schritt.
+
+Stand Lauf 11 (uttoranger, 12.10.2026): W1, T5, T6, F8, N6, N7 und I1 sind entschieden und in Nr. 66–74 eingeplant (freigabe.md §15); in der Freigabe heißen F8, N6 und N7 „F7", „B2" und „D3" (Zuordnung nach dem Muster des Registers). Nr. 66 darf eine Expand-Migration anlegen (Wortlaut bei W1). Die Nacharbeit aus Lauf 10 (Nr. 70) und der Fehler im Nachbestell-Link (Nr. 71) sind beauftragt; die Port-Frage ist durch Nr. 70 erledigt. Vorgemerkt im Backlog: „Illustrationen: Bögen in höherer Auflösung (2K/4K) neu erzeugen und mit dem Schneideskript der Projektleitung ersetzen, sobald Kacheln größer als 260 px gezeigt werden; Schwarzweiß-Fassung für Plakat und dunkles Theme nutzen". Offen und nicht in diesem Lauf: E-Mail-Pflicht nach FAGG; „Produkte im Shop" je Verkaufsgröße oder Familie; Gründungszusage bei Rücknahme der Freischaltung; Grundlage Kundinnen-Status; OSM-Auszug für die Karte; CI-Lint blockierend; SEPA-Weg, Rechnung/USt der Grundgebühr, Rücklastschriften, Admin-Protokoll (S12). Die Live-Schaltung samt `STRIPE_LIVE_AB` macht der Mensch als letzten Schritt.
