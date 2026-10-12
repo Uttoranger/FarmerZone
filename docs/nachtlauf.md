@@ -114,6 +114,15 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 56 | Altlasten Lauf 8 §6 und Kleinkram | `freigabe.md` §13 | E10 (Pflichttexte nicht umformulieren) |
 | 57 | Datenschutzerklärung, Nachtrag (Entwurf, vom Branch der Nr. 33) | `freigabe.md` §13 | – |
 | Sammel 9 | Sammel-PR `integration/lauf9` (ohne 57) | `freigabe.md` §13 | G3 |
+| 58 | Bausteinverzeichnis und Regelvorschläge | `freigabe.md` §14 | G4 |
+| 59 | Startseite: Karte der Region (von 63) | `freigabe.md` §14 | – |
+| 60 | Telefonnummer erst nach dem Kauf (von 63) | `freigabe.md` §14 | E8 |
+| 61 | Tarif-Zeile und „Deine Konditionen" Fassung 2 (von 63) | `freigabe.md` §14 | E6, K1, K2 |
+| 62 | Gründungs-Enddatum je Hof (gestapelt auf 61; Migration) | `freigabe.md` §14 | K2 |
+| 63 | Lint auf null und Lint im Stop-Hook | `freigabe.md` §14 | – |
+| 64 | Nacharbeit Lauf 9: Sentry-Filter und Herkunft | `freigabe.md` §14 | S16 |
+| 65 | Nacharbeit Lauf 9: Mein Hof speichern und Testzahlungen | `freigabe.md` §14 | N4, Z4 |
+| Sammel 10 | Sammel-PR `integration/lauf10` | `freigabe.md` §14 | G3, G4 |
 
 **17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
 
@@ -131,6 +140,13 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 - 57 zweigt vom Branch `nacht/2026-10-07/33-datenschutz` (#210) ab, nachdem dort `origin/main` hineingeholt und gepusht ist. Ihr PR ist ein Entwurf mit diesem Branch als Basis und kommt nicht in den Sammel-PR.
 
 Vor jeder Nummer wird `origin/main` hineingeholt. Keine Migrationen, keine neuen Pakete. Nachprüfung des Fix-Commits bei 50, 54, 55 und 56.
+
+**Reihenfolge in Lauf 10** (`freigabe.md` §14, Haltepunkt Sammel-PR): 63 ∥ 58 ∥ 64 ∥ 65 → 59 ∥ 60 ∥ 61 → 62 → Sammel-PR. Die Branches:
+- 63, 58, 64 und 65 zweigen von `origin/main` ab.
+- 59, 60 und 61 zweigen vom Branch der Nr. 63 ab, damit `pnpm lint` auf ihnen 0 Fehler hat. Ist 63 nach zwei Runden nicht fertig, zweigen 59–61 von `origin/main` ab, mit der Regel „keine neuen Lint-Fehler gegenüber der Grundlinie"; 0 Fehler gibt es dann erst im Sammel-PR.
+- 62 zweigt vom Branch der Nr. 61 ab.
+
+Höchstens drei Umsetzer gleichzeitig. Nie zwei Nummern an derselben Code-Datei (Dateigrenzen in `freigabe.md` §14).
 
 **06b – Reservierte Slugs vollständig:** `RESERVED_SLUGS` in `src/lib/slug.ts` um alle Ordner aus `KEINE_HOFSEITE` (`next.config.ts`) ergänzen (u. a. `teilen`, `verify`, `konditionen`, `meldungen`, `fehler-melden`, `problem-melden`, `farm-page`, `forgot-password`, `reset-password`, `intern`), plus Test, der beide Listen gegeneinander prüft. Braucht keine Freigabe. In Produktion ist keiner dieser Slugs belegt (geprüft am 05.10.2026).
 
@@ -151,6 +167,26 @@ Der Lauf beginnt bei der ersten Nummer, die in `status.md` nicht als „fertig" 
 6. **`status.md` aktualisieren:** Nummer, Status, PR-Link, Branch, Dauer, offene Punkte.
 7. Nächste Nummer.
 8. **Am Ende des Laufs: Sammel-PR** (Register G3). Branch `integration/lauf<n>` von `main`, alle fertigen PRs des Laufs per `git merge --no-ff` in Merge-Reihenfolge; Doku-Konflikte beide Seiten behalten, Code-Konflikte sauber zusammenführen und jede Auflösung im PR-Text begründen; Typecheck, Unit- und Integrationstests auf dem Gesamtstand grün. Entwürfe kommen nicht hinein.
+
+---
+
+## 4a. Tempo
+
+Gilt seit Lauf 10 (`freigabe.md` §14 §0); geht §4 vor, wo es abweicht (Bilder: §4 Schritt 3).
+
+1. Lesemappe statt Volltext. Der Dirigent gibt jedem Umsetzer: den Text seiner Nummer, die Ausgangslage (Dateien mit Textankern), die Mockup-Dateien, docs/ai/CODING_STANDARDS.md und docs/ai/TESTING_GUIDELINES.md ganz, von ARCHITECTURE.md (129 KB) und DESIGN_SYSTEM.md (108 KB) nur die in der Nummer genannten Abschnitte, aus entscheidungen.md und umsetzungsprompt.md nur die genannten Einträge, das Bausteinverzeichnis docs/ai/BAUSTEINE.md (Lauf 10: ab Nr. 59 aus 58). Weiteres sucht der Umsetzer gezielt mit Grep; keine der großen Dateien wird am Stück gelesen. CLAUDE.md liest jeder Agent ohnehin.
+2. Tests gezielt. Nach jedem Schritt: pnpm typecheck und pnpm vitest related --run <geänderte Quelldateien>; der Dirigent gibt dem tester diesen Modus und die Dateiliste ausdrücklich mit („nur typecheck und vitest related, kein lint, kein voller Lauf"). Vor JEDEM Commit der volle Lauf pnpm typecheck && pnpm lint && pnpm test (CLAUDE.md §1); deshalb Commits sparsam: ein Commit je Umsetzung, ein Commit je Runde, WIP-Commits nur beim Stopp nach §5. pnpm test:integration nur bei Nummern, für die die Freigabe es nennt (Lauf 10: 62), und auf dem Sammel-PR. Gemessen am 11.10.: voller Testlauf 2:48 min, typecheck 0:57, lint 0:44, related je nach Datei 0:30–1:40.
+3. Prüfen in Runden, nicht alles neu. Nach einer Nachbesserung bekommt der pruefer im Aufruf den Bereich git diff <zuletzt geprüfter Commit>..HEAD und seine eigenen Befunde; nur das prüft er. Ein zweiter voller Durchgang über den Gesamt-Diff nur bei Nummern, die die Freigabe als Kaufstrecke, Admin-Action/Migration, Sicherheits- oder Datenpfad nennt (Lauf 10: 60, 62, 64, 65); bei allen anderen keiner (Lauf 10: 58, 59, 61, 63).
+4. Runden nur für Blocker. Blocker = Sicherheit oder Geld, Datenkonsistenz, Typisierung, rote Tests, Mockup-Abweichung ohne Begründung, Regelverstoß aus CLAUDE.md §2. Sollte = Stil, Teststärke, Doku, Benennung. Sollte-Befunde behebt der Umsetzer nur, wenn sie Dateien betreffen, die er in derselben Runde ohnehin anfasst; sonst stehen sie im Bericht unter „Nacharbeit" und gesammelt im Morgenbericht. Kein Durchgang nur für Teststärke oder Stil (Lauf 9, Nr. 54 Runde 2). Das ist für den Nachtlauf die Ausnahme von sprint Schritt 5; der Dirigent gibt die Zuordnung dem pruefer mit.
+   - **Blocker:** Sicherheit oder Geld, Datenkonsistenz, Typisierung, rote Tests, Mockup-Abweichung ohne Begründung, Regelverstoß aus CLAUDE.md §2.
+   - **Sollte:** Stil, Teststärke, Doku, Benennung – nur in ohnehin angefassten Dateien beheben, sonst Bericht „Nacharbeit" und Morgenbericht.
+5. Höchstens zwei Runden. Rote Tests danach: Lauf stoppen (§5, unverändert). Anderer Blocker danach: PR als Entwurf, Blocker im Morgenbericht, nächste Nummer.
+6. Bilder einmal. a) Mit sichter: Der Umsetzer macht keine Screenshots. Nach tester und pruefer startet der Dirigent im Worktree der Nummer den Dev-Server gegen die lokale Test-DB (DATABASE_URL und DIRECT_URL ausdrücklich gesetzt, keine .env.local im Worktree, eigener Port je Worktree) und übergibt dem sichter Adresse, Routen, Zustände und Mockups. Der sichter prüft nur diese Routen bei 390 und 1440 px in beiden Themes, ein Durchgang; seine Blocker und Abweichungen gehen als Runde an den Umsetzer; danach beendet der Dirigent den Server. b) Ohne sichter: Der Umsetzer macht genau diese Bilder selbst, keine weiteren Breiten. Keine Bilder bei Nummern ohne sichtbare Änderung und beim Doku-PR (Lauf 10: 58, 63). Geht §4 Schritt 3 (Vorlage) vor.
+7. Berichte kurz. docs/nachtlauf/berichte/<nr>.md höchstens 60 Zeilen: je Datei ein Satz, Annahmen, nicht gelöst, Testschritte, welche .md angepasst, Nacharbeit, Regelvorschlag. Messtabellen nur, wo die Nummer Zahlen verlangt. Die Checkliste der Freigabe (§3) steht nur im PR-Text.
+8. Status sparsam. status.md nur bei läuft, fertig (PR), Entwurf, blockiert – nicht bei „in Prüfung" oder „Runde 1". Ein Commit je Änderung.
+9. Parallel, wo unabhängig. Wellen und Höchstzahl gleichzeitiger Umsetzer stehen in der Freigabe (Lauf 10: erste Welle 63, 58, 64, 65 mit höchstens drei gleichzeitig; zweite Welle 59, 60, 61 nach 63; 62 stapelt auf 61). Nie zwei Nummern an derselben Code-Datei (die Freigabe nennt die Grenzen); Doku-Konflikte (CLAUDE.md, nachtlauf.md, DEVELOPMENT.md) löst der Sammel-PR nach seiner Regel.
+10. Modell je Aufgabe. Klar spezifizierte Aufgaben ohne Gestaltungsfragen mit model: sonnet, die übrigen mit Opus (Lauf 10: Doku-PR und 58 Sonnet, 59–65 Opus); tester und sichter Sonnet; pruefer bleibt Opus.
+11. Im Code nur prüfen, wo es nötig ist. Validierung nur an Systemgrenzen (CODING_STANDARDS §3: API-Route, Server Action, Webhook, URL-Parameter, localStorage, externe Antwort; Schemas in src/schemas/). Keine Zod-Schemas oder Null-Prüfungen zwischen eigenen Funktionen, keine doppelten Prüfungen Client und Server über das bestehende Muster hinaus, keine „sicherheitshalber"-Abfragen auf Werte, die der Typ schon garantiert, kein try/catch um Code, der nicht werfen kann. Tests für Fachregeln und Systemgrenzen, nicht für jede Hilfsfunktion; keine Tests, die nur Konstanten wiederholen. Der pruefer meldet überflüssige Prüfungen als Befund „Sollte".
 
 ---
 
@@ -203,7 +239,7 @@ claude -p "$(cat docs/nachtlauf-start.txt)" \
   --permission-prompts none \
   --allowedTools "Read" "Edit" "Write" "Glob" "Grep" "Agent" "Skill" "TodoWrite" \
     "Bash(pnpm typecheck*)" "Bash(pnpm lint*)" "Bash(pnpm test*)" "Bash(pnpm vitest*)" \
-    "Bash(pnpm build*)" "Bash(pnpm install --frozen-lockfile*)" "Bash(pnpm exec prisma migrate diff*)" \
+    "Bash(pnpm build*)" "Bash(pnpm dev*)" "Bash(pnpm bausteine*)" "Bash(pnpm install --frozen-lockfile*)" "Bash(pnpm exec prisma migrate diff*)" \
     "Bash(pnpm exec prisma generate*)" "Bash(pnpm exec prisma validate*)" "Bash(pnpm exec prisma format*)" \
     "Bash(git *)" "Bash(gh pr create*)" "Bash(gh pr view*)" "Bash(gh pr list*)" "Bash(agent-browser *)" \
   --disallowedTools "Bash(pnpm db:*)" "Bash(pnpm exec prisma migrate deploy*)" "Bash(pnpm exec prisma db push*)" "Bash(pnpm exec prisma migrate dev*)" "Bash(pnpm exec prisma migrate reset*)" "Bash(pnpm add*)" "Bash(git push --force*)" "Bash(git push -f*)" "Bash(gh pr merge*)" \
