@@ -525,23 +525,33 @@ function ersetzeZuweisungen(text: string, nurHinterLeerraum = false): string {
   let ende = 0
   for (const treffer of text.matchAll(ZUWEISUNG_KANDIDAT)) {
     if (treffer.index < ende || !istGeheimerSchluessel(treffer[1])) continue
+    // Vorab (vorabHinterLeerraum): nur ein Wert hinter Leerraum.
+    if (nurHinterLeerraum && !/\s/.test(treffer[2])) continue
     const wertAnfang = treffer.index + treffer[0].length
-    // Vorab (vorabHinterLeerraum): nur ein Wert hinter Leerraum, der selbst keine Adresse ist — die liest danach die URL-Regel.
-    if (nurHinterLeerraum && (!/\s/.test(treffer[2]) || /^(?:\/|https?:)/i.test(text.slice(wertAnfang, wertAnfang + 6)))) continue
     EIGENER_PLATZHALTER.lastIndex = wertAnfang
     const nachPlatzhalter = EIGENER_PLATZHALTER.test(text) ? EIGENER_PLATZHALTER.lastIndex : wertAnfang
     ZUWEISUNG_WERT.lastIndex = nachPlatzhalter
     ZUWEISUNG_WERT.test(text)
-    const wertEnde = ZUWEISUNG_WERT.lastIndex
+    let wertEnde = ZUWEISUNG_WERT.lastIndex
+    if (nurHinterLeerraum) {
+      // Steht im Wort ein „/" oder „:", könnte darin eine Adresse beginnen — dann fällt das
+      // ganze Wort bis zum Leerraum, so verschiebt der Ersatz keine Adressgrenze. Sonst nur
+      // der Wert; eine E-Mail-Adresse als ganzer Wert bleibt für die E-Mail-Regel.
+      BIS_LEERRAUM.lastIndex = nachPlatzhalter
+      BIS_LEERRAUM.test(text)
+      if (/[/:]/.test(text.slice(nachPlatzhalter, BIS_LEERRAUM.lastIndex))) wertEnde = BIS_LEERRAUM.lastIndex
+      else if (wertEnde > nachPlatzhalter && ersetzeEmails(text.slice(nachPlatzhalter, wertEnde)) === '[e-mail entfernt]') continue
+    }
     // Kein Wert, oder er ist genau ein eigener Platzhalter: stehen lassen.
     if (wertEnde === wertAnfang || (nachPlatzhalter > wertAnfang && wertEnde === nachPlatzhalter)) continue
-    // Eine E-Mail-Adresse als Wert sieht hinter Leerraum später die E-Mail-Regel, roh.
-    if (nurHinterLeerraum && text.slice(wertAnfang, wertEnde).includes('@')) continue
     ergebnis += `${text.slice(ende, wertAnfang)}[entfernt]`
     ende = wertEnde
   }
   return ergebnis + text.slice(ende)
 }
+
+/** Der Rest eines Worts bis zum nächsten Leerraum, klebend. */
+const BIS_LEERRAUM = /\S*/y
 
 const BEARER_MUSTER = /\bBearer\s+[A-Za-z0-9._~+/=-]+/g
 
@@ -590,20 +600,33 @@ function bereinigeFreitext(text: string): string {
   return ohneZuweisung.replace(LANGE_KENNUNG_MUSTER, '[kennung entfernt]')
 }
 
+/** Vorab (vorabHinterLeerraum): „Bearer" und sein Token — steht im Wort ein „/"
+ *  oder „:" (dort könnte eine Adresse beginnen), das ganze Wort bis zum Leerraum. */
+const BEARER_VORAB = /\bBearer\s+(?:\S*[/:]\S*|[A-Za-z0-9._~+/=-]+)/g
+
+/** Vorab: ein Code, ebenso mit dem ganzen Wort, wenn darin „/" oder „:" steht. */
+const ANMELDECODE_VORAB = /\b(code|otp|anmeldecode)(\W{1,3})(?:\d{6}\b\S*[/:]\S*|\d{6}\b)/gi
+
 /**
  * Geheimnisse, deren Wert hinter Leerraum steht — „Bearer …", „token: …",
  * „code: 123456" —, fallen vor den Adressen (Nacharbeit nach Runde 2). Liest
  * eine Adresse ihr Schlüsselwort mit (`…/x","h":"Bearer`, bis zum Leerraum),
  * steht es danach kodiert in ihr (`%22Bearer`, `token%3A`), und die Regeln
- * danach sähen es nicht mehr, während der Wert dahinter stehen bliebe. Die
- * Struktur der Adressen ändert das nicht: Der Ersatz beginnt erst hinter
- * Leerraum, wo jede Adresse endet; ein Wert, der selbst eine Adresse ist,
- * bleibt für die URL-Regel.
+ * danach sähen es nicht mehr, während der Wert dahinter stehen bliebe.
+ * Steht im Wort des Werts ein „/" oder „:", fällt vorab das ganze Wort bis
+ * zum Leerraum: Keine Adresse reicht über Leerraum, also verschiebt der
+ * Ersatz keine Grenze (`Bearer /x?s=…`, `token: (/x?a=1&s=…)`). Ohne „/"
+ * und „:" kann im Rest keine Adresse beginnen; dann fällt nur der Wert, und
+ * Anführungszeichen und Klammern dahinter bleiben (`token: "[entfernt]" }`).
+ * Ein Code, vor dem ein „/" steht (`code /123456?s=…`), gehört zu einer
+ * Adresse — ihn nimmt die Regel nach den Adressen.
  */
 function vorabHinterLeerraum(text: string): string {
   const ohneCode = text
-    .replace(BEARER_MUSTER, 'Bearer [entfernt]')
-    .replace(ANMELDECODE_MUSTER, (treffer, wort: string, trenner: string) => (/\s/.test(trenner) ? `${wort}${trenner}[code entfernt]` : treffer))
+    .replace(BEARER_VORAB, 'Bearer [entfernt]')
+    .replace(ANMELDECODE_VORAB, (treffer, wort: string, trenner: string) =>
+      /\s/.test(trenner) && !trenner.includes('/') ? `${wort}${trenner}[code entfernt]` : treffer
+    )
   return ersetzeZuweisungen(ohneCode, true)
 }
 

@@ -1039,6 +1039,8 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
     }
     expect(adresse('/x?q=Artikel+12345678')).toBe('https://farmerzone.at/x?q=Artikel+12345678')
     expect(adresse('/x?q=12+345678901')).toBe('https://farmerzone.at/x?q=12+345678901')
+    // Der Preis des freien Rands (sichere Richtung): nach einem Satzzeichen gilt ein „+" vor acht Ziffern als Nummer.
+    expect(adresse('/x?q=Bestellnr.+12345678')).toBe('https://farmerzone.at/x?q=Bestellnr.%5Btelefon+entfernt%5D')
     expect(adresse('/x?q=a%0912345678')).toBe('https://farmerzone.at/x?q=a%0912345678')
     // Der Preis der rohen Lesart (sichere Richtung): Ein mit „+" angehängtes Wort zählt zur Adresse.
     expect(adresse('/x?q=Hallo+kundin@example.com')).toBe('https://farmerzone.at/x?q=%5Be-mail+entfernt%5D')
@@ -1103,12 +1105,35 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
       '{"u":"/api/og?url=https://farmerzone.at/x","token": "abc123def456"}',
       'Fetch {"url":"https://farmerzone.at/x","headers":{"authorization":"Bearer abc123def456ghi"}}',
       'Login /api/auth?callbackUrl=https://farmerzone.at/konto&otp 123456 abgelaufen',
+      // Ein „@" im Wert ist noch keine E-Mail-Adresse (Passwort).
+      '{"u":"/api/og?url=https://farmerzone.at/x","password": "Sommer@2024"}',
+      'Abruf https://farmerzone.at/x?a=1,password: Sommer@2024 weg',
     ]
     for (const roh of faelle) {
       for (const ergebnis of [nachricht(roh), extraText(roh), brotkrume(roh), fehlertext(roh)]) {
-        expect(ergebnis ?? '', roh).not.toMatch(/abc123def456|123456/)
+        expect(ergebnis ?? '', roh).not.toMatch(/abc123def456|123456|Sommer@2024/)
       }
     }
+    // Der Vorab-Ersatz verschiebt keine Adressgrenze: Steht im Wort ein „/" oder „:", fällt es ganz.
+    for (const roh of [
+      'Weiter redirect_token: (/x?a=1&s=abc123sig) weg',
+      'Weiter redirect_token: «/x?a=1&s=abc123sig» weg',
+      'token: x(https://farmerzone.at/a?b=1&s=abc123sig) weg',
+      'Abruf /api/og?url=https://farmerzone.at/x,token: /9j4AAQgeheim weg',
+      'Weiter: Bearer /x?s=abc123sig weg',
+      'Weiter: Bearer https://farmerzone.at/x?a=(1)&s=abc123sig weg',
+      'Fehler code /123456?s=abc123sig weg',
+    ]) {
+      for (const ergebnis of [nachricht(roh), extraText(roh), brotkrume(roh), fehlertext(roh)]) {
+        expect(ergebnis ?? '', roh).not.toMatch(/abc123sig|9j4AAQgeheim|123456/)
+      }
+    }
+    expect(nachricht('Weiter: Bearer /x?s=abc123sig weg')).toBe('Weiter: Bearer [entfernt] weg')
+    expect(nachricht('Fehler code /123456?s=abc123sig weg')).toBe('Fehler code /[code entfernt] weg')
+    // Ohne „/" und „:" im Wort fällt nur der Wert, Anführungszeichen und Klammern dahinter bleiben.
+    expect(fehlertext('Invalid prisma.session.findFirst() invocation: { where: { token: "abc123def456" } }')).toBe(
+      'Invalid prisma.session.findFirst() invocation: { where: { token: "[entfernt]" } }'
+    )
     expect(nachricht(faelle[0])).toBe('Fetch {"u":"/api/og?url=https%3A%2F%2Ffarmerzone.at%2Fx%22%2C%22h%22%3A%22Bearer [entfernt]"}')
     expect(fehlertext(faelle[3])).toBe('Abruf /api/og?url=https%3A%2F%2Ffarmerzone.at%2Fx%2Ctoken%3A [entfernt] weg')
     // Gegenproben: Ein Wert, der selbst eine Adresse ist, liest die URL-Regel (ihre Parameter fallen dort);
