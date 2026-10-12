@@ -24,8 +24,8 @@
             "type": "command",
             "command": "node",
             "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/abschluss-pruefen.mjs"],
-            "timeout": 300,
-            "statusMessage": "Typecheck und Tests laufen"
+            "timeout": 420,
+            "statusMessage": "Typecheck, Lint und Tests laufen"
           }
         ]
       }

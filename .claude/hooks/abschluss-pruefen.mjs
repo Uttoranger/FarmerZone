@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Stop-Hook: Claude darf einen Zug nicht beenden, solange Typecheck oder Tests
- * rot sind. Exit 2 hält die Sitzung offen und zeigt Claude den Fehlertext.
+ * Stop-Hook: Claude darf einen Zug nicht beenden, solange Typecheck, Lint oder
+ * Tests rot sind. Exit 2 hält die Sitzung offen und zeigt Claude den Fehlertext.
  *
  * Warum das nötig ist: Eine Regel in CLAUDE.md ("vor jedem Commit testen") ist
  * eine Bitte. Dieser Hook ist eine Tür. Regeln ohne Durchsetzung werden ab der
@@ -64,7 +64,7 @@ const versuche = zaehlerLesen()
 if (versuche >= MAX_VERSUCHE) {
   zaehlerLoeschen()
   console.error(
-    `Hinweis: Typecheck/Tests waren ${MAX_VERSUCHE}× rot. Der Hook lässt dich jetzt ` +
+    `Hinweis: Typecheck/Lint/Tests waren ${MAX_VERSUCHE}× rot. Der Hook lässt dich jetzt ` +
     `durch, damit die Sitzung nicht hängt — aber der Stand ist NICHT commit-fähig. ` +
     `Sag das dem Menschen ausdrücklich im Abschlussbericht.`
   )
@@ -75,6 +75,15 @@ const typecheck = lauf('pnpm typecheck')
 if (!typecheck.ok) {
   zaehlerSchreiben(versuche + 1)
   console.error(`Typecheck ist rot — beheben, bevor du den Zug beendest:\n\n${typecheck.ausgabe}`)
+  process.exit(2)
+}
+
+// Seit Nr. 63 gehören 0 Lint-Fehler zur Abschlussprüfung; Warnungen lassen
+// durch (eslint endet dann mit 0). Derselbe Zähler wie Typecheck und Tests.
+const lint = lauf('pnpm lint')
+if (!lint.ok) {
+  zaehlerSchreiben(versuche + 1)
+  console.error(`Lint ist rot — beheben, bevor du den Zug beendest:\n\n${lint.ausgabe}`)
   process.exit(2)
 }
 

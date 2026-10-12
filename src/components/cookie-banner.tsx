@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -15,6 +15,19 @@ import {
 
 const COOKIE_KEY = 'fz_cookie_ok'
 
+// Ob der Hinweis bestätigt ist, weiß nur der Browser. Server und Hydration
+// rendern „bestätigt" (also nichts), danach liest React den Speicher — wie
+// früher der Effekt, ohne setState darin. Andere Tabs werden wie bisher nicht beobachtet.
+function nichtsAbonnieren(): () => void {
+  return () => {}
+}
+function bestaetigtImBrowser(): boolean {
+  return Boolean(localStorage.getItem(COOKIE_KEY))
+}
+function bestaetigtAufDemServer(): boolean {
+  return true
+}
+
 /**
  * Die festen Leisten unten (Merkmal an der Leiste), wie sie gerade im Fenster
  * liegen — samt allem, was aus ihnen herausragt (der erhobene Mittelknopf).
@@ -27,16 +40,15 @@ function festeLeisten(): LeistenMass[] {
 }
 
 export function CookieBanner(): React.JSX.Element | null {
-  const [visible, setVisible] = useState(false)
+  const gespeichert = useSyncExternalStore(nichtsAbonnieren, bestaetigtImBrowser, bestaetigtAufDemServer)
+  // „Verstanden" in diesem Fenster: Der Speicher meldet das Schreiben nicht von selbst.
+  const [bestaetigt, setBestaetigt] = useState(false)
+  const visible = !gespeichert && !bestaetigt
   // Seit Nr. 46 über der höchsten festen Leiste (Unterleiste, Kaufknopf) statt
   // darauf — die Regel steht in src/lib/cookie-hinweis.ts.
   const [unten, setUnten] = useState(COOKIE_HINWEIS_RAND_PX)
   const [hoehe, setHoehe] = useState(0)
   const hinweis = useRef<HTMLElement>(null)
-
-  useEffect(() => {
-    if (!localStorage.getItem(COOKIE_KEY)) setVisible(true)
-  }, [])
 
   useEffect(() => {
     if (!visible) return
@@ -64,7 +76,7 @@ export function CookieBanner(): React.JSX.Element | null {
 
   function accept() {
     localStorage.setItem(COOKIE_KEY, '1')
-    setVisible(false)
+    setBestaetigt(true)
   }
 
   if (!visible) return null

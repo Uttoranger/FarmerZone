@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Plus, Trash2, Loader2 } from 'lucide-react'
@@ -84,10 +84,13 @@ export function PickupSlotsClient({
   // Haus-Muster (nachlese-4 Punkt 14): alle drei Wege optimistisch, nach
   // Erfolg router.refresh(). Der Refresh liefert neue initialSlots — dieser
   // Sync übernimmt sie, sonst würde der useState-Startwert ewig festhängen
-  // und Server- und Client-Stand könnten nie konvergieren.
-  useEffect(() => {
+  // und Server- und Client-Stand könnten nie konvergieren. Übernommen wird
+  // beim Rendern (Zustand bei neuen Props anpassen), nicht in einem Effekt.
+  const [uebernommeneSlots, setUebernommeneSlots] = useState(initialSlots)
+  if (initialSlots !== uebernommeneSlots) {
+    setUebernommeneSlots(initialSlots)
     setSlots(initialSlots)
-  }, [initialSlots])
+  }
 
   function handleAdd() {
     // Clientseitig dieselben Regeln wie der Server (Zeitlogik, Dublette,

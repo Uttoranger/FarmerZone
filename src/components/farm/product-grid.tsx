@@ -514,10 +514,13 @@ export function ProductGrid({
   const [orderedIds, setOrderedIds] = useState<string[] | null>(null)
   const [, startReorderTransition] = useTransition()
 
-  // Neuer Server-Stand (props) macht den optimistischen Zustand obsolet
-  useEffect(() => {
+  // Neuer Server-Stand (props) macht den optimistischen Zustand obsolet —
+  // zurückgesetzt beim Rendern (Zustand bei neuen Props anpassen), nicht in einem Effekt.
+  const [produkteDerSortierung, setProdukteDerSortierung] = useState(products)
+  if (products !== produkteDerSortierung) {
+    setProdukteDerSortierung(products)
     setOrderedIds(null)
-  }, [products])
+  }
 
   // Sprint Sichtbarkeits-Schalter: der vorgezogene Sichtbarkeitsstand.
   //
