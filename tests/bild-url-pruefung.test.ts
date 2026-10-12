@@ -279,7 +279,6 @@ describe('publishStatusPost (Beitragsfoto geht auch per Mail an Abonnentinnen)',
     photoUrl,
     showOnFarmPage: true,
     sendEmail: false,
-    sendWhatsApp: false,
   })
 
   beforeEach(() => {

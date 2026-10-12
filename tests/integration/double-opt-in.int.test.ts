@@ -131,7 +131,6 @@ async function beitragPerMail(hof: Hof): Promise<{ emailCount?: number; error?: 
     anlass: 'FRESH_PRODUCT',
     showOnFarmPage: true,
     sendEmail: true,
-    sendWhatsApp: false,
   })
 }
 

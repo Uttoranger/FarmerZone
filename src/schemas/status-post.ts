@@ -38,7 +38,8 @@ export const beitragVeroeffentlichenSchema = z.object({
   linkedProductIds: z.array(z.string().min(1).max(64)).max(BEITRAG_PRODUKTE_MAX).optional(),
   showOnFarmPage: z.boolean(),
   sendEmail: z.boolean(),
-  sendWhatsApp: z.boolean(),
+  // Kein sendWhatsApp mehr (Register T5, Nr. 67): Ein Feld, das trotzdem
+  // kommt, verwirft Zod — beim Veröffentlichen geht nichts per WhatsApp raus.
 })
 
 /**

@@ -64,7 +64,7 @@ function baueBeitragsSeitenNeu(slug: string): void {
 
 export async function publishStatusPost(
   eingabe: BeitragVeroeffentlichenEingabe
-): Promise<{ postId?: string; emailCount?: number; whatsAppCount?: number; error?: string }> {
+): Promise<{ postId?: string; emailCount?: number; error?: string }> {
   const geprueft = beitragVeroeffentlichenSchema.safeParse(eingabe)
   if (!geprueft.success) {
     // Nur Titel, Text und Anlass tragen eigene deutsche Sätze; sonst stünde
@@ -112,13 +112,10 @@ export async function publishStatusPost(
       }
     }
 
-    // WhatsApp subscribers
-    const whatsAppSubscribers = data.sendWhatsApp
-      ? await prisma.customerFarmSubscription.findMany({
-          where: { farmId: farm.id, optInWhatsApp: true, customerPhone: { not: null } },
-          select: { customerEmail: true, customerPhone: true },
-        })
-      : []
+    // Kein WhatsApp-Häkchen mehr (Register T5, Nr. 67): Die Abonnentinnen
+    // erreicht der Hof danach über das Teilen-Fenster bzw. die Tipp-Liste, die
+    // sie beim Öffnen live liest (W1) — sentViaWhatsApp und
+    // whatsappRecipientCount werden hier nicht mehr gesetzt (Vorgabe der Spalten).
 
     const post = await prisma.statusPost.create({
       data: {
@@ -132,9 +129,7 @@ export async function publishStatusPost(
         publishedAt: now,
         expiresAt,
         sentViaEmail: data.sendEmail && emailSubscribers.length > 0,
-        sentViaWhatsApp: data.sendWhatsApp && whatsAppSubscribers.length > 0,
         emailRecipientCount: emailSubscribers.length,
-        whatsappRecipientCount: whatsAppSubscribers.length,
       },
     })
 
@@ -180,7 +175,7 @@ export async function publishStatusPost(
     const farmSlug = await prisma.farm.findUnique({ where: { id: farm.id }, select: { slug: true } })
     if (farmSlug) revalidatePath(`/${farmSlug.slug}`)
 
-    return { postId: post.id, emailCount: emailSubscribers.length, whatsAppCount: whatsAppSubscribers.length }
+    return { postId: post.id, emailCount: emailSubscribers.length }
   } catch (err) {
     meldeFehler('veroeffentlichen', err)
     return { error: UNERWARTET.veroeffentlichen }

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import {
   Leaf, CalendarDays, Tag, MessageCircle,
-  Home, Mail, MessageSquare, CircleDot,
+  Home, Mail,
   ArrowRight, CheckCircle, Check,
   Camera, Loader2, X,
 } from 'lucide-react'
@@ -19,8 +19,9 @@ import { renderStatusBodyWithChip } from '@/lib/status-body'
 import { MAILABSTAND_TAGE } from '@/lib/beitrag-mailabstand'
 import { tageSeit } from '@/lib/hof-kunden'
 import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
-import { kundinAdresse } from '@/lib/mein-hof-ansicht'
-import { meldeGespeichertAnsehen } from '@/components/mein-hof/gespeichert-ansehen'
+import { TeilenFenster } from '@/components/teilen/teilen-fenster'
+import { ladeBeitragFenster } from '@/components/teilen/beitrag-teilen'
+import type { TeilenFensterBeitrag } from '@/lib/teilen-fenster'
 
 type Anlass = 'FRESH_PRODUCT' | 'NEW_SEASON' | 'PROMOTION' | 'ANNOUNCEMENT'
 
@@ -44,7 +45,6 @@ const ANLASS_COLOR: Record<Anlass, string> = {
 interface Props {
   products: { id: string; name: string; price: number }[]
   emailCount: number
-  whatsAppCount: number
   recentEmailSentAt: string | null
   // Zeitpunkt der Seite (ISO, vom Server) — „vor n Tagen" rechnet nie mit der
   // Uhr des Browsers, sonst wichen Server- und Browser-HTML ab (CODING_STANDARDS §2).
@@ -98,7 +98,7 @@ function Stepper({ step }: { step: number }) {
   )
 }
 
-export function StatusNewClient({ products, emailCount, whatsAppCount, recentEmailSentAt, jetzt, prefill }: Props) {
+export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt, prefill }: Props) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [step, setStep] = useState(1)
@@ -126,8 +126,10 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
   // Channel state
   const [showOnFarmPage, setShowOnFarmPage] = useState(true)
   const [sendEmail, setSendEmail] = useState(emailCount > 0)
-  const [sendWhatsApp, setSendWhatsApp] = useState(false)
-  const [sendWhatsAppStatus, setSendWhatsAppStatus] = useState(false)
+  // Nach dem Veröffentlichen (Register T5): das Teilen-Fenster des Beitrags;
+  // „veröffentlicht" sperrt den Knopf, bis der Weg in den Reiter fertig ist.
+  const [teilen, setTeilen] = useState<TeilenFensterBeitrag | null>(null)
+  const [veroeffentlicht, setVeroeffentlicht] = useState(false)
 
   const recentEmailDaysAgo = recentEmailSentAt ? tageSeit(recentEmailSentAt, new Date(jetzt)) : null
   const emailBlocked = recentEmailDaysAgo !== null && recentEmailDaysAgo < MAILABSTAND_TAGE
@@ -160,35 +162,31 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
         linkedProductIds,
         showOnFarmPage,
         sendEmail: sendEmail && !emailBlocked,
-        sendWhatsApp,
       })
       if (res.error) {
         toast.error(res.error)
         return
       }
-      if (sendWhatsApp && whatsAppCount > 0 && res.postId) {
-        router.push(`/status/${res.postId}/send-whatsapp`)
-      } else {
-        const parts: string[] = []
-        if (showOnFarmPage) parts.push('auf der Hof-Seite')
-        if (sendEmail && !emailBlocked && (res.emailCount ?? 0) > 0)
-          parts.push(`${res.emailCount} E-Mails versendet`)
-        const meldung = `Beitrag veröffentlicht${parts.length ? ' — ' + parts.join(', ') : ''}`
-        if (showOnFarmPage) {
-          // „Gespeichert · Ansehen" (Nr. 49, Register N4): „Ansehen" führt in
-          // den Reiter mit „So sieht’s die Kundin" — die Hofseite auf dem
-          // Reiter Beiträge. Ab lg bleibt der bisherige Toast.
-          meldeGespeichertAnsehen({
-            abschnitt: 'beitraege',
-            beschreibung: meldung,
-            onAnsehen: () => router.push(kundinAdresse('beitraege')),
-          })
-        } else {
-          toast.success(meldung)
+      setVeroeffentlicht(true)
+      // Register T5: Steht der Beitrag auf der Hofseite, öffnet sich das
+      // Teilen-Fenster im Beitrag-Modus (am Handy das Blatt) — es ersetzt die
+      // Meldung und trägt die WhatsApp-Abonnentinnen als erste Karte;
+      // Schließen führt in den Reiter. Kommt das Fenster nicht, bleibt der
+      // Beitrag trotzdem veröffentlicht: dann die Meldung wie ohne Hofseite.
+      if (showOnFarmPage && res.postId) {
+        const fenster = await ladeBeitragFenster(res.postId)
+        if ('daten' in fenster) {
+          setTeilen(fenster.daten)
+          return
         }
-        // Direkt in den Reiter — /status leitet seit Nr. 22e ohnehin dorthin um.
-        router.push(BEITRAEGE_HREF)
       }
+      const parts: string[] = []
+      if (showOnFarmPage) parts.push('auf der Hof-Seite')
+      if (sendEmail && !emailBlocked && (res.emailCount ?? 0) > 0)
+        parts.push(`${res.emailCount} E-Mails versendet`)
+      toast.success(`Beitrag veröffentlicht${parts.length ? ' — ' + parts.join(', ') : ''}`)
+      // Direkt in den Reiter — /status leitet seit Nr. 22e ohnehin dorthin um.
+      router.push(BEITRAEGE_HREF)
     })
   }
 
@@ -428,25 +426,6 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
                 onChange={emailBlocked ? undefined : setSendEmail}
                 disabled={emailCount === 0 || emailBlocked}
               />
-              <ChannelCard
-                icon={<MessageSquare className="size-5" aria-hidden="true" />}
-                title="Per WhatsApp an Abonnenten"
-                subtitle={
-                  whatsAppCount > 0
-                    ? `${whatsAppCount} ${whatsAppCount === 1 ? 'Kunde' : 'Kunden'} · je 1 Tap auf "Senden"`
-                    : 'Noch keine Abonnenten'
-                }
-                checked={sendWhatsApp}
-                onChange={setSendWhatsApp}
-                disabled={whatsAppCount === 0}
-              />
-              <ChannelCard
-                icon={<CircleDot className="size-5" aria-hidden="true" />}
-                title="Als WhatsApp-Status-Bild teilen"
-                subtitle="Wir erstellen ein Bild — du postest es 1× in deinen Status"
-                checked={sendWhatsAppStatus}
-                onChange={setSendWhatsAppStatus}
-              />
             </div>
 
             <div className="bg-muted rounded-xl p-4 mb-5 text-sm text-muted-foreground">
@@ -527,37 +506,30 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
                   {emailCount} E-Mails werden automatisch versendet
                 </div>
               )}
-              {sendWhatsApp && whatsAppCount > 0 && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="size-4 text-status-fertig shrink-0" aria-hidden="true" />
-                  {whatsAppCount} WhatsApp-Nachrichten (je 1 Tap)
-                </div>
-              )}
-              {sendWhatsAppStatus && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="size-4 text-status-fertig shrink-0" aria-hidden="true" />
-                  WhatsApp-Status-Bild zum Download
-                </div>
-              )}
             </div>
 
             {/* A2: orange CTA */}
             <button
               onClick={handlePublish}
-              disabled={pending}
+              disabled={pending || veroeffentlicht}
               className={cn('w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2', FOKUS_RAHMEN)}
             >
               {pending ? 'Wird versendet…' : 'Versand starten'}
             </button>
-
-            {sendWhatsAppStatus && (
-              <p className="text-xs text-muted-foreground text-center mt-3">
-                Das Status-Bild wird nach dem Versand zum Download bereitstehen.
-              </p>
-            )}
           </div>
         )}
       </div>
+      {teilen && (
+        <TeilenFenster
+          daten={teilen}
+          offen
+          onOffenChange={(offen) => {
+            if (offen) return
+            setTeilen(null)
+            router.push(BEITRAEGE_HREF)
+          }}
+        />
+      )}
     </div>
   )
 }

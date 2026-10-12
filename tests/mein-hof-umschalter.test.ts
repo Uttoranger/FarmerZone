@@ -266,10 +266,11 @@ describe('„Gespeichert · Ansehen"', () => {
     expect(quelle('src/components/farm/farm-page-view.tsx')).not.toMatch(/onGespeichert\('titelbild'\)/)
   })
 
-  it('Beiträge: nach dem Veröffentlichen auf der Hofseite — „Ansehen" führt in den Reiter mit der Kundenansicht', () => {
+  it('Beiträge: nach dem Veröffentlichen auf der Hofseite öffnet sich das Teilen-Fenster (T5) statt „Gespeichert · Ansehen"', () => {
     const neu = quelle('src/app/(hof)/status/new/status-new-client.tsx')
-    expect(neu).toMatch(/if \(showOnFarmPage\) \{[\s\S]*?meldeGespeichertAnsehen\(\{\s*abschnitt: 'beitraege',\s*beschreibung: meldung,\s*onAnsehen: \(\) => router\.push\(kundinAdresse\('beitraege'\)\),?\s*\}\)/)
-    expect(neu).toMatch(/\} else \{\s*toast\.success\(meldung\)/)
+    expect(neu).toMatch(/if \(showOnFarmPage && res\.postId\) \{\s*const fenster = await ladeBeitragFenster\(res\.postId\)/)
+    expect(neu).toContain('<TeilenFenster')
+    expect(neu).not.toContain('meldeGespeichertAnsehen')
   })
 
   it('Produkte behält den Teilen-Moment aus Nr. 30 — kein „Gespeichert · Ansehen"', () => {
@@ -339,8 +340,8 @@ describe('„Gespeichert · Ansehen" je Abschnitt EINMAL — ein neues Speichern
     expect(angesehen).toHaveBeenCalledOnce()
   })
 
-  it('am Quelltext: der Umschalter gibt den Abschnitt mit, der Beitrag seinen eigenen', () => {
+  it('am Quelltext: der Umschalter gibt den Abschnitt mit; der Beitrag meldet sich über das Teilen-Fenster (T5)', () => {
     expect(quelle('src/components/mein-hof/mein-hof-ansicht.tsx')).toContain('meldeGespeichertAnsehen({ abschnitt, onAnsehen: () => zeigeKundin(abschnitt) })')
-    expect(quelle('src/app/(hof)/status/new/status-new-client.tsx')).toContain("abschnitt: 'beitraege'")
+    expect(quelle('src/app/(hof)/status/new/status-new-client.tsx')).not.toContain("abschnitt: 'beitraege'")
   })
 })
