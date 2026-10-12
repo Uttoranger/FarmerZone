@@ -5,13 +5,14 @@
  * tests/integration/auftritt-abschnitte.int.test.ts.
  *
  * Beweist:
- *  - Nacheinander: Das zweite Speichern liest erst, wenn das erste geschrieben
- *    hat — auch zwischen Auftritt und Profil (eine Kette je Fenster).
+ *  - Nacheinander: Das zweite Speichern beginnt erst, wenn das erste
+ *    geschrieben hat — auch zwischen Auftritt und Profil (eine Kette je Fenster).
+ *  - speichereAuftritt schickt nur den Teil des Abschnitts und liest vorher
+ *    keinen Stand (Nr. 65, Register N4: die Aktion schreibt nur Mitgeschicktes).
  *  - Ein Fehler hält die Kette nicht an: Der erste Lauf wirft (der Aufrufer
- *    bekommt den Fehler), der zweite läuft trotzdem und liest frisch.
+ *    bekommt den Fehler), der zweite läuft trotzdem; das Profil liest frisch.
  *  - Hängt ein Speichern, startet das nächste nicht daneben: Nach der
- *    Höchstwartezeit kommt der Satz mit Ausweg, ohne dass gelesen oder
- *    geschrieben wurde; die Kette wartet weiter auf das hängende. Kommt es
+ *    Höchstwartezeit kommt der Satz mit Ausweg, ohne dass geschrieben wurde; die Kette wartet weiter auf das hängende. Kommt es
  *    doch zurück, läuft das nächste wieder normal.
  *  - Die Formulare zeigen jeden Fehler als Satz, auch eine gescheiterte
  *    Anfrage (speichernOhneWurf) — statt der Fehlerseite, die Eingabe bleibt.
@@ -22,16 +23,14 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ABSCHNITT_SPEICHERN_TEXT, type AuftrittStand } from '@/lib/abschnitt-stand'
+import { ABSCHNITT_SPEICHERN_TEXT } from '@/lib/abschnitt-stand'
 
 const aktion = vi.hoisted(() => ({
-  ladeAuftrittStand: vi.fn(),
   saveAppearanceAction: vi.fn(),
   ladeProfilStand: vi.fn(),
   updateProfile: vi.fn(),
 }))
 vi.mock('@/server/actions/appearance', () => ({
-  ladeAuftrittStand: aktion.ladeAuftrittStand,
   saveAppearanceAction: aktion.saveAppearanceAction,
 }))
 vi.mock('@/server/actions/farm', () => ({
@@ -41,7 +40,6 @@ vi.mock('@/server/actions/farm', () => ({
 const sentry = vi.hoisted(() => ({ captureException: vi.fn(), addBreadcrumb: vi.fn() }))
 vi.mock('@sentry/nextjs', () => sentry)
 
-const STAND: AuftrittStand = { tagline: 'Alt', foundedYear: null, aboutText: 'Über uns von früher', sectionsConfig: [], farmValues: [] }
 const PROFIL = {
   name: 'Hof Test', ownerName: 'Max Mustermann', description: 'Gemüse aus Musterdorf', address: 'Musterweg 1',
   postalCode: '4900', city: 'Musterdorf', country: 'AT', phone: '+43 660 0000000', email: 'hof@example.com',
@@ -65,7 +63,6 @@ function spaeteAntwort() {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  aktion.ladeAuftrittStand.mockResolvedValue({ stand: STAND })
   aktion.saveAppearanceAction.mockResolvedValue({})
   aktion.ladeProfilStand.mockResolvedValue({ profil: PROFIL })
   aktion.updateProfile.mockResolvedValue({})
@@ -76,7 +73,7 @@ afterEach(() => {
 })
 
 describe('nacheinander', () => {
-  it('das zweite Speichern liest erst, wenn das erste geschrieben hat — auch Profil nach Auftritt', async () => {
+  it('das zweite Speichern beginnt erst, wenn das erste geschrieben hat — auch Profil nach Auftritt', async () => {
     const { speichereAuftritt, speichereProfil } = await speicherweg()
     const erstes = spaeteAntwort()
     aktion.saveAppearanceAction.mockReturnValueOnce(erstes.antwort)
@@ -94,31 +91,55 @@ describe('nacheinander', () => {
   })
 })
 
-describe('ein Fehler hält die Kette nicht an', () => {
-  it('der erste Lauf wirft, der zweite läuft trotzdem und liest frisch', async () => {
+describe('speichereAuftritt schickt nur den eigenen Abschnitt (Nr. 65)', () => {
+  it('nur der Teil geht an die Aktion — Werte nach Platz, kein Stand wird vorher gelesen', async () => {
     const { speichereAuftritt } = await speicherweg()
-    aktion.ladeAuftrittStand
-      .mockResolvedValueOnce({ stand: STAND })
-      .mockResolvedValueOnce({ stand: { ...STAND, aboutText: 'Inzwischen gespeichert' } })
+
+    await expect(speichereAuftritt({ farmValues: [{ icon: 'bio', title: 'Bio-zertifiziert', subtitle: '', sortOrder: 3 }] })).resolves.toEqual({})
+
+    expect(aktion.saveAppearanceAction).toHaveBeenCalledTimes(1)
+    expect(aktion.saveAppearanceAction).toHaveBeenCalledWith({ farmValues: [{ icon: 'bio', title: 'Bio-zertifiziert', subtitle: null, sortOrder: 0 }] })
+    expect(aktion.ladeProfilStand).not.toHaveBeenCalled()
+  })
+})
+
+describe('ein Fehler hält die Kette nicht an', () => {
+  it('der erste Lauf wirft, der zweite läuft trotzdem — mit seinem eigenen Teil', async () => {
+    const { speichereAuftritt } = await speicherweg()
     aktion.saveAppearanceAction.mockRejectedValueOnce(new Error('Netz weg'))
 
     const eins = speichereAuftritt({ tagline: 'Eins' })
-    const zwei = speichereAuftritt({ tagline: 'Zwei' })
+    const zwei = speichereAuftritt({ aboutText: 'Zwei' })
 
     // Der Aufrufer bekommt den Fehler (das Formular zeigt dann seinen Satz).
     await expect(eins).rejects.toThrow('Netz weg')
     await expect(zwei).resolves.toEqual({})
-    expect(aktion.ladeAuftrittStand).toHaveBeenCalledTimes(2)
+    expect(aktion.saveAppearanceAction).toHaveBeenCalledTimes(2)
+    expect(aktion.saveAppearanceAction).toHaveBeenLastCalledWith({ aboutText: 'Zwei' })
+  })
+
+  it('das Profil liest nach einem Fehler frisch', async () => {
+    const { speichereProfil } = await speicherweg()
+    aktion.ladeProfilStand.mockResolvedValueOnce({ profil: PROFIL }).mockResolvedValueOnce({ profil: { ...PROFIL, name: 'Hof Inzwischen' } })
+    aktion.updateProfile.mockRejectedValueOnce(new Error('Netz weg'))
+
+    const eins = speichereProfil({ phone: '+43 660 1111111' })
+    const zwei = speichereProfil({ phone: '+43 660 2222222' })
+
+    await expect(eins).rejects.toThrow('Netz weg')
+    await expect(zwei).resolves.toEqual({})
+    expect(aktion.ladeProfilStand).toHaveBeenCalledTimes(2)
     // Mit dem Stand des zweiten Lesens, nicht dem des ersten.
-    expect(aktion.saveAppearanceAction).toHaveBeenLastCalledWith(expect.objectContaining({ tagline: 'Zwei', aboutText: 'Inzwischen gespeichert' }))
+    expect(aktion.updateProfile).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Hof Inzwischen', phone: '+43 660 2222222' }))
   })
 
   it('auch ein Fehler beim Lesen hält sie nicht an', async () => {
-    const { speichereAuftritt } = await speicherweg()
-    aktion.ladeAuftrittStand.mockRejectedValueOnce(new Error('Netz weg'))
+    const { speichereAuftritt, speichereProfil } = await speicherweg()
+    aktion.ladeProfilStand.mockRejectedValueOnce(new Error('Netz weg'))
 
-    await expect(speichereAuftritt({ tagline: 'Eins' })).rejects.toThrow('Netz weg')
+    await expect(speichereProfil({ phone: '+43 660 1111111' })).rejects.toThrow('Netz weg')
     await expect(speichereAuftritt({ tagline: 'Zwei' })).resolves.toEqual({})
+    expect(aktion.updateProfile).not.toHaveBeenCalled()
     expect(aktion.saveAppearanceAction).toHaveBeenCalledTimes(1)
   })
 })
@@ -134,11 +155,10 @@ describe('ein hängendes Speichern', () => {
     const zwei = speichereAuftritt({ tagline: 'Zwei' })
     await vi.advanceTimersByTimeAsync(KETTE_WARTET_HOECHSTENS_MS - 1)
     // Gegenprobe: vor Ablauf der Wartezeit wartet es noch.
-    expect(aktion.ladeAuftrittStand).toHaveBeenCalledTimes(1)
+    expect(aktion.saveAppearanceAction).toHaveBeenCalledTimes(1)
     await vi.advanceTimersByTimeAsync(1)
     await expect(zwei).resolves.toEqual({ error: ABSCHNITT_SPEICHERN_TEXT.vorigesHaengt })
-    // Weder gelesen noch geschrieben — nichts lief neben dem hängenden.
-    expect(aktion.ladeAuftrittStand).toHaveBeenCalledTimes(1)
+    // Nichts geschrieben — nichts lief neben dem hängenden.
     expect(aktion.saveAppearanceAction).toHaveBeenCalledTimes(1)
 
     // Auch das nächste wartet noch auf das hängende.

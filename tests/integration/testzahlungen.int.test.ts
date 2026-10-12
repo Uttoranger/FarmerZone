@@ -11,6 +11,11 @@
  *    Stichtag. Bar und Karte beim Hof zählen immer.
  *  - Umsatz von Auswertung, Verkäufe (Woche und Jahr für die Umsatzgrenze),
  *    Heute und Kunden ohne Testzahlungen; ohne Stichtag wie vor Nr. 55.
+ *  - Seit Nr. 65 auch mit gesetztem Stichtag geprüft: Umsatz-Auswertung samt
+ *    Lieblingsprodukten (getUmsatzAuswertung, getTopProdukte), die Schnellwahl
+ *    im Verkauf-Dialog (getMeistverkaufteProduktIds) und die Servicegebühren
+ *    des Monats (getServicegebuehrenMonat); die Kundin zählt Testzahlungen
+ *    auch nicht als Bestellung (Z4, Ergänzung Lauf 10).
  *  - Die Hinweiszeile kommt genau dann, wenn eine gezeigte Zahl eine
  *    Testzahlung auslässt — auf den Seiten des Hofs wie auf Admin-Finanzen.
  *
@@ -34,8 +39,9 @@ import { istTestzahlung, ohneTestzahlungenSql, ohneTestzahlungenWhere, testzahlu
 import { umsatzfenster } from '@/lib/umsatz'
 import { getAdminFarms } from '@/server/queries/admin'
 import { getFinanzen } from '@/server/queries/finanzen'
-import { getKennzahlen } from '@/server/queries/auswertung'
-import { getSalesOverview } from '@/server/queries/manual-sales'
+import { getKennzahlen, getServicegebuehrenMonat } from '@/server/queries/auswertung'
+import { getMeistverkaufteProduktIds, getSalesOverview } from '@/server/queries/manual-sales'
+import { getTopProdukte, getUmsatzAuswertung } from '@/server/queries/analytics'
 import { getHeute } from '@/server/queries/heute'
 import { getCustomersForFarm } from '@/server/queries/customers'
 import { testzahlungenHinweisFuerHof } from '@/server/queries/testzahlungen'
@@ -207,8 +213,58 @@ describe('Umsatz ohne Testzahlungen — Auswertung, Verkäufe, Heute, Kunden', (
 
     expect(await getKennzahlen(farm.id, woche, STICHTAG)).toMatchObject({ bestellungen: 2, online: 1, vorOrt: 1, warenCents: 3250 })
     expect((await getHeute(farm.id, JETZT, Promise.resolve(), STICHTAG)).woche.dieseWocheCent).toBe(3250)
+    // Die Testzahlung zählt auch nicht als Bestellung — wie Auswertung und Admin-Hofliste (Z4, Ergänzung Lauf 10).
     const [kundin] = await getCustomersForFarm(farm.id, JETZT, STICHTAG)
-    expect(kundin).toMatchObject({ umsatzCents: 3250, orderCount: 3 })
+    expect(kundin).toMatchObject({ umsatzCents: 3250, orderCount: 2 })
+  })
+
+  it('mit Stichtag: Umsatz-Auswertung und Lieblingsprodukte der Woche ohne die Testzahlung (Nr. 65)', async () => {
+    const farm = await hofMitWoche()
+    const woche = umsatzfenster('woche', JETZT)
+
+    const auswertung = await getUmsatzAuswertung(farm.id, 'woche', 0, JETZT, STICHTAG)
+    expect(auswertung.summeCent).toBe(3250)
+    expect(auswertung.topProdukte).toEqual([expect.objectContaining({ name: 'Testprodukt', cent: 3250, menge: 2 })])
+    expect(await getTopProdukte(farm.id, woche.aktuell, 3, STICHTAG)).toEqual([expect.objectContaining({ cent: 3250, menge: 2 })])
+
+    // Gegenprobe ohne Stichtag: Die Testzahlung zählt mit.
+    expect((await getUmsatzAuswertung(farm.id, 'woche', 0, JETZT, null)).summeCent).toBe(5250)
+    expect(await getTopProdukte(farm.id, woche.aktuell, 3, null)).toEqual([expect.objectContaining({ cent: 5250, menge: 3 })])
+  })
+
+  it('mit Stichtag: die Schnellwahl „Was?" im Verkauf-Dialog zählt keine Testzahlung (Nr. 65)', async () => {
+    const { farm } = await erstelleHof()
+    const nurGetestet = await erstelleProdukt(farm.id, { name: 'Nur getestet' })
+    const verkauft = await erstelleProdukt(farm.id, { name: 'Echt verkauft' })
+    for (const tag of ['2083-03-10', '2083-03-11']) {
+      await bestelle(farm.id, { paymentMethod: 'ONLINE', createdAt: new Date(`${tag}T09:00:00+01:00`), produktId: nurGetestet.id }) // Testzahlung
+    }
+    await bestelle(farm.id, { paymentMethod: 'ONSITE_CASH', createdAt: new Date('2083-03-12T09:00:00+01:00'), produktId: verkauft.id }) // bar, echt
+
+    expect(await getMeistverkaufteProduktIds(farm.id, JETZT, STICHTAG)).toEqual([verkauft.id])
+    // Gegenprobe ohne Stichtag: Die zwei Testzahlungen liegen vorn.
+    expect(await getMeistverkaufteProduktIds(farm.id, JETZT, null)).toEqual([nurGetestet.id, verkauft.id])
+  })
+
+  it('mit Stichtag: Servicegebühren dieses Monats ohne die Testzahlung — bar und Karte beim Hof zählen (Nr. 65)', async () => {
+    const { farm } = await erstelleHof()
+    const davor = new Date('2083-03-05T10:00:00+01:00')
+    const danach = new Date('2083-03-17T10:00:00+01:00')
+    await bestelle(farm.id, { paymentMethod: 'ONLINE', createdAt: davor, gebuehrCents: 52 }) // Testzahlung
+    await bestelle(farm.id, { paymentMethod: 'ONLINE', createdAt: danach, gebuehrCents: 61 }) // echt
+    await bestelle(farm.id, { paymentMethod: 'ONSITE_CASH', createdAt: davor, gebuehrCents: 70 }) // bar, echt
+    await bestelle(farm.id, { paymentMethod: 'ONSITE_CARD', createdAt: davor, gebuehrCents: 40 }) // Karte beim Hof, echt
+
+    expect(await getServicegebuehrenMonat(farm.id, JETZT, STICHTAG)).toMatchObject({
+      monat: '2083-03',
+      onlineCents: 61,
+      onlineAnzahl: 1,
+      vorOrtCents: 110,
+      vorOrtAnzahl: 2,
+      summeCents: 171,
+    })
+    // Gegenprobe ohne Stichtag: Die Gebühr der Testzahlung zählt mit.
+    expect(await getServicegebuehrenMonat(farm.id, JETZT, null)).toMatchObject({ onlineCents: 113, onlineAnzahl: 2, vorOrtCents: 110, summeCents: 223 })
   })
 
   it('ohne Stichtag ist das Ergebnis dasselbe wie vor Nr. 55', async () => {

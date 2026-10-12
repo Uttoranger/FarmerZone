@@ -10,9 +10,13 @@
  *     bzw. `process.env.STRIPE_LIVE_AB` nur in src/lib/umgebung-server.ts;
  *     `<werte>.STRIPE_LIVE_AB` nur in src/lib/umgebung.ts (dort wird der
  *     übergebene Rohwert rein geprüft).
- *  2. Den Stichtag holt nur die Servergrenze (src/server/**): der Import von
- *     `STRIPE_LIVE_AB` und, seit Runde 1, `UMGEBUNG.stripeLiveAb` — reine
- *     Regeln bekommen ihn als Parameter.
+ *  2. Den Stichtag holt nur die Abfrageschicht (src/server/queries/**, seit
+ *     Nr. 65; vorher ganz src/server): der Import von `STRIPE_LIVE_AB` (auch
+ *     umbenannt, relativ oder als Re-Export) und, seit Runde 1,
+ *     `UMGEBUNG.stripeLiveAb` — reine Regeln bekommen ihn als Parameter.
+ *     Einen eigenen `STRIPE_LIVE_AB` (etwa eine Konstante) gibt es außer in
+ *     src/lib/umgebung-server.ts nur dort. Bestellung, Erstattung und Storno
+ *     (src/server/actions, src/server/teilerstattung.ts) kennen ihn nicht.
  *  3. Eine zweite Fassung der Regel außerhalb von testzahlung.ts: ein
  *     Größer/Kleiner-Vergleich, ein Prisma-Vergleich (`lt`, `lte`, `gt`,
  *     `gte`) oder eine Vorlage (rohes SQL, Text) mit dem Stichtag; der
@@ -27,6 +31,9 @@
  *     eigenes `NOT` daneben ist erlaubt).
  *  5. `getDashboardStats` ist entfallen (seit Heute ungenutzt, Nr. 55) und
  *     kommt nicht zurück.
+ *  6. Die Regel selbst (`@/lib/testzahlung`, auch relativ, als Re-Export oder
+ *     dynamischer Import) binden nur src/lib/** und src/server/queries/** ein
+ *     (Nr. 65).
  *
  * Zwei benannte Ausnahmen: `topfVonBestellung(b, null)` in
  * `testzahlungenBetroffen` (lib/finanzen.ts) — dort ist genau „ohne die
@@ -53,7 +60,7 @@
  * Gegenproben unten zeigen, dass jede Suche anschlägt.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { join, posix, relative } from 'node:path'
 import ts from 'typescript'
 import { describe, it, expect } from 'vitest'
 
@@ -106,6 +113,24 @@ const STICHTAG_ARGUMENT: Record<string, number> = {
 const REGEL_IM_AND = new Set(['umsatzBestellungWhere', 'ohneTestzahlungenWhere', 'umsatzTestzahlungenWhere'])
 
 type Fund = { datei: string; zeile: number; grund: string }
+
+/** Das Ziel eines Imports relativ zu src/, ohne Endung — `@/lib/x` und `../lib/x` gleich; Pakete null. */
+function modulZiel(datei: string, spezifizierer: string): string | null {
+  const pfad = spezifizierer.startsWith('@/')
+    ? spezifizierer.slice(2)
+    : spezifizierer.startsWith('.')
+      ? posix.normalize(posix.join(posix.dirname(datei), spezifizierer))
+      : null
+  return pfad === null ? null : pfad.replace(/\.(ts|tsx|js)$/, '').replace(/\/index$/, '')
+}
+
+/** Nennt ein Import oder Re-Export den Stichtag (auch umbenannt; `export *` reicht alles weiter)? */
+function nenntStichtag(knoten: ts.ImportDeclaration | ts.ExportDeclaration): boolean {
+  const istStichtagName = (e: ts.ImportSpecifier | ts.ExportSpecifier) => (e.propertyName ?? e.name).text === 'STRIPE_LIVE_AB'
+  if (ts.isExportDeclaration(knoten)) return !knoten.exportClause || (ts.isNamedExports(knoten.exportClause) && knoten.exportClause.elements.some(istStichtagName))
+  const benannt = knoten.importClause?.namedBindings
+  return !!benannt && ts.isNamedImports(benannt) && benannt.elements.some(istStichtagName)
+}
 
 function dateien(ordner: string): string[] {
   return readdirSync(ordner).flatMap((name) => {
@@ -191,11 +216,23 @@ function pruefeQuelle(datei: string, text: string): Fund[] {
       if (!ausUmgebung && datei !== PRUEF_DATEI) melde(knoten, 'liest einen Rohwert STRIPE_LIVE_AB außerhalb von src/lib/umgebung.ts')
     }
 
-    // 2. Import des Stichtags
-    if (ts.isImportDeclaration(knoten) && ts.isStringLiteral(knoten.moduleSpecifier) && knoten.moduleSpecifier.text === '@/lib/umgebung-server') {
-      const benannt = knoten.importClause?.namedBindings
-      const holt = benannt && ts.isNamedImports(benannt) && benannt.elements.some((e) => (e.propertyName ?? e.name).text === 'STRIPE_LIVE_AB')
-      if (holt && !datei.startsWith('server/')) melde(knoten, 'importiert den Stichtag außerhalb der Servergrenze (src/server)')
+    // 2. Den Stichtag holt nur die Abfrageschicht; 6. die Regel binden nur reine Regeln und Abfragen ein (Nr. 65)
+    const darfStichtag = datei.startsWith('server/queries/')
+    const darfRegel = datei.startsWith('lib/') || datei.startsWith('server/queries/')
+    if ((ts.isImportDeclaration(knoten) || ts.isExportDeclaration(knoten)) && knoten.moduleSpecifier && ts.isStringLiteral(knoten.moduleSpecifier)) {
+      const ziel = modulZiel(datei, knoten.moduleSpecifier.text)
+      if (ziel === 'lib/umgebung-server' && !darfStichtag && nenntStichtag(knoten)) melde(knoten, 'importiert den Stichtag außerhalb von src/server/queries')
+      if (ziel === 'lib/testzahlung' && !darfRegel) melde(knoten, 'bindet die Regel @/lib/testzahlung außerhalb von src/lib und src/server/queries ein')
+    }
+    if (
+      ts.isCallExpression(knoten) &&
+      knoten.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      knoten.arguments[0] &&
+      ts.isStringLiteralLike(knoten.arguments[0]) &&
+      modulZiel(datei, knoten.arguments[0].text) === 'lib/testzahlung' &&
+      !darfRegel
+    ) {
+      melde(knoten, 'bindet die Regel @/lib/testzahlung außerhalb von src/lib und src/server/queries ein')
     }
     if (
       ts.isPropertyAccessExpression(knoten) &&
@@ -203,9 +240,20 @@ function pruefeQuelle(datei: string, text: string): Fund[] {
       ts.isIdentifier(knoten.expression) &&
       knoten.expression.text === 'UMGEBUNG' &&
       datei !== LESE_DATEI &&
-      !datei.startsWith('server/')
+      !darfStichtag
     ) {
-      melde(knoten, 'liest den Stichtag über UMGEBUNG außerhalb der Servergrenze (src/server)')
+      melde(knoten, 'liest den Stichtag über UMGEBUNG außerhalb von src/server/queries')
+    }
+    // Ein eigener STRIPE_LIVE_AB (Konstante, Parameter, Weitergabe): Schlüssel in Objekten und `x.STRIPE_LIVE_AB`
+    // sind die Variable selbst (Prüfung 1), Import und Re-Export prüft die Zeile oben.
+    if (ts.isIdentifier(knoten) && knoten.text === 'STRIPE_LIVE_AB' && !darfStichtag && datei !== LESE_DATEI) {
+      const eltern = knoten.parent
+      const nurName =
+        (ts.isPropertyAccessExpression(eltern) && eltern.name === knoten) ||
+        ((ts.isPropertyAssignment(eltern) || ts.isPropertySignature(eltern) || ts.isPropertyDeclaration(eltern)) && eltern.name === knoten) ||
+        ts.isImportSpecifier(eltern) ||
+        ts.isExportSpecifier(eltern)
+      if (!nurName) melde(knoten, 'eigener Stichtag STRIPE_LIVE_AB außerhalb von src/server/queries und src/lib/umgebung-server.ts')
     }
 
     // 3. Zweite Fassung der Regel
@@ -311,26 +359,22 @@ describe('Gegenproben — jede Suche schlägt an', () => {
     expect(gruende('lib/umgebung.ts', 'const s = leseStripeLiveAb(werte.STRIPE_LIVE_AB)')).toEqual([])
   })
 
-  it('2. Import des Stichtags außerhalb der Servergrenze', () => {
+  it('2. Import des Stichtags außerhalb der Abfrageschicht', () => {
     const zeile = "import { STRIPE_LIVE_AB } from '@/lib/umgebung-server'"
-    expect(gruende('lib/finanzen.ts', zeile)).toContain('importiert den Stichtag außerhalb der Servergrenze (src/server)')
-    expect(gruende('app/(hof)/analytics/page.tsx', zeile)).toContain('importiert den Stichtag außerhalb der Servergrenze (src/server)')
+    expect(gruende('lib/finanzen.ts', zeile)).toContain('importiert den Stichtag außerhalb von src/server/queries')
+    expect(gruende('app/(hof)/analytics/page.tsx', zeile)).toContain('importiert den Stichtag außerhalb von src/server/queries')
     expect(gruende('components/x.tsx', "import { STRIPE_LIVE_AB as ab } from '@/lib/umgebung-server'")).toHaveLength(1)
     expect(gruende('server/queries/heute.ts', zeile)).toEqual([])
     // Über UMGEBUNG am Import vorbei (Runde 1):
-    expect(gruende('components/x.tsx', 'f(UMGEBUNG.stripeLiveAb)')).toEqual([
-      'liest den Stichtag über UMGEBUNG außerhalb der Servergrenze (src/server)',
-    ])
-    expect(gruende('lib/hof-kunden.ts', 'const s = UMGEBUNG.stripeLiveAb')).toContain(
-      'liest den Stichtag über UMGEBUNG außerhalb der Servergrenze (src/server)'
-    )
+    expect(gruende('components/x.tsx', 'f(UMGEBUNG.stripeLiveAb)')).toEqual(['liest den Stichtag über UMGEBUNG außerhalb von src/server/queries'])
+    expect(gruende('lib/hof-kunden.ts', 'const s = UMGEBUNG.stripeLiveAb')).toContain('liest den Stichtag über UMGEBUNG außerhalb von src/server/queries')
     expect(gruende('server/queries/x.ts', 'f(UMGEBUNG.stripeLiveAb)')).toEqual([])
     expect(gruende('lib/umgebung-server.ts', 'export const STRIPE_LIVE_AB: Date | null = UMGEBUNG.stripeLiveAb')).toEqual([])
   })
 
   it('3. eine zweite Fassung der Regel', () => {
     expect(gruende('lib/x.ts', 'const t = b.createdAt < stripeLiveAb')).toContain('vergleicht selbst mit dem Stichtag (Regel: src/lib/testzahlung.ts)')
-    expect(gruende('lib/x.ts', 'const t = b.createdAt.getTime() >= STRIPE_LIVE_AB.getTime()')).toHaveLength(1)
+    expect(gruende('server/queries/x.ts', 'const t = b.createdAt.getTime() >= STRIPE_LIVE_AB.getTime()')).toHaveLength(1)
     expect(gruende('server/x.ts', 'f({ createdAt: { lt: stripeLiveAb } })')).toContain('Prisma-Vergleich mit dem Stichtag (Regel: ohneTestzahlungenWhere)')
     expect(gruende('server/x.ts', 'const s = Prisma.sql`"createdAt" < ${stripeLiveAb}`')).toContain(
       'Stichtag in einer Vorlage — rohes SQL nur über ohneTestzahlungenSql'
@@ -383,6 +427,29 @@ describe('Gegenproben — jede Suche schlägt an', () => {
     expect(gruende('server/x.ts', 'f({ ...umsatzBestellungWhere(farmId, fenster, stripeLiveAb), NOT: { id: x } })')).toEqual([])
     expect(gruende('server/x.ts', 'f({ farmId, AND: [ohneTestzahlungenWhere(stripeLiveAb), { total: { gt: 0 } }] })')).toEqual([])
     expect(gruende('lib/umsatz.ts', 'f({ ...abgeholtImFenster(farmId, fenster), AND: [testzahlungWhere(stripeLiveAb)] })')).toEqual([])
+  })
+
+  it('6. Stichtag nur in src/server/queries und src/lib/umgebung-server.ts, die Regel nur aus src/lib und src/server/queries (Nr. 65)', () => {
+    const stichtag = 'importiert den Stichtag außerhalb von src/server/queries'
+    const umgebung = 'liest den Stichtag über UMGEBUNG außerhalb von src/server/queries'
+    const eigener = 'eigener Stichtag STRIPE_LIVE_AB außerhalb von src/server/queries und src/lib/umgebung-server.ts'
+    const regel = 'bindet die Regel @/lib/testzahlung außerhalb von src/lib und src/server/queries ein'
+    // Gegenproben: Bestellung und Erstattung bleiben unberührt (Register Z4) — dort hat der Stichtag nichts zu suchen.
+    expect(gruende('server/actions/orders.ts', "import { STRIPE_LIVE_AB } from '@/lib/umgebung-server'")).toEqual([stichtag])
+    expect(gruende('server/teilerstattung.ts', "import { STRIPE_LIVE_AB as ab } from '../lib/umgebung-server'")).toEqual([stichtag])
+    expect(gruende('server/teilerstattung.ts', "export { STRIPE_LIVE_AB } from '@/lib/umgebung-server'")).toEqual([stichtag])
+    expect(gruende('server/actions/orders.ts', 'f(UMGEBUNG.stripeLiveAb)')).toEqual([umgebung])
+    expect(gruende('server/teilerstattung.ts', "const STRIPE_LIVE_AB = new Date('2026-11-02T00:00:00+01:00')")).toEqual([eigener])
+    expect(gruende('server/actions/orders.ts', "import { istTestzahlung } from '@/lib/testzahlung'")).toEqual([regel])
+    expect(gruende('server/teilerstattung.ts', "import type { GezeigteSummen } from '../lib/testzahlung'")).toEqual([regel])
+    expect(gruende('server/actions/orders.ts', "const r = await import('@/lib/testzahlung')")).toEqual([regel])
+    expect(gruende('components/x.tsx', "export { ohneTestzahlungenWhere } from '@/lib/testzahlung'")).toEqual([regel])
+    // Erlaubt: die Abfragen, die eine Stelle, an der die Variable gelesen wird, und die reinen Regeln.
+    expect(gruende('server/queries/heute.ts', "import { STRIPE_LIVE_AB } from '@/lib/umgebung-server'\nf(STRIPE_LIVE_AB)")).toEqual([])
+    expect(gruende('lib/umgebung-server.ts', 'export const STRIPE_LIVE_AB: Date | null = UMGEBUNG.stripeLiveAb')).toEqual([])
+    expect(gruende('server/queries/admin.ts', "import { ohneTestzahlungenSql } from '@/lib/testzahlung'")).toEqual([])
+    expect(gruende('lib/umsatz.ts', "import { testzahlungWhere } from './testzahlung'")).toEqual([])
+    expect(gruende('lib/env.ts', 'const s = z.object({ STRIPE_LIVE_AB: z.string().optional() })')).toEqual([])
   })
 
   it('5. getDashboardStats', () => {

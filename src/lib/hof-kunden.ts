@@ -38,7 +38,10 @@ export type KundenZusammenfassung = {
   customerEmail: string
   customerName: string
   customerPhone: string
+  /** Bestellungen ohne Testzahlungen (Register Z4, Ergänzung Lauf 10) — gezählt wie Auswertung und Admin-Hofliste. */
   orderCount: number
+  /** Alle Bestellungen, auch Testzahlungen — so viele zeigt die Liste im Kundendetail; daran zählt „N weitere …". */
+  alleBestellungen: number
   /** Warenpreis aller Bestellungen ohne Storno, Nicht-Abholung und Testzahlung (Register Z4), in Cent. */
   umsatzCents: number
   firstOrderDate: string
@@ -75,13 +78,40 @@ export function kundenStatus(anzahl: number, tageSeitLetzter: number, tageSeitEr
   return null
 }
 
+type StatusMerkmale = Pick<KundenZusammenfassung, 'status' | 'isStammkunde' | 'isDiesenMonatAktiv' | 'isLangeNichtGesehen' | 'isNeu'>
+
+/**
+ * Status und Filter-Merkmale aus den GEZÄHLTEN Bestellungen (zeitlich
+ * sortiert) — dieselbe Zahl wie `orderCount`. Ohne gezählte Bestellung (nur
+ * Testzahlungen) gibt es keinen Status und keinen Filter: „0 Bestellungen ·
+ * Diesen Monat aktiv" widerspräche sich.
+ */
+function bestimmeStatusMerkmale(gezaehlt: readonly KundenBestellung[], jetzt: Date): StatusMerkmale {
+  const erste = gezaehlt[0]
+  const letzte = gezaehlt[gezaehlt.length - 1]
+  if (!erste || !letzte) return { status: null, isStammkunde: false, isDiesenMonatAktiv: false, isLangeNichtGesehen: false, isNeu: false }
+  const anzahl = gezaehlt.length
+  const tageSeitLetzter = Math.floor((jetzt.getTime() - letzte.createdAt.getTime()) / TAG_MS)
+  const tageSeitErster = Math.floor((jetzt.getTime() - erste.createdAt.getTime()) / TAG_MS)
+  return {
+    status: kundenStatus(anzahl, tageSeitLetzter, tageSeitErster),
+    isStammkunde: anzahl >= 3,
+    isDiesenMonatAktiv: tageSeitLetzter <= 30,
+    isLangeNichtGesehen: anzahl >= 2 && tageSeitLetzter > 60,
+    isNeu: anzahl === 1 && tageSeitErster < 14,
+  }
+}
+
 /**
  * Aus den Bestellungen EINER Kundin ihre Zusammenfassung. Name und Telefon
  * stammen aus der letzten Bestellung (die aktuellste Angabe).
  *
- * Testzahlungen (online vor `stripeLiveAb`, Register Z4) sind kein Umsatz.
- * Bestellzahl, Status und Lieblingsprodukte zählen sie weiter: Z4 nimmt sie
- * nur aus Umsatz und Gebühr (freigabe.md §13, Nr. 55 „Kunden-Umsätze").
+ * Testzahlungen (online vor `stripeLiveAb`, Register Z4) sind kein Umsatz und
+ * zählen seit Lauf 10 auch nicht zur Bestellzahl (Z4, Ergänzung: Auswertung,
+ * Admin-Hofliste und Kundenansicht zählen gleich) — und damit nicht im Status,
+ * der an ihr hängt. Lieblingsprodukte, erste und letzte Bestellung beschreiben
+ * die Liste der Bestellungen, die alle zeigt, und nehmen sie weiter mit —
+ * ebenso `alleBestellungen`, sonst fehlte unter der Liste „N weitere …".
  */
 export function fasseKundinZusammen(
   bestellungen: readonly KundenBestellung[],
@@ -92,10 +122,9 @@ export function fasseKundinZusammen(
   const sortiert = [...bestellungen].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
   const erste = sortiert[0]
   const letzte = sortiert[sortiert.length - 1]
+  const gezaehlt = sortiert.filter((b) => !istTestzahlung(b, stripeLiveAb))
 
-  const umsatzCents = sortiert
-    .filter((b) => !OHNE_UMSATZ.includes(b.status) && !istTestzahlung(b, stripeLiveAb))
-    .reduce((summe, b) => summe + b.betragCents, 0)
+  const umsatzCents = gezaehlt.filter((b) => !OHNE_UMSATZ.includes(b.status)).reduce((summe, b) => summe + b.betragCents, 0)
 
   const mengen = new Map<string, number>()
   for (const b of sortiert) {
@@ -107,26 +136,19 @@ export function fasseKundinZusammen(
     .slice(0, 3)
     .map(([name, count]) => ({ name, count }))
 
-  const daysSinceLastOrder = Math.floor((jetzt.getTime() - letzte.createdAt.getTime()) / TAG_MS)
-  const tageSeitErster = Math.floor((jetzt.getTime() - erste.createdAt.getTime()) / TAG_MS)
-  const orderCount = sortiert.length
-
   return {
     customerEmail: letzte.customerEmail,
     customerName: letzte.customerName,
     customerPhone: letzte.customerPhone,
-    orderCount,
+    orderCount: gezaehlt.length,
+    alleBestellungen: sortiert.length,
     umsatzCents,
     firstOrderDate: erste.createdAt.toISOString(),
     lastOrderDate: letzte.createdAt.toISOString(),
-    daysSinceLastOrder,
+    daysSinceLastOrder: Math.floor((jetzt.getTime() - letzte.createdAt.getTime()) / TAG_MS),
     isSubscribed: !!(abo?.optInEmail || abo?.optInWhatsApp),
     topProducts,
-    status: kundenStatus(orderCount, daysSinceLastOrder, tageSeitErster),
-    isStammkunde: orderCount >= 3,
-    isDiesenMonatAktiv: daysSinceLastOrder <= 30,
-    isLangeNichtGesehen: orderCount >= 2 && daysSinceLastOrder > 60,
-    isNeu: orderCount === 1 && tageSeitErster < 14,
+    ...bestimmeStatusMerkmale(gezaehlt, jetzt),
   }
 }
 
