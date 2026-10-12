@@ -164,3 +164,85 @@ describe('Nr. 64 — neu fängt mindestens, was main fängt (Zufallsvergleich, f
     expect(neuFingMehr).toBeGreaterThan(100)
   })
 })
+
+/** Ein Text so, wie ihn ein Mensch liest: „+" als Leerzeichen, Escapes dekodiert (auch mehrfach kodiert). */
+function lesbar(text: string): string {
+  const folge = (escapes: string) => {
+    try {
+      return decodeURIComponent(escapes)
+    } catch {
+      return escapes.replace(/%[0-7][0-9A-Fa-f]/g, (escape) => decodeURIComponent(escape))
+    }
+  }
+  let sicht = text.replace(/\+/g, ' ')
+  for (let runde = 0; runde < 5; runde++) {
+    const weiter = sicht.replace(/(?:%[0-9A-Fa-f]{2})+/g, folge)
+    if (weiter === sicht) break
+    sicht = weiter
+  }
+  return sicht
+}
+
+type Feld = 'Span-Beschreibung' | 'Adresse' | 'query_string' | 'Fehlertext' | 'Nachricht'
+
+function neuFeld(feld: Feld, text: string): string {
+  if (feld === 'Span-Beschreibung') {
+    const span = bereinigeEreignis(ereignis({ type: 'transaction', spans: [{ description: `GET https://farmerzone.at/x?q=${text}` }] }))
+    return (span as unknown as { spans: Array<{ description: string }> }).spans[0].description
+  }
+  if (feld === 'Adresse') return bereinigeEreignis(ereignis({ request: { url: `https://farmerzone.at/hoefe?q=${text}` } })).request?.url ?? ''
+  if (feld === 'query_string') {
+    const abfrage = bereinigeEreignis(ereignis({ request: { query_string: `q=${text}` } })).request?.query_string
+    return typeof abfrage === 'string' ? abfrage : ''
+  }
+  if (feld === 'Fehlertext') return neuFehlertext(text)
+  return bereinigeEreignis(ereignis({ message: text })).message ?? ''
+}
+
+describe('Nr. 64, Runde 1 — die Rückschritte aus dem Vollvergleich gegen den ganzen Code von main', () => {
+  it('von Rufnummer und E-Mail-Adresse bleibt nicht mehr lesbar als bei main — auch wenn die Nummer erst dekodiert über das Adressende reicht', () => {
+    // Je Zeile: Feld, Eingabe und wie viele Ziffern 3–9 bei main lesbar blieben (die
+    // Ziffern trägt nur die Rufnummer). Die ersten elf fand der Vollvergleich
+    // (8 × 100 000 Folgen): Zwei Nummern ohne Trenner, die zweite reicht über das
+    // Adressende — main fing den Rest nur, weil die neu kodierte Adresse ihm ein „+"
+    // oder ein Escape voranstellte (a); der Platzhalter der Plus-Lesart beendete den
+    // Wert von „token:" zu früh (b). Die nächsten drei: dieselbe Lage, in der ein
+    // geheimer Wert die Nummer bis zum Adressende nimmt, auch in Fehlertext und Nachricht.
+    const faelle: [Feld, string, number][] = [
+      ['Span-Beschreibung', 'token=+43+664+9876543%2F0664%2098765430043 664 9876543%22', 0],
+      ['Span-Beschreibung', '01201201-ABCD-EF01-2012-ABCDEF012012%C3%A4Artikelsuche=token=1%280664%29%2098765430664 9876543', 0],
+      ['Span-Beschreibung', 'token=%280664%29%2098765430043 664 9876543', 0],
+      ['Span-Beschreibung', '+436649876543/0664%2098765430664-987 65 43%2520:', 0],
+      ['Adresse', '+43 664 9876543token: (xq%40example.com%2B436649876543cka0120120120abcdefghij120664%209876543&q=', 7],
+      ['query_string', '+43 664 9876543token: (xq%40example.com%2B436649876543cka0120120120abcdefghij120664%209876543&q=', 7],
+      ['Span-Beschreibung', 'token=0664%2098765430664-987 65 43(/%22', 0],
+      ['Span-Beschreibung', '%C3%A4token=Telefonhttps://farmerzone.at/hoefe?q=0664%2098765430664-987 65 43(0664)+987+65+43', 7],
+      ['Span-Beschreibung', 'token=xq%2540example.com%2B436649876543Artikel0664%2F9876543otp: 012012%2520.%2B436649876543', 12],
+      ['Span-Beschreibung', 'token=%280664%29%2098765430043 664 9876543xq.kundin@example.com%3Axq%2Bshop%40example.com', 0],
+      ['Span-Beschreibung', '+43+664+98765430664%2098765430664 9876543%2FTel012#q=', 0],
+      ['Span-Beschreibung', 'token=10664%2098765430664 9876543', 0],
+      ['Fehlertext', 'Abruf /x?q=token=10664%2098765430664 9876543 weiter', 0],
+      ['Nachricht', 'Abruf https://farmerzone.at/x?q=token=%280664%29%2098765430043 664 9876543 weiter', 0],
+      // Aus dem Vollvergleich nach der ersten Behebung: Eine Lesart mit „+" als Trenner las die Nummer
+      // weiter, als die Regel am Schluss sie nimmt, und ein Platzhalter für den Rest zerteilte einen Wert
+      // oder eine lange Kennung, die eine spätere Regel ganz nahm (in der letzten Zeile ließ auch main
+      // 20 Ziffern stehen, aus Pfad und Ende — es dürfen nicht mehr werden).
+      ['Span-Beschreibung', '+43 664 9876543+012%3A', 0],
+      ['Fehlertext', '"/token=(0664)+987+65+43%2B43664987654301201201-abcd-ef01-2012-012012012012Hof%20)', 0],
+      ['Fehlertext', '/token=(0664)+987+65+43%2B43%20664%209876543%3Aä:0664/9876543&q=', 0],
+      ['Nachricht', '%3A:#q=/x/0664%2520987%252065430664 9876543cka0120120120abcdefghij120664/9876543', 20],
+      // Die lange Kennung, mit der der Rest fällt, endet, wo E-Mail- oder Telefon-Regel ansetzen — die laufen vorher.
+      ['Nachricht', 'https://farmerzone.at/hoefe?q=(0664) 987654301201201-abcd-ef01-2012-012012012012xq@example.com', 3],
+      ['Nachricht', 'Abholungxhttps://farmerzone.at/hoefe?q=%280664%29%2098765430043 664 9876543cka0120120120abcdefghijkl0664/9876543', 3],
+      ['Nachricht', 'xq@b%C3%A4ckerei.examplehttps://farmerzone.at/hoefe?q=(0664) 9876543pi_2Nk0120120120aBcDeF0043 664 9876543', 3],
+      // Ein „+" in einer Adresse der Plus-Lesart beendet keinen Wert; lange Kennung und Nachlese werden vereinigt.
+      ['Adresse', 'Bearer  %20/otp: 012012otp: 012012xq+shop@example.com10:200664%209876543', 7],
+      ['Nachricht', '/x/01201201-abcd-ef01-2012-012012012012+43 (664) 987-654301201201-ABCD-EF01-2012-ABCDEF012012%C3%A4pi_2Nk0120120120aBcDeF', 0],
+    ]
+    const abweichungen = faelle.flatMap(([feld, text, beiMain]) => {
+      const neu = lesbar(neuFeld(feld, text))
+      return nummernRest(neu) > beiMain || adressRest(neu) > 0 ? [`[${feld}] ${text} → ${neu}`] : []
+    })
+    expect(abweichungen).toEqual([])
+  })
+})

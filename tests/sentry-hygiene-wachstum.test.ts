@@ -92,6 +92,14 @@ const FAELLE: [string, Fall][] = [
   // Jeder Schlüssel steht am Ende des Werts davor und zählt: Jeder Wert wird trotzdem nur einmal gelesen.
   ['ersetzeZuweisungen: ein Schlüssel am Ende jedes Werts', span((t) => ({ data: { 'url.full': `https://farmerzone.at/x/${t}` } }))((n) => wiederhole('token: x]secret: 0664 98765 ', n))],
   ['Span-Beschreibung: Nummern über das Ende vieler Adressen', span((t) => ({ description: t }))((n) => wiederhole('GET https://x.example/a?q=token=1+43 664 9876543 ', n))],
+  // Runde 1: Jede Adresse wird dekodiert gelesen, ob eine Nummer über ihr Ende reicht.
+  ['Span-Beschreibung: Nummern, die erst dekodiert über das Ende vieler Adressen reichen',
+    span((t) => ({ description: t }))((n) => wiederhole('GET https://x.example/a?q=token=%280664%29%2098765430043 664 9876543 ', n))],
+  // Ziffern und Trenner hinter einer Adresse liest der Rest nur bis zur nächsten — sonst von jeder bis ans Ende (Verhältnis 16).
+  ['findeNummernReste: viele relative Adressen hintereinander', fehlertext((n) => wiederhole(' /1', n))],
+  ['ersetzeNummernVorKodierung: Nummern mit Trennern in den Werten vieler Adressen',
+    nachricht((n) => wiederhole('Abruf https://x.example/x?f=Hof_0664%2F1234567_foto.jpg ', n))],
+  ['bereinigeLesarten: Zuweisungen auf dem unveränderten Wert', adresse((n) => wiederhole('token: (xq%40example.com%2B436649876543x0664%209876543', n))],
 ]
 
 describe('Nr. 64 — Laufzeit wächst linear: t(4N)/t(N) unter 8 (Median aus 3 Läufen, bis zu 3 Versuche)', () => {

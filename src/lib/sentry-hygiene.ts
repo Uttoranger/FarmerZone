@@ -286,7 +286,7 @@ type Bereich = { anfang: number; ende: number; ersatz: string }
  * zählt jedes Zeichen ganz, auch eines außerhalb der Grundebene (Nr. 56).
  * Die Bereiche sind geordnet und überlappen nicht.
  */
-function emailBereiche(text: string): Bereich[] {
+function findeEmailBereiche(text: string): Bereich[] {
   const bereiche: Bereich[] = []
   let ende = 0
   for (let at = text.indexOf('@'); at !== -1; at = text.indexOf('@', Math.max(at + 1, ende))) {
@@ -324,7 +324,7 @@ function ersetzeVereinigt(text: string, bereiche: Bereich[]): string {
 }
 
 function ersetzeEmails(text: string): string {
-  return ersetzeVereinigt(text, emailBereiche(text))
+  return ersetzeVereinigt(text, findeEmailBereiche(text))
 }
 
 function bereinigeText(text: string): string {
@@ -346,6 +346,29 @@ function bereinigeTextGanz(text: string): string {
   return ersetzeNummernAmWort(bereinigeText(text))
 }
 
+/** Ein Zeichen einer Nummer, das URLSearchParams kodiert: alles außer Ziffer, „." und „-". */
+const KODIERTER_TRENNER = /[^\d.-]/
+
+/**
+ * Die Nachlese für einen Namen oder Wert einer Abfrage in einer Adresse im Text
+ * (Nr. 64, Runde 1), bevor URLSearchParams ihn neu kodiert. Neu kodiert verliert
+ * eine Nummer ihre Trenner („0664/1234567" → „0664%2F1234567", „0664 1234567" →
+ * „0664+1234567"), und die Nachlese am Schluss des äußersten Durchgangs sähe sie
+ * nicht mehr — in request.url fiel sie, in Nachricht, Fehlertext und
+ * Span-Beschreibung blieb sie. Deshalb fallen hier die Nummern mit einem solchen
+ * Trenner; die übrigen stehen neu kodiert unverändert da und bleiben der Nachlese
+ * am Schluss, nach den Regeln, die ein ganzes Wort nehmen (eine lange Kennung aus
+ * Hex-Ziffern zerteilt sie so nicht).
+ */
+function ersetzeNummernVorKodierung(text: string): string {
+  return text.replace(TELEFON_AM_WORT_MUSTER, (nummer) => (KODIERTER_TRENNER.test(nummer) ? TELEFON_ERSATZ : nummer))
+}
+
+/** bereinigeText samt der Nachlese vor dem Neukodieren. */
+function bereinigeTextVorKodierung(text: string): string {
+  return ersetzeNummernVorKodierung(bereinigeText(text))
+}
+
 /** Eine Nummer mit „+" vorn in der Plus-Lesart einer Abfrage: nur mit freiem
  *  linken Rand — kein Buchstabe, keine Ziffer, kein „_" und kein „+" davor,
  *  oder ein Escape, das nach dem Dekodieren noch steht („tel:+43…",
@@ -362,8 +385,8 @@ const PLUS_NUMMER_ROH = /(?:(?<=%[0-9A-Fa-f]{2})|(?<![\p{L}\p{N}\p{M}_+]))\+\d(?
  * („kundin@example.com+43…"). Die Bereiche der Nummern stehen im Text vor dem
  * Ersetzen; in einem Platzhalter liegt keine (er trägt Buchstaben).
  */
-function plusBereiche(text: string): Bereich[] {
-  const emails = emailBereiche(text)
+function findePlusBereiche(text: string): Bereich[] {
+  const emails = findeEmailBereiche(text)
   if (!text.includes('+')) return emails
   const bereiche = [...emails]
   let email = 0
@@ -396,7 +419,7 @@ type Lesarten = { roh: string; leer: string; plus: string; zuDekodiert: Umrechnu
 const UTF8 = new TextDecoder()
 
 /** Das Byte eines Escapes an dieser Stelle, sonst -1. */
-function escapeByte(text: string, stelle: number): number {
+function leseEscapeByte(text: string, stelle: number): number {
   if (text[stelle] !== '%' || !/^[0-9A-Fa-f]{2}$/.test(text.slice(stelle + 1, stelle + 3))) return -1
   return parseInt(text.slice(stelle + 1, stelle + 3), 16)
 }
@@ -410,7 +433,7 @@ function leseLesarten(roh: string): Lesarten {
   const ende: number[] = []
   let stelle = 0
   while (stelle < roh.length) {
-    const byte = escapeByte(roh, stelle)
+    const byte = leseEscapeByte(roh, stelle)
     if (byte === -1) {
       anfang[stelle] = ende[stelle] = leer.length
       leer += roh[stelle] === '+' ? ' ' : roh[stelle]
@@ -423,7 +446,7 @@ function leseLesarten(roh: string): Lesarten {
     // einem Byte, das kein Folgebyte ist, beginnt UTF-8 neu.
     const start = stelle
     const bytes = [byte]
-    for (stelle += 3; (escapeByte(roh, stelle) & 0xc0) === 0x80; stelle += 3) bytes.push(escapeByte(roh, stelle))
+    for (stelle += 3; (leseEscapeByte(roh, stelle) & 0xc0) === 0x80; stelle += 3) bytes.push(leseEscapeByte(roh, stelle))
     const zeichen = byte < 0x80 && bytes.length === 1 ? String.fromCharCode(byte) : UTF8.decode(Uint8Array.from(bytes))
     for (let i = start; i < stelle; i++) {
       anfang[i] = leer.length
@@ -442,7 +465,7 @@ function leseLesarten(roh: string): Lesarten {
  * ersetzeVorab): Ersetzte die rohe Lesart zuerst, schnitt sie der Telefon-Regel
  * die Nummer entzwei (`Abholung%3A+2026-10-10+0664%2F9876543` behielt
  * `%2F9876543`).
- * - Die Plus-Lesart roh wie vorher (plusBereiche: Adressen mit @, Nummern mit
+ * - Die Plus-Lesart roh wie vorher (findePlusBereiche: Adressen mit @, Nummern mit
  *   „+" vorn; ein Escape vor dem „+" ist ein freier Rand, kodierte Bytes in
  *   einer Domain zählen mit).
  * - Dieselbe dekodiert — einmal und, bei einem Wert, voll wie weiterDekodiert —,
@@ -462,18 +485,18 @@ function leseLesarten(roh: string): Lesarten {
  * sicher, aber nicht mehr lesbar.
  */
 function bereinigeLesarten({ roh, leer, plus, zuDekodiert }: Lesarten, voll: boolean): string {
-  const plusLesarten = plusBereiche(roh).map((bereich): Bereich => {
+  const plusLesarten = findePlusBereiche(roh).map((bereich): Bereich => {
     const [von, bis] = zuDekodiert(bereich.anfang, bereich.ende)
     return { anfang: von, ende: bis, ersatz: bereich.ersatz }
   })
-  plusLesarten.push(...plusNummern(plus, GLEICH))
+  plusLesarten.push(...findePlusNummern(plus, GLEICH))
   const lesartPlus = voll ? weiterDekodiertMitRueckweg(plus) : null
-  if (lesartPlus !== null && lesartPlus.text !== plus) plusLesarten.push(...plusNummern(lesartPlus.text, lesartPlus.zurueck))
+  if (lesartPlus !== null && lesartPlus.text !== plus) plusLesarten.push(...findePlusNummern(lesartPlus.text, lesartPlus.zurueck))
   // Schneidet keiner, bleibt alles der Regel des Werts.
   if (plusLesarten.length === 0) return leer
   const lesart = voll ? weiterDekodiertMitRueckweg(leer) : { text: leer, zurueck: GLEICH }
   if (lesart === null) return ersetzeVereinigt(leer, plusLesarten)
-  const nummern = schneidende(
+  const nummern = findeSchneidende(
     [...lesart.text.matchAll(TELEFON_MUSTER)].map((treffer): Bereich => {
       const [von, bis] = lesart.zurueck(treffer.index, treffer.index + treffer[0].length)
       return { anfang: von, ende: bis, ersatz: TELEFON_ERSATZ }
@@ -483,22 +506,56 @@ function bereinigeLesarten({ roh, leer, plus, zuDekodiert }: Lesarten, voll: boo
   )
   // Reicht eine solche Nummer in eine Adresse, fällt die Adresse mit — sonst
   // nähme ihr die Nummer den Teil vor dem @.
-  const adressen = schneidende(
-    emailBereiche(lesart.text).map((email): Bereich => {
+  const adressen = findeSchneidende(
+    findeEmailBereiche(lesart.text).map((email): Bereich => {
       const [von, bis] = lesart.zurueck(email.anfang, email.ende)
       return { anfang: von, ende: bis, ersatz: email.ersatz }
     }),
     nummern
   )
-  return ersetzeVereinigt(leer, [...plusLesarten, ...nummern, ...adressen])
+  const lesarten = [...plusLesarten, ...nummern, ...adressen]
+  return ersetzeVereinigt(leer, voll ? [...lesarten, ...findeWerteUmLesarten(leer, lesarten)] : lesarten)
 }
+
+/**
+ * Die Bereiche der Zuweisungs-Regel in einem Wert (bereinigeLesarten, Runde 1):
+ * Danach liest sie ihn ohnehin (bereinigeAbfrageWert), aber mit Platzhaltern
+ * darin, und deren Leerzeichen beendete den Wert zu früh
+ * (`token: (xq%40example.com%2B436649876543x0664%209876543` behielt `0664 9876543`).
+ * Deshalb liest sie hier den unveränderten, voll dekodierten Wert, in dem jeder
+ * Bereich der Lesarten als ein Wort ohne Trenner gilt — wie ein Platzhalter an
+ * seiner Stelle, nur ohne Leerzeichen: Ein „+" in einer Adresse der Plus-Lesart
+ * (`otp: 012012xq+shop@example.com10:200664%209876543`) ist dort kein
+ * Leerzeichen, und der Wert läuft über sie hinweg. Die Bereiche werden vereinigt.
+ */
+function findeWerteUmLesarten(leer: string, lesarten: Bereich[]): Bereich[] {
+  let maskiert = ''
+  let ende = 0
+  for (const bereich of [...lesarten].sort((a, b) => a.anfang - b.anfang)) {
+    if (bereich.ende <= ende) continue
+    const von = Math.max(bereich.anfang, ende)
+    maskiert += leer.slice(ende, von) + LESART_MASKE.repeat(bereich.ende - von)
+    ende = bereich.ende
+  }
+  const lesart = weiterDekodiertMitRueckweg(maskiert + leer.slice(ende))
+  if (lesart === null) return []
+  return findeZuweisungsBereiche(lesart.text).map((wert): Bereich => {
+    const [von, bis] = lesart.zurueck(wert.anfang, wert.ende)
+    return { anfang: von, ende: bis, ersatz: wert.ersatz }
+  })
+}
+
+/** Ein Zeichen, das für die Zuweisungs-Regel nichts ist: kein Wortzeichen (kein
+ *  Schlüssel), kein Trenner eines Werts, keine Ziffer, kein Zeichen eines
+ *  Bearer-Tokens — so liest sie einen maskierten Bereich wie einen Platzhalter. */
+const LESART_MASKE = '#'
 
 /** Die Bereiche aus `kandidaten`, die einen aus `anker` schneiden — mit
  *  `ueberstehend` nur die, die dabei über die Anker hinausreichen (ein ganz
  *  gedeckter fiele ohnehin). Linear nach dem Ordnen: Die zusammengelegten Anker
  *  und die Kandidaten laufen je einmal durch (ein Vergleich jedes Kandidaten
  *  mit jedem Anker wäre quadratisch). */
-function schneidende(kandidaten: Bereich[], anker: Bereich[], ueberstehend = false): Bereich[] {
+function findeSchneidende(kandidaten: Bereich[], anker: Bereich[], ueberstehend = false): Bereich[] {
   const vereint: { anfang: number; ende: number }[] = []
   for (const bereich of [...anker].sort((a, b) => a.anfang - b.anfang)) {
     const letzter = vereint.length > 0 ? vereint[vereint.length - 1] : null
@@ -516,14 +573,14 @@ function schneidende(kandidaten: Bereich[], anker: Bereich[], ueberstehend = fal
 }
 
 /** Die Nummern mit „+" vorn einer Plus-Lesart, umgerechnet mit `zurueck`: für
- *  sich gelesen und hinter den Platzhaltern der Adressen (plusBereiche, dort ist
+ *  sich gelesen und hinter den Platzhaltern der Adressen (findePlusBereiche, dort ist
  *  der Rand frei: `kundin%40example.com+43…`). Nur hinter den Platzhaltern
  *  gelesen, endete eine Nummer, wo eine Adresse ihr Ende als Teil vor dem @
  *  nimmt (`+43 664 9876543Tel+kundin@…`) — und die Adresse fällt hier nicht. */
-function plusNummern(text: string, zurueck: Umrechnung): Bereich[] {
+function findePlusNummern(text: string, zurueck: Umrechnung): Bereich[] {
   if (!text.includes('+')) return []
   const fuerSich = [...text.matchAll(PLUS_NUMMER_ROH)].map((treffer): Bereich => ({ anfang: treffer.index, ende: treffer.index + treffer[0].length, ersatz: TELEFON_ERSATZ }))
-  return [...fuerSich, ...plusBereiche(text).filter((bereich) => bereich.ersatz === TELEFON_ERSATZ)].map((bereich) => {
+  return [...fuerSich, ...findePlusBereiche(text).filter((bereich) => bereich.ersatz === TELEFON_ERSATZ)].map((bereich) => {
     const [von, bis] = zurueck(bereich.anfang, bereich.ende)
     return { anfang: von, ende: bis, ersatz: TELEFON_ERSATZ }
   })
@@ -531,7 +588,7 @@ function plusNummern(text: string, zurueck: Umrechnung): Bereich[] {
 
 /** Die rohen Paare einer Abfrage, zerlegt wie von URLSearchParams: Ein „?" vorn
  *  fällt, leere Stücke zwischen „&" ebenso, der Name endet am ersten „=". */
-function rohePaare(query: string): [string, string][] {
+function zerlegeRohePaare(query: string): [string, string][] {
   const stuecke = (query.startsWith('?') ? query.slice(1) : query).split('&').filter((stueck) => stueck !== '')
   return stuecke.map((stueck) => {
     const gleich = stueck.indexOf('=')
@@ -555,9 +612,9 @@ function rohePaare(query: string): [string, string][] {
  * eigene.
  */
 function bereinigeQuery(query: string, freitext = false, tiefe = 0, nachlese = true): string {
-  const regel = freitext ? bereinigeFreitext : nachlese ? bereinigeTextGanz : bereinigeText
+  const regel = freitext ? bereinigeFreitext : nachlese ? bereinigeTextGanz : bereinigeTextVorKodierung
   const sauber = new URLSearchParams()
-  for (const [nameRoh, wertRoh] of rohePaare(query)) {
+  for (const [nameRoh, wertRoh] of zerlegeRohePaare(query)) {
     const name = leseLesarten(nameRoh)
     // Ob ein Name heikel ist, entscheidet der unveränderte Name, nicht der
     // bereinigte („token@example.com=…" hieße sonst „[e-mail entfernt]").
@@ -687,15 +744,16 @@ function weiterDekodiertMitRueckweg(wert: string): { text: string; zurueck: Umre
  */
 function bereinigeAbfrageWert(wert: string, tiefe: number, nachlese: boolean): string {
   const ohneZuweisung = ersetzeZuweisungen(weiterDekodiert(wert))
-  if (!ADRESS_WERT.test(ohneZuweisung)) return nachlese ? bereinigeTextGanz(ohneZuweisung) : bereinigeText(ohneZuweisung)
+  if (!ADRESS_WERT.test(ohneZuweisung)) return nachlese ? bereinigeTextGanz(ohneZuweisung) : bereinigeTextVorKodierung(ohneZuweisung)
   return tiefe < MAX_ADRESS_TIEFE ? bereinigeUrl(ohneZuweisung, tiefe + 1, nachlese) : ADRESSE_ERSATZ
 }
 
 /** Bereinigt den Pfad-Teil: E-Mails (roh und kodiert), Telefonnummern,
  *  Zuweisungen wie „;token=…" oder „%23token=…" (Nr. 56, Runde 2: vorher
  *  prüfte die URL-Regel den Pfad nicht darauf) und undurchsichtige
- *  Kennungs-Segmente. */
-function bereinigePfad(pfad: string, nachlese: boolean): string {
+ *  Kennungs-Segmente. `kodiert`: Der Pfad gehört zu einer Adresse, die selbst ein
+ *  Abfragewert ist, und wird mit ihm neu kodiert (ersetzeNummernVorKodierung). */
+function bereinigePfad(pfad: string, nachlese: boolean, kodiert: boolean): string {
   const segmente = ersetzeZuweisungen(bereinigeText(pfad)).split('/')
   const sauber = segmente
     .map((segment, i) => {
@@ -711,7 +769,7 @@ function bereinigePfad(pfad: string, nachlese: boolean): string {
     })
     .join('/')
   // Erst nach den Segmenten: Ein langes Segment fällt ganz, statt um eine Nummer zerteilt zu werden.
-  return nachlese ? ersetzeNummernAmWort(sauber) : sauber
+  return nachlese ? ersetzeNummernAmWort(sauber) : kodiert ? ersetzeNummernVorKodierung(sauber) : sauber
 }
 
 /** Bereinigt eine volle URL: Pfad, Query und Anker. Alles ab dem ERSTEN #
@@ -728,7 +786,7 @@ function bereinigeUrl(url: string, tiefe = 0, nachlese = true): string {
   const ohneAnker = raute === -1 ? url : url.slice(0, raute)
   const anker = raute === -1 ? '' : bereinigeAnker(url.slice(raute + 1), tiefe, nachlese)
   const trenner = ohneAnker.indexOf('?')
-  const pfad = bereinigePfad(trenner === -1 ? ohneAnker : ohneAnker.slice(0, trenner), nachlese)
+  const pfad = bereinigePfad(trenner === -1 ? ohneAnker : ohneAnker.slice(0, trenner), nachlese, tiefe > 0)
   const query = trenner === -1 ? '' : bereinigeQuery(ohneAnker.slice(trenner + 1), false, tiefe, nachlese)
   return `${pfad}${query ? `?${query}` : ''}${anker ? `#${anker}` : ''}`
 }
@@ -740,7 +798,7 @@ function bereinigeUrl(url: string, tiefe = 0, nachlese = true): string {
  *  blieb) — dann wird der Anker vorher dekodiert. */
 function bereinigeAnker(anker: string, tiefe: number, nachlese: boolean): string {
   const mitTrennern = anker.includes('=') ? anker : dekodiereFehlertolerant(anker)
-  return mitTrennern.includes('=') ? bereinigeQuery(mitTrennern, false, tiefe, nachlese) : bereinigePfad(anker, nachlese)
+  return mitTrennern.includes('=') ? bereinigeQuery(mitTrennern, false, tiefe, nachlese) : bereinigePfad(anker, nachlese, tiefe > 0)
 }
 
 /** Eine absolute Adresse in einem Text, bis zum Leerraum. */
@@ -749,11 +807,11 @@ const ADRESSE_IM_TEXT = /https?:\/\/\S+/gi
 /** Bereinigt URLs, die IN einem Text stecken (Span-Beschreibungen wie
  *  „GET https://…?token=…", seit Nr. 56 Runde 1 auch groß geschrieben),
  *  danach den Text selbst. Geht eine Nummer aus einer Adresse hinter ihr weiter,
- *  fällt ihr Rest wie im Freitext (nummernReste, Nr. 64): Vorher fing die
+ *  fällt ihr Rest wie im Freitext (findeNummernReste, Nr. 64): Vorher fing die
  *  Telefon-Regel sie nur, wo die neu kodierte Adresse ihr den Anfang zufällig
  *  stehen ließ (`…token=2021-10-12+43 (664) 987-6543`). */
 function bereinigeTextMitUrls(text: string): string {
-  const ohneReste = ersetzeVereinigt(text, nummernReste(text, ADRESSE_IM_TEXT, [...text.matchAll(TELEFON_MUSTER)]))
+  const ohneReste = ersetzeVereinigt(text, findeNummernReste(text, ADRESSE_IM_TEXT, [...text.matchAll(TELEFON_MUSTER)], false))
   return bereinigeTextGanz(ohneReste.replace(ADRESSE_IM_TEXT, (url) => bereinigeUrl(url, 0, false)))
 }
 
@@ -854,6 +912,13 @@ function istGeheimerSchluessel(schluessel: string): boolean {
  * über die zusammengelegten Bereiche.
  */
 function ersetzeZuweisungen(text: string): string {
+  return ersetzeVereinigt(text, findeZuweisungsBereiche(text))
+}
+
+/** Die Bereiche von ersetzeZuweisungen, geordnet und zusammengelegt — für Regeln,
+ *  die sie mit eigenen Bereichen auf demselben Text vereinigen (bereinigeLesarten,
+ *  findeNummernReste). */
+function findeZuweisungsBereiche(text: string): Bereich[] {
   const werte: Bereich[] = []
   for (const treffer of text.matchAll(BEARER_MUSTER)) {
     const ende = treffer.index + treffer[0].length
@@ -875,7 +940,7 @@ function ersetzeZuweisungen(text: string): string {
     werte.push({ anfang: wertAnfang, ende: wertEnde, ersatz: WERT_ERSATZ })
     zuweisungEnde = wertEnde
   }
-  if (werte.length === 0) return text
+  if (werte.length === 0) return werte
   werte.sort((a, b) => a.anfang - b.anfang)
   const nummern = [...text.matchAll(NUMMER_IM_WERT)]
   const vereint: Bereich[] = []
@@ -890,7 +955,7 @@ function ersetzeZuweisungen(text: string): string {
       if (nummern[nummer].index >= aktuell.anfang) aktuell.ende = Math.max(aktuell.ende, nummern[nummer].index + nummern[nummer][0].length)
     }
   }
-  return ersetzeVereinigt(text, vereint)
+  return vereint
 }
 
 /** Eine Nummer, die einen Wert verlängert (ersetzeZuweisungen): ohne Ränder,
@@ -957,11 +1022,19 @@ function entferneIps(text: string): string {
 function bereinigeFreitext(text: string): string {
   const ohneIp = entferneIps(text)
   if (/^(?:https?:\/\/|\/)\S*$/i.test(ohneIp)) return bereinigeUrl(ohneIp)
-  const vorab = ersetzeVorab(ohneIp, ADRESSE_IM_FREITEXT)
+  const vorab = ersetzeVorab(ohneIp, ADRESSE_IM_FREITEXT, true)
   const mitAdressen = bereinigeText(vorab.replace(ADRESSE_IM_FREITEXT, (adresse) => bereinigeUrl(adresse, 0, false)))
   const ohneZuweisung = ersetzeZuweisungen(mitAdressen)
-  return ersetzeNummernAmWort(ohneZuweisung.replace(LANGE_KENNUNG_MUSTER, '[kennung entfernt]'))
+  // Lange Kennungen und Nachlese auf demselben Text, vereinigt (Runde 1): Nacheinander
+  // nahm die Kennung das Ende einer Nummer mit (`<uuid>+43 (664) 987-6543<Kennung>`
+  // ließ `+43 (664)` stehen); eine Nummer ganz in einer Kennung fällt mit ihr.
+  return ersetzeVereinigt(ohneZuweisung, [
+    ...findeTreffer(ohneZuweisung, LANGE_KENNUNG_MUSTER).map((kennung): Bereich => ({ ...kennung, ersatz: KENNUNG_ERSATZ })),
+    ...findeTreffer(ohneZuweisung, TELEFON_AM_WORT_MUSTER).map((nummer): Bereich => ({ ...nummer, ersatz: TELEFON_ERSATZ })),
+  ])
 }
+
+const KENNUNG_ERSATZ = '[kennung entfernt]'
 
 /** „Bearer" vor einem Token (ersetzeVorab), auch direkt hinter Ziffern wie
  *  die Schlüssel (istGeheimerSchluessel): `…4567Bearer …` sahen die Regeln danach
@@ -1008,8 +1081,8 @@ function wortEnde(text: string, stelle: number): number {
   return BIS_LEERRAUM.lastIndex
 }
 
-/** Die Nummer aus `liste` (geordnet, ohne Überlappung), die als letzte vor `stelle` beginnt. */
-function nummerVor(liste: RegExpExecArray[], stelle: number): RegExpExecArray | undefined {
+/** Wie viele Nummern aus `liste` (geordnet) vor `stelle` beginnen — binär gesucht. */
+function zaehleNummernVor(liste: RegExpExecArray[], stelle: number): number {
   let links = 0
   let rechts = liste.length
   while (links < rechts) {
@@ -1017,7 +1090,18 @@ function nummerVor(liste: RegExpExecArray[], stelle: number): RegExpExecArray | 
     if (liste[mitte].index < stelle) links = mitte + 1
     else rechts = mitte
   }
-  return links > 0 ? liste[links - 1] : undefined
+  return links
+}
+
+/** Die Nummer aus `liste` (geordnet, ohne Überlappung), die als letzte vor `stelle` beginnt. */
+function findeNummerVor(liste: RegExpExecArray[], stelle: number): RegExpExecArray | undefined {
+  const davor = zaehleNummernVor(liste, stelle)
+  return davor > 0 ? liste[davor - 1] : undefined
+}
+
+/** Wo die erste Nummer aus `liste` (geordnet) ab `stelle` beginnt, sonst undefined. */
+function findeErsteNummerAb(liste: RegExpExecArray[], stelle: number): number | undefined {
+  return liste[zaehleNummernVor(liste, stelle)]?.index
 }
 
 /**
@@ -1029,7 +1113,7 @@ function nummerVor(liste: RegExpExecArray[], stelle: number): RegExpExecArray | 
  * Nummer mehr, wenn ihr Anfang mit einem Wert fällt. Er bleibt nur, wenn eine
  * der beiden Regeln die Nummer danach über die Grenze der bereinigten Adresse
  * nimmt (`?tel=0664`, `/x/<uuid>+43 664 …`). Seit Nr. 64 zählt dafür jede Nummer,
- * die in der bereinigten Adresse beginnt und bis zum Ende des Rests reicht —
+ * die in der bereinigten Adresse beginnt und über ihre Grenze in den Rest reicht —
  * vorher musste der Anfang der Nummer dort unverändert stehen, und neu kodiert
  * (`?q=(0043 664 …` → `%280043`) blieb er stehen, nur der Rest fiel. Nur die
  * Zeichen zu vergleichen genügte ohnehin nicht: `?a=106&s=06 64 …` endet
@@ -1037,39 +1121,129 @@ function nummerVor(liste: RegExpExecArray[], stelle: number): RegExpExecArray | 
  * nicht an. Reicht eine E-Mail-Adresse in den Rest (`… 9876543xq%40…`), nimmt
  * ihre Regel ab ihrem Anfang die Ziffern vor der Telefon-Regel: Dann muss die
  * Telefon-Regel nur bis dorthin reichen. `nummern` sind die Treffer der
- * Telefon-Regel im Text. Linear: Jede Adresse, über deren Ende eine Nummer
- * reicht, wird einmal mehr bereinigt und gelesen; Nummern und E-Mail-Adressen
- * sucht je ein Durchgang.
+ * Telefon-Regel im Text. Seit Nr. 64, Runde 1, zählt auch eine Nummer, die erst
+ * in einer dekodierten Lesart der Adresse beginnt (findeDekodiertenRest), und der
+ * Rest bleibt auch, wenn der Wert einer Zuweisung aus der bereinigten Adresse ihn
+ * ganz deckt; `langeKennungen`: Im Freitext fällt eine lange Kennung, die der Rest
+ * anschneidet, mit ihm (findeKennungsEnde). Linear:
+ * Jede Adresse, über deren Ende eine Nummer reicht, wird einmal mehr bereinigt
+ * und gelesen, ebenso jede, hinter der eine Ziffer folgt; Nummern und
+ * E-Mail-Adressen sucht je ein Durchgang.
  */
-function nummernReste(text: string, adressen: RegExp, nummern: RegExpExecArray[]): Bereich[] {
+function findeNummernReste(text: string, adressen: RegExp, nummern: RegExpExecArray[], langeKennungen: boolean): Bereich[] {
   const bereiche: Bereich[] = []
   const nummernAmWort = [...text.matchAll(TELEFON_AM_WORT_MUSTER)]
-  const emails = [...emailBereiche(text), ...[...text.matchAll(EMAIL_KODIERT_MUSTER)].map((treffer) => ({ anfang: treffer.index, ende: treffer.index + treffer[0].length }))]
+  const emails = [...findeEmailBereiche(text), ...[...text.matchAll(EMAIL_KODIERT_MUSTER)].map((treffer) => ({ anfang: treffer.index, ende: treffer.index + treffer[0].length }))]
   emails.sort((a, b) => a.anfang - b.anfang)
   let email = 0
-  for (const adresse of text.matchAll(adressen)) {
+  const treffer = [...text.matchAll(adressen)]
+  for (const [i, adresse] of treffer.entries()) {
     const ende = adresse.index + adresse[0].length
-    const nummer = [nummerVor(nummern, ende), nummerVor(nummernAmWort, ende)].find(
+    const nummer = [findeNummerVor(nummern, ende), findeNummerVor(nummernAmWort, ende)].find(
       (kandidat) => kandidat !== undefined && kandidat.index >= adresse.index && kandidat.index + kandidat[0].length > ende
     )
-    if (nummer === undefined) continue
-    const nummerEnde = nummer.index + nummer[0].length
+    // Der Rest liest nur bis zur nächsten Adresse — so liest jede Stelle nur einmal
+    // (`/1 /2 /3 …`: Die Kette liefe sonst von jeder Adresse bis ans Ende).
+    const kette = NUMMER_KETTE.exec(text.slice(ende, i + 1 < treffer.length ? treffer[i + 1].index : text.length))?.[0] ?? ''
+    const nummerEnde = Math.max(nummer === undefined ? ende : nummer.index + nummer[0].length, ende + findeDekodiertenRest(adresse[0], kette))
+    if (nummerEnde === ende) continue
     // Die Adressen sind geordnet: Eine E-Mail-Adresse, die vor diesem Rest endet, endet vor jedem weiteren.
     while (email < emails.length && emails[email].ende <= ende) email++
     const bis = email < emails.length && emails[email].anfang < nummerEnde ? emails[email].anfang : nummerEnde
     const bereinigt = bereinigeUrl(adresse[0], 0, false)
     const zusammen = bereinigt + text.slice(ende, bis)
-    let letzteZiffer = zusammen.length - 1
-    while (letzteZiffer >= 0 && !/\d/.test(zusammen[letzteZiffer])) letzteZiffer--
-    const nimmtSie = (muster: RegExp) =>
-      [...zusammen.matchAll(muster)].some((treffer) => treffer.index < bereinigt.length && treffer.index + treffer[0].length > letzteZiffer)
-    if (nimmtSie(TELEFON_MUSTER) || nimmtSie(TELEFON_AM_WORT_MUSTER)) continue
+    // Nimmt eine Regel danach die Nummer über die Grenze der bereinigten Adresse,
+    // bleibt der Rest für sie: die Telefon-Regel oder die Nachlese — über die Grenze
+    // genügt, eine Lesart mit „+" als Trenner liest die Nummer oft weiter
+    // (`+43 664 9876543+012`), und fiele ihr Rest vorher, bliebe ihr Anfang in der
+    // Adresse —, oder der Wert einer Zuweisung aus der Adresse, wenn er den ganzen
+    // Rest deckt: Fehlertext und Freitext lesen Zuweisungen danach im ganzen Text,
+    // über ein „)" am Adressende hinweg (`/token=(0664)+987+65+43…`), und ein
+    // Platzhalter hier zerteilte den Wert (endet er vorher, an `/token=(0664) 98…`,
+    // fällt der Rest wie sonst).
+    const grenze = bereinigt.length
+    const nimmtSie =
+      [...findeTreffer(zusammen, TELEFON_MUSTER), ...findeTreffer(zusammen, TELEFON_AM_WORT_MUSTER)].some((nummer) => nummer.anfang < grenze && nummer.ende > grenze) ||
+      findeZuweisungsBereiche(zusammen).some((wert) => wert.anfang < grenze && wert.ende >= zusammen.length)
+    if (nimmtSie) continue
     // Das Zeichen, an dem die Adresse endet, bleibt — so bleibt auch ihre Grenze.
     let rest = ende + 1
     while (rest < nummerEnde && /\s/.test(text[rest])) rest++
-    if (rest < nummerEnde) bereiche.push({ anfang: rest, ende: nummerEnde, ersatz: TELEFON_ERSATZ })
+    if (rest >= nummerEnde) continue
+    // Im Freitext fällt eine lange Kennung, die der Rest anschneidet, mit ihm — so weit,
+    // wie sie nach E-Mail- und Telefon-Regel noch steht: Die laufen vor der Regel der
+    // langen Kennung (`…9876543cka…0664/9876543`, `…9876543cka…xq%40example.com`).
+    const grenzeKennung = Math.min(findeErsteNummerAb(nummern, nummerEnde) ?? text.length, email < emails.length ? emails[email].anfang : text.length)
+    bereiche.push({ anfang: rest, ende: langeKennungen ? findeKennungsEnde(text, nummerEnde, grenzeKennung) : nummerEnde, ersatz: TELEFON_ERSATZ })
   }
   return bereiche
+}
+
+/** Die Treffer eines Musters als Bereiche. */
+function findeTreffer(text: string, muster: RegExp): { anfang: number; ende: number }[] {
+  return [...text.matchAll(muster)].map((treffer) => ({ anfang: treffer.index, ende: treffer.index + treffer[0].length }))
+}
+
+/** Zeichen einer langen Kennung (LANGE_KENNUNG_MUSTER) ab einer Stelle, klebend. */
+const KENNUNG_ZEICHEN = /[A-Za-z0-9_-]*/y
+
+/** Das Ende der langen Kennung, in der das Zeichen vor `stelle` liegt und die vor
+ *  `grenze` endet, sonst `stelle` (findeNummernReste im Freitext): Endet der Rest
+ *  einer Nummer in einer Folge, die LANGE_KENNUNG_MUSTER danach ganz nähme
+ *  (`… 9876543cka…`), zerteilte sein Platzhalter sie, und der Teil dahinter bliebe
+ *  stehen — die Bereiche werden vereinigt. Linear: Die Folge liegt im Rest hinter
+ *  einer Adresse, vor der nächsten. */
+function findeKennungsEnde(text: string, stelle: number, grenze: number): number {
+  KENNUNG_ZEICHEN.lastIndex = stelle
+  KENNUNG_ZEICHEN.test(text)
+  const bis = Math.min(KENNUNG_ZEICHEN.lastIndex, grenze)
+  let von = stelle
+  while (von > 0 && /[A-Za-z0-9_-]/.test(text[von - 1])) von--
+  return bis - von >= 32 ? bis : stelle
+}
+
+/** Ziffern und Trenner einer Nummer am Anfang, auch „+" wie in der Plus-Lesart:
+ *  So weit kann eine Nummer aus einer Adresse in den Text dahinter reichen. */
+const NUMMER_KETTE = /^[\s/\-.()+\d]*/
+
+/** Ein Text so oft dekodiert, wie er sich ändert — höchstens eine Runde mehr,
+ *  als weiterDekodiert prüft (was tiefer kodiert ist, fällt dort ganz). */
+function dekodiereGanz(text: string): string {
+  let ergebnis = text
+  for (let runde = 0; runde <= MAX_ADRESS_TIEFE; runde++) {
+    const weiter = dekodiereFehlertolerant(ergebnis)
+    if (weiter === ergebnis) break
+    ergebnis = weiter
+  }
+  return ergebnis
+}
+
+/**
+ * Wie weit eine Nummer, die in einer dekodierten Lesart der Adresse beginnt, in
+ * die `kette` dahinter reicht — 0, wenn keine (findeNummernReste, Nr. 64, Runde 1).
+ * Die URL-Regel liest Abfragewerte dekodiert und nimmt dort eine Nummer bis zum
+ * Ende der Adresse; ihr Rest dahinter blieb roh stehen
+ * (`?q=token=%280664%29%2098765430043 664 9876543` → `token%3D%5Bentfernt%5D 664 9876543`).
+ * main fing ihn nur zufällig: Die neu kodierte Adresse stellte dem Rest ein „+"
+ * oder ein Escape voran. Gelesen wird wie in der URL-Regel: mit „+" als
+ * Leerzeichen die Telefon-Regel, die Nachlese und die Zuweisungs-Regel samt
+ * Nummer im Wert, mit „+" als Plus die Nummern der Plus-Lesart. Die Kette bleibt
+ * roh, wie sie im Text steht. Linear: jede Lesart einmal dekodiert und je Regel
+ * einmal gelesen.
+ */
+function findeDekodiertenRest(adresse: string, kette: string): number {
+  if (!/\d/.test(kette)) return 0
+  let weite = 0
+  const miss = (lesart: string, bereiche: { anfang: number; ende: number }[]) => {
+    for (const bereich of bereiche) {
+      if (bereich.anfang < lesart.length && bereich.ende > lesart.length) weite = Math.max(weite, bereich.ende - lesart.length)
+    }
+  }
+  const leer = dekodiereGanz(adresse.replace(/\+/g, ' '))
+  miss(leer, [...findeTreffer(leer + kette, TELEFON_MUSTER), ...findeTreffer(leer + kette, TELEFON_AM_WORT_MUSTER), ...findeZuweisungsBereiche(leer + kette)])
+  const plus = dekodiereGanz(adresse)
+  miss(plus, findePlusNummern(plus + kette, GLEICH))
+  return weite
 }
 
 /**
@@ -1093,9 +1267,9 @@ function nummernReste(text: string, adressen: RegExp, nummern: RegExpExecArray[]
  * hinter dem Leerraum. Linear: Nummern und Adressen werden je einmal gesucht,
  * jede Regel setzt je Treffer einmal an, jedes Wort liest sie höchstens
  * einmal, und eine Adresse, über deren Ende eine Nummer reicht, wird einmal
- * mehr bereinigt.
+ * mehr bereinigt. `langeKennungen`: Danach folgt LANGE_KENNUNG_MUSTER (Freitext).
  */
-function ersetzeVorab(text: string, adressen: RegExp): string {
+function ersetzeVorab(text: string, adressen: RegExp, langeKennungen: boolean): string {
   const nummern = [...text.matchAll(TELEFON_MUSTER)]
   const bereiche: Bereich[] = []
   /** Ein Wert ab `anfang`, mit Adresse und Nummer, die in ihm beginnen. Ist er
@@ -1107,12 +1281,12 @@ function ersetzeVorab(text: string, adressen: RegExp): string {
    *  wieder eine Nummer oder Adresse beginnen. Jede Runde liest nur das neue Stück. */
   const wert = (anfang: number, ende: number, ersatz: string, ziffernRest = true, nummerAb = anfang) => {
     const bis = endeMitAdresse(text, anfang, ende)
-    const erste = nummerVor(nummern, bis)
+    const erste = findeNummerVor(nummern, bis)
     if (erste !== undefined && erste.index >= nummerAb && erste.index <= anfang && erste.index + erste[0].length >= bis) return
     let ganz = bis
     for (;;) {
       let neu = ganz
-      const nummer = nummerVor(nummern, neu)
+      const nummer = findeNummerVor(nummern, neu)
       if (nummer !== undefined && nummer.index >= nummerAb) neu = Math.max(neu, nummer.index + nummer[0].length)
       if (ziffernRest && /\d/.test(text[neu - 1])) {
         ZIFFERN_REST.lastIndex = neu
@@ -1161,7 +1335,7 @@ function ersetzeVorab(text: string, adressen: RegExp): string {
     if (ende === -1 || ersetzeEmails(text.slice(anfang, ende)) === '[e-mail entfernt]') continue
     wert(anfang, ende, '[entfernt]')
   }
-  bereiche.push(...nummernReste(text, adressen, nummern))
+  bereiche.push(...findeNummernReste(text, adressen, nummern, langeKennungen))
   // Ein Bereich, der vor dem Ende des vorigen beginnt, liegt in ihm: In einem
   // Wort beginnen zwei Werte nur am selben Ort (otp: 123456) — dann zuerst der
   // längere, „otp: 905173-abc" fällt als Wert —, und der Rest einer Nummer
@@ -1217,7 +1391,7 @@ const ADRESSE_IM_FREITEXT =
  * (Prisma: token: "…", Runde 1); einer ganz ohne Schlüssel bleibt.
  */
 function bereinigeFehlertext(text: string): string {
-  const vorab = ersetzeVorab(text, ADRESSE_IM_FEHLERTEXT)
+  const vorab = ersetzeVorab(text, ADRESSE_IM_FEHLERTEXT, false)
   const mitAdressen = bereinigeText(vorab.replace(ADRESSE_IM_FEHLERTEXT, (adresse) => bereinigeUrl(adresse, 0, false)))
   return ersetzeNummernAmWort(ersetzeZuweisungen(mitAdressen))
 }

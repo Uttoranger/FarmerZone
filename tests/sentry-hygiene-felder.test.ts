@@ -1466,3 +1466,49 @@ describe('Nr. 64 — Zuweisungen: Schlüssel hinter einem Wert, Nummern im Wert 
     }
   })
 })
+
+describe('Nr. 64, Runde 1 — Nummern an Wörtern in Abfragewerten von Adressen im Text', () => {
+  const nachricht = (wert: string) => bereinigeEreignis(ereignis({ message: wert })).message
+  const fehlertext = (wert: string) => bereinigeEreignis(ereignis({ exception: { values: [{ value: wert }] } })).exception?.values?.[0].value
+  const extraText = (wert: string) => (bereinigeEreignis(ereignis({ extra: { text: wert } })).extra as { text?: string } | undefined)?.text
+  const brotkrume = (wert: string) => bereinigeEreignis(ereignis({ breadcrumbs: [{ category: 'console', message: wert }] })).breadcrumbs?.[0].message
+  const adresse = (url: string) => bereinigeEreignis(ereignis({ request: { url } })).request?.url
+  const beschreibung = (text: string) =>
+    (bereinigeEreignis(ereignis({ type: 'transaction', spans: [{ description: text }] })) as unknown as { spans: Array<{ description?: string }> }).spans[0]
+      .description
+
+  it('eine Nummer mit „/" oder Leerzeichen an einem Wort fällt in Nachricht, extra, Brotkrume, Fehlertext und Span-Beschreibung wie in request.url', () => {
+    // Vorher bereinigten diese Felder die Adresse ohne Nachlese, und die Nachlese am Schluss sah nur
+    // den neu kodierten Wert: „Hof_0664%2F1234567_foto.jpg" — dort sind „%2F" und „+" keine Trenner.
+    const datei = 'https://farmerzone.at/x?f=Hof_0664%2F1234567_foto.jpg'
+    const datei_sauber = 'https://farmerzone.at/x?f=Hof_%5Btelefon+entfernt%5D_foto.jpg'
+    expect(adresse(datei)).toBe(datei_sauber)
+    for (const feld of [nachricht, extraText, brotkrume]) expect(feld(`Abruf ${datei} gescheitert`)).toBe(`Abruf ${datei_sauber} gescheitert`)
+    expect(fehlertext('Abruf /x?f=Telefon0664%201234567Adresse gescheitert')).toBe('Abruf /x?f=Telefon%5Btelefon+entfernt%5DAdresse gescheitert')
+    expect(beschreibung('GET https://farmerzone.at/x?f=Telefon0664%201234567Adresse')).toBe('GET https://farmerzone.at/x?f=Telefon%5Btelefon+entfernt%5DAdresse')
+    // Auch im Pfad einer Adresse, die selbst ein Abfragewert ist: Er wird mit dem Wert neu kodiert.
+    expect(nachricht('Abruf https://farmerzone.at/login?next=%2Fbilder%2FHof_0664%201234567_x gescheitert')).toBe(
+      'Abruf https://farmerzone.at/login?next=%2Fbilder%2FHof_%5Btelefon+entfernt%5D_x gescheitert'
+    )
+  })
+
+  it('der Rest einer Nummer hinter einer Adresse zerteilt kein Wort, das eine spätere Regel ganz nimmt', () => {
+    // Fehlertext: Die Adresse endet an „)", die Zuweisungs-Regel liest den Wert danach darüber hinweg —
+    // ein Platzhalter für den Rest beendete ihn sonst an seinem Leerzeichen („[entfernt] entfernt]").
+    expect(fehlertext('Fehler bei /token=(0664)+987+65+43 weiter')).toBe('Fehler bei /token=[entfernt] weiter')
+    // Freitext: Beginnt mit dem Rest eine lange Kennung, fällt sie mit ihm, statt dass ihr Ende stehen bleibt.
+    expect(nachricht('Abruf https://farmerzone.at/x?q=token=%280664%29%2098765430043 664 9876543abcdefghijklmnopqrstuvwxy weiter')).toBe(
+      'Abruf https://farmerzone.at/x?q=token%3D%5Bentfernt%5D [telefon entfernt] weiter'
+    )
+  })
+
+  it('Gegenprobe: eine lange Kennung im Abfragewert fällt weiter ganz, die Nachlese zerteilt sie nicht vorher', () => {
+    // Ohne Trenner steht die Nummer neu kodiert unverändert da — sie bleibt der Nachlese am Schluss, nach der Regel der langen Kennung.
+    expect(nachricht('Abruf https://farmerzone.at/x?v=abcdef0123456789abcdef0123456789ab gescheitert')).toBe(
+      'Abruf https://farmerzone.at/x?v=[kennung entfernt] gescheitert'
+    )
+    expect(nachricht('Abruf https://farmerzone.at/x?f=Hof_06641234567_foto.jpg gescheitert')).toBe(
+      'Abruf https://farmerzone.at/x?f=Hof_[telefon entfernt]_foto.jpg gescheitert'
+    )
+  })
+})
