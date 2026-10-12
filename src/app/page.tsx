@@ -4,18 +4,19 @@ import { unstable_rethrow } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { ladeOeffentlicheHoefe } from '@/server/queries/oeffentliche-hoefe'
 import { schonGemeldet } from '@/server/oeffentlich-lesen'
-import { beispielRechnung, waehleStartseitenHoefe, type StartseitenHof } from '@/lib/startseite'
+import {
+  beispielRechnung,
+  waehleKartenHoefe,
+  waehleStartseitenHoefe,
+  type StartseitenHof,
+  type StartseitenKarte,
+} from '@/lib/startseite'
+import type { KartenForm } from '@/lib/regionskarte'
 import { istBrennmaterialSaison } from '@/lib/brennmaterial-saison'
 import { STARTSEITE_VORSCHAUBILD } from '@/lib/vorschaubild'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
-import { StartseiteKopf } from '@/components/startseite/startseite-kopf'
-import {
-  HoefeInDerNaehe,
-  HofKarten,
-  HofKartenFehler,
-  HofKartenSkelett,
-  KartenHof,
-} from '@/components/startseite/hoefe-in-der-naehe'
+import { RegionsKarte, StartseiteKopf } from '@/components/startseite/startseite-kopf'
+import { HoefeInDerNaehe, HofKarten, HofKartenFehler, HofKartenSkelett } from '@/components/startseite/hoefe-in-der-naehe'
 import {
   BrennmaterialBand,
   Fragen,
@@ -62,17 +63,20 @@ export const metadata: Metadata = {
 export const revalidate = 300
 
 /**
- * Die Höfe der Startseite — einmal je Bau (cache), obwohl Kopf und
- * Abschnitt sie beide brauchen. Scheitert das Laden, zeigt die Seite den
+ * Die Höfe der Startseite — einmal je Bau (cache), obwohl die Karte im Kopf
+ * (zweimal: Browser und Handy) und die Hofkarten sie brauchen. Karte und
+ * Hofkarten kommen aus DERSELBEN Liste, auch die Koordinaten der Pins — keine
+ * zweite Abfrage (Nr. 59). Scheitert das Laden, zeigt die Seite den
  * Fehler inline an den Karten (DESIGN_SYSTEM, „Zustände") statt der 500 für
  * die ganze Startseite; der Fehler geht trotzdem nach Sentry. BEWUSST IN KAUF
  * GENOMMEN: Diese Fassung bleibt dann bis zum nächsten Bau stehen (höchstens
  * fünf Minuten) — ein Wurf statt der Startseite wäre schlimmer, und beim Bau
  * ohne Datenbank (Build-Umgebung) bräche er den ganzen Build ab.
  */
-const ladeStartseitenHoefe = cache(async (): Promise<StartseitenHof[] | 'fehler'> => {
+const ladeStartseitenHoefe = cache(async (): Promise<{ hoefe: StartseitenHof[]; karte: StartseitenKarte } | 'fehler'> => {
   try {
-    return waehleStartseitenHoefe(await ladeOeffentlicheHoefe())
+    const liste = await ladeOeffentlicheHoefe()
+    return { hoefe: waehleStartseitenHoefe(liste), karte: waehleKartenHoefe(liste) }
   } catch (err) {
     // Nexts eigene Steuersignale (Umleitung, dynamisches Rendern) gehören
     // nicht in die Fehleranzeige.
@@ -84,13 +88,14 @@ const ladeStartseitenHoefe = cache(async (): Promise<StartseitenHof[] | 'fehler'
 })
 
 async function HofKartenGeladen() {
-  const hoefe = await ladeStartseitenHoefe()
-  return hoefe === 'fehler' ? <HofKartenFehler /> : <HofKarten hoefe={hoefe} />
+  const daten = await ladeStartseitenHoefe()
+  return daten === 'fehler' ? <HofKartenFehler /> : <HofKarten hoefe={daten.hoefe} />
 }
 
-async function KartenHofGeladen() {
-  const hoefe = await ladeStartseitenHoefe()
-  return hoefe === 'fehler' ? null : <KartenHof hof={hoefe[0] ?? null} />
+/** Ohne Daten (Fehler) nur das Land — den Fehler sagen die Hofkarten darunter. */
+async function RegionsKarteGeladen({ form }: { form: KartenForm }) {
+  const daten = await ladeStartseitenHoefe()
+  return <RegionsKarte form={form} karte={daten === 'fehler' ? null : daten.karte} />
 }
 
 /**
@@ -109,11 +114,11 @@ export default function HomePage() {
   return (
     <KundeShellMitSitzung>
       <StartseiteKopf
-        kartenHof={
-          <Suspense fallback={null}>
-            <KartenHofGeladen />
+        karte={(form) => (
+          <Suspense fallback={<RegionsKarte form={form} karte={null} />}>
+            <RegionsKarteGeladen form={form} />
           </Suspense>
-        }
+        )}
       />
       <HoefeInDerNaehe>
         <Suspense fallback={<HofKartenSkelett />}>

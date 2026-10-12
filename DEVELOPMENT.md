@@ -4866,6 +4866,16 @@ Auftrag freigabe.md §13 „56" (Sicherheitspfad, Nachprüfung). Keine Schema-Ä
   - Rückschritt aus Runde 2: In Nachricht, Brotkrume und extra endete eine absolute Adresse an „]", „)" und Anführungszeichen, und „&reorder=…" oder „&s=…" dahinter blieb. Dort reichen absolute Adressen wieder bis zum Leerraum wie auf main (`ADRESSE_IM_FREITEXT`); seit 48a3820 liest eine relative Adresse eine eingebettete absolute mit (`/api/og?url=https://…`). 5dce1f4 ließ sie davor enden; dann landeten bei einer absoluten ohne „?" die übrigen Parameter der äußeren Abfrage in deren Pfad, und „&s=…" blieb. Im Fehlertext bleibt die engere Grenze aus Runde 1: Dort stehen Adressen oft in Klammern oder JSON, und der Text dahinter hilft beim Beheben; auf main gab es dort gar keine URL-Regel.
   - Ein Abfragewert, der sich nach der letzten Dekodier-Runde noch ändert, fällt ganz; fünffach kodiert blieb der Token vorher kodiert stehen.
 
+## Startseite: Karte der Region (Nachtlauf Nr. 59, Oktober 2026)
+
+Auftrag freigabe.md §14 „59" (Mockups web-/mobil-k0-startseite-karte-region). Keine Schema-Änderung, keine Migration, kein neues Paket. Bericht 59.
+
+- **SVG statt Schmuckfläche:** Die Karte im Kopf ist ein SVG, auf dem Server gezeichnet (`RegionsKarte`), aus `src/lib/regionskarte-daten.ts` — kein Leaflet, keine Kacheln, kein Abruf, kein `<img>`; die Startseite lädt dafür kein Skript. Projektion wie die Webkarte (`weltPixel`), eine Einheit = ein Weltpixel bei der festen Zoomstufe der Zeichnung: So gruppiert `gruppierePins` (Nr. 52) ohne Umrechnung. Zwei Zeichnungen (Browser 520 px, Handy 358 px) statt einer skalierten, weil Schrift und Pins am Handy sonst auf zwei Drittel schrumpften.
+- **Daten aus Natural Earth:** OpenStreetMap war in der Umgebung gesperrt; Natural Earth (gemeinfrei) lag vor. Erzeugt von einem Skript außerhalb des Repos (Schritte im Kopf der Datei). Im Ausschnitt hat Natural Earth nur Inn, Salzach und Straßen mit E-Nummern — Orte, Mattig, Antiesen, Wald und die B-Nummern fehlen und sind weggelassen, nicht nachgezeichnet. Ein OSM-Auszug ergänzte nur diese Datei (dann mit „Kartendaten: © OpenStreetMap-Mitwirkende" unter der Karte).
+- **Fachregeln:** Zähler und Pins sind die Höfe der öffentlichen Liste mit Koordinaten im Ausschnitt, pausierte mit; ohne Koordinaten oder außerhalb fehlen sie und zählen nicht. Hervorgehoben wird der zuletzt freigeschaltete nicht pausierte Hof mit Foto, sonst der erste in der Reihenfolge der Hofkarten. Liste und Karte kommen aus einer Abfrage (`ladeOeffentlicheHoefe`); `waehleStartseitenHoefe` behält die Koordinaten (`lage`).
+- **Farben:** Die Karte ist Papier auf dem Foto und folgt dem Modus nicht — nur theme-feste Tokens. Flüsse grün statt blau, weil das Design-System kein Blau kennt.
+- **Beschriftungen:** Ein Name steht nur dort, wo er Rand, Pins und anderen Namen ausweicht, sonst gar nicht; das Schild E55 entfällt so im Browser (es läge unter „Karte öffnen").
+
 ## Nützliche Befehle
 
 ```bash

@@ -23,6 +23,8 @@ import {
 } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { BAR_OHNE_GEBUEHR_HINWEIS, mitBarAusnahme } from '@/lib/konditionen'
+import { gruppenBeschriftung, type PinPunkt } from '@/lib/hoefe-anzeige'
+import { liegtImAusschnitt, type GeoPunkt } from '@/lib/regionskarte'
 
 /** Eine Adresse der Hofübersicht mit genau diesen Filtern; ohne Filter die nackte /hoefe. */
 export function hoefeAdresse(teil: Partial<HoefeFilter> = {}): string {
@@ -51,8 +53,14 @@ export const STARTSEITE_CHIPS: readonly SuchChip[] = [
   { label: KATEGORIE_LABEL.BRENNHOLZ, filter: { kategorien: ['BRENNHOLZ'] } },
 ]
 
-/** Die Karte rechts im Kopf und „Alle Höfe auf der Karte" führen hierhin. */
+/** Die Karte im Kopf und „Alle Höfe auf der Karte" führen hierhin. */
 export const KARTE_ADRESSE = hoefeAdresse({ ansicht: 'karte' })
+
+/** Der Knopf unter der Karte am Handy (Mockup mobil-k0-startseite-karte-region). */
+export const KARTE_KNOPF = 'Alle Höfe auf der Karte'
+
+/** Die Pille unten rechts auf der Karte im Browser (Mockup web-k0-startseite-karte-region). */
+export const KARTE_OEFFNEN = 'Karte öffnen'
 
 /** „Brennmaterial finden" im Saisonband. */
 export const BRENNMATERIAL_ADRESSE = hoefeAdresse({ kategorien: ['BRENNHOLZ'] })
@@ -117,6 +125,8 @@ export type StartseitenHofEingabe = {
   kategorien: readonly ProductCategoryValue[]
   naechsteAbholung: NaechsteAbholung | null
   fotos: readonly string[]
+  latitude: number | null
+  longitude: number | null
 }
 
 /** Eine Karte unter „Höfe in deiner Nähe" — fertig zum Zeichnen, ohne Decimal und Date. */
@@ -133,21 +143,22 @@ export type StartseitenHof = {
   angebot: string
   /** Das erste Foto des Fotostreifens (Titelbild zuerst), sonst null. */
   foto: string | null
+  /** Wo der Hof liegt — null ohne Koordinaten (dann kein Pin auf der Karte). */
+  lage: GeoPunkt | null
 }
 
-/**
- * Die Höfe der Startseite. Einen Standort kennt die Seite nicht (er bleibt im
- * Browser, und erst /hoefe fragt danach) — deshalb die Reihenfolge der
- * Übersicht ohne Bezugspunkt (Freischaltung, die ältesten zuerst), pausierte
- * Höfe ans Ende: Wer zum ersten Mal kommt, soll zuerst Höfe sehen, bei denen
- * man gerade bestellen kann.
- */
-export function waehleStartseitenHoefe(
-  hoefe: readonly StartseitenHofEingabe[],
-  deckel: number = STARTSEITE_HOEFE_DECKEL
-): StartseitenHof[] {
-  const geordnet = [...hoefe.filter((h) => !h.isPaused), ...hoefe.filter((h) => h.isPaused)]
-  return geordnet.slice(0, Math.max(0, deckel)).map((hof) => ({
+/** Die Lage aus der Liste: nur mit beiden Koordinaten. */
+function leseLage(hof: StartseitenHofEingabe): GeoPunkt | null {
+  return hof.latitude === null || hof.longitude === null ? null : { lat: hof.latitude, lon: hof.longitude }
+}
+
+/** Erst die Höfe, bei denen man gerade bestellen kann, pausierte ans Ende — die Reihenfolge der Liste bleibt sonst. */
+function ordneOffeneZuerst(hoefe: readonly StartseitenHofEingabe[]): StartseitenHofEingabe[] {
+  return [...hoefe.filter((h) => !h.isPaused), ...hoefe.filter((h) => h.isPaused)]
+}
+
+function bereiteStartseitenHof(hof: StartseitenHofEingabe): StartseitenHof {
+  return {
     slug: hof.slug,
     name: hof.name,
     ort: `${hof.postalCode} ${hof.city}`.trim(),
@@ -162,7 +173,77 @@ export function waehleStartseitenHoefe(
       .map((k) => KATEGORIE_LABEL[k])
       .join(' · '),
     foto: hof.fotos[0] ?? null,
-  }))
+    lage: leseLage(hof),
+  }
+}
+
+/**
+ * Die Höfe der Startseite. Einen Standort kennt die Seite nicht (er bleibt im
+ * Browser, und erst /hoefe fragt danach) — deshalb die Reihenfolge der
+ * Übersicht ohne Bezugspunkt (Freischaltung, die ältesten zuerst), pausierte
+ * Höfe ans Ende: Wer zum ersten Mal kommt, soll zuerst Höfe sehen, bei denen
+ * man gerade bestellen kann.
+ */
+export function waehleStartseitenHoefe(
+  hoefe: readonly StartseitenHofEingabe[],
+  deckel: number = STARTSEITE_HOEFE_DECKEL
+): StartseitenHof[] {
+  return ordneOffeneZuerst(hoefe).slice(0, Math.max(0, deckel)).map(bereiteStartseitenHof)
+}
+
+// ─── Karte der Region (Nr. 59) ──────────────────────────────────────────────
+
+/** So viele Kategorien nennt die Hofkarte auf der Karte (Mockup: „Mattighofen · Gemüse · Eier"). */
+export const KARTENHOF_KATEGORIEN = 2
+
+/** Die Hofkarte auf der Karte — Text im Link, ohne Bild. */
+export type KartenHofkarte = Pick<StartseitenHof, 'slug' | 'name' | 'abholung' | 'abholungIstTermin'> & {
+  /** „Mattighofen · Gemüse · Eier" — Ort und bis zu zwei Kategorien. */
+  zeile: string
+}
+
+export type StartseitenKarte = {
+  /** Die Höfe der Liste, die im Ausschnitt liegen — so viele zählt der Zähler. */
+  pins: PinPunkt[]
+  hervorgehoben: KartenHofkarte | null
+}
+
+/**
+ * Was die Karte der Region zeigt — aus DERSELBEN Liste wie die Hofkarten
+ * darunter (keine zweite Abfrage). Auf der Karte stehen die Höfe mit
+ * Koordinaten im Ausschnitt, pausierte mit: Sie stehen auch in der Liste.
+ * Höfe ohne Koordinaten oder außerhalb fehlen auf der Karte und zählen nicht
+ * — der Zähler nennt genau die Höfe, die die Karte zeigt.
+ *
+ * Hervorgehoben wird der zuletzt freigeschaltete Hof mit Foto (die Liste kommt
+ * nach Freischaltung, die ältesten zuerst), sonst der erste in der Reihenfolge
+ * der Hofkarten. Ein pausierter Hof wird nur hervorgehoben, wenn alle
+ * pausieren: Die Karte soll einen Hof zeigen, bei dem man bestellen kann.
+ */
+export function waehleKartenHoefe(hoefe: readonly StartseitenHofEingabe[]): StartseitenKarte {
+  const aufDerKarte = hoefe.flatMap((hof) => {
+    const lage = leseLage(hof)
+    return lage && liegtImAusschnitt(lage) ? [{ hof, lage }] : []
+  })
+  const pins = aufDerKarte.map(({ hof, lage }, i): PinPunkt => ({ slug: hof.slug, nummer: i + 1, lat: lage.lat, lon: lage.lon }))
+  const hoefeDerKarte = aufDerKarte.map(({ hof }) => hof)
+  const hof = hoefeDerKarte.findLast((h) => !h.isPaused && h.fotos.length > 0) ?? ordneOffeneZuerst(hoefeDerKarte)[0]
+  if (!hof) return { pins, hervorgehoben: null }
+  const { slug, name, abholung, abholungIstTermin } = bereiteStartseitenHof(hof)
+  const zeile = [hof.city.trim(), ...hof.kategorien.slice(0, KARTENHOF_KATEGORIEN).map((k) => KATEGORIE_LABEL[k])]
+    .filter(Boolean)
+    .join(' · ')
+  return { pins, hervorgehoben: { slug, name, abholung, abholungIstTermin, zeile } }
+}
+
+/** Der Zähler oben links auf der Karte: „19 Höfe in der Region". */
+export function formatiereRegionsZaehler(anzahl: number): string {
+  return `${gruppenBeschriftung(anzahl)} in der Region`
+}
+
+/** Der Name des Kartenlinks für Screenreader — mit der Zahl, sobald es mehr als einen Hof gibt. */
+export function benenneKartenLink(anzahl: number): string {
+  return anzahl > 1 ? `Alle ${anzahl} Höfe auf der Karte ansehen` : 'Alle Höfe auf der Karte ansehen'
 }
 
 // ─── Warum direkt vom Hof: Beispielrechnung ─────────────────────────────────

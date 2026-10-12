@@ -23,6 +23,10 @@
  *    HTML (Tokens tragen beide Themes).
  *  - Aufbau der Seite: KundeShell statt LandingNav, Höfe hinter Suspense mit
  *    Skelett, Brennmaterial-Band hinter der Saisonregel.
+ *  - Karte der Region (Nr. 59): Zähler und Pins aus den Höfen der Liste mit
+ *    Koordinaten im Ausschnitt, der hervorgehobene Hof, EIN Link auf die
+ *    Kartenansicht mit der Zahl im Namen, SVG ohne Bild und ohne Abruf, Farben
+ *    nur über Tokens; Liste und Karte aus EINER Abfrage.
  *
  * Gegenproben: Jede gesuchte Abwesenheit wird an einer Stelle gesucht, an der
  * dasselbe Merkmal nachweislich vorkommt.
@@ -54,6 +58,9 @@ import {
   STARTSEITE_FRAGEN,
   beispielRechnung,
   hoefeAdresse,
+  benenneKartenLink,
+  formatiereRegionsZaehler,
+  waehleKartenHoefe,
   waehleStartseitenHoefe,
   type StartseitenHofEingabe,
 } from '@/lib/startseite'
@@ -62,14 +69,8 @@ import { STARTSEITE_VORSCHAUBILD } from '@/lib/vorschaubild'
 import { KATEGORIE_LABEL } from '@/lib/taxonomie'
 import type { ProductCategoryValue } from '@/schemas/product'
 import { leseHoefeFilter, type HoefeFilter } from '@/schemas/hoefe-filter'
-import { StartseiteKopf } from '@/components/startseite/startseite-kopf'
-import {
-  HoefeInDerNaehe,
-  HofKarten,
-  HofKartenFehler,
-  HofKartenSkelett,
-  KartenHof,
-} from '@/components/startseite/hoefe-in-der-naehe'
+import { RegionsKarte, StartseiteKopf } from '@/components/startseite/startseite-kopf'
+import { HoefeInDerNaehe, HofKarten, HofKartenFehler, HofKartenSkelett } from '@/components/startseite/hoefe-in-der-naehe'
 import {
   BrennmaterialBand,
   Fragen,
@@ -80,6 +81,8 @@ import {
 } from '@/components/startseite/startseite-abschnitte'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
+/** Ohne Kommentare — die Dateien erklären, was sie NICHT tun. */
+const code = (pfad: string) => quelle(pfad).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 const html = (element: ReactElement) => renderToStaticMarkup(element)
 
 /** Liest eine /hoefe-Adresse so, wie /hoefe sie liest. */
@@ -100,9 +103,21 @@ function hof(teil: Partial<StartseitenHofEingabe> & { slug: string }): Startseit
     kategorien: ['EIER'],
     naechsteAbholung: null,
     fotos: [],
+    latitude: null,
+    longitude: null,
     ...teil,
   }
 }
+
+/** Erfundene Lagen im Ausschnitt der Karte (12,80–13,62 / 47,93–48,40) und eine weit draußen. */
+const IM_AUSSCHNITT = [
+  { latitude: 48.2, longitude: 13.1 },
+  { latitude: 48.3, longitude: 13.4 },
+  { latitude: 48.05, longitude: 13.2 },
+  { latitude: 48.1, longitude: 12.95 },
+] as const
+const WEIT_DRAUSSEN = { latitude: 47.2, longitude: 15.4 } as const
+const HEUTE_NACHMITTAG = { dayOfWeek: 1, startTime: '15:00', endTime: '18:00', tageVoraus: 0 } as const
 
 describe('Metadaten', () => {
   it('Titel und Beschreibung nennen Futter — Open Graph und Twitter-Karte sagen dasselbe', () => {
@@ -232,6 +247,69 @@ describe('waehleStartseitenHoefe', () => {
   it('keine Höfe → leere Auswahl (die Seite zeigt den Leerzustand)', () => {
     expect(waehleStartseitenHoefe([])).toEqual([])
   })
+
+  it('behält die Koordinaten aus der Liste (Nr. 59) — ohne Koordinaten keine Lage', () => {
+    const [mit, ohne] = waehleStartseitenHoefe([hof({ slug: 'mit', ...IM_AUSSCHNITT[0] }), hof({ slug: 'ohne' })])
+    expect(mit.lage).toEqual({ lat: 48.2, lon: 13.1 })
+    expect(ohne.lage).toBeNull()
+  })
+})
+
+describe('Karte der Region — Zähler, Pins und hervorgehobener Hof (Nr. 59)', () => {
+  it('zählt die Höfe der Liste, die die Karte zeigt: mit Koordinaten im Ausschnitt, pausierte mit', () => {
+    const karte = waehleKartenHoefe([
+      hof({ slug: 'a', ...IM_AUSSCHNITT[0] }),
+      hof({ slug: 'pause', isPaused: true, ...IM_AUSSCHNITT[1] }),
+      hof({ slug: 'weit', ...WEIT_DRAUSSEN }),
+      hof({ slug: 'ohne' }),
+    ])
+    expect(karte.pins.map((p) => p.slug)).toEqual(['a', 'pause'])
+    expect(formatiereRegionsZaehler(karte.pins.length)).toBe('2 Höfe in der Region')
+    expect(benenneKartenLink(karte.pins.length)).toBe('Alle 2 Höfe auf der Karte ansehen')
+  })
+
+  it('ein Hof in der Einzahl; ohne Zahl nennt der Link keine', () => {
+    expect(formatiereRegionsZaehler(1)).toBe('1 Hof in der Region')
+    expect(benenneKartenLink(1)).toBe('Alle Höfe auf der Karte ansehen')
+    expect(benenneKartenLink(0)).toBe('Alle Höfe auf der Karte ansehen')
+  })
+
+  it('hervorgehoben: der zuletzt freigeschaltete Hof mit Foto (die Liste kommt älteste zuerst)', () => {
+    const karte = waehleKartenHoefe([
+      hof({ slug: 'alt-mit-foto', fotos: ['/a.jpg'], ...IM_AUSSCHNITT[0] }),
+      hof({ slug: 'neu-mit-foto', fotos: ['/b.jpg'], ...IM_AUSSCHNITT[1] }),
+      hof({ slug: 'neuer-ohne-foto', ...IM_AUSSCHNITT[2] }),
+      hof({ slug: 'pause-mit-foto', isPaused: true, fotos: ['/c.jpg'], ...IM_AUSSCHNITT[3] }),
+      hof({ slug: 'weit-mit-foto', fotos: ['/d.jpg'], ...WEIT_DRAUSSEN }),
+    ])
+    expect(karte.hervorgehoben?.slug).toBe('neu-mit-foto')
+  })
+
+  it('ohne Foto der erste wie in der Liste darunter — pausierte zuletzt; ohne Höfe keiner', () => {
+    const karte = waehleKartenHoefe([hof({ slug: 'pause', isPaused: true, ...IM_AUSSCHNITT[0] }), hof({ slug: 'offen', ...IM_AUSSCHNITT[1] })])
+    expect(karte.hervorgehoben?.slug).toBe('offen')
+    expect(waehleKartenHoefe([hof({ slug: 'ohne' })])).toEqual({ pins: [], hervorgehoben: null })
+  })
+
+  it('die Hofkarte: Name, Ort, bis zu zwei Kategorien, nächste Abholung', () => {
+    const { hervorgehoben } = waehleKartenHoefe([
+      hof({
+        slug: 'x',
+        name: 'Hof X',
+        city: 'Testort',
+        kategorien: ['GEMUESE', 'EIER', 'BROT'],
+        naechsteAbholung: HEUTE_NACHMITTAG,
+        ...IM_AUSSCHNITT[0],
+      }),
+    ])
+    expect(hervorgehoben).toEqual({
+      slug: 'x',
+      name: 'Hof X',
+      zeile: `Testort · ${KATEGORIE_LABEL.GEMUESE} · ${KATEGORIE_LABEL.EIER}`,
+      abholung: 'Heute 15:00–18:00',
+      abholungIstTermin: true,
+    })
+  })
 })
 
 describe('beispielRechnung', () => {
@@ -296,15 +374,82 @@ describe('Kopf — Video, Standbild und Suche', () => {
     expect(gelesen('/hoefe?q=Eier').suchtext).toBe('Eier')
   })
 
-  it('die Karte führt zur Kartenansicht; der Hof davor nur, wenn es einen gibt', () => {
-    expect(kopf).toContain(`href="${KARTE_ADRESSE}"`)
-    const mitHof = html(
-      createElement(StartseiteKopf, {
-        kartenHof: createElement(KartenHof, { hof: waehleStartseitenHoefe([hof({ slug: 'erster' })])[0] }),
-      })
-    )
-    expect(mitHof).toContain('href="/erster"')
-    expect(html(createElement(KartenHof, { hof: null }))).toBe('')
+  it('die Karte führt zur Kartenansicht — im Browser und am Handy, dort mit dem Knopf darunter (Nr. 59)', () => {
+    // Zwei Karten (Browser, Handy) und der Knopf „Alle Höfe auf der Karte".
+    expect(kopf.split(`href="${KARTE_ADRESSE}"`).length - 1).toBe(3)
+    expect(kopf).toContain('Alle Höfe auf der Karte')
+    const daten = waehleKartenHoefe([hof({ slug: 'erster', ...IM_AUSSCHNITT[0] })])
+    const mitDaten = html(createElement(StartseiteKopf, { karte: (form) => createElement(RegionsKarte, { form, karte: daten }) }))
+    expect(mitDaten.split('1 Hof in der Region').length - 1).toBe(2)
+  })
+})
+
+describe('Karte der Region — gezeichnet (Nr. 59)', () => {
+  const daten = waehleKartenHoefe([
+    hof({
+      slug: 'erster',
+      name: 'Hof Erster',
+      city: 'Testort',
+      fotos: ['/foto.jpg'],
+      naechsteAbholung: HEUTE_NACHMITTAG,
+      ...IM_AUSSCHNITT[0],
+    }),
+    // So nah am ersten, dass beide EIN Gruppen-Pin werden.
+    hof({ slug: 'nachbar', latitude: 48.2004, longitude: 13.1004 }),
+    hof({ slug: 'weiter', ...IM_AUSSCHNITT[1] }),
+  ])
+  const web = html(createElement(RegionsKarte, { form: 'web', karte: daten }))
+  const leer = html(createElement(RegionsKarte, { form: 'handy', karte: null }))
+
+  it('die ganze Fläche ist EIN Link auf die Kartenansicht, die Zahl der Höfe im Namen', () => {
+    for (const text of [web, html(createElement(RegionsKarte, { form: 'handy', karte: daten }))]) {
+      expect(text.match(/<a\b/g)).toHaveLength(1)
+      expect(text).toMatch(new RegExp(`^<a href="${KARTE_ADRESSE.replace(/[?]/g, '\\?')}"`))
+      expect(text).toContain('aria-label="Alle 3 Höfe auf der Karte ansehen"')
+      expect(text.endsWith('</a>')).toBe(true)
+    }
+  })
+
+  it('das SVG ist für Screenreader verborgen, Zähler und Hofkarte stehen als Text im Link', () => {
+    // Das SVG, in dem das Land steht (die Symbole von lucide tragen aria-hidden ohnehin).
+    const kartenSvg = web.slice(web.lastIndexOf('<svg', web.indexOf('Salzach')))
+    expect(kartenSvg.slice(0, kartenSvg.indexOf('>'))).toContain('aria-hidden="true"')
+    for (const teil of ['3 Höfe in der Region', 'Hof Erster', 'Testort', 'Abholung: Heute 15:00–18:00', 'title="Hof Erster"']) {
+      expect(web).toContain(teil)
+    }
+  })
+
+  it('Gruppen-Pin mit Zahl: die zwei nahen Höfe zeigen eine 2', () => {
+    expect(web).toMatch(/<text[^>]*>2<\/text>/)
+  })
+
+  it('kein Bild, keine Kacheln, kein Abruf: weder <img> noch fetch noch Leaflet', () => {
+    for (const text of [web, leer]) {
+      expect(text).not.toMatch(/<img\b/)
+      expect(text).not.toMatch(/tile\.|openstreetmap/i)
+    }
+    for (const pfad of ['src/lib/regionskarte.ts', 'src/lib/regionskarte-daten.ts', 'src/components/startseite/startseite-kopf.tsx']) {
+      expect(code(pfad), pfad).not.toMatch(/\bfetch\(|leaflet|next\/dynamic|tile\.openstreetmap/i)
+    }
+    // Gegenprobe: Ein Bild fände die Suche — der Kopf zeigt sein Standbild als <img> (Attrappe von next/image).
+    expect(html(createElement(StartseiteKopf, {}))).toMatch(/<img\b/)
+  })
+
+  it('ohne Daten (laden, Fehler) nur das Land: kein Zähler, keine Hofkarte, der Link ohne Zahl', () => {
+    expect(leer).toContain(`href="${KARTE_ADRESSE}"`)
+    expect(leer).toContain('aria-label="Alle Höfe auf der Karte ansehen"')
+    expect(leer).not.toMatch(/in der Region|Abholung/)
+    // Gegenprobe: Das Land ist trotzdem gezeichnet.
+    expect(leer).toContain('Salzach')
+  })
+
+  it('Farben nur über Tokens — auch im SVG kein Farbwert', () => {
+    for (const text of [web, leer]) {
+      expect(text).not.toMatch(/#[0-9a-f]{3,8}\b/i)
+      expect(text).not.toMatch(/\b(rgba?|hsla?|oklch)\(/)
+    }
+    // Gegenprobe: die Token-Klassen stehen im SVG.
+    expect(web).toMatch(/<svg[\s\S]*fill-accent[\s\S]*<\/svg>/)
   })
 })
 
@@ -510,6 +655,14 @@ describe('Aufbau der Seite', () => {
 
   it('die Höfe hinter Suspense mit Skelett — Kopf und Suche warten nicht auf die Datenbank', () => {
     expect(seite).toMatch(/<Suspense fallback=\{<HofKartenSkelett \/>\}>\s*<HofKartenGeladen \/>/)
+  })
+
+  it('die Karte hinter Suspense: bis die Höfe da sind, das Land ohne Pins (Nr. 59)', () => {
+    expect(seite).toMatch(/<Suspense fallback=\{<RegionsKarte form=\{form\} karte=\{null\} \/>\}>\s*<RegionsKarteGeladen form=\{form\} \/>/)
+  })
+
+  it('Liste und Karte aus EINER Abfrage — keine zweite für die Koordinaten', () => {
+    expect(code('src/app/page.tsx').match(/ladeOeffentlicheHoefe\(/g)).toHaveLength(1)
   })
 
   it('das Brennmaterial-Band nur in der Saison', () => {

@@ -1,15 +1,37 @@
 import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Check, LocateFixed, Search } from 'lucide-react'
+import { Check, House, LocateFixed, Map as MapIcon, Search, Sprout } from 'lucide-react'
 import { SUCHTEXT_MAX, SUCHTEXT_PARAMETER } from '@/schemas/hoefe-filter'
-import { KARTE_ADRESSE, hoefeAdresse } from '@/lib/startseite'
+import {
+  KARTE_ADRESSE,
+  KARTE_KNOPF,
+  KARTE_OEFFNEN,
+  hoefeAdresse,
+  benenneKartenLink,
+  formatiereRegionsZaehler,
+  type StartseitenKarte,
+} from '@/lib/startseite'
+import {
+  HOFKARTE_ANTEIL,
+  REGIONSKARTE_MASSE,
+  REGIONS_NAMEN,
+  platziereHofkarte,
+  rundeAufZehntel,
+  zeichneLand,
+  zeichneMarken,
+  type GezeichneteMarke,
+  type KartenForm,
+} from '@/lib/regionskarte'
+import type { StrassenArt } from '@/lib/regionskarte-daten'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 
 /*
- * Der Kopf der Startseite (Mockups web-k0-startseite, mobil-k0-startseite):
- * Kornfeld-Video als Hintergrund, links Satz und Suche, rechts die Karte.
+ * Der Kopf der Startseite (Mockups web-k0-startseite, mobil-k0-startseite;
+ * die Karte seit Nr. 59 nach web-/mobil-k0-startseite-karte-region):
+ * Kornfeld-Video als Hintergrund, links Satz und Suche, rechts die Karte der
+ * Region — am Handy steht sie unter der Suche.
  *
  * Alles über dem Foto bleibt in beiden Themes gleich (DESIGN_SYSTEM: „Bild-
  * Overlays bleiben immer dunkel hinterlegt und sind theme-unabhängig") —
@@ -23,10 +45,14 @@ const FOKUS_AUF_FOTO = cn(FOKUS_RAHMEN, 'focus-visible:outline-white')
 
 const VERSPRECHEN = ['Bar oder online bezahlen', 'Keine Lieferkosten – du holst ab', 'Der Hof bekommt den vollen Preis'] as const
 
-/** Die Stecknadeln der Karte — Schmuck; wo die Höfe wirklich liegen, zeigt /hoefe. */
-const NADELN = ['left-[30%] top-[30%]', 'left-[66%] top-[40%]', 'left-[44%] top-[66%]', 'left-[74%] top-[74%]'] as const
+/** Ohne Daten zeichnet die Karte nur das Land — so steht sie auch, solange die Höfe laden. */
+const zeichneKarteOhneDaten = (form: KartenForm): ReactNode => <RegionsKarte form={form} karte={null} />
 
-export function StartseiteKopf({ kartenHof }: { kartenHof?: ReactNode }): React.JSX.Element {
+/**
+ * `karte` liefert die Karte je Form: Die Seite reicht sie hinter einer
+ * Suspense-Grenze herein, damit Kopf und Suche nicht auf die Datenbank warten.
+ */
+export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (form: KartenForm) => ReactNode }): React.JSX.Element {
   return (
     // bg-black: der Grund unter Foto und Schleier, solange das Bild lädt (und
     // für die Kontrastprüfung) — die weiße Schrift steht nie auf dem hellen Seitengrund.
@@ -128,6 +154,23 @@ export function StartseiteKopf({ kartenHof }: { kartenHof?: ReactNode }): React.
             In deiner Nähe suchen – mit Postleitzahl oder Standort
           </Link>
 
+          {/* Am Handy (unter 1024 px) die Karte unter der Suche, darunter der
+              Knopf (Mockup mobil-k0-startseite-karte-region). Breiter als
+              440 px wird sie nicht: Am Tablett füllte sie sonst den Schirm. */}
+          <div className="flex w-full max-w-[440px] flex-col gap-[22px] lg:hidden">
+            {karte('handy')}
+            <Link
+              href={KARTE_ADRESSE}
+              className={cn(
+                'flex h-12 items-center justify-center gap-2 rounded-[14px] bg-accent px-4 text-[15px] font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90',
+                FOKUS_AUF_FOTO
+              )}
+            >
+              <MapIcon className="size-[17px] shrink-0" strokeWidth={1.7} aria-hidden="true" />
+              {KARTE_KNOPF}
+            </Link>
+          </div>
+
           <ul className="flex flex-col gap-[7px] md:mt-1.5 md:flex-row md:flex-wrap md:gap-[22px]">
             {VERSPRECHEN.map((text) => (
               <li key={text} className="flex items-center gap-[7px] text-[13.5px] text-white/85">
@@ -138,30 +181,222 @@ export function StartseiteKopf({ kartenHof }: { kartenHof?: ReactNode }): React.
           </ul>
         </div>
 
-        {/* Die Karte rechts (ab 1024 px): ein Bild der Gegend, kein
-            Kartendienst — Leaflet und Kacheln blieben der Hofübersicht
-            vorbehalten, die Startseite lädt dafür kein Skript. Die Fläche
-            führt zur Kartenansicht von /hoefe; davor der erste Hof als Karte. */}
-        <div className="relative hidden h-[440px] w-[420px] shrink-0 lg:block xl:w-[520px]">
-          <Link
-            href={KARTE_ADRESSE}
-            aria-label="Alle Höfe auf der Karte ansehen"
-            className={cn('absolute inset-0 overflow-hidden rounded-[26px] bg-accent', FOKUS_AUF_FOTO)}
-          >
-            <span aria-hidden="true" className="absolute inset-0 bg-linear-150 from-black/30 via-transparent via-55% to-primary/30" />
-            <span aria-hidden="true" className="absolute top-[120px] -left-10 h-0.5 w-[640px] rotate-[14deg] bg-accent-foreground/12" />
-            <span aria-hidden="true" className="absolute -top-[60px] left-[160px] h-[560px] w-0.5 rotate-[24deg] bg-accent-foreground/10" />
-            {NADELN.map((lage) => (
-              <span
-                key={lage}
-                aria-hidden="true"
-                className={cn('absolute size-3.5 rounded-full border-[2.5px] border-primary-foreground bg-primary', lage)}
-              />
-            ))}
-          </Link>
-          {kartenHof}
-        </div>
+        {/* Die Karte rechts (ab 1024 px), so breit wie bisher. */}
+        <div className="hidden w-[420px] shrink-0 lg:block xl:w-[520px]">{karte('web')}</div>
       </div>
     </section>
+  )
+}
+
+/** Strichbreiten wie im Mockup (Einheiten = Pixel bei Entwurfsgröße): Rand und Fläche je Straßenart, Flüsse nach Name. */
+const STRASSEN_STRICH: Record<StrassenArt, { rand: number; flaeche: number }> = {
+  fernstrasse: { rand: 7, flaeche: 5 },
+  hauptstrasse: { rand: 6, flaeche: 4 },
+  strasse: { rand: 5, flaeche: 3 },
+}
+const FLUSS_STRICH: Record<string, number> = { Inn: 7, Salzach: 5 }
+
+/** Ein Hof als kleines Haus (Mockup: 18 × 19 px), hervorgehoben größer; um seinen Punkt zentriert. */
+function HausPin({ x, y, gross }: { x: number; y: number; gross: boolean }) {
+  const s = gross ? 1.45 : 1
+  return (
+    <g className="fill-accent stroke-accent-foreground" strokeWidth={1.6} strokeLinejoin="round">
+      <path d={`M${rundeAufZehntel(x - 9 * s)} ${rundeAufZehntel(y - 1.9 * s)} L${rundeAufZehntel(x)} ${rundeAufZehntel(y - 9.4 * s)} L${rundeAufZehntel(x + 9 * s)} ${rundeAufZehntel(y - 1.9 * s)} Z`} />
+      <rect x={rundeAufZehntel(x - 6.85 * s)} y={rundeAufZehntel(y - 1.9 * s)} width={rundeAufZehntel(13.7 * s)} height={rundeAufZehntel(11.2 * s)} rx={1.5} />
+      <rect x={rundeAufZehntel(x - 2 * s)} y={rundeAufZehntel(y + 3.2 * s)} width={rundeAufZehntel(4 * s)} height={rundeAufZehntel(6.1 * s)} className="fill-accent-foreground stroke-none" />
+    </g>
+  )
+}
+
+function Marke({ marke }: { marke: GezeichneteMarke }) {
+  return (
+    <g>
+      {marke.hervorgehoben && <circle cx={rundeAufZehntel(marke.x)} cy={rundeAufZehntel(marke.y)} r={21} className="fill-accent/20" />}
+      {marke.art === 'pin' ? (
+        <HausPin x={marke.x} y={marke.y} gross={marke.hervorgehoben} />
+      ) : (
+        <>
+          <circle cx={rundeAufZehntel(marke.x)} cy={rundeAufZehntel(marke.y)} r={15} className="fill-accent stroke-accent-foreground" strokeWidth={2.5} />
+          <text x={rundeAufZehntel(marke.x)} y={rundeAufZehntel(marke.y + 4.5)} textAnchor="middle" fontSize={13} fontWeight={700} className="fill-accent-foreground font-sans">
+            {marke.anzahl}
+          </text>
+        </>
+      )}
+    </g>
+  )
+}
+
+/**
+ * Die Karte der Region (Nr. 59, Mockups web-k0-startseite-karte-region und
+ * mobil-k0-startseite-karte-region): ein SVG aus Natural-Earth-Daten, auf
+ * dem Server gezeichnet — kein Kartendienst, keine Kacheln, kein Skript, kein
+ * Bild. Die ganze Fläche ist EIN Link auf die Kartenansicht von /hoefe; das
+ * SVG ist für Screenreader verborgen, Zähler und Hofkarte stehen als Text im
+ * Link, sein Name nennt die Zahl. Ohne Daten (laden, Fehler) steht nur das
+ * Land da, ohne Zähler und Hofkarte; den Fehler zeigen die Hofkarten darunter.
+ *
+ * Die Karte folgt dem Modus bewusst NICHT: Sie ist Papier wie die Kacheln der
+ * Hofübersicht (CODING_STANDARDS §7, „Was dem Modus NICHT folgt") und liegt in
+ * beiden Themes auf dem dunklen Foto. Deshalb nur Tokens, die im neuen Design
+ * in beiden Themes gleich sind: accent-foreground (Crème) für Papier und
+ * Flächen, primary-foreground (fast schwarz) für Schrift und Linien, accent
+ * (Grün) für Höfe und Wasser — ein Blau kennt das Design-System nicht.
+ */
+export function RegionsKarte({ form, karte }: { form: KartenForm; karte: StartseitenKarte | null }): React.JSX.Element {
+  const mass = REGIONSKARTE_MASSE[form]
+  const anzahl = karte?.pins.length ?? 0
+  const hof = karte?.hervorgehoben ?? null
+  const marken = zeichneMarken(karte?.pins ?? [], mass, hof?.slug ?? null)
+  const land = zeichneLand(mass, marken)
+  const markeDesHofs = marken.find((m) => m.hervorgehoben)
+  const lage = hof && markeDesHofs ? platziereHofkarte(markeDesHofs, mass, HOFKARTE_ANTEIL[form]) : null
+
+  return (
+    <Link
+      href={KARTE_ADRESSE}
+      aria-label={benenneKartenLink(anzahl)}
+      className={cn(
+        'group relative block overflow-hidden bg-accent-foreground shadow-2xl',
+        form === 'web' ? 'rounded-[26px]' : 'rounded-[22px]',
+        FOKUS_AUF_FOTO
+      )}
+      style={{ aspectRatio: `${mass.breite} / ${mass.hoehe}` }}
+    >
+      <svg viewBox={`0 0 ${mass.breite} ${mass.hoehe}`} aria-hidden="true" className="absolute inset-0 block size-full">
+        {/* Papier: Crème mit einem Hauch Dunkel, damit die Straßen heller sind als das Land. */}
+        <rect width={mass.breite} height={mass.hoehe} className="fill-primary-foreground/6" />
+        {land.fluesse.map((fluss) =>
+          fluss.pfade.map((d, i) => (
+            <path
+              key={`${fluss.name}-${i}`}
+              d={d}
+              fill="none"
+              strokeWidth={FLUSS_STRICH[fluss.name] ?? 4}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="stroke-accent/45"
+            />
+          ))
+        )}
+        {land.strassen.map((strasse, s) =>
+          strasse.pfade.map((d, i) => (
+            <g key={`${s}-${i}`} fill="none" strokeLinecap="round" strokeLinejoin="round">
+              <path d={d} strokeWidth={STRASSEN_STRICH[strasse.art].rand} className="stroke-primary-foreground/20" />
+              <path d={d} strokeWidth={STRASSEN_STRICH[strasse.art].flaeche} className="stroke-accent-foreground" />
+            </g>
+          ))
+        )}
+        {land.fluesse.map(
+          ({ beschriftung: b }) =>
+            b && (
+              <text
+                key={b.text}
+                x={rundeAufZehntel(b.x)}
+                y={rundeAufZehntel(b.y)}
+                transform={`rotate(${rundeAufZehntel(b.winkel)} ${rundeAufZehntel(b.x)} ${rundeAufZehntel(b.y)})`}
+                textAnchor="middle"
+                fontSize={12}
+                strokeWidth={3}
+                className="fill-accent stroke-accent-foreground font-heading italic [paint-order:stroke]"
+              >
+                {b.text}
+              </text>
+            )
+        )}
+        {land.schilder.map((schild) => {
+          const breite = 8 + 5.5 * schild.text.length
+          return (
+            <g key={schild.text}>
+              <rect
+                x={rundeAufZehntel(schild.x - breite / 2)}
+                y={rundeAufZehntel(schild.y - 8)}
+                width={rundeAufZehntel(breite)}
+                height={16}
+                rx={4}
+                className="fill-accent-foreground stroke-primary-foreground/25"
+              />
+              <text x={rundeAufZehntel(schild.x)} y={rundeAufZehntel(schild.y + 3.5)} textAnchor="middle" fontSize={10} fontWeight={600} className="fill-primary-foreground/70 font-sans">
+                {schild.text}
+              </text>
+            </g>
+          )
+        })}
+        {REGIONS_NAMEN.map((name) => (
+          <text
+            key={name.text}
+            x={rundeAufZehntel(name.x * mass.breite)}
+            y={rundeAufZehntel(name.y * mass.hoehe)}
+            textAnchor={name.anker}
+            fontSize={10}
+            fontWeight={600}
+            letterSpacing={2}
+            className="fill-primary-foreground/65 font-sans"
+          >
+            {name.text}
+          </text>
+        ))}
+        {lage && (
+          <line
+            x1={rundeAufZehntel(lage.linie.x1)}
+            y1={rundeAufZehntel(lage.linie.y1)}
+            x2={rundeAufZehntel(lage.linie.x2)}
+            y2={rundeAufZehntel(lage.linie.y2)}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            className="stroke-accent"
+          />
+        )}
+        {/* Der hervorgehobene Hof zuletzt: Er liegt über seinen Nachbarn. */}
+        {[...marken.filter((m) => !m.hervorgehoben), ...marken.filter((m) => m.hervorgehoben)].map((marke) => (
+          <Marke key={marke.schluessel} marke={marke} />
+        ))}
+      </svg>
+
+      {anzahl > 0 && (
+        <span className="absolute top-3.5 left-3.5 flex h-[34px] items-center gap-[7px] rounded-full bg-accent-foreground px-[13px] text-[13px] font-semibold text-primary-foreground shadow-md">
+          <House className="size-[15px] shrink-0 text-accent" strokeWidth={1.7} aria-hidden="true" />
+          {formatiereRegionsZaehler(anzahl)}
+        </span>
+      )}
+
+      {form === 'web' && (
+        <span className="absolute right-3.5 bottom-3.5 flex h-[38px] items-center gap-1.5 rounded-full bg-accent px-[15px] text-[13.5px] font-semibold text-accent-foreground transition-colors duration-[250ms] group-hover:bg-accent-hover">
+          <MapIcon className="size-[15px] shrink-0" strokeWidth={1.7} aria-hidden="true" />
+          {KARTE_OEFFNEN}
+        </span>
+      )}
+
+      {hof && lage && (
+        <span
+          className="absolute flex items-center gap-2.5 rounded-2xl bg-accent-foreground p-2.5 text-primary-foreground shadow-xl"
+          style={{
+            left: `${lage.links}%`,
+            width: `${HOFKARTE_ANTEIL[form] * 100}%`,
+            ...(lage.senkrecht.kante === 'oben' ? { top: `${lage.senkrecht.abstand}%` } : { bottom: `${lage.senkrecht.abstand}%` }),
+          }}
+        >
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-[10px] bg-accent/15 text-accent">
+            <Sprout className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
+          </span>
+          <span className="flex min-w-0 flex-col gap-0.5">
+            <span title={hof.name} className="truncate font-heading text-[15px] font-semibold">
+              {hof.name}
+            </span>
+            {hof.zeile && <span className="truncate text-[11.5px] text-primary-foreground/70">{hof.zeile}</span>}
+            {hof.abholung && (
+              // Die Abholzeit darf umbrechen statt abzubrechen — abgeschnitten fehlte genau die Uhrzeit.
+              <span
+                className={cn(
+                  'line-clamp-2 text-[11.5px] break-words',
+                  hof.abholungIstTermin ? 'font-semibold text-accent' : 'text-primary-foreground/70'
+                )}
+              >
+                {hof.abholungIstTermin ? `Abholung: ${hof.abholung}` : hof.abholung}
+              </span>
+            )}
+          </span>
+        </span>
+      )}
+    </Link>
   )
 }
