@@ -33,15 +33,22 @@ export type { HofReiterId }
 export type HofReiter = { id: HofReiterId; label: string }
 
 /**
- * Übersicht · Produkte · Beiträge. „Beiträge" nur, wenn die Hofseite gerade
- * einen zeigt (der aktive Status, wie bisher in der Übersicht) — ein Reiter
- * ins Leere wäre kein Angebot. Die Produktzahl steht im Reiter wie im Mockup.
+ * So viele Beiträge zeigt die Hofseite höchstens (Register F8) — die neuesten.
+ * Ältere sind kein Angebot mehr; der Reiter bliebe sonst eine Chronik.
  */
-export function hofseiteReiter({ produktAnzahl, hatBeitrag }: { produktAnzahl: number; hatBeitrag: boolean }): HofReiter[] {
+export const HOFSEITE_BEITRAEGE_MAX = 5
+
+/**
+ * Übersicht · Produkte · Beiträge. „Beiträge · n“ nur, wenn die Hofseite gerade
+ * Beiträge zeigt (alle aktiven, Register F8) — ein Reiter ins Leere wäre kein
+ * Angebot. Beide Zahlen stehen im Reiter wie im Mockup und sind die Zahl dessen,
+ * was der Reiter dann zeigt.
+ */
+export function hofseiteReiter({ produktAnzahl, beitragAnzahl }: { produktAnzahl: number; beitragAnzahl: number }): HofReiter[] {
   return [
     { id: 'uebersicht', label: 'Übersicht' },
     { id: 'produkte', label: produktAnzahl > 0 ? `Produkte · ${formatZahl(produktAnzahl)}` : 'Produkte' },
-    ...(hatBeitrag ? [{ id: 'beitraege' as const, label: 'Beiträge' }] : []),
+    ...(beitragAnzahl > 0 ? [{ id: 'beitraege' as const, label: `Beiträge · ${formatZahl(beitragAnzahl)}` }] : []),
   ]
 }
 
@@ -332,6 +339,16 @@ export function vorWieLange(iso: string, jetztIso: string): string {
   if (stunden < 24) return stunden === 1 ? 'vor 1 Stunde' : `vor ${stunden} Stunden`
   const tage = Math.floor(stunden / 24)
   return tage === 1 ? 'vor 1 Tag' : `vor ${tage} Tagen`
+}
+
+/**
+ * Die Zeit über einer Beitragskarte (Register F8): Der neueste Beitrag heißt
+ * „Aktuell · vor 2 Stunden“, die weiteren nur „vor 3 Tagen“ — „Aktuell“ steht
+ * nie an zwei Karten.
+ */
+export function beitragZeitText(istNeuester: boolean, veroeffentlichtIso: string, jetztIso: string): string {
+  const her = vorWieLange(veroeffentlichtIso, jetztIso)
+  return istNeuester ? `Aktuell · ${her}` : her
 }
 
 // ─── Warenkorb-Anker ────────────────────────────────────────────────────────
