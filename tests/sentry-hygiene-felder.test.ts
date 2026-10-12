@@ -991,9 +991,11 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
       ['/login?next=%2Fx%23%252B436641234567', '/login?next=%2Fx%23%5Btelefon+entfernt%5D'],
       ['/login?next=https%3A%2F%2Ffarmerzone.at%2Fkunden%2F%252B436641234567', '/login?next=https%3A%2F%2Ffarmerzone.at%2Fkunden%2F%5Btelefon+entfernt%5D'],
       ['/login?next=%2Fx%3Fh%3DBearer%2520abc%252Bdef123', '/login?next=%2Fx%3Fh%3DBearer%2B%255Bentfernt%255D'],
-      // Auch in der Abfrage der Adresse selbst: als Plus wie als Leerzeichen.
+      // Auch in der Abfrage der Adresse selbst: als Plus, als Leerzeichen und gemischt.
       ['/x?tel=+436641234567', '/x?tel=%5Btelefon+entfernt%5D'],
       ['/x?tel=0664+1234567', '/x?tel=%5Btelefon+entfernt%5D'],
+      ['/x?tel=+43+664+1234567', '/x?tel=%5Btelefon+entfernt%5D'],
+      ['/x?q=%22+436641234567', '/x?q=%22%5Btelefon+entfernt%5D'],
     ]
     for (const [roh, sauber] of faelle) {
       expect(adresse(roh), roh).toBe(`https://farmerzone.at${sauber}`)
@@ -1025,6 +1027,13 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
     expect(adresse('/hoefe?q=frische+eier&seite=2')).toBe('https://farmerzone.at/hoefe?q=frische+eier&seite=2')
     expect(adresse('/login?info=%252B436641234567')).toBe('https://farmerzone.at/login?info=%5Btelefon+entfernt%5D')
     expect(adresse('/x?ziel=%2Fkunden%2Fanna%2540example.org')).toBe('https://farmerzone.at/x?ziel=%2Fkunden%2F%5Be-mail+entfernt%5D')
+    // Roh zählt ein „+" vorn nur mit freiem linken Rand als Nummer — an einem Wort ist es ein Leerzeichen.
+    expect(adresse('/x?q=Artikel+12345678')).toBe('https://farmerzone.at/x?q=Artikel+12345678')
+    expect(adresse('/x?q=a%0912345678')).toBe('https://farmerzone.at/x?q=a%0912345678')
+    // Der Preis der rohen Lesart (sichere Richtung): Ein mit „+" angehängtes Wort zählt zur Adresse.
+    expect(adresse('/x?q=Hallo+kundin@example.com')).toBe('https://farmerzone.at/x?q=%5Be-mail+entfernt%5D')
+    // Ein heikler Name bleibt heikel, auch wenn die rohe Lesart ihn ersetzt hätte.
+    expect(adresse('/x?token@example.com=abc123&seite=2')).toBe('https://farmerzone.at/x?seite=2')
   })
 
   it('ein doppelt kodiertes Escape links ist eine Grenze wie ein einfaches — in Pfad, Fehlertext, Nachricht und extra', () => {
@@ -1054,8 +1063,12 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
       ['Link https://farmerzone.at/x?f[a]=1&reorder=abc123', 'Link https://farmerzone.at/x?f%5Ba%5D=1'],
       ['Link https://farmerzone.at/x?utm=(herbst)&s=abc123sig', 'Link https://farmerzone.at/x?utm=%28herbst%29'],
       [`Link https://farmerzone.at/x?q='a'&token=abc123`, 'Link https://farmerzone.at/x?q=%27a%27'],
-      // In einer relativen Adresse: Sie endet vor der absoluten, die bis zum Leerraum gelesen wird.
-      ['Abruf /api/og?url=https://farmerzone.at/x?f[a]=1&s=abc123sig gescheitert', 'Abruf /api/og?url=https://farmerzone.at/x?f%5Ba%5D=1 gescheitert'],
+      // In einer relativen Adresse: Sie liest die absolute mit, bis zum Leerraum — die
+      // Parameter danach gehören zur äußeren Abfrage, auch ohne „?" in der absoluten.
+      ['Abruf /api/og?url=https://farmerzone.at/x?f[a]=1&s=abc123sig gescheitert', 'Abruf /api/og?url=https%3A%2F%2Ffarmerzone.at%2Fx%3Ff%255Ba%255D%3D1 gescheitert'],
+      ['Abruf /api/og?url=https://farmerzone.at/x&s=abc123sig gescheitert', 'Abruf /api/og?url=https%3A%2F%2Ffarmerzone.at%2Fx gescheitert'],
+      ['Abruf /api/og?url=https://farmerzone.at/x&reorder=abc123 gescheitert', 'Abruf /api/og?url=https%3A%2F%2Ffarmerzone.at%2Fx gescheitert'],
+      ['Abruf /api/og?url=https://farmerzone.at/x&pathname=hof/foto.jpg gescheitert', 'Abruf /api/og?url=https%3A%2F%2Ffarmerzone.at%2Fx gescheitert'],
       ['Abruf /proxy/https://farmerzone.at/x?f[a]=1&reorder=abc123 weg', 'Abruf /proxy/https://farmerzone.at/x?f%5Ba%5D=1 weg'],
       [`Wert =/https://farmerzone.at/x?q='a'&s=abc123sig weg`, 'Wert =/https://farmerzone.at/x?q=%27a%27 weg'],
     ]

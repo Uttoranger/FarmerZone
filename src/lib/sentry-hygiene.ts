@@ -256,13 +256,23 @@ function bereinigeText(text: string): string {
     .replace(ANMELDECODE_MUSTER, '$1$2[code entfernt]')
 }
 
+/** Eine Nummer mit „+" vorn in der rohen Lesart: nur mit freiem linken Rand
+ *  (Anfang, „=", „&", „/", „?", „#", „;" oder ein Escape) — ein „+" an einem
+ *  Wort ist dort meist ein Leerzeichen („Artikel+12345678" bleibt). Die
+ *  weiteren „+" gelten als Trenner („+43+664+1234567": das erste ein Plus,
+ *  die übrigen Leerzeichen). Linear: Angesetzt wird nur an einem „+". */
+const PLUS_NUMMER_ROH = /(?<=^|[=&/?#;]|%[0-9A-Fa-f]{2})\+\d(?:[\s/\-.()+]{0,3}\d){7,}/g
+
 /** Die rohe Lesart einer Abfrage (bereinigeQuery): nur die Regeln, für die
- *  ein „+" zählt — Adressen mit @ und Telefonnummern. Kodierte Adressen (%40)
- *  liest erst die dekodierte Lesart: In der rohen Abfrage hielte das kodierte
- *  Muster „%2Fkunden%2F…" für den Teil vor dem @ und nähme den Pfad mit.
- *  Ein Treffer reicht nie über „&" oder „=" hinaus. */
+ *  ein „+" als Plus zählt — Adressen mit @ und Nummern mit „+" vorn. Nummern
+ *  mit 0 vorn und kodierte Adressen (%40) liest die zerlegte Lesart; in der
+ *  rohen hielte das kodierte Muster „%2Fkunden%2F…" für den Teil vor dem @
+ *  und nähme den Pfad mit. Der Preis: Vor einem rohen @ zählt ein mit „+"
+ *  angehängtes Wort zur Adresse („Hallo+kundin@…" fällt ganz), und ein
+ *  kodierter Pfad davor ebenso — sicher, aber nicht mehr lesbar. Ein Treffer
+ *  reicht nie über „&" oder „=" hinaus. */
 function bereinigePlusLesart(text: string): string {
-  return ersetzeEmails(text).replace(TELEFON_MUSTER, '[telefon entfernt]')
+  return ersetzeEmails(text).replace(PLUS_NUMMER_ROH, '[telefon entfernt]')
 }
 
 /**
@@ -283,8 +293,15 @@ function bereinigePlusLesart(text: string): string {
 function bereinigeQuery(query: string, freitext = false, tiefe = 0): string {
   const regel = freitext ? bereinigeFreitext : bereinigeText
   const sauber = new URLSearchParams()
+  // Ob ein Name heikel ist, entscheidet auch die unveränderte Zerlegung
+  // („token@example.com=…" hieße sonst „[e-mail entfernt]"). Beide haben
+  // dieselben Paare in derselben Reihenfolge: Kein Treffer und kein
+  // Platzhalter enthält „&" oder „=".
+  const namenRoh = [...new URLSearchParams(query).keys()]
+  let paar = 0
   new URLSearchParams(bereinigePlusLesart(query)).forEach((wert, name) => {
-    if (HEIKLE_PARAMETER.test(name)) return
+    const nameRoh = namenRoh[paar++] ?? name
+    if (HEIKLE_PARAMETER.test(name) || HEIKLE_PARAMETER.test(nameRoh)) return
     sauber.append(regel(name), freitext ? bereinigeFreitext(weiterDekodiert(wert)) : bereinigeAbfrageWert(wert, tiefe))
   })
   return sauber.toString()
@@ -552,9 +569,10 @@ function entferneIps(text: string): string {
  * Ein Text aus einem strukturierten Feld. Ist er ganz eine Adresse (absolut
  * oder ab „/"), gilt die URL-Regel (Pfad-Token, heikle Parameter, Blob-Pfad);
  * sonst die Text-Regel samt eingebetteter Adressen — seit Nr. 56, Runde 2,
- * relativ nach derselben Regel wie im Fehlertext, absolut bis zum Leerraum
- * (ADRESSE_IM_FREITEXT): Vorher blieb „Fehler bei /login?next=%2F…%3Ftoken%3D…"
- * in Nachricht, Brotkrume und extra stehen, im Fehlertext fiel der Token.
+ * relativ mit derselben Grenze wie im Fehlertext, absolut (auch in einer
+ * relativen) bis zum Leerraum (ADRESSE_IM_FREITEXT): Vorher blieb
+ * „Fehler bei /login?next=%2F…%3Ftoken%3D…" in Nachricht, Brotkrume und extra
+ * stehen, im Fehlertext fiel der Token.
  * IP-Adressen fallen zuerst — sonst hielte die Telefon-Regel eine lange IPv4
  * für eine Nummer.
  */
@@ -582,13 +600,15 @@ const ADRESSE_IM_FEHLERTEXT =
  *  wie im Fehlertext, absolut aber bis zum Leerraum wie bereinigeTextMitUrls
  *  (Nacharbeit nach Runde 2) — „]", „)" und Anführungszeichen stehen in
  *  Adressen (?f[a]=1, ?utm=(herbst)); endete die Adresse dort, sah die
- *  URL-Regel „&reorder=…" oder „&s=…" dahinter nicht mehr. Eine relative
- *  endet vor einer absoluten (/api/og?url=https://…), damit diese bis zum
- *  Leerraum gelesen wird; die Vorschau prüft je Zeichen acht Zeichen, das
- *  bleibt linear. Im Fehlertext bleibt die engere Grenze: Dort stehen
- *  Adressen oft in Klammern oder JSON, und der Text danach hilft beim Beheben. */
+ *  URL-Regel „&reorder=…" oder „&s=…" dahinter nicht mehr. Steckt in einer
+ *  relativen Adresse eine absolute (/api/og?url=https://…), liest die
+ *  relative sie mit, bis zum Leerraum: Endete sie davor, landeten die
+ *  übrigen Parameter der äußeren Abfrage im Pfad der absoluten, und „&s=…"
+ *  blieb. Die Vorschau prüft je Zeichen acht Zeichen, das bleibt linear.
+ *  Im Fehlertext bleibt die engere Grenze: Dort stehen Adressen oft in
+ *  Klammern oder JSON, und der Text danach hilft beim Beheben. */
 const ADRESSE_IM_FREITEXT =
-  /https?:\/\/\S+|(?<![\p{L}\p{N}\p{M}_/.~%-])\/(?:(?!https?:\/\/)[^\s"'`<>)\]«»„“”‚‘’])*/giu
+  /https?:\/\/\S+|(?<![\p{L}\p{N}\p{M}_/.~%-])\/(?:(?!https?:\/\/)[^\s"'`<>)\]«»„“”‚‘’])*(?:https?:\/\/\S*)?/giu
 
 /**
  * Der Fehlertext (exception.value): E-Mail, Telefon und Code wie bisher, seit
