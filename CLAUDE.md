@@ -94,6 +94,7 @@ Vor Codeänderungen lesen — nicht raten:
 | `docs/ai/CODING_STANDARDS.md` | Bei **jeder** Codeänderung |
 | `docs/ai/TESTING_GUIDELINES.md` | Bei jedem Test, bei jeder Änderung an getestetem Code |
 | `docs/ai/DESIGN_SYSTEM.md` | Bei **jeder** UI-Änderung: Tokens, Themes, Komponenten, Zustände |
+| `docs/ai/BAUSTEINE.md` | Vor jeder neuen Datei, Komponente oder Funktion: gibt es das schon? Nach dem Stichwort durchsuchen (erzeugt mit `pnpm bausteine`, nie von Hand) |
 | `docs/entscheidungen.md` | Vor jeder Arbeit, die eine Entscheidung berührt (Redesign, Geld, Konto, Konditionen): was entschieden und was offen ist |
 | `docs/umsetzungsprompt.md` | Bei Arbeit am Redesign: Reihenfolge, Gates, Parallelisierung, Definition of Done |
 | `docs/mockups/README.md` | Vor dem Bau oder Umbau eines Screens: welches Mockup gilt |

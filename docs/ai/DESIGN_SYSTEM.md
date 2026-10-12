@@ -50,6 +50,7 @@ Alle Farben kommen aus CSS-Custom-Properties auf `:root`, umgeschaltet über `da
 ## Komponenten
 
 - Basiskomponenten liegen an genau **einem** Ort (`src/components/ui`); Kundenseite und Hofbereich importieren nur von dort. Kein Duplizieren in Feature-Ordner.
+- **Vor jeder neuen Komponente** `docs/ai/BAUSTEINE.md` nach dem Stichwort durchsuchen (erzeugt mit `pnpm bausteine`): Was dort steht, wird benutzt oder additiv erweitert. Löst ein neuer Baustein einen alten ab, trägt der alte im Kopfkommentar `@altbestand <Ersatz>`; neuer Code nimmt den Ersatz.
 - Bestand: Button (accent, primary, outline, ghost), Card, StatusBadge (offen/fertig/neutral), Input mit Label, Select, Stepper, Toggle, Tabs, Filter-Chips, BottomNav mit Mittelbutton-Slot, Sidebar, ListRow, Table, ProgressBar, EmptyState, Skeleton, Toast.
 - **Bausteine des neuen Designs (Gate 2, `src/components/ui`)** — Vorschau `/intern/bausteine` (nur Admin), Render-Test `tests/bausteine.test.ts`:
 

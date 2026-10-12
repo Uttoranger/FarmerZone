@@ -142,6 +142,10 @@ Der Lauf beginnt bei der ersten Nummer, die in `status.md` nicht als „fertig" 
 
 ## 4. Ablauf je Gate (Dirigent)
 
+**Regel-Inventur (Register G4):** Jeder fünfte Lauf (10, 15, …) beginnt mit einer Regel-Inventur, bevor das erste Gate startet. Quellen: `CLAUDE.md` §2, `docs/ai/CODING_STANDARDS.md` und `docs/ai/TESTING_GUIDELINES.md` ganz; in `ARCHITECTURE.md` und `DESIGN_SYSTEM.md` nur per Grep nach „Niemals|Nie |Immer|Pflicht|verboten". Je Vorschlag: Fundstelle, Grund (überholt / doppelt mit … / abgedeckt durch Test …), Vorschlag; höchstens 20, die stärksten zuerst. Es bleiben Vorschläge: Gestrichen wird nichts ohne Freigabe des Menschen (Abschnitt „Regelvorschläge" im Morgenbericht, §6).
+
+`docs/ai/BAUSTEINE.md` ist erzeugt. Bei einem Merge-Konflikt darin (auch im Sammel-PR, Schritt 8) nicht beide Seiten behalten, sondern `pnpm bausteine` ausführen und die Datei einchecken.
+
 1. **Vorbedingungen prüfen:** Freigaben laut Tabelle vorhanden? Vorgänger-Branch vorhanden und grün? Sonst: überspringen oder stoppen (Abschnitt 5), Eintrag in `status.md`.
 2. **Branch anlegen** nach Regel 2.
 3. **Umsetzer starten** (Unteragent, frischer Kontext) mit genau diesem Auftrag:
@@ -176,6 +180,7 @@ Am Ende jedes Laufs schreibt der Dirigent `docs/nachtlauf/morgenbericht-<datum>.
 - Tabelle aller bearbeiteten Nummern: Status, PR-Link, **Vorschau-Link** (Vercel-Vorschau des PR), **„enthält Migration: ja/nein"**, was weggelassen wurde und warum.
 - **Merge-Reihenfolge** für den Menschen, mit dem Hinweis: **Gestapelte PRs per Merge-Commit mergen, nicht per Squash** (sonst entstehen Konflikte in den darauf gestapelten Branches).
 - Abschnitt **„Für dich zu tun"**: alles, was nur der Mensch erledigen kann (Entscheidungen, Prüfungen in Produktion, Stripe- oder Vercel-Einstellungen, Freigaben für den nächsten Lauf), als Liste zum Abhaken.
+- Abschnitt **„Regelvorschläge"**: gesammelt aus Punkt 6 der Berichte (und, in jedem fünften Lauf, aus der Regel-Inventur), je Vorschlag Ursache, Gegenmaßnahme und Ort. Eine Prüfung (Test, Lint, Hook) geht vor einer Textregel. Der Mensch gibt frei; erst dann wird die Regel eingetragen, mit Herkunft (Nummer) und Datum.
 - Gesammelte Fragen und fehlende Freigaben, damit der nächste Lauf weiterkommt.
 - Wo die Screenshots liegen.
 

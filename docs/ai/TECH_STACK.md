@@ -80,6 +80,7 @@ Stand: 2026-09. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 | QR-Code | `qrcode` (^1.5.4, Typen `@types/qrcode`) — nur die Matrix über `qrPfad` in `src/lib/qr-code.ts`, gezeichnet als eigener SVG-Pfad (Teilen-Bild, QR-Plakat; seit Nr. 21, Freigabe §3) | `QRCode.toDataURL`/`toString` im Code (fremde Grafik, zweite Gestalt), QR-Dienste im Netz |
 | Teilen-Bild | `next/og` (`ImageResponse`, Satori) — nur in Routen-Handlern, Farben als Werte mit Lint-Ausnahme je Zeile (Satori kennt keine CSS-Variablen) | Puppeteer/Canvas-Pakete, Bilddienste im Netz |
 | Server-State | React Query (nur wo vorhanden) | Neue globale Stores |
+| Bausteinverzeichnis | `pnpm bausteine` (`scripts/bausteine.ts`, `tsx` + die Compiler-API des vorhandenen `typescript`, nur Syntaxbaum) erzeugt `docs/ai/BAUSTEINE.md` | Von Hand gepflegte Liste, zweites Parser-Paket (ts-morph, acorn), Zeitstempel in der Datei |
 
 ---
 
