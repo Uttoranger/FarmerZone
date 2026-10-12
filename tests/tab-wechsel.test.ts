@@ -152,7 +152,7 @@ describe('ladeHofbereich — die Zahlen des Layouts nebeneinander', () => {
     vi.mocked(getFarmForUser).mockResolvedValue({ id: 'hof-1', name: 'Testhof', slug: 'testhof', logoUrl: null } as never)
   }
 
-  it('startet offene Bestellungen, Balken und Admin-Recht gleichzeitig', async () => {
+  it('startet offene Bestellungen, Balken, Admin-Recht und Tarif-Zeile gleichzeitig', async () => {
     angemeldet()
     const offen = aufgeschoben<number>()
     const balken = aufgeschoben<null>()
@@ -168,6 +168,8 @@ describe('ladeHofbereich — die Zahlen des Layouts nebeneinander', () => {
     expect(getOpenOrdersCount).toHaveBeenCalledWith('hof-1')
     expect(getFarmBannerState).toHaveBeenCalledWith('nutzer-1')
     expect(isAdminUser).toHaveBeenCalledWith('nutzer-1')
+    // Nr. 61: Die Tarif-Zeile (Tarif und Produkte im Shop) läuft daneben, nicht danach.
+    expect(prisma.farm.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'hof-1' } }))
 
     offen.loese(3)
     balken.loese(null)

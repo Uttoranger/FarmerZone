@@ -99,10 +99,12 @@ describe('Gerendert — dieselben Preise auf beiden Seiten', () => {
   it.each([
     ['/konditionen', konditionen],
     ['/fuer-hoefe', fuerHoefe],
-  ])('%s nennt jeden Tarif mit Preis und den Satz der Servicegebühr', (_seite, html) => {
+  ])('%s nennt jeden Tarif mit Preis und Zusatz und den Satz der Servicegebühr', (_seite, html) => {
     for (const tarif of TARIFE) {
       expect(html).toContain(tarif.name)
       expect(html).toContain(tarif.preis)
+      // Der Zusatz aus derselben Quelle — seit Nr. 61 bei Hoftor „Für ein kleines Angebot".
+      expect(html).toContain(entschaerft(tarif.zusatz))
     }
     expect(html).toContain(SERVICEGEBUEHR_SATZ_TEXT)
   })

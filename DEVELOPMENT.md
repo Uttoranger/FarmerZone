@@ -4914,6 +4914,17 @@ Auftrag freigabe.md §14 „59" (Mockups web-/mobil-k0-startseite-karte-region).
 - **Zugang:** Bestätigung und Bestellseite lesen Telefon und E-Mail erst nach der Signaturprüfung (S1); „Bestellungen finden" führt nur über signierte Links dorthin, die Bestellnummer öffnet nichts.
 - **Sackgassen:** „… oder ruf direkt am Hof an" und „Frag am besten direkt beim Hof nach" gibt es nicht mehr; die Kasse verweist mit `KONTAKT_UNTER_ANGABEN_ZUM_HOF` auf die Angaben in derselben Kasse.
 
+## Tarif-Zeile und „Deine Konditionen" Fassung 2 (Nachtlauf Nr. 61, Oktober 2026)
+
+Auftrag freigabe.md §14 „61" (Register E6-Ergänzung, K1, K2, O8). Keine Migration, kein neues Paket.
+
+- **Fachregel Tarif-Zustand (`bestimmeTarifZustand`, konditionen.ts):** vier Zustände. Gründungshof, solange der Wiener Kalendertag von heute nicht nach `gruendungBis` liegt — mit Vorrang vor der Startphase, weil ein Gründungshof seine eigene Zusage sehen soll; sonst Startphase vor `TARIFE_AB`; danach Hoftor ohne Wahl oder bei gewähltem Hoftor, Hofladen nur nach aktiver Wahl. Verglichen wird über `kalendertagInWien`, weil eine DATE-Spalte als UTC-Mitternacht kommt und um 0:30 Uhr in Wien in UTC noch gestern ist. Bis Nr. 62 liefert jeder Aufrufer `gruendungBis: null`; Nr. 62 setzt nur den Wert ein (`ladeTarifZeile` mit `ladeTarifStand`, `ladeKonditionenHof`, `ladeEinstellungenUebersicht`).
+- **Warum ein Feld `fuerWen` neben `zusatz`:** Der Zusatz von Hofladen trägt „monatlich kündbar"; auf „Deine Konditionen" steht das unter dem Preis und stünde sonst zweimal in der Karte. Die öffentlichen Seiten behalten den vollen Zusatz.
+- **Was bewusst gleich blieb:** die Leistungen der Tarife (eine Fassung für alle Seiten; das Mockup schreibt „3 Produkte gleichzeitig im Shop" und „Urlaubsmodus: pausieren für € 0"), `VOLLER_WARENPREIS` ohne „immer", der Kopf mit Rückweg statt Brotkrumen, `MONATSABRECHNUNG_TEXT` mit „rechnen wir … ab" (auch /konditionen nutzt ihn).
+- **„Wählen kannst du ab Jänner 2027"** ist aus `TARIFE_AB` abgeleitet (Monat des letzten Tags der Startphase), damit kein zweites Datum im Code steht.
+- **Runde 1 (Gründungshof für Nr. 62 vorbereitet):** „Dein Stand" zeigt einem Gründungshof Titel und Zusage mit Datum (`baueGruendungsZusage`, Wortlaut der Freigabe für Nr. 62) — sonst sähe er oben nur die allgemeine Startphase statt seiner Zusage. Die Zeile „Konditionen und Tarif" der Übersicht kommt aus derselben Regel: Vorher stand dort ohne Tarif immer der Übergang (auch nach dem Stichtag und für Gründungshöfe) und mit Tarif ein Preis außerhalb von „Deine Konditionen" (gegen die E6-Ergänzung).
+- **Offen:** „Dein Stand" für die Zeit nach dem Stichtag samt Tarif-Wahl (Gate 8, O8); `KonditionenLaden` zeigt noch die Form von Fassung 1.
+
 ## Nützliche Befehle
 
 ```bash

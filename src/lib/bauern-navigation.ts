@@ -441,6 +441,13 @@ export type HofNavigation = {
   handyLeiste: readonly HofLeistenPlatz[]
   /** Das Mehr-Blatt am Handy, danach Darstellung und Abmelden. */
   mehr: readonly HofNavPunkt[]
+  /**
+   * Die Tarif-Zeile (Nr. 61): unten in der Seitenleiste vor der Person, im
+   * Mehr-Blatt oben als Gruppe „Dein Tarif". Bewusst kein HofNavPunkt — sie
+   * hat keinen Aktiv-Zustand, und ihr Inhalt (Zustand und Texte) kommt fertig
+   * vom Server; hier stehen nur Überschrift und Ziel.
+   */
+  tarif: { titel: string; ziel: { label: string; href: string } }
 }
 
 /** Die Ordnung der HofShell für dieses Konto — „Admin" nur für den Betreiber. */
@@ -453,6 +460,7 @@ export function hofNavigation({ isAdmin }: { isAdmin: boolean }): HofNavigation 
     neu: HOF_NEU,
     handyLeiste: HOF_HANDY_LEISTE,
     mehr: HOF_MEHR.filter(sichtbar),
+    tarif: { titel: DEIN_TARIF_TITEL, ziel: EINSTELLUNG_KONDITIONEN },
   }
 }
 
@@ -585,6 +593,11 @@ export function zielNachSpeichern(pfad: string | null | undefined): string | nul
  */
 export const EINSTELLUNG_MEIN_AUFTRITT = { label: 'Mein Auftritt', href: HOFSEITE_HREF } as const
 export const EINSTELLUNG_KONTO = { label: 'Konto und Sicherheit', href: '/settings/account' } as const
+/** Seit Nr. 61 auch das Ziel der Tarif-Zeile in Seitenleiste und Mehr-Blatt. */
+export const EINSTELLUNG_KONDITIONEN = { label: 'Konditionen und Tarif', href: '/settings/konditionen' } as const
+
+/** Die Gruppe der Tarif-Zeile im Mehr-Blatt (Nr. 61, Mockups mobil-h5-mehr-tarif-*). */
+export const DEIN_TARIF_TITEL = 'Dein Tarif'
 
 /**
  * „Mein Hof → Hofseite" — der Weg in Worten, wie ihn das Hof-Profil für Logo

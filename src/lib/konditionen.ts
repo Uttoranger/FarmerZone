@@ -5,9 +5,11 @@
  * freigabe.md): Hoftor 0 €, Hofladen 19 € im Monat, die Servicegebühr zahlt
  * der Kunde, abgerechnet wird einmal im Monat per SEPA.
  *
- * NUR TEXTE. Hier wird nichts berechnet, begrenzt oder abgebucht: Es gibt
- * (noch) keine Tarif-Grenzen, keine Grundgebühr und keinen SEPA-Einzug im
- * Code; `Farm.tarif` bleibt für jeden Hof leer, bis Gate 8 die Wahl baut.
+ * TEXTE UND EINE ANZEIGE-REGEL. Hier wird nichts begrenzt oder abgebucht: Es
+ * gibt (noch) keine Tarif-Grenzen, keine Grundgebühr und keinen SEPA-Einzug
+ * im Code; `Farm.tarif` bleibt für jeden Hof leer, bis Gate 8 die Wahl baut.
+ * Die einzige Regel, `bestimmeTarifZustand` (Nr. 61), sagt nur, welchen Stand
+ * Tarif-Zeile und „Deine Konditionen" zeigen.
  *
  * Übergang (Register K1, Nachtlauf 17d): In der Startphase ist FarmerZone
  * kostenlos, die Tarife gelten erst ab `TARIFE_AB`. Jede Seite, die Tarife
@@ -24,7 +26,7 @@
  */
 import type { Tarif } from '@prisma/client'
 import { centsAlsEuro, formatDatumLang, formatEuro, formatZahl } from '@/lib/format'
-import { wienerMitternacht } from '@/lib/wiener-tag'
+import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
 
 /**
  * Die Tarif-Kennung ist das Prisma-Enum `Tarif` — nur als Typ eingebunden,
@@ -43,8 +45,13 @@ export type TarifText = {
   grundgebuehrCents: number
   /** „€ 19" — ohne Nachkommastellen, wie im Preismodell. */
   preis: string
-  /** Für wen der Tarif gedacht ist. */
+  /** Für wen der Tarif gedacht ist — auf /fuer-hoefe, /konditionen und Einrichten mit Bedingung. */
   zusatz: string
+  /**
+   * Nur „für wen", ohne Bedingung — für „Deine Konditionen" (Nr. 61), wo die
+   * Bedingungen unter dem Preis stehen und sonst doppelt dastünden.
+   */
+  fuerWen: string
   leistungen: readonly string[]
 }
 
@@ -56,13 +63,23 @@ export function grundgebuehrText(cents: number): string {
 
 export const PRO_MONAT = '/ Monat'
 
+/** „€ 19 im Monat" — der Preis als Satzteil auf „Deine Konditionen" (Nr. 61). */
+export const IM_MONAT = 'im Monat'
+
+/** Die Bedingung des Tarifs mit Grundgebühr (E6). */
+export const MONATLICH_KUENDBAR = 'monatlich kündbar'
+
+const HOFLADEN_FUER_WEN = 'Für den laufenden Verkauf'
+
 export const TARIFE: readonly TarifText[] = [
   {
     id: 'HOFTOR',
     name: 'Hoftor',
     grundgebuehrCents: 0,
     preis: grundgebuehrText(0),
-    zusatz: 'Zum Reinschnuppern',
+    // Seit Nr. 61 (Freigabe §14): wirkt auf /fuer-hoefe, /konditionen, Einrichten und „Deine Konditionen".
+    zusatz: 'Für ein kleines Angebot',
+    fuerWen: 'Für ein kleines Angebot',
     leistungen: [
       `${HOFTOR_PRODUKTE} Produkte`,
       `${HOFTOR_ABHOLZEITEN_JE_WOCHE} Abholzeit pro Woche`,
@@ -74,7 +91,8 @@ export const TARIFE: readonly TarifText[] = [
     name: 'Hofladen',
     grundgebuehrCents: 1900,
     preis: grundgebuehrText(1900),
-    zusatz: 'Für den laufenden Verkauf · monatlich kündbar',
+    zusatz: `${HOFLADEN_FUER_WEN} · ${MONATLICH_KUENDBAR}`,
+    fuerWen: HOFLADEN_FUER_WEN,
     leistungen: ['Unbegrenzt Produkte', 'Abholzeiten frei wählbar + Packliste', `Urlaubsmodus für ${grundgebuehrText(0)}`],
   },
 ]
@@ -270,25 +288,241 @@ export const KONDITIONEN_UEBERGANG = [STARTPHASE_SATZ, TARIFE_AB_SATZ, BESTANDSH
  */
 export const KONDITIONEN_DERZEIT = `Derzeit gilt: ${KONDITIONEN_UEBERGANG}`
 
+/** Ein Stück Satz, auf Wunsch hervorgehoben — „Deine Konditionen" zeigt manche Teile fett (Nr. 61). */
+export type TextTeil = { text: string; betont?: boolean }
+
 /**
  * Wie abgerechnet wird (E6), zeitlich eingeordnet (K1): Vor dem Stichtag läuft
  * keine Abbuchung. Barbestellungen vor dem Stichtag tragen keine Gebühr, und
  * Gebühren aus älteren Barbestellungen werden nicht eingezogen (B1) — deshalb
- * gibt es vor dem Stichtag nichts, was die Abrechnung nachholen müsste.
+ * gibt es vor dem Stichtag nichts, was die Abrechnung nachholen müsste. Die
+ * Grundgebühr nur nach aktiver Wahl von Hofladen (E6-Ergänzung, Nr. 61) —
+ * „Deine Konditionen" hebt das hervor, darum in Teilen.
  */
-export const MONATSABRECHNUNG_TEXT =
-  `Ab dem ${TARIFE_AB_TEXT} rechnen wir einmal im Monat per SEPA-Lastschrift ab: ` +
-  'die Grundgebühr und die Servicegebühren aus Barbestellungen. ' +
-  'Bei Online-Zahlungen ist die Servicegebühr schon beim Bezahlen erledigt.'
+export const MONATSABRECHNUNG_TEILE: readonly TextTeil[] = [
+  { text: `Ab dem ${TARIFE_AB_TEXT} rechnen wir einmal im Monat per SEPA-Lastschrift ab: die Grundgebühr – ` },
+  { text: `nur wenn du ${tarifText('HOFLADEN').name} gewählt hast`, betont: true },
+  { text: ' – und die Servicegebühren aus Barbestellungen. Bei Online-Zahlungen ist die Servicegebühr schon beim Bezahlen erledigt.' },
+]
+
+/** Derselbe Satz am Stück — für /konditionen. */
+export const MONATSABRECHNUNG_TEXT = MONATSABRECHNUNG_TEILE.map((teil) => teil.text).join('')
 
 /** Wann der Text dieser Seite zuletzt geändert wurde. */
 export const KONDITIONEN_STAND = 'Oktober 2026'
 
 /**
- * Was die Karte „Tarif" auf Einrichten zeigt. Ein Hof ohne gewählten Tarif
- * (`Farm.tarif` leer — heute jeder) sieht beide Tarife statt eines erfundenen
- * „Dein Tarif"; einen Tarif setzt erst Gate 8.
+ * Was die Karte „Tarif" auf Einrichten zeigt: ohne gewählten Tarif
+ * (`Farm.tarif` leer — heute jeder Hof) beide Tarife, mit Wahl (erst ab
+ * Gate 8) nur diesen unter „Dein Tarif". Wo der Hof gerade steht
+ * (Startphase, Gründungshof, Hoftor), sagt nicht diese Karte, sondern die
+ * Tarif-Zeile der HofShell über `bestimmeTarifZustand` (Nr. 61).
  */
 export function tarifKarte(tarif: TarifId | null): { titel: string; tarife: readonly TarifText[] } {
   return tarif ? { titel: 'Dein Tarif', tarife: [tarifText(tarif)] } : { titel: 'Tarife', tarife: TARIFE }
 }
+
+// ─── Tarif-Zustand und Tarif-Zeile (Nr. 61; Register E6-Ergänzung, K1, K2) ──
+
+/** Wo ein Hof gerade steht — die Tarif-Zeile der HofShell und „Deine Konditionen" fragen nur das. */
+export type TarifZustand = 'startphase' | 'gruendungshof' | 'hoftor' | 'hofladen'
+
+/**
+ * Was die Regel über einen Hof wissen muss. `gruendungBis` ist das Ende der
+ * Gründungszusage (K2, DATE-Spalte ab Nr. 62); bis Nr. 62 Gründungshöfe
+ * erkennt, liefert jeder Aufrufer null.
+ */
+export type TarifHof = { tarif: TarifId | null; gruendungBis: Date | null }
+
+type Stand = { zustand: 'gruendungshof'; bis: Date } | { zustand: Exclude<TarifZustand, 'gruendungshof'> }
+
+function ermittleStand(hof: TarifHof, jetzt: Date): Stand {
+  // Einschließlich des Tages und als WIENER Kalendertag: Eine DATE-Spalte kommt
+  // als UTC-Mitternacht, und um 0:30 Uhr in Wien ist es in UTC noch gestern.
+  if (hof.gruendungBis !== null && kalendertagInWien(jetzt) <= kalendertagInWien(hof.gruendungBis)) {
+    return { zustand: 'gruendungshof', bis: hof.gruendungBis }
+  }
+  if (jetzt.getTime() < TARIFE_AB.getTime()) return { zustand: 'startphase' }
+  return { zustand: hof.tarif === 'HOFLADEN' ? 'hofladen' : 'hoftor' }
+}
+
+/**
+ * Die EINE Regel zum Tarif-Zustand (Nr. 61): Gründungshof bis einschließlich
+ * seines Tages (K2) — mit Vorrang vor der Startphase, denn er soll seine
+ * Zusage sehen, nicht die allgemeine —, sonst vor `TARIFE_AB` die Startphase
+ * (K1), danach Hoftor ohne Wahl und Hofladen nur nach aktiver Wahl
+ * (E6-Ergänzung). Sie entscheidet nur die Anzeige.
+ */
+export function bestimmeTarifZustand(hof: TarifHof, jetzt: Date): TarifZustand {
+  return ermittleStand(hof, jetzt).zustand
+}
+
+/** „kostenlos" — statt „€ 0" in Tarif-Zeile und Tarif-Karte (Nr. 61). */
+export const KOSTENLOS = 'kostenlos'
+
+/** Der letzte Augenblick der Startphase: eine Millisekunde vor dem Stichtag. */
+const STARTPHASE_ENDE = new Date(TARIFE_AB.getTime() - 1)
+
+/** „31. Jänner 2027" — der letzte Tag der Startphase (K1), über den gemeinsamen Formatierer. */
+export const STARTPHASE_BIS_TEXT = formatDatumLang(STARTPHASE_ENDE)
+
+// Monat in Wiener Zeit, österreichisch („Jänner") — wie formatDatumLang.
+const MONAT_JAHR_FORMAT = new Intl.DateTimeFormat('de-AT', { month: 'long', year: 'numeric', timeZone: 'Europe/Vienna' })
+const MONAT_FORMAT = new Intl.DateTimeFormat('de-AT', { month: 'long', timeZone: 'Europe/Vienna' })
+
+/**
+ * „Jänner 2027" — ab diesem Monat kann ein Hof Hofladen wählen: im letzten
+ * Monat der Startphase (Freigabe §14 Nr. 61; E6-Ergänzung: nur nach aktiver
+ * Wahl mit SEPA-Mandat).
+ */
+export const TARIF_WAHL_AB_TEXT = MONAT_JAHR_FORMAT.format(STARTPHASE_ENDE)
+
+/** „Produkte im Shop" — Tarif-Zeile und Vergleich sagen dasselbe. */
+export const PRODUKTE_IM_SHOP = 'Produkte im Shop'
+
+const HOFTOR_NAME = tarifText('HOFTOR').name
+const HOFLADEN_NAME = tarifText('HOFLADEN').name
+
+/**
+ * Die Texte der Tarif-Zeile in Seitenleiste und Mehr-Blatt (Nr. 61): eine
+ * Statuszeile ohne Preis und ohne Warnfarbe — der Preis steht nur auf „Deine
+ * Konditionen", nach dem Nutzen und mit Bedingungen (E6-Ergänzung). Hofladen
+ * hat keine Zeile.
+ */
+export const TARIF_ZEILE = {
+  startphase: { titel: `Startphase: ${KOSTENLOS}`, zeile: `bis ${STARTPHASE_BIS_TEXT}`, handy: 'du musst nichts tun' },
+  gruendungshof: { titel: 'Gründungshof', zeile: 'ohne Grundgebühr bis' },
+  hoftor: { titel: `${HOFTOR_NAME} · ${KOSTENLOS}`, zeile: PRODUKTE_IM_SHOP, hinweis: 'Tarife vergleichen' },
+} as const
+
+/**
+ * Was die Tarif-Zeile zeigt — fertig vom Server: Die HofShell ist eine
+ * Client-Komponente und rechnet nichts mit der Zeit (CODING_STANDARDS §2).
+ */
+export type TarifZeileDaten = {
+  zustand: Exclude<TarifZustand, 'hofladen'>
+  titel: string
+  /** Unterzeile in der Seitenleiste. */
+  zeile: string
+  /** Unterzeile im Mehr-Blatt (am Handy). */
+  zeileHandy: string
+  /** Nur Hoftor: „n von 3" und der Anteil für den Balken (0 bis 1) — Anzeige, keine Sperre (O8 baut Gate 8). */
+  grenze?: { wert: string; anteil: number }
+  /** Nur Hoftor: „Tarife vergleichen". */
+  hinweis?: string
+}
+
+/** Die Tarif-Zeile eines Hofs aus TARIF_ZEILE — null bei Hofladen (keine Zeile). */
+export function baueTarifZeile(hof: TarifHof & { produkteImShop: number }, jetzt: Date): TarifZeileDaten | null {
+  const stand = ermittleStand(hof, jetzt)
+  switch (stand.zustand) {
+    case 'hofladen':
+      return null
+    case 'startphase': {
+      const t = TARIF_ZEILE.startphase
+      return { zustand: stand.zustand, titel: t.titel, zeile: t.zeile, zeileHandy: `${t.zeile} · ${t.handy}` }
+    }
+    case 'gruendungshof': {
+      const zeile = `${TARIF_ZEILE.gruendungshof.zeile} ${formatDatumLang(stand.bis)}`
+      return { zustand: stand.zustand, titel: TARIF_ZEILE.gruendungshof.titel, zeile, zeileHandy: zeile }
+    }
+    case 'hoftor': {
+      const t = TARIF_ZEILE.hoftor
+      return {
+        zustand: stand.zustand,
+        titel: t.titel,
+        zeile: t.zeile,
+        zeileHandy: t.zeile,
+        grenze: {
+          wert: `${hof.produkteImShop} von ${HOFTOR_PRODUKTE}`,
+          anteil: Math.min(hof.produkteImShop / HOFTOR_PRODUKTE, 1),
+        },
+        hinweis: t.hinweis,
+      }
+    }
+  }
+}
+
+// ─── „Deine Konditionen", Fassung 2 (Nr. 61; Mockups *-h1-einstellungen-konditionen-v2) ──
+
+/** „Dein Stand" oben auf der Seite: eine Überschrift, Sätze mit hervorgehobenen Teilen. */
+export type DeinStand = { titel: string; saetze: readonly (readonly TextTeil[])[] }
+
+export const DEIN_STAND_TITEL = 'Dein Stand'
+
+/**
+ * „Dein Stand" in der Startphase (K1, E6-Ergänzung). Für Gründungshöfe gilt
+ * `baueGruendungsZusage` (K2), für die Zeit nach dem Stichtag kommt der
+ * Wortlaut mit Gate 8 — bis dahin steht dort der Übergang K1 allein.
+ */
+export const DEIN_STAND_STARTPHASE: DeinStand = {
+  titel: `Startphase – für dich ist alles ${KOSTENLOS}.`,
+  saetze: [
+    [{ text: 'Bis ' }, { text: STARTPHASE_BIS_TEXT, betont: true }, { text: ' zahlst du nichts. Du musst nichts tun und nichts auswählen.' }],
+    [{ text: `Ab ${TARIFE_AB_TEXT} läuft dein Hof ` }, { text: `${KOSTENLOS} im Tarif ${HOFTOR_NAME}`, betont: true }, { text: ' weiter.' }],
+    [{ text: `${HOFLADEN_NAME} gibt es nur, wenn du ihn selbst wählst. Erst dann wird etwas abgebucht.` }],
+  ],
+}
+
+/**
+ * Die Zusage eines Gründungshofs (Register K2): Hofladen ohne Grundgebühr bis
+ * zu seinem Tag, danach die normale Regel (E6-Ergänzung) — nie ein Preis, nie
+ * die alte Provision für „danach". Der Wortlaut steht NUR hier: „Dein Stand"
+ * nimmt ihn, und Nr. 62 lässt `gruendungsKonditionenText` (gruendungshof.ts,
+ * Freischalt-Dialog im Admin) hierauf verweisen. Datum wie in der Tarif-Zeile.
+ */
+export function baueGruendungsZusage(bis: Date): string {
+  return (
+    `${HOFLADEN_NAME} ${TARIF_ZEILE.gruendungshof.zeile} ${formatDatumLang(bis)}. ` +
+    `Danach gelten die normalen Tarife – ohne Wahl ${HOFTOR_NAME}, ${KOSTENLOS}.`
+  )
+}
+
+/**
+ * „Dein Stand" eines Hofs aus derselben Regel wie die Tarif-Zeile: ein
+ * Gründungshof mit seiner Zusage (Vorrang, K2), sonst vor dem Stichtag die
+ * Startphase (K1). Danach null, bis Gate 8 den Wortlaut bringt — dann zeigt
+ * „Deine Konditionen" den Übergang K1 allein.
+ */
+export function baueDeinStand(hof: TarifHof, jetzt: Date): DeinStand | null {
+  const stand = ermittleStand(hof, jetzt)
+  if (stand.zustand === 'gruendungshof') {
+    return { titel: TARIF_ZEILE.gruendungshof.titel, saetze: [[{ text: baueGruendungsZusage(stand.bis) }]] }
+  }
+  return stand.zustand === 'startphase' ? DEIN_STAND_STARTPHASE : null
+}
+
+/** Über den Tarif-Karten. */
+export const TARIFE_TITEL = 'Zwei Tarife – du entscheidest'
+
+/** Die Marken über den Tarif-Karten (E6-Ergänzung: ohne Wahl gilt Hoftor; „Dein Tarif" nur nach Wahl). */
+export const TARIF_MARKE = { gewaehlt: 'Dein Tarif', automatisch: 'Gilt automatisch', mehr: 'Wenn du mehr brauchst' } as const
+
+/** Unter dem Tarif, der ohne Wahl gilt. */
+export const OHNE_WAHL_SATZ = 'Du musst dafür nichts tun.'
+
+/** Unter dem Preis: frühestens ab dem Stichtag (K1), kündbar, nur nach Wahl (E6-Ergänzung). */
+export const PREIS_BEDINGUNGEN = `frühestens ab ${TARIFE_AB_TEXT} · ${MONATLICH_KUENDBAR} · nur wenn du ihn wählst`
+
+/** Wann die Wahl öffnet (Freigabe §14 Nr. 61). */
+export const TARIF_WAHL_SATZ = `Wählen kannst du ab ${TARIF_WAHL_AB_TEXT}.`
+
+/** Der Vergleich „Heute / Im Hoftor" — nur vor dem Stichtag, Zahlen aus den Konstanten und der Hof-Abfrage. */
+export const VERGLEICH_TEXT = {
+  titel: `Was das ab ${MONAT_FORMAT.format(TARIFE_AB)} für deinen Hof heißt`,
+  heute: 'Heute',
+  hoftor: `Im ${HOFTOR_NAME}`,
+  produkte: PRODUKTE_IM_SHOP,
+  abholzeiten: 'Abholzeiten pro Woche',
+} as const
+
+/** Was über der Grenze geschieht (O8): Der Hof wählt, der Rest ruht, gelöscht wird nichts. */
+export const VERGLEICH_SATZ: readonly TextTeil[] = [
+  {
+    text:
+      `Im ${HOFTOR_NAME} suchst du dir aus, welche ${HOFTOR_PRODUKTE} Produkte sichtbar bleiben. ` +
+      'Die anderen ruhen und sind mit einem Tipp wieder da – ',
+  },
+  { text: 'gelöscht wird nichts', betont: true },
+  { text: `. Mit ${HOFLADEN_NAME} bleibt alles, wie es ist.` },
+]
